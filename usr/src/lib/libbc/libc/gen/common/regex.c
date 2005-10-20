@@ -25,7 +25,6 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.1 80/12/21 */
 
 /*
  * routines to do regular expression matching
@@ -120,16 +119,19 @@ static struct re_globals {
 #define	braelist (_re->_braelist)
 #define	circf (_re->_circf)
 
+static int	advance(char *, char *);
+static int	backref(int, char *);
+static int	cclass(char *, char, int);
+
 /*
  * compile the regular expression argument into a dfa
  */
 char *
-re_comp(sp)
-	register char	*sp;
+re_comp(char *sp)
 {
-	register int	c;
-	register struct re_globals *_re = re_globals;
-	register char	*ep;
+	int	c;
+	struct re_globals *_re = re_globals;
+	char	*ep;
 	int	cclcnt, numbra = 0;
 	char	*lastep = 0;
 	char	bracket[NBRA];
@@ -149,7 +151,7 @@ re_comp(sp)
 	if (sp == 0 || *sp == '\0') {
 		if (*ep == 0)
 			return("No previous regular expression");
-		return(0);
+		return (0);
 	}
 	if (*sp == '^') {
 		circf = 1;
@@ -165,7 +167,7 @@ re_comp(sp)
 				comerr("unmatched \\(");
 			*ep++ = CEOF;
 			*ep++ = 0;
-			return(0);
+			return (0);
 		}
 		if (c != '*')
 			lastep = ep;
@@ -257,12 +259,11 @@ re_comp(sp)
  * match the argument string against the compiled re
  */
 int
-re_exec(p1)
-	register char	*p1;
+re_exec(char *p1)
 {
-	register struct re_globals *_re = re_globals;
-	register char	*p2;
-	register int	c;
+	struct re_globals *_re = re_globals;
+	char	*p2;
+	int	c;
 	int	rv;
 
 	if (_re == 0)
@@ -301,13 +302,12 @@ re_exec(p1)
  * try to match the next thing in the dfa
  */
 static	int
-advance(lp, ep)
-	register char	*lp, *ep;
+advance(char *lp, char *ep)
 {
-	register char	*curlp;
+	char	*curlp;
 	int	ct, i;
 	int	rv;
-	register struct re_globals *_re = re_globals;
+	struct re_globals *_re = re_globals;
 
 	for (;;)
 		switch (*ep++) {
@@ -409,33 +409,29 @@ advance(lp, ep)
 		}
 }
 
-static
-backref(i, lp)
-	register int	i;
-	register char	*lp;
+static int
+backref(int i, char *lp)
 {
-	register char	*bp;
-	register struct re_globals *_re = re_globals;
+	char	*bp;
+	struct re_globals *_re = re_globals;
 
 	bp = braslist[i];
 	while (*bp++ == *lp++)
 		if (bp >= braelist[i])
-			return(1);
-	return(0);
+			return (1);
+	return (0);
 }
 
 static int
-cclass(set, c, af)
-	register char	*set, c;
-	int	af;
+cclass(char *set, char c, int af)
 {
-	register int	n;
+	int	n;
 
 	if (c == 0)
 		return(0);
 	n = *set++;
 	while (--n)
 		if (*set++ == c)
-			return(af);
-	return(! af);
+			return (af);
+	return (!af);
 }

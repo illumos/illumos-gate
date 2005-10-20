@@ -24,25 +24,20 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-#include <sys/errno.h>
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-extern int errno;
+#include <errno.h>
 
-open(path, flags, mode)
-    char           *path;
-    int            flags;
-    int		   mode;
+
+int
+open(char *path, int flags, int mode)
 {
     return (bc_open(path, flags, mode));
 }
 
 
-
-bc_open(path, flags, mode)
-    char           *path;
-    int            flags;
-    int		   mode;
+int
+bc_open(char *path, int flags, int mode)
 {
     if ((path == (char*)0) || (path == (char*) -1)) {
 	errno = EFAULT;
@@ -50,4 +45,3 @@ bc_open(path, flags, mode)
     }
     return (open_com(path, flags, mode));
 }
-

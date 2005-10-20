@@ -20,11 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1990-1996 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 #include <sys/types.h>
@@ -35,12 +35,8 @@
 #define	I_SWROPT	(STR|023)
 #define	SNDPIPE		0x002
 
-extern int	errno;
-
-connect(s, name, namelen)
-int	s;
-struct sockaddr *name;
-int	namelen;
+int
+connect(int s, struct sockaddr *name, int namelen)
 {
 	int	a;
 

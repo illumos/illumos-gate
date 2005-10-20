@@ -27,7 +27,7 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 3.11 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 /*
@@ -37,21 +37,17 @@
  */
 #include <stdio.h>
 #include "stdiom.h"
+#include <memory.h>
 
 #define MIN(x, y)	(x < y ? x : y)
 
 extern int _filbuf();
-extern _bufsync();
-extern char *memcpy();
 
 int
-fread(ptr, size, count, iop)
-char *ptr;
-int size, count;
-register FILE *iop;
+fread(char *ptr, int size, int count, FILE *iop)
 {
-	register unsigned int nleft;
-	register int n;
+	unsigned int nleft;
+	int n;
 
 	if (size <= 0 || count <= 0) return 0;
 	nleft = count * size;

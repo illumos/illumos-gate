@@ -34,23 +34,18 @@
  * contributors.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
- /* from UCB 4.2 83/02/27 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
+#include <malloc.h>
+#include <unistd.h>
 
-extern void free();
-extern int isatty();
 extern unsigned char (*_smbuf)[_SBFSIZ];
-extern void _getsmbuf();
 
 void
-setbuffer(iop, buf, size)
-	register FILE *iop;
-	char *buf;
-	int size;
+setbuffer(FILE *iop, char *buf, int size)
 {
-	register int fno = fileno(iop);  /* file number */
+	int fno = fileno(iop);  /* file number */
 
 	if (iop->_base != NULL && iop->_flag&_IOMYBUF)
 		free((char *)iop->_base);
@@ -73,17 +68,17 @@ setbuffer(iop, buf, size)
 /*
  * set line buffering
  */
-setlinebuf(iop)
-	register FILE *iop;
+int
+setlinebuf(FILE *iop)
 {
-	register unsigned char *buf;
-	extern char *malloc();
+	char *buf;
 
 	fflush(iop);
-	setbuffer(iop, (unsigned char *)NULL, 0);
-	buf = (unsigned char *)malloc(128);
+	setbuffer(iop, NULL, 0);
+	buf = (char *)malloc(128);
 	if (buf != NULL) {
 		setbuffer(iop, buf, 128);
 		iop->_flag |= _IOLBF|_IOMYBUF;
 	}
+	return (0);
 }

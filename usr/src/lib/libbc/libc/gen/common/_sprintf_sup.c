@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "base_conversion.h"
 
@@ -32,77 +33,65 @@
  * complex or too seldom used to be worth assembly language coding.
  */
 
+/* p = x * y + c ; return (p/10000 << 16 | p%10000) */
 unsigned long
-_prodc_b10000(x, y, c)		/* p = x * y + c ; return (p/10000 << 16 |
-				 * p%10000) */
-	_BIG_FLOAT_DIGIT x, y;
-	unsigned long   c;
+_prodc_b10000(_BIG_FLOAT_DIGIT x, _BIG_FLOAT_DIGIT y, unsigned long c)
 {
 	unsigned long   p = x * (unsigned long) y + c;
 
 	return ((p / 10000) << 16) | (p % 10000);
 }
 
+/* p = x * y ; return p */
 unsigned long
-_prod_b65536(x, y)		/* p = x * y ; return p */
-	_BIG_FLOAT_DIGIT x, y;
+_prod_b65536(_BIG_FLOAT_DIGIT x, _BIG_FLOAT_DIGIT y)	
 {
-	return x * (unsigned long) y;
+	return (x * (unsigned long)y);
 }
 
+/* p = x * y ; return (p/10000 << 16 | p%10000) */
 unsigned long
-_prod_b10000(x, y)		/* p = x * y ; return (p/10000 << 16 |
-				 * p%10000) */
-	_BIG_FLOAT_DIGIT x, y;
+_prod_b10000(_BIG_FLOAT_DIGIT x, _BIG_FLOAT_DIGIT y)	
 {
 	unsigned long   p = x * (unsigned long) y;
 
 	return ((p / 10000) << 16) | (p % 10000);
 }
 
+/* p = x << n + c ; return (p/10000 << 16 | p%10000) */
 unsigned long
-_lshift_b10000(x, n, c)		/* p = x << n + c ; return (p/10000 << 16 |
-				 * p%10000) */
-	_BIG_FLOAT_DIGIT x;
-	short unsigned  n;
-	long unsigned   c;
+_lshift_b10000(_BIG_FLOAT_DIGIT x, short unsigned n, long unsigned c)	
 {
 	unsigned long   p = (((unsigned long) x) << n) + c;
 
 	return ((p / 10000) << 16) | (p % 10000);
 }
 
+/* p = x * 10000 + c ; return p */
 unsigned long
-_prod_10000_b65536(x, c)	/* p = x * 10000 + c ; return p */
-	_BIG_FLOAT_DIGIT x;
-	long unsigned   c;
+_prod_10000_b65536(_BIG_FLOAT_DIGIT x, long unsigned c)
 {
-	return x * (unsigned long) 10000 + c;
+	return (x * (unsigned long) 10000 + c);
 }
 
+/* p = x << 16 + c ; return (p/10000 << 16 | p%10000) */
 unsigned long
-_prod_65536_b10000(x, c)	/* p = x << 16 + c ; return (p/10000 << 16 |
-				 * p%10000) */
-	_BIG_FLOAT_DIGIT x;
-	long unsigned   c;
+_prod_65536_b10000(_BIG_FLOAT_DIGIT x, long unsigned c)	
 {
 	unsigned long   p = (((unsigned long) x) << 16) + c;
 
 	return ((p / 10000) << 16) | (p % 10000);
 }
 
+/* p = c ; return (p/10000 << 16 | p%10000) */
 unsigned long
-_carry_out_b10000(c)		/* p = c ; return (p/10000 << 16 | p%10000) */
-	unsigned long   c;
+_carry_out_b10000(unsigned long c)
 {
 	return ((c / 10000) << 16) | (c % 10000);
 }
 
 void
-_left_shift_base_ten(pbf, multiplier)
-	_big_float     *pbf;
-	short unsigned  multiplier;
-
+_left_shift_base_ten(_big_float *pbf, short unsigned multiplier)
 {
 	/*
 	 * Multiply a base-10**4 significand by 2<<multiplier.  Extend length
@@ -129,9 +118,7 @@ _left_shift_base_ten(pbf, multiplier)
 }
 
 void
-_left_shift_base_two(pbf, multiplier)
-	_big_float     *pbf;
-	short unsigned  multiplier;
+_left_shift_base_two(_big_float *pbf, short unsigned multiplier)
 {
 	/*
 	 * Multiply a base-2**16 significand by 2<<multiplier.  Extend length
@@ -156,11 +143,8 @@ _left_shift_base_two(pbf, multiplier)
 }
 
 void
-_right_shift_base_two(pbf, multiplier, sticky)
-	_big_float     *pbf;
-	short unsigned  multiplier;
-	_BIG_FLOAT_DIGIT *sticky;
-
+_right_shift_base_two(_big_float *pbf, short unsigned multiplier,
+    _BIG_FLOAT_DIGIT *sticky)
 {
 	/* *pb = *pb / 2**multiplier	to normalize.	15 <= multiplier <= 1 */
 	/* Any bits shifted out got to *sticky. */
@@ -179,9 +163,7 @@ _right_shift_base_two(pbf, multiplier, sticky)
 }
 
 void
-_multiply_base_ten(pbf, multiplier)
-	_BIG_FLOAT_DIGIT multiplier;
-	_big_float     *pbf;
+_multiply_base_ten(_big_float *pbf, _BIG_FLOAT_DIGIT multiplier)
 {
 	/*
 	 * Multiply a base-10**4 significand by multiplier.  Extend length as
@@ -207,10 +189,8 @@ _multiply_base_ten(pbf, multiplier)
 }
 
 void
-_multiply_base_two(pbf, multiplier, carry)
-	_big_float     *pbf;
-	_BIG_FLOAT_DIGIT multiplier;
-	long unsigned   carry;
+_multiply_base_two(_big_float *pbf, _BIG_FLOAT_DIGIT multiplier,
+    long unsigned carry)
 {
 	/*
 	 * Multiply a base-2**16 significand by multiplier.  Extend length as
@@ -233,9 +213,7 @@ _multiply_base_two(pbf, multiplier, carry)
 }
 
 void
-_multiply_base_ten_by_two(pbf, multiplier)
-	short unsigned  multiplier;
-	_big_float     *pbf;
+_multiply_base_ten_by_two(_big_float *pbf, short unsigned multiplier)
 {
 	/*
 	 * Multiply a base-10**4 significand by 2**multiplier.  Extend length
@@ -261,11 +239,7 @@ _multiply_base_ten_by_two(pbf, multiplier)
 }
 
 void
-_unpacked_to_big_float(pu, pb, pe)
-	unpacked       *pu;
-	_big_float     *pb;
-	int            *pe;
-
+_unpacked_to_big_float(unpacked *pu, _big_float *pb, int *pe)
 {
 	/*
 	 * Converts pu into a bigfloat *pb of minimal length; exponent *pe
@@ -297,9 +271,7 @@ _unpacked_to_big_float(pu, pb, pe)
 }
 
 void
-_mul_65536short(pbf, carry)
-	_big_float     *pbf;
-	unsigned long   carry;
+_mul_65536short(_big_float *pbf, unsigned long carry)
 {
 	/* *pbf *= 65536 ; += carry ; */
 
@@ -320,9 +292,7 @@ _mul_65536short(pbf, carry)
 }
 
 void
-_big_binary_to_big_decimal(pb, pd)
-	_big_float     *pb, *pd;
-
+_big_binary_to_big_decimal(_big_float *pb, _big_float *pd)
 {
 	/* Convert _big_float from binary form to decimal form. */
 

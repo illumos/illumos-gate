@@ -24,7 +24,8 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* c2 secure */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /* getacinfo.c  -  get audit control info */
 
 #include <stdio.h>
@@ -50,6 +51,9 @@ static char *FLGLABEL    = "flags:";
 static int  LASTOP;
 static int  DIRINIT;
 static FILE *acf;    /* pointer into /etc/security/audit/audit_control */
+
+void	setac(void);
+void	endac(void);
 
 /* getacinfo.c  -  get audit control info
  *
@@ -78,13 +82,10 @@ static FILE *acf;    /* pointer into /etc/security/audit/audit_control */
  */
 
 int
-getacdir(dir, len)
-char *dir;
-int len;
+getacdir(char *dir, int len)
 {
 	int retstat = SUCCESS, gotone = 0, dirlen, dirst;
 	char entry[LEN];
-	void setac();
 	
 	/* 
 	 * open file if it is not already opened
@@ -163,12 +164,10 @@ int len;
  */
 
 int
-getacmin(min_val)
-int *min_val;
+getacmin(int *min_val)
 {
 	int retstat = SUCCESS, gotone = 0;
 	char entry[LEN];
-	void endac();
 
 	/* 
 	 * open file if it is not already opened 
@@ -224,13 +223,11 @@ int *min_val;
  *          -3 - error - directory entry format error 
  */
 
-getacflg(auditstring, len)
-char *auditstring;
-int len;		
+int
+getacflg(char *auditstring, int len)
 {
 	int retstat = SUCCESS, gotone = 0, minst, minlen;
 	char entry[LEN];
-	void endac();
 
 	/* 
 	 * open file if it is not already opened 
@@ -289,7 +286,7 @@ int len;
 
 /* rewind the audit control file */
 void
-setac()
+setac(void)
 {
 	if (acf == NULL)
 		acf = fopen(AUDIT_CTRL, "r");
@@ -302,7 +299,7 @@ setac()
 
 /* close the audit control file */
 void
-endac()
+endac(void)
 {
 	if (acf != NULL) {
 		fclose(acf);

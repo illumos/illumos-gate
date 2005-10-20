@@ -20,30 +20,33 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1988-1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
-
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	Copyright (c) 1984 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 #include <stdio.h>
 #include <ctype.h>
-#include <varargs.h>
+#include <stdarg.h>
 #include <values.h>
 #include <floatingpoint.h>
 #include <errno.h>
+#include <memory.h>
 
 #define NCHARS	(1 << BITSPERBYTE)
 #define locgetc()	(chcount+=1,getc(iop))
 #define locungetc(x)	(chcount-=1,ungetc(x,iop))
 
-extern char *memset();
 static int chcount,flag_eof;
+
+static int	number(int, int, int, int, FILE *, va_list *);
+static int	string(int, int, int, char *, FILE *, va_list *);
+static unsigned char	*setup(unsigned char *, char *);
 
 #ifdef S5EMUL
 #define	isws(c)		isspace(c)
@@ -77,14 +80,10 @@ static char _sptab[1+256] = {
 #endif
 
 int
-_doscan(iop, fmt, va_alist)
-register FILE *iop;
-register unsigned char *fmt;
-va_list va_alist;
+_doscan(FILE *iop, unsigned char *fmt, va_list va_alist)
 {
-	extern unsigned char *setup();
 	char tab[NCHARS];
-	register int ch;
+	int ch;
 	int nmatch = 0, len, inchar, stow, size;
 	chcount=0; flag_eof=0;
 
@@ -193,19 +192,18 @@ out:
 	return (nmatch != 0 ? nmatch : EOF); /* end of input */
 }
 
-/***************************************************************
+/*
+ **************************************************************
  * Functions to read the input stream in an attempt to match incoming
  * data to the current pattern from the main loop of _doscan().
- ***************************************************************/
+ **************************************************************
+ */
 static int
-number(stow, type, len, size, iop, listp)
-int stow, type, len, size;
-register FILE *iop;
-va_list *listp;
+number(int stow, int type, int len, int size, FILE *iop, va_list *listp)
 {
 	char numbuf[64], inchar, lookahead;
-	register char *np = numbuf;
-	register int c, base;
+	char *np = numbuf;
+	int c, base;
 	int digitseen = 0, floater = 0, negflg = 0;
 	long lcval = 0;
 	switch(type)
@@ -355,7 +353,7 @@ va_list *listp;
                 }
 		if (isdigit(c))
 		{
-			register int digit;
+			int digit;
 			digit = c - '0';
 			if (base == 8)
 			{
@@ -381,7 +379,7 @@ va_list *listp;
 		}
 		else if (base == 16 && isxdigit(c))
 		{
-			register int digit;
+			int digit;
 			digit = c - (isupper(c) ? 'A' - 10 : 'a' - 10);
 			if (stow)
 				lcval = (lcval<<4) + digit;
@@ -413,14 +411,10 @@ va_list *listp;
 }
 
 static int
-string(stow, type, len, tab, iop, listp)
-register int stow, type, len;
-register char *tab;
-register FILE *iop;
-va_list *listp;
+string(int stow, int type, int len, char *tab, FILE *iop, va_list *listp)
 {
-	register int ch;
-	register char *ptr;
+	int ch;
+	char *ptr;
 	char *start;
 
 	start = ptr = stow ? va_arg(*listp, char *) : NULL;
@@ -480,11 +474,9 @@ va_list *listp;
 }
 
 static unsigned char *
-setup(fmt, tab)
-register unsigned char *fmt;
-register char *tab;
+setup(unsigned char *fmt, char *tab)
 {
-	register int b, c, d, t = 0;
+	int b, c, d, t = 0;
 
 	if (*fmt == '^')
 	{

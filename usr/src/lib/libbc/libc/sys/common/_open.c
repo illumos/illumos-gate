@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,7 +28,7 @@
 
 #include <stdio.h>
 #include <fcntl.h>
-#include <strings.h>
+#include <string.h>
 #include <mntent.h>
 #include <syscall.h>
 #include <sys/param.h>
@@ -50,10 +50,11 @@
 		xx = NULL
 
 char *mktemp();
-char *strtok();
+
 static void getPrinterInfo(char *, FILE *);
 static char sepstr[] = " \t\n";
 static char dash[] = "-";
+static int	open_printcap(void);
 
 /* SVR4/SunOS 5.0 equivalent modes */
 #define	N_O_NDELAY	0x04
@@ -294,7 +295,7 @@ _fopen(char *file, char *mode)
 	extern FILE *_findiop();
 	FILE *iop;
 
-	register int    plus, oflag, fd;
+	int    plus, oflag, fd;
 
 	iop = _findiop();
 
@@ -331,7 +332,7 @@ _fopen(char *file, char *mode)
 }
 
 static int
-open_printcap()
+open_printcap(void)
 {
 	FILE		*fd;
 	FILE		*_fopen();

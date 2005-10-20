@@ -26,15 +26,13 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-extern int	errno;
+#include <errno.h>
 
-listen(s, backlog)
-int	s, backlog;
+int
+listen(int s, int backlog)
 {
 	int	a;
 	if ((a = _listen(s, backlog)) == -1)
 		maperror(errno);
-	return(a);
+	return (a);
 }
-
-

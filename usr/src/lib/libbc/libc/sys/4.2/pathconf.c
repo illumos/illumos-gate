@@ -24,13 +24,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "chkpath.h"
 
-pathconf(p, what)
-    char* p;
+long
+pathconf(char *p, int what)
 {
     CHKNULL(p);
-    return _syscall(SYS_pathconf, p, what);
+    return (_syscall(SYS_pathconf, p, what));
 }

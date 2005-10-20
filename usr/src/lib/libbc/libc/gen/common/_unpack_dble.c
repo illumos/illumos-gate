@@ -19,24 +19,18 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint) && defined(SCCSIDS)
-static char     sccsid[] = "%Z%%M%	%I%	%E% SMI";
-#endif
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "base_conversion.h"
 
-void
-_fp_normalize(pu)
-	unpacked *pu;
-
 /* Normalize a number.  Does not affect zeros, infs, or NaNs. */
-
+void
+_fp_normalize(unpacked *pu)
 {
 	int             i;
 	short unsigned  nlzwords, nlzbits;
@@ -81,19 +75,15 @@ _fp_normalize(pu)
 	}
 }
 
-void
-_fp_set_exception(ex)
-	enum fp_exception_type ex;
-
 /* Set the exception bit in the current exception register. */
-
+void
+_fp_set_exception(enum fp_exception_type ex)
 {
 	_fp_current_exceptions |= 1 << (int) ex;
 }
 
 enum fp_class_type
-_class_double(x)
-	double         *x;
+_class_double(double *x)
 {
 	double_equivalence kluge;
 
@@ -114,13 +104,10 @@ _class_double(x)
 		return fp_normal;
 }
 
-void
-_fp_leftshift(pu, n)
-	unpacked       *pu;
-	unsigned        n;
 
 /* Left shift significand by 11 <= n <= 16 bits.  Affect all classes.	 */
-
+void
+_fp_leftshift(unpacked *pu, unsigned n)
 {
 	int             i;
 
@@ -133,10 +120,9 @@ _fp_leftshift(pu, n)
 	}
 }
 
+
 void
-_unpack_double(pu, px)
-	unpacked       *pu;	/* unpacked result */
-	double         *px;	/* packed double */
+_unpack_double(unpacked *pu, double *px)
 {
 	double_equivalence x;
 	int             i;
@@ -180,8 +166,7 @@ _unpack_double(pu, px)
 }
 
 enum fp_class_type
-_class_quadruple(x)
-	quadruple      *x;
+_class_quadruple(quadruple *x)
 {
 	quadruple_equivalence kluge;
 	int             i;
@@ -209,9 +194,7 @@ _class_quadruple(x)
 }
 
 void
-_unpack_quadruple(pu, px)
-	unpacked       *pu;	/* unpacked result */
-	quadruple      *px;	/* packed quadruple */
+_unpack_quadruple(unpacked *pu, quadruple *px)
 {
 	quadruple_equivalence x;
 	int             i;

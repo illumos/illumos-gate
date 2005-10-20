@@ -1,18 +1,19 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* from UCB 5.2 3/9/86 */
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <sys/file.h>
 
-mkstemp(as)
-	char *as;
+int
+mkstemp(char *as)
 {
-	register char *s;
-	register unsigned int pid;
-	register int fd, i;
+	char *s;
+	unsigned int pid;
+	int fd, i;
 
 	pid = getpid();
 	s = as;
@@ -27,8 +28,8 @@ mkstemp(as)
 	i = 'a';
 	while ((fd = open(as, O_CREAT|O_EXCL|O_RDWR, 0600)) == -1) {
 		if (i == 'z')
-			return(-1);
+			return (-1);
 		*s = i++;
 	}
-	return(fd);
+	return (fd);
 }

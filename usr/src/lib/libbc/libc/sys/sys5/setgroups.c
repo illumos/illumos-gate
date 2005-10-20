@@ -24,25 +24,24 @@
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * POSIX.1 compatible setgroups() routine
  * This is needed while gid_t is not the same size as int (or whatever the
  * syscall is using at the time).
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/syscall.h>
 
-setgroups(ngroups, grouplist)
-int	ngroups;
-gid_t	grouplist[];
+int
+setgroups(int ngroups, gid_t grouplist[])
 {
 	int	glist[NGROUPS];	/* setgroups() syscall expects ints */
-	register int	i;	/* loop control */
+	int	i;	/* loop control */
 
 	if (ngroups > NGROUPS) {
 		errno = EINVAL;

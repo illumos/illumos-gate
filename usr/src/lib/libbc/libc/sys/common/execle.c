@@ -20,31 +20,35 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1987 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-#include <varargs.h>
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <stdarg.h>
 
 /*
  *	execle(name, arg0, arg1, ..., argn, (char *)0, envp)
  */
-/*VARARGS1*/
-execle(name, va_alist)
-	register char *name;
-	va_dcl
+int
+execle(char *name, ...)
 {
-	register char **first;
-	va_list args;
+	va_list	args;
+	char	**first;
+	char	**environmentp;
 
-	va_start(args);
+	va_start(args, name);
 	first = (char **)args;
-	while (va_arg(args, char *))	/* traverse argument list to 0 */
+	/* traverse argument list to NULL */
+	while (va_arg(args, char *) != (char *)0)
 		;
 	/* environment is next arg */
-	return(execve(name, first, *(char **)args));
+	environmentp = va_arg(args, char **);
+	va_end(args);
+
+	return (execve(name, first, environmentp));
 }

@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1989 by Sun Microsystems, Inc.
+ * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#ifndef _QUAD_INCLUDED_
+#define	_QUAD_INCLUDED_		/* Render harmless multiple inclusions. */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Header file for long double == quadruple-precision run-time support. C
@@ -38,10 +42,6 @@
  */
 
 #include <math.h>		/* to get float macros */
-
-#ifndef _QUAD_INCLUDED_
-#define _QUAD_INCLUDED_		/* Render harmless multiple inclusions. */
-
 
 #ifdef __STDC__			/* are we there yet */
 
@@ -68,51 +68,40 @@ struct quadstruct {
 
 /******		Phase I Quad support: C run-time in libc/crt		*****/
 
-extern QUAD _Q_neg( /* QUAD x */ );	/* returns -x */
-extern QUAD _Q_add( /* QUAD x, y */ );	/* returns x + y */
-extern QUAD _Q_sub( /* QUAD x, y */ );	/* returns x - y */
-extern QUAD _Q_mul( /* QUAD x, y */ );	/* returns x * y */
-extern QUAD _Q_div( /* QUAD x, y */ );	/* returns x / y */
-extern QUAD _Q_sqrt( /* QUAD x */ );	/* return sqrt(x) */
+extern QUAD _Q_neg(QUAD);		/* returns -x */
+extern QUAD _Q_add(QUAD, QUAD);		/* returns x + y */
+extern QUAD _Q_sub(QUAD, QUAD);		/* returns x - y */
+extern QUAD _Q_mul(QUAD, QUAD);		/* returns x * y */
+extern QUAD _Q_div(QUAD, QUAD);		/* returns x / y */
+extern QUAD _Q_sqrt(QUAD);		/* return sqrt(x) */
 extern enum fcc_type
-                _Q_cmp( /* QUAD x, y */ );	/* x compare y , exception
-						 * only on signaling NaN */
+	_Q_cmp(QUAD, QUAD);		/* x compare y , exception */
+					/* only on signaling NaN */
 extern enum fcc_type
-                _Q_cmpe( /* QUAD x, y */ );	/* x compare y , exception
-						 * on quiet NaN */
-extern int   _Q_feq( /* QUAD x, y */ );	/* return TRUE if x == y */
-extern int   _Q_fne( /* QUAD x, y */ );	/* return TRUE if x != y */
-extern int   _Q_fgt( /* QUAD x, y */ );	/* return TRUE if x >  y */
-extern int   _Q_fge( /* QUAD x, y */ );	/* return TRUE if x >= y */
-extern int   _Q_flt( /* QUAD x, y */ );	/* return TRUE if x <  y */
-extern int   _Q_fle( /* QUAD x, y */ );	/* return TRUE if x <= y */
+	_Q_cmpe(QUAD, QUAD);		/* x compare y , exception */
+					/* on quiet NaN */
+extern int   _Q_feq(QUAD, QUAD);	/* return TRUE if x == y */
+extern int   _Q_fne(QUAD, QUAD);	/* return TRUE if x != y */
+extern int   _Q_fgt(QUAD, QUAD);	/* return TRUE if x >  y */
+extern int   _Q_fge(QUAD, QUAD);	/* return TRUE if x >= y */
+extern int   _Q_flt(QUAD, QUAD);	/* return TRUE if x <  y */
+extern int   _Q_fle(QUAD, QUAD);	/* return TRUE if x <= y */
 
 /* Conversion routines are pretty straightforward. */
 
-extern QUAD _Q_stoq( /* SINGLE s */ );
-extern QUAD _Q_dtoq( /* double d */ );
-extern QUAD _Q_itoq( /* int i */ );
-extern QUAD _Q_utoq( /* unsigned u */ );
-extern SINGLERESULT	_Q_qtos( /* QUAD x */ );
-extern double		_Q_qtod( /* QUAD x */ );
-extern int		_Q_qtoi( /* QUAD x */ );
-extern unsigned		_Q_qtou( /* QUAD x */ );
+extern QUAD _Q_stoq(SINGLE);
+extern QUAD _Q_dtoq(double);
+extern QUAD _Q_itoq(int);
+extern QUAD _Q_utoq(unsigned);
+extern SINGLERESULT	_Q_qtos(QUAD);
+extern double		_Q_qtod(QUAD);
+extern int		_Q_qtoi(QUAD);
+extern unsigned		_Q_qtou(QUAD);
 
 /******	
     Phase I Quad support: scanf/printf support in libc/gen/common
 *****/
 
-extern void
-decimal_to_longdouble(		/* QUAD *px ; decimal_mode *pm;
-				 * decimal_record *pd;
-		          fp_exception_field_type *ps; */ );
-
-extern void
-longdouble_to_decimal(		/* QUAD *px ; decimal_mode *pm;
-				 * decimal_record *pd;
-		          fp_exception_field_type *ps; */ );
-
-#ifdef sparc
 enum fcc_type 	 		/* relationships for loading into cc */
 	{
 	fcc_equal	= 0,
@@ -120,53 +109,7 @@ enum fcc_type 	 		/* relationships for loading into cc */
 	fcc_greater	= 2,
 	fcc_unordered	= 3
 	} ;
-#endif
-#ifdef i386
-enum fcc_type 	 		/* relationships for loading into cc */
-	{
-	fcc_equal	= 64,
-	fcc_less	= 1,
-	fcc_greater	= 0,
-	fcc_unordered	= 69
-	} ;
-#endif
-#ifdef mc68000
-enum fcc_type 	 		/* relationships for loading into cc */
-	{
-	fcc_equal	= 4,
-	fcc_less	= 25,
-	fcc_greater	= 0,
-	fcc_unordered	= 2
-	} ;
-#endif
 
-#ifdef i386
-typedef			/* FPU register viewed as single components. */
-	struct
-	{
-	unsigned significand :	23 ;
-	unsigned exponent :	 8 ;
-	unsigned sign :		 1 ;
-	}
-	single_type ;
-
-typedef			/* FPU register viewed as double components. */
-	struct
-	{
-	unsigned significand :	20 ;
-	unsigned exponent :	11 ;
-	unsigned sign :		 1 ;
-	}
-	double_type ;
-typedef			/* FPU register viewed as extended components. */
-	struct
-	{
-	unsigned significand :	16 ;
-	unsigned exponent :	15 ;
-	unsigned sign :		 1 ;
-	}
-	extended_type ;
-#else
 typedef			/* FPU register viewed as single components. */
 	struct
 	{
@@ -192,8 +135,6 @@ typedef			/* FPU register viewed as extended components. */
 	unsigned significand :	16 ;
 	}
 	extended_type ;
-#endif
-
 
 enum fp_op_type		/* Type specifiers in FPU instructions. */
 	{
@@ -203,5 +144,8 @@ enum fp_op_type		/* Type specifiers in FPU instructions. */
 	fp_op_extended	= 3
 	} ;
 
+
+extern void	_Q_get_rp_rd(void);
+extern void	_Q_set_exception(unsigned);
 
 #endif				/* QUAD_INCLUDED */

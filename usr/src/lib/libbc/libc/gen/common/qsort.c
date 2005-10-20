@@ -19,8 +19,12 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.2 83/03/089 */
 
 /*
  * qsort.c:
@@ -39,6 +43,8 @@ static  int		qsz;			/* size of each record */
 static  int		thresh;			/* THRESHold in chars */
 static  int		mthresh;		/* MTHRESHold in chars */
 
+static void	qst(char *, char *);
+
 /*
  * qsort:
  * First, set up some global parameters for qst to share.  Then, quicksort
@@ -46,13 +52,10 @@ static  int		mthresh;		/* MTHRESHold in chars */
  * It's not...
  */
 
-qsort(base, n, size, compar)
-	char	*base;
-	int	n;
-	int	size;
-	int	(*compar)();
+void
+qsort(char *base, int n, int size, int (*compar)())
 {
-	register char c, *i, *j, *lo, *hi;
+	char c, *i, *j, *lo, *hi;
 	char *min, *max;
 
 	if (n <= 1)
@@ -121,12 +124,11 @@ qsort(base, n, size, compar)
  * (And there are only three places where this is done).
  */
 
-static
-qst(base, max)
-	char *base, *max;
+static void
+qst(char *base, char *max)
 {
-	register char c, *i, *j, *jj;
-	register int ii;
+	char c, *i, *j, *jj;
+	int ii;
 	char *mid, *tmp;
 	int lo, hi;
 

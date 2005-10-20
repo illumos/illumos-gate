@@ -3,13 +3,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from UCB 5.2 3/9/86 */
-
 /*
  * Copyright (c) 1984 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Return the number of the slot in the utmp file
@@ -24,16 +24,14 @@
 #include <sys/syscall.h>
 #include <sys/fcntl.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <strings.h>
 
-char	*ttyname();
-char	*rindex();
-
-#define	NULL	0
-
-ttyslot()
+int
+ttyslot(void)
 {
-	register char *tp, *p;
-	register s;
+	char *tp, *p;
+	int s;
 	int fd;
 	struct utmpx utx;
 

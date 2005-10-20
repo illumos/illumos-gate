@@ -1,16 +1,17 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 5.4 7/25/86 */
 /*
  * Copyright (c) 1985 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include <sys/param.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <ctype.h>
 #include <stdio.h>
+#include <malloc.h>
 
 #define SHELLS "/etc/shells"
 
@@ -22,13 +23,14 @@ static char *okshells[] =
 
 static char **shells, *strings;
 static char **curshell;
-extern char **initshells();
+
+static char **initshells(void);
 
 /*
  * Get a list of shells from SHELLS, if it exists.
  */
 char *
-getusershell()
+getusershell(void)
 {
 	char *ret;
 
@@ -40,7 +42,8 @@ getusershell()
 	return (ret);
 }
 
-endusershell()
+void
+endusershell(void)
 {
 	
 	if (shells != NULL)
@@ -52,19 +55,19 @@ endusershell()
 	curshell = NULL;
 }
 
-setusershell()
+void
+setusershell(void)
 {
 
 	curshell = initshells();
 }
 
 static char **
-initshells()
+initshells(void)
 {
-	register char **sp, *cp;
-	register FILE *fp;
+	char **sp, *cp;
+	FILE *fp;
 	struct stat statb;
-	extern char *malloc(), *calloc();
 
 	if (shells != NULL)
 		free((char *)shells);
@@ -73,21 +76,21 @@ initshells()
 		free(strings);
 	strings = NULL;
 	if ((fp = fopen(SHELLS, "r")) == (FILE *)0)
-		return(okshells);
+		return (okshells);
 	if (fstat(fileno(fp), &statb) == -1) {
 		(void)fclose(fp);
-		return(okshells);
+		return (okshells);
 	}
 	if ((strings = malloc((unsigned)statb.st_size + 1)) == NULL) {
 		(void)fclose(fp);
-		return(okshells);
+		return (okshells);
 	}
 	shells = (char **)calloc((unsigned)statb.st_size / 3, sizeof (char *));
 	if (shells == NULL) {
 		(void)fclose(fp);
 		free(strings);
 		strings = NULL;
-		return(okshells);
+		return (okshells);
 	}
 	sp = shells;
 	cp = strings;

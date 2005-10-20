@@ -27,16 +27,15 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 1.2 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 #include <stdio.h>
 #include <errno.h>
+#include <malloc.h>
 #include "iob.h"
 
 #define active(iop)	((iop)->_flag & (_IOREAD|_IOWRT|_IORW))
-
-extern	char	*calloc();
 
 static unsigned char sbuf[NSTATIC][_SBFSIZ];
 unsigned char (*_smbuf)[_SBFSIZ] = sbuf;
@@ -53,10 +52,10 @@ static	FILE	**endglue;
  * the old and new FILE entries, which are then no longer contiguous.
  */
 FILE *
-_findiop()
+_findiop(void)
 {
-	register FILE **iov, *iop;
-	register FILE *fp;
+	FILE **iov, *iop;
+	FILE *fp;
 
 	if(iobglue == NULL) {
 		for(iop = _iob; iop < _iob + NSTATIC; iop++)
@@ -82,11 +81,12 @@ _findiop()
 	return(*iov);
 }
 
-_f_morefiles()
+int
+_f_morefiles(void)
 {
-	register FILE **iov;
-	register FILE *fp;
-	register unsigned char *cp;
+	FILE **iov;
+	FILE *fp;
+	unsigned char *cp;
 	int nfiles;
 
 	nfiles = getdtablesize();
@@ -109,10 +109,11 @@ _f_morefiles()
 	return(1);
 }
 
-f_prealloc()
+void
+f_prealloc(void)
 {
-	register FILE **iov;
-	register FILE *fp;
+	FILE **iov;
+	FILE *fp;
 
 	if(iobglue == NULL && _f_morefiles() == 0)
 		return;
@@ -123,11 +124,10 @@ f_prealloc()
 }
 
 void
-_fwalk(function)
-register int (*function)();
+_fwalk(int (*function)(FILE *))
 {
-	register FILE **iov;
-	register FILE *fp;
+	FILE **iov;
+	FILE *fp;
 
 	if(function == NULL)
 		return;

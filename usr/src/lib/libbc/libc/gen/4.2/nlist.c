@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1987 Sun Microsystems, Inc.
+ * Copyright 1987 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/file.h>
 #include <a.out.h>
@@ -32,12 +33,11 @@
  * nlist - retreive attributes from name list (string table version)
  *         [The actual work is done in ../common/_nlist.c]
  */
-nlist(name, list)
-	char *name;
-	struct nlist *list;
+int
+nlist(char *name, struct nlist *list)
 {
-	register int fd;
-	register int e;
+	int fd;
+	int e;
 
 	fd = open(name, O_RDONLY, 0);
 	e = _nlist(fd, list);

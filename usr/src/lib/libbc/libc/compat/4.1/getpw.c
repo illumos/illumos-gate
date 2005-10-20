@@ -19,24 +19,24 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
-/* 
- * Copyright (c) 1984 by Sun Microsystems, Inc.
+/*
+ * Copyright 1984 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <pwd.h>
 
-getpw(uid, buf)
-	int uid;
-	char buf[];
+int
+getpw(int uid, char buf[])
 {
 	struct passwd *pw;
 	char numbuf[20];
 
 	pw = getpwuid(uid);
 	if(pw == 0)
-		return 1;
+		return (1);
 	strcpy(buf, pw->pw_name);
 	strcat(buf, ":");
 	strcat(buf, pw->pw_passwd);
@@ -47,17 +47,10 @@ getpw(uid, buf)
 	sprintf(numbuf, "%d", pw->pw_gid);
 	strcat(buf, numbuf);
 	strcat(buf, ":");
-#if 0
-	sprintf(numbuf, "%d", pw->pw_quota);
-	strcat(buf, numbuf);
-	strcat(buf, ":");
-	strcat(buf, pw->pw_comment);
-	strcat(buf, ":");
-#endif
 	strcat(buf, pw->pw_gecos);
 	strcat(buf, ":");
 	strcat(buf, pw->pw_dir);
 	strcat(buf, ":");
 	strcat(buf, pw->pw_shell);
-	return 0;
+	return (0);
 }

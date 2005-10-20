@@ -19,17 +19,20 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1989 by Sun Microsystems, Inc.
- *
- * This file is intended to contain the basic
- * specific details of a given architecture.
+ * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _sun4_param_h
-#define _sun4_param_h
+#define	_sun4_param_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * This file is intended to contain the basic
+ * specific details of a given architecture.
+ */
 
 /*
  * Machine dependent constants for Sun4.
@@ -43,7 +46,7 @@
 #define VAC
 #else
 #undef VAC
-#endif SUN4_260 || SUN4_470 || SUN4_330
+#endif	/* SUN4_260 || SUN4_470 || SUN4_330 */
 
 /*
  * Define the FPU symbol if we could run on a machine with an external
@@ -60,7 +63,7 @@
 #define MMU_3LEVEL
 #else
 #undef MMU_3LEVEL
-#endif SUN4_470
+#endif	/* SUN4_470 */
 
 /*
  * Define IOC if we could run on machines that have an I/O cache.
@@ -69,7 +72,7 @@
 #define IOC
 #else
 #undef IOC
-#endif SUN4_470
+#endif	/* SUN4_470 */
 
 /*
  * Define BCOPY_BUF if we could run on machines that have a bcopy buffer.
@@ -78,7 +81,7 @@
 #define BCOPY_BUF
 #else
 #undef BCOPY_BUF
-#endif SUN4_470
+#endif	/* SUN4_470 */
 
 /*
  * Define VA_HOLE for machines that have a hole in the virtual address space.
@@ -87,7 +90,7 @@
 #define VA_HOLE
 #else
 #undef VA_HOLE
-#endif SUN4_260 || SUN4_110 || SUN4_330
+#endif	/* SUN4_260 || SUN4_110 || SUN4_330 */
 
 /*
  * MMU_PAGES* describes the physical page size used by the mapping hardware.
@@ -197,4 +200,4 @@
 #define	CLSHIFT		PAGESHIFT
 #define	clrnd(i)	(i)
 
-#endif /*!_sun4_param_h*/
+#endif /* !_sun4_param_h */

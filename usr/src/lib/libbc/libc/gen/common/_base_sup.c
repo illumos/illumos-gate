@@ -19,21 +19,19 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "base_conversion.h"
 
 #ifdef DEBUG
 
 void
-_display_big_float(pbf, base)
-	_big_float     *pbf;
-	unsigned        base;
-
+_display_big_float(_big_float *pbf, unsigned base)
 {
 	int             i;
 
@@ -55,11 +53,8 @@ _display_big_float(pbf, base)
 #endif
 
 void
-_integerstring_to_big_decimal(ds, ndigs, nzin, pnzout, pd)
-	char            ds[];
-unsigned        ndigs, nzin, *pnzout;
-_big_float     *pd;
-
+_integerstring_to_big_decimal(char ds[], unsigned ndigs, unsigned nzin,
+    unsigned *pnzout, _big_float *pd)
 {
 	/*
 	 * Convert ndigs decimal digits from ds, and up to 3 trailing zeros,
@@ -121,11 +116,8 @@ _big_float     *pd;
 }
 
 void
-_fractionstring_to_big_decimal(ds, ndigs, nzin, pbf)
-	char            ds[];
-unsigned        ndigs, nzin;
-_big_float     *pbf;
-
+_fractionstring_to_big_decimal(char ds[], unsigned ndigs, unsigned nzin,
+    _big_float *pbf)
 {
 	/*
 	 * Converts a decimal string containing an implicit point, nzin
@@ -178,9 +170,7 @@ _big_float     *pbf;
 }
 
 void
-_mul_10000short(pbf, carry)
-	_big_float     *pbf;
-	long unsigned   carry;
+_mul_10000short(_big_float *pbf, long unsigned carry)
 {
 	int             j;
 	long unsigned   p;
@@ -199,9 +189,7 @@ _mul_10000short(pbf, carry)
 }
 
 void
-_big_decimal_to_big_binary(pd, pb)
-	_big_float     *pb, *pd;
-
+_big_decimal_to_big_binary(_big_float *pd, _big_float *pb)
 {
 	/* Convert _big_float from decimal form to binary form. */
 
@@ -278,10 +266,8 @@ _big_decimal_to_big_binary(pd, pb)
 #endif
 }
 
-_big_binary_to_unpacked(pb, pu)
-	_big_float     *pb;
-	unpacked       *pu;
-
+void
+_big_binary_to_unpacked(_big_float *pb, unpacked *pu)
 {
 	/* Convert a binary big_float to a binary_unpacked.	 */
 

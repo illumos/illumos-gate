@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" /* c2 secure */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <signal.h>
@@ -41,9 +41,8 @@
  * passwd table and the use of secure RPC in NIS+.
  */
 
-grpauth(name, password)
-	char *name;
-	char *password;
+int
+grpauth(char *name, char *password)
 {
 
 	/*

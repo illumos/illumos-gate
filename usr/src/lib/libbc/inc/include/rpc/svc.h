@@ -19,16 +19,19 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * svc.h, Server-side remote procedure call interface.
- *
- * Copyright (C) 1984, Sun Microsystems, Inc.
+ * Copyright 1984 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _rpc_svc_h
 #define	_rpc_svc_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * svc.h, Server-side remote procedure call interface.
+ */
 
 /*
  * This interface must manage two items concerning remote procedure calling:
@@ -62,11 +65,7 @@ enum xprt_stat {
  * Server side transport handle
  */
 typedef struct {
-#ifdef KERNEL
-	struct socket	*xp_sock;
-#else
 	int		xp_sock;
-#endif
 	u_short		xp_port;	 /* associated port number */
 	struct xp_ops {
 	    bool_t	(*xp_recv)();	 /* receive incomming requests */
@@ -170,7 +169,6 @@ extern void	svc_unregister();
  */
 extern void	xprt_register();
 
-#ifndef KERNEL
 /*
  * Transport un-register
  *
@@ -180,7 +178,6 @@ extern void	xprt_register();
 extern void	xprt_unregister();
 
 
-#endif !KERNEL
 
 
 /*
@@ -216,9 +213,7 @@ extern void	svcerr_noproc();
 extern void	svcerr_progvers();
 extern void	svcerr_auth();
 extern void	svcerr_noprog();
-#ifndef KERNEL
 extern void	svcerr_systemerr();
-#endif
 
 /*
  * Lowest level dispatching -OR- who owns this process anyway.
@@ -231,7 +226,6 @@ extern void	svcerr_systemerr();
  * "in-place" results of a select system call (see select, section 2).
  */
 
-#ifndef KERNEL
 /*
  * Global keeper of rpc service descriptors in use
  * dynamic; must be inspected before each call to select
@@ -244,12 +238,9 @@ extern fd_set svc_fdset;
  * also see clnt.h for protocol numbers.
  */
 extern void rpctest_service();
-#endif !KERNEL
 
 extern void	svc_getreq();
-#ifndef KERNEL
 extern void	svc_getreqset();	/* takes fdset instead of int */
-#endif
 extern void	svc_run();		/* never returns */
 
 /*
@@ -261,7 +252,6 @@ extern void	svc_run();		/* never returns */
  * These are the existing service side transport implementations
  */
 
-#ifndef KERNEL
 /*
  * Memory based rpc for testing and timing.
  */
@@ -289,7 +279,6 @@ SVCXPRT *svcfd_create();
  * Kernel udp based rpc.
  */
 extern SVCXPRT *svckudp_create();
-#endif !KERNEL
 
 
-#endif /*!_rpc_svc_h*/
+#endif /* !_rpc_svc_h */

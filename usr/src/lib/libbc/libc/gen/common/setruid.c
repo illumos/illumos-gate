@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.1 83/06/30 */
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-setruid(ruid)
-	int ruid;
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+int
+setruid(int ruid)
 {
 
 	return (setreuid(ruid, -1));

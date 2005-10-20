@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* c2 secure */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/file.h>
 
@@ -33,11 +33,12 @@
 /*
  * Is this a secure system ?
  */
-issecure()
+int
+issecure(void)
 {
 	static int	securestate	= -1;
 
 	if (securestate == -1)
 		securestate = (access(PWDADJ, F_OK) == 0);
-	return(securestate);
+	return (securestate);
 }

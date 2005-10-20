@@ -30,9 +30,8 @@
 #include <sys/file.h>
 #include <sys/syscall.h>
 
-execve(file, argv, arge)
-char *file;
-char **argv, **arge;
+int
+execve(char *file, char **argv, char **arge)
 {
 	char *c;
 	char path[256];
@@ -64,5 +63,5 @@ char **argv, **arge;
 		}
 	}
 	
-	return(_syscall(SYS_execve, file, argv, arge));
+	return (_syscall(SYS_execve, file, argv, arge));
 }

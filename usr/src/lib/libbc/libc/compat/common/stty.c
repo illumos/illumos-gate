@@ -19,8 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-	 /* from UCB 4.2 83/07/04 */
+/*
+ * Copyright 1983 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Writearound to old stty system call.
@@ -28,8 +32,8 @@
 
 #include <sgtty.h>
 
-stty(fd, ap)
-	struct sgttyb *ap;
+int
+stty(int fd, struct sgttyb *ap)
 {
 
 	return(ioctl(fd, TIOCSETP, ap));

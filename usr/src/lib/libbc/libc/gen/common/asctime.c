@@ -9,7 +9,7 @@
  * specifies the terms and conditions for redistribution.
  */ 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
@@ -18,14 +18,13 @@
 
 static	char	cbuf[26];
 
-char		*ct_numb();
+static char	*ct_numb(char *, int);
 
 char *
-asctime(t)
-struct tm *t;
+asctime(struct tm *t)
 {
-	register char *cp, *ncp;
-	register int *tp;
+	char *cp, *ncp;
+	int *tp;
 
 	cp = cbuf;
 	for (ncp = "Day Mon 00 00:00:00 1900\n"; *cp++ = *ncp++;);
@@ -47,12 +46,11 @@ struct tm *t;
 	cp = ct_numb(cp, (t->tm_year + TM_YEAR_BASE)/100);
 	cp--;
 	cp = ct_numb(cp, t->tm_year+100);
-	return(cbuf);
+	return (cbuf);
 }
 
 static char *
-ct_numb(cp, n)
-register char *cp;
+ct_numb(char *cp, int n)
 {
 	cp++;
 	if (n>=10)
@@ -60,5 +58,5 @@ register char *cp;
 	else
 		*cp++ = ' ';
 	*cp++ = n%10 + '0';
-	return(cp);
+	return (cp);
 }

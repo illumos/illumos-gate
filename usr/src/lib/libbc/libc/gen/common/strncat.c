@@ -19,8 +19,12 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.1 80/12/21 */
 
 /*
  * Concatenate s2 on the end of s1.  S1's space must be large enough.
@@ -29,11 +33,9 @@
  */
 
 char *
-strncat(s1, s2, n)
-	register char *s1, *s2;
-	register n;
+strncat(char *s1, char *s2, int n)
 {
-	register char *os1;
+	char *os1;
 
 	os1 = s1;
 	while (*s1++)

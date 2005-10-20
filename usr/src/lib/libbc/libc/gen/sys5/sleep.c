@@ -1,4 +1,7 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+/*
+ * Copyright 1986 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -6,15 +9,15 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1986 by Sun Microsystems, Inc.
- */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <signal.h>
 
 #define	setvec(vec, a) \
 	vec.sv_handler = a; vec.sv_mask = vec.sv_onstack = 0
+
+static void	sleepx(void);
 
 /*
  * sleep(n)
@@ -26,13 +29,11 @@
  * it would be nice if someone rewrote it.
  */
 unsigned
-sleep(n)
-	unsigned n;
+sleep(unsigned n)
 {
-	void sleepx();
 	int omask;
 	struct itimerval new, old, zero;
-	register struct itimerval *newp = &new;
+	struct itimerval *newp = &new;
 	struct timeval left_over;
 	int alrm_flg;
 	struct sigvec vec, ovec;
@@ -107,6 +108,6 @@ sleep(n)
 }
 
 static void
-sleepx()
+sleepx(void)
 {
 }

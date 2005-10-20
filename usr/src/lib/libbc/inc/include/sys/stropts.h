@@ -19,16 +19,18 @@
  *
  * CDDL HEADER END
  */
-/*	from S5R3 sys/stropts.h 10.7	*/
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
 /*	Copyright (c) 1984 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 #ifndef _sys_stropts_h
-#define _sys_stropts_h
+#define	_sys_stropts_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Read options
@@ -73,25 +75,25 @@
 /*
  *  Stream Ioctl defines
  */
-#define I_NREAD		_IOR(S,01,int)
-#define I_PUSH		_IOWN(S,02,FMNAMESZ+1)
-#define I_POP		_IO(S,03)
-#define I_LOOK		_IORN(S,04,FMNAMESZ+1)
-#define I_FLUSH		_IO(S,05)
-#define I_SRDOPT	_IO(S,06)
-#define I_GRDOPT	_IOR(S,07,int)
-#define I_STR		_IOWR(S,010,struct strioctl)
-#define I_SETSIG	_IO(S,011)
-#define I_GETSIG	_IOR(S,012,int)
-#define I_FIND		_IOWN(S,013,FMNAMESZ+1)
-#define I_LINK		_IO(S,014)
-#define I_UNLINK	_IO(S,015)
-#define I_PEEK		_IOWR(S,017,struct strpeek)
-#define I_FDINSERT	_IOW(S,020,struct strfdinsert)
-#define I_SENDFD	_IO(S,021)
-#define I_RECVFD	_IOR(S,022,struct strrecvfd)
-#define I_PLINK		_IO(S,023)
-#define I_PUNLINK	_IO(S,024)
+#define I_NREAD		_IOR('S',01,int)
+#define I_PUSH		_IOWN('S',02,FMNAMESZ+1)
+#define I_POP		_IO('S',03)
+#define I_LOOK		_IORN('S',04,FMNAMESZ+1)
+#define I_FLUSH		_IO('S',05)
+#define I_SRDOPT	_IO('S',06)
+#define I_GRDOPT	_IOR('S',07,int)
+#define I_STR		_IOWR('S',010,struct strioctl)
+#define I_SETSIG	_IO('S',011)
+#define I_GETSIG	_IOR('S',012,int)
+#define I_FIND		_IOWN('S',013,FMNAMESZ+1)
+#define I_LINK		_IO('S',014)
+#define I_UNLINK	_IO('S',015)
+#define I_PEEK		_IOWR('S',017,struct strpeek)
+#define I_FDINSERT	_IOW('S',020,struct strfdinsert)
+#define I_SENDFD	_IO('S',021)
+#define I_RECVFD	_IOR('S',022,struct strrecvfd)
+#define I_PLINK		_IO('S',023)
+#define I_PUNLINK	_IO('S',024)
 
 
 /*
@@ -147,17 +149,10 @@ struct strfdinsert {
  * receive file descriptor structure
  */
 struct strrecvfd {
-#ifdef KERNEL
-	union {
-		struct file *fp;
-		int fd;
-	} f;
-#else
 	int fd;
-#endif
 	unsigned short uid;
 	unsigned short gid;
 	char fill[8];
 };
 
-#endif /*!_sys_stropts_h*/
+#endif /* !_sys_stropts_h */

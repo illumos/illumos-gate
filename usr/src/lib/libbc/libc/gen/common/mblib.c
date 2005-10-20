@@ -24,15 +24,11 @@
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * misc routines
  */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-#if !defined(lint) && defined(SCCSIDS)
-static  char *sccsid = "%Z%%M%	%I%	%E% SMI";
-#endif 
 
 #include <stdio.h>
 #include <sys/types.h>
@@ -40,34 +36,35 @@ static  char *sccsid = "%Z%%M%	%I%	%E% SMI";
 #include "mbextern.h"
 #include <dlfcn.h>
 
-static void *handle = (void *)NULL;	/* initialize it with -1 */
+static void *handle = (void *)NULL;	/* initialize it with NULL */
 
 /*
  * Close current library library
  */
-_ml_close_library()
+int
+_ml_close_library(void)
 {
 	if (handle == (void *)NULL) {
 		_code_set_info.open_flag = NULL;
-		return;
+		return (-1);
 	}
 
 	dlclose(handle);  
 	_code_set_info.open_flag = NULL;
 	handle = (void *)NULL;
-	return(0);
+	return (0);
 }
 
 /*
  * Open the given library
  */
 void *
-_ml_open_library()
+_ml_open_library(void)
 {
 	char buf[BUFSIZ];
 
 	if (handle != (void *)NULL) /* This library is already opened */
-		return(handle);
+		return (handle);
 
 	/*
 	 * Open the given library
@@ -85,5 +82,5 @@ _ml_open_library()
 	else
 		printf ("_ml_open_library: dlopen failed\n");
 #endif
-	return(handle);
+	return (handle);
 }

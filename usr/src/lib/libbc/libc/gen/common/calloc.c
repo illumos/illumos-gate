@@ -19,25 +19,35 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.1 80/12/21 */
+
+#include <stdio.h>
+#include <malloc.h>
 
 /*
  * calloc - allocate and clear memory block
  */
 #define CHARPERINT (sizeof(int)/sizeof(char))
-#define NULL 0
+
 #ifdef	S5EMUL
 #define	ptr_t	void*
+#define	free_t	void
+#define	free_return(x)	(x)
 #else
 #define	ptr_t	char*
+#define	free_t	int
+#define	free_return(x)	return (x)
 #endif
 
 ptr_t
-calloc(num, size)
-	unsigned num, size;
+calloc(unsigned num, unsigned size)
 {
-	register ptr_t mp;
+	ptr_t mp;
 	ptr_t	malloc();
 
 	num *= size;
@@ -48,9 +58,8 @@ calloc(num, size)
 	return ((ptr_t)(mp));
 }
 
-cfree(p, num, size)
-	ptr_t p;
-	unsigned num, size;
+free_t
+cfree(ptr_t p, unsigned num, unsigned size)
 {
-	free(p);
+	free_return(free(p));
 }

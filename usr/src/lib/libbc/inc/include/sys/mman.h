@@ -24,10 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _sys_mman_h
-#define _sys_mman_h
+#define	_sys_mman_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Protections are chosen from these bits, or-ed together.
@@ -42,11 +42,6 @@
 #define	PROT_WRITE	0x2		/* pages can be written */
 #define	PROT_EXEC	0x4		/* pages can be executed */
 
-#ifdef KERNEL
-#define	PROT_USER	0x8		/* pages are user accessable */
-#define	PROT_ALL	(PROT_READ | PROT_WRITE | PROT_EXEC | PROT_USER)
-#endif KERNEL
-
 #define	PROT_NONE	0x0		/* pages cannot be accessed */
 
 /* sharing types:  must choose either SHARED or PRIVATE */
@@ -60,13 +55,6 @@
 /* these flags not yet implemented */
 #define	MAP_RENAME	0x20		/* rename private pages to file */
 #define	MAP_NORESERVE	0x40		/* don't reserve needed swap area */
-
-#ifdef notdef
-/*
- * Not clear that this flag will ever be implemented
- */
-#define	MAP_INHERIT	0x80		/* inherit this mapping accross exec */
-#endif notdef
 
 /*
  * For the sake of backward object compatibility, we use the _MAP_NEW flag.
@@ -87,7 +75,7 @@
  * address of mapping on success and (caddr_t)-1 on error.
  */
 extern caddr_t mmap();
-#endif !LOCORE && !KERNEL
+#endif	/* !LOCORE && !KERNEL */
 
 /* advice to madvise */
 #define	MADV_NORMAL	0		/* no further special treatment */
@@ -112,4 +100,4 @@ extern caddr_t mmap();
 #define	MCL_CURRENT	0x1		/* lock current mappings */
 #define	MCL_FUTURE	0x2		/* lock future mappings */
 
-#endif /*!_sys_mman_h*/
+#endif /* !_sys_mman_h */

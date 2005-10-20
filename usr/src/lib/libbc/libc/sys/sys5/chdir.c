@@ -24,12 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/syscall.h>
 
-chdir(s)
-    char           *s;
+int
+chdir(char *s)
 {
-    return _syscall(SYS_chdir, s);
+    return (_syscall(SYS_chdir, s));
 }

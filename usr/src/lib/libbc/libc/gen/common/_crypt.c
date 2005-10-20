@@ -27,7 +27,7 @@
 /*      Copyright (c) 1984,1988 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 1.3 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 /*
@@ -152,6 +152,8 @@ static struct _crypt {
 #define	ablock	(_c->_ablock)
 #define	iobuf	(_c->_iobuf)
 
+static void	_cryptinit(void);
+
 /*
  * Set up the key schedule from the key.
  */
@@ -160,12 +162,11 @@ static struct _crypt {
 static
 #endif
 void
-setkey(key)
-char *key;
+setkey(char *key)
 {
-	register i, j, k;
+	int i, j, k;
 	int t;
-	register struct _crypt *_c = __crypt;
+	struct _crypt *_c = __crypt;
 
 	if (!_c) {
 		_cryptinit();
@@ -292,13 +293,11 @@ static	char	P[] = {
  */
 
 void
-encrypt(block, edflag)
-char	*block;
-int	edflag;
+encrypt(char *block, int edflag)
 {
 	int	i, ii;
-	register int t, j, k;
-	register struct _crypt *_c = __crypt;
+	int t, j, k;
+	struct _crypt *_c = __crypt;
 
 	if (!_c) {
 		_cryptinit();
@@ -389,12 +388,11 @@ int	edflag;
 }
 
 char *
-_crypt(pw, salt)
-char	*pw, *salt;
+_crypt(char *pw, char *salt)
 {
-	register int i, j, c;
+	int i, j, c;
 	int	temp;
-	register struct _crypt *_c = __crypt;
+	struct _crypt *_c = __crypt;
 
 	if (!_c) {
 		_cryptinit();
@@ -455,11 +453,11 @@ char	*pw, *salt;
 	return(iobuf);
 }
 
-static
-_cryptinit()
+static void
+_cryptinit(void)
 {
-	register struct _crypt *_c = __crypt;
-	register int i;
+	struct _crypt *_c = __crypt;
+	int i;
 
 	if (_c)
 		return;

@@ -1,8 +1,6 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 5.1 85/05/30 */
-
 /*
- * Copyright (c) 1987 by Sun Microsystems, Inc.
+ * Copyright 1987 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -10,6 +8,8 @@
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -26,15 +26,14 @@
  *       The algorithm has been modified from the original to use local
  *       (rather than stdio) buffering and issues considerably fewer lseeks.
  */
-_nlist(fd, list)
-	int fd;
-	struct nlist *list;
+int
+_nlist(int fd, struct nlist *list)
 {
-	register struct nlist *p, *q;
-	register char *s1, *s2;
-	register int soff;
-	register int stroff = 0;
-	register n, m;
+	struct nlist *p, *q;
+	char *s1, *s2;
+	int soff;
+	int stroff = 0;
+	int n, m;
 	int maxlen, nreq;
 	long sa;		/* symbol address */
 	long ss;		/* start of strings */

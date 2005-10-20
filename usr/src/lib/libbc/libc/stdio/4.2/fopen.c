@@ -27,37 +27,34 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 1.8 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 #include <stdio.h>
 #include <fcntl.h>
 
-extern int open(), fclose();
-extern FILE *_findiop(), *_endopen();
+extern int	fclose();
+extern FILE	*_findiop();
+
+static FILE	*_endopen(char *, char *, FILE *);
 
 FILE *
-fopen(file, mode)
-char	*file, *mode;
+fopen(char *file, char *mode)
 {
 	return (_endopen(file, mode, _findiop()));
 }
 
 FILE *
-freopen(file, mode, iop)
-char	*file, *mode;
-register FILE *iop;
+freopen(char *file, char *mode, FILE *iop)
 {
 	(void) fclose(iop); /* doesn't matter if this fails */
 	return (_endopen(file, mode, iop));
 }
 
 static FILE *
-_endopen(file, mode, iop)
-char	*file, *mode;
-register FILE *iop;
+_endopen(char *file, char *mode, FILE *iop)
 {
-	register int	plus, oflag, fd;
+	int	plus, oflag, fd;
 
 	if (iop == NULL || file == NULL || file[0] == '\0')
 		return (NULL);

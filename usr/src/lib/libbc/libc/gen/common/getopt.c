@@ -1,9 +1,8 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from 4.3BSD-tahoe 4.9 6/23/89 */
-
 /*
- * Copyright (c) 1989 Sun Microsystems, Inc.
+ * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 /*
  * Copyright (c) 1987 Regents of the University of California.
  * All rights reserved.
@@ -20,6 +19,9 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 
 /* LINTLIBRARY */
 
@@ -39,12 +41,11 @@ int		optopt;		/* character checked for validity */
 #define	BADCH	(int)'?'
 #define	EMSG	""
 
-getopt(nargc, nargv, ostr)
-	int nargc;
-	char **nargv, *ostr;
+int
+getopt(int nargc, char **nargv, char *ostr)
 {
 	static char *place = EMSG;		/* option letter processing */
-	register char *oli;			/* option letter list index */
+	char *oli;			/* option letter list index */
 	char *p;
 
 	if (!*place) {				/* update scanning pointer */

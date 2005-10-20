@@ -24,17 +24,14 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <errno.h>
 
-extern	errno;
-
-ulimit(cmd, newlimit)
-	int cmd;
-	long newlimit;
+long
+ulimit(int cmd, long newlimit)
 {
 	struct rlimit rlimit;
 

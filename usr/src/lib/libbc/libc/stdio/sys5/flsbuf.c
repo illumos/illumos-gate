@@ -25,51 +25,48 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from ../4.2/flsbuf.c  */
 
 /*LINTLIBRARY*/
 #include <stdio.h>
-#include <sys/errno.h>
+#include <errno.h>
 #include "../common/stdiom.h"
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <malloc.h>
 
-extern void free();
-extern int errno, write(), close(), isatty();
-extern char *malloc();
 extern unsigned char (*_smbuf)[_SBFSIZ];
 
-void _getsmbuf();
+void	_findbuf(FILE *);
+void	_bufsync(FILE *);
+
+extern int fclose();
 
 /*
  * Flush buffers on exit
  */
-
 void
-_cleanup()
+_cleanup(void)
 {
-	extern int fclose();
 
 	_fwalk(fclose);
 }
-/*
-	fclose() will flush (output) buffers for a buffered open
-	FILE and then issue a system close on the _fileno.  The
-	_base field will be reset to NULL for any but stdin and
-	stdout, the _ptr field will be set the same as the _base
-	field. The _flags and the _cnt field will be zeroed.
-	If buffers had been obtained via malloc(), the space will
-	be free()'d.  In case the FILE was not open, or fflush()
-	or close() failed, an EOF will be returned, otherwise the
-	return value is 0.
- */
 
+/*
+ *	fclose() will flush (output) buffers for a buffered open
+ *	FILE and then issue a system close on the _fileno.  The
+ *	_base field will be reset to NULL for any but stdin and
+ *	stdout, the _ptr field will be set the same as the _base
+ *	field. The _flags and the _cnt field will be zeroed.
+ *	If buffers had been obtained via malloc(), the space will
+ *	be free()'d.  In case the FILE was not open, or fflush()
+ *	or close() failed, an EOF will be returned, otherwise the
+ *	return value is 0.
+ */
 int
-fclose(iop)
-register FILE *iop;
+fclose(FILE *iop)
 {
-	register int rtn=EOF;
+	int rtn=EOF;
 
 	if(iop == NULL)
 		return(rtn);
@@ -91,15 +88,14 @@ register FILE *iop;
 }
 
 /*
-	The fflush() routine must take care because of the
-	possibility for recursion. The calling program might
-	do IO in an interupt catching routine that is likely
-	to interupt the write() call within fflush()
+ *	The fflush() routine must take care because of the
+ *	possibility for recursion. The calling program might
+ *	do IO in an interupt catching routine that is likely
+ *	to interupt the write() call within fflush()
  */
 
 int
-fflush(iop)
-register FILE *iop;
+fflush(FILE *iop)
 {
 	if (!(iop->_flag & _IOWRT)) {
 		if ((iop->_base != NULL) && iop->_cnt) {
@@ -114,7 +110,8 @@ register FILE *iop;
 	return(ferror(iop) ? EOF : 0);
 }
 
-/* The routine _flsbuf may or may not actually flush the output buffer.  If
+/*
+ * The routine _flsbuf may or may not actually flush the output buffer.  If
  * the file is line-buffered, the fact that iop->_cnt has run below zero
  * is meaningless: it is always kept below zero so that invocations of putc
  * will consistently give control to _flsbuf, even if the buffer is far from
@@ -127,9 +124,7 @@ register FILE *iop;
  */
 
 int
-_flsbuf(c, iop)
-unsigned char c;
-register FILE *iop;
+_flsbuf(unsigned char c, FILE *iop)
 {
     unsigned char c1;
 
@@ -165,7 +160,8 @@ register FILE *iop;
     return( ferror(iop) ? EOF : c);
 }
 
-/* The function _xflsbuf writes out the current contents of the output
+/*
+ * The function _xflsbuf writes out the current contents of the output
  * buffer delimited by iop->_base and iop->_ptr.
  * iop->_cnt is reset appropriately, but its value on entry to _xflsbuf
  * is ignored.
@@ -184,11 +180,10 @@ register FILE *iop;
  */
 
 int
-_xflsbuf(iop)
-register FILE *iop;
+_xflsbuf(FILE *iop)
 {
-	register unsigned char *base;
-	register int n;
+	unsigned char *base;
+	int n;
 
 	n = iop->_ptr - (base = iop->_base);
 	iop->_ptr = base;
@@ -201,15 +196,15 @@ register FILE *iop;
 	return(0);
 }
 
-/* The function _wrtchk checks to see whether it is legitimate to write
+/*
+ * The function _wrtchk checks to see whether it is legitimate to write
  * to the specified device.  If it is, _wrtchk sets flags in iop->_flag for
  * writing, assures presence of a buffer, and returns 0.  If writing is not
  * legitimate, EOF is returned.
  */
 
 int
-_wrtchk(iop)
-register FILE *iop;
+_wrtchk(FILE *iop)
 {
 	if ( (iop->_flag & (_IOWRT | _IOEOF)) != _IOWRT ) {
 		if (!(iop->_flag & (_IOWRT | _IORW)))
@@ -233,12 +228,12 @@ register FILE *iop;
  * the _IOMYBUF flag is set in iop->_flag.
  */
 
-_findbuf(iop)
-register FILE *iop;
+void
+_findbuf(FILE *iop)
 {
-	register int fno = fileno(iop); /* file number */
+	int fno = fileno(iop); /* file number */
 	struct stat statb;
-	register int size;
+	int size;
 
 	/* allocate a small block for unbuffered, large for buffered */
 	if (iop->_flag & _IONBF)  {
@@ -272,7 +267,8 @@ register FILE *iop;
 	iop->_ptr = iop->_base;
 }
 
-/* The function _bufsync is called because interrupts and other signals
+/*
+ * The function _bufsync is called because interrupts and other signals
  * which occur in between the decrementing of iop->_cnt and the incrementing
  * of iop->_ptr, or in other contexts as well, may upset the synchronization
  * of iop->_cnt and iop->ptr.  If this happens, calling _bufsync should
@@ -282,11 +278,11 @@ register FILE *iop;
  * _bufsync to do the wrong thing, but usually with benign effects.
  */
 
-_bufsync(iop)
-register FILE *iop;
+void
+_bufsync(FILE *iop)
 {
-	register int spaceleft;
-	register unsigned char *bufend = iop->_base + iop->_bufsiz;
+	int spaceleft;
+	unsigned char *bufend = iop->_base + iop->_bufsiz;
 
 	if ((spaceleft = bufend - iop->_ptr) < 0)
 		iop->_ptr = bufend;

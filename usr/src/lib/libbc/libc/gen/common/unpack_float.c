@@ -19,19 +19,19 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* IEEE function implementations.	 */
 
 #include "base_conversion.h"
 
 enum fp_class_type
-_class_single(x)
-	single         *x;
+_class_single(single *x)
 {
 	single_equivalence kluge;
 
@@ -53,8 +53,7 @@ _class_single(x)
 }
 
 enum fp_class_type
-_class_extended(x)
-	extended       *x;
+_class_extended(extended *x)
 {
 	extended_equivalence kluge;
 
@@ -78,9 +77,7 @@ _class_extended(x)
 }
 
 void
-_unpack_single(pu, px)
-	unpacked       *pu;	/* unpacked result */
-	single         *px;	/* packed single */
+_unpack_single(unpacked *pu, single *px)
 {
 	single_equivalence x;
 	int             i;
@@ -121,9 +118,7 @@ _unpack_single(pu, px)
 }
 
 void
-_unpack_extended(pu, px)
-	unpacked       *pu;	/* unpacked result */
-	extended       *px;	/* packed extended */
+_unpack_extended(unpacked *pu, extended *px)
 {
 	extended_equivalence x;
 	int             i;
@@ -164,9 +159,8 @@ _unpack_extended(pu, px)
 	}
 }
 
-
-_display_unpacked(pu)
-	unpacked       *pu;
+void
+_display_unpacked(unpacked *pu)
 {
 	int             i, e;
 

@@ -19,8 +19,12 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.4 83/06/19 */
 
 #include <fstab.h>
 #include <stdio.h>
@@ -30,9 +34,8 @@
 static	struct fstab *pfs;
 static	FILE *fs_file;
 
-static
-fstabscan(fs)
-	struct fstab *fs;
+static int
+fstabscan(struct fstab *fs)
 {
 	struct mntent *mnt;
 
@@ -62,8 +65,9 @@ fstabscan(fs)
 	fs->fs_passno = mnt->mnt_passno;
 	return (5);
 }
-	
-setfsent()
+
+int
+setfsent(void)
 {
 
 	if (fs_file)
@@ -75,7 +79,8 @@ setfsent()
 	return (1);
 }
 
-endfsent()
+int
+endfsent(void)
 {
 
 	if (fs_file) {
@@ -86,7 +91,7 @@ endfsent()
 }
 
 struct fstab *
-getfsent()
+getfsent(void)
 {
 	int nfields;
 
@@ -104,10 +109,9 @@ getfsent()
 }
 
 struct fstab *
-getfsspec(name)
-	char *name;
+getfsspec(char *name)
 {
-	register struct fstab *fsp;
+	struct fstab *fsp;
 
 	if (setfsent() == 0)	/* start from the beginning */
 		return ((struct fstab *)0);
@@ -118,10 +122,9 @@ getfsspec(name)
 }
 
 struct fstab *
-getfsfile(name)
-	char *name;
+getfsfile(char *name)
 {
-	register struct fstab *fsp;
+	struct fstab *fsp;
 
 	if (setfsent() == 0)	/* start from the beginning */
 		return ((struct fstab *)0);
@@ -132,10 +135,9 @@ getfsfile(name)
 }
 
 struct fstab *
-getfstype(type)
-	char *type;
+getfstype(char *type)
 {
-	register struct fstab *fs;
+	struct fstab *fs;
 
 	if (setfsent() == 0)
 		return ((struct fstab *)0);

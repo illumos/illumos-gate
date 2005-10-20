@@ -19,9 +19,9 @@
  *
  * CDDL HEADER END
  */
-/* 
- * Copyright (c) 1995, by Sun Microsystems, Inc.
- * All rights reserved.
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*      Copyright (c) 1984 AT&T */
@@ -32,8 +32,10 @@
 /*LINTLIBRARY*/
 #include <stdio.h>
 #include <ctype.h>
-#include <varargs.h>
+#include <stdarg.h>
 #include <errno.h>
+#include <string.h>
+#include <malloc.h>
 
 #define ON	1
 #define OFF	0
@@ -41,99 +43,106 @@
 #define ARGMAX  64
 static unsigned char newap[ARGMAX * sizeof(double)];
 static unsigned char newform[256];
-extern char *strcpy();
-extern char *malloc();
 
 extern int _doscan();
-static int format_arg();
 
-/*VARARGS1*/
+static int	format_arg(unsigned char *, unsigned char *, unsigned char *);
+
 int
-scanf(fmt, va_alist)
-char *fmt;
-va_dcl
+scanf(char *fmt, ...)
 {
 	va_list ap;
 	char *nf;
 	int ret_val;
+	
 
-	va_start(ap);
+	va_start(ap, fmt);
 	if (strlen(fmt) >= sizeof(newform)) {
 		nf = malloc(strlen(fmt)+1);
-		if (format_arg(strcpy(nf, fmt), ap, newap) == ON) {
+		if (format_arg((unsigned char *)strcpy(nf, fmt), ap, newap)
+		    == ON) {
+			va_end(ap);
 			ret_val = _doscan(stdin, nf, newap);
 			free(nf);
 			return(ret_val);
 		}
 		free(nf);
-	} else if (format_arg(strcpy(newform, fmt), ap, newap) == ON) {
+	} else if (format_arg((unsigned char *)strcpy(newform, fmt), ap, newap)
+	    == ON) {
+		va_end(ap);
 		return(_doscan(stdin, newform, newap));
 	}
-	return(_doscan(stdin, fmt, ap));
+	ret_val = _doscan(stdin, fmt, ap);
+	va_end(ap);
+	return (ret_val);
 }
 
-/*VARARGS2*/
 int
-fscanf(iop, fmt, va_alist)
-FILE *iop;
-char *fmt;
-va_dcl
+fscanf(FILE *iop, char *fmt, ...)
 {
 	va_list ap;
 	char *nf;
 	int ret_val;
 
-	va_start(ap);
 #ifdef POSIX
         if ( !(iop->_flag & (_IOREAD|_IORW)) ) {
                 iop->_flag |= _IOERR;
                 errno = EBADF;
                 return (EOF);
         }
-#endif POSIX
+#endif	/* POSIX */
+	va_start(ap, fmt);
 	if (strlen(fmt) >= sizeof(newform)) {
 		nf = malloc(strlen(fmt)+1);
-		if (format_arg(strcpy(nf, fmt), ap, newap) == ON) {
+		if (format_arg((unsigned char *)strcpy(nf, fmt), ap, newap)
+		    == ON) {
+			va_end(ap);
 			ret_val = _doscan(stdin, nf, newap);
 			free(nf);
 			return(ret_val);
 		}
 		free(nf);
-	} else if (format_arg(strcpy(newform, fmt), ap, newap) == ON) {
+	} else if (format_arg((unsigned char *)strcpy(newform, fmt), ap, newap)
+	    == ON) {
+		va_end(ap);
 		return(_doscan(iop, newform, newap));
 	}
-	return(_doscan(iop, fmt, ap));
+	ret_val = _doscan(iop, fmt, ap);
+	va_end(ap);
+	return (ret_val);
 }
 
-/*VARARGS2*/
 int
-sscanf(str, fmt, va_alist)
-register char *str;
-char *fmt;
-va_dcl
+sscanf(char *str, char *fmt, ...)
 {
 	va_list ap;
 	FILE strbuf;
 	char *nf;
 	int ret_val;
 
-	va_start(ap);
+	va_start(ap, fmt);
 	strbuf._flag = _IOREAD|_IOSTRG;
 	strbuf._ptr = strbuf._base = (unsigned char*)str;
 	strbuf._cnt = strlen(str);
 	strbuf._bufsiz = strbuf._cnt;
 	if (strlen(fmt) >= sizeof(newform)) {
 		nf = malloc(strlen(fmt)+1);
-		if (format_arg(strcpy(nf, fmt), ap, newap) == ON) {
+		if (format_arg((unsigned char *)strcpy(nf, fmt), ap, newap)
+		    == ON) {
+			va_end(ap);
 			ret_val = _doscan(stdin, nf, newap);
 			free(nf);
 			return(ret_val);
 		}
 		free(nf);
-	} else if (format_arg(strcpy(newform, fmt), ap, newap) == ON) {
+	} else if (format_arg((unsigned char *)strcpy(newform, fmt), ap, newap)
+	    == ON) {
+		va_end(ap);
 		return(_doscan(&strbuf, newform, newap));
 	}
-	return(_doscan(&strbuf, fmt, ap));
+	ret_val = _doscan(&strbuf, fmt, ap);
+	va_end(ap);
+	return (ret_val);
 }
 
 /*
@@ -153,11 +162,10 @@ struct al {
 };
 
 static int
-format_arg(format, list, newlist)
-unsigned char *format, *list, *newlist;
+format_arg(unsigned char *format, unsigned char *list, unsigned char *newlist)
 {
 	unsigned char *aptr, *bptr, *cptr;
-	register i, fcode, nl_fmt, num, length, j;
+	int i, fcode, nl_fmt, num, length, j;
 	unsigned char *fmtsav;
 	struct al args[ARGMAX + 1];
 

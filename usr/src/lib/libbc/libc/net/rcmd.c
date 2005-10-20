@@ -9,7 +9,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
@@ -25,11 +25,8 @@
 #include <netdb.h>
 #include <errno.h>
 
-extern	errno;
-char	*index(), *strcpy();
-#ifndef	S5EMUL
-char	*sprintf();
-#endif
+#include <strings.h>
+
 static char *domain;
 
 int
@@ -169,8 +166,7 @@ bad:
 }
 
 int
-rresvport(alport)
-	int *alport;
+rresvport(int *alport)
 {
 	struct sockaddr_in sin;
 	int s;
@@ -206,8 +202,8 @@ ruserok(
 {
 	FILE *hostf;
 	char fhost[MAXHOSTNAMELEN];
-	register const char *sp;
-	register char *p;
+	const char *sp;
+	char *p;
 	int baselen = -1;
 
 	struct stat sbuf;
@@ -278,15 +274,13 @@ ruserok(
 	return (-1);
 }
 
-_validuser(hostf, rhost, luser, ruser, baselen)
-char *rhost, *luser, *ruser;
-FILE *hostf;
-int baselen;
+int
+_validuser(FILE *hostf, char *rhost, char *luser, char *ruser, int baselen)
 {
 	char *user;
 	char ahost[MAXHOSTNAMELEN];
 	int hostmatch, usermatch;
-	register char *p;
+	char *p;
 
 	if (domain == NULL) {
                 (void) yp_get_default_domain(&domain);
@@ -349,14 +343,13 @@ int baselen;
 	return (-1);
 }
 
-_checkhost(rhost, lhost, len)
-char *rhost, *lhost;
-int len;
+int
+_checkhost(char *rhost, char *lhost, int len)
 {
 	static char *ldomain;
 	static char *domainp;
 	static int nodomain;
-	register char *cp;
+	char *cp;
 
 	if (ldomain == NULL) {
 		ldomain = (char *)malloc(MAXHOSTNAMELEN+1);

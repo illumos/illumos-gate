@@ -24,11 +24,10 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
-unmount(s)
-    char           *s;
+int
+unmount(char *s)
 {
-    return umount(s);
+    return (umount(s));
 }

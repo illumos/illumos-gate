@@ -27,10 +27,10 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<syscall.h>
-#include 	<varargs.h>
+#include 	<stdarg.h>
 #include	<sys/types.h>
 #include	<sys/ipc.h>
 #include	<sys/msg.h>
@@ -42,43 +42,32 @@
 #define	MSGRCV	2
 #define	MSGSND	3
 
-
-msgget(key, msgflg)
-key_t key;
-int msgflg;
+int
+msgget(key_t key, int msgflg)
 {
-	return(_syscall(SYS_msgsys, MSGGET, key, msgflg));
+	return (_syscall(SYS_msgsys, MSGGET, key, msgflg));
 }
 
-msgctl(msqid, cmd, buf)
-int msqid, cmd;
-struct msqid_ds *buf;
+int
+msgctl(int msqid, int cmd, struct msqid_ds *buf)
 {
-	return(_syscall(SYS_msgsys, MSGCTL, msqid, cmd, buf));
+	return (_syscall(SYS_msgsys, MSGCTL, msqid, cmd, buf));
 }
 
-msgrcv(msqid, msgp, msgsz, msgtyp, msgflg)
-int msqid;
-struct msgbuf *msgp;
-int msgsz;
-long msgtyp;
-int msgflg;
+int
+msgrcv(int msqid, struct msgbuf *msgp, int msgsz, long msgtyp, int msgflg)
 {
-	return(_syscall(SYS_msgsys, MSGRCV, msqid, msgp, msgsz, msgtyp, msgflg));
+	return (_syscall(SYS_msgsys, MSGRCV, msqid, msgp, msgsz, msgtyp, msgflg));
 }
 
-msgsnd(msqid, msgp, msgsz, msgflg)
-int msqid;
-struct msgbuf *msgp;
-int msgsz, msgflg;
+int
+msgsnd(int msqid, struct msgbuf *msgp, int msgsz, int msgflg)
 {
-	return(_syscall(SYS_msgsys, MSGSND, msqid, msgp, msgsz, msgflg));
+	return (_syscall(SYS_msgsys, MSGSND, msqid, msgp, msgsz, msgflg));
 }
 
-
-msgsys(sysnum, va_alist)
-int sysnum;
-va_dcl
+int
+msgsys(int sysnum, ...)
 {
 	va_list ap;
 	key_t key;
@@ -91,29 +80,35 @@ va_dcl
 	long msgtyp;
 
 
-	va_start(ap);
+	va_start(ap, sysnum);
 	switch (sysnum) {
 	case MSGGET:
 		key=va_arg(ap, key_t);
 		msgflag=va_arg(ap, int);
-		return(msgget(key, msgflag));
+		va_end(ap);
+		return (msgget(key, msgflag));
 	case MSGCTL:
 		msqid=va_arg(ap, int);
 		cmd=va_arg(ap, int);
 		buf=va_arg(ap, struct msqid_ds *);
-		return(msgctl(msqid, cmd, buf));
+		va_end(ap);
+		return (msgctl(msqid, cmd, buf));
 	case MSGRCV:
 		msqid=va_arg(ap, int);
 		msgp=va_arg(ap, struct msgbuf *);
 		msgsz=va_arg(ap, int);
 		msgtyp=va_arg(ap, long);
 		msgflg=va_arg(ap, int);
-		return(msgrcv(msqid, msgp, msgsz, msgtyp, msgflg));
+		va_end(ap);
+		return (msgrcv(msqid, msgp, msgsz, msgtyp, msgflg));
 	case MSGSND:
 		msqid=va_arg(ap, int);
 		msgp=va_arg(ap, struct msgbuf *);
 		msgsz=va_arg(ap, int);
 		msgflg=va_arg(ap, int);
-		return(msgsnd(msqid, msgp, msgsz, msgflg));
+		va_end(ap);
+		return (msgsnd(msqid, msgp, msgsz, msgflg));
 	}
+	va_end(ap);
+	return (-1);
 }

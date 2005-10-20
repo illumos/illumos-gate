@@ -20,17 +20,17 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1987 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _sys_ttold_h
-#define _sys_ttold_h
+#define	_sys_ttold_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 struct tchars {
 	char	t_intrc;	/* interrupt */
@@ -73,19 +73,19 @@ struct	sgttyb {
  *  2) not implemented (and never were implemented)
  *  3) implemented on top of new-style "ioctl"s.
  */
-#define	TIOCGETD	_IOR(t, 0, int)		/* get line discipline */
-#define	TIOCSETD	_IOW(t, 1, int)		/* set line discipline */
-#define	TIOCHPCL	_IO(t, 2)		/* hang up on last close */
-#define	TIOCMODG	_IOR(t, 3, int)		/* get modem state - OBSOLETE */
-#define	TIOCMODS	_IOW(t, 4, int)		/* set modem state - OBSOLETE */
-#define	TIOCGETP	_IOR(t, 8,struct sgttyb)/* get parameters -- gtty */
-#define	TIOCSETP	_IOW(t, 9,struct sgttyb)/* set parameters -- stty */
-#define	TIOCSETN	_IOW(t,10,struct sgttyb)/* as above, but no flushtty */
-#define	TIOCEXCL	_IO(t, 13)		/* set exclusive use of tty */
-#define	TIOCNXCL	_IO(t, 14)		/* reset exclusive use of tty */
-#define	TIOCFLUSH	_IOW(t, 16, int)	/* flush buffers */
-#define	TIOCSETC	_IOW(t,17,struct tchars)/* set special characters */
-#define	TIOCGETC	_IOR(t,18,struct tchars)/* get special characters */
+#define	TIOCGETD	_IOR('t', 0, int)		/* get line discipline */
+#define	TIOCSETD	_IOW('t', 1, int)		/* set line discipline */
+#define	TIOCHPCL	_IO('t', 2)		/* hang up on last close */
+#define	TIOCMODG	_IOR('t', 3, int)		/* get modem state - OBSOLETE */
+#define	TIOCMODS	_IOW('t', 4, int)		/* set modem state - OBSOLETE */
+#define	TIOCGETP	_IOR('t', 8,struct sgttyb)/* get parameters -- gtty */
+#define	TIOCSETP	_IOW('t', 9,struct sgttyb)/* set parameters -- stty */
+#define	TIOCSETN	_IOW('t',10,struct sgttyb)/* as above, but no flushtty */
+#define	TIOCEXCL	_IO('t', 13)		/* set exclusive use of tty */
+#define	TIOCNXCL	_IO('t', 14)		/* reset exclusive use of tty */
+#define	TIOCFLUSH	_IOW('t', 16, int)	/* flush buffers */
+#define	TIOCSETC	_IOW('t',17,struct tchars)/* set special characters */
+#define	TIOCGETC	_IOR('t',18,struct tchars)/* get special characters */
 #define		O_TANDEM	0x00000001	/* send stopc on out q full */
 #define		O_CBREAK	0x00000002	/* half-cooked mode */
 #define		O_LCASE		0x00000004	/* simulate lower case */
@@ -134,10 +134,10 @@ struct	sgttyb {
 #define		O_DECCTQ	0x40000000	/* only ^Q starts after ^S */
 #define		O_NOFLSH	0x80000000	/* no output flush on signal */
 /* locals, from 127 down */
-#define	TIOCLBIS	_IOW(t, 127, int)	/* bis local mode bits */
-#define	TIOCLBIC	_IOW(t, 126, int)	/* bic local mode bits */
-#define	TIOCLSET	_IOW(t, 125, int)	/* set entire local mode word */
-#define	TIOCLGET	_IOR(t, 124, int)	/* get local modes */
+#define	TIOCLBIS	_IOW('t', 127, int)	/* bis local mode bits */
+#define	TIOCLBIC	_IOW('t', 126, int)	/* bic local mode bits */
+#define	TIOCLSET	_IOW('t', 125, int)	/* set entire local mode word */
+#define	TIOCLGET	_IOR('t', 124, int)	/* get local modes */
 #define		LCRTBS		(O_CRTBS>>16)
 #define		LPRTERA		(O_PRTERA>>16)
 #define		LCRTERA		(O_CRTERA>>16)
@@ -153,14 +153,14 @@ struct	sgttyb {
 #define		LPENDIN		(O_PENDIN>>16)
 #define		LDECCTQ		(O_DECCTQ>>16)
 #define		LNOFLSH		(O_NOFLSH>>16)
-#define	TIOCSBRK	_IO(t, 123)		/* set break bit */
-#define	TIOCCBRK	_IO(t, 122)		/* clear break bit */
-#define	TIOCSDTR	_IO(t, 121)		/* set data terminal ready */
-#define	TIOCCDTR	_IO(t, 120)		/* clear data terminal ready */
-#define	TIOCSLTC	_IOW(t,117,struct ltchars)/* set local special chars */
-#define	TIOCGLTC	_IOR(t,116,struct ltchars)/* get local special chars */
-#define	TIOCSTOP	_IO(t, 111)		/* stop output, like ^S */
-#define	TIOCSTART	_IO(t, 110)		/* start output, like ^Q */
+#define	TIOCSBRK	_IO('t', 123)		/* set break bit */
+#define	TIOCCBRK	_IO('t', 122)		/* clear break bit */
+#define	TIOCSDTR	_IO('t', 121)		/* set data terminal ready */
+#define	TIOCCDTR	_IO('t', 120)		/* clear data terminal ready */
+#define	TIOCSLTC	_IOW('t',117,struct ltchars)/* set local special chars */
+#define	TIOCGLTC	_IOR('t',116,struct ltchars)/* get local special chars */
+#define	TIOCSTOP	_IO('t', 111)		/* stop output, like ^S */
+#define	TIOCSTART	_IO('t', 110)		/* start output, like ^Q */
 
 /*
  * Sun-specific ioctls, which have been moved to the Sun-specific range.
@@ -172,15 +172,15 @@ struct	sgttyb {
  * structure's "ts_lines" field is greater than 64K or not.  If so,
  * it's almost certainly a "struct winsize" instead.
  */
-#define	_O_TIOCCONS	_IO(t, 104)		/* get console I/O */
-#define	_O_TIOCSSIZE	_IOW(t,103,struct ttysize)/* get tty size */
-#define	_O_TIOCGSIZE	_IOR(t,102,struct ttysize)/* get tty size */
+#define	_O_TIOCCONS	_IO('t', 104)		/* get console I/O */
+#define	_O_TIOCSSIZE	_IOW('t',103,struct ttysize)/* get tty size */
+#define	_O_TIOCGSIZE	_IOR('t',102,struct ttysize)/* get tty size */
 
 /*
  * Sun-specific ioctls.
  */
-#define	TIOCSETX	_IOW(t, 34, int)	/* set extra modes for S5 compatibility */
-#define	TIOCGETX	_IOR(t, 35, int)	/* get extra modes for S5 compatibility */
+#define	TIOCSETX	_IOW('t', 34, int)	/* set extra modes for S5 compatibility */
+#define	TIOCGETX	_IOR('t', 35, int)	/* get extra modes for S5 compatibility */
 #define		NOPOST		0x00000001	/* no processing on output (LITOUT with 7 bits + parity) */
 #define		NOISIG		0x00000002	/* disable all signal-generating characters */
 #define		STOPB		0x00000004	/* two stop bits */
@@ -195,4 +195,4 @@ struct	sgttyb {
 
 #include <sys/ttycom.h>
 
-#endif /*!_sys_ttold_h*/
+#endif /* !_sys_ttold_h */

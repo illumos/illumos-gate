@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1986 by Sun Microsystems, Inc.
+ * Copyright 1986 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * file: malloc.c
@@ -46,16 +47,16 @@
 
 #include "mallint.h"
 #include <errno.h>
+#include <stdlib.h>
+#include <stdarg.h>
 
 /* system interface */
 
 extern	char	*sbrk();
 extern	int	getpagesize();
-extern	abort();
-extern	int	errno;
 
 static	int	nbpg = 0;	/* set by calling getpagesize() */
-static	bool	morecore();	/* get more memory into free space */
+static	bool	morecore(uint);	/* get more memory into free space */
 
 #ifdef	S5EMUL
 #define	ptr_t		void *	/* ANSI C says these are voids */
@@ -86,19 +87,22 @@ char	*_ubound = NULL;		/* upper bound of heap */
 
 /* free header list management */
 
-static	Freehdr	getfreehdr();
-static	putfreehdr();
+static	Freehdr	getfreehdr(void);
+static	void	putfreehdr(Freehdr);
 static	Freehdr	freehdrptr = NIL;	/* ptr to block of available headers */
 static	int	nfreehdrs = 0;		/* # of headers in current block */
 static	Freehdr	freehdrlist = NIL;	/* List of available headers */
 
 /* error checking */
-static	error();	/* sets errno; prints msg and aborts if DEBUG is on */
+static void	error(char *, ...);
+/* sets errno; prints msg and aborts if DEBUG is on */
+
+static int	reclaim(Dblk, uint, int);
 
 #ifdef	DEBUG	/*	>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> */
 
-int	malloc_debug(/*level*/);
-int	malloc_verify();
+int	malloc_debug(int);
+int	malloc_verify(void);
 static	int debug_level = 1;
 
 /*
@@ -114,16 +118,16 @@ static	int debug_level = 1;
 	|| (size) > heapsize() \
 	|| ((char*)(p))+(size) > _ubound )
 
-#else	!DEBUG		=================================================
+#else	/* !DEBUG	================================================= */
 
 #define malloc_debug(level) 0
 #define malloc_verify() 1
 #define debug_level 0
 #define badblksize(p,size) 0
 
-#endif	!DEBUG		<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+#endif	/* !DEBUG	<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
 
-
+
 /*
  * insert (newblk, len)
  *	Inserts a new node in the free space tree, placing it
@@ -140,18 +144,20 @@ static	int debug_level = 1;
  *	The new node is then inserted at the root of the subtree for
  *	which the shorter node forms the old root (or in place of the
  *	null pointer).
+ *
+ * Arguments
+ *	newblk:	Ptr to the block to insert
+ *	len:	Length of new node
  */
 
-static
-insert(newblk, len)
-	register Dblk newblk;		/* Ptr to the block to insert */
-	register uint len;		/* Length of new node */
+static void
+insert(Dblk newblk, uint len)
 {
-	register Freehdr *fpp;		/* Address of ptr to subtree */
-	register Freehdr x;
-	register Freehdr *left_hook;	/* Temp for insertion */
-	register Freehdr *right_hook;	/* Temp for insertion */
-	register Freehdr newhdr;
+	Freehdr *fpp;		/* Address of ptr to subtree */
+	Freehdr x;
+	Freehdr *left_hook;	/* Temp for insertion */
+	Freehdr *right_hook;	/* Temp for insertion */
+	Freehdr newhdr;
 
 	/*
 	 * check for bad block size.
@@ -235,7 +241,6 @@ insert(newblk, len)
 
 } /*insert*/
 
-
 /*
  * delete(p)
  *	deletes a node from a cartesian tree. p is the address of
@@ -251,15 +256,14 @@ insert(newblk, len)
  * On entry:
  *	*p is assumed to be non-null.
  */
-static
-delete(p)
-	register Freehdr *p;
+static void
+delete(Freehdr *p)
 {
-	register Freehdr x;
-	register Freehdr left_branch;	/* left subtree of deleted node */
-	register Freehdr right_branch;	/* right subtree of deleted node */
-	register uint left_weight;
-	register uint right_weight;
+	Freehdr x;
+	Freehdr left_branch;	/* left subtree of deleted node */
+	Freehdr right_branch;	/* right subtree of deleted node */
+	uint left_weight;
+	uint right_weight;
 
 	x = *p;
 	left_branch = x->left;
@@ -310,7 +314,7 @@ delete(p)
 	putfreehdr(x);
 } /*delete*/
 
-
+
 /*
  * demote(p)
  *	Demotes a node in a cartesian tree, if necessary, to establish
@@ -337,16 +341,15 @@ delete(p)
  *   c. *p is non-null
  */
 
-static
-demote(p)
-	register Freehdr *p;
+static void
+demote(Freehdr *p)
 {
-	register Freehdr x;		/* addr of node to be demoted */
-	register Freehdr left_branch;
-	register Freehdr right_branch;
-	register uint	left_weight;
-	register uint	right_weight;
-	register uint	x_weight;
+	Freehdr x;		/* addr of node to be demoted */
+	Freehdr left_branch;
+	Freehdr right_branch;
+	uint	left_weight;
+	uint	right_weight;
+	uint	x_weight;
 
 	x = *p;
 	x_weight = weight(x);
@@ -384,7 +387,7 @@ demote(p)
 
 } /*demote*/
 
-
+
 /*
  * char*
  * malloc(nbytes)
@@ -416,15 +419,14 @@ demote(p)
  */
 
 ptr_t
-malloc(nbytes)
-	register uint	nbytes;
+malloc(uint nbytes)
 {
-	register Freehdr allocp;	/* ptr to node to be allocated */
-	register Freehdr *fpp;		/* for tree modifications */
-	register Freehdr left_branch;
-	register Freehdr right_branch;
-	register uint	 left_weight;
-	register uint	 right_weight;
+	Freehdr allocp;	/* ptr to node to be allocated */
+	Freehdr *fpp;		/* for tree modifications */
+	Freehdr left_branch;
+	Freehdr right_branch;
+	uint	 left_weight;
+	uint	 right_weight;
 	Dblk	 retblk;		/* block returned to the user */
 
 	/*
@@ -513,7 +515,7 @@ malloc(nbytes)
 		 * n bytes at the top are returned to the caller; the
 		 * remainder of the block goes back to free space.
 		 */
-		register Dblk nblk;
+		Dblk nblk;
 
 		retblk = allocp->block;
 		nblk = nextblk(retblk, nbytes);		/* ^next block */
@@ -543,7 +545,7 @@ malloc(nbytes)
 	return((ptr_t)retblk->data);
 
 } /*malloc*/
-
+
 /*
  * free(p)
  *	return a block to the free space tree.
@@ -559,15 +561,14 @@ malloc(nbytes)
  *	If the block size is invalid, return.
  */
 free_t
-free(ptr)
-	ptr_t	ptr;
+free(ptr_t ptr)
 {
-	register uint 	 nbytes;	/* Size of node to be released */
-	register Freehdr *fpp;		/* For deletion from free list */
-	register Freehdr neighbor;	/* Node to be coalesced */
-	register Dblk	 neighbor_blk;	/* Ptr to potential neighbor */
-	register uint	 neighbor_size;	/* Size of potential neighbor */
-	register Dblk	 oldblk;	/* Ptr to block to be freed */
+	uint 	 nbytes;	/* Size of node to be released */
+	Freehdr *fpp;		/* For deletion from free list */
+	Freehdr neighbor;	/* Node to be coalesced */
+	Dblk	 neighbor_blk;	/* Ptr to potential neighbor */
+	uint	 neighbor_size;	/* Size of potential neighbor */
+	Dblk	 oldblk;	/* Ptr to block to be freed */
 
 	/*
 	 * if rigorous checking was requested, do it.
@@ -694,7 +695,7 @@ free(ptr)
 
 } /*free*/
 
-
+
 /*
  * char*
  * shrink(oldblk, oldsize, newsize)
@@ -704,11 +705,9 @@ free(ptr)
  */
 
 static char *
-shrink(oldblk, oldsize, newsize)
-	register Dblk oldblk;
-	register uint oldsize, newsize;
+shrink(Dblk oldblk, uint oldsize, uint newsize)
 {
-	register Dblk remainder;
+	Dblk remainder;
 	if (oldsize - newsize >= SMALLEST_BLK) {
 		/*
 		 * Block is to be contracted. Split the old block
@@ -727,7 +726,6 @@ shrink(oldblk, oldsize, newsize)
 	return(oldblk->data);
 }
 
-
 /*
  * char*
  * realloc(ptr, nbytes)
@@ -752,18 +750,16 @@ shrink(oldblk, oldsize, newsize)
  * This atrocity was found in the source for diff(1).
  */
 ptr_t
-realloc(ptr, nbytes)
-	ptr_t	ptr;
-	uint	nbytes;
+realloc(ptr_t ptr, uint nbytes)
 {
-	register Freehdr *fpp;
-	register Freehdr fp;
-	register Dblk	oldblk;
-	register Dblk	freeblk;
-	register Dblk	oldneighbor;
-	register uint	oldsize;
-	register uint	newsize;
-	register uint	oldneighborsize;
+	Freehdr *fpp;
+	Freehdr fp;
+	Dblk	oldblk;
+	Dblk	freeblk;
+	Dblk	oldneighbor;
+	uint	oldsize;
+	uint	newsize;
+	uint	oldneighborsize;
 
 	/*
 	 * Add SVR4 semantics for OS 5.x so /usr/lib librarys
@@ -912,7 +908,7 @@ realloc(ptr, nbytes)
 
 } /* realloc */
 
-
+
 /*
  * *** The following code was pulled out of realloc() ***
  *
@@ -928,16 +924,13 @@ realloc(ptr, nbytes)
  *						if 'flag' == 1).
  */
 static int
-reclaim(oldblk, oldsize, flag)
-	register Dblk oldblk;
-	uint oldsize;
-	int flag;
+reclaim(Dblk oldblk, uint oldsize, int flag)
 {
-	register Dblk oldneighbor;
-	register Freehdr	*fpp;
-	register Freehdr	fp;
-	register Dblk		freeblk;
-	register uint		size;
+	Dblk oldneighbor;
+	Freehdr	*fpp;
+	Freehdr	fp;
+	Dblk		freeblk;
+	uint		size;
 
 	/*
 	 * Search the free space list for a node describing oldblk,
@@ -993,7 +986,7 @@ reclaim(oldblk, oldsize, flag)
 			 * oldblk is somewhere to the right of freeblk.
 			 * Check to see if it lies within freeblk.
 			 */
-			register Dblk freeneighbor;
+			Dblk freeneighbor;
 			freeneighbor =  nextblk(freeblk, freeblk->size); 
 			if (oldblk >= freeneighbor) {
 				/*
@@ -1116,8 +1109,7 @@ reclaim(oldblk, oldsize, flag)
  */
 
 static bool
-morecore(nbytes)
-	uint nbytes;
+morecore(uint nbytes)
 {
 	Dblk p;
 	Freehdr newhdr;
@@ -1154,7 +1146,7 @@ morecore(nbytes)
 
 } /*morecore*/
 
-
+
 /*
  * Get a free block header from the free header list.
  * When the list is empty, allocate an array of headers.
@@ -1162,11 +1154,11 @@ morecore(nbytes)
  * When we can't allocate another array, we're in deep weeds.
  */
 static	Freehdr
-getfreehdr()
+getfreehdr(void)
 {
 	Freehdr	r;
-	register Dblk	blk;
-	register uint	size;
+	Dblk	blk;
+	uint	size;
 
 	if (freehdrlist != NIL) {
 		r = freehdrlist;
@@ -1201,15 +1193,13 @@ getfreehdr()
  * Free a free block header
  * Add it to the list of available headers.
  */
-static
-putfreehdr(p)
-	Freehdr	p;
+static void
+putfreehdr(Freehdr p)
 {
 	p->left = freehdrlist;
 	freehdrlist = p;
 }
 
-
 #ifndef DEBUG	/*	>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> */
 
 /*
@@ -1218,15 +1208,13 @@ putfreehdr(p)
  * load /usr/lib/malloc.debug.o with your program.
  */
 /*ARGSUSED*/
-static
-error(fmt, arg1, arg2, arg3)
-	char	*fmt;
-	int arg1, arg2, arg3;
+static void
+error(char *fmt, ...)
 {
 	errno = EINVAL;
 }
 
-#endif	!DEBUG		<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+#endif	/* !DEBUG	<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */
 
 
 #ifdef	DEBUG	/*	>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> */
@@ -1249,13 +1237,12 @@ error(fmt, arg1, arg2, arg3)
  *	returns the previous level of error reporting.
  */
 int
-malloc_debug(level)
-	int level;
+malloc_debug(int level)
 {
 	int old_level;
 	old_level = debug_level;
 	debug_level = level;
-	return old_level;
+	return (old_level);
 }
 
 /*
@@ -1272,8 +1259,8 @@ malloc_debug(level)
 
 #define chkhdr(p) chkblk(p)
 
-static blkerror(p)
-	Freehdr p;
+static
+blkerror(Freehdr p)
 {
 	error("Illegal block address (%#x)\n", (p));
 }
@@ -1285,11 +1272,10 @@ static blkerror(p)
  */
 
 static int
-cartesian(p)
-	register Freehdr p;
+cartesian(Freehdr p)
 {
-	register Freehdr probe;
-	register Dblk db,pdb;
+	Freehdr probe;
+	Dblk db,pdb;
 
 	if (p == NIL)				/* no tree to test */
 		return 1;
@@ -1361,12 +1347,12 @@ cartesian(p)
  */
 
 int
-malloc_verify()
+malloc_verify(void)
 {
-	register int	maxsize;
-	register int	hdrsize;
-	register int	size;
-	register Dblk	p;
+	int	maxsize;
+	int	hdrsize;
+	int	size;
+	Dblk	p;
 	uint	lb,ub;
 
 	extern  char	end[];
@@ -1428,91 +1414,26 @@ extern	int	fileno();	/*bletch*/
 
 static	char	stderrbuf[LBUFSIZ];
 
-/*VARARGS2*/
-static
-sprintf( string, fmt, x1, x2, x3 )
-	char *string;
-	register char *fmt;
-	uint x1,x2,x3;
-{
-	register char *buf = string;
-	uint *argp = &x1;
-	register char c;
-
-	while ( c = *fmt++ ) {
-		if (c != '%') {
-			putchar(c);
-		} else {
-			/*
-			 * print formatted argument
-			 */
-			register uint x;
-			unsigned short radix;
-			char prbuf[12];
-			register char *cp;
-
-			x = *argp++;
-
-			switch( c = *fmt++ ) {
-			case 'd':
-				radix = 10;
-				if ((int)x < 0) {
-					putchar('-');
-					x = (unsigned)(-(int)x);
-				}
-				break;
-			case '#':
-				c = *fmt++;
-				if (c == 'x') {
-					putchar('0');
-					putchar(c);
-				}
-				/*FALL THROUGH*/
-			case 'x':
-				radix = 16;
-				break;
-			default:
-				putchar(c);
-				continue;
-			} /*switch*/
-
-			cp = prbuf;
-			do {
-				*cp++ = "0123456789abcdef"[x%radix];
-				x /= radix;
-			} while(x);
-			do {
-				putchar(*--cp);
-			} while(cp > prbuf);
-		}/*if*/
-	} /*while*/
-
-	putchar('\0');
-	return(buf - string);
-
-} /*sprintf*/
-
 /*
  * Error routine.
  * If debug_level == 0, does nothing except set errno = EINVAL.
  * Otherwise, prints an error message to stderr and generates a
  * core image.
  */
-
-/*VARARGS1*/
-static
-error(fmt, arg1, arg2, arg3)
-	char	*fmt;
-	int arg1, arg2, arg3;
+static void
+error(char *fmt, ...)
 {
-	static n = 0;	/* prevents infinite recursion when using stdio */
-	register int nbytes;
+	static int n = 0; /* prevents infinite recursion when using stdio */
+	int nbytes;
+	va_list ap;
 
 	errno = EINVAL;
 	if (debug_level == 0)
 		return;
 	if (!n++) {
-		nbytes = sprintf(stderrbuf, fmt, arg1, arg2, arg3);
+		va_start(ap, fmt);
+		nbytes = vsprintf(stderrbuf, fmt, ap);
+		va_end(ap);
 		stderrbuf[nbytes++] = '\n';
 		stderrbuf[nbytes] = '\0';
 		write(fileno(stderr), stderrbuf, nbytes);
@@ -1520,4 +1441,4 @@ error(fmt, arg1, arg2, arg3)
 	abort();
 }
 
-#endif	DEBUG		<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+#endif	/* DEBUG	<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<< */

@@ -19,17 +19,17 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "_Qquad.h"
 
 QUAD 
-_Q_neg(x)
-	QUAD x;
+_Q_neg(QUAD x)
 {
 	QUAD z;
 	int	*pz = (int*) &z;
@@ -40,5 +40,5 @@ _Q_neg(x)
 	} else {
 	    pz[3] ^= 0x80000000;
 	}
-	return z;
+	return (z);
 }

@@ -24,12 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/syscall.h>
 
-symlink(t, f)
-    char           *t, *f;
+int
+symlink(char *t, char *f)
 {
-    return _syscall(SYS_symlink, t, f);
+    return (_syscall(SYS_symlink, t, f));
 }

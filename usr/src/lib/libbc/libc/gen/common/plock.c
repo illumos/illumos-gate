@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-/* @(#)plock.c 1.3 90/03/30 */
-
 /*
- * Copyright (c) 1989 by Sun Microsystems, Inc.
+ * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * plock - lock "segments" in physical memory.
@@ -49,6 +50,8 @@
 extern	struct link_dynamic _DYNAMIC;
 extern	int mlock();
 extern	int munlock();
+extern	caddr_t sbrk();		/* find end of data segment */
+extern	caddr_t etext;		/* end of text segment */
 
 /*
  * Module-scope variables.
@@ -61,19 +64,19 @@ static	int state_pid = -1;		/* pid to which state belongs */
  * Local worker routine to lock text and data segments.  Handles
  * dynamically loaded objects.  This routine is highly dependent
  * on executable format and layout.
+ *
+ * Arguments:
+ *	op:	desired operation
+ *	f:	function to perform
  */
 static int
-apply_lock(op, f)
-	int op;				/* desired operation */
-	int (*f)();			/* function to perform */
+apply_lock(int op, int (*f)(caddr_t, u_int))
 {
 	int	e = 0;			/* return value */
 	caddr_t	a;			/* address of operation */
 	u_int	l;			/* length of operation */
 	struct	link_map *lmp;		/* link map walker */
 	struct	exec *eh;		/* exec header */
-	extern	caddr_t sbrk();		/* find end of data segment */
-	extern	caddr_t etext;		/* end of text segment */
 
 	/*
 	 * Operate on application segment first.
@@ -108,9 +111,9 @@ apply_lock(op, f)
 	 */
 	switch (_DYNAMIC.ld_version) {
 	case 2:
-#ifdef sparc
+#if	defined(__sparc)
 	case 3:
-#endif sparc
+#endif	/* __sparc */
 		lmp = _DYNAMIC.ld_un.ld_2->ld_loaded;
 		break;
 	default:
@@ -144,11 +147,13 @@ apply_lock(op, f)
 }
 
 /*
- * plock 
+ * plock
+ *
+ * Argument:
+ *	op:	desired operation
  */
 int
-plock(op)
-	int op;				/* desired operation */
+plock(int op)
 {
 	int 	e = 0;			/* return value */
 	int	pid;			/* current pid */

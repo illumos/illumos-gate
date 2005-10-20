@@ -27,14 +27,14 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
+#ifndef _sys_shm_h
+#define	_sys_shm_h
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	IPC Shared Memory Facility.
  */
-
-#ifndef _sys_shm_h
-#define _sys_shm_h
 
 #include <sys/param.h>
 /* #include <machine/mmu.h> */
@@ -79,78 +79,4 @@ struct shmid_ds {
 	struct anon_map	*shm_amp;	/* segment anon_map pointer */
 };
 
-
-
-#ifdef KERNEL
-/*
- *	Permission Definitions.
- */
-
-#define	SHM_W	0200	/* write permission */
-#define	SHM_R	0400	/* read permission */
-
-/*
- *	ipc_perm Mode Definitions.
- */
-
-#define	SHM_INIT	001000	/* segment not yet initialized */
-#define SHM_LOCKED	004000	/* shmid locked */
-#define SHM_LOCKWAIT	010000	/* shmid wanted */
-
-#define	PSHM	(PZERO + 1)	/* sleep priority */
-
-/* define resource locking macros */
-#define SHMLOCK(sp) { \
-	while ((sp)->shm_perm.mode & SHM_LOCKED) { \
-		(sp)->shm_perm.mode |= SHM_LOCKWAIT; \
-		(void) sleep((caddr_t)(sp), PSHM); \
-	} \
-	(sp)->shm_perm.mode |= SHM_LOCKED; \
-}
-
-#define SHMUNLOCK(sp) { \
-	(sp)->shm_perm.mode &= ~SHM_LOCKED; \
-	if ((sp)->shm_perm.mode & SHM_LOCKWAIT) { \
-		(sp)->shm_perm.mode &= ~SHM_LOCKWAIT; \
-		curpri = PSHM; \
-		wakeup((caddr_t)(sp)); \
-	} \
-}
-
-/*
- *	Shared Memory information structure
- */
-struct	shminfo {
-	int	shmmax,		/* max shared memory segment size */
-		shmmin,		/* min shared memory segment size */
-		shmmni,		/* # of shared memory identifiers */
-		shmseg,		/* (obsolete)                     */
-		shmall;		/* (obsolete)                     */
-};
-struct shminfo	shminfo;	/* configuration parameters */
-
-/*
- *	Configuration Parameters
- * These parameters are tuned by editing the system configuration file.
- * The following lines establish the default values.
- */
-#ifndef	SHMSIZE
-#define	SHMSIZE	1024	/* maximum shared memory segment size (in Kbytes) */
-#endif
-#ifndef	SHMMNI
-#define	SHMMNI	100	/* # of shared memory identifiers */
-#endif
-
-/* The following parameters are assumed not to require tuning */
-#define	SHMMIN	1			/* min shared memory segment size */
-#define	SHMMAX	(SHMSIZE * 1024)	/* max shared memory segment size */
-
-
-/*
- * Structures allocated in machdep.c
- */
-struct shmid_ds	*shmem;		/* shared memory id pool */
-
-#endif KERNEL
-
-#endif /*!_sys_shm_h*/
+#endif /* !_sys_shm_h */

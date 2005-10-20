@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* c2 secure */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <string.h>
@@ -65,6 +65,8 @@ struct exception {
 };
 typedef struct exception except_t;
 
+static int	stringcopy(char *, char *, int);
+
 /*
  * getauditflagschar() - convert bit flag to character string  
  * 
@@ -78,10 +80,8 @@ typedef struct exception except_t;
  *    		-1 - error
  */
 
-getauditflagschar(auditstring, masks, verbose)  
-	char *auditstring;
-	audit_state_t *masks; 
-	int verbose;
+int
+getauditflagschar(char *auditstring, audit_state_t *masks, int verbose)  
 {
 	int i, j, k, mask_num;
 	int list = -1, retstat = 0; 
@@ -347,10 +347,9 @@ getauditflagschar(auditstring, masks, verbose)
 	return (retstat);
 }
 
-static stringcopy(auditstring, event, flag)
-	char *auditstring;
-	char *event;
-	int flag;		/* if set, output comma after event */
+static int
+stringcopy(char *auditstring, char *event,
+    int flag)	/* if set, output comma after event */
 {
 	int retstat = 0;
 
@@ -393,9 +392,8 @@ static stringcopy(auditstring, event, flag)
  *        		not match event flag names
  */
 
-getauditflagsbin(auditstring, masks)  
-	char *auditstring;
-	audit_state_t *masks;
+int
+getauditflagsbin(char *auditstring, audit_state_t *masks)  
 {
 	int i, gotone, done = 0, invert = 0, tryagain;
 	int retstat = 0, succ_event, fail_event;

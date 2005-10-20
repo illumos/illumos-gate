@@ -22,7 +22,7 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 3.3 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 /*
@@ -32,17 +32,15 @@
  */
 #include <stdio.h>
 #include "stdiom.h"
+#include <memory.h>
 
 extern int _filbuf();
-extern _bufsync();
-extern char *memccpy();
 
 char *
-gets(ptr)
-char *ptr;
+gets(char *ptr)
 {
 	char *p, *ptr0 = ptr;
-	register int n;
+	int n;
 
 	for ( ; ; ) {
 		if (stdin->_cnt <= 0) { /* empty buffer */

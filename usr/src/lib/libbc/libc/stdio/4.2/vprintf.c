@@ -19,22 +19,24 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 1.1 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 #include <stdio.h>
-#include <varargs.h>
+#include <stdarg.h>
 
 extern int _doprnt();
 
-/*VARARGS1*/
 int
-vprintf(format, ap)
-char *format;
-va_list ap;
+vprintf(char *format, va_list ap)
 {
 	if (!(stdout->_flag & _IOWRT)) {
 		/* if no write flag */
@@ -43,8 +45,8 @@ va_list ap;
 			stdout->_flag |= _IOWRT;
 		} else {
 			/* else error */
-			return EOF;
+			return (EOF);
 		}
 	}
-	return(_doprnt(format, ap, stdout));
+	return (_doprnt(format, ap, stdout));
 }

@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 1983 Regents of the University of California.
- * All rights reserved.  The Berkeley software License Agreement
- * specifies the terms and conditions for redistribution.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright (c) 1983 Regents of the University of California.
+ * All rights reserved.  The Berkeley software License Agreement
+ * specifies the terms and conditions for redistribution.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,14 +34,17 @@
 #include <sys/signal.h>
 #include <sys/syslog.h>
 #include <sys/time.h>
+#include <sys/unistd.h>
 #include <netdb.h>
 #include <strings.h>
-#include <varargs.h>
+#include <stdarg.h>
 #include <vfork.h>
 #include <stdio.h>
+#include <errno.h>
+#include <malloc.h>
+
 
 #define	MAXLINE	1024			/* max message size */
-#define	NULL	0			/* manifest */
 
 #define	PRIMASK(p)	(1 << ((p) & LOG_PRIMASK))
 #define	PRIFAC(p)	(((p) & LOG_FACMASK) >> 3)
@@ -68,15 +71,17 @@ static struct _syslog {
 #define	SyslogHost (_syslog->_SyslogHost)
 #define	LogFacility (_syslog->_LogFacility)
 
-extern	int errno;
 
-extern char *calloc();
 extern char *strerror(int);
 extern time_t time();
-extern unsigned int alarm();
+
+void	vsyslog(int, char *, va_list);
+void	openlog(char *, int, int);
+static int	snprintf(char *, size_t, char *, ...);
+static int	vsnprintf(char *, size_t, char *, va_list ap);
 
 static int
-allocstatic()
+allocstatic(void)
 {
 	_syslog = (struct _syslog *)calloc(1, sizeof (struct _syslog));
 	if (_syslog == 0)
@@ -89,27 +94,22 @@ allocstatic()
 	return (1);
 }
 
-/*VARARGS2*/
-syslog(pri, fmt, va_alist)
-	int pri;
-	char *fmt;
-	va_dcl
+void
+syslog(int pri, char *fmt, ...)
 {
 	va_list ap;
 
-	va_start(ap);
+	va_start(ap, fmt);
 	vsyslog(pri, fmt, ap);
 	va_end(ap);
 }
 
-vsyslog(pri, fmt, ap)
-	int pri;
-	char *fmt;
-	va_list ap;
+void
+vsyslog(int pri, char *fmt, va_list ap)
 {
 	char buf[MAXLINE + 1], outline[MAXLINE + 1];
-	register char *b, *f, *o;
-	register int c;
+	char *b, *f, *o;
+	int c;
 	long now;
 	int pid, olderrno = errno;
 	int retsiz, outsiz = MAXLINE + 1;
@@ -236,10 +236,8 @@ vsyslog(pri, fmt, ap)
 /*
  * OPENLOG -- open system log
  */
-
-openlog(ident, logstat, logfac)
-	char *ident;
-	int logstat, logfac;
+void
+openlog(char *ident, int logstat, int logfac)
 {
 	if (_syslog == 0 && !allocstatic())
 		return;
@@ -262,8 +260,8 @@ openlog(ident, logstat, logfac)
 /*
  * CLOSELOG -- close the system log
  */
-
-closelog()
+void
+closelog(void)
 {
 
 	if (_syslog == 0)
@@ -275,8 +273,8 @@ closelog()
 /*
  * SETLOGMASK -- set the log mask level
  */
-setlogmask(pmask)
-	int pmask;
+int
+setlogmask(int pmask)
 {
 	int omask;
 
@@ -297,14 +295,10 @@ setlogmask(pmask)
 
 extern int _doprnt();
 
-/*VARARGS3*/
 static int
-snprintf(string, n, format, va_alist)
-char *string, *format;
-size_t n;
-va_dcl
+snprintf(char *string, size_t n, char *format, ...)
 {
-	register int count;
+	int count;
 	FILE siop;
 	va_list ap;
 
@@ -313,21 +307,17 @@ va_dcl
 	siop._cnt = n - 1;
 	siop._base = siop._ptr = (unsigned char *)string;
 	siop._flag = _IOWRT+_IOSTRG;
-	va_start(ap);
+	va_start(ap, format);
 	count = _doprnt(format, ap, &siop);
 	va_end(ap);
 	*siop._ptr = '\0';	/* plant terminating null character */
 	return (count);
 }
 
-/*VARARGS3*/
 static int
-vsnprintf(string, n, format, ap)
-char *string, *format;
-size_t n;
-va_list ap;
+vsnprintf(char *string, size_t n, char *format, va_list ap)
 {
-	register int count;
+	int count;
 	FILE siop;
 
 	if (n == 0)

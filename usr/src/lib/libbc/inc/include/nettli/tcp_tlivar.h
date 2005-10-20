@@ -19,20 +19,21 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_TCP_TLIVAR_
 #define	_TCP_TLIVAR_
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * Data structure definitions for the streams interface
  * to the socket-based TCP implementation.
  */
-
 
 /*
  * Socket Information block contains the special socket wakeup
@@ -134,10 +135,6 @@ extern	tcptli_debug;
 #define	TCPTLI_PRINTF if (tcptli_debug) printf
 #else
 #define	TCPTLI_PRINTF
-#endif	TLIDEBUG
+#endif	/* TLIDEBUG */
 
-#ifdef	KERNEL
-extern struct tt_softc	tt_softc[];
-#endif	KERNEL
-
-#endif	_TCP_TLIVAR_
+#endif	/* _TCP_TLIVAR_ */

@@ -27,7 +27,7 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -43,13 +43,11 @@
 #define SV_SETLK	6
 #define SV_SETLKW	7
 
-lockf(fildes, function, size)
-	int fildes;
-	int function;
-	long size;
+int
+lockf(int fildes, int function, long size)
 {
 	struct flock ld;
-	register int cmd;
+	int cmd;
 
 	cmd = SV_SETLK;		/* assume non-blocking operation */
 	ld.l_type = F_WRLCK;	/* lockf() only deals with exclusive locks */

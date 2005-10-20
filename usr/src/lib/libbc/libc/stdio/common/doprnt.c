@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1988-1995, by Sun Microsystems, Inc.
- * All rights reserved
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /* Copyright (c) 1988 AT&T */
@@ -41,7 +41,7 @@
 
 #include <stdio.h>
 #include <ctype.h>
-#include <varargs.h>
+#include <stdarg.h>
 #include <values.h>
 #include <locale.h>
 #include "doprnt.h"
@@ -63,13 +63,8 @@
 extern void _fourdigitsquick();
 #endif
 
-void _mkarglst();
-void _getarg();
-static char *_check_dol();
-
-
 #define emitchar(c)   { if (--filecnt < 0) { \
-				register FILE *iop = file; \
+				FILE *iop = file; \
 				if (((iop->_flag & (_IOLBF|_IONBF)) == 0 \
 				    || -filecnt >= iop->_bufsiz)) { \
 					iop->_ptr = fileptr; \
@@ -99,27 +94,29 @@ typedef struct stva_list {
 	va_list ap;
 } stva_list;
 
-_doprnt(format, in_args, file)
-	char *format;
-	va_list in_args;
-	FILE *file;
+void	_mkarglst(char *, stva_list, stva_list []);
+void	_getarg(char *, stva_list *, int);
+static char	*_check_dol(char *, int *);
+
+int
+_doprnt(char *format, va_list in_args, FILE *file)
 {
 	char convertbuffer[1024] ;
 	
 	/* Current position in format */
-	register char *cp;
+	char *cp;
 
 	/* Starting and ending points for value to be printed */
-	register char *bp;
+	char *bp;
 	char *p;
 
 	/* Pointer and count for I/O buffer */
-	register unsigned char *fileptr;
-	register int filecnt;
+	unsigned char *fileptr;
+	int filecnt;
 
 	/* Field width and precision */
 	int width;
-	register int prec;
+	int prec;
 
 	/* Format code */
 	char fcode;
@@ -177,15 +174,15 @@ _doprnt(format, in_args, file)
 
 
 	/* The value being converted, if integer */
-	register unsigned long val;
+	unsigned long val;
 
 	/* Work variables */
-	register int n;
-	register char c;
+	int n;
+	char c;
 	char radix;
 	int svswitch = 0;
 	/* count of output characters */
-	register int count;
+	int count;
 
 	/* variables for positional parameters */
 	char    *sformat = format;      /* save the beginning of the format */
@@ -285,7 +282,7 @@ _doprnt(format, in_args, file)
 				val = va_arg(args.ap, unsigned);
 			udcommon:
                                 {
-                                register char *stringp = lowerhex;
+                                char *stringp = lowerhex;
                                 bp = buf+MAXDIGS;
                                 stringp = lowerhex;
                                 do {
@@ -297,7 +294,7 @@ _doprnt(format, in_args, file)
 
 			case 'X':
 				{
-				register char *stringp = upperhex;
+				char *stringp = upperhex;
 				val = va_arg(args.ap, unsigned);
 				bp = buf + MAXDIGS;
 				if (val == 0)
@@ -312,7 +309,7 @@ _doprnt(format, in_args, file)
 			case 'x':
 			case 'p':
 				{
-				register char *stringp = lowerhex;
+				char *stringp = lowerhex;
 				val = va_arg(args.ap, unsigned);
 				bp = buf + MAXDIGS;
 				if (val == 0)
@@ -327,7 +324,7 @@ _doprnt(format, in_args, file)
 			case 'O':
 			case 'o':
 				{
-				register char *stringp = lowerhex;
+				char *stringp = lowerhex;
 				val = va_arg(args.ap, unsigned);
 				bp = buf + MAXDIGS;
 				if (val == 0)
@@ -613,7 +610,7 @@ _doprnt(format, in_args, file)
 				}
 				/* Set translate table for digits */
 				{
-				register char *stringp;
+				char *stringp;
 				if (fcode == 'X')
 					stringp = upperhex;
 				else
@@ -674,7 +671,7 @@ _doprnt(format, in_args, file)
 				break;
 #if FLOAT
 
-#ifdef sparc
+#if	defined(__sparc)
 #define GETQVAL /* Sun-4 macro to get a quad q from the argument list, passed as a pointer. */ \
       { qval = *(va_arg(args.ap, quadruple*)) ; }
 #else
@@ -717,7 +714,7 @@ _doprnt(format, in_args, file)
 					goto ebreak ;
 					}
 				{
-				register char *stringp;
+				char *stringp;
 				/* Place the first digit in the buffer */
 				stringp = &buf[0];
 				*stringp++ = *bp != '\0'? *bp++: '0';
@@ -807,7 +804,7 @@ ebreak:
 					goto fbreak ;    
 					}
 				{
-				register char *stringp;
+				char *stringp;
 				/* Initialize buffer pointer */
 				stringp = &buf[0];
 
@@ -1000,7 +997,7 @@ out:
 	return (ferror(file)? EOF: count);
 }
 
-#ifdef sparc
+#if	defined(__sparc)
 /*
  * We use "double *" instead of "quadruple *" to skip over the pointer to
  * long double on the argument list since a pointer is a pointer after all.
@@ -1015,13 +1012,12 @@ out:
 		(void) va_arg(args.ap, unsigned long); \
 }
 #endif
-/* This function initializes arglst, to contain the appropriate va_list values
- * for the first MAXARGS arguments. */
+/*
+ * This function initializes arglst, to contain the appropriate va_list values
+ * for the first MAXARGS arguments.
+ */
 void
-_mkarglst(fmt, args, arglst)
-char	*fmt;
-stva_list args;
-stva_list arglst[];
+_mkarglst(char *fmt, stva_list args, stva_list arglst[])
 {
 	static char *digits = "01234567890", *skips = "# +-.0123456789h$";
 
@@ -1152,10 +1148,7 @@ stva_list arglst[];
  * pargs is assumed to contain the value of arglst[MAXARGS - 1].
  */
 void
-_getarg(fmt, pargs, argno)
-char	*fmt;
-stva_list *pargs;
-int	argno;
+_getarg(char *fmt, stva_list *pargs, int argno)
 {
 	static char *digits = "01234567890", *skips = "# +-.0123456789h$";
 	int i, n, curargno, flags;
@@ -1256,9 +1249,7 @@ int	argno;
  * parse a string, mini parse
  */
 static char *
-_check_dol(s, val)
-	char *s;
-	int *val;
+_check_dol(char *s, int *val)
 {
 	char *os;	/* save old string */
 	int tmp_val = 0;

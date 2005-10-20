@@ -24,16 +24,15 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "chkpath.h"
 
-mkfifo(path, mode)
-	char *path;
-	mode_t mode;
+int
+mkfifo(char *path, mode_t mode)
 {
 	CHKNULL(path);
-	return mknod(path, S_IFIFO | (mode & (S_IRWXU|S_IRWXG|S_IRWXO)));
+	return (mknod(path, S_IFIFO | (mode & (S_IRWXU|S_IRWXG|S_IRWXO))));
 }

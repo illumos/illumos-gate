@@ -27,29 +27,32 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 1.2 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*	LINTLIBRARY	*/
 /*	putenv - change environment variables
+ *
+ *	input - char *change = a pointer to a string of the form
+ *			       "name=value"
+ *
+ *	output - 0, if successful
+ *		 1, otherwise
+ */
 
-	input - char *change = a pointer to a string of the form
-			       "name=value"
+#include <stdio.h>
+#include <stdlib.h>
 
-	output - 0, if successful
-		 1, otherwise
-*/
-#define NULL 0
 extern char **environ;		/* pointer to enviroment */
-static reall;		/* flag to reallocate space, if putenv is called
+static int	reall;		/* flag to reallocate space, if putenv is called
 				   more than once */
+static int	find(char *);
+static int	match(char *, char *);
 
 int
-putenv(change)
-char *change;
+putenv(char *change)
 {
 	char **newenv;		    /* points to new environment */
-	register int which;	    /* index of variable to replace */
-	char *realloc(), *malloc(); /* memory alloc routines */
+	int which;	    /* index of variable to replace */
 
 	if ((which = find(change)) < 0)  {
 		/* if a new variable */
@@ -60,14 +63,14 @@ char *change;
 			/* we have expanded environ before */
 			newenv = (char **)realloc(environ,
 				  which*sizeof(char *));
-			if (newenv == NULL)  return -1;
+			if (newenv == NULL)  return (-1);
 			/* now that we have space, change environ */
 			environ = newenv;
 		} else {
 			/* environ points to the original space */
 			reall++;
 			newenv = (char **)malloc(which*sizeof(char *));
-			if (newenv == NULL)  return -1;
+			if (newenv == NULL)  return (-1);
 			(void)memcpy((char *)newenv, (char *)environ,
  				(int)(which*sizeof(char *)));
 			environ = newenv;
@@ -78,7 +81,7 @@ char *change;
 		/* we are replacing an old variable */
 		environ[which] = change;
 	}
-	return 0;
+	return (0);
 }
 
 /*	find - find where s2 is in environ
@@ -88,18 +91,17 @@ char *change;
  *	output - index of name in environ that matches "name"
  *		 -size of table, if none exists
 */
-static
-find(str)
-register char *str;
+static int
+find(char *str)
 {
-	register int ct = 0;	/* index into environ */
+	int ct = 0;	/* index into environ */
 
 	while(environ[ct] != NULL)   {
 		if (match(environ[ct], str)  != 0)
-			return ct;
+			return (ct);
 		ct++;
 	}
-	return -(++ct);
+	return (-(++ct));
 }
 /*
  *	s1 is either name, or name=value
@@ -108,14 +110,13 @@ register char *str;
  *	else return 0
  */
 
-static
-match(s1, s2)
-register char *s1, *s2;
+static int
+match(char *s1, char *s2)
 {
 	while(*s1 == *s2++)  {
 		if (*s1 == '=')
-			return 1;
+			return (1);
 		s1++;
 	}
-	return 0;
+	return (0);
 }

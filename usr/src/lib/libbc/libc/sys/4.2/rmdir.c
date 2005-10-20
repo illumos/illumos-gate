@@ -24,19 +24,18 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-# include "chkpath.h"
+#include "chkpath.h"
 
-rmdir(d)
-    char           *d;
+int
+rmdir(char *d)
 {
 	int ret;
-	extern errno;
 
 	CHKNULL(d);
 	ret = _syscall(SYS_rmdir, d);
 	if (errno == EEXIST)
 		errno = ENOTEMPTY;
-	return ret;
+	return (ret);
 }

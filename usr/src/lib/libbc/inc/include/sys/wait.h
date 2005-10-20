@@ -9,6 +9,9 @@
  * specifies the terms and conditions for redistribution.
  */
 
+#ifndef	__sys_wait_h
+#define	__sys_wait_h
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -20,9 +23,6 @@
  * detailed information about process resource utilization (<vtimes.h>).
  */
 
-#ifndef	__sys_wait_h
-#define	__sys_wait_h
-
 #ifndef	_POSIX_SOURCE
 #define	__wait		wait
 #define	w_termsig	__w_termsig
@@ -31,7 +31,7 @@
 #define	w_stopval	__w_stopval
 #define	w_stopsig	__w_stopsig
 #define	WSTOPPED	_WSTOPPED
-#endif	!_POSIX_SOURCE
+#endif	/* !_POSIX_SOURCE */
 
 /*
  * Structure of the information in the first word returned by both
@@ -44,17 +44,10 @@ union __wait	{
 	 * Terminated process status.
 	 */
 	struct {
-#if	defined(vax) || defined(i386)
-		unsigned short	w_Termsig:7;	/* termination signal */
-		unsigned short	w_Coredump:1;	/* core dump indicator */
-		unsigned short	w_Retcode:8;	/* exit code if w_termsig==0 */
-#endif
-#if	defined(mc68000) || defined(sparc)
 		unsigned short	w_Fill1:16;	/* high 16 bits unused */
 		unsigned short	w_Retcode:8;	/* exit code if w_termsig==0 */
 		unsigned short	w_Coredump:1;	/* core dump indicator */
 		unsigned short	w_Termsig:7;	/* termination signal */
-#endif
 	} w_T;
 	/*
 	 * Stopped process status.  Returned
@@ -62,15 +55,9 @@ union __wait	{
 	 * with the WUNTRACED option bit.
 	 */
 	struct {
-#if	defined(vax) || defined(i386)
-		unsigned short	w_Stopval:8;	/* == W_STOPPED if stopped */
-		unsigned short	w_Stopsig:8;	/* signal that stopped us */
-#endif
-#if	defined(mc68000) || defined(sparc)
 		unsigned short	w_Fill2:16;	/* high 16 bits unused */
 		unsigned short	w_Stopsig:8;	/* signal that stopped us */
 		unsigned short	w_Stopval:8;	/* == W_STOPPED if stopped */
-#endif
 	} w_S;
 };
 #define	__w_termsig	w_T.w_Termsig
@@ -101,24 +88,9 @@ union __wait	{
 #define	WTERMSIG(x)	(((union __wait*)&(x))->__w_termsig)
 #define	WSTOPSIG(x)	(((union __wait*)&(x))->__w_stopsig)
 
-#if	defined(KERNEL)  &&  !defined(_POSIX_SOURCE)
-/*
- * Arguments to wait4() system call, included here so it may be called by
- * other routines in the kernel.
- */
-struct wait4_args {
-	int pid;
-	union wait *status;
-	int options;
-	struct rusage *rusage;
-};
-#endif	KERNEL
-
-#ifndef	KERNEL
 #include <sys/stdtypes.h>
 
 pid_t	wait(/* int *loc */);
 pid_t	waitpid(/* pid_t pid, int *loc, int opts */);
-#endif
 
 #endif	/* !__sys_wait_h */

@@ -27,10 +27,10 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<syscall.h>
-#include	<varargs.h>
+#include	<stdarg.h>
 #include	<sys/types.h>
 #include	<sys/ipc.h>
 #include	<sys/sem.h>
@@ -40,11 +40,8 @@
 #define SEMGET  1
 #define SEMOP   2
 
-/*VARARGS3*/
-semctl(semid, semnum, cmd, arg)
-int semid, cmd;
-int semnum;
-union semun arg;
+int
+semctl(int semid, int semnum, int cmd, union semun *arg)
 {
 	switch (cmd) {
 
@@ -55,34 +52,30 @@ union semun arg;
 	case SETVAL:
 	case GETALL:
 	case SETALL:
-		return(_syscall(SYS_semsys,SEMCTL,semid,semnum,cmd,arg.val));
+		return (_syscall(SYS_semsys,SEMCTL,semid,semnum,cmd,arg->val));
 
 	case IPC_RMID:
 		cmd += 10;
 		/* fall-through */
 	default:
-		return(_syscall(SYS_semsys,SEMCTL,semid,semnum,cmd,0));
+		return (_syscall(SYS_semsys,SEMCTL,semid,semnum,cmd,0));
 	}
 }
 
-semget(key, nsems, semflg)
-key_t key;
-int nsems, semflg;
+int
+semget(key_t key, int nsems, int semflg)
 {
-	return(_syscall(SYS_semsys, SEMGET, key, nsems, semflg));
+	return (_syscall(SYS_semsys, SEMGET, key, nsems, semflg));
 }
 
-semop(semid, sops, nsops)
-int semid;
-struct sembuf *sops;
-int nsops;
+int
+semop(int semid, struct sembuf *sops, int nsops)
 {
-	return(_syscall(SYS_semsys, SEMOP, semid, sops, nsops));
+	return (_syscall(SYS_semsys, SEMOP, semid, sops, nsops));
 }
 
-semsys(sysnum, va_alist)
-int sysnum;
-va_dcl
+int
+semsys(int sysnum, ...)
 {
 	va_list ap;
 	int semid, cmd;
@@ -93,7 +86,7 @@ va_dcl
 	struct sembuf *sops;
 	int nsops;
 
-	va_start(ap);
+	va_start(ap, sysnum);
 	switch (sysnum) {
 	case SEMCTL:
 		semid=va_arg(ap, int);
@@ -102,17 +95,21 @@ va_dcl
 		val=va_arg(ap, int);
 		if ((cmd == IPC_STAT) || (cmd == IPC_SET) || (cmd == IPC_RMID))
 			cmd += 10;
-		return(_syscall(SYS_semsys, SEMCTL, semid, semnum, cmd, val));
+		va_end(ap);
+		return (_syscall(SYS_semsys, SEMCTL, semid, semnum, cmd, val));
 	case SEMGET:
 		key=va_arg(ap, key_t);
 		nsems=va_arg(ap, int);
 		semflg=va_arg(ap, int);
-		return(semget(key, nsems, semflg));
+		va_end(ap);
+		return (semget(key, nsems, semflg));
 	case SEMOP:
 		semid=va_arg(ap, int);
 		sops=va_arg(ap, struct sembuf *);
 		nsops=va_arg(ap, int);
-		return(semop(semid, sops, nsops));
+		va_end(ap);
+		return (semop(semid, sops, nsops));
 	}
+	va_end(ap);
+	return (-1);
 }
-

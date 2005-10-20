@@ -27,14 +27,14 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from S5R2 1.3 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<syscall.h>
-#include	<varargs.h>
+#include	<stdarg.h>
 #include	<sys/types.h>
 #include	<sys/ipc.h>
 #include	<sys/shm.h>
-#include	<sys/errno.h>
+#include	<errno.h>
 
 
 /* shmsys dispatch argument */
@@ -60,25 +60,20 @@ struct shmid_sv {
 	
 
 char *
-shmat(shmid, shmaddr, shmflg)
-	int shmid;
-	char *shmaddr;
-	int shmflg;
+shmat(int shmid, char *shmaddr, int shmflg)
 {
 	return ((char *)_syscall(SYS_shmsys, SHMAT, shmid, shmaddr, shmflg));
 }
 
-shmctl(shmid, cmd, buf)
-	int shmid, cmd;
-	struct shmid_ds *buf;
+int
+shmctl(int shmid, int cmd, struct shmid_ds *buf)
 {
 	struct shmid_sv n_buf;
 	int ret;
-	extern int errno;
 
 	if (buf == (struct shmid_ds *)-1) {
 		errno = EFAULT;
-		return(-1);
+		return (-1);
 	}
 
 	if (buf == 0) {
@@ -109,26 +104,24 @@ shmctl(shmid, cmd, buf)
 		buf->shm_ctime = n_buf.shm_ctime;
 	}
 
-	return(ret);
+	return (ret);
 }
 
-shmdt(shmaddr)
-	char *shmaddr;
+int
+shmdt(char *shmaddr)
 {
 
 	return (_syscall(SYS_shmsys, SHMDT, shmaddr));
 }
 
-shmget(key, size, shmflg)
-	key_t key;
-	int size, shmflg;
+int
+shmget(key_t key, int size, int shmflg)
 {
 	return (_syscall(SYS_shmsys, SHMGET, key, size, shmflg));
 }
 
-shmsys(sysnum, va_alist)
-int sysnum;
-va_dcl
+int
+shmsys(int sysnum, ...)
 {
         va_list ap;
 	int shmid, shmflg, cmd, size;
@@ -136,25 +129,31 @@ va_dcl
 	struct shmid_ds *buf;
 	key_t key;
 
-	va_start(ap);
+	va_start(ap, sysnum);
 	switch (sysnum) {
 	case SHMAT:
 			shmid=va_arg(ap, int);
 			shmaddr=va_arg(ap, char *);
 			shmflg=va_arg(ap, int);
-			return((int)shmat(shmid, shmaddr, shmflg));
+			va_end(ap);
+			return ((int)shmat(shmid, shmaddr, shmflg));
 	case SHMCTL:
 			shmid=va_arg(ap, int);
 			cmd=va_arg(ap, int);
 			buf=va_arg(ap, struct shmid_ds *);
-			return(shmctl(shmid, cmd, buf));
+			va_end(ap);
+			return (shmctl(shmid, cmd, buf));
 	case SHMDT:
 			shmaddr=va_arg(ap, char *);
-			return(shmdt(shmaddr));
+			va_end(ap);
+			return (shmdt(shmaddr));
 	case SHMGET:
 			key=va_arg(ap, key_t);
 			size=va_arg(ap, int);
 			shmflg=va_arg(ap, int);
-			return(shmget(key, size, shmflg));
+			va_end(ap);
+			return (shmget(key, size, shmflg));
 	}
+	va_end(ap);
+	return (-1);
 }

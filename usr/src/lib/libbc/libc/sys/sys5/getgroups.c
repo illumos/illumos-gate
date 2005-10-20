@@ -24,25 +24,24 @@
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * POSIX.1 compatible getgroups() routine
  * This is needed while gid_t is not the same size as int (or whatever the
  * syscall is using at the time).
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/syscall.h>
 
-getgroups(gidsetsize, grouplist)
-int	gidsetsize;
-gid_t	grouplist[];
+int
+getgroups(int gidsetsize, gid_t grouplist[])
 {
 	int	glist[NGROUPS];	/* getgroups() syscall returns ints */
-	register int	i;	/* loop control */
-	register int	rc;	/* return code hold area */
+	int	i;	/* loop control */
+	int	rc;	/* return code hold area */
 
 	rc = _syscall(SYS_getgroups, gidsetsize, glist);
 	if (rc > 0 && gidsetsize != 0)

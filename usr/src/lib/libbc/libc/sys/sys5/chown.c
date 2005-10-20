@@ -24,12 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/syscall.h>
 
-chown(s, u, g)
-    char           *s;
+int
+chown(char *s, int u, int g)
 {
-    return _syscall(SYS_lchown, s, u, g);
+    return (_syscall(SYS_lchown, s, u, g));
 }

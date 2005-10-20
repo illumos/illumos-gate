@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* c2 secure */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <pwd.h>
@@ -40,9 +40,8 @@
  * passwd table and the use of secure RPC in NIS+.
  */
 
-pwdauth(name, password)
-	char *name;
-	char *password;
+int
+pwdauth(char *name, char *password)
 {
 	/*
 	 * this routine authenticates a password for the named user.

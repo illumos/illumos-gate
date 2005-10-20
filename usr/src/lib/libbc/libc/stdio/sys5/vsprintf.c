@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,18 +36,16 @@
 
 /*LINTLIBRARY*/
 #include <stdio.h>
-#include <varargs.h>
+#include <stdarg.h>
 #include <values.h>
 
 extern int _doprnt();
 
 /*VARARGS2*/
 int
-vsprintf(string, format, ap)
-char *string, *format;
-va_list ap;
+vsprintf(char *string, char *format, va_list ap)
 {
-	register int count;
+	int count;
 	FILE siop;
 
 	siop._cnt = MAXINT;
@@ -55,5 +53,5 @@ va_list ap;
 	siop._flag = _IOWRT+_IOSTRG;
 	count = _doprnt(format, ap, &siop);
 	*siop._ptr = '\0'; /* plant terminating null character */
-	return(count);
+	return (count);
 }

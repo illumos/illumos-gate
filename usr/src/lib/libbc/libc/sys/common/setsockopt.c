@@ -28,6 +28,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <errno.h>
 
 /* multicast setsockopts */
 #define	SUNOS4X_IP_MULTICAST_IF		2
@@ -41,14 +42,9 @@
 #define	SUNOS5X_IP_ADD_MEMBERSHIP	0x13
 #define	SUNOS5X_IP_DROP_MEMBERSHIP	0x14
 
-extern int	errno;
 
-setsockopt(s, level, optname, optval, optlen)
-register int	s;
-register int	level;
-register int	optname;
-register char	*optval;
-register int	optlen;
+int
+setsockopt(int s, int level, int optname, char *optval, int optlen)
 {
 	int	a;
 
@@ -111,5 +107,5 @@ register int	optlen;
 
 	if ((a = _setsockopt(s, level, optname, optval, optlen)) == -1)
 		maperror(errno);
-	return(a);
+	return (a);
 }

@@ -27,14 +27,14 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
+#ifndef _sys_sem_h
+#define	_sys_sem_h
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	IPC Semaphore Facility.
  */
-
-#ifndef _sys_sem_h
-#define _sys_sem_h
 
 /*
  *	Semaphore Operation Flags.
@@ -100,100 +100,4 @@ union semun {
 	ushort		*array;	/* array for GETALL & SETALL */
 };
 
-
-#ifdef KERNEL
-/*
- *	Implementation Constants.
- */
-
-#define	PSEMN	(PZERO + 3)	/* sleep priority waiting for greater value */
-#define	PSEMZ	(PZERO + 2)	/* sleep priority waiting for zero */
-
-#define	SEMVMX	32767		/* semaphore maximum value */
-#define	SEMAEM	16384		/* adjust on exit max value */
-
-
-/*
- *	Permission Definitions.
- */
-
-#define	SEM_A	0200	/* alter permission */
-#define	SEM_R	0400	/* read permission */
-
-/*
- *	There is one undo structure per process in the system.
- */
-
-struct sem_undo {
-	struct sem_undo	*un_np;	/* ptr to next active undo structure */
-	short		un_cnt;	/* # of active entries */
-	struct undo {
-		short	un_aoe;	/* adjust on exit values */
-		short	un_num;	/* semaphore # */
-		int	un_id;	/* semid */
-	}	un_ent[1];	/* (semume) undo entries (one minimum) */
-};
-
-/*
- * semaphore information structure
- */
-struct	seminfo	{
-	int	semmap,		/* # of entries in semaphore map */
-		semmni,		/* # of semaphore identifiers */
-		semmns,		/* # of semaphores in system */
-		semmnu,		/* # of undo structures in system */
-		semmsl,		/* max # of semaphores per id */
-		semopm,		/* max # of operations per semop call */
-		semume,		/* max # of undo entries per process */
-		semusz,		/* size in bytes of undo structure */
-		semvmx,		/* semaphore maximum value */
-		semaem;		/* adjust on exit max value */
-};
-struct seminfo	seminfo;	/* configuration parameters */
-
-
-/*
- *	Configuration Parameters
- * These parameters are tuned by editing the system configuration file.
- * The following lines establish the default values.
- */
-#ifndef	SEMMNI
-#define	SEMMNI	10		/* # of semaphore identifiers */
-#endif
-#ifndef	SEMMNS
-#define	SEMMNS	60		/* # of semaphores in system */
-#endif
-#ifndef	SEMUME
-#define	SEMUME	10		/* max # of undo entries per process */
-#endif
-#ifndef	SEMMNU
-#define	SEMMNU	30		/* # of undo structures in system */
-#endif
-
-/* The following parameters are assumed not to require tuning */
-#ifndef	SEMMAP
-#define	SEMMAP	30		/* # of entries in semaphore map */
-#endif
-#ifndef	SEMMSL
-#define	SEMMSL	SEMMNS		/* max # of semaphores per id */
-#endif
-#ifndef	SEMOPM
-#define	SEMOPM	100		/* max # of operations per semop call */
-#endif
-
-		/* size in bytes of undo structure */
-#define	SEMUSZ	(sizeof(struct sem_undo)+sizeof(struct undo)*SEMUME)
-
-
-/*
- * Structures allocated in machdep.c
- */
-struct semid_ds *sema;		/* semaphore id pool */
-struct sem	*sem;		/* semaphore pool */
-struct map	*semmap;	/* semaphore allocation map */
-struct sem_undo	**sem_undo;	/* per process undo table */
-int		*semu;		/* undo structure pool */
-
-#endif KERNEL
-
-#endif /*!_sys_sem_h*/
+#endif /* !_sys_sem_h */

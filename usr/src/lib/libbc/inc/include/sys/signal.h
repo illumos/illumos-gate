@@ -1,12 +1,12 @@
 /*
- * Copyright (c) 1982 Regents of the University of California.
- * All rights reserved.  The Berkeley software License Agreement
- * specifies the terms and conditions for redistribution.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
+ * Copyright (c) 1982 Regents of the University of California.
+ * All rights reserved.  The Berkeley software License Agreement
+ * specifies the terms and conditions for redistribution.
  */
 
 #ifndef	__sys_signal_h
@@ -25,99 +25,39 @@
 #define	SIGINT	2	/* interrupt */
 #define	SIGQUIT	3	/* quit */
 #define	SIGILL	4	/* illegal instruction (not reset when caught) */
-#ifdef	vax
-#define	    ILL_RESAD_FAULT	0x0	/* reserved addressing fault */
-#define	    ILL_PRIVIN_FAULT	0x1	/* privileged instruction fault */
-#define	    ILL_RESOP_FAULT	0x2	/* reserved operand fault */
-/* CHME, CHMS, CHMU are not yet given back to users reasonably */
-#endif	vax
-#ifdef	mc68000
-#define	    ILL_ILLINSTR_FAULT	0x10	/* illegal instruction fault */
-#define	    ILL_PRIVVIO_FAULT	0x20	/* privilege violation fault */
-#define	    ILL_COPROCERR_FAULT	0x34	/* [coprocessor protocol error fault] */
-#define	    ILL_TRAP1_FAULT	0x84	/* trap #1 fault */
-#define	    ILL_TRAP2_FAULT	0x88	/* trap #2 fault */
-#define	    ILL_TRAP3_FAULT	0x8c	/* trap #3 fault */
-#define	    ILL_TRAP4_FAULT	0x90	/* trap #4 fault */
-#define	    ILL_TRAP5_FAULT	0x94	/* trap #5 fault */
-#define	    ILL_TRAP6_FAULT	0x98	/* trap #6 fault */
-#define	    ILL_TRAP7_FAULT	0x9c	/* trap #7 fault */
-#define	    ILL_TRAP8_FAULT	0xa0	/* trap #8 fault */
-#define	    ILL_TRAP9_FAULT	0xa4	/* trap #9 fault */
-#define	    ILL_TRAP10_FAULT	0xa8	/* trap #10 fault */
-#define	    ILL_TRAP11_FAULT	0xac	/* trap #11 fault */
-#define	    ILL_TRAP12_FAULT	0xb0	/* trap #12 fault */
-#define	    ILL_TRAP13_FAULT	0xb4	/* trap #13 fault */
-#define	    ILL_TRAP14_FAULT	0xb8	/* trap #14 fault */
-#endif	mc68000
-#ifdef	sparc
-#define	    ILL_STACK		0x00	/* bad stack */
-#define	    ILL_ILLINSTR_FAULT	0x02	/* illegal instruction fault */
-#define	    ILL_PRIVINSTR_FAULT	0x03	/* privileged instruction fault */
+
+#define	ILL_STACK		0x00	/* bad stack */
+#define	ILL_ILLINSTR_FAULT	0x02	/* illegal instruction fault */
+#define	ILL_PRIVINSTR_FAULT	0x03	/* privileged instruction fault */
 /* codes from 0x80 to 0xff are software traps */
-#define	    ILL_TRAP_FAULT(n)	((n)+0x80) /* trap n fault */
-#endif	sparc
-#if defined(__i386) || defined(__amd64)
-#define	    ILL_ILLINSTR_FAULT	0x02	/* illegal instruction fault */
-#endif
+#define	ILL_TRAP_FAULT(n)	((n)+0x80) /* trap n fault */
+
 #define	SIGTRAP	5	/* trace trap (not reset when caught) */
 #define	SIGIOT	6	/* IOT instruction */
 #define	SIGABRT 6	/* used by abort, replace SIGIOT in the future */
 #define	SIGEMT	7	/* EMT instruction */
-#ifdef	mc68000
-#define	    EMT_EMU1010		0x28	/* line 1010 emulator trap */
-#define	    EMT_EMU1111		0x2c	/* line 1111 emulator trap */
-#endif	mc68000
-#ifdef	sparc
-#define	    EMT_TAG		0x0a	/* tag overflow */
-#endif	sparc
+
+#define	EMT_TAG		0x0a	/* tag overflow */
+
 #define	SIGFPE	8	/* floating point exception */
-#ifdef	vax
-#define	    FPE_INTOVF_TRAP	0x1	/* integer overflow */
-#define	    FPE_INTDIV_TRAP	0x2	/* integer divide by zero */
-#define	    FPE_FLTOVF_TRAP	0x3	/* floating overflow */
-#define	    FPE_FLTDIV_TRAP	0x4	/* floating/decimal divide by zero */
-#define	    FPE_FLTUND_TRAP	0x5	/* floating underflow */
-#define	    FPE_DECOVF_TRAP	0x6	/* decimal overflow */
-#define	    FPE_SUBRNG_TRAP	0x7	/* subscript out of range */
-#define	    FPE_FLTOVF_FAULT	0x8	/* floating overflow fault */
-#define	    FPE_FLTDIV_FAULT	0x9	/* divide by zero floating fault */
-#define	    FPE_FLTUND_FAULT	0xa	/* floating underflow fault */
-#endif	vax
-#ifdef	mc68000
-#define	    FPE_INTDIV_TRAP	0x14	/* integer divide by zero */
-#define	    FPE_CHKINST_TRAP	0x18	/* CHK [CHK2] instruction */
-#define	    FPE_TRAPV_TRAP	0x1c	/* TRAPV [cpTRAPcc TRAPcc] instr */
-#define	    FPE_FLTBSUN_TRAP	0xc0	/* [branch or set on unordered cond] */
-#define	    FPE_FLTINEX_TRAP	0xc4	/* [floating inexact result] */
-#define	    FPE_FLTDIV_TRAP	0xc8	/* [floating divide by zero] */
-#define	    FPE_FLTUND_TRAP	0xcc	/* [floating underflow] */
-#define	    FPE_FLTOPERR_TRAP	0xd0	/* [floating operand error] */
-#define	    FPE_FLTOVF_TRAP	0xd4	/* [floating overflow] */
-#define	    FPE_FLTNAN_TRAP	0xd8	/* [floating Not-A-Number] */
-#ifdef	sun
-#define	    FPE_FPA_ENABLE	0x400	/* [FPA not enabled] */
-#define	    FPE_FPA_ERROR	0x404	/* [FPA arithmetic exception] */
-#endif	sun
-#endif	mc68000
-#ifdef	sparc
-#define	    FPE_INTOVF_TRAP	0x1	/* integer overflow */
-#define	    FPE_STARTSIG_TRAP	0x2	/* process using fp */
-#define	    FPE_INTDIV_TRAP	0x14	/* integer divide by zero */
-#define	    FPE_FLTINEX_TRAP	0xc4	/* [floating inexact result] */
-#define	    FPE_FLTDIV_TRAP	0xc8	/* [floating divide by zero] */
-#define	    FPE_FLTUND_TRAP	0xcc	/* [floating underflow] */
-#define	    FPE_FLTOPERR_TRAP	0xd0	/* [floating operand error] */
-#define	    FPE_FLTOVF_TRAP	0xd4	/* [floating overflow] */
-#endif	sparc
+
+#define	FPE_INTOVF_TRAP	0x1	/* integer overflow */
+#define	FPE_STARTSIG_TRAP	0x2	/* process using fp */
+#define	FPE_INTDIV_TRAP	0x14	/* integer divide by zero */
+#define	FPE_FLTINEX_TRAP	0xc4	/* [floating inexact result] */
+#define	FPE_FLTDIV_TRAP	0xc8	/* [floating divide by zero] */
+#define	FPE_FLTUND_TRAP	0xcc	/* [floating underflow] */
+#define	FPE_FLTOPERR_TRAP	0xd0	/* [floating operand error] */
+#define	FPE_FLTOVF_TRAP	0xd4	/* [floating overflow] */
+
 #define	SIGKILL	9	/* kill (cannot be caught or ignored) */
 /*
  * The codes for SIGBUS and SIGSEGV are described in <vm/faultcode.h>
  */
 #define	SIGBUS	10	/* bus error */
-#define	    BUS_HWERR	FC_HWERR	/* misc hardware error (e.g. timeout) */
-#define	    BUS_ALIGN	FC_ALIGN	/* hardware alignment error */
-#define	    BUS_OBJERR	FC_OBJERR	/* object returned errno value */
+#define	BUS_HWERR	FC_HWERR	/* misc hardware error (e.g. timeout) */
+#define	BUS_ALIGN	FC_ALIGN	/* hardware alignment error */
+#define	BUS_OBJERR	FC_OBJERR	/* object returned errno value */
 /*
  * The BUS_CODE(code) will be one of the above.  In the BUS_OBJERR case,
  * doing a BUS_ERRNO(code) gives an errno value reported by the underlying
@@ -126,19 +66,19 @@
  * the specification has always claimed that such errors produce SIGBUS.
  * The segmentation cases are left defined as a transition aid.
  */
-#define	    BUS_CODE(C)		FC_CODE(C)
-#define	    BUS_ERRNO(C)	FC_ERRNO(C)
+#define	BUS_CODE(C)		FC_CODE(C)
+#define	BUS_ERRNO(C)	FC_ERRNO(C)
 #define	SIGSEGV	11	/* segmentation violation */
-#define	    SEGV_NOMAP	FC_NOMAP	/* no mapping at the fault address */
-#define	    SEGV_PROT	FC_PROT		/* access exceeded protections */
-#define	    SEGV_OBJERR	FC_OBJERR	/* object returned errno value */
+#define	SEGV_NOMAP	FC_NOMAP	/* no mapping at the fault address */
+#define	SEGV_PROT	FC_PROT		/* access exceeded protections */
+#define	SEGV_OBJERR	FC_OBJERR	/* object returned errno value */
 /*
  * The SEGV_CODE(code) will be SEGV_NOMAP, SEGV_PROT, or SEGV_OBJERR.
  * In the SEGV_OBJERR case, doing a SEGV_ERRNO(code) gives an errno value
  * reported by the underlying file object mapped at the fault address.
  */
-#define	    SEGV_CODE(C)	FC_CODE(C)
-#define	    SEGV_ERRNO(C)	FC_ERRNO(C)
+#define	SEGV_CODE(C)	FC_CODE(C)
+#define	SEGV_ERRNO(C)	FC_ERRNO(C)
 #define	SIGSYS	12	/* bad argument to system call */
 #define	SIGPIPE	13	/* write on a pipe with no one to read it */
 #define	SIGALRM	14	/* alarm clock */
@@ -176,7 +116,7 @@ void  (*sigset())();
 int   sighold();
 int   sigrelse();
 int   sigignore();
-#endif	!KERNEL  &&  !LOCORE
+#endif	/* !KERNEL  &&  !LOCORE */
 
 #ifndef	LOCORE
 /*
@@ -220,19 +160,6 @@ struct	sigstack {
 struct	sigcontext {
 	int	sc_onstack;		/* sigstack state to restore */
 	int	sc_mask;		/* signal mask to restore */
-#ifdef	vax
-	int	sc_sp;			/* sp to restore */
-	int	sc_fp;			/* fp to restore */
-	int	sc_ap;			/* ap to restore */
-	int	sc_pc;			/* pc to restore */
-	int	sc_ps;			/* psl to restore */
-#endif	vax
-#ifdef	mc68000
-	int	sc_sp;			/* sp to restore */
-	int	sc_pc;			/* pc to retore */
-	int	sc_ps;			/* psl to restore */
-#endif	mc68000
-#ifdef	sparc
 #define	SPARC_MAXREGWINDOW	31	/* max usable windows in sparc */
 	int	sc_sp;			/* sp to restore */
 	int	sc_pc;			/* pc to retore */
@@ -243,16 +170,8 @@ struct	sigcontext {
 	int	sc_wbcnt;		/* number of outstanding windows */
 	char	*sc_spbuf[SPARC_MAXREGWINDOW]; /* sp's for each wbuf */
 	int	sc_wbuf[SPARC_MAXREGWINDOW][16]; /* window save buf */
-#endif	sparc
-#ifdef	sun386
-	int	sc_sp;			/* sp to restore */
-	int	sc_pc;			/* pc to retore */
-	int	sc_ps;			/* psl to restore */
-	int	sc_eax;			/* eax to restore */
-	int	sc_edx;			/* edx to restore */
-#endif
 };
-#endif	!LOCORE
+#endif	/* !LOCORE */
 
 #define	BADSIG		(void (*)())-1
 
@@ -264,9 +183,6 @@ struct	sigcontext {
 #define	SIG_DFL		(void (*)())0
 #define	SIG_IGN		(void (*)())1
 
-#ifdef	KERNEL
-#define	SIG_CATCH	(void (*)())2
-#endif	KERNEL
 #define	SIG_HOLD	(void (*)())3
 
 /*
@@ -276,10 +192,6 @@ struct	sigcontext {
 /*
  * signals that can't caught, blocked, or ignored
  */
-#ifdef	KERNEL
-#define	cantmask		(sigmask(SIGKILL)|sigmask(SIGSTOP))
-#endif
-
 
 /*
  * If SIG_BLOCK, SIG_UNBLOCK, or SIG_SETMASK are changed, the same changes

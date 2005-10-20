@@ -20,15 +20,15 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/syscall.h>
-#include <sys/errno.h>
+#include <errno.h>
 
 #define	 CHKNULL(p)					\
 	if ((p) == (char *)0 || (p) == (char *) -1) {	\
@@ -39,4 +39,3 @@
 	}
 
 extern int      syscall();
-extern          errno;

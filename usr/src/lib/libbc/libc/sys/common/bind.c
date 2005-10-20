@@ -20,24 +20,21 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#include <sys/errno.h>
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* optional comment */
-
-extern int	errno;
 
 #define	SOV_SOCKBSD	3
 
-bind(s, name, namelen)
-int	s;
-struct sockaddr *name;
-int	namelen;
+int
+bind(int s, struct sockaddr *name, int namelen)
 {
 	int	a;
 	if ((a = _so_bind(s, name, namelen, SOV_SOCKBSD)) != 0) {

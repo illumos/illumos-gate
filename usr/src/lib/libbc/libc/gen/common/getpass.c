@@ -28,33 +28,35 @@
 /*	  All Rights Reserved  	*/
 
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R3 1.10 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 #include <stdio.h>
 #include <signal.h>
 #include <termios.h>
+#include <unistd.h>
 
 extern void setbuf();
-extern FILE *fopen();
-extern int fclose(), fprintf(), findiop();
-extern int kill(), ioctl(), getpid();
+extern int	fclose(FILE *);
+extern int	fprintf(FILE *, char *, ...);
+extern int	findiop();
+extern int ioctl();
 static int intrupt;
+
+static void	catch(void);
 
 #define	MAXPASSWD	8	/* max significant characters in password */
 
 char *
-getpass(prompt)
-char	*prompt;
+getpass(char *prompt)
 {
 	struct termios ttyb;
-	unsigned long flags;
-	register char *p;
-	register int c;
+	long flags;
+	char *p;
+	int c;
 	FILE	*fi;
 	static char pbuf[ MAXPASSWD + 1 ];
 	struct sigvec osv, sv;
-	void	catch();
 
 	if((fi = fopen("/dev/tty", "r")) == NULL)
 #ifdef S5EMUL
@@ -95,7 +97,7 @@ char	*prompt;
 }
 
 static void
-catch()
+catch(void)
 {
 	++intrupt;
 }

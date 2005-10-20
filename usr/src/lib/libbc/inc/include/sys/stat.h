@@ -20,18 +20,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-/*
- * NOTE: changes to this file should also be made to xpg2include/sys/stat.h
+ * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	__SYS_STAT_H
 #define	__SYS_STAT_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * NOTE: changes to this file should also be made to xpg2include/sys/stat.h
+ */
 
 #include <sys/types.h>
 
@@ -111,14 +111,12 @@ struct	stat {
 #define	S_ISSOCK(m)	(((m)&_IFMT) == _IFSOCK)
 #endif
 
-#ifndef	KERNEL
-int	chmod(/* char *path, mode_t mode */);
-int	fstat(/* int fd; struct stat *sbuf */);
-int	mkdir(/* char *path; mode_t mode */);
-int	mkfifo(/* char *path; mode_t mode */);
-int	stat(/* char *path; struct stat *sbuf */);
-mode_t	umask(/* mode_t mask */);
-#endif
+int	chmod(char *, mode_t);
+int	fstat(int, struct stat *);
+int	mkdir(char *, mode_t);
+int	mkfifo(char *, mode_t);
+int	stat(char *, struct stat *);
+mode_t	umask(mode_t);
 
 #ifdef	__cplusplus
 }

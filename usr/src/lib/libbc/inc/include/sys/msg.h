@@ -27,14 +27,14 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
+#ifndef _sys_msg_h
+#define	_sys_msg_h
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	IPC Message Facility.
  */
-
-#ifndef _sys_msg_h
-#define _sys_msg_h
 
 /*
  *	Message Operation Flags.
@@ -68,11 +68,7 @@ struct msqid_ds {
  */
 
 /* HACK :: change the name when compiling the kernel to avoid conflicts */
-#ifdef KERNEL
-struct ipcmsgbuf {
-#else
 struct msgbuf {
-#endif KERNEL
 	long	mtype;		/* message type */
 	char	mtext[1];	/* message text */
 };
@@ -88,113 +84,4 @@ struct msg {
 	ushort		msg_spot;	/* message text map address */
 };
 
-
-
-#ifdef KERNEL
-/*
- *	Implementation Constants.
- */
-
-#define	PMSG	(PZERO + 2)	/* message facility sleep priority */
-
-/*
- *	Permission Definitions.
- */
-
-#define	MSG_R	0400	/* read permission */
-#define	MSG_W	0200	/* write permission */
-
-/*
- *	ipc_perm Mode Definitions.
- */
-
-#define	MSG_RWAIT	001000	/* a reader is waiting for a message */
-#define	MSG_WWAIT	002000	/* a writer is waiting to send */
-#define	MSG_LOCKED	004000	/* msqid locked */
-#define	MSG_LOCKWAIT	010000	/* msqid wanted */
-
-/* define resource locking macros */
-#define MSGWAKEUP(addr) {				\
-	curpri = PMSG;					\
-	wakeup((caddr_t)(addr));			\
-}
-
-#define	MSGLOCK(qp) {						\
-	while ((qp)->msg_perm.mode & MSG_LOCKED) {		\
-		(qp)->msg_perm.mode |= MSG_LOCKWAIT;		\
-		if (sleep((caddr_t)(qp), PMSG | PCATCH)) {	\
-			(qp)->msg_perm.mode &= ~MSG_LOCKWAIT;	\
-			u.u_error = EINTR;			\
-			return (NULL);				\
-		}						\
-	}							\
-	(qp)->msg_perm.mode |= MSG_LOCKED;			\
-}
-
-#define MSGUNLOCK(qp) {					\
-	(qp)->msg_perm.mode &= ~MSG_LOCKED;		\
-	if ((qp)->msg_perm.mode & MSG_LOCKWAIT) {	\
-		(qp)->msg_perm.mode &= ~MSG_LOCKWAIT;	\
-		MSGWAKEUP(qp);				\
-	}						\
-}
-
-
-/*
- *	Message information structure.
- */
-
-struct msginfo {
-	int	msgmap,	/* # of entries in msg map */
-		msgmax,	/* max message size */
-		msgmnb,	/* max # bytes on queue */
-		msgmni,	/* # of message queue identifiers */
-		msgssz,	/* msg segment size (should be word size multiple) */
-		msgtql;	/* # of system message headers */
-	ushort	msgseg;	/* # of msg segments (MUST BE < 32768) */
-};
-struct msginfo	msginfo;	/* message parameters */
-
-
-/*
- *	Configuration Parameters
- * These parameters are tuned by editing the system configuration file.
- * The following lines establish the default values.
- */
-#ifndef	MSGPOOL
-#define	MSGPOOL	8	/* size, in kilobytes, of message pool */
-#endif
-#ifndef	MSGMNB
-#define	MSGMNB	2048	/* default max number of bytes on a queue */
-#endif
-#ifndef	MSGMNI
-#define	MSGMNI	50	/* number of message queue identifiers */
-#endif
-#ifndef	MSGTQL
-#define	MSGTQL	50	/* # of system message headers */
-#endif
-
-/* The following parameters are assumed not to require tuning */
-#ifndef	MSGMAP
-#define	MSGMAP	100	/* number of entries in msg map */
-#endif
-#ifndef	MSGMAX
-#define	MSGMAX	(MSGPOOL * 1024)	/* max message size (in bytes) */
-#endif
-#ifndef	MSGSSZ
-#define	MSGSSZ	8	/* msg segment size (should be word size multiple) */
-#endif
-#define	MSGSEG	((MSGPOOL * 1024) / MSGSSZ) /* # segments (MUST BE < 32768) */
-
-
-/*
- * Structures allocated in machdep.c
- */
-char		*msg;		/* base address of message buffer */
-struct map	*msgmap;	/* msg allocation map */
-struct msg	*msgh;		/* message headers */
-struct msqid_ds	*msgque;	/* msg queue headers */
-
-#endif KERNEL
-
-#endif /*!_sys_msg_h*/
+#endif /* !_sys_msg_h */

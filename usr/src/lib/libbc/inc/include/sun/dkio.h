@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1987 by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _sun_dkio_h
 #define	_sun_dkio_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* #include <sys/ioctl.h> not needed? */
 #include <sun/dklabel.h>
@@ -330,31 +331,31 @@ struct fdraw {
 /*
  * Disk io control commands
  */
-#define	DKIOCGGEOM	_IOR(d, 2, struct dk_geom)	/* Get geometry */
-#define	DKIOCSGEOM	_IOW(d, 3, struct dk_geom)	/* Set geometry */
-#define	DKIOCGPART	_IOR(d, 4, struct dk_map)	/* Get partition info */
-#define	DKIOCSPART	_IOW(d, 5, struct dk_map)	/* Set partition info */
-#define	DKIOCINFO	_IOR(d, 8, struct dk_info)	/* Get info */
-#define	DKIOCGCONF	_IOR(d, 126, struct dk_conf)	/* Get conf info */
-#define	DKIOCSTYPE	_IOW(d, 125, struct dk_type)	/* Set drive info */
-#define	DKIOCGTYPE	_IOR(d, 124, struct dk_type)	/* Get drive info */
-#define	DKIOCSAPART	_IOW(d, 123, struct dk_allmap)	/* Set all partitions */
-#define	DKIOCGAPART	_IOR(d, 122, struct dk_allmap)	/* Get all partitions */
-#define	DKIOCSBAD	_IOW(d, 121, struct dk_badmap)	/* Set bad sector map */
-#define	DKIOCGBAD	_IOW(d, 120, struct dk_badmap)	/* Get bad sector map */
-#define	DKIOCSCMD	_IOW(d, 119, struct dk_cmd)	/* Set generic cmd */
-#define	DKIOCGLOG	_IOR(d, 118, struct dk_loghdr)	/* Get error log */
-#define	DKIOCGDIAG	_IOR(d, 116, struct dk_diag)	/* Get diagnostics */
-#define	DKIOCWCHK	_IOWR(d, 115, int)		/* Toggle write check */
-#define	FDKIOGCHAR	_IOR(d, 114, struct fdk_char)	/* GetCharacteristics */
-#define	FDKIOSCHAR	_IOW(d, 113, struct fdk_char)	/* SetCharacteristics */
-#define	FDKEJECT	_IO(d, 112)			/* Eject floppy disk */
-#define	FDKGETCHANGE	_IOR(d, 111, int)		/* Get diskchng stat */
-#define	FDKGETDRIVECHAR	_IOR(d, 110, struct fdk_drive)	/* Get drivechar */
-#define	FDKSETDRIVECHAR	_IOW(d, 109, struct fdk_drive)	/* Set drivechar */
-#define	FDKGETSEARCH	_IOR(d, 108, struct fdk_search)	/* Get search tbl */
-#define	FDKSETSEARCH	_IOW(d, 107, struct fdk_search)	/* Set search tbl */
-#define	FDKIOCSCMD	_IOWR(d, 106, struct fdk_cmd)	/* Floppy command */
-#define	F_RAW		_IOWR(d, 105, struct fdraw)	/* ECDstyle genericcmd*/
+#define	DKIOCGGEOM	_IOR('d', 2, struct dk_geom)	/* Get geometry */
+#define	DKIOCSGEOM	_IOW('d', 3, struct dk_geom)	/* Set geometry */
+#define	DKIOCGPART	_IOR('d', 4, struct dk_map)	/* Get partition info */
+#define	DKIOCSPART	_IOW('d', 5, struct dk_map)	/* Set partition info */
+#define	DKIOCINFO	_IOR('d', 8, struct dk_info)	/* Get info */
+#define	DKIOCGCONF	_IOR('d', 126, struct dk_conf)	/* Get conf info */
+#define	DKIOCSTYPE	_IOW('d', 125, struct dk_type)	/* Set drive info */
+#define	DKIOCGTYPE	_IOR('d', 124, struct dk_type)	/* Get drive info */
+#define	DKIOCSAPART	_IOW('d', 123, struct dk_allmap)	/* Set all partitions */
+#define	DKIOCGAPART	_IOR('d', 122, struct dk_allmap)	/* Get all partitions */
+#define	DKIOCSBAD	_IOW('d', 121, struct dk_badmap)	/* Set bad sector map */
+#define	DKIOCGBAD	_IOW('d', 120, struct dk_badmap)	/* Get bad sector map */
+#define	DKIOCSCMD	_IOW('d', 119, struct dk_cmd)	/* Set generic cmd */
+#define	DKIOCGLOG	_IOR('d', 118, struct dk_loghdr)	/* Get error log */
+#define	DKIOCGDIAG	_IOR('d', 116, struct dk_diag)	/* Get diagnostics */
+#define	DKIOCWCHK	_IOWR('d', 115, int)		/* Toggle write check */
+#define	FDKIOGCHAR	_IOR('d', 114, struct fdk_char)	/* GetCharacteristics */
+#define	FDKIOSCHAR	_IOW('d', 113, struct fdk_char)	/* SetCharacteristics */
+#define	FDKEJECT	_IO('d', 112)			/* Eject floppy disk */
+#define	FDKGETCHANGE	_IOR('d', 111, int)		/* Get diskchng stat */
+#define	FDKGETDRIVECHAR	_IOR('d', 110, struct fdk_drive)	/* Get drivechar */
+#define	FDKSETDRIVECHAR	_IOW('d', 109, struct fdk_drive)	/* Set drivechar */
+#define	FDKGETSEARCH	_IOR('d', 108, struct fdk_search)	/* Get search tbl */
+#define	FDKSETSEARCH	_IOW('d', 107, struct fdk_search)	/* Set search tbl */
+#define	FDKIOCSCMD	_IOWR('d', 106, struct fdk_cmd)	/* Floppy command */
+#define	F_RAW		_IOWR('d', 105, struct fdraw)	/* ECDstyle genericcmd*/
 
-#endif /*!_sun_dkio_h*/
+#endif /* !_sun_dkio_h */

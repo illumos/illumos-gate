@@ -22,7 +22,8 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  *	execv(file, argv)
  *
@@ -30,12 +31,10 @@
  *	last vector element must be NULL
  *	environment passed automatically
  */
-
-execv(file, argv)
-	char	*file;
-	char	**argv;
+int
+execv(char *file, char **argv)
 {
 	extern	char	**environ;
 
-	return(execve(file, argv, environ));
+	return (execve(file, argv, environ));
 }

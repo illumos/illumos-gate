@@ -24,12 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/syscall.h>
 
-mkdir(p, m)
-    char           *p;
+int
+mkdir(char *p, int m)
 {
-    return _syscall(SYS_mkdir, p, m);
+    return (_syscall(SYS_mkdir, p, m));
 }

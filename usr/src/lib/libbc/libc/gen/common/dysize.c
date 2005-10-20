@@ -19,20 +19,25 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	 /* from Arthur Olson's 3.1 */
 
 /*LINTLIBRARY*/
 
 #include <tzfile.h>
 
-dysize(y)
+int
+dysize(int y)
 {
 	/*
-	** The 4.[0123]BSD version of dysize behaves as if the return statement
-	** below read
-	**	return ((y % 4) == 0) ? DAYS_PER_LYEAR : DAYS_PER_NYEAR;
-	** but since we'd rather be right than (strictly) compatible. . .
-	*/
-	return isleap(y) ? DAYS_PER_LYEAR : DAYS_PER_NYEAR;
+	 * The 4.[0123]BSD version of dysize behaves as if the return statement
+	 * below read
+	 *	return ((y % 4) == 0) ? DAYS_PER_LYEAR : DAYS_PER_NYEAR;
+	 * but since we'd rather be right than (strictly) compatible. . .
+	 */
+	return (isleap(y) ? DAYS_PER_LYEAR : DAYS_PER_NYEAR);
 }

@@ -19,8 +19,12 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.1 83/05/31 */
 
 #include <sys/time.h>
 #include <sys/resource.h>
@@ -42,8 +46,11 @@ struct vtimes {
 	int	vm_oublk;		/* block writes */
 };
 
-vtimes(par, chi)
-	register struct vtimes *par, *chi;
+static void	getvtimes(struct rusage *, struct vtimes *);
+static int	scale60(struct timeval *);
+
+int
+vtimes(struct vtimes *par, struct vtimes *chi)
 {
 	struct rusage ru;
 
@@ -60,10 +67,8 @@ vtimes(par, chi)
 	return (0);
 }
 
-static
-getvtimes(aru, avt)
-	register struct rusage *aru;
-	register struct vtimes *avt;
+static void
+getvtimes(struct rusage *aru, struct vtimes *avt)
 {
 
 	avt->vm_utime = scale60(&aru->ru_utime);
@@ -78,9 +83,8 @@ getvtimes(aru, avt)
 	avt->vm_oublk = aru->ru_oublock;
 }
 
-static
-scale60(tvp)
-	register struct timeval *tvp;
+static int
+scale60(struct timeval *tvp)
 {
 
 	return (tvp->tv_sec * 60 + tvp->tv_usec / 16667);

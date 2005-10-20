@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
-/*	from UCB 1.4 06/30/83	*/
+/*
+ * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef	__include_stdio_h
+#define	__include_stdio_h
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-# ifndef FILE
 #define	BUFSIZ	1024
 #define _SBFSIZ	8
 extern	struct	_iobuf {
@@ -53,9 +58,9 @@ extern	struct	_iobuf {
 #define	stdout	(&_iob[1])
 #define	stderr	(&_iob[2])
 
-#ifdef lint	/* so that lint likes (void)putc(a,b) */
-extern int putc();
-extern int getc();
+#if	defined(__lint)	/* so that lint likes (void)putc(a,b) */
+extern int putc(int, FILE *);
+extern int getc(FILE *);
 #else
 #define	getc(p)		(--(p)->_cnt>=0? ((int)*(p)->_ptr++):_filbuf(p))
 #define putc(x, p)	(--(p)->_cnt >= 0 ?\
@@ -66,29 +71,31 @@ extern int getc();
 			_flsbuf(*(unsigned char *)(p)->_ptr, p)) :\
 		_flsbuf((unsigned char)(x), p)))
 #endif
+
 #define	getchar()	getc(stdin)
 #define	putchar(x)	putc((x),stdout)
 #define	feof(p)		(((p)->_flag&_IOEOF)!=0)
 #define	ferror(p)	(((p)->_flag&_IOERR)!=0)
 #define	clearerr(p)	(void) ((p)->_flag &= ~(_IOERR|_IOEOF))
 
-extern FILE	*fopen();
-extern FILE	*fdopen();
-extern FILE	*freopen();
-extern FILE	*popen();
-extern FILE	*tmpfile();
-extern long	ftell();
-extern char	*fgets();
-extern char	*gets();
-extern char	*sprintf();
-extern char	*ctermid();
-extern char	*cuserid();
-extern char	*tempnam();
-extern char	*tmpnam();
-extern int	fileno();
+extern FILE	*fopen(char *, char *);
+extern FILE	*fdopen(int, char *);
+extern FILE	*freopen(char *, char *, FILE *);
+extern FILE	*popen(char *, char *);
+extern FILE	*tmpfile(void);
+extern long	ftell(FILE *);
+extern char	*fgets(char *, int, FILE *);
+extern char	*gets(char *);
+extern char	*sprintf(char *, char *, ...);
+extern char	*ctermid(char *);
+extern char	*cuserid(char *);
+extern char	*tempnam(char *, char *);
+extern char	*tmpnam(char *);
+extern int	fileno(FILE *);
 
 #define L_ctermid	9
 #define L_cuserid	9
 #define P_tmpdir	"/usr/tmp/"
 #define L_tmpnam	25		/* (sizeof(P_tmpdir) + 15) */
-# endif
+
+#endif /* !__include_stdio_h */

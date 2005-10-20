@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1988-1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,10 +30,8 @@
 #include <malloc.h>
 
 void
-_copy_big_float_digits(p1, p2, n)
-	_BIG_FLOAT_DIGIT *p1, *p2;
-	short unsigned  n;
-
+_copy_big_float_digits(_BIG_FLOAT_DIGIT *p1, _BIG_FLOAT_DIGIT *p2,
+    short unsigned n)
 {				/* Copies p1[n] = p2[n] */
 	short unsigned  i;
 
@@ -42,9 +40,7 @@ _copy_big_float_digits(p1, p2, n)
 }
 
 void
-_free_big_float(p)
-	_big_float     *p;
-
+_free_big_float(_big_float *p)
 {
 	/* Central routine to call free for base conversion.	 */
 
@@ -57,10 +53,7 @@ _free_big_float(p)
 }
 
 void
-_base_conversion_abort(ern, bcastring)
-	int             ern;
-	char           *bcastring;
-
+_base_conversion_abort(int ern, char *bcastring)
 {
 	char            pstring[160];
 
@@ -70,46 +63,37 @@ _base_conversion_abort(ern, bcastring)
 	abort();
 }
 
-void
-_big_float_times_power(
-#ifdef notdef
-/* function to multiply a big_float times a positive power of two or ten. */
-		       _big_float * pbf;	/* Operand x, to be replaced
-						 * by the product x * mult **
-						 * n. */
-	int             mult;	/* if mult is two, x is base 10**4; if mult
-				 * is ten, x is base 2**16 */
-	int             n;
-	int             precision;	/* Number of bits of precision
-					 * ultimately required (mult=10) or
-					 * number of digits of precision
-					 * ultimately required (mult=2).
-					 * Extra bits are allowed internally
-					 * to permit correct rounding. */
 /*
+ * function to multiply a big_float times a positive power of two or ten.
+ *
+ * Arguments
+ * 	pbf:		Operand x, to be replaced by the product x * mult ** n.
+ *	mult:		if mult is two, x is base 10**4;
+ *			if mult is ten, x is base 2**16
+ *	n:
+ *	precision:	Number of bits of precision ultimately required
+ *			(mult=10) or number of digits of precision ultimately
+ *			required (mult=2).
+ *			Extra bits are allowed internally to permit correct
+ *			rounding.
+ *	pnewbf:		Return result *pnewbf is set to: pbf if uneventful
+ *			BIG_FLOAT_TIMES_TOOBIG  if n is bigger than the tables
+ *			permit ;
+ *			BIG_FLOAT_TIMES_NOMEM   if pbf->blength was
+ *			insufficient to hold the product, and malloc failed to
+ *			produce a new block ;
+ *			&newbf                  if pbf->blength was
+ *			insufficient to hold the product, and a new _big_float
+ *			was allocated by malloc.  newbf holds the product.
+ *			It's the caller's responsibility to free this space
+ *			when no longer needed.
+ *
  * if precision is < 0, then -pfb->bexponent/{4 or 16} digits are discarded
  * on the last product.
  */
-	_big_float    **pnewbf;	/* Return result *pnewbf is set to: pbf if
-				 * uneventful BIG_FLOAT_TIMES_TOOBIG  if n is
-				 * bigger than the tables permit ;
-				 * BIG_FLOAT_TIMES_NOMEM   if pbf->blength
-				 * was insufficient to hold the product, and
-				 * malloc failed to produce a new block ;
-				 * &newbf                  if pbf->blength
-				 * was insufficient to hold the product, and
-				 * a new _big_float was allocated by malloc.
-				 * newbf holds the product.  It's the
-				 * caller's responsibility to free this space
-				 * when no longer needed. */
-#else
-		                       pbf, mult, n, precision, pnewbf
-#endif
-)
-	_big_float     *pbf;
-	int             mult, n, precision;
-	_big_float    **pnewbf;
-
+ void
+_big_float_times_power(_big_float *pbf, int mult, int n, int precision,
+    _big_float **pnewbf)
 {
 	short unsigned  base, sumlz = 0;
 	unsigned short  productsize, trailing_zeros_to_delete, needed_precision, *pp, *table[3], max[3], *start[3], *lz[3], tablepower[3];
@@ -301,7 +285,7 @@ _big_float_times_power(
 				/* Generate criterion for early termination.	 */
 				switch (base) {
 				case 2:
-					canquit = 65536;
+					canquit = (short unsigned)65536;
 					break;
 				case 10:
 					canquit = 10000;

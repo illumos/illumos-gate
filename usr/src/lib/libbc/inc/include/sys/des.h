@@ -19,16 +19,20 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef _sys_des_h
+#define _sys_des_h
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Generic DES driver interface
  * Keep this file hardware independent!
- * Copyright (c) 1986 by Sun Microsystems, Inc.
  */
-
-#ifndef _sys_des_h
-#define _sys_des_h
 
 #define DES_MAXLEN 	65536	/* maximum # of bytes to encrypt  */
 #define DES_QUICKLEN	16	/* maximum # of bytes to encrypt quickly */
@@ -49,18 +53,18 @@ struct desparams {
 		u_char UDES_data[DES_QUICKLEN];
 		u_char *UDES_buf;
 	} UDES;
-#	define des_data UDES.UDES_data	/* direct data here if quick */
-#	define des_buf	UDES.UDES_buf	/* otherwise, pointer to data */
+#define des_data UDES.UDES_data	/* direct data here if quick */
+#define des_buf	UDES.UDES_buf	/* otherwise, pointer to data */
 };
 
 /*
  * Encrypt an arbitrary sized buffer
  */
-#define	DESIOCBLOCK	_IOWR(d, 6, struct desparams)
+#define	DESIOCBLOCK	_IOWR('d', 6, struct desparams)
 
 /* 
  * Encrypt of small amount of data, quickly
  */
-#define DESIOCQUICK	_IOWR(d, 7, struct desparams) 
+#define DESIOCQUICK	_IOWR('d', 7, struct desparams) 
 
-#endif /*!_sys_des_h*/
+#endif /* !_sys_des_h */

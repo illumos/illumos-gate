@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1985 by Sun Microsystems, Inc.
+ * Copyright 1985 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _sparc_trap_h
-#define _sparc_trap_h
+#define	_sparc_trap_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Trap type values.
@@ -86,9 +87,7 @@
 
 #define ST_GETCC		0x20
 #define ST_SETCC		0x21
-#ifdef	sun4c
 #define ST_MON_BREAKPOINT	0x7F
-#endif	sun4c
 
 /*
  * Software trap vectors 16 - 31 are reserved for use by the user
@@ -121,4 +120,4 @@
 #define T_AST			0x400
 #define T_ZERO			0x00
 
-#endif /*!_sparc_trap_h*/
+#endif /* !_sparc_trap_h */

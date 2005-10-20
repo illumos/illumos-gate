@@ -24,18 +24,20 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
 #include <mntent.h>
 #include <sys/file.h>
+#include <malloc.h>
+
+static int	mntprtent(FILE *, struct mntent *);
 
 static	struct mntent *mntp;
-char	*calloc();
 
 struct mntent *
-_mnt()
+_mnt(void)
 {
 
 	if (mntp == 0)
@@ -44,8 +46,7 @@ _mnt()
 }
 
 static char *
-mntstr(p)
-	register char **p;
+mntstr(char **p)
 {
 	unsigned char *cp = (unsigned char *) *p;
 	unsigned char *retstr;
@@ -64,10 +65,9 @@ mntstr(p)
 }
 
 static int
-mntdigit(p)
-	register char **p;
+mntdigit(char **p)
 {
-	register int value = 0;
+	int value = 0;
 	unsigned char *cp = (unsigned char *) *p;
 
 	while (*cp && isspace(*cp))
@@ -86,10 +86,8 @@ mntdigit(p)
 	return (value);
 }
 
-static
-mnttabscan(mnttabp, mnt)
-	FILE *mnttabp;
-	struct mntent *mnt;
+static int
+mnttabscan(FILE *mnttabp, struct mntent *mnt)
 {
 	static	char *line = NULL;
 	char *cp;
@@ -122,9 +120,7 @@ mnttabscan(mnttabp, mnt)
 }
 	
 FILE *
-setmntent(fname, flag)
-	char *fname;
-	char *flag;
+setmntent(char *fname, char *flag)
 {
 	FILE *mnttabp;
 
@@ -144,8 +140,7 @@ setmntent(fname, flag)
 }
 
 int
-endmntent(mnttabp)
-	FILE *mnttabp;
+endmntent(FILE *mnttabp)
 {
 
 	if (mnttabp) {
@@ -155,8 +150,7 @@ endmntent(mnttabp)
 }
 
 struct mntent *
-getmntent(mnttabp)
-	FILE *mnttabp;
+getmntent(FILE *mnttabp)
 {
 	int nfields;
 
@@ -170,9 +164,8 @@ getmntent(mnttabp)
 	return (mntp);
 }
 
-addmntent(mnttabp, mnt)
-	FILE *mnttabp;
-	register struct mntent *mnt;
+int
+addmntent(FILE *mnttabp, struct mntent *mnt)
 {
 	if (fseek(mnttabp, 0L, 2) < 0)
 		return (1);
@@ -187,8 +180,7 @@ addmntent(mnttabp, mnt)
 }
 
 static char *
-mntopt(p)
-	char **p;
+mntopt(char **p)
 {
 	unsigned char *cp = (unsigned char *) *p;
 	unsigned char *retstr;
@@ -207,9 +199,7 @@ mntopt(p)
 }
 
 char *
-hasmntopt(mnt, opt)
-	register struct mntent *mnt;
-	register char *opt;
+hasmntopt(struct mntent *mnt, char *opt)
 {
 	char *f, *opts;
 	static char *tmpopts;
@@ -229,10 +219,8 @@ hasmntopt(mnt, opt)
 	return (NULL);
 }
 
-static
-mntprtent(mnttabp, mnt)
-	FILE *mnttabp;
-	register struct mntent *mnt;
+static int
+mntprtent(FILE *mnttabp, struct mntent *mnt)
 {
 	fprintf(mnttabp, "%s %s %s %s %d %d\n",
 	    mnt->mnt_fsname,
@@ -241,5 +229,5 @@ mntprtent(mnttabp, mnt)
 	    mnt->mnt_opts,
 	    mnt->mnt_freq,
 	    mnt->mnt_passno);
-	return(0);
+	return (0);
 }

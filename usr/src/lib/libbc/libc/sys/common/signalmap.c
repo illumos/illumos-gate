@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "signalmap.h"
 #include <sys/signal.h>
@@ -33,10 +33,8 @@
 extern int errno;
 void (*handlers[32])();		/* XXX - 32???  NSIG, maybe? */
 
-void maphandler(sig, code, scp, addr)
-int sig, code;
-struct sigcontext *scp;
-char *addr;
+void
+maphandler(int sig, int code, struct sigcontext *scp, char *addr)
 {
 	switch (sig) {
 		case SIGBUS:
@@ -54,9 +52,8 @@ char *addr;
 	__sendsig(maptooldsig(sig), code, scp, addr, handlers[sig]);
 }
 	
-void (*signal(sig, a))()
-int sig;
-void (*a)();
+void (*
+signal(int sig, void (*a)(int)))(int)
 {
 	int newsig;
 
@@ -75,13 +72,12 @@ void (*a)();
 }
 
 
-sigvec(sig, nvec, ovec)
-int sig;
-struct sigvec *nvec, *ovec;
+int
+sigvec(int sig, struct sigvec *nvec, struct sigvec *ovec)
 {
 	int newsig;
 	struct sigvec tvec, *tvecp;
-	void (*oldhand)();
+	void (*oldhand)(int);
 
 	if ((int)nvec == -1 || (int)ovec == -1) {
 		errno = EFAULT;
@@ -119,122 +115,121 @@ struct sigvec *nvec, *ovec;
 	return (0);
 }
 
-sigsetmask(mask)
-int mask;
+int
+sigsetmask(int mask)
 {
 	int ret;
 	ret = ucbsigsetmask(maptonewmask(mask));
-	return(maptooldmask(ret));
+	return (maptooldmask(ret));
 }
 
-sigblock(mask)
-int mask;
+int
+sigblock(int mask)
 {
 	int ret;
 	ret = ucbsigblock(maptonewmask(mask));
-	return(maptooldmask(ret));
+	return (maptooldmask(ret));
 }
 
 
-int sigpause(mask)
-int mask;
+int
+sigpause(int mask)
 {
 	int ret;
-	return(ucbsigpause(maptonewmask(mask)));
+	return (ucbsigpause(maptonewmask(mask)));
 }
 
-siginterrupt(sig, flag)
-int sig, flag;
+int
+siginterrupt(int sig, int flag)
 {
-	return(ucbsiginterrupt(maptonewsig(sig), flag));
+	return (ucbsiginterrupt(maptonewsig(sig), flag));
 }
 
 
-maptonewsig(sig)
-int	sig;
+int
+maptonewsig(int sig)
 {
 	switch (sig) {
 	case SIGURG:               /* urgent condition on IO channel */
-		return(XSIGURG);
+		return (XSIGURG);
 	case SIGSTOP:              /* sendable stop signal not from tty */
-		return(XSIGSTOP);
+		return (XSIGSTOP);
 	case SIGTSTP:            /* stop signal from tty */
-		return(XSIGTSTP);
+		return (XSIGTSTP);
 	case SIGCONT:            /* continue a stopped process */
-		return(XSIGCONT);
+		return (XSIGCONT);
 	case SIGCLD:          /* System V name for SIGCHLD */
-		return(XSIGCLD);
+		return (XSIGCLD);
 	case SIGTTIN:          /* to readers pgrp upon background tty read */
-		return(XSIGTTIN);
+		return (XSIGTTIN);
 	case SIGTTOU:         /* like TTIN for output */
-		return(XSIGTTOU);
+		return (XSIGTTOU);
 	case SIGIO:        /* input/output possible signal */
-		return(XSIGIO);
+		return (XSIGIO);
 	case SIGXCPU:       /* exceeded CPU time limit */
-		return(XSIGXCPU);
+		return (XSIGXCPU);
 	case SIGXFSZ:       /* exceeded file size limit */
-		return(XSIGXFSZ);
+		return (XSIGXFSZ);
 	case SIGVTALRM:      /* virtual time alarm */
-		return(XSIGVTALRM);
+		return (XSIGVTALRM);
 	case SIGPROF:        /* profiling time alarm */
-		return(XSIGPROF);
+		return (XSIGPROF);
 	case SIGWINCH:       /* window changed */
-		return(XSIGWINCH);
+		return (XSIGWINCH);
 	case SIGLOST:	     /* resource lost, not supported */
-		return(-1);
+		return (-1);
 	case SIGUSR1:
-		return(XSIGUSR1);
+		return (XSIGUSR1);
 	case SIGUSR2:      /* user defined signal 2 */
-		return(XSIGUSR2);
+		return (XSIGUSR2);
 	default:
-		return(sig);
+		return (sig);
 	}
 }
 
-
-maptooldsig(sig)
-int	sig;
+int
+maptooldsig(int sig)
 {
 	switch (sig) {
 	case XSIGURG:               /* urgent condition on IO channel */
-		return(SIGURG);
+		return (SIGURG);
 	case XSIGSTOP:              /* sendable stop signal not from tty */
-		return(SIGSTOP);
+		return (SIGSTOP);
 	case XSIGTSTP:            /* stop signal from tty */
-		return(SIGTSTP);
+		return (SIGTSTP);
 	case XSIGCONT:            /* continue a stopped process */
-		return(SIGCONT);
+		return (SIGCONT);
 	case XSIGCLD:          /* System V name for SIGCHLD */
-		return(SIGCLD);
+		return (SIGCLD);
 	case XSIGTTIN:          /* to readers pgrp upon background tty read */
-		return(SIGTTIN);
+		return (SIGTTIN);
 	case XSIGTTOU:         /* like TTIN for output */
-		return(SIGTTOU);
+		return (SIGTTOU);
 	case XSIGIO:        /* input/output possible signal */
-		return(SIGIO);
+		return (SIGIO);
 	case XSIGXCPU:       /* exceeded CPU time limit */
-		return(SIGXCPU);
+		return (SIGXCPU);
 	case XSIGXFSZ:       /* exceeded file size limit */
-		return(SIGXFSZ);
+		return (SIGXFSZ);
 	case XSIGVTALRM:      /* virtual time alarm */
-		return(SIGVTALRM);
+		return (SIGVTALRM);
 	case XSIGPROF:        /* profiling time alarm */
-		return(SIGPROF);
+		return (SIGPROF);
 	case XSIGWINCH:       /* window changed */
-		return(SIGWINCH);
+		return (SIGWINCH);
 	case XSIGUSR1:
-		return(SIGUSR1);
+		return (SIGUSR1);
 	case XSIGUSR2:      /* user defined signal 2 */
-		return(SIGUSR2);
+		return (SIGUSR2);
 	case XSIGPWR:      /* user defined signal 2 */
-		return(-1);
+		return (-1);
 	default:
-		return(sig);
+		return (sig);
 	}
 }
 
-int maptooldmask(mask)
-	int mask;
+int
+maptooldmask(int mask)
 {
 	int omask;
 
@@ -270,17 +265,17 @@ int maptooldmask(mask)
 		omask |= sigmask(SIGUSR1);
 	if (mask & sigmask(XSIGUSR2))
 		omask |= sigmask(SIGUSR2);
-	return(omask);
+	return (omask);
 }	
 
 
-int maptonewmask(omask)
-	int omask;
+int
+maptonewmask(int omask)
 {
 	int mask;
 
 	if (omask == -1) {
-		return(-1);
+		return (-1);
 	}
 
 	mask = omask & 0x7FFF;		/* these signo are the same */
@@ -315,5 +310,5 @@ int maptonewmask(omask)
 		mask |= sigmask(XSIGUSR1);
 	if (omask & sigmask(SIGUSR2))
 		mask |= sigmask(XSIGUSR2);
-	return(mask);
+	return (mask);
 }	

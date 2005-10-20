@@ -19,8 +19,12 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1983 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.3 82/11/14 */
 
 #include <sys/types.h>
 #include <netinet/in.h>
@@ -29,10 +33,10 @@
  * Return the network number from an internet
  * address; handles class a/b/c network #'s.
  */
-inet_netof(in)
-	struct in_addr in;
+int
+inet_netof(struct in_addr in)
 {
-	register u_long i = ntohl(in.s_addr);
+	u_long i = ntohl(in.s_addr);
 
 	if (IN_CLASSA(i))
 		return (((i)&IN_CLASSA_NET) >> IN_CLASSA_NSHIFT);

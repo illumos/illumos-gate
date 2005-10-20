@@ -19,12 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1986-1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Exported file system table manager. Reads/writes "/etc/xtab".
@@ -42,11 +43,11 @@ extern char *strcpy();
 
 static char *TMPFILE = "/tmp/xtabXXXXXX";
 
-static char *skipwhite();
-static char *skipnonwhite();
+static char *skipwhite(char *);
+static char *skipnonwhite(char *);
 
 FILE *
-setexportent()
+setexportent(void)
 {
 	FILE *f;
 	int fd;
@@ -75,16 +76,14 @@ setexportent()
 
 
 void
-endexportent(f)
-	FILE *f;
+endexportent(FILE *f)
 {
-	(void)fclose(f);
+	(void) fclose(f);
 }
 
 
 struct exportent *
-getexportent(f)
-	FILE *f;
+getexportent(FILE *f)
 {
 	static char *line = NULL;
 	static struct exportent xent;
@@ -119,9 +118,8 @@ getexportent(f)
 	return (&xent);
 }
 
-remexportent(f, dirname)
-	FILE *f;
-	char *dirname;
+int
+remexportent(FILE *f, char *dirname)
 {
 	char buf[LINESIZE];
 	FILE *f2;
@@ -192,11 +190,8 @@ remexportent(f, dirname)
 	return (res < 0 ? -1 : 0); 
 }
 
-
-addexportent(f, dirname, options)
-	FILE *f;
-	char *dirname;
-	char *options;
+int
+addexportent(FILE *f, char *dirname, char *options)
 {
 	long pos;	
 
@@ -213,9 +208,7 @@ addexportent(f, dirname, options)
  
 
 char *
-getexportopt(xent, opt)
-	struct exportent *xent;
-	char *opt;
+getexportopt(struct exportent *xent, char *opt)
 {
 	static char *tokenbuf = NULL;
 	char *lp;
@@ -248,8 +241,7 @@ getexportopt(xent, opt)
 #define iswhite(c) 	((c) == ' ' || c == '\t')
 
 static char *
-skipwhite(str)
-	char *str;
+skipwhite(char *str)
 {
 	while (*str && iswhite(*str)) {
 		str++;
@@ -258,8 +250,7 @@ skipwhite(str)
 }
 
 static char *
-skipnonwhite(str)
-	char *str;
+skipnonwhite(char *str)
 {
 	while (*str && ! iswhite(*str)) {
 		str++;

@@ -23,6 +23,7 @@
  * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -31,65 +32,75 @@
 #include <stdio.h>
 #include <signal.h>
 #include <errno.h>
+
 #define cantmask        (sigmask(SIGKILL)|sigmask(SIGSTOP))
 
-extern errno;
 
 /*
  * sigemptyset - all known signals
  */
-sigemptyset(sigp)
-    sigset_t *sigp;
+int
+sigemptyset(sigset_t *sigp)
 {
-    if (!sigp)
-	return errno = EINVAL, -1;
-    *sigp = 0;
-    return 0;
+	if (!sigp) {
+		errno = EINVAL;
+		return (-1);
+	}
+	*sigp = 0;
+	return (0);
 }
     
 /*
  * sigfillset - all known signals
  */
-sigfillset(sigp)
-    sigset_t *sigp;
+int
+sigfillset(sigset_t *sigp)
 {
-    if (!sigp)
-	return errno = EINVAL, -1;
-    *sigp = sigmask(NSIG - 1) | (sigmask(NSIG - 1) - 1);
-    return 0;
+	if (!sigp) {
+		errno = EINVAL;
+		return (-1);
+	}
+	*sigp = sigmask(NSIG - 1) | (sigmask(NSIG - 1) - 1);
+	return (0);
 }
 
 /*
  * add the signal to the set
  */
-sigaddset(sigp,signo)	
-    sigset_t* sigp;
+int
+sigaddset(sigset_t *sigp, int signo)	
 {
-    if (!sigp  ||  signo <= 0  ||  signo >= NSIG)
-	return errno = EINVAL, -1;
-    *sigp |= sigmask(signo);
-    return 0;
+	if (!sigp  ||  signo <= 0  ||  signo >= NSIG) {
+		errno = EINVAL;
+		return (-1);
+	}
+	*sigp |= sigmask(signo);
+	return (0);
 }
 
 /*
  * remove the signal from the set
  */
-sigdelset(sigp,signo)
-    sigset_t* sigp;
+int
+sigdelset(sigset_t *sigp, int signo)
 {
-    if (!sigp  ||  signo <= 0  ||  signo >= NSIG)
-	return errno = EINVAL, -1;
-    *sigp &= ~sigmask(signo);
-    return 0;
+	if (!sigp  ||  signo <= 0  ||  signo >= NSIG) {
+		errno = EINVAL;
+		return (-1);
+	}
+	*sigp &= ~sigmask(signo);
+	return (0);
 }
 
 /*
  * return true if the signal is in the set (return is 0 or 1)
  */
-sigismember(sigp,signo)
-    sigset_t* sigp;
+int
+sigismember(sigset_t *sigp, int signo)
 {
-    if (!sigp  ||  signo <= 0  ||  signo >= NSIG)
-	return errno = EINVAL, -1;
-    return (*sigp & sigmask(signo)) != 0;
+	if (!sigp  ||  signo <= 0  ||  signo >= NSIG) {
+		errno = EINVAL;
+		return (-1);
+	}
+	return ((*sigp & sigmask(signo)) != 0);
 }

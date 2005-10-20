@@ -30,7 +30,7 @@
 
 #define NUM_FD	16
 
-struct fd_lst{
+struct fd_lst {
         int     fd[NUM_FD];                 /* list of 16 descriptors */
 	int 	fds[NUM_FD];
         struct fd_lst *next;     
@@ -40,9 +40,8 @@ struct fd_lst{
 static struct fd_lst *fdlist = NULL;
 static struct fd_lst *fdtail = NULL;
 
-
-fd_init(lst)
-	struct fd_lst *lst;
+void
+fd_init(struct fd_lst *lst)
 {
 	int i;
 	
@@ -55,8 +54,8 @@ fd_init(lst)
 
 
 	
-int fd_add(fd, fds)
-int fd, fds;
+int
+fd_add(int fd, int fds)
 {
 	int i;
 	struct fd_lst *fdc, *fdnew;
@@ -89,11 +88,12 @@ int fd, fds;
 	fdtail = fdnew;
 	fdtail->fd[0] = fd;
 	fdtail->fds[0] = fds;
-	return(0);
+	return (0);
 }
 
 
-int fd_rem(fd)
+int
+fd_rem(int fd)
 {
 	int i;
 	struct fd_lst *fdc = fdlist;
@@ -103,15 +103,17 @@ int fd_rem(fd)
 			if (fdc->fd[i] == fd) {
 				fdc->fd[i] = -1;
 				fdc->fds[i] = -1;
-				return(0);
+				return (0);
 			}
 		}
 		fdc = fdc->next;
 	}
+	return (0);
 }
 
 
-int fd_get(fd)
+int
+fd_get(int fd)
 {
 	int i;
 	struct fd_lst *fdc = fdlist;
@@ -119,19 +121,10 @@ int fd_get(fd)
 	while (fdc != NULL) {
 		for (i=0; i<NUM_FD; i++) {
 			if (fdc->fd[i] == fd) {
-				return(fdc->fds[i]);
+				return (fdc->fds[i]);
 			}
 		}
 		fdc = fdc->next;
 	}
-	return(-1);
+	return (-1);
 }
-
-				
-
-
-	
-
-	
-
-	

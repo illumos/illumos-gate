@@ -19,25 +19,22 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "base_conversion.h"
 
 /*	Fundamental utilities for base conversion that should be recoded as assembly language subprograms or as inline expansion templates. */
 
-void
-_fourdigitsquick(t, d)
-	short unsigned  t;
-	char            *d;
-
 /* Converts t < 10000 into four ascii digits at *pc.     */
-
+void
+_fourdigitsquick(short unsigned t, char *d)
 {
-	register short  i;
+	short  i;
 
 	i = 3;
 	do {
@@ -48,10 +45,8 @@ _fourdigitsquick(t, d)
 }
 
 void
-_multiply_base_two_vector(n, px, py, product)
-	short unsigned  n, *py;
-	_BIG_FLOAT_DIGIT *px, product[3];
-
+_multiply_base_two_vector(short unsigned n, _BIG_FLOAT_DIGIT *px,
+    short unsigned *py, _BIG_FLOAT_DIGIT product[3])
 {
 	/*
 	 * Given xi and yi, base 2**16 vectors of length n, computes dot
@@ -81,10 +76,8 @@ _multiply_base_two_vector(n, px, py, product)
 }
 
 void
-_multiply_base_ten_vector(n, px, py, product)
-	short unsigned  n, *py;
-	_BIG_FLOAT_DIGIT *px, product[3];
-
+_multiply_base_ten_vector(short unsigned n, _BIG_FLOAT_DIGIT *px,
+    short unsigned *py, _BIG_FLOAT_DIGIT product[3])
 {
 	/*
 	 * Given xi and yi, base 10**4 vectors of length n, computes dot
@@ -96,7 +89,7 @@ _multiply_base_ten_vector(n, px, py, product)
 	 * is least significant, product[2] most.
 	 */
 
-#define ABASE	3000000000	/* Base of accumulator. */
+#define ABASE	3000000000U	/* Base of accumulator. */
 
 	unsigned long   acc;
 	short unsigned  carry;
@@ -123,4 +116,3 @@ _multiply_base_ten_vector(n, px, py, product)
 	acc /= 10000;
 	product[2] = (_BIG_FLOAT_DIGIT) (acc + (ABASE / 100000000) * carry);
 }
-

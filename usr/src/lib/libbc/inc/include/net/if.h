@@ -9,10 +9,10 @@
  * specifies the terms and conditions for redistribution.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _net_if_h
-#define _net_if_h
+#define	_net_if_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Structures defining a network interface, providing a packet
@@ -260,13 +260,4 @@ struct	ifconf {
 #define	ifc_req	ifc_ifcu.ifcu_req	/* array of structures returned */
 };
 
-#ifdef KERNEL
-struct	ifqueue rawintrq;		/* raw packet input queue */
-struct	ifnet *ifnet;
-struct	ifaddr *ifa_ifwithaddr(), *ifa_ifwithnet();
-struct	ifaddr *ifa_ifwithdstaddr();
-struct	ifaddr *ifa_ifwithaf();
-struct	ifnet *ifunit();
-#endif KERNEL
-
-#endif /*!_net_if_h*/
+#endif /* !_net_if_h */

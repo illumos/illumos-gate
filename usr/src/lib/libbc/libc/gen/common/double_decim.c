@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /* Conversion between binary and decimal floating point. */
 
@@ -31,21 +32,15 @@
 
 /* PRIVATE FUNCTIONS */
 
-void
-decimal_round(pm, pd, ps, round, sticky)
-	decimal_mode   *pm;
-	decimal_record *pd;
-	fp_exception_field_type *ps;
-	char            round;
-	unsigned        sticky;
-
 /*
  * Rounds decimal record *pd according to modes in *pm, recording exceptions
  * for inexact or overflow in *ps.  round is the round digit and sticky is 0
  * or non-zero to indicate exact or inexact. pd->ndigits is expected to be
  * correctly set.
  */
-
+void
+decimal_round(decimal_mode *pm, decimal_record *pd, fp_exception_field_type *ps,
+    char round, unsigned sticky)
 {
 	int             lsd, i;
 
@@ -107,24 +102,24 @@ ret:
 	return;
 }
 
-void
-binary_to_decimal_integer(pu, nsig, ds, nzeros, ndigs)
-	unpacked       *pu;	/* Input unpacked integer value input. */
-	unsigned        nsig;	/* Input number of significant digits
-				 * required. */
-	char            ds[];	/* Output decimal integer string output -
-				 * must be large enough. */
-unsigned       *nzeros;		/* Output number of implicit trailing zeros
-				 * produced. */
-unsigned       *ndigs;		/* Output number of explicit digits produced
-				 * in ds. */
-
 /*
  * Converts an unpacked integer value *pu into a decimal string in *ds, of
- * length returned in *ndigs. /* Inexactness is indicated by setting
+ * length returned in *ndigs. Inexactness is indicated by setting
  * ds[ndigs-1] odd.
+ *
+ * Arguments
+ *	pu:		Input unpacked integer value input.
+ *	nsig:		Input number of significant digits required.
+ *	ds:		Output decimal integer string output
+ *			must be large enough.
+ *	nzeros:		Output number of implicit trailing zeros
+ *			produced.
+ *	ndigs:		Output number of explicit digits produced
+ *			in ds.
  */
-
+void
+binary_to_decimal_integer(unpacked *pu, unsigned nsig, char ds[],
+    unsigned *nzeros, unsigned *ndigs)
 {
 
 	_big_float     *pd, b, d;
@@ -196,29 +191,31 @@ unsigned       *ndigs;		/* Output number of explicit digits produced
 #endif
 }
 
-void
-binary_to_decimal_fraction(pu, nsig, nfrac, ds, nzeros, ndigs)
-	unpacked       *pu;	/* Input unpacked fraction value output < 1
-				 * in magnitude. */
-	unsigned        nsig;	/* Input number of significant digits
-				 * required. */
-	unsigned        nfrac;	/* Input number of digits after point
-				 * required. */
-	char            ds[];	/* Output decimal integer string output -
-				 * must be large enough. */
-int            *nzeros;		/* Output number of implicit leading zeros
-				 * produced. */
-int            *ndigs;		/* Output number of explicit digits produced
-				 * in ds. */
-
 /*
  * Converts an unpacked fraction value *pu into a decimal string consisting
  * of a) an implicit '.' b) *nzeros implicit leading zeros c) *ndigs explicit
  * digits in ds ds contains at least nsig significant digits. nzeros + *
  * *ndigs is at least nfrac digits after the point. Inexactness is indicated
  * by sticking to the lsb.
+ *
+ * Arguments
+ *
+ *	pu:		Input unpacked fraction value output < 1
+ *			in magnitude.
+ *	nsig:		Input number of significant digits
+ *			required.
+ *	nfrac:		Input number of digits after point
+ *			required.
+ *	ds:		Output decimal integer string output -
+ *			must be large enough.
+ *	nzeros:		Output number of implicit leading zeros
+ *			produced.
+ *	ndigs:		Output number of explicit digits produced
+ *			in ds.
  */
-
+ void
+binary_to_decimal_fraction(unpacked *pu, unsigned nsig, unsigned nfrac,
+    char ds[], int *nzeros, int *ndigs)
 {
 	_big_float     *pb, b, d;
 	int             e, i, j, is, excess;
@@ -337,11 +334,8 @@ int            *ndigs;		/* Output number of explicit digits produced
 }
 
 void
-_unpacked_to_decimal(px, pm, pd, ps)
-	unpacked       *px;
-	decimal_mode   *pm;
-	decimal_record *pd;
-	fp_exception_field_type *ps;
+_unpacked_to_decimal(unpacked *px, decimal_mode *pm, decimal_record *pd,
+    fp_exception_field_type *ps)
 {
 	unpacked        fx, ix;
 	unsigned        fmask, imask;
@@ -645,11 +639,8 @@ overflow:
 }
 
 void
-double_to_decimal(px, pm, pd, ps)
-	double         *px;
-	decimal_mode   *pm;
-	decimal_record *pd;
-	fp_exception_field_type *ps;
+double_to_decimal(double *px, decimal_mode *pm, decimal_record *pd,
+    fp_exception_field_type *ps)
 {
 	double_equivalence kluge;
 	unpacked        u;
@@ -674,11 +665,8 @@ double_to_decimal(px, pm, pd, ps)
 }
 
 void
-quadruple_to_decimal(px, pm, pd, ps)
-	quadruple      *px;
-	decimal_mode   *pm;
-	decimal_record *pd;
-	fp_exception_field_type *ps;
+quadruple_to_decimal(quadruple *px, decimal_mode *pm, decimal_record *pd,
+    fp_exception_field_type *ps)
 {
 	quadruple_equivalence kluge;
 	unpacked        u;

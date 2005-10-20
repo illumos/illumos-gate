@@ -24,12 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/syscall.h>
 
-chmod(s, m)
-    char           *s;
+int
+chmod(char *s, int m)
 {
-    return _syscall(SYS_chmod, s, m);
+    return (_syscall(SYS_chmod, s, m));
 }

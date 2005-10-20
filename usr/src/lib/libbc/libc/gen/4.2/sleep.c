@@ -1,11 +1,10 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 5.1 85/05/30 */
-
 /*
- * Copyright (c) 1980 Regents of the University of California.
+ * copyright (c) 1980 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/time.h>
 #include <signal.h>
@@ -15,13 +14,14 @@
 
 static int ringring;
 
-sleep(n)
-	unsigned n;
+static void	sleepx(void);
+
+void
+sleep(unsigned n)
 {
-	void sleepx();
 	int omask;
 	struct itimerval itv, oitv;
-	register struct itimerval *itp = &itv;
+	struct itimerval *itp = &itv;
 	struct sigvec vec, ovec;
 
 	if (n == 0)
@@ -59,7 +59,7 @@ sleep(n)
 }
 
 static void
-sleepx()
+sleepx(void)
 {
 
 	ringring = 1;

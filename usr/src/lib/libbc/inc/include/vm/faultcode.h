@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1987 by Sun Microsystems, Inc.
+ * Copyright 1987 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _vm_faultcode_h
 #define	_vm_faultcode_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This file describes the "code" that is delivered during
@@ -49,6 +50,6 @@
 
 #ifndef LOCORE
 typedef	int	faultcode_t;	/* type returned by vm fault routines */
-#endif LOCORE
+#endif	/* LOCORE */
 
-#endif /*!_vm_faultcode_h*/
+#endif /* !_vm_faultcode_h */

@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -33,8 +34,8 @@
  */
 
 /*LINTLIBRARY*/
-mlockall(flags)
-	int flags;
+int
+mlockall(int flags)
 {
 
 	return (mctl(0, 0, MC_LOCKAS, flags));

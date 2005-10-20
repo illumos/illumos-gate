@@ -3,13 +3,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -17,7 +17,10 @@
 #include <stdio.h>
 #include <errno.h>
 #include <ndbm.h>
-datum dbm_do_nextkey(/*db, key*/);
+#include <stdlib.h>
+#include <string.h>
+
+datum dbm_do_nextkey(DBM *, datum);
 
 
 /*add support for batched writing for NIS*/
@@ -33,15 +36,26 @@ datum dbm_do_nextkey(/*db, key*/);
 #define dbm_setdirdirty(db) (db)->dbm_flags |= _DBM_DIRDIRTY
 #define dbm_clrdirdirty(db) (db)->dbm_flags &= ~_DBM_DIRDIRTY
 
+
+static void	dbm_access(DBM *, long);
+static int	getbit(DBM *);
+static int	setbit(DBM *);
+static int	cmpdatum(datum, datum);
+static int	finddatum(char [PBLKSIZ], datum);
+static int	delitem(char [PBLKSIZ], int);
+static int	additem(char [PBLKSIZ], datum, datum);
+static datum	makdatum(char [PBLKSIZ], int);
+static long	dcalchash(datum);
+
 /*used to make a dbm file all at once instead of incrementally*/
-dbm_setdefwrite(db)
-	DBM *db;
+void
+dbm_setdefwrite(DBM *db)
 {
 	db->dbm_flags |= _DBM_DEFWRITE;
 }
 
-dbm_flush(db)
-	DBM *db;
+int
+dbm_flush(DBM *db)
 {
 	int ok=0;
 	if (dbm_flushpag(db)<0) ok= -1;
@@ -49,8 +63,8 @@ dbm_flush(db)
 	return(ok);
 }
 
-dbm_flushpag(db)
-	DBM *db;
+int
+dbm_flushpag(DBM *db)
 {
 	int ok=0;
 	if (dbm_dirty(db)){ /*must page out the page*/
@@ -64,8 +78,8 @@ dbm_flushpag(db)
 	return(ok);
 }
 
-dbm_flushdir(db)
-	DBM *db;
+int
+dbm_flushdir(DBM *db)
 {
 	int ok=0;
 	if (dbm_dirdirty(db)){ /*must page out the dir*/
@@ -80,20 +94,11 @@ dbm_flushdir(db)
 #define BYTESIZ 8
 #undef setbit
 
-static  datum makdatum();
-static  long dcalchash();
-extern  int errno;
-extern	char *malloc();
-extern	char *strcpy();
-extern	char *strcat();
-
 DBM *
-dbm_open(file, flags, mode)
-	char *file;
-	int flags, mode;
+dbm_open(char *file, int flags, int mode)
 {
 	struct stat statb;
-	register DBM *db;
+	DBM *db;
 	int	serrno;
 
 	if ((db = (DBM *)malloc(sizeof *db)) == 0) {
@@ -144,16 +149,14 @@ bad:
 }
 
 void
-dbm_close(db)
-	DBM *db;
+dbm_close(DBM *db)
 {
-(void) dbm_close_status(db);
+	(void) dbm_close_status(db);
 }
 
 /*close with return code*/
 int
-dbm_close_status(db)
-	DBM *db;
+dbm_close_status(DBM *db)
 {
 	int ok;
 	ok=0;
@@ -162,12 +165,11 @@ dbm_close_status(db)
 	if (close(db->dbm_dirf)<0) ok= -1;
 	if ( close(db->dbm_pagf)<0) ok= -1;
 	free((char *)db);
-	return(ok);
+	return (ok);
 }
+
 long
-dbm_forder(db, key)
-	register DBM *db;
-	datum key;
+dbm_forder(DBM *db, datum key)
 {
 	long hash;
 
@@ -182,11 +184,9 @@ dbm_forder(db, key)
 }
 
 datum
-dbm_fetch(db, key)
-	register DBM *db;
-	datum key;
+dbm_fetch(DBM *db, datum key)
 {
-	register i;
+	int i;
 	datum item;
 
 	if (dbm_error(db))
@@ -203,11 +203,10 @@ err:
 	return (item);
 }
 
-dbm_delete(db, key)
-	register DBM *db;
-	datum key;
+int
+dbm_delete(DBM *db, datum key)
 {
-	register i;
+	int i;
 
 	if (dbm_error(db))
 		return (-1);
@@ -235,12 +234,10 @@ dbm_delete(db, key)
 	return (0);
 }
 
-dbm_store(db, key, dat, replace)
-	register DBM *db;
-	datum key, dat;
-	int replace;
+int
+dbm_store(DBM *db, datum key, datum dat, int replace)
 {
-	register i;
+	int i;
 	datum item, item1;
 	char ovfbuf[PBLKSIZ];
 
@@ -322,10 +319,9 @@ split:
 	}
 	goto loop;
 }
+
 static long
-dbm_hashinc(db,hash)
-	DBM *db;
-	long hash;
+dbm_hashinc(DBM *db, long hash)
 {
 
 	long bit;
@@ -347,11 +343,9 @@ dbm_hashinc(db,hash)
 static datum nullkey= {NULL, 0};
 
 datum
-dbm_firsthash(db,hash)
-register DBM *db;
-long hash;
+dbm_firsthash(DBM *db, long hash)
 {
-	register i,j;
+	int i,j;
 	datum item, bitem;
 
 loop:
@@ -380,17 +374,16 @@ loop:
 }
 
 datum
-dbm_firstkey(db)
-	DBM *db;
+dbm_firstkey(DBM *db)
 {
 
 	db->dbm_blkptr = 0L;
 	db->dbm_keyptr = 0;
 	return (dbm_firsthash(db, 0L));
 }
+
 datum
-dbm_nextkey(db)
-	DBM *db;
+dbm_nextkey(DBM *db)
 {
 
 	return (dbm_do_nextkey(db, nullkey));
@@ -403,13 +396,9 @@ which some evil users might do to search from some specific place.
 It finds the first key at or after blkptr,keyptr in block seq order
 this requires looking at all sorts of emtpy blocks in many cases*/
 
-static 
-datum
-dbm_slow_nextkey(db)
-	register DBM *db;
-
+static datum
+dbm_slow_nextkey(DBM *db)
 {
-
 	struct stat statb;
 	datum item;
 
@@ -417,7 +406,7 @@ dbm_slow_nextkey(db)
 		goto err;
 	statb.st_size /= PBLKSIZ;
 
-       for (;;) {
+	for (;;) {
 		if (db->dbm_blkptr != db->dbm_pagbno) {
 
 			if (dbm_dirty(db)) dbm_flushpag(db);
@@ -450,22 +439,18 @@ err:
 	return (item);
 }
 
-
-
 datum
-dbm_do_nextkey(db, inkey)
-	register DBM *db;
-	datum inkey;
+dbm_do_nextkey(DBM *db, datum inkey)
 {
 	datum item,bitem;
 	long hash;
 	datum key;
 	int f;
-	register i;
-	register j;
-	register short *sp;
-	register n;
-	register char *p1, *p2;
+	int i;
+	int j;
+	short *sp;
+	int n;
+	char *p1, *p2;
 
 	if ( dbm_error(db) ) {
 		item.dptr = NULL;
@@ -488,7 +473,7 @@ dbm_do_nextkey(db, inkey)
 
 		if (db->dbm_blkptr == 0L &&
 			db->dbm_keyptr == 0)
-			return(dbm_firsthash(db, 0L));
+			return (dbm_firsthash(db, 0L));
 
 		/*no -- get lastkey this is like dbm_access by blkptr*/
 
@@ -513,7 +498,7 @@ dbm_do_nextkey(db, inkey)
 	these variables and their former meaning.
 	If we set the variables this would have got
 	us the key for sure! So give him the old algorithm.*/
-		if (key.dptr == NULL) return(dbm_slow_nextkey(db));
+		if (key.dptr == NULL) return (dbm_slow_nextkey(db));
 	}
 
 	/*at this point the last key is paged in and
@@ -603,7 +588,7 @@ keep_going:
 	if(f == 0) {
 	        db->dbm_keyptr = j + 2;
 	        db->dbm_blkptr = db->dbm_blkno;
-		return(bitem);
+		return (bitem);
 	}
 
 	/*really need hash at this point*/
@@ -613,23 +598,21 @@ keep_going:
 	hash = dbm_hashinc(db,hash);
 
 	if(hash == 0)
-		return(item); /*null*/
+		return (item); /*null*/
 	/*get first item on next page in hash table order*/
-	return(dbm_firsthash(db, hash));
+	return (dbm_firsthash(db, hash));
 
 
 }
 
-static
-dbm_access(db, hash)
-	register DBM *db;
-	long hash;
+static void
+dbm_access(DBM *db, long hash)
 {
-	register b, i, n;
-	register long bn;
-	register long my_bitno;
-	register long my_hmask;
-	register long my_blkno;
+	int b, i, n;
+	long bn;
+	long my_bitno;
+	long my_hmask;
+	long my_blkno;
 
 	for (my_hmask=0;; my_hmask=(my_hmask<<1)+1) {
 		my_blkno = hash & my_hmask;
@@ -679,12 +662,11 @@ dbm_access(db, hash)
 	}
 }
 
-static
-getbit(db)
-	register DBM *db;
+static int 
+getbit(DBM *db)
 {
 	long bn;
-	register b, i, n;
+	int b, i, n;
 	
 
 	if (db->dbm_bitno > db->dbm_maxbno)
@@ -703,12 +685,11 @@ getbit(db)
 	return (db->dbm_dirbuf[i] & (1<<n));
 }
 
-static
-setbit(db)
-	register DBM *db;
+static int
+setbit(DBM *db)
 {
 	long bn;
-	register i, n, b;
+	int i, n, b;
 
 	if (db->dbm_bitno > db->dbm_maxbno)
 		db->dbm_maxbno = db->dbm_bitno;
@@ -737,11 +718,10 @@ setbit(db)
 }
 
 static datum
-makdatum(buf, n)
-	char buf[PBLKSIZ];
+makdatum(char buf[PBLKSIZ], int n)
 {
-	register short *sp;
-	register t;
+	short *sp;
+	int t;
 	datum item;
 
 	sp = (short *)buf;
@@ -758,11 +738,11 @@ makdatum(buf, n)
 	return (item);
 }
 
-static cmpdatum(d1, d2)
-	datum d1, d2;
+static int
+cmpdatum(datum d1, datum d2)
 {
-	register n;
-	register char *p1, *p2;
+	int n;
+	char *p1, *p2;
 
 	n = d1.dsize;
 	if(n != d2.dsize)
@@ -778,13 +758,11 @@ static cmpdatum(d1, d2)
 	return(0);
 }
 
-static
-finddatum(buf, item)
-	char buf[PBLKSIZ];
-	datum item;
+static int
+finddatum(char buf[PBLKSIZ], datum item)
 {
-	register short *sp;
-	register int i, n, j;
+	short *sp;
+	int i, n, j;
 
 	sp = (short *)buf;
 	n = PBLKSIZ;
@@ -799,15 +777,10 @@ finddatum(buf, item)
 }
 
 static  int hitab[16]
-/* ken's
-{
-	055,043,036,054,063,014,004,005,
-	010,064,077,000,035,027,025,071,
-};
-*/
  = {    61, 57, 53, 49, 45, 41, 37, 33,
 	29, 25, 21, 17, 13,  9,  5,  1,
 };
+
 static  long hltab[64]
  = {
 	06100151277L,06106161736L,06452611562L,05001724107L,
@@ -829,13 +802,12 @@ static  long hltab[64]
 };
 
 static long
-dcalchash(item)
-	datum item;
+dcalchash(datum item)
 {
-	register int s, c, j;
-	register char *cp;
-	register long hashl;
-	register int hashi;
+	int s, c, j;
+	char *cp;
+	long hashl;
+	int hashi;
 
 	hashl = 0;
 	hashi = 0;
@@ -853,12 +825,11 @@ dcalchash(item)
 /*
  * Delete pairs of items (n & n+1).
  */
-static
-delitem(buf, n)
-	char buf[PBLKSIZ];
+static int
+delitem(char buf[PBLKSIZ], int n)
 {
-	register short *sp, *sp1;
-	register i1, i2;
+	short *sp, *sp1;
+	int i1, i2;
 
 	sp = (short *)buf;
 	i2 = sp[0];
@@ -885,13 +856,11 @@ delitem(buf, n)
 /*
  * Add pairs of items (item & item1).
  */
-static
-additem(buf, item, item1)
-	char buf[PBLKSIZ];
-	datum item, item1;
+static int
+additem(char buf[PBLKSIZ], datum item, datum item1)
 {
-	register short *sp;
-	register i1, i2;
+	short *sp;
+	int i1, i2;
 
 	sp = (short *)buf;
 	i1 = PBLKSIZ;
@@ -910,12 +879,11 @@ additem(buf, item, item1)
 }
 
 #ifdef DEBUG
-static
-chkblk(buf)
-	char buf[PBLKSIZ];
+static int
+chkblk(char buf[PBLKSIZ])
 {
-	register short *sp;
-	register t, i;
+	short *sp;
+	int t, i;
 
 	sp = (short *)buf;
 	t = PBLKSIZ;

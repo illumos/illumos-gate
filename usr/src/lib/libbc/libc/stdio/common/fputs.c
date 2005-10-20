@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*      Copyright (c) 1984 AT&T */
@@ -39,25 +39,23 @@
 #include <stdio.h>
 #include "stdiom.h"
 #include <errno.h>
+#include <memory.h>
 
-extern char *memccpy();
-static char *memnulccpy();
+static char	*memnulccpy(char *, char *, int, int);
 
 int
-fputs(ptr, iop)
-char *ptr;
-register FILE *iop;
+fputs(char *ptr, FILE *iop)
 {
-	register int ndone = 0, n;
-	register unsigned char *cptr, *bufend;
-	register char *p;
-	register char c;
+	int ndone = 0, n;
+	unsigned char *cptr, *bufend;
+	char *p;
+	char c;
 
 	if (_WRTCHK(iop)) {
 		iop->_flag |= _IOERR;
 #ifdef POSIX
 		errno = EBADF;
-#endif POSIX
+#endif	/* POSIX */
 		return (EOF);
 	}
 	bufend = iop->_base + iop->_bufsiz;
@@ -131,11 +129,9 @@ register FILE *iop;
  * or NULL if c or NUL is not found in the first n bytes.
  */
 static char *
-memnulccpy(s1, s2, c, n)
-register char *s1, *s2;
-register int c, n;
+memnulccpy(char *s1, char *s2, int c, int n)
 {
-	register int cmoved;
+	int cmoved;
 
 	while (--n >= 0) {
 		cmoved = *s2++;

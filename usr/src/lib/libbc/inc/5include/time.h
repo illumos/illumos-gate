@@ -27,10 +27,10 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef	__5include_time_h
+#define	__5include_time_h
 
-#ifndef	__time_h
-#define	__time_h
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/stdtypes.h>
 
@@ -82,6 +82,6 @@ extern char	*tzname[];
 extern int	daylight;
 extern long	timezone;
 extern void	tzsetwall(/* void */);
-#endif	!_POSIX_SOURCE
+#endif	/* !_POSIX_SOURCE */
 
-#endif	!__time_h
+#endif	/* !__5include_time_h */

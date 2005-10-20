@@ -20,16 +20,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1989,2001 by Sun Microsystems, Inc.
- * All rights reserved.
- *
- * Defines for user SCSI commands
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SCSI_IMPL_USCSI_H
 #define	_SCSI_IMPL_USCSI_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * Defines for user SCSI commands
+ */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -59,7 +61,7 @@ struct uscsi_cmd {
 /*
  * User SCSI io control command
  */
-#define	USCSICMD	_IOWR(u, 1, struct uscsi_cmd) /* user scsi command */
+#define	USCSICMD	_IOWR('u', 1, struct uscsi_cmd) /* user scsi command */
 
 /*
  * user scsi status bit masks

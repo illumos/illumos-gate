@@ -20,78 +20,77 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 1.2 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 /*
  *	execlp(name, arg,...,0)	(like execl, but does path search)
  *	execvp(name, argv)	(like execv, but does path search)
  */
-#include <sys/errno.h>
+#include <errno.h>
 #include <sys/param.h>
-#include <varargs.h>
-#define	NULL	0
+#include <stdarg.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-static char *execat();
+static char *execat(char *, char *, char *);
 static char *shell = "/bin/sh";
-extern char *getenv(), *strchr();
-extern unsigned sleep();
-extern int errno, execv();
 
-/*VARARGS1*/
 int
-execlp(name, va_alist)
-	char	*name;
-	va_dcl
+execlp(char *name, ...)
 {
-	va_list args;
+	va_list	args;
+	int	r;
 
-	va_start(args);
-	return(execvp(name, (char **)args));
+	va_start(args, name);
+	r = execvp(name, (char **)args);
+	va_end(args);
+
+	return (r);
 }
 
 int
-execvp(name, argv)
-char	*name, **argv;
+execvp(char *name, char **argv)
 {
 	char	*pathstr;
 	char	fname[MAXPATHLEN];
 	char	*newargs[256];
 	int	i;
-	register char	*cp;
-	register unsigned etxtbsy=1;
-	register int eacces=0;
+	char	*cp;
+	unsigned etxtbsy = 1;
+	int	eacces = 0;
 
-	if((pathstr = getenv("PATH")) == NULL)
+	if ((pathstr = getenv("PATH")) == NULL)
 		pathstr = ":/usr/ucb:/bin:/usr/bin";
-	cp = strchr(name, '/')? "": pathstr;
+	cp = strchr(name, '/') ? "": pathstr;
 
 	do {
 		cp = execat(cp, name, fname);
 	retry:
 		(void) execv(fname, argv);
-		switch(errno) {
+		switch (errno) {
 		case ENOEXEC:
 			newargs[0] = "sh";
 			newargs[1] = fname;
-			for(i=1; newargs[i+1]=argv[i]; ++i) {
-				if(i >= 254) {
+			for (i = 1; (newargs[i+1] = argv[i]) != NULL; ++i) {
+				if (i >= 254) {
 					errno = E2BIG;
 					return(-1);
 				}
 			}
 			(void) execv(shell, newargs);
-			return(-1);
+			return (-1);
 		case ETXTBSY:
-			if(++etxtbsy > 5)
-				return(-1);
+			if (++etxtbsy > 5)
+				return (-1);
 			(void) sleep(etxtbsy);
 			goto retry;
 		case EACCES:
@@ -100,30 +99,28 @@ char	*name, **argv;
 		case ENOMEM:
 		case E2BIG:
 		case EFAULT:
-			return(-1);
+			return (-1);
 		}
-	} while(cp);
-	if(eacces)
+	} while (cp);
+	if (eacces)
 		errno = EACCES;
-	return(-1);
+	return (-1);
 }
 
 static char *
-execat(s1, s2, si)
-register char *s1, *s2;
-char	*si;
+execat(char *s1, char *s2, char *si)
 {
-	register char	*s;
+	char	*s;
 	char	*end;
 
 	s = si;
 	end = s + MAXPATHLEN;
-	while(*s1 && *s1 != ':' && s < end)
+	while (*s1 && *s1 != ':' && s < end)
 		*s++ = *s1++;
-	if(si != s && s < end)
+	if (si != s && s < end)
 		*s++ = '/';
-	while(*s2 && s < end)
+	while (*s2 && s < end)
 		*s++ = *s2++;
 	*s = '\0';
-	return(*s1? ++s1: 0);
+	return (*s1 ? ++s1: 0);
 }

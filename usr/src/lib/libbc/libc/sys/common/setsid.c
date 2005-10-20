@@ -26,34 +26,34 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <sys/errno.h>
+#include <errno.h>
 
 
 static int setsid_called = 0;
 static int real_setsid_called=0;
 static int setsid_val, setsid_errno;
 
-extern int errno;
 
 /* setpgrp system call number, setsid command code */
 #define SYS_pgrpsys     39
 #define SYS_setsid	3
 
-setsid()
+int
+setsid(void)
 {
 	if (setsid_called != getpid()) {
 		setsid_called = getpid();
-		return(bc_setsid());
+		return (bc_setsid());
 	} else {
 		errno = EPERM;
-		return(-1);
+		return (-1);
 	}
 }
 	
 
 
 int
-bc_setsid()
+bc_setsid(void)
 {
 	if (real_setsid_called != getpid()) {
 		real_setsid_called = getpid();
@@ -61,8 +61,5 @@ bc_setsid()
 		setsid_errno = errno;
 	}
 	errno = setsid_errno;
-	return(setsid_val);
+	return (setsid_val);
 }
-
-
-

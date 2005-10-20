@@ -60,8 +60,6 @@
  * 
  */
 
-extern int errno;
-
 /*
  * arguments to wait functions from SVR4
  */
@@ -246,7 +244,7 @@ wait4(int pid, int *status, int options, struct rusage *rp)
 static int
 wstat(int code, int status)
 {
-        register stat = (status & 0377);
+	int stat = (status & 0377);
 
         switch (code) {
 	case CLD_EXITED:

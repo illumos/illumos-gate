@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * wrappers for posix tty manipulation functions
@@ -35,27 +35,11 @@
 #include <termio.h>
 #include <sys/types.h>
 
-extern	errno;
-
-speed_t	cfgetospeed(/*struct termios* p*/);
-int	cfsetospeed(/*struct termios* p, speed_t speed*/);
-speed_t	cfgetispeed(/*struct termios* p*/);
-int	cfsetispeed(/*struct termios* p, speed_t speed*/);
-int	tcgetattr(/*int fd, struct termios* p*/);
-int	tcsetattr(/*int fd, opts, struct termios* p*/);
-int	tcsendbreak(/*int fd, howlong*/);
-int	tcdrain(/*int fd*/);
-int	tcflush(/*int fd, which*/);
-int	tcflow(/*int fd, what*/);
-pid_t	tcgetpgrp(/*int fd*/);
-int	tcsetpgrp(/*int fd, pid_t pgrp*/);
-
 /*
  * return the output speed from the struct
  */
 speed_t
-cfgetospeed(termios_p)
-	struct termios *termios_p;
+cfgetospeed(struct termios *termios_p)
 {
 	return (termios_p->c_cflag & CBAUDEXT ?
 			(termios_p->c_cflag & CBAUD) + CBAUD + 1 :
@@ -65,9 +49,8 @@ cfgetospeed(termios_p)
 /*
  * set the speed in the struct
  */
-cfsetospeed(termios_p, speed)
-	struct termios *termios_p;
-	speed_t speed;
+int
+cfsetospeed(struct termios *termios_p, speed_t speed)
 {
 	if (speed > (2*CBAUD + 1)) {
 		errno = EINVAL;
@@ -88,8 +71,7 @@ cfsetospeed(termios_p, speed)
  * return the input speed from the struct
  */
 speed_t
-cfgetispeed(termios_p)
-	struct termios *termios_p;
+cfgetispeed(struct termios *termios_p)
 {
 	return (termios_p->c_cflag & CIBAUDEXT ?
 	    ((termios_p->c_cflag & CIBAUD) >> IBSHIFT)
@@ -100,9 +82,8 @@ cfgetispeed(termios_p)
 /*
  * set the input speed in the struct
  */
-cfsetispeed(termios_p, speed)
-	struct termios *termios_p;
-	speed_t speed;
+int
+cfsetispeed(struct termios *termios_p, speed_t speed)
 {
 	if (speed > (2*CBAUD + 1)) {
 		errno = EINVAL;
@@ -121,8 +102,8 @@ cfsetispeed(termios_p, speed)
 /*
  * grab the modes
  */
-tcgetattr(fd, termios_p)
-	struct termios *termios_p;
+int
+tcgetattr(int fd, struct termios *termios_p)
 {
 	return (ioctl(fd, TCGETS, termios_p));
 }
@@ -130,8 +111,8 @@ tcgetattr(fd, termios_p)
 /*
  * set the modes
  */
-tcsetattr(fd, option, termios_p)
-	struct termios *termios_p;
+int
+tcsetattr(int fd, int option, struct termios *termios_p)
 {
 	struct termios	work_area;
 
@@ -163,9 +144,10 @@ tcsetattr(fd, option, termios_p)
  * This is kludged for duration != 0; it should do something like crank the
  * baud rate down and then send the break if the duration != 0.
  */
-tcsendbreak(fd, duration)
+int
+tcsendbreak(int fd, int duration)
 {
-	register unsigned d = (unsigned)duration;
+	unsigned d = (unsigned)duration;
 
 	do
 		if (ioctl(fd, TCSBRK, 0) == -1)
@@ -177,7 +159,8 @@ tcsendbreak(fd, duration)
 /*
  * wait for all output to drain from fd
  */
-tcdrain(fd)
+int
+tcdrain(int fd)
 {
 	return (ioctl(fd, TCSBRK, !0));
 }
@@ -185,7 +168,8 @@ tcdrain(fd)
 /*
  * flow control
  */
-tcflow(fd, action)
+int
+tcflow(int fd, int action)
 {
 	switch (action) {
 	default:
@@ -203,7 +187,8 @@ tcflow(fd, action)
 /*
  * flush read/write/both
  */
-tcflush(fd, queue)
+int
+tcflush(int fd, int queue)
 {
 	switch (queue) {
 	default:
@@ -221,7 +206,7 @@ tcflush(fd, queue)
  * get the foreground process group id
  */
 pid_t
-tcgetpgrp(fd)
+tcgetpgrp(int fd)
 {
 	int grp_id;
 
@@ -234,7 +219,8 @@ tcgetpgrp(fd)
 /*
  * set the foreground process group id
  */
-tcsetpgrp(fd, grp_id)
+int
+tcsetpgrp(int fd, int grp_id)
 {
 	return (ioctl(fd, TIOCSETPGRP, &grp_id));
 }

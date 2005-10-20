@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -34,10 +35,8 @@
  */
 
 /*LINTLIBRARY*/
-msync(addr, len, flags)
-	caddr_t addr;
-	u_int len;
-	int flags;
+int
+msync(caddr_t addr, u_int len, int flags)
 {
 	if ((int)len <= 0) {
 		errno = EINVAL;

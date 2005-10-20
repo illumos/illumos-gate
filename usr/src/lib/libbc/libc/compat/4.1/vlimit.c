@@ -19,8 +19,12 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.2 83/06/20 */
 
 /*
  * (Almost) backwards compatible vlimit.
@@ -40,8 +44,8 @@
 
 #define	NLIMITS		6
 
-vlimit(limit, value)
-	int limit, value;
+int
+vlimit(int limit, int value)
 {
 	struct rlimit rlim;
 

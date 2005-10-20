@@ -25,7 +25,6 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	/* from UCB 4.1 83/05/01 */
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -46,8 +45,8 @@ struct timeb {
 	short	dstflag;
 };
 
-ftime(tp)
-	register struct timeb *tp;
+int
+ftime(struct timeb *tp)
 {
 	struct timeval t;
 
@@ -60,4 +59,6 @@ ftime(tp)
 	tp->millitm = t.tv_usec / 1000;
 	tp->timezone = _timezone / 60;
 	tp->dstflag = _daylight;
+
+	return (0);
 }

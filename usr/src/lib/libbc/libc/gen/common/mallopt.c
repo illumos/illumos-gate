@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1986 by Sun Microsystems, Inc.
+ * Copyright 1986 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "mallint.h"
 #include <errno.h>
@@ -31,28 +32,28 @@
 /*
  * mallopt -- System V-compatible malloc "optimizer"
  */
-mallopt(cmd, value)
-int cmd, value;
+int
+mallopt(int cmd, int value)
 {
 	if (__mallinfo.smblks != 0)
-		return(-1);		/* small block has been allocated */
+		return (-1);		/* small block has been allocated */
 
 	switch (cmd) {
 	case M_MXFAST:		/* small block size */
 		if (value < 0)
-			return(-1);
+			return (-1);
 		__mallinfo.mxfast = value;
 		break;
 
 	case M_NLBLKS:		/* # small blocks per holding block */
 		if (value <= 0)
-			return(-1);
+			return (-1);
 		__mallinfo.nlblks = value;
 		break;
 
 	case M_GRAIN:		/* small block rounding factor */
 		if (value <= 0)
-			return(-1);
+			return (-1);
 		/* round up to multiple of minimum alignment */
 		__mallinfo.grain = roundup(value, ALIGNSIZ);
 		break;
@@ -61,13 +62,13 @@ int cmd, value;
 		break;
 
 	default:
-		return(-1);
+		return (-1);
 	}
 
 	/* make sure that everything is consistent */
 	__mallinfo.mxfast = roundup(__mallinfo.mxfast, __mallinfo.grain);
 
-	return(0);
+	return (0);
 }
 
 
@@ -75,7 +76,7 @@ int cmd, value;
  * mallinfo -- System V-compatible malloc information reporter
  */
 struct mallinfo
-mallinfo()
+mallinfo(void)
 {
 	struct mallinfo mi;
 
@@ -83,5 +84,5 @@ mallinfo()
 	mi.uordblks = mi.uordbytes - (mi.allocated * sizeof(uint));
 	mi.fordblks = mi.arena - (mi.treeoverhead + mi.uordblks +
 					    (mi.ordblks * sizeof(uint)));
-	return(mi);
+	return (mi);
 }

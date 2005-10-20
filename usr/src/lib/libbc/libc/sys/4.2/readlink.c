@@ -24,13 +24,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-# include "chkpath.h"
+#include "chkpath.h"
 
-readlink(p, b, s)
-    char           *p, *b;
+int
+readlink(char *p, char *b, int s)
 {
     CHKNULL(p);
-    return _syscall(SYS_readlink, p, b, s);
+    return (_syscall(SYS_readlink, p, b, s));
 }

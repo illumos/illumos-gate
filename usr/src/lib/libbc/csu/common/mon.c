@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *	Environment variable PROFDIR added such that:
@@ -36,13 +36,17 @@
 #include <sys/param.h>
 #include <sys/dir.h>
 #include "mon.h"
+#include <sys/fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+
 #define PROFDIR	"PROFDIR"
 
-extern int creat(), write(), close(), getpid();
-extern void profil(), perror();
-extern char *getenv(), *strcpy(), *strrchr();
+extern void	profil(), perror();
 
-void monitor(), moncontrol();
+void	monitor(char *, char *, char *, int, int);
+void	moncontrol(int);
 
 char **___Argv = NULL; /* initialized to argv array by mcrt0 (if loaded) */
 
@@ -62,9 +66,9 @@ static struct mondata {
 #define	MSG "No space for monitor buffer(s)\n"
 
 static struct mondata *
-_mondata()
+_mondata(void)
 {
-	register struct mondata *d = mondata;
+	struct mondata *d = mondata;
 
 	if (d == 0) {
 		if ((d = (struct mondata *)
@@ -76,9 +80,8 @@ _mondata()
 	return (d);
 }
 
-monstartup(lowpc, highpc)
-	char *lowpc;
-	char *highpc;
+void
+monstartup(char *lowpc, char *highpc)
 {
 	int monsize;
 	char *buffer;
@@ -98,26 +101,29 @@ monstartup(lowpc, highpc)
 	monitor(lowpc, highpc, buffer, monsize, cntsiz);
 }
 
+/*
+ * Arguments
+ *	lowpc, hightpc:	boundaries of text to be monitored
+ *	buf:		ptr to space for monitor data (WORDs)
+ *	bufsiz:		size of above space (in WORDs)
+ *	cntsiz:		max no. of functions whose calls are counted
+ */
 void
-monitor(lowpc, highpc, buf, bufsiz, cntsiz)
-	char *lowpc, *highpc;	/* boundaries of text to be monitored */
-	char *buf;		/* ptr to space for monitor data (WORDs) */
-	int bufsiz;		/* size of above space (in WORDs) */
-	int cntsiz;		/* max no. of functions whose calls are counted */
+monitor(char *lowpc, char *highpc, char *buf, int bufsiz, int cntsiz)
 {
-	register struct mondata *d = _mondata();
-	register int o;
+	struct mondata *d = _mondata();
+	int o;
 	struct phdr *php;
 	static int ssiz;
 	static char *sbuf;
-	register char *s, *name;
+	char *s, *name;
 
 	name = d->mon_out;
 
 	if (lowpc == NULL) {		/* true only at the end */
 		moncontrol(0);
 		if (sbuf != NULL) {
-			register int pid, n;
+			int pid, n;
 
 			if (d->progname[0] != '\0') { /* finish constructing
 						    "PROFDIR/pid.progname" */
@@ -195,10 +201,9 @@ monitor(lowpc, highpc, buf, bufsiz, cntsiz)
  *	all the data structures are ready.
  */
 void
-moncontrol(mode)
-    int mode;
+moncontrol(int mode)
 {
-    register struct mondata *d = _mondata();
+    struct mondata *d = _mondata();
 
     if (mode) {
 	/* start */

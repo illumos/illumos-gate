@@ -19,23 +19,25 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 1.1 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 #include <stdio.h>
-#include <varargs.h>
+#include <stdarg.h>
 #include <values.h>
 
 extern int _doprnt();
 
-/*VARARGS2*/
 char *
-vsprintf(string, format, ap)
-char *string, *format;
-va_list ap;
+vsprintf(char *string, char *format, va_list ap)
 {
 	FILE siop;
 
@@ -44,5 +46,5 @@ va_list ap;
 	siop._flag = _IOWRT+_IOSTRG;
 	(void) _doprnt(format, ap, &siop);
 	*siop._ptr = '\0'; /* plant terminating null character */
-	return(string);
+	return (string);
 }

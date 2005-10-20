@@ -20,30 +20,26 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 1.1 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 #include <stdio.h>
-#include <varargs.h>
+#include <stdarg.h>
 
 extern int _doprnt();
 
-/*VARARGS2*/
 int
-vfprintf(iop, format, ap)
-FILE *iop;
-char *format;
-va_list ap;
+vfprintf(FILE *iop, char *format, va_list ap)
 {
 	unsigned char localbuf[BUFSIZ];
-	register int count;
+	int count;
 
 	if (!(iop->_flag & _IOWRT)) {
 		/* if no write flag */
@@ -52,7 +48,7 @@ va_list ap;
 			iop->_flag |= _IOWRT;
 		} else {
 			/* else error */
-			return EOF;
+			return (EOF);
 		}
 	}
 	if (iop->_flag & _IONBF) {
@@ -65,7 +61,8 @@ va_list ap;
 		iop->_base = NULL;
 		iop->_bufsiz = 0;
 		iop->_cnt = 0;
-	} else
+	} else {
 		count = _doprnt(format, ap, iop);
-	return(count);
+	}
+	return (count);
 }

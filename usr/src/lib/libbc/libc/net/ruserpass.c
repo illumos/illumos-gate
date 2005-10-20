@@ -24,16 +24,19 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-	 /* from UCB 4.2 82/10/10 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <malloc.h>
+#include <strings.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-char	*malloc(), *index(), *getenv(), *getpass(), *getlogin();
+char	*getpass();
 
 #define	DEFAULT	1
 #define	LOGIN	2
@@ -50,6 +53,9 @@ char	*malloc(), *index(), *getenv(), *getpass(), *getlogin();
 #define	MAXTOKEN  11
 #define NTOKENS	(MAXTOKEN - 1 + 2 + 1)	/* two duplicates and null, minus id */
 
+static void	rnetrc(char *, char **, char **);
+static int	token(void);
+
 static struct ruserdata {
 	char tokval[100];
 	struct toktab {
@@ -57,13 +63,13 @@ static struct ruserdata {
 		int tval;
 	} toktab[NTOKENS];
 	FILE *cfile;
-} *ruserdata, *_ruserdata();
+} *ruserdata, *_ruserdata(void);
 
 
 static struct ruserdata *
-_ruserdata()
+_ruserdata(void)
 {
-	register struct ruserdata *d = ruserdata;
+	struct ruserdata *d = ruserdata;
 	struct toktab *t;
 
 	if (d == 0) {
@@ -90,9 +96,8 @@ _ruserdata()
 	return(d);
 }
 
-
-_ruserpass(host, aname, apass)
-	char *host, **aname, **apass;
+void
+_ruserpass(char *host, char **aname, char **apass)
 {
 
 	if (*aname == 0 || *apass == 0)
@@ -118,15 +123,13 @@ _ruserpass(host, aname, apass)
 }
 
 
-static
-rnetrc(host, aname, apass)
-	char *host, **aname, **apass;
+static void
+rnetrc(char *host, char **aname, char **apass)
 {
-	register struct ruserdata *d = _ruserdata();
+	struct ruserdata *d = _ruserdata();
 	char *hdir, buf[BUFSIZ];
 	int t;
 	struct stat stb;
-	extern int errno;
 
 	if (d == 0)
 		return;
@@ -191,10 +194,10 @@ done:
 	fclose(d->cfile);
 }
 
-static
-token()
+static int
+token(void)
 {
-	register struct ruserdata *d = _ruserdata();
+	struct ruserdata *d = _ruserdata();
 	char *cp;
 	int c;
 	struct toktab *t;
@@ -233,4 +236,3 @@ token()
 			return (t->tval);
 	return (ID);
 }
-

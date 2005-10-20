@@ -19,19 +19,20 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1985 by Sun Microsystems, Inc.
+ * Copyright 1985 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <rpc/rpc.h>
 #include <netdb.h>
 #include <sys/socket.h>
 
-getrpcport(host, prognum, versnum, proto)
-	char *host;
+int
+getrpcport(char *host, int prognum, int versnum, int proto)
 {
 	struct sockaddr_in addr;
 	struct hostent *hp;

@@ -27,28 +27,25 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 2.1 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 #include <stdio.h>
+#include <unistd.h>
 
-extern _findbuf();
-extern int read();
-extern int fflush();
+extern void	_findbuf();
+
+static void	lbfflush(FILE *);
 
 int
-__filbuf(iop)
-register FILE *iop;
+__filbuf(FILE *iop)
 {
 	return (_filbuf(iop));
 }
 
 int
-_filbuf(iop)
-register FILE *iop;
+_filbuf(FILE *iop)
 {
-	static void lbfflush();
-
 	if ( !(iop->_flag & _IOREAD) )
 		if (iop->_flag & _IORW)
 			iop->_flag |= _IOREAD;
@@ -84,8 +81,7 @@ register FILE *iop;
 }
 
 static void
-lbfflush(iop)
-FILE *iop;
+lbfflush(FILE *iop)
 {
 	if (iop->_flag & _IOLBF)
 		(void) fflush(iop);

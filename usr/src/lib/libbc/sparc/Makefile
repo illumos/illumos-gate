@@ -389,11 +389,11 @@ $(DYNLIBS5):= DIR = s5pics
 all: $(TXTS) $(LIBS)
 
 $(DYNLIB4X): pics .WAIT $(PICS)
-	$(CC) -o $@ -dy -G $(DYNFLAGS) $(PICS) $(LDLIBS)
+	$(CC) -o $@ -G $(DYNFLAGS) $(PICS) $(LDLIBS)
 	$(POST_PROCESS_SO)
 
 $(DYNLIBS5): s5pics .WAIT $(S5PICOBJS)
-	$(CC) -o $@ -dy -G $(DYNFLAGS) $(S5PICOBJS) $(LDLIBS)
+	$(CC) -o $@ -G $(DYNFLAGS) $(S5PICOBJS) $(LDLIBS)
 	$(POST_PROCESS_SO)
 
 # include common library targets
@@ -427,7 +427,7 @@ s5pics/times.o : ../libc/compat/sys5/epoch.h ../libc/compat/sys5/times.c
 
 pics/maperror.o s5pics/maperror.o: ../libc/sys/common/maperror.c
 	$(CC) -I../libc/sys/common $(CPPFLAGS) $(CFLAGS) -c -o $@ ../libc/sys/common/maperror.c
-	
+
 #
 # The following rules generate the .h file and XDR routines from the
 # rpcgen source. Objects built here, look for it here. Further, when

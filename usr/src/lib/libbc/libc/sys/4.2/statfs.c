@@ -24,18 +24,16 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "chkpath.h"
 #include <sys/types.h>
 #include <sys/vfs.h>
 
-statfs(s, b)
-    char            *s;
-    struct statfs *b;
+int
+statfs(char *s, struct statfs *b)
 {
 	CHKNULL(s);
 
-	return(statfs_com(s, b));
+	return (statfs_com(s, b));
 }
-

@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1990-1997 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -88,10 +88,7 @@ struct nfsarg {
 };
 
 int
-mount(type, dir, flags, data)
-char	*type, *dir;
-int	flags;
-caddr_t data;
+mount(char *type, char *dir, int flags, caddr_t data)
 {
 	int idx, nflags = 0;
 	int returnValue;
@@ -163,4 +160,5 @@ caddr_t data;
 		free(na->knconf);
 		return (returnValue);
 	}
+	return (-1);
 }

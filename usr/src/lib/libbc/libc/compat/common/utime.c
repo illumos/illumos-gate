@@ -25,12 +25,9 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.2 83/05/31 */
 
 #include <sys/types.h>
 #include <sys/time.h>
-
-extern long time();
 
 /*
  * Backwards compatible utime.
@@ -47,9 +44,9 @@ extern long time();
  * The BSD system call never allowed a null pointer so there should
  * be no compatibility problem there.
  */
-utime(name, otv)
-	char *name;
-	time_t otv[2];
+
+int
+utime(char *name, time_t otv[2])
 {
 	struct timeval tv[2];
 

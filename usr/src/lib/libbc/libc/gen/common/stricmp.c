@@ -3,13 +3,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from UCB 1.3 8/3/87 */
-
 /*
  * Copyright (c) 1987 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * This array is designed for mapping upper and lower case letter
@@ -51,42 +51,39 @@ static char charmap[] = {
 	'\370', '\371', '\372', '\373', '\374', '\375', '\376', '\377',
 };
 
-strcasecmp(s1, s2)
-	register char *s1, *s2;
+int
+strcasecmp(char *s1, char *s2)
 {
-	register char *cm = charmap;
+	char *cm = charmap;
 
 	while (cm[*s1] == cm[*s2++])
 		if (*s1++ == '\0')
-			return(0);
+			return (0);
 	return(cm[*s1] - cm[*--s2]);
 }
 
-strncasecmp(s1, s2, n)
-	register char *s1, *s2;
-	register int n;
+int
+strncasecmp(char *s1, char *s2, int n)
 {
-	register char *cm = charmap;
-
+	char *cm = charmap;
+	
 	while (--n >= 0 && cm[*s1] == cm[*s2++])
 		if (*s1++ == '\0')
-			return(0);
+			return (0);
 	return(n < 0 ? 0 : cm[*s1] - cm[*--s2]);
 }
 
 /*
  *  For 4.0 compatibility
  */
-stricmp(s1, s2)
-	register char *s1, *s2;
+int
+stricmp(char *s1, char *s2)
 {
-	return(strcasecmp(s1, s2));
+	return (strcasecmp(s1, s2));
 }
 
-strnicmp(s1, s2, n)
-	register char *s1, *s2;
-	register int n;
+int
+strnicmp(char *s1, char *s2, int n)
 {
-	return(strncasecmp(s1, s2, n));
+	return (strncasecmp(s1, s2, n));
 }
-

@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * If we're asked to make a directory, do a "mkdir" instead, so we meet
@@ -36,13 +36,9 @@
 #include <errno.h>
 
 extern int _mknod();
-extern int mkdir();
 
 int
-mknod(path, mode, dev)
-	char *path;
-	int mode;
-	int dev;
+mknod(char *path, int mode, int dev)
 {
 	if ((mode & S_IFMT) == S_IFDIR)
 		if (geteuid()) {

@@ -24,7 +24,7 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* c2 secure */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <stdio.h>
@@ -34,18 +34,15 @@
 #include <pwdadj.h>
 #include <pwd.h>
 #include <rpcsvc/ypclnt.h>
+#include <string.h>
+#include <malloc.h>
 
 extern void rewind();
 extern long strtol();
-extern int strcmp();
-extern int strlen();
 extern int fclose();
-extern char *strcpy();
-extern char *strncpy();
-extern char *calloc();
-extern char *malloc();
 
-void setpwaent(), endpwaent();
+void	setpwaent(void);
+void	endpwaent(void);
 
 static struct _pwajunk {
 	struct passwd _NULLPW;
@@ -62,7 +59,7 @@ static struct _pwajunk {
 	struct passwd_adjunct _apwadj;
 	char _interpline[BUFSIZ+1];
 	char *_domain;
-} *__pwajunk, *_pwajunk();
+} *__pwajunk, *_pwajunk(void);
 
 #define	NULLPW (_pwa->_NULLPW)
 #define pwfadj (_pwa->_pwfadj)
@@ -78,13 +75,23 @@ static struct _pwajunk {
 
 static char *PASSWDADJ	= "/etc/security/passwd.adjunct"; 
 
-static struct passwd_adjunct *interpret();
-static struct passwd_adjunct *interpretwithsave();
-static struct passwd_adjunct *save();
-static struct passwd_adjunct *getnamefromyellow();
+static struct passwd_adjunct	*interpret(char *, int);
+static struct passwd_adjunct	*interpretwithsave(char *, int,
+    struct passwd_adjunct *);
+static struct passwd_adjunct	*save(struct passwd_adjunct *);
+static struct passwd_adjunct	*getnamefromyellow(char *,
+    struct passwd_adjunct *);
+static int	matchname(char [], struct passwd_adjunct **, char *);
+static int	onminuslist(struct passwd_adjunct *);
+static void	getnextfromyellow(void);
+static void	getfirstfromyellow(void);
+static void	freeminuslist(void);
+static void	addtominuslist(char *);
+
+
 
 static struct _pwajunk *
-_pwajunk()
+_pwajunk(void)
 {
 
 	if (__pwajunk == 0)
@@ -93,58 +100,34 @@ _pwajunk()
 }
 
 struct passwd_adjunct *
-getpwanam(name)
-	register char *name;
+getpwanam(char *name)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	struct passwd_adjunct *pwadj;
 	char line[BUFSIZ+1];
 
 	if (_pwa == 0)
-		return (0);
+		return (NULL);
 	setpwaent();
 	if (!pwfadj)
-		return NULL;
+		return (NULL);
 	while (fgets(line, BUFSIZ, pwfadj) != NULL) {
 		if ((pwadj = interpret(line, strlen(line))) == NULL)
 			continue;
 		if (matchname(line, &pwadj, name)) {
 			endpwaent();
-			return pwadj;
+			return (pwadj);
 		}
 	}
 	endpwaent();
-	return NULL;
+	return (NULL);
 }
-
-#ifdef	NOT_INCLUDED
-struct passwd_adjunct *
-getpwauid(uid)
-	register uid;
-{
-	register struct _pwajunk *_pwa = _pwajunk();
-	/*
-	 * provided for consistency even though there is no uid in
-	 * the adjunct file.
-	 */
-	struct passwd *getpwuid();
-	struct passwd *pw;
-
-	if (_pwa == 0)
-		return (0);
-	if ((pw = getpwuid(uid)) == NULL)
-		return NULL;
-	return (getpwanam(pw->pw_name));
-}
-#endif	NOT_INCLUDED
-
-
 
 
 void
-setpwaent()
+setpwaent(void)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 
 	if (_pwa == 0)
 		return;
@@ -164,9 +147,9 @@ setpwaent()
 
 
 void
-endpwaent()
+endpwaent(void)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 
 	if (_pwa == 0)
 		return;
@@ -184,9 +167,9 @@ endpwaent()
 
 
 struct passwd_adjunct *
-getpwaent()
+getpwaent(void)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	char line[BUFSIZ+1];
 	static struct passwd_adjunct *savepwadj;
 	struct passwd_adjunct *pwadj;
@@ -195,7 +178,7 @@ getpwaent()
 	char *dom;
 
 	if (_pwa == 0)
-		return (0);
+		return (NULL);
 	if (domain == NULL) {
 		(void) yp_get_default_domain(&domain );
 	}
@@ -208,25 +191,25 @@ getpwaent()
 			pwadj = interpretwithsave(yp, yplen, savepwadj); 
 			free(yp);
 			if (pwadj == NULL)
-				return(NULL);
+				return (NULL);
 			getnextfromyellow();
 			if (!onminuslist(pwadj)) {
-				return(pwadj);
+				return (pwadj);
 			}
 		} else if (getnetgrent(&mach,&user,&dom)) {
 			if (user) {
 				pwadj = getnamefromyellow(user, savepwadj);
 				if (pwadj != NULL && !onminuslist(pwadj)) {
-					return(pwadj);
+					return (pwadj);
 				}
 			}
 		} else {
 			endnetgrent();
 			if (fgets(line, BUFSIZ, pwfadj) == NULL)  {
-				return(NULL);
+				return (NULL);
 			}
 			if ((pwadj = interpret(line, strlen(line))) == NULL)
-				return(NULL);
+				return (NULL);
 			switch(line[0]) {
 			case '+':
 				if (strcmp(pwadj->pwa_name, "+") == 0) {
@@ -247,7 +230,7 @@ getpwaent()
 					savepwadj = save(pwadj);
 					pwadj = getnamefromyellow(pwadj->pwa_name+1, savepwadj);
 					if (pwadj != NULL && !onminuslist(pwadj)) {
-						return(pwadj);
+						return (pwadj);
 					}
 				}
 				break;
@@ -255,7 +238,7 @@ getpwaent()
 				if (line[1] == '@') {
 					if (innetgr(pwadj->pwa_name+2,(char *) NULL,"*",domain)) {
 						/* everybody was subtracted */
-						return(NULL);
+						return (NULL);
 					}
 					setnetgrent(pwadj->pwa_name+2);
 					while (getnetgrent(&mach,&user,&dom)) {
@@ -270,7 +253,7 @@ getpwaent()
 				break;
 			default:
 				if (!onminuslist(pwadj)) {
-					return(pwadj);
+					return (pwadj);
 				}
 				break;
 			}
@@ -278,13 +261,10 @@ getpwaent()
 	}
 }
 
-static
-matchname(line1, pwadjp, name)
-	char line1[];
-	struct passwd_adjunct **pwadjp;
-	char *name;
+static int
+matchname(char line1[], struct passwd_adjunct **pwadjp, char *name)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	struct passwd_adjunct *savepwadj;
 	struct passwd_adjunct *pwadj = *pwadjp;
 
@@ -297,10 +277,10 @@ matchname(line1, pwadjp, name)
 				pwadj = getnamefromyellow(name, savepwadj);
 				if (pwadj) {
 					*pwadjp = pwadj;
-					return 1;
+					return (1);
 				}
 				else
-					return 0;
+					return (0);
 			}
 			if (line1[1] == '@') {
 				if (innetgr(pwadj->pwa_name+2,(char *) NULL,name,domain)) {
@@ -308,45 +288,45 @@ matchname(line1, pwadjp, name)
 					pwadj = getnamefromyellow(name,savepwadj);
 					if (pwadj) {
 						*pwadjp = pwadj;
-						return 1;
+						return (1);
 					}
 				}
-				return 0;
+				return (0);
 			}
 			if (strcmp(pwadj->pwa_name+1, name) == 0) {
 				savepwadj = save(pwadj);
 				pwadj = getnamefromyellow(pwadj->pwa_name+1, savepwadj);
 				if (pwadj) {
 					*pwadjp = pwadj;
-					return 1;
+					return (1);
 				}
 				else
-					return 0;
+					return (0);
 			}
 			break;
 		case '-':
 			if (line1[1] == '@') {
 				if (innetgr(pwadj->pwa_name+2,(char *) NULL,name,domain)) {
 					*pwadjp = NULL;
-					return 1;
+					return (1);
 				}
 			}
 			else if (strcmp(pwadj->pwa_name+1, name) == 0) {
 				*pwadjp = NULL;
-				return 1;
+				return (1);
 			}
 			break;
 		default:
 			if (strcmp(pwadj->pwa_name, name) == 0)
-				return 1;
+				return (1);
 	}
-	return 0;
+	return (0);
 }
 
-static
-getnextfromyellow()
+static void
+getnextfromyellow(void)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	int reason;
 	char *key;
 	int keylen;
@@ -367,10 +347,10 @@ fprintf(stderr, "reason yp_next failed is %d\n", reason);
 	oldyplen = keylen;
 }
 
-static
-getfirstfromyellow()
+static void
+getfirstfromyellow(void)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	int reason;
 	char *key;
 	int keylen;
@@ -391,56 +371,51 @@ fprintf(stderr, "reason yp_first failed is %d\n", reason);
 }
 
 static struct passwd_adjunct *
-getnamefromyellow(name, savepwadj)
-	char *name;
-	struct passwd_adjunct *savepwadj;
+getnamefromyellow(char *name, struct passwd_adjunct *savepwadj)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	struct passwd_adjunct *pwadj;
 	int reason;
 	char *val;
 	int vallen;
 	
 	if (_pwa == 0)
-		return (0);
+		return (NULL);
 	reason = yp_match(domain, "passwd.adjunct.byname", name, strlen(name)
 		, &val, &vallen);
 	if (reason) {
 #ifdef DEBUG
 fprintf(stderr, "reason yp_match failed is %d\n", reason);
 #endif
-		return NULL;
+		return (NULL);
 	} else {
 		pwadj = interpret(val, vallen);
 		free(val);
 		if (pwadj == NULL)
-			return NULL;
+			return (NULL);
 		if (savepwadj->pwa_passwd && *savepwadj->pwa_passwd)
 			pwadj->pwa_passwd =  savepwadj->pwa_passwd;
-		return pwadj;
+		return (pwadj);
 	}
 }
 
 static struct passwd_adjunct *
-interpretwithsave(val, len, savepwadj)
-	char *val;
-	struct passwd_adjunct *savepwadj;
+interpretwithsave(char *val, int len, struct passwd_adjunct *savepwadj)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	struct passwd_adjunct *pwadj;
 	
 	if (_pwa == 0)
-		return (0);
+		return (NULL);
 	if ((pwadj = interpret(val, len)) == NULL)
-		return NULL;
+		return (NULL);
 	if (savepwadj->pwa_passwd && *savepwadj->pwa_passwd)
 		pwadj->pwa_passwd =  savepwadj->pwa_passwd;
-	return pwadj;
+	return (pwadj);
 }
 
 static char *
-pwskip(p)
-	register char *p;
+pwskip(char *p)
 {
 	while(*p && *p != ':' && *p != '\n')
 		++p;
@@ -448,19 +423,18 @@ pwskip(p)
 		*p = '\0';
 	else if (*p != '\0')
 		*p++ = '\0';
-	return(p);
+	return (p);
 }
 
 static struct passwd_adjunct *
-interpret(val, len)
-	char *val;
+interpret(char *val, int len)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
-	register char *p;
+	struct _pwajunk *_pwa = _pwajunk();
+	char *p;
 	char *field;
 
 	if (_pwa == 0)
-		return (0);
+		return (NULL);
 	(void) strncpy(interpline, val, len);
 	p = interpline;
 	interpline[len] = '\n';
@@ -491,7 +465,7 @@ interpret(val, len)
 	apwadj.pwa_au_always.as_success = 0;
 	apwadj.pwa_au_always.as_failure = 0;
 	if (getauditflagsbin(field, &apwadj.pwa_au_always) != 0)
-		return NULL;
+		return (NULL);
 	field = p;
 	(void) pwskip(p);
 	p = apwadj.pwa_passwd;
@@ -503,13 +477,13 @@ interpret(val, len)
 	apwadj.pwa_au_never.as_success = 0;
 	apwadj.pwa_au_never.as_failure = 0;
 	if (getauditflagsbin(field, &apwadj.pwa_au_never) != 0)
-		return NULL;
-	return(&apwadj);
+		return (NULL);
+	return (&apwadj);
 }
 
-static
-freeminuslist() {
-	register struct _pwajunk *_pwa = _pwajunk();
+static void
+freeminuslist(void) {
+	struct _pwajunk *_pwa = _pwajunk();
 	struct list *ls;
 	
 	if (_pwa == 0)
@@ -521,11 +495,10 @@ freeminuslist() {
 	minuslist = NULL;
 }
 
-static
-addtominuslist(name)
-	char *name;
+static void
+addtominuslist(char *name)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	struct list *ls;
 	char *buf;
 	
@@ -545,14 +518,13 @@ addtominuslist(name)
  * for passwd.adjunct
  */
 static struct passwd_adjunct *
-save(pwadj)
-	struct passwd_adjunct *pwadj;
+save(struct passwd_adjunct *pwadj)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	static struct passwd_adjunct *sv;
 
 	if (_pwa == 0)
-		return (0);
+		return (NULL);
 	/* free up stuff from last call */
 	if (sv) {
 		free(sv->pwa_passwd);
@@ -563,24 +535,23 @@ save(pwadj)
 	sv->pwa_passwd = malloc((unsigned) strlen(pwadj->pwa_passwd) + 1);
 	(void) strcpy(sv->pwa_passwd, pwadj->pwa_passwd);
 
-	return sv;
+	return (sv);
 }
 
-static
-onminuslist(pwadj)
-	struct passwd_adjunct *pwadj;
+static int
+onminuslist(struct passwd_adjunct *pwadj)
 {
-	register struct _pwajunk *_pwa = _pwajunk();
+	struct _pwajunk *_pwa = _pwajunk();
 	struct list *ls;
-	register char *nm;
+	char *nm;
 
 	if (_pwa == 0)
-		return 0;
+		return (0);
 	nm = pwadj->pwa_name;
 	for (ls = minuslist; ls != NULL; ls = ls->nxt) {
 		if (strcmp(ls->name,nm) == 0) {
-			return(1);
+			return (1);
 		}
 	}
-	return(0);
+	return (0);
 }

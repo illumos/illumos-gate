@@ -19,13 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _sys_termio_h
-#define _sys_termio_h
+#define	_sys_termio_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/ioccom.h>
 #include	<sys/termios.h>
@@ -46,10 +51,10 @@ struct termio {
 	unsigned char	c_cc[NCC];	/* control chars */
 };
 
-#define	TCGETA	_IOR(T, 1, struct termio)
-#define	TCSETA	_IOW(T, 2, struct termio)
-#define	TCSETAW	_IOW(T, 3, struct termio)
-#define	TCSETAF	_IOW(T, 4, struct termio)
-#define	TCSBRK	_IO(T, 5)
+#define	TCGETA	_IOR('T', 1, struct termio)
+#define	TCSETA	_IOW('T', 2, struct termio)
+#define	TCSETAW	_IOW('T', 3, struct termio)
+#define	TCSETAF	_IOW('T', 4, struct termio)
+#define	TCSBRK	_IO('T', 5)
 
-#endif /*!_sys_termio_h*/
+#endif /* !_sys_termio_h */

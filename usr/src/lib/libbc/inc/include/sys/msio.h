@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1987 by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _sundev_msio_h
-#define _sundev_msio_h
+#define	_sundev_msio_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Mouse related ioctls
@@ -39,7 +40,7 @@ typedef struct {
     int             speed_limit;
 }               Ms_parms;
 
-#define	MSIOGETPARMS	_IOR(m, 2, Ms_parms) /*  get / set jitter, speed  */
-#define	MSIOSETPARMS	_IOW(m, 3, Ms_parms) /*  law, or speed limit	   */
+#define	MSIOGETPARMS	_IOR('m', 2, Ms_parms) /*  get / set jitter, speed  */
+#define	MSIOSETPARMS	_IOW('m', 3, Ms_parms) /*  law, or speed limit	   */
 
-#endif /*!_sundev_msio_h*/
+#endif /* !_sundev_msio_h */

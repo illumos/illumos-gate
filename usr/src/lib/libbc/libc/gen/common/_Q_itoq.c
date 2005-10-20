@@ -19,24 +19,23 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "_Qquad.h"
 #include "_Qglobals.h"
 
-#define	FUNC	itoq
 
 QUAD
-_Q_itoq(x)
-	int x;
+_Q_itoq(int x)
 {
 	unpacked	px;
 	QUAD		q;
-	_fp_unpack(&px,&x,fp_op_integer);
-	_fp_pack(&px,&q,fp_op_extended);
-	return q;
+	_fp_unpack(&px, (int *)&x,fp_op_integer);
+	_fp_pack(&px, (int *)&q,fp_op_extended);
+	return (q);
 }

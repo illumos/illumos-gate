@@ -24,14 +24,14 @@
  * Use is subject to license terms.
  */
 
+#ifndef	_sys_mount_h
+#define	_sys_mount_h
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * mount options
  */
-
-#ifndef	_sys_mount_h
-#define	_sys_mount_h
 
 #define	M_RDONLY	0x01	/* mount fs read only */
 #define	M_NOSUID	0x02	/* mount fs with setuid not allowed */
@@ -41,19 +41,6 @@
 #define	M_NOSUB		0x20	/* Disallow mounts beneath this mount */
 #define	M_MULTI		0x40	/* Do multi-component lookup on files */
 #define	M_SYS5		0x80	/* Mount with Sys 5-specific semantics */
-
-#ifdef	KERNEL
-/*
- * File system types, these correspond to entries in fsconf
- */
-#define	MOUNT_UFS	1
-#define	MOUNT_NFS	2
-#define	MOUNT_PC	3
-#define	MOUNT_LO	4
-#define	MOUNT_TFS	5
-#define	MOUNT_TMP	6
-#define	MOUNT_MAXTYPE	7
-#endif	KERNEL
 
 struct	ufs_args {
 	char	*fspec;
@@ -80,10 +67,6 @@ struct  pathcnf {
         cc_t            pc_vdisable;    /* safe char to turn off c_cc[i] */
         char            pc_xxx;         /* alignment padding; cc_t == char */
         short           pc_mask[_PC_N]; /* see below */
-#ifdef  KERNEL
-        short           pc_refcnt;      /* number of mounts that use this */
-        struct pathcnf  *pc_next;       /* linked list */
-#endif
 };
 
 
@@ -122,17 +105,5 @@ struct	nfs_args {
 #define	NFSMNT_SECURE	0x1000	/* secure mount */
 #define	NFSMNT_NOCTO	0x2000	/* no close-to-open consistency */
 #define	NFSMNT_POSIX	0x4000	/* static pathconf kludge info */
-
-#ifdef	PCFS
-struct	pc_args {
-	char	*fspec;
-};
-#endif	PCFS
-
-#ifdef	LOFS
-struct	lo_args {
-	char    *fsdir;
-};
-#endif	LOFS
 
 #endif	/* !_sys_mount_h */

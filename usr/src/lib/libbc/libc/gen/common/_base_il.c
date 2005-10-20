@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "base_conversion.h"
 
@@ -43,19 +44,16 @@
  * expansion templates.
  */
 
+/* p = x * y + c ; return p */
 unsigned long
-_umac(x, y, c)		/* p = x * y + c ; return p */
-	_BIG_FLOAT_DIGIT x, y;
-	unsigned long c;
+_umac(_BIG_FLOAT_DIGIT x, _BIG_FLOAT_DIGIT y, unsigned long c)
 {
-	return x * (unsigned long) y + c;
+	return (x * (unsigned long) y + c);
 }
 
+/* p = x + c ; return (p/10000 << 16 | p%10000) */
 unsigned long
-_carry_in_b10000(x, c)		/* p = x + c ; return (p/10000 << 16 |
-				 * p%10000) */
-	_BIG_FLOAT_DIGIT x;
-	long unsigned c;
+_carry_in_b10000(_BIG_FLOAT_DIGIT x, long unsigned c)		
 {
 	unsigned long   p = x + c ;
 
@@ -63,9 +61,7 @@ _carry_in_b10000(x, c)		/* p = x + c ; return (p/10000 << 16 |
 }
 
 void
-_carry_propagate_two(carry, psignificand)
-	unsigned long carry;
-	_BIG_FLOAT_DIGIT *psignificand;
+_carry_propagate_two(unsigned long carry, _BIG_FLOAT_DIGIT *psignificand)
 {
 	/*
 	 * Propagate carries in a base-2**16 significand.
@@ -83,9 +79,7 @@ _carry_propagate_two(carry, psignificand)
 }
 
 void
-_carry_propagate_ten(carry, psignificand)
-	unsigned long carry;
-	_BIG_FLOAT_DIGIT *psignificand;
+_carry_propagate_ten(unsigned long carry, _BIG_FLOAT_DIGIT *psignificand)
 {
 	/*
 	 * Propagate carries in a base-10**4 significand.
@@ -101,4 +95,3 @@ _carry_propagate_ten(carry, psignificand)
 		carry = p >> 16;
 	}
 }
-

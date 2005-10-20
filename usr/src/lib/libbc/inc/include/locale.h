@@ -19,16 +19,19 @@
  *
  * CDDL HEADER END
  */
-/* Copyright (c) 1988 Sun Microsystems Inc */
+/*
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#ifndef	__locale_h
+#define	__locale_h
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Locale indices.
  */
-
-#ifndef	__locale_h
-#define	__locale_h
 
 #ifndef	NULL
 #define	NULL		0
@@ -152,4 +155,4 @@ struct langinfo {
     : -1)
 #endif	/* _POSIX_SOURCE */
 
-#endif / *!__locale_h */
+#endif	/* !__locale_h */

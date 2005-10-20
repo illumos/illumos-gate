@@ -18,18 +18,18 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+/*
  * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB X.X XX/XX/XX */
 
 #include <sys/types.h>
 
-ntohs(a)
-	u_short a;
+unsigned short
+ntohs(u_short a)
 {
 
 	return (a);

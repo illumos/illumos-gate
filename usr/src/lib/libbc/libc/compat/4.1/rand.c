@@ -19,18 +19,23 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.1 80/12/21 */
 
 static	long	randx = 1;
 
-srand(x)
-unsigned x;
+void
+srand(unsigned x)
 {
 	randx = x;
 }
 
-rand()
+int
+rand(void)
 {
-	return((randx = randx * 1103515245 + 12345) & 0x7fffffff);
+	return ((randx = randx * 1103515245 + 12345) & 0x7fffffff);
 }

@@ -20,11 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1988-1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+#ifndef	_base_conversion_h
+#define	_base_conversion_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <errno.h>
 
@@ -65,176 +68,147 @@
 
 /* PRIVATE TYPES 	 */
 
-typedef struct {		/* Unpack floating-point internal format. *//* V
-				 * alue is 0.s0s1..sn * 2**(1+exponent) */
+/*
+ * Unpack floating-point internal format.
+ * Value is 0.s0s1..sn * 2**(1+exponent)
+ */
+typedef struct {		
 	int             sign;
 	enum fp_class_type fpclass;
 	int             exponent;	/* Unbiased exponent. */
-	unsigned        significand[UNPACKED_SIZE];	/* Last word is round
-							 * and sticky. */
-}
-                unpacked;
+	unsigned        significand[UNPACKED_SIZE];	/* Last word is round */
+							/* and sticky. */
+} unpacked;
 
 #ifdef i386
 typedef struct {		/* Most significant word formats. */
 	unsigned        significand:23;
 	unsigned        exponent:8;
 	unsigned        sign:1;
-}
-                single_msw;
+} single_msw;
 
 typedef struct {
 	unsigned        significand:20;
 	unsigned        exponent:11;
 	unsigned        sign:1;
-}
-                double_msw;
+} double_msw;
 
 typedef struct {
 	unsigned        exponent:15;
 	unsigned        sign:1;
 	unsigned        unused:16;
-}
-                extended_msw;
+} extended_msw;
 
 typedef struct {
 	unsigned        significand:16;
 	unsigned        exponent:15;
 	unsigned        sign:1;
-}
-                quadruple_msw;
+} quadruple_msw;
 
 typedef struct {		/* Floating-point formats in detail. */
 	single_msw      msw;
-}
-                single_formatted;
+} single_formatted;
 
 typedef struct {
 	unsigned        significand2;
 	double_msw      msw;
-}
-                double_formatted;
+} double_formatted;
 
 typedef struct {
 	unsigned        significand2;
 	unsigned        significand;
 	extended_msw    msw;
-}
-                extended_formatted;
+} extended_formatted;
 
 typedef struct {
 	unsigned        significand4;
 	unsigned        significand3;
 	unsigned        significand2;
 	quadruple_msw   msw;
-}
-                quadruple_formatted;
+} quadruple_formatted;
 #else
 typedef struct {		/* Most significant word formats. */
 	unsigned        sign:1;
 	unsigned        exponent:8;
 	unsigned        significand:23;
-}
-                single_msw;
+} single_msw;
 
 typedef struct {
 	unsigned        sign:1;
 	unsigned        exponent:11;
 	unsigned        significand:20;
-}
-                double_msw;
+} double_msw;
 
 typedef struct {
 	unsigned        sign:1;
 	unsigned        exponent:15;
 	unsigned        unused:16;
-}
-                extended_msw;
+} extended_msw;
 
 typedef struct {
 	unsigned        sign:1;
 	unsigned        exponent:15;
 	unsigned        significand:16;
-}
-                quadruple_msw;
+} quadruple_msw;
 
 typedef struct {		/* Floating-point formats in detail. */
 	single_msw      msw;
-}
-                single_formatted;
+} single_formatted;
 
 typedef struct {
 	double_msw      msw;
 	unsigned        significand2;
-}
-                double_formatted;
+} double_formatted;
 
 typedef struct {
 	extended_msw    msw;
 	unsigned        significand;
 	unsigned        significand2;
-}
-                extended_formatted;
+} extended_formatted;
 
 typedef struct {
 	quadruple_msw   msw;
 	unsigned        significand2;
 	unsigned        significand3;
 	unsigned        significand4;
-}
-                quadruple_formatted;
+} quadruple_formatted;
 #endif
 
 typedef union {			/* Floating-point formats equivalenced. */
 	single_formatted f;
 	single          x;
-}
-                single_equivalence;
+} single_equivalence;
 
 typedef union {
 	double_formatted f;
 	double          x;
-}
-                double_equivalence;
+} double_equivalence;
 
 typedef union {
 	extended_formatted f;
 	extended        x;
-}
-                extended_equivalence;
+} extended_equivalence;
 
 typedef union {
 	quadruple_formatted f;
 	quadruple       x;
-}
-                quadruple_equivalence;
+} quadruple_equivalence;
 
 /* PRIVATE GLOBAL VARIABLES */
 
-fp_exception_field_type _fp_current_exceptions;	/* Current floating-point
-						 * exceptions. */
+/* Current floating-point exceptions. */
+fp_exception_field_type _fp_current_exceptions;
 
-enum fp_direction_type
-                _fp_current_direction;	/* Current rounding direction. */
+/* Current rounding direction. */
+enum fp_direction_type	_fp_current_direction;
 
-enum fp_precision_type
-                _fp_current_precision;	/* Current rounding precision. */
+/* Current rounding precision. */
+enum fp_precision_type	_fp_current_precision;
 
 /* PRIVATE FUNCTIONS */
 
-extern void 
-_fp_normalize( /* pu */ );
-/* unpacked        *pu ;           /* unpacked operand and result */
-
-extern void 
-_fp_leftshift( /* pu, n */ );
-/*
- * unpacked       *pu; unsigned        n;
- */
-
-extern void 
-_fp_set_exception( /* ex */ );
-/* enum fp_exception_type ex ;	/* exception to be set in curexcep */
+extern void _fp_set_exception(enum fp_exception_type);
+/* enum fp_exception_type ex ; */	/* exception to be set in curexcep */
 
 /*
  * Default size for _big_float - suitable for single and double precision.
@@ -243,15 +217,16 @@ _fp_set_exception( /* ex */ );
 #define _BIG_FLOAT_SIZE	(DECIMAL_STRING_LENGTH/2)
 #define _BIG_FLOAT_DIGIT short unsigned	/* big_float significand type */
 
-#define _INTEGER_SIZE	4932	/* Maximum number of integer digits in a
-				 * representable extended or quad. */
+/* Maximum number of integer digits in a representable extended or quad. */
+#define _INTEGER_SIZE	4932	
 
-typedef struct {		/* Variable-precision floating-point type
-				 * used for intermediate results.	 */
-	unsigned short  bsize;	/* Maximum allowable logical length of
-				 * significand. */
-	unsigned short  blength;/* Logical length of significand. */
-	short int       bexponent;	/* Exponent to be attached to least
+typedef struct {		/* Variable-precision floating-point type */
+				/* used for intermediate results.	 */
+	unsigned short  bsize;	/* Maximum allowable logical length of */
+				/* significand. */
+	unsigned short  blength;	/* Logical length of significand. */
+	short int       bexponent;	/*
+					 * Exponent to be attached to least
 					 * significant word of significand.
 					 * exponent >= 0 implies all integer,
 					 * with decimal point to right of
@@ -265,7 +240,8 @@ typedef struct {		/* Variable-precision floating-point type
 					 * most significand word. exponent <
 					 * -length implies decimal point to
 					 * left of most significant word with
-					 * -length-exponent leading zeros. */
+					 * -length-exponent leading zeros.
+					 */
 	/*
 	 * NOTE: bexponent represents a power of 2 or 10, even though big
 	 * digits are powers of 2**16 or 10**4.
@@ -275,87 +251,98 @@ typedef struct {		/* Variable-precision floating-point type
 	 * Significand of digits in base 10**4 or 2**16. significand[0] is
 	 * least significant, significand[length-1] is most significant.
 	 */
-}               _big_float;
+} _big_float;
 
 #define BIG_FLOAT_TIMES_NOMEM	(_big_float *)0
 #define BIG_FLOAT_TIMES_TOOBIG	(_big_float *)1
 
 /* Internal functions defined in base conversion support routines. */
 
-extern void     _multiply_base_ten();
-extern void     _multiply_base_two_carry();
-extern void     _multiply_base_ten_by_two();
-extern void     _multiply_base_two();
-extern void     _multiply_base_two_by_two();
-extern void     _carry_propagate_two();
-extern void     _carry_propagate_ten();
-extern void     _multiply_base_two_vector();
-extern void     _multiply_base_ten_vector();
-extern void     _fourdigitsquick();
-extern void     _unpacked_to_big_float();
-extern void     _big_binary_to_big_decimal();
-extern void     _left_shift_base_ten();
-extern void     _left_shift_base_two();
-extern void     _right_shift_base_two();
-extern void     _free_big_float();
-extern void	_base_conversion_abort();
-extern void	_display_big_float();
-extern void	_integerstring_to_big_decimal();
-extern void	_fractionstring_to_big_decimal();
-extern void	_big_decimal_to_big_binary();
-extern void	_fp_rightshift();
-extern void	_fp_leftshift();
-extern void	_fp_normalize();
-extern void	_pack_single();
-extern void	_pack_double();
-extern void	_pack_extended();
-extern void	_pack_quadruple();
-extern void	_unpack_single();
-extern void	_unpack_double();
-extern void	_unpack_extended();
-extern void	_unpack_quadruple();
-extern void	_unpacked_to_decimal();
-extern enum fp_class_type	_class_single();
-extern enum fp_class_type	_class_double();
-extern enum fp_class_type	_class_extended();
-extern enum fp_class_type	_class_quadruple();
+extern void     _multiply_base_ten(_big_float *, _BIG_FLOAT_DIGIT);
+extern void     _multiply_base_ten_by_two(_big_float *, short unsigned);
+extern void     _multiply_base_two(_big_float *, _BIG_FLOAT_DIGIT,
+    long unsigned);
+extern void     _carry_propagate_two(unsigned long, _BIG_FLOAT_DIGIT *);
+extern void     _carry_propagate_ten(unsigned long, _BIG_FLOAT_DIGIT *);
+extern void     _multiply_base_two_vector(short unsigned, _BIG_FLOAT_DIGIT *,
+    short unsigned *, _BIG_FLOAT_DIGIT []);
+extern void     _multiply_base_ten_vector(short unsigned, _BIG_FLOAT_DIGIT *,
+    short unsigned *, _BIG_FLOAT_DIGIT []);
+extern void     _fourdigitsquick(short unsigned, char*);
+extern void     _unpacked_to_big_float(unpacked *, _big_float *, int *);
+extern void     _big_binary_to_big_decimal(_big_float *, _big_float *);
+extern void     _left_shift_base_ten(_big_float *, short unsigned);
+extern void     _left_shift_base_two(_big_float *, short unsigned);
+extern void     _right_shift_base_two(_big_float *, short unsigned,
+    _BIG_FLOAT_DIGIT *);
+extern void     _free_big_float(_big_float *);
+extern void	_base_conversion_abort(int, char *);
+extern void	_display_big_float(_big_float *, unsigned);
+extern void	_integerstring_to_big_decimal(char [], unsigned, unsigned,
+    unsigned *, _big_float *);
+extern void	_fractionstring_to_big_decimal(char [], unsigned, unsigned,
+    _big_float *);
+extern void	_big_decimal_to_big_binary(_big_float *, _big_float *);
+extern void	_fp_rightshift(unpacked *, int);
+extern void	_fp_leftshift(unpacked *, unsigned);
+extern void	_fp_normalize(unpacked *);
+extern void	_pack_single(unpacked *, single *);
+extern void	_pack_double(unpacked *, double *);
+extern void	_pack_extended(unpacked *, extended *);
+extern void	_pack_quadruple(unpacked *, quadruple *);
+extern void	_unpack_single(unpacked *, single *);
+extern void	_unpack_double(unpacked *, double *);
+extern void	_unpack_extended(unpacked *, extended *);
+extern void	_unpack_quadruple(unpacked *, quadruple *);
+extern void	_unpacked_to_decimal(unpacked *, decimal_mode *,
+    decimal_record *, fp_exception_field_type *);
+extern enum fp_class_type	_class_single(single *);
+extern enum fp_class_type	_class_double(double *);
+extern enum fp_class_type	_class_extended(extended *);
+extern enum fp_class_type	_class_quadruple(quadruple *);
 
 /*
-   Fundamental utilities that multiply or add two shorts into a unsigned long, 
-   sometimes add an unsigned long carry, 
-   compute quotient and remainder in underlying base, and return
-   quo<<16 | rem as  a unsigned long.
+ * Fundamental utilities that multiply or add two shorts into a unsigned long, 
+ * sometimes add an unsigned long carry, 
+ * compute quotient and remainder in underlying base, and return
+ * quo<<16 | rem as  a unsigned long.
  */
 
-extern unsigned long _umac();		/* p = x * y + c ; return p */
-/*
-extern unsigned long _prodc_b65536();	/* p = x * y + c ; return p */
+extern unsigned long _umac(_BIG_FLOAT_DIGIT, _BIG_FLOAT_DIGIT, unsigned long);
+	/* p = x * y + c ; return p */
+
 #define _prodc_b65536(x,y,c) (_umac((x),(y),(c)))
-extern unsigned long _prodc_b10000();	/* p = x * y + c ; return (p/10000 <<
-extern unsigned long _prod_b65536();	/* p = x * y ; return p */
-extern unsigned long _prod_b10000();	/* p = x * y ; return (p/10000 << 16 | p%10000) */
-extern unsigned long _prod_10000_b65536();	/* p = x * 10000 + c ; return
-						 * p */
-extern unsigned long _prod_65536_b10000();	/* p = x * 65536 + c ; return
-						 * (p/10000 << 16 | p%10000) */
-/*
-extern unsigned long _rshift_b65536();		/* p = x << n + c<<16 ; return p */
+
+extern unsigned long _prodc_b10000(_BIG_FLOAT_DIGIT, _BIG_FLOAT_DIGIT,
+    unsigned long);
+/* p = x * y + c ; return (p/10000 << */
+
+extern unsigned long _prod_b10000(_BIG_FLOAT_DIGIT, _BIG_FLOAT_DIGIT);
+/* p = x * y ; return (p/10000 << 16 | p%10000) */
+
+extern unsigned long _prod_10000_b65536(_BIG_FLOAT_DIGIT, long unsigned);
+/* p = x * 10000 + c ; return p */
+
+extern unsigned long _prod_65536_b10000(_BIG_FLOAT_DIGIT, long unsigned);
+/* p = x * 65536 + c ; return (p/10000 << 16 | p%10000) */
+
 #define _rshift_b65536(x,n,c) ((((unsigned long) (x)) << (16-(n))) + ((c)<<16))
-/*
-extern unsigned long _lshift_b65536();		/* p = x << n + c ; return p */
+
 #define _lshift_b65536(x,n,c) ((((unsigned long) (x)) << (n)) + (c))
-extern unsigned long _lshift_b10000();	/* p = x << n + c ; return (p/10000
-					 * << 16 | p%10000) */
-/*
-extern unsigned long _carry_in_b65536();	/* p = x + c ; return p */
+
+extern unsigned long _lshift_b10000(_BIG_FLOAT_DIGIT, _BIG_FLOAT_DIGIT,
+    long unsigned);
+/* p = x << n + c ; return (p/10000 << 16 | p%10000) */
+
 #define _carry_in_b65536(x,c) ((x) + (c))
-extern unsigned long _carry_in_b10000();	/* p = x + c ; return
-						 * (p/10000 << 16 | p%10000) */
-/*
-extern unsigned long _carry_out_b65536();	/* p = c ; return p */
+
+extern unsigned long _carry_in_b10000(_BIG_FLOAT_DIGIT, long unsigned);
+/* p = x + c ; return (p/10000 << 16 | p%10000) */
+
 #define _carry_out_b65536(c) (c)
-extern unsigned long _carry_out_b10000();	/* p = c ; return (p/10000 <<
-						 * 16 | p%10000) */
+
+extern unsigned long _carry_out_b10000(unsigned long);
+/* p = c ; return (p/10000 << 16 | p%10000) */
 
 /*
  * Header file for revised "fast" base conversion based upon table look-up
@@ -363,36 +350,7 @@ extern unsigned long _carry_out_b10000();	/* p = c ; return (p/10000 <<
  */
 
 extern void
-_big_float_times_power(
-#ifdef notdef
-/* function to multiply a big_float times a positive power of two or ten.	 */
-		       _big_float * pbf;	/* Operand x, to be replaced
-						 * by the product x * mult **
-						 * n. */
-	int             mult;	/* if mult is two, x is base 10**4; if mult
-				 * is ten, x is base 2**16 */
-	int             n;
-	int             precision;	/* Number of bits of precision
-					 * ultimately required (mult=10) or
-					 * number of digits of precision
-					 * ultimately required (mult=2).
-					 * Extra bits are allowed internally
-					 * to permit correct rounding. */
-	_big_float    **pnewbf;	/* Return result *pnewbf is set to: pbf f
-				 * uneventful: *pbf holds the product ;
-				 * BIG_FLOAT_TIMES_TOOBIG	if n is
-				 * bigger than the tables permit ;
-				 * BIG_FLOAT_TIMES_NOMEM	if
-				 * pbf->blength was insufficient to hold the
-				 * product, and malloc failed to produce a
-				 * new block ; &newbf			if
-				 * pbf->blength was insufficient to hold the
-				 * product, and a new _big_float was
-				 * allocated by malloc. newbf holds the
-				 * product. It's the caller's responsibility
-				 * to free this space when no longer needed. */
-#endif
-);
+_big_float_times_power(_big_float *, int, int, int, _big_float **);
 
 /* Variables defined in _small_powers.c and _big_powers.c	 */
 /* Used in base conversion. */
@@ -429,7 +387,7 @@ _big_float_times_power(
  * The powers are maintained with x[start] less significant than x[start+1], so
  * that the interpretation of a _small_powers_T entry is that
  * 
-T**i = (B**leading_zeros[i]) * (x[start[i]] + x[start[i]+1] * B + ...
+ * T**i = (B**leading_zeros[i]) * (x[start[i]] + x[start[i]+1] * B + ...
  * x[start[i+1]-1] * B**(start[i+1]-start[i]) )
  * 
  * where B = (2 or 10)**TTINY
@@ -462,3 +420,5 @@ extern unsigned short _leading_zeros_big_powers_ten[];
 extern unsigned short _max_big_powers_two;
 extern unsigned short _big_powers_two[];
 extern unsigned short _start_big_powers_two[];
+
+#endif /* _base_conversion_h */

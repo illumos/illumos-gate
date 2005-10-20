@@ -28,9 +28,8 @@
 
 #include <sys/syscall.h>
 
-link(a, b)
-    char           *a;
-    char           *b;
+int
+link(char *a, char *b)
 {
-    return _syscall(SYS_link, a, b);
+    return (_syscall(SYS_link, a, b));
 }

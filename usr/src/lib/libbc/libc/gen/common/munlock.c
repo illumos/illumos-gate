@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -33,9 +34,8 @@
  */
 
 /*LINTLIBRARY*/
-munlock(addr, len)
-	caddr_t addr;
-	u_int len;
+int
+munlock(caddr_t addr, u_int len)
 {
 
 	return (mctl(addr, len, MC_UNLOCK, 0));

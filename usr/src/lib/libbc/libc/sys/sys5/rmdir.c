@@ -24,15 +24,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/syscall.h>
 
-rmdir(d)
-    char           *d;
+int
+rmdir(char *d)
 {
-	int ret;
-	extern errno;
 
-	return(_syscall(SYS_rmdir, d));
+	return (_syscall(SYS_rmdir, d));
 }

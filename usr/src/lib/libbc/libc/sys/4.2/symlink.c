@@ -24,14 +24,14 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-# include "chkpath.h"
+#include "chkpath.h"
 
-symlink(t, f)
-    char           *t, *f;
+int
+symlink(char *t, char *f)
 {
     CHKNULL(t);
     CHKNULL(f);
-    return _syscall(SYS_symlink, t, f);
+    return (_syscall(SYS_symlink, t, f));
 }

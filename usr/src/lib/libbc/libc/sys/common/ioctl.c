@@ -20,11 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Do not include sys/conf.h- it isn't in the compatibility include dirs.
@@ -79,8 +79,8 @@ struct s5termios {
 #define N_ENOMSG	35	
 #define N_I_FIND	('S'<<8)|013
 #define N_I_PUSH	('S'<<8)|02
-#define WINGETEXPOSEDRL	_IOWR(g,31,struct winclip)
-#define WINGETDAMAGEDRL _IOWR(g,32,struct winclip)
+#define WINGETEXPOSEDRL	_IOWR('g',31,struct winclip)
+#define WINGETDAMAGEDRL _IOWR('g',32,struct winclip)
 
 struct n_sgttyb {
 	char    sg_ispeed;              /* input speed */

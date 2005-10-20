@@ -26,12 +26,11 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-# include "chkpath.h"
+#include "chkpath.h"
 
-mknod(p, m, d)
-    char           *p;
-    int m, d;
+int
+mknod(char *p, int m, int d)
 {
     CHKNULL(p);
-    return _syscall(SYS_mknod, p, m, d);
+    return (_syscall(SYS_mknod, p, m, d));
 }

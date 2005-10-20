@@ -19,28 +19,25 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1985 by Sun Microsystems, Inc.
+ * Copyright 1985 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _sys_exec_h
-#define _sys_exec_h
+#define	_sys_exec_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * format of the exec header
  * known by kernel and by user programs
  */
 struct exec {
-#ifdef sun
 	unsigned char	a_dynamic:1;	/* has a __DYNAMIC */
 	unsigned char	a_toolversion:7;/* version of toolset used to create this file */
 	unsigned char	a_machtype;	/* machine type */
 	unsigned short	a_magic;	/* magic number */
-#else
-	unsigned long	a_magic;	/* magic number */
-#endif
 	unsigned long	a_text;		/* size of text segment */
 	unsigned long	a_data;		/* size of initialized data */
 	unsigned long	a_bss;		/* size of uninitialized data */
@@ -56,7 +53,6 @@ struct exec {
 
 /* machine types */
 
-#ifdef sun
 #define M_OLDSUN2	0	/* old sun-2 executable files */
 #define M_68010		1	/* runs on either 68010 or 68020 */
 #define M_68020		2	/* runs only on 68020 */
@@ -64,6 +60,5 @@ struct exec {
 
 #define TV_SUN2_SUN3	0
 #define TV_SUN4		1
-#endif sun
 
-#endif /*!_sys_exec_h*/
+#endif /* !_sys_exec_h */

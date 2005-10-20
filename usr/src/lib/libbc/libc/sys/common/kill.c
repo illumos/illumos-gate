@@ -28,20 +28,17 @@
 
 #include <sys/syscall.h>
 #include <stdio.h>
+#include <errno.h>
 
-extern int errno;
 
-kill(pid, sig)
-int pid, sig;
+int
+kill(int pid, int sig)
 {
 	return(bc_kill(pid, sig));
 }
 
-
-bc_kill(pid, sig)
-int pid, sig;
+int
+bc_kill(int pid, int sig)
 {
 	return(_kill(pid, maptonewsig(sig)));
 }
-
-

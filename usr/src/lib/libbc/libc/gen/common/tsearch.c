@@ -22,7 +22,7 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 2.3 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 /*
@@ -34,20 +34,24 @@
  */
 
 #include <search.h>
+#include <stdio.h>
+#include <malloc.h>
+
 typedef char *POINTER;
 typedef struct node { POINTER key; struct node *llink, *rlink; } NODE;
 
-#define	NULL	0
-
-extern char *malloc();
-
+/*
+ * Find or insert key into search tree
+ *
+ * Arguments
+ *	key:	Key to be located
+ *	rootp:	Address of the root of the tree
+ *	compar:	Comparison function
+ */
 NODE *
-tsearch(key, rootp, compar)	/* Find or insert key into search tree*/
-POINTER	key;			/* Key to be located */
-register NODE	**rootp;	/* Address of the root of the tree */
-int	(*compar)();		/* Comparison function */
+tsearch(POINTER key, NODE **rootp, int (*compar)(POINTER, POINTER))
 {
-	register NODE *q;	/* New node if key not found */
+	NODE *q;	/* New node if key not found */
 
 	if (rootp == NULL)
 		return (NULL);
@@ -68,15 +72,20 @@ int	(*compar)();		/* Comparison function */
 	return (q);
 }
 
+/*
+ * Delete node with key key
+ *
+ * Arguments
+ *	key:	Key to be deleted
+ *	rootp:	Address of the root of tree
+ *	compar:	Comparison function
+ */
 NODE *
-tdelete(key, rootp, compar)	/* Delete node with key key */
-POINTER	key;			/* Key to be deleted */
-register NODE	**rootp;	/* Address of the root of tree */
-int	(*compar)();		/* Comparison function */
+tdelete(POINTER key, NODE **rootp, int (*compar)(POINTER, POINTER))
 {
 	NODE *p;		/* Parent of node to be deleted */
-	register NODE *q;	/* Successor node */
-	register NODE *r;	/* Right son node */
+	NODE *q;	/* Successor node */
+	NODE *r;	/* Right son node */
 	int ans;		/* Result of comparison */
 
 	if (rootp == NULL || (p = *rootp) == NULL)
@@ -109,22 +118,32 @@ int	(*compar)();		/* Comparison function */
 	return (p);
 }
 
+static void	_twalk(NODE *, void (*)(NODE *, VISIT, int), int);
+
+/*
+ * Walk the nodes of a tree
+ *
+ * Arguments
+ *	root:	Root of the tree to be walked
+ *	action:	Function to be called at each node
+ */
 void
-twalk(root, action)		/* Walk the nodes of a tree */
-NODE	*root;			/* Root of the tree to be walked */
-void	(*action)();		/* Function to be called at each node */
+twalk(NODE *root, void (*action)(NODE *, VISIT, int))
 {
-	void _twalk();
 
 	if (root != NULL && action != NULL)
 		_twalk(root, action, 0);
 }
 
+/*
+ * Walk the nodes of a tree
+ *
+ * Arguments
+ *	root:	Root of the tree to be walked
+ *	action:	Function to be called at each node
+ */
 static void
-_twalk(root, action, level)	/* Walk the nodes of a tree */
-register NODE	*root;		/* Root of the tree to be walked */
-register void	(*action)();	/* Function to be called at each node */
-register int	level;
+_twalk(NODE *root, void (*action)(NODE *, VISIT, int), int level)
 {
 	if (root->llink == NULL && root->rlink == NULL)
 		(*action)(root, leaf, level);

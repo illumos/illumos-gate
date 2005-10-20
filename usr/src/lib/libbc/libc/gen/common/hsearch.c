@@ -47,6 +47,8 @@
 
 #include <stdio.h>
 #include <limits.h>
+#include <malloc.h>
+#include <string.h>
 
 #define SUCCEED		0
 #define FAIL		1
@@ -133,10 +135,6 @@ static unsigned int length;	/* Size of the hash table */
 static unsigned int m;		/* Log base 2 of length */
 static unsigned int prcnt;	/* Number of probes this item */
 
-extern void free();
-extern int printf(), fprintf();
-extern char *malloc(), *calloc(), *strcpy();
-
 int hcreate();
 void hdestroy();
 ENTRY *hsearch();
@@ -200,9 +198,13 @@ main()
 }
 #endif
 
+/*
+ * Create a hash table no smaller than size
+ *
+ *	size:	Minimum size for hash table
+ */
 int
-hcreate(size)		/* Create a hash table no smaller than size */
-int size;		/* Minimum size for hash table */
+hcreate(int size)		
 {
     unsigned int unsize;	/* Holds the shifted size */
 
@@ -219,11 +221,11 @@ int size;		/* Minimum size for hash table */
     }
 
     table = (TABELEM *) calloc(length, sizeof(TABELEM));
-    return(table != NULL);
+    return (table != NULL);
 }
 
 void
-hdestroy()	/* Reset the module to its initial state */
+hdestroy(void)	/* Reset the module to its initial state */
 {
     free((POINTER) table);
 #ifdef OPEN
@@ -237,10 +239,14 @@ hdestroy()	/* Reset the module to its initial state */
    section 6.4, algorithm D.  Labels flag corresponding actions.
 */
 
-ENTRY
-*hsearch(item, action)	/* Find or insert the item into the table */
-ENTRY item;		/* Item to be inserted or found */
-ACTION action;		/* FIND or ENTER */
+/*
+ * Find or insert the item into the table
+ *
+ *	item:	Item to be inserted or found
+ *	action:	FIND or ENTER
+ */
+ENTRY *
+hsearch(ENTRY item, ACTION action)
 {
     unsigned int i;	/* Insertion index */
     unsigned int c;	/* Secondary probe displacement */
@@ -335,11 +341,9 @@ D6: if(action == FIND)		/* Insert if requested */
 #ifdef USCR
 #    ifdef DRIVER
 static int
-compare(a, b)
-POINTER a;
-POINTER b;
+compare(POINTER a, POINTER b)
 {
-    return(strcmp(a, b));
+    return (strcmp(a, b));
 }
 
 int (* hcompar)() = compare;
@@ -357,10 +361,14 @@ int (* hcompar)() = compare;
 #    endif
 #    endif
 
-ENTRY
-*hsearch(item, action)	/* Chained search with sorted lists */
-ENTRY item;		/* Item to be inserted or found */
-ACTION action;		/* FIND or ENTER */
+/*
+ * Chained search with sorted lists
+ *
+ *	item:	Item to be inserted or found
+ *	action: FIND or ENTER
+ */
+ENTRY *
+hsearch(ENTRY item, ACTION action)
 {
     NODE *p;		/* Searches through the linked list */
     NODE **q;		/* Where to store the pointer to a new NODE */
@@ -401,11 +409,13 @@ ACTION action;		/* FIND or ENTER */
     }
 }
 
-static ENTRY
-*build(last, next, item)
-NODE **last;		/* Where to store in last list item */
-NODE *next;		/* Link to next list item */
-ENTRY item;		/* Item to be kept in node */
+/*
+ *	last:		Where to store in last list item
+ *	next:		Link to next list item
+ *	item:		Item to be kept in node
+ */
+static ENTRY *
+build(NODE **last, NODE *next, ENTRY item)
 {
     NODE *p = (NODE *) malloc(sizeof(NODE));
 
@@ -421,24 +431,32 @@ ENTRY item;		/* Item to be kept in node */
 #endif
 
 #ifdef DIV
+/*
+ * Division hashing scheme
+ *
+ *	key:	Key to be hashed
+ */
 static unsigned int
-hashd(key)		/* Division hashing scheme */
-POINTER key;		/* Key to be hashed */
+hashd(POINTER key)		
 {
-    return(crunch(key) % length);
+    return (crunch(key) % length);
 }
 #else
 #ifdef MULT
 /*
-    NOTE: The following algorithm only works on machines where
-    the results of multiplying two integers is the least
-    significant part of the double word integer required to hold
-    the result.  It is adapted from Knuth, Volume 3, section 6.4.
-*/
+ *    NOTE: The following algorithm only works on machines where
+ *    the results of multiplying two integers is the least
+ *    significant part of the double word integer required to hold
+ *    the result.  It is adapted from Knuth, Volume 3, section 6.4.
+ */
 
+/*
+ * Multiplication hashing scheme
+ *
+ *	key:	Key to be hashed
+ */
 static unsigned int
-hashm(key)		/* Multiplication hashing scheme */
-POINTER key;		/* Key to be hashed */
+hashm(POINTER key)
 {
     static int first = TRUE;	/* TRUE on the first call only */
 
@@ -451,7 +469,7 @@ POINTER key;		/* Key to be hashed */
 	}
 	first = FALSE;
     }
-    return((int) (((unsigned) (crunch(key) * FACTOR)) >> SHIFT));
+    return ((int) (((unsigned) (crunch(key) * FACTOR)) >> SHIFT));
 }
 
 /*
@@ -459,18 +477,22 @@ POINTER key;		/* Key to be hashed */
  * Adapted from Knuth, Volume 3, section 6.4.
  */
 
+/*
+ * Secondary hashing routine
+ *
+ *	key:	String to be hashed
+ */
 static unsigned int
-hash2m(key)		/* Secondary hashing routine */
-POINTER key;		/* String to be hashed */
+hash2m(POINTER key)
 {
-    return((int) (((unsigned) ((crunch(key) * FACTOR) << m) >> SHIFT) | 1));
+    return ((int) (((unsigned) ((crunch(key) * FACTOR) << m) >> SHIFT) | 1));
 }
 #endif
 #endif
 
+/* Convert multicharacter key to unsigned int */
 static unsigned int
-crunch(key)		/* Convert multicharacter key to unsigned int */
-POINTER key;
+crunch(POINTER key)
 {
     unsigned int sum = 0;	/* Results */
     int s;			/* Length of the key */
@@ -478,7 +500,7 @@ POINTER key;
     for(s = 0; *key; s++)	/* Simply add up the bytes */
 	sum += *key++;
 
-    return(sum + s);
+    return (sum + s);
 }
 
 #ifdef DRIVER

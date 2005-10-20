@@ -15,14 +15,13 @@
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 5.1 85/05/30 */
-
 /*
  * Copyright (c) 1983 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * Scan the directory dirname calling select to make a list of selected
@@ -35,22 +34,21 @@
 #include <sys/stat.h>
 #include <sys/dir.h>
 
-scandir(dirname, namelist, select, dcomp)
-	char *dirname;
-	struct direct *(*namelist[]);
-	int (*select)(), (*dcomp)();
+int
+scandir(char *dirname, struct direct *(*namelist[]),
+    int (*select)(), int (*dcomp)())
 {
-	register struct direct *d, *p, **names;
-	register int nitems;
-	register char *cp1, *cp2;
+	struct direct *d, *p, **names;
+	int nitems;
+	char *cp1, *cp2;
 	struct stat stb;
 	long arraysz;
 	DIR *dirp;
 
 	if ((dirp = opendir(dirname)) == NULL)
-		return(-1);
+		return (-1);
 	if (fstat(dirp->dd_fd, &stb) < 0)
-		return(-1);
+		return (-1);
 
 	/*
 	 * estimate the array size by taking the size of the directory file
@@ -59,7 +57,7 @@ scandir(dirname, namelist, select, dcomp)
 	arraysz = (stb.st_size / 24);
 	names = (struct direct **)malloc(arraysz * sizeof(struct direct *));
 	if (names == NULL)
-		return(-1);
+		return (-1);
 
 	nitems = 0;
 	while ((d = readdir(dirp)) != NULL) {
@@ -70,7 +68,7 @@ scandir(dirname, namelist, select, dcomp)
 		 */
 		p = (struct direct *)malloc(DIRSIZ(d));
 		if (p == NULL)
-			return(-1);
+			return (-1);
 		p->d_ino = d->d_ino;
 		p->d_reclen = d->d_reclen;
 		p->d_namlen = d->d_namlen;
@@ -81,12 +79,12 @@ scandir(dirname, namelist, select, dcomp)
 		 */
 		if (++nitems >= arraysz) {
 			if (fstat(dirp->dd_fd, &stb) < 0)
-				return(-1);	/* just might have grown */
+				return (-1);	/* just might have grown */
 			arraysz = stb.st_size / 12;
 			names = (struct direct **)realloc((char *)names,
 				arraysz * sizeof(struct direct *));
 			if (names == NULL)
-				return(-1);
+				return (-1);
 		}
 		names[nitems-1] = p;
 	}
@@ -94,14 +92,14 @@ scandir(dirname, namelist, select, dcomp)
 	if (nitems && dcomp != NULL)
 		qsort(names, nitems, sizeof(struct direct *), dcomp);
 	*namelist = names;
-	return(nitems);
+	return (nitems);
 }
 
 /*
  * Alphabetic order comparison routine for those who want it.
  */
-alphasort(d1, d2)
-	struct direct **d1, **d2;
+int
+alphasort(struct direct **d1, struct direct **d2)
 {
-	return(strcmp((*d1)->d_name, (*d2)->d_name));
+	return (strcmp((*d1)->d_name, (*d2)->d_name));
 }

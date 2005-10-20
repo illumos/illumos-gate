@@ -19,13 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1983 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.1 83/06/09 */
 
 /*
  * Backwards compatible pause.
  */
-pause()
+int
+pause(void)
 {
 
 	sigpause(sigblock(0));

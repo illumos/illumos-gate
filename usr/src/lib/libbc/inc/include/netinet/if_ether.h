@@ -10,10 +10,10 @@
  * is provided ``as is'' without express or implied warranty.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 #ifndef _netinet_if_ether_h
-#define _netinet_if_ether_h
+#define	_netinet_if_ether_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * The following include is for compatibility with SunOS 3.x and
@@ -128,65 +128,23 @@ struct	arptab {
  * where this is not the case, use bcmp instead.  Note that like
  * bcmp, we return zero if they are the SAME.
  */
-#if defined(sun2) || defined(sun3) || defined(sun3x)
-/*
- * On 680x0 machines, we can do a longword compare that is NOT
- * longword aligned, as long as it is even aligned.
- */
-#define ether_cmp(a,b) ( ((short *)a)[2] != ((short *)b)[2] || \
-  *((long *)a) != *((long *)b) )
-#endif
-
-#if defined(sparc)
 #define ether_cmp(a,b) ( ((short *)b)[2] != ((short *)a)[2] || \
  ((short *)b)[1] != ((short *)a)[1] || ((short *)b)[0] != ((short *)a)[0] )
-#endif 
-
-#ifndef ether_cmp
-#define ether_cmp(a,b) (bcmp((caddr_t)a,(caddr_t)b, 6))
-#endif
 
 /*
  * Copy Ethernet addresses from a to b - assumes that the two given
  * pointers can be referenced as shorts.  On architectures
  * where this is not the case, use bcopy instead.
  */
-#if defined(sun2) || defined(sun3) || defined(sun3x)
-#define ether_copy(a,b) { ((long *)b)[0]=((long *)a)[0]; \
- ((short *)b)[2]=((short *)a)[2]; }
-#endif
-
-#if defined(sparc)
 #define ether_copy(a,b) { ((short *)b)[0]=((short *)a)[0]; \
  ((short *)b)[1]=((short *)a)[1]; ((short *)b)[2]=((short *)a)[2]; }
-#endif
-
-#ifndef ether_copy
-#define ether_copy(a,b) (bcopy((caddr_t)a,(caddr_t)b, 6))
-#endif
 
 /*
  * Copy IP addresses from a to b - assumes that the two given
  * pointers can be referenced as shorts.  On architectures
  * where this is not the case, use bcopy instead.
  */
-#if defined(sun2) || defined(sun3) || defined(sun3x)
-#define ip_copy(a,b) { *((long *)b) = *((long *)a); }
-#endif
-
-#if defined(sparc)
 #define ip_copy(a,b) { ((short *)b)[0]=((short *)a)[0]; \
  ((short *)b)[1]=((short *)a)[1]; }
-#endif
 
-#ifndef ip_copy
-#define ip_copy(a,b) (bcopy((caddr_t)a,(caddr_t)b, 4))
-#endif
-
-#ifdef	KERNEL
-struct	ether_addr etherbroadcastaddr;
-struct	arptab *arptnew();
-char *ether_sprintf();
-#endif	KERNEL
-
-#endif /*!_netinet_if_ether_h*/
+#endif /* !_netinet_if_ether_h */

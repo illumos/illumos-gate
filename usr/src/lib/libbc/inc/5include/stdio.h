@@ -27,45 +27,11 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
+
+#ifndef	__5include_stdio_h
+#define	__5include_stdio_h
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-/*	from S5R2 2.7	*/
-
-#ifdef	comment	/* ======================================================= */
-
-"Standard" header file definition.  See the C style paper for
-full explanations.  Note that this reorganization has been
-forced upon us by ANSI C; please abide by it.  This file, aside
-from this comment, is supposed to be a good example.
-
-/* sccs id stuff */
-
-#ifndef	__dir_filename_h
-#define	__dir_filename_h
-
-/*#include */	/* all includes come first */
-
-#define		/* all defines other than function like macros */
-
-structs
-unions
-enums
-
-function prototypes
-
-/*
- * macros that are supplied as C functions have to be defined after
- * the C prototype.
- */
-#define		/* all function like macros */
-
-extern variables
-
-#endif	__dir_filename_h
-
-#endif	/* comment ======================================================= */
-
-#ifndef	__stdio_h
-#define	__stdio_h
 
 #include <sys/stdtypes.h>	/* for size_t */
 
@@ -145,49 +111,49 @@ typedef	struct {
 } FILE;
 
 #ifndef	_POSIX_SOURCE
-extern char	*ctermid(/* char *s */);	/* unistd.h */
-extern char	*cuserid(/* char *s */);	/* unistd.h */
-extern FILE	*popen(/* char *prog, char *mode */);
-extern char	*tempnam(/* char *d, char *s */);
+extern char	*ctermid(char *);	/* unistd.h */
+extern char	*cuserid(char *);	/* unistd.h */
+extern FILE	*popen(char *, char *);
+extern char	*tempnam(char *, char *);
 #endif
 
-extern void	clearerr(/* FILE *stream */);
-extern int	fclose(/* FILE *f */);
-extern FILE	*fdopen(/* int fd, char *type */);
-extern int	feof(/* FILE *f */);
-extern int	ferror(/* FILE *f */);
-extern int	fflush(/* FILE *f */);
-extern int	fgetc(/* FILE *f */);
-extern int	fileno(/* FILE *f */);
-extern FILE	*fopen(/* const char *path, const char *mode */);
-extern char	*fgets(/* char *s, int n, FILE *f */);
-extern int	fprintf(/* FILE *f, const char *fmt, ... */);
-extern int	fputc(/* int c, FILE *f */);
-extern int	fputs(/* const char *s, FILE *f */);
-extern size_t	fread(/* void *ptr, size_t size, size_t nmemb, FILE *f */);
-extern FILE	*freopen(/* const char *filename, const char *mode, FILE *f */);
-extern int	fscanf(/* FILE *f, const char *format, ... */);
-extern int	fseek(/* FILE *f, long int offset, int whence */);
-extern long	ftell(/* FILE *f */);
-extern size_t	fwrite(/* const void *p, size_t size, size_t nmemb, FILE *f */);
-extern int	getc(/* FILE *f */);
-extern int	getchar(/* void */);
-extern char	*gets(/* char *s */);
-extern void	perror(/* const char *s */);
-extern int	printf(/* const char *fmt, ... */);
-extern int	putc(/* int c, FILE *f */);
-extern int	putchar(/* int c */);
-extern int	puts(/* const char *s */);
-extern int	remove(/* const char *filename */);
-extern int	rename(/* char *old, char *new */);
-extern void	rewind(/* FILE *f */);
-extern int	scanf(/* const char *format, ... */);
-extern void	setbuf(/* FILE *f, char *b */);
-extern int	sprintf(/* char *s, const char *fmt, ... */);
-extern int	sscanf(/* const char *s, const char *format, ... */);
-extern FILE	*tmpfile(/* void */);
-extern char	*tmpnam(/* char *s */);
-extern int	ungetc(/* int c, FILE *f */);
+extern void	clearerr(FILE *);
+extern int	fclose(FILE *);
+extern FILE	*fdopen(int, char *);
+extern int	feof(FILE *);
+extern int	ferror(FILE *);
+extern int	fflush(FILE *);
+extern int	fgetc(FILE *);
+extern int	fileno(FILE *);
+extern FILE	*fopen(char *, char *);
+extern char	*fgets(char *, int, FILE *);
+extern int	fprintf(FILE *, char *, ...);
+extern int	fputc(int, FILE *);
+extern int	fputs(char *, FILE *);
+extern size_t	fread(char *, int, int, FILE *);
+extern FILE	*freopen(char *, char *, FILE *);
+extern int	fscanf(FILE *, char *, ...);
+extern int	fseek(FILE *, long int, int);
+extern long	ftell(FILE *);
+extern size_t	fwrite(char *, int, int, FILE *);
+extern int	getc(FILE *);
+extern int	getchar(void);
+extern char	*gets(char *);
+extern void	perror(char *);
+extern int	printf(char *, ...);
+extern int	putc(int, FILE *);
+extern int	putchar(int);
+extern int	puts(char *);
+extern int	remove(char *);
+extern int	rename(char *, char *);
+extern void	rewind(FILE *);
+extern int	scanf(char *, ...);
+extern void	setbuf(FILE *, char *);
+extern int	sprintf(char *, char *, ...);
+extern int	sscanf(char *, char *, ...);
+extern FILE	*tmpfile(void);
+extern char	*tmpnam(char *);
+extern int	ungetc(int, FILE *);
 
 #ifndef	lint
 #define	getc(p)		(--(p)->_cnt >= 0 ? ((int) *(p)->_ptr++) : _filbuf(p))
@@ -207,4 +173,4 @@ extern int	ungetc(/* int c, FILE *f */);
 
 extern FILE	_iob[];
 
-#endif	/* !__stdio_h */
+#endif	/* !__5include_stdio_h */

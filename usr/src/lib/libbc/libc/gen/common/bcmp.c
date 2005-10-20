@@ -19,12 +19,15 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB X.X XX/XX/XX */
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 
-bcmp(s1, s2, len)
-	register char *s1, *s2;
-	register int len;
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+int
+bcmp(char *s1, char *s2, int len)
 {
 
 	while (len--)

@@ -35,7 +35,8 @@
  * returned.
  */
 
-getdtablesize()
+int
+getdtablesize(void)
 {
         int     nds;
         int     error;

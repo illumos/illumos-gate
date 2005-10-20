@@ -49,10 +49,10 @@ struct statvfs {
         u_long  f_filler[16];   /* reserved for future expansion */
 };
 
+void	cpstatvfs(struct statfs *, struct statvfs *);
 
-statfs_com(s, b)
-    char            *s;
-    struct statfs *b;
+int
+statfs_com(char *s, struct statfs *b)
 {
 	int    ret;
 	struct statvfs vfsb;
@@ -63,9 +63,8 @@ statfs_com(s, b)
 	return(ret);		
 }
 
-fstatfs(fd, b)
-    int		     fd;
-    struct statfs  *b;
+int
+fstatfs(int fd, struct statfs *b)
 {
 	int    ret;
 	struct statvfs vfsb;
@@ -79,9 +78,8 @@ fstatfs(fd, b)
 /* 
  * Common code to copy vfs buf to BSD style buf 
  */
-cpstatvfs(bsdbuf, vbuf)
-    struct statfs	*bsdbuf;
-    struct statvfs      *vbuf;
+void
+cpstatvfs(struct statfs *bsdbuf, struct statvfs *vbuf)
 {
 	bsdbuf->f_type = (long) 0;  		/* type of info, zero for now */
 	bsdbuf->f_bsize = (vbuf->f_frsize != 0) ?

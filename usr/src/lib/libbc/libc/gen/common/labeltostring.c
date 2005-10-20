@@ -24,15 +24,12 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* c2 secure */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/label.h> 
 
 char *
-labeltostring(part, value, verbose)
-int part;
-blabel_t *value;
-int verbose;
+labeltostring(int part, blabel_t *value, int verbose)
 {
 	char *string;
 
@@ -41,10 +38,8 @@ int verbose;
 	return (string);
 }
 
-labelfromstring(part, label_string, value)
-int part;
-char *label_string;
-blabel_t *value;
+void
+labelfromstring(int part, char *label_string, blabel_t *value)
 {
 	bzero(value, sizeof(value));
 }

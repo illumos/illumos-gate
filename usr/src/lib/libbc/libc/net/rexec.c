@@ -25,7 +25,6 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 4.8 83/08/18 */
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -35,21 +34,19 @@
 #include <stdio.h>
 #include <netdb.h>
 #include <errno.h>
+#include <strings.h>
+#include <unistd.h>
 
-extern	errno;
-char	*index();
-char	*getpass(), *getlogin();
-#ifndef	S5EMUL
-char	*sprintf();
-#endif
+
+char	*getpass();
 
 int
 rexec(
 	char **ahost,
 	unsigned short rport,
-	const char *name,
-	const char *pass,
-	const char *cmd,
+	char *name,
+	char *pass,
+	char *cmd,
 	int *fd2p)
 {
 	int s, timo = 1, s3;

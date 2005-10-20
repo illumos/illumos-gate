@@ -19,11 +19,14 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+/*
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright (c) 1990 by Sun Microsystems, Inc.
- *
  * All routines necessary to deal with the file /etc/ethers.  The file
  * contains mappings from 48 bit ethernet addresses to their corresponding
  * hosts name.  The addresses have an ascii representation of the form
@@ -49,13 +52,16 @@ static char *ethers = "/etc/ethers";
  * where the first part is a 48 bit ethernet addrerss and the second is
  * the corresponding hosts name.
  * Returns zero if successful, non-zero otherwise.
+ *
+ * Arguments
+ *	s:		the string to be parsed
+ *	e:		ethernet address struct to be filled in
+ *	hostname:	hosts name to be set
  */
-ether_line(s, e, hostname)
-	char *s;		/* the string to be parsed */
-	struct ether_addr *e;	/* ethernet address struct to be filled in */
-	char *hostname;		/* hosts name to be set */
+int
+ether_line(char *s, struct ether_addr *e, char *hostname)
 {
-	register int i;
+	int i;
 	unsigned int t[6];
 	
 	i = sscanf(s, " %x:%x:%x:%x:%x:%x %s",
@@ -73,8 +79,7 @@ ether_line(s, e, hostname)
  */
 #define EI(i)	(unsigned int)(e->ether_addr_octet[(i)])
 char *
-ether_ntoa(e)
-	struct ether_addr *e;
+ether_ntoa(struct ether_addr *e)
 {
 	static char *s;
 
@@ -93,11 +98,10 @@ ether_ntoa(e)
  * Converts a ethernet address representation back into its 48 bits.
  */
 struct ether_addr *
-ether_aton(s)
-	char *s;
+ether_aton(char *s)
 {
 	static struct ether_addr *ep;
-	register int i;
+	int i;
 	unsigned int t[6];
 	
 	if (ep == 0) {

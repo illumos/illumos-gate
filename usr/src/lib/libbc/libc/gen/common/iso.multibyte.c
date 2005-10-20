@@ -26,10 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#if !defined(lint) && defined(SCCSIDS)
-static  char *sccsid = "%Z%%M%	%I%	%E% SMI";
-#endif 
-
 #include <sys/types.h>
 #include "codeset.h"
 #include "mbextern.h"
@@ -73,24 +69,22 @@ static struct state _des_states[NUM_OF_STATES] = {
 	{-1, 0}, {-1, 0}, {-1, 0}, {01, 0}
 };
 
-int _savestates();	/* save states */
-int _restorestates();	/* restore states */
-int _initializestates();/* Initialize states */
+void _savestates(void);	/* save states */
+void _restorestates(void);	/* restore states */
+void _initializestates(void);/* Initialize states */
+
 
 /*
  * Variables for wc*tomb*()
  */
 static char _currentOUT = G0; /* G0, G1, G2 or G3 */
-static prevcsize = 1;
+static int	prevcsize = 1;
 
 /*
  * mbtowc - subroutine for most iso codeset sequences
  */
 int
-_mbtowc_iso(pwc, s, n)
-	wchar_t *pwc;
-	char *s;
-	size_t n;
+_mbtowc_iso(wchar_t *pwc, char *s, size_t n)
 {
 	unsigned char ch;		
 	unsigned char tch;	/* temporary use */
@@ -373,10 +367,7 @@ gen_wide:
  *  mbstowcs()
  */ 
 size_t
-_mbstowcs_iso(pwcs, s, n)
-	wchar_t *pwcs;
-	unsigned char *s;
-	size_t n;
+_mbstowcs_iso(wchar_t *pwcs, unsigned char *s, size_t n)
 {
 	int ret1;
 	int accsum = 0;
@@ -392,7 +383,7 @@ _mbstowcs_iso(pwcs, s, n)
 	 */
 	 _savestates(); _initializestates();
 	 while (accsum < n) {
-		ret1 = _mbtowc_iso (&pwc, s, MAXMBSIZE);
+		ret1 = _mbtowc_iso (&pwc, (char *)s, MAXMBSIZE);
 		if (ret1 < 0)
 			return (-1);	/* error */
 		if (ret1 == 0 || pwc == 0) {
@@ -419,9 +410,7 @@ _mbstowcs_iso(pwcs, s, n)
  * wctomb - 
  */
 int
-_wctomb_iso(s, pwc)
-	unsigned char *s;
-	wchar_t pwc;
+_wctomb_iso(unsigned char *s, wchar_t pwc)
 {
 	unsigned char ch;		
 	unsigned char tch;	/* temporary use */
@@ -824,10 +813,7 @@ _wctomb_iso(s, pwc)
  * wcstombs
  */
 size_t
-_wcstombs_iso(s, pwcs, n)
-	char *s;
-	wchar_t *pwcs;
-	int n;
+_wcstombs_iso(char *s, wchar_t *pwcs, int n)
 {
 	int acclen = 0;
 	char buf[MMB_CUR_MAX];
@@ -841,7 +827,7 @@ _wcstombs_iso(s, pwcs, n)
 	 */
 	 _savestates(); _initializestates();
 	 while (acclen < n) {
-		ret1 = _wctomb_iso (buf, *pwcs);
+		ret1 = _wctomb_iso ((unsigned char *)buf, *pwcs);
 		/*
 		 * end of string ?
 		 */
@@ -880,8 +866,8 @@ _wcstombs_iso(s, pwcs, n)
  * Supplementary routines
  */
 
-int
-_initializestates()
+void
+_initializestates(void)
 {
 	_currentG0 = G0;
 	_currentG1 = G1;
@@ -897,10 +883,10 @@ static char SAVED_currentG1;
 static struct state SAVED_des_states[NUM_OF_STATES];
 static struct state SAVED_Invoked_G0, SAVED_Invoked_G1;
 static char SAVED_currentOUT = G0; /* G0, G1, G2 or G3 */
-static SAVED_prevcsize = 1;
+static int	SAVED_prevcsize = 1;
 
-int
-_savestates()
+void
+_savestates(void)
 {
 
 	SAVED_currentG0 = _currentG0;
@@ -918,8 +904,8 @@ _savestates()
 	SAVED_prevcsize = prevcsize;
 }
 
-int 
-_restorestates()
+void
+_restorestates(void)
 {
 	_currentG0 = SAVED_currentG0;
 	_currentG1 = SAVED_currentG1;

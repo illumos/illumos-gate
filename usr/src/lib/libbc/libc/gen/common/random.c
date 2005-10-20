@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-	/* from UCB 4.2 83/01/02 */
 
-#include	<stdio.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 /*
  * random.c:
@@ -139,7 +139,7 @@ static struct _randomjunk {
 	long	*state;
 	int	rand_type, rand_deg, rand_sep;
 	long	*end_ptr;
-} *__randomjunk, *_randomjunk(), _randominit = {
+} *__randomjunk, *_randomjunk(void), _randominit = {
 	/*
 	 * Initially, everything is set up as if from :
 	 *		initstate(1, &randtbl, 128);
@@ -169,13 +169,12 @@ static struct _randomjunk {
 	&_randominit.randtbl[ DEG_3 + 1]
 };
 
-long random();
-extern char *malloc();
+long random(void);
 
 static struct _randomjunk *
-_randomjunk()
+_randomjunk(void)
 {
-	register struct _randomjunk *rp = __randomjunk;
+	struct _randomjunk *rp = __randomjunk;
 
 	if (rp == 0) {
 		rp = (struct _randomjunk *)malloc(sizeof (*rp));
@@ -200,11 +199,11 @@ _randomjunk()
  * values produced by this routine.
  */
 
-srandom(x)
-	unsigned	x;
+void
+srandom(unsigned x)
 {
-	register struct _randomjunk *rp = _randomjunk();
-	register  int		i;
+	struct _randomjunk *rp = _randomjunk();
+	int		i;
 
 	if (rp == 0)
 		return;
@@ -238,16 +237,18 @@ srandom(x)
  * Note: the first thing we do is save the current state, if any, just like
  * setstate() so that it doesn't matter when initstate is called.
  * Returns a pointer to the old state.
+ *
+ * Arguments:
+ *	seed:		seed for R. N. G.
+ *	arg_state:	pointer to state array
+ *	n:		# bytes of state info
  */
 
 char  *
-initstate(seed, arg_state, n)
-	unsigned	seed;			/* seed for R. N. G. */
-	char		*arg_state;		/* pointer to state array */
-	int		n;			/* # bytes of state info */
+initstate(unsigned seed, char *arg_state, int n)
 {
-	register struct _randomjunk *rp = _randomjunk();
-	register  char		*ostate;
+	struct _randomjunk *rp = _randomjunk();
+	 char		*ostate;
 
 	if (rp == 0)
 		return (0);
@@ -304,13 +305,12 @@ initstate(seed, arg_state, n)
  */
 
 char  *
-setstate(arg_state)
-	char		*arg_state;
+setstate(char *arg_state)
 {
-	register struct _randomjunk *rp = _randomjunk();
-	register  long		*new_state;
-	register  int		type;
-	register  int		rear;
+	struct _randomjunk *rp = _randomjunk();
+	long		*new_state;
+	int		type;
+	int		rear;
 	char			*ostate;
 
 	if (rp == 0)
@@ -323,17 +323,17 @@ setstate(arg_state)
 	rp->state[-1] = (rp->rand_type == TYPE_0) ? rp->rand_type
 			: MAX_TYPES*(rp->rptr - rp->state) + rp->rand_type;
 	switch (type)  {
-	    case  TYPE_0:
-	    case  TYPE_1:
-	    case  TYPE_2:
-	    case  TYPE_3:
-	    case  TYPE_4:
+	case  TYPE_0:
+	case  TYPE_1:
+	case  TYPE_2:
+	case  TYPE_3:
+	case  TYPE_4:
 		rp->rand_type = type;
 		rp->rand_deg = rp->degrees[type];
 		rp->rand_sep = rp->seps[type];
 		break;
 
-	    default:
+	default:
 		fprintf(stderr, "setstate: invalid state info; not changed.\n");
 	}
 	rp->state = &new_state[1];
@@ -362,9 +362,9 @@ setstate(arg_state)
  */
 
 long
-random()
+random(void)
 {
-	register struct _randomjunk *rp = _randomjunk();
+	struct _randomjunk *rp = _randomjunk();
 	long		i;
 
 	if (rp == 0)

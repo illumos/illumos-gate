@@ -20,14 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2001 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
-
-/*	from S5R3 1.5 */
 
 #ifndef	_BC_SYS_UNISTD_H
 #define	_BC_SYS_UNISTD_H
@@ -103,59 +101,56 @@ extern "C" {
 #define	W_OK		2	/* is it writable by caller */
 #define	R_OK		4	/* is it readable by caller */
 
-#if	!defined(KERNEL)
 #include <sys/types.h>
 
-extern void	_exit(/* int status */);
-extern int	access(/* char *path, int amode */);
-extern unsigned	alarm(/* unsigned secs */);
-extern int	chdir(/* char *path */);
-extern int	chmod(/* char *path, mode_t mode */);
-extern int	chown(/* char *path, uid_t owner, gid_t group */);
-extern int	close(/* int fildes */);
-extern char	*ctermid(/* char *s */);
-extern char	*cuserid(/* char *s */);
-extern int	dup(/* int fildes */);
-extern int	dup2(/* int fildes, int fildes2 */);
-extern int	execl(/* char *path, ... */);
-extern int	execle(/* char *path, ... */);
-extern int	execlp(/* char *file, ... */);
-extern int	execv(/* char *path, char *argv[] */);
-extern int	execve(/* char *path, char *argv[], char *envp[] */);
-extern int	execvp(/* char *file, char *argv[] */);
-extern pid_t	fork(/* void */);
-extern long	fpathconf(/* int fd, int name */);
-extern char	*getcwd(/* char *buf, int size */);
-extern gid_t	getegid(/* void */);
-extern uid_t	geteuid(/* void */);
-extern gid_t	getgid(/* void */);
-extern int	getgroups(/* int gidsetsize, gid_t grouplist[] */);
-extern char	*getlogin(/* void */);
-extern pid_t	getpgrp(/* void */);
-extern pid_t	getpid(/* void */);
-extern pid_t	getppid(/* void */);
-extern uid_t	getuid(/* void */);
-extern int	isatty(/* int fildes */);
-extern int	link(/* char *path1, char *path2 */);
-extern off_t	lseek(/* int fildes, off_t offset, int whence */);
-extern long	pathconf(/* char *path, int name */);
-extern int	pause(/* void */);
-extern int	pipe(/* int fildes[2] */);
-extern int	read(/* int fildes, char *buf, unsigned int nbyte */);
-extern int	rmdir(/* char *path */);
-extern int	setgid(/* gid_t gid */);
-extern int	setpgid(/* pid_t pid, pid_t pgid */);
-extern pid_t	setsid(/* void */);
-extern int	setuid(/* uid_t uid */);
-extern unsigned	sleep(/* unsigned int seconds */);
-extern long	sysconf(/* int name */);
-extern pid_t	tcgetpgrp(/* int fildes */);
-extern int	tcsetpgrp(/* int fildes, pid_t pgrp_id */);
-extern char	*ttyname(/* int fildes */);
-extern int	unlink(/* char *path */);
-extern int	write(/* int fildes, char *buf, unsigned int nbyte */);
-
-#endif	/* !KERNEL */
+extern void	_exit(int);
+extern int	access(char *, int);
+extern unsigned	alarm(unsigned);
+extern int	chdir(char *);
+extern int	chmod(char *, mode_t);
+extern int	chown(char *, uid_t, gid_t);
+extern int	close(int);
+extern char	*ctermid(char *);
+extern char	*cuserid(char *);
+extern int	dup(int);
+extern int	dup2(int, int);
+extern int	execl(char *, ...);
+extern int	execle(char *, ...);
+extern int	execlp(char *, ...);
+extern int	execv(char *, char *[]);
+extern int	execve(char *, char *[], char *[]);
+extern int	execvp(char *, char *[]);
+extern pid_t	fork(void);
+extern long	fpathconf(int, int);
+extern char	*getcwd(char *, int);
+extern gid_t	getegid(void);
+extern uid_t	geteuid(void);
+extern gid_t	getgid(void);
+extern int	getgroups(int, gid_t []);
+extern char	*getlogin(void);
+extern pid_t	getpgrp(void);
+extern pid_t	getpid(void);
+extern pid_t	getppid(void);
+extern uid_t	getuid(void);
+extern int	isatty(int);
+extern int	link(char *, char *);
+extern off_t	lseek(int, off_t, int);
+extern long	pathconf(char *, int);
+extern int	pause(void);
+extern int	pipe(int [2]);
+extern int	read(int, char *, int);
+extern int	rmdir(char *);
+extern int	setgid(gid_t);
+extern int	setpgid(pid_t, pid_t);
+extern pid_t	setsid(void);
+extern int	setuid(uid_t);
+extern unsigned	sleep(unsigned int);
+extern long	sysconf(int);
+extern pid_t	tcgetpgrp(int);
+extern int	tcsetpgrp(int, pid_t);
+extern char	*ttyname(int);
+extern int	unlink(char *);
+extern int	write(int, char *, int);
 
 #ifdef	__cplusplus
 }

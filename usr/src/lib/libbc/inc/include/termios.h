@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	__SYS_TERMIOS_H
@@ -226,12 +226,12 @@ extern "C" {
 /*
  * codes 1 through 5, not shown here, are old "termio" calls
  */
-#define	TCXONC		_IO(T, 6)
-#define	TCFLSH		_IO(T, 7)
-#define	TCGETS		_IOR(T, 8, struct termios)
-#define	TCSETS		_IOW(T, 9, struct termios)
-#define	TCSETSW		_IOW(T, 10, struct termios)
-#define	TCSETSF		_IOW(T, 11, struct termios)
+#define	TCXONC		_IO('T', 6)
+#define	TCFLSH		_IO('T', 7)
+#define	TCGETS		_IOR('T', 8, struct termios)
+#define	TCSETS		_IOW('T', 9, struct termios)
+#define	TCSETSW		_IOW('T', 10, struct termios)
+#define	TCSETSF		_IOW('T', 11, struct termios)
 #endif	/* !_POSIX_SOURCE */
 
 #define	TCOOFF		0		/* arg to TCXONC & tcflow() */

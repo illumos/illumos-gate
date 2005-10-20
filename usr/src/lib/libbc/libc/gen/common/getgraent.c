@@ -24,23 +24,21 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* c2 secure */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <grp.h>
 #include <grpadj.h>
 #include <rpcsvc/ypclnt.h>
+#include <string.h>
+#include <malloc.h>
 
 extern void rewind();
 extern long strtol();
-extern int strlen();
-extern int strcmp();
 extern int fclose();
-extern char *strcpy();
-extern char *calloc();
-extern char *malloc();
 
-void setgraent(), endgraent();
+void	setgraent(void);
+void	endgraent(void);
 
 static struct gradata {
 	char	*domain;
@@ -56,19 +54,28 @@ static struct gradata {
 	struct	group_adjunct interpgra;
 	char	interpline[BUFSIZ+1];
 	struct	group_adjunct *sv;
-} *gradata, *_gradata();
+} *gradata, *_gradata(void);
 
 static char *GROUPADJ = "/etc/security/group.adjunct";
-static	struct group_adjunct *interpret();
-static	struct group_adjunct *interpretwithsave();
-static	struct group_adjunct *save();
-static	struct group_adjunct *getnamefromyellow();
-static	struct group_adjunct *getgidfromyellow();
+
+static struct group_adjunct	*interpret(char *, int);
+static struct group_adjunct	*interpretwithsave(char *, int,
+    struct group_adjunct *);
+static struct group_adjunct	*save(struct group_adjunct *);
+static struct group_adjunct	*getnamefromyellow(char *,
+    struct group_adjunct *);
+static int	onminuslist(struct group_adjunct *);
+static int	matchname(char [], struct group_adjunct **, char *);
+static void	freeminuslist(void);
+static void	getnextfromyellow(void);
+static void	getfirstfromyellow(void);
+static void	addtominuslist(char *);
+
 
 static struct gradata *
-_gradata()
+_gradata(void)
 {
-	register struct gradata *g = gradata;
+	struct gradata *g = gradata;
 
 	if (g == 0) {
 		g = (struct gradata *)calloc(1, sizeof (struct gradata));
@@ -77,25 +84,10 @@ _gradata()
 	return (g);
 }
 
-#ifdef	NOT_DEFINED
 struct group_adjunct *
-getgragid(gid)
-register gid;
+getgranam(char *name)
 {
-	struct group *getgrgid();
-	struct group *gr;
-
-	if ((gr = getgrgid(gid)) == NULL)
-		return NULL;
-	return (getgranam(gr->gr_name));
-}
-#endif	NOT_DEFINED
-
-struct group_adjunct *
-getgranam(name)
-register char *name;
-{
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 	struct group_adjunct *gra;
 	char line[BUFSIZ+1];
 
@@ -103,7 +95,7 @@ register char *name;
 	if (g == 0)
 		return (0);
 	if (!g->grfa)
-		return NULL;
+		return (NULL);
 	while (fgets(line, BUFSIZ, g->grfa) != NULL) {
 		if ((gra = interpret(line, strlen(line))) == NULL)
 			continue;
@@ -117,9 +109,9 @@ register char *name;
 }
 
 void
-setgraent()
+setgraent(void)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 
 	if (g == NULL)
 		return;
@@ -136,9 +128,9 @@ setgraent()
 }
 
 void
-endgraent()
+endgraent(void)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 
 	if (g == 0)
 		return;
@@ -153,33 +145,30 @@ endgraent()
 }
 
 struct group_adjunct *
-fgetgraent(f)
-	FILE *f;
+fgetgraent(FILE *f)
 {
 	char line1[BUFSIZ+1];
 
 	if(fgets(line1, BUFSIZ, f) == NULL)
-		return(NULL);
+		return (NULL);
 	return (interpret(line1, strlen(line1)));
 }
 
 static char *
-grskip(p,c)
-	register char *p;
-	register c;
+grskip(char *p, int c)
 {
 	while(*p && *p != c && *p != '\n') ++p;
 	if (*p == '\n')
 		*p = '\0';
 	else if (*p != '\0')
 		*p++ = '\0';
-	return(p);
+	return (p);
 }
 
 struct group_adjunct *
-getgraent()
+getgraent(void)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 	char line1[BUFSIZ+1];
 	static struct group_adjunct *savegra;
 	struct group_adjunct *gra;
@@ -190,13 +179,13 @@ getgraent()
 		(void) yp_get_default_domain(&g->domain);
 	}
 	if(!g->grfa && !(g->grfa = fopen(GROUPADJ, "r")))
-		return(NULL);
+		return (NULL);
   again:
 	if (g->yp) {
 		gra = interpretwithsave(g->yp, g->yplen, savegra);
 		free(g->yp);
 		if (gra == NULL)
-			return(NULL);
+			return (NULL);
 		getnextfromyellow();
 		if (onminuslist(gra))
 			goto again;
@@ -204,9 +193,9 @@ getgraent()
 			return (gra);
 	}
 	else if (fgets(line1, BUFSIZ, g->grfa) == NULL)
-		return(NULL);
+		return (NULL);
 	if ((gra = interpret(line1, strlen(line1))) == NULL)
-		return(NULL);
+		return (NULL);
 	switch(line1[0]) {
 		case '+':
 			if (strcmp(gra->gra_name, "+") == 0) {
@@ -236,15 +225,14 @@ getgraent()
 			return (gra);
 			break;
 	}
-	/*NOTREACHED*/
+	/* NOTREACHED */
 }
 
 static struct group_adjunct *
-interpret(val, len)
-	char *val;
+interpret(char *val, int len)
 {
-	register struct gradata *g = _gradata();
-	register char *p;
+	struct gradata *g = _gradata();
+	char *p;
 
 	if (g == 0)
 		return (0);
@@ -267,9 +255,10 @@ interpret(val, len)
 	return (&g->interpgra);
 }
 
-static
-freeminuslist() {
-	register struct gradata *g = _gradata();
+static void
+freeminuslist(void)
+{
+	struct gradata *g = _gradata();
 	struct list *ls;
 	
 	if (g == 0)
@@ -282,11 +271,9 @@ freeminuslist() {
 }
 
 static struct group_adjunct *
-interpretwithsave(val, len, savegra)
-	char *val;
-	struct group_adjunct *savegra;
+interpretwithsave(char *val, int len, struct group_adjunct *savegra)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 	struct group_adjunct *gra;
 	
 	if (g == 0)
@@ -298,27 +285,26 @@ interpretwithsave(val, len, savegra)
 	return (gra);
 }
 
-static
-onminuslist(gra)
-	struct group_adjunct *gra;
+static int
+onminuslist(struct group_adjunct *gra)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 	struct list *ls;
-	register char *nm;
+	char *nm;
 	
 	if (g == 0)
-		return 0;
+		return (0);
 	nm = gra->gra_name;
 	for (ls = g->minuslist; ls != NULL; ls = ls->nxt)
 		if (strcmp(ls->name, nm) == 0)
-			return 1;
-	return 0;
+			return (1);
+	return (0);
 }
 
-static
-getnextfromyellow()
+static void
+getnextfromyellow(void)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 	int reason;
 	char *key = NULL;
 	int keylen;
@@ -339,10 +325,10 @@ fprintf(stderr, "reason yp_next failed is %d\n", reason);
 	g->oldyplen = keylen;
 }
 
-static
-getfirstfromyellow()
+static void
+getfirstfromyellow(void)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 	int reason;
 	char *key = NULL;
 	int keylen;
@@ -363,11 +349,9 @@ fprintf(stderr, "reason yp_first failed is %d\n", reason);
 }
 
 static struct group_adjunct *
-getnamefromyellow(name, savegra)
-	char *name;
-	struct group_adjunct *savegra;
+getnamefromyellow(char *name, struct group_adjunct *savegra)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 	struct group_adjunct *gra;
 	int reason;
 	char *val;
@@ -380,24 +364,23 @@ getnamefromyellow(name, savegra)
 #ifdef DEBUG
 fprintf(stderr, "reason yp_next failed is %d\n", reason);
 #endif
-		return NULL;
+		return (NULL);
 	}
 	else {
 		gra = interpret(val, vallen);
 		free(val);
 		if (gra == NULL)
-			return NULL;
+			return (NULL);
 		if (savegra->gra_passwd && *savegra->gra_passwd)
 			gra->gra_passwd =  savegra->gra_passwd;
-		return gra;
+		return (gra);
 	}
 }
 
-static
-addtominuslist(name)
-	char *name;
+static void
+addtominuslist(char *name)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 	struct list *ls;
 	char *buf;
 	
@@ -417,13 +400,12 @@ addtominuslist(name)
  * value in the NIS
  */
 static struct group_adjunct *
-save(gra)
-	struct group_adjunct *gra;
+save(struct group_adjunct *gra)
 {
-	register struct gradata *g = _gradata();
+	struct gradata *g = _gradata();
 	
 	if (g == 0)
-		return 0;
+		return (0);
 	/* 
 	 * free up stuff from last time around
 	 */
@@ -434,50 +416,47 @@ save(gra)
 	g->sv = (struct group_adjunct *)calloc(1, sizeof(struct group_adjunct));
 	g->sv->gra_passwd = (char *)malloc(strlen(gra->gra_passwd) + 1);
 	(void) strcpy(g->sv->gra_passwd, gra->gra_passwd);
-	return g->sv;
+	return (g->sv);
 }
 
-static
-matchname(line1, grap, name)
-	char line1[];
-	struct group_adjunct **grap;
-	char *name;
+static int
+matchname(char line1[], struct group_adjunct **grap, char *name)
 {
 	struct group_adjunct *savegra;
 	struct group_adjunct *gra = *grap;
 
-	switch(line1[0]) {
+	switch (line1[0]) {
 		case '+':
 			if (strcmp(gra->gra_name, "+") == 0) {
 				savegra = save(gra);
 				gra = getnamefromyellow(name, savegra);
 				if (gra) {
 					*grap = gra;
-					return 1;
+					return (1);
 				}
 				else
-					return 0;
+					return (0);
 			}
 			if (strcmp(gra->gra_name+1, name) == 0) {
 				savegra = save(gra);
 				gra = getnamefromyellow(gra->gra_name+1, savegra);
 				if (gra) {
 					*grap = gra;
-					return 1;
+					return (1);
 				}
 				else
-					return 0;
+					return (0);
 			}
 			break;
 		case '-':
 			if (strcmp(gra->gra_name+1, name) == 0) {
 				*grap = NULL;
-				return 1;
+				return (1);
 			}
 			break;
 		default:
 			if (strcmp(gra->gra_name, name) == 0)
-				return 1;
+				return (1);
 	}
-	return 0;
+	return (0);
 }

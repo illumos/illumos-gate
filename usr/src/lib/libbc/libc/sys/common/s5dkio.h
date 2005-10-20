@@ -20,13 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1990 by Sun Microsystems, Inc.
+ * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS5_DKIO_H
 #define	_SYS5_DKIO_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SunOS-4.0 5.19 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
@@ -103,6 +104,7 @@ struct s5_dk_cinfo {
 
 /*
  * From sys/scsi/impl/uscsi.h
+ */
 /*
  * definition for user-scsi command structure
  */

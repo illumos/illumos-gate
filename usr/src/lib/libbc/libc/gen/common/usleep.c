@@ -3,14 +3,13 @@
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	/* from UCB 5.1 85/06/05 */
-
 /*
  * Copyright (c) 1985 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <unistd.h>
 #include <sys/time.h>
@@ -24,13 +23,13 @@
 
 static int ringring;
 
-usleep(n)
-	unsigned n;
+void
+usleep(unsigned n)
 {
 	static void sleepx();
 	int omask;
 	struct itimerval itv, oitv;
-	register struct itimerval *itp = &itv;
+	struct itimerval *itp = &itv;
 	struct sigvec vec, ovec;
 
 	if (n == 0)
@@ -68,7 +67,7 @@ usleep(n)
 }
 
 static void
-sleepx()
+sleepx(void)
 {
 
 	ringring = 1;

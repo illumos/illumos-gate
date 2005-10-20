@@ -27,28 +27,27 @@
 /*      Copyright (c) 1984 AT&T */
 /*        All Rights Reserved   */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"  /* from S5R2 1.2 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 /*
  *	called from "assert" macro; prints without printf or stdio.
  */
 
+#include <malloc.h>
+
 #define WRITE(s, n)	(void) write(2, (s), (n))
 #define WRITESTR(s1, n, s2)	WRITE((s1), n), \
 				WRITE((s2), (unsigned) strlen(s2))
 
 #define	LINESTR ", line NNNNN\n"
-char	*malloc();
 
-_assert(assertion, filename, line_num)
-char *assertion;
-char *filename;
-int line_num;
+void
+_assert(char *assertion, char *filename, int line_num)
 {
 	static char *linestr;
-	register char *p;
-	register int div, digit;
+	char *p;
+	int div, digit;
 
 	if (!linestr) {
 		linestr = malloc(strlen(LINESTR)+1);

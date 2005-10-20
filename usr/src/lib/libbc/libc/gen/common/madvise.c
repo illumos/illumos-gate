@@ -19,11 +19,12 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
 #include <sys/mman.h>
@@ -35,10 +36,8 @@
  */
 
 /*LINTLIBRARY*/
-madvise(addr, len, advice)
-	caddr_t addr;
-	u_int len;
-	int advice;
+int
+madvise(caddr_t addr, u_int len, int advice)
 {
 	if (len == 0) {
 		errno = EINVAL;
@@ -52,6 +51,7 @@ madvise(addr, len, advice)
  * because it is not in the bcp libc.
  */
 int
-vadvise(int param) {
+vadvise(int param)
+{
 	return (0);
 }

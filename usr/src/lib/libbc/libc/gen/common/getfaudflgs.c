@@ -18,13 +18,13 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
- *
+ */
+/*
  * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-			 /* c2 secure */
 
 #include <sys/types.h>
 #include <sys/label.h>
@@ -50,10 +50,9 @@
  *          -1 - error
  */
 
-getfauditflags(usremasks, usrdmasks, lastmasks)
-audit_state_t *usremasks;
-audit_state_t *usrdmasks;
-audit_state_t *lastmasks;
+int
+getfauditflags(audit_state_t *usremasks, audit_state_t *usrdmasks,
+    audit_state_t *lastmasks)
 {	 
 	int len = MAXSTRLEN, retstat = 0;
 	char s_auditstring[MAXSTRLEN];

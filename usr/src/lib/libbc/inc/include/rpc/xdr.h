@@ -19,16 +19,19 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
- * xdr.h, External Data Representation Serialization Routines.
- *
- * Copyright (C) 1984, Sun Microsystems, Inc.
+ * Copyright 1984 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _rpc_xdr_h
 #define	_rpc_xdr_h
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * xdr.h, External Data Representation Serialization Routines.
+ */
 
 #include <rpc/types.h>
 /*
@@ -225,7 +228,6 @@ extern bool_t	xdr_bytes();
 extern bool_t	xdr_opaque();
 extern bool_t	xdr_string();
 extern bool_t	xdr_union();
-#ifndef KERNEL
 extern void	xdr_free();
 extern bool_t	xdr_char();
 extern bool_t	xdr_u_char();
@@ -235,7 +237,6 @@ extern bool_t	xdr_double();
 extern bool_t	xdr_reference();
 extern bool_t	xdr_pointer();
 extern bool_t	xdr_wrapstring();
-#endif !KERNEL
 
 /*
  * Common opaque bytes objects used by many rpc protocols;
@@ -254,15 +255,11 @@ extern bool_t	xdr_netobj();
  * xdr streams.
  */
 extern void	xdrmem_create();	/* XDR using memory buffers */
-#ifndef KERNEL
 extern void	xdrstdio_create();	/* XDR using stdio library */
 extern void	xdrrec_create();	/* XDR pseudo records for tcp */
 extern bool_t	xdrrec_endofrecord();	/* make end of xdr record */
 extern int	xdrrec_readbytes();	/* like a read on a pipe */
 extern bool_t	xdrrec_skiprecord();	/* move to beginning of next record */
 extern bool_t	xdrrec_eof();		/* true if no more input */
-#else
-extern void xdrmbuf_init();		/* XDR using kernel mbufs */
-#endif !KERNEL
 
-#endif /*!_rpc_xdr_h*/
+#endif /* !_rpc_xdr_h */

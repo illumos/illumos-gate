@@ -30,12 +30,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#if	!defined(lint) && defined(SCCSIDS)
-static  char *sccsid = "%Z%%M% %I%	%E% SMI";
-#endif
-
-#include <fcntl.h>
-extern int	open();
+#include <sys/fcntl.h>
 #include <locale.h>
 #include <stdlib.h>
 #include "codeset.h"
@@ -50,8 +45,6 @@ extern int	open();
 
 #define	TRAILER ".ci"
 
-extern int	stat();
-extern char	*getenv();
 
 struct	_code_set_info _code_set_info = {
 	NULL,
@@ -141,23 +134,19 @@ struct	lconv *lconv = &lconv_arr;
 static	char *lconv_numeric_str = NULL;
 static 	char *lconv_monetary_str = NULL;
 
-int	getlocale_ctype(/*char *locale, char *ctypep, char *newlocale*/);
-char	*getlocale_numeric(/*char *locale, struct lconv *lconvp*/);
-static 	char	*getlocale_monetary();
-void	init_statics();
-
-static	char	*getstr(/*char *p, char **strp*/);
-static	char	*getgrouping(/*char *p, char **groupingp*/);
-static	char	*getnum(/*char *p, int *nump*/);
-static	char	*getbool(/*char *p, int *boolp*/);
-int		openlocale(/*char *category, int cat_id, char *locale, char *newlocale */);
-static int	set_codeinfo(/*char */);
-static int	set_default();
+int	openlocale(char *, int, char *, char *);
+int	getlocale_ctype(char *, char *, char *);
+char	*getlocale_numeric(char *, struct lconv *, char *);
+void	init_statics(void);
+static char	*getlocale_monetary(char *, struct lconv *, char *);
+static char	*getstr(char *, char **);
+static char	*getgrouping(char *, char **);
+static char	*getnum(char  *, char *);
+static char	*getbool(char *, char *);
+static void	set_default(void);
 
 char *
-setlocale(category, locale)
-	int category;
-	char *locale;
+setlocale(int category, char *locale)
 {
 	static char buf[MAXLOCALE*(MAXLOCALENAME + 1) + 1];
 		/* buffer for current LC_ALL value */
@@ -167,8 +156,8 @@ setlocale(category, locale)
 	struct lconv my_lconv;		/* local copy */
 	char *my_lconv_numeric_str;
 	char *my_lconv_monetary_str;
-	register int i;
-	register char *p;
+	int i;
+	char *p;
 
 
 	 /* initialize my_lconv to lconv */
@@ -244,31 +233,31 @@ setlocale(category, locale)
 
 				case LC_CTYPE - 1:
 					if (setlocale(LC_CTYPE,p) == NULL)
-						return NULL;
+						return (NULL);
 					break;
 				case LC_NUMERIC - 1:
 					if (setlocale(LC_NUMERIC,p) == NULL)
-						return NULL;
+						return (NULL);
 					break;
 				case LC_TIME - 1:
 					if (setlocale(LC_TIME,p) == NULL)
-						return NULL;
+						return (NULL);
 					break;
 				case LC_MONETARY - 1:
 					if (setlocale(LC_MONETARY,p) == NULL)
-						return NULL;
+						return (NULL);
 					break;
 				case LANGINFO - 1:
 					if (setlocale(LANGINFO,p) == NULL)
-						return NULL;
+						return (NULL);
 					break;
 				case LC_COLLATE - 1:
 					if (setlocale(LC_COLLATE,p) == NULL)
-						return NULL;
+						return (NULL);
 					break;
 				case LC_MESSAGES - 1:
 					if (setlocale(LC_MESSAGES,p) == NULL)
-						return NULL;
+						return (NULL);
 					break;
 				}
 				p = NULL;
@@ -365,12 +354,9 @@ setlocale(category, locale)
 }
 
 int
-getlocale_ctype(locale, ctypep, newlocale)
-	char *locale;
-	char *ctypep;
-	char *newlocale;
+getlocale_ctype(char *locale, char *ctypep, char *newlocale)
 {
-	register int fd;
+	int fd;
 
 	if ((fd = openlocale("LC_CTYPE", LC_CTYPE, locale, newlocale)) > 0) {
 		if (read(fd, (char *)ctypep, CTYPE_SIZE) != CTYPE_SIZE) {
@@ -385,15 +371,12 @@ getlocale_ctype(locale, ctypep, newlocale)
 /* open and load the numeric information */
 
 char *
-getlocale_numeric(locale, lconvp, newlocale)
-	char *locale;
-	register struct lconv *lconvp;
-	char *newlocale;
+getlocale_numeric(char *locale, struct lconv *lconvp, char *newlocale)
 {
-	register int fd;
+	int fd;
 	struct stat buf;
 	char *str;
-	register char *p;
+	char *p;
 
 	if ((fd = openlocale("LC_NUMERIC", LC_NUMERIC, locale, newlocale)) < 0)
 		return (NULL);
@@ -438,20 +421,17 @@ fail:
 
 
 static char *
-getlocale_monetary(locale, lconvp, newlocale)
-	char *locale;
-	register struct lconv *lconvp;
-	char *newlocale;
+getlocale_monetary(char *locale, struct lconv *lconvp, char *newlocale)
 {
-	register int fd;
+	int fd;
 	struct stat buf;
 	char *str;
-	register char *p;
+	char *p;
 
 	if ((fd = openlocale("LC_MONETARY", LC_MONETARY, locale, newlocale)) < 0)
 		return (NULL);
 	if (fd == 0)
-		return "";
+		return ("");
 	if ((fstat(fd, &buf)) != 0)
 		return (NULL);
 	if ((str = (char*)malloc((unsigned)buf.st_size + 2)) == NULL)
@@ -519,13 +499,11 @@ getlocale_monetary(locale, lconvp, newlocale)
 fail:
 	(void) close(fd);
 	free((malloc_t)str);
-	return NULL;
+	return (NULL);
 }
 
 static char *
-getstr(p, strp)
-	register char *p;
-	char **strp;
+getstr(char *p, char **strp)
 {
 	*strp = p;
 	p = strchr(p, '\n');
@@ -536,11 +514,9 @@ getstr(p, strp)
 }
 
 static char *
-getgrouping(p, groupingp)
-	register char *p;
-	char **groupingp;
+getgrouping(char *p, char **groupingp)
 {
-	register int c;
+	int c;
 
 	if (*p == '\0')
 		return (NULL);	/* no grouping */
@@ -558,12 +534,10 @@ getgrouping(p, groupingp)
 }
 
 static char *
-getnum(p, nump)
-	register char *p;
-	char *nump;
+getnum(char *p, char *nump)
 {
-	register int num;
-	register int c;
+	int num;
+	int c;
 
 	if (*p == '\0')
 		return (NULL);	/* no number */
@@ -584,9 +558,7 @@ getnum(p, nump)
 }
 
 static char *
-getbool(p, boolp)
-	register char *p;
-	char *boolp;
+getbool(char *p, char *boolp)
 {
 
 	if (*p == '\0')
@@ -640,11 +612,7 @@ getbool(p, boolp)
  *  is called)
  */
 int
-openlocale(category, cat_id, locale, newlocale)
-	char *category;
-	register int cat_id;
-	register char *locale;
-	char *newlocale;
+openlocale(char *category, int cat_id, char *locale, char *newlocale)
 {
 	char pathname[MAXPATHLEN], *defp;
 	int fd, fd2;
@@ -669,10 +637,10 @@ openlocale(category, cat_id, locale, newlocale)
 	}
 	if (strcmp(locale,_locales[cat_id-1]) == 0) {
 		(void) strcpy(newlocale, locale);
-		return 0;
+		return (0);
 	}
 	if (strlen(locale) > MAXLOCALENAME)
-		return -1;
+		return (-1);
 
 	(void) strcpy(pathname, PRIVATE_LOCALE_DIR);
 	(void) strcat(pathname, category);
@@ -718,7 +686,7 @@ openlocale(category, cat_id, locale, newlocale)
        
 		if (fd2 == -1)  {
 			set_default();
-			return fd;
+			return (fd);
 		}
 
 		/*
@@ -732,7 +700,7 @@ openlocale(category, cat_id, locale, newlocale)
 			 */
 			 set_default();
 			 close(fd2);
-			 return -1;
+			 return (-1);
 		}
 		/*
 		 * set up trailer file
@@ -748,7 +716,7 @@ openlocale(category, cat_id, locale, newlocale)
 		 	 code_header.code_info_size) { 
 					close(fd2);
 					set_default();
-					return -1;
+					return (-1);
 				}
 			_code_set_info.code_info = my_info;
 		 }
@@ -759,24 +727,24 @@ openlocale(category, cat_id, locale, newlocale)
 			_code_set_info.code_info = NULL;
 			close(fd2);
 			set_default();
-			return -1;
+			return (-1);
 		 }
 		 close (fd2);
 	}
-	return fd;
+	return (fd);
 }
 
 struct	lconv *
-localeconv()
+localeconv(void)
 {
 	return (lconv);
 }
 
 struct	dtconv *
-localdtconv()
+localdtconv(void)
 {
-	register char *p;
-	register short i;
+	char *p;
+	short i;
 
 	char *rawmonths = "Jan\nFeb\nMar\nApr\nMay\nJun\nJul\nAug\nSep\nOct\nNov\nDec\nJanuary\nFebruary\nMarch\nApril\nMay\nJune\nJuly\nAugust\nSeptember\nOctober\nNovember\nDecember";
 
@@ -836,8 +804,8 @@ char *rawfmts = "%H:%M:%S\n%m/%d/%y\n%a %b %e %T %Z %Y\nAM\nPM\n%A, %B %e, %Y\n"
 }
 
 
-static int
-set_default()
+static void
+set_default(void)
 {
 
 	strcpy(_code_set_info.code_name, Default);
@@ -848,14 +816,16 @@ set_default()
 	_code_set_info.open_flag = 0;
 }
 
-void init_statics() {
+void
+init_statics(void)
+{
 
-		short i;
+	short i;
 
-		for (i=0; i<MAXLOCALE-1;i++)
-			strcpy(_locales[i],"C");
-		strcpy(_code_set_info.code_name, "default");
-		strcpy(_my_time,"C");
-		_langinfo.yesstr = "yes";
-		_langinfo.nostr = "no";
+	for (i=0; i<MAXLOCALE-1;i++)
+		strcpy(_locales[i],"C");
+	strcpy(_code_set_info.code_name, "default");
+	strcpy(_my_time,"C");
+	_langinfo.yesstr = "yes";
+	_langinfo.nostr = "no";
 }

@@ -24,18 +24,13 @@
  * Use is subject to license terms.
  */
 
-/*
- * Copyright 1990 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#include "chkpath.h"
 
-# include "chkpath.h"
-
-mkdir(p, m)
-    char           *p;
+int
+mkdir(char *p, int m)
 {
     CHKNULL(p);
-    return _syscall(SYS_mkdir, p, m);
+    return (_syscall(SYS_mkdir, p, m));
 }

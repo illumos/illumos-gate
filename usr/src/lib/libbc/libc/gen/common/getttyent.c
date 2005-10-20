@@ -1,10 +1,11 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-	  /* from UCB 5.4 5/19/86 */
 /*
  * Copyright (c) 1985 Regents of the University of California.
  * All rights reserved.  The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 
 #include <stdio.h>
 #include <strings.h>
@@ -17,10 +18,10 @@ static struct _ttyentjunk {
 	FILE	*tf;
 	char	line[LINE];
 	struct	ttyent tty;
-} *__ttyentjunk, *_ttyentjunk();
+} *__ttyentjunk, *_ttyentjunk(void);
 
 static struct _ttyentjunk *
-_ttyentjunk()
+_ttyentjunk(void)
 {
 
 	if (__ttyentjunk == 0)
@@ -28,9 +29,10 @@ _ttyentjunk()
 	return (__ttyentjunk);
 }
 
-setttyent()
+void
+setttyent(void)
 {
-	register struct _ttyentjunk *t = _ttyentjunk();
+	struct _ttyentjunk *t = _ttyentjunk();
 
 	if (t == 0)
 		return;
@@ -40,9 +42,10 @@ setttyent()
 		rewind(t->tf);
 }
 
-endttyent()
+void
+endttyent(void)
 {
-	register struct _ttyentjunk *t = _ttyentjunk();
+	struct _ttyentjunk *t = _ttyentjunk();
 
 	if (t == 0)
 		return;
@@ -59,13 +62,12 @@ endttyent()
  * and return a pointer to the next field.
  */
 static char *
-skip(p)
-	register char *p;
+skip(char *p)
 {
-	register struct _ttyentjunk *t = _ttyentjunk();
-	register char *cp = p;
-	register int c;
-	register int q = 0;
+	struct _ttyentjunk *t = _ttyentjunk();
+	char *cp = p;
+	int c;
+	int q = 0;
 
 	if (t == 0)
 		return (0);
@@ -97,21 +99,20 @@ skip(p)
 }
 
 static char *
-value(p)
-	register char *p;
+value(char *p)
 {
 	if ((p = index(p,'=')) == 0)
-		return(NULL);
+		return (NULL);
 	p++;			/* get past the = sign */
-	return(p);
+	return (p);
 }
 
 struct ttyent *
-getttyent()
+getttyent(void)
 {
-	register struct _ttyentjunk *t = _ttyentjunk();
-	register char *p;
-	register int c;
+	struct _ttyentjunk *t = _ttyentjunk();
+	char *p;
+	int c;
 
 	if (t == 0)
 		return (NULL);
@@ -158,5 +159,5 @@ getttyent()
 		t->tty.ty_comment = 0;
 	if (p = index(p, '\n'))
 		*p = '\0';
-	return(&t->tty);
+	return (&t->tty);
 }

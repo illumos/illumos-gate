@@ -19,29 +19,25 @@
  *
  * CDDL HEADER END
  */
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
 /*
- * Copyright (c) 1988 by Sun Microsystems, Inc.
+ * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "_Qquad.h"
 #include "_Qglobals.h"
 
-extern _Q_get_rp_rd(), _Q_set_exception();
-
-#define	FUNC	qtos
-
 SINGLERESULT 
-_Q_qtos(x)
-	QUAD x;
+_Q_qtos(QUAD x)
 {
 	unpacked	px;
 	float		s;
 	_fp_current_exceptions = 0;
 	_Q_get_rp_rd();
-	_fp_unpack(&px,&x,fp_op_extended);
-	_fp_pack(&px,&s,fp_op_single);
+	_fp_unpack(&px, (int *)&x,fp_op_extended);
+	_fp_pack(&px, (int *)&s,fp_op_single);
 	_Q_set_exception(_fp_current_exceptions);
 	RETURNSINGLE(s);
 }
