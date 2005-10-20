@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,89 +12,81 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <locale.h>
 #include <stdio.h>
 #include <assert.h>
-#define unopen(fil) {if (fil!=NULL) {fclose(fil); fil=NULL;}}
+#define	unopen(fil) {if (fil != NULL) {fclose(fil); fil = NULL; }}
 
+extern void err();
 extern long indexdate, gdate();
 extern FILE *iopen();
-runbib (s)
-char *s;
+
+int ckexist(char *, char *);
+
+static void
+runbib(char *s)
 {
 	/* make a file suitable for fgrep */
 	char tmp[200];
-	sprintf(tmp, "/usr/lib/refer/mkey '%s' > '%s.ig'", s,s);
+	sprintf(tmp, "/usr/lib/refer/mkey '%s' > '%s.ig'", s, s);
 	system(tmp);
 }
 
-makefgrep(indexname)
-char *indexname;
+int
+makefgrep(char *indexname)
 {
 	FILE *fa, *fb;
-	if (ckexist(indexname, ".ig"))
-	{
+	if (ckexist(indexname, ".ig")) {
 		/* existing gfrep -type index */
-# if D1
+#if D1
 		fprintf(stderr, "found fgrep\n");
-# endif
+#endif
 		fa = iopen(indexname, ".ig");
 		fb = iopen(indexname, "");
-		if (gdate(fb)>gdate(fa))
-		{
-			if (fa!=NULL)
+		if (gdate(fb) > gdate(fa)) {
+			if (fa != NULL)
 				fclose(fa);
 			runbib(indexname);
-			fa= iopen(indexname, ".ig");
+			fa = iopen(indexname, ".ig");
 		}
 		indexdate = gdate(fa);
-		unopen(fa); 
+		unopen(fa);
 		unopen(fb);
-	}
-	else
-		if (ckexist(indexname, ""))
-		{
+	} else
+		if (ckexist(indexname, "")) {
 			/* make fgrep */
-# if D1
+#if D1
 			fprintf(stderr, "make fgrep\n");
-# endif
+#endif
 			runbib(indexname);
 			time(&indexdate);
-		}
-		else /* failure */
-		return(0);
-	return(1); /* success */
+		} else /* failure */
+			return (0);
+	return (1); /* success */
 }
 
-ckexist(s, t)
-char *s, *t;
+int
+ckexist(char *s, char *t)
 {
 	char fnam[100];
-	strcpy (fnam, s);
-	strcat (fnam, t);
+	strcpy(fnam, s);
+	strcat(fnam, t);
 	return (access(fnam, 04) != -1);
 }
 
 FILE *
-iopen(s, t)
-char *s, *t;
+iopen(char *s, char *t)
 {
 	char fnam[100];
 	FILE *f;
-	strcpy (fnam, s);
-	strcat (fnam, t);
-	f = fopen (fnam, "r");
-	if (f == NULL)
-	{
+	strcpy(fnam, s);
+	strcat(fnam, t);
+	f = fopen(fnam, "r");
+	if (f == NULL) {
 		err(gettext("Missing expected file %s"), fnam);
 		exit(1);
 	}
-	return(f);
+	return (f);
 }

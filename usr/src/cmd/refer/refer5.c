@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,17 +12,12 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "refer..c"
-#define SAME 0
-#define NFLAB 3000		/* number of bytes to record all labels */
-#define NLABC 1000		/* max number of labels */
+#define	SAME 0
+#define	NFLAB 3000		/* number of bytes to record all labels */
+#define	NLABC 1000		/* max number of labels */
 
 static char sig[MXSIG];
 static char bflab[NFLAB];
@@ -28,8 +27,22 @@ static char labc[NLABC];
 static char stbuff[50];
 static int  prevsig;
 
-putsig (nf, flds, nref, nstline, endline, toindex)   /* choose signal style */
-char *flds[], *nstline, *endline;
+extern void addch();
+extern void append();
+extern void err();
+extern void flout();
+extern int prefix();
+
+char keylet(char *, int);
+static void initadd(char *, char *, char *);
+static void mycpy(char *, char *);
+static void mycpy2(char *, char *, int);
+void tokeytab(char *, int);
+
+/* choose signal style */
+void
+putsig(int nf, char *flds[], int nref, char *nstline,
+	    char *endline, int toindex)
 {
 	char t[100], t1[MXSIG], t2[100], format[10], *sd, *stline;
 	int addon, another = 0;
@@ -46,15 +59,16 @@ char *flds[], *nstline, *endline;
 				fpar(nf, flds, t, keywant, 1, 0);
 			if (science && t[0] == 0) {
 				if (fpar(nf, flds, t, 'A', 1, 0) != 0) {
-					if (fpar(nf, flds, t2, 'D', 1, 0) != 0) {
+					if (fpar(nf, flds, t2, 'D',
+					    1, 0) != 0) {
 						strcat(t, ", ");
 						strcat(t, t2);
 					}
 				}
 			} else if (t[0] == 0) {
 				sprintf(format,
-					nmlen>0 ? "%%.%ds%%s" : "%%s%%s",
-					nmlen);
+				    nmlen > 0 ? "%%.%ds%%s" : "%%s%%s",
+				    nmlen);
 				/* format is %s%s for default labels */
 				/* or %.3s%s eg if wanted */
 				if (fpar(nf, flds, t2, 'D', 1, 0)) {
@@ -81,14 +95,12 @@ char *flds[], *nstline, *endline;
 				}
 			}
 			if ((!keywant || addon) && !science) {
-			    addch(t, keylet(t, nref));
-			}
-			else {
-			    tokeytab (t,nref);
+				addch(t, keylet(t, nref));
+			} else {
+				tokeytab(t, nref);
 			}
 		}
-	}
-	else {
+	} else {
 		if (sort)
 			sprintf(t, "%c%d%c", FLAG, nref, FLAG);
 		else
@@ -96,26 +108,26 @@ char *flds[], *nstline, *endline;
 	}
 	another = (sd = lookat()) ? prefix(".[", sd) : 0;
 	if (another && (strcmp(".[\n", sd) != SAME))
-		fprintf(stderr, (char *)gettext("File %s line %d: punctuation ignored from: %s"),
-			Ifile, Iline, sd);
+		fprintf(stderr, (char *)gettext(
+		    "File %s line %d: punctuation ignored from: %s"),
+		    Ifile, Iline, sd);
 	if ((strlen(sig) + strlen(t)) > MXSIG)
 		err(gettext("sig overflow (%d)"), MXSIG);
 	strcat(sig, t);
 #if EBUG
-	fprintf(stderr, "sig is now %s leng %d\n",sig,strlen(sig));
+	fprintf(stderr, "sig is now %s leng %d\n", sig, strlen(sig));
 #endif
 	trimnl(nstline);
 	trimnl(endline);
 	stline = stbuff;
 	if (prevsig == 0) {
-		strcpy (stline, nstline);
-		prevsig=1;
+		strcpy(stline, nstline);
+		prevsig = 1;
 	}
 	if (stline[2] || endline[2]) {
 		stline += 2;
 		endline += 2;
-	}
-	else {
+	} else {
 		stline  = "\\*([.";
 		endline = "\\*(.]";
 	}
@@ -134,7 +146,7 @@ char *flds[], *nstline, *endline;
 			prevsig = 0;
 			if (fo == fhide) {
 				int ch;
-				fclose(fhide); 
+				fclose(fhide);
 				fhide = fopen(hidenam, "r");
 				fo = ftemp;
 				while ((ch = getc(fhide)) != EOF)
@@ -142,8 +154,7 @@ char *flds[], *nstline, *endline;
 				fclose(fhide);
 				unlink(hidenam);
 			}
-		}
-		else {
+		} else {
 			if (labels) {
 				strcat(sig, ",\\|");
 			} else {
@@ -162,30 +173,30 @@ char *flds[], *nstline, *endline;
 #endif
 				fhide = fopen(hidenam, "w");
 				if (fhide == NULL)
-					err(gettext("Can't get scratch file %s"),
-						hidenam);
+					err(gettext(
+					    "Can't get scratch file %s"),
+					    hidenam);
 				fo = fhide;
 			}
 		}
 	}
 	if (bare < 2)
 		if (nf > 0 && toindex)
-			fprintf(fo,".ds [F %s%c",t,sep);
+			fprintf(fo, ".ds [F %s%c", t, sep);
 	if (bare > 0)
 		flout();
 #if EBUG
-	fprintf(stderr, "sig is now %s\n",sig);
+	fprintf(stderr, "sig is now %s\n", sig);
 #endif
 }
 
 char *
-fpar (nf, flds, out, c, seq, prepend)
-char *flds[], *out;
+fpar(int nf, char *flds[], char *out, int c, int seq, int prepend)
 {
 	char *p, *s;
 	int i, fnd = 0;
 
-	for(i = 0; i < nf; i++)
+	for (i = 0; i < nf; i++)
 		if (flds[i][1] == c && ++fnd >= seq) {
 			/* for titles use first word otherwise last */
 			if (c == 'T' || c == 'J') {
@@ -197,33 +208,33 @@ char *flds[], *out;
 				if (prefix("The ", p))
 					p += 4;
 				mycpy2(out, p, 20);
-				return(out);
+				return (out);
 			}
 			/* if its not 'L' then use just the last word */
 			s = p = flds[i]+2;
 			if (c != 'L') {
-			    for(; *p; p++);
-			    while (p > s && *p != ' ')
-				    p--;
+				for (; *p; p++)
+					;
+				while (p > s && *p != ' ')
+					p--;
 			}
 			/* special wart for authors */
-			if (c == 'A' && (p[-1] == ',' || p[1] =='(')) {
+			if (c == 'A' && (p[-1] == ',' || p[1] == '(')) {
 				p--;
 				while (p > s && *p != ' ')
 					p--;
 				mycpy(out, p+1);
-			}
-			else
+			} else
 				strcpy(out, p+1);
 			if (c == 'A' && prepend)
 				initadd(out, flds[i]+2, p);
-			return(out);
+			return (out);
 		}
-	return(0);
+	return (0);
 }
 
-putkey(nf, flds, nref, keystr)
-char *flds[], *keystr;
+void
+putkey(int nf, char *flds[], int nref, char *keystr)
 {
 	char t1[50], *sf;
 	int ctype, i, count;
@@ -234,11 +245,11 @@ char *flds[], *keystr;
 	else {
 		while (ctype = *keystr++) {
 			count = atoi(keystr);
-			if (*keystr=='+')
-				count=999;
+			if (*keystr == '+')
+				count = 999;
 			if (count <= 0)
 				count = 1;
-			for(i = 1; i <= count; i++) {
+			for (i = 1; i <= count; i++) {
 				sf = fpar(nf, flds, t1, ctype, i, 1);
 				if (sf == 0)
 					break;
@@ -251,25 +262,25 @@ char *flds[], *keystr;
 }
 
 
-tokeytab (t, nref)
-char *t;
+void
+tokeytab(char *t, int nref)
 {
-	strcpy(labtab[nref]=lbp, t);
+	strcpy(labtab[nref] = lbp, t);
 	while (*lbp++)
 		;
 }
 
-keylet(t, nref)
-char *t;
+char
+keylet(char *t, int nref)
 {
 	int i;
 	int x = 'a' - 1;
 
-	for(i = 1; i < nref; i++) {
+	for (i = 1; i < nref; i++) {
 		if (strcmp(labtab[i], t) == 0)
 			x = labc[i];
 	}
-	tokeytab (t, nref);
+	tokeytab(t, nref);
 	if (lbp-bflab > NFLAB)
 		err(gettext("bflab overflow (%d)"), NFLAB);
 	if (nref > NLABC)
@@ -277,23 +288,23 @@ char *t;
 #if EBUG
 	fprintf(stderr, "lbp up to %d of %d\n", lbp-bflab, NFLAB);
 #endif
-	return(labc[nref] = x+1);
+	return (labc[nref] = x+1);
 }
 
-mycpy(s, t)
-char *s, *t;
+static void
+mycpy(char *s, char *t)
 {
 	while (*t && *t != ',' && *t != ' ')
 		*s++ = *t++;
 	*s = 0;
 }
 
-mycpy2(s, t, n)
-char *s, *t;
+static void
+mycpy2(char *s, char *t, int n)
 {
 	int c;
 
-	while (n-- && (c= *t++) > 0) {
+	while (n-- && (c = *t++) > 0) {
 		if (c == ' ')
 			c = '-';
 		*s++ = c;
@@ -301,8 +312,8 @@ char *s, *t;
 	*s = 0;
 }
 
-initadd(to, from, stop)
-char *to, *from, *stop;
+static void
+initadd(char *to, char *from, char *stop)
 {
 	int c, nalph = 1;
 
@@ -335,10 +346,10 @@ char *s;
 
 	for (p = articles; *p; p++) {
 		r2 = s;
-		for (r1 = *p; ((*r1 ^ *r2) & ~040 ) == 0; r1++)
+		for (r1 = *p; ((*r1 ^ *r2) & ~040) == 0; r1++)
 			r2++;
 		if (*r1 == 0 && *r2 != 0)
-			return(r2);
+			return (r2);
 	}
-	return(s);
+	return (s);
 }

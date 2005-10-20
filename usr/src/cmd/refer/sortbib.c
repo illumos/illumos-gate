@@ -1,16 +1,15 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
  * All rights reserved. The Berkeley software License Agreement
  * specifies the terms and conditions for redistribution.
- */
-
-/*
- * Copyright (c) 1983-1988 by Sun Microsystems, Inc.
- * All Rights Reserved.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,13 +28,21 @@ char *keystr = "AD";		/* default sorting on author and date */
 int multauth = 0;		/* by default sort on senior author only */
 int oneauth;			/* has there been author in the record? */
 
-main(argc, argv)	/* sortbib: sort bibliographic database in place */
-int argc;
-char *argv[];
+static int article(char *);
+static void deliver(FILE *[], FILE *);
+static int endcomma(char *);
+static void error(char *);
+static void eval(char []);
+static void parse(char [], char fld[][BUF]);
+static void sortbib(FILE *, FILE *, int);
+static void onintr(void);
+
+/* sortbib: sort bibliographic database in place */
+int
+main(int argc, char *argv[])
 {
 	FILE *fp[MXFILES], *tfp;
 	int i;
-	void onintr();
 
 	(void) setlocale(LC_ALL, "");
 
@@ -44,22 +51,19 @@ char *argv[];
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	if (argc == 1)		/* can't use stdin for seeking anyway */
-	{
+	if (argc == 1) {		/* can't use stdin for seeking anyway */
 		puts(gettext("Usage:  sortbib [-sKEYS] database [...]\n\
 \t-s: sort by fields in KEYS (default is AD)"));
 		exit(1);
 	}
-	if (argc > 2 && argv[1][0] == '-' && argv[1][1] == 's')
-	{
+	if (argc > 2 && argv[1][0] == '-' && argv[1][1] == 's') {
 		/* if a key is specified use it, otherwise use default key */
 		if (argv[1][2] != '\0')
 			keystr = argv[1] + 2;
 		eval(keystr);		/* evaluate A+ for multiple authors */
 		argv++; argc--;
 	}
-	if (argc > MXFILES+1)	/* too many open file streams */
-	{
+	if (argc > MXFILES+1) {	/* too many open file streams */
 		fprintf(stderr,
 		gettext("sortbib: More than %d databases specified\n"),
 		    MXFILES);
@@ -74,7 +78,7 @@ char *argv[];
 
 	(void) close(tmpfd);
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)	/* remove if interrupted */
-		signal(SIGINT, onintr);
+		signal(SIGINT, (void(*)())onintr);
 	if ((tfp = fopen(tempfile, "w")) == NULL) {
 		(void) unlink(tempfile);
 		error(tempfile);
@@ -84,55 +88,49 @@ char *argv[];
 	fclose(tfp);
 	deliver(fp, tfp);	/* do disk seeks and read from biblio files */
 	(void) unlink(tempfile);
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
 int rsmode = 0;		/* record separator: 1 = null line, 2 = bracket */
 
-sortbib(fp, tfp, i)	/* read records, prepare list for sorting */
-FILE *fp, *tfp;
-int i;
+/* read records, prepare list for sorting */
+static void
+sortbib(FILE *fp, FILE *tfp, int i)
 {
 	long offset, lastoffset = 0, ftell();	/* byte offsets in file */
 	int length, newrec, recno = 0;		/* reclen, new rec'd?, number */
 	char line[BUF], fld[4][BUF];		/* one line, the sort fields */
 
 	/* measure byte offset, then get new line */
-	while (offset = ftell(fp), fgets(line, BUF, fp))
-	{
+	while (offset = ftell(fp), fgets(line, BUF, fp)) {
 		if (recno == 0)		/* accept record w/o initial newline */
 			newrec = 1;
-		if (line[0] == '\n')	/* accept null line record separator */
-		{
+		if (line[0] == '\n') {	/* accept null line record separator */
 			if (!rsmode)
 				rsmode = 1;	/* null line mode */
 			if (rsmode == 1)
 				newrec = 1;
 		}
-		if (line[0] == '.' && line[1] == '[')	/* also accept .[ .] */
-		{
+		if (line[0] == '.' && line[1] == '[') {	/* also accept .[ .] */
 			if (!rsmode)
 				rsmode = 2;	/* bracket pair mode */
 			if (rsmode == 2)
 				newrec = 1;
 		}
-		if (newrec)		/* by whatever means above */
-		{
+		if (newrec) {		/* by whatever means above */
 			newrec = 0;
 			length = offset - lastoffset;	/* measure rec len */
 			if (length > BUF*8) {
 				fprintf(stderr,
-				gettext("sortbib: record %d longer than %d (%d)\n"),
-					recno, BUF*8, length);
+				gettext("sortbib: record %d longer than %d "
+				    "(%d)\n"), recno, BUF*8, length);
 				(void) unlink(tempfile);
 				exit(1);
 			}
-			if (recno++)			/* info for sorting */
-			{
+			if (recno++) {			/* info for sorting */
 				fprintf(tfp, "%d %d %d : %s %s %s %s\n",
-					i, lastoffset, length,
-					fld[0], fld[1], fld[2], fld[3]);
+				    i, lastoffset, length,
+				    fld[0], fld[1], fld[2], fld[3]);
 				if (ferror(tfp)) {
 					(void) unlink(tempfile);
 					error(tempfile);
@@ -147,19 +145,16 @@ int i;
 	}
 	offset = ftell(fp);		/* measure byte offset at EOF */
 	length = offset - lastoffset;	/* measure final record length */
-	if (length > BUF*8)
-	{
+	if (length > BUF*8) {
 		fprintf(stderr,
 		    gettext("sortbib: record %d longer than %d (%d)\n"),
 		    recno, BUF*8, length);
 		(void) unlink(tempfile);
 		exit(1);
 	}
-	if (line[0] != '\n')		/* ignore null line just before EOF */
-	{
+	if (line[0] != '\n') {		/* ignore null line just before EOF */
 		fprintf(tfp, "%d %d %d : %s %s %s %s\n",
-			i, lastoffset, length,
-			fld[0], fld[1], fld[2], fld[3]);
+		    i, lastoffset, length, fld[0], fld[1], fld[2], fld[3]);
 		if (ferror(tfp)) {
 			(void) unlink(tempfile);
 			error(tempfile);	/* disk error in /tmp */
@@ -167,8 +162,9 @@ int i;
 	}
 }
 
-deliver(fp, tfp)	/* deliver sorted entries out of database(s) */
-FILE *fp[], *tfp;
+/* deliver sorted entries out of database(s) */
+static void
+deliver(FILE *fp[], FILE *tfp)
 {
 	char str[BUF], buff[BUF*8];	/* for tempfile & databases */
 	char cmd[80];			/* for using system sort command */
@@ -182,8 +178,7 @@ FILE *fp[], *tfp;
 		error("sortbib");
 	}
 	tfp = fopen(tempfile, "r");
-	while (fgets(str, sizeof (str), tfp))
-	{
+	while (fgets(str, sizeof (str), tfp)) {
 		/* get file pointer, record offset, and length */
 		if (sscanf(str, "%d %d %d :", &i, &offset, &length) != 3)
 			error(gettext("sortbib: sorting error"));
@@ -208,9 +203,9 @@ FILE *fp[], *tfp;
 	}
 }
 
-parse(line, fld)	/* get fields out of line, prepare for sorting */
-char line[];
-char fld[][BUF];
+/* get fields out of line, prepare for sorting */
+static void
+parse(char line[], char fld[][BUF])
 {
 	char wd[8][BUF/4], *strcat();
 	int n, i, j;
@@ -218,13 +213,10 @@ char fld[][BUF];
 	for (i = 0; i < 8; i++)		/* zap out old strings */
 		*wd[i] = NULL;
 	n = sscanf(line, "%s %s %s %s %s %s %s %s",
-		wd[0], wd[1], wd[2], wd[3], wd[4], wd[5], wd[6], wd[7]);
-	for (i = 0; i < 4; i++)
-	{
-		if (wd[0][1] == keystr[i])
-		{
-			if (wd[0][1] == 'A')
-			{
+	    wd[0], wd[1], wd[2], wd[3], wd[4], wd[5], wd[6], wd[7]);
+	for (i = 0; i < 4; i++) {
+		if (wd[0][1] == keystr[i]) {
+			if (wd[0][1] == 'A') {
 				if (oneauth && !multauth)	/* no repeat */
 					break;
 				else if (oneauth)		/* mult auths */
@@ -260,8 +252,9 @@ char fld[][BUF];
 	}
 }
 
-article(str)		/* see if string contains an article */
-char *str;
+/* see if string contains an article */
+static int
+article(char *str)
 {
 	if (strcmp("The", str) == 0)	/* English */
 		return (1);
@@ -286,15 +279,14 @@ char *str;
 	return (0);
 }
 
-eval(keystr)		/* evaluate key string for A+ marking */
-char keystr[];
+/* evaluate key string for A+ marking */
+static void
+eval(char keystr[])
 {
 	int i, j;
 
-	for (i = 0, j = 0; keystr[i]; i++, j++)
-	{
-		if (keystr[i] == '+')
-		{
+	for (i = 0, j = 0; keystr[i]; i++, j++) {
+		if (keystr[i] == '+') {
 			multauth = 1;
 			i++;
 		}
@@ -305,29 +297,30 @@ char keystr[];
 	keystr[j] = NULL;
 }
 
-error(s)		/* exit in case of various system errors */
-char *s;
+/* exit in case of various system errors */
+static void
+error(char *s)
 {
 	perror(s);
 	exit(1);
 }
 
-void
-onintr()		/* remove tempfile in case of interrupt */
+/* remove tempfile in case of interrupt */
+static void
+onintr(void)
 {
 	fprintf(stderr, gettext("\nInterrupt\n"));
 	unlink(tempfile);
 	exit(1);
 }
 
-endcomma(str)
-char *str;
+static int
+endcomma(char *str)
 {
 	int n;
 
 	n = strlen(str) - 1;
-	if (str[n] == ',')
-	{
+	if (str[n] == ',') {
 		str[n] = NULL;
 		return (1);
 	}

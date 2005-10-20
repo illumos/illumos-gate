@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,12 +12,7 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 #include <stdio.h>
@@ -27,14 +26,14 @@
  *		2 - some error
  */
 #define	MAXSIZ 700
-#define QSIZE 400
+#define	QSIZE 400
 struct words {
 	char 	inp;
 	char	out;
 	struct	words *nst;
 	struct	words *link;
 	struct	words *fail;
-} 
+}
 *www, *smax, *q;
 
 char	buf[2*BUFSIZ];
@@ -49,195 +48,205 @@ int	numwords;
 int	nfound;
 static int flag = 0;
 
-fgrep(argc, argv)
-char **argv;
+extern void err();
+extern void *zalloc();
+
+static void cfail(void);
+static void cgotofn(void);
+static void execute(void);
+static char gch(void);
+static int new(struct words *x);
+static void overflo(void);
+
+int
+fgrep(int argc, char **argv)
 {
 	nsucc = need = inct = rflag = numwords = nfound = 0;
 	instr = 0;
 	flag = 0;
-	if (www==0)
-		www = (struct words *) zalloc(MAXSIZ, sizeof (*www));
-	if (www==NULL)
+	if (www == 0)
+		www = (struct words *)zalloc(MAXSIZ, sizeof (*www));
+	if (www == NULL)
 		err(gettext("Can't get space for machines"), 0);
-	for (q=www; q<www+MAXSIZ; q++) {
-		q->inp =0; q->out =0; q->nst =0; q->link =0; q->fail =0;
+	for (q = www; q < www+MAXSIZ; q++) {
+		q->inp = 0; q->out = 0; q->nst = 0; q->link = 0; q->fail = 0;
 	}
 	xargc = argc-1;
 	xargv = argv+1;
-	while (xargc>0 && xargv[0][0]=='-')
-		{
-		switch(xargv[0][1])
-			{
+	while (xargc > 0 && xargv[0][0] == '-') {
+		switch (xargv[0][1]) {
 			case 'r': /* return value only */
 				rflag++;
 				break;
 			case 'n': /* number of answers needed */
-				need = (int) xargv[1];
+				need = (int)xargv[1];
 				xargv++; xargc--;
 				break;
 			case 'i':
 				instr = xargv[1];
-				inct = (int) xargv[2]+2;
-# if D2
-fprintf(stderr,"inct %d xargv.2. %o %d\n",inct, xargv[2],xargv[2]);
-# endif
+				inct = (int)xargv[2]+2;
+#if D2
+fprintf(stderr, "inct %d xargv.2. %o %d\n", inct, xargv[2], xargv[2]);
+#endif
 				xargv += 2; xargc -= 2;
 				break;
-			}
+		}
 		xargv++; xargc--;
-		}
-	if (xargc<=0)
-		{
-		write (2, "bad fgrep call\n", 15);
+	}
+	if (xargc <= 0) {
+		write(2, "bad fgrep call\n", 15);
 		exit(2);
-		}
-# if D1
+	}
+#if D1
 	fprintf(stderr, "before cgoto\n");
-# endif
+#endif
 	cgotofn();
-# if D1
+#if D1
 	fprintf(stderr, "before cfail\n");
-# endif
+#endif
 	cfail();
-# if D1
+#if D1
 	fprintf(stderr, "before execute instr %.20s\n", instr? instr: "");
 	fprintf(stderr, "end of string %d %c %c %c\n", inct,
-		instr ? instr[inct-3] : '\0',
-		instr ? instr[inct-2] : '\0',
-		instr ? instr[inct-1] : '\0');
-# endif
+	    instr ? instr[inct-3] : '\0',
+	    instr ? instr[inct-2] : '\0',
+	    instr ? instr[inct-1] : '\0');
+#endif
 	execute();
-# if D1
+#if D1
 	fprintf(stderr, "returning nsucc %d\n", nsucc);
-	fprintf(stderr, "fgrep done www %o\n",www);
-# endif
-	return(nsucc == 0);
+	fprintf(stderr, "fgrep done www %o\n", www);
+#endif
+	return (nsucc == 0);
 }
 
-execute()
+static void
+execute(void)
 {
-	register char *p;
-	register struct words *c;
-	register ch;
-	register ccount;
+	char *p;
+	struct words *c;
+	char ch;
+	int ccount;
 	int f;
 	char *nlp;
-	f=0;
+	f = 0;
 	ccount = instr ? inct : 0;
-	nfound=0;
+	nfound = 0;
 	p = instr ? instr : buf;
 	if (need == 0) need = numwords;
 	nlp = p;
 	c = www;
-# if D2
-fprintf(stderr, "in execute ccount %d inct %d\n",ccount, inct );
-# endif
+#if D2
+fprintf(stderr, "in execute ccount %d inct %d\n", ccount, inct);
+#endif
 	for (;;) {
-# if D3
+#if D3
 fprintf(stderr, "down ccount\n");
-# endif
+#endif
 		if (--ccount <= 0) {
-# if D2
-fprintf(stderr, "ex loop ccount %d instr %o\n",ccount, instr);
-# endif
+#if D2
+fprintf(stderr, "ex loop ccount %d instr %o\n", ccount, instr);
+#endif
 			if (instr) break;
 			if (p == &buf[2*BUFSIZ]) p = buf;
 			if (p > &buf[BUFSIZ]) {
-				if ((ccount = read(f, p, &buf[2*BUFSIZ] - p)) <= 0) break;
-			}
-			else if ((ccount = read(f, p, BUFSIZ)) <= 0) break;
-# if D2
+				if ((ccount = read(f, p,
+				    &buf[2*BUFSIZ] - p)) <= 0)
+					break;
+			} else if ((ccount = read(f, p, BUFSIZ)) <= 0) break;
+#if D2
 fprintf(stderr, " normal read %d bytres\n", ccount);
-{char xx[20]; sprintf(xx, "they are %%.%ds\n", ccount);
-fprintf(stderr, xx, p);
+{
+	char xx[20];
+	sprintf(xx, "they are %%.%ds\n", ccount);
+	fprintf(stderr, xx, p);
 }
-# endif
+#endif
 		}
 nstate:
 		ch = *p;
-# if D2
-fprintf(stderr, "roaming along in ex ch %c c %o\n",ch,c);
-# endif
+#if D2
+fprintf(stderr, "roaming along in ex ch %c c %o\n", ch, c);
+#endif
 		if (isupper(ch)) ch |= 040;
 		if (c->inp == ch) {
 			c = c->nst;
-		}
-		else if (c->link != 0) {
+		} else if (c->link != 0) {
 			c = c->link;
 			goto nstate;
-		}
-		else {
+		} else {
 			c = c->fail;
-			if (c==0) {
+			if (c == 0) {
 				c = www;
 istate:
 				if (c->inp == ch) {
 					c = c->nst;
-				}
-				else if (c->link != 0) {
+				} else if (c->link != 0) {
 					c = c->link;
 					goto istate;
 				}
-			}
-			else goto nstate;
+			} else goto nstate;
 		}
-		if (c->out && new (c)) {
-# if D2
-fprintf(stderr, " found: nfound %d need %d\n",nfound,need);
-# endif
-			if (++nfound >= need)
-			{
-# if D1
-fprintf(stderr, "found, p %o nlp %o ccount %d buf %o buf[2*BUFSIZ] %o\n",p,nlp,ccount,buf,buf+2*BUFSIZ);
-# endif
-				if (instr==0)
+		if (c->out && new(c)) {
+#if D2
+fprintf(stderr, " found: nfound %d need %d\n", nfound, need);
+#endif
+			if (++nfound >= need) {
+#if D1
+fprintf(stderr, "found, p %o nlp %o ccount %d buf %o buf[2*BUFSIZ] %o\n",
+    p, nlp, ccount, buf, buf+2*BUFSIZ);
+#endif
+				if (instr == 0)
 				while (*p++ != '\n') {
-# if D3
+#if D3
 fprintf(stderr, "down ccount2\n");
-# endif
+#endif
 					if (--ccount <= 0) {
-						if (p == &buf[2*BUFSIZ]) p = buf;
+						if (p == &buf[2*BUFSIZ])
+							p = buf;
 						if (p > &buf[BUFSIZ]) {
-							if ((ccount = read(f, p, &buf[2*BUFSIZ] - p)) <= 0) break;
-						}
-						else if ((ccount = read(f, p, BUFSIZ)) <= 0) break;
-# if D2
-fprintf(stderr, " read %d bytes\n",ccount);
+							if ((ccount = read(f, p,
+							    &buf[2*BUFSIZ] - p))
+							    <= 0)
+								break;
+						} else if ((ccount = read(f, p,
+						    BUFSIZ)) <= 0)
+							break;
+#if D2
+fprintf(stderr, " read %d bytes\n", ccount);
 { char xx[20]; sprintf(xx, "they are %%.%ds\n", ccount);
 fprintf(stderr, xx, p);
 }
-# endif
+#endif
 					}
 				}
 				nsucc = 1;
-				if (rflag==0)
-					{
-# if D2
-fprintf(stderr, "p %o nlp %o buf %o\n",p,nlp,buf);
-if (p>nlp)
-{write (2, "XX\n", 3); write (2, nlp, p-nlp); write (2, "XX\n", 3);}
-# endif
+				if (rflag == 0) {
+#if D2
+fprintf(stderr, "p %o nlp %o buf %o\n", p, nlp, buf);
+if (p > nlp)
+{write(2, "XX\n", 3); write(2, nlp, p-nlp); write(2, "XX\n", 3); }
+#endif
 					if (p > nlp) write(1, nlp, p-nlp);
 					else {
-						write(1, nlp, &buf[2*BUFSIZ] - nlp);
+						write(1, nlp,
+						    &buf[2*BUFSIZ] - nlp);
 						write(1, buf, p-&buf[0]);
-						}
-					if (p[-1]!= '\n') write (1, "\n", 1);
 					}
-				if (instr==0)
-					{
+					if (p[-1] != '\n') write(1, "\n", 1);
+				}
+				if (instr == 0) {
 					nlp = p;
 					c = www;
-					nfound=0; 
-					}
-			}
-			else
+					nfound = 0;
+				}
+			} else
 				ccount++;
 			continue;
 		}
-# if D2
-fprintf(stderr, "nr end loop p %o\n",p);
-# endif
+#if D2
+fprintf(stderr, "nr end loop p %o\n", p);
+#endif
 		if (instr)
 			p++;
 		else
@@ -245,29 +254,31 @@ fprintf(stderr, "nr end loop p %o\n",p);
 		{
 			nlp = p;
 			c = www;
-			nfound=0;
+			nfound = 0;
 		}
 	}
-	if (instr==0)
+	if (instr == 0)
 		close(f);
 }
 
-cgotofn() {
-	register c;
-	register struct words *s;
+static void
+cgotofn(void)
+{
+	char c;
+	struct words *s;
 	s = smax = www;
-nword:	
-	for(;;) {
-# if D1
-	fprintf(stderr, " in for loop c now %o %c\n",c, c>' ' ? c : ' ');
-# endif
-		if ((c = gch())==0) return;
+nword:
+	for (;;) {
+#if D1
+	fprintf(stderr, " in for loop c now %o %c\n", c, c > ' ' ? c : ' ');
+#endif
+		if ((c = gch()) == 0)
+			return;
 		else if (c == '\n') {
 			s->out = 1;
 			s = www;
-		}
-		else {
-loop:	
+		} else {
+loop:
 			if (s->inp == c) {
 				s = s->nst;
 				continue;
@@ -290,8 +301,9 @@ enter:
 		if (smax >= &www[MAXSIZ - 1]) overflo();
 		s->nst = ++smax;
 		s = smax;
-	} 
-	while ((c = gch()) != '\n');
+	}
+	while ((c = gch()) != '\n')
+		;
 	smax->out = 1;
 	s = www;
 	numwords++;
@@ -299,38 +311,45 @@ enter:
 
 }
 
-gch()
+static char
+gch(void)
 {
 	static char *s;
-	if (flag==0)
-	{
-		flag=1;
+	if (flag == 0) {
+		flag = 1;
 		s = *xargv++;
-# if D1
+#if D1
 	fprintf(stderr, "next arg is %s xargc %d\n", xargc > 0 ? s : "", xargc);
-# endif
-		if (xargc-- <=0) return(0);
+#endif
+		if (xargc-- <= 0)
+			return (0);
 	}
-	if (*s) return(*s++);
-	for(flag=0; flag<2*BUFSIZ; flag++)
-		buf[flag]=0;
-	flag=0;
-	return('\n');
+	if (*s)
+		return (*s++);
+	for (flag = 0; flag < 2*BUFSIZ; flag++)
+		buf[flag] = 0;
+	flag = 0;
+	return ('\n');
 }
 
-overflo() {
-	write(2,"wordlist too large\n", 19);
+static void
+overflo(void)
+{
+	write(2, "wordlist too large\n", 19);
 	exit(2);
 }
-cfail() {
+
+static void
+cfail(void)
+{
 	struct words *queue[QSIZE];
 	struct words **front, **rear;
 	struct words *state;
-	register char c;
-	register struct words *s;
+	char c;
+	struct words *s;
 	s = www;
 	front = rear = queue;
-init:	
+init:
 	if ((s->inp) != 0) {
 		*rear++ = s->nst;
 		if (rear >= &queue[QSIZE - 1]) overflo();
@@ -339,12 +358,12 @@ init:
 		goto init;
 	}
 
-	while (rear!=front) {
+	while (rear != front) {
 		s = *front;
 		if (front == &queue[QSIZE-1])
 			front = queue;
 		else front++;
-cloop:	
+cloop:
 		if ((c = s->inp) != 0) {
 			*rear = (q = s->nst);
 			if (front < rear)
@@ -355,14 +374,13 @@ cloop:
 			else
 				if (++rear == front) overflo();
 			state = s->fail;
-floop:	
+floop:
 			if (state == 0) state = www;
 			if (state->inp == c) {
 				q->fail = state->nst;
 				if ((state->nst)->out == 1) q->out = 1;
 				continue;
-			}
-			else if ((state = state->link) != 0)
+			} else if ((state = state->link) != 0)
 				goto floop;
 		}
 		if ((s = s->link) != 0)
@@ -370,13 +388,15 @@ floop:
 	}
 }
 
-static int seen[50];
-new (x)
+static struct words *seen[50];
+
+static int
+new(struct words *x)
 {
 	int i;
-	for(i=0; i<nfound; i++)
-		if (seen[i]==x)
-			return(0);
-	seen[i]=x;
-	return(1);
+	for (i = 0; i < nfound; i++)
+		if (seen[i] == x)
+			return (0);
+	seen[i] = x;
+	return (1);
 }

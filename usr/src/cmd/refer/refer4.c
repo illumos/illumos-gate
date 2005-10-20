@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,26 +12,26 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "refer..c"
 #include <locale.h>
 
-#define punctuat(c) (c=='.' || c=='?' || c=='!' || c==',' || c==';' || c==':')
+#define	punctuat(c)	(c == '.' || c == '?' || c == '!' || \
+			    c == ',' || c == ';' || c == ':')
 
-static gate = 0;
+static int gate = 0;
 static char buff[BUFSIZ];
 
-output(s)
-char *s;
+extern void err();
+
+char *trimnl(char *);
+
+void
+output(char *s)
 {
 	if (gate)
-		fputs(buff,ftemp);
+		fputs(buff, ftemp);
 	else
 		gate = 1;
 	strcpy(buff, s);
@@ -35,8 +39,8 @@ char *s;
 		err(gettext("one buff too big (%d)!"), BUFSIZ);
 }
 
-append(s)
-char *s;
+void
+append(char *s)
 {
 	char *p;
 	int lch;
@@ -49,7 +53,7 @@ char *s;
 		*p = NULL;
 	else /* pre-punctuation */
 		switch (lch) {
-		case '.': 
+		case '.':
 		case '?':
 		case '!':
 		case ',':
@@ -60,14 +64,14 @@ char *s;
 		}
 	strcat(buff, s);
 	if (postpunct)
-		switch(lch) {
-		case '.': 
+		switch (lch) {
+		case '.':
 		case '?':
 		case '!':
 		case ',':
 		case ';':
 		case ':':
-			for(p = buff; *p; p++)
+			for (p = buff; *p; p++)
 				;
 			if (*--p == '\n')
 				*p = NULL;
@@ -79,23 +83,23 @@ char *s;
 		err(gettext("output buff too long (%d)"), BUFSIZ);
 }
 
-flout()
+void
+flout(void)
 {
 	if (gate)
-		fputs(buff,ftemp);
+		fputs(buff, ftemp);
 	gate = 0;
 }
 
 char *
-trimnl(ln)
-char *ln;
+trimnl(char *ln)
 {
-	register char *p = ln;
+	char *p = ln;
 
 	while (*p)
 		p++;
 	p--;
 	if (*p == '\n')
 		*p = 0;
-	return(ln);
+	return (ln);
 }

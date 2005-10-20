@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,32 +12,43 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "refer..c"
 #include <locale.h>
-#define NFLD 30
-#define TLEN 512
+#define	NFLD 30
+#define	TLEN 512
 
 extern FILE *in;
 char one[ANSLEN];
 int onelen = ANSLEN;
 static char dr [100] = "";
 
-doref(line1)
-char *line1;
+extern int prefix();
+extern int common();
+extern void dumpold();
+extern void putref();
+extern void flout();
+extern int tabs();
+extern int chkdup();
+extern void putsig();
+extern void putkey();
+extern void err();
+extern int corout();
+
+void choices(char *);
+int control(char);
+static int newline(char *);
+
+void
+doref(char *line1)
 {
 	char buff[QLEN], dbuff[3*QLEN];
 	char answer[ANSLEN], temp[TLEN], line[BUFSIZ];
 	char *p, **sr, *flds[NFLD], *r;
 	int stat, nf, nr, query = 0, alph, digs;
 
-   again:
+again:
 	buff[0] = dbuff[0] = NULL;
 	if (biblio && Iline == 1 && line1[0] == '%')
 		strcat(dbuff, line1);
@@ -55,8 +70,8 @@ char *line1;
 	}
 	if (biblio && line[0] == '\n' && feof(in))
 		return;
-	if (strcmp(buff, "$LIST$\n")==0) {
-		assert (dbuff[0] == 0);
+	if (strcmp(buff, "$LIST$\n") == 0) {
+		assert(dbuff[0] == 0);
 		dumpold();
 		return;
 	}
@@ -81,7 +96,7 @@ char *line1;
 				}
 				if (alph == 0 && digs > 0) {
 					r = p-digs;
-					if (digs != 4 || atoi(r)/100 != 19) { 
+					if (digs != 4 || atoi(r)/100 != 19) {
 						while (r < p)
 							*r++ = ' ';
 					}
@@ -97,10 +112,12 @@ char *line1;
 			corout(buff, temp, "hunt", *sr, TLEN);
 			assert(strlen(temp) < TLEN);
 			if (strlen(temp)+strlen(answer) > BUFSIZ)
-				err(gettext("Accumulated answers too large"),0);
+				err(gettext(
+				    "Accumulated answers too large"), 0);
 			strcat(answer, temp);
-			if (strlen(answer)>BUFSIZ)
-				err(gettext("answer too long (%d)"), strlen(answer));
+			if (strlen(answer) > BUFSIZ)
+				err(gettext("answer too long (%d)"),
+				    strlen(answer));
 			if (newline(answer) > 0)
 				break;
 		}
@@ -113,7 +130,8 @@ char *line1;
 			fprintf(stderr, gettext("No such paper: %s\n"), buff);
 			return;
 		default:
-			fprintf(stderr, gettext("Too many hits: %s\n"), trimnl(buff));
+			fprintf(stderr, gettext(
+			    "Too many hits: %s\n"), trimnl(buff));
 			choices(answer);
 			p = buff;
 			while (*p != '\n')
@@ -126,7 +144,8 @@ char *line1;
 						nf = tabs(flds, one);
 						nf += tabs(flds+nf, dbuff);
 						assert(nf < NFLD);
-						putsig(nf,flds,nr,line1,line,0);
+						putsig(nf, flds, nr, line1,
+						    line, 0);
 					}
 					return;
 				}
@@ -153,19 +172,19 @@ char *line1;
 		fprintf(fo, "%s%c%s", convert+1, sep, line+3);
 }
 
-newline(s)
-char *s;
+static int
+newline(char *s)
 {
 	int k = 0, c;
 
 	while (c = *s++)
 		if (c == '\n')
 		k++;
-	return(k);
+	return (k);
 }
 
-choices(buff)
-char *buff;
+void
+choices(char *buff)
 {
 	char ob[BUFSIZ], *p, *r, *q, *t;
 	int nl;
@@ -176,29 +195,31 @@ char *buff;
 		corout(r, ob, "deliv", dr, BUFSIZ);
 			nl = 1;
 			for (q = ob; *q; q++) {
-				if (nl && (q[0]=='.'||q[0]=='%') && q[1]=='T') {
+				if (nl && (q[0] == '.' || q[0] == '%') &&
+				    q[1] == 'T') {
 					q += 3;
 					for (t = q; *t && *t != '\n'; t++)
 						;
-				*t = 0;
+					*t = 0;
 					fprintf(stderr, "%.70s\n", q);
-					q = 0; 
-				break;
-			}
+					q = 0;
+					break;
+				}
 				nl = *q == '\n';
-		}
+			}
 			if (q)
-			fprintf(stderr, gettext("??? at %s\n"),r);
-			r=p;
+				fprintf(stderr, gettext("??? at %s\n"), r);
+			r = p;
 		}
 	}
 }
 
-control(c)
+int
+control(char c)
 {
 	if (c == '.')
-		return(1);
+		return (1);
 	if (c == '%')
-		return(1);
-	return(0);
+		return (1);
+	return (0);
 }

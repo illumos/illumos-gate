@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,34 +12,41 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
-
+#include <stdlib.h>
 #include <signal.h>
 #include <locale.h>
 #include "refer..c"
 
-main(argc,argv)		/* process command-line arguments */
-char *argv[];
+extern void clfgrep();
+extern void doref();
+extern void dumpold();
+extern void err();
+extern void output();
+extern int prefix();
+extern void recopy();
+
+void cleanup(void);
+void signals(void);
+
+int
+main(int argc, char *argv[])	/* process command-line arguments */
 {
 	char line[BUFSIZ], *s;
 	int nodeflt = 0;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
-#define TEXT_DOMAIN "SYS_TEST"
+#define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
 	signals();
 	while (argc > 1 && argv[1][0] == '-') {
-		switch(argv[1][1]) {
+		switch (argv[1][1]) {
 		case 'e':
-			endpush++; 
+			endpush++;
 			break;
 		case 's':
 			sort++;
@@ -43,7 +54,7 @@ char *argv[];
 			if (argv[1][2])
 				keystr = argv[1]+2;
 			break;
-		case 'l': 
+		case 'l':
 			labels++;
 			s = argv[1]+2;
 			nmlen = atoi(s);
@@ -60,15 +71,16 @@ char *argv[];
 			nodeflt = 1;
 			break;
 		case 'p':
-			argc--; 
+			argc--;
 			argv++;
 			*search++ = argv[1];
 			if (search-rdata > NSERCH)
-				err(gettext("too many -p options (%d)"), NSERCH);
+				err(gettext(
+				    "too many -p options (%d)"), NSERCH);
 			break;
 		case 'a':
 			authrev = atoi(argv[1]+2);
-			if (authrev<=0)
+			if (authrev <= 0)
 				authrev = 1000;
 			break;
 		case 'b':
@@ -94,7 +106,7 @@ char *argv[];
 			postpunct++;
 			break;
 		}
-		argc--; 
+		argc--;
 		argv++;
 	}
 	if (getenv("REFER") != NULL)
@@ -116,15 +128,15 @@ char *argv[];
 			fo = ftemp;
 			fprintf(stderr, gettext("Can't open scratch file"));
 		}
-		sep = 002; /* separate records without confusing sort..*/
-	} else 
+		sep = 002; /* separate records without confusing sort.. */
+	} else
 		fo = ftemp;
 	do {
 		if (argc > 1) {
 			fclose(in);
 			Iline = 0;
 			in = fopen(Ifile = argv[1], "r");
-			argc--; 
+			argc--;
 			argv++;
 			if (in == NULL) {
 				err(gettext("Can't read %s"), Ifile);
@@ -151,13 +163,13 @@ char *argv[];
 		recopy(ofile);
 	clfgrep();
 	cleanup();
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
 extern void intr();
 
-signals()
+void
+signals(void)
 {
 	if (signal(SIGINT, SIG_IGN) != SIG_IGN)
 		signal(SIGINT, intr);
@@ -166,14 +178,16 @@ signals()
 	signal(SIGTERM, intr);
 }
 
-void intr()
+void
+intr(void)
 {
 	signal(SIGINT, SIG_IGN);
 	cleanup();
 	exit(1);
 }
 
-cleanup()
+void
+cleanup(void)
 {
 	if (tfile[0])
 		unlink(tfile);

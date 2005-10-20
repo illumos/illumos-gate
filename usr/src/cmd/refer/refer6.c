@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,19 +12,23 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "refer..c"
-#define dsde (macro? "de" : "ds")
-#define ifnl (macro? sep : ' ')
+#define	dsde (macro? "de" : "ds")
+#define	ifnl (macro? sep : ' ')
 
-putref(n, tvec)
-char *tvec[];
+extern int control();
+extern char *mindex();
+
+int hastype(int, char *[], char);
+static char last(char *);
+char *class(int, char *[]);
+char *caps(char *, char *);
+char *revauth(char *, char *);
+
+void
+putref(int n, char *tvec[])
 {
 	char *s, *tx;
 	char buf1[BUFSIZ], buf2[50];
@@ -39,33 +47,33 @@ char *tvec[];
 				cch = s[2];
 				tx = s+3;
 				macro = 1;
-			}
-			else {
+			} else {
 				cch = s[1];
 				tx = s+2;
 				macro = 0;
 			}
-		}
-		else {
+		} else {
 			cch = lastype;
 			tx = s;
 		}
 #if EBUG
-		fprintf(stderr, "smallcaps %s cch %c\n",smallcaps, cch);
+		fprintf(stderr, "smallcaps %s cch %c\n", smallcaps, cch);
 #endif
 		if (mindex(smallcaps, cch))
 			tx = caps(tx, buf1);
 #if EBUG
-		fprintf(stderr, " s %o tx %o %s\n",s,tx,tx);
+		fprintf(stderr, " s %o tx %o %s\n", s, tx, tx);
 #endif
 		if (!control(s[0])) {	/* append to previous item */
 			if (lastype != 0) {
 				if (macro)
 					fprintf(fo, "%s%c", tx, sep);
 				else
-					fprintf(fo, ".as [%c \" %s%c",lastype,tx,sep);
+					fprintf(fo, ".as [%c \" %s%c",
+					    lastype, tx, sep);
 				if (lastype == 'T')
-					ltitle = (mindex(".;,?", last(tx))!=0);
+					ltitle = (mindex(".;,?",
+					    last(tx)) != 0);
 				if (lastype == 'A')
 					lauth = last(tx) == '.';
 			}
@@ -74,40 +82,40 @@ char *tvec[];
 		if (mindex("XYZ[]", cch)) {	/* skip these */
 			lastype = 0;
 			continue;
-		}
-		else {
+		} else {
 			if (cch == 'A') {
 				if (nauth < authrev)
 					tx = revauth(tx, buf2);
 				if (nauth++ == 0)
 					if (macro)
-						fprintf(fo,
-						".de [%c%c%s%c",cch,sep,tx,sep);
+						fprintf(fo, ".de [%c%c%s%c",
+						    cch, sep, tx, sep);
 					else
-						fprintf(fo,
-						".ds [%c%s%c", cch,tx,sep);
+						fprintf(fo, ".ds [%c%s%c",
+						    cch, tx, sep);
 				else {
-					la = (tvec[i+1][1]!='A');
+					la = (tvec[i+1][1] != 'A');
 					fprintf(fo, ".as [A \"");
 					if (la == 0 || nauth != 2)
 						fprintf(fo, ",");
 					if (la)
-						fprintf(fo,"%s", 
-						mindex(smallcaps, 'A') ? " \\s-2AND\\s+2" : " and");
+						fprintf(fo, "%s",
+						    mindex(smallcaps, 'A') ?
+						    " \\s-2AND\\s+2" : " and");
 					fprintf(fo, "%s%c", tx, sep);
 				}
 				lauth = last(tx) == '.';
-			}
-			else {
+			} else {
 				if (macro)
-					fprintf(fo,
-						".de [%c%c%s%c",cch,sep,tx,sep);
+					fprintf(fo, ".de [%c%c%s%c",
+					    cch, sep, tx, sep);
 				else
-					fprintf(fo, ".ds [%c%s%c",cch,tx, sep);
+					fprintf(fo, ".ds [%c%s%c",
+					    cch, tx, sep);
 			}
 		}
 		if (cch == 'P')
-			fprintf(fo, ".nr [P %d%c", mindex(s, '-')!=0, sep);
+			fprintf(fo, ".nr [P %d%c", mindex(s, '-') != 0, sep);
 		lastype = cch;
 		if (cch == 'T')
 			ltitle = (mindex(".;,?", last(tx)) != 0);
@@ -122,8 +130,8 @@ char *tvec[];
 	fprintf(fo, ".][ %s%c", class(n, tvec), '\n');
 }
 
-tabs (sv, line)
-char *sv[], *line;
+int
+tabs(char *sv[], char *line)
 {
 	char *p;
 	int n = 0;
@@ -135,41 +143,39 @@ char *sv[], *line;
 			sv[n++] = p+1;
 		}
 	}
-	return(n-1);
+	return (n-1);
 }
 
 char *
-class (nt, tv)
-char *tv[];
+class(int nt, char *tv[])
 {
-	if (hastype (nt, tv, 'J'))
-		return("1 journal-article");
-	if (hastype (nt, tv, 'B'))
-		return("3 article-in-book");
-	if (hastype (nt, tv, 'R'))
+	if (hastype(nt, tv, 'J'))
+		return ("1 journal-article");
+	if (hastype(nt, tv, 'B'))
+		return ("3 article-in-book");
+	if (hastype(nt, tv, 'R'))
 		return ("4 tech-report");
-	if (hastype (nt, tv, 'G'))
+	if (hastype(nt, tv, 'G'))
 		return ("4 tech-report");
-	if (hastype (nt, tv, 'I'))
-		return("2 book");
-	if (hastype (nt, tv,'M'))
+	if (hastype(nt, tv, 'I'))
+		return ("2 book");
+	if (hastype(nt, tv, 'M'))
 		return ("5 bell-tm");
-	return("0 other");
+	return ("0 other");
 }
 
-hastype (nt, tv, c)
-char *tv[];
+int
+hastype(int nt, char *tv[], char c)
 {
 	int i;
 	for (i = 0; i < nt; i++)
-		if (control(tv[i][0]) && tv[i][1]==c )
-			return(1);
-	return(0);
+		if (control(tv[i][0]) && tv[i][1] == c)
+			return (1);
+	return (0);
 }
 
 char *
-caps(a, b)
-char *a, *b;
+caps(char *a, char *b)
 {
 	char *p;
 	int c, alph, this;
@@ -202,12 +208,11 @@ char *a, *b;
 		*b++ = '2';
 	}
 	*b = 0;
-	return(p);
+	return (p);
 }
 
 char *
-revauth(s, b)
-char *s, *b;
+revauth(char *s, char *b)
 {
 	char *init, *name, *jr, *p, *bcop;
 
@@ -216,11 +221,11 @@ char *s, *b;
 	while (*name)
 		name++;
 	jr = name;
-	while (name > init && *name!= ' ')
+	while (name > init && *name != ' ')
 		name--;
-	if (name[-1] == ',' || name[-1]== '(' ) {
+	if (name[-1] == ',' || name[-1] == '(') {
 		jr = --name;
-		while (name>init && *name != ' ')
+		while (name > init && *name != ' ')
 			name--;
 	}
 	p = name;
@@ -231,16 +236,16 @@ char *s, *b;
 		*b++ = *init++;
 	if (*jr)
 		jr++;
-	while(*jr)
+	while (*jr)
 		*b++ = *jr++;
 	*b++ = 0;
-	return(bcop);
+	return (bcop);
 }
 
-last(s)
-char *s;
+static char
+last(char *s)
 {
 	while (*s)
 		s++;
-	return(*--s);
+	return (*--s);
 }

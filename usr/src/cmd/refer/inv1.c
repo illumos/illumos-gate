@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,21 +12,22 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <locale.h>
 #include <assert.h>
 
-main(argc, argv)
-char *argv[];
+extern void err();
+extern int newkeys();
+extern int recopy();
+extern void whash();
+
+int
+main(int argc, char *argv[])
 {
-	/* Make inverted file indexes.  Reads a stream from mkey which
+	/*
+	 * Make inverted file indexes.  Reads a stream from mkey which
 	 * gives record pointer items and keys.  Generates set of files
 	 *	a. NHASH pointers to file b.
 	 *	b. lists of record numbers.
@@ -42,88 +47,80 @@ char *argv[];
 	char tmpa[20], tmpb[20], tmpc[20];
 	char *remove = NULL;
 	int chatty = 0, docs, hashes, fp[2], fr, fw, pfork, pwait, status;
-	int i,j,k;
+	int i, j, k;
 	long keys;
-	int iflong =0;
+	int iflong = 0;
 	char *sortdir;
 
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)
-#define TEXT_DOMAIN "SYS_TEST"
+#define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
-	sortdir = (access("/crp/tmp", 06)==0) ? "/crp/tmp" : "/usr/tmp";
-	while (argc>1 && argv[1][0] == '-')
-	{
-		switch(argv[1][1])
-		{
+	sortdir = (access("/crp/tmp", 06) == 0) ? "/crp/tmp" : "/usr/tmp";
+	while (argc > 1 && argv[1][0] == '-') {
+		switch (argv[1][1]) {
 		case 'h': /* size of hash table */
-			nhash = atoi (argv[1]+2); 
+			nhash = atoi(argv[1]+2);
 			break;
 		case 'n': /* new, don't append */
-			appflg=0; 
+			appflg = 0;
 			break;
 		case 'a': /* append to old file */
-			appflg=1; 
+			appflg = 1;
 			break;
 		case 'v': /* verbose output */
-			chatty=1; 
+			chatty = 1;
 			break;
 		case 'd': /* keep keys on file .id for check on searching */
-			keepkey=1; 
+			keepkey = 1;
 			break;
-		case 'p': /* pipe into sort (saves space, costs time)*/
-			pipein = 1; 
+		case 'p': /* pipe into sort (saves space, costs time) */
+			pipein = 1;
 			break;
 		case 'i': /* input is on file, not stdin */
 			close(0);
 			if (open(argv[2], 0) != 0)
 				err(gettext("Can't read input %s"), argv[2]);
-			if (argv[1][2]=='u') /* unlink */
+			if (argv[1][2] == 'u') /* unlink */
 				remove = argv[2];
-			argc--; 
+			argc--;
 			argv++;
 			break;
 		}
 		argc--;
 		argv++;
 	}
-	strcpy (nma, argc >= 2 ? argv[1] : "Index");
-	strcpy (nmb, nma);
-	strcpy (nmc, nma);
-	strcpy (nmd, nma);
-	strcat (nma, ".ia");
-	strcat (nmb, ".ib");
-	strcat (nmc, ".ic");
-	strcat (nmd, ".id");
+	strcpy(nma, argc >= 2 ? argv[1] : "Index");
+	strcpy(nmb, nma);
+	strcpy(nmc, nma);
+	strcpy(nmd, nma);
+	strcat(nma, ".ia");
+	strcat(nmb, ".ib");
+	strcat(nmc, ".ic");
+	strcat(nmd, ".id");
 
 	sprintf(tmpa, "junk%di", getpid());
-	if (pipein)
-	{
+	if (pipein) {
 		sprintf(com, "/usr/bin/sort -T %s -o %s", sortdir, tmpa);
 		fta = popen(com, "w");
-	}
-	else /* use tmp file */
-	{
+	} else {	/* use tmp file */
 		fta = fopen(tmpa, "w");
-		assert (fta != NULL);
+		assert(fta != NULL);
 	}
 	fb = 0;
-	if (appflg )
-	{
-		if (fb = fopen(nmb, "r"))
-		{
+	if (appflg) {
+		if (fb = fopen(nmb, "r")) {
 			sprintf(tmpb, "junk%dj", getpid());
 			ftb = fopen(tmpb, "w");
-			if (ftb==NULL)
-				err(gettext("Can't get scratch file %s"),tmpb);
+			if (ftb == NULL)
+				err(gettext("Can't get scratch file %s"), tmpb);
 			nhash = recopy(ftb, fb, fopen(nma, "r"));
 			fclose(ftb);
-		}
-		else
-			appflg=0;
+		} else
+			appflg = 0;
 	}
 	fc = fopen(nmc,  appflg ? "a" : "w");
 	if (keepkey)
@@ -133,8 +130,7 @@ char *argv[];
 	if (remove != NULL)
 		unlink(remove);
 	fclose(fta);
-	if (pipein)
-	{
+	if (pipein) {
 		pclose(fta);
 	}
 	else
@@ -142,13 +138,12 @@ char *argv[];
 		sprintf(com, "sort -T %s %s -o %s", sortdir, tmpa, tmpa);
 		system(com);
 	}
-	if (appflg)
-	{
+	if (appflg) {
 		sprintf(tmpc, "junk%dk", getpid());
 		sprintf(com, "mv %s %s", tmpa, tmpc);
 		system(com);
 		sprintf(com, "sort -T %s  -m %s %s -o %s", sortdir,
-		tmpb, tmpc, tmpa);
+		    tmpb, tmpc, tmpa);
 		system(com);
 	}
 	fta = fopen(tmpa, "r");
@@ -156,19 +151,16 @@ char *argv[];
 	fb = fopen(nmb, "w");
 	whash(fta, fa, fb, nhash, iflong, &keys, &hashes);
 	fclose(fta);
-# ifndef D1
+#ifndef D1
 	unlink(tmpa);
-# endif
-	if (appflg)
-	{
+#endif
+	if (appflg) {
 		unlink(tmpb);
 		unlink(tmpc);
 	}
 	if (chatty)
+		printf(gettext("%ld key occurrences,  %d hashes, %d docs\n"),
+		    keys, hashes, docs);
 
-		printf (gettext("%ld key occurrences,  %d hashes, %d docs\n"),
-		keys, hashes, docs);
-
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }

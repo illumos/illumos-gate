@@ -1,6 +1,10 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,20 +12,18 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI" 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <ctype.h>
 #include <locale.h>
 
-main(argc, argv)	/* look in biblio for record matching keywords */
-int argc;
-char **argv;
+static void instruct(void);
+static void map_lower(char *);
+
+/* look in biblio for record matching keywords */
+int
+main(int argc, char **argv)
 {
 	FILE *hfp, *fopen(), *popen();
 	char s[BUFSIZ], hunt[64];
@@ -29,7 +31,7 @@ char **argv;
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)
-#define TEXT_DOMAIN "SYS_TEST"
+#define	TEXT_DOMAIN "SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -40,7 +42,7 @@ char **argv;
 	}
 	sprintf(s, "%s.ia", argv[1]);
 	if (access(s, 0) == -1) {
-		sprintf (s, "%s", argv[1]);
+		sprintf(s, "%s", argv[1]);
 		if (access(s, 0) == -1) {
 			perror(s);
 			fprintf(stderr, gettext("\tNeither index file %s.ia \
@@ -55,7 +57,7 @@ nor reference file %s found\n"), s, s);
 		if (*s == 'y')
 			instruct();
 	}
-   again:
+again:
 	fprintf(stderr, "> ");
 	if (fgets(s, BUFSIZ, stdin)) {
 		if (*s == '\n')
@@ -72,19 +74,19 @@ nor reference file %s found\n"), s, s);
 		goto again;
 	}
 	fprintf(stderr, gettext("EOT\n"));
-	exit(0);
-	/* NOTREACHED */
+	return (0);
 }
 
-map_lower(s)		/* map string s to lower case */
-char *s;
+static void
+map_lower(char *s)		/* map string s to lower case */
 {
-	for ( ; *s; ++s)
+	for (; *s; ++s)
 		if (isupper(*s))
 			*s = tolower(*s);
 }
 
-instruct()
+static void
+instruct(void)
 {
 	fputs(gettext(
 "\nType keywords (such as author and date) after the > prompt.\n\
