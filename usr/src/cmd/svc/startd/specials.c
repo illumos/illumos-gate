@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,8 +73,7 @@ special_fsroot_post_online()
 	}
 
 	if (!st->st_log_locale_known) {
-		if (st->st_locale)
-			locale = st->st_locale;
+		locale = st->st_locale;
 
 		(void) setlocale(LC_ALL, "");
 		st->st_locale = setlocale(LC_MESSAGES, "");
