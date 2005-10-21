@@ -3479,6 +3479,7 @@ rehash:
 	}
 
 	if (hmeblkp == NULL) {
+		kmem_cache_free(pa_hment_cache, pahmep);
 		*rpfn = PFN_INVALID;
 		return (ENXIO);
 	}
@@ -3491,6 +3492,7 @@ rehash:
 	ASSERT(saddr >= baseaddr);
 	if (eaddr > (caddr_t)get_hblk_endaddr(hmeblkp)) {
 		SFMMU_HASH_UNLOCK(hmebp);
+		kmem_cache_free(pa_hment_cache, pahmep);
 		*rpfn = PFN_INVALID;
 		return (ENXIO);
 	}
@@ -3501,7 +3503,19 @@ rehash:
 	ASSERT(TTE_IS_VALID(&tte));
 	pfn = sfmmu_ttetopfn(&tte, vaddr);
 
+	/*
+	 * The pfn may not have a page_t underneath in which case we
+	 * just return it. This can happen if we are doing I/O to a
+	 * static portion of the kernel's address space, for instance.
+	 */
 	pp = osfhmep->hme_page;
+	if (pp == NULL) {
+		SFMMU_HASH_UNLOCK(hmebp);
+		kmem_cache_free(pa_hment_cache, pahmep);
+		*rpfn = pfn;
+		return (0);
+	}
+
 	pml = sfmmu_mlist_enter(pp);
 
 	if ((flags & HAC_PAGELOCK) && !locked) {
@@ -3674,6 +3688,11 @@ rehash:
 	ASSERT(TTE_IS_VALID(&tte));
 
 	pp = osfhmep->hme_page;
+	if (pp == NULL) {
+		SFMMU_HASH_UNLOCK(hmebp);
+		return;
+	}
+
 	pml = sfmmu_mlist_enter(pp);
 
 	if ((flags & HAC_PAGELOCK) && !locked) {
