@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,7 +124,7 @@ getfield(constp *nextp, constp limit, int uns, void *valp)
 	char		numbuf[12];  /* Holds -2^31 and trailing ':' */
 	size_t		len;
 
-	if (p >= limit) {
+	if (p == 0 || p >= limit) {
 		return (0);
 	}
 	if (*p == ':') {
