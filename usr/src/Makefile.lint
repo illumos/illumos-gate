@@ -229,6 +229,7 @@ COMMON_SUBDIRS = \
 	cmd/rpcsvc/rpc.bootparamd \
 	cmd/runat \
 	cmd/sed_xpg4 \
+	cmd/setpgrp \
 	cmd/smartcard \
 	cmd/smbios \
 	cmd/smserverd \
@@ -256,6 +257,7 @@ COMMON_SUBDIRS = \
 	cmd/truss \
 	cmd/tty \
 	cmd/uadmin \
+	cmd/ul \
 	cmd/users \
 	cmd/utmp_update \
 	cmd/utmpd \

@@ -19,20 +19,17 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-
-
-
 
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #define	DEBUG
 #define	tempfree(a)	{if (istemp(a)) {xfree(a->sval); a->tval = 0; }}
 
@@ -78,9 +75,15 @@ static CELL	exitcell	={ OJUMP, JEXIT, 0, 0, 0.0, NUM, 0 };
 CELL	*jexit	= &exitcell;
 static CELL	tempcell	={ OCELL, CTEMP, 0, 0, 0.0, NUM, 0 };
 
-run(a) NODE *a;
+static void redirprint(wchar_t *s, int a, NODE *b);
+
+void freesymtab(CELL *ap);
+void fldbld(void);
+
+void
+run(NODE *a)
 {
-	register int i;
+	int i;
 
 	execute(a);
 	/* Wait for children to complete if output to a pipe. */
@@ -90,11 +93,12 @@ run(a) NODE *a;
 }
 
 
-CELL *execute(u) NODE *u;
+CELL *
+execute(NODE *u)
 {
-	register CELL *(*proc)();
-	register CELL *x;
-	register NODE *a;
+	CELL *(*proc)();
+	CELL *x;
+	NODE *a;
 
 	if (u == NULL)
 		return (true);
@@ -121,9 +125,10 @@ CELL *execute(u) NODE *u;
 
 
 
-CELL *program(a, n) register NODE **a;
+CELL *
+program(NODE **a, int n)
 {
-	register CELL *x;
+	CELL *x;
 
 	if (a[0] != NULL) {
 		x = execute(a[0]);
@@ -153,9 +158,10 @@ CELL *program(a, n) register NODE **a;
 
 
 
-CELL *getline()
+CELL *
+getline(void)
 {
-	register CELL *x;
+	CELL *x;
 
 	x = gettemp();
 	setfval(x, (awkfloat) getrec());
@@ -165,9 +171,10 @@ CELL *getline()
 
 
 
-CELL *array(a, n) register NODE **a;
+CELL *
+array(NODE **a, int n)
 {
-	register CELL *x, *y;
+	CELL *x, *y;
 	extern CELL *arrayel();
 
 	x = execute(a[1]);
@@ -179,12 +186,13 @@ CELL *array(a, n) register NODE **a;
 
 
 
-CELL *arrayel(a, b) NODE *a; CELL *b;
+CELL *
+arrayel(NODE *a, CELL *b)
 {
-	register wchar_t *s;
-	register CELL *x;
-	register int i;
-	register CELL *y;
+	wchar_t *s;
+	CELL *x;
+	int i;
+	CELL *y;
 
 	s = getsval(b);
 	x = (CELL *) a;
@@ -200,11 +208,12 @@ CELL *arrayel(a, b) NODE *a; CELL *b;
 	return (y);
 }
 
-CELL *matchop(a, n) NODE **a;
+CELL *
+matchop(NODE **a, int n)
 {
-	register CELL *x;
-	register wchar_t *s;
-	register int i;
+	CELL *x;
+	wchar_t *s;
+	int i;
 
 	x = execute(a[0]);
 	s = getsval(x);
@@ -219,10 +228,11 @@ CELL *matchop(a, n) NODE **a;
 
 
 
-CELL *boolop(a, n) NODE **a;
+CELL *
+boolop(NODE **a, int n)
 {
-	register CELL *x, *y;
-	register int i;
+	CELL *x, *y;
+	int i;
 
 
 
@@ -251,17 +261,19 @@ CELL *boolop(a, n) NODE **a;
 	default:
 		error(FATAL, "unknown boolean operator %d", n);
 	}
+	return (false);
 }
 
 
 
 
-CELL *relop(a, n) NODE **a;
+CELL *
+relop(NODE **a, int n)
 {
-	register int i;
-	register CELL *x, *y;
+	int i;
+	CELL *x, *y;
 	awkfloat j;
-	register wchar_t *xs, *ys;
+	wchar_t *xs, *ys;
 
 
 
@@ -297,6 +309,7 @@ CELL *relop(a, n) NODE **a;
 	default:
 		error(FATAL, "unknown relational operator %d", n);
 	}
+	return (false);
 }
 
 
@@ -306,10 +319,11 @@ CELL *relop(a, n) NODE **a;
 
 
 
-CELL *gettemp()
+CELL *
+gettemp(void)
 {
-	register int i;
-	register CELL *x;
+	int i;
+	CELL *x;
 
 
 
@@ -327,10 +341,11 @@ CELL *gettemp()
 
 
 
-CELL *indirect(a, n) NODE **a;
+CELL *
+indirect(NODE **a, int n)
 {
-	register CELL *x;
-	register int m;
+	CELL *x;
+	int m;
 	CELL *fieldadr();
 
 	x = execute(a[0]);
@@ -345,11 +360,12 @@ CELL *indirect(a, n) NODE **a;
 
 
 
-CELL *substr(a, nnn) NODE **a;
+CELL *
+substr(NODE **a, int nnn)
 {
-	register int k, m, n;
-	register wchar_t *s, temp;
-	register CELL *x, *y;
+	int k, m, n;
+	wchar_t *s, temp;
+	CELL *x, *y;
 
 	y = execute(a[0]);
 	s = getsval(y);
@@ -390,10 +406,11 @@ CELL *substr(a, nnn) NODE **a;
 
 
 
-CELL *sindex(a, nnn) NODE **a;
+CELL *
+sindex(NODE **a, int nnn)
 {
-	register CELL *x;
-	register wchar_t *s1, *s2, *p1, *p2, *q;
+	CELL *x;
+	wchar_t *s1, *s2, *p1, *p2, *q;
 
 	x = execute(a[0]);
 	s1 = getsval(x);
@@ -418,15 +435,16 @@ CELL *sindex(a, nnn) NODE **a;
 
 
 
-wchar_t *format(s, a) register wchar_t *s; NODE *a;
+wchar_t *
+format(wchar_t *s, NODE *a)
 {
-	register wchar_t *buf, *ep, *str;
-	register wchar_t *p;
-	register char *t;
+	wchar_t *buf, *ep, *str;
+	wchar_t *p;
+	char *t;
 	wchar_t *os;
 	wchar_t tbuf[2*RECSIZE];
 	char fmt[200];
-	register CELL *x;
+	CELL *x;
 	int flag = 0;
 	awkfloat xf;
 
@@ -557,11 +575,12 @@ wchar_t *format(s, a) register wchar_t *s; NODE *a;
 }
 
 
-CELL *asprintf(a, n) NODE **a;
+CELL *
+asprintf(NODE **a, int n)
 {
-	register CELL *x;
-	register NODE *y;
-	register wchar_t *s;
+	CELL *x;
+	NODE *y;
+	wchar_t *s;
 
 	y = a[0]->nnext;
 	x = execute(a[0]);
@@ -574,10 +593,11 @@ CELL *asprintf(a, n) NODE **a;
 }
 
 
-CELL *arith(a, n) NODE **a;
+CELL *
+arith(NODE **a, int n)
 {
 	awkfloat i, j;
-	register CELL *x, *y, *z;
+	CELL *x, *y, *z;
 
 	x = execute(a[0]);
 	i = getfval(x);
@@ -621,10 +641,11 @@ CELL *arith(a, n) NODE **a;
 
 
 
-CELL *incrdecr(a, n) NODE **a;
+CELL *
+incrdecr(NODE **a, int n)
 {
-	register CELL *x, *z;
-	register int k;
+	CELL *x, *z;
+	int k;
 	awkfloat xf;
 
 	x = execute(a[0]);
@@ -643,9 +664,10 @@ CELL *incrdecr(a, n) NODE **a;
 
 
 
-CELL *assign(a, n) NODE **a;
+CELL *
+assign(NODE **a, int n)
 {
-	register CELL *x, *y;
+	CELL *x, *y;
 	awkfloat xf, yf;
 
 
@@ -700,11 +722,12 @@ CELL *assign(a, n) NODE **a;
 
 
 
-CELL *cat(a, q) NODE **a;
+CELL *
+cat(NODE **a, int q)
 {
-	register CELL *x, *y, *z;
-	register int n1, n2;
-	register wchar_t *s;
+	CELL *x, *y, *z;
+	int n1, n2;
+	wchar_t *s;
 
 
 
@@ -730,9 +753,10 @@ CELL *cat(a, q) NODE **a;
 
 
 
-CELL *pastat(a, n) NODE **a;
+CELL *
+pastat(NODE **a, int n)
 {
-	register CELL *x;
+	CELL *x;
 
 
 
@@ -751,10 +775,11 @@ CELL *pastat(a, n) NODE **a;
 
 
 
-CELL *dopa2(a, n) NODE **a;
+CELL *
+dopa2(NODE **a, int n)
 {
-	register CELL *x;
-	register int pair;
+	CELL *x;
+	int pair;
 
 
 
@@ -780,9 +805,10 @@ CELL *dopa2(a, n) NODE **a;
 
 
 
-CELL *aprintf(a, n) NODE **a;
+CELL *
+aprintf(NODE **a, int n)
 {
-	register CELL *x;
+	CELL *x;
 
 
 
@@ -800,13 +826,14 @@ CELL *aprintf(a, n) NODE **a;
 
 
 
-CELL *split(a, nnn) NODE **a;
+CELL *
+split(NODE **a, int nnn)
 {
-	register CELL *x;
-	register CELL *ap;
-	register wchar_t *s, *p, c;
+	CELL *x;
+	CELL *ap;
+	wchar_t *s, *p, c;
 	wchar_t *t, temp, num[5];
-	register wchar_t sep;
+	wchar_t sep;
 	int n, flag;
 
 
@@ -885,9 +912,10 @@ CELL *split(a, nnn) NODE **a;
 
 
 
-CELL *ifstat(a, n) NODE **a;
+CELL *
+ifstat(NODE **a, int n)
 {
-	register CELL *x;
+	CELL *x;
 
 
 
@@ -907,9 +935,10 @@ CELL *ifstat(a, n) NODE **a;
 
 
 
-CELL *whilestat(a, n) NODE **a;
+CELL *
+whilestat(NODE **a, int n)
 {
-	register CELL *x;
+	CELL *x;
 
 
 
@@ -932,10 +961,11 @@ CELL *whilestat(a, n) NODE **a;
 
 
 
-CELL *forstat(a, n) NODE **a;
+CELL *
+forstat(NODE **a, int n)
 {
-	register CELL *x;
-	register CELL *z;
+	CELL *x;
+	CELL *z;
 
 
 
@@ -964,10 +994,11 @@ CELL *forstat(a, n) NODE **a;
 
 
 
-CELL *instat(a, n) NODE **a;
+CELL *
+instat(NODE **a, int n)
 {
-	register CELL *vp, *arrayp, *cp, **tp;
-	register CELL *x;
+	CELL *vp, *arrayp, *cp, **tp;
+	CELL *x;
 	int i;
 
 
@@ -997,9 +1028,10 @@ CELL *instat(a, n) NODE **a;
 
 
 
-CELL *jump(a, n) NODE **a;
+CELL *
+jump(NODE **a, int n)
 {
-	register CELL *y;
+	CELL *y;
 
 
 
@@ -1020,17 +1052,19 @@ CELL *jump(a, n) NODE **a;
 	default:
 		error(FATAL, "illegal jump type %d", n);
 	}
+	return (NULL);
 }
 
 
 
 
-CELL *fncn(a, n) NODE **a;
+CELL *
+fncn(NODE **a, int n)
 {
-	register CELL *x;
+	CELL *x;
 	awkfloat u;
-	register int t;
-	register wchar_t *wp;
+	int t;
+	wchar_t *wp;
 
 	t = (int) a[0];
 	x = execute(a[1]);
@@ -1055,10 +1089,11 @@ CELL *fncn(a, n) NODE **a;
 
 
 
-CELL *print(a, n) NODE **a;
+CELL *
+print(NODE **a, int n)
 {
-	register NODE *x;
-	register CELL *y;
+	NODE *x;
+	CELL *y;
 	wchar_t s[RECSIZE];
 	wchar_t *ss, *bp, *ep;
 
@@ -1106,15 +1141,18 @@ CELL *print(a, n) NODE **a;
 
 
 
-
-CELL *nullproc() {}
-
-
-
-
-CELL *nodetoobj(a) NODE *a;
+CELL *
+nullproc(void)
 {
-	register CELL *x;
+	return (NULL);
+}
+
+
+
+CELL *
+nodetoobj(NODE *a)
+{
+	CELL *x;
 
 	x= (CELL *) a->nobj;
 	x->ctype = OCELL;
@@ -1124,10 +1162,11 @@ CELL *nodetoobj(a) NODE *a;
 	return (x);
 }
 
-redirprint(s, a, b) wchar_t *s; NODE *b;
+static void
+redirprint(wchar_t *s, int a, NODE *b)
 {
-	register int i;
-	register CELL *x;
+	int i;
+	CELL *x;
 
 	x = execute(b);
 	getsval(x);

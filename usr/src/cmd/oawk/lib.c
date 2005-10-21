@@ -71,8 +71,11 @@ int	maxfld	= 0;	/* last used field */
 CELL	*maxmfld = &fldtab[0];
 
 static int isclvar(wchar_t *);
+static void setclvar(wchar_t *);
+void fldbld(void);
 
-getrec()
+int
+getrec(void)
 {
 	wchar_t *rr, *er;
 	int c, sep;
@@ -191,8 +194,8 @@ isclvar(wchar_t *arg)
 	return (0);
 }
 
-setclvar(s)	/* set var=value from s */
-wchar_t *s;
+static void
+setclvar(wchar_t *s)	/* set var=value from s */
 {
 	wchar_t *p;
 	CELL *q;
@@ -207,7 +210,8 @@ wchar_t *s;
 }
 
 
-fldbld()
+void
+fldbld(void)
 {
 	wchar_t *r, *fr, sep, c;
 	static wchar_t L_NF[] = L"NF";
@@ -282,7 +286,8 @@ fldbld()
 }
 
 
-recbld()
+void
+recbld(void)
 {
 	int i;
 	wchar_t *r, *p;
@@ -319,14 +324,17 @@ fieldadr(n)
 int	errorflag	= 0;
 
 
+int
 yyerror(char *s)
 {
 	fprintf(stderr,
 	    gettext("awk: %s near line %lld\n"), gettext(s), lineno);
 	errorflag = 2;
+	return (0);
 }
 
 
+void
 error(f, s, a1, a2, a3, a4, a5, a6, a7)
 {
 	fprintf(stderr, "awk: ");
@@ -339,7 +347,9 @@ error(f, s, a1, a2, a3, a4, a5, a6, a7)
 }
 
 
-PUTS(s) char *s; {
+void
+PUTS(char *s)
+{
 	dprintf("%s\n", s, NULL, NULL);
 }
 
@@ -347,8 +357,8 @@ PUTS(s) char *s; {
 #define	MAXEXPON	38	/* maximum exponenet for fp number */
 
 
-isanumber(s)
-wchar_t *s;
+int
+isanumber(wchar_t *s)
 {
 	int d1, d2;
 	int point;

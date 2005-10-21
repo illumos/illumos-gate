@@ -22,32 +22,34 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2	*/
 /*
 	Set process group ID to this process ID and exec the command line
 	that is the argument list.
 */
 
 
+#include <sys/types.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <stdio.h>
 
-main( argc, argv )
-int	argc;
-char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	char	*cmd;
 
 	cmd = *argv;
-	if( argc <= 1 ) {
-		fprintf( stderr, "Usage:  %s command [ arg ... ]\n", cmd );
+	if (argc <= 1)  {
+		(void) fprintf(stderr, "Usage:  %s command [ arg ... ]\n", cmd);
 		exit(1);
 	}
 	argv++;
 	argc--;
-	setpgrp();
-	execvp( *argv, argv );
-	fprintf( stderr, "%s: %s not executed.  ", cmd, *argv );
-	perror( "" );
-	exit( 1 );
+	(void) setpgrp();
+	(void) execvp(*argv, argv);
+	(void) fprintf(stderr, "%s: %s not executed.  ", cmd, *argv);
+	perror("");
+	return (1);
 }

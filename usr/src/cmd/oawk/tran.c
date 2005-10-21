@@ -19,20 +19,21 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "stdio.h"
 #include "awk.def"
 #include "awk.h"
+#include <stdlib.h>
 
 CELL *symtab[MAXSYM];	/* symbol table pointers */
 
@@ -51,8 +52,10 @@ CELL	*recloc;	/* location of record */
 CELL	*nrloc;		/* NR */
 CELL	*nfloc;		/* NF */
 
+void recbld(void);
 
-syminit()
+void
+syminit(void)
 {
 	static wchar_t L_0[] = L"0";
 	static wchar_t L_zeronull[] = L"$zero&null";
@@ -91,7 +94,8 @@ syminit()
 }
 
 
-CELL **makesymtab()
+CELL **
+makesymtab(void)
 {
 	int i;
 	CELL **cp;
@@ -106,8 +110,8 @@ CELL **makesymtab()
 }
 
 
-freesymtab(ap)	/* free symbol table */
-CELL *ap;
+void
+freesymtab(CELL *ap)	/* free symbol table */
 {
 	CELL *cp, **tp, *next;
 	int i;
@@ -128,14 +132,11 @@ CELL *ap;
 }
 
 
-CELL *setsymtab(n, s, f, t, tab)
-wchar_t *n, *s;
-awkfloat f;
-unsigned t;
-CELL **tab;
+CELL *
+setsymtab(wchar_t *n, wchar_t *s, awkfloat f, unsigned t, CELL **tab)
 {
-	register h;
-	register CELL *p;
+	int h;
+	CELL *p;
 	CELL *lookup();
 
 
@@ -161,10 +162,10 @@ CELL **tab;
 }
 
 
-hash(s)	/* form hash value for string s */
-register wchar_t *s;
+int
+hash(wchar_t *s)	/* form hash value for string s */
 {
-	register unsigned hashval;
+	unsigned hashval;
 
 
 	for (hashval = 0; *s != '\0'; /* dummy */)
@@ -173,11 +174,11 @@ register wchar_t *s;
 }
 
 
-CELL *lookup(s, tab, flag)	/* look for s in tab, flag must match */
-register wchar_t *s;
-CELL **tab;
+CELL *
+lookup(wchar_t *s, CELL **tab, int flag)
+	/* look for s in tab, flag must match */
 {
-	register CELL *p;
+	CELL *p;
 
 
 	for (p = tab[hash(s)]; p != NULL; p = p->nextval)
@@ -188,9 +189,8 @@ CELL **tab;
 }
 
 
-awkfloat setfval(vp, f)
-register CELL *vp;
-awkfloat f;
+awkfloat
+setfval(CELL *vp, awkfloat f)
 {
 	dprintf("setfval: %o %g\n", vp, f, NULL);
 /* imb */
@@ -225,9 +225,8 @@ awkfloat f;
 }
 
 
-wchar_t *setsval(vp, s)
-register CELL *vp;
-wchar_t *s;
+wchar_t *
+setsval(CELL *vp, wchar_t *s)
 {
 	dprintf("setsval: %o %ws\n", vp, s, NULL);
 	if (vp->tval & ARR)
@@ -254,8 +253,8 @@ wchar_t *s;
 }
 
 
-awkfloat getfval(vp)
-register CELL *vp;
+awkfloat
+getfval(CELL *vp)
 {
 
 
@@ -286,8 +285,8 @@ register CELL *vp;
 }
 
 
-wchar_t *getsval(vp)
-register CELL *vp;
+wchar_t *
+getsval(CELL *vp)
 {
 	char s[100];
 	wchar_t ws[100];
@@ -304,7 +303,7 @@ register CELL *vp;
 	if ((vp->tval & STR) == 0) {
 		if (!(vp->tval&FLD))
 			xfree(vp->sval);
-		if ((long long)vp->fval==vp->fval)
+		if ((long long)vp->fval == vp->fval)
 			sprintf(s, "%.20g", vp->fval);
 		else
 			sprintf(s, toeuccode(*OFMT), vp->fval);
@@ -318,10 +317,10 @@ register CELL *vp;
 }
 
 
-wchar_t *tostring(s)
-register wchar_t *s;
+wchar_t *
+tostring(wchar_t *s)
 {
-	register wchar_t *p;
+	wchar_t *p;
 
 
 	p = (wchar_t *) malloc((wslen(s)+1)*sizeof (wchar_t));
@@ -333,7 +332,7 @@ register wchar_t *s;
 
 
 #ifndef yfree
-yfree(a) char *a;
+yfree(char *a)
 {
 	printf("%o\n", a);
 	free(a);

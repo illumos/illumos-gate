@@ -1,6 +1,10 @@
+/*
+ * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright (c) 1980 Regents of the University of California.
@@ -8,20 +12,19 @@
  * specifies the terms and conditions for redistribution.
  */
 
-/*
- * Copyright (c) 1983, 1984 1985, 1986, 1987, 1988, 2000 Sun Microsystems, Inc.
- * All Rights Reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>
 #include <locale.h>
 #include <wctype.h>
 #include <widec.h>
 #include <euc.h>
+#include <getwidth.h>
 #include <limits.h>
 #include <stdlib.h>
+#include <curses.h>
+#include <term.h>
+#include <string.h>
 
 #define	IESC	L'\033'
 #define	SO	L'\016'
@@ -64,15 +67,26 @@ int	iflag;
 eucwidth_t wp;
 int scrw[4];
 
-main(argc, argv)
-	int argc;
-	char **argv;
+void setmode(int newmode);
+void outc(wchar_t c);
+int outchar(char c);
+void initcap(void);
+void reverse(void);
+void fwd(void);
+void initbuf(void);
+void iattr(void);
+void overstrike(void);
+void flushln(void);
+void ul_filter(FILE *f);
+void ul_puts(char *str);
+
+int
+main(int argc, char **argv)
 {
 	int c;
-	char *cp, *termtype;
+	char *termtype;
 	FILE *f;
 	char termcap[1024];
-	char *getenv();
 	extern int optind;
 	extern char *optarg;
 
@@ -91,7 +105,7 @@ main(argc, argv)
 	termtype = getenv("TERM");
 	if (termtype == NULL || (argv[0][0] == 'c' && !isatty(1)))
 		termtype = "lpr";
-	while ((c=getopt(argc, argv, "it:T:")) != EOF)
+	while ((c = getopt(argc, argv, "it:T:")) != EOF)
 		switch (c) {
 
 		case 't':
@@ -103,7 +117,7 @@ main(argc, argv)
 			break;
 
 		default:
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			gettext("\
 Usage: %s [ -i ] [ -t terminal ] [ filename...]\n"),
 				argv[0]);
@@ -116,42 +130,41 @@ Usage: %s [ -i ] [ -t terminal ] [ filename...]\n"),
 		break;
 
 	default:
-		fprintf(stderr, gettext("trouble reading termcap"));
-		/* fall through to ... */
+		(void) fprintf(stderr, gettext("trouble reading termcap"));
+		/*FALLTHROUGH*/
 
 	case 0:
 		/* No such terminal type - assume dumb */
-		strcpy(termcap, "dumb:os:col#80:cr=^M:sf=^J:am:");
+		(void) strcpy(termcap, "dumb:os:col#80:cr=^M:sf=^J:am:");
 		break;
 	}
 	initcap();
-	if ((tgetflag("os") && ENTER_BOLD==NULL) ||
-		(tgetflag("ul") && ENTER_UNDERLINE==NULL && UNDER_CHAR==NULL))
+	if ((tgetflag("os") && ENTER_BOLD == NULL) || (tgetflag("ul") &&
+		ENTER_UNDERLINE == NULL && UNDER_CHAR == NULL))
 			must_overstrike = 1;
 	initbuf();
 	if (optind == argc)
-		filter(stdin);
-	else for (; optind<argc; optind++) {
+		ul_filter(stdin);
+	else for (; optind < argc; optind++) {
 		f = fopen(argv[optind], "r");
 		if (f == NULL) {
 			perror(argv[optind]);
 			exit(1);
 		} else
-			filter(f);
+			ul_filter(f);
 	}
-	exit(0);
+	return (0);
 }
 
-filter(f)
-FILE *f;
+void
+ul_filter(FILE *f)
 {
-	register wchar_t c;
-	register i;
+	wchar_t c;
+	int i;
 
 	while ((c = getwc(f)) != EOF) {
-		if (maxcol >= LINE_MAX)
-		{
-			fprintf(stderr,
+		if (maxcol >= LINE_MAX) {
+			(void) fprintf(stderr,
 	gettext("Input line longer than %d characters\n"), LINE_MAX);
 			exit(1);
 		}
@@ -212,7 +225,7 @@ FILE *f;
 				continue;
 
 			default:
-				fprintf(stderr,
+				(void) fprintf(stderr,
 			gettext("Unknown escape sequence in input: %o, %o\n"),
 					IESC, c);
 				exit(1);
@@ -224,6 +237,8 @@ FILE *f;
 				obuf[col].c_mode |= UNDERL | mode;
 			else
 				obuf[col].c_char = '_';
+			/*FALLTHROUGH*/
+
 		case L' ':
 			col++;
 			if (col > maxcol)
@@ -265,14 +280,15 @@ FILE *f;
 		flushln();
 }
 
-flushln()
+void
+flushln(void)
 {
-	register lastmode;
-	register i;
+	int lastmode;
+	int i;
 	int hadmodes = 0;
 
 	lastmode = NORMAL;
-	for (i=0; i<maxcol; i++) {
+	for (i = 0; i < maxcol; i++) {
 		if (obuf[i].c_mode != lastmode) {
 			hadmodes++;
 			setmode(obuf[i].c_mode);
@@ -280,7 +296,7 @@ flushln()
 		}
 		if (obuf[i].c_char == L'\0') {
 			if (upln) {
-				puts(CURS_RIGHT);
+				ul_puts(CURS_RIGHT);
 			} else
 				outc(L' ');
 		} else
@@ -291,7 +307,7 @@ flushln()
 	}
 	if (must_overstrike && hadmodes)
 		overstrike();
-	putwchar(L'\n');
+	(void) putwchar(L'\n');
 	if (iflag && hadmodes)
 		iattr();
 	if (upln)
@@ -303,12 +319,13 @@ flushln()
  * For terminals that can overstrike, overstrike underlines and bolds.
  * We don't do anything with halfline ups and downs, or Greek.
  */
-overstrike()
+void
+overstrike(void)
 {
-	register int i, n;
+	int i, n;
 	wchar_t *cp, *scp;
 	size_t  szbf = 256, tszbf;
-	int hadbold=0;
+	int hadbold = 0;
 
 	scp = (wchar_t *)malloc(sizeof (wchar_t) * szbf);
 	if (!scp) {
@@ -328,7 +345,7 @@ overstrike()
 #endif
 
 	/* Set up overstrike buffer */
-	for (i=0; i<maxcol; i++) {
+	for (i = 0; i < maxcol; i++) {
 		n = scrw[wcsetno(obuf[i].c_char)];
 		if (tszbf <= n) {
 		/* may not enough buffer for this char */
@@ -369,31 +386,32 @@ overstrike()
 		case BOLD:
 			tszbf--;
 			*cp++ = obuf[i].c_char;
-			hadbold=1;
+			hadbold = 1;
 			break;
 		}
 	}
-	putwchar(L'\r');
-	for (*cp=L' '; *cp==L' '; cp--)
+	(void) putwchar(L'\r');
+	for (*cp = L' '; *cp == L' '; cp--)
 		*cp = L'\0';
-	for (cp=scp; *cp; cp++)
-		putwchar(*cp);
+	for (cp = scp; *cp; cp++)
+		(void) putwchar(*cp);
 	if (hadbold) {
-		putwchar(L'\r');
-		for (cp=scp; *cp; cp++)
-			putwchar(*cp==L'_' ? L' ' : *cp);
-		putwchar(L'\r');
-		for (cp=scp; *cp; cp++)
-			putwchar(*cp==L'_' ? L' ' : *cp);
+		(void) putwchar(L'\r');
+		for (cp = scp; *cp; cp++)
+			(void) putwchar(*cp == L'_' ? L' ' : *cp);
+		(void) putwchar(L'\r');
+		for (cp = scp; *cp; cp++)
+			(void) putwchar(*cp == L'_' ? L' ' : *cp);
 	}
 	free(scp);
 }
 
-iattr()
+void
+iattr(void)
 {
-	register int i, n;
+	int i, n;
 	wchar_t *cp, *scp;
-	register wchar_t cx;
+	wchar_t cx;
 	size_t  szbf = 256, tszbf;
 
 	scp = (wchar_t *)malloc(sizeof (wchar_t) * szbf);
@@ -412,7 +430,7 @@ iattr()
 	 */
 	(void) malloc(1024 * 1024);
 #endif
-	for (i=0; i<maxcol; i++) {
+	for (i = 0; i < maxcol; i++) {
 		switch (obuf[i].c_mode) {
 		case NORMAL:	cx = ' '; break;
 		case ALTSET:	cx = 'g'; break;
@@ -448,17 +466,18 @@ iattr()
 			i++;
 		}
 	}
-	for (*cp=L' '; *cp==L' '; cp--)
+	for (*cp = L' '; *cp == L' '; cp--)
 		*cp = L'\0';
-	for (cp=scp; *cp; cp++)
-		putwchar(*cp);
-	putwchar(L'\n');
+	for (cp = scp; *cp; cp++)
+		(void) putwchar(*cp);
+	(void) putwchar(L'\n');
 	free(scp);
 }
 
-initbuf()
+void
+initbuf(void)
 {
-	register i;
+	int i;
 
 	/* following depends on NORMAL == 000 */
 	for (i = 0; i < LINE_MAX; i++)
@@ -469,9 +488,10 @@ initbuf()
 	mode &= ALTSET;
 }
 
-fwd()
+void
+fwd(void)
 {
-	register oldcol, oldmax;
+	int oldcol, oldmax;
 
 	oldcol = col;
 	oldmax = maxcol;
@@ -480,21 +500,21 @@ fwd()
 	maxcol = oldmax;
 }
 
-reverse()
+void
+reverse(void)
 {
 	upln++;
 	fwd();
-	puts(CURS_UP);
-	puts(CURS_UP);
+	ul_puts(CURS_UP);
+	ul_puts(CURS_UP);
 	upln++;
 }
 
-initcap()
+void
+initcap(void)
 {
 	static char tcapbuf[512];
-	char *termtype;
 	char *bp = tcapbuf;
-	char *getenv(), *tgetstr();
 
 	/* This nonsense attempts to work with both old and new termcap */
 	CURS_UP =		tgetstr("up", &bp);
@@ -548,44 +568,45 @@ printf("so %s se %s us %s ue %s me %s\n",
 	must_use_uc = (UNDER_CHAR && !ENTER_UNDERLINE);
 }
 
-outchar(c)
-char c;
+int
+outchar(char c)
 {
-	putchar(c&0177);
+	(void) putchar(c&0177);
+	return (0);
 }
 
-puts(str)
-const char *str;
+void
+ul_puts(char *str)
 {
 	if (str)
-		tputs(str, 1, outchar);
+		(void) tputs(str, 1, outchar);
 }
 
-static curmode = 0;
-outc(c)
-wchar_t c;
+static int curmode = 0;
+
+void
+outc(wchar_t c)
 {
-	register int m, n;
+	int m, n;
 
 	if (c == CDUMMY)
 		return;
-	putwchar(c);
+	(void) putwchar(c);
 	if (must_use_uc && (curmode & UNDERL)) {
 		m = n = scrw[wcsetno(c)];
-		puts(CURS_LEFT);
+		ul_puts(CURS_LEFT);
 		while (--m > 0)
-			puts(CURS_LEFT);
-		puts(UNDER_CHAR);
+			ul_puts(CURS_LEFT);
+		ul_puts(UNDER_CHAR);
 		while (--n > 0)
-			puts(UNDER_CHAR);
+			ul_puts(UNDER_CHAR);
 	}
 }
 
-setmode(newmode)
-int newmode;
+void
+setmode(int newmode)
 {
-	if (!iflag)
-	{
+	if (!iflag) {
 		if (curmode != NORMAL && newmode != NORMAL)
 			setmode(NORMAL);
 		switch (newmode) {
@@ -594,40 +615,40 @@ int newmode;
 			case NORMAL:
 				break;
 			case UNDERL:
-				puts(EXIT_UNDERLINE);
+				ul_puts(EXIT_UNDERLINE);
 				break;
 			default:
 				/* This includes standout */
-				puts(EXIT_ATTRIBUTES);
+				ul_puts(EXIT_ATTRIBUTES);
 				break;
 			}
 			break;
 		case ALTSET:
-			puts(ENTER_REVERSE);
+			ul_puts(ENTER_REVERSE);
 			break;
 		case SUPERSC:
 			/*
 			 * This only works on a few terminals.
 			 * It should be fixed.
 			 */
-			puts(ENTER_UNDERLINE);
-			puts(ENTER_DIM);
+			ul_puts(ENTER_UNDERLINE);
+			ul_puts(ENTER_DIM);
 			break;
 		case SUBSC:
-			puts(ENTER_DIM);
+			ul_puts(ENTER_DIM);
 			break;
 		case UNDERL:
-			puts(ENTER_UNDERLINE);
+			ul_puts(ENTER_UNDERLINE);
 			break;
 		case BOLD:
-			puts(ENTER_BOLD);
+			ul_puts(ENTER_BOLD);
 			break;
 		default:
 			/*
 			 * We should have some provision here for multiple modes
 			 * on at once.  This will have to come later.
 			 */
-			puts(ENTER_STANDOUT);
+			ul_puts(ENTER_STANDOUT);
 			break;
 		}
 	}

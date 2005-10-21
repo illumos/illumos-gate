@@ -23,7 +23,7 @@
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "awk.h"
 
@@ -116,18 +116,19 @@ struct tok
 "IN_EXIT", 339,
 "LASTTOKEN", 340,
 };
-ptoken(n)
+void
+ptoken(int n)
 {
-	if (n<128) printf("lex: %c\n", n);
-	else	if (n<=256) printf("lex:? %o\n", n);
-	else	if (n<LASTTOKEN) printf("lex: %s\n", tok[n-257].tnm);
+	if (n < 128) printf("lex: %c\n", n);
+	else	if (n <= 256) printf("lex:? %o\n", n);
+	else	if (n < LASTTOKEN) printf("lex: %s\n", tok[n-257].tnm);
 	else	printf("lex:? %o\n", n);
-	return;
 }
 
-char *tokname(n)
+char *
+tokname(n)
 {
-	if (n<=256 || n >= LASTTOKEN)
+	if (n <= 256 || n >= LASTTOKEN)
 		n = 257;
 	return (tok[n-257].tnm);
 }

@@ -1,10 +1,4 @@
 %{
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-%}
-%{
-/*	  All Rights Reserved  	*/
-%}
-%{
 /*
  * CDDL HEADER START
  *
@@ -26,12 +20,19 @@
  *
  * CDDL HEADER END
  */
-/* Copyright (c) 1996, by Sun Microsystems, Inc.                */
-/* All rights reserved.                                         */
+/*
+ * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 %}
-
 %{
-#ident	"%Z%%M%	%I%	%E% SMI"
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+%}
+%{
+/*	  All Rights Reserved  	*/
+%}
+%{
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 %}
 
 %Start A str chc sc reg comment
@@ -213,9 +214,10 @@ WS	[ \t]
 
 %%
 
+int
 input()
 {
-	register c;
+	int c;
 	extern wchar_t *lexprog;
 
 	if (yysptr > yysbuf)
@@ -231,6 +233,7 @@ input()
 	return (c);
 }
 
+void
 startreg()
 {
 	BEGIN reg;

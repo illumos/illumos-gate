@@ -24,7 +24,7 @@
  * All rights reserved.
  */
 
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include	<locale.h>
 #include	<euc.h>
 #include	<widec.h>
@@ -173,3 +173,5 @@ typedef struct  ccl_chars {
 } ccl_chars_t;
 
 ccl_chars_t	*cclenter();
+
+extern void error();

@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 1991 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "awk.h"
 /* tmaino #define NULL 0 */
@@ -90,8 +94,8 @@ struct xx
 char *table[SIZE];
 char *names[SIZE];
 
-
-main()
+int
+main(void)
 {
 	struct xx *p;
 	int i;
@@ -101,23 +105,23 @@ main()
 	printf("CELL *nullproc();\n");
 	for (i = SIZE; --i >= 0; /* dummy */)
 		names[i] = "";
-	for (p=proc; p->token!=0; p++)
-		if (p==proc || strcmp(p->name, (p-1)->name))
+	for (p = proc; p->token != 0; p++)
+		if (p == proc || strcmp(p->name, (p-1)->name))
 			printf("extern CELL *%s();\n", p->name);
-	for (p=proc; p->token!=0; p++)
+	for (p = proc; p->token != 0; p++)
 		table[p->token-FIRSTTOKEN] = p->name;
 	printf("CELL *(*proctab[%d])() = {\n", SIZE);
-	for (i=0; i<SIZE; i++)
-		if (table[i]==0)
+	for (i = 0; i < SIZE; i++)
+		if (table[i] == 0)
 			printf("/*%s*/\tnullproc,\n", tokname(i+FIRSTTOKEN));
 		else
 		printf("/*%s*/\t%s,\n", tokname(i+FIRSTTOKEN), table[i]);
 	printf("};\n");
 	printf("char *printname[%d] = {\n", SIZE);
-	for (p=proc; p->token!=0; p++)
+	for (p = proc; p->token != 0; p++)
 		names[p->token-FIRSTTOKEN] = p->pname;
-	for (i=0; i<SIZE; i++)
+	for (i = 0; i < SIZE; i++)
 		printf("/*%s*/\t\"%s\",\n", tokname(i+FIRSTTOKEN), names[i]);
 	printf("};\n");
-	exit(0);
+	return (0);
 }

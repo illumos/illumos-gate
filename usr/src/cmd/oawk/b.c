@@ -19,20 +19,21 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 
 /*
  * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "awk.def"
 #include "stdio.h"
 #include "awk.h"
+#include <stdlib.h>
 
 
 extern NODE *op2();
@@ -94,12 +95,16 @@ int	line;
 static int	ccln_member();
 static int	insert_table();
 static int	delete_table();
+static void	penter(NODE *p);
+static void	follow(NODE *v);
+static void	overflo(void);
+static void	cfoll(NODE *v);
+static void	freetr(NODE *p);
 #ifdef DEBUG
 #define	ddump_table(t, s)	dump_table(t, s)
 #else
 #define	ddump_table(t, s)
 #endif
-
 
 struct fa *
 makedfa(p)	/* returns dfa for tree pointed to by p */
@@ -123,9 +128,8 @@ NODE *p;
 	return (fap);
 }
 
-
-penter(p)	/* set up parent pointers and leaf indices */
-NODE *p;
+static void
+penter(NODE *p)	/* set up parent pointers and leaf indices */
 {
 	switch (type(p)) {
 		LEAF
@@ -149,9 +153,8 @@ NODE *p;
 	}
 }
 
-
-freetr(p)	/* free parse tree and follow sets */
-NODE *p;
+static void
+freetr(NODE *p)	/* free parse tree and follow sets */
 {
 	switch (type(p)) {
 		LEAF
@@ -174,15 +177,13 @@ NODE *p;
 	}
 }
 ccl_chars_t *
-cclenter(p)
-register wchar_t *p;
+cclenter(wchar_t *p)
 {
-	register int		i, cn;
-	register wchar_t	c, pc;
-	register wchar_t	*op;
-	register ccl_chars_t	*new;
-	ccl_chars_t		chars[MAXLIN];
-
+	int 		i, cn;
+	wchar_t		c, pc;
+	wchar_t		*op;
+	ccl_chars_t	*new;
+	ccl_chars_t	chars[MAXLIN];
 
 	op = p;
 	i = 0;
@@ -221,17 +222,16 @@ char_array:
 	return (new);
 }
 
-
-overflo()
+static void
+overflo(void)
 {
 	error(FATAL, "regular expression too long\n");
 }
 
-
-cfoll(v)	/* enter follow set of each leaf of vertex v into foll[leaf] */
-register NODE *v;
+static void
+cfoll(NODE *v)	/* enter follow set of each leaf of vertex v into foll[leaf] */
 {
-	register i;
+	int i;
 	int prev;
 	int *add();
 
@@ -257,12 +257,11 @@ register NODE *v;
 	}
 }
 
-
-first(p)		/* collects initially active leaves of p into setvec */
-register NODE *p;
+int
+first(NODE *p)		/* collects initially active leaves of p into setvec */
 	/* returns 0 or 1 depending on whether p matches empty string */
 {
-	register b;
+	int b;
 
 
 	switch (type(p)) {
@@ -298,9 +297,9 @@ register NODE *p;
 	return (-1);
 }
 
-
-follow(v)
-NODE *v;		/* collects leaves that can follow v into setvec */
+static void
+follow(NODE *v)
+		/* collects leaves that can follow v into setvec */
 {
 	NODE *p;
 
@@ -345,13 +344,8 @@ NODE *v;		/* collects leaves that can follow v into setvec */
  * it only used within a this source file("b.c").
  */
 
-
-ccl_member(ns, cs, ne, ce, s)	/* is cs thru ce in s? */
-register int		ns;
-register wchar_t	cs;
-register int		ne;
-register wchar_t	ce;
-register ccl_chars_t	*s;
+int				/* is cs thru ce in s? */
+ccl_member(int ns, wchar_t cs, int ne, wchar_t ce, ccl_chars_t *s)
 {
 	/*
 	 * The specified range(cs, ce) must be beside the range between
@@ -367,14 +361,8 @@ register ccl_chars_t	*s;
 }
 
 
-static
-ccln_member(ns, cs, ne, ce, s, n)	/* is cs thru ce in s? */
-register int ns;
-register wchar_t cs;
-register int ne;
-register wchar_t ce;
-register ccl_chars_t *s;
-register int n;
+static int			/* is cs thru ce in s? */
+ccln_member(int ns, wchar_t cs, int ne, wchar_t ce, ccl_chars_t *s, int n)
 {
 	/*
 	 * The specified range(cs, ce) must be beside the range between
@@ -390,8 +378,8 @@ register int n;
 }
 
 
-member(c, s)	/* is c in s? */
-register wchar_t c, *s;
+int
+member(wchar_t c, wchar_t *s)	/* is c in s? */
 {
 	while (*s)
 		if (c == *s++)
@@ -399,11 +387,10 @@ register wchar_t c, *s;
 	return (0);
 }
 
-
-notin(array, n, prev)		/* is setvec in array[0] thru array[n]? */
-int **array;
-int *prev; {
-	register i, j;
+int
+notin(int **array, int n, int *prev) /* is setvec in array[0] thru array[n]? */
+{
+	int i, j;
 	int *ptr;
 	for (i = 0; i <= n; i++) {
 		ptr = array[i];
@@ -419,9 +406,11 @@ int *prev; {
 }
 
 
-int *add(n) {		/* remember setvec */
+int *
+add(int n)
+{		/* remember setvec */
 	int *ptr, *p;
-	register i;
+	int i;
 	if ((p = ptr = (int *)malloc((n+1)*sizeof (int))) == NULL)
 		overflo();
 	*ptr = n;
@@ -439,12 +428,12 @@ int *add(n) {		/* remember setvec */
 struct fa *
 cgotofn()
 {
-	register i, k;
-	register int *ptr;
-	register int ns, ne;
-	register wchar_t cs, ce;
-	register ccl_chars_t *p;
-	register NODE *cp;
+	int i, k;
+	int *ptr;
+	int ns, ne;
+	wchar_t cs, ce;
+	ccl_chars_t *p;
+	NODE *cp;
 	int j, n, s, ind, numtrans;
 	int finflg;
 	int curpos, num, prev;
@@ -455,7 +444,7 @@ cgotofn()
 		ccl_chars_t	cc;
 		int		n;
 	} fatab[257];
-	register struct fa *pfa;
+	struct fa *pfa;
 
 
 	char index[MAXLIN];
@@ -837,18 +826,15 @@ dprintf("j = %d, cs = %o, ce = %o\n", j, cs, ce);
  * Insert CCL entry to CCL table with maintain optimized order.
  */
 static int
-insert_table(table_base, table_size, ns, cs, ne, ce)
-ccl_chars_t		*table_base;
-register int		table_size;
-register int		ns, ne;
-register wchar_t	cs, ce;
+insert_table(ccl_chars_t *table_base, int table_size, int ns, wchar_t cs,
+	int ne, wchar_t ce)
 {
-	register int		i;
-	register int		tns, tne;
-	register wchar_t	tcs, tce;
-	register ccl_chars_t	*table;
-	register ccl_chars_t	*saved_table;
-	int			saved_i;
+	int		i;
+	int		tns, tne;
+	wchar_t		tcs, tce;
+	ccl_chars_t	*table;
+	ccl_chars_t	*saved_table;
+	int		saved_i;
 
 
 
@@ -978,20 +964,17 @@ add_null:
 
 
 static int
-delete_table(table_base, table_size, ns, cs, ne, ce)
-ccl_chars_t		*table_base;
-register int		table_size;
-register int		ns, ne;
-register wchar_t	cs, ce;
+delete_table(ccl_chars_t *table_base, int table_size, int ns, wchar_t cs,
+		int ne, wchar_t ce)
 {
-	register int		i;
-	int			saved_i;
-	register ccl_chars_t	*table;
-	register ccl_chars_t	*saved_table;
-	register int		tns;
-	register wchar_t	tcs;
-	register int		tne;
-	register wchar_t	tce;
+	int		i;
+	int		saved_i;
+	ccl_chars_t	*table;
+	ccl_chars_t	*saved_table;
+	int		tns;
+	wchar_t		tcs;
+	int		tne;
+	wchar_t		tce;
 
 
 
@@ -1087,11 +1070,9 @@ register wchar_t	cs, ce;
 
 
 #ifdef DEBUG
-dump_table(table, size)
-register ccl_chars_t	*table;
-register int		size;
+dump_table(ccl_chars_t *table, int size)
 {
-	register int	i;
+	int	i;
 
 
 
@@ -1112,14 +1093,12 @@ register int		size;
 
 
 
-
-match(pfa, p)
-register struct fa *pfa;
-register wchar_t *p;
+int
+match(struct fa *pfa, wchar_t *p)
 {
-	register count;
-	register int n, ns, ne;
-	register wchar_t c, cs, ce;
+	int count;
+	int n, ns, ne;
+	wchar_t c, cs, ce;
 
 
 	if (p == 0)

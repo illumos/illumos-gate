@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -46,15 +46,21 @@ eucwidth_t eucwidth;
 
 extern FILE	*yyin;	/* lex input file */
 wchar_t *lexprog;	/* points to program argument if it exists */
-extern	errorflag;	/* non-zero if any syntax errors; set by yyerror */
+extern	int errorflag;	/* non-zero if any syntax errors; set by yyerror */
 
 wchar_t	radixpoint = L'.';
 
 int filefd, symnum, ansfd;
 extern int maxsym, errno;
-main(argc, argv) int argc; char **argv; {
-	register wchar_t	*p, **wargv;
-	register int		i;
+
+extern void run(NODE *a);
+extern void syminit(void);
+
+int
+main(int argc, char *argv[])
+{
+	wchar_t	*p, **wargv;
+	int i;
 	static wchar_t L_dash[] = L"-";
 	static wchar_t L_dashd[] = L"-d";
 	char	*nl_radix;
@@ -147,9 +153,10 @@ gettext("awk: Usage: awk [-Fc] [-f source | 'cmds'] [files]\n"));
 	if (errorflag)
 		exit(errorflag);
 	run(winner);
-	exit(errorflag);
+	return (errorflag);
 }
 
+int
 yywrap()
 {
 	return (1);
