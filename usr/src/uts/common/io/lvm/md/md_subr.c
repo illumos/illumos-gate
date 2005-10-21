@@ -67,6 +67,8 @@
 #include <sys/sysevent/eventdefs.h>
 
 #include <sys/sysevent/svm.h>
+#include <sys/lvm/md_basic.h>
+
 
 /*
  * Machine specific Hertz is kept here
@@ -3629,65 +3631,6 @@ md_biodone(struct buf *pb)
 	biodone(pb);
 }
 
-/*
- * The following constants are not defined in a 32 bit environment.
- * We definitely need them also in a 32bit environment,
- * since we're always dealing with 64 bit wide devices
- */
-#ifndef	NBITSMINOR64
-#define	NBITSMINOR64	32
-#endif	/* NBITSMINOR64 */
-
-#ifndef	MAXMAJ64
-#define	MAXMAJ64	0xfffffffful
-#endif	/* MAXMAJ64 */
-
-#ifndef	MAXMIN64
-#define	MAXMIN64	0xfffffffful
-#endif	/* MAXMAJ64 */
-
-
-/*
- * Driver private devt expansion routine
- * INPUT:  dev	a 64 bit container holding either a 32 bit or a 64 bit device
- * OUTPUT: always an expanded 64 bit device, even if we are running in a
- *		32 bit Kernel.
- */
-md_dev64_t
-md_expldev(md_dev64_t dev)
-{
-	minor_t minor;
-	major_t major = (major_t)(dev >> NBITSMINOR64) & MAXMAJ64;
-
-	/* Here we were given a 64bit dev, return unchanged */
-	if (major != (major_t)0)
-		return (dev);
-	/* otherwise we were given a 32 bit dev */
-	major = (major_t)dev >> NBITSMINOR32 & MAXMAJ32;
-	minor = (minor_t)dev & MAXMIN32;
-	return (((md_dev64_t)major << NBITSMINOR64) | minor);
-}
-
-
-/*
- * Driver private devt compact routine
- * INPUT:  dev	a 64 bit container holding either a 32 bit or a 64 bit device
- * OUTPUT: always a compacted 32 bit device, even if we are running in a
- *		64 bit Kernel.
- */
-dev32_t
-md_cmpldev(md_dev64_t dev)
-{
-	minor_t minor;
-	major_t major = (major_t)(dev >> NBITSMINOR64) & MAXMAJ64;
-
-	if (major == 0) {
-		/* Here we were given a 32bit dev, return unchanged */
-		return ((dev32_t)dev);
-	}
-	minor = (minor_t)dev & MAXMIN32;
-	return (((dev32_t)major << NBITSMINOR32) | minor);
-}
 
 /*
  * Driver special private devt handling routine

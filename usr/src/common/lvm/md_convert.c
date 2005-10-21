@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,17 +59,70 @@
 #include <sys/sysmacros.h>
 #include <sys/types.h>
 #include <sys/cmn_err.h>
-
 #include <sys/lvm/mdvar.h>
-
-
+#ifdef _KERNEL
+#include <sys/lvm/md_basic.h>
+#else /* !_KERNEL */
+#include <meta_basic.h>
+#endif /* _KERNEL */
 #include <sys/lvm/md_convert.h>
+
+
+/*
+ * SVM private devt expansion routine
+ * INPUT:  dev  a 64 bit container holding either a 32 bit or a 64 bit device
+ * OUTPUT: always an expanded 64 bit device, even if we are running in a
+ *              32 bit Kernel.
+ */
+md_dev64_t
+md_expldev(md_dev64_t dev)
+{
+	minor_t minor;
+	major_t major = (major_t)(dev >> NBITSMINOR64) & MAXMAJ64;
+
+	/* Here we were given a 64bit dev, return unchanged */
+	if (major != (major_t)0)
+		return (dev);
+	/* otherwise we were given a 32 bit dev */
+	major = (major_t)dev >> NBITSMINOR32 & MAXMAJ32;
+	minor = (minor_t)dev & MAXMIN32;
+	return (((md_dev64_t)major << NBITSMINOR64) | minor);
+}
+
+/*
+ * SVM private devt compact routine
+ * INPUT:  dev  a 64 bit container holding either a 32 bit or a 64 bit device
+ * OUTPUT: always a compacted 32 bit device, even if we are running in a
+ *              64 bit Kernel.
+ */
+dev32_t
+md_cmpldev(md_dev64_t dev)
+{
+	minor_t minor;
+	major_t major = (major_t)(dev >> NBITSMINOR64) & MAXMAJ64;
+
+	/* Here we were given a 32bit dev, return unchanged */
+	if (major == 0) {
+		return ((dev32_t)dev);
+	}
+	/* otherwise we were given a 64 bit dev */
+	minor = (minor_t)dev & MAXMIN32;
+	return (((dev32_t)major << NBITSMINOR32) | minor);
+}
+
 
 /*
  * given a small stripe unit, compute the size of an appropriate
  * big stripe unit.
  * if first_comp_only is set just return the offset of the first component
  * in the new big unit.
+ *
+ * The function:
+ * usr/src/lib/lvm/libmeta/common/meta_statconcise.c:get_stripe_req_size()
+ * contains code derived from this function and thus if any changes are made to
+ * this function get_stripe_req_size() should be evaluated to determine whether
+ * or not code changes will also  be necessary there.
+ *
  */
 size_t
 get_big_stripe_req_size(ms_unit32_od_t *un, int first_comp_only)
@@ -152,7 +205,9 @@ get_small_stripe_req_size(ms_unit_t *un, int first_comp_only)
 void
 stripe_convert(caddr_t small, caddr_t big, int direction)
 {
+	/*LINTED*/
 	ms_unit32_od_t *small_un = (ms_unit32_od_t *)small;
+	/*LINTED*/
 	ms_unit_t *big_un = (ms_unit_t *)big;
 
 	struct ms_row32_od	*small_mdr;
@@ -246,7 +301,9 @@ stripe_convert(caddr_t small, caddr_t big, int direction)
 void
 mirror_convert(caddr_t small, caddr_t big, int direction)
 {
+	/*LINTED*/
 	mm_unit32_od_t *small_un = (mm_unit32_od_t *)small;
+	/*LINTED*/
 	mm_unit_t *big_un = (mm_unit_t *)big;
 	int i;
 
@@ -333,7 +390,9 @@ void
 raid_convert(caddr_t small, caddr_t big, int direction)
 
 {
+	/*LINTED*/
 	mr_unit32_od_t *small_un = (mr_unit32_od_t *)small;
+	/*LINTED*/
 	mr_unit_t *big_un = (mr_unit_t *)big;
 
 	int i;
@@ -387,7 +446,9 @@ void
 softpart_convert(caddr_t small, caddr_t big, int direction)
 
 {
+	/*LINTED*/
 	mp_unit32_od_t *small_un = (mp_unit32_od_t *)small;
+	/*LINTED*/
 	mp_unit_t *big_un = (mp_unit_t *)big;
 
 	if (direction == BIG_2_SMALL) {
@@ -426,7 +487,9 @@ softpart_convert(caddr_t small, caddr_t big, int direction)
 void
 trans_master_convert(caddr_t smallp, caddr_t bigp, int direction)
 {
+	/*LINTED*/
 	mt_unit32_od_t *small = (mt_unit32_od_t *)smallp;
+	/*LINTED*/
 	mt_unit_t *big = (mt_unit_t *)bigp;
 
 	if (direction == SMALL_2_BIG) {
@@ -509,7 +572,9 @@ trans_master_convert(caddr_t smallp, caddr_t bigp, int direction)
 void
 trans_log_convert(caddr_t smallp, caddr_t bigp, int direction)
 {
+	/*LINTED*/
 	ml_unit32_od_t *small = (ml_unit32_od_t *)smallp;
+	/*LINTED*/
 	ml_unit_t *big = (ml_unit_t *)bigp;
 
 	if (direction == SMALL_2_BIG) {
@@ -589,7 +654,9 @@ void
 hs_convert(caddr_t small, caddr_t big, int direction)
 
 {
+	/*LINTED*/
 	hot_spare32_od_t *small_un = (hot_spare32_od_t *)small;
+	/*LINTED*/
 	hot_spare_t *big_un = (hot_spare_t *)big;
 
 	if (direction == BIG_2_SMALL) {

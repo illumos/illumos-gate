@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,7 +30,7 @@ LIBRARY=       	libmeta.a
 VERS=          	.1 
 COMMON =	$(SRC)/common/lvm
 
-CMN_OBJS = md_crc.o
+CMN_OBJS = md_crc.o md_convert.o md_revchk.o
 
 DERIVED_OBJS = \
 	mdiox_xdr.o \
@@ -98,6 +98,7 @@ LOCAL_OBJS=        \
 	meta_setup.o \
 	meta_smf.o \
 	meta_stat.o \
+	meta_statconcise.o \
 	meta_sp.o \
 	meta_stripe.o \
 	meta_systemfile.o \

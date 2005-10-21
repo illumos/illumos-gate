@@ -832,6 +832,11 @@ extern void	*getshared_name(set_t, mdkey_t, int);
 
 #endif	/* _KERNEL */
 
+
+/* externals from md_revchk.c */
+extern int	revchk(uint_t my_rev, uint_t data);
+
+
 #ifdef	__cplusplus
 }
 #endif

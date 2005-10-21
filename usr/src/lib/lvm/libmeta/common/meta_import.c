@@ -35,10 +35,11 @@
 #include "meta_set_prv.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <strings.h>
 #include <sys/lvm/md_mddb.h>
 #include <sys/lvm/md_names.h>
 #include <sys/lvm/md_crc.h>
+#include <sys/lvm/md_convert.h>
 
 typedef struct did_list {
 	void		*rdid;	/* real did if replicated set */
@@ -58,7 +59,7 @@ typedef struct replicated_disk {
 
 /*
  * The current implementation limits the max device id length to 256 bytes.
- * Should the max device id length be increased, this define would have to
+ * Should the max device id length be increased, this definition would have to
  * be bumped up accordingly
  */
 #define	MAX_DEVID_LEN		256
@@ -86,7 +87,7 @@ static int replicated_disk_list_built = 0;
  * - The kernel routine works on in core master blocks, or mddb_mb_ic_t; this
  * routine works instead on the mddb_mb_t read directly from the disk
  */
-static daddr_t
+daddr_t
 getphysblk(
 	mddb_block_t	blk,
 	mddb_mb_t	*mbp
@@ -121,6 +122,7 @@ drive_append(
 	mddrivename_t		*dnp,
 	void			*devid,
 	void			*rdevid,
+	void			*devname,
 	int			devid_sz,
 	char			*minor_name,
 	md_timeval32_t		timestamp,
@@ -161,6 +163,9 @@ drive_append(
 		(void) memcpy(midp->mid_devid, devid, devid_sz);
 	}
 
+	if (devname)
+		midp->mid_devname = Strdup(devname);
+
 	midp->mid_devid_sz = devid_sz;
 	midp->mid_setcreatetimestamp = timestamp;
 	(void) strlcpy(midp->mid_minor_name, minor_name, MDDB_MINOR_NAME_MAX);
@@ -184,14 +189,15 @@ drive_append_wrapper(
 	mddrivename_t		*dnp,
 	void 			*devid,
 	void			*rdevid,
+	void			*devname,
 	int			devid_sz,
 	char			*minor_name,
 	md_timeval32_t		timestamp,
 	md_im_replica_info_t	*mirp
 )
 {
-	(void) drive_append(tailpp, dnp, devid, rdevid, devid_sz, minor_name,
-		timestamp, mirp);
+	(void) drive_append(tailpp, dnp, devid, rdevid, devname, devid_sz,
+	    minor_name, timestamp, mirp);
 
 	if ((*tailpp)->mid_next == NULL)
 		return (tailpp);
@@ -484,6 +490,7 @@ get_replica_disks(
 				(void) close(fd);
 				midpp = drive_append_wrapper(midpp, dnp,
 				    replica_disk->did, replica_disk->rdid,
+				    replica_disk->devname,
 				    devid_sz, minor_name, mbp->mb_setcreatetime,
 				    NULL);
 				mirpp = &((*midpp)->mid_replicas);
@@ -535,20 +542,90 @@ get_replica_disks(
 }
 
 
+/*
+ * append_pnm_rec()
+ *
+ * Append pnm_rec_t entry to list of physical devices in the diskset.  Entry
+ * contains a mapping of n_key in NM namespace(or min_key in DID_NM namespace)
+ * to name of the physical device.  This list will be used to ensure that the
+ * correct names of the physical devices are printed in the metastat output--the
+ * NM namespace might have stale information about where the physical devices
+ * were previously located when the diskset was last active.
+ */
+static void
+append_pnm_rec(
+	pnm_rec_t	**pnm,
+	mdkey_t		min_key,
+	char		*n_name
+)
+{
+	pnm_rec_t 	*tmp_pnm;
+	char 		*p;
+	int 		len;
+
+	if ((p = strrchr(n_name, '/')) != NULL)
+		p++;
+
+	/*
+	 * Allocates pnm_rec_t record for the physical
+	 * device.
+	 */
+	len = strlen(p) + 1; /* Length of name plus Null term */
+	tmp_pnm  = Malloc(sizeof (pnm_rec_t) + len);
+	(void) strncpy(tmp_pnm->n_name, p, len);
+	tmp_pnm->n_key = min_key;
+
+	/*
+	 * Adds new element to head of pnm_rec_t list.
+	 */
+	if (*pnm == NULL) {
+		tmp_pnm->next = NULL;
+		*pnm = tmp_pnm;
+	} else {
+		tmp_pnm->next = *pnm;
+		*pnm = tmp_pnm;
+	}
+}
 
 /*
- * get_nonreplica_disks()
+ * free_pnm_rec_list()
+ *
+ * Freeing all pnm_rec_t entries on the list of physical devices in the
+ * diskset.
+ */
+void
+free_pnm_rec_list(pnm_rec_t **pnm)
+{
+	pnm_rec_t	*tmp_pnm, *rm_pnm;
+
+	for (tmp_pnm = *pnm; tmp_pnm != NULL; ) {
+		rm_pnm = tmp_pnm;
+		tmp_pnm = tmp_pnm->next;
+		Free(rm_pnm);
+	}
+
+	*pnm = NULL;
+}
+
+
+/*
+ * get_disks_from_didnamespace()
+ * This function was origionally called: get_nonreplica_disks()
  *
  * Extracts the disks without replicas from the locator name space and adds them
  * to the supplied list of md_im_drive_info_t.
+ * If the print verbose option was given then this function will also
+ * correct the nm namespace so that the n_name is the right ctd name
  */
 static void
-get_nonreplica_disks(
+get_disks_from_didnamespace(
 	md_im_set_desc_t	*misp,
+	pnm_rec_t		**pnm,
 	mddb_rb_t		*did_nm,
 	mddb_rb_t		*did_shrnm,
-	md_error_t		*ep,
-	int			replicated
+	uint_t 			imp_flags,
+	int			replicated,
+	md_error_t		*ep
 )
 {
 	char			*search_path = "/dev";
@@ -638,6 +715,14 @@ get_nonreplica_disks(
 			assert(nmlist->devname != NULL);
 			dnp = metadrivename(&sp,
 			    metadiskname(nmlist->devname), ep);
+			/*
+			 * Add drive to pnm_rec_t list of physical devices for
+			 * metastat output.
+			 */
+			if (imp_flags & META_IMP_VERBOSE) {
+				append_pnm_rec(pnm, min->min_key,
+				    nmlist->devname);
+			}
 
 			assert(dnp != NULL);
 			/* Is it already on the list? */
@@ -704,10 +789,12 @@ get_nonreplica_disks(
 				/*
 				 * If it is replicated diskset,
 				 * r_did will be non-NULL and
-				 * devid_sz will be its size
+				 * devid_sz will be its size.
+				 * Passing the devname as NULL because field
+				 * is not currently used for a non-replica disk.
 				 */
 				midpp = drive_append_wrapper(midpp,
-				    dnp, &did->did_devid, r_did,
+				    dnp, &did->did_devid, r_did, NULL,
 				    devid_sz, &min->min_name[0],
 				    mbp->mb_setcreatetime, NULL);
 				Free(mbp);
@@ -734,12 +821,15 @@ set_append(
 	mddb_mb_t		*mb,
 	mddb_lb_t		*lbp,
 	mddb_rb_t		*nm,
+	pnm_rec_t		**pnm,
 	mddb_rb_t		*did_nm,
 	mddb_rb_t		*did_shrnm,
-	md_error_t		*ep,
-	int			replicated
+	uint_t 			imp_flags,
+	int			replicated,
+	md_error_t		*ep
 )
 {
+
 	md_im_set_desc_t	*misp;
 	set_t			setno = mb->mb_setno;
 
@@ -759,45 +849,18 @@ set_append(
 	get_replica_disks(misp, did_listp, mb, lbp, ep, replicated);
 
 	if (nm != NULL && did_nm != NULL && did_shrnm != NULL) {
-		get_nonreplica_disks(misp, did_nm, did_shrnm, ep, replicated);
+		get_disks_from_didnamespace(misp, pnm, did_nm,
+		    did_shrnm, imp_flags, replicated, ep);
 	}
 
 	/*
-	 * An error in this struct could come from either of the above routines;
+	 * An error in this struct could come from either of
+	 * the above routines;
 	 * in both cases, we want to pass it back on up.
 	 */
+
 	return (misp);
 }
-
-
-
-/*
- * set_append_wrapper()
- *
- * Constant time append wrapper; the append function will always walk the list,
- * this will take a tail argument and use the append function on just the tail
- * node, doing the appropriate old-tail-next-pointer bookkeeping.
- */
-static md_im_set_desc_t **
-set_append_wrapper(
-	md_im_set_desc_t	**tailpp,
-	did_list_t		*did_listp,
-	mddb_mb_t		*mb,
-	mddb_lb_t		*lbp,
-	mddb_rb_t		*nm,
-	mddb_rb_t		*did_nm,
-	mddb_rb_t		*did_shrnm,
-	md_error_t		*ep,
-	int			replicated
-)
-{
-	(void) set_append(tailpp, did_listp, mb, lbp, nm, did_nm,
-	    did_shrnm, ep, replicated);
-
-	/* it's the first item in the list, return it instead of the next */
-	return (((*tailpp)->mis_next == NULL) ? tailpp : &(*tailpp)->mis_next);
-}
-
 
 
 /*
@@ -1704,8 +1767,298 @@ check_nm_disks(
 	return (0);
 }
 
+
 /*
- * meta_get_set_info
+ * report_metadb_info()
+ *
+ * Generates metadb output for the diskset.
+ *
+ */
+static void
+report_metadb_info(
+	md_im_set_desc_t	*misp,
+	char			*indent
+)
+{
+	md_im_drive_info_t	*d;
+	md_im_replica_info_t	*r;
+	char			*unk_str = "";
+	int			i;
+
+	(void) printf("%s\t%5.5s\t\t%9.9s\t%11.11s\n", indent, gettext("flags"),
+	    gettext("first blk"), gettext("block count"));
+
+	unk_str = gettext("unknown");
+
+	/*
+	 * Looping through all drives in the diskset to print
+	 * out information about the drive and if the verbose
+	 * option is set print out replica data.
+	 */
+	for (d = misp->mis_drives; d != NULL; d = d->mid_next) {
+
+		if (d->mid_replicas != NULL) {
+			for (r = d->mid_replicas; r != NULL;
+			    r = r->mir_next) {
+				(void) printf("%s", indent);
+				for (i = 0; i < MDDB_FLAGS_LEN; i++) {
+					if (r->mir_flags & (1 << i)) {
+						(void) putchar(
+						    MDDB_FLAGS_STRING[i]);
+					} else {
+						(void) putchar(' ');
+					}
+				}
+				if ((r->mir_offset == -1) && (r->mir_length
+				    == -1)) {
+					(void) printf("%7.7s\t\t%7.7s\t",
+					    unk_str, unk_str);
+				} else if (r->mir_length == -1) {
+					(void) printf("%i\t\t%7.7s\t",
+					    r->mir_offset, unk_str);
+				} else {
+					(void) printf("%i\t\t%i\t",
+					    r->mir_offset, r->mir_length);
+				}
+				(void) printf("\t%s\n",
+				    d->mid_devname);
+			}
+		}
+	}
+	(void) printf("\n");
+}
+
+
+/*
+ * report_set_info()
+ *
+ * Returns:
+ *	< 0 for failure
+ *	  0 for success
+ *
+ */
+static int
+report_set_info(
+	md_im_set_desc_t	*misp,
+	mddb_mb_t		*mb,
+	mddb_lb_t		*lbp,
+	mddb_rb_t		*nm,
+	pnm_rec_t		**pnm,
+	mdname_t		*rsp,
+	int			fd,
+	uint_t			imp_flags,
+	int			set_count,
+	md_error_t		*ep
+)
+{
+	int 			rval = 0;
+	md_im_drive_info_t	*d;
+	md_im_replica_info_t	*r;
+	md_im_drive_info_t	*good_disk = NULL;
+	int			i;
+	int			in = META_INDENT;
+	char			indent[MAXPATHLEN];
+	int			dlen = 0;
+	md_timeval32_t		firstdisktime;
+	md_timeval32_t		lastaccess; /* stores last modified timestamp */
+	int			set_contains_time_conflict = 0;
+	int			disk_time_conflict = 0;
+
+
+	/* Calculates the correct indentation. */
+	indent[0] = 0;
+	for (i = 0; i < in; i++)
+		(void) strlcat(indent, " ", sizeof (indent));
+
+	/*
+	 * This will print before the information for the first diskset
+	 * if the verbose option was set.
+	 */
+	if (set_count == 1) {
+		if (imp_flags & META_IMP_REPORT) {
+			(void) printf("\n%s:\n\n",
+			    gettext("Disksets eligible for import"));
+		}
+	}
+
+	/*
+	 * Make the distinction between a regular diskset and
+	 * a replicated diskset.
+	 */
+	if (misp->mis_flags & MD_IM_SET_REPLICATED) {
+		if (imp_flags & META_IMP_REPORT) {
+			(void) printf("%i)  %s:\n", set_count, gettext(
+			    "Found replicated diskset containing disks"));
+		} else {
+			(void) printf("\n%s:\n", gettext(
+			    "Importing replicated diskset containing disks"));
+		}
+	} else {
+		if (imp_flags & META_IMP_REPORT) {
+			(void) printf("%i)  %s:\n", set_count, gettext(
+			    "Found regular diskset containing disks"));
+		} else {
+			(void) printf("\n%s:\n", gettext(
+			    "Importing regular diskset containing disks"));
+		}
+	}
+
+
+	/*
+	 * Save the set creation time for the first disk in the
+	 * diskset.
+	 */
+	for (d = misp->mis_drives; d != NULL; d = d->mid_next) {
+		dlen = max(dlen, strlen(d->mid_dnp->cname));
+		if (good_disk == NULL) {
+			for (r = d->mid_replicas; r != NULL; r = r->mir_next) {
+				if (r->mir_flags & MDDB_F_ACTIVE) {
+					good_disk = d;
+					firstdisktime =
+					    d->mid_setcreatetimestamp;
+					break;
+				}
+			}
+		} else {
+			break;
+		}
+	}
+
+
+	/*
+	 * Compares the set creation time from the first disk in the
+	 * diskset to the diskset creation time on all other
+	 * disks in the diskset.
+	 * If they are different then the disk probably belongs to a
+	 * different diskset so we will print out a warning.
+	 *
+	 * Looping through all drives in the diskset to print
+	 * out information about the drive.
+	 */
+	for (d = misp->mis_drives; d != NULL; disk_time_conflict = 0,
+	    d = d->mid_next) {
+		/*
+		 * Verify that the disk's seconds and micro-seconds fields
+		 * match the fields for the good_disk.
+		 */
+		if ((firstdisktime.tv_sec !=
+		    d->mid_setcreatetimestamp.tv_sec) ||
+		    (firstdisktime.tv_usec !=
+		    d->mid_setcreatetimestamp.tv_usec)) {
+			disk_time_conflict = 1;
+			set_contains_time_conflict = 1;
+		}
+
+		/* Printing disk names. */
+		if (disk_time_conflict == 1) {
+			/* print '*' next to conflicting disk */
+			(void) printf("%s%-*.*s *\n", indent,
+			    dlen, dlen, d->mid_dnp->cname);
+		} else {
+			(void) printf("%s%-*.*s\n", indent,
+			    dlen, dlen, d->mid_dnp->cname);
+		}
+	}
+	(void) printf("\n");
+
+	/*
+	 * This note explains the "*" that appears next to the
+	 * disks with metadbs' whose lb_inittime timestamp does not
+	 * match the rest of the diskset.
+	 */
+	if (set_contains_time_conflict) {
+		(void) printf("%s%s\n%s%s\n\n", indent,
+		    gettext("* WARNING: This disk has been reused in "
+		    "another diskset."), indent, gettext("Import may corrupt "
+		    "data in the diskset."));
+	}
+
+
+	/*
+	 * If the verbose flag was given on the command line,
+	 * we will print out the metastat -c information , the
+	 * creation time, and last modified time for the diskset.
+	 */
+	if (imp_flags & META_IMP_VERBOSE) {
+		(void) printf("%s%s\n", indent,
+		    gettext("Metadatabase information:"));
+		report_metadb_info(misp, indent);
+
+		/*
+		 * Printing creation time and last modified time.
+		 * Last modified: uses the global variable "lastaccess",
+		 * which is set to the last updated timestamp from all of
+		 * the database blocks(db_timestamp) or record blocks
+		 * (rb_timestamp).
+		 * Creation time is the locator block init time
+		 * (lb_inittime).
+		 */
+		lastaccess = good_disk->mid_replicas->mir_timestamp;
+
+		(void) printf("%s%s\n", indent,
+		    gettext("Metadevice information:"));
+		rval = report_metastat_info(mb, lbp, nm, pnm, rsp, fd,
+		    &lastaccess, ep);
+		if (rval < 0) {
+			return (rval);
+		}
+
+		(void) printf("%s%s:\t%s\n", indent,
+		    gettext("Creation time"),
+		    meta_print_time(&good_disk->mid_replicas->mir_timestamp));
+		(void) printf("%s%s:\t%s\n", indent,
+		    gettext("Last modified time"),
+		    meta_print_time(&lastaccess));
+	} else {
+		/*
+		 * Even if the verbose option is not set, we will print the
+		 * creation time for the diskset.
+		 */
+		(void) printf("%s%s:\t%s\n", indent, gettext("Creation time"),
+		    meta_print_time(&good_disk->mid_replicas->mir_timestamp));
+	}
+
+
+	/*
+	 * If the diskset is not actually being imported, then we
+	 * print out extra information about how to import it.
+	 * If the verbose flag was not set, then we will also
+	 * print out information about how to obtain verbose output.
+	 */
+	if (imp_flags & META_IMP_REPORT) {
+		/*
+		 * TRANSLATION_NOTE
+		 *
+		 * The translation of the phrase "For more information
+		 * about this set" will be followed by a ":" and a
+		 * suggested command (untranslatable) that the user
+		 * may use to request additional information.
+		 */
+		if (!(imp_flags & META_IMP_VERBOSE)) {
+		(void) printf("%s%s:\n%s  %s -r -v %s\n", indent,
+		    gettext("For more information about this diskset"),
+		    indent, myname, good_disk->mid_dnp->cname);
+		}
+		/*
+		 * TRANSLATION_NOTE
+		 *
+		 * The translation of the phrase "To import this set"
+		 * will be followed by a ":" and a suggested command
+		 * (untranslatable) that the user may use to import
+		 * the specified diskset.
+		 */
+		(void) printf("%s%s:\n%s  %s -s <newsetname> %s\n", indent,
+		    gettext("To import this diskset"), indent, myname,
+		    good_disk->mid_dnp->cname);
+	}
+	(void) printf("\n\n");
+
+	return (rval);
+}
+
+
+/*
+ * meta_get_and_report_set_info
  *
  * Scans a given drive for set specific information. If the given drive
  * has a shared metadb, scans the shared metadb for information pertaining
@@ -1718,11 +2071,13 @@ check_nm_disks(
  *	ENOTSUP for partial disksets detected
  */
 int
-meta_get_set_info(
-	mddrivenamelist_t *dp,
-	md_im_set_desc_t **mispp,
-	int local_mb_ok,
-	md_error_t *ep
+meta_get_and_report_set_info(
+	mddrivenamelist_t	*dp,
+	md_im_set_desc_t	**mispp,
+	int			local_mb_ok,
+	uint_t			imp_flags,
+	int			*set_count,
+	md_error_t 		*ep
 )
 {
 	uint_t			s;
@@ -1752,6 +2107,8 @@ meta_get_set_info(
 	struct devid_min_rec	*did_nmp;
 	int			extended_namespace = 0;
 	int			replicated = 0;
+	pnm_rec_t		*pnm = NULL; /* list of physical devs in set */
+	md_im_set_desc_t	*misp;
 
 	dnp = dp->drivenamep;
 
@@ -1893,7 +2250,7 @@ meta_get_set_info(
 	 * nm_rec. Extended namespace handling is left for Phase 2.
 	 *
 	 * What this should really be is a loop, each iteration of
-	 * which reads in a nm_rec and calls the set_append_wrapper().
+	 * which reads in a nm_rec and calls the set_append().
 	 */
 	/*LINTED*/
 	nmp = (struct nm_rec *)(nm + sizeof (mddb_rb_t));
@@ -1944,10 +2301,17 @@ meta_get_set_info(
 
 append:
 	/* Finally, we've got what we need to process this replica. */
-	mispp = set_append_wrapper(mispp, did_listp, mbp, lbp,
+	misp = set_append(mispp, did_listp, mbp, lbp,
 	    /*LINTED*/
-	    (mddb_rb_t *)nm, (mddb_rb_t *)did_nm, (mddb_rb_t *)did_shrnm,
-	    ep, replicated);
+	    (mddb_rb_t *)nm, &pnm, (mddb_rb_t *)did_nm, (mddb_rb_t *)did_shrnm,
+	    imp_flags, replicated, ep);
+
+	*set_count += 1;
+	rval = report_set_info(misp, mbp, lbp,
+		/*LINTED*/
+		(mddb_rb_t *)nm, &pnm, rsp, fd, imp_flags, *set_count, ep);
+	if (rval < 0)
+		goto out;
 
 	/* Return the fact that we found at least one set */
 	rval = 1;
@@ -1965,6 +2329,8 @@ out:
 		Free(did_nm);
 	if (did_shrnm != NULL)
 		Free(did_shrnm);
+	if (pnm != NULL)
+		free_pnm_rec_list(&pnm);
 
 	/*
 	 * If we are at the end of the list, we must free up

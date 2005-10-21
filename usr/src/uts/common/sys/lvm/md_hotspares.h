@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,13 +118,19 @@ typedef struct hot_spare32_od {
 #pragma pack()
 #endif
 
+/*
+ * The pads are necessary for the hot_spare_t structure to be interpreted
+ * correctly in userland on the amd64 arch.
+ */
 typedef struct hot_spare {
 	uint_t			hs_revision;    /* revision number */
 	mddb_recid_t		hs_record_id;   /* db record id */
 	md_dev64_t		hs_devnum;	/* hs device number */
 	mdkey_t			hs_key;		/* namespace key */
+	int			hs_pad1;
 	diskaddr_t		hs_start_blk;   /* hs starting block */
 	int			hs_has_label;   /* hs has a label */
+	int			hs_pad2;
 	diskaddr_t		hs_number_blks; /* hs # of blocks */
 	hotspare_states_t	hs_state;	/* hs state */
 	int			hs_refcount;    /* # hsp using the hs */

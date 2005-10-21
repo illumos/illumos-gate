@@ -506,18 +506,6 @@ freebuffer(
 	}
 }
 
-int
-revchk(
-	uint_t	mine,
-	uint_t	data
-)
-{
-	if ((MDDB_REV_MAJOR & mine) != (MDDB_REV_MAJOR & data))
-		return (1);
-	if ((MDDB_REV_MINOR & mine) < (MDDB_REV_MINOR & data))
-		return (1);
-	return (0);
-}
 
 static void
 blkbusy(

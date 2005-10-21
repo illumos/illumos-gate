@@ -75,22 +75,17 @@ static void	print_concise_stripe(int indent, mdsetname_t *sp,
 static void	print_concise_sp(int indent, mdsetname_t *sp, md_sp_t *part);
 static void	print_concise_trans(int indent, mdsetname_t *sp,
 		    md_trans_t *trans);
-static void	print_concise_entry(int indent, char *name, diskaddr_t size,
-		    char mtype);
 static void	free_names(mdnamelist_t **nlp);
 static char	*get_sm_state(md_mirror_t *mirror, int i,
 		    md_status_t mirror_status, uint_t tstate);
 static char	*get_raid_col_state(md_raidcol_t *colp, uint_t tstate);
 static char	*get_stripe_state(md_comp_t *mdcp, uint_t tstate);
 static char	*get_hs_state(md_hs_t *hsp);
-static char	*strip_blanks(char *s);
 static struct sp_base_list *sp_add_done(md_sp_t *part, struct sp_base_list *lp);
 static int	sp_done(md_sp_t *part, struct sp_base_list *lp);
 static int	sp_match(md_sp_t *part, struct sp_base_list *lp);
 static void	sp_free_list(struct sp_base_list *lp);
 
-#define	INDENT		4
-#define	NAMEWIDTH	16
 
 /*
  * print named hotspare pool or metadevice
@@ -1221,7 +1216,7 @@ print_concise_diskset(mdsetname_t *sp)
 		/*
 		 * print the common metadevice hierarchy under these soft parts
 		 */
-		print_concise_md(INDENT, sp, soft_part->compnamep);
+		print_concise_md(META_INDENT, sp, soft_part->compnamep);
 	    }
 
 	    free_names(&nl);
@@ -1350,7 +1345,7 @@ print_concise_mirror(int indent, mdsetname_t *sp, md_mirror_t *mirror)
 
 	(void) printf("\n");
 
-	indent += INDENT;
+	indent += META_INDENT;
 	for (i = 0; i < NMIRROR; i++) {
 	    if (mirror->submirrors[i].submirnamep == NULL)
 		continue;
@@ -1414,7 +1409,7 @@ print_concise_raid(int indent, mdsetname_t *sp, md_raid_t *raid)
 
 	(void) printf("\n");
 
-	indent += INDENT;
+	indent += META_INDENT;
 	for (i = 0; i < raid->cols.cols_len; i++) {
 	    print_concise_md(indent, sp, raid->cols.cols_val[i].colnamep);
 	}
@@ -1485,7 +1480,7 @@ print_concise_stripe(int indent, mdsetname_t *sp, md_stripe_t *stripe)
 
 	(void) printf("\n");
 
-	indent += INDENT;
+	indent += META_INDENT;
 	for (i = 0; i < stripe->rows.rows_len; i++) {
 	    md_row_t	*rowp;
 	    int		j;
@@ -1513,7 +1508,7 @@ print_concise_sp(int indent, mdsetname_t *sp, md_sp_t *part)
 
 	(void) printf(" %s\n", part->compnamep->cname);
 
-	print_concise_md(indent + INDENT, sp, part->compnamep);
+	print_concise_md(indent + META_INDENT, sp, part->compnamep);
 }
 
 /*
@@ -1536,7 +1531,7 @@ print_concise_trans(int indent, mdsetname_t *sp, md_trans_t *trans)
 
 	(void) printf("\n");
 
-	indent += INDENT;
+	indent += META_INDENT;
 
 	print_concise_md(indent, sp, trans->masternamep);
 
@@ -1592,37 +1587,6 @@ print_concise_md(int indent, mdsetname_t *sp, mdname_t *np)
 	default:
 	    return;
 	}
-}
-
-/*
- * Print properly indented metadevice name, type and size for concise output.
- */
-static void
-print_concise_entry(int indent, char *name, diskaddr_t size, char mtype)
-{
-	int	i;
-	int	width = NAMEWIDTH;	/* minumum field width for name */
-	char	in[MAXPATHLEN];
-	char	*sz;
-
-	in[0] = 0;
-	for (i = 0; i < indent; i++)
-	    (void) strlcat(in, " ", sizeof (in));
-
-	/* set up minimum field width. negative for left justified */
-	width -= indent;
-	if (width < 0)
-	    width = 0;		/* overflowed; no minimum field needed */
-	else
-	    width = 0 - width;	/* make it negative for left justification */
-
-	if (size == 0) {
-	    sz = "-";
-	} else {
-	    sz = strip_blanks(meta_number_to_string(size, DEV_BSIZE));
-	}
-
-	(void) printf("%s%*s %c %6s", in, width, name, mtype, sz);
 }
 
 /*
@@ -1739,27 +1703,7 @@ get_raid_col_state(md_raidcol_t *colp, uint_t tstate)
 	if (tstate != 0)
 	    return (gettext("unavail"));
 
-	switch (colp->state) {
-	case RCS_INIT:
-	    return (gettext("initializing"));
-
-	case RCS_OKAY:
-	    return (NULL);
-
-	case RCS_INIT_ERRED:
-	    /*FALLTHROUGH*/
-	case RCS_ERRED:
-	    return (gettext("maint"));
-
-	case RCS_LAST_ERRED:
-	    return (gettext("last-erred"));
-
-	case RCS_RESYNC:
-	    return (gettext("resyncing"));
-
-	default:
-	    return (gettext("unknown"));
-	}
+	return (meta_get_raid_col_state(colp->state));
 }
 
 /*
@@ -1773,18 +1717,7 @@ get_stripe_state(md_comp_t *mdcp, uint_t tstate)
 	if (tstate != 0)
 	    return ("unavail");
 
-	switch (state) {
-	case CS_OKAY:
-	    return (NULL);
-	case CS_ERRED:
-	    return (gettext("maint"));
-	case CS_LAST_ERRED:
-	    return (gettext("last-erred"));
-	case CS_RESYNC:
-	    return (gettext("resyncing"));
-	default:
-	    return (gettext("invalid"));
-	}
+	return (meta_get_stripe_state(state));
 }
 
 /*
@@ -1795,43 +1728,9 @@ get_hs_state(md_hs_t *hsp)
 {
 	hotspare_states_t	state = hsp->state;
 
-	switch (state) {
-	case HSS_AVAILABLE:
-	    return (NULL);
-	case HSS_RESERVED:
-	    return (gettext("in-use"));
-	case HSS_BROKEN:
-	    return (gettext("broken"));
-	case HSS_UNUSED:
-	default:
-	    return (gettext("invalid"));
-	}
+	return (meta_get_hs_state(state));
 }
 
-
-/*
- * Strip blanks from string.  Used for size field in concise output.
- */
-static char *
-strip_blanks(char *s)
-{
-	char *p;
-
-	for (p = s; *p; ) {
-	    if (*p == ' ') {
-		char *t;
-
-		for (t = p; *t; t++) {
-		    *t = *(t + 1);
-		}
-
-	    } else {
-		p++;
-	    }
-	}
-
-	return (s);
-}
 
 /*
  * Keep track of printed soft partitions for concise output.

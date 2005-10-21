@@ -950,11 +950,27 @@ function	meta_list_drives
 version		SUNWprivate_1.1
 end
 
-function	meta_get_set_info
+function	meta_get_and_report_set_info
 version		SUNWprivate_1.1
 end
 
 function	meta_prune_cnames
+version		SUNWprivate_1.1
+end
+
+function	print_concise_entry
+version		SUNWprivate_1.1
+end
+
+function	meta_get_raid_col_state
+version		SUNWprivate_1.1
+end
+
+function	meta_get_stripe_state
+version		SUNWprivate_1.1
+end
+
+function	meta_get_hs_state
 version		SUNWprivate_1.1
 end
 

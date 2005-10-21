@@ -1747,6 +1747,10 @@ extern md_mn_msg_t	*copy_msg(md_mn_msg_t *src, md_mn_msg_t *dest);
 /* meta_import.c */
 extern	int		read_master_block(md_error_t *ep, int fd, void *bp,
 			    int bsize);
+extern	int		read_database_block(md_error_t *, int, mddb_mb_t *, int,
+			    void *, int);
+extern	daddr_t		getphysblk(mddb_block_t, mddb_mb_t *);
+
 typedef struct md_im_names {
 	int	min_count;
 	char	**min_names;
@@ -1774,6 +1778,7 @@ typedef struct md_im_drive_info {
 	int				mid_o_devid_sz;
 	char				mid_minor_name[MDDB_MINOR_NAME_MAX];
 	md_timeval32_t			mid_setcreatetimestamp;
+	char				*mid_devname;
 	md_im_replica_info_t		*mid_replicas;
 	struct md_im_drive_info		*overlap; /* chain of overlap disks */
 } md_im_drive_info_t;
@@ -1790,11 +1795,38 @@ typedef struct md_im_set_desc {
 	int				mis_active_replicas;
 } md_im_set_desc_t;
 
+/*
+ * pnm_rec is used to store the mapping from keys in the NM namespace
+ * to actual physical devices.  The current name of a physical device, used
+ * by a set that can be imported, can be retrieved by matching the did_key
+ * (deviceID entry) in the DID_SHR_NM namespace to the min_devid_key in the
+ * DID_NM namespace(the did_key to the min_key).  Then matching the min_key
+ * in the DID_NM namespace to the n_key in the NM namespace.
+ *
+ * n_name is defined to be an array, so that only one malloc is needed for the
+ * entire datastructure.
+ */
+typedef struct pnm_rec {
+	mdkey_t		n_key;  /* The n_key/min_key value */
+	struct pnm_rec	*next;
+	ushort_t	n_namlen;
+	char		n_name[1]; /* The name of the physical device */
+} pnm_rec_t;
+
+/* Indentation value for metaimport output */
+#define	META_INDENT			4
+
+/* Flags for metaimport reporting */
+#define	META_IMP_REPORT		0x0001
+#define	META_IMP_VERBOSE	0x0002
+
 extern	int			meta_list_disks(md_error_t *, md_im_names_t *);
 extern	mddrivenamelist_t	*meta_prune_cnames(md_error_t *,
 				    md_im_names_t *, int);
-extern	int			meta_get_set_info(mddrivenamelist_t *,
-				    md_im_set_desc_t **, int, md_error_t *);
+extern	int			meta_get_and_report_set_info(
+				    mddrivenamelist_t *, md_im_set_desc_t **,
+				    int, uint_t, int *, md_error_t *);
+extern	void			free_pnm_rec_list(pnm_rec_t **);
 extern	int			meta_imp_set(md_im_set_desc_t *,
 				    char *, int, bool_t, md_error_t *);
 extern	int			meta_imp_drvused(mdsetname_t *sp,
@@ -1871,3 +1903,13 @@ extern int		halt_set(mdsetname_t *sp, md_error_t *ep);
 #endif
 
 #endif	/* _META_H */
+
+/* meta_statconcise.c */
+extern  void		print_concise_entry(int indent, char *name,
+			    diskaddr_t size, char mtype);
+extern	char		*meta_get_raid_col_state(rcs_state_t);
+extern	char		*meta_get_stripe_state(comp_state_t);
+extern	char		*meta_get_hs_state(hotspare_states_t);
+extern	int		report_metastat_info(mddb_mb_t *, mddb_lb_t *,
+			    mddb_rb_t *, pnm_rec_t **, mdname_t *, int,
+			    md_timeval32_t *, md_error_t *);

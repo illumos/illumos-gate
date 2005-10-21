@@ -822,9 +822,11 @@ UFS_OBJS +=	ufs_alloc.o	ufs_bmap.o	ufs_dir.o 	ufs_xattr.o \
 #			LVM modules
 #
 MD_OBJS	+= md.o md_error.o md_ioctl.o md_mddb.o md_names.o \
-	md_med.o md_rename.o md_subr.o md_convert.o
+	md_med.o md_rename.o md_subr.o
 
-MD_DERIVED_OBJS = md_crc.o metamed_xdr.o meta_basic_xdr.o
+MD_COMMON_OBJS = md_convert.o md_crc.o md_revchk.o
+
+MD_DERIVED_OBJS = metamed_xdr.o meta_basic_xdr.o
 
 SOFTPART_OBJS += sp.o sp_ioctl.o
 

@@ -180,206 +180,6 @@ report_overlap_recommendation()
 	Free(mbp);
 }
 
-static void
-report_standard(md_im_set_desc_t *s, int do_cmd, int overlap)
-{
-	md_im_drive_info_t	*d;
-	md_im_replica_info_t	*r;
-	md_im_drive_info_t	*good_disk = NULL;
-	int			i;
-	md_timeval32_t		firstdisktime;
-
-	for (i = 0; s != NULL; s = s->mis_next, i++) {
-		int	time_conflict = 0;
-
-		/* Choose the best drive to use for the import command */
-		for (good_disk = NULL, d = s->mis_drives;
-		    d != NULL; d = d->mid_next) {
-			if (good_disk == NULL) {
-				for (r = d->mid_replicas;
-				    r != NULL;
-				    r = r->mir_next) {
-					if (r->mir_flags & MDDB_F_ACTIVE) {
-						good_disk = d;
-						break;
-					}
-				}
-			}
-		}
-
-		/*
-		 * Make the distinction between a regular diskset and
-		 * a replicated diskset.
-		 */
-		if (s->mis_flags & MD_IM_SET_REPLICATED) {
-			(void) fprintf(stdout, "%s :\n",
-			gettext("Replicated diskset found containing disks"));
-		} else {
-			(void) fprintf(stdout, "%s :\n",
-			gettext("Regular diskset found containing disks"));
-		}
-
-
-		/*
-		 * Save the set creation time from the first disk in the
-		 * diskset and compare the set creation time on all other
-		 * disks in the set to that. If they are the same, the
-		 * disk really belongs here. If they are different the
-		 * disk probably belongs to a different set and we'll
-		 * need to print out a warning.
-		 */
-		firstdisktime = s->mis_drives->mid_setcreatetimestamp;
-		for (d = s->mis_drives; d != NULL; d = d->mid_next) {
-			if ((firstdisktime.tv_sec ==
-			    d->mid_setcreatetimestamp.tv_sec) &&
-			    (firstdisktime.tv_usec ==
-			    d->mid_setcreatetimestamp.tv_usec)) {
-				(void) fprintf(stdout, "  %s\n",
-				    d->mid_dnp->cname);
-			} else {
-				(void) fprintf(stdout, "  %s *\n",
-				    d->mid_dnp->cname);
-				time_conflict = 1;
-			}
-		}
-
-		if (time_conflict) {
-			fprintf(stdout, "* WARNING: This disk has been reused "
-			    "in another set.\n  Import may corrupt data in the "
-			    "disk set.\n");
-		}
-
-		if (overlap) {
-			(void) fprintf(stdout, "%s: %s\n",
-			    gettext("Diskset creation time"),
-		    meta_print_time(&s->mis_drives->mid_replicas->
-			mir_timestamp));
-		}
-
-		/*
-		 * when do_cmd is true, we are not actually importing
-		 * a disk set, but want to print out extra information
-		 */
-		if (do_cmd) {
-			/*
-			 * TRANSLATION_NOTE
-			 *
-			 * The translation of the phrase "For more information
-			 * about this set" will be followed by a ":" and a
-			 * suggested command (untranslatable) that the user
-			 * may use to request additional information.
-			 */
-			(void) fprintf(stdout, "%s:\n  %s -r -v %s\n",
-			    gettext("For more information about this set"),
-			    myname, good_disk->mid_dnp->cname);
-
-			/*
-			 * TRANSLATION_NOTE
-			 *
-			 * The translation of the phrase "To import this set"
-			 * will be followed by a ":" and a suggested command
-			 * (untranslatable) that the user may use to import
-			 * the specified diskset.
-			 */
-			(void) fprintf(stdout, "%s:\n  %s -s <newsetname> %s\n",
-			    gettext("To import this set"), myname,
-			    good_disk->mid_dnp->cname);
-		}
-
-		(void) fprintf(stdout, "\n");
-	}
-
-	if (overlap) {
-		report_overlap_recommendation();
-	}
-}
-
-static void
-report_verbose(md_im_set_desc_t *s, int do_cmd, int overlap)
-{
-	md_im_drive_info_t	*d;
-	md_im_replica_info_t	*r;
-	md_im_drive_info_t	*good_disk;
-	static const char	fmt1[] = "%-*.*s %12.12s %12.12s %s\n";
-	static const char	fmt2[] = "%-*.*s %12d %12d ";
-	int			dlen = 0;
-	int			f;
-
-	for (; s != NULL; s = s->mis_next) {
-
-		/*
-		 * Run through the drives in this set to find the one with the
-		 * longest common name and the one we want to consider "best"
-		 */
-		for (d = s->mis_drives, good_disk = NULL;
-		    d != NULL; d = d->mid_next) {
-			dlen = max(dlen, strlen(d->mid_dnp->cname));
-			for (r = d->mid_replicas; r != NULL; r = r->mir_next) {
-				if ((good_disk == NULL) &&
-				    (r->mir_flags & MDDB_F_ACTIVE)) {
-					good_disk = d;
-					break;
-				}
-			}
-		}
-
-		if (do_cmd) {
-			(void) fprintf(stdout, "%s: %s -s <newsetname> %s\n",
-				gettext("To import this set"), myname,
-				good_disk->mid_dnp->cname);
-		}
-
-		(void) fprintf(stdout, "%s: %s\n", gettext("Last update"),
-		    meta_print_time(&good_disk->mid_replicas->mir_timestamp));
-
-
-		/* Make sure the length will hold the column heading */
-		dlen = max(dlen, strlen(gettext("Device")));
-
-		(void) fprintf(stdout, fmt1, dlen, dlen, gettext("Device"),
-		    gettext("offset"), gettext("length"),
-		    gettext("replica flags"));
-
-		for (d = s->mis_drives; d != NULL; d = d->mid_next) {
-
-			if (d->mid_replicas != NULL) {
-				for (r = d->mid_replicas;
-				    r != NULL;
-				    r = r->mir_next) {
-					(void) fprintf(stdout, fmt2, dlen, dlen,
-					    (r == d->mid_replicas) ?
-					    d->mid_dnp->cname : "",
-					    r->mir_offset, r->mir_length);
-
-					for (f = 0; f < MDDB_FLAGS_LEN; f++) {
-						(void) putchar(
-						    (r->mir_flags & (1 << f)) ?
-						    MDDB_FLAGS_STRING[f] : ' ');
-					}
-
-					(void) fprintf(stdout, "\n");
-				}
-			} else {
-				(void) fprintf(stdout, fmt1,
-				    dlen, dlen, d->mid_dnp->cname,
-				    gettext("no replicas"), "", "");
-			}
-		}
-
-		if (overlap) {
-			(void) fprintf(stdout, "%s: %s\n",
-			    gettext("Diskset creation time"),
-		    meta_print_time(&s->mis_drives->mid_replicas->
-			mir_timestamp));
-		}
-
-		(void) fprintf(stdout, "\n");
-	}
-
-	if (overlap) {
-		report_overlap_recommendation();
-	}
-}
 
 int
 main(int argc, char *argv[])
@@ -390,7 +190,6 @@ main(int argc, char *argv[])
 	mdsetname_t		*sp = NULL;
 	char			*setname_new = NULL;
 	int			report_only = 0;
-	int			verbose = 0;
 	int			version = 0;
 	bool_t			dry_run = 0;
 	md_im_names_t		cnames = { 0, NULL };
@@ -408,6 +207,8 @@ main(int argc, char *argv[])
 	int			force = 0;
 	int			overlap = 0;
 	int			partial = 0;
+	uint_t			imp_flags = 0;
+	int			set_count = 0;
 
 	/*
 	 * Get the locale set up before calling any other routines
@@ -458,6 +259,7 @@ main(int argc, char *argv[])
 
 		case 'r':
 			report_only = 1;
+			imp_flags |= META_IMP_REPORT;
 			break;
 
 		case 's':
@@ -465,7 +267,7 @@ main(int argc, char *argv[])
 			break;
 
 		case 'v':
-			verbose = 1;
+			imp_flags |= META_IMP_VERBOSE;
 			break;
 
 		case 'V':
@@ -614,7 +416,13 @@ main(int argc, char *argv[])
 			    goto skipdisk;
 		}
 
-		hasreplica = meta_get_set_info(dp, mispp, 0, ep);
+		/*
+		 * In addition to updating the misp list, either verbose or
+		 * standard output will be generated.
+		 *
+		 */
+		hasreplica = meta_get_and_report_set_info(dp, mispp, 0,
+		    imp_flags, &set_count, ep);
 
 		/*
 		 * If current disk is part of a partial diskset,
@@ -739,7 +547,6 @@ skipdisk:
 	if (misp->mis_next != NULL) {
 		have_multiple_sets = 1;
 	}
-
 	/*
 	 * Generate the appropriate (verbose or not) report for all sets
 	 * detected.  If we're planning on importing later, only include the
@@ -753,7 +560,18 @@ skipdisk:
 	 * check for the overlapping
 	 */
 	if (have_multiple_sets) {
+		/* Printing out how many candidate disksets we found. */
+		if (imp_flags & META_IMP_REPORT) {
+			(void) printf("%s: %i\n\n",
+			    gettext("Number of disksets eligible for import"),
+			    set_count);
+		}
+
 		overlap = set_disk_overlap(misp);
+		if (overlap) {
+			report_overlap_recommendation();
+		}
+
 		if (!report_only) {
 			md_eprintf("%s\n\n", gettext("multiple unconfigured "
 			    "sets detected.\nRerun the command with the "
@@ -761,11 +579,6 @@ skipdisk:
 		}
 	}
 
-	if (verbose) {
-	    report_verbose(misp, (report_only || have_multiple_sets), overlap);
-	} else {
-	    report_standard(misp, (report_only || have_multiple_sets), overlap);
-	}
 
 	/*
 	 * If it's a report-only request, we're done.  If it's an import

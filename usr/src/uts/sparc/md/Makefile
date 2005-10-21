@@ -21,7 +21,7 @@
 #
 #
 # uts/sparc/md/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,8 +41,10 @@ UTSBASE	= ../..
 #
 MODULE		= md
 OBJECTS		= $(MD_OBJS:%=$(OBJS_DIR)/%)
+OBJECTS		+= $(MD_COMMON_OBJS:%=$(OBJS_DIR)/%)
 OBJECTS		+= $(MD_DERIVED_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(MD_OBJS:%.o=$(LINTS_DIR)/%.ln)
+LINTS		+= $(MD_COMMON_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR     = $(UTSBASE)/common/io/lvm/md
 
