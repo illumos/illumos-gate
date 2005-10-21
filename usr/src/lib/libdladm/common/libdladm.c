@@ -186,7 +186,7 @@ dladm_walk(void (*fn)(void *, const char *), void *arg)
 	ddp = dw.dw_dev_list;
 	while (ddp) {
 		fn(arg, ddp->dd_name);
-		dladm_walk_vlan(fn, arg, ddp->dd_name);
+		(void) dladm_walk_vlan(fn, arg, ddp->dd_name);
 		last_ddp = ddp;
 		ddp = ddp->dd_next;
 		free(last_ddp);
