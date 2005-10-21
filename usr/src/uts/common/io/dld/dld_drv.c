@@ -411,7 +411,7 @@ failed:
  */
 typedef struct dld_ioc_vlan_state {
 	uint_t		bytes_left;
-	uint_t		count;
+	dld_ioc_vlan_t	*divp;
 	dld_vlan_info_t	*vlanp;
 } dld_ioc_vlan_state_t;
 
@@ -420,15 +420,22 @@ drv_ioc_vlan_info(dls_vlan_t *dvp, void *arg)
 {
 	dld_ioc_vlan_state_t	*statep = arg;
 
-	if (statep->bytes_left < sizeof (dld_vlan_info_t))
-		return (ENOSPC);
+	/*
+	 * passed buffer space is limited to 65536 bytes. So
+	 * copy only the vlans associated with the passed link.
+	 */
+	if (strcmp(dvp->dv_dlp->dl_dev, statep->divp->div_name) == 0 &&
+	    dvp->dv_dlp->dl_port == statep->divp->div_port &&
+	    dvp->dv_id != 0) {
+		if (statep->bytes_left < sizeof (dld_vlan_info_t))
+			return (ENOSPC);
 
-	(void) strlcpy(statep->vlanp->dvi_name, dvp->dv_name, IFNAMSIZ);
-	statep->vlanp->dvi_vid = dvp->dv_id;
-
-	statep->count++;
-	statep->bytes_left -= sizeof (dld_vlan_info_t);
-	statep->vlanp += 1;
+		(void) strlcpy(statep->vlanp->dvi_name,
+		    dvp->dv_name, IFNAMSIZ);
+		statep->divp->div_count++;
+		statep->bytes_left -= sizeof (dld_vlan_info_t);
+		statep->vlanp += 1;
+	}
 	return (0);
 }
 
@@ -439,22 +446,28 @@ drv_ioc_vlan(dld_ctl_str_t *ctls, mblk_t *mp)
 	dld_ioc_vlan_state_t	state;
 	int			err = EINVAL;
 	queue_t			*q = ctls->cs_wq;
+	mblk_t			*bp;
 
 	if ((err = miocpullup(mp, sizeof (dld_ioc_vlan_t))) != 0)
 		goto failed;
 
-	divp = (dld_ioc_vlan_t *)mp->b_cont->b_rptr;
-	state.bytes_left = MBLKL(mp->b_cont) - sizeof (dld_ioc_vlan_t);
-	state.count = 0;
+	if ((bp = msgpullup(mp->b_cont, -1)) == NULL)
+		goto failed;
+
+	freemsg(mp->b_cont);
+	mp->b_cont = bp;
+	divp = (dld_ioc_vlan_t *)bp->b_rptr;
+	divp->div_count = 0;
+	state.bytes_left = MBLKL(bp) - sizeof (dld_ioc_vlan_t);
+	state.divp = divp;
 	state.vlanp = (dld_vlan_info_t *)(divp + 1);
 
 	err = dls_vlan_walk(drv_ioc_vlan_info, &state);
 	if (err != 0)
 		goto failed;
 
-	divp->div_count = state.count;
 	miocack(q, mp, sizeof (dld_ioc_vlan_t) +
-	    state.count * sizeof (dld_vlan_info_t), 0);
+	    state.divp->div_count * sizeof (dld_vlan_info_t), 0);
 	return;
 
 failed:

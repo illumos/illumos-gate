@@ -40,6 +40,15 @@
 #include <sys/dld.h>
 #include <net/if.h>
 
+typedef struct dladm_dev {
+	char			dd_name[IFNAMSIZ];
+	struct dladm_dev	*dd_next;
+} dladm_dev_t;
+
+typedef struct dladm_walk {
+	dladm_dev_t		*dw_dev_list;
+} dladm_walk_t;
+
 /*
  * Issue an ioctl to the specified file descriptor attached to the
  * DLD control driver interface.
@@ -84,36 +93,32 @@ i_dladm_info(int fd, const char *name, dladm_attr_t *dap)
 }
 
 /*
- * Callback function used to count the number of DDI_NT_NET.
- */
-/* ARGSUSED */
-static int
-i_dladm_nt_net_count(di_node_t node, di_minor_t minor, void *arg)
-{
-	uint_t		*countp = arg;
-
-	(*countp)++;
-	return (DI_WALK_CONTINUE);
-}
-
-/*
  * Adds a datalink to the array corresponding to arg.
  */
 static void
 i_dladm_nt_net_add(void *arg, char *name)
 {
-	char		**array = arg;
-	char		*elem;
+	dladm_walk_t	*dwp = arg;
+	dladm_dev_t	*ddp = dwp->dw_dev_list;
+	dladm_dev_t	**lastp = &dwp->dw_dev_list;
 
-	for (;;) {
-		elem = *(array++);
-		if (elem[0] == '\0')
-			break;
-		if (strcmp(elem, name) == 0)
+	while (ddp) {
+		/*
+		 * Skip duplicates.
+		 */
+		if (strcmp(ddp->dd_name, name) == 0)
 			return;
+
+		lastp = &ddp->dd_next;
+		ddp = ddp->dd_next;
 	}
 
-	(void) strlcpy(elem, name, MAXNAMELEN);
+	if ((ddp = malloc(sizeof (*ddp))) == NULL)
+		return;
+
+	(void) strlcpy(ddp->dd_name, name, IFNAMSIZ);
+	ddp->dd_next = NULL;
+	*lastp = ddp;
 }
 
 /*
@@ -150,7 +155,6 @@ i_dladm_nt_net_walk(di_node_t node, di_minor_t minor, void *arg)
 		(void) dlpi_close(fd);
 		return (DI_WALK_CONTINUE);
 	}
-
 	(void) snprintf(name, IFNAMSIZ - 1, "%s%d", provider, ppa);
 	i_dladm_nt_net_add(arg, name);
 	(void) dlpi_close(fd);
@@ -165,95 +169,68 @@ int
 dladm_walk(void (*fn)(void *, const char *), void *arg)
 {
 	di_node_t	root;
-	uint_t		count;
-	char		**array;
-	char		*elem;
-	int		i;
+	dladm_walk_t	dw;
+	dladm_dev_t	*ddp, *last_ddp;
 
 	if ((root = di_init("/", DINFOCACHE)) == DI_NODE_NIL) {
 		errno = EFAULT;
 		return (-1);
 	}
+	dw.dw_dev_list = NULL;
 
-	count = 0;
-	(void) di_walk_minor(root, DDI_NT_NET, DI_CHECK_ALIAS, (void *)&count,
-	    i_dladm_nt_net_count);
-
-	if (count == 0)
-		return (dladm_walk_vlan(fn, arg));
-
-	if ((array = malloc(count * sizeof (char *))) == NULL)
-		goto done;
-
-	for (i = 0; i < count; i++) {
-		if ((array[i] = malloc(IFNAMSIZ)) != NULL) {
-			(void) memset(array[i], '\0', IFNAMSIZ);
-			continue;
-		}
-
-		while (--i >= 0)
-			free(array[i]);
-		goto done;
-	}
-
-	(void) di_walk_minor(root, DDI_NT_NET, DI_CHECK_ALIAS, (void *)array,
+	(void) di_walk_minor(root, DDI_NT_NET, DI_CHECK_ALIAS, &dw,
 	    i_dladm_nt_net_walk);
+
 	di_fini(root);
 
-	for (i = 0; i < count; i++) {
-		elem = array[i];
-		if (elem[0] != '\0')
-			fn(arg, (const char *)elem);
-		free(elem);
+	ddp = dw.dw_dev_list;
+	while (ddp) {
+		fn(arg, ddp->dd_name);
+		dladm_walk_vlan(fn, arg, ddp->dd_name);
+		last_ddp = ddp;
+		ddp = ddp->dd_next;
+		free(last_ddp);
 	}
 
-done:
-	free(array);
-	return (dladm_walk_vlan(fn, arg));
+	return (0);
 }
 
 /*
  * Invoke the specified callback function for each vlan managed by dld
  */
 int
-dladm_walk_vlan(void (*fn)(void *, const char *), void *arg)
+dladm_walk_vlan(void (*fn)(void *, const char *), void *arg, const char *name)
 {
-	int		fd, bufsize, rc, i;
-	int		nvlan = 512;
+	int		fd, bufsize, i;
+	int		nvlan = 4094;
 	dld_ioc_vlan_t	*iocp = NULL;
 	dld_vlan_info_t	*dvip;
 
 	if ((fd = open(DLD_CONTROL_DEV, O_RDWR)) < 0)
 		return (-1);
 
-	for (;;) {
-		bufsize = sizeof (dld_ioc_vlan_t) +
-		    nvlan * sizeof (dld_vlan_info_t);
+	bufsize = sizeof (dld_ioc_vlan_t) + nvlan * sizeof (dld_vlan_info_t);
 
-		iocp = (dld_ioc_vlan_t *)calloc(1, bufsize);
-		if (iocp == NULL)
-			goto done;
+	if ((iocp = (dld_ioc_vlan_t *)calloc(1, bufsize)) == NULL)
+		return (-1);
 
-		rc = i_dladm_ioctl(fd, DLDIOCVLAN, iocp, bufsize);
-		if (rc == 0)
-			break;
-
-		if (errno == ENOSPC) {
-			nvlan *= 2;
-			free(iocp);
-			continue;
-		}
-		goto done;
+	if (strncmp(name, "aggr", 4) == 0) {
+		(void) strlcpy((char *)iocp->div_name, "aggr0", IFNAMSIZ);
+		iocp->div_port = atoi(strpbrk(name, "0123456789"));
+	} else {
+		(void) strlcpy((char *)iocp->div_name, name, IFNAMSIZ);
+		iocp->div_port = 0;
 	}
-
-	dvip = (dld_vlan_info_t *)(iocp + 1);
-
-	for (i = 0; i < iocp->div_count; i++) {
-		if (dvip[i].dvi_vid != 0)
+	if (i_dladm_ioctl(fd, DLDIOCVLAN, iocp, bufsize) == 0) {
+		dvip = (dld_vlan_info_t *)(iocp + 1);
+		for (i = 0; i < iocp->div_count; i++)
 			(*fn)(arg, dvip[i].dvi_name);
 	}
-
-done:
+	/*
+	 * Note: Callers of dladm_walk_vlan() ignore the return
+	 * value of this routine. So ignoring ioctl failure case
+	 * and just returning 0.
+	 */
 	free(iocp);
 	(void) close(fd);
 	return (0);

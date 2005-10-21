@@ -102,12 +102,13 @@ typedef struct dld_ioc_attr {
 #define	DLDIOCVLAN	(DLDIOC | 0x04)
 
 typedef struct dld_ioc_vlan {
+	char		div_name[IFNAMSIZ];
+	uint_t		div_port;
 	uint_t		div_count;
 } dld_ioc_vlan_t;
 
 typedef struct dld_vlan_info {
 	char		dvi_name[IFNAMSIZ];
-	uint16_t	dvi_vid;
 } dld_vlan_info_t;
 
 #ifdef _KERNEL

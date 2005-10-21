@@ -47,7 +47,8 @@ struct dladm_attr {
 };
 
 extern int	dladm_walk(void (*)(void *, const char *), void *);
-extern int	dladm_walk_vlan(void (*)(void *, const char *), void *);
+extern int	dladm_walk_vlan(void (*)(void *,
+			    const char *), void *, const char *);
 extern int	dladm_info(const char *, dladm_attr_t *);
 
 #ifdef	__cplusplus
