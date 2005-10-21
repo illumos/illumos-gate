@@ -59,6 +59,14 @@ typedef struct cmd_subscriber {
 	cmd_evdisp_stat_t subr_stat;
 } cmd_subscriber_t;
 
+/*ARGSUSED*/
+cmd_evdisp_t
+cmd_nop(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
+    cmd_errcl_t clcode)
+{
+	return (CMD_EVD_UNUSED);
+}
+
 static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.ucc", 		cmd_xxc,	CMD_ERRCL_UCC },
 	{ "ereport.cpu.*.ucu",		cmd_xxu,	CMD_ERRCL_UCU },
@@ -115,6 +123,21 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.io.*.ecc.s-dwce",	cmd_ioxe_sec },
 	{ "ereport.io.*.ecc.s-drue",	cmd_ioxe_sec },
 	{ "ereport.io.*.ecc.s-dwue",	cmd_ioxe_sec },
+	{ "ereport.cpu.*.ddc",		cmd_nop },
+	{ "ereport.cpu.*.dmdu",		cmd_nop },
+	{ "ereport.cpu.*.dmsu",		cmd_nop },
+	{ "ereport.cpu.*.dmtu",		cmd_nop },
+	{ "ereport.cpu.*.dtc",		cmd_nop },
+	{ "ereport.cpu.*.idc",		cmd_nop },
+	{ "ereport.cpu.*.imdu",		cmd_nop },
+	{ "ereport.cpu.*.imtu",		cmd_nop },
+	{ "ereport.cpu.*.irc",		cmd_nop },
+	{ "ereport.cpu.*.itc",		cmd_nop },
+	{ "ereport.cpu.*.ldac",		cmd_nop },
+	{ "ereport.cpu.*.ldrc",		cmd_nop },
+	{ "ereport.cpu.*.ldsc",		cmd_nop },
+	{ "ereport.cpu.*.ldwc",		cmd_nop },
+	{ "ereport.cpu.*.ltc",		cmd_nop },
 	{ NULL, NULL }
 };
 
@@ -299,6 +322,22 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dsc");
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dau");
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dsu");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ddc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dmdu");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dmsu");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dmtu");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dtc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.frc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.idc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.imdu");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.imtu");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.irc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.itc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ldac");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ldrc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ldsc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ldwc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ltc");
 
 	fmd_hdl_subscribe(hdl, "ereport.io.tom.ecc.drce");
 	fmd_hdl_subscribe(hdl, "ereport.io.tom.ecc.dwce");

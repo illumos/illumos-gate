@@ -108,3 +108,13 @@ cmd_ue(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 {
 	return (xe_common(hdl, ep, nvl, class, cmd_ue_common));
 }
+
+cmd_evdisp_t
+cmd_frx(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
+    cmd_errcl_t clcode)
+{
+	cmd_errcl_t matchmask = (clcode == CMD_ERRCL_FRC ? (CMD_ERRCL_RCE |
+	    CMD_ERRCL_IOCE) : (CMD_ERRCL_RUE | CMD_ERRCL_IOUE));
+
+	return (cmd_rxefrx_common(hdl, ep, nvl, class, clcode, matchmask));
+}

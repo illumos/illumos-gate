@@ -520,7 +520,7 @@ iorxefrx_match(fmd_hdl_t *hdl, cmd_errcl_t errcl, cmd_errcl_t matchmask,
  * Got an RxE or an FRx.  FRx ereports can be matched with RxE ereports and
  * vice versa.  FRx ereports can also be matched with IOxE ereports.
  */
-static cmd_evdisp_t
+cmd_evdisp_t
 cmd_rxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
     const char *class, cmd_errcl_t clcode, cmd_errcl_t matchmask)
 {
@@ -720,16 +720,6 @@ ioxe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 	return (hdlr(hdl, ep, nvl, class, afar, AFLT_STAT_VALID, synd,
 	    AFLT_STAT_VALID, cmd_mem_name2type(typenm, minorvers), disp,
 	    rsrc));
-}
-
-cmd_evdisp_t
-cmd_frx(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
-    cmd_errcl_t clcode)
-{
-	cmd_errcl_t matchmask = (clcode == CMD_ERRCL_FRC ? (CMD_ERRCL_RCE |
-	    CMD_ERRCL_IOCE) : (CMD_ERRCL_RUE | CMD_ERRCL_IOUE));
-
-	return (cmd_rxefrx_common(hdl, ep, nvl, class, clcode, matchmask));
 }
 
 cmd_evdisp_t

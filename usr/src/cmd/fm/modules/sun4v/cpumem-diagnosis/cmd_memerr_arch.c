@@ -171,3 +171,11 @@ cmd_ue(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 {
 	return (xe_common(hdl, ep, nvl, class, clcode, cmd_ue_common));
 }
+
+/*ARGSUSED*/
+cmd_evdisp_t
+cmd_frx(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
+    cmd_errcl_t clcode)
+{
+	return (CMD_EVD_UNUSED);
+}

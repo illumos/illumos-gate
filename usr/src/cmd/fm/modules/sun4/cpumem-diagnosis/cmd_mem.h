@@ -149,6 +149,9 @@ extern cmd_evdisp_t cmd_ioxe(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 extern cmd_evdisp_t cmd_ioxe_sec(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_rxefrx_common(fmd_hdl_t *hdl, fmd_event_t *ep,
+    nvlist_t *nvl, const char *class, cmd_errcl_t clcode,
+    cmd_errcl_t matchmask);
 
 /*
  * A list of received IOxE/RxE/FRx ereports is maintained for correlation
