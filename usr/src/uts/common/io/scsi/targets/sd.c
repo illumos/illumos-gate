@@ -14008,11 +14008,17 @@ sd_start_cmds(struct sd_lun *un, struct buf *immed_bp)
 		/*
 		 * If we are syncing or dumping, fail the command to
 		 * avoid recursively calling back into scsi_transport().
-		 * See panic.c for more information about the states
-		 * the system can be in during panic.
+		 * The dump I/O itself uses a separate code path so this
+		 * only prevents non-dump I/O from being sent while dumping.
+		 * File system sync takes place before dumping begins.
+		 * During panic, filesystem I/O is allowed provided
+		 * un_in_callback is <= 1.  This is to prevent recursion
+		 * such as sd_start_cmds -> scsi_transport -> sdintr ->
+		 * sd_start_cmds and so on.  See panic.c for more information
+		 * about the states the system can be in during panic.
 		 */
 		if ((un->un_state == SD_STATE_DUMPING) ||
-		    (un->un_in_callback > 1)) {
+		    (ddi_in_panic() && (un->un_in_callback > 1))) {
 			SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
 			    "sd_start_cmds: panicking\n");
 			goto exit;
