@@ -865,6 +865,7 @@ copy_kmdb() {
 
 	typeset foundkmdb=no
 	typeset kmdbpath=
+	typeset destdir=
 
 	platdir=$INSTALL_FILES/platform/$KARCH/$GLOMNAME
 	if [[ $GLOM = "yes" ]] ; then
@@ -873,9 +874,18 @@ copy_kmdb() {
 		machdir=$INSTALL_FILES/kernel
 	fi
 
-	kmdbpath=$SRC/cmd/mdb/$KARCH/$b64srcdir/kmdb/kmdbmod
 	if [[ $WANT64 = "yes" ]] ; then
-		if kmdb_copy_kmdbmod $kmdbpath $platdir/misc/$b64tgtdir ; then
+		# kmdbmod for sparc and x86 are built and installed
+		# in different places
+		if [[ $(mach) = "i386" ]] ; then
+			kmdbpath=$SRC/cmd/mdb/$isadir/$b64srcdir/kmdb/kmdbmod
+			destdir=$machdir/misc/$b64tgtdir
+		else
+			kmdbpath=$SRC/cmd/mdb/$KARCH/$b64srcdir/kmdb/kmdbmod
+			destdir=$platdir/misc/$b64tgtdir
+		fi
+
+		if kmdb_copy_kmdbmod $kmdbpath $destdir ; then
 			foundkmdb="yes"
 
 			kmdb_copy_machkmods $SRC/cmd/mdb/$isadir/$b64srcdir \
@@ -885,9 +895,11 @@ copy_kmdb() {
 		fi
 	fi
 
-	kmdbpath=$SRC/cmd/mdb/$isadir/$b32srcdir/kmdb/kmdbmod
 	if [[ $WANT32 = "yes" ]] ; then
-		if kmdb_copy_kmdbmod $kmdbpath $machdir/misc/$b32tgtdir ; then
+		kmdbpath=$SRC/cmd/mdb/$isadir/$b32srcdir/kmdb/kmdbmod
+		destdir=$machdir/misc/$b32tgtdir
+
+		if kmdb_copy_kmdbmod $kmdbpath $destdir ; then
 			foundkmdb="yes"
 
 			kmdb_copy_machkmods $SRC/cmd/mdb/$isadir/$b32srcdir \
