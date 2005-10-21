@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,9 @@ static void usage();
 /*
  *	uux
  */
+int
 main(argc, argv, envp)
+int argc;
 char *argv[];
 char *envp[];
 {
@@ -940,6 +942,7 @@ char *envp[];
 
 	cleanup(0);
 	/* NOTREACHED */
+	return (0);
 }
 
 
@@ -951,7 +954,7 @@ char *envp[];
  */
 void
 cleanup(code)
-register int code;
+int code;
 {
 	static int first = 1;
 
@@ -976,7 +979,7 @@ register int code;
  */
 static void
 onintr(inter)
-register int inter;
+int inter;
 {
 	char str[30];
 	(void) signal(inter, SIG_IGN);

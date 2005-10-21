@@ -39,6 +39,8 @@ extern void pkfail(), pkzero(), pkoutput(), pkreset(), pkcntl(), pkgetpack();
 extern int pksack();
 static void pkdata();
 static int pkcget();
+static void xlatestate(struct pack *, int);
+void xlatecntl(int, int);
 
 /*
  * Code added to allow translation of states from numbers to
@@ -81,9 +83,9 @@ struct pack *
 pkopen(ifn, ofn)
 int ifn, ofn;
 {
-	register struct pack *pk;
-	register char **bp;
-	register int i;
+	struct pack *pk;
+	char **bp;
+	int i;
 	int windows = WINDOWS;
 	extern int xpacksize, packsize;
 
@@ -163,11 +165,11 @@ int ifn, ofn;
  */
 void
 pkgetpack(ipk)
-register struct pack *ipk;
+struct pack *ipk;
 {
-	register char *p;
-	register struct pack *pk;
-	register struct header *h;
+	char *p;
+	struct pack *pk;
+	struct header *h;
 	unsigned short sum;
 	int k, tries, ifn, noise;
 	char **bp, hdchk;
@@ -289,10 +291,12 @@ retransmit:
 /*
  * Translate pk->p_state into something printable.
  */
+static void
 xlatestate(pk, dbglvl)
-register struct pack *pk;
+struct pack *pk;
+int dbglvl;
 {
-	register int i;
+	int i;
 	char delimc = ' ', msgline[80], *buf = msgline;
 
 	if (Debug < dbglvl)
@@ -308,16 +312,17 @@ register struct pack *pk;
 	}
 	sprintf(buf, " (0%o)\n", pk->p_state);
 	DEBUG(dbglvl, "%s", msgline);
+	return;
 }
 
 static void
 pkdata(c, sum, pk, bp)
-register struct pack *pk;
+struct pack *pk;
 unsigned short sum;
 char c;
 char **bp;
 {
-	register x;
+	int x;
 	int t;
 	char m;
 
@@ -353,13 +358,13 @@ slot:
  */
 void
 pkxstart(pk, cntl, x)
-register struct pack *pk;
+struct pack *pk;
 int x;
 char cntl;
 {
-	register char *p;
-	register short checkword;
-	register char hdchk;
+	char *p;
+	short checkword;
+	char hdchk;
 
 	p = (caddr_t) &pk->p_ohbuf;
 	*p++ = SYN;
@@ -425,14 +430,14 @@ char cntl;
 
 static int
 pkcget(fn, b, n)
-register int n;
-register char *b;
-register int fn;
+int n;
+char *b;
+int fn;
 {
-	register int ret;
+	int ret;
 #ifdef PKSPEEDUP
 	extern int linebaudrate;
-	register int donap = (linebaudrate > 0 && linebaudrate < 4800);
+	int donap = (linebaudrate > 0 && linebaudrate < 4800);
 #endif /*  PKSPEEDUP  */
 
 	if (n == 0)
@@ -491,13 +496,16 @@ register int fn;
  * role == 0: receive
  * role == 1: send
  */
+void
 xlatecntl(role, cntl)
+int role;
+int cntl;
 {
 	static char *cntltype[4] = {"CNTL, ", "ALT, ", "DATA, ", "SHORT, "};
 	static char *cntlxxx[8] = {"ZERO, ", "CLOSE, ", "RJ, ", "SRJ, ",
 				   "RR, ", "INITC, ", "INITB, ", "INITA, "};
 	char dbgbuf[128];
-	register char *ptr;
+	char *ptr;
 
 	ptr = dbgbuf;
 	strcpy(ptr, role ? "send " : "recv ");

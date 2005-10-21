@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1988,1989,1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -21,12 +21,17 @@
 static struct termios termios_set;
 static struct termios termios_clear;
 
+static int parse_modes(char *modes);
+static void setty(int);
+
+int
 setmode(modes, fd)
 	char *modes;
 	int fd;
 {
 	if (parse_modes(modes))
 		setty(fd);
+	return (0);
 }
 
 struct mds {
@@ -276,9 +281,9 @@ static int
 parse_modes(modes)
 	char *modes;
 {
-	register char *curtoken;
-	register int match;
-	register int i;
+	char *curtoken;
+	int match;
+	int i;
 
 	termios_clear.c_iflag = 0;
 	termios_clear.c_oflag = 0;
@@ -332,8 +337,8 @@ parse_modes(modes)
 /*
  * setup tty lines.
  */
-static
-setty(fd)
+static void
+setty(int fd)
 {
 	struct termios termios;
 

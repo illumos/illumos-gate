@@ -19,13 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include <time.h>
@@ -81,6 +81,8 @@ static void friendlytime();
 static void complete();
 static int state();
 static int gnameflck();
+static void kprocessC();
+static int convert();
 void uprocessC(), printit(), docalc(), procState();
 
 static short State, Queued, Running, Complete, Interrupted;
@@ -118,6 +120,7 @@ short avgxfer;		/*  will be set to 1 if -c not specified    */
 short Jobcount;		/* == 1 if -j parameter set with -s option */
 char f[NAMESIZE];
 
+int
 main(argc, argv, envp)
 char *argv[];
 char **envp;
@@ -450,9 +453,7 @@ char **envp;
 	    for (m = M; m->mach[0] != NULLCHAR; m++)
 		printit(m);
 	}
-	exit(0);
-
-	/* NOTREACHED */
+	return (0);
 }
 
 
@@ -466,14 +467,14 @@ uprocessC(machine, dir, file)
 char   *machine, *dir, *file;
 {
 	struct stat s;
-	register struct tm *tp;
+	struct tm *tp;
 	char fullname[MAXFULLNAME], buf[BUFSIZ], user[9];
 	char xfullname[MAXFULLNAME];
 	char file1[BUFSIZ], file2[BUFSIZ], file3[BUFSIZ], type[2], opt[256];
 	short goodRecord = 0;
 	FILE *fp, *xfp;
 	short first = 1;
-	short statefound = 0;
+	int statefound = 0;
 	extern long fsize();
 	char format_tmp[BUFSIZ+1];
 	fp=xfp=NULL;
@@ -699,12 +700,12 @@ int inputint;
  * kprocessC - process kill or rejuvenate job
  */
 
-int
+static void
 kprocessC(dir, file)
 char *file, *dir;
 {
 	struct stat s;
-	register struct tm *tp;
+	struct tm *tp;
 	extern struct tm *localtime();
 	char fullname[MAXFULLNAME], buf[BUFSIZ], user[9];
 	char rfullname[MAXFULLNAME];
@@ -919,7 +920,7 @@ void
 printit(m)
 struct m *m;
 {
-	register struct tm *tp;
+	struct tm *tp;
 	time_t	t;
 	int	minimum;
 	extern struct tm *localtime();
@@ -997,7 +998,7 @@ struct m *m;
 int
 lckpid()
 {
-    register i;
+    int i;
     int fd, ret;
     pid_t pid, list[MAXLOCKS];
     char alpid[SIZEOFPID+2];	/* +2 for '\n' and null */
@@ -1068,11 +1069,11 @@ lckpid()
  */
 static int
 gnameflck(p, filename)
-register char *filename;
+char *filename;
 DIR *p;
 {
 	struct dirent dentry;
-	register struct dirent *dp = &dentry;
+	struct dirent *dp = &dentry;
 
 	for (;;) {
 		if ((dp = readdir(p)) == NULL)
@@ -1233,12 +1234,12 @@ char *jcdir, *cdotfile;
 	char lckfile[MAXBASENAME+1], lockname[MAXBASENAME+1];
 	char lckdir[BUFSIZ+1];
 	DIR *subjcdir, *sjcdir;
-	short rtnstate = 0;
+	int rtnstate = 0;
 	foundlck = 0;
 	CequalA = 0;
 	sjcdir = opendir(jcdir);
 	if (sjcdir == NULL)
-		return;
+		return (0);
 
 	while (gnamef(sjcdir, comparef) == TRUE) {
 	    if (comparef[0] == 'A') {
@@ -1309,7 +1310,7 @@ long timerange;
 	static float rst, ust, kst, xferrate, utt, ktt;
 	static float rtt, wfield, xfield, yfield;
 
-	register struct perfrec *recptr;
+	struct perfrec *recptr;
 	static float tqt;
 	static int jobs;
 	char abuf[BUFSIZ];
@@ -1478,7 +1479,7 @@ gmts()
 {
 	static char	date[] = "YYMMDDhhmmss";
 
-	register struct tm *	td;
+	struct tm 		*td;
 	time_t			now;	/* Current time. */
 	time_t			temp;
 	now = time((time_t *) 0);
@@ -1520,7 +1521,7 @@ gmt()
 {
 	static char	date[] = "YYMMDDhhmmss";
 
-	register struct tm *	td;
+	struct tm	*td;
 	time_t			now;	/* Current time. */
 
 	now = time((time_t *) 0);

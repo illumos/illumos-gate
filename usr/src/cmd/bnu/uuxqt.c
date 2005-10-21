@@ -19,15 +19,13 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
-/*	from SVR4 bnu:uuxqt.c 2.12.1.12				*/
-
 /*
- * Copyright 2000, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -61,7 +59,9 @@ static int chkFile();
 static int doFileChk();
 void cleanup(), xprocess();
 
+int
 main(argc, argv, envp)
+int argc;
 char *argv[];
 char *envp[];
 {
@@ -221,6 +221,7 @@ char *envp[];
 	closedir(fp1);
 	cleanup(0);
 	/* NOTREACHED */
+	return (0);
 }
 
 void
@@ -236,7 +237,7 @@ int	code;
  */
 void
 onintr(inter)
-register int	inter;
+int	inter;
 {
 	char	str[30];
 	(void) signal(inter, SIG_IGN);
@@ -270,7 +271,7 @@ char	*file;
  */
 static int
 xcompare(f1, f2)
-const register void	*f1, *f2;
+const void	*f1, *f2;
 {
 	/* assumes file name is X.siteG1234 */
 	/* use -strcmp() so that xstash is sorted largest first */
@@ -323,7 +324,7 @@ char	*file;
  */
 int
 gt_Xfile(file, dir)
-register char	*file, *dir;
+char	*file, *dir;
 {
 	DIR *pdir;
 
@@ -363,9 +364,9 @@ register char	*file, *dir;
  */
 int
 gotfiles(file)
-register char	*file;
+char	*file;
 {
-	register FILE *fp;
+	FILE *fp;
 	struct stat stbuf;
 	char	buf[BUFSIZ], rqfile[MAXNAMESIZE];
 
@@ -411,7 +412,7 @@ register char	*file;
 void
 rm_Xfiles()
 {
-	register FILE *fp;
+	FILE *fp;
 	char	buf[BUFSIZ], file[MAXNAMESIZE], tfile[MAXNAMESIZE];
 	char	tfull[MAXFULLNAME];
 
@@ -443,7 +444,7 @@ rm_Xfiles()
 void
 mv_Xfiles()
 {
-	register FILE *fp;
+	FILE *fp;
 	char	buf[BUFSIZ], ffile[MAXFULLNAME], tfile[MAXNAMESIZE];
 	char	tfull[MAXFULLNAME];
 
@@ -1201,6 +1202,8 @@ char *dirname;
 			    sizeof (msgbuf));
 		}
 	    } else {
+		char *bname;
+
 		if (eaccess(GRADES, 04) != -1)
 			dqueue = fdgrade();
 		else
@@ -1210,8 +1213,9 @@ char *dirname;
 		    WORKSPACE, tempname);
 		fp = fdopen(ret = creat(cfile, CFILEMODE), "w");
 		ASSERT(ret >= 0 && fp != NULL, Ct_OPEN, cfile, errno);
+		bname = BASENAME(dfile, '/');
 		(void) fprintf(fp, "S %s %s %s -d %s 0666\n",
-		    BASENAME(dfile, '/'), fout, user, BASENAME(dfile, '/'));
+		    bname, fout, user, bname);
 		fclose(fp);
 		(void) snprintf(sendsys, sizeof (sendsys), "%s/%c", sysout,
 		    dqueue);
@@ -1245,6 +1249,8 @@ char *dirname;
 		    }
 		}
 	    } else {
+		char *bname;
+
 		if (eaccess(GRADES, 04) != -1)
 			dqueue = fdgrade();
 		else
@@ -1254,9 +1260,9 @@ char *dirname;
 		    WORKSPACE, tempname);
 		fp = fdopen(ret = creat(cfile, CFILEMODE), "w");
 		ASSERT(ret >= 0 && fp != NULL, Ct_OPEN, cfile, errno);
+		bname = BASENAME(errDfile, '/');
 		(void) fprintf(fp, "S %s %s %s -d %s 0666\n",
-		    BASENAME(errDfile, '/'), ferr, user,
-		    BASENAME(errDfile, '/'));
+		    bname, ferr, user, bname);
 		fclose(fp);
 		(void) snprintf(sendsys, sizeof (sendsys), "%s/%c",
 		    syserr, dqueue);

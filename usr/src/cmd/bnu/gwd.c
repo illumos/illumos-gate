@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:gwd.c 2.5 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "uucp.h"
 
@@ -82,7 +87,7 @@ char *file;
 struct stat *buf;
 {
 #ifndef V7
-	register ret;
+	int ret;
 
 	(void) setuid(Uid);
 	ret = stat(file, buf);

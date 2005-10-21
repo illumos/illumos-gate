@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,7 @@ void cleanup(){}
 void systat(){}
 void logent(){}
 
+static void cleanworkspace(void);
 
 /* types of D. files */
 #define D_MAIL	1
@@ -149,7 +150,9 @@ char *_Warning[] = {
 "",
 };
 
+int
 main(argc, argv, envp)
+int argc;
 char *argv[];
 char **envp;
 {
@@ -316,9 +319,7 @@ char **envp;
 		closedir(machdir);
 	}
 	closedir(spooldir);
-	exit(0);
-
-	/* NOTREACHED */
+	return (0);
 }
 
 /* procdtype - select the type of processing that a D. file should receive */
@@ -382,7 +383,7 @@ cprocess(fullname)
 char *fullname;
 {
 	struct stat s;
-	register struct tm *tp;
+	struct tm *tp;
 	char buf[BUFSIZ], user[9];
 	char file1[BUFSIZ], file2[BUFSIZ], file3[BUFSIZ], type[2], opt[256];
 	char text[BUFSIZ], text1[BUFSIZ], text2[BUFSIZ];
@@ -477,7 +478,7 @@ wprocess(dir, file)
 char *dir, *file;
 {
 	struct stat s;
-	register struct tm *tp;
+	struct tm *tp;
 	char fullname[BUFSIZ], xfile[BUFSIZ], xF_file[BUFSIZ];
 	char buf[BUFSIZ], user[BUFSIZ];
 	char file1[BUFSIZ], file2[BUFSIZ], file3[BUFSIZ], type[2], opt[256];
@@ -900,7 +901,7 @@ sendMail(system, user, file, mtext)
 char *system, *user, *file;
 char *mtext[];
 {
-	register FILE *fp, *fi;
+	FILE *fp, *fi;
 	char cmd[BUFSIZ];
 	char *p;
 
@@ -950,7 +951,7 @@ int
 execRnews(file)
 char *file;
 {
-	register FILE *fp, *fi;
+	FILE *fp, *fi;
 	char cmd[BUFSIZ];
 
 	DEBUG(5, "Rnews %s\n", file);
@@ -1068,7 +1069,7 @@ static FILE	*_Lf = NULL;
 
 void
 logit(text, status)
-register char	*text;
+char	*text;
 int status;
 {
 
@@ -1089,7 +1090,8 @@ int status;
 	return;
 }
 
-cleanworkspace()
+static void
+cleanworkspace(void)
 {
 	DIR	*spooldir;
 	char f[MAXFULLNAME];

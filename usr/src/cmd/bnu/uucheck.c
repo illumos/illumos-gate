@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,8 +49,8 @@ int Uerrors = 0;	/* error count */
 #define USAGE	"[-v] [-xNUM]"
 
 int Debug=0;
-mkdirs(){}
-canPath(){}
+int mkdirs(){ return (0); }
+int canPath(){ return (0); }
 char RemSpool[] = SPOOL; /* this is a dummy for chkpth() -- never used here */
 char *Spool = SPOOL;
 char *Pubdir = PUBDIR;
@@ -97,7 +97,9 @@ struct tab
 extern char *nextarg();
 int verbose = 0;	/* fsck-like verbosity */
 
+int
 main(argc, argv)
+int argc;
 char *argv[];
 {
     struct stat statbuf;
@@ -150,10 +152,7 @@ char *argv[];
     Uerrors += checkPerm();
     if (verbose) printf("*** uucheck:  %s Check Complete\n\n", PERMISSIONS);
 
-    exit(Uerrors);
-
-
-	/* NOTREACHED */
+    return(Uerrors);
 }
 
 int
@@ -208,8 +207,8 @@ int
 outLine(type)
 int type;
 {
-	register int i;
-	register char *p;
+	int i;
+	char *p;
 	char *arg, cmd[BUFSIZ];
 	int error = 0;
 	char myname[MAXBASENAME+1];

@@ -47,11 +47,11 @@
  */
 int
 imsg(msg, fn)
-register char *msg;
-register int fn;
+char *msg;
+int fn;
 {
-	register char c;
-	register int i;
+	char c;
+	int i;
 	short fndsync;
 	char *bmsg;
 
@@ -100,8 +100,8 @@ register int fn;
  */
 int
 omsg(type, msg, fn)
-register char *msg;
-register char type;
+char *msg;
+char type;
 int fn;
 {
 	char buf[BUFSIZ];
@@ -116,7 +116,8 @@ int fn;
  * null turnoff routine to be used for errors
  * during protocol selection.
  */
-turnoff()
+int
+turnoff(void)
 {
 	return(0);
 }

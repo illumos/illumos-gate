@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:anlwrk.c 2.6 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
 	This module contains routines that find C. files
 	in a system spool directory, return the next C. file
@@ -71,8 +76,8 @@ static int
 anlwrk(file, wvec, wcount)
 char *file, **wvec;
 {
-	register i;
-	register FILE *p_bookmark;    /* pointer to afile 		    */
+	int i;
+	FILE *p_bookmark;    /* pointer to afile */
 	static   FILE *fp = NULL;    /* currently opened C. file pointer    */
 	static char afile[NAMESIZE]; /* file with line count for book marks */
 	static char str[MAXRQST];    /* the string which  wvec points to    */
@@ -241,7 +246,7 @@ char *file;
 static int
 bldflst()
 {
-	register DIR *pdir;
+	DIR *pdir;
 	char filename[NAMESIZE];
 	char prefix[SYSNSIZE+3];
 
@@ -277,7 +282,7 @@ extern int
 gtwvec(file, wrkvec, wcount)
 char *file, **wrkvec;
 {
-	register int nargs;
+	int nargs;
 
 	DEBUG(7, "gtwvec: dir %s\n", RemSpool);
 	while ((nargs = anlwrk(file, wrkvec, wcount)) == 0) {
@@ -297,8 +302,8 @@ static void
 insert(file)
 char *file;
 {
-	register i, j;
-	register char *p;
+	int i, j;
+	char *p;
 
 	DEBUG(7, "insert(%s)  ", file);
 	for (i = Nfiles; i>0; i--) {

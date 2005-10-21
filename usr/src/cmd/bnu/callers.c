@@ -183,10 +183,10 @@ char *in, *out;
  */
 static char *
 repphone(arg, phone, trstr)
-register char *arg, *phone, *trstr;
+char *arg, *phone, *trstr;
 {
 	static char pbuf[2*(MAXPH+2)];
-	register char *fp, *tp;
+	char *fp, *tp;
 
 	for (tp=pbuf; *arg; arg++) {
 		if (*arg != '\\') {
@@ -228,15 +228,15 @@ static char saved_dcname[20];
  */
 GLOBAL int
 processdev(flds, dev)
-register char *flds[], *dev[];
+char *flds[], *dev[];
 {
 	int dcf = -1;
-	register struct caller	*ca;
+	struct caller	*ca;
 	char *args[D_MAX+1], dcname[20];
-	register char **sdev;
+	char **sdev;
 	EXTERN int pop_push();
 	EXTERN void  setdevcfg();
-	register nullfd;
+	int nullfd;
 	char *phonecl;			/* clear phone string */
 	char phoneex[2*(MAXPH+2)];	/* expanded phone string */
 	EXTERN void ttygenbrk();
@@ -361,7 +361,7 @@ register char *flds[], *dev[];
 	 * according to scripts in dialers file.
 	 */
 	for (; dev[D_CALLER] != NULL; dev += 2) {
-		register int w;
+		int w;
 		/*
 		 * Scan Dialers file to find an entry
 		 */
@@ -436,9 +436,9 @@ int dcf;
  */
 static void
 translate(ttab, str)
-register char *ttab, *str;
+char *ttab, *str;
 {
-	register char *s;
+	char *s;
 
 	for(;*ttab && *(ttab+1); ttab += 2)
 		for(s=str;*s;s++)
@@ -461,11 +461,11 @@ register char *ttab, *str;
  */
 static int
 gdial(type, arps, narps)
-register char *type, *arps[];
-register int narps;
+char *type, *arps[];
+int narps;
 {
 	static char info[MAXLINE];
-	register na;
+	int na;
 	EXTERN void dialreset();
 	EXTERN char * currdial();
 
@@ -509,7 +509,7 @@ GLOBAL int
 dkcall(flds, dev)
 char *flds[], *dev[];
 {
-	register fd;
+	int fd;
 #ifdef V8
 	extern int cdkp_ld;
 #endif
@@ -1052,7 +1052,7 @@ char *dev[];
 	char		addrbuf[ BUFSIZ ];
 	char		devname[MAXNAMESIZE];
 	int		fd;
-	register int	i, j;
+	int	i, j;
 	struct t_bind	*bind_ret = 0;
 	struct t_info	tinfo;
 	struct t_call	*sndcall = 0, *rcvcall = 0;

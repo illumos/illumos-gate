@@ -19,15 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-/*
- * Copyright (c) 2000, 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 cu:cu.c 2.46.2.2 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 
 /*
@@ -274,7 +274,9 @@ static char *P_TELLENGTH = "Telno cannot exceed 58 digits!\r\n";
  *	Main line invokes "transmit" to read TTY & write to remote.
  ***************************************************************/
 
+int
 main(argc, argv)
+int argc;
 char *argv[];
 {
     extern void setservice();
@@ -618,6 +620,7 @@ char *argv[];
     }
     cleanup(Cn);
     /*NOTREACHED*/
+	return (0);
 }
 
 /*
@@ -665,9 +668,9 @@ int
 transmit()
 {
     char b[BUFSIZ];
-    register char *p;
-    register int escape;
-    register int id = 0;  /*flag for systemname prompt on tilda escape*/
+    char *p;
+    int escape;
+    int id = 0;  /* flag for systemname prompt on tilda escape */
 
     CDEBUG(4,"transmit started\n\r%s", "");
 
@@ -785,7 +788,7 @@ _flush()
  **************************************************************/
 int
 tilda(cmd)
-register char	*cmd;
+char	*cmd;
 {
 
     VERBOSE("\r\n%s", "");
@@ -973,7 +976,7 @@ char	*str;
 
 static void
 _dopercen(cmd)
-register char *cmd;
+char *cmd;
 {
     char	*arg[5];
     char	*getpath;
@@ -1222,8 +1225,8 @@ register char *cmd;
 static void
 _receive()
 {
-    register silent = NO, file = -1;
-    register char *p;
+    int silent = NO, file = -1;
+    char *p;
     int	tic;
     int for_me = NO;
     char	b[BUFSIZ];
@@ -1416,7 +1419,7 @@ _mode(arg)
 static pid_t
 dofork()
 {
-    register int i;
+    int i;
     pid_t x;
 
     for(i = 0; i < 6; ++i) {
@@ -1538,7 +1541,7 @@ int fd;
 
 static void
 _w_str(string)
-register char *string;
+char *string;
 {
     int len;
 
@@ -1681,7 +1684,7 @@ sysname(name)
 char * name;
 {
 
-    register char *s;
+    char *s;
 
     if(uname(&utsn) < 0)
 	s = "Local";
@@ -1698,8 +1701,8 @@ blckcnt(count)
 long count;
 {
     static long lcharcnt = 0;
-    register long c1, c2;
-    register int i;
+    long c1, c2;
+    int i;
     char c;
 
     if(count == (long) (-1)) {	/* initialization call */

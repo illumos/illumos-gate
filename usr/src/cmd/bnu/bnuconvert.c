@@ -19,14 +19,20 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:bnuconvert.c 1.3.1.2 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"uucp.h"
 
+int
 main(argc, argv)
 int argc;
 char **argv;
@@ -127,7 +133,7 @@ char **argv;
 		closedir(machdir);
 	}
 	closedir(spooldir);
-	exit(0);
+	return (0);
 }
 /* a dummy cleanup function to satisfy a .o file */
 void cleanup() {}

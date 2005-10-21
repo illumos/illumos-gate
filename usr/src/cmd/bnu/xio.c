@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,11 +79,11 @@ xturnoff()
  */
 int
 xwrmsg(type, str, fn)
-register char *str;
+char *str;
 int fn;
 char type;
 {
-	register char *s;
+	char *s;
 	char bufr[XBUFSIZ];
 
 	bufr[0] = type;
@@ -107,9 +107,9 @@ char type;
  */
 int
 xrdmsg(str, fn)
-register char *str;
+char *str;
 {
-	register int len;
+	int len;
 
 	if(setjmp(Xfailbuf))
 		return(FAIL);
@@ -143,8 +143,8 @@ int
 xwrdata(fp1, fn)
 FILE *fp1;
 {
-	register fd1;
-	register int len, ret;
+	int fd1;
+	int len, ret;
 	unsigned long bytes;
 	char bufr[XBUFSIZ];
 
@@ -177,9 +177,9 @@ int
 xrddata(fn, fp2)
 FILE *fp2;
 {
-	register int fd2;
-	register int len;
-	register int ret = SUCCESS;
+	int fd2;
+	int len;
+	int ret = SUCCESS;
 	unsigned long bytes;
 	char bufr[XBUFSIZ];
 
@@ -212,9 +212,9 @@ FILE *fp2;
  */
 int
 xrdblk(blk, len,  fn)
-register char *blk;
+char *blk;
 {
-	register int i, ret;
+	int i, ret;
 
 	if(setjmp(Xfailbuf))
 		return(FAIL);

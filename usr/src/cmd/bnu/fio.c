@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,7 +87,7 @@ static int frdblk(), fwrblk();
 
 #ifndef MAXMSGLEN
 #define MAXMSGLEN	BUFSIZ
-#endif MAXMSGLEN
+#endif	/* MAXMSGLEN */
 
 static int fchksum;
 static jmp_buf Ffailbuf;
@@ -110,7 +110,8 @@ static struct termio ttbuf;
 static struct sgttyb ttbuf;
 #endif
 
-fturnon()
+int
+fturnon(void)
 {
 	int ret;
 #ifdef ATTSVTTY
@@ -150,7 +151,8 @@ fturnon()
 	return SUCCESS;
 }
 
-fturnoff()
+int
+fturnoff(void)
 {
 	if (ioctlok) {
 #ifdef ATTSVTTY
@@ -164,12 +166,13 @@ fturnoff()
 	return SUCCESS;
 }
 
+int
 fwrmsg(type, str, fn)
-register char *str;
+char *str;
 int fn;
 char type;
 {
-	register char *s;
+	char *s;
 	char bufr[MAXMSGLEN];
 
 	s = bufr;
@@ -184,11 +187,12 @@ char type;
 	return SUCCESS;
 }
 
+int
 frdmsg(str, fn)
-register char *str;
-register int fn;
+char *str;
+int fn;
 {
-	register char *smax;
+	char *smax;
 
 	if (setjmp(Ffailbuf))
 		return FAIL;
@@ -214,11 +218,12 @@ msgerr:
 	return FAIL;
 }
 
+int
 fwrdata(fp1, fn)
 FILE *fp1;
 int fn;
 {
-	register int alen, ret;
+	int alen, ret;
 	char ack, ibuf[MAXMSGLEN];
 	int flen, retries = 0;
 	long fbytes;
@@ -255,12 +260,13 @@ acct:
 /* max. attempts to retransmit a file: */
 #define MAXRETRIES	(fbytes < 10000L ? 2 : 1)
 
+int
 frddata(fn, fp2)
-register int fn;
-register FILE *fp2;
+int fn;
+FILE *fp2;
 {
-	register int flen;
-	register char eof;
+	int flen;
+	char eof;
 	char ibuf[FIBUFSIZ];
 	int ret, retries = 0;
 	long alen, fbytes;
@@ -300,11 +306,11 @@ acct:
 	return ret;
 }
 
-static
+static int
 frdbuf(blk, len, fn)
-register char *blk;
-register int len;
-register int fn;
+char *blk;
+int len;
+int fn;
 {
 	static int ret = FIBUFSIZ / 2;
 
@@ -320,7 +326,7 @@ register int fn;
 /* call ultouch every TC calls to either frdblk or fwrblk  */
 #define TC	20
 static int tc = TC;
-#endif !defined(ATTSVKILL)
+#endif	/* !defined(ATTSVKILL) */
 
 /* Byte conversion:
  *
@@ -333,14 +339,14 @@ static int tc = TC;
  * 372-377	 176	 072-077
  */
 
-static
+static int
 fwrblk(fn, fp, lenp)
 int fn;
-register FILE *fp;
+FILE *fp;
 int *lenp;
 {
-	register char *op;
-	register int c, sum, nl, len;
+	char *op;
+	int c, sum, nl, len;
 	char obuf[FOBUFSIZ + 8];
 	int ret;
 
@@ -420,14 +426,14 @@ writeit:
 	return ret == nl ? nl : ret < 0 ? 0 : -ret;
 }
 
-static
+static int
 frdblk(ip, fn, rlen)
-register char *ip;
+char *ip;
 int fn;
 long *rlen;
 {
-	register char *op, c;
-	register int sum, len, nl;
+	char *op, c;
+	int sum, len, nl;
 	char buf[5], *erbp = ip;
 	int i;
 	static char special = 0;

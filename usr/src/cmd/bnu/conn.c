@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,10 +53,10 @@ static char	par_tab[128];
 
 EXTERN void alarmtr();
 static void addProto(), mergeProto(), removeProto();
+static void bld_partab();
 static char *nextProto();
 EXTERN char *findProto();
 static void getProto();
-static finds();
 EXTERN int getto();		/* make this static when ct uses altconn() */
 EXTERN int chat(), rddev(), expect(), wrstr(), wrchr();
 EXTERN int processdev(), getdevline(), getsysline(), sysaccess();
@@ -145,8 +145,8 @@ getto(flds)
 char *flds[];
 {
 	char *dev[D_MAX+2], devbuf[BUFSIZ];
-	register int status;
-	register int dcf = -1;
+	int status;
+	int dcf = -1;
 	int reread = 0;
 	int tries = 0;	/* count of call attempts - for limit purposes */
 	EXTERN void devreset();
@@ -376,7 +376,7 @@ getProto(save, str)
 char *save;
 char *str;
 {
-	register char *p;
+	char *p;
 
 	*save = NULLCHAR;
 	if ( (p=strchr(str, ',')) != NULL) {
@@ -432,8 +432,8 @@ addProto (desired, valid)
 char *desired;
 char *valid;
 {
-	register char * protoPtr;
-	register char *	wantPtr;
+	char *protoPtr;
+	char *wantPtr;
 
 	if ( *desired == '\0' )
 	    return;
@@ -623,7 +623,7 @@ expect(str, fn)
 char *str;
 int fn;
 {
-	register char *bptr, *sptr;
+	char *bptr, *sptr;
 	char    buf[BUFSIZ];
 
 	bptr = buf;
@@ -675,7 +675,7 @@ int fn;
 {
 	static char rdvec[MR];
 	char *rp = rdvec;
-	register int kr, c;
+	int kr, c;
 	char nextch;
 
 	*rp = 0;
@@ -782,7 +782,7 @@ char *str, *phstr1, *phstr2;
 int fn;
 {
 	int sendcr = 1, echocheck = 0;
-	register char	*sptr, *bptr;
+	char	*sptr, *bptr;
 	char	buf[BUFSIZ];
 	struct termio	ttybuf;
 	static int p_init = 0;
@@ -939,10 +939,11 @@ err:
 /*
  * generate parity table for use by sendthem.
  */
+static void
 bld_partab(type)
 int type;
 {
-	register int i, j, n;
+	int i, j, n;
 
 	for (i = 0; i < 128; i++) {
 		n = 0;
@@ -993,8 +994,8 @@ char *buf;
 
 GLOBAL int
 wrchr(fn, buf, len)
-register int fn;
-register char *buf;
+int fn;
+char *buf;
 {
 	int 	i, saccess;
 	char	cin, cout;
@@ -1228,7 +1229,7 @@ char *cp;
 /*	Sleep in increments of 60ths of second.	*/
 GLOBAL void
 nap (time)
-register int time;
+int time;
 {
 	static int fd;
 

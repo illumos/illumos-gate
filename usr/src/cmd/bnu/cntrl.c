@@ -248,7 +248,6 @@ cntrl()
 {
 	FILE * fp;
 	struct stat stbuf;
-	extern (*Rdmsg)(), (*Wrmsg)();
 	char *	p;
 	long 	startp;		/* checkpoint restart point */
 	long	actualsize;	/* actual file size */
@@ -1385,11 +1384,11 @@ char *s, m;
 void
 notify(mailopt, user, msgin, sys, msgcode)
 char *user, *msgin, *sys;
-register char *msgcode;
+char *msgcode;
 {
-	register int i;
+	int i;
 	char str[BUFSIZ];
-	register char *msg;
+	char *msg;
 
 	DEBUG(4,"mailopt %d, ", mailopt);
 	DEBUG(4,"statfopt %d\n", statfopt);
@@ -1481,10 +1480,9 @@ char	*f, *m;
  *	SUCCESS	-> successful protocol selection
  *	FAIL	-> can't find common or open failed
  */
-startup()
+int
+startup(void)
 {
-	extern (*Rdmsg)(), (*Wrmsg)();
-	extern imsg(), omsg();
 	extern void blptcl();
 	extern int fptcl();
 	char msg[BUFSIZ], str[BUFSIZ];
@@ -1525,7 +1523,7 @@ startup()
  */
 int
 fptcl(str, valid)
-register char *str, *valid;
+char *str, *valid;
 {
 	char *l;
 
@@ -1559,10 +1557,10 @@ register char *str, *valid;
  */
 void
 blptcl(str)
-register char *str;
+char *str;
 {
-	register struct Proto *p;
-	register char *validPtr;
+	struct Proto *p;
+	char *validPtr;
 
 	/* Build list of valid protocols. */
 	for (validPtr = str, p = Ptbl; (*validPtr = p->P_id) != NULLCHAR;
@@ -1582,9 +1580,9 @@ register char *str;
  */
 int
 stptcl(c)
-register char *c;
+char *c;
 {
-	register struct Proto *p;
+	struct Proto *p;
 
 	for (p = Ptbl; p->P_id != '\0'; p++) {
 		if (*c == p->P_id) {
@@ -1617,7 +1615,7 @@ register char *c;
  */
 void
 unlinkdf(file)
-register char *file;
+char *file;
 {
 	if (strlen(file) > (size_t) 6)
 		(void) unlink(file);

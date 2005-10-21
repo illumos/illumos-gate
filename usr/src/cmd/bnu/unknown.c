@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  */
-/* 
+/*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -48,6 +48,7 @@
 
 void fall_on_sword();
 
+int
 main(argc, argv)
 int	argc;
 char	*argv[];
@@ -83,9 +84,7 @@ char	*argv[];
 	if ( fclose(fp) != 0 )
 		fall_on_sword("cannot close", buf);
 
-	exit(0);
-
-	/* NOTREACHED */
+	return (0);
 }
 
 /* don't return from here */

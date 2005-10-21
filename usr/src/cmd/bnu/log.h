@@ -19,11 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#ifndef LOG_H
+#define	LOG_H
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:log.h 1.1 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #define	MCHAR		'M'	/* Indicates master */
 #define SCHAR		'S'	/* Indicates slave */
@@ -84,7 +91,9 @@ extern char * scOwn();			/* security.c */
 extern char * scSize();			/* security.c */
 extern void copyText();			/* perfstat.c */
 extern void writeLog();			/* perfstat.c */
-extern openLog();			/* perfstat.c */
+extern int openLog();			/* perfstat.c */
 extern void closeLog();			/* perfstat.c */
 extern char *	gmt();			/* perfstat.c */
 extern time_t  	cpucycle();		/* account.c */
+
+#endif	/* LOG_H */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,7 +96,7 @@ eturnoff()
  */
 int
 ewrmsg(type, str, fn)
-register char *str;
+char *str;
 int fn;
 char type;
 {
@@ -113,7 +113,7 @@ char type;
  */
 int
 erdmsg(str, fn)
-register char *str;
+char *str;
 {
 	return(etrdmsg(str, fn, 0));
 }
@@ -129,10 +129,10 @@ register char *str;
  */
 int
 ewrdata(fp1, fn)
-register FILE *fp1;
+FILE *fp1;
 int	fn;
 {
-	register int ret;
+	int ret;
 	int	fd1;
 	int len;
 	unsigned long bytes;
@@ -201,9 +201,9 @@ int	fn;
  */
 int
 erddata(fn, fp2)
-register FILE *fp2;
+FILE *fp2;
 {
-	register int ret;
+	int ret;
 	int	fd2;
 	char bufr[EBUFSIZ];
 	int	len;
@@ -283,9 +283,9 @@ register FILE *fp2;
  */
 int
 erdblk(blk, len,  fn)
-register char *blk;
+char *blk;
 {
-	register int i, ret;
+	int i, ret;
 
 	if(setjmp(Failbuf)) {
 		DEBUG(7, "timeout (%d sec)\n", msgtime);
@@ -322,6 +322,7 @@ struct tbuf {
  *	FAIL	-> read timed out
  *	SUCCESS	-> ok message in str
  */
+int
 trdmsg(str, fn)
 char *str;
 {
@@ -337,6 +338,7 @@ char *str;
  *	FAIL	-> write failed
  *	SUCCESS	-> write succeeded
  */
+int
 twrmsg(type, str, fn)
 char type;
 char *str;
@@ -352,11 +354,12 @@ char *str;
  *	FAIL	->failure in link
  *	SUCCESS	-> ok
  */
+int
 twrdata(fp1, fn)
-register FILE *fp1;
+FILE *fp1;
 int	fn;
 {
-	register int ret;
+	int ret;
 	int len;
 	unsigned long bytes;
 	struct tbuf bufr;
@@ -400,10 +403,11 @@ int	fn;
  *	SUCCESS	-> ok
  *	FAIL	-> failure on link
  */
+int
 trddata(fn, fp2)
-register FILE *fp2;
+FILE *fp2;
 {
-	register int len, nread;
+	int len, nread;
 	long Nbytes;
 	unsigned long bytes = 0L;
 	char bufr[TBUFSIZE];
@@ -443,11 +447,12 @@ register FILE *fp2;
  * where rddata can pick it up.
  */
 
+int
 etrdmsg(str, fn, i)
-register char *str;
-register int i;
+char *str;
+int i;
 {
-	register int len;
+	int len;
 	int nullterm = 0;
 	char *null, *argstr;
 
@@ -508,9 +513,10 @@ register int i;
  *	FAIL	-> write failed
  *	SUCCESS	-> write succeeded
  */
+int
 etwrmsg(type, str, fn, len)
 char type;
-register char *str;
+char *str;
 int fn, len;
 {
 	char bufr[EBUFSIZ], *endstr;

@@ -391,7 +391,7 @@ extern "C" {
 
 /* The call structure is used by ct.c, cu.c, and dial.c.	*/
 
-static struct call {
+struct call {
 	char *speed;		/* transmission baud rate */
 	char *line;		/* device name for outgoing line */
 	char *telno;		/* ptr to tel-no digit string */
@@ -456,7 +456,7 @@ struct caller {
 
 /* structure for a saved C file */
 
-static struct cs_struct {
+struct cs_struct {
 	char	file[NAMESIZE];
 	char	sys[NAMESIZE+5];
 	char	sgrade[NAMESIZE];
@@ -598,11 +598,11 @@ extern unsigned long	getfilesize();			/* statlog.c */
 extern void 		putfilesize();			/* statlog.c */
 
 EXTERN char	*protoString();				/* permission.c */
-extern		logFind(), mchFind();			/* permission.c */
-extern		chkperm(), chkpth();			/* permission.c */
-extern		cmdOK(), switchRole();			/* permission.c */
-extern		callBack(), requestOK();		/* permission.c */
-extern		noSpool();				/* permission.c */
+extern int	logFind(), mchFind();			/* permission.c */
+extern int	chkperm(), chkpth();			/* permission.c */
+extern int	cmdOK(), switchRole();			/* permission.c */
+extern int	callBack(), requestOK();		/* permission.c */
+extern int	noSpool();				/* permission.c */
 extern void	myName();				/* permission.c */
 
 extern int	mkdirs();				/* expfile.c */

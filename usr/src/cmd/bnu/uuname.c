@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
  *	-l	-> returns only the local system name.
  *	-c	-> print remote systems accessible to cu
  */
+int
 main(argc,argv)
 int argc;
 char **argv;
@@ -98,9 +99,7 @@ char **argv;
 		puts(name);
 		(void) strcpy(prev, name);
 	}
-	exit(0);
-
-	/* NOTREACHED */
+	return (0);
 }
 
 /* small, private copies of assert(), logent(), */

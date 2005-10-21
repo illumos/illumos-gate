@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,11 @@
 #include "pk.h"
 
 struct pack *Pk;
-extern int gwrblk(), grdblk(), pkread(), pkwrite();
+extern int pkread(), pkwrite();
 extern void pkclose();
+
+static int grdblk(char *, int);
+static int gwrblk(char *, int);
 
 extern int packsize, xpacksize;
 
@@ -166,7 +169,7 @@ int
 grddata(fn, fp2)
 FILE *fp2;
 {
-	register int ret = SUCCESS;
+	int ret = SUCCESS;
 	int fd2;
 	int len;
 	char bufr[BUFSIZ];

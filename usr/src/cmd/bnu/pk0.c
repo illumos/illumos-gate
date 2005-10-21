@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #include "pk.h"
 #include <sys/buf.h>
 
+extern void xlatecntl();
 extern void pkcntl(), pkoutput(), pkclose(), pkreset(), pkzero(),
 	pkgetpack(), pkxstart();
 extern int pkread(), pkwrite(), pksack();
@@ -50,9 +51,10 @@ extern int xpacksize;
  */
 void
 pkcntl(c, pk)
-register struct pack *pk;
+int c;
+struct pack *pk;
 {
-	register cntl, val;
+	int cntl, val;
 
 	val = c & MOD8;
 	cntl = (c>>3) & MOD8;
@@ -124,8 +126,8 @@ register struct pack *pk;
 static int
 pkaccept()
 {
-	register struct pack *pk;
-	register x,seq;
+	struct pack *pk;
+	int x,seq;
 	char m, cntl, *p, imask, **bp;
 	int bad,accept,skip,t,cc;
 	unsigned short sum;
@@ -250,8 +252,8 @@ pkread(ibuf, icount)
 char *ibuf;
 int icount;
 {
-	register struct pack *pk;
-	register x;
+	struct pack *pk;
+	int x;
 	int is,cc,xfr,count;
 	char *cp, **bp;
 
@@ -316,8 +318,8 @@ pkwrite(ibuf, icount)
 char *ibuf;
 int icount;
 {
-	register struct pack *pk;
-	register x;
+	struct pack *pk;
+	int x;
 	caddr_t cp;
 	int partial;
 	int cc, fc, count;
@@ -368,9 +370,9 @@ int icount;
 
 int
 pksack(pk)
-register struct pack *pk;
+struct pack *pk;
 {
-	register x, i;
+	int x, i;
 
 	i = 0;
 	for(x=pk->p_ps; x!=pk->p_rpr; ) {
@@ -391,9 +393,9 @@ register struct pack *pk;
 
 void
 pkoutput(pk)
-register struct pack *pk;
+struct pack *pk;
 {
-register x;
+int x;
 char bstate;
 int i;
 
@@ -499,8 +501,8 @@ out:
 void
 pkclose()
 {
-	register struct pack *pk;
-	register i;
+	struct pack *pk;
+	int i;
 	int rcheck;
 	char **bp;
 
@@ -560,7 +562,7 @@ pkclose()
 
 void
 pkreset(pk)
-register struct pack *pk;
+struct pack *pk;
 {
 
 	pk->p_ps = pk->p_pr =  pk->p_rpr = 0;
@@ -569,12 +571,12 @@ register struct pack *pk;
 
 static int
 chksum(s,n)
-register char *s;
-register n;
+char *s;
+int n;
 {
-	register short sum;
-	register unsigned short t;
-	register short x;
+	short sum;
+	unsigned short t;
+	short x;
 
 	sum = -1;
 	x = 0;
@@ -598,9 +600,9 @@ register n;
 
 static int
 pksize(n)
-register n;
+int n;
 {
-	register k;
+	int k;
 
 	n >>= 5;
 	for(k=0; n >>= 1; k++);

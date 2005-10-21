@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:uuglist.c 1.6 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	"uucp.h"
 
@@ -37,6 +42,7 @@ static char  Nnament[MAXLENGTH][NAMESIZE];
 static char *Nptr[MAXLENGTH];
 static short Nnames = 0;
 
+int
 main(argc, argv)
 int argc;
 char **argv;
@@ -84,14 +90,14 @@ char **argv;
 		puts(Nptr[i]);
 		(void) strcpy(prev, Nptr[i]);
 	}
-	exit(0);
+	return (0);
 }
 static void
 insert(name)
 char *name;
 {
-	register i,j;
-	register char *p;
+	int i,j;
+	char *p;
 
 	DEBUG(7, "insert(%s) ", name);
 
@@ -160,11 +166,11 @@ uproc()
 }
 
 int Dfileused = FALSE;
-wfcommit() {}
+void wfcommit() {}
 void cleanup() {}
-gnamef() {}
-gdirf() {}
-cklock() {}
+int gnamef() { return (0); }
+int gdirf() { return (0); }
+int cklock() { return (0); }
 
 /*VARARGS*/
 /*ARGSUSED*/

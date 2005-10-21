@@ -20,13 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/* from UCB 5.4 6/23/85 */
 
 /*
  * 4.2BSD, 2.9BSD, or ATTSVR4 TCP/IP server for uucico
@@ -38,7 +36,7 @@
 #ifdef BSD2_9
 #include <sys/localopts.h>
 #include <sys/file.h>
-#endif BSD2_9
+#endif	/* BSD2_9 */
 #include <signal.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -63,7 +61,7 @@ pam_handle_t    *pamh;
 
 #if !defined(BSD4_2) && !defined(BSD2_9) && !defined(ATTSVR4)
 --- You must have either BSD4_2, BSD2_9, or ATTSVR4 defined for this to work
-#endif !BSD4_2 && !BSD2_9
+#endif	/* !BSD4_2 && !BSD2_9 */
 #if defined(BSD4_2) && defined(BSD2_9)
 --- You may not have both BSD4_2 and BSD2_9 defined for this to work
 #endif	/* check for stupidity */
@@ -87,16 +85,19 @@ char *nenv[] = {
 };
 extern char **environ;
 
+static void doit(struct sockaddr_in *);
+static void dologout(void);
+
+int
 main(argc, argv)
 int argc;
 char **argv;
 {
 #ifndef BSDINETD
-	register int s, tcp_socket;
+	int s, tcp_socket;
 	struct servent *sp;
-#endif !BSDINETD
+#endif	/* !BSDINETD */
 	extern int errno;
-	int dologout();
 
 	if (argc > 1 && strcmp(argv[1], "-n") == 0)
 		nolog = 1;
@@ -114,7 +115,7 @@ char **argv;
 		doit(&hisctladdr);
 	dologout();
 	exit(1);
-#else !BSDINETD
+#else	/* !BSDINETD */
 	sp = getservbyname("uucp", "tcp");
 	if (sp == NULL) {
 		perror("uucpd: getservbyname");
@@ -168,7 +169,7 @@ char **argv;
 		}
 		close(s);
 	}
-#endif BSD4_2
+#endif	/* BSD4_2 */
 
 #ifdef BSD2_9
 	for (;;) {
@@ -195,12 +196,13 @@ char **argv;
 			exit(1);
 		}
 	}
-#endif BSD2_9
-#endif	!BSDINETD
+#endif	/* BSD2_9 */
+#endif	/* !BSDINETD */
 
 	/* NOTREACHED */
 }
 
+static void
 doit(sinp)
 struct sockaddr_in *sinp;
 {
@@ -304,17 +306,18 @@ struct sockaddr_in *sinp;
 
 #if defined(BSD4_2) || defined(ATTSVR4)
 	execl(UUCICO, "uucico", "-u", user, (char *)0);
-#endif BSD4_2
+#endif	/* BSD4_2 */
 #ifdef BSD2_9
 	sprintf(passwd, "-h%s", inet_ntoa(sinp->sin_addr));
 	execl(UUCICO, "uucico", passwd, (char *)0);
-#endif BSD2_9
+#endif	/* BSD2_9 */
 	perror("uucico server: execl");
 }
 
+int
 readline(p, n)
-register char *p;
-register int n;
+char *p;
+int n;
 {
 	char c;
 
@@ -334,42 +337,43 @@ register int n;
 #ifdef ATTSVR4
 #include <sac.h>	/* for SC_WILDC */
 #include <utmpx.h>
-#else !ATTSVR4
+#else	/* !ATTSVR4 */
 #include <utmp.h>
-#endif !ATTSVR4
+#endif	/* !ATTSVR4 */
 #if defined(BSD4_2) || defined(ATTSVR4)
 #include <fcntl.h>
-#endif BSD4_2
+#endif	/* BSD4_2 */
 
 #ifdef BSD2_9
 #define	O_APPEND	0 /* kludge */
 #define	wait3(a, b, c)	wait2(a, b)
-#endif BSD2_9
+#endif	/* BSD2_9 */
 
 #define	SCPYN(a, b)	strncpy(a, b, sizeof (a))
 
 #ifdef ATTSVR4
 struct	utmpx utmp;
-#else !ATTSVR4
+#else	/* !ATTSVR4 */
 struct	utmp utmp;
-#endif !ATTSVR4
+#endif	/* !ATTSVR4 */
 
-dologout()
+static void
+dologout(void)
 {
 #ifdef ATTSVR4
 	int status;
-#else !ATTSVR4
+#else	/* !ATTSVR4 */
 	union wait status;
-#endif !ATSVR4
+#endif	/* !ATSVR4 */
 	int pid, wtmp;
 	/* the following 2 variables are needed for utmp mgmt */
 	struct utmpx	ut;
 
 #ifdef BSDINETD
 	while ((pid = wait(&status)) > 0) {
-#else  !BSDINETD
+#else	/* !BSDINETD */
 	while ((pid = wait3(&status, WNOHANG, 0)) > 0) {
-#endif !BSDINETD
+#endif	/* !BSDINETD */
 		if (nolog)
 			continue;
 #ifdef ATTSVR4
@@ -397,7 +401,7 @@ dologout()
 		 */
 
 		updwtmpx(WTMPX_FILE, &ut);
-#else !ATTSVR4
+#else	/* !ATTSVR4 */
 		wtmp = open("/usr/adm/wtmp", O_WRONLY|O_APPEND);
 		if (wtmp >= 0) {
 			sprintf(utmp.ut_line, "uucp%.4d", pid);
@@ -406,17 +410,18 @@ dologout()
 			(void) time(&utmp.ut_time);
 #ifdef BSD2_9
 			(void) lseek(wtmp, 0L, 2);
-#endif BSD2_9
+#endif	/* BSD2_9 */
 			(void) write(wtmp, (char *)&utmp, sizeof (utmp));
 			(void) close(wtmp);
 		}
-#endif !ATTSVR4
+#endif	/* !ATTSVR4 */
 	}
 }
 
 /*
  * Record login in wtmp file.
  */
+int
 dologin(pw, sin)
 struct passwd *pw;
 struct sockaddr_in *sin;
@@ -477,7 +482,7 @@ struct sockaddr_in *sin;
 	 *	}
 	 */
 
-#else !ATTSVR4
+#else	/* !ATTSVR4 */
 	wtmp = open("/usr/adm/wtmp", O_WRONLY|O_APPEND);
 	if (wtmp >= 0) {
 		/* hack, but must be unique and no tty line */
@@ -488,11 +493,11 @@ struct sockaddr_in *sin;
 		time(&utmp.ut_time);
 #ifdef BSD2_9
 		(void) lseek(wtmp, 0L, 2);
-#endif BSD2_9
+#endif	/* BSD2_9 */
 		(void) write(wtmp, (char *)&utmp, sizeof (utmp));
 		(void) close(wtmp);
 	}
-#endif !ATTSVR4
+#endif	/* !ATTSVR4 */
 
 	return (0);
 }

@@ -19,15 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-/*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:ct.c 2.27.2.1 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  *
@@ -131,10 +131,12 @@ char *s1, *s2;
 
 jmp_buf Sjbuf;			/* used by uucp routines */
 
+int
 main (argc, argv)
+int argc;
 char   *argv[];
 {
-    register int    c;
+    int    	c;
     int		found = 0,
 		errors = 0,
 		first = TRUE;
@@ -523,7 +525,7 @@ disconnect (code)
  */
 void
 cleanup (code)
-register int    code;
+int    code;
 {
     CDEBUG(5, "cleanup(%d)\n", code);
     rmlock (CNULL);
@@ -760,8 +762,8 @@ char   *file;
 
 static void
 zero (adr, size)
-register char  *adr;
-register int    size;
+char  *adr;
+int    size;
 {
     while (size--)
 	*adr++ = '\0';

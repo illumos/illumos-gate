@@ -19,15 +19,15 @@
  *
  * CDDL HEADER END
  */
-/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
-
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:permission.c 2.12 */
+/*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
+/*	  All Rights Reserved  	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef UUCHECK
 #include "uucp.h"
@@ -178,7 +178,7 @@ int
 mchFind(name)
 char *name;
 {
-	register i, ret;
+	int i, ret;
 	DEBUG(5, "mchFind called (%s)\n", name);
 	if ( (ret = userFind (name, "", U_MACHINE)) == FAIL)
 	    /* see if there is a default line */
@@ -314,8 +314,8 @@ fillList(type, list)
 int type;
 char *list[];
 {
-	register char *p;
-	register num;
+	char *p;
+	int num;
 	int maxlist = 0;
 
 	p = _Flds[type];
@@ -561,11 +561,11 @@ parse_tokens(flds, buf)
 char *flds[];
 char *buf;
 {
-	register i;
-	register char *p;
+	int i;
+	char *p;
 	struct name_value pair;
 	static char _line[BUFSIZ];
-	register char *line = buf;
+	char *line = buf;
 
 	if (buf == NULL)
 		line = _line;	/* if no buffer specified, use default */
@@ -613,7 +613,7 @@ char *buf;
  */
 char *
 next_token (string, pair)
-register char *string;
+char *string;
 struct name_value *pair;
 {
 	char	*prev = _uu_setlocale(LC_ALL, "C");
@@ -652,7 +652,7 @@ getuline(fp, line)
 FILE *fp;
 char *line;
 {
-	register char *p, *c;
+	char *p, *c;
 	char buf[BUFSIZ];
 	
 	p = line;
@@ -691,7 +691,7 @@ char *
 nextarg(str, name)
 char *str, **name;
 {
-	register char *p, *b;
+	char *p, *b;
 	static char buf[SMAX+1];
 
 	for(b=buf,p=str; *p != ':' && *p && b < buf+SMAX;)
@@ -788,9 +788,9 @@ char	*cmd, *fullcmd;
  */
 static int
 listMatch(name, list)
-register char *name, *list[];
+char *name, *list[];
 {
-    register i;
+    int i;
     char *temp, *tend;
     struct stat statbuf;
     dev_t _dev[MAXPATHS+1];
@@ -848,10 +848,10 @@ register char *name, *list[];
  */
 static int
 cmdMatch(name, fullname)
-register char *name;
+char *name;
 char *fullname;
 {
-	register i;
+	int i;
 	char *bname;
 	int allok = FALSE;
 
@@ -900,7 +900,7 @@ int
 chkpth(path, flag)
 char *path;
 {
-	register char *s;
+	char *s;
 
 	/*
 	 * this is probably redundant,
@@ -954,7 +954,7 @@ int
 chkperm(from, to, opt)
 char *from, *to, *opt;
 {
-	register char *lxp, *p;
+	char *lxp, *p;
 	struct stat s;
 	char dir[MAXFULLNAME];
 

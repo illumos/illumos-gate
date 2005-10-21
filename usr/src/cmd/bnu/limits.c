@@ -19,11 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* from SVR4 bnu:limits.c 1.4 */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "uucp.h"
 
@@ -124,8 +129,8 @@ get_tokens (line,flds)
 char *line;
 char *flds[];
 {
-	register i;
-	register char *p;
+	int i;
+	char *p;
 	struct name_value pair;
 
 	/* initialize defaults  in case parameter is not specified */

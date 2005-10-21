@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,9 @@ void cleanup(), exuucico();
 
 void logent(){}		/* to load ulockf.c */
 
+int
 main(argc, argv, envp)
+int argc;
 char *argv[];
 char **envp;
 {
@@ -200,6 +202,7 @@ char **envp;
 	cleanup(0);
 
 	/* NOTREACHED */
+	return (0);
 }
 
 struct m	*

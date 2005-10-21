@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,9 +48,9 @@ static char *bal();
  */
 char *
 getprm(s, whsp, prm)
-register char *s, *whsp, *prm;
+char *s, *whsp, *prm;
 {
-	register char *c;
+	char *c;
 	char rightq;		/* the right quote character */
 	char *beginning;
 	wchar_t	ch;
@@ -100,7 +100,7 @@ register char *s, *whsp, *prm;
 					*prm++ = *s++;
 					*prm++ = *s++;
 					*prm = '\0';
-					return;
+					return (s);
 				}
 				*prm++ = *s++;
 			}
@@ -157,7 +157,7 @@ register char *s, *whsp, *prm;
 
 static char *
 bal(s, r)
-register char *s;
+char *s;
 char r;
 {
 	int	width;
@@ -190,7 +190,7 @@ int
 split(arg, sys, fwd, file)
 char *arg, *sys, *fwd, *file;
 {
-    register wchar_t *cl, *cr, *n;
+    wchar_t *cl, *cr, *n;
     int retval = 0;
     wchar_t	wcbuf[MAXFULLNAME];
     wchar_t	tmpbuf[MAXFULLNAME];

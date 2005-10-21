@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,7 +79,9 @@ static void checkrmt();		/* See if we want to talk to remote. */
 
 extern char *Mytype;
 
+int
 main(argc, argv, envp)
+int argc;
 char *argv[];
 char **envp;
 {
@@ -756,6 +758,7 @@ char **envp;
 	}
 	cleanup(exitcode);
 	/*NOTREACHED*/
+	return (0);
 }
 
 /*
@@ -763,7 +766,7 @@ char **envp;
  */
 void
 cleanup(code)
-register int code;
+int code;
 {
 	(void) signal(SIGINT, SIG_IGN);
 	(void) signal(SIGHUP, SIG_IGN);
@@ -789,7 +792,7 @@ char TM_name[MAXNAMESIZE];
 void
 cleanTM()
 {
-	register int i;
+	int i;
 	char tm_name[MAXNAMESIZE];
 
 	DEBUG(7,"TM_cnt: %d\n",TM_cnt);
@@ -820,7 +823,7 @@ pid_t pnum;
  */
 void
 onintr(inter)
-register int inter;
+int inter;
 {
 	char str[30];
 	/* I'm putting a test for zero here because I saw it happen
@@ -865,7 +868,7 @@ timeout()
 /* skip to next field */
 static char *
 pskip(p)
-register char *p;
+char *p;
 {
 	if ((p = strchr(p, ' ')) != CNULL)
 		do
@@ -877,7 +880,7 @@ register char *p;
 void
 closedem()
 {
-	register i, maxfiles;
+	int i, maxfiles;
 
 #ifdef ATTSVR3
 	maxfiles = ulimit(4,0);
@@ -913,7 +916,7 @@ setTZ()
 	extern char	*fgets();
 	FILE		*tzfp;
 	extern FILE	*fopen();
-	register int	i;
+	int		i;
 	extern int	fclose(), strncmp();
 
 	if ( (tzfp = fopen("/etc/TIMEZONE","r")) == (FILE *)NULL )
