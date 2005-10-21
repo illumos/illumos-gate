@@ -232,8 +232,20 @@ forcpy:
 	cmp	%o2, 17			! for small counts copy bytes
 	bleu,pt	%ncc, .dbytecp
 	nop
-	cmp	%o2, 0x80		! For lengths less than 128 bytes
-	bgu,pn	%ncc, .blkalgndst	! no block st/quad ld
+
+	cmp	%o2, 0x80		! For lengths less than 128 bytes no
+	bleu,pn	%ncc, .no_blkcpy	! copy using ASI_BLK_INIT_ST_QUAD_LDD_P
+
+	/*
+	 * Make sure that source and destination buffers are 64 bytes apart.
+	 * If they are not, do not use ASI_BLK_INIT_ST_QUAD_LDD_P asi to copy
+	 * the data.
+	 */
+	subcc	%o1, %o0, %o3
+	blu	%ncc, .blkalgndst
+	cmp	%o3, 0x40		! if src - dst >= 0x40
+	bgeu,pt	%ncc, .blkalgndst	! then use ASI_BLK_INIT_ST_QUAD_LDD_P
+.no_blkcpy:
 	andcc	%o1, 3, %o5		! is src word aligned
 	bz,pn	%ncc, .aldst
 	cmp	%o5, 2			! is src half-word aligned
