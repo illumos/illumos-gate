@@ -69,6 +69,10 @@ extern "C" {
 
 #include <sys/mac.h>
 
+#ifdef __amd64
+#include <sys/x86_archext.h>
+#endif
+
 /*
  * <sys/ethernet.h> *may* already have provided the typedef ether_addr_t;
  * but of course C doesn't provide a way to check this directly.  So here

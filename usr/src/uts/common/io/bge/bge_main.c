@@ -1849,8 +1849,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	    intr_types);
 
 	if ((intr_types & DDI_INTR_TYPE_MSI) && bgep->chipid.bge_msi_enabled) {
-		bge_log(bgep, "Using MSI interrupt type");
-
 		if (bge_add_msi_intrs(bgep) != DDI_SUCCESS) {
 			bge_error(bgep, "MSI registration failed, "
 			    "trying LEGACY interrupt type\n");
@@ -1863,8 +1861,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 
 	if (!(bgep->progress & PROGRESS_INTR) &&
 	    (intr_types & DDI_INTR_TYPE_FIXED)) {
-		bge_log(bgep, "Using Legacy interrupt type\n");
-
 		if (bge_add_legacy_intrs(bgep) != DDI_SUCCESS) {
 			bge_error(bgep, "Legacy interrupt "
 			    "registration failed\n");
@@ -1908,7 +1904,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Initialise the (internal) PHY.
 	 */
 	bgep->link_state = LINK_STATE_UNKNOWN;
-	bgep->link_up_msg = bgep->link_down_msg = " (initialised)";
+	bgep->link_up_msg = bgep->link_down_msg = " (initialized)";
 
 	mutex_enter(bgep->genlock);
 

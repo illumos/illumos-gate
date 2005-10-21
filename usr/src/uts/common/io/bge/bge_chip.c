@@ -563,6 +563,26 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	pci_config_put32(handle, PCI_CONF_BGE_MWBAR, 0);
 }
 
+#ifdef __amd64
+/*
+ * Distinguish CPU types
+ *
+ * These use to  distinguish AMD64 or Intel EM64T of CPU running mode.
+ * If CPU runs on Intel EM64T mode,the 64bit operation cannot works fine
+ * for PCI-Express based network interface card. This is the work-around
+ * for those nics.
+ */
+static boolean_t bge_get_em64t_type(void);
+#pragma	inline(bge_get_em64t_type)
+
+static boolean_t
+bge_get_em64t_type(void)
+{
+
+	return (x86_vendor == X86_VENDOR_Intel);
+}
+#endif
+
 /*
  * Operating register get/set access routines
  */
@@ -632,7 +652,17 @@ bge_reg_get64(bge_t *bgep, bge_regno_t regno)
 {
 	uint64_t regval;
 
+#ifdef	__amd64
+	if (bge_get_em64t_type()) {
+		regval = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno + 4));
+		regval <<= 32;
+		regval |= ddi_get32(bgep->io_handle, PIO_ADDR(bgep, regno));
+	} else {
+		regval = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, regno));
+	}
+#else
 	regval = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, regno));
+#endif
 
 #ifdef	_LITTLE_ENDIAN
 	regval = (regval >> 32) | (regval << 32);
@@ -657,7 +687,21 @@ bge_reg_put64(bge_t *bgep, bge_regno_t regno, uint64_t data)
 	data = ((data >> 32) | (data << 32));
 #endif	/* _LITTLE_ENDIAN */
 
+#ifdef	__amd64
+	if (bge_get_em64t_type()) {
+		ddi_put32(bgep->io_handle,
+			PIO_ADDR(bgep, regno), (uint32_t)data);
+		BGE_PCICHK(bgep);
+		ddi_put32(bgep->io_handle,
+			PIO_ADDR(bgep, regno + 4), (uint32_t)(data >> 32));
+
+	} else {
+		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, regno), data);
+	}
+#else
 	ddi_put64(bgep->io_handle, PIO_ADDR(bgep, regno), data);
+#endif
+
 	BGE_PCICHK(bgep);
 }
 
@@ -810,7 +854,18 @@ bge_nic_get64(bge_t *bgep, bge_regno_t addr)
 	addr &= MWBAR_GRANULE_MASK;
 	addr += NIC_MEM_WINDOW_OFFSET;
 
-	data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
+#ifdef	__amd64
+		if (bge_get_em64t_type()) {
+			data = ddi_get32(bgep->io_handle, PIO_ADDR(bgep, addr));
+			data <<= 32;
+			data |= ddi_get32(bgep->io_handle,
+				PIO_ADDR(bgep, addr + 4));
+		} else {
+			data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
+		}
+#else
+		data = ddi_get64(bgep->io_handle, PIO_ADDR(bgep, addr));
+#endif
 
 	BGE_TRACE(("bge_nic_get64($%p, 0x%lx) = 0x%016llx",
 		(void *)bgep, addr, data));
@@ -830,7 +885,21 @@ bge_nic_put64(bge_t *bgep, bge_regno_t addr, uint64_t data)
 	bge_nic_setwin(bgep, addr & ~MWBAR_GRANULE_MASK);
 	addr &= MWBAR_GRANULE_MASK;
 	addr += NIC_MEM_WINDOW_OFFSET;
+
+#ifdef	__amd64
+	if (bge_get_em64t_type()) {
+		ddi_put32(bgep->io_handle,
+			PIO_ADDR(bgep, addr), (uint32_t)data);
+		BGE_PCICHK(bgep);
+		ddi_put32(bgep->io_handle,
+			PIO_ADDR(bgep, addr + 4), (uint32_t)(data >> 32));
+	} else {
+		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), data);
+	}
+#else
 	ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), data);
+#endif
+
 	BGE_PCICHK(bgep);
 }
 
@@ -857,8 +926,26 @@ bge_nic_putrcb(bge_t *bgep, bge_regno_t addr, bge_rcb_t *rcbp)
 	addr += NIC_MEM_WINDOW_OFFSET;
 
 	p = (void *)rcbp;
+#ifdef	__amd64
+	if (bge_get_em64t_type()) {
+		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr),
+			(uint32_t)(*p));
+		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 4),
+			(uint32_t)(*p >> 32));
+		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 8),
+			(uint32_t)(*(p + 1)));
+		ddi_put32(bgep->io_handle, PIO_ADDR(bgep, addr + 12),
+			(uint32_t)(*p >> 32));
+
+	} else {
+		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), *p++);
+		ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr+8), *p);
+	}
+#else
 	ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr), *p++);
-	ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr+8), *p);
+	ddi_put64(bgep->io_handle, PIO_ADDR(bgep, addr + 8), *p);
+#endif
+
 	BGE_PCICHK(bgep);
 }
 
@@ -2004,7 +2091,7 @@ bge_chip_id_init(bge_t *bgep)
 	 */
 	if (cidp->chip_label == 0)
 		bge_problem(bgep,
-			"Device 'pci%04x,%04x' not recognised (%d?)",
+			"Device 'pci%04x,%04x' not recognized (%d?)",
 			cidp->vendor, cidp->device, cidp->device);
 	else if (!dev_ok)
 		bge_problem(bgep,
@@ -2013,7 +2100,7 @@ bge_chip_id_init(bge_t *bgep)
 			cidp->revision);
 	else if (!sys_ok)
 		bge_problem(bgep,
-			"%d-based subsystem 'pci%04x,%04x' not supported",
+			"%d-based subsystem 'pci%04x,%04x' not validated",
 			cidp->chip_label, cidp->subven, cidp->subdev);
 	else
 		cidp->flags |= CHIP_FLAG_SUPPORTED;
@@ -2283,12 +2370,14 @@ bge_sync_mac_modes(bge_t *bgep)
 	 * Reprogram the Ethernet MAC mode ...
 	 */
 	macmode = regval = bge_reg_get32(bgep, ETHERNET_MAC_MODE_REG);
-	if (bgep->chipid.flags & CHIP_FLAG_SERDES)
+	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
+		(bgep->param_loop_mode != BGE_LOOP_INTERNAL_MAC))
 		macmode &= ~ETHERNET_MODE_LINK_POLARITY;
 	else
 		macmode |= ETHERNET_MODE_LINK_POLARITY;
 	macmode &= ~ETHERNET_MODE_PORTMODE_MASK;
-	if (bgep->chipid.flags & CHIP_FLAG_SERDES)
+	if ((bgep->chipid.flags & CHIP_FLAG_SERDES) &&
+		(bgep->param_loop_mode != BGE_LOOP_INTERNAL_MAC))
 		macmode |= ETHERNET_MODE_PORTMODE_TBI;
 	else if (bgep->param_link_speed == 10 || bgep->param_link_speed == 100)
 		macmode |= ETHERNET_MODE_PORTMODE_MII;
