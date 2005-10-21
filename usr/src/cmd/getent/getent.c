@@ -20,12 +20,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <locale.h>
@@ -53,8 +54,9 @@ static struct table t[] = {
 	{ NULL,		NULL }
 };
 
-static	void usage(void);
+static	void usage(void) __NORETURN;
 
+int
 main(int argc, const char **argv)
 {
 	struct table *p;
