@@ -1083,8 +1083,7 @@ dump_table(ccl_chars_t *table, int size)
 
 	printf("Duming table %o with size %d\n", table, size);
 	size++;	/* To watch out NULL */
-	for (i = 0; i < size; i++, table++)
-	{
+	for (i = 0; i < size; i++, table++) {
 		printf("{%3o, %3o}, ", table->cc_cs, table->cc_ce);
 	}
 	printf("\n");
