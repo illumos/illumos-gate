@@ -101,8 +101,13 @@ typedef struct px_err_reg_desc {
  */
 #define	PX_ERPT_SEND_DEC(n)	int px_err_ ## n ## _send_ereport\
 	(dev_info_t *rpdip, caddr_t csr_base, uint64_t ss_reg, \
-	ddi_fm_error_t *derr, char *class_name)
+	ddi_fm_error_t *derr, uint_t bit, char *class_name)
 #define	PX_ERPT_SEND(n)		px_err_ ## n ## _send_ereport
+
+/*
+ * Macro to test for primary vs secondary
+ */
+#define	PX_ERR_IS_PRI(bit) (bit < 32)
 
 /*
  * Predefined error handling functions.

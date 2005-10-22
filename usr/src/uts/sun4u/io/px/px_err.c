@@ -54,6 +54,11 @@
 	0, \
 	PX_ERR_BIT_HANDLE(hdl), \
 	PX_ERPT_SEND(erpt), \
+	PX_ERR_JBC_CLASS(bit) }, \
+	{ JBC_INTERRUPT_STATUS_ ## bit ## _S, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
 	PX_ERR_JBC_CLASS(bit)
 px_err_bit_desc_t px_err_cb_tbl[] = {
 	/* JBC FATAL - see io erpt doc, section 1.1 */
@@ -112,6 +117,11 @@ px_err_bit_desc_t px_err_cb_tbl[] = {
 	0, \
 	PX_ERR_BIT_HANDLE(hdl), \
 	PX_ERPT_SEND(erpt), \
+	PX_ERR_DMC_CLASS(bit) }, \
+	{ IMU_INTERRUPT_STATUS_ ## bit ## _S, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
 	PX_ERR_DMC_CLASS(bit)
 px_err_bit_desc_t px_err_imu_tbl[] = {
 	/* DMC IMU RDS - see io erpt doc, section 2.1 */
@@ -136,6 +146,11 @@ px_err_bit_desc_t px_err_imu_tbl[] = {
 /* mmu errors */
 #define	MMU_BIT_DESC(bit, hdl, erpt) \
 	MMU_INTERRUPT_STATUS_ ## bit ## _P, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_DMC_CLASS(bit) }, \
+	{ MMU_INTERRUPT_STATUS_ ## bit ## _S, \
 	0, \
 	PX_ERR_BIT_HANDLE(hdl), \
 	PX_ERPT_SEND(erpt), \
@@ -164,6 +179,11 @@ px_err_bit_desc_t px_err_mmu_tbl[] = {
  */
 #define	ILU_BIT_DESC(bit, hdl, erpt) \
 	ILU_INTERRUPT_STATUS_ ## bit ## _P, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_CLASS(bit) }, \
+	{ ILU_INTERRUPT_STATUS_ ## bit ## _S, \
 	0, \
 	PX_ERR_BIT_HANDLE(hdl), \
 	PX_ERPT_SEND(erpt), \
@@ -245,6 +265,11 @@ px_err_bit_desc_t px_err_tlu_ce_tbl[] = {
 /* pec oe errors */
 #define	TLU_OE_BIT_DESC(bit, hdl, erpt) \
 	TLU_OTHER_EVENT_STATUS_CLEAR_ ## bit ## _P, \
+	0, \
+	PX_ERR_BIT_HANDLE(hdl), \
+	PX_ERPT_SEND(erpt), \
+	PX_ERR_PEC_CLASS(bit) }, \
+	{ TLU_OTHER_EVENT_STATUS_CLEAR_ ## bit ## _S, \
 	0, \
 	PX_ERR_BIT_HANDLE(hdl), \
 	PX_ERPT_SEND(erpt), \
@@ -852,6 +877,7 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 						    csr_base,
 						    ss_reg,
 						    derr,
+						    err_bit_desc->bit,
 						    err_bit_desc->class_name);
 				}
 			}
@@ -1003,11 +1029,12 @@ PX_ERPT_SEND_DEC(do_not)
 PX_ERPT_SEND_DEC(jbc_fatal)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_JBC_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, JBC_ERROR_LOG_ENABLE),
 	    FIRE_JBC_IE, DATA_TYPE_UINT64,
@@ -1029,11 +1056,12 @@ PX_ERPT_SEND_DEC(jbc_fatal)
 PX_ERPT_SEND_DEC(jbc_merge)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_JBC_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, JBC_ERROR_LOG_ENABLE),
 	    FIRE_JBC_IE, DATA_TYPE_UINT64,
@@ -1060,8 +1088,12 @@ px_err_jbc_merge_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)
 {
+	boolean_t	pri = PX_ERR_IS_PRI(err_bit_descr->bit);
 	uint64_t	paddr;
 	int		ret;
+
+	if (!pri)
+		return (PX_FATAL_GOS);
 
 	paddr = CSR_XR(csr_base, MERGE_TRANSACTION_ERROR_LOG);
 	paddr &= MERGE_TRANSACTION_ERROR_LOG_ADDRESS_MASK;
@@ -1076,11 +1108,12 @@ px_err_jbc_merge_handle(dev_info_t *rpdip, caddr_t csr_base,
 PX_ERPT_SEND_DEC(jbc_in)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_JBC_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, JBC_ERROR_LOG_ENABLE),
 	    FIRE_JBC_IE, DATA_TYPE_UINT64,
@@ -1116,8 +1149,12 @@ px_err_jbc_jbusint_in_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)
 {
+	boolean_t	pri = PX_ERR_IS_PRI(err_bit_descr->bit);
 	uint64_t	paddr;
 	int		ret;
+
+	if (!pri)
+		return (PX_FATAL_GOS);
 
 	paddr = CSR_XR(csr_base, JBCINT_IN_TRANSACTION_ERROR_LOG);
 	paddr &= JBCINT_IN_TRANSACTION_ERROR_LOG_ADDRESS_MASK;
@@ -1133,11 +1170,12 @@ px_err_jbc_jbusint_in_handle(dev_info_t *rpdip, caddr_t csr_base,
 PX_ERPT_SEND_DEC(jbc_out)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_JBC_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, JBC_ERROR_LOG_ENABLE),
 	    FIRE_JBC_IE, DATA_TYPE_UINT64,
@@ -1159,11 +1197,12 @@ PX_ERPT_SEND_DEC(jbc_out)
 PX_ERPT_SEND_DEC(jbc_odcd)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_JBC_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, JBC_ERROR_LOG_ENABLE),
 	    FIRE_JBC_IE, DATA_TYPE_UINT64,
@@ -1193,8 +1232,12 @@ px_err_jbc_dmcint_odcd_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)
 {
+	boolean_t	pri = PX_ERR_IS_PRI(err_bit_descr->bit);
 	uint64_t	paddr;
 	int		ret;
+
+	if (!pri)
+		return (PX_FATAL_GOS);
 
 	paddr = CSR_XR(csr_base, DMCINT_ODCD_ERROR_LOG);
 	paddr &= DMCINT_ODCD_ERROR_LOG_ADDRESS_MASK;
@@ -1209,11 +1252,12 @@ px_err_jbc_dmcint_odcd_handle(dev_info_t *rpdip, caddr_t csr_base,
 PX_ERPT_SEND_DEC(jbc_idc)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_JBC_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, JBC_ERROR_LOG_ENABLE),
 	    FIRE_JBC_IE, DATA_TYPE_UINT64,
@@ -1233,11 +1277,12 @@ PX_ERPT_SEND_DEC(jbc_idc)
 PX_ERPT_SEND_DEC(jbc_csr)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_JBC_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, JBC_ERROR_LOG_ENABLE),
 	    FIRE_JBC_IE, DATA_TYPE_UINT64,
@@ -1263,8 +1308,12 @@ px_err_jbc_csr_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)
 {
+	boolean_t	pri = PX_ERR_IS_PRI(err_bit_descr->bit);
 	uint64_t	paddr;
 	int		ret;
+
+	if (!pri)
+		return (PX_FATAL_GOS);
 
 	paddr = CSR_XR(csr_base, CSR_ERROR_LOG);
 	paddr &= CSR_ERROR_LOG_ADDRESS_MASK;
@@ -1281,11 +1330,12 @@ px_err_jbc_csr_handle(dev_info_t *rpdip, caddr_t csr_base,
 PX_ERPT_SEND_DEC(imu_rds)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_IMU_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, IMU_ERROR_LOG_ENABLE),
 	    FIRE_IMU_IE, DATA_TYPE_UINT64,
@@ -1377,11 +1427,12 @@ px_err_imu_eq_ovfl_handle(dev_info_t *rpdip, caddr_t csr_base,
 PX_ERPT_SEND_DEC(imu_scs)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_IMU_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, IMU_ERROR_LOG_ENABLE),
 	    FIRE_IMU_IE, DATA_TYPE_UINT64,
@@ -1401,11 +1452,12 @@ PX_ERPT_SEND_DEC(imu_scs)
 PX_ERPT_SEND_DEC(imu)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_IMU_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, IMU_ERROR_LOG_ENABLE),
 	    FIRE_IMU_IE, DATA_TYPE_UINT64,
@@ -1423,11 +1475,12 @@ PX_ERPT_SEND_DEC(imu)
 PX_ERPT_SEND_DEC(mmu_tfar_tfsr)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_MMU_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, MMU_ERROR_LOG_ENABLE),
 	    FIRE_MMU_IE, DATA_TYPE_UINT64,
@@ -1449,11 +1502,12 @@ PX_ERPT_SEND_DEC(mmu_tfar_tfsr)
 PX_ERPT_SEND_DEC(mmu)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_MMU_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, MMU_ERROR_LOG_ENABLE),
 	    FIRE_MMU_IE, DATA_TYPE_UINT64,
@@ -1473,6 +1527,7 @@ px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)
 {
+	boolean_t	pri = PX_ERR_IS_PRI(err_bit_descr->bit);
 	uint64_t	mmu_log_enable, mmu_intr_enable;
 	uint64_t	mask = BITMASK(err_bit_descr->bit);
 	uint64_t	mmu_tfa, mmu_ctrl;
@@ -1506,6 +1561,9 @@ px_err_mmu_rbne_handle(dev_info_t *rpdip, caddr_t csr_base,
 	    (mmu_ctrl & mmu_enable_bit)) {
 		err = PX_FATAL_SW;
 	} else {
+		if (!pri)
+			return (PX_FATAL_GOS);
+
 		ret = px_handle_lookup(
 			rpdip, DMA_HANDLE, derr->fme_ena, (void *)mmu_tfa);
 		err = (ret == DDI_FM_FATAL) ? PX_FATAL_GOS : PX_NONFATAL;
@@ -1533,8 +1591,12 @@ px_err_mmu_tfa_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)
 {
+	boolean_t	pri = PX_ERR_IS_PRI(err_bit_descr->bit);
 	uint64_t	mmu_tfa;
 	uint_t		ret;
+
+	if (!pri)
+		return (PX_FATAL_GOS);
 
 	mmu_tfa = CSR_XR(csr_base, MMU_TRANSLATION_FAULT_ADDRESS);
 	ret = px_handle_lookup(
@@ -1550,8 +1612,12 @@ px_err_mmu_tblwlk_handle(dev_info_t *rpdip, caddr_t csr_base,
 	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
 	px_err_bit_desc_t *err_bit_descr)
 {
+	boolean_t	pri = PX_ERR_IS_PRI(err_bit_descr->bit);
 	uint64_t	mmu_tfa;
 	uint_t		ret;
+
+	if (!pri)
+		return (PX_FATAL_GOS);
 
 	mmu_tfa = CSR_XR(csr_base, MMU_TRANSLATION_FAULT_ADDRESS);
 	ret = px_handle_lookup(
@@ -1594,11 +1660,12 @@ px_err_tlu_lup_handle(dev_info_t *rpdip, caddr_t csr_base,
 PX_ERPT_SEND_DEC(pec_ilu)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_ILU_ELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, ILU_ERROR_LOG_ENABLE),
 	    FIRE_ILU_IE, DATA_TYPE_UINT64,
@@ -1630,11 +1697,12 @@ px_err_pciex_ue_handle(dev_info_t *rpdip, caddr_t csr_base,
 PX_ERPT_SEND_DEC(pciex_rx_ue)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_TLU_UELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE),
 	    FIRE_TLU_UIE, DATA_TYPE_UINT64,
@@ -1656,11 +1724,12 @@ PX_ERPT_SEND_DEC(pciex_rx_ue)
 PX_ERPT_SEND_DEC(pciex_tx_ue)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_TLU_UELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE),
 	    FIRE_TLU_UIE, DATA_TYPE_UINT64,
@@ -1682,11 +1751,12 @@ PX_ERPT_SEND_DEC(pciex_tx_ue)
 PX_ERPT_SEND_DEC(pciex_rx_tx_ue)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_TLU_UELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE),
 	    FIRE_TLU_UIE, DATA_TYPE_UINT64,
@@ -1712,11 +1782,12 @@ PX_ERPT_SEND_DEC(pciex_rx_tx_ue)
 PX_ERPT_SEND_DEC(pciex_ue)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_TLU_UELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_UNCORRECTABLE_ERROR_LOG_ENABLE),
 	    FIRE_TLU_UIE, DATA_TYPE_UINT64,
@@ -1748,11 +1819,12 @@ px_err_pciex_ce_handle(dev_info_t *rpdip, caddr_t csr_base,
 PX_ERPT_SEND_DEC(pciex_ce)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_TLU_CELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_CORRECTABLE_ERROR_LOG_ENABLE),
 	    FIRE_TLU_CIE, DATA_TYPE_UINT64,
@@ -1770,11 +1842,12 @@ PX_ERPT_SEND_DEC(pciex_ce)
 PX_ERPT_SEND_DEC(pciex_rx_oe)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_TLU_OEELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_OTHER_EVENT_LOG_ENABLE),
 	    FIRE_TLU_OEIE, DATA_TYPE_UINT64,
@@ -1796,11 +1869,12 @@ PX_ERPT_SEND_DEC(pciex_rx_oe)
 PX_ERPT_SEND_DEC(pciex_rx_tx_oe)
 {
 	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_TLU_OEELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_OTHER_EVENT_LOG_ENABLE),
 	    FIRE_TLU_OEIE, DATA_TYPE_UINT64,
@@ -1825,12 +1899,13 @@ PX_ERPT_SEND_DEC(pciex_rx_tx_oe)
 /* TLU Other Event - see io erpt doc, section 3.9 */
 PX_ERPT_SEND_DEC(pciex_oe)
 {
-	char			buf[FM_MAX_CLASS];
+	char		buf[FM_MAX_CLASS];
+	boolean_t	pri = PX_ERR_IS_PRI(bit);
 
 	(void) snprintf(buf, FM_MAX_CLASS, "%s", class_name);
 	ddi_fm_ereport_post(rpdip, buf, derr->fme_ena,
 	    DDI_NOSLEEP, FM_VERSION, DATA_TYPE_UINT8, 0,
-	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, B_TRUE,
+	    FIRE_PRIMARY, DATA_TYPE_BOOLEAN_VALUE, pri,
 	    FIRE_TLU_OEELE, DATA_TYPE_UINT64,
 	    CSR_XR(csr_base, TLU_OTHER_EVENT_LOG_ENABLE),
 	    FIRE_TLU_OEIE, DATA_TYPE_UINT64,
@@ -1858,7 +1933,7 @@ PX_ERPT_SEND_DEC(pciex_ldn)
 		return (PX_OK);
 	}
 	return (PX_ERPT_SEND(pciex_oe)(rpdip, csr_base, ss_reg, derr,
-	    class_name));
+	    bit, class_name));
 
 }
 
@@ -1877,5 +1952,5 @@ PX_ERPT_SEND_DEC(pciex_lup)
 	}
 
 	return (PX_ERPT_SEND(pciex_oe)(rpdip, csr_base, ss_reg, derr,
-	    class_name));
+	    bit, class_name));
 }

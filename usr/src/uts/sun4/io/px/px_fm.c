@@ -250,12 +250,16 @@ int
 px_handle_lookup(dev_info_t *dip, int type, uint64_t fme_ena, void *afar)
 {
 	uint32_t cap = ((px_t *)DIP_TO_STATE(dip))->px_fm_cap;
+	int	ret = DDI_FM_FATAL;
+
 	int (*f)() = type == DMA_HANDLE ?
 	    (DDI_FM_DMA_ERR_CAP(cap) ? px_dma_check : NULL) :
 	    (DDI_FM_ACC_ERR_CAP(cap) ? px_acc_check : NULL);
 
-	return (f ? ndi_fmc_error(dip, NULL, type, f, fme_ena, afar) :
-	    DDI_FM_UNKNOWN);
+	if (f)
+		ret = ndi_fmc_error(dip, NULL, type, f, fme_ena, afar);
+
+	return (ret == DDI_FM_UNKNOWN ? DDI_FM_FATAL : ret);
 }
 
 /*

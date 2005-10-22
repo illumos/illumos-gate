@@ -233,59 +233,60 @@ px_cb_check_errors(dev_info_t *dip, ddi_fm_error_t *derr,
 	/* block/op/phase/cond/dir/flag... */
 	switch (epkt->rc_descr.op) {
 	case OP_PIO:
-		err |= PX_NONFATAL;
-
+		err = PX_NONFATAL;
 		/* check handle if affected memory address is captured */
 		if (epkt->rc_descr.M != 0) {
 			ret = px_handle_lookup(dip, ACC_HANDLE,
 			    derr->fme_ena, (void *)epkt->addr);
 		}
 		if (ret == DDI_FM_FATAL)
-			err |= PX_FATAL_SW;
+			err |= PX_FATAL_GOS;
 		break;
 
 	case OP_DMA:
 		switch (epkt->rc_descr.phase) {
 		case PH_ADDR:
-			err |= PX_FATAL_GOS;
+			err = PX_FATAL_GOS;
 			break;
 		case PH_DATA:
 			if (epkt->rc_descr.cond == CND_UE) {
-				err |= PX_FATAL_GOS;
+				err = PX_FATAL_GOS;
 				break;
 			}
 
-			err |= PX_NONFATAL;
+			err = PX_NONFATAL;
 			if (epkt->rc_descr.M == 1) {
 				ret = px_handle_lookup(dip, DMA_HANDLE,
 				    derr->fme_ena, (void *)epkt->addr);
 				if (ret == DDI_FM_FATAL)
-					err |= PX_FATAL_SW;
+					err |= PX_FATAL_GOS;
 			}
 			break;
 		default:
 			DBG(DBG_ERR_INTR, dip, "Unexpected epkt");
-			err |= PX_ERR_UNKNOWN;
+			err = PX_FATAL_GOS;
 			break;
 		}
 		break;
 	case OP_UNKNOWN:
-		err |= PX_NONFATAL;
+		err = PX_NONFATAL;
 		if (epkt->rc_descr.M == 1) {
 			int	ret1, ret2;
+
 			ret1 = px_handle_lookup(dip, DMA_HANDLE, derr->fme_ena,
 			    (void *)epkt->addr);
 			ret2 = px_handle_lookup(dip, ACC_HANDLE, derr->fme_ena,
 			    (void *)epkt->addr);
-			if ((ret1 == DDI_FM_FATAL) || (ret2 == DDI_FM_FATAL))
-				err |= PX_FATAL_SW;
+
+			if (ret1 == DDI_FM_FATAL || ret2 == DDI_FM_FATAL)
+				err |= PX_FATAL_GOS;
 		}
 		break;
 
 	case OP_RESERVED:
 	default:
 		DBG(DBG_ERR_INTR, NULL, "Unrecognized JBC error.");
-		err |= PX_ERR_UNKNOWN;
+		err = PX_FATAL_GOS;
 		break;
 	}
 
@@ -317,7 +318,6 @@ px_mmu_check_errors(dev_info_t *dip, ddi_fm_error_t *derr,
 	case OP_TBW:	/* nonfatal, stuck-fatal */
 		err = PX_NONFATAL;
 		break;
-
 	default:
 		err = PX_ERR_UNKNOWN;
 		break;
@@ -326,12 +326,12 @@ px_mmu_check_errors(dev_info_t *dip, ddi_fm_error_t *derr,
 	if ((epkt->rc_descr.D != 0) || (epkt->rc_descr.M != 0)) {
 		ret = px_handle_lookup(dip, DMA_HANDLE, derr->fme_ena,
 		    (void *)epkt->addr);
-	}
-
-	if (ret == DDI_FM_FATAL)
-		err = PX_FATAL_SW;
-	else if ((ret == DDI_FM_NONFATAL) && (err = PX_ERR_UNKNOWN))
-		err = PX_NONFATAL;
+		if (ret == DDI_FM_FATAL)
+			err |= PX_FATAL_GOS;
+		else
+			err |= PX_NONFATAL;
+	} else
+		err |= PX_NONFATAL;
 
 	return (err);
 }
