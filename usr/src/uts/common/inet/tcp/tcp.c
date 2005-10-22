@@ -1155,38 +1155,9 @@ static void	tcp_ioctl_abort_conn(queue_t *, mblk_t *);
 static int	tcp_ioctl_abort_bucket(tcp_ioc_abort_conn_t *, int, int *,
     boolean_t);
 
-/*
- * Write-side flow-control is implemented via the per instance STREAMS
- * write-side Q by explicitly setting QFULL to stop the flow of mblk_t(s)
- * and clearing QFULL and calling qbackenable() to restart the flow based
- * on the number of TCP unsent bytes (i.e. those not on the wire waiting
- * for a remote ACK).
- *
- * This is different than a standard STREAMS kmod which when using the
- * STREAMS Q the framework would automatictly flow-control based on the
- * defined hiwat/lowat values as mblk_t's are enqueued/dequeued.
- *
- * As of FireEngine TCP write-side flow-control needs to take into account
- * both the unsent tcp_xmit list bytes but also any squeue_t enqueued bytes
- * (i.e. from tcp_wput() -> tcp_output()).
- *
- * This is accomplished by adding a new tcp_t fields, tcp_squeue_bytes, to
- * count the number of bytes enqueued by tcp_wput() and the number of bytes
- * dequeued and processed by tcp_output().
- *
- * So, the total number of bytes unsent is (squeue_bytes + unsent) with all
- * flow-control uses of unsent replaced with the macro TCP_UNSENT_BYTES.
- */
 
 static void	tcp_clrqfull(tcp_t *);
 static void	tcp_setqfull(tcp_t *);
-
-#define	TCP_UNSENT_BYTES(tcp) \
-	((tcp)->tcp_squeue_bytes + (tcp)->tcp_unsent)
-
-/*
- * STREAMS kmod stuff ...
- */
 
 static struct module_info tcp_rinfo =  {
 #define	TCP_MODULE_ID	5105
@@ -1997,10 +1968,12 @@ tcp_unfuse(tcp_t *tcp)
 	/* Lift up any flow-control conditions */
 	if (tcp->tcp_flow_stopped) {
 		tcp_clrqfull(tcp);
+		tcp->tcp_flow_stopped = B_FALSE;
 		TCP_STAT(tcp_fusion_backenabled);
 	}
 	if (peer_tcp->tcp_flow_stopped) {
 		tcp_clrqfull(peer_tcp);
+		peer_tcp->tcp_flow_stopped = B_FALSE;
 		TCP_STAT(tcp_fusion_backenabled);
 	}
 
@@ -2192,6 +2165,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp)
 	if (TCP_IS_DETACHED(peer_tcp) &&
 	    peer_tcp->tcp_rcv_cnt > peer_rq->q_hiwat) {
 		tcp_setqfull(tcp);
+		tcp->tcp_flow_stopped = B_TRUE;
 		TCP_STAT(tcp_fusion_flowctl);
 	}
 
@@ -2229,6 +2203,7 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp)
 		} else if (!tcp->tcp_flow_stopped) {
 			if (!canputnext(peer_rq)) {
 				tcp_setqfull(tcp);
+				tcp->tcp_flow_stopped = B_TRUE;
 				TCP_STAT(tcp_fusion_flowctl);
 			} else {
 				ASSERT(peer_tcp->tcp_rcv_list != NULL);
@@ -2236,8 +2211,6 @@ tcp_fuse_output(tcp_t *tcp, mblk_t *mp)
 				    peer_tcp, NULL);
 				TCP_STAT(tcp_fusion_putnext);
 			}
-		} else if (TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
-			tcp_clrqfull(tcp);
 		}
 	}
 	return (B_TRUE);
@@ -4503,6 +4476,7 @@ tcp_stop_lingering(tcp_t *tcp)
 	if (tcp->tcp_state > TCPS_LISTEN) {
 		tcp_acceptor_hash_remove(tcp);
 		if (tcp->tcp_flow_stopped) {
+			tcp->tcp_flow_stopped = B_FALSE;
 			tcp_clrqfull(tcp);
 		}
 
@@ -4824,6 +4798,7 @@ tcp_close_output(void *arg, mblk_t *mp, void *arg2)
 		tcp_acceptor_hash_remove(tcp);
 
 		if (tcp->tcp_flow_stopped) {
+			tcp->tcp_flow_stopped = B_FALSE;
 			tcp_clrqfull(tcp);
 		}
 
@@ -8014,6 +7989,7 @@ tcp_reinit(tcp_t *tcp)
 	tcp_timers_stop(tcp);
 
 	if (tcp->tcp_flow_stopped) {
+		tcp->tcp_flow_stopped = B_FALSE;
 		tcp_clrqfull(tcp);
 	}
 	/*
@@ -8421,8 +8397,6 @@ tcp_reinit_values(tcp)
 
 	tcp->tcp_in_ack_unsent = 0;
 	tcp->tcp_cork = B_FALSE;
-
-	tcp->tcp_squeue_bytes = 0;
 
 #undef	DONTCARE
 #undef	PRESERVE
@@ -10498,8 +10472,8 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 				 * condition to be lifted right away.
 				 */
 				if (tcp->tcp_flow_stopped &&
-				    TCP_UNSENT_BYTES(tcp)
-				    < tcp->tcp_xmit_hiwater) {
+				    tcp->tcp_unsent < tcp->tcp_xmit_hiwater) {
+					tcp->tcp_flow_stopped = B_FALSE;
 					tcp_clrqfull(tcp);
 				}
 			}
@@ -16014,6 +15988,7 @@ tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2)
 			(void) tcp_rcv_drain(tcp->tcp_rq, tcp);
 
 		tcp_clrqfull(peer_tcp);
+		peer_tcp->tcp_flow_stopped = B_FALSE;
 		TCP_STAT(tcp_fusion_backenabled);
 		return;
 	}
@@ -17466,7 +17441,6 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	int		usable;
 	conn_t		*connp = (conn_t *)arg;
 	tcp_t		*tcp = connp->conn_tcp;
-	uint32_t	msize;
 
 	/*
 	 * Try and ASSERT the minimum possible references on the
@@ -17481,15 +17455,8 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	    (connp->conn_fanout == NULL && connp->conn_ref >= 3));
 
 	/* Bypass tcp protocol for fused tcp loopback */
-	if (tcp->tcp_fused) {
-		msize = msgdsize(mp);
-		mutex_enter(&connp->conn_lock);
-		tcp->tcp_squeue_bytes -= msize;
-		mutex_exit(&connp->conn_lock);
-
-		if (tcp_fuse_output(tcp, mp))
-			return;
-	}
+	if (tcp->tcp_fused && tcp_fuse_output(tcp, mp))
+		return;
 
 	mss = tcp->tcp_mss;
 	if (tcp->tcp_xmit_zc_clean)
@@ -17515,21 +17482,12 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	    (len == 0) ||
 	    (len > mss) ||
 	    (tcp->tcp_valid_bits != 0)) {
-		msize = msgdsize(mp);
-		mutex_enter(&connp->conn_lock);
-		tcp->tcp_squeue_bytes -= msize;
-		mutex_exit(&connp->conn_lock);
-
 		tcp_wput_data(tcp, mp, B_FALSE);
 		return;
 	}
 
 	ASSERT(tcp->tcp_xmit_tail_unsent == 0);
 	ASSERT(tcp->tcp_fin_sent == 0);
-
-	mutex_enter(&connp->conn_lock);
-	tcp->tcp_squeue_bytes -= len;
-	mutex_exit(&connp->conn_lock);
 
 	/* queue new packet onto retransmission queue */
 	if (tcp->tcp_xmit_head == NULL) {
@@ -17576,11 +17534,6 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	if (len > usable) {
 		/* Can't send complete M_DATA in one shot */
 		goto slow;
-	}
-
-	if (tcp->tcp_flow_stopped &&
-	    TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
-		tcp_clrqfull(tcp);
 	}
 
 	/*
@@ -17956,6 +17909,7 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 			ASSERT(peer_tcp->tcp_fused);
 
 			tcp_clrqfull(peer_tcp);
+			peer_tcp->tcp_flow_stopped = B_FALSE;
 			TCP_STAT(tcp_fusion_backenabled);
 		}
 	}
@@ -18291,27 +18245,12 @@ tcp_wput(queue_t *q, mblk_t *mp)
 	t_scalar_t type;
 	uchar_t *rptr;
 	struct iocblk	*iocp;
-	uint32_t	msize;
 
 	ASSERT(connp->conn_ref >= 2);
 
 	switch (DB_TYPE(mp)) {
 	case M_DATA:
-		tcp = connp->conn_tcp;
-		ASSERT(tcp != NULL);
-
-		msize = msgdsize(mp);
-
-		mutex_enter(&connp->conn_lock);
-		CONN_INC_REF_LOCKED(connp);
-
-		tcp->tcp_squeue_bytes += msize;
-		if (TCP_UNSENT_BYTES(tcp) > tcp->tcp_xmit_hiwater) {
-			mutex_exit(&connp->conn_lock);
-			tcp_setqfull(tcp);
-		} else
-			mutex_exit(&connp->conn_lock);
-
+		CONN_INC_REF(connp);
 		(*tcp_squeue_wput_proc)(connp->conn_sqp, mp,
 		    tcp_output, connp, SQTAG_TCP_OUTPUT);
 		return;
@@ -19275,12 +19214,15 @@ done:;
 		TCP_TIMER_RESTART(tcp, tcp->tcp_rto);
 	}
 	/* Note that len is the amount we just sent but with a negative sign */
-	tcp->tcp_unsent += len;
+	len += tcp->tcp_unsent;
+	tcp->tcp_unsent = len;
 	if (tcp->tcp_flow_stopped) {
-		if (TCP_UNSENT_BYTES(tcp) <= tcp->tcp_xmit_lowater) {
+		if (len <= tcp->tcp_xmit_lowater) {
+			tcp->tcp_flow_stopped = B_FALSE;
 			tcp_clrqfull(tcp);
 		}
-	} else if (TCP_UNSENT_BYTES(tcp) >= tcp->tcp_xmit_hiwater) {
+	} else if (len >= tcp->tcp_xmit_hiwater) {
+		tcp->tcp_flow_stopped = B_TRUE;
 		tcp_setqfull(tcp);
 	}
 }
@@ -21170,6 +21112,7 @@ tcp_wput_flush(tcp_t *tcp, mblk_t *mp)
 		 * tcp_xmit_lowater, so re-enable flow.
 		 */
 		if (tcp->tcp_flow_stopped) {
+			tcp->tcp_flow_stopped = B_FALSE;
 			tcp_clrqfull(tcp);
 		}
 	}
@@ -25222,29 +25165,16 @@ tcp_timer_free(tcp_t *tcp, mblk_t *mp)
  * End of TCP Timers implementation.
  */
 
-/*
- * tcp_{set,clr}qfull() functions are used to either set or clear QFULL
- * on the specified backing STREAMS q. Note, the caller may make the
- * decision to call based on the tcp_t.tcp_flow_stopped value which
- * when check outside the q's lock is only an advisory check ...
- */
-
 static void
 tcp_setqfull(tcp_t *tcp)
 {
 	queue_t *q = tcp->tcp_wq;
 
 	if (!(q->q_flag & QFULL)) {
+		TCP_STAT(tcp_flwctl_on);
 		mutex_enter(QLOCK(q));
-		if (!(q->q_flag & QFULL)) {
-			/* still need to set QFULL */
-			q->q_flag |= QFULL;
-			tcp->tcp_flow_stopped = B_TRUE;
-			mutex_exit(QLOCK(q));
-			TCP_STAT(tcp_flwctl_on);
-		} else {
-			mutex_exit(QLOCK(q));
-		}
+		q->q_flag |= QFULL;
+		mutex_exit(QLOCK(q));
 	}
 }
 
@@ -25255,14 +25185,10 @@ tcp_clrqfull(tcp_t *tcp)
 
 	if (q->q_flag & QFULL) {
 		mutex_enter(QLOCK(q));
-		if (q->q_flag & QFULL) {
-			q->q_flag &= ~QFULL;
-			tcp->tcp_flow_stopped = B_FALSE;
-			mutex_exit(QLOCK(q));
-			if (q->q_flag & QWANTW)
-				qbackenable(q, 0);
-		} else
-			mutex_exit(QLOCK(q));
+		q->q_flag &= ~QFULL;
+		mutex_exit(QLOCK(q));
+		if (q->q_flag & QWANTW)
+			qbackenable(q, 0);
 	}
 }
 
