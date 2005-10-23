@@ -2002,11 +2002,10 @@ if [[ ! -f $usr/lib/dns/libdns.so ]] && ! $ZCAT $cpiodir/generic.usr$ZFIX | \
 fi
 
 update_script="/ws/onnv-gate/public/bin/update_ce"
-if [ "$plat" = "SUNW,Sun-Fire-15000" ] && ifconfig -a | egrep '^ce' \
-	    >/dev/null 2>/dev/null; then
-	# Sun Fire 12K/15K/20K/25K requires CE version 1.146 or later.
+if ifconfig -a | egrep '^ce' >/dev/null 2>/dev/null; then
+	# CE version 1.148 or later is required
 	cever=`modinfo | grep 'CE Ethernet' | sed 's/.*v1\.//' | tr -d ')' | \
-	    nawk '{ if ($1 < 146) print "BAD"; else print $1 }'`
+	    nawk '{ if ($1 < 148) print "BAD"; else print $1 }'`
 	if [ "$cever" = "BAD" ]; then
 		fail "You must run $update_script to upgrade your ce driver."
 	fi

@@ -2437,6 +2437,18 @@ devflg_to_qflag(struct streamtab *stp, uint32_t devflag, uint32_t *qflagp,
 	if (devflag & D_SYNCSTR)
 		qflag |= QSYNCSTR;
 
+	/*
+	 * Private flag used by a transport module to indicate
+	 * to sockfs that it supports direct-access mode without
+	 * having to go through STREAMS.
+	 */
+	if (devflag & _D_DIRECT) {
+		/* Reject unless the module is fully-MT (no perimeter) */
+		if ((qflag & QMT_TYPEMASK) != QMTSAFE)
+			goto bad;
+		qflag |= _QDIRECT;
+	}
+
 	*qflagp = qflag;
 	*sqtypep = sqtype;
 	return (0);
@@ -8236,11 +8248,11 @@ hcksum_assoc(mblk_t *mp,  multidata_t *mmd, pdesc_t *pd,
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_MULTIDATA);
 	if (mp->b_datap->db_type == M_DATA) {
 		/* Associate values for M_DATA type */
-		mp->b_datap->db_cksumstart = (intptr_t)start;
-		mp->b_datap->db_cksumstuff = (intptr_t)stuff;
-		mp->b_datap->db_cksumend = (intptr_t)end;
-		mp->b_datap->db_struioun.cksum.flags = flags;
-		mp->b_datap->db_cksum16 = (uint16_t)value;
+		DB_CKSUMSTART(mp) = (intptr_t)start;
+		DB_CKSUMSTUFF(mp) = (intptr_t)stuff;
+		DB_CKSUMEND(mp) = (intptr_t)end;
+		DB_CKSUMFLAGS(mp) = flags;
+		DB_CKSUM16(mp) = (uint16_t)value;
 
 	} else {
 		pattrinfo_t pa_info;
@@ -8258,6 +8270,8 @@ hcksum_assoc(mblk_t *mp,  multidata_t *mmd, pdesc_t *pd,
 			hck->hcksum_end_offset = end;
 			hck->hcksum_cksum_val.inet_cksum = (uint16_t)value;
 			hck->hcksum_flags = flags;
+		} else {
+			rc = -1;
 		}
 	}
 	return (rc);
@@ -8271,20 +8285,16 @@ hcksum_retrieve(mblk_t *mp, multidata_t *mmd, pdesc_t *pd,
 	ASSERT(DB_TYPE(mp) == M_DATA || DB_TYPE(mp) == M_MULTIDATA);
 	if (mp->b_datap->db_type == M_DATA) {
 		if (flags != NULL) {
-			*flags = mp->b_datap->db_struioun.cksum.flags;
+			*flags = DB_CKSUMFLAGS(mp);
 			if (*flags & HCK_PARTIALCKSUM) {
 				if (start != NULL)
-					*start = (uint32_t)
-					    mp->b_datap->db_cksumstart;
+					*start = (uint32_t)DB_CKSUMSTART(mp);
 				if (stuff != NULL)
-					*stuff = (uint32_t)
-					    mp->b_datap->db_cksumstuff;
+					*stuff = (uint32_t)DB_CKSUMSTUFF(mp);
 				if (end != NULL)
-					*end =
-					    (uint32_t)mp->b_datap->db_cksumend;
+					*end = (uint32_t)DB_CKSUMEND(mp);
 				if (value != NULL)
-					*value =
-					    (uint32_t)mp->b_datap->db_cksum16;
+					*value = (uint32_t)DB_CKSUM16(mp);
 			}
 		}
 	} else {

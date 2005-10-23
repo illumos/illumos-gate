@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992,1997-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -50,6 +50,11 @@
 #include <inet/mib2.h>
 #include <inet/optcom.h>
 #include <inet/snmpcom.h>
+
+#include <inet/ip.h>
+#include <inet/ip6.h>
+#include <inet/tcp.h>
+#include <inet/udp_impl.h>
 
 #define	DEFAULT_LENGTH	sizeof (long)
 #define	DATA_MBLK_SIZE	1024
@@ -90,10 +95,7 @@ static sor_t	req_arr[] = {
  * ctl buffer.
  */
 int
-snmp_append_data(mpdata, blob, len)
-	mblk_t	*mpdata;
-	char	*blob;
-	int	len;
+snmp_append_data(mblk_t *mpdata, char *blob, int len)
 {
 
 	if (!mpdata)
@@ -169,12 +171,7 @@ snmp_append_data2(mblk_t *mpdata, mblk_t **last_mpp, char *blob, int len)
  *   for them: getfn() returns 0, setfn() returns 1.
  */
 boolean_t
-snmpcom_req(q, mp, setfn, getfn, credp)
-	queue_t	*q;
-	mblk_t	*mp;
-	pfi_t	setfn;
-	pfi_t	getfn;
-	cred_t	*credp;
+snmpcom_req(queue_t *q, mblk_t *mp, pfi_t setfn, pfi_t getfn, cred_t *credp)
 {
 	mblk_t			*mpctl;
 	struct opthdr		*req;
@@ -184,6 +181,7 @@ snmpcom_req(q, mp, setfn, getfn, credp)
 	sor_t			*sreq;
 	struct T_optmgmt_req	*tor = (struct T_optmgmt_req *)mp->b_rptr;
 	struct T_optmgmt_ack	*toa;
+	boolean_t		pass_to_ip = B_FALSE;
 
 	if (mp->b_cont) {	/* don't deal with multiple mblk's */
 		freemsg(mp->b_cont);
@@ -208,6 +206,10 @@ snmpcom_req(q, mp, setfn, getfn, credp)
 	    (!(req_start->level >= EXPER_RANGE_START &&
 			req_start->level <= EXPER_RANGE_END)))
 		return (B_FALSE);
+
+	if (setfn == tcp_snmp_set || setfn == udp_snmp_set ||
+	    getfn == tcp_snmp_get || getfn == udp_snmp_get)
+		pass_to_ip = B_TRUE;
 
 	switch (tor->MGMT_flags) {
 
@@ -235,8 +237,10 @@ snmpcom_req(q, mp, setfn, getfn, credp)
 				(uchar_t *)&req[1], req->len))
 				goto bad_req4;
 		}
-		if (q->q_next)
+		if (q->q_next != NULL)
 			putnext(q, mp);
+		else if (pass_to_ip)
+			ip_output(Q_TO_CONN(q), mp, q, IP_WPUT);
 		else
 			freemsg(mp);
 		return (B_TRUE);
@@ -268,8 +272,11 @@ snmpcom_req(q, mp, setfn, getfn, credp)
 		 * this is bottom module of stream, send up an EOD ctl msg,
 		 * otherwise pass onto the next guy for processing.
 		 */
-		if (q->q_next) {
+		if (q->q_next != NULL) {
 			putnext(q, mp);
+			return (B_TRUE);
+		} else if (pass_to_ip) {
+			ip_output(Q_TO_CONN(q), mp, q, IP_WPUT);
 			return (B_TRUE);
 		}
 		if (mp->b_cont) {

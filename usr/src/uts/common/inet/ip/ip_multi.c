@@ -65,6 +65,7 @@
 #include <inet/ipsec_impl.h>
 #include <inet/sctp_ip.h>
 #include <inet/ip_listutils.h>
+#include <inet/udp_impl.h>
 
 #include <netinet/igmp.h>
 
@@ -1186,14 +1187,39 @@ void
 ip_multicast_loopback(queue_t *q, ill_t *ill, mblk_t *mp_orig, int fanout_flags,
     zoneid_t zoneid)
 {
-	mblk_t		*mp;
-	mblk_t		*ipsec_mp;
+	mblk_t	*mp;
+	mblk_t	*ipsec_mp;
 
-	/* TODO this could use dup'ed messages except for the IP header. */
-	mp = ip_copymsg(mp_orig);
+	if (DB_TYPE(mp_orig) == M_DATA &&
+	    ((ipha_t *)mp_orig->b_rptr)->ipha_protocol == IPPROTO_UDP) {
+		uint_t hdrsz;
+
+		hdrsz = IPH_HDR_LENGTH((ipha_t *)mp_orig->b_rptr) +
+		    sizeof (udpha_t);
+		ASSERT(MBLKL(mp_orig) >= hdrsz);
+
+		if (((mp = allocb(hdrsz, BPRI_MED)) != NULL) &&
+		    (mp_orig = dupmsg(mp_orig)) != NULL) {
+			bcopy(mp_orig->b_rptr, mp->b_rptr, hdrsz);
+			mp->b_wptr += hdrsz;
+			mp->b_cont = mp_orig;
+			mp_orig->b_rptr += hdrsz;
+			if (MBLKL(mp_orig) == 0) {
+				mp->b_cont = mp_orig->b_cont;
+				mp_orig->b_cont = NULL;
+				freeb(mp_orig);
+			}
+		} else if (mp != NULL) {
+			freeb(mp);
+			mp = NULL;
+		}
+	} else {
+		mp = ip_copymsg(mp_orig);
+	}
+
 	if (mp == NULL)
 		return;
-	if (mp->b_datap->db_type == M_CTL) {
+	if (DB_TYPE(mp) == M_CTL) {
 		ipsec_mp = mp;
 		mp = mp->b_cont;
 	} else {
@@ -2553,7 +2579,7 @@ ip_extract_msfilter(queue_t *q, mblk_t *mp, ipif_t **ipifpp, ipsq_func_t func)
 	zoneid = connp->conn_zoneid;
 
 	/* don't allow multicast operations on a tcp conn */
-	if (IS_TCP_CONN(connp))
+	if (IPCL_IS_TCP(connp))
 		return (ENOPROTOOPT);
 
 	if (cmd == SIOCSIPMSFILTER || cmd == SIOCGIPMSFILTER) {

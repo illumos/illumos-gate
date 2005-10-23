@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,18 +55,6 @@
 #include "ncaconf.h"
 
 /* NCA does not support IPv6... */
-#ifndef	IP_DEV_NAME
-#define	IP_DEV_NAME	"/dev/ip"
-#endif
-
-#ifndef	IP_MOD_NAME
-#define	IP_MOD_NAME	"ip"
-#endif
-
-#ifndef	UDP_DEV_NAME
-#define	UDP_DEV_NAME	"/dev/udp"
-#endif
-
 #ifndef	NCA_MOD_NAME
 #define	NCA_MOD_NAME	"nca"
 #endif

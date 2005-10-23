@@ -1690,6 +1690,21 @@ getq(queue_t *q)
 }
 
 /*
+ * Calculate number of data bytes in a single data message block taking
+ * multidata messages into account.
+ */
+
+#define	ADD_MBLK_SIZE(mp, size) 					\
+	if (DB_TYPE(mp) != M_MULTIDATA) {				\
+		(size) += MBLKL(mp);					\
+	} else {							\
+		uint_t	pinuse;						\
+									\
+		mmd_getsize(mmd_getmultidata(mp), NULL, &pinuse);	\
+		(size) += pinuse;					\
+	}
+
+/*
  * Like getq() but does not backenable.  This is used by the stream
  * head when a putback() is likely.  The caller must call qbackenable()
  * after it is done with accessing the queue.
@@ -1721,7 +1736,7 @@ getq_noenab(queue_t *q)
 
 		/* Get message byte count for q_count accounting */
 		for (tmp = bp; tmp; tmp = tmp->b_cont) {
-			bytecnt += (tmp->b_wptr - tmp->b_rptr);
+			ADD_MBLK_SIZE(tmp, bytecnt);
 			mblkcnt++;
 		}
 
@@ -1941,7 +1956,7 @@ rmvq_noenab(queue_t *q, mblk_t *mp)
 
 	/* Get the size of the message for q_count accounting */
 	for (tmp = mp; tmp; tmp = tmp->b_cont) {
-		bytecnt += (tmp->b_wptr - tmp->b_rptr);
+		ADD_MBLK_SIZE(tmp, bytecnt);
 		mblkcnt++;
 	}
 
@@ -2433,9 +2448,10 @@ putq(queue_t *q, mblk_t *bp)
 
 	/* Get message byte count for q_count accounting */
 	for (tmp = bp; tmp; tmp = tmp->b_cont) {
-		bytecnt += (tmp->b_wptr - tmp->b_rptr);
+		ADD_MBLK_SIZE(tmp, bytecnt);
 		mblkcnt++;
 	}
+
 	if (qbp) {
 		qbp->qb_count += bytecnt;
 		qbp->qb_mblkcnt += mblkcnt;
@@ -2617,7 +2633,7 @@ putbq(queue_t *q, mblk_t *bp)
 
 	/* Get message byte count for q_count accounting */
 	for (tmp = bp; tmp; tmp = tmp->b_cont) {
-		bytecnt += (tmp->b_wptr - tmp->b_rptr);
+		ADD_MBLK_SIZE(tmp, bytecnt);
 		mblkcnt++;
 	}
 	if (qbp) {
@@ -2748,7 +2764,7 @@ badord:
 
 	/* Get mblk and byte count for q_count accounting */
 	for (tmp = mp; tmp; tmp = tmp->b_cont) {
-		bytecnt += (tmp->b_wptr - tmp->b_rptr);
+		ADD_MBLK_SIZE(tmp, bytecnt);
 		mblkcnt++;
 	}
 

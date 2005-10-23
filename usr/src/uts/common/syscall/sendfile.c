@@ -73,6 +73,89 @@ extern int sosendfile64(file_t *, file_t *, const struct ksendfilevec64 *,
 extern void nl7c_sendfilev(struct sonode *, u_offset_t, struct sendfilevec *,
 		int);
 
+/*
+ * kstrwritemp() has very similar semantics as that of strwrite().
+ * The main difference is it obtains mblks from the caller and also
+ * does not do any copy as done in strwrite() from user buffers to
+ * kernel buffers.
+ *
+ * Currently, this routine is used by sendfile to send data allocated
+ * within the kernel without any copying. This interface does not use the
+ * synchronous stream interface as synch. stream interface implies
+ * copying.
+ */
+int
+kstrwritemp(struct vnode *vp, mblk_t *mp, ushort_t fmode)
+{
+	struct stdata *stp;
+	struct queue *wqp;
+	char waitflag;
+	int tempmode;
+	int error = 0;
+	int done = 0;
+	struct sonode *so;
+	boolean_t direct;
+
+	ASSERT(vp->v_stream);
+	stp = vp->v_stream;
+
+	so = VTOSO(vp);
+	direct = (so->so_state & SS_DIRECT);
+
+	/*
+	 * This is the sockfs direct fast path. canputnext() need
+	 * not be accurate so we don't grab the sd_lock here. If
+	 * we get flow-controlled, we grab sd_lock just before the
+	 * do..while loop below to emulate what strwrite() does.
+	 */
+	wqp = stp->sd_wrq;
+	if (canputnext(wqp) && direct &&
+	    !(stp->sd_flag & (STWRERR|STRHUP|STPLEX))) {
+		return (sostream_direct(so, NULL, mp, CRED()));
+	} else if (stp->sd_flag & (STWRERR|STRHUP|STPLEX)) {
+		/* Fast check of flags before acquiring the lock */
+		mutex_enter(&stp->sd_lock);
+		error = strgeterr(stp, STWRERR|STRHUP|STPLEX, 0);
+		mutex_exit(&stp->sd_lock);
+		if (error != 0) {
+			if (!(stp->sd_flag & STPLEX) &&
+			    (stp->sd_wput_opt & SW_SIGPIPE)) {
+				tsignal(curthread, SIGPIPE);
+				error = EPIPE;
+			}
+			return (error);
+		}
+	}
+
+	waitflag = WRITEWAIT;
+	if (stp->sd_flag & OLDNDELAY)
+		tempmode = fmode & ~FNDELAY;
+	else
+		tempmode = fmode;
+
+	mutex_enter(&stp->sd_lock);
+	do {
+		if (canputnext(wqp)) {
+			mutex_exit(&stp->sd_lock);
+			putnext(wqp, mp);
+			return (0);
+		}
+		error = strwaitq(stp, waitflag, (ssize_t)0, tempmode, -1,
+		    &done);
+	} while (error == 0 && !done);
+
+	mutex_exit(&stp->sd_lock);
+	/*
+	 * EAGAIN tells the application to try again. ENOMEM
+	 * is returned only if the memory allocation size
+	 * exceeds the physical limits of the system. ENOMEM
+	 * can't be true here.
+	 */
+	if (error == ENOMEM)
+		error = EAGAIN;
+	return (error);
+}
+
 #define	SEND_MAX_CHUNK	16
 
 #if defined(_SYSCALL32_IMPL) || defined(_ILP32)
@@ -1045,7 +1128,7 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 				goto err;
 			}
 
-			if ((so->so_state & SS_TCP_FAST_ACCEPT) &&
+			if ((so->so_state & SS_DIRECT) &&
 			    (so->so_priv != NULL)) {
 				maxblk = ((tcp_t *)so->so_priv)->tcp_mss;
 			} else {

@@ -80,6 +80,7 @@
 #include <inet/ip_rts.h>
 #include <inet/ip_ndp.h>
 #include <inet/ip_if.h>
+#include <inet/ip_impl.h>
 #include <inet/tun.h>
 #include <inet/sctp_ip.h>
 
@@ -1232,10 +1233,10 @@ ipsq_pending_mp_cleanup(ill_t *ill, conn_t *connp)
 	} else {
 		/*
 		 * IP-MT XXX In the case of TLI/XTI bind / optmgmt this can't
-		 * be just ip_ioctl_freemsg. we have to restart it
+		 * be just inet_freemsg. we have to restart it
 		 * otherwise the thread will be stuck.
 		 */
-		ip_ioctl_freemsg(mp);
+		inet_freemsg(mp);
 	}
 	return (B_TRUE);
 }
@@ -1344,10 +1345,10 @@ ipsq_xopq_mp_cleanup(ill_t *ill, conn_t *connp)
 		} else {
 			/*
 			 * IP-MT XXX In the case of TLI/XTI bind / optmgmt
-			 * this can't be just ip_ioctl_freemsg. we have to
+			 * this can't be just inet_freemsg. we have to
 			 * restart it otherwise the thread will be stuck.
 			 */
-			ip_ioctl_freemsg(curr);
+			inet_freemsg(curr);
 		}
 	}
 }
@@ -1384,7 +1385,7 @@ conn_ioctl_cleanup(conn_t *connp)
 	if (curr != NULL) {
 		mutex_exit(&connp->conn_lock);
 		CONN_DEC_REF(connp);
-		ip_ioctl_freemsg(curr);
+		inet_freemsg(curr);
 		return;
 	}
 	/*
@@ -2042,7 +2043,7 @@ ill_capability_mdt_reset(ill_t *ill, mblk_t **sc_mp)
 	dl_capability_sub_t *dl_subcap;
 	int size;
 
-	if (!(ill->ill_capabilities & ILL_CAPAB_MDT))
+	if (!ILL_MDT_CAPABLE(ill))
 		return;
 
 	ASSERT(ill->ill_mdt_capab != NULL);
@@ -2857,6 +2858,9 @@ ill_capability_poll_capable(ill_t *ill, dl_capab_poll_t *ipoll,
 	bcopy((void *)&poll, (void *)opoll, sizeof (dl_capab_poll_t));
 	ASSERT(nmp->b_wptr == (nmp->b_rptr + size));
 
+	ip1dbg(("ill_capability_poll_capable: asking interface %s "
+	    "to enable polling\n", ill->ill_name));
+
 	/* nmp points to a DL_CAPABILITY_REQ message to enable polling */
 	ill_dlpi_send(ill, nmp);
 }
@@ -2944,6 +2948,8 @@ ill_capability_poll_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 			ASSERT(ill->ill_poll_capab != NULL);
 			ill->ill_capabilities |= ILL_CAPAB_POLL;
 		}
+		ip1dbg(("ill_capability_poll_ack: interface %s "
+		    "has enabled polling\n", ill->ill_name));
 		break;
 	}
 }
@@ -3048,8 +3054,9 @@ ill_capability_hcksum_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 		return;
 	}
 
-#define	CURR_HCKSUM_CAPAB \
-	(HCKSUM_INET_PARTIAL | HCKSUM_INET_FULL_V4 | HCKSUM_IPHDRCKSUM)
+#define	CURR_HCKSUM_CAPAB				\
+	(HCKSUM_INET_PARTIAL | HCKSUM_INET_FULL_V4 |	\
+	HCKSUM_INET_FULL_V6 | HCKSUM_IPHDRCKSUM)
 
 	if ((ihck->hcksum_txflags & HCKSUM_ENABLE) &&
 	    (ihck->hcksum_txflags & CURR_HCKSUM_CAPAB)) {
@@ -3126,10 +3133,11 @@ ill_capability_hcksum_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 		 * hardware checksum acceleration.
 		 */
 		ill_dlpi_send(ill, nmp);
-	} else
+	} else {
 		ip1dbg(("ill_capability_hcksum_ack: interface %s has "
 		    "advertised %x hardware checksum capability flags\n",
 		    ill->ill_name, ihck->hcksum_txflags));
+	}
 }
 
 static void
@@ -3140,7 +3148,7 @@ ill_capability_hcksum_reset(ill_t *ill, mblk_t **sc_mp)
 	dl_capability_sub_t *dl_subcap;
 	int size;
 
-	if (!(ill->ill_capabilities & ILL_CAPAB_HCKSUM))
+	if (!ILL_HCKSUM_CAPABLE(ill))
 		return;
 
 	ASSERT(ill->ill_hcksum_capab != NULL);
@@ -7300,7 +7308,7 @@ ipsq_flush(ill_t *ill)
 				ASSERT(mp_next == NULL);
 				ipsq->ipsq_mptail = prev;
 			}
-			ip_ioctl_freemsg(mp);
+			inet_freemsg(mp);
 		} else {
 			prev = mp;
 		}
@@ -8838,7 +8846,7 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 		if (mp1 != NULL)
 			freeb(mp1);
 		if (pending_mp != NULL)
-			ip_ioctl_freemsg(pending_mp);
+			inet_freemsg(pending_mp);
 		return (ENOMEM);
 	}
 
@@ -8848,7 +8856,7 @@ ip_sioctl_arp_common(ill_t *ill, queue_t *q, mblk_t *mp, sin_t *sin,
 	    (caddr_t)&ipaddr);
 	if (mp2 == NULL) {
 		freeb(mp1);
-		ip_ioctl_freemsg(pending_mp);
+		inet_freemsg(pending_mp);
 		return (ENOMEM);
 	}
 	/* Put together the chain. */
@@ -9743,7 +9751,7 @@ ip_sioctl_iocack(queue_t *q, mblk_t *mp)
 	pending_mp = ill_pending_mp_get(ill, &connp, ioc_id);
 	if (pending_mp == NULL) {
 		ASSERT(connp == NULL);
-		ip_ioctl_freemsg(mp);
+		inet_freemsg(mp);
 		return;
 	}
 	ASSERT(connp != NULL);
@@ -9760,7 +9768,7 @@ ip_sioctl_iocack(queue_t *q, mblk_t *mp)
 	 */
 	orig_ioc_mp->b_cont->b_next = pending_mp->b_cont->b_next;
 	orig_ioc_mp->b_cont->b_prev = pending_mp->b_cont->b_prev;
-	ip_ioctl_freemsg(pending_mp);
+	inet_freemsg(pending_mp);
 
 	/*
 	 * We're done if there was an error or if this is not an SIOCG{X}ARP
@@ -18114,6 +18122,8 @@ ipif_mask_reply(ipif_t *ipif)
 	icmph->icmph_type = ICMP_ADDRESS_MASK_REPLY;
 	bcopy(&ipif->ipif_net_mask, &icmph[1], IP_ADDR_LEN);
 	icmph->icmph_checksum = IP_CSUM(mp, sizeof (ipha_t), 0);
+	if (icmph->icmph_checksum == 0)
+		icmph->icmph_checksum = 0xffff;
 
 	put(ipif->ipif_wq, mp);
 

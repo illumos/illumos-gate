@@ -75,9 +75,11 @@
 #include <netinet/sctp.h>
 
 #include <inet/ip.h>
+#include <inet/ip_impl.h>
 #include <inet/ip6.h>
 #include <inet/ip6_asp.h>
 #include <inet/tcp.h>
+#include <inet/tcp_impl.h>
 #include <inet/ip_multi.h>
 #include <inet/ip_if.h>
 #include <inet/ip_ire.h>
@@ -110,6 +112,7 @@
 
 #include <inet/ipclassifier.h>
 #include <inet/sctp_ip.h>
+#include <inet/udp_impl.h>
 
 /*
  * Values for squeue switch:
@@ -122,7 +125,8 @@ squeue_func_t ip_input_proc;
 /*
  * IP statistics.
  */
-#define	IP_STAT(x)	(ip_statistics.x.value.ui64++)
+#define	IP_STAT(x)		(ip_statistics.x.value.ui64++)
+#define	IP_STAT_UPDATE(x, n)	(ip_statistics.x.value.ui64 += (n))
 
 typedef struct ip_stat {
 	kstat_named_t	ipsec_fanout_proto;
@@ -158,42 +162,68 @@ typedef struct ip_stat {
 	kstat_named_t   ip_ire_redirect_timer_expired;
 	kstat_named_t	ip_ire_pmtu_timer_expired;
 	kstat_named_t	ip_input_multi_squeue;
+	kstat_named_t	ip_tcp_in_full_hw_cksum_err;
+	kstat_named_t	ip_tcp_in_part_hw_cksum_err;
+	kstat_named_t	ip_tcp_in_sw_cksum_err;
+	kstat_named_t	ip_tcp_out_sw_cksum_bytes;
+	kstat_named_t	ip_udp_in_full_hw_cksum_err;
+	kstat_named_t	ip_udp_in_part_hw_cksum_err;
+	kstat_named_t	ip_udp_in_sw_cksum_err;
+	kstat_named_t	ip_udp_out_sw_cksum_bytes;
+	kstat_named_t	ip_frag_mdt_pkt_out;
+	kstat_named_t	ip_frag_mdt_discarded;
+	kstat_named_t	ip_frag_mdt_allocfail;
+	kstat_named_t	ip_frag_mdt_addpdescfail;
+	kstat_named_t	ip_frag_mdt_allocd;
 } ip_stat_t;
 
 static ip_stat_t ip_statistics = {
-	{ "ipsec_fanout_proto", 	KSTAT_DATA_UINT64 },
-	{ "ip_udp_fannorm", 		KSTAT_DATA_UINT64 },
-	{ "ip_udp_fanmb", 		KSTAT_DATA_UINT64 },
-	{ "ip_udp_fanothers", 		KSTAT_DATA_UINT64 },
-	{ "ip_udp_fast_path", 		KSTAT_DATA_UINT64 },
-	{ "ip_udp_slow_path", 		KSTAT_DATA_UINT64 },
-	{ "ip_udp_input_err", 		KSTAT_DATA_UINT64 },
-	{ "ip_tcppullup", 		KSTAT_DATA_UINT64 },
-	{ "ip_tcpoptions", 		KSTAT_DATA_UINT64 },
-	{ "ip_multipkttcp", 		KSTAT_DATA_UINT64 },
-	{ "ip_tcp_fast_path",		KSTAT_DATA_UINT64 },
-	{ "ip_tcp_slow_path",		KSTAT_DATA_UINT64 },
-	{ "ip_tcp_input_error",		KSTAT_DATA_UINT64 },
-	{ "ip_db_ref",			KSTAT_DATA_UINT64 },
-	{ "ip_notaligned1",		KSTAT_DATA_UINT64 },
-	{ "ip_notaligned2",		KSTAT_DATA_UINT64 },
-	{ "ip_multimblk3",		KSTAT_DATA_UINT64 },
-	{ "ip_multimblk4",		KSTAT_DATA_UINT64 },
-	{ "ip_ipoptions",		KSTAT_DATA_UINT64 },
-	{ "ip_classify_fail",		KSTAT_DATA_UINT64 },
-	{ "ip_opt",			KSTAT_DATA_UINT64 },
-	{ "ip_udp_rput_local",		KSTAT_DATA_UINT64 },
-	{ "ipsec_proto_ahesp",		KSTAT_DATA_UINT64 },
-	{ "ip_conn_flputbq",		KSTAT_DATA_UINT64 },
-	{ "ip_conn_walk_drain",		KSTAT_DATA_UINT64 },
-	{ "ip_out_sw_cksum",		KSTAT_DATA_UINT64 },
-	{ "ip_in_sw_cksum",		KSTAT_DATA_UINT64 },
-	{ "ip_trash_ire_reclaim_calls",	KSTAT_DATA_UINT64 },
+	{ "ipsec_fanout_proto",			KSTAT_DATA_UINT64 },
+	{ "ip_udp_fannorm",			KSTAT_DATA_UINT64 },
+	{ "ip_udp_fanmb",			KSTAT_DATA_UINT64 },
+	{ "ip_udp_fanothers",			KSTAT_DATA_UINT64 },
+	{ "ip_udp_fast_path",			KSTAT_DATA_UINT64 },
+	{ "ip_udp_slow_path",			KSTAT_DATA_UINT64 },
+	{ "ip_udp_input_err",			KSTAT_DATA_UINT64 },
+	{ "ip_tcppullup",			KSTAT_DATA_UINT64 },
+	{ "ip_tcpoptions",			KSTAT_DATA_UINT64 },
+	{ "ip_multipkttcp",			KSTAT_DATA_UINT64 },
+	{ "ip_tcp_fast_path",			KSTAT_DATA_UINT64 },
+	{ "ip_tcp_slow_path",			KSTAT_DATA_UINT64 },
+	{ "ip_tcp_input_error",			KSTAT_DATA_UINT64 },
+	{ "ip_db_ref",				KSTAT_DATA_UINT64 },
+	{ "ip_notaligned1",			KSTAT_DATA_UINT64 },
+	{ "ip_notaligned2",			KSTAT_DATA_UINT64 },
+	{ "ip_multimblk3",			KSTAT_DATA_UINT64 },
+	{ "ip_multimblk4",			KSTAT_DATA_UINT64 },
+	{ "ip_ipoptions",			KSTAT_DATA_UINT64 },
+	{ "ip_classify_fail",			KSTAT_DATA_UINT64 },
+	{ "ip_opt",				KSTAT_DATA_UINT64 },
+	{ "ip_udp_rput_local",			KSTAT_DATA_UINT64 },
+	{ "ipsec_proto_ahesp",			KSTAT_DATA_UINT64 },
+	{ "ip_conn_flputbq",			KSTAT_DATA_UINT64 },
+	{ "ip_conn_walk_drain",			KSTAT_DATA_UINT64 },
+	{ "ip_out_sw_cksum",			KSTAT_DATA_UINT64 },
+	{ "ip_in_sw_cksum",			KSTAT_DATA_UINT64 },
+	{ "ip_trash_ire_reclaim_calls",		KSTAT_DATA_UINT64 },
 	{ "ip_trash_ire_reclaim_success",	KSTAT_DATA_UINT64 },
-	{ "ip_ire_arp_timer_expired",	KSTAT_DATA_UINT64 },
+	{ "ip_ire_arp_timer_expired",		KSTAT_DATA_UINT64 },
 	{ "ip_ire_redirect_timer_expired",	KSTAT_DATA_UINT64 },
-	{ "ip_ire_pmtu_timer_expired",	KSTAT_DATA_UINT64 },
-	{ "ip_input_multi_squeue",	KSTAT_DATA_UINT64 },
+	{ "ip_ire_pmtu_timer_expired",		KSTAT_DATA_UINT64 },
+	{ "ip_input_multi_squeue",		KSTAT_DATA_UINT64 },
+	{ "ip_tcp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
+	{ "ip_tcp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
+	{ "ip_tcp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
+	{ "ip_tcp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
+	{ "ip_udp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
+	{ "ip_udp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
+	{ "ip_udp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
+	{ "ip_udp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
+	{ "ip_frag_mdt_pkt_out",		KSTAT_DATA_UINT64 },
+	{ "ip_frag_mdt_discarded",		KSTAT_DATA_UINT64 },
+	{ "ip_frag_mdt_allocfail",		KSTAT_DATA_UINT64 },
+	{ "ip_frag_mdt_addpdescfail",		KSTAT_DATA_UINT64 },
+	{ "ip_frag_mdt_allocd",			KSTAT_DATA_UINT64 },
 };
 
 static kstat_t *ip_kstat;
@@ -591,28 +621,12 @@ uint_t ip_max_frag_dups = 10;
 /* RFC1122 Conformance */
 #define	IP_FORWARD_DEFAULT	IP_FORWARD_NEVER
 
-#ifdef	_BIG_ENDIAN
-#define	IP_HDR_CSUM_TTL_ADJUST	256
-#define	IP_TCP_CSUM_COMP	IPPROTO_TCP
-#define	IP_UDP_CSUM_COMP	IPPROTO_UDP
-#else
-#define	IP_HDR_CSUM_TTL_ADJUST	1
-#define	IP_TCP_CSUM_COMP	(IPPROTO_TCP << 8)
-#define	IP_UDP_CSUM_COMP	(IPPROTO_UDP << 8)
-#endif
-
-#define	TCP_CHECKSUM_OFFSET		16
-#define	UDP_CHECKSUM_OFFSET		6
-
 #define	ILL_MAX_NAMELEN			LIFNAMSIZ
-
-#define	UDPH_SIZE	8
 
 /* Leave room for ip_newroute to tack on the src and target addresses */
 #define	OK_RESOLVER_MP(mp)						\
 	((mp) && ((mp)->b_wptr - (mp)->b_rptr) >= (2 * IP_ADDR_LEN))
 
-static ipif_t	*conn_get_held_ipif(conn_t *, ipif_t **, int *);
 static int	conn_set_held_ipif(conn_t *, ipif_t **, ipif_t *);
 
 static mblk_t	*ip_wput_attach_llhdr(mblk_t *, ire_t *, ip_proc_t, uint32_t);
@@ -668,6 +682,8 @@ static int	ip_rput_forward_options(mblk_t *, ipha_t *, ire_t *);
 static boolean_t	ip_rput_local_options(queue_t *, mblk_t *, ipha_t *,
 			    ire_t *);
 static int	ip_rput_options(queue_t *, mblk_t *, ipha_t *, ipaddr_t *);
+static boolean_t ip_rput_fragment(queue_t *, mblk_t **, ipha_t *, uint32_t *,
+		    uint16_t *);
 int		ip_snmp_get(queue_t *, mblk_t *);
 static mblk_t	*ip_snmp_get_mib2_ip(queue_t *, mblk_t *);
 static mblk_t	*ip_snmp_get_mib2_ip6(queue_t *, mblk_t *);
@@ -692,7 +708,6 @@ int		ip_snmp_set(queue_t *, int, int, uchar_t *, int);
 static boolean_t	ip_source_routed(ipha_t *);
 static boolean_t	ip_source_route_included(ipha_t *);
 
-static void	ip_unbind(queue_t *, mblk_t *);
 static void	ip_wput_frag(ire_t *, mblk_t *, ip_pkt_t, uint32_t, uint32_t);
 static mblk_t	*ip_wput_frag_copyhdr(uchar_t *, int, int);
 static void	ip_wput_local_options(ipha_t *);
@@ -766,6 +781,15 @@ uint_t	icmp_pkt_err_sent = 0;	/* Number of packets sent in burst */
 
 time_t	ip_g_frag_timeout = IP_FRAG_TIMEOUT;
 clock_t	ip_g_frag_timo_ms = IP_FRAG_TIMEOUT * 1000;
+
+/*
+ * Threshold which determines whether MDT should be used when
+ * generating IP fragments; payload size must be greater than
+ * this threshold for MDT to take place.
+ */
+#define	IP_WPUT_FRAG_MDT_MIN	32768
+
+int	ip_wput_frag_mdt_min = IP_WPUT_FRAG_MDT_MIN;
 
 /* Protected by ip_mi_lock */
 static void	*ip_g_head;		/* Instance Data List Head */
@@ -1431,7 +1455,7 @@ static ipha_t icmp_ipha = {
 };
 
 struct module_info ip_mod_info = {
-	5701, "ip", 1, INFPSZ, 65536, 1024
+	IP_MOD_ID, IP_MOD_NAME, 1, INFPSZ, 65536, 1024
 };
 
 static struct qinit rinit = {
@@ -1930,6 +1954,8 @@ icmp_inbound(queue_t *q, mblk_t *mp, boolean_t broadcast, ill_t *ill,
 	/* Send out an ICMP packet */
 	icmph->icmph_checksum = 0;
 	icmph->icmph_checksum = IP_CSUM(mp, iph_hdr_length, 0);
+	if (icmph->icmph_checksum == 0)
+		icmph->icmph_checksum = 0xFFFF;
 	if (broadcast || CLASSD(ipha->ipha_dst)) {
 		ipif_t	*ipif_chosen;
 		/*
@@ -3204,6 +3230,8 @@ icmp_pkt(queue_t *q, mblk_t *mp, void *stuff, size_t len,
 	bcopy(stuff, icmph, len);
 	icmph->icmph_checksum = 0;
 	icmph->icmph_checksum = IP_CSUM(mp, (int32_t)sizeof (ipha_t), 0);
+	if (icmph->icmph_checksum == 0)
+		icmph->icmph_checksum = 0xFFFF;
 	BUMP_MIB(&icmp_mib, icmpOutMsgs);
 	put(q, ipsec_mp);
 }
@@ -3704,7 +3732,7 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	ASSERT(!connp->conn_af_isv6);
 	connp->conn_pkt_isv6 = B_FALSE;
 
-	len = mp->b_wptr - mp->b_rptr;
+	len = MBLKL(mp);
 	if (len < (sizeof (*tbr) + 1)) {
 		(void) mi_strlog(q, 1, SL_ERROR|SL_TRACE,
 		    "ip_bind: bogus msg, len %ld", len);
@@ -3716,7 +3744,7 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	protocol = *mp->b_wptr & 0xFF;
 	tbr = (struct T_bind_req *)mp->b_rptr;
 	/* Reset the message type in preparation for shipping it back. */
-	mp->b_datap->db_type = M_PCPROTO;
+	DB_TYPE(mp) = M_PCPROTO;
 
 	connp->conn_ulp = (uint8_t)protocol;
 
@@ -3762,8 +3790,8 @@ ip_bind_v4(queue_t *q, mblk_t *mp, conn_t *connp)
 	 */
 
 	mp1 = mp->b_cont;
-	ire_requested = (mp1 && mp1->b_datap->db_type == IRE_DB_REQ_TYPE);
-	ipsec_policy_set = (mp1 && mp1->b_datap->db_type == IPSEC_POLICY_SET);
+	ire_requested = (mp1 != NULL && DB_TYPE(mp1) == IRE_DB_REQ_TYPE);
+	ipsec_policy_set = (mp1 != NULL && DB_TYPE(mp1) == IPSEC_POLICY_SET);
 
 	switch (tbr->ADDR_length) {
 	default:
@@ -4169,7 +4197,7 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 	if (ip_multidata_outbound && !ipsec_policy_set && dst_ire != NULL &&
 	    !(dst_ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST)) &&
 	    (md_ill = ire_to_ill(dst_ire), md_ill != NULL) &&
-	    (md_ill->ill_capabilities & ILL_CAPAB_MDT)) {
+	    ILL_MDT_CAPABLE(md_ill)) {
 		md_dst_ire = dst_ire;
 		IRE_REFHOLD(md_dst_ire);
 	}
@@ -4689,43 +4717,19 @@ ip_modclose(ill_t *ill)
 }
 
 /*
- * IP has been configured as _D_QNEXTLESS for the client side i.e the driver
- * instance. This implies that
- * 1. IP cannot access the read side q_next pointer directly - it must
- *    use routines like putnext and canputnext.
- * 2. ip_close must ensure that all sources of messages being putnext upstream
- *    are gone before qprocsoff is called.
- *
- * #2 is handled by having ip_close do the ipcl_hash_remove and wait for
- * conn_ref to drop to zero before calling qprocsoff.
+ * This is called as part of close() for both IP and UDP
+ * in order to quiesce the conn.
  */
-
-/* ARGSUSED */
-int
-ip_close(queue_t *q, int flags)
+void
+ip_quiesce_conn(conn_t *connp)
 {
-	conn_t		*connp;
 	boolean_t	drain_cleanup_reqd = B_FALSE;
 	boolean_t	conn_ioctl_cleanup_reqd = B_FALSE;
 	boolean_t	ilg_cleanup_reqd = B_FALSE;
 
-	TRACE_1(TR_FAC_IP, TR_IP_CLOSE, "ip_close: q %p", q);
+	ASSERT(!IPCL_IS_TCP(connp));
 
 	/*
-	 * Call the appropriate delete routine depending on whether this is
-	 * a module or device.
-	 */
-	if (WR(q)->q_next != NULL) {
-		/* This is a module close */
-		return (ip_modclose((ill_t *)q->q_ptr));
-	}
-
-	connp = Q_TO_CONN(q);
-	ASSERT(connp->conn_tcp == NULL);
-
-	/*
-	 * We are being closed as /dev/ip or /dev/ip6.
-	 *
 	 * Mark the conn as closing, and this conn must not be
 	 * inserted in future into any list. Eg. conn_drain_insert(),
 	 * won't insert this conn into the conn_drain_list.
@@ -4736,6 +4740,7 @@ ip_close(queue_t *q, int flags)
 	 * cannot get set henceforth.
 	 */
 	mutex_enter(&connp->conn_lock);
+	ASSERT(!(connp->conn_state_flags & CONN_QUIESCED));
 	connp->conn_state_flags |= CONN_CLOSING;
 	if (connp->conn_idl != NULL)
 		drain_cleanup_reqd = B_TRUE;
@@ -4745,17 +4750,17 @@ ip_close(queue_t *q, int flags)
 		ilg_cleanup_reqd = B_TRUE;
 	mutex_exit(&connp->conn_lock);
 
+	if (IPCL_IS_UDP(connp))
+		udp_quiesce_conn(connp);
+
 	if (conn_ioctl_cleanup_reqd)
 		conn_ioctl_cleanup(connp);
 
 	/*
 	 * Remove this conn from any fanout list it is on.
-	 * Then wait until the number of pending putnexts from
-	 * the fanout code drops to zero, before calling qprocsoff.
-	 * This is the guarantee a QNEXTLESS driver provides to
-	 * STREAMS, and is mentioned at the top of this function.
+	 * and then wait for any threads currently operating
+	 * on this endpoint to finish
 	 */
-
 	ipcl_hash_remove(connp);
 
 	/*
@@ -4776,7 +4781,6 @@ ip_close(queue_t *q, int flags)
 
 	conn_delete_ire(connp, NULL);
 
-
 	/*
 	 * Now conn refcnt can increase only thru CONN_INC_REF_LOCKED.
 	 * callers from write side can't be there now because close
@@ -4787,7 +4791,29 @@ ip_close(queue_t *q, int flags)
 	connp->conn_state_flags |= CONN_CONDEMNED;
 	while (connp->conn_ref != 1)
 		cv_wait(&connp->conn_cv, &connp->conn_lock);
+	connp->conn_state_flags |= CONN_QUIESCED;
 	mutex_exit(&connp->conn_lock);
+}
+
+/* ARGSUSED */
+int
+ip_close(queue_t *q, int flags)
+{
+	conn_t		*connp;
+
+	TRACE_1(TR_FAC_IP, TR_IP_CLOSE, "ip_close: q %p", q);
+
+	/*
+	 * Call the appropriate delete routine depending on whether this is
+	 * a module or device.
+	 */
+	if (WR(q)->q_next != NULL) {
+		/* This is a module close */
+		return (ip_modclose((ill_t *)q->q_ptr));
+	}
+
+	connp = q->q_ptr;
+	ip_quiesce_conn(connp);
 
 	qprocsoff(q);
 
@@ -4801,6 +4827,15 @@ ip_close(queue_t *q, int flags)
 	 * has completed, and service has completed or won't run in
 	 * future.
 	 */
+	ASSERT(connp->conn_ref == 1);
+
+	/*
+	 * A conn which was previously marked as IPCL_UDP cannot
+	 * retain the flag because it would have been cleared by
+	 * udp_close().
+	 */
+	ASSERT(!IPCL_IS_UDP(connp));
+
 	if (connp->conn_latch != NULL) {
 		IPLATCH_REFRELE(connp->conn_latch);
 		connp->conn_latch = NULL;
@@ -4825,6 +4860,83 @@ ip_close(queue_t *q, int flags)
 
 	q->q_ptr = WR(q)->q_ptr = NULL;
 	return (0);
+}
+
+int
+ip_snmpmod_close(queue_t *q)
+{
+	conn_t *connp = Q_TO_CONN(q);
+	ASSERT(connp->conn_flags & (IPCL_TCPMOD | IPCL_UDPMOD));
+
+	qprocsoff(q);
+
+	if (connp->conn_flags & IPCL_UDPMOD)
+		udp_close_free(connp);
+
+	if (connp->conn_cred != NULL) {
+		crfree(connp->conn_cred);
+		connp->conn_cred = NULL;
+	}
+	CONN_DEC_REF(connp);
+	q->q_ptr = WR(q)->q_ptr = NULL;
+	return (0);
+}
+
+/*
+ * Write side put procedure for TCP module or UDP module instance.  TCP/UDP
+ * as a module is only used for MIB browsers that push TCP/UDP over IP or ARP.
+ * The only supported primitives are T_SVR4_OPTMGMT_REQ and T_OPTMGMT_REQ.
+ * M_FLUSH messages and ioctls are only passed downstream; we don't flush our
+ * queues as we never enqueue messages there and we don't handle any ioctls.
+ * Everything else is freed.
+ */
+void
+ip_snmpmod_wput(queue_t *q, mblk_t *mp)
+{
+	conn_t	*connp = q->q_ptr;
+	pfi_t	setfn;
+	pfi_t	getfn;
+
+	ASSERT(connp->conn_flags & (IPCL_TCPMOD | IPCL_UDPMOD));
+
+	switch (DB_TYPE(mp)) {
+	case M_PROTO:
+	case M_PCPROTO:
+		if ((MBLKL(mp) >= sizeof (t_scalar_t)) &&
+		    ((((union T_primitives *)mp->b_rptr)->type ==
+			T_SVR4_OPTMGMT_REQ) ||
+		    (((union T_primitives *)mp->b_rptr)->type ==
+			T_OPTMGMT_REQ))) {
+			/*
+			 * This is the only TPI primitive supported. Its
+			 * handling does not require tcp_t, but it does require
+			 * conn_t to check permissions.
+			 */
+			cred_t	*cr = DB_CREDDEF(mp, connp->conn_cred);
+
+			if (connp->conn_flags & IPCL_TCPMOD) {
+				setfn = tcp_snmp_set;
+				getfn = tcp_snmp_get;
+			} else {
+				setfn = udp_snmp_set;
+				getfn = udp_snmp_get;
+			}
+			if (!snmpcom_req(q, mp, setfn, getfn, cr)) {
+				freemsg(mp);
+				return;
+			}
+		} else if ((mp = mi_tpi_err_ack_alloc(mp, TPROTO, ENOTSUP))
+		    != NULL)
+			qreply(q, mp);
+		break;
+	case M_FLUSH:
+	case M_IOCTL:
+		putnext(q, mp);
+		break;
+	default:
+		freemsg(mp);
+		break;
+	}
 }
 
 /* Return the IP checksum for the IP header at "iph". */
@@ -5081,7 +5193,7 @@ ip_dot_saddr(uchar_t *addr, char *buf)
  * Send an ICMP error after patching up the packet appropriately.  Returns
  * non-zero if the appropriate MIB should be bumped; zero otherwise.
  */
-static int
+static boolean_t
 ip_fanout_send_icmp(queue_t *q, mblk_t *mp, uint_t flags,
     uint_t icmp_type, uint_t icmp_code, boolean_t mctl_present, zoneid_t zoneid)
 {
@@ -5103,8 +5215,8 @@ ip_fanout_send_icmp(queue_t *q, mblk_t *mp, uint_t flags,
 		 * ipsec_check_global_policy() assumes M_DATA as clear
 		 * and M_CTL as secure.
 		 */
-		db_type = mp->b_datap->db_type;
-		mp->b_datap->db_type = M_DATA;
+		db_type = DB_TYPE(mp);
+		DB_TYPE(mp) = M_DATA;
 		secure = B_FALSE;
 	}
 	/*
@@ -5119,17 +5231,17 @@ ip_fanout_send_icmp(queue_t *q, mblk_t *mp, uint_t flags,
 		first_mp = ipsec_check_global_policy(first_mp, NULL,
 		    ipha, NULL, mctl_present);
 		if (first_mp == NULL)
-			return (0);
+			return (B_FALSE);
 	}
 
 	if (!mctl_present)
-		mp->b_datap->db_type = db_type;
+		DB_TYPE(mp) = db_type;
 
 	if (flags & IP_FF_SEND_ICMP) {
 		if (flags & IP_FF_HDR_COMPLETE) {
 			if (ip_hdr_complete(ipha, zoneid)) {
 				freemsg(first_mp);
-				return (1);
+				return (B_TRUE);
 			}
 		}
 		if (flags & IP_FF_CKSUM) {
@@ -5152,10 +5264,10 @@ ip_fanout_send_icmp(queue_t *q, mblk_t *mp, uint_t flags,
 		}
 	} else {
 		freemsg(first_mp);
-		return (0);
+		return (B_FALSE);
 	}
 
-	return (1);
+	return (B_TRUE);
 }
 
 #ifdef DEBUG
@@ -5592,7 +5704,7 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 			}
 
 			mp->b_datap->db_struioflag |= STRUIO_EAGER;
-			mp->b_datap->db_cksumstart = (intptr_t)sqp;
+			DB_CKSUMSTART(mp) = (intptr_t)sqp;
 			syn_present = B_TRUE;
 		}
 	}
@@ -5720,7 +5832,6 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
     boolean_t secure, ipha_t *ipha, uint_t flags, ill_t *recv_ill,
     boolean_t ip_policy)
 {
-	queue_t		*rq = connp->conn_rq;
 	boolean_t	mctl_present = (first_mp != NULL);
 	uint32_t	in_flags = 0; /* set to IP_RECVSLLA and/or IP_RECVIF */
 	uint32_t	ill_index;
@@ -5730,7 +5841,7 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 	else
 		first_mp = mp;
 
-	if (!canputnext(rq)) {
+	if (CONN_UDP_FLOWCTLD(connp)) {
 		BUMP_MIB(&ip_mib, udpInOverflows);
 		freemsg(first_mp);
 		return;
@@ -5776,7 +5887,9 @@ ip_fanout_udp_conn(conn_t *connp, mblk_t *first_mp, mblk_t *mp,
 		mp = ip_add_info(mp, recv_ill, in_flags);
 	}
 	BUMP_MIB(&ip_mib, ipInDelivers);
-	putnext(rq, mp);
+
+	/* Send it upstream */
+	CONN_UDP_RECV(connp, mp);
 }
 
 /*
@@ -8454,7 +8567,6 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		return (ip_modopen(q, devp, flag, sflag, credp));
 	}
 
-
 	/*
 	 * We are opening as a device. This is an IP client stream, and we
 	 * allocate an conn_t as the instance data.
@@ -8462,6 +8574,9 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	connp = ipcl_conn_create(IPCL_IPCCONN, KM_SLEEP);
 	connp->conn_upq = q;
 	q->q_ptr = WR(q)->q_ptr = connp;
+
+	if (flag & SO_SOCKSTR)
+		connp->conn_flags |= IPCL_SOCKET;
 
 	/* Minor tells us which /dev entry was opened */
 	if (geteminor(*devp) == IPV6_MINOR) {
@@ -8474,9 +8589,7 @@ ip_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		connp->conn_pkt_isv6 = B_FALSE;
 	}
 
-
-	if ((connp->conn_dev =
-	    inet_minor_alloc(ip_minor_arena)) == 0) {
+	if ((connp->conn_dev = inet_minor_alloc(ip_minor_arena)) == 0) {
 		q->q_ptr = WR(q)->q_ptr = NULL;
 		CONN_DEC_REF(connp);
 		return (EBUSY);
@@ -10734,381 +10847,455 @@ ip_udp_check(queue_t *q, conn_t *connp, ill_t *ill, ipha_t *ipha,
 }
 
 /*
- * Do fragmentation reassembly.
- * returns B_TRUE if successful else B_FALSE.
+ * Fragmentation reassembly.  Each ILL has a hash table for
+ * queuing packets undergoing reassembly for all IPIFs
+ * associated with the ILL.  The hash is based on the packet
+ * IP ident field.  The ILL frag hash table was allocated
+ * as a timer block at the time the ILL was created.  Whenever
+ * there is anything on the reassembly queue, the timer will
+ * be running.  Returns B_TRUE if successful else B_FALSE;
  * frees mp on failure.
  */
 static boolean_t
-ip_rput_fragment(queue_t *q, mblk_t **mpp, ipha_t *ipha)
+ip_rput_fragment(queue_t *q, mblk_t **mpp, ipha_t *ipha,
+    uint32_t *cksum_val, uint16_t *cksum_flags)
 {
 	uint32_t	frag_offset_flags;
-	ill_t   *ill = (ill_t *)q->q_ptr;
-	mblk_t *mp = *mpp;
-	mblk_t *t_mp;
+	ill_t		*ill = (ill_t *)q->q_ptr;
+	mblk_t		*mp = *mpp;
+	mblk_t		*t_mp;
 	ipaddr_t	dst;
+	uint8_t		proto = ipha->ipha_protocol;
+	uint32_t	sum_val;
+	uint16_t	sum_flags;
+	ipf_t		*ipf;
+	ipf_t		**ipfp;
+	ipfb_t		*ipfb;
+	uint16_t	ident;
+	uint32_t	offset;
+	ipaddr_t	src;
+	uint_t		hdr_length;
+	uint32_t	end;
+	mblk_t		*mp1;
+	mblk_t		*tail_mp;
+	size_t		count;
+	size_t		msg_len;
+	uint8_t		ecn_info = 0;
+	uint32_t	packet_size;
+	boolean_t	pruned = B_FALSE;
+
+	if (cksum_val != NULL)
+		*cksum_val = 0;
+	if (cksum_flags != NULL)
+		*cksum_flags = 0;
 
 	/*
 	 * Drop the fragmented as early as possible, if
 	 * we don't have resource(s) to re-assemble.
 	 */
-
 	if (ip_reass_queue_bytes == 0) {
 		freemsg(mp);
 		return (B_FALSE);
 	}
 
+	/* Check for fragmentation offset; return if there's none */
+	if ((frag_offset_flags = ntohs(ipha->ipha_fragment_offset_and_flags) &
+	    (IPH_MF | IPH_OFFSET)) == 0)
+		return (B_TRUE);
+
+	/*
+	 * We utilize hardware computed checksum info only for UDP since
+	 * IP fragmentation is a normal occurence for the protocol.  In
+	 * addition, checksum offload support for IP fragments carrying
+	 * UDP payload is commonly implemented across network adapters.
+	 */
+	ASSERT(ill != NULL);
+	if (proto == IPPROTO_UDP && dohwcksum && ILL_HCKSUM_CAPABLE(ill) &&
+	    (DB_CKSUMFLAGS(mp) & (HCK_FULLCKSUM | HCK_PARTIALCKSUM))) {
+		mblk_t *mp1 = mp->b_cont;
+		int32_t len;
+
+		/* Record checksum information from the packet */
+		sum_val = (uint32_t)DB_CKSUM16(mp);
+		sum_flags = DB_CKSUMFLAGS(mp);
+
+		/* IP payload offset from beginning of mblk */
+		offset = ((uchar_t *)ipha + IPH_HDR_LENGTH(ipha)) - mp->b_rptr;
+
+		if ((sum_flags & HCK_PARTIALCKSUM) &&
+		    (mp1 == NULL || mp1->b_cont == NULL) &&
+		    offset >= DB_CKSUMSTART(mp) &&
+		    ((len = offset - DB_CKSUMSTART(mp)) & 1) == 0) {
+			uint32_t adj;
+			/*
+			 * Partial checksum has been calculated by hardware
+			 * and attached to the packet; in addition, any
+			 * prepended extraneous data is even byte aligned.
+			 * If any such data exists, we adjust the checksum;
+			 * this would also handle any postpended data.
+			 */
+			IP_ADJCKSUM_PARTIAL(mp->b_rptr + DB_CKSUMSTART(mp),
+			    mp, mp1, len, adj);
+
+			/* One's complement subtract extraneous checksum */
+			if (adj >= sum_val)
+				sum_val = ~(adj - sum_val) & 0xFFFF;
+			else
+				sum_val -= adj;
+		}
+	} else {
+		sum_val = 0;
+		sum_flags = 0;
+	}
+
+	/* Clear hardware checksumming flag */
+	DB_CKSUMFLAGS(mp) = 0;
+
+	ident = ipha->ipha_ident;
+	offset = (frag_offset_flags << 3) & 0xFFFF;
+	src = ipha->ipha_src;
 	dst = ipha->ipha_dst;
+	hdr_length = IPH_HDR_LENGTH(ipha);
+	end = ntohs(ipha->ipha_length) - hdr_length;
 
-	/* Clear hardware checksumming flag if set */
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	/* If end == 0 then we have a packet with no data, so just free it */
+	if (end == 0) {
+		freemsg(mp);
+		return (B_FALSE);
+	}
 
-	/* Check for fragmentation offset. */
-	frag_offset_flags = ntohs(ipha->ipha_fragment_offset_and_flags) &
-	    (IPH_MF | IPH_OFFSET);
-	if (frag_offset_flags) {
-		ipf_t		*ipf;
-		ipf_t		**ipfp;
-		ipfb_t		*ipfb;
-		uint16_t	ident;
-		uint32_t	offset;
-		ipaddr_t	src;
-		uint_t		hdr_length;
-		uint32_t	end;
-		uint8_t		proto;
-		mblk_t		*mp1;
-		mblk_t		*tail_mp;
-		size_t		count;
-		size_t		msg_len;
-		uint8_t		ecn_info = 0;
-		uint32_t	packet_size;
-		boolean_t 	pruned = B_FALSE;
+	/* Record the ECN field info. */
+	ecn_info = (ipha->ipha_type_of_service & 0x3);
+	if (offset != 0) {
+		/*
+		 * If this isn't the first piece, strip the header, and
+		 * add the offset to the end value.
+		 */
+		mp->b_rptr += hdr_length;
+		end += offset;
+	}
 
-		ident = ipha->ipha_ident;
-		offset = (frag_offset_flags << 3) & 0xFFFF;
-		src = ipha->ipha_src;
-		hdr_length = IPH_HDR_LENGTH(ipha);
-		end = ntohs(ipha->ipha_length) - hdr_length;
+	msg_len = MBLKSIZE(mp);
+	tail_mp = mp;
+	while (tail_mp->b_cont != NULL) {
+		tail_mp = tail_mp->b_cont;
+		msg_len += MBLKSIZE(tail_mp);
+	}
+
+	/* If the reassembly list for this ILL will get too big, prune it */
+	if ((msg_len + sizeof (*ipf) + ill->ill_frag_count) >=
+	    ip_reass_queue_bytes) {
+		ill_frag_prune(ill,
+		    (ip_reass_queue_bytes < msg_len) ? 0 :
+		    (ip_reass_queue_bytes - msg_len));
+		pruned = B_TRUE;
+	}
+
+	ipfb = &ill->ill_frag_hash_tbl[ILL_FRAG_HASH(src, ident)];
+	mutex_enter(&ipfb->ipfb_lock);
+
+	ipfp = &ipfb->ipfb_ipf;
+	/* Try to find an existing fragment queue for this packet. */
+	for (;;) {
+		ipf = ipfp[0];
+		if (ipf != NULL) {
+			/*
+			 * It has to match on ident and src/dst address.
+			 */
+			if (ipf->ipf_ident == ident &&
+			    ipf->ipf_src == src &&
+			    ipf->ipf_dst == dst &&
+			    ipf->ipf_protocol == proto) {
+				/*
+				 * If we have received too many
+				 * duplicate fragments for this packet
+				 * free it.
+				 */
+				if (ipf->ipf_num_dups > ip_max_frag_dups) {
+					ill_frag_free_pkts(ill, ipfb, ipf, 1);
+					freemsg(mp);
+					mutex_exit(&ipfb->ipfb_lock);
+					return (B_FALSE);
+				}
+				/* Found it. */
+				break;
+			}
+			ipfp = &ipf->ipf_hash_next;
+			continue;
+		}
 
 		/*
-		 * if end == 0 then we have a packet with no data, so just
-		 * free it.
+		 * If we pruned the list, do we want to store this new
+		 * fragment?. We apply an optimization here based on the
+		 * fact that most fragments will be received in order.
+		 * So if the offset of this incoming fragment is zero,
+		 * it is the first fragment of a new packet. We will
+		 * keep it.  Otherwise drop the fragment, as we have
+		 * probably pruned the packet already (since the
+		 * packet cannot be found).
 		 */
-		if (end == 0) {
+		if (pruned && offset != 0) {
+			mutex_exit(&ipfb->ipfb_lock);
 			freemsg(mp);
 			return (B_FALSE);
 		}
-		proto = ipha->ipha_protocol;
 
-		/*
-		 * Fragmentation reassembly.  Each ILL has a hash table for
-		 * queuing packets undergoing reassembly for all IPIFs
-		 * associated with the ILL.  The hash is based on the packet
-		 * IP ident field.  The ILL frag hash table was allocated
-		 * as a timer block at the time the ILL was created.  Whenever
-		 * there is anything on the reassembly queue, the timer will
-		 * be running.
-		 */
-		ASSERT(ill != NULL);
-
-		/* Record the ECN field info. */
-		ecn_info = (ipha->ipha_type_of_service & 0x3);
-		if (offset != 0) {
+		if (ipfb->ipfb_frag_pkts >= MAX_FRAG_PKTS)  {
 			/*
-			 * If this isn't the first piece, strip the header, and
-			 * add the offset to the end value.
+			 * Too many fragmented packets in this hash
+			 * bucket. Free the oldest.
 			 */
-			mp->b_rptr += hdr_length;
-			end += offset;
+			ill_frag_free_pkts(ill, ipfb, ipfb->ipfb_ipf, 1);
 		}
 
-		msg_len = mp->b_datap->db_lim - mp->b_datap->db_base;
-		tail_mp = mp;
-		while (tail_mp->b_cont != NULL) {
-			tail_mp = tail_mp->b_cont;
-			msg_len += tail_mp->b_datap->db_lim -
-			    tail_mp->b_datap->db_base;
-		}
-
-		/*
-		 * If the reassembly list for this ILL will get too big
-		 * prune it.
-		 */
-		if ((msg_len + sizeof (*ipf) + ill->ill_frag_count) >=
-		    ip_reass_queue_bytes) {
-			ill_frag_prune(ill,
-			    (ip_reass_queue_bytes < msg_len) ? 0 :
-			    (ip_reass_queue_bytes - msg_len));
-			pruned = B_TRUE;
-		}
-
-		ipfb = &ill->ill_frag_hash_tbl[ILL_FRAG_HASH(src, ident)];
-		mutex_enter(&ipfb->ipfb_lock);
-
-		ipfp = &ipfb->ipfb_ipf;
-		/* Try to find an existing fragment queue for this packet. */
-		for (;;) {
-			ipf = ipfp[0];
-			if (ipf != NULL) {
-				/*
-				 * It has to match on ident and src/dst address.
-				 */
-				if (ipf->ipf_ident == ident &&
-				    ipf->ipf_src == src &&
-				    ipf->ipf_dst == dst &&
-				    ipf->ipf_protocol == proto) {
-					/*
-					 * If we have received too many
-					 * duplicate fragments for this packet
-					 * free it.
-					 */
-					if (ipf->ipf_num_dups >
-					    ip_max_frag_dups) {
-						ill_frag_free_pkts(ill, ipfb,
-						    ipf, 1);
-						freemsg(mp);
-						mutex_exit(&ipfb->ipfb_lock);
-						return (B_FALSE);
-					}
-					/* Found it. */
-					break;
-				}
-				ipfp = &ipf->ipf_hash_next;
-				continue;
-			}
-
-			/*
-			 * If we pruned the list, do we want to store this new
-			 * fragment?. We apply an optimization here based on the
-			 * fact that most fragments will be received in order.
-			 * So if the offset of this incoming fragment is zero,
-			 * it is the first fragment of a new packet. We will
-			 * keep it.  Otherwise drop the fragment, as we have
-			 * probably pruned the packet already (since the
-			 * packet cannot be found).
-			 */
-			if (pruned && offset != 0) {
-				mutex_exit(&ipfb->ipfb_lock);
-				freemsg(mp);
-				return (B_FALSE);
-			}
-
-			if (ipfb->ipfb_frag_pkts >= MAX_FRAG_PKTS)  {
-				/*
-				 * Too many fragmented packets in this hash
-				 * bucket. Free the oldest.
-				 */
-				ill_frag_free_pkts(ill, ipfb, ipfb->ipfb_ipf,
-				    1);
-			}
-
-			/* New guy.  Allocate a frag message. */
-			mp1 = allocb(sizeof (*ipf), BPRI_MED);
-			if (mp1 == NULL) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
-				freemsg(mp);
+		/* New guy.  Allocate a frag message. */
+		mp1 = allocb(sizeof (*ipf), BPRI_MED);
+		if (mp1 == NULL) {
+			BUMP_MIB(&ip_mib, ipInDiscards);
+			freemsg(mp);
 reass_done:
-				mutex_exit(&ipfb->ipfb_lock);
-				return (B_FALSE);
-			}
+			mutex_exit(&ipfb->ipfb_lock);
+			return (B_FALSE);
+		}
 
 
-			BUMP_MIB(&ip_mib, ipReasmReqds);
-			mp1->b_cont = mp;
+		BUMP_MIB(&ip_mib, ipReasmReqds);
+		mp1->b_cont = mp;
 
-			/* Initialize the fragment header. */
-			ipf = (ipf_t *)mp1->b_rptr;
-			ipf->ipf_mp = mp1;
-			ipf->ipf_ptphn = ipfp;
-			ipfp[0] = ipf;
-			ipf->ipf_hash_next = NULL;
-			ipf->ipf_ident = ident;
-			ipf->ipf_protocol = proto;
-			ipf->ipf_src = src;
-			ipf->ipf_dst = dst;
-			ipf->ipf_nf_hdr_len = 0;
-			/* Record reassembly start time. */
-			ipf->ipf_timestamp = gethrestime_sec();
-			/* Record ipf generation and account for frag header */
-			ipf->ipf_gen = ill->ill_ipf_gen++;
-			ipf->ipf_count = mp1->b_datap->db_lim -
-			    mp1->b_datap->db_base;
-			ipf->ipf_last_frag_seen = B_FALSE;
-			ipf->ipf_ecn = ecn_info;
-			ipf->ipf_num_dups = 0;
-			ipfb->ipfb_frag_pkts++;
+		/* Initialize the fragment header. */
+		ipf = (ipf_t *)mp1->b_rptr;
+		ipf->ipf_mp = mp1;
+		ipf->ipf_ptphn = ipfp;
+		ipfp[0] = ipf;
+		ipf->ipf_hash_next = NULL;
+		ipf->ipf_ident = ident;
+		ipf->ipf_protocol = proto;
+		ipf->ipf_src = src;
+		ipf->ipf_dst = dst;
+		ipf->ipf_nf_hdr_len = 0;
+		/* Record reassembly start time. */
+		ipf->ipf_timestamp = gethrestime_sec();
+		/* Record ipf generation and account for frag header */
+		ipf->ipf_gen = ill->ill_ipf_gen++;
+		ipf->ipf_count = MBLKSIZE(mp1);
+		ipf->ipf_last_frag_seen = B_FALSE;
+		ipf->ipf_ecn = ecn_info;
+		ipf->ipf_num_dups = 0;
+		ipfb->ipfb_frag_pkts++;
+		ipf->ipf_checksum = 0;
+		ipf->ipf_checksum_flags = 0;
 
-			/*
-			 * We handle reassembly two ways.  In the easy case,
-			 * where all the fragments show up in order, we do
-			 * minimal bookkeeping, and just clip new pieces on
-			 * the end.  If we ever see a hole, then we go off
-			 * to ip_reassemble which has to mark the pieces and
-			 * keep track of the number of holes, etc.  Obviously,
-			 * the point of having both mechanisms is so we can
-			 * handle the easy case as efficiently as possible.
-			 */
-			if (offset == 0) {
-				/* Easy case, in-order reassembly so far. */
-				ipf->ipf_count += msg_len;
-				ipf->ipf_tail_mp = tail_mp;
-				/*
-				 * Keep track of next expected offset in
-				 * ipf_end.
-				 */
-				ipf->ipf_end = end;
-				ipf->ipf_nf_hdr_len = hdr_length;
-			} else {
-				/* Hard case, hole at the beginning. */
-				ipf->ipf_tail_mp = NULL;
-				/*
-				 * ipf_end == 0 means that we have given up
-				 * on easy reassembly.
-				 */
-				ipf->ipf_end = 0;
-				/*
-				 * ipf_hole_cnt is set by ip_reassemble.
-				 * ipf_count is updated by ip_reassemble.
-				 * No need to check for return value here
-				 * as we don't expect reassembly to complete
-				 * or fail for the first fragment itself.
-				 */
-				(void) ip_reassemble(mp, ipf,
-				    (frag_offset_flags & IPH_OFFSET) << 3,
-				    (frag_offset_flags & IPH_MF), ill, msg_len);
-			}
-			/* Update per ipfb and ill byte counts */
-			ipfb->ipfb_count += ipf->ipf_count;
-			ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
-			ill->ill_frag_count += ipf->ipf_count;
-			ASSERT(ill->ill_frag_count > 0); /* Wraparound */
-			/* If the frag timer wasn't already going, start it. */
-			mutex_enter(&ill->ill_lock);
-			ill_frag_timer_start(ill);
-			mutex_exit(&ill->ill_lock);
-			goto reass_done;
+		/* Store checksum value in fragment header */
+		if (sum_flags != 0) {
+			sum_val = (sum_val & 0xFFFF) + (sum_val >> 16);
+			sum_val = (sum_val & 0xFFFF) + (sum_val >> 16);
+			ipf->ipf_checksum = sum_val;
+			ipf->ipf_checksum_flags = sum_flags;
 		}
 
 		/*
-		 * We have a new piece of a datagram which is already being
-		 * reassembled.  Update the ECN info if all IP fragments
-		 * are ECN capable.  If there is one which is not, clear
-		 * all the info.  If there is at least one which has CE
-		 * code point, IP needs to report that up to transport.
+		 * We handle reassembly two ways.  In the easy case,
+		 * where all the fragments show up in order, we do
+		 * minimal bookkeeping, and just clip new pieces on
+		 * the end.  If we ever see a hole, then we go off
+		 * to ip_reassemble which has to mark the pieces and
+		 * keep track of the number of holes, etc.  Obviously,
+		 * the point of having both mechanisms is so we can
+		 * handle the easy case as efficiently as possible.
 		 */
-		if (ecn_info != IPH_ECN_NECT && ipf->ipf_ecn != IPH_ECN_NECT) {
-			if (ecn_info == IPH_ECN_CE)
-				ipf->ipf_ecn = IPH_ECN_CE;
-		} else {
-			ipf->ipf_ecn = IPH_ECN_NECT;
-		}
-		if (offset && ipf->ipf_end == offset) {
-			/* The new fragment fits at the end */
-			ipf->ipf_tail_mp->b_cont = mp;
-			/* Update the byte count */
+		if (offset == 0) {
+			/* Easy case, in-order reassembly so far. */
 			ipf->ipf_count += msg_len;
-			/* Update per ipfb and ill byte counts */
-			ipfb->ipfb_count += msg_len;
-			ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
-			ill->ill_frag_count += msg_len;
-			ASSERT(ill->ill_frag_count > 0); /* Wraparound */
-			if (frag_offset_flags & IPH_MF) {
-				/* More to come. */
-				ipf->ipf_end = end;
-				ipf->ipf_tail_mp = tail_mp;
-				goto reass_done;
-			}
+			ipf->ipf_tail_mp = tail_mp;
+			/*
+			 * Keep track of next expected offset in
+			 * ipf_end.
+			 */
+			ipf->ipf_end = end;
+			ipf->ipf_nf_hdr_len = hdr_length;
 		} else {
-			/* Go do the hard cases. */
-			int ret;
+			/* Hard case, hole at the beginning. */
+			ipf->ipf_tail_mp = NULL;
+			/*
+			 * ipf_end == 0 means that we have given up
+			 * on easy reassembly.
+			 */
+			ipf->ipf_end = 0;
 
-			if (offset == 0)
-				ipf->ipf_nf_hdr_len = hdr_length;
+			/* Forget checksum offload from now on */
+			ipf->ipf_checksum_flags = 0;
 
-			/* Save current byte count */
-			count = ipf->ipf_count;
-			ret = ip_reassemble(mp, ipf,
+			/*
+			 * ipf_hole_cnt is set by ip_reassemble.
+			 * ipf_count is updated by ip_reassemble.
+			 * No need to check for return value here
+			 * as we don't expect reassembly to complete
+			 * or fail for the first fragment itself.
+			 */
+			(void) ip_reassemble(mp, ipf,
 			    (frag_offset_flags & IPH_OFFSET) << 3,
 			    (frag_offset_flags & IPH_MF), ill, msg_len);
-			/* Count of bytes added and subtracted (freeb()ed) */
-			count = ipf->ipf_count - count;
-			if (count) {
-				/* Update per ipfb and ill byte counts */
-				ipfb->ipfb_count += count;
-				ASSERT(ipfb->ipfb_count > 0); /* Wraparound */
-				ill->ill_frag_count += count;
-				ASSERT(ill->ill_frag_count > 0);
-			}
-			if (ret == IP_REASS_PARTIAL) {
-				goto reass_done;
-			} else if (ret == IP_REASS_FAILED) {
-				/* Reassembly failed. Free up all resources */
-				ill_frag_free_pkts(ill, ipfb, ipf, 1);
-				for (t_mp = mp; t_mp != NULL;
-				    t_mp = t_mp->b_cont) {
-					IP_REASS_SET_START(t_mp, 0);
-					IP_REASS_SET_END(t_mp, 0);
-				}
-				freemsg(mp);
-				goto reass_done;
-			}
-			/* We will reach here iff 'ret' is IP_REASS_COMPLETE */
 		}
-		/*
-		 * We have completed reassembly.  Unhook the frag header from
-		 * the reassembly list.
-		 *
-		 * Before we free the frag header, record the ECN info
-		 * to report back to the transport.
-		 */
-		ecn_info = ipf->ipf_ecn;
-		BUMP_MIB(&ip_mib, ipReasmOKs);
-		ipfp = ipf->ipf_ptphn;
-		mp1 = ipf->ipf_mp;
+		/* Update per ipfb and ill byte counts */
+		ipfb->ipfb_count += ipf->ipf_count;
+		ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
+		ill->ill_frag_count += ipf->ipf_count;
+		ASSERT(ill->ill_frag_count > 0); /* Wraparound */
+		/* If the frag timer wasn't already going, start it. */
+		mutex_enter(&ill->ill_lock);
+		ill_frag_timer_start(ill);
+		mutex_exit(&ill->ill_lock);
+		goto reass_done;
+	}
+
+	/*
+	 * If the packet's flag has changed (it could be coming up
+	 * from an interface different than the previous, therefore
+	 * possibly different checksum capability), then forget about
+	 * any stored checksum states.  Otherwise add the value to
+	 * the existing one stored in the fragment header.
+	 */
+	if (sum_flags != 0 && sum_flags == ipf->ipf_checksum_flags) {
+		sum_val += ipf->ipf_checksum;
+		sum_val = (sum_val & 0xFFFF) + (sum_val >> 16);
+		sum_val = (sum_val & 0xFFFF) + (sum_val >> 16);
+		ipf->ipf_checksum = sum_val;
+	} else if (ipf->ipf_checksum_flags != 0) {
+		/* Forget checksum offload from now on */
+		ipf->ipf_checksum_flags = 0;
+	}
+
+	/*
+	 * We have a new piece of a datagram which is already being
+	 * reassembled.  Update the ECN info if all IP fragments
+	 * are ECN capable.  If there is one which is not, clear
+	 * all the info.  If there is at least one which has CE
+	 * code point, IP needs to report that up to transport.
+	 */
+	if (ecn_info != IPH_ECN_NECT && ipf->ipf_ecn != IPH_ECN_NECT) {
+		if (ecn_info == IPH_ECN_CE)
+			ipf->ipf_ecn = IPH_ECN_CE;
+	} else {
+		ipf->ipf_ecn = IPH_ECN_NECT;
+	}
+	if (offset && ipf->ipf_end == offset) {
+		/* The new fragment fits at the end */
+		ipf->ipf_tail_mp->b_cont = mp;
+		/* Update the byte count */
+		ipf->ipf_count += msg_len;
+		/* Update per ipfb and ill byte counts */
+		ipfb->ipfb_count += msg_len;
+		ASSERT(ipfb->ipfb_count > 0);	/* Wraparound */
+		ill->ill_frag_count += msg_len;
+		ASSERT(ill->ill_frag_count > 0); /* Wraparound */
+		if (frag_offset_flags & IPH_MF) {
+			/* More to come. */
+			ipf->ipf_end = end;
+			ipf->ipf_tail_mp = tail_mp;
+			goto reass_done;
+		}
+	} else {
+		/* Go do the hard cases. */
+		int ret;
+
+		if (offset == 0)
+			ipf->ipf_nf_hdr_len = hdr_length;
+
+		/* Save current byte count */
 		count = ipf->ipf_count;
-		ipf = ipf->ipf_hash_next;
-		if (ipf)
-			ipf->ipf_ptphn = ipfp;
-		ipfp[0] = ipf;
-		ill->ill_frag_count -= count;
-		ASSERT(ipfb->ipfb_count >= count);
-		ipfb->ipfb_count -= count;
-		ipfb->ipfb_frag_pkts--;
-		mutex_exit(&ipfb->ipfb_lock);
-		/* Ditch the frag header. */
-		mp = mp1->b_cont;
-
-		freeb(mp1);
-
-		/* Restore original IP length in header. */
-		packet_size = (uint32_t)msgdsize(mp);
-		if (packet_size > IP_MAXPACKET) {
+		ret = ip_reassemble(mp, ipf,
+		    (frag_offset_flags & IPH_OFFSET) << 3,
+		    (frag_offset_flags & IPH_MF), ill, msg_len);
+		/* Count of bytes added and subtracted (freeb()ed) */
+		count = ipf->ipf_count - count;
+		if (count) {
+			/* Update per ipfb and ill byte counts */
+			ipfb->ipfb_count += count;
+			ASSERT(ipfb->ipfb_count > 0); /* Wraparound */
+			ill->ill_frag_count += count;
+			ASSERT(ill->ill_frag_count > 0);
+		}
+		if (ret == IP_REASS_PARTIAL) {
+			goto reass_done;
+		} else if (ret == IP_REASS_FAILED) {
+			/* Reassembly failed. Free up all resources */
+			ill_frag_free_pkts(ill, ipfb, ipf, 1);
+			for (t_mp = mp; t_mp != NULL; t_mp = t_mp->b_cont) {
+				IP_REASS_SET_START(t_mp, 0);
+				IP_REASS_SET_END(t_mp, 0);
+			}
 			freemsg(mp);
-			BUMP_MIB(&ip_mib, ipInHdrErrors);
+			goto reass_done;
+		}
+		/* We will reach here iff 'ret' is IP_REASS_COMPLETE */
+	}
+	/*
+	 * We have completed reassembly.  Unhook the frag header from
+	 * the reassembly list.
+	 *
+	 * Before we free the frag header, record the ECN info
+	 * to report back to the transport.
+	 */
+	ecn_info = ipf->ipf_ecn;
+	BUMP_MIB(&ip_mib, ipReasmOKs);
+	ipfp = ipf->ipf_ptphn;
+
+	/* We need to supply these to caller */
+	if ((sum_flags = ipf->ipf_checksum_flags) != 0)
+		sum_val = ipf->ipf_checksum;
+	else
+		sum_val = 0;
+
+	mp1 = ipf->ipf_mp;
+	count = ipf->ipf_count;
+	ipf = ipf->ipf_hash_next;
+	if (ipf != NULL)
+		ipf->ipf_ptphn = ipfp;
+	ipfp[0] = ipf;
+	ill->ill_frag_count -= count;
+	ASSERT(ipfb->ipfb_count >= count);
+	ipfb->ipfb_count -= count;
+	ipfb->ipfb_frag_pkts--;
+	mutex_exit(&ipfb->ipfb_lock);
+	/* Ditch the frag header. */
+	mp = mp1->b_cont;
+
+	freeb(mp1);
+
+	/* Restore original IP length in header. */
+	packet_size = (uint32_t)msgdsize(mp);
+	if (packet_size > IP_MAXPACKET) {
+		freemsg(mp);
+		BUMP_MIB(&ip_mib, ipInHdrErrors);
+		return (B_FALSE);
+	}
+
+	if (DB_REF(mp) > 1) {
+		mblk_t *mp2 = copymsg(mp);
+
+		freemsg(mp);
+		if (mp2 == NULL) {
+			BUMP_MIB(&ip_mib, ipInDiscards);
 			return (B_FALSE);
 		}
-
-		if (mp->b_datap->db_ref > 1) {
-			mblk_t *mp2;
-
-			mp2 = copymsg(mp);
-			freemsg(mp);
-			if (!mp2) {
-				BUMP_MIB(&ip_mib, ipInDiscards);
-				return (B_FALSE);
-			}
-			mp = mp2;
-		}
-		ipha = (ipha_t *)mp->b_rptr;
-
-		ipha->ipha_length = htons((uint16_t)packet_size);
-		/* We're now complete, zip the frag state */
-		ipha->ipha_fragment_offset_and_flags = 0;
-		/* Record the ECN info. */
-		ipha->ipha_type_of_service &= 0xFC;
-		ipha->ipha_type_of_service |= ecn_info;
-		*mpp = mp;
-
+		mp = mp2;
 	}
+	ipha = (ipha_t *)mp->b_rptr;
+
+	ipha->ipha_length = htons((uint16_t)packet_size);
+	/* We're now complete, zip the frag state */
+	ipha->ipha_fragment_offset_and_flags = 0;
+	/* Record the ECN info. */
+	ipha->ipha_type_of_service &= 0xFC;
+	ipha->ipha_type_of_service |= ecn_info;
+	*mpp = mp;
+
+	/* Reassembly is successful; return checksum information if needed */
+	if (cksum_val != NULL)
+		*cksum_val = sum_val;
+	if (cksum_flags != NULL)
+		*cksum_flags = sum_flags;
+
 	return (B_TRUE);
 }
 
@@ -11156,16 +11343,12 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 {
 	uint32_t	sum;
 	uint32_t	u1;
-	uint32_t	u2;
 	boolean_t	mctl_present;
 	conn_t		*connp;
 	mblk_t		*first_mp;
-	mblk_t		*mp1;
-	dblk_t		*dp;
 	uint16_t	*up;
 	ill_t		*ill = (ill_t *)q->q_ptr;
-	uint32_t	ports;
-	boolean_t	cksum_computed = B_FALSE;
+	uint16_t	reass_hck_flags = 0;
 
 #define	rptr    ((uchar_t *)ipha)
 
@@ -11182,19 +11365,13 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	    IP_SIMPLE_HDR_LENGTH_IN_WORDS);
 
 	/* IP options present */
-	if (u1)
+	if (u1 != 0)
 		goto ipoptions;
 
-#define	IS_IPHDR_HWCKSUM(mctl_present, mp, ill)				\
-	((!mctl_present) && (mp->b_datap->db_struioun.cksum.flags &	\
-	HCK_IPV4_HDRCKSUM) && (ill->ill_capabilities &			\
-	ILL_CAPAB_HCKSUM) && dohwcksum)
-
 	/* Check the IP header checksum.  */
-	if (IS_IPHDR_HWCKSUM(mctl_present, mp, ill)) {
+	if (IS_IP_HDR_HWCKSUM(mctl_present, mp, ill)) {
 		/* Clear the IP header h/w cksum flag */
-		mp->b_datap->db_struioun.cksum.flags &=
-		    ~HCK_IPV4_HDRCKSUM;
+		DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
 	} else {
 #define	uph	((uint16_t *)ipha)
 		sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] + uph[5] +
@@ -11207,7 +11384,7 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		 * Don't verify header checksum if this packet is coming
 		 * back from AH/ESP as we already did it.
 		 */
-		if (!mctl_present && (sum && sum != 0xFFFF)) {
+		if (!mctl_present && sum != 0 && sum != 0xFFFF) {
 			BUMP_MIB(&ip_mib, ipInCksumErrs);
 			freemsg(first_mp);
 			return;
@@ -11236,133 +11413,52 @@ ip_udp_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	/* packet does not contain complete IP & UDP headers */
 	if ((mp->b_wptr - rptr) < (IP_SIMPLE_HDR_LENGTH + UDPH_SIZE))
 		goto udppullup;
+
 	/* up points to UDP header */
 	up = (uint16_t *)((uchar_t *)ipha + IP_SIMPLE_HDR_LENGTH);
 #define	iphs    ((uint16_t *)ipha)
 
-#define	IP_CKSUM_RECV(len, u1, u2, mp, mp1, error, dp) {		\
-	boolean_t	doswcksum = B_TRUE;				\
-	uint_t		hcksumflags = 0;				\
-									\
-	hcksumflags = dp->db_struioun.cksum.flags;			\
-									\
-	/* Clear the hardware checksum flags; they have been consumed */\
-	dp->db_struioun.cksum.flags = 0;				\
-	if (hcksumflags && (ill->ill_capabilities & ILL_CAPAB_HCKSUM) &&\
-		dohwcksum) {						\
-		if (hcksumflags & HCK_FULLCKSUM) {			\
-			/* 						\
-			 * Full checksum has been computed by the	\
-			 * hardware and has been attached. 		\
-			 */						\
-			doswcksum = B_FALSE;				\
-			if (!(hcksumflags & HCK_FULLCKSUM_OK) &&	\
-			    (dp->db_cksum16 != 0xffff)) {		\
-				ipcsumdbg("full hwcksumerr\n", mp);	\
-				goto error;				\
-			}						\
-		} else if ((hcksumflags & HCK_PARTIALCKSUM) &&		\
-		    (((len = (IP_SIMPLE_HDR_LENGTH - dp->db_cksumstart))\
-		    & 1) == 0)) {					\
-			uint32_t	tot_len = 0;			\
-									\
-			doswcksum = B_FALSE;				\
-			/* Partial checksum computed */			\
-			u1 += dp->db_cksum16;				\
-			tot_len = mp->b_wptr - mp->b_rptr;		\
-			if (!mp1)					\
-				mp1 = mp;				\
-			else						\
-				tot_len += mp1->b_wptr - mp1->b_rptr;	\
-			if (len > 0) {					\
-				/* 					\
-				 * Prepended extraneous data. Adjust	\
-				 * checksum.				\
-				 */					\
-				u2 = IP_BCSUM_PARTIAL((uchar_t *)(rptr +\
-				    dp->db_cksumstart),	(int32_t)len, 	\
-				    0);					\
-			} else						\
-				u2 = 0;					\
-			if ((len = (dp->db_cksumend - tot_len)) > 0) {	\
-				/* 					\
-				 * Postpended extraneous data. Adjust	\
-				 * checksum.				\
-				 */					\
-				uint32_t	u3;			\
-									\
-				u3 = IP_BCSUM_PARTIAL(mp1->b_wptr, 	\
-				    (int32_t)len, 0);			\
-				if ((uintptr_t)mp1->b_wptr & 1)		\
-					/*				\
-					 * Postpended extraneous data	\
-					 * was odd byte aligned, so 	\
-					 * swap resulting checksum 	\
-					 * bytes.			\
-					 */				\
-					u2 += ((u3 << 8) & 0xffff) | 	\
-					    (u3 >> 8);			\
-				else					\
-					u2 += u3;			\
-				u2 = (u2 & 0xFFFF) + ((int)(u2) >> 16);	\
-			}						\
-			/*						\
-			 * One's complement subtract extraneous checksum\
-			 */						\
-			if (u2 >= u1)					\
-				u1 = ~(u2 - u1) & 0xFFFF;		\
-			else						\
-				u1 -= u2;				\
-			u1 = (u1 & 0xFFFF) + ((int)u1 >> 16);		\
-			if (~(u1) & 0xFFFF) {				\
-				ipcsumdbg("partial hwcksumerr\n", mp);	\
-				goto error;				\
-			}						\
-		} 							\
-	} 								\
-	if (doswcksum) {						\
-		IP_STAT(ip_in_sw_cksum);				\
-		if ((IP_CSUM(mp, (int32_t)((uchar_t *)up -		\
-		    (uchar_t *)ipha), u1)) != 0) {			\
-			ipcsumdbg("swcksumerr\n", mp);			\
-			goto error;					\
-		}							\
-	}								\
-}
-
-	dp = mp->b_datap;
 	/* if udp hdr cksum != 0, then need to checksum udp packet */
-	if (up[3]) {
-		cksum_computed = B_TRUE;
-		/* multiple mblks of udp data? */
-		if ((mp1 = mp->b_cont) != NULL) {
-			/* more than two? */
-			if (mp1->b_cont)
-				goto multipktudp;
-		}
+	if (up[3] != 0) {
+		mblk_t *mp1 = mp->b_cont;
+		boolean_t cksum_err;
+		uint16_t hck_flags = 0;
 
 		/* Pseudo-header checksum */
 		u1 = IP_UDP_CSUM_COMP + iphs[6] + iphs[7] + iphs[8] +
 		    iphs[9] + up[2];
-		if (!mctl_present) {
-			ssize_t len = 0;
 
-			IP_CKSUM_RECV(len, u1, u2, mp, mp1, udpcksumerr, dp);
-		} else {
-multipktudp:
+		/*
+		 * Revert to software checksum calculation if the interface
+		 * isn't capable of checksum offload or if IPsec is present.
+		 */
+		if (ILL_HCKSUM_CAPABLE(ill) && !mctl_present && dohwcksum)
+			hck_flags = DB_CKSUMFLAGS(mp);
+
+		if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
 			IP_STAT(ip_in_sw_cksum);
-			if ((IP_CSUM(mp, (int32_t)((uchar_t *)up -
-			    (uchar_t *)ipha), u1)) != 0) {
-udpcksumerr:
-				ip1dbg(("ip_udp_input: bad udp checksum\n"));
-				BUMP_MIB(&ip_mib, udpInCksumErrs);
-				freemsg(first_mp);
-				return;
-			}
+
+		IP_CKSUM_RECV(hck_flags, u1,
+		    (uchar_t *)(rptr + DB_CKSUMSTART(mp)),
+		    (int32_t)((uchar_t *)up - rptr),
+		    mp, mp1, cksum_err);
+
+		if (cksum_err) {
+			BUMP_MIB(&ip_mib, udpInCksumErrs);
+
+			if (hck_flags & HCK_FULLCKSUM)
+				IP_STAT(ip_udp_in_full_hw_cksum_err);
+			else if (hck_flags & HCK_PARTIALCKSUM)
+				IP_STAT(ip_udp_in_part_hw_cksum_err);
+			else
+				IP_STAT(ip_udp_in_sw_cksum_err);
+
+			freemsg(first_mp);
+			return;
 		}
 	}
 
-	/* broadcast IP packet? */
+	/* Non-fragmented broadcast or multicast packet? */
 	if (ire->ire_type == IRE_BROADCAST)
 		goto udpslowpath;
 
@@ -11371,7 +11467,7 @@ udpcksumerr:
 		ASSERT(connp->conn_upq != NULL);
 		IP_STAT(ip_udp_fast_path);
 
-		if (!canputnext(connp->conn_upq)) {
+		if (CONN_UDP_FLOWCTLD(connp)) {
 			freemsg(mp);
 			BUMP_MIB(&ip_mib, udpInOverflows);
 		} else {
@@ -11383,7 +11479,8 @@ udpcksumerr:
 			 */
 			if (ip_udp_check(q, connp, recv_ill,
 			    ipha, &mp, &first_mp, mctl_present)) {
-				putnext(connp->conn_upq, mp);
+				/* Send it upstream */
+				CONN_UDP_RECV(connp, mp);
 			}
 		}
 		/*
@@ -11416,9 +11513,13 @@ ipoptions:
 	u1 = ntohs(ipha->ipha_fragment_offset_and_flags);
 	if (u1 & (IPH_MF | IPH_OFFSET)) {
 fragmented:
-		if (!ip_rput_fragment(q, &mp, ipha)) {
+		/*
+		 * "sum" and "reass_hck_flags" are non-zero if the
+		 * reassembled packet has a valid hardware computed
+		 * checksum information associated with it.
+		 */
+		if (!ip_rput_fragment(q, &mp, ipha, &sum, &reass_hck_flags))
 			goto slow_done;
-		}
 		/*
 		 * Make sure that first_mp points back to mp as
 		 * the mp we came in with could have changed in
@@ -11432,7 +11533,7 @@ fragmented:
 	/* Now we have a complete datagram, destined for this machine. */
 	u1 = IPH_HDR_LENGTH(ipha);
 	/* Pull up the UDP header, if necessary. */
-	if ((mp->b_wptr - mp->b_rptr) < (u1 + UDPH_SIZE)) {
+	if ((MBLKL(mp)) < (u1 + UDPH_SIZE)) {
 udppullup:
 		if (!pullupmsg(mp, u1 + UDPH_SIZE)) {
 			BUMP_MIB(&ip_mib, ipInDiscards);
@@ -11441,30 +11542,43 @@ udppullup:
 		}
 		ipha = (ipha_t *)mp->b_rptr;
 	}
+
 	/*
-	 * Validate the checksum.  This code is a bit funny looking
-	 * but may help out the compiler in this crucial spot.
+	 * Validate the checksum for the reassembled packet; for the
+	 * pullup case we calculate the payload checksum in software.
 	 */
 	up = (uint16_t *)((uchar_t *)ipha + u1 + UDP_PORTS_OFFSET);
-	if (!cksum_computed && up[3]) {
-		IP_STAT(ip_in_sw_cksum);
-		sum = IP_CSUM(mp, (int32_t)((uchar_t *)up - (uchar_t *)ipha),
-		    IP_UDP_CSUM_COMP + iphs[6] +
-		    iphs[7] + iphs[8] +
-		    iphs[9] + up[2]);
-		if (sum != 0) {
-			ip1dbg(("ip_udp_input: bad udp checksum\n"));
-				BUMP_MIB(&ip_mib, udpInCksumErrs);
-				freemsg(first_mp);
-				goto slow_done;
+	if (up[3] != 0) {
+		boolean_t cksum_err;
+
+		if ((reass_hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
+			IP_STAT(ip_in_sw_cksum);
+
+		IP_CKSUM_RECV_REASS(reass_hck_flags,
+		    (int32_t)((uchar_t *)up - (uchar_t *)ipha),
+		    IP_UDP_CSUM_COMP + iphs[6] + iphs[7] + iphs[8] +
+		    iphs[9] + up[2], sum, cksum_err);
+
+		if (cksum_err) {
+			BUMP_MIB(&ip_mib, udpInCksumErrs);
+
+			if (reass_hck_flags & HCK_FULLCKSUM)
+				IP_STAT(ip_udp_in_full_hw_cksum_err);
+			else if (reass_hck_flags & HCK_PARTIALCKSUM)
+				IP_STAT(ip_udp_in_part_hw_cksum_err);
+			else
+				IP_STAT(ip_udp_in_sw_cksum_err);
+
+			freemsg(first_mp);
+			goto slow_done;
 		}
 	}
 udpslowpath:
 
-	ports = *(uint32_t *)up;
-	/* Clear hardware checksum flag */
-	mp->b_datap->db_struioun.cksum.flags = 0;
-	ip_fanout_udp(q, first_mp, ill, ipha, ports,
+	/* Clear hardware checksum flag to be safe */
+	DB_CKSUMFLAGS(mp) = 0;
+
+	ip_fanout_udp(q, first_mp, ill, ipha, *(uint32_t *)up,
 	    (ire->ire_type == IRE_BROADCAST),
 	    IP_FF_SEND_ICMP | IP_FF_CKSUM | IP_FF_IP6INFO,
 	    mctl_present, B_TRUE, recv_ill, ire->ire_zoneid);
@@ -11473,6 +11587,7 @@ slow_done:
 	IP_STAT(ip_udp_slow_path);
 	return;
 
+#undef  iphs
 #undef  rptr
 }
 
@@ -11485,17 +11600,17 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 	conn_t		*connp;
 	uint32_t	sum;
 	uint32_t	u1;
-	uint32_t	u2;
 	uint16_t	*up;
 	int		offset;
 	ssize_t		len;
 	mblk_t		*mp1;
-	dblk_t		*dp;
 	boolean_t	syn_present = B_FALSE;
 	tcph_t		*tcph;
 	uint_t		ip_hdr_len;
 	ill_t		*ill = (ill_t *)q->q_ptr;
 	zoneid_t	zoneid = ire->ire_zoneid;
+	boolean_t	cksum_err;
+	uint16_t	hck_flags = 0;
 
 #define	rptr	((uchar_t *)ipha)
 
@@ -11514,10 +11629,9 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 		goto ipoptions;
 	} else {
 		/* Check the IP header checksum.  */
-		if (IS_IPHDR_HWCKSUM(mctl_present, mp, ill)) {
+		if (IS_IP_HDR_HWCKSUM(mctl_present, mp, ill)) {
 			/* Clear the IP header h/w cksum flag */
-			mp->b_datap->db_struioun.cksum.flags &=
-			    ~HCK_IPV4_HDRCKSUM;
+			DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
 		} else {
 #define	uph	((uint16_t *)ipha)
 			sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
@@ -11596,30 +11710,32 @@ ip_tcp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 #endif
 	u1 += iphs[6] + iphs[7] + iphs[8] + iphs[9];
 
-
 	/*
-	 * If the packet has gone through AH/ESP, do the checksum here
-	 * itself.
-	 *
-	 * If it has not gone through IPSEC processing and not a duped
-	 * mblk, then look for driver checksummed mblk. We validate or
-	 * postpone the checksum to TCP for single copy checksum.
-	 *
-	 * Note that we only honor HW cksum in the fastpath.
+	 * Revert to software checksum calculation if the interface
+	 * isn't capable of checksum offload or if IPsec is present.
 	 */
-	dp = mp->b_datap;
-	if (!mctl_present) {
-		IP_CKSUM_RECV(len, u1, u2, mp, mp1, tcpcksumerr, dp);
-	} else {
+	if (ILL_HCKSUM_CAPABLE(ill) && !mctl_present && dohwcksum)
+		hck_flags = DB_CKSUMFLAGS(mp);
+
+	if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
 		IP_STAT(ip_in_sw_cksum);
-		if ((IP_CSUM(mp, (int32_t)((uchar_t *)up - rptr),
-		    u1)) != 0) {
-tcpcksumerr:
-			BUMP_MIB(&ip_mib, tcpInErrs);
-			ip1dbg(("ip_tcp_input: bad tcp checksum \n"));
-			freemsg(first_mp);
-			goto slow_done;
-		}
+
+	IP_CKSUM_RECV(hck_flags, u1,
+	    (uchar_t *)(rptr + DB_CKSUMSTART(mp)),
+	    (int32_t)((uchar_t *)up - rptr),
+	    mp, mp1, cksum_err);
+
+	if (cksum_err) {
+		BUMP_MIB(&ip_mib, tcpInErrs);
+
+		if (hck_flags & HCK_FULLCKSUM)
+			IP_STAT(ip_tcp_in_full_hw_cksum_err);
+		else if (hck_flags & HCK_PARTIALCKSUM)
+			IP_STAT(ip_tcp_in_part_hw_cksum_err);
+		else
+			IP_STAT(ip_tcp_in_sw_cksum_err);
+
+		goto error;
 	}
 
 try_again:
@@ -11654,7 +11770,7 @@ try_again:
 	if ((tcph->th_flags[0] & (TH_SYN|TH_ACK|TH_RST|TH_URG)) == TH_SYN) {
 		if (IPCL_IS_TCP(connp)) {
 			mp->b_datap->db_struioflag |= STRUIO_EAGER;
-			mp->b_datap->db_cksumstart =
+			DB_CKSUMSTART(mp) =
 			    (intptr_t)ip_squeue_get(ill_ring);
 			if (IPCL_IS_FULLY_BOUND(connp) && !mctl_present &&
 			    !CONN_INBOUND_POLICY_PRESENT(connp)) {
@@ -11800,7 +11916,7 @@ ipoptions:
 	u1 = ntohs(ipha->ipha_fragment_offset_and_flags);
 	if (u1 & (IPH_MF | IPH_OFFSET)) {
 fragmented:
-		if (!ip_rput_fragment(q, &mp, ipha)) {
+		if (!ip_rput_fragment(q, &mp, ipha, NULL, NULL)) {
 			if (mctl_present)
 				freeb(first_mp);
 			goto slow_done;
@@ -11876,9 +11992,10 @@ multipkttcp:
 	 * ICMP's back, then this flag may need to be cleared in
 	 * other places as well.
 	 */
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	DB_CKSUMFLAGS(mp) = 0;
 
 	up = (uint16_t *)(rptr + u1 + TCP_PORTS_OFFSET);
+
 	u1 = (uint32_t)(len - u1);	/* TCP datagram length. */
 #ifdef	_BIG_ENDIAN
 	u1 += IPPROTO_TCP;
@@ -11890,7 +12007,7 @@ multipkttcp:
 	 * Not M_DATA mblk or its a dup, so do the checksum now.
 	 */
 	IP_STAT(ip_in_sw_cksum);
-	if (IP_CSUM(mp, (int32_t)((uchar_t *)up - rptr), u1)) {
+	if (IP_CSUM(mp, (int32_t)((uchar_t *)up - rptr), u1) != 0) {
 		BUMP_MIB(&ip_mib, tcpInErrs);
 		goto error;
 	}
@@ -11937,12 +12054,12 @@ ip_sctp_input(mblk_t *mp, ipha_t *ipha, ill_t *recv_ill, boolean_t mctl_present,
 		goto ipoptions;
 	} else {
 		/* Check the IP header checksum.  */
-		if (IS_IPHDR_HWCKSUM(mctl_present, mp, ill)) {
+		if (IS_IP_HDR_HWCKSUM(mctl_present, mp, ill)) {
 			/*
 			 * Since there is no SCTP h/w cksum support yet, just
 			 * clear the flag.
 			 */
-			mp->b_datap->db_struioun.cksum.flags = 0;
+			DB_CKSUMFLAGS(mp) = 0;
 		} else {
 #define	uph	((uint16_t *)ipha)
 			sum = uph[0] + uph[1] + uph[2] + uph[3] + uph[4] +
@@ -12031,7 +12148,7 @@ no_conn:
 	return;
 
 ipoptions:
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	DB_CKSUMFLAGS(mp) = 0;
 	if (!ip_options_cksum(q, first_mp, ipha, ire))
 		goto slow_done;
 
@@ -12041,7 +12158,7 @@ ipoptions:
 	u1 = ntohs(ipha->ipha_fragment_offset_and_flags);
 	if (u1 & (IPH_MF | IPH_OFFSET)) {
 fragmented:
-		if (!ip_rput_fragment(q, &mp, ipha))
+		if (!ip_rput_fragment(q, &mp, ipha, NULL, NULL))
 			goto slow_done;
 		/*
 		 * Make sure that first_mp points back to mp as
@@ -12183,7 +12300,7 @@ ip_rput_noire(queue_t *q, ill_t *in_ill, mblk_t *mp, int ll_multicast,
 	 * Clear the indication that this may have a hardware checksum
 	 * as we are not using it
 	 */
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	DB_CKSUMFLAGS(mp) = 0;
 
 	/*
 	 * Now hand the packet to ip_newroute.
@@ -12351,7 +12468,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 			 * Clear the indication that this may have
 			 * hardware checksum as we are not using it.
 			 */
-			mp->b_datap->db_struioun.cksum.flags = 0;
+			DB_CKSUMFLAGS(mp) = 0;
 			icmp_unreachable(q, mp,
 			    ICMP_SOURCE_ROUTE_FAILED);
 			ire_refrele(ire);
@@ -12361,7 +12478,7 @@ ip_rput_process_forward(queue_t *q, mblk_t *mp, ire_t *ire, ipha_t *ipha,
 	}
 
 	/* Packet is being forwarded. Turning off hwcksum flag. */
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	DB_CKSUMFLAGS(mp) = 0;
 	if (ip_g_send_redirects) {
 		/*
 		 * Check whether the incoming interface and outgoing
@@ -12435,15 +12552,17 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t **irep, ipha_t *ipha,
 {
 	queue_t		*q;
 	ire_t		*ire;
+	uint16_t	hcksumflags;
 
 	q = *qp;
 	ire = *irep;
 
 	/*
 	 * Clear the indication that this may have hardware
-	 * checksum as we are not using it.
+	 * checksum as we are not using it for forwarding.
 	 */
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	hcksumflags = DB_CKSUMFLAGS(mp);
+	DB_CKSUMFLAGS(mp) = 0;
 
 	/*
 	 * Directed broadcast forwarding: if the packet came in over a
@@ -12613,6 +12732,9 @@ ip_rput_process_broadcast(queue_t **qp, mblk_t *mp, ire_t **irep, ipha_t *ipha,
 	}
 
 	*irep = ire;
+
+	/* Restore any hardware checksum flags */
+	DB_CKSUMFLAGS(mp) = hcksumflags;
 	return (B_FALSE);
 }
 
@@ -12632,7 +12754,7 @@ ip_rput_process_multicast(queue_t *q, mblk_t *mp, ill_t *ill, ipha_t *ipha,
 		 * Clear the indication that this may have hardware
 		 * checksum as we are not using it.
 		 */
-		mp->b_datap->db_struioun.cksum.flags = 0;
+		DB_CKSUMFLAGS(mp) = 0;
 		retval = ip_mforward(ill, ipha, mp);
 		/* ip_mforward updates mib variables if needed */
 		/* clear b_prev - used by ip_mroute_decap */
@@ -12951,7 +13073,7 @@ ip_rput(queue_t *q, mblk_t *mp)
 			/*
 			 * Also SIOC[GS]TUN* ioctls can come here.
 			 */
-			ip_ioctl_freemsg(mp);
+			inet_freemsg(mp);
 			TRACE_2(TR_FAC_IP, TR_IP_RPUT_END,
 			    "ip_input_end: q %p (%S)", q, "uninit");
 			return;
@@ -13300,9 +13422,20 @@ ip_input(ill_t *ill, ill_rx_ring_t *ip_ring, mblk_t *mp_chain, size_t hdrlen)
 			continue;
 		}
 
-		/* broadcast? */
+		/*
+		 * Broadcast IRE may indicate either broadcast or
+		 * multicast packet
+		 */
 		if (ire->ire_type == IRE_BROADCAST) {
-			if (ip_rput_process_broadcast(&q, mp, &ire, ipha, ill,
+			/*
+			 * Skip broadcast checks if packet is UDP multicast;
+			 * we'd rather not enter ip_rput_process_broadcast()
+			 * unless the packet is broadcast for real, since
+			 * that routine is a no-op for multicast.
+			 */
+			if ((ipha->ipha_protocol != IPPROTO_UDP ||
+			    !CLASSD(ipha->ipha_dst)) &&
+			    ip_rput_process_broadcast(&q, mp, &ire, ipha, ill,
 			    dst, cgtp_flt_pkt, ll_multicast)) {
 				continue;
 			}
@@ -13528,24 +13661,6 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 		break;
 	default:
 		break;
-	}
-	freemsg(mp);
-}
-
-/*
- * This function is used to free a message that has gone through
- * mi_copyin processing which modifies the M_IOCTL mblk's b_next
- * and b_prev pointers. We use this function to set b_next/b_prev
- * to NULL and free them.
- */
-void
-ip_ioctl_freemsg(mblk_t *mp)
-{
-	mblk_t	*bp = mp;
-
-	for (; bp != NULL; bp = bp->b_cont) {
-		bp->b_prev = NULL;
-		bp->b_next = NULL;
 	}
 	freemsg(mp);
 }
@@ -14483,7 +14598,7 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					mp->b_cont->b_prev =
 					    mp1->b_cont->b_prev;
 				}
-				ip_ioctl_freemsg(mp1);
+				inet_freemsg(mp1);
 				ASSERT(ipsq->ipsq_current_ipif != NULL);
 				ASSERT(connp != NULL);
 				ip_ioctl_finish(CONNP_TO_WQ(connp), mp,
@@ -14515,7 +14630,7 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					mp->b_cont->b_prev =
 					    mp1->b_cont->b_prev;
 				}
-				ip_ioctl_freemsg(mp1);
+				inet_freemsg(mp1);
 				if (iocp->ioc_error == 0)
 					mp->b_datap->db_type = M_IOCDATA;
 				ASSERT(connp != NULL);
@@ -14596,7 +14711,7 @@ ip_rput_other(ipsq_t *ipsq, queue_t *q, mblk_t *mp, void *dummy_arg)
 					mp->b_cont->b_prev =
 					    mp1->b_cont->b_prev;
 				}
-				ip_ioctl_freemsg(mp1);
+				inet_freemsg(mp1);
 				if (iocp->ioc_error == 0)
 					iocp->ioc_error = EINVAL;
 				ASSERT(connp != NULL);
@@ -15321,7 +15436,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 		 */
 		ASSERT(!mctl_present);
 		ASSERT(first_mp == mp);
-		if (!ip_rput_fragment(q, &mp, ipha)) {
+		if (!ip_rput_fragment(q, &mp, ipha, NULL, NULL)) {
 			return;
 		}
 		/*
@@ -15337,7 +15452,7 @@ ip_proto_input(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire,
 	 * Clear hardware checksumming flag as it is currently only
 	 * used by TCP and UDP.
 	 */
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	DB_CKSUMFLAGS(mp) = 0;
 
 	/* Now we have a complete datagram, destined for this machine. */
 	u1 = IPH_HDR_LENGTH(ipha);
@@ -15839,7 +15954,7 @@ ip_rput_local_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ire_t *ire)
 bad_src_route:
 	q = WR(q);
 	/* make sure we clear any indication of a hardware checksum */
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	DB_CKSUMFLAGS(mp) = 0;
 	icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED);
 	return (B_FALSE);
 
@@ -16022,14 +16137,14 @@ ip_rput_options(queue_t *q, mblk_t *mp, ipha_t *ipha, ipaddr_t *dstp)
 param_prob:
 	q = WR(q);
 	/* make sure we clear any indication of a hardware checksum */
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	DB_CKSUMFLAGS(mp) = 0;
 	icmp_param_problem(q, mp, (uint8_t)code);
 	return (-1);
 
 bad_src_route:
 	q = WR(q);
 	/* make sure we clear any indication of a hardware checksum */
-	mp->b_datap->db_struioun.cksum.flags = 0;
+	DB_CKSUMFLAGS(mp) = 0;
 	icmp_unreachable(q, mp, ICMP_SOURCE_ROUTE_FAILED);
 	return (-1);
 }
@@ -17571,7 +17686,7 @@ ip_trash_ire_reclaim(void *args)
  * upper level protocol.  We remove this conn from any fanout hash list it is
  * on, and zero out the bind information.  No reply is expected up above.
  */
-static void
+mblk_t *
 ip_unbind(queue_t *q, mblk_t *mp)
 {
 	conn_t	*connp = Q_TO_CONN(q);
@@ -17591,7 +17706,7 @@ ip_unbind(queue_t *q, mblk_t *mp)
 	 * original message.
 	 */
 	if (mp == NULL)
-		return;
+		return (NULL);
 
 	/*
 	 * Don't bzero the ports if its TCP since TCP still needs the
@@ -17601,7 +17716,7 @@ ip_unbind(queue_t *q, mblk_t *mp)
 	if (!IPCL_IS_TCP(connp))
 		bzero(&connp->u_port, sizeof (connp->u_port));
 
-	qreply(q, mp);
+	return (mp);
 }
 
 /*
@@ -17657,7 +17772,9 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 	/* is queue flow controlled? */
 	if ((q->q_first != NULL || connp->conn_draining) &&
 	    (caller == IP_WPUT)) {
-		goto doputq;
+		ASSERT(!need_decref);
+		(void) putq(q, mp);
+		return;
 	}
 
 	/* Multidata transmit? */
@@ -17990,11 +18107,6 @@ standard_path:
 	}
 	if (need_decref)
 		CONN_DEC_REF(connp);
-	return;
-
-doputq:
-	ASSERT(!need_decref);
-	(void) putq(q, mp);
 	return;
 
 qnext:
@@ -18933,7 +19045,7 @@ ip_wput(queue_t *q, mblk_t *mp)
  * the ipif refcnt has gone to zero and holding the ill_g_lock and ill_lock
  * the above holds.
  */
-static ipif_t *
+ipif_t *
 conn_get_held_ipif(conn_t *connp, ipif_t **ipifp, int *err)
 {
 	ipif_t	*ipif;
@@ -19414,7 +19526,6 @@ ip_wput_ire(queue_t *q, mblk_t *mp, ire_t *ire, conn_t *connp, int caller)
 	boolean_t	multirt_send = B_FALSE;
 	int		err;
 	zoneid_t	zoneid;
-	boolean_t	iphdrhwcksum = B_FALSE;
 
 	TRACE_1(TR_FAC_IP, TR_IP_WPUT_IRE_START,
 	    "ip_wput_ire_start: q %p", q);
@@ -19749,102 +19860,6 @@ another:;
 	/* pseudo checksum (do it in parts for IP header checksum) */
 	cksum = (dst >> 16) + (dst & 0xFFFF) + (src >> 16) + (src & 0xFFFF);
 
-#define	FRAGMENT_NEEDED(mtu, size)	\
-	(((mtu) < (unsigned int)(size)) ? B_TRUE : B_FALSE)
-
-#define	IS_FASTPATH(ire, bp) 					\
-	((ire)->ire_fp_mp != NULL &&				\
-	(MBLKHEAD((bp)) >= (MBLKL((ire)->ire_fp_mp))))		\
-
-#define	IPH_UDPH_CHECKSUMP(ipha, hlen) \
-	((uint16_t *)(((uchar_t *)ipha)+(hlen + UDP_CHECKSUM_OFFSET)))
-#define	IPH_TCPH_CHECKSUMP(ipha, hlen) \
-	    ((uint16_t *)(((uchar_t *)ipha)+(hlen+TCP_CHECKSUM_OFFSET)))
-
-#define	IP_CKSUM_XMIT(ill, ire, mp, up, proto, hlen, max_frag,		\
-	    ipsec_len) { 						\
-	uint32_t	sum;						\
-	uint32_t	xmit_capab = HCKSUM_INET_FULL_V4 |		\
-			    HCKSUM_INET_PARTIAL | HCKSUM_IPHDRCKSUM;	\
-	boolean_t	cksum_offload = B_FALSE;			\
-									\
-	/*								\
-	 * The ire fp mp can change due to the arrival of a		\
-	 * DL_NOTE_FASTPATH_FLUSH in the case of IRE_BROADCAST		\
-	 * and IRE_MIPRTUN. Hence the ire_fp_mp has to be accessed	\
-	 * only under the ire_lock in such cases.			\
-	 */								\
-	LOCK_IRE_FP_MP(ire);						\
-	if ((ill) && (ill->ill_capabilities & ILL_CAPAB_HCKSUM) &&	\
-	    (ill->ill_hcksum_capab->ill_hcksum_txflags &		\
-	    xmit_capab) && (!FRAGMENT_NEEDED(max_frag, 			\
-	    (LENGTH + ipsec_len))) && (!(ire->ire_flags & 		\
-	    RTF_MULTIRT)) && (ipsec_len == 0) && 			\
-	    IS_FASTPATH((ire), (mp)) &&	(dohwcksum)) { 			\
-		/*							\
-		 * Underlying interface supports hardware checksumming.	\
-		 * So postpone the checksum to the interface driver	\
-		 */							\
-									\
-		if ((hlen) == IP_SIMPLE_HDR_LENGTH) {			       \
-			if (ill->ill_hcksum_capab->ill_hcksum_txflags &        \
-			    HCKSUM_IPHDRCKSUM) {			       \
-				mp->b_datap->db_struioun.cksum.flags |=	       \
-				    HCK_IPV4_HDRCKSUM;			       \
-				/* seed the cksum field to 0 */		       \
-				ipha->ipha_hdr_checksum = 0;		       \
-				iphdrhwcksum = B_TRUE;			       \
-			}						       \
-			/*						       \
-			 * If underlying h/w supports full h/w checksumming    \
-			 * and no IP options are present, then offload	       \
-			 * full checksumming to the hardware.		       \
-			 *						       \
-			 * If h/w can do partial checksumming then offload     \
-			 * unless the startpoint offset, including mac-header, \
-			 * is too big for the interface to some of our	       \
-			 * hardware (CE and ERI) which have 6 bit fields.      \
-			 * Sigh.					       \
-			 * Unhappily we don't have the mac-header size here    \
-			 * so punt for any options.			       \
-			 */						       \
-			if (ill->ill_hcksum_capab->ill_hcksum_txflags &        \
-			    HCKSUM_INET_FULL_V4) {			       \
-				UNLOCK_IRE_FP_MP(ire);			       \
-				/* Seed the checksum field to 0 */	       \
-				*up = 0;				       \
-				mp->b_datap->db_struioun.cksum.flags |=	       \
-				    HCK_FULLCKSUM;			       \
-				cksum_offload = B_TRUE;			       \
-			} else if (ill->ill_hcksum_capab->ill_hcksum_txflags & \
-			    HCKSUM_INET_PARTIAL) {			       \
-				UNLOCK_IRE_FP_MP(ire);			       \
-				sum = *up + cksum + proto;		       \
-				sum = (sum & 0xFFFF) + (sum >> 16);	       \
-				*up = (sum & 0xFFFF) + (sum >> 16);	       \
-				/*					       \
-				 * All offsets are relative to the beginning   \
-				 * of the IP header.			       \
-				 */					       \
-				mp->b_datap->db_cksumstart = hlen;	       \
-				mp->b_datap->db_cksumstuff = 		       \
-				    (PROTO == IPPROTO_UDP) ?		       \
-				    (hlen) + UDP_CHECKSUM_OFFSET :	       \
-				    (hlen) + TCP_CHECKSUM_OFFSET;	       \
-				mp->b_datap->db_cksumend = ipha->ipha_length;  \
-				mp->b_datap->db_struioun.cksum.flags |=	       \
-				    HCK_PARTIALCKSUM;			       \
-				cksum_offload = B_TRUE;			       \
-			}						       \
-		}							\
-	} 								\
-	if (!cksum_offload) {						\
-		UNLOCK_IRE_FP_MP(ire);					\
-		IP_STAT(ip_out_sw_cksum);				\
-		(sum) = IP_CSUM((mp), (hlen), cksum + proto);		\
-		*(up) = (uint16_t)((sum) ? (sum) : ~(sum));		\
-	}								\
-}
 	if (!IP_FLOW_CONTROLLED_ULP(PROTO)) {
 		queue_t *dev_q = stq->q_next;
 
@@ -19856,10 +19871,16 @@ another:;
 		    (ip_hdr_included != IP_HDR_INCLUDED)) {
 			hlen = (V_HLEN & 0xF) << 2;
 			up = IPH_UDPH_CHECKSUMP(ipha, hlen);
-			if (*up) {
-				IP_CKSUM_XMIT(ill, ire, mp, up,
-				    IP_UDP_CSUM_COMP, hlen, max_frag,
-				    ipsec_len);
+			if (*up != 0) {
+				IP_CKSUM_XMIT(ill, ire, mp, ipha, up, PROTO,
+				    hlen, LENGTH, max_frag, ipsec_len, cksum);
+				/* Software checksum? */
+				if (DB_CKSUMFLAGS(mp) == 0) {
+					IP_STAT(ip_out_sw_cksum);
+					IP_STAT_UPDATE(
+					    ip_udp_out_sw_cksum_bytes,
+					    LENGTH - hlen);
+				}
 			}
 		}
 	} else if (ip_hdr_included != IP_HDR_INCLUDED) {
@@ -19873,8 +19894,14 @@ another:;
 			 * replicated via several interfaces, and not all of
 			 * them may have this capability.
 			 */
-			IP_CKSUM_XMIT(ill, ire, mp, up,
-			    IP_TCP_CSUM_COMP, hlen, max_frag, ipsec_len);
+			IP_CKSUM_XMIT(ill, ire, mp, ipha, up, PROTO, hlen,
+			    LENGTH, max_frag, ipsec_len, cksum);
+			/* Software checksum? */
+			if (DB_CKSUMFLAGS(mp) == 0) {
+				IP_STAT(ip_out_sw_cksum);
+				IP_STAT_UPDATE(ip_tcp_out_sw_cksum_bytes,
+				    LENGTH - hlen);
+			}
 		} else {
 			sctp_hdr_t	*sctph;
 
@@ -19904,7 +19931,7 @@ another:;
 	cksum += ttl_protocol;
 
 	/* fragment the packet */
-	if (FRAGMENT_NEEDED(max_frag, (LENGTH + ipsec_len)))
+	if (max_frag < (uint_t)(LENGTH + ipsec_len))
 		goto fragmentit;
 	/*
 	 * Don't use frag_flag if packet is pre-built or source
@@ -19918,8 +19945,8 @@ another:;
 		ipha->ipha_fragment_offset_and_flags |=
 		    htons(ire->ire_frag_flag);
 
-	if (!iphdrhwcksum) {
-		/* checksum */
+	if (!(DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM)) {
+		/* calculate IP header checksum */
 		cksum += ipha->ipha_ident;
 		cksum += (v_hlen_tos_len >> 16)+(v_hlen_tos_len & 0xFFFF);
 		cksum += ipha->ipha_fragment_offset_and_flags;
@@ -20258,7 +20285,11 @@ broadcast:
 			hlen = (V_HLEN & 0xF) << 2;
 			up = IPH_TCPH_CHECKSUMP(ipha, hlen);
 			IP_STAT(ip_out_sw_cksum);
+			IP_STAT_UPDATE(ip_tcp_out_sw_cksum_bytes,
+			    LENGTH - hlen);
 			*up = IP_CSUM(mp, hlen, cksum + IP_TCP_CSUM_COMP);
+			if (*up == 0)
+				*up = 0xFFFF;
 		} else if (PROTO == IPPROTO_SCTP &&
 		    (ip_hdr_included != IP_HDR_INCLUDED)) {
 			sctp_hdr_t	*sctph;
@@ -20338,17 +20369,18 @@ broadcast:
 				 */
 				hlen = (V_HLEN & 0xF) << 2;
 				up = IPH_UDPH_CHECKSUMP(ipha, hlen);
-				if (*up) {
-					uint_t	sum;
-
-					/*
-					 * NOTE: watch out for compiler high
-					 * bits
-					 */
-					IP_STAT(ip_out_sw_cksum);
-					sum = IP_CSUM(mp, hlen,
-					    cksum + IP_UDP_CSUM_COMP);
-					*up = (uint16_t)(sum ? sum : ~sum);
+				max_frag = ire->ire_max_frag;
+				if (*up != 0) {
+					IP_CKSUM_XMIT(ire_ill, ire, mp, ipha,
+					    up, PROTO, hlen, LENGTH, max_frag,
+					    ipsec_len, cksum);
+					/* Software checksum? */
+					if (DB_CKSUMFLAGS(mp) == 0) {
+						IP_STAT(ip_out_sw_cksum);
+						IP_STAT_UPDATE(
+						    ip_udp_out_sw_cksum_bytes,
+						    LENGTH - hlen);
+					}
 				}
 			}
 		}
@@ -20369,9 +20401,7 @@ broadcast:
 			    conn_multicast_loop));
 
 			/*  Forget header checksum offload */
-			mp->b_datap->db_struioun.cksum.flags &=
-			    ~HCK_IPV4_HDRCKSUM;
-			iphdrhwcksum = B_FALSE;
+			DB_CKSUMFLAGS(mp) &= ~HCK_IPV4_HDRCKSUM;
 
 			/*
 			 * Local loopback of multicasts?  Check the
@@ -20459,10 +20489,8 @@ broadcast:
 		}
 		max_frag = ire->ire_max_frag;
 		cksum += ttl_protocol;
-		if (!FRAGMENT_NEEDED(max_frag, (LENGTH + ipsec_len))) {
+		if (max_frag >= (uint_t)(LENGTH + ipsec_len)) {
 			/* No fragmentation required for this one. */
-			/* Complete the IP header checksum. */
-			cksum += ipha->ipha_ident;
 			/*
 			 * Don't use frag_flag if packet is pre-built or source
 			 * routed or if multicast (since multicast packets do
@@ -20475,26 +20503,32 @@ broadcast:
 				ipha->ipha_fragment_offset_and_flags |=
 				    htons(ire->ire_frag_flag);
 
-			cksum += (v_hlen_tos_len >> 16)+
-			    (v_hlen_tos_len & 0xFFFF);
-			cksum += ipha->ipha_fragment_offset_and_flags;
-			hlen = (V_HLEN & 0xF) - IP_SIMPLE_HDR_LENGTH_IN_WORDS;
-			if (hlen) {
-			    checksumoptions:
-				/*
-				 * Account for the IP Options in the IP
-				 * header checksum.
-				 */
-				up = (uint16_t *)(rptr+IP_SIMPLE_HDR_LENGTH);
-				do {
-					cksum += up[0];
-					cksum += up[1];
-					up += 2;
-				} while (--hlen);
+			if (!(DB_CKSUMFLAGS(mp) & HCK_IPV4_HDRCKSUM)) {
+				/* Complete the IP header checksum. */
+				cksum += ipha->ipha_ident;
+				cksum += (v_hlen_tos_len >> 16)+
+				    (v_hlen_tos_len & 0xFFFF);
+				cksum += ipha->ipha_fragment_offset_and_flags;
+				hlen = (V_HLEN & 0xF) -
+				    IP_SIMPLE_HDR_LENGTH_IN_WORDS;
+				if (hlen) {
+				    checksumoptions:
+					/*
+					 * Account for the IP Options in the IP
+					 * header checksum.
+					 */
+					up = (uint16_t *)(rptr+
+					    IP_SIMPLE_HDR_LENGTH);
+					do {
+						cksum += up[0];
+						cksum += up[1];
+						up += 2;
+					} while (--hlen);
+				}
+				cksum = ((cksum & 0xFFFF) + (cksum >> 16));
+				cksum = ~(cksum + (cksum >> 16));
+				ipha->ipha_hdr_checksum = (uint16_t)cksum;
 			}
-			cksum = ((cksum & 0xFFFF) + (cksum >> 16));
-			cksum = ~(cksum + (cksum >> 16));
-			ipha->ipha_hdr_checksum = (uint16_t)cksum;
 			if (ipsec_len != 0) {
 				ipsec_out_process(q, first_mp, ire, ill_index);
 				if (!next_mp) {
@@ -20991,6 +21025,298 @@ ip_md_zcopy_attr(multidata_t *mmd, pdesc_t *pd, uint_t flags)
 }
 
 /*
+ * Check if ip_wput_frag_mdt() and ip_wput_frag_mdt_v6() can handle a message
+ * block chain. We could rewrite to handle arbitrary message block chains but
+ * that would make the code complicated and slow. Right now there three
+ * restrictions:
+ *
+ *   1. The first message block must contain the complete IP header and
+ *	at least 1 byte of payload data.
+ *   2. At most MULTIDATA_MAX_PBUFS non-empty message blocks are allowed
+ *	so that we can use a single Multidata message.
+ *   3. No frag must be distributed over two or more message blocks so
+ *	that we don't need more than two packet descriptors per frag.
+ *
+ * The above restrictions allow us to support userland applications (which
+ * will send down a single message block) and NFS over UDP (which will
+ * send down a chain of at most three message blocks).
+ *
+ * We also don't use MDT for payloads with less than or equal to
+ * ip_wput_frag_mdt_min bytes because it would cause too much overhead.
+ */
+boolean_t
+ip_can_frag_mdt(mblk_t *mp, ssize_t hdr_len, ssize_t len)
+{
+	int	blocks;
+	ssize_t	total, missing, size;
+
+	ASSERT(mp != NULL);
+	ASSERT(hdr_len > 0);
+
+	size = MBLKL(mp) - hdr_len;
+	if (size <= 0)
+		return (B_FALSE);
+
+	/* The first mblk contains the header and some payload. */
+	blocks = 1;
+	total = size;
+	size %= len;
+	missing = (size == 0) ? 0 : (len - size);
+	mp = mp->b_cont;
+
+	while (mp != NULL) {
+		/*
+		 * Give up if we encounter a zero length message block.
+		 * In practice, this should rarely happen and therefore
+		 * not worth the trouble of freeing and re-linking the
+		 * mblk from the chain to handle such case.
+		 */
+		if ((size = MBLKL(mp)) == 0)
+			return (B_FALSE);
+
+		/* Too many payload buffers for a single Multidata message? */
+		if (++blocks > MULTIDATA_MAX_PBUFS)
+			return (B_FALSE);
+
+		total += size;
+		/* Is a frag distributed over two or more message blocks? */
+		if (missing > size)
+			return (B_FALSE);
+		size -= missing;
+
+		size %= len;
+		missing = (size == 0) ? 0 : (len - size);
+
+		mp = mp->b_cont;
+	}
+
+	return (total > ip_wput_frag_mdt_min);
+}
+
+/*
+ * Outbound IPv4 fragmentation routine using MDT.
+ */
+static void
+ip_wput_frag_mdt(ire_t *ire, mblk_t *mp, ip_pkt_t pkt_type, int len,
+    uint32_t frag_flag, int offset)
+{
+	ipha_t		*ipha_orig;
+	int		i1, ip_data_end;
+	uint_t		pkts, wroff, hdr_chunk_len, pbuf_idx;
+	mblk_t		*hdr_mp, *md_mp = NULL;
+	unsigned char	*hdr_ptr, *pld_ptr;
+	multidata_t	*mmd;
+	ip_pdescinfo_t	pdi;
+
+	ASSERT(DB_TYPE(mp) == M_DATA);
+	ASSERT(MBLKL(mp) > sizeof (ipha_t));
+
+	ipha_orig = (ipha_t *)mp->b_rptr;
+	mp->b_rptr += sizeof (ipha_t);
+
+	/* Calculate how many packets we will send out */
+	i1 = (mp->b_cont == NULL) ? MBLKL(mp) : msgsize(mp);
+	pkts = (i1 + len - 1) / len;
+	ASSERT(pkts > 1);
+
+	/* Allocate a message block which will hold all the IP Headers. */
+	wroff = ip_wroff_extra;
+	hdr_chunk_len = wroff + IP_SIMPLE_HDR_LENGTH;
+
+	i1 = pkts * hdr_chunk_len;
+	/*
+	 * Create the header buffer, Multidata and destination address
+	 * and SAP attribute that should be associated with it.
+	 */
+	if ((hdr_mp = allocb(i1, BPRI_HI)) == NULL ||
+	    ((hdr_mp->b_wptr += i1),
+	    (mmd = mmd_alloc(hdr_mp, &md_mp, KM_NOSLEEP)) == NULL) ||
+	    !ip_md_addr_attr(mmd, NULL, ire->ire_dlureq_mp)) {
+		freemsg(mp);
+		if (md_mp == NULL) {
+			freemsg(hdr_mp);
+		} else {
+free_mmd:		IP_STAT(ip_frag_mdt_discarded);
+			freemsg(md_mp);
+		}
+		IP_STAT(ip_frag_mdt_allocfail);
+		UPDATE_MIB(&ip_mib, ipOutDiscards, pkts);
+		return;
+	}
+	IP_STAT(ip_frag_mdt_allocd);
+
+	/*
+	 * Add a payload buffer to the Multidata; this operation must not
+	 * fail, or otherwise our logic in this routine is broken.  There
+	 * is no memory allocation done by the routine, so any returned
+	 * failure simply tells us that we've done something wrong.
+	 *
+	 * A failure tells us that either we're adding the same payload
+	 * buffer more than once, or we're trying to add more buffers than
+	 * allowed.  None of the above cases should happen, and we panic
+	 * because either there's horrible heap corruption, and/or
+	 * programming mistake.
+	 */
+	if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
+		goto pbuf_panic;
+
+	hdr_ptr = hdr_mp->b_rptr;
+	pld_ptr = mp->b_rptr;
+
+	/* Establish the ending byte offset, based on the starting offset. */
+	offset <<= 3;
+	ip_data_end = offset + ntohs(ipha_orig->ipha_length) -
+	    IP_SIMPLE_HDR_LENGTH;
+
+	pdi.flags = PDESC_HBUF_REF | PDESC_PBUF_REF;
+
+	while (pld_ptr < mp->b_wptr) {
+		ipha_t		*ipha;
+		uint16_t	offset_and_flags;
+		uint16_t	ip_len;
+		int		error;
+
+		ASSERT((hdr_ptr + hdr_chunk_len) <= hdr_mp->b_wptr);
+		ipha = (ipha_t *)(hdr_ptr + wroff);
+		ASSERT(OK_32PTR(ipha));
+		*ipha = *ipha_orig;
+
+		if (ip_data_end - offset > len) {
+			offset_and_flags = IPH_MF;
+		} else {
+			/*
+			 * Last frag. Set len to the length of this last piece.
+			 */
+			len = ip_data_end - offset;
+			/* A frag of a frag might have IPH_MF non-zero */
+			offset_and_flags =
+			    ntohs(ipha->ipha_fragment_offset_and_flags) &
+			    IPH_MF;
+		}
+		offset_and_flags |= (uint16_t)(offset >> 3);
+		offset_and_flags |= (uint16_t)frag_flag;
+		/* Store the offset and flags in the IP header. */
+		ipha->ipha_fragment_offset_and_flags = htons(offset_and_flags);
+
+		/* Store the length in the IP header. */
+		ip_len = (uint16_t)(len + IP_SIMPLE_HDR_LENGTH);
+		ipha->ipha_length = htons(ip_len);
+
+		/*
+		 * Set the IP header checksum.  Note that mp is just
+		 * the header, so this is easy to pass to ip_csum.
+		 */
+		ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
+
+		/*
+		 * Record offset and size of header and data of the next packet
+		 * in the multidata message.
+		 */
+		PDESC_HDR_ADD(&pdi, hdr_ptr, wroff, IP_SIMPLE_HDR_LENGTH, 0);
+		PDESC_PLD_INIT(&pdi);
+		i1 = MIN(mp->b_wptr - pld_ptr, len);
+		ASSERT(i1 > 0);
+		PDESC_PLD_SPAN_ADD(&pdi, pbuf_idx, pld_ptr, i1);
+		if (i1 == len) {
+			pld_ptr += len;
+		} else {
+			i1 = len - i1;
+			mp = mp->b_cont;
+			ASSERT(mp != NULL);
+			ASSERT(MBLKL(mp) >= i1);
+			/*
+			 * Attach the next payload message block to the
+			 * multidata message.
+			 */
+			if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
+				goto pbuf_panic;
+			PDESC_PLD_SPAN_ADD(&pdi, pbuf_idx, mp->b_rptr, i1);
+			pld_ptr = mp->b_rptr + i1;
+		}
+
+		if ((mmd_addpdesc(mmd, (pdescinfo_t *)&pdi, &error,
+		    KM_NOSLEEP)) == NULL) {
+			/*
+			 * Any failure other than ENOMEM indicates that we
+			 * have passed in invalid pdesc info or parameters
+			 * to mmd_addpdesc, which must not happen.
+			 *
+			 * EINVAL is a result of failure on boundary checks
+			 * against the pdesc info contents.  It should not
+			 * happen, and we panic because either there's
+			 * horrible heap corruption, and/or programming
+			 * mistake.
+			 */
+			if (error != ENOMEM) {
+				cmn_err(CE_PANIC, "ip_wput_frag_mdt: "
+				    "pdesc logic error detected for "
+				    "mmd %p pinfo %p (%d)\n",
+				    (void *)mmd, (void *)&pdi, error);
+				/* NOTREACHED */
+			}
+			IP_STAT(ip_frag_mdt_addpdescfail);
+			/* Free unattached payload message blocks as well */
+			md_mp->b_cont = mp->b_cont;
+			goto free_mmd;
+		}
+
+		/* Advance fragment offset. */
+		offset += len;
+
+		/* Advance to location for next header in the buffer. */
+		hdr_ptr += hdr_chunk_len;
+
+		/* Did we reach the next payload message block? */
+		if (pld_ptr == mp->b_wptr && mp->b_cont != NULL) {
+			mp = mp->b_cont;
+			/*
+			 * Attach the next message block with payload
+			 * data to the multidata message.
+			 */
+			if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
+				goto pbuf_panic;
+			pld_ptr = mp->b_rptr;
+		}
+	}
+
+	ASSERT(hdr_mp->b_wptr == hdr_ptr);
+	ASSERT(mp->b_wptr == pld_ptr);
+
+	/* Update IP statistics */
+	UPDATE_MIB(&ip_mib, ipFragCreates, pkts);
+	BUMP_MIB(&ip_mib, ipFragOKs);
+	IP_STAT_UPDATE(ip_frag_mdt_pkt_out, pkts);
+
+	if (pkt_type == OB_PKT) {
+		ire->ire_ob_pkt_count += pkts;
+		if (ire->ire_ipif != NULL)
+			atomic_add_32(&ire->ire_ipif->ipif_ob_pkt_count, pkts);
+	} else {
+		/*
+		 * The type is IB_PKT in the forwarding path and in
+		 * the mobile IP case when the packet is being reverse-
+		 * tunneled to the home agent.
+		 */
+		ire->ire_ib_pkt_count += pkts;
+		ASSERT(!IRE_IS_LOCAL(ire));
+		if (ire->ire_type & IRE_BROADCAST)
+			atomic_add_32(&ire->ire_ipif->ipif_ib_pkt_count, pkts);
+		else
+			atomic_add_32(&ire->ire_ipif->ipif_fo_pkt_count, pkts);
+	}
+	ire->ire_last_used_time = lbolt;
+	/* Send it down */
+	putnext(ire->ire_stq, md_mp);
+	return;
+
+pbuf_panic:
+	cmn_err(CE_PANIC, "ip_wput_frag_mdt: payload buffer logic "
+	    "error for mmd %p pbuf %p (%d)", (void *)mmd, (void *)mp,
+	    pbuf_idx);
+	/* NOTREACHED */
+}
+
+/*
  * Outbound IP fragmentation routine.
  *
  * NOTE : This routine does not ire_refrele the ire that is passed in
@@ -21000,29 +21326,30 @@ static void
 ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
     uint32_t frag_flag)
 {
-	int	i1;
-	mblk_t	*ll_hdr_mp;
-	int 	ll_hdr_len;
-	int	hdr_len;
-	mblk_t	*hdr_mp;
-	ipha_t	*ipha;
-	int	ip_data_end;
-	int	len;
-	mblk_t	*mp = mp_orig;
-	int	offset;
-	queue_t	*q;
+	int		i1;
+	mblk_t		*ll_hdr_mp;
+	int 		ll_hdr_len;
+	int		hdr_len;
+	mblk_t		*hdr_mp;
+	ipha_t		*ipha;
+	int		ip_data_end;
+	int		len;
+	mblk_t		*mp = mp_orig;
+	int		offset;
+	queue_t		*q;
 	uint32_t	v_hlen_tos_len;
-	mblk_t	*first_mp;
-	boolean_t mctl_present;
-	mblk_t	*xmit_mp;
-	mblk_t	*carve_mp;
-	ire_t   *ire1 = NULL;
-	ire_t   *save_ire = NULL;
-	mblk_t  *next_mp = NULL;
-	boolean_t last_frag = B_FALSE;
-	boolean_t multirt_send = B_FALSE;
-	ire_t *first_ire = NULL;
-	irb_t *irb = NULL;
+	mblk_t		*first_mp;
+	boolean_t	mctl_present;
+	ill_t		*ill;
+	mblk_t		*xmit_mp;
+	mblk_t		*carve_mp;
+	ire_t		*ire1 = NULL;
+	ire_t		*save_ire = NULL;
+	mblk_t  	*next_mp = NULL;
+	boolean_t	last_frag = B_FALSE;
+	boolean_t	multirt_send = B_FALSE;
+	ire_t		*first_ire = NULL;
+	irb_t		*irb = NULL;
 
 	TRACE_0(TR_FAC_IP, TR_IP_WPUT_FRAG_START,
 	    "ip_wput_frag_start:");
@@ -21036,6 +21363,7 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 		mctl_present = B_FALSE;
 	}
 
+	ASSERT(MBLKL(mp) >= sizeof (ipha_t));
 	ipha = (ipha_t *)mp->b_rptr;
 
 	/*
@@ -21079,7 +21407,36 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	}
 
 	hdr_len = (V_HLEN & 0xF) << 2;
+
 	ipha->ipha_hdr_checksum = 0;
+
+	/*
+	 * Establish the number of bytes maximum per frag, after putting
+	 * in the header.
+	 */
+	len = (max_frag - hdr_len) & ~7;
+
+	/* Check if we can use MDT to send out the frags. */
+	ASSERT(!IRE_IS_LOCAL(ire));
+	if (hdr_len == IP_SIMPLE_HDR_LENGTH && ip_multidata_outbound &&
+	    !(ire->ire_flags & RTF_MULTIRT) && !IPP_ENABLED(IPP_LOCAL_OUT) &&
+	    (ill = ire_to_ill(ire)) != NULL && ILL_MDT_CAPABLE(ill) &&
+	    IP_CAN_FRAG_MDT(mp, IP_SIMPLE_HDR_LENGTH, len)) {
+		ASSERT(ill->ill_mdt_capab != NULL);
+		if (!ill->ill_mdt_capab->ill_mdt_on) {
+			/*
+			 * If MDT has been previously turned off in the past,
+			 * and we currently can do MDT (due to IPQoS policy
+			 * removal, etc.) then enable it for this interface.
+			 */
+			ill->ill_mdt_capab->ill_mdt_on = 1;
+			ip1dbg(("ip_wput_frag: enabled MDT for interface %s\n",
+			    ill->ill_name));
+		}
+		ip_wput_frag_mdt(ire, mp, pkt_type, len, frag_flag,
+		    offset);
+		return;
+	}
 
 	/* Get a copy of the header for the trailing frags */
 	hdr_mp = ip_wput_frag_copyhdr((uchar_t *)ipha, hdr_len, offset);
@@ -21099,12 +21456,6 @@ ip_wput_frag(ire_t *ire, mblk_t *mp_orig, ip_pkt_t pkt_type, uint32_t max_frag,
 	/* Establish the ending byte offset, based on the starting offset. */
 	offset <<= 3;
 	ip_data_end = offset + ntohs(ipha->ipha_length) - hdr_len;
-
-	/*
-	 * Establish the number of bytes maximum per frag, after putting
-	 * in the header.
-	 */
-	len = (max_frag - hdr_len) & ~7;
 
 	/* Store the length of the first fragment in the IP header. */
 	i1 = len + hdr_len;
@@ -22565,8 +22916,6 @@ ip_wput_ipsec_out(queue_t *q, mblk_t *ipsec_mp, ipha_t *ipha, ill_t *ill,
 	zoneid_t zoneid;
 	uint32_t cksum;
 	uint16_t *up;
-	/* Hack until the UDP merge into IP happens. */
-	extern boolean_t udp_compute_checksum(void);
 #ifdef	_BIG_ENDIAN
 #define	LENGTH	(v_hlen_tos_len & 0xFFFF)
 #else
@@ -22741,6 +23090,8 @@ send:
 
 		offset = IP_SIMPLE_HDR_LENGTH + UDP_CHECKSUM_OFFSET;
 		IP_STAT(ip_out_sw_cksum);
+		IP_STAT_UPDATE(ip_udp_out_sw_cksum_bytes,
+		    ntohs(htons(ipha->ipha_length) - IP_SIMPLE_HDR_LENGTH));
 #define	iphs	((uint16_t *)ipha)
 		cksum = IP_UDP_CSUM_COMP + iphs[6] + iphs[7] + iphs[8] +
 		    iphs[9] + ntohs(htons(ipha->ipha_length) -
@@ -23790,10 +24141,10 @@ ip_ioctl_finish(queue_t *q, mblk_t *mp, int err, int mode,
 void
 ip_resume_tcp_bind(void *arg, mblk_t *mp, void *arg2)
 {
-	conn_t *connp = (conn_t *)arg;
+	conn_t *connp = arg;
 	tcp_t	*tcp;
 
-	ASSERT(connp != NULL && connp->conn_tcp != NULL);
+	ASSERT(connp != NULL && IPCL_IS_TCP(connp) && connp->conn_tcp != NULL);
 	tcp = connp->conn_tcp;
 
 	if (connp->conn_tcp->tcp_state == TCPS_CLOSED)
@@ -23801,7 +24152,6 @@ ip_resume_tcp_bind(void *arg, mblk_t *mp, void *arg2)
 	else
 		tcp_rput_other(tcp, mp);
 	CONN_OPER_PENDING_DONE(connp);
-
 }
 
 /* Called from ip_wput for all non data messages */
@@ -24031,31 +24381,48 @@ nak:
 		case T_BIND_REQ: {
 			/* Request can get queued in bind */
 			ASSERT(connp != NULL);
+			/*
+			 * Both TCP and UDP call ip_bind_{v4,v6}() directly
+			 * instead of going through this path.  We only get
+			 * here in the following cases:
+			 *
+			 * a. Bind retries, where ipsq is non-NULL.
+			 * b. T_BIND_REQ is issued from non TCP/UDP
+			 *    transport, e.g. icmp for raw socket,
+			 *    in which case ipsq will be NULL.
+			 */
+			ASSERT(ipsq != NULL ||
+			    (!IPCL_IS_TCP(connp) && !IPCL_IS_UDP(connp)));
+
 			/* Don't increment refcnt if this is a re-entry */
 			if (ipsq == NULL)
 				CONN_INC_REF(connp);
-			mp = connp->conn_af_isv6 ?
-			    ip_bind_v6(q, mp, connp, NULL) :
-				ip_bind_v4(q, mp, connp);
-			if (mp != NULL) {
-				tcp_t	*tcp;
-
-				tcp = connp->conn_tcp;
-				if (tcp != NULL) {
-					if (ipsq == NULL) {
-						tcp_rput_other(tcp, mp);
-					} else {
-						CONN_INC_REF(connp);
-						squeue_fill(connp->conn_sqp, mp,
-						    ip_resume_tcp_bind,
-						    connp, SQTAG_TCP_RPUTOTHER);
-						return;
-					}
-				} else {
-					qreply(q, mp);
-				}
-				CONN_OPER_PENDING_DONE(connp);
+			mp = connp->conn_af_isv6 ? ip_bind_v6(q, mp,
+			    connp, NULL) : ip_bind_v4(q, mp, connp);
+			if (mp == NULL)
+				return;
+			if (IPCL_IS_TCP(connp)) {
+				/*
+				 * In the case of TCP endpoint we
+				 * come here only for bind retries
+				 */
+				ASSERT(ipsq != NULL);
+				CONN_INC_REF(connp);
+				squeue_fill(connp->conn_sqp, mp,
+				    ip_resume_tcp_bind, connp,
+				    SQTAG_BIND_RETRY);
+				return;
+			} else if (IPCL_IS_UDP(connp)) {
+				/*
+				 * In the case of UDP endpoint we
+				 * come here only for bind retries
+				 */
+				ASSERT(ipsq != NULL);
+				udp_resume_bind(connp, mp);
+				return;
 			}
+			qreply(q, mp);
+			CONN_OPER_PENDING_DONE(connp);
 			return;
 		}
 		case T_SVR4_OPTMGMT_REQ:
@@ -24111,7 +24478,8 @@ nak:
 			}
 			return;
 		case T_UNBIND_REQ:
-			ip_unbind(q, mp);
+			mp = ip_unbind(q, mp);
+			qreply(q, mp);
 			return;
 		default:
 			/*

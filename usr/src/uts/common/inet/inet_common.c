@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -102,4 +102,22 @@ inet_minor_free(void *a, dev_t dev)
 {
 	ASSERT((dev != OPENFAIL) && (dev != 0) && (dev <= inet_maxminor));
 	vmem_free(((inet_arena_t *)a)->ineta_arena, (void *)dev, 1);
+}
+
+/*
+ * This function is used to free a message that has gone through
+ * mi_copyin processing which modifies the M_IOCTL mblk's b_next
+ * and b_prev pointers. We use this function to set b_next/b_prev
+ * to NULL and free them.
+ */
+void
+inet_freemsg(mblk_t *mp)
+{
+	mblk_t	*bp = mp;
+
+	for (; bp != NULL; bp = bp->b_cont) {
+		bp->b_prev = NULL;
+		bp->b_next = NULL;
+	}
+	freemsg(mp);
 }

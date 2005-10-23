@@ -3883,9 +3883,6 @@ static const mdb_walker_t walkers[] = {
 		mi_walk_init, mi_walk_step, mi_walk_fini, NULL },
 	{ "sonode", "given a sonode, walk its children",
 		sonode_walk_init, sonode_walk_step, sonode_walk_fini, NULL },
-	{ "udp", "walk UDP connections using MI",
-		mi_payload_walk_init, mi_payload_walk_step,
-		mi_payload_walk_fini, &mi_udp_arg },
 
 	/* from nvpair.c */
 	{ NVPAIR_WALKER_NAME, NVPAIR_WALKER_DESCR,

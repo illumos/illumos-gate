@@ -194,7 +194,6 @@ static int	ar_entry_add(queue_t *q, mblk_t *mp);
 static int	ar_entry_delete(queue_t *q, mblk_t *mp);
 static int	ar_entry_query(queue_t *q, mblk_t *mp);
 static int	ar_entry_squery(queue_t *q, mblk_t *mp);
-static void	ar_freemsg(mblk_t *mp);
 static int	ar_interface_up(queue_t *q, mblk_t *mp);
 static int	ar_interface_down(queue_t *q, mblk_t *mp);
 static int	ar_interface_on(queue_t *q, mblk_t *mp);
@@ -1231,7 +1230,7 @@ ar_cmd_done(arl_t *arl)
 				ar_ip->ar_arl_ip_assoc = ar_arl;
 			}
 		}
-		ar_freemsg(mp);
+		inet_freemsg(mp);
 	}
 
 	/*
@@ -1745,19 +1744,6 @@ ar_entry_squery(queue_t *q, mblk_t *mp_orig)
 	return (0);
 }
 
-/* Make sure b_next and b_prev are null and then free the message */
-static void
-ar_freemsg(mblk_t *mp)
-{
-	mblk_t *mp1;
-
-	for (mp1 = mp; mp1; mp1 = mp1->b_cont) {
-		mp1->b_prev = mp1->b_next = NULL;
-		mp1->b_queue = NULL;
-	}
-	freemsg(mp);
-}
-
 /* Process an interface down causing us to detach and unbind. */
 /* ARGSUSED */
 static int
@@ -1936,7 +1922,7 @@ ar_ll_cleanup_arl_queue(queue_t *q)
 					BUMP_IRE_STATS(ire_stats_v4,
 					    ire_stats_freed);
 				}
-				ar_freemsg(mp);
+				inet_freemsg(mp);
 			} else {
 				prev = mp;
 			}
@@ -2587,7 +2573,7 @@ ar_query_delete(ace_t *ace, uchar_t *ar)
 			    *(uint32_t *)mp->b_rptr == AR_ENTRY_QUERY) {
 				BUMP_IRE_STATS(ire_stats_v4, ire_stats_freed);
 			}
-			ar_freemsg(mp);
+			inet_freemsg(mp);
 		} else {
 			mpp = &mp->b_next;
 		}
@@ -2657,7 +2643,7 @@ ar_query_reply(ace_t *ace, int ret_val, uchar_t *proto_addr,
 		} else {
 			if (ret_val != 0) {
 				/* TODO: find some way to let the guy know? */
-				ar_freemsg(mp);
+				inet_freemsg(mp);
 				BUMP_IRE_STATS(ire_stats_v4, ire_stats_freed);
 				continue;
 			}
@@ -2849,7 +2835,7 @@ ar_rput(queue_t *q, mblk_t *mp)
 			    "arp_rput_end: q %p (%S)", q, "proto");
 			return;
 		default:
-			ar_freemsg(mp);
+			inet_freemsg(mp);
 			return;
 		}
 		if ((mp->b_wptr - mp->b_rptr) < sizeof (dl_unitdata_ind_t) ||

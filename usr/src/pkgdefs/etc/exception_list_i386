@@ -347,6 +347,8 @@ usr/lib/llib-lipsecutil.ln	i386
 usr/include/inet/arp_impl.h	i386
 usr/include/inet/rawip_impl.h	i386
 usr/include/inet/udp_impl.h	i386
+usr/include/inet/tcp_impl.h	i386
+usr/include/inet/ip_impl.h	i386
 usr/include/inet/ip_ndp.h	i386
 usr/include/inet/ipdrop.h	i386
 usr/include/inet/tun.h		i386

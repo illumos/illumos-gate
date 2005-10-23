@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -203,6 +203,18 @@ typedef struct opt_restart_s {
 #define	SETFN_OPTCOM_NEGOTIATE		2 /* semantics for T_*_OPTCOM_REQ */
 #define	SETFN_UD_NEGOTIATE		3 /* semantics for T_UNITDATA_REQ */
 #define	SETFN_CONN_NEGOTIATE		4 /* semantics for T_CONN_*_REQ */
+
+/*
+ * Object to represent database of options to search passed to
+ * {sock,tpi}optcom_req() interface routine to take care of option
+ * management and associated methods.
+ */
+extern optdb_obj_t tcp_opt_obj;
+extern optdb_obj_t udp_opt_obj;
+extern optdb_obj_t ip_opt_obj;
+
+extern uint_t	tcp_max_optsize;
+extern uint_t	udp_max_optsize;
 
 /*
  * Function prototypes

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -240,9 +240,12 @@ typedef struct gld_mac_info {
 #define	GLD_CAP_LINKSTATE	0x00000001 /* will call gld_linkstate() */
 #define	GLD_CAP_CKSUM_IPHDR	0x00000008 /* IP checksum offload	*/
 #define	GLD_CAP_CKSUM_PARTIAL	0x00000010 /* TCP/UDP partial		*/
-#define	GLD_CAP_CKSUM_FULL_V4	0x00000020 /* TCP/UDP full		*/
-#define	GLD_CAP_CKSUM_ANY	0x00000038 /* any or all of the above	*/
+#define	GLD_CAP_CKSUM_FULL_V4	0x00000020 /* TCP/UDP full for IPv4	*/
 #define	GLD_CAP_ZEROCOPY	0x00000040 /* zerocopy */
+#define	GLD_CAP_CKSUM_FULL_V6	0x00000080 /* TCP/UDP full for IPv6	*/
+#define	GLD_CAP_CKSUM_ANY				\
+	(GLD_CAP_CKSUM_IPHDR|GLD_CAP_CKSUM_PARTIAL|	\
+	GLD_CAP_CKSUM_FULL_V4|GLD_CAP_CKSUM_FULL_V6)
 
 /* values of gldm_linkstate, as passed to gld_linkstate() */
 #define	GLD_LINKSTATE_DOWN	-1

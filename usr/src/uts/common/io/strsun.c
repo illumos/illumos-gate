@@ -37,7 +37,9 @@
 #include <sys/errno.h>
 #include <sys/stream.h>
 #include <sys/stropts.h>
+#include <sys/strsubr.h>
 #include <sys/strsun.h>
+#include <sys/sysmacros.h>
 #include <sys/cmn_err.h>
 
 void
@@ -242,4 +244,64 @@ miocpullup(mblk_t *iocmp, size_t size)
 	iocmp->b_cont = newdatamp;
 	freemsg(datamp);
 	return (0);
+}
+
+/* Copy userdata into a new mblk_t */
+mblk_t *
+mcopyinuio(struct stdata *stp, uio_t *uiop, ssize_t iosize,
+    ssize_t maxblk, int *errorp)
+{
+	mblk_t	*head = NULL, **tail = &head;
+	size_t	offset = stp->sd_wroff;
+
+	if (iosize == INFPSZ || iosize > uiop->uio_resid)
+		iosize = uiop->uio_resid;
+
+	if (maxblk == INFPSZ)
+		maxblk = iosize;
+
+	/* Nothing to do in these cases, so we're done */
+	if (iosize < 0 || maxblk < 0 || (maxblk == 0 && iosize > 0))
+		goto done;
+
+	if (stp->sd_flag & STRCOPYCACHED)
+		uiop->uio_extflg |= UIO_COPY_CACHED;
+
+	/*
+	 * We will enter the loop below if iosize is 0; it will allocate an
+	 * empty message block and call uiomove(9F) which will just return.
+	 * We could avoid that with an extra check but would only slow
+	 * down the much more likely case where iosize is larger than 0.
+	 */
+	do {
+		ssize_t blocksize;
+		mblk_t  *mp;
+
+		blocksize = MIN(iosize, maxblk);
+		ASSERT(blocksize >= 0);
+		if ((mp = allocb_cred(offset + blocksize, CRED())) == NULL) {
+			*errorp = ENOMEM;
+			return (head);
+		}
+		mp->b_rptr += offset;
+		mp->b_wptr = mp->b_rptr + blocksize;
+		DB_CPID(mp) = curproc->p_pid;
+
+		*tail = mp;
+		tail = &mp->b_cont;
+
+		/* uiomove(9F) either returns 0 or EFAULT */
+		if ((*errorp = uiomove(mp->b_rptr, (size_t)blocksize,
+		    UIO_WRITE, uiop)) != 0) {
+			ASSERT(*errorp != ENOMEM);
+			freemsg(head);
+			return (NULL);
+		}
+
+		iosize -= blocksize;
+	} while (iosize > 0);
+
+done:
+	*errorp = 0;
+	return (head);
 }

@@ -1096,6 +1096,8 @@ extern int strpoll(register struct stdata *, short, int, short *,
 extern void strclean(struct vnode *);
 extern void str_cn_clean();	/* XXX hook for consoles signal cleanup */
 extern int strwrite(struct vnode *, struct uio *, cred_t *);
+extern int strwrite_common(struct vnode *, struct uio *, cred_t *, int);
+extern int kstrwritemp(struct vnode *, mblk_t *, ushort_t);
 extern int strread(struct vnode *, struct uio *, cred_t *);
 extern int strioctl(struct vnode *, int, intptr_t, int, int, cred_t *, int *);
 extern int strrput(queue_t *, mblk_t *);
@@ -1180,6 +1182,7 @@ extern mblk_t *allocb_wait(size_t, uint_t, uint_t, int *);
 extern mblk_t *allocb_cred(size_t, cred_t *);
 extern mblk_t *allocb_cred_wait(size_t, uint_t, int *, cred_t *);
 extern mblk_t *allocb_tmpl(size_t, const mblk_t *);
+extern mblk_t *allocb_tryhard(size_t);
 extern void mblk_setcred(mblk_t *, cred_t *);
 extern void strpollwakeup(vnode_t *, short);
 extern int putnextctl_wait(queue_t *, int);
@@ -1188,7 +1191,6 @@ extern int kstrputmsg(struct vnode *, mblk_t *, struct uio *, ssize_t,
     unsigned char, int, int);
 extern int kstrgetmsg(struct vnode *, mblk_t **, struct uio *,
     unsigned char *, int *, clock_t, rval_t *);
-extern int kstrwritemp(struct vnode *, mblk_t *, ushort_t);
 
 extern void strsetrerror(vnode_t *, int, int, errfunc_t);
 extern void strsetwerror(vnode_t *, int, int, errfunc_t);
@@ -1216,6 +1218,8 @@ extern void fmodsw_rele(fmodsw_impl_t *);
 
 extern void freemsgchain(mblk_t *);
 extern mblk_t *copymsgchain(mblk_t *);
+
+extern mblk_t *mcopyinuio(struct stdata *, uio_t *, ssize_t, ssize_t, int *);
 
 /*
  * shared or externally configured data structures
@@ -1262,6 +1266,19 @@ extern struct queue *OTHERQ(queue_t *); /* stream.h */
 extern struct queue *RD(queue_t *);
 extern struct queue *WR(queue_t *);
 extern int SAMESTR(queue_t *);
+
+/*
+ * The following hardware checksum related macros are private
+ * interfaces that are subject to change without notice.
+ */
+#ifdef _KERNEL
+#define	DB_CKSUMSTART(mp)	((mp)->b_datap->db_cksumstart)
+#define	DB_CKSUMEND(mp)		((mp)->b_datap->db_cksumend)
+#define	DB_CKSUMSTUFF(mp)	((mp)->b_datap->db_cksumstuff)
+#define	DB_CKSUMFLAGS(mp)	((mp)->b_datap->db_struioun.cksum.flags)
+#define	DB_CKSUM16(mp)		((mp)->b_datap->db_cksum16)
+#define	DB_CKSUM32(mp)		((mp)->b_datap->db_cksum32)
+#endif	/* _KERNEL */
 
 #ifdef	__cplusplus
 }

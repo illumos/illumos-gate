@@ -2642,11 +2642,18 @@ strput(struct stdata *stp, mblk_t *mctl, struct uio *uiop, ssize_t *iosize,
 int
 strwrite(struct vnode *vp, struct uio *uiop, cred_t *crp)
 {
+	return (strwrite_common(vp, uiop, crp, 0));
+}
+
+/* ARGSUSED2 */
+int
+strwrite_common(struct vnode *vp, struct uio *uiop, cred_t *crp, int wflag)
+{
 	struct stdata *stp;
 	struct queue *wqp;
 	ssize_t rmin, rmax;
 	ssize_t iosize;
-	char waitflag;
+	int waitflag;
 	int tempmode;
 	int error = 0;
 	int b_flag;
@@ -2701,7 +2708,7 @@ strwrite(struct vnode *vp, struct uio *uiop, cred_t *crp)
 	/*
 	 * Do until count satisfied or error.
 	 */
-	waitflag = WRITEWAIT;
+	waitflag = WRITEWAIT | wflag;
 	if (stp->sd_flag & OLDNDELAY)
 		tempmode = uiop->uio_fmode & ~FNDELAY;
 	else
@@ -2799,79 +2806,6 @@ out:
 		error = EAGAIN;
 	TRACE_3(TR_FAC_STREAMS_FR, TR_STRWRITE_OUT,
 		"strwrite out:q %p out %d error %d", wqp, 2, error);
-	return (error);
-}
-
-/*
- * kstrwritemp() has very similar semantics as that of strwrite().
- * The main difference is it obtains mblks from the caller and also
- * does not do any copy as done in strwrite() from user buffers to
- * kernel buffers.
- *
- *
- * Currently, this routine is used by sendfile to send data allocated
- * within the kernel without any copying. This interface does not use the
- * synchronous stream interface as synch. stream interface implies
- * copying.
- */
-int
-kstrwritemp(struct vnode *vp, mblk_t *mp, ushort_t fmode)
-{
-	struct stdata *stp;
-	struct queue *wqp;
-	char waitflag;
-	int tempmode;
-	int error;
-	int done = 0;
-
-	ASSERT(vp->v_stream);
-	stp = vp->v_stream;
-
-	if (stp->sd_flag & (STWRERR|STRHUP|STPLEX)) {
-		mutex_enter(&stp->sd_lock);
-		error = strwriteable(stp, B_FALSE, B_TRUE);
-		mutex_exit(&stp->sd_lock);
-		if (error != 0)
-			return (error);
-	}
-
-	/*
-	 * First, check for flow control without grabbing the sd_lock.
-	 * If we would block, re-check with the lock. This is similar
-	 * to the logic used by strwrite().
-	 */
-	wqp = stp->sd_wrq;
-	if (canputnext(wqp)) {
-		putnext(wqp, mp);
-		return (0);
-	}
-
-	waitflag = WRITEWAIT;
-	if (stp->sd_flag & OLDNDELAY)
-		tempmode = fmode & ~FNDELAY;
-	else
-		tempmode = fmode;
-
-	mutex_enter(&stp->sd_lock);
-	do {
-		if (canputnext(wqp)) {
-			mutex_exit(&stp->sd_lock);
-			putnext(wqp, mp);
-			return (0);
-		}
-		error = strwaitq(stp, waitflag, (ssize_t)0, tempmode, -1,
-		    &done);
-	} while (error == 0 && !done);
-
-	mutex_exit(&stp->sd_lock);
-	/*
-	 * EAGAIN tells the application to try again. ENOMEM
-	 * is returned only if the memory allocation size
-	 * exceeds the physical limits of the system. ENOMEM
-	 * can't be true here.
-	 */
-	if (error == ENOMEM)
-		error = EAGAIN;
 	return (error);
 }
 

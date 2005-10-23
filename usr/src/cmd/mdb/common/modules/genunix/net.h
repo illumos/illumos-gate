@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 extern "C" {
 #endif
 
-extern struct mi_payload_walk_arg_s mi_udp_arg;
 extern struct mi_payload_walk_arg_s mi_ar_arg;
 extern struct mi_payload_walk_arg_s mi_icmp_arg;
 extern struct mi_payload_walk_arg_s mi_ill_arg;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,7 +144,6 @@ static	nce_t		nce_nil;
 	mblk_t		*mp;
 	mblk_t		*template;
 	nce_t		**ncep;
-	int		err = 0;
 	boolean_t	dropped = B_FALSE;
 
 	ASSERT(MUTEX_HELD(&ndp_g_lock));
@@ -280,8 +279,15 @@ static	nce_t		nce_nil;
 		mutex_exit(&nce->nce_lock);
 		mutex_enter(&ndp_g_lock);
 	}
-done:
-	return (err);
+	/*
+	 * If the hw_addr is NULL, typically for ND_INCOMPLETE nces, then
+	 * we call nce_fastpath as soon as the nce is resolved in ndp_process.
+	 * We call nce_fastpath from nce_update if the link layer address of
+	 * the peer changes from nce_update
+	 */
+	if (hw_addr != NULL || ill->ill_net_type == IRE_IF_NORESOLVER)
+		nce_fastpath(nce);
+	return (0);
 }
 
 int
@@ -1028,7 +1034,6 @@ ndp_noresolver(ill_t *ill, const in6_addr_t *dst)
 		 * Cache entry with a proper resolver cookie was
 		 * created.
 		 */
-		nce_fastpath(nce);
 		NCE_REFRELE(nce);
 		break;
 	case EEXIST:
@@ -1108,7 +1113,6 @@ nce_set_multicast(ill_t *ill, const in6_addr_t *dst)
 		ip1dbg(("nce_set_multicast: create failed" "%d\n", err));
 		return (err);
 	}
-	nce_fastpath(nce);
 	NCE_REFRELE(nce);
 	return (0);
 }
@@ -2168,8 +2172,7 @@ nce_set_ll(nce_t *nce, uchar_t *ll_addr)
 
 	ASSERT(ll_addr != NULL);
 	/* Always called before fast_path_probe */
-	if (nce->nce_fp_mp != NULL)
-		return;
+	ASSERT(nce->nce_fp_mp == NULL);
 	if (ill->ill_sap_length != 0) {
 		/*
 		 * Copy the SAP type specified in the
@@ -2265,8 +2268,8 @@ nce_update(nce_t *nce, uint16_t new_state, uchar_t *new_ll_addr)
 		if (nce->nce_fp_mp != NULL) {
 			freemsg(nce->nce_fp_mp);
 			nce->nce_fp_mp = NULL;
-			need_fastpath_update = B_TRUE;
 		}
+		need_fastpath_update = B_TRUE;
 	}
 	mutex_exit(&nce->nce_lock);
 	if (need_stop_timer) {

@@ -171,6 +171,8 @@ typedef struct	queue {
 #define	_QINSERTING	0x04000000	/* Private, module is being inserted */
 #define	_QREMOVING	0x08000000	/* Private, module is being removed */
 #define	_QASSOCIATED	0x10000000	/* queue is associated with a device */
+#define	_QDIRECT	0x20000000	/* Private; transport module uses */
+					/* direct interface to/from sockfs */
 
 /* queue sqflags (protected by SQLOCK). */
 #define	Q_SQQUEUED	0x01		/* Queue is in the syncq list */

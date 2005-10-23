@@ -137,21 +137,23 @@ so_sock2stream(struct sonode *so)
 
 	ASSERT(so->so_version != SOV_STREAM);
 
-	/* tell the transport below that sockmod is being popped */
-	if ((so->so_state & SS_TCP_FAST_ACCEPT) != 0) {
-		int	rval;
-		mblk_t	**mpp;
+	if (so->so_state & SS_DIRECT) {
+		mblk_t **mpp;
+		int rval;
 
+		/*
+		 * Tell the transport below that sockmod is being popped
+		 */
 		mutex_exit(&so->so_lock);
-		error = strioctl(vp, SIOCPOPSOCKFS, NULL, 0, K_TO_K, CRED(),
+		error = strioctl(vp, _SIOCSOCKFALLBACK, 0, 0, K_TO_K, CRED(),
 		    &rval);
 		mutex_enter(&so->so_lock);
 		if (error != 0) {
-			dprintso(so, 0,
-			    ("so_sock2stream(%p): SIOCPOPSOCKFS failed\n", so));
+			dprintso(so, 0, ("so_sock2stream(%p): "
+			    "_SIOCSOCKFALLBACK failed\n", so));
 			goto exit;
 		}
-		so->so_state &= ~SS_TCP_FAST_ACCEPT;
+		so->so_state &= ~SS_DIRECT;
 
 		for (mpp = &so->so_conn_ind_head; (mp = *mpp) != NULL;
 		    mpp = &mp->b_next) {
@@ -412,7 +414,7 @@ so_strinit(struct sonode *so, struct sonode *tso)
 
 		/* the following do_tcapability may update so->so_mode */
 		if ((tso->so_serv_type != T_CLTS) &&
-		    ((so->so_state & SS_TCP_FAST_ACCEPT) == 0)) {
+		    !(so->so_state & SS_DIRECT)) {
 			error = do_tcapability(so, TC1_ACCEPTOR_ID);
 			if (error)
 				return (error);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -38,7 +38,13 @@
 #define	INET_DEVDESC	"TCP STREAMS driver %I%"
 #define	INET_MODDESC	"TCP STREAMS module %I%"
 #define	INET_DEVMINOR	TCP_MINOR
-#define	INET_DEVMTFLAGS	D_MP
+/*
+ * Note that unlike UDP, TCP uses synchronous STREAMS only
+ * for TCP Fusion (loopback); this is why we don't define
+ * D_SYNCSTR here.  Since TCP as a module is used only for
+ * SNMP purposes, we define _D_DIRECT for device instance.
+ */
+#define	INET_DEVMTFLAGS	(D_MP|_D_DIRECT)
 #define	INET_MODMTFLAGS	D_MP
 
 #include "../inetddi.c"

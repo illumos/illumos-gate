@@ -52,6 +52,7 @@ extern "C" {
 #include <sys/vmem.h>
 #include <sys/squeue.h>
 #include <sys/systm.h>
+#include <sys/multidata.h>
 
 #ifdef DEBUG
 #define	ILL_DEBUG
@@ -67,7 +68,19 @@ extern "C" {
  * of flags.
  */
 #define	IP_DEVMTFLAGS D_MP
-#endif
+#endif	/* _KERNEL */
+
+#define	IP_MOD_NAME	"ip"
+#define	IP_DEV_NAME	"/dev/ip"
+#define	IP6_DEV_NAME	"/dev/ip6"
+
+#define	UDP_MOD_NAME	"udp"
+#define	UDP_DEV_NAME	"/dev/udp"
+#define	UDP6_DEV_NAME	"/dev/udp6"
+
+#define	TCP_MOD_NAME	"tcp"
+#define	TCP_DEV_NAME	"/dev/tcp"
+#define	TCP6_DEV_NAME	"/dev/tcp6"
 
 /* Minor numbers */
 #define	IPV4_MINOR	0
@@ -101,8 +114,6 @@ typedef uint32_t ipaddr_t;
 #define	ILL_FRAG_HASH_TBL_COUNT	((unsigned int)64)
 #define	ILL_FRAG_HASH_TBL_SIZE	(ILL_FRAG_HASH_TBL_COUNT * sizeof (ipfb_t))
 
-#define	IP_DEV_NAME			"/dev/ip"
-#define	IP_MOD_NAME			"ip"
 #define	IPV4_ADDR_LEN			4
 #define	IP_ADDR_LEN			IPV4_ADDR_LEN
 #define	IP_ARP_PROTO_TYPE		0x0800
@@ -236,6 +247,7 @@ typedef struct ipoptp_s
 
 #define	Q_TO_CONN(q)	((conn_t *)(q)->q_ptr)
 #define	Q_TO_TCP(q)	(Q_TO_CONN((q))->conn_tcp)
+#define	Q_TO_UDP(q)	(Q_TO_CONN((q))->conn_udp)
 
 /*
  * The following two macros are used by IP to get the appropriate
@@ -244,12 +256,9 @@ typedef struct ipoptp_s
  * from a conn directly if it knows that the conn is not TCP.
  */
 #define	CONNP_TO_WQ(connp)	\
-	(((connp)->conn_tcp == NULL) ? (connp)->conn_wq :	\
-	(connp)->conn_tcp->tcp_wq)
+	(IPCL_IS_TCP(connp) ? (connp)->conn_tcp->tcp_wq : (connp)->conn_wq)
 
 #define	CONNP_TO_RQ(connp)	RD(CONNP_TO_WQ(connp))
-
-#define	IS_TCP_CONN(connp)	(((connp)->conn_flags & IPCL_TCP) != 0)
 
 #define	GRAB_CONN_LOCK(q)	{				\
 	if (q != NULL && CONN_Q(q))				\
@@ -302,9 +311,8 @@ typedef struct ipoptp_s
  */
 #define	IP6_NO_IPPOLICY		0x800	/* Don't do IPQoS processing */
 #define	IP6_IN_LLMCAST		0x1000	/* Multicast */
-#define	IP6_IN_NOCKSUM		0x2000	/* Don't compute checksum */
 
-#define	IP_FF_LOOPBACK		0x4000	/* Loopback fanout */
+#define	IP_FF_LOOPBACK		0x2000	/* Loopback fanout */
 
 #ifndef	IRE_DB_TYPE
 #define	IRE_DB_TYPE	M_SIG
@@ -357,6 +365,8 @@ typedef struct ipf_s {
 	uint_t		ipf_prev_nexthdr_offset; /* Offset for nexthdr value */
 	uint8_t		ipf_ecn;	/* ECN info for the fragments */
 	uint8_t		ipf_num_dups;	/* Number of times dup frags recvd */
+	uint16_t	ipf_checksum_flags; /* Hardware checksum flags */
+	uint32_t	ipf_checksum;	/* Partial checksum of fragment data */
 } ipf_t;
 
 #define	ipf_src	V4_PART_OF_V6(ipf_v6src)
@@ -623,9 +633,10 @@ typedef struct ip_m_s {
  * depends on the atomic 32 bit access to that field.
  */
 #define	CONN_CLOSING		0x01	/* ip_close waiting for ip_wsrv */
-#define	CONN_IPSEC_LOAD_WAIT	0x10	/* waiting for load */
-#define	CONN_CONDEMNED		0x40	/* conn is closing, no more refs */
-#define	CONN_INCIPIENT		0x80	/* conn not yet visible, no refs */
+#define	CONN_IPSEC_LOAD_WAIT	0x02	/* waiting for load */
+#define	CONN_CONDEMNED		0x04	/* conn is closing, no more refs */
+#define	CONN_INCIPIENT		0x08	/* conn not yet visible, no refs */
+#define	CONN_QUIESCED		0x10	/* conn is now quiescent */
 
 /*
  * Parameter to ip_output giving the identity of the caller.
@@ -2593,6 +2604,7 @@ extern ipparam_t	*ip_param_arr;
 
 extern int ip_g_forward;
 extern int ipv6_forward;
+extern vmem_t *ip_minor_arena;
 
 #define	ip_respond_to_address_mask_broadcast ip_param_arr[0].ip_param_value
 #define	ip_g_send_redirects		ip_param_arr[5].ip_param_value
@@ -2697,18 +2709,11 @@ extern uint32_t ipsechw_debug;
 #define	ip1dbg(a)	if (ip_debug > 2) printf a
 #define	ip2dbg(a)	if (ip_debug > 3) printf a
 #define	ip3dbg(a)	if (ip_debug > 4) printf a
-
-#define	ipcsumdbg(a, b) \
-	if (ip_debug == 1) \
-		prom_printf(a); \
-	else if (ip_debug > 1) \
-		{ prom_printf("%smp=%p\n", a, (void *)b); }
 #else
 #define	ip0dbg(a)	/* */
 #define	ip1dbg(a)	/* */
 #define	ip2dbg(a)	/* */
 #define	ip3dbg(a)	/* */
-#define	ipcsumdbg(a, b)	/* */
 #endif	/* IP_DEBUG */
 
 extern const char *dlpi_prim_str(int);
@@ -2717,7 +2722,6 @@ extern void	ill_frag_timer(void *);
 extern ill_t	*ill_first(int, int, ill_walk_context_t *);
 extern ill_t	*ill_next(ill_walk_context_t *, ill_t *);
 extern void	ill_frag_timer_start(ill_t *);
-extern void	ip_ioctl_freemsg(mblk_t *);
 extern mblk_t	*ip_carve_mp(mblk_t **, ssize_t);
 extern mblk_t	*ip_dlpi_alloc(size_t, t_uscalar_t);
 extern char	*ip_dot_addr(ipaddr_t, char *);
@@ -2749,6 +2753,9 @@ extern void	ip_input(ill_t *, ill_rx_ring_t *, mblk_t *, size_t);
 extern void	ip_rput_dlpi(queue_t *, mblk_t *);
 extern void	ip_rput_forward(ire_t *, ipha_t *, mblk_t *, ill_t *);
 extern void	ip_rput_forward_multicast(ipaddr_t, mblk_t *, ipif_t *);
+
+extern int	ip_snmpmod_close(queue_t *);
+extern void	ip_snmpmod_wput(queue_t *, mblk_t *);
 extern void	ip_udp_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *);
 extern void	ip_proto_input(queue_t *, mblk_t *, ipha_t *, ire_t *, ill_t *);
 extern void	ip_rput_other(ipsq_t *, queue_t *, mblk_t *, void *);
@@ -2821,6 +2828,7 @@ extern int	ipsec_req_from_conn(conn_t *, ipsec_req_t *, int);
 extern int	ip_snmp_get(queue_t *q, mblk_t *mctl);
 extern int	ip_snmp_set(queue_t *q, int, int, uchar_t *, int);
 extern void	ip_process_ioctl(ipsq_t *, queue_t *, mblk_t *, void *);
+extern void	ip_quiesce_conn(conn_t *);
 extern  void    ip_reprocess_ioctl(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_restart_optmgmt(ipsq_t *, queue_t *, mblk_t *, void *);
 extern void	ip_ioctl_finish(queue_t *, mblk_t *, int, int, ipif_t *,
@@ -2842,6 +2850,7 @@ extern boolean_t ip_md_hcksum_attr(struct multidata_s *, struct pdesc_s *,
 			uint32_t, uint32_t, uint32_t, uint32_t);
 extern boolean_t ip_md_zcopy_attr(struct multidata_s *, struct pdesc_s *,
 			uint_t);
+extern mblk_t	*ip_unbind(queue_t *, mblk_t *);
 
 /* Hooks for CGTP (multirt routes) filtering module */
 #define	CGTP_FILTER_REV_1	1
@@ -2925,17 +2934,6 @@ struct ill_mdt_capab_s {
 	uint_t ill_mdt_span_limit; /* maximum payload span per packet */
 };
 
-/*
- * ioctl identifier and structure for Multidata Transmit update
- * private M_CTL communication from IP to ULP.
- */
-#define	MDT_IOC_INFO_UPDATE	(('M' << 8) + 1020)
-
-typedef struct ip_mdt_info_s {
-	uint_t	mdt_info_id;	/* MDT_IOC_INFO_UPDATE */
-	ill_mdt_capab_t	mdt_capab; /* ILL MDT capabilities */
-} ip_mdt_info_t;
-
 struct ill_hcksum_capab_s {
 	uint_t	ill_hcksum_version;	/* interface version */
 	uint_t	ill_hcksum_txflags;	/* capabilities on transmit */
@@ -2991,35 +2989,6 @@ struct ill_poll_capab_s {
 };
 
 /*
- * Macro that determines whether or not a given ILL is allowed for MDT.
- */
-#define	ILL_MDT_USABLE(ill)	\
-	((ill->ill_capabilities & ILL_CAPAB_MDT) != 0 &&		\
-	ill->ill_mdt_capab != NULL &&					\
-	ill->ill_mdt_capab->ill_mdt_version == MDT_VERSION_2 &&		\
-	ill->ill_mdt_capab->ill_mdt_on != 0)
-
-/*
- * Macro that determines whether or not a given CONN may be considered
- * for fast path prior to proceeding further with Multidata.
- */
-#define	CONN_IS_MD_FASTPATH(connp)	\
-	((connp)->conn_dontroute == 0 &&	/* SO_DONTROUTE */	\
-	(connp)->conn_nofailover_ill == NULL &&	/* IPIF_NOFAILOVER */	\
-	(connp)->conn_xmit_if_ill == NULL &&	/* IP_XMIT_IF */	\
-	(connp)->conn_outgoing_pill == NULL &&	/* IP{V6}_BOUND_PIF */	\
-	(connp)->conn_outgoing_ill == NULL)	/* IP{V6}_BOUND_IF */
-
-/*
- * Macro that determines whether or not a given IPC requires
- * outbound IPSEC processing.
- */
-#define	CONN_IPSEC_OUT_ENCAPSULATED(connp)	\
-	((connp)->conn_out_enforce_policy ||	\
-	((connp)->conn_latch != NULL &&		\
-	(connp)->conn_latch->ipl_out_policy != NULL))
-
-/*
  * IP squeues exports
  */
 extern int 		ip_squeue_profile;
@@ -3049,12 +3018,15 @@ extern void ip_squeue_get_pkts(squeue_t *);
 extern int ip_squeue_bind_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
 extern int ip_squeue_bind_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern void ip_squeue_clean(void *, mblk_t *, void *);
+extern void ip_resume_tcp_bind(void *, mblk_t *, void *);
 
-extern	void	ip_resume_tcp_bind(void *, mblk_t *mp, void *);
+extern void tcp_wput(queue_t *, mblk_t *);
+
 extern int	ip_fill_mtuinfo(struct in6_addr *, in_port_t,
 	struct ip6_mtuinfo *);
+extern	ipif_t *conn_get_held_ipif(conn_t *, ipif_t **, int *);
 
-typedef	void	(*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
+typedef void    (*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 
 /*
  * Squeue tags. Tags only need to be unique when the callback function is the
@@ -3091,6 +3063,11 @@ typedef	void	(*ipsq_func_t)(ipsq_t *, queue_t *, mblk_t *, void *);
 #define	SQTAG_TCP_WPUT_OTHER		28
 #define	SQTAG_TCP_CONN_REQ_UNBOUND	29
 #define	SQTAG_TCP_SEND_PENDING		30
+#define	SQTAG_BIND_RETRY		31
+#define	SQTAG_UDP_FANOUT		32
+#define	SQTAG_UDP_INPUT			33
+#define	SQTAG_UDP_WPUT			34
+#define	SQTAG_UDP_OUTPUT		35
 
 #endif	/* _KERNEL */
 

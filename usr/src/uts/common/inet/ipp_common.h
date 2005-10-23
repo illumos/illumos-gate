@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ extern uint32_t ipp_action_count;
 
 /* Apply IPQoS policies for inbound traffic? */
 #define	IP6_IN_IPP(flags) (IPP_ENABLED(IPP_LOCAL_IN) &&	\
-	(!((flags) & (IP6_NO_IPPOLICY|IP6_IN_NOCKSUM))))
+	(!((flags) & IP6_NO_IPPOLICY)))
 
 /* Apply IPQoS policies for oubound traffic? */
 #define	IP6_OUT_IPP(flags)	\

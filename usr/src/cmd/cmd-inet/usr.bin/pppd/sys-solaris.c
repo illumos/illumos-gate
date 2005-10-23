@@ -76,6 +76,7 @@
 #include <netinet/in.h>
 #include <sys/tihdr.h>
 #include <inet/mib2.h>
+#include <inet/ip.h>
 #include <sys/ethernet.h>
 #include <sys/ser_sync.h>
 
@@ -91,27 +92,6 @@
 #if !defined(lint) && !defined(_lint)
 static const char rcsid[] = RCSID;
 #endif
-
-/* Need to use UDP for ifconfig compatibility */
-#if !defined(UDP_DEV_NAME)
-#define	UDP_DEV_NAME		"/dev/udp"
-#endif /* UDP_DEV_NAME */
-
-#if !defined(IP_DEV_NAME)
-#define	IP_DEV_NAME		"/dev/ip"
-#endif /* IP_DEV_NAME */
-
-#if !defined(UDP6_DEV_NAME)
-#define	UDP6_DEV_NAME		"/dev/udp6"
-#endif /* UDP6_DEV_NAME */
-
-#if !defined(IP6_DEV_NAME)
-#define	IP6_DEV_NAME		"/dev/ip6"
-#endif /* IP6_DEV_NAME */
-
-#if !defined(IP_MOD_NAME)
-#define	IP_MOD_NAME		"ip"
-#endif /* IP_MOD_NAME */
 
 #define	PPPSTRTIMOUT	1	/* Timeout in seconds for ioctl */
 #define	MAX_POLLFDS	32

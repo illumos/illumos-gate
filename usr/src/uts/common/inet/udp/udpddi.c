@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -32,19 +32,22 @@
 #include <sys/modctl.h>
 #include <inet/common.h>
 #include <inet/ip.h>
+#include <inet/udp_impl.h>
 
 #define	INET_NAME	"udp"
 #define	INET_MODDESC	"UDP STREAMS module %I%"
 #define	INET_DEVDESC	"UDP STREAMS driver %I%"
 #define	INET_DEVMINOR	IPV4_MINOR
 #define	INET_STRTAB	udpinfo
-#define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since as a driver we're ip */
-#define	INET_MODMTFLAGS (D_MP | D_MTQPAIR | D_MTPUTSHARED | _D_MTOCSHARED)
+#define	INET_DEVMTFLAGS	IP_DEVMTFLAGS
+/*
+ * We define both synchronous STREAMS and sockfs direct-access
+ * mode for UDP module instance, because it is autopushed on
+ * top of /dev/ip for the sockets case.
+ */
+#define	INET_MODMTFLAGS (D_MP|D_SYNCSTR|_D_DIRECT)
 
 #include "../inetddi.c"
-
-extern void udp_ddi_init(void);
-extern void udp_ddi_destroy(void);
 
 int
 _init(void)

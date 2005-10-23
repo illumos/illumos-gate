@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -44,12 +44,12 @@ extern "C" {
 #include <sys/types.h>
 
 /*
- * Intel x86 can handle unaligned access. However, the checksum routine
+ * x86 can handle unaligned access. However, the checksum routine
  * assumes that the source is 16 bit aligned so we always make sure
  * that packet headers are 16 bit aligned.
  */
 #define	OK_16PTR(p)	(!((uintptr_t)(p) & 0x1))
-#if defined(__i386)
+#if defined(__x86)
 #define	OK_32PTR(p)	OK_16PTR(p)
 #else
 #define	OK_32PTR(p)	(!((uintptr_t)(p) & 0x3))

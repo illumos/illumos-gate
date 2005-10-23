@@ -100,6 +100,7 @@ struct sockaddr_ux {
 };
 
 typedef struct sonodeops sonodeops_t;
+typedef struct sonode sonode_t;
 
 /*
  * The sonode represents a socket. A sonode never exist in the file system
@@ -364,7 +365,7 @@ struct sonode {
 #define	SS_DONEREAD		0x00080000 /* NCAfs: all data read */
 #define	SS_MOREDATA		0x00100000 /* NCAfs: NCA has more data */
 
-#define	SS_TCP_FAST_ACCEPT	0x00200000 /* Use TCP's accept fast-path */
+#define	SS_DIRECT		0x00200000 /* transport is directly below */
 
 #define	SS_LADDR_VALID		0x01000000	/* so_laddr valid for user */
 #define	SS_FADDR_VALID		0x02000000	/* so_faddr valid for user */
@@ -769,8 +770,10 @@ extern void	so_drain_discon_ind(struct sonode *);
 extern void	so_flush_discon_ind(struct sonode *);
 extern int	sowaitconnected(struct sonode *, int, int);
 
+extern int	sostream_direct(struct sonode *, struct uio *,
+		    mblk_t *, cred_t *);
 extern int	sosend_dgram(struct sonode *, struct sockaddr *,
-			socklen_t, struct uio *, int);
+		    socklen_t, struct uio *, int);
 extern int	sosend_svc(struct sonode *, struct uio *, t_scalar_t, int, int);
 extern void	so_installhooks(struct sonode *);
 extern int	so_strinit(struct sonode *, struct sonode *);

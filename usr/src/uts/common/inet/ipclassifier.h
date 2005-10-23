@@ -37,6 +37,7 @@ extern "C" {
 #include <inet/ip.h>
 #include <inet/mi.h>
 #include <inet/tcp.h>
+#include <inet/udp_impl.h>
 #include <inet/ip6.h>
 #include <netinet/in.h>		/* for IPPROTO_* constants */
 #include <sys/sdt.h>
@@ -58,17 +59,19 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
  */
 
 /* Conn Flags */
-#define	IPCL_BOUND		0x80000000	/* Conn in bind table */
-#define	IPCL_CONNECTED		0x40000000	/* Conn in connected table */
-#define	IPCL_TCP4		0x08000000	/* A TCP connection */
-#define	IPCL_TCP6		0x04000000	/* A TCP6 connection */
-#define	IPCL_EAGER		0x01000000	/* Incoming connection */
-#define	IPCL_CL_LISTENER	0x00800000	/* Cluster listener */
-#define	IPCL_ACCEPTOR		0x00400000	/* Sockfs priv acceptor */
-#define	IPCL_SOCKET		0x00200000	/* Sockfs connection */
-#define	IPCL_CHECK_POLICY	0x00100000	/* Needs policy checking */
+#define	IPCL_UDPMOD		0x00020000	/* Is UDP module instance */
+#define	IPCL_TCPMOD		0x00040000	/* Is TCP module instance */
 #define	IPCL_FULLY_BOUND	0x00080000	/* Bound to correct squeue */
-#define	IPCL_TCPMOD		0x00040000	/* Is tcp module instance */
+#define	IPCL_CHECK_POLICY	0x00100000	/* Needs policy checking */
+#define	IPCL_SOCKET		0x00200000	/* Sockfs connection */
+#define	IPCL_ACCEPTOR		0x00400000	/* Sockfs priv acceptor */
+#define	IPCL_CL_LISTENER	0x00800000	/* Cluster listener */
+#define	IPCL_EAGER		0x01000000	/* Incoming connection */
+#define	IPCL_UDP		0x02000000	/* A UDP connection */
+#define	IPCL_TCP6		0x04000000	/* A TCP6 connection */
+#define	IPCL_TCP4		0x08000000	/* A TCP connection */
+#define	IPCL_CONNECTED		0x40000000	/* Conn in connected table */
+#define	IPCL_BOUND		0x80000000	/* Conn in bind table */
 
 /* Flags identifying the type of conn */
 #define	IPCL_TCPCONN		0x00000001	/* Flag to indicate cache */
@@ -80,8 +83,6 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 #define	IPCL_TCP		(IPCL_TCP4|IPCL_TCP6)
 #define	IPCL_REMOVED		0x00000020
 #define	IPCL_REUSED		0x00000040
-
-#define	IS_TCP_CONN(connp)	(((connp)->conn_flags & IPCL_TCP) != 0)
 
 #define	IPCL_IS_TCP4(connp)						\
 	(((connp)->conn_flags & IPCL_TCP4))
@@ -107,6 +108,13 @@ typedef void (*edesc_rpf)(void *, mblk_t *, void *);
 
 #define	IPCL_IS_TCP(connp)						\
 	((connp)->conn_flags & (IPCL_TCP4|IPCL_TCP6))
+
+/*
+ * IPCL_UDP is set on the conn when udp is directly above ip;
+ * this flag is cleared the moment udp is popped.
+ */
+#define	IPCL_IS_UDP(connp)						\
+	((connp)->conn_flags & IPCL_UDP)
 
 #define	IPCL_IS_IPTUN(connp)						\
 	((connp)->conn_ulp == IPPROTO_ENCAP || \
@@ -169,6 +177,8 @@ struct conn_s {
 		pad_to_bit_31 : 2;
 
 	tcp_t		*conn_tcp;		/* Pointer to the tcp struct */
+	udp_t		*conn_udp;		/* Pointer to the udp struct */
+
 	squeue_t	*conn_sqp;		/* Squeue for processing */
 	edesc_rpf	conn_recv;		/* Pointer to recv routine */
 	void		*conn_pad1;
@@ -483,6 +493,7 @@ extern int	ipcl_conn_insert(conn_t *, uint8_t, ipaddr_t, ipaddr_t,
 		    uint32_t);
 extern int	ipcl_conn_insert_v6(conn_t *, uint8_t, const in6_addr_t *,
 		    const in6_addr_t *, uint32_t, uint_t);
+extern conn_t	*ipcl_get_next_conn(connf_t *, conn_t *, uint32_t);
 
 void ipcl_proto_insert(conn_t *, uint8_t);
 void ipcl_proto_insert_v6(conn_t *, uint8_t);

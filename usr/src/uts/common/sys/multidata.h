@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,19 +68,24 @@ typedef struct mbufinfo_s {
 /*
  * Multidata packet descriptor information.
  */
-typedef struct pdescinfo_s {
-	uint_t	flags;		/* misc. flags */
-	uchar_t	*hdr_base;	/* start address of header area */
-	uchar_t *hdr_rptr;	/* start address of header data */
-	uchar_t *hdr_wptr;	/* end address of header data */
-	uchar_t	*hdr_lim;	/* end address of header area */
-	uint_t	pld_cnt;	/* number of payload area */
-	struct pld_ary_s {
-		int pld_pbuf_idx;	/* payload buffer index */
-		uchar_t *pld_rptr;	/* start address of payload data */
-		uchar_t *pld_wptr;	/* pointer to end of payload data */
-	} pld_ary[MULTIDATA_MAX_PBUFS];
-} pdescinfo_t;
+struct pld_ary_s {
+	int pld_pbuf_idx;	/* payload buffer index */
+	uchar_t *pld_rptr;	/* start address of payload data */
+	uchar_t *pld_wptr;	/* pointer to end of payload data */
+};
+
+#define	PDESCINFO_STRUCT(elems) 					\
+{									\
+	uint_t	flags;		/* misc. flags */			\
+	uchar_t	*hdr_base;	/* start address of header area */	\
+	uchar_t *hdr_rptr;	/* start address of header data */	\
+	uchar_t *hdr_wptr;	/* end address of header data */	\
+	uchar_t	*hdr_lim;	/* end address of header area */	\
+	uint_t	pld_cnt;	/* number of payload area */		\
+	struct pld_ary_s	pld_ary[(elems)];			\
+}
+
+typedef struct pdescinfo_s PDESCINFO_STRUCT(MULTIDATA_MAX_PBUFS) pdescinfo_t;
 
 /*
  * Possible values for flags

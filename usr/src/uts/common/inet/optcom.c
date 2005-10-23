@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -81,8 +81,6 @@ static size_t opt_level_allopts_lengths(t_uscalar_t, opdes_t *, uint_t);
 static boolean_t opt_length_ok(opdes_t *, struct T_opthdr *);
 static t_uscalar_t optcom_max_optbuf_len(opdes_t *, uint_t);
 static boolean_t opt_bloated_maxsize(opdes_t *);
-
-extern optdb_obj_t tcp_opt_obj;
 
 /* Common code for sending back a T_ERROR_ACK. */
 void
@@ -220,8 +218,11 @@ svr4_optcom_req(queue_t *q, mblk_t *mp, cred_t *cr, optdb_obj_t *dbobjp)
 	opdes_t	*optd;
 	boolean_t	pass_to_next = B_FALSE;
 	boolean_t	pass_to_ip = B_FALSE;
+	boolean_t	is_tcp;
 	struct T_optmgmt_ack *toa;
 	struct T_optmgmt_req *tor;
+
+	is_tcp = (dbobjp == &tcp_opt_obj);
 
 	/*
 	 * Allocate M_CTL and prepend to the packet for restarting this
@@ -550,14 +551,14 @@ no_mem:;
 				opt1->len = opt->len;
 				bcopy(&opt[1], &opt1[1], opt->len);
 				/*
-				 * Pass the option down to IP only if
-				 * TCP hasn't processed it.
+				 * Pass the option down to IP only
+				 * if TCP hasn't processed it.
 				 */
-				if (dbobjp == &tcp_opt_obj)
+				if (is_tcp)
 					pass_to_ip = B_TRUE;
-			}
-			else
+			} else {
 				opt1->len = (t_uscalar_t)len;
+			}
 			opt1 = (struct opthdr *)((uchar_t *)&opt1[1] +
 			    _TPI_ALIGN_OPT(opt1->len));
 		} /* end for loop */
@@ -639,10 +640,10 @@ restart:
 				optcom_err_ack(q, mp, TSYSERR, error);
 				freeb(first_mp);
 				return (0);
-			} else if (error < 0 && dbobjp == &tcp_opt_obj) {
+			} else if (error < 0 && is_tcp) {
 				/*
-				 * Pass the option down to IP only if
-				 * TCP hasn't processed it.
+				 * Pass the option down to IP only
+				 * if TCP hasn't processed it.
 				 */
 				pass_to_ip = B_TRUE;
 			}

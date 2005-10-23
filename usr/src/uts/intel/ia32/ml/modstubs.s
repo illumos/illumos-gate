@@ -482,6 +482,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(sockfs, sosendfile64,  	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sock_getfasync,  nomod_zero);
 	NO_UNLOAD_STUB(sockfs, nl7c_sendfilev,  nomod_zero);
+	NO_UNLOAD_STUB(sockfs, sostream_direct,	nomod_zero);
 	END_MODULE(sockfs);
 #endif
 
@@ -527,12 +528,6 @@ fcnname/**/_info:							\
 	MODULE(spdsock,drv);
 	WSTUB(spdsock,	spdsock_update_pending_algs,	nomod_zero);
 	END_MODULE(spdsock);
-#endif
-
-#ifndef UDP_MODULE
-	MODULE(udp,drv);
-	WSTUB(udp, udp_compute_checksum, nomod_zero);
-	END_MODULE(udp);
 #endif
 
 #ifndef NATTYMOD_MODULE

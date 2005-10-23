@@ -729,7 +729,8 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, sqproc_t proc, void *arg,
 #endif
 #if SQUEUE_DEBUG
 	conn_t 	*connp = (conn_t *)arg;
-	ASSERT(connp->conn_tcp->tcp_connp == connp);
+	ASSERT(!IPCL_IS_TCP(connp) || connp->conn_tcp->tcp_connp == connp);
+	ASSERT(!IPCL_IS_UDP(connp) || connp->conn_udp->udp_connp == connp);
 #endif
 
 	ASSERT(proc != NULL);
@@ -954,9 +955,10 @@ squeue_enter_nodrain(squeue_t *sqp, mblk_t *mp, sqproc_t proc, void *arg,
 	ASSERT(sqp != NULL);
 	ASSERT(mp != NULL);
 	ASSERT(mp->b_next == NULL);
-	ASSERT(connp->conn_tcp->tcp_connp == connp);
-
+	ASSERT(!IPCL_IS_TCP(connp) || connp->conn_tcp->tcp_connp == connp);
+	ASSERT(!IPCL_IS_UDP(connp) || connp->conn_udp->udp_connp == connp);
 	ASSERT(MUTEX_NOT_HELD(&sqp->sq_lock));
+
 	mutex_enter(&sqp->sq_lock);
 
 	being_processed = (sqp->sq_state & SQS_PROC);
@@ -1100,7 +1102,8 @@ squeue_fill(squeue_t *sqp, mblk_t *mp, sqproc_t proc, void * arg,
 	ASSERT(sqp != NULL);
 	ASSERT(mp != NULL);
 	ASSERT(mp->b_next == NULL);
-	ASSERT(connp->conn_tcp->tcp_connp == connp);
+	ASSERT(!IPCL_IS_TCP(connp) || connp->conn_tcp->tcp_connp == connp);
+	ASSERT(!IPCL_IS_UDP(connp) || connp->conn_udp->udp_connp == connp);
 
 	ASSERT(MUTEX_NOT_HELD(&sqp->sq_lock));
 	mutex_enter(&sqp->sq_lock);

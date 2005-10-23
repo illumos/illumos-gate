@@ -233,6 +233,7 @@ const char ipclassifier_version[] = "@(#)ipclassifier.c	1.6	04/03/31 SMI";
 #include <inet/ip_rts.h>
 #include <inet/optcom.h>
 #include <inet/ip_ndp.h>
+#include <inet/udp_impl.h>
 #include <inet/sctp_ip.h>
 
 #include <sys/ethernet.h>
@@ -351,8 +352,7 @@ ipcl_init(void)
 
 	ipcl_conn_cache = kmem_cache_create("ipcl_conn_cache",
 	    sizeof (conn_t), CACHE_ALIGN_SIZE,
-	    NULL, NULL,
-	    NULL, NULL, NULL, 0);
+	    NULL, NULL, NULL, NULL, NULL, 0);
 
 	ipcl_tcpconn_cache = kmem_cache_create("ipcl_tcpconn_cache",
 	    sizeof (itc_t), CACHE_ALIGN_SIZE,
@@ -501,17 +501,19 @@ ipcl_conn_create(uint32_t type, int sleep)
 	case IPCL_IPCCONN:
 		connp = kmem_cache_alloc(ipcl_conn_cache, sleep);
 		if (connp == NULL)
-			return (connp);
+			return (NULL);
 		bzero(connp, sizeof (conn_t));
-		mutex_init(&connp->conn_lock, NULL,
-		    MUTEX_DEFAULT, NULL);
+		mutex_init(&connp->conn_lock, NULL, MUTEX_DEFAULT, NULL);
 		cv_init(&connp->conn_cv, NULL, CV_DEFAULT, NULL);
-		connp->conn_flags |= IPCL_IPCCONN;
+		connp->conn_flags = IPCL_IPCCONN;
 		connp->conn_ref = 1;
 		IPCL_DEBUG_LVL(1,
 		    ("ipcl_conn_create: connp = %p\n", (void *)connp));
 		ipcl_globalhash_insert(connp);
 		break;
+	default:
+		connp = NULL;
+		ASSERT(0);
 	}
 
 	return (connp);
@@ -521,7 +523,6 @@ void
 ipcl_conn_destroy(conn_t *connp)
 {
 	mblk_t	*mp;
-	tcp_t	*tcp = connp->conn_tcp;
 
 	ASSERT(!MUTEX_HELD(&connp->conn_lock));
 	ASSERT(connp->conn_ref == 0);
@@ -531,6 +532,8 @@ ipcl_conn_destroy(conn_t *connp)
 
 	cv_destroy(&connp->conn_cv);
 	if (connp->conn_flags & IPCL_TCPCONN) {
+		tcp_t	*tcp = connp->conn_tcp;
+
 		mutex_destroy(&connp->conn_lock);
 		ASSERT(connp->conn_tcp != NULL);
 		tcp_free(tcp);
@@ -567,6 +570,7 @@ ipcl_conn_destroy(conn_t *connp)
 	} else if (connp->conn_flags & IPCL_SCTPCONN) {
 		sctp_free(connp);
 	} else {
+		ASSERT(connp->conn_udp == NULL);
 		mutex_destroy(&connp->conn_lock);
 		kmem_cache_free(ipcl_conn_cache, connp);
 	}
@@ -1861,6 +1865,57 @@ ipcl_lookup_listener_v6(uint16_t lport, in6_addr_t *laddr, uint_t ifindex,
 	}
 	mutex_exit(&bind_connfp->connf_lock);
 	return (NULL);
+}
+
+/*
+ * ipcl_get_next_conn
+ *	get the next entry in the conn global list
+ *	and put a reference on the next_conn.
+ *	decrement the reference on the current conn.
+ *
+ * This is an iterator based walker function that also provides for
+ * some selection by the caller. It walks through the conn_hash bucket
+ * searching for the next valid connp in the list, and selects connections
+ * that are neither closed nor condemned. It also REFHOLDS the conn
+ * thus ensuring that the conn exists when the caller uses the conn.
+ */
+conn_t *
+ipcl_get_next_conn(connf_t *connfp, conn_t *connp, uint32_t conn_flags)
+{
+	conn_t	*next_connp;
+
+	if (connfp == NULL)
+		return (NULL);
+
+	mutex_enter(&connfp->connf_lock);
+
+	next_connp = (connp == NULL) ?
+	    connfp->connf_head : connp->conn_g_next;
+
+	while (next_connp != NULL) {
+		mutex_enter(&next_connp->conn_lock);
+		if (!(next_connp->conn_flags & conn_flags) ||
+		    (next_connp->conn_state_flags &
+		    (CONN_CONDEMNED | CONN_INCIPIENT))) {
+			/*
+			 * This conn has been condemned or
+			 * is closing, or the flags don't match
+			 */
+			mutex_exit(&next_connp->conn_lock);
+			next_connp = next_connp->conn_g_next;
+			continue;
+		}
+		CONN_INC_REF_LOCKED(next_connp);
+		mutex_exit(&next_connp->conn_lock);
+		break;
+	}
+
+	mutex_exit(&connfp->connf_lock);
+
+	if (connp != NULL)
+		CONN_DEC_REF(connp);
+
+	return (next_connp);
 }
 
 #ifdef CONN_DEBUG

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992,1997-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,13 @@
 #define	INET_DEVMINOR	IPV6_MINOR
 #define	INET_DEVDESC	"UDP6 STREAMS driver %I%"
 #define	INET_STRTAB	udpinfo
-#define	INET_DEVMTFLAGS	IP_DEVMTFLAGS	/* since we're really ip */
+#define	INET_DEVMTFLAGS	IP_DEVMTFLAGS
+/*
+ * We define both synchronous STREAMS and sockfs direct-access
+ * mode for UDP module instance, because it is autopushed on
+ * top of /dev/ip for the sockets case.
+ */
+#define	INET_MODMTFLAGS	(D_MP|D_SYNCSTR|_D_DIRECT)
 
 #include "../inetddi.c"
 

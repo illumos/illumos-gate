@@ -107,7 +107,8 @@ net_tcp_ipv6(const tcp_t *tcp)
 static int
 net_udp_active(const udp_t *udp)
 {
-	return ((udp->udp_state != TS_UNBND) && (udp->udp_state != TS_IDLE));
+	return ((udp->udp_state == TS_IDLE) ||
+	    (udp->udp_state == TS_DATA_XFER));
 }
 
 static int
@@ -355,11 +356,6 @@ mi_payload_walk_fini(mdb_walk_state_t *wsp)
 	delete_mi_payload_walk_data(wsp->walk_data, arg->mi_pwa_size);
 }
 
-const mi_payload_walk_arg_t mi_udp_arg = {
-	"udp", "udp_g_head", sizeof (udp_t),
-	MI_PAYLOAD_DEVICE | MI_PAYLOAD_MODULE
-};
-
 const mi_payload_walk_arg_t mi_ar_arg = {
 	"arp", "ar_g_head", sizeof (ar_t),
 	MI_PAYLOAD_DEVICE | MI_PAYLOAD_MODULE
@@ -595,7 +591,7 @@ netstat_tcp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
 	tcp = (tcp_t *)((uintptr_t)connp + (tcp_kaddr - kaddr));
 
 	if ((uintptr_t)tcp < (uintptr_t)connp ||
-	    (uintptr_t)&tcp->tcp_connp > (uintptr_t)connp + itc_size ||
+	    (uintptr_t)(tcp + 1) > (uintptr_t)connp + itc_size ||
 	    (uintptr_t)tcp->tcp_connp != kaddr) {
 		mdb_warn("conn_tcp %p is invalid", tcp_kaddr);
 		return (WALK_NEXT);
@@ -603,7 +599,7 @@ netstat_tcp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
 	connp->conn_tcp = tcp;
 	tcp->tcp_connp = connp;
 
-	if (!(opts & NETSTAT_ALL || net_tcp_active(tcp)) ||
+	if (!((opts & NETSTAT_ALL) || net_tcp_active(tcp)) ||
 	    (af == AF_INET && !net_tcp_ipv4(tcp)) ||
 	    (af == AF_INET6 && !net_tcp_ipv6(tcp))) {
 		return (WALK_NEXT);
@@ -639,45 +635,57 @@ netstat_tcpv6_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 	return (netstat_tcp_cb(kaddr, walk_data, cb_data, AF_INET6));
 }
 
+/*ARGSUSED*/
 static int
-netstat_udpv4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
+netstat_udp_cb(uintptr_t kaddr, const void *walk_data, void *cb_data, int af)
 {
-	const udp_t *udp = walk_data;
 	const uintptr_t opts = (uintptr_t)cb_data;
+	udp_t udp;
+	conn_t connp;
 
-	if (!((opts & NETSTAT_ALL || net_udp_active(udp)) && net_udp_ipv4(udp)))
+	if (mdb_vread(&udp, sizeof (udp_t), kaddr) == -1) {
+		mdb_warn("failed to read udp at %p", kaddr);
+		return (WALK_ERR);
+	}
+
+	if (mdb_vread(&connp, sizeof (conn_t),
+	    (uintptr_t)udp.udp_connp) == -1) {
+		mdb_warn("failed to read udp_connp at %p",
+		    (uintptr_t)udp.udp_connp);
+		return (WALK_ERR);
+	}
+
+	if (!((opts & NETSTAT_ALL) || net_udp_active(&udp)) ||
+	    (af == AF_INET && !net_udp_ipv4(&udp)) ||
+	    (af == AF_INET6 && !net_udp_ipv6(&udp))) {
 		return (WALK_NEXT);
+	}
 
-	mdb_printf("%0?p %2i ", kaddr, udp->udp_state);
-	net_ipv4addrport_pr(&udp->udp_v6src, udp->udp_port);
-	mdb_printf(" ");
-	net_ipv4addrport_pr(&udp->udp_v6dst, udp->udp_dstport);
-	mdb_printf(" %4i\n", udp->udp_zoneid);
+	mdb_printf("%0?p %2i ", kaddr, udp.udp_state);
+	if (af == AF_INET) {
+		net_ipv4addrport_pr(&udp.udp_v6src, udp.udp_port);
+		mdb_printf(" ");
+		net_ipv4addrport_pr(&udp.udp_v6dst, udp.udp_dstport);
+	} else if (af == AF_INET6) {
+		net_ipv6addrport_pr(&udp.udp_v6src, udp.udp_port);
+		mdb_printf(" ");
+		net_ipv6addrport_pr(&udp.udp_v6dst, udp.udp_dstport);
+	}
+	mdb_printf(" %4i\n", connp.conn_zoneid);
 
 	return (WALK_NEXT);
 }
 
 static int
+netstat_udpv4_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
+{
+	return (netstat_udp_cb(kaddr, walk_data, cb_data, AF_INET));
+}
+
+static int
 netstat_udpv6_cb(uintptr_t kaddr, const void *walk_data, void *cb_data)
 {
-	const udp_t *udp = walk_data;
-	const uintptr_t opts = (uintptr_t)cb_data;
-
-	if (!((opts & NETSTAT_ALL || net_udp_active(udp)) && net_udp_ipv6(udp)))
-		return (WALK_NEXT);
-
-	mdb_printf("%0?p %2i ", kaddr, udp->udp_state);
-	net_ipv6addrport_pr(&udp->udp_v6src, udp->udp_port);
-	mdb_printf(" ");
-
-	/* Remote */
-	if (udp->udp_state == TS_DATA_XFER)
-		net_ipv6addrport_pr(&udp->udp_v6dst, udp->udp_dstport);
-	else
-		mdb_printf("%*s.0    ", ADDR_V6_WIDTH, "0:0:0:0:0:0:0:0");
-	mdb_printf(" %4i\n", udp->udp_zoneid);
-
-	return (WALK_NEXT);
+	return (netstat_udp_cb(kaddr, walk_data, cb_data, AF_INET6));
 }
 
 /*
@@ -855,7 +863,7 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    "UDPv4", ADDR_V4_WIDTH, "Local Address",
 			    ADDR_V4_WIDTH, "Remote Address", "Zone");
 
-			if (mdb_walk("genunix`udp", netstat_udpv4_cb,
+			if (mdb_walk("udp_cache", netstat_udpv4_cb,
 			    (void *)(uintptr_t)opts) == -1) {
 				mdb_warn("failed to walk genunix`udp");
 				return (DCMD_ERR);
@@ -870,12 +878,11 @@ netstat(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			    "UDPv6", ADDR_V6_WIDTH, "Local Address",
 			    ADDR_V6_WIDTH, "Remote Address", "Zone");
 
-			if (mdb_walk("genunix`udp", netstat_udpv6_cb,
+			if (mdb_walk("udp_cache", netstat_udpv6_cb,
 			    (void *)(uintptr_t)opts) == -1) {
 				mdb_warn("failed to walk genunix`udp");
 				return (DCMD_ERR);
 			}
-
 		}
 	}
 

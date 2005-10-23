@@ -3415,6 +3415,8 @@ gld_cap_ack(queue_t *q, mblk_t *mp)
 			dlhp->hcksum_txflags |= HCKSUM_INET_PARTIAL;
 		if (macinfo->gldm_capabilities & GLD_CAP_CKSUM_FULL_V4)
 			dlhp->hcksum_txflags |= HCKSUM_INET_FULL_V4;
+		if (macinfo->gldm_capabilities & GLD_CAP_CKSUM_FULL_V6)
+			dlhp->hcksum_txflags |= HCKSUM_INET_FULL_V6;
 		if (macinfo->gldm_capabilities & GLD_CAP_CKSUM_IPHDR)
 			dlhp->hcksum_txflags |= HCKSUM_IPHDRCKSUM;
 

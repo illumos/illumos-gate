@@ -689,6 +689,8 @@ typedef struct {
 					/* ability */
 #define	HCKSUM_INET_FULL_V4	0x04	/* Full 1's complement checksum */
 					/* ability for IPv4 packets. */
+#define	HCKSUM_INET_FULL_V6	0x08	/* Full 1's complement checksum */
+					/* ability for IPv6 packets. */
 #define	HCKSUM_IPHDRCKSUM	0x10	/* IPv4 Header checksum offload */
 					/* capability */
 #ifdef _KERNEL

@@ -370,8 +370,7 @@ extern boolean_t	ip_hdr_length_nexthdr_v6(mblk_t *, ip6_t *,
 		    uint16_t *, uint8_t **);
 extern int	ip_hdr_length_v6(mblk_t *, ip6_t *);
 extern uint32_t	ip_massage_options_v6(ip6_t *, ip6_rthdr_t *);
-extern void	ip_wput_frag_v6(mblk_t *, ire_t *, uint_t, conn_t *,
-		    boolean_t, int);
+extern void	ip_wput_frag_v6(mblk_t *, ire_t *, uint_t, conn_t *, int, int);
 extern void 	ip_wput_ipsec_out_v6(queue_t *, mblk_t *, ip6_t *, ill_t *,
     ire_t *);
 extern int	ip_total_hdrs_len_v6(ip6_pkt_t *);

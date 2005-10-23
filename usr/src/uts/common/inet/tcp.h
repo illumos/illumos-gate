@@ -286,11 +286,8 @@ typedef struct tcp_s {
 		tcp_accept_error : 1,	/* Error during TLI accept */
 
 		tcp_send_discon_ind : 1, /* TLI accept err, send discon ind */
-		tcp_fused : 1,		/* loopback tcp in fusion mode */
-		tcp_unfusable : 1,	/* fusion not allowed on endpoint */
-		tcp_fused_sigurg : 1,	/* send SIGURG upon draining */
 		tcp_cork : 1,		/* tcp_cork option */
-		tcp_pad_to_bit_31 : 15;
+		tcp_pad_to_bit_31 : 18;
 
 	uint32_t	tcp_if_mtu;	/* Outgoing interface MTU. */
 
@@ -514,10 +511,29 @@ typedef struct tcp_s {
 #define	tcp_ipp_use_min_mtu	tcp_sticky_ipp.ipp_use_min_mtu
 	struct tcp_s *tcp_saved_listener;	/* saved value of listener */
 
+	uint32_t	tcp_in_ack_unsent;	/* ACK for unsent data cnt. */
+
+	/*
+	 * The following fusion-related fields are protected by squeue.
+	 */
 	struct tcp_s *tcp_loopback_peer;	/* peer tcp for loopback */
 	mblk_t	*tcp_fused_sigurg_mp;		/* M_PCSIG mblk for SIGURG */
+	size_t	tcp_fuse_rcv_hiwater;		/* fusion receive queue size */
+	uint_t	tcp_fuse_rcv_unread_hiwater;	/* max # of outstanding pkts */
+	/*
+	 * The following fusion-related fields and bit fields are to be
+	 * manipulated with squeue protection or with tcp_fuse_lock held.
+	 */
+	kmutex_t tcp_fuse_lock;
+	uint_t tcp_fuse_rcv_unread_cnt;	/* # of outstanding pkts */
+	uint32_t
+		tcp_fused : 1,		/* loopback tcp in fusion mode */
+		tcp_unfusable : 1,	/* fusion not allowed on endpoint */
+		tcp_fused_sigurg : 1,	/* send SIGURG upon draining */
+		tcp_direct_sockfs : 1,	/* direct calls to sockfs */
 
-	uint32_t	tcp_in_ack_unsent;	/* ACK for unsent data cnt. */
+		tcp_fuse_syncstr_stopped : 1, /* synchronous streams stopped */
+		tcp_fuse_to_bit_31 : 27;
 
 	/*
 	 * This variable is accessed without any lock protection
@@ -525,6 +541,8 @@ typedef struct tcp_s {
 	 * with the rest which require such condition.
 	 */
 	boolean_t	tcp_issocket;	/* this is a socket tcp */
+
+	uint32_t	tcp_squeue_bytes;
 } tcp_t;
 
 extern void 	tcp_free(tcp_t *tcp);
@@ -537,7 +555,8 @@ extern void 	tcp_input(void *arg, mblk_t *mp, void *arg2);
 extern void	tcp_rput_data(void *arg, mblk_t *mp, void *arg2);
 extern void 	*tcp_get_conn(void *arg);
 extern void	tcp_time_wait_collector(void *arg);
-
+extern int	tcp_snmp_get(queue_t *, mblk_t *);
+extern int	tcp_snmp_set(queue_t *, int, int, uchar_t *, int len);
 /*
  * The TCP Fanout structure.
  * The hash tables and their linkage (tcp_*_hash_next, tcp_ptp*hn) are
@@ -609,18 +628,6 @@ typedef struct tcp_ioc_abort_conn_s {
 #if _LONG_LONG_ALIGNMENT == 8 && _LONG_LONG_ALIGNMENT_32 == 4
 #pragma pack()
 #endif
-
-/* Named Dispatch Parameter Management Structure */
-typedef struct tcpparam_s {
-	uint32_t	tcp_param_min;
-	uint32_t	tcp_param_max;
-	uint32_t	tcp_param_val;
-	char		*tcp_param_name;
-} tcpparam_t;
-
-extern tcpparam_t	tcp_param_arr[];
-
-extern boolean_t	do_tcp_fusion;
 
 #if (defined(_KERNEL) || defined(_KMEMUSER))
 extern void tcp_rput_other(tcp_t *tcp, mblk_t *mp);

@@ -18,32 +18,14 @@
 #include <sys/dlpi.h>
 #include <libdlpi.h>
 
+#include <inet/ip.h>
+
 #define	LOOPBACK_IF	"lo0"
 
 #define	NONE_STR	"none"
 
 #ifndef	ARP_MOD_NAME
 #define	ARP_MOD_NAME	"arp"
-#endif
-
-#ifndef	IP_DEV_NAME
-#define	IP_DEV_NAME	"/dev/ip"
-#endif
-
-#ifndef	IP_MOD_NAME
-#define	IP_MOD_NAME	"ip"
-#endif
-
-#ifndef	IP6_DEV_NAME
-#define	IP6_DEV_NAME	"/dev/ip6"
-#endif
-
-#ifndef	UDP_DEV_NAME
-#define	UDP_DEV_NAME	"/dev/udp"
-#endif
-
-#ifndef	UDP6_DEV_NAME
-#define	UDP6_DEV_NAME	"/dev/udp6"
 #endif
 
 #define	ADDRBITS_V4	32	/* number of bits in IPv4 address */

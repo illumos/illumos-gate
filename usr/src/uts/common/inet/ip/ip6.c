@@ -58,6 +58,7 @@
 #include <sys/policy.h>
 #include <net/if.h>
 #include <net/if_arp.h>
+#include <net/if_types.h>
 #include <net/route.h>
 #include <net/if_dl.h>
 #include <sys/sockio.h>
@@ -74,9 +75,12 @@
 #include <inet/snmpcom.h>
 
 #include <inet/ip.h>
+#include <inet/ip_impl.h>
 #include <inet/ip6.h>
 #include <inet/ip6_asp.h>
 #include <inet/tcp.h>
+#include <inet/tcp_impl.h>
+#include <inet/udp_impl.h>
 #include <inet/ipp_common.h>
 
 #include <inet/ip_multi.h>
@@ -103,20 +107,51 @@ extern squeue_func_t ip_input_proc;
 /*
  * IP statistics.
  */
-#define	IP6_STAT(x)	(ip6_statistics.x.value.ui64++)
+#define	IP6_STAT(x)		(ip6_statistics.x.value.ui64++)
+#define	IP6_STAT_UPDATE(x, n)	(ip6_statistics.x.value.ui64 += (n))
 
 typedef struct ip6_stat {
 	kstat_named_t	ip6_udp_fast_path;
 	kstat_named_t	ip6_udp_slow_path;
 	kstat_named_t	ip6_udp_fannorm;
 	kstat_named_t	ip6_udp_fanmb;
+	kstat_named_t   ip6_out_sw_cksum;
+	kstat_named_t   ip6_in_sw_cksum;
+	kstat_named_t	ip6_tcp_in_full_hw_cksum_err;
+	kstat_named_t	ip6_tcp_in_part_hw_cksum_err;
+	kstat_named_t	ip6_tcp_in_sw_cksum_err;
+	kstat_named_t	ip6_tcp_out_sw_cksum_bytes;
+	kstat_named_t	ip6_udp_in_full_hw_cksum_err;
+	kstat_named_t	ip6_udp_in_part_hw_cksum_err;
+	kstat_named_t	ip6_udp_in_sw_cksum_err;
+	kstat_named_t	ip6_udp_out_sw_cksum_bytes;
+	kstat_named_t	ip6_frag_mdt_pkt_out;
+	kstat_named_t	ip6_frag_mdt_discarded;
+	kstat_named_t	ip6_frag_mdt_allocfail;
+	kstat_named_t	ip6_frag_mdt_addpdescfail;
+	kstat_named_t	ip6_frag_mdt_allocd;
 } ip6_stat_t;
 
 static ip6_stat_t ip6_statistics = {
-	{ "ip6_udp_fast_path", 	KSTAT_DATA_UINT64 },
-	{ "ip6_udp_slow_path", 	KSTAT_DATA_UINT64 },
-	{ "ip6_udp_fannorm", 	KSTAT_DATA_UINT64 },
-	{ "ip6_udp_fanmb", 	KSTAT_DATA_UINT64 },
+	{ "ip6_udp_fast_path",			KSTAT_DATA_UINT64 },
+	{ "ip6_udp_slow_path",			KSTAT_DATA_UINT64 },
+	{ "ip6_udp_fannorm",			KSTAT_DATA_UINT64 },
+	{ "ip6_udp_fanmb",			KSTAT_DATA_UINT64 },
+	{ "ip6_out_sw_cksum",			KSTAT_DATA_UINT64 },
+	{ "ip6_in_sw_cksum",			KSTAT_DATA_UINT64 },
+	{ "ip6_tcp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
+	{ "ip6_tcp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
+	{ "ip6_tcp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
+	{ "ip6_tcp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
+	{ "ip6_udp_in_full_hw_cksum_err",	KSTAT_DATA_UINT64 },
+	{ "ip6_udp_in_part_hw_cksum_err",	KSTAT_DATA_UINT64 },
+	{ "ip6_udp_in_sw_cksum_err",		KSTAT_DATA_UINT64 },
+	{ "ip6_udp_out_sw_cksum_bytes",		KSTAT_DATA_UINT64 },
+	{ "ip6_frag_mdt_pkt_out",		KSTAT_DATA_UINT64 },
+	{ "ip6_frag_mdt_discarded",		KSTAT_DATA_UINT64 },
+	{ "ip6_frag_mdt_allocfail",		KSTAT_DATA_UINT64 },
+	{ "ip6_frag_mdt_addpdescfail",		KSTAT_DATA_UINT64 },
+	{ "ip6_frag_mdt_allocd",		KSTAT_DATA_UINT64 },
 };
 
 static kstat_t *ip6_kstat;
@@ -221,7 +256,7 @@ static void	ip_fanout_udp_v6(queue_t *, mblk_t *, ip6_t *, uint32_t,
 static int	ip_process_options_v6(queue_t *, mblk_t *, ip6_t *,
     uint8_t *, uint_t, uint8_t);
 static mblk_t	*ip_rput_frag_v6(queue_t *, mblk_t *, ip6_t *,
-    ip6_frag_t *, uint_t, uint_t *);
+    ip6_frag_t *, uint_t, uint_t *, uint32_t *, uint16_t *);
 static boolean_t	ip_source_routed_v6(ip6_t *, mblk_t *);
 static void	ip_wput_ire_v6(queue_t *, mblk_t *, ire_t *, int, int,
     conn_t *, int, int, int);
@@ -2302,7 +2337,8 @@ ip_bind_v6(queue_t *q, mblk_t *mp, conn_t *connp, ip6_pkt_t *ipp)
 			connp->conn_recv = tcp_input;
 	}
 	/* Update qinfo if v4/v6 changed */
-	if ((orig_pkt_isv6 != connp->conn_pkt_isv6) && !IS_TCP_CONN(connp)) {
+	if ((orig_pkt_isv6 != connp->conn_pkt_isv6) &&
+	    !(IPCL_IS_TCP(connp) || IPCL_IS_UDP(connp))) {
 		if (connp->conn_pkt_isv6)
 			ip_setqinfo(RD(q), IPV6_MINOR, B_TRUE);
 		else
@@ -2531,7 +2567,6 @@ ip_bind_connected_resume_v6(ipsq_t *ipsq, queue_t *q, mblk_t *mp,
     void *dummy_arg)
 {
 	conn_t	*connp = NULL;
-	tcp_t *tcp;
 	t_scalar_t prim;
 
 	ASSERT(DB_TYPE(mp) == M_PROTO || DB_TYPE(mp) == M_PCPROTO);
@@ -2543,24 +2578,24 @@ ip_bind_connected_resume_v6(ipsq_t *ipsq, queue_t *q, mblk_t *mp,
 	prim = ((union T_primitives *)mp->b_rptr)->type;
 	ASSERT(prim == O_T_BIND_REQ || prim == T_BIND_REQ);
 
-	tcp = connp->conn_tcp;
-	if (tcp != NULL) {
+	if (IPCL_IS_TCP(connp)) {
 		/* Pass sticky_ipp for scope_id and pktinfo */
-		mp = ip_bind_v6(q, mp, connp, &tcp->tcp_sticky_ipp);
+		mp = ip_bind_v6(q, mp, connp, &connp->conn_tcp->tcp_sticky_ipp);
 	} else {
 		/* For UDP and ICMP */
 		mp = ip_bind_v6(q, mp, connp, NULL);
 	}
 	if (mp != NULL) {
-		if (tcp != NULL) {
+		if (IPCL_IS_TCP(connp)) {
 			CONN_INC_REF(connp);
-			squeue_fill(connp->conn_sqp, mp,
-			    ip_resume_tcp_bind, connp, SQTAG_TCP_RPUTOTHER);
-			return;
+			squeue_fill(connp->conn_sqp, mp, ip_resume_tcp_bind,
+			    connp, SQTAG_TCP_RPUTOTHER);
+		} else if (IPCL_IS_UDP(connp)) {
+			udp_resume_bind(connp, mp);
 		} else {
 			qreply(q, mp);
+			CONN_OPER_PENDING_DONE(connp);
 		}
-		CONN_OPER_PENDING_DONE(connp);
 	}
 }
 
@@ -2719,7 +2754,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 	if (ip_multidata_outbound && !ipsec_policy_set && dst_ire != NULL &&
 	    !(dst_ire->ire_type & (IRE_LOCAL | IRE_LOOPBACK | IRE_BROADCAST)) &&
 	    (md_ill = ire_to_ill(dst_ire), md_ill != NULL) &&
-	    (md_ill->ill_capabilities & ILL_CAPAB_MDT)) {
+	    ILL_MDT_CAPABLE(md_ill)) {
 		md_dst_ire = dst_ire;
 		IRE_REFHOLD(md_dst_ire);
 	}
@@ -2936,7 +2971,7 @@ ip_bind_connected_v6(conn_t *connp, mblk_t *mp, in6_addr_t *v6src,
 		 */
 		error = ipcl_conn_insert_v6(connp, protocol, v6src, v6dst,
 		    connp->conn_ports,
-		    IS_TCP_CONN(connp) ? connp->conn_tcp->tcp_bound_if : 0);
+		    IPCL_IS_TCP(connp) ? connp->conn_tcp->tcp_bound_if : 0);
 	}
 	if (error == 0) {
 		connp->conn_fully_bound = B_TRUE;
@@ -3411,8 +3446,7 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 		ASSERT((dp->db_struioflag & STRUIO_IP) == 0);
 
 		/* Initiate IPPf processing, if needed. */
-		if (IPP_ENABLED(IPP_LOCAL_IN) &&
-			(flags & (IP6_NO_IPPOLICY|IP6_IN_NOCKSUM))) {
+		if (IPP_ENABLED(IPP_LOCAL_IN) && (flags & IP6_NO_IPPOLICY)) {
 			ill_index = ill->ill_phyint->phyint_ifindex;
 			ip_process(IPP_LOCAL_IN, &first_mp, ill_index);
 			if (first_mp == NULL) {
@@ -3447,14 +3481,14 @@ ip_fanout_tcp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, ill_t *ill, ill_t *inill,
 			}
 
 			mp->b_datap->db_struioflag |= STRUIO_EAGER;
-			mp->b_datap->db_cksumstart = (intptr_t)sqp;
+			DB_CKSUMSTART(mp) = (intptr_t)sqp;
 
 			/*
 			 * db_cksumstuff is unused in the incoming
 			 * path; Thus store the ifindex here. It will
 			 * be cleared in tcp_conn_create_v6().
 			 */
-			mp->b_datap->db_cksumstuff =
+			DB_CKSUMSTUFF(mp) =
 			    (intptr_t)ill->ill_phyint->phyint_ifindex;
 			syn_present = B_TRUE;
 		}
@@ -3587,7 +3621,6 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
     ill_t *ill, ill_t *inill, uint_t flags, boolean_t mctl_present,
     zoneid_t zoneid)
 {
-	queue_t		*rq;
 	uint32_t	dstport, srcport;
 	in6_addr_t	dst;
 	mblk_t		*first_mp;
@@ -3637,9 +3670,8 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 		/* Found a client */
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
-		rq = connp->conn_rq;
 
-		if (!canputnext(rq)) {
+		if (CONN_UDP_FLOWCTLD(connp)) {
 			freemsg(first_mp);
 			BUMP_MIB(ill->ill_ip6_mib, udpInOverflows);
 			CONN_DEC_REF(connp);
@@ -3691,7 +3723,10 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 			}
 		}
 		BUMP_MIB(ill->ill_ip6_mib, ipv6InDelivers);
-		putnext(rq, mp);
+
+		/* Send it upstream */
+		CONN_UDP_RECV(connp, mp);
+
 		IP6_STAT(ip6_udp_fannorm);
 		CONN_DEC_REF(connp);
 		if (mctl_present)
@@ -3746,7 +3781,6 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 		mp1 = mctl_present ? first_mp1->b_cont : first_mp1;
 		CONN_INC_REF(connp);
 		mutex_exit(&connfp->connf_lock);
-		rq = connp->conn_rq;
 		/*
 		 * For link-local always add ifindex so that transport
 		 * can set sin6_scope_id. Avoid it for ICMP error
@@ -3762,7 +3796,7 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 			BUMP_MIB(ill->ill_ip6_mib, ipv6InDiscards);
 			goto next_one;
 		}
-		if (!canputnext(rq)) {
+		if (CONN_UDP_FLOWCTLD(connp)) {
 			BUMP_MIB(ill->ill_ip6_mib, udpInOverflows);
 			freemsg(mp1);
 			goto next_one;
@@ -3778,7 +3812,9 @@ ip_fanout_udp_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h, uint32_t ports,
 			if (mctl_present)
 				freeb(first_mp1);
 			BUMP_MIB(ill->ill_ip6_mib, ipv6InDelivers);
-			putnext(rq, mp1);
+
+			/* Send it upstream */
+			CONN_UDP_RECV(connp, mp1);
 		}
 next_one:
 		mutex_enter(&connfp->connf_lock);
@@ -3791,7 +3827,6 @@ next_one:
 
 	/* Last one.  Send it upstream. */
 	mutex_exit(&connfp->connf_lock);
-	rq = connp->conn_rq;
 
 	/* Initiate IPPF processing */
 	if (IP6_IN_IPP(flags)) {
@@ -3830,7 +3865,7 @@ next_one:
 			first_mp = mp;
 		}
 	}
-	if (!canputnext(rq)) {
+	if (CONN_UDP_FLOWCTLD(connp)) {
 		BUMP_MIB(ill->ill_ip6_mib, udpInOverflows);
 		freemsg(mp);
 	} else {
@@ -3844,7 +3879,9 @@ next_one:
 			}
 		}
 		BUMP_MIB(ill->ill_ip6_mib, ipv6InDelivers);
-		putnext(rq, mp);
+
+		/* Send it upstream */
+		CONN_UDP_RECV(connp, mp);
 	}
 	IP6_STAT(ip6_udp_fanmb);
 	CONN_DEC_REF(connp);
@@ -6447,7 +6484,7 @@ ip_rput_v6(queue_t *q, mblk_t *mp)
 		 */
 		if ((mp->b_datap->db_type != M_PCPROTO) ||
 		    (dl->dl_primitive == DL_UNITDATA_IND)) {
-			ip_ioctl_freemsg(mp);
+			inet_freemsg(mp);
 			return;
 		}
 	}
@@ -6835,14 +6872,16 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 	mblk_t		*first_mp1;
 	boolean_t	no_forward;
 	ip6_hbh_t	*hbhhdr;
-	boolean_t	no_cksum = (flags & IP6_IN_NOCKSUM);
 	boolean_t	ll_multicast = (flags & IP6_IN_LLMCAST);
 	conn_t		*connp;
-	int		off;
 	ilm_t		*ilm;
 	uint32_t	ports;
 	uint_t		ipif_id = 0;
 	zoneid_t	zoneid = GLOBAL_ZONEID;
+	uint16_t	hck_flags, reass_hck_flags;
+	uint32_t	reass_sum;
+	boolean_t	cksum_err;
+	mblk_t		*mp1;
 
 	EXTRACT_PKT_MP(mp, first_mp, mctl_present);
 
@@ -6899,11 +6938,14 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 		pkt_len -= diff;
 	}
 
-	/*
-	 * XXX When zero-copy support is added, this turning off of
-	 * checksum flag  will need to be done more selectively.
-	 */
-	mp->b_datap->db_struioun.cksum.flags &= ~HCK_PARTIALCKSUM;
+	if (ILL_HCKSUM_CAPABLE(ill) && !mctl_present && dohwcksum)
+		hck_flags = DB_CKSUMFLAGS(mp);
+	else
+		hck_flags = 0;
+
+	/* Clear checksum flags in case we need to forward */
+	DB_CKSUMFLAGS(mp) = 0;
+	reass_sum = reass_hck_flags = 0;
 
 	nexthdr = ip6h->ip6_nxt;
 
@@ -7168,7 +7210,6 @@ ip_rput_data_v6(queue_t *q, ill_t *inill, mblk_t *mp, ip6_t *ip6h,
 			/* TBD add site-local check at site boundary? */
 		} else if (ipv6_send_redirects) {
 			in6_addr_t	*v6targ;
-			mblk_t		*mp1;
 			in6_addr_t	gw_addr_v6;
 			ire_t		*src_ire_v6 = NULL;
 
@@ -7313,7 +7354,6 @@ ipv6forus:
 		case IPPROTO_TCP: {
 			uint16_t	*up;
 			uint32_t	sum;
-			dblk_t		*dp;
 			int		offset;
 
 			hdr_len = pkt_len - remlen;
@@ -7336,6 +7376,7 @@ ipv6forus:
 					freemsg(first_mp);
 					return;
 				}
+				hck_flags = 0;
 				ip6h = (ip6_t *)mp->b_rptr;
 				whereptr = (uint8_t *)ip6h + hdr_len;
 			}
@@ -7368,28 +7409,10 @@ ipv6forus:
 						freemsg(first_mp);
 						return;
 					}
+					hck_flags = 0;
 					ip6h = (ip6_t *)mp->b_rptr;
 					whereptr = (uint8_t *)ip6h + hdr_len;
 				}
-			}
-
-			/*
-			 * If packet is being looped back locally checksums
-			 * aren't used
-			 */
-			if (no_cksum) {
-				if (mp->b_datap->db_type == M_DATA) {
-					/*
-					 * M_DATA mblk, so init mblk (chain)
-					 * for no struio().
-					 */
-					mblk_t  *mp1 = mp;
-
-					do {
-						mp1->b_datap->db_struioflag = 0;
-					} while ((mp1 = mp1->b_cont) != NULL);
-				}
-				goto tcp_fanout;
 			}
 
 			up = (uint16_t *)&ip6h->ip6_src;
@@ -7400,44 +7423,38 @@ ipv6forus:
 			 *  -	Destination IPv6 address
 			 *  -	TCP payload length
 			 *  -	TCP protocol ID
-			 * XXX need zero-copy support here
 			 */
 			sum = htons(IPPROTO_TCP + remlen) +
 			    up[0] + up[1] + up[2] + up[3] +
 			    up[4] + up[5] + up[6] + up[7] +
 			    up[8] + up[9] + up[10] + up[11] +
 			    up[12] + up[13] + up[14] + up[15];
-			sum = (sum & 0xffff) + (sum >> 16);
-			dp = mp->b_datap;
-			if (dp->db_type != M_DATA || dp->db_ref > 1) {
-				/*
-				 * Not M_DATA mblk or its a dup, so do the
-				 * checksum now.
-				 */
-				sum = IP_CSUM(mp, hdr_len, sum);
-				if (sum) {
-					/* checksum failed */
-					ip1dbg(("ip_rput_data_v6: TCP checksum"
-					    " failed %x off %d\n",
-					    sum, hdr_len));
-					BUMP_MIB(&ip_mib, tcpInErrs);
-					freemsg(first_mp);
-					return;
-				}
-			} else {
-				/*
-				 * M_DATA mblk and not a dup
-				 * compute checksum here
-				 */
-				off = (int)(whereptr - mp->b_rptr);
 
-				if (IP_CSUM(mp, off, sum)) {
-					BUMP_MIB(&ip_mib, tcpInErrs);
-					ipcsumdbg("ip_rput_data_v6 "
-					    "swcksumerr\n", mp);
-					freemsg(first_mp);
-					return;
-				}
+			/* Fold initial sum */
+			sum = (sum & 0xffff) + (sum >> 16);
+
+			mp1 = mp->b_cont;
+
+			if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
+				IP6_STAT(ip6_in_sw_cksum);
+
+			IP_CKSUM_RECV(hck_flags, sum, (uchar_t *)
+			    ((uchar_t *)mp->b_rptr + DB_CKSUMSTART(mp)),
+			    (int32_t)(whereptr - (uchar_t *)mp->b_rptr),
+			    mp, mp1, cksum_err);
+
+			if (cksum_err) {
+				BUMP_MIB(&ip_mib, tcpInErrs);
+
+				if (hck_flags & HCK_FULLCKSUM)
+					IP6_STAT(ip6_tcp_in_full_hw_cksum_err);
+				else if (hck_flags & HCK_PARTIALCKSUM)
+					IP6_STAT(ip6_tcp_in_part_hw_cksum_err);
+				else
+					IP6_STAT(ip6_tcp_in_sw_cksum_err);
+
+				freemsg(first_mp);
+				return;
 			}
 tcp_fanout:
 			ip_fanout_tcp_v6(q, first_mp, ip6h, ill, inill,
@@ -7468,18 +7485,16 @@ tcp_fanout:
 			}
 
 			sctph = (sctp_hdr_t *)(mp->b_rptr + hdr_len);
-			if (!no_cksum) {
-				/* checksum */
-				pktsum = sctph->sh_chksum;
-				sctph->sh_chksum = 0;
-				calcsum = sctp_cksum(mp, hdr_len);
-				if (calcsum != pktsum) {
-					BUMP_MIB(&sctp_mib, sctpChecksumError);
-					freemsg(mp);
-					return;
-				}
-				sctph->sh_chksum = pktsum;
+			/* checksum */
+			pktsum = sctph->sh_chksum;
+			sctph->sh_chksum = 0;
+			calcsum = sctp_cksum(mp, hdr_len);
+			if (calcsum != pktsum) {
+				BUMP_MIB(&sctp_mib, sctpChecksumError);
+				freemsg(mp);
+				return;
 			}
+			sctph->sh_chksum = pktsum;
 			ports = *(uint32_t *)(mp->b_rptr + hdr_len);
 			if ((connp = sctp_find_conn(&ip6h->ip6_src,
 			    &ip6h->ip6_dst, ports, ipif_id, zoneid)) == NULL) {
@@ -7501,8 +7516,6 @@ tcp_fanout:
 
 			hdr_len = pkt_len - remlen;
 
-#define	UDPH_SIZE 8
-
 			if (hada_mp != NULL) {
 				ip0dbg(("udp hada drop\n"));
 				goto hada_drop;
@@ -7519,16 +7532,10 @@ tcp_fanout:
 					freemsg(first_mp);
 					return;
 				}
+				hck_flags = 0;
 				ip6h = (ip6_t *)mp->b_rptr;
 				whereptr = (uint8_t *)ip6h + hdr_len;
 			}
-#undef UDPH_SIZE
-			/*
-			 * If packet is being looped back locally checksums
-			 * aren't used
-			 */
-			if (no_cksum)
-				goto udp_fanout;
 
 			/*
 			 *  Before going through the regular checksum
@@ -7568,15 +7575,37 @@ tcp_fanout:
 			    up[8] + up[9] + up[10] + up[11] +
 			    up[12] + up[13] + up[14] + up[15];
 
+			/* Fold initial sum */
 			sum = (sum & 0xffff) + (sum >> 16);
-			/* Next sum in the UDP packet */
-			sum = IP_CSUM(mp, hdr_len, sum);
-			if (sum) {
-				/* UDP checksum failed */
-				ip1dbg(("ip_rput_data_v6: UDP checksum "
-				    "failed %x\n",
-				    sum));
+
+			if (reass_hck_flags != 0) {
+				hck_flags = reass_hck_flags;
+
+				IP_CKSUM_RECV_REASS(hck_flags,
+				    (int32_t)(whereptr - (uchar_t *)mp->b_rptr),
+				    sum, reass_sum, cksum_err);
+			} else {
+				mp1 = mp->b_cont;
+
+				IP_CKSUM_RECV(hck_flags, sum, (uchar_t *)
+				    ((uchar_t *)mp->b_rptr + DB_CKSUMSTART(mp)),
+				    (int32_t)(whereptr - (uchar_t *)mp->b_rptr),
+				    mp, mp1, cksum_err);
+			}
+
+			if ((hck_flags & (HCK_FULLCKSUM|HCK_PARTIALCKSUM)) == 0)
+				IP6_STAT(ip6_in_sw_cksum);
+
+			if (cksum_err) {
 				BUMP_MIB(ill->ill_ip6_mib, udpInCksumErrs);
+
+				if (hck_flags & HCK_FULLCKSUM)
+					IP6_STAT(ip6_udp_in_full_hw_cksum_err);
+				else if (hck_flags & HCK_PARTIALCKSUM)
+					IP6_STAT(ip6_udp_in_part_hw_cksum_err);
+				else
+					IP6_STAT(ip6_udp_in_sw_cksum_err);
+
 				freemsg(first_mp);
 				return;
 			}
@@ -7592,13 +7621,6 @@ tcp_fanout:
 				goto hada_drop;
 			}
 
-			/*
-			 * If packet is being looped back locally checksums
-			 * aren't used
-			 */
-			if (no_cksum)
-				goto icmp_fanout;
-
 			up = (uint16_t *)&ip6h->ip6_src;
 			sum = htons(IPPROTO_ICMPV6 + remlen) +
 			    up[0] + up[1] + up[2] + up[3] +
@@ -7607,7 +7629,7 @@ tcp_fanout:
 			    up[12] + up[13] + up[14] + up[15];
 			sum = (sum & 0xffff) + (sum >> 16);
 			sum = IP_CSUM(mp, hdr_len, sum);
-			if (sum) {
+			if (sum != 0) {
 				/* IPv6 ICMP checksum failed */
 				ip1dbg(("ip_rput_data_v6: ICMPv6 checksum "
 				    "failed %x\n",
@@ -7795,6 +7817,7 @@ tcp_fanout:
 					freemsg(mp);
 					return;
 				}
+				hck_flags = 0;
 				ip6h = (ip6_t *)mp->b_rptr;
 				whereptr = (uint8_t *)ip6h + pkt_len - remlen;
 			}
@@ -7820,8 +7843,12 @@ tcp_fanout:
 				}
 			}
 
+			/* Restore the flags */
+			DB_CKSUMFLAGS(mp) = hck_flags;
+
 			mp = ip_rput_frag_v6(q, mp, ip6h, fraghdr,
-			    remlen - used, &prev_nexthdr_offset);
+			    remlen - used, &prev_nexthdr_offset,
+			    &reass_sum, &reass_hck_flags);
 			if (mp == NULL) {
 				/* Reassembly is still pending */
 				return;
@@ -8032,7 +8059,7 @@ udp_fanout:
 		return;
 	}
 
-	if (!canputnext(connp->conn_upq)) {
+	if (CONN_UDP_FLOWCTLD(connp)) {
 		freemsg(first_mp);
 		BUMP_MIB(ill->ill_ip6_mib, udpInOverflows);
 		CONN_DEC_REF(connp);
@@ -8062,7 +8089,9 @@ udp_fanout:
 	IP6_STAT(ip6_udp_fast_path);
 	BUMP_MIB(ill->ill_ip6_mib, ipv6InReceives);
 	BUMP_MIB(ill->ill_ip6_mib, ipv6InDelivers);
-	putnext(connp->conn_upq, mp);
+
+	/* Send it upstream */
+	CONN_UDP_RECV(connp, mp);
 
 	CONN_DEC_REF(connp);
 	freemsg(hada_mp);
@@ -8086,7 +8115,8 @@ hada_drop:
  */
 static mblk_t *
 ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
-    ip6_frag_t *fraghdr, uint_t remlen, uint_t *prev_nexthdr_offset)
+    ip6_frag_t *fraghdr, uint_t remlen, uint_t *prev_nexthdr_offset,
+    uint32_t *cksum_val, uint16_t *cksum_flags)
 {
 	ill_t		*ill = (ill_t *)q->q_ptr;
 	uint32_t	ident = ntohl(fraghdr->ip6f_ident);
@@ -8107,6 +8137,62 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	mblk_t		*tail_mp;
 	mblk_t		*t_mp;
 	boolean_t	pruned = B_FALSE;
+	uint32_t	sum_val;
+	uint16_t	sum_flags;
+
+
+	if (cksum_val != NULL)
+		*cksum_val = 0;
+	if (cksum_flags != NULL)
+		*cksum_flags = 0;
+
+	/*
+	 * We utilize hardware computed checksum info only for UDP since
+	 * IP fragmentation is a normal occurence for the protocol.  In
+	 * addition, checksum offload support for IP fragments carrying
+	 * UDP payload is commonly implemented across network adapters.
+	 */
+	ASSERT(ill != NULL);
+	if (nexthdr == IPPROTO_UDP && dohwcksum && ILL_HCKSUM_CAPABLE(ill) &&
+	    (DB_CKSUMFLAGS(mp) & (HCK_FULLCKSUM | HCK_PARTIALCKSUM))) {
+		mblk_t *mp1 = mp->b_cont;
+		int32_t len;
+
+		/* Record checksum information from the packet */
+		sum_val = (uint32_t)DB_CKSUM16(mp);
+		sum_flags = DB_CKSUMFLAGS(mp);
+
+		/* fragmented payload offset from beginning of mblk */
+		offset = (uint16_t)((uchar_t *)&fraghdr[1] - mp->b_rptr);
+
+		if ((sum_flags & HCK_PARTIALCKSUM) &&
+		    (mp1 == NULL || mp1->b_cont == NULL) &&
+		    offset >= (uint16_t)DB_CKSUMSTART(mp) &&
+		    ((len = offset - (uint16_t)DB_CKSUMSTART(mp)) & 1) == 0) {
+			uint32_t adj;
+			/*
+			 * Partial checksum has been calculated by hardware
+			 * and attached to the packet; in addition, any
+			 * prepended extraneous data is even byte aligned.
+			 * If any such data exists, we adjust the checksum;
+			 * this would also handle any postpended data.
+			 */
+			IP_ADJCKSUM_PARTIAL(mp->b_rptr + DB_CKSUMSTART(mp),
+			    mp, mp1, len, adj);
+
+			/* One's complement subtract extraneous checksum */
+			if (adj >= sum_val)
+				sum_val = ~(adj - sum_val) & 0xFFFF;
+			else
+				sum_val -= adj;
+		}
+	} else {
+		sum_val = 0;
+		sum_flags = 0;
+	}
+
+	/* Clear hardware checksumming flag */
+	DB_CKSUMFLAGS(mp) = 0;
 
 	/*
 	 * Note: Fragment offset in header is in 8-octet units.
@@ -8159,7 +8245,6 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	 * Drop the fragmented as early as possible, if
 	 * we don't have resource(s) to re-assemble.
 	 */
-
 	if (ip_reass_queue_bytes == 0) {
 		freemsg(mp);
 		return (NULL);
@@ -8183,12 +8268,11 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	 * there is anything on the reassembly queue, the timer will
 	 * be running.
 	 */
-	msg_len = mp->b_datap->db_lim - mp->b_datap->db_base;
+	msg_len = MBLKSIZE(mp);
 	tail_mp = mp;
 	while (tail_mp->b_cont != NULL) {
 		tail_mp = tail_mp->b_cont;
-		msg_len += tail_mp->b_datap->db_lim -
-		    tail_mp->b_datap->db_base;
+		msg_len += MBLKSIZE(tail_mp);
 	}
 	/*
 	 * If the reassembly list for this ILL will get too big
@@ -8287,7 +8371,7 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		ipf->ipf_timestamp = gethrestime_sec();
 		/* Record ipf generation and account for frag header */
 		ipf->ipf_gen = ill->ill_ipf_gen++;
-		ipf->ipf_count = mp1->b_datap->db_lim - mp1->b_datap->db_base;
+		ipf->ipf_count = MBLKSIZE(mp1);
 		ipf->ipf_protocol = nexthdr;
 		ipf->ipf_nf_hdr_len = 0;
 		ipf->ipf_prev_nexthdr_offset = 0;
@@ -8295,6 +8379,16 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		ipf->ipf_ecn = ecn_info;
 		ipf->ipf_num_dups = 0;
 		ipfb->ipfb_frag_pkts++;
+		ipf->ipf_checksum = 0;
+		ipf->ipf_checksum_flags = 0;
+
+		/* Store checksum value in fragment header */
+		if (sum_flags != 0) {
+			sum_val = (sum_val & 0xFFFF) + (sum_val >> 16);
+			sum_val = (sum_val & 0xFFFF) + (sum_val >> 16);
+			ipf->ipf_checksum = sum_val;
+			ipf->ipf_checksum_flags = sum_flags;
+		}
 
 		/*
 		 * We handle reassembly two ways.  In the easy case,
@@ -8326,6 +8420,10 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 			 * on easy reassembly.
 			 */
 			ipf->ipf_end = 0;
+
+			/* Forget checksum offload from now on */
+			ipf->ipf_checksum_flags = 0;
+
 			/*
 			 * ipf_hole_cnt is set by ip_reassemble.
 			 * ipf_count is updated by ip_reassemble.
@@ -8346,6 +8444,23 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 		ill_frag_timer_start(ill);
 		mutex_exit(&ill->ill_lock);
 		goto partial_reass_done;
+	}
+
+	/*
+	 * If the packet's flag has changed (it could be coming up
+	 * from an interface different than the previous, therefore
+	 * possibly different checksum capability), then forget about
+	 * any stored checksum states.  Otherwise add the value to
+	 * the existing one stored in the fragment header.
+	 */
+	if (sum_flags != 0 && sum_flags == ipf->ipf_checksum_flags) {
+		sum_val += ipf->ipf_checksum;
+		sum_val = (sum_val & 0xFFFF) + (sum_val >> 16);
+		sum_val = (sum_val & 0xFFFF) + (sum_val >> 16);
+		ipf->ipf_checksum = sum_val;
+	} else if (ipf->ipf_checksum_flags != 0) {
+		/* Forget checksum offload from now on */
+		ipf->ipf_checksum_flags = 0;
 	}
 
 	/*
@@ -8443,6 +8558,13 @@ ip_rput_frag_v6(queue_t *q, mblk_t *mp, ip6_t *ip6h,
 	nexthdr = ipf->ipf_protocol;
 	*prev_nexthdr_offset = ipf->ipf_prev_nexthdr_offset;
 	ipfp = ipf->ipf_ptphn;
+
+	/* We need to supply these to caller */
+	if ((sum_flags = ipf->ipf_checksum_flags) != 0)
+		sum_val = ipf->ipf_checksum;
+	else
+		sum_val = 0;
+
 	mp1 = ipf->ipf_mp;
 	count = ipf->ipf_count;
 	ipf = ipf->ipf_hash_next;
@@ -8507,6 +8629,12 @@ reass_done:
 	/* Record the ECN info. */
 	ip6h->ip6_vcf &= htonl(0xFFCFFFFF);
 	ip6h->ip6_vcf |= htonl(ecn_info << 20);
+
+	/* Reassembly is successful; return checksum information if needed */
+	if (cksum_val != NULL)
+		*cksum_val = sum_val;
+	if (cksum_flags != NULL)
+		*cksum_flags = sum_flags;
 
 	return (mp);
 }
@@ -9954,7 +10082,7 @@ notv6:
 	if (q->q_next == NULL) {
 		connp = Q_TO_CONN(q);
 
-		if (IS_TCP_CONN(connp)) {
+		if (IPCL_IS_TCP(connp)) {
 			/* change conn_send for the tcp_v4_connections */
 			connp->conn_send = ip_output;
 		} else if (connp->conn_ulp == IPPROTO_SCTP) {
@@ -10426,11 +10554,51 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		uint32_t	sum;
 		uint_t		ill_index =  ((ill_t *)ire->ire_stq->q_ptr)->
 		    ill_phyint->phyint_ifindex;
+		queue_t		*dev_q = ire->ire_stq->q_next;
 
 		/*
 		 * non-NULL send-to queue - packet is to be sent
 		 * out an interface.
 		 */
+
+		/* Driver is flow-controlling? */
+		if (!IP_FLOW_CONTROLLED_ULP(nexthdr) &&
+		    ((dev_q->q_next || dev_q->q_first) && !canput(dev_q))) {
+			/*
+			 * Queue packet if we have an conn to give back
+			 * pressure.  We can't queue packets intended for
+			 * hardware acceleration since we've tossed that
+			 * state already.  If the packet is being fed back
+			 * from ire_send_v6, we don't know the position in
+			 * the queue to enqueue the packet and we discard
+			 * the packet.
+			 */
+			ASSERT(mp == first_mp);
+			if (ip_output_queue && connp != NULL &&
+			    !mctl_present && caller != IRE_SEND) {
+				if (caller == IP_WSRV) {
+					connp->conn_did_putbq = 1;
+					(void) putbq(connp->conn_wq, mp);
+					conn_drain_insert(connp);
+					/*
+					 * caller == IP_WSRV implies we are
+					 * the service thread, and the
+					 * queue is already noenabled.
+					 * The check for canput and
+					 * the putbq is not atomic.
+					 * So we need to check again.
+					 */
+					if (canput(dev_q))
+						connp->conn_did_putbq = 0;
+				} else {
+					(void) putq(connp->conn_wq, mp);
+				}
+				return;
+			}
+			BUMP_MIB(mibptr, ipv6OutDiscards);
+			freemsg(mp);
+			return;
+		}
 
 		/*
 		 * Look for reachability confirmations from the transport.
@@ -10490,20 +10658,20 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			    up[12] + up[13] + up[14] + up[15];
 			sum = (sum & 0xffff) + (sum >> 16);
 			*insp = IP_CSUM(mp, hdr_length, sum);
+			if (*insp == 0)
+				*insp = 0xFFFF;
 		} else if (nexthdr == IPPROTO_TCP) {
 			uint16_t	*up;
 
 			/*
 			 * Check for full IPv6 header + enough TCP header
 			 * to get at the checksum field.
-			 * XXX need hardware checksum support.
 			 */
-#define	TCP_CSUM_OFFSET	16
-#define	TCP_CSUM_SIZE	2
 			if ((mp->b_wptr - mp->b_rptr) <
-			    (hdr_length + TCP_CSUM_OFFSET + TCP_CSUM_SIZE)) {
+			    (hdr_length + TCP_CHECKSUM_OFFSET +
+			    TCP_CHECKSUM_SIZE)) {
 				if (!pullupmsg(mp, hdr_length +
-				    TCP_CSUM_OFFSET + TCP_CSUM_SIZE)) {
+				    TCP_CHECKSUM_OFFSET + TCP_CHECKSUM_SIZE)) {
 					ip1dbg(("ip_wput_v6: TCP hdr pullupmsg"
 					    " failed\n"));
 					BUMP_MIB(mibptr, ipv6OutDiscards);
@@ -10519,30 +10687,28 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			 * into the tcp checksum field, so we don't
 			 * need to explicitly sum it in here.
 			 */
-			if (hdr_length == IPV6_HDR_LEN) {
-				/* src, dst, tcp consequtive */
-				up = (uint16_t *)(((uchar_t *)ip6h) +
-				    IPV6_HDR_LEN + TCP_CSUM_OFFSET);
-				*up = IP_CSUM(mp,
-				    IPV6_HDR_LEN - 2 * sizeof (in6_addr_t),
-				    htons(IPPROTO_TCP));
-			} else {
-				sum = htons(IPPROTO_TCP) +
-				    up[0] + up[1] + up[2] + up[3] +
-				    up[4] + up[5] + up[6] + up[7] +
-				    up[8] + up[9] + up[10] + up[11] +
-				    up[12] + up[13] + up[14] + up[15];
-				/*
-				 * Fold the initial sum.
-				 */
-				sum = (sum & 0xffff) + (sum >> 16);
-				up = (uint16_t *)(((uchar_t *)ip6h) +
-				    hdr_length + TCP_CSUM_OFFSET);
-				*up = IP_CSUM(mp, hdr_length, sum);
-			}
-#undef TCP_CSUM_OFFSET
-#undef TCP_CSUM_SIZE
+			sum = up[0] + up[1] + up[2] + up[3] +
+			    up[4] + up[5] + up[6] + up[7] +
+			    up[8] + up[9] + up[10] + up[11] +
+			    up[12] + up[13] + up[14] + up[15];
 
+			/* Fold the initial sum */
+			sum = (sum & 0xffff) + (sum >> 16);
+
+			up = (uint16_t *)(((uchar_t *)ip6h) +
+			    hdr_length + TCP_CHECKSUM_OFFSET);
+
+			IP_CKSUM_XMIT(ill, ire, mp, ip6h, up, IPPROTO_TCP,
+			    hdr_length, ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN,
+			    ire->ire_max_frag, mctl_present, sum);
+
+			/* Software checksum? */
+			if (DB_CKSUMFLAGS(mp) == 0) {
+				IP6_STAT(ip6_out_sw_cksum);
+				IP6_STAT_UPDATE(ip6_tcp_out_sw_cksum_bytes,
+				    (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN) -
+				    hdr_length);
+			}
 		} else if (nexthdr == IPPROTO_UDP) {
 			uint16_t	*up;
 
@@ -10550,12 +10716,10 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			 * check for full IPv6 header + enough UDP header
 			 * to get at the UDP checksum field
 			 */
-#define	UDP_CSUM_OFFSET	6
-#define	UDP_CSUM_SIZE	2
 			if ((mp->b_wptr - mp->b_rptr) < (hdr_length +
-			    UDP_CSUM_OFFSET + UDP_CSUM_SIZE)) {
+			    UDP_CHECKSUM_OFFSET + UDP_CHECKSUM_SIZE)) {
 				if (!pullupmsg(mp, hdr_length +
-				    UDP_CSUM_OFFSET + UDP_CSUM_SIZE)) {
+				    UDP_CHECKSUM_OFFSET + UDP_CHECKSUM_SIZE)) {
 					ip1dbg(("ip_wput_v6: UDP hdr pullupmsg"
 					    " failed\n"));
 					BUMP_MIB(mibptr, ipv6OutDiscards);
@@ -10570,34 +10734,28 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			 * into the udp checksum field, so we don't
 			 * need to explicitly sum it in here.
 			 */
-			if (hdr_length == IPV6_HDR_LEN) {
-				/* src, dst, udp consequtive */
-				up = (uint16_t *)(((uchar_t *)ip6h) +
-				    IPV6_HDR_LEN + UDP_CSUM_OFFSET);
-				*up = IP_CSUM(mp,
-				    IPV6_HDR_LEN - 2 * sizeof (in6_addr_t),
-				    htons(IPPROTO_UDP));
-			} else {
-				sum = htons(IPPROTO_UDP) +
-				    up[0] + up[1] + up[2] + up[3] +
-				    up[4] + up[5] + up[6] + up[7] +
-				    up[8] + up[9] + up[10] + up[11] +
-				    up[12] + up[13] + up[14] + up[15];
-				sum = (sum & 0xffff) + (sum >> 16);
-				up = (uint16_t *)(((uchar_t *)ip6h) +
-				    hdr_length + UDP_CSUM_OFFSET);
-				*up = IP_CSUM(mp, hdr_length, sum);
-			}
+			sum = up[0] + up[1] + up[2] + up[3] +
+			    up[4] + up[5] + up[6] + up[7] +
+			    up[8] + up[9] + up[10] + up[11] +
+			    up[12] + up[13] + up[14] + up[15];
 
-			/*
-			 * According to RFC 2460, UDP in IPv6 shouldn't
-			 * appear with all zero checksum on the wire and
-			 * should be changed to 0xffff.
-			 */
-			if (*up == 0)
-				*up = 0xffff;
-#undef UDP_CSUM_OFFSET
-#undef UDP_CSUM_SIZE
+			/* Fold the initial sum */
+			sum = (sum & 0xffff) + (sum >> 16);
+
+			up = (uint16_t *)(((uchar_t *)ip6h) +
+			    hdr_length + UDP_CHECKSUM_OFFSET);
+
+			IP_CKSUM_XMIT(ill, ire, mp, ip6h, up, IPPROTO_UDP,
+			    hdr_length, ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN,
+			    ire->ire_max_frag, mctl_present, sum);
+
+			/* Software checksum? */
+			if (DB_CKSUMFLAGS(mp) == 0) {
+				IP6_STAT(ip6_out_sw_cksum);
+				IP6_STAT_UPDATE(ip6_udp_out_sw_cksum_bytes,
+				    (ntohs(ip6h->ip6_plen) + IPV6_HDR_LEN) -
+				    hdr_length);
+			}
 		} else if (nexthdr == IPPROTO_ICMPV6) {
 			uint16_t	*up;
 			icmp6_t *icmp6;
@@ -10627,6 +10785,9 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			    up[12] + up[13] + up[14] + up[15];
 			sum = (sum & 0xffff) + (sum >> 16);
 			icmp6->icmp6_cksum = IP_CSUM(mp, hdr_length, sum);
+			if (icmp6->icmp6_cksum == 0)
+				icmp6->icmp6_cksum = 0xFFFF;
+
 			/* Update output mib stats */
 			icmp_update_out_mib_v6(ill, icmp6);
 		} else if (nexthdr == IPPROTO_SCTP) {
@@ -10764,6 +10925,223 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 }
 
 /*
+ * Outbound IPv6 fragmentation routine using MDT.
+ */
+static void
+ip_wput_frag_mdt_v6(mblk_t *mp, ire_t *ire, size_t max_chunk,
+    size_t unfragmentable_len, uint8_t nexthdr, uint_t prev_nexthdr_offset)
+{
+	ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
+	uint_t		pkts, wroff, hdr_chunk_len, pbuf_idx;
+	mblk_t		*hdr_mp, *md_mp = NULL;
+	int		i1;
+	multidata_t	*mmd;
+	unsigned char	*hdr_ptr, *pld_ptr;
+	ip_pdescinfo_t	pdi;
+	uint32_t	ident;
+	size_t		len;
+	uint16_t	offset;
+	queue_t		*stq = ire->ire_stq;
+	ill_t		*ill = (ill_t *)stq->q_ptr;
+
+	ASSERT(DB_TYPE(mp) == M_DATA);
+	ASSERT(MBLKL(mp) > unfragmentable_len);
+
+	/*
+	 * Move read ptr past unfragmentable portion, we don't want this part
+	 * of the data in our fragments.
+	 */
+	mp->b_rptr += unfragmentable_len;
+
+	/* Calculate how many packets we will send out  */
+	i1 = (mp->b_cont == NULL) ? MBLKL(mp) : msgsize(mp);
+	pkts = (i1 + max_chunk - 1) / max_chunk;
+	ASSERT(pkts > 1);
+
+	/* Allocate a message block which will hold all the IP Headers. */
+	wroff = ip_wroff_extra;
+	hdr_chunk_len = wroff + unfragmentable_len + sizeof (ip6_frag_t);
+
+	i1 = pkts * hdr_chunk_len;
+	/*
+	 * Create the header buffer, Multidata and destination address
+	 * and SAP attribute that should be associated with it.
+	 */
+	if ((hdr_mp = allocb(i1, BPRI_HI)) == NULL ||
+	    ((hdr_mp->b_wptr += i1),
+	    (mmd = mmd_alloc(hdr_mp, &md_mp, KM_NOSLEEP)) == NULL) ||
+	    !ip_md_addr_attr(mmd, NULL, ire->ire_nce->nce_res_mp)) {
+		freemsg(mp);
+		if (md_mp == NULL) {
+			freemsg(hdr_mp);
+		} else {
+free_mmd:		IP6_STAT(ip6_frag_mdt_discarded);
+			freemsg(md_mp);
+		}
+		IP6_STAT(ip6_frag_mdt_allocfail);
+		BUMP_MIB(ill->ill_ip6_mib, ipv6OutFragFails);
+		UPDATE_MIB(ill->ill_ip6_mib, ipv6OutDiscards, pkts);
+		return;
+	}
+	IP6_STAT(ip6_frag_mdt_allocd);
+
+	/*
+	 * Add a payload buffer to the Multidata; this operation must not
+	 * fail, or otherwise our logic in this routine is broken.  There
+	 * is no memory allocation done by the routine, so any returned
+	 * failure simply tells us that we've done something wrong.
+	 *
+	 * A failure tells us that either we're adding the same payload
+	 * buffer more than once, or we're trying to add more buffers than
+	 * allowed.  None of the above cases should happen, and we panic
+	 * because either there's horrible heap corruption, and/or
+	 * programming mistake.
+	 */
+	if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0) {
+		goto pbuf_panic;
+	}
+
+	hdr_ptr = hdr_mp->b_rptr;
+	pld_ptr = mp->b_rptr;
+
+	pdi.flags = PDESC_HBUF_REF | PDESC_PBUF_REF;
+
+	ident = htonl(atomic_add_32_nv(&ire->ire_ident, 1));
+
+	/*
+	 * len is the total length of the fragmentable data in this
+	 * datagram.  For each fragment sent, we will decrement len
+	 * by the amount of fragmentable data sent in that fragment
+	 * until len reaches zero.
+	 */
+	len = ntohs(ip6h->ip6_plen) - (unfragmentable_len - IPV6_HDR_LEN);
+
+	offset = 0;
+	prev_nexthdr_offset += wroff;
+
+	while (len != 0) {
+		size_t		mlen;
+		ip6_t		*fip6h;
+		ip6_frag_t	*fraghdr;
+		int		error;
+
+		ASSERT((hdr_ptr + hdr_chunk_len) <= hdr_mp->b_wptr);
+		mlen = MIN(len, max_chunk);
+		len -= mlen;
+
+		fip6h = (ip6_t *)(hdr_ptr + wroff);
+		ASSERT(OK_32PTR(fip6h));
+		bcopy(ip6h, fip6h, unfragmentable_len);
+		hdr_ptr[prev_nexthdr_offset] = IPPROTO_FRAGMENT;
+
+		fip6h->ip6_plen = htons((uint16_t)(mlen +
+		    unfragmentable_len - IPV6_HDR_LEN + sizeof (ip6_frag_t)));
+
+		fraghdr = (ip6_frag_t *)((unsigned char *)fip6h +
+		    unfragmentable_len);
+		fraghdr->ip6f_nxt = nexthdr;
+		fraghdr->ip6f_reserved = 0;
+		fraghdr->ip6f_offlg = htons(offset) |
+		    ((len != 0) ? IP6F_MORE_FRAG : 0);
+		fraghdr->ip6f_ident = ident;
+
+		/*
+		 * Record offset and size of header and data of the next packet
+		 * in the multidata message.
+		 */
+		PDESC_HDR_ADD(&pdi, hdr_ptr, wroff,
+		    unfragmentable_len + sizeof (ip6_frag_t), 0);
+		PDESC_PLD_INIT(&pdi);
+		i1 = MIN(mp->b_wptr - pld_ptr, mlen);
+		ASSERT(i1 > 0);
+		PDESC_PLD_SPAN_ADD(&pdi, pbuf_idx, pld_ptr, i1);
+		if (i1 == mlen) {
+			pld_ptr += mlen;
+		} else {
+			i1 = mlen - i1;
+			mp = mp->b_cont;
+			ASSERT(mp != NULL);
+			ASSERT(MBLKL(mp) >= i1);
+			/*
+			 * Attach the next payload message block to the
+			 * multidata message.
+			 */
+			if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
+				goto pbuf_panic;
+			PDESC_PLD_SPAN_ADD(&pdi, pbuf_idx, mp->b_rptr, i1);
+			pld_ptr = mp->b_rptr + i1;
+		}
+
+		if ((mmd_addpdesc(mmd, (pdescinfo_t *)&pdi, &error,
+		    KM_NOSLEEP)) == NULL) {
+			/*
+			 * Any failure other than ENOMEM indicates that we
+			 * have passed in invalid pdesc info or parameters
+			 * to mmd_addpdesc, which must not happen.
+			 *
+			 * EINVAL is a result of failure on boundary checks
+			 * against the pdesc info contents.  It should not
+			 * happen, and we panic because either there's
+			 * horrible heap corruption, and/or programming
+			 * mistake.
+			 */
+			if (error != ENOMEM) {
+				cmn_err(CE_PANIC, "ip_wput_frag_mdt_v6: "
+				    "pdesc logic error detected for "
+				    "mmd %p pinfo %p (%d)\n",
+				    (void *)mmd, (void *)&pdi, error);
+				/* NOTREACHED */
+			}
+			IP6_STAT(ip6_frag_mdt_addpdescfail);
+			/* Free unattached payload message blocks as well */
+			md_mp->b_cont = mp->b_cont;
+			goto free_mmd;
+		}
+
+		/* Advance fragment offset. */
+		offset += mlen;
+
+		/* Advance to location for next header in the buffer. */
+		hdr_ptr += hdr_chunk_len;
+
+		/* Did we reach the next payload message block? */
+		if (pld_ptr == mp->b_wptr && mp->b_cont != NULL) {
+			mp = mp->b_cont;
+			/*
+			 * Attach the next message block with payload
+			 * data to the multidata message.
+			 */
+			if ((pbuf_idx = mmd_addpldbuf(mmd, mp)) < 0)
+				goto pbuf_panic;
+			pld_ptr = mp->b_rptr;
+		}
+	}
+
+	ASSERT(hdr_mp->b_wptr == hdr_ptr);
+	ASSERT(mp->b_wptr == pld_ptr);
+
+	/* Update IP statistics */
+	UPDATE_MIB(ill->ill_ip6_mib, ipv6OutFragCreates, pkts);
+	BUMP_MIB(ill->ill_ip6_mib, ipv6OutFragOKs);
+	IP6_STAT_UPDATE(ip6_frag_mdt_pkt_out, pkts);
+
+	ire->ire_ob_pkt_count += pkts;
+	if (ire->ire_ipif != NULL)
+		atomic_add_32(&ire->ire_ipif->ipif_ob_pkt_count, pkts);
+
+	ire->ire_last_used_time = lbolt;
+	/* Send it down */
+	putnext(stq, md_mp);
+	return;
+
+pbuf_panic:
+	cmn_err(CE_PANIC, "ip_wput_frag_mdt_v6: payload buffer logic "
+	    "error for mmd %p pbuf %p (%d)", (void *)mmd, (void *)mp,
+	    pbuf_idx);
+	/* NOTREACHED */
+}
+
+/*
  * IPv6 fragmentation.  Essentially the same as IPv4 fragmentation.
  * We have not optimized this in terms of number of mblks
  * allocated. For instance, for each fragment sent we always allocate a
@@ -10779,7 +11157,7 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
  */
 void
 ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
-    boolean_t caller, int max_frag)
+    int caller, int max_frag)
 {
 	ip6_t		*ip6h = (ip6_t *)mp->b_rptr;
 	ip6_t		*fip6h;
@@ -10849,6 +11227,19 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 	}
 	unfragmentable_len = (uint_t)(ptr - (uint8_t *)ip6h);
 
+	max_chunk = (min(max_frag, ire->ire_max_frag) - unfragmentable_len -
+	    sizeof (ip6_frag_t)) & ~7;
+
+	/* Check if we can use MDT to send out the frags. */
+	ASSERT(!IRE_IS_LOCAL(ire));
+	if (ip_multidata_outbound && reachable == 0 &&
+	    !(ire->ire_flags & RTF_MULTIRT) && ILL_MDT_CAPABLE(ill) &&
+	    IP_CAN_FRAG_MDT(mp, unfragmentable_len, max_chunk)) {
+		ip_wput_frag_mdt_v6(mp, ire, max_chunk, unfragmentable_len,
+		    nexthdr, prev_nexthdr_offset);
+		return;
+	}
+
 	/*
 	 * Allocate an mblk with enough room for the link-layer
 	 * header, the unfragmentable part of the datagram, and the
@@ -10875,7 +11266,7 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 
 	fraghdr->ip6f_nxt = nexthdr;
 	fraghdr->ip6f_reserved = 0;
-	fraghdr->ip6f_offlg = htons(0);
+	fraghdr->ip6f_offlg = 0;
 	fraghdr->ip6f_ident = htonl(ident);
 
 	/*
@@ -10885,9 +11276,6 @@ ip_wput_frag_v6(mblk_t *mp, ire_t *ire, uint_t reachable, conn_t *connp,
 	 * until len reaches zero.
 	 */
 	len = ntohs(ip6h->ip6_plen) - (unfragmentable_len - IPV6_HDR_LEN);
-
-	max_chunk = (min(max_frag, ire->ire_max_frag) - unfragmentable_len -
-	    sizeof (ip6_frag_t)) & ~7;
 
 	/*
 	 * Move read ptr past unfragmentable portion, we don't want this part
@@ -11117,7 +11505,9 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 		}
 	}
 
-	if (IP_FLOW_CONTROLLED_ULP(ip6h->ip6_nxt) || canput(stq->q_next)) {
+	/* Flow-control check has been done in ip_wput_ire_v6 */
+	if (IP_FLOW_CONTROLLED_ULP(ip6h->ip6_nxt) || caller == IP_WPUT ||
+	    caller == IP_WSRV || canput(stq->q_next)) {
 		uint32_t ill_index;
 
 		/*
@@ -11164,7 +11554,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 				ill = ire_to_ill(ire);
 			}
 			IRB_REFRELE(irb);
-		} else if (connp != NULL && IS_TCP_CONN(connp) &&
+		} else if (connp != NULL && IPCL_IS_TCP(connp) &&
 		    connp->conn_mdt_ok && !connp->conn_tcp->tcp_mdt &&
 		    ILL_MDT_USABLE(ill)) {
 			/*
@@ -11583,7 +11973,7 @@ ip_xmit_v6(mblk_t *mp, ire_t *ire, uint_t flags, conn_t *connp,
 				(void) putbq(connp->conn_wq, mp);
 				conn_drain_insert(connp);
 				/*
-				 * called_from_wsrv implies we are
+				 * caller == IP_WSRV implies we are
 				 * the service thread, and the
 				 * queue is already noenabled.
 				 * The check for canput and

@@ -265,9 +265,9 @@ extern "C" {
 #define	SIOCDXARP	_IOW('i', 168, struct xarpreq)	/* delete ARP entry */
 
 /*
- * IOCTL to indicate to the transport that the sockmod is being popped
+ * IOCTL private to sockfs.
  */
-#define	SIOCPOPSOCKFS	_IOW('i', 169, 0)
+#define	_SIOCSOCKFALLBACK _IOW('i', 169, 0)
 
 /*
  * IOCTLs for getting and setting zone associated with an interface, and

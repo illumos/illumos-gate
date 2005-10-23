@@ -54,6 +54,7 @@
 #include <libdevinfo.h>
 #include <sys/systeminfo.h>
 #include <netdb.h>
+#include <inet/ip.h>
 
 #include <ipmp_mpathd.h>
 #include "rcm_module.h"
@@ -70,12 +71,7 @@
 /* Some generic well-knowns and defaults used in this module */
 #define	SLASH_DEV		"/dev"		/* /dev directory */
 
-#define	IP_DEV_NAME		"/dev/ip"	/* IPV4 ip device */
-#define	IP6_DEV_NAME		"/dev/ip6"	/* IPV6 ip device */
-#define	IP_MOD_NAME		"ip"		/* ip module */
 #define	ARP_MOD_NAME		"arp"		/* arp module */
-#define	UDP_DEV_NAME		"/dev/udp"	/* IPv4 udp device */
-#define	UDP6_DEV_NAME		"/dev/udp6"	/* IPv6 udp device */
 #define	IP_MAX_MODS		9		/* max modules pushed on intr */
 #define	MAX_RECONFIG_SIZE	1024		/* Max. reconfig string size */
 

@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -218,6 +218,8 @@ extern int cdev_prop_op(dev_t, dev_info_t *, ddi_prop_op_t,
 #define	D_HOTPLUG	0x4	/* Driver is hotplug capable */
 
 #define	D_U64BIT	0x40000	/* Driver supports unsigned 64-bit uio offset */
+
+#define	_D_DIRECT	0x80000	/* Private flag for transport modules */
 
 #endif /* !defined(_XPG4_2) || defined(__EXTENSIONS__) */
 

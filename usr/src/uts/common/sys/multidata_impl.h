@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -190,21 +190,6 @@ struct multidata_s {
 	uint_t	mmd_hbuf_ref;	/* descriptors referring to header buffer */
 	uint_t	mmd_pbuf_ref;	/* descriptors referring to payload buffer(s) */
 };
-
-/*
- * Smaller and private version of pdescinfo_t used specifically for tcp,
- * which allows for only two payload spans per packet.  Any changes made
- * to the pdescinfo_t structure must be reflected here as well.
- */
-typedef struct tcp_pdescinfo_s {
-	uint_t	flags;		/* misc. flags */
-	uchar_t	*hdr_base;	/* start address of header area */
-	uchar_t *hdr_rptr;	/* start address of header data */
-	uchar_t *hdr_wptr;	/* end address of header data */
-	uchar_t	*hdr_lim;	/* end address of header area */
-	uint_t	pld_cnt;	/* number of payload area */
-	struct pld_ary_s pld_ary[2];
-} tcp_pdescinfo_t;
 
 #ifdef _KERNEL
 

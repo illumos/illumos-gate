@@ -57,6 +57,7 @@
 
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/sockio.h>
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <sys/strsun.h>
@@ -72,6 +73,7 @@
 #include <inet/ip.h>
 #include <inet/ip6.h>
 #include <inet/tcp.h>
+#include <inet/udp_impl.h>
 
 #include <fs/sockfs/nl7c.h>
 #include <sys/zone.h>
@@ -185,6 +187,10 @@ static int	sotpi_sendmsg(struct sonode *, struct nmsghdr *,
 		    struct uio *);
 static int	sotpi_shutdown(struct sonode *, int);
 static int	sotpi_getsockname(struct sonode *);
+static int	sosend_dgramcmsg(struct sonode *, struct sockaddr *, socklen_t,
+		    struct uio *, void *, t_uscalar_t, int);
+static int	sodgram_direct(struct sonode *, struct sockaddr *,
+		    socklen_t, struct uio *, int);
 
 sonodeops_t sotpi_sonodeops = {
 	sotpi_accept,		/* sop_accept		*/
@@ -222,16 +228,40 @@ sotpi_create(vnode_t *accessvp, int domain, int type, int protocol, int version,
 	so = VTOSO(vp);
 
 	flags = FREAD|FWRITE;
-	if (tso != NULL) {
-		if ((tso->so_state & (SS_TCP_FAST_ACCEPT)) != 0) {
-			flags |= SO_ACCEPTOR|SO_SOCKSTR;
-			so->so_state |= SS_TCP_FAST_ACCEPT;
-		}
-	} else {
-		if ((so->so_type == SOCK_STREAM) &&
-		    (so->so_family == AF_INET || so->so_family == AF_INET6)) {
-			flags |= SO_SOCKSTR;
-			so->so_state |= SS_TCP_FAST_ACCEPT;
+
+	if ((type == SOCK_STREAM || type == SOCK_DGRAM) &&
+	    (domain == AF_INET || domain == AF_INET6) &&
+	    (protocol == IPPROTO_TCP || protocol == IPPROTO_UDP ||
+	    protocol == IPPROTO_IP)) {
+		/* Tell tcp or udp that it's talking to sockets */
+		flags |= SO_SOCKSTR;
+
+		/*
+		 * Here we indicate to socktpi_open() our attempt to
+		 * make direct calls between sockfs and transport.
+		 * The final decision is left to socktpi_open().
+		 */
+		so->so_state |= SS_DIRECT;
+
+		ASSERT(so->so_type != SOCK_DGRAM || tso == NULL);
+		if (so->so_type == SOCK_STREAM && tso != NULL) {
+			if (tso->so_state & SS_DIRECT) {
+				/*
+				 * Inherit SS_DIRECT from listener and pass
+				 * SO_ACCEPTOR open flag to tcp, indicating
+				 * that this is an accept fast-path instance.
+				 */
+				flags |= SO_ACCEPTOR;
+			} else {
+				/*
+				 * SS_DIRECT is not set on listener, meaning
+				 * that the listener has been converted from
+				 * a socket to a stream.  Ensure that the
+				 * acceptor inherits these settings.
+				 */
+				so->so_state &= ~SS_DIRECT;
+				flags &= ~SO_SOCKSTR;
+			}
 		}
 	}
 
@@ -1052,7 +1082,7 @@ done:
 }
 
 /* bind the socket */
-int
+static int
 sotpi_bind(struct sonode *so, struct sockaddr *name, socklen_t namelen,
     int flags)
 {
@@ -1372,7 +1402,7 @@ again:
 	case AF_INET:
 	case AF_INET6:
 		if ((optlen == sizeof (intptr_t)) &&
-		    ((so->so_state & SS_TCP_FAST_ACCEPT) != 0)) {
+		    ((so->so_state & SS_DIRECT) != 0)) {
 			bcopy(mp->b_rptr + conn_ind->OPT_offset,
 			    &opt, conn_ind->OPT_length);
 		} else {
@@ -1385,7 +1415,19 @@ again:
 			 * problems when sockfs sends a normal T_CONN_RES
 			 * message down the new stream.
 			 */
-			so->so_state &= ~SS_TCP_FAST_ACCEPT;
+			if (so->so_state & SS_DIRECT) {
+				int rval;
+				/*
+				 * For consistency we inform tcp to disable
+				 * direct interface on the listener, though
+				 * we can certainly live without doing this
+				 * because no data will ever travel upstream
+				 * on the listening socket.
+				 */
+				so->so_state &= ~SS_DIRECT;
+				(void) strioctl(SOTOV(so), _SIOCSOCKFALLBACK,
+				    0, 0, K_TO_K, CRED(), &rval);
+			}
 			opt = NULL;
 			optlen = 0;
 		}
@@ -1554,9 +1596,10 @@ again:
 	if (nso->so_options & SO_LINGER)
 		nso->so_linger = so->so_linger;
 
-	if ((so->so_state & SS_TCP_FAST_ACCEPT) != 0) {
+	if ((so->so_state & SS_DIRECT) != 0) {
 		mblk_t *ack_mp;
 
+		ASSERT(nso->so_state & SS_DIRECT);
 		ASSERT(opt != NULL);
 
 		conn_res->OPT_length = optlen;
@@ -3308,13 +3351,8 @@ err:
  * Assumes caller has verified that SS_ISBOUND etc. are set.
  */
 static int
-sosend_dgramcmsg(struct sonode *so,
-		struct sockaddr *name,
-		t_uscalar_t namelen,
-		struct uio *uiop,
-		void *control,
-		t_uscalar_t controllen,
-		int flags)
+sosend_dgramcmsg(struct sonode *so, struct sockaddr *name, socklen_t namelen,
+    struct uio *uiop, void *control, t_uscalar_t controllen, int flags)
 {
 	struct T_unitdata_req	tudr;
 	mblk_t			*mp;
@@ -3636,11 +3674,8 @@ sosend_svccmsg(struct sonode *so,
  * name and the source address is passed as an option.
  */
 int
-sosend_dgram(struct sonode	*so,
-		struct sockaddr	*name,
-		socklen_t	namelen,
-		struct uio	*uiop,
-		int		flags)
+sosend_dgram(struct sonode *so, struct sockaddr	*name, socklen_t namelen,
+    struct uio *uiop, int flags)
 {
 	struct T_unitdata_req	tudr;
 	mblk_t			*mp;
@@ -3651,7 +3686,7 @@ sosend_dgram(struct sonode	*so,
 	socklen_t		srclen;
 	ssize_t			len;
 
-	ASSERT(name && namelen);
+	ASSERT(name != NULL && namelen != 0);
 
 	len = uiop->uio_resid;
 	if (len > so->so_tidu_size) {
@@ -3659,14 +3694,14 @@ sosend_dgram(struct sonode	*so,
 		goto done;
 	}
 
-	/*
-	 * Length and family checks.
-	 */
+	/* Length and family checks */
 	error = so_addr_verify(so, name, namelen);
-	if (error) {
-		eprintsoline(so, error);
+	if (error != 0)
 		goto done;
-	}
+
+	if (so->so_state & SS_DIRECT)
+		return (sodgram_direct(so, name, namelen, uiop, flags));
+
 	if (so->so_family == AF_UNIX) {
 		if (so->so_state & SS_FADDR_NOXLATE) {
 			/*
@@ -4061,8 +4096,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	if (msg->msg_controllen != 0) {
 		if (!(so_mode & SM_CONNREQUIRED)) {
 			error = sosend_dgramcmsg(so, name, namelen, uiop,
-				msg->msg_control, msg->msg_controllen,
-				flags);
+			    msg->msg_control, msg->msg_controllen, flags);
 		} else {
 			if (flags & MSG_OOB) {
 				/* Can't generate T_EXDATA_REQ with options */
@@ -4080,7 +4114,7 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 	if (!(so_mode & SM_CONNREQUIRED)) {
 		/*
 		 * If there is no SO_DONTROUTE to turn off return immediately
-		 * from sosend_dgram. This can allow tail-call optimizations.
+		 * from send_dgram. This can allow tail-call optimizations.
 		 */
 		if (!dontroute) {
 			return (sosend_dgram(so, name, namelen, uiop, flags));
@@ -4104,13 +4138,16 @@ sotpi_sendmsg(struct sonode *so, struct nmsghdr *msg, struct uio *uiop)
 
 				dprintso(so, 1, ("sotpi_sendmsg: write\n"));
 				/*
-				 * If there is no SO_DONTROUTE to turn off
-				 * return immediately from strwrite. This can
-				 * allow tail-call optimizations.
+				 * If there is no SO_DONTROUTE to turn off,
+				 * SS_DIRECT is on, and there is no flow
+				 * control, we can take the fast path.
 				 */
-				if (!dontroute)
-					return (strwrite(SOTOV(so), uiop,
-							CRED()));
+				if (!dontroute &&
+				    (so_state & SS_DIRECT) &&
+				    canputnext(SOTOV(so)->v_stream->sd_wrq)) {
+					return (sostream_direct(so, uiop,
+					    NULL, CRED()));
+				}
 				error = strwrite(SOTOV(so), uiop, CRED());
 				goto done;
 			}
@@ -4137,6 +4174,206 @@ done:
 				&val, (t_uscalar_t)sizeof (val));
 	}
 	return (error);
+}
+
+/*
+ * Sending data on a datagram socket.
+ * Assumes caller has verified that SS_ISBOUND etc. are set.
+ */
+/* ARGSUSED */
+static int
+sodgram_direct(struct sonode *so, struct sockaddr *name,
+    socklen_t namelen, struct uio *uiop, int flags)
+{
+	struct T_unitdata_req	tudr;
+	mblk_t			*mp;
+	int			error = 0;
+	void			*addr;
+	socklen_t		addrlen;
+	ssize_t			len;
+	struct stdata		*stp = SOTOV(so)->v_stream;
+	int			so_state;
+	queue_t			*udp_wq;
+
+	ASSERT(name != NULL && namelen != 0);
+	ASSERT(!(so->so_mode & SM_CONNREQUIRED));
+	ASSERT(!(so->so_mode & SM_EXDATA));
+	ASSERT(so->so_family == AF_INET || so->so_family == AF_INET6);
+	ASSERT(SOTOV(so)->v_type == VSOCK);
+
+	/* Caller checked for proper length */
+	len = uiop->uio_resid;
+	ASSERT(len <= so->so_tidu_size);
+
+	/* Length and family checks have been done by caller */
+	ASSERT(name->sa_family == so->so_family);
+	ASSERT(so->so_family == AF_INET ||
+	    (namelen == (socklen_t)sizeof (struct sockaddr_in6)));
+	ASSERT(so->so_family == AF_INET6 ||
+	    (namelen == (socklen_t)sizeof (struct sockaddr_in)));
+
+	addr = name;
+	addrlen = namelen;
+
+	if (stp->sd_sidp != NULL &&
+	    (error = straccess(stp, JCWRITE)) != 0)
+		goto done;
+
+	so_state = so->so_state;
+
+	/*
+	 * For UDP we don't break up the copyin into smaller pieces
+	 * as in the TCP case.  That means if ENOMEM is returned by
+	 * mcopyinuio() then the uio vector has not been modified at
+	 * all and we fallback to either strwrite() or kstrputmsg()
+	 * below.  Note also that we never generate priority messages
+	 * from here.
+	 */
+	udp_wq = stp->sd_wrq->q_next;
+	if (canput(udp_wq) &&
+	    (mp = mcopyinuio(stp, uiop, -1, -1, &error)) != NULL) {
+		ASSERT(DB_TYPE(mp) == M_DATA);
+		ASSERT(uiop->uio_resid == 0);
+#ifdef C2_AUDIT
+		if (audit_active)
+			audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
+#endif /* C2_AUDIT */
+		udp_wput_data(udp_wq, mp, addr, addrlen);
+		return (0);
+	}
+	if (error != 0 && error != ENOMEM)
+		return (error);
+
+	/*
+	 * For connected, let strwrite() handle the blocking case.
+	 * Otherwise we fall thru and use kstrputmsg().
+	 */
+	if (so_state & SS_ISCONNECTED)
+		return (strwrite(SOTOV(so), uiop, CRED()));
+
+	tudr.PRIM_type = T_UNITDATA_REQ;
+	tudr.DEST_length = addrlen;
+	tudr.DEST_offset = (t_scalar_t)sizeof (tudr);
+	tudr.OPT_length = 0;
+	tudr.OPT_offset = 0;
+
+	mp = soallocproto2(&tudr, sizeof (tudr), addr, addrlen, 0, _ALLOC_INTR);
+	if (mp == NULL) {
+		/*
+		 * Caught a signal waiting for memory.
+		 * Let send* return EINTR.
+		 */
+		error = EINTR;
+		goto done;
+	}
+
+#ifdef C2_AUDIT
+	if (audit_active)
+		audit_sock(T_UNITDATA_REQ, strvp2wq(SOTOV(so)), mp, 0);
+#endif /* C2_AUDIT */
+
+	error = kstrputmsg(SOTOV(so), mp, uiop, len, 0, MSG_BAND, 0);
+done:
+#ifdef SOCK_DEBUG
+	if (error != 0) {
+		eprintsoline(so, error);
+	}
+#endif /* SOCK_DEBUG */
+	return (error);
+}
+
+int
+sostream_direct(struct sonode *so, struct uio *uiop, mblk_t *mp, cred_t *cr)
+{
+	struct stdata *stp = SOTOV(so)->v_stream;
+	ssize_t iosize, rmax, maxblk;
+	queue_t *tcp_wq = stp->sd_wrq->q_next;
+	int error = 0, wflag = 0;
+
+	ASSERT(so->so_mode & SM_BYTESTREAM);
+	ASSERT(SOTOV(so)->v_type == VSOCK);
+
+	if (stp->sd_sidp != NULL &&
+	    (error = straccess(stp, JCWRITE)) != 0)
+		return (error);
+
+	if (uiop == NULL) {
+		/*
+		 * kstrwritemp() should have checked sd_flag and
+		 * flow-control before coming here.  If we end up
+		 * here it means that we can simply pass down the
+		 * data to tcp.
+		 */
+		ASSERT(mp != NULL);
+		tcp_wput(tcp_wq, mp);
+		return (0);
+	}
+
+	/* Fallback to strwrite() to do proper error handling */
+	if (stp->sd_flag & (STWRERR|STRHUP|STPLEX|STRDELIM|OLDNDELAY))
+		return (strwrite(SOTOV(so), uiop, cr));
+
+	rmax = stp->sd_qn_maxpsz;
+	ASSERT(rmax >= 0 || rmax == INFPSZ);
+	if (rmax == 0 || uiop->uio_resid <= 0)
+		return (0);
+
+	if (rmax == INFPSZ)
+		rmax = uiop->uio_resid;
+
+	maxblk = stp->sd_maxblk;
+
+	for (;;) {
+		iosize = MIN(uiop->uio_resid, rmax);
+
+		mp = mcopyinuio(stp, uiop, iosize, maxblk, &error);
+		if (mp == NULL) {
+			/*
+			 * Fallback to strwrite() for ENOMEM; if this
+			 * is our first time in this routine and the uio
+			 * vector has not been modified, we will end up
+			 * calling strwrite() without any flag set.
+			 */
+			if (error == ENOMEM)
+				goto slow_send;
+			else
+				return (error);
+		}
+		ASSERT(uiop->uio_resid >= 0);
+		/*
+		 * If mp is non-NULL and ENOMEM is set, it means that
+		 * mcopyinuio() was able to break down some of the user
+		 * data into one or more mblks.  Send the partial data
+		 * to tcp and let the rest be handled in strwrite().
+		 */
+		ASSERT(error == 0 || error == ENOMEM);
+		tcp_wput(tcp_wq, mp);
+
+		wflag |= NOINTR;
+
+		if (uiop->uio_resid == 0) {	/* No more data; we're done */
+			ASSERT(error == 0);
+			break;
+		} else if (error == ENOMEM || !canput(tcp_wq) || (stp->sd_flag &
+		    (STWRERR|STRHUP|STPLEX|STRDELIM|OLDNDELAY))) {
+slow_send:
+			/*
+			 * We were able to send down partial data using
+			 * the direct call interface, but are now relying
+			 * on strwrite() to handle the non-fastpath cases.
+			 * If the socket is blocking we will sleep in
+			 * strwaitq() until write is permitted, otherwise,
+			 * we will need to return the amount of bytes
+			 * written so far back to the app.  This is the
+			 * reason why we pass NOINTR flag to strwrite()
+			 * for non-blocking socket, because we don't want
+			 * to return EAGAIN when portion of the user data
+			 * has actually been sent down.
+			 */
+			return (strwrite_common(SOTOV(so), uiop, cr, wflag));
+		}
+	}
+	return (0);
 }
 
 /*

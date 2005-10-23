@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2001, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -97,13 +97,13 @@ typedef	void	(*pfv_t)();
 #define	INET_MAXMINOR		MAXMIN	/* maximum device minor number */
 
 #ifdef _KERNEL
+#include <sys/stream.h>
 
-extern void inet_init(void);
-extern void inet_destroy(void);
 extern void *inet_minor_create(char *, dev_t, int);
 extern void inet_minor_destroy(void *);
 extern dev_t inet_minor_alloc(void *);
 extern void inet_minor_free(void *, dev_t);
+extern void inet_freemsg(mblk_t *);
 
 #endif	/* _KERNEL */
 
