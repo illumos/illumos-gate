@@ -20,22 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1994, 1998, 2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
-
-#
-# SUNWcsd preinstall script - clean up various existing device entries
-#
-
-#
-# If upgrading from an x86 system which has no st driver, remove
-# any existing /dev/rmt/* nodes.
-#
-if [ ! -f $BASEDIR/kernel/drv/st -a -d $BASEDIR/dev/rmt ]; then
-	rm -f $BASEDIR/dev/rmt/*
-fi
 
 #
 # Remove old pseudo-device entries
