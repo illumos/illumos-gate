@@ -98,19 +98,6 @@ LINTS_DIR	= $(OBJS_DIR)
 LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/mpxu/lint-libs/$(OBJS_DIR)
 
 #
-#       The following must be defined for all implementations:
-#
-#       MAPFILE:        ld mapfile for the build of kernel/unix.
-#       MODSTUBS:       Module stubs source file.
-#       GENASSYM_SRC:   genassym.c
-#       FDGENASSYM_SRC: fd_genassym.c
-#
-MAPFILE		= $(UTSBASE)/sun4u/conf/Mapfile
-MODSTUBS	= $(UTSBASE)/sparc/ml/modstubs.s
-GENASSYM_SRC	= $(UTSBASE)/sun4u/ml/genassym.c
-FDGENASSYM_SRC	= $(UTSBASE)/sun/io/fd_genassym.c
-
-#
 #       Define the actual specific platforms
 #
 MACHINE_DEFS	= -D$(PLATFORM) -D_MACHDEP -DSFMMU -DMP

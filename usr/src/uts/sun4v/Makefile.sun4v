@@ -33,7 +33,6 @@
 #	Machine type (implementation architecture):
 #
 PLATFORM	 = sun4v
-OPLATFORM	 = sun4u
 LINKED_PLATFORMS += SUNW,Sun-Fire-T1000
 PROMIF		 = ieee1275
 PSMBASE		 = $(UTSBASE)/../psm
@@ -194,7 +193,7 @@ LINT_DEFS	= -Xarch=v9
 #	PLATFORM_OFFSETS:	Platform specific mach_offsets.in
 #	FDOFFSETS:		fd_offsets.in
 #
-MAPFILE		 = $(UTSBASE)/$(OPLATFORM)/conf/Mapfile
+MAPFILE		 = $(UTSBASE)/sun4/conf/Mapfile
 MODSTUBS	 = $(UTSBASE)/sparc/ml/modstubs.s
 GENCONST_SRC	 = $(UTSBASE)/sun4/ml/genconst.c
 OFFSETS		 = $(UTSBASE)/sun4/ml/offsets.in

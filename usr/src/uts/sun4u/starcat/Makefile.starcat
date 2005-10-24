@@ -128,15 +128,6 @@ UNIX_O		= $(UNIX_DIR)/$(OBJS_DIR)/unix.o
 LINT_LIB	= $(LINT_LIB_DIR)/llib-lunix.ln
 
 #
-#	The following must be defined for all implementations:
-#
-#	MAPFILE:	ld mapfile for the build of kernel/unix.
-#	MODSTUBS:	Module stubs source file.
-#
-MAPFILE		= $(UTSBASE)/sun4u/conf/Mapfile
-MODSTUBS	= $(UTSBASE)/sparc/ml/modstubs.s
-
-#
 #	Define the actual specific platforms
 #
 MACHINE_DEFS	= -D$(PLATFORM) -D_MACHDEP -DSFMMU -DMP -DMIXEDCPU_DR_SUPPORTED

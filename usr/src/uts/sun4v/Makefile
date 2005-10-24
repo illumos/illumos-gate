@@ -193,7 +193,7 @@ include ../Makefile.targ
 # Cross-reference customization: build a cross-reference over all of the
 # sun4v-related directories.
 #
-XRDIRS	= ../sun4v ../sun4u ../sun4 ../sfmmu ../sparc ../sun ../common
+XRDIRS	= ../sun4v ../sun4 ../sfmmu ../sparc ../sun ../common
 XRPRUNE = i86pc
 
 cscope.out tags: FRC
