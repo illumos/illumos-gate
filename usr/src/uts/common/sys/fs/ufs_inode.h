@@ -219,6 +219,17 @@ struct 	icommon {
 };
 
 /*
+ * Large directories can be cached. Directory caching can take the following
+ * states:
+ */
+typedef enum {
+	CD_DISABLED_NOMEM = -2,
+	CD_DISABLED_TOOBIG,
+	CD_DISABLED,
+	CD_ENABLED
+} cachedir_t;
+
+/*
  * Large Files: Note we use the inline functions load_double, store_double
  * to load and store the long long values of i_size. Therefore the
  * address of i_size must be eight byte aligned. Kmem_alloc of incore
@@ -247,7 +258,7 @@ typedef struct inode {
 				/*					*/
 	uint_t	i_flag;		/* inode flags */
 	uint_t	i_seq;		/* modification sequence number */
-	boolean_t i_cachedir;	/* Cache this directory on next lookup */
+	cachedir_t i_cachedir;	/* Cache this directory on next lookup */
 				/* - no locking needed  */
 	long	i_mapcnt;	/* mappings to file pages */
 	int	*i_map;		/* block list for the corresponding file */

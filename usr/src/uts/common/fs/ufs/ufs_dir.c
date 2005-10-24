@@ -127,6 +127,11 @@ static struct dirtemplate mastertemplate = {
  */
 int ufs_min_dir_cache = 1024 << AV_DIRECT_SHIFT;
 
+/* The time point the dnlc directory caching was disabled */
+static hrtime_t ufs_dc_disable_at;
+/* directory caching disable duration */
+static hrtime_t ufs_dc_disable_duration = (hrtime_t)NANOSEC * 5;
+
 #ifdef DEBUG
 int dirchk = 1;
 #else /* !DEBUG */
@@ -280,20 +285,38 @@ restart:
 	caching = 0;
 
 	/*
-	 * Attempt to cache any directories greater than
-	 * the tunable ufs_min_cache_dir.
+	 * Attempt to cache any directories greater than the tunable
+	 * ufs_min_cache_dir. If it fails due to memory shortage (DNOMEM),
+	 * disable caching for this directory and record the system time.
+	 * Any attempt after the disable time has expired will enable
+	 * the caching again.
 	 */
-	if ((dp->i_size >= ufs_min_dir_cache) && (dp->i_cachedir)) {
-		switch (dnlc_dir_start(dcap, dp->i_size >> AV_DIRECT_SHIFT)) {
-		case DNOMEM:
-		case DTOOBIG:
-			dp->i_cachedir = 0;
-			break;
-		case DOK:
-			caching = 1;
-			break;
-		default:
-			break;
+	if (dp->i_size >= ufs_min_dir_cache) {
+		/*
+		 * if the directory caching disable time has expired
+		 * enable the caching again.
+		 */
+		if (dp->i_cachedir == CD_DISABLED_NOMEM &&
+		    gethrtime() - ufs_dc_disable_at > ufs_dc_disable_duration) {
+			ufs_dc_disable_at = 0;
+			dp->i_cachedir = CD_ENABLED;
+		}
+		if (dp->i_cachedir == CD_ENABLED) {
+			switch (dnlc_dir_start(dcap, dp->i_size >>
+				AV_DIRECT_SHIFT)) {
+			case DNOMEM:
+				dp->i_cachedir = CD_DISABLED_NOMEM;
+				ufs_dc_disable_at = gethrtime();
+				break;
+			case DTOOBIG:
+				dp->i_cachedir = CD_DISABLED_TOOBIG;
+				break;
+			case DOK:
+				caching = 1;
+				break;
+			default:
+				break;
+			}
 		}
 	}
 	/*
@@ -393,7 +416,7 @@ searchloop:
 				extra = ep_reclen;
 				if (offset & (DIRBLKSIZ - 1)) {
 					dnlc_dir_purge(dcap);
-					dp->i_cachedir = 0;
+					dp->i_cachedir = CD_DISABLED;
 					caching = 0;
 				}
 			} else {
@@ -1152,17 +1175,32 @@ ufs_dircheckforname(
 	}
 	slotp->cached = 0;
 	caching = NULL;
-	if (tdp->i_cachedir && !noentry) {
+	if (!noentry && tdp->i_size >= ufs_min_dir_cache) {
 		/*
-		 * Attempt to cache any directories greater than
-		 * the tunable ufs_min_cache_dir.
+		 * if the directory caching disable time has expired
+		 * enable caching again.
 		 */
-		if (tdp->i_size >= ufs_min_dir_cache) {
+		if (tdp->i_cachedir == CD_DISABLED_NOMEM &&
+		    gethrtime() - ufs_dc_disable_at > ufs_dc_disable_duration) {
+			ufs_dc_disable_at = 0;
+			tdp->i_cachedir = CD_ENABLED;
+		}
+		/*
+		 * Attempt to cache any directories greater than the tunable
+		 * ufs_min_cache_dir. If it fails due to memory shortage
+		 * (DNOMEM), disable caching for this directory and record
+		 * the system time. Any attempt after the disable time has
+		 * expired will enable the caching again.
+		 */
+		if (tdp->i_cachedir == CD_ENABLED) {
 			switch (dnlc_dir_start(dcap,
 			    tdp->i_size >> AV_DIRECT_SHIFT)) {
 			case DNOMEM:
+				tdp->i_cachedir = CD_DISABLED_NOMEM;
+				ufs_dc_disable_at = gethrtime();
+				break;
 			case DTOOBIG:
-				tdp->i_cachedir = 0;
+				tdp->i_cachedir = CD_DISABLED_TOOBIG;
 				break;
 			case DOK:
 				caching = 1;

@@ -367,7 +367,7 @@ ufs_alloc_inode(ufsvfs_t *ufsvfsp, ino_t ino)
 	ip->i_cflags = 0;
 	ip->i_mapcnt = 0;
 	ip->i_dquot = NULL;
-	ip->i_cachedir = 1;
+	ip->i_cachedir = CD_ENABLED;
 	ip->i_writer = NULL;
 
 	/*
