@@ -300,6 +300,7 @@ DRV_KMODS	+= zcons
 # Common code drivers
 #
 DRV_KMODS	+= ixgb
+DRV_KMODS	+= rge
 
 #
 #	DTrace and DTrace Providers

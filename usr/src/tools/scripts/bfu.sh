@@ -2359,7 +2359,7 @@ fi
 create_datalink_conf()
 {
 	# /etc/datalink.conf needs to be populated.
-	drivers="bge xge"
+	drivers="bge rge xge"
 	conf=$rootprefix/etc/datalink.conf
 
 	if [ ! -f $conf ]; then

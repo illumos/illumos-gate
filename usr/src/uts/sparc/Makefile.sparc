@@ -237,6 +237,7 @@ DRV_KMODS	+= vni
 #       Hardware Drivers in common space
 #
 DRV_KMODS       += ixgb
+DRV_KMODS	+= rge
 
 #
 #	Machine Specific Driver Modules (/kernel/drv):

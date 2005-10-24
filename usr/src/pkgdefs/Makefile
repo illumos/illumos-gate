@@ -267,6 +267,7 @@ COMMON_SUBDIRS= \
 	SUNWrcmdc \
 	SUNWrcmdr \
 	SUNWrcmds \
+	SUNWrge \
 	SUNWrmwbr \
 	SUNWrmwbu \
 	SUNWroute \
