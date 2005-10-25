@@ -43,11 +43,6 @@ DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
 
 #
-# depends on low-level PCI functions
-#
-LDFLAGS		+= -dy -Nmisc/pci_autoconfig
-
-#
 # lint pass one non-enforcement
 #
 CFLAGS += $(CCVERBOSE) -DPWRDMN -DACPI_USE_LOCAL_CACHE

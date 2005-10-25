@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,7 @@
 #include <sys/pci.h>
 #include <sys/pci_impl.h>
 #include <sys/sunddi.h>
-#include "pci_autoconfig.h"
+#include <sys/pci_cfgspace_impl.h>
 
 /*
  * This variable is a place holder for the initial value in PCI_PMC register

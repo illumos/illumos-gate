@@ -59,7 +59,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 # depends on misc/pci_autoconfig misc/pcihp
 #
-LDFLAGS		+= -dy -Nmisc/pci_autoconfig -Nmisc/pcihp
+LDFLAGS		+= -dy -Nmisc/pcihp
 
 #
 #	Default build targets.

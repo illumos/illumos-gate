@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #include <sys/pci_impl.h>
-#include "pci_autoconfig.h"
+#include <sys/pci_cfgspace_impl.h>
 
 /*
  * The "mechanism 2" interface only has 4 bits for device number.  To

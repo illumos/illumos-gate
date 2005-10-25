@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Derived from pseudocode supplied by Intel.
@@ -37,7 +37,8 @@
 
 #include <sys/types.h>
 #include <sys/pci.h>
-#include "pci_autoconfig.h"
+#include <sys/mutex.h>
+#include <sys/pci_cfgspace_impl.h>
 
 #define	PCI_82454_RW_CONTROL	0x54
 

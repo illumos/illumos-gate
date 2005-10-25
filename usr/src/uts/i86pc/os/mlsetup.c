@@ -57,6 +57,7 @@
 #include <sys/bootconf.h>
 #include <sys/kobj.h>
 #include <sys/kobj_lex.h>
+#include <sys/pci_cfgspace.h>
 #if defined(__amd64)
 #include <sys/bootsvcs.h>
 
@@ -317,6 +318,9 @@ mlsetup(struct regs *rp)
 	cpu_list_init(CPU);
 
 	cpu_vm_data_init(CPU);
+
+	/* lgrp_init() needs PCI config space access */
+	pci_cfgspace_init();
 
 	/*
 	 * Initialize the lgrp framework

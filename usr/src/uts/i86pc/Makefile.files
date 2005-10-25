@@ -66,6 +66,11 @@ CORE_OBJS +=			\
 	memscrub.o		\
 	mpcore.o		\
 	notes.o			\
+	pci_cfgspace.o		\
+	pci_mech1.o		\
+	pci_mech2.o		\
+	pci_neptune.o		\
+	pci_orion.o		\
 	pmem.o			\
 	ppage.o			\
 	startup.o		\
@@ -148,10 +153,6 @@ PCI_AUTOCONFIG_OBJS += \
 	pci_autoconfig.o \
 	pci_boot.o	\
 	pci_memlist.o	\
-	pci_mech1.o	\
-	pci_mech2.o	\
-	pci_neptune.o	\
-	pci_orion.o	\
 	pci_resource.o
 
 ACPICA_OBJS	+= dbcmds.o dbdisply.o \

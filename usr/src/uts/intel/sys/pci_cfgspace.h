@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Interfaces internal to the i86pc PCI nexus driver.
@@ -35,11 +35,11 @@
 extern "C" {
 #endif
 
+extern void pci_cfgspace_init(void);
+
 /*
- * The "pci_autoconfig" module gets loaded and called early in system
- * startup, when it's still safe to call the BIOS and ask what configuration
- * mechanism to use.  Pci_autoconfig leaves the access routines in the
- * external pointers pci_get?_func.
+ * These used to be set by, and live in, pci_autoconfig; now they are set
+ * by pci_cfgspace_init(), and live in the base kernel.
  */
 
 extern uint8_t (*pci_getb_func)(int bus, int dev, int func, int reg);
