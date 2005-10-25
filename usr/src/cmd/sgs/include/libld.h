@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
@@ -132,6 +133,7 @@ struct ofl_desc {
 	Word		ofl_outrelscnt;	/* 	and count */
 	List		ofl_actrels;	/* list of relocations to perform */
 	Word		ofl_actrelscnt;	/* 	and count */
+	Word		ofl_entrelscnt;	/* no of relocations entered */
 	List		ofl_copyrels;	/* list of copy relocations */
 	List		ofl_ordered;	/* list of shf_ordered sections */
 	List		ofl_syminfsyms;	/* list of interesting syms */

@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
@@ -1011,6 +1012,8 @@ process_reld(Ofl_desc *ofl, Is_desc *isp, Rel_desc *reld, Word rsndx,
 		    isp->is_name, rtype);
 		return (S_ERROR);
 	}
+
+	ofl->ofl_entrelscnt++;
 
 	/*
 	 * Special case: a register symbol associated with symbol index 0 is

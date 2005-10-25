@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -44,15 +45,23 @@ Dbg_statistics_ld(Ofl_desc *ofl)
 		    EC_XWORD(ofl->ofl_arscnt));
 	}
 
-	if (ofl->ofl_locscnt || ofl->ofl_globcnt || ofl->ofl_entercnt) {
-		dbg_print(MSG_INTL(MSG_STATS_SYMBOLS),
-		    EC_XWORD(ofl->ofl_locscnt), EC_XWORD(ofl->ofl_globcnt),
-		    EC_XWORD(ofl->ofl_entercnt));
+	if (ofl->ofl_locscnt || ofl->ofl_globcnt) {
+		dbg_print(MSG_INTL(MSG_STATS_SYMBOLS_OUT),
+		    EC_XWORD(ofl->ofl_globcnt), EC_XWORD(ofl->ofl_locscnt));
+	}
+	if (ofl->ofl_entercnt || ofl->ofl_scopecnt || ofl->ofl_elimcnt) {
+		dbg_print(MSG_INTL(MSG_STATS_SYMBOLS_IN),
+		    EC_XWORD(ofl->ofl_entercnt), EC_XWORD(ofl->ofl_scopecnt),
+		    EC_XWORD(ofl->ofl_elimcnt));
 	}
 
-	if (ofl->ofl_outrelscnt || ofl->ofl_actrelscnt) {
-		dbg_print(MSG_INTL(MSG_STATS_RELOCS),
-		    EC_XWORD(ofl->ofl_outrelscnt),
+	if (ofl->ofl_outrelscnt) {
+		dbg_print(MSG_INTL(MSG_STATS_RELOCS_OUT),
+		    EC_XWORD(ofl->ofl_outrelscnt));
+	}
+	if (ofl->ofl_entrelscnt || ofl->ofl_actrelscnt) {
+		dbg_print(MSG_INTL(MSG_STATS_RELOCS_IN),
+		    EC_XWORD(ofl->ofl_entrelscnt),
 		    EC_XWORD(ofl->ofl_actrelscnt));
 	}
 }

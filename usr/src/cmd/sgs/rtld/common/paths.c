@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -84,7 +84,8 @@ get_dir_list(unsigned char rules, Rt_map * lmp, uint_t flags)
 			if (env_info & ENV_INF_PATHCFG)
 				mode |= LA_SER_CONFIG;
 
-			DBG_CALL(Dbg_libs_path(rpl_libpath, mode, 0));
+			DBG_CALL(Dbg_libs_path(rpl_libpath, mode,
+			    config->c_name));
 
 			/*
 			 * For ldd(1) -s, indicate the search paths that'll

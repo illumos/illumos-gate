@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,7 +19,13 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 @ _START_
 
@@ -681,9 +684,11 @@
 @ MSG_STATS_GENERAL	"General Statistics:"
 @ MSG_STATS_FILES	"  Input files: relocatables=%lld  \
 			 shared objects=%lld  archives=%lld"
-@ MSG_STATS_SYMBOLS	"      Symbols: locals=%lld  globals=%lld  \
-			 (processed=%lld)"
-@ MSG_STATS_RELOCS	"  Relocations: output=%lld  (active=%lld)"
+@ MSG_STATS_SYMBOLS_OUT	"      Symbols output: globals=%-10lld locals=%lld"
+@ MSG_STATS_SYMBOLS_IN	"      Symbols  input: globals=%-10lld scoped=%-10lld \
+			 eliminated=%lld"
+@ MSG_STATS_RELOCS_OUT	"  Relocations output: records=%lld"
+@ MSG_STATS_RELOCS_IN	"  Relocations  input: records=%-10lld applied=%lld"
 
 # Hardware/Software capabilities messages
 @ MSG_CAP_ELF_TITLE	"     index  tag               value"

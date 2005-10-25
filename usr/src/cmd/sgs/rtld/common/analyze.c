@@ -1805,7 +1805,6 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 	if (flags & FLG_RT_HWCAP) {
 		fdp->fd_fmap.fm_maddr = fmap->fm_maddr;
 		fdp->fd_fmap.fm_mflags = fmap->fm_mflags;
-		fdp->fd_pname = fdesc.fd_pname;
 		fdp->fd_fd = fdesc.fd_fd;
 	}
 

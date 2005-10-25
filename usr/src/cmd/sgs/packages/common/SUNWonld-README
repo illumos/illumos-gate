@@ -1524,11 +1524,12 @@ PSARC 2005/514 - AMD64 - large section support
 6311865 Linker: x86 medium model; invalid ELF program header
 --------------------------------------------------------------------------------
 All the above change is incorporated in the following patches:
-    Solaris/SunOS 5.10_sparc	patch T117461-XX
-    Solaris/SunOS 5.10_x86	patch T118345-XX
+    Solaris/SunOS 5.10_sparc	patch T117461-07
+    Solaris/SunOS 5.10_x86	patch T118345-11
 --------------------------------------------------------------------------------
 6309061 link_audit should use __asm__ with gcc
 6310736 gcc and sgs/libld don't get along on SPARC
 6329796 Memory leak with iconv_open/iconv_close with patch 109147-33
 6332983 s9 linker patches 112963-24/113986-20 causing cluster machines not
 	to boot
+6340814 ld.so.1 core dump with HWCAP relocatable object + updated statistics

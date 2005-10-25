@@ -127,15 +127,15 @@ remove_fdesc(Fdesc * fdp)
 	}
 	if (fdp->fd_fd)
 		(void) close(fdp->fd_fd);
-	if (fdp->fd_nname)
-		free((void *)fdp->fd_nname);
 	if (fdp->fd_pname && (fdp->fd_pname != fdp->fd_nname))
 		free((void *)fdp->fd_pname);
+	if (fdp->fd_nname)
+		free((void *)fdp->fd_nname);
 }
 
 /*
- * When $HWCAP is used to represent filtees, take the associated filtee
- * directory and analyze all the files it contains.
+ * When $HWCAP is used to represent dependencies, take the associated directory
+ * and analyze all the files it contains.
  */
 int
 hwcap_dir(Alist ** fdalpp, Lm_list * lml, const char *name, Rt_map * clmp,
@@ -200,9 +200,9 @@ hwcap_dir(Alist ** fdalpp, Lm_list * lml, const char *name, Rt_map * clmp,
 		if ((name = load_trace(lml, name, clmp)) == 0)
 			continue;
 
-		if (find_path(lml, name, clmp, flags, &fdesc, &_rej) == 0) {
+		if (find_path(lml, name, clmp, flags, &fdesc, &_rej) == 0)
 			rejection_inherit(rej, &_rej, &fdesc);
-		} else {
+		else {
 			DBG_CALL(Dbg_cap_hw_candidate(name));
 
 			/*
@@ -210,12 +210,11 @@ hwcap_dir(Alist ** fdalpp, Lm_list * lml, const char *name, Rt_map * clmp,
 			 * hardware capabilities for later sorting.  Otherwise
 			 * we have a new candidate.
 			 */
-			if (fdesc.fd_lmp) {
+			if (fdesc.fd_lmp)
 				fdesc.fd_fmap.fm_hwptr = HWCAP(fdesc.fd_lmp);
-			} else {
-				fdesc.fd_nname = name;
+			else
 				fdesc.fd_fmap = *fmap;
-			}
+
 			if (alist_append(&fdalp, &fdesc,
 			    sizeof (Fdesc), 10) == 0) {
 				remove_fdesc(&fdesc);
