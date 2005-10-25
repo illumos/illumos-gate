@@ -408,7 +408,7 @@ main(int c, char **av)
 	/*
 	 * Save the remaining arguments in argv.
 	 */
-	setq(S_argv /* "argv" */, v, &shvhed);
+	setq(S_argv /* "argv" */, copyblk(v), &shvhed);
 
 	/*
 	 * Set up the prompt.
