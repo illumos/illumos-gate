@@ -184,7 +184,7 @@ static const char *fail_msg = "%stransport failed: reason '%s': %s";
 char _depends_on[] = "misc/scsi";
 
 static struct modldrv modldrv = {
-	&mod_driverops, "SCSI Enclosure Services Driver %I%", &ses_dev_ops
+	&mod_driverops, "SCSI Enclosure Services %I%", &ses_dev_ops
 };
 
 static struct modlinkage modlinkage = {
@@ -508,15 +508,14 @@ ses_doattach(dev_info_t *dip)
 	 * At the same time, check to make sure getrbuf
 	 * actually succeeded.
 	 */
-	if (ssc->ses_sbufp == NULL || (*ssc->ses_vec.softc_init)(ssc, 1)) {
+	if ((*ssc->ses_vec.softc_init)(ssc, 1)) {
+		SES_LOG(ssc, SES_CE_DEBUG3, "failed softc init");
+		(void) (*ssc->ses_vec.softc_init)(ssc, 0);
 		ddi_remove_minor_node(dip, NULL);
 		scsi_destroy_pkt(ssc->ses_rqpkt);
 		scsi_free_consistent_buf(ssc->ses_rqbp);
 		if (ssc->ses_sbufp) {
-			SES_LOG(ssc, SES_CE_DEBUG3, "failed to getrbuf");
 			freerbuf(ssc->ses_sbufp);
-		} else {
-			SES_LOG(ssc, SES_CE_DEBUG3, "failed softc init");
 		}
 		cv_destroy(&ssc->ses_sbufcv);
 		ddi_soft_state_free(estate, inst);
