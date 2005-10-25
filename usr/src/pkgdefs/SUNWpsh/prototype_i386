@@ -63,7 +63,6 @@ f none usr/include/sys/dktp/flowctrl.h 644 root bin
 f none usr/include/sys/dktp/gda.h 644 root bin
 f none usr/include/sys/dktp/hba.h 644 root bin
 f none usr/include/sys/dktp/mscsi.h 644 root bin
-f none usr/include/sys/dktp/objmgr.h 644 root bin
 f none usr/include/sys/dktp/quetypes.h 644 root bin
 f none usr/include/sys/dktp/queue.h 644 root bin
 f none usr/include/sys/dktp/scdk.h 644 root bin

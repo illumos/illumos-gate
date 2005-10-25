@@ -32,13 +32,13 @@
 #include <sys/dktp/queue.h>
 #include <sys/dktp/fctypes.h>
 #include <sys/dktp/flowctrl.h>
-#include <sys/dktp/objmgr.h>
 #include <sys/dktp/cmdev.h>
-#include <sys/dktp/cmdk.h>
 #include <sys/dkio.h>
 #include <sys/dktp/tgdk.h>
+#include <sys/dktp/dadk.h>
 #include <sys/dktp/bbh.h>
 
+#include <sys/dktp/cmdk.h>
 #include <sys/stat.h>
 #include <sys/vtoc.h>
 #include <sys/file.h>
@@ -70,7 +70,16 @@ static	int	cmdk_debug = DIO;
  */
 #define	PARTITION0_INDEX	(NDKMAP + 0)
 
+#define	DKTP_DATA		(dkp->dk_tgobjp)->tg_data
+#define	DKTP_EXT		(dkp->dk_tgobjp)->tg_ext
+
 static void *cmdk_state;
+
+/*
+ * the cmdk_attach_mutex protects cmdk_max_instance in multi-threaded
+ * attach situations
+ */
+static kmutex_t cmdk_attach_mutex;
 static int cmdk_max_instance = 0;
 
 /*
@@ -80,12 +89,6 @@ static int cmdk_max_instance = 0;
  * will only be called in a single threaded operation.
  */
 static int	cmdk_indump;
-
-/*
- * the cmdk_attach_mutex protects cmdk_max_instance in multi-threaded
- * attach situations
- */
-static kmutex_t cmdk_attach_mutex;
 
 static struct driver_minor_data {
 	char    *name;
@@ -141,10 +144,10 @@ static struct driver_minor_data {
  * Local Function Prototypes
  */
 static int cmdk_reopen(struct cmdk *dkp);
-static int cmdk_create_obj(dev_info_t *devi, struct cmdk *dkp);
-static void cmdk_destroy_obj(dev_info_t *devi, struct cmdk *dkp, int unload);
-static int cmdk_create_lbobj(dev_info_t *devi, struct cmdk *dkp);
-static void cmdk_destroy_lbobj(dev_info_t *devi, struct cmdk *dkp, int unload);
+static int cmdk_create_obj(dev_info_t *dip, struct cmdk *dkp);
+static void cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp, int unload);
+static int cmdk_create_lbobj(dev_info_t *dip, struct cmdk *dkp);
+static void cmdk_destroy_lbobj(dev_info_t *dip, struct cmdk *dkp, int unload);
 static void cmdkmin(struct buf *bp);
 static int cmdkrw(dev_t dev, struct uio *uio, int flag);
 static int cmdkarw(dev_t dev, struct aio_req *aio, int flag);
@@ -178,17 +181,17 @@ static struct bbh_obj cmdk_bbh_obj = {
 	&cmdk_bbh_ops
 };
 
-static int cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p);
-static int cmdkclose(dev_t dev, int flag, int otyp, cred_t *cred_p);
+static int cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp);
+static int cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp);
 static int cmdkstrategy(struct buf *bp);
 static int cmdkdump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk);
 static int cmdkioctl(dev_t, int, intptr_t, int, cred_t *, int *);
-static int cmdkread(dev_t dev, struct uio *uio, cred_t *cred_p);
-static int cmdkwrite(dev_t dev, struct uio *uio, cred_t *cred_p);
+static int cmdkread(dev_t dev, struct uio *uio, cred_t *credp);
+static int cmdkwrite(dev_t dev, struct uio *uio, cred_t *credp);
 static int cmdk_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
     int mod_flags, char *name, caddr_t valuep, int *lengthp);
-static int cmdkaread(dev_t dev, struct aio_req *aio, cred_t *cred_p);
-static int cmdkawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p);
+static int cmdkaread(dev_t dev, struct aio_req *aio, cred_t *credp);
+static int cmdkawrite(dev_t dev, struct aio_req *aio, cred_t *credp);
 
 /*
  * Configuration Data
@@ -221,9 +224,9 @@ static struct cb_ops cmdk_cb_ops = {
 
 static int cmdkinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
     void **result);
-static int cmdkprobe(dev_info_t *devi);
-static int cmdkattach(dev_info_t *devi, ddi_attach_cmd_t cmd);
-static int cmdkdetach(dev_info_t *devi, ddi_detach_cmd_t cmd);
+static int cmdkprobe(dev_info_t *dip);
+static int cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd);
+static int cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd);
 
 struct dev_ops cmdk_ops = {
 	DEVO_REV, 		/* devo_rev, */
@@ -247,7 +250,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module. This one is a driver */
-	"Common Direct Access Disk Driver %I%",
+	"Common Direct Access Disk %I%",
 	&cmdk_ops, 				/* driver ops 		*/
 };
 
@@ -255,13 +258,9 @@ static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modldrv, NULL
 };
 
-char _depends_on[] =
-	"drv/objmgr misc/snlb misc/dadk misc/strategy";
-
 int
 _init(void)
 {
-
 	int 	rval;
 
 	if (rval = ddi_soft_state_init(&cmdk_state, sizeof (struct cmdk), 7))
@@ -278,7 +277,6 @@ _init(void)
 int
 _fini(void)
 {
-
 	return (EBUSY);
 
 	/*
@@ -304,7 +302,6 @@ _fini(void)
 int
 _info(struct modinfo *modinfop)
 {
-
 	return (mod_info(&modlinkage, modinfop));
 }
 
@@ -333,13 +330,13 @@ cmdk_bbh_freehandle(opaque_t bbh_data, opaque_t handle)
  * Autoconfiguration Routines
  */
 static int
-cmdkprobe(dev_info_t *devi)
+cmdkprobe(dev_info_t *dip)
 {
 	int 	instance;
 	int	status;
 	struct	cmdk	*dkp;
 
-	instance = ddi_get_instance(devi);
+	instance = ddi_get_instance(dip);
 
 	if (ddi_get_soft_state(cmdk_state, instance))
 		return (DDI_PROBE_PARTIAL);
@@ -348,20 +345,20 @@ cmdkprobe(dev_info_t *devi)
 	    ((dkp = ddi_get_soft_state(cmdk_state, instance)) == NULL))
 		return (DDI_PROBE_PARTIAL);
 
-	dkp->dk_dip = devi;
+	dkp->dk_dip = dip;
 
 	/* for property create inside DKLB_*() */
-	dkp->dk_dev = makedevice(ddi_driver_major(devi),
-	    ddi_get_instance(devi) << CMDK_UNITSHF);
+	dkp->dk_dev = makedevice(ddi_driver_major(dip),
+	    ddi_get_instance(dip) << CMDK_UNITSHF);
 
-	if (cmdk_create_obj(devi, dkp) != DDI_SUCCESS) {
+	if (cmdk_create_obj(dip, dkp) != DDI_SUCCESS) {
 		ddi_soft_state_free(cmdk_state, instance);
 		return (DDI_PROBE_PARTIAL);
 	}
 
-	status = TGDK_PROBE(CMDK_TGOBJP(dkp), KM_NOSLEEP);
+	status = dadk_probe(DKTP_DATA, KM_NOSLEEP);
 	if (status != DDI_PROBE_SUCCESS) {
-		cmdk_destroy_obj(devi, dkp, 0);
+		cmdk_destroy_obj(dip, dkp, 0);
 		ddi_soft_state_free(cmdk_state, instance);
 		return (status);
 	}
@@ -371,13 +368,13 @@ cmdkprobe(dev_info_t *devi)
 #ifdef CMDK_DEBUG
 	if (cmdk_debug & DENT)
 		PRF("cmdkprobe: instance= %d name= `%s`\n",
-		    instance, ddi_get_name_addr(devi));
+		    instance, ddi_get_name_addr(dip));
 #endif
 	return (status);
 }
 
 static int
-cmdkattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
+cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int 	instance;
 	long	start, count;
@@ -388,30 +385,29 @@ cmdkattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
-	instance = ddi_get_instance(devi);
+
+	instance = ddi_get_instance(dip);
 	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
 		return (DDI_FAILURE);
 
-	if (TGDK_ATTACH(CMDK_TGOBJP(dkp)) != DDI_SUCCESS) {
-		ddi_soft_state_free(cmdk_state, instance);
-		return (DDI_FAILURE);
-	}
+	/* dadk_attach is an empty function that only returns SUCCESS */
+	dadk_attach(DKTP_DATA);
 
-	node_type = TGDK_GETNODETYPE(CMDK_TGOBJP(dkp));
+	node_type = DKTP_EXT->tg_nodetype;
 	for (dmdp = cmdk_minor_data; dmdp->name != NULL; dmdp++) {
 		minor_t minor_num = (instance << CMDK_UNITSHF) | dmdp->minor;
 
 		(void) sprintf(name, "%s", dmdp->name);
-		if (ddi_create_minor_node(devi, name, dmdp->type, minor_num,
+		if (ddi_create_minor_node(dip, name, dmdp->type, minor_num,
 		    node_type, NULL) == DDI_FAILURE) {
 
-			cmdk_destroy_obj(devi, dkp, 0);
+			cmdk_destroy_obj(dip, dkp, 0);
 
 			sema_destroy(&dkp->dk_semoclose);
 			ddi_soft_state_free(cmdk_state, instance);
 
-			ddi_remove_minor_node(devi, NULL);
-			ddi_prop_remove_all(devi);
+			ddi_remove_minor_node(dip, NULL);
+			ddi_prop_remove_all(dip);
 			return (DDI_FAILURE);
 		}
 	}
@@ -424,9 +420,9 @@ cmdkattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * Add a zero-length attribute to tell the world we support
 	 * kernel ioctls (for layered drivers)
 	 */
-	(void) ddi_prop_create(DDI_DEV_T_NONE, devi, DDI_PROP_CANSLEEP,
+	(void) ddi_prop_create(DDI_DEV_T_NONE, dip, DDI_PROP_CANSLEEP,
 	    DDI_KERNEL_IOCTL, NULL, 0);
-	ddi_report_dev(devi);
+	ddi_report_dev(dip);
 
 	cmdk_part_info_init(dkp);
 
@@ -444,47 +440,7 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	int 		instance;
 	int		max_instance;
 
-	switch (cmd) {
-
-	case DDI_DETACH:
-
-		mutex_enter(&cmdk_attach_mutex);
-		max_instance = cmdk_max_instance;
-		mutex_exit(&cmdk_attach_mutex);
-
-		for (instance = 0; instance < max_instance; instance++) {
-			dkp = ddi_get_soft_state(cmdk_state, instance);
-			if (!dkp)
-				continue;
-			if (dkp->dk_flag & CMDK_OPEN)
-				return (DDI_FAILURE);
-		}
-
-		instance = ddi_get_instance(dip);
-		if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
-			return (DDI_SUCCESS);
-
-		/*
-		 * The cmdk_part_info call at the end of cmdkattach may have
-		 * caused cmdk_reopen to do a TGDK_OPEN, make sure we close on
-		 * detach for case when cmdkopen/cmdkclose never occurs.
-		 */
-		if (dkp->dk_flag & CMDK_TGDK_OPEN) {
-			dkp->dk_flag &= ~CMDK_TGDK_OPEN;
-			TGDK_CLOSE(CMDK_TGOBJP(dkp));
-		}
-
-		cmdk_part_info_fini(dkp);
-		cmdk_destroy_lbobj(dip, dkp, 1);
-		cmdk_destroy_obj(dip, dkp, 1);
-
-		sema_destroy(&dkp->dk_semoclose);
-		ddi_soft_state_free(cmdk_state, instance);
-
-		ddi_prop_remove_all(dip);
-		ddi_remove_minor_node(dip, NULL);
-		return (DDI_SUCCESS);
-	default:
+	if (cmd != DDI_DETACH) {
 #ifdef CMDK_DEBUG
 		if (cmdk_debug & DIO) {
 			PRF("cmdkdetach: cmd = %d unknown\n", cmd);
@@ -492,6 +448,43 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 #endif
 		return (DDI_FAILURE);
 	}
+
+	mutex_enter(&cmdk_attach_mutex);
+	max_instance = cmdk_max_instance;
+	mutex_exit(&cmdk_attach_mutex);
+
+	for (instance = 0; instance < max_instance; instance++) {
+		dkp = ddi_get_soft_state(cmdk_state, instance);
+		if (!dkp)
+			continue;
+		if (dkp->dk_flag & CMDK_OPEN)
+			return (DDI_FAILURE);
+	}
+
+	instance = ddi_get_instance(dip);
+	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
+		return (DDI_SUCCESS);
+
+	/*
+	 * The cmdk_part_info call at the end of cmdkattach may have
+	 * caused cmdk_reopen to do a TGDK_OPEN, make sure we close on
+	 * detach for case when cmdkopen/cmdkclose never occurs.
+	 */
+	if (dkp->dk_flag & CMDK_TGDK_OPEN) {
+		dkp->dk_flag &= ~CMDK_TGDK_OPEN;
+		dadk_close(DKTP_DATA);
+	}
+
+	cmdk_part_info_fini(dkp);
+	cmdk_destroy_lbobj(dip, dkp, 1);
+	cmdk_destroy_obj(dip, dkp, 1);
+
+	sema_destroy(&dkp->dk_semoclose);
+	ddi_soft_state_free(cmdk_state, instance);
+
+	ddi_prop_remove_all(dip);
+	ddi_remove_minor_node(dip, NULL);
+	return (DDI_SUCCESS);
 }
 
 static int
@@ -500,6 +493,7 @@ cmdkinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	dev_t		dev = (dev_t)arg;
 	int 		instance;
 	struct	cmdk	*dkp;
+
 #ifdef lint
 	dip = dip;	/* no one ever uses this */
 #endif
@@ -599,7 +593,7 @@ cmdkdump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	bp->b_bcount = nblk << SCTRSHFT;
 	SET_BP_SEC(bp, (p_lblksrt + blkno));
 
-	TGDK_DUMP(CMDK_TGOBJP(dkp), bp);
+	(void) dadk_dump(DKTP_DATA, bp);
 	return (bp->b_error);
 }
 
@@ -690,12 +684,12 @@ rwcmd_copyout(struct dadkio_rwcmd *rwcmdp, caddr_t outaddr, int flag)
  * ioctl routine
  */
 static int
-cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
-	int *rval_p)
+cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
+	int *rvalp)
 {
 	int 		instance;
-	struct	scsi_device *devp;
-	struct	cmdk	*dkp;
+	struct scsi_device *devp;
+	struct cmdk	*dkp;
 	char 		data[NBPSCTR];
 
 	instance = CMDKUNIT(dev);
@@ -710,7 +704,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		struct dk_minfo	media_info;
 		struct  tgdk_geom phyg;
 
-		TGDK_GETPHYGEOM(CMDK_TGOBJP(dkp), &phyg);
+		dadk_getphygeom(DKTP_DATA, &phyg);
 
 		media_info.dki_lbsize = phyg.g_secsiz;
 		media_info.dki_capacity = phyg.g_cap;
@@ -728,7 +722,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		struct dk_cinfo *info = (struct dk_cinfo *)data;
 
 		/* controller information */
-		info->dki_ctype = TGDK_GETCTYPE(CMDK_TGOBJP(dkp));
+		info->dki_ctype = DKTP_EXT->tg_ctype;
 		info->dki_cnum = ddi_get_instance(ddi_get_parent(dkp->dk_dip));
 		(void) strcpy(info->dki_cname,
 		    ddi_get_name(ddi_get_parent(dkp->dk_dip)));
@@ -786,7 +780,8 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		if (ddi_copyin((void *)arg, &state, sizeof (int), flag))
 			return (EFAULT);
 
-		if (rval = TGDK_CHECK_MEDIA(CMDK_TGOBJP(dkp), &state))
+		/* dadk_check_media blocks until state changes */
+		if (rval = dadk_check_media(DKTP_DATA, &state))
 			return (rval);
 
 		if (state == DKIO_INSERTED) {
@@ -814,7 +809,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 	case DKIOCREMOVABLE: {
 		int i;
 
-		i = TGDK_RMB(CMDK_TGOBJP(dkp)) ? 1 : 0;
+		i = (DKTP_EXT->tg_rmb) ? 1 : 0;
 
 		if (ddi_copyout(&i, (caddr_t)arg, sizeof (int), flag))
 			return (EFAULT);
@@ -822,8 +817,8 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 		return (0);
 	}
 
-	case DKIOCG_VIRTGEOM:
 	case DKIOCG_PHYGEOM:
+	case DKIOCG_VIRTGEOM:
 	case DKIOCGGEOM:
 	case DKIOCSGEOM:
 	case DKIOCSVTOC:
@@ -837,7 +832,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			return (EIO);
 
 		return (DKLB_IOCTL(dkp->dk_lbobjp, cmd, arg, flag,
-			cred_p, rval_p));
+			credp, rvalp));
 
 	case DIOCTL_RWCMD: {
 		struct	dadkio_rwcmd *rwcmdp;
@@ -849,8 +844,13 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 
 		if (status == 0) {
 			bzero(&(rwcmdp->status), sizeof (struct dadkio_status));
-			status = TGDK_IOCTL(CMDK_TGOBJP(dkp), dev, cmd,
-			    (uintptr_t)rwcmdp, flag, cred_p, rval_p);
+			status = dadk_ioctl(DKTP_DATA,
+			    dev,
+			    cmd,
+			    (uintptr_t)rwcmdp,
+			    flag,
+			    credp,
+			    rvalp);
 		}
 		if (status == 0)
 			status = rwcmd_copyout(rwcmdp, (caddr_t)arg, flag);
@@ -860,14 +860,19 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 	}
 
 	default:
-		return (TGDK_IOCTL(CMDK_TGOBJP(dkp), dev, cmd, arg, flag,
-			cred_p, rval_p));
+		return (dadk_ioctl(DKTP_DATA,
+		    dev,
+		    cmd,
+		    arg,
+		    flag,
+		    credp,
+		    rvalp));
 	}
 }
 
 /*ARGSUSED1*/
 static int
-cmdkclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
+cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp)
 {
 	int		part;
 	ulong_t		partbit;
@@ -915,7 +920,7 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 		}
 		if (i >= CMDK_MAXPART) {
 			/* OK, last close */
-			TGDK_CLOSE(CMDK_TGOBJP(dkp));
+			dadk_close(DKTP_DATA);
 			dkp->dk_flag &=
 			    ~(CMDK_OPEN | CMDK_TGDK_OPEN | CMDK_VALID_LABEL);
 		}
@@ -927,7 +932,7 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 
 /*ARGSUSED3*/
 static int
-cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
+cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp)
 {
 	dev_t		dev = *dev_p;
 	int 		part;
@@ -963,9 +968,8 @@ cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 			sema_v(&dkp->dk_semoclose);
 			return (ENXIO);
 		}
-
 	}
-	if (TGDK_RDONLY(CMDK_TGOBJP(dkp)) && (flag & FWRITE)) {
+	if (DKTP_EXT->tg_rdonly && (flag & FWRITE)) {
 		sema_v(&dkp->dk_semoclose);
 		return (EROFS);
 	}
@@ -1006,39 +1010,24 @@ excl_open_fail:
 static int
 cmdk_reopen(struct cmdk *dkp)
 {
-	struct cmdk_label *dklbp;
-	int		 i;
-
 	/* open the target disk	 */
-	if (TGDK_OPEN(CMDK_TGOBJP(dkp), 0) != DDI_SUCCESS)
+	if (dadk_open(DKTP_DATA, 0) != DDI_SUCCESS)
 		return (FALSE);
 
 	/* mark as having opened target */
 	dkp->dk_flag |= CMDK_TGDK_OPEN;
 
 	/* check for valid label object */
-	if (!dkp->dk_lbobjp) {
+	if (!dkp->dk_lbobjp)
 		if (cmdk_create_lbobj(dkp->dk_dip, dkp) != DDI_SUCCESS)
 			return (FALSE);
-	} else {
-		/* reset back to pseudo bbh */
-		TGDK_SET_BBHOBJ(CMDK_TGOBJP(dkp), &cmdk_bbh_obj);
-	}
+
+	/* reset back to pseudo bbh */
+	dadk_set_bbhobj(DKTP_DATA, &cmdk_bbh_obj);
 
 	/* search for proper disk label object */
-	for (i = 0, dklbp = dkp->dk_lb; i < CMDK_LABEL_MAX; i++, dklbp++) {
-		if (!dklbp->dkl_objp)
-			continue;
-		dkp->dk_lbobjp = dklbp->dkl_objp;
-		if (DKLB_OPEN(dkp->dk_lbobjp, dkp->dk_dev, dkp->dk_dip)
-		    == DDI_SUCCESS)
-			break;
-	}
+	(void) DKLB_OPEN(dkp->dk_lbobjp, dkp->dk_dev, dkp->dk_dip);
 
-	/*
-	 * the last opened label object will become the installed label
-	 * this allows whole raw disk access for disk preparations
-	 */
 	dkp->dk_flag |= CMDK_VALID_LABEL;
 	return (TRUE);
 }
@@ -1048,7 +1037,7 @@ cmdk_reopen(struct cmdk *dkp)
  */
 /*ARGSUSED2*/
 static int
-cmdkread(dev_t dev, struct uio *uio, cred_t *cred_p)
+cmdkread(dev_t dev, struct uio *uio, cred_t *credp)
 {
 	return (cmdkrw(dev, uio, B_READ));
 }
@@ -1058,7 +1047,7 @@ cmdkread(dev_t dev, struct uio *uio, cred_t *cred_p)
  */
 /*ARGSUSED2*/
 static int
-cmdkaread(dev_t dev, struct aio_req *aio, cred_t *cred_p)
+cmdkaread(dev_t dev, struct aio_req *aio, cred_t *credp)
 {
 	return (cmdkarw(dev, aio, B_READ));
 }
@@ -1068,7 +1057,7 @@ cmdkaread(dev_t dev, struct aio_req *aio, cred_t *cred_p)
  */
 /*ARGSUSED2*/
 static int
-cmdkwrite(dev_t dev, struct uio *uio, cred_t *cred_p)
+cmdkwrite(dev_t dev, struct uio *uio, cred_t *credp)
 {
 	return (cmdkrw(dev, uio, B_WRITE));
 }
@@ -1078,7 +1067,7 @@ cmdkwrite(dev_t dev, struct uio *uio, cred_t *cred_p)
  */
 /*ARGSUSED2*/
 static int
-cmdkawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
+cmdkawrite(dev_t dev, struct aio_req *aio, cred_t *credp)
 {
 	return (cmdkarw(dev, aio, B_WRITE));
 }
@@ -1151,7 +1140,7 @@ cmdkstrategy(struct buf *bp)
 	}
 
 	SET_BP_SEC(bp, (p_lblksrt + dkblock(bp)));
-	if (TGDK_STRATEGY(CMDK_TGOBJP(dkp), bp) != DDI_SUCCESS) {
+	if (dadk_strategy(DKTP_DATA, bp) != DDI_SUCCESS) {
 		bp->b_resid += bp->b_bcount;
 		biodone(bp);
 	}
@@ -1159,20 +1148,18 @@ cmdkstrategy(struct buf *bp)
 }
 
 static int
-cmdk_create_obj(dev_info_t *devi, struct cmdk *dkp)
+cmdk_create_obj(dev_info_t *dip, struct cmdk *dkp)
 {
 	struct scsi_device *devp;
 	opaque_t	queobjp = NULL;
 	opaque_t	flcobjp = NULL;
-	char		que_keyvalp[OBJNAMELEN];
+	char		que_keyvalp[64];
 	int		que_keylen;
-	char		flc_keyvalp[OBJNAMELEN];
+	char		flc_keyvalp[64];
 	int		flc_keylen;
-	char		dsk_keyvalp[OBJNAMELEN];
-	int		dsk_keylen;
 
 	que_keylen = sizeof (que_keyvalp);
-	if (ddi_prop_op(DDI_DEV_T_NONE, devi, PROP_LEN_AND_VAL_BUF,
+	if (ddi_prop_op(DDI_DEV_T_NONE, dip, PROP_LEN_AND_VAL_BUF,
 	    DDI_PROP_CANSLEEP, "queue", que_keyvalp, &que_keylen) !=
 	    DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "cmdk_create_obj: queue property undefined");
@@ -1180,79 +1167,56 @@ cmdk_create_obj(dev_info_t *devi, struct cmdk *dkp)
 	}
 	que_keyvalp[que_keylen] = (char)0;
 
+	if (strcmp(que_keyvalp, "qfifo") == 0) {
+		queobjp = (opaque_t)qfifo_create();
+	} else if (strcmp(que_keyvalp, "qsort") == 0) {
+		queobjp = (opaque_t)qsort_create();
+	} else {
+		return (DDI_FAILURE);
+	}
+
 	flc_keylen = sizeof (flc_keyvalp);
-	if (ddi_prop_op(DDI_DEV_T_NONE, devi, PROP_LEN_AND_VAL_BUF,
+	if (ddi_prop_op(DDI_DEV_T_NONE, dip, PROP_LEN_AND_VAL_BUF,
 	    DDI_PROP_CANSLEEP, "flow_control", flc_keyvalp, &flc_keylen) !=
 	    DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN,
 		    "cmdk_create_obj: flow-control property undefined");
 		return (DDI_FAILURE);
 	}
+
 	flc_keyvalp[flc_keylen] = (char)0;
 
-	dsk_keylen = sizeof (dsk_keyvalp);
-	if (ddi_prop_op(DDI_DEV_T_NONE, devi, PROP_LEN_AND_VAL_BUF,
-	    DDI_PROP_CANSLEEP, "disk", dsk_keyvalp, &dsk_keylen) !=
-	    DDI_PROP_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "cmdk_create_obj: target disk property undefined");
-		return (DDI_FAILURE);
-	}
-	dsk_keyvalp[dsk_keylen] = (char)0;
-
-	if ((objmgr_load_obj(que_keyvalp) != DDI_SUCCESS) ||
-	    !(queobjp = objmgr_create_obj(que_keyvalp))) {
-		cmn_err(CE_WARN,
-		    "cmdk_create_obj: ERROR creating queue method %s\n",
-		    que_keyvalp);
+	if (strcmp(flc_keyvalp, "dsngl") == 0) {
+		flcobjp = (opaque_t)dsngl_create();
+	} else if (strcmp(flc_keyvalp, "dmult") == 0) {
+		flcobjp = (opaque_t)dmult_create();
+	} else {
 		return (DDI_FAILURE);
 	}
 
-	if ((objmgr_load_obj(flc_keyvalp) != DDI_SUCCESS) ||
-	    !(flcobjp = objmgr_create_obj(flc_keyvalp))) {
-		QUE_FREE(queobjp);
-		(void) objmgr_destroy_obj(que_keyvalp);
-		cmn_err(CE_WARN,
-		    "cmdk_create_obj: ERROR creating flow control %s\n",
-		    flc_keyvalp);
-		return (DDI_FAILURE);
-	}
+	dkp->dk_tgobjp = (opaque_t)dadk_create();
 
-	if ((objmgr_load_obj(dsk_keyvalp) != DDI_SUCCESS) ||
-	    !(dkp->dk_tgobjp = objmgr_create_obj(dsk_keyvalp))) {
-		QUE_FREE(queobjp);
-		(void) objmgr_destroy_obj(que_keyvalp);
-		FLC_FREE(flcobjp);
-		(void) objmgr_destroy_obj(flc_keyvalp);
-		cmn_err(CE_WARN,
-		    "cmdk_create_obj: ERROR creating target disk %s\n",
-		    dsk_keyvalp);
-		return (DDI_FAILURE);
-	}
+	devp = ddi_get_driver_private(dip);
 
-	devp = ddi_get_driver_private(devi);
-
-	TGDK_INIT(CMDK_TGOBJP(dkp), devp, flcobjp, queobjp, &cmdk_bbh_obj,
+	dadk_init(DKTP_DATA, devp, flcobjp, queobjp, &cmdk_bbh_obj,
 	    NULL);
 
 	return (DDI_SUCCESS);
 }
 
 static void
-cmdk_destroy_obj(dev_info_t *devi, struct cmdk *dkp, int unload)
+cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp, int unload)
 {
-	char		que_keyvalp[OBJNAMELEN];
+	char		que_keyvalp[64];
 	int		que_keylen;
-	char		flc_keyvalp[OBJNAMELEN];
+	char		flc_keyvalp[64];
 	int		flc_keylen;
-	char		dsk_keyvalp[OBJNAMELEN];
-	int		dsk_keylen;
 
-	TGDK_FREE(CMDK_TGOBJP(dkp));
-	CMDK_TGOBJP(dkp) = NULL;
+	dadk_free(DKTP_DATA);
+	DKTP_DATA = NULL;
 
 	que_keylen = sizeof (que_keyvalp);
-	if (ddi_prop_op(DDI_DEV_T_NONE, devi, PROP_LEN_AND_VAL_BUF,
+	if (ddi_prop_op(DDI_DEV_T_NONE, dip, PROP_LEN_AND_VAL_BUF,
 	    DDI_PROP_CANSLEEP, "queue", que_keyvalp, &que_keylen) !=
 	    DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN, "cmdk_destroy_obj: queue property undefined");
@@ -1261,7 +1225,7 @@ cmdk_destroy_obj(dev_info_t *devi, struct cmdk *dkp, int unload)
 	que_keyvalp[que_keylen] = (char)0;
 
 	flc_keylen = sizeof (flc_keyvalp);
-	if (ddi_prop_op(DDI_DEV_T_NONE, devi, PROP_LEN_AND_VAL_BUF,
+	if (ddi_prop_op(DDI_DEV_T_NONE, dip, PROP_LEN_AND_VAL_BUF,
 	    DDI_PROP_CANSLEEP, "flow_control", flc_keyvalp, &flc_keylen) !=
 	    DDI_PROP_SUCCESS) {
 		cmn_err(CE_WARN,
@@ -1269,90 +1233,32 @@ cmdk_destroy_obj(dev_info_t *devi, struct cmdk *dkp, int unload)
 		return;
 	}
 	flc_keyvalp[flc_keylen] = (char)0;
-
-	dsk_keylen = sizeof (dsk_keyvalp);
-	if (ddi_prop_op(DDI_DEV_T_NONE, devi, PROP_LEN_AND_VAL_BUF,
-	    DDI_PROP_CANSLEEP, "disk", dsk_keyvalp, &dsk_keylen) !=
-	    DDI_PROP_SUCCESS) {
-		cmn_err(CE_WARN,
-		    "cmdk_destroy_obj: target disk property undefined");
-		return;
-	}
-	dsk_keyvalp[dsk_keylen] = (char)0;
-
-	(void) objmgr_destroy_obj(que_keyvalp);
-	(void) objmgr_destroy_obj(flc_keyvalp);
-	(void) objmgr_destroy_obj(dsk_keyvalp);
-
-	if (unload) {
-		objmgr_unload_obj(que_keyvalp);
-		objmgr_unload_obj(flc_keyvalp);
-		objmgr_unload_obj(dsk_keyvalp);
-	}
 }
 
 static int
-cmdk_create_lbobj(dev_info_t *devi, struct cmdk *dkp)
+cmdk_create_lbobj(dev_info_t *dip, struct cmdk *dkp)
 {
-	struct cmdk_label *dklbp;
-	char		**contents;
-	uint_t		numelem;
-	int		i;
-	int		mystatus;
-
-	dklbp = dkp->dk_lb;
-	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, devi, 0, "disklabel",
-	    &contents, &numelem) != DDI_PROP_SUCCESS) {
-		(void) strcpy(dklbp->dkl_name, "snlb");
-	} else {
-		for (i = 0; (i < CMDK_LABEL_MAX) && (i < numelem);
-		    i++, dklbp++) {
-			(void) strncpy(dklbp->dkl_name, contents[i],
-			    sizeof (dklbp->dkl_name));
-			dklbp->dkl_name[sizeof (dklbp->dkl_name) - 1] = '\0';
-		}
-		ddi_prop_free(contents);
+	dkp->dk_lbobjp = (opaque_t)snlb_create();
+	if (!(dkp->dk_lbobjp)) {
+		cmn_err(CE_WARN,
+		    "cmdk_create_lbobj: ERROR creating disklabel %s",
+		    "snlb");
+		return (DDI_FAILURE);
 	}
 
-	dklbp = dkp->dk_lb;
-	for (i = 0, mystatus = DDI_FAILURE; i < CMDK_LABEL_MAX; i++, dklbp++) {
-		if (dklbp->dkl_name[0] == 0)
-			break;
-		if ((objmgr_load_obj(dklbp->dkl_name) != DDI_SUCCESS) ||
-		    !(dklbp->dkl_objp = objmgr_create_obj(dklbp->dkl_name))) {
-			cmn_err(CE_WARN,
-			    "cmdk_create_lbobj: ERROR creating disklabel %s",
-			    dklbp->dkl_name);
-			dklbp->dkl_name[0] = 0;
-		} else {
-			DKLB_INIT(dklbp->dkl_objp, CMDK_TGOBJP(dkp), NULL);
-			mystatus = DDI_SUCCESS;
-		}
-	}
-	return (mystatus);
+	DKLB_INIT(dkp->dk_lbobjp, dkp->dk_tgobjp, NULL);
+
+	return (DDI_SUCCESS);
 }
 
 /*ARGSUSED*/
 static void
-cmdk_destroy_lbobj(dev_info_t *devi, struct cmdk *dkp, int unload)
+cmdk_destroy_lbobj(dev_info_t *dip, struct cmdk *dkp, int unload)
 {
-	struct cmdk_label *dklbp;
-	int i;
-
 	if (!dkp->dk_lbobjp)
 		return;
 
-	dklbp = dkp->dk_lb;
-	for (i = 0; i < CMDK_LABEL_MAX; i++, dklbp++) {
-		if (dklbp->dkl_name[0] == 0)
-			continue;
-		DKLB_FREE(dklbp->dkl_objp);
-		(void) objmgr_destroy_obj(dklbp->dkl_name);
-		if (unload)
-			objmgr_unload_obj(dklbp->dkl_name);
-		dklbp->dkl_name[0] = 0;
-	}
-
+	DKLB_FREE(dkp->dk_lbobjp);
 	dkp->dk_lbobjp = 0;
 }
 
@@ -1389,7 +1295,6 @@ static int
 cmdk_part_info(struct cmdk *dkp, int force, daddr_t *startp, long *countp,
 		int part)
 {
-
 	/*
 	 * The dk_pinfo_state variable (and by implication the partition
 	 * info) is always protected by the dk_pinfo_lock mutex.
@@ -1486,7 +1391,6 @@ error:
 static void
 cmdk_devstatus(struct cmdk *dkp)
 {
-
 	mutex_enter(&dkp->dk_pinfo_lock);
 	switch (dkp->dk_pinfo_state) {
 

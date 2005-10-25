@@ -38,7 +38,6 @@
 #include <sys/vtoc.h>
 #include <sys/dkio.h>
 
-#include <sys/dktp/objmgr.h>
 #include <sys/dktp/dadev.h>
 #include <sys/dktp/fctypes.h>
 #include <sys/dktp/flowctrl.h>
@@ -48,11 +47,6 @@
 #include <sys/dktp/dadkio.h>
 #include <sys/dktp/dadk.h>
 #include <sys/cdio.h>
-
-/*
- *	Object Management
- */
-static opaque_t dadk_create();
 
 /*
  * Local Function Prototypes
@@ -84,30 +78,6 @@ struct tgcom_objops dadk_com_ops = {
 	0, 0
 };
 
-static int dadk_init(opaque_t objp, opaque_t devp, opaque_t flcobjp,
-    opaque_t queobjp, opaque_t bbhobjp, void *lkarg);
-static int dadk_free(struct tgdk_obj *dkobjp);
-static int dadk_probe(opaque_t objp, int kmsflg);
-static int dadk_attach(opaque_t objp);
-static int dadk_open(opaque_t objp, int flag);
-static int dadk_close(opaque_t objp);
-static int dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg,
-    int flag, cred_t *cred_p, int *rval_p);
-static int dadk_strategy(opaque_t objp, struct buf *bp);
-static int dadk_setgeom(opaque_t objp, struct tgdk_geom *dkgeom_p);
-static int dadk_getgeom(opaque_t objp, struct tgdk_geom *dkgeom_p);
-static struct tgdk_iob *dadk_iob_alloc(opaque_t objp, daddr_t blkno,
-    ssize_t xfer, int kmsflg);
-static int dadk_iob_free(opaque_t objp, struct tgdk_iob *iobp);
-static caddr_t dadk_iob_htoc(opaque_t objp, struct tgdk_iob *iobp);
-static caddr_t dadk_iob_xfer(opaque_t objp, struct tgdk_iob *iobp, int rw);
-static int dadk_dump(opaque_t objp, struct buf *bp);
-static int dadk_getphygeom(opaque_t objp, struct tgdk_geom *dkgeom_p);
-static int dadk_set_bbhobj(opaque_t objp, opaque_t bbhobjp);
-static int dadk_check_media(opaque_t objp, int *state);
-static void dadk_watch_thread(struct dadk *dadkp);
-static int dadk_inquiry(opaque_t objp, opaque_t *inqpp);
-static void dadk_cleanup(struct tgdk_obj *dkobjp);
 static int dadk_rmb_ioctl(struct dadk *dadkp, int cmd, intptr_t arg, int flags,
     int silent);
 static void dadk_rmb_iodone(struct buf *bp);
@@ -230,54 +200,32 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,	/* Type of module */
-	"Direct Attached Disk Object"
+	"Direct Attached Disk %I%"
 };
 
 static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modlmisc, NULL
 };
 
-char _depends_on[] = "misc/gda drv/objmgr";
-
 int
 _init(void)
 {
-	int	err;
-
 #ifdef DADK_DEBUG
 	if (dadk_debug & DENT)
 		PRF("dadk_init: call\n");
 #endif
-	if (objmgr_ins_entry("dadk",
-	    (opaque_t)dadk_create, OBJ_MODGRP_SNGL) != DDI_SUCCESS)
-		return (EINVAL);
-
-	if ((err = mod_install(&modlinkage)) != 0)
-		(void) objmgr_del_entry("dadk");
-
-	return (err);
+	return (mod_install(&modlinkage));
 }
 
 int
 _fini(void)
 {
-	int	err, objerr;
-
 #ifdef DADK_DEBUG
 	if (dadk_debug & DENT)
 		PRF("dadk_fini: call\n");
 #endif
-	if (objmgr_del_entry("dadk") == DDI_FAILURE)
-		return (EBUSY);
 
-	if ((err = mod_remove(&modlinkage)) != 0) {
-		objerr = objmgr_ins_entry("dadk",
-		    (opaque_t)dadk_create, OBJ_MODGRP_SNGL);
-		/* currently objmgr_ins_entry always succeeds */
-		ASSERT(objerr == DDI_SUCCESS);
-	}
-
-	return (err);
+	return (mod_remove(&modlinkage));
 }
 
 int
@@ -286,7 +234,7 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-static opaque_t
+struct tgdk_obj *
 dadk_create()
 {
 	struct tgdk_obj *dkobjp;
@@ -306,10 +254,10 @@ dadk_create()
 	if (dadk_debug & DENT)
 		PRF("dadk_create: tgdkobjp= 0x%x dadkp= 0x%x\n", dkobjp, dadkp);
 #endif
-	return ((opaque_t)dkobjp);
+	return (dkobjp);
 }
 
-static int
+int
 dadk_init(opaque_t objp, opaque_t devp, opaque_t flcobjp, opaque_t queobjp,
 	opaque_t bbhobjp, void *lkarg)
 {
@@ -331,7 +279,7 @@ dadk_init(opaque_t objp, opaque_t devp, opaque_t flcobjp, opaque_t queobjp,
 	return (FLC_INIT(flcobjp, &(dadkp->dad_com), queobjp, lkarg));
 }
 
-static int
+int
 dadk_free(struct tgdk_obj *dkobjp)
 {
 	TGDK_CLEANUP(dkobjp);
@@ -340,7 +288,7 @@ dadk_free(struct tgdk_obj *dkobjp)
 	return (DDI_SUCCESS);
 }
 
-static void
+void
 dadk_cleanup(struct tgdk_obj *dkobjp)
 {
 	struct dadk *dadkp;
@@ -359,7 +307,7 @@ dadk_cleanup(struct tgdk_obj *dkobjp)
 }
 
 /* ARGSUSED */
-static int
+int
 dadk_probe(opaque_t objp, int kmsflg)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -410,13 +358,13 @@ dadk_probe(opaque_t objp, int kmsflg)
 
 
 /* ARGSUSED */
-static int
+int
 dadk_attach(opaque_t objp)
 {
 	return (DDI_SUCCESS);
 }
 
-static int
+int
 dadk_set_bbhobj(opaque_t objp, opaque_t bbhobjp)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -432,7 +380,7 @@ dadk_set_bbhobj(opaque_t objp, opaque_t bbhobjp)
 }
 
 /* ARGSUSED */
-static int
+int
 dadk_open(opaque_t objp, int flag)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -510,7 +458,7 @@ dadk_setcap(struct dadk *dadkp)
 }
 
 
-static int
+int
 dadk_close(opaque_t objp)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -524,7 +472,7 @@ dadk_close(opaque_t objp)
 	return (DDI_SUCCESS);
 }
 
-static int
+int
 dadk_strategy(opaque_t objp, struct buf *bp)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -545,7 +493,7 @@ dadk_strategy(opaque_t objp, struct buf *bp)
 	return (DDI_SUCCESS);
 }
 
-static int
+int
 dadk_dump(opaque_t objp, struct buf *bp)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -588,7 +536,7 @@ dadk_dump(opaque_t objp, struct buf *bp)
 }
 
 /* ARGSUSED  */
-static int
+int
 dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 	cred_t *cred_p, int *rval_p)
 {
@@ -756,7 +704,7 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 	return (dadk_rmb_ioctl(dadkp, cmd, arg, flag, 0));
 }
 
-static int
+int
 dadk_getphygeom(opaque_t objp, struct tgdk_geom *dkgeom_p)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -766,17 +714,16 @@ dadk_getphygeom(opaque_t objp, struct tgdk_geom *dkgeom_p)
 	return (DDI_SUCCESS);
 }
 
-static int
+int
 dadk_getgeom(opaque_t objp, struct tgdk_geom *dkgeom_p)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
-
 	bcopy((caddr_t)&dadkp->dad_logg, (caddr_t)dkgeom_p,
 	    sizeof (struct tgdk_geom));
 	return (DDI_SUCCESS);
 }
 
-static int
+int
 dadk_setgeom(opaque_t objp, struct tgdk_geom *dkgeom_p)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -789,7 +736,7 @@ dadk_setgeom(opaque_t objp, struct tgdk_geom *dkgeom_p)
 }
 
 
-static tgdk_iob_handle
+tgdk_iob_handle
 dadk_iob_alloc(opaque_t objp, daddr_t blkno, ssize_t xfer, int kmsflg)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -826,7 +773,7 @@ dadk_iob_alloc(opaque_t objp, daddr_t blkno, ssize_t xfer, int kmsflg)
 }
 
 /* ARGSUSED */
-static int
+int
 dadk_iob_free(opaque_t objp, struct tgdk_iob *iobp)
 {
 	struct buf *bp;
@@ -844,14 +791,14 @@ dadk_iob_free(opaque_t objp, struct tgdk_iob *iobp)
 }
 
 /* ARGSUSED */
-static caddr_t
+caddr_t
 dadk_iob_htoc(opaque_t objp, struct tgdk_iob *iobp)
 {
 	return (iobp->b_bp->b_un.b_addr+iobp->b_pbyteoff);
 }
 
 
-static caddr_t
+caddr_t
 dadk_iob_xfer(opaque_t objp, struct tgdk_iob *iobp, int rw)
 {
 	struct dadk	*dadkp = (struct dadk *)objp;
@@ -1236,7 +1183,7 @@ dadk_iodone(struct buf *bp)
 	biodone(bp);
 }
 
-static int
+int
 dadk_check_media(opaque_t objp, int *state)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
@@ -1331,7 +1278,7 @@ dadk_watch_thread(struct dadk *dadkp)
 	} while (dadkp->dad_thread_cnt);
 }
 
-static int
+int
 dadk_inquiry(opaque_t objp, opaque_t *inqpp)
 {
 	struct dadk *dadkp = (struct dadk *)objp;

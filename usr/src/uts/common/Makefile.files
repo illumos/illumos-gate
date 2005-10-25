@@ -682,8 +682,6 @@ STRATEGY_OBJS += strategy.o
 
 CMDK_OBJS +=	cmdk.o
 
-OBJMGR_OBJS +=	objmgr.o
-
 HPCSVC_OBJS += hpcsvc.o
 
 PCIHPNEXUS_OBJS += pcihp.o

@@ -881,7 +881,6 @@ DKTPHDRS=		\
 	flowctrl.h	\
 	gda.h		\
 	hba.h		\
-	objmgr.h	\
 	quetypes.h	\
 	queue.h		\
 	snlb.h		\

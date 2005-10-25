@@ -5424,6 +5424,14 @@ mondo_loop() {
 	rm -f $root/platform/i86pc/kernel/drv/mlx
 	rm -f $root/platform/i86pc/kernel/drv/mlx.conf
 	rm -rf $usr/include/sys/dktp/mlx
+
+	#
+	# Remove objmgr
+	#
+	rm -f $root/kernel/drv/objmgr.conf
+	rm -f $root/kernel/drv/objmgr
+	rm -f $root/kernel/drv/amd64/objmgr
+	rm -f $root/usr/include/sys/dktp/objmgr.h
  
 	#
 	# Remove Floating Point Emulator for EOF as per PSARC/2003/651

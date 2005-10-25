@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,8 @@ struct	dklb_objops {
 	void	(*lb_partinfo)(opaque_t, daddr_t *, long *, int);
 	void	*lb_resv[2];
 };
+
+struct dklb_obj *snlb_create();
 
 #define	DKLB_NUMPART(X) (((struct dklb_obj *)(X))->lb_ext->lb_numpart)
 #define	DKLB_VALIDLB(X) (((struct dklb_obj *)(X))->lb_ext->lb_flag & DKLB_VALLB)

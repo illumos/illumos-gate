@@ -47,7 +47,6 @@ i8042 100
 kb8042 101
 cmdk 102
 conskbd 103
-objmgr 104
 tl 105
 asy 106
 fdc 111

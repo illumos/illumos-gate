@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +31,6 @@
  */
 #include <sys/dktp/cm.h>
 #include <sys/kstat.h>
-#include <sys/dktp/objmgr.h>
 
 #include <sys/dktp/quetypes.h>
 #include <sys/dktp/queue.h>
@@ -45,20 +44,13 @@
 /*
  *	Object Management
  */
-static opaque_t qfifo_create();
-static opaque_t qmerge_create();
-static opaque_t qsort_create();
-static opaque_t qtag_create();
-static opaque_t dsngl_create();
-static opaque_t dmult_create();
-static opaque_t duplx_create();
-static opaque_t adapt_create();
+
 static struct buf *qmerge_nextbp(struct que_data *qfp, struct buf *bp_merge,
     int *can_merge);
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,	/* Type of module */
-	"Device Strategy Objects"
+	"Device Strategy Objects %I%"
 };
 
 static struct modlinkage modlinkage = {
@@ -67,116 +59,16 @@ static struct modlinkage modlinkage = {
 	NULL
 };
 
-char _depends_on[] = "drv/objmgr";
-
 int
 _init(void)
 {
-	int	err = EINVAL;
-	int	worked = 0;
-
-	if (objmgr_ins_entry("qfifo",
-	    (opaque_t)qfifo_create, "strategy") == DDI_SUCCESS)
-		worked |= 0x01;
-	if (objmgr_ins_entry("qmerge",
-	    (opaque_t)qmerge_create, "strategy") == DDI_SUCCESS)
-		worked |= 0x02;
-	if (objmgr_ins_entry("qsort",
-	    (opaque_t)qsort_create, "strategy") == DDI_SUCCESS)
-		worked |= 0x04;
-	if (objmgr_ins_entry("qtag",
-	    (opaque_t)qtag_create, "strategy") == DDI_SUCCESS)
-		worked |= 0x08;
-	if (objmgr_ins_entry("dsngl",
-	    (opaque_t)dsngl_create, "strategy") == DDI_SUCCESS)
-		worked |= 0x10;
-	if (objmgr_ins_entry("dmult",
-	    (opaque_t)dmult_create, "strategy") == DDI_SUCCESS)
-		worked |= 0x20;
-	if (objmgr_ins_entry("duplx",
-	    (opaque_t)duplx_create, "strategy") == DDI_SUCCESS)
-		worked |= 0x40;
-	if (objmgr_ins_entry("adapt",
-	    (opaque_t)adapt_create, "strategy") == DDI_SUCCESS)
-		worked |= 0x80;
-
-	if ((worked != 0xFF) || ((err = mod_install(&modlinkage)) != 0)) {
-		if (worked & 0x01)
-			(void) objmgr_del_entry("qfifo");
-		if (worked & 0x02)
-			(void) objmgr_del_entry("qmerge");
-		if (worked & 0x04)
-			(void) objmgr_del_entry("qsort");
-		if (worked & 0x08)
-			(void) objmgr_del_entry("qtag");
-		if (worked & 0x10)
-			(void) objmgr_del_entry("dsngl");
-		if (worked & 0x20)
-			(void) objmgr_del_entry("dmult");
-		if (worked & 0x40)
-			(void) objmgr_del_entry("duplx");
-		if (worked & 0x80)
-			(void) objmgr_del_entry("adapt");
-	}
-
-	return (err);
+	return (mod_install(&modlinkage));
 }
 
 int
 _fini(void)
 {
-	int err = EBUSY;
-	int objerr = 0;
-	int worked = 0;
-
-	if (objmgr_del_entry("qfifo") == DDI_FAILURE)
-		worked |= 0x01;
-	if (objmgr_del_entry("qmerge") == DDI_FAILURE)
-		worked |= 0x02;
-	if (objmgr_del_entry("qsort") == DDI_FAILURE)
-		worked |= 0x04;
-	if (objmgr_del_entry("qtag") == DDI_FAILURE)
-		worked |= 0x08;
-	if (objmgr_del_entry("dsngl") == DDI_FAILURE)
-		worked |= 0x10;
-	if (objmgr_del_entry("dmult") == DDI_FAILURE)
-		worked |= 0x20;
-	if (objmgr_del_entry("duplx") == DDI_FAILURE)
-		worked |= 0x40;
-	if (objmgr_del_entry("adapt") == DDI_FAILURE)
-		worked |= 0x80;
-
-	if ((worked != 0xFF) || ((err = mod_remove(&modlinkage)) != 0)) {
-		if ((worked & 0x01) && (objmgr_ins_entry("qfifo",
-		    (opaque_t)qfifo_create, "strategy") != DDI_SUCCESS))
-			objerr++;
-		if ((worked & 0x02) && (objmgr_ins_entry("qmerge",
-		    (opaque_t)qmerge_create, "strategy") != DDI_SUCCESS))
-			objerr++;
-		if ((worked & 0x04) && (objmgr_ins_entry("qsort",
-		    (opaque_t)qsort_create, "strategy") != DDI_SUCCESS))
-			objerr++;
-		if ((worked & 0x08) && (objmgr_ins_entry("qtag",
-		    (opaque_t)qtag_create, "strategy") != DDI_SUCCESS))
-			objerr++;
-		if ((worked & 0x10) && (objmgr_ins_entry("dsngl",
-		    (opaque_t)dsngl_create, "strategy") != DDI_SUCCESS))
-			objerr++;
-		if ((worked & 0x20) && (objmgr_ins_entry("dmult",
-		    (opaque_t)dmult_create, "strategy") != DDI_SUCCESS))
-			objerr++;
-		if ((worked & 0x40) && (objmgr_ins_entry("duplx",
-		    (opaque_t)duplx_create, "strategy") != DDI_SUCCESS))
-			objerr++;
-		if ((worked & 0x80) && (objmgr_ins_entry("adapt",
-		    (opaque_t)adapt_create, "strategy") != DDI_SUCCESS))
-			objerr++;
-
-		/* currently objmgr_ins_entry always succeeds */
-		ASSERT(objerr == 0);
-	}
-
-	return (err);
+	return (mod_remove(&modlinkage));
 }
 
 int
@@ -205,14 +97,14 @@ static 	int	flc_malloc_intr = 0;
 
 static	int	flc_kstat = 1;
 
-static opaque_t fc_create(struct flc_objops *fcopsp);
+static struct flc_obj *fc_create(struct flc_objops *fcopsp);
 static int fc_init(opaque_t queuep, opaque_t tgcom_objp, opaque_t que_objp,
     void *lkarg);
 static int fc_free(struct flc_obj *flcobjp);
 static int fc_start_kstat(opaque_t queuep, char *devtype, int instance);
 static int fc_stop_kstat(opaque_t queuep);
 
-static opaque_t
+static struct flc_obj *
 fc_create(struct flc_objops *fcopsp)
 {
 	struct	flc_obj *flcobjp;
@@ -314,7 +206,7 @@ struct 	flc_objops dsngl_ops = {
 	0, 0
 };
 
-static opaque_t
+struct flc_obj *
 dsngl_create()
 {
 	return (fc_create((struct flc_objops *)&dsngl_ops));
@@ -439,7 +331,7 @@ struct 	flc_objops dmult_ops = {
 	0, 0
 };
 
-static opaque_t
+struct flc_obj *
 dmult_create()
 {
 	return (fc_create((struct flc_objops *)&dmult_ops));
@@ -586,7 +478,7 @@ struct 	flc_objops duplx_ops = {
 	0, 0
 };
 
-static opaque_t
+struct flc_obj *
 duplx_create()
 {
 	struct	flc_obj *flcobjp;
@@ -600,11 +492,12 @@ duplx_create()
 	flcobjp->flc_data = (opaque_t)fcdp;
 	flcobjp->flc_ops  = &duplx_ops;
 
-	if (!(fcdp->ds_writeq.fc_qobjp = objmgr_create_obj("qfifo"))) {
+	fcdp->ds_writeq.fc_qobjp = qfifo_create();
+	if (!(fcdp->ds_writeq.fc_qobjp = qfifo_create())) {
 		kmem_free(flcobjp, (sizeof (*flcobjp) + sizeof (*fcdp)));
 		return (NULL);
 	}
-	return ((opaque_t)flcobjp);
+	return (flcobjp);
 }
 
 static int
@@ -615,7 +508,6 @@ duplx_free(struct flc_obj *flcobjp)
 	fcdp = (struct duplx_data *)flcobjp->flc_data;
 	if (fcdp->ds_writeq.fc_qobjp) {
 		QUE_FREE(fcdp->ds_writeq.fc_qobjp);
-		(void) objmgr_destroy_obj("qfifo");
 	}
 	if (fcdp->ds_readq.fc_qobjp)
 		QUE_FREE(fcdp->ds_readq.fc_qobjp);
@@ -810,7 +702,7 @@ struct 	flc_objops adapt_ops = {
 	0, 0
 };
 
-static opaque_t
+struct flc_obj *
 adapt_create()
 {
 	return (fc_create((struct flc_objops *)&adapt_ops));
@@ -834,12 +726,12 @@ static	int	que_debug = DENT|DERR|DIO;
 /*
  * 	Local Function Prototypes
  */
-static opaque_t que_create(struct que_objops *qopsp);
+static struct que_obj *que_create(struct que_objops *qopsp);
 static int que_init(struct que_data *qfp, void *lkarg);
 static int que_free(struct que_obj *queobjp);
 static struct buf *que_del(struct que_data *qfp);
 
-static opaque_t
+static struct que_obj *
 que_create(struct que_objops *qopsp)
 {
 	struct	que_data *qfp;
@@ -957,7 +849,7 @@ static int	qmerge_merge = 0;
 /*
  * 	Local static data
  */
-static opaque_t
+struct que_obj *
 qmerge_create()
 {
 	struct que_data *qfp;
@@ -1450,7 +1342,7 @@ struct 	que_objops qfifo_ops = {
 /*
  * 	Local static data
  */
-static opaque_t
+struct que_obj *
 qfifo_create()
 {
 	return (que_create((struct que_objops *)&qfifo_ops));
@@ -1490,7 +1382,7 @@ struct 	que_objops qsort_ops = {
 /*
  * 	Local static data
  */
-static opaque_t
+struct que_obj *
 qsort_create()
 {
 	return (que_create((struct que_objops *)&qsort_ops));
@@ -1572,7 +1464,7 @@ struct 	que_objops qtag_ops = {
 /*
  * 	Local static data
  */
-static opaque_t
+struct que_obj *
 qtag_create()
 {
 	return (que_create((struct que_objops *)&qtag_ops));

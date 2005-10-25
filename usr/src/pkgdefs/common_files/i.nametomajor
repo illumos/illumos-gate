@@ -216,6 +216,7 @@ obsolete_i386()
 		obs["nee"] = 1;
 		obs["nei"] = 1;
 		obs["nfe"] = 1;
+		obs["objmgr"] = 1;
 		obs["p9000"] = 1;
 		obs["p9100"] = 1;
 		obs["pcaic"] = 1;

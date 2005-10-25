@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,6 +95,8 @@ struct	tgdk_objops {
 	void (*tg_cleanup)(struct tgdk_obj *);
 	void *tg_resv[1];
 };
+
+struct tgdk_obj *dadk_create();
 
 #define	TGDK_GETNODETYPE(X) (((struct tgdk_obj *)(X))->tg_ext->tg_nodetype)
 #define	TGDK_SETNODETYPE(X, Y) \

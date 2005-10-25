@@ -20,7 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1992 Sun Microsystems, Inc.  All Rights Reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_DKTP_DADK_H
@@ -31,6 +32,8 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <sys/dktp/tgcom.h>
 
 struct	dadk {
 	struct tgdk_ext	*dad_extp;	/* back pointer to ext data	*/
@@ -84,6 +87,31 @@ struct	dadk {
 #define	QUE_COMMAND		2
 #define	QUE_SENSE		3
 #define	JUST_RETURN		4
+
+int dadk_init(opaque_t objp, opaque_t devp, opaque_t flcobjp,
+    opaque_t queobjp, opaque_t bbhobjp, void *lkarg);
+int dadk_free(struct tgdk_obj *dkobjp);
+int dadk_probe(opaque_t objp, int kmsflg);
+int dadk_attach(opaque_t objp);
+int dadk_open(opaque_t objp, int flag);
+int dadk_close(opaque_t objp);
+int dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg,
+    int flag, cred_t *cred_p, int *rval_p);
+int dadk_strategy(opaque_t objp, struct buf *bp);
+int dadk_setgeom(opaque_t objp, struct tgdk_geom *dkgeom_p);
+int dadk_getgeom(opaque_t objp, struct tgdk_geom *dkgeom_p);
+struct tgdk_iob *dadk_iob_alloc(opaque_t objp, daddr_t blkno,
+    ssize_t xfer, int kmsflg);
+int dadk_iob_free(opaque_t objp, struct tgdk_iob *iobp);
+caddr_t dadk_iob_htoc(opaque_t objp, struct tgdk_iob *iobp);
+caddr_t dadk_iob_xfer(opaque_t objp, struct tgdk_iob *iobp, int rw);
+int dadk_dump(opaque_t objp, struct buf *bp);
+int dadk_getphygeom(opaque_t objp, struct tgdk_geom *dkgeom_p);
+int dadk_set_bbhobj(opaque_t objp, opaque_t bbhobjp);
+int dadk_check_media(opaque_t objp, int *state);
+static void dadk_watch_thread(struct dadk *dadkp);
+int dadk_inquiry(opaque_t objp, opaque_t *inqpp);
+void dadk_cleanup(struct tgdk_obj *dkobjp);
 
 #ifdef	__cplusplus
 }

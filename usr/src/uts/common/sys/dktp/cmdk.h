@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include <sys/dktp/tgdk.h>
+
 #define	CMDK_UNITSHF	6
 #define	CMDK_MAXPART	(1 << CMDK_UNITSHF)
 
@@ -42,12 +44,6 @@ struct	dk_openinfo {
 	uint64_t	dk_exl;			/* bit per partition: 2^6 */
 };
 
-struct	cmdk_label {
-	opaque_t	dkl_objp;
-	char		dkl_name[OBJNAMELEN];
-};
-
-#define	CMDK_LABEL_MAX	3
 struct	cmdk {
 	long		dk_flag;
 	dev_info_t	*dk_dip;
@@ -56,9 +52,8 @@ struct	cmdk {
 	ksema_t		dk_semoclose;	/* lock for opens/closes 	*/
 	struct		dk_openinfo dk_open;
 
-	opaque_t 	dk_tgobjp;	/* target disk object pointer	*/
+	struct tgdk_obj	*dk_tgobjp;	/* target disk object pointer	*/
 	opaque_t 	dk_lbobjp;
-	struct cmdk_label dk_lb[CMDK_LABEL_MAX];
 
 	kmutex_t	dk_pinfo_lock;
 	kcondvar_t	dk_pinfo_cv;

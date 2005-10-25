@@ -22,7 +22,7 @@
 #
 # uts/intel/cmdk/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,6 +65,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE) $(ROOT_ITUFILE)
 #
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
+LDFLAGS		+= -dy -Nmisc/dadk -Nmisc/strategy -Nmisc/snlb
 
 #
 #	Default build targets.

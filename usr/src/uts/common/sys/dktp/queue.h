@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,11 @@ struct	que_objops {
 	struct buf *(*que_del)(struct que_data *);
 	void	*que_res[2];
 };
+
+struct que_obj *qfifo_create();
+struct que_obj *qmerge_create();
+struct que_obj *qsort_create();
+struct que_obj *qtag_create();
 
 #define	QUE_INIT(X, lkarg) (*((struct que_obj *)(X))->que_ops->que_init) \
 	(((struct que_obj *)(X))->que_data, (lkarg))

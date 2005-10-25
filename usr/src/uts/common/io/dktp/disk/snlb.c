@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,18 +38,12 @@
 
 #include <sys/dktp/fdisk.h>
 
-#include <sys/dktp/objmgr.h>
 #include <sys/dktp/bbh.h>
 #include <sys/dktp/tgdk.h>
 #include <sys/dktp/dklb.h>
 #include <sys/dktp/snlb.h>
 
 #include <sys/scsi/generic/inquiry.h>
-
-/*
- *	Object Management
- */
-static opaque_t snlb_create();
 
 /*
  * Local Function Prototypes
@@ -125,13 +119,11 @@ int	snlb_debug = DERR|DIO|DXDEVID;
  * This is the driver loadable module wrapper.
  */
 
-char _depends_on[] = "drv/objmgr";
-
 #include <sys/modctl.h>
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,	/* Type of module */
-	"Solaris Disk Label Object"
+	"Solaris Disk Label Object %I%"
 };
 
 static struct modlinkage modlinkage = {
@@ -141,38 +133,17 @@ static struct modlinkage modlinkage = {
 int
 _init(void)
 {
-	int	err;
-
-	if (objmgr_ins_entry("snlb",
-	    (opaque_t)snlb_create, OBJ_MODGRP_SNGL) != DDI_SUCCESS)
-		return (EINVAL);
-
-	if ((err = mod_install(&modlinkage)) != 0)
-		(void) objmgr_del_entry("snlb");
-
-	return (err);
+	return (mod_install(&modlinkage));
 }
 
 int
 _fini(void)
 {
-	int	err, objerr;
-
 #ifdef SNLB_DEBUG
 	if (snlb_debug & DENT)
 		PRF("snlb_fini: call\n");
 #endif
-	if (objmgr_del_entry("snlb") == DDI_FAILURE)
-		return (EBUSY);
-
-	if ((err = mod_remove(&modlinkage)) != 0) {
-		objerr = objmgr_ins_entry("snlb", (opaque_t)snlb_create,
-		    OBJ_MODGRP_SNGL);
-		/* currently objmgr_ins_entry always succeeds */
-		ASSERT(objerr == DDI_SUCCESS);
-	}
-
-	return (err);
+	return (mod_remove(&modlinkage));
 }
 
 int
@@ -198,7 +169,7 @@ snlb_mprint(struct dkl_partition *pp)
 }
 #endif
 
-static opaque_t
+struct dklb_obj *
 snlb_create()
 {
 	struct	dklb_obj *lbobjp;
@@ -211,7 +182,7 @@ snlb_create()
 	lbobjp->lb_ops = (struct dklb_objops *)&snlb_ops;
 	lbobjp->lb_ext = &(lbobjp->lb_extblk);
 	snlbp->s_extp = &(lbobjp->lb_extblk);
-	return ((opaque_t)lbobjp);
+	return (lbobjp);
 }
 
 static int

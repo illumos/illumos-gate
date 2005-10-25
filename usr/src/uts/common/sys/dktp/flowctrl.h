@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,11 @@ struct	flc_objops {
 	int	(*flc_stop_kstat)(opaque_t);
 	void	*flc_resv[2];
 };
+
+struct flc_obj *dsngl_create();
+struct flc_obj *dmult_create();
+struct flc_obj *duplx_create();
+struct flc_obj *adapt_create();
 
 #define	FLC_INIT(X, tgcomobjp, queobjp, lkarg) \
 	(*((struct flc_obj *)(X))->flc_ops->flc_init) \
