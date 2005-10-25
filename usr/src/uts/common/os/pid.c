@@ -63,6 +63,7 @@ struct pid pid0 = {
 	0,		/* pid_prslot	*/
 	0,		/* pid_id	*/
 	NULL,		/* pid_pglink	*/
+	NULL,		/* pid_pgtail	*/
 	NULL,		/* pid_link	*/
 	3		/* pid_ref	*/
 };

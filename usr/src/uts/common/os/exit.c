@@ -865,10 +865,29 @@ waitid(idtype_t idtype, id_t id, k_siginfo_t *ip, int options)
 	}
 
 	pp = ttoproc(curthread);
+
 	/*
 	 * lock parent mutex so that sibling chain can be searched.
 	 */
 	mutex_enter(&pidlock);
+
+	/*
+	 * if we are only looking for exited processes and child_ns list
+	 * is empty no reason to look at all children.
+	 */
+	if (idtype == P_ALL &&
+	    (options & (WOPTMASK & ~WNOWAIT)) == (WNOHANG | WEXITED) &&
+		pp->p_child_ns == NULL) {
+
+		if (pp->p_child) {
+			mutex_exit(&pidlock);
+			bzero(ip, sizeof (k_siginfo_t));
+			return (0);
+		}
+		mutex_exit(&pidlock);
+		return (ECHILD);
+	}
+
 	while ((cp = pp->p_child) != NULL) {
 
 		proc_gone = 0;

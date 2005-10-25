@@ -108,6 +108,7 @@
 #include <sys/bitmap.h>
 #include <sys/vmsystm.h>
 #include <sys/debug.h>
+#include <sys/fs/swapnode.h>
 #include <sys/tnf_probe.h>
 #include <sys/lgrp.h>
 #include <sys/policy.h>
@@ -123,6 +124,8 @@
 #include <vm/rm.h>
 
 #include <fs/fs_subr.h>
+
+struct vnode *anon_vp;
 
 int anon_debug;
 
@@ -203,6 +206,11 @@ anon_init(void)
 		anonmap_cache_constructor, anonmap_cache_destructor, NULL,
 		NULL, NULL, 0);
 	swap_maxcontig = (1024 * 1024) >> PAGESHIFT;	/* 1MB of pages */
+
+	anon_vp = vn_alloc(KM_SLEEP);
+	vn_setops(anon_vp, swap_vnodeops);
+	anon_vp->v_type = VREG;
+	anon_vp->v_flag |= (VISSWAP|VISSWAPFS);
 }
 
 /*
@@ -1860,7 +1868,8 @@ top:
 	 */
 	if (prealloc) {
 		ASSERT(conpp == NULL);
-		if (page_alloc_pages(seg, addr, NULL, ppa, szc, 0) != 0) {
+		if (page_alloc_pages(anon_vp, seg, addr, NULL, ppa,
+		    szc, 0) != 0) {
 			VM_STAT_ADD(anonvmstats.getpages[7]);
 			if (brkcow == 0 ||
 			    !anon_share(amp->ahp, start_idx, pgcnt)) {
@@ -2358,7 +2367,7 @@ anon_map_privatepages(
 	if (anypgsz == -1) {
 		VM_STAT_ADD(anonvmstats.privatepages[2]);
 		prealloc = 0;
-	} else if (page_alloc_pages(seg, addr, &pplist, NULL, szc,
+	} else if (page_alloc_pages(anon_vp, seg, addr, &pplist, NULL, szc,
 	    anypgsz) != 0) {
 		VM_STAT_ADD(anonvmstats.privatepages[3]);
 		prealloc = 0;
@@ -2704,7 +2713,7 @@ anon_map_createpages(
 				lgrp = lgrp_mem_choose(seg, addr, pgsz);
 
 				pplist = page_get_freelist(
-				    (struct vnode *)NULL, (u_offset_t)0, seg,
+				    anon_vp, (u_offset_t)0, seg,
 				    addr, pgsz, 0, lgrp);
 
 				if (pplist == NULL) {

@@ -212,6 +212,7 @@ kern_setup1(void)
 	pp->p_sessp = &session0;
 	pp->p_tlist = &t0;
 	pid0.pid_pglink = pp;
+	pid0.pid_pgtail = pp;
 
 	/*
 	 * XXX - we asssume that the u-area is zeroed out except for

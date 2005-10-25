@@ -24,8 +24,8 @@
 
 
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -121,15 +121,30 @@ pgjoin(p, pgp)
 {
 	ASSERT(MUTEX_HELD(&pidlock));
 
-	p->p_ppglink = NULL;
-	p->p_pglink = pgp->pid_pglink;
-	if (pgp->pid_pglink) {
-		pgp->pid_pglink->p_ppglink = p;
-	}
-	pgp->pid_pglink = p;
 	p->p_pgidp = pgp;
 
-	if (p->p_pglink == NULL) {
+	if (pgp->pid_pglink == NULL) {
+		ASSERT(pgp->pid_pgtail == NULL);
+		p->p_ppglink = NULL;
+		p->p_pglink = NULL;
+		pgp->pid_pglink = p;
+		pgp->pid_pgtail = p;
+	} else 	{
+		ASSERT(pgp->pid_pgtail != NULL);
+		if (pglinked(p)) {
+			p->p_ppglink = NULL;
+			p->p_pglink = pgp->pid_pglink;
+			pgp->pid_pglink->p_ppglink = p;
+			pgp->pid_pglink = p;
+		} else {
+			p->p_ppglink = pgp->pid_pgtail;
+			p->p_pglink = NULL;
+			pgp->pid_pgtail->p_pglink = p;
+			pgp->pid_pgtail = p;
+		}
+	}
+
+	if (pgp->pid_pglink == pgp->pid_pgtail) {
 		PID_HOLD(pgp);
 		if (pglinked(p))
 			pgp->pid_pgorphaned = 0;
@@ -159,6 +174,9 @@ pgexit(prp)
 	}
 	if (prp->p_pglink) {
 		prp->p_pglink->p_ppglink = prp->p_ppglink;
+	}
+	if (pgp->pid_pgtail == prp) {
+		pgp->pid_pgtail = prp->p_ppglink;
 	}
 
 	prp->p_pgidp = NULL;

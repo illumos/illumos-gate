@@ -2064,8 +2064,8 @@ uint32_t pg_alloc_pgs_mtbf = 0;
  * Returns non zero on failure.
  */
 int
-page_alloc_pages(struct seg *seg, caddr_t addr, page_t **basepp,
-    page_t *ppa[], uint_t szc, int anypgsz)
+page_alloc_pages(struct vnode *vp, struct seg *seg, caddr_t addr,
+    page_t **basepp, page_t *ppa[], uint_t szc, int anypgsz)
 {
 	pgcnt_t		npgs, curnpgs, totpgs;
 	size_t		pgsz;
@@ -2098,7 +2098,7 @@ page_alloc_pages(struct seg *seg, caddr_t addr, page_t **basepp,
 
 	while (npgs && szc) {
 		lgrp = lgrp_mem_choose(seg, addr, pgsz);
-		pp = page_get_freelist(NULL, 0, seg, addr, pgsz, 0, lgrp);
+		pp = page_get_freelist(vp, 0, seg, addr, pgsz, 0, lgrp);
 		if (pp != NULL) {
 			VM_STAT_ADD(alloc_pages[1]);
 			page_list_concat(&pplist, &pp);

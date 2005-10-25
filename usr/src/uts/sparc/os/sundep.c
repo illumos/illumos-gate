@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,6 +130,7 @@ kern_setup1(void)
 	pp->p_sessp = &session0;
 	pp->p_tlist = &t0;
 	pid0.pid_pglink = pp;
+	pid0.pid_pgtail = pp;
 
 	/*
 	 * We assume that the u-area is zeroed out.

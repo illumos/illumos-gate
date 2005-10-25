@@ -367,6 +367,7 @@ struct pid {
 	unsigned int pid_prslot :24;
 	pid_t pid_id;
 	struct proc *pid_pglink;
+	struct proc *pid_pgtail;
 	struct pid *pid_link;
 	uint_t pid_ref;
 };

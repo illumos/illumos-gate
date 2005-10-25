@@ -3302,7 +3302,7 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			    !page_exists_physcontig(vp, off, szc,
 				segtype == MAP_PRIVATE ? ppa : NULL)) {
 				SEGVN_VMSTAT_FLTVNPAGES(9);
-				if (page_alloc_pages(seg, a, &pplist, NULL,
+				if (page_alloc_pages(vp, seg, a, &pplist, NULL,
 				    szc, 0) && type != F_SOFTLOCK) {
 					SEGVN_VMSTAT_FLTVNPAGES(10);
 					pszc = 0;
@@ -3740,8 +3740,8 @@ segvn_fault_vnodepages(struct hat *hat, struct seg *seg, caddr_t lpgaddr,
 			 * allocate now.
 			 */
 			if (pplist == NULL &&
-			    page_alloc_pages(seg, a, &pplist, NULL, szc, 0) &&
-			    type != F_SOFTLOCK) {
+			    page_alloc_pages(vp, seg, a, &pplist, NULL,
+				szc, 0) && type != F_SOFTLOCK) {
 				SEGVN_VMSTAT_FLTVNPAGES(38);
 				for (i = 0; i < pages; i++) {
 					page_unlock(ppa[i]);
