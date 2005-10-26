@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -244,6 +244,16 @@ fcode_timer(void *arg)
 		fp->error = FC_TIMEOUT;
 		mutex_exit(&fc_request_lock);
 		cv_broadcast(&fc_request_cv);
+		return;
+	} else if (fp->error != FC_SUCCESS) {
+		/*
+		 * An error was detected, but didn't close the driver.
+		 * This will allow the process to error out, returning
+		 * the interpreter error code instead of FC_TIMEOUT.
+		 */
+		fp->busy = FC_R_DONE;
+		cv_broadcast(&fc_request_cv);
+		mutex_exit(&fc_request_lock);
 		return;
 	} else {
 		cmn_err(CE_WARN, "fcode_timer: Timeout waiting for "

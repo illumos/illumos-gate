@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,9 +54,8 @@ fc_reg_read(fcode_env_t *env, char *service, fstack_t virt, int *errp)
 		/* Don't report error on peeks */
 		*errp = error;
 	else if (error) {
-		log_message(MSG_ERROR, "fc_read_reg: ERROR: cookie: %llx"
+		forth_abort(env, "fc_read_reg: ERROR: cookie: %llx"
 		    " virt: %llx\n", (uint64_t)virt, (uint64_t)virtaddr);
-		data = 0;
 	}
 	return (data);
 }
@@ -81,7 +80,7 @@ fc_reg_write(fcode_env_t *env, char *service, fstack_t virt, fc_cell_t data,
 		/* Don't report error on pokes */
 		*errp = error;
 	else if (error) {
-		log_message(MSG_ERROR, "fc_write_reg: ERROR: cookie: %llx"
+		forth_abort(env, "fc_write_reg: ERROR: cookie: %llx"
 		    " virt: %llx\n", (uint64_t)virt, (uint64_t)virtaddr);
 	}
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -252,7 +252,9 @@ void
 find_fcode(fcode_env_t *env)
 {
 	fstack_t *dp = env->ds;
+	common_data_t *cdp = env->private;
 	static char func_name[] = "find_fcode";
+	int error;
 
 	my_unit(env);
 	push_a_string(env, "device-id");
@@ -300,7 +302,13 @@ find_fcode(fcode_env_t *env)
 		    func_name, TOS);
 		return;
 	}
+
 	debug_msg(DEBUG_FIND_FCODE, "%s: not found\n", func_name);
+	error = FC_NO_FCODE;
+	if (ioctl(cdp->fcode_fd, FC_SET_FCODE_ERROR, &error) < 0) {
+		log_perror(MSG_FATAL, "ioctl(FC_SET_FCODE_ERROR) failed");
+		return;
+	}
 }
 
 int

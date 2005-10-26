@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <syslog.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <sys/fcode.h>
 
 char efcode_sh_file[] = "/usr/lib/efcode/efcode.sh";
 char dev_fcode_file[] = "/dev/fcode";
@@ -57,6 +58,7 @@ main(int argc, char **argv)
 	char tc;
 	pid_t pid, tpid;
 	long nerr = 0;
+	int error;
 
 	openlog("efdaemon", LOG_PID|LOG_CONS, LOG_DAEMON);
 
@@ -160,10 +162,21 @@ main(int argc, char **argv)
 			else if (pid != tpid)
 				syslog(LOG_ERR, "Wait error, expect pid: %d"
 				    " got %d, status: %x\n", pid, tpid, status);
-			else if (status)
+			else if (status) {
 				syslog(LOG_ERR, "Wait pid: %d status: %x\n",
 				    pid, status);
-			else if (debug)
+				if (WIFEXITED(status) &&
+				    (WEXITSTATUS(status) == 1)) {
+					error = FC_FCODE_ABORT;
+				} else {
+					error = FC_EXEC_FAILED;
+				}
+				if (ioctl(fd, FC_SET_FCODE_ERROR, &error) < 0) {
+					syslog(LOG_ERR,
+					    "ioctl(FC_SET_FCODE_ERROR)"
+					    " failed\n");
+				}
+			} else if (debug)
 				syslog(LOG_DEBUG, "Wait: pid: %d\n", pid);
 			close(fd);
 			continue;

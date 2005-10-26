@@ -1098,7 +1098,7 @@ pcicfg_ntbridge_unconfigure_child(dev_info_t *new_device, uint_t devno)
 	}
 
 	if (pcicfg_config_setup(new_ntbridgechild, &config_handle)
-							!= DDI_SUCCESS) {
+	    != DDI_SUCCESS) {
 		cmn_err(CE_WARN,
 			"pcicfg: Cannot map ntbridge child %x\n", devno);
 		(void) ndi_devi_free(new_ntbridgechild);
@@ -3787,15 +3787,23 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 			(void) ndi_devi_bind_driver(new_child, 0);
 
 			return (PCICFG_SUCCESS);
+		} else if ((error != FC_NO_FCODE) &&
+				    (pcicfg_dont_interpret == 0))  {
+			/*
+			 * The interpreter located fcode, but had an error in
+			 * processing. Cleanup and fail the operation.
+			 */
+			DEBUG0("Interpreter detected fcode failure\n");
+			(void) pcicfg_free_resources(new_child);
+			goto failed;
 		} else {
 			/*
-			 * Either the interpreter failed or the we chose
-			 * not to run the interpreter (pcicfg_dont_interpret).
+			 * Either the interpreter failed with FC_NO_FCODE or we
+			 * chose not to run the interpreter
+			 * (pcicfg_dont_interpret).
 			 *
 			 * If the interpreter failed because there was no
 			 * dropin, then we need to probe the device ourself.
-			 * Otherwise we will probably just fail the
-			 * configuration.
 			 */
 
 			/*
@@ -3863,6 +3871,16 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 
 				ret = pcicfg_configure_ntbridge(new_child,
 								bus, device);
+			}
+			if (ret != PCICFG_SUCCESS) {
+				/*
+				 * Bridge configure failed. Free up the self
+				 * probed entry. The bus resource allocation
+				 * maps need to be cleaned up to prevent
+				 * warnings on retries of the failed configure.
+				 */
+				(void) pcicfg_ntbridge_unconfigure(new_child);
+				(void) pcicfg_teardown_device(new_child);
 			}
 #endif
 

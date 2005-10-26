@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,7 @@ extern "C" {
 #define	FC_VALIDATE		(FCIOC | 3)
 #define	FC_GET_MY_ARGS		(FCIOC | 4)
 #define	FC_GET_FCODE_DATA	(FCIOC | 5)
+#define	FC_SET_FCODE_ERROR	(FCIOC | 6)
 
 #define	FC_GET_MY_ARGS_BUFLEN	256	/* Max my-args length */
 
@@ -293,6 +294,21 @@ typedef struct fc_fcode_info {
  */
 #define	FC_GET_FCODE_SIZE	"sunos,get-fcode-size"
 #define	FC_GET_FCODE		"sunos,get-fcode"
+
+/*
+ * Values for fc_request 'error'. This has been moved from the _KERNEL
+ * area to allow the FC_SET_FCODE_ERROR ioctl to use these values to
+ * signal the kernel as to the disposition of the userland interpreter.
+ * NOTE: Positive values are used to indicate a kernel error,
+ * negative values are used to identify userland interpreter errors.
+ */
+#define	FC_SUCCESS	0		/* FCode interpreted successfully */
+#define	FC_TIMEOUT	1		/* Timer expired */
+#define	FC_ERROR	-1		/* Interpreter error */
+#define	FC_EXEC_FAILED	-2		/* Interpreter failed to exec */
+#define	FC_NO_FCODE	-3		/* Interpreter couldn't find fcode */
+#define	FC_FCODE_ABORT	-4		/* Interpreter called exit(1) */
+#define	FC_ERROR_VALID(s) ((s) >= FC_FCODE_ABORT) && ((s) <= FC_TIMEOUT)
 
 /*
  * kernel internal data structures and interfaces
@@ -548,13 +564,6 @@ struct fc_request {
 #define	FC_R_INIT	0		/* initialized, on queue */
 #define	FC_R_BUSY	1		/* request is active, busy */
 #define	FC_R_DONE	2		/* request is done and may be deq'd */
-
-/*
- * Values for 'error'.
- */
-#define	FC_SUCCESS	0		/* FCode interpreted successfully */
-#define	FC_TIMEOUT	1		/* Timer expired */
-#define	FC_ERROR	-1		/* Interpreter error */
 
 /*
  * Function to call to invoke the fcode interpreter.

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,7 @@ static struct fc_state {
 #define	FC_STATE_READ_DONE	2	/* blocking read done */
 #define	FC_STATE_IN_PROGRESS	3	/* FC_GET_PARAMETERS done, active */
 #define	FC_STATE_VALIDATED	4	/* FC_VALIDATE done, active */
+#define	FC_STATE_ERROR_SET	5	/* FC_SET_FCODE_ERROR done, active */
 #define	FC_STATE_ACTIVE(s)	((s) != 0)
 #define	FC_STATE_AVAILABLE(s)	((s) == FC_STATE_INACTIVE)
 
@@ -79,6 +80,7 @@ static int fc_get_my_args(dev_t, intptr_t, int, cred_t *, int *);
 static int fc_run_priv(dev_t, intptr_t, int, cred_t *, int *);
 static int fc_validate(dev_t, intptr_t, int, cred_t *, int *);
 static int fc_get_fcode(dev_t, intptr_t, int, cred_t *, int *);
+static int fc_set_fcode_error(dev_t, intptr_t, int, cred_t *, int *);
 
 static struct cb_ops fc_cb_ops = {
 	fc_open,		/* open */
@@ -335,7 +337,13 @@ fc_close(dev_t dev, int flag, int otype, cred_t *cred_p)
 			    "fc_close: Send invalidate cmd\n");
 			cp->svc_name = fc_ptr2cell(FC_SVC_INVALIDATE);
 			(void) fp->ap_ops(fp->ap_dip, fp->handle, cp);
-			fp->error = FC_ERROR;
+			if ((st->state != FC_STATE_ERROR_SET) ||
+			    (fp->error == FC_SUCCESS)) {
+				fp->error = FC_ERROR;
+			}
+			/*
+			 * else - fp->error already set by userland interpreter
+			 */
 		}
 
 		bzero(cp, sizeof (struct fc_client_interface));
@@ -464,6 +472,12 @@ fc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		 */
 		return (fc_get_fcode(dev, arg, mode, credp, rvalp));
 
+
+	case FC_SET_FCODE_ERROR:
+		/*
+		 * Copy in interpreter error status
+		 */
+		return (fc_set_fcode_error(dev, arg, mode, credp, rvalp));
 	}
 	/*
 	 * Invalid ioctl command
@@ -856,6 +870,53 @@ fc_get_fcode(dev_t dev, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		    "fault copying out fcode to %p\n", fcode_info.fcode_ptr);
 		return (EFAULT);
 	}
+
+	return (0);
+}
+
+/*
+ * fc_set_fcode_error:  Copy in	fcode error.
+ * The input 'arg' is a pointer to int which
+ * should have the appropriate error code set.
+ */
+
+/*ARGSUSED*/
+static int
+fc_set_fcode_error(dev_t dev, intptr_t arg, int mode, cred_t *credp, int *rvalp)
+{
+	struct fc_state *st;
+	struct fc_request *fp;
+	int m = (int)getminor(dev) - 1;
+	int status;
+
+	st = fc_states + m;
+	ASSERT(m < fc_max_opens && FC_STATE_ACTIVE(st->state));
+
+	ASSERT(st->req != NULL);
+	fp = st->req;
+
+	FC_DEBUG1(3, CE_CONT, "fc_ioctl: fc_set_fcode_error fp: %p\n", fp);
+
+	/*
+	 * Get the error code from userland.
+	 * We expect these to be negative values to denote
+	 * interpreter errors.
+	 */
+	if (copyin((void *)arg, &status, sizeof (int))) {
+		FC_DEBUG1(1, CE_CONT, "fc_ioctl: fc_set_fcode_error "
+		    "fault copying in status from %p\n", arg);
+		return (EFAULT);
+	}
+
+	if (!FC_ERROR_VALID(status)) {
+		FC_DEBUG1(1, CE_CONT, "fc_ioctl: fc_set_fcode_error "
+		    "invalid error code specified %i\n", status);
+		return (EINVAL);
+	}
+	fp->error = status;
+	mutex_enter(&fc_open_lock);
+	st->state = FC_STATE_ERROR_SET;
+	mutex_exit(&fc_open_lock);
 
 	return (0);
 }
