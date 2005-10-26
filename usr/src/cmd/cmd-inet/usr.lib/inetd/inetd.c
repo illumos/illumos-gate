@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -237,6 +237,9 @@ static void create_bound_fds(instance_t *);
 static void destroy_bound_fds(instance_t *);
 static void destroy_instance(instance_t *);
 static void inetd_stop(void);
+static void
+exec_method(instance_t *instance, instance_method_t method, method_info_t *mi,
+    struct method_context *mthd_ctxt, const proto_info_t *pi) __NORETURN;
 
 /*
  * The following two functions are callbacks that libumem uses to determine
@@ -873,6 +876,123 @@ handle_bind_failure(instance_t *instance)
 	}
 }
 
+
+/*
+ * Check if two transport protocols for RPC conflict.  
+ */
+
+boolean_t
+is_rpc_proto_conflict(const char *proto0, const char *proto1) {
+	if (strcmp(proto0, "tcp") == 0) {
+		if (strcmp(proto1, "tcp") == 0)
+			return (B_TRUE);
+		if (strcmp(proto1, "tcp6") == 0)
+			return (B_TRUE);
+		return (B_FALSE);
+	}
+
+	if (strcmp(proto0, "tcp6") == 0) {
+		if (strcmp(proto1, "tcp") == 0)
+			return (B_TRUE);
+		if (strcmp(proto1, "tcp6only") == 0)
+			return (B_TRUE);
+		if (strcmp(proto1, "tcp6") == 0)
+			return (B_TRUE);
+		return (B_FALSE);
+	}
+
+	if (strcmp(proto0, "tcp6only") == 0) {
+		if (strcmp(proto1, "tcp6only") == 0)
+			return (B_TRUE);
+		if (strcmp(proto1, "tcp6") == 0)
+			return (B_TRUE);
+		return (B_FALSE);
+	}
+
+	if (strcmp(proto0, "udp") == 0) {
+		if (strcmp(proto1, "udp") == 0)
+			return (B_TRUE);
+		if (strcmp(proto1, "udp6") == 0)
+			return (B_TRUE);
+		return (B_FALSE);
+	}
+
+	if (strcmp(proto0, "udp6") == 0) {
+
+		if (strcmp(proto1, "udp") == 0)
+			return (B_TRUE);
+		if (strcmp(proto1, "udp6only") == 0)
+			return (B_TRUE);
+		if (strcmp(proto1, "udp6") == 0)
+			return (B_TRUE);
+		return (B_FALSE);
+	}
+
+	if (strcmp(proto0, "udp6only") == 0) {
+
+		if (strcmp(proto1, "udp6only") == 0)
+			return (B_TRUE);
+		if (strcmp(proto1, "udp6") == 0)
+			return (B_TRUE);
+		return (0);
+	}
+
+	/*
+	 * If the protocol isn't TCP/IP or UDP/IP assume that it has its own
+	 * port namepsace and that conflicts can be detected by literal string
+	 * comparison.
+	 */
+
+	if (strcmp(proto0, proto1))
+		return (FALSE);
+
+	return (B_TRUE);
+}
+
+
+/*
+ * Check if inetd thinks this RPC program number is already registered.
+ *
+ * An RPC protocol conflict occurs if
+ * 	a) the program numbers are the same and,
+ * 	b) the version numbers overlap,
+ * 	c) the protocols (TCP vs UDP vs tic*) are the same.
+ */
+
+boolean_t
+is_rpc_num_in_use(int rpc_n, char *proto, int lowver, int highver) {
+	instance_t *i;
+	basic_cfg_t *cfg;
+	proto_info_t *pi;
+
+	for (i = uu_list_first(instance_list); i != NULL;
+	    i = uu_list_next(instance_list, i)) {
+
+		cfg = i->config->basic;
+		if (i->cur_istate != IIS_ONLINE)
+			continue;
+
+		for (pi = uu_list_first(cfg->proto_list); pi != NULL;
+		    pi = uu_list_next(cfg->proto_list, pi)) {
+
+			if (pi->ri == NULL)
+				continue;
+			if (pi->ri->prognum != rpc_n)
+				continue;
+			if (!is_rpc_proto_conflict(pi->proto, proto))	
+				continue;
+			if ((lowver < pi->ri->lowver &&
+			    highver < pi->ri->lowver) ||
+			    (lowver > pi->ri->highver &&
+			    highver > pi->ri->highver))
+				continue;
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
+
 /*
  * Independent of the transport, for each of the entries in the instance's
  * proto list this function first attempts to create an associated network fd;
@@ -921,6 +1041,20 @@ create_bound_fds(instance_t *instance)
 		}
 
 		if (pi->ri != NULL) {
+
+			/*
+			 * Don't register the same RPC program number twice.
+			 * Doing so silently discards the old service
+			 * without causing an error.
+			 */
+			if (is_rpc_num_in_use(pi->ri->prognum, pi->proto,
+				pi->ri->lowver, pi->ri->highver)) {
+				failure = B_TRUE;
+				close_net_fd(instance, pi->listen_fd);
+				pi->listen_fd = -1;
+				continue;
+			}
+
 			unregister_rpc_service(instance->fmri, pi->ri);
 			if (register_rpc_service(instance->fmri, pi->ri) ==
 			    -1) {
@@ -2738,6 +2872,9 @@ get_method_error_success(instance_method_t method)
 	case IM_START:
 		return (RERR_RESTART);
 	}
+	(void) fprintf(stderr, gettext("Internal fatal error in inetd.\n"));
+
+	abort();
 	/* NOTREACHED */
 }
 
@@ -2874,7 +3011,7 @@ run_method(instance_t *instance, instance_method_t method,
 		goto prefork_failure;
 	case 0:				/* child */
 		exec_method(instance, method, mi, mthd_ctxt, start_info);
-		break;
+		/* NOTREACHED */
 	default:			/* parent */
 		restarter_free_method_context(mthd_ctxt);
 		mthd_ctxt = NULL;
@@ -3369,18 +3506,19 @@ fini(void)
 	uds_fini();
 	if (timer_queue != NULL)
 		iu_tq_destroy(timer_queue);
-	if (rst_event_handle != NULL)
-		restarter_unbind_handle(rst_event_handle);
+
 
 	/*
-	 * We don't explicitly close the event pipe as restarter_event_proxy()
-	 * doesn't anticipate the pipe being closed; in the case it was trying
-	 * to write to it it would get a SIGPIPE and result in an ungraceful
-	 * shutdown, and in the case it was trying to read from it, safe_read()
-	 * would return, and it would have to block itself in some way until the
-	 * process exited. Not closing this end of the pipe prevents the first
-	 * problem from occurring, and allows the thread in
-	 * restarter_event_proxy() to block on the read till the process exits.
+	 * We don't bother to undo the restarter interface at all.
+	 * Because of quirks in the interface, there is no way to
+	 * disconnect from the channel and cause any new events to be
+	 * queued.  However, any events which are received and not
+	 * acknowledged will be re-sent when inetd restarts as long as inetd
+	 * uses the same subscriber ID, which it does.
+	 *
+	 * By keeping the event pipe open but ignoring it, any events which
+	 * occur will cause restarter_event_proxy to hang without breaking
+	 * anything.
 	 */
 
 	if (instance_list != NULL) {

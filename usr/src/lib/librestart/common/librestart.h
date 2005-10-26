@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,6 @@ typedef enum {
 int restarter_bind_handle(uint32_t, const char *,
     int (*event_handler)(restarter_event_t *), int,
     restarter_event_handle_t **);
-void restarter_unbind_handle(restarter_event_handle_t *);
 
 restarter_event_type_t restarter_event_get_type(restarter_event_t *);
 uint64_t restarter_event_get_seq(restarter_event_t *);

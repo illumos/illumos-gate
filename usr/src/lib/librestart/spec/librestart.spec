@@ -45,12 +45,6 @@ declaration	int restarter_bind_handle(uint32_t, const char *, int (*event_handle
 version		SUNWprivate_1.1
 end
 
-function	restarter_unbind_handle
-include		<librestart.h>
-declaration	void restarter_unbind_handle(restarter_event_handle_t *)
-version		SUNWprivate_1.1
-end
-
 function	restarter_event_get_type
 include		<librestart.h>
 declaration	restarter_event_type_t restarter_event_get_type(restarter_event_t *)

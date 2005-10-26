@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -324,12 +324,6 @@ restarter_bind_handle(uint32_t version, const char *restarter_name,
 
 	*rehp = h;
 	return (0);
-}
-
-void
-restarter_unbind_handle(restarter_event_handle_t *h)
-{
-	free_restarter_event_handle(h);
 }
 
 restarter_event_handle_t *
