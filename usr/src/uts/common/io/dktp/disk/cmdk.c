@@ -145,7 +145,7 @@ static struct driver_minor_data {
  */
 static int cmdk_reopen(struct cmdk *dkp);
 static int cmdk_create_obj(dev_info_t *dip, struct cmdk *dkp);
-static void cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp, int unload);
+static void cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp);
 static int cmdk_create_lbobj(dev_info_t *dip, struct cmdk *dkp);
 static void cmdk_destroy_lbobj(dev_info_t *dip, struct cmdk *dkp, int unload);
 static void cmdkmin(struct buf *bp);
@@ -358,7 +358,7 @@ cmdkprobe(dev_info_t *dip)
 
 	status = dadk_probe(DKTP_DATA, KM_NOSLEEP);
 	if (status != DDI_PROBE_SUCCESS) {
-		cmdk_destroy_obj(dip, dkp, 0);
+		cmdk_destroy_obj(dip, dkp);
 		ddi_soft_state_free(cmdk_state, instance);
 		return (status);
 	}
@@ -391,7 +391,7 @@ cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 
 	/* dadk_attach is an empty function that only returns SUCCESS */
-	dadk_attach(DKTP_DATA);
+	(void) dadk_attach(DKTP_DATA);
 
 	node_type = DKTP_EXT->tg_nodetype;
 	for (dmdp = cmdk_minor_data; dmdp->name != NULL; dmdp++) {
@@ -401,7 +401,7 @@ cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (ddi_create_minor_node(dip, name, dmdp->type, minor_num,
 		    node_type, NULL) == DDI_FAILURE) {
 
-			cmdk_destroy_obj(dip, dkp, 0);
+			cmdk_destroy_obj(dip, dkp);
 
 			sema_destroy(&dkp->dk_semoclose);
 			ddi_soft_state_free(cmdk_state, instance);
@@ -472,12 +472,12 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	 */
 	if (dkp->dk_flag & CMDK_TGDK_OPEN) {
 		dkp->dk_flag &= ~CMDK_TGDK_OPEN;
-		dadk_close(DKTP_DATA);
+		(void) dadk_close(DKTP_DATA);
 	}
 
 	cmdk_part_info_fini(dkp);
 	cmdk_destroy_lbobj(dip, dkp, 1);
-	cmdk_destroy_obj(dip, dkp, 1);
+	cmdk_destroy_obj(dip, dkp);
 
 	sema_destroy(&dkp->dk_semoclose);
 	ddi_soft_state_free(cmdk_state, instance);
@@ -704,7 +704,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		struct dk_minfo	media_info;
 		struct  tgdk_geom phyg;
 
-		dadk_getphygeom(DKTP_DATA, &phyg);
+		(void) dadk_getphygeom(DKTP_DATA, &phyg);
 
 		media_info.dki_lbsize = phyg.g_secsiz;
 		media_info.dki_capacity = phyg.g_cap;
@@ -920,7 +920,7 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp)
 		}
 		if (i >= CMDK_MAXPART) {
 			/* OK, last close */
-			dadk_close(DKTP_DATA);
+			(void) dadk_close(DKTP_DATA);
 			dkp->dk_flag &=
 			    ~(CMDK_OPEN | CMDK_TGDK_OPEN | CMDK_VALID_LABEL);
 		}
@@ -1023,7 +1023,7 @@ cmdk_reopen(struct cmdk *dkp)
 			return (FALSE);
 
 	/* reset back to pseudo bbh */
-	dadk_set_bbhobj(DKTP_DATA, &cmdk_bbh_obj);
+	(void) dadk_set_bbhobj(DKTP_DATA, &cmdk_bbh_obj);
 
 	/* search for proper disk label object */
 	(void) DKLB_OPEN(dkp->dk_lbobjp, dkp->dk_dev, dkp->dk_dip);
@@ -1198,21 +1198,21 @@ cmdk_create_obj(dev_info_t *dip, struct cmdk *dkp)
 
 	devp = ddi_get_driver_private(dip);
 
-	dadk_init(DKTP_DATA, devp, flcobjp, queobjp, &cmdk_bbh_obj,
+	(void) dadk_init(DKTP_DATA, devp, flcobjp, queobjp, &cmdk_bbh_obj,
 	    NULL);
 
 	return (DDI_SUCCESS);
 }
 
 static void
-cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp, int unload)
+cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp)
 {
 	char		que_keyvalp[64];
 	int		que_keylen;
 	char		flc_keyvalp[64];
 	int		flc_keylen;
 
-	dadk_free(DKTP_DATA);
+	(void) dadk_free(DKTP_DATA);
 	DKTP_DATA = NULL;
 
 	que_keylen = sizeof (que_keyvalp);
@@ -1235,6 +1235,7 @@ cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp, int unload)
 	flc_keyvalp[flc_keylen] = (char)0;
 }
 
+/*ARGSUSED*/
 static int
 cmdk_create_lbobj(dev_info_t *dip, struct cmdk *dkp)
 {
