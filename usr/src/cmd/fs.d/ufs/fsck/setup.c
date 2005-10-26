@@ -138,6 +138,12 @@ read_super_block(int listerr)
 		err = "MAGIC NUMBER WRONG";
 		goto fail;
 	}
+	if (sblock.fs_magic == FS_MAGIC &&
+		(sblock.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+		sblock.fs_version != UFS_VERSION_MIN)) {
+		err = "UNRECOGNIZED VERSION";
+		goto fail;
+	}
 	if (sblock.fs_magic == MTB_UFS_MAGIC &&
 		(sblock.fs_version > MTB_UFS_VERSION_1 ||
 		sblock.fs_version < MTB_UFS_VERSION_MIN)) {

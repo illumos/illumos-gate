@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -533,9 +533,12 @@ main(argc, argv)
 		}
 	}
 
-	if (fs->fs_magic == MTB_UFS_MAGIC &&
+	if ((fs->fs_magic == FS_MAGIC &&
+	    (fs->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    fs->fs_version != UFS_VERSION_MIN)) ||
+	    (fs->fs_magic == MTB_UFS_MAGIC &&
 	    (fs->fs_version > MTB_UFS_VERSION_1 ||
-	    fs->fs_version < MTB_UFS_VERSION_MIN)) {
+	    fs->fs_version < MTB_UFS_VERSION_MIN))) {
 		if (!override) {
 			printf("%s: Unrecognized UFS version number: %d\n",
 			    special, fs->fs_version);
@@ -4185,13 +4188,26 @@ empty:
 						return;
 					}
 				}
+				if (sb->fs_magic == FS_MAGIC &&
+				    (sb->fs_version !=
+					UFS_EFISTYLE4NONEFI_VERSION_2 &&
+				    sb->fs_version != UFS_VERSION_MIN)) {
+					cur_cgrp = 0;
+					if (!override) {
+						printf("invalid super block ");
+						printf("version number\n");
+						cur_cgrp--;
+						error++;
+						return;
+					}
+				}
 				if (sb->fs_magic == MTB_UFS_MAGIC &&
 				    (sb->fs_version > MTB_UFS_VERSION_1 ||
 				    sb->fs_version < MTB_UFS_VERSION_MIN)) {
 					cur_cgrp = 0;
 					if (!override) {
 						printf("invalid super block ");
-						printf("magic word\n");
+						printf("version number\n");
 						cur_cgrp--;
 						error++;
 						return;
@@ -4584,8 +4600,7 @@ printsb(fs)
 	printf("magic\t%x\ttime\t%s",
 	    fs->fs_magic, ctime(&t));
 #endif
-	if (fs->fs_magic == MTB_UFS_MAGIC)
-		printf("version\t%x\n", fs->fs_version);
+	printf("version\t%x\n", fs->fs_version);
 	printf("nbfree\t%ld\tndir\t%ld\tnifree\t%ld\tnffree\t%ld\n",
 	    fs->fs_cstotal.cs_nbfree, fs->fs_cstotal.cs_ndir,
 	    fs->fs_cstotal.cs_nifree, fs->fs_cstotal.cs_nffree);

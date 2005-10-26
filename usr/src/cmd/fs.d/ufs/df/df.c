@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -484,6 +484,15 @@ dfreedev(file)
 		(void) fprintf(stderr, gettext(
 "df: %s: not a ufs file system\n"),
 		    file);
+		(void) close(fi);
+		return;
+	}
+	if (sblock.fs_magic == FS_MAGIC &&
+	    (sblock.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    sblock.fs_version != UFS_VERSION_MIN)) {
+		(void) fprintf(stderr, gettext(
+"df: %s: unrecognized version of UFS: %d\n"),
+		    file, sblock.fs_version);
 		(void) close(fi);
 		return;
 	}

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,9 @@ ident_fs(int fd, char *rawpath, int *clean, int verbose)
 		*clean = FALSE;
 	}
 
-	if ((fs->fs_magic == FS_MAGIC) ||
+	if ((fs->fs_magic == FS_MAGIC &&
+	    (fs->fs_version == UFS_EFISTYLE4NONEFI_VERSION_2 ||
+	    fs->fs_version == UFS_VERSION_MIN)) ||
 	    (fs->fs_magic == MTB_UFS_MAGIC &&
 	    (fs->fs_version <= MTB_UFS_VERSION_1 &&
 	    fs->fs_version >= MTB_UFS_VERSION_MIN))) {

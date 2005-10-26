@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,12 +52,13 @@ extern "C" {
 
 /*
  * The following values are minor release values for UFS.
- * The fs_version field in the superblock will equal one of them
- * if the file system's magic number is MTB_UFS_MAGIC.
+ * The fs_version field in the superblock will equal one of them.
  */
 
 #define		MTB_UFS_VERSION_MIN	1
 #define		MTB_UFS_VERSION_1	1
+#define		UFS_VERSION_MIN	0
+#define		UFS_EFISTYLE4NONEFI_VERSION_2	2
 
 /*
  * Each disk drive contains some number of file systems.
@@ -150,6 +151,20 @@ extern "C" {
  */
 #define	MAXMNTLEN 512
 #define	MAXCSBUFS 32
+
+#define	LABEL_TYPE_VTOC		1
+#define	LABEL_TYPE_EFI		2
+#define	LABEL_TYPE_OTHER	3
+
+/*
+ * The following constant is taken from the ANSI T13 ATA Specification
+ * and defines the maximum size (in sectors) that an ATA disk can be
+ * and still has to provide CHS translation. For a disk above this
+ * size all sectors are to be accessed via their LBA address. This
+ * makes a good cut off value to move from disk provided geometry
+ * to the predefined defaults used in efi label disks.
+ */
+#define	CHSLIMIT	(63 * 256 * 1024)
 
 /*
  * Per cylinder group information; summarized in blocks allocated
@@ -323,7 +338,7 @@ struct  fs {
 	int32_t	fs_cpc;			/* cyl per cycle in postbl */
 	short	fs_opostbl[16][8];	/* old rotation block list head */
 	int32_t	fs_sparecon[51];	/* reserved for future constants */
-	int32_t fs_version;		/* minor version of MTB ufs */
+	int32_t fs_version;		/* minor version of ufs */
 	int32_t	fs_logbno;		/* block # of embedded log */
 	int32_t fs_reclaim;		/* reclaim open, deleted files */
 	int32_t	fs_sparecon2;		/* reserved for future constant */

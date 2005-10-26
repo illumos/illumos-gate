@@ -108,6 +108,14 @@ main(int argc, char *argv[])
 	"fsirand: Not a file system (bad magic number in superblock)\n");
 		exit(1);
 	}
+	if (fs->fs_magic == FS_MAGIC &&
+	    (fs->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    fs->fs_version != UFS_VERSION_MIN)) {
+		(void) fprintf(stderr,
+	"fsirand: Unrecognized UFS format version number %d (in superblock)\n",
+		    fs->fs_version);
+		exit(1);
+	}
 	if (fs->fs_magic == MTB_UFS_MAGIC &&
 	    (fs->fs_version > MTB_UFS_VERSION_1 ||
 	    fs->fs_version < MTB_UFS_VERSION_MIN)) {

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -427,6 +427,11 @@ fsname /devfrom volfrom /devto volto\n");
 		    (Sptr->fs_magic != MTB_UFS_MAGIC))
 			perr(10, "File System type unknown--get help\n");
 
+		if (Sptr->fs_magic == FS_MAGIC &&
+		    (Sptr->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+		    Sptr->fs_version != UFS_VERSION_MIN))
+			perr(10, "Unrecognized version of UFS--get help\n");
+
 		if (Sptr->fs_magic == MTB_UFS_MAGIC &&
 		    (Sptr->fs_version > MTB_UFS_VERSION_1 ||
 		    Sptr->fs_version < MTB_UFS_VERSION_MIN))
@@ -578,6 +583,11 @@ fsname /devfrom volfrom /devto volto\n");
 		if ((Sptr -> fs_magic != FS_MAGIC) &&
 		    (Sptr -> fs_magic != MTB_UFS_MAGIC))
 			perr(10, "File System type unknown--get help!\n");
+
+		if (Sptr->fs_magic == FS_MAGIC &&
+		    (Sptr->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+		    Sptr->fs_version != UFS_VERSION_MIN))
+			perr(10, "Unrecognized version of UFS--get help\n");
 
 		if (Sptr->fs_magic == MTB_UFS_MAGIC &&
 		    (Sptr->fs_version > MTB_UFS_VERSION_1 ||

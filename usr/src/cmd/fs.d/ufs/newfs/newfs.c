@@ -106,6 +106,9 @@ static void fatal(char *fmt, ...);
 #define	DESBLKSIZE	8192
 #define	DESFRAGSIZE	1024
 
+#define	dprintf(x)	if (debug) printf x
+
+int		debug = 0;	/* enable debug output */
 static int	Nflag;		/* run mkfs without writing file system */
 static int	Tflag;		/* set up file system for growth to over 1 TB */
 static int	verbose;	/* show mkfs line before exec */
@@ -116,6 +119,7 @@ static int	ntracks;	/* # tracks/cylinder */
 static int	ntracks_set = 0; /* true if the user specified ntracks */
 static int	optim = FS_OPTTIME;	/* optimization, t(ime) or s(pace) */
 static int	nsectors;	/* # sectors/track */
+static int	geom_nsectors;	/* # sectors/track as returned by GEOM ioctl */
 static int	cpg;		/* cylinders/cylinder group */
 static int	cpg_set = 0;	/* true if the user specified cpg */
 static int	minfree = -1;	/* free space threshold */
@@ -134,9 +138,12 @@ static int	text_sb = 0;	/* no disk changes; just final sb text dump */
 static int	binary_sb = 0;	/* no disk changes; just final sb binary dump */
 static int	label_type;	/* see types below */
 
-#define	LABEL_TYPE_VTOC		1
-#define	LABEL_TYPE_EFI		2
-#define	LABEL_TYPE_OTHER	3
+/*
+ * The variable use_efi_dflts is an indicator of whether to use EFI logic
+ * or the geometry logic in laying out the filesystem. This is decided
+ * based on the size of the disk and is used only for non-EFI labeled disks.
+ */
+static int	use_efi_dflts = 0;
 
 static char	device[MAXPATHLEN];
 static char	cmd[BUFSIZ];
@@ -150,6 +157,7 @@ main(int argc, char *argv[])
 	struct stat64 st;
 	int status;
 	int option;
+	int nsect;
 	struct fs *sbp;	/* Pointer to superblock (if present) */
 	diskaddr_t actual_fssize;
 	diskaddr_t max_possible_fssize;
@@ -407,11 +415,14 @@ main(int argc, char *argv[])
 	}
 
 	if (label_type == LABEL_TYPE_VTOC) {
-		if (nsectors < 0)
-			fatal(gettext("%s: no default #sectors/track"),
-			    special);
-		if (ntracks < 0)
-			fatal(gettext("%s: no default #tracks"), special);
+		if (!use_efi_dflts) {
+			if (nsectors < 0)
+				fatal(gettext("%s: no default #sectors/track"),
+				    special);
+			if (ntracks < 0)
+				fatal(gettext("%s: no default #tracks"),
+				    special);
+		}
 		if (rpm < 0)
 			fatal(gettext(
 			    "%s: no default revolutions/minute value"),
@@ -562,9 +573,12 @@ main(int argc, char *argv[])
 
 		maxipg = roundup(bsize * NBBY / 3,
 		    bsize / sizeof (struct inode));
+
+		nsect = (nsectors == -1) ? geom_nsectors : nsectors;
+
 		maxcpg = (bsize - sizeof (struct cg) - howmany(maxipg, NBBY)) /
 		    (sizeof (long) + nrpos * sizeof (short) +
-			nsectors / (MAXFRAG * NBBY));
+			nsect / (MAXFRAG * NBBY));
 		cpg = (fssize / GBSEC) * 32;
 		if (cpg > maxcpg)
 			cpg = maxcpg;
@@ -604,6 +618,8 @@ main(int argc, char *argv[])
 		if (!yes())
 			exit(0);
 	}
+	dprintf(("DeBuG newfs : nsect=%d ntrak=%d cpg=%d\n",
+		nsectors, ntracks, cpg));
 	/*
 	 * If alternates-per-cylinder is ever implemented:
 	 * need to get apc from dp->d_apc if no -a switch???
@@ -718,10 +734,23 @@ getdiskbydev(char *disk)
 		if (ioctl(fd, DKIOCGGEOM, &g))
 			fatal(gettext(
 			    "%s: Unable to read Disk geometry"), disk);
+		dprintf(("DeBuG newfs : geom=%ld, CHSLIMIT=%d\n",
+			g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect, CHSLIMIT));
+		if (((g.dkg_ncyl * g.dkg_nhead * g.dkg_nsect) > CHSLIMIT) &&
+		    !Tflag) {
+			dprintf(("DeBuG newfs : geom > CHSLIMIT\n"));
+			use_efi_dflts = 1;
+		}
+		/*
+		 * Though the nsector that is passed to mkfs is decided here
+		 * based on use_efi_dflts, we still need the geometry
+		 * based dkg_nsect for the cpg calculation later.
+		 */
+		geom_nsectors = g.dkg_nsect;
 		if (nsectors == 0)
-			nsectors = g.dkg_nsect;
+			nsectors = use_efi_dflts ? -1 : g.dkg_nsect;
 		if (ntracks == 0)
-			ntracks = g.dkg_nhead;
+			ntracks = use_efi_dflts ? -1 : g.dkg_nhead;
 		if (rpm == 0)
 			rpm = ((int)g.dkg_rpm <= 0) ? 3600: g.dkg_rpm;
 	}

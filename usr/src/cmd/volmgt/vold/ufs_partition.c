@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -219,12 +219,21 @@ get_label(partition_private_t *partition_privatep)
 		(void) memcpy(file_system_structp, super_blockp,
 				sizeof (struct fs));
 	}
-	if ((partition_result == PARTITION_SUCCESS) &&
-	    ((file_system_structp->fs_magic != FS_MAGIC) &&
-	    (file_system_structp->fs_magic != MTB_UFS_MAGIC) ||
-	    ((file_system_structp->fs_magic == MTB_UFS_MAGIC) &&
-	    ((file_system_structp->fs_version > MTB_UFS_VERSION_1) ||
-	    (file_system_structp->fs_version < MTB_UFS_VERSION_MIN))))) {
+	if (partition_result == PARTITION_SUCCESS &&
+	    file_system_structp->fs_magic != FS_MAGIC &&
+	    file_system_structp->fs_magic != MTB_UFS_MAGIC) {
+		partition_result = PARTITION_NOT_THIS_TYPE;
+	}
+	if (partition_result == PARTITION_SUCCESS &&
+	    file_system_structp->fs_magic == FS_MAGIC &&
+	    file_system_structp->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    file_system_structp->fs_version != UFS_VERSION_MIN) {
+		partition_result = PARTITION_NOT_THIS_TYPE;
+	}
+	if (partition_result == PARTITION_SUCCESS &&
+	    file_system_structp->fs_magic == MTB_UFS_MAGIC &&
+	    (file_system_structp->fs_version > MTB_UFS_VERSION_1 ||
+	    file_system_structp->fs_version < MTB_UFS_VERSION_MIN)) {
 		partition_result = PARTITION_NOT_THIS_TYPE;
 	}
 	if (partition_result == PARTITION_SUCCESS) {

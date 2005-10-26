@@ -203,6 +203,10 @@ dumpfs(const char *name)
 	}
 	if ((afs.fs_magic != FS_MAGIC) && (afs.fs_magic != MTB_UFS_MAGIC))
 		return (31+1);
+	if ((afs.fs_magic == FS_MAGIC) &&
+	    (afs.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    afs.fs_version != UFS_VERSION_MIN))
+		return (31+1);
 	if ((afs.fs_magic == MTB_UFS_MAGIC) &&
 	    (afs.fs_version > MTB_UFS_VERSION_1 ||
 	    afs.fs_version < MTB_UFS_VERSION_MIN))

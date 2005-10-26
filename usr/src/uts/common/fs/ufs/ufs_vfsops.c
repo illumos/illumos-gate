@@ -644,6 +644,9 @@ remountfs(struct vfs *vfsp, dev_t dev, void *raw_argsp, int args_len)
 	fspt = (struct fs *)tpt->b_un.b_addr;
 	if (((fspt->fs_magic != FS_MAGIC) &&
 	    (fspt->fs_magic != MTB_UFS_MAGIC)) ||
+	    (fspt->fs_magic == FS_MAGIC &&
+		(fspt->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+		fspt->fs_version != UFS_VERSION_MIN)) ||
 	    (fspt->fs_magic == MTB_UFS_MAGIC &&
 		(fspt->fs_version > MTB_UFS_VERSION_1 ||
 		fspt->fs_version < MTB_UFS_VERSION_MIN)) ||
@@ -841,13 +844,20 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 	if (tp->b_flags & B_ERROR)
 		goto out;
 	fsp = (struct fs *)tp->b_un.b_addr;
-#ifdef _LP64
+
 	if ((fsp->fs_magic != FS_MAGIC) && (fsp->fs_magic != MTB_UFS_MAGIC)) {
-		if (why == ROOT_INIT) {
-			cmn_err(CE_NOTE,
-			    "mount: not a UFS magic number (0x%x)",
-			    fsp->fs_magic);
-		}
+		cmn_err(CE_NOTE,
+		    "mount: not a UFS magic number (0x%x)", fsp->fs_magic);
+		error = EINVAL;
+		goto out;
+	}
+
+	if ((fsp->fs_magic == FS_MAGIC) &&
+	    (fsp->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    fsp->fs_version != UFS_VERSION_MIN)) {
+		cmn_err(CE_NOTE,
+		    "mount: unrecognized version of UFS on-disk format: %d",
+		    fsp->fs_version);
 		error = EINVAL;
 		goto out;
 	}
@@ -862,17 +872,8 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 		goto out;
 	}
 
-#else
+#ifndef _LP64
 	if (fsp->fs_magic == MTB_UFS_MAGIC) {
-		if (fsp->fs_version > MTB_UFS_VERSION_1 ||
-		    fsp->fs_version < MTB_UFS_VERSION_MIN) {
-			cmn_err(CE_NOTE,
-			    "mount: unrecognized version of UFS"
-			    " on-disk format: %d", fsp->fs_version);
-			error = EINVAL;
-			goto out;
-		}
-
 		/*
 		 * Find the size of the device in sectors.  If the
 		 * the size in sectors is greater than INT_MAX, it's
@@ -894,13 +895,8 @@ mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,
 			goto out;
 		}
 
-	} else if (fsp->fs_magic != FS_MAGIC) {
-		cmn_err(CE_NOTE,
-		    "mount: not a UFS magic number (0x%x)", fsp->fs_magic);
-		error = EINVAL;
-		goto out;
 	}
-#endif /* _LP64 */
+#endif
 
 	if (fsp->fs_bsize > MAXBSIZE || fsp->fs_frag > MAXFRAG ||
 	    fsp->fs_bsize < sizeof (struct fs) || fsp->fs_bsize < PAGESIZE) {
@@ -1748,6 +1744,10 @@ ufs_statvfs(struct vfs *vfsp, struct statvfs64 *sp)
 	ufsvfsp = (struct ufsvfs *)vfsp->vfs_data;
 	fsp = ufsvfsp->vfs_fs;
 	if ((fsp->fs_magic != FS_MAGIC) && (fsp->fs_magic != MTB_UFS_MAGIC))
+		return (EINVAL);
+	if (fsp->fs_magic == FS_MAGIC &&
+	    (fsp->fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    fsp->fs_version != UFS_VERSION_MIN))
 		return (EINVAL);
 	if (fsp->fs_magic == MTB_UFS_MAGIC &&
 	    (fsp->fs_version > MTB_UFS_VERSION_1 ||

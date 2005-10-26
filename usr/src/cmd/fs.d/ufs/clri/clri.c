@@ -102,6 +102,15 @@ main(int argc, char *argv[])
 		return (35);
 	}
 
+	if (sblock.fs_magic == FS_MAGIC &&
+	    (sblock.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    sblock.fs_version != UFS_VERSION_MIN)) {
+		(void) printf(
+		    "unrecognized version of UFS on-disk format: %d\n",
+		    sblock.fs_version);
+		return (35);
+	}
+
 	if (sblock.fs_magic == MTB_UFS_MAGIC &&
 	    (sblock.fs_version > MTB_UFS_VERSION_1 ||
 	    sblock.fs_version < MTB_UFS_VERSION_MIN)) {

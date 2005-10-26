@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,6 +175,15 @@ label(special, fsname, volume)
 			gettext("bad super block magic number\n"));
 		exit(31+1);
 	}
+	if ((sblock.fs_magic == FS_MAGIC) &&
+	    ((sblock.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2) &&
+	    (sblock.fs_version != UFS_VERSION_MIN))) {
+		(void) fprintf(stderr, gettext("labelit: "));
+		(void) fprintf(stderr,
+			gettext("unrecognized UFS format version: %d\n"),
+			    sblock.fs_version);
+		exit(31+1);
+	}
 	if ((sblock.fs_magic == MTB_UFS_MAGIC) &&
 	    ((sblock.fs_version > MTB_UFS_VERSION_1) ||
 	    (sblock.fs_version < MTB_UFS_VERSION_MIN))) {
@@ -257,6 +266,16 @@ label(special, fsname, volume)
 			    (void) fprintf(stderr, gettext("labelit: "));
 			    (void) fprintf(stderr,
 		gettext("bad alternate super block(%i) magic number\n"), i);
+				exit(31+1);
+			}
+			if ((altsblock.fs_magic == FS_MAGIC) &&
+			    ((altsblock.fs_version !=
+				UFS_EFISTYLE4NONEFI_VERSION_2) &&
+			    (altsblock.fs_version != UFS_VERSION_MIN))) {
+				(void) fprintf(stderr, gettext("labelit: "));
+				(void) fprintf(stderr,
+		gettext("bad alternate super block UFS format version: %d\n"),
+					    altsblock.fs_version);
 				exit(31+1);
 			}
 			if ((altsblock.fs_magic == MTB_UFS_MAGIC) &&

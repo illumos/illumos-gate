@@ -97,10 +97,28 @@
  *	72MB CDC	18		9
  *	30MB CDC	18		5
  *	720KB Diskette	9		2
+ *
+ * However the defaults will be different for disks larger than CHSLIMIT.
  */
 
 #define	DFLNSECT	32
 #define	DFLNTRAK	16
+
+/*
+ * The following default sectors and tracks values are used for
+ * non-efi disks that are larger than the CHS addressing limit. The
+ * existing default cpg of 16 (DESCPG) holds good for larger disks too.
+ */
+#define	DEF_SECTORS_EFI	128
+#define	DEF_TRACKS_EFI	48
+
+/*
+ * The maximum number of cylinders in a group depends upon how much
+ * information can be stored on a single cylinder. The default is to
+ * use 16 cylinders per group.  This is effectively tradition - it was
+ * the largest value acceptable under SunOs 4.1
+ */
+#define	DESCPG		16	/* desired fs_cpg */
 
 /*
  * The following two constants set the default block and fragment sizes.
@@ -111,14 +129,6 @@
  */
 #define	DESBLKSIZE	8192
 #define	DESFRAGSIZE	1024
-
-/*
- * The maximum number of cylinders in a group depends upon how much
- * information can be stored on a single cylinder. The default is to
- * use 16 cylinders per group.  This is effectively tradition - it was
- * the largest value acceptable under SunOs 4.1
- */
-#define	DESCPG		16	/* desired fs_cpg */
 
 /*
  * MINFREE gives the minimum acceptable percentage of file system
@@ -170,6 +180,25 @@
  * summary information is 2ms for a typical 3600 rpm drive.
  */
 #define	NRPOS		8	/* number distinct rotational positions */
+
+#ifdef DEBUG
+#define	dprintf(x)	printf x
+#else
+#define	dprintf(x)
+#endif
+
+/*
+ * For the -N option, when calculating the backup superblocks, do not print
+ * them if we are not really sure. We may have to try an alternate method of
+ * arriving at the superblocks. So defer printing till a handful of superblocks
+ * look good.
+ */
+#define	tprintf(x)	if (Nflag && retry) \
+				strncat(tmpbuf, x, strlen(x)); \
+			else \
+				(void) fprintf(stderr, x);
+
+#define	ALTSB		32	/* Location of first backup superblock */
 
 /*
  * range_check "user_supplied" flag values.
@@ -400,8 +429,9 @@ static void dump_sblock(void);
 union {
 	struct fs fs;
 	char pad[SBSIZE];
-} fsun;
+} fsun, altfsun;
 #define	sblock	fsun.fs
+#define	altsblock	altfsun.fs
 
 struct	csum *fscs;
 
@@ -435,6 +465,13 @@ int	fso = -1;
 
 /* Used to indicate to number() that a bogus value should cause us to exit */
 #define	NO_DEFAULT	LONG_MIN
+
+/*
+ * INVALIDSBLIMIT is the number of bad backup superblocks that will be
+ * tolerated before we decide to try arriving at a different set of them
+ * using a different logic. This is applicable for non-EFI disks only.
+ */
+#define	INVALIDSBLIMIT	10
 
 /*
  * The *_flag variables are used to indicate that the user specified
@@ -490,6 +527,7 @@ int	Rflag;		/* dump the superblock in binary */
 char	*fsys;
 time_t	mkfstime;
 char	*string;
+int	label_type;
 
 /*
  * logging support
@@ -526,7 +564,7 @@ int		isbad;
 void		lockexit(int);
 void		randomgeneration(void);
 void		checksummarysize(void);
-void		checksblock(void);
+int		checksblock(struct fs, int);
 void		growinit(char *);
 void		checkdev(char *, char  *);
 void		checkmount(struct mnttab *, char *);
@@ -578,8 +616,10 @@ main(int argc, char *argv[])
 	struct mnttab mntp;
 	char *special;
 	struct statvfs64 fs;
+	struct dk_geom dkg;
 	struct dk_cinfo dkcinfo;
 	char pbuf[sizeof (uint64_t) * 3 + 1];
+	char *tmpbuf;
 	int width, plen;
 	uint64_t num;
 	int c, saverr;
@@ -589,6 +629,9 @@ main(int argc, char *argv[])
 	uint64_t nbytes64;
 	int remaining_cg;
 	int do_dot = 0;
+	int use_efi_dflts = 0, retry = 0;
+	int invalid_sb_cnt, ret, skip_this_sb;
+	int save_nsect, save_ntrack, save_cpg;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -948,6 +991,7 @@ main(int argc, char *argv[])
 	} else {
 		maxcontig = tmpmaxcontig;
 	}
+	dprintf(("DeBuG maxcontig : %ld\n", maxcontig));
 
 	if (rotdelay == -1) {	/* default by newfs and mkfs */
 		rotdelay = ROTDELAY;
@@ -956,6 +1000,7 @@ main(int argc, char *argv[])
 	if (cpg_flag == RC_DEFAULT) { /* If not explicity set, use default */
 		cpg = DESCPG;
 	}
+	dprintf(("DeBuG cpg : %ld\n", cpg));
 
 	/*
 	 * Now that we have the semi-sane args, either positional, via -o,
@@ -1011,13 +1056,152 @@ main(int argc, char *argv[])
 		}
 	}
 
+	/*
+	 * With newer and much larger disks, the newfs(1M) and mkfs_ufs(1M)
+	 * commands had problems in correctly handling the "native" geometries
+	 * for various storage devices.
+	 *
+	 * To handle the new age disks, mkfs_ufs(1M) will use the EFI style
+	 * for non-EFI disks that are larger than the CHS addressing limit
+	 * ( > 8GB approx ) and ignore the disk geometry information for
+	 * these drives. This is what is currently done for multi-terrabyte
+	 * filesystems on EFI disks.
+	 *
+	 * However if the user asked for a specific layout by supplying values
+	 * for these parameters, honour the user supplied parameters.
+	 */
+
+	if (mtb != 'y' && label_type == LABEL_TYPE_VTOC &&
+	    ((nsect == -1 && ntrack == -1) ||
+	    (grow && ntrack_flag == RC_DEFAULT))) {
+		/*
+		 * "-1" indicates that we were called from newfs and these
+		 * arguments were not passed in command line. Calculate nsect
+		 * and ntrack in the same manner as newfs.
+		 *
+		 * This is required because, the defaults for nsect and ntrack
+		 * is hardcoded in mkfs, whereas to generate the alternate
+		 * superblock locations for the -N option, there is a need for
+		 * the geometry based values that newfs would have arrived at.
+		 * Newfs would have arrived at these values as below.
+		 */
+
+		if (ioctl(fsi, DKIOCGGEOM, &dkg)) {
+		    dprintf(("%s: Unable to read Disk geometry", fsys));
+		    perror(gettext("Unable to read Disk geometry"));
+		    lockexit(32);
+		} else {
+		    nsect = dkg.dkg_nsect;
+		    ntrack = dkg.dkg_nhead;
+#ifdef i386	/* Bug 1170182 */
+		    if (ntrack > 32 && (ntrack % 16) != 0) {
+			ntrack -= (ntrack % 16);
+		    }
+#endif
+		    if ((dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect)
+				> CHSLIMIT) {
+			use_efi_dflts = 1;
+			retry = 1;
+		    }
+		}
+		dprintf(("DeBuG mkfs: geom = %ld CHSLIMIT = %d\n",
+			dkg.dkg_ncyl * dkg.dkg_nhead * dkg.dkg_nsect,
+			CHSLIMIT));
+	}
 
 	/*
-	 * 32K based on max block size of 64K, and rotational layout
-	 * test of nsect <= (256 * sectors/block).  Current block size
-	 * limit is not 64K, but it's growing soon.
+	 * For the newfs -N case, even if the disksize is > CHSLIMIT, do not
+	 * blindly follow EFI style. If the fs_version indicates a geometry
+	 * based layout, try that one first. If it fails we can always try the
+	 * other logic.
+	 *
+	 * If we were called from growfs, we will have a problem if we mix
+	 * and match the filesystem creation and growth styles. For example,
+	 * if we create using EFI style and we have to also grow using EFI
+	 * style. So follow the style indicated by the fs_version.
+	 *
+	 * Read and verify the primary superblock. If it looks sane, use the
+	 * fs_version from the superblock. If the primary superblock does
+	 * not look good, read and verify the first alternate superblock at
+	 * ALTSB. Use the fs_version to decide whether to use the
+	 * EFI style logic or the old geometry based logic to calculate
+	 * the alternate superblock locations.
 	 */
-	range_check(&nsect, "nsect", 1, 32768, DFLNSECT, nsect_flag);
+	if ((Nflag && use_efi_dflts) || (grow)) {
+		if (grow && ntrack_flag != RC_DEFAULT)
+			goto retry_alternate_logic;
+		rdfs((diskaddr_t)(SBOFF / sectorsize), (int)sbsize,
+			(char *)&altsblock);
+		ret = checksblock(altsblock, 1);
+
+		if (!ret) {
+			if (altsblock.fs_magic == MTB_UFS_MAGIC) {
+				mtb = 'y';
+				goto retry_alternate_logic;
+			}
+			use_efi_dflts = (altsblock.fs_version ==
+				UFS_EFISTYLE4NONEFI_VERSION_2) ? 1 : 0;
+		} else {
+			/*
+			 * The primary superblock didn't help in determining
+			 * the fs_version. Try the first alternate superblock.
+			 */
+			dprintf(("DeBuG checksblock() failed - error : %d"
+				" for sb : %d\n", ret, SBOFF/sectorsize));
+			rdfs((diskaddr_t)ALTSB, (int)sbsize,
+				(char *)&altsblock);
+			ret = checksblock(altsblock, 1);
+
+			if (!ret) {
+			    if (altsblock.fs_magic == MTB_UFS_MAGIC) {
+				mtb = 'y';
+				goto retry_alternate_logic;
+			    }
+			    use_efi_dflts = (altsblock.fs_version ==
+				UFS_EFISTYLE4NONEFI_VERSION_2) ? 1 : 0;
+			} else
+			    dprintf(("DeBuG checksblock() failed - error : %d"
+				" for sb : %d\n", ret, ALTSB));
+		}
+	}
+
+retry_alternate_logic:
+	invalid_sb_cnt = 0;
+	if (use_efi_dflts) {
+		save_nsect = nsect;
+		save_ntrack = ntrack;
+		save_cpg = cpg;
+
+		nsect = DEF_SECTORS_EFI;
+		ntrack = DEF_TRACKS_EFI;
+		cpg = DESCPG;
+
+		dprintf(("\nDeBuG Using EFI defaults\n"));
+		dprintf(("DeBuG save_nsect=%d, save_ntrack=%d, save_cpg=%d\n",
+		    save_nsect, save_ntrack, save_cpg));
+	} else {
+		save_nsect = DEF_SECTORS_EFI;
+		save_ntrack = DEF_TRACKS_EFI;
+		save_cpg = DESCPG;
+		dprintf(("\n\nDeBuG mkfs: Using Geometry\n"));
+		dprintf(("DeBuG save_nsect=%d, save_ntrack=%d, save_cpg=%d\n",
+		    save_nsect, save_ntrack, save_cpg));
+		/*
+		 * 32K based on max block size of 64K, and rotational layout
+		 * test of nsect <= (256 * sectors/block).  Current block size
+		 * limit is not 64K, but it's growing soon.
+		 */
+		range_check(&nsect, "nsect", 1, 32768, DFLNSECT, nsect_flag);
+		/*
+		 * ntrack is the number of tracks per cylinder.
+		 * The ntrack value must be between 1 and the total number of
+		 * sectors in the file system.
+		 */
+		range_check(&ntrack, "ntrack", 1,
+		    fssize_db > INT_MAX ? INT_MAX : (uint32_t)fssize_db,
+		    DFLNTRAK, ntrack_flag);
+	}
+
 	range_check(&apc, "apc", 0, nsect - 1, 0, apc_flag);
 
 	if (mtb == 'y')
@@ -1059,15 +1243,6 @@ main(int argc, char *argv[])
 	range_check(&rps, "rps", 1, 1000, DEFHZ, rps_flag);
 	range_check(&minfree, "free", 0, 99, MINFREE, minfree_flag);
 	range_check(&nrpos, "nrpos", 1, nsect, MIN(nsect, NRPOS), nrpos_flag);
-
-	/*
-	 * ntrack is the number of tracks per cylinder.
-	 * The ntrack value must be between 1 and the total number of
-	 * sectors in the file system.
-	 */
-	range_check(&ntrack, "ntrack", 1,
-	    fssize_db > INT_MAX ? INT_MAX : (uint32_t)fssize_db,
-	    DFLNTRAK, ntrack_flag);
 
 	/*
 	 * nbpi is variable, but 2MB seems a reasonable upper limit,
@@ -1121,8 +1296,11 @@ main(int argc, char *argv[])
 		    nsect * ntrack);
 	}
 
+	dprintf(("DeBuG cpg : %ld\n", cpg));
 	if (cpg == -1)
 		cpg = maxcpg;
+	dprintf(("DeBuG cpg : %ld\n", cpg));
+
 	/*
 	 * mincpg is variable in complex ways, so we really can't
 	 * do a sane lower-end limit check at this point.
@@ -1791,6 +1969,10 @@ grow30:
 		sblock.fs_version = MTB_UFS_VERSION_1;
 	} else {
 		sblock.fs_magic = FS_MAGIC;
+		if (use_efi_dflts)
+			sblock.fs_version = UFS_EFISTYLE4NONEFI_VERSION_2;
+		else
+			sblock.fs_version = UFS_VERSION_MIN;
 	}
 
 	if (grow) {
@@ -1836,27 +2018,85 @@ grow40:
 	    (float)sblock.fs_size * sblock.fs_fsize / MB, sblock.fs_ncg,
 	    sblock.fs_cpg, (float)sblock.fs_fpg * sblock.fs_fsize / MB,
 	    sblock.fs_ipg);
+
+	tmpbuf = calloc(sblock.fs_ncg / 50 + 500, 1);
+	if (tmpbuf == NULL) {
+		perror("calloc");
+		lockexit(32);
+	}
 	/*
 	 * Now build the cylinders group blocks and
 	 * then print out indices of cylinder groups.
 	 */
-	(void) fprintf(stderr, gettext(
+	tprintf(gettext(
 	    "super-block backups (for fsck -F ufs -o b=#) at:\n"));
 	for (width = cylno = 0; cylno < sblock.fs_ncg && cylno < 10; cylno++) {
 		if ((grow == 0) || (cylno >= grow_fs_ncg))
 			initcg(cylno);
 		num = fsbtodb(&sblock, (uint64_t)cgsblock(&sblock, cylno));
+		/*
+		 * If Nflag and if the disk is larger than the CHSLIMIT,
+		 * then sanity test the superblocks before reporting. If there
+		 * are too many superblocks which look insane, we probably
+		 * have to retry with alternate logic. If we are already
+		 * retrying, then our efforts to arrive at alternate
+		 * superblocks failed, so complain and exit.
+		 */
+		if (Nflag && retry) {
+		    skip_this_sb = 0;
+		    rdfs((diskaddr_t)num, sbsize, (char *)&altsblock);
+		    ret = checksblock(altsblock, 1);
+		    if (ret) {
+			skip_this_sb = 1;
+			invalid_sb_cnt++;
+			dprintf(("DeBuG checksblock() failed - error : %d"
+			    " for sb : %llu invalid_sb_cnt : %d\n",
+			    ret, num, invalid_sb_cnt));
+		    } else {
+			/*
+			 * Though the superblock looks sane, verify if the
+			 * fs_version in the superblock and the logic that
+			 * we are using to arrive at the superblocks match.
+			 */
+			if (use_efi_dflts && altsblock.fs_version
+			    != UFS_EFISTYLE4NONEFI_VERSION_2) {
+				skip_this_sb = 1;
+				invalid_sb_cnt++;
+			}
+		    }
+		    if (invalid_sb_cnt >= INVALIDSBLIMIT) {
+			if (retry > 1) {
+			    (void) fprintf(stderr, gettext(
+				"Error determining alternate "
+				"superblock locations\n"));
+			    free(tmpbuf);
+			    lockexit(32);
+			}
+			retry++;
+			use_efi_dflts = !use_efi_dflts;
+			nsect = save_nsect;
+			ntrack = save_ntrack;
+			cpg = save_cpg;
+			free(tmpbuf);
+			goto retry_alternate_logic;
+		    }
+		    if (skip_this_sb)
+			continue;
+		}
 		(void) sprintf(pbuf, " %llu,", num);
 		plen = strlen(pbuf);
 		if ((width + plen) > (WIDTH - 1)) {
 			width = plen;
-			(void) fprintf(stderr, "\n");
+			tprintf("\n");
 		} else {
 			width += plen;
 		}
-		(void) fprintf(stderr, "%s", pbuf);
+		if (Nflag && retry)
+			strncat(tmpbuf, pbuf, strlen(pbuf));
+		else
+			(void) fprintf(stderr, "%s", pbuf);
 	}
-	(void) fprintf(stderr, "\n");
+	tprintf("\n");
 
 	remaining_cg = sblock.fs_ncg - cylno;
 
@@ -1865,8 +2105,7 @@ grow40:
 	 * initialized, print a "." for every 50 cylinder groups.
 	 */
 	if (remaining_cg > 300) {
-		(void) fprintf(stderr, gettext(
-		    "Initializing cylinder groups:\n"));
+		tprintf(gettext("Initializing cylinder groups:\n"));
 		do_dot = 1;
 	}
 
@@ -1887,10 +2126,10 @@ grow40:
 		if ((grow == 0) || (cylno >= grow_fs_ncg))
 			initcg(cylno);
 		if (do_dot && cylno % 50 == 0) {
-			(void) fprintf(stderr, ".");
+			tprintf(".");
 			i++;
 			if (i == WIDTH - 1) {
-				(void) fprintf(stderr, "\n");
+				tprintf("\n");
 				i = 0;
 			}
 		}
@@ -1902,26 +2141,80 @@ grow40:
 	 */
 
 	if (do_dot) {
-		(void) fprintf(stderr, gettext(
+		tprintf(gettext(
 	    "\nsuper-block backups for last 10 cylinder groups at:\n"));
 	}
 	for (width = 0; cylno < sblock.fs_ncg; cylno++) {
 		if ((grow == 0) || (cylno >= grow_fs_ncg))
 			initcg(cylno);
 		num = fsbtodb(&sblock, (uint64_t)cgsblock(&sblock, cylno));
-		(void) sprintf(pbuf, " %llu,", num);
+		if (Nflag && retry) {
+		    skip_this_sb = 0;
+		    rdfs((diskaddr_t)num, sbsize, (char *)&altsblock);
+		    ret = checksblock(altsblock, 1);
+		    if (ret) {
+			skip_this_sb = 1;
+			invalid_sb_cnt++;
+			dprintf(("DeBuG checksblock() failed - error : %d"
+			    " for sb : %llu invalid_sb_cnt : %d\n",
+			    ret, num, invalid_sb_cnt));
+		    } else {
+			/*
+			 * Though the superblock looks sane, verify if the
+			 * fs_version in the superblock and the logic that
+			 * we are using to arrive at the superblocks match.
+			 */
+			if (use_efi_dflts && altsblock.fs_version
+			    != UFS_EFISTYLE4NONEFI_VERSION_2) {
+				skip_this_sb = 1;
+				invalid_sb_cnt++;
+			}
+		    }
+		    if (invalid_sb_cnt >= INVALIDSBLIMIT) {
+			if (retry > 1) {
+			    (void) fprintf(stderr, gettext(
+				"Error determining alternate "
+				"superblock locations\n"));
+			    free(tmpbuf);
+			    lockexit(32);
+			}
+			retry++;
+			use_efi_dflts = !use_efi_dflts;
+			nsect = save_nsect;
+			ntrack = save_ntrack;
+			cpg = save_cpg;
+			free(tmpbuf);
+			goto retry_alternate_logic;
+		    }
+		    if (skip_this_sb)
+			continue;
+		}
+		/* Don't print ',' for the last superblock */
+		if (cylno == sblock.fs_ncg-1)
+			(void) sprintf(pbuf, " %llu", num);
+		else
+			(void) sprintf(pbuf, " %llu,", num);
 		plen = strlen(pbuf);
 		if ((width + plen) > (WIDTH - 1)) {
 			width = plen;
-			(void) fprintf(stderr, "\n");
+			tprintf("\n");
 		} else {
 			width += plen;
 		}
-		(void) fprintf(stderr, "%s", pbuf);
+		if (Nflag && retry)
+			strncat(tmpbuf, pbuf, strlen(pbuf));
+		else
+			(void) fprintf(stderr, "%s", pbuf);
 	}
-	(void) fprintf(stderr, "\n");
-	if (Nflag)
+	tprintf("\n");
+	if (Nflag) {
+		if (retry)
+			fprintf(stderr, "%s", tmpbuf);
+		free(tmpbuf);
 		lockexit(0);
+	}
+
+	free(tmpbuf);
 	if (grow)
 		goto grow50;
 
@@ -2028,16 +2321,17 @@ get_max_size(int fd)
 {
 	struct vtoc vtoc;
 	dk_gpt_t *efi_vtoc;
-	int	is_efi = 0;
 	diskaddr_t	slicesize;
 
 	int index = read_vtoc(fd, &vtoc);
 
-	if (index < 0) {
+	if (index >= 0) {
+		label_type = LABEL_TYPE_VTOC;
+	} else {
 		if (index == VT_ENOTSUP || index == VT_ERROR) {
 			/* it might be an EFI label */
-			is_efi = 1;
 			index = efi_alloc_and_read(fd, &efi_vtoc);
+			label_type = LABEL_TYPE_EFI;
 		}
 	}
 
@@ -2055,7 +2349,7 @@ get_max_size(int fd)
 		lockexit(32);
 	}
 
-	if (is_efi) {
+	if (label_type == LABEL_TYPE_EFI) {
 		slicesize = efi_vtoc->efi_parts[index].p_size;
 		efi_free(efi_vtoc);
 	} else {
@@ -2071,11 +2365,8 @@ get_max_size(int fd)
 		slicesize = (uint32_t)vtoc.v_part[index].p_size;
 	}
 
-	if (debug) {
-		(void) fprintf(stderr,
-		    "get_max_size: index = %d, p_size = %lld, dolimit = %d\n",
-		    index, slicesize, (slicesize > FS_MAX));
-	}
+	dprintf(("DeBuG get_max_size index = %d, p_size = %lld, dolimit = %d\n",
+	    index, slicesize, (slicesize > FS_MAX)));
 
 	/*
 	 * The next line limits a UFS file system to the maximum
@@ -3154,6 +3445,14 @@ dump_fscmd(char *fsys, int fsi)
 		lockexit(32);
 	}
 
+	if (sblock.fs_magic == FS_MAGIC &&
+	    (sblock.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+	    sblock.fs_version != UFS_VERSION_MIN)) {
+	    (void) fprintf(stderr, gettext(
+		"Unknown version of UFS format: %d\n"), sblock.fs_version);
+		lockexit(32);
+	}
+
 	if (sblock.fs_magic == MTB_UFS_MAGIC &&
 	    (sblock.fs_version > MTB_UFS_VERSION_1 ||
 	    sblock.fs_version < MTB_UFS_VERSION_MIN)) {
@@ -3556,45 +3855,56 @@ checksummarysize()
 	}
 }
 
-void
-checksblock()
+/*
+ * checksblock() has two uses:
+ *	- One is to sanity test the superblock and is used when newfs(1M)
+ *	  is invoked with the "-N" option. If any discrepancy was found,
+ *	  just return whatever error was found and do not exit.
+ *	- the other use of it is in places where you expect the superblock
+ *	  to be sane, and if it isn't, then we exit.
+ * Which of the above two actions to take is indicated with the second argument.
+ */
+
+int
+checksblock(struct fs sb, int proceed)
 {
-	/*
-	 * make sure this is a file system
-	 */
-	if ((sblock.fs_magic != FS_MAGIC) &&
-	    (sblock.fs_magic != MTB_UFS_MAGIC)) {
-		(void) fprintf(stderr,
-			gettext("Bad superblock; magic number wrong\n"));
-		lockexit(32);
+	int err = 0;
+	char *errmsg;
+
+	if ((sb.fs_magic != FS_MAGIC) && (sb.fs_magic != MTB_UFS_MAGIC)) {
+	    err = 1;
+	    errmsg = gettext("Bad superblock; magic number wrong\n");
+	} else if ((sb.fs_magic == FS_MAGIC &&
+		(sb.fs_version != UFS_EFISTYLE4NONEFI_VERSION_2 &&
+		sb.fs_version != UFS_VERSION_MIN)) ||
+		(sb.fs_magic == MTB_UFS_MAGIC &&
+		(sb.fs_version > MTB_UFS_VERSION_1 ||
+		sb.fs_version < MTB_UFS_VERSION_MIN))) {
+	    err = 2;
+	    errmsg = gettext("Unrecognized version of UFS\n");
+	} else if (sb.fs_ncg < 1) {
+	    err = 3;
+	    errmsg = gettext("Bad superblock; ncg out of range\n");
+	} else if (sb.fs_cpg < 1) {
+	    err = 4;
+	    errmsg = gettext("Bad superblock; cpg out of range\n");
+	} else if (sb.fs_ncg * sb.fs_cpg < sb.fs_ncyl ||
+		(sb.fs_ncg - 1) * sb.fs_cpg >= sb.fs_ncyl) {
+	    err = 5;
+	    errmsg = gettext("Bad superblock; ncyl out of range\n");
+	} else if (sb.fs_sbsize <= 0 || sb.fs_sbsize > sb.fs_bsize) {
+	    err = 6;
+	    errmsg = gettext("Bad superblock; superblock size out of range\n");
 	}
 
-	if (sblock.fs_magic == MTB_UFS_MAGIC &&
-	    sblock.fs_version > MTB_UFS_VERSION_1) {
-		(void) fprintf(stderr,
-			gettext("Unrecognized version of UFS\n"));
-		lockexit(32);
+
+	if (proceed) {
+		if (err) dprintf(("%s", errmsg));
+		return (err);
 	}
 
-	if (sblock.fs_ncg < 1) {
-		(void) fprintf(stderr,
-		    gettext("Bad superblock; ncg out of range\n"));
-		lockexit(32);
-	}
-	if (sblock.fs_cpg < 1) {
-		(void) fprintf(stderr,
-		    gettext("Bad superblock; cpg out of range\n"));
-		lockexit(32);
-	}
-	if (sblock.fs_ncg * sblock.fs_cpg < sblock.fs_ncyl ||
-	    (sblock.fs_ncg - 1) * sblock.fs_cpg >= sblock.fs_ncyl) {
-		(void) fprintf(stderr,
-		    gettext("Bad superblock; ncyl out of range\n"));
-		lockexit(32);
-	}
-	if (sblock.fs_sbsize <= 0 || sblock.fs_sbsize > sblock.fs_bsize) {
-		(void) fprintf(stderr, gettext(
-			"Bad superblock; superblock size out of range\n"));
+	if (err) {
+		fprintf(stderr, "%s", errmsg);
 		lockexit(32);
 	}
 }
@@ -3693,7 +4003,7 @@ growinit(char *devstr)
 	 * Read and verify the superblock
 	 */
 	rdfs((diskaddr_t)(SBOFF / sectorsize), (int)sbsize, (char *)&sblock);
-	checksblock();
+	(void) checksblock(sblock, 0);
 	if (sblock.fs_postblformat != FS_DYNAMICPOSTBLFMT) {
 		(void) fprintf(stderr,
 			gettext("old file system format; can't growfs\n"));
@@ -4238,7 +4548,7 @@ probe_summaryinfo()
 	 * read and verify the superblock
 	 */
 	rdfs((diskaddr_t)(SBOFF / sectorsize), (int)sbsize, (char *)&sblock);
-	checksblock();
+	(void) checksblock(sblock, 0);
 
 	/*
 	 * check how much we can extend the cg summary info block
@@ -4978,6 +5288,9 @@ static void
 range_check(long *varp, char *name, long minimum, long maximum,
     long def_val, int user_supplied)
 {
+	dprintf(("DeBuG %s : %ld (%ld %ld %ld)\n",
+		name, *varp, minimum, maximum, def_val));
+
 	if ((*varp < minimum) || (*varp > maximum)) {
 		if (user_supplied != RC_DEFAULT) {
 			(void) fprintf(stderr, gettext(
@@ -4991,6 +5304,7 @@ range_check(long *varp, char *name, long minimum, long maximum,
 				    name, def_val);
 			}
 			*varp = def_val;
+			dprintf(("DeBuG %s : %ld\n", name, *varp));
 			return;
 		}
 		lockexit(2);
