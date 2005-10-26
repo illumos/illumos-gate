@@ -1947,7 +1947,7 @@ update_archive(char *root, char *opt)
 	 * root (-R option); bam_root_readonly applies to '/' only.
 	 * Note: statvfs() does not always report the truth
 	 */
-	if (!bam_smf_check && is_readonly(root)) {
+	if (!bam_smf_check && !bam_check && is_readonly(root)) {
 		if (bam_verbose)
 			bam_print(RDONLY_FS, root);
 		return (BAM_SUCCESS);
