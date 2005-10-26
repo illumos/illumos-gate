@@ -878,7 +878,7 @@ handle_bind_failure(instance_t *instance)
 
 
 /*
- * Check if two transport protocols for RPC conflict.  
+ * Check if two transport protocols for RPC conflict.
  */
 
 boolean_t
@@ -979,7 +979,7 @@ is_rpc_num_in_use(int rpc_n, char *proto, int lowver, int highver) {
 				continue;
 			if (pi->ri->prognum != rpc_n)
 				continue;
-			if (!is_rpc_proto_conflict(pi->proto, proto))	
+			if (!is_rpc_proto_conflict(pi->proto, proto))
 				continue;
 			if ((lowver < pi->ri->lowver &&
 			    highver < pi->ri->lowver) ||
