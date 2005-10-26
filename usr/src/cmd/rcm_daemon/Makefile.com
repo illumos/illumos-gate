@@ -109,6 +109,7 @@ LDLIBS_MODULES =
 SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool
 SUNW_svm_rcm.so	:= LDLIBS_MODULES += -L$(ROOT)/usr/lib -lmeta
 SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -llaadm
+SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
 
 LDLIBS += -lgen -lelf -lcmd -lrcm -lnvpair -ldevinfo -lnsl -lsocket -lrt
 

@@ -48,13 +48,13 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
-#include <sys/dlpi.h>
 #include <stropts.h>
 #include <strings.h>
 #include <libdevinfo.h>
 #include <sys/systeminfo.h>
 #include <netdb.h>
 #include <inet/ip.h>
+#include <libinetutil.h>
 
 #include <ipmp_mpathd.h>
 #include "rcm_module.h"
@@ -69,8 +69,6 @@
 #endif
 
 /* Some generic well-knowns and defaults used in this module */
-#define	SLASH_DEV		"/dev"		/* /dev directory */
-
 #define	ARP_MOD_NAME		"arp"		/* arp module */
 #define	IP_MAX_MODS		9		/* max modules pushed on intr */
 #define	MAX_RECONFIG_SIZE	1024		/* Max. reconfig string size */
@@ -132,8 +130,6 @@
 
 /* in.mpathd(1M) specifics */
 #define	MPATHD_MAX_RETRIES	5	/* Max. offline retries */
-#define	MPATHD_OK		0	/* failback success from mpathd */
-#define	MPATHD_FAILBACK_TIME	180	/* Time in secs. for mpathd failback */
 
 /* Stream module operations */
 #define	MOD_INSERT		0	/* Insert a mid-stream module */
@@ -142,7 +138,6 @@
 
 /* VLAN format support */
 #define	VLAN_MAX_PPA_ALLOWED	1000
-#define	VLAN_GET_VID(ppa)	(ppa / VLAN_MAX_PPA_ALLOWED)
 #define	VLAN_GET_PPA(ppa)	(ppa % VLAN_MAX_PPA_ALLOWED)
 
 /* devfsadm attach nvpair values */
@@ -180,10 +175,7 @@ typedef struct mpathd_response {
 /* Physical interface representation */
 typedef struct ip_pif {
 	char			pi_ifname[LIFNAMSIZ+1];	/* interface name */
-	char			pi_ifindex;		/* Interface index */
 	char			pi_grpname[LIFNAMSIZ+1]; /* IPMP group name */
-	int			pi_style;	/* DLPI provider style */
-	int			pi_ppa;		/* Phys. point of attachment */
 	struct ip_lif		*pi_lifs;	/* ptr to logical interfaces */
 } ip_pif_t;
 
@@ -201,7 +193,6 @@ typedef struct ip_lif
 		struct sockaddr_in6	ip6;    /* IPv6 */
 	} li_addr;
 	uint64_t		li_ifflags;	/* current IFF_* flags */
-	uint64_t		li_oldflags;	/* flags prior to offline */
 	int			li_modcnt;	/* # of modules */
 	char	*li_modules[IP_MAX_MODS];	/* module list pushed */
 	char	*li_reconfig;			/* Reconfiguration string */
@@ -287,19 +278,14 @@ static int	if_cfginfo(ip_cache_t *, uint_t);
 static int	if_unplumb(ip_cache_t *);
 static int	if_replumb(ip_cache_t *);
 static void 	ip_log_err(ip_cache_t *, char **, char *);
-static int	getdlpi_style(char *);
-static char	*get_physical_resource(char *);
-static int	get_ppa(char *);
+static char	*get_physical_resource(const char *);
 static void	clr_cfg_state(ip_pif_t *);
-/*LINTED*/
-static int	if_change_flags(ip_pif_t *, uint64_t, boolean_t);
 static uint64_t	if_get_flags(ip_pif_t *);
 static int	mpathd_send_cmd(mpathd_cmd_t *);
 static int	connect_to_mpathd(int);
-/*LINTED*/
-static int	get_lun(char *);
-/*LINTED*/
+#ifdef RCM_IPMP_DEBUG
 static void	dump_node(ip_cache_t *);
+#endif
 static int	modop(char *, char *, int, char);
 static int	get_modlist(char *, ip_lif_t *);
 static int	ip_domux2fd(int *, int *, struct lifreq *);
@@ -477,7 +463,6 @@ static int
 ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
     char **errorp, rcm_info_t **depend_info)
 {
-	char *nic;
 	ip_cache_t *node;
 	ip_pif_t *pif;
 	int detachable = 0;
@@ -492,9 +477,6 @@ ip_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 	assert(id == (id_t)0);
 	assert(errorp != NULL);
 	assert(depend_info != NULL);
-
-	nic = strrchr(rsrc, '/');
-	nic = nic ? nic + 1 : rsrc;
 
 	/* Lock the cache and lookup the resource */
 	(void) mutex_lock(&cache_lock);
@@ -653,7 +635,6 @@ ip_undo_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
     char **errorp, rcm_info_t **depend_info)
 {
 	ip_cache_t *node;
-	char *nic;
 
 	rcm_log_message(RCM_TRACE1, "IP: online(%s)\n", rsrc);
 
@@ -663,9 +644,6 @@ ip_undo_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 	assert(id == (id_t)0);
 	assert(errorp != NULL);
 	assert(depend_info != NULL);
-
-	nic = strrchr(rsrc, '/');
-	nic = nic ? nic + 1 : rsrc;
 
 	(void) mutex_lock(&cache_lock);
 	node = cache_lookup(hd, rsrc, CACHE_NO_REFRESH);
@@ -1153,10 +1131,9 @@ cache_remove(ip_cache_t *node)
 static int
 update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 {
-	char ifname[RCM_NET_RESOURCE_MAX];
+	char	ifname[RCM_NET_RESOURCE_MAX];
+	ifspec_t ifspec;
 	ushort_t ifnumber = 0;
-	int ppa;
-	char *cp;
 	ip_cache_t *probe;
 	ip_pif_t pif;
 	ip_pif_t *probepif;
@@ -1168,54 +1145,31 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 
 	rcm_log_message(RCM_TRACE1, "IP: update_pif(%s)\n", lifr->lifr_name);
 
-	/* Determine the interface name and lun number */
-	(void) memcpy(&ifname, lifr->lifr_name, sizeof (ifname));
-	ifname[sizeof (ifname) - 1] = '\0';
-
-	/* remove LIF component */
-	cp = strchr(ifname, ':');
-	if (cp) {
-		*cp = 0;
-		cp++;
-		ifnumber = atoi(cp);
+	if (!ifparse_ifspec(lifr->lifr_name, &ifspec)) {
+		rcm_log_message(RCM_ERROR, _("IP: bad network interface: %s\n"),
+		    lifr->lifr_name);
+		return (-1);
 	}
 
-	(void) memcpy(&pif.pi_ifname, &ifname, sizeof (pif.pi_ifname));
-	pif.pi_ifname[sizeof (pif.pi_ifname) - 1] = '\0';
-
-	/* Determine DLPI style */
-	if (getdlpi_style(ifname) == DL_STYLE1) {
-		pif.pi_ppa = 0;
-		pif.pi_style = DL_STYLE1;
-		rcm_log_message(RCM_DEBUG, "IP: DLPI style1 (%s)\n", ifname);
-	} else {		/* DLPI style 2 */
-		/* Determine the ppa */
-		if ((ppa = get_ppa(ifname)) < 0) {
-			rcm_log_message(RCM_ERROR,
-			    _("IP: get_ppa(%s): %s\n"),
-			    ifname, strerror(ENXIO));
-			return (-1);
-		}
-
-		pif.pi_style = DL_STYLE2;
-		pif.pi_ppa = ppa;
-		rcm_log_message(RCM_DEBUG, "IP: DLPI style2 (%s)\n", ifname);
-	}
+	(void) snprintf(pif.pi_ifname, sizeof (pif.pi_ifname), "%s%d",
+	    ifspec.ifsp_devnm, ifspec.ifsp_ppa);
+	if (ifspec.ifsp_lunvalid)
+		ifnumber = ifspec.ifsp_lun;
 
 	/* Get the interface flags */
 	(void) strcpy(lifreq.lifr_name, lifr->lifr_name);
 	if (ioctl(sock, SIOCGLIFFLAGS, (char *)&lifreq) < 0) {
 		rcm_log_message(RCM_ERROR,
 		    _("IP: SIOCGLIFFLAGS(%s): %s\n"),
-		    ifname, strerror(errno));
+		    pif.pi_ifname, strerror(errno));
 		return (-1);
 	}
 	(void) memcpy(&ifflags, &lifreq.lifr_flags, sizeof (ifflags));
 
 	/* Ignore loopback and multipoint interfaces */
-	if (!(ifflags & IFF_MULTICAST) ||
-	    (ifflags & IFF_LOOPBACK)) {
-		rcm_log_message(RCM_TRACE3, "IP: if ignored (%s)\n", ifname);
+	if (!(ifflags & IFF_MULTICAST) || (ifflags & IFF_LOOPBACK)) {
+		rcm_log_message(RCM_TRACE3, "IP: if ignored (%s)\n",
+		    pif.pi_ifname);
 		return (0);
 	}
 
@@ -1240,15 +1194,6 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 		return (-1);
 	}
 	(void) memcpy(&ifaddr, &lifreq.lifr_addr, sizeof (ifaddr));
-
-	/* Get the interface index */
-	if (ioctl(sock, SIOCGLIFINDEX, (char *)&lifreq) < 0) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: SIOCGLIFINDEX(%s): %s\n"),
-		    lifreq.lifr_name, strerror(errno));
-		return (-1);
-	}
-	pif.pi_ifindex = lifreq.lifr_index;
 
 	/* Search for the interface in our cache */
 	(void) snprintf(ifname, sizeof (ifname), "%s/%s", RCM_NET_PREFIX,
@@ -1328,11 +1273,8 @@ update_pif(rcm_handle_t *hd, int af, int sock, struct lifreq *lifr)
 	}
 
 	/* save pif properties */
-	probepif->pi_ifindex = pif.pi_ifindex;
 	(void) memcpy(&probepif->pi_grpname, &pif.pi_grpname,
 	    sizeof (pif.pi_grpname));
-	probepif->pi_style = pif.pi_style;
-	probepif->pi_ppa = pif.pi_ppa;
 
 	/* add lif, if this is a lif and it is not in cache */
 	if (!lif_listed) {
@@ -2026,186 +1968,37 @@ ip_ipmp_undo_offline(ip_cache_t *node)
 }
 
 /*
- * getdlpi_style() - Determine the DLPI provider style of the interface
- */
-static int
-getdlpi_style(char *ifname)
-{
-	int local_fd;
-	char devname[RCM_NET_RESOURCE_MAX];
-
-	(void) snprintf(devname, sizeof (devname), "%s/%s", SLASH_DEV, ifname);
-
-	/* First try DLPI style 1 */
-	if ((local_fd = open(devname, O_RDWR)) != -1) {
-		(void) close(local_fd);
-		return (DL_STYLE1);
-	}
-
-	return (DL_STYLE2);
-}
-
-/*
- * get_ppa() - Determine the ppa for an interface, DLPI style 2 only
- */
-static int
-get_ppa(char *rsrc)
-{
-	int i;
-	uint_t p = 0;
-	unsigned int m = 1;
-
-	i = strlen(rsrc) - 1;
-	while (i >= 0 && '0' <= rsrc[i] && rsrc[i] <= '9') {
-		p += (rsrc[i] - '0')*m;
-		m *= 10;
-		i--;
-	}
-	if (m == 1) {
-		return (-1);
-	}
-	return (VLAN_GET_PPA(p)); /* VLAN support */
-}
-
-/*
- * get_lun() - Determine the logical interface number
- */
-static int
-get_lun(char *rsrc)
-{
-	char resource[RCM_NET_RESOURCE_MAX];
-	char *cp;
-
-	(void) strcpy(resource, rsrc);
-
-	/* remove LIF component */
-	cp = strchr(resource, ':');
-	if (cp) {
-		cp++;
-		return (atoi(cp));
-	}
-
-	return (0);
-}
-
-/*
- * get_physical_resource() - Determine the actual physical interface name.
- *			   Supports VLAN interfaces.
- *			   Caller must free the malloced space for the string.
+ * get_physical_resource() - Convert a name (e.g., "SUNW_network/hme0:1" or
+ * "SUNW_network/hme1000") into a dynamically allocated string containing the
+ * associated physical device resource name ("SUNW_network/hme0").  Since we
+ * assume that interface names map directly to device names, this is a
+ * pass-through operation, with the exception that logical interface numbers
+ * and VLANs encoded in the PPA are stripped.  This logic will need to be
+ * revisited to support administratively-chosen interface names.
  */
 static char *
-get_physical_resource(char *rsrc)
+get_physical_resource(const char *rsrc)
 {
-	char *resource;
-	char *ifname;
-	char *nic;
-	int ppa;
+	char		*rsrc_ifname, *ifname;
+	ifspec_t	ifspec;
 
-	resource = (char *)malloc(strlen(rsrc) + 1);
-	if (resource == NULL) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: malloc error(%s): %s\n"), strerror(errno), rsrc);
+	rsrc_ifname = strchr(rsrc, '/');
+	if (rsrc_ifname == NULL || !ifparse_ifspec(rsrc_ifname + 1, &ifspec)) {
+		rcm_log_message(RCM_ERROR, _("IP: bad resource: %s\n"), rsrc);
 		return (NULL);
 	}
-	(void) strcpy(resource, rsrc);
 
-	/* remove LIF component if any */
-	nic = strchr(resource, ':');
-	if (nic) {
-		*nic = 0;
-	}
-
-	ppa = get_ppa(resource);
-
-	/* Determine device name */
-	nic = resource;
-	while (nic++) {
-		if (('0' <= *nic) && (*nic <= '9')) {
-			*nic = 0;
-			break;
-		}
-	}
-
-	ifname = (char *)malloc(RCM_NET_RESOURCE_MAX);
+	ifname = malloc(RCM_NET_RESOURCE_MAX);
 	if (ifname == NULL) {
-		rcm_log_message(RCM_ERROR,
-		    _("IP: malloc error(%s): %s\n"), strerror(errno), rsrc);
-		free(resource);
+		rcm_log_message(RCM_ERROR, _("IP: malloc error(%s): %s\n"),
+		    strerror(errno), rsrc);
 		return (NULL);
 	}
 
-	if (ppa < 0) {
-		/* This could be a network group */
-		(void) snprintf(ifname, RCM_NET_RESOURCE_MAX, "%s", resource);
-	} else {
-		(void) snprintf(ifname, RCM_NET_RESOURCE_MAX, "%s%d",
-		    resource, ppa);
-	}
+	(void) snprintf(ifname, RCM_NET_RESOURCE_MAX, "%s/%s%d", RCM_NET_PREFIX,
+	    ifspec.ifsp_devnm, VLAN_GET_PPA(ifspec.ifsp_ppa));
 
-	free(resource);
 	return (ifname);
-}
-
-/*
- * if_change_flags() - set/clear the flag specified for the physical interface
- *		     Call with cache_lock held
- */
-static int
-if_change_flags(ip_pif_t *pif, uint64_t flags, boolean_t set)
-{
-	int sock;
-	struct lifreq lifr;
-	ip_lif_t *lif;
-
-	if (!(flags & RCM_PIF_FLAGS)) {
-		rcm_log_message(RCM_DEBUG,
-		    "IP: if_change_flags: Not a physical interface flag\n");
-		return (-1);
-	}
-
-	/* IPv4 is ok, since we only manipulate physical interface flags */
-	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
-		rcm_log_message(RCM_ERROR,
-		    _("IPv4 socket open: %s\n"), strerror(errno));
-		return (-1);
-	}
-
-	/*
-	 * Get the current flags from the kernel, and set/clear the
-	 * desired phyint flags.
-	 */
-	(void) strncpy(lifr.lifr_name, pif->pi_ifname, sizeof (lifr.lifr_name));
-	lifr.lifr_name[sizeof (lifr.lifr_name) - 1] = '\0';
-	if (ioctl(sock, SIOCGLIFFLAGS, (char *)&lifr) < 0) {
-		rcm_log_message(RCM_DEBUG,
-		    "ioctl SIOCGLIFFLAGS: %s\n", strerror(errno));
-		(void) close(sock);
-		return (-1);
-	}
-	if (set)
-		lifr.lifr_flags |= flags;
-	else
-		lifr.lifr_flags &= ~flags;
-	if (ioctl(sock, SIOCSLIFFLAGS, (char *)&lifr) < 0) {
-		rcm_log_message(RCM_DEBUG,
-		    "ioctl SIOCSLIFFLAGS: %s\n", strerror(errno));
-		(void) close(sock);
-		return (-1);
-	}
-
-	(void) close(sock);
-
-	/* Keep cached flags consistent.  */
-	for (lif = pif->pi_lifs; lif != NULL; lif = lif->li_next) {
-		if (lif->li_ifnum == 0) {
-			if (set)
-				lif->li_ifflags |= flags;
-			else
-				lif->li_ifflags &= ~flags;
-		}
-	}
-
-	return (0);
 }
 
 /*
@@ -3831,30 +3624,17 @@ tokenize(char *line, char **tokens, char *tspace, int *ntok)
 }
 
 #ifdef RCM_IPMP_DEBUG
-
 static void
 dump_node(ip_cache_t *node)
 {
-	ip_pif_t *pif;
-	ip_lif_t *lif;
-
-	pif = node->ip_pif;
+	ip_pif_t *pif = node->ip_pif;
+	ip_lif_t *lif = pif->pi_lifs;
 
 	rcm_log_message(RCM_TRACE1, "Node dump:\n");
 	rcm_log_message(RCM_TRACE1, "resource = %s\t cache flags = 0x%x\n",
 	    node->ip_resource, node->ip_cachestate);
-	rcm_log_message(RCM_TRACE1, "ifname = %s\t ifindex = %d\n",
-	    pif->pi_ifname, pif->pi_ifindex);
-	rcm_log_message(RCM_TRACE1, "groupname = %s\t PPA = %d\n",
-	    pif->pi_grpname, pif->pi_ppa);
-	if (pif->pi_style == DL_STYLE1) {
-		rcm_log_message(RCM_TRACE1, "Provider = DLPI style 1\n");
-	}
-	if (pif->pi_style == DL_STYLE2) {
-		rcm_log_message(RCM_TRACE1, "Provider = DLPI style 2\n");
-	};
-
-	lif = pif->pi_lifs;
+	rcm_log_message(RCM_TRACE1, "ifname = %s\n", pif->pi_ifname);
+	rcm_log_message(RCM_TRACE1, "groupname = %s\n", pif->pi_grpname);
 
 	if (lif == NULL) {
 		rcm_log_message(RCM_TRACE1, "No lifs hosted on this device.\n");
@@ -3876,14 +3656,4 @@ dump_node(ip_cache_t *node)
 		lif = lif->li_next;
 	}
 }
-
-#else /* !RCM_IPMP_DEBUG */
-
-/*ARGSUSED*/
-static void
-dump_node(ip_cache_t *node)
-{
-	/* do nothing */
-}
-
 #endif /* RCM_IPMP_DEBUG */

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,9 +77,9 @@ main(int argc, char *argv[])
 	struct statvfs	vfs;
 	char		*root, *interface, *strategy, dummy;
 	long		len;
-	int		fd, numifs;
-	struct ifreq	*ifr;
-	struct ifconf	ifconf;
+	int		fd, nifs, nlifr;
+	struct lifreq	*lifr;
+	struct lifconf	lifc;
 
 	/* root location */
 	if (statvfs("/", &vfs) < 0)
@@ -129,18 +130,20 @@ main(int argc, char *argv[])
 		return (2);
 	}
 
-	if (ioctl(fd, SIOCGIFNUM, &numifs) < 0) {
+	if (ioctl(fd, SIOCGIFNUM, &nifs) < 0) {
 		(void) fprintf(stderr, "%s: SIOCGIFNUM: %s\n", argv[0],
 		    strerror(errno));
 		(void) close(fd);
 		return (2);
 	}
 
-	ifconf.ifc_len = numifs * sizeof (struct ifreq);
-	ifconf.ifc_buf = alloca(ifconf.ifc_len);
+	lifc.lifc_len = nifs * sizeof (struct lifreq);
+	lifc.lifc_buf = alloca(lifc.lifc_len);
+	lifc.lifc_flags = 0;
+	lifc.lifc_family = AF_INET;
 
-	if (ioctl(fd, SIOCGIFCONF, &ifconf) < 0) {
-		(void) fprintf(stderr, "%s: SIOCGIFCONF: %s\n", argv[0],
+	if (ioctl(fd, SIOCGLIFCONF, &lifc) < 0) {
+		(void) fprintf(stderr, "%s: SIOCGLIFCONF: %s\n", argv[0],
 		    strerror(errno));
 		(void) close(fd);
 		return (2);
@@ -149,22 +152,22 @@ main(int argc, char *argv[])
 	strategy = NULL;
 	interface = NULL;
 
-	for (ifr = ifconf.ifc_req; ifr < &ifconf.ifc_req[ifconf.ifc_len /
-	    sizeof (struct ifreq)]; ifr++) {
+	nlifr = lifc.lifc_len / sizeof (struct lifreq);
+	for (lifr = lifc.lifc_req; nlifr > 0; lifr++, nlifr--) {
 
-		if (strchr(ifr->ifr_name, ':') != NULL)
-			continue;	/* skip virtual interfaces */
+		if (strchr(lifr->lifr_name, ':') != NULL)
+			continue;	/* skip logical interfaces */
 
-		if (ioctl(fd, SIOCGIFFLAGS, ifr) < 0) {
-			(void) fprintf(stderr, "%s: SIOCGIFFLAGS: %s\n",
+		if (ioctl(fd, SIOCGLIFFLAGS, lifr) < 0) {
+			(void) fprintf(stderr, "%s: SIOCGLIFFLAGS: %s\n",
 			    argv[0], strerror(errno));
 			continue;
 		}
 
-		if (ifr->ifr_flags & (IFF_VIRTUAL|IFF_POINTOPOINT))
+		if (lifr->lifr_flags & (IFF_VIRTUAL|IFF_POINTOPOINT))
 			continue;
 
-		if (ifr->ifr_flags & IFF_UP) {
+		if (lifr->lifr_flags & IFF_UP) {
 			/*
 			 * For the "nfs rarp" case, we assume that the first
 			 * IFF_UP interface is the one using RARP, so stash
@@ -178,10 +181,10 @@ main(int argc, char *argv[])
 			 * interface name in the RARP case anyway.
 			 */
 			if (interface == NULL)
-				interface = ifr->ifr_name;
+				interface = lifr->lifr_name;
 
-			if (ifr->ifr_flags & IFF_DHCPRUNNING) {
-				interface = ifr->ifr_name;
+			if (lifr->lifr_flags & IFF_DHCPRUNNING) {
+				interface = lifr->lifr_name;
 				strategy = "dhcp";
 				break;
 			}

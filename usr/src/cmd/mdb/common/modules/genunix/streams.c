@@ -95,7 +95,7 @@ static const strflags_t qf[] = {
 	{ SF(_QINSERTING),	"module is inserted with _I_INSERT"	},
 	{ SF(_QREMOVING)	"module is removed with _I_REMOVE"	},
 	{ SF(_QASSOCIATED),	"queue is associated with a device"	},
-	{ SF(0),		NULL }
+	{ 0, NULL,		NULL					}
 };
 
 /*
@@ -110,7 +110,7 @@ static const struct str_flags sqf[] = {
 	{ SF(SQ_WANTWAKEUP)	"Thread waiting on sq_wait"		},
 	{ SF(SQ_WANTEXWAKEUP),	"Thread waiting on sq_exwait"		},
 	{ SF(SQ_EVENTS),	"There are events on syncq"		},
-	{ SF(0),		NULL					}
+	{ 0, NULL,		NULL					}
 };
 
 /*
@@ -125,7 +125,7 @@ static const struct str_flags sqt[] = {
 	{ SF(SQ_COSVC),		"Concurrent outer svc procedure"	},
 	{ SF(SQ_COOC),		"Concurrent outer open/close"		},
 	{ SF(SQ_COCB),		"Concurrent outer callback"		},
-	{ SF(0),		NULL					}
+	{ 0, NULL,		NULL					}
 };
 
 /*
@@ -164,7 +164,7 @@ static const struct str_flags stdf[] = {
 	{ SF(STREOPENFAIL),	"re-open has failed"			},
 	{ SF(STRMATE),		"this stream is a mate"			},
 	{ SF(STRHASLINKS),	"there are I_LINKs under this stream"	},
-	{ SF(0),		NULL					}
+	{ 0, NULL,		NULL					}
 };
 
 static const struct str_flags mbf[] = {
@@ -175,7 +175,7 @@ static const struct str_flags mbf[] = {
 	{ SF(MSGMARKNEXT), 	"Private: b_next's first byte marked"	},
 	{ SF(MSGNOTMARKNEXT),	"Private: ... not marked"		},
 	{ SF(MSGHASREF),	"Private: msg has reference to owner"	},
-	{ SF(0),		NULL					}
+	{ 0, NULL,		NULL					}
 };
 
 #define	M_DATA_T 0xff
@@ -211,6 +211,7 @@ static const strtypes_t mbt[] = {
 	{ "M_STARTI",	M_STARTI,	"restart reception after stop"	},
 	{ "M_PCEVENT",	M_PCEVENT,	"Obsoleted: do not use"		},
 	{ "M_UNHANGUP",	M_UNHANGUP,	"line reconnect"		},
+	{ NULL,		0,		NULL 				}
 };
 
 /* Allocation flow trace events, starting from 0 */
