@@ -1569,6 +1569,7 @@ add_device_to_disklist(char *devname, char *devpath)
 	struct ctlr_type	*ctlr, *tctlr;
 	struct	mctlr_list	*mlp;
 	struct	efi_info	efi_info;
+	struct dk_minfo		mediainfo;
 	int			search_file;
 	int			status;
 	int			i;
@@ -1624,13 +1625,23 @@ add_device_to_disklist(char *devname, char *devpath)
 	}
 
 	if (mlp == NULL) {
+		if (dkinfo.dki_ctype == DKC_CDROM) {
+			if (ioctl(search_file, DKIOCGMEDIAINFO,
+			    &mediainfo) < 0) {
+				mediainfo.dki_media_type = DK_UNKNOWN;
+			}
+		}
 		/*
 		 * Skip CDROM devices, they are read only.
-		 *	Also skip PCMCIA memory card device since
-		 *	it is used as a pseudo floppy disk drive
-		 *	at the present time (BugID 1201473)
+		 * But not devices like Iomega Rev Drive which
+		 * identifies itself as a CDROM, but has a removable
+		 * disk.
+		 * Also skip PCMCIA memory card device since
+		 * it is used as a pseudo floppy disk drive
+		 * at the present time (BugID 1201473)
 		 */
-		if ((dkinfo.dki_ctype == DKC_CDROM) ||
+		if (((dkinfo.dki_ctype == DKC_CDROM) &&
+		    (mediainfo.dki_media_type != DK_REMOVABLE_DISK)) ||
 		    (dkinfo.dki_ctype == DKC_PCMCIA_MEM)) {
 			(void) close(search_file);
 			return;

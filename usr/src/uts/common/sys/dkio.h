@@ -281,6 +281,7 @@ struct dk_minfo {
  * maintain compatibility with SFF8090.  The following define the
  * optical media type.
  */
+#define	DK_REMOVABLE_DISK	0x02 /* Removable Disk */
 #define	DK_MO_ERASABLE		0x03 /* MO Erasable */
 #define	DK_MO_WRITEONCE		0x04 /* MO Write once */
 #define	DK_AS_MO		0x05 /* AS MO */
