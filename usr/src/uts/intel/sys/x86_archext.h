@@ -102,11 +102,12 @@ extern "C" {
 						/* 0x00000800 - reserved */
 						/* 0x00001000 - reserved */
 						/* 0x00002000 - reserved */
+#define	CPUID_INTC_ECX_CX16	0x00002000	/* CMPXCHG16B */
 #define	CPUID_INTC_ECX_XTPR	0x00004000	/* disable task pri messages */
 
 #define	FMT_CPUID_INTC_ECX			\
 	"\20"					\
-	"\20\17xtpr\13cid\11tm2"		\
+	"\20\17xtpr\16cx16\13cid\11tm2"		\
 	"\10est\5dscpl\4monitor\1sse3"
 
 /*

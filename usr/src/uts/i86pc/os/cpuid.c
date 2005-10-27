@@ -370,6 +370,9 @@ cpuid_pass1(cpu_t *cpu)
 				}
 			} else if (cpi->cpi_model >= 6)
 				mask_edx |= CPUID_INTC_EDX_MMX;
+		} else if (cpi->cpi_family >= 0xf) {
+			/* SSE3 and CX16, at least, are valid; enable all */
+			mask_ecx = 0xffffffff;
 		}
 		break;
 	case X86_VENDOR_TM:
@@ -481,15 +484,12 @@ cpuid_pass1(cpu_t *cpu)
 		feature |= X86_PAE;
 	if (cp->cp_edx & CPUID_INTC_EDX_CX8)
 		feature |= X86_CX8;
-#if defined(CPUID_INTC_ECX_CX16)
 	/*
-	 * In the July 16 2004 edition of AN 485, Intel rescinded
-	 * the definition of this bit -- it's now in the "Do not count on
-	 * their value" category.
+	 * Once this bit was thought questionable, but it looks like it's
+	 * back, as of Application Note 485 March 2005 (24161829.pdf)
 	 */
 	if (cp->cp_ecx & CPUID_INTC_ECX_CX16)
 		feature |= X86_CX16;
-#endif
 	if (cp->cp_edx & CPUID_INTC_EDX_PAT)
 		feature |= X86_PAT;
 	if (cp->cp_edx & CPUID_INTC_EDX_SEP)
