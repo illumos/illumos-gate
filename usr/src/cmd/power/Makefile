@@ -53,6 +53,7 @@ ROOTMETHOD =	$(ROOTLIBSVCMETHOD)/svc-power
 
 TEXT_DOMAIN=	SUNW_OST_OSCMD
 
+XGETFLAGS +=    -a -x power_all.xcl
 POFILE=		power_all.po
 POFILES=	$(PMCFG_SRCS:%.c=%.po)
 # needed because POFILES is deleted by clobber, but it's under

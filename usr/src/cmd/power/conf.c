@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,7 +136,7 @@ mesg(int code, char *fmt, ...)
 static void
 usage(void)
 {
-	(void) fprintf(stderr, "Usage: %s [-r]\n", prog);
+	(void) fprintf(stderr, gettext("Usage: %s [-r]\n"), prog);
 	exit(1);
 }
 

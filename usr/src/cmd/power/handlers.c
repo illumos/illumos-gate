@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,7 +124,8 @@ strcpy_limit(char *dst, char *src, size_t limit, char *info)
 int
 autosd(void)
 {
-	char **bp, *behavior, *unrec = "unrecognized autoshutdown behavior";
+	char **bp, *behavior;
+	char *unrec = gettext("unrecognized autoshutdown behavior");
 	static char *blist[] = {
 		"autowakeup", "default", "noshutdown",
 		"shutdown", "unconfigured", NULL
@@ -134,7 +135,7 @@ autosd(void)
 	if (gethm(LINEARG(2), &new_cc.as_sh, &new_cc.as_sm) ||
 	    gethm(LINEARG(3), &new_cc.as_fh, &new_cc.as_fm))
 		return (NOUP);
-	mesg(MDEBUG, "idle %d, start %d:%02d, finis %d:%02d\n",
+	mesg(MDEBUG, "idle %d, start %d:%02d, finish %d:%02d\n",
 	    new_cc.as_idle, new_cc.as_sh, new_cc.as_sm,
 	    new_cc.as_fh, new_cc.as_fm);
 
