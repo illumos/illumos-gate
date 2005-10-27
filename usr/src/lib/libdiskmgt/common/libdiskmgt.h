@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,19 @@ extern "C" {
 
 #include <libnvpair.h>
 
-/* typedef void  *dm_descriptor_t; */
+/*
+ * Holds all the data regarding the device.
+ * Private to libdiskmgt. Must use dm_xxx functions to set/get data.
+ */
 typedef uint64_t  dm_descriptor_t;
+
+typedef enum {
+	DM_WHO_MKFS = 0,
+	DM_WHO_ZPOOL,
+	DM_WHO_FORMAT,
+	DM_WHO_SWAP,
+	DM_WHO_DUMP
+} dm_who_type_t;
 
 typedef enum {
     DM_DRIVE = 0,
@@ -199,6 +210,7 @@ typedef enum {
 #define	DM_USE_VXVM		"vxvm"
 #define	DM_USE_FS		"fs"
 #define	DM_USE_VFSTAB		"vfstab"
+#define	DM_USE_ZPOOL		"zpool"
 
 /* event */
 #define	DM_EV_NAME		"name"
@@ -232,6 +244,13 @@ nvlist_t		*dm_get_stats(dm_descriptor_t desc, int stat_type,
 void			dm_init_event_queue(void(*callback)(nvlist_t *, int),
 			    int *errp);
 nvlist_t		*dm_get_event(int *errp);
+void			dm_get_slices(char *drive, dm_descriptor_t **slices,
+			    int *errp);
+void			dm_get_slice_stats(char *slice, nvlist_t **dev_stats,
+			    int *errp);
+void			dm_get_usage_string(char *who, char *data, char **msg);
+int			dm_inuse(char *dev_name, char **msg, dm_who_type_t who,
+			    int *errp);
 
 #ifdef __cplusplus
 }

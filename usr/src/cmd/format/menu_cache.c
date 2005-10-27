@@ -21,7 +21,8 @@
  */
 
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,7 +51,7 @@
 #include "startup.h"
 #include "partition.h"
 #include "prompts.h"
-#include "checkmount.h"
+#include "checkdev.h"
 #include "io.h"
 #include "ctlr_scsi.h"
 #include "auto_sense.h"

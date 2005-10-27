@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1998-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,7 +53,7 @@ main(int argc, char *argv[])
 	u_longlong_t minf;
 	struct stat st;
 	int c;
-
+	int dflag = 0;			/* for checking in use during -d ops */
 	int dcmode = DC_CURRENT;	/* kernel settings override unless -u */
 	int modified = 0;		/* have we modified the dump config? */
 	char *minfstr = NULL;		/* string value of -m argument */
@@ -116,10 +116,10 @@ main(int argc, char *argv[])
 					return (E_USAGE);
 				modified++;
 				break;
-
 			case 'd':
 				if (dconf_str2device(&dc, optarg) == -1)
 					return (E_USAGE);
+				dflag++;
 				modified++;
 				break;
 
@@ -166,7 +166,7 @@ main(int argc, char *argv[])
 		 * fails, we re-load the kernel configuration and write that
 		 * out to the file in order to force the file in sync.
 		 */
-		if (dconf_update(&dc) == -1)
+		if (dconf_update(&dc, 0) == -1)
 			(void) dconf_getdev(&dc);
 		if (dconf_write(&dc) == -1)
 			return (E_ERROR);
@@ -176,7 +176,8 @@ main(int argc, char *argv[])
 		 * If we're modifying the configuration, then try
 		 * to update it, and write out the file if successful.
 		 */
-		if (dconf_update(&dc) == -1 || dconf_write(&dc) == -1)
+		if (dconf_update(&dc, dflag) == -1 ||
+		    dconf_write(&dc) == -1)
 			return (E_ERROR);
 	}
 

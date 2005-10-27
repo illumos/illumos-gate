@@ -55,7 +55,7 @@
 #include "startup.h"
 #include "partition.h"
 #include "prompts.h"
-#include "checkmount.h"
+#include "checkdev.h"
 #include "io.h"
 #include "ctlr_scsi.h"
 #include "auto_sense.h"

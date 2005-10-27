@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,6 +101,9 @@ partition_get_assocs(descriptor_t *desc, int *errp)
 	struct ipart	iparts[FD_NUMPART];
 	char		pname[MAXPATHLEN];
 	int		conv_flag = 0;
+#if defined(i386) || defined(__amd64)
+	int		len;
+#endif
 
 	if (get_parts(desc->p.disk, iparts, pname, sizeof (pname)) != 0) {
 	    return (libdiskmgt_empty_desc_array(errp));
@@ -114,17 +117,13 @@ partition_get_assocs(descriptor_t *desc, int *errp)
 	    return (NULL);
 	}
 
-#ifdef i386
-	{
+#if defined(i386) || defined(__amd64)
 	    /* convert part. name (e.g. c0d0p0) */
-	    int	len;
-
 	    len = strlen(pname);
 	    if (len > 1 && *(pname + (len - 2)) == 'p') {
 		conv_flag = 1;
 		*(pname + (len - 1)) = 0;
 	    }
-	}
 #endif
 
 	/*
@@ -336,8 +335,7 @@ partition_make_descriptors()
 		int	i;
 		char	mname[MAXPATHLEN];
 		int	conv_flag = 0;
-
-#ifdef i386
+#if defined(i386) || defined(__amd64)
 		/* convert part. name (e.g. c0d0p0) */
 		int	len;
 
@@ -473,15 +471,8 @@ get_parts(disk_t *disk, struct ipart *iparts, char *opath, int opath_len)
 
 	/* First make sure media is inserted and spun up. */
 	if (!media_read_info(fd, &minfo)) {
-#ifdef i386
-	    /* XXX Work around bug 4725434 */
-	    if (disk->removable) {
-#endif
 	    (void) close(fd);
 	    return (ENODEV);
-#ifdef i386
-	    }
-#endif
 	}
 
 	if (!partition_has_fdisk(disk, fd)) {
@@ -659,7 +650,7 @@ open_disk(disk_t *diskp, char *opath, int len)
 		}
 
 		if ((dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-		    _PC_NAME_MAX + 1)) == NULL) {
+		    PATH_MAX + 1)) == NULL) {
 		    /* out of memory */
 		    (void) close(fd);
 		    return (-1);

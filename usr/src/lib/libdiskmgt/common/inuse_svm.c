@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,35 +124,46 @@ inuse_svm(char *slice, nvlist_t *attrs, int *errp)
 
 	(void) mutex_lock(&init_lock);
 	if (!initialized) {
-	    /* dynamically load libmeta */
-	    if (init_svm()) {
-		/* need to initialize the cluster library to avoid seg faults */
-		(mdl_sdssc_bind_library)();
+		/* dynamically load libmeta */
+		if (init_svm()) {
+			/*
+			 * need to initialize the cluster library to
+			 * avoid seg faults
+			 */
+			(mdl_sdssc_bind_library)();
 
-		/* load the SVM cache */
-		*errp = load_svm();
+			/* load the SVM cache */
+			*errp = load_svm();
+
+			if (*errp == 0) {
+				/* start a thread to monitor the svm config */
+				sysevent_handle_t *shp;
+				const char *subclass_list[1];
+				/*
+				 * Only start the svmevent thread if
+				 * we are not doing an install
+				 */
+
+				if (getenv("_LIBDISKMGT_INSTALL") == NULL) {
+					shp = sysevent_bind_handle(
+					    event_handler);
+					if (shp != NULL) {
+						subclass_list[0] = EC_SUB_ALL;
+						if (sysevent_subscribe_event(
+						    shp, EC_SVM_CONFIG,
+						    subclass_list, 1) != 0) {
+							*errp = errno;
+						}
+					} else {
+						*errp = errno;
+					}
+				}
+			}
+		}
 
 		if (*errp == 0) {
-		    /* start a thread to monitor the svm config */
-		    sysevent_handle_t *shp;
-		    const char *subclass_list[1];
-
-		    shp = sysevent_bind_handle(event_handler);
-		    if (shp != NULL) {
-			subclass_list[0] = EC_SUB_ALL;
-			if (sysevent_subscribe_event(shp, EC_SVM_CONFIG,
-			    subclass_list, 1) != 0) {
-			    *errp = errno;
-			}
-		    } else {
-			*errp = errno;
-		    }
+			initialized = 1;
 		}
-	    }
-
-	    if (*errp == 0) {
-		initialized = 1;
-	    }
 	}
 	(void) mutex_unlock(&init_lock);
 

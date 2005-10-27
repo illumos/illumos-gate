@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -142,7 +142,6 @@ inuse_fs(char *slice, nvlist_t *attrs, int *errp)
 		    libdiskmgt_add_str(attrs, DM_USED_BY, DM_USE_VFSTAB, errp);
 		    libdiskmgt_add_str(attrs, DM_USED_NAME, mountp, errp);
 		    found = 1;
-		    break;
 		}
 		listp = listp->next;
 	    }

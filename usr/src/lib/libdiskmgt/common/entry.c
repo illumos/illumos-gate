@@ -34,10 +34,15 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libintl.h>
+#include <locale.h>
+#include <sys/debug.h>
 
 #include "libdiskmgt.h"
 #include "disks_private.h"
 #include "partition.h"
+
+extern	char	*getfullblkname();
 
 
 extern dm_desc_type_t drive_assoc_types[];
@@ -49,8 +54,11 @@ extern dm_desc_type_t partition_assoc_types[];
 extern dm_desc_type_t path_assoc_types[];
 extern dm_desc_type_t alias_assoc_types[];
 
+
 static dm_descriptor_t *ptr_array_to_desc_array(descriptor_t **ptrs, int *errp);
 static descriptor_t **desc_array_to_ptr_array(dm_descriptor_t *da, int *errp);
+static int build_usage_string(char *dname, char *by, char *data, char **use,
+	int *found, int *errp);
 
 void
 dm_free_descriptor(dm_descriptor_t desc)
@@ -403,46 +411,57 @@ dm_get_stats(dm_descriptor_t desc, int stat_type, int *errp)
 	cache_rlock();
 
 	if (!cache_is_valid_desc(dp)) {
-	    cache_unlock();
-	    *errp = EBADF;
-	    return (NULL);
+		cache_unlock();
+		*errp = EBADF;
+		return (NULL);
 	}
 
 	/* verify that the descriptor is still valid */
 	if (dp->p.generic == NULL) {
-	    cache_unlock();
-	    *errp = ENODEV;
-	    return (NULL);
+		cache_unlock();
+		*errp = ENODEV;
+		return (NULL);
 	}
 
 	switch (dp->type) {
 	case DM_DRIVE:
-	    stats = drive_get_stats(dp, stat_type, errp);
-	    break;
+		stats = drive_get_stats(dp, stat_type, errp);
+		break;
 	case DM_BUS:
-	    stats = bus_get_stats(dp, stat_type, errp);
-	    break;
+		stats = bus_get_stats(dp, stat_type, errp);
+		break;
 	case DM_CONTROLLER:
-	    stats = controller_get_stats(dp, stat_type, errp);
-	    break;
+		stats = controller_get_stats(dp, stat_type, errp);
+		break;
 	case DM_MEDIA:
-	    stats = media_get_stats(dp, stat_type, errp);
-	    break;
+		stats = media_get_stats(dp, stat_type, errp);
+		break;
 	case DM_SLICE:
-	    stats = slice_get_stats(dp, stat_type, errp);
-	    break;
+		if (stat_type == DM_SLICE_STAT_USE) {
+			/*
+			 * If NOINUSE_CHECK is set, we do not perform
+			 * the in use checking if the user has set stat_type
+			 * DM_SLICE_STAT_USE
+			 */
+			if (getenv("NOINUSE_CHECK") != NULL) {
+				stats = NULL;
+				break;
+			}
+		}
+		stats = slice_get_stats(dp, stat_type, errp);
+		break;
 	case DM_PARTITION:
-	    stats = partition_get_stats(dp, stat_type, errp);
-	    break;
+		stats = partition_get_stats(dp, stat_type, errp);
+		break;
 	case DM_PATH:
-	    stats = path_get_stats(dp, stat_type, errp);
-	    break;
+		stats = path_get_stats(dp, stat_type, errp);
+		break;
 	case DM_ALIAS:
-	    stats = alias_get_stats(dp, stat_type, errp);
-	    break;
+		stats = alias_get_stats(dp, stat_type, errp);
+		break;
 	default:
-	    *errp = EINVAL;
-	    break;
+		*errp = EINVAL;
+		break;
 	}
 
 	cache_unlock();
@@ -468,7 +487,284 @@ dm_get_type(dm_descriptor_t desc)
 
 	return (dp->type);
 }
+/*
+ * Returns, via slices paramater, a dm_descriptor_t list of
+ * slices for the named disk drive.
+ */
+void
+dm_get_slices(char *drive, dm_descriptor_t **slices, int *errp)
+{
+	dm_descriptor_t alias;
+	dm_descriptor_t	*media;
+	dm_descriptor_t *disk;
 
+	*slices = NULL;
+	*errp = 0;
+
+	if (drive == NULL) {
+		return;
+	}
+
+	alias = dm_get_descriptor_by_name(DM_ALIAS, drive, errp);
+
+	/*
+	 * Errors must be handled by the caller. The dm_descriptor_t *
+	 * values will be NULL if an error occured in these calls.
+	 */
+
+	if (alias != NULL) {
+		disk = dm_get_associated_descriptors(alias, DM_DRIVE, errp);
+		dm_free_descriptor(alias);
+		if (disk != NULL) {
+			media = dm_get_associated_descriptors(*disk,
+			    DM_MEDIA, errp);
+			dm_free_descriptors(disk);
+			if (media != NULL) {
+				*slices = dm_get_associated_descriptors(*media,
+				    DM_SLICE, errp);
+				dm_free_descriptors(media);
+			}
+		}
+	}
+}
+/*
+ * Convenience function to get slice stats
+ */
+void
+dm_get_slice_stats(char *slice, nvlist_t **dev_stats, int *errp)
+{
+	dm_descriptor_t	devp;
+
+	*dev_stats = NULL;
+	*errp = 0;
+
+	if (slice == NULL) {
+		return;
+	}
+
+	/*
+	 * Errors must be handled by the caller. The dm_descriptor_t *
+	 * values will be NULL if an error occured in these calls.
+	 */
+	devp = dm_get_descriptor_by_name(DM_SLICE, slice, errp);
+	if (devp != NULL) {
+		*dev_stats = dm_get_stats(devp, DM_SLICE_STAT_USE,
+		    errp);
+		dm_free_descriptor(devp);
+	}
+}
+
+/*
+ * Returns 'in use' details, if found, about a specific dev_name,
+ * based on the caller(who). It is important to note that it is possible
+ * for there to be more than one 'in use' statistic regarding a dev_name.
+ * The **msg parameter returns a list of 'in use' details. This message
+ * is formatted via gettext().
+ */
+int
+dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
+{
+	nvlist_t *dev_stats = NULL;
+	char *by, *data;
+	nvpair_t *nvwhat = NULL;
+	nvpair_t *nvdesc = NULL;
+	int	found = 0;
+	char	*dname = NULL;
+
+	*errp = 0;
+	*msg = NULL;
+
+	dname = getfullblkname(dev_name);
+	/*
+	 * If we cannot find the block name, we cannot check the device
+	 * for in use statistics. So, return found, which is == 0.
+	 */
+	if (dname == NULL || *dname == '\0') {
+		return (found);
+	}
+
+	dm_get_slice_stats(dname, &dev_stats, errp);
+	if (dev_stats == NULL) {
+		/*
+		 * If there is an error, but it isn't a no device found error
+		 * return the error as recorded. Otherwise, with a full
+		 * block name, we might not be able to get the slice
+		 * associated, and will get an ENODEV error. For example,
+		 * an SVM metadevice will return a value from getfullblkname()
+		 * but libdiskmgt won't be able to find this device for
+		 * statistics gathering. This is expected and we should not
+		 * report errnoneous errors.
+		 */
+		if (*errp) {
+			if (*errp == ENODEV) {
+				*errp = 0;
+			}
+		}
+		free(dname);
+		return (found);
+	}
+
+	for (;;) {
+
+		nvwhat = nvlist_next_nvpair(dev_stats, nvdesc);
+		nvdesc = nvlist_next_nvpair(dev_stats, nvwhat);
+
+		/*
+		 * End of the list found.
+		 */
+		if (nvwhat == NULL || nvdesc == NULL) {
+			break;
+		}
+		/*
+		 * Otherwise, we check to see if this client(who) cares
+		 * about this in use scenario
+		 */
+
+		ASSERT(strcmp(nvpair_name(nvwhat), DM_USED_BY) == 0);
+		ASSERT(strcmp(nvpair_name(nvdesc), DM_USED_NAME) == 0);
+		/*
+		 * If we error getting the string value continue on
+		 * to the next pair(if there is one)
+		 */
+		if (nvpair_value_string(nvwhat, &by)) {
+			continue;
+		}
+		if (nvpair_value_string(nvdesc, &data)) {
+			continue;
+		}
+
+		switch (who) {
+			case DM_WHO_MKFS:
+				/*
+				 * mkfs is not in use for these cases.
+				 * All others are in use.
+				 */
+				if (strcmp(by, DM_USE_LU) == 0 ||
+				    strcmp(by, DM_USE_FS) == 0) {
+					break;
+				}
+				if (build_usage_string(dname,
+				    by, data, msg, &found, errp) != 0) {
+					if (*errp) {
+						goto out;
+					}
+				}
+				break;
+			case DM_WHO_SWAP:
+				/*
+				 * Not in use for this.
+				 */
+				if (strcmp(by, DM_USE_DUMP) == 0 ||
+				    strcmp(by, DM_USE_FS) == 0) {
+					break;
+				}
+
+				if (build_usage_string(dname,
+				    by, data, msg, &found, errp) != 0) {
+					if (*errp) {
+						goto out;
+					}
+				}
+				break;
+			case DM_WHO_DUMP:
+				/*
+				 * Not in use for this.
+				 */
+				if ((strcmp(by, DM_USE_MOUNT) == 0 &&
+				    strcmp(data, "swap") == 0) ||
+				    strcmp(by, DM_USE_DUMP) == 0 ||
+				    strcmp(by, DM_USE_FS) == 0) {
+					break;
+				}
+				if (build_usage_string(dname,
+				    by, data, msg, &found, errp)) {
+					if (*errp) {
+						goto out;
+					}
+				}
+				break;
+
+			case DM_WHO_FORMAT:
+				if (strcmp(by, DM_USE_FS) == 0)
+					break;
+				if (build_usage_string(dname,
+				    by, data, msg, &found, errp) != 0) {
+					if (*errp) {
+						goto out;
+					}
+				}
+				break;
+			default:
+				/*
+				 * nothing found in use for this client
+				 * of libdiskmgt. Default is 'not in use'.
+				 */
+				break;
+		}
+	}
+out:
+	if (dname != NULL)
+		free(dname);
+	if (dev_stats != NULL)
+		nvlist_free(dev_stats);
+
+	return (found);
+}
+
+void
+dm_get_usage_string(char *what, char *how, char **usage_string)
+{
+
+
+	if (usage_string == NULL || what == NULL) {
+		return;
+	}
+	*usage_string = NULL;
+
+	if (strcmp(what, DM_USE_MOUNT) == 0) {
+		if (strcmp(how, "swap") == 0) {
+			*usage_string = dgettext(TEXT_DOMAIN,
+			    "%s is currently used by swap. Please see swap(1M)."
+			    "\n");
+		} else {
+			*usage_string = dgettext(TEXT_DOMAIN,
+			    "%s is currently mounted on %s."
+			    " Please see umount(1M).\n");
+		}
+	} else if (strcmp(what, DM_USE_VFSTAB) == 0) {
+		*usage_string = dgettext(TEXT_DOMAIN,
+		    "%s is normally mounted on %s according to /etc/vfstab. "
+		    "Please remove this entry to use this device.\n");
+	} else if (strcmp(what, DM_USE_FS) == 0) {
+		*usage_string = dgettext(TEXT_DOMAIN,
+		    "Warning: %s contains a %s filesystem.\n");
+	} else if (strcmp(what, DM_USE_SVM) == 0) {
+		if (strcmp(how, "mdb") == 0) {
+			*usage_string = dgettext(TEXT_DOMAIN,
+			    "%s contains an SVM %s. Please see "
+			    "metadb(1M).\n");
+		} else {
+			*usage_string = dgettext(TEXT_DOMAIN,
+			    "%s is part of SVM volume %s. "
+			    "Please see metaclear(1M).\n");
+		}
+	} else if (strcmp(what, DM_USE_VXVM) == 0) {
+		*usage_string = dgettext(TEXT_DOMAIN,
+		    "%s is part of VxVM volume %s.\n");
+	} else if (strcmp(what, DM_USE_LU) == 0) {
+		*usage_string = dgettext(TEXT_DOMAIN,
+		    "%s is in use for live upgrade %s. Please see ludelete(1M)."
+		    "\n");
+	} else if (strcmp(what, DM_USE_DUMP) == 0) {
+		*usage_string = dgettext(TEXT_DOMAIN,
+		    "%s is in use by %s. Please see dumpadm(1M)."
+		    "\n");
+	} else if (strcmp(what, DM_USE_ZPOOL) == 0) {
+		*usage_string = dgettext(TEXT_DOMAIN,
+		    "%s is in use by zpool %s. Please see zpool(1M)."
+		    "\n");
+	}
+}
 void
 libdiskmgt_add_str(nvlist_t *attrs, char *name, char *val, int *errp)
 {
@@ -596,4 +892,51 @@ ptr_array_to_desc_array(descriptor_t **ptrs, int *errp)
 
 	return (da);
 #endif
+}
+/*
+ * Build the usage string for the in use data. Return the build string in
+ * the msg parameter. This function takes care of reallocing all the memory
+ * for this usage string. Usage string is returned already formatted for
+ * localization.
+ */
+static int
+build_usage_string(char *dname, char *by, char *data, char **msg,
+    int *found, int *errp)
+{
+	int	len0;
+	int	len1;
+	char	*use;
+	char	*p;
+
+	*errp = 0;
+
+	dm_get_usage_string(by, data, &use);
+	if (!use) {
+		return (-1);
+	}
+
+	if (*msg)
+		len0 = strlen(*msg);
+	else
+		len0 = 0;
+	/* LINTED */
+	len1 = snprintf(NULL, 0, use, dname, data);
+
+	/*
+	 * If multiple in use details they
+	 * are listed 1 per line for ease of
+	 * reading. dm_find_usage_string
+	 * formats these appropriately.
+	 */
+	if ((p = realloc(*msg, len0 + len1 + 1)) == NULL) {
+		*errp = errno;
+		free(*msg);
+		return (-1);
+	}
+	*msg = p;
+
+	/* LINTED */
+	(void) snprintf(*msg + len0, len1 + 1, use, dname, data);
+	(*found)++;
+	return (0);
 }

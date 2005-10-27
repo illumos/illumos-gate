@@ -192,9 +192,9 @@
 ./lib/libbsm/common/adt_ucred.h
 
 #
-# Ignore files provided by Adaptec as part of their software drop.
+# Ignore libdiskmgt.h. Used for building but not delivered.
 #
-./uts/intel/io/adpu320/chim/hwm/seqse320.h
+./lib/libdiskmgt/common/libdiskmgt.h
 
 #
 # Ignore files originally supplied by ISC (Internet Software Consortium) 

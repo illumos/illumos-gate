@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_DCONF_H
@@ -64,7 +64,7 @@ extern int dconf_open(dumpconf_t *, const char *, const char *, int);
 extern int dconf_getdev(dumpconf_t *);
 extern int dconf_close(dumpconf_t *);
 extern int dconf_write(dumpconf_t *);
-extern int dconf_update(dumpconf_t *);
+extern int dconf_update(dumpconf_t *, int);
 extern void dconf_print(dumpconf_t *, FILE *);
 
 extern int dconf_str2device(dumpconf_t *, char *);

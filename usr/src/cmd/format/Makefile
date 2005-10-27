@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1991-1997,2002,2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@
 
 PROG= format
 
-COBJS=	add_definition.o analyze.o checkmount.o ctlr_scsi.o \
+COBJS=	add_definition.o analyze.o checkdev.o ctlr_scsi.o \
 	defect.o init_menus.o io.o label.o main.o \
 	menu.o menu_analyze.o menu_cache.o menu_command.o menu_defect.o \
 	menu_partition.o misc.o modify_partition.o partition.o \
@@ -56,7 +56,7 @@ $(ROOTETCDATA) := FILEMODE = 0644
 $(ROOTETCDATA) := OWNER = root
 $(ROOTETCDATA) := GROUP = sys
 
-LDLIBS +=	-ladm -lefi
+LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair
 
 .KEEP_STATE:
 

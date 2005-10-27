@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,11 @@
 #include	<sys/stat.h>
 #include	<fcntl.h>
 #include	<string.h>
+#include	<libdiskmgt.h>
+#include	"fslib.h"
+
+
+static int match(char **opts, char *s);
 
 #define	FSTYPE_MAX	8
 #define	ARGV_MAX	1024
@@ -117,13 +122,18 @@ char	*argv[];
 	char	*vfs_path = VFS_PATH;
 	char	*alt_path = ALT_PATH;
 	int	i;
+	int	j;
 	int	verbose = 0;		/* set if -V is specified */
 	int	F_flg = 0;
 	int	mflag = 0;
+	int	Nflag = 0;
 	char	*oopts = NULL;
+	char	*tmpopts = NULL;	/* used for in use checking */
 	int	iflag = 0;
 	int	usgflag = 0;
 	int	arg;			/* argument from getopt() */
+	char	*msg;
+	int	error;
 	extern	char *optarg;		/* getopt specific */
 	extern	int optind;
 	extern	int opterr;
@@ -167,6 +177,10 @@ char	*argv[];
 				newargv[newargc++] = "-o";
 				newargv[newargc++] = optarg;
 				oopts = optarg;
+				if (!Nflag) {
+					tmpopts = optarg;
+					Nflag = has_Nflag(tmpopts);
+				}
 				break;
 			case '?':	/* print usage message */
 				newargv[newargc++] = "-?";
@@ -192,14 +206,15 @@ char	*argv[];
 			optarg = NULL;
 	}
 	if (F_flg > 1) {
-		fprintf(stderr, gettext("%s: more than one FSType specified\n"),
-			cbasename);
+		(void) fprintf(stderr,
+		    gettext("%s: more than one FSType specified\n"),
+		    cbasename);
 		usage(cbasename, c_ptr->c_usgstr);
 		exit(2);
 	}
 	if (fstype != NULL) {
 		if (strlen(fstype) > FSTYPE_MAX) {
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			    gettext("%s: FSType %s exceeds %d characters\n"),
 			    cbasename, fstype, FSTYPE_MAX);
 			exit(2);
@@ -224,18 +239,19 @@ char	*argv[];
 	}
 
 	if ((special == NULL) && (!usgflag)) {
-		fprintf(stderr, gettext("%s: special not specified\n"),
+		(void) fprintf(stderr, gettext("%s: special not specified\n"),
 		    cbasename);
 		usage(cbasename, c_ptr->c_usgstr);
 		exit(2);
 	}
+
 	if ((fstype == NULL) && (usgflag))
 		usage(cbasename, c_ptr->c_usgstr);
 	if (fstype == NULL)
 		lookup();
 	if (fstype == NULL) {
-		fprintf(stderr, gettext("%s: FSType cannot be identified\n"),
-			cbasename);
+		(void) fprintf(stderr,
+		    gettext("%s: FSType cannot be identified\n"), cbasename);
 		usage(cbasename, c_ptr->c_usgstr);
 		exit(2);
 	}
@@ -254,6 +270,29 @@ char	*argv[];
 			printf("%s ", newargv[i]);
 		printf("\n");
 		exit(0);
+	}
+
+	/*
+	 * Prior to executing the command for mkfs check for device in use.
+	 * If the mflag is set, user wants to see command that created
+	 * an already existing filesystem. Do not check for in use in this
+	 * case. If Nflag is set user wants to see what the parameters
+	 * would be to create the filesystem. Do not check for in use in
+	 * this case.
+	 */
+	if (strcmp(cbasename, "mkfs") == 0 && !mflag && !Nflag) {
+		if (dm_inuse(special, &msg, DM_WHO_MKFS, &error) ||
+		    error) {
+			if (error != 0) {
+				(void) fprintf(stderr, gettext("Error occurred"
+				    " with device in use checking: %s\n"),
+				    strerror(error));
+			} else {
+				(void) fprintf(stderr, "%s", msg);
+				free(msg);
+				exit(2);
+			}
+		}
 	}
 
 	/*
@@ -279,18 +318,18 @@ char	*argv[];
 	}
 	if (errno != ENOENT) {
 		perror(cbasename);
-		fprintf(stderr, gettext("%s: cannot execute %s\n"), cbasename,
-		    full_path);
+		(void) fprintf(stderr, gettext("%s: cannot execute %s\n"),
+		    cbasename, full_path);
 		exit(2);
 	}
 
 	if (sysfs(GETFSIND, fstype) == (-1)) {
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    gettext("%s: FSType %s not installed in the kernel\n"),
 		    cbasename, fstype);
 		exit(2);
 	}
-	fprintf(stderr,
+	(void) fprintf(stderr,
 	    gettext("%s: Operation not applicable for FSType %s \n"),
 	    cbasename, fstype);
 	exit(2);
@@ -301,9 +340,10 @@ char *cmd;
 char **usg;
 {
 	int i;
-	fprintf(stderr, gettext("Usage:\n"));
+	(void) fprintf(stderr, gettext("Usage:\n"));
 	for (i = 0; usg[i] != NULL; i++)
-		fprintf(stderr, "%s %s\n", gettext(cmd), gettext(usg[i]));
+		(void) fprintf(stderr, "%s %s\n", gettext(cmd),
+		    gettext(usg[i]));
 	exit(2);
 }
 
@@ -323,7 +363,8 @@ lookup()
 	struct vfstab	vget, vref;
 
 	if ((fd = fopen(vfstab, "r")) == NULL) {
-		fprintf(stderr, gettext("%s: cannot open vfstab\n"), cbasename);
+		(void) fprintf(stderr, gettext("%s: cannot open vfstab\n"),
+		    cbasename);
 		exit(1);
 	}
 	vfsnull(&vref);
@@ -345,13 +386,13 @@ lookup()
 		fstype = vget.vfs_fstype;
 		break;
 	case VFS_TOOLONG:
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    gettext("%s: line in vfstab exceeds %d characters\n"),
 		    cbasename, VFS_LINE_MAX-2);
 		exit(1);
 		break;
 	case VFS_TOOFEW:
-		fprintf(stderr,
+		(void) fprintf(stderr,
 		    gettext("%s: line in vfstab has too few entries\n"),
 		    cbasename);
 		exit(1);
@@ -376,12 +417,65 @@ char *opts;
 			if (errstr == NULL)
 				errstr = gettext("Unknown error");
 
-			fprintf(stderr, gettext("%s: %s: error %d: %s\n"),
-				cmd, mountpoint, en, errstr);
+			(void) fprintf(stderr,
+			    gettext("%s: %s: error %d: %s\n"),
+			    cmd, mountpoint, en, errstr);
 
 			exit(2);
 		}
 		close(fd);
 	}
 	fssnap_show_status(mountpoint, opts, 1, (opts ? 0 : 1));
+}
+static int
+has_Nflag(char *opts)
+{
+	while (opts != NULL && *opts != '\0') {
+		if (match(&opts, "N")) {
+			return (1);
+		}
+		if (!opts)
+			break;
+		if (*opts == ',')
+			opts ++;
+		if (*opts == ' ')
+			opts ++;
+	}
+	return (0);
+}
+/*
+ * Parses the -o [fs specific options string] to search for the UFS -N flag.
+ * Return the opts string pointing to the next position in the string if
+ * match is not found. A delimiter of , or ' ' can be used depending on the
+ * caller, newfs or mkfs.
+ */
+static int
+match(char **opts, char *s)
+{
+	char *cs;
+	char *tmp_str;
+
+	cs = *opts;
+
+	while (*cs++ == *s) {
+		if (*s++ == '\0') {
+			goto true;
+		}
+	}
+	if (*s != '\0') {
+		/*
+		 * If we cannot find the delimiter it means we
+		 * have hit the end of the string.
+		 */
+		tmp_str = strchr(*opts, ',');
+		if (!tmp_str)
+			tmp_str = strchr(*opts, ' ');
+
+		*opts = tmp_str;
+		return (0);
+	}
+true:
+	cs--;
+	*opts = cs;
+	return (1);
 }

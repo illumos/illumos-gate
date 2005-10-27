@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -652,8 +652,13 @@ initialize()
 
 	cache_loaded = 1;
 
-	if ((status = events_start_event_watcher()) != 0) {
-	    return (status);
+	/*
+	 * Only start the event thread if we are not doing an install
+	 */
+	if (getenv("_LIBDISKMGT_INSTALL") == NULL) {
+		if ((status = events_start_event_watcher()) != 0) {
+			return (status);
+		}
 	}
 
 	return (0);

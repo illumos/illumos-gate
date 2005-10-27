@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,7 @@
 #include "menu_scsi.h"
 #include "ctlr_scsi.h"
 #include "startup.h"
-#include "checkmount.h"
+#include "checkdev.h"
 
 
 #ifdef	__STDC__
@@ -563,6 +563,15 @@ do_format()
 	if (checkswap((daddr_t)-1, (daddr_t)-1)) {
 		err_print("Cannot format disk while its partitions are \
 currently being used for swapping.\n\n");
+		return (-1);
+	}
+	/*
+	 * Are any being used for SVM, VxVM or live upgrade.
+	 */
+	if (checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
+	    (diskaddr_t)-1, 0, 0)) {
+		err_print("Cannot format disk while its partitions are "
+		    "currently being used as described.\n");
 		return (-1);
 	}
 

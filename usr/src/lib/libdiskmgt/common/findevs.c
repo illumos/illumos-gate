@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -978,7 +978,7 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 	    diskp->removable = get_prop(REMOVABLE_PROP, args->node);
 	    if (diskp->removable == -1) {
 		diskp->removable = 0;
-#ifdef i386
+#if defined(i386) || defined(__amd64)
 		/*
 		 * x86 does not have removable property.  Check for common
 		 * removable drives, zip & jaz, and mark those correctly.

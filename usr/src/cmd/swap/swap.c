@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,7 @@
 #include	<fcntl.h>
 #include	<locale.h>
 #include	<libintl.h>
+#include	<libdiskmgt.h>
 
 #define	LFLAG	0x01	/* swap -l (list swap devices) */
 #define	DFLAG	0x02	/* swap -d (delete swap device) */
@@ -85,9 +86,11 @@ main(int argc, char **argv)
 {
 	int c, flag = 0;
 	int ret;
+	int error = 0;
 	off_t s_offset = 0;
 	off_t length = 0;
 	char *pathname;
+	char *msg;
 
 	(void) setlocale(LC_ALL, "");
 
@@ -185,9 +188,6 @@ main(int argc, char **argv)
 					exit(1);
 				}
 			}
-			if ((ret = valid(pathname,
-			    s_offset * 512, length * 512)) == 0)
-				ret = add(pathname, s_offset, length, flag);
 			break;
 
 		case '1':
@@ -201,6 +201,32 @@ main(int argc, char **argv)
 		case '?':
 			usage();
 			exit(1);
+		}
+	}
+	/*
+	 * do the add here. Check for in use prior to add.
+	 * The values for length and offset are set above.
+	 */
+	if (flag & AFLAG) {
+		/*
+		 * If device is in use for a swap device, print message
+		 * and exit.
+		 */
+		if (dm_inuse(pathname, &msg, DM_WHO_SWAP, &error) ||
+		    error) {
+			if (error != 0) {
+				(void) fprintf(stderr, gettext("Error occurred"
+				    " with device in use checking: %s\n"),
+				    strerror(error));
+			} else {
+				(void) fprintf(stderr, "%s", msg);
+				free(msg);
+				exit(1);
+			}
+		}
+		if ((ret = valid(pathname,
+		    s_offset * 512, length * 512)) == 0) {
+		    ret = add(pathname, s_offset, length, flag);
 		}
 	}
 	if (!flag) {

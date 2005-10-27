@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <libdiskmgt.h>
 
 #include "dconf.h"
 #include "minfree.h"
@@ -49,6 +50,7 @@ typedef struct dc_token {
 	int (*tok_parse)(dumpconf_t *, char *);
 	int (*tok_print)(const dumpconf_t *, FILE *);
 } dc_token_t;
+
 
 static int print_device(const dumpconf_t *, FILE *);
 static int print_savdir(const dumpconf_t *, FILE *);
@@ -344,9 +346,25 @@ dconf_dev_ioctl(dumpconf_t *dcp, int cmd)
 }
 
 int
-dconf_update(dumpconf_t *dcp)
+dconf_update(dumpconf_t *dcp, int checkinuse)
 {
-	int oconf;
+	int 		oconf;
+	int		error;
+	char		*msg;
+
+	error = 0;
+
+	if (checkinuse && (dm_inuse(dcp->dc_device, &msg, DM_WHO_DUMP,
+		    &error) || error)) {
+		if (error != 0) {
+			warn(gettext("failed to determine if %s is"
+			    " in use"), dcp->dc_device);
+		} else {
+			warn(msg);
+			free(msg);
+			return (-1);
+		}
+	}
 
 	/*
 	 * Save the existing dump configuration in case something goes wrong.

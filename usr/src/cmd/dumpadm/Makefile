@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,7 @@ SVCMETHOD= svc-dumpadm
 
 OBJS = main.o dconf.o minfree.o utils.o swap.o
 SRCS = $(OBJS:.o=.c)
+
 
 lint := LINTFLAGS = -mx
 
@@ -44,6 +45,8 @@ GROUP = bin
 
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)
 $(ROOTMANIFEST) := FILEMODE = 0444
+
+LDLIBS +=	-ldiskmgt
 
 .KEEP_STATE:
 

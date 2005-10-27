@@ -275,6 +275,7 @@ HDRSUBDIRS= libaio	\
 	libdevice	\
 	libdevid	\
 	libdevinfo	\
+	libdiskmgt	\
 	libdladm	\
 	libdlpi		\
 	libdhcpagent	\

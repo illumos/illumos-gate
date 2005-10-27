@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,7 +32,7 @@ OBJECTS =	assoc_types.o \
 		entry.o cache.o drive.o controller.o alias.o path.o \
                 media.o slice.o partition.o findevs.o events.o \
                 bus.o inuse_mnt.o inuse_svm.o inuse_lu.o inuse_fs.o \
-                inuse_vxvm.o inuse_dump.o
+                inuse_vxvm.o inuse_dump.o inuse_zpool.o
 
 include ../../Makefile.lib
 

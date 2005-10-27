@@ -56,7 +56,7 @@
 #include "startup.h"
 #include "partition.h"
 #include "prompts.h"
-#include "checkmount.h"
+#include "checkdev.h"
 #include "io.h"
 #include "ctlr_scsi.h"
 #include "auto_sense.h"
@@ -607,6 +607,18 @@ c_type()
 currently being used for swapping.\n");
 		return (-1);
 	}
+
+	/*
+	 * Check for partitions being used in SVM, VxVM or LU devices
+	 */
+
+	if ((tptr != oldtype) &&
+		checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
+		    (diskaddr_t)-1, 0, 0)) {
+		err_print("Cannot set disk type while its "
+		    "partitions are currently in use.\n");
+				return (-1);
+	}
 	/*
 	 * If the type selected is different from the previous type,
 	 * mark the disk as not labelled and reload the current
@@ -748,7 +760,6 @@ c_current()
 	fmt_print("\n");
 	return (0);
 }
-
 /*
  * This routine implements the 'format' command.  It allows the user
  * to format and verify any portion of the disk.
@@ -757,11 +768,11 @@ int
 c_format()
 {
 	diskaddr_t		start, end;
-	time_t		clock;
-	int		format_time, format_tracks, format_cyls;
-	int		format_interval;
-	int		deflt, status;
-	u_ioparam_t	ioparam;
+	time_t			clock;
+	int			format_time, format_tracks, format_cyls;
+	int			format_interval;
+	int			deflt, status;
+	u_ioparam_t		ioparam;
 
 	/*
 	 * There must be a current disk type and a current disk
@@ -857,6 +868,16 @@ c_format()
 currently being used for swapping.\n");
 		return (-1);
 	}
+	/*
+	 * Check for partitions being used in SVM, VxVM or LU devices
+	 * in this format zone
+	 */
+	if (checkdevinuse(cur_disk->disk_name, start, end, 0, 0)) {
+		err_print("Cannot format disk while its partitions "
+			    "are currently in use.\n");
+			return (-1);
+	}
+
 	if (SCSI && (format_time = scsi_format_time()) > 0) {
 		fmt_print(
 		    "Ready to format.  Formatting cannot be interrupted\n"
@@ -1118,6 +1139,12 @@ being used for swapping.\ncontinue"))
 		return (-1);
 	}
 
+	if (checkdevinuse(cur_disk->disk_name, bn, bn, 0, 0)) {
+		if (check("Repair is in a partition which is currently "
+		    "in use.\ncontinue"))
+			return (-1);
+	}
+
 	/*
 	 * Try to read the sector before repairing it.  If we can
 	 * get good data out of it, we can write that data back
@@ -1288,8 +1315,8 @@ c_show()
 int
 c_label()
 {
-	int	 status;
-	int	deflt, *defltptr = NULL;
+	int			status;
+	int			deflt, *defltptr = NULL;
 
 	/*
 	 * There must be a current disk type (and therefore a current disk).
@@ -1341,6 +1368,17 @@ c_label()
 		}
 	}
 
+	/*
+	 * Check to see if any partitions used for svm, vxvm or live upgrade
+	 * are on the disk. If so, refuse to label the disk, but only
+	 * if we are trying to shrink a partition in use.
+	 */
+	if (checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
+	    (diskaddr_t)-1, 0, 1)) {
+		err_print("Cannot label disk when "
+		    "partitions are in use as described.\n");
+		return (-1);
+	}
 
 	/*
 	 * If there is not a current partition map, warn the user we

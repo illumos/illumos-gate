@@ -93,6 +93,10 @@ lib/llib-llaadm		sparc
 lib/llib-lmacadm.ln		sparc
 lib/llib-lmacadm		sparc
 #
+# Installed in the proto area for building those things
+# that are dependent on it. No delivered as part of a pkg.
+usr/include/libdiskmgt.h	sparc
+#
 # IKE and IPsec support library exceptions.  The IKE support
 # library contains exclusively private interfaces, as does
 # libipsecutil.  My apologies for the glut of header files here.

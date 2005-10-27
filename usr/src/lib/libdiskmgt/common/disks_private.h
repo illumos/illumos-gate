@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -262,6 +262,7 @@ int		libdiskmgt_str_eq(char *nm1, char *nm2);
 int		inuse_mnt(char *slice, nvlist_t *attrs, int *errp);
 int		inuse_svm(char *slice, nvlist_t *attrs, int *errp);
 int		inuse_lu(char *slice, nvlist_t *attrs, int *errp);
+int		inuse_zpool(char *slice, nvlist_t *attrs, int *errp);
 int		inuse_dump(char *slice, nvlist_t *attrs, int *errp);
 int		inuse_vxvm(char *slice, nvlist_t *attrs, int *errp);
 int		inuse_fs(char *slice, nvlist_t *attrs, int *errp);

@@ -22,7 +22,7 @@
 #
 # CDDL HEADER END
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+# pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libdiskmgt/spec/diskmgt.spec
 
@@ -109,3 +109,25 @@ include         <libdiskmgt.h>
 declaration     nvlist_t *dm_get_event(int *errp)
 version         SUNWprivate_1.1
 end
+
+function	dm_get_slices
+include		<libdiskmgt.h>
+declaration	void dm_get_slices(char * drive, dm_descriptor_t **slices, \
+		int *errp)
+version		SUNWprivate_1.1
+end
+
+function	dm_get_slice_stats
+include		<libdiskmgt.h>
+declaration	void dm_get_slice_stats(char *slice, nvlist_t **dev_stats, \
+		int *errp)
+version		SUNWprivate_1.1
+end
+
+function	dm_inuse
+include		<libdiskmgt.h>
+declaration	void dm_inuse(char * dev_name, char **msg, dm_who_type_t who, 
+		int *errp)
+version		SUNWprivate_1.1
+end
+

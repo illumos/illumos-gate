@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,20 +29,27 @@
 include ../Makefile.lib
 
 HDRS =		libdiskmgt.h
+ROOTHDRDIR=	$(ROOT)/usr/include
+ROOTHDRS=	$(HDRS:%=$(ROOTHDRDIR)/%)
+CHECKDIRS=	$(HDRS:%.h=%.check)
 HDRDIR =	common
 SUBDIRS =	spec .WAIT $(MACH) $(BUILD64) $(MACH64)
+
+$(ROOTHDRDIR)/%: %
+	$(INS.file)
 
 all :=		TARGET = all
 clean :=	TARGET = clean
 clobber	:=	TARGET = clobber
 install	:=	TARGET = install
 lint :=		TARGET = lint
+install_h:=	TARGET = install_h
 
 .KEEP_STATE:
 
 all clean clobber install lint: $(SUBDIRS)
 
-install_h:
+install_h: $(ROOTHDRS)
 
 check:		$(CHECKHDRS)
 

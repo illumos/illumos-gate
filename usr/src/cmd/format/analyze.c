@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,7 @@
 #include "defect.h"
 #include "label.h"
 #include "param.h"
-#include "checkmount.h"
+#include "checkdev.h"
 
 
 /*

@@ -25,7 +25,6 @@
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 /*
  * This file contains the main entry point of the program and other
  * routines relating to the general flow.
@@ -54,7 +53,7 @@
 #include "menu_command.h"
 #include "menu_partition.h"
 #include "prompts.h"
-#include "checkmount.h"
+#include "checkdev.h"
 #include "label.h"
 
 extern	struct menu_item menu_command[];
@@ -539,6 +538,13 @@ Continue"))
 	 */
 	if (checkmount((daddr_t)-1, (daddr_t)-1))
 		err_print("Warning: Current Disk has mounted partitions.\n");
+
+	/*
+	 * If any part of this device is also part of an SVM, VxVM or
+	 * Live Upgrade device, print a warning.
+	 */
+	(void) checkdevinuse(cur_disk->disk_name, (diskaddr_t)-1,
+	    (diskaddr_t)-1, 1, 0);
 
 	/*
 	 * Get the Solaris Fdisk Partition information

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,7 @@ static struct inuse_detectors {
 } detectors[] = {
 	{inuse_mnt, DM_USE_MOUNT},
 	{inuse_svm, DM_USE_SVM},
+	{inuse_zpool, DM_USE_ZPOOL},
 	{inuse_lu, DM_USE_LU},
 	{inuse_dump, DM_USE_DUMP},
 	{inuse_vxvm, DM_USE_VXVM},
@@ -453,10 +454,6 @@ get_attrs(descriptor_t *dp, int fd,  nvlist_t *attrs)
 
 	/* First make sure media is inserted and spun up. */
 	if (!media_read_info(fd, &minfo)) {
-#ifdef i386
-	    /* XXX Work around bug 4725434 */
-	    if (dp->p.disk->removable)
-#endif
 	    return (ENODEV);
 	}
 
@@ -838,7 +835,7 @@ get_removable_assocs(descriptor_t *desc, char *volm_path, int *errp)
 		struct dirent	*dentp;
 
 		dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-		    _PC_NAME_MAX + 1);
+		    PATH_MAX + 1);
 		if (dentp != NULL) {
 #ifdef _LP64
 		    while (readdir_r(dirp, dentp, &result) != NULL) {
@@ -1092,7 +1089,7 @@ make_volm_dir_descriptors(disk_t *dp, int dirfd, char *volm_path)
 
 	error = 0;
 	dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-	    _PC_NAME_MAX + 1);
+	    PATH_MAX + 1);
 	if (dentp != NULL) {
 #ifdef _LP64
 	    while (readdir_r(dirp, dentp, &result) != NULL) {
@@ -1284,7 +1281,7 @@ match_removable_name(disk_t *diskp, char *name, int *errp)
 		    slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
 
 		    dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-			_PC_NAME_MAX + 1);
+			PATH_MAX + 1);
 		    if (dentp != NULL) {
 #ifdef _LP64
 			while (readdir_r(dirp, dentp, &result) != NULL) {
@@ -1361,7 +1358,7 @@ num_removable_slices(int fd, struct stat *bufp, char *volm_path)
 		slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
 
 		dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-		    _PC_NAME_MAX + 1);
+		    PATH_MAX + 1);
 		if (dentp != NULL) {
 #ifdef _LP64
 		    while (readdir_r(dirp, dentp, &result) != NULL) {

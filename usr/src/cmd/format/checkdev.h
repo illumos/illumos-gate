@@ -20,19 +20,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-#ifndef	_CHECKMOUNT_H
-#define	_CHECKMOUNT_H
+#ifndef	_CHECKDEV_H
+#define	_CHECKDEV_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
-
 
 /*
  *	Prototypes for ANSI C
@@ -41,10 +40,12 @@ int	checkmount(diskaddr_t start, diskaddr_t end);
 int	checkswap(diskaddr_t start, diskaddr_t end);
 int	check_label_with_mount(void);
 int	check_label_with_swap(void);
+int	checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end,
+	    int print, int check_label);
 
 
 #ifdef	__cplusplus
 }
 #endif
 
-#endif	/* _CHECKMOUNT_H */
+#endif	/* _CHECKDEV_H */

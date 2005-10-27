@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -682,7 +682,7 @@ drive_open_disk(disk_t *diskp, char *opath, int len)
 		}
 
 		if ((dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-		    _PC_NAME_MAX + 1)) == NULL) {
+		    PATH_MAX + 1)) == NULL) {
 		    /* out of memory */
 		    (void) close(fd);
 		    return (-1);

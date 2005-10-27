@@ -153,7 +153,7 @@ umount: umount.o $(FSLIB)
 	$(POST_PROCESS)
 
 $(SPPROG):	switchout.o deffs.o fssnapsup.o
-	$(LINK.c) -o $@ switchout.o deffs.o fssnapsup.o $(LDLIBS)
+	$(LINK.c) -o $@ switchout.o deffs.o fssnapsup.o $(LDLIBS) -ldiskmgt
 	$(POST_PROCESS)
 
 install: $(FSLIB) .WAIT $(SUBDIRS) .WAIT install_local

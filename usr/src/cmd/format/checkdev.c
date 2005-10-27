@@ -20,17 +20,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * This file contians miscellaneous routines.
+ * This file contains miscellaneous device validation routines.
  */
-#include "global.h"
 
+#include "global.h"
 #include <sys/mnttab.h>
 #include <sys/mntent.h>
 #include <sys/autoconf.h>
@@ -47,25 +48,29 @@
 #include <sys/swap.h>
 #include <sys/sysmacros.h>
 #include <ctype.h>
+#include <libdiskmgt.h>
+#include <libnvpair.h>
 #include "misc.h"
-#include "checkmount.h"
+#include "checkdev.h"
 
 /* Function prototypes */
 #ifdef	__STDC__
 
-static struct swaptable *getswapentries(void);
-static void freeswapentries(struct swaptable *);
+static struct 	swaptable *getswapentries(void);
+static void 	freeswapentries(struct swaptable *);
 static int	getpartition(char *pathname);
-static int	checkpartitions(int mounted);
+static int 	checkpartitions(int bm_mounted);
 
 #else	/* __STDC__ */
 
 static struct swaptable *getswapentries();
 static void freeswapentries();
 static int	getpartition();
-static int	checkpartitions();
+static int 	checkpartitions();
 
 #endif	/* __STDC__ */
+
+extern char	*getfullname();
 
 static struct swaptable *
 getswapentries(void)
@@ -256,7 +261,246 @@ checkswap(start, end)
 
 
 }
+/*
+ * Determines if there are partitions that are a part of an SVM, VxVM, zpool
+ * volume or a live upgrade device,  overlapping a given portion of a disk.
+ * Mounts and swap devices are checked in legacy format code.
+ */
+int
+checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
+	int check_label)
+{
 
+	int 		error;
+	int 		found = 0;
+	int		check = 0;
+	int 		i;
+	int		bm_inuse = 0;
+	int		part = 0;
+	uint64_t	slice_start, slice_size;
+	dm_descriptor_t	*slices = NULL;
+	nvlist_t	*attrs = NULL;
+	char		*usage;
+	char		*name;
+
+	/*
+	 * For format, we get basic 'in use' details from libdiskmgt. After
+	 * that we must do the appropriate checking to see if the 'in use'
+	 * details require a bit of additional work.
+	 */
+
+	dm_get_slices(cur_disk_path, &slices, &error);
+	if (error) {
+		err_print("Error occurred with device in use checking: %s\n",
+		    strerror(error));
+		return (found);
+	}
+	if (slices == NULL)
+		return (found);
+
+	for (i = 0; slices[i] != NULL; i++) {
+		/*
+		 * If we are checking the whole disk
+		 * then any and all in use data is
+		 * relevant.
+		 */
+		if (start == UINT_MAX64) {
+			name = dm_get_name(slices[i], &error);
+			if (error != 0 || !name) {
+				err_print("Error occurred with device "
+				    "in use checking: %s\n",
+				    strerror(error));
+				continue;
+			}
+			if (dm_inuse(name, &usage, DM_WHO_FORMAT, &error) ||
+			    error) {
+				if (error != 0) {
+					dm_free_name(name);
+					name = NULL;
+					err_print("Error occurred with device "
+					    "in use checking: %s\n",
+					    strerror(error));
+					continue;
+				}
+				dm_free_name(name);
+				name = NULL;
+				/*
+				 * If this is a dump device, then it is
+				 * a failure. You cannot format a slice
+				 * that is a dedicated dump device.
+				 */
+
+				if (strstr(usage, DM_USE_DUMP)) {
+					if (print) {
+						err_print(usage);
+						free(usage);
+					}
+					dm_free_descriptors(slices);
+					return (1);
+				}
+				/*
+				 * We really found a device that is in use.
+				 * Set 'found' for the return value, and set
+				 * 'check' to indicate below that we must
+				 * get the partition number to set bm_inuse
+				 * in the event we are trying to label this
+				 * device. check_label is set when we are
+				 * checking modifications for in use slices
+				 * on the device.
+				 */
+				found ++;
+				check = 1;
+				if (print) {
+					err_print(usage);
+					free(usage);
+				}
+			}
+		} else {
+			/*
+			 * Before getting the in use data, verify that the
+			 * current slice is within the range we are checking.
+			 */
+			attrs = dm_get_attributes(slices[i], &error);
+			if (error) {
+				err_print("Error occurred with device in use "
+				    "checking: %s\n", strerror(error));
+				continue;
+			}
+			if (attrs == NULL) {
+				continue;
+			}
+
+			(void) nvlist_lookup_uint64(attrs, DM_START,
+			    &slice_start);
+			(void) nvlist_lookup_uint64(attrs, DM_SIZE,
+			    &slice_size);
+			if (start >= (slice_start + slice_size) ||
+			    (end < slice_start)) {
+				nvlist_free(attrs);
+				attrs = NULL;
+				continue;
+			}
+			name = dm_get_name(slices[i], &error);
+			if (error != 0 || !name) {
+				err_print("Error occurred with device "
+				    "in use checking: %s\n",
+				    strerror(error));
+				nvlist_free(attrs);
+				attrs = NULL;
+				continue;
+			}
+			if (dm_inuse(name, &usage,
+			    DM_WHO_FORMAT, &error) || error) {
+				if (error != 0) {
+					dm_free_name(name);
+					name = NULL;
+					err_print("Error occurred with device "
+					    "in use checking: %s\n",
+					    strerror(error));
+					nvlist_free(attrs);
+					attrs = NULL;
+					continue;
+				}
+				dm_free_name(name);
+				name = NULL;
+				/*
+				 * If this is a dump device, then it is
+				 * a failure. You cannot format a slice
+				 * that is a dedicated dump device.
+				 */
+				if (strstr(usage, DM_USE_DUMP)) {
+					if (print) {
+						err_print(usage);
+						free(usage);
+					}
+					dm_free_descriptors(slices);
+					nvlist_free(attrs);
+					return (1);
+				}
+				/*
+				 * We really found a device that is in use.
+				 * Set 'found' for the return value, and set
+				 * 'check' to indicate below that we must
+				 * get the partition number to set bm_inuse
+				 * in the event we are trying to label this
+				 * device. check_label is set when we are
+				 * checking modifications for in use slices
+				 * on the device.
+				 */
+				found ++;
+				check = 1;
+				if (print) {
+					err_print(usage);
+					free(usage);
+				}
+			}
+		}
+		/*
+		 * If check is set it means we found a slice(the current slice)
+		 * on this device in use in some way.  We potentially want
+		 * to check this slice when labeling is
+		 * requested. We set bm_inuse with this partition value
+		 * for use later if check_label was set when called.
+		 */
+		if (check) {
+			name = dm_get_name(slices[i], &error);
+			if (error != 0 || !name) {
+				err_print("Error occurred with device "
+				    "in use checking: %s\n",
+				    strerror(error));
+				nvlist_free(attrs);
+				attrs = NULL;
+				continue;
+			}
+			part = getpartition(name);
+			dm_free_name(name);
+			name = NULL;
+			if (part != -1) {
+				bm_inuse |= 1 << part;
+			}
+			check = 0;
+		}
+		/*
+		 * If we have attributes then we have successfully
+		 * found the slice we were looking for and we also
+		 * know this means we are not searching the whole
+		 * disk so break out of the loop
+		 * now.
+		 */
+		if (attrs) {
+			nvlist_free(attrs);
+			break;
+		}
+	}
+
+	if (slices) {
+		dm_free_descriptors(slices);
+	}
+
+	/*
+	 * The user is trying to label the disk. We have to do special
+	 * checking here to ensure they are not trying to modify a slice
+	 * that is in use in an incompatible way.
+	 */
+	if (check_label && bm_inuse) {
+		/*
+		 * !0 indicates that we found a
+		 * problem. In this case, we have overloaded
+		 * the use of checkpartitions to work for
+		 * in use devices. bm_inuse is representative
+		 * of the slice that is in use, not that
+		 * is mounted as is in the case of the normal
+		 * use of checkpartitions.
+		 *
+		 * The call to checkpartitions will return !0 if
+		 * we are trying to shrink a device that we have found
+		 * to be in use above.
+		 */
+		return (checkpartitions(bm_inuse));
+	}
+
+	return (found);
+}
 /*
  * This routine checks to see if there are mounted partitions overlapping
  * a given portion of a disk.  If the start parameter is < 0, it means
@@ -432,13 +676,11 @@ check_label_with_mount()
 }
 
 /*
- * This Routine checks if any partitions specified by the
- * bit-map of mounted/swap partitions are affected by
- * writing the new label
+ * This Routine checks if any partitions specified
+ * are affected by writing the new label
  */
 static int
-checkpartitions(bm_mounted)
-int bm_mounted;
+checkpartitions(int bm_mounted)
 {
 	struct dk_map32		*n;
 	struct dk_map		*o;

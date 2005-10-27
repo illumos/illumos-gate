@@ -34,7 +34,7 @@
 #include "menu_partition.h"
 #include "menu_command.h"
 #include "modify_partition.h"
-#include "checkmount.h"
+#include "checkdev.h"
 #include "misc.h"
 #include "label.h"
 #include "auto_sense.h"

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -440,27 +440,6 @@ apply_filter(descriptor_t **media, int filter[], int *errp)
 		    cache_free_descriptor(media[i]);
 		}
 	    }
-#ifdef i386
-	    /* XXX Work around bug 4725434 */
-	    else if (!media[i]->p.disk->removable) {
-		int	j;
-		int	match;
-
-		match = 0;
-		for (j = 0; filter[j] != DM_FILTER_END; j++) {
-		    if (DM_MT_FIXED == filter[j]) {
-			found[pos++] = media[i];
-			match = 1;
-			break;
-		    }
-		}
-
-		if (!match) {
-		    cache_free_descriptor(media[i]);
-		}
-	    }
-#endif
-
 	    (void) close(fd);
 	}
 	found[pos] = NULL;
@@ -506,10 +485,6 @@ get_attrs(disk_t *dp, int fd, nvlist_t *attrs)
 
 	/* The first thing to do is read the media */
 	if (!media_read_info(fd, &minfo)) {
-	    /* XXX Work around bug 4725434 */
-#ifdef i386
-	    if (dp->removable)
-#endif
 	    return (ENODEV);
 	}
 

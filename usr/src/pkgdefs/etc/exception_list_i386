@@ -104,6 +104,11 @@ lib/llib-llaadm		i386
 lib/llib-lmacadm.ln		i386
 lib/llib-lmacadm		i386
 #
+# Installed in the proto area for building utilties dependent on
+# it, but is not shipped.
+#
+usr/include/libdiskmgt.h	i386
+#
 # The following files are used by the dhcpmgr.
 #
 usr/share/lib/locale/com/sun/dhcpmgr/bridge/ResourceBundle.properties	i386
