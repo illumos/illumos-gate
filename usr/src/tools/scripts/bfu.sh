@@ -2707,6 +2707,48 @@ remove_eof_fns()
 	rm -f $usr/lib/sparcv9/libxfn.so.2
 }
 
+remove_eof_face() {
+	# Packages to remove
+	typeset -r face_pkgs='SUNWfac'
+	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
+	typeset pkg
+
+	printf 'Removing AT&T FACE... '
+
+	#
+	# First, attempt to remove the packages cleanly if possible.
+	#
+	for pkg in $face_pkgs
+	do
+		if pkginfo $pkgroot -q $pkg; then
+			printf ' %s' $pkg
+			pkgrm $pkgroot -n $pkg >/dev/null 2>&1
+		fi
+	done
+	printf '\n'
+
+	#
+	# In case that didn't work, do it manually.
+	# Remove FACE from $rootprefix/var/sadm/install/contents
+	#
+	for pkg in $face_pkgs
+	do
+		if [ -d $rootprefix/var/sadm/pkg/$pkg ]; then
+			rm -rf $rootprefix/var/sadm/pkg/$pkg
+			grep -vw $pkg $rootprefix/var/sadm/install/contents > \
+			    /tmp/contents.$$
+			cp /tmp/contents.$$ $rootprefix/var/sadm/install/contents.$$
+			rm /tmp/contents.$$
+		fi
+	done
+
+	#
+	# Cleanup any remaining FACE files, symlinks, and directories.
+	#
+	rm -rf $usr/oasys
+	rm -rf $usr/vmsys
+}
+
 remove_properties() {
 
 	#
@@ -4627,6 +4669,13 @@ mondo_loop() {
 	     -d $usr/lib/fn -o \
 	     -d $rootprefix/var/fn ]; then
 		remove_eof_fns
+	fi
+
+	#
+	# Remove AT&T FACE
+	#
+	if [ -d $usr/oasys -o -d $usr/vmsys ]; then
+		remove_eof_face
 	fi
 
 	#

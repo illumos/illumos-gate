@@ -168,7 +168,6 @@ COMMON_SUBDIRS= \
 	SUNWdtrc \
 	SUNWdtrp \
 	SUNWesu  \
-	SUNWfac  \
 	SUNWfmd  \
 	SUNWfss \
 	SUNWftdur \

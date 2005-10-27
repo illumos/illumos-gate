@@ -46,6 +46,7 @@ i postinstall
 # SUNWcsu
 #
 d none usr 755 root sys
+s none usr/adm=../var/adm
 d none usr/bin 755 root bin
 f none usr/bin/alias 555 root bin
 f none usr/bin/amt 555 root bin

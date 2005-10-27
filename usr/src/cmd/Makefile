@@ -145,7 +145,6 @@ COMMON_SUBDIRS=		\
 	expand		\
 	expr		\
 	exstr		\
-	face		\
 	factor		\
 	false		\
 	fdetach		\
