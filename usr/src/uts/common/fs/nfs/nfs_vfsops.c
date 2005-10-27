@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -222,7 +222,7 @@ nfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	STRUCT_DECL(netbuf, addr_tmp);
 	int flags, addr_type;
 	char *p, *pf;
-	zone_t *zone = curproc->p_zone;
+	zone_t *zone = nfs_zone();
 
 	if ((error = secpolicy_fs_mount(cr, mvp, vfsp)) != 0)
 		return (error);
@@ -685,7 +685,7 @@ more:
 	/*
 	 * Stop the mount from going any further if the zone is going away.
 	 */
-	if (zone_status_get(zone) >= ZONE_IS_SHUTTING_DOWN) {
+	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN) {
 		error = EBUSY;
 		goto errout;
 	}
@@ -856,7 +856,7 @@ nfsrootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 	struct nfs_stats *nfsstatsp;
 	cred_t *lcr = NULL, *tcr = cr;
 
-	nfsstatsp = zone_getspecific(nfsstat_zone_key, curproc->p_zone);
+	nfsstatsp = zone_getspecific(nfsstat_zone_key, nfs_zone());
 	ASSERT(nfsstatsp != NULL);
 
 	/*
@@ -1130,7 +1130,7 @@ nfs_root(vfs_t *vfsp, vnode_t **vpp)
 
 	mi = VFTOMI(vfsp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EPERM);
 
 	svp = mi->mi_curr_serv;
@@ -1287,7 +1287,7 @@ nfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 	struct nfs_fid *nfsfidp = (struct nfs_fid *)fidp;
 	zoneid_t zoneid = VFTOMI(vfsp)->mi_zone->zone_id;
 
-	if (curproc->p_zone != VFTOMI(vfsp)->mi_zone)
+	if (nfs_zone() != VFTOMI(vfsp)->mi_zone)
 		return (EPERM);
 	if (fidp->fid_len != (sizeof (*nfsfidp) - sizeof (short))) {
 #ifdef DEBUG

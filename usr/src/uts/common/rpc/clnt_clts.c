@@ -374,7 +374,7 @@ clnt_clts_kinit(CLIENT *h, struct netbuf *addr, int retrys, cred_t *cred)
 	struct cku_private *p = htop(h);
 	struct rpcstat *rsp;
 
-	rsp = zone_getspecific(rpcstat_zone_key, curproc->p_zone);
+	rsp = zone_getspecific(rpcstat_zone_key, rpc_zone());
 	ASSERT(rsp != NULL);
 
 	p->cku_retrys = retrys;
@@ -1296,7 +1296,7 @@ endpnt_type_create(struct knetconfig *config)
 	mutex_init(&etype->e_plock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&etype->e_ilock, NULL, MUTEX_DEFAULT, NULL);
 	etype->e_rdev = config->knc_rdev;
-	etype->e_zoneid = getzoneid();
+	etype->e_zoneid = rpc_zoneid();
 	etype->e_async_count = 0;
 	cv_init(&etype->e_async_cv, NULL, CV_DEFAULT, NULL);
 
@@ -1427,7 +1427,7 @@ endpnt_get(struct knetconfig *config, int useresvport)
 	int			i = 0;
 	int			error;
 	int			retval;
-	zoneid_t		zoneid = getzoneid();
+	zoneid_t		zoneid = rpc_zoneid();
 
 	RPCLOG(1, "endpnt_get: protofmly %s, ", config->knc_protofmly);
 	RPCLOG(1, "rdev %ld\n", config->knc_rdev);

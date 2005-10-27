@@ -49,6 +49,7 @@
 #include <libxml/parser.h>
 
 #include <libdevinfo.h>
+#include <uuid/uuid.h>
 
 #include <libzonecfg.h>
 #include "zonecfg_impl.h"
@@ -105,6 +106,8 @@ struct zone_dochandle {
 	char		zone_dh_delete_name[ZONENAME_MAX];
 };
 
+char *zonecfg_root = "";
+
 /*
  * For functions which return int, which is most of the functions herein,
  * the return values should be from the Z_foo set defined in <libzonecfg.h>.
@@ -113,22 +116,49 @@ struct zone_dochandle {
  */
 
 /*
+ * Set the root (/) path for all zonecfg configuration files.  This is a
+ * private interface used by Live Upgrade extensions to access zone
+ * configuration inside mounted alternate boot environments.
+ */
+void
+zonecfg_set_root(const char *rootpath)
+{
+	if (*zonecfg_root != '\0')
+		free(zonecfg_root);
+	if (rootpath == NULL || rootpath[0] == '\0' || rootpath[1] == '\0' ||
+	    (zonecfg_root = strdup(rootpath)) == NULL)
+		zonecfg_root = "";
+}
+
+const char *
+zonecfg_get_root(void)
+{
+	return (zonecfg_root);
+}
+
+boolean_t
+zonecfg_in_alt_root(void)
+{
+	return (*zonecfg_root != '\0');
+}
+
+/*
  * Callers of the _file_path() functions are expected to have the second
  * parameter be a (char foo[MAXPATHLEN]).
  */
 
-static void
+static boolean_t
 config_file_path(const char *zonename, char *answer)
 {
-	(void) snprintf(answer, MAXPATHLEN,
-	    "%s/%s.xml", ZONE_CONFIG_ROOT, zonename);
+	return (snprintf(answer, MAXPATHLEN, "%s%s/%s.xml", zonecfg_root,
+	    ZONE_CONFIG_ROOT, zonename) < MAXPATHLEN);
 }
 
-static void
-snap_file_path(char *zonename, char *answer)
+static boolean_t
+snap_file_path(const char *zonename, char *answer)
 {
-	(void) snprintf(answer, MAXPATHLEN,
-	    "%s/%s.snapshot.xml", ZONE_SNAPSHOT_ROOT, zonename);
+	return (snprintf(answer, MAXPATHLEN, "%s%s/%s.snapshot.xml",
+	    zonecfg_root, ZONE_SNAPSHOT_ROOT, zonename) < MAXPATHLEN);
 }
 
 /*ARGSUSED*/
@@ -199,7 +229,8 @@ zonecfg_destroy(const char *zonename, boolean_t force)
 	int err, state_err;
 	zone_state_t state;
 
-	config_file_path(zonename, path);
+	if (!config_file_path(zonename, path))
+		return (Z_MISC_FS);
 
 	state_err = zone_get_state((char *)zonename, &state);
 	err = access(path, W_OK);
@@ -251,11 +282,12 @@ zonecfg_destroy(const char *zonename, boolean_t force)
 }
 
 int
-zonecfg_destroy_snapshot(char *zonename)
+zonecfg_destroy_snapshot(const char *zonename)
 {
 	char path[MAXPATHLEN];
 
-	snap_file_path(zonename, path);
+	if (!snap_file_path(zonename, path))
+		return (Z_MISC_FS);
 	return (zonecfg_destroy_impl(path));
 }
 
@@ -312,7 +344,8 @@ getrootattr(zone_dochandle_t handle, const xmlChar *propname,
 }
 
 static int
-setrootattr(zone_dochandle_t handle, const xmlChar *propname, char *propval)
+setrootattr(zone_dochandle_t handle, const xmlChar *propname,
+    const char *propval)
 {
 	int err;
 	xmlNodePtr root;
@@ -358,7 +391,8 @@ stripcomments(zone_dochandle_t handle)
 }
 
 static int
-zonecfg_get_handle_impl(char *zonename, char *filename, zone_dochandle_t handle)
+zonecfg_get_handle_impl(const char *zonename, const char *filename,
+    zone_dochandle_t handle)
 {
 	xmlValidCtxtPtr cvp;
 	struct stat statbuf;
@@ -387,34 +421,37 @@ zonecfg_get_handle_impl(char *zonename, char *filename, zone_dochandle_t handle)
 }
 
 int
-zonecfg_get_handle(char *zonename, zone_dochandle_t handle)
+zonecfg_get_handle(const char *zonename, zone_dochandle_t handle)
 {
 	char path[MAXPATHLEN];
 
-	config_file_path(zonename, path);
+	if (!config_file_path(zonename, path))
+		return (Z_MISC_FS);
 	handle->zone_dh_newzone = B_FALSE;
 
 	return (zonecfg_get_handle_impl(zonename, path, handle));
 }
 
 int
-zonecfg_get_snapshot_handle(char *zonename, zone_dochandle_t handle)
+zonecfg_get_snapshot_handle(const char *zonename, zone_dochandle_t handle)
 {
 	char path[MAXPATHLEN];
 
-	snap_file_path(zonename, path);
+	if (!snap_file_path(zonename, path))
+		return (Z_MISC_FS);
 	handle->zone_dh_newzone = B_FALSE;
 	return (zonecfg_get_handle_impl(zonename, path, handle));
 }
 
 int
-zonecfg_get_template_handle(char *template, char *zonename,
+zonecfg_get_template_handle(const char *template, const char *zonename,
     zone_dochandle_t handle)
 {
 	char path[MAXPATHLEN];
 	int err;
 
-	config_file_path(template, path);
+	if (!config_file_path(template, path))
+		return (Z_MISC_FS);
 
 	if ((err = zonecfg_get_handle_impl(template, path, handle)) != Z_OK)
 		return (err);
@@ -450,7 +487,7 @@ is_snapshot(zone_dochandle_t handle)
  * safety if this routine had to change the app locale on the fly.
  */
 int
-zonecfg_validate_zonename(char *zone)
+zonecfg_validate_zonename(const char *zone)
 {
 	int i;
 
@@ -573,7 +610,12 @@ zonecfg_set_name(zone_dochandle_t handle, char *name)
 int
 zonecfg_get_zonepath(zone_dochandle_t handle, char *path, size_t pathsize)
 {
-	return (getrootattr(handle, DTD_ATTR_ZONEPATH, path, pathsize));
+	size_t len;
+
+	if ((len = strlcpy(path, zonecfg_root, pathsize)) >= pathsize)
+		return (Z_TOO_BIG);
+	return (getrootattr(handle, DTD_ATTR_ZONEPATH, path + len,
+	    pathsize - len));
 }
 
 int
@@ -841,7 +883,8 @@ zonecfg_save(zone_dochandle_t handle)
 	if ((err = zonecfg_get_name(handle, zname, sizeof (zname))) != Z_OK)
 		return (err);
 
-	config_file_path(zname, path);
+	if (!config_file_path(zname, path))
+		return (Z_MISC_FS);
 
 	addcomment(handle, "\n    DO NOT EDIT THIS "
 	    "FILE.  Use zonecfg(1M) instead.\n");
@@ -856,8 +899,8 @@ zonecfg_save(zone_dochandle_t handle)
 	handle->zone_dh_newzone = B_FALSE;
 
 	if (is_renaming(handle)) {
-		config_file_path(handle->zone_dh_delete_name, delpath);
-		(void) unlink(delpath);
+		if (config_file_path(handle->zone_dh_delete_name, delpath))
+			(void) unlink(delpath);
 		handle->zone_dh_delete_name[0] = '\0';
 	}
 
@@ -876,11 +919,17 @@ zonecfg_access(const char *zonename, int amode)
 {
 	char path[MAXPATHLEN];
 
-	config_file_path(zonename, path);
+	if (!config_file_path(zonename, path))
+		return (Z_INVAL);
 	if (access(path, amode) == 0)
 		return (Z_OK);
-	if (errno == ENOENT && access(ZONE_CONFIG_ROOT, amode) == 0)
-		return (Z_OK);
+	if (errno == ENOENT) {
+		if (snprintf(path, sizeof (path), "%s%s", zonecfg_root,
+		    ZONE_CONFIG_ROOT) >= sizeof (path))
+			return (Z_INVAL);
+		if (access(path, amode) == 0)
+			return (Z_OK);
+	}
 	if (errno == EACCES)
 		return (Z_ACCES);
 	if (errno == EINVAL)
@@ -889,7 +938,7 @@ zonecfg_access(const char *zonename, int amode)
 }
 
 int
-zonecfg_create_snapshot(char *zonename)
+zonecfg_create_snapshot(const char *zonename)
 {
 	zone_dochandle_t handle;
 	char path[MAXPATHLEN], zonepath[MAXPATHLEN], rpath[MAXPATHLEN];
@@ -925,12 +974,20 @@ zonecfg_create_snapshot(char *zonename)
 		if ((error = zonecfg_set_zonepath(handle, rpath)) != Z_OK)
 			goto out;
 	}
-	if ((mkdir(ZONE_SNAPSHOT_ROOT, S_IRWXU) == -1) && (errno != EEXIST)) {
+	if (snprintf(path, sizeof (path), "%s%s", zonecfg_root,
+	    ZONE_SNAPSHOT_ROOT) >= sizeof (path)) {
+		error = Z_MISC_FS;
+		goto out;
+	}
+	if ((mkdir(path, S_IRWXU) == -1) && (errno != EEXIST)) {
 		error = Z_MISC_FS;
 		goto out;
 	}
 
-	snap_file_path(zonename, path);
+	if (!snap_file_path(zonename, path)) {
+		error = Z_MISC_FS;
+		goto out;
+	}
 
 	addcomment(handle, "\n    DO NOT EDIT THIS FILE.  "
 	    "It is a snapshot of running zone state.\n");
@@ -2974,12 +3031,19 @@ zone_get_zonepath(char *zone_name, char *zonepath, size_t rp_sz)
 	struct zoneent *ze;
 	FILE *cookie;
 	int err;
+	char *cp;
 
 	if (zone_name == NULL)
 		return (Z_INVAL);
 
+	(void) strlcpy(zonepath, zonecfg_root, rp_sz);
+	cp = zonepath + strlen(zonepath);
+	while (cp > zonepath && cp[-1] == '/')
+		*--cp = '\0';
+
 	if (strcmp(zone_name, GLOBAL_ZONENAME) == 0) {
-		(void) strlcpy(zonepath, "/", rp_sz);
+		if (zonepath[0] == '\0')
+			(void) strlcpy(zonepath, "/", rp_sz);
 		return (Z_OK);
 	}
 
@@ -2988,20 +3052,20 @@ zone_get_zonepath(char *zone_name, char *zonepath, size_t rp_sz)
 	 * a copy of the zone path, allow for it to be zero length, in which
 	 * case we ignore this result and fall back to the XML files.
 	 */
-	(void) strlcpy(zonepath, "", rp_sz);
 	cookie = setzoneent();
 	while ((ze = getzoneent_private(cookie)) != NULL) {
 		if (strcmp(ze->zone_name, zone_name) == 0) {
 			found = B_TRUE;
-			if (strlen(ze->zone_path) > 0)
-				(void) strlcpy(zonepath, ze->zone_path, rp_sz);
+			if (ze->zone_path[0] != '\0')
+				(void) strlcpy(cp, ze->zone_path,
+				    rp_sz - (cp - zonepath));
 		}
 		free(ze);
 		if (found)
 			break;
 	}
 	endzoneent(cookie);
-	if (found && strlen(zonepath) > 0)
+	if (found && *cp != '\0')
 		return (Z_OK);
 
 	/* Fall back to the XML files. */
@@ -3037,12 +3101,27 @@ zone_get_rootpath(char *zone_name, char *rootpath, size_t rp_sz)
 }
 
 static zone_state_t
-kernel_state_to_user_state(zone_status_t kernel_state)
+kernel_state_to_user_state(zoneid_t zoneid, zone_status_t kernel_state)
 {
+	char zoneroot[MAXPATHLEN];
+	size_t zlen;
+
 	assert(kernel_state <= ZONE_MAX_STATE);
 	switch (kernel_state) {
 		case ZONE_IS_UNINITIALIZED:
+			return (ZONE_STATE_READY);
 		case ZONE_IS_READY:
+			/*
+			 * If the zone's root is mounted on $ZONEPATH/lu, then
+			 * it's a mounted scratch zone.
+			 */
+			if (zone_getattr(zoneid, ZONE_ATTR_ROOT, zoneroot,
+			    sizeof (zoneroot)) >= 0) {
+				zlen = strlen(zoneroot);
+				if (zlen > 3 &&
+				    strcmp(zoneroot + zlen - 3, "/lu") == 0)
+					return (ZONE_STATE_MOUNTED);
+			}
 			return (ZONE_STATE_READY);
 		case ZONE_IS_BOOTING:
 		case ZONE_IS_RUNNING:
@@ -3067,15 +3146,33 @@ zone_get_state(char *zone_name, zone_state_t *state_num)
 	struct zoneent *ze;
 	boolean_t found = B_FALSE;
 	FILE *cookie;
+	char kernzone[ZONENAME_MAX];
+	FILE *fp;
 
 	if (zone_name == NULL)
 		return (Z_INVAL);
 
+	/*
+	 * If we're looking at an alternate root, then we need to query the
+	 * kernel using the scratch zone name.
+	 */
+	zone_id = -1;
+	if (*zonecfg_root != '\0' && !zonecfg_is_scratch(zone_name)) {
+		if ((fp = zonecfg_open_scratch("", B_FALSE)) != NULL) {
+			if (zonecfg_find_scratch(fp, zone_name, zonecfg_root,
+			    kernzone, sizeof (kernzone)) == 0)
+				zone_id = getzoneidbyname(kernzone);
+			zonecfg_close_scratch(fp);
+		}
+	} else {
+		zone_id = getzoneidbyname(zone_name);
+	}
+
 	/* check to see if zone is running */
-	if ((zone_id = getzoneidbyname(zone_name)) != -1 &&
+	if (zone_id != -1 &&
 	    zone_getattr(zone_id, ZONE_ATTR_STATUS, &status,
 	    sizeof (status)) >= 0) {
-		*state_num = kernel_state_to_user_state(status);
+		*state_num = kernel_state_to_user_state(zone_id, status);
 		return (Z_OK);
 	}
 
@@ -3152,7 +3249,7 @@ zone_get_id(const char *str, zoneid_t *zip)
 	    (hdl = zonecfg_init_handle()) == NULL)
 		return (-1);
 
-	if (zonecfg_get_handle((char *)str, hdl) == Z_OK) {
+	if (zonecfg_get_handle(str, hdl) == Z_OK) {
 		/* zone exists but isn't active */
 		*zip = ZONE_ID_UNDEFINED;
 		err = 0;
@@ -3176,6 +3273,8 @@ zone_state_str(zone_state_t state_num)
 		return (ZONE_STATE_STR_INSTALLED);
 	case ZONE_STATE_READY:
 		return (ZONE_STATE_STR_READY);
+	case ZONE_STATE_MOUNTED:
+		return (ZONE_STATE_STR_MOUNTED);
 	case ZONE_STATE_RUNNING:
 		return (ZONE_STATE_STR_RUNNING);
 	case ZONE_STATE_SHUTTING_DOWN:
@@ -3184,6 +3283,70 @@ zone_state_str(zone_state_t state_num)
 		return (ZONE_STATE_STR_DOWN);
 	default:
 		return ("unknown");
+	}
+}
+
+/*
+ * Given a UUID value, find an associated zone name.  This is intended to be
+ * used by callers who set up some 'default' name (corresponding to the
+ * expected name for the zone) in the zonename buffer, and thus the function
+ * doesn't touch this buffer on failure.
+ */
+int
+zonecfg_get_name_by_uuid(const uuid_t uuid, char *zonename, size_t namelen)
+{
+	FILE *fp;
+	struct zoneent *ze;
+
+	/*
+	 * A small amount of subterfuge via casts is necessary here because
+	 * libuuid doesn't use const correctly, but we don't want to export
+	 * this brokenness to our clients.
+	 */
+	if (uuid_is_null(*(uuid_t *)&uuid))
+		return (Z_NO_ZONE);
+	if ((fp = setzoneent()) == NULL)
+		return (Z_NO_ZONE);
+	while ((ze = getzoneent_private(fp)) != NULL) {
+		if (uuid_compare(*(uuid_t *)&uuid, ze->zone_uuid) == 0)
+			break;
+		free(ze);
+	}
+	endzoneent(fp);
+	if (ze != NULL) {
+		(void) strlcpy(zonename, ze->zone_name, namelen);
+		free(ze);
+		return (Z_OK);
+	} else {
+		return (Z_NO_ZONE);
+	}
+}
+
+/*
+ * Given a zone name, get its UUID.  Returns a "NULL" UUID value if the zone
+ * exists but the file doesn't have a value set yet.  Returns an error if the
+ * zone cannot be located.
+ */
+int
+zonecfg_get_uuid(const char *zonename, uuid_t uuid)
+{
+	FILE *fp;
+	struct zoneent *ze;
+
+	if ((fp = setzoneent()) == NULL)
+		return (Z_NO_ZONE);
+	while ((ze = getzoneent_private(fp)) != NULL) {
+		if (strcmp(ze->zone_name, zonename) == 0)
+			break;
+		free(ze);
+	}
+	endzoneent(fp);
+	if (ze != NULL) {
+		uuid_copy(uuid, ze->zone_uuid);
+		free(ze);
+		return (Z_OK);
+	} else {
+		return (Z_NO_ZONE);
 	}
 }
 

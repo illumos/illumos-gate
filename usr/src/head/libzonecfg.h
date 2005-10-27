@@ -48,6 +48,7 @@ extern "C" {
 #include <stdio.h>
 #include <rctl.h>
 #include <zone.h>
+#include <sys/uuid.h>
 
 #define	ZONE_ID_UNDEFINED	-1
 
@@ -89,9 +90,10 @@ extern "C" {
 #define	ZONE_STATE_INCOMPLETE		1
 #define	ZONE_STATE_INSTALLED		2
 #define	ZONE_STATE_READY		3
-#define	ZONE_STATE_RUNNING		4
-#define	ZONE_STATE_SHUTTING_DOWN	5
-#define	ZONE_STATE_DOWN			6
+#define	ZONE_STATE_MOUNTED		4
+#define	ZONE_STATE_RUNNING		5
+#define	ZONE_STATE_SHUTTING_DOWN	6
+#define	ZONE_STATE_DOWN			7
 
 #define	ZONE_STATE_MAXSTRLEN	14
 
@@ -107,7 +109,8 @@ extern "C" {
 struct zoneent {
 	char	zone_name[ZONENAME_MAX];	/* name of the zone */
 	int	zone_state;	/* configured | incomplete | installed */
-	char	zone_path[MAXPATHLEN];
+	char	zone_path[MAXPATHLEN];		/* path to zone storage */
+	uuid_t	zone_uuid;			/* unique ID for zone */
 	char	zone_newname[ZONENAME_MAX];	/* for doing renames */
 };
 
@@ -159,22 +162,26 @@ struct zone_attrtab {
  * Basic configuration management routines.
  */
 extern	zone_dochandle_t	zonecfg_init_handle(void);
-extern	int	zonecfg_get_handle(char *, zone_dochandle_t);
-extern	int	zonecfg_get_snapshot_handle(char *, zone_dochandle_t);
-extern	int	zonecfg_get_template_handle(char *, char *, zone_dochandle_t);
+extern	int	zonecfg_get_handle(const char *, zone_dochandle_t);
+extern	int	zonecfg_get_snapshot_handle(const char *, zone_dochandle_t);
+extern	int	zonecfg_get_template_handle(const char *, const char *,
+    zone_dochandle_t);
 extern	int	zonecfg_check_handle(zone_dochandle_t);
 extern	void	zonecfg_fini_handle(zone_dochandle_t);
 extern	int	zonecfg_destroy(const char *, boolean_t);
-extern	int	zonecfg_destroy_snapshot(char *);
+extern	int	zonecfg_destroy_snapshot(const char *);
 extern	int	zonecfg_save(zone_dochandle_t);
-extern	int	zonecfg_create_snapshot(char *);
+extern	int	zonecfg_create_snapshot(const char *);
 extern	char	*zonecfg_strerror(int);
 extern	int	zonecfg_access(const char *, int);
+extern	void	zonecfg_set_root(const char *);
+extern	const char *zonecfg_get_root(void);
+extern	boolean_t zonecfg_in_alt_root(void);
 
 /*
  * Zone name, path to zone directory, autoboot setting and pool.
  */
-extern	int	zonecfg_validate_zonename(char *);
+extern	int	zonecfg_validate_zonename(const char *);
 extern	int	zonecfg_get_name(zone_dochandle_t, char *, size_t);
 extern	int	zonecfg_set_name(zone_dochandle_t, char *);
 extern	int	zonecfg_get_zonepath(zone_dochandle_t, char *, size_t);
@@ -289,6 +296,8 @@ extern	int	zone_get_zonepath(char *, char *, size_t);
 extern	int	zone_get_state(char *, zone_state_t *);
 extern	int	zone_set_state(char *, zone_state_t);
 extern	char	*zone_state_str(zone_state_t);
+extern	int	zonecfg_get_name_by_uuid(const uuid_t, char *, size_t);
+extern	int	zonecfg_get_uuid(const char *, uuid_t);
 
 /*
  * Iterator for configured zones.
@@ -318,6 +327,23 @@ extern boolean_t zonecfg_valid_rctlblk(const rctlblk_t *);
 extern boolean_t zonecfg_valid_rctl(const char *, const rctlblk_t *);
 extern int zonecfg_construct_rctlblk(const struct zone_rctlvaltab *,
     rctlblk_t *);
+
+/*
+ * Live Upgrade support functions.  Shared between ON and install gate.
+ */
+extern FILE *zonecfg_open_scratch(const char *, boolean_t);
+extern int zonecfg_lock_scratch(FILE *);
+extern void zonecfg_close_scratch(FILE *);
+extern int zonecfg_get_scratch(FILE *, char *, size_t, char *, size_t, char *,
+    size_t);
+extern int zonecfg_find_scratch(FILE *, const char *, const char *, char *,
+    size_t);
+extern int zonecfg_reverse_scratch(FILE *, const char *, char *, size_t,
+    char *, size_t);
+extern int zonecfg_add_scratch(FILE *, const char *, const char *,
+    const char *);
+extern int zonecfg_delete_scratch(FILE *, const char *);
+extern boolean_t zonecfg_is_scratch(const char *);
 
 #ifdef __cplusplus
 }

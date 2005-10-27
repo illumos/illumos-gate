@@ -8912,6 +8912,13 @@ tcp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	dev_t		conn_dev;
 	zoneid_t	zoneid = getzoneid();
 
+	/*
+	 * Special case for install: miniroot needs to be able to access files
+	 * via NFS as though it were always in the global zone.
+	 */
+	if (credp == kcred && nfs_global_client_only != 0)
+		zoneid = GLOBAL_ZONEID;
+
 	if (q->q_ptr != NULL)
 		return (0);
 

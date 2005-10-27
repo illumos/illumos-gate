@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,9 +93,9 @@ extern void eventstream_write(zone_evt_t evt);
 /*
  * Virtual platform interfaces.
  */
-extern int vplat_create(zlog_t *);
-extern int vplat_bringup(zlog_t *);
-extern int vplat_teardown(zlog_t *);
+extern zoneid_t vplat_create(zlog_t *, boolean_t);
+extern int vplat_bringup(zlog_t *, boolean_t);
+extern int vplat_teardown(zlog_t *, boolean_t);
 
 
 /*

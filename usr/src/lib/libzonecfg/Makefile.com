@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,12 +28,12 @@
 
 LIBRARY=	libzonecfg.a
 VERS=		.1
-OBJECTS=	libzonecfg.o getzoneent.o
+OBJECTS=	libzonecfg.o getzoneent.o scratchops.o
 
 include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
-LDLIBS +=	-lc -lsocket -lnsl
+LDLIBS +=	-lc -lsocket -lnsl -luuid
 $(DYNLIB) :=	LDLIBS += -lxml2
 CPPFLAGS +=	-I/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)

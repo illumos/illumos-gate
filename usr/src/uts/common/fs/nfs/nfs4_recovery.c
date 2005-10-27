@@ -341,7 +341,7 @@ nfs4_start_recovery(nfs4_error_t *ep, mntinfo4_t *mi, vnode_t *vp1,
 	bool_t abort = FALSE;
 	bool_t gone = FALSE;
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 	mutex_enter(&mi->mi_lock);
 	/*
 	 * If there is lost state, we need to kick off recovery even if the
@@ -393,7 +393,7 @@ start_recovery_action(nfs4_recov_t what, bool_t reboot, mntinfo4_t *mi,
 {
 	recov_info_t *recovp;
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 	mutex_enter(&mi->mi_lock);
 	mi->mi_in_recovery++;
 	mutex_exit(&mi->mi_lock);

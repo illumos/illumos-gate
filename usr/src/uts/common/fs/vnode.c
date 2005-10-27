@@ -72,6 +72,9 @@
 	((vp)->v_type != VCHR && (vp)->v_type != VBLK && \
 	    (vp)->v_type != VFIFO && vn_is_readonly(vp))
 
+/* Tunable via /etc/system; used only by admin/install */
+int nfs_global_client_only;
+
 /*
  * Convert stat(2) formats to vnode types and vice versa.  (Knows about
  * numerical order of S_IFMT and vnode types.)
@@ -1842,6 +1845,9 @@ vn_can_change_zones(vnode_t *vp)
 	struct vfssw *vswp;
 	int allow = 1;
 	vnode_t *rvp;
+
+	if (nfs_global_client_only != 0)
+		return (1);
 
 	/*
 	 * We always want to look at the underlying vnode if there is one.

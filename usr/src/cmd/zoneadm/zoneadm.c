@@ -108,9 +108,11 @@ static size_t nzents;
 #define	CMD_VERIFY	6
 #define	CMD_INSTALL	7
 #define	CMD_UNINSTALL	8
+#define	CMD_MOUNT	9
+#define	CMD_UNMOUNT	10
 
 #define	CMD_MIN		CMD_HELP
-#define	CMD_MAX		CMD_UNINSTALL
+#define	CMD_MAX		CMD_UNMOUNT
 
 struct cmd {
 	uint_t	cmd_num;				/* command number */
@@ -139,6 +141,8 @@ static int list_func(int argc, char *argv[]);
 static int verify_func(int argc, char *argv[]);
 static int install_func(int argc, char *argv[]);
 static int uninstall_func(int argc, char *argv[]);
+static int mount_func(int argc, char *argv[]);
+static int unmount_func(int argc, char *argv[]);
 static int sanity_check(char *zone, int cmd_num, boolean_t running,
     boolean_t unsafe_when_running);
 static int cmd_match(char *cmd);
@@ -154,7 +158,10 @@ static struct cmd cmdtab[] = {
 	{ CMD_VERIFY,		"verify",	SHELP_VERIFY,	verify_func },
 	{ CMD_INSTALL,		"install",	SHELP_INSTALL,	install_func },
 	{ CMD_UNINSTALL,	"uninstall",	SHELP_UNINSTALL,
-	    uninstall_func }
+	    uninstall_func },
+	/* Private commands for admin/install */
+	{ CMD_MOUNT,		"mount",	NULL,		mount_func },
+	{ CMD_UNMOUNT,		"unmount",	NULL,		unmount_func }
 };
 
 /* global variables */
@@ -226,6 +233,8 @@ long_help(int cmd_num)
 			return (gettext("Uninstall the configuration from the "
 			    "system.  The -F flag can be used\n\tto force the "
 			    "action."));
+		default:
+			return ("");
 	}
 	/* NOTREACHED */
 	return (NULL);
@@ -248,6 +257,8 @@ usage(boolean_t explicit)
 	    gettext("subcommand"));
 	(void) fprintf(fd, "\n%s:\n\n", gettext("Subcommands"));
 	for (i = CMD_MIN; i <= CMD_MAX; i++) {
+		if (cmdtab[i].short_usage == NULL)
+			continue;
 		(void) fprintf(fd, "%s\n", cmdtab[i].short_usage);
 		if (explicit)
 			(void) fprintf(fd, "\t%s\n\n", long_help(i));
@@ -356,7 +367,7 @@ zone_print(zone_entry_t *zent, boolean_t verbose, boolean_t parsable)
 }
 
 static int
-lookup_zone_info(char *zone_name, zone_entry_t *zent)
+lookup_zone_info(const char *zone_name, zoneid_t zid, zone_entry_t *zent)
 {
 	char root[MAXPATHLEN];
 	int err;
@@ -365,8 +376,7 @@ lookup_zone_info(char *zone_name, zone_entry_t *zent)
 	(void) strlcpy(zent->zroot, "???", sizeof (zent->zroot));
 	zent->zstate_str = "???";
 
-	if ((zent->zid = getzoneidbyname(zone_name)) == -1)
-		zent->zid = ZONE_ID_UNDEFINED;
+	zent->zid = zid;
 
 	if ((err = zone_get_zonepath(zent->zname, root, sizeof (root))) !=
 	    Z_OK) {
@@ -395,11 +405,14 @@ lookup_zone_info(char *zone_name, zone_entry_t *zent)
  */
 
 static int
-fetch_zents()
+fetch_zents(void)
 {
 	zoneid_t *zids = NULL;
 	uint_t nzents_saved;
-	int i;
+	int i, retv;
+	FILE *fp;
+	boolean_t inaltroot;
+	zone_entry_t *zentp;
 
 	if (nzents > 0)
 		return (Z_OK);
@@ -429,20 +442,56 @@ again:
 
 	zents = safe_calloc(nzents, sizeof (zone_entry_t));
 
+	inaltroot = zonecfg_in_alt_root();
+	if (inaltroot)
+		fp = zonecfg_open_scratch("", B_FALSE);
+	else
+		fp = NULL;
+	zentp = zents;
+	retv = Z_OK;
 	for (i = 0; i < nzents; i++) {
 		char name[ZONENAME_MAX];
+		char altname[ZONENAME_MAX];
 
-		if (getzonenamebyid(zids[i], name, sizeof (name)) < 0)
+		if (getzonenamebyid(zids[i], name, sizeof (name)) < 0) {
 			zperror(gettext("failed to get zone name"), B_FALSE);
-		else if (lookup_zone_info(name, &zents[i]) != Z_OK)
-			zerror(gettext("failed to get zone list"));
+			retv = Z_ERR;
+			continue;
+		}
+		if (zonecfg_is_scratch(name)) {
+			/* Ignore scratch zones by default */
+			if (!inaltroot)
+				continue;
+			if (fp == NULL ||
+			    zonecfg_reverse_scratch(fp, name, altname,
+			    sizeof (altname), NULL, 0) == -1) {
+				zerror(gettext("cannot resolve scratch "
+				    "zone %s"), name);
+				retv = Z_ERR;
+				continue;
+			}
+			(void) strcpy(name, altname);
+		} else {
+			/* Ignore non-scratch when in an alternate root */
+			if (inaltroot && strcmp(name, GLOBAL_ZONENAME) != 0)
+				continue;
+		}
+		if (lookup_zone_info(name, zids[i], zentp) != Z_OK) {
+			zerror(gettext("failed to get zone data"));
+			retv = Z_ERR;
+			continue;
+		}
+		zentp++;
 	}
+	nzents = zentp - zents;
+	if (fp != NULL)
+		zonecfg_close_scratch(fp);
 
 	free(zids);
-	return (Z_OK);
+	return (retv);
 }
 
-static void
+static int
 zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable)
 {
 	int i;
@@ -454,22 +503,17 @@ zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable)
 	 * First get the list of running zones from the kernel and print them.
 	 * If that is all we need, then return.
 	 */
-	if (fetch_zents() != Z_OK) {
+	if ((i = fetch_zents()) != Z_OK) {
 		/*
 		 * No need for error messages; fetch_zents() has already taken
 		 * care of this.
 		 */
-		return;
+		return (i);
 	}
-	for (i = 0; i < nzents; i++) {
-		if (!verbose && !parsable) {
-			zone_print(&zents[i], verbose, parsable);
-			continue;
-		}
+	for (i = 0; i < nzents; i++)
 		zone_print(&zents[i], verbose, parsable);
-	}
 	if (min_state >= ZONE_STATE_RUNNING)
-		return;
+		return (Z_OK);
 	/*
 	 * Next, get the full list of zones from the configuration, skipping
 	 * any we have already printed.
@@ -484,7 +528,7 @@ zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable)
 			free(name);
 			continue;
 		}
-		if (lookup_zone_info(name, &zent) != Z_OK) {
+		if (lookup_zone_info(name, ZONE_ID_UNDEFINED, &zent) != Z_OK) {
 			free(name);
 			continue;
 		}
@@ -493,6 +537,7 @@ zone_print_list(zone_state_t min_state, boolean_t verbose, boolean_t parsable)
 			zone_print(&zent, verbose, parsable);
 	}
 	endzoneent(cookie);
+	return (Z_OK);
 }
 
 static zone_entry_t *
@@ -635,16 +680,18 @@ crosscheck_zonepaths(char *path)
 				continue;
 			}
 		}
-		res = resolvepath(ze->zone_path, rpath, sizeof (rpath));
+		(void) snprintf(path_copy, sizeof (path_copy), "%s%s",
+		    zonecfg_get_root(), ze->zone_path);
+		res = resolvepath(path_copy, rpath, sizeof (rpath));
 		if (res == -1) {
 			if (errno != ENOENT) {
-				zperror(ze->zone_path, B_FALSE);
+				zperror(path_copy, B_FALSE);
 				free(ze);
 				return (Z_ERR);
 			}
 			(void) printf(gettext("WARNING: zone %s is installed, "
 			    "but its %s %s does not exist.\n"), ze->zone_name,
-			    "zonepath", ze->zone_path);
+			    "zonepath", path_copy);
 			free(ze);
 			continue;
 		}
@@ -848,12 +895,17 @@ grab_lock_file(const char *zone_name, int *lockfd)
 	char pathbuf[PATH_MAX];
 	struct flock flock;
 
-	if (mkdir(ZONES_TMPDIR, S_IRWXU) < 0 && errno != EEXIST) {
-		zerror(gettext("could not mkdir %s: %s"), ZONES_TMPDIR,
+	if (snprintf(pathbuf, sizeof (pathbuf), "%s%s", zonecfg_get_root(),
+	    ZONES_TMPDIR) >= sizeof (pathbuf)) {
+		zerror(gettext("alternate root path is too long"));
+		return (Z_ERR);
+	}
+	if (mkdir(pathbuf, S_IRWXU) < 0 && errno != EEXIST) {
+		zerror(gettext("could not mkdir %s: %s"), pathbuf,
 		    strerror(errno));
 		return (Z_ERR);
 	}
-	(void) chmod(ZONES_TMPDIR, S_IRWXU);
+	(void) chmod(pathbuf, S_IRWXU);
 
 	/*
 	 * One of these lock files is created for each zone (when needed).
@@ -861,8 +913,11 @@ grab_lock_file(const char *zone_name, int *lockfd)
 	 * but since there is only one per zone, there is no resource
 	 * starvation issue.
 	 */
-	(void) snprintf(pathbuf, sizeof (pathbuf), "%s/%s.zoneadm.lock",
-	    ZONES_TMPDIR, zone_name);
+	if (snprintf(pathbuf, sizeof (pathbuf), "%s%s/%s.zoneadm.lock",
+	    zonecfg_get_root(), ZONES_TMPDIR, zone_name) >= sizeof (pathbuf)) {
+		zerror(gettext("alternate root path is too long"));
+		return (Z_ERR);
+	}
 	if ((*lockfd = open(pathbuf, O_RDWR|O_CREAT, S_IRUSR|S_IWUSR)) < 0) {
 		zerror(gettext("could not open %s: %s"), pathbuf,
 		    strerror(errno));
@@ -884,10 +939,11 @@ grab_lock_file(const char *zone_name, int *lockfd)
 	return (Z_OK);
 }
 
-static void
+static boolean_t
 get_doorname(const char *zone_name, char *buffer)
 {
-	(void) snprintf(buffer, PATH_MAX, ZONE_DOOR_PATH, zone_name);
+	return (snprintf(buffer, PATH_MAX, "%s" ZONE_DOOR_PATH,
+	    zonecfg_get_root(), zone_name) < PATH_MAX);
 }
 
 /*
@@ -931,7 +987,8 @@ start_zoneadmd(const char *zone_name)
 	int doorfd, lockfd;
 	struct door_info info;
 
-	get_doorname(zone_name, doorpath);
+	if (!get_doorname(zone_name, doorpath))
+		return (Z_ERR);
 
 	if (grab_lock_file(zone_name, &lockfd) != Z_OK)
 		return (Z_ERR);
@@ -960,12 +1017,22 @@ start_zoneadmd(const char *zone_name)
 		zperror(gettext("could not fork"), B_FALSE);
 		goto out;
 	} else if (child_pid == 0) {
-		/* child process */
+		const char *argv[6], **ap;
 
+		/* child process */
 		prepare_audit_context();
 
-		(void) execl("/usr/lib/zones/zoneadmd", "zoneadmd", "-z",
-		    zone_name, NULL);
+		ap = argv;
+		*ap++ = "zoneadmd";
+		*ap++ = "-z";
+		*ap++ = zone_name;
+		if (zonecfg_in_alt_root()) {
+			*ap++ = "-R";
+			*ap++ = zonecfg_get_root();
+		}
+		*ap = NULL;
+
+		(void) execv("/usr/lib/zones/zoneadmd", (char * const *)argv);
 		zperror(gettext("could not exec zoneadmd"), B_FALSE);
 		_exit(Z_ERR);
 	} else {
@@ -995,7 +1062,8 @@ ping_zoneadmd(const char *zone_name)
 	int doorfd;
 	struct door_info info;
 
-	get_doorname(zone_name, doorpath);
+	if (!get_doorname(zone_name, doorpath))
+		return (Z_ERR);
 
 	if ((doorfd = open(doorpath, O_RDONLY)) < 0) {
 		return (Z_ERR);
@@ -1036,7 +1104,11 @@ call_zoneadmd(const char *zone_name, zone_cmd_arg_t *arg)
 	}
 	arg->uniqid = uniqid;
 	(void) strlcpy(arg->locale, locale, sizeof (arg->locale));
-	get_doorname(zone_name, doorpath);
+	if (!get_doorname(zone_name, doorpath)) {
+		zerror(gettext("alternate root path is too long"));
+		free(rvalp);
+		return (-1);
+	}
 
 	/*
 	 * Loop trying to start zoneadmd; if something goes seriously
@@ -1104,6 +1176,11 @@ ready_func(int argc, char *argv[])
 	zone_cmd_arg_t zarg;
 	int arg;
 
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot ready zone in alternate root"));
+		return (Z_ERR);
+	}
+
 	optind = 0;
 	if ((arg = getopt(argc, argv, "?")) != EOF) {
 		switch (arg) {
@@ -1137,6 +1214,11 @@ boot_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
 	int arg;
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot boot zone in alternate root"));
+		return (Z_ERR);
+	}
 
 	zarg.bootbuf[0] = '\0';
 
@@ -1197,7 +1279,7 @@ static int
 list_func(int argc, char *argv[])
 {
 	zone_entry_t *zentp, zent;
-	int arg;
+	int arg, retv;
 	boolean_t output = B_FALSE, verbose = B_FALSE, parsable = B_FALSE;
 	zone_state_t min_state = ZONE_STATE_RUNNING;
 	zoneid_t zone_id = getzoneid();
@@ -1233,12 +1315,13 @@ list_func(int argc, char *argv[])
 			return (Z_ERR);
 		}
 		if (zone_id == GLOBAL_ZONEID) {
-			zone_print_list(min_state, verbose, parsable);
+			retv = zone_print_list(min_state, verbose, parsable);
 		} else {
+			retv = Z_OK;
 			fake_up_local_zone(zone_id, &zent);
 			zone_print(&zent, verbose, parsable);
 		}
-		return (Z_OK);
+		return (retv);
 	}
 
 	/*
@@ -1284,7 +1367,8 @@ list_func(int argc, char *argv[])
 	} else if ((zentp = lookup_running_zone(target_zone)) != NULL) {
 		zone_print(zentp, verbose, parsable);
 		output = B_TRUE;
-	} else if (lookup_zone_info(target_zone, &zent) == Z_OK) {
+	} else if (lookup_zone_info(target_zone, ZONE_ID_UNDEFINED,
+	    &zent) == Z_OK) {
 		zone_print(&zent, verbose, parsable);
 		output = B_TRUE;
 	}
@@ -1380,6 +1464,8 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 	zone_entry_t *zent;
 	priv_set_t *privset;
 	zone_state_t state;
+	char kernzone[ZONENAME_MAX];
+	FILE *fp;
 
 	if (getzoneid() != GLOBAL_ZONEID) {
 		zerror(gettext("must be in the global zone to %s a zone."),
@@ -1411,10 +1497,7 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 		return (Z_ERR);
 	}
 
-	zent = lookup_running_zone(zone);
-
 	if (strcmp(zone, GLOBAL_ZONENAME) == 0) {
-		assert((zent != NULL) && (zent->zid == GLOBAL_ZONEID));
 		zerror(gettext("%s operation is invalid for the global zone."),
 		    cmd_to_str(cmd_num));
 		return (Z_ERR);
@@ -1424,6 +1507,19 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 		zerror(gettext("%s operation is invalid for zones starting "
 		    "with SUNW."), cmd_to_str(cmd_num));
 		return (Z_ERR);
+	}
+
+	if (!zonecfg_in_alt_root()) {
+		zent = lookup_running_zone(zone);
+	} else if ((fp = zonecfg_open_scratch("", B_FALSE)) == NULL) {
+		zent = NULL;
+	} else {
+		if (zonecfg_find_scratch(fp, zone, zonecfg_get_root(),
+		    kernzone, sizeof (kernzone)) == 0)
+			zent = lookup_running_zone(kernzone);
+		else
+			zent = NULL;
+		zonecfg_close_scratch(fp);
 	}
 
 	/*
@@ -1481,6 +1577,7 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 			break;
 		case CMD_READY:
 		case CMD_BOOT:
+		case CMD_MOUNT:
 			if (state < ZONE_STATE_INSTALLED) {
 				zerror(gettext("must be %s before %s."),
 				    zone_state_str(ZONE_STATE_INSTALLED),
@@ -1496,6 +1593,14 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 				return (Z_ERR);
 			}
 			break;
+		case CMD_UNMOUNT:
+			if (state != ZONE_STATE_MOUNTED) {
+				zerror(gettext("must be %s before %s."),
+				    zone_state_str(ZONE_STATE_MOUNTED),
+				    cmd_to_str(cmd_num));
+				return (Z_ERR);
+			}
+			break;
 		}
 	}
 	return (Z_OK);
@@ -1506,6 +1611,11 @@ halt_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
 	int arg;
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot halt zone in alternate root"));
+		return (Z_ERR);
+	}
 
 	optind = 0;
 	if ((arg = getopt(argc, argv, "?")) != EOF) {
@@ -1539,6 +1649,11 @@ reboot_func(int argc, char *argv[])
 {
 	zone_cmd_arg_t zarg;
 	int arg;
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot reboot zone in alternate root"));
+		return (Z_ERR);
+	}
 
 	optind = 0;
 	if ((arg = getopt(argc, argv, "?")) != EOF) {
@@ -1792,6 +1907,7 @@ verify_details(int cmd_num)
 	char zonepath[MAXPATHLEN], checkpath[MAXPATHLEN];
 	int return_code = Z_OK;
 	int err;
+	boolean_t in_alt_root;
 
 	if ((handle = zonecfg_init_handle()) == NULL) {
 		zperror(cmd_to_str(cmd_num), B_TRUE);
@@ -1833,6 +1949,10 @@ verify_details(int cmd_num)
 		    "because of the above errors.\n"), zonepath);
 		return_code = Z_ERR;
 	}
+
+	in_alt_root = zonecfg_in_alt_root();
+	if (in_alt_root)
+		goto no_net;
 
 	if ((err = zonecfg_setnwifent(handle)) != Z_OK) {
 		errno = err;
@@ -1881,12 +2001,13 @@ verify_details(int cmd_num)
 		(void) close(so);
 	}
 	(void) zonecfg_endnwifent(handle);
+no_net:
 
 	if (verify_filesystems(handle) != Z_OK)
 		return_code = Z_ERR;
-	if (verify_rctls(handle) != Z_OK)
+	if (!in_alt_root && verify_rctls(handle) != Z_OK)
 		return_code = Z_ERR;
-	if (verify_pool(handle) != Z_OK)
+	if (!in_alt_root && verify_pool(handle) != Z_OK)
 		return_code = Z_ERR;
 	zonecfg_fini_handle(handle);
 	if (return_code == Z_ERR)
@@ -1932,6 +2053,11 @@ install_func(int argc, char *argv[])
 	int err, arg;
 	char zonepath[MAXPATHLEN];
 	int status;
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot install zone in alternate root"));
+		return (Z_ERR);
+	}
 
 	optind = 0;
 	if ((arg = getopt(argc, argv, "?")) != EOF) {
@@ -2059,6 +2185,11 @@ uninstall_func(int argc, char *argv[])
 	int err, arg;
 	int status;
 
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot uninstall zone in alternate root"));
+		return (Z_ERR);
+	}
+
 	optind = 0;
 	while ((arg = getopt(argc, argv, "?F")) != EOF) {
 		switch (arg) {
@@ -2167,6 +2298,46 @@ bad:
 	return (err);
 }
 
+/* ARGSUSED */
+static int
+mount_func(int argc, char *argv[])
+{
+	zone_cmd_arg_t zarg;
+
+	if (argc > 0)
+		return (Z_USAGE);
+	if (sanity_check(target_zone, CMD_MOUNT, B_FALSE, B_FALSE) != Z_OK)
+		return (Z_ERR);
+	if (verify_details(CMD_MOUNT) != Z_OK)
+		return (Z_ERR);
+
+	zarg.cmd = Z_MOUNT;
+	if (call_zoneadmd(target_zone, &zarg) != 0) {
+		zerror(gettext("call to %s failed"), "zoneadmd");
+		return (Z_ERR);
+	}
+	return (Z_OK);
+}
+
+/* ARGSUSED */
+static int
+unmount_func(int argc, char *argv[])
+{
+	zone_cmd_arg_t zarg;
+
+	if (argc > 0)
+		return (Z_USAGE);
+	if (sanity_check(target_zone, CMD_UNMOUNT, B_FALSE, B_FALSE) != Z_OK)
+		return (Z_ERR);
+
+	zarg.cmd = Z_UNMOUNT;
+	if (call_zoneadmd(target_zone, &zarg) != 0) {
+		zerror(gettext("call to %s failed"), "zoneadmd");
+		return (Z_ERR);
+	}
+	return (Z_OK);
+}
+
 static int
 help_func(int argc, char *argv[])
 {
@@ -2253,6 +2424,7 @@ main(int argc, char **argv)
 {
 	int arg;
 	zoneid_t zid;
+	struct stat st;
 
 	if ((locale = setlocale(LC_ALL, "")) == NULL)
 		locale = "C";
@@ -2266,12 +2438,24 @@ main(int argc, char **argv)
 		exit(Z_ERR);
 	}
 
-	while ((arg = getopt(argc, argv, "?z:")) != EOF) {
+	while ((arg = getopt(argc, argv, "?z:R:")) != EOF) {
 		switch (arg) {
 		case '?':
 			return (usage(B_TRUE));
 		case 'z':
 			target_zone = optarg;
+			break;
+		case 'R':	/* private option for admin/install use */
+			if (*optarg != '/') {
+				zerror(gettext("root path must be absolute."));
+				exit(Z_ERR);
+			}
+			if (stat(optarg, &st) == -1 || !S_ISDIR(st.st_mode)) {
+				zerror(
+				    gettext("root path must be a directory."));
+				exit(Z_ERR);
+			}
+			zonecfg_set_root(optarg);
 			break;
 		default:
 			return (usage(B_FALSE));

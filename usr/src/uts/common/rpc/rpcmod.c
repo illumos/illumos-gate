@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -496,7 +496,7 @@ rpcmodopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 
 	mutex_init(&rmp->rm_lock, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&rmp->rm_cwait, NULL, CV_DEFAULT, NULL);
-	rmp->rm_zoneid = getzoneid();
+	rmp->rm_zoneid = rpc_zoneid();
 	/*
 	 * slot type will be set by kRPC client and server ioctl's
 	 */
@@ -1380,7 +1380,7 @@ mir_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	mir->mir_frag_len = -(int32_t)sizeof (uint32_t);
 
-	mir->mir_zoneid = getzoneid();
+	mir->mir_zoneid = rpc_zoneid();
 	mutex_init(&mir->mir_mutex, NULL, MUTEX_DEFAULT, NULL);
 	cv_init(&mir->mir_condvar, NULL, CV_DRIVER, NULL);
 	cv_init(&mir->mir_timer_cv, NULL, CV_DRIVER, NULL);

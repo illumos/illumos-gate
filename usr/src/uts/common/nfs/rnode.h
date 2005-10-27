@@ -382,6 +382,8 @@ extern void	nfs_rw_destroy(nfs_rwlock_t *);
 extern int	nfs_directio(vnode_t *, int, cred_t *);
 extern int	nfs3_rddir_compar(const void *, const void *);
 extern int	nfs_rddir_compar(const void *, const void *);
+extern struct zone *nfs_zone(void);
+extern zoneid_t nfs_zoneid(void);
 
 #endif
 

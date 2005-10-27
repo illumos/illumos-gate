@@ -1461,7 +1461,7 @@ noasync:
 		pvn_write_done(pp, flags | B_ERROR);
 		return (0);
 	}
-	if (curproc->p_zone != mi->mi_zone) {
+	if (nfs_zone() != mi->mi_zone) {
 		/*
 		 * So this was a cross-zone sync putpage.  We pass in B_ERROR
 		 * to pvn_write_done() to re-mark the pages as dirty and unlock
@@ -1594,7 +1594,7 @@ noasync:
 		return (0);
 	}
 
-	if (curproc->p_zone != mi->mi_zone) {
+	if (nfs_zone() != mi->mi_zone) {
 		/*
 		 * So this was a cross-zone sync pageio.  We pass in B_ERROR
 		 * to pvn_write_done() to re-mark the pages as dirty and unlock
@@ -1790,7 +1790,7 @@ noasync:
 	}
 
 	if (curproc == proc_pageout || curproc == proc_fsflush ||
-	    curproc->p_zone != mi->mi_zone) {
+	    nfs_zone() != mi->mi_zone) {
 		while (plist != NULL) {
 			pp = plist;
 			page_sub(&plist, pp);

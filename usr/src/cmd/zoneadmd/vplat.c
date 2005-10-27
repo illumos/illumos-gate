@@ -34,6 +34,33 @@
  * the way up, ready the zone; on the way down, they halt the zone.
  * See the much longer block comment at the beginning of zoneadmd.c
  * for a bigger picture of how the whole program functions.
+ *
+ * This module also has primary responsibility for the layout of "scratch
+ * zones."  These are mounted, but inactive, zones that are used during
+ * operating system upgrade and potentially other administrative action.  The
+ * scratch zone environment is similar to the miniroot environment.  The zone's
+ * actual root is mounted read-write on /a, and the standard paths (/usr,
+ * /sbin, /lib) all lead to read-only copies of the running system's binaries.
+ * This allows the administrative tools to manipulate the zone using "-R /a"
+ * without relying on any binaries in the zone itself.
+ *
+ * If the scratch zone is on an alternate root (Live Upgrade [LU] boot
+ * environment), then we must resolve the lofs mounts used there to uncover
+ * writable (unshared) resources.  Shared resources, though, are always
+ * read-only.  In addition, if the "same" zone with a different root path is
+ * currently running, then "/b" inside the zone points to the running zone's
+ * root.  This allows LU to synchronize configuration files during the upgrade
+ * process.
+ *
+ * To construct this environment, this module creates a tmpfs mount on
+ * $ZONEPATH/lu.  Inside this scratch area, the miniroot-like environment as
+ * described above is constructed on the fly.  The zone is then created using
+ * $ZONEPATH/lu as the root.
+ *
+ * Note that scratch zones are inactive.  The zone's bits are not running and
+ * likely cannot be run correctly until upgrade is done.  Init is not running
+ * there, nor is SMF.  Because of this, the "mounted" state of a scratch zone
+ * is not a part of the usual halt/ready/boot state machine.
  */
 
 #include <sys/param.h>
@@ -141,8 +168,20 @@ static struct symlink_info dev_symlinks[] = {
 /* for routing socket */
 static int rts_seqno = 0;
 
+/* mangled zone name when mounting in an alternate root environment */
+static char kernzone[ZONENAME_MAX];
+
+/* array of cached mount entries for resolve_lofs */
+static struct mnttab *resolve_lofs_mnts, *resolve_lofs_mnt_max;
+
 /* from libsocket, not in any header file */
 extern int getnetmaskbyaddr(struct in_addr, struct in_addr *);
+
+/*
+ * An optimization for build_mnttable: reallocate (and potentially copy the
+ * data) only once every N times through the loop.
+ */
+#define	MNTTAB_HUNK	32
 
 /*
  * Private autofs system call
@@ -156,6 +195,244 @@ autofs_cleanup(zoneid_t zoneid)
 	 * Ask autofs to unmount all trigger nodes in the given zone.
 	 */
 	return (_autofssys(AUTOFS_UNMOUNTALL, (void *)zoneid));
+}
+
+static void
+free_mnttable(struct mnttab *mnt_array, uint_t nelem)
+{
+	uint_t i;
+
+	if (mnt_array == NULL)
+		return;
+	for (i = 0; i < nelem; i++) {
+		free(mnt_array[i].mnt_mountp);
+		free(mnt_array[i].mnt_fstype);
+		free(mnt_array[i].mnt_special);
+		free(mnt_array[i].mnt_mntopts);
+		assert(mnt_array[i].mnt_time == NULL);
+	}
+	free(mnt_array);
+}
+
+/*
+ * Build the mount table for the zone rooted at "zroot", storing the resulting
+ * array of struct mnttabs in "mnt_arrayp" and the number of elements in the
+ * array in "nelemp".
+ */
+static int
+build_mnttable(zlog_t *zlogp, const char *zroot, size_t zrootlen, FILE *mnttab,
+    struct mnttab **mnt_arrayp, uint_t *nelemp)
+{
+	struct mnttab mnt;
+	struct mnttab *mnts;
+	struct mnttab *mnp;
+	uint_t nmnt;
+
+	rewind(mnttab);
+	resetmnttab(mnttab);
+	nmnt = 0;
+	mnts = NULL;
+	while (getmntent(mnttab, &mnt) == 0) {
+		struct mnttab *tmp_array;
+
+		if (strncmp(mnt.mnt_mountp, zroot, zrootlen) != 0)
+			continue;
+		if (nmnt % MNTTAB_HUNK == 0) {
+			tmp_array = realloc(mnts,
+			    (nmnt + MNTTAB_HUNK) * sizeof (*mnts));
+			if (tmp_array == NULL) {
+				free_mnttable(mnts, nmnt);
+				return (-1);
+			}
+			mnts = tmp_array;
+		}
+		mnp = &mnts[nmnt++];
+
+		/*
+		 * Zero out any fields we're not using.
+		 */
+		(void) memset(mnp, 0, sizeof (*mnp));
+
+		if (mnt.mnt_special != NULL)
+			mnp->mnt_special = strdup(mnt.mnt_special);
+		if (mnt.mnt_mntopts != NULL)
+			mnp->mnt_mntopts = strdup(mnt.mnt_mntopts);
+		mnp->mnt_mountp = strdup(mnt.mnt_mountp);
+		mnp->mnt_fstype = strdup(mnt.mnt_fstype);
+		if ((mnt.mnt_special != NULL && mnp->mnt_special == NULL) ||
+		    (mnt.mnt_mntopts != NULL && mnp->mnt_mntopts == NULL) ||
+		    mnp->mnt_mountp == NULL || mnp->mnt_fstype == NULL) {
+			zerror(zlogp, B_TRUE, "memory allocation failed");
+			free_mnttable(mnts, nmnt);
+			return (-1);
+		}
+	}
+	*mnt_arrayp = mnts;
+	*nelemp = nmnt;
+	return (0);
+}
+
+/*
+ * This is an optimization.  The resolve_lofs function is used quite frequently
+ * to manipulate file paths, and on a machine with a large number of zones,
+ * there will be a huge number of mounted file systems.  Thus, we trigger a
+ * reread of the list of mount points
+ */
+static void
+lofs_discard_mnttab(void)
+{
+	free_mnttable(resolve_lofs_mnts,
+	    resolve_lofs_mnt_max - resolve_lofs_mnts);
+	resolve_lofs_mnts = resolve_lofs_mnt_max = NULL;
+}
+
+static int
+lofs_read_mnttab(zlog_t *zlogp)
+{
+	FILE *mnttab;
+	uint_t nmnts;
+
+	if ((mnttab = fopen(MNTTAB, "r")) == NULL)
+		return (-1);
+	if (build_mnttable(zlogp, "", 0, mnttab, &resolve_lofs_mnts,
+	    &nmnts) == -1) {
+		(void) fclose(mnttab);
+		return (-1);
+	}
+	(void) fclose(mnttab);
+	resolve_lofs_mnt_max = resolve_lofs_mnts + nmnts;
+	return (0);
+}
+
+/*
+ * This function loops over potential loopback mounts and symlinks in a given
+ * path and resolves them all down to an absolute path.
+ */
+static void
+resolve_lofs(zlog_t *zlogp, char *path, size_t pathlen)
+{
+	int len, arlen;
+	const char *altroot;
+	char tmppath[MAXPATHLEN];
+	boolean_t outside_altroot;
+
+	if ((len = resolvepath(path, tmppath, sizeof (tmppath))) == -1)
+		return;
+	tmppath[len] = '\0';
+	(void) strlcpy(path, tmppath, sizeof (tmppath));
+
+	/* This happens once per zoneadmd operation. */
+	if (resolve_lofs_mnts == NULL && lofs_read_mnttab(zlogp) == -1)
+		return;
+
+	altroot = zonecfg_get_root();
+	arlen = strlen(altroot);
+	outside_altroot = B_FALSE;
+	for (;;) {
+		struct mnttab *mnp;
+
+		for (mnp = resolve_lofs_mnts; mnp < resolve_lofs_mnt_max;
+		    mnp++) {
+			if (mnp->mnt_fstype == NULL ||
+			    mnp->mnt_mountp == NULL ||
+			    mnp->mnt_special == NULL ||
+			    strcmp(mnp->mnt_fstype, MNTTYPE_LOFS) != 0)
+				continue;
+			len = strlen(mnp->mnt_mountp);
+			if (strncmp(mnp->mnt_mountp, path, len) == 0 &&
+			    (path[len] == '/' || path[len] == '\0'))
+				break;
+		}
+		if (mnp >= resolve_lofs_mnt_max)
+			break;
+		if (outside_altroot) {
+			char *cp;
+			int olen = sizeof (MNTOPT_RO) - 1;
+
+			/*
+			 * If we run into a read-only mount outside of the
+			 * alternate root environment, then the user doesn't
+			 * want this path to be made read-write.
+			 */
+			if (mnp->mnt_mntopts != NULL &&
+			    (cp = strstr(mnp->mnt_mntopts, MNTOPT_RO)) !=
+			    NULL &&
+			    (cp == mnp->mnt_mntopts || cp[-1] == ',') &&
+			    (cp[olen] == '\0' || cp[olen] == ',')) {
+				break;
+			}
+		} else if (arlen > 0 &&
+		    (strncmp(mnp->mnt_special, altroot, arlen) != 0 ||
+		    (mnp->mnt_special[arlen] != '\0' &&
+		    mnp->mnt_special[arlen] != '/'))) {
+			outside_altroot = B_TRUE;
+		}
+		/* use temporary buffer because new path might be longer */
+		(void) snprintf(tmppath, sizeof (tmppath), "%s%s",
+		    mnp->mnt_special, path + len);
+		if ((len = resolvepath(tmppath, path, pathlen)) == -1)
+			break;
+		path[len] = '\0';
+	}
+}
+
+/*
+ * For a regular mount, check if a replacement lofs mount is needed because the
+ * referenced device is already mounted somewhere.
+ */
+static int
+check_lofs_needed(zlog_t *zlogp, struct zone_fstab *fsptr)
+{
+	struct mnttab *mnp;
+	zone_fsopt_t *optptr, *onext;
+
+	/* This happens once per zoneadmd operation. */
+	if (resolve_lofs_mnts == NULL && lofs_read_mnttab(zlogp) == -1)
+		return (-1);
+
+	/*
+	 * If this special node isn't already in use, then it's ours alone;
+	 * no need to worry about conflicting mounts.
+	 */
+	for (mnp = resolve_lofs_mnts; mnp < resolve_lofs_mnt_max;
+	    mnp++) {
+		if (strcmp(mnp->mnt_special, fsptr->zone_fs_special) == 0)
+			break;
+	}
+	if (mnp >= resolve_lofs_mnt_max)
+		return (0);
+
+	/*
+	 * Convert this duplicate mount into a lofs mount.
+	 */
+	(void) strlcpy(fsptr->zone_fs_special, mnp->mnt_mountp,
+	    sizeof (fsptr->zone_fs_special));
+	(void) strlcpy(fsptr->zone_fs_type, MNTTYPE_LOFS,
+	    sizeof (fsptr->zone_fs_type));
+	fsptr->zone_fs_raw[0] = '\0';
+
+	/*
+	 * Discard all but one of the original options and set that to be the
+	 * same set of options used for inherit package directory resources.
+	 */
+	optptr = fsptr->zone_fs_options;
+	if (optptr == NULL) {
+		optptr = malloc(sizeof (*optptr));
+		if (optptr == NULL) {
+			zerror(zlogp, B_TRUE, "cannot mount %s",
+			    fsptr->zone_fs_dir);
+			return (-1);
+		}
+	} else {
+		while ((onext = optptr->zone_fsopt_next) != NULL) {
+			optptr->zone_fsopt_next = onext->zone_fsopt_next;
+			free(onext);
+		}
+	}
+	(void) strcpy(optptr->zone_fsopt_opt, IPD_DEFAULT_OPTS);
+	optptr->zone_fsopt_next = NULL;
+	fsptr->zone_fs_options = optptr;
+	return (0);
 }
 
 static int
@@ -237,8 +514,9 @@ make_dev_links(zlog_t *zlogp, char *zonepath)
 			(void) unlink(dev);
 		}
 		if (symlink(dev_symlinks[i].sl_target, dev) != 0) {
-			zerror(zlogp, B_TRUE, "could not setup %s symlink",
-			    dev_symlinks[i].sl_source);
+			zerror(zlogp, B_TRUE, "could not setup %s->%s symlink",
+			    dev_symlinks[i].sl_source,
+			    dev_symlinks[i].sl_target);
 			return (-1);
 		}
 	}
@@ -257,6 +535,8 @@ create_dev_files(zlog_t *zlogp)
 		zerror(zlogp, B_TRUE, "unable to determine zone root");
 		return (-1);
 	}
+	if (zonecfg_in_alt_root())
+		resolve_lofs(zlogp, zonepath, sizeof (zonepath));
 
 	if (make_dev_dirs(zlogp, zonepath) != 0)
 		return (-1);
@@ -344,74 +624,16 @@ is_remote_fstype(const char *fstype, char *const *remote_fstypes)
 	return (B_FALSE);
 }
 
-static void
-free_mnttable(struct mnttab *mnt_array, uint_t nelem)
-{
-	uint_t i;
-
-	if (mnt_array == NULL)
-		return;
-	for (i = 0; i < nelem; i++) {
-		free(mnt_array[i].mnt_mountp);
-		free(mnt_array[i].mnt_fstype);
-		assert(mnt_array[i].mnt_special == NULL);
-		assert(mnt_array[i].mnt_mntopts == NULL);
-		assert(mnt_array[i].mnt_time == NULL);
-	}
-	free(mnt_array);
-}
-
 /*
- * Build the mount table for the zone rooted at "zroot", storing the resulting
- * array of struct mnttabs in "mnt_arrayp" and the number of elements in the
- * array in "nelemp".
+ * This converts a zone root path (normally of the form .../root) to a Live
+ * Upgrade scratch zone root (of the form .../lu).
  */
-static int
-build_mnttable(zlog_t *zlogp, const char *zroot, size_t zrootlen, FILE *mnttab,
-    struct mnttab **mnt_arrayp, uint_t *nelemp)
+static void
+root_to_lu(zlog_t *zlogp, char *zroot, size_t zrootlen, boolean_t isresolved)
 {
-	struct mnttab mnt;
-	struct mnttab *mnts;
-	struct mnttab *mnp;
-	uint_t nmnt;
-
-	rewind(mnttab);
-	resetmnttab(mnttab);
-	nmnt = 0;
-	mnts = NULL;
-	while (getmntent(mnttab, &mnt) == 0) {
-		struct mnttab *tmp_array;
-
-		if (strncmp(mnt.mnt_mountp, zroot, zrootlen) != 0)
-			continue;
-		nmnt++;
-		tmp_array = realloc(mnts, nmnt * sizeof (*mnts));
-		if (tmp_array == NULL) {
-			nmnt--;
-			free_mnttable(mnts, nmnt);
-			return (-1);
-		}
-		mnts = tmp_array;
-		mnp = &mnts[nmnt - 1];
-		/*
-		 * Zero out the fields we won't be using.
-		 */
-		mnp->mnt_special = NULL;
-		mnp->mnt_mntopts = NULL;
-		mnp->mnt_time = NULL;
-
-		mnp->mnt_mountp = strdup(mnt.mnt_mountp);
-		mnp->mnt_fstype = strdup(mnt.mnt_fstype);
-		if (mnp->mnt_mountp == NULL ||
-		    mnp->mnt_fstype == NULL) {
-			zerror(zlogp, B_TRUE, "memory allocation failed");
-			free_mnttable(mnts, nmnt);
-			return (-1);
-		}
-	}
-	*mnt_arrayp = mnts;
-	*nelemp = nmnt;
-	return (0);
+	if (!isresolved && zonecfg_in_alt_root())
+		resolve_lofs(zlogp, zroot, zrootlen);
+	(void) strcpy(strrchr(zroot, '/') + 1, "lu");
 }
 
 /*
@@ -444,9 +666,8 @@ build_mnttable(zlog_t *zlogp, const char *zroot, size_t zrootlen, FILE *mnttab,
  * Zone must be down (ie, no processes or threads active).
  */
 static int
-unmount_filesystems(zlog_t *zlogp)
+unmount_filesystems(zlog_t *zlogp, zoneid_t zoneid, boolean_t unmount_cmd)
 {
-	zoneid_t zoneid;
 	int error = 0;
 	FILE *mnttab;
 	struct mnttab *mnts;
@@ -457,15 +678,12 @@ unmount_filesystems(zlog_t *zlogp)
 	boolean_t stuck = B_FALSE;
 	char **remote_fstypes = NULL;
 
-	if ((zoneid = getzoneidbyname(zone_name)) == -1) {
-		zerror(zlogp, B_TRUE, "unable to find zoneid");
-		return (-1);
-	}
-
 	if (zone_get_rootpath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
 		zerror(zlogp, B_FALSE, "unable to determine zone root");
 		return (-1);
 	}
+	if (unmount_cmd)
+		root_to_lu(zlogp, zroot, sizeof (zroot), B_FALSE);
 
 	(void) strcat(zroot, "/");
 	zrootlen = strlen(zroot);
@@ -796,6 +1014,7 @@ static int
 mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 {
 	char    path[MAXPATHLEN];
+	char	specpath[MAXPATHLEN];
 	char    optstr[MAX_MNTOPT_STR];
 	zone_fsopt_t *optptr;
 
@@ -815,12 +1034,22 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 	if (strlen(fsptr->zone_fs_special) == 0) {
 		/*
 		 * A zero-length special is how we distinguish IPDs from
-		 * general-purpose FSs.
+		 * general-purpose FSs.  Make sure it mounts from a place that
+		 * can be seen via the alternate zone's root.
 		 */
+		if (snprintf(specpath, sizeof (specpath), "%s%s",
+		    zonecfg_get_root(), fsptr->zone_fs_dir) >=
+		    sizeof (specpath)) {
+			zerror(zlogp, B_FALSE, "cannot mount %s: path too "
+			    "long in alternate root", fsptr->zone_fs_dir);
+			return (-1);
+		}
+		if (zonecfg_in_alt_root())
+			resolve_lofs(zlogp, specpath, sizeof (specpath));
 		if (domount(zlogp, MNTTYPE_LOFS, IPD_DEFAULT_OPTS,
-		    fsptr->zone_fs_dir, path) != 0) {
+		    specpath, path) != 0) {
 			zerror(zlogp, B_TRUE, "failed to loopback mount %s",
-			    fsptr->zone_fs_dir);
+			    specpath);
 			return (-1);
 		}
 		return (0);
@@ -840,6 +1069,36 @@ mount_one(zlog_t *zlogp, struct zone_fstab *fsptr, const char *rootpath)
 		    "invalid file-system type %s", fsptr->zone_fs_special,
 		    fsptr->zone_fs_dir, fsptr->zone_fs_type);
 		return (-1);
+	}
+
+	/*
+	 * If we're looking at an alternate root environment, then construct
+	 * read-only loopback mounts as necessary.  For all lofs mounts, make
+	 * sure that the 'special' entry points inside the alternate root.  (We
+	 * don't do this with other mounts, as devfs isn't in the alternate
+	 * root, and we need to assume the device environment is roughly the
+	 * same.)
+	 */
+	if (zonecfg_in_alt_root()) {
+		struct stat64 st;
+
+		if (stat64(fsptr->zone_fs_special, &st) != -1 &&
+		    S_ISBLK(st.st_mode) &&
+		    check_lofs_needed(zlogp, fsptr) == -1)
+			return (-1);
+		if (strcmp(fsptr->zone_fs_type, MNTTYPE_LOFS) == 0) {
+			if (snprintf(specpath, sizeof (specpath), "%s%s",
+			    zonecfg_get_root(), fsptr->zone_fs_special) >=
+			    sizeof (specpath)) {
+				zerror(zlogp, B_FALSE, "cannot mount %s: path "
+				    "too long in alternate root",
+				    fsptr->zone_fs_special);
+				return (-1);
+			}
+			resolve_lofs(zlogp, specpath, sizeof (specpath));
+			(void) strlcpy(fsptr->zone_fs_special, specpath,
+			    sizeof (fsptr->zone_fs_special));
+		}
 	}
 
 	/*
@@ -879,8 +1138,174 @@ free_fs_data(struct zone_fstab *fsarray, uint_t nelem)
 	free(fsarray);
 }
 
+/*
+ * This function constructs the miniroot-like "scratch zone" environment.  If
+ * it returns B_FALSE, then the error has already been logged.
+ */
+static boolean_t
+build_mounted(zlog_t *zlogp, char *rootpath, size_t rootlen,
+    const char *zonepath)
+{
+	char tmp[MAXPATHLEN], fromdir[MAXPATHLEN];
+	char luroot[MAXPATHLEN];
+	const char **cpp;
+	static const char *mkdirs[] = {
+		"/system", "/system/contract", "/proc", "/dev", "/tmp",
+		"/a", NULL
+	};
+	static const char *localdirs[] = {
+		"/etc", "/var", NULL
+	};
+	static const char *loopdirs[] = {
+		"/etc/lib", "/etc/fs", "/lib", "/sbin", "/platform",
+		"/usr", NULL
+	};
+	static const char *tmpdirs[] = {
+		"/tmp", "/var/run", NULL
+	};
+	FILE *fp;
+	struct stat st;
+	char *altstr;
+	uuid_t uuid;
+
+	/*
+	 * Construct a small Solaris environment, including the zone root
+	 * mounted on '/a' inside that environment.
+	 */
+	resolve_lofs(zlogp, rootpath, rootlen);
+	(void) snprintf(luroot, sizeof (luroot), "%s/lu", zonepath);
+	resolve_lofs(zlogp, luroot, sizeof (luroot));
+	(void) snprintf(tmp, sizeof (tmp), "%s/bin", luroot);
+	(void) symlink("./usr/bin", tmp);
+
+	/*
+	 * These are mostly special mount points; not handled here.  (See
+	 * zone_mount_early.)
+	 */
+	for (cpp = mkdirs; *cpp != NULL; cpp++) {
+		(void) snprintf(tmp, sizeof (tmp), "%s%s", luroot, *cpp);
+		if (mkdir(tmp, 0755) != 0) {
+			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
+			return (B_FALSE);
+		}
+	}
+
+	/*
+	 * These are mounted read-write from the zone undergoing upgrade.  We
+	 * must be careful not to 'leak' things from the main system into the
+	 * zone, and this accomplishes that goal.
+	 */
+	for (cpp = localdirs; *cpp != NULL; cpp++) {
+		(void) snprintf(tmp, sizeof (tmp), "%s%s", luroot, *cpp);
+		(void) snprintf(fromdir, sizeof (fromdir), "%s%s", rootpath,
+		    *cpp);
+		if (mkdir(tmp, 0755) != 0) {
+			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
+			return (B_FALSE);
+		}
+		if (domount(zlogp, MNTTYPE_LOFS, "", fromdir, tmp) != 0) {
+			zerror(zlogp, B_TRUE, "cannot mount %s on %s", tmp,
+			    *cpp);
+			return (B_FALSE);
+		}
+	}
+
+	/*
+	 * These are things mounted read-only from the running system because
+	 * they contain binaries that must match system.
+	 */
+	for (cpp = loopdirs; *cpp != NULL; cpp++) {
+		(void) snprintf(tmp, sizeof (tmp), "%s%s", luroot, *cpp);
+		if (mkdir(tmp, 0755) != 0) {
+			if (errno != EEXIST) {
+				zerror(zlogp, B_TRUE, "cannot create %s", tmp);
+				return (B_FALSE);
+			}
+			if (lstat(tmp, &st) != 0) {
+				zerror(zlogp, B_TRUE, "cannot stat %s", tmp);
+				return (B_FALSE);
+			}
+			/*
+			 * Ignore any non-directories encountered.  These are
+			 * things that have been converted into symlinks
+			 * (/etc/fs and /etc/lib) and no longer need a lofs
+			 * fixup.
+			 */
+			if (!S_ISDIR(st.st_mode))
+				continue;
+		}
+		if (domount(zlogp, MNTTYPE_LOFS, IPD_DEFAULT_OPTS, *cpp,
+		    tmp) != 0) {
+			zerror(zlogp, B_TRUE, "cannot mount %s on %s", tmp,
+			    *cpp);
+			return (B_FALSE);
+		}
+	}
+
+	/*
+	 * These are things with tmpfs mounted inside.
+	 */
+	for (cpp = tmpdirs; *cpp != NULL; cpp++) {
+		(void) snprintf(tmp, sizeof (tmp), "%s%s", luroot, *cpp);
+		if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
+			return (B_FALSE);
+		}
+		if (domount(zlogp, MNTTYPE_TMPFS, "", "swap", tmp) != 0) {
+			zerror(zlogp, B_TRUE, "cannot mount swap on %s", *cpp);
+			return (B_FALSE);
+		}
+	}
+
+	/*
+	 * This is here to support lucopy.  If there's an instance of this same
+	 * zone on the current running system, then we mount its root up as
+	 * read-only inside the scratch zone.
+	 */
+	(void) zonecfg_get_uuid(zone_name, uuid);
+	altstr = strdup(zonecfg_get_root());
+	if (altstr == NULL) {
+		zerror(zlogp, B_TRUE, "out of memory");
+		return (B_FALSE);
+	}
+	zonecfg_set_root("");
+	(void) strlcpy(tmp, zone_name, sizeof (tmp));
+	(void) zonecfg_get_name_by_uuid(uuid, tmp, sizeof (tmp));
+	if (zone_get_rootpath(tmp, fromdir, sizeof (fromdir)) == Z_OK &&
+	    strcmp(fromdir, rootpath) != 0) {
+		(void) snprintf(tmp, sizeof (tmp), "%s/b", luroot);
+		if (mkdir(tmp, 0755) != 0) {
+			zerror(zlogp, B_TRUE, "cannot create %s", tmp);
+			return (B_FALSE);
+		}
+		if (domount(zlogp, MNTTYPE_LOFS, IPD_DEFAULT_OPTS, fromdir,
+		    tmp) != 0) {
+			zerror(zlogp, B_TRUE, "cannot mount %s on %s", tmp,
+			    fromdir);
+			return (B_FALSE);
+		}
+	}
+	zonecfg_set_root(altstr);
+	free(altstr);
+
+	if ((fp = zonecfg_open_scratch(luroot, B_TRUE)) == NULL) {
+		zerror(zlogp, B_TRUE, "cannot open zone mapfile");
+		return (B_FALSE);
+	}
+	(void) ftruncate(fileno(fp), 0);
+	if (zonecfg_add_scratch(fp, zone_name, kernzone, "/") == -1) {
+		zerror(zlogp, B_TRUE, "cannot add zone mapfile entry");
+	}
+	zonecfg_close_scratch(fp);
+	(void) snprintf(tmp, sizeof (tmp), "%s/a", luroot);
+	if (domount(zlogp, MNTTYPE_LOFS, "", rootpath, tmp) != 0)
+		return (B_FALSE);
+	(void) strlcpy(rootpath, tmp, rootlen);
+	return (B_TRUE);
+}
+
 static int
-mount_filesystems(zlog_t *zlogp)
+mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 {
 	char	rootpath[MAXPATHLEN];
 	char	zonepath[MAXPATHLEN];
@@ -891,10 +1316,11 @@ mount_filesystems(zlog_t *zlogp)
 	zone_state_t zstate;
 
 	if (zone_get_state(zone_name, &zstate) != Z_OK ||
-	    zstate != ZONE_STATE_READY) {
+	    (zstate != ZONE_STATE_READY && zstate != ZONE_STATE_MOUNTED)) {
 		zerror(zlogp, B_FALSE,
-		    "zone must be in '%s' state to mount file-systems",
-		    zone_state_str(ZONE_STATE_READY));
+		    "zone must be in '%s' or '%s' state to mount file-systems",
+		    zone_state_str(ZONE_STATE_READY),
+		    zone_state_str(ZONE_STATE_MOUNTED));
 		goto bad;
 	}
 
@@ -936,9 +1362,14 @@ mount_filesystems(zlog_t *zlogp)
 	}
 	fs_ptr = tmp_ptr;
 	fsp = &fs_ptr[num_fs - 1];
+	/*
+	 * Note that mount_one will prepend the alternate root to
+	 * zone_fs_special and do the necessary resolution, so all that is
+	 * needed here is to strip the root added by zone_get_zonepath.
+	 */
 	(void) strlcpy(fsp->zone_fs_dir, "/dev", sizeof (fsp->zone_fs_dir));
 	(void) snprintf(fsp->zone_fs_special, sizeof (fsp->zone_fs_special),
-	    "%s/dev", zonepath);
+	    "%s/dev", zonepath + strlen(zonecfg_get_root()));
 	fsp->zone_fs_raw[0] = '\0';
 	(void) strlcpy(fsp->zone_fs_type, MNTTYPE_LOFS,
 	    sizeof (fsp->zone_fs_type));
@@ -1011,8 +1442,28 @@ mount_filesystems(zlog_t *zlogp)
 	zonecfg_fini_handle(handle);
 	handle = NULL;
 
+	/*
+	 * If we're mounting a zone for administration, then we need to set up
+	 * the "/a" environment inside the zone so that the commands that run
+	 * in there have access to both the running system's utilities and the
+	 * to-be-modified zone's files.
+	 */
+	if (mount_cmd &&
+	    !build_mounted(zlogp, rootpath, sizeof (rootpath), zonepath))
+		goto bad;
+
 	qsort(fs_ptr, num_fs, sizeof (*fs_ptr), fs_compare);
 	for (i = 0; i < num_fs; i++) {
+		if (mount_cmd && strcmp(fs_ptr[i].zone_fs_dir, "/dev") == 0) {
+			size_t slen = strlen(rootpath) - 2;
+
+			/* /dev is special and always goes at the top */
+			rootpath[slen] = '\0';
+			if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
+				goto bad;
+			rootpath[slen] = '/';
+			continue;
+		}
 		if (mount_one(zlogp, &fs_ptr[i], rootpath) != 0)
 			goto bad;
 	}
@@ -1795,7 +2246,7 @@ devfsadm_call(zlog_t *zlogp, const char *arg)
 	if (status == 0 || status == -1)
 		return (status);
 	zerror(zlogp, B_FALSE, "%s call (%s %s %s) unexpectedly returned %d",
-	    DEVFSADM, DEVFSADM_PATH, arg, zone_name, status);
+		    DEVFSADM, DEVFSADM_PATH, arg, zone_name, status);
 	return (-1);
 }
 
@@ -2062,21 +2513,115 @@ prtmount(const char *fs, void *x) {
 	return (0);
 }
 
-int
-vplat_create(zlog_t *zlogp)
+/*
+ * Look for zones running on the main system that are using this root (or any
+ * subdirectory of it).  Return B_TRUE and print an error if a conflicting zone
+ * is found or if we can't tell.
+ */
+static boolean_t
+duplicate_zone_root(zlog_t *zlogp, const char *rootpath)
 {
-	int rval = -1;
+	zoneid_t *zids = NULL;
+	uint_t nzids = 0;
+	boolean_t retv;
+	int rlen, zlen;
+	char zroot[MAXPATHLEN];
+	char zonename[ZONENAME_MAX];
+
+	for (;;) {
+		nzids += 10;
+		zids = malloc(nzids * sizeof (*zids));
+		if (zids == NULL) {
+			zerror(zlogp, B_TRUE, "unable to allocate memory");
+			return (B_TRUE);
+		}
+		if (zone_list(zids, &nzids) == 0)
+			break;
+		free(zids);
+	}
+	retv = B_FALSE;
+	rlen = strlen(rootpath);
+	while (nzids > 0) {
+		/*
+		 * Ignore errors; they just mean that the zone has disappeared
+		 * while we were busy.
+		 */
+		if (zone_getattr(zids[--nzids], ZONE_ATTR_ROOT, zroot,
+		    sizeof (zroot)) == -1)
+			continue;
+		zlen = strlen(zroot);
+		if (zlen > rlen)
+			zlen = rlen;
+		if (strncmp(rootpath, zroot, zlen) == 0 &&
+		    (zroot[zlen] == '\0' || zroot[zlen] == '/') &&
+		    (rootpath[zlen] == '\0' || rootpath[zlen] == '/')) {
+			if (getzonenamebyid(zids[nzids], zonename,
+			    sizeof (zonename)) == -1)
+				(void) snprintf(zonename, sizeof (zonename),
+				    "id %d", (int)zids[nzids]);
+			zerror(zlogp, B_FALSE,
+			    "zone root %s already in use by zone %s",
+			    rootpath, zonename);
+			retv = B_TRUE;
+			break;
+		}
+	}
+	free(zids);
+	return (retv);
+}
+
+/*
+ * Search for loopback mounts that use this same source node (same device and
+ * inode).  Return B_TRUE if there is one or if we can't tell.
+ */
+static boolean_t
+duplicate_reachable_path(zlog_t *zlogp, const char *rootpath)
+{
+	struct stat64 rst, zst;
+	struct mnttab *mnp;
+
+	if (stat64(rootpath, &rst) == -1) {
+		zerror(zlogp, B_TRUE, "can't stat %s", rootpath);
+		return (B_TRUE);
+	}
+	if (resolve_lofs_mnts == NULL && lofs_read_mnttab(zlogp) == -1)
+		return (B_TRUE);
+	for (mnp = resolve_lofs_mnts; mnp < resolve_lofs_mnt_max; mnp++) {
+		if (mnp->mnt_fstype == NULL ||
+		    strcmp(MNTTYPE_LOFS, mnp->mnt_fstype) != 0)
+			continue;
+		/* We're looking at a loopback mount.  Stat it. */
+		if (mnp->mnt_special != NULL &&
+		    stat64(mnp->mnt_special, &zst) != -1 &&
+		    rst.st_dev == zst.st_dev && rst.st_ino == zst.st_ino) {
+			zerror(zlogp, B_FALSE,
+			    "zone root %s is reachable through %s",
+			    rootpath, mnp->mnt_mountp);
+			return (B_TRUE);
+		}
+	}
+	return (B_FALSE);
+}
+
+zoneid_t
+vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
+{
+	zoneid_t rval = -1;
 	priv_set_t *privs;
 	char rootpath[MAXPATHLEN];
 	char *rctlbuf = NULL;
-	size_t rctlbufsz;
-	zoneid_t zoneid;
+	size_t rctlbufsz = 0;
+	zoneid_t zoneid = -1;
 	int xerr;
+	char *kzone;
+	FILE *fp = NULL;
 
 	if (zone_get_rootpath(zone_name, rootpath, sizeof (rootpath)) != Z_OK) {
 		zerror(zlogp, B_TRUE, "unable to determine zone root");
 		return (-1);
 	}
+	if (zonecfg_in_alt_root())
+		resolve_lofs(zlogp, rootpath, sizeof (rootpath));
 
 	if ((privs = priv_allocset()) == NULL) {
 		zerror(zlogp, B_TRUE, "%s failed", "priv_allocset");
@@ -2087,13 +2632,80 @@ vplat_create(zlog_t *zlogp)
 		zerror(zlogp, B_TRUE, "Failed to initialize privileges");
 		goto error;
 	}
-	if (get_rctls(zlogp, &rctlbuf, &rctlbufsz) != 0) {
+	if (!mount_cmd && get_rctls(zlogp, &rctlbuf, &rctlbufsz) != 0) {
 		zerror(zlogp, B_FALSE, "Unable to get list of rctls");
 		goto error;
 	}
 
+	kzone = zone_name;
+
+	/*
+	 * We must do this scan twice.  First, we look for zones running on the
+	 * main system that are using this root (or any subdirectory of it).
+	 * Next, we reduce to the shortest path and search for loopback mounts
+	 * that use this same source node (same device and inode).
+	 */
+	if (duplicate_zone_root(zlogp, rootpath))
+		goto error;
+	if (duplicate_reachable_path(zlogp, rootpath))
+		goto error;
+
+	if (mount_cmd) {
+		root_to_lu(zlogp, rootpath, sizeof (rootpath), B_TRUE);
+
+		/*
+		 * Forge up a special root for this zone.  When a zone is
+		 * mounted, we can't let the zone have its own root because the
+		 * tools that will be used in this "scratch zone" need access
+		 * to both the zone's resources and the running machine's
+		 * executables.
+		 *
+		 * Note that the mkdir here also catches read-only filesystems.
+		 */
+		if (mkdir(rootpath, 0755) != 0 && errno != EEXIST) {
+			zerror(zlogp, B_TRUE, "cannot create %s", rootpath);
+			goto error;
+		}
+		if (domount(zlogp, "tmpfs", "", "swap", rootpath) != 0)
+			goto error;
+	}
+
+	if (zonecfg_in_alt_root()) {
+		/*
+		 * If we are mounting up a zone in an alternate root partition,
+		 * then we have some additional work to do before starting the
+		 * zone.  First, resolve the root path down so that we're not
+		 * fooled by duplicates.  Then forge up an internal name for
+		 * the zone.
+		 */
+		if ((fp = zonecfg_open_scratch("", B_TRUE)) == NULL) {
+			zerror(zlogp, B_TRUE, "cannot open mapfile");
+			goto error;
+		}
+		if (zonecfg_lock_scratch(fp) != 0) {
+			zerror(zlogp, B_TRUE, "cannot lock mapfile");
+			goto error;
+		}
+		if (zonecfg_find_scratch(fp, zone_name, zonecfg_get_root(),
+		    NULL, 0) == 0) {
+			zerror(zlogp, B_FALSE, "scratch zone already running");
+			goto error;
+		}
+		/* This is the preferred name */
+		(void) snprintf(kernzone, sizeof (kernzone), "SUNWlu-%s",
+		    zone_name);
+		srandom(getpid());
+		while (zonecfg_reverse_scratch(fp, kernzone, NULL, 0, NULL,
+		    0) == 0) {
+			/* This is just an arbitrary name; note "." usage */
+			(void) snprintf(kernzone, sizeof (kernzone),
+			    "SUNWlu.%08lX%08lX", random(), random());
+		}
+		kzone = kernzone;
+	}
+
 	xerr = 0;
-	if ((zoneid = zone_create(zone_name, rootpath, privs, rctlbuf,
+	if ((zoneid = zone_create(kzone, rootpath, privs, rctlbuf,
 	    rctlbufsz, &xerr)) == -1) {
 		if (xerr == ZE_AREMOUNTS) {
 			if (zonecfg_find_mounts(rootpath, NULL, NULL) < 1) {
@@ -2117,42 +2729,147 @@ vplat_create(zlog_t *zlogp)
 		}
 		goto error;
 	}
+
+	if (zonecfg_in_alt_root() &&
+	    zonecfg_add_scratch(fp, zone_name, kernzone,
+	    zonecfg_get_root()) == -1) {
+		zerror(zlogp, B_TRUE, "cannot add mapfile entry");
+		goto error;
+	}
+
 	/*
-	 * The following is a warning, not an error.
+	 * The following is a warning, not an error, and is not performed when
+	 * merely mounting a zone for administrative use.
 	 */
-	if (bind_to_pool(zlogp, zoneid) != 0)
+	if (!mount_cmd && bind_to_pool(zlogp, zoneid) != 0)
 		zerror(zlogp, B_FALSE, "WARNING: unable to bind zone to "
 		    "requested pool; using default pool.");
-	rval = 0;
+	rval = zoneid;
+	zoneid = -1;
+
 error:
+	if (zoneid != -1)
+		(void) zone_destroy(zoneid);
 	if (rctlbuf != NULL)
 		free(rctlbuf);
 	priv_freeset(privs);
+	if (fp != NULL)
+		zonecfg_close_scratch(fp);
+	lofs_discard_mnttab();
 	return (rval);
 }
 
 int
-vplat_bringup(zlog_t *zlogp)
+vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd)
 {
-	if (create_dev_files(zlogp) != 0)
+	if (create_dev_files(zlogp) != 0 ||
+	    mount_filesystems(zlogp, mount_cmd) != 0) {
+		lofs_discard_mnttab();
 		return (-1);
-	if (mount_filesystems(zlogp) != 0)
+	}
+	if (!mount_cmd && (devfsadm_register(zlogp) != 0 ||
+	    configure_network_interfaces(zlogp) != 0)) {
+		lofs_discard_mnttab();
 		return (-1);
-	if (devfsadm_register(zlogp) != 0)
-		return (-1);
-	if (configure_network_interfaces(zlogp) != 0)
-		return (-1);
+	}
+	lofs_discard_mnttab();
 	return (0);
 }
 
-int
-vplat_teardown(zlog_t *zlogp)
+static int
+lu_root_teardown(zlog_t *zlogp)
 {
+	char zroot[MAXPATHLEN];
+
+	if (zone_get_rootpath(zone_name, zroot, sizeof (zroot)) != Z_OK) {
+		zerror(zlogp, B_FALSE, "unable to determine zone root");
+		return (-1);
+	}
+	root_to_lu(zlogp, zroot, sizeof (zroot), B_FALSE);
+
+	/*
+	 * At this point, the processes are gone, the filesystems (save the
+	 * root) are unmounted, and the zone is on death row.  But there may
+	 * still be creds floating about in the system that reference the
+	 * zone_t, and which pin down zone_rootvp causing this call to fail
+	 * with EBUSY.  Thus, we try for a little while before just giving up.
+	 * (How I wish this were not true, and umount2 just did the right
+	 * thing, or tmpfs supported MS_FORCE This is a gross hack.)
+	 */
+	if (umount2(zroot, MS_FORCE) != 0) {
+		if (errno == ENOTSUP && umount2(zroot, 0) == 0)
+			goto unmounted;
+		if (errno == EBUSY) {
+			int tries = 10;
+
+			while (--tries >= 0) {
+				(void) sleep(1);
+				if (umount2(zroot, 0) == 0)
+					goto unmounted;
+				if (errno != EBUSY)
+					break;
+			}
+		}
+		zerror(zlogp, B_TRUE, "unable to unmount '%s'", zroot);
+		return (-1);
+	}
+unmounted:
+
+	/*
+	 * Only zones in an alternate root environment have scratch zone
+	 * entries.
+	 */
+	if (zonecfg_in_alt_root()) {
+		FILE *fp;
+		int retv;
+
+		if ((fp = zonecfg_open_scratch("", B_FALSE)) == NULL) {
+			zerror(zlogp, B_TRUE, "cannot open mapfile");
+			return (-1);
+		}
+		retv = -1;
+		if (zonecfg_lock_scratch(fp) != 0)
+			zerror(zlogp, B_TRUE, "cannot lock mapfile");
+		else if (zonecfg_delete_scratch(fp, kernzone) != 0)
+			zerror(zlogp, B_TRUE, "cannot delete map entry");
+		else
+			retv = 0;
+		zonecfg_close_scratch(fp);
+		return (retv);
+	} else {
+		return (0);
+	}
+}
+
+int
+vplat_teardown(zlog_t *zlogp, boolean_t unmount_cmd)
+{
+	char *kzone;
 	zoneid_t zoneid;
 
-	if ((zoneid = getzoneidbyname(zone_name)) == ZONE_ID_UNDEFINED) {
+	kzone = zone_name;
+	if (zonecfg_in_alt_root()) {
+		FILE *fp;
+
+		if ((fp = zonecfg_open_scratch("", B_FALSE)) == NULL) {
+			zerror(zlogp, B_TRUE, "unable to open map file");
+			goto error;
+		}
+		if (zonecfg_find_scratch(fp, zone_name, zonecfg_get_root(),
+		    kernzone, sizeof (kernzone)) != 0) {
+			zerror(zlogp, B_FALSE, "unable to find scratch zone");
+			zonecfg_close_scratch(fp);
+			goto error;
+		}
+		zonecfg_close_scratch(fp);
+		kzone = kernzone;
+	}
+
+	if ((zoneid = getzoneidbyname(kzone)) == ZONE_ID_UNDEFINED) {
 		if (!bringup_failure_recovery)
 			zerror(zlogp, B_TRUE, "unable to get zoneid");
+		if (unmount_cmd)
+			(void) lu_root_teardown(zlogp);
 		goto error;
 	}
 
@@ -2161,21 +2878,22 @@ vplat_teardown(zlog_t *zlogp)
 		goto error;
 	}
 
-	if (devfsadm_unregister(zlogp) != 0)
+	if (!unmount_cmd && devfsadm_unregister(zlogp) != 0)
 		goto error;
 
-	if (unconfigure_network_interfaces(zlogp, zoneid) != 0) {
+	if (!unmount_cmd &&
+	    unconfigure_network_interfaces(zlogp, zoneid) != 0) {
 		zerror(zlogp, B_FALSE,
 		    "unable to unconfigure network interfaces in zone");
 		goto error;
 	}
 
-	if (tcp_abort_connections(zlogp, zoneid) != 0) {
+	if (!unmount_cmd && tcp_abort_connections(zlogp, zoneid) != 0) {
 		zerror(zlogp, B_TRUE, "unable to abort TCP connections");
 		goto error;
 	}
 
-	if (unmount_filesystems(zlogp) != 0) {
+	if (unmount_filesystems(zlogp, zoneid, unmount_cmd) != 0) {
 		zerror(zlogp, B_FALSE,
 		    "unable to unmount file systems in zone");
 		goto error;
@@ -2185,10 +2903,21 @@ vplat_teardown(zlog_t *zlogp)
 		zerror(zlogp, B_TRUE, "unable to destroy zone");
 		goto error;
 	}
-	destroy_console_slave();
 
+	/*
+	 * Special teardown for alternate boot environments: remove the tmpfs
+	 * root for the zone and then remove it from the map file.
+	 */
+	if (unmount_cmd && lu_root_teardown(zlogp) != 0)
+		goto error;
+
+	if (!unmount_cmd)
+		destroy_console_slave();
+
+	lofs_discard_mnttab();
 	return (0);
 
 error:
+	lofs_discard_mnttab();
 	return (-1);
 }

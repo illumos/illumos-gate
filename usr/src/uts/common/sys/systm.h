@@ -110,6 +110,12 @@ extern char *isa_list;		/* For sysinfo's isalist option */
 extern int noexec_user_stack;		/* patchable via /etc/system */
 extern int noexec_user_stack_log;	/* patchable via /etc/system */
 
+/*
+ * Use NFS client operations in the global zone only.  Under contract with
+ * admin/install; do not change without coordinating with that consolidation.
+ */
+extern int nfs_global_client_only;
+
 extern void report_stack_exec(proc_t *, caddr_t);
 
 extern void startup(void);

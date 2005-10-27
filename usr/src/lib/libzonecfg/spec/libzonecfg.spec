@@ -26,6 +26,24 @@
 #
 # lib/libzonecfg/spec/libzonecfg.spec
 
+function	zonecfg_set_root
+include		<libzonecfg.h>
+declaration	void zonecfg_set_root(const char *)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_get_root
+include		<libzonecfg.h>
+declaration	const char *zonecfg_get_root(void)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_in_alt_root
+include		<libzonecfg.h>
+declaration	boolean_t zonecfg_in_alt_root(void)
+version		SUNWprivate_1.1
+end
+
 function	zonecfg_init_handle
 include		<libzonecfg.h>
 declaration	zone_dochandle_t zonecfg_init_handle(void)
@@ -34,19 +52,20 @@ end
 
 function	zonecfg_get_handle
 include		<libzonecfg.h>
-declaration	int zonecfg_get_handle(char *, zone_dochandle_t)
+declaration	int zonecfg_get_handle(const char *, zone_dochandle_t)
 version		SUNWprivate_1.1
 end		
 
 function	zonecfg_get_snapshot_handle
 include		<libzonecfg.h>
-declaration	int zonecfg_get_snapshot_handle(char *, zone_dochandle_t)
+declaration	int zonecfg_get_snapshot_handle(const char *, zone_dochandle_t)
 version		SUNWprivate_1.1
 end		
 
 function	zonecfg_get_template_handle
 include		<libzonecfg.h>
-declaration	int zonecfg_get_template_handle(char *, char *, zone_dochandle_t)
+declaration	int zonecfg_get_template_handle(const char *, const char *, \
+			zone_dochandle_t)
 version		SUNWprivate_1.1
 end		
 
@@ -448,13 +467,13 @@ end
 
 function	zonecfg_create_snapshot
 include		<libzonecfg.h>
-declaration	int zonecfg_create_snapshot(char *)
+declaration	int zonecfg_create_snapshot(const char *)
 version		SUNWprivate_1.1
 end		
 
 function	zonecfg_destroy_snapshot
 include		<libzonecfg.h>
-declaration	int zonecfg_destroy_snapshot(char *)
+declaration	int zonecfg_destroy_snapshot(const char *)
 version		SUNWprivate_1.1
 end		
 
@@ -543,6 +562,18 @@ declaration	char *zone_state_str(zone_state_t);
 version		SUNWprivate_1.1
 end		
 
+function	zonecfg_get_name_by_uuid
+include		<libzonecfg.h>
+declaration	int zonecfg_get_name_by_uuid(const uuid_t, char *, size_t)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_get_uuid
+include		<libzonecfg.h>
+declaration	int zonecfg_get_uuid(const char *, uuid_t)
+version		SUNWprivate_1.1
+end
+
 function	zonecfg_same_net_address
 include		<libzonecfg.h>
 declaration	boolean_t zonecfg_same_net_address(char *, char *);
@@ -588,6 +619,64 @@ end
 function	zonecfg_construct_rctlblk
 include		<libzonecfg.h>
 declaration	int zonecfg_construct_rctlblk(const struct zone_rctlvaltab *, rctlblk_t *);
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_open_scratch
+include		<libzonecfg.h>
+declaration	FILE *zonecfg_open_scratch(const char *, boolean_t)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_lock_scratch
+include		<libzonecfg.h>
+declaration	int zonecfg_lock_scratch(FILE *)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_close_scratch
+include		<libzonecfg.h>
+declaration	void zonecfg_close_scratch(FILE *)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_get_scratch
+include		<libzonecfg.h>
+declaration	int zonecfg_get_scratch(FILE *, char *, size_t, char *, \
+			size_t, char *, size_t)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_find_scratch
+include		<libzonecfg.h>
+declaration	int zonecfg_find_scratch(FILE *, const char *, const char *, \
+			char *, size_t)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_reverse_scratch
+include		<libzonecfg.h>
+declaration	int zonecfg_reverse_scratch(FILE *, const char *, char *, \
+			size_t, char *, size_t)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_add_scratch
+include		<libzonecfg.h>
+declaration	int zonecfg_add_scratch(FILE *, const char *, const char *, \
+			const char *)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_delete_scratch
+include		<libzonecfg.h>
+declaration	int zonecfg_delete_scratch(FILE *, const char *)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_is_scratch
+include		<libzonecfg.h>
+declaration	boolean_t zonecfg_is_scratch(const char *)
 version		SUNWprivate_1.1
 end
 

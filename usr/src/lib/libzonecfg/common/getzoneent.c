@@ -35,7 +35,6 @@
  */
 
 #include <stdlib.h>
-#include <ctype.h>
 #include <string.h>
 #include <errno.h>
 #include <libzonecfg.h>
@@ -43,6 +42,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <assert.h>
+#include <uuid/uuid.h>
 #include "zonecfg_impl.h"
 
 
@@ -56,6 +56,8 @@
  * Same with double-quotes themselves: they are not allowed in zone names,
  * and do not occur in zone states, and in theory should never occur in a
  * zonepath since zonecfg does not support a method for escaping them.
+ *
+ * It never returns NULL.
  */
 
 static char *
@@ -129,7 +131,7 @@ getzoneent_private(FILE *cookie)
 			continue;
 		}
 		p = gettok(&cp);
-		if (p == NULL || *p == '\0' || strlen(p) > ZONENAME_MAX) {
+		if (*p == '\0' || strlen(p) >= ZONENAME_MAX) {
 			/*
 			 * empty or very long zone names are not allowed
 			 */
@@ -138,7 +140,7 @@ getzoneent_private(FILE *cookie)
 		(void) strlcpy(ze->zone_name, p, ZONENAME_MAX);
 
 		p = gettok(&cp);
-		if (p == NULL || *p == '\0') {
+		if (*p == '\0') {
 			/* state field should not be empty */
 			continue;
 		}
@@ -149,19 +151,20 @@ getzoneent_private(FILE *cookie)
 			ze->zone_state = ZONE_STATE_INCOMPLETE;
 		} else if (strcmp(p, ZONE_STATE_STR_INSTALLED) == 0) {
 			ze->zone_state = ZONE_STATE_INSTALLED;
-		} else
+		} else {
 			continue;
+		}
 
 		p = gettok(&cp);
-		if (strlen(p) > MAXPATHLEN) {
+		if (strlen(p) >= MAXPATHLEN) {
 			/* very long paths are not allowed */
 			continue;
 		}
-		if (p == NULL) {
-			/* empty paths accepted for backwards compatibility */
-			p = "";
-		}
 		(void) strlcpy(ze->zone_path, p, MAXPATHLEN);
+
+		p = gettok(&cp);
+		if (uuid_parse(p, ze->zone_uuid) == -1)
+			uuid_clear(ze->zone_uuid);
 
 		break;
 	}
@@ -169,10 +172,23 @@ getzoneent_private(FILE *cookie)
 	return (ze);
 }
 
+static boolean_t
+get_index_path(char *path)
+{
+	return (snprintf(path, MAXPATHLEN, "%s%s", zonecfg_root,
+	    ZONE_INDEX_FILE) < MAXPATHLEN);
+}
+
 FILE *
 setzoneent(void)
 {
-	return (fopen(ZONE_INDEX_FILE, "r"));
+	char path[MAXPATHLEN];
+
+	if (!get_index_path(path)) {
+		errno = EINVAL;
+		return (NULL);
+	}
+	return (fopen(path, "r"));
 }
 
 void
@@ -183,25 +199,35 @@ endzoneent(FILE *cookie)
 }
 
 static int
-lock_index_file(int *lock_fd)
+lock_index_file(void)
 {
+	int lock_fd;
 	struct flock lock;
+	char path[MAXPATHLEN];
 
-	if ((mkdir(ZONE_SNAPSHOT_ROOT, S_IRWXU) == -1) && errno != EEXIST)
-		return (Z_LOCKING_FILE);
-	*lock_fd = open(ZONE_INDEX_LOCK_FILE, O_CREAT|O_RDWR, 0644);
-	if (*lock_fd < 0)
-		return (Z_LOCKING_FILE);
+	if (snprintf(path, sizeof (path), "%s%s", zonecfg_root,
+	    ZONE_INDEX_LOCK_DIR) >= sizeof (path))
+		return (-1);
+	if ((mkdir(path, S_IRWXU) == -1) && errno != EEXIST)
+		return (-1);
+	if (strlcat(path, ZONE_INDEX_LOCK_FILE, sizeof (path)) >=
+	    sizeof (path))
+		return (-1);
+	lock_fd = open(path, O_CREAT|O_RDWR, 0644);
+	if (lock_fd == -1)
+		return (-1);
 
 	lock.l_type = F_WRLCK;
 	lock.l_whence = SEEK_SET;
 	lock.l_start = 0;
 	lock.l_len = 0;
 
-	if (fcntl(*lock_fd, F_SETLKW, &lock) == -1)
-		return (Z_LOCKING_FILE);
+	if (fcntl(lock_fd, F_SETLKW, &lock) == -1) {
+		(void) close(lock_fd);
+		return (-1);
+	}
 
-	return (Z_OK);
+	return (lock_fd);
 }
 
 static int
@@ -247,11 +273,14 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 {
 	FILE *index_file, *tmp_file;
 	char *tmp_file_name, buf[MAX_INDEX_LEN], orig_buf[MAX_INDEX_LEN];
-	char zone[ZONENAME_MAX + 1];		/* name plus newline */
+	char zone[ZONENAME_MAX];
 	char line[MAX_INDEX_LEN];
 	int tmp_file_desc, lock_fd, err;
 	boolean_t exists = B_FALSE, need_quotes;
 	char *cp, *p;
+	char path[MAXPATHLEN];
+	char uuidstr[37];		/* hard-coded because of CR 6305641 */
+	size_t tlen;
 
 	assert(ze != NULL);
 	if (operation == PZE_ADD &&
@@ -261,13 +290,19 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	if (operation != PZE_MODIFY && strlen(ze->zone_newname) != 0)
 		return (Z_INVAL);
 
-	if ((err = lock_index_file(&lock_fd)) != Z_OK)
-		return (err);
-	tmp_file_name = strdup(_PATH_TMPFILE);
+	if ((lock_fd = lock_index_file()) == -1)
+		return (Z_LOCKING_FILE);
+
+	/* using sizeof gives us room for the terminating NUL byte as well */
+	tlen = sizeof (_PATH_TMPFILE) + strlen(zonecfg_root);
+	tmp_file_name = malloc(tlen);
 	if (tmp_file_name == NULL) {
 		(void) unlock_index_file(lock_fd);
 		return (Z_NOMEM);
 	}
+	(void) snprintf(tmp_file_name, tlen, "%s%s", zonecfg_root,
+	    _PATH_TMPFILE);
+
 	tmp_file_desc = mkstemp(tmp_file_name);
 	if (tmp_file_desc == -1) {
 		(void) unlink(tmp_file_name);
@@ -277,17 +312,16 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	}
 	if ((tmp_file = fdopen(tmp_file_desc, "w")) == NULL) {
 		(void) close(tmp_file_desc);
-		(void) unlink(tmp_file_name);
-		free(tmp_file_name);
-		(void) unlock_index_file(lock_fd);
-		return (Z_MISC_FS);
+		err = Z_MISC_FS;
+		goto error;
 	}
-	if ((index_file = fopen(ZONE_INDEX_FILE, "r")) == NULL) {
-		(void) fclose(tmp_file);
-		(void) unlink(tmp_file_name);
-		free(tmp_file_name);
-		(void) unlock_index_file(lock_fd);
-		return (Z_MISC_FS);
+	if (!get_index_path(path)) {
+		err = Z_MISC_FS;
+		goto error;
+	}
+	if ((index_file = fopen(path, "r")) == NULL) {
+		err = Z_MISC_FS;
+		goto error;
 	}
 
 	/*
@@ -300,9 +334,17 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	 */
 	need_quotes = (strchr(ze->zone_path, ':') != NULL);
 
-	(void) snprintf(line, sizeof (line), "%s:%s:%s%s%s\n", ze->zone_name,
-	    zone_state_str(ze->zone_state), need_quotes ? "\"" : "",
-	    ze->zone_path, need_quotes ? "\"" : "");
+	/*
+	 * If this zone doesn't yet have a unique identifier, then give it one.
+	 */
+	if (uuid_is_null(ze->zone_uuid))
+		uuid_generate(ze->zone_uuid);
+	uuid_unparse(ze->zone_uuid, uuidstr);
+
+	(void) snprintf(line, sizeof (line), "%s:%s:%s%s%s:%s\n",
+	    ze->zone_name, zone_state_str(ze->zone_state),
+	    need_quotes ? "\"" : "", ze->zone_path, need_quotes ? "\"" : "",
+	    uuidstr);
 	for (;;) {
 		if (fgets(buf, sizeof (buf), index_file) == NULL) {
 			if (operation == PZE_ADD && !exists)
@@ -323,7 +365,7 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 			continue;
 		}
 		p = gettok(&cp);
-		if (p == NULL || *p == '\0' || strlen(p) > ZONENAME_MAX) {
+		if (*p == '\0' || strlen(p) >= ZONENAME_MAX) {
 			/*
 			 * empty or very long zone names are not allowed
 			 */
@@ -335,6 +377,7 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 			exists = B_TRUE;		/* already there */
 			if (operation == PZE_ADD) {
 				/* can't add same zone */
+				err = Z_UPDATING_INDEX;
 				goto error;
 			} else if (operation == PZE_MODIFY) {
 				char tmp_state[ZONE_STATE_MAXSTRLEN + 1];
@@ -348,8 +391,9 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 				}
 				/* use existing value for state */
 				p = gettok(&cp);
-				if (p == NULL || *p == '\0') {
+				if (*p == '\0') {
 					/* state field should not be empty */
+					err = Z_UPDATING_INDEX;
 					goto error;
 				}
 				(void) strlcpy(tmp_state,
@@ -367,11 +411,12 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 				else
 					tmp_name = ze->zone_name;
 
-				(void) fprintf(tmp_file, "%s:%s:%s%s%s\n",
+				(void) fprintf(tmp_file, "%s:%s:%s%s%s:%s\n",
 				    tmp_name, tmp_state,
 				    need_quotes ? "\"" : "",
 				    (strlen(ze->zone_path) == 0) ? p :
-				    ze->zone_path, need_quotes ? "\"" : "");
+				    ze->zone_path, need_quotes ? "\"" : "",
+				    uuidstr);
 			}
 			/* else if (operation == PZE_REMOVE) { no-op } */
 		} else {
@@ -380,31 +425,30 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	}
 
 	(void) fclose(index_file);
+	index_file = NULL;
 	if (fclose(tmp_file) != 0) {
-		(void) unlink(tmp_file_name);
-		free(tmp_file_name);
-		(void) unlock_index_file(lock_fd);
-		return (Z_MISC_FS);
+		tmp_file = NULL;
+		err = Z_MISC_FS;
+		goto error;
 	}
+	tmp_file = NULL;
 	(void) chmod(tmp_file_name, 0644);
-	if (rename(tmp_file_name, ZONE_INDEX_FILE) == -1) {
-		(void) unlink(tmp_file_name);
-		free(tmp_file_name);
-		(void) unlock_index_file(lock_fd);
-		if (errno == EACCES)
-			return (Z_ACCES);
-		return (Z_MISC_FS);
+	if (rename(tmp_file_name, path) == -1) {
+		err = errno == EACCES ? Z_ACCES : Z_MISC_FS;
+		goto error;
 	}
 	free(tmp_file_name);
 	if (unlock_index_file(lock_fd) != Z_OK)
 		return (Z_UNLOCKING_FILE);
 	return (Z_OK);
+
 error:
-	(void) fclose(index_file);
-	(void) fclose(tmp_file);
+	if (index_file != NULL)
+		(void) fclose(index_file);
+	if (tmp_file != NULL)
+		(void) fclose(tmp_file);
 	(void) unlink(tmp_file_name);
 	free(tmp_file_name);
-	if (unlock_index_file(lock_fd) != Z_OK)
-		return (Z_UNLOCKING_FILE);
-	return (Z_UPDATING_INDEX);
+	(void) unlock_index_file(lock_fd);
+	return (err);
 }

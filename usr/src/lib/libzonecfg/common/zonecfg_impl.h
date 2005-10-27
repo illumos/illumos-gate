@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,18 +49,31 @@ typedef enum {
 #define	ZONE_STATE_STR_INCOMPLETE	"incomplete"
 #define	ZONE_STATE_STR_INSTALLED	"installed"
 #define	ZONE_STATE_STR_READY		"ready"
+#define	ZONE_STATE_STR_MOUNTED		"mounted"
 #define	ZONE_STATE_STR_RUNNING		"running"
 #define	ZONE_STATE_STR_SHUTTING_DOWN	"shutting_down"
 #define	ZONE_STATE_STR_DOWN		"down"
 
-/* "::\n" => 3, no need to count '\0' as ZONENAME_MAX covers that */
-#define	MAX_INDEX_LEN	(ZONENAME_MAX + ZONE_STATE_MAXSTRLEN + MAXPATHLEN + 3)
+/*
+ * ":::\n" => 4, no need to count '\0' as ZONENAME_MAX covers that.
+ *
+ * Note that both ZONE_STATE_MAXSTRLEN and MAXPATHLEN include a NUL byte, and
+ * this extra count of 2 bytes covers the quotes that may be placed around the
+ * path.
+ *
+ * The swilly "36" constant here is to cover the fact that libuuid is broken;
+ * see CR 6305641.
+ */
+#define	MAX_INDEX_LEN	(ZONENAME_MAX + ZONE_STATE_MAXSTRLEN + MAXPATHLEN + \
+			36 + 4)
 
-#define	ZONE_INDEX_LOCK_FILE	ZONE_SNAPSHOT_ROOT "/index.lock"
+#define	ZONE_INDEX_LOCK_DIR	ZONE_SNAPSHOT_ROOT
+#define	ZONE_INDEX_LOCK_FILE	"/index.lock"
 
 #define	ZONE_SNAPSHOT_ROOT	ZONES_TMPDIR
 
 extern int putzoneent(struct zoneent *, zoneent_op_t);
+extern char *zonecfg_root;
 
 #ifdef	__cplusplus
 }

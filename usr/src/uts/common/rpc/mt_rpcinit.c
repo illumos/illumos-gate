@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,4 +166,21 @@ alloc_xid(void)
 
 	mutex_exit(&xid_lock);
 	return (xid);
+}
+
+/*
+ * These functions are temporary and designed for the upgrade-workaround only.
+ * They cannot be used for general zone-crossing RPC client support, and will
+ * be removed shortly.
+ */
+struct zone *
+rpc_zone(void)
+{
+	return (nfs_global_client_only != 0 ? global_zone : curproc->p_zone);
+}
+
+zoneid_t
+rpc_zoneid(void)
+{
+	return (nfs_global_client_only != 0 ? GLOBAL_ZONEID : getzoneid());
 }

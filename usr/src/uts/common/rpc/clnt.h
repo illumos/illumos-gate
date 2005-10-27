@@ -340,6 +340,9 @@ typedef struct calllist_s {
  */
 extern uint32_t alloc_xid(void);
 
+extern struct zone *rpc_zone(void);
+extern zoneid_t rpc_zoneid(void);
+
 extern int clnt_tli_kcreate(struct knetconfig *config, struct netbuf *svcaddr,
 	rpcprog_t, rpcvers_t, uint_t max_msgsize, int retrys,
 	struct cred *cred, CLIENT **ncl);

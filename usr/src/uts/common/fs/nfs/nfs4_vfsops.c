@@ -331,7 +331,7 @@ nfs4_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	char *p, *pf;
 	struct pathname pn;
 	char *userbufptr;
-	zone_t *zone = curproc->p_zone;
+	zone_t *zone = nfs_zone();
 	nfs4_error_t n4e;
 
 	if (secpolicy_fs_mount(cr, mvp, vfsp) != 0)
@@ -741,7 +741,7 @@ more:
 	/*
 	 * Stop the mount from going any further if the zone is going away.
 	 */
-	if (zone_status_get(zone) >= ZONE_IS_SHUTTING_DOWN) {
+	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN) {
 		error = EBUSY;
 		goto errout;
 	}
@@ -1579,10 +1579,10 @@ nfs4rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo4 *svp_head,
 	int orig_sv_pathlen, num_retry;
 	cred_t *lcr = NULL, *tcr = cr;
 
-	nfsstatsp = zone_getspecific(nfsstat_zone_key, curproc->p_zone);
+	nfsstatsp = zone_getspecific(nfsstat_zone_key, nfs_zone());
 	ASSERT(nfsstatsp != NULL);
 
-	ASSERT(curproc->p_zone == zone);
+	ASSERT(nfs_zone() == zone);
 	ASSERT(crgetref(cr));
 
 	/*
@@ -1955,7 +1955,7 @@ nfs4_unmount(vfs_t *vfsp, int flag, cred_t *cr)
 
 	if (flag & MS_FORCE) {
 		vfsp->vfs_flag |= VFS_UNMOUNTED;
-		if (curproc->p_zone != mi->mi_zone) {
+		if (nfs_zone() != mi->mi_zone) {
 			/*
 			 * If the request is coming from the wrong zone,
 			 * we don't want to create any new threads, and
@@ -2038,7 +2038,7 @@ nfs4_root(vfs_t *vfsp, vnode_t **vpp)
 
 	mi = VFTOMI4(vfsp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EPERM);
 
 	svp = mi->mi_curr_serv;
@@ -3220,9 +3220,9 @@ nfs4_move_mi(mntinfo4_t *mi, servinfo4_t *old, servinfo4_t *new)
 {
 	nfs4_server_t *p, *op = NULL, *np = NULL;
 	int num_open;
-	zoneid_t zoneid = getzoneid();
+	zoneid_t zoneid = nfs_zoneid();
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 	mutex_enter(&nfs4_server_lst_lock);
 #ifdef DEBUG
@@ -3310,7 +3310,7 @@ nfs4_server_t *
 servinfo4_to_nfs4_server(servinfo4_t *srv_p)
 {
 	nfs4_server_t *np;
-	zoneid_t zoneid = getzoneid();
+	zoneid_t zoneid = nfs_zoneid();
 
 	mutex_enter(&nfs4_server_lst_lock);
 	for (np = nfs4_server_lst.forw; np != &nfs4_server_lst; np = np->forw) {
@@ -3371,7 +3371,8 @@ find_nfs4_server_all(mntinfo4_t *mi, int all)
 	 * another zone's server list, as long as it doesn't try to contact
 	 * them.
 	 */
-	ASSERT(zoneid == getzoneid() || getzoneid() == GLOBAL_ZONEID);
+	ASSERT(zoneid == getzoneid() || getzoneid() == GLOBAL_ZONEID ||
+	    nfs_global_client_only != 0);
 
 	/*
 	 * The nfs4_server_lst_lock global lock is held when we get a new
@@ -3539,7 +3540,7 @@ nfs4_free_mount(vfs_t *vfsp, cred_t *cr)
 	 * We need to participate in the CPR framework if this is a kernel
 	 * thread.
 	 */
-	async_thread = (curproc == curproc->p_zone->zone_zsched);
+	async_thread = (curproc == nfs_zone()->zone_zsched);
 	if (async_thread) {
 		mutex_init(&cpr_lock, NULL, MUTEX_DEFAULT, NULL);
 		CALLB_CPR_INIT(&cpr_info, &cpr_lock, callb_generic_cpr,

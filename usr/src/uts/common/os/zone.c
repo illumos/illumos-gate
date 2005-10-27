@@ -3090,6 +3090,15 @@ zone_destroy(zoneid_t zoneid)
 	    (mod_hash_key_t)(uintptr_t)zone->zone_id);
 	mutex_exit(&zonehash_lock);
 
+	/*
+	 * Release the root vnode; we're not using it anymore.  Nor should any
+	 * other thread that might access it exist.
+	 */
+	if (zone->zone_rootvp != NULL) {
+		VN_RELE(zone->zone_rootvp);
+		zone->zone_rootvp = NULL;
+	}
+
 	/* add to deathrow list */
 	mutex_enter(&zone_deathrow_lock);
 	list_insert_tail(&zone_deathrow, zone);

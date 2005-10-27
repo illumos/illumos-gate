@@ -103,11 +103,14 @@
 
 static char *progname;
 char *zone_name;	/* zone which we are managing */
+static zoneid_t zone_id;
 
 static zlog_t logsys;
 
 mutex_t	lock = DEFAULTMUTEX;	/* to serialize stuff */
 mutex_t	msglock = DEFAULTMUTEX;	/* for calling setlocale() */
+
+static sema_t scratch_sem;	/* for scratch zones */
 
 static char	zone_door_path[MAXPATHLEN];
 static int	zone_door = -1;
@@ -122,6 +125,21 @@ boolean_t bringup_failure_recovery = B_FALSE; /* ignore certain failures */
 #define	PATH_TO_INIT	"/sbin/init"
 
 #define	DEFAULT_LOCALE	"C"
+
+static const char *
+z_cmd_name(zone_cmd_t zcmd)
+{
+	/* This list needs to match the enum in sys/zone.h */
+	static const char *zcmdstr[] = {
+		"ready", "boot", "reboot", "halt", "note_uninstalling",
+		"mount", "unmount"
+	};
+
+	if (zcmd >= sizeof (zcmdstr) / sizeof (*zcmdstr))
+		return ("unknown");
+	else
+		return (zcmdstr[(int)zcmd]);
+}
 
 static char *
 get_execbasename(char *execfullname)
@@ -244,8 +262,13 @@ mkzonedir(zlog_t *zlogp)
 	return (0);
 }
 
-static zoneid_t
-zone_ready(zlog_t *zlogp)
+/*
+ * Bring a zone up to the pre-boot "ready" stage.  The mount_cmd argument is
+ * 'true' if this is being invoked as part of the processing for the "mount"
+ * subcommand.
+ */
+static int
+zone_ready(zlog_t *zlogp, boolean_t mount_cmd)
 {
 	int err;
 
@@ -255,15 +278,15 @@ zone_ready(zlog_t *zlogp)
 		return (-1);
 	}
 
-	if (vplat_create(zlogp) != 0) {
+	if ((zone_id = vplat_create(zlogp, mount_cmd)) == -1) {
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));
 		return (-1);
 	}
-	if (vplat_bringup(zlogp) != 0) {
+	if (vplat_bringup(zlogp, mount_cmd) != 0) {
 		bringup_failure_recovery = B_TRUE;
-		(void) vplat_teardown(NULL);
+		(void) vplat_teardown(NULL, mount_cmd);
 		if ((err = zonecfg_destroy_snapshot(zone_name)) != Z_OK)
 			zerror(zlogp, B_FALSE, "destroying snapshot: %s",
 			    zonecfg_strerror(err));
@@ -356,6 +379,26 @@ mount_early_fs(zlog_t *zlogp, zoneid_t zoneid, const char *spec,
 }
 
 static int
+zone_mount_early(zlog_t *zlogp, zoneid_t zoneid)
+{
+	if (mount_early_fs(zlogp, zoneid, "/proc", "/proc", "proc") != 0)
+		return (-1);
+
+	if (mount_early_fs(zlogp, zoneid, "ctfs", CTFS_ROOT, "ctfs") != 0)
+		return (-1);
+
+	if (mount_early_fs(zlogp, zoneid, "swap", "/etc/svc/volatile",
+	    "tmpfs") != 0)
+		return (-1);
+
+	if (mount_early_fs(zlogp, zoneid, "mnttab", "/etc/mnttab",
+	    "mntfs") != 0)
+		return (-1);
+
+	return (0);
+}
+
+static int
 zone_bootup(zlog_t *zlogp, const char *bootargs)
 {
 	zoneid_t zoneid;
@@ -371,18 +414,7 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 		return (-1);
 	}
 
-	if (mount_early_fs(zlogp, zoneid, "/proc", "/proc", "proc") != 0)
-		return (-1);
-
-	if (mount_early_fs(zlogp, zoneid, "ctfs", CTFS_ROOT, "ctfs") != 0)
-		return (-1);
-
-	if (mount_early_fs(zlogp, zoneid, "swap", "/etc/svc/volatile",
-	    "tmpfs") != 0)
-		return (-1);
-
-	if (mount_early_fs(zlogp, zoneid, "mnttab", "/etc/mnttab",
-	    "mntfs") != 0)
+	if (zone_mount_early(zlogp, zoneid) != 0)
 		return (-1);
 
 	/*
@@ -414,11 +446,11 @@ zone_bootup(zlog_t *zlogp, const char *bootargs)
 }
 
 static int
-zone_halt(zlog_t *zlogp)
+zone_halt(zlog_t *zlogp, boolean_t unmount_cmd)
 {
 	int err;
 
-	if (vplat_teardown(zlogp) != 0) {
+	if (vplat_teardown(zlogp, unmount_cmd) != 0) {
 		if (!bringup_failure_recovery)
 			zerror(zlogp, B_FALSE, "unable to destroy zone");
 		return (-1);
@@ -504,7 +536,6 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	zlog_t *zlogp;
 	zone_cmd_rval_t *rvalp;
 	size_t rlen = getpagesize(); /* conservative */
-	char *cmd_str = NULL;
 
 	/* LINTED E_BAD_PTR_CAST_ALIGN */
 	zargp = (zone_cmd_arg_t *)args;
@@ -579,8 +610,9 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	 * Check for validity of command.
 	 */
 	if (cmd != Z_READY && cmd != Z_BOOT && cmd != Z_REBOOT &&
-	    cmd != Z_HALT && cmd != Z_NOTE_UNINSTALLING) {
-		zerror(&logsys, B_FALSE, "invalid command");
+	    cmd != Z_HALT && cmd != Z_NOTE_UNINSTALLING && cmd != Z_MOUNT &&
+	    cmd != Z_UNMOUNT) {
+		zerror(&logsys, B_FALSE, "invalid command %d", (int)cmd);
 		goto out;
 	}
 
@@ -629,41 +661,26 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 		 * Not our area of expertise; we just print a nice message
 		 * and die off.
 		 */
-		switch (cmd) {
-		case Z_READY:
-			cmd_str = "ready";
-			break;
-		case Z_BOOT:
-			cmd_str = "boot";
-			break;
-		case Z_HALT:
-			cmd_str = "halt";
-			break;
-		case Z_REBOOT:
-			cmd_str = "reboot";
-			break;
-		}
-		assert(cmd_str != NULL);
 		zerror(zlogp, B_FALSE,
 		    "%s operation is invalid for zones in state '%s'",
-		    cmd_str, zone_state_str(zstate));
+		    z_cmd_name(cmd), zone_state_str(zstate));
 		break;
 
 	case ZONE_STATE_INSTALLED:
 		switch (cmd) {
 		case Z_READY:
-			rval = zone_ready(zlogp);
+			rval = zone_ready(zlogp, B_FALSE);
 			if (rval == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			break;
 		case Z_BOOT:
 			eventstream_write(Z_EVT_ZONE_BOOTING);
-			if ((rval = zone_ready(zlogp)) == 0)
+			if ((rval = zone_ready(zlogp, B_FALSE)) == 0)
 				rval = zone_bootup(zlogp, zargp->bootbuf);
 			audit_put_record(zlogp, uc, rval, "boot");
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
-				(void) zone_halt(zlogp);
+				(void) zone_halt(zlogp, B_FALSE);
 			}
 			break;
 		case Z_HALT:
@@ -682,7 +699,7 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
 			zerror(zlogp, B_FALSE, "%s operation is invalid "
-			    "for zones in state '%s'", "reboot",
+			    "for zones in state '%s'", z_cmd_name(cmd),
 			    zone_state_str(zstate));
 			rval = -1;
 			break;
@@ -694,6 +711,28 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			 * Once it does, we will be in_death_throes.
 			 */
 			eventstream_write(Z_EVT_ZONE_UNINSTALLING);
+			break;
+		case Z_MOUNT:
+			if (kernelcall)	/* Invalid; can't happen */
+				abort();
+			rval = zone_ready(zlogp, B_TRUE);
+			if (rval == 0)
+				rval = zone_mount_early(zlogp, zone_id);
+			/*
+			 * Ordinarily, /dev/fd would be mounted inside the zone
+			 * by svc:/system/filesystem/usr:default, but since
+			 * we're not booting the zone, we need to do this
+			 * manually.
+			 */
+			if (rval == 0)
+				rval = mount_early_fs(zlogp, zone_id, "fd",
+				    "/dev/fd", "fd");
+			break;
+		case Z_UNMOUNT:
+			if (kernelcall)	/* Invalid; can't happen */
+				abort();
+			zerror(zlogp, B_FALSE, "zone is already unmounted");
+			rval = 0;
 			break;
 		}
 		break;
@@ -716,30 +755,45 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			audit_put_record(zlogp, uc, rval, "boot");
 			if (rval != 0) {
 				bringup_failure_recovery = B_TRUE;
-				(void) zone_halt(zlogp);
+				(void) zone_halt(zlogp, B_FALSE);
 			}
 			break;
 		case Z_HALT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
-			if ((rval = zone_halt(zlogp)) != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE)) != 0)
 				break;
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
 		case Z_REBOOT:
+		case Z_NOTE_UNINSTALLING:
+		case Z_MOUNT:
+		case Z_UNMOUNT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
 			zerror(zlogp, B_FALSE, "%s operation is invalid "
-			    "for zones in state '%s'", "reboot",
+			    "for zones in state '%s'", z_cmd_name(cmd),
 			    zone_state_str(zstate));
 			rval = -1;
 			break;
-		case Z_NOTE_UNINSTALLING:
+		}
+		break;
+
+	case ZONE_STATE_MOUNTED:
+		switch (cmd) {
+		case Z_UNMOUNT:
 			if (kernelcall)	/* Invalid; can't happen */
 				abort();
-			zerror(zlogp, B_FALSE, "%s operation is "
-			    "invalid for zones in state '%s'",
-			    "note_uninstall", zone_state_str(zstate));
+			rval = zone_halt(zlogp, B_TRUE);
+			if (rval == 0)
+				(void) sema_post(&scratch_sem);
+			break;
+		default:
+			if (kernelcall)	/* Invalid; can't happen */
+				abort();
+			zerror(zlogp, B_FALSE, "%s operation is invalid "
+			    "for zones in state '%s'", z_cmd_name(cmd),
+			    zone_state_str(zstate));
 			rval = -1;
 			break;
 		}
@@ -750,9 +804,9 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 	case ZONE_STATE_DOWN:
 		switch (cmd) {
 		case Z_READY:
-			if ((rval = zone_halt(zlogp)) != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE)) != 0)
 				break;
-			if ((rval = zone_ready(zlogp)) == 0)
+			if ((rval = zone_ready(zlogp, B_FALSE)) == 0)
 				eventstream_write(Z_EVT_ZONE_READIED);
 			break;
 		case Z_BOOT:
@@ -766,25 +820,27 @@ server(void *cookie, char *args, size_t alen, door_desc_t *dp,
 			rval = 0;
 			break;
 		case Z_HALT:
-			if ((rval = zone_halt(zlogp)) != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE)) != 0)
 				break;
 			eventstream_write(Z_EVT_ZONE_HALTED);
 			break;
 		case Z_REBOOT:
 			eventstream_write(Z_EVT_ZONE_REBOOTING);
-			if ((rval = zone_halt(zlogp)) != 0)
+			if ((rval = zone_halt(zlogp, B_FALSE)) != 0)
 				break;
-			if ((rval = zone_ready(zlogp)) == 0) {
+			if ((rval = zone_ready(zlogp, B_FALSE)) == 0) {
 				rval = zone_bootup(zlogp, "");
 				audit_put_record(zlogp, uc, rval, "reboot");
 				if (rval != 0)
-					(void) zone_halt(zlogp);
+					(void) zone_halt(zlogp, B_FALSE);
 			}
 			break;
 		case Z_NOTE_UNINSTALLING:
-			zerror(zlogp, B_FALSE, "%s operation is "
-			    "invalid for zones in state '%s'",
-			    "note_uninstall", zone_state_str(zstate));
+		case Z_MOUNT:
+		case Z_UNMOUNT:
+			zerror(zlogp, B_FALSE, "%s operation is invalid "
+			    "for zones in state '%s'", z_cmd_name(cmd),
+			    zone_state_str(zstate));
 			rval = -1;
 			break;
 		}
@@ -1023,8 +1079,11 @@ main(int argc, char *argv[])
 	/*
 	 * Process options.
 	 */
-	while ((opt = getopt(argc, argv, "z:")) != EOF) {
+	while ((opt = getopt(argc, argv, "R:z:")) != EOF) {
 		switch (opt) {
+		case 'R':
+			zonecfg_set_root(optarg);
+			break;
 		case 'z':
 			zone_name = optarg;
 			break;
@@ -1206,7 +1265,7 @@ main(int argc, char *argv[])
 	}
 
 	(void) snprintf(zone_door_path, sizeof (zone_door_path),
-	    ZONE_DOOR_PATH, zone_name);
+	    "%s" ZONE_DOOR_PATH, zonecfg_get_root(), zone_name);
 
 	/*
 	 * See if another zoneadmd is running for this zone.  If not, then we
@@ -1237,7 +1296,7 @@ main(int argc, char *argv[])
 	 * serve_console_sock() below gets called, and any pending
 	 * connection is accept()ed).
 	 */
-	if (init_console(zlogp) == -1)
+	if (!zonecfg_in_alt_root() && init_console(zlogp) == -1)
 		goto child_out;
 
 	/*
@@ -1247,6 +1306,13 @@ main(int argc, char *argv[])
 	 * below to see why this matters.
 	 */
 	(void) mutex_lock(&lock);
+
+	/* Init semaphore for scratch zones. */
+	if (sema_init(&scratch_sem, 0, USYNC_THREAD, NULL) == -1) {
+		zerror(zlogp, B_TRUE,
+		    "failed to initialize semaphore for scratch zone");
+		goto child_out;
+	}
 
 	/*
 	 * Note: door setup must occur *after* the console is setup.
@@ -1286,8 +1352,17 @@ main(int argc, char *argv[])
 	 * serve_console() has returned, we are past the point of no return
 	 * in the life of this zoneadmd.
 	 */
-	serve_console(zlogp);
-	assert(in_death_throes);
+	if (zonecfg_in_alt_root()) {
+		/*
+		 * This is just awful, but mounted scratch zones don't (and
+		 * can't) have consoles.  We just wait for unmount instead.
+		 */
+		while (sema_wait(&scratch_sem) == EINTR)
+			;
+	} else {
+		serve_console(zlogp);
+		assert(in_death_throes);
+	}
 
 	/*
 	 * This is the next-to-last part of the exit interlock.  Upon calling

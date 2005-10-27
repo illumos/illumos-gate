@@ -721,7 +721,7 @@ cb_dispatch(struct svc_req *req, SVCXPRT *xprt)
 	    struct nfs4_callback_globals *);
 	void (*freeproc)(CB_COMPOUND4res *);
 
-	ncg = zone_getspecific(nfs4_callback_zone_key, curproc->p_zone);
+	ncg = zone_getspecific(nfs4_callback_zone_key, nfs_zone());
 	ASSERT(ncg != NULL);
 
 	ncg->nfs4_callback_stats.cb_dispatch.value.ui64++;
@@ -1058,7 +1058,7 @@ nfs4_svc(struct nfs4_svc_args *arg, model_t model)
 		return (error);
 	}
 
-	ncg = zone_getspecific(nfs4_callback_zone_key, curproc->p_zone);
+	ncg = zone_getspecific(nfs4_callback_zone_key, nfs_zone());
 	ASSERT(ncg != NULL);
 
 	mutex_enter(&ncg->nfs4_cb_lock);
@@ -1083,7 +1083,7 @@ nfs4_svc(struct nfs4_svc_args *arg, model_t model)
 struct nfs4_callback_globals *
 nfs4_get_callback_globals(void)
 {
-	return (zone_getspecific(nfs4_callback_zone_key, curproc->p_zone));
+	return (zone_getspecific(nfs4_callback_zone_key, nfs_zone()));
 }
 
 static void *
@@ -1376,8 +1376,8 @@ nfs4delegreturn_cleanup(rnode4_t *rp, nfs4_server_t *np)
 
 	if (np != NULL) {
 		ncg = np->zone_globals;
-	} else if (curproc->p_zone == VTOMI4(RTOV4(rp))->mi_zone) {
-		ncg = zone_getspecific(nfs4_callback_zone_key, curproc->p_zone);
+	} else if (nfs_zone() == VTOMI4(RTOV4(rp))->mi_zone) {
+		ncg = zone_getspecific(nfs4_callback_zone_key, nfs_zone());
 		ASSERT(ncg != NULL);
 	} else {
 		/*
@@ -1722,7 +1722,7 @@ nfs4delegreturn(rnode4_t *rp, int flags)
 {
 	struct nfs4_callback_globals *ncg;
 
-	ncg = zone_getspecific(nfs4_callback_zone_key, curproc->p_zone);
+	ncg = zone_getspecific(nfs4_callback_zone_key, nfs_zone());
 	ASSERT(ncg != NULL);
 
 	return (nfs4delegreturn_impl(rp, flags, ncg));
@@ -2060,7 +2060,7 @@ nfs4delegreturn_thread(struct cb_recall_pass *args)
 	callb_cpr_t cpr_info;
 	struct nfs4_callback_globals *ncg;
 
-	ncg = zone_getspecific(nfs4_callback_zone_key, curproc->p_zone);
+	ncg = zone_getspecific(nfs4_callback_zone_key, nfs_zone());
 	ASSERT(ncg != NULL);
 
 	mutex_init(&cpr_lock, NULL, MUTEX_DEFAULT, NULL);
@@ -2183,7 +2183,7 @@ nfs4_delegation_accept(rnode4_t *rp, open_claim_type4 claim,  OPEN4res *res,
 	struct nfs4_callback_globals *ncg;
 	open_delegation_type4 odt;
 
-	ncg = zone_getspecific(nfs4_callback_zone_key, curproc->p_zone);
+	ncg = zone_getspecific(nfs4_callback_zone_key, nfs_zone());
 	ASSERT(ncg != NULL);
 
 	mutex_enter(&rp->r_statev4_lock);
@@ -2598,7 +2598,7 @@ nfs4_dlistclean(void)
 {
 	struct nfs4_callback_globals *ncg;
 
-	ncg = zone_getspecific(nfs4_callback_zone_key, curproc->p_zone);
+	ncg = zone_getspecific(nfs4_callback_zone_key, nfs_zone());
 	ASSERT(ncg != NULL);
 
 	nfs4_dlistclean_impl(ncg, 0);

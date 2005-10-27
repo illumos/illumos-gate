@@ -221,7 +221,7 @@ nfs3_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	STRUCT_DECL(netbuf, addr_tmp);
 	int flags, addr_type;
 	char *p, *pf;
-	zone_t *zone = curproc->p_zone;
+	zone_t *zone = nfs_zone();
 
 	if ((error = secpolicy_fs_mount(cr, mvp, vfsp)) != 0)
 		return (EPERM);
@@ -695,7 +695,7 @@ more:
 	/*
 	 * Stop the mount from going any further if the zone is going away.
 	 */
-	if (zone_status_get(zone) >= ZONE_IS_SHUTTING_DOWN) {
+	if (zone_status_get(curproc->p_zone) >= ZONE_IS_SHUTTING_DOWN) {
 		error = EBUSY;
 		goto errout;
 	}
@@ -772,10 +772,10 @@ nfs3rootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 	struct nfs_stats *nfsstatsp;
 	cred_t *lcr = NULL, *tcr = cr;
 
-	nfsstatsp = zone_getspecific(nfsstat_zone_key, curproc->p_zone);
+	nfsstatsp = zone_getspecific(nfsstat_zone_key, nfs_zone());
 	ASSERT(nfsstatsp != NULL);
 
-	ASSERT(curproc->p_zone == zone);
+	ASSERT(nfs_zone() == zone);
 	/*
 	 * Create a mount record and link it to the vfs struct.
 	 */
@@ -1178,7 +1178,7 @@ nfs3_root(vfs_t *vfsp, vnode_t **vpp)
 
 	mi = VFTOMI(vfsp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EPERM);
 
 	svp = mi->mi_curr_serv;
@@ -1223,7 +1223,7 @@ nfs3_statvfs(vfs_t *vfsp, struct statvfs64 *sbp)
 	hrtime_t t;
 
 	mi = VFTOMI(vfsp);
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EPERM);
 	error = nfs3_root(vfsp, &vp);
 	if (error)
@@ -1332,7 +1332,7 @@ nfs3_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp)
 		return (ESTALE);
 	}
 
-	if (curproc->p_zone != VFTOMI(vfsp)->mi_zone)
+	if (nfs_zone() != VFTOMI(vfsp)->mi_zone)
 		return (EPERM);
 	fh.fh3_length = fidp->fid_len;
 	bcopy(fidp->fid_data, fh.fh3_u.data, fh.fh3_length);

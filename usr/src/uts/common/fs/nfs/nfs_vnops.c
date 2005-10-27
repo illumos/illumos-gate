@@ -241,7 +241,7 @@ nfs_open(vnode_t **vpp, int flag, cred_t *cr)
 
 	vp = *vpp;
 	rp = VTOR(vp);
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 	mutex_enter(&rp->r_statelock);
 	if (rp->r_cred == NULL) {
@@ -293,7 +293,7 @@ nfs_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 	 * open; if we happen to get here from the wrong zone we can't do
 	 * anything over the wire.
 	 */
-	if (VTOMI(vp)->mi_zone != curproc->p_zone) {
+	if (VTOMI(vp)->mi_zone != nfs_zone()) {
 		/*
 		 * We could attempt to clean up locks, except we're sure
 		 * that the current process didn't acquire any locks on
@@ -404,7 +404,7 @@ nfs_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	rp = VTOR(vp);
 	mi = VTOMI(vp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 
 	ASSERT(nfs_rw_lock_held(&rp->r_rwlock, RW_READER));
@@ -517,7 +517,7 @@ nfs_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 	rp = VTOR(vp);
 
 	mi = VTOMI(vp);
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 	if (vp->v_type != VREG)
 		return (EISDIR);
@@ -726,7 +726,7 @@ nfs_rdwrlbn(vnode_t *vp, page_t *pp, u_offset_t off, size_t len,
 	struct buf *bp;
 	int error;
 
-	ASSERT(curproc->p_zone == VTOMI(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
 	bp = pageio_setup(pp, len, vp, flags);
 	ASSERT(bp != NULL);
 
@@ -774,7 +774,7 @@ nfswrite(vnode_t *vp, caddr_t base, uint_t offset, int count, cred_t *cr)
 	rp = VTOR(vp);
 	mi = VTOMI(vp);
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 	wa.wa_args = &wa.wa_args_buf;
 	wa.wa_fhandle = *VTOFH(vp);
@@ -858,7 +858,7 @@ nfsread(vnode_t *vp, caddr_t base, uint_t offset, int count, size_t *residp,
 	rp = VTOR(vp);
 	mi = VTOMI(vp);
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 	douprintf = 1;
 
@@ -962,7 +962,7 @@ static int
 nfs_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 {
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 	switch (cmd) {
 		case _FIODIRECTIO:
@@ -978,7 +978,7 @@ nfs_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	int error;
 	rnode_t *rp;
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 	/*
 	 * If it has been specified that the return value will
@@ -1050,7 +1050,7 @@ nfs_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	    vap->va_size > MAXOFF32_T)
 		return (EFBIG);
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
 	va.va_mask = AT_UID | AT_MODE;
@@ -1085,7 +1085,7 @@ nfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 
 	mask = vap->va_mask;
 
-	ASSERT(curproc->p_zone == VTOMI(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
 
 	rp = VTOR(vp);
 
@@ -1287,7 +1287,7 @@ nfssetattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 static int
 nfs_accessx(void *vp, int mode, cred_t *cr)
 {
-	ASSERT(curproc->p_zone == VTOMI((vnode_t *)vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI((vnode_t *)vp)->mi_zone);
 	return (nfs_access(vp, mode, 0, cr));
 }
 
@@ -1301,7 +1301,7 @@ nfs_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 
 	mi = VTOMI(vp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 	if (mi->mi_flags & MI_ACL) {
 		error = acl_access2(vp, mode, flags, cr);
@@ -1368,7 +1368,7 @@ nfs_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr)
 	if (vp->v_type != VLNK)
 		return (EINVAL);
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
 	rp = VTOR(vp);
@@ -1455,7 +1455,7 @@ nfs_fsync(vnode_t *vp, int syncflag, cred_t *cr)
 	if ((syncflag & FNODSYNC) || IS_SWAPVP(vp))
 		return (0);
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
 	error = nfs_putpage(vp, (offset_t)0, 0, 0, cr);
@@ -1484,7 +1484,7 @@ nfs_inactive(vnode_t *vp, cred_t *cr)
 	 * potentially turn into an expensive no-op if, for instance, v_count
 	 * gets incremented in the meantime, but it's still correct.
 	 */
-	if (curproc->p_zone != VTOMI(vp)->mi_zone) {
+	if (nfs_zone() != VTOMI(vp)->mi_zone) {
 		nfs_async_inactive(vp, cr, nfs_inactive);
 		return;
 	}
@@ -1582,7 +1582,7 @@ nfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	vnode_t *avp = NULL;
 	rnode_t *drp;
 
-	if (curproc->p_zone != VTOMI(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI(dvp)->mi_zone)
 		return (EPERM);
 
 	drp = VTOR(dvp);
@@ -1663,7 +1663,7 @@ nfslookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 {
 	int error;
 
-	ASSERT(curproc->p_zone == VTOMI(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(dvp)->mi_zone);
 
 	/*
 	 * If lookup is for "", just return dvp.  Don't need
@@ -1727,7 +1727,7 @@ nfslookup_dnlc(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr)
 	vnode_t *vp;
 
 	ASSERT(*nm != '\0');
-	ASSERT(curproc->p_zone == VTOMI(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(dvp)->mi_zone);
 
 	/*
 	 * Lookup this name in the DNLC.  If successful, then validate
@@ -1798,7 +1798,7 @@ nfslookup_otw(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr,
 
 	ASSERT(*nm != '\0');
 	ASSERT(dvp->v_type == VDIR);
-	ASSERT(curproc->p_zone == VTOMI(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(dvp)->mi_zone);
 
 	setdiropargs(&da, nm, dvp);
 
@@ -1863,7 +1863,7 @@ nfs_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 
 	drp = VTOR(dvp);
 
-	if (curproc->p_zone != VTOMI(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI(dvp)->mi_zone)
 		return (EPERM);
 	if (nfs_rw_enter_sig(&drp->r_rwlock, RW_WRITER, INTR(dvp)))
 		return (EINTR);
@@ -2101,7 +2101,7 @@ nfs_remove(vnode_t *dvp, char *nm, cred_t *cr)
 	rnode_t *rp;
 	rnode_t *drp;
 
-	if (curproc->p_zone != VTOMI(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI(dvp)->mi_zone)
 		return (EPERM);
 	drp = VTOR(dvp);
 	if (nfs_rw_enter_sig(&drp->r_rwlock, RW_WRITER, INTR(dvp)))
@@ -2228,7 +2228,7 @@ nfs_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
 	int douprintf;
 	rnode_t *tdrp;
 
-	if (curproc->p_zone != VTOMI(tdvp)->mi_zone)
+	if (nfs_zone() != VTOMI(tdvp)->mi_zone)
 		return (EPERM);
 	if (VOP_REALVP(svp, &realvp) == 0)
 		svp = realvp;
@@ -2270,7 +2270,7 @@ nfs_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 {
 	vnode_t *realvp;
 
-	if (curproc->p_zone != VTOMI(odvp)->mi_zone)
+	if (nfs_zone() != VTOMI(odvp)->mi_zone)
 		return (EPERM);
 	if (VOP_REALVP(ndvp, &realvp) == 0)
 		ndvp = realvp;
@@ -2295,7 +2295,7 @@ nfsrename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 	rnode_t *odrp;
 	rnode_t *ndrp;
 
-	ASSERT(curproc->p_zone == VTOMI(odvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(odvp)->mi_zone);
 	if (strcmp(onm, ".") == 0 || strcmp(onm, "..") == 0 ||
 	    strcmp(nnm, ".") == 0 || strcmp(nnm, "..") == 0)
 		return (EINVAL);
@@ -2560,7 +2560,7 @@ nfs_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr)
 	rnode_t *drp;
 	hrtime_t t;
 
-	if (curproc->p_zone != VTOMI(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI(dvp)->mi_zone)
 		return (EPERM);
 
 	setdiropargs(&args.ca_da, nm, dvp);
@@ -2646,7 +2646,7 @@ nfs_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
 	int douprintf;
 	rnode_t *drp;
 
-	if (curproc->p_zone != VTOMI(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI(dvp)->mi_zone)
 		return (EPERM);
 	drp = VTOR(dvp);
 	if (nfs_rw_enter_sig(&drp->r_rwlock, RW_WRITER, INTR(dvp)))
@@ -2739,7 +2739,7 @@ nfs_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr)
 	int douprintf;
 	rnode_t *drp;
 
-	if (curproc->p_zone != VTOMI(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI(dvp)->mi_zone)
 		return (EPERM);
 	setdiropargs(&args.sla_from, lnm, dvp);
 	args.sla_sa = &args.sla_sa_buf;
@@ -2818,7 +2818,7 @@ nfs_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp)
 	rp = VTOR(vp);
 
 	ASSERT(nfs_rw_lock_held(&rp->r_rwlock, RW_READER));
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 	/*
 	 * Make sure that the directory cache is valid.
@@ -3095,7 +3095,7 @@ nfsreaddir(vnode_t *vp, rddir_cache *rdc, cred_t *cr)
 	int douprintf;
 	failinfo_t fi, *fip;
 
-	ASSERT(curproc->p_zone == VTOMI(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
 	count = rdc->buflen;
 
 	rp = VTOR(vp);
@@ -3218,7 +3218,7 @@ nfs_bio(struct buf *bp, cred_t *cr)
 
 	DTRACE_IO1(start, struct buf *, bp);
 
-	ASSERT(curproc->p_zone == VTOMI(bp->b_vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(bp->b_vp)->mi_zone);
 	offset = dbtob(bp->b_blkno);
 
 	if (bp->b_flags & B_READ) {
@@ -3459,7 +3459,7 @@ nfs_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 		return (ENOSYS);
 
 	ASSERT(off <= MAXOFF32_T);
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 	if (protp != NULL)
 		*protp = PROT_ALL;
@@ -3549,7 +3549,7 @@ nfs_getapage(vnode_t *vp, u_offset_t off, size_t len, uint_t *protp,
 	int ra_window; /* readahead window */
 	page_t *pagefound;
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 	rp = VTOR(vp);
 	bsize = MAX(vp->v_vfsp->vfs_bsize, PAGESIZE);
@@ -3803,7 +3803,7 @@ nfs_readahead(vnode_t *vp, u_offset_t blkoff, caddr_t addr, struct seg *seg,
 	uint_t bsize, blksize;
 	rnode_t *rp = VTOR(vp);
 
-	ASSERT(curproc->p_zone == VTOMI(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
 
 	bsize = MAX(vp->v_vfsp->vfs_bsize, PAGESIZE);
 
@@ -3919,7 +3919,7 @@ nfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 	if (len == 0 && !(flags & B_INVAL) && vn_is_readonly(vp))
 		return (0);
 
-	if (!(flags & B_ASYNC) && curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (!(flags & B_ASYNC) && nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 	ASSERT(off <= MAXOFF32_T);
 
@@ -3954,7 +3954,7 @@ nfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
 	ASSERT(!vn_is_readonly(vp));
 	ASSERT(pp != NULL);
 	ASSERT(cr != NULL);
-	ASSERT((flags & B_ASYNC) || curproc->p_zone == VTOMI(vp)->mi_zone);
+	ASSERT((flags & B_ASYNC) || nfs_zone() == VTOMI(vp)->mi_zone);
 
 	rp = VTOR(vp);
 	ASSERT(rp->r_count > 0);
@@ -4071,7 +4071,7 @@ nfs_sync_putapage(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 
 	flags |= B_WRITE;
 
-	ASSERT(curproc->p_zone == VTOMI(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
 	error = nfs_rdwrlbn(vp, pp, io_off, io_len, flags, cr);
 
 	rp = VTOR(vp);
@@ -4129,7 +4129,7 @@ nfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	rnode_t *rp;
 	struct vattr va;
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
 	if (vp->v_flag & VNOMAP)
@@ -4230,7 +4230,7 @@ nfs_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
 	/*
@@ -4260,7 +4260,7 @@ nfs_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	/* check for valid cmd parameter */
 	if (cmd != F_GETLK && cmd != F_SETLK && cmd != F_SETLKW)
 		return (EINVAL);
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
 	/* Verify l_type. */
@@ -4414,7 +4414,7 @@ nfs_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	    (bfp->l_len > MAXOFF32_T))
 		return (EFBIG);
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
 	error = convoff(vp, bfp, 0, offset);
@@ -4477,7 +4477,7 @@ nfs_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 	 * A process may not change zones if it has NFS pages mmap'ed
 	 * in, so we can't legitimately get here from the wrong zone.
 	 */
-	ASSERT(curproc->p_zone == VTOMI(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
 
 	rp = VTOR(vp);
 
@@ -4591,7 +4591,7 @@ nfs_delmap_callback(struct as *as, void *arg, uint_t event)
 		 * dirty pages.
 		 */
 		if ((mi->mi_flags & MI_NOCTO) ||
-		    curproc->p_zone != mi->mi_zone)
+		    nfs_zone() != mi->mi_zone)
 			error = nfs_putpage(dmapp->vp, dmapp->off, dmapp->len,
 			    B_ASYNC, dmapp->cr);
 		else
@@ -4621,7 +4621,7 @@ nfs_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 {
 	int error = 0;
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 	/*
 	 * This looks a little weird because it's written in a general
@@ -4729,7 +4729,7 @@ nfs_sync_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 {
 	int error;
 
-	ASSERT(curproc->p_zone == VTOMI(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI(vp)->mi_zone);
 	error = nfs_rdwrlbn(vp, pp, io_off, io_len, flags, cr);
 	if (flags & B_READ)
 		pvn_read_done(pp, (error ? B_ERROR : 0) | flags);
@@ -4750,7 +4750,7 @@ nfs_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 
 	if (io_off > MAXOFF32_T)
 		return (EFBIG);
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 	rp = VTOR(vp);
 	mutex_enter(&rp->r_statelock);
@@ -4777,7 +4777,7 @@ nfs_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 
 	mi = VTOMI(vp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 	if (mi->mi_flags & MI_ACL) {
 		error = acl_setacl2(vp, vsecattr, flag, cr);
@@ -4796,7 +4796,7 @@ nfs_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 
 	mi = VTOMI(vp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 	if (mi->mi_flags & MI_ACL) {
 		error = acl_getacl2(vp, vsecattr, flag, cr);
@@ -4815,7 +4815,7 @@ nfs_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
 	struct nfs_owner nfs_owner;
 	netobj lm_fh;
 
-	if (curproc->p_zone != VTOMI(vp)->mi_zone)
+	if (nfs_zone() != VTOMI(vp)->mi_zone)
 		return (EIO);
 
 	/*

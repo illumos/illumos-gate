@@ -586,7 +586,7 @@ nfs4_open(vnode_t **vpp, int flag, cred_t *cr)
 	char fn[MAXNAMELEN];
 
 	NFS4_DEBUG(nfs4_client_state_debug, (CE_NOTE, "nfs4_open: "));
-	if (curproc->p_zone != VTOMI4(*vpp)->mi_zone)
+	if (nfs_zone() != VTOMI4(*vpp)->mi_zone)
 		return (EIO);
 	rp = VTOR4(*vpp);
 
@@ -820,7 +820,7 @@ nfs4open_otw(vnode_t *dvp, char *file_name, struct vattr *in_va,
 		"open %s open flag 0x%x cred %p", file_name, open_flag,
 		(void *)cr));
 
-	ASSERT(curproc->p_zone == VTOMI4(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(dvp)->mi_zone);
 	if (create_flag) {
 		/*
 		 * We are to create a file.  Initialize the passed in vnode
@@ -1663,7 +1663,7 @@ nfs4_reopen(vnode_t *vp, nfs4_open_stream_t *osp, nfs4_error_t *ep,
 	nfs4_bseqid_entry_t *bsep = NULL;
 
 	ASSERT(nfs4_consistent_type(vp));
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 	nfs4_error_zinit(ep);
 
@@ -2184,7 +2184,7 @@ nfs4_open_non_reg_file(vnode_t **vpp, int flag, cred_t *cr)
 	rnode4_t *rp;
 	nfs4_ga_res_t gar;
 
-	ASSERT(curproc->p_zone == VTOMI4(*vpp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(*vpp)->mi_zone);
 
 	/*
 	 * If close-to-open consistency checking is turned off or
@@ -2225,7 +2225,7 @@ nfs4_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 	 * open; if we happen to get here from the wrong zone we can't do
 	 * anything over the wire.
 	 */
-	if (VTOMI4(vp)->mi_zone != curproc->p_zone) {
+	if (VTOMI4(vp)->mi_zone != nfs_zone()) {
 		/*
 		 * We could attempt to clean up locks, except we're sure
 		 * that the current process didn't acquire any locks on
@@ -2368,7 +2368,7 @@ nfs4close_otw(rnode4_t *rp, cred_t *cred_otw, nfs4_open_owner_t *oop,
 	nfs4_lost_rqst_t lost_rqst;
 	hrtime_t t;
 
-	ASSERT(curproc->p_zone == VTOMI4(RTOV4(rp))->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(RTOV4(rp))->mi_zone);
 
 	ASSERT(MUTEX_HELD(&osp->os_sync_lock));
 
@@ -2552,7 +2552,7 @@ nfs4_read(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 
 	mi = VTOMI4(vp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 
 	if (uiop->uio_resid == 0)
@@ -2655,7 +2655,7 @@ nfs4_write(vnode_t *vp, struct uio *uiop, int ioflag, cred_t *cr,
 
 	mi = VTOMI4(vp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 
 	if (uiop->uio_resid == 0)
@@ -2898,7 +2898,7 @@ nfs4_rdwrlbn(vnode_t *vp, page_t *pp, u_offset_t off, size_t len,
 	uchar_t fsdata;
 	stable_how4 stab_comm;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 	bp = pageio_setup(pp, len, vp, flags);
 	ASSERT(bp != NULL);
 
@@ -2953,7 +2953,7 @@ nfs4rdwr_check_osid(vnode_t *vp, nfs4_error_t *ep, cred_t *cr)
 	mntinfo4_t 		*mi = VTOMI4(vp);
 	int 			reopen_needed;
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 
 	oop = find_open_owner(cr, NFS4_PERM_CREATED, mi);
@@ -3028,7 +3028,7 @@ nfs4write(vnode_t *vp, caddr_t base, u_offset_t offset, int count, cred_t *cr,
 	rp = VTOR4(vp);
 	mi = VTOMI4(vp);
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 	stable = *stab_comm;
 	*stab_comm = FILE_SYNC4;
@@ -3248,7 +3248,7 @@ nfs4read(vnode_t *vp, caddr_t base, offset_t offset, int count,
 	mi = VTOMI4(vp);
 	doqueue = 1;
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 	args.ctag = async ? TAG_READAHEAD : TAG_READ;
 
@@ -3458,7 +3458,7 @@ recov_retry:
 static int
 nfs4_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 {
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 	switch (cmd) {
 		case _FIODIRECTIO:
@@ -3474,7 +3474,7 @@ nfs4_getattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr)
 	int error;
 	rnode4_t *rp = VTOR4(vp);
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 	/*
 	 * If it has been specified that the return value will
@@ -3560,7 +3560,7 @@ nfs4_setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	if (vap->va_mask & AT_NOSET)
 		return (EINVAL);
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 
 	/*
@@ -3619,7 +3619,7 @@ nfs4setattr(vnode_t *vp, struct vattr *vap, int flags, cred_t *cr,
 	servinfo4_t *svp;
 	bitmap4 supp_attrs;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 	rp = VTOR4(vp);
 	nfs4_init_stateid_types(&sid_types);
 
@@ -4106,7 +4106,7 @@ nfs4_access(vnode_t *vp, int mode, int flags, cred_t *cr)
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 	mntinfo4_t *mi = VTOMI4(vp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 
 	acc = 0;
@@ -4320,7 +4320,7 @@ nfs4_readlink(vnode_t *vp, struct uio *uiop, cred_t *cr)
 	hrtime_t t;
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 	/*
 	 * Can't readlink anything other than a symbolic link.
@@ -4472,7 +4472,7 @@ nfs4_fsync(vnode_t *vp, int syncflag, cred_t *cr)
 
 	if ((syncflag & FNODSYNC) || IS_SWAPVP(vp))
 		return (0);
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 	error = nfs4_putpage_commit(vp, (offset_t)0, 0, cr);
 	if (!error)
@@ -4506,7 +4506,7 @@ nfs4_inactive(vnode_t *vp, cred_t *cr)
 	 * potentially turn into an expensive no-op if, for instance, v_count
 	 * gets incremented in the meantime, but it's still correct.
 	 */
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone) {
+	if (nfs_zone() != VTOMI4(vp)->mi_zone) {
 		nfs4_async_inactive(vp, cr);
 		return;
 	}
@@ -4578,7 +4578,7 @@ nfs4_inactive_otw(vnode_t *vp, cred_t *cr)
 	char *name;
 #endif
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 	ASSERT(!IS_SHADOW(vp, rp));
 
 #ifdef DEBUG
@@ -4778,7 +4778,7 @@ nfs4_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 	rnode4_t *drp;
 
 	*vpp = NULL;
-	if (curproc->p_zone != VTOMI4(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI4(dvp)->mi_zone)
 		return (EPERM);
 	/*
 	 * if LOOKUP_XATTR, must replace dvp (object) with
@@ -4902,7 +4902,7 @@ nfs4lookup(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr, int skipdnlc)
 	int error;
 	rnode4_t *drp;
 
-	ASSERT(curproc->p_zone == VTOMI4(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(dvp)->mi_zone);
 
 	/*
 	 * If lookup is for "", just return dvp.  Don't need
@@ -5069,7 +5069,7 @@ nfs4lookupvalidate_otw(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr)
 	nfs4_ga_res_t *garp = NULL;
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 
-	ASSERT(curproc->p_zone == VTOMI4(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(dvp)->mi_zone);
 	ASSERT(nm != NULL);
 	ASSERT(nm[0] != '\0');
 	ASSERT(dvp->v_type == VDIR);
@@ -5498,7 +5498,7 @@ nfs4lookupnew_otw(vnode_t *dvp, char *nm, vnode_t **vpp, cred_t *cr)
 	rnode4_t *drp = VTOR4(dvp);
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 
-	ASSERT(curproc->p_zone == VTOMI4(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(dvp)->mi_zone);
 	ASSERT(nm != NULL);
 	ASSERT(nm[0] != '\0');
 	ASSERT(dvp->v_type == VDIR);
@@ -6176,7 +6176,7 @@ nfs4openattr(vnode_t *dvp, vnode_t **avp, int cflag, cred_t *cr)
 	int		needrecov = 0;
 	nfs4_recov_state_t recov_state;
 
-	ASSERT(curproc->p_zone == VTOMI4(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(dvp)->mi_zone);
 
 	*avp = NULL;
 	recov_state.rs_flags = 0;
@@ -6339,7 +6339,7 @@ nfs4_create(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	enum createmode4 createmode;
 	bool_t must_trunc = FALSE;
 
-	if (curproc->p_zone != VTOMI4(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI4(dvp)->mi_zone)
 		return (EPERM);
 	if (exclusive == EXCL && (dvp->v_flag & V_XATTRDIR)) {
 		return (EINVAL);
@@ -6662,7 +6662,7 @@ call_nfs4_create_req(vnode_t *dvp, char *nm, void *data, struct vattr *va,
 		idx_fattr = 4;
 	}
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 	if (nfs_rw_enter_sig(&drp->r_rwlock, RW_WRITER, INTR4(dvp))) {
 		return (EINTR);
 	}
@@ -6941,7 +6941,7 @@ nfs4mknod(vnode_t *dvp, char *nm, struct vattr *va, enum vcexcl exclusive,
 	nfs_ftype4 type;
 	specdata4 spec, *specp = NULL;
 
-	ASSERT(curproc->p_zone == VTOMI4(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(dvp)->mi_zone);
 
 	switch (va->va_type) {
 	case VCHR:
@@ -7020,7 +7020,7 @@ nfs4_remove(vnode_t *dvp, char *nm, cred_t *cr)
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 	dirattr_info_t dinfo;
 
-	if (curproc->p_zone != VTOMI4(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI4(dvp)->mi_zone)
 		return (EPERM);
 	drp = VTOR4(dvp);
 	if (nfs_rw_enter_sig(&drp->r_rwlock, RW_WRITER, INTR4(dvp)))
@@ -7248,7 +7248,7 @@ nfs4_link(vnode_t *tdvp, vnode_t *svp, char *tnm, cred_t *cr)
 	ASSERT(nfs4_consistent_type(tdvp));
 	ASSERT(nfs4_consistent_type(svp));
 
-	if (curproc->p_zone != VTOMI4(tdvp)->mi_zone)
+	if (nfs_zone() != VTOMI4(tdvp)->mi_zone)
 		return (EPERM);
 	if (VOP_REALVP(svp, &realvp) == 0) {
 		svp = realvp;
@@ -7438,7 +7438,7 @@ nfs4_rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 {
 	vnode_t *realvp;
 
-	if (curproc->p_zone != VTOMI4(odvp)->mi_zone)
+	if (nfs_zone() != VTOMI4(odvp)->mi_zone)
 		return (EPERM);
 	if (VOP_REALVP(ndvp, &realvp) == 0)
 		ndvp = realvp;
@@ -7468,7 +7468,7 @@ nfs4rename(vnode_t *odvp, char *onm, vnode_t *ndvp, char *nnm, cred_t *cr)
 	int do_link = 1;
 	nfsstat4 stat = NFS4_OK;
 
-	ASSERT(curproc->p_zone == VTOMI4(odvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(odvp)->mi_zone);
 	ASSERT(nfs4_consistent_type(odvp));
 	ASSERT(nfs4_consistent_type(ndvp));
 
@@ -7842,7 +7842,7 @@ nfs4rename_persistent_fh(vnode_t *odvp, char *onm, vnode_t *renvp,
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 	dirattr_info_t dinfo, *dinfop;
 
-	ASSERT(curproc->p_zone == VTOMI4(odvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(odvp)->mi_zone);
 
 	recov_state.rs_flags = 0;
 	recov_state.rs_num_retry_despite_err = 0;
@@ -8034,7 +8034,7 @@ nfs4rename_volatile_fh(vnode_t *odvp, char *onm, vnode_t *ovp,
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 	dirattr_info_t dinfo, *dinfop = &dinfo;
 
-	ASSERT(curproc->p_zone == VTOMI4(odvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(odvp)->mi_zone);
 
 	recov_state.rs_flags = 0;
 	recov_state.rs_num_retry_despite_err = 0;
@@ -8293,7 +8293,7 @@ nfs4_mkdir(vnode_t *dvp, char *nm, struct vattr *va, vnode_t **vpp, cred_t *cr)
 	int error;
 	vnode_t *vp;
 
-	if (curproc->p_zone != VTOMI4(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI4(dvp)->mi_zone)
 		return (EPERM);
 	/*
 	 * As ".." has special meaning and rather than send a mkdir
@@ -8342,7 +8342,7 @@ nfs4_rmdir(vnode_t *dvp, char *nm, vnode_t *cdir, cred_t *cr)
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 	dirattr_info_t dinfo, *dinfop;
 
-	if (curproc->p_zone != VTOMI4(dvp)->mi_zone)
+	if (nfs_zone() != VTOMI4(dvp)->mi_zone)
 		return (EPERM);
 	/*
 	 * As ".." has special meaning and rather than send a rmdir
@@ -8526,7 +8526,7 @@ nfs4_symlink(vnode_t *dvp, char *lnm, struct vattr *tva, char *tnm, cred_t *cr)
 	char *contents;
 	mntinfo4_t *mi = VTOMI4(dvp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EPERM);
 	if (!(mi->mi_flags & MI4_SYMLINK))
 		return (EOPNOTSUPP);
@@ -8581,7 +8581,7 @@ nfs4_readdir(vnode_t *vp, struct uio *uiop, cred_t *cr, int *eofp)
 	rddir4_cache *rdc;
 	rddir4_cache *rrdc;
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 	rp = VTOR4(vp);
 
@@ -8771,7 +8771,7 @@ do_nfs4readdir(vnode_t *vp, rddir4_cache *rdc, cred_t *cr)
 	int error;
 	rnode4_t *rp;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	rp = VTOR4(vp);
 
@@ -8887,7 +8887,7 @@ nfs4readdir(vnode_t *vp, rddir4_cache *rdc, cred_t *cr)
 	hrtime_t t;
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 	ASSERT(rdc->flags & RDDIR);
 	ASSERT(rdc->entries == NULL);
 
@@ -9246,7 +9246,7 @@ nfs4_bio(struct buf *bp, stable_how4 *stab_comm, cred_t *cr, bool_t readahead)
 	bool_t first_time = TRUE;	/* first time getting otw cred */
 	bool_t last_time = FALSE;	/* last time getting otw cred */
 
-	ASSERT(curproc->p_zone == VTOMI4(bp->b_vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(bp->b_vp)->mi_zone);
 
 	DTRACE_IO1(start, struct buf *, bp);
 	offset = ldbtob(bp->b_lblkno);
@@ -9421,7 +9421,7 @@ nfs4_rwunlock(vnode_t *vp, int write_lock, caller_context_t *ctp)
 static int
 nfs4_seek(vnode_t *vp, offset_t ooff, offset_t *noffp)
 {
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 
 	/*
@@ -9449,7 +9449,7 @@ nfs4_getpage(vnode_t *vp, offset_t off, size_t len, uint_t *protp,
 	int error;
 	mntinfo4_t *mi;
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 	rp = VTOR4(vp);
 	if (IS_SHADOW(vp, rp))
@@ -9555,7 +9555,7 @@ nfs4_getapage(vnode_t *vp, u_offset_t off, size_t len, uint_t *protp,
 	page_t *pagefound;
 	page_t *savepp;
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 
 	rp = VTOR4(vp);
@@ -9815,7 +9815,7 @@ nfs4_readahead(vnode_t *vp, u_offset_t blkoff, caddr_t addr, struct seg *seg,
 	rnode4_t *rp = VTOR4(vp);
 	page_t *savepp;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	bsize = MAX(vp->v_vfsp->vfs_bsize, PAGESIZE);
 
@@ -9927,7 +9927,7 @@ nfs4_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 
 	ASSERT(cr != NULL);
 
-	if (!(flags & B_ASYNC) && curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (!(flags & B_ASYNC) && nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 
 	rp = VTOR4(vp);
@@ -9974,7 +9974,7 @@ nfs4_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp, size_t *lenp,
 	ASSERT(!(vp->v_vfsp->vfs_flag & VFS_RDONLY));
 	ASSERT(pp != NULL);
 	ASSERT(cr != NULL);
-	ASSERT((flags & B_ASYNC) || curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT((flags & B_ASYNC) || nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	rp = VTOR4(vp);
 	ASSERT(rp->r_count > 0);
@@ -10088,7 +10088,7 @@ nfs4_sync_putapage(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	int error;
 	rnode4_t *rp;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	flags |= B_WRITE;
 
@@ -10157,7 +10157,7 @@ nfs4_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	rnode4_t *rp = VTOR4(vp);
 	mntinfo4_t *mi = VTOMI4(vp);
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 
 	if (vp->v_flag & VNOMAP)
@@ -10426,7 +10426,7 @@ nfs4_addmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 	mi = VTOMI4(vp);
 	rp = VTOR4(vp);
 
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
@@ -10538,7 +10538,7 @@ nfs4_frlock(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 	int error = 0, intr = INTR4(vp);
 	nfs4_error_t e;
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 
 	/* check for valid cmd parameter */
@@ -10684,7 +10684,7 @@ nfs4_space(vnode_t *vp, int cmd, struct flock64 *bfp, int flag,
 {
 	int error;
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 	ASSERT(vp->v_type == VREG);
 	if (cmd != F_FREESP)
@@ -10741,7 +10741,7 @@ nfs4_delmap(vnode_t *vp, offset_t off, struct as *as, caddr_t addr,
 	 * A process may not change zones if it has NFS pages mmap'ed
 	 * in, so we can't legitimately get here from the wrong zone.
 	 */
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	rp = VTOR4(vp);
 
@@ -11003,7 +11003,7 @@ nfs4_pathconf(vnode_t *vp, int cmd, ulong_t *valp, cred_t *cr)
 
 	gar.n4g_ext_res = &ger;
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 	if (cmd == _PC_PATH_MAX || cmd == _PC_SYMLINK_MAX) {
 		*valp = MAXPATHLEN;
@@ -11133,7 +11133,7 @@ nfs4_sync_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 {
 	int error;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	error = nfs4_rdwrlbn(vp, pp, io_off, io_len, flags, cr);
 	if (flags & B_READ)
@@ -11150,7 +11150,7 @@ nfs4_pageio(vnode_t *vp, page_t *pp, u_offset_t io_off, size_t io_len,
 	int error;
 	rnode4_t *rp;
 
-	if (!(flags & B_ASYNC) && curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (!(flags & B_ASYNC) && nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 
 	if (pp == NULL)
@@ -11314,7 +11314,7 @@ nfs4_dispose(vnode_t *vp, page_t *pp, int fl, int dn, cred_t *cr)
 	mutex_exit(&rp->r_statelock);
 
 	if (curproc == proc_pageout || curproc == proc_fsflush ||
-	    curproc->p_zone != VTOMI4(vp)->mi_zone) {
+	    nfs_zone() != VTOMI4(vp)->mi_zone) {
 		nfs4_async_commit(vp, plist, offset, len,
 		    cr, do_nfs4_async_commit);
 		return;
@@ -11402,7 +11402,7 @@ nfs4_commit(vnode_t *vp, offset4 offset, count4 count, cred_t *cr)
 	bool_t last_time = FALSE;	/* last time getting OTW cred */
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	rp = VTOR4(vp);
 
@@ -11544,7 +11544,7 @@ nfs4_set_mod(vnode_t *vp)
 	kmutex_t *vphm;
 	rnode4_t *rp;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	/* make sure we're looking at the master vnode, not a shadow */
 
@@ -11693,7 +11693,7 @@ nfs4_get_commit_range(vnode_t *vp, u_offset_t soff, size_t len)
 	rp = VTOR4(vp);
 	ASSERT(rp->r_flags & R4COMMIT);
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	/* make sure we're looking at the master vnode, not a shadow */
 
@@ -11753,7 +11753,7 @@ nfs4_putpage_commit(vnode_t *vp, offset_t poff, size_t plen, cred_t *cr)
 	verifier4 write_verf;
 	rnode4_t *rp = VTOR4(vp);
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	/*
 	 * Flush the data portion of the file and then commit any
@@ -11831,7 +11831,7 @@ nfs4_commit_vp(vnode_t *vp, u_offset_t poff, size_t plen,
 	offset3 offset;
 	count3 len;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	rp = VTOR4(vp);
 
@@ -11907,7 +11907,7 @@ nfs4_sync_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
 	int error;
 	page_t *pp;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	error = nfs4_commit(vp, (offset4)offset, (count3)count, cr);
 
@@ -11956,7 +11956,7 @@ nfs4_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 	vsecattr_t	nfsace4_vsap;
 
 	mi = VTOMI4(vp);
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 	if (mi->mi_flags & MI4_ACL) {
 		/* if we have a delegation, return it */
@@ -12003,7 +12003,7 @@ nfs4_getsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 	rnode4_t	*rp = VTOR4(vp);
 
 	mi = VTOMI4(vp);
-	if (curproc->p_zone != mi->mi_zone)
+	if (nfs_zone() != mi->mi_zone)
 		return (EIO);
 
 	bzero(&gar, sizeof (gar));
@@ -12208,7 +12208,7 @@ nfs4_shrlock(vnode_t *vp, int cmd, struct shrlock *shr, int flag, cred_t *cr)
 {
 	int error;
 
-	if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+	if (nfs_zone() != VTOMI4(vp)->mi_zone)
 		return (EIO);
 	/*
 	 * check for valid cmd parameter
@@ -12266,7 +12266,7 @@ nfs4_update_attrcache(nfsstat4 status, nfs4_ga_res_t *garp,
 {
 	int error = 0;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	if (status != NFS4_OK) {
 		/* getattr not done or failed */
@@ -12292,7 +12292,7 @@ nfs4_update_dircaches(change_info4 *cinfo, vnode_t *dvp, vnode_t *vp, char *nm,
 {
 	rnode4_t	*drp = VTOR4(dvp);
 
-	ASSERT(curproc->p_zone == VTOMI4(dvp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(dvp)->mi_zone);
 
 	/* Purge rddir cache for dir since it changed */
 	if (drp->r_dir != NULL)
@@ -12397,7 +12397,7 @@ nfs4open_confirm(vnode_t *vp, seqid4 *seqid, stateid4 *stateid, cred_t *cr,
 	OPEN_CONFIRM4args *open_confirm_args;
 	int needrecov;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 #if DEBUG
 	mutex_enter(&oop->oo_lock);
 	ASSERT(oop->oo_seqid_inuse);
@@ -12520,7 +12520,7 @@ state_to_cred(nfs4_open_stream_t *osp)
 static struct lm_sysid *
 nfs4_find_sysid(mntinfo4_t *mi)
 {
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 	/*
 	 * Switch from RDMA knconf to original mount knconf
@@ -12622,7 +12622,7 @@ nfs4frlock_validate_args(int cmd, flock64_t *flk, int flag, vnode_t *vp,
 static int
 nfs4frlock_get_sysid(struct lm_sysid **lspp, vnode_t *vp, flock64_t *flk)
 {
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	/* Find the lm_sysid */
 	*lspp = nfs4_find_sysid(VTOMI4(vp));
@@ -12718,7 +12718,7 @@ nfs4frlock_start_call(nfs4_lock_call_type_t ctype, vnode_t *vp,
 	int error = 0;
 	rnode4_t *rp;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	if (ctype == NFS4_LCK_CTYPE_NORM) {
 		error = nfs4_start_fop(VTOMI4(vp), vp, NULL, op_hint,
@@ -12853,7 +12853,7 @@ nfs4frlock_setup_lockt_args(nfs4_lock_call_type_t ctype, nfs_argop4 *argop,
 {
 	LOCKT4args *lockt_args;
 
-	ASSERT(curproc->p_zone == VTOMI4(RTOV4(rp))->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(RTOV4(rp))->mi_zone);
 	ASSERT(ctype == NFS4_LCK_CTYPE_NORM);
 	argop->argop = OP_LOCKT;
 	argsp->ctag = TAG_LOCKT;
@@ -12901,7 +12901,7 @@ nfs4frlock_check_deleg(vnode_t *vp, nfs4_error_t *ep, cred_t *cr, int lt)
 	rnode4_t		*rp = VTOR4(vp);
 	mntinfo4_t		*mi = VTOMI4(vp);
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 	nfs4_error_zinit(ep);
 
@@ -13005,7 +13005,7 @@ nfs4frlock_setup_locku_args(nfs4_lock_call_type_t ctype, nfs_argop4 *argop,
 	bool_t			is_spec = FALSE;
 	rnode4_t		*rp = VTOR4(vp);
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 	ASSERT(ctype == NFS4_LCK_CTYPE_NORM);
 
 	nfs4frlock_check_deleg(vp, ep, cr, F_UNLCK);
@@ -13116,7 +13116,7 @@ nfs4frlock_setup_lock_args(nfs4_lock_call_type_t ctype, LOCK4args **lock_argsp,
 	pid_t			pid;
 	rnode4_t		*rp = VTOR4(vp);
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	nfs4frlock_check_deleg(vp, ep, cr, flk->l_type);
 	if (ep->error || ep->stat != NFS4_OK)
@@ -13174,7 +13174,7 @@ nfs4frlock_save_lost_rqst(nfs4_lock_call_type_t ctype, int error,
 {
 	bool_t unlock = (flk->l_type == F_UNLCK);
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 	ASSERT(ctype == NFS4_LCK_CTYPE_NORM ||
 	    ctype == NFS4_LCK_CTYPE_REINSTATE);
 
@@ -13344,7 +13344,7 @@ nfs4frlock_recovery(int needrecov, nfs4_error_t *ep,
 
 	bool_t abort, retry;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 	ASSERT((*argspp) != NULL);
 	ASSERT((*respp) != NULL);
 	if (lock_args || locku_args)
@@ -13456,7 +13456,7 @@ nfs4frlock_results_ok(nfs4_lock_call_type_t ctype, int cmd, flock64_t *flk,
 	vnode_t *vp, int flag, u_offset_t offset,
 	nfs4_lost_rqst_t *resend_rqstp)
 {
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 	if ((cmd == F_SETLK || cmd == F_SETLKW) &&
 	    (flk->l_type == F_RDLCK || flk->l_type == F_WRLCK)) {
 		if (ctype == NFS4_LCK_CTYPE_NORM) {
@@ -13491,7 +13491,7 @@ nfs4frlock_results_denied(nfs4_lock_call_type_t ctype, LOCK4args *lock_args,
 	nfs_resop4 *resop, cred_t *cr, bool_t *did_start_fop,
 	bool_t *skip_get_err)
 {
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	if (lock_args) {
 		nfs4_open_owner_t	*oop = *oopp;
@@ -13641,7 +13641,7 @@ nfs4frlock_update_state(LOCK4args *lock_args, LOCKU4args *locku_args,
 	vnode_t *vp, flock64_t *flk, cred_t *cr,
 	nfs4_lost_rqst_t *resend_rqstp)
 {
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	if (lock_args) {
 		LOCK4res *lock_res;
@@ -13708,7 +13708,7 @@ nfs4frlock_final_cleanup(nfs4_lock_call_type_t ctype, COMPOUND4args_clnt *argsp,
 	int		error = *errorp;
 	nfs_argop4	*argop;
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 	/*
 	 * The client recovery code wants the raw status information,
 	 * so don't map the NFS status code to an errno value for
@@ -13867,7 +13867,7 @@ nfs4frlock(nfs4_lock_call_type_t ctype, vnode_t *vp, int cmd, flock64_t *flk,
 	char *name;
 #endif
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 #ifdef DEBUG
 	name = fn_name(VTOSV(vp)->sv_name);
@@ -14185,7 +14185,7 @@ nfs4_safelock(vnode_t *vp, const struct flock64 *bfp, cred_t *cr)
 	struct vattr va;
 	int error;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 	ASSERT(rp->r_mapcnt >= 0);
 	NFS4_DEBUG(nfs4_client_lock_debug, (CE_NOTE, "nfs4_safelock %s: "
 		"(%"PRIx64", %"PRIx64"); mapcnt = %ld", bfp->l_type == F_WRLCK ?
@@ -14246,7 +14246,7 @@ nfs4_register_lock_locally(vnode_t *vp, struct flock64 *flk, int flag,
 	char *name;
 #endif
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 #ifdef DEBUG
 	name = fn_name(VTOSV(vp)->sv_name);
@@ -14304,7 +14304,7 @@ nfs4_lockrelease(vnode_t *vp, int flag, offset_t offset, cred_t *cr)
 	bool_t recovonly;
 
 	ASSERT((uintptr_t)vp > KERNELBASE);
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	rp = VTOR4(vp);
 	mi = VTOMI4(vp);
@@ -14474,7 +14474,7 @@ vtodv(vnode_t *vp, vnode_t **dvpp, cred_t *cr, bool_t need_start_op)
 	nfs4_fname_t *mfname;
 	int error;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	if (vp->v_flag & VROOT) {
 		nfs4_sharedfh_t *sfh;
@@ -14639,7 +14639,7 @@ nfs4close_notw(vnode_t *vp, nfs4_open_stream_t *osp, int *have_lockp)
 
 	NFS4_DEBUG(nfs4close_notw_debug, (CE_NOTE, "nfs4close_notw: "
 	    "rp=%p osp=%p", (void *)rp, (void *)osp));
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 	ASSERT(mutex_owned(&osp->os_sync_lock));
 	ASSERT(*have_lockp);
 
@@ -14681,7 +14681,7 @@ nfs4close_all(vnode_t *vp, cred_t *cr)
 	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
 	rnode4_t *rp;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	error = 0;
 	rp = VTOR4(vp);
@@ -14823,7 +14823,7 @@ nfs4close_one(vnode_t *vp, nfs4_open_stream_t *provided_osp, cred_t *cr,
 	int did_start_seqid_sync = 0;
 	int have_sync_lock = 0;
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	NFS4_DEBUG(nfs4close_one_debug, (CE_NOTE, "closing vp %p osp %p, "
 	    "lrp %p, close type %d len %ld prot %x mmap flags %x bits %x",
@@ -15567,7 +15567,7 @@ nfs4_reinstitute_local_lock_state(vnode_t *vp, flock64_t *lost_flp, cred_t *cr,
 	 * as that found in the active lock list, "list". The intersecting
 	 * region locks are added to ri_llp in increasing l_start order.
 	 */
-	ASSERT(curproc->p_zone == mi->mi_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
 
 	locks = flk_active_locks_for_vp(vp);
 	ri_llp = NULL;
@@ -15696,7 +15696,7 @@ push_reinstate(vnode_t *vp, int cmd, flock64_t *flk, cred_t *cr,
 	nfs_lock_type4 locktype;
 	nfs4_error_t e = { EINTR, NFS4_OK, RPC_SUCCESS };
 
-	ASSERT(curproc->p_zone == VTOMI4(vp)->mi_zone);
+	ASSERT(nfs_zone() == VTOMI4(vp)->mi_zone);
 
 	locktype = flk_to_locktype(cmd, flk->l_type);
 	nfs4frlock_save_lost_rqst(NFS4_LCK_CTYPE_REINSTATE, EINTR, locktype,

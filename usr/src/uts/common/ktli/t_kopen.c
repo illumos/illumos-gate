@@ -80,6 +80,13 @@ t_kopen(file_t *fp, dev_t rdev, int flags, TIUSER **tiptr, cred_t *cr)
 	TIUSER			*ntiptr;
 	int			rtries = 0;
 
+	/*
+	 * Special case for install: miniroot needs to be able to access files
+	 * via NFS as though it were always in the global zone.
+	 */
+	if (nfs_global_client_only != 0)
+		cr = kcred;
+
 	KTLILOG(2, "t_kopen: fp %x, ", fp);
 	KTLILOG(2, "rdev %x, ", rdev);
 	KTLILOG(2, "flags %x\n", flags);

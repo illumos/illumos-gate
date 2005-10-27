@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -339,7 +339,7 @@ nfs_idmap_str_uid(utf8string *u8s, uid_t *uid, bool_t isserver)
 	door_arg_t		door_args;
 	door_handle_t		dh;
 
-	nig = zone_getspecific(nfsidmap_zone_key, curproc->p_zone);
+	nig = zone_getspecific(nfsidmap_zone_key, nfs_zone());
 	ASSERT(nig != NULL);
 
 	if (!u8s || !u8s->utf8string_val || u8s->utf8string_len == 0 ||
@@ -552,7 +552,7 @@ nfs_idmap_uid_str(uid_t uid, utf8string *u8s, bool_t isserver)
 	door_arg_t		door_args;
 	door_handle_t		dh;
 
-	nig = zone_getspecific(nfsidmap_zone_key, curproc->p_zone);
+	nig = zone_getspecific(nfsidmap_zone_key, nfs_zone());
 	ASSERT(nig != NULL);
 
 	/*
@@ -718,7 +718,7 @@ nfs_idmap_str_gid(utf8string *u8s, gid_t *gid, bool_t isserver)
 	door_arg_t		door_args;
 	door_handle_t		dh;
 
-	nig = zone_getspecific(nfsidmap_zone_key, curproc->p_zone);
+	nig = zone_getspecific(nfsidmap_zone_key, nfs_zone());
 	ASSERT(nig != NULL);
 
 	if (!u8s || !u8s->utf8string_val || u8s->utf8string_len == 0 ||
@@ -932,7 +932,7 @@ nfs_idmap_gid_str(gid_t gid, utf8string *u8s, bool_t isserver)
 	door_arg_t		door_args;
 	door_handle_t		dh;
 
-	nig = zone_getspecific(nfsidmap_zone_key, curproc->p_zone);
+	nig = zone_getspecific(nfsidmap_zone_key, nfs_zone());
 	ASSERT(nig != NULL);
 
 	/*
@@ -1138,7 +1138,7 @@ nfs_idmap_args(struct nfsidmap_args *idmp)
 {
 	struct nfsidmap_globals *nig;
 
-	nig = zone_getspecific(nfsidmap_zone_key, curproc->p_zone);
+	nig = zone_getspecific(nfsidmap_zone_key, nfs_zone());
 	ASSERT(nig != NULL);
 
 	nfs_idmap_cache_flush(&nig->u2s_ci);

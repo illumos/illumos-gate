@@ -815,7 +815,7 @@ again:
 	if (list_head(&rp->r_open_streams) != NULL) {
 		mutex_exit(&rp->r_os_lock);
 		rw_exit(&rp->r_hashq->r_lock);
-		if (curproc->p_zone != VTOMI4(vp)->mi_zone)
+		if (nfs_zone() != VTOMI4(vp)->mi_zone)
 			nfs4_clear_open_streams(rp);
 		else
 			(void) nfs4close_all(vp, cr);

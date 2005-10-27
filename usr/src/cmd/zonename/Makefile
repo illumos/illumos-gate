@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/zonename/Makefile
@@ -31,6 +31,10 @@
 PROG=	zonename
 
 include	../Makefile.cmd
+
+LAZYLIBS =	$(ZLAZYLOAD) -lzonecfg $(ZNOLAZYLOAD)
+lint :=		LAZYLIBS = -lzonecfg
+LDLIBS +=	$(LAZYLIBS)
 
 .KEEP_STATE:
 

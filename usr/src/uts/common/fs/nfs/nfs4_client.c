@@ -1727,7 +1727,7 @@ nfs4_async_putapage(vnode_t *vp, page_t *pp, u_offset_t off, size_t len,
 noasync:
 
 	if (curproc == proc_pageout || curproc == proc_fsflush ||
-	    curproc->p_zone == mi->mi_zone) {
+	    nfs_zone() == mi->mi_zone) {
 		/*
 		 * If we get here in the context of the pageout/fsflush,
 		 * or we have run out of memory or we're attempting to
@@ -1748,7 +1748,7 @@ noasync:
 	}
 
 	/*
-	 * We'll get here only if (curproc->p_zone != mi->mi_zone)
+	 * We'll get here only if (nfs_zone() != mi->mi_zone)
 	 * which means that this was a cross-zone sync putpage.
 	 *
 	 * We pass in B_ERROR to pvn_write_done() to re-mark the pages
@@ -1877,7 +1877,7 @@ noasync:
 		return (0);
 	}
 
-	if (curproc->p_zone != mi->mi_zone) {
+	if (nfs_zone() != mi->mi_zone) {
 		/*
 		 * So this was a cross-zone sync pageio.  We pass in B_ERROR
 		 * to pvn_write_done() to re-mark the pages as dirty and unlock
@@ -2061,7 +2061,7 @@ nfs4_async_commit(vnode_t *vp, page_t *plist, offset3 offset, count3 count,
 
 noasync:
 	if (curproc == proc_pageout || curproc == proc_fsflush ||
-	    curproc->p_zone != mi->mi_zone) {
+	    nfs_zone() != mi->mi_zone) {
 		while (plist != NULL) {
 			pp = plist;
 			page_sub(&plist, pp);

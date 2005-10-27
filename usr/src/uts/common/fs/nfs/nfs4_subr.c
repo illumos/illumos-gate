@@ -1548,8 +1548,8 @@ rfs4call(mntinfo4_t *mi, COMPOUND4args_clnt *argsp, COMPOUND4res_clnt *resp,
 	int num_resops;
 	struct nfs4_clnt *nfscl;
 
-	ASSERT(curproc->p_zone == mi->mi_zone);
-	nfscl = zone_getspecific(nfs4clnt_zone_key, curproc->p_zone);
+	ASSERT(nfs_zone() == mi->mi_zone);
+	nfscl = zone_getspecific(nfs4clnt_zone_key, nfs_zone());
 	ASSERT(nfscl != NULL);
 
 	nfscl->nfscl_stat.calls.value.ui64++;
@@ -2017,7 +2017,7 @@ nfs4_make_dotdot(nfs4_sharedfh_t *fhp, hrtime_t t, vnode_t *dvp,
 		    ((! need_start_op) && (no_need_start_op)));
 	}
 #endif
-	ASSERT(VTOMI4(dvp)->mi_zone == curproc->p_zone);
+	ASSERT(VTOMI4(dvp)->mi_zone == nfs_zone());
 
 	NFS4_DEBUG(nfs4_client_shadow_debug, (CE_NOTE,
 	    "nfs4_make_dotdot: called with fhp %p, dvp %s", (void *)fhp,

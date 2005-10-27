@@ -543,7 +543,7 @@ clnt_cots_kcreate(dev_t dev, struct netbuf *addr, int family, rpcprog_t prog,
 
 	RPCLOG(8, "clnt_cots_kcreate: prog %u\n", prog);
 
-	rpcstat = zone_getspecific(rpcstat_zone_key, curproc->p_zone);
+	rpcstat = zone_getspecific(rpcstat_zone_key, rpc_zone());
 	ASSERT(rpcstat != NULL);
 
 	/* Allocate and intialize the client handle. */
@@ -1737,7 +1737,7 @@ connmgr_get(
 	clock_t prev_time;
 	int tidu_size;
 	bool_t	connected;
-	zoneid_t zoneid = getzoneid();
+	zoneid_t zoneid = rpc_zoneid();
 
 	/*
 	 * If the call is not a retry, look for a transport entry that
@@ -2459,7 +2459,7 @@ connmgr_connect(
 		 */
 		struct rpcstat *rpcstat;
 
-		rpcstat = zone_getspecific(rpcstat_zone_key, curproc->p_zone);
+		rpcstat = zone_getspecific(rpcstat_zone_key, rpc_zone());
 		ASSERT(rpcstat != NULL);
 
 		RPCLOG0(1, "connmgr_connect: cannot alloc mp for "

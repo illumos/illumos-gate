@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1342,19 +1342,33 @@ main(int argc, char **argv)
 	char *slavename, slaveshortname[MAXPATHLEN];
 	priv_set_t *privset;
 	int tmpl_fd;
+	struct stat sb;
+	char kernzone[ZONENAME_MAX];
 
 	(void) setlocale(LC_ALL, "");
 	(void) textdomain(TEXT_DOMAIN);
 
 	(void) getpname(argv[0]);
 
-	while ((arg = getopt(argc, argv, "ECSe:l:")) != EOF) {
+	while ((arg = getopt(argc, argv, "ECR:Se:l:")) != EOF) {
 		switch (arg) {
 		case 'C':
 			console = 1;
 			break;
 		case 'E':
 			nocmdchar = 1;
+			break;
+		case 'R':	/* undocumented */
+			if (*optarg != '/') {
+				zerror(gettext("root path must be absolute."));
+				exit(2);
+			}
+			if (stat(optarg, &sb) == -1 || !S_ISDIR(sb.st_mode)) {
+				zerror(
+				    gettext("root path must be a directory."));
+				exit(2);
+			}
+			zonecfg_set_root(optarg);
 			break;
 		case 'S':
 			failsafe = 1;
@@ -1379,6 +1393,11 @@ main(int argc, char **argv)
 	if (console != 0 && failsafe != 0) {
 		zerror(gettext("-S may not be specified for console login"));
 		usage();
+	}
+
+	if (console != 0 && zonecfg_in_alt_root()) {
+		zerror(gettext("-R may not be specified for console login"));
+		exit(2);
 	}
 
 	if (failsafe != 0 && lflag != 0) {
@@ -1503,22 +1522,36 @@ main(int argc, char **argv)
 		return (0);
 	}
 
-	if (st != ZONE_STATE_RUNNING) {
+	if (st != ZONE_STATE_RUNNING && st != ZONE_STATE_MOUNTED) {
 		zerror(gettext("login allowed only to running zones "
 		    "(%s is '%s')."), zonename, zone_state_str(st));
 		return (1);
 	}
 
-	/*
-	 * We only need the zone root path and zoneid if we are setting up a
-	 * pty.
-	 */
-	if ((zoneid = getzoneidbyname(zonename)) == -1) {
+	(void) strlcpy(kernzone, zonename, sizeof (kernzone));
+	if (zonecfg_in_alt_root()) {
+		FILE *fp = zonecfg_open_scratch("", B_FALSE);
+
+		if (fp == NULL || zonecfg_find_scratch(fp, zonename,
+		    zonecfg_get_root(), kernzone, sizeof (kernzone)) == -1) {
+			zerror(gettext("cannot find scratch zone %s"),
+			    zonename);
+			if (fp != NULL)
+				zonecfg_close_scratch(fp);
+			return (1);
+		}
+		zonecfg_close_scratch(fp);
+	}
+
+	if ((zoneid = getzoneidbyname(kernzone)) == -1) {
 		zerror(gettext("failed to get zoneid for zone '%s'"),
 		    zonename);
 		return (1);
 	}
 
+	/*
+	 * We need the zone path only if we are setting up a pty.
+	 */
 	if (zone_get_zonepath(zonename, zonepath, sizeof (zonepath)) == -1) {
 		zerror(gettext("could not get root path for zone %s"),
 		    zonename);
@@ -1538,6 +1571,12 @@ main(int argc, char **argv)
 	if (!interactive)
 		return (noninteractive_login(zonename, zoneid, login, new_args,
 		    new_env));
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot use interactive login with scratch "
+		    "zone"));
+		return (1);
+	}
 
 	/*
 	 * Things are more complex in interactive mode; we get the

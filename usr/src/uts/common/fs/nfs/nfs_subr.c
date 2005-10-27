@@ -454,7 +454,7 @@ clget(clinfo_t *ci, servinfo_t *svp, cred_t *cr, CLIENT **newcl,
 {
 	struct nfs_clnt *nfscl;
 
-	nfscl = zone_getspecific(nfsclnt_zone_key, curproc->p_zone);
+	nfscl = zone_getspecific(nfsclnt_zone_key, nfs_zone());
 	ASSERT(nfscl != NULL);
 
 	return (clget_impl(ci, svp, cr, newcl, chp, nfscl));
@@ -612,7 +612,7 @@ clfree(CLIENT *cl, struct chtab *cp)
 {
 	struct nfs_clnt *nfscl;
 
-	nfscl = zone_getspecific(nfsclnt_zone_key, curproc->p_zone);
+	nfscl = zone_getspecific(nfsclnt_zone_key, nfs_zone());
 	ASSERT(nfscl != NULL);
 
 	clfree_impl(cl, cp, nfscl);
@@ -937,7 +937,7 @@ rfscall(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 	TRACE_2(TR_FAC_NFS, TR_RFSCALL_START,
 		"rfscall_start:which %d mi %p", which, mi);
 
-	nfscl = zone_getspecific(nfsclnt_zone_key, curproc->p_zone);
+	nfscl = zone_getspecific(nfsclnt_zone_key, nfs_zone());
 	ASSERT(nfscl != NULL);
 
 	nfscl->nfscl_stat.calls.value.ui64++;
@@ -1475,7 +1475,7 @@ aclcall(mntinfo_t *mi, rpcproc_t which, xdrproc_t xdrargs, caddr_t argsp,
 		"rfscall_start:which %d mi %p", which, mi);
 #endif
 
-	nfscl = zone_getspecific(nfsclnt_zone_key, curproc->p_zone);
+	nfscl = zone_getspecific(nfsclnt_zone_key, nfs_zone());
 	ASSERT(nfscl != NULL);
 
 	nfscl->nfscl_stat.calls.value.ui64++;
@@ -4208,7 +4208,7 @@ failover_thread(mntinfo_t *mi)
 	 * DEBUG kernels, hence we don't want to pay the penalty of the lookup
 	 * on non-DEBUG kernels.
 	 */
-	nfscl = zone_getspecific(nfsclnt_zone_key, curproc->p_zone);
+	nfscl = zone_getspecific(nfsclnt_zone_key, nfs_zone());
 	ASSERT(nfscl != NULL);
 #endif
 
@@ -4431,7 +4431,7 @@ failover_remap(failinfo_t *fi)
 #ifdef DEBUG
 	struct nfs_clnt *nfscl;
 
-	nfscl = zone_getspecific(nfsclnt_zone_key, curproc->p_zone);
+	nfscl = zone_getspecific(nfsclnt_zone_key, nfs_zone());
 	ASSERT(nfscl != NULL);
 #endif
 	/*
@@ -4933,4 +4933,29 @@ nfs_getsrvnames(mntinfo_t *mi, size_t *len)
 	*len = length;
 
 	return (srvnames);
+}
+
+/*
+ * These two functions are temporary and designed for the upgrade-workaround
+ * only.  They cannot be used for general zone-crossing NFS client support, and
+ * will be removed shortly.
+ *
+ * When the workaround is enabled, all NFS traffic is forced into the global
+ * zone.  These functions are called when the code needs to refer to the state
+ * of the underlying network connection.  They're not called when the function
+ * needs to refer to the state of the process that invoked the system call.
+ * (E.g., when checking whether the zone is shutting down during the mount()
+ * call.)
+ */
+
+struct zone *
+nfs_zone(void)
+{
+	return (nfs_global_client_only != 0 ? global_zone : curproc->p_zone);
+}
+
+zoneid_t
+nfs_zoneid(void)
+{
+	return (nfs_global_client_only != 0 ? GLOBAL_ZONEID : getzoneid());
 }

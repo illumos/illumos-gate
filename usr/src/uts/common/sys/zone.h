@@ -120,7 +120,8 @@ typedef enum {
  * communicates with zoneadmd, but only uses Z_REBOOT and Z_HALT.
  */
 typedef enum zone_cmd {
-	Z_READY, Z_BOOT, Z_REBOOT, Z_HALT, Z_NOTE_UNINSTALLING
+	Z_READY, Z_BOOT, Z_REBOOT, Z_HALT, Z_NOTE_UNINSTALLING,
+	Z_MOUNT, Z_UNMOUNT
 } zone_cmd_t;
 
 #define	ZONEBOOTARGS_MAX	257	/* uadmin()'s buffer is 257 bytes. */
