@@ -578,7 +578,7 @@ lwp_rtt(void)
 	ldn	[THREAD_REG + T_STACK], %l7
 	call	__dtrace_probe___proc_start
 	sub	%l7, STACK_BIAS, %sp
-	ba	0f
+	ba,a,pt	%xcc, 0f
 
 	ENTRY_NP(lwp_rtt)
 	ldn	[THREAD_REG + T_STACK], %l7
@@ -593,5 +593,6 @@ lwp_rtt(void)
 	ldx	[%l7 + O1_OFF], %o1
 	ba,a,pt	%xcc, user_rtt
 	SET_SIZE(lwp_rtt)
+	SET_SIZE(lwp_rtt_initial)
 
 #endif	/* lint */

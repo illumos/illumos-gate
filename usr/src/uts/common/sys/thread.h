@@ -350,6 +350,7 @@ typedef struct _kthread {
 #define	T_WAKEABLE	0x0002	/* thread is blocked, signals enabled */
 #define	T_TOMASK	0x0004	/* use lwp_sigoldmask on return from signal */
 #define	T_TALLOCSTK	0x0008  /* thread structure allocated from stk */
+#define	T_FORKALL	0x0010	/* thread was cloned by forkall() */
 #define	T_WOULDBLOCK	0x0020	/* for lockfs */
 #define	T_DONTBLOCK	0x0040	/* for lockfs */
 #define	T_DONTPEND	0x0080	/* for lockfs */

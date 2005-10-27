@@ -677,11 +677,14 @@ post_syscall(long rval1, long rval2)
 		 * The default action is to redo the trap instruction.
 		 * We increment the pc and npc past it for NORMALRETURN.
 		 * JUSTRETURN has set up a new pc and npc already.
-		 * RESTARTSYS automatically restarts by leaving pc and npc
-		 * alone.
+		 * If we are a cloned thread of forkall(), don't
+		 * adjust here because we have already inherited
+		 * the adjusted values from our clone.
 		 */
-		rp->r_pc = rp->r_npc;
-		rp->r_npc += 4;
+		if (!(t->t_flag & T_FORKALL)) {
+			rp->r_pc = rp->r_npc;
+			rp->r_npc += 4;
+		}
 	}
 
 	/*
@@ -726,6 +729,7 @@ sig_check:
 	 */
 	lwp->lwp_eosys = NORMALRETURN;
 	clear_stale_fd();
+	t->t_flag &= ~T_FORKALL;
 
 	if (t->t_astflag | t->t_sig_check) {
 		/*

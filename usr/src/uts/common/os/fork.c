@@ -334,6 +334,7 @@ cfork(int isvfork, int isfork1)
 		/* for each entry in the parent's lwp directory... */
 		for (i = 0, ldp = p->p_lwpdir; i < p->p_lwpdir_sz; i++, ldp++) {
 			klwp_t *clwp;
+			kthread_t *ct;
 
 			if ((lep = ldp->ld_entry) == NULL)
 				continue;
@@ -342,17 +343,22 @@ cfork(int isvfork, int isfork1)
 				clwp = forklwp(ttolwp(t), cp, t->t_tid);
 				if (clwp == NULL)
 					goto forklwperr;
+				ct = lwptot(clwp);
 				/*
 				 * Inherit lwp_wait()able and daemon flags.
 				 */
-				lwptot(clwp)->t_proc_flag |=
+				ct->t_proc_flag |=
 				    (t->t_proc_flag & (TP_TWAIT|TP_DAEMON));
 				/*
 				 * Keep track of the clone of curthread to
 				 * post return values through lwp_setrval().
+				 * Mark other threads for special treatment
+				 * by lwp_rtt() / post_syscall().
 				 */
 				if (t == curthread)
 					clone = clwp;
+				else
+					ct->t_flag |= T_FORKALL;
 			} else {
 				/*
 				 * Replicate zombie lwps in the child.

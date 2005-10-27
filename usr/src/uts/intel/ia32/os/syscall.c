@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -589,6 +590,7 @@ sig_check:
 	 */
 	lwp->lwp_eosys = NORMALRETURN;
 	clear_stale_fd();
+	t->t_flag &= ~T_FORKALL;
 
 	/*
 	 * If a single-step trap occurred on a syscall (see trap())
