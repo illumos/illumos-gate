@@ -322,3 +322,9 @@ s none usr/xpg4/lib/64=amd64
 f none usr/xpg4/lib/amd64/libcurses.so.1 755 root bin
 f none usr/xpg4/lib/amd64/libcurses.so.2 755 root bin
 s none usr/xpg4/lib/amd64/libcurses.so=libcurses.so.2
+d none etc 755 root sys
+d none etc/flash 755 root sys
+d none etc/flash/precreation 700 root sys
+d none etc/flash/preexit 700 root sys
+d none etc/flash/postcreation 700 root sys
+f none etc/flash/precreation/caplib 500 root sys

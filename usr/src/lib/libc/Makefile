@@ -64,10 +64,13 @@ VAR2_BLDDIR =	$(MACH)_$(VAR2)
 i386_VARIANTS=	$(VAR1) $(VAR2)
 sparc_VARIANTS=
 
+i386_ETC=	$(MACH)/etc
+sparc_ETC=
+
 VARIANTS=	$($(MACH)_VARIANTS)
 VARIANT_SUBDIRS	= $(VARIANTS:%=$(MACH)_%)
 
-SUBDIRS=	$(MACH) $(VARIANT_SUBDIRS)
+SUBDIRS=	$(MACH) $(MACH_ETC) $(VARIANT_SUBDIRS)
 $(BUILD64)SUBDIRS += $(MACH64)
 
 LIBS =		$(DYNLIB) $(LINTLIB)
@@ -97,7 +100,9 @@ $(ROOTVARIANTDIR)/$(VAR2_DYNLIB)	:= FILEMODE= 755
 
 .KEEP_STATE:
 
-all:	spec .WAIT lib32 $(BUILD64) .WAIT lib64
+all:	spec .WAIT lib32 $(BUILD64) .WAIT lib64 .WAIT etc
+
+etc:	$($(MACH)_ETC)
 
 lib32:	$(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
 
@@ -106,7 +111,11 @@ lib64:	$(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS)
 $(VARIANTLIBS): FRC
 	@cd $(@D); pwd; VERSION='$(VERSION)' $(MAKE) $(@F)
 
+$($(MACH)_ETC): FRC
+	@cd $(@); pwd; $(MAKE) $(TARGET)
+
 install:	all			\
+		etc			\
 		spec			\
 		inslib32		\
 		$(BUILD64) inslib64
