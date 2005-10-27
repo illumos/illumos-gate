@@ -135,8 +135,6 @@ init_cpu_info(struct cpu *cp)
 static void
 init_cpu_syscall(struct cpu *cp)
 {
-	uint64_t value;
-
 	kpreempt_disable();
 
 #if defined(__amd64)
@@ -160,19 +158,16 @@ init_cpu_syscall(struct cpu *cp)
 		/*
 		 * Program the magic registers ..
 		 */
-		value = ((uint64_t)(U32CS_SEL << 16 | KCS_SEL)) << 32;
-		wrmsr(MSR_AMD_STAR, &value);
-		value = (uintptr_t)sys_syscall;
-		wrmsr(MSR_AMD_LSTAR, &value);
-		value = (uintptr_t)sys_syscall32;
-		wrmsr(MSR_AMD_CSTAR, &value);
+		wrmsr(MSR_AMD_STAR, ((uint64_t)(U32CS_SEL << 16 | KCS_SEL)) <<
+		    32);
+		wrmsr(MSR_AMD_LSTAR, (uint64_t)(uintptr_t)sys_syscall);
+		wrmsr(MSR_AMD_CSTAR, (uint64_t)(uintptr_t)sys_syscall32);
 
 		/*
 		 * This list of flags is masked off the incoming
 		 * %rfl when we enter the kernel.
 		 */
-		value = PS_IE | PS_T;
-		wrmsr(MSR_AMD_SFMASK, &value);
+		wrmsr(MSR_AMD_SFMASK, (uint64_t)(uintptr_t)(PS_IE | PS_T));
 	}
 #endif
 
@@ -208,11 +203,8 @@ init_cpu_syscall(struct cpu *cp)
 		 * resume() sets this value to the base of the threads stack
 		 * via a context handler.
 		 */
-		value = 0;
-		wrmsr(MSR_INTC_SEP_ESP, &value);
-
-		value = (uintptr_t)sys_sysenter;
-		wrmsr(MSR_INTC_SEP_EIP, &value);
+		wrmsr(MSR_INTC_SEP_ESP, 0ULL);
+		wrmsr(MSR_INTC_SEP_EIP, (uint64_t)(uintptr_t)sys_sysenter);
 	}
 
 	kpreempt_enable();
@@ -665,11 +657,9 @@ workaround_errata(struct cpu *cpu)
 		 * Certain Reverse REP MOVS May Produce Unpredictable Behaviour
 		 */
 #if defined(OPTERON_ERRATUM_109)
-		uint64_t	patchlevel;
 
-		(void) rdmsr(MSR_AMD_PATCHLEVEL, &patchlevel);
 		/* workaround is to print a warning to upgrade BIOS */
-		if (patchlevel == 0)
+		if (rdmsr(MSR_AMD_PATCHLEVEL) == 0)
 			opteron_erratum_109++;
 #else
 		WARNING(cpu, 109);
@@ -695,16 +685,13 @@ workaround_errata(struct cpu *cpu)
 		 * sequential execution across the va hole boundary.
 		 */
 		if (lma == 0) {
-			uint64_t	efer;
-
 			/*
 			 * check LMA once: assume all cpus are in long mode
 			 * or not.
 			 */
 			lma = 1;
 
-			(void) rdmsr(MSR_AMD_EFER, &efer);
-			if (efer & AMD_EFER_LMA) {
+			if (rdmsr(MSR_AMD_EFER) & AMD_EFER_LMA) {
 				if (hole_start) {
 					hole_start -= PAGESIZE;
 				} else {
@@ -738,12 +725,9 @@ workaround_errata(struct cpu *cpu)
 
 		if (opteron_erratum_122 || lgrp_plat_node_cnt > 1 ||
 		    cpuid_get_ncpu_per_chip(cpu) > 1) {
-			uint64_t	hwcrval;
-
 			/* disable TLB Flush Filter */
-			(void) rdmsr(MSR_AMD_HWCR, &hwcrval);
-			hwcrval |= AMD_HWCR_FFDIS;
-			wrmsr(MSR_AMD_HWCR, &hwcrval);
+			wrmsr(MSR_AMD_HWCR, rdmsr(MSR_AMD_HWCR) |
+			    (uint64_t)(uintptr_t)AMD_HWCR_FFDIS);
 			opteron_erratum_122++;
 		}
 
@@ -765,11 +749,8 @@ workaround_errata(struct cpu *cpu)
 		 */
 
 		if (cpuid_get_ncpu_per_chip(cpu) > 1) {
-			uint64_t	patchlevel;
-
-			(void) rdmsr(MSR_AMD_PATCHLEVEL, &patchlevel);
 			/* workaround is to print a warning to upgrade BIOS */
-			if (patchlevel == 0)
+			if (rdmsr(MSR_AMD_PATCHLEVEL) == 0)
 				opteron_erratum_123++;
 		}
 	}
@@ -787,14 +768,11 @@ workaround_errata(struct cpu *cpu)
 		 */
 		if ((opteron_erratum_131 == 0) && ((lgrp_plat_node_cnt *
 		    cpuid_get_ncpu_per_chip(cpu)) >= 4)) {
-			uint64_t nbcfg;
-
 			/*
 			 * Workaround is to print a warning to upgrade
 			 * the BIOS
 			 */
-			(void) rdmsr(MSR_AMD_NB_CFG, &nbcfg);
-			if (!(nbcfg & AMD_NB_CFG_SRQ_HEARTBEAT))
+			if (!(rdmsr(MSR_AMD_NB_CFG) & AMD_NB_CFG_SRQ_HEARTBEAT))
 				opteron_erratum_131++;
 		}
 #endif
@@ -1267,20 +1245,15 @@ cpu_fast_syscall_enable(void *arg)
 static void
 cpu_sep_enable(void)
 {
-	uint64_t value;
-
 	ASSERT(x86_feature & X86_SEP);
 	ASSERT(curthread->t_preempt || getpil() >= LOCK_LEVEL);
 
-	value = KCS_SEL;
-	wrmsr(MSR_INTC_SEP_CS, &value);
+	wrmsr(MSR_INTC_SEP_CS, (uint64_t)(uintptr_t)KCS_SEL);
 }
 
 static void
 cpu_sep_disable(void)
 {
-	uint64_t value;
-
 	ASSERT(x86_feature & X86_SEP);
 	ASSERT(curthread->t_preempt || getpil() >= LOCK_LEVEL);
 
@@ -1288,28 +1261,22 @@ cpu_sep_disable(void)
 	 * Setting the SYSENTER_CS_MSR register to 0 causes software executing
 	 * the sysenter or sysexit instruction to trigger a #gp fault.
 	 */
-	value = 0;
-	wrmsr(MSR_INTC_SEP_CS, &value);
+	wrmsr(MSR_INTC_SEP_CS, 0ULL);
 }
 
 static void
 cpu_asysc_enable(void)
 {
-	uint64_t value;
-
 	ASSERT(x86_feature & X86_ASYSC);
 	ASSERT(curthread->t_preempt || getpil() >= LOCK_LEVEL);
 
-	(void) rdmsr(MSR_AMD_EFER, &value);
-	value |= AMD_EFER_SCE;
-	wrmsr(MSR_AMD_EFER, &value);
+	wrmsr(MSR_AMD_EFER, rdmsr(MSR_AMD_EFER) |
+	    (uint64_t)(uintptr_t)AMD_EFER_SCE);
 }
 
 static void
 cpu_asysc_disable(void)
 {
-	uint64_t value;
-
 	ASSERT(x86_feature & X86_ASYSC);
 	ASSERT(curthread->t_preempt || getpil() >= LOCK_LEVEL);
 
@@ -1317,7 +1284,6 @@ cpu_asysc_disable(void)
 	 * Turn off the SCE (syscall enable) bit in the EFER register. Software
 	 * executing syscall or sysret with this bit off will incur a #ud trap.
 	 */
-	(void) rdmsr(MSR_AMD_EFER, &value);
-	value &= ~AMD_EFER_SCE;
-	wrmsr(MSR_AMD_EFER, &value);
+	wrmsr(MSR_AMD_EFER, rdmsr(MSR_AMD_EFER) &
+	    ~((uint64_t)(uintptr_t)AMD_EFER_SCE));
 }

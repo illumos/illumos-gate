@@ -260,19 +260,16 @@ kctl_boot_tmpinit(void)
 	 * and fail horribly if it hasn't.  We'll install a pointer to a dummy
 	 * cpu_t for use during our initialization.
 	 */
-	cpu_t *cpu = kobj_zalloc(sizeof (cpu_t), KM_TMP);
-	cpu_t *old;
+	cpu_t *old = (cpu_t *)rdmsr(MSR_AMD_GSBASE);
 
-	(void) rdmsr(MSR_AMD_GSBASE, (uint64_t *)&old);
-	wrmsr(MSR_AMD_GSBASE, (uint64_t *)&cpu);
-
+	wrmsr(MSR_AMD_GSBASE, (uint64_t)kobj_zalloc(sizeof (cpu_t), KM_TMP));
 	return (old);
 }
 
 void
 kctl_boot_tmpfini(void *old)
 {
-	wrmsr(MSR_AMD_GSBASE, (uint64_t *)&old);
+	wrmsr(MSR_AMD_GSBASE, (uint64_t)old);
 }
 
 #else

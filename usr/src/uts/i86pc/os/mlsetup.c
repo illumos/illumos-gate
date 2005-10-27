@@ -188,8 +188,7 @@ mlsetup(struct regs *rp)
 		/*
 		 * setup %gs for the kernel
 		 */
-		uint64_t addr64 = (uint64_t)&cpus[0];
-		wrmsr(MSR_AMD_GSBASE, &addr64);
+		wrmsr(MSR_AMD_GSBASE, (uint64_t)&cpus[0]);
 		/*
 		 * XX64 We should never dereference off "other gsbase" or
 		 * "fsbase".  So, we should arrange to point FSBASE and
@@ -200,9 +199,8 @@ mlsetup(struct regs *rp)
 		 * For now, point it at 8G -- at least it should be unmapped
 		 * until some 64-bit processes run.
 		 */
-		addr64 = 0x200000000ul;
-		wrmsr(MSR_AMD_FSBASE, &addr64);
-		wrmsr(MSR_AMD_KGSBASE, &addr64);
+		wrmsr(MSR_AMD_FSBASE, 0x200000000UL);
+		wrmsr(MSR_AMD_KGSBASE, 0x200000000UL);
 	}
 
 #elif defined(__i386)

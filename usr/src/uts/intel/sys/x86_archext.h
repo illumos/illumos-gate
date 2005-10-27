@@ -457,8 +457,8 @@ extern const char CyrixInstead[];
 #if defined(_KERNEL)
 
 
-extern uint64_t rdmsr(uint_t, uint64_t *);
-extern void wrmsr(uint_t, const uint64_t *);
+extern uint64_t rdmsr(uint_t);
+extern void wrmsr(uint_t, const uint64_t);
 extern void invalidate_cache(void);
 struct regs;
 extern int mca_exception(struct regs *);

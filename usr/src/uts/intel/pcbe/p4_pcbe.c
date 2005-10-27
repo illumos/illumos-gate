@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -493,7 +493,6 @@ p4_pcbe_overflow_bitmap(void)
 {
 	extern int	kcpc_hw_overflow_intr_installed;
 	uint64_t	ret = 0;
-	uint64_t	tmp;
 	int		i;
 
 	/*
@@ -502,8 +501,7 @@ p4_pcbe_overflow_bitmap(void)
 	 * safe to read the CCCR values here.
 	 */
 	for (i = 0; i < 18; i++) {
-		(void) rdmsr(p4_ctrs[i].pc_ctladdr, &tmp);
-		if (tmp & CCCR_OVF)
+		if (rdmsr(p4_ctrs[i].pc_ctladdr) & CCCR_OVF)
 			ret |= (1 << i);
 	}
 
@@ -786,7 +784,6 @@ static void
 p4_pcbe_program(void *token)
 {
 	int			i;
-	uint64_t		escr;
 	uint64_t		cccr;
 	p4_pcbe_config_t	*cfgs[18];
 
@@ -813,6 +810,8 @@ p4_pcbe_program(void *token)
 		int	lid = chip_plat_get_clogid(CPU); /* Logical ID of CPU */
 
 		for (i = 0; i < 18; i++) {
+			uint64_t escr;
+
 			if (cfgs[i] == NULL)
 				continue;
 			escr = (uint64_t)cfgs[i]->p4_escr;
@@ -826,8 +825,8 @@ p4_pcbe_program(void *token)
 			if (cfgs[i]->p4_flags & P4_SIBLING_SYS)
 				escr |= (lid == 0) ? ESCR_T1_OS : ESCR_T0_OS;
 
-			wrmsr(p4_ctrs[i].pc_caddr, &cfgs[i]->p4_rawpic);
-			wrmsr(p4_escrs[cfgs[i]->p4_escr_ndx].pe_addr, &escr);
+			wrmsr(p4_ctrs[i].pc_caddr, cfgs[i]->p4_rawpic);
+			wrmsr(p4_escrs[cfgs[i]->p4_escr_ndx].pe_addr, escr);
 		}
 
 		for (i = 0; i < 18; i++) {
@@ -841,22 +840,22 @@ p4_pcbe_program(void *token)
 			if (cfgs[i]->p4_flags & P4_PMI)
 				cccr |= (lid == 0) ?
 				    CCCR_OVF_PMI_T0 : CCCR_OVF_PMI_T1;
-			wrmsr(p4_ctrs[i].pc_ctladdr, &cccr);
+			wrmsr(p4_ctrs[i].pc_ctladdr, cccr);
 		}
 	} else {
 		for (i = 0; i < 18; i++) {
 			if (cfgs[i] == NULL)
 				continue;
-			escr = (uint64_t)cfgs[i]->p4_escr;
-			wrmsr(p4_ctrs[i].pc_caddr, &cfgs[i]->p4_rawpic);
-			wrmsr(p4_escrs[cfgs[i]->p4_escr_ndx].pe_addr, &escr);
+			wrmsr(p4_ctrs[i].pc_caddr, cfgs[i]->p4_rawpic);
+			wrmsr(p4_escrs[cfgs[i]->p4_escr_ndx].pe_addr,
+			    (uint64_t)cfgs[i]->p4_escr);
 		}
 
 		for (i = 0; i < 18; i++) {
 			if (cfgs[i] == NULL)
 				continue;
-			cccr = (uint64_t)cfgs[i]->p4_cccr;
-			wrmsr(p4_ctrs[i].pc_ctladdr, &cccr);
+			wrmsr(p4_ctrs[i].pc_ctladdr,
+			    (uint64_t)cfgs[i]->p4_cccr);
 		}
 	}
 }
@@ -865,10 +864,9 @@ static void
 p4_pcbe_allstop(void)
 {
 	int		i;
-	uint64_t	tmp = 0;
 
 	for (i = 0; i < 18; i++)
-		wrmsr(p4_ctrs[i].pc_ctladdr, &tmp);
+		wrmsr(p4_ctrs[i].pc_ctladdr, 0ULL);
 
 	setcr4(getcr4() & ~CR4_PCE);
 }
@@ -884,7 +882,7 @@ p4_pcbe_sample(void *token)
 	int			i;
 
 	for (i = 0; i < 18; i++)
-		(void) rdmsr(p4_ctrs[i].pc_caddr, &curpic[i]);
+		curpic[i] = rdmsr(p4_ctrs[i].pc_caddr);
 
 	build_cfgs(cfgs, addrs, token);
 

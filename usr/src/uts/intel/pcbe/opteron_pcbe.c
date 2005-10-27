@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -403,7 +403,6 @@ opt_pcbe_program(void *token)
 						&nullcfgs[2], &nullcfgs[3] };
 	opt_pcbe_config_t	*pcfg = NULL;
 	int			i;
-	uint64_t		tmp;
 	uint32_t		curcr4 = getcr4();
 
 	/*
@@ -433,13 +432,13 @@ opt_pcbe_program(void *token)
 	 */
 
 	for (i = 0; i < 4; i++) {
-		wrmsr(PES_BASE_ADDR + i, &cfgs[i]->opt_evsel);
-		wrmsr(PIC_BASE_ADDR + i, &cfgs[i]->opt_rawpic);
+		wrmsr(PES_BASE_ADDR + i, cfgs[i]->opt_evsel);
+		wrmsr(PIC_BASE_ADDR + i, cfgs[i]->opt_rawpic);
 	}
 
 	for (i = 0; i < 4; i++) {
-		tmp = cfgs[i]->opt_evsel | OPT_PES_ENABLE;
-		wrmsr(PES_BASE_ADDR + i, &tmp);
+		wrmsr(PES_BASE_ADDR + i, cfgs[i]->opt_evsel |
+		    (uint64_t)(uintptr_t)OPT_PES_ENABLE);
 	}
 }
 
@@ -447,10 +446,9 @@ static void
 opt_pcbe_allstop(void)
 {
 	int		i;
-	uint64_t	tmp = 0;
 
 	for (i = 0; i < 4; i++)
-		wrmsr(PES_BASE_ADDR + i, &tmp);
+		wrmsr(PES_BASE_ADDR + i, 0ULL);
 
 	/*
 	 * Disable non-privileged access to the counter registers.
@@ -470,7 +468,7 @@ opt_pcbe_sample(void *token)
 	int64_t			diff;
 
 	for (i = 0; i < 4; i++)
-		(void) rdmsr(PIC_BASE_ADDR + i, &curpic[i]);
+		curpic[i] = rdmsr(PIC_BASE_ADDR);
 
 	/*
 	 * Query kernel for all configs which are co-programmed.

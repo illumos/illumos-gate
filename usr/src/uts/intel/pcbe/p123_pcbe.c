@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +95,7 @@ static char *pic_events[2] = { NULL, NULL };
  */
 static int ptm_rdpmc_avail = 0;
 
-static const uint64_t allstopped = 0;
+#define	ALL_STOPPED	0ULL
 
 typedef struct _ptm_pcbe_config {
 	uint8_t		ptm_picno;	/* 0 for pic0 or 1 for pic1 */
@@ -573,7 +573,7 @@ ptm_pcbe_overflow_bitmap(void)
 	 * 2) Either counter has requested an interrupt
 	 */
 
-	(void) rdmsr(REG_PERFEVNT0, &pes[0]);
+	pes[0] = rdmsr(REG_PERFEVNT0);
 	if (((uint32_t)pes[0] & P6_PES_EN) != P6_PES_EN)
 		return (0);
 
@@ -583,7 +583,7 @@ ptm_pcbe_overflow_bitmap(void)
 	 * on this hardware other than by using unreliable heuristics.
 	 */
 
-	(void) rdmsr(REG_PERFEVNT1, &pes[1]);
+	pes[1] = rdmsr(REG_PERFEVNT1);
 	if ((uint32_t)pes[0] & P6_PES_INT)
 		ret |= 0x1;
 	if ((uint32_t)pes[1] & P6_PES_INT)
@@ -759,25 +759,23 @@ ptm_pcbe_program(void *token)
 	}
 
 	if (ptm_ver == PTM_VER_P5) {
-		uint64_t	cesr = 0;
-		wrmsr(P5_CESR, &allstopped);
-		wrmsr(P5_CTR0, &pic0->ptm_rawpic);
-		wrmsr(P5_CTR1, &pic1->ptm_rawpic);
-		cesr = pic0->ptm_ctl | pic1->ptm_ctl;
-		wrmsr(P5_CESR, &cesr);
-		(void) rdmsr(P5_CTR0, &pic0->ptm_rawpic);
-		(void) rdmsr(P5_CTR1, &pic1->ptm_rawpic);
+		wrmsr(P5_CESR, ALL_STOPPED);
+		wrmsr(P5_CTR0, pic0->ptm_rawpic);
+		wrmsr(P5_CTR1, pic1->ptm_rawpic);
+		wrmsr(P5_CESR, pic0->ptm_ctl | pic1->ptm_ctl);
+		pic0->ptm_rawpic = rdmsr(P5_CTR0);
+		pic1->ptm_rawpic = rdmsr(P5_CTR1);
 	} else {
 		uint64_t	pes;
-		wrmsr(REG_PERFEVNT0, &allstopped);
-		wrmsr(REG_PERFCTR0, &pic0->ptm_rawpic);
-		wrmsr(REG_PERFCTR1, &pic1->ptm_rawpic);
+		wrmsr(REG_PERFEVNT0, ALL_STOPPED);
+		wrmsr(REG_PERFCTR0, pic0->ptm_rawpic);
+		wrmsr(REG_PERFCTR1, pic1->ptm_rawpic);
 		pes = pic1->ptm_ctl;
 		DTRACE_PROBE1(ptm__pes1, uint64_t, pes);
-		wrmsr(REG_PERFEVNT1, &pes);
+		wrmsr(REG_PERFEVNT1, pes);
 		pes = pic0->ptm_ctl | (1 << CPC_P6_PES_EN);
 		DTRACE_PROBE1(ptm__pes0, uint64_t, pes);
-		wrmsr(REG_PERFEVNT0, &pes);
+		wrmsr(REG_PERFEVNT0, pes);
 	}
 }
 
@@ -785,9 +783,9 @@ static void
 ptm_pcbe_allstop(void)
 {
 	if (ptm_ver == PTM_VER_P5)
-		wrmsr(P5_CESR, &allstopped);
+		wrmsr(P5_CESR, ALL_STOPPED);
 	else {
-		wrmsr(REG_PERFEVNT0, &allstopped);
+		wrmsr(REG_PERFEVNT0, ALL_STOPPED);
 		setcr4((uint32_t)getcr4() & ~CR4_PCE);
 	}
 }
@@ -826,11 +824,11 @@ ptm_pcbe_sample(void *token)
 	ASSERT(pic0->ptm_picno == 0 && pic1->ptm_picno == 1);
 
 	if (ptm_ver == PTM_VER_P5) {
-		(void) rdmsr(P5_CTR0, &curpic[0]);
-		(void) rdmsr(P5_CTR1, &curpic[1]);
+		curpic[0] = rdmsr(P5_CTR0);
+		curpic[1] = rdmsr(P5_CTR1);
 	} else {
-		(void) rdmsr(REG_PERFCTR0, &curpic[0]);
-		(void) rdmsr(REG_PERFCTR1, &curpic[1]);
+		curpic[0] = rdmsr(REG_PERFCTR0);
+		curpic[1] = rdmsr(REG_PERFCTR1);
 	}
 
 	DTRACE_PROBE1(ptm__curpic0, uint64_t, curpic[0]);

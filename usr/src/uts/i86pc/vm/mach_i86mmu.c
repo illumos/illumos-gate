@@ -578,17 +578,14 @@ activate_pae(void *pages)
 static void
 set_nxe(void)
 {
-	uint64_t efer;
-
 	if (mmu.pt_nx == 0)
 		return;
 
 	/*
 	 * AMD64 EFER is model specific register #0xc0000080 and NXE is bit 11
 	 */
-	(void) rdmsr(MSR_AMD_EFER, &efer);
-	efer |= AMD_EFER_NXE;
-	wrmsr(MSR_AMD_EFER, &efer);
+	wrmsr(MSR_AMD_EFER, rdmsr(MSR_AMD_EFER) |
+	    (uint64_t)(uintptr_t)AMD_EFER_NXE);
 }
 
 void (*set_nxe_func)(void) = set_nxe;

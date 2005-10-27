@@ -2411,24 +2411,20 @@ void
 setup_mca()
 {
 	int 		i;
-	uint64_t	allzeros;
-	uint64_t	allones;
 	uint64_t	mca_cap;
 
 	if (!(x86_feature & X86_MCA))
 		return;
-	(void) rdmsr(REG_MCG_CAP, &mca_cap);
-	allones = 0xffffffffffffffffULL;
+	mca_cap = rdmsr(REG_MCG_CAP);
 	if (mca_cap & MCG_CAP_CTL_P)
-		(void) wrmsr(REG_MCG_CTL, &allones);
+		wrmsr(REG_MCG_CTL, -1ULL);	/* all ones */
 	mca_cnt = mca_cap & MCG_CAP_COUNT_MASK;
 	if (mca_cnt > P6_MCG_CAP_COUNT)
 		mca_cnt = P6_MCG_CAP_COUNT;
 	for (i = 1; i < mca_cnt; i++)
-		(void) wrmsr(mci_ctl[i], &allones);
-	allzeros = 0;
+		wrmsr(mci_ctl[i], -1ULL);	/* all ones */
 	for (i = 0; i < mca_cnt; i++)
-		(void) wrmsr(mci_status[i], &allzeros);
+		wrmsr(mci_status[i], 0ULL);
 	setcr4(getcr4() | CR4_MCE);
 
 }
@@ -2437,21 +2433,16 @@ int
 mca_exception(struct regs *rp)
 {
 	uint64_t	status, addr;
-	uint64_t	allzeros;
-	uint64_t	buf;
 	int		i, ret = 1, errcode, mserrcode;
 
-	allzeros = 0;
-	(void) rdmsr(REG_MCG_STATUS, &buf);
-	status = buf;
+	status = rdmsr(REG_MCG_STATUS);
 	if (status & MCG_STATUS_RIPV)
 		ret = 0;
 	if (status & MCG_STATUS_EIPV)
 		cmn_err(CE_WARN, "MCE at 0x%lx", rp->r_pc);
-	(void) wrmsr(REG_MCG_STATUS, &allzeros);
+	wrmsr(REG_MCG_STATUS, 0ULL);
 	for (i = 0; i < mca_cnt; i++) {
-		(void) rdmsr(mci_status[i], &buf);
-		status = buf;
+		status = rdmsr(mci_status[i]);
 		/*
 		 * If status register not valid skip this bank
 		 */
@@ -2464,8 +2455,7 @@ mca_exception(struct regs *rp)
 			 * If mci_addr contains the address where
 			 * error occurred, display the address
 			 */
-			(void) rdmsr(mci_addr[i], &buf);
-			addr = buf;
+			addr = rdmsr(mci_addr[i]);
 			cmn_err(CE_WARN, "MCE: Bank %d: error code 0x%x:"\
 			    "addr = 0x%" PRIx64 ", model errcode = 0x%x", i,
 			    errcode, addr, mserrcode);
@@ -2474,7 +2464,7 @@ mca_exception(struct regs *rp)
 			    "MCE: Bank %d: error code 0x%x, mserrcode = 0x%x",
 			    i, errcode, mserrcode);
 		}
-		(void) wrmsr(mci_status[i], &allzeros);
+		wrmsr(mci_status[i], 0ULL);
 	}
 	return (ret);
 }
@@ -2489,28 +2479,28 @@ setup_mtrr()
 	if (!(x86_feature & X86_MTRR))
 		return;
 
-	(void) rdmsr(REG_MTRRCAP, &mtrrcap);
-	(void) rdmsr(REG_MTRRDEF, &mtrrdef);
+	mtrrcap = rdmsr(REG_MTRRCAP);
+	mtrrdef = rdmsr(REG_MTRRDEF);
 	if (mtrrcap & MTRRCAP_FIX) {
-		(void) rdmsr(REG_MTRR64K, &mtrr64k);
-		(void) rdmsr(REG_MTRR16K1, &mtrr16k1);
-		(void) rdmsr(REG_MTRR16K2, &mtrr16k2);
-		(void) rdmsr(REG_MTRR4K1, &mtrr4k1);
-		(void) rdmsr(REG_MTRR4K2, &mtrr4k2);
-		(void) rdmsr(REG_MTRR4K3, &mtrr4k3);
-		(void) rdmsr(REG_MTRR4K4, &mtrr4k4);
-		(void) rdmsr(REG_MTRR4K5, &mtrr4k5);
-		(void) rdmsr(REG_MTRR4K6, &mtrr4k6);
-		(void) rdmsr(REG_MTRR4K7, &mtrr4k7);
-		(void) rdmsr(REG_MTRR4K8, &mtrr4k8);
+		mtrr64k = rdmsr(REG_MTRR64K);
+		mtrr16k1 = rdmsr(REG_MTRR16K1);
+		mtrr16k2 = rdmsr(REG_MTRR16K2);
+		mtrr4k1 = rdmsr(REG_MTRR4K1);
+		mtrr4k2 = rdmsr(REG_MTRR4K2);
+		mtrr4k3 = rdmsr(REG_MTRR4K3);
+		mtrr4k4 = rdmsr(REG_MTRR4K4);
+		mtrr4k5 = rdmsr(REG_MTRR4K5);
+		mtrr4k6 = rdmsr(REG_MTRR4K6);
+		mtrr4k7 = rdmsr(REG_MTRR4K7);
+		mtrr4k8 = rdmsr(REG_MTRR4K8);
 	}
 	if ((vcnt = (mtrrcap & MTRRCAP_VCNTMASK)) > MAX_MTRRVAR)
 		vcnt = MAX_MTRRVAR;
 
 	for (i = 0, ecx = REG_MTRRPHYSBASE0, mtrrphys = mtrrphys_arr;
 		i <  vcnt - 1; i++, ecx += 2, mtrrphys++) {
-		(void) rdmsr(ecx, &mtrrphys->mtrrphys_base);
-		(void) rdmsr(ecx + 1, &mtrrphys->mtrrphys_mask);
+		mtrrphys->mtrrphys_base = rdmsr(ecx);
+		mtrrphys->mtrrphys_mask = rdmsr(ecx + 1);
 		if ((x86_feature & X86_PAT) && enable_relaxed_mtrr) {
 			mtrrphys->mtrrphys_mask &= ~MTRRPHYSMASK_V;
 		}
@@ -2534,7 +2524,6 @@ setup_mtrr()
 void
 mtrr_sync()
 {
-	uint64_t my_mtrrdef;
 	uint_t	crvalue, cr0_orig;
 	int	vcnt, i, ecx;
 	struct	mtrrvar	*mtrrphys;
@@ -2546,33 +2535,33 @@ mtrr_sync()
 	invalidate_cache();
 	setcr3(getcr3());
 
-	if (x86_feature & X86_PAT) {
-		(void) wrmsr(REG_MTRRPAT, &pat_attr_reg);
-	}
-	(void) rdmsr(REG_MTRRDEF, &my_mtrrdef);
-	my_mtrrdef &= ~MTRRDEF_E;
-	(void) wrmsr(REG_MTRRDEF, &my_mtrrdef);
+	if (x86_feature & X86_PAT)
+		wrmsr(REG_MTRRPAT, pat_attr_reg);
+
+	wrmsr(REG_MTRRDEF, rdmsr(REG_MTRRDEF) &
+	    ~((uint64_t)(uintptr_t)MTRRDEF_E));
+
 	if (mtrrcap & MTRRCAP_FIX) {
-		(void) wrmsr(REG_MTRR64K, &mtrr64k);
-		(void) wrmsr(REG_MTRR16K1, &mtrr16k1);
-		(void) wrmsr(REG_MTRR16K2, &mtrr16k2);
-		(void) wrmsr(REG_MTRR4K1, &mtrr4k1);
-		(void) wrmsr(REG_MTRR4K2, &mtrr4k2);
-		(void) wrmsr(REG_MTRR4K3, &mtrr4k3);
-		(void) wrmsr(REG_MTRR4K4, &mtrr4k4);
-		(void) wrmsr(REG_MTRR4K5, &mtrr4k5);
-		(void) wrmsr(REG_MTRR4K6, &mtrr4k6);
-		(void) wrmsr(REG_MTRR4K7, &mtrr4k7);
-		(void) wrmsr(REG_MTRR4K8, &mtrr4k8);
+		wrmsr(REG_MTRR64K, mtrr64k);
+		wrmsr(REG_MTRR16K1, mtrr16k1);
+		wrmsr(REG_MTRR16K2, mtrr16k2);
+		wrmsr(REG_MTRR4K1, mtrr4k1);
+		wrmsr(REG_MTRR4K2, mtrr4k2);
+		wrmsr(REG_MTRR4K3, mtrr4k3);
+		wrmsr(REG_MTRR4K4, mtrr4k4);
+		wrmsr(REG_MTRR4K5, mtrr4k5);
+		wrmsr(REG_MTRR4K6, mtrr4k6);
+		wrmsr(REG_MTRR4K7, mtrr4k7);
+		wrmsr(REG_MTRR4K8, mtrr4k8);
 	}
 	if ((vcnt = (mtrrcap & MTRRCAP_VCNTMASK)) > MAX_MTRRVAR)
 		vcnt = MAX_MTRRVAR;
 	for (i = 0, ecx = REG_MTRRPHYSBASE0, mtrrphys = mtrrphys_arr;
-		i <  vcnt - 1; i++, ecx += 2, mtrrphys++) {
-		(void) wrmsr(ecx, &mtrrphys->mtrrphys_base);
-		(void) wrmsr(ecx + 1, &mtrrphys->mtrrphys_mask);
+	    i <  vcnt - 1; i++, ecx += 2, mtrrphys++) {
+		wrmsr(ecx, mtrrphys->mtrrphys_base);
+		wrmsr(ecx + 1, mtrrphys->mtrrphys_mask);
 	}
-	(void) wrmsr(REG_MTRRDEF, &mtrrdef);
+	wrmsr(REG_MTRRDEF, mtrrdef);
 	setcr3(getcr3());
 	invalidate_cache();
 	setcr0(cr0_orig);

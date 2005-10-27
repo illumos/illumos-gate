@@ -2710,12 +2710,12 @@ highbit(ulong_t i)
 
 /*ARGSUSED*/
 uint64_t
-rdmsr(uint_t r, uint64_t *mtr)
+rdmsr(uint_t r)
 { return (0); }
 
 /*ARGSUSED*/
 void
-wrmsr(uint_t r, const uint64_t *mtr)
+wrmsr(uint_t r, const uint64_t val)
 {}
 
 void
@@ -2729,16 +2729,15 @@ invalidate_cache(void)
 	ENTRY(rdmsr)
 	movl	%edi, %ecx
 	rdmsr
-	movl	%eax, (%rsi)
-	movl	%edx, 4(%rsi)
 	shlq	$32, %rdx
 	orq	%rdx, %rax
 	ret
 	SET_SIZE(rdmsr)
 
 	ENTRY(wrmsr)
-	movl	(%rsi), %eax
-	movl	4(%rsi), %edx
+	movq	%rsi, %rdx
+	shrq	$32, %rdx
+	movl	%esi, %eax
 	movl	%edi, %ecx
 	wrmsr
 	ret
@@ -2749,17 +2748,13 @@ invalidate_cache(void)
 	ENTRY(rdmsr)
 	movl	4(%esp), %ecx
 	rdmsr
-	movl	8(%esp), %ecx
-	movl	%eax, (%ecx)
-	movl	%edx, 4(%ecx)
 	ret
 	SET_SIZE(rdmsr)
 
 	ENTRY(wrmsr)
-	movl	8(%esp), %ecx
-	movl	(%ecx), %eax
-	movl	4(%ecx), %edx
 	movl	4(%esp), %ecx
+	movl	8(%esp), %eax
+	movl	12(%esp), %edx 
 	wrmsr
 	ret
 	SET_SIZE(wrmsr)
