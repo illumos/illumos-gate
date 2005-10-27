@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,7 +209,7 @@ extern srvnops_t	wscons_srvnops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Workstation Redirection driver 'iwscn' %I%",
+	"Workstation Redirection driver 'iwscn' 1.42",
 	&iwscn_ops,	/* driver ops */
 };
 
@@ -409,12 +409,20 @@ static int
 iwscnread(dev_t dev, uio_t *uio, cred_t *cred)
 {
 	wcd_data_t	*wd;
-	int error;
+	int 		error;
+	vnode_t		*vp;
 
 	rw_enter(&iwscn_lock, RW_READER);
 	wd = srilookup(getminor(dev));
-	error = strread(wd->wd_list->wl_vp, uio, cred);
+	/*
+	 * We don't need to hold iwscn_lock while waiting for the read to
+	 * complete, but the vnode must not be destroyed.
+	 */
+	vp = wd->wd_list->wl_vp;
+	VN_HOLD(vp);
 	rw_exit(&iwscn_lock);
+	error = strread(vp, uio, cred);
+	VN_RELE(vp);
 	return (error);
 }
 
