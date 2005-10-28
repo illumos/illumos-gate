@@ -2923,13 +2923,14 @@ tsb_user_itlb_synth:
         retry
 #endif
 
-tsb_kernel:					! no 32M or 256M support
+tsb_kernel:
 #ifdef sun4v
 	cmp	%g7, TTE4M
+	bge,pn	%icc, 5f
 #else
-	cmp	%g7, TTESZ_VALID | TTE4M
-#endif
+	cmp	%g7, TTESZ_VALID | TTE4M	! no 32M or 256M support
 	be,pn	%icc, 5f
+#endif
 	  nop
 	ldn	[%g6 + TSBMISS_TSBPTR], %g1	! g1 = 8k tsbptr
 	ba,pt	%xcc, 6f
