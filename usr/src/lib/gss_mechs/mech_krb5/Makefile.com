@@ -97,37 +97,11 @@ K5_ASN1= asn1_decode.o asn1_k_decode.o asn1_encode.o \
 	asn1_k_encode.o asn1_misc.o
 
 # krb5/ccache
-K5_CC= ccbase.o ccdefault.o ccdefops.o ser_cc.o cc_retr.o cccopy.o
-
-# krb5/ccache/file
-K5_CC_FILE= \
-	fcc_close.o fcc_destry.o fcc_eseq.o fcc_gennew.o fcc_getnam.o \
-	fcc_gprin.o fcc_init.o fcc_nseq.o fcc_read.o fcc_reslv.o \
-	fcc_retrv.o fcc_sseq.o fcc_store.o fcc_skip.o fcc_ops.o \
-	fcc_write.o fcc_sflags.o fcc_defops.o fcc_errs.o fcc_maybe.o
-
-# krb5/ccache/memory
-K5_CC_MEM= \
-	mcc_close.o mcc_destry.o mcc_eseq.o mcc_gennew.o \
-	mcc_getnam.o mcc_gprin.o mcc_init.o mcc_nseq.o \
-	mcc_reslv.o mcc_retrv.o mcc_sseq.o mcc_store.o mcc_ops.o \
-	mcc_sflags.o
-
-# krb5/ccache/stdio
-K5_CC_STD= \
-	scc_close.o scc_destry.o scc_eseq.o \
-	scc_gennew.o scc_getnam.o scc_gprin.o scc_init.o \
-	scc_nseq.o scc_read.o scc_reslv.o scc_retrv.o \
-	scc_sseq.o scc_store.o scc_skip.o scc_ops.o scc_write.o \
-	scc_sflags.o scc_defops.o scc_errs.o scc_maybe.o
+K5_CC= cc_file.o cc_memory.o ccbase.o ccfns.o ccdefault.o ccdefops.o ser_cc.o cc_retr.o cccopy.o
 
 # krb5/keytab
 K5_KT=	ktadd.o ktbase.o ktdefault.o ktfr_entry.o \
-	ktremove.o read_servi.o
-
-K5_KT_FILE=ktf_add.o ktf_close.o ktf_endget.o ktf_g_ent.o ktf_g_name.o \
-	ktf_next.o ktf_resolv.o	ktf_remove.o ktf_ssget.o ktf_util.o \
-	ktf_ops.o ktf_wops.o ktf_wreslv.o ktf_defops.o ser_ktf.o
+	ktremove.o read_servi.o kt_file.o kt_srvtab.o ktfns.o
 
 K5_KRB= addr_comp.o  addr_order.o  addr_srch.o \
 	auth_con.o  bld_pr_ext.o  bld_princ.o  chk_trans.o \
@@ -141,7 +115,7 @@ K5_KRB= addr_comp.o  addr_order.o  addr_srch.o \
 	recvauth.o  send_tgs.o  sendauth.o  srv_rcache.o  str_conv.o \
 	tgtname.o  valid_times.o  walk_rtree.o appdefault.o deltat.o \
 	enc_helper.o gic_keytab.o gic_opt.o gic_pwd.o preauth2.o \
-	vfy_increds.o vic_opt.o
+	vfy_increds.o vic_opt.o krb5_libinit.o
 
 K5_KRB_UTS= copy_athctr.o copy_auth.o copy_cksum.o copy_key.o \
 	copy_princ.o init_ctx.o kfree.o parse.o ser_actx.o \
@@ -156,14 +130,15 @@ K5_OS=	an_to_ln.o def_realm.o ccdefname.o free_krbhs.o free_hstrl.o \
 	net_read.o net_write.o osconfig.o port2ip.o promptusr.o \
 	read_msg.o read_pwd.o realm_dom.o sendto_kdc.o sn2princ.o \
 	unlck_file.o ustime.o write_msg.o safechown.o \
-	prompter.o realm_iter.o foreachaddr.o
+	prompter.o realm_iter.o foreachaddr.o \
+	dnsglue.o dnssrv.o thread_safe.o
 
 K5_OS_UTS=init_os_ctx.o timeofday.o toffset.o c_ustime.o
 
 K5_POSIX= setenv.o daemon.o
 
 K5_RCACHE=rc_base.o rc_file.o rc_mem.o rc_common.o rc_io.o rcdef.o rc_conv.o \
-	ser_rc.o
+	ser_rc.o rcfns.o
 
 MECH= 	accept_sec_context.o store_cred.o \
 	add_cred.o disp_com_err_status.o  disp_major_status.o \
@@ -190,8 +165,11 @@ MECH_UTS= delete_sec_context.o gssapi_krb5.o \
 PROFILE_OBJS= prof_tree.o prof_file.o prof_parse.o prof_init.o \
 	prof_set.o prof_get.o
 
+SUPPORT_OBJS= fake-addrinfo.o  threads.o
+
 OBJECTS= \
 	$(MECH)  $(MECH_UTS) \
+	$(SUPPORT_OBJS) \
 	$(PROFILE_OBJS) \
 	$(CRYPTO) $(CRYPTO_UTS) \
 	$(CRYPTO_CRC32) \
@@ -208,8 +186,8 @@ OBJECTS= \
 	$(CRYPTO_RAW) \
 	$(ET) \
 	$(K5_ASN1) \
-	$(K5_CC) $(K5_CC_FILE) $(K5_CC_MEM) $(K5_CC_STD) \
-	$(K5_KT) $(K5_KT_FILE) \
+	$(K5_CC) \
+	$(K5_KT) \
 	$(K5_KRB) $(K5_KRB_UTS) \
 	$(K5_OS) $(K5_OS_UTS) \
 	$(K5_POSIX) $(K5_RCACHE)
@@ -233,6 +211,11 @@ CPPFLAGS += -I$(REL_PATH)/libgss -I../include  \
 		-I$(SRC)/uts/common/gssapi/include \
 		-I$(SRC)/lib/gss_mechs/mech_krb5/include/krb5 \
 		-I../include/krb5 \
+		-I../krb5/keytab \
+		-I../krb5/krb \
+		-I../krb5/os \
+		-I../krb5/ccache \
+		-I../krb5/rcache \
 		-I$(SRC)/lib/krb5 \
 		-I$(SRC)/lib/krb5/kadm5 \
 		-I$(SRC)/uts/common/gssapi/mechs/krb5/include \
@@ -456,6 +439,10 @@ objs/%.o pics/%.o: $(REL_PATH)/profile/%.c
 	$(COMPILE.c)  -o $@ $<
 	$(POST_PROCESS_O)
 
+objs/%.o pics/%.o: $(REL_PATH)/support/%.c
+	$(COMPILE.c)  -o $@ $<
+	$(POST_PROCESS_O)
+
 $(DYNLIB):	$(MAPFILE)
 
 $(MAPFILE):
@@ -476,9 +463,9 @@ OS_FLAGS = -DHAVE_LIBSOCKET -DHAVE_LIBNSL -DTIME_WITH_SYS_TIME \
 	-DHAVE_ERRNO -DHAVE_STRFTIME -DHAVE_STRPTIME -DHAVE_STRERROR \
 	-DHAVE_STAT -DSIZEOF_INT=4 -DPROVIDE_KERNEL_IMPORT \
 	-DHAVE_STDINT_H -DPOSIX_SIGNALS -DHAVE_GETENV -DHAVE_SETENV \
-	-DHAVE_UNSETENV
+	-DHAVE_UNSETENV -DHAVE_FCHMOD
 
-CPPFLAGS += -I$(REL_PATH)/krb5/ccache/file $(OS_FLAGS)
+CPPFLAGS += -I$(REL_PATH)krb5/ccache/file $(OS_FLAGS)
 
 SOURCES= \
 	$(CRYPTO_OS_UTS:%.o= $(SRC)/uts/common/gssapi/mechs/krb5/crypto/os/%.c)\
@@ -507,10 +494,7 @@ SOURCES= \
 	$(ET:%.o= $(SRC)/lib/gss_mechs/mech_krb5/et/%.c) \
 	$(K5_ASN1:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/asn.1/%.c) \
 	$(K5_CC:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/ccache/%.c) \
-	$(K5_CC_FILE:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/ccache/file/%.c) \
-	$(K5_CC_STD:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/ccache/stdio/%.c) \
 	$(K5_KT:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/keytab/%.c) \
-	$(K5_KT_FILE:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/keytab/file/%.c) \
 	$(K5_KRB:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/krb/%.c)\
 	$(K5_KRB_UTS:%.o= $(SRC)/uts/common/gssapi/mechs/krb5/krb5/krb/%.c)\
 	$(K5_OS:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/os/%.c)\
@@ -519,8 +503,8 @@ SOURCES= \
 	$(K5_RCACHE:%.o= $(SRC)/lib/gss_mechs/mech_krb5/krb5/rcache/%.c) \
 	$(MECH:%.o= $(SRC)/lib/gss_mechs/mech_krb5/mech/%.c) \
 	$(MECH_UTS:%.o= $(SRC)/uts/common/gssapi/mechs/krb5/mech/%.c) \
-	$(PROFILE_OBJS:%.o= $(SRC)/lib/gss_mechs/mech_krb5/profile/%.c)
-
+	$(PROFILE_OBJS:%.o= $(SRC)/lib/gss_mechs/mech_krb5/profile/%.c) \
+	$(SUPPORT_OBJS:%.o= $(SRC)/lib/gss_mechs/mech_krb5/support/%.c)
 
 # So lint.out won't be needlessly recreated
 lint: $(LINTOUT)

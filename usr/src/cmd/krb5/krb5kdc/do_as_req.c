@@ -52,10 +52,10 @@
 #include "adm_proto.h"
 #include "extern.h"
 
-static krb5_error_code prepare_error_as PROTOTYPE((krb5_kdc_req *,
+static krb5_error_code prepare_error_as (krb5_kdc_req *,
 						   int,
 						   krb5_data *, 
-						   krb5_data **));
+						   krb5_data **);
 
 /*ARGSUSED*/
 krb5_error_code
@@ -367,7 +367,7 @@ krb5_data **response;			/* filled in with a response packet */
     client_key = (krb5_key_data *) NULL;
     for (i = 0; i < request->nktypes; i++) {
 	useenctype = request->ktype[i];
-	if (!valid_enctype(useenctype))
+	if (!krb5_c_valid_enctype(useenctype))
 	    continue;
 
 	if (!krb5_dbe_find_enctype(kdc_context, &client, useenctype, -1,
@@ -554,9 +554,9 @@ krb5_data **response;
     retval = krb5_mk_error(kdc_context, &errpkt, scratch);
     free(errpkt.text.data);
     if (retval)
-    free(scratch);
-    else 
-    *response = scratch;
-    
+	free(scratch);
+    else
+	*response = scratch;
+
     return retval;
 }

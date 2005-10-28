@@ -182,11 +182,11 @@ comp_cksum(kcontext, source, ticket, his_cksum)
     krb5_error_code 	  retval;
     krb5_boolean	  valid;
 
-    if (!valid_cksumtype(his_cksum->checksum_type)) 
+    if (!krb5_c_valid_cksumtype(his_cksum->checksum_type)) 
 	return KRB5KDC_ERR_SUMTYPE_NOSUPP;
 
     /* must be collision proof */
-    if (!is_coll_proof_cksum(his_cksum->checksum_type))
+    if (!krb5_c_is_coll_proof_cksum(his_cksum->checksum_type))
 	return KRB5KRB_AP_ERR_INAPP_CKSUM;
 
     /* verify checksum */
@@ -1464,7 +1464,7 @@ select_session_keytype(context, server, nktypes, ktype)
     krb5_enctype dfl = 0;
     
     for (i = 0; i < nktypes; i++) {
-	if (!valid_enctype(ktype[i]))
+	if (!krb5_c_valid_enctype(ktype[i]))
 	    continue;
 
 	if (dbentry_supports_enctype(context, server, ktype[i]))

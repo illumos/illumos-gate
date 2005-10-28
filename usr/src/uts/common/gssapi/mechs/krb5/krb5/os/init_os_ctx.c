@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,12 +35,20 @@
 
 #define NEED_WINDOWS
 #include <k5-int.h>
+#ifndef _KERNEL
+#include "os-proto.h"
+#endif
 
-#ifdef macintosh
-#include <PreferencesLib.h>
-#endif /* macintosh */
+/* SUNW14resync: Solaris kerb does not need this feature in this file */
+#ifdef USE_LOGIN_LIBRARY
+#undef USE_LOGIN_LIBRARY
+#endif
 
-#if defined(_MSDOS) || defined(_WIN32)
+#ifdef USE_LOGIN_LIBRARY
+#include "KerberosLoginPrivate.h"
+#endif 
+
+#if defined(_WIN32)
 
 static krb5_error_code
 get_from_windows_dir(
@@ -171,14 +179,12 @@ get_from_registry(
     return retval;
 }
 
-#endif /* _MSDOS || _WIN32 */
+#endif /* _WIN32 */
 
 #ifndef _KERNEL
 static void
-free_filespecs(files)
-	profile_filespec_t *files;
+free_filespecs(profile_filespec_t *files) 
 {
-#ifndef macintosh
     char **cp;
 
     if (files == 0)
@@ -186,107 +192,16 @@ free_filespecs(files)
     
     for (cp = files; *cp; cp++)
 	free(*cp);
-#endif
     free(files);
 }
 
-static krb5_error_code
-os_get_default_config_files(pfiles, secure)
-	profile_filespec_t ** pfiles;
-	krb5_boolean secure;
+/* This function is needed by KfM's KerberosPreferences API
+ * because it needs to be able to specify "secure" */
+krb5_error_code
+os_get_default_config_files(profile_filespec_t **pfiles, krb5_boolean secure)
 {
     profile_filespec_t* files;
-#ifdef macintosh
-	FSSpec*	preferencesFiles = nil;
-	UInt32	numPreferencesFiles;
-	FSSpec*	preferencesFilesToInit = nil;
-	UInt32	numPreferencesFilesToInit;
-	UInt32 i;
-	Boolean foundPreferences = false;
-	Boolean writtenPreferences = false;
-	SInt16 refNum = -1;
-	SInt32 length = 0;
-	
-	OSErr err = KPGetListOfPreferencesFiles (
-		secure ? kpSystemPreferences : kpUserPreferences | kpSystemPreferences,
-		&preferencesFiles,
-		&numPreferencesFiles);
-
-	if (err == noErr) {		
-		/* After we get the list of files, check whether any of them contain any useful information */
-		for (i = 0; i < numPreferencesFiles; i++) {
-			if (KPPreferencesFileIsReadable (&preferencesFiles [i]) == noErr) {
-				/* It's readable, check if it has anything in the data fork */
-				err = FSpOpenDF (&preferencesFiles [i], fsRdPerm, &refNum);
-				if (err == noErr) {
-					err = GetEOF (refNum, &length);
-				}
-				
-				if (refNum != -1) {
-					FSClose (refNum);
-				}
-				
-				if (length != 0) {
-					foundPreferences = true;
-					break;
-				}
-			}
-		}
-
-		if (!foundPreferences) {
-			/* We found no profile data in any of those files; try to initialize one */
-			/* If we are running "secure" do not try to initialize preferences */
-			if (!secure) {
-				err = KPGetListOfPreferencesFiles (kpUserPreferences, &preferencesFilesToInit, &numPreferencesFilesToInit);
-				if (err == noErr) {
-					for (i = 0; i < numPreferencesFilesToInit; i++) {
-						if (KPPreferencesFileIsWritable (&preferencesFilesToInit [i]) == noErr) {
-							err = noErr;
-							/* If not readable, create it */
-							if (KPPreferencesFileIsReadable (&preferencesFilesToInit [i]) != noErr) {
-								err = KPCreatePreferencesFile (&preferencesFilesToInit [i]);
-							}
-							/* Initialize it */
-							if (err == noErr) {
-								err = KPInitializeWithDefaultKerberosLibraryPreferences (&preferencesFilesToInit [i]);
-							}
-							break;
-						}
-					}
-				}
-			}
-		}
-	}
-	
-	if (err == noErr) {
-		files = malloc ((numPreferencesFiles + 1) * sizeof (FSSpec));
-		if (files == NULL)
-			err = memFullErr;
-	}
-	
-	if (err == noErr) {
-    	for (i = 0; i < numPreferencesFiles; i++) {
-    		files [i] = preferencesFiles [i];
-    	}
-    	
-    	files [numPreferencesFiles].vRefNum = 0;
-    	files [numPreferencesFiles].parID = 0;
-    	files [numPreferencesFiles].name[0] = '\0';
-	}
-	
-	if (preferencesFiles != nil)
-		KPFreeListOfPreferencesFiles (preferencesFiles);
-	
-	if (preferencesFilesToInit != nil) 
-		KPFreeListOfPreferencesFiles (preferencesFilesToInit);
-		
-	if (err == memFullErr)
-		return ENOMEM;
-	else if (err != noErr)
-		return ENOENT;
-	
-#else /* !macintosh */
-#if defined(_MSDOS) || defined(_WIN32)
+#if defined(_WIN32)
     krb5_error_code retval = 0;
     char *name = 0;
 
@@ -331,14 +246,24 @@ os_get_default_config_files(pfiles, secure)
     files = malloc(2 * sizeof(char *));
     files[0] = name;
     files[1] = 0;
-#else /* !_MSDOS && !_WIN32 */
+#else /* !_WIN32 */
     char* filepath = 0;
     int n_entries, i;
-    int ent_len;
+    unsigned int ent_len;
     const char *s, *t;
 
-    if (!secure) filepath = getenv("KRB5_CONFIG");
-    if (!filepath) filepath = DEFAULT_PROFILE_PATH;
+#ifdef USE_LOGIN_LIBRARY 
+    /* If __KLAllowHomeDirectoryAccess() == FALSE, we are probably 
+       trying to authenticate to a fileserver for the user's homedir. */ 
+    if (secure || !__KLAllowHomeDirectoryAccess ()) {
+#else 
+    if (secure) { 
+#endif 
+	filepath = DEFAULT_SECURE_PROFILE_PATH; 
+    } else {  
+	filepath = getenv("KRB5_CONFIG"); 
+	if (!filepath) filepath = DEFAULT_PROFILE_PATH;
+    }
 
     /* count the distinct filename components */
     for(s = filepath, n_entries = 1; *s; s++) {
@@ -372,9 +297,8 @@ os_get_default_config_files(pfiles, secure)
     }
     /* cap the array */
     files[i] = 0;
-#endif /* !_MSDOS && !_WIN32 */
-#endif /* !macintosh */
-    *pfiles = files;
+#endif /* !_WIN32 */
+    *pfiles = (profile_filespec_t *)files;
     return 0;
 }
 
@@ -383,8 +307,7 @@ os_get_default_config_files(pfiles, secure)
    do not include user paths (from environment variables, etc.)
 */
 static krb5_error_code
-os_init_paths(ctx)
-	krb5_context ctx;
+os_init_paths(krb5_context ctx)
 {
     krb5_error_code	retval = 0;
     profile_filespec_t *files = 0;
@@ -399,6 +322,7 @@ os_init_paths(ctx)
     if (!retval) {
         retval = profile_init((const_profile_filespec_t *) files,
 			      &ctx->profile);
+
 #ifdef KRB5_DNS_LOOKUP
         /* if none of the filenames can be opened use an empty profile */
         if (retval == ENOENT) {
@@ -430,31 +354,22 @@ os_init_paths(ctx)
 #endif /* !_KERNEL */
 
 krb5_error_code
-krb5_os_init_context(ctx)
-	krb5_context ctx;
+krb5_os_init_context(krb5_context ctx)
 {
 	krb5_os_context os_ctx;
 	krb5_error_code	retval = 0;
 
-	if (ctx->os_context)
-		return 0;
-
-	os_ctx = MALLOC(sizeof(struct _krb5_os_context));
-	if (!os_ctx)
-		return ENOMEM;
-	(void) memset(os_ctx, 0, sizeof(struct _krb5_os_context));
+	os_ctx = ctx->os_context;
 	os_ctx->magic = KV5M_OS_CONTEXT;
-
-	ctx->os_context = (void *) os_ctx;
 
 	os_ctx->time_offset = 0;
 	os_ctx->usec_offset = 0;
 	os_ctx->os_flags = 0;
 	os_ctx->default_ccname = 0;
-	os_ctx->default_ccprincipal = 0;
 
 #ifndef _KERNEL
 	krb5_cc_set_default_name(ctx, NULL);
+
 	retval = os_init_paths(ctx);
 #endif
 	/*
@@ -467,18 +382,18 @@ krb5_os_init_context(ctx)
 
 #ifndef _KERNEL
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_get_profile (ctx, profile)
-	krb5_context ctx;
-	profile_t* profile;
+krb5_error_code KRB5_CALLCONV
+krb5_get_profile (krb5_context ctx, profile_t *profile)
 {
     krb5_error_code	retval = 0;
     profile_filespec_t *files = 0;
 
     retval = os_get_default_config_files(&files, ctx->profile_secure);
 
-    if (!retval)
-        retval = profile_init((const_profile_filespec_t *) files, profile);
+    if (!retval) {
+	retval = profile_init((const_profile_filespec_t *) files,
+                               profile); 
+    }
 
     if (files)
         free_filespecs(files);
@@ -498,13 +413,10 @@ krb5_get_profile (ctx, profile)
 
 #endif
 
-#ifndef macintosh
 #ifndef _KERNEL
 
 krb5_error_code
-krb5_set_config_files(ctx, filenames)
-	krb5_context ctx;
-	const char **filenames;
+krb5_set_config_files(krb5_context ctx, const char **filenames)
 {
 	krb5_error_code retval;
 	profile_t	profile;
@@ -520,30 +432,26 @@ krb5_set_config_files(ctx, filenames)
 	return 0;
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_get_default_config_files(pfilenames)
-	char ***pfilenames;
+krb5_error_code KRB5_CALLCONV
+krb5_get_default_config_files(char ***pfilenames)
 {
     if (!pfilenames)
         return EINVAL;
     return os_get_default_config_files(pfilenames, FALSE);
 }
 
-KRB5_DLLIMP void KRB5_CALLCONV
-krb5_free_config_files(filenames)
-	char **filenames;
+void KRB5_CALLCONV
+krb5_free_config_files(char **filenames)
 {
     free_filespecs(filenames);
 }
 
 #endif /* _KERNEL */
-#endif /* macintosh */
 
 #ifndef _KERNEL
 
 krb5_error_code
-krb5_secure_config_files(ctx)
-	krb5_context ctx;
+krb5_secure_config_files(krb5_context ctx)
 {
 	/* Obsolete interface; always return an error.
 
@@ -567,30 +475,19 @@ krb5_secure_config_files(ctx)
 #endif /* _KERNEL */
 
 void
-krb5_os_free_context(ctx)
-	krb5_context	ctx;
+krb5_os_free_context(krb5_context ctx)
 {
 	krb5_os_context os_ctx;
 
 	os_ctx = ctx->os_context;
 	
-	if (!os_ctx)
-		return;
-
         if (os_ctx->default_ccname) {
 		FREE(os_ctx->default_ccname,
 			strlen(os_ctx->default_ccname) + 1);
                 os_ctx->default_ccname = 0;
         }
 
-	if (os_ctx->default_ccprincipal) {
-		krb5_free_principal (ctx, os_ctx->default_ccprincipal);
-		os_ctx->default_ccprincipal = 0;
-	}
-
 	os_ctx->magic = 0;
-	FREE(os_ctx, sizeof(struct _krb5_os_context));
-	ctx->os_context = 0;
 
 #ifndef _KERNEL
 	if (ctx->profile) {

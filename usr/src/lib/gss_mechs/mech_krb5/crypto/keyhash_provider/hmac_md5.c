@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,12 +41,6 @@
 #include <arcfour.h>
 #include <hash_provider.h>
 #include <keyhash_provider.h>
-
-static void 
-k5_hmac_md5_hash_size (size_t *output) 
-{
-  *output = 16;
-}
 
 static  krb5_error_code
 k5_hmac_md5_hash (krb5_context context,
@@ -134,8 +128,8 @@ cleanup:
 
 const struct krb5_keyhash_provider 
 krb5int_keyhash_hmac_md5 = {
-			k5_hmac_md5_hash_size,
-			k5_hmac_md5_hash,
-			NULL /*checksum  again*/
+	16,
+	k5_hmac_md5_hash,
+	NULL /*checksum  again*/
 };
 

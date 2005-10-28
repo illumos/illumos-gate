@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,9 +34,8 @@
 #include <k5-int.h>
 #include <etypes.h>
 
-KRB5_DLLIMP krb5_boolean KRB5_CALLCONV
-valid_enctype(etype)
-     krb5_enctype etype;
+krb5_boolean KRB5_CALLCONV
+krb5_c_valid_enctype(krb5_enctype etype)
 {
     int i;
 
@@ -48,12 +47,18 @@ valid_enctype(etype)
     return(0);
 }
 
+krb5_boolean KRB5_CALLCONV
+valid_enctype(krb5_enctype etype)
+{
+    return krb5_c_valid_enctype (etype);
+}
+
 /* Solaris kerberos:
  *
  * is_in_keytype(): returns 1 if enctype == one of the enctypes in keytype
  * otherwise 0 is returned.
  */
-KRB5_DLLIMP krb5_boolean KRB5_CALLCONV
+krb5_boolean KRB5_CALLCONV
 is_in_keytype(keytype, numkeytypes, enctype)
     krb5_const krb5_enctype	*keytype;
     int			numkeytypes;

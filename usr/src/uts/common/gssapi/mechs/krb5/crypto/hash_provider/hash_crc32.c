@@ -30,18 +30,6 @@
 #include <crc-32.h>
 #include <hash_provider.h>
 
-static void
-k5_crc32_hash_size(size_t *output)
-{
-    *output = CRC32_CKSUM_LENGTH;
-}
-
-static void
-k5_crc32_block_size(size_t *output)
-{
-    *output = 1;
-}
-
 /* ARGSUSED */
 static krb5_error_code
 k5_crc32_hash(krb5_context context,
@@ -69,7 +57,7 @@ k5_crc32_hash(krb5_context context,
 }
 
 const struct krb5_hash_provider krb5_hash_crc32 = {
-    k5_crc32_hash_size,
-    k5_crc32_block_size,
+    CRC32_CKSUM_LENGTH,
+    1,
     k5_crc32_hash
 };

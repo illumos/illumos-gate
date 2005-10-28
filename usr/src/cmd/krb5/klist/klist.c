@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -73,20 +73,20 @@ size_t timestamp_width;
 
 krb5_context kcontext;
 
-char * etype_string KRB5_PROTOTYPE((krb5_enctype ));
-void show_credential KRB5_PROTOTYPE((char *,
+char * etype_string (krb5_enctype );
+void show_credential (char *,
 				krb5_context,
-				krb5_creds *));
+				krb5_creds *);
 	
-void do_ccache KRB5_PROTOTYPE((char *));
-void do_keytab KRB5_PROTOTYPE((char *));
-void printtime KRB5_PROTOTYPE((time_t));
-void one_addr KRB5_PROTOTYPE((krb5_address *));
-void fillit KRB5_PROTOTYPE((FILE *, int, int));
+void do_ccache (char *);
+void do_keytab (char *);
+void printtime (time_t);
+void one_addr (krb5_address *);
+void fillit (FILE *, int, int);
 void show_addr(krb5_address *a);
 
 #ifdef KRB5_KRB4_COMPAT
-void do_v4_ccache KRB5_PROTOTYPE((char *));
+void do_v4_ccache (char *);
 #endif /* KRB5_KRB4_COMPAT */
 
 #define DEFAULT 0

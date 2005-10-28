@@ -223,7 +223,7 @@ OM_uint32 *time_rec;
 	size_t i;
 	krb5_gss_cred_id_t cred;
 	gss_OID_set ret_mechs = GSS_C_NULL_OID_SET;
-	const gss_OID_set_desc FAR * valid_mechs;
+	const gss_OID_set_desc  * valid_mechs;
 	int req_old, req_new;
 	OM_uint32 ret;
 	krb5_error_code code;

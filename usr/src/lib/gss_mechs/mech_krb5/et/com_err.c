@@ -1,5 +1,5 @@
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -26,6 +26,7 @@
  * provided "as is" without express or implied warranty.
  */
 
+
 #include <stdio.h>
 #include <string.h>
 #include <locale.h>
@@ -44,8 +45,8 @@ static void MacMessageBox(char *errbuf);
 static et_old_error_hook_func com_err_hook = 0;
 
 static void default_com_err_proc
-ET_P((const char FAR *whoami, errcode_t code,
-	const char FAR *fmt, va_list ap));
+(const char  *whoami, errcode_t code,
+	const char  *fmt, va_list ap);
 
 /* Solaris Kerberos specific fix start --------------------------- */
 
@@ -117,9 +118,9 @@ my_gettext(int msg_idx)
 /* Solaris Kerberos:  this code is significantly altered from
  * the MIT 1.2.1 version to work with internationalization */
 static void default_com_err_proc(whoami, code, fmt, ap)
-	const char FAR *whoami;
+	const char  *whoami;
 	errcode_t code;
-	const char FAR *fmt;
+	const char  *fmt;
 	va_list ap;
 {
 	char whilebuf[1024] = "";
@@ -189,10 +190,10 @@ static void default_com_err_proc(whoami, code, fmt, ap)
 	fflush(stderr);
 }
 
-KRB5_DLLIMP void KRB5_CALLCONV com_err_va(whoami, code, fmt, ap)
-	const char FAR *whoami;
+void KRB5_CALLCONV com_err_va(whoami, code, fmt, ap)
+	const char  *whoami;
 	errcode_t code;
-	const char FAR *fmt;
+	const char  *fmt;
 	va_list ap;
 {
 	if (!com_err_hook)
@@ -203,14 +204,14 @@ KRB5_DLLIMP void KRB5_CALLCONV com_err_va(whoami, code, fmt, ap)
 
 
 #ifndef ET_VARARGS
-KRB5_DLLIMP void KRB5_CALLCONV_C com_err(const char FAR *whoami,
+void KRB5_CALLCONV_C com_err(const char  *whoami,
 					 errcode_t code,
-					 const char FAR *fmt, ...)
+					 const char  *fmt, ...)
 #else
-KRB5_DLLIMP void KRB5_CALLCONV_C com_err(whoami, code, fmt, va_alist)
-	const char FAR *whoami;
+void KRB5_CALLCONV_C com_err(whoami, code, fmt, va_alist)
+	const char  *whoami;
 	errcode_t code;
-	const char FAR *fmt;
+	const char  *fmt;
 	va_dcl
 #endif
 {

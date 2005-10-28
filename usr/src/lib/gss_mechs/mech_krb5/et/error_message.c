@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1998-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -28,7 +28,7 @@ static char buffer[25];
 
 struct et_list * _et_list = (struct et_list *) NULL;
 
-KRB5_DLLIMP const char * KRB5_CALLCONV error_message (code)
+const char * KRB5_CALLCONV error_message (code)
 long code;
 {
     int offset;
@@ -107,4 +107,16 @@ oops:
     *cp++ = '0' + offset;
     *cp = '\0';
     return(buffer);
+}
+
+int com_err_finish_init()
+{
+	/*
+	 * SUNW14resync
+	 * Since the original SEAM (Solaris Kerberos) error_message()
+	 * has deviated substantially from MIT let's disable
+	 * com_err_initialize for now and revisit if necessary.
+	 */
+	/* return CALL_INIT_FUNCTION(com_err_initialize); */
+	return 0;
 }

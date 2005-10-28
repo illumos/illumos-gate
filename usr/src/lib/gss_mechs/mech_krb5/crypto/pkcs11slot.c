@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,8 +155,9 @@ slot_supports_krb5(CK_SLOT_ID_PTR slotid)
 			 * make sure it supports the correct key sizes.
 			 * If not, disable this enctype and continue.
 			 */
-			krb5_enctypes_list[i].enc->keysize(&keysize,
-				&keylength);
+			keysize = krb5_enctypes_list[i].enc->keybytes;
+			keylength = krb5_enctypes_list[i].enc->keylength;
+
 			if (keylength > info.ulMaxKeySize) {
 				krb5_enctypes_list[i].etype = -1;
 				krb5_enctypes_list[i].in_string =

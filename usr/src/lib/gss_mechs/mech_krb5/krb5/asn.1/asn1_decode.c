@@ -238,6 +238,11 @@ asn1_error_code asn1_decode_generaltime(asn1buf *buf, time_t *val)
       free(s);
       return ASN1_BAD_FORMAT;
   }
+  if(s[0] == '1' && !memcmp("19700101000000Z", s, 15)) {
+      t = 0;
+      free(s);
+      goto done;
+  }
 #define c2i(c) ((c)-'0')
   ts.tm_year = 1000*c2i(s[0]) + 100*c2i(s[1]) + 10*c2i(s[2]) + c2i(s[3])
     - 1900;
@@ -252,6 +257,7 @@ asn1_error_code asn1_decode_generaltime(asn1buf *buf, time_t *val)
 
   if(t == -1) return ASN1_BAD_TIMEFORMAT;
 
+done:
   *val = t;
   cleanup();
 }

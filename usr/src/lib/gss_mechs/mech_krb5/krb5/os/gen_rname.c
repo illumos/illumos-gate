@@ -30,13 +30,8 @@
 #include "k5-int.h"
 #include "os-proto.h"
 
-/*ARGSUSED*/
 krb5_error_code
-krb5_gen_replay_name(context, address, uniq, string)
-    krb5_context 	  context;
-    const krb5_address 	* address;
-    const char 		* uniq;
-    char 	       ** string;
+krb5_gen_replay_name(krb5_context context, const krb5_address *address, const char *uniq, char **string)
 {
     char * tmp;
     int i;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,7 +8,7 @@
 /*
  * lib/krb5/krb/init_ctx.c
  *
- * Copyright 1994,1999,2000 by the Massachusetts Institute of Technology.
+ * Copyright 1994,1999,2000, 2002, 2003  by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -72,6 +72,23 @@
 pid_t __krb5_current_pid; /* fork safety: contains the current process ID */
 #endif
 
+#ifndef _KERNEL
+#include <krb5_libinit.h>
+#endif
+
+/* The des-mdX entries are last for now, because it's easy to
+   configure KDCs to issue TGTs with des-mdX keys and then not accept
+   them.  This'll be fixed, but for better compatibility, let's prefer
+   des-crc for now.  */
+#define DEFAULT_ETYPE_LIST	\
+	"aes256-cts-hmac-sha1-96 " \
+	"aes128-cts-hmac-sha1-96 " \
+	"des3-hmac-sha1 " \
+	"arcfour-hmac-md5 " \
+	"des-cbc-md5 " \
+	"des-cbc-crc"
+
+
 /* The only functions that are needed from this file when in kernel are
  * krb5_init_context and krb5_free_context.
  * In krb5_init_context we need only os_init_context since we don'it need the
@@ -84,16 +101,16 @@ extern krb5_error_code krb5_vercheck();
 extern void krb5_win_ccdll_load(krb5_context context);
 #endif
 
-static krb5_error_code init_common ();
+static krb5_error_code init_common (krb5_context *, krb5_boolean);
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
+krb5_error_code KRB5_CALLCONV
 krb5_init_context(context)
 	krb5_context *context;
 {
 	return init_common (context, FALSE);
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
+krb5_error_code KRB5_CALLCONV
 krb5_init_secure_context(context)
 	krb5_context *context;
 {
@@ -323,9 +340,7 @@ krb5_free_ef_handle(krb5_context ctx)
 #endif /* !_KERNEL */
 
 static krb5_error_code
-init_common (context, secure)
-	krb5_context *context;
-	krb5_boolean secure;
+init_common (krb5_context *context, krb5_boolean secure)
 {
 	krb5_context ctx = 0;
 	krb5_error_code retval;
@@ -338,7 +353,7 @@ init_common (context, secure)
 	int tmp;
 #endif
 
-#if (defined(_MSDOS) || defined(_WIN32))
+#if (defined(_WIN32))
 	/* 
 	 * Load the krbcc32.dll if necessary.  We do this here so that
 	 * we know to use API: later on during initialization.
@@ -353,6 +368,12 @@ init_common (context, secure)
 	retval = krb5_vercheck();
 	if (retval)
 		return retval;
+#else /* assume UNIX for now */
+#ifndef _KERNEL
+	retval = krb5int_initialize_library ();
+	if (retval)
+	    return retval;
+#endif /* !_KERNEL */
 #endif
 
 	*context = 0;
@@ -442,12 +463,8 @@ init_common (context, secure)
 	profile_get_integer(ctx->profile, "libdefaults",
 			    "kdc_default_options", 0,
 			    KDC_OPT_RENEWABLE_OK, &tmp);
-	ctx->kdc_default_options = KDC_OPT_RENEWABLE_OK;
-#ifdef macintosh
+	ctx->kdc_default_options = tmp;
 #define DEFAULT_KDC_TIMESYNC 1
-#else
-#define DEFAULT_KDC_TIMESYNC 0
-#endif
 	profile_get_integer(ctx->profile, "libdefaults",
 			    "kdc_timesync", 0, DEFAULT_KDC_TIMESYNC,
 			    &tmp);
@@ -488,9 +505,8 @@ cleanup:
 	return retval;
 }
 
-KRB5_DLLIMP void KRB5_CALLCONV
-krb5_free_context(ctx)
-	krb5_context	ctx;
+void KRB5_CALLCONV
+krb5_free_context(krb5_context ctx)
 {
 	KRB5_LOG0(KRB5_INFO,"krb5_free_context() start");
 
@@ -537,16 +553,14 @@ krb5_free_context(ctx)
  * Set the desired default ktypes, making sure they are valid.
  */
 krb5_error_code
-krb5_set_default_in_tkt_ktypes(context, ktypes)
-	krb5_context context;
-	const krb5_enctype *ktypes;
+krb5_set_default_in_tkt_ktypes(krb5_context context, const krb5_enctype *ktypes)
 {
     krb5_enctype * new_ktypes;
     int i;
 
     if (ktypes) {
 	for (i = 0; ktypes[i]; i++) {
-	    if (!valid_enctype(ktypes[i])) 
+	    if (!krb5_c_valid_enctype(ktypes[i])) 
 		return KRB5_PROG_ETYPE_NOSUPP;
 	}
 
@@ -569,12 +583,8 @@ krb5_set_default_in_tkt_ktypes(context, ktypes)
 }
 
 static krb5_error_code
-get_profile_etype_list(context, ktypes, profstr, ctx_count, ctx_list)
-     krb5_context context;
-     krb5_enctype **ktypes;
-     char *profstr;
-     int ctx_count;
-     krb5_enctype *ctx_list;
+get_profile_etype_list(krb5_context context, krb5_enctype **ktypes, char *profstr,
+		       int ctx_count, krb5_enctype *ctx_list)
 {
     krb5_enctype *old_ktypes = NULL;
 
@@ -596,35 +606,29 @@ get_profile_etype_list(context, ktypes, profstr, ctx_count, ctx_list)
 	   session key types.
 	 */
 
-	char *retval;
+	char *retval = NULL;
 	char *sp, *ep;
 	int j, checked_enctypes, count;
 	krb5_error_code code;
 
 	code = profile_get_string(context->profile, "libdefaults", profstr,
-				  NULL,
-				  "aes256-cts-hmac-sha1-96 "
-				  "aes128-cts-hmac-sha1-96 "
-				  "des3-hmac-sha1 "
-				  "arcfour-hmac-md5 "
-				  "des-cbc-md5 "
-				  "des-cbc-crc",
-				  &retval);
+				  NULL, DEFAULT_ETYPE_LIST, &retval);
 	if (code)
 	    return code;
 
+	if (!retval)  /* SUNW14resync - just in case */
+            return PROF_EINVAL;  /* XXX */
+
 	count = 0;
 	sp = retval;
-	while (sp) {
-	    for (ep = sp; *ep && (*ep != ',') && !isspace(*ep); ep++)
+	while (*sp) {
+	    for (ep = sp; *ep && (*ep != ',') && !isspace((int) (*ep)); ep++)
 		;
 	    if (*ep) {
 		*ep++ = '\0';
-		while (isspace(*ep))
-		    ep++;
-	    } else
-		ep = (char *) NULL;
-
+		while (isspace((int) (*ep)) || *ep == ',')
+		    *ep++ = '\0';
+	    }
 	    count++;
 	    sp = ep;
 	}
@@ -681,9 +685,7 @@ get_profile_etype_list(context, ktypes, profstr, ctx_count, ctx_list)
 }
 
 krb5_error_code
-krb5_get_default_in_tkt_ktypes(context, ktypes)
-    krb5_context context;
-    krb5_enctype **ktypes;
+krb5_get_default_in_tkt_ktypes(krb5_context context, krb5_enctype **ktypes)
 {
     return(get_profile_etype_list(context, ktypes, "default_tkt_enctypes",
 				  context->in_tkt_ktype_count,
@@ -691,9 +693,7 @@ krb5_get_default_in_tkt_ktypes(context, ktypes)
 }
 
 krb5_error_code
-krb5_set_default_tgs_enctypes(context, ktypes)
-	krb5_context context;
-	const krb5_enctype *ktypes;
+krb5_set_default_tgs_enctypes (krb5_context context, const krb5_enctype *ktypes)
 {
     krb5_enctype * new_ktypes;
     int i;
@@ -734,9 +734,7 @@ krb5_error_code krb5_set_default_tgs_ktypes
 /*ARGSUSED*/
 void
 KRB5_CALLCONV
-krb5_free_ktypes (context, val)
-     krb5_context context;
-     krb5_enctype FAR *val;
+krb5_free_ktypes (krb5_context context, krb5_enctype *val)
 {
     free (val);
 }
@@ -744,10 +742,7 @@ krb5_free_ktypes (context, val)
 /*ARGSUSED*/
 krb5_error_code
 KRB5_CALLCONV
-krb5_get_tgs_ktypes(context, princ, ktypes)
-    krb5_context context;
-    krb5_const_principal princ;
-    krb5_enctype **ktypes;
+krb5_get_tgs_ktypes(krb5_context context, krb5_const_principal princ, krb5_enctype **ktypes)
 {
     if (context->use_conf_ktypes)
 	/* This one is set *only* by reading the config file; it's not
@@ -762,9 +757,7 @@ krb5_get_tgs_ktypes(context, princ, ktypes)
 }
 
 krb5_error_code
-krb5_get_permitted_enctypes(context, ktypes)
-    krb5_context context;
-    krb5_enctype **ktypes;
+krb5_get_permitted_enctypes(krb5_context context, krb5_enctype **ktypes)
 {
     return(get_profile_etype_list(context, ktypes, "permitted_enctypes",
 				  context->tgs_ktype_count,
@@ -772,9 +765,7 @@ krb5_get_permitted_enctypes(context, ktypes)
 }
 
 krb5_boolean
-krb5_is_permitted_enctype(context, etype)
-     krb5_context context;
-     krb5_enctype etype;
+krb5_is_permitted_enctype(krb5_context context, krb5_enctype etype)
 {
     krb5_enctype *list, *ptr;
     krb5_boolean ret;

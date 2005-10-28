@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,44 +121,44 @@ struct dump_args {
 };
 
 static krb5_error_code dump_k5beta_iterator
-PROTOTYPE((krb5_pointer,
-						       krb5_db_entry *));
+(krb5_pointer,
+						       krb5_db_entry *);
 static krb5_error_code dump_k5beta6_iterator
-PROTOTYPE((krb5_pointer,
-							krb5_db_entry *));
+(krb5_pointer,
+							krb5_db_entry *);
 static krb5_error_code dump_iprop_iterator
-PROTOTYPE((krb5_pointer,
-							krb5_db_entry *));
+(krb5_pointer,
+							krb5_db_entry *);
 static krb5_error_code dump_k5beta7_princ
-PROTOTYPE((krb5_pointer,
-						     krb5_db_entry *));
+(krb5_pointer,
+						     krb5_db_entry *);
 static krb5_error_code dump_iprop_princ
-PROTOTYPE((krb5_pointer,
-						     krb5_db_entry *));
+(krb5_pointer,
+						     krb5_db_entry *);
 static krb5_error_code dump_ov_princ
-PROTOTYPE((krb5_pointer,
-						krb5_db_entry *));
-static void dump_k5beta7_policy PROTOTYPE((void *, osa_policy_ent_t));
+(krb5_pointer,
+						krb5_db_entry *);
+static void dump_k5beta7_policy (void *, osa_policy_ent_t);
 
 typedef
-krb5_error_code(*dump_func) PROTOTYPE((krb5_pointer,
-					       krb5_db_entry *));
+krb5_error_code(*dump_func) (krb5_pointer,
+					       krb5_db_entry *);
 
 static int process_k5beta_record
-PROTOTYPE((char *, krb5_context,
-					    FILE *, int, int *, void *));
+(char *, krb5_context,
+					    FILE *, int, int *, void *);
 static int process_k5beta6_record
-PROTOTYPE((char *, krb5_context,
-					     FILE *, int, int *, void *));
+(char *, krb5_context,
+					     FILE *, int, int *, void *);
 static int process_k5beta7_record
-PROTOTYPE((char *, krb5_context,
-					     FILE *, int, int *, void *));
+(char *, krb5_context,
+					     FILE *, int, int *, void *);
 static int process_ov_record
-PROTOTYPE((char *, krb5_context,
-					FILE *, int, int *, void *));
+(char *, krb5_context,
+					FILE *, int, int *, void *);
 typedef
-krb5_error_code(*load_func) PROTOTYPE((char *, krb5_context,
-					       FILE *, int, int *, void *));
+krb5_error_code(*load_func) (char *, krb5_context,
+					       FILE *, int, int *, void *);
 
 typedef struct _dump_version {
      char *name;

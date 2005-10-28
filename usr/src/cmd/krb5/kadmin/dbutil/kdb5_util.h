@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,24 +63,24 @@ extern char *progname;
 extern char *Err_no_database;
 
 void add_key
-PROTOTYPE((char const *, char const *,
+(char const *, char const *,
 	krb5_const_principal, const krb5_keyblock *,
-	krb5_kvno, krb5_keysalt *));
+	krb5_kvno, krb5_keysalt *);
 int set_dbname_help
-    PROTOTYPE((char *, char *));
+    (char *, char *);
 
-char *kdb5_util_Init PROTOTYPE((int, char **));
+char *kdb5_util_Init (int, char **);
 
 int quit();
 
 int check_for_match
-    PROTOTYPE((char *, int, krb5_db_entry *, int, int));
+    (char *, int, krb5_db_entry *, int, int);
 
 void parse_token
-    PROTOTYPE((char *, int *, int *, char *));
+    (char *, int *, int *, char *);
 
 int create_db_entry
-    PROTOTYPE((krb5_principal, krb5_db_entry *));
+    (krb5_principal, krb5_db_entry *);
 
 #ifdef	__cplusplus
 }

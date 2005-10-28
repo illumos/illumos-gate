@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,12 +98,20 @@ krb5_rc_mem_get_span(
 	krb5_rcache id,
 	krb5_deltat *lifespan)
 {
-	*lifespan = ((struct mem_data *)(id->data))->lifespan;
-	return (0);
+    krb5_error_code err;
+    struct mem_data *t;
+
+    err = k5_mutex_lock(&id->lock);
+    if (err)
+	return err;
+    t = (struct mem_data *) id->data;
+    *lifespan = t->lifespan;
+    k5_mutex_unlock(&id->lock);
+    return 0;
 }
 
 krb5_error_code KRB5_CALLCONV
-krb5_rc_mem_init(krb5_context context, krb5_rcache id, krb5_deltat lifespan)
+krb5_rc_mem_init_locked(krb5_context context, krb5_rcache id, krb5_deltat lifespan)
 {
 	struct mem_data *t = (struct mem_data *)id->data;
 	krb5_error_code retval;
@@ -112,6 +120,20 @@ krb5_rc_mem_init(krb5_context context, krb5_rcache id, krb5_deltat lifespan)
 	/* default to clockskew from the context */
 	return (0);
 }
+
+krb5_error_code KRB5_CALLCONV
+krb5_rc_mem_init(krb5_context context, krb5_rcache id, krb5_deltat lifespan)
+{
+    krb5_error_code retval;
+
+    retval = k5_mutex_lock(&id->lock);
+    if (retval)
+	return retval;
+    retval = krb5_rc_mem_init_locked(context, id, lifespan);
+    k5_mutex_unlock(&id->lock);
+    return retval;
+}
+
 
 krb5_error_code KRB5_CALLCONV
 krb5_rc_mem_close_no_free(krb5_context context, krb5_rcache id)
@@ -139,9 +161,15 @@ krb5_rc_mem_close_no_free(krb5_context context, krb5_rcache id)
 krb5_error_code KRB5_CALLCONV
 krb5_rc_mem_close(krb5_context context, krb5_rcache id)
 {
-	krb5_rc_mem_close_no_free(context, id);
-	free(id);
-	return (0);
+    krb5_error_code retval;
+    retval = k5_mutex_lock(&id->lock);
+    if (retval)
+	return retval;
+    krb5_rc_mem_close_no_free(context, id);
+    k5_mutex_unlock(&id->lock);
+    k5_mutex_destroy(&id->lock);
+    free(id);
+    return 0;
 }
 
 krb5_error_code KRB5_CALLCONV
@@ -195,7 +223,24 @@ cleanup:
 krb5_error_code KRB5_CALLCONV
 krb5_rc_mem_recover(krb5_context context, krb5_rcache id)
 {
+	/* SUNW14resync - No need for locking here, just returning RC_NOIO */
 	return (KRB5_RC_NOIO);
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_rc_mem_recover_or_init(krb5_context context, krb5_rcache id,
+			    krb5_deltat lifespan)
+{
+    krb5_error_code retval;
+
+    retval = k5_mutex_lock(&id->lock);
+    if (retval)
+	return retval;
+    retval = krb5_rc_mem_recover(context, id);
+    if (retval)
+	retval = krb5_rc_mem_init_locked(context, id, lifespan);
+    k5_mutex_unlock(&id->lock);
+    return retval;
 }
 
 krb5_error_code KRB5_CALLCONV

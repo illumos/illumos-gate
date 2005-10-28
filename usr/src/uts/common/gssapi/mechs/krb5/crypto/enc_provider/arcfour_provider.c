@@ -13,36 +13,10 @@
 #include <k5-int.h>
 #include <arcfour.h>
 
-/* The blocksize for the enctype */
-static void k5_arcfour_blocksize(size_t *);
-
-/* keysize for the enctype (number of bytes, and length of key (parity/etc) */
-static void k5_arcfour_keysize(size_t *, size_t *);
-
 /* from a random bitstrem, construct a key */
 static krb5_error_code
 k5_arcfour_make_key(krb5_context, const krb5_data *, krb5_keyblock *);
 
-/* This seems to work... although I am not sure what the implications are
-   in other places in the kerberos library */
-static void
-k5_arcfour_blocksize(size_t *blocksize)
-{
-  KRB5_LOG0(KRB5_INFO, "k5_arcfour_blocksize called");
-  *blocksize = 1;
-}
-
-/* Keysize is arbitrary in arcfour, but the constraints of the system, and
-   to attempt to work with the MSFT system forces us to 16byte/128bit.
-   Since there is no parity in the key, the byte and length are the same.
-*/
-static void
-k5_arcfour_keysize(size_t *keybytes, size_t *keylength)
-{
-    KRB5_LOG0(KRB5_INFO, "k5_arcfour_keysize called");
-    *keybytes = 16;
-    *keylength = 16;
-}
 #ifndef _KERNEL
 static krb5_error_code
 setup_arcfour_crypto(CK_SESSION_HANDLE session,
@@ -376,8 +350,8 @@ k5_arcfour_init_state (krb5_context context,
    we just call "docrypt" directly
 */
 const struct krb5_enc_provider krb5int_enc_arcfour = {
-    k5_arcfour_blocksize,
-    k5_arcfour_keysize,
+    1,
+    16, 16,
     k5_arcfour_encrypt,
     k5_arcfour_decrypt,
     k5_arcfour_make_key,

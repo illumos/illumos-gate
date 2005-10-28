@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,7 +15,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -36,10 +36,10 @@
 
 #include <k5-int.h>
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_kt_free_entry (context, entry)
-    krb5_context context;
-    krb5_keytab_entry FAR *entry;
+krb5_error_code KRB5_CALLCONV
+krb5_free_keytab_entry_contents (krb5_context context, krb5_keytab_entry *entry)
+
+
 {
     if (!entry)
 	return 0;
@@ -50,4 +50,10 @@ krb5_kt_free_entry (context, entry)
         krb5_free_keyblock_contents(context, &entry->key);
     }
     return 0;
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_kt_free_entry (krb5_context context, krb5_keytab_entry *entry)
+{
+    return krb5_free_keytab_entry_contents (context, entry);
 }

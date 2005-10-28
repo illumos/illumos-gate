@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -7,6 +7,8 @@
 
 #include <k5-int.h>
 #include <auth_con.h>
+
+static krb5_boolean chk_heimdal_seqnum(krb5_ui_4, krb5_ui_4);
 
 /*ARGSUSED*/
 static krb5_error_code
@@ -47,6 +49,8 @@ krb5_auth_con_init(krb5_context context, krb5_auth_context *auth_context)
 
     (*auth_context)->req_cksumtype = context->default_ap_req_sumtype;
     (*auth_context)->safe_cksumtype = context->default_safe_sumtype;
+    (*auth_context) -> checksum_func = NULL;
+    (*auth_context)->checksum_func_data = NULL;
     (*auth_context)->magic = KV5M_AUTH_CONTEXT;
     return 0;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,12 +28,8 @@
 /*
  * encrypt the enc_part of krb5_cred
  */
-static krb5_error_code
-encrypt_credencpart(
-    krb5_context	  context,
-    krb5_cred_enc_part 	* pcredpart,
-    krb5_keyblock 	* pkeyblock,
-    krb5_enc_data 	* pencdata)
+static krb5_error_code 
+encrypt_credencpart(krb5_context context, krb5_cred_enc_part *pcredpart, krb5_keyblock *pkeyblock, krb5_enc_data *pencdata)
 {
     krb5_error_code 	  retval;
     krb5_data 		* scratch;
@@ -74,15 +70,7 @@ encrypt_credencpart(
 /*----------------------- krb5_mk_ncred_basic -----------------------*/
 
 static krb5_error_code
-krb5_mk_ncred_basic(
-    krb5_context 	context,
-    krb5_creds 	        ** ppcreds,
-    krb5_int32 		nppcreds,
-    krb5_keyblock 	* keyblock,
-    krb5_replay_data    * replaydata,
-    krb5_address  	* local_addr,
-    krb5_address  	* remote_addr,
-    krb5_cred 		* pcred)
+krb5_mk_ncred_basic(krb5_context context, krb5_creds **ppcreds, krb5_int32 nppcreds, krb5_keyblock *keyblock, krb5_replay_data *replaydata, krb5_address *local_addr, krb5_address *remote_addr, krb5_cred *pcred)
 {
     krb5_cred_enc_part 	  credenc;
     krb5_error_code	  retval;
@@ -101,8 +89,8 @@ krb5_mk_ncred_basic(
     credenc.timestamp = replaydata->timestamp;
 
     /* Get memory for creds and initialize it */
-    size = sizeof(krb5_cred_info  *) * (nppcreds + 1);
-    credenc.ticket_info = (krb5_cred_info  *  *) malloc(size);
+    size = sizeof(krb5_cred_info *) * (nppcreds + 1);
+    credenc.ticket_info = (krb5_cred_info **) malloc(size);
     if (credenc.ticket_info == NULL)
 	return ENOMEM;
     memset(credenc.ticket_info, 0, size);
@@ -165,12 +153,7 @@ cleanup:
  * outputs an encoded KRB_CRED message suitable for krb5_rd_cred
  */
 krb5_error_code KRB5_CALLCONV
-krb5_mk_ncred(
-    krb5_context 	  context,
-    krb5_auth_context	  auth_context,
-    krb5_creds 	       ** ppcreds,
-    krb5_data 	       ** ppdata,
-    krb5_replay_data	* outdata)
+krb5_mk_ncred(krb5_context context, krb5_auth_context auth_context, krb5_creds **ppcreds, krb5_data **ppdata, krb5_replay_data *outdata)
 {
     krb5_address  * premote_fulladdr = NULL;
     krb5_address  * plocal_fulladdr = NULL;
@@ -200,11 +183,11 @@ krb5_mk_ncred(
     memset(pcred, 0, sizeof(krb5_cred));
 
     if ((pcred->tickets
-      = (krb5_ticket  *  *)malloc(sizeof(krb5_ticket  *) * (ncred + 1))) == NULL) {
+      = (krb5_ticket **)malloc(sizeof(krb5_ticket *) * (ncred + 1))) == NULL) {
 	retval = ENOMEM;
 	free(pcred);
     }
-    memset(pcred->tickets, 0, sizeof(krb5_ticket  *) * (ncred +1));
+    memset(pcred->tickets, 0, sizeof(krb5_ticket *) * (ncred +1));
 
     /* Get keyblock */
     if ((keyblock = auth_context->send_subkey) == NULL)
@@ -312,12 +295,7 @@ error:
  * A convenience function that calls krb5_mk_ncred.
  */
 krb5_error_code KRB5_CALLCONV
-krb5_mk_1cred(
-    krb5_context 	  context,
-    krb5_auth_context	  auth_context,
-    krb5_creds 		* pcreds,
-    krb5_data 	        ** ppdata,
-    krb5_replay_data  	* outdata)
+krb5_mk_1cred(krb5_context context, krb5_auth_context auth_context, krb5_creds *pcreds, krb5_data **ppdata, krb5_replay_data *outdata)
 {
     krb5_error_code retval;
     krb5_creds  **ppcreds;

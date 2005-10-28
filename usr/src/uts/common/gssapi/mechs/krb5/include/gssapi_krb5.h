@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,19 +71,19 @@ extern const gss_OID_desc krb5_gss_oid_array[];
 #define gss_krb5_nt_machine_uid_name	gss_nt_machine_uid_name
 #define gss_krb5_nt_string_uid_name	gss_nt_string_uid_name
 
-GSS_DLLIMP OM_uint32 KRB5_CALLCONV gss_krb5_get_tkt_flags
-	PROTOTYPE((OM_uint32 *minor_status,
+OM_uint32 KRB5_CALLCONV gss_krb5_get_tkt_flags
+	(OM_uint32 *minor_status,
 		   gss_ctx_id_t context_handle,
-		   krb5_flags *ticket_flags));
+		   krb5_flags *ticket_flags);
 
-GSS_DLLIMP OM_uint32 KRB5_CALLCONV gss_krb5_copy_ccache
-	PROTOTYPE((void *ctx, OM_uint32 *minor_status,
+OM_uint32 KRB5_CALLCONV gss_krb5_copy_ccache
+	(void *ctx, OM_uint32 *minor_status,
 		   gss_cred_id_t cred_handle,
-		   krb5_ccache out_ccache));
+		   krb5_ccache out_ccache);
 
-GSS_DLLIMP OM_uint32 KRB5_CALLCONV gss_krb5_ccache_name
-	PROTOTYPE((OM_uint32 *minor_status, const char *name,
-		   const char **out_name));
+OM_uint32 KRB5_CALLCONV gss_krb5_ccache_name
+	(OM_uint32 *minor_status, const char *name,
+		   const char **out_name);
 
 #ifdef __cplusplus
 }

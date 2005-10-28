@@ -30,10 +30,7 @@
 #include <errno.h>
 
 krb5_error_code
-krb5_write_message(context, fdp, outbuf)
-    krb5_context context;
-	krb5_pointer	fdp;
-	krb5_data	*outbuf;
+krb5_write_message(krb5_context context, krb5_pointer fdp, krb5_data *outbuf)
 {
 	krb5_int32	len;
 	int		fd = *( (int *) fdp);

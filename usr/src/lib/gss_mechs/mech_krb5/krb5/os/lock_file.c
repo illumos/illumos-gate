@@ -31,7 +31,7 @@
 #include <k5-int.h>
 #include <stdio.h>
 
-#if !defined(_MSDOS) && !defined(_WIN32) && !defined(HAVE_MACSOCK_H)
+#if !defined(_WIN32)
 
 /* Unix version...  */
 
@@ -63,17 +63,14 @@
 
 /*ARGSUSED*/
 krb5_error_code
-krb5_lock_file(context, fd, mode)
-    krb5_context context;
-    int fd;
-    int mode;
+krb5_lock_file(krb5_context context, int fd, int mode)
 {
     int 		lock_flag = -1;
     krb5_error_code	retval = 0;
 #ifdef POSIX_FILE_LOCKS
     int lock_cmd = F_SETLKW;
     static struct flock flock_zero;
-    struct flock lock_arg;
+    struct flock lock_arg = { 0 };
 
     lock_arg = flock_zero;
 #endif
@@ -133,7 +130,7 @@ krb5_lock_file(context, fd, mode)
     
     return retval;
 }
-#else   /* MSDOS or Macintosh */
+#else   /* Windows or Macintosh */
 
 krb5_error_code
 krb5_lock_file(context, fd, mode)

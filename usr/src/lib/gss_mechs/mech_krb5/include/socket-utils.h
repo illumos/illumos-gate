@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
@@ -54,6 +59,11 @@
 
 /* for HAVE_SOCKLEN_T, KRB5_USE_INET6, etc */
 #include "autoconf.h"
+#if 0   /* SUNW14resync */
+#include "krb5/autoconf.h"
+/* for sockaddr_storage */
+#include "port-sockets.h"
+#endif   /* SUNW14resync */
 
 #if defined (__GNUC__)
 /*

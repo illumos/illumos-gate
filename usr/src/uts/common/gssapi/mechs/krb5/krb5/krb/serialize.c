@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,9 +41,7 @@
  * krb5_find_serializer()	- See if a particular type is registered.
  */
 krb5_ser_handle
-krb5_find_serializer(kcontext, odtype)
-    krb5_context	kcontext;
-    krb5_magic		odtype;
+krb5_find_serializer(krb5_context kcontext, krb5_magic odtype)
 {
     krb5_ser_handle	res;
     krb5_ser_handle	sctx;
@@ -64,9 +62,7 @@ krb5_find_serializer(kcontext, odtype)
  * krb5_register_serializer()	- Register a particular serializer.
  */
 krb5_error_code
-krb5_register_serializer(kcontext, entry)
-    krb5_context	kcontext;
-    const krb5_ser_entry *entry;
+krb5_register_serializer(krb5_context kcontext, const krb5_ser_entry *entry)
 {
     krb5_error_code	kret;
     krb5_ser_handle	stable;
@@ -105,11 +101,7 @@ krb5_register_serializer(kcontext, entry)
  *			  piece of opaque data.
  */
 krb5_error_code KRB5_CALLCONV
-krb5_size_opaque(
-    krb5_context	kcontext,
-    krb5_magic		odtype,
-    krb5_pointer	arg,
-    size_t		*sizep)
+krb5_size_opaque(krb5_context kcontext, krb5_magic odtype, krb5_pointer arg, size_t *sizep)
 {
     krb5_error_code	kret;
     krb5_ser_handle	shandle;
@@ -125,12 +117,7 @@ krb5_size_opaque(
  * krb5_externalize_opaque()	- Externalize a piece of opaque data.
  */
 krb5_error_code KRB5_CALLCONV
-krb5_externalize_opaque(
-    krb5_context	kcontext,
-    krb5_magic		odtype,
-    krb5_pointer	arg,
-    krb5_octet		* *bufpp,
-    size_t		*sizep)
+krb5_externalize_opaque(krb5_context kcontext, krb5_magic odtype, krb5_pointer arg, krb5_octet **bufpp, size_t *sizep)
 {
     krb5_error_code	kret;
     krb5_ser_handle	shandle;
@@ -147,11 +134,7 @@ krb5_externalize_opaque(
  * Externalize a piece of arbitrary data.
  */
 krb5_error_code
-krb5_externalize_data(kcontext, arg, bufpp, sizep)
-    krb5_context	kcontext;
-    krb5_pointer	arg;
-    krb5_octet		**bufpp;
-    size_t		*sizep;
+krb5_externalize_data(krb5_context kcontext, krb5_pointer arg, krb5_octet **bufpp, size_t *sizep)
 {
     krb5_error_code	kret;
     krb5_magic		*mp;
@@ -186,12 +169,7 @@ krb5_externalize_data(kcontext, arg, bufpp, sizep)
  *				  structure.
  */
 krb5_error_code KRB5_CALLCONV
-krb5_internalize_opaque(
-    krb5_context	kcontext,
-    krb5_magic		odtype,
-    krb5_pointer	*argp,
-    krb5_octet		* *bufpp,
-    size_t		*sizep)
+krb5_internalize_opaque(krb5_context kcontext, krb5_magic odtype, krb5_pointer *argp, krb5_octet **bufpp, size_t *sizep)
 {
     krb5_error_code	kret;
     krb5_ser_handle	shandle;
@@ -209,10 +187,7 @@ krb5_internalize_opaque(
  *				  Update buffer pointer and remaining space.
  */
 krb5_error_code KRB5_CALLCONV
-krb5_ser_pack_int32(
-    krb5_int32		iarg,
-    krb5_octet		* *bufp,
-    size_t		*remainp)
+krb5_ser_pack_int32(krb5_int32 iarg, krb5_octet **bufp, size_t *remainp)
 {
     if (*remainp >= sizeof(krb5_int32)) {
 	(*bufp)[0] = (krb5_octet) ((iarg >> 24) & 0xff);
@@ -248,11 +223,7 @@ krb5_ser_pack_int64(krb5_int64 iarg, krb5_octet **bufp, size_t *remainp)
  * krb5_ser_pack_bytes()	- Pack a string of bytes.
  */
 krb5_error_code KRB5_CALLCONV
-krb5_ser_pack_bytes(
-    krb5_octet	*ostring,
-    size_t	osize,
-    krb5_octet	* *bufp,
-    size_t	*remainp)
+krb5_ser_pack_bytes(krb5_octet *ostring, size_t osize, krb5_octet **bufp, size_t *remainp)
 {
     if (*remainp >= osize) {
 	(void) memcpy(*bufp, ostring, osize);
@@ -268,10 +239,7 @@ krb5_ser_pack_bytes(
  * krb5_ser_unpack_int32()	- Unpack a 4-byte integer if it's there.
  */
 krb5_error_code KRB5_CALLCONV
-krb5_ser_unpack_int32(
-    krb5_int32	*intp,
-    krb5_octet	* *bufp,
-    size_t	*remainp)
+krb5_ser_unpack_int32(krb5_int32 *intp, krb5_octet **bufp, size_t *remainp)
 {
     if (*remainp >= sizeof(krb5_int32)) {
 	*intp = (((krb5_int32) ((unsigned char) (*bufp)[0]) << 24) |
@@ -306,11 +274,7 @@ krb5_ser_unpack_int64(krb5_int64 *intp, krb5_octet **bufp, size_t *remainp)
  * krb5_ser_unpack_bytes()	- Unpack a byte string if it's there.
  */
 krb5_error_code KRB5_CALLCONV
-krb5_ser_unpack_bytes(
-    krb5_octet	*istring,
-    size_t	isize,
-    krb5_octet	* *bufp,
-    size_t	*remainp)
+krb5_ser_unpack_bytes(krb5_octet *istring, size_t isize, krb5_octet **bufp, size_t *remainp)
 {
     if (*remainp >= isize) {
 	(void) memcpy(istring, *bufp, isize);

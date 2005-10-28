@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,10 +60,10 @@
 /* #define DEFAULT_UDP_PREF_LIMIT	 1465 */
 #define HARD_UDP_LIMIT		32700 /* could probably do 64K-epsilon ? */
 
-extern krb5_error_code
-krb5int_sendto (krb5_context context, const krb5_data *message,
-		const struct addrlist *addrs, krb5_data *reply,
-		struct sockaddr_storage *localaddr, socklen_t *localaddrlen);
+krb5_error_code krb5int_sendto(krb5_context, const krb5_data *,
+			    const struct addrlist *, krb5_data *,
+			    struct sockaddr_storage *,
+			    socklen_t *, int *);
 
 /* Solaris kerberos: leaving this here because other code depends on this. */
 static void default_debug_handler (const void *data, size_t len)
@@ -295,11 +295,11 @@ merge_addrlists (struct addrlist *dest, struct addrlist *src)
 krb5_error_code
 krb5_sendto_kdc (krb5_context context, const krb5_data *message,
 		 const krb5_data *realm, krb5_data *reply,
-		 int use_master, int tcp_only)
+		 int *use_master, int tcp_only)
 {
     krb5_error_code retval;
     struct addrlist addrs;
-    int socktype1 = 0, socktype2 = 0;
+    int socktype1 = 0, socktype2 = 0, addr_used;
 
     /*
      * find KDC location(s) for realm
@@ -317,7 +317,7 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
     /*LINTED*/
     dprint("krb5_sendto_kdc(%d@%p, \"%D\", use_master=%d, tcp_only=%d)\n",
     /*LINTED*/
-	   message->length, message->data, realm, use_master, tcp_only);
+	   message->length, message->data, realm, *use_master, tcp_only);
 
     /* 
      * Solaris Kerberos: keep it simple by not supporting a udp_preference_limit
@@ -342,7 +342,7 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
     }
 #endif /**************** END IFDEF'ed OUT *******************************/
 
-    retval = (use_master ? KRB5_KDC_UNREACH : KRB5_REALM_UNKNOWN);
+    retval = (*use_master ? KRB5_KDC_UNREACH : KRB5_REALM_UNKNOWN);
 
     if (tcp_only)
 	socktype1 = SOCK_STREAM, socktype2 = 0;
@@ -351,11 +351,11 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
     else
 	socktype1 = SOCK_STREAM, socktype2 = SOCK_DGRAM;
 
-    retval = krb5_locate_kdc(context, realm, &addrs, use_master, socktype1, 0);
+    retval = krb5_locate_kdc(context, realm, &addrs, *use_master, socktype1, 0);
     if (socktype2) {
 	struct addrlist addrs2;
 
-	retval = krb5_locate_kdc(context, realm, &addrs2, use_master,
+	retval = krb5_locate_kdc(context, realm, &addrs2, *use_master,
 				 socktype2, 0);
 	if (retval == 0) {
 	    (void) merge_addrlists(&addrs, &addrs2);
@@ -363,10 +363,38 @@ krb5_sendto_kdc (krb5_context context, const krb5_data *message,
 	}
     }
     if (addrs.naddrs > 0) {
-	retval = krb5int_sendto (context, message, &addrs, reply, 0, 0);
-	krb5int_free_addrlist (&addrs);
-	if (retval == 0)
+        retval = krb5int_sendto (context, message, &addrs, reply, 0, 0,
+		&addr_used);
+	if (retval == 0) { 
+            /*
+	     * Set use_master to 1 if we ended up talking to a master when 
+	     * didn't explicitly request to 
+	     */ 
+
+	    if (*use_master == 0) { 
+	        struct addrlist addrs3; 
+		retval = krb5_locate_kdc(context, realm, &addrs3, 1,  
+					addrs.addrs[addr_used]->ai_socktype,
+					addrs.addrs[addr_used]->ai_family);
+		if (retval == 0) { 
+		    int i; 
+		    for (i = 0; i < addrs3.naddrs; i++) { 
+			if (addrs.addrs[addr_used]->ai_addrlen == 
+			    addrs3.addrs[i]->ai_addrlen && 
+			    memcmp(addrs.addrs[addr_used]->ai_addr, 
+				addrs3.addrs[i]->ai_addr, 
+				addrs.addrs[addr_used]->ai_addrlen) == 0) { 
+				*use_master = 1;
+				break;
+			}
+		    }
+		    krb5int_free_addrlist (&addrs3);
+		}
+	    }
+	    krb5int_free_addrlist (&addrs);
 	    return 0;
+	}
+	krb5int_free_addrlist (&addrs);
     }
     return retval;
 }
@@ -984,7 +1012,8 @@ krb5_error_code
 /*ARGSUSED*/
 krb5int_sendto (krb5_context context, const krb5_data *message,
 		const struct addrlist *addrs, krb5_data *reply,
-		struct sockaddr_storage *localaddr, socklen_t *localaddrlen)
+		struct sockaddr_storage *localaddr, socklen_t *localaddrlen,
+		int *addr_used)
 {
     int i, pass;
     int delay_this_pass = 2;
@@ -1091,10 +1120,12 @@ krb5int_sendto (krb5_context context, const krb5_data *message,
     reply->length = (conns[winning_conn].x.in.pos
 		     - conns[winning_conn].x.in.buf);
     /*LINTED*/
-    dprint("returning %d bytes in buffer %p\n",
-	   (int) reply->length, reply->data);
+    dprint("returning %d bytes in buffer %p (winning_conn=%d)\n",
+	(int) reply->length, reply->data, winning_conn);
     retval = 0;
     conns[winning_conn].x.in.buf = 0;
+    if (addr_used)
+	    *addr_used = winning_conn;
     if (localaddr != 0 && localaddrlen != 0 && *localaddrlen > 0)
 	(void) getsockname(conns[winning_conn].fd, (struct sockaddr *)localaddr,
 			   localaddrlen);

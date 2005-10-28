@@ -39,11 +39,9 @@
  * < 0 if first is less than 2nd, > 0 if first is greater than 2nd.
  */
 /*ARGSUSED*/
-int
-krb5_address_order(context, addr1, addr2)
-    krb5_context context;
-    register krb5_const krb5_address *addr1;
-    register krb5_const krb5_address *addr2;
+int KRB5_CALLCONV
+krb5_address_order(krb5_context context, krb5_const krb5_address *addr1,
+	krb5_const krb5_address *addr2)
 {
     int dir;
     register int i;

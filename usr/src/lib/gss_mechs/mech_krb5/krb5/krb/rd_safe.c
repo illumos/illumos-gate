@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,15 +54,7 @@
  returns system errors, integrity errors
  */
 static krb5_error_code
-krb5_rd_safe_basic(context, inbuf, keyblock, recv_addr, sender_addr,
-	     	   replaydata, outbuf)
-    krb5_context          context;
-    const krb5_data     * inbuf;
-    const krb5_keyblock * keyblock;
-    const krb5_address  * recv_addr;
-    const krb5_address  * sender_addr;
-    krb5_replay_data    * replaydata;
-    krb5_data           * outbuf;
+krb5_rd_safe_basic(krb5_context context, const krb5_data *inbuf, const krb5_keyblock *keyblock, const krb5_address *recv_addr, const krb5_address *sender_addr, krb5_replay_data *replaydata, krb5_data *outbuf)
 {
     krb5_error_code 	  retval;
     krb5_safe 		* message;
@@ -196,13 +188,8 @@ cleanup:
     return retval;
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_rd_safe(context, auth_context, inbuf, outbuf, outdata)
-    krb5_context 	  context;
-    krb5_auth_context 	  auth_context;
-    const krb5_data   	* inbuf;
-    krb5_data 	      	* outbuf;
-    krb5_replay_data  	* outdata;
+krb5_error_code KRB5_CALLCONV
+krb5_rd_safe(krb5_context context, krb5_auth_context auth_context, const krb5_data *inbuf, krb5_data *outbuf, krb5_replay_data *outdata)
 {
     krb5_error_code 	  retval;
     krb5_keyblock	* keyblock;
@@ -297,7 +284,8 @@ krb5_rd_safe(context, auth_context, inbuf, outbuf, outdata)
     }
 
     if (auth_context->auth_context_flags & KRB5_AUTH_CONTEXT_DO_SEQUENCE) {
-	if (auth_context->remote_seq_number != replaydata.seq) {
+	if (!krb5int_auth_con_chkseqnum(context, auth_context,
+					replaydata.seq)) {
 	    retval =  KRB5KRB_AP_ERR_BADORDER;
 	    goto error;
 	}

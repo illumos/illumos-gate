@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,9 +80,10 @@ _kadm5_get_kpasswd_protocol(void *handle)
  * non-SEAM servers which support the Marc Horowitz defined
  * protocol (1998) for password changing.
  *
+ * SUNW14resync - added _local as it conflicts with one in krb5.h
  */
 static krb5_error_code
-krb5_change_password(context, params, creds, newpw, srvr_rsp_code,
+krb5_change_password_local(context, params, creds, newpw, srvr_rsp_code,
 		    srvr_msg)
 krb5_context context;
 kadm5_config_params *params;
@@ -426,7 +427,7 @@ kadm5_chpass_principal_v2(void *server_handle,
 	}
 
 	/* Now we have all we need to make the change request. */
-	result = krb5_change_password(handle->context, &handle->params,
+	result = krb5_change_password_local(handle->context, &handle->params,
 				    &ncreds, newpw,
 				    srvr_rsp_code,
 				    srvr_msg);

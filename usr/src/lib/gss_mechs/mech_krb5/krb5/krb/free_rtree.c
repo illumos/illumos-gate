@@ -28,9 +28,7 @@
 #include "k5-int.h"
 
 void
-krb5_free_realm_tree(context, realms)
-    krb5_context context;
-    krb5_principal *realms;
+krb5_free_realm_tree(krb5_context context, krb5_principal *realms)
 {
     register krb5_principal *nrealms = realms;
     while (*nrealms) {

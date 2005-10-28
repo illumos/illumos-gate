@@ -1,9 +1,36 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * lib/krb5/krb/gic_keytab.c
+ *
+ * Copyright (C) 2002, 2003 by the Massachusetts Institute of Technology.
+ * All rights reserved.
+ *
+ * Export of this software from the United States of America may
+ *   require a specific license from the United States Government.
+ *   It is the responsibility of any person or organization contemplating
+ *   export to obtain such a license before exporting.
+ * 
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  Furthermore if you modify this software you must label
+ * your software as modified software and not distribute it in such a
+ * fashion that it might be confused with the original M.I.T. software.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ */
+
 #include <k5-int.h>
 
 /*ARGSUSED*/
@@ -32,7 +59,7 @@ krb5_get_as_key_keytab(
 	if (as_key->enctype == etype)
 	    return(0);
 
-	krb5_free_keyblock(context, as_key);
+	krb5_free_keyblock_contents(context, as_key);
 	as_key->length = 0;
     }
 
@@ -71,10 +98,10 @@ krb5_get_init_creds_keytab(
    krb5_keytab keytab;
 
    if (arg_keytab == NULL) {
-       if (ret = krb5_kt_default(context, &keytab))
+	if ((ret = krb5_kt_default(context, &keytab)))
 	   return ret;
    } else {
-       keytab = arg_keytab;
+	keytab = arg_keytab;
    }
 
    use_master = 0;
@@ -84,7 +111,7 @@ krb5_get_init_creds_keytab(
    ret = krb5_get_init_creds(context, creds, client, NULL, NULL,
 			     start_time, in_tkt_service, options,
 			     krb5_get_as_key_keytab, (void *) keytab,
-			     use_master,NULL);
+			     &use_master,NULL);
 
    /* check for success */
 
@@ -105,7 +132,7 @@ krb5_get_init_creds_keytab(
       ret2 = krb5_get_init_creds(context, creds, client, NULL, NULL,
 				 start_time, in_tkt_service, options,
 				 krb5_get_as_key_keytab, (void *) keytab,
-				 use_master, NULL);
+				 &use_master, NULL);
       
       if (ret2 == 0) {
 	 ret = 0;
@@ -115,7 +142,7 @@ krb5_get_init_creds_keytab(
       /* if the master is unreachable, return the error from the
 	 slave we were able to contact */
 
-      if ((ret2 == KRB5_KDC_UNREACH) || (ret == KRB5_REALM_CANT_RESOLVE))
+      if ((ret2 == KRB5_KDC_UNREACH) || (ret2 == KRB5_REALM_CANT_RESOLVE))
 	 goto cleanup;
 
       ret = ret2;
@@ -131,3 +158,57 @@ cleanup:
    return(ret);
 }
 
+krb5_error_code KRB5_CALLCONV
+krb5_get_in_tkt_with_keytab(krb5_context context, krb5_flags options,
+			      krb5_address *const *addrs, krb5_enctype *ktypes,
+			      krb5_preauthtype *pre_auth_types,
+			      krb5_keytab arg_keytab, krb5_ccache ccache,
+			      krb5_creds *creds, krb5_kdc_rep **ret_as_reply)
+{
+    krb5_error_code retval;
+    krb5_get_init_creds_opt opt;
+    char * server = NULL;
+    krb5_keytab keytab;
+    krb5_principal client_princ, server_princ;
+    int use_master = 0;
+    
+    krb5int_populate_gic_opt(context, &opt,
+			     options, addrs, ktypes,
+			     pre_auth_types, creds);
+    if (arg_keytab == NULL) {
+	retval = krb5_kt_default(context, &keytab);
+	if (retval)
+	    return retval;
+    }
+    else keytab = arg_keytab;
+    
+    retval = krb5_unparse_name( context, creds->server, &server);
+    if (retval)
+	goto cleanup;
+    server_princ = creds->server;
+    client_princ = creds->client;
+    retval = krb5_get_init_creds (context,
+				  creds, creds->client,  
+				  krb5_prompter_posix,  NULL,
+				  0, server, &opt,
+				  krb5_get_as_key_keytab, (void *)keytab,
+				  &use_master, ret_as_reply);
+    krb5_free_unparsed_name( context, server);
+    if (retval) {
+	goto cleanup;
+    }
+	if (creds->server)
+	    krb5_free_principal( context, creds->server);
+	if (creds->client)
+	    krb5_free_principal( context, creds->client);
+	creds->client = client_princ;
+	creds->server = server_princ;
+	
+    /* store it in the ccache! */
+    if (ccache)
+	if ((retval = krb5_cc_store_cred(context, ccache, creds)))
+	    goto cleanup;
+ cleanup:    if (arg_keytab == NULL)
+     krb5_kt_close(context, keytab);
+    return retval;
+}

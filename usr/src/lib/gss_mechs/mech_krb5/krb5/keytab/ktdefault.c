@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -15,7 +15,7 @@
  *   require a specific license from the United States Government.
  *   It is the responsibility of any person or organization contemplating
  *   export to obtain such a license before exporting.
- *
+ * 
  * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
  * distribute this software and its documentation for any purpose and
  * without fee is hereby granted, provided that the above copyright
@@ -37,10 +37,8 @@
 #include <k5-int.h>
 #include <stdio.h>
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_kt_default(context, id)
-    krb5_context context;
-    krb5_keytab FAR *id;
+krb5_error_code KRB5_CALLCONV
+krb5_kt_default(krb5_context context, krb5_keytab *id)
 {
     char defname[BUFSIZ];
     krb5_error_code retval;
@@ -49,3 +47,6 @@ krb5_kt_default(context, id)
 	return retval;
     return krb5_kt_resolve(context, defname, id);
 }
+
+
+

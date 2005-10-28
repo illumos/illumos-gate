@@ -48,12 +48,10 @@ static int etype_match(e1, e2)
 }
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_c_keyed_checksum_types(context, enctype, count, cksumtypes)
-     krb5_context context;
-     krb5_enctype enctype;
-     unsigned int *count;
-     krb5_cksumtype **cksumtypes;
+
+krb5_error_code KRB5_CALLCONV
+krb5_c_keyed_checksum_types(krb5_context context, krb5_enctype enctype,
+			    unsigned int *count, krb5_cksumtype **cksumtypes)
 {
     unsigned int i, c;
 
@@ -86,10 +84,8 @@ krb5_c_keyed_checksum_types(context, enctype, count, cksumtypes)
 }
 
 /*ARGSUSED*/
-KRB5_DLLIMP void KRB5_CALLCONV
-krb5_free_cksumtypes(context, val)
-    krb5_context context;
-    krb5_cksumtype FAR * val;
+void KRB5_CALLCONV
+krb5_free_cksumtypes(krb5_context context, krb5_cksumtype *val)
 {
     if (val)
 	krb5_xfree(val);

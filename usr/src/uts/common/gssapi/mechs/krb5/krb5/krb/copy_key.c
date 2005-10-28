@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,7 @@
  */
 krb5_error_code
 krb5_copy_keyblock_data(krb5_context context,
-	const krb5_keyblock *from, krb5_keyblock *to)
+			const krb5_keyblock *from, krb5_keyblock *to)
 {
 	krb5_error_code ret = 0;
 
@@ -87,7 +87,7 @@ krb5_copy_keyblock_data(krb5_context context,
  * Copy a keyblock, including alloc'ed storage.
  */
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
+krb5_error_code KRB5_CALLCONV
 krb5_copy_keyblock(context, from, to)
     krb5_context context;
     const krb5_keyblock *from;

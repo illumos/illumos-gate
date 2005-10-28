@@ -28,6 +28,7 @@
  */
 
 #include <gssapiP_krb5.h>
+#include <k5-int.h>
 
 OM_uint32
 krb5_gss_release_cred(ctx, minor_status, cred_handle)

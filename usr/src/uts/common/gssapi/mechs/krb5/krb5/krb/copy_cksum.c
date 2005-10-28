@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,11 +36,8 @@
 #include <k5-int.h>
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_copy_checksum(context, ckfrom, ckto)
-    krb5_context context;
-    const krb5_checksum FAR *ckfrom;
-    krb5_checksum FAR * FAR *ckto;
+krb5_error_code KRB5_CALLCONV
+krb5_copy_checksum(krb5_context context, const krb5_checksum *ckfrom, krb5_checksum **ckto)
 {
     krb5_checksum *tempto;
 

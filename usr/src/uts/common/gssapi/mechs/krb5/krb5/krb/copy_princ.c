@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,11 +38,8 @@
  * Copy a principal structure, with fresh allocation.
  */
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_copy_principal(context, inprinc, outprinc)
-    krb5_context context;
-    krb5_const_principal inprinc;
-    krb5_principal FAR *outprinc;
+krb5_error_code KRB5_CALLCONV
+krb5_copy_principal(krb5_context context, krb5_const_principal inprinc, krb5_principal *outprinc)
 {
     register krb5_principal tempprinc;
     register int i, nelems;
@@ -67,7 +64,7 @@ krb5_copy_principal(context, inprinc, outprinc)
     }
 
     for (i = 0; i < nelems; i++) {
-	int len = krb5_princ_component(context, inprinc, i)->length;
+	unsigned int len = krb5_princ_component(context, inprinc, i)->length;
 	krb5_princ_component(context, tempprinc, i)->length = len;
 
         /*
@@ -87,29 +84,32 @@ krb5_copy_principal(context, inprinc, outprinc)
 	if (len)
 	    (void) memcpy(krb5_princ_component(context, tempprinc, i)->data,
 		   krb5_princ_component(context, inprinc, i)->data, len);
+	else
+	    krb5_princ_component(context, tempprinc, i)->data = 0;
     }
 
     tempprinc->realm.length = inprinc->realm.length;
 
     /*
-     * Allocate one extra byte for the realm name string terminator.  The
+     * Allocate one extra byte for the realm name string terminator. The
      * realm and principle component strings alway leave a null byte after
      * 'length' bytes that needs to be malloc/freed.
      */
-    tempprinc->realm.data = MALLOC(tempprinc->realm.length + 1);
-
-    if (!tempprinc->realm.data && tempprinc->realm.length) {
+    if (tempprinc->realm.length) {
+        tempprinc->realm.data = MALLOC(tempprinc->realm.length + 1);
+        if (!tempprinc->realm.data) {
 	    for (i = 0; i < nelems; i++)
-		    FREE(krb5_princ_component(context, tempprinc, i)->data,
+                FREE(krb5_princ_component(context, tempprinc, i)->data,
 			krb5_princ_component(context, inprinc, i)->length + 1);
-	    FREE (tempprinc->data, nelems * sizeof(krb5_data));
-	    FREE (tempprinc,sizeof(krb5_principal_data));
+	    FREE(tempprinc->data, nelems * sizeof(krb5_data));
+	    FREE(tempprinc, sizeof(krb5_principal_data));
 	    return ENOMEM;
-    }
-    if (tempprinc->realm.length)
-	(void) memcpy(tempprinc->realm.data, inprinc->realm.data,
+        }
+	memcpy(tempprinc->realm.data, inprinc->realm.data,
 	       inprinc->realm.length);
-    
+    } else
+        tempprinc->realm.data = 0;
+
     *outprinc = tempprinc;
     return 0;
 }

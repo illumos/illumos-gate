@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,14 +39,6 @@
 #include <sys/crypto/api.h>
 #endif
 
-static const char mit_des_zeroblock[8] = {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00};
-
-static void
-k5_descbc_hash_size(size_t *output)
-{
-    *output = MIT_DES_BLOCK_LENGTH;
-}
-
 /*ARGSUSED*/
 static krb5_error_code
 k5_descbc_hash(krb5_context context,
@@ -77,7 +69,7 @@ k5_descbc_hash(krb5_context context,
 }
 
 const struct krb5_keyhash_provider krb5_keyhash_descbc = {
-    k5_descbc_hash_size,
+    MIT_DES_BLOCK_LENGTH,
     k5_descbc_hash,
     NULL
 };

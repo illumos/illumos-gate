@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,20 +8,23 @@
 /*
  * prof_tree.c --- these routines maintain the parse tree of the
  * 	config file.
- *
+ * 
  * All of the details of how the tree is stored is abstracted away in
  * this file; all of the other profile routines build, access, and
  * modify the tree via the accessor functions found in this file.
  *
  * Each node may represent either a relation or a section header.
- *
+ * 
  * A section header must have its value field set to 0, and may a one
  * or more child nodes, pointed to by first_child.
- *
+ * 
  * A relation has as its value a pointer to allocated memory
  * containing a string.  Its first_child pointer must be null.
  *
  */
+
+
+#include "prof_int.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -31,14 +34,13 @@
 #include <errno.h>
 #include <ctype.h>
 
-#include "prof_int.h"
-
 struct profile_node {
 	errcode_t	magic;
 	char *name;
 	char *value;
 	int group_level;
 	int final:1;		/* Indicate don't search next file */
+	int deleted:1;
 	struct profile_node *first_child;
 	struct profile_node *parent;
 	struct profile_node *next, *prev;
@@ -51,8 +53,7 @@ struct profile_node {
 /*
  * Free a node, and any children
  */
-void profile_free_node(node)
-	struct profile_node *node;
+void profile_free_node(struct profile_node *node)
 {
 	struct profile_node *child, *next;
 
@@ -73,12 +74,24 @@ void profile_free_node(node)
 	free(node);
 }
 
+#ifndef HAVE_STRDUP
+#undef strdup
+#define strdup MYstrdup
+static char *MYstrdup (const char *s)
+{
+    size_t sz = strlen(s) + 1;
+    char *p = malloc(sz);
+    if (p != 0)
+	memcpy(p, s, sz);
+    return p;
+}
+#endif
+
 /*
  * Create a node
  */
-errcode_t profile_create_node(name, value, ret_node)
-	const char *name, *value;
-	struct profile_node **ret_node;
+errcode_t profile_create_node(const char *name, const char *value,
+			      struct profile_node **ret_node)
 {
 	struct profile_node *new;
 
@@ -86,19 +99,17 @@ errcode_t profile_create_node(name, value, ret_node)
 	if (!new)
 		return ENOMEM;
 	memset(new, 0, sizeof(struct profile_node));
-	new->name = (char *) malloc(strlen(name)+1);
+	new->name = (char *) strdup(name);
 	if (new->name == 0) {
-		profile_free_node(new);
-		return ENOMEM;
+	    profile_free_node(new);
+	    return ENOMEM;
 	}
-	strcpy(new->name, name);
 	if (value) {
-		new->value = (char *) malloc(strlen(value)+1);
+	new->value = (char *) strdup(value);
 		if (new->value == 0) {
-			profile_free_node(new);
-			return ENOMEM;
+		    profile_free_node(new);
+		    return ENOMEM;
 		}
-		strcpy(new->value, value);
 	}
 	new->magic = PROF_MAGIC_NODE;
 
@@ -111,8 +122,7 @@ errcode_t profile_create_node(name, value, ret_node)
  * the profile are true.  If not, we have a programming bug somewhere,
  * probably in this file.
  */
-errcode_t profile_verify_node(node)
-	struct profile_node *node;
+errcode_t profile_verify_node(struct profile_node *node)
 {
 	struct profile_node *p, *last;
 	errcode_t	retval;
@@ -142,14 +152,11 @@ errcode_t profile_verify_node(node)
 /*
  * Add a node to a particular section
  */
-errcode_t profile_add_node(section, name, value, ret_node)
-	struct profile_node *section;
-	const char *name, *value;
-	struct profile_node **ret_node;
+errcode_t profile_add_node(struct profile_node *section, const char *name,
+			   const char *value, struct profile_node **ret_node)
 {
 	errcode_t retval;
 	struct profile_node *p, *last, *new;
-	int	cmp = -1;
 
 	CHECK_MAGIC(section);
 
@@ -158,10 +165,11 @@ errcode_t profile_add_node(section, name, value, ret_node)
 
 	/*
 	 * Find the place to insert the new node.  We look for the
-	 * place *after* the last match of the node name, since
+	 * place *after* the last match of the node name, since 
 	 * order matters.
 	 */
 	for (p=section->first_child, last = 0; p; last = p, p = p->next) {
+		int cmp;
 		cmp = strcmp(p->name, name);
 		if (cmp > 0)
 			break;
@@ -170,6 +178,7 @@ errcode_t profile_add_node(section, name, value, ret_node)
 	if (retval)
 		return retval;
 	new->group_level = section->group_level+1;
+	new->deleted = 0;
 	new->parent = section;
 	new->prev = last;
 	new->next = p;
@@ -187,8 +196,7 @@ errcode_t profile_add_node(section, name, value, ret_node)
 /*
  * Set the final flag on a particular node.
  */
-errcode_t profile_make_node_final(node)
-	struct profile_node *node;
+errcode_t profile_make_node_final(struct profile_node *node)
 {
 	CHECK_MAGIC(node);
 
@@ -199,8 +207,7 @@ errcode_t profile_make_node_final(node)
 /*
  * Check the final flag on a node
  */
-int profile_is_node_final(node)
-	struct profile_node *node;
+int profile_is_node_final(struct profile_node *node)
 {
 	return (node->final != 0);
 }
@@ -210,8 +217,7 @@ int profile_is_node_final(node)
  * only; if the name needs to be returned from an exported function,
  * strdup it first!)
  */
-const char *profile_get_node_name(node)
-	struct profile_node *node;
+const char *profile_get_node_name(struct profile_node *node)
 {
 	return node->name;
 }
@@ -221,8 +227,7 @@ const char *profile_get_node_name(node)
  * only; if the name needs to be returned from an exported function,
  * strdup it first!)
  */
-const char *profile_get_node_value(node)
-	struct profile_node *node;
+const char *profile_get_node_value(struct profile_node *node)
 {
 	return node->value;
 }
@@ -234,20 +239,16 @@ const char *profile_get_node_value(node)
  * section which matches the name; don't return relations.  If value
  * is non-NULL, then only return relations which match the requested
  * value.  (The value argument is ignored if section_flag is non-zero.)
- *
+ * 
  * The first time this routine is called, the state pointer must be
  * null.  When this profile_find_node_relation() returns, if the state
  * pointer is non-NULL, then this routine should be called again.
  * (This won't happen if section_flag is non-zero, obviously.)
  *
  */
-errcode_t profile_find_node(section, name, value, section_flag, state, node)
-	struct profile_node *section;
-	const char *name;
-	const char *value;
-	int section_flag;
-	void **state;
-	struct profile_node **node;
+errcode_t profile_find_node(struct profile_node *section, const char *name,
+			    const char *value, int section_flag, void **state,
+			    struct profile_node **node)
 {
 	struct profile_node *p;
 
@@ -270,6 +271,8 @@ errcode_t profile_find_node(section, name, value, section_flag, state, node)
 			if (value && (strcmp(p->value, value)))
 				continue;
 		}
+		if (p->deleted)
+		    continue;
 		/* A match! */
 		if (node)
 			*node = p;
@@ -317,11 +320,9 @@ errcode_t profile_find_node(section, name, value, section_flag, state, node)
  * returned to a calling application (profile_find_node_relation is not an
  * exported interface), it should be strdup()'ed.
  */
-errcode_t profile_find_node_relation(section, name, state, ret_name, value)
-	struct profile_node *section;
-	const char *name;
-	void **state;
-	char **ret_name, **value;
+errcode_t profile_find_node_relation(struct profile_node *section,
+				     const char *name, void **state,
+				     char **ret_name, char **value)
 {
 	struct profile_node *p;
 	errcode_t	retval;
@@ -349,15 +350,12 @@ errcode_t profile_find_node_relation(section, name, state, ret_name, value)
  *
  * This is (plus accessor functions for the name and value given a
  * profile node) makes this function mostly syntactic sugar for
- * profile_find_node.
+ * profile_find_node. 
  */
-errcode_t profile_find_node_subsection(section, name, state, ret_name,
-				       subsection)
-	struct profile_node *section;
-	const char *name;
-	void **state;
-	char **ret_name;
-	struct profile_node **subsection;
+errcode_t profile_find_node_subsection(struct profile_node *section,
+				       const char *name, void **state,
+				       char **ret_name,
+				       struct profile_node **subsection)
 {
 	struct profile_node *p;
 	errcode_t	retval;
@@ -381,8 +379,8 @@ errcode_t profile_find_node_subsection(section, name, state, ret_name,
 /*
  * This function returns the parent of a particular node.
  */
-errcode_t profile_get_node_parent(section, parent)
-	struct profile_node *section, **parent;
+errcode_t profile_get_node_parent(struct profile_node *section,
+				  struct profile_node **parent)
 {
 	*parent = section->parent;
 	return 0;
@@ -390,13 +388,13 @@ errcode_t profile_get_node_parent(section, parent)
 
 /*
  * This is a general-purpose iterator for returning all nodes that
- * match the specified name array.
+ * match the specified name array.  
  */
 struct profile_iterator {
 	prf_magic_t		magic;
 	profile_t		profile;
 	int			flags;
-	const char 		**names;
+	const char 		*const *names;
 	const char		*name;
 	prf_file_t		file;
 	int			file_serial;
@@ -405,11 +403,9 @@ struct profile_iterator {
 	int			num;
 };
 
-errcode_t profile_node_iterator_create(profile, names, flags, ret_iter)
-	profile_t	profile;
-	const char	**names;
-	int		flags;
-	void		**ret_iter;
+errcode_t profile_node_iterator_create(profile_t profile,
+				       const char *const *names, int flags,
+				       void **ret_iter)
 {
 	struct profile_iterator *iter;
 	int	done_idx = 0;
@@ -442,8 +438,7 @@ errcode_t profile_node_iterator_create(profile, names, flags, ret_iter)
 	return 0;
 }
 
-void profile_node_iterator_free(iter_p)
-	void	**iter_p;
+void profile_node_iterator_free(void **iter_p)
 {
 	struct profile_iterator *iter;
 
@@ -463,32 +458,46 @@ void profile_node_iterator_free(iter_p)
  * (profile_node_iterator is not an exported interface), it should be
  * strdup()'ed.
  */
-errcode_t profile_node_iterator(iter_p, ret_node, ret_name, ret_value)
-	void	**iter_p;
-	struct profile_node	**ret_node;
-	char **ret_name, **ret_value;
+errcode_t profile_node_iterator(void **iter_p, struct profile_node **ret_node,
+				char **ret_name, char **ret_value)
 {
 	struct profile_iterator 	*iter = *iter_p;
 	struct profile_node 		*section, *p;
-	const char			**cpp;
+	const char			*const *cpp;
 	errcode_t			retval;
 	int				skip_num = 0;
 
 	if (!iter || iter->magic != PROF_MAGIC_ITERATOR)
 		return PROF_MAGIC_ITERATOR;
+	if (iter->file && iter->file->magic != PROF_MAGIC_FILE)
+	    return PROF_MAGIC_FILE;
+	if (iter->file && iter->file->data->magic != PROF_MAGIC_FILE_DATA)
+	    return PROF_MAGIC_FILE_DATA;
 	/*
 	 * If the file has changed, then the node pointer is invalid,
 	 * so we'll have search the file again looking for it.
 	 */
-	if (iter->node && (iter->file->upd_serial != iter->file_serial)) {
+	if (iter->file) {
+	    retval = k5_mutex_lock(&iter->file->data->lock);
+	    if (retval)
+		return retval;
+	}
+	if (iter->node && (iter->file->data->upd_serial != iter->file_serial)) {
 		iter->flags &= ~PROFILE_ITER_FINAL_SEEN;
 		skip_num = iter->num;
 		iter->node = 0;
+	}
+	if (iter->node && iter->node->magic != PROF_MAGIC_NODE) {
+	    if (iter->file)
+		k5_mutex_unlock(&iter->file->data->lock);
+	    return PROF_MAGIC_NODE;
 	}
 get_new_file:
 	if (iter->node == 0) {
 		if (iter->file == 0 ||
 		    (iter->flags & PROFILE_ITER_FINAL_SEEN)) {
+			if (iter->file)
+			    k5_mutex_unlock(&iter->file->data->lock);
 			profile_node_iterator_free(iter_p);
 			if (ret_node)
 				*ret_node = 0;
@@ -498,20 +507,42 @@ get_new_file:
 				*ret_value =0;
 			return 0;
 		}
+		k5_mutex_unlock(&iter->file->data->lock);
 		if ((retval = profile_update_file(iter->file))) {
+		    if (retval == ENOENT || retval == EACCES) {
+			/* XXX memory leak? */
+			iter->file = iter->file->next;
+			if (iter->file) {
+			    retval = k5_mutex_lock(&iter->file->data->lock);
+			    if (retval) {
+				profile_node_iterator_free(iter_p);
+				return retval;
+			    }
+			}
+			skip_num = 0;
+			retval = 0;
+			goto get_new_file;
+		    } else {
 			profile_node_iterator_free(iter_p);
 			return retval;
+		    }
 		}
-		iter->file_serial = iter->file->upd_serial;
+		retval = k5_mutex_lock(&iter->file->data->lock);
+		if (retval) {
+		    profile_node_iterator_free(iter_p);
+		    return retval;
+		}
+		iter->file_serial = iter->file->data->upd_serial;
 		/*
 		 * Find the section to list if we are a LIST_SECTION,
 		 * or find the containing section if not.
 		 */
-		section = iter->file->root;
+		section = iter->file->data->root;
 		for (cpp = iter->names; cpp[iter->done_idx]; cpp++) {
-			for (p=section->first_child; p; p = p->next)
+			for (p=section->first_child; p; p = p->next) {
 				if (!strcmp(p->name, *cpp) && !p->value)
 					break;
+			}
 			if (!p) {
 				section = 0;
 				break;
@@ -521,7 +552,15 @@ get_new_file:
 				iter->flags |= PROFILE_ITER_FINAL_SEEN;
 		}
 		if (!section) {
+			k5_mutex_unlock(&iter->file->data->lock);
 			iter->file = iter->file->next;
+			if (iter->file) {
+			    retval = k5_mutex_lock(&iter->file->data->lock);
+			    if (retval) {
+				profile_node_iterator_free(iter_p);
+				return retval;
+			    }
+			}
 			skip_num = 0;
 			goto get_new_file;
 		}
@@ -549,11 +588,20 @@ get_new_file:
 	}
 	iter->num++;
 	if (!p) {
+		k5_mutex_unlock(&iter->file->data->lock);
 		iter->file = iter->file->next;
+		if (iter->file) {
+		    retval = k5_mutex_lock(&iter->file->data->lock);
+		    if (retval) {
+			profile_node_iterator_free(iter_p);
+			return retval;
+		    }
+		}
 		iter->node = 0;
 		skip_num = 0;
 		goto get_new_file;
 	}
+	k5_mutex_unlock(&iter->file->data->lock);
 	if ((iter->node = p->next) == NULL)
 		iter->file = iter->file->next;
 	if (ret_node)
@@ -565,28 +613,19 @@ get_new_file:
 	return 0;
 }
 
-/*
+/* 
  * Remove a particular node.
- *
+ * 
  * TYT, 2/25/99
  */
-errcode_t profile_remove_node(node)
-	struct profile_node *node;
+errcode_t profile_remove_node(struct profile_node *node)
 {
 	CHECK_MAGIC(node);
 
 	if (node->parent == 0)
 		return PROF_EINVAL; /* Can't remove the root! */
 	
-	if (node->prev)
-		node->prev->next = node->next;
-	else
-		node->parent->first_child = node->next;
-
-	if (node->next)
-		node->next->prev = node->prev;
-
-	profile_free_node(node);
+	node->deleted = 1;
 
 	return 0;
 }
@@ -596,9 +635,8 @@ errcode_t profile_remove_node(node)
  *
  * TYT, 2/25/99
  */
-errcode_t profile_set_relation_value(node, new_value)
-	struct profile_node *node;
-	const char *new_value;
+errcode_t profile_set_relation_value(struct profile_node *node,
+				     const char *new_value)
 {
 	char	*cp;
 	
@@ -623,9 +661,7 @@ errcode_t profile_set_relation_value(node, new_value)
  *
  * TYT 2/25/99
  */
-errcode_t profile_rename_node(node, new_name)
-	struct profile_node	*node;
-	const char		*new_name;
+errcode_t profile_rename_node(struct profile_node *node, const char *new_name)
 {
 	char			*new_string;
 	struct profile_node 	*p, *last;

@@ -1,4 +1,5 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * lib/krb5/os/realm_dom.c
  *
@@ -42,15 +43,12 @@
  * This was hacked together from krb5_get_host_realm().
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include <ctype.h>
 #include <stdio.h>
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_get_realm_domain(context, realm, domain)
-    krb5_context context;
-    const char *realm;
-    char **domain;
+krb5_error_code KRB5_CALLCONV
+krb5_get_realm_domain(krb5_context context, const char *realm, char **domain)
 {
     krb5_error_code retval;
     char *temp_domain = 0;

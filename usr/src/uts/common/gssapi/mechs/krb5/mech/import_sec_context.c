@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,6 @@
 #include <k5-int.h>
 #include <gssapi/gssapi.h>
 
-#include <sys/debug.h>
 /*
  * Fix up the OID of the mechanism so that uses the static version of
  * the OID if possible.

@@ -1,35 +1,37 @@
 /*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
  * profile.h
  */
 
 #ifndef _KRB5_PROFILE_H
 #define _KRB5_PROFILE_H
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+/* SUNW14resync */
+#include "../profile/prof_err.h"
 
-#if defined(_MSDOS) || defined(_WIN32) || defined(MACINTOSH)
+#if defined(_WIN32)
 #include <win-mac.h>
+#endif
+
+#if defined(__MACH__) && defined(__APPLE__)
+#    include <TargetConditionals.h>
+#    if TARGET_RT_MAC_CFM
+#        error "Use KfM 4.0 SDK headers for CFM compilation."
+#    endif
 #endif
 
 #ifndef KRB5_CALLCONV
 #define KRB5_CALLCONV
 #define KRB5_CALLCONV_C
-#define KRB5_DLLIMP
-#define GSS_DLLIMP
-#define KRB5_EXPORTVAR
-#define FAR
-#define NEAR
 #endif
 
 typedef struct _profile_t *profile_t;
-
-#if !defined(PROTOTYPE)
-#if defined(__STDC__) || defined(__cplusplus) || defined(_MSDOS) || defined(_WIN32)
-#define PROTOTYPE(x) x
-#else
-#define PROTOTYPE(x) ()
-#endif
-#endif
 
 /*
  * Used by the profile iterator in prof_get.c
@@ -38,149 +40,96 @@ typedef struct _profile_t *profile_t;
 #define PROFILE_ITER_SECTIONS_ONLY	0x0002
 #define PROFILE_ITER_RELATIONS_ONLY	0x0004
 
-/* Macintoh CFM-68K magic incantation */
-#if defined(macintosh) && defined(__CFM68K__) && !defined(__USING_STATIC_LIBS__)
-#pragma import on
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
 
-/* On everything but MacOS, we use file paths as unique file identifiers */
-#ifndef macintosh
-#define PROFILE_USES_PATHS
-/*
- * Solaris: This is to let prof_file.c know that Solaris is
- * not a substandard OS
- */
-#define HAVE_ACCESS
-#endif
-
-#ifdef PROFILE_USES_PATHS
 typedef char* profile_filespec_t;	/* path as C string */
 typedef char* profile_filespec_list_t;	/* list of : separated paths, C string */
-typedef const char* const_profile_filespec_t;	/* path as C string */
-typedef const char* const_profile_filespec_list_t;	/* list of : separated paths, C string */
-#else
-/* On MacOS, we use native file specifiers as unique file identifiers */
-#include <Files.h>
-typedef FSSpec profile_filespec_t;
-typedef FSSpec* profile_filespec_list_t;
-/* array should be terminated with {0, 0, ""} */
-typedef FSSpec const_profile_filespec_t;
-typedef FSSpec* const_profile_filespec_list_t;	
-#endif
+typedef const char * const_profile_filespec_t;	/* path as C string */
+typedef const char * const_profile_filespec_list_t;	/* list of : separated paths, C string */
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_init
-	PROTOTYPE ((const_profile_filespec_t *files, profile_t *ret_profile));
+long KRB5_CALLCONV profile_init
+	(const_profile_filespec_t *files, profile_t *ret_profile);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_init_path
-	PROTOTYPE ((const_profile_filespec_list_t filelist, profile_t *ret_profile));
+long KRB5_CALLCONV profile_init_path
+	(const_profile_filespec_list_t filelist, profile_t *ret_profile);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_flush
-	PROTOTYPE ((profile_t profile));
+long KRB5_CALLCONV profile_flush
+	(profile_t profile);
+long KRB5_CALLCONV profile_flush_to_file
+	(profile_t profile, const_profile_filespec_t outfile);
+long KRB5_CALLCONV profile_flush_to_buffer
+	(profile_t profile, char **bufp);
+void KRB5_CALLCONV profile_free_buffer
+	(profile_t profile, char *buf);
 
-KRB5_DLLIMP void KRB5_CALLCONV profile_abandon
-	PROTOTYPE ((profile_t profile));
+long KRB5_CALLCONV profile_is_writable
+	(profile_t profile, int *writable);
+long KRB5_CALLCONV profile_is_modified
+	(profile_t profile, int *modified);
 
-KRB5_DLLIMP void KRB5_CALLCONV profile_release
-	PROTOTYPE ((profile_t profile));
+void KRB5_CALLCONV profile_abandon
+	(profile_t profile);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_get_values
-	PROTOTYPE ((profile_t profile, const char **names, char ***ret_values));
+void KRB5_CALLCONV profile_release
+	(profile_t profile);
 
-KRB5_DLLIMP void KRB5_CALLCONV profile_free_list
-	PROTOTYPE ((char **list));
+long KRB5_CALLCONV profile_get_values
+	(profile_t profile, const char *const *names, char ***ret_values);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_get_string
-	PROTOTYPE((profile_t profile, const char *name, const char *subname, 
+void KRB5_CALLCONV profile_free_list
+	(char **list);
+
+long KRB5_CALLCONV profile_get_string
+	(profile_t profile, const char *name, const char *subname, 
 			const char *subsubname, const char *def_val,
-			char **ret_string));
-KRB5_DLLIMP long KRB5_CALLCONV profile_get_integer
-	PROTOTYPE((profile_t profile, const char *name, const char *subname,
+			char **ret_string);
+long KRB5_CALLCONV profile_get_integer
+	(profile_t profile, const char *name, const char *subname,
 			const char *subsubname, int def_val,
-			int *ret_default));
+			int *ret_default);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_get_relation_names
-	PROTOTYPE((profile_t profile, const char **names, char ***ret_names));
+long KRB5_CALLCONV profile_get_boolean
+	(profile_t profile, const char *name, const char *subname,
+			const char *subsubname, int def_val,
+			int *ret_default);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_get_subsection_names
-	PROTOTYPE((profile_t profile, const char **names, char ***ret_names));
+long KRB5_CALLCONV profile_get_relation_names
+	(profile_t profile, const char **names, char ***ret_names);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_iterator_create
-	PROTOTYPE((profile_t profile, const char **names,
-		   int flags, void **ret_iter));
+long KRB5_CALLCONV profile_get_subsection_names
+	(profile_t profile, const char **names, char ***ret_names);
 
-KRB5_DLLIMP void KRB5_CALLCONV profile_iterator_free
-	PROTOTYPE((void **iter_p));
+long KRB5_CALLCONV profile_iterator_create
+	(profile_t profile, const char *const *names,
+		   int flags, void **ret_iter);
+
+void KRB5_CALLCONV profile_iterator_free
+	(void **iter_p);
 	
-KRB5_DLLIMP long KRB5_CALLCONV profile_iterator
-	PROTOTYPE((void	**iter_p, char **ret_name, char **ret_value));
+long KRB5_CALLCONV profile_iterator
+	(void	**iter_p, char **ret_name, char **ret_value);
 
-KRB5_DLLIMP void KRB5_CALLCONV profile_release_string PROTOTYPE((char *str));
+void KRB5_CALLCONV profile_release_string (char *str);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_update_relation
-	PROTOTYPE((profile_t profile, const char **names, 
-		   const char *old_value, const char *new_value));
+long KRB5_CALLCONV profile_update_relation
+	(profile_t profile, const char **names, 
+		   const char *old_value, const char *new_value);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_clear_relation
-	PROTOTYPE((profile_t profile, const char **names));
+long KRB5_CALLCONV profile_clear_relation
+	(profile_t profile, const char **names);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_rename_section
-	PROTOTYPE((profile_t profile, const char **names, 
-		   const char *new_name));
+long KRB5_CALLCONV profile_rename_section
+	(profile_t profile, const char **names, 
+		   const char *new_name);
 
-KRB5_DLLIMP long KRB5_CALLCONV profile_add_relation
-	PROTOTYPE((profile_t profile, const char **names, 
-		   const char *new_value));
+long KRB5_CALLCONV profile_add_relation
+	(profile_t profile, const char **names, 
+		   const char *new_value);
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-
-/* Macintoh CFM-68K magic incantation */
-#if defined(macintosh) && defined(__CFM68K__) && !defined(__USING_STATIC_LIBS__)
-#pragma import reset
-#endif
-
-
-/*
- * prof_err.h:
- * This file is automatically generated; please do not edit it.
- */
-
-#define PROF_VERSION                             (-1429577728L)
-#define PROF_MAGIC_NODE                          (-1429577727L)
-#define PROF_NO_SECTION                          (-1429577726L)
-#define PROF_NO_RELATION                         (-1429577725L)
-#define PROF_ADD_NOT_SECTION                     (-1429577724L)
-#define PROF_SECTION_WITH_VALUE                  (-1429577723L)
-#define PROF_BAD_LINK_LIST                       (-1429577722L)
-#define PROF_BAD_GROUP_LVL                       (-1429577721L)
-#define PROF_BAD_PARENT_PTR                      (-1429577720L)
-#define PROF_MAGIC_ITERATOR                      (-1429577719L)
-#define PROF_SET_SECTION_VALUE                   (-1429577718L)
-#define PROF_EINVAL                              (-1429577717L)
-#define PROF_READ_ONLY                           (-1429577716L)
-#define PROF_SECTION_NOTOP                       (-1429577715L)
-#define PROF_SECTION_SYNTAX                      (-1429577714L)
-#define PROF_RELATION_SYNTAX                     (-1429577713L)
-#define PROF_EXTRA_CBRACE                        (-1429577712L)
-#define PROF_MISSING_OBRACE                      (-1429577711L)
-#define PROF_MAGIC_PROFILE                       (-1429577710L)
-#define PROF_MAGIC_SECTION                       (-1429577709L)
-#define PROF_TOPSECTION_ITER_NOSUPP              (-1429577708L)
-#define PROF_INVALID_SECTION                     (-1429577707L)
-#define PROF_END_OF_SECTIONS                     (-1429577706L)
-#define PROF_BAD_NAMESET                         (-1429577705L)
-#define PROF_NO_PROFILE                          (-1429577704L)
-#define PROF_MAGIC_FILE                          (-1429577703L)
-#define PROF_FAIL_OPEN                           (-1429577702L)
-#define PROF_EXISTS                              (-1429577701L)
-#define ERROR_TABLE_BASE_prof (-1429577728L)
-
-/* for compatibility with older versions... */
-#define prof_err_base ERROR_TABLE_BASE_prof
 
 #endif /* _KRB5_PROFILE_H */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,6 +195,13 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
 
    cred->ccache = NULL;
 
+   /* SUNW14resync - do we need this? */
+#if 0
+   /* load the GSS ccache name into the kg_context */
+   if (GSS_ERROR(kg_sync_ccache_name(context, minor_status)))
+       return(GSS_S_FAILURE);
+#endif
+
    /* open the default credential cache */
 
    code = krb5int_cc_default(context, &ccache);
@@ -204,9 +211,15 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    }
 
    /* turn off OPENCLOSE mode while extensive frobbing is going on */
-
+   /*
+    * SUNW14resync
+    * Added calls to krb5_cc_set_flags(... KRB5_TC_OPENCLOSE)
+    * on the error returns cuz the 1.4 krb5_cc_close does not always close
+    * the file like it used to and caused STC test gss.27 to fail.
+    */
    flags = 0;		/* turns off OPENCLOSE mode */
    if ((code = krb5_cc_set_flags(context, ccache, flags)) != 0) {
+      (void)krb5_cc_close(context, ccache);
       *minor_status = code;
       return(GSS_S_NO_CRED);
    }
@@ -214,6 +227,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    /* get out the principal name and see if it matches */
 
    if ((code = krb5_cc_get_principal(context, ccache, &princ)) != 0) {
+      (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = code;
       return(GSS_S_FAILURE);
@@ -222,6 +236,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    if (desired_name != (gss_name_t) NULL) {
       if (! krb5_principal_compare(context, princ, (krb5_principal) desired_name)) {
 	 (void)krb5_free_principal(context, princ);
+         (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
 	 (void)krb5_cc_close(context, ccache);
 	 *minor_status = KG_CCACHE_NOMATCH;
 	 return(GSS_S_NO_CRED);
@@ -235,6 +250,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    /* iterate over the ccache, find the tgt */
 
    if ((code = krb5_cc_start_seq_get(context, ccache, &cur)) != 0) {
+      (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = code;
       return(GSS_S_FAILURE);
@@ -254,6 +270,7 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
 				   krb5_princ_realm(context, princ)->data,
 				   0);
    if (code) {
+      (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = code;
       return(GSS_S_FAILURE);
@@ -278,18 +295,21 @@ acquire_init_cred(context, minor_status, desired_name, output_princ, cred)
    if (code && code != KRB5_CC_END) {
       /* this means some error occurred reading the ccache */
       (void)krb5_cc_end_seq_get(context, ccache, &cur);
+      (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = code;
       return(GSS_S_FAILURE);
    } else if (! got_endtime) {
       /* this means the ccache was entirely empty */
       (void)krb5_cc_end_seq_get(context, ccache, &cur);
+      (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
       (void)krb5_cc_close(context, ccache);
       *minor_status = KG_EMPTY_CCACHE;
       return(GSS_S_FAILURE);
    } else {
       /* this means that we found an endtime to use. */
       if ((code = krb5_cc_end_seq_get(context, ccache, &cur)) != 0) {
+	 (void)krb5_cc_set_flags(context, ccache, KRB5_TC_OPENCLOSE);
 	 (void)krb5_cc_close(context, ccache);
 	 *minor_status = code;
 	 return(GSS_S_FAILURE);
@@ -352,7 +372,7 @@ krb5_gss_acquire_cred_no_lock(ctx, minor_status, desired_name, time_req,
    size_t i;
    krb5_gss_cred_id_t cred;
    gss_OID_set ret_mechs = GSS_C_NULL_OID_SET;
-   const gss_OID_set_desc FAR * valid_mechs;
+   const gss_OID_set_desc * valid_mechs;
    int req_old, req_new;
    OM_uint32 ret;
    krb5_error_code code;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,14 +37,11 @@
 
 #include <dk.h>
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_c_make_checksum(context, cksumtype, key, usage, input, cksum)
-     krb5_context context;
-     krb5_cksumtype cksumtype;
-     krb5_const krb5_keyblock *key;
-     krb5_keyusage usage;
-     krb5_const krb5_data *input;
-     krb5_checksum *cksum;
+
+krb5_error_code KRB5_CALLCONV
+krb5_c_make_checksum(krb5_context context, krb5_cksumtype cksumtype,
+		    const krb5_keyblock *key, krb5_keyusage usage,
+		    const krb5_data *input, krb5_checksum *cksum)
 {
     int i, e1, e2;
     krb5_data data;
@@ -62,9 +59,9 @@ krb5_c_make_checksum(context, cksumtype, key, usage, input, cksum)
 	return(KRB5_BAD_ENCTYPE);
 
     if (krb5_cksumtypes_list[i].keyhash)
-	(*(krb5_cksumtypes_list[i].keyhash->hash_size))(&cksumlen);
+	cksumlen = krb5_cksumtypes_list[i].keyhash->hashsize;
     else
-	(*(krb5_cksumtypes_list[i].hash->hash_size))(&cksumlen);
+	cksumlen = krb5_cksumtypes_list[i].hash->hashsize;
 
 #ifdef _KERNEL
     context->kef_cksum_mt = krb5_cksumtypes_list[i].kef_cksum_mt;
@@ -174,7 +171,7 @@ cleanup:
 	(void) memset(cksum->contents, 0, cksum->length);
 	FREE(cksum->contents, cksum->length);
 	cksum->length = 0;
-	cksum->contents = 0;
+	cksum->contents = NULL;
     }
 
     KRB5_LOG(KRB5_INFO, "krb5_c_make_checksum() end ret = %d\n", ret);

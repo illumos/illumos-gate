@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -356,21 +356,6 @@ function	krb5_verify_init_creds_opt_set_ap_req_nofail
 include		<krb5.h>, <k5-int.h>
 declaration	void krb5_verify_init_creds_opt_set_ap_req_nofail ( \
 			krb5_verify_init_creds_opt *opt, int ap_req_nofail)
-version		SUNWprivate_1.1
-end
-
-function	recvauth_common
-include		<krb5.h>, <k5-int.h>
-declaration	krb5_error_code recvauth_common ( \
-			krb5_context context, \
-			krb5_auth_context * auth_context, \
-			krb5_pointer fd, \
-			char *appl_version, \
-			krb5_principal server, \
-			krb5_int32 flags, \
-			krb5_keytab keytab, \
-			krb5_ticket ** ticket, \
-			krb5_data *version)
 version		SUNWprivate_1.1
 end
 

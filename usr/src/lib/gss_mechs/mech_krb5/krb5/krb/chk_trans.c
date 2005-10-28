@@ -274,7 +274,7 @@ check_realm_in_list (krb5_data *realm, void *data)
 }
 
 krb5_error_code
-krb5_check_transited_list (krb5_context ctx, krb5_data *trans_in,
+krb5_check_transited_list (krb5_context ctx, const krb5_data *trans_in,
 			   const krb5_data *crealm, const krb5_data *srealm)
 {
     krb5_data trans;

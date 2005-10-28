@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,32 +44,30 @@
    include these bits of info. */
 
 void
-krb5_dk_encrypt_length(enc, hash, inputlen, length)
-     krb5_const struct krb5_enc_provider *enc;
-     krb5_const struct krb5_hash_provider *hash;
-     size_t inputlen;
-     size_t *length;
+krb5_dk_encrypt_length(const struct krb5_enc_provider *enc,
+		    const struct krb5_hash_provider *hash,
+		    size_t inputlen, size_t *length)
 {
     size_t blocksize, hashsize;
 
-    (*(enc->block_size))(&blocksize);
-    (*(hash->hash_size))(&hashsize);
+    blocksize = enc->block_size;
+    hashsize = hash->hashsize;
 
     *length = krb5_roundup(blocksize+inputlen, blocksize) + hashsize;
 }
 
 krb5_error_code
-krb5_dk_encrypt(context, enc, hash, key, usage, ivec, input, output)
-     krb5_context context;
-     krb5_const struct krb5_enc_provider *enc;
-     krb5_const struct krb5_hash_provider *hash;
-     krb5_const krb5_keyblock *key;
-     krb5_keyusage usage;
-     krb5_const krb5_data *ivec;
-     krb5_const krb5_data *input;
-     krb5_data *output;
+krb5_dk_encrypt(
+	krb5_context context,
+	krb5_const struct krb5_enc_provider *enc,
+	krb5_const struct krb5_hash_provider *hash,
+	krb5_const krb5_keyblock *key,
+	krb5_keyusage usage,
+	krb5_const krb5_data *ivec,
+	krb5_const krb5_data *input,
+	krb5_data *output)
 {
-    size_t blocksize, keybytes, keylength, plainlen, enclen;
+    size_t blocksize, plainlen, enclen;
     krb5_error_code ret;
     krb5_data d1, d2;
     unsigned char *plaintext = NULL, *cn;
@@ -91,8 +89,7 @@ krb5_dk_encrypt(context, enc, hash, key, usage, ivec, input, output)
     if (ret)
 	    return (ret);
 
-    (*(enc->block_size))(&blocksize);
-    (*(enc->keysize))(&keybytes, &keylength);
+    blocksize = enc->block_size;
     plainlen = krb5_roundup(blocksize+input->length, blocksize);
 
     krb5_dk_encrypt_length(enc, hash, input->length, &enclen);
@@ -179,7 +176,7 @@ krb5int_aes_encrypt_length(enc, hash, inputlen, length)
 {
     size_t blocksize, hashsize;
 
-    (*(enc->block_size))(&blocksize);
+    blocksize = enc->block_size;
     hashsize = 96 / 8;
 
     /* No roundup, since CTS requires no padding once we've hit the
@@ -199,7 +196,7 @@ trunc_hmac (krb5_context context,
     char buff[256]; /* sufficiently large enough to hold current hmacs */
     krb5_data tmphash;
 
-    (hash->hash_size)(&hashsize);
+    hashsize = hash->hashsize;
     if (hashsize < output->length)
 	return (KRB5_CRYPTO_INTERNAL);
 
@@ -233,7 +230,7 @@ krb5int_aes_dk_encrypt(krb5_context context,
 	const krb5_data *input,
 	krb5_data *output)
 {
-    size_t blocksize, keybytes, keylength, plainlen, enclen;
+    size_t blocksize, plainlen, enclen;
     krb5_error_code ret;
     krb5_data d1, d2;
     unsigned char *plaintext, *cn;
@@ -253,8 +250,7 @@ krb5int_aes_dk_encrypt(krb5_context context,
     if (ret)
             return (ret);
 
-    (*(enc->block_size))(&blocksize);
-    (*(enc->keysize))(&keybytes, &keylength);
+    blocksize = enc->block_size;
     plainlen = blocksize+input->length;
 
     krb5int_aes_encrypt_length(enc, hash, input->length, &enclen);

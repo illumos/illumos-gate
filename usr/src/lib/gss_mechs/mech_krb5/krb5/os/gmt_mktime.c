@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,14 +43,22 @@ static const int days_in_month[12] = {
 
 #define hasleapday(year) (year%400?(year%100?(year%4?0:1):0):1)
 
-time_t gmt_mktime(t)
-     struct tm* t;
+time_t gmt_mktime(struct tm *t)
 {
   time_t accum;
 
 #define assert_time(cnd) if(!(cnd)) return (time_t) -1
 
-  assert_time(t->tm_year>=70);
+  /*
+   * For 32-bit signed time_t centered on 1/1/1970, the range is:
+   * time 0x80000000 -> Fri Dec 13 16:45:52 1901
+   * time 0x7fffffff -> Mon Jan 18 22:14:07 2038
+   *
+   * So years 1901 and 2038 are allowable, but we can't encode all
+   * dates in those years, and we're not doing overflow/underflow
+   * checking for such cases.
+   */
+  assert_time(t->tm_year>=1);
   assert_time(t->tm_year<=138);
   assert_time(t->tm_mon>=0);
   assert_time(t->tm_mon<=11);
@@ -70,7 +78,10 @@ time_t gmt_mktime(t)
   accum *= 365;			/* 365 days/normal year */
 
   /* add in leap day for all previous years */
-  accum += (t->tm_year - 69) / 4;
+  if (t->tm_year >= 70)
+    accum += (t->tm_year - 69) / 4;
+  else
+    accum -= (72 - t->tm_year) / 4;
   /* add in leap day for this year */
   if(t->tm_mon >= 2)		/* march or later */
     if(hasleapday((t->tm_year + 1900))) accum += 1;

@@ -1,5 +1,5 @@
 #
-# Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -151,12 +151,6 @@ function	profile_ser_size
 include		<stdio.h>, <prof_int.h>
 declaration	errcode_t profile_ser_size (const char *unused, \
 			profile_t profile, size_t *sizep)
-version		SUNWprivate_1.1
-end
-
-function	profile_update_file
-include		<stdio.h>, <prof_int.h>
-declaration	errcode_t profile_update_file (prf_file_t prf)
 version		SUNWprivate_1.1
 end
 

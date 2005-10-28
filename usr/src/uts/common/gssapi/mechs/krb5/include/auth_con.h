@@ -14,8 +14,8 @@ struct _krb5_auth_context {
     krb5_keyblock     * recv_subkey;
 
     krb5_int32		auth_context_flags;
-    krb5_int32		remote_seq_number;
-    krb5_int32		local_seq_number;
+    krb5_ui_4		remote_seq_number;
+    krb5_ui_4		local_seq_number;
     krb5_authenticator *authentp;		/* mk_req, rd_req, mk_rep, ...*/
     krb5_cksumtype	req_cksumtype;		/* mk_safe, ... */
     krb5_cksumtype	safe_cksumtype;		/* mk_safe, ... */

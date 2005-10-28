@@ -1,12 +1,12 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright (c) 1994 by the Massachusetts Institute of Technology.
+ * Copyright (c) 1994,2003 by the Massachusetts Institute of Technology.
  * Copyright (c) 1994 CyberSAFE Corporation
  * Copyright (c) 1993 Open Computing Security Group
  * Copyright (c) 1990,1991 by the Massachusetts Institute of Technology.
@@ -70,13 +70,7 @@
 #define FLAGS2OPTS(flags) (flags & KDC_TKT_COMMON_MASK)
 
 static krb5_error_code
-krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts, kdcopt)
-    krb5_context context;
-    krb5_ccache ccache;
-    krb5_creds  *in_cred;
-    krb5_creds  **out_cred;
-    krb5_creds  ***tgts;
-    int		kdcopt;
+krb5_get_cred_from_kdc_opt(krb5_context context, krb5_ccache ccache, krb5_creds *in_cred, krb5_creds **out_cred, krb5_creds ***tgts, int kdcopt)
 {
   krb5_creds      **ret_tgts = NULL;
   int             ntgts = 0;
@@ -88,7 +82,7 @@ krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts, kdcopt)
   krb5_principal  *tgs_list = NULL;
   krb5_principal  *top_server = NULL;
   krb5_principal  *next_server = NULL;
-  int             nservers = 0;
+  unsigned int             nservers = 0;
   krb5_boolean	  old_use_conf_ktypes = context->use_conf_ktypes;
 
   /* in case we never get a TGT, zero the return */
@@ -258,18 +252,14 @@ krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts, kdcopt)
 	/* didn't find it in the cache so try and get one */
 	/* with current tgt.                              */
 
-	if (!valid_enctype(tgt.keyblock.enctype)) {
+	if (!krb5_c_valid_enctype(tgt.keyblock.enctype)) {
 	    retval = KRB5_PROG_ETYPE_NOSUPP;
 	    goto cleanup;
 	}
 
 	krb5_free_cred_contents(context, &tgtq);
 	memset(&tgtq, 0, sizeof(tgtq));
-#ifdef HAVE_C_STRUCTURE_ASSIGNMENT
 	tgtq.times        = tgt.times;
-#else
-	memcpy(&tgtq.times, &tgt.times, sizeof(krb5_ticket_times));
-#endif
 
 	if ((retval = krb5_copy_principal(context, tgt.client, &tgtq.client)))
 	    goto cleanup;
@@ -277,10 +267,11 @@ krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts, kdcopt)
 	    goto cleanup;
 	tgtq.is_skey      = FALSE;
 	tgtq.ticket_flags = tgt.ticket_flags;
-	if ((retval = krb5_get_cred_via_tkt(context, &tgt,
+	retval = krb5_get_cred_via_tkt(context, &tgt,
 					    FLAGS2OPTS(tgtq.ticket_flags),
-					    tgt.addresses, &tgtq, &tgtr))) {
-	
+				            tgt.addresses, &tgtq, &tgtr);
+	if (retval) {
+
        /*
 	* couldn't get one so now loop backwards through the realms
 	* list and try and get a tgt for a realm as close to the
@@ -326,7 +317,7 @@ krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts, kdcopt)
 
 	      /* not in the cache so try and get one with our current tgt. */
 
-	      if (!valid_enctype(tgt.keyblock.enctype)) {
+	      if (!krb5_c_valid_enctype(tgt.keyblock.enctype)) {
 		  retval = KRB5_PROG_ETYPE_NOSUPP;
 		  goto cleanup;
 	      }
@@ -342,12 +333,12 @@ krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts, kdcopt)
 		  goto cleanup;
 	      tgtq.is_skey      = FALSE;
 	      tgtq.ticket_flags = tgt.ticket_flags;
-	      if ((retval = krb5_get_cred_via_tkt(context, &tgt,
-						  FLAGS2OPTS(tgtq.ticket_flags),
-						  tgt.addresses,
-						  &tgtq, &tgtr))) {
+	      retval = krb5_get_cred_via_tkt(context, &tgt,
+					     FLAGS2OPTS(tgtq.ticket_flags),
+					     tgt.addresses,
+					     &tgtq, &tgtr);
+	      if (retval)
 		  continue;
-	      }
 	
 	      /* save tgt in return array */
 	      if ((retval = krb5_copy_creds(context, tgtr,
@@ -382,7 +373,9 @@ krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts, kdcopt)
 	for (next_server = top_server; *next_server; next_server++) {
             krb5_data *realm_1 = krb5_princ_component(context, next_server[0], 1);
             krb5_data *realm_2 = krb5_princ_component(context, tgtr->server, 1);
-            if (realm_1->length == realm_2->length &&
+            if (realm_1 != NULL &&
+		realm_2 != NULL &&
+		realm_1->length == realm_2->length &&
                 !memcmp(realm_1->data, realm_2->data, realm_1->length)) {
 		break;
             }
@@ -410,16 +403,17 @@ krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts, kdcopt)
 
   /* got/finally have tgt!  try for the creds */
 
-  if (!valid_enctype(tgt.keyblock.enctype)) {
+  if (!krb5_c_valid_enctype(tgt.keyblock.enctype)) {
     retval = KRB5_PROG_ETYPE_NOSUPP;
     goto cleanup;
   }
 
   context->use_conf_ktypes = old_use_conf_ktypes;
-  retval = krb5_get_cred_via_tkt(context, &tgt, FLAGS2OPTS(tgt.ticket_flags) |
+  retval = krb5_get_cred_via_tkt(context, &tgt,
+				 FLAGS2OPTS(tgt.ticket_flags) |
 				 kdcopt |
-  				 	(in_cred->second_ticket.length ?
-				  	 KDC_OPT_ENC_TKT_IN_SKEY : 0),
+  				 (in_cred->second_ticket.length ?
+				  KDC_OPT_ENC_TKT_IN_SKEY : 0),
 				 tgt.addresses, in_cred, out_cred);
 
   /* cleanup and return */
@@ -440,12 +434,7 @@ cleanup:
 }
 
 krb5_error_code
-krb5_get_cred_from_kdc(context, ccache, in_cred, out_cred, tgts)
-    krb5_context context;
-    krb5_ccache ccache;
-    krb5_creds  *in_cred;
-    krb5_creds  **out_cred;
-    krb5_creds  ***tgts;
+krb5_get_cred_from_kdc(krb5_context context, krb5_ccache ccache, krb5_creds *in_cred, krb5_creds **out_cred, krb5_creds ***tgts)
 {
 
   return krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts,
@@ -453,12 +442,7 @@ krb5_get_cred_from_kdc(context, ccache, in_cred, out_cred, tgts)
 }
 
 krb5_error_code
-krb5_get_cred_from_kdc_validate(context, ccache, in_cred, out_cred, tgts)
-    krb5_context context;
-    krb5_ccache ccache;
-    krb5_creds  *in_cred;
-    krb5_creds  **out_cred;
-    krb5_creds  ***tgts;
+krb5_get_cred_from_kdc_validate(krb5_context context, krb5_ccache ccache, krb5_creds *in_cred, krb5_creds **out_cred, krb5_creds ***tgts)
 {
 
   return krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts,
@@ -466,12 +450,7 @@ krb5_get_cred_from_kdc_validate(context, ccache, in_cred, out_cred, tgts)
 }
 
 krb5_error_code
-krb5_get_cred_from_kdc_renew(context, ccache, in_cred, out_cred, tgts)
-    krb5_context context;
-    krb5_ccache ccache;
-    krb5_creds  *in_cred;
-    krb5_creds  **out_cred;
-    krb5_creds  ***tgts;
+krb5_get_cred_from_kdc_renew(krb5_context context, krb5_ccache ccache, krb5_creds *in_cred, krb5_creds **out_cred, krb5_creds ***tgts)
 {
 
   return krb5_get_cred_from_kdc_opt(context, ccache, in_cred, out_cred, tgts,

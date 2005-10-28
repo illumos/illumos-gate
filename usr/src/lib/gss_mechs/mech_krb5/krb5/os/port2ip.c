@@ -36,11 +36,7 @@
 
 /*ARGSUSED*/
 krb5_error_code
-krb5_unpack_full_ipaddr(context, inaddr, adr, port)
-    krb5_context context;
-    const krb5_address *inaddr;
-    krb5_int32 *adr;
-    krb5_int16 *port;
+krb5_unpack_full_ipaddr(krb5_context context, const krb5_address *inaddr, krb5_int32 *adr, krb5_int16 *port)
 {
     unsigned long smushaddr;
     unsigned short smushport;

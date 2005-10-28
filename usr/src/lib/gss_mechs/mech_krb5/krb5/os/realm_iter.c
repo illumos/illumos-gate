@@ -27,16 +27,14 @@
  * krb5_realm_iterate()
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
 #include <ctype.h>
 #include <stdio.h>
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_realm_iterator_create(context, iter_p)
-    krb5_context context;
-    void **iter_p;
+krb5_error_code KRB5_CALLCONV
+krb5_realm_iterator_create(krb5_context context, void **iter_p)
 {
-    static const char *names[] = { "realms", 0 };
+    static const char *const names[] = { "realms", 0 };
 	
     return profile_iterator_create(context->profile, names,
 				   PROFILE_ITER_LIST_SECTION |
@@ -44,30 +42,20 @@ krb5_realm_iterator_create(context, iter_p)
 				   iter_p);
 }
 
-/*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_realm_iterator(context, iter_p, ret_realm)
-    krb5_context context;
-    void **iter_p;
-    char **ret_realm;
+krb5_error_code KRB5_CALLCONV
+krb5_realm_iterator(krb5_context context, void **iter_p, char **ret_realm)
 {
     return profile_iterator(iter_p, ret_realm, 0);
 }
 
-/*ARGSUSED*/
-KRB5_DLLIMP void KRB5_CALLCONV
-krb5_realm_iterator_free(context, iter_p)
-    krb5_context context;
-    void **iter_p;
+void KRB5_CALLCONV
+krb5_realm_iterator_free(krb5_context context, void **iter_p)
 {
     profile_iterator_free(iter_p);
 }
 
-/*ARGSUSED*/
-KRB5_DLLIMP void KRB5_CALLCONV
-krb5_free_realm_string(context, str)
-    krb5_context context;
-    char *str;
+void KRB5_CALLCONV
+krb5_free_realm_string(krb5_context context, char *str)
 {
     profile_release_string(str);
 }

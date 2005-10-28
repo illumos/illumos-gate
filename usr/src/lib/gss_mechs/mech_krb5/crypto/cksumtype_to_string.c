@@ -28,11 +28,8 @@
 #include <k5-int.h>
 #include <cksumtypes.h>
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_cksumtype_to_string(cksumtype, buffer, buflen)
-    krb5_cksumtype	cksumtype;
-    char		FAR * buffer;
-    size_t		buflen;
+krb5_error_code KRB5_CALLCONV
+krb5_cksumtype_to_string(krb5_cksumtype cksumtype, char *buffer, size_t buflen)
 {
     int i;
 

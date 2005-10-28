@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * src/lib/krb5/asn.1/asn1_k_decode.c
@@ -72,9 +77,6 @@
 #define alloc_field(var, type)			\
   var = (type*)calloc(1, sizeof(type));		\
   if ((var) == NULL) return ENOMEM
-
-#define free_field(var)			\
-  if ((var) != NULL) { free(var); var = NULL; }
 
 /* Fetch an expected APPLICATION class tag and verify. */
 #define apptag(tagexpect)								\
@@ -352,7 +354,7 @@ asn1_error_code asn1_decode_msgtype(asn1buf *buf, krb5_msgtype *val)
 asn1_error_code asn1_decode_realm(asn1buf *buf, krb5_principal *val)
 {
   return asn1_decode_generalstring(buf,
-				   (uint32_t *)&((*val)->realm.length),
+				   &((*val)->realm.length),
 				   &((*val)->realm.data));
 }
 
@@ -372,7 +374,7 @@ asn1_error_code asn1_decode_principal_name(asn1buf *buf, krb5_principal *val)
 					     size*sizeof(krb5_data));
 	if((*val)->data == NULL) return ENOMEM;
 	retval = asn1_decode_generalstring(&seqbuf,
-			   (uint32_t *)&((*val)->data[size-1].length),
+					   &((*val)->data[size-1].length),
 			   &((*val)->data[size-1].data));
 	if(retval) return retval;
       }
@@ -532,11 +534,8 @@ asn1_error_code asn1_decode_ticket(asn1buf *buf, krb5_ticket *val)
   if (!applen) {
       taginfo t;
       retval = asn1_get_tag_2(buf, &t);
-      if (retval) {
-	  free_field(val->server);
-	  return retval;
+      if (retval) return retval;
       }
-  }
   cleanup();
 }
 
@@ -569,12 +568,7 @@ asn1_error_code asn1_decode_kdc_req_body(asn1buf *buf, krb5_kdc_req *val)
     get_field(val->server,2,asn1_decode_realm);
     if(val->client != NULL){
       retval = asn1_krb5_realm_copy(val->client,val->server);
-      if(retval) {
-	  free_field(val->server);
-	  free_field(val->client);
-	  return retval; }
-      }
-
+      if(retval) return retval; }
 
     /* If opt_field server is missing, memory reference to server is
        lost and results in memory leak */
@@ -821,12 +815,13 @@ asn1_error_code asn1_decode_sequence_of_checksum(asn1buf *buf, krb5_checksum ***
 
 static asn1_error_code asn1_decode_etype_info2_entry(asn1buf *buf, krb5_etype_info_entry *val )
 {
+  char *tmpp;
   setup();
   { begin_structure();
     get_field(val->etype,0,asn1_decode_enctype);
     if (tagnum == 1) {
-	    char *s = (char *)val->salt;
-	    get_lenfield(val->length, s, 1, asn1_decode_generalstring);
+      tmpp = (char *)val->salt; /* SUNW14resync hack */
+      get_lenfield(val->length,tmpp,1,asn1_decode_generalstring);
     } else {
 	    val->length = KRB5_ETYPE_NO_SALT;
 	    val->salt = 0;
@@ -872,7 +867,8 @@ static asn1_error_code asn1_decode_etype_info2_entry_1_3(asn1buf *buf, krb5_etyp
   cleanup();
 }
 
-asn1_error_code asn1_decode_etype_info_entry(asn1buf *buf, krb5_etype_info_entry *val )
+
+static asn1_error_code asn1_decode_etype_info_entry(asn1buf *buf, krb5_etype_info_entry *val )
 {
   setup();
   { begin_structure();

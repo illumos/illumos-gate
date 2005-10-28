@@ -53,7 +53,8 @@
  * krb5_deltat_to_string()	- Convert krb5_deltat to string.
  */
 
-#include <k5-int.h>
+#include "k5-int.h"
+#include <ctype.h>
 
 /* Salt type conversions */
 
@@ -83,10 +84,8 @@ static const struct salttype_lookup_entry salttype_table[] = {
 static const int salttype_table_nents = sizeof(salttype_table)/
 					sizeof(salttype_table[0]);
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_string_to_salttype(string, salttypep)
-    char	FAR * string;
-    krb5_int32	FAR * salttypep;
+krb5_error_code KRB5_CALLCONV
+krb5_string_to_salttype(char *string, krb5_int32 *salttypep)
 {
     int i;
     int found;
@@ -108,11 +107,8 @@ krb5_string_to_salttype(string, salttypep)
  * These routines return 0 for success, EINVAL for invalid parameter, ENOMEM
  * if the supplied buffer/length will not contain the output.
  */
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_salttype_to_string(salttype, buffer, buflen)
-    krb5_int32	salttype;
-    char	FAR * buffer;
-    size_t	buflen;
+krb5_error_code KRB5_CALLCONV
+krb5_salttype_to_string(krb5_int32 salttype, char *buffer, size_t buflen)
 {
     int i;
     const char *out;
@@ -143,29 +139,36 @@ krb5_salttype_to_string(salttype, buffer, buflen)
 static size_t strftime (char *, size_t, const char *, const struct tm *);
 #endif
 
-#ifndef HAVE_STRPTIME
+#ifdef HAVE_STRPTIME
+#ifdef NEED_STRPTIME_PROTO
+extern char *strptime (const char *, const char *,
+			    struct tm *)
+#ifdef __cplusplus
+    throw()
+#endif
+    ;
+#endif
+#else /* HAVE_STRPTIME */
 #undef strptime
 #define strptime my_strptime
 static char *strptime (const char *, const char *, struct tm *);
 #endif
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_string_to_timestamp(string, timestampp)
-    char		FAR * string;
-    krb5_timestamp	FAR * timestampp;
+krb5_error_code KRB5_CALLCONV
+krb5_string_to_timestamp(char *string, krb5_timestamp *timestampp)
 {
-    int i,found;
-    struct tm timebuf, nowbuf;
-    time_t now;
+    int i;
+    struct tm timebuf;
+    time_t now, ret_time;
     char *s;
     static const char * const atime_format_table[] = {
-	"%Y" "%m%d%H" "%M" "%S",/* yyyymmddhhmmss		*/
+	"%Y%m%d%H%M%S",		/* yyyymmddhhmmss		*/
 	"%Y.%m.%d.%H.%M.%S",	/* yyyy.mm.dd.hh.mm.ss		*/
-	"%y%m%d%H" "%M" "%S",	/* yymmddhhmmss			*/
+	"%y%m%d%H%M%S",		/* yymmddhhmmss			*/
 	"%y.%m.%d.%H.%M.%S",	/* yy.mm.dd.hh.mm.ss		*/
-	"%y%m%d%H" "%M",	/* yymmddhhmm			*/
-	"%H" "%M" "%S",		/* hhmmss			*/
-	"%H" "%M",		/* hhmm				*/
+	"%y%m%d%H%M",		/* yymmddhhmm			*/
+	"%H%M%S",		/* hhmmss			*/
+	"%H%M",			/* hhmm				*/
 	"%T",			/* hh:mm:ss			*/
 	"%R",			/* hh:mm			*/
 	/* The following not really supported unless native strptime present */
@@ -176,61 +179,64 @@ krb5_string_to_timestamp(string, timestampp)
     static const int atime_format_table_nents =
 	sizeof(atime_format_table)/sizeof(atime_format_table[0]);
 
-    found = 0;
+
+    now = time((time_t *) NULL);
     for (i=0; i<atime_format_table_nents; i++) {
-	s = strptime(string, atime_format_table[i], &timebuf);
-	/* make sure the entire string was parsed */
-	if (s && (*s == '\0')) {
-		/* If only time and no date was provided, assume today */
-		if ((timebuf.tm_mday == 0) && (timebuf.tm_mon == 0) &&
-			(timebuf.tm_year == 0)) {
-			now = time((time_t *) NULL);
-			(void) memcpy(&nowbuf, localtime(&now), sizeof(timebuf));
-			timebuf.tm_mday = nowbuf.tm_mday;
-			timebuf.tm_mon = nowbuf.tm_mon;
-			timebuf.tm_year = nowbuf.tm_year;
-		}
-		found = 1;
-		break;
+        /* We reset every time throughout the loop as the manual page
+	 * indicated that no guarantees are made as to preserving timebuf
+	 * when parsing fails
+	 */
+#ifdef HAVE_LOCALTIME_R
+	(void) localtime_r(&now, &timebuf);
+#else
+	memcpy(&timebuf, localtime(&now), sizeof(timebuf));
+#endif
+	if ((s = strptime(string, atime_format_table[i], &timebuf))
+	    && (s != string)) {
+ 	    /* See if at end of buffer - otherwise partial processing */
+	    while(*s != 0 && isspace((int) *s)) s++;
+	    if (*s != 0)
+	        continue;
+	    if (timebuf.tm_year <= 0)
+		continue;	/* clearly confused */
+	    ret_time = mktime(&timebuf);
+	    if (ret_time == (time_t) -1)
+		continue;	/* clearly confused */
+	    *timestampp = (krb5_timestamp) ret_time;
+	    return 0;
 	}
     }
-    if (found) {
-	if ((*timestampp = (krb5_timestamp) mktime(&timebuf)) != -1) {
-		if (timebuf.tm_isdst == 1) {
-			*timestampp -= (timezone - altzone);
-		}
-		return (0);
-	}
-    }
-    return(EINVAL);	
+    return(EINVAL);
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_timestamp_to_string(timestamp, buffer, buflen)
-    krb5_timestamp	timestamp;
-    char		FAR * buffer;
-    size_t		buflen;
+krb5_error_code KRB5_CALLCONV
+krb5_timestamp_to_string(krb5_timestamp timestamp, char *buffer, size_t buflen)
 {
     int ret;
     time_t timestamp2 = timestamp;
+    struct tm tmbuf;
+    const char *fmt = "%c"; /* This is to get around gcc -Wall warning that 
+			       the year returned might be two digits */
 
-    ret = strftime(buffer, buflen, "%c", localtime(&timestamp2));
+#ifdef HAVE_LOCALTIME_R
+    (void) localtime_r(&timestamp2, &tmbuf);
+#else
+    memcpy(&tmbuf, localtime(&timestamp2), sizeof(tmbuf));
+#endif
+    ret = strftime(buffer, buflen, fmt, &tmbuf);
     if (ret == 0 || ret == buflen)
 	return(ENOMEM);
     return(0);
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_timestamp_to_sfstring(timestamp, buffer, buflen, pad)
-    krb5_timestamp	timestamp;
-    char		FAR * buffer;
-    size_t		buflen;
-    char		FAR * pad;
+krb5_error_code KRB5_CALLCONV
+krb5_timestamp_to_sfstring(krb5_timestamp timestamp, char *buffer, size_t buflen, char *pad)
 {
     struct tm	*tmp;
     size_t i;
     size_t	ndone;
     time_t timestamp2 = timestamp;
+    struct tm tmbuf;
 
     static const char * const sftime_format_table[] = {
 	"%c",			/* Default locale-dependent date and time */
@@ -241,7 +247,11 @@ krb5_timestamp_to_sfstring(timestamp, buffer, buflen, pad)
     static const int sftime_format_table_nents =
 	sizeof(sftime_format_table)/sizeof(sftime_format_table[0]);
 
-    tmp = localtime(&timestamp2);
+#ifdef HAVE_LOCALTIME_R
+    tmp = localtime_r(&timestamp2, &tmbuf);
+#else
+    memcpy((tmp = &tmbuf), localtime(&timestamp2), sizeof(tmbuf));
+#endif
     ndone = 0;
     for (i=0; i<sftime_format_table_nents; i++) {
 	if ((ndone = strftime(buffer, buflen, sftime_format_table[i], tmp)))
@@ -263,17 +273,14 @@ krb5_timestamp_to_sfstring(timestamp, buffer, buflen, pad)
     }
     return((ndone) ? 0 : ENOMEM);
 }
-
+
 #ifdef SUNW_INC_DEAD_CODE
 /* relative time (delta-t) conversions */
 
 /* string->deltat is in deltat.y */
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_deltat_to_string(deltat, buffer, buflen)
-    krb5_deltat	deltat;
-    char	FAR * buffer;
-    size_t	buflen;
+krb5_error_code KRB5_CALLCONV
+krb5_deltat_to_string(krb5_deltat deltat, char *buffer, size_t buflen)
 {
     int			days, hours, minutes, seconds;
     krb5_deltat		dt;

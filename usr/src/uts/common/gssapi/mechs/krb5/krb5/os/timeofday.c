@@ -1,5 +1,5 @@
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,10 +50,8 @@
 extern int errno;
 #endif
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_timeofday(context, timeret)
-    krb5_context context;
-    register krb5_int32 FAR *timeret;
+krb5_error_code KRB5_CALLCONV 
+krb5_timeofday(krb5_context context, register krb5_int32 *timeret)
 {
     krb5_os_context os_ctx = context->os_context;
     krb5_int32 tval;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,11 +55,7 @@
  returns system errors
  */
 static krb5_error_code
-krb5_send_tgs_basic(context, in_data, in_cred, outbuf)
-    krb5_context          context;
-    krb5_data           * in_data;
-    krb5_creds          * in_cred;
-    krb5_data           * outbuf;
+krb5_send_tgs_basic(krb5_context context, krb5_data *in_data, krb5_creds *in_cred, krb5_data *outbuf)
 {
     krb5_error_code       retval;
     krb5_checksum         checksum;
@@ -136,19 +132,12 @@ cleanup_scratch:
 }
 
 krb5_error_code
-krb5_send_tgs(context, kdcoptions, timestruct, ktypes, sname, addrs,
-	      authorization_data, padata, second_ticket, in_cred, rep)
-    krb5_context context;
-    const krb5_flags kdcoptions;
-    const krb5_ticket_times * timestruct;
-    const krb5_enctype * ktypes;
-    krb5_const_principal sname;
-    krb5_address * const * addrs;
-    krb5_authdata * const * authorization_data;
-    krb5_pa_data * const * padata;
-    const krb5_data * second_ticket;
-    krb5_creds * in_cred;
-    krb5_response * rep;
+krb5_send_tgs(krb5_context context, krb5_flags kdcoptions,
+	      const krb5_ticket_times *timestruct, const krb5_enctype *ktypes,
+	      krb5_const_principal sname, krb5_address *const *addrs,
+	      krb5_authdata *const *authorization_data,
+	      krb5_pa_data *const *padata, const krb5_data *second_ticket,
+	      krb5_creds *in_cred, krb5_response *rep)
 {
     krb5_error_code retval;
     krb5_kdc_req tgsreq;
@@ -158,7 +147,7 @@ krb5_send_tgs(context, kdcoptions, timestruct, ktypes, sname, addrs,
     krb5_timestamp time_now;
     krb5_pa_data **combined_padata;
     krb5_pa_data ap_req_padata;
-    int tcp_only = 0;
+    int tcp_only = 0, use_master;
 
     /*
      * in_creds MUST be a valid credential NOT just a partially filled in
@@ -207,7 +196,7 @@ krb5_send_tgs(context, kdcoptions, timestruct, ktypes, sname, addrs,
     if (ktypes) {
 	/* Check passed ktypes and make sure they're valid. */
    	for (tgsreq.nktypes = 0; ktypes[tgsreq.nktypes]; tgsreq.nktypes++) {
-    	    if (!valid_enctype(ktypes[tgsreq.nktypes]))
+    	    if (!krb5_c_valid_enctype(ktypes[tgsreq.nktypes]))
 		return KRB5_PROG_ETYPE_NOSUPP;
 	}
     	tgsreq.ktype = (krb5_enctype *)ktypes;
@@ -281,9 +270,10 @@ krb5_send_tgs(context, kdcoptions, timestruct, ktypes, sname, addrs,
 
     /* now send request & get response from KDC */
 send_again:
+    use_master = 0;
     retval = krb5_sendto_kdc(context, scratch, 
 			     krb5_princ_realm(context, sname),
-			     &rep->response, NULL, tcp_only);
+			     &rep->response, &use_master, tcp_only);
     if (retval == 0) {
 	if (krb5_is_krb_error(&rep->response)) {
 	    if (!tcp_only) {

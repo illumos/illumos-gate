@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* autoconf.h.  Generated automatically by configure.  */
 /* autoconf.h.in.  Generated automatically from configure.in by autoheader.  */
@@ -136,3 +141,57 @@
 
 /* Define if you have sockaddr_storage */
 #define HAVE_STRUCT_SOCKADDR_STORAGE 1
+
+/* SUNW14resync start */ 
+
+/* Define if thread support enabled */
+#define ENABLE_THREADS 1
+
+/* Define if #pragma weak references work */
+#define HAVE_PRAGMA_WEAK_REF 1
+
+/* Define if you have POSIX threads libraries and header files. */
+#define HAVE_PTHREAD 1
+
+/* Define to 1 if you have the `pthread_mutexattr_setrobust_np' function. */
+#define HAVE_PTHREAD_MUTEXATTR_SETROBUST_NP 1
+
+/* Define if pthread_mutexattr_setrobust_np is provided in the thread library.
+   */
+#define HAVE_PTHREAD_MUTEXATTR_SETROBUST_NP_IN_THREAD_LIB 1
+
+/* Define to 1 if you have the `pthread_mutex_lock' function. */
+#define HAVE_PTHREAD_MUTEX_LOCK 1
+
+/* Define to 1 if you have the `pthread_once' function. */
+#define HAVE_PTHREAD_ONCE 1
+
+/* Define to 1 if you have the `pthread_rwlock_init' function. */
+#define HAVE_PTHREAD_RWLOCK_INIT 1
+
+/* Define if pthread_rwlock_init is provided in the thread library. */
+#define HAVE_PTHREAD_RWLOCK_INIT_IN_THREAD_LIB 1
+
+
+/* XXX */
+/* Define to the necessary symbol if this constant uses a non-standard name on
+   your system. */
+#undef PTHREAD_CREATE_JOINABLE
+
+/* Define if link-time options for library finalization will be used */
+#undef USE_LINKER_FINI_OPTION
+
+/* Define if link-time options for library initialization will be used */
+#undef USE_LINKER_INIT_OPTION
+
+/* from MIT 1.4 configure CC=.../cc */
+#define HAVE_PRAGMA_WEAK_REF 1
+#define DELAY_INITIALIZER 1
+#define USE_LINKER_INIT_OPTION 1
+#define USE_LINKER_FINI_OPTION 1
+
+#define USE_BUNDLE_ERROR_STRINGS 1
+#ifndef KRB5_PRIVATE
+#define KRB5_PRIVATE 1
+#endif
+/* SUNW14resync end */ 

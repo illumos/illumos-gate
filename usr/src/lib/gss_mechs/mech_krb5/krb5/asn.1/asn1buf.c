@@ -52,7 +52,7 @@
    base points to a valid, allocated octet array or is NULL
    bound, if non-NULL, points to the last valid octet
    next >= base
-   next <= bound+1  (i.e. next should be able to step just past the bound,
+   next <= bound+2  (i.e. next should be able to step just past the bound,
                      but no further.  (The bound should move out in response
 		     to being crossed by next.)) */
 
@@ -129,17 +129,10 @@ asn1_error_code asn1buf_skiptail(asn1buf *buf, const unsigned int length, const 
       return ASN1_OVERRUN;
   }
   while (nestlevel > 0) {
+    if (buf->bound - buf->next + 1 <= 0)
+      return ASN1_OVERRUN;
     retval = asn1_get_tag_2(buf, &t);
     if (retval) return retval;
-
-    /* 
-     * asn1_get_tag_2() sets tagnum=ASN1_TAGNUM_CEILING if there is a problem
-     * with the buffer, including overrun.
-     */
-
-    if (t.tagnum == ASN1_TAGNUM_CEILING)
-	return ASN1_OVERRUN;
-
     if (!t.indef) {
       if (t.length <= buf->bound - buf->next + 1)
 	buf->next += t.length;

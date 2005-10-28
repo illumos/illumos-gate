@@ -31,15 +31,12 @@
 #include <k5-int.h>
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_copy_addr(context, inad, outad)
-    krb5_context context;
-    const krb5_address FAR *inad;
-    krb5_address FAR * FAR *outad;
+krb5_error_code KRB5_CALLCONV
+krb5_copy_addr(krb5_context context, const krb5_address *inad, krb5_address **outad)
 {
-    krb5_address FAR *tmpad;
+    krb5_address *tmpad;
 
-    if (!(tmpad = (krb5_address FAR *)malloc(sizeof(*tmpad))))
+    if (!(tmpad = (krb5_address *)malloc(sizeof(*tmpad))))
 	return ENOMEM;
 #ifdef HAVE_C_STRUCTURE_ASSIGNMENT
     *tmpad = *inad;
@@ -58,15 +55,12 @@ krb5_copy_addr(context, inad, outad)
 /*
  * Copy an address array, with fresh allocation.
  */
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_copy_addresses(context, inaddr, outaddr)
-    krb5_context context;
-    krb5_address FAR * const FAR * inaddr;
-    krb5_address FAR * FAR * FAR *outaddr;
+krb5_error_code KRB5_CALLCONV
+krb5_copy_addresses(krb5_context context, krb5_address *const *inaddr, krb5_address ***outaddr)
 {
     krb5_error_code retval;
     krb5_address ** tempaddr;
-    register int nelems = 0;
+    register unsigned int nelems = 0;
 
     if (!inaddr) {
 	    *outaddr = 0;
@@ -106,7 +100,7 @@ krb5_append_addresses(context, inaddr, outaddr)
     krb5_error_code retval;
     krb5_address ** tempaddr;
     krb5_address ** tempaddr2;
-    register int nelems = 0;
+    register unsigned int nelems = 0;
     register int norigelems = 0;
 
     if (!inaddr)

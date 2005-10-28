@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -7,338 +7,17 @@
 # lib/gss_mechs/mech_krb5/spec/krb5_cache.spec
 #
 
-function	krb5_fcc_close
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_close \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
 
-function	krb5_fcc_close_file
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_close_file \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_destroy
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_destroy \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_end_seq_get
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_end_seq_get \
-			(krb5_context context, krb5_ccache id, \
-			krb5_cc_cursor *cursor)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_generate_new
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_generate_new \
-			(krb5_context context, krb5_ccache *id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_get_name
-include		<krb5.h>, <fcc-proto.h>
-declaration	char * krb5_fcc_get_name \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_get_principal
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_get_principal \
-			(krb5_context context, krb5_ccache id, \
-			krb5_principal *princ)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_initialize
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_initialize \
-			(krb5_context context, krb5_ccache id, \
-			krb5_principal princ)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_interpret
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_interpret \
-			(krb5_context context, int errnum)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_next_cred
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_next_cred \
-			(krb5_context, krb5_ccache id, \
-			krb5_cc_cursor *cursor, \
-			krb5_creds *creds)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_open_file
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_open_file \
-			(krb5_context context, krb5_ccache id, \
-			int mode)
-version		SUNWprivate_1.1
-end
 
 data		krb5_fcc_ops
 declaration	krb5_cc_ops krb5_fcc_ops
 version		SUNWprivate_1.1
 end
 
-function	krb5_fcc_read
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read \
-			(krb5_context context, krb5_ccache id, \
-			krb5_pointer buf, int len)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_addr
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_addr \
-			(krb5_context context, krb5_ccache id, \
-			krb5_address *addr)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_addrs
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_addrs \
-			(krb5_context context, krb5_ccache id, \
-			krb5_address ***addrs)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_authdata
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_authdata \
-			(krb5_context context, krb5_ccache id, \
-			krb5_authdata ***a)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_authdatum
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_authdatum \
-			(krb5_context context, krb5_ccache id, \
-			krb5_authdata *a)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_data
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_data \
-			(krb5_context context, krb5_ccache id, \
-			krb5_data *data)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_int32
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_int32 \
-			(krb5_context context, krb5_ccache id, \
-			krb5_int32 *i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_keyblock
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_keyblock \
-			(krb5_context context, krb5_ccache id, \
-			krb5_keyblock *keyblock)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_octet
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_octet \
-			(krb5_context context, krb5_ccache id, \
-			krb5_octet *i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_principal
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_principal \
-			(krb5_context context, krb5_ccache id, \
-			krb5_principal *princ)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_times
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_times \
-			(krb5_context context, krb5_ccache id, \
-			krb5_ticket_times *t)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_read_ui_2
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_read_ui_2 \
-			(krb5_context context, krb5_ccache id, \
-			krb5_ui_2 *i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_resolve
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_resolve \
-			(krb5_context context, krb5_ccache *id, \
-			const char *residual)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_retrieve
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_retrieve \
-			(krb5_context context, krb5_ccache id, \
-			krb5_flags whichfields, krb5_creds *mcreds, \
-			krb5_creds *creds)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_set_flags
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_set_flags \
-			(krb5_context context, krb5_ccache id, \
-			krb5_flags flags)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_skip_header
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_skip_header \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_skip_principal
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_skip_principal \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_start_seq_get
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_start_seq_get \
-			(krb5_context context, krb5_ccache id, \
-			krb5_cc_cursor *cursor)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store \
-			(krb5_context context, krb5_ccache id, \
-			krb5_creds *creds)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_addr
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_addr \
-			(krb5_context context, krb5_ccache id, \
-			krb5_address *addr)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_addrs
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_addrs \
-			(krb5_context context, krb5_ccache id, \
-			krb5_address **addrs)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_authdata
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_authdata \
-			(krb5_context context, krb5_ccache id, \
-			krb5_authdata **a)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_authdatum
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_authdatum \
-			(krb5_context context, krb5_ccache id, \
-			krb5_authdata *a)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_data
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_data \
-			(krb5_context context, krb5_ccache id, \
-			krb5_data *data)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_int32
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_int32 \
-			(krb5_context context, krb5_ccache id, \
-			krb5_int32 i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_keyblock
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_keyblock \
-			(krb5_context context, krb5_ccache id, \
-			krb5_keyblock *keyblock)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_octet
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_octet \
-			(krb5_context context, krb5_ccache id, \
-			krb5_int32 i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_principal
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_principal \
-			(krb5_context context, krb5_ccache id, \
-			krb5_principal princ)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_times
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_times \
-			(krb5_context context, krb5_ccache id, \
-			krb5_ticket_times *t)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_store_ui_2
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_store_ui_2 \
-			(krb5_context context, krb5_ccache id, \
-			krb5_int32 i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_fcc_write
-include		<krb5.h>, <fcc-proto.h>
-declaration	krb5_error_code krb5_fcc_write \
-			(krb5_context context, krb5_ccache id, \
-			krb5_pointer buf, int len)
+function	krb5_rc_close
+include		<krb5.h>
+declaration	krb5_error_code krb5_rc_close \
+			(krb5_context context, krb5_rcache id)
 version		SUNWprivate_1.1
 end
 
@@ -625,339 +304,7 @@ declaration	krb5_error_code krb5_rc_resolve_full \
 version		SUNWprivate_1.1
 end
 
-function	krb5_scc_close
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_close \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
 
-function	krb5_scc_close_file
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_close_file \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_destroy
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_destroy \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_end_seq_get
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_end_seq_get \
-			(krb5_context, krb5_ccache id, \
-			krb5_cc_cursor *cursor)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_generate_new
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_generate_new \
-			(krb5_context context, krb5_ccache *id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_get_name
-include		<krb5.h>, <scc-proto.h>
-declaration	char *krb5_scc_get_name \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_get_principal
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_get_principal \
-			(krb5_context context, krb5_ccache id, \
-			krb5_principal *princ)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_initialize
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_initialize \
-			(krb5_context context, krb5_ccache id, \
-			krb5_principal princ)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_interpret
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_interpret \
-			(krb5_context context, int errnum)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_next_cred
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_next_cred \
-			(krb5_context context, krb5_ccache id, \
-			krb5_cc_cursor *cursor, krb5_creds *creds)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_open_file
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_open_file \
-			(krb5_context context, krb5_ccache id, \
-			int mode)
-version		SUNWprivate_1.1
-end
-
-data		krb5_scc_ops
-declaration	krb5_cc_ops krb5_scc_ops
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read \
-			(krb5_context context, krb5_ccache id, \
-			krb5_pointer buf, int len)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_addr
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_addr \
-			(krb5_context context, krb5_ccache id, \
-			krb5_address *addr)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_addrs
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_addrs \
-			(krb5_context context, krb5_ccache id, \
-			krb5_address ***addrs)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_authdata
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_authdata \
-			(krb5_context context, krb5_ccache id, \
-			krb5_authdata ***a)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_authdatum
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_authdatum \
-			(krb5_context context, krb5_ccache id, \
-			krb5_authdata *a)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_data
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_data \
-			(krb5_context context, krb5_ccache id, \
-			krb5_data *data)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_int32
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_int32 \
-			(krb5_context context, krb5_ccache id, \
-			krb5_int32 *i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_keyblock
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_keyblock \
-			(krb5_context context, krb5_ccache id, \
-			krb5_keyblock *keyblock)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_octet
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_octet \
-			(krb5_context context, krb5_ccache id, \
-			krb5_octet *i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_principal
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_principal \
-			(krb5_context context, krb5_ccache id, \
-			krb5_principal *princ)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_times
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_times \
-			(krb5_context context, krb5_ccache id, \
-			krb5_ticket_times *t)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_read_ui_2
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_read_ui_2 \
-			(krb5_context context, krb5_ccache id, \
-			krb5_ui_2 *i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_resolve
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_resolve \
-			(krb5_context context, krb5_ccache *id, \
-			const char *residual)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_retrieve
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_retrieve \
-			(krb5_context context, krb5_ccache id, \
-			krb5_flags whichfields, krb5_creds *mcreds, \
-			krb5_creds *creds)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_set_flags
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_set_flags \
-			(krb5_context context, krb5_ccache id, \
-			krb5_flags flags)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_skip_header
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_skip_header \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_skip_principal
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_skip_principal \
-			(krb5_context context, krb5_ccache id)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_start_seq_get
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_start_seq_get \
-			(krb5_context context, krb5_ccache id, \
-			krb5_cc_cursor *cursor)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store \
-			(krb5_context context, krb5_ccache id, \
-			krb5_creds *creds)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_addr
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_addr \
-			(krb5_context context, krb5_ccache id, \
-			krb5_address *addr)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_addrs
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_addrs \
-			(krb5_context context, krb5_ccache id, \
-			krb5_address **addrs)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_authdata
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_authdata \
-			(krb5_context, krb5_ccache, \
-			krb5_authdata **)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_authdatum
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_authdatum \
-			(krb5_context context, krb5_ccache id, \
-			krb5_authdata *a)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_data
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_data \
-			(krb5_context context, krb5_ccache id, \
-			krb5_data *data)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_int32
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_int32 \
-			(krb5_context context, krb5_ccache id, \
-			krb5_int32 i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_keyblock
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_keyblock \
-			(krb5_context context, krb5_ccache id, \
-			krb5_keyblock *keyblock)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_octet
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_octet \
-			(krb5_context context, krb5_ccache id, \
-			krb5_int32 i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_principal
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_principal \
-			(krb5_context context, krb5_ccache id, \
-			krb5_principal princ)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_times
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_times \
-			(krb5_context context, krb5_ccache id, \
-			krb5_ticket_times *t)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_store_ui_2
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_store_ui_2 \
-			(krb5_context context, krb5_ccache id, \
-			krb5_int32 i)
-version		SUNWprivate_1.1
-end
-
-function	krb5_scc_write
-include		<krb5.h>, <scc-proto.h>
-declaration	krb5_error_code krb5_scc_write \
-			(krb5_context context, krb5_ccache id, \
-			krb5_pointer buf, int len)
-version		SUNWprivate_1.1
-end
 
 function	krb5_cc_copy_creds
 include		<krb5.h>
@@ -1007,9 +354,9 @@ declaration	krb5_error_code krb5_cc_resolve \
 version		SUNWprivate_1.1
 end
 
-function	krb5_cc_retrieve_cred_default
+function	krb5_cc_retrieve_cred
 include		<krb5.h>
-declaration	krb5_error_code krb5_cc_retrieve_cred_default \
+declaration	krb5_error_code krb5_cc_retrieve_cred \
 			(krb5_context context, krb5_ccache id, \
 			krb5_flags flags, krb5_creds *mcreds, \
 			krb5_creds *creds)
@@ -1020,11 +367,6 @@ function	krb5_cc_set_default_name
 include		<krb5.h>
 declaration	krb5_error_code krb5_cc_set_default_name ( \
 			krb5_context context, const char *name)
-version		SUNWprivate_1.1
-end
-
-data		krb5_cc_stdio_ops
-declaration	krb5_cc_ops krb5_cc_stdio_ops
 version		SUNWprivate_1.1
 end
 
@@ -1040,3 +382,86 @@ declaration	unsigned int krb5_get_notification_message (void)
 version		SUNWprivate_1.1
 end
 
+function	krb5_cc_initialize
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_initialize \
+			(krb5_context context, krb5_ccache cache, \
+                       	krb5_principal principal)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_get_principal
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_get_principal \
+			(krb5_context context, krb5_ccache cache, \
+                       	krb5_principal *principal)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_close
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_close \
+			(krb5_context context, krb5_ccache cache)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_destroy
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_destroy \
+			(krb5_context context, krb5_ccache cache)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_end_seq_get
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_end_seq_get \
+			(krb5_context context, krb5_ccache cache, \
+			krb5_cc_cursor *cursor)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_get_name
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_get_name \
+			(krb5_context context, krb5_ccache cache)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_get_type
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_get_type \
+			(krb5_context context, krb5_ccache cache)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_next_cred
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_next_cred \
+			(krb5_context context, krb5_ccache cache, \
+			krb5_cc_cursor *cursor, krb5_creds *creds)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_set_flags
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_destroy \
+			(krb5_context context, krb5_ccache cache, \
+			krb5_flags flags)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_start_seq_get
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_start_seq_get \
+			(krb5_context context, krb5_ccache cache, \
+			krb5_cc_cursor *cursor)
+version		SUNWprivate_1.1
+end
+
+function	krb5_cc_store_cred
+include		<krb5.h>
+declaration	krb5_error_code  krb5_cc_store_cred \
+			(krb5_context context, krb5_ccache cache, \
+			krb5_creds *creds)
+version		SUNWprivate_1.1
+end

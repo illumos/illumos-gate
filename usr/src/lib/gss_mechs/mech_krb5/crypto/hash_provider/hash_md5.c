@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,18 +34,6 @@
 #include <k5-int.h>
 #include <hash_provider.h>
 
-static void
-k5_md5_hash_size(size_t *output)
-{
-    *output = MD5_CKSUM_LENGTH;
-}
-
-static void
-k5_md5_block_size(size_t *output)
-{
-    *output = MD5_BLOCKSIZE;
-}
-
 static krb5_error_code
 k5_md5_hash(krb5_context context,
 	unsigned int icount, krb5_const krb5_data *input,
@@ -61,7 +49,7 @@ k5_md5_hash(krb5_context context,
 }
 
 const struct krb5_hash_provider krb5int_hash_md5 = {
-    k5_md5_hash_size,
-    k5_md5_block_size,
+    MD5_CKSUM_LENGTH,
+    MD5_BLOCKSIZE,
     k5_md5_hash
 };

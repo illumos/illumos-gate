@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,11 +40,8 @@
  * Copy credentials, allocating fresh storage where needed.
  */
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_copy_creds(context, incred, outcred)
-    krb5_context context;
-    const krb5_creds *incred;
-    krb5_creds **outcred;
+krb5_error_code KRB5_CALLCONV
+krb5_copy_creds(krb5_context context, const krb5_creds *incred, krb5_creds **outcred)
 {
     krb5_creds *tempcred;
     krb5_error_code retval;

@@ -883,7 +883,7 @@ krb5_error_code encode_krb5_setpw_req(const krb5_principal target,
 
   krb5_addfield(target,2,asn1_encode_realm);
   krb5_addfield(target,1,asn1_encode_principal_name);
-  krb5_addlenfield(strlen(password), (const uchar_t *)password,0,asn1_encode_octetstring);
+  krb5_addlenfield(strlen(password), (const unsigned char *)password,0,asn1_encode_octetstring);
   krb5_makeseq();
 
 

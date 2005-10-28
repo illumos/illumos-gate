@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,7 +57,7 @@
 
 #include <gssapiP_krb5.h>
 #include <gssapiP_generic.h>
-#include <krb5.h>
+#include <k5-int.h>
 #ifdef HAVE_STRING_H
 #include <string.h>
 #else
@@ -192,7 +192,8 @@ krb5_gss_add_cred(ct, minor_status, input_cred_handle,
 	/* make a copy */
 	krb5_gss_cred_id_t new_cred;
 	char *kttype, ktboth[1024];
-	char *cctype, *ccname, ccboth[1024];
+	const char *cctype, *ccname;
+	char ccboth[1024];
 
 	if ((new_cred =
 	     (krb5_gss_cred_id_t) xmalloc(sizeof(krb5_gss_cred_id_rec)))

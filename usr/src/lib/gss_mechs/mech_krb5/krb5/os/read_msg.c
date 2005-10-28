@@ -29,15 +29,8 @@
 #include "k5-int.h"
 #include <errno.h>
 
-#ifndef ECONNABORTED
-#define ECONNABORTED WSAECONNABORTED
-#endif
-
 krb5_error_code
-krb5_read_message(context, fdp, inbuf)
-    krb5_context context;
-	krb5_pointer fdp;
-	krb5_data	*inbuf;
+krb5_read_message(krb5_context context, krb5_pointer fdp, krb5_data *inbuf)
 {
 	krb5_int32	len;
    int      len2, ilen;

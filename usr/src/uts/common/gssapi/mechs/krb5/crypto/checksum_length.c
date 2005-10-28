@@ -29,11 +29,9 @@
 #include <cksumtypes.h>
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_c_checksum_length(context, cksumtype, length)
-     krb5_context context;
-     krb5_cksumtype cksumtype;
-     size_t *length;
+krb5_error_code KRB5_CALLCONV
+krb5_c_checksum_length(krb5_context context, krb5_cksumtype cksumtype,
+		    size_t *length)
 {
     int i;
 
@@ -46,11 +44,11 @@ krb5_c_checksum_length(context, cksumtype, length)
 	return(KRB5_BAD_ENCTYPE);
 
     if (krb5_cksumtypes_list[i].keyhash)
-	(*(krb5_cksumtypes_list[i].keyhash->hash_size))(length);
-    else if (krb5_cksumtypes_list[i].trunc_size)
-	*length = krb5_cksumtypes_list[i].trunc_size;
+        *length = krb5_cksumtypes_list[i].keyhash->hashsize;
+    else if (krb5_cksumtypes_list[i].trunc_size) 
+        *length = krb5_cksumtypes_list[i].trunc_size; 
     else
-	(*(krb5_cksumtypes_list[i].hash->hash_size))(length);
+        *length = krb5_cksumtypes_list[i].hash->hashsize;
 
     return(0);
 }

@@ -22,10 +22,7 @@ Local stuff:
 */
 
 krb5_error_code
-krb5_auth_to_rep(context, auth, rep)
-    krb5_context context;
-    krb5_tkt_authent *auth;
-    krb5_donot_replay *rep;
+krb5_auth_to_rep(krb5_context context, krb5_tkt_authent *auth, krb5_donot_replay *rep)
 {
  krb5_error_code retval;
  rep->cusec = auth->authenticator->cusec;

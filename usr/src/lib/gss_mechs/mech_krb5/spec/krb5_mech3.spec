@@ -230,11 +230,6 @@ declaration	krb5_error_code krb5_principal2salt \
 version		SUNWprivate_1.1
 end
 
-# spec2trace RFE
-function	krb5_principal2salt_internal
-version		SUNWprivate_1.1
-end
-
 function	krb5_principal2salt_norealm
 include		<krb5.h>
 declaration	krb5_error_code krb5_principal2salt_norealm \

@@ -1,8 +1,3 @@
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/os-proto.h
@@ -36,42 +31,52 @@
 #ifndef KRB5_LIBOS_INT_PROTO__
 #define KRB5_LIBOS_INT_PROTO__
 
-#ifdef SOCK_DGRAM			/* XXX hack... */
+struct addrlist;
 krb5_error_code krb5_locate_kdc
-    PROTOTYPE((krb5_context,
-	       const krb5_data *,
-	       struct addrlist *,
-	       int ,
-	       int ,
-	       int));
+    (krb5_context, const krb5_data *, struct addrlist *, int, int, int);
 
-krb5_error_code krb5_get_servername
-    PROTOTYPE((krb5_context,
-		const krb5_data *,
-		const char *, const char *,
-	    	char *,
-		unsigned short *));
-#endif
+/* Solaris/SUNW14resync */
+krb5_error_code krb5_get_servername 
+	(krb5_context,
+	const krb5_data *,
+	const char *, const char *,
+	char *,
+	unsigned short *);
+
 
 #ifdef HAVE_NETINET_IN_H
 krb5_error_code krb5_unpack_full_ipaddr
-    PROTOTYPE((krb5_context,
+	      (krb5_context,
 	       const krb5_address *,
 	       krb5_int32 *,
-	       krb5_int16 *));
+	       krb5_int16 *);
 
 krb5_error_code krb5_make_full_ipaddr
-    PROTOTYPE((krb5_context,
+              (krb5_context,
 	       krb5_int32,
 	       int,			/* unsigned short promotes to signed
 					   int */
-	       krb5_address **));
+	       krb5_address **);
 
 #endif /* HAVE_NETINET_IN_H */
 
 krb5_error_code krb5_try_realm_txt_rr(const char *, const char *, 
 				      char **realm);
 
+/* Obsolete interface - leave prototype here until code removed */
+krb5_error_code krb5_secure_config_files(krb5_context ctx);
+
+int _krb5_use_dns_realm (krb5_context);
+int _krb5_use_dns_kdc (krb5_context);
+int _krb5_conf_boolean (const char *);
+
+#include "k5-thread.h"
+extern k5_mutex_t krb5int_us_time_mutex;
+
+extern unsigned int krb5_max_skdc_timeout;
+extern unsigned int krb5_skdc_timeout_shift;
+extern unsigned int krb5_skdc_timeout_1;
 extern unsigned int krb5_max_dgram_size;
+
 
 #endif /* KRB5_LIBOS_INT_PROTO__ */

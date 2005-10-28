@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,11 +43,8 @@ extern char *krb5_defkeyname;
 /* this is a an exceedinly gross thing. */
 char *krb5_overridekeyname = NULL;
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_kt_default_name(context, name, namesize)
-    krb5_context context;
-    char FAR *name;
-    int namesize;
+krb5_error_code KRB5_CALLCONV
+krb5_kt_default_name(krb5_context context, char *name, int namesize)
 {
     char *cp = 0;
     char *retval;
@@ -71,7 +68,7 @@ krb5_kt_default_name(context, name, namesize)
 	strncpy(name, retval, namesize);
 	profile_release_string(retval);
     } else {
-#if defined (_MSDOS) || defined(_WIN32)
+#if defined(_WIN32)
 	{
 	    char    defname[160];
 	    int     len;

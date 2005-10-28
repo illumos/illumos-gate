@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,7 +132,7 @@ char *argv[];
 	}
     }
 
-    if (!valid_enctype(global_params.enctype)) {
+    if (!krb5_c_valid_enctype(global_params.enctype)) {
 	char tmp[32];
 
 	if (krb5_enctype_to_string(global_params.enctype,

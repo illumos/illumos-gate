@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,8 +134,8 @@ krb5_hmac(krb5_context context,
 	return(EINVAL);
     }
 
-    (*(hash->hash_size))(&hashsize);
-    (*(hash->block_size))(&blocksize);
+    hashsize = hash->hashsize;
+    blocksize = hash->blocksize;
 
     if (key->length > blocksize)
 	return(KRB5_CRYPTO_INTERNAL);

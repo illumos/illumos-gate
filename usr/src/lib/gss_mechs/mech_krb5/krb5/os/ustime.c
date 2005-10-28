@@ -34,11 +34,8 @@
 
 #include <k5-int.h>
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_us_timeofday(context, seconds, microseconds)
-    krb5_context context;
-    krb5_int32 FAR *seconds;
-    krb5_int32 FAR *microseconds;
+krb5_error_code KRB5_CALLCONV
+krb5_us_timeofday(krb5_context context, krb5_int32 *seconds, krb5_int32 *microseconds)
 {
     krb5_os_context os_ctx = context->os_context;
     krb5_int32 sec, usec;

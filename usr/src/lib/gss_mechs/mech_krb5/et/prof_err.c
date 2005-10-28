@@ -1,5 +1,5 @@
 /*
- * Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,6 +94,15 @@ switch (errorno) {
 	case 27:
 		return(dgettext(TEXT_DOMAIN,
 			"Section already exists"));
+	case 28:
+		return(dgettext(TEXT_DOMAIN,
+			"Invalid boolean value"));
+	case 29:
+		return(dgettext(TEXT_DOMAIN,
+			"Invalid integer value"));
+	case 30:
+		return(dgettext(TEXT_DOMAIN,
+			"Bad magic value in profile_file_data_t"));
 	default:
 		return("unknown error");
 	}

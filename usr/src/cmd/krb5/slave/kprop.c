@@ -356,6 +356,11 @@ void get_tickets(context)
 	}
 }
 
+/* SUNW14resync - SOCKET is defed in 1.4 in port-sockets.h */
+#ifdef SOCKET
+#undef SOCKET
+#endif
+
 krb5_error_code
 open_connection(host, fd, Errmsg, ErrmsgSz)
 	char	*host;

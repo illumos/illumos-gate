@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,11 +36,8 @@
 
 #include <k5-int.h>
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_copy_authenticator(context, authfrom, authto)
-    krb5_context context;
-    const krb5_authenticator FAR *authfrom;
-    krb5_authenticator FAR *FAR *authto;
+krb5_error_code KRB5_CALLCONV
+krb5_copy_authenticator(krb5_context context, const krb5_authenticator *authfrom, krb5_authenticator **authto)
 {
     krb5_error_code retval;
     krb5_authenticator *tempto;

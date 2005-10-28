@@ -29,11 +29,9 @@
 #include <etypes.h>
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_c_block_size(context, enctype, blocksize)
-     krb5_context context;
-     krb5_enctype enctype;
-     size_t *blocksize;
+krb5_error_code KRB5_CALLCONV
+krb5_c_block_size(krb5_context context, krb5_enctype enctype,
+		size_t *blocksize)
 {
     int i;
 
@@ -45,7 +43,7 @@ krb5_c_block_size(context, enctype, blocksize)
     if (i == krb5_enctypes_length)
 	return(KRB5_BAD_ENCTYPE);
 
-    (*(krb5_enctypes_list[i].enc->block_size))(blocksize);
+    *blocksize = krb5_enctypes_list[i].enc->block_size;
 
     return(0);
 }

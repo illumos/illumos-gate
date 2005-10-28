@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
  * ser_rcdfl.c - Serialize replay cache context.
  */
 #include <k5-int.h>
+#include "rc-int.h"
 
 /*
  * Routines to deal with externalizing krb5_rcache.
@@ -44,11 +45,11 @@
  *	krb5_rcache_internalize();
  */
 static krb5_error_code krb5_rcache_size
-	KRB5_PROTOTYPE((krb5_context, krb5_pointer, size_t *));
+	(krb5_context, krb5_pointer, size_t *);
 static krb5_error_code krb5_rcache_externalize
-	KRB5_PROTOTYPE((krb5_context, krb5_pointer, krb5_octet **, size_t *));
+	(krb5_context, krb5_pointer, krb5_octet **, size_t *);
 static krb5_error_code krb5_rcache_internalize
-	KRB5_PROTOTYPE((krb5_context,krb5_pointer *, krb5_octet **, size_t *));
+	(krb5_context,krb5_pointer *, krb5_octet **, size_t *);
 
 /*
  * Serialization entry for this type.
@@ -65,10 +66,7 @@ static const krb5_ser_entry krb5_rcache_ser_entry = {
  *				  this krb5_rcache variant.
  */
 static krb5_error_code
-krb5_rcache_size(kcontext, arg, sizep)
-    krb5_context	kcontext;
-    krb5_pointer	arg;
-    size_t		*sizep;
+krb5_rcache_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
 {
     krb5_error_code	kret;
     krb5_rcache		rcache;
@@ -102,11 +100,7 @@ krb5_rcache_size(kcontext, arg, sizep)
  * krb5_rcache_externalize()	- Externalize the krb5_rcache.
  */
 static krb5_error_code
-krb5_rcache_externalize(kcontext, arg, buffer, lenremain)
-    krb5_context	kcontext;
-    krb5_pointer	arg;
-    krb5_octet		**buffer;
-    size_t		*lenremain;
+krb5_rcache_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **buffer, size_t *lenremain)
 {
     krb5_error_code	kret;
     krb5_rcache		rcache;
@@ -166,11 +160,7 @@ krb5_rcache_externalize(kcontext, arg, buffer, lenremain)
  * krb5_rcache_internalize()	- Internalize the krb5_rcache.
  */
 static krb5_error_code
-krb5_rcache_internalize(kcontext, argp, buffer, lenremain)
-    krb5_context	kcontext;
-    krb5_pointer	*argp;
-    krb5_octet		**buffer;
-    size_t		*lenremain;
+krb5_rcache_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet **buffer, size_t *lenremain)
 {
     krb5_error_code	kret;
     krb5_rcache		rcache;
@@ -219,9 +209,8 @@ krb5_rcache_internalize(kcontext, argp, buffer, lenremain)
 /*
  * Register the rcache serializer.
  */
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_ser_rcache_init(kcontext)
-    krb5_context	kcontext;
+krb5_error_code KRB5_CALLCONV
+krb5_ser_rcache_init(krb5_context kcontext)
 {
     return(krb5_register_serializer(kcontext, &krb5_rcache_ser_entry));
 }

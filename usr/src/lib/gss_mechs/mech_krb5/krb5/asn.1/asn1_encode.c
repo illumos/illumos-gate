@@ -232,38 +232,53 @@ asn1_error_code asn1_encode_generaltime(asn1buf *buf, time_t val,
 					unsigned int *retlen)
 {
   asn1_error_code retval;
-  struct tm *gtime;
-  char s[16];
+  struct tm *gtime, gtimebuf;
+  char s[16], *sp;
   unsigned int length, sum=0;
   time_t gmt_time = val;
 
-  gtime = gmtime(&gmt_time);
-
   /*
    * Time encoding: YYYYMMDDhhmmssZ
-   *
-   * Sanity check this just to be paranoid, as gmtime can return NULL,
-   * and some bogus implementations might overrun on the sprintf.
    */
-  if (gtime == NULL ||
-      gtime->tm_year > 8099 || gtime->tm_mon > 11 ||
-      gtime->tm_mday > 31 || gtime->tm_hour > 23 ||
-      gtime->tm_min > 59 || gtime->tm_sec > 59)
-    return ASN1_BAD_GMTIME;
-  sprintf(s, "%04d%02d%02d%02d%02d%02dZ",
-	  1900+gtime->tm_year, gtime->tm_mon+1, gtime->tm_mday,
-	  gtime->tm_hour, gtime->tm_min, gtime->tm_sec);
+  if (gmt_time == 0) {
+	sp = "19700101000000Z";
+  } else { 
+	
+	/*
+        * Sanity check this just to be paranoid, as gmtime can return NULL,
+        * and some bogus implementations might overrun on the sprintf.
+        */
+#ifdef HAVE_GMTIME_R
+	if (gmtime_r(&gmt_time, &gtimebuf) == NULL)
+		return ASN1_BAD_GMTIME;
+#else
+	gtime = gmtime(&gmt_time);
+	if (gtime == NULL)
+		return ASN1_BAD_GMTIME;
+	memcpy(&gtimebuf, gtime, sizeof(gtimebuf));
+#endif
+	gtime = &gtimebuf;
+	
+	if (gtime->tm_year > 8099 || gtime->tm_mon > 11 ||
+	    gtime->tm_mday > 31 || gtime->tm_hour > 23 ||
+	    gtime->tm_min > 59 || gtime->tm_sec > 59)
+		return ASN1_BAD_GMTIME;
+	sprintf(s, "%04d%02d%02d%02d%02d%02dZ",
+		1900+gtime->tm_year, gtime->tm_mon+1, gtime->tm_mday,
+		gtime->tm_hour, gtime->tm_min, gtime->tm_sec);
+	sp = s;
+ }
 
-  retval = asn1buf_insert_charstring(buf,15,s);
+  retval = asn1buf_insert_charstring(buf,15,sp);
   if(retval) return retval;
   sum = 15;
 
-  retval = asn1_make_tag(buf,UNIVERSAL,PRIMITIVE,ASN1_GENERALTIME,sum,&length);
-  if(retval) return retval;
-  sum += length;
-
-  *retlen = sum;
-  return 0;
+   retval = asn1_make_tag(buf,UNIVERSAL,PRIMITIVE,ASN1_GENERALTIME,sum,&length);
+   if(retval) return retval;
+   sum += length;
+   
+   *retlen = sum;
+   return 0;
 }
 
 asn1_error_code asn1_encode_generalstring(asn1buf *buf, unsigned int len,

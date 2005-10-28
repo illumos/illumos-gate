@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,8 +35,8 @@
 int
 mit_des3_cbc_encrypt(context, in, out, length, key, ivec, encrypt)
 	krb5_context context;
-	const mit_des_cblock FAR *in;
-	mit_des_cblock FAR *out;
+	const mit_des_cblock *in;
+	mit_des_cblock *out;
 	long length;
 	krb5_keyblock *key;
 	mit_des_cblock ivec;
@@ -116,8 +116,8 @@ final_cleanup:
 /* ARGSUSED */
 int
 mit_des3_cbc_encrypt(krb5_context context,
-	const mit_des_cblock FAR *in,
-	mit_des_cblock FAR *out,
+	const mit_des_cblock *in,
+	mit_des_cblock *out,
         long length, krb5_keyblock *key,
         mit_des_cblock ivec, int encrypt)
 {

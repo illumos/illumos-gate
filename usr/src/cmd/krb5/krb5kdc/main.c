@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,20 +53,20 @@
 #include <netinet/in.h>
 #endif
 
-kdc_realm_t *find_realm_data PROTOTYPE((char *, krb5_ui_4));
+kdc_realm_t *find_realm_data (char *, krb5_ui_4);
 
-void usage PROTOTYPE((char *));
+void usage (char *);
 
-krb5_sigtype request_exit PROTOTYPE((int));
-krb5_sigtype request_hup  PROTOTYPE((int));
+krb5_sigtype request_exit (int);
+krb5_sigtype request_hup  (int);
 
-void setup_signal_handlers PROTOTYPE((void));
+void setup_signal_handlers (void);
 
-krb5_error_code setup_sam PROTOTYPE((void));
+krb5_error_code setup_sam (void);
 
-void initialize_realms PROTOTYPE((krb5_context, int, char **));
+void initialize_realms (krb5_context, int, char **);
 
-void finish_realms PROTOTYPE((char *));
+void finish_realms (char *);
 
 static int nofork = 0;
 static int rkey_init_done = 0;

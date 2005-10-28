@@ -51,40 +51,40 @@ typedef struct _krb5_kt_list {
 } *krb5_kt_list;
 
 krb5_error_code ktutil_free_kt_list
-KRB5_PROTOTYPE((krb5_context,
-	krb5_kt_list));
+(krb5_context,
+	krb5_kt_list);
 
 krb5_error_code ktutil_delete
-KRB5_PROTOTYPE((krb5_context,
+(krb5_context,
 	krb5_kt_list *,
-	int));
+	int);
 
 krb5_error_code ktutil_add
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 			krb5_kt_list *,
 			char *,
 			krb5_kvno,
 			char *,
-			int));
+			int);
 
 krb5_error_code ktutil_read_keytab
-KRB5_PROTOTYPE((krb5_context,
+(krb5_context,
 	char *,
-	krb5_kt_list *));
+	krb5_kt_list *);
 
 krb5_error_code ktutil_write_keytab
-KRB5_PROTOTYPE((krb5_context,
+(krb5_context,
 	krb5_kt_list,
-	char *));
+	char *);
 
 #ifdef KRB5_KRB4_COMPAT
 krb5_error_code ktutil_read_srvtab
-KRB5_PROTOTYPE((krb5_context,
+(krb5_context,
 	char *,
-	krb5_kt_list *));
+	krb5_kt_list *);
 krb5_error_code ktutil_write_srvtab
-KRB5_PROTOTYPE((krb5_context,
+(krb5_context,
 	krb5_kt_list,
-	char *));
+	char *);
 
 #endif

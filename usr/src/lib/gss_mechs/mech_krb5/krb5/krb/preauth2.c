@@ -1,12 +1,12 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Copyright 1995 by the Massachusetts Institute of Technology.  All
+ * Copyright 1995, 2003 by the Massachusetts Institute of Technology.  All
  * Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -118,19 +118,19 @@ krb5_error_code pa_enc_timestamp(krb5_context context,
 		 *etype, request->ktype[0]);
 	}
 #endif
-       if (ret = ((*gak_fct)(context, request->client,
+       if ((ret = ((*gak_fct)(context, request->client,
 			     *etype ? *etype : request->ktype[0],
 			     prompter, prompter_data,
-			     salt, s2kparams, as_key, gak_data)))
+			     salt, s2kparams, as_key, gak_data))))
            return(ret);
     }
 
     /* now get the time of day, and encrypt it accordingly */
 
-    if (ret = krb5_us_timeofday(context, &pa_enc.patimestamp, &pa_enc.pausec))
+    if ((ret = krb5_us_timeofday(context, &pa_enc.patimestamp, &pa_enc.pausec)))
 	return(ret);
 
-    if (ret = encode_krb5_pa_enc_ts(&pa_enc, &tmp))
+    if ((ret = encode_krb5_pa_enc_ts(&pa_enc, &tmp)))
 	return(ret);
 
 #ifdef DEBUG
@@ -266,7 +266,7 @@ krb5_error_code pa_sam(krb5_context context,
 
     tmpsam.length = in_padata->length;
     tmpsam.data = (char *) in_padata->contents;
-    if (ret = decode_krb5_sam_challenge(&tmpsam, &sam_challenge))
+    if ((ret = decode_krb5_sam_challenge(&tmpsam, &sam_challenge)))
 	return(ret);
 
     if (sam_challenge->sam_flags & KRB5_SAM_MUST_PK_ENCRYPT_SAD) {
@@ -312,14 +312,14 @@ krb5_error_code pa_sam(krb5_context context,
     response_data.length = sizeof(response);
 
     kprompt.prompt = prompt;
-    kprompt.hidden = sam_challenge->sam_challenge.length?0:1;
+    kprompt.hidden = 1;
     kprompt.reply = &response_data;
     prompt_type = KRB5_PROMPT_TYPE_PREAUTH;
 
     /* PROMPTER_INVOCATION */
     krb5int_set_prompt_types(context, &prompt_type);
-    if (ret = ((*prompter)(context, prompter_data, name,
-			   banner, 1, &kprompt))) {
+    if ((ret = ((*prompter)(context, prompter_data, name,
+			   banner, 1, &kprompt)))) {
 	krb5_xfree(sam_challenge);
 	krb5int_set_prompt_types(context, 0);
 	return(ret);
@@ -328,9 +328,9 @@ krb5_error_code pa_sam(krb5_context context,
 
     enc_sam_response_enc.sam_nonce = sam_challenge->sam_nonce;
     if (sam_challenge->sam_nonce == 0) {
-	if (ret = krb5_us_timeofday(context, 
+	if ((ret = krb5_us_timeofday(context, 
 				&enc_sam_response_enc.sam_timestamp,
-				&enc_sam_response_enc.sam_usec)) {
+				&enc_sam_response_enc.sam_usec))) {
 		krb5_xfree(sam_challenge);
 		return(ret);
 	}
@@ -354,8 +354,8 @@ krb5_error_code pa_sam(krb5_context context,
 	/* generate a salt using the requested principal */
 
 	if ((salt->length == -1) && (salt->data == NULL)) {
-	    if (ret = krb5_principal2salt(context, request->client,
-					  &defsalt)) {
+	    if ((ret = krb5_principal2salt(context, request->client,
+					  &defsalt))) {
 		krb5_xfree(sam_challenge);
 		return(ret);
 	    }
@@ -439,8 +439,8 @@ krb5_error_code pa_sam(krb5_context context,
     krb5_xfree(sam_challenge);
 
     /* encode the encoded part of the response */
-    if (ret = encode_krb5_enc_sam_response_enc(&enc_sam_response_enc,
-					       &scratch))
+    if ((ret = encode_krb5_enc_sam_response_enc(&enc_sam_response_enc,
+					       &scratch)))
 	return(ret);
 
     /*
@@ -484,7 +484,7 @@ krb5_error_code pa_sam(krb5_context context,
     if ((pa = malloc(sizeof(krb5_pa_data))) == NULL)
 	return(ENOMEM);
 
-    if (ret = encode_krb5_sam_response(&sam_response, &scratch)) {
+    if ((ret = encode_krb5_sam_response(&sam_response, &scratch))) {
 	free(pa);
 	return(ret);
     }
@@ -1011,11 +1011,11 @@ krb5_do_preauth(krb5_context context,
 		    (pa_types[j].flags & paorder[h])) {
 		    out_pa = NULL;
 
-		    if (ret = ((*pa_types[j].fct)(context, request,
+		    if ((ret = ((*pa_types[j].fct)(context, request,
 					in_padata[i], &out_pa,
 					salt, s2kparams, etype, as_key,
 					prompter, prompter_data,
-					gak_fct, gak_data))) {
+					gak_fct, gak_data)))) {
 			goto cleanup;
 		    }
 

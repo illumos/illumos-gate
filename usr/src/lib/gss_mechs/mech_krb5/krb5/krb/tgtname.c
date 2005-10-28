@@ -26,14 +26,12 @@
  */
 
 #include "k5-int.h"
+#include "int-proto.h"
 
 /* This is an internal-only function, used by krb5_get_cred_from_kdc() */
 
 krb5_error_code
-krb5_tgtname(context, server, client, tgtprinc)
-    krb5_context context;
-    const krb5_data *server, *client;
-    krb5_principal *tgtprinc;
+krb5_tgtname(krb5_context context, const krb5_data *server, const krb5_data *client, krb5_principal *tgtprinc)
 {
     return krb5_build_principal_ext(context, tgtprinc, client->length, client->data,
 				    KRB5_TGS_NAME_SIZE, KRB5_TGS_NAME, 

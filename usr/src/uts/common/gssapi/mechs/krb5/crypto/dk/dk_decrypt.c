@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,7 +90,7 @@ krb5_dk_decrypt_maybe_trunc_hmac(
      size_t hmacsize)
 {
     krb5_error_code ret;
-    size_t hashsize, blocksize, keybytes, keylength, enclen, plainlen;
+    size_t hashsize, blocksize, enclen, plainlen;
     unsigned char *plaindata = NULL, *cksum = NULL, *cn;
     krb5_data d1, d2;
     krb5_keyblock *derived_encr_key = NULL;
@@ -111,9 +111,8 @@ krb5_dk_decrypt_maybe_trunc_hmac(
     if (ret)
 	    return (ret);
 
-    (*(hash->hash_size))(&hashsize);
-    (*(enc->block_size))(&blocksize);
-    (*(enc->keysize))(&keybytes, &keylength);
+    hashsize = hash->hashsize;
+    blocksize = enc->block_size;
 
     if (hmacsize == 0)
 	hmacsize = hashsize;

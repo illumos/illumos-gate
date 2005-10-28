@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,11 @@
  * Return default cred. cache name.
  */
 
+/*
+ * SUNW14resync - because of changes specific to Solaris, future
+ * resyncs should leave this file "as is" if possible.
+ */
+
 #include <k5-int.h>
 #include <stdio.h>
 
@@ -42,7 +47,9 @@
  */
 #include <dirent.h>
 
-static krb5_error_code get_from_os(char *name_buf, int name_size)
+static krb5_error_code get_from_os(
+	char *name_buf,
+	int name_size)
 {
 	krb5_error_code retval;
 
@@ -55,10 +62,10 @@ static krb5_error_code get_from_os(char *name_buf, int name_size)
 }
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_cc_set_default_name(context, name)
-	krb5_context context;
-	const char *name;
+krb5_error_code KRB5_CALLCONV
+krb5_cc_set_default_name(
+	krb5_context context,
+	const char *name)
 {
 	char name_buf[MAXNAMLEN];
 	char *new_name = getenv(KRB5_ENV_CCNAME);
@@ -103,14 +110,6 @@ krb5_cc_set_default_name(context, name)
 		return ENOMEM;
 	strcpy(new_name, name);
 
-	if (!os_ctx->default_ccname
-	    || (strcmp(os_ctx->default_ccname, new_name) != 0)) {
-		/* the ccache changed... forget the old principal */
-		if (os_ctx->default_ccprincipal)
-			krb5_free_principal (context, os_ctx->default_ccprincipal);
-		os_ctx->default_ccprincipal = 0;  /* we don't care until we use it */
-	}
-	
 	if (os_ctx->default_ccname)
 		free(os_ctx->default_ccname);
 
@@ -119,9 +118,8 @@ krb5_cc_set_default_name(context, name)
 }
 
 	
-KRB5_DLLIMP const char FAR * KRB5_CALLCONV
-krb5_cc_default_name(context)
-    krb5_context context;
+const char * KRB5_CALLCONV
+krb5_cc_default_name(krb5_context context)
 {
 	krb5_os_context os_ctx;
 

@@ -242,7 +242,7 @@ error_out:
       free_field(*rep,checksum);
       free_field(*rep,client);
       free(*rep);
-      *rep = NULL; /* Solaris: prevent double free's and bogus derefs */
+      *rep = NULL;
   }
   return retval;
 }
@@ -278,7 +278,7 @@ error_out:
   if (rep && *rep) {
       free_field(*rep,server);
       free(*rep);
-      *rep = NULL; /* Solaris: prevent double free's and bogus derefs */
+      *rep = NULL;
   }
   return retval;
 }
@@ -331,7 +331,7 @@ error_out:
       free_field(*rep,session);
       free_field(*rep,client);
       free(*rep);
-      *rep = NULL; /* Solaris: prevent double free's and bogus derefs */
+      *rep = NULL;
   }
   return retval;
 }
@@ -415,7 +415,7 @@ error_out:
   if (rep && *rep) {
       free_field(*rep,ticket);
       free(*rep);
-      *rep = NULL; /* Solaris: prevent double free's and bogus derefs */
+      *rep = NULL;
   }
   return retval;
 }
@@ -464,7 +464,7 @@ error_out:
   if (rep && *rep) {
       free_field(*rep,subkey);
       free(*rep);
-      *rep = NULL; /* Solaris: prevent double free's and bogus derefs */
+      *rep = NULL;
   }
   return retval;
 }
@@ -570,7 +570,7 @@ error_out:
   if (rep && *rep) {
       free_field(*rep,checksum);
       free(*rep);
-      *rep = NULL; /* Solaris: prevent double free's and bogus derefs */
+      *rep = NULL;
   }
   return retval;
 }
@@ -629,7 +629,7 @@ error_out:
       free_field(*rep,r_address);
       free_field(*rep,s_address);
       free(*rep);
-      *rep = NULL; /* Solaris: prevent double free's and bogus derefs */
+      *rep = NULL;
   }
   return retval;
 }
@@ -684,7 +684,7 @@ error_out:
       free_field(*rep,r_address);
       free_field(*rep,s_address);
       free(*rep);
-      *rep = NULL; /* Solaris: prevent double free's and bogus derefs */
+      *rep = NULL;
   }
   return retval;
 }
@@ -730,7 +730,7 @@ error_out:
       free_field(*rep,server);
       free_field(*rep,client);
       free(*rep);
-      *rep = NULL; /* Solaris: prevent double free's and bogus derefs */
+      *rep = NULL;
   }
   return retval;
 }

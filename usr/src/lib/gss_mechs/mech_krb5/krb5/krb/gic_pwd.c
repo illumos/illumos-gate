@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,15 +92,16 @@ krb5_get_as_key_password(
 
 	/* PROMPTER_INVOCATION */
 	krb5int_set_prompt_types(context, &prompt_type);
-	if (ret = (((*prompter)(context, prompter_data, NULL, NULL,
-				1, &prompt)))) {
+	if ((ret = (((*prompter)(context, prompter_data, NULL, NULL,
+				1, &prompt))))) {
 	    krb5int_set_prompt_types(context, 0);
 	    return(ret);
 	}
 	krb5int_set_prompt_types(context, 0);
     }
 
-    if ((salt->length == -1) && (salt->data == NULL)) {
+    if ((salt->length == -1 || salt->length == SALT_TYPE_AFS_LENGTH) &&
+		(salt->data == NULL)) {
 	if ((ret = krb5_principal2salt(context, client, &defsalt)))
 	    return(ret);
 
@@ -171,7 +172,7 @@ krb5_get_init_creds_password(
    ret = krb5_get_init_creds(context, creds, client, prompter, data,
 			     start_time, in_tkt_service, options,
 			     krb5_get_as_key_password, (void *) &pw0,
-			     use_master, &as_reply);
+			     &use_master, &as_reply);
 
    /* check for success */
 
@@ -179,7 +180,7 @@ krb5_get_init_creds_password(
       goto cleanup;
 
    /* If all the kdc's are unavailable, or if the error was due to a
-      user interrupt, fail */
+      user interrupt, or preauth errored out, fail */
 
    if ((ret == KRB5_KDC_UNREACH) ||
        (ret == KRB5_PREAUTH_FAILED) ||
@@ -201,7 +202,7 @@ krb5_get_init_creds_password(
       ret2 = krb5_get_init_creds(context, creds, client, prompter, data,
 				 start_time, in_tkt_service, options,
 				 krb5_get_as_key_password, (void *) &pw0,
-				 use_master, &as_reply);
+				 &use_master, &as_reply);
 
       if (ret2 == 0) {
 	 ret = 0;
@@ -290,8 +291,8 @@ krb5_get_init_creds_password(
 
       /* PROMPTER_INVOCATION */
       krb5int_set_prompt_types(context, prompt_types);
-      if (ret = ((*prompter)(context, data, 0, banner,
-			     sizeof(prompt)/sizeof(prompt[0]), prompt)))
+      if ((ret = ((*prompter)(context, data, 0, banner,
+			     sizeof(prompt)/sizeof(prompt[0]), prompt))))
 	 goto cleanup;
       krb5int_set_prompt_types(context, 0);
 
@@ -337,7 +338,7 @@ krb5_get_init_creds_password(
    ret = krb5_get_init_creds(context, creds, client, prompter, data,
 			     start_time, in_tkt_service, options,
 			     krb5_get_as_key_password, (void *) &pw0,
-			     use_master, &as_reply);
+			     &use_master, &as_reply);
 
 cleanup:
    krb5int_set_prompt_types(context, 0);
@@ -425,3 +426,114 @@ cleanup:
    return(ret);
 }
 
+void krb5int_populate_gic_opt (
+    krb5_context context, krb5_get_init_creds_opt *opt,
+    krb5_flags options, krb5_address * const *addrs, krb5_enctype *ktypes,
+    krb5_preauthtype *pre_auth_types, krb5_creds *creds)
+{
+  int i;
+  krb5_int32 starttime;
+
+    krb5_get_init_creds_opt_init(opt);
+    if (addrs)
+      krb5_get_init_creds_opt_set_address_list(opt, (krb5_address **) addrs);
+    if (ktypes) {
+	for (i=0; ktypes[i]; i++);
+	if (i)
+	    krb5_get_init_creds_opt_set_etype_list(opt, ktypes, i);
+    }
+    if (pre_auth_types) {
+	for (i=0; pre_auth_types[i]; i++);
+	if (i)
+	    krb5_get_init_creds_opt_set_preauth_list(opt, pre_auth_types, i);
+    }
+    if (options&KDC_OPT_FORWARDABLE)
+	krb5_get_init_creds_opt_set_forwardable(opt, 1);
+    else krb5_get_init_creds_opt_set_forwardable(opt, 0);
+    if (options&KDC_OPT_PROXIABLE)
+	krb5_get_init_creds_opt_set_proxiable(opt, 1);
+    else krb5_get_init_creds_opt_set_proxiable(opt, 0);
+    if (creds && creds->times.endtime) {
+        krb5_timeofday(context, &starttime);
+        if (creds->times.starttime) starttime = creds->times.starttime;
+        krb5_get_init_creds_opt_set_tkt_life(opt, creds->times.endtime - starttime);
+    }
+}
+
+/*
+  Rewrites get_in_tkt in terms of newer get_init_creds API.
+ Attempts to get an initial ticket for creds->client to use server
+ creds->server, (realm is taken from creds->client), with options
+ options, and using creds->times.starttime, creds->times.endtime,
+ creds->times.renew_till as from, till, and rtime.  
+ creds->times.renew_till is ignored unless the RENEWABLE option is requested.
+
+ If addrs is non-NULL, it is used for the addresses requested.  If it is
+ null, the system standard addresses are used.
+
+ If password is non-NULL, it is converted using the cryptosystem entry
+ point for a string conversion routine, seeded with the client's name.
+ If password is passed as NULL, the password is read from the terminal,
+ and then converted into a key.
+
+ A succesful call will place the ticket in the credentials cache ccache.
+
+ returns system errors, encryption errors
+ */
+krb5_error_code KRB5_CALLCONV
+krb5_get_in_tkt_with_password(krb5_context context, krb5_flags options,
+			      krb5_address *const *addrs, krb5_enctype *ktypes,
+			      krb5_preauthtype *pre_auth_types,
+			      const char *password, krb5_ccache ccache,
+			      krb5_creds *creds, krb5_kdc_rep **ret_as_reply)
+{
+    krb5_error_code retval;
+    krb5_data pw0;
+    char pw0array[1024];
+    krb5_get_init_creds_opt opt;
+    char * server;
+    krb5_principal server_princ, client_princ;
+    int use_master = 0;
+
+    pw0array[0] = '\0';
+    pw0.data = pw0array;
+    if (password) {
+	pw0.length = strlen(password);
+	if (pw0.length > sizeof(pw0array))
+	    return EINVAL;
+	strncpy(pw0.data, password, sizeof(pw0array));
+	if (pw0.length == 0)
+	    pw0.length = sizeof(pw0array);
+    } else {
+	pw0.length = sizeof(pw0array);
+    }
+    krb5int_populate_gic_opt(context, &opt,
+			     options, addrs, ktypes,
+			     pre_auth_types, creds);
+    retval = krb5_unparse_name( context, creds->server, &server);
+    if (retval)
+      return (retval);
+    server_princ = creds->server;
+    client_princ = creds->client;
+        retval = krb5_get_init_creds (context,
+					   creds, creds->client,  
+					   krb5_prompter_posix,  NULL,
+					   0, server, &opt,
+				      krb5_get_as_key_password, &pw0,
+				      &use_master, ret_as_reply);
+	  krb5_free_unparsed_name( context, server);
+	if (retval) {
+	  return (retval);
+	}
+	if (creds->server)
+	    krb5_free_principal( context, creds->server);
+	if (creds->client)
+	    krb5_free_principal( context, creds->client);
+	creds->client = client_princ;
+	creds->server = server_princ;
+	/* store it in the ccache! */
+	if (ccache)
+	  if ((retval = krb5_cc_store_cred(context, ccache, creds)))
+	    return (retval);
+	return retval;
+}

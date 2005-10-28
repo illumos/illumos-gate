@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,35 +43,15 @@
 #include <stdio.h>
 #include <string.h>
 
-static char *sendauth_version = "KRB5_SENDAUTH_V1.0";
+static const char sendauth_version[] = "KRB5_SENDAUTH_V1.0";
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_sendauth(context, auth_context,
-	      /* IN */
-	      fd, appl_version, client, server, ap_req_options, in_data,
-	      in_creds,
-	      /* IN/OUT */
-	      ccache,
-	      /* OUT */
-	      error, rep_result, out_creds)
-    	krb5_context 		  context;
-    	krb5_auth_context       FAR * auth_context;
-	krb5_pointer		  fd;
-	char			FAR * appl_version;
-	krb5_principal		  client;
-	krb5_principal		  server;
-	krb5_flags		  ap_req_options;
-	krb5_data		FAR * in_data;
-	krb5_creds		FAR * in_creds;
-	krb5_ccache	  	  ccache;
-	krb5_error             FAR * FAR * error;
-	krb5_ap_rep_enc_part   FAR * FAR * rep_result;
-	krb5_creds	       FAR * FAR * out_creds;
+krb5_error_code KRB5_CALLCONV
+krb5_sendauth(krb5_context context, krb5_auth_context *auth_context, krb5_pointer fd, char *appl_version, krb5_principal client, krb5_principal server, krb5_flags ap_req_options, krb5_data *in_data, krb5_creds *in_creds, krb5_ccache ccache, krb5_error **error, krb5_ap_rep_enc_part **rep_result, krb5_creds **out_creds)
 {
 	krb5_octet		result;
 	krb5_creds 		creds;
-	krb5_creds		FAR * credsp = NULL;
-	krb5_creds		FAR * credspout = NULL;
+	krb5_creds		* credsp = NULL;
+	krb5_creds		* credspout = NULL;
 	krb5_error_code		retval = 0;
 	krb5_data		inbuf, outbuf;
 	int			len;
@@ -87,7 +67,7 @@ krb5_sendauth(context, auth_context,
 	 * by the string itself.
 	 */
 	outbuf.length = strlen(sendauth_version) + 1;
-	outbuf.data = sendauth_version;
+	outbuf.data = (char *) sendauth_version;
 	if ((retval = krb5_write_message(context, fd, &outbuf)))
 		return(retval);
 	outbuf.length = strlen(appl_version) + 1;
@@ -98,9 +78,6 @@ krb5_sendauth(context, auth_context,
 	 * Now, read back a byte: 0 means no error, 1 means bad sendauth
 	 * version, 2 means bad application version
 	 */
-#ifndef ECONNABORTED
-#define ECONNABORTED WSAECONNABORTED
-#endif
     if ((len = krb5_net_read(context, *((int *) fd), (char *)&result, 1)) != 1)
 	return((len < 0) ? errno : ECONNABORTED);
     if (result == 1)

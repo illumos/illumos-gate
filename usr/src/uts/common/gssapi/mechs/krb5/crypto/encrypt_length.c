@@ -29,12 +29,9 @@
 #include <etypes.h>
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_c_encrypt_length(context, enctype, inputlen, length)
-     krb5_context context;
-     krb5_enctype enctype;
-     size_t inputlen;
-     size_t *length;
+krb5_error_code KRB5_CALLCONV
+krb5_c_encrypt_length(krb5_context context, krb5_enctype enctype,
+		    size_t inputlen, size_t *length)
 {
     int i;
 

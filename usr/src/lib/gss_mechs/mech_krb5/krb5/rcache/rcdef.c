@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,11 +36,16 @@
 #include "rc_mem.h"
 
 
+/*
+ * Solaris Kerberos
+ * MIT 1.4 just has "dfl" while we now have "FILE" and "MEMORY".
+ */
 krb5_rc_ops krb5_rc_file_ops = {
 	0,
 	"FILE",
 	krb5_rc_file_init,
 	krb5_rc_file_recover,
+	krb5_rc_file_recover_or_init,
 	krb5_rc_file_destroy,
 	krb5_rc_file_close,
 	krb5_rc_file_store,
@@ -55,6 +60,7 @@ krb5_rc_ops krb5_rc_mem_ops = {
 	"MEMORY",
 	krb5_rc_mem_init,
 	krb5_rc_mem_recover,
+	krb5_rc_mem_recover_or_init,
 	krb5_rc_mem_destroy,
 	krb5_rc_mem_close,
 	krb5_rc_mem_store,

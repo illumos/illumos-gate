@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,8 +28,8 @@ krb5_arcfour_encrypt_length(enc, hash, inputlen, length)
 {
   size_t blocksize, hashsize;
 
-  (*(enc->block_size))(&blocksize);
-  (*(hash->hash_size))(&hashsize);
+  blocksize = enc->block_size;
+  hashsize = hash->hashsize;
 
   /* checksum + (confounder + inputlen, in even blocksize) */
   *length = hashsize + krb5_roundup(8 + inputlen, blocksize);
@@ -85,12 +85,12 @@ krb5_arcfour_encrypt(context, enc, hash, key, usage, ivec, input, output)
   krb5_keyblock *kptr;
   krb5_data d1, d2, d3, salt, plaintext, checksum, ciphertext, confounder;
   krb5_keyusage ms_usage;
-  size_t keylength, keybytes, blocksize, hashsize;
+  size_t keybytes, blocksize, hashsize;
   krb5_error_code ret = 0;
 
-  (*(enc->block_size))(&blocksize);
-  (*(enc->keysize))(&keybytes, &keylength);
-  (*(hash->hash_size))(&hashsize);
+  blocksize = enc->block_size;
+  keybytes = enc->keybytes;
+  hashsize = hash->hashsize;
   
   bzero(&d2, sizeof(krb5_data));
   bzero(&k2, sizeof(krb5_keyblock));
@@ -281,12 +281,11 @@ krb5_arcfour_decrypt(context, enc, hash, key, usage, ivec, input, output)
   krb5_keyblock k1,k2,k3, *kptr;
   krb5_data d1,d2,d3,salt,ciphertext,plaintext,checksum;
   krb5_keyusage ms_usage;
-  size_t keybytes, keylength, hashsize, blocksize;
+  size_t keybytes, hashsize;
   krb5_error_code ret;
 
-  (*(enc->block_size))(&blocksize);
-  (*(enc->keysize))(&keybytes, &keylength);
-  (*(hash->hash_size))(&hashsize);
+  keybytes = enc->keybytes;
+  hashsize = hash->hashsize;
 
   bzero(&d2, sizeof(krb5_data));
   bzero(&k2, sizeof(krb5_keyblock));

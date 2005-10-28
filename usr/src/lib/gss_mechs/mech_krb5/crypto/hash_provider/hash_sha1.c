@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,20 +34,6 @@
 #include <k5-int.h>
 #include <hash_provider.h>
 
-static void
-k5_sha1_hash_size(size_t *output)
-{
-    KRB5_LOG0(KRB5_INFO, "k5_sha1_hash_size() start");
-    *output = SHS_DIGESTSIZE;
-}
-
-static void
-k5_sha1_block_size(size_t *output)
-{
-    KRB5_LOG0(KRB5_INFO, "k5_sha1_block_size() start");
-    *output = SHS_DATASIZE;
-}
-
 static krb5_error_code
 k5_sha1_hash(krb5_context context,
 	unsigned int icount, krb5_const krb5_data *input,
@@ -65,7 +51,7 @@ k5_sha1_hash(krb5_context context,
 }
 
 const struct krb5_hash_provider krb5_hash_sha1 = {
-    k5_sha1_hash_size,
-    k5_sha1_block_size,
+    SHS_DIGESTSIZE,
+    SHS_DATASIZE,
     k5_sha1_hash
 };

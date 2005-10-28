@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  * 
  * All rights reserved.
@@ -66,9 +66,6 @@
 #include <sys/file.h>
 #include <signal.h>
 #include <string.h>
-#ifndef POSIX_TERMIOS
-#include <sgtty.h>
-#endif
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/time.h>

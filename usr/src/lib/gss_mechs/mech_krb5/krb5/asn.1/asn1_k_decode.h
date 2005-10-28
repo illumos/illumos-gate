@@ -143,8 +143,6 @@ asn1_error_code asn1_decode_pa_data
 	(asn1buf *buf, krb5_pa_data *val);
 asn1_error_code asn1_decode_passwdsequence
 	(asn1buf *buf, passwd_phrase_element *val);
-asn1_error_code asn1_decode_etype_info_entry
-	(asn1buf *buf, krb5_etype_info_entry *val);
 asn1_error_code asn1_decode_sam_challenge
 	(asn1buf *buf, krb5_sam_challenge *val);
 asn1_error_code asn1_decode_sam_challenge_2

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -24,6 +24,7 @@ extern "C" {
 
 #include "rc_common.h"
 #include "rc_io.h"
+#include "rc-int.h"
 
 #ifndef EXCESSREPS
 #define	EXCESSREPS 30
@@ -56,42 +57,46 @@ struct file_data {
 extern krb5_rc_ops krb5_rc_file_ops;
 
 krb5_error_code KRB5_CALLCONV krb5_rc_file_init 
-    	PROTOTYPE((krb5_context,
+    	(krb5_context,
 		   krb5_rcache,
-		   krb5_deltat));
+		   krb5_deltat);
 krb5_error_code KRB5_CALLCONV krb5_rc_file_recover 
-	PROTOTYPE((krb5_context,
-		   krb5_rcache)); 
+	(krb5_context,
+		   krb5_rcache);
+krb5_error_code KRB5_CALLCONV krb5_rc_file_recover_or_init 
+    	(krb5_context,
+		   krb5_rcache,
+		   krb5_deltat); 
 krb5_error_code KRB5_CALLCONV krb5_rc_file_destroy 
-	PROTOTYPE((krb5_context,
-		   krb5_rcache));
+	(krb5_context,
+		   krb5_rcache);
 krb5_error_code KRB5_CALLCONV krb5_rc_file_close 
-	PROTOTYPE((krb5_context,
-		   krb5_rcache));
+	(krb5_context,
+		   krb5_rcache);
 krb5_error_code KRB5_CALLCONV krb5_rc_file_store 
-	PROTOTYPE((krb5_context,
+	(krb5_context,
 		   krb5_rcache,
-		   krb5_donot_replay *));
+		   krb5_donot_replay *);
 krb5_error_code KRB5_CALLCONV krb5_rc_file_expunge 
-	PROTOTYPE((krb5_context,
-		   krb5_rcache));
+	(krb5_context,
+		   krb5_rcache);
 krb5_error_code KRB5_CALLCONV krb5_rc_file_get_span 
-	PROTOTYPE((krb5_context,
+	(krb5_context,
 		   krb5_rcache,
-		   krb5_deltat *));
+		   krb5_deltat *);
 char * KRB5_CALLCONV krb5_rc_file_get_name 
-	PROTOTYPE((krb5_context,
-		   krb5_rcache));
+	(krb5_context,
+		   krb5_rcache);
 krb5_error_code KRB5_CALLCONV krb5_rc_file_resolve 
-	PROTOTYPE((krb5_context,
+	(krb5_context,
 		   krb5_rcache,
-		   char *));
+		   char *);
 krb5_error_code krb5_rc_file_close_no_free
-	PROTOTYPE((krb5_context,
-		   krb5_rcache));
+	(krb5_context,
+		   krb5_rcache);
 void krb5_rc_free_entry 
-	PROTOTYPE((krb5_context,
-		   krb5_donot_replay **));
+	(krb5_context,
+		   krb5_donot_replay **);
 
 #ifdef __cplusplus
 }

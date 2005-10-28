@@ -24,6 +24,14 @@
 #include <gssapiP_generic.h>
 
 /*
+ * SUNW14resync
+ * This is defed in autoconf but we don't grok it for kernel (why?).
+ */
+#ifndef SIZEOF_INT
+#define SIZEOF_INT 4
+#endif
+
+/*
  * $Id: util_token.c,v 1.20.2.1 2003/12/16 02:56:16 tlyu Exp $
  */
 

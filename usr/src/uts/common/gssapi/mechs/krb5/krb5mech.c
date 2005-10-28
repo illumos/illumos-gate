@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * A module for Kerberos V5  security mechanism.
@@ -23,10 +23,10 @@ char _depends_on[] = "misc/kgssapi crypto/md5";
 OM_uint32 krb5_gss_get_context(void ** context);
 
 extern krb5_error_code krb5_ser_context_init
-	KRB5_PROTOTYPE((krb5_context));
+	(krb5_context);
 
 extern	krb5_error_code	krb5_ser_auth_context_init
-	KRB5_PROTOTYPE((krb5_context));
+	(krb5_context);
 
 static	struct	gss_config krb5_mechanism =
 	{{9, "\052\206\110\206\367\022\001\002\002"},

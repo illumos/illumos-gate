@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,10 +37,7 @@
 
 /*ARGSUSED*/
 static krb5_error_code
-krb5_copy_authdatum(context, inad, outad)
-    krb5_context context;
-const krb5_authdata *inad;
-krb5_authdata **outad;
+krb5_copy_authdatum(krb5_context context, const krb5_authdata *inad, krb5_authdata **outad)
 {
     krb5_authdata *tmpad;
 
@@ -64,15 +61,12 @@ krb5_authdata **outad;
 /*
  * Copy an authdata array, with fresh allocation.
  */
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_copy_authdata(context, inauthdat, outauthdat)
-    krb5_context context;
-    krb5_authdata FAR * const FAR * inauthdat;
-    krb5_authdata FAR * FAR * FAR *outauthdat;
+krb5_error_code KRB5_CALLCONV
+krb5_copy_authdata(krb5_context context, krb5_authdata *const *inauthdat, krb5_authdata ***outauthdat)
 {
     krb5_error_code retval;
     krb5_authdata ** tempauthdat;
-    register int nelems = 0;
+    register unsigned int nelems = 0;
 
     if (!inauthdat) {
 	    *outauthdat = 0;

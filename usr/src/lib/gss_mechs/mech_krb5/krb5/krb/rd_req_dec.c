@@ -67,8 +67,8 @@
  */
 
 static krb5_error_code decrypt_authenticator
-	PROTOTYPE((krb5_context, const krb5_ap_req *, krb5_authenticator **,
-		   int));
+	(krb5_context, const krb5_ap_req *, krb5_authenticator **,
+		   int);
 
 #define in_clock_skew(date) (labs((date)-currenttime) < context->clockskew)
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,7 +108,8 @@ krb5_error_code krb5int_c_combine_keys
 
     enc = krb5_enctypes_list[i].enc;
 
-    (*(enc->keysize))(&keybytes, &keylength);
+    keybytes = enc->keybytes;
+    keylength = enc->keylength;
 
     /*
      * Allocate and set up buffers
@@ -302,8 +303,9 @@ static krb5_error_code dr
     unsigned char *inblockdata, *outblockdata;
     krb5_data inblock, outblock;
 
-    (*(enc->block_size))(&blocksize);
-    (*(enc->keysize))(&keybytes, &keylength);
+    blocksize = enc->block_size;
+    keybytes = enc->keybytes;
+    keylength = enc->keylength;
 
     /* allocate and set up buffers */
 

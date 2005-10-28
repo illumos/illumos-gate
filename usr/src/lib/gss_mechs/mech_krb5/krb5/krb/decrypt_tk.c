@@ -40,17 +40,14 @@
 */
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_decrypt_tkt_part(context, srv_key, ticket)
-    krb5_context context;
-    const krb5_keyblock FAR *srv_key;
-    register krb5_ticket FAR *ticket;
+krb5_error_code KRB5_CALLCONV
+krb5_decrypt_tkt_part(krb5_context context, const krb5_keyblock *srv_key, register krb5_ticket *ticket)
 {
     krb5_enc_tkt_part *dec_tkt_part;
     krb5_data scratch;
     krb5_error_code retval;
 
-    if (!valid_enctype(ticket->enc_part.enctype))
+    if (!krb5_c_valid_enctype(ticket->enc_part.enctype))
 	return KRB5_PROG_ETYPE_NOSUPP;
 
     scratch.length = ticket->enc_part.ciphertext.length;
@@ -58,9 +55,9 @@ krb5_decrypt_tkt_part(context, srv_key, ticket)
 	return(ENOMEM);
 
     /* call the encryption routine */
-    if (retval = krb5_c_decrypt(context, srv_key,
+    if ((retval = krb5_c_decrypt(context, srv_key,
 				KRB5_KEYUSAGE_KDC_REP_TICKET, 0,
-				&ticket->enc_part, &scratch)) {
+				&ticket->enc_part, &scratch))) {
 	free(scratch.data);
 	return retval;
     }

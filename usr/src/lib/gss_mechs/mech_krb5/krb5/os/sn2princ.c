@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -7,7 +7,7 @@
 /*
  * lib/krb5/os/sn2princ.c
  *
- * Copyright 1991 by the Massachusetts Institute of Technology.
+ * Copyright 1991,2002 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -36,6 +36,7 @@
 
 #define NEED_SOCKETS
 #include <k5-int.h>
+#include "fake-addrinfo.h"
 #include <ctype.h>
 #include <netdb.h>
 #ifdef HAVE_SYS_PARAM_H
@@ -53,13 +54,8 @@ extern void		res_freehostent(struct hostent *);
  * Note, krb5_sname_to_principal() allocates memory for ret_princ.  Be sure to
  * use krb5_free_principal() on ret_princ to free it when done referencing it.
  */
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_sname_to_principal(context, hostname, sname, type, ret_princ)
-    krb5_context context;
-    const char FAR * hostname;
-    const char FAR * sname;
-    krb5_int32 type;
-    krb5_principal FAR * ret_princ;
+krb5_error_code KRB5_CALLCONV 
+krb5_sname_to_principal(krb5_context context, const char *hostname, const char *sname, krb5_int32 type, krb5_principal *ret_princ)
 {
     char **hrealms, *realm, *remote_host;
     krb5_error_code retval;
@@ -183,8 +179,8 @@ krb5_sname_to_principal(context, hostname, sname, type, ret_princ)
 
 	if (type == KRB5_NT_SRV_HST)
 	    for (cp = remote_host; *cp; cp++)
-		if (isupper(*cp))
-		    *cp = tolower(*cp);
+		if (isupper((int) *cp))
+		    *cp = tolower((int) *cp);
 
 	/*
 	 * Windows NT5's broken resolver gratuitously tacks on a

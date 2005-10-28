@@ -41,11 +41,9 @@
  * If the two addresses are the same, return TRUE, else return FALSE
  */
 /*ARGSUSED*/
-krb5_boolean
-krb5_address_compare(context, addr1, addr2)
-    krb5_context context;
-    krb5_const krb5_address *addr1;
-    krb5_const krb5_address *addr2;
+krb5_boolean KRB5_CALLCONV
+krb5_address_compare(krb5_context context, krb5_const krb5_address *addr1,
+	krb5_const krb5_address *addr2)
 {
     KRB5_LOG0(KRB5_INFO, "krb5_address_compare() start");
 

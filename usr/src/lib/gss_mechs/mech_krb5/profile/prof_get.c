@@ -5,14 +5,14 @@
  *
  */
 
+#include "prof_int.h"
 #include <stdio.h>
 #include <string.h>
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
 #include <errno.h>
-
-#include "prof_int.h"
+#include <limits.h>
 
 /*
  * These functions --- init_list(), end_list(), and add_to_list() are
@@ -36,8 +36,7 @@ struct profile_string_list {
 /*
  * Initialize the string list abstraction.
  */
-static errcode_t init_list(list)
-	struct profile_string_list *list;
+static errcode_t init_list(struct profile_string_list *list)
 {
 	list->num = 0;
 	list->max = 10;
@@ -52,9 +51,7 @@ static errcode_t init_list(list)
  * Free any memory left over in the string abstraction, returning the
  * built up list in *ret_list if it is non-null.
  */
-static void end_list(list, ret_list)
-    struct profile_string_list *list;
-    char ***ret_list;
+static void end_list(struct profile_string_list *list, char ***ret_list)
 {
 	char	**cp;
 
@@ -76,16 +73,14 @@ static void end_list(list, ret_list)
 /*
  * Add a string to the list.
  */
-static errcode_t add_to_list(list, str)
-	struct profile_string_list *list;
-	const char	*str;
+static errcode_t add_to_list(struct profile_string_list *list, const char *str)
 {
 	char 	*newstr, **newlist;
 	int	newmax;
 	
 	if (list->num+1 >= list->max) {
 		newmax = list->max + 10;
-		newlist = (char **)realloc(list->list, newmax * sizeof(char *));
+		newlist = (char **) realloc(list->list, newmax * sizeof(char *));
 		if (newlist == 0)
 			return ENOMEM;
 		list->max = newmax;
@@ -104,9 +99,7 @@ static errcode_t add_to_list(list, str)
 /*
  * Return TRUE if the string is already a member of the list.
  */
-static int is_list_member(list, str)
-	struct profile_string_list *list;
-	const char	*str;
+static int is_list_member(struct profile_string_list *list, const char *str)
 {
 	char **cpp;
 
@@ -124,8 +117,7 @@ static int is_list_member(list, str)
  * This function frees a null-terminated list as returned by
  * profile_get_values.
  */
-KRB5_DLLIMP void KRB5_CALLCONV profile_free_list(list)
-    char	**list;
+void KRB5_CALLCONV profile_free_list(char **list)
 {
     char	**cp;
 
@@ -137,11 +129,9 @@ KRB5_DLLIMP void KRB5_CALLCONV profile_free_list(list)
     free(list);
 }
 
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_get_values(profile, names, ret_values)
-	profile_t	profile;
-	const char	**names;
-	char	***ret_values;
+errcode_t KRB5_CALLCONV
+profile_get_values(profile_t profile, const char *const *names,
+		   char ***ret_values)
 {
 	errcode_t		retval;
 	void			*state;
@@ -180,10 +170,8 @@ cleanup:
  * This function only gets the first value from the file; it is a
  * helper function for profile_get_string, profile_get_integer, etc.
  */
-errcode_t profile_get_value(profile, names, ret_value)
-	profile_t	profile;
-	const char	**names;
-	const char	**ret_value;
+errcode_t profile_get_value(profile_t profile, const char **names,
+			    const char **ret_value)
 {
 	errcode_t		retval;
 	void			*state;
@@ -207,13 +195,10 @@ cleanup:
 	return retval;
 }
 
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_get_string(profile, name, subname, subsubname,
-			     def_val, ret_string)
-	profile_t	profile;
-	const char	*name, *subname, *subsubname;
-	const char	*def_val;
-	char 	**ret_string;
+errcode_t KRB5_CALLCONV
+profile_get_string(profile_t profile, const char *name, const char *subname,
+		   const char *subsubname, const char *def_val,
+		   char **ret_string)
 {
 	const char	*value;
 	errcode_t	retval;
@@ -233,7 +218,7 @@ profile_get_string(profile, name, subname, subsubname,
 		value = def_val;
     
 	if (value) {
-		*ret_string = (char *) malloc(strlen(value)+1);
+	  *ret_string = (char *) malloc(strlen(value)+1);
 		if (*ret_string == 0)
 			return ENOMEM;
 		strcpy(*ret_string, value);
@@ -242,22 +227,19 @@ profile_get_string(profile, name, subname, subsubname,
 	return 0;
 }
 
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_get_integer(profile, name, subname, subsubname,
-			      def_val, ret_int)
-	profile_t	profile;
-	const char	*name, *subname, *subsubname;
-	int		def_val;
-	int		*ret_int;
+errcode_t KRB5_CALLCONV
+profile_get_integer(profile_t profile, const char *name, const char *subname,
+		    const char *subsubname, int def_val, int *ret_int)
 {
 	const char	*value;
 	errcode_t	retval;
 	const char	*names[4];
+	char            *end_value;
+	long		ret_long;
 
-	if (profile == 0) {
-		*ret_int = def_val;
+	*ret_int = def_val;
+	if (profile == 0)
 		return 0;
-	}
 
 	names[0] = name;
 	names[1] = subname;
@@ -269,20 +251,97 @@ profile_get_integer(profile, name, subname, subsubname,
 		return 0;
 	} else if (retval)
 		return retval;
+
+	if (value[0] == 0)
+	    /* Empty string is no good.  */
+	    return PROF_BAD_INTEGER;
+	errno = 0;
+	ret_long = strtol (value, &end_value, 10);
+
+	/* Overflow or underflow.  */
+	if ((ret_long == LONG_MIN || ret_long == LONG_MAX) && errno != 0)
+	    return PROF_BAD_INTEGER;
+	/* Value outside "int" range.  */
+	if ((long) (int) ret_long != ret_long)
+	    return PROF_BAD_INTEGER;
+	/* Garbage in string.  */
+	if (end_value != value + strlen (value))
+	    return PROF_BAD_INTEGER;
+	
    
-	*ret_int = atoi(value);
+	*ret_int = ret_long;
 	return 0;
+}
+
+static const char *const conf_yes[] = {
+    "y", "yes", "true", "t", "1", "on",
+    0,
+};
+
+static const char *const conf_no[] = {
+    "n", "no", "false", "nil", "0", "off",
+    0,
+};
+
+static errcode_t
+profile_parse_boolean(const char *s, int *ret_boolean)
+{
+    const char *const *p;
+    
+    if (ret_boolean == NULL)
+    	return PROF_EINVAL;
+
+    for(p=conf_yes; *p; p++) {
+		if (!strcasecmp(*p,s)) {
+			*ret_boolean = 1;
+	    	return 0;
+		}
+    }
+
+    for(p=conf_no; *p; p++) {
+		if (!strcasecmp(*p,s)) {
+			*ret_boolean = 0;
+			return 0;
+		}
+    }
+	
+	return PROF_BAD_BOOLEAN;
+}
+
+errcode_t KRB5_CALLCONV
+profile_get_boolean(profile_t profile, const char *name, const char *subname,
+		    const char *subsubname, int def_val, int *ret_boolean)
+{
+	const char	*value;
+	errcode_t	retval;
+	const char	*names[4];
+
+	if (profile == 0) {
+		*ret_boolean = def_val;
+		return 0;
+	}
+
+	names[0] = name;
+	names[1] = subname;
+	names[2] = subsubname;
+	names[3] = 0;
+	retval = profile_get_value(profile, names, &value);
+	if (retval == PROF_NO_SECTION || retval == PROF_NO_RELATION) {
+		*ret_boolean = def_val;
+		return 0;
+	} else if (retval)
+		return retval;
+   
+	return profile_parse_boolean (value, ret_boolean);
 }
 
 /*
  * This function will return the list of the names of subections in the
  * under the specified section name.
  */
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_get_subsection_names(profile, names, ret_names)
-	profile_t	profile;
-	const char	**names;
-	char		***ret_names;
+errcode_t KRB5_CALLCONV
+profile_get_subsection_names(profile_t profile, const char **names,
+			     char ***ret_names)
 {
 	errcode_t		retval;
 	void			*state;
@@ -316,11 +375,9 @@ cleanup:
  * This function will return the list of the names of relations in the
  * under the specified section name.
  */
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_get_relation_names(profile, names, ret_names)
-	profile_t	profile;
-	const char	**names;
-	char		***ret_names;
+errcode_t KRB5_CALLCONV
+profile_get_relation_names(profile_t profile, const char **names,
+			   char ***ret_names)
 {
 	errcode_t		retval;
 	void			*state;
@@ -350,27 +407,21 @@ cleanup:
 	return retval;
 }
 
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_iterator_create(profile, names, flags, ret_iter)
-	profile_t	profile;
-	const char	**names;
-	int		flags;
-	void		**ret_iter;
+errcode_t KRB5_CALLCONV
+profile_iterator_create(profile_t profile, const char *const *names, int flags,
+			void **ret_iter)
 {
 	return profile_node_iterator_create(profile, names, flags, ret_iter);
 }
 
-KRB5_DLLIMP void KRB5_CALLCONV
-profile_iterator_free(iter_p)
-	void	**iter_p;
+void KRB5_CALLCONV
+profile_iterator_free(void **iter_p)
 {
 	profile_node_iterator_free(iter_p);
 }
 
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_iterator(iter_p, ret_name, ret_value)
-	void	**iter_p;
-	char **ret_name, **ret_value;
+errcode_t KRB5_CALLCONV
+profile_iterator(void **iter_p, char **ret_name, char **ret_value)
 {
 	char *name, *value;
 	errcode_t	retval;
@@ -381,7 +432,7 @@ profile_iterator(iter_p, ret_name, ret_value)
 
 	if (ret_name) {
 		if (name) {
-			*ret_name = (char *) malloc(strlen(name)+1);
+		  *ret_name = (char *) malloc(strlen(name)+1);
 			if (!*ret_name)
 				return ENOMEM;
 			strcpy(*ret_name, name);
@@ -390,7 +441,7 @@ profile_iterator(iter_p, ret_name, ret_value)
 	}
 	if (ret_value) {
 		if (value) {
-			*ret_value = (char *) malloc(strlen(value)+1);
+		  *ret_value = (char *) malloc(strlen(value)+1);
 			if (!*ret_value) {
 				if (ret_name) {
 					free(*ret_name);
@@ -405,9 +456,8 @@ profile_iterator(iter_p, ret_name, ret_value)
 	return 0;
 }
 
-KRB5_DLLIMP void KRB5_CALLCONV
-profile_release_string(str)
-	char *str;
+void KRB5_CALLCONV
+profile_release_string(char *str)
 {
 	free(str);
 }

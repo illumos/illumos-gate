@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,13 +37,13 @@ static unsigned char kerberos[] = "kerberos";
 #define kerberos_len (sizeof(kerberos)-1)
 
 krb5_error_code
-krb5_dk_string_to_key(context, enc, string, salt, parms, key)
-     krb5_context context;
-     krb5_const struct krb5_enc_provider *enc;
-     krb5_const krb5_data *string;
-     krb5_const krb5_data *salt;
-     krb5_const krb5_data *parms;
-     krb5_keyblock *key;
+krb5_dk_string_to_key(
+	krb5_context context,
+	krb5_const struct krb5_enc_provider *enc,
+	krb5_const krb5_data *string,
+	krb5_const krb5_data *salt,
+	krb5_const krb5_data *parms,
+	krb5_keyblock *key)
 {
     krb5_error_code ret;
     size_t keybytes, keylength, concatlen;
@@ -53,7 +53,8 @@ krb5_dk_string_to_key(context, enc, string, salt, parms, key)
 
     /* key->length is checked by krb5_derive_key */
 
-    (*(enc->keysize))(&keybytes, &keylength);
+    keybytes = enc->keybytes;
+    keylength = enc->keylength;
 
     concatlen = string->length+(salt?salt->length:0);
 

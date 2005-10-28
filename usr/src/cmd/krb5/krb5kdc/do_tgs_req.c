@@ -53,19 +53,19 @@
 
 extern krb5_error_code setup_server_realm(krb5_principal);
 
-static void find_alternate_tgs PROTOTYPE((krb5_kdc_req *,
+static void find_alternate_tgs (krb5_kdc_req *,
 					  krb5_db_entry *,
 					  krb5_boolean *,
 					  int *,
 					  const krb5_fulladdr *,
 					  int,
-					  char *));
+					  char *);
 
-static krb5_error_code prepare_error_tgs PROTOTYPE((krb5_kdc_req *,
+static krb5_error_code prepare_error_tgs (krb5_kdc_req *,
 						    krb5_ticket *,
 						    int,
 						    const char *,
-						    krb5_data **));
+						    krb5_data **);
 
 /*ARGSUSED*/
 krb5_error_code
@@ -254,7 +254,7 @@ tgt_again:
 	}
 	
 	etype = request->second_ticket[st_idx]->enc_part2->session->enctype;
-	if (!valid_enctype(etype)) {
+	if (!krb5_c_valid_enctype(etype)) {
 	    status = "BAD_ETYPE_IN_2ND_TKT";
 	    errcode = KRB5KDC_ERR_ETYPE_NOSUPP;
 	    goto cleanup;
@@ -741,10 +741,10 @@ krb5_data **response;
     retval = krb5_mk_error(kdc_context, &errpkt, scratch);
     free(errpkt.text.data);
     if (retval)
-    free(scratch); 
+	free(scratch);
     else
-    *response = scratch;
-    
+	*response = scratch;
+
     return retval;
 }
 

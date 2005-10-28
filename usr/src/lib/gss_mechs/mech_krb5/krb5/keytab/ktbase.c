@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,38 +35,87 @@
  */
 
 #include <k5-int.h>
+#include <k5-thread.h>
+#include <kt-int.h>
 
-extern krb5_kt_ops krb5_ktf_ops;
-extern krb5_kt_ops krb5_kts_ops;
+extern const krb5_kt_ops krb5_ktf_ops;
+extern const krb5_kt_ops krb5_ktf_writable_ops;
+extern const krb5_kt_ops krb5_kts_ops;
 
 struct krb5_kt_typelist {
-    krb5_kt_ops *ops;
-    struct krb5_kt_typelist *next;
+    const krb5_kt_ops *ops;
+    const struct krb5_kt_typelist *next;
 };
-static struct krb5_kt_typelist krb5_kt_typelist_dfl = { &krb5_kt_dfl_ops, 0 };
-static struct krb5_kt_typelist *kt_typehead = &krb5_kt_typelist_dfl;
+static const struct krb5_kt_typelist krb5_kt_typelist_dfl = { &krb5_kt_dfl_ops, 0 };
+static const struct krb5_kt_typelist *kt_typehead = &krb5_kt_typelist_dfl;
+
+static const struct krb5_kt_typelist krb5_kt_typelist_wrfile  = {
+    &krb5_ktf_writable_ops,
+    0
+};
+static const struct krb5_kt_typelist krb5_kt_typelist_file  = {
+    &krb5_ktf_ops,
+    &krb5_kt_typelist_wrfile
+};
+static const struct krb5_kt_typelist krb5_kt_typelist_srvtab = {
+    &krb5_kts_ops,
+    &krb5_kt_typelist_file
+};
+
+/* SUNW14resync */
+/*
+static const struct krb5_kt_typelist *kt_typehead = &krb5_kt_typelist_srvtab;*/
+
+/* Lock for protecting the type list.  */
+static k5_mutex_t kt_typehead_lock = K5_MUTEX_PARTIAL_INITIALIZER;
+
+int krb5int_kt_initialize(void)
+{
+    return k5_mutex_finish_init(&kt_typehead_lock);
+}
+
+void
+krb5int_kt_finalize(void)
+{
+    struct krb5_kt_typelist *t, *t_next;
+    k5_mutex_destroy(&kt_typehead_lock);
+    for (t = (struct krb5_kt_typelist *)kt_typehead; t != &krb5_kt_typelist_srvtab;
+	t = t_next) {
+        t_next = (struct krb5_kt_typelist *)t->next;
+	free(t);
+    }
+}
+
 
 /*
  * Register a new key table type
  * don't replace if it already exists; return an error instead.
  */
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_kt_register(context, ops)
-    krb5_context context;
-    krb5_kt_ops FAR *ops;
+krb5_error_code KRB5_CALLCONV
+krb5_kt_register(krb5_context context, const krb5_kt_ops *ops)
 {
-    struct krb5_kt_typelist *t;
-    for (t = kt_typehead;t && strcmp(t->ops->prefix,ops->prefix);t = t->next)
+    const struct krb5_kt_typelist *t;
+    struct krb5_kt_typelist *newt;
+    krb5_error_code err;
+
+    err = k5_mutex_lock(&kt_typehead_lock);
+    if (err)
+	return err;
+    for (t = kt_typehead; t && strcmp(t->ops->prefix,ops->prefix);t = t->next)
 	;
     if (t) {
+	k5_mutex_unlock(&kt_typehead_lock);
 	return KRB5_KT_TYPE_EXISTS;
     }
-    if (!(t = (struct krb5_kt_typelist *) malloc(sizeof(*t))))
+    if (!(newt = (struct krb5_kt_typelist *) malloc(sizeof(*t)))) {
+	k5_mutex_unlock(&kt_typehead_lock);
 	return ENOMEM;
-    t->next = kt_typehead;
-    t->ops = ops;
-    kt_typehead = t;
+    }
+    newt->next = kt_typehead;
+    newt->ops = ops;
+    kt_typehead = newt;
+    k5_mutex_unlock(&kt_typehead_lock);
     return 0;
 }
 
@@ -80,34 +129,52 @@ krb5_kt_register(context, ops)
  * particular keytab type.
  */
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_kt_resolve (context, name, ktid)
-    krb5_context context;
-    krb5_const char FAR *name;
-    krb5_keytab FAR *ktid;
+#include <ctype.h>
+krb5_error_code KRB5_CALLCONV
+krb5_kt_resolve (krb5_context context, const char *name, krb5_keytab *ktid)
 {
-    struct krb5_kt_typelist *tlist;
-    char *pfx, *resid, *cp;
-    int pfxlen;
-
+    const struct krb5_kt_typelist *tlist;
+    char *pfx;
+    unsigned int pfxlen;
+    const char *cp, *resid;
+    krb5_error_code err;
+    
     cp = strchr (name, ':');
     if (!cp) {
 	    return (*krb5_kt_dfl_ops.resolve)(context, name, ktid);
     }
 
-    pfxlen = cp - (char *)name;
-    resid = (char *)name + pfxlen + 1;
-	
-    pfx = malloc (pfxlen+1);
-    if (!pfx)
-	return ENOMEM;
+    pfxlen = cp - name;
 
-    memcpy (pfx, name, pfxlen);
-    pfx[pfxlen] = '\0';
+    if ( pfxlen == 1 && isalpha(name[0]) ) {
+        /* We found a drive letter not a prefix - use FILE: */
+        pfx = strdup("FILE:");
+        if (!pfx)
+            return ENOMEM;
+
+        resid = name;
+    } else {
+        resid = name + pfxlen + 1;
+	
+        pfx = malloc (pfxlen+1);
+        if (!pfx)
+            return ENOMEM;
+
+        memcpy (pfx, name, pfxlen);
+        pfx[pfxlen] = '\0';
+    }
 
     *ktid = (krb5_keytab) 0;
 
-    for (tlist = kt_typehead; tlist; tlist = tlist->next) {
+    err = k5_mutex_lock(&kt_typehead_lock);
+    if (err)
+	return err;
+    tlist = kt_typehead;
+    /* Don't need to hold the lock, since entries are never modified
+       or removed once they're in the list.  Just need to protect
+       access to the list head variable itself.  */
+    k5_mutex_unlock(&kt_typehead_lock);
+    for (; tlist; tlist = tlist->next) {
 	if (strcmp (tlist->ops->prefix, pfx) == 0) {
 	    free(pfx);
 	    return (*tlist->ops->resolve)(context, resid, ktid);
@@ -117,6 +184,7 @@ krb5_kt_resolve (context, name, ktid)
     return KRB5_KT_UNKNOWN_TYPE;
 }
 
+
 /*
  * Routines to deal with externalizingt krb5_keytab.
  *	krb5_keytab_size();
@@ -124,11 +192,11 @@ krb5_kt_resolve (context, name, ktid)
  *	krb5_keytab_internalize();
  */
 static krb5_error_code krb5_keytab_size
-	KRB5_PROTOTYPE((krb5_context, krb5_pointer, size_t *));
+	(krb5_context, krb5_pointer, size_t *);
 static krb5_error_code krb5_keytab_externalize
-	KRB5_PROTOTYPE((krb5_context, krb5_pointer, krb5_octet **, size_t *));
+	(krb5_context, krb5_pointer, krb5_octet **, size_t *);
 static krb5_error_code krb5_keytab_internalize
-	KRB5_PROTOTYPE((krb5_context,krb5_pointer *, krb5_octet **, size_t *));
+	(krb5_context,krb5_pointer *, krb5_octet **, size_t *);
 
 /*
  * Serialization entry for this type.
@@ -141,10 +209,7 @@ static const krb5_ser_entry krb5_keytab_ser_entry = {
 };
 
 static krb5_error_code
-krb5_keytab_size(kcontext, arg, sizep)
-    krb5_context	kcontext;
-    krb5_pointer	arg;
-    size_t		*sizep;
+krb5_keytab_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
 {
     krb5_error_code	kret;
     krb5_keytab		keytab;
@@ -160,11 +225,7 @@ krb5_keytab_size(kcontext, arg, sizep)
 }
 
 static krb5_error_code
-krb5_keytab_externalize(kcontext, arg, buffer, lenremain)
-    krb5_context	kcontext;
-    krb5_pointer	arg;
-    krb5_octet		**buffer;
-    size_t		*lenremain;
+krb5_keytab_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **buffer, size_t *lenremain)
 {
     krb5_error_code	kret;
     krb5_keytab		keytab;
@@ -180,11 +241,7 @@ krb5_keytab_externalize(kcontext, arg, buffer, lenremain)
 }
 
 static krb5_error_code
-krb5_keytab_internalize(kcontext, argp, buffer, lenremain)
-    krb5_context	kcontext;
-    krb5_pointer	*argp;
-    krb5_octet		**buffer;
-    size_t		*lenremain;
+krb5_keytab_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet **buffer, size_t *lenremain)
 {
     krb5_error_code	kret;
     krb5_ser_handle	shandle;
@@ -196,9 +253,8 @@ krb5_keytab_internalize(kcontext, argp, buffer, lenremain)
     return(kret);
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_ser_keytab_init(kcontext)
-    krb5_context	kcontext;
+krb5_error_code KRB5_CALLCONV
+krb5_ser_keytab_init(krb5_context kcontext)
 {
     return(krb5_register_serializer(kcontext, &krb5_keytab_ser_entry));
 }

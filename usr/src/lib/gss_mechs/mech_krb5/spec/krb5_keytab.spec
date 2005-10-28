@@ -1,5 +1,5 @@
 #
-# Copyright 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,6 +53,54 @@ function	krb5_kt_register
 include		<krb5.h>
 declaration	krb5_error_code krb5_kt_register \
 			(krb5_context context, krb5_kt_ops *ops)
+version		SUNWprivate_1.1
+end
+
+function	krb5_kt_close
+include		<krb5.h>
+declaration	krb5_error_code krb5_kt_close \
+			(krb5_context context, krb5_keytab keytab)
+version		SUNWprivate_1.1
+end
+
+function	krb5_kt_next_entry
+include		<krb5.h>
+declaration	krb5_error_code krb5_kt_next_entry \
+			(krb5_context context, krb5_keytab keytab, \
+		   	krb5_keytab_entry *entry, krb5_kt_cursor *cursor)
+version		SUNWprivate_1.1
+end
+
+function	krb5_kt_get_name
+include		<krb5.h>
+declaration	krb5_error_code krb5_kt_get_name \
+			(krb5_context context, krb5_keytab keytab, char *name, \
+		 	unsigned int namelen)
+version		SUNWprivate_1.1
+end
+
+
+function	krb5_kt_start_seq_get
+include		<krb5.h>
+declaration	krb5_error_code krb5_kt_start_seq_get(krb5_context context, \
+			krb5_keytab keytab, krb5_kt_cursor *cursor)
+version		SUNWprivate_1.1
+end
+
+function	krb5_kt_end_seq_get
+include		<krb5.h>
+declaration	krb5_error_code  \
+		krb5_kt_end_seq_get(krb5_context context, krb5_keytab keytab, \
+		    krb5_kt_cursor *cursor)
+version		SUNWprivate_1.1
+end
+
+function	krb5_kt_get_entry
+include		<krb5.h>
+declaration	krb5_error_code krb5_kt_get_entry \
+			(krb5_context context, krb5_keytab keytab, \
+			krb5_const_principal principal, krb5_kvno vno, \
+			krb5_enctype enctype, krb5_keytab_entry *entry)
 version		SUNWprivate_1.1
 end
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,8 +82,6 @@ static struct gss_config krb5_mechanism = {
 
 #include <k5-int.h>
 
-extern char *
-error_message(krb5_error_code errCode);
 
 OM_uint32
 krb5_gss_get_context(context)
@@ -125,7 +123,7 @@ error:
 			
 				"Kerberos mechanism library"
 				" initialization error: %s."),
-			error_message(errCode));
+		    error_message((long)errCode));
 	}
 	return (GSS_S_FAILURE);
 }

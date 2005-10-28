@@ -72,10 +72,10 @@
 */
 
 static krb5_error_code
-krb5_generate_authenticator PROTOTYPE((krb5_context,
+krb5_generate_authenticator (krb5_context,
 				       krb5_authenticator *, krb5_principal,
-				       const krb5_checksum *, krb5_keyblock *,
-				       krb5_int32, krb5_authdata ** ));
+				       krb5_checksum *, krb5_keyblock *,
+				       krb5_ui_4, krb5_authdata ** );
 
 krb5_error_code
 krb5int_generate_and_save_subkey (krb5_context context,
@@ -287,15 +287,15 @@ krb5_generate_authenticator(
     krb5_context context,
     krb5_authenticator *authent,
     krb5_principal client,
-    const krb5_checksum *cksum,
+    krb5_checksum *cksum,
     krb5_keyblock *key,
-    krb5_int32 seq_number,
+    krb5_ui_4 seq_number,
     krb5_authdata **authorization)
 {
     krb5_error_code retval;
 
     authent->client = client;
-    authent->checksum = (krb5_checksum *)cksum;
+    authent->checksum = cksum;
     if (key) {
 	retval = krb5_copy_keyblock(context, key, &authent->subkey);
 	if (retval)

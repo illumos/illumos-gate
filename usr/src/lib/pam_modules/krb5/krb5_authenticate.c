@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -763,7 +763,6 @@ krb5_cleanup(pam_handle_t *pamh, void *data, int pam_status)
 	 */
 	if ((pam_status == PAM_SUCCESS) &&
 	    (kmd->auth_status == PAM_SUCCESS) && kmd->ccache)
-		/* LINTED */
 		krb5_cc_close(kmd->kcontext, kmd->ccache);
 
 	if (kmd->password) {

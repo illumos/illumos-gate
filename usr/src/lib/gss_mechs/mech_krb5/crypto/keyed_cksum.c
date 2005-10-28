@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,9 +34,8 @@
 #include <k5-int.h>
 #include <cksumtypes.h>
 
-KRB5_DLLIMP krb5_boolean KRB5_CALLCONV
-is_keyed_cksum(ctype)
-     krb5_cksumtype ctype;
+krb5_boolean KRB5_CALLCONV
+krb5_c_is_keyed_cksum(krb5_cksumtype ctype)
 {
     int i;
 

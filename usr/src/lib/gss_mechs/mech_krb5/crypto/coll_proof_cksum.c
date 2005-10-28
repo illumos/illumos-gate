@@ -28,9 +28,8 @@
 #include <k5-int.h>
 #include <cksumtypes.h>
 
-KRB5_DLLIMP krb5_boolean KRB5_CALLCONV
-is_coll_proof_cksum(ctype)
-     krb5_cksumtype ctype;
+krb5_boolean KRB5_CALLCONV
+krb5_c_is_coll_proof_cksum(krb5_cksumtype ctype)
 {
     int i;
 
@@ -43,4 +42,10 @@ is_coll_proof_cksum(ctype)
     /* ick, but it's better than coredumping, which is what the
        old code would have done */
     return(0);
+}
+
+krb5_boolean KRB5_CALLCONV
+is_coll_proof_cksum(krb5_cksumtype ctype)
+{
+  return krb5_c_is_coll_proof_cksum (ctype);
 }

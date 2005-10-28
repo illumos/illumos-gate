@@ -37,6 +37,9 @@
 #include <string.h>
 
 #include <k5-int.h>
+#include <krb5.h>
+#include <int-proto.h>
+#include <os-proto.h>
 
 /*
  All-purpose initial ticket routine, usually called via
@@ -69,20 +72,38 @@
 
 /* some typedef's for the function args to make things look a bit cleaner */
 
-typedef krb5_error_code (*git_key_proc) PROTOTYPE((krb5_context,
+typedef krb5_error_code (*git_key_proc) (krb5_context,
 						   const krb5_enctype,
 						   krb5_data *,
 						   krb5_const_pointer,
-						   krb5_keyblock **));
+						   krb5_keyblock **);
 
-typedef krb5_error_code (*git_decrypt_proc) PROTOTYPE((krb5_context,
+typedef krb5_error_code (*git_decrypt_proc) (krb5_context,
 						       const krb5_keyblock *,
 						       krb5_const_pointer,
-						       krb5_kdc_rep * ));
+						       krb5_kdc_rep *);
 
-static krb5_error_code make_preauth_list PROTOTYPE((krb5_context,
+static krb5_error_code make_preauth_list (krb5_context,
 						    krb5_preauthtype *,
-						    int, krb5_pa_data ***));
+						    int, krb5_pa_data ***);
+
+/*
+ * This function performs 32 bit bounded addition so we can generate
+ * lifetimes without overflowing krb5_int32
+ */
+static krb5_int32 krb5int_addint32 (krb5_int32 x, krb5_int32 y)
+{
+    if ((x > 0) && (y > (KRB5_INT32_MAX - x))) {
+        /* sum will be be greater than KRB5_INT32_MAX */
+        return KRB5_INT32_MAX;
+    } else if ((x < 0) && (y < (KRB5_INT32_MIN - x))) {
+        /* sum will be less than KRB5_INT32_MIN */
+        return KRB5_INT32_MIN;
+    }
+    
+    return x + y;
+}
+
 /*
  * This function sends a request to the KDC, and gets back a response;
  * the response is parsed into ret_err_reply or ret_as_reply if the
@@ -90,14 +111,12 @@ static krb5_error_code make_preauth_list PROTOTYPE((krb5_context,
  * unexpected response, an error is returned.
  */
 static krb5_error_code
-send_as_request(context, request, time_now, ret_err_reply, ret_as_reply,
-		use_master)
-    krb5_context 		context;
-    krb5_kdc_req		*request;
-    krb5_timestamp 		*time_now;
-    krb5_error ** 		ret_err_reply;
-    krb5_kdc_rep ** 		ret_as_reply;
-    int 			use_master;
+send_as_request(krb5_context 		context,
+		krb5_kdc_req		*request,
+		krb5_timestamp 		*time_now,
+		krb5_error ** 		ret_err_reply,
+		krb5_kdc_rep ** 	ret_as_reply,
+		int 			*use_master)
 {
     krb5_kdc_rep *as_reply = 0;
     krb5_error_code retval;
@@ -203,16 +222,14 @@ cleanup:
 }
 
 static krb5_error_code
-decrypt_as_reply(context, request, as_reply, key_proc, keyseed, key,
-		 decrypt_proc, decryptarg)
-    krb5_context 		context;
-    krb5_kdc_req		*request;
-    krb5_kdc_rep		*as_reply;
-    git_key_proc 		key_proc;
-    krb5_const_pointer 		keyseed;
-    krb5_keyblock *		key;	
-    git_decrypt_proc 		decrypt_proc;
-    krb5_const_pointer 		decryptarg;
+decrypt_as_reply(krb5_context 		context,
+		 krb5_kdc_req		*request,
+		 krb5_kdc_rep		*as_reply,
+		 git_key_proc 		key_proc,
+		 krb5_const_pointer 	keyseed,
+		 krb5_keyblock *	key,
+		 git_decrypt_proc 	decrypt_proc,
+		 krb5_const_pointer 	decryptarg)
 {
     krb5_error_code		retval;
     krb5_keyblock *		decrypt_key = 0;
@@ -279,11 +296,10 @@ cleanup:
 }
 
 static krb5_error_code
-verify_as_reply(context, time_now, request, as_reply)
-    krb5_context 		context;
-    krb5_timestamp 		time_now;
-    krb5_kdc_req		*request;
-    krb5_kdc_rep		*as_reply;
+verify_as_reply(krb5_context 		context,
+		krb5_timestamp 		time_now,
+		krb5_kdc_req		*request,
+		krb5_kdc_rep		*as_reply)
 {
     krb5_error_code		retval;
 
@@ -330,13 +346,12 @@ verify_as_reply(context, time_now, request, as_reply)
 
 /*ARGSUSED*/
 static krb5_error_code
-stash_as_reply(context, time_now, request, as_reply, creds, ccache)
-    krb5_context 		context;
-    krb5_timestamp 		time_now;
-    krb5_kdc_req		*request;
-    krb5_kdc_rep		*as_reply;
-    krb5_creds * 		creds;
-    krb5_ccache 		ccache;
+stash_as_reply(krb5_context 		context,
+	       krb5_timestamp 		time_now,
+	       krb5_kdc_req		*request,
+	       krb5_kdc_rep		*as_reply,
+	       krb5_creds * 		creds,
+	       krb5_ccache 		ccache)
 {
     krb5_error_code 		retval;
     krb5_data *			packet;
@@ -347,12 +362,12 @@ stash_as_reply(context, time_now, request, as_reply, creds, ccache)
     server = NULL;
 
     if (!creds->client)
-        if (retval = krb5_copy_principal(context, as_reply->client, &client))
+        if ((retval = krb5_copy_principal(context, as_reply->client, &client)))
 	    goto cleanup;
 
     if (!creds->server)
-	if (retval = krb5_copy_principal(context, as_reply->enc_part2->server,
-					  &server))
+	if ((retval = krb5_copy_principal(context, as_reply->enc_part2->server,
+					  &server)))
 	    goto cleanup;
 
     /* fill in the credentials */
@@ -415,11 +430,10 @@ cleanup:
 
 /*ARGSUSED*/
 static krb5_error_code
-make_preauth_list(context, ptypes, nptypes, ret_list)
-    krb5_context	context;
-    krb5_preauthtype *	ptypes;
-    int			nptypes;
-    krb5_pa_data ***	ret_list;
+make_preauth_list(krb5_context	context,
+		  krb5_preauthtype *	ptypes,
+		  int			nptypes,
+		  krb5_pa_data ***	ret_list)
 {
     krb5_preauthtype *		ptypep;
     krb5_pa_data **		preauthp;
@@ -459,27 +473,37 @@ make_preauth_list(context, ptypes, nptypes, ret_list)
 }
 
 #define MAX_IN_TKT_LOOPS 16
+/* SUNW14resync - Solaris krb does not use this (appearently) */
+#if 0
+static const krb5_enctype get_in_tkt_enctypes[] = {
+    ENCTYPE_DES3_CBC_SHA1,
+    ENCTYPE_ARCFOUR_HMAC,
+    ENCTYPE_DES_CBC_MD5,
+    ENCTYPE_DES_CBC_MD4,
+    ENCTYPE_DES_CBC_CRC,
+    0
+};
+#endif
 
 /* begin libdefaults parsing code.  This should almost certainly move
    somewhere else, but I don't know where the correct somewhere else
    is yet. */
 
 /* XXX Duplicating this is annoying; try to work on a better way.*/
-static char *conf_yes[] = {
+static const char *const conf_yes[] = {
     "y", "yes", "true", "t", "1", "on",
     0,
 };
 
-static char *conf_no[] = {
+static const char *const conf_no[] = {
     "n", "no", "false", "nil", "0", "off",
     0,
 };
 
 int
-_krb5_conf_boolean(s)
-     char *s;
+_krb5_conf_boolean(const char *s)
 {
-    char **p;
+    const char *const *p;
 
     for(p=conf_yes; *p; p++) {
 	if (!strcasecmp(*p,s))
@@ -496,11 +520,8 @@ _krb5_conf_boolean(s)
 }
 
 static krb5_error_code
-krb5_libdefault_string(context, realm, option, ret_value)
-     krb5_context context;
-     const krb5_data *realm;
-     const char *option;
-     char **ret_value;
+krb5_libdefault_string(krb5_context context, const krb5_data *realm,
+		       const char *option, char **ret_value)
 {
     profile_t profile;
     const char *names[5];
@@ -574,11 +595,8 @@ goodbye:
 /* as well as the DNS code */
 
 krb5_error_code
-krb5_libdefault_boolean(context, realm, option, ret_value)
-     krb5_context context;
-     const char *option;
-     const krb5_data *realm;
-     int *ret_value;
+krb5_libdefault_boolean(krb5_context context, const krb5_data *realm,
+			const char *option, int *ret_value)
 {
     char *string = NULL;
     krb5_error_code retval;
@@ -594,28 +612,26 @@ krb5_libdefault_boolean(context, realm, option, ret_value)
     return(0);
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_get_init_creds(context, creds, client, prompter, prompter_data,
-		    start_time, in_tkt_service, options, gak_fct, gak_data,
-		    use_master, as_reply)
-     krb5_context context;
-     krb5_creds *creds;
-     krb5_principal client;
-     krb5_prompter_fct prompter;
-     void *prompter_data;
-     krb5_deltat start_time;
-     char *in_tkt_service;
-     krb5_get_init_creds_opt *options;
-     krb5_gic_get_as_key_fct gak_fct;
-     void *gak_data;
-     int  use_master;
-     krb5_kdc_rep **as_reply;
+krb5_error_code KRB5_CALLCONV
+krb5_get_init_creds(krb5_context context,
+		    krb5_creds *creds,
+		    krb5_principal client,
+		    krb5_prompter_fct prompter,
+		    void *prompter_data,
+		    krb5_deltat start_time,
+		    char *in_tkt_service,
+		    krb5_get_init_creds_opt *options,
+		    krb5_gic_get_as_key_fct gak_fct,
+		    void *gak_data,
+		    int  *use_master,
+		    krb5_kdc_rep **as_reply)
 {
     krb5_error_code ret;
     krb5_kdc_req request;
     krb5_pa_data **padata;
     int tempint;
-    char *tempstr;
+    char *tempstr = NULL;
+    krb5_deltat tkt_life;
     krb5_deltat renew_life;
     krb5_deltat max_life;
     int loopcount;
@@ -679,16 +695,51 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
     if (tempint)
 	request.kdc_options |= KDC_OPT_PROXIABLE;
 
-    /* renewable */
+    /* allow_postdate */
 
+    if (start_time > 0)
+	request.kdc_options |= (KDC_OPT_ALLOW_POSTDATE|KDC_OPT_POSTDATED);
+    
+    /* ticket lifetime */
+    
+    if ((ret = krb5_timeofday(context, &request.from)))
+	goto cleanup;
+    request.from = krb5int_addint32(request.from, start_time);
+    
+    if (options && (options->flags & KRB5_GET_INIT_CREDS_OPT_TKT_LIFE)) {
+        tkt_life = options->tkt_life;
+    } else if ((ret = krb5_libdefault_string(context, &client->realm,
+					     "ticket_lifetime", &tempstr))
+	       == 0) {
+	if ((ret = krb5_string_to_deltat(tempstr, &tkt_life))) {
+	    free(tempstr);
+	    tempstr = NULL;
+	    goto cleanup;
+	}
+	if (tempstr) {
+	    free(tempstr);
+	    tempstr = NULL;
+	}
+    } else {
+	/* this used to be hardcoded in kinit.c */
+	tkt_life = 24*60*60;
+    }
+    request.till = krb5int_addint32(request.from, tkt_life);
+    
+    /* renewable lifetime */
+    
     if (options && (options->flags & KRB5_GET_INIT_CREDS_OPT_RENEW_LIFE)) {
 	renew_life = options->renew_life;
     } else if ((ret = krb5_libdefault_string(context, &client->realm,
 					     "renew_lifetime", &tempstr))
 	       == 0) {
-	if (ret = krb5_string_to_deltat(tempstr, &renew_life)) {
+	if ((ret = krb5_string_to_deltat(tempstr, &renew_life))) {
 	    free(tempstr);
 	    goto cleanup;
+	}
+	if (tempstr) {
+	    free(tempstr);
+	    tempstr = NULL;
 	}
     } else {
 	renew_life = 0;
@@ -696,21 +747,30 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
     if (renew_life > 0)
 	request.kdc_options |= KDC_OPT_RENEWABLE;
 
-    /* allow_postdate */
-
-    if (start_time > 0)
-	request.kdc_options |= (KDC_OPT_ALLOW_POSTDATE|KDC_OPT_POSTDATED);
+    if (renew_life > 0) {
+	request.rtime = krb5int_addint32(request.from, renew_life);
+        if (request.rtime < request.till) {
+            /* don't ask for a smaller renewable time than the lifetime */
+            request.rtime = request.till;
+        }
+        /* we are already asking for renewable tickets so strip this option */
+	request.kdc_options &= ~(KDC_OPT_RENEWABLE_OK);
+    } else {
+	request.rtime = 0;
+    }
 
     /* client */
 
     request.client = client;
+
+    /* service */
 
     if (in_tkt_service) {
 	/* this is ugly, because so are the data structures involved.  I'm
 	   in the library, so I'm going to manipulate the data structures
 	   directly, otherwise, it will be worse. */
 
-	if (ret = krb5_parse_name(context, in_tkt_service, &request.server))
+        if ((ret = krb5_parse_name(context, in_tkt_service, &request.server)))
 	    goto cleanup;
 
 	/* stuff the client realm into the server principal.
@@ -727,44 +787,15 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
 	memcpy(request.server->realm.data, request.client->realm.data,
 	       request.client->realm.length);
     } else {
-	if (ret = krb5_build_principal_ext(context, &request.server,
+	if ((ret = krb5_build_principal_ext(context, &request.server,
 					   request.client->realm.length,
 					   request.client->realm.data,
 					   KRB5_TGS_NAME_SIZE,
 					   KRB5_TGS_NAME,
 					   request.client->realm.length,
 					   request.client->realm.data,
-					   0))
+					   0)))
 	    goto cleanup;
-    }
-
-    if (ret = krb5_timeofday(context, &request.from))
-	goto cleanup;
-    request.from += start_time;
-
-    request.till = request.from;
-    if (options && (options->flags & KRB5_GET_INIT_CREDS_OPT_TKT_LIFE))
-	request.till += options->tkt_life;
-    else if ((ret = krb5_libdefault_string(context, &client->realm,
-					     "max_lifetime", &tempstr)) == 0) {
-	/* Solaris Kerberos: max_lifetime parameter support (tkt lifetime) */
-	if (ret = krb5_string_to_deltat(tempstr, &max_life)) {
-	    free(tempstr);
-	    goto cleanup;
-	}
-	request.till += max_life;
-    } else {
-	/* Solaris Kerberos: defaulting to infinity.  Note 0 == infinity (ASN1
-	 * encoding will do the right thing). 
-	 */
-	request.till = 0;
-    }
-
-    if (renew_life > 0) {
-	request.rtime = request.from;
-	request.rtime += renew_life;
-    } else {
-	request.rtime = 0;
     }
 
     /* nonce is filled in by send_as_request */
@@ -790,12 +821,12 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
        that would be work. */
     else if (((ret = krb5_libdefault_boolean(context, &client->realm,
 					    "no_addresses", &tempint)) == 0)
-	     && tempint) {
+	     || (tempint == 1)) {
 	    /*EMPTY*/
 	    ;
     } else if (((ret = krb5_libdefault_boolean(context, &client->realm,
 					    "noaddresses", &tempint)) == 0)
-	     && tempint) {
+	     || (tempint == 1)) {
 	    /*EMPTY*/
 	    ;
     } else {
@@ -811,9 +842,9 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
     /* set up the other state.  */
 
     if (options && (options->flags & KRB5_GET_INIT_CREDS_OPT_PREAUTH_LIST)) {
-	if (ret = make_preauth_list(context, options->preauth_list,
+	if ((ret = make_preauth_list(context, options->preauth_list,
 				    options->preauth_list_length,
-				    &padata))
+				    &padata)))
 	    goto cleanup;
     }
 
@@ -835,10 +866,10 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
 	    request.padata = NULL;
 	}
 
-	if (ret = krb5_do_preauth(context, &request,
+	if ((ret = krb5_do_preauth(context, &request,
 			  padata, &request.padata,
 			  &salt, &s2kparams, &etype, &as_key, prompter,
-			  prompter_data, gak_fct, gak_data))
+			  prompter_data, gak_fct, gak_data)))
 	    goto cleanup;
 
 	if (padata) {
@@ -861,7 +892,8 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
 		if (ret)
 		    goto cleanup;
 	    } else {
-		ret = err_reply->error + ERROR_TABLE_BASE_krb5;
+		ret = (krb5_error_code) err_reply->error
+			+ ERROR_TABLE_BASE_krb5;
 		krb5_free_error(context, err_reply);
 		goto cleanup;
 	    }
@@ -880,10 +912,10 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
 
     /* process any preauth data in the as_reply */
 
-    if (ret = krb5_do_preauth(context, &request,
+    if ((ret = krb5_do_preauth(context, &request,
 		      local_as_reply->padata, &padata,
 		      &salt, &s2kparams, &etype, &as_key, prompter,
-		      prompter_data, gak_fct, gak_data))
+		      prompter_data, gak_fct, gak_data)))
 	goto cleanup;
 
     /* XXX if there's padata on output, something is wrong, but it's
@@ -913,20 +945,21 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
     if (ret) {
 	/* if we haven't get gotten a key, get it now */
 
-	if (ret = ((*gak_fct)(context, request.client,
+	if ((ret = ((*gak_fct)(context, request.client,
 			      local_as_reply->enc_part.enctype,
 			      prompter, prompter_data, &salt, &s2kparams,
-			      &as_key, gak_data)))
+			      &as_key, gak_data))))
 	    goto cleanup;
 
-	if (ret=decrypt_as_reply(context, (krb5_kdc_req *)NULL, local_as_reply,
-				   (git_key_proc)NULL, (krb5_const_pointer)NULL,
-				   &as_key, krb5_kdc_rep_decrypt_proc,
-				   (krb5_const_pointer)NULL))
+	if ((ret=decrypt_as_reply(context, (krb5_kdc_req *)NULL,
+				  local_as_reply, (git_key_proc)NULL,
+				  (krb5_const_pointer)NULL, &as_key,
+				  krb5_kdc_rep_decrypt_proc,
+				  (krb5_const_pointer)NULL)))
 	    goto cleanup;
     }
 
-    if (ret = verify_as_reply(context, time_now, &request, local_as_reply))
+    if ((ret = verify_as_reply(context, time_now, &request, local_as_reply)))
 	goto cleanup;
 
 	/*
@@ -936,8 +969,8 @@ krb5_get_init_creds(context, creds, client, prompter, prompter_data,
 	 */
 	(void) memset(creds, 0, sizeof(*creds));
 
-    if (ret = stash_as_reply(context, time_now, &request, local_as_reply,
-			     creds, (krb5_ccache)NULL))
+    if ((ret = stash_as_reply(context, time_now, &request, local_as_reply,
+			      creds, (krb5_ccache)NULL)))
 	goto cleanup;
 
     /* success */
@@ -963,6 +996,7 @@ cleanup:
     if (salt.data &&
 	(!(options && (options->flags & KRB5_GET_INIT_CREDS_OPT_SALT))))
 	krb5_xfree(salt.data);
+    krb5_free_data_contents(context, &s2kparams);
     if (as_reply)
 	*as_reply = local_as_reply;
     else if (local_as_reply)

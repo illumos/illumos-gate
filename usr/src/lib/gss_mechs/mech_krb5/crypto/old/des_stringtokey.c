@@ -27,23 +27,37 @@
 
 #include <k5-int.h>
 #include <old.h>
+#include <des_int.h>
 
 /* XXX */
 extern krb5_error_code mit_des_string_to_key_int
-KRB5_PROTOTYPE ((krb5_context context,
-		krb5_keyblock FAR * keyblock,
-		 const krb5_data FAR * data,
-		 const krb5_data FAR * salt));
+(krb5_context context,
+ krb5_keyblock * keyblock,
+ const krb5_data * data,
+ const krb5_data * salt);
 
 /*ARGSUSED*/
 krb5_error_code
-krb5_des_string_to_key(context, enc, string, salt, parms, key)
-     krb5_context context;
-     krb5_const struct krb5_enc_provider *enc;
-     krb5_const krb5_data *string;
-     krb5_const krb5_data *salt;
-     krb5_const krb5_data *parms;
-     krb5_keyblock *key;
+krb5_des_string_to_key(krb5_context context,
+		    const struct krb5_enc_provider *enc,
+		    const krb5_data *string,
+		    const krb5_data *salt,
+		    krb5_const krb5_data *parm,
+		    krb5_keyblock *key)
 {
-    return(mit_des_string_to_key_int(context, key, string, salt));
+    int type;
+    if (parm) {
+        if (parm->length != 1)
+	    return KRB5_ERR_BAD_S2K_PARAMS;
+	type = parm->data[0];
+    } else type = 0;
+
+    switch(type) {
+    case 0:
+        return mit_des_string_to_key_int(context, key, string, salt);
+    case 1:
+        return mit_afs_string_to_key(context, key, string, salt);
+    default:
+        return KRB5_ERR_BAD_S2K_PARAMS;
+    }
 }

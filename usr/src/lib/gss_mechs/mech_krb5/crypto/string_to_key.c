@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,13 +34,28 @@
 #include <etypes.h>
 
 krb5_error_code KRB5_CALLCONV
-krb5_c_string_to_key_with_params(context, enctype, string, salt, params, key)
-	krb5_context context;
-	krb5_enctype enctype;
-	const krb5_data *string;
-	const krb5_data *salt;
-	const krb5_data *params;
-	krb5_keyblock *key;
+krb5_c_string_to_key_with_params(krb5_context context,
+                                 krb5_enctype enctype,
+                                 const krb5_data *string,
+                                 const krb5_data *salt,
+                                 const krb5_data *params,
+                                 krb5_keyblock *key);
+
+/*ARGSUSED*/
+krb5_error_code KRB5_CALLCONV
+krb5_c_string_to_key(krb5_context context, krb5_enctype enctype,
+                     const krb5_data *string, const krb5_data *salt,
+                     krb5_keyblock *key)
+{
+    return krb5_c_string_to_key_with_params(context, enctype, string, salt,
+					    NULL, key);
+}
+
+krb5_error_code KRB5_CALLCONV
+krb5_c_string_to_key_with_params(krb5_context context, krb5_enctype enctype,
+                                 const krb5_data *string,
+				 const krb5_data *salt,
+				 const krb5_data *params, krb5_keyblock *key)
 {
     int i;
     krb5_error_code ret;
@@ -56,8 +71,22 @@ krb5_c_string_to_key_with_params(context, enctype, string, salt, params, key)
 	return(KRB5_BAD_ENCTYPE);
 
     enc = krb5_enctypes_list[i].enc;
-
-    (*(enc->keysize))(&keybytes, &keylength);
+/* xxx AFS string2key function is indicated by a special length  in
+* the salt in much of the code.  However only the DES enctypes can
+* deal with this.  Using s2kparams would be a much better solution.*/
+    if (salt && salt->length == SALT_TYPE_AFS_LENGTH) {
+        switch (enctype) {
+        case ENCTYPE_DES_CBC_CRC:
+        case ENCTYPE_DES_CBC_MD4:
+        case ENCTYPE_DES_CBC_MD5:
+            break;
+        default:
+            return (KRB5_CRYPTO_INTERNAL);
+        }
+    }
+ 
+    keybytes = enc->keybytes; 
+    keylength = enc->keylength; 
 
     if ((key->contents = (krb5_octet *) malloc(keylength)) == NULL)
 	return(ENOMEM);
@@ -78,17 +107,3 @@ krb5_c_string_to_key_with_params(context, enctype, string, salt, params, key)
 
     return(ret);
 }
-
-/*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_c_string_to_key(context, enctype, string, salt, key)
-     krb5_context context;
-     krb5_enctype enctype;
-     krb5_const krb5_data *string;
-     krb5_const krb5_data *salt;
-     krb5_keyblock *key;
-{
-    return krb5_c_string_to_key_with_params(context, enctype, string, salt,
-                                            NULL, key);
-}
-

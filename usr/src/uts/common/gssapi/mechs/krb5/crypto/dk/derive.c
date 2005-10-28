@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -268,8 +268,10 @@ krb5_derive_key(context, enc, inkey, outkey, in_constant)
 
     KRB5_LOG0(KRB5_INFO, "krb5_derive_key() start");
 
-    (*(enc->block_size))(&blocksize);
-    (*(enc->keysize))(&keybytes, &keylength);
+    blocksize = enc->block_size;
+    keybytes = enc->keybytes;
+    keylength = enc->keylength;
+
 
     if ((inkey->length != keylength) ||
 	(outkey->length != keylength))

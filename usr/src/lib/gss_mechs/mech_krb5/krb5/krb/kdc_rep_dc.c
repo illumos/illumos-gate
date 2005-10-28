@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,11 +44,7 @@
 
 /*ARGSUSED*/
 krb5_error_code
-krb5_kdc_rep_decrypt_proc(context, key, decryptarg, dec_rep)
-    krb5_context context;
-    const krb5_keyblock * key;
-    krb5_const_pointer decryptarg;
-    krb5_kdc_rep * dec_rep;
+krb5_kdc_rep_decrypt_proc(krb5_context context, const krb5_keyblock *key, krb5_const_pointer decryptarg, krb5_kdc_rep *dec_rep)
 {
     krb5_error_code retval;
     krb5_data scratch;
@@ -68,7 +64,7 @@ krb5_kdc_rep_decrypt_proc(context, key, decryptarg, dec_rep)
 	return(ENOMEM);
     }
 
-    (void) (dec_rep->enc_part.enctype);
+    /*(void) (dec_rep->enc_part.enctype);*/
 
     retval = krb5_c_decrypt(context, key, usage, 0, &dec_rep->enc_part,
 				 &scratch);

@@ -1,39 +1,87 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/*  A Bison parser, made from ../../../../asrc/lib/krb5/krb/x-deltat.y
- by  GNU Bison version 1.27
-  */
+/*  A Bison parser, made from ./x-deltat.y
+    by GNU Bison version 1.28  */
 
 #define YYBISON 1  /* Identify Bison output.  */
 
 #define	NUM	257
 #define	LONGNUM	258
-#define	WS	259
+#define	OVERFLOW	259
+#define	WS	260
 
-#line 38 "../../../../asrc/lib/krb5/krb/x-deltat.y"
+#line 38 "./x-deltat.y"
 
 
 #include <ctype.h>
 #include <errno.h>
 #include <k5-int.h>
 
-#if 0
-#define NBITS(TYPE) (8*sizeof(TYPE))
-#define LOG10_2 0.30103
-#define LOG10_MAX(TYPE) (LOG10_2 * NBITS(TYPE))
-#define BUFFERSIZE(TYPE) (1 /* \0 */ + (int) (1 + LOG10_MAX(TYPE)))
-#endif
-
 struct param {
-    krb5_deltat delta;
+    krb5_int32 delta;
     char *p;
 };
 
 #define YYPARSE_PARAM tmv
 
+#define MAX_TIME KRB5_INT32_MAX
+#define MIN_TIME KRB5_INT32_MIN
+
+#define DAY (24 * 3600)
+#define HOUR 3600
+
+#define MAX_DAY (MAX_TIME / DAY)
+#define MIN_DAY (MIN_TIME / DAY)
+#define MAX_HOUR (MAX_TIME / HOUR)
+#define MIN_HOUR (MIN_TIME / HOUR)
+#define MAX_MIN (MAX_TIME / 60)
+#define MIN_MIN (MIN_TIME / 60)
+
+/* An explanation of the tests being performed. 
+   We do not want to overflow a 32 bit integer with out manipulations, 
+   even for testing for overflow. Therefore we rely on the following:
+
+   The lex parser will not return a number > MAX_TIME (which is out 32
+   bit limit).
+
+   Therefore, seconds (s) will require 
+       MIN_TIME < s < MAX_TIME
+
+   For subsequent tests, the logic is as follows:
+
+      If A < MAX_TIME and  B < MAX_TIME
+
+      If we want to test if A+B < MAX_TIME, there are two cases
+        if (A > 0) 
+         then A + B < MAX_TIME if B < MAX_TIME - A
+	else A + B < MAX_TIME  always.
+
+      if we want to test if MIN_TIME < A + B
+          if A > 0 - then nothing to test
+          otherwise, we test if MIN_TIME - A < B.
+
+   We of course are testing for:
+          MIN_TIME < A + B < MAX_TIME
+*/
+
+
+#define DAY_NOT_OK(d) (d) > MAX_DAY || (d) < MIN_DAY
+#define HOUR_NOT_OK(h) (h) > MAX_HOUR || (h) < MIN_HOUR
+#define MIN_NOT_OK(m) (m) > MAX_MIN || (m) < MIN_MIN
+#define SUM_OK(a, b) (((a) > 0) ? ( (b) <= MAX_TIME - (a)) : (MIN_TIME - (a) <= (b)))
+#define DO_SUM(res, a, b) if (!SUM_OK((a), (b))) YYERROR; \
+                          res = (a) + (b)
+
+
+#define OUT_D ((struct param *)tmv)->delta 
 #define DO(D,H,M,S) \
  { \
-     ((struct param *)tmv)->delta = (((D * 24) + H) * 60 + M) * 60 + S; \
+     /* Overflow testing - this does not handle negative values well.. */ \
+     if (DAY_NOT_OK(D) || HOUR_NOT_OK(H) || MIN_NOT_OK(M)) YYERROR; \
+     OUT_D = D * DAY; \
+     DO_SUM(OUT_D, OUT_D, H * HOUR); \
+     DO_SUM(OUT_D, OUT_D, M * 60); \
+     DO_SUM(OUT_D, OUT_D, S); \
  }
 
 static int mylex (int *, char **);
@@ -47,7 +95,7 @@ static int mylex (int *, char **);
 static int yyparse (void *);
 
 
-#line 77 "../../../../asrc/lib/krb5/krb/x-deltat.y"
+#line 125 "./x-deltat.y"
 typedef union { int val; } YYSTYPE;
 #include <stdio.h>
 
@@ -59,29 +107,25 @@ typedef union { int val; } YYSTYPE;
 
 
 
-#define	YYFINAL		41
+#define	YYFINAL		42
 #define	YYFLAG		-32768
-#define	YYNTBASE	12
+#define	YYNTBASE	13
 
-#define YYTRANSLATE(x) ((unsigned)(x) <= 259 ? yytranslate[x] : 21)
+#define YYTRANSLATE(x) ((unsigned)(x) <= 260 ? yytranslate[x] : 22)
 
 static const char yytranslate[] = {     0,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     5,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     2,     2,     2,     6,     2,     2,
+     2,     2,     2,     2,     6,     2,     2,     2,     2,     2,
+     2,     2,     2,     2,     2,     2,     2,     7,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     2,     2,     2,     2,     2,     7,
-     2,     2,     2,     8,     2,     2,     2,     2,     9,     2,
-     2,     2,     2,     2,    10,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+     2,     2,     2,     2,     2,     2,     2,     2,     2,     8,
+     2,     2,     2,     9,     2,     2,     2,     2,    10,     2,
+     2,     2,     2,     2,    11,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
@@ -91,33 +135,38 @@ static const char yytranslate[] = {     0,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
      2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
-     2,     2,     2,     2,     2,     1,     3,     4,    11
+     2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+     2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+     2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+     2,     2,     2,     2,     2,     2,     2,     2,     2,     2,
+     2,     2,     2,     2,     2,     1,     3,     4,     5,    12
 };
 
 #if YYDEBUG != 0
 static const short yyprhs[] = {     0,
-     0,     2,     4,     6,     8,    11,    12,    14,    17,    21,
-    25,    29,    32,    40,    46,    50,    52,    56,    58,    62,
-    64
+     0,     2,     4,     6,     8,    11,    12,    14,    17,    20,
+    24,    28,    32,    35,    43,    49,    53,    55,    57,    61,
+    63,    67,    69
 };
 
-static const short yyrhs[] = {    17,
-     0,     3,     0,     4,     0,    13,     0,     5,    13,     0,
-     0,    11,     0,    15,    14,     0,    16,     7,    18,     0,
-    16,     8,    19,     0,    16,     9,    20,     0,    16,    10,
-     0,    16,     5,     3,     6,     3,     6,     3,     0,    16,
-     6,     3,     6,     3,     0,    16,     6,     3,     0,    19,
-     0,    16,     8,    19,     0,    20,     0,    16,     9,    20,
-     0,    15,     0,    16,    10,     0
+static const short yyrhs[] = {    18,
+     0,     3,     0,     4,     0,    14,     0,     6,    14,     0,
+     0,    12,     0,    16,    15,     0,    16,     5,     0,    17,
+     8,    19,     0,    17,     9,    20,     0,    17,    10,    21,
+     0,    17,    11,     0,    17,     6,     3,     7,     3,     7,
+     3,     0,    17,     7,     3,     7,     3,     0,    17,     7,
+     3,     0,    17,     0,    20,     0,    17,     9,    20,     0,
+    21,     0,    17,    10,    21,     0,    16,     0,    17,    11,
+     0
 };
 
 #endif
 
 #if YYDEBUG != 0
 static const short yyrline[] = { 0,
-    88,    89,    89,    90,    90,    91,    91,    92,    93,    95,
-    96,    97,    98,    99,   100,   103,   105,   106,   108,   109,
-   111
+   136,   137,   137,   138,   138,   139,   139,   140,   141,   142,
+   144,   145,   146,   147,   148,   149,   150,   153,   155,   157,
+   159,   161,   163
 };
 #endif
 
@@ -125,69 +174,69 @@ static const short yyrline[] = { 0,
 #if YYDEBUG != 0 || defined (YYERROR_VERBOSE)
 
 static const char * const yytname[] = {   "$","error","$undefined.","NUM","LONGNUM",
-"'-'","':'","'d'","'h'","'m'","'s'","WS","start","posnum","num","ws","wsnum",
-"deltat","opt_hms","opt_ms","opt_s", NULL
+"OVERFLOW","'-'","':'","'d'","'h'","'m'","'s'","WS","start","posnum","num","ws",
+"wsnum","deltat","opt_hms","opt_ms","opt_s", NULL
 };
 #endif
 
 static const short yyr1[] = {     0,
-    12,    13,    13,    14,    14,    15,    15,    16,    17,    17,
-    17,    17,    17,    17,    17,    18,    18,    19,    19,    20,
-    20
+    13,    14,    14,    15,    15,    16,    16,    17,    17,    18,
+    18,    18,    18,    18,    18,    18,    18,    19,    19,    20,
+    20,    21,    21
 };
 
 static const short yyr2[] = {     0,
-     1,     1,     1,     1,     2,     0,     1,     2,     3,     3,
-     3,     2,     7,     5,     3,     1,     3,     1,     3,     1,
-     2
+     1,     1,     1,     1,     2,     0,     1,     2,     2,     3,
+     3,     3,     2,     7,     5,     3,     1,     1,     3,     1,
+     3,     1,     2
 };
 
 static const short yydefact[] = {     6,
-     7,     0,     0,     1,     2,     3,     0,     4,     8,     0,
-     0,     6,     6,     6,    12,     5,     0,    15,    20,     0,
-     9,    16,    18,     0,    10,     0,    11,     0,     0,     6,
-     6,    21,     0,    14,    17,    19,     0,    13,     0,     0,
-     0
+     7,     0,    17,     1,     2,     3,     9,     0,     4,     8,
+     0,     0,     6,     6,     6,    13,     5,     0,    16,    22,
+     0,    10,    18,    20,     0,    11,     0,    12,     0,     0,
+     6,     6,    23,     0,    15,    19,    21,     0,    14,     0,
+     0,     0
 };
 
-static const short yydefgoto[] = {    39,
-     8,     9,    19,    24,     4,    21,    22,    23
+static const short yydefgoto[] = {    40,
+     9,    10,    20,    25,     4,    22,    23,    24
 };
 
-static const short yypact[] = {    -9,
--32768,    12,    -1,-32768,-32768,-32768,     7,-32768,-32768,    10,
-    16,    -9,    -9,    -9,-32768,-32768,    20,    21,    12,    13,
--32768,-32768,-32768,    15,-32768,    18,-32768,    26,    27,    -9,
-    -9,-32768,    28,-32768,-32768,-32768,    29,-32768,    33,    35,
--32768
+static const short yypact[] = {   -10,
+-32768,    18,    -2,-32768,-32768,-32768,-32768,    13,-32768,-32768,
+    11,    16,   -10,   -10,   -10,-32768,-32768,    20,    21,    18,
+     1,-32768,-32768,-32768,    15,-32768,    19,-32768,    26,    28,
+   -10,   -10,-32768,    27,-32768,-32768,-32768,    30,-32768,    35,
+    36,-32768
 };
 
 static const short yypgoto[] = {-32768,
-    30,-32768,    36,     0,-32768,-32768,   -12,   -11
+    29,-32768,    38,     0,-32768,-32768,   -13,   -12
 };
 
 
-#define	YYLAST		37
+#define	YYLAST		38
 
 
 static const short yytable[] = {     3,
-    25,     1,    27,    10,    11,    12,    13,    14,    15,     5,
-     6,    20,    17,    26,     5,     6,     7,    35,    18,    36,
-    30,    31,    32,    31,    32,    28,    29,    32,    33,    34,
-    26,    38,    40,    37,    41,     2,    16
+    26,     1,    28,    11,    12,    13,    14,    15,    16,    31,
+    32,    33,    21,    18,    27,     5,     6,    36,    19,    37,
+     5,     6,     7,     8,    32,    33,    29,    30,    34,    33,
+    35,    27,    39,    38,    41,    42,    17,     2
 };
 
 static const short yycheck[] = {     0,
-    13,    11,    14,     5,     6,     7,     8,     9,    10,     3,
-     4,    12,     3,    14,     3,     4,     5,    30,     3,    31,
-     8,     9,    10,     9,    10,     6,     6,    10,     3,     3,
-    31,     3,     0,     6,     0,     0,     7
+    14,    12,    15,     6,     7,     8,     9,    10,    11,     9,
+    10,    11,    13,     3,    15,     3,     4,    31,     3,    32,
+     3,     4,     5,     6,    10,    11,     7,     7,     3,    11,
+     3,    32,     3,     7,     0,     0,     8,     0
 };
 #define YYPURE 1
 
 /* -*-C-*-  Note some compilers choke on comments on `#line' lines.  */
-#line 3 "/mit/gnu/share/bison.simple"
-/* This file comes from bison-1.27.  */
+#line 3 "/usr/share/bison.simple"
+/* This file comes from bison-1.28.  */
 
 /* Skeleton output parser for bison,
    Copyright (C) 1984, 1989, 1990 Free Software Foundation, Inc.
@@ -400,7 +449,7 @@ __yy_memcpy (char *to, char *from, unsigned int count)
 #endif
 #endif
 
-#line 216 "/mit/gnu/share/bison.simple"
+#line 217 "/usr/share/bison.simple"
 
 /* The user can define YYPARSE_PARAM as the name of an argument to be passed
    into yyparse.  The argument should have type void *.
@@ -729,56 +778,66 @@ yyreduce:
   switch (yyn) {
 
 case 5:
-#line 90 "../../../../asrc/lib/krb5/krb/x-deltat.y"
+#line 138 "./x-deltat.y"
 { yyval.val = - yyvsp[0].val; ;
     break;}
 case 8:
-#line 92 "../../../../asrc/lib/krb5/krb/x-deltat.y"
+#line 140 "./x-deltat.y"
 { yyval.val = yyvsp[0].val; ;
     break;}
 case 9:
-#line 94 "../../../../asrc/lib/krb5/krb/x-deltat.y"
-{ DO (yyvsp[-2].val,  0,  0, yyvsp[0].val); ;
+#line 141 "./x-deltat.y"
+{ YYERROR ;
     break;}
 case 10:
-#line 95 "../../../../asrc/lib/krb5/krb/x-deltat.y"
-{ DO ( 0, yyvsp[-2].val,  0, yyvsp[0].val); ;
+#line 143 "./x-deltat.y"
+{ DO (yyvsp[-2].val,  0,  0, yyvsp[0].val); ;
     break;}
 case 11:
-#line 96 "../../../../asrc/lib/krb5/krb/x-deltat.y"
-{ DO ( 0,  0, yyvsp[-2].val, yyvsp[0].val); ;
+#line 144 "./x-deltat.y"
+{ DO ( 0, yyvsp[-2].val,  0, yyvsp[0].val); ;
     break;}
 case 12:
-#line 97 "../../../../asrc/lib/krb5/krb/x-deltat.y"
-{ DO ( 0,  0,  0, yyvsp[-1].val); ;
+#line 145 "./x-deltat.y"
+{ DO ( 0,  0, yyvsp[-2].val, yyvsp[0].val); ;
     break;}
 case 13:
-#line 98 "../../../../asrc/lib/krb5/krb/x-deltat.y"
-{ DO (yyvsp[-6].val, yyvsp[-4].val, yyvsp[-2].val, yyvsp[0].val); ;
+#line 146 "./x-deltat.y"
+{ DO ( 0,  0,  0, yyvsp[-1].val); ;
     break;}
 case 14:
-#line 99 "../../../../asrc/lib/krb5/krb/x-deltat.y"
-{ DO ( 0, yyvsp[-4].val, yyvsp[-2].val, yyvsp[0].val); ;
+#line 147 "./x-deltat.y"
+{ DO (yyvsp[-6].val, yyvsp[-4].val, yyvsp[-2].val, yyvsp[0].val); ;
     break;}
 case 15:
-#line 100 "../../../../asrc/lib/krb5/krb/x-deltat.y"
+#line 148 "./x-deltat.y"
+{ DO ( 0, yyvsp[-4].val, yyvsp[-2].val, yyvsp[0].val); ;
+    break;}
+case 16:
+#line 149 "./x-deltat.y"
 { DO ( 0, yyvsp[-2].val, yyvsp[0].val,  0); ;
     break;}
 case 17:
-#line 105 "../../../../asrc/lib/krb5/krb/x-deltat.y"
-{ yyval.val = yyvsp[-2].val * 3600 + yyvsp[0].val; ;
+#line 150 "./x-deltat.y"
+{ DO ( 0,  0,  0, yyvsp[0].val); ;
     break;}
 case 19:
-#line 108 "../../../../asrc/lib/krb5/krb/x-deltat.y"
-{ yyval.val = yyvsp[-2].val * 60 + yyvsp[0].val; ;
+#line 155 "./x-deltat.y"
+{ if (HOUR_NOT_OK(yyvsp[-2].val)) YYERROR;
+	                                  DO_SUM(yyval.val, yyvsp[-2].val * 3600, yyvsp[0].val); ;
     break;}
-case 20:
-#line 110 "../../../../asrc/lib/krb5/krb/x-deltat.y"
+case 21:
+#line 159 "./x-deltat.y"
+{ if (MIN_NOT_OK(yyvsp[-2].val)) YYERROR;
+	                                  DO_SUM(yyval.val, yyvsp[-2].val * 60, yyvsp[0].val); ;
+    break;}
+case 22:
+#line 162 "./x-deltat.y"
 { yyval.val = 0; ;
     break;}
 }
    /* the action file gets copied in in place of this dollarsign */
-#line 542 "/mit/gnu/share/bison.simple"
+#line 543 "/usr/share/bison.simple"
 
   yyvsp -= yylen;
   yyssp -= yylen;
@@ -998,11 +1057,11 @@ yyerrhandle:
     }
   return 1;
 }
-#line 113 "../../../../asrc/lib/krb5/krb/x-deltat.y"
+#line 165 "./x-deltat.y"
 
 
 static int
-mylex (int *intp, char **pp)
+mylex (krb5_int32 *intp, char **pp)
 {
     int num, c;
 #define P (*pp)
@@ -1032,8 +1091,12 @@ mylex (int *intp, char **pp)
     case '9':
 	/* XXX assumes ASCII */
 	num = c - '0';
-	while (isdigit (*P)) {
+	while (isdigit ((int) *P)) {
+	  if (num > MAX_TIME / 10) 
+	    return OVERFLOW;
 	    num *= 10;
+	    if (num > MAX_TIME - (*P - '0')) 
+	      return OVERFLOW;
 	    num += *P++ - '0';
 	}
 	*intp = num;
@@ -1041,7 +1104,7 @@ mylex (int *intp, char **pp)
     case ' ':
     case '\t':
     case '\n':
-	while (isspace (*P))
+	while (isspace ((int) *P))
 	    P++;
 	return WS;
     default:
@@ -1049,16 +1112,14 @@ mylex (int *intp, char **pp)
     }
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_string_to_deltat(string, deltatp)
-    char	FAR * string;
-    krb5_deltat	FAR * deltatp;
+krb5_error_code KRB5_CALLCONV
+krb5_string_to_deltat(char *string, krb5_deltat *deltatp)
 {
     struct param p;
     p.delta = 0;
     p.p = string;
     if (yyparse (&p))
-	return EINVAL;
+	return KRB5_DELTAT_BADFORMAT;
     *deltatp = p.delta;
     return 0;
 }

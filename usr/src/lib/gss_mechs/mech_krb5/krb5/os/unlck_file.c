@@ -29,9 +29,7 @@
 #include <stdio.h>
 
 krb5_error_code
-krb5_unlock_file(context, fd)
-    krb5_context context;
-    int fd;
+krb5_unlock_file(krb5_context context, int fd)
 {
     return krb5_lock_file(context, fd, KRB5_LOCKMODE_UNLOCK);
 }

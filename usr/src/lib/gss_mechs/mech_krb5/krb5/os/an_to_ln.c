@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #if	HAVE_REGEX_H
 #include <regex.h>
 #endif	/* HAVE_REGEX_H */
+#include <string.h>
 /*
  * Use compile(3) if no regcomp present.
  */
@@ -68,9 +69,9 @@
 #define	KDBM_CLOSE(db)		dbm_close(db)
 #define	KDBM_FETCH(db, key)	dbm_fetch(db, key)
 #else /*ANAME_DB*/
-extern DBM	*db_dbm_open KRB5_PROTOTYPE((char *, int, int));
-extern void	db_dbm_close KRB5_PROTOTYPE((DBM *));
-extern datum	db_dbm_fetch KRB5_PROTOTYPE((DBM *, datum));
+extern DBM	*db_dbm_open (char *, int, int);
+extern void	db_dbm_close (DBM *);
+extern datum	db_dbm_fetch (DBM *, datum);
 #define KDBM_OPEN(db, fl, mo)	db_dbm_open(db, fl, mo)
 #define KDBM_CLOSE(db)		db_dbm_close(db)
 #define KDBM_FETCH(db, key)	db_dbm_fetch(db, key)
@@ -114,10 +115,10 @@ db_an_to_ln(context, dbname, aname, lnsize, lname)
     krb5_context context;
     char *dbname;
     krb5_const_principal aname;
-    const int lnsize;
+    const unsigned int lnsize;
     char *lname;
 {
-#if	(!defined(_MSDOS) && !defined(_WIN32) && !defined(macintosh))
+#if !defined(_WIN32)
     DBM *db;
     krb5_error_code retval;
     datum key, contents;
@@ -153,13 +154,13 @@ db_an_to_ln(context, dbname, aname, lnsize, lname)
     /* can't close until we copy the contents. */
     (void) KDBM_CLOSE(db);
     return retval;
-#else	/* !_MSDOS && !_WIN32 && !MACINTOSH */
+#else	/* !_WIN32 && !MACINTOSH */
     /*
      * If we don't have support for a database mechanism, then we can't
      * translate this now, can we?
      */
     return KRB5_LNAME_NOTRANS;
-#endif	/* !_MSDOS && !_WIN32 && !MACINTOSH */
+#endif	/* !_WIN32 && !MACINTOSH */
 }
 #endif /*ANAME_DB*/
 
@@ -562,17 +563,17 @@ rule_an_to_ln(krb5_context context, char *rule,
 					     < MAX_FORMAT_BUFFER)) {
 					selstring_used += datap->length;
 				    } else {
-					kret = KRB5_LNAME_NOTRANS;
+					kret = ENOMEM;
 					goto errout;
 				    }
 				    strncpy(cout,
 					    datap->data,
-					    datap->length);
+					    (unsigned) datap->length);
 				    cout += datap->length;
 				    *cout = '\0';
 				    current++;
 				    /* Point past number */
-				    while (isdigit(*current))
+				    while (isdigit((int) *current))
 					current++;
 				}
 				else
@@ -695,7 +696,7 @@ default_an_to_ln(krb5_context context, krb5_const_principal aname,
 {
     krb5_error_code retval;
     char *def_realm;
-    int realm_length;
+    unsigned int realm_length;
 
     realm_length = krb5_princ_realm(context, aname)->length;
 
@@ -756,7 +757,7 @@ default_an_to_ln(krb5_context context, krb5_const_principal aname,
 
 krb5_error_code
 krb5_aname_to_localname(krb5_context context,
-	krb5_const_principal aname, const int lnsize, char *lname)
+	krb5_const_principal aname, const int lnsize_in, char *lname)
 {
     krb5_error_code	kret;
     char		*realm;
@@ -767,9 +768,12 @@ krb5_aname_to_localname(krb5_context context,
     int			i, nvalid;
     char		*cp, *s;
     char		*typep, *argp;
+    unsigned int        lnsize;
 
-    if (lnsize < 0)
+    if (lnsize_in < 0)
 	return KRB5_CONFIG_NOTENUFSPACE;
+
+    lnsize = lnsize_in; /* Unsigned */
 
     /*
      * First get the default realm.

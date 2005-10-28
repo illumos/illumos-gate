@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,9 +126,9 @@ krb5_error_code KRB5_CALLCONV
 krb5_mk_priv(
     krb5_context 	  context,
     krb5_auth_context 	  auth_context,
-    const krb5_data   	FAR * userdata,
-    krb5_data         	FAR * outbuf,
-    krb5_replay_data  	FAR * outdata)
+    const krb5_data   	  *userdata,
+    krb5_data         	  *outbuf,
+    krb5_replay_data  	  *outdata)
 {
     krb5_error_code 	  retval;
     krb5_keyblock       * keyblock;

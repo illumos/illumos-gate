@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,127 +45,127 @@ typedef struct _krb5_fulladdr {
     krb5_ui_4		port;
 } krb5_fulladdr;
 
-krb5_error_code check_hot_list PROTOTYPE((krb5_ticket *));
-krb5_boolean realm_compare PROTOTYPE((krb5_principal, krb5_principal));
-krb5_boolean krb5_is_tgs_principal PROTOTYPE((krb5_principal));
-krb5_error_code add_to_transited PROTOTYPE((krb5_data *,
+krb5_error_code check_hot_list (krb5_ticket *);
+krb5_boolean realm_compare (krb5_principal, krb5_principal);
+krb5_boolean krb5_is_tgs_principal (krb5_principal);
+krb5_error_code add_to_transited (krb5_data *,
 					    krb5_data *,
 					    krb5_principal,
 					    krb5_principal,
-					    krb5_principal));
-krb5_error_code compress_transited PROTOTYPE((krb5_data *,
+					    krb5_principal);
+krb5_error_code compress_transited (krb5_data *,
 					      krb5_principal,
-					      krb5_data *));
-krb5_error_code concat_authorization_data PROTOTYPE((krb5_authdata **,
+					      krb5_data *);
+krb5_error_code concat_authorization_data (krb5_authdata **,
 						     krb5_authdata **,
-						     krb5_authdata ***));
-krb5_error_code fetch_last_req_info PROTOTYPE((krb5_db_entry *,
-					       krb5_last_req_entry ***));
+						     krb5_authdata ***);
+krb5_error_code fetch_last_req_info (krb5_db_entry *,
+					       krb5_last_req_entry ***);
 
-krb5_error_code kdc_convert_key PROTOTYPE((krb5_keyblock *,
+krb5_error_code kdc_convert_key (krb5_keyblock *,
 					   krb5_keyblock *,
-					   int));
+					   int);
 krb5_error_code kdc_process_tgs_req 
-	PROTOTYPE((krb5_kdc_req *,
+	(krb5_kdc_req *,
 	           const krb5_fulladdr *,
 	           krb5_data *,
 	           krb5_ticket **,
-	           krb5_keyblock **));
+	           krb5_keyblock **);
 
-krb5_error_code kdc_get_server_key PROTOTYPE((krb5_ticket *,
+krb5_error_code kdc_get_server_key (krb5_ticket *,
 					      krb5_keyblock **,
-					      krb5_kvno *));
+					      krb5_kvno *);
 
-int validate_as_request PROTOTYPE((krb5_kdc_req *, krb5_db_entry, 
+int validate_as_request (krb5_kdc_req *, krb5_db_entry, 
 					  krb5_db_entry, krb5_timestamp,
-					  const char **));
+					  const char **);
 
-int validate_tgs_request PROTOTYPE((krb5_kdc_req *, krb5_db_entry, 
+int validate_tgs_request (krb5_kdc_req *, krb5_db_entry, 
 					  krb5_ticket *, krb5_timestamp,
-					  const char **));
+					  const char **);
 
-int fetch_asn1_field PROTOTYPE((unsigned char *, unsigned int, unsigned int,
-				 krb5_data *));
+int fetch_asn1_field (unsigned char *, unsigned int, unsigned int,
+				 krb5_data *);
 
 int
-dbentry_has_key_for_enctype PROTOTYPE((krb5_context context,
+dbentry_has_key_for_enctype (krb5_context context,
 				       krb5_db_entry *client,
-				       krb5_enctype enctype));
+				       krb5_enctype enctype);
     
 int
-dbentry_supports_enctype PROTOTYPE((krb5_context context,
+dbentry_supports_enctype (krb5_context context,
 				    krb5_db_entry *client,
-				    krb5_enctype enctype));
+				    krb5_enctype enctype);
 
 krb5_enctype
-select_session_keytype PROTOTYPE((krb5_context context,
+select_session_keytype (krb5_context context,
 				  krb5_db_entry *server,
 				  int nktypes,
-				  krb5_enctype *ktypes));
+				  krb5_enctype *ktypes);
 
 krb5_error_code
-get_salt_from_key PROTOTYPE((krb5_context, krb5_principal,
-			     krb5_key_data *, krb5_data *));
+get_salt_from_key (krb5_context, krb5_principal,
+			     krb5_key_data *, krb5_data *);
 
-void limit_string PROTOTYPE((char *name));
+void limit_string (char *name);
 
 /* do_as_req.c */
-krb5_error_code process_as_req PROTOTYPE((krb5_kdc_req *,
+krb5_error_code process_as_req (krb5_kdc_req *,
 					  const krb5_fulladdr *,
 					  int,
-					  krb5_data ** ));
+					  krb5_data ** );
 
 /* do_tgs_req.c */
-krb5_error_code process_tgs_req PROTOTYPE((krb5_data *,
+krb5_error_code process_tgs_req (krb5_data *,
 					   const krb5_fulladdr *,
 					   int, 
-					   krb5_data ** ));
+					   krb5_data ** );
 /* dispatch.c */
-krb5_error_code dispatch PROTOTYPE((krb5_data *,
+krb5_error_code dispatch (krb5_data *,
 				    const krb5_fulladdr *,
 				    int,
-				    krb5_data **));
+				    krb5_data **);
 
 /* main.c */
-krb5_error_code kdc_initialize_rcache PROTOTYPE((krb5_context, char *));
+krb5_error_code kdc_initialize_rcache (krb5_context, char *);
 
-krb5_error_code setup_server_realm PROTOTYPE((krb5_principal));
+krb5_error_code setup_server_realm (krb5_principal);
 
 /* network.c */
-krb5_error_code listen_and_process PROTOTYPE((const char *));
-krb5_error_code setup_network PROTOTYPE((const char *));
-krb5_error_code closedown_network PROTOTYPE((const char *));
+krb5_error_code listen_and_process (const char *);
+krb5_error_code setup_network (const char *);
+krb5_error_code closedown_network (const char *);
 
 /* policy.c */
-int against_local_policy_as PROTOTYPE((krb5_kdc_req *, krb5_db_entry,
+int against_local_policy_as (krb5_kdc_req *, krb5_db_entry,
 					krb5_db_entry, krb5_timestamp,
-					const char **));
+					const char **);
 
-int against_local_policy_tgs PROTOTYPE((krb5_kdc_req *, krb5_db_entry,
-					krb5_ticket *, const char **));
+int against_local_policy_tgs (krb5_kdc_req *, krb5_db_entry,
+					krb5_ticket *, const char **);
 
 /* kdc_preauth.c */
 const char * missing_required_preauth
-    PROTOTYPE((krb5_db_entry *client, krb5_db_entry *server,
-	       krb5_enc_tkt_part *enc_tkt_reply));
-void get_preauth_hint_list PROTOTYPE((krb5_kdc_req * request,
+    (krb5_db_entry *client, krb5_db_entry *server,
+	       krb5_enc_tkt_part *enc_tkt_reply);
+void get_preauth_hint_list (krb5_kdc_req * request,
 				      krb5_db_entry *client,
 				      krb5_db_entry *server,
-				      krb5_data *e_data));
+				      krb5_data *e_data);
 krb5_error_code check_padata
-    PROTOTYPE((krb5_context context, krb5_db_entry *client,
-	       krb5_kdc_req *request, krb5_enc_tkt_part *enc_tkt_reply));
+    (krb5_context context, krb5_db_entry *client,
+	       krb5_kdc_req *request, krb5_enc_tkt_part *enc_tkt_reply);
     
 krb5_error_code return_padata
-    PROTOTYPE((krb5_context context, krb5_db_entry *client,
+    (krb5_context context, krb5_db_entry *client,
 	       krb5_kdc_req *request, krb5_kdc_rep *reply,
-	       krb5_key_data *client_key, krb5_keyblock *encrypting_key));
+	       krb5_key_data *client_key, krb5_keyblock *encrypting_key);
     
 /* replay.c */
-krb5_boolean kdc_check_lookaside PROTOTYPE((krb5_data *, const krb5_fulladdr *,
-					    krb5_data **));
-void kdc_insert_lookaside PROTOTYPE((krb5_data *, const krb5_fulladdr *,
-				     krb5_data *));
+krb5_boolean kdc_check_lookaside (krb5_data *, const krb5_fulladdr *,
+					    krb5_data **);
+void kdc_insert_lookaside (krb5_data *, const krb5_fulladdr *,
+				     krb5_data *);
 
 /* sock2p.c */
 #ifndef HAVE_INET_NTOP
@@ -183,10 +183,10 @@ extern void sockaddr2p (const struct sockaddr *, char *, size_t, int *);
 #define clear(flagfield, flag) (flagfield &= ~(flag))
 
 #ifdef KRB5_KRB4_COMPAT
-krb5_error_code process_v4 PROTOTYPE((const krb5_data *,
+krb5_error_code process_v4 (const krb5_data *,
 				      const krb5_fulladdr *,
 				      int is_secondary,
-				      krb5_data **));
+				      krb5_data **);
 #else
 #define process_v4(foo,bar,quux,foobar)	KRB5KRB_AP_ERR_BADVERSION
 #endif

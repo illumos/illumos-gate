@@ -72,16 +72,17 @@ typedef WSABUF sg_buf;
 /* If this source file requires it, define struct sockaddr_in
    (and possibly other things related to network I/O).  */
 
-#ifdef HAVE_MACSOCK_H		/* Sockets stuff differs on Mac */
-#include "macsock.h"		/* Macintosh sockets emulation library */
-#else  /* ! HAVE_MACSOCK_H */	/* Sockets stuff for Unix machines */
-
 #include "autoconf.h"
 
 #include <sys/types.h>
 #include <netinet/in.h>		/* For struct sockaddr_in and in_addr */
 #include <arpa/inet.h>		/* For inet_ntoa */
-#include <netdb.h>		/* For struct hostent, gethostbyname, etc */
+#include <netdb.h>
+
+#ifndef HAVE_NETDB_H_H_ERRNO
+extern int h_errno;		/* In case it's missing, e.g., HP-UX 10.20. */
+#endif
+
 #include <sys/param.h>		/* For MAXHOSTNAMELEN */
 #include <sys/socket.h>		/* For SOCK_*, AF_*, etc */
 #include <sys/time.h>		/* For struct timeval */
@@ -89,7 +90,6 @@ typedef WSABUF sg_buf;
 #ifdef HAVE_SYS_UIO_H
 #include <sys/uio.h>		/* For struct iovec, for sg_buf */
 #endif
-
 #ifdef HAVE_SYS_FILIO_H
 #include <sys/filio.h>		/* For FIONBIO on Solaris.  */
 #endif
@@ -160,18 +160,16 @@ typedef struct iovec sg_buf;
 #define inet_ntop(AF,SRC,DST,CNT)					    \
     ((AF) == AF_INET							    \
      ? ((CNT) < 16							    \
-	? (SOCKET_SET_ERRNO(ENOSPC), NULL)				    \
+	? (SOCKET_SET_ERRNO(ENOSPC), (const char *)NULL)		    \
 	: (sprintf((DST), "%d.%d.%d.%d",				    \
 		   ((const unsigned char *)(const void *)(SRC))[0] & 0xff,  \
 		   ((const unsigned char *)(const void *)(SRC))[1] & 0xff,  \
 		   ((const unsigned char *)(const void *)(SRC))[2] & 0xff,  \
 		   ((const unsigned char *)(const void *)(SRC))[3] & 0xff), \
 	   (DST)))							    \
-     : (SOCKET_SET_ERRNO(EAFNOSUPPORT), NULL))
+     : (SOCKET_SET_ERRNO(EAFNOSUPPORT), (const char *)NULL))
 #define HAVE_INET_NTOP
 #endif
-
-#endif /* HAVE_MACSOCK_H */
 
 #endif /* _WIN32 */
 

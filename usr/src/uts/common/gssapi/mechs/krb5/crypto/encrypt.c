@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -172,14 +172,10 @@ init_key_uef(CK_SESSION_HANDLE hSession, krb5_keyblock *key)
 #endif /* _KERNEL */
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_c_encrypt(context, key, usage, ivec, input, output)
-     krb5_context context;
-     krb5_const krb5_keyblock *key;
-     krb5_keyusage usage;
-     krb5_const krb5_data *ivec;
-     krb5_const krb5_data *input;
-     krb5_enc_data *output;
+krb5_error_code KRB5_CALLCONV 
+krb5_c_encrypt(krb5_context context, const krb5_keyblock *key,
+	    krb5_keyusage usage, const krb5_data *ivec,
+	    const krb5_data *input, krb5_enc_data *output)
 {
     krb5_error_code ret;
     int i;

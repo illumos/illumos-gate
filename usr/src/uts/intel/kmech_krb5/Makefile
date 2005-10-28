@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -83,4 +83,6 @@ include $(UTSBASE)/intel/Makefile.targ
 INC_PATH += \
 	-I$(UTSBASE)/common/gssapi \
 	-I$(UTSBASE)/common/gssapi/include \
-	-I$(UTSBASE)/common/gssapi/mechs/krb5/include
+	-I$(UTSBASE)/common/gssapi/mechs/krb5/include \
+	-I$(SRC)/lib/gss_mechs/mech_krb5/include \
+	-I$(SRC)/lib/gss_mechs/mech_krb5/krb5/krb

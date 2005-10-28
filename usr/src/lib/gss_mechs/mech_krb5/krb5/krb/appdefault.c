@@ -1,9 +1,14 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * appdefault - routines designed to be called from applications to
  *		 handle the [appdefaults] profile section
  */
-
 #include <stdio.h>
 #include <string.h>
 #include <k5-int.h>
@@ -11,20 +16,19 @@
 
 
  /*xxx Duplicating this is annoying; try to work on a better way.*/
-static char *conf_yes[] = {
+static const char *conf_yes[] = {
 	"y", "yes", "true", "t", "1", "on",
 	0,
 };
 
-static char *conf_no[] = {
+static const char *conf_no[] = {
 	"n", "no", "false", "nil", "0", "off",
 	0,
 };
 
-static int conf_boolean(s)
-	char *s;
+static int conf_boolean(char *s)
 {
-	char **p;
+	const char * const *p;
 	for(p=conf_yes; *p; p++) {
 		if (!strcasecmp(*p,s))
 			return 1;
@@ -37,12 +41,9 @@ static int conf_boolean(s)
 	return 0;
 }
 
-static krb5_error_code appdefault_get(context, appname, realm, option,
-				ret_value)
-        krb5_context context;
-	const char *appname, *option;
-        const krb5_data *realm;
-	char **ret_value;
+static krb5_error_code appdefault_get(krb5_context context,
+			const char *appname, const krb5_data *realm,
+			const char *option, char **ret_value)
 {
         profile_t profile;
         const char *names[5];
@@ -142,14 +143,11 @@ goodbye:
 	return 0;
 }
 
-KRB5_DLLIMP void KRB5_CALLCONV 
-krb5_appdefault_boolean(context, appname, realm, option,
-			default_value, ret_value)
-        krb5_context context;
-	const char *appname,  *option;
-        const krb5_data *realm;
-	int default_value;
-	int *ret_value;
+void KRB5_CALLCONV 
+krb5_appdefault_boolean(krb5_context context,
+		const char *appname, const krb5_data *realm,
+		const char *option, int default_value,
+		int *ret_value)
 {
 	char *string = NULL;
 	krb5_error_code retval;
@@ -163,14 +161,11 @@ krb5_appdefault_boolean(context, appname, realm, option,
 		*ret_value = default_value;
 }
 
-KRB5_DLLIMP void KRB5_CALLCONV 
-krb5_appdefault_string(context, appname, realm, option, default_value,
-		       ret_value)
-     krb5_context context;
-	const char *appname, *option, *default_value;
-	char **ret_value;
-     const krb5_data *realm;
-	{
+void KRB5_CALLCONV 
+krb5_appdefault_string(krb5_context context, const char *appname,
+		const krb5_data *realm, const char *option,
+		const char *default_value, char **ret_value)
+{
 	krb5_error_code retval;
 	char *string;
 

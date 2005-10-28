@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,11 +46,8 @@
  returns system errors
 */
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_mk_rep(context, auth_context, outbuf)
-    krb5_context 	  context;
-    krb5_auth_context	  auth_context;
-    krb5_data 		FAR * outbuf;
+krb5_error_code KRB5_CALLCONV
+krb5_mk_rep(krb5_context context, krb5_auth_context auth_context, krb5_data *outbuf)
 {
     krb5_error_code 	  retval;
     krb5_ap_rep_enc_part  repl;

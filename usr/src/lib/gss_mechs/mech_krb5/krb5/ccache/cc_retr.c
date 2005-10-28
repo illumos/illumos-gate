@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
  */
 
 #include <k5-int.h>
+#include "cc-int.h"
 
 #define KRB5_OK 0
 
@@ -42,9 +43,7 @@
 #define times_match_exact(t1,t2) (memcmp((char *)(t1), (char *)(t2), sizeof(*(t1))) == 0)
 
 static krb5_boolean
-times_match(t1, t2)
-     const krb5_ticket_times *t1;
-     const krb5_ticket_times *t2;
+times_match(const krb5_ticket_times *t1, const krb5_ticket_times *t2)
 {
     if (t1->renew_till) {
 	if (t1->renew_till > t2->renew_till)
@@ -59,10 +58,7 @@ times_match(t1, t2)
 }
 
 static krb5_boolean
-standard_fields_match(context, mcreds, creds)
-krb5_context		context;
-const krb5_creds	*mcreds;
-const krb5_creds	*creds;
+standard_fields_match(krb5_context context, const krb5_creds *mcreds, const krb5_creds *creds)
 {
   return (krb5_principal_compare(context, mcreds->client,creds->client)
 	  && krb5_principal_compare(context, mcreds->server,creds->server));
@@ -71,9 +67,7 @@ const krb5_creds	*creds;
 /* only match the server name portion, not the server realm portion */
 
 static krb5_boolean
-srvname_match(context, mcreds, creds)
-   krb5_context context;
-   const krb5_creds *mcreds, *creds;
+srvname_match(krb5_context context, const krb5_creds *mcreds, const krb5_creds *creds)
 {
     krb5_boolean retval;
     krb5_principal_data p1, p2;
@@ -91,8 +85,7 @@ srvname_match(context, mcreds, creds)
 }
 
 static krb5_boolean
-authdata_match(mdata, data)
-     krb5_authdata * const *mdata, * const *data;
+authdata_match(krb5_authdata *const *mdata, krb5_authdata *const *data) 
 {
     const krb5_authdata *mdatap, *datap;
 
@@ -110,7 +103,7 @@ authdata_match(mdata, data)
       if ((mdatap->ad_type != datap->ad_type) ||
           (mdatap->length != datap->length) ||
           (memcmp ((char *)mdatap->contents,
-		 (char *)datap->contents, mdatap->length) != 0))
+		(char *)datap->contents, (unsigned) mdatap->length) != 0))
           return FALSE;
       mdata++;
       data++;
@@ -119,8 +112,7 @@ authdata_match(mdata, data)
 }
 
 static krb5_boolean
-data_match(data1, data2)
-     const krb5_data *data1, *data2;
+data_match(const krb5_data *data1, const krb5_data *data2)
 {
     if (!data1) {
 	if (!data2)
@@ -133,7 +125,8 @@ data_match(data1, data2)
     if (data1->length != data2->length)
 	return FALSE;
     else
-	return memcmp(data1->data, data2->data, data1->length) ? FALSE : TRUE;
+	return memcmp(data1->data, data2->data, (unsigned) data1->length)
+		? FALSE : TRUE;
 }
 
 static int
@@ -173,16 +166,42 @@ pref (krb5_enctype my_ktype, int nktypes, krb5_enctype *ktypes)
  * KRB5_CC_NOT_KTYPE
  */
 
+krb5_boolean
+krb5int_cc_creds_match_request(krb5_context context, krb5_flags whichfields, krb5_creds *mcreds, krb5_creds *creds)
+{
+    if (((set(KRB5_TC_MATCH_SRV_NAMEONLY) &&
+		   srvname_match(context, mcreds, creds)) ||
+	       standard_fields_match(context, mcreds, creds))
+	      &&
+	      (! set(KRB5_TC_MATCH_IS_SKEY) ||
+	       mcreds->is_skey == creds->is_skey)
+	      &&
+	      (! set(KRB5_TC_MATCH_FLAGS_EXACT) ||
+	       mcreds->ticket_flags == creds->ticket_flags)
+	      &&
+	      (! set(KRB5_TC_MATCH_FLAGS) ||
+	       flags_match(mcreds->ticket_flags, creds->ticket_flags))
+	      &&
+	      (! set(KRB5_TC_MATCH_TIMES_EXACT) ||
+	       times_match_exact(&mcreds->times, &creds->times))
+	      &&
+	      (! set(KRB5_TC_MATCH_TIMES) ||
+	       times_match(&mcreds->times, &creds->times))
+	      &&
+	      ( ! set(KRB5_TC_MATCH_AUTHDATA) ||
+	       authdata_match(mcreds->authdata, creds->authdata))
+	      &&
+	      (! set(KRB5_TC_MATCH_2ND_TKT) ||
+	       data_match (&mcreds->second_ticket, &creds->second_ticket))
+	      &&
+	     ((! set(KRB5_TC_MATCH_KTYPE))||
+		(mcreds->keyblock.enctype == creds->keyblock.enctype)))
+        return TRUE;
+    return FALSE;
+}
+
 static krb5_error_code
-krb5_cc_retrieve_cred_seq (context, id, whichfields,
-			   mcreds, creds, nktypes, ktypes)
-   krb5_context context;
-   krb5_ccache id;
-   krb5_flags whichfields;
-   krb5_creds *mcreds;
-   krb5_creds *creds;
-   int nktypes;
-   krb5_enctype *ktypes;
+krb5_cc_retrieve_cred_seq (krb5_context context, krb5_ccache id, krb5_flags whichfields, krb5_creds *mcreds, krb5_creds *creds, int nktypes, krb5_enctype *ktypes)
 {
      /* This function could be considerably faster if it kept indexing */
      /* information.. sounds like a "next version" idea to me. :-) */
@@ -205,33 +224,7 @@ krb5_cc_retrieve_cred_seq (context, id, whichfields,
 	  return kret;
 
      while ((kret = krb5_cc_next_cred(context, id, &cursor, &fetchcreds)) == KRB5_OK) {
-	 if (((set(KRB5_TC_MATCH_SRV_NAMEONLY) &&
-		   srvname_match(context, mcreds, &fetchcreds)) ||
-	       standard_fields_match(context, mcreds, &fetchcreds))
-	      &&
-	      (! set(KRB5_TC_MATCH_IS_SKEY) ||
-	       mcreds->is_skey == fetchcreds.is_skey)
-	      &&
-	      (! set(KRB5_TC_MATCH_FLAGS_EXACT) ||
-	       mcreds->ticket_flags == fetchcreds.ticket_flags)
-	      &&
-	      (! set(KRB5_TC_MATCH_FLAGS) ||
-	       flags_match(mcreds->ticket_flags, fetchcreds.ticket_flags))
-	      &&
-	      (! set(KRB5_TC_MATCH_TIMES_EXACT) ||
-	       times_match_exact(&mcreds->times, &fetchcreds.times))
-	      &&
-	      (! set(KRB5_TC_MATCH_TIMES) ||
-	       times_match(&mcreds->times, &fetchcreds.times))
-	      &&
-	      ( ! set(KRB5_TC_MATCH_AUTHDATA) ||
-	       authdata_match(mcreds->authdata, fetchcreds.authdata))
-	      &&
-	      (! set(KRB5_TC_MATCH_2ND_TKT) ||
-	       data_match (&mcreds->second_ticket, &fetchcreds.second_ticket))
-	      &&
-	     ((! set(KRB5_TC_MATCH_KTYPE))||
-		(mcreds->keyblock.enctype == fetchcreds.keyblock.enctype)))
+	    if (krb5int_cc_creds_match_request(context, whichfields, mcreds, &fetchcreds))
 	  {
 	      if (ktypes) {
 		  fetched.pref = pref (fetchcreds.keyblock.enctype,
@@ -269,12 +262,7 @@ krb5_cc_retrieve_cred_seq (context, id, whichfields,
 }
 
 krb5_error_code KRB5_CALLCONV
-krb5_cc_retrieve_cred_default (context, id, flags, mcreds, creds)
-   krb5_context context;
-   krb5_ccache id;
-   krb5_flags flags;
-   krb5_creds *mcreds;
-   krb5_creds *creds;
+krb5_cc_retrieve_cred_default (krb5_context context, krb5_ccache id, krb5_flags flags, krb5_creds *mcreds, krb5_creds *creds)
 {
     krb5_enctype *ktypes;
     int nktypes;

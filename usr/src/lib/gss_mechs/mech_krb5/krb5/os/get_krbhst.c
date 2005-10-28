@@ -59,10 +59,7 @@
  */
 
 krb5_error_code
-krb5_get_krbhst(context, realm, hostlist)
-    krb5_context context;
-    const krb5_data *realm;
-    char ***hostlist;
+krb5_get_krbhst(krb5_context context, const krb5_data *realm, char ***hostlist)
 {
     char	**values, **cpp, *cp;
     const char	*realm_kdc_names[4];
@@ -110,7 +107,7 @@ krb5_get_krbhst(context, realm, hostlist)
         goto cleanup;
     }
     for (i = 0; i < count; i++) {
-	int len = strlen (values[i]) + 1;
+	unsigned int len = strlen (values[i]) + 1;
         rethosts[i] = malloc(len);
         if (!rethosts[i]) {
             retval = ENOMEM;

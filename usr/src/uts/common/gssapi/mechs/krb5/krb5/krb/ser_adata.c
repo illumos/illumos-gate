@@ -27,6 +27,7 @@
  * ser_adata.c - Serialize a krb5_authdata structure.
  */
 #include <k5-int.h>
+#include <int-proto.h>
 
 /*
  * Routines to deal with externalizing the krb5_authdata:
@@ -35,11 +36,11 @@
  *	krb5_authdata_internalize();
  */
 static krb5_error_code krb5_authdata_size
-	KRB5_PROTOTYPE((krb5_context, krb5_pointer, size_t *));
+	(krb5_context, krb5_pointer, size_t *);
 static krb5_error_code krb5_authdata_externalize
-	KRB5_PROTOTYPE((krb5_context, krb5_pointer, krb5_octet **, size_t *));
+	(krb5_context, krb5_pointer, krb5_octet **, size_t *);
 static krb5_error_code krb5_authdata_internalize
-	KRB5_PROTOTYPE((krb5_context,krb5_pointer *, krb5_octet **, size_t *));
+	(krb5_context, krb5_pointer *, krb5_octet **, size_t *);
 
 /* Local data */
 static const krb5_ser_entry krb5_authdata_ser_entry = {
@@ -55,10 +56,7 @@ static const krb5_ser_entry krb5_authdata_ser_entry = {
  */
 /*ARGSUSED*/
 static krb5_error_code
-krb5_authdata_size(kcontext, arg, sizep)
-    krb5_context	kcontext;
-    krb5_pointer	arg;
-    size_t		*sizep;
+krb5_authdata_size(krb5_context kcontext, krb5_pointer arg, size_t *sizep)
 {
     krb5_error_code	kret;
     krb5_authdata	*authdata;
@@ -88,11 +86,7 @@ krb5_authdata_size(kcontext, arg, sizep)
  * krb5_authdata_externalize()	- Externalize the krb5_authdata.
  */
 static krb5_error_code
-krb5_authdata_externalize(kcontext, arg, buffer, lenremain)
-    krb5_context	kcontext;
-    krb5_pointer	arg;
-    krb5_octet		**buffer;
-    size_t		*lenremain;
+krb5_authdata_externalize(krb5_context kcontext, krb5_pointer arg, krb5_octet **buffer, size_t *lenremain)
 {
     krb5_error_code	kret;
     krb5_authdata	*authdata;
@@ -140,11 +134,7 @@ krb5_authdata_externalize(kcontext, arg, buffer, lenremain)
  */
 /*ARGSUSED*/
 static krb5_error_code
-krb5_authdata_internalize(kcontext, argp, buffer, lenremain)
-    krb5_context	kcontext;
-    krb5_pointer	*argp;
-    krb5_octet		**buffer;
-    size_t		*lenremain;
+krb5_authdata_internalize(krb5_context kcontext, krb5_pointer *argp, krb5_octet **buffer, size_t *lenremain)
 {
     krb5_error_code	kret;
     krb5_authdata	*authdata;
@@ -206,8 +196,7 @@ krb5_authdata_internalize(kcontext, argp, buffer, lenremain)
  * Register the authdata serializer.
  */
 krb5_error_code
-krb5_ser_authdata_init(kcontext)
-    krb5_context	kcontext;
+krb5_ser_authdata_init(krb5_context kcontext)
 {
     return(krb5_register_serializer(kcontext, &krb5_authdata_ser_entry));
 }

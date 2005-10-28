@@ -1,5 +1,5 @@
 /*
- * Copyright 1997-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,12 +43,12 @@ extern "C" {
  */
 
 
-extern int against_postdate_policy PROTOTYPE((krb5_timestamp));
+extern int against_postdate_policy (krb5_timestamp);
 
-extern int against_flag_policy_as PROTOTYPE((const krb5_kdc_req *));
+extern int against_flag_policy_as (const krb5_kdc_req *);
 
-extern int against_flag_policy_tgs PROTOTYPE((const krb5_kdc_req *,
-					      const krb5_ticket *));
+extern int against_flag_policy_tgs (const krb5_kdc_req *,
+					      const krb5_ticket *);
 
 #ifdef	__cplusplus
 }

@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -14,11 +14,8 @@
 #define	O_BINARY	0
 #endif
 
-/*ARGSUSED*/
 krb5_error_code
-krb5_create_secure_file(context, pathname)
-	krb5_context context;
-	const char * pathname;
+krb5_create_secure_file(krb5_context context, const char *pathname)
 
 {
 	int 	fd;
@@ -42,11 +39,8 @@ krb5_create_secure_file(context, pathname)
 	}
 }
 
-/*ARGSUSED*/
 krb5_error_code
-krb5_sync_disk_file(context, fp)
-	krb5_context context;
-	FILE *fp;
+krb5_sync_disk_file(krb5_context context, FILE *fp)
 {
 	if (fp == NULL) {
 		(void) fclose(fp);

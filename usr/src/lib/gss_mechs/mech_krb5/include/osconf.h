@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,8 @@ extern "C" {
 #include "autoconf.h"
 #endif
 
-#define	DEFAULT_PROFILE_PATH	"/etc/krb5/krb5.conf"
+#define	DEFAULT_SECURE_PROFILE_PATH	"/etc/krb5/krb5.conf"
+#define DEFAULT_PROFILE_PATH	DEFAULT_SECURE_PROFILE_PATH 
 #define	DEFAULT_KEYTAB_NAME	"FILE:/etc/krb5/krb5.keytab"
 #define	DEFAULT_KEYTAB		"WRFILE:/etc/krb5/krb5.keytab"
 
@@ -58,7 +59,12 @@ extern "C" {
 #define	DEFAULT_KDC_PROFILE	"/etc/krb5/kdc.conf"
 #define	KDC_PROFILE_ENV		"KRB5_KDC_PROFILE"
 
-#define	DEFAULT_KDC_ENCTYPE	ENCTYPE_DES_CBC_CRC
+/*
+ * SUNW14resync
+ * MIT 1.4 has changed to ENCTYPE_DES3_CBC_SHA1 but we stick with the old one
+ * for backward compat.
+ */
+#define DEFAULT_KDC_ENCTYPE	ENCTYPE_DES_CBC_CRC
 #define	KDCRCACHE		"dfl:krb5kdc_rcache"
 
 #define	KDC_PORTNAME		"kerberos" /* for /etc/services or equiv. */

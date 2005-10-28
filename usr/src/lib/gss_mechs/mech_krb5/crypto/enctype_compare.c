@@ -29,12 +29,9 @@
 #include <etypes.h>
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_c_enctype_compare(context, e1, e2, similar)
-     krb5_context context;
-     krb5_enctype e1;
-     krb5_enctype e2;
-     krb5_boolean *similar;
+krb5_error_code KRB5_CALLCONV
+krb5_c_enctype_compare(krb5_context context, krb5_enctype e1, krb5_enctype e2,
+		    krb5_boolean *similar)
 {
     int i, j;
 

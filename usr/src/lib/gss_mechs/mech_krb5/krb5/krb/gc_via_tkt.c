@@ -35,12 +35,7 @@
 #define in_clock_skew(date, now) (labs((date)-(now)) < context->clockskew)
 
 static krb5_error_code
-krb5_kdcrep2creds(context, pkdcrep, address, psectkt, ppcreds)
-    krb5_context          context;
-    krb5_kdc_rep        * pkdcrep;
-    krb5_address *const * address;
-    krb5_data		* psectkt;
-    krb5_creds         ** ppcreds;
+krb5_kdcrep2creds(krb5_context context, krb5_kdc_rep *pkdcrep, krb5_address *const *address, krb5_data *psectkt, krb5_creds **ppcreds)
 {
     krb5_error_code retval;  
     krb5_data *pdata;
@@ -103,13 +98,9 @@ cleanup:
 }
  
 krb5_error_code
-krb5_get_cred_via_tkt (context, tkt, kdcoptions, address, in_cred, out_cred)
-    krb5_context 	  context;
-    krb5_creds 		* tkt;
-    const krb5_flags 	  kdcoptions;
-    krb5_address *const * address;
-    krb5_creds 		* in_cred;
-    krb5_creds 	       ** out_cred;
+krb5_get_cred_via_tkt (krb5_context context, krb5_creds *tkt,
+		       krb5_flags kdcoptions, krb5_address *const *address,
+		       krb5_creds *in_cred, krb5_creds **out_cred)
 {
     krb5_error_code retval;
     krb5_kdc_rep *dec_rep;
@@ -180,7 +171,7 @@ krb5_get_cred_via_tkt (context, tkt, kdcoptions, address, in_cred, out_cred)
 	if (retval) 			/* neither proper reply nor error! */
 	    goto error_4;
 
-	retval = err_reply->error + ERROR_TABLE_BASE_krb5;
+	retval = (krb5_error_code) err_reply->error + ERROR_TABLE_BASE_krb5;
 
 	krb5_free_error(context, err_reply);
 	goto error_4;

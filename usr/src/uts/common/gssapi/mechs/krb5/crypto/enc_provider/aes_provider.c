@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -9,24 +9,6 @@
 #include <enc_provider.h>
 
 #define BLOCK_SIZE 16
-
-static void
-aes_block_size(size_t *blocksize)
-{
-    *blocksize = 16;
-}
-
-static void
-aes128_keysize(size_t *keybytes, size_t *keylength)
-{
-    *keybytes = *keylength = 16;
-}
-
-static void
-aes256_keysize(size_t *keybytes, size_t *keylength)
-{
-    *keybytes = *keylength = 32;
-}
 
 #define XOR_BLOCK(src, dst) \
 	(dst)[0] ^= (src)[0]; \
@@ -553,8 +535,8 @@ krb5int_aes_init_state (krb5_context context, const krb5_keyblock *key,
 }
 
 const struct krb5_enc_provider krb5int_enc_aes128 = {
-    aes_block_size,
-    aes128_keysize,
+    BLOCK_SIZE,
+    16, 16,
     krb5int_aes_encrypt,
     krb5int_aes_decrypt,
     k5_aes_make_key,
@@ -563,8 +545,8 @@ const struct krb5_enc_provider krb5int_enc_aes128 = {
 };
 
 const struct krb5_enc_provider krb5int_enc_aes256 = {
-    aes_block_size,
-    aes256_keysize,
+    BLOCK_SIZE,
+    32, 32,
     krb5int_aes_encrypt,
     krb5int_aes_decrypt,
     k5_aes_make_key,

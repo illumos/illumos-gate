@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,23 +119,23 @@ typedef struct _restriction {
 } restriction_t;
 
 krb5_error_code acl_init
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   int,
-		   char *));
+		   char *);
 void acl_finish
-	KRB5_PROTOTYPE((krb5_context,
-		   int));
+	(krb5_context,
+		   int);
 krb5_boolean acl_check
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   gss_name_t,
 		   krb5_int32,
 		   krb5_principal,
-		   restriction_t **));
+		   restriction_t **);
 krb5_error_code acl_impose_restrictions
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   kadm5_principal_ent_rec *,
 		   long *,
-		   restriction_t *));
+		   restriction_t *);
 #ifdef	__cplusplus
 }
 #endif

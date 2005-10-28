@@ -32,18 +32,23 @@
 
 /*ARGSUSED*/
 krb5_error_code
-krb5_generate_subkey(context, key, subkey)
-    krb5_context context;
-    krb5_const krb5_keyblock *key;
-    krb5_keyblock **subkey;
+krb5_generate_subkey(krb5_context context, const krb5_keyblock *key, krb5_keyblock **subkey)
 {
     krb5_error_code retval;
+
+#if 0
+/* 
+ * Solaris Kerberos:  Don't bother with this PRNG stuff,
+ * we have /dev/random and PKCS#11 to handle Random Numbers.
+ */
+
     krb5_data seed;
 
     seed.length = key->length;
     seed.data = (char *)key->contents;
-    if ((retval = krb5_c_random_seed(context, &seed)))
+    if ((retval = krb5_c_random_add_entropy(context, KRB5_C_RANDSOURCE_TRUSTEDPARTY, &seed)))
 	return(retval);
+#endif /* 0 */
 
     if ((*subkey = (krb5_keyblock *) malloc(sizeof(krb5_keyblock))) == NULL)
 	return(ENOMEM);

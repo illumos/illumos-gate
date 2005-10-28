@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,14 +34,10 @@
 #include <etypes.h>
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_c_decrypt(context, key, usage, ivec, input, output)
-     krb5_context context;
-     krb5_const krb5_keyblock *key;
-     krb5_keyusage usage;
-     krb5_const krb5_data *ivec;
-     krb5_const krb5_enc_data *input;
-     krb5_data *output;
+krb5_error_code KRB5_CALLCONV
+krb5_c_decrypt(krb5_context context, const krb5_keyblock *key,
+	    krb5_keyusage usage, const krb5_data *ivec,
+	    const krb5_enc_data *input, krb5_data *output)
 {
     int i;
     krb5_error_code ret = 0;

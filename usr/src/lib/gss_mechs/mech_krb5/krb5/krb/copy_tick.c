@@ -31,10 +31,7 @@
 #include <k5-int.h>
 
 static krb5_error_code
-krb5_copy_enc_tkt_part(context, partfrom, partto)
-    krb5_context context;
-    const krb5_enc_tkt_part *partfrom;
-    krb5_enc_tkt_part **partto;
+krb5_copy_enc_tkt_part(krb5_context context, const krb5_enc_tkt_part *partfrom, krb5_enc_tkt_part **partto)
 {
     krb5_error_code retval;
     krb5_enc_tkt_part *tempto;
@@ -99,11 +96,8 @@ krb5_copy_enc_tkt_part(context, partfrom, partto)
     return 0;
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_copy_ticket(context, from, pto)
-    krb5_context context;
-    const krb5_ticket *from;
-    krb5_ticket **pto;
+krb5_error_code KRB5_CALLCONV
+krb5_copy_ticket(krb5_context context, const krb5_ticket *from, krb5_ticket **pto)
 {
     krb5_error_code retval;
     krb5_ticket *tempto;

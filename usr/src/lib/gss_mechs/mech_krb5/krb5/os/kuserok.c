@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
  */
 
 #include "k5-int.h"
+/* #if !defined(_WIN32)            Not yet for Windows */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -52,10 +53,9 @@ gsscred_name_to_unix_cred_ext();
 extern int
 safechown(const char *src, uid_t uid, gid_t gid, int mode);
 
-extern char *
-error_message(krb5_error_code retval);
+extern const char *error_message(long);
 
-#define	MAX_USERNAME 10
+#define	MAX_USERNAME 65
 #define	CACHE_FILENAME_LEN 35
 
 krb5_data tgtname = {
@@ -242,11 +242,8 @@ krb5_gsscred(krb5_principal principal, uid_t *uid)
  *
  */
 
-krb5_boolean
-krb5_kuserok(context, principal, luser)
-    krb5_context context;
-    krb5_principal principal;
-    const char *luser;
+krb5_boolean KRB5_CALLCONV
+krb5_kuserok(krb5_context context, krb5_principal principal, const char *luser)
 {
     struct stat sbuf;
     struct passwd *pwd;
@@ -261,9 +258,23 @@ krb5_kuserok(context, principal, luser)
     int gobble;
 
     /* no account => no access */
-    if ((pwd = getpwnam(luser)) == NULL) {
+#ifdef HAVE_GETPWNAM_R
+    char pwbuf[BUFSIZ];
+    struct passwd pwx;
+#if !defined(GETPWNAM_R_4_ARGS)
+    /* POSIX */
+    if (getpwnam_r(luser, &pwx, pwbuf, sizeof(pwbuf), &pwd) != 0)
+	pwd = NULL;
+#else
+    /* draft POSIX */
+    pwd = getpwnam_r(luser, &pwx, pwbuf, sizeof(pwbuf));
+#endif
+#else
+    pwd = getpwnam(luser);
+#endif
+    if (pwd == NULL)
 	return(FALSE);
-    }
+
     (void) strncpy(pbuf, pwd->pw_dir, sizeof(pbuf) - 1);
     pbuf[sizeof(pbuf) - 1] = '\0';
     (void) strncat(pbuf, "/.k5login", sizeof(pbuf) - 1 - strlen(pbuf));

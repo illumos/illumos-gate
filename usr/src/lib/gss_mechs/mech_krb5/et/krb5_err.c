@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -761,6 +761,15 @@ switch (errorno) {
 		    "service not available"));
 	case 244: /* KRB5_RC_BADNAME */
 		return (dgettext(TEXT_DOMAIN, "Bad replay cache name"));
+	case 245: /* KRB5_CONF_NOT_CONFIGURED */
+		return (dgettext(TEXT_DOMAIN,
+				"krb5 conf file not configured"));
+	case 246: /* PKCS_ERR */
+		return (dgettext(TEXT_DOMAIN, "PKCS error"));
+		/* SUNW14resync start */
+	case 247: /* KRB5_DELTAT_BADFORMAT */
+		return (dgettext(TEXT_DOMAIN, "Delta time bad format"));
+		/* SUNW14resync end */
 	default:
 		return ("unknown error");
 	}

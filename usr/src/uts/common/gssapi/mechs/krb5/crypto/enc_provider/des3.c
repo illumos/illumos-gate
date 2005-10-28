@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,31 +33,6 @@
 
 #include <k5-int.h>
 #include <des_int.h>
-
-static const mit_des_cblock mit_des_zeroblock[8] = {
-        {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-        {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-        {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-        {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-        {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-        {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-        {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00},
-        {0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00} };
-
-static void
-k5_des3_block_size(size_t *blocksize)
-{
-    KRB5_LOG0(KRB5_INFO, "k5_des3_block_size() start\n");
-    *blocksize = 8;
-}
-
-static void
-k5_des3_keysize(size_t *keybytes, size_t *keylength)
-{
-    KRB5_LOG0(KRB5_INFO, "k5_des3_keysize() start\n");
-    *keybytes = 21;
-    *keylength = 24;
-}
 
 static krb5_error_code
 k5_des3_docrypt(krb5_context context,
@@ -152,8 +127,8 @@ k5_des3_make_key(krb5_context context, krb5_const krb5_data *randombits,
 }
 
 const struct krb5_enc_provider krb5_enc_des3 = {
-    k5_des3_block_size,
-    k5_des3_keysize,
+    8,
+    21, 24,
     k5_des3_encrypt,
     k5_des3_decrypt,
     k5_des3_make_key,

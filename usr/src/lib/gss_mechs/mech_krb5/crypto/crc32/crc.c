@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8,7 +8,7 @@
 /*
  * lib/crypto/crc32/crc.c
  *
- * Copyright 1990 by the Massachusetts Institute of Technology.
+ * Copyright 1990, 2002 by the Massachusetts Institute of Technology.
  * All Rights Reserved.
  *
  * Export of this software from the United States of America may
@@ -153,20 +153,20 @@ static uint32_t const crc_table[256] = {
 /* Windows needs to these prototypes for crc32_cksumtable_entry below */
 
 static krb5_error_code
-crc32_sum_func PROTOTYPE((
+crc32_sum_func (
 	krb5_const krb5_pointer in,
 	krb5_const size_t in_length,
 	krb5_const krb5_pointer seed,
 	krb5_const size_t seed_length,
-	krb5_checksum FAR *outcksum));
+	krb5_checksum *outcksum);
 
 static krb5_error_code
-crc32_verify_func PROTOTYPE((
-	krb5_const krb5_checksum FAR *cksum,
+crc32_verify_func (
+	krb5_const krb5_checksum *cksum,
 	krb5_const krb5_pointer in,
 	krb5_const size_t in_length,
 	krb5_const krb5_pointer seed,
-	krb5_const size_t seed_length));
+	krb5_const size_t seed_length);
 
 /*ARGSUSED*/
 static krb5_error_code
@@ -175,7 +175,7 @@ crc32_sum_func(in, in_length, seed, seed_length, outcksum)
     krb5_const size_t in_length;
     krb5_const krb5_pointer seed;
     krb5_const size_t seed_length;
-    krb5_checksum FAR *outcksum;
+    krb5_checksum *outcksum;
 {
     register u_char *data;
     register u_long c = 0;
@@ -205,7 +205,7 @@ crc32_sum_func(in, in_length, seed, seed_length, outcksum)
 /*ARGSUSED*/
 static krb5_error_code
 crc32_verify_func(cksum, in, in_length, seed, seed_length)
-    krb5_const krb5_checksum FAR *cksum;
+    krb5_const krb5_checksum *cksum;
     krb5_const krb5_pointer in;
     krb5_const size_t in_length;
     krb5_const krb5_pointer seed;

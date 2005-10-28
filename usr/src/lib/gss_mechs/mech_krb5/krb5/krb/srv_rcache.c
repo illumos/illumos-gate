@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,25 +38,24 @@
 #include <ctype.h>
 #include <stdio.h>
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_get_server_rcache(context, piece, rcptr)
-    krb5_context context;
-    const krb5_data *piece;
-    krb5_rcache *rcptr;
+#define isvalidrcname(x) ((!ispunct(x))&&isgraph(x))
+krb5_error_code KRB5_CALLCONV
+krb5_get_server_rcache(krb5_context context, const krb5_data *piece,
+		       krb5_rcache *rcptr)
 {
     krb5_rcache rcache = 0;
-    char *cachename = 0, *def_env = 0;
+    char *cachename = 0, *def_env = 0, *cachetype;
     char tmp[4];
     krb5_error_code retval;
-    int len, p, i;
+    int p, i;
+    unsigned int len;
 
 #ifdef HAVE_GETEUID
     unsigned long tens;
     unsigned long uid = geteuid();
 #endif
-
-    rcache = (krb5_rcache) malloc(sizeof(*rcache));
-    if (!rcache)
+    
+    if (piece == NULL)
 	return ENOMEM;
 
 /*
@@ -67,17 +66,18 @@ krb5_get_server_rcache(context, piece, rcptr)
     if ((def_env = krb5_rc_default_name(context)) != 0) {
 	cachename = strdup(def_env);
 	if (!cachename) {
-		free(rcache);
 		return (ENOMEM);
 	}
 	goto skip_create;
     }
+    
+    cachetype = krb5_rc_default_type(context);
 
     len = piece->length + 3 + 1;
     for (i = 0; i < piece->length; i++) {
-	if (piece->data[i] == '\\')
+	if (piece->data[i] == '-')
 	    len++;
-	else if (!isgraph(piece->data[i]))
+	else if (!isvalidrcname((int) piece->data[i]))
 	    len += 3;
     }
 
@@ -86,23 +86,25 @@ krb5_get_server_rcache(context, piece, rcptr)
     for (tens = 1; (uid / tens) > 9 ; tens *= 10)
 	len++;
 #endif
-
-    cachename = malloc(len);
+    
+    cachename = malloc(strlen(cachetype) + 5 + len);
     if (!cachename) {
 	retval = ENOMEM;
 	goto cleanup;
     }
-    strcpy(cachename, "rc_");
-    p = 3;
+    strcpy(cachename, cachetype);
+
+    p = strlen(cachename);
+    cachename[p++] = ':';
     for (i = 0; i < piece->length; i++) {
-	if (piece->data[i] == '\\') {
-	    cachename[p++] = '\\';
-	    cachename[p++] = '\\';
+	if (piece->data[i] == '-') {
+	    cachename[p++] = '-';
+	    cachename[p++] = '-';
 	    continue;
 	}
-	if (!isgraph(piece->data[i])) {
+	if (!isvalidrcname((int) piece->data[i])) {
 	    sprintf(tmp, "%03o", piece->data[i]);
-	    cachename[p++] = '\\';
+	    cachename[p++] = '-';
 	    cachename[p++] = tmp[0];
 	    cachename[p++] = tmp[1];
 	    cachename[p++] = tmp[2];
@@ -122,20 +124,19 @@ krb5_get_server_rcache(context, piece, rcptr)
     cachename[p++] = '\0';
 
 skip_create:
-    if ((retval = krb5_rc_resolve(context, rcache, cachename)) != 0)
+    retval = krb5_rc_resolve_full(context, &rcache, cachename);
+    if (retval)
 	goto cleanup;
 
     /*
      * First try to recover the replay cache; if that doesn't work,
      * initialize it.
      */
-    if (krb5_rc_recover(context, rcache)) {
-	retval = krb5_rc_initialize(context, rcache, context->clockskew);
-	if (retval) {
-	    (void) krb5_rc_close(context, rcache);
-	    rcache = 0;
-	    goto cleanup;
-	}
+    retval = krb5_rc_recover_or_initialize(context, rcache, context->clockskew);
+    if (retval) {
+	krb5_rc_close(context, rcache);
+	rcache = 0;
+	goto cleanup;
     }
 
     *rcptr = rcache;

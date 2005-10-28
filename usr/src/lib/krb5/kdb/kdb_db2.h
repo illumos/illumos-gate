@@ -70,56 +70,56 @@ typedef struct _krb5_db2_context {
 #define KDB2_LOCK_EXT ".ok"
 
 krb5_error_code krb5_db2_db_set_name 
-	KRB5_PROTOTYPE((krb5_context,
-		   char * ));
+	(krb5_context,
+		   char * );
 krb5_error_code krb5_db2_db_init 
-	KRB5_PROTOTYPE((krb5_context));
+	(krb5_context);
 krb5_error_code krb5_db2_db_fini 
-	KRB5_PROTOTYPE((krb5_context));
+	(krb5_context);
 krb5_error_code krb5_db2_db_get_age 
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   char *,
-		   time_t * ));
+		   time_t * );
 krb5_error_code krb5_db2_db_create 
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   char *,
-		   krb5_int32));
+		   krb5_int32);
 krb5_error_code krb5_db2_db_destroy 
-	KRB5_PROTOTYPE((krb5_context,
-		   char * ));
+	(krb5_context,
+		   char * );
 krb5_error_code krb5_db2_db_rename 
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   char *,
-		   char * ));
+		   char * );
 krb5_error_code krb5_db2_db_get_principal 
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   krb5_const_principal,
 		   krb5_db_entry *,
 		   int *,
-		   krb5_boolean * ));
+		   krb5_boolean * );
 void krb5_db2_db_free_principal 
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   krb5_db_entry *,
-		   int ));
+		   int );
 krb5_error_code krb5_db2_db_put_principal 
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   krb5_db_entry *,
-		   int * ));
+		   int * );
 krb5_error_code krb5_db2_db_iterate
-    	KRB5_PROTOTYPE((krb5_context,
-		   krb5_error_code (*) KRB5_PROTOTYPE((krb5_pointer,
-					          krb5_db_entry *)),
-	           krb5_pointer ));
+    	(krb5_context,
+		   krb5_error_code (*) (krb5_pointer,
+					          krb5_db_entry *),
+	           krb5_pointer );
 krb5_error_code krb5_db2_db_set_nonblocking 
-	KRB5_PROTOTYPE((krb5_context,
+	(krb5_context,
 		   krb5_boolean,
-		   krb5_boolean * ));
+		   krb5_boolean * );
 krb5_boolean krb5_db2_db_set_lockmode
-	KRB5_PROTOTYPE((krb5_context,
-		   krb5_boolean ));
+	(krb5_context,
+		   krb5_boolean );
 krb5_error_code krb5_db2_db_open_database 
-	KRB5_PROTOTYPE((krb5_context));
+	(krb5_context);
 krb5_error_code krb5_db2_db_close_database 
-	KRB5_PROTOTYPE((krb5_context));
+	(krb5_context);
 
 #endif /* KRB5_KDB_DB2_H */

@@ -12,6 +12,8 @@
  *
  */
 
+#include "prof_int.h"
+
 #include <stdio.h>
 #include <string.h>
 #ifdef HAVE_STDLIB_H
@@ -19,13 +21,10 @@
 #endif
 #include <errno.h>
 
-#include "prof_int.h"
-
-static errcode_t rw_setup(profile)
-	profile_t	profile;
+static errcode_t rw_setup(profile_t profile)
 {
    	prf_file_t	file;
-	errcode_t	retval;
+	errcode_t	retval = 0;
 
 	if (!profile)
 		return PROF_NO_PROFILE;
@@ -34,15 +33,44 @@ static errcode_t rw_setup(profile)
 		return PROF_MAGIC_PROFILE;
 
 	file = profile->first_file;
-	if (!(file->flags & PROFILE_FILE_RW))
-		return PROF_READ_ONLY;
+
+	retval = profile_lock_global();
+	if (retval)
+	    return retval;
 
 	/* Don't update the file if we've already made modifications */
-	if (file->flags & PROFILE_FILE_DIRTY)
-		return 0;
-			
+	if (file->data->flags & PROFILE_FILE_DIRTY) {
+	    profile_unlock_global();
+	    return 0;
+	}
+
+	if ((file->data->flags & PROFILE_FILE_SHARED) != 0) {
+	    prf_data_t new_data;
+	    new_data = profile_make_prf_data(file->data->filespec);
+	    if (new_data == NULL) {
+		retval = ENOMEM;
+	    } else {
+		retval = k5_mutex_init(&new_data->lock);
+		if (retval == 0) {
+		    new_data->root = NULL;
+		    new_data->flags = file->data->flags & ~PROFILE_FILE_SHARED;
+		    new_data->timestamp = 0;
+		    new_data->upd_serial = file->data->upd_serial;
+		}
+	    }
+
+	    if (retval != 0) {
+		profile_unlock_global();
+		free(new_data);
+		return retval;
+	    }
+	    profile_dereference_data_locked(file->data);
+	    file->data = new_data;
+	}
+
+	profile_unlock_global();
 	retval = profile_update_file(file);
-	
+
 	return retval;
 }
 
@@ -52,12 +80,9 @@ static errcode_t rw_setup(profile)
  * 
  * ADL - 2/23/99, rewritten TYT 2/25/99
  */
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_update_relation(profile, names, old_value, new_value)
-	profile_t	profile;
-	const char	**names;
-	const char	*old_value;
-	const char	*new_value;
+errcode_t KRB5_CALLCONV
+profile_update_relation(profile_t profile, const char **names,
+			const char *old_value, const char *new_value)
 {	
 	errcode_t	retval;
 	struct profile_node *section, *node;
@@ -74,30 +99,33 @@ profile_update_relation(profile, names, old_value, new_value)
 	if (!old_value || !*old_value)
 		return PROF_EINVAL;
 
-	section = profile->first_file->root;
+	retval = k5_mutex_lock(&profile->first_file->data->lock);
+	if (retval)
+	    return retval;
+	section = profile->first_file->data->root;
 	for (cpp = names; cpp[1]; cpp++) {
 		state = 0;
 		retval = profile_find_node(section, *cpp, 0, 1,
 					   &state, &section);
-		if (retval)
-			return retval;
+		if (retval) {
+		    k5_mutex_unlock(&profile->first_file->data->lock);
+		    return retval;
+		}
 	}
 
 	state = 0;
 	retval = profile_find_node(section, *cpp, old_value, 0, &state, &node);
-	if (retval)
-		return retval;
-
-	if (new_value)
+	if (retval == 0) {
+	    if (new_value)
 		retval = profile_set_relation_value(node, new_value);
-	else
+	    else
 		retval = profile_remove_node(node);
-	if (retval)
-		return retval;
-
-	profile->first_file->flags |= PROFILE_FILE_DIRTY;
+	}
+	if (retval == 0)
+	    profile->first_file->data->flags |= PROFILE_FILE_DIRTY;
+	k5_mutex_unlock(&profile->first_file->data->lock);
 	
-	return 0;
+	return retval;
 }
 
 /* 
@@ -105,16 +133,14 @@ profile_update_relation(profile, names, old_value, new_value)
  * 
  * TYT - 2/25/99
  */
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_clear_relation(profile, names)
-	profile_t	profile;
-	const char	**names;
+errcode_t KRB5_CALLCONV
+profile_clear_relation(profile_t profile, const char **names)
 {	
 	errcode_t	retval;
 	struct profile_node *section, *node;
 	void		*state;
 	const char	**cpp;
-	
+
 	retval = rw_setup(profile);
 	if (retval)
 		return retval;
@@ -122,7 +148,7 @@ profile_clear_relation(profile, names)
 	if (names == 0 || names[0] == 0 || names[1] == 0)
 		return PROF_BAD_NAMESET;
 
-	section = profile->first_file->root;
+	section = profile->first_file->data->root;
 	for (cpp = names; cpp[1]; cpp++) {
 		state = 0;
 		retval = profile_find_node(section, *cpp, 0, 1,
@@ -141,7 +167,7 @@ profile_clear_relation(profile, names)
 			return retval;
 	} while (state);
 
-	profile->first_file->flags |= PROFILE_FILE_DIRTY;
+	profile->first_file->data->flags |= PROFILE_FILE_DIRTY;
 	
 	return 0;
 }
@@ -152,11 +178,9 @@ profile_clear_relation(profile, names)
  * 
  * ADL - 2/23/99, rewritten TYT 2/25/99
  */
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_rename_section(profile, names, new_name)
-	profile_t	profile;
-	const char	**names;
-	const char	*new_name;
+errcode_t KRB5_CALLCONV
+profile_rename_section(profile_t profile, const char **names,
+		       const char *new_name)
 {	
 	errcode_t	retval;
 	struct profile_node *section, *node;
@@ -170,30 +194,32 @@ profile_rename_section(profile, names, new_name)
 	if (names == 0 || names[0] == 0 || names[1] == 0)
 		return PROF_BAD_NAMESET;
 
-	section = profile->first_file->root;
+	retval = k5_mutex_lock(&profile->first_file->data->lock);
+	if (retval)
+	    return retval;
+	section = profile->first_file->data->root;
 	for (cpp = names; cpp[1]; cpp++) {
 		state = 0;
 		retval = profile_find_node(section, *cpp, 0, 1,
 					   &state, &section);
-		if (retval)
-			return retval;
+		if (retval) {
+		    k5_mutex_unlock(&profile->first_file->data->lock);
+		    return retval;
+		}
 	}
 
 	state = 0;
 	retval = profile_find_node(section, *cpp, 0, 1, &state, &node);
-	if (retval)
-		return retval;
-
-	if (new_name)
+	if (retval == 0) {
+	    if (new_name)
 		retval = profile_rename_node(node, new_name);
-	else
+	    else
 		retval = profile_remove_node(node);
-	if (retval)
-		return retval;
-
-	profile->first_file->flags |= PROFILE_FILE_DIRTY;
-	
-	return 0;
+	}
+	if (retval == 0)
+	    profile->first_file->data->flags |= PROFILE_FILE_DIRTY;
+	k5_mutex_unlock(&profile->first_file->data->lock);
+	return retval;
 }
 
 /*
@@ -205,11 +231,9 @@ profile_rename_section(profile, names, new_name)
  *
  * ADL - 2/23/99, rewritten TYT 2/25/99
  */
-KRB5_DLLIMP errcode_t KRB5_CALLCONV
-profile_add_relation(profile, names, new_value)
-	profile_t	profile;
-	const char  	**names;
-	const char	*new_value; 
+errcode_t KRB5_CALLCONV
+profile_add_relation(profile_t profile, const char **names,
+		     const char *new_value)
 {
 	errcode_t	retval;
     	struct profile_node *section;
@@ -223,31 +247,41 @@ profile_add_relation(profile, names, new_value)
 	if (names == 0 || names[0] == 0 || names[1] == 0)
 		return PROF_BAD_NAMESET;
 
-	section = profile->first_file->root;
+	retval = k5_mutex_lock(&profile->first_file->data->lock);
+	if (retval)
+	    return retval;
+	section = profile->first_file->data->root;
 	for (cpp = names; cpp[1]; cpp++) {
 		state = 0;
 		retval = profile_find_node(section, *cpp, 0, 1,
 					   &state, &section);
 		if (retval == PROF_NO_SECTION)
 			retval = profile_add_node(section, *cpp, 0, &section);
-		if (retval)
-			return retval;
+		if (retval) {
+		    k5_mutex_unlock(&profile->first_file->data->lock);
+		    return retval;
+		}
 	}
 
 	if (new_value == 0) {
 		retval = profile_find_node(section, *cpp, 0, 1, &state, 0);
-		if (retval == 0)
-			return PROF_EXISTS;
-		else if (retval != PROF_NO_SECTION)
-			return retval;
+		if (retval == 0) {
+		    k5_mutex_unlock(&profile->first_file->data->lock);
+		    return PROF_EXISTS;
+		} else if (retval != PROF_NO_SECTION) {
+		    k5_mutex_unlock(&profile->first_file->data->lock);
+		    return retval;
+		}
 	}
 
 	retval = profile_add_node(section, *cpp, new_value, 0);
-	if (retval)
-		return retval;
+	if (retval) {
+	    k5_mutex_unlock(&profile->first_file->data->lock);
+	    return retval;
+	}
 
-	profile->first_file->flags |= PROFILE_FILE_DIRTY;
-	
+	profile->first_file->data->flags |= PROFILE_FILE_DIRTY;
+	k5_mutex_unlock(&profile->first_file->data->lock);
 	return 0;
 }
 

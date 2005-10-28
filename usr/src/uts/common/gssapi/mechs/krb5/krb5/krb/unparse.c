@@ -29,7 +29,7 @@
  *
  * krb5_unparse_name() routine
  *
- * Rewritten by Theodore Ts'o to propoerly unparse principal names
+ * Rewritten by Theodore Ts'o to properly unparse principal names
  * which have the component or realm separator as part of one of their
  * components.
  */
@@ -63,18 +63,17 @@
 #define	COMPONENT_SEP	'/'
 
 /*ARGSUSED*/
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_unparse_name_ext(context, principal, name, size)
-    krb5_context context;
-    krb5_const_principal principal;
-    register char FAR * FAR *name;
-    int	FAR *size;
+krb5_error_code KRB5_CALLCONV
+krb5_unparse_name_ext(krb5_context context, krb5_const_principal principal, register char **name, unsigned int *size)
 {
 	register char *cp, *q;
 	register int i,j;
 	int	length;
 	krb5_int32 nelem;
-	register int totalsize = 0;
+	register unsigned int totalsize = 0;
+
+	if (!principal || !name)
+		return KRB5_PARSE_MALFORMED;
 
 	cp = krb5_princ_realm(context, principal)->data;
 	length = krb5_princ_realm(context, principal)->length;
@@ -100,7 +99,7 @@ krb5_unparse_name_ext(context, principal, name, size)
 	}
 	if (nelem == 0 )
 		totalsize++;
-	
+
 	/*
 	 * Allocate space for the ascii string; if space has been
 	 * provided, use it, realloc'ing it if necessary.
@@ -202,13 +201,11 @@ krb5_unparse_name_ext(context, principal, name, size)
     return 0;
 }
 
-KRB5_DLLIMP krb5_error_code KRB5_CALLCONV
-krb5_unparse_name(context, principal, name)
-    krb5_context context;
-    krb5_const_principal principal;
-    register char **name;
+krb5_error_code KRB5_CALLCONV
+krb5_unparse_name(krb5_context context, krb5_const_principal principal, register char **name)
 {
-	*name = NULL;
+	if (name)			/* name == NULL will return error from _ext */
+		*name = NULL;
 	return(krb5_unparse_name_ext(context, principal, name, NULL));
 }
 
