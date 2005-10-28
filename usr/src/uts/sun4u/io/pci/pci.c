@@ -43,7 +43,7 @@
 #include <sys/ddi_subrdefs.h>
 #include <sys/epm.h>
 #include <sys/hotplug/pci/pcihp.h>
-#include <sys/pci_tools_var.h>
+#include <sys/pci/pci_tools_ext.h>
 #include <sys/spl.h>
 #include <sys/pci/pci_obj.h>
 

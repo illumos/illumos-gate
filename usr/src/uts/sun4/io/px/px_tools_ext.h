@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_SYS_PX_TOOLS_H
-#define	_SYS_PX_TOOLS_H
+#ifndef	_SYS_PX_TOOLS_EXT_H
+#define	_SYS_PX_TOOLS_EXT_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -52,4 +52,4 @@ void pxtool_uninit(dev_info_t *dip);
 }
 #endif
 
-#endif	/* _SYS_PX_TOOLS_H */
+#endif	/* _SYS_PX_TOOLS_EXT_H */

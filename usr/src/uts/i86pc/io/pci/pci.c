@@ -49,7 +49,7 @@
 #include <sys/pci_intr_lib.h>
 #include <sys/policy.h>
 #include <sys/pci_tools.h>
-#include <sys/pci_tools_var.h>
+#include "pci_tools_ext.h"
 #include "pci_var.h"
 
 /* Save minimal state. */
@@ -309,7 +309,8 @@ pci_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto bad_pcihp_init;
 	}
 
-	if (pcitool_init(devi) != DDI_SUCCESS) {
+	/* Second arg: initialize for pci, not pci_express */
+	if (pcitool_init(devi, B_FALSE) != DDI_SUCCESS) {
 		goto bad_pcitool_init;
 	}
 
@@ -1646,9 +1647,11 @@ static int
 pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 	int *rvalp)
 {
-	int rv = ENOTTY;
-
-	minor_t minor = getminor(dev);
+	minor_t		minor = getminor(dev);
+	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
+	pci_state_t	*pci_p = ddi_get_soft_state(pci_statep, instance);
+	dev_info_t	*dip = pci_p->pci_dip;
+	int		rv = ENOTTY;
 
 	switch (PCIHP_AP_MINOR_NUM_TO_PCI_DEVNUM(minor)) {
 	case PCI_TOOL_REG_MINOR_NUM:
@@ -1662,7 +1665,7 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				rv = EPERM;
 			else
 				rv = pcitool_dev_reg_ops(
-				    dev, (void *)arg, cmd, mode);
+				    dip, (void *)arg, cmd, mode);
 			break;
 
 		case PCITOOL_NEXUS_SET_REG:
@@ -1673,7 +1676,7 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				rv = EPERM;
 			else
 				rv = pcitool_bus_reg_ops(
-				    dev, (void *)arg, cmd, mode);
+				    dip, (void *)arg, cmd, mode);
 			break;
 		}
 		break;
@@ -1693,7 +1696,7 @@ pci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		/* These require no special privileges. */
 		case PCITOOL_DEVICE_GET_INTR:
 		case PCITOOL_DEVICE_NUM_INTR:
-			rv = pcitool_intr_admn(dev, (void *)arg, cmd, mode);
+			rv = pcitool_intr_admn(dip, (void *)arg, cmd, mode);
 			break;
 		}
 		break;

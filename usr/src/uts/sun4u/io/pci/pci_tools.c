@@ -39,8 +39,20 @@
 #include <sys/hotplug/pci/pcihp.h>
 
 #include <sys/pci_tools.h>
-#include <sys/pci_tools_var.h>
-#include <sys/pci/pci_tools_impl.h>
+#include <sys/pci/pci_tools_ext.h>
+
+/*
+ * Number of interrupts supported per PCI bus.
+ */
+#define	PCI_MAX_INO		0x3f
+
+/*
+ * PCI Space definitions.
+ */
+#define	PCI_CONFIG_RANGE_BANK	(PCI_REG_ADDR_G(PCI_ADDR_CONFIG))
+#define	PCI_IO_RANGE_BANK	(PCI_REG_ADDR_G(PCI_ADDR_IO))
+#define	PCI_MEM_RANGE_BANK	(PCI_REG_ADDR_G(PCI_ADDR_MEM32))
+#define	PCI_MEM64_RANGE_BANK	(PCI_REG_ADDR_G(PCI_ADDR_MEM64))
 
 /*
  * Extract 64 bit parent or size values from 32 bit cells of

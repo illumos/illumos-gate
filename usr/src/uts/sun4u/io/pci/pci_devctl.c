@@ -39,7 +39,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/pci/pci_obj.h>
 #include <sys/pci_tools.h>
-#include <sys/pci_tools_var.h>
+#include <sys/pci/pci_tools_ext.h>
 #include <sys/open.h>
 #include <sys/errno.h>
 #include <sys/file.h>

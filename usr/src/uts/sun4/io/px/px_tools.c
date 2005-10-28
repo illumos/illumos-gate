@@ -34,7 +34,7 @@
 #include <sys/hotplug/pci/pcihp.h>
 #include "px_obj.h"
 #include <sys/pci_tools.h>
-#include "px_tools.h"
+#include "px_tools_ext.h"
 #include "px_tools_var.h"
 
 /*

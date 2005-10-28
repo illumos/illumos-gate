@@ -38,9 +38,14 @@
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_tools.h>
-#include <sys/pci_tools_var.h>
+#include "pci_tools_ext.h"
 #include "pci_var.h"
 #include <sys/promif.h>
+
+#define	PCIEX_BDF_OFFSET_DELTA	4
+#define	PCIEX_REG_FUNC_SHIFT	(PCI_REG_FUNC_SHIFT + PCIEX_BDF_OFFSET_DELTA)
+#define	PCIEX_REG_DEV_SHIFT	(PCI_REG_DEV_SHIFT + PCIEX_BDF_OFFSET_DELTA)
+#define	PCIEX_REG_BUS_SHIFT	(PCI_REG_BUS_SHIFT + PCIEX_BDF_OFFSET_DELTA)
 
 #define	SUCCESS	0
 
@@ -61,7 +66,12 @@ static uint8_t pci_bars[] = {
 	PCI_CONF_ROM
 };
 
+/* Max offset allowed into config space for a particular device. */
+static uint64_t max_cfg_size = PCI_CONF_HDR_SIZE;
+
 static uint64_t pcitool_swap_endian(uint64_t data, int size);
+static int pcitool_pciex_cfg_access(dev_info_t *dip, pcitool_reg_t *prg,
+    boolean_t write_flag);
 static int pcitool_cfg_access(dev_info_t *dip, pcitool_reg_t *prg,
     boolean_t write_flag);
 static int pcitool_io_access(dev_info_t *dip, pcitool_reg_t *prg,
@@ -72,7 +82,7 @@ static uint64_t pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages);
 static void pcitool_unmap(uint64_t virt_addr, size_t num_pages);
 
 int
-pcitool_init(dev_info_t *dip)
+pcitool_init(dev_info_t *dip, boolean_t is_pciex)
 {
 	int instance = ddi_get_instance(dip);
 
@@ -90,6 +100,9 @@ pcitool_init(dev_info_t *dip)
 		ddi_remove_minor_node(dip, PCI_MINOR_REG);
 		return (DDI_FAILURE);
 	}
+
+	if (is_pciex)
+		max_cfg_size = PCIE_CONF_HDR_SIZE;
 
 	return (DDI_SUCCESS);
 }
@@ -117,7 +130,7 @@ pcitool_uninit(dev_info_t *dip)
  */
 /*ARGSUSED*/
 int
-pcitool_intr_admn(dev_t dev, void *arg, int cmd, int mode)
+pcitool_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
 {
 	return (ENOTSUP);
 }
@@ -129,7 +142,7 @@ pcitool_intr_admn(dev_t dev, void *arg, int cmd, int mode)
  */
 /*ARGSUSED*/
 int
-pcitool_bus_reg_ops(dev_t dev, void *arg, int cmd, int mode)
+pcitool_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 {
 	return (ENOTSUP);
 }
@@ -157,6 +170,49 @@ pcitool_swap_endian(uint64_t data, int size)
 	return (returned_data.data64);
 }
 
+
+/*
+ * Access device.  prg is modified.
+ *
+ * Extended config space is available only through memory-mapped access.
+ * Standard config space on pci express devices is available either way,
+ * so do it memory-mapped here too, for simplicity.
+ */
+/*ARGSUSED*/
+static int
+pcitool_pciex_cfg_access(dev_info_t *dip, pcitool_reg_t *prg,
+    boolean_t write_flag)
+{
+	int rval = SUCCESS;
+	uint64_t virt_addr;
+	size_t	num_virt_pages;
+
+	prg->status = PCITOOL_SUCCESS;
+
+	/* XXX replace e0000000 value below with 0 once FW changes are made */
+	prg->phys_addr = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
+	    "ecfga-base-address", 0xe00000000);
+	if (prg->phys_addr == 0) {
+		prg->status = PCITOOL_IO_ERROR;
+		return (EIO);
+	}
+
+	prg->phys_addr += prg->offset +
+	    ((prg->bus_no << PCIEX_REG_BUS_SHIFT) |
+	    (prg->dev_no << PCIEX_REG_DEV_SHIFT) |
+	    (prg->func_no << PCIEX_REG_FUNC_SHIFT));
+
+	virt_addr = pcitool_map(prg->phys_addr,
+	    PCITOOL_ACC_ATTR_SIZE(prg->acc_attr), &num_virt_pages);
+	if (virt_addr == NULL) {
+		prg->status = PCITOOL_IO_ERROR;
+		return (EIO);
+	}
+
+	rval = pcitool_mem_access(dip, prg, virt_addr, write_flag);
+	pcitool_unmap(virt_addr, num_virt_pages);
+	return (rval);
+}
 
 /* Access device.  prg is modified. */
 /*ARGSUSED*/
@@ -439,8 +495,8 @@ pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages)
 	if ((offset + size) > (MMU_PAGESIZE * 2)) {
 		if (pcitool_debug)
 			prom_printf("boundary violation: "
-			    "offset:0x%" PRIx64 ", size:%" PRId64 ", "
-			    "pagesize:0x%x\n", offset, size, MMU_PAGESIZE);
+			    "offset:0x%" PRIx64 ", size:%ld, pagesize:0x%lx\n",
+			    offset, (uintptr_t)size, (uintptr_t)MMU_PAGESIZE);
 		return (NULL);
 
 	} else if ((offset + size) > MMU_PAGESIZE) {
@@ -486,13 +542,8 @@ pcitool_unmap(uint64_t virt_addr, size_t num_pages)
 
 /* Perform register accesses on PCI leaf devices. */
 int
-pcitool_dev_reg_ops(dev_t dev, void *arg, int cmd, int mode)
+pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 {
-	minor_t		minor = getminor(dev);
-	int		instance = PCIHP_AP_MINOR_NUM_TO_INSTANCE(minor);
-	pci_state_t	*pci_p = ddi_get_soft_state(pci_statep, instance);
-	dev_info_t	*dip = pci_p->pci_dip;
-
 	boolean_t	write_flag = B_FALSE;
 	int		rval = 0;
 	pcitool_reg_t	prg;
@@ -546,19 +597,25 @@ pcitool_dev_reg_ops(dev_t dev, void *arg, int cmd, int mode)
 		/* Proper config space desired. */
 		if (prg.barnum == 0) {
 
-			if (prg.offset > 0xFF) {
-				prg.status = PCITOOL_OUT_OF_RANGE;
-				rval = EINVAL;
-				goto done_reg;
-			}
-
 			if (pcitool_debug)
 				prom_printf(
 				    "config access: offset:0x%" PRIx64 ", "
 				    "phys_addr:0x%" PRIx64 "\n",
 				    prg.offset, prg.phys_addr);
+
+			if (prg.offset >= max_cfg_size) {
+				prg.status = PCITOOL_OUT_OF_RANGE;
+				rval = EINVAL;
+				goto done_reg;
+			}
+
 			/* Access device.  prg is modified. */
-			rval = pcitool_cfg_access(dip, &prg, write_flag);
+			if (max_cfg_size == PCIE_CONF_HDR_SIZE)
+				rval = pcitool_pciex_cfg_access(dip, &prg,
+				    write_flag);
+			else
+				rval = pcitool_cfg_access(dip, &prg,
+				    write_flag);
 
 			if (pcitool_debug)
 				prom_printf(

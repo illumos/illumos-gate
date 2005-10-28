@@ -37,7 +37,7 @@
 #include <px_tools_var.h>
 #include <px_asm_4u.h>
 #include <px_lib4u.h>
-#include <px_tools.h>
+#include <px_tools_ext.h>
 
 /*
  * Delay needed to have a safe environment envelop any error which could

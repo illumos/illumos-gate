@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_PCI_TOOLS_VAR_H
-#define	_SYS_PCI_TOOLS_VAR_H
+#ifndef _SYS_PCI_TOOLS_EXT_H
+#define	_SYS_PCI_TOOLS_EXT_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -55,4 +55,4 @@ extern void pcitool_uninit(dev_info_t *dip);
 }
 #endif
 
-#endif	/* _SYS_PCI_TOOLS_VAR_H */
+#endif	/* _SYS_PCI_TOOLS_EXT_H */
