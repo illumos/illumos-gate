@@ -884,9 +884,14 @@ fr_info_t *fin;
 	int minicmpsz = sizeof(struct icmp);
 	icmphdr_t *icmp;
 
+	if (fin->fin_off != 0) {
+		frpr_short(fin, ICMPERR_ICMPHLEN);
+		return;
+	}
+
 	fr_checkv4sum(fin);
 
-	if (!fin->fin_off && (fin->fin_dlen > 1)) {
+	if (fin->fin_dlen > 1) {
 		icmp = fin->fin_dp;
 
 		fin->fin_data[0] = *(u_short *)icmp;
@@ -955,17 +960,16 @@ fr_info_t *fin;
 {
 	int flags, tlen;
 	tcphdr_t *tcp;
-	fr_ip_t *fi;
-	u_short off;
 
-	fi = &fin->fin_fi;
-	fi->fi_flx |= FI_TCPUDP;
-	off = fin->fin_off;
+	fin->fin_flx |= FI_TCPUDP;
+	if (fin->fin_off != 0)
+		return;
+
 	tcp = fin->fin_dp;
 	tlen = TCP_OFF(tcp) << 2;
 
 #if defined(_KERNEL) && !defined(__sgi)
-	if ((off == 0) && (fin->fin_m != NULL) &&
+	if ((fin->fin_m != NULL) && 
 	    (M_LEN(fin->fin_m) < tlen + fin->fin_hlen)) {
 		if (fr_pullup(fin->fin_m, fin, tlen + fin->fin_hlen) == NULL)
 			return;
@@ -978,7 +982,7 @@ fr_info_t *fin;
 	 */
 	if (tlen < sizeof(tcphdr_t))
 		fin->fin_flx |= FI_BAD;
-	if (!(fi->fi_flx & FI_SHORT) && !off) {
+	if (!(fin->fin_flx & FI_SHORT)) {
 		flags = tcp->th_flags;
 		fin->fin_tcpf = tcp->th_flags;
 
@@ -1011,7 +1015,7 @@ fr_info_t *fin;
 		}
 	}
 
-	if (!off && (fin->fin_dlen > 3)) {
+	if (fin->fin_dlen > 3) {
 		fin->fin_sport = ntohs(tcp->th_sport);
 		fin->fin_dport = ntohs(tcp->th_dport);
 	}
@@ -1079,13 +1083,12 @@ static INLINE void frpr_udpcommon(fin)
 fr_info_t *fin;
 {
 	udphdr_t *udp;
-	fr_ip_t *fi;
 
-	fi = &fin->fin_fi;
-	fi->fi_flx |= FI_TCPUDP;
-	udp = fin->fin_dp;
+	fin->fin_flx |= FI_TCPUDP;
 
 	if (!fin->fin_off && (fin->fin_dlen > 3)) {
+		udp = fin->fin_dp;
+
 		fin->fin_sport = ntohs(udp->uh_sport);
 		fin->fin_dport = ntohs(udp->uh_dport);
 	}
