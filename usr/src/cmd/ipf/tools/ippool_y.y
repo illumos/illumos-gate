@@ -221,7 +221,9 @@ hashopts:
 
 addrlist:
 	range next addrlist		{ $1->ipn_next = $3; $$ = $1; }
-	| range next			{ $$ = $1; }
+	| range next 			{ $$ = $1; }
+	| range ',' addrlist		{ $1->ipn_next = $3; $$ = $1; }
+	| range 			{ $$ = $1; }
 	;
 
 grouplist:
