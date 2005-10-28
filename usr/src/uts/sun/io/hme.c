@@ -8848,7 +8848,7 @@ hme_display_linkup(struct hme *hmep, uint32_t speed)
 	else if (speed == HME_SPEED_10)
 		(void) sprintf(linkup_msg, "10 Mbps ");
 	else
-		(void) sprintf(linkup_msg, "");
+		linkup_msg[0] = '\0';
 
 	if (hmep->hme_fdx)
 		(void) strcat(linkup_msg, "full duplex link up");

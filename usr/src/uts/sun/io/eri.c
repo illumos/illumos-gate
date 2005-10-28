@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6226,7 +6226,7 @@ eri_read_dma(struct eri *erip, volatile struct rmd *rmdp,
 	{
 		uint32_t hw_fcs, tail_fcs;
 		/*
-		 * since we don't let the hardware srip the CRC in hdx
+		 * since we don't let the hardware strip the CRC in hdx
 		 * then the driver needs to do it.
 		 * this is to workaround a hardware bug
 		 */
@@ -6242,7 +6242,7 @@ eri_read_dma(struct eri *erip, volatile struct rmd *rmdp,
 		tail_fcs = bp->b_wptr[0] << 8 | bp->b_wptr[1];
 		tail_fcs += bp->b_wptr[2] << 8 | bp->b_wptr[3];
 		tail_fcs = (tail_fcs & 0xffff) + (tail_fcs >> 16);
-		if ((uint32_t)(bp->b_wptr) & 1) {
+		if ((uintptr_t)(bp->b_wptr) & 1) {
 			tail_fcs = (tail_fcs << 8) & 0xffff  | (tail_fcs >> 8);
 		}
 		hw_fcs += tail_fcs;
@@ -8736,7 +8736,7 @@ eri_display_link_status(struct eri *erip)
 		(void) sprintf(link_up_msg, "10 Mbps ");
 		break;
 	default:
-		(void) sprintf(link_up_msg, "");
+		link_up_msg[0] = '\0';
 	}
 
 	if (param_mode)
