@@ -209,7 +209,7 @@ extern srvnops_t	wscons_srvnops;
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module.  This one is a pseudo driver */
-	"Workstation Redirection driver 'iwscn' 1.42",
+	"Workstation Redirection driver 'iwscn' %I%",
 	&iwscn_ops,	/* driver ops */
 };
 
