@@ -4936,20 +4936,29 @@ pr_readdir_objectdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 	if ((p->p_flag & SSYS) || (as = p->p_as) == &kas) {
 		as = NULL;
 		objdirsize = 0;
-	} else {
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
-		if (as->a_updatedir)
-			rebuild_objdir(as);
-		objdirsize = as->a_sizedir;
 	}
 
 	/*
 	 * Loop until user's request is satisfied or until
-	 * all mapped objects have been examined.
+	 * all mapped objects have been examined. Cannot hold
+	 * the address space lock for the following call as
+	 * gfs_readdir_pred() utimately causes a call to uiomove().
 	 */
 	while ((error = gfs_readdir_pred(&gstate, uiop, &n)) == 0) {
 		vattr_t vattr;
 		char str[64];
+
+		/*
+		 * Set the correct size of the directory just
+		 * in case the process has changed it's address
+		 * space via mmap/munmap calls.
+		 */
+		if (as != NULL) {
+			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			if (as->a_updatedir)
+				rebuild_objdir(as);
+			objdirsize = as->a_sizedir;
+		}
 
 		/*
 		 * Find next object.
@@ -4960,6 +4969,9 @@ pr_readdir_objectdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 			vattr.va_mask = AT_FSID | AT_NODEID;
 			n++;
 		}
+
+		if (as != NULL)
+			AS_LOCK_EXIT(as, &as->a_lock);
 
 		/*
 		 * Stop when all objects have been reported.
@@ -4974,26 +4986,13 @@ pr_readdir_objectdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 		else
 			pr_object_name(str, vp, &vattr);
 
-		/*
-		 * Drop the address space lock to do the uiomove().
-		 */
-		if (as != NULL)
-			AS_LOCK_EXIT(as, &as->a_lock);
 		error = gfs_readdir_emit(&gstate, uiop, n, vattr.va_nodeid,
 		    str);
-		if (as != NULL) {
-			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
-			if (as->a_updatedir) {
-				rebuild_objdir(as);
-				objdirsize = as->a_sizedir;
-			}
-		}
+
 		if (error)
 			break;
 	}
 
-	if (as != NULL)
-		AS_LOCK_EXIT(as, &as->a_lock);
 	mutex_enter(&p->p_lock);
 	prunlock(pnp);
 
