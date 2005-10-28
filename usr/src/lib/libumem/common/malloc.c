@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -393,6 +393,11 @@ realloc(void *buf_arg, size_t newsize)
 
 	if (buf_arg == NULL)
 		return (malloc(newsize));
+
+	if (newsize == 0) {
+		free(buf_arg);
+		return (NULL);
+	}
 
 	/*
 	 * get the old data size without freeing the buffer
