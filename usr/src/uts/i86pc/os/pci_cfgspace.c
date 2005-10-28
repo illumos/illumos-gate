@@ -31,7 +31,6 @@
  */
 
 #include <sys/systm.h>
-#include <sys/cmn_err.h>
 #include <sys/psw.h>
 #include <sys/bootconf.h>
 #include <sys/reboot.h>
@@ -157,8 +156,6 @@ pci_check(void)
 		break;
 
 	default:
-		/* Not sure what to do here. */
-		cmn_err(CE_WARN, "pci:  Unknown configuration type");
 		return (FALSE);
 	}
 
@@ -195,9 +192,6 @@ pci_check_bios(void)
 	pci_bios_mech = (ax & 0x3);
 	pci_bios_vers = regs.ebx.word.bx;
 	pci_bios_nbus = (regs.ecx.word.cx & 0xff);
-	if (boothowto & RB_VERBOSE)
-		cmn_err(CE_CONT, "PCI probe mech %x, version 0x%x, # busses %d",
-		    pci_bios_mech, pci_bios_vers, pci_bios_nbus);
 
 	switch (pci_bios_mech) {
 	default:	/* ?!? */

@@ -429,14 +429,6 @@ static pgcnt_t kphysm_init(page_t *, struct memseg *, pgcnt_t, pgcnt_t);
 
 void init_intr_threads(struct cpu *);
 
-/*
- * Dummy spl priority masks
- */
-static unsigned char	dummy_cpu_pri[MAXIPL + 1] = {
-	0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf,
-	0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf, 0xf
-};
-
 /* real-time-clock initialization parameters */
 long gmt_lag;		/* offset in seconds of gmt to local time */
 extern long process_rtc_config_file(void);
@@ -649,11 +641,6 @@ startup_init()
 		halt("This processor is not supported by this release "
 		    "of Solaris.");
 	}
-
-	/*
-	 * Set up dummy values till psm spl code installed
-	 */
-	CPU->cpu_pri_data = dummy_cpu_pri;
 
 	PRM_POINT("startup_init() done");
 }
