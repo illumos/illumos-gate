@@ -968,9 +968,9 @@ is_rpc_num_in_use(int rpc_n, char *proto, int lowver, int highver) {
 	for (i = uu_list_first(instance_list); i != NULL;
 	    i = uu_list_next(instance_list, i)) {
 
-		cfg = i->config->basic;
 		if (i->cur_istate != IIS_ONLINE)
 			continue;
+		cfg = i->config->basic;
 
 		for (pi = uu_list_first(cfg->proto_list); pi != NULL;
 		    pi = uu_list_next(cfg->proto_list, pi)) {
