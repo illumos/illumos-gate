@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-1994, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,7 +71,7 @@ prom_test_method(char *method, dnode_t node)
 		rv = p1275_cell2int(ci[5]);
 	} else {
 		(void) prom_sprintf(buf,
-		    "\" %s\" h# %x find-method invert h# %x l!",
+		    "\" %s\" h# %x find-method invert h# %p l!",
 		    method, node, &rv);
 		prom_interpret(buf, 0, 0, 0, 0, 0);
 	}

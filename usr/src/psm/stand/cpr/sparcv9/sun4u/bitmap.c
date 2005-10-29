@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,7 +230,7 @@ map_free_phys(caddr_t vaddr, size_t size, char *name)
 
 	str = "map_free_phys";
 	virt = prom_claim_virt(size, vaddr);
-	CB_VPRINTF(("\n%s: claim vaddr 0x%x, size 0x%x, ret 0x%x\n",
+	CB_VPRINTF(("\n%s: claim vaddr 0x%p, size 0x%lx, ret 0x%p\n",
 	    str, vaddr, size, virt));
 	if (virt != vaddr) {
 		prom_printf("\n%s: cant reserve (0x%p - 0x%p) for \"%s\"\n",
@@ -247,8 +247,8 @@ map_free_phys(caddr_t vaddr, size_t size, char *name)
 
 		err = prom_map_phys(-1, MMU_PAGESIZE, virt, phys);
 		if (err || verbose) {
-			prom_printf("    map virt 0x%p, phys 0x%lx, "
-			    "ppn 0x%lx, ret %d\n", virt, phys, ppn, err);
+			prom_printf("    map virt 0x%p, phys 0x%llx, "
+			    "ppn 0x%x, ret %d\n", virt, phys, ppn, err);
 		}
 		if (err)
 			return ((caddr_t)ERR);
@@ -312,7 +312,7 @@ cb_set_bitmap(void)
 	alloc_size = PAGE_ROUNDUP(all_bitmap_size);
 	if (verbose || CPR_DBG(7)) {
 		prom_printf("%s: nbitmaps %d, bmda_size 0x%lx\n",
-		    str, cb_nbitmaps);
+		    str, cb_nbitmaps, bmda_size);
 		prom_printf("%s: all_bitmap_size 0x%lx, alloc_size 0x%lx\n",
 		    str, all_bitmap_size, alloc_size);
 	}
@@ -469,7 +469,7 @@ cb_get_physavail(void)
 	 */
 	glen = prom_getprop(mem_node, mem_prop, pabuf);
 	if (glen != len) {
-		prom_printf("\n%s: %s,%s: expected len %d, got %d\n",
+		prom_printf("\n%s: 0x%x,%s: expected len %d, got %d\n",
 		    str, mem_node, mem_prop, len, glen);
 		return (ERR);
 	}
@@ -489,7 +489,7 @@ cb_get_physavail(void)
 		arp->low = ADDR_TO_PN(pap->base);
 		arp->high = arp->low + pages - 1;
 		if (verbose) {
-			prom_printf("  %d: (0x%lx - 0x%lx),\tpages %d\n",
+			prom_printf("  %d: (0x%lx - 0x%lx),\tpages %ld\n",
 			    (int)(arp - cb_physavail),
 			    arp->low, arp->high, (arp->high - arp->low + 1));
 		}
@@ -514,7 +514,8 @@ move_page(caddr_t vaddr, pfn_t oldppn)
 	newppn = find_apage();
 	newphys = PN_TO_ADDR(newppn);
 	oldphys = PN_TO_ADDR(oldppn);
-	CB_VPRINTF(("    remap vaddr 0x%p, old 0x%x/0x%x, new 0x%x/0x%x\n",
+	CB_VPRINTF(("    remap vaddr 0x%p, old 0x%lx/0x%llx,"
+	    "	new 0x%lx/0x%llx\n",
 	    vaddr, oldppn, oldphys, newppn, newphys));
 	phys_xcopy(oldphys, newphys, MMU_PAGESIZE);
 	err = prom_remap(MMU_PAGESIZE, vaddr, newphys);

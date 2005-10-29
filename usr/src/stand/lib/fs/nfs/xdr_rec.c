@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,7 +151,7 @@ xdrrec_create(XDR *xdrs, uint_t sendsize, uint_t recvsize, caddr_t tcp_handle,
 		return;
 	}
 	for (rstrm->out_base = rstrm->the_buffer;
-		(uint_t)rstrm->out_base % BYTES_PER_XDR_UNIT != 0;
+		(uintptr_t)rstrm->out_base % BYTES_PER_XDR_UNIT != 0;
 		rstrm->out_base++);
 	rstrm->in_base = rstrm->out_base + sendsize;
 	/*
@@ -190,7 +190,8 @@ xdrrec_getint32(XDR *xdrs, int32_t *ip)
 
 	/* first try the inline, fast case */
 	if ((rstrm->fbtbc >= sizeof (int32_t)) &&
-		(((int)rstrm->in_boundry - (int)bufip) >= sizeof (int32_t))) {
+		(((ptrdiff_t)rstrm->in_boundry
+		    - (ptrdiff_t)bufip) >= sizeof (int32_t))) {
 		*ip = (int32_t)ntohl((uint32_t)(*bufip));
 		rstrm->fbtbc -= sizeof (int32_t);
 		rstrm->in_finger += sizeof (int32_t);
@@ -261,11 +262,10 @@ static bool_t
 xdrrec_putbytes(XDR *xdrs, caddr_t addr, int32_t len)
 {
 	RECSTREAM *rstrm = (RECSTREAM *)(xdrs->x_private);
-	int current;
+	ptrdiff_t current;
 
 	while (len > 0) {
-		current = (uint_t)rstrm->out_boundry -
-			(uint_t)rstrm->out_finger;
+		current = rstrm->out_boundry - rstrm->out_finger;
 		current = (len < current) ? len : current;
 		bcopy(addr, rstrm->out_finger, current);
 		rstrm->out_finger += current;
@@ -286,7 +286,7 @@ xdrrec_getpos(XDR *xdrs)
 	RECSTREAM *rstrm = (RECSTREAM *)xdrs->x_private;
 	int32_t pos;
 
-	pos = lseek((int)rstrm->tcp_handle, (int32_t)0, 1);
+	pos = lseek((int)(intptr_t)rstrm->tcp_handle, 0, 1);
 	if (pos != -1)
 		switch (xdrs->x_op) {
 
@@ -435,16 +435,16 @@ bool_t
 xdrrec_endofrecord(XDR *xdrs, bool_t sendnow)
 {
 	RECSTREAM *rstrm = (RECSTREAM *)(xdrs->x_private);
-	uint32_t len;  /* fragment length */
+	ptrdiff_t len;  /* fragment length */
 
 	if (sendnow || rstrm->frag_sent ||
-		((uint32_t)rstrm->out_finger + sizeof (uint32_t) >=
-		(uint32_t)rstrm->out_boundry)) {
+		((ptrdiff_t)rstrm->out_finger + sizeof (uint32_t)
+		    >= (ptrdiff_t)rstrm->out_boundry)) {
 		rstrm->frag_sent = FALSE;
 		return (flush_out(rstrm, TRUE));
 	}
-	len = (uint32_t)(rstrm->out_finger) - (uint32_t)(rstrm->frag_header) -
-		sizeof (uint32_t);
+	len = (ptrdiff_t)rstrm->out_finger - (ptrdiff_t)rstrm->frag_header;
+	len -= sizeof (uint32_t);
 	*(rstrm->frag_header) = htonl((uint32_t)len | LAST_FRAG);
 	rstrm->frag_header = (uint32_t *)rstrm->out_finger;
 	rstrm->out_finger += sizeof (uint32_t);
@@ -459,11 +459,13 @@ static bool_t
 flush_out(RECSTREAM *rstrm, bool_t eor)
 {
 	uint32_t eormask = (eor == TRUE) ? LAST_FRAG : 0;
-	uint32_t len = (uint32_t)(rstrm->out_finger) -
-		(uint32_t)(rstrm->frag_header) - sizeof (uint32_t);
+	ptrdiff_t len;
+
+	len = (ptrdiff_t)rstrm->out_finger - (ptrdiff_t)rstrm->frag_header;
+	len -= sizeof (uint32_t);
 
 	*(rstrm->frag_header) = htonl(len | eormask);
-	len = (uint32_t)(rstrm->out_finger) - (uint32_t)(rstrm->out_base);
+	len = rstrm->out_finger - rstrm->out_base;
 	if ((*(rstrm->writeit))(rstrm->tcp_handle, rstrm->out_base, (int)len)
 	    != (int)len)
 		return (FALSE);
@@ -477,11 +479,11 @@ static bool_t  /* knows nothing about records!  Only about input buffers */
 fill_input_buf(RECSTREAM *rstrm, int frag_len)
 {
 	caddr_t where;
-	uint_t i;
+	uintptr_t i;
 	int len;
 
 	where = rstrm->in_base;
-	i = (uint_t)rstrm->in_boundry % BYTES_PER_XDR_UNIT;
+	i = (uintptr_t)rstrm->in_boundry % BYTES_PER_XDR_UNIT;
 	where += i;
 	len = (frag_len < (rstrm->in_size - i)) ? frag_len :
 		rstrm->in_size - i;
@@ -499,10 +501,10 @@ fill_input_buf(RECSTREAM *rstrm, int frag_len)
 static bool_t
 get_input_bytes(RECSTREAM *rstrm, caddr_t addr, int frag_len, int len)
 {
-	int current;
+	ptrdiff_t current;
 
 	while (len > 0) {
-		current = (int)rstrm->in_boundry - (int)rstrm->in_finger;
+		current = rstrm->in_boundry - rstrm->in_finger;
 #ifdef DEBUG
 	printf("get_input_bytes: len = %d, frag_len = %d, current %d\n",
 		len, frag_len, current);
@@ -549,12 +551,12 @@ set_input_fragment(RECSTREAM *rstrm)
 static bool_t  /* consumes input bytes; knows nothing about records! */
 skip_input_bytes(RECSTREAM *rstrm, int32_t cnt)
 {
-	int current;
+	ptrdiff_t current;
 #ifdef DEBUG
 	printf("skip_input_fragment: cnt = %d\n", cnt);
 #endif
 	while (cnt > 0) {
-		current = (int)rstrm->in_boundry - (int)rstrm->in_finger;
+		current = rstrm->in_boundry - rstrm->in_finger;
 		if (current == 0) {
 			if (! fill_input_buf(rstrm, cnt))
 				return (FALSE);

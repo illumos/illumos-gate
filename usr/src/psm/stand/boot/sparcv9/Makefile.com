@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # psm/stand/boot/sparcv9/Makefile.com
@@ -38,6 +38,7 @@ TOP_CMN_DIR	= $(SRC)/common
 CMN_DIR		= $(BOOTSRCDIR)/common
 MACH_DIR	= ../../sparc/common
 PLAT_DIR	= .
+BOOT_DIR        = $(SRC)/psm/stand/boot
 
 BOOT_SRC	= boot.c wanboot.c
 
@@ -90,6 +91,7 @@ CPPINCS		+= -I$(STANDDIR)
 CPPINCS		+= -I$(STANDDIR)/lib
 CPPINCS		+= -I$(STANDDIR)/lib/sa
 CPPINCS		+= -I$(SRC)/common/net/dhcp
+CPPINCS		+= -I$(BOOT_DIR)/sparc/common
 CPPFLAGS	= $(CPPDEFS) $(CPPINCS)
 CPPFLAGS	+= $(CCYFLAG)$(STANDDIR)
 ASFLAGS		+= $(CPPDEFS) -P -D_ASM $(CPPINCS)

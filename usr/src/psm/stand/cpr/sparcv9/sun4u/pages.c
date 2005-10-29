@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,7 +206,7 @@ restore_page_group(cpd_t *descp)
 		size = mmu_ptob(descp->cpd_pages);
 		len = decompress(src, dst, descp->cpd_length, size);
 		if (len != size) {
-			prom_printf("\nbad decompressed len %d, size %d\n",
+			prom_printf("\nbad decompressed len %lu, size %lu\n",
 			    len, size);
 			return (ERR);
 		}

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994,1998-2000,2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -262,6 +262,12 @@ prom_chosennode(void)
 
 	prom_fatal_error("prom_chosennode: Can't find </chosen>\n");
 	/*NOTREACHED*/
+
+	/*
+	 * gcc doesn't recognize "NOTREACHED" and puts the warning.
+	 * To surpress it, returning an integer value is required.
+	 */
+	return ((dnode_t)0);
 }
 
 /*

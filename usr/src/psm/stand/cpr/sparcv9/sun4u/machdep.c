@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +177,7 @@ restore_tlb(struct sun4u_tlb *utp, int cpu_id)
 		(*tfunc)(utp->index, virt, &utp->tte);
 		if (verbose || CPR_DBG(4)) {
 			prom_printf("    cpu_id %d: write %ctlb "
-			    "(index %x, virt 0x%p, size 0x%x)\n",
+			    "(index %x, virt 0x%lx, size 0x%x)\n",
 			    cpu_id, tname, utp->index, utp->va_tag,
 			    TTEBYTES(utp->tte.tte_size));
 		}

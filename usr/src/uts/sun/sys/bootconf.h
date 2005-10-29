@@ -174,7 +174,7 @@ typedef unsigned long long boot_cell_t;
 #define	boot_dnode2cell(d)	((boot_cell_t)((unsigned)((dnode_t)(d))))
 #define	boot_ihandle2cell(ih)	((boot_cell_t)((unsigned)((ihandle_t)(ih))))
 
-#define	boot_cell2ptr(p)	((void *)((boot_cell_t)(p)))
+#define	boot_cell2ptr(p)	((void *)(uintptr_t)((boot_cell_t)(p)))
 #define	boot_cell2int(i)	((int)((boot_cell_t)(i)))
 #define	boot_cell2uint(u)	((unsigned int)((boot_cell_t)(u)))
 #define	boot_cell2uint64(u)	((uint64_t)((boot_cell_t)(u)))

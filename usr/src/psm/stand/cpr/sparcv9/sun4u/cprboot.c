@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +100,7 @@ cb_intro(void)
 	 */
 	if ((uintptr_t)_end > CB_SRC_VIRT) {
 		prom_printf("\ndata collision:\n"
-		    "(_end=0x%p > CB_LOW_VIRT=0x%p), recompile...\n",
+		    "(_end=0x%p > CB_LOW_VIRT=0x%x), recompile...\n",
 		    _end, CB_SRC_VIRT);
 		return (ERR);
 	}
@@ -150,7 +150,7 @@ get_bootargs(void)
 
 	if (verbose) {
 		for (argv = cb_args; *argv; argv++) {
-			prom_printf("    %d: \"%s\"\n",
+			prom_printf("    %ld: \"%s\"\n",
 			    (argv - cb_args), *argv);
 		}
 	}
@@ -375,7 +375,7 @@ cb_read_statefile(void)
 	phys = 0;
 	err = cb_alloc(alsize, MMU_PAGESIZE512K, &sfile.buf, &phys);
 	CB_VPRINTF(("%s:\n    alloc size 0x%lx, buf size 0x%lx\n"
-	    "    virt 0x%p, phys 0x%lx\n",
+	    "    virt 0x%p, phys 0x%llx\n",
 	    str, alsize, sfile.size, sfile.buf, phys));
 	if (err) {
 		prom_printf("%s: cant alloc statefile buf, size 0x%lx\n%s\n",
@@ -566,7 +566,8 @@ main(void *cookie, int first)
 		if (verbose || CPR_DBG(1)) {
 			prom_printf("%s: milliseconds %d\n",
 			    prog, prom_gettime() - cb_msec);
-			prom_printf("%s: resume pc 0x%p\n", prog, mdinfo.func);
+			prom_printf("%s: resume pc 0x%lx\n",
+			    prog, mdinfo.func);
 			prom_printf("%s: exit_to_kernel(0x%p, 0x%p)\n\n",
 			    prog, cookie, &mdinfo);
 		}

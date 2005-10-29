@@ -81,7 +81,8 @@ bop_open(struct bootops *bop, char *name, int flags)
 	boot_cell_t args[6];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("open");
 	args[1] = 2;
 	args[2] = 1;
@@ -111,7 +112,8 @@ bop_read(struct bootops *bop, int fd, caddr_t buf, size_t size)
 	boot_cell_t args[7];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("read");
 	args[1] = 3;
 	args[2] = 1;
@@ -141,7 +143,8 @@ bop_seek(struct bootops *bop, int fd, off_t hi, off_t lo)
 	boot_cell_t args[7];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("seek");
 	args[1] = 3;
 	args[2] = 1;
@@ -169,7 +172,8 @@ bop_close(struct bootops *bop, int fd)
 	boot_cell_t args[5];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("close");
 	args[1] = 1;
 	args[2] = 1;
@@ -197,7 +201,8 @@ bop_alloc(struct bootops *bop, caddr_t virthint, size_t size, int align)
 	boot_cell_t args[7];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("alloc");
 	args[1] = 3;
 	args[2] = 1;
@@ -206,7 +211,7 @@ bop_alloc(struct bootops *bop, caddr_t virthint, size_t size, int align)
 	args[4] = boot_size2cell(size);
 	args[5] = boot_int2cell(align);
 	(void) (bsys_1275_call)(args);
-	return ((caddr_t)boot_ptr2cell(args[6]));
+	return ((caddr_t)(uintptr_t)boot_ptr2cell((uintptr_t)args[6]));
 }
 
 /*
@@ -226,7 +231,8 @@ bop_alloc_virt(struct bootops *bop, caddr_t virt, size_t size)
 	boot_cell_t args[6];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("alloc_virt");
 	args[1] = 2;
 	args[2] = 1;
@@ -234,7 +240,7 @@ bop_alloc_virt(struct bootops *bop, caddr_t virt, size_t size)
 	args[3] = boot_ptr2cell(virt);
 	args[4] = boot_size2cell(size);
 	(void) (bsys_1275_call)(args);
-	return ((caddr_t)boot_ptr2cell(args[5]));
+	return ((caddr_t)(uintptr_t)boot_ptr2cell((uintptr_t)args[5]));
 }
 
 /*
@@ -255,7 +261,8 @@ bop_free(struct bootops *bop, caddr_t virt, size_t size)
 	boot_cell_t args[6];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("free");
 	args[1] = 2;
 	args[2] = 1;
@@ -286,7 +293,8 @@ bop_map(struct bootops *bop, caddr_t virt, int space,
 	boot_cell_t args[8];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("map");
 	args[1] = 3;
 	args[2] = 1;
@@ -317,7 +325,8 @@ bop_unmap(struct bootops *bop, caddr_t virt, size_t size)
 	boot_cell_t args[6];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("unmap");
 	args[1] = 2;
 	args[2] = 1;
@@ -343,7 +352,8 @@ bop_quiesce_io(struct bootops *bop)
 	boot_cell_t args[4];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("quiesce");
 	args[1] = 0;
 	args[2] = 1;
@@ -368,7 +378,8 @@ bop_getproplen(struct bootops *bop, char *name)
 	boot_cell_t args[7];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("getproplen");
 	args[1] = 1;
 	args[2] = 1;
@@ -396,7 +407,8 @@ bop_getprop(struct bootops *bop, char *name, void *value)
 	boot_cell_t args[6];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("getprop");
 	args[1] = 2;
 	args[2] = 1;
@@ -424,7 +436,8 @@ bop_nextprop(struct bootops *bop, char *prevprop)
 	boot_cell_t args[5];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("nextprop");
 	args[1] = 1;
 	args[2] = 1;
@@ -459,7 +472,8 @@ bop_puts(struct bootops *bop, char *string)
 		(*bsys_printf)(bop, string);
 		return;
 	}
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("puts");
 	args[1] = 1;
 	args[2] = 0;
@@ -510,10 +524,11 @@ bop_putsarg(struct bootops *bop, const char *string, ...)
 		va_start(ap, string);
 		switch (*fmt) {
 		case 's':
-			arg = (uint64_t)va_arg(ap, char *);
+			/* use uintptr_t to suppress the gcc warning */
+			arg = (uint64_t)(uintptr_t)va_arg(ap, char *);
 			break;
 		case 'p':
-			arg = (uint64_t)va_arg(ap, void *);
+			arg = (uint64_t)(uintptr_t)va_arg(ap, void *);
 			break;
 		case 'd':
 		case 'D':
@@ -547,7 +562,7 @@ bop_putsarg(struct bootops *bop, const char *string, ...)
 		return;
 	}
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("putsarg");
 	args[1] = 2;
 	args[2] = 0;
@@ -574,7 +589,8 @@ bop_mountroot(struct bootops *bop, char *path)
 	boot_cell_t args[5];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("mountroot");
 	args[1] = 2;
 	args[2] = 1;
@@ -600,7 +616,8 @@ bop_unmountroot(struct bootops *bop)
 	boot_cell_t args[4];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("unmountroot");
 	args[1] = 0;
 	args[2] = 1;
@@ -623,9 +640,10 @@ bop_unmountroot(struct bootops *bop)
 int
 bop_serviceavail(struct bootops *bop, char *name)
 {
+	/* use uintptr_t to suppress the gcc warning */
 	boot_cell_t args[5];
 	int	(*bsys_1275_call)(void *) =
-	    (int (*)(void *))bop->bsys_1275_call;
+	    (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 
 	args[0] = boot_ptr2cell("serviceavail");
 	args[1] = 1;
@@ -652,7 +670,8 @@ bop_fstat(struct bootops *bop, int fd, struct bootstat *st)
 	boot_cell_t args[6];
 	int	(*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("fstat");
 	args[1] = 2;
 	args[2] = 1;
@@ -676,7 +695,8 @@ bop_enter_mon(struct bootops *bop)
 	boot_cell_t args[4];
 	int (*bsys_1275_call)(void *);
 
-	bsys_1275_call = (int (*)(void *))bop->bsys_1275_call;
+	/* use uintptr_t to suppress the gcc warning */
+	bsys_1275_call = (int (*)(void *))(uintptr_t)bop->bsys_1275_call;
 	args[0] = boot_ptr2cell("enter_mon");
 	args[1] = 0;
 	args[2] = 0;

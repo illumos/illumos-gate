@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-1995, 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,14 +77,14 @@ kern_resfree(caddr_t virtaddr, size_t size)
 int
 get_progmemory(caddr_t vaddr, size_t size, int align)
 {
-	uint_t n;
+	uintptr_t n;
 
 	/*
 	 * if the vaddr given is not a mult of PAGESIZE,
 	 * then we rounddown to a page, but keep the same
 	 * ending addr.
 	 */
-	n = (uint_t)vaddr & (pagesize - 1);
+	n = (uintptr_t)vaddr & (pagesize - 1);
 	if (n) {
 		vaddr -= n;
 		size += n;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * tcp.c, Code implementing the TCP protocol.
@@ -264,11 +264,14 @@ static in_port_t	tcp_next_port_to_try = 32*1024;
  * b_next and b_prev of messages on the reassembly queue.  The messages are
  * chained using b_cont.  These macros are used in tcp_reass() so we don't
  * have to see the ugly casts and assignments.
+ * Note. use uintptr_t to suppress the gcc warning.
  */
-#define	TCP_REASS_SEQ(mp)		((uint32_t)((mp)->b_next))
-#define	TCP_REASS_SET_SEQ(mp, u)	((mp)->b_next = (mblk_t *)(u))
-#define	TCP_REASS_END(mp)		((uint32_t)((mp)->b_prev))
-#define	TCP_REASS_SET_END(mp, u)	((mp)->b_prev = (mblk_t *)(u))
+#define	TCP_REASS_SEQ(mp)		((uint32_t)(uintptr_t)((mp)->b_next))
+#define	TCP_REASS_SET_SEQ(mp, u)	((mp)->b_next = \
+					    (mblk_t *)((uintptr_t)(u)))
+#define	TCP_REASS_END(mp)		((uint32_t)(uintptr_t)((mp)->b_prev))
+#define	TCP_REASS_SET_END(mp, u)	((mp)->b_prev = \
+					    (mblk_t *)((uintptr_t)(u)))
 
 #define	TCP_TIMER_RESTART(tcp, intvl) \
 	(tcp)->tcp_rto_timeout = prom_gettime() + intvl; \
@@ -2568,8 +2571,9 @@ tcp_sack_rxmit(tcp_t *tcp, int sock_id)
 
 		/*
 		 * Update the send timestamp to avoid false retransmission.
+		 * Note. use uintptr_t to suppress the gcc warning.
 		 */
-		snxt_mp->b_prev = (mblk_t *)prom_gettime();
+		snxt_mp->b_prev = (mblk_t *)(uintptr_t)prom_gettime();
 
 		BUMP_MIB(tcp_mib.tcpRetransSegs);
 		UPDATE_MIB(tcp_mib.tcpRetransBytes, seg_len);
@@ -3841,9 +3845,10 @@ process_ack:
 		/*
 		 * An ACK sequence we haven't seen before, so get the RTT
 		 * and update the RTO.
+		 * Note. use uintptr_t to suppress the gcc warning.
 		 */
 		tcp_set_rto(tcp, (int32_t)(prom_gettime() -
-		    (uint32_t)mp1->b_prev));
+		    (uint32_t)(uintptr_t)mp1->b_prev));
 
 		/* Remeber the last sequence to be ACKed */
 		tcp->tcp_csuna = seg_ack;
@@ -4120,8 +4125,9 @@ xmit_check:
 			    B_TRUE);
 
 			if (mp1 != NULL) {
+				/* use uintptr_t to suppress the gcc warning */
 				tcp->tcp_xmit_head->b_prev =
-				    (mblk_t *)prom_gettime();
+				    (mblk_t *)(uintptr_t)prom_gettime();
 				tcp->tcp_csuna = tcp->tcp_snxt;
 				BUMP_MIB(tcp_mib.tcpRetransSegs);
 				UPDATE_MIB(tcp_mib.tcpRetransBytes, snd_size);
@@ -4238,8 +4244,10 @@ tcp_ss_rexmit(tcp_t *tcp, int sock_id)
 			/*
 			 * Update the send timestamp to avoid false
 			 * retransmission.
+			 * Note. use uintptr_t to suppress the gcc warning.
 			 */
-			old_snxt_mp->b_prev = (mblk_t *)prom_gettime();
+			old_snxt_mp->b_prev =
+			    (mblk_t *)(uintptr_t)prom_gettime();
 			BUMP_MIB(tcp_mib.tcpRetransSegs);
 			UPDATE_MIB(tcp_mib.tcpRetransBytes, cnt);
 
@@ -4301,8 +4309,9 @@ tcp_timer(tcp_t	*tcp, int sock_id)
 			BUMP_MIB(tcp_mib.tcpTimRetrans);
 			if (tcp->tcp_xmit_head == NULL)
 				break;
+			/* use uintptr_t to suppress the gcc warning */
 			time_to_wait = (int32_t)(prom_gettime() -
-			    (uint32_t)tcp->tcp_xmit_head->b_prev);
+			    (uint32_t)(uintptr_t)tcp->tcp_xmit_head->b_prev);
 			time_to_wait = tcp->tcp_rto - time_to_wait;
 			if (time_to_wait > 0) {
 				/*
@@ -4532,8 +4541,10 @@ tcp_timer(tcp_t	*tcp, int sock_id)
 	if (mss > tcp->tcp_swnd && tcp->tcp_swnd != 0)
 		mss = tcp->tcp_swnd;
 
-	if ((mp = tcp->tcp_xmit_head) != NULL)
-		mp->b_prev = (mblk_t *)prom_gettime();
+	if ((mp = tcp->tcp_xmit_head) != NULL) {
+		/* use uintptr_t to suppress the gcc warning */
+		mp->b_prev = (mblk_t *)(uintptr_t)prom_gettime();
+	}
 	mp = tcp_xmit_mp(tcp, mp, mss, NULL, NULL, tcp->tcp_suna, B_TRUE, &mss,
 	    B_TRUE);
 	if (mp == NULL)
@@ -4745,7 +4756,8 @@ data_null:
 			usable = usable_r;
 	}
 
-	local_time = (mblk_t *)prom_gettime();
+	/* use uintptr_t to suppress the gcc warning */
+	local_time = (mblk_t *)(uintptr_t)prom_gettime();
 
 	/*
 	 * "Our" Nagle Algorithm.  This is not the same as in the old
@@ -4947,7 +4959,8 @@ data_null:
 		}
 
 		if (tcp->tcp_snd_ts_ok) {
-			U32_TO_BE32((uint32_t)local_time,
+			/* use uintptr_t to suppress the gcc warning */
+			U32_TO_BE32((uint32_t)(uintptr_t)local_time,
 				(char *)tcph+TCP_MIN_HEADER_LENGTH+4);
 			U32_TO_BE32(tcp->tcp_ts_recent,
 			    (char *)tcph+TCP_MIN_HEADER_LENGTH+8);

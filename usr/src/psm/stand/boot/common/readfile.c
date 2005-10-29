@@ -42,9 +42,7 @@
 #include <sys/bootvfs.h>
 #include <sys/platnames.h>
 
-#if defined(__i386)
 #include "util.h"
-#endif
 
 #ifdef	BOOTAMD64
 #include <amd64/amd64_page.h>
@@ -321,15 +319,15 @@ readfile(int fd, int print)
 }
 
 /*
- * Macros to add attribute/values
- * to the ELF bootstrap vector
- * and the aux vector.
+ * Macros to add attribute/values to the ELF bootstrap vector
+ * and the aux vector. Use the type-cast to convert integers
+ * to pointers first to suppress the gcc warning.
  */
 #define	AUX(p, a, v)	{ (p)->a_type = (a); \
-			((p)++)->a_un.a_val = (int32_t)(v); }
+			((p)++)->a_un.a_val = (int32_t)(uintptr_t)(v); }
 
 #define	EBV(p, a, v)	{ (p)->eb_tag = (a); \
-			((p)++)->eb_un.eb_val = (Elf32_Word)(v); }
+			((p)++)->eb_un.eb_val = (Elf32_Word)(uintptr_t)(v); }
 
 static func_t
 read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
@@ -364,7 +362,8 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 	if (elfhdrp->e_phnum == 0 || elfhdrp->e_phoff == 0)
 		goto elferror;
 
-	entrypt = (func_t)elfhdrp->e_entry;
+	/* use uintptr_t to suppress the gcc warning */
+	entrypt = (func_t)(uintptr_t)elfhdrp->e_entry;
 	if (verbosemode)
 		dprintf("Entry point: %p\n", (void *)entrypt);
 
@@ -551,8 +550,9 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 						goto elferror;
 				} else
 #endif	/* i386 */
-				if (get_progmemory((caddr_t)base, size,
-				    npagesize))
+				/* use uintptr_t to suppress the gcc warning */
+				if (get_progmemory((caddr_t)(uintptr_t)base,
+				    size, npagesize))
 					goto elferror;
 			}
 
@@ -560,8 +560,9 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 				dprintf("reading 0x%x bytes into 0x%x\n",
 				phdr->p_filesz, loadaddr);
 			}
-			if (xread(fd, (caddr_t)loadaddr, phdr->p_filesz) !=
-			    phdr->p_filesz)
+			/* use uintptr_t to suppress the gcc warning */
+			if (xread(fd, (caddr_t)(uintptr_t)loadaddr,
+			    phdr->p_filesz) != phdr->p_filesz)
 				goto elferror;
 
 			/* zero out BSS */
@@ -572,8 +573,8 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 					    loadaddr,
 					    phdr->p_memsz - phdr->p_filesz);
 				}
-
-				bzero((void *)loadaddr,
+				/* use uintptr_t to suppress the gcc warning */
+				bzero((void *)(uintptr_t)loadaddr,
 				    phdr->p_memsz - phdr->p_filesz);
 				bss_seen++;
 				if (print)
@@ -582,10 +583,11 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 			}
 
 			/* force instructions to be visible to icache */
-			if (phdr->p_flags & PF_X)
-				sync_instruction_memory((caddr_t)phdr->p_vaddr,
+			if (phdr->p_flags & PF_X) {
+				sync_instruction_memory(
+				    (caddr_t)(uintptr_t)phdr->p_vaddr,
 				    phdr->p_memsz);
-
+			}
 #ifdef	MPSAS
 			sas_symtab(phdr->p_vaddr,
 				    phdr->p_vaddr + phdr->p_memsz);
@@ -666,12 +668,15 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 			kmem_free(elfbootvec, vsize);
 			goto elferror;
 		}
+		/* use uintptr_t to suppress the gcc warning */
 		if ((elfbootvec->eb_un.eb_ptr =
-		    (Elf32_Addr)kmem_alloc(size, 0)) == NULL) {
+		    (Elf32_Addr)(uintptr_t)kmem_alloc(size, 0)) == NULL) {
 			kmem_free(elfbootvec, vsize);
 			goto elferror;
 		}
-		bcopy(auxv, (void *)(elfbootvec->eb_un.eb_ptr), size);
+		/* use uintptr_t to suppress the gcc warning */
+		bcopy(auxv,
+		    (void *)(uintptr_t)(elfbootvec->eb_un.eb_ptr), size);
 
 #if defined(_ELF64_SUPPORT) && !defined(BOOTAMD64)
 		/*
@@ -684,13 +689,15 @@ read_elf32(int fd, int print, Elf32_Ehdr *elfhdrp)
 		bcopy(bootv, elfbootvecELF32_64, vsize);
 
 		size = (av - auxv) * sizeof (auxv64_t);
+		/* use uintptr_t to suppress the gcc warning */
 		if ((elfbootvecELF32_64->eb_un.eb_ptr =
-		    (Elf32_Addr)kmem_alloc(size, 0)) == NULL) {
+		    (Elf32_Addr)(uintptr_t)kmem_alloc(size, 0)) == NULL) {
 			kmem_free(elfbootvecELF32_64, vsize);
 			goto elferror;
 		} else {
 			auxv64_t *a64 =
-			    (auxv64_t *)elfbootvecELF32_64->eb_un.eb_ptr;
+			    (auxv64_t *)(uintptr_t)
+			    elfbootvecELF32_64->eb_un.eb_ptr;
 			auxv32_t *a = auxv;
 
 			for (a = auxv; a < av; a++) {
@@ -1116,8 +1123,9 @@ iload32(char *rtld, Elf32_Phdr *thdr, Elf32_Phdr *dhdr, auxv32_t **avp)
 	caddr_t shdrs = NULL;
 	caddr_t etext, edata;
 
-	etext = (caddr_t)thdr->p_vaddr + thdr->p_memsz;
-	edata = (caddr_t)dhdr->p_vaddr + dhdr->p_memsz;
+	/* use uintptr_t to suppress the gcc warning */
+	etext = (caddr_t)(uintptr_t)thdr->p_vaddr + thdr->p_memsz;
+	edata = (caddr_t)(uintptr_t)dhdr->p_vaddr + dhdr->p_memsz;
 
 	/*
 	 * Get the module path.
@@ -1217,12 +1225,16 @@ iload32(char *rtld, Elf32_Phdr *thdr, Elf32_Phdr *dhdr, auxv32_t **avp)
 			}
 		}
 		/*
-		 * Assign the section's virtual addr.
+		 * Assign the section's virtual addr. Use uintptr_t to
+		 * suppress the gcc warning.
 		 */
-		sp->sh_addr = (Elf32_Off)load;
-		/* force instructions to be visible to icache */
+		sp->sh_addr = (Elf32_Off)(uintptr_t)load;
+		/*
+		 * Force instructions to be visible to icache. Use
+		 * uintptr_t to suppress the gcc warning as well.
+		 */
 		if (sp->sh_flags & SHF_EXECINSTR)
-			sync_instruction_memory((caddr_t)sp->sh_addr,
+			sync_instruction_memory((caddr_t)(uintptr_t)sp->sh_addr,
 			    sp->sh_size);
 	}
 	/*

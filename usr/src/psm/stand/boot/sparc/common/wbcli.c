@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -500,7 +500,7 @@ clhelp(cli_ent_t *cliptr, char *valstr, boolean_t out)
 static int
 cllist(cli_ent_t *cliptr, char *valstr, boolean_t out)
 {
-	int	wanted = (int)valstr;
+	int	wanted = (int)(uintptr_t)valstr; /* use uintptr_t for gcc */
 	int	i;
 
 	wanted  &= ~(CLF_CMD | CLF_ARG);
@@ -539,7 +539,7 @@ static int
 clprompt(cli_ent_t *cliptr, char *valstr, boolean_t out)
 {
 	char	*p;
-	int	wanted = (int)valstr;
+	int	wanted = (int)(uintptr_t)valstr; /* use uintrptr_t for gcc */
 
 	/*
 	 * If processing boot arguments, simply note the fact that clprompt()
@@ -794,7 +794,8 @@ cli_eval_buf(char *inbuf, int wanted)
 		 * clprompt() and cllist().
 		 */
 		if ((cliptr->flags & CLF_CMD) != 0) {
-			valstr = (char *)wanted;
+			/* use uintptr_t to suppress the gcc warning */
+			valstr = (char *)(uintptr_t)wanted;
 		}
 
 		/*

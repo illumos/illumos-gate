@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1987-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -127,7 +127,7 @@ cpr_reset_properties(void)
 
 	node = prom_optionsnode();
 	if (node == OBP_NONODE || node == OBP_BADNODE) {
-		prom_printf("%s: cannot find \"options\" node\n");
+		prom_printf("%s: cannot find \"options\" node\n", str);
 		return (-1);
 	}
 
