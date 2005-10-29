@@ -56,7 +56,7 @@ $(ROOTETCDATA) := FILEMODE = 0644
 $(ROOTETCDATA) := OWNER = root
 $(ROOTETCDATA) := GROUP = sys
 
-LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair
+LDLIBS +=	-ladm -lefi -ldiskmgt -lnvpair -ldevid
 
 .KEEP_STATE:
 

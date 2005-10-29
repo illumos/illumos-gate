@@ -525,6 +525,7 @@ f none usr/include/sys/cis_protos.h 644 root bin
 f none usr/include/sys/cladm.h 644 root bin
 f none usr/include/sys/class.h 644 root bin
 f none usr/include/sys/clconf.h 644 root bin
+f none usr/include/sys/cmlb.h 644 root bin
 f none usr/include/sys/cmn_err.h 644 root bin
 f none usr/include/sys/compress.h 644 root bin
 f none usr/include/sys/condvar.h 644 root bin

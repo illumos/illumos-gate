@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1993-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,11 +51,14 @@ int			build_default_partition(
 				struct dk_label *label,
 				int		ctrl_type);
 
+struct disk_type *auto_direct_get_geom_label(int fd, struct dk_label *label);
 #else
 
 struct disk_type	*auto_sense();
 struct disk_type	*auto_efi_sense();
 int			build_default_partition();
+struct disk_type *auto_direct_get_geom_label();
+
 
 #endif	/* __STDC__ */
 

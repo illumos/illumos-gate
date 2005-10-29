@@ -206,6 +206,16 @@ static struct disk_type	*new_scsi_disk_type(
 				struct dk_label	*label);
 static struct disk_info	*find_scsi_disk_info(
 				struct dk_cinfo	*dkinfo);
+
+static struct disk_type *new_direct_disk_type(int fd, char *disk_name,
+    struct dk_label *label);
+
+static struct disk_info *find_direct_disk_info(struct dk_cinfo *dkinfo);
+static int efi_ioctl(int fd, int cmd, dk_efi_t *dk_ioc);
+static int auto_label_init(struct dk_label *label);
+static struct ctlr_info *find_direct_ctlr_info(struct dk_cinfo	*dkinfo);
+static  struct disk_info *find_direct_disk_info(struct dk_cinfo *dkinfo);
+
 static char		*get_sun_disk_name(
 				char		*disk_name,
 				struct scsi_inquiry *inquiry);
@@ -338,6 +348,382 @@ auto_efi_sense(int fd, struct efi_info *label)
 	disk_info->disk_parts = part;
 	return (disk);
 }
+
+static int
+efi_ioctl(int fd, int cmd, dk_efi_t *dk_ioc)
+{
+	void *data = dk_ioc->dki_data;
+	int error;
+
+	dk_ioc->dki_data_64 = (uint64_t)(uintptr_t)data;
+	error = ioctl(fd, cmd, (void *)dk_ioc);
+	dk_ioc->dki_data = data;
+
+	return (error);
+}
+
+static struct ctlr_info *
+find_direct_ctlr_info(
+	struct dk_cinfo		*dkinfo)
+{
+	struct ctlr_info	*ctlr;
+
+	if (dkinfo->dki_ctype != DKC_DIRECT)
+		return (NULL);
+
+	for (ctlr = ctlr_list; ctlr != NULL; ctlr = ctlr->ctlr_next) {
+		if (ctlr->ctlr_addr == dkinfo->dki_addr &&
+		    ctlr->ctlr_space == dkinfo->dki_space &&
+		    ctlr->ctlr_ctype->ctype_ctype == DKC_DIRECT) {
+			return (ctlr);
+		}
+	}
+
+	impossible("no DIRECT controller info");
+	/*NOTREACHED*/
+}
+
+static  struct disk_info *
+find_direct_disk_info(
+	struct dk_cinfo		*dkinfo)
+{
+	struct disk_info	*disk;
+	struct dk_cinfo		*dp;
+
+	for (disk = disk_list; disk != NULL; disk = disk->disk_next) {
+		assert(dkinfo->dki_ctype == DKC_DIRECT);
+		dp = &disk->disk_dkinfo;
+		if (dp->dki_ctype == dkinfo->dki_ctype &&
+		    dp->dki_cnum == dkinfo->dki_cnum &&
+		    dp->dki_unit == dkinfo->dki_unit &&
+		    strcmp(dp->dki_dname, dkinfo->dki_dname) == 0) {
+			return (disk);
+		}
+	}
+
+	impossible("No DIRECT disk info instance\n");
+	/*NOTREACHED*/
+}
+
+/*
+ * To convert EFI to SMI labels, we need to get label geometry.
+ * Unfortunately at this time there is no good way to do so.
+ * DKIOCGGEOM will fail if disk is EFI labeled. So we hack around
+ * it and clear EFI label, do a DKIOCGGEOM and put the EFI label
+ * back on disk.
+ * This routine gets the label geometry and initializes the label
+ * It uses cur_file as opened device.
+ * returns 0 if succeeds or -1 if failed.
+ */
+static int
+auto_label_init(struct dk_label *label)
+{
+	dk_efi_t	dk_ioc;
+	dk_efi_t	dk_ioc_back;
+	efi_gpt_t	*data = NULL;
+	efi_gpt_t	*databack = NULL;
+	struct dk_geom	disk_geom;
+	struct dk_minfo	disk_info;
+	efi_gpt_t 	*backsigp;
+	int		fd = cur_file;
+	int		rval = -1;
+	int		efisize = EFI_LABEL_SIZE * 2;
+	int		success = 0;
+	uint64_t	sig;
+	uint64_t	backsig;
+
+	if ((data = calloc(efisize, 1)) == NULL) {
+		err_print("auto_label_init: calloc failed\n");
+		goto auto_label_init_out;
+	}
+
+	dk_ioc.dki_data = data;
+	dk_ioc.dki_lba = 1;
+	dk_ioc.dki_length = efisize;
+
+	if (efi_ioctl(fd, DKIOCGETEFI, &dk_ioc) != 0) {
+		err_print("auto_label_init: GETEFI failed\n");
+		goto auto_label_init_out;
+	}
+
+	if ((databack = calloc(efisize, 1)) == NULL) {
+		err_print("auto_label_init calloc2 failed");
+		goto auto_label_init_out;
+	}
+
+	/* get the LBA size and capacity */
+	if (ioctl(fd, DKIOCGMEDIAINFO, (caddr_t)&disk_info) == -1) {
+		err_print("auto_label_init: dkiocgmediainfo failed\n");
+		goto auto_label_init_out;
+	}
+
+	if (disk_info.dki_lbsize == 0) {
+		if (option_msg && diag_msg) {
+			err_print("auto_lbal_init: assuming 512 byte"
+			    "block size");
+		}
+		disk_info.dki_lbsize = DEV_BSIZE;
+	}
+
+	if (disk_info.dki_lbsize != DEV_BSIZE) {
+		err_print("auto_label_init: lbasize is not 512\n");
+		goto auto_label_init_out;
+	}
+
+	dk_ioc_back.dki_data = databack;
+
+	/*
+	 * back up efi label goes to capacity - 1, we are reading an extra block
+	 * before the back up label.
+	 */
+	dk_ioc_back.dki_lba = disk_info.dki_capacity - 1 - 1;
+	dk_ioc_back.dki_length = efisize;
+
+	if (efi_ioctl(fd, DKIOCGETEFI, &dk_ioc_back) != 0) {
+		err_print("auto_label_init: GETEFI backup failed\n");
+		goto auto_label_init_out;
+	}
+
+	sig = dk_ioc.dki_data->efi_gpt_Signature;
+	dk_ioc.dki_data->efi_gpt_Signature = 0x0;
+
+	enter_critical();
+
+	if (efi_ioctl(fd, DKIOCSETEFI, &dk_ioc) == -1) {
+		err_print("auto_label_init: SETEFI failed\n");
+		exit_critical();
+		goto auto_label_init_out;
+	}
+
+	backsigp = (efi_gpt_t *)((uintptr_t)dk_ioc_back.dki_data + DEV_BSIZE);
+
+	backsig = backsigp->efi_gpt_Signature;
+
+	backsigp->efi_gpt_Signature = 0;
+
+	if (efi_ioctl(fd, DKIOCSETEFI, &dk_ioc_back) == -1) {
+		err_print("auto_label_init: SETEFI backup failed\n");
+	}
+
+	if (ioctl(cur_file, DKIOCGGEOM, &disk_geom) != 0)
+		err_print("auto_label_init: GGEOM failed\n");
+	else
+		success = 1;
+
+	dk_ioc.dki_data->efi_gpt_Signature = sig;
+	backsigp->efi_gpt_Signature = backsig;
+
+	if (efi_ioctl(cur_file, DKIOCSETEFI, &dk_ioc_back) == -1) {
+		err_print("auto_label_init: SETEFI revert backup failed\n");
+		success = 0;
+	}
+
+	if (efi_ioctl(cur_file, DKIOCSETEFI, &dk_ioc) == -1) {
+		err_print("auto_label_init: SETEFI revert failed\n");
+		success = 0;
+	}
+
+	exit_critical();
+
+	if (success == 0)
+		goto auto_label_init_out;
+
+	ncyl = disk_geom.dkg_ncyl;
+	acyl = disk_geom.dkg_acyl;
+	nhead =  disk_geom.dkg_nhead;
+	nsect = disk_geom.dkg_nsect;
+	pcyl = ncyl + acyl;
+
+	label->dkl_pcyl = pcyl;
+	label->dkl_ncyl = ncyl;
+	label->dkl_acyl = acyl;
+	label->dkl_nhead = nhead;
+	label->dkl_nsect = nsect;
+	label->dkl_apc = 0;
+	label->dkl_intrlv = 1;
+	label->dkl_rpm = disk_geom.dkg_rpm;
+
+	label->dkl_magic = DKL_MAGIC;
+
+	(void) snprintf(label->dkl_asciilabel, sizeof (label->dkl_asciilabel),
+	    "%s cyl %d alt %d hd %d sec %d",
+	    "DEFAULT", ncyl, acyl, nhead, nsect);
+
+	rval = 0;
+#if defined(_FIRMWARE_NEEDS_FDISK)
+	(void) auto_solaris_part(label);
+	ncyl = label->dkl_ncyl;
+
+#endif	/* defined(_FIRMWARE_NEEDS_FDISK) */
+
+	if (!build_default_partition(label, DKC_DIRECT)) {
+		rval = -1;
+	}
+
+	(void) checksum(label, CK_MAKESUM);
+
+
+auto_label_init_out:
+	if (data)
+		free(data);
+	if (databack)
+		free(databack);
+
+	return (rval);
+}
+
+static struct disk_type *
+new_direct_disk_type(
+	int		fd,
+	char		*disk_name,
+	struct dk_label	*label)
+{
+	struct disk_type	*dp;
+	struct disk_type	*disk;
+	struct ctlr_info	*ctlr;
+	struct dk_cinfo		dkinfo;
+	struct partition_info	*part = NULL;
+	struct partition_info	*pt;
+	struct disk_info	*disk_info;
+	int			i;
+
+	/*
+	 * Get the disk controller info for this disk
+	 */
+	if (ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
+		if (option_msg && diag_msg) {
+			err_print("DKIOCINFO failed\n");
+		}
+		return (NULL);
+	}
+
+	/*
+	 * Find the ctlr_info for this disk.
+	 */
+	ctlr = find_direct_ctlr_info(&dkinfo);
+
+	/*
+	 * Allocate a new disk type for the direct controller.
+	 */
+	disk = (struct disk_type *)zalloc(sizeof (struct disk_type));
+
+	/*
+	 * Find the disk_info instance for this disk.
+	 */
+	disk_info = find_direct_disk_info(&dkinfo);
+
+	/*
+	 * The controller and the disk should match.
+	 */
+	assert(disk_info->disk_ctlr == ctlr);
+
+	/*
+	 * Link the disk into the list of disks
+	 */
+	dp = ctlr->ctlr_ctype->ctype_dlist;
+	if (dp == NULL) {
+		ctlr->ctlr_ctype->ctype_dlist = dp;
+	} else {
+		while (dp->dtype_next != NULL) {
+			dp = dp->dtype_next;
+		}
+		dp->dtype_next = disk;
+	}
+	disk->dtype_next = NULL;
+
+	/*
+	 * Allocate and initialize the disk name.
+	 */
+	disk->dtype_asciilabel = alloc_string(disk_name);
+
+	/*
+	 * Initialize disk geometry info
+	 */
+	disk->dtype_pcyl = label->dkl_pcyl;
+	disk->dtype_ncyl = label->dkl_ncyl;
+	disk->dtype_acyl = label->dkl_acyl;
+	disk->dtype_nhead = label->dkl_nhead;
+	disk->dtype_nsect = label->dkl_nsect;
+	disk->dtype_rpm = label->dkl_rpm;
+
+	part = (struct partition_info *)
+		zalloc(sizeof (struct partition_info));
+	pt = disk->dtype_plist;
+	if (pt == NULL) {
+		disk->dtype_plist = part;
+	} else {
+		while (pt->pinfo_next != NULL) {
+			pt = pt->pinfo_next;
+		}
+		pt->pinfo_next = part;
+	}
+
+	part->pinfo_next = NULL;
+
+	/*
+	 * Set up the partition name
+	 */
+	part->pinfo_name = alloc_string("default");
+
+	/*
+	 * Fill in the partition info from the label
+	 */
+	for (i = 0; i < NDKMAP; i++) {
+
+#if defined(_SUNOS_VTOC_8)
+		part->pinfo_map[i] = label->dkl_map[i];
+
+#elif defined(_SUNOS_VTOC_16)
+		part->pinfo_map[i].dkl_cylno =
+			label->dkl_vtoc.v_part[i].p_start /
+				((int)(disk->dtype_nhead *
+					disk->dtype_nsect - apc));
+		part->pinfo_map[i].dkl_nblk =
+			label->dkl_vtoc.v_part[i].p_size;
+#else
+#error No VTOC format defined.
+#endif				/* defined(_SUNOS_VTOC_8) */
+	}
+
+	/*
+	 * Use the VTOC if valid, or install a default
+	 */
+	if (label->dkl_vtoc.v_version == V_VERSION) {
+		(void) memcpy(disk_info->v_volume, label->dkl_vtoc.v_volume,
+			LEN_DKL_VVOL);
+		part->vtoc = label->dkl_vtoc;
+	} else {
+		(void) memset(disk_info->v_volume, 0, LEN_DKL_VVOL);
+		set_vtoc_defaults(part);
+	}
+
+	/*
+	 * Link the disk to the partition map
+	 */
+	disk_info->disk_parts = part;
+
+	return (disk);
+}
+
+/*
+ * Get a disk type that has label info. This is used to convert
+ * EFI label to SMI label
+ */
+struct disk_type *
+auto_direct_get_geom_label(int fd, struct dk_label *label)
+{
+	struct disk_type		*disk_type;
+
+	if (auto_label_init(label) != 0) {
+		err_print("auto_direct_get_geom_label: failed to get label"
+		    "geometry");
+		return (NULL);
+	} else {
+		disk_type = new_direct_disk_type(fd, "DEFAULT", label);
+		return (disk_type);
+	}
+}
+
 
 /*
  * Auto-sense a scsi disk configuration, ie get the information
@@ -1091,7 +1477,6 @@ build_default_partition(
 		}
 		return (0);
 	}
-
 #if defined(i386)
 	/*
 	 * Set the default boot partition to 1 cylinder
@@ -1153,12 +1538,18 @@ build_default_partition(
 #error No VTOC format defined.
 #endif				/* defined(_SUNOS_VTOC_16) */
 
-		if (i == 2 || ncyls[i] == 0)
+		if (i == 2 || ncyls[i] == 0) {
+#if defined(_SUNOS_VTOC_8)
+			if (i != 2) {
+				label->dkl_map[i].dkl_cylno = 0;
+				label->dkl_map[i].dkl_nblk = 0;
+			}
+#endif
 			continue;
+		}
 #if defined(_SUNOS_VTOC_8)
 		label->dkl_map[i].dkl_cylno = cyl;
 		label->dkl_map[i].dkl_nblk = ncyls[i] * blks_per_cyl;
-
 #elif defined(_SUNOS_VTOC_16)
 		label->dkl_vtoc.v_part[i].p_start = cyl * blks_per_cyl;
 		label->dkl_vtoc.v_part[i].p_size = ncyls[i] * blks_per_cyl;

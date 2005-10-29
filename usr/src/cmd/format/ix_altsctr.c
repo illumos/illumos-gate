@@ -534,7 +534,7 @@ assign_altsctr()
 			ap->ap_map_sectot - 1, cluster, ALTS_MAP_DOWN);
 	    if (alts_ind == NULL) {
 		(void) fprintf(stderr,
-	"Unable to allocate alternates for bad starting sector %ld.\n",
+	"Unable to allocate alternates for bad starting sector %u.\n",
 			(ap->ap_entp)[i].bad_start);
 		return (65);
 	    }

@@ -57,7 +57,6 @@ f none usr/include/sys/dktp/cmdk.h 644 root bin
 f none usr/include/sys/dktp/controller.h 644 root bin
 f none usr/include/sys/dktp/dadev.h 644 root bin
 f none usr/include/sys/dktp/dadk.h 644 root bin
-f none usr/include/sys/dktp/dklb.h 644 root bin
 f none usr/include/sys/dktp/fctypes.h 644 root bin
 f none usr/include/sys/dktp/flowctrl.h 644 root bin
 f none usr/include/sys/dktp/gda.h 644 root bin
@@ -68,7 +67,6 @@ f none usr/include/sys/dktp/queue.h 644 root bin
 f none usr/include/sys/dktp/scdk.h 644 root bin
 f none usr/include/sys/dktp/scdkwatch.h 644 root bin
 f none usr/include/sys/dktp/sctarget.h 644 root bin
-f none usr/include/sys/dktp/snlb.h 644 root bin
 f none usr/include/sys/dktp/tgcd.h 644 root bin
 f none usr/include/sys/dktp/tgcom.h 644 root bin
 f none usr/include/sys/dktp/tgdk.h 644 root bin

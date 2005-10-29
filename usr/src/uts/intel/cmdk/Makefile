@@ -65,7 +65,7 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE) $(ROOT_ITUFILE)
 #
 DEBUG_FLGS	=
 DEBUG_DEFS	+= $(DEBUG_FLGS)
-LDFLAGS		+= -dy -Nmisc/dadk -Nmisc/strategy -Nmisc/snlb
+LDFLAGS		+= -dy -Nmisc/dadk -Nmisc/strategy -Nmisc/cmlb
 
 #
 #	Default build targets.

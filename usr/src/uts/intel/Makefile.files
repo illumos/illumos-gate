@@ -113,6 +113,8 @@ XMEMFS_OBJS +=		\
 #
 SD_OBJS += sd.o sd_xbuf.o
 
+CMLB_OBJS += cmlb.o
+
 VGATEXT_OBJS += vgatext.o vgasubr.o
 
 #

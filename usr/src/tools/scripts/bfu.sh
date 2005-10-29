@@ -5475,6 +5475,14 @@ mondo_loop() {
 	rm -rf $usr/include/sys/dktp/mlx
 
 	#
+	# Remove snlb
+	#
+	rm -f $root/kernel/misc/snlb
+	rm -f $root/kernel/misc/amd64/snlb
+	rm -f $root/usr/include/sys/dktp/dklb.h
+	rm -f $root/usr/include/sys/dktp/snlb.h
+
+	#
 	# Remove objmgr
 	#
 	rm -f $root/kernel/drv/objmgr.conf

@@ -676,8 +676,6 @@ DADK_OBJS +=	dadk.o
 
 GDA_OBJS +=	gda.o
 
-SNLB_OBJS +=	snlb.o
-
 STRATEGY_OBJS += strategy.o
 
 CMDK_OBJS +=	cmdk.o

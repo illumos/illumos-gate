@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,22 +44,22 @@ extern "C" {
 
 /*	alternate sector partition information table			*/
 struct	alts_parttbl {
-	long	alts_sanity;	/* to validate correctness		*/
-	long  	alts_version;	/* version number			*/
-	daddr_t	alts_map_base;	/* disk offset of alts_partmap		*/
-	long	alts_map_len;	/* byte length of alts_partmap		*/
-	daddr_t	alts_ent_base;	/* disk offset of alts_entry		*/
-	long	alts_ent_used;	/* number of alternate entries used	*/
-	long	alts_ent_end;	/* disk offset of top of alts_entry	*/
-	daddr_t	alts_resv_base;	/* disk offset of alts_reserved		*/
-	long 	alts_pad[5];	/* reserved fields			*/
+	uint32_t	alts_sanity;	/* to validate correctness	*/
+	uint32_t  	alts_version;	/* version number		*/
+	daddr32_t	alts_map_base;	/* disk offset of alts_partmap	*/
+	uint32_t	alts_map_len;	/* byte length of alts_partmap	*/
+	daddr32_t	alts_ent_base;	/* disk offset of alts_entry	*/
+	uint32_t	alts_ent_used;	/* number of alternate entries used */
+	daddr32_t	alts_ent_end;	/* disk offset of top of alts_entry */
+	daddr32_t	alts_resv_base;	/* disk offset of alts_reserved	*/
+	uint32_t 	alts_pad[5];	/* reserved fields		*/
 };
 
 /*	alternate sector remap entry table				*/
 struct	alts_ent {
-	daddr_t	bad_start;	/* starting bad sector number		*/
-	daddr_t	bad_end;	/* ending bad sector number		*/
-	daddr_t	good_start;	/* starting alternate sector to use	*/
+	daddr32_t	bad_start;	/* starting bad sector number	*/
+	daddr32_t	bad_end;	/* ending bad sector number	*/
+	daddr32_t	good_start;	/* starting alternate sector to use */
 };
 
 /*	size of alternate partition table structure			*/

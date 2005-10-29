@@ -37,14 +37,16 @@
 #include <sys/dktp/tgdk.h>
 #include <sys/dktp/dadk.h>
 #include <sys/dktp/bbh.h>
-
+#include <sys/dktp/altsctr.h>
 #include <sys/dktp/cmdk.h>
+
 #include <sys/stat.h>
 #include <sys/vtoc.h>
 #include <sys/file.h>
 #include <sys/dktp/dadkio.h>
-#include <sys/dktp/dklb.h>
 #include <sys/aio_req.h>
+
+#include <sys/cmlb.h>
 
 /*
  * Local Static Data
@@ -90,82 +92,25 @@ static int cmdk_max_instance = 0;
  */
 static int	cmdk_indump;
 
-static struct driver_minor_data {
-	char    *name;
-	int	minor;
-	int	type;
-} cmdk_minor_data[] = {
-	{"a", 0, S_IFBLK},
-	{"b", 1, S_IFBLK},
-	{"c", 2, S_IFBLK},
-	{"d", 3, S_IFBLK},
-	{"e", 4, S_IFBLK},
-	{"f", 5, S_IFBLK},
-	{"g", 6, S_IFBLK},
-	{"h", 7, S_IFBLK},
-	{"i", 8, S_IFBLK},
-	{"j", 9, S_IFBLK},
-	{"k", 10, S_IFBLK},
-	{"l", 11, S_IFBLK},
-	{"m", 12, S_IFBLK},
-	{"n", 13, S_IFBLK},
-	{"o", 14, S_IFBLK},
-	{"p", 15, S_IFBLK},
-	{"q", 16, S_IFBLK},
-	{"r", 17, S_IFBLK},
-	{"s", 18, S_IFBLK},
-	{"t", 19, S_IFBLK},
-	{"u", 20, S_IFBLK},
-	{"a,raw", 0, S_IFCHR},
-	{"b,raw", 1, S_IFCHR},
-	{"c,raw", 2, S_IFCHR},
-	{"d,raw", 3, S_IFCHR},
-	{"e,raw", 4, S_IFCHR},
-	{"f,raw", 5, S_IFCHR},
-	{"g,raw", 6, S_IFCHR},
-	{"h,raw", 7, S_IFCHR},
-	{"i,raw", 8, S_IFCHR},
-	{"j,raw", 9, S_IFCHR},
-	{"k,raw", 10, S_IFCHR},
-	{"l,raw", 11, S_IFCHR},
-	{"m,raw", 12, S_IFCHR},
-	{"n,raw", 13, S_IFCHR},
-	{"o,raw", 14, S_IFCHR},
-	{"p,raw", 15, S_IFCHR},
-	{"q,raw", 16, S_IFCHR},
-	{"r,raw", 17, S_IFCHR},
-	{"s,raw", 18, S_IFCHR},
-	{"t,raw", 19, S_IFCHR},
-	{"u,raw", 20, S_IFCHR},
-	{0}
-};
-
 /*
  * Local Function Prototypes
  */
-static int cmdk_reopen(struct cmdk *dkp);
 static int cmdk_create_obj(dev_info_t *dip, struct cmdk *dkp);
 static void cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp);
-static int cmdk_create_lbobj(dev_info_t *dip, struct cmdk *dkp);
-static void cmdk_destroy_lbobj(dev_info_t *dip, struct cmdk *dkp, int unload);
 static void cmdkmin(struct buf *bp);
 static int cmdkrw(dev_t dev, struct uio *uio, int flag);
 static int cmdkarw(dev_t dev, struct aio_req *aio, int flag);
-static int cmdk_part_info(struct cmdk *dkp, int force, daddr_t *startp,
-    long *countp, int part);
-static void cmdk_part_info_init(struct cmdk *dkp);
-static void cmdk_part_info_fini(struct cmdk *dkp);
-
-#ifdef	NOT_USED
-static void cmdk_devstatus(struct cmdk *dkp);
-#endif	/* NOT_USED */
 
 /*
  * Bad Block Handling Functions Prototypes
  */
+static void cmdk_bbh_reopen(struct cmdk *dkp);
 static opaque_t cmdk_bbh_gethandle(opaque_t bbh_data, struct buf *bp);
 static bbh_cookie_t cmdk_bbh_htoc(opaque_t bbh_data, opaque_t handle);
 static void cmdk_bbh_freehandle(opaque_t bbh_data, opaque_t handle);
+static void cmdk_bbh_close(struct cmdk *dkp);
+static void cmdk_bbh_setalts_idx(struct cmdk *dkp);
+static int cmdk_bbh_bsearch(struct alts_ent *buf, int cnt, daddr32_t key);
 
 static struct bbh_objops cmdk_bbh_ops = {
 	nulldev,
@@ -174,11 +119,6 @@ static struct bbh_objops cmdk_bbh_ops = {
 	cmdk_bbh_htoc,
 	cmdk_bbh_freehandle,
 	0, 0
-};
-
-static struct bbh_obj cmdk_bbh_obj = {
-	NULL,
-	&cmdk_bbh_ops
 };
 
 static int cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp);
@@ -192,10 +132,6 @@ static int cmdk_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
     int mod_flags, char *name, caddr_t valuep, int *lengthp);
 static int cmdkaread(dev_t dev, struct aio_req *aio, cred_t *credp);
 static int cmdkawrite(dev_t dev, struct aio_req *aio, cred_t *credp);
-
-/*
- * Configuration Data
- */
 
 /*
  * Device driver ops vector
@@ -258,6 +194,30 @@ static struct modlinkage modlinkage = {
 	MODREV_1, (void *)&modldrv, NULL
 };
 
+/* Function prototypes for cmlb callbacks */
+
+static int cmdk_lb_rdwr(dev_info_t *dip, uchar_t cmd, void *bufaddr,
+    diskaddr_t start, size_t length);
+static int cmdk_lb_getphygeom(dev_info_t *dip,  cmlb_geom_t *phygeomp);
+static int cmdk_lb_getvirtgeom(dev_info_t *dip,  cmlb_geom_t *virtgeomp);
+static int cmdk_lb_getcapacity(dev_info_t *dip, diskaddr_t *capp);
+static int cmdk_lb_getattribute(dev_info_t *dip, tg_attribute_t *tgattribute);
+
+static void cmdk_devid_setup(struct cmdk *dkp);
+static int cmdk_devid_modser(struct cmdk *dkp);
+static int cmdk_get_modser(struct cmdk *dkp, int ioccmd, char *buf, int len);
+static int cmdk_devid_fabricate(struct cmdk *dkp);
+static int cmdk_devid_read(struct cmdk *dkp);
+
+static cmlb_tg_ops_t cmdk_lb_ops = {
+	TG_DK_OPS_VERSION_0,
+	cmdk_lb_rdwr,
+	cmdk_lb_getphygeom,
+	cmdk_lb_getvirtgeom,
+	cmdk_lb_getcapacity,
+	cmdk_lb_getattribute
+};
+
 int
 _init(void)
 {
@@ -305,27 +265,6 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-/*	pseudo BBH functions						*/
-/*ARGSUSED*/
-static opaque_t
-cmdk_bbh_gethandle(opaque_t bbh_data, struct buf *bp)
-{
-	return (NULL);
-}
-
-/*ARGSUSED*/
-static bbh_cookie_t
-cmdk_bbh_htoc(opaque_t bbh_data, opaque_t handle)
-{
-	return (NULL);
-}
-
-/*ARGSUSED*/
-static void
-cmdk_bbh_freehandle(opaque_t bbh_data, opaque_t handle)
-{
-}
-
 /*
  * Autoconfiguration Routines
  */
@@ -345,26 +284,34 @@ cmdkprobe(dev_info_t *dip)
 	    ((dkp = ddi_get_soft_state(cmdk_state, instance)) == NULL))
 		return (DDI_PROBE_PARTIAL);
 
+	mutex_init(&dkp->dk_mutex, NULL, MUTEX_DRIVER, NULL);
+	rw_init(&dkp->dk_bbh_mutex, NULL, RW_DRIVER, NULL);
 	dkp->dk_dip = dip;
+	mutex_enter(&dkp->dk_mutex);
 
-	/* for property create inside DKLB_*() */
 	dkp->dk_dev = makedevice(ddi_driver_major(dip),
 	    ddi_get_instance(dip) << CMDK_UNITSHF);
 
+	/* linkage to dadk and strategy */
 	if (cmdk_create_obj(dip, dkp) != DDI_SUCCESS) {
+		mutex_exit(&dkp->dk_mutex);
+		mutex_destroy(&dkp->dk_mutex);
+		rw_destroy(&dkp->dk_bbh_mutex);
 		ddi_soft_state_free(cmdk_state, instance);
 		return (DDI_PROBE_PARTIAL);
 	}
 
 	status = dadk_probe(DKTP_DATA, KM_NOSLEEP);
 	if (status != DDI_PROBE_SUCCESS) {
-		cmdk_destroy_obj(dip, dkp);
+		cmdk_destroy_obj(dip, dkp);	/* dadk/strategy linkage  */
+		mutex_exit(&dkp->dk_mutex);
+		mutex_destroy(&dkp->dk_mutex);
+		rw_destroy(&dkp->dk_bbh_mutex);
 		ddi_soft_state_free(cmdk_state, instance);
 		return (status);
 	}
 
-	sema_init(&dkp->dk_semoclose, 1, NULL, SEMA_DRIVER, NULL);
-
+	mutex_exit(&dkp->dk_mutex);
 #ifdef CMDK_DEBUG
 	if (cmdk_debug & DENT)
 		PRF("cmdkprobe: instance= %d name= `%s`\n",
@@ -376,12 +323,9 @@ cmdkprobe(dev_info_t *dip)
 static int
 cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
-	int 	instance;
-	long	start, count;
-	struct 	driver_minor_data *dmdp;
-	struct	cmdk *dkp;
-	char 	*node_type;
-	char	name[48];
+	int 		instance;
+	struct		cmdk *dkp;
+	char 		*node_type;
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -390,31 +334,52 @@ cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
 		return (DDI_FAILURE);
 
+	mutex_enter(&dkp->dk_mutex);
+
 	/* dadk_attach is an empty function that only returns SUCCESS */
 	(void) dadk_attach(DKTP_DATA);
 
-	node_type = DKTP_EXT->tg_nodetype;
-	for (dmdp = cmdk_minor_data; dmdp->name != NULL; dmdp++) {
-		minor_t minor_num = (instance << CMDK_UNITSHF) | dmdp->minor;
+	node_type = (DKTP_EXT->tg_nodetype);
 
-		(void) sprintf(name, "%s", dmdp->name);
-		if (ddi_create_minor_node(dip, name, dmdp->type, minor_num,
-		    node_type, NULL) == DDI_FAILURE) {
+	/*
+	 * this open allows cmlb to read the device
+	 * and determine the label types
+	 * so that cmlb can create minor nodes for device
+	 */
 
-			cmdk_destroy_obj(dip, dkp);
+	/* open the target disk	 */
+	if (dadk_open(DKTP_DATA, 0) != DDI_SUCCESS)
+		goto fail2;
 
-			sema_destroy(&dkp->dk_semoclose);
-			ddi_soft_state_free(cmdk_state, instance);
+	/* mark as having opened target */
+	dkp->dk_flag |= CMDK_TGDK_OPEN;
 
-			ddi_remove_minor_node(dip, NULL);
-			ddi_prop_remove_all(dip);
-			return (DDI_FAILURE);
-		}
-	}
+	cmlb_alloc_handle((cmlb_handle_t *)&dkp->dk_cmlbhandle);
+
+	if (cmlb_attach(dip,
+	    &cmdk_lb_ops,
+	    DTYPE_DIRECT,		/* device_type */
+	    0,				/* removable */
+	    node_type,
+	    CMLB_CREATE_ALTSLICE_VTOC_16_DTYPE_DIRECT,	/* alter_behaviour */
+	    dkp->dk_cmlbhandle) != 0)
+		goto fail1;
+
+	/* Calling validate will create minor nodes according to disk label */
+	(void) cmlb_validate(dkp->dk_cmlbhandle);
+
+	/* set bbh (Bad Block Handling) */
+	cmdk_bbh_reopen(dkp);
+
+	/* setup devid string */
+	cmdk_devid_setup(dkp);
+
 	mutex_enter(&cmdk_attach_mutex);
 	if (instance > cmdk_max_instance)
 		cmdk_max_instance = instance;
 	mutex_exit(&cmdk_attach_mutex);
+
+	mutex_exit(&dkp->dk_mutex);
 
 	/*
 	 * Add a zero-length attribute to tell the world we support
@@ -424,12 +389,18 @@ cmdkattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    DDI_KERNEL_IOCTL, NULL, 0);
 	ddi_report_dev(dip);
 
-	cmdk_part_info_init(dkp);
-
-	/* Need to open the label and register devid early */
-	(void) cmdk_part_info(dkp, TRUE, &start, &count, PARTITION0_INDEX);
-
 	return (DDI_SUCCESS);
+
+fail1:
+	cmlb_free_handle(&dkp->dk_cmlbhandle);
+	(void) dadk_close(DKTP_DATA);
+fail2:
+	cmdk_destroy_obj(dip, dkp);
+	rw_destroy(&dkp->dk_bbh_mutex);
+	mutex_exit(&dkp->dk_mutex);
+	mutex_destroy(&dkp->dk_mutex);
+	ddi_soft_state_free(cmdk_state, instance);
+	return (DDI_FAILURE);
 }
 
 
@@ -453,6 +424,7 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	max_instance = cmdk_max_instance;
 	mutex_exit(&cmdk_attach_mutex);
 
+	/* check if any instance of driver is open */
 	for (instance = 0; instance < max_instance; instance++) {
 		dkp = ddi_get_soft_state(cmdk_state, instance);
 		if (!dkp)
@@ -465,6 +437,8 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
 		return (DDI_SUCCESS);
 
+	mutex_enter(&dkp->dk_mutex);
+
 	/*
 	 * The cmdk_part_info call at the end of cmdkattach may have
 	 * caused cmdk_reopen to do a TGDK_OPEN, make sure we close on
@@ -475,15 +449,16 @@ cmdkdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		(void) dadk_close(DKTP_DATA);
 	}
 
-	cmdk_part_info_fini(dkp);
-	cmdk_destroy_lbobj(dip, dkp, 1);
-	cmdk_destroy_obj(dip, dkp);
+	cmlb_detach(dkp->dk_cmlbhandle);
+	cmlb_free_handle(&dkp->dk_cmlbhandle);
+	ddi_prop_remove_all(dip);
 
-	sema_destroy(&dkp->dk_semoclose);
+	cmdk_destroy_obj(dip, dkp);	/* dadk/strategy linkage  */
+	mutex_exit(&dkp->dk_mutex);
+	mutex_destroy(&dkp->dk_mutex);
+	rw_destroy(&dkp->dk_bbh_mutex);
 	ddi_soft_state_free(cmdk_state, instance);
 
-	ddi_prop_remove_all(dip);
-	ddi_remove_minor_node(dip, NULL);
 	return (DDI_SUCCESS);
 }
 
@@ -497,7 +472,6 @@ cmdkinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 #ifdef lint
 	dip = dip;	/* no one ever uses this */
 #endif
-
 #ifdef CMDK_DEBUG
 	if (cmdk_debug & DENT)
 		PRF("cmdkinfo: call\n");
@@ -523,16 +497,16 @@ static int
 cmdk_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
     char *name, caddr_t valuep, int *lengthp)
 {
-	int		instance = ddi_get_instance(dip);
 	struct	cmdk	*dkp;
-	long		lblocks;
-	uint64_t	nblocks64;
-	daddr_t		p_lblksrt;
+	diskaddr_t	p_lblksrt;
+	diskaddr_t	p_lblkcnt;
 
 #ifdef CMDK_DEBUG
 	if (cmdk_debug & DENT)
 		PRF("cmdk_prop_op: call\n");
 #endif
+
+	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
 
 	/*
 	 * Our dynamic properties are all device specific and size oriented.
@@ -540,22 +514,23 @@ cmdk_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op, int mod_flags,
 	 * to ddi_prop_op_nblocks with the size information, otherwise the
 	 * request is passed to ddi_prop_op. Size depends on valid label.
 	 */
-	dkp = ddi_get_soft_state(cmdk_state, instance);
-	if ((dev == DDI_DEV_T_ANY) || (dkp == NULL) ||
-	    !(dkp->dk_flag & CMDK_VALID_LABEL)) {
-pass:		return (ddi_prop_op(dev, dip, prop_op, mod_flags,
-		    name, valuep, lengthp));
-	} else {
-		/* force re-read of MBR and label and partition info */
-		if (!cmdk_part_info(dkp, TRUE, &p_lblksrt,
-		    &lblocks, CMDKPART(dev)))
-			goto pass;
-
-		/* get nblocks value */
-		nblocks64 = (ulong_t)lblocks;
-		return (ddi_prop_op_nblocks(dev, dip, prop_op, mod_flags,
-		    name, valuep, lengthp, nblocks64));
+	if ((dev != DDI_DEV_T_ANY) && (dkp != NULL)) {
+		if (!cmlb_partinfo(
+		    dkp->dk_cmlbhandle,
+		    CMDKPART(dev),
+		    &p_lblkcnt,
+		    &p_lblksrt,
+		    NULL,
+		    NULL))
+			return (ddi_prop_op_nblocks(dev, dip,
+			    prop_op, mod_flags,
+			    name, valuep, lengthp,
+			    (uint64_t)p_lblkcnt));
 	}
+
+	return (ddi_prop_op(dev, dip,
+	    prop_op, mod_flags,
+	    name, valuep, lengthp));
 }
 
 /*
@@ -566,8 +541,8 @@ cmdkdump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 {
 	int 		instance;
 	struct	cmdk	*dkp;
-	daddr_t		p_lblksrt;
-	long		p_lblkcnt;
+	diskaddr_t	p_lblksrt;
+	diskaddr_t	p_lblkcnt;
 	struct	buf	local;
 	struct	buf	*bp;
 
@@ -579,7 +554,15 @@ cmdkdump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)) || (blkno < 0))
 		return (ENXIO);
 
-	DKLB_PARTINFO(dkp->dk_lbobjp, &p_lblksrt, &p_lblkcnt, CMDKPART(dev));
+	if (cmlb_partinfo(
+	    dkp->dk_cmlbhandle,
+	    CMDKPART(dev),
+	    &p_lblkcnt,
+	    &p_lblksrt,
+	    NULL,
+	    NULL)) {
+		return (ENXIO);
+	}
 
 	if ((blkno+nblk) > p_lblkcnt)
 		return (EINVAL);
@@ -684,8 +667,7 @@ rwcmd_copyout(struct dadkio_rwcmd *rwcmdp, caddr_t outaddr, int flag)
  * ioctl routine
  */
 static int
-cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
-	int *rvalp)
+cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 {
 	int 		instance;
 	struct scsi_device *devp;
@@ -704,6 +686,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		struct dk_minfo	media_info;
 		struct  tgdk_geom phyg;
 
+		/* dadk_getphygeom always returns success */
 		(void) dadk_getphygeom(DKTP_DATA, &phyg);
 
 		media_info.dki_lbsize = phyg.g_secsiz;
@@ -722,7 +705,7 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		struct dk_cinfo *info = (struct dk_cinfo *)data;
 
 		/* controller information */
-		info->dki_ctype = DKTP_EXT->tg_ctype;
+		info->dki_ctype = (DKTP_EXT->tg_ctype);
 		info->dki_cnum = ddi_get_instance(ddi_get_parent(dkp->dk_dip));
 		(void) strcpy(info->dki_cname,
 		    ddi_get_name(ddi_get_parent(dkp->dk_dip)));
@@ -747,35 +730,11 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 			return (0);
 	}
 
-	case DKIOCPARTINFO: {
-		daddr_t	start;
-		long len;
-		STRUCT_DECL(part_info, p);
-
-		/*
-		 * force re-read of MBR and label and partition info
-		 */
-		if (!cmdk_part_info(dkp, TRUE, &start, &len, CMDKPART(dev)))
-			return (ENXIO);
-
-		if (len > INT_MAX)
-			return (EOVERFLOW);
-
-		STRUCT_INIT(p, flag & FMODELS);
-		STRUCT_FSET(p, p_start, start);
-		STRUCT_FSET(p, p_length, (int)len);
-		if (ddi_copyout(STRUCT_BUF(p), (caddr_t)arg, STRUCT_SIZE(p),
-		    flag))
-			return (EFAULT);
-		return (0);
-	}
-
 	case DKIOCSTATE: {
 		int	state;
 		int	rval;
-		int 	part;
-		daddr_t	p_lblksrt;
-		long	p_lblkcnt;
+		diskaddr_t	p_lblksrt;
+		diskaddr_t	p_lblkcnt;
 
 		if (ddi_copyin((void *)arg, &state, sizeof (int), flag))
 			return (EFAULT);
@@ -784,16 +743,18 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		if (rval = dadk_check_media(DKTP_DATA, &state))
 			return (rval);
 
+		cmlb_invalidate(dkp->dk_cmlbhandle);
 		if (state == DKIO_INSERTED) {
-			part = CMDKPART(dev);
-			/*
-			 * force re-read of MBR and label and partition info
-			 */
-			if (!cmdk_part_info(dkp, TRUE, &p_lblksrt, &p_lblkcnt,
-			    part))
+			if (cmlb_partinfo(
+			    dkp->dk_cmlbhandle,
+			    CMDKPART(dev),
+			    &p_lblkcnt,
+			    &p_lblksrt,
+			    NULL,
+			    NULL))
 				return (ENXIO);
 
-			if (part < 0 || p_lblkcnt <= 0)
+			if (p_lblkcnt <= 0)
 				return (ENXIO);
 		}
 
@@ -817,22 +778,49 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp,
 		return (0);
 	}
 
+	case DKIOCADDBAD:
+		/*
+		 * This is not an update mechanism to add bad blocks
+		 * to the bad block structures stored on disk.
+		 *
+		 * addbadsec(1M) will update the bad block data on disk
+		 * and use this ioctl to force the driver to re-initialize
+		 * the list of bad blocks in the driver.
+		 */
+
+		/* start BBH */
+		cmdk_bbh_reopen(dkp);
+		return (0);
+
 	case DKIOCG_PHYGEOM:
 	case DKIOCG_VIRTGEOM:
 	case DKIOCGGEOM:
 	case DKIOCSGEOM:
-	case DKIOCSVTOC:
-	case DKIOCGVTOC:
 	case DKIOCGAPART:
 	case DKIOCSAPART:
-	case DKIOCADDBAD:
+	case DKIOCGVTOC:
+	case DKIOCSVTOC:
+	case DKIOCPARTINFO:
+	case DKIOCGMBOOT:
+	case DKIOCSMBOOT:
+	case DKIOCGETEFI:
+	case DKIOCSETEFI:
+	case DKIOCPARTITION:
+	{
+		int rc;
 
-		/* If we don't have a label obj we can't call its ioctl */
-		if (!dkp->dk_lbobjp)
-			return (EIO);
-
-		return (DKLB_IOCTL(dkp->dk_lbobjp, cmd, arg, flag,
-			credp, rvalp));
+		rc = cmlb_ioctl(
+		    dkp->dk_cmlbhandle,
+		    dev,
+		    cmd,
+		    arg,
+		    flag,
+		    credp,
+		    rvalp);
+		if (cmd == DKIOCSVTOC)
+			cmdk_devid_setup(dkp);
+		return (rc);
+	}
 
 	case DIOCTL_RWCMD: {
 		struct	dadkio_rwcmd *rwcmdp;
@@ -878,55 +866,32 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp)
 	ulong_t		partbit;
 	int 		instance;
 	struct cmdk	*dkp;
-	int		i;
 
 	instance = CMDKUNIT(dev);
 	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)) ||
 	    (otyp >= OTYPCNT))
 		return (ENXIO);
 
-	sema_p(&dkp->dk_semoclose);
+	mutex_enter(&dkp->dk_mutex);
 
-	/* check for device has been opened */
+	/* check if device has been opened */
 	if (!(dkp->dk_flag & CMDK_OPEN)) {
-		sema_v(&dkp->dk_semoclose);
+		mutex_exit(&dkp->dk_mutex);
 		return (ENXIO);
 	}
 
 	part = CMDKPART(dev);
-	if (part < 0) {
-		sema_v(&dkp->dk_semoclose);
-		return (ENXIO);
-	}
 	partbit = 1 << part;
 
 	/* account for close */
 	if (otyp == OTYP_LYR) {
-		if (dkp->dk_open.dk_lyr[part])
-			dkp->dk_open.dk_lyr[part]--;
+		if (dkp->dk_open_lyr[part])
+			dkp->dk_open_lyr[part]--;
 	} else
-		dkp->dk_open.dk_reg[otyp] &= ~partbit;
-	dkp->dk_open.dk_exl &= ~partbit;
+		dkp->dk_open_reg[otyp] &= ~partbit;
+	dkp->dk_open_exl &= ~partbit;
 
-	/* check for last close */
-	for (i = 0; i < OTYPCNT; i++) {
-		if (dkp->dk_open.dk_reg[i])
-			break;
-	}
-	if (i >= OTYPCNT) {
-		for (i = 0; i < CMDK_MAXPART; i++) {
-			if (dkp->dk_open.dk_lyr[i])
-				break;
-		}
-		if (i >= CMDK_MAXPART) {
-			/* OK, last close */
-			(void) dadk_close(DKTP_DATA);
-			dkp->dk_flag &=
-			    ~(CMDK_OPEN | CMDK_TGDK_OPEN | CMDK_VALID_LABEL);
-		}
-	}
-
-	sema_v(&dkp->dk_semoclose);
+	mutex_exit(&dkp->dk_mutex);
 	return (DDI_SUCCESS);
 }
 
@@ -939,8 +904,8 @@ cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp)
 	ulong_t		partbit;
 	int 		instance;
 	struct	cmdk	*dkp;
-	daddr_t		p_lblksrt;
-	long		p_lblkcnt;
+	diskaddr_t	p_lblksrt;
+	diskaddr_t	p_lblkcnt;
 	int		i;
 
 	instance = CMDKUNIT(dev);
@@ -950,86 +915,66 @@ cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp)
 	if (otyp >= OTYPCNT)
 		return (EINVAL);
 
-	if ((part = CMDKPART(dev)) < 0)
-		return (ENXIO);
+	part = CMDKPART(dev);
+	partbit = 1 << part;
 
-	sema_p(&dkp->dk_semoclose);
+	mutex_enter(&dkp->dk_mutex);
 
 	/* re-do the target open */
-	if (cmdk_part_info(dkp, TRUE, &p_lblksrt, &p_lblkcnt, part)) {
+	cmlb_invalidate(dkp->dk_cmlbhandle);
+	if (!cmlb_partinfo(
+	    dkp->dk_cmlbhandle,
+	    part,
+	    &p_lblkcnt,
+	    &p_lblksrt,
+	    NULL,
+	    NULL)) {
 		if (p_lblkcnt <= 0 &&
 		    ((flag & (FNDELAY|FNONBLOCK)) == 0 || otyp != OTYP_CHR)) {
-			sema_v(&dkp->dk_semoclose);
+			mutex_exit(&dkp->dk_mutex);
 			return (ENXIO);
 		}
 	} else {
 		/* fail if not doing non block open */
 		if ((flag & (FNONBLOCK|FNDELAY)) == 0) {
-			sema_v(&dkp->dk_semoclose);
+			mutex_exit(&dkp->dk_mutex);
 			return (ENXIO);
 		}
 	}
-	if (DKTP_EXT->tg_rdonly && (flag & FWRITE)) {
-		sema_v(&dkp->dk_semoclose);
+	if ((DKTP_EXT->tg_rdonly) && (flag & FWRITE)) {
+		mutex_exit(&dkp->dk_mutex);
 		return (EROFS);
 	}
 
-	partbit = 1 << part;
-
 	/* check for part already opend exclusively */
-	if (dkp->dk_open.dk_exl & partbit)
+	if (dkp->dk_open_exl & partbit)
 		goto excl_open_fail;
 
 	/* check if we can establish exclusive open */
 	if (flag & FEXCL) {
-		if (dkp->dk_open.dk_lyr[part])
+		if (dkp->dk_open_lyr[part])
 			goto excl_open_fail;
 		for (i = 0; i < OTYPCNT; i++) {
-			if (dkp->dk_open.dk_reg[i] & partbit)
+			if (dkp->dk_open_reg[i] & partbit)
 				goto excl_open_fail;
 		}
 	}
 
-	/* open will succeed, acount for open */
+	/* open will succeed, account for open */
 	dkp->dk_flag |= CMDK_OPEN;
 	if (otyp == OTYP_LYR)
-		dkp->dk_open.dk_lyr[part]++;
+		dkp->dk_open_lyr[part]++;
 	else
-		dkp->dk_open.dk_reg[otyp] |= partbit;
+		dkp->dk_open_reg[otyp] |= partbit;
 	if (flag & FEXCL)
-		dkp->dk_open.dk_exl |= partbit;
+		dkp->dk_open_exl |= partbit;
 
-	sema_v(&dkp->dk_semoclose);
+	mutex_exit(&dkp->dk_mutex);
 	return (DDI_SUCCESS);
 
 excl_open_fail:
-	sema_v(&dkp->dk_semoclose);
+	mutex_exit(&dkp->dk_mutex);
 	return (EBUSY);
-}
-
-static int
-cmdk_reopen(struct cmdk *dkp)
-{
-	/* open the target disk	 */
-	if (dadk_open(DKTP_DATA, 0) != DDI_SUCCESS)
-		return (FALSE);
-
-	/* mark as having opened target */
-	dkp->dk_flag |= CMDK_TGDK_OPEN;
-
-	/* check for valid label object */
-	if (!dkp->dk_lbobjp)
-		if (cmdk_create_lbobj(dkp->dk_dip, dkp) != DDI_SUCCESS)
-			return (FALSE);
-
-	/* reset back to pseudo bbh */
-	(void) dadk_set_bbhobj(DKTP_DATA, &cmdk_bbh_obj);
-
-	/* search for proper disk label object */
-	(void) DKLB_OPEN(dkp->dk_lbobjp, dkp->dk_dev, dkp->dk_dip);
-
-	dkp->dk_flag |= CMDK_VALID_LABEL;
-	return (TRUE);
 }
 
 /*
@@ -1100,8 +1045,8 @@ cmdkstrategy(struct buf *bp)
 	int 		instance;
 	struct	cmdk 	*dkp;
 	long		d_cnt;
-	daddr_t		p_lblksrt;
-	long		p_lblkcnt;
+	diskaddr_t	p_lblksrt;
+	diskaddr_t	p_lblkcnt;
 
 	instance = CMDKUNIT(bp->b_edev);
 	if (cmdk_indump || !(dkp = ddi_get_soft_state(cmdk_state, instance)) ||
@@ -1119,8 +1064,13 @@ cmdkstrategy(struct buf *bp)
 	/*
 	 * only re-read the vtoc if necessary (force == FALSE)
 	 */
-	if (!cmdk_part_info(dkp, FALSE, &p_lblksrt, &p_lblkcnt,
-	    CMDKPART(bp->b_edev))) {
+	if (cmlb_partinfo(
+	    dkp->dk_cmlbhandle,
+	    CMDKPART(bp->b_edev),
+	    &p_lblkcnt,
+	    &p_lblksrt,
+	    NULL,
+	    NULL)) {
 		SETBPERR(bp, ENXIO);
 	}
 
@@ -1158,6 +1108,9 @@ cmdk_create_obj(dev_info_t *dip, struct cmdk *dkp)
 	char		flc_keyvalp[64];
 	int		flc_keylen;
 
+	ASSERT(mutex_owned(&dkp->dk_mutex));
+
+	/* Create linkage to queueing routines based on property */
 	que_keylen = sizeof (que_keyvalp);
 	if (ddi_prop_op(DDI_DEV_T_NONE, dip, PROP_LEN_AND_VAL_BUF,
 	    DDI_PROP_CANSLEEP, "queue", que_keyvalp, &que_keylen) !=
@@ -1175,6 +1128,7 @@ cmdk_create_obj(dev_info_t *dip, struct cmdk *dkp)
 		return (DDI_FAILURE);
 	}
 
+	/* Create linkage to dequeueing routines based on property */
 	flc_keylen = sizeof (flc_keyvalp);
 	if (ddi_prop_op(DDI_DEV_T_NONE, dip, PROP_LEN_AND_VAL_BUF,
 	    DDI_PROP_CANSLEEP, "flow_control", flc_keyvalp, &flc_keylen) !=
@@ -1194,11 +1148,15 @@ cmdk_create_obj(dev_info_t *dip, struct cmdk *dkp)
 		return (DDI_FAILURE);
 	}
 
+	/* populate bbh_obj object stored in dkp */
+	dkp->dk_bbh_obj.bbh_data = dkp;
+	dkp->dk_bbh_obj.bbh_ops = &cmdk_bbh_ops;
+
+	/* create linkage to dadk */
 	dkp->dk_tgobjp = (opaque_t)dadk_create();
 
 	devp = ddi_get_driver_private(dip);
-
-	(void) dadk_init(DKTP_DATA, devp, flcobjp, queobjp, &cmdk_bbh_obj,
+	(void) dadk_init(DKTP_DATA, devp, flcobjp, queobjp, &dkp->dk_bbh_obj,
 	    NULL);
 
 	return (DDI_SUCCESS);
@@ -1212,8 +1170,10 @@ cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp)
 	char		flc_keyvalp[64];
 	int		flc_keylen;
 
-	(void) dadk_free(DKTP_DATA);
-	DKTP_DATA = NULL;
+	ASSERT(mutex_owned(&dkp->dk_mutex));
+
+	(void) dadk_free((dkp->dk_tgobjp));
+	dkp->dk_tgobjp = NULL;
 
 	que_keylen = sizeof (que_keyvalp);
 	if (ddi_prop_op(DDI_DEV_T_NONE, dip, PROP_LEN_AND_VAL_BUF,
@@ -1235,199 +1195,781 @@ cmdk_destroy_obj(dev_info_t *dip, struct cmdk *dkp)
 	flc_keyvalp[flc_keylen] = (char)0;
 }
 
-/*ARGSUSED*/
 static int
-cmdk_create_lbobj(dev_info_t *dip, struct cmdk *dkp)
+cmdk_lb_rdwr(
+    dev_info_t *dip,
+    uchar_t cmd,
+    void *bufaddr,
+    diskaddr_t start,
+    size_t count)
 {
-	dkp->dk_lbobjp = (opaque_t)snlb_create();
-	if (!(dkp->dk_lbobjp)) {
-		cmn_err(CE_WARN,
-		    "cmdk_create_lbobj: ERROR creating disklabel %s",
-		    "snlb");
+	struct cmdk	*dkp;
+	opaque_t	handle;
+	int		rc = 0;
+	char		*bufa;
+
+	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
+	if (dkp == NULL)
+		return (ENXIO);
+
+	if (cmd != TG_READ && cmd != TG_WRITE)
+		return (EINVAL);
+
+	/* count must be multiple of 512 */
+	count = (count + NBPSCTR - 1) & -NBPSCTR;
+	handle = dadk_iob_alloc(DKTP_DATA, start, count, KM_SLEEP);
+	if (!handle)
+		return (DDI_FAILURE);
+
+	if (cmd == TG_READ) {
+		bufa = dadk_iob_xfer(DKTP_DATA, handle, B_READ);
+		if (!bufa)
+			rc = EIO;
+		else
+			bcopy(bufa, bufaddr, count);
+	} else {
+		bufa = dadk_iob_htoc(DKTP_DATA, handle);
+		bcopy(bufaddr, bufa, count);
+		bufa = dadk_iob_xfer(DKTP_DATA, handle, B_WRITE);
+		if (!bufa)
+			rc = EIO;
+	}
+	(void) dadk_iob_free(DKTP_DATA, handle);
+
+	return (rc);
+}
+
+static int
+cmdk_lb_getcapacity(
+    dev_info_t *dip,
+    diskaddr_t *capp)
+{
+	struct cmdk		*dkp;
+	struct tgdk_geom	phyg;
+
+	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
+	if (dkp == NULL)
+		return (ENXIO);
+
+	/* dadk_getphygeom always returns success */
+	(void) dadk_getphygeom(DKTP_DATA, &phyg);
+
+	*capp = phyg.g_cap;
+
+	return (0);
+}
+
+static int
+cmdk_lb_getvirtgeom(
+    dev_info_t *dip,
+    cmlb_geom_t *virtgeomp)
+{
+	struct cmdk		*dkp;
+	struct tgdk_geom	phyg;
+	diskaddr_t		capacity;
+
+	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
+	if (dkp == NULL)
+		return (ENXIO);
+
+	(void) dadk_getgeom(DKTP_DATA, &phyg);
+	capacity = phyg.g_cap;
+
+	/*
+	 * If the controller returned us something that doesn't
+	 * really fit into an Int 13/function 8 geometry
+	 * result, just fail the ioctl.  See PSARC 1998/313.
+	 */
+	if (capacity < 0 || capacity >= 63 * 254 * 1024)
+		return (EINVAL);
+
+	virtgeomp->g_capacity	= capacity;
+	virtgeomp->g_nsect	= 63;
+	virtgeomp->g_nhead	= 254;
+	virtgeomp->g_ncyl	= capacity / (63 * 254);
+	virtgeomp->g_acyl	= 0;
+	virtgeomp->g_secsize	= 512;
+	virtgeomp->g_intrlv	= 1;
+	virtgeomp->g_rpm	= 3600;
+
+	return (0);
+}
+
+static int
+cmdk_lb_getphygeom(
+    dev_info_t *dip,
+    cmlb_geom_t *phygeomp)
+{
+	struct cmdk		*dkp;
+	struct tgdk_geom	phyg;
+
+	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
+	if (dkp == NULL)
+		return (ENXIO);
+
+	/* dadk_getphygeom always returns success */
+	(void) dadk_getphygeom(DKTP_DATA, &phyg);
+
+	phygeomp->g_capacity	= phyg.g_cap;
+	phygeomp->g_nsect	= phyg.g_sec;
+	phygeomp->g_nhead	= phyg.g_head;
+	phygeomp->g_acyl	= phyg.g_acyl;
+	phygeomp->g_ncyl	= phyg.g_cyl;
+	phygeomp->g_secsize	= phyg.g_secsiz;
+	phygeomp->g_intrlv	= 1;
+	phygeomp->g_rpm		= 3600;
+
+	return (0);
+}
+
+static int
+cmdk_lb_getattribute(
+    dev_info_t *dip,
+    tg_attribute_t *tgattribute)
+{
+	struct cmdk *dkp;
+
+	dkp = ddi_get_soft_state(cmdk_state, ddi_get_instance(dip));
+	if (dkp == NULL)
+		return (ENXIO);
+
+	if ((DKTP_EXT->tg_rdonly))
+		tgattribute->media_is_writable = FALSE;
+	else
+		tgattribute->media_is_writable = TRUE;
+
+	return (0);
+}
+
+/*
+ * Create and register the devid.
+ * There are 4 different ways we can get a device id:
+ *    1. Already have one - nothing to do
+ *    2. Build one from the drive's model and serial numbers
+ *    3. Read one from the disk (first sector of last track)
+ *    4. Fabricate one and write it on the disk.
+ * If any of these succeeds, register the deviceid
+ */
+static void
+cmdk_devid_setup(struct cmdk *dkp)
+{
+	int	rc;
+
+	/* Try options until one succeeds, or all have failed */
+
+	/* 1. All done if already registered */
+	if (dkp->dk_devid != NULL)
+		return;
+
+	/* 2. Build a devid from the model and serial number */
+	rc = cmdk_devid_modser(dkp);
+	if (rc != DDI_SUCCESS) {
+		/* 3. Read devid from the disk, if present */
+		rc = cmdk_devid_read(dkp);
+
+		/* 4. otherwise make one up and write it on the disk */
+		if (rc != DDI_SUCCESS)
+			rc = cmdk_devid_fabricate(dkp);
+	}
+
+	/* If we managed to get a devid any of the above ways, register it */
+	if (rc == DDI_SUCCESS)
+		(void) ddi_devid_register(dkp->dk_dip, dkp->dk_devid);
+
+}
+
+/*
+ * Build a devid from the model and serial number
+ * Return DDI_SUCCESS or DDI_FAILURE.
+ */
+static int
+cmdk_devid_modser(struct cmdk *dkp)
+{
+	int	rc = DDI_FAILURE;
+	char	*hwid;
+	int	modlen;
+	int	serlen;
+
+	/*
+	 * device ID is a concatenation of model number, '=', serial number.
+	 */
+	hwid = kmem_alloc(CMDK_HWIDLEN, KM_SLEEP);
+	modlen = cmdk_get_modser(dkp, DIOCTL_GETMODEL, hwid, CMDK_HWIDLEN);
+	if (modlen == 0) {
+		rc = DDI_FAILURE;
+		goto err;
+	}
+	hwid[modlen++] = '=';
+	serlen = cmdk_get_modser(dkp, DIOCTL_GETSERIAL,
+	    hwid + modlen, CMDK_HWIDLEN - modlen);
+	if (serlen == 0) {
+		rc = DDI_FAILURE;
+		goto err;
+	}
+	hwid[modlen + serlen] = 0;
+
+	/* Initialize the device ID, trailing NULL not included */
+	rc = ddi_devid_init(dkp->dk_dip, DEVID_ATA_SERIAL, modlen + serlen,
+	    hwid, (ddi_devid_t *)&dkp->dk_devid);
+	if (rc != DDI_SUCCESS) {
+		rc = DDI_FAILURE;
+		goto err;
+	}
+
+	rc = DDI_SUCCESS;
+
+err:
+	kmem_free(hwid, CMDK_HWIDLEN);
+	return (rc);
+}
+
+static int
+cmdk_get_modser(struct cmdk *dkp, int ioccmd, char *buf, int len)
+{
+	dadk_ioc_string_t strarg;
+	int		rval;
+	char		*s;
+	char		ch;
+	boolean_t	ret;
+	int		i;
+	int		tb;
+
+	strarg.is_buf = buf;
+	strarg.is_size = len;
+	if (dadk_ioctl(DKTP_DATA,
+	    dkp->dk_dev,
+	    ioccmd,
+	    (uintptr_t)&strarg,
+	    FNATIVE | FKIOCTL,
+	    NULL,
+	    &rval) != 0)
+		return (0);
+
+	/*
+	 * valid model/serial string must contain a non-zero non-space
+	 * trim trailing spaces/NULL
+	 */
+	ret = B_FALSE;
+	s = buf;
+	for (i = 0; i < strarg.is_size; i++) {
+		ch = *s++;
+		if (ch != ' ' && ch != '\0')
+			tb = i + 1;
+		if (ch != ' ' && ch != '\0' && ch != '0')
+			ret = B_TRUE;
+	}
+
+	if (ret == B_FALSE)
+		return (0);
+
+	return (tb);
+}
+
+/*
+ * Read a devid from on the first block of the last track of
+ * the last cylinder.  Make sure what we read is a valid devid.
+ * Return DDI_SUCCESS or DDI_FAILURE.
+ */
+static int
+cmdk_devid_read(struct cmdk *dkp)
+{
+	diskaddr_t	blk;
+	struct dk_devid *dkdevidp;
+	uint_t		*ip;
+	int		chksum;
+	int		i, sz;
+	tgdk_iob_handle	handle;
+	int		rc = DDI_FAILURE;
+
+	if (cmlb_get_devid_block(dkp->dk_cmlbhandle, &blk))
+		goto err;
+
+	/* read the devid */
+	handle = dadk_iob_alloc(DKTP_DATA, blk, NBPSCTR, KM_SLEEP);
+	if (handle == NULL)
+		goto err;
+
+	dkdevidp = (struct dk_devid *)dadk_iob_xfer(DKTP_DATA, handle, B_READ);
+	if (dkdevidp == NULL)
+		goto err;
+
+	/* Validate the revision */
+	if ((dkdevidp->dkd_rev_hi != DK_DEVID_REV_MSB) ||
+	    (dkdevidp->dkd_rev_lo != DK_DEVID_REV_LSB))
+		goto err;
+
+	/* Calculate the checksum */
+	chksum = 0;
+	ip = (uint_t *)dkdevidp;
+	for (i = 0; i < ((NBPSCTR - sizeof (int))/sizeof (int)); i++)
+		chksum ^= ip[i];
+	if (DKD_GETCHKSUM(dkdevidp) != chksum)
+		goto err;
+
+	/* Validate the device id */
+	if (ddi_devid_valid((ddi_devid_t)dkdevidp->dkd_devid) != DDI_SUCCESS)
+		goto err;
+
+	/* keep a copy of the device id */
+	sz = ddi_devid_sizeof((ddi_devid_t)dkdevidp->dkd_devid);
+	dkp->dk_devid = kmem_alloc(sz, KM_SLEEP);
+	bcopy(dkdevidp->dkd_devid, dkp->dk_devid, sz);
+
+	rc = DDI_SUCCESS;
+
+err:
+	if (handle != NULL)
+		(void) dadk_iob_free(DKTP_DATA, handle);
+	return (rc);
+}
+
+/*
+ * Create a devid and write it on the first block of the last track of
+ * the last cylinder.
+ * Return DDI_SUCCESS or DDI_FAILURE.
+ */
+static int
+cmdk_devid_fabricate(struct cmdk *dkp)
+{
+	ddi_devid_t	devid = NULL;	/* devid made by ddi_devid_init  */
+	struct dk_devid	*dkdevidp;	/* devid struct stored on disk */
+	diskaddr_t	blk;
+	tgdk_iob_handle	handle = NULL;
+	uint_t		*ip, chksum;
+	int		i;
+	int		rc;
+
+	rc = ddi_devid_init(dkp->dk_dip, DEVID_FAB, 0, NULL, &devid);
+	if (rc != DDI_SUCCESS)
+		goto err;
+
+	if (cmlb_get_devid_block(dkp->dk_cmlbhandle, &blk)) {
+		/* no device id block address */
 		return (DDI_FAILURE);
 	}
 
-	DKLB_INIT(dkp->dk_lbobjp, dkp->dk_tgobjp, NULL);
+	handle = dadk_iob_alloc(DKTP_DATA, blk, NBPSCTR, KM_SLEEP);
+	if (!handle)
+		goto err;
 
-	return (DDI_SUCCESS);
+	/* Locate the buffer */
+	dkdevidp = (struct dk_devid *)dadk_iob_htoc(DKTP_DATA, handle);
+
+	/* Fill in the revision */
+	bzero(dkdevidp, NBPSCTR);
+	dkdevidp->dkd_rev_hi = DK_DEVID_REV_MSB;
+	dkdevidp->dkd_rev_lo = DK_DEVID_REV_LSB;
+
+	/* Copy in the device id */
+	i = ddi_devid_sizeof(devid);
+	if (i > DK_DEVID_SIZE)
+		goto err;
+	bcopy(devid, dkdevidp->dkd_devid, i);
+
+	/* Calculate the chksum */
+	chksum = 0;
+	ip = (uint_t *)dkdevidp;
+	for (i = 0; i < ((NBPSCTR - sizeof (int))/sizeof (int)); i++)
+		chksum ^= ip[i];
+
+	/* Fill in the checksum */
+	DKD_FORMCHKSUM(chksum, dkdevidp);
+
+	/* write the devid */
+	(void) dadk_iob_xfer(DKTP_DATA, handle, B_WRITE);
+
+	dkp->dk_devid = devid;
+
+	rc = DDI_SUCCESS;
+
+err:
+	if (handle != NULL)
+		(void) dadk_iob_free(DKTP_DATA, handle);
+
+	if (rc != DDI_SUCCESS && devid != NULL)
+		ddi_devid_free(devid);
+
+	return (rc);
+}
+
+static void
+cmdk_bbh_free_alts(struct cmdk *dkp)
+{
+	if (dkp->dk_alts_hdl) {
+		(void) dadk_iob_free(DKTP_DATA, dkp->dk_alts_hdl);
+		kmem_free(dkp->dk_slc_cnt,
+		    NDKMAP * (sizeof (uint32_t) + sizeof (struct alts_ent *)));
+		dkp->dk_alts_hdl = NULL;
+	}
+}
+
+static void
+cmdk_bbh_reopen(struct cmdk *dkp)
+{
+	tgdk_iob_handle 	handle = NULL;
+	diskaddr_t		slcb, slcn, slce;
+	struct	alts_parttbl	*ap;
+	struct	alts_ent	*enttblp;
+	uint32_t		altused;
+	uint32_t		altbase;
+	uint32_t		altlast;
+	int			alts;
+	uint16_t		vtoctag;
+	int			i, j;
+
+	/* find slice with V_ALTSCTR tag */
+	for (alts = 0; alts < NDKMAP; alts++) {
+		if (cmlb_partinfo(
+		    dkp->dk_cmlbhandle,
+		    alts,
+		    &slcn,
+		    &slcb,
+		    NULL,
+		    &vtoctag)) {
+			goto empty;	/* no partition table exists */
+		}
+
+		if (vtoctag == V_ALTSCTR && slcn > 1)
+			break;
+	}
+	if (alts >= NDKMAP) {
+		goto empty;	/* no V_ALTSCTR slice defined */
+	}
+
+	/* read in ALTS label block */
+	handle = dadk_iob_alloc(DKTP_DATA, slcb, NBPSCTR, KM_SLEEP);
+	if (!handle) {
+		goto empty;
+	}
+
+	ap = (struct alts_parttbl *)dadk_iob_xfer(DKTP_DATA, handle, B_READ);
+	if (!ap || (ap->alts_sanity != ALTS_SANITY)) {
+		goto empty;
+	}
+
+	altused = ap->alts_ent_used;	/* number of BB entries */
+	altbase = ap->alts_ent_base;	/* blk offset from begin slice */
+	altlast = ap->alts_ent_end;	/* blk offset to last block */
+	/* ((altused * sizeof (struct alts_ent) + NBPSCTR - 1) & ~NBPSCTR) */
+
+	if (altused == 0 ||
+	    altbase < 1 ||
+	    altbase > altlast ||
+	    altlast >= slcn) {
+		goto empty;
+	}
+	(void) dadk_iob_free(DKTP_DATA, handle);
+
+	/* read in ALTS remapping table */
+	handle = dadk_iob_alloc(DKTP_DATA,
+	    slcb + altbase,
+	    (altlast - altbase + 1) << SCTRSHFT, KM_SLEEP);
+	if (!handle) {
+		goto empty;
+	}
+
+	enttblp = (struct alts_ent *)dadk_iob_xfer(DKTP_DATA, handle, B_READ);
+	if (!enttblp) {
+		goto empty;
+	}
+
+	rw_enter(&dkp->dk_bbh_mutex, RW_WRITER);
+
+	/* allocate space for dk_slc_cnt and dk_slc_ent tables */
+	if (dkp->dk_slc_cnt == NULL) {
+		dkp->dk_slc_cnt = kmem_alloc(NDKMAP *
+		    (sizeof (long) + sizeof (struct alts_ent *)), KM_SLEEP);
+	}
+	dkp->dk_slc_ent = (struct alts_ent **)(dkp->dk_slc_cnt + NDKMAP);
+
+	/* free previous BB table (if any) */
+	if (dkp->dk_alts_hdl) {
+		(void) dadk_iob_free(DKTP_DATA, dkp->dk_alts_hdl);
+		dkp->dk_alts_hdl = NULL;
+		dkp->dk_altused = 0;
+	}
+
+	/* save linkage to new BB table */
+	dkp->dk_alts_hdl = handle;
+	dkp->dk_altused = altused;
+
+	/*
+	 * build indexes to BB table by slice
+	 * effectively we have
+	 *	struct alts_ent *enttblp[altused];
+	 *
+	 *	uint32_t	dk_slc_cnt[NDKMAP];
+	 *	struct alts_ent *dk_slc_ent[NDKMAP];
+	 */
+	for (i = 0; i < NDKMAP; i++) {
+		if (cmlb_partinfo(
+		    dkp->dk_cmlbhandle,
+		    i,
+		    &slcn,
+		    &slcb,
+		    NULL,
+		    NULL)) {
+			goto empty1;
+		}
+
+		dkp->dk_slc_cnt[i] = 0;
+		if (slcn == 0)
+			continue;	/* slice is not allocated */
+
+		/* last block in slice */
+		slce = slcb + slcn - 1;
+
+		/* find first remap entry in after beginnning of slice */
+		for (j = 0; j < altused; j++) {
+			if (enttblp[j].bad_start + enttblp[j].bad_end >= slcb)
+				break;
+		}
+		dkp->dk_slc_ent[i] = enttblp + j;
+
+		/* count remap entrys until end of slice */
+		for (; j < altused && enttblp[j].bad_start <= slce; j++) {
+			dkp->dk_slc_cnt[i] += 1;
+		}
+	}
+
+	rw_exit(&dkp->dk_bbh_mutex);
+	return;
+
+empty:
+	rw_enter(&dkp->dk_bbh_mutex, RW_WRITER);
+empty1:
+	if (handle && handle != dkp->dk_alts_hdl)
+		(void) dadk_iob_free(DKTP_DATA, handle);
+
+	if (dkp->dk_alts_hdl) {
+		(void) dadk_iob_free(DKTP_DATA, dkp->dk_alts_hdl);
+		dkp->dk_alts_hdl = NULL;
+	}
+
+	rw_exit(&dkp->dk_bbh_mutex);
+}
+
+/*ARGSUSED*/
+static bbh_cookie_t
+cmdk_bbh_htoc(opaque_t bbh_data, opaque_t handle)
+{
+	struct	bbh_handle *hp;
+	bbh_cookie_t ckp;
+
+	hp = (struct  bbh_handle *)handle;
+	ckp = hp->h_cktab + hp->h_idx;
+	hp->h_idx++;
+	return (ckp);
 }
 
 /*ARGSUSED*/
 static void
-cmdk_destroy_lbobj(dev_info_t *dip, struct cmdk *dkp, int unload)
+cmdk_bbh_freehandle(opaque_t bbh_data, opaque_t handle)
 {
-	if (!dkp->dk_lbobjp)
-		return;
+	struct	bbh_handle *hp;
 
-	DKLB_FREE(dkp->dk_lbobjp);
-	dkp->dk_lbobjp = 0;
+	hp = (struct  bbh_handle *)handle;
+	kmem_free(handle, (sizeof (struct bbh_handle) +
+	    (hp->h_totck * (sizeof (struct bbh_cookie)))));
 }
 
 
 /*
- * cmdk_part_info()
+ *	cmdk_bbh_gethandle remaps the bad sectors to alternates.
+ *	There are 7 different cases when the comparison is made
+ *	between the bad sector cluster and the disk section.
  *
- *	Make the device valid if possible. The dk_pinfo_lock is only
- *	held for very short periods so that there's very little
- *	contention with the cmdk_devstatus() function which can
- *	be called from interrupt context.
+ *	bad sector cluster	gggggggggggbbbbbbbggggggggggg
+ *	case 1:			   ddddd
+ *	case 2:				   -d-----
+ *	case 3:					     ddddd
+ *	case 4:			         dddddddddddd
+ *	case 5:			      ddddddd-----
+ *	case 6:			           ---ddddddd
+ *	case 7:			           ddddddd
  *
- *	This function implements a simple state machine which looks
- *	like this:
- *
- *
- *	   +---------------------------------+
- *         |				     |
- *	   +--> invalid --> busy --> valid --+
- *			     ^|
- *			     |v
- *			    busy2
- *
- *	This function can change the state from invalid to busy, or from
- *	busy2 to busy, or from busy to valid.
- *
- *	The cmdk_devstatus() function can change the state from valid
- *	to invalid or from busy to busy2.
- *
+ *	where:  g = good sector,	b = bad sector
+ *		d = sector in disk section
+ *		- = disk section may be extended to cover those disk area
  */
 
-
-static int
-cmdk_part_info(struct cmdk *dkp, int force, daddr_t *startp, long *countp,
-		int part)
+static opaque_t
+cmdk_bbh_gethandle(opaque_t bbh_data, struct buf *bp)
 {
+	struct cmdk		*dkp = (struct cmdk *)bbh_data;
+	struct bbh_handle	*hp;
+	struct bbh_cookie	*ckp;
+	struct alts_ent		*altp;
+	uint32_t		alts_used;
+	uint32_t		part = CMDKPART(bp->b_edev);
+	daddr32_t		lastsec;
+	long			d_count;
+	int			i;
+	int			idx;
+	int			cnt;
+
+	if (part >= V_NUMPAR)
+		return (NULL);
+
 	/*
-	 * The dk_pinfo_state variable (and by implication the partition
-	 * info) is always protected by the dk_pinfo_lock mutex.
+	 * This if statement is atomic and it will succeed
+	 * if there are no bad blocks (almost always)
+	 *
+	 * so this if is performed outside of the rw_enter for speed
+	 * and then repeated inside the rw_enter for safety
 	 */
-	mutex_enter(&dkp->dk_pinfo_lock);
-
-	for (;;) {
-		switch (dkp->dk_pinfo_state) {
-
-		case CMDK_PARTINFO_VALID:
-			/* it's already valid */
-			if (!force) {
-				goto done;
-			}
-		/*FALLTHROUGH*/
-
-		case CMDK_PARTINFO_INVALID:
-			/*
-			 * It's invalid or we're being forced to reread
-			 */
-			goto reopen;
-
-		case CMDK_PARTINFO_BUSY:
-		case CMDK_PARTINFO_BUSY2:
-			/*
-			 * Some other thread has already called
-			 * cmdk_reopen(), wait for it to complete and then
-			 * start over from the top.
-			 */
-			cv_wait(&dkp->dk_pinfo_cv, &dkp->dk_pinfo_lock);
-		}
+	if (!dkp->dk_alts_hdl) {
+		return (NULL);
 	}
 
-reopen:
+	rw_enter(&dkp->dk_bbh_mutex, RW_READER);
+
+	if (dkp->dk_alts_hdl == NULL) {
+		rw_exit(&dkp->dk_bbh_mutex);
+		return (NULL);
+	}
+
+	alts_used = dkp->dk_slc_cnt[part];
+	if (alts_used == 0) {
+		rw_exit(&dkp->dk_bbh_mutex);
+		return (NULL);
+	}
+	altp = dkp->dk_slc_ent[part];
+
 	/*
-	 * ASSERT: only one thread at a time can possibly reach this point
-	 * and invoke cmdk_reopen()
+	 * binary search for the largest bad sector index in the alternate
+	 * entry table which overlaps or larger than the starting d_sec
 	 */
-	dkp->dk_pinfo_state = CMDK_PARTINFO_BUSY;
+	i = cmdk_bbh_bsearch(altp, alts_used, GET_BP_SEC(bp));
+	/* if starting sector is > the largest bad sector, return */
+	if (i == -1) {
+		rw_exit(&dkp->dk_bbh_mutex);
+		return (NULL);
+	}
+	/* i is the starting index.  Set altp to the starting entry addr */
+	altp += i;
 
-	for (;;)  {
-		int	rc;
+	d_count = bp->b_bcount >> SCTRSHFT;
+	lastsec = GET_BP_SEC(bp) + d_count - 1;
 
-		/*
-		 * drop the mutex while in cmdk_reopen() because
-		 * it may take a long time to return
-		 */
-		mutex_exit(&dkp->dk_pinfo_lock);
-		rc = cmdk_reopen(dkp);
-		mutex_enter(&dkp->dk_pinfo_lock);
+	/* calculate the number of bad sectors */
+	for (idx = i, cnt = 0; idx < alts_used; idx++, altp++, cnt++) {
+		if (lastsec < altp->bad_start)
+			break;
+	}
 
-		if (rc == FALSE) {
-			/*
-			 * bailout, probably due to no device,
-			 * or invalid label
-			 */
-			goto error;
-		}
+	if (!cnt) {
+		rw_exit(&dkp->dk_bbh_mutex);
+		return (NULL);
+	}
 
-		switch (dkp->dk_pinfo_state) {
+	/* calculate the maximum number of reserved cookies */
+	cnt <<= 1;
+	cnt++;
 
-		case CMDK_PARTINFO_BUSY:
-			dkp->dk_pinfo_state = CMDK_PARTINFO_VALID;
-			cv_broadcast(&dkp->dk_pinfo_cv);
-			goto done;
+	/* allocate the handle */
+	hp = (struct bbh_handle *)kmem_zalloc((sizeof (*hp) +
+	    (cnt * sizeof (*ckp))), KM_SLEEP);
 
-		case CMDK_PARTINFO_BUSY2:
-			/*
-			 * device status changed by cmdk_devstatus(),
-			 * redo the reopen
-			 */
-			dkp->dk_pinfo_state = CMDK_PARTINFO_BUSY;
+	hp->h_idx = 0;
+	hp->h_totck = cnt;
+	ckp = hp->h_cktab = (struct bbh_cookie *)(hp + 1);
+	ckp[0].ck_sector = GET_BP_SEC(bp);
+	ckp[0].ck_seclen = d_count;
+
+	altp = dkp->dk_slc_ent[part];
+	altp += i;
+	for (idx = 0; i < alts_used; i++, altp++) {
+		/* CASE 1: */
+		if (lastsec < altp->bad_start)
+			break;
+
+		/* CASE 3: */
+		if (ckp[idx].ck_sector > altp->bad_end)
+			continue;
+
+		/* CASE 2 and 7: */
+		if ((ckp[idx].ck_sector >= altp->bad_start) &&
+		    (lastsec <= altp->bad_end)) {
+			ckp[idx].ck_sector = altp->good_start +
+			    ckp[idx].ck_sector - altp->bad_start;
 			break;
 		}
+
+		/* at least one bad sector in our section.  break it. */
+		/* CASE 5: */
+		if ((lastsec >= altp->bad_start) &&
+			    (lastsec <= altp->bad_end)) {
+			ckp[idx+1].ck_seclen = lastsec - altp->bad_start + 1;
+			ckp[idx].ck_seclen -= ckp[idx+1].ck_seclen;
+			ckp[idx+1].ck_sector = altp->good_start;
+			break;
+		}
+		/* CASE 6: */
+		if ((ckp[idx].ck_sector <= altp->bad_end) &&
+		    (ckp[idx].ck_sector >= altp->bad_start)) {
+			ckp[idx+1].ck_seclen = ckp[idx].ck_seclen;
+			ckp[idx].ck_seclen = altp->bad_end -
+			    ckp[idx].ck_sector + 1;
+			ckp[idx+1].ck_seclen -= ckp[idx].ck_seclen;
+			ckp[idx].ck_sector = altp->good_start +
+			    ckp[idx].ck_sector - altp->bad_start;
+			idx++;
+			ckp[idx].ck_sector = altp->bad_end + 1;
+			continue;	/* check rest of section */
+		}
+
+		/* CASE 4: */
+		ckp[idx].ck_seclen = altp->bad_start - ckp[idx].ck_sector;
+		ckp[idx+1].ck_sector = altp->good_start;
+		ckp[idx+1].ck_seclen = altp->bad_end - altp->bad_start + 1;
+		idx += 2;
+		ckp[idx].ck_sector = altp->bad_end + 1;
+		ckp[idx].ck_seclen = lastsec - altp->bad_end;
 	}
 
-
-done:
-	/*
-	 * finished cmdk_reopen() without any device status change
-	 */
-	DKLB_PARTINFO(dkp->dk_lbobjp, startp, countp, part);
-	mutex_exit(&dkp->dk_pinfo_lock);
-	return (TRUE);
-
-error:
-	dkp->dk_pinfo_state = CMDK_PARTINFO_INVALID;
-	cv_broadcast(&dkp->dk_pinfo_cv);
-	mutex_exit(&dkp->dk_pinfo_lock);
-	return (FALSE);
+	rw_exit(&dkp->dk_bbh_mutex);
+	return ((opaque_t)hp);
 }
 
-#ifdef	NOT_USED
-static void
-cmdk_devstatus(struct cmdk *dkp)
+static int
+cmdk_bbh_bsearch(struct alts_ent *buf, int cnt, daddr32_t key)
 {
-	mutex_enter(&dkp->dk_pinfo_lock);
-	switch (dkp->dk_pinfo_state) {
+	int	i;
+	int	ind;
+	int	interval;
+	int	mystatus = -1;
 
-	case CMDK_PARTINFO_VALID:
-		dkp->dk_pinfo_state = CMDK_PARTINFO_INVALID;
-		break;
+	if (!cnt)
+		return (mystatus);
 
-	case CMDK_PARTINFO_INVALID:
-		break;
+	ind = 1; /* compiler complains about possible uninitialized var	*/
+	for (i = 1; i <= cnt; i <<= 1)
+		ind = i;
 
-	case CMDK_PARTINFO_BUSY:
-		dkp->dk_pinfo_state = CMDK_PARTINFO_BUSY2;
-		break;
-
-	case CMDK_PARTINFO_BUSY2:
-		break;
+	for (interval = ind; interval; ) {
+		if ((key >= buf[ind-1].bad_start) &&
+		    (key <= buf[ind-1].bad_end)) {
+			return (ind-1);
+		} else {
+			interval >>= 1;
+			if (key < buf[ind-1].bad_start) {
+				/* record the largest bad sector index */
+				mystatus = ind-1;
+				if (!interval)
+					break;
+				ind = ind - interval;
+			} else {
+				/*
+				 * if key is larger than the last element
+				 * then break
+				 */
+				if ((ind == cnt) || !interval)
+					break;
+				if ((ind+interval) <= cnt)
+					ind += interval;
+			}
+		}
 	}
-	mutex_exit(&dkp->dk_pinfo_lock);
-}
-#endif	/* NOT_USED */
-
-
-/*
- * initialize the state for cmdk_part_info()
- */
-static void
-cmdk_part_info_init(struct cmdk *dkp)
-{
-	mutex_init(&dkp->dk_pinfo_lock, NULL, MUTEX_DRIVER, NULL);
-	cv_init(&dkp->dk_pinfo_cv, NULL, CV_DRIVER, NULL);
-	dkp->dk_pinfo_state = CMDK_PARTINFO_INVALID;
-}
-
-static void
-cmdk_part_info_fini(struct cmdk *dkp)
-{
-	mutex_destroy(&dkp->dk_pinfo_lock);
-	cv_destroy(&dkp->dk_pinfo_cv);
+	return (mystatus);
 }

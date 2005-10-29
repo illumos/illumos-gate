@@ -110,6 +110,7 @@ CHKHDRS=			\
 	cladm.h			\
 	class.h			\
 	clconf.h		\
+	cmlb.h			\
 	cmn_err.h		\
 	compress.h		\
 	condvar.h		\
@@ -875,7 +876,6 @@ DKTPHDRS=		\
 	dadev.h		\
 	dadk.h		\
 	dadkio.h	\
-	dklb.h		\
 	fctypes.h	\
 	fdisk.h		\
 	flowctrl.h	\
@@ -883,7 +883,6 @@ DKTPHDRS=		\
 	hba.h		\
 	quetypes.h	\
 	queue.h		\
-	snlb.h		\
 	tgcom.h		\
 	tgdk.h
 

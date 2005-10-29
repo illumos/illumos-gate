@@ -44,6 +44,7 @@
 #include <sys/vtoc.h>
 #include <sys/uuid.h>
 #include <errno.h>
+#include <devid.h>
 
 #if defined(_FIRMWARE_NEEDS_FDISK)
 #include <sys/dktp/fdisk.h>
@@ -579,6 +580,64 @@ read_label(int fd, struct dk_label *label)
 	return (vtoc_to_label(label, &vtoc, &geom));
 }
 
+int
+get_disk_info_from_devid(int fd, struct efi_info *label)
+{
+	ddi_devid_t	devid;
+	char		*s;
+	int		n;
+	char		*vid, *pid;
+	int		nvid, npid;
+	struct dk_minfo	minf;
+	struct dk_cinfo	dkinfo;
+
+
+	if (devid_get(fd, &devid)) {
+		if (option_msg && diag_msg)
+			err_print("devid_get failed\n");
+		return (-1);
+	}
+
+	n = devid_sizeof(devid);
+	s = (char *)devid;
+
+	if (ioctl(fd, DKIOCINFO, &dkinfo) == -1) {
+		if (option_msg && diag_msg)
+			err_print("DKIOCINFO failed\n");
+		return (-1);
+	}
+
+	if (dkinfo.dki_ctype != DKC_DIRECT)
+		return (-1);
+
+	vid = s+12;
+	if (!(pid = strchr(vid, '=')))
+		return (-1);
+	nvid = pid - vid;
+	pid += 1;
+	npid = n - nvid - 13;
+
+	if (nvid > 9)
+		nvid = 9;
+	if (npid > 17) {
+		pid = pid + npid - 17;
+		npid = 17;
+	}
+
+	if (ioctl(fd, DKIOCGMEDIAINFO, &minf) == -1) {
+		devid_free(devid);
+		return (-1);
+	}
+
+	(void) strlcpy(label->vendor, vid, nvid);
+	(void) strlcpy(label->product, pid, npid);
+	(void) strlcpy(label->revision, "0001", 5);
+	label->capacity = minf.dki_capacity * minf.dki_lbsize / 512;
+
+	devid_free(devid);
+	return (0);
+}
+
 /*
  * Issue uscsi_inquiry and read_capacity commands to
  * retrieve the disk's Vendor, Product, Revision and
@@ -589,6 +648,9 @@ get_disk_info(int fd, struct efi_info *label)
 {
 	struct scsi_inquiry	inquiry;
 	struct scsi_capacity_16	capacity;
+
+	if (!get_disk_info_from_devid(fd, label))
+		return (0);
 
 	if (uscsi_inquiry(fd, (char *)&inquiry, sizeof (inquiry))) {
 		err_print("Inquiry failed on %d\n", fd);

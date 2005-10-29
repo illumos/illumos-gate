@@ -148,6 +148,7 @@ d none kernel/ipp/sparcv9 755 root sys
 f none kernel/ipp/sparcv9/ipgpc 755 root sys
 d none kernel/misc/sparcv9 755 root sys
 f none kernel/misc/sparcv9/busra 755 root sys
+f none kernel/misc/sparcv9/cmlb 755 root sys
 f none kernel/misc/sparcv9/consconfig 755 root sys
 f none kernel/misc/sparcv9/ctf 755 root sys
 f none kernel/misc/sparcv9/dada 755 root sys

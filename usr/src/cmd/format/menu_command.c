@@ -1444,25 +1444,37 @@ c_label()
 		    return (-1);
 		}
 
-		dptr = auto_sense(cur_file, 1, &label);
-		pcyl = label.dkl_pcyl;
-		ncyl = label.dkl_ncyl;
-		acyl = label.dkl_acyl;
-		nhead = label.dkl_nhead;
-		nsect = label.dkl_nsect;
 
+		fmt_print("Warning: This disk has an EFI label. Changing to "
+		    "SMI label will erase all\ncurrent partitions.\n");
+
+		if (check("Continue"))
+			return (-1);
+
+		(void) memset((char *)&label, 0, sizeof (struct dk_label));
+
+		if (cur_ctype->ctype_ctype == DKC_DIRECT)
+			dptr = auto_direct_get_geom_label(cur_file,  &label);
+		else
+			dptr = auto_sense(cur_file, 1, &label);
 		if (dptr == NULL) {
-		    fmt_print("Autoconfiguration failed.\n");
-		    return (-1);
+			fmt_print("Autoconfiguration failed.\n");
+			return (-1);
 		}
 
 		if (cur_disk->fdisk_part.systid == EFI_PMBR) {
 			fmt_print("You must use fdisk to delete the current "
 				"EFI partition and create a new\n"
 				"Solaris partition before you can convert the "
-				"label\n");
+				"label.\n");
 			return (-1);
 		}
+
+		pcyl = label.dkl_pcyl;
+		ncyl = label.dkl_ncyl;
+		acyl = label.dkl_acyl;
+		nhead = label.dkl_nhead;
+		nsect = label.dkl_nsect;
 
 		cur_label = L_TYPE_SOLARIS;
 		cur_disk->label_type = L_TYPE_SOLARIS;
@@ -1475,23 +1487,24 @@ c_label()
 		cur_dtype = dptr;
 		cur_parts = dptr->dtype_plist;
 		dptr->dtype_next = NULL;
-		break;
+
+		if (status = write_label())
+			err_print("Label failed.\n");
+		return (status);
+
+
 	    case 1:
 		/*
 		 * SMI label to EFI label
 		 */
-#ifdef i386
-		fmt_print("WARNING: converting this device to EFI labels will "
-			"erase all current fdisk\n"
-			"partition information.");
-		if (check(" Continue")) {
+
+
+		fmt_print("Warning: This disk has an SMI label. Changing to "
+		    "EFI label will erase all\ncurrent partitions.\n");
+
+		if (check("Continue")) {
 			return (-1);
 		}
-#else /* i386 */
-		if (check("Ready to label disk; continue")) {
-		    return (-1);
-		}
-#endif /* i386 */
 
 		if (get_disk_info(cur_file, &efinfo) != 0) {
 		    return (-1);

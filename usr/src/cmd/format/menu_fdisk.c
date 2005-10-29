@@ -575,14 +575,17 @@ auto_solaris_part(struct dk_label *label)
 	int		status, i, fd;
 	struct mboot	mboot;
 	struct ipart	ip;
-	char		buf[80];
 	char		*bootptr;
+	char		pbuf[MAXPATHLEN];
 
-	(void) snprintf(buf, sizeof (buf), "/dev/rdsk/%sp0", x86_devname);
-	if ((fd = open(buf, O_RDONLY)) < 0) {
-		err_print("Error: can't open selected disk '%s'.\n", buf);
+
+	get_pname(&pbuf[0]);
+
+	if ((fd = open_disk(pbuf, O_RDONLY)) < 0) {
+		err_print("Error: can't open selected disk '%s'.\n", pbuf);
 		return (-1);
 	}
+
 	status = read(fd, (caddr_t)&mboot, sizeof (struct mboot));
 
 	if (status != sizeof (struct mboot)) {
