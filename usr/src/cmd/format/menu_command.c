@@ -1453,6 +1453,7 @@ c_label()
 
 		(void) memset((char *)&label, 0, sizeof (struct dk_label));
 
+		(void) strcpy(x86_devname, cur_disk->disk_name);
 		if (cur_ctype->ctype_ctype == DKC_DIRECT)
 			dptr = auto_direct_get_geom_label(cur_file,  &label);
 		else

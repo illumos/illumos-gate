@@ -579,8 +579,7 @@ auto_solaris_part(struct dk_label *label)
 	char		pbuf[MAXPATHLEN];
 
 
-	get_pname(&pbuf[0]);
-
+	(void) snprintf(pbuf, sizeof (pbuf), "/dev/rdsk/%sp0", x86_devname);
 	if ((fd = open_disk(pbuf, O_RDONLY)) < 0) {
 		err_print("Error: can't open selected disk '%s'.\n", pbuf);
 		return (-1);
