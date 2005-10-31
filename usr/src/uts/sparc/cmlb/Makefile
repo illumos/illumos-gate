@@ -52,10 +52,10 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS); \
+clean:		$(CLEAN_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS) \
+clobber:	$(CLOBBER_DEPS)
 		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
