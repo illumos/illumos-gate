@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -564,7 +564,7 @@ ibd_output(int index, struct inetgram *ogp)
 void
 ibd_init(void)
 {
-	dnode_t	chosen;
+	pnode_t	chosen;
 	char	*mtuprop = "ipib-frame-size";
 	char	*bcastprop = "ipib-broadcast";
 	char	*addrprop = "ipib-address";

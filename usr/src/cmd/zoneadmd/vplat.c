@@ -91,6 +91,7 @@
 #include <wait.h>
 #include <limits.h>
 #include <libgen.h>
+#include <libzfs.h>
 #include <zone.h>
 #include <assert.h>
 
@@ -98,6 +99,7 @@
 #include <sys/mnttab.h>
 #include <sys/fs/autofs.h>	/* for _autofssys() */
 #include <sys/fs/lofs_info.h>
+#include <sys/fs/zfs.h>
 
 #include <pool.h>
 #include <sys/pool.h>
@@ -1418,6 +1420,14 @@ mount_filesystems(zlog_t *zlogp, boolean_t mount_cmd)
 		goto bad;
 	}
 	while (zonecfg_getfsent(handle, &fstab) == Z_OK) {
+		/*
+		 * ZFS filesystems will not be accessible under an alternate
+		 * root, since the pool will not be known.  Ignore them in this
+		 * case.
+		 */
+		if (mount_cmd && strcmp(fstab.zone_fs_type, MNTTYPE_ZFS) == 0)
+			continue;
+
 		num_fs++;
 		if ((tmp_ptr = realloc(fs_ptr,
 		    num_fs * sizeof (*tmp_ptr))) == NULL) {
@@ -2439,6 +2449,150 @@ get_zone_pool(zlog_t *zlogp, char *poolbuf, size_t bufsz)
 }
 
 static int
+get_datasets(zlog_t *zlogp, char **bufp, size_t *bufsizep)
+{
+	zone_dochandle_t handle;
+	struct zone_dstab dstab;
+	size_t total, offset, len;
+	int error = -1;
+	char *str;
+
+	*bufp = NULL;
+	*bufsizep = 0;
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		return (-1);
+	}
+	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+
+	if (zonecfg_setdsent(handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "%s failed", "zonecfg_setdsent");
+		goto out;
+	}
+
+	total = 0;
+	while (zonecfg_getdsent(handle, &dstab) == Z_OK)
+		total += strlen(dstab.zone_dataset_name) + 1;
+	(void) zonecfg_enddsent(handle);
+
+	if (total == 0) {
+		error = 0;
+		goto out;
+	}
+
+	if ((str = malloc(total)) == NULL) {
+		zerror(zlogp, B_TRUE, "memory allocation failed");
+		goto out;
+	}
+
+	if (zonecfg_setdsent(handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "%s failed", "zonecfg_setdsent");
+		goto out;
+	}
+	offset = 0;
+	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
+		len = strlen(dstab.zone_dataset_name);
+		(void) strlcpy(str + offset, dstab.zone_dataset_name,
+		    sizeof (dstab.zone_dataset_name) - offset);
+		offset += len;
+		if (offset != total - 1)
+			str[offset++] = ',';
+	}
+	(void) zonecfg_enddsent(handle);
+
+	error = 0;
+	*bufp = str;
+	*bufsizep = total;
+
+out:
+	if (error != 0 && str != NULL)
+		free(str);
+	if (handle != NULL)
+		zonecfg_fini_handle(handle);
+
+	return (error);
+}
+
+/* ARGSUSED */
+static void
+zfs_error_handler(const char *fmt, va_list ap)
+{
+	/*
+	 * Do nothing - we interpret the failures from each libzfs call below.
+	 */
+}
+
+static int
+validate_datasets(zlog_t *zlogp)
+{
+	zone_dochandle_t handle;
+	struct zone_dstab dstab;
+	zfs_handle_t *zhp;
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zerror(zlogp, B_TRUE, "getting zone configuration handle");
+		return (-1);
+	}
+	if (zonecfg_get_snapshot_handle(zone_name, handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+
+	if (zonecfg_setdsent(handle) != Z_OK) {
+		zerror(zlogp, B_FALSE, "invalid configuration");
+		zonecfg_fini_handle(handle);
+		return (-1);
+	}
+
+	zfs_set_error_handler(zfs_error_handler);
+
+	/*
+	 * libzfs opens /dev/zfs during its .init routine.
+	 * zoneadmd automatically closes these files when it daemonizes,
+	 * so we cheat by re-calling the init routine.
+	 */
+	zfs_init();
+
+	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
+
+		if ((zhp = zfs_open(dstab.zone_dataset_name,
+		    ZFS_TYPE_FILESYSTEM)) == NULL) {
+			zerror(zlogp, B_FALSE, "cannot open ZFS dataset '%s'",
+			    dstab.zone_dataset_name);
+			zonecfg_fini_handle(handle);
+			return (-1);
+		}
+
+		/*
+		 * Automatically set the 'zoned' property.  We check the value
+		 * first because we'll get EPERM if it is already set.
+		 */
+		if (!zfs_prop_get_int(zhp, ZFS_PROP_ZONED) &&
+		    zfs_prop_set(zhp, ZFS_PROP_ZONED, "on") != 0) {
+			zerror(zlogp, B_FALSE, "cannot set 'zoned' "
+			    "property for ZFS dataset '%s'\n",
+			    dstab.zone_dataset_name);
+			zonecfg_fini_handle(handle);
+			zfs_close(zhp);
+			return (-1);
+		}
+
+		zfs_close(zhp);
+	}
+	(void) zonecfg_enddsent(handle);
+
+	zonecfg_fini_handle(handle);
+
+	return (0);
+}
+
+static int
 bind_to_pool(zlog_t *zlogp, zoneid_t zoneid)
 {
 	pool_conf_t *poolconf;
@@ -2611,6 +2765,8 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	char rootpath[MAXPATHLEN];
 	char *rctlbuf = NULL;
 	size_t rctlbufsz = 0;
+	char *zfsbuf = NULL;
+	size_t zfsbufsz = 0;
 	zoneid_t zoneid = -1;
 	int xerr;
 	char *kzone;
@@ -2634,6 +2790,10 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 	}
 	if (!mount_cmd && get_rctls(zlogp, &rctlbuf, &rctlbufsz) != 0) {
 		zerror(zlogp, B_FALSE, "Unable to get list of rctls");
+		goto error;
+	}
+	if (get_datasets(zlogp, &zfsbuf, &zfsbufsz) != 0) {
+		zerror(zlogp, B_FALSE, "Unable to get list of ZFS datasets");
 		goto error;
 	}
 
@@ -2706,7 +2866,7 @@ vplat_create(zlog_t *zlogp, boolean_t mount_cmd)
 
 	xerr = 0;
 	if ((zoneid = zone_create(kzone, rootpath, privs, rctlbuf,
-	    rctlbufsz, &xerr)) == -1) {
+	    rctlbufsz, zfsbuf, zfsbufsz, &xerr)) == -1) {
 		if (xerr == ZE_AREMOUNTS) {
 			if (zonecfg_find_mounts(rootpath, NULL, NULL) < 1) {
 				zerror(zlogp, B_FALSE,
@@ -2762,6 +2922,11 @@ error:
 int
 vplat_bringup(zlog_t *zlogp, boolean_t mount_cmd)
 {
+	if (!mount_cmd && validate_datasets(zlogp) != 0) {
+		lofs_discard_mnttab();
+		return (-1);
+	}
+
 	if (create_dev_files(zlogp) != 0 ||
 	    mount_filesystems(zlogp, mount_cmd) != 0) {
 		lofs_discard_mnttab();

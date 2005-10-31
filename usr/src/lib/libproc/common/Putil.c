@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1998-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,8 +41,8 @@
 void
 list_link(void *new, void *existing)
 {
-	list_t *p = new;
-	list_t *q = existing;
+	plist_t *p = new;
+	plist_t *q = existing;
 
 	if (q) {
 		p->list_forw = q;
@@ -60,7 +60,7 @@ list_link(void *new, void *existing)
 void
 list_unlink(void *old)
 {
-	list_t *p = old;
+	plist_t *p = old;
 
 	if (p->list_forw != p) {
 		p->list_back->list_forw = p->list_forw;

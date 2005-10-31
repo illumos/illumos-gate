@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -431,23 +431,6 @@ revokedevaccess(char *dev, uid_t uid, gid_t gid, mode_t mode)
 	} while (fdetach(dev) == 0);
 
 	/* Remove ACLs */
-	if (acl(dev, GETACLCNT, 0, NULL) > MIN_ACL_ENTRIES) {
-		aclent_t acls[3];
 
-		acls[0].a_type = USER_OBJ;
-		acls[0].a_id = uid;
-		acls[0].a_perm = 0;
-
-		acls[1].a_type = GROUP_OBJ;
-		acls[1].a_id = gid;
-		acls[1].a_perm = 0;
-
-		acls[2].a_type = OTHER_OBJ;
-		acls[2].a_id = 0;
-		acls[2].a_perm = 0;
-
-		(void) acl(dev, SETACL, 3, acls);
-	}
-
-	(void) chmod(dev, mode);
+	(void) acl_strip(dev, uid, gid, mode);
 }

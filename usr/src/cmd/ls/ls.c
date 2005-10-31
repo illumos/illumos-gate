@@ -61,7 +61,7 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <errno.h>
-#include <libcmdutils.h>
+#include <aclutils.h>
 
 #ifndef STANDALONE
 #define	TERMINFO
@@ -139,6 +139,7 @@ struct	lbuf	{
 	char 	acl;		/* indicate there are additional acl entries */
 	int	cycle;		/* cycle detected flag */
 	struct ditem *ancinfo;	/* maintains ancestor info */
+	acl_t *aclp;		/* ACL if present */
 };
 
 struct dchain {
@@ -219,6 +220,7 @@ static int		Hflg;
 static int		Lflg;
 static int		Rflg;
 static int		Sflg;
+static int		vflg;
 static long		hscale;
 static mode_t		flags;
 static int		err = 0;	/* Contains return code */
@@ -284,9 +286,8 @@ main(int argc, char *argv[])
 		mflg = 0;
 	}
 
-
 	while ((c = getopt(argc, argv,
-	    "aAbcCdeEfFghHilLmnopqrRsStux1@")) != EOF)
+	    "aAbcCdeEfFghHilLmnopqrRsStux1@v")) != EOF)
 		switch (c) {
 		case 'a':
 			aflg++;
@@ -415,6 +416,18 @@ main(int argc, char *argv[])
 			cflg = 0;
 			uflg++;
 			continue;
+		case 'v':
+			vflg++;
+#if !defined(XPG4)
+			if (lflg)
+				continue;
+#endif
+			lflg++;
+			statreq++;
+			Cflg = 0;
+			xflg = 0;
+			mflg = 0;
+			continue;
 		case 'x':
 			xflg = 1;
 			Cflg = 1;
@@ -447,7 +460,7 @@ main(int argc, char *argv[])
 		}
 	if (opterr) {
 		(void) fprintf(stderr, gettext(
-		    "usage: ls -aAbcCdeEfFghHilLmnopqrRsStux1@ [files]\n"));
+		    "usage: ls -aAbcCdeEfFghHilLmnopqrRsStuxv1@ [files]\n"));
 		exit(2);
 	}
 
@@ -851,6 +864,13 @@ pentry(struct lbuf *ap)
 			curcol += strcol((unsigned char *)dmark);
 		}
 	}
+
+	if (vflg) {
+		new_line();
+		if (p->aclp) {
+			acl_printacl(p->aclp, num_cols);
+		}
+	}
 }
 
 /* print various r,w,x permissions */
@@ -1100,7 +1120,7 @@ gstat(char *file, int argfl, struct ditem *myparent)
 	ssize_t cc;
 	int (*statf)() = ((Lflg) || (Hflg && argfl)) ? stat : lstat;
 	int aclcnt;
-	aclent_t *aclp;
+	int error;
 	aclent_t *tp;
 	o_mode_t groupperm, mask;
 	int grouppermfound, maskfound;
@@ -1285,75 +1305,77 @@ gstat(char *file, int argfl, struct ditem *myparent)
 
 		/* ACL: check acl entries count */
 		if (doacl) {
+
+			error = acl_get(file, 0, &rep->aclp);
+			if (error) {
+				(void) fprintf(stderr,
+				    gettext("ls: can't read ACL on %s: %s\n"),
+				    file, acl_strerror(error));
+				return (NULL);
+			}
+
 			rep->acl = ' ';
-			if ((aclcnt = acl(file, GETACLCNT, 0, NULL)) >
-			    MIN_ACL_ENTRIES) {
 
-				/* this file has a non-trivial acl */
-
+			if (rep->aclp &&
+			    ((acl_flags(rep->aclp) & ACL_IS_TRIVIAL) == 0)) {
 				rep->acl = '+';
-
 				/*
-				 * For files with non-trivial acls, the
-				 * effective group permissions are the
-				 * intersection of the GROUP_OBJ value and
-				 * the CLASS_OBJ (acl mask) value. Determine
-				 * both the GROUP_OBJ and CLASS_OBJ for this
-				 * file and insert the logical AND of those
-				 * two values in the group permissions field
-				 * of the lflags value for this file.
+				 * Special handling for ufs aka aclent_t ACL's
 				 */
+				if (rep->aclp &&
+				    acl_type(rep->aclp) == ACLENT_T) {
+					/*
+					 * For files with non-trivial acls, the
+					 * effective group permissions are the
+					 * intersection of the GROUP_OBJ value
+					 * and the CLASS_OBJ (acl mask) value.
+					 * Determine both the GROUP_OBJ and
+					 * CLASS_OBJ for this file and insert
+					 * the logical AND of those two values
+					 * in the group permissions field
+					 * of the lflags value for this file.
+					 */
 
-				if ((aclp = (aclent_t *)malloc(
-				    (sizeof (aclent_t)) * aclcnt)) == NULL) {
-					perror("ls");
-					exit(2);
-				}
-
-				if (acl(file, GETACL, aclcnt, aclp) < 0) {
-					free(aclp);
-					(void) fprintf(stderr, "ls: ");
-					perror(file);
-					nfiles--;
-					err = 2;
-					return (NULL);
-				}
-
-				/*
-				 * Until found in acl list, assume maximum
-				 * permissions for both group and mask.  (Just
-				 * in case the acl lacks either value for
-				 * some reason.)
-				 */
-				groupperm = 07;
-				mask = 07;
-				grouppermfound = 0;
-				maskfound = 0;
-				for (tp = aclp; aclcnt--; tp++) {
-					if (tp->a_type == GROUP_OBJ) {
-						groupperm = tp->a_perm;
-						grouppermfound = 1;
-						continue;
+					/*
+					 * Until found in acl list, assume
+					 * maximum permissions for both group
+					 * a nd mask.  (Just in case the acl
+					 * lacks either value for some reason.)
+					 */
+					groupperm = 07;
+					mask = 07;
+					grouppermfound = 0;
+					maskfound = 0;
+					aclcnt = acl_cnt(rep->aclp);
+					for (tp =
+					    (aclent_t *)acl_data(rep->aclp);
+					    aclcnt--; tp++) {
+						if (tp->a_type == GROUP_OBJ) {
+							groupperm = tp->a_perm;
+							grouppermfound = 1;
+							continue;
+						}
+						if (tp->a_type == CLASS_OBJ) {
+							mask = tp->a_perm;
+							maskfound = 1;
+						}
+						if (grouppermfound && maskfound)
+							break;
 					}
-					if (tp->a_type == CLASS_OBJ) {
-						mask = tp->a_perm;
-						maskfound = 1;
-					}
-					if (grouppermfound && maskfound)
-						break;
+
+
+					/* reset all the group bits */
+					rep->lflags &= ~S_IRWXG;
+
+					/*
+					 * Now set them to the logical AND of
+					 * the GROUP_OBJ permissions and the
+					 * acl mask.
+					 */
+
+					rep->lflags |= (groupperm & mask) << 3;
+
 				}
-
-				free(aclp);
-
-				/* reset all the group bits */
-				rep->lflags &= ~S_IRWXG;
-
-				/*
-				 * Now set them to the logical AND of the
-				 * GROUP_OBJ permissions and the acl mask.
-				 */
-
-				rep->lflags |= (groupperm & mask) << 3;
 			}
 
 			if (atflg && pathconf(file, _PC_XATTR_EXISTS) == 1)

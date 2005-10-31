@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -429,7 +429,7 @@ init_bootargs(char *fname_buf, int fname_buf_sz, char *bargs_buf,
 boolean_t
 is_netdev(char *devpath)
 {
-	dnode_t	node = prom_finddevice(devpath);
+	pnode_t	node = prom_finddevice(devpath);
 	char *options;
 
 	if ((node == OBP_NONODE) || (node == OBP_BADNODE))
@@ -473,7 +473,7 @@ is_netdev(char *devpath)
 void
 mangle_os_bootpath(char *bpath)
 {
-	dnode_t node;
+	pnode_t node;
 	char *stripped_pathname;
 
 	node = prom_finddevice(bpath);

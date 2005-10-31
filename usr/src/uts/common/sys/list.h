@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,9 +36,6 @@ extern "C" {
 #endif
 
 typedef struct list_node list_node_t;
-struct list;
-
-#ifdef _KERNEL
 typedef struct list list_t;
 
 void list_create(list_t *, size_t, size_t);
@@ -56,7 +53,8 @@ void *list_tail(list_t *);
 void *list_next(list_t *, void *);
 void *list_prev(list_t *, void *);
 
-#endif /* _KERNEL */
+int list_link_active(list_node_t *);
+int list_is_empty(list_t *);
 
 #ifdef	__cplusplus
 }

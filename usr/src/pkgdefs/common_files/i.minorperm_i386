@@ -220,6 +220,8 @@ bmc:bmc
 dld:*
 aggr:*
 smbios:smbios
+zfs:*
+zfs:zfs
 EOF
 }
 

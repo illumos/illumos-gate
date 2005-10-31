@@ -199,7 +199,7 @@ extern	int		prom_getmacaddr(ihandle_t hd, caddr_t ea);
 /*
  * CPU Control Group: MP's only.
  */
-extern	int		prom_startcpu(dnode_t node, caddr_t pc, int arg);
+extern	int		prom_startcpu(pnode_t node, caddr_t pc, int arg);
 extern	int		prom_startcpu_bycpuid(int cpuid, caddr_t pc, int arg);
 extern	int		prom_stopcpu_bycpuid(int);
 extern	void		promsafe_pause_cpus(void);

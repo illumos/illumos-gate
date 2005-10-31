@@ -699,6 +699,12 @@ lib/amd64/llib-lcmdutils.ln		i386
 lib/amd64/libcmdutils.so		i386
 usr/lib/amd64/libcmdutils.so		i386
 usr/lib/amd64/llib-lcmdutils.ln		i386
+
+#
+# Private interfaces in libsec
+#
+usr/include/aclutils.h			i386
+
 #
 # User<->kernel interface used by cfgadm/IB only
 #
@@ -721,3 +727,19 @@ usr/include/sys/libdevid.h		i386
 #
 lib/libc_i18n.a				i386
 lib/amd64/libc_i18n.a			i386
+
+#
+# ZFS internal tools and lint libraries
+#
+usr/bin/ztest				i386
+usr/bin/i86/ztest			i386
+usr/bin/amd64/ztest			i386
+usr/lib/llib-lzfs.ln			i386
+usr/lib/llib-lzfs			i386
+usr/lib/llib-lzfs_jni			i386
+usr/lib/llib-lzfs_jni.ln		i386
+usr/lib/llib-lzpool			i386
+usr/lib/llib-lzpool.ln			i386
+usr/lib/amd64/llib-lzfs.ln		i386
+usr/lib/amd64/llib-lzfs_jni.ln		i386
+usr/lib/amd64/llib-lzpool.ln		i386

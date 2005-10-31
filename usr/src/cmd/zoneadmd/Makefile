@@ -39,7 +39,7 @@ POFILES= $(OBJS:%.o=%.po)
 CFLAGS += $(CCVERBOSE)
 LINTFLAGS += -ux
 LDLIBS += -lsocket -lzonecfg -lnsl -ldevinfo -ldevice -lnvpair -lpool \
-	-lgen -lbsm -lcontract
+	-lgen -lbsm -lcontract -lzfs
 XGETFLAGS += -a -x zoneadmd.xcl
 
 .KEEP_STATE:

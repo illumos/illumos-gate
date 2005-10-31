@@ -1761,3 +1761,15 @@ secpolicy_gart_map(const cred_t *cr)
 	}
 	return (0);
 }
+
+/*
+ * secpolicy_zfs
+ *
+ * Determine if the user has permission to manipulate ZFS datasets (not pools).
+ * Equivalent to the SYS_MOUNT privilege.
+ */
+int
+secpolicy_zfs(const cred_t *cr)
+{
+	return (PRIV_POLICY(cr, PRIV_SYS_MOUNT, B_FALSE, EPERM, NULL));
+}

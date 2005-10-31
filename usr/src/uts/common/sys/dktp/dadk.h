@@ -45,7 +45,9 @@ struct	dadk {
 	unsigned dad_rmb : 1;		/* removable device		*/
 	unsigned dad_rdonly : 1;	/* read only device		*/
 	unsigned dad_cdrom : 1;		/* cdrom device			*/
-	unsigned dad_resv : 5;
+	unsigned dad_noflush : 1;	/* flush cmd unsupported	*/
+	unsigned dad_wce : 1;		/* disk write cache enabled	*/
+	unsigned dad_resv : 3;
 	unsigned char dad_type;		/* device type			*/
 	unsigned char dad_ctype;	/* controller type 		*/
 
@@ -74,6 +76,7 @@ struct	dadk {
  */
 #define	DADK_BSY_TIMEOUT	(drv_usectohz(5 * 1000000))
 #define	DADK_IO_TIME		35
+#define	DADK_FLUSH_CACHE_TIME	60
 #define	DADK_RETRY_COUNT	5
 #define	DADK_SILENT		1
 
@@ -97,6 +100,7 @@ int dadk_open(opaque_t objp, int flag);
 int dadk_close(opaque_t objp);
 int dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg,
     int flag, cred_t *cred_p, int *rval_p);
+int dadk_flushdone(struct buf *bp);
 int dadk_strategy(opaque_t objp, struct buf *bp);
 int dadk_setgeom(opaque_t objp, struct tgdk_geom *dkgeom_p);
 int dadk_getgeom(opaque_t objp, struct tgdk_geom *dkgeom_p);

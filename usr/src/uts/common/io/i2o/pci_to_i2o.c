@@ -866,7 +866,7 @@ i2o_create_devinfo(iop_nexus_instance_t *iop)
 
 		/* create the devinfo node */
 		if (ndi_devi_alloc(iop->dip, nodename,
-			(dnode_t)DEVI_SID_NODEID, &cdip) != NDI_SUCCESS) {
+			(pnode_t)DEVI_SID_NODEID, &cdip) != NDI_SUCCESS) {
 			cmn_err(CE_WARN,
 				"i2o_create_devinfo: ndi_devi_alloc failed");
 			goto fail;

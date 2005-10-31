@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1556,7 +1556,7 @@ get_wanbootfs(const url_t *server_url)
 static boolean_t
 init_netdev(char *bpath)
 {
-	dnode_t		anode;
+	pnode_t		anode;
 	int		proplen;
 	static char	netalias[OBP_MAXPATHLEN];
 

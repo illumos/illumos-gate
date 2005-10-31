@@ -64,6 +64,7 @@
 #include <limits.h>
 #include <sys/acl.h>
 #include <libcmdutils.h>
+#include <aclutils.h>
 
 #define	FTYPE(A)	(A.st_mode)
 #define	FMODE(A)	(A.st_mode)
@@ -138,11 +139,9 @@ static int		attrsilent = 0;
 static int		targetexists = 0;
 static char		yeschr[SCHAR_MAX + 2];
 static char		nochr[SCHAR_MAX + 2];
-static int		s1aclcnt;
-static aclent_t		*s1aclp = NULL;
 static int		cmdarg;		/* command line argument */
 static avl_tree_t	*stree = NULL;	/* source file inode search tree */
-
+static acl_t		*s1acl;
 
 int
 main(int argc, char *argv[])
@@ -803,9 +802,9 @@ copy:
 
 				if (pflg || mve) {
 					(void) chmod(target, FMODE(s1));
-					if (s1aclp != NULL) {
-						if ((acl(target, SETACL,
-						    s1aclcnt, s1aclp)) < 0) {
+					if (s1acl != NULL) {
+						if ((acl_set(target,
+						    s1acl)) < 0) {
 							if (pflg || mve) {
 								(void) fprintf(
 								    stderr,
@@ -1065,6 +1064,7 @@ chkfiles(char *source, char **to)
 	int	(*statf)() = (cpy &&
 		    !(Pflg || (Hflg && !cmdarg))) ? stat : lstat;
 	char    *target = *to;
+	int	error;
 
 	/*
 	 * Make sure source file exists.
@@ -1088,26 +1088,15 @@ chkfiles(char *source, char **to)
 	 * Get ACL info: don't bother with ln or mv'ing symlinks
 	 */
 	if ((!lnk) && !(mve && ISLNK(s1))) {
-		if (s1aclp != NULL) {
-			free(s1aclp);
-			s1aclp = NULL;
+		if (s1acl != NULL) {
+			acl_free(s1acl);
+			s1acl = NULL;
 		}
-		if ((s1aclcnt = acl(source, GETACLCNT, 0, NULL)) < 0) {
+		if ((error = acl_get(source, ACL_NO_TRIVIAL, &s1acl)) != 0) {
 			(void) fprintf(stderr,
-			    "%s: failed to get acl entries\n", source);
+			    "%s: failed to get acl entries: %s\n", source,
+			    acl_strerror(error));
 			return (1);
-		}
-		if (s1aclcnt > MIN_ACL_ENTRIES) {
-			if ((s1aclp = (aclent_t *)malloc(
-				sizeof (aclent_t) * s1aclcnt)) == NULL) {
-				(void) fprintf(stderr, "Insufficient memory\n");
-				return (1);
-			}
-			if ((acl(source, GETACL, s1aclcnt, s1aclp)) < 0) {
-				(void) fprintf(stderr,
-				    "%s: failed to get acl entries\n", source);
-				return (1);
-			}
 		}
 		/* else: just permission bits */
 	}
@@ -1563,8 +1552,9 @@ copydir(char *source, char *target)
 	int pret = 0;		/* need separate flag if -p is specified */
 	mode_t	fixmode = (mode_t)0;	/* cleanup mode after copy */
 	struct stat s1save;
-	int s1aclcnt_save;
-	aclent_t *s1aclp_save = NULL;
+	acl_t  *s1acl_save;
+
+	s1acl_save = NULL;
 
 	if (cpy && !rflg) {
 		(void) fprintf(stderr,
@@ -1597,12 +1587,15 @@ copydir(char *source, char *target)
 		 * s1 gets overwritten when doing the recursive copy.
 		 */
 		s1save = s1;
-		if (s1aclp != NULL) {
-			if ((s1aclp_save = (aclent_t *)malloc(sizeof (aclent_t)
-			    * s1aclcnt)) != NULL) {
-				(void) memcpy(s1aclp_save, s1aclp,
-				    sizeof (aclent_t) * s1aclcnt);
-				s1aclcnt_save = s1aclcnt;
+		if (s1acl != NULL) {
+			s1acl_save = acl_dup(s1acl);
+			if (s1acl_save == NULL) {
+				(void) fprintf(stderr, gettext("%s: "
+				    "Insufficient memory to save acl"
+				    " entry\n"), cmd);
+				if (pflg)
+					return (1);
+
 			}
 #ifdef XPG4
 			else {
@@ -1627,9 +1620,8 @@ copydir(char *source, char *target)
 	 * ACL for directory
 	 */
 	if (pflg || mve) {
-		if (s1aclp_save != NULL) {
-			if ((acl(target, SETACL, s1aclcnt_save, s1aclp_save))
-			    < 0) {
+		if (s1acl_save != NULL) {
+			if (acl_set(target, s1acl_save) < 0) {
 #ifdef XPG4
 				if (pflg || mve) {
 #else
@@ -1639,13 +1631,15 @@ copydir(char *source, char *target)
 					    "%s: failed to set acl entries "
 					    "on %s\n"), cmd, target);
 					if (pflg) {
-						free(s1aclp_save);
+						acl_free(s1acl_save);
+						s1acl_save = NULL;
 						ret++;
 					}
 				}
 				/* else: silent and continue */
 			}
-			free(s1aclp_save);
+			acl_free(s1acl_save);
+			s1acl_save = NULL;
 		}
 		if ((pret = chg_mode(target, UID(s1save), GID(s1save),
 		    FMODE(s1save))) == 0)
@@ -1705,7 +1699,6 @@ use_stdin(void)
 static int
 copyattributes(char *source, char *target)
 {
-	int ret;
 	int sourcedirfd, targetdirfd;
 	int srcfd, targfd;
 	int tmpfd;
@@ -1716,12 +1709,11 @@ copyattributes(char *source, char *target)
 	char *srcbuf, *targbuf;
 	size_t src_size, targ_size;
 	int error = 0;
+	int aclerror;
 	mode_t mode;
 	int clearflg = 0;
-	int	aclcnt;
-	int	attrdiraclcnt;
-	aclent_t *aclp = NULL;
-	aclent_t *attrdiraclp = NULL;
+	acl_t *xacl = NULL;
+	acl_t *attrdiracl = NULL;
 	struct stat attrdir, s3, s4;
 	struct timeval times[2];
 	mode_t	targmode;
@@ -1918,58 +1910,30 @@ copyattributes(char *source, char *target)
 		 * Now set owner and group of attribute directory, implies
 		 * changing the ACL of the hidden attribute directory first.
 		 */
-		if ((attrdiraclcnt = facl(sourcedirfd,
-		    GETACLCNT, 0, NULL)) < 0) {
+		if ((aclerror = facl_get(sourcedirfd,
+		    ACL_NO_TRIVIAL, &attrdiracl)) != 0) {
 			if (!attrsilent) {
 				(void) fprintf(stderr, gettext(
 				    "%s: failed to get acl entries of"
 				    " attribute directory for"
-				    " %s\n"), cmd, source);
+				    " %s : %s\n"), cmd,
+				    source, acl_strerror(aclerror));
 				++error;
 			}
 		}
-		if (attrdiraclcnt > MIN_ACL_ENTRIES) {
-			if ((attrdiraclp = (aclent_t *)malloc(
-				sizeof (aclent_t) * attrdiraclcnt)) == NULL) {
+
+		if (attrdiracl) {
+			if (facl_set(targetdirfd, attrdiracl) != 0) {
 				if (!attrsilent) {
 					(void) fprintf(stderr, gettext(
-						"insufficient memory"
-						" for acl\n"));
+					"%s: failed to set acl entries"
+					" on attribute directory "
+					"for %s\n"), cmd, target);
 					++error;
 				}
-			} else {
-				if ((ret = facl(sourcedirfd, GETACL,
-					attrdiraclcnt, attrdiraclp)) == -1) {
-					if (!attrsilent) {
-						(void) fprintf(stderr,
-						    gettext(
-						    "%s: failed to get acl"
-						    " entries of attribute"
-						    " directory for"
-						    " %s\n"), cmd, target);
-						free(attrdiraclp);
-						attrdiraclp = NULL;
-						attrdiraclcnt = 0;
-						++error;
-					}
-
-				}
-				if (ret != -1 && (facl(targetdirfd, SETACL,
-				    attrdiraclcnt,
-				    attrdiraclp) != 0)) {
-					if (!attrsilent) {
-						(void) fprintf(stderr, gettext(
-						"%s: failed to set acl entries"
-						" on attribute directory "
-						"for %s\n"), cmd, target);
-						++error;
-					}
-					free(attrdiraclp);
-					attrdiraclp = NULL;
-					attrdiraclcnt = 0;
-				}
+				acl_free(attrdiracl);
+				attrdiracl = NULL;
 			}
-
 		}
 	}
 
@@ -2040,52 +2004,17 @@ copyattributes(char *source, char *target)
 		}
 
 		if (pflg || mve) {
-			if ((aclcnt = facl(srcattrfd,
-			    GETACLCNT, 0, NULL)) < 0) {
+			if ((aclerror = facl_get(srcattrfd,
+			    ACL_NO_TRIVIAL, &xacl)) != 0) {
 				if (!attrsilent) {
 					(void) fprintf(stderr, gettext(
 					    "%s: failed to get acl entries of"
 					    " attribute %s for"
-					    " %s: "), cmd, dp->d_name, source);
-					perror("");
+					    " %s: %s"), cmd, dp->d_name,
+					    source, acl_strerror(aclerror));
 					++error;
 				}
 			}
-			if (aclcnt > MIN_ACL_ENTRIES) {
-				if ((aclp = (aclent_t *)malloc(
-					sizeof (aclent_t) * aclcnt)) ==
-						NULL) {
-					if (!attrsilent) {
-						(void) fprintf(stderr, gettext(
-							"insufficient memory"
-							" for acl: "));
-						perror("");
-						++error;
-					}
-				} else {
-
-					if ((facl(srcattrfd, GETACL,
-						aclcnt, aclp)) < 0) {
-						if (!attrsilent) {
-							(void) fprintf(stderr,
-							    gettext(
-							    "%s: failed to get"
-							    " acl entries of"
-							    " attribute %s for"
-							    /*CSTYLED*/
-							    " %s: "), cmd,
-							    dp->d_name, target);
-							free(aclp);
-							aclp = NULL;
-							perror("");
-							++error;
-						}
-
-					}
-
-				}
-			}
-
 		}
 
 		(void) unlinkat(targetdirfd, dp->d_name, 0);
@@ -2105,8 +2034,8 @@ copyattributes(char *source, char *target)
 		/*
 		 * preserve ACL
 		 */
-		if ((pflg || mve) && aclp != NULL) {
-			if ((facl(targattrfd, SETACL, aclcnt, aclp)) < 0) {
+		if ((pflg || mve) && xacl != NULL) {
+			if ((facl_set(targattrfd, xacl)) < 0) {
 				if (!attrsilent) {
 					(void) fprintf(stderr, gettext(
 					    "%s: failed to set acl entries on"
@@ -2114,9 +2043,8 @@ copyattributes(char *source, char *target)
 					    "%s\n"), cmd, dp->d_name, target);
 					++error;
 				}
-				free(aclp);
-				aclp = NULL;
-				aclcnt = 0;
+				acl_free(xacl);
+				xacl = NULL;
 			}
 		}
 
@@ -2231,11 +2159,10 @@ copyattributes(char *source, char *target)
 			}
 		}
 next:
-		if (aclp != NULL) {
-			free(aclp);
-			aclp = NULL;
+		if (xacl != NULL) {
+			acl_free(xacl);
+			xacl = NULL;
 		}
-		aclcnt = 0;
 		if (srcbuf != NULL)
 			free(srcbuf);
 		if (targbuf != NULL)
@@ -2248,10 +2175,14 @@ next:
 		srcbuf = targbuf = NULL;
 	}
 out:
-	if (aclp != NULL)
-		free(aclp);
-	if (attrdiraclp != NULL)
-		free(attrdiraclp);
+	if (xacl != NULL) {
+		acl_free(xacl);
+		xacl = NULL;
+	}
+	if (attrdiracl != NULL) {
+		acl_free(attrdiracl);
+		attrdiracl = NULL;
+	}
 	if (srcbuf)
 		free(srcbuf);
 	if (targbuf)

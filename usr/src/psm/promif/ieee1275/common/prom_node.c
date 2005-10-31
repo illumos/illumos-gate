@@ -32,8 +32,8 @@
 /*
  * Routines for walking the PROMs devinfo tree
  */
-dnode_t
-prom_nextnode(dnode_t nodeid)
+pnode_t
+prom_nextnode(pnode_t nodeid)
 {
 	cell_t ci[5];
 
@@ -50,8 +50,8 @@ prom_nextnode(dnode_t nodeid)
 	return (p1275_cell2dnode(ci[4]));	/* Res1: peer phandle */
 }
 
-dnode_t
-prom_childnode(dnode_t nodeid)
+pnode_t
+prom_childnode(pnode_t nodeid)
 {
 	cell_t ci[5];
 
@@ -74,10 +74,10 @@ prom_childnode(dnode_t nodeid)
  * overhead of a recursive implementation.
  */
 void
-prom_walk_devs(dnode_t node, int (*cb)(dnode_t, void *, void *), void *arg,
+prom_walk_devs(pnode_t node, int (*cb)(pnode_t, void *, void *), void *arg,
     void *result)
 {
-	dnode_t stack[OBP_STACKDEPTH];
+	pnode_t stack[OBP_STACKDEPTH];
 	int stackidx = 0;
 
 	if (node == OBP_NONODE || node == OBP_BADNODE) {
@@ -87,8 +87,8 @@ prom_walk_devs(dnode_t node, int (*cb)(dnode_t, void *, void *), void *arg,
 	stack[0] = node;
 
 	for (;;) {
-		dnode_t curnode = stack[stackidx];
-		dnode_t child;
+		pnode_t curnode = stack[stackidx];
+		pnode_t child;
 
 		/*
 		 * We're out of stuff to do at this level, bump back up a level
@@ -137,19 +137,19 @@ prom_walk_devs(dnode_t node, int (*cb)(dnode_t, void *, void *), void *arg,
  * supplied in 'devtype'.
  */
 static int
-bytype_cb(dnode_t node, void *arg, void *result)
+bytype_cb(pnode_t node, void *arg, void *result)
 {
 	if (prom_devicetype(node, (char *)arg)) {
-		*((dnode_t *)result) = node;
+		*((pnode_t *)result) = node;
 		return (PROM_WALK_TERMINATE);
 	}
 	return (PROM_WALK_CONTINUE);
 }
 
-dnode_t
-prom_findnode_bydevtype(dnode_t node, char *devtype)
+pnode_t
+prom_findnode_bydevtype(pnode_t node, char *devtype)
 {
-	dnode_t result = OBP_NONODE;
+	pnode_t result = OBP_NONODE;
 	prom_walk_devs(node, bytype_cb, devtype, &result);
 	return (result);
 }
@@ -160,19 +160,19 @@ prom_findnode_bydevtype(dnode_t node, char *devtype)
  * returns the first node whose name matches the name supplied in 'name'.
  */
 static int
-byname_cb(dnode_t node, void *arg, void *result)
+byname_cb(pnode_t node, void *arg, void *result)
 {
 	if (prom_getnode_byname(node, (char *)arg)) {
-		*((dnode_t *)result) = node;
+		*((pnode_t *)result) = node;
 		return (PROM_WALK_TERMINATE);
 	}
 	return (PROM_WALK_CONTINUE);
 }
 
-dnode_t
-prom_findnode_byname(dnode_t node, char *name)
+pnode_t
+prom_findnode_byname(pnode_t node, char *name)
 {
-	dnode_t result = OBP_NONODE;
+	pnode_t result = OBP_NONODE;
 	prom_walk_devs(node, byname_cb, name, &result);
 	return (result);
 }
@@ -181,16 +181,16 @@ prom_findnode_byname(dnode_t node, char *name)
  * Return the root nodeid.
  * Calling prom_nextnode(0) returns the root nodeid.
  */
-dnode_t
+pnode_t
 prom_rootnode(void)
 {
-	static dnode_t rootnode;
+	static pnode_t rootnode;
 
 	return (rootnode ? rootnode : (rootnode = prom_nextnode(OBP_NONODE)));
 }
 
-dnode_t
-prom_parentnode(dnode_t nodeid)
+pnode_t
+prom_parentnode(pnode_t nodeid)
 {
 	cell_t ci[5];
 
@@ -207,7 +207,7 @@ prom_parentnode(dnode_t nodeid)
 	return (p1275_cell2dnode(ci[4]));	/* Res1: parent phandle */
 }
 
-dnode_t
+pnode_t
 prom_finddevice(char *path)
 {
 	cell_t ci[5];
@@ -243,14 +243,14 @@ prom_finddevice(char *path)
 		promplat_free(path, len);
 #endif
 
-	return ((dnode_t)p1275_cell2dnode(ci[4])); /* Res1: phandle */
+	return ((pnode_t)p1275_cell2dnode(ci[4])); /* Res1: phandle */
 }
 
-dnode_t
+pnode_t
 prom_chosennode(void)
 {
-	static dnode_t chosen;
-	dnode_t	node;
+	static pnode_t chosen;
+	pnode_t	node;
 
 	if (chosen)
 		return (chosen);
@@ -267,7 +267,7 @@ prom_chosennode(void)
 	 * gcc doesn't recognize "NOTREACHED" and puts the warning.
 	 * To surpress it, returning an integer value is required.
 	 */
-	return ((dnode_t)0);
+	return ((pnode_t)0);
 }
 
 /*
@@ -275,10 +275,10 @@ prom_chosennode(void)
  * /aliases exists in OBP >= 2.4 and in Open Firmware.
  * Returns OBP_BADNODE if it doesn't exist.
  */
-dnode_t
+pnode_t
 prom_alias_node(void)
 {
-	static dnode_t node;
+	static pnode_t node;
 
 	if (node == 0)
 		node = prom_finddevice("/aliases");
@@ -289,10 +289,10 @@ prom_alias_node(void)
  * Returns the nodeid of /options.
  * Returns OBP_BADNODE if it doesn't exist.
  */
-dnode_t
+pnode_t
 prom_optionsnode(void)
 {
-	static dnode_t node;
+	static pnode_t node;
 
 	if (node == 0)
 		node = prom_finddevice("/options");

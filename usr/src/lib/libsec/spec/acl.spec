@@ -41,6 +41,26 @@ exception	($return == GRP_ERROR	|| \
 			$return == MEM_ERROR)
 end		
 
+function	acl_check
+include		<sys/acl.h>
+declaration	int acl_check(acl_t *aclp, int flag);
+version		SUNW_1.2
+errno		EINVAL
+exception	 ($return == EACL_GRP_ERROR   || \
+	$return == EACL_USER_ERROR   || \
+	$return == EACL_OTHER_ERROR  || \
+	$return == EACL_CLASS_ERROR  || \
+	$return == EACL_DUPLICATE_ERROR      || \
+	$return == EACL_MISS_ERROR  || \
+	$return == EACL_MEM_ERROR   || \
+	$return == EACL_ENTRY_ERROR)	|| \
+	$return == EACL_INHERIT_ERROR || \
+	$return == EACL_FLAGS_ERROR || \
+	$return == EACL_PERM_MASK_ERROR || \
+	$return == EACL_COUNT_ERROR 
+end
+
+
 function	aclsort
 include		<sys/acl.h>
 declaration	int aclsort(int nentries, int calclass, aclent_t *aclbufp)
@@ -78,3 +98,124 @@ version		SUNW_0.9
 exception	$return == 0
 end		
 
+function	acl_get
+include		<sys/acl.h>
+declaration	int acl_get(char *, int, acl_t **);
+version		SUNW_1.2
+end		
+
+function	facl_get
+include		<aclutils.h>
+declaration	int facl_get(int, int, acl_t **);
+version		SUNW_1.2
+end		
+
+function	acl_set
+include		<sys/acl.h>
+declaration	int acl_set(char *, acl_t  *);
+version		SUNW_1.2
+end		
+
+function	facl_set
+include		<sys/acl.h>
+declaration	int facl_set(int, acl_t  *);
+version		SUNW_1.2
+end		
+
+function	acl_strip
+include		<sys/acl.h>
+declaration	int acl_strip(char *, uid_t, gid_t, mode_t);
+version		SUNW_1.2
+end		
+
+function	acl_trivial
+include		<sys/acl.h>
+declaration	int acl_trivial(char *file)
+version		SUNW_1.2
+end
+
+function	acl_totext
+include		<sys/acl.h>
+declaration	char *acl_totext(acl_t *acl);
+version		SUNW_1.2
+exception	$return == 0
+end
+
+function	acl_fromtext
+include		<sys/acl.h>
+declaration	int acl_fromtext(char *textp, acl_t **);
+version		SUNW_1.2
+end
+
+function	acl_free
+include		<sys/acl.h>
+declaration	void acl_free(acl_t *aclp);
+version		SUNW_1.2
+end
+
+function	acl_addentries
+include		<sys/acl.h>
+declaration	int acl_addentries(acl_t *acl1, aclt_t *acl2, int slot);
+version		SUNWprivate_1.1
+end
+
+function	acl_removeentries
+include		<sys/acl.h>
+declaration	int acl_removeentries(acl_t *acl1, aclt_t *acl2, int, int);
+version		SUNWprivate_1.1
+end
+
+function	acl_printacl
+include		<sys/acl.h>
+declaration	void acl_printacl(acl_t *aclp, int cols);
+version		SUNWprivate_1.1
+end
+
+function	acl_strerror
+include		<sys/acl.h>
+declaration	char *acl_strerror(int errnum);
+version		SUNWprivate_1.1
+end
+
+function	acl_modifyentries
+include		<sys/acl.h>
+declaration	int acl_modifyentries(acl_t *acl1, acl_t *newentries,
+    int where);
+version		SUNWprivate_1.1
+end
+
+function	acl_alloc
+include		<sys/acl.h>
+declaration	int acl_alloc(enum acl_type);
+version		SUNWprivate_1.1
+end
+
+function	acl_dup
+include		<aclutils.h>
+declaration	acl_t acl_dup(acl_t *);
+version		SUNWprivate_1.1
+end 
+
+function	acl_cnt
+include		<aclutils.h>
+declaration	int acl_cnt(acl_t *);
+version		SUNWprivate_1.1
+end
+
+function	acl_type
+include		<aclutils.h>
+declaration	int acl_type(acl_t *);
+version		SUNWprivate_1.1
+end
+
+function	acl_flags
+include		<aclutils.h>
+declaration	int acl_flags(acl_t *);
+version		SUNWprivate_1.1
+end
+
+function	acl_data
+include		<aclutils.h>
+declaration	void *acl_data(acl_t *);
+version		SUNWprivate_1.1
+end

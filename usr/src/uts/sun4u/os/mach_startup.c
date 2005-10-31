@@ -236,7 +236,7 @@ iam_positron(void)
 {
 	char model[32];
 	const char proto_model[] = "SUNW,501-2732";
-	dnode_t root = prom_rootnode();
+	pnode_t root = prom_rootnode();
 
 	if (prom_getproplen(root, "model") != sizeof (proto_model))
 		return (0);

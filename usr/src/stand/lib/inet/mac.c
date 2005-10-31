@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ mac_init(char *bootdevicename)
 	static char	*chosen_net = "chosen-network-type";
 	static char	*supported_net = "supported-network-types";
 	static char	*netiftype = "network-interface-type";
-	dnode_t		node;
+	pnode_t		node;
 	char		*wp, *media_type;
 	int		len = 0, i;
 #endif	/* !__i386 */

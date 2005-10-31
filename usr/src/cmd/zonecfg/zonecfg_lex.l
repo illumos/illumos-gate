@@ -159,6 +159,8 @@ char *safe_strdup(char *s);
 <TSTATE>zonename	{ return ZONENAME; }
 <CSTATE>zonename	{ return ZONENAME; }
 
+<TSTATE>dataset	{ return DATASET; }
+
 <TSTATE>zonepath	{ return ZONEPATH; }
 <CSTATE>zonepath	{ return ZONEPATH; }
 

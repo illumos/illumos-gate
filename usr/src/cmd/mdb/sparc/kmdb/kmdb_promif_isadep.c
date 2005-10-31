@@ -69,7 +69,7 @@ kmdb_prom_get_handle(char *name)
 char *
 kmdb_prom_get_options_prop(kmdb_auxv_t *kav, char *propname)
 {
-	dnode_t node;
+	pnode_t node;
 	ssize_t len;
 	char *val;
 
@@ -97,18 +97,18 @@ kmdb_prom_free_options_prop(char *val)
 }
 
 int
-kmdb_prom_getprop(dnode_t node, char *name, caddr_t value)
+kmdb_prom_getprop(pnode_t node, char *name, caddr_t value)
 {
 	return (prom_getprop(node, name, value));
 }
 
 typedef struct walk_cpu_data {
-	int (*wcd_cb)(dnode_t, void *, void *);
+	int (*wcd_cb)(pnode_t, void *, void *);
 	void *wcd_arg;
 } walk_cpu_data_t;
 
 static int
-walk_cpus_cb(dnode_t node, void *arg, void *result)
+walk_cpus_cb(pnode_t node, void *arg, void *result)
 {
 	walk_cpu_data_t *wcd = arg;
 
@@ -139,7 +139,7 @@ walk_cpus_cb(dnode_t node, void *arg, void *result)
 }
 
 void
-kmdb_prom_walk_cpus(int (*cb)(dnode_t, void *, void *), void *arg, void *result)
+kmdb_prom_walk_cpus(int (*cb)(pnode_t, void *, void *), void *arg, void *result)
 {
 	walk_cpu_data_t wcd;
 

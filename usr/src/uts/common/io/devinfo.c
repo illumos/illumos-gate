@@ -157,7 +157,7 @@ struct di_dkey {
 	dev_info_t	*dk_dip;
 	major_t		dk_major;
 	int		dk_inst;
-	dnode_t		dk_nodeid;
+	pnode_t		dk_nodeid;
 };
 
 struct di_pkey {

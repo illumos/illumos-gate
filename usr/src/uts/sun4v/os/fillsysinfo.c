@@ -98,8 +98,8 @@ int	debug_fillsysinfo = 0;
 int ncpunode;
 struct cpu_node cpunodes[NCPU];
 
-void	fill_cpu(dnode_t);
-void	plat_fill_mc(dnode_t);
+void	fill_cpu(pnode_t);
+void	plat_fill_mc(pnode_t);
 #pragma weak plat_fill_mc
 
 uint64_t	system_clock_freq;
@@ -110,7 +110,7 @@ uint_t		niommu_tsbs = 0;
  * Hardware watchdog support.
  */
 #define	CHOSEN_EEPROM	"eeprom"
-static dnode_t 		chosen_eeprom;
+static pnode_t 		chosen_eeprom;
 
 /*
  * If this variable is non-zero, cpr should return "not supported" when
@@ -129,11 +129,11 @@ int cpr_platform_enable = 0;
 /*
  * Some nodes have functions that need to be called when they're seen.
  */
-static void	have_pci(dnode_t);
+static void	have_pci(pnode_t);
 
 static struct wkdevice {
 	char *wk_namep;
-	void (*wk_func)(dnode_t);
+	void (*wk_func)(pnode_t);
 	caddr_t *wk_vaddrp;
 	ushort_t wk_flags;
 #define	V_OPTIONAL	0x0000
@@ -145,14 +145,14 @@ static struct wkdevice {
 	{ 0, },
 };
 
-static void map_wellknown(dnode_t);
+static void map_wellknown(pnode_t);
 
 void
 map_wellknown_devices()
 {
 	struct wkdevice *wkp;
 	phandle_t	ieeprom;
-	dnode_t	root;
+	pnode_t	root;
 	uint_t	stick_freq;
 
 	/*
@@ -161,16 +161,16 @@ map_wellknown_devices()
 	if (GETPROPLEN(prom_chosennode(), CHOSEN_EEPROM) ==
 	    sizeof (phandle_t) &&
 	    GETPROP(prom_chosennode(), CHOSEN_EEPROM, (caddr_t)&ieeprom) != -1)
-		chosen_eeprom = (dnode_t)prom_decode_int(ieeprom);
+		chosen_eeprom = (pnode_t)prom_decode_int(ieeprom);
 
-	root = prom_nextnode((dnode_t)0);
+	root = prom_nextnode((pnode_t)0);
 	/*
 	 * Get System clock frequency from root node if it exists.
 	 */
 	if (GETPROP(root, "stick-frequency", (caddr_t)&stick_freq) != -1)
 		system_clock_freq = stick_freq;
 
-	map_wellknown(NEXT((dnode_t)0));
+	map_wellknown(NEXT((pnode_t)0));
 
 	/*
 	 * See if it worked
@@ -187,11 +187,11 @@ map_wellknown_devices()
  * map_wellknown - map known devices & registers
  */
 static void
-map_wellknown(dnode_t curnode)
+map_wellknown(pnode_t curnode)
 {
 	extern int status_okay(int, char *, int);
 	char tmp_name[MAXSYSNAME];
-	static void fill_address(dnode_t, char *);
+	static void fill_address(pnode_t, char *);
 	int sok;
 
 #ifdef VPRINTF
@@ -251,7 +251,7 @@ map_wellknown(dnode_t curnode)
 }
 
 static void
-fill_address(dnode_t curnode, char *namep)
+fill_address(pnode_t curnode, char *namep)
 {
 	struct wkdevice *wkp;
 	int size;
@@ -300,7 +300,7 @@ fill_address(dnode_t curnode, char *namep)
 }
 
 void
-fill_cpu(dnode_t node)
+fill_cpu(pnode_t node)
 {
 	struct cpu_node *cpunode;
 	processorid_t cpuid;
@@ -337,7 +337,7 @@ fill_cpu(dnode_t node)
 		/*
 		 * If we didn't find it in the CPU node, look in the root node.
 		 */
-		dnode_t root = prom_nextnode((dnode_t)0);
+		pnode_t root = prom_nextnode((pnode_t)0);
 		if (GETPROP(root, "clock-frequency", (caddr_t)&clk_freq) == -1)
 			clk_freq = 0;
 	}
@@ -368,7 +368,7 @@ fill_cpu(dnode_t node)
  * handling purposes.
  */
 static void
-have_pci(dnode_t node)
+have_pci(pnode_t node)
 {
 	int size;
 	uint_t portid;

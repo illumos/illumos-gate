@@ -30,18 +30,26 @@
 # (when it did contain symbols explicitly) may depend on it.
 #
 i386 {
+	SUNW_1.2:	{SUNW_1.1};
 	SUNW_1.1:	{SUNW_0.9};
 	SUNW_0.9;
+	SUNWprivate_1.1;
 }
 sparcv9 {
+	SUNW_1.2:	{SUNW_1.1};
 	SUNW_1.1:	{SUNW_0.9};
 	SUNW_0.9;
+	SUNWprivate_1.1;
 }
 sparc {
+	SUNW_1.2:	{SUNW_1.1};
 	SUNW_1.1:	{SUNW_0.9};
 	SUNW_0.9;
+	SUNWprivate_1.1;
 }
 amd64 {
+	SUNW_1.2:	{SUNW_1.1};
 	SUNW_1.1:	{SUNW_0.9};
 	SUNW_0.9;
+	SUNWprivate_1.1;
 }

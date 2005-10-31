@@ -11982,7 +11982,7 @@ nfs4_setsecattr(vnode_t *vp, vsecattr_t *vsecattr, int flag, cred_t *cr)
 			 * These are ace_t type entries.
 			 */
 			error = vs_acet_to_ace4(vsecattr, &nfsace4_vsap,
-			    vp->v_type == VDIR, FALSE);
+			    FALSE);
 			if (error)
 				return (error);
 		}
@@ -12151,7 +12151,7 @@ nfs4_create_getsecattr_return(vsecattr_t *filled_vsap, vsecattr_t *vsap,
 
 	if (orig_mask & (VSA_ACE | VSA_ACECNT)) {
 		error = vs_ace4_to_acet(filled_vsap, vsap, uid, gid,
-		    isdir, FALSE, ((orig_mask & VSA_ACE) ? FALSE : TRUE));
+		    FALSE, ((orig_mask & VSA_ACE) ? FALSE : TRUE));
 
 		if (error)
 			return (error);

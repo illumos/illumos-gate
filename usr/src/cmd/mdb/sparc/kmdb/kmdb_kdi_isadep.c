@@ -70,7 +70,7 @@ kdi_xc_one(int cpuid, void (*cb)(void))
 
 /*ARGSUSED1*/
 static int
-kdi_init_cpus_cb(dnode_t node, void *arg, void *result)
+kdi_init_cpus_cb(pnode_t node, void *arg, void *result)
 {
 	/*
 	 * Sun4v dosen't support virtual address cache

@@ -136,6 +136,7 @@ static char rcs_ident[] =
 #include <strings.h>
 #include <fcntl.h>
 #include <dirent.h>
+#include <aclutils.h>
 
 /*
  * Multi-byte handling for 'y' or 'n'
@@ -1602,8 +1603,8 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 {
 	mode_t mode;
 	struct utimbuf timep;
-	int aclcnt;
-	aclent_t *aclp;
+	acl_t *aclp;
+	int error;
 
 	if (fclose(outp)) {
 		perror(ofname);
@@ -1654,41 +1655,20 @@ copystat(char *ifname, struct stat *ifstat, char *ofname)
 		if (chmod(ofname, mode))	 /* Copy modes */
 			perror(ofname);
 
-		/* Copy ACL info */
-		if ((aclcnt = acl(ifname, GETACLCNT, 0, NULL)) < 0) {
+		error = acl_get(ifname, ACL_NO_TRIVIAL, &aclp);
+		if (error != 0) {
 			(void) fprintf(stderr, gettext(
-			    "%s: failed to get acl count\n"),
-			    ifname);
+			    "%s: failed to retrieve acl : %s\n"),
+			    ifname, acl_strerror(error));
 			perm_stat = 1;
 		}
-		/*
-		 * Get ACL info: don't bother allocating space if
-		 * there are only standard permissions, i.e.,
-		 * ACL count < 4.
-		 */
-		if (aclcnt > MIN_ACL_ENTRIES) {
-			if ((aclp = (aclent_t *)malloc(
-			    sizeof (aclent_t) * aclcnt)) == NULL) {
-				(void) fprintf(stderr, gettext(
-				    "Insufficient memory\n"));
-				exit(1);
-			}
-			if (acl(ifname, GETACL, aclcnt, aclp) < 0) {
-				(void) fprintf(stderr, gettext(
-				    "%s: failed to get acl entries\n"),
-				    ifname);
-				perm_stat = 1;
-			} else {
-				if (acl(ofname, SETACL,
-				    aclcnt, aclp) < 0) {
-					(void) fprintf(stderr, gettext(
-					    "%s: failed to set acl "
-					    "entries\n"), ofname);
-					perm_stat = 1;
-				}
-			}
-			free(aclp);
+		if (aclp && (acl_set(ofname, aclp) < 0)) {
+			(void) fprintf(stderr, gettext("%s: failed to set acl "
+			    "entries\n"), ofname);
+			perm_stat = 1;
 		}
+		if (aclp)
+			acl_free(aclp);
 
 		/* Copy ownership */
 		(void) chown(ofname, ifstat->st_uid, ifstat->st_gid);

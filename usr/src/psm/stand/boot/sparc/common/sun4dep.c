@@ -46,7 +46,7 @@ fiximp(void)
 void
 setup_aux(void)
 {
-	dnode_t node;
+	pnode_t node;
 	/* big enough for OBP_NAME and for a reasonably sized OBP_COMPATIBLE. */
 	static char cpubuf[5 * OBP_MAXDRVNAME];
 	extern uint_t icache_flush;

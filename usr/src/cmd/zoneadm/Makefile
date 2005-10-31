@@ -38,7 +38,7 @@ $(ROOTMANIFEST)         := FILEMODE= 444
 $(ROOTMANIFESTDIR)/%: %
 	$(INS.file)
 
-LDLIBS += -lzonecfg -lsocket -lgen -lpool -lbsm
+LDLIBS += -lzonecfg -lsocket -lgen -lpool -lbsm -lzfs
 
 lint := LINTFLAGS += -ux
 

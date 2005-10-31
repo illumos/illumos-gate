@@ -107,7 +107,7 @@ static caddr_t top_resvmem, scratchresvp;
 static int
 impl_name(char *buf, size_t bufsz)
 {
-	dnode_t n = prom_rootnode();
+	pnode_t n = prom_rootnode();
 	size_t len = prom_getproplen(n, "name");
 
 	if (len == 0 || len >= bufsz)

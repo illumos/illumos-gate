@@ -1682,6 +1682,21 @@ kmem_cache_magazine_enable(kmem_cache_t *cp)
 }
 
 /*
+ * Reap (almost) everything right now.  See kmem_cache_magazine_purge()
+ * for explanation of the back-to-back kmem_depot_ws_update() calls.
+ */
+void
+kmem_cache_reap_now(kmem_cache_t *cp)
+{
+	kmem_depot_ws_update(cp);
+	kmem_depot_ws_update(cp);
+
+	(void) taskq_dispatch(kmem_taskq,
+	    (task_func_t *)kmem_depot_ws_reap, cp, TQ_SLEEP);
+	taskq_wait(kmem_taskq);
+}
+
+/*
  * Recompute a cache's magazine size.  The trade-off is that larger magazines
  * provide a higher transfer rate with the depot, while smaller magazines
  * reduce memory consumption.  Magazine resizing is an expensive operation;
@@ -1976,6 +1991,15 @@ kmem_maxavail(void)
 	spgcnt_t vmem = btop(vmem_size(heap_arena, VMEM_FREE));
 
 	return ((size_t)ptob(MAX(MIN(pmem, vmem), 0)));
+}
+
+/*
+ * Indicate whether memory-intensive kmem debugging is enabled.
+ */
+int
+kmem_debugging(void)
+{
+	return (kmem_flags & (KMF_AUDIT | KMF_REDZONE));
 }
 
 kmem_cache_t *

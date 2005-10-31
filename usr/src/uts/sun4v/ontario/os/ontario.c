@@ -72,7 +72,7 @@ void
 load_platform_drivers(void)
 {
 	dev_info_t 		*dip;		/* dip of the isa driver */
-	dnode_t 		nodeid;
+	pnode_t 		nodeid;
 
 	/*
 	 * Install ISA driver. This is required for the southbridge IDE

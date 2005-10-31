@@ -569,20 +569,6 @@ dv_vattr_merge(struct dv_node *dv, struct vattr *vap)
 }
 
 /*
- * Free a vsecattr
- */
-static void
-dv_free_vsa(struct vsecattr *vsap)
-{
-	if (vsap->vsa_aclcnt > 0 && vsap->vsa_aclentp)
-		kmem_free(vsap->vsa_aclentp,
-		    vsap->vsa_aclcnt * sizeof (aclent_t));
-	if (vsap->vsa_dfaclcnt > 0 && vsap->vsa_dfaclentp)
-		kmem_free(vsap->vsa_dfaclentp,
-		    vsap->vsa_dfaclcnt * sizeof (aclent_t));
-}
-
-/*
  * dv_shadow_node
  *
  * Given a VDIR dv_node, find/create the associated VDIR
@@ -623,7 +609,6 @@ dv_shadow_node(
 	int		create_tried;
 	int		error;
 	mperm_t		mp;
-	struct vsecattr	vsa;
 
 	ASSERT(vp->v_type == VDIR || vp->v_type == VCHR || vp->v_type == VBLK);
 	dv = VTODV(vp);
@@ -678,19 +663,14 @@ lookup:
 		dv->dv_attrvp = rvp;	/* with one hold */
 
 		/*
-		 * Determine if we have (non-trivial) ACLs on this node.
-		 * NB: This should be changed call fs_acl_nontrivial for
-		 * new ACE flavor ACLs.
+		 * Determine if we have non-trivial ACLs on this node.
+		 * It is not necessary to VOP_RWLOCK since fs_acl_nontrivial
+		 * only does VOP_GETSECATTR.
 		 */
-		vsa.vsa_mask = VSA_ACL | VSA_ACLCNT | VSA_DFACL | VSA_DFACLCNT;
-		error = VOP_GETSECATTR(rvp, &vsa, 0, cred);
 		dv->dv_flags &= ~DV_ACL;
-		if (error == 0) {
-			if (vsa.vsa_aclcnt > MIN_ACL_ENTRIES) {
-				dv->dv_flags |= DV_ACL;	/* non-trivial ACL */
-			}
-			dv_free_vsa(&vsa);
-		}
+
+		if (fs_acl_nontrivial(rvp, cred))
+			dv->dv_flags |= DV_ACL;
 
 		/*
 		 * If we have synced out the memory attributes, free

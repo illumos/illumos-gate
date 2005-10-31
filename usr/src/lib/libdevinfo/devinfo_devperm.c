@@ -84,7 +84,6 @@ setdevaccess(char *dev, uid_t uid, gid_t gid, mode_t mode,
     void (*errmsg)(char *))
 {
 	int err = 0, local_errno;
-	aclent_t acls[4];
 	char errstring[MAX_LINELEN];
 
 	if (chown(dev, uid, gid) == -1) {
@@ -106,24 +105,12 @@ setdevaccess(char *dev, uid_t uid, gid_t gid, mode_t mode,
 		(*errmsg)(errstring);
 	}
 
-	acls[0].a_type = USER_OBJ;
-	acls[0].a_id = uid;
-	acls[0].a_perm = ((mode & 0700) >> 6);
+	/*
+	 * strip_acl sets an acl and changes the files owner/group
+	 */
+	err = acl_strip(dev, uid, gid, mode);
 
-	acls[1].a_type = GROUP_OBJ;
-	acls[1].a_id = gid;
-	acls[1].a_perm = ((mode & 0070) >> 3);
-
-	acls[2].a_type = CLASS_OBJ;
-	acls[2].a_id = (uid_t)-1;
-	acls[2].a_perm = ((mode & 0070) >> 3);
-
-	acls[3].a_type = OTHER_OBJ;
-	acls[3].a_id = (uid_t)-1;
-	acls[3].a_perm = (mode & 0007);
-
-	/* Remove ACLs */
-	if (acl(dev, SETACL, 4, acls) < 0) {
+	if (err != 0) {
 		/*
 		 * If the file system returned ENOSYS, we know that it
 		 * doesn't support ACLs, therefore, we must assume that
@@ -139,15 +126,14 @@ setdevaccess(char *dev, uid_t uid, gid_t gid, mode_t mode,
 				(*errmsg)(errstring);
 			}
 		}
-	}
-
-	if (chmod(dev, mode) == -1) {
-		err = -1;
-		if (errmsg) {
-			(void) snprintf(errstring, MAX_LINELEN,
-			    "failed to chmod device %s: %s\n",
-			    dev, strerror(errno));
-			(*errmsg)(errstring);
+		if (chmod(dev, mode) == -1) {
+			err = -1;
+			if (errmsg) {
+				(void) snprintf(errstring, MAX_LINELEN,
+				    "failed to chmod device %s: %s\n",
+				    dev, strerror(errno));
+				(*errmsg)(errstring);
+			}
 		}
 	}
 

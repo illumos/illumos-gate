@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.
  * All rights reserved.
  * Use is subject to license terms.
  */
@@ -68,6 +68,8 @@
 #include <nfs/nfs_clnt.h>
 #include <nfs/nfs_acl.h>
 
+#include <fs/fs_subr.h>
+
 /*
  * These are the interface routines for the server side of the
  * NFS ACL server.  See the NFS ACL protocol specification
@@ -94,6 +96,25 @@ acl2_getacl(GETACL2args *args, GETACL2res *resp, struct exportinfo *exi,
 	resp->resok.acl.vsa_mask = args->mask;
 
 	error = VOP_GETSECATTR(vp, &resp->resok.acl, 0, cr);
+
+	if (error == ENOSYS) {
+		/*
+		 * If the underlying file system doesn't support
+		 * aclent_t type acls, fabricate an acl.  This is
+		 * required in order to to support existing clients
+		 * that require the call to VOP_GETSECATTR to
+		 * succeed while making the assumption that all
+		 * file systems support aclent_t type acls.  This
+		 * causes problems for servers exporting ZFS file
+		 * systems because ZFS supports ace_t type acls,
+		 * and fails (with ENOSYS) when asked for aclent_t
+		 * type acls.
+		 *
+		 * Note: if the fs_fab_acl() fails, we have other problems.
+		 * This error should be returned to the caller.
+		 */
+		error = fs_fab_acl(vp, &resp->resok.acl, 0, cr);
+	}
 
 	if (error) {
 		VN_RELE(vp);
@@ -453,6 +474,25 @@ acl3_getacl(GETACL3args *args, GETACL3res *resp, struct exportinfo *exi,
 	resp->resok.acl.vsa_mask = args->mask;
 
 	error = VOP_GETSECATTR(vp, &resp->resok.acl, 0, cr);
+
+	if (error == ENOSYS) {
+		/*
+		 * If the underlying file system doesn't support
+		 * aclent_t type acls, fabricate an acl.  This is
+		 * required in order to to support existing clients
+		 * that require the call to VOP_GETSECATTR to
+		 * succeed while making the assumption that all
+		 * file systems support aclent_t type acls.  This
+		 * causes problems for servers exporting ZFS file
+		 * systems because ZFS supports ace_t type acls,
+		 * and fails (with ENOSYS) when asked for aclent_t
+		 * type acls.
+		 *
+		 * Note: if the fs_fab_acl() fails, we have other problems.
+		 * This error should be returned to the caller.
+		 */
+		error = fs_fab_acl(vp, &resp->resok.acl, 0, cr);
+	}
 
 	if (error)
 		goto out;

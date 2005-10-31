@@ -60,7 +60,6 @@
 #include <langinfo.h>
 #include <ftw.h>
 
-
 #define	A_DAY		(long)(60*60*24)	/* a day full of seconds */
 #define	A_MIN		(long)(60)
 #define	BLKSIZ		512
@@ -964,8 +963,7 @@ struct FTW *state;
 			 * nftw()) of the file
 			 */
 			filename = gettail(name);
-			val = (acl(filename, GETACLCNT, 0, NULL) >
-			    MIN_ACL_ENTRIES);
+			val = acl_trivial(name);
 			break;
 		}
 		/*
@@ -1352,7 +1350,7 @@ list(file, stp)
 	struct stat *stp;
 {
 	char pmode[32], uname[32], gname[32], fsize[32], ftime[32];
-
+	int trivial;
 
 /*
  * Each line below contains the relevant permission (column 1) and character
@@ -1456,7 +1454,11 @@ list(file, stp)
 
 	tailname = gettail(file);
 
-	if (acl(tailname, GETACLCNT, 0, NULL) > MIN_ACL_ENTRIES)
+	trivial = acl_trivial(tailname);
+	if (trivial == -1)
+		trivial =  0;
+
+	if (trivial == 1)
 		pmode[permoffset(who) + 1] = '+';
 	else
 		pmode[permoffset(who) + 1] = ' ';

@@ -543,7 +543,7 @@ update_hvdump_buffer(void)
 
 
 static int
-getintprop(dnode_t node, char *name, int deflt)
+getintprop(pnode_t node, char *name, int deflt)
 {
 	int	value;
 

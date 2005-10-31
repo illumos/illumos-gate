@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +44,7 @@ prom_create_encoded_prop(char *propname, void *prop_data, int prop_datalen,
 					" pop-package"
 					" r> to my-self";
 	char *command;
-	static dnode_t cn = OBP_NONODE;
+	static pnode_t cn = OBP_NONODE;
 
 	if (cn == OBP_NONODE) {
 		cn = prom_finddevice("/chosen");

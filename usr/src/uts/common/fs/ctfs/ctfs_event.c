@@ -287,7 +287,7 @@ ctfs_ev_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 	ctfs_evnode_t *evnode = vp->v_data;
 
 	return (ctfs_endpoint_ioctl(&evnode->ctfs_ev_listener, cmd, arg, cr,
-	    VTOZ(vp), 0));
+	    VTOZONE(vp), 0));
 }
 
 /*
@@ -430,7 +430,7 @@ ctfs_bu_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 	ctfs_bunode_t *bunode = vp->v_data;
 
 	return (ctfs_endpoint_ioctl(&bunode->ctfs_bu_listener, cmd, arg, cr,
-	    VTOZ(vp), bunode->ctfs_bu_queue->ctq_listno == CTEL_BUNDLE));
+	    VTOZONE(vp), bunode->ctfs_bu_queue->ctq_listno == CTEL_BUNDLE));
 }
 
 /*

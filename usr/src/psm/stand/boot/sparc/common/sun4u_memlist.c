@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,14 +77,14 @@ init_memlists(void)
 struct memlist *
 fill_memlists(char *name, char *prop, struct memlist *old)
 {
-	static dnode_t pmem = 0;
-	static dnode_t pmmu = 0;
-	dnode_t node;
+	static pnode_t pmem = 0;
+	static pnode_t pmmu = 0;
+	pnode_t node;
 	size_t links;
 	struct memlist *al;
 	struct sun4u_prom_memlist *pm = scratch_memlist;
 
-	if (pmem == (dnode_t)0)  {
+	if (pmem == (pnode_t)0)  {
 
 		/*
 		 * Figure out the interesting phandles, one time

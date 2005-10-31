@@ -2910,7 +2910,7 @@ ibnex_commsvc_initnode(dev_info_t *parent, ibdm_port_attr_t *port_attr,
 	node_data->node_state = IBNEX_CFGADM_CONFIGURING;
 
 	ndi_devi_alloc_sleep(parent,
-	    IBNEX_IBPORT_CNAME, (dnode_t)DEVI_SID_NODEID, &cdip);
+	    IBNEX_IBPORT_CNAME, (pnode_t)DEVI_SID_NODEID, &cdip);
 
 	node_data->node_dip	= cdip;
 	ddi_set_parent_data(cdip, node_data);

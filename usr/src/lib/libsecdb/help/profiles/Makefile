@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,6 +63,8 @@ HTMLENTS = \
 	RtUserMngmnt.html \
 	RtUserSecurity.html \
 	RtDatAdmin.html \
+	RtZFSFileSysMngmnt.html \
+	RtZFSStorageMngmnt.html \
 	RtZoneMngmnt.html \
 	RtDefault.html
 

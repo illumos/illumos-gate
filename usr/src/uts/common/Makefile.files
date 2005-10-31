@@ -23,7 +23,7 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This Makefile defines all file modules for the directory uts/common
 # and its children. These are the source files which may be considered
@@ -65,6 +65,7 @@ CORE_OBJS +=	$(COMMON_CORE_OBJS) $($(MACH)_CORE_OBJS)
 GENUNIX_OBJS +=	\
 		access.o	\
 		acl.o		\
+		acl_common.o	\
 		adjtime.o	\
 		alarm.o		\
 		aio_subr.o	\
@@ -843,6 +844,71 @@ MIRROR_OBJS += mirror.o mirror_ioctl.o mirror_resync.o
 NOTIFY_OBJS += md_notify.o
 
 TRANS_OBJS += mdtrans.o trans_ioctl.o trans_log.o
+
+ZFS_COMMON_OBJS +=		\
+	arc.o			\
+	bplist.o		\
+	dbuf.o			\
+	dmu.o			\
+	dmu_object.o		\
+	dmu_objset.o		\
+	dmu_traverse.o		\
+	dmu_tx.o		\
+	dnode.o			\
+	dnode_sync.o		\
+	dsl_dir.o		\
+	dsl_dataset.o		\
+	dsl_pool.o		\
+	dmu_zfetch.o		\
+	dsl_prop.o		\
+	fletcher.o		\
+	lzjb.o			\
+	metaslab.o		\
+	refcount.o		\
+	sha256.o		\
+	spa.o			\
+	spa_config.o		\
+	spa_misc.o		\
+	space_map.o		\
+	txg.o			\
+	uberblock.o		\
+	unique.o		\
+	vdev.o			\
+	vdev_cache.o		\
+	vdev_file.o		\
+	vdev_label.o		\
+	vdev_mirror.o		\
+	vdev_missing.o		\
+	vdev_queue.o		\
+	vdev_raidz.o		\
+	vdev_root.o		\
+	zap.o			\
+	zap_leaf.o		\
+	zap_micro.o		\
+	zfs_byteswap.o		\
+	zil.o			\
+	zio.o			\
+	zio_checksum.o		\
+	zio_compress.o
+
+ZFS_SHARED_OBJS +=		\
+	zfs_namecheck.o		\
+	zfs_prop.o
+
+ZFS_OBJS +=			\
+	$(ZFS_COMMON_OBJS)	\
+	$(ZFS_SHARED_OBJS)	\
+	vdev_disk.o		\
+	zfs_acl.o		\
+	zfs_ctldir.o		\
+	zfs_dir.o		\
+	zfs_ioctl.o		\
+	zfs_log.o		\
+	zfs_replay.o		\
+	zfs_vfsops.o		\
+	zfs_vnops.o		\
+	zfs_znode.o		\
+	zvol.o
 
 #
 #			streams modules

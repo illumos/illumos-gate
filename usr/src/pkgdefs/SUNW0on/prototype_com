@@ -50,6 +50,7 @@ f none usr/lib/locale/C/LC_MESSAGES/SUN4.po              644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4U.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUNOS.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/PCI.po               644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/ZFS.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_ADMIN.po    644 root sys
 f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_NETRPC.po   644 root sys
 f none usr/lib/locale/C/LC_MESSAGES/SUNW_OST_OSCMD.po    644 root sys
@@ -269,6 +270,8 @@ f none usr/lib/help/profiles/locale/RtFileSysSecurity.html 444 root bin
 f none usr/lib/help/profiles/locale/RtDHCPMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtIPFilterMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtDatAdmin.html 444 root bin
+f none usr/lib/help/profiles/locale/RtZFSFileSysMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/RtZFSStorageMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/RtZoneMngmnt.html 444 root bin
 #
 #

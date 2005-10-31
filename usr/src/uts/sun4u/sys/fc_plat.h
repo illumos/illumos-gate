@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FC_PLAT_H
@@ -71,7 +71,7 @@ typedef uint32_t fc_phandle_t;
 #define	fc_size2cell(u)		((fc_cell_t)((size_t)(u)))
 #define	fc_ssize2cell(i)	((fc_cell_t)((ssize_t)(i)))
 #define	fc_phandle2cell(ph)	((fc_cell_t)((unsigned int)((phandle_t)(ph))))
-#define	fc_dnode2cell(d)	((fc_cell_t)((unsigned int)((dnode_t)(d))))
+#define	fc_dnode2cell(d)	((fc_cell_t)((unsigned int)((pnode_t)(d))))
 #define	fc_ull2cell_high(ll)	(0LL)
 #define	fc_ull2cell_low(ll)	((fc_cell_t)(ll))
 #define	fc_uintptr2cell(i)	((fc_cell_t)((uintptr_t)(i)))
@@ -88,7 +88,7 @@ typedef uint32_t fc_phandle_t;
 #define	fc_cell2size(u)		((size_t)((fc_cell_t)(u)))
 #define	fc_cell2ssize(i)	((ssize_t)((fc_cell_t)(i)))
 #define	fc_cell2phandle(ph)	((phandle_t)((fc_cell_t)(ph)))
-#define	fc_cell2dnode(d)	((dnode_t)((fc_cell_t)(d)))
+#define	fc_cell2dnode(d)	((pnode_t)((fc_cell_t)(d)))
 #define	fc_cells2ull(h, l)	((unsigned long long)(fc_cell_t)(l))
 #define	fc_cell2uintptr(i)	((uintptr_t)((fc_cell_t)(i)))
 #define	fc_cell2uchar(c)	((unsigned char)(fc_cell_t)(c))

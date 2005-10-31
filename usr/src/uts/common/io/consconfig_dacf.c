@@ -314,7 +314,7 @@ consconfig_dprintf(int l, const char *fmt, ...)
 char *
 get_alias(char *alias, char *buf)
 {
-	dnode_t node;
+	pnode_t node;
 
 	/* OBP >= 2.4 has /aliases */
 	if ((node = prom_alias_node()) == OBP_BADNODE)

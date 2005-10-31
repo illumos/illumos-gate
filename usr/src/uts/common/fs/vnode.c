@@ -720,28 +720,37 @@ top:
 		vsec.vsa_dfaclcnt = 0;
 		vsec.vsa_dfaclentp = NULL;
 		vsec.vsa_mask = VSA_DFACLCNT;
-		if (error = VOP_GETSECATTR(dvp, &vsec, 0, CRED())) {
+		error =  VOP_GETSECATTR(dvp, &vsec, 0, CRED());
+		/*
+		 * If error is ENOSYS then treat it as no error
+		 * Don't want to force all file systems to support
+		 * aclent_t style of ACL's.
+		 */
+		if (error == ENOSYS)
+			error = 0;
+		if (error) {
 			if (*vpp != NULL)
 				VN_RELE(*vpp);
 			goto out;
+		} else {
+			/*
+			 * Apply the umask if no default ACLs.
+			 */
+			if (vsec.vsa_dfaclcnt == 0)
+				vap->va_mode &= ~umask;
+
+			/*
+			 * VOP_GETSECATTR() may have allocated memory for
+			 * ACLs we didn't request, so double-check and
+			 * free it if necessary.
+			 */
+			if (vsec.vsa_aclcnt && vsec.vsa_aclentp != NULL)
+				kmem_free((caddr_t)vsec.vsa_aclentp,
+				    vsec.vsa_aclcnt * sizeof (aclent_t));
+			if (vsec.vsa_dfaclcnt && vsec.vsa_dfaclentp != NULL)
+				kmem_free((caddr_t)vsec.vsa_dfaclentp,
+				    vsec.vsa_dfaclcnt * sizeof (aclent_t));
 		}
-
-		/*
-		 * Apply the umask if no default ACLs.
-		 */
-		if (vsec.vsa_dfaclcnt == 0)
-			vap->va_mode &= ~umask;
-
-		/*
-		 * VOP_GETSECATTR() may have allocated memory for ACLs we
-		 * didn't request, so double-check and free it if necessary.
-		 */
-		if (vsec.vsa_aclcnt && vsec.vsa_aclentp != NULL)
-			kmem_free((caddr_t)vsec.vsa_aclentp,
-				vsec.vsa_aclcnt * sizeof (aclent_t));
-		if (vsec.vsa_dfaclcnt && vsec.vsa_dfaclentp != NULL)
-			kmem_free((caddr_t)vsec.vsa_dfaclentp,
-				vsec.vsa_dfaclcnt * sizeof (aclent_t));
 	}
 
 	/*

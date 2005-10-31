@@ -4324,6 +4324,16 @@ mondo_loop() {
 	    $root/kernel/strmod/sparcv9/udp6	\
 
 	#
+	# Remove old ZFS binaries (back when it was three modules)
+	#
+	find $root/kernel/drv -name zpool | xargs rm -f
+	rm -f $root/kernel/drv/zpool.conf
+	rm -r $root/kernel/drv/zpool.cache
+
+	find $root/kernel/drv -name zvol | xargs rm -f
+	rm -f $root/kernel/drv/zvol.conf
+
+	#
 	# Remove /usr/lib/old_libthread since support for it has
 	# been removed from the kernel in Solaris 10.  If this is
 	# a backwards BFU, it will all be extracted again by cpio.

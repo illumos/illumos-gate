@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,7 @@ typedef struct sun4u_tlb sutlb_t;
  * processor info
  */
 struct sun4u_cpu_info {
-	dnode_t node;
+	pnode_t node;
 	processorid_t cpu_id;
 };
 

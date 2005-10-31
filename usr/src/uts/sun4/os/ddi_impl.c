@@ -1487,7 +1487,7 @@ configure(void)
 	 * page as a side-effect of devr_next(0) (which prom_nextnode calls),
 	 * so this *must* be executed early on. (XXX This is untrue for sun4u)
 	 */
-	(void) prom_nextnode((dnode_t)0);
+	(void) prom_nextnode((pnode_t)0);
 #endif
 
 	/*
@@ -1550,7 +1550,7 @@ status_okay(int id, char *buf, int buflen)
 	 * NB: proplen, if it's a string, includes the NULL in the
 	 * the size of the property, and fail_len does not.
 	 */
-	proplen = prom_getproplen((dnode_t)id, (caddr_t)status);
+	proplen = prom_getproplen((pnode_t)id, (caddr_t)status);
 	if (proplen <= fail_len)	/* nonexistent or uninteresting len */
 		return (1);
 
@@ -1570,7 +1570,7 @@ status_okay(int id, char *buf, int buflen)
 	 * a buffer was passed in and the caller wants to print the
 	 * value, but the buffer was too small).
 	 */
-	(void) prom_bounded_getprop((dnode_t)id, (caddr_t)status,
+	(void) prom_bounded_getprop((pnode_t)id, (caddr_t)status,
 	    (caddr_t)bufp, len);
 	*(bufp + len - 1) = (char)0;
 

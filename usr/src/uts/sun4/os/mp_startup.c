@@ -248,9 +248,9 @@ start_cpu(int cpuid, void(*flag_func)(int))
 		    cpuid);
 	} else {
 		/* "by-cpuid" interface didn't exist.  Do it the old way */
-		dnode_t nodeid = cpunodes[cpuid].nodeid;
+		pnode_t nodeid = cpunodes[cpuid].nodeid;
 
-		ASSERT(nodeid != (dnode_t)0);
+		ASSERT(nodeid != (pnode_t)0);
 		(void) prom_startcpu(nodeid, (caddr_t)&cpu_startup, cpuid);
 	}
 
@@ -795,9 +795,9 @@ start_other_cpus(int flag)
 	 * launch all the slave cpus now
 	 */
 	for (cpuid = 0; cpuid < NCPU; cpuid++) {
-		dnode_t nodeid = cpunodes[cpuid].nodeid;
+		pnode_t nodeid = cpunodes[cpuid].nodeid;
 
-		if (nodeid == (dnode_t)0)
+		if (nodeid == (pnode_t)0)
 			continue;
 
 		if (cpuid == bootcpu) {

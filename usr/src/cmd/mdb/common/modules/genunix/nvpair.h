@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_NVPAIR_H
@@ -34,8 +34,12 @@ extern "C" {
 #endif
 
 #define	NVPAIR_DCMD_NAME    "nvpair"
-#define	NVPAIR_DCMD_USAGE   ":"
+#define	NVPAIR_DCMD_USAGE   ":[-rq]"
 #define	NVPAIR_DCMD_DESCR   "print out an nvpair"
+
+#define	NVLIST_DCMD_NAME	"nvlist"
+#define	NVLIST_DCMD_USAGE	":[-v]"
+#define	NVLIST_DCMD_DESCR	"print out an nvlist"
 
 #define	NVPAIR_WALKER_NAME  "nvpair"
 #define	NVPAIR_WALKER_DESCR "walk through the nvpairs in an unpacked nvlist"
@@ -52,7 +56,9 @@ extern "C" {
 extern int nvpair_walk_init(mdb_walk_state_t *wsp);
 extern int nvpair_walk_step(mdb_walk_state_t *wsp);
 extern int nvpair_print(uintptr_t addr, uint_t flags,
-			int argc, const mdb_arg_t *argv);
+    int argc, const mdb_arg_t *argv);
+extern int nvlist_print(uintptr_t addr, uint_t flags,
+    int argc, const mdb_arg_t *argv);
 
 #ifdef	__cplusplus
 }

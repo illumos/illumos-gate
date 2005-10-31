@@ -40,6 +40,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <errno.h>
+#include <string.h>
 
 static void usage(void);
 
@@ -115,9 +117,9 @@ main(int argc, char **argv)
 		}
 		if (ferror(f)) {
 			errflg++;
-			(void) fprintf(stderr,
-			gettext("sum: read error on %s\n"),
-			    (argc > 0) ? argv[i] : "-");
+			(void) fprintf(stderr, gettext("sum: read error "
+			    "on '%s': %s\n"), (argc > 0) ? argv[i] : "-",
+			    strerror(errno));
 		}
 		if (alg == 1)
 			(void) printf("%.5u %6lld", sum,

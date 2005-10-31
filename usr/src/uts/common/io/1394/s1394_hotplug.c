@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,7 +164,7 @@ s1394_create_devinfo(s1394_hal_t *hal, s1394_node_t *node, uint32_t *unit_dir,
 	hal_dip = hal->halinfo.dip;
 
 	/* Allocate and init a new device node instance. */
-	result = ndi_devi_alloc(hal_dip, "unit", (dnode_t)DEVI_SID_NODEID,
+	result = ndi_devi_alloc(hal_dip, "unit", (pnode_t)DEVI_SID_NODEID,
 	    &target_dip);
 
 	if (result != NDI_SUCCESS) {

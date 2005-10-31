@@ -48,3 +48,5 @@ find_files "s.*" usr/src/cmd/cmd-crypto/etc/keys
 find_files "s.*" usr/src/common/ipf
 find_files "s.*" usr/src/common/mdesc
 find_files "s.*" usr/src/common/fs
+find_files "s.*" usr/src/common/acl
+find_files "s.*" usr/src/common/zfs

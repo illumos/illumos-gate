@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,7 @@ prom_stdout_is_framebuffer(void)
 	static int remember = -1;
 
 	if (remember == -1)
-		remember = prom_devicetype((dnode_t) prom_stdout_node(),
+		remember = prom_devicetype((pnode_t)prom_stdout_node(),
 			OBP_DISPLAY);
 	return (remember);
 }

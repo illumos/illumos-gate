@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +49,8 @@
 #include <limits.h>
 #include <sys/param.h>
 #include <dirent.h>
+#include <sys/acl.h>
+#include <aclutils.h>
 
 static struct utimbuf u_times;
 
@@ -240,11 +242,13 @@ main(int argc, char *argv[])
 {
 	extern int optind;
 	int i, k;
+	int error;
 	int sep, errflg = 0, pcat = 0;
 	register char *p1, *cp;
 	int fcount = 0;		/* failure count */
 	int max_name;
 	void onsig(int);
+	acl_t *aclp;
 
 
 	if (signal(SIGHUP, SIG_IGN) != SIG_IGN)
@@ -334,6 +338,14 @@ main(int argc, char *argv[])
 		if (pcat)
 			outfile = 1;	/* standard output */
 		else {
+
+			error = facl_get(infile, ACL_NO_TRIVIAL, &aclp);
+			if (error != 0) {
+				(void) printf(gettext(
+				    "%s: %s: cannot retrieve ACL : %s\n"),
+				argv0, filename, acl_strerror(error));
+			}
+
 			max_name = pathconf(filename, _PC_NAME_MAX);
 			if (max_name == -1) {
 				/* no limit on length of filename */
@@ -395,6 +407,12 @@ main(int argc, char *argv[])
 				}
 				(void) chown(argvk,
 						status.st_uid, status.st_gid);
+				if (aclp && (facl_set(outfile, aclp) < 0)) {
+					(void) printf(gettext("%s: cannot "
+					    "set ACL on %s: "), argv0, argvk);
+					perror("");
+				}
+
 				rmflg = 0;
 				(void) printf(gettext("%s: %s: unpacked\n"),
 					argv0, argvk);
@@ -415,6 +433,9 @@ main(int argc, char *argv[])
 done:		(void) close(infile);
 		if (!pcat)
 			(void) close(outfile);
+
+		if (aclp)
+			acl_free(aclp);
 	}
 	return (fcount);
 }

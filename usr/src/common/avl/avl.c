@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,7 @@
  *	- Since the AVL data is always embedded in other structures, there is
  *	  no locking or memory allocation in the AVL routines. This must be
  *	  provided for by the enclosing data structure's semantics. Typically,
- *	  avl_insert()/_remove()/avl_insert_here() require some kind of
+ *	  avl_insert()/_add()/_remove()/avl_insert_here() require some kind of
  *	  exclusive write lock. Other operations require a read lock.
  *
  *      - The implementation uses iteration instead of explicit recursion,
@@ -95,6 +95,7 @@
 #include <sys/param.h>
 #include <sys/debug.h>
 #include <sys/avl.h>
+#include <sys/cmn_err.h>
 
 /*
  * Small arrays to translate between balance (or diff) values and child indeces.
@@ -597,6 +598,29 @@ avl_insert_here(
 	ASSERT(node->avl_child[child] == NULL);
 
 	avl_insert(tree, new_data, AVL_MKINDEX(node, child));
+}
+
+/*
+ * Add a new node to an AVL tree.
+ */
+void
+avl_add(avl_tree_t *tree, void *new_node)
+{
+	avl_index_t where;
+
+	/*
+	 * This is unfortunate.  We want to call panic() here, even for
+	 * non-DEBUG kernels.  In userland, however, we can't depend on anything
+	 * in libc or else the rtld build process gets confused.  So, all we can
+	 * do in userland is resort to a normal ASSERT().
+	 */
+	if (avl_find(tree, new_node, &where) != NULL)
+#ifdef _KERNEL
+		panic("avl_find() succeeded inside avl_add()");
+#else
+		ASSERT(0);
+#endif
+	avl_insert(tree, new_node, where);
 }
 
 /*

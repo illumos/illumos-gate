@@ -24,13 +24,14 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <dlfcn.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -51,6 +52,7 @@
 #include <sys/mkdev.h>
 #include <sys/int_limits.h>
 #include <sys/zone.h>
+#include <libzfs.h>
 
 #include "fslib.h"
 
@@ -171,6 +173,7 @@ struct df_request {
 
 #define	DFR_MOUNT_POINT(dfrp)	(dfrp)->dfr_mte->mte_mount->mnt_mountp
 #define	DFR_SPECIAL(dfrp)	(dfrp)->dfr_mte->mte_mount->mnt_special
+#define	DFR_FSTYPE(dfrp)	(dfrp)->dfr_mte->mte_mount->mnt_fstype
 #define	DFR_ISMOUNTEDFS(dfrp)	((dfrp)->dfr_mte != NULL)
 
 #define	DFRP(p)			((struct df_request *)(p))
@@ -236,9 +239,23 @@ static void parse_options(int, char **);
 static char *basename(char *);
 
 
+/* ARGSUSED */
+static void
+dummy_error_handler(const char *fmt, va_list ap)
+{
+	/* Do nothing */
+}
+
+static zfs_handle_t *(*_zfs_open)(const char *, int);
+static void (*_zfs_close)(zfs_handle_t *);
+static uint64_t (*_zfs_prop_get_int)(zfs_handle_t *, zfs_prop_t);
+static void (*_zfs_set_error_handler)(void (*)(const char *, va_list));
+
 void
 main(int argc, char *argv[])
 {
+	void *hdl;
+
 	(void) setlocale(LC_ALL, "");
 
 #if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
@@ -251,6 +268,32 @@ main(int argc, char *argv[])
 #ifdef	_iBCS2
 	sysv3_set = getenv("SYSV3");
 #endif	/* _iBCS2 */
+
+	/*
+	 * Dynamically check for libzfs, in case the user hasn't installed the
+	 * SUNWzfs packages.  A basic utility such as df shouldn't depend on
+	 * optional filesystems.
+	 */
+	if ((hdl = dlopen("libzfs.so", RTLD_LAZY)) != NULL) {
+		_zfs_set_error_handler = (void (*)())
+		    dlsym(hdl, "zfs_set_error_handler");
+		_zfs_open = (zfs_handle_t *(*)())dlsym(hdl, "zfs_open");
+		_zfs_close = (void (*)())dlsym(hdl, "zfs_close");
+		_zfs_prop_get_int = (uint64_t (*)())
+		    dlsym(hdl, "zfs_prop_get_int");
+
+		if (_zfs_set_error_handler != NULL) {
+			assert(_zfs_open != NULL);
+			assert(_zfs_close != NULL);
+			assert(_zfs_prop_get_int != NULL);
+
+			/*
+			 * Disable ZFS error reporting, so we don't get messages
+			 * like "can't open ..." under race conditions.
+			 */
+			_zfs_set_error_handler(dummy_error_handler);
+		}
+	}
 
 	if (EQ(program_name, DEVNM_CMD))
 		do_devnm(argc, argv);
@@ -1169,6 +1212,68 @@ number_to_scaled_string(
 	return (buf);
 }
 
+/*
+ * The statvfs() implementation allows us to return only two values, the total
+ * number of blocks and the number of blocks free.  The equation 'used = total -
+ * free' will not work for ZFS filesystems, due to the nature of pooled storage.
+ * We choose to return values in the statvfs structure that will produce correct
+ * results for 'used' and 'available', but not 'total'.  This function will open
+ * the underlying ZFS dataset if necessary and get the real value.
+ */
+static void
+adjust_total_blocks(struct df_request *dfrp, fsblkcnt64_t *total,
+    uint64_t blocksize)
+{
+	zfs_handle_t	*zhp;
+	char *dataset, *slash;
+	uint64_t quota;
+
+	if (strcmp(DFR_FSTYPE(dfrp), MNTTYPE_ZFS) != 0 ||
+	    _zfs_open == NULL)
+		return;
+
+	/*
+	 * We want to get the total size for this filesystem as bounded by any
+	 * quotas. In order to do this, we start at the current filesystem and
+	 * work upwards until we find a dataset with a quota.  If we reach the
+	 * pool itself, then the total space is the amount used plus the amount
+	 * available.
+	 */
+	if ((dataset = strdup(DFR_SPECIAL(dfrp))) == NULL)
+		return;
+
+	slash = dataset + strlen(dataset);
+	do {
+		*slash = '\0';
+
+		if ((zhp = _zfs_open(dataset, ZFS_TYPE_ANY)) == NULL) {
+			free(dataset);
+			return;
+		}
+
+		if ((quota = _zfs_prop_get_int(zhp, ZFS_PROP_QUOTA)) != 0) {
+			*total = quota / blocksize;
+			_zfs_close(zhp);
+			free(dataset);
+			return;
+		}
+
+		_zfs_close(zhp);
+
+	} while ((slash = strrchr(dataset, '/')) != NULL);
+
+
+	if ((zhp = _zfs_open(dataset, ZFS_TYPE_ANY)) == NULL) {
+		free(dataset);
+		return;
+	}
+
+	*total = (_zfs_prop_get_int(zhp, ZFS_PROP_USED) +
+	    _zfs_prop_get_int(zhp, ZFS_PROP_AVAILABLE)) / blocksize;
+
+	_zfs_close(zhp);
+	free(dataset);
+}
 
 /*
  * The output will appear properly columnized regardless of the names of
@@ -1178,6 +1283,7 @@ static void
 g_output(struct df_request *dfrp, struct statvfs64 *fsp)
 {
 	fsblkcnt64_t	available_blocks	= fsp->f_bavail;
+	fsblkcnt64_t	total_blocks = fsp->f_blocks;
 	numbuf_t	total_blocks_buf;
 	numbuf_t	total_files_buf;
 	numbuf_t	free_blocks_buf;
@@ -1258,9 +1364,11 @@ g_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	if ((long long)available_blocks < (long long)0)
 		available_blocks = (fsblkcnt64_t)0;
 
+	adjust_total_blocks(dfrp, &total_blocks, fsp->f_frsize);
+
 	(void) printf("%*s %-*s %*s %-*s %*s %-*s %*s %-*s\n",
 		NCOL1_WIDTH, number_to_string(total_blocks_buf,
-					fsp->f_blocks, fsp->f_frsize, 512),
+					total_blocks, fsp->f_frsize, 512),
 			SCOL1_WIDTH, total_blocks_str,
 		NCOL2_WIDTH, number_to_string(free_blocks_buf,
 					fsp->f_bfree, fsp->f_frsize, 512),
@@ -1346,6 +1454,8 @@ k_output(struct df_request *dfrp, struct statvfs64 *fsp)
 		file_system = "";
 	}
 
+	adjust_total_blocks(dfrp, &total_blocks, fsp->f_frsize);
+
 	if (use_scaling) { /* comes from the -h option */
 	(void) printf("%-*s %*s %*s %*s %-*s %-s\n",
 		FILESYSTEM_WIDTH, file_system,
@@ -1428,12 +1538,15 @@ strings_init()
 static void
 t_output(struct df_request *dfrp, struct statvfs64 *fsp)
 {
+	fsblkcnt64_t	total_blocks = fsp->f_blocks;
 	numbuf_t	total_blocks_buf;
 	numbuf_t	total_files_buf;
 	numbuf_t	free_blocks_buf;
 	numbuf_t	free_files_buf;
 
 	STRINGS_INIT();
+
+	adjust_total_blocks(dfrp, &total_blocks, fsp->f_frsize);
 
 	(void) printf("%-*s(%-*s): %*s %s %*s %s\n",
 		MOUNT_POINT_WIDTH, DFR_MOUNT_POINT(dfrp),
@@ -1456,7 +1569,7 @@ t_output(struct df_request *dfrp, struct statvfs64 *fsp)
 	(void) printf("%*s: %*s %s %*s %s\n",
 		MNT_SPEC_WIDTH, total_str,
 		BLOCK_WIDTH, number_to_string(total_blocks_buf,
-				fsp->f_blocks, fsp->f_frsize, 512),
+				total_blocks, fsp->f_frsize, 512),
 		blocks_str,
 		NFILES_WIDTH, number_to_string(total_files_buf,
 				fsp->f_files, 1, 1),

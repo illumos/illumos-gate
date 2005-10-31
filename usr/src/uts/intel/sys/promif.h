@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,16 +65,16 @@ extern	void		prom_free(caddr_t virt, uint_t size);
 /*
  * Device tree and property group: OBP and IEEE 1275-1994.
  */
-extern	dnode_t		prom_childnode(dnode_t nodeid);
-extern	dnode_t		prom_nextnode(dnode_t nodeid);
-extern	dnode_t		prom_optionsnode(void);
-extern	dnode_t		prom_alias_node(void);
-extern	dnode_t		prom_rootnode(void);
+extern	pnode_t		prom_childnode(pnode_t nodeid);
+extern	pnode_t		prom_nextnode(pnode_t nodeid);
+extern	pnode_t		prom_optionsnode(void);
+extern	pnode_t		prom_alias_node(void);
+extern	pnode_t		prom_rootnode(void);
 
-extern	int		prom_getproplen(dnode_t nodeid, caddr_t name);
-extern	int		prom_getprop(dnode_t nodeid, caddr_t name,
+extern	int		prom_getproplen(pnode_t nodeid, caddr_t name);
+extern	int		prom_getprop(pnode_t nodeid, caddr_t name,
 			    caddr_t value);
-extern	caddr_t		prom_nextprop(dnode_t nodeid, caddr_t previous,
+extern	caddr_t		prom_nextprop(pnode_t nodeid, caddr_t previous,
 			    caddr_t next);
 
 extern	char		*prom_decode_composite_string(void *buf,
@@ -83,9 +83,9 @@ extern	char		*prom_decode_composite_string(void *buf,
 /*
  * Device tree and property group: IEEE 1275-1994 Only.
  */
-extern	dnode_t		prom_finddevice(char *path);
+extern	pnode_t		prom_finddevice(char *path);
 
-extern	int		prom_bounded_getprop(dnode_t nodeid,
+extern	int		prom_bounded_getprop(pnode_t nodeid,
 			    caddr_t name, caddr_t buffer, int buflen);
 
 /*
@@ -192,7 +192,7 @@ extern	char		*prom_vsprintf(char *s, const char *fmt, __va_list adx)
  * promif tree searching routines ... OBP and IEEE 1275-1994.
  */
 
-extern	dnode_t		prom_findnode_byname(dnode_t id, char *name);
+extern	pnode_t		prom_findnode_byname(pnode_t id, char *name);
 extern	char		*prom_get_extend_name(void);
 
 extern	int		prom_devreset(int);

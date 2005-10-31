@@ -88,11 +88,11 @@ extern uint_t		ldphysio_il(uint64_t physaddr);
 extern void		stphysio_il(uint64_t physaddr, uint_t value);
 
 extern uint64_t		mc_get_mem_alignment(void);
-extern uint64_t		mc_get_asr_addr(dnode_t);
-extern uint64_t		mc_get_idle_addr(dnode_t);
-extern uint64_t		mc_get_alignment_mask(dnode_t);
-extern int		mc_read_asr(dnode_t, uint_t *);
-extern int		mc_write_asr(dnode_t, uint_t);
+extern uint64_t		mc_get_asr_addr(pnode_t);
+extern uint64_t		mc_get_idle_addr(pnode_t);
+extern uint64_t		mc_get_alignment_mask(pnode_t);
+extern int		mc_read_asr(pnode_t, uint_t *);
+extern int		mc_write_asr(pnode_t, uint_t);
 extern uint64_t		mc_asr_to_pa(uint_t);
 extern uint_t		mc_pa_to_asr(uint_t, uint64_t);
 
@@ -106,7 +106,7 @@ typedef struct {
 typedef struct drmach_node {
 	void		*here;
 
-	dnode_t		 (*get_dnode)(struct drmach_node *node);
+	pnode_t		 (*get_dnode)(struct drmach_node *node);
 	int		 (*walk)(struct drmach_node *node, void *data,
 				int (*cb)(drmach_node_walk_args_t *args));
 } drmach_node_t;
@@ -363,17 +363,17 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
-static dnode_t
+static pnode_t
 drmach_node_obp_get_dnode(drmach_node_t *np)
 {
-	return ((dnode_t)np->here);
+	return ((pnode_t)np->here);
 }
 
 static int
 drmach_node_obp_walk(drmach_node_t *np, void *data,
 		int (*cb)(drmach_node_walk_args_t *args))
 {
-	dnode_t			nodeid;
+	pnode_t			nodeid;
 	int			rv;
 	drmach_node_walk_args_t	args;
 
@@ -423,7 +423,7 @@ drmach_node_dispose(drmach_node_t *np)
 static dev_info_t *
 drmach_node_get_dip(drmach_node_t *np)
 {
-	dnode_t nodeid;
+	pnode_t nodeid;
 
 	nodeid = np->get_dnode(np);
 	if (nodeid == OBP_NONODE)
@@ -447,7 +447,7 @@ drmach_node_get_dip(drmach_node_t *np)
 	/*NOTREACHED*/
 }
 
-static dnode_t
+static pnode_t
 drmach_node_get_dnode(drmach_node_t *np)
 {
 	return (np->get_dnode(np));
@@ -463,7 +463,7 @@ drmach_node_walk(drmach_node_t *np, void *param,
 static int
 drmach_node_get_prop(drmach_node_t *np, char *name, void *buf)
 {
-	dnode_t	nodeid;
+	pnode_t	nodeid;
 	int	rv;
 
 	nodeid = np->get_dnode(np);
@@ -482,7 +482,7 @@ drmach_node_get_prop(drmach_node_t *np, char *name, void *buf)
 static int
 drmach_node_get_proplen(drmach_node_t *np, char *name, int *len)
 {
-	dnode_t	 nodeid;
+	pnode_t	 nodeid;
 	int	 rv;
 
 	nodeid = np->get_dnode(np);
@@ -599,10 +599,10 @@ drmach_array_dispose(drmach_array_t *arr, void (*disposer)(drmachid_t))
 
 /*ARGSUSED*/
 static int
-drmach_prom_select(dnode_t nodeid, void *arg, uint_t flags)
+drmach_prom_select(pnode_t nodeid, void *arg, uint_t flags)
 {
 	int			rprop[64];
-	dnode_t			saved;
+	pnode_t			saved;
 	drmach_config_args_t	*ap = (drmach_config_args_t *)arg;
 	drmach_device_t		*dp = ap->dp;
 	sbd_error_t		*err;
@@ -927,7 +927,7 @@ hold_rele_branch(dev_info_t *rdip, void *arg)
 static int
 drmach_init(void)
 {
-	dnode_t		nodeid;
+	pnode_t		nodeid;
 	dev_info_t	*rdip;
 	int		hold, circ;
 
@@ -1057,7 +1057,7 @@ static sbd_error_t *
 drmach_get_mc_asr_addr(drmachid_t id, uint64_t *pa)
 {
 	drmach_device_t	*dp;
-	dnode_t		nodeid;
+	pnode_t		nodeid;
 	uint64_t	addr;
 
 	if (!DRMACH_IS_MEM_ID(id))
@@ -1080,7 +1080,7 @@ static sbd_error_t *
 drmach_get_mc_idle_addr(drmachid_t id, uint64_t *pa)
 {
 	drmach_device_t	*dp;
-	dnode_t		nodeid;
+	pnode_t		nodeid;
 	uint64_t	addr;
 
 	if (!DRMACH_IS_MEM_ID(id))
@@ -1103,7 +1103,7 @@ static sbd_error_t *
 drmach_read_mc_asr(drmachid_t id, uint_t *mcregp)
 {
 	drmach_device_t	*dp;
-	dnode_t		 nodeid;
+	pnode_t		 nodeid;
 	sbd_error_t	*err;
 
 	if (!DRMACH_IS_MEM_ID(id))
@@ -1125,7 +1125,7 @@ static sbd_error_t *
 drmach_write_mc_asr(drmachid_t id, uint_t mcreg)
 {
 	drmach_device_t	*dp;
-	dnode_t		 nodeid;
+	pnode_t		 nodeid;
 	sbd_error_t	*err;
 
 	if (!DRMACH_IS_MEM_ID(id))
@@ -1912,7 +1912,7 @@ drmach_remove_counter_nodes(drmachid_t id)
 {
 	int		num;
 	char		name[OBP_MAXDRVNAME];
-	dnode_t		child;
+	pnode_t		child;
 	dev_info_t	*dip;
 	sbd_error_t	*err;
 	drmach_status_t	stat;
@@ -2481,7 +2481,7 @@ drmach_cpu_start(struct cpu *cp)
 	extern void	restart_other_cpu(int);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
-	ASSERT(cpunodes[cpuid].nodeid != (dnode_t)0);
+	ASSERT(cpunodes[cpuid].nodeid != (pnode_t)0);
 
 	cp->cpu_flags &= ~CPU_POWEROFF;
 
@@ -3197,7 +3197,7 @@ drmach_mem_get_alignment(drmachid_t id, uint64_t *mask)
 {
 	drmach_device_t	*mem;
 	sbd_error_t	*err;
-	dnode_t		 nodeid;
+	pnode_t		 nodeid;
 
 	if (!DRMACH_IS_MEM_ID(id))
 		return (drerr_new(0, ESTF_INAPPROP, NULL));
@@ -3695,7 +3695,7 @@ sbd_error_t *
 drmach_unconfigure(drmachid_t id, int flags)
 {
 	drmach_device_t	*dp;
-	dnode_t		 nodeid;
+	pnode_t		 nodeid;
 	dev_info_t	*dip, *fdip = NULL;
 	uint_t 		ddi_flags;
 

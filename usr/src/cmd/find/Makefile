@@ -22,8 +22,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989,1996 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PROG= find
@@ -33,6 +33,8 @@ include ../Makefile.cmd
 
 $(XPG4) := CFLAGS += -DXPG4
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+
+LDLIBS += -lsec
 
 .KEEP_STATE:
 

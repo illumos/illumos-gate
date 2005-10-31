@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -179,7 +179,7 @@ prom_setprop_null(void)
 }
 
 int
-prom_getproplen(dnode_t nodeid, caddr_t name)
+prom_getproplen(pnode_t nodeid, caddr_t name)
 {
 	cell_t ci[6];
 
@@ -199,7 +199,7 @@ prom_getproplen(dnode_t nodeid, caddr_t name)
 
 
 int
-prom_getprop(dnode_t nodeid, caddr_t name, caddr_t value)
+prom_getprop(pnode_t nodeid, caddr_t name, caddr_t value)
 {
 	int len, rv;
 	cell_t ci[8];
@@ -235,7 +235,7 @@ prom_getprop(dnode_t nodeid, caddr_t name, caddr_t value)
 }
 
 int
-prom_bounded_getprop(dnode_t nodeid, caddr_t name, caddr_t value, int len)
+prom_bounded_getprop(pnode_t nodeid, caddr_t name, caddr_t value, int len)
 {
 	cell_t ci[8];
 
@@ -256,7 +256,7 @@ prom_bounded_getprop(dnode_t nodeid, caddr_t name, caddr_t value, int len)
 }
 
 caddr_t
-prom_nextprop(dnode_t nodeid, caddr_t previous, caddr_t next)
+prom_nextprop(pnode_t nodeid, caddr_t previous, caddr_t next)
 {
 	cell_t ci[7];
 
@@ -277,7 +277,7 @@ prom_nextprop(dnode_t nodeid, caddr_t previous, caddr_t next)
 }
 
 int
-prom_setprop(dnode_t nodeid, caddr_t name, caddr_t value, int len)
+prom_setprop(pnode_t nodeid, caddr_t name, caddr_t value, int len)
 {
 	cell_t ci[8];
 #ifdef PROM_32BIT_ADDRS

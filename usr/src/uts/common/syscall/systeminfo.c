@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -244,7 +244,7 @@ systeminfo(int command, char *buf, long count)
  * to locate a given nodeid in the device tree.
  */
 struct i_path_findnode {
-	dnode_t nodeid;
+	pnode_t nodeid;
 	dev_info_t *dip;
 };
 

@@ -877,7 +877,7 @@ load_boot_platform_modules(char *drv)
  * to locate a given nodeid in the device tree.
  */
 struct i_path_findnode {
-	dnode_t nodeid;
+	pnode_t nodeid;
 	dev_info_t *dip;
 };
 
@@ -952,7 +952,7 @@ netboot_over_ib(char *bootpath)
 
 	char		*temp;
 	boolean_t	ret = B_FALSE;
-	dnode_t		node = prom_finddevice(bootpath);
+	pnode_t		node = prom_finddevice(bootpath);
 	int		len;
 	char		devicetype[OBP_MAXDRVNAME];
 

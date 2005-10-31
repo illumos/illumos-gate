@@ -1769,7 +1769,7 @@ int
 i_cpr_is_supported(void)
 {
 	char es_prop[] = "energystar-v2";
-	dnode_t node;
+	pnode_t node;
 	int last;
 	extern int cpr_supported_override;
 	extern int cpr_platform_enable;

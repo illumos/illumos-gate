@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@ extern "C" {
 typedef struct P_list {
 	struct P_list	*list_forw;
 	struct P_list	*list_back;
-} list_t;
+} plist_t;
 
 /*
  * Routines to manipulate linked lists:
@@ -47,8 +47,8 @@ typedef struct P_list {
 extern void list_link(void *, void *);
 extern void list_unlink(void *);
 
-#define	list_next(elem)	(void *)(((list_t *)(elem))->list_forw)
-#define	list_prev(elem)	(void *)(((list_t *)(elem))->list_back)
+#define	list_next(elem)	(void *)(((plist_t *)(elem))->list_forw)
+#define	list_prev(elem)	(void *)(((plist_t *)(elem))->list_back)
 
 /*
  * Routines to manipulate sigset_t, fltset_t, or sysset_t.

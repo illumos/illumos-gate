@@ -249,11 +249,11 @@ ctfs_stat_ioctl(vnode_t *vp, int cmd, intptr_t arg, int flag, cred_t *cr,
 	detail = STRUCT_FGET(st, ctst_detail);
 	if (detail == CTD_COMMON) {
 		mutex_enter(&ct->ct_lock);
-		contract_status_common(ct, VTOZ(vp), STRUCT_BUF(st), mdl);
+		contract_status_common(ct, VTOZONE(vp), STRUCT_BUF(st), mdl);
 		mutex_exit(&ct->ct_lock);
 	} else if (detail <= CTD_ALL) {
 		VERIFY(nvlist_alloc(&foo, NV_UNIQUE_NAME, KM_SLEEP) == 0);
-		type->ct_type_ops->contop_status(ct, VTOZ(vp), detail, foo,
+		type->ct_type_ops->contop_status(ct, VTOZONE(vp), detail, foo,
 		    STRUCT_BUF(st), mdl);
 		VERIFY(nvlist_pack(foo, &bufp, &len, NV_ENCODE_NATIVE,
 		    KM_SLEEP) == 0);

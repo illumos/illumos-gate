@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1989 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@ static struct xdr_ops *xdrmem_ops(void);
  * memory buffer.
  */
 void
-xdrmem_create(XDR *xdrs, caddr_t addr, u_int size, enum xdr_op op)
+xdrmem_create(XDR *xdrs, caddr_t addr, uint_t size, enum xdr_op op)
 {
 	xdrs->x_op = op;
 	xdrs->x_ops = xdrmem_ops();
@@ -113,14 +113,14 @@ xdrmem_putbytes(XDR *xdrs, caddr_t addr, int len)
 	return (TRUE);
 }
 
-static u_int
+static uint_t
 xdrmem_getpos(XDR *xdrs)
 {
-	return ((u_int)((uintptr_t)xdrs->x_private - (uintptr_t)xdrs->x_base));
+	return ((uint_t)((uintptr_t)xdrs->x_private - (uintptr_t)xdrs->x_base));
 }
 
 static bool_t
-xdrmem_setpos(XDR *xdrs, u_int pos)
+xdrmem_setpos(XDR *xdrs, uint_t pos)
 {
 	caddr_t newaddr = xdrs->x_base + pos;
 	caddr_t lastaddr = xdrs->x_private + xdrs->x_handy;
@@ -142,7 +142,7 @@ xdrmem_inline(XDR *xdrs, int len)
 	if (xdrs->x_handy >= len) {
 		xdrs->x_handy -= len;
 		/* LINTED pointer alignment */
-		buf = (rpc_inline_t *) xdrs->x_private;
+		buf = (rpc_inline_t *)xdrs->x_private;
 		xdrs->x_private += len;
 	}
 	return (buf);
@@ -151,10 +151,18 @@ xdrmem_inline(XDR *xdrs, int len)
 static bool_t
 xdrmem_control(XDR *xdrs, int request, void *info)
 {
+	xdr_bytesrec *xptr;
 	int32_t *int32p;
 	int len;
 
 	switch (request) {
+
+	case XDR_GET_BYTES_AVAIL:
+		xptr = (xdr_bytesrec *)info;
+		xptr->xc_is_last_record = TRUE;
+		xptr->xc_num_avail = xdrs->x_handy;
+		return (TRUE);
+
 	case XDR_PEEK:
 		/*
 		 * Return the next 4 byte unit in the XDR stream.
@@ -177,9 +185,8 @@ xdrmem_control(XDR *xdrs, int request, void *info)
 		xdrs->x_private += len;
 		return (TRUE);
 
-	default:
-		return (FALSE);
 	}
+	return (FALSE);
 }
 
 static struct xdr_ops *

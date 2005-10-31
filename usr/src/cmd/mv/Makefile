@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,9 +50,9 @@ XGETFLAGS += -a -x mv.xcl
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 LINTFLAGS += -DXPG4
 
-lint :=	LDLIBS += -lcmdutils -lavl
-$(PROG) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl $(ZNOLAZYLOAD)
-$(XPG4) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl $(ZNOLAZYLOAD)
+lint :=	LDLIBS += -lcmdutils -lavl -lsec
+$(PROG) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec $(ZNOLAZYLOAD)
+$(XPG4) := LDLIBS += $(ZLAZYLOAD) -lcmdutils -lavl -lsec $(ZNOLAZYLOAD)
 
 .KEEP_STATE:
 

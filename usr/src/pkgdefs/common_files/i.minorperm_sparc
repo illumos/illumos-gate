@@ -283,6 +283,8 @@ ntwdt:*
 dld:*
 aggr:*
 mdesc:*
+zfs:*
+zfs:zfs
 EOF
 }
 

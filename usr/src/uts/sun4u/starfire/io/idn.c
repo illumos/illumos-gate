@@ -5524,7 +5524,7 @@ idnxdc_broadcast(domainset_t domset, idn_msgtype_t *mtp,
 static int
 idn_prom_getsmr(uint_t *smrsz, uint64_t *paddrp, uint64_t *sizep)
 {
-	dnode_t		nodeid;
+	pnode_t		nodeid;
 	int		found = 0;
 	int		len;
 	uint_t		smrsize = 0;

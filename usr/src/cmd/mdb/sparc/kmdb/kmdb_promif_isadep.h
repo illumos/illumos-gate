@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,12 +39,12 @@
 extern "C" {
 #endif
 
-extern void kmdb_prom_walk_cpus(int (*)(dnode_t, void *, void *),
+extern void kmdb_prom_walk_cpus(int (*)(pnode_t, void *, void *),
     void *, void *);
 extern void kmdb_prom_enter_mon(void);
 extern void kmdb_prom_exit_to_mon(void);
 extern void kmdb_prom_interpret(const char *);
-extern int kmdb_prom_getprop(dnode_t, char *, caddr_t);
+extern int kmdb_prom_getprop(pnode_t, char *, caddr_t);
 
 /* private to promif */
 extern int kmdb_prom_translate_virt(uintptr_t, physaddr_t *);

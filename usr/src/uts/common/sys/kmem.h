@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -92,6 +92,7 @@ extern void kmem_thread_init(void);
 extern void kmem_mp_init(void);
 extern void kmem_reap(void);
 extern void kmem_reap_idspace(void);
+extern int kmem_debugging(void);
 extern size_t kmem_avail(void);
 extern size_t kmem_maxavail(void);
 
@@ -102,6 +103,7 @@ extern void kmem_cache_destroy(kmem_cache_t *);
 extern void *kmem_cache_alloc(kmem_cache_t *, int);
 extern void kmem_cache_free(kmem_cache_t *, void *);
 extern uint64_t kmem_cache_stat(kmem_cache_t *, char *);
+extern void kmem_cache_reap_now(kmem_cache_t *);
 
 #endif	/* _KERNEL */
 

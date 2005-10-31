@@ -516,6 +516,8 @@ f none usr/lib/help/profiles/locale/C/RtKerberosClntMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtKerberosSrvrMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtIPFilterMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtDatAdmin.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtZFSFileSysMngmnt.html 444 root bin
+f none usr/lib/help/profiles/locale/C/RtZFSStorageMngmnt.html 444 root bin
 f none usr/lib/help/profiles/locale/C/RtZoneMngmnt.html 444 root bin
 d none usr/lib/iconv 755 root bin
 f none usr/lib/iconv/646da.8859.t 444 root bin

@@ -41,22 +41,22 @@
  * Return the root nodeid.
  * Calling prom_nextnode(0) returns the root nodeid.
  */
-dnode_t
+pnode_t
 prom_rootnode(void)
 {
-	static dnode_t rootnode;
+	static pnode_t rootnode;
 
 	return (rootnode ? rootnode : (rootnode = prom_nextnode(OBP_NONODE)));
 }
 
-dnode_t
-prom_nextnode(dnode_t nodeid)
+pnode_t
+prom_nextnode(pnode_t nodeid)
 {
 	return (promif_nextnode(nodeid));
 }
 
-dnode_t
-prom_childnode(dnode_t nodeid)
+pnode_t
+prom_childnode(pnode_t nodeid)
 {
 
 	return (promif_childnode(nodeid));
@@ -66,32 +66,32 @@ prom_childnode(dnode_t nodeid)
  * disallow searching
  */
 /*ARGSUSED*/
-dnode_t
-prom_findnode_byname(dnode_t n, char *name)
+pnode_t
+prom_findnode_byname(pnode_t n, char *name)
 {
 	return (OBP_NONODE);
 }
 
-dnode_t
+pnode_t
 prom_chosennode(void)
 {
 	return (OBP_NONODE);
 }
 
-dnode_t
+pnode_t
 prom_optionsnode(void)
 {
 	return (OBP_NONODE);
 }
 
 /*ARGSUSED*/
-dnode_t
+pnode_t
 prom_finddevice(char *path)
 {
 	return (OBP_BADNODE);
 }
 
-dnode_t
+pnode_t
 prom_alias_node(void)
 {
 	return (OBP_BADNODE);

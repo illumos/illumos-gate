@@ -52,8 +52,8 @@ int vac = 1;
  */
 #define	IMPL_US_I	0x10
 
-static dnode_t
-visit(dnode_t node)
+static pnode_t
+visit(pnode_t node)
 {
 	int impl, manu;
 	char name[32];
@@ -65,24 +65,24 @@ visit(dnode_t node)
 	 * if name isn't 'SUNW,UltraSPARC', continue.
 	 */
 	if (prom_getproplen(node, "name") != sizeof (ultrasparc))
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 	(void) prom_getprop(node, "name", name);
 	if (strncmp(name, ultrasparc, sizeof (ultrasparc)) != 0)
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 
 	if (prom_getproplen(node, manufacturer) != sizeof (int))
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 	(void) prom_getprop(node, manufacturer, (caddr_t)&manu);
 
 	if ((manu != SUNW_JEDEC) && (manu != TI_JEDEC))
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 
 	if (prom_getproplen(node, implementation) != sizeof (int))
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 	(void) prom_getprop(node, implementation, (caddr_t)&impl);
 
 	if (impl != IMPL_US_I)
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 
 	return (node);
 }
@@ -90,19 +90,19 @@ visit(dnode_t node)
 /*
  * visit each node in the device tree, until we get a non-null answer
  */
-static dnode_t
-walk(dnode_t node)
+static pnode_t
+walk(pnode_t node)
 {
-	dnode_t id;
+	pnode_t id;
 
 	if (visit(node))
 		return (node);
 
 	for (node = prom_childnode(node); node; node = prom_nextnode(node))
-		if ((id = walk(node)) != (dnode_t)0)
+		if ((id = walk(node)) != (pnode_t)0)
 			return (id);
 
-	return ((dnode_t)0);
+	return ((pnode_t)0);
 }
 
 /*

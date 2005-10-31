@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,7 @@ include ../Makefile.cmd
 
 LFLAGS =	-t
 YFLAGS =	-d -b zonecfg_grammar
-LDLIBS +=	-lzonecfg -ll -lnsl -ltecla
+LDLIBS +=	-lzonecfg -ll -lnsl -ltecla -lzfs
 CPPFLAGS +=	-I.
 CLEANFILES +=	zonecfg_lex.c zonecfg_grammar.tab.c zonecfg_grammar.tab.h
 

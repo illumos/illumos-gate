@@ -143,7 +143,7 @@ get_boardnum(int nid, dev_info_t *par)
 {
 	int board_num;
 
-	if (prom_getprop((dnode_t)nid, OBP_BOARDNUM,
+	if (prom_getprop((pnode_t)nid, OBP_BOARDNUM,
 	    (caddr_t)&board_num) != -1)
 		return (board_num);
 
@@ -154,7 +154,7 @@ get_boardnum(int nid, dev_info_t *par)
 	while (par) {
 		nid = ddi_get_nodeid(par);
 
-		if (prom_getprop((dnode_t)nid, OBP_BOARDNUM,
+		if (prom_getprop((pnode_t)nid, OBP_BOARDNUM,
 		    (caddr_t)&board_num) != -1)
 			return (board_num);
 
@@ -172,11 +172,11 @@ getlongprop_buf(int id, char *name, char *buf, int maxlen)
 {
 	int size;
 
-	size = prom_getproplen((dnode_t)id, name);
+	size = prom_getproplen((pnode_t)id, name);
 	if (size <= 0 || (size > maxlen - 1))
 		return (-1);
 
-	if (-1 == prom_getprop((dnode_t)id, name, buf))
+	if (-1 == prom_getprop((pnode_t)id, name, buf))
 		return (-1);
 
 	/*
@@ -385,10 +385,10 @@ pf_is_dmacapable(pfn_t pfn)
 int
 dip_to_cpu_id(dev_info_t *dip, processorid_t *cpu_id)
 {
-	dnode_t		nodeid;
+	pnode_t		nodeid;
 	int		i;
 
-	nodeid = (dnode_t)ddi_get_nodeid(dip);
+	nodeid = (pnode_t)ddi_get_nodeid(dip);
 	for (i = 0; i < NCPU; i++) {
 		if (cpunodes[i].nodeid == nodeid) {
 			*cpu_id = i;
@@ -434,7 +434,7 @@ ndi2errno(int n)
  * Prom tree node list
  */
 struct ptnode {
-	dnode_t		nodeid;
+	pnode_t		nodeid;
 	struct ptnode	*next;
 };
 
@@ -450,10 +450,10 @@ struct pta {
 };
 
 static void
-visit_node(dnode_t nodeid, struct pta *ap)
+visit_node(pnode_t nodeid, struct pta *ap)
 {
 	struct ptnode	**nextp;
-	int		(*select)(dnode_t, void *, uint_t);
+	int		(*select)(pnode_t, void *, uint_t);
 
 	ASSERT(nodeid != OBP_NONODE && nodeid != OBP_BADNODE);
 
@@ -501,7 +501,7 @@ create_prom_branch(void *arg, int has_changed)
 {
 	int		circ, c;
 	int		exists, rv;
-	dnode_t		nodeid;
+	pnode_t		nodeid;
 	struct ptnode	*tnp;
 	dev_info_t	*dip;
 	struct pta	*ap = arg;

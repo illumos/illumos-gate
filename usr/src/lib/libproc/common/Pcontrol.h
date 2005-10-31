@@ -68,7 +68,7 @@ typedef struct {		/* symbol table */
 } sym_tbl_t;
 
 typedef struct file_info {	/* symbol information for a mapped file */
-	list_t	file_list;	/* linked list */
+	plist_t	file_list;	/* linked list */
 	char	file_pname[PRMAPSZ];	/* name from prmap_t */
 	struct map_info *file_map;	/* primary (text) mapping */
 	int	file_ref;	/* references from map_info_t structures */
@@ -102,7 +102,7 @@ typedef struct map_info {	/* description of an address space mapping */
 } map_info_t;
 
 typedef struct lwp_info {	/* per-lwp information from core file */
-	list_t	lwp_list;	/* linked list */
+	plist_t	lwp_list;	/* linked list */
 	lwpid_t	lwp_id;		/* lwp identifier */
 	lwpsinfo_t lwp_psinfo;	/* /proc/<pid>/lwp/<lwpid>/lwpsinfo data */
 	lwpstatus_t lwp_status;	/* /proc/<pid>/lwp/<lwpid>/lwpstatus data */
@@ -116,7 +116,7 @@ typedef struct lwp_info {	/* per-lwp information from core file */
 typedef struct core_info {	/* information specific to core files */
 	char core_dmodel;	/* data model for core file */
 	int core_errno;		/* error during initialization if != 0 */
-	list_t core_lwp_head;	/* head of list of lwp info */
+	plist_t core_lwp_head;	/* head of list of lwp info */
 	lwp_info_t *core_lwp;	/* current lwp information */
 	uint_t core_nlwp;	/* number of lwp's in list */
 	off64_t core_size;	/* size of core file in bytes */
@@ -171,7 +171,7 @@ struct ps_prochandle {
 	size_t	map_count;	/* number of mappings */
 	size_t	map_alloc;	/* number of mappings allocated */
 	uint_t	num_files;	/* number of file elements in file_info */
-	list_t	file_head;	/* head of mapped files w/ symbol table info */
+	plist_t	file_head;	/* head of mapped files w/ symbol table info */
 	char	*execname;	/* name of the executable file */
 	auxv_t	*auxv;		/* the process's aux vector */
 	int	nauxv;		/* number of aux vector entries */
@@ -227,6 +227,7 @@ int	Pstopstatus(struct ps_prochandle *, long, uint32_t);
 extern	int	Padd_mapping(struct ps_prochandle *, off64_t, file_info_t *,
     prmap_t *);
 extern	void	Psort_mappings(struct ps_prochandle *);
+
 
 /*
  * Architecture-dependent definition of the breakpoint instruction.

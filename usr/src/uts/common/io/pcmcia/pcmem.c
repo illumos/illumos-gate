@@ -20,12 +20,11 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
 
 /*
  *  PCMCIA Memory Nexus Driver
@@ -304,7 +303,7 @@ pcmem_create_pcram_node(dev_info_t *dip)
 	PCMEM_DEBUG((CE_CONT,
 	    "pcmem_create_pcram_node dip=%p\n", (void *)dip));
 
-	if (ndi_devi_alloc(dip, "pcram", (dnode_t)DEVI_SID_NODEID, &child) !=
+	if (ndi_devi_alloc(dip, "pcram", (pnode_t)DEVI_SID_NODEID, &child) !=
 	    NDI_SUCCESS) {
 		cmn_err(CE_WARN,
 		    "pcmem: unable to create node [%s]\n", "pcram");

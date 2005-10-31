@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,11 +71,15 @@ struct	dcd_identify {
 	ushort_t dcd_recmwdma;	/*  66  rec multi-word dma cycle info    */
 	ushort_t dcd_minpio;	/*  67  min PIO cycle info */
 	ushort_t dcd_minpioflow;	/*  68  min PIO cycle info w/flow ctl */
-	ushort_t dcd_padding1[19]; /* 69 pad to 87 */
+	ushort_t dcd_padding1[11];	/* 69 pad to 79 */
+	ushort_t dcd_majvers;	/*  80  ATA major version supported */
+	ushort_t dcd_padding2[4];	/* 81 pad to 84 */
+	ushort_t dcd_features85;	/*  85  feature enabled bits */
+	ushort_t dcd_padding3[2];	/* 86 pad to 87 */
 	ushort_t dcd_ultra_dma;	/*  88	Ultra dma capability */
-	ushort_t dcd_padding2[37]; /* 89 pad to 125 */
+	ushort_t dcd_padding4[37];	/* 89 pad to 125 */
 	ushort_t dcd_lastlun;	/* 126 last logical unit number */
-	ushort_t dcd_padding3[129];	/* pad to 255 */
+	ushort_t dcd_padding5[129];	/* pad to 255 */
 };
 
 
@@ -96,6 +100,16 @@ struct	dcd_identify {
  */
 #define	PIO_MODE4_MASK		0x02
 #define	PIO_MODE3_MASK		0x01
+
+/*
+ * The following are bits for dcd_majvers, word 80
+ */
+#define	IDENTIFY_80_ATAPI_4	0x0010
+
+/*
+ * The following are the bits for dcd_features85, word 85
+ */
+#define	IDENTIFY_85_WCE		(1 << 5)
 
 #ifdef	__cplusplus
 }

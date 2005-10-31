@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -621,7 +621,6 @@ devfs_getsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
 
 	error = VOP_GETSECATTR(avp, vsap, flags, cr);
 	dsysdebug(error, ("vop_getsecattr %s %d\n", VTODV(vp)->dv_name, error));
-
 	rw_exit(&dv->dv_contents);
 	return (error);
 }
@@ -678,10 +677,11 @@ devfs_setsecattr(struct vnode *vp, struct vsecattr *vsap, int flags,
 	VOP_RWUNLOCK(avp, V_WRITELOCK_TRUE, NULL);
 
 	/*
-	 * NB: This code should call fs_acl_nontrivial when available so that
-	 * DV_ACL is only set on nontrivial ACLs.
+	 * Set DV_ACL if we have a non-trivial set of ACLs.  It is not
+	 * necessary to hold VOP_RWLOCK since fs_acl_nontrivial only does
+	 * VOP_GETSECATTR calls.
 	 */
-	if (error == 0)
+	if (fs_acl_nontrivial(avp, cr))
 		dv->dv_flags |= DV_ACL;
 	return (error);
 }

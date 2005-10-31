@@ -676,7 +676,7 @@ bcd2int(unsigned char num) {
 static int
 todds1307_setup_prom()
 {
-	dnode_t todnode;
+	pnode_t todnode;
 	char tod1307_devpath[MAXNAMELEN];
 
 	if ((todnode = prom_findnode_bydevtype(prom_rootnode(),

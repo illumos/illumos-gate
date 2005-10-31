@@ -126,7 +126,7 @@ mblk2assoc(mblk_t *mp, ttymux_assoc_t *assoc)
  * Given a device path return an OBP alias for it if it exists.
  */
 static char *
-val2alias(dnode_t node, char *path)
+val2alias(pnode_t node, char *path)
 {
 	char *buf1;
 	char *buf2;
@@ -291,7 +291,7 @@ device_fini_impl(sm_mux_state_t *ms, sm_console_t *cn, sm_lqi_t *plqi)
 }
 
 static int
-read_prop(dnode_t node, char *propname, char **propval)
+read_prop(pnode_t node, char *propname, char **propval)
 {
 	int	proplen = prom_getproplen(node, propname);
 
@@ -347,7 +347,7 @@ sm_strtok_r(char *p, char *sep, char **lasts)
 static int
 upd_config(boolean_t append, char *pname, char *path)
 {
-	dnode_t		onode, anode;
+	pnode_t		onode, anode;
 	size_t		plen;		/* length of property name */
 	char		*pval;		/* value of property */
 	char		*tok, *lasts;

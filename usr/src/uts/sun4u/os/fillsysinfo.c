@@ -104,10 +104,10 @@ struct cpu_node cpunodes[NCPU];
 
 static void	check_cpus_ver(void);
 static void	check_cpus_set(void);
-void	fill_cpu(dnode_t);
+void	fill_cpu(pnode_t);
 void	fill_cpu_ddi(dev_info_t *);
 void	empty_cpu(int);
-void	plat_fill_mc(dnode_t);
+void	plat_fill_mc(pnode_t);
 #pragma weak plat_fill_mc
 
 uint64_t	system_clock_freq;
@@ -132,7 +132,7 @@ uint_t		niommu_tsbs = 0;
  */
 #define	CHOSEN_EEPROM	"eeprom"
 #define	WATCHDOG_ENABLE "watchdog-enable"
-static dnode_t 		chosen_eeprom;
+static pnode_t 		chosen_eeprom;
 
 /*
  * Appropriate tod module will be dynamically selected while booting
@@ -162,17 +162,17 @@ int cpr_platform_enable = 0;
 /*
  * Some nodes have functions that need to be called when they're seen.
  */
-static void	have_sbus(dnode_t);
-static void	have_pci(dnode_t);
-static void	have_eeprom(dnode_t);
-static void	have_auxio(dnode_t);
-static void	have_rtc(dnode_t);
-static void	have_tod(dnode_t);
-static void	have_pmc(dnode_t);
+static void	have_sbus(pnode_t);
+static void	have_pci(pnode_t);
+static void	have_eeprom(pnode_t);
+static void	have_auxio(pnode_t);
+static void	have_rtc(pnode_t);
+static void	have_tod(pnode_t);
+static void	have_pmc(pnode_t);
 
 static struct wkdevice {
 	char *wk_namep;
-	void (*wk_func)(dnode_t);
+	void (*wk_func)(pnode_t);
 	caddr_t *wk_vaddrp;
 	ushort_t wk_flags;
 #define	V_OPTIONAL	0x0000
@@ -189,14 +189,14 @@ static struct wkdevice {
 	{ 0, },
 };
 
-static void map_wellknown(dnode_t);
+static void map_wellknown(pnode_t);
 
 void
 map_wellknown_devices()
 {
 	struct wkdevice *wkp;
 	phandle_t	ieeprom;
-	dnode_t	root;
+	pnode_t	root;
 	uint_t	stick_freq;
 
 	/*
@@ -205,16 +205,16 @@ map_wellknown_devices()
 	if (GETPROPLEN(prom_chosennode(), CHOSEN_EEPROM) ==
 	    sizeof (phandle_t) &&
 	    GETPROP(prom_chosennode(), CHOSEN_EEPROM, (caddr_t)&ieeprom) != -1)
-		chosen_eeprom = (dnode_t)prom_decode_int(ieeprom);
+		chosen_eeprom = (pnode_t)prom_decode_int(ieeprom);
 
-	root = prom_nextnode((dnode_t)0);
+	root = prom_nextnode((pnode_t)0);
 	/*
 	 * Get System clock frequency from root node if it exists.
 	 */
 	if (GETPROP(root, "stick-frequency", (caddr_t)&stick_freq) != -1)
 		system_clock_freq = stick_freq;
 
-	map_wellknown(NEXT((dnode_t)0));
+	map_wellknown(NEXT((pnode_t)0));
 
 	/*
 	 * See if it worked
@@ -240,11 +240,11 @@ map_wellknown_devices()
  * map_wellknown - map known devices & registers
  */
 static void
-map_wellknown(dnode_t curnode)
+map_wellknown(pnode_t curnode)
 {
 	extern int status_okay(int, char *, int);
 	char tmp_name[MAXSYSNAME];
-	static void fill_address(dnode_t, char *);
+	static void fill_address(pnode_t, char *);
 	int sok;
 
 #ifdef VPRINTF
@@ -305,7 +305,7 @@ map_wellknown(dnode_t curnode)
 }
 
 static void
-fill_address(dnode_t curnode, char *namep)
+fill_address(pnode_t curnode, char *namep)
 {
 	struct wkdevice *wkp;
 	int size;
@@ -354,7 +354,7 @@ fill_address(dnode_t curnode, char *namep)
 }
 
 int
-get_portid(dnode_t node, dnode_t *cmpp)
+get_portid(pnode_t node, pnode_t *cmpp)
 {
 	int portid;
 	char dev_type[OBP_MAXPROPNAME];
@@ -429,7 +429,7 @@ adj_ecache_setsize(int ecsetsize)
 }
 
 void
-fill_cpu(dnode_t node)
+fill_cpu(pnode_t node)
 {
 	extern int cpu_get_cpu_unum(int, char *, int, int *);
 	struct cpu_node *cpunode;
@@ -438,7 +438,7 @@ fill_cpu(dnode_t node)
 	int tlbsize;
 	int size;
 	uint_t clk_freq;
-	dnode_t cmpnode;
+	pnode_t cmpnode;
 	char namebuf[OBP_MAXPROPNAME], unum[UNUM_NAMLEN];
 	char *namebufp;
 
@@ -484,7 +484,7 @@ fill_cpu(dnode_t node)
 		/*
 		 * If we didn't find it in the CPU node, look in the root node.
 		 */
-		dnode_t root = prom_nextnode((dnode_t)0);
+		pnode_t root = prom_nextnode((pnode_t)0);
 		if (GETPROP(root, "clock-frequency", (caddr_t)&clk_freq) == -1)
 			clk_freq = 0;
 	}
@@ -962,7 +962,7 @@ check_cpus_set(void)
  * handling purposes, referenced by v_sysio_addr in machdep.c.
  */
 static void
-have_sbus(dnode_t node)
+have_sbus(pnode_t node)
 {
 	int size;
 	uint_t portid;
@@ -989,7 +989,7 @@ have_sbus(dnode_t node)
  * handling purposes.
  */
 static void
-have_pci(dnode_t node)
+have_pci(pnode_t node)
 {
 	int size;
 	uint_t portid;
@@ -1026,7 +1026,7 @@ have_pci(dnode_t node)
  * by v_eeprom_addr in locore.s.
  */
 static void
-have_eeprom(dnode_t node)
+have_eeprom(pnode_t node)
 {
 	int size;
 	uint32_t eaddr;
@@ -1085,7 +1085,7 @@ have_eeprom(dnode_t node)
 }
 
 static void
-have_rtc(dnode_t node)
+have_rtc(pnode_t node)
 {
 	int size;
 	uint32_t eaddr;
@@ -1128,15 +1128,15 @@ have_rtc(dnode_t node)
 }
 
 static void
-have_pmc(dnode_t node)
+have_pmc(pnode_t node)
 {
 	uint32_t vaddr;
-	dnode_t root;
+	pnode_t root;
 
 	/*
 	 * Watchdog property is in the root node.
 	 */
-	root = prom_nextnode((dnode_t)0);
+	root = prom_nextnode((pnode_t)0);
 	if (GETPROPLEN(root, WATCHDOG_ENABLE) != -1) {
 		/*
 		 * The hardware watchdog timer resides within logical
@@ -1155,7 +1155,7 @@ have_pmc(dnode_t node)
 }
 
 static void
-have_auxio(dnode_t node)
+have_auxio(pnode_t node)
 {
 	size_t size, n;
 	uint32_t addr[5];
@@ -1189,7 +1189,7 @@ have_auxio(dnode_t node)
 }
 
 static void
-have_tod(dnode_t node)
+have_tod(pnode_t node)
 {
 	static char tod_name[MAXSYSNAME];
 

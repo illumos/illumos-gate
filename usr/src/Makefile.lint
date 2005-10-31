@@ -132,6 +132,7 @@ COMMON_SUBDIRS = \
 	cmd/fs.d/udfs/mount \
 	cmd/fs.d/ufs/mount \
 	cmd/fs.d/ufs/fsirand\
+	cmd/fs.d/zfs/fstyp \
 	cmd/fuser \
 	cmd/gcore \
 	cmd/getconf \
@@ -272,12 +273,16 @@ COMMON_SUBDIRS = \
 	cmd/xstr \
 	cmd/yes \
 	cmd/yppasswd \
+	cmd/zdb \
 	cmd/zdump \
+	cmd/zfs \
 	cmd/zlogin \
 	cmd/zoneadm \
 	cmd/zoneadmd \
 	cmd/zonecfg \
 	cmd/zonename \
+	cmd/zpool \
+	cmd/ztest \
 	lib/abi \
 	lib/auditd_plugins \
 	lib/crypt_modules \
@@ -349,6 +354,8 @@ COMMON_SUBDIRS = \
 	lib/libwanboot \
 	lib/libwanbootutil \
 	lib/libxnet \
+	lib/libzfs \
+	lib/libzfs_jni \
 	lib/libzonecfg \
 	lib/libzoneinfo \
 	lib/lvm \

@@ -20,12 +20,12 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
-/*	  All Rights Reserved  	*/
+/*	  All Rights Reserved	*/
 
 
 #ifndef _SYS_DEBUG_H
@@ -34,6 +34,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/isa_defs.h>
+#include <sys/types.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -43,29 +44,22 @@ extern "C" {
  * ASSERT(ex) causes a panic or debugger entry if expression ex is not
  * true.  ASSERT() is included only for debugging, and is a no-op in
  * production kernels.  VERIFY(ex), on the other hand, behaves like
- * ASSERT on debug kernels but evaluates the expression on non-debug
- * kernels.
+ * ASSERT and is evaluated on both debug and non-debug kernels.
  */
-
-#ifdef _KERNEL
-#if DEBUG
-#define	VERIFY(EX) ((void)((EX) || assfail(#EX, __FILE__, __LINE__)))
-#else
-#define	VERIFY(EX) ((void)(EX))
-#endif
-#endif
 
 #if defined(__STDC__)
 extern int assfail(const char *, const char *, int);
+#define	VERIFY(EX) ((void)((EX) || assfail(#EX, __FILE__, __LINE__)))
 #if DEBUG
-#define	ASSERT(EX) ((void)((EX) || assfail(#EX, __FILE__, __LINE__)))
+#define	ASSERT(EX) VERIFY(EX)
 #else
 #define	ASSERT(x)  ((void)0)
 #endif
 #else	/* defined(__STDC__) */
 extern int assfail();
+#define	VERIFY(EX) ((void)((EX) || assfail("EX", __FILE__, __LINE__)))
 #if DEBUG
-#define	ASSERT(EX) ((void)((EX) || assfail("EX", __FILE__, __LINE__)))
+#define	ASSERT(EX) VERIFY(EX)
 #else
 #define	ASSERT(x)  ((void)0)
 #endif
@@ -80,6 +74,39 @@ extern int assfail();
 #else
 #define	ASSERT64(x)
 #define	ASSERT32(x)	ASSERT(x)
+#endif
+
+/*
+ * ASSERT3() behaves like ASSERT() except that it is an explicit conditional,
+ * and prints out the values of the left and right hand expressions as part of
+ * the panic message to ease debugging.  The three variants imply the type
+ * of their arguments.  ASSERT3S() is for signed data types, ASSERT3U() is
+ * for unsigned, and ASSERT3P() is for pointers.  The VERIFY3*() macros
+ * have the same relationship as above.
+ */
+extern void assfail3(const char *, uintmax_t, const char *, uintmax_t,
+    const char *, int);
+#define	VERIFY3_IMPL(LEFT, OP, RIGHT, TYPE) do { \
+	const TYPE __left = (TYPE)(LEFT); \
+	const TYPE __right = (TYPE)(RIGHT); \
+	if (!(__left OP __right)) \
+		assfail3(#LEFT " " #OP " " #RIGHT, \
+			(uintmax_t)__left, #OP, (uintmax_t)__right, \
+			__FILE__, __LINE__); \
+_NOTE(CONSTCOND) } while (0)
+
+
+#define	VERIFY3S(x, y, z)	VERIFY3_IMPL(x, y, z, int64_t)
+#define	VERIFY3U(x, y, z)	VERIFY3_IMPL(x, y, z, uint64_t)
+#define	VERIFY3P(x, y, z)	VERIFY3_IMPL(x, y, z, uintptr_t)
+#if DEBUG
+#define	ASSERT3S(x, y, z)	VERIFY3S(x, y, z)
+#define	ASSERT3U(x, y, z)	VERIFY3U(x, y, z)
+#define	ASSERT3P(x, y, z)	VERIFY3P(x, y, z)
+#else
+#define	ASSERT3S(x, y, z)	((void)0)
+#define	ASSERT3U(x, y, z)	((void)0)
+#define	ASSERT3P(x, y, z)	((void)0)
 #endif
 
 #ifdef	_KERNEL

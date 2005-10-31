@@ -69,7 +69,7 @@ get_impl_arch_name(enum ia_state_mach *state, int use_default)
 	static int len;
 	static char *ia;
 
-	dnode_t n;
+	pnode_t n;
 	char *cp;
 	char *namename;
 
@@ -78,7 +78,7 @@ newstate:
 	case STATE_NAME:
 		*state = STATE_COMPAT_INIT;
 		namename = OBP_NAME;
-		n = (dnode_t)prom_rootnode();
+		n = (pnode_t)prom_rootnode();
 		len = prom_getproplen(n, namename);
 		if (len <= 0 || len >= MAXNMLEN)
 			goto newstate;
@@ -90,7 +90,7 @@ newstate:
 	case STATE_COMPAT_INIT:
 		*state = STATE_COMPAT;
 		namename = OBP_COMPATIBLE;
-		n = (dnode_t)prom_rootnode();
+		n = (pnode_t)prom_rootnode();
 		len = prom_getproplen(n, namename);
 		if (len <= 0 || len >= MAXNMLEN) {
 			*state = STATE_DEFAULT;

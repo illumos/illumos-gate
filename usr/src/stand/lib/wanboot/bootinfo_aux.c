@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@ bi_end_bootinfo(void)
 boolean_t
 bi_get_chosen_prop(const char *name, void *valbuf, size_t *vallenp)
 {
-	static dnode_t	chosen;
+	static pnode_t	chosen;
 	int		len;
 
 	/*

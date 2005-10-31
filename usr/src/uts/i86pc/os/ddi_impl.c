@@ -246,7 +246,7 @@ status_okay(int id, char *buf, int buflen)
 	 * NB: proplen, if it's a string, includes the NULL in the
 	 * the size of the property, and fail_len does not.
 	 */
-	proplen = prom_getproplen((dnode_t)id, (caddr_t)status);
+	proplen = prom_getproplen((pnode_t)id, (caddr_t)status);
 	if (proplen <= fail_len)	/* nonexistant or uninteresting len */
 		return (1);
 
@@ -266,7 +266,7 @@ status_okay(int id, char *buf, int buflen)
 	 * a buffer was passed in and the caller wants to print the
 	 * value, but the buffer was too small).
 	 */
-	(void) prom_bounded_getprop((dnode_t)id, (caddr_t)status,
+	(void) prom_bounded_getprop((pnode_t)id, (caddr_t)status,
 	    (caddr_t)bufp, len);
 	*(bufp + len - 1) = (char)0;
 
@@ -349,11 +349,11 @@ getlongprop_buf(int id, char *name, char *buf, int maxlen)
 {
 	int size;
 
-	size = prom_getproplen((dnode_t)id, name);
+	size = prom_getproplen((pnode_t)id, name);
 	if (size <= 0 || (size > maxlen - 1))
 		return (-1);
 
-	if (-1 == prom_getprop((dnode_t)id, name, buf))
+	if (-1 == prom_getprop((pnode_t)id, name, buf))
 		return (-1);
 
 	if (strcmp("name", name) == 0) {
@@ -2091,7 +2091,7 @@ impl_setup_ddi(void)
 	int err;
 
 	ndi_devi_alloc_sleep(ddi_root_node(), "ramdisk",
-	    (dnode_t)DEVI_SID_NODEID, &xdip);
+	    (pnode_t)DEVI_SID_NODEID, &xdip);
 
 	(void) BOP_GETPROP(bootops,
 	    "ramdisk_start", (void *)&ramdisk_start);
@@ -2109,7 +2109,7 @@ impl_setup_ddi(void)
 
 	/* isa node */
 	ndi_devi_alloc_sleep(ddi_root_node(), "isa",
-	    (dnode_t)DEVI_SID_NODEID, &isa_dip);
+	    (pnode_t)DEVI_SID_NODEID, &isa_dip);
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, isa_dip,
 	    "device_type", "isa");
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, isa_dip,

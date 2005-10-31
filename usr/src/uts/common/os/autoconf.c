@@ -208,11 +208,11 @@ getlongprop_buf(int id, char *name, char *buf, int maxlen)
 {
 	int size;
 
-	size = prom_getproplen((dnode_t)id, name);
+	size = prom_getproplen((pnode_t)id, name);
 	if (size <= 0 || (size > maxlen - 1))
 		return (-1);
 
-	if (-1 == prom_getprop((dnode_t)id, name, buf))
+	if (-1 == prom_getprop((pnode_t)id, name, buf))
 		return (-1);
 
 	/*
@@ -246,14 +246,14 @@ get_neighbors(dev_info_t *di, int flag)
 	snid = cnid = 0;
 	switch (flag) {
 		case DDI_WALK_PRUNESIB:
-			cnid = (int)prom_childnode((dnode_t)nid);
+			cnid = (int)prom_childnode((pnode_t)nid);
 			break;
 		case DDI_WALK_PRUNECHILD:
-			snid = (int)prom_nextnode((dnode_t)nid);
+			snid = (int)prom_nextnode((pnode_t)nid);
 			break;
 		case 0:
-			snid = (int)prom_nextnode((dnode_t)nid);
-			cnid = (int)prom_childnode((dnode_t)nid);
+			snid = (int)prom_nextnode((pnode_t)nid);
+			cnid = (int)prom_childnode((pnode_t)nid);
 			break;
 		default:
 			return (DDI_WALK_TERMINATE);
@@ -265,7 +265,7 @@ get_neighbors(dev_info_t *di, int flag)
 		 * add the first sibling that passes check_status()
 		 */
 		for (; snid && (snid != -1);
-		    snid = (int)prom_nextnode((dnode_t)snid)) {
+		    snid = (int)prom_nextnode((pnode_t)snid)) {
 			if (getlongprop_buf(snid, OBP_NAME, buf,
 			    sizeof (buf)) > 0) {
 				if (check_status(snid, buf, parent) ==
@@ -286,9 +286,9 @@ get_neighbors(dev_info_t *di, int flag)
 			if (check_status(cnid, buf, di) == DDI_SUCCESS) {
 				(void) ddi_add_child(di, buf, cnid, -1);
 			} else {
-				for (cnid = (int)prom_nextnode((dnode_t)cnid);
+				for (cnid = (int)prom_nextnode((pnode_t)cnid);
 				    cnid && (cnid != -1);
-				    cnid = (int)prom_nextnode((dnode_t)cnid)) {
+				    cnid = (int)prom_nextnode((pnode_t)cnid)) {
 					if (getlongprop_buf(cnid, OBP_NAME,
 					    buf, sizeof (buf)) > 0) {
 						if (check_status(cnid, buf, di)
@@ -352,7 +352,7 @@ static void
 create_devinfo_tree(void)
 {
 	major_t major;
-	dnode_t nodeid;
+	pnode_t nodeid;
 
 	i_ddi_node_cache_init();
 #if defined(__sparc)

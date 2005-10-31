@@ -51,6 +51,8 @@
 #include <string.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <sys/acl.h>
+#include <aclutils.h>
 
 #undef lint
 
@@ -350,7 +352,9 @@ main(int argc, char *argv[])
 	register char *cp;
 	int k, sep, errflg = 0;
 	int c;
+	int error;
 	int fcount = 0; /* count failures */
+	acl_t *aclp = NULL;
 
 	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)	/* Should be defined by cc -D */
@@ -448,6 +452,7 @@ main(int argc, char *argv[])
 				"pack: %s: already exists\n"), filename);
 			goto closein;
 		}
+
 		if ((outfile = creat(filename, status.st_mode)) < 0) {
 			fprintf(stderr, gettext(
 				"pack: %s: cannot create: "), filename);
@@ -455,6 +460,13 @@ main(int argc, char *argv[])
 			goto closein;
 		}
 
+		error = facl_get(infile, ACL_NO_TRIVIAL, &aclp);
+
+		if (error != 0) {
+			fprintf(stderr, gettext(
+			    "pack: %s: cannot retrieve ACL: %s\n"), argv[k],
+			    acl_strerror(error));
+		}
 		if (packfile(argv[k]) &&
 		    ((pathconf(argv[k], _PC_XATTR_EXISTS) != 1) ||
 				(mv_xattrs(infile, outfile,
@@ -509,6 +521,12 @@ main(int argc, char *argv[])
 				perror("");
 			}
 			chown(filename, status.st_uid, status.st_gid);
+			if (aclp && (facl_set(outfile, aclp) < 0)) {
+				fprintf(stderr, gettext(
+				    "pack: %s: failed to set acl entries\n"),
+				    filename);
+				perror("");
+			}
 			if (!errflg)
 				fcount--;  /* success after all */
 		} else {
@@ -517,6 +535,10 @@ main(int argc, char *argv[])
 			}
 			unlink(filename);
 		}
+
+		if (aclp)
+			acl_free(aclp);
+
 closein:	close(outfile);
 		close(infile);
 	}

@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 1989-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -32,7 +32,7 @@ include ../Makefile.cmd
 
 FILEMODE= 04511
 
-LDLIBS += -ldevinfo
+LDLIBS += -ldevinfo -lsec
 
 .KEEP_STATE:
 

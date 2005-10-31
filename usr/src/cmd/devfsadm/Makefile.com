@@ -62,6 +62,7 @@ LINK_SRCS =			\
 	$(COMMON)/sgen_link.c	\
 	$(COMMON)/md_link.c	\
 	$(COMMON)/dtrace_link.c	\
+	$(COMMON)/zfs_link.c	\
 	$(MISC_LINK_ISA).c
 
 LINT_MODULES = $(LINK_SRCS:.c=.ln)
@@ -82,6 +83,7 @@ LINK_OBJS =			\
 	sgen_link.o		\
 	md_link.o		\
 	dtrace_link.o		\
+	zfs_link.o		\
 	$(MISC_LINK_ISA).o
 
 LINK_MODS =			\
@@ -100,6 +102,7 @@ LINK_MODS =			\
 	SUNW_sgen_link.so	\
 	SUNW_md_link.so		\
 	SUNW_dtrace_link.so	\
+	SUNW_zfs_link.so	\
 	SUNW_$(MISC_LINK_ISA).so
 
 DEVLINKTAB = devlink.tab

@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-1994, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,7 +55,7 @@ prom_stdout_ihandle(void)
 /*
  * Return phandle of stdout
  */
-dnode_t
+pnode_t
 prom_stdout_node(void)
 {
 	static phandle_t pstdout;
@@ -65,7 +65,7 @@ prom_stdout_node(void)
 		return (pstdout);
 
 	if ((istdout = prom_stdout_ihandle()) == (ihandle_t)-1)
-		return (pstdout = (dnode_t)OBP_BADNODE);
+		return (pstdout = (pnode_t)OBP_BADNODE);
 
 	return (pstdout = prom_getphandle(istdout));
 }

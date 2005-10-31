@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,13 +86,13 @@ extern	void		prom_free(caddr_t virt, size_t size);
 /*
  * Device tree and property group: OBP and IEEE 1275-1994.
  */
-extern	dnode_t		prom_childnode(dnode_t nodeid);
-extern	dnode_t		prom_nextnode(dnode_t nodeid);
-extern	dnode_t		prom_parentnode(dnode_t nodeid);
-extern	dnode_t		prom_rootnode(void);
-extern	dnode_t		prom_chosennode(void);
-extern	dnode_t		prom_alias_node(void);
-extern	dnode_t		prom_optionsnode(void);
+extern	pnode_t		prom_childnode(pnode_t nodeid);
+extern	pnode_t		prom_nextnode(pnode_t nodeid);
+extern	pnode_t		prom_parentnode(pnode_t nodeid);
+extern	pnode_t		prom_rootnode(void);
+extern	pnode_t		prom_chosennode(void);
+extern	pnode_t		prom_alias_node(void);
+extern	pnode_t		prom_optionsnode(void);
 
 extern	int		prom_asr_list_keys_len();
 extern	int		prom_asr_list_keys(caddr_t value);
@@ -102,16 +102,16 @@ extern	int		prom_asr_disable(char *keystr, int keystr_len,
 			    char *reason, int reason_len);
 extern	int		prom_asr_enable(char *keystr, int keystr_len);
 
-extern	int		prom_getproplen(dnode_t nodeid, caddr_t name);
-extern	int		prom_getprop(dnode_t nodeid, caddr_t name,
+extern	int		prom_getproplen(pnode_t nodeid, caddr_t name);
+extern	int		prom_getprop(pnode_t nodeid, caddr_t name,
 			    caddr_t value);
-extern	caddr_t		prom_nextprop(dnode_t nodeid, caddr_t previous,
+extern	caddr_t		prom_nextprop(pnode_t nodeid, caddr_t previous,
 			    caddr_t next);
-extern	int		prom_setprop(dnode_t nodeid, caddr_t name,
+extern	int		prom_setprop(pnode_t nodeid, caddr_t name,
 			    caddr_t value, int len);
 
-extern	int		prom_getnode_byname(dnode_t id, char *name);
-extern	int		prom_devicetype(dnode_t id, char *type);
+extern	int		prom_getnode_byname(pnode_t id, char *name);
+extern	int		prom_devicetype(pnode_t id, char *type);
 
 extern	char		*prom_decode_composite_string(void *buf,
 			    size_t buflen, char *prev);
@@ -119,9 +119,9 @@ extern	char		*prom_decode_composite_string(void *buf,
 /*
  * Device tree and property group: IEEE 1275-1994 Only.
  */
-extern	dnode_t		prom_finddevice(char *path);	/* Also on obp2.x */
+extern	pnode_t		prom_finddevice(char *path);	/* Also on obp2.x */
 
-extern	int		prom_bounded_getprop(dnode_t nodeid,
+extern	int		prom_bounded_getprop(pnode_t nodeid,
 			    caddr_t name, caddr_t buffer, int buflen);
 
 extern	phandle_t	prom_getphandle(ihandle_t i);
@@ -148,8 +148,8 @@ extern	int		prom_phandle_to_path(phandle_t, char *buf,
  */
 extern	ihandle_t	prom_stdin_ihandle(void);
 extern	ihandle_t	prom_stdout_ihandle(void);
-extern	dnode_t		prom_stdin_node(void);
-extern	dnode_t		prom_stdout_node(void);
+extern	pnode_t		prom_stdin_node(void);
+extern	pnode_t		prom_stdout_node(void);
 extern	char		*prom_stdinpath(void);
 extern	char		*prom_stdoutpath(void);
 extern	int		prom_stdin_devname(char *buffer);
@@ -179,7 +179,7 @@ extern	int		prom_getversion(void);
 extern	int		prom_is_openprom(void);
 extern	int		prom_is_p1275(void);
 extern	int		prom_version_name(char *buf, int buflen);
-extern	int		prom_version_check(char *buf, size_t len, dnode_t *n);
+extern	int		prom_version_check(char *buf, size_t len, pnode_t *n);
 
 extern	void		*prom_mon_id(void);	/* SMCC/OBP platform centric */
 
@@ -223,7 +223,7 @@ extern void		prom_set_symbol_lookup(void *sym2val, void *val2sym);
  * Administrative group: IEEE 1275 only.
  */
 extern	int		prom_test(char *service);
-extern	int		prom_test_method(char *method, dnode_t node);
+extern	int		prom_test_method(char *method, pnode_t node);
 
 /*
  * Promif support group: Generic.
@@ -264,7 +264,7 @@ extern  ssize_t		prom_write(ihandle_t fd, caddr_t buf, size_t len,
 extern	int		prom_seek(int fd, u_longlong_t offset);
 
 extern	void		prom_writestr(const char *buf, size_t bufsize);
-extern	void		prom_dnode_to_pathname(dnode_t, char *);
+extern	void		prom_pnode_to_pathname(pnode_t, char *);
 
 /*PRINTFLIKE1*/
 extern	void		prom_printf(const char *fmt, ...)
@@ -284,12 +284,12 @@ extern	char		*prom_vsprintf(char *s, const char *fmt, __va_list adx)
 #define	PROM_WALK_CONTINUE	0	/* keep walking to next node */
 #define	PROM_WALK_TERMINATE	1	/* abort walk now */
 
-extern	void		prom_walk_devs(dnode_t node,
-			    int (*f)(dnode_t, void *, void *),
+extern	void		prom_walk_devs(pnode_t node,
+			    int (*f)(pnode_t, void *, void *),
 			    void *arg, void *result);
 
-extern	dnode_t		prom_findnode_byname(dnode_t id, char *name);
-extern	dnode_t		prom_findnode_bydevtype(dnode_t id, char *devtype);
+extern	pnode_t		prom_findnode_byname(pnode_t id, char *name);
+extern	pnode_t		prom_findnode_bydevtype(pnode_t id, char *devtype);
 
 #define	PROM_STOP	{	\
 	prom_printf("File %s line %d\n", __FILE__, __LINE__); \

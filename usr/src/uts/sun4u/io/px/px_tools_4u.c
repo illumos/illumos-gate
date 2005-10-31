@@ -314,7 +314,7 @@ pxtool_dev_reg_ops_platchk(dev_info_t *dip, pcitool_reg_t *prg_p)
 	 * Guard against checking a root nexus which is empty.
 	 * On some systems this will result in a Fatal Reset.
 	 */
-	if ((int)prom_childnode((dnode_t)devi_nodeid) == OBP_NONODE) {
+	if ((int)prom_childnode((pnode_t)devi_nodeid) == OBP_NONODE) {
 		DBG(DBG_TOOLS, dip,
 		    "pxtool_dev_reg_ops set/get reg: nexus has no devs!\n");
 		prg_p->status = PCITOOL_IO_ERROR;

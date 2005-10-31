@@ -822,7 +822,7 @@ usba_create_child_devi(dev_info_t	*dip,
 	    "port status=0x%x", node_name,
 	    (void *)usba_device, port_status);
 
-	ndi_devi_alloc_sleep(dip, node_name, (dnode_t)DEVI_SID_NODEID,
+	ndi_devi_alloc_sleep(dip, node_name, (pnode_t)DEVI_SID_NODEID,
 				child_dip);
 
 	USB_DPRINTF_L3(DPRINT_MASK_USBA, usba_log_handle,

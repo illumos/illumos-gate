@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  *	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
@@ -40,6 +40,7 @@ extern "C" {
 #define	VFSTAB		"/etc/vfstab"
 #define	MNTMAXSTR	128
 
+#define	MNTTYPE_ZFS	"zfs"		/* ZFS file system */
 #define	MNTTYPE_UFS	"ufs"		/* Unix file system */
 #define	MNTTYPE_NFS	"nfs"		/* NFS file system */
 #define	MNTTYPE_NFS3	"nfs3"		/* NFS Version 3 file system */
@@ -116,7 +117,8 @@ extern "C" {
 #define	MNTOPT_PUBLIC	"public"	/* Use NFS public file handlee */
 #define	MNTOPT_LOGGING "logging" 	/* enable logging */
 #define	MNTOPT_NOLOGGING "nologging" 	/* disable logging */
-#define	MNTOPT_NOATIME  "noatime"	/* Do not update i_atime for inodes */
+#define	MNTOPT_ATIME	"atime"		/* update atime for files */
+#define	MNTOPT_NOATIME  "noatime"	/* do not update atime for files */
 #define	MNTOPT_GLOBAL	"global"	/* Cluster-wide global mount */
 #define	MNTOPT_NOGLOBAL	"noglobal"	/* Mount local to single node */
 #define	MNTOPT_DFRATIME	"dfratime"	/* Deferred access time updates */

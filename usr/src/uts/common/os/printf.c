@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,6 +296,23 @@ assfail(const char *a, const char *f, int l)
 		panic("assertion failed: %s, file: %s, line: %d", a, f, l);
 
 	return (0);
+}
+
+void
+assfail3(const char *a, uintmax_t lv, const char *op, uintmax_t rv,
+    const char *f, int l)
+{
+	if (aask)  {
+		printf("ASSERTION CAUGHT: %s (0x%llx %s 0x%llx), file: %s, "
+		    "line: %d", a, (u_longlong_t)lv, op, (u_longlong_t)rv,
+		    f, l);
+		debug_enter(NULL);
+	}
+
+	if (!aok && !panicstr)
+		panic("assertion failed: %s (0x%llx %s 0x%llx), file: %s, "
+		    "line: %d", a, (u_longlong_t)lv, op, (u_longlong_t)rv,
+		    f, l);
 }
 
 int

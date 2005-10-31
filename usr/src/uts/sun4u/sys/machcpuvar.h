@@ -166,7 +166,7 @@ struct cpu_node {
 	int	implementation;
 	int	version;
 	int	portid;
-	dnode_t	nodeid;
+	pnode_t	nodeid;
 	uint64_t	clock_freq;
 	uint_t	tick_nsec_scale;
 	union {

@@ -79,9 +79,10 @@ typedef int bool;
 #define	RT_DEVICE	8
 #define	RT_RCTL		9
 #define	RT_ATTR		10
+#define	RT_DATASET	11
 
 #define	RT_MIN		RT_UNKNOWN
-#define	RT_MAX		RT_ATTR
+#define	RT_MAX		RT_DATASET
 
 /* property types: increment PT_MAX when expanding this list */
 #define	PT_UNKNOWN	0

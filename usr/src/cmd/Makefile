@@ -49,6 +49,7 @@ FIRST_SUBDIRS=		\
 
 COMMON_SUBDIRS=		\
 	agents		\
+	availdevs	\
 	lp		\
 	perl		\
 	man		\
@@ -420,13 +421,17 @@ COMMON_SUBDIRS=		\
 	yes		\
 	ypcmd		\
 	yppasswd	\
+	zdb		\
 	zdump		\
+	zfs		\
 	zic		\
 	zlogin		\
 	zoneadm		\
 	zoneadmd	\
 	zonecfg		\
-	zonename
+	zonename	\
+	zpool		\
+	ztest
 
 i386_SUBDIRS=		\
 	addbadsec	\
@@ -664,12 +669,14 @@ MSGSUBDIRS=		\
 	xargs		\
 	yppasswd	\
 	zdump		\
+	zfs		\
 	zic		\
 	zlogin		\
 	zoneadm		\
 	zoneadmd	\
 	zonecfg		\
-	zonename
+	zonename	\
+	zpool
 
 sparc_MSGSUBDIRS=	\
 	fruadm		\

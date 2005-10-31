@@ -69,6 +69,7 @@
 #include <limits.h>
 #include <iconv.h>
 #include <assert.h>
+#include <aclutils.h>
 #if defined(__SunOS_5_6) || defined(__SunOS_5_7)
 extern int defcntl();
 #endif
@@ -381,7 +382,7 @@ struct	file_list	{
 static	struct	file_list	*exclude_tbl[TABLE_SIZE],
 				*include_tbl[TABLE_SIZE];
 
-static int	append_secattr(char **, int *, int, aclent_t *, char);
+static int	append_secattr(char **, int *, acl_t *);
 static void	write_ancillary(union hblock *, char *, int, char);
 
 static void add_file_to_table(struct file_list *table[], char *str);
@@ -493,6 +494,7 @@ static char *get_component(char *path);
 static int retry_attrdir_open(char *name);
 static char *skipslashes(char *string, char *start);
 static void chop_endslashes(char *path);
+
 static	struct stat stbuf;
 
 static	int	checkflag = 0;
@@ -2392,11 +2394,11 @@ doxtract(char *argv[])
 	int error;
 	int symflag;
 	int want;
-	aclent_t	*aclp = NULL;	/* acl buffer pointer */
-	int		aclcnt = 0;	/* acl entries count */
+	acl_t	*aclp = NULL;	/* acl info */
 	timestruc_t	time_zero;	/* used for call to doDirTimes */
 	int		dircreate;
 	int convflag;
+	int cnt;
 
 	time_zero.tv_sec = 0;
 	time_zero.tv_nsec = 0;
@@ -2895,16 +2897,14 @@ filedone:
 #if defined(O_XATTR)
 			if (xattrp != (struct xattr_buf *)NULL) {
 				if (Hiddendir)
-					ret = facl(dirfd, SETACL,
-						aclcnt, aclp);
+					ret = facl_set(dirfd, aclp);
 				else
-					ret = facl(ofile, SETACL,
-						aclcnt, aclp);
+					ret = facl_set(ofile, aclp);
 			} else {
-				ret = acl(namep, SETACL, aclcnt, aclp);
+				ret = acl_set(namep, aclp);
 			}
 #else
-			ret = acl(namep, SETACL, aclcnt, aclp);
+			ret = acl_set(namep, &aclp);
 #endif
 			if (ret < 0) {
 				if (pflag) {
@@ -2914,7 +2914,7 @@ filedone:
 				}
 				/* else: silent and continue */
 			}
-			free(aclp);
+			acl_free(aclp);
 			aclp = NULL;
 		}
 
@@ -2986,30 +2986,41 @@ filedone:
 					}
 					bytes -= TBLOCK;
 				}
+				bytes = stbuf.st_size;
 				/* got all attributes in secp */
 				tp = secp;
 				do {
 					attr = (struct sec_attr *)tp;
 					switch (attr->attr_type) {
 					case UFSD_ACL:
+					case ACE_ACL:
 						(void) sscanf(attr->attr_len,
-						    "%7o", (uint_t *)&aclcnt);
+						    "%7o",
+						    (uint_t *)
+						    &cnt);
 						/* header is 8 */
 						attrsize = 8 + (int)strlen(
 						    &attr->attr_info[0]) + 1;
-						aclp = aclfromtext(
-						    &attr->attr_info[0], &cnt);
-						if (aclp == NULL) {
+
+						error =
+						    acl_fromtext(
+						    &attr->attr_info[0], &aclp);
+
+						if (error != 0) {
 							(void) fprintf(stderr,
 							    gettext(
 							    "aclfromtext "
-							    "failed\n"));
+							    "failed: %s\n"),
+							    acl_strerror(
+							    error));
+							bytes -= attrsize;
 							break;
 						}
-						if (aclcnt != cnt) {
+						if (acl_cnt(aclp) != cnt) {
 							(void) fprintf(stderr,
 							    gettext(
 							    "aclcnt error\n"));
+							bytes -= attrsize;
 							break;
 						}
 						bytes -= attrsize;
@@ -5520,9 +5531,7 @@ int
 append_secattr(
 	char	 **secinfo,	/* existing security info */
 	int	 *secinfo_len,	/* length of existing security info */
-	int	 size,		/* new attribute size: unit depends on type */
-	aclent_t *attrp,	/* new attribute data pointer */
-	char	 attr_type)	/* new attribute type */
+	acl_t	*aclp)
 {
 	char	*new_secinfo;
 	char	*attrtext;
@@ -5530,12 +5539,13 @@ append_secattr(
 	int	oldsize;
 
 	/* no need to add */
-	if (attrp == NULL)
+	if (aclp == (void *)NULL)
 		return (0);
 
-	switch (attr_type) {
-	case UFSD_ACL:
-		attrtext = acltotext((aclent_t *)attrp, size);
+	switch (acl_type(aclp)) {
+	case ACLENT_T:
+	case ACE_T:
+		attrtext = acl_totext(aclp);
 		if (attrtext == NULL) {
 			(void) fprintf(stderr, "acltotext failed\n");
 			return (-1);
@@ -5547,9 +5557,10 @@ append_secattr(
 			(void) fprintf(stderr, "can't allocate memory\n");
 			return (-1);
 		}
-		attr->attr_type = UFSD_ACL;
+		attr->attr_type = (acl_type(aclp) == ACLENT_T) ?
+		    UFSD_ACL : ACE_ACL;
 		(void) sprintf(attr->attr_len,
-		    "%06o", size); /* acl entry count */
+		    "%06o", acl_cnt(aclp)); /* acl entry count */
 		(void) strcpy((char *)&attr->attr_info[0], attrtext);
 		free(attrtext);
 		break;
@@ -6705,11 +6716,11 @@ static int
 put_extra_attributes(char *longname, char *shortname, char *prefix,
 		int filetype, char typeflag)
 {
-	int		aclcnt;
-	static aclent_t	*aclp;
+	static acl_t *aclp = NULL;
+	int error;
 
-	if (aclp != (aclent_t *)NULL) {
-		free(aclp);
+	if (aclp != NULL) {
+		acl_free(aclp);
 		aclp = NULL;
 	}
 #if defined(O_XATTR)
@@ -6730,34 +6741,20 @@ put_extra_attributes(char *longname, char *shortname, char *prefix,
 		if (((stbuf.st_mode & S_IFMT) != S_IFLNK)) {
 			/*
 			 * Get ACL info: dont bother allocating space if
-			 * there are only standard permissions, i.e. ACL
-			 * count <= 4
+			 * there is only a trivial ACL.
 			 */
-			if ((aclcnt = acl(shortname, GETACLCNT, 0, NULL)) < 0) {
+			if ((error = acl_get(shortname, ACL_NO_TRIVIAL,
+			    &aclp)) != 0) {
 				(void) fprintf(stderr, gettext(
-				    "%s: failed to get acl count\n"), longname);
+				    "%s: failed to retrieve acl : %s\n"),
+				    longname, acl_strerror(error));
 				return (1);
-			}
-			if (aclcnt > MIN_ACL_ENTRIES) {
-				if ((aclp = (aclent_t *)malloc(
-				    sizeof (aclent_t) * aclcnt)) == NULL) {
-					(void) fprintf(stderr, gettext(
-					    "Insufficient memory\n"));
-					return (1);
-				}
-				if (acl(shortname, GETACL, aclcnt, aclp) < 0) {
-					(void) fprintf(stderr, gettext(
-					    "%s: failed to get acl entries\n"),
-					    longname);
-					return (1);
-				}
 			}
 		}
 
 		/* append security attributes if any */
-		if (aclp != (aclent_t *)NULL) {
-			(void) append_secattr(&secinfo, &len, aclcnt,
-			    aclp, UFSD_ACL);
+		if (aclp != NULL) {
+			(void) append_secattr(&secinfo, &len, aclp);
 			(void) write_ancillary(&dblock, secinfo, len, ACL_HDR);
 		}
 	}

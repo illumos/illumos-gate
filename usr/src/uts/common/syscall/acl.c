@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@
 #include <sys/filio.h>
 #include <sys/acl.h>
 #include <sys/cmn_err.h>
+#include <acl/acl_common.h>
 
 #include <sys/unistd.h>
 #include <sys/debug.h>
@@ -216,9 +217,6 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 		break;
 
 	case ACE_GETACL:
-		if (nentries < 3)
-			return (EINVAL);
-
 		if (aclbufp == NULL)
 			return (EFAULT);
 
@@ -317,7 +315,7 @@ cacl(int cmd, int nentries, void *aclbufp, vnode_t *vp, int *rv)
 		break;
 
 	case ACE_SETACL:
-		if (nentries < 3 || nentries > (MAX_ACL_ENTRIES * 2))
+		if (nentries > (MAX_ACL_ENTRIES))
 			return (EINVAL);
 
 		if (aclbufp == NULL)
@@ -356,75 +354,4 @@ errout:
 	if (dfaclbsize && vsecattr.vsa_dfaclentp)
 		kmem_free(vsecattr.vsa_dfaclentp, dfaclbsize);
 	return (error);
-}
-
-
-/*
- * Generic shellsort, from K&R (1st ed, p 58.), somewhat modified.
- * v = Ptr to array/vector of objs
- * n = # objs in the array
- * s = size of each obj (must be multiples of a word size)
- * f = ptr to function to compare two objs
- *	returns (-1 = less than, 0 = equal, 1 = greater than
- */
-void
-ksort(caddr_t v, int n, int s, int (*f)())
-{
-	int g, i, j, ii;
-	unsigned int *p1, *p2;
-	unsigned int tmp;
-
-	/* No work to do */
-	if (v == NULL || n <= 1)
-		return;
-
-	/* Sanity check on arguments */
-	ASSERT(((uintptr_t)v & 0x3) == 0 && (s & 0x3) == 0);
-	ASSERT(s > 0);
-	for (g = n / 2; g > 0; g /= 2) {
-		for (i = g; i < n; i++) {
-			for (j = i - g; j >= 0 &&
-				(*f)(v + j * s, v + (j + g) * s) == 1;
-					j -= g) {
-				p1 = (unsigned *)(v + j * s);
-				p2 = (unsigned *)(v + (j + g) * s);
-				for (ii = 0; ii < s / 4; ii++) {
-					tmp = *p1;
-					*p1++ = *p2;
-					*p2++ = tmp;
-				}
-			}
-		}
-	}
-}
-
-/*
- * Compare two acls, all fields.  Returns:
- * -1 (less than)
- *  0 (equal)
- * +1 (greater than)
- */
-int
-cmp2acls(void *a, void *b)
-{
-	aclent_t *x = (aclent_t *)a;
-	aclent_t *y = (aclent_t *)b;
-
-	/* Compare types */
-	if (x->a_type < y->a_type)
-		return (-1);
-	if (x->a_type > y->a_type)
-		return (1);
-	/* Equal types; compare id's */
-	if (x->a_id < y->a_id)
-		return (-1);
-	if (x->a_id > y->a_id)
-		return (1);
-	/* Equal ids; compare perms */
-	if (x->a_perm < y->a_perm)
-		return (-1);
-	if (x->a_perm > y->a_perm)
-		return (1);
-	/* Totally equal */
-	return (0);
 }

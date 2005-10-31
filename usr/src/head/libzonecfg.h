@@ -158,6 +158,10 @@ struct zone_attrtab {
 	char	zone_attr_value[2 * BUFSIZ];
 };
 
+struct zone_dstab {
+	char	zone_dataset_name[MAXNAMELEN];
+};
+
 /*
  * Basic configuration management routines.
  */
@@ -262,6 +266,15 @@ extern	int	zonecfg_get_attr_string(const struct zone_attrtab *, char *,
 extern	int	zonecfg_get_attr_uint(const struct zone_attrtab *, uint64_t *);
 
 /*
+ * ZFS configuration.
+ */
+extern	int	zonecfg_add_ds(zone_dochandle_t, struct zone_dstab *);
+extern	int	zonecfg_delete_ds(zone_dochandle_t, struct zone_dstab *);
+extern	int	zonecfg_modify_ds(zone_dochandle_t, struct zone_dstab *,
+    struct zone_dstab *);
+extern	int	zonecfg_lookup_ds(zone_dochandle_t, struct zone_dstab *);
+
+/*
  * '*ent' iterator routines.
  */
 extern	int	zonecfg_setfsent(zone_dochandle_t);
@@ -282,6 +295,9 @@ extern	int	zonecfg_endattrent(zone_dochandle_t);
 extern	int	zonecfg_setrctlent(zone_dochandle_t);
 extern	int	zonecfg_getrctlent(zone_dochandle_t, struct zone_rctltab *);
 extern	int	zonecfg_endrctlent(zone_dochandle_t);
+extern	int	zonecfg_setdsent(zone_dochandle_t);
+extern	int	zonecfg_getdsent(zone_dochandle_t, struct zone_dstab *);
+extern	int	zonecfg_enddsent(zone_dochandle_t);
 
 /*
  * Privilege-related functions.

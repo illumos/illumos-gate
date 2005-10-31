@@ -190,6 +190,9 @@ SUBDIRS= \
 	../cmd/sendmail/libmilter	\
 	sasl_plugins	\
 	udapl		\
+	libzpool	\
+	libzfs		\
+	libzfs_jni	\
 	$($(MACH)_SUBDIRS)
 
 sparc_SUBDIRS= .WAIT	\
@@ -314,6 +317,7 @@ HDRSUBDIRS= libaio	\
 	librpcsvc	\
 	librsm		\
 	libsasl		\
+	libsec		\
 	libslp		\
 	libsmedia	\
 	libsysevent	\
@@ -326,6 +330,7 @@ HDRSUBDIRS= libaio	\
 	libuutil	\
 	libwrap		\
 	libxcurses2	\
+	libzfs		\
 	libzoneinfo	\
 	lvm		\
 	openssl		\
@@ -391,7 +396,7 @@ libc:		libc_i18n
 libcmdutils:	libavl
 libcontract:	libnvpair
 libdevid:	libdevinfo
-libdevinfo:	libnvpair
+libdevinfo:	libnvpair libsec
 libdhcpagent:	libdhcputil libnsl libsocket
 libdhcpsvc:	libinetutil
 libdhcputil:	libinetutil
@@ -427,6 +432,9 @@ librestart:	libuutil libscf
 pkcs11:		libcryptoutil
 print:		libldap5
 udapl/udapl_tavor:	udapl/libdat
+libzfs:		libdevinfo libdevid libgen libnvpair libuutil
+libzfs_jni:	libdiskmgt libnvpair libzfs
+libzpool:	libavl libumem libnvpair
 
 #
 # The reason this rule checks for the existence of the

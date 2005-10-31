@@ -416,7 +416,7 @@ cb_get_physavail(void)
 {
 	int len, glen, scnt, need, space;
 	char *str, *pdev, *mem_prop;
-	dnode_t mem_node;
+	pnode_t mem_node;
 	physaddr_t phys;
 	pgcnt_t pages;
 	arange_t *arp;

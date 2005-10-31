@@ -1041,7 +1041,7 @@ alloc_kb_mouse(dev_info_t *i8042_dip)
 
 	/* mouse */
 	ndi_devi_alloc_sleep(i8042_dip, "mouse",
-	    (dnode_t)DEVI_SID_NODEID, &xdip);
+	    (pnode_t)DEVI_SID_NODEID, &xdip);
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip,
 	    "reg", 1);
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
@@ -1052,7 +1052,7 @@ alloc_kb_mouse(dev_info_t *i8042_dip)
 
 	/* keyboard */
 	ndi_devi_alloc_sleep(i8042_dip, "keyboard",
-	    (dnode_t)DEVI_SID_NODEID, &xdip);
+	    (pnode_t)DEVI_SID_NODEID, &xdip);
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip,
 	    "reg", 0);
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,

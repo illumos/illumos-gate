@@ -734,6 +734,11 @@ usr/lib/libcmdutils.so				sparc
 usr/lib/sparcv9/llib-lcmdutils.ln		sparc
 usr/lib/sparcv9/libcmdutils.so			sparc
 #
+# Private interfaces in libsec
+#
+usr/include/aclutils.h				sparc
+
+#
 # User<->kernel interface used by cfgadm/IB only
 #
 usr/include/sys/ib/ibnex				sparc
@@ -792,3 +797,16 @@ lib/sparcv9/libc_i18n.a				sparc
 # Only the shared object is shipped.
 #
 usr/platform/SUNW,Sun-Fire-T200/lib/llib-lpcp.ln	sparc
+#
+# ZFS internal tools and lint libraries
+#
+usr/bin/ztest				sparc
+usr/bin/sparcv9/ztest			sparc
+usr/lib/llib-lzfs			sparc
+usr/lib/llib-lzfs.ln			sparc
+usr/lib/llib-lzfs_jni			sparc
+usr/lib/llib-lzfs_jni.ln		sparc
+usr/lib/llib-lzpool			sparc
+usr/lib/sparcv9/llib-lzfs.ln		sparc
+usr/lib/sparcv9/llib-lzfs_jni.ln	sparc
+usr/lib/sparcv9/llib-lzpool.ln		sparc

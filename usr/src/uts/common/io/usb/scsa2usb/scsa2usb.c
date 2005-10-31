@@ -1750,7 +1750,7 @@ scsa2usb_create_luns(scsa2usb_state_t *scsa2usbp)
 		}
 
 		ndi_devi_alloc_sleep(scsa2usbp->scsa2usb_dip, node_name,
-		    (dnode_t)DEVI_SID_NODEID, &cdip);
+		    (pnode_t)DEVI_SID_NODEID, &cdip);
 
 		/* attach target & lun properties */
 		rval = ndi_prop_update_int(DDI_DEV_T_NONE, cdip, "target", 0);

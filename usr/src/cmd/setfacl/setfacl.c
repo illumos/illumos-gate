@@ -31,6 +31,11 @@ static char sccsid[] = "@(#)setfacl.c	1.10	05/06/16 SMI";
 #endif
 
 /*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+/*
  * setfacl [-r] -f aclfile file ...
  * setfacl [-r] -d acl_entries file ...
  * setfacl [-r] -m acl_entries file ...
@@ -48,6 +53,7 @@ static char sccsid[] = "@(#)setfacl.c	1.10	05/06/16 SMI";
 #include <sys/acl.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
 
 
 #define	ADD	1
@@ -202,6 +208,14 @@ get_acl_info(char *filep, aclent_t **aclpp)
 	int	aclcnt;
 
 	if ((aclcnt = acl(filep, GETACLCNT, 0, NULL)) < 0) {
+		if (errno == ENOSYS) {
+			(void) fprintf(stderr,
+			    gettext("file system doesn't support aclent_t "
+			    "style ACL's.\n"
+			    "See acl(5) for more information on"
+			    " ACL styles support by Solaris.\n"));
+			return (-1);
+		}
 		(void) fprintf(stderr,
 		    gettext("%s: failed to get acl count\n"), filep);
 		perror("get acl count error");

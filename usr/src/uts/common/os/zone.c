@@ -173,7 +173,7 @@
  *   the following system calls (all subcodes of the primary "zone"
  *   system call):
  *   - zone_create: creates a zone with selected attributes (name,
- *     root path, privileges, resource controls)
+ *     root path, privileges, resource controls, ZFS datasets)
  *   - zone_enter: allows the current process to enter a zone
  *   - zone_getattr: reports attributes of a zone
  *   - zone_list: lists all zones active in the system
@@ -770,6 +770,23 @@ zone_free_zsd(zone_t *zone)
 }
 
 /*
+ * Frees memory associated with the zone dataset list.
+ */
+static void
+zone_free_datasets(zone_t *zone)
+{
+	zone_dataset_t *t, *next;
+
+	for (t = list_head(&zone->zone_datasets); t != NULL; t = next) {
+		next = list_next(&zone->zone_datasets, t);
+		list_remove(&zone->zone_datasets, t);
+		kmem_free(t->zd_dataset, strlen(t->zd_dataset) + 1);
+		kmem_free(t, sizeof (*t));
+	}
+	list_destroy(&zone->zone_datasets);
+}
+
+/*
  * zone.cpu-shares resource control support.
  */
 /*ARGSUSED*/
@@ -1055,6 +1072,7 @@ zone_free(zone_t *zone)
 	}
 
 	zone_free_zsd(zone);
+	zone_free_datasets(zone);
 
 	if (zone->zone_rootvp != NULL)
 		VN_RELE(zone->zone_rootvp);
@@ -2500,6 +2518,55 @@ zone_create_error(int er_error, int er_ext, int *er_out) {
 }
 
 /*
+ * Parses a comma-separated list of ZFS datasets into a per-zone dictionary.
+ */
+static int
+parse_zfs(zone_t *zone, caddr_t ubuf, size_t buflen)
+{
+	char *kbuf;
+	char *dataset, *next;
+	zone_dataset_t *zd;
+	size_t len;
+
+	if (ubuf == NULL || buflen == 0)
+		return (0);
+
+	if ((kbuf = kmem_alloc(buflen, KM_NOSLEEP)) == NULL)
+		return (ENOMEM);
+
+	if (copyin(ubuf, kbuf, buflen) != 0) {
+		kmem_free(kbuf, buflen);
+		return (EFAULT);
+	}
+
+	dataset = next = kbuf;
+	for (;;) {
+		zd = kmem_alloc(sizeof (zone_dataset_t), KM_SLEEP);
+
+		next = strchr(dataset, ',');
+
+		if (next == NULL)
+			len = strlen(dataset);
+		else
+			len = next - dataset;
+
+		zd->zd_dataset = kmem_alloc(len + 1, KM_SLEEP);
+		bcopy(dataset, zd->zd_dataset, len);
+		zd->zd_dataset[len] = '\0';
+
+		list_insert_head(&zone->zone_datasets, zd);
+
+		if (next == NULL)
+			break;
+
+		dataset = next + 1;
+	}
+
+	kmem_free(kbuf, buflen);
+	return (0);
+}
+
+/*
  * System call to create/initialize a new zone named 'zone_name', rooted
  * at 'zone_root', with a zone-wide privilege limit set of 'zone_privs',
  * and initialized with the zone-wide rctls described in 'rctlbuf'.
@@ -2510,7 +2577,7 @@ zone_create_error(int er_error, int er_ext, int *er_out) {
 static zoneid_t
 zone_create(const char *zone_name, const char *zone_root,
     const priv_set_t *zone_privs, caddr_t rctlbuf, size_t rctlbufsz,
-    int *extended_error)
+    caddr_t zfsbuf, size_t zfsbufsz, int *extended_error)
 {
 	struct zsched_arg zarg;
 	nvlist_t *rctls = NULL;
@@ -2543,6 +2610,8 @@ zone_create(const char *zone_name, const char *zone_root,
 	cv_init(&zone->zone_cv, NULL, CV_DEFAULT, NULL);
 	list_create(&zone->zone_zsd, sizeof (struct zsd_entry),
 	    offsetof(struct zsd_entry, zsd_linkage));
+	list_create(&zone->zone_datasets, sizeof (zone_dataset_t),
+	    offsetof(zone_dataset_t, zd_linkage));
 
 	if ((error = zone_set_name(zone, zone_name)) != 0) {
 		zone_free(zone);
@@ -2576,6 +2645,11 @@ zone_create(const char *zone_name, const char *zone_root,
 	if ((error = parse_rctls(rctlbuf, rctlbufsz, &rctls)) != 0) {
 		zone_free(zone);
 		return (zone_create_error(error, 0, extended_error));
+	}
+
+	if ((error = parse_zfs(zone, zfsbuf, zfsbufsz)) != 0) {
+		zone_free(zone);
+		return (set_errno(error));
 	}
 
 	/*
@@ -3722,7 +3796,7 @@ zone_lookup(const char *zone_name)
 
 /* ARGSUSED */
 long
-zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4, void *arg5)
+zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 {
 	zone_def zs;
 
@@ -3748,6 +3822,8 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4, void *arg5)
 			    (unsigned long)zs32.zone_privs;
 			zs.rctlbuf = (caddr_t)(unsigned long)zs32.rctlbuf;
 			zs.rctlbufsz = zs32.rctlbufsz;
+			zs.zfsbuf = (caddr_t)(unsigned long)zs32.zfsbuf;
+			zs.zfsbufsz = zs32.zfsbufsz;
 			zs.extended_error =
 			    (int *)(unsigned long)zs32.extended_error;
 #else
@@ -3757,6 +3833,7 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4, void *arg5)
 
 		return (zone_create(zs.zone_name, zs.zone_root,
 			zs.zone_privs, (caddr_t)zs.rctlbuf, zs.rctlbufsz,
+			(caddr_t)zs.zfsbuf, zs.zfsbufsz,
 			zs.extended_error));
 	case ZONE_BOOT:
 		return (zone_boot((zoneid_t)(uintptr_t)arg1,
@@ -4036,4 +4113,62 @@ zone_shutdown_global(void)
 	ASSERT(zone_status_get(global_zone) == ZONE_IS_RUNNING);
 	zone_status_set(global_zone, ZONE_IS_SHUTTING_DOWN);
 	mutex_exit(&zone_status_lock);
+}
+
+/*
+ * Returns true if the named dataset is visible in the current zone.
+ * The 'write' parameter is set to 1 if the dataset is also writable.
+ */
+int
+zone_dataset_visible(const char *dataset, int *write)
+{
+	zone_dataset_t *zd;
+	size_t len;
+	zone_t *zone = curproc->p_zone;
+
+	if (dataset[0] == '\0')
+		return (0);
+
+	/*
+	 * Walk the list once, looking for datasets which match exactly, or
+	 * specify a dataset underneath an exported dataset.  If found, return
+	 * true and note that it is writable.
+	 */
+	for (zd = list_head(&zone->zone_datasets); zd != NULL;
+	    zd = list_next(&zone->zone_datasets, zd)) {
+
+		len = strlen(zd->zd_dataset);
+		if (strlen(dataset) >= len &&
+		    bcmp(dataset, zd->zd_dataset, len) == 0 &&
+		    (zd->zd_dataset[len-1] == '/' ||
+		    dataset[len] == '\0' || dataset[len] == '/')) {
+			if (write)
+				*write = 1;
+			return (1);
+		}
+	}
+
+	/*
+	 * Walk the list a second time, searching for datasets which are parents
+	 * of exported datasets.  These should be visible, but read-only.
+	 *
+	 * Note that we also have to support forms such as 'pool/dataset/', with
+	 * a trailing slash.
+	 */
+	for (zd = list_head(&zone->zone_datasets); zd != NULL;
+	    zd = list_next(&zone->zone_datasets, zd)) {
+
+		len = strlen(dataset);
+		if (dataset[len - 1] == '/')
+			len--;	/* Ignore trailing slash */
+		if (len < strlen(zd->zd_dataset) &&
+		    bcmp(dataset, zd->zd_dataset, len) == 0 &&
+		    zd->zd_dataset[len] == '/') {
+			if (write)
+				*write = 0;
+			return (1);
+		}
+	}
+
+	return (0);
 }

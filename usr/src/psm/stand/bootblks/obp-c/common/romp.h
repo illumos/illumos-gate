@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,17 +42,17 @@ extern "C" {
 
 struct config_ops {
 #ifdef	_KERNEL
-	dnode_t	(*devr_next)(/* dnode_t nodeid */);
-	dnode_t	(*devr_child)(/* dnode_t nodeid */);
+	pnode_t	(*devr_next)(/* pnode_t nodeid */);
+	pnode_t	(*devr_child)(/* pnode_t nodeid */);
 #else	/* _KERNEL */
-	int	(*devr_next)(/* dnode_t nodeid */);
-	int	(*devr_child)(/* dnode_t nodeid */);
+	int	(*devr_next)(/* pnode_t nodeid */);
+	int	(*devr_child)(/* pnode_t nodeid */);
 #endif	/* _KERNEL */
-	int	(*devr_getproplen)(/* dnode_t nodeid, char *name */);
-	int	(*devr_getprop)(/* dnode_t nodeid, char *name, caddr_t buf */);
-	int	(*devr_setprop)(/* dnode_t nodeid, char *name, caddr_t value,
+	int	(*devr_getproplen)(/* pnode_t nodeid, char *name */);
+	int	(*devr_getprop)(/* pnode_t nodeid, char *name, caddr_t buf */);
+	int	(*devr_setprop)(/* pnode_t nodeid, char *name, caddr_t value,
 	    uint_t size */);
-	caddr_t	(*devr_nextprop)(/* dnode_t nodeid, char *previous */);
+	caddr_t	(*devr_nextprop)(/* pnode_t nodeid, char *previous */);
 };
 
 struct romvec_obp {
@@ -204,13 +204,13 @@ struct romvec_obp {
 	 * V3 MP only functions: It's a fatal error to call these from a UP.
 	 */
 
-	int (*op3_startcpu)(/* dnode_t moduleid, dev_reg_t contextable,
+	int (*op3_startcpu)(/* pnode_t moduleid, dev_reg_t contextable,
 	    int whichcontext, caddr_t pc */);
 
-	int (*op3_stopcpu)(/* dnode_t */);
+	int (*op3_stopcpu)(/* pnode_t */);
 
-	int (*op3_idlecpu)(/* dnode_t */);
-	int (*op3_resumecpu)(/* dnode_t */);
+	int (*op3_idlecpu)(/* pnode_t */);
+	int (*op3_resumecpu)(/* pnode_t */);
 };
 
 union sunromvec {

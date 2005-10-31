@@ -29,6 +29,7 @@ MODULE = genunix.so
 MDBTGT = kvm
 
 COMMONSRCS = \
+	avl.c \
 	bio.c \
 	contract.c \
 	cpupart.c \

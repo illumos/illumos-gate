@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-1994, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,7 @@ char *
 prom_bootargs(void)
 {
 	int length;
-	dnode_t node;
+	pnode_t node;
 	static char *name = "bootargs";
 	static char bootargs[OBP_MAXPATHLEN];
 
@@ -65,7 +65,7 @@ prom_bootpath(void)
 {
 	static char bootpath[OBP_MAXPATHLEN];
 	int length;
-	dnode_t node;
+	pnode_t node;
 	static char *name = "bootpath";
 
 	if (bootpath[0] != (char)0)

@@ -120,7 +120,7 @@ cpu_init_trap(void)
 
 
 static int
-getintprop(dnode_t node, char *name, int deflt)
+getintprop(pnode_t node, char *name, int deflt)
 {
 	int	value;
 
@@ -142,7 +142,7 @@ getintprop(dnode_t node, char *name, int deflt)
  */
 /*ARGSUSED*/
 void
-cpu_fiximp(dnode_t dnode)
+cpu_fiximp(pnode_t dnode)
 {
 	int i, a;
 	extern int vac_size, vac_shift;

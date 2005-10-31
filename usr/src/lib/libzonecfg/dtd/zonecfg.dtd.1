@@ -1,9 +1,6 @@
 <?xml version='1.0' encoding='UTF-8' ?>
 
 <!--
- Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- Use is subject to license terms.
-
  CDDL HEADER START
 
  The contents of this file are subject to the terms of the
@@ -23,6 +20,9 @@
  information: Portions Copyright [yyyy] [name of copyright owner]
 
  CDDL HEADER END
+
+ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Use is subject to license terms.
 
     ident	"%Z%%M%	%I%	%E% SMI"
 -->
@@ -69,7 +69,11 @@
 					#REQUIRED
 			value		CDATA #REQUIRED>
 
-<!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device | rctl | attr)*>
+<!ELEMENT dataset	EMPTY>
+
+<!ATTLIST dataset	name		CDATA #REQUIRED>
+
+<!ELEMENT zone		(filesystem | inherited-pkg-dir | network | device | rctl | attr | dataset)*>
 
 <!ATTLIST zone		name		CDATA #REQUIRED
 			zonepath	CDATA #REQUIRED

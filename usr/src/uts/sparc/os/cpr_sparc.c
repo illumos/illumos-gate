@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,13 +67,13 @@ static cdef_t orig_def_info = {
 
 static char *cpr_next_component(char **);
 static char *cpr_get_prefix(char *);
-static char *cpr_build_nodename(dnode_t);
+static char *cpr_build_nodename(pnode_t);
 static void cpr_abbreviate_devpath(char *, char *);
 static int cpr_show_props = 0;
 
 
 static int
-cpr_get_options_node(dnode_t *nodep)
+cpr_get_options_node(pnode_t *nodep)
 {
 	*nodep = prom_optionsnode();
 	if (*nodep == OBP_NONODE || *nodep == OBP_BADNODE) {
@@ -93,7 +93,7 @@ static int
 cpr_get_bool_prop(char *name, int *result)
 {
 	char value[PROP_BOOL_LEN];
-	dnode_t node;
+	pnode_t node;
 	int len, err;
 
 	if (err = cpr_get_options_node(&node))
@@ -116,7 +116,7 @@ int
 cpr_update_nvram(cprop_t *props)
 {
 	cprop_t *tail;
-	dnode_t node;
+	pnode_t node;
 	int len, rc;
 
 	if (rc = cpr_get_options_node(&node))
@@ -258,7 +258,7 @@ cpr_default_setup(int alloc)
 {
 	cprop_t *orig, *new, *tail;
 	int len, err = 0;
-	dnode_t node;
+	pnode_t node;
 	char *fmt;
 
 	if (alloc == 0) {
@@ -348,7 +348,7 @@ cpr_spinning_bar(void)
 static void
 cpr_abbreviate_devpath(char *in_path, char *out_path)
 {
-	static dnode_t cur_node;
+	static pnode_t cur_node;
 	char *position = in_path + 1;	/* Skip the leading slash. */
 	char *cmpt;
 
@@ -356,8 +356,8 @@ cpr_abbreviate_devpath(char *in_path, char *out_path)
 	*out_path = '\0';
 
 	while ((cmpt = cpr_next_component(&position)) != NULL) {
-		dnode_t long_match = NULL;
-		dnode_t short_match = NULL;
+		pnode_t long_match = NULL;
+		pnode_t short_match = NULL;
 		int short_hits = 0;
 		char *name;
 		char *prefix = cpr_get_prefix(cmpt);
@@ -461,7 +461,7 @@ cpr_get_prefix(char *cmpt)
  * from the first two (binary) words of the "reg" property.
  */
 static char *
-cpr_build_nodename(dnode_t node)
+cpr_build_nodename(pnode_t node)
 {
 	static char	name[OBP_MAXPATHLEN];
 	int		reg[512];

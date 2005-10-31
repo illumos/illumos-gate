@@ -709,7 +709,7 @@ pr_read_status(prnode_t *pnp, uio_t *uiop)
 	 */
 	sp = kmem_alloc(sizeof (*sp), KM_SLEEP);
 	if ((error = prlock(pnp, ZNO)) == 0) {
-		prgetstatus(pnp->pr_common->prc_proc, sp, VTOZ(PTOV(pnp)));
+		prgetstatus(pnp->pr_common->prc_proc, sp, VTOZONE(PTOV(pnp)));
 		prunlock(pnp);
 		error = pr_uioread(sp, sizeof (*sp), uiop);
 	}
@@ -753,7 +753,7 @@ pr_read_lstatus(prnode_t *pnp, uio_t *uiop)
 		if (ldp->ld_entry == NULL ||
 		    (t = ldp->ld_entry->le_thread) == NULL)
 			continue;
-		prgetlwpstatus(t, sp, VTOZ(PTOV(pnp)));
+		prgetlwpstatus(t, sp, VTOZONE(PTOV(pnp)));
 		sp = (lwpstatus_t *)((caddr_t)sp + LSPAN(lwpstatus_t));
 	}
 	prunlock(pnp);
@@ -1426,7 +1426,7 @@ pr_read_lwpstatus(prnode_t *pnp, uio_t *uiop)
 		goto out;
 	}
 
-	prgetlwpstatus(pnp->pr_common->prc_thread, sp, VTOZ(PTOV(pnp)));
+	prgetlwpstatus(pnp->pr_common->prc_thread, sp, VTOZONE(PTOV(pnp)));
 	prunlock(pnp);
 
 	error = pr_uioread(sp, sizeof (*sp), uiop);
@@ -1799,7 +1799,7 @@ pr_read_status_32(prnode_t *pnp, uio_t *uiop)
 			error = EOVERFLOW;
 		} else {
 			prgetstatus32(pnp->pr_common->prc_proc, sp,
-			    VTOZ(PTOV(pnp)));
+			    VTOZONE(PTOV(pnp)));
 			prunlock(pnp);
 			error = pr_uioread(sp, sizeof (*sp), uiop);
 		}
@@ -1852,7 +1852,7 @@ pr_read_lstatus_32(prnode_t *pnp, uio_t *uiop)
 		if (ldp->ld_entry == NULL ||
 		    (t = ldp->ld_entry->le_thread) == NULL)
 			continue;
-		prgetlwpstatus32(t, sp, VTOZ(PTOV(pnp)));
+		prgetlwpstatus32(t, sp, VTOZONE(PTOV(pnp)));
 		sp = (lwpstatus32_t *)((caddr_t)sp + LSPAN32(lwpstatus32_t));
 	}
 	prunlock(pnp);
@@ -2471,7 +2471,7 @@ pr_read_lwpstatus_32(prnode_t *pnp, uio_t *uiop)
 		goto out;
 	}
 
-	prgetlwpstatus32(pnp->pr_common->prc_thread, sp, VTOZ(PTOV(pnp)));
+	prgetlwpstatus32(pnp->pr_common->prc_thread, sp, VTOZONE(PTOV(pnp)));
 	prunlock(pnp);
 
 	error = pr_uioread(sp, sizeof (*sp), uiop);
@@ -4281,9 +4281,9 @@ pr_lookup_ctdir(vnode_t *dp, char *comp)
 	 * outside the zone.  (see logic in contract_status_common)
 	 */
 	if ((ct->ct_owner != p) &&
-	    !(p == VTOZ(dp)->zone_zsched && ct->ct_state < CTS_ORPHAN &&
-	    VTOZ(dp)->zone_uniqid == contract_getzuniqid(ct) &&
-	    VTOZ(dp)->zone_uniqid != GLOBAL_ZONEUNIQID &&
+	    !(p == VTOZONE(dp)->zone_zsched && ct->ct_state < CTS_ORPHAN &&
+	    VTOZONE(dp)->zone_uniqid == contract_getzuniqid(ct) &&
+	    VTOZONE(dp)->zone_uniqid != GLOBAL_ZONEUNIQID &&
 	    ct->ct_czuniqid == GLOBAL_ZONEUNIQID)) {
 		prunlock(dpnp);
 		prfreenode(pnp);
@@ -4668,7 +4668,7 @@ pr_readdir_procdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 
 	ASSERT(pnp->pr_type == PR_PROCDIR);
 
-	zoneid = VTOZ(PTOV(pnp))->zone_id;
+	zoneid = VTOZONE(PTOV(pnp))->zone_id;
 
 	if ((error = gfs_readdir_init(&gstate, PNSIZ, PRSDSIZE, uiop,
 	    PRROOTINO, PRROOTINO)) != 0)
@@ -5453,7 +5453,7 @@ pr_readdir_ctdir(prnode_t *pnp, uio_t *uiop, int *eofp)
 		return (error);
 	}
 
-	zid = VTOZ(pnp->pr_vnode)->zone_uniqid;
+	zid = VTOZONE(pnp->pr_vnode)->zone_uniqid;
 	while ((error = gfs_readdir_pred(&gstate, uiop, &n)) == 0) {
 		id_t next = contract_plookup(p, n, zid);
 		if (next == -1) {

@@ -202,7 +202,7 @@ void
 error_init(void)
 {
 	char tmp_name[MAXSYSNAME];
-	dnode_t node;
+	pnode_t node;
 	size_t size = cpu_aflt_size();
 
 	/*

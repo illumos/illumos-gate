@@ -23,7 +23,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,6 +81,7 @@ extern int	fs_shrlock(struct vnode *, int, struct shrlock *, int,
 			cred_t *);
 extern int	fs_vnevent_nosupport(vnode_t *, vnevent_t);
 extern int	fs_vnevent_support(vnode_t *, vnevent_t);
+extern int	fs_acl_nontrivial(struct vnode *vp, struct cred *cr);
 
 #endif	/* _KERNEL */
 

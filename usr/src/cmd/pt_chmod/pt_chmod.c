@@ -92,23 +92,8 @@ main(int argc, char **argv)
 	} while (fdetach(tty) == 0);
 
 	/* Remove ACLs */
-	if (acl(tty, GETACLCNT, 0, NULL) > MIN_ACL_ENTRIES) {
-		aclent_t acls[3];
 
-		acls[0].a_type = USER_OBJ;
-		acls[0].a_id = 0;
-		acls[0].a_perm = 6;
-
-		acls[1].a_type = GROUP_OBJ;
-		acls[1].a_id = gid;
-		acls[1].a_perm = 2;
-
-		acls[2].a_type = OTHER_OBJ;
-		acls[2].a_id = 0;
-		acls[2].a_perm = 0;
-
-		(void) acl(tty, SETACL, 3, acls);
-	}
+	(void) acl_strip(tty, 0, gid, 0620);
 
 	if (chown(tty, getuid(), gid))
 		return (1);

@@ -20,7 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993-1997 by Sun Microsystems, Inc.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +43,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/acl.h>
+#include <aclutils.h>
 
 struct entry {
 	int	count;
@@ -66,8 +68,8 @@ struct entry_stat {
 static void free_mem(struct entry_stat *);
 static int check_dup(int, uid_t *, uid_t, struct entry_stat *);
 
-int
-aclcheck(aclent_t *aclbufp, int nentries, int *which)
+static int
+aclent_aclcheck(aclent_t *aclbufp, int nentries,  int *which, int isdir)
 {
 	struct entry_stat	tally;
 	aclent_t		*aclentp;
@@ -82,10 +84,10 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		case USER_OBJ:
 			/* check uniqueness */
 			if (tally.user_obj.count > 0) {
-				*which = (int) (aclentp - aclbufp);
+				*which = (int)(aclentp - aclbufp);
 				(void) free_mem(&tally);
 				errno = EINVAL;
-				return (USER_ERROR);
+				return (EACL_USER_ERROR);
 			}
 			tally.user_obj.count = 1;
 			break;
@@ -93,10 +95,10 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		case GROUP_OBJ:
 			/* check uniqueness */
 			if (tally.group_obj.count > 0) {
-				*which = (int) (aclentp - aclbufp);
+				*which = (int)(aclentp - aclbufp);
 				(void) free_mem(&tally);
 				errno = EINVAL;
-				return (GRP_ERROR);
+				return (EACL_GRP_ERROR);
 			}
 			tally.group_obj.count = 1;
 			break;
@@ -104,10 +106,10 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		case OTHER_OBJ:
 			/* check uniqueness */
 			if (tally.other_obj.count > 0) {
-				*which = (int) (aclentp - aclbufp);
+				*which = (int)(aclentp - aclbufp);
 				(void) free_mem(&tally);
 				errno = EINVAL;
-				return (OTHER_ERROR);
+				return (EACL_OTHER_ERROR);
 			}
 			tally.other_obj.count = 1;
 			break;
@@ -115,10 +117,10 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		case CLASS_OBJ:
 			/* check uniqueness */
 			if (tally.class_obj.count > 0) {
-				*which = (int) (aclentp - aclbufp);
+				*which = (int)(aclentp - aclbufp);
 				(void) free_mem(&tally);
 				errno = EINVAL;
-				return (CLASS_ERROR);
+				return (EACL_CLASS_ERROR);
 			}
 			tally.class_obj.count = 1;
 			break;
@@ -145,12 +147,12 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 			if (cnt == 0) {
 				*idp = calloc(nentries, sizeof (uid_t));
 				if (*idp == NULL)
-					return (MEM_ERROR);
+					return (EACL_MEM_ERROR);
 			} else {
 				if (check_dup(cnt, *idp, aclentp->a_id,
 				    &tally) == -1) {
-					*which = (int) (aclentp - aclbufp);
-					return (DUPLICATE_ERROR);
+					*which = (int)(aclentp - aclbufp);
+					return (EACL_DUPLICATE_ERROR);
 				}
 			}
 			(*idp)[cnt] = aclentp->a_id;
@@ -159,10 +161,10 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		case DEF_USER_OBJ:
 			/* check uniqueness */
 			if (tally.def_user_obj.count > 0) {
-				*which = (int) (aclentp - aclbufp);
+				*which = (int)(aclentp - aclbufp);
 				(void) free_mem(&tally);
 				errno = EINVAL;
-				return (USER_ERROR);
+				return (EACL_USER_ERROR);
 			}
 			tally.def_user_obj.count = 1;
 			break;
@@ -170,10 +172,10 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		case DEF_GROUP_OBJ:
 			/* check uniqueness */
 			if (tally.def_group_obj.count > 0) {
-				*which = (int) (aclentp - aclbufp);
+				*which = (int)(aclentp - aclbufp);
 				(void) free_mem(&tally);
 				errno = EINVAL;
-				return (GRP_ERROR);
+				return (EACL_GRP_ERROR);
 			}
 			tally.def_group_obj.count = 1;
 			break;
@@ -181,10 +183,10 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		case DEF_OTHER_OBJ:
 			/* check uniqueness */
 			if (tally.def_other_obj.count > 0) {
-				*which = (int) (aclentp - aclbufp);
+				*which = (int)(aclentp - aclbufp);
 				(void) free_mem(&tally);
 				errno = EINVAL;
-				return (OTHER_ERROR);
+				return (EACL_OTHER_ERROR);
 			}
 			tally.def_other_obj.count = 1;
 			break;
@@ -192,10 +194,10 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		case DEF_CLASS_OBJ:
 			/* check uniqueness */
 			if (tally.def_class_obj.count > 0) {
-				*which = (int) (aclentp - aclbufp);
+				*which = (int)(aclentp - aclbufp);
 				(void) free_mem(&tally);
 				errno = EINVAL;
-				return (CLASS_ERROR);
+				return (EACL_CLASS_ERROR);
 			}
 			tally.def_class_obj.count = 1;
 			break;
@@ -203,8 +205,8 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		default:
 			(void) free_mem(&tally);
 			errno = EINVAL;
-			*which = (int) (aclentp - aclbufp);
-			return (ENTRY_ERROR);
+			*which = (int)(aclentp - aclbufp);
+			return (EACL_ENTRY_ERROR);
 		}
 	}
 	/* If there are group or user entries, there must be one class entry */
@@ -212,14 +214,14 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		if (tally.class_obj.count != 1) {
 			(void) free_mem(&tally);
 			errno = EINVAL;
-			return (MISS_ERROR);
+			return (EACL_MISS_ERROR);
 		}
 	/* same is true for default entries */
 	if (tally.def_user.count > 0 || tally.def_group.count > 0)
 		if (tally.def_class_obj.count != 1) {
 			(void) free_mem(&tally);
 			errno = EINVAL;
-			return (MISS_ERROR);
+			return (EACL_MISS_ERROR);
 		}
 
 	/* there must be exactly one user_obj, group_obj, and other_obj entry */
@@ -228,26 +230,42 @@ aclcheck(aclent_t *aclbufp, int nentries, int *which)
 		tally.other_obj.count != 1) {
 		(void) free_mem(&tally);
 		errno = EINVAL;
-		return (MISS_ERROR);
+		return (EACL_MISS_ERROR);
 	}
 
 	/* has default? same rules apply to default entries */
-	if (tally.def_user.count > 0 ||
-	    tally.def_user_obj.count > 0 ||
-	    tally.def_group.count > 0 ||
-	    tally.def_group_obj.count > 0 ||
-	    tally.def_class_obj.count > 0 ||
-	    tally.def_other_obj.count > 0)
+	if (tally.def_user.count > 0 || tally.def_user_obj.count > 0 ||
+	    tally.def_group.count > 0 || tally.def_group_obj.count > 0 ||
+	    tally.def_class_obj.count > 0 || tally.def_other_obj.count > 0) {
+
+		/*
+		 * Can't have default ACL's on non-directories
+		 */
+		if (isdir == 0) {
+			(void) free_mem(&tally);
+			errno = EINVAL;
+			return (EACL_INHERIT_NOTDIR);
+		}
+
 		if (tally.def_user_obj.count != 1 ||
 		    tally.def_group_obj.count != 1 ||
 		    tally.def_other_obj.count != 1) {
 			(void) free_mem(&tally);
 			errno = EINVAL;
-			return (MISS_ERROR);
+			return (EACL_MISS_ERROR);
 		}
+	}
+
 	(void) free_mem(&tally);
 	return (0);
 }
+
+int
+aclcheck(aclent_t *aclbufp, int nentries, int *which)
+{
+	return (aclent_aclcheck(aclbufp, nentries, which, 1));
+}
+
 
 static void
 free_mem(struct entry_stat *tallyp)
@@ -275,4 +293,100 @@ check_dup(int count, uid_t *ids, uid_t newid, struct entry_stat *tallyp)
 		}
 	}
 	return (0);
+}
+
+#define	IFLAGS	(ACE_FILE_INHERIT_ACE|ACE_DIRECTORY_INHERIT_ACE| \
+    ACE_NO_PROPAGATE_INHERIT_ACE|ACE_INHERIT_ONLY_ACE)
+
+static int
+ace_aclcheck(acl_t *aclp, int isdir)
+{
+	ace_t 	*acep;
+	int 	i;
+	int	error = 0;
+
+	/*
+	 * step through all valid flags.
+	 */
+
+	if (aclp->acl_cnt <= 0 || aclp->acl_cnt > MAX_ACL_ENTRIES)
+		return (EACL_COUNT_ERROR);
+
+	for (i = 0, acep = aclp->acl_aclp;
+	    i != aclp->acl_cnt && error == 0; i++, acep++) {
+		switch (acep->a_flags & 0xf040) {
+		case 0:
+		case ACE_OWNER:
+		case ACE_EVERYONE:
+		case ACE_IDENTIFIER_GROUP:
+		case ACE_GROUP|ACE_IDENTIFIER_GROUP:
+			break;
+		default:
+			errno = EINVAL;
+			return (EACL_FLAGS_ERROR);
+		}
+
+		/*
+		 * Can't have inheritance on files.
+		 */
+		if ((acep->a_flags &
+		    (ACE_FILE_INHERIT_ACE|ACE_DIRECTORY_INHERIT_ACE|
+		    ACE_INHERIT_ONLY_ACE|ACE_NO_PROPAGATE_INHERIT_ACE)) &&
+		    isdir == 0) {
+			errno = EINVAL;
+			return (EACL_INHERIT_NOTDIR);
+		}
+
+		/*
+		 * INHERIT_ONLY/NO_PROPAGATE need a to INHERIT_FILE
+		 * or INHERIT_DIR also
+		 */
+		if (acep->a_flags &
+		    (ACE_INHERIT_ONLY_ACE|ACE_NO_PROPAGATE_INHERIT_ACE)) {
+			if ((acep->a_flags & (ACE_FILE_INHERIT_ACE|
+			    ACE_DIRECTORY_INHERIT_ACE)) == 0) {
+				errno = EINVAL;
+				return (EACL_INHERIT_ERROR);
+			}
+			break;
+		}
+
+		switch (acep->a_type) {
+		case ACE_ACCESS_ALLOWED_ACE_TYPE:
+		case ACE_ACCESS_DENIED_ACE_TYPE:
+		case ACE_SYSTEM_AUDIT_ACE_TYPE:
+		case ACE_SYSTEM_ALARM_ACE_TYPE:
+			break;
+		default:
+			errno = EINVAL;
+			return (EACL_ENTRY_ERROR);
+		}
+		if (acep->a_access_mask > ACE_ALL_PERMS) {
+			errno = EINVAL;
+			return (EACL_PERM_MASK_ERROR);
+		}
+	}
+
+	return (0);
+}
+
+int
+acl_check(acl_t *aclp, int flag)
+{
+	int error;
+	int where;
+
+	switch (aclp->acl_type) {
+	case ACLENT_T:
+		error = aclent_aclcheck(aclp->acl_aclp, aclp->acl_cnt,
+		    &where, flag);
+		break;
+	case ACE_T:
+		error = ace_aclcheck(aclp, flag);
+		break;
+	default:
+		errno = EINVAL;
+		error = EACL_ENTRY_ERROR;
+	}
+	return (error);
 }

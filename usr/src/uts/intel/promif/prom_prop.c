@@ -35,19 +35,19 @@
 #include <sys/prom_emul.h>
 
 int
-prom_getproplen(dnode_t nodeid, caddr_t name)
+prom_getproplen(pnode_t nodeid, caddr_t name)
 {
 	return (promif_getproplen(nodeid, name));
 }
 
 int
-prom_getprop(dnode_t nodeid, caddr_t name, caddr_t value)
+prom_getprop(pnode_t nodeid, caddr_t name, caddr_t value)
 {
 	return (promif_getprop(nodeid, name, value));
 }
 
 caddr_t
-prom_nextprop(dnode_t nodeid, caddr_t previous, caddr_t next)
+prom_nextprop(pnode_t nodeid, caddr_t previous, caddr_t next)
 {
 	return (promif_nextprop(nodeid, previous, next));
 }
@@ -70,7 +70,7 @@ prom_decode_composite_string(void *buf, size_t buflen, char *prev)
 
 /*ARGSUSED*/
 int
-prom_bounded_getprop(dnode_t nodeid, caddr_t name, caddr_t value, int len)
+prom_bounded_getprop(pnode_t nodeid, caddr_t name, caddr_t value, int len)
 {
 	return (-1);
 }

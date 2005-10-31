@@ -279,6 +279,30 @@ declaration     int zonecfg_lookup_attr(zone_dochandle_t, struct zone_attrtab *)
 version         SUNWprivate_1.1
 end             
 
+function	zonecfg_add_ds
+include		<libzonecfg.h>
+declaration	int zonecfg_add_ds(zone_dochandle_t, struct zone_dstab *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_delete_ds
+include		<libzonecfg.h>
+declaration	int zonecfg_delete_ds(zone_dochandle_t, struct zone_dstab *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_modify_ds
+include		<libzonecfg.h>
+declaration	int zonecfg_modify_ds(zone_dochandle_t, struct zone_dstab *, struct zone_dstab *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_lookup_ds
+include		<libzonecfg.h>
+declaration	int zonecfg_lookup_ds(zone_dochandle_t, struct zone_dstab *)
+version		SUNWprivate_1.1
+end		
+
 function        zonecfg_get_attr_boolean
 include         <libzonecfg.h>
 declaration     int zonecfg_get_attr_boolean(const struct zone_attrtab *, boolean_t *)
@@ -456,6 +480,24 @@ end
 function	zonecfg_endrctlent
 include		<libzonecfg.h>
 declaration	int zonecfg_endrctlent(zone_dochandle_t)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_setdsent
+include		<libzonecfg.h>
+declaration	int zonecfg_setdsent(zone_dochandle_t);
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_getdsent
+include		<libzonecfg.h>
+declaration	int zonecfg_getdsent(zone_dochandle_t, struct zone_dstab *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_enddsent
+include		<libzonecfg.h>
+declaration	int zonecfg_enddsent(zone_dochandle_t)
 version		SUNWprivate_1.1
 end		
 

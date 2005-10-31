@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,6 +31,7 @@
 #include <sys/statvfs.h>
 #include <sys/wait.h>
 #include "bart.h"
+#include <aclutils.h>
 
 static int	sanitize_reloc_root(char *root, size_t bufsize);
 static int	create_manifest_filelist(char **argv, char *reloc_root);
@@ -623,46 +624,28 @@ sanitized_fname(const char *fname, boolean_t canon_path)
 static char *
 get_acl_string(const char *fname, const struct stat64 *statb, int *err_code)
 {
-	aclent_t	*aclbuf;
-	int		num_acls, ret;
-	char		*acl_info;
+	acl_t		*aclp;
+	char		*acltext;
+	int		error;
 
 	if (S_ISLNK(statb->st_mode)) {
 		return (safe_strdup("-"));
 	}
 
-	/* First, figure out how many ACL entries this file has */
-	num_acls = acl(fname, GETACLCNT, 0, NULL);
-	if (num_acls < 0) {
-		*err_code = WARNING_EXIT;
-		perror(fname);
-		return (safe_strdup("-"));
-	}
-
 	/*
-	 * Next, create a buffer which is big enough for all the ACL entries.
-	 * Then go get the raw data.
+	 *  Include trivial acl's
 	 */
-	aclbuf = (aclent_t *)safe_calloc(sizeof (aclent_t) * num_acls);
-	ret = acl(fname, GETACL, num_acls, aclbuf);
-	if (ret < 0) {
+	error = acl_get(fname, 0, &aclp);
+
+	if (error != 0) {
 		*err_code = WARNING_EXIT;
-		perror(fname);
+		(void) fprintf(stderr, "%s: %s\n", fname, acl_strerror(error));
 		return (safe_strdup("-"));
+	} else {
+		acltext = acl_totext(aclp);
+		acl_free(aclp);
+		return (acltext);
 	}
-
-	/* Convert the raw entries to text */
-	acl_info = acltotext(aclbuf, num_acls);
-
-	/* Free up the buffer which held the raw ACL entries */
-	free(aclbuf);
-
-	if (acl_info == NULL) {
-		*err_code = WARNING_EXIT;
-		perror(fname);
-		return (safe_strdup("-"));
-	} else
-		return (acl_info);
 }
 
 

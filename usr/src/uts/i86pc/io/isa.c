@@ -537,7 +537,7 @@ add_known_used_resources(void)
 
 	if (usedrdip == NULL) {
 		(void) ndi_devi_alloc_sleep(ddi_root_node(), USED_RESOURCES,
-		    (dnode_t)DEVI_SID_NODEID, &usedrdip);
+		    (pnode_t)DEVI_SID_NODEID, &usedrdip);
 	}
 
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, usedrdip,
@@ -607,7 +607,7 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 	/* serial ports */
 	for (i = 0; i < 2; i++) {
 		ndi_devi_alloc_sleep(isa_dip, "asy",
-		    (dnode_t)DEVI_SID_NODEID, &xdip);
+		    (pnode_t)DEVI_SID_NODEID, &xdip);
 		(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
 		    "reg", (int *)&asy_regs[i], 3);
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip,
@@ -617,7 +617,7 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 
 	/* parallel port */
 	ndi_devi_alloc_sleep(isa_dip, "lp",
-	    (dnode_t)DEVI_SID_NODEID, &xdip);
+	    (pnode_t)DEVI_SID_NODEID, &xdip);
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
 	    "reg", (int *)&lp_regs, 3);
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, xdip,
@@ -626,7 +626,7 @@ isa_alloc_nodes(dev_info_t *isa_dip)
 
 	/* i8042 node */
 	ndi_devi_alloc_sleep(isa_dip, "i8042",
-	    (dnode_t)DEVI_SID_NODEID, &xdip);
+	    (pnode_t)DEVI_SID_NODEID, &xdip);
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,
 	    "reg", (int *)i8042_regs, 6);
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, xdip,

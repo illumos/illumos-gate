@@ -164,7 +164,7 @@ obp_timestamp(char *v)
  */
 
 static struct obp_rev_table *flashprom_ortp;
-static dnode_t flashprom_node;
+static pnode_t flashprom_node;
 static int flashprom_checked;
 static int flashprom_return_code;
 
@@ -201,12 +201,12 @@ check_timestamp(char *model, int tstamp)
 	return (0);
 }
 
-static dnode_t
-visit(dnode_t node)
+static pnode_t
+visit(pnode_t node)
 {
 	int tstamp, plen, i;
 	char vers[512], model[64];
-	static dnode_t openprom_node;
+	static pnode_t openprom_node;
 	static char version[] = "version";
 	static char model_name[] = "model";
 	static char flashprom[] = "flashprom";
@@ -215,24 +215,24 @@ visit(dnode_t node)
 	 * if name isn't 'flashprom', continue.
 	 */
 	if (prom_getproplen(node, OBP_NAME) != sizeof (flashprom))
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 	(void) prom_getprop(node, OBP_NAME, model);
 	if (prom_strncmp(model, flashprom, sizeof (flashprom)) != 0)
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 
 	plen = prom_getproplen(node, version);
 	if (plen <= 0 || plen > sizeof (vers))
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 	(void) prom_getprop(node, version, vers);
 	vers[plen] = '\0';
 
 	/* Make sure it's an OBP flashprom */
 	if (vers[0] != 'O' && vers[1] != 'B' && vers[2] != 'P')
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 
 	plen = prom_getproplen(node, model_name);
 	if (plen <= 0 || plen > sizeof (model))
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 	(void) prom_getprop(node, model_name, model);
 	model[plen] = '\0';
 
@@ -241,13 +241,13 @@ visit(dnode_t node)
 		prom_printf("prom_version_check: node contains "
 		    "improperly formatted version property,\n"
 		    "\tnot checking prom version");
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 	}
 
 	i = check_timestamp(model, tstamp);
 
 	if (i == 0)
-		return ((dnode_t)0);
+		return ((pnode_t)0);
 
 	/*
 	 * We know that "node"'s flashprom image contains downrev firmware,
@@ -300,19 +300,19 @@ visit(dnode_t node)
 /*
  * visit each node in the device tree, until we get a non-null answer
  */
-static dnode_t
-walk(dnode_t node)
+static pnode_t
+walk(pnode_t node)
 {
-	dnode_t id;
+	pnode_t id;
 
 	if (visit(node))
 		return (node);
 
 	for (node = prom_childnode(node); node; node = prom_nextnode(node))
-		if ((id = walk(node)) != (dnode_t)0)
+		if ((id = walk(node)) != (pnode_t)0)
 			return (id);
 
-	return ((dnode_t)0);
+	return ((pnode_t)0);
 }
 
 /*
@@ -327,10 +327,10 @@ walk(dnode_t node)
  * and a printable message in *buf, buflen.
  */
 int
-prom_version_check(char *buf, size_t buflen, dnode_t *nodeid)
+prom_version_check(char *buf, size_t buflen, pnode_t *nodeid)
 {
 	char *p;
-	dnode_t node = flashprom_node;
+	pnode_t node = flashprom_node;
 	size_t i;
 
 	/*
@@ -344,7 +344,7 @@ prom_version_check(char *buf, size_t buflen, dnode_t *nodeid)
 	if (nodeid)
 		*nodeid = node;
 
-	if (node == (dnode_t)0) {
+	if (node == (pnode_t)0) {
 		if (buf && buflen)
 			*buf = '\0';
 		return (PROM_VER64_OK);

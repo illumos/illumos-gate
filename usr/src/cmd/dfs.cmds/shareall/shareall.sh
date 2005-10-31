@@ -88,3 +88,10 @@ then
 else			# for every file system ...
 	cat $infile|/sbin/sh
 fi
+
+# If the user has ZFS installed, invoke 'zfs share -a' to share all ZFS
+# filesystems 
+if [ -x /usr/sbin/zfs ]
+then
+	/usr/sbin/zfs share -a
+fi

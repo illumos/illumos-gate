@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1994-2000, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,7 +48,7 @@ prom_stopcpu_bycpuid(int cpuid)
 
 
 int
-prom_startcpu(dnode_t node, caddr_t pc, int arg)
+prom_startcpu(pnode_t node, caddr_t pc, int arg)
 {
 	cell_t ci[6];
 
@@ -86,7 +86,7 @@ prom_startcpu_bycpuid(int cpuid, caddr_t pc, int arg)
 }
 
 int
-prom_wakeupcpu(dnode_t node)
+prom_wakeupcpu(pnode_t node)
 {
 	cell_t ci[5];
 	int	rv;
@@ -107,7 +107,7 @@ prom_wakeupcpu(dnode_t node)
 }
 
 int
-prom_cpuoff(dnode_t node)
+prom_cpuoff(pnode_t node)
 {
 	cell_t ci[5];
 	int rv;

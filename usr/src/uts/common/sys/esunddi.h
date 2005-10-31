@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,7 +211,7 @@ e_ddi_walk_driver(char *, int (*f)(dev_info_t *, void *), void *);
  * NOTE: .conf nodeids are not valid arguments to this function.
  */
 dev_info_t *
-e_ddi_nodeid_to_dip(dnode_t nodeid);
+e_ddi_nodeid_to_dip(pnode_t nodeid);
 
 /*
  * Obsolete interfaces, no longer used, to be removed.

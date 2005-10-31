@@ -51,7 +51,7 @@ prom_test(char *service)
 }
 
 int
-prom_test_method(char *method, dnode_t node)
+prom_test_method(char *method, pnode_t node)
 {
 	cell_t ci[6];
 	int rv;

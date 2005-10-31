@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,17 +204,17 @@ extern	int		prom_getmacaddr(ihandle_t hd, caddr_t ea);
 /*
  * CPU Control Group: MP's only.
  */
-extern	int		prom_startcpu(dnode_t node, caddr_t pc, int arg);
+extern	int		prom_startcpu(pnode_t node, caddr_t pc, int arg);
 extern	int		prom_startcpu_bycpuid(int cpuid, caddr_t pc, int arg);
 extern	int		prom_stopcpu_bycpuid(int);
 extern	int		prom_sunfire_cpu_off(void);	/* SunFire only */
-extern	int		prom_wakeupcpu(dnode_t node);
-extern	int		prom_serengeti_wakeupcpu(dnode_t node);
+extern	int		prom_wakeupcpu(pnode_t node);
+extern	int		prom_serengeti_wakeupcpu(pnode_t node);
 extern	int		prom_hotaddcpu(int cpuid);
 extern	int		prom_hotremovecpu(int cpuid);
 extern	void		promsafe_pause_cpus(void);
 extern	void		promsafe_xc_attention(cpuset_t cpuset);
-extern	int		prom_serengeti_cpu_off(dnode_t node);
+extern	int		prom_serengeti_cpu_off(pnode_t node);
 
 /*
  * Set trap table

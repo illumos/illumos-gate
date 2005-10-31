@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -64,7 +64,7 @@ include ../Makefile.cmd
 CPPFLAGS += -DSYS_NAME
 $(XPG4):= CPPFLAGS += -DXPG4
 sttydefs := LDLIBS += -lnsl
-ttymon := LDLIBS += -lnsl -ldevinfo
+ttymon := LDLIBS += -lnsl -lsec -ldevinfo
 
 # Only stty can be built with -DEUC.  ttymon will dump core unless further
 # changes are made to it.

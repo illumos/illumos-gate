@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,9 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#define	LIST_WALK_NAME	"list"
+#define	LIST_WALK_DESC	"walk a linked list"
 
 int list_walk_init(mdb_walk_state_t *wsp);
 int list_walk_step(mdb_walk_state_t *wsp);

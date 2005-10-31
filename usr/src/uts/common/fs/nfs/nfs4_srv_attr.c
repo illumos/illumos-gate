@@ -887,8 +887,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		if (error != 0)
 			break;
 		if (whichacl & _ACL_ACE_ENABLED) {
-			error = vs_acet_to_ace4(&vs_native, &vs_ace4,
-			    vp->v_type == VDIR, TRUE);
+			error = vs_acet_to_ace4(&vs_native, &vs_ace4, TRUE);
 			vs_acet_destroy(&vs_native);
 		} else {
 			error = vs_aent_to_ace4(&vs_native, &vs_ace4,
@@ -968,8 +967,7 @@ rfs4_fattr4_acl(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 
 		if (whichacl & _ACL_ACE_ENABLED) {
 			error = vs_ace4_to_acet(&vs_ace4, &vs_native,
-			    vap->va_uid, vap->va_gid, vp->v_type == VDIR, TRUE,
-			    FALSE);
+			    vap->va_uid, vap->va_gid, TRUE, FALSE);
 			if (error != 0)
 				break;
 			(void) VOP_RWLOCK(vp, V_WRITELOCK_TRUE, NULL);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -255,24 +255,7 @@ list_devices(int optflg, uid_t uid, char *device)
 static int
 newdac(char *file, uid_t owner, gid_t group, o_mode_t mode)
 {
-	int	err = 0;
-	aclent_t	min_acl[MIN_ACL_ENTRIES];
-
-	min_acl[0].a_type = USER_OBJ;
-	min_acl[0].a_id   = owner;
-	min_acl[0].a_perm = ((mode & 0700) >> 6);
-
-	min_acl[1].a_type = GROUP_OBJ;
-	min_acl[1].a_id   = group;
-	min_acl[1].a_perm = ((mode & 0070) >> 3);
-
-	min_acl[2].a_type = CLASS_OBJ;
-	min_acl[2].a_id   = (uid_t)-1;
-	min_acl[2].a_perm = ((mode & 0070) >> 3);
-
-	min_acl[3].a_type = OTHER_OBJ;
-	min_acl[3].a_id   = (uid_t)-1;
-	min_acl[3].a_perm = (mode & 0007);
+	int		err = 0;
 
 	do {
 		if (chown(file, owner, group) == -1) {
@@ -281,7 +264,9 @@ newdac(char *file, uid_t owner, gid_t group, o_mode_t mode)
 		}
 	} while (fdetach(file) == 0);
 
-	if (acl(file, SETACL, MIN_ACL_ENTRIES, min_acl) < 0) {
+	err = acl_strip(file, owner, group, (mode_t)mode);
+
+	if (err != 0) {
 		dperror("newdac, unable to setacl");
 		err = SETACL_PERR;
 	}

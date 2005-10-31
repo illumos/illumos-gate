@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/chmod/Makefile
@@ -41,6 +41,8 @@ CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
 
 LINTFLAGS += -erroff=E_NAME_DEF_NOT_USED2
+
+LDLIBS += -lsec
 
 POFILE= chmod_cmd.po
 XGETFLAGS= -a -x chmod.xcl

@@ -350,13 +350,13 @@ read_prom_mappings(size_t *ntransrootp)
 {
 	char *prop = "translations";
 	size_t translen;
-	dnode_t node;
+	pnode_t node;
 	struct translation *transroot;
 
 	/*
 	 * the "translations" property is associated with the mmu node
 	 */
-	node = (dnode_t)prom_getphandle(prom_mmu_ihandle());
+	node = (pnode_t)prom_getphandle(prom_mmu_ihandle());
 
 	/*
 	 * We use the TSB space to read in the prom mappings.  This space

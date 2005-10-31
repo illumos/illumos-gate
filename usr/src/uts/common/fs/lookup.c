@@ -789,7 +789,7 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 	size_t dbuflen;
 	struct iovec iov;
 	struct uio uio;
-	int err;
+	int error;
 	int eof;
 	vnode_t *cmpvp;
 	struct dirent64 *dp;
@@ -811,8 +811,8 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 	uio.uio_extflg = UIO_COPY_CACHED;
 	uio.uio_loffset = 0;
 
-	if ((err = VOP_ACCESS(dvp, VREAD, 0, cr)) != 0)
-		return (err);
+	if ((error = VOP_ACCESS(dvp, VREAD, 0, cr)) != 0)
+		return (error);
 
 	while (!eof) {
 		uio.uio_resid = dlen;
@@ -820,12 +820,12 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 		iov.iov_len = dlen;
 
 		(void) VOP_RWLOCK(dvp, V_WRITELOCK_FALSE, NULL);
-		err = VOP_READDIR(dvp, &uio, cr, &eof);
+		error = VOP_READDIR(dvp, &uio, cr, &eof);
 		VOP_RWUNLOCK(dvp, V_WRITELOCK_FALSE, NULL);
 
 		dbuflen = dlen - uio.uio_resid;
 
-		if (err || dbuflen == 0)
+		if (error || dbuflen == 0)
 			break;
 
 		dp = (dirent64_t *)dbuf;
@@ -840,7 +840,7 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 				continue;
 			}
 
-			err = VOP_LOOKUP(dvp, dp->d_name, &cmpvp, &pnp, 0,
+			error = VOP_LOOKUP(dvp, dp->d_name, &cmpvp, &pnp, 0,
 			    vrootp, cr);
 
 			/*
@@ -849,7 +849,7 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 			 * just removed an entry since the readdir() call, and
 			 * the entry we want is further on in the directory.
 			 */
-			if (err == 0) {
+			if (error == 0) {
 				if (vnode_match(tvp, cmpvp, cr)) {
 					VN_RELE(cmpvp);
 					*rdp = dp;
@@ -857,8 +857,8 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 				}
 
 				VN_RELE(cmpvp);
-			} else if (err != ENOENT) {
-				return (err);
+			} else if (error != ENOENT) {
+				return (error);
 			}
 
 			dp = (dirent64_t *)((intptr_t)dp + dp->d_reclen);
@@ -868,13 +868,26 @@ dirfindvp(vnode_t *vrootp, vnode_t *dvp, vnode_t *tvp, cred_t *cr, char *dbuf,
 	/*
 	 * Something strange has happened, this directory does not contain the
 	 * specified vnode.  This should never happen in the normal case, since
-	 * we ensured that dvp is the parent of vp.  This may be possible in
-	 * some race conditions, so fail gracefully.
+	 * we ensured that dvp is the parent of vp.  This is possible in some
+	 * rare conditions (races and the special .zfs directory).
 	 */
-	if (err == 0)
-		err = ENOENT;
+	if (error == 0) {
+		error = VOP_LOOKUP(dvp, ".zfs", &cmpvp, &pnp, 0, vrootp, cr);
+		if (error == 0) {
+			if (vnode_match(tvp, cmpvp, cr)) {
+				(void) strcpy(dp->d_name, ".zfs");
+				dp->d_reclen = strlen(".zfs");
+				dp->d_off = 2;
+				dp->d_ino = 1;
+				*rdp = dp;
+			} else {
+				error = ENOENT;
+			}
+			VN_RELE(cmpvp);
+		}
+	}
 
-	return (err);
+	return (error);
 }
 
 /*

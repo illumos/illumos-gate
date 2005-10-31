@@ -73,7 +73,7 @@ extern int plat_stdin_is_keyboard(void);
  * XXX	Make this dynamic.. or (better still) make the interface stateless
  */
 static struct oprom_state {
-	dnode_t	current_id;	/* node we're fetching props from */
+	pnode_t	current_id;	/* node we're fetching props from */
 	int16_t	already_open;	/* if true, this instance is 'active' */
 	int16_t	ioc_state;	/* snapshot ioctl state */
 	char	*snapshot;	/* snapshot of all prom nodes */
@@ -93,9 +93,9 @@ static int opattach(dev_info_t *, ddi_attach_cmd_t cmd);
 static int opdetach(dev_info_t *, ddi_detach_cmd_t cmd);
 
 /* help functions */
-static int oprom_checknodeid(dnode_t, dnode_t);
+static int oprom_checknodeid(pnode_t, pnode_t);
 static int oprom_copyinstr(intptr_t, char *, size_t, size_t);
-static int oprom_copynode(dnode_t, uint_t, char **, size_t *);
+static int oprom_copynode(pnode_t, uint_t, char **, size_t *);
 static int oprom_snapshot(struct oprom_state *, intptr_t);
 static int oprom_copyout(struct oprom_state *, intptr_t);
 static int oprom_setstate(struct oprom_state *, int16_t);
@@ -182,7 +182,7 @@ _fini(void)
 }
 
 static dev_info_t *opdip;
-static dnode_t options_nodeid;
+static pnode_t options_nodeid;
 
 /*ARGSUSED*/
 static int
@@ -269,7 +269,7 @@ opromopen(dev_t *devp, int flag, int otyp, cred_t *credp)
 			/*
 			 * It's ours.
 			 */
-			st->current_id = (dnode_t)0;
+			st->current_id = (pnode_t)0;
 			ASSERT(st->snapshot == NULL && st->size == 0);
 			ASSERT(st->ioc_state == IOC_IDLE);
 			break;
@@ -339,7 +339,7 @@ opromioctl_cb(void *avp, int has_changed)
 	char *valbuf;
 	int error = 0;
 	uint_t userbufsize;
-	dnode_t node_id;
+	pnode_t node_id;
 	char propname[OBP_MAXPROPNAME];
 
 	st = argp->st;
@@ -621,25 +621,25 @@ opromioctl_cb(void *avp, int has_changed)
 	case OPROMSETNODEID:
 
 		if (prom_is_openprom() == 0 ||
-		    userbufsize < sizeof (dnode_t)) {
+		    userbufsize < sizeof (pnode_t)) {
 			error = EINVAL;
 			break;
 		}
 
 		/*
-		 * The argument is a phandle. (aka dnode_t)
+		 * The argument is a phandle. (aka pnode_t)
 		 */
 		if (copyin(((caddr_t)arg + sizeof (uint_t)),
-		    opp->oprom_array, sizeof (dnode_t)) != 0) {
+		    opp->oprom_array, sizeof (pnode_t)) != 0) {
 			error = EFAULT;
 			break;
 		}
 
 		/*
-		 * If dnode_t from userland is garbage, we
+		 * If pnode_t from userland is garbage, we
 		 * could confuse the PROM.
 		 */
-		node_id = *(dnode_t *)opp->oprom_array;
+		node_id = *(pnode_t *)opp->oprom_array;
 		if (oprom_checknodeid(node_id, st->current_id) == 0) {
 			cmn_err(CE_NOTE, "!nodeid 0x%x not found",
 			    (int)node_id);
@@ -657,11 +657,11 @@ opromioctl_cb(void *avp, int has_changed)
 			break;
 		}
 
-		opp->oprom_size = sizeof (dnode_t);
-		*(dnode_t *)opp->oprom_array = st->current_id;
+		opp->oprom_size = sizeof (pnode_t);
+		*(pnode_t *)opp->oprom_array = st->current_id;
 
 		if (copyout(opp, (void *)arg,
-		    sizeof (dnode_t) + sizeof (uint_t)) != 0)
+		    sizeof (pnode_t) + sizeof (uint_t)) != 0)
 			error = EFAULT;
 		break;
 
@@ -929,7 +929,7 @@ opromioctl_cb(void *avp, int has_changed)
 		struct openprom_opr64 *opr =
 		    (struct openprom_opr64 *)opp->oprom_array;
 		int i;
-		dnode_t id;
+		pnode_t id;
 
 		if (userbufsize < sizeof (*opr)) {
 			error = EINVAL;
@@ -1071,13 +1071,13 @@ oprom_copyinstr(intptr_t arg, char *buf, size_t bufsize, size_t maxsize)
 }
 
 /*
- * Check dnode_t passed in from userland
+ * Check pnode_t passed in from userland
  */
 static int
-oprom_checknodeid(dnode_t node_id, dnode_t current_id)
+oprom_checknodeid(pnode_t node_id, pnode_t current_id)
 {
 	int depth;
-	dnode_t id[OBP_STACKDEPTH];
+	pnode_t id[OBP_STACKDEPTH];
 
 	/*
 	 * optimized path
@@ -1098,7 +1098,7 @@ oprom_checknodeid(dnode_t node_id, dnode_t current_id)
 	 * long path: walk from root till we find node_id
 	 */
 	depth = 1;
-	id[0] = prom_nextnode((dnode_t)0);
+	id[0] = prom_nextnode((pnode_t)0);
 
 	while (depth) {
 		if (id[depth - 1] == node_id)
@@ -1191,7 +1191,7 @@ oprom_copyout(struct oprom_state *st, intptr_t arg)
  * Copy all properties of nodeid into a single packed nvlist
  */
 static int
-oprom_copyprop(dnode_t nodeid, uint_t flag, nvlist_t *nvl)
+oprom_copyprop(pnode_t nodeid, uint_t flag, nvlist_t *nvl)
 {
 	int proplen;
 	char *propname, *propval, *buf1, *buf2;
@@ -1253,10 +1253,10 @@ oprom_copyprop(dnode_t nodeid, uint_t flag, nvlist_t *nvl)
  * Copy all children and descendents into a a packed nvlist
  */
 static int
-oprom_copychild(dnode_t nodeid, uint_t flag, char **buf, size_t *size)
+oprom_copychild(pnode_t nodeid, uint_t flag, char **buf, size_t *size)
 {
 	nvlist_t *nvl;
-	dnode_t child = prom_childnode(nodeid);
+	pnode_t child = prom_childnode(nodeid);
 
 	if (child == 0)
 		return (0);
@@ -1285,7 +1285,7 @@ oprom_copychild(dnode_t nodeid, uint_t flag, char **buf, size_t *size)
  * Copy a node into a packed nvlist
  */
 static int
-oprom_copynode(dnode_t nodeid, uint_t flag, char **buf, size_t *size)
+oprom_copynode(pnode_t nodeid, uint_t flag, char **buf, size_t *size)
 {
 	int error = 0;
 	nvlist_t *nvl;

@@ -108,7 +108,7 @@ ctfs_tdir_do_readdir(vnode_t *vp, struct dirent64 *dp, int *eofp,
 	ctid_t next;
 	ct_type_t *ty = ct_types[gfs_file_index(vp)];
 
-	zuniqid = VTOZ(vp)->zone_uniqid;
+	zuniqid = VTOZONE(vp)->zone_uniqid;
 	next = contract_type_lookup(ty, zuniqid, *offp);
 
 	if (next == -1) {
@@ -135,7 +135,7 @@ ctfs_tdir_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop)
 		return (ENOENT);
 
 	ct = contract_type_ptr(ct_types[gfs_file_index(vp)], i,
-	    VTOZ(vp)->zone_uniqid);
+	    VTOZONE(vp)->zone_uniqid);
 	if (ct == NULL)
 		return (ENOENT);
 

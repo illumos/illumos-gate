@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,48 +31,40 @@
 LIBRARY= libsec.a
 VERS= .1
 
-OBJECTS=	\
-	aclcheck.o	\
-	aclmode.o	\
-	aclsort.o	\
-	acltext.o
+OBJS_SHARED= acl_common.o
+OBJS_COMMON= aclcheck.o aclmode.o aclsort.o acltext.o aclutils.o
+OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED)
 
 # include library definitions
 include ../../Makefile.lib
 
+LIBS =		$(DYNLIB) $(LINTLIB)
+
+CFLAGS +=	$(CCVERBOSE)
+CPPFLAGS +=	-I$(SRCDIR) -I../../../common/acl
+DYNFLAGS +=	$(MAPOPTS)
+LDLIBS += -lc 
+
 # install this library in the root filesystem
 include ../../Makefile.rootfs
 
-MAPFILE=	$(MAPDIR)/mapfile
-MAPOPTS=	$(MAPFILE:%=-M %)
-SRCS=		$(OBJECTS:%.o=../common/%.c)
+SRCS=		$(OBJS_COMMON:%.o=$(SRCDIR)/%.c) \
+		 $(OBJS_SHARED:%.o=$(SRC)/common/acl/%.c)
 
-LIBS =		$(DYNLIB) $(LINTLIB)
+$(LINTLIB):= SRCS=	$(SRCDIR)/$(LINTSRC)
 
-$(LINTLIB):= SRCS=../common/llib-lsec
-
-LINTSRC=	$(LINTLIB:%.ln=%)
-
-CFLAGS +=	$(CCVERBOSE)
-DYNFLAGS +=	$(MAPOPTS)
-LDLIBS += -lc
+SRCDIR=		../common
+MAPDIR=		../spec/$(TRANSMACH)
+SPECMAPFILE=	$(MAPDIR)/mapfile
 
 .KEEP_STATE:
 
+all: $(LIBS)
+
 lint: lintcheck
 
-$(DYNLIB):	$(MAPFILE)
-
-$(MAPFILE):
-	@cd $(MAPDIR); $(MAKE) mapfile
-
-# include library targets
-include ../../Makefile.targ
-
-pics/%.o: ../common/%.c
+pics/%.o: ../../../common/acl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
 
-# install rule for lint library target
-$(ROOTLINTDIR)/%:	../common/%
-	$(INS.file)
+include ../../Makefile.targ

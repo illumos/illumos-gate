@@ -163,7 +163,7 @@ create_root_bus_dip(uchar_t bus)
 	ASSERT(pci_bus_res[bus].par_bus == (uchar_t)-1);
 
 	ndi_devi_alloc_sleep(ddi_root_node(), "pci",
-	    (dnode_t)DEVI_SID_NODEID, &dip);
+	    (pnode_t)DEVI_SID_NODEID, &dip);
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
 	    "device_type", "pci");
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
@@ -645,12 +645,12 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 
 		/* allocate two child nodes */
 		ndi_devi_alloc_sleep(dip, "ide",
-		    (dnode_t)DEVI_SID_NODEID, &cdip);
+		    (pnode_t)DEVI_SID_NODEID, &cdip);
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
 		    "reg", 0);
 		(void) ndi_devi_bind_driver(cdip, 0);
 		ndi_devi_alloc_sleep(dip, "ide",
-		    (dnode_t)DEVI_SID_NODEID, &cdip);
+		    (pnode_t)DEVI_SID_NODEID, &cdip);
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
 		    "reg", 1);
 		(void) ndi_devi_bind_driver(cdip, 0);

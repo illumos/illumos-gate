@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -93,6 +93,7 @@ f none usr/lib/mdb/kvm/ufs_log.so 555 root sys
 f none usr/lib/mdb/kvm/uhci.so 555 root sys
 f none usr/lib/mdb/kvm/usba.so 555 root sys
 d none usr/lib/mdb/proc/amd64 755 root bin
+f none usr/lib/mdb/proc/amd64/libavl.so 555 root sys
 f none usr/lib/mdb/proc/amd64/libc.so 555 root sys
 f none usr/lib/mdb/proc/amd64/libnvpair.so 555 root sys
 f none usr/lib/mdb/proc/amd64/libsysevent.so 555 root sys

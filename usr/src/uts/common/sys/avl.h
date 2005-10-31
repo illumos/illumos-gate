@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,7 +78,7 @@ extern "C" {
  *
  * followed by any mixture of:
  *
- * 2a. Insert nodes with: avl_find() and avl_insert()
+ * 2a. Insert nodes with: avl_add(), or avl_find() and avl_insert()
  *
  * 2b. Visited elements with:
  *	 avl_first() - returns the lowest valued node
@@ -89,7 +89,7 @@ extern "C" {
  * 2c.  Find the node with the closest value either less than or greater
  *	than a given value with avl_nearest().
  *
- * 2d. Remove individual nodes from the list/tree with avl_remove.
+ * 2d. Remove individual nodes from the list/tree with avl_remove().
  *
  * and finally when the list is being destroyed
  *
@@ -235,7 +235,17 @@ extern void *avl_nearest(avl_tree_t *tree, avl_index_t where, int direction);
 
 
 /*
- * Remove a single node from the tree.
+ * Add a single node to the tree.
+ * The node must not be in the tree, and it must not
+ * compare equal to any other node already in the tree.
+ *
+ * node   - the node to add
+ */
+extern void avl_add(avl_tree_t *tree, void *node);
+
+
+/*
+ * Remove a single node from the tree.  The node must be in the tree.
  *
  * node   - the node to remove
  */

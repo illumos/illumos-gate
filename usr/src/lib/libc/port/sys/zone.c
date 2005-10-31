@@ -40,9 +40,10 @@
 #include <stdlib.h>
 #include <errno.h>
 
-zoneid_t
-zone_create(const char *name, const char *root, const priv_set_t *privs,
-    const char *rctls, size_t rctlsz, int *extended_error)
+extern zoneid_t
+zone_create(const char *name, const char *root, const struct priv_set *privs,
+    const char *rctls, size_t rctlsz, const char *zfs, size_t zfssz,
+    int *extended_error)
 {
 	zone_def  zd;
 
@@ -51,10 +52,11 @@ zone_create(const char *name, const char *root, const priv_set_t *privs,
 	zd.zone_privs = privs;
 	zd.rctlbuf = rctls;
 	zd.rctlbufsz = rctlsz;
+	zd.zfsbuf = zfs;
+	zd.zfsbufsz = zfssz;
 	zd.extended_error = extended_error;
 
-	return ((zoneid_t)syscall(SYS_zone,
-	    ZONE_CREATE, &zd));
+	return ((zoneid_t)syscall(SYS_zone, ZONE_CREATE, &zd));
 }
 
 int

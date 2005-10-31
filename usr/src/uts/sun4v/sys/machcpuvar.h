@@ -193,7 +193,7 @@ struct cpu_node {
 	char	name[MAXSYSNAME];
 	char	fru_fmri[sizeof (CPU_FRU_FMRI) + UNUM_NAMLEN];
 	int	cpuid;
-	dnode_t	nodeid;
+	pnode_t	nodeid;
 	uint64_t	clock_freq;
 	uint_t	tick_nsec_scale;
 	union {

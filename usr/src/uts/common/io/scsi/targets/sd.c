@@ -67,10 +67,10 @@
  * Loadable module info.
  */
 #if (defined(__fibre))
-#define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver %I%"
+#define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver 1.471"
 char _depends_on[]	= "misc/scsi drv/fcp";
 #else
-#define	SD_MODULE_NAME	"SCSI Disk Driver %I%"
+#define	SD_MODULE_NAME	"SCSI Disk Driver 1.471"
 char _depends_on[]	= "misc/scsi";
 #endif
 
@@ -810,6 +810,7 @@ static int sd_pm_idletime = 1;
 #define	sd_init_event_callbacks		ssd_init_event_callbacks
 #define	sd_event_callback		ssd_event_callback
 #define	sd_disable_caching		ssd_disable_caching
+#define	sd_get_write_cache_enabled	ssd_get_write_cache_enabled
 #define	sd_make_device			ssd_make_device
 #define	sdopen				ssdopen
 #define	sdclose				ssdclose
@@ -932,6 +933,8 @@ static int sd_pm_idletime = 1;
 #define	sd_send_scsi_PERSISTENT_RESERVE_OUT	\
 					ssd_send_scsi_PERSISTENT_RESERVE_OUT
 #define	sd_send_scsi_SYNCHRONIZE_CACHE	ssd_send_scsi_SYNCHRONIZE_CACHE
+#define	sd_send_scsi_SYNCHRONIZE_CACHE_biodone	\
+					ssd_send_scsi_SYNCHRONIZE_CACHE_biodone
 #define	sd_send_scsi_MODE_SENSE		ssd_send_scsi_MODE_SENSE
 #define	sd_send_scsi_MODE_SELECT	ssd_send_scsi_MODE_SELECT
 #define	sd_send_scsi_RDWR		ssd_send_scsi_RDWR
@@ -1147,6 +1150,7 @@ static void  sd_event_callback(dev_info_t *, ddi_eventcookie_t, void *, void *);
 
 
 static int   sd_disable_caching(struct sd_lun *un);
+static int   sd_get_write_cache_enabled(struct sd_lun *un, int *is_enabled);
 static dev_t sd_make_device(dev_info_t *devi);
 
 static void  sd_update_block_info(struct sd_lun *un, uint32_t lbasize,
@@ -1375,7 +1379,9 @@ static int sd_send_scsi_PERSISTENT_RESERVE_IN(struct sd_lun *un,
 	uchar_t usr_cmd, uint16_t data_len, uchar_t *data_bufp);
 static int sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un,
 	uchar_t usr_cmd, uchar_t *usr_bufp);
-static int sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un);
+static int sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un,
+	struct dk_callback *dkc);
+static int sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp);
 static int sd_send_scsi_GET_CONFIGURATION(struct sd_lun *un,
 	struct uscsi_cmd *ucmdbuf, uchar_t *rqbuf, uint_t rqbuflen,
 	uchar_t *bufaddr, uint_t buflen);
@@ -7626,6 +7632,7 @@ sd_unit_attach(dev_info_t *devi)
 	int	reservation_flag = SD_TARGET_IS_UNRESERVED;
 	int	instance;
 	int	rval;
+	int	wc_enabled;
 	uint64_t	capacity;
 	uint_t		lbasize;
 
@@ -8486,6 +8493,19 @@ sd_unit_attach(dev_info_t *devi)
 			goto devid_failed;
 		}
 	}
+
+	/*
+	 * NOTE: Since there is currently no mechanism to
+	 * change the state of the Write Cache Enable mode select,
+	 * this code just checks the value of the WCE bit
+	 * at device attach time.  If a mechanism
+	 * is added to the driver to change WCE, un_f_write_cache_enabled
+	 * must be updated appropriately.
+	 */
+	(void) sd_get_write_cache_enabled(un, &wc_enabled);
+	mutex_enter(SD_MUTEX(un));
+	un->un_f_write_cache_enabled = (wc_enabled != 0);
+	mutex_exit(SD_MUTEX(un));
 
 	/*
 	 * Set the pstat and error stat values here, so data obtained during the
@@ -9716,6 +9736,115 @@ sd_disable_caching(struct sd_lun *un)
 
 
 /*
+ *    Function: sd_get_write_cache_enabled()
+ *
+ * Description: This routine is the driver entry point for determining if
+ *		write caching is enabled.  It examines the WCE (write cache
+ *		enable) bits of mode page 8 (MODEPAGE_CACHING).
+ *
+ *   Arguments: un - driver soft state (unit) structure
+ *   		is_enabled - pointer to int where write cache enabled state
+ *   			is returned (non-zero -> write cache enabled)
+ *
+ *
+ * Return Code: EIO
+ *		code returned by sd_send_scsi_MODE_SENSE
+ *
+ *     Context: Kernel Thread
+ *
+ * NOTE: If ioctl is added to disable write cache, this sequence should
+ * be followed so that no locking is required for accesses to
+ * un->un_f_write_cache_enabled:
+ * 	do mode select to clear wce
+ * 	do synchronize cache to flush cache
+ * 	set un->un_f_write_cache_enabled = FALSE
+ *
+ * Conversely, an ioctl to enable the write cache should be done
+ * in this order:
+ * 	set un->un_f_write_cache_enabled = TRUE
+ * 	do mode select to set wce
+ */
+
+static int
+sd_get_write_cache_enabled(struct sd_lun *un, int *is_enabled)
+{
+	struct mode_caching	*mode_caching_page;
+	uchar_t			*header;
+	size_t			buflen;
+	int			hdrlen;
+	int			bd_len;
+	int			rval = 0;
+
+	ASSERT(un != NULL);
+	ASSERT(is_enabled != NULL);
+
+	/* in case of error, flag as enabled */
+	*is_enabled = TRUE;
+
+	/*
+	 * Do a test unit ready, otherwise a mode sense may not work if this
+	 * is the first command sent to the device after boot.
+	 */
+	(void) sd_send_scsi_TEST_UNIT_READY(un, 0);
+
+	if (un->un_f_cfg_is_atapi == TRUE) {
+		hdrlen = MODE_HEADER_LENGTH_GRP2;
+	} else {
+		hdrlen = MODE_HEADER_LENGTH;
+	}
+
+	/*
+	 * Allocate memory for the retrieved mode page and its headers.  Set
+	 * a pointer to the page itself.
+	 */
+	buflen = hdrlen + MODE_BLK_DESC_LENGTH + sizeof (struct mode_caching);
+	header = kmem_zalloc(buflen, KM_SLEEP);
+
+	/* Get the information from the device. */
+	if (un->un_f_cfg_is_atapi == TRUE) {
+		rval = sd_send_scsi_MODE_SENSE(un, CDB_GROUP1, header, buflen,
+		    MODEPAGE_CACHING, SD_PATH_DIRECT);
+	} else {
+		rval = sd_send_scsi_MODE_SENSE(un, CDB_GROUP0, header, buflen,
+		    MODEPAGE_CACHING, SD_PATH_DIRECT);
+	}
+	if (rval != 0) {
+		SD_ERROR(SD_LOG_IOCTL_RMMEDIA, un,
+		    "sd_get_write_cache_enabled: Mode Sense Failed\n");
+		kmem_free(header, buflen);
+		return (rval);
+	}
+
+	/*
+	 * Determine size of Block Descriptors in order to locate
+	 * the mode page data. ATAPI devices return 0, SCSI devices
+	 * should return MODE_BLK_DESC_LENGTH.
+	 */
+	if (un->un_f_cfg_is_atapi == TRUE) {
+		struct mode_header_grp2	*mhp;
+		mhp	= (struct mode_header_grp2 *)header;
+		bd_len  = (mhp->bdesc_length_hi << 8) | mhp->bdesc_length_lo;
+	} else {
+		bd_len  = ((struct mode_header *)header)->bdesc_length;
+	}
+
+	if (bd_len > MODE_BLK_DESC_LENGTH) {
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		    "sd_get_write_cache_enabled: Mode Sense returned invalid "
+		    "block descriptor length\n");
+		kmem_free(header, buflen);
+		return (EIO);
+	}
+
+	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
+	*is_enabled = mode_caching_page->wce;
+
+	kmem_free(header, buflen);
+	return (0);
+}
+
+
+/*
  *    Function: sd_make_device
  *
  * Description: Utility routine to return the Solaris device number from
@@ -10348,8 +10477,13 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 #endif
 				mutex_exit(SD_MUTEX(un));
 				if (sd_pm_entry(un) == DDI_SUCCESS) {
-					if (sd_send_scsi_SYNCHRONIZE_CACHE(un)
-					    != 0) {
+					rval =
+					    sd_send_scsi_SYNCHRONIZE_CACHE(un,
+					    NULL);
+					/* ignore error if not supported */
+					if (rval == ENOTSUP) {
+						rval = 0;
+					} else if (rval != 0) {
 						rval = EIO;
 					}
 					sd_pm_exit(un);
@@ -11886,6 +12020,8 @@ sd_uscsi_iodone(int index, struct sd_lun *un, struct buf *bp)
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
 	SD_INFO(SD_LOG_IO, un, "sd_uscsi_iodone: entry.\n");
+
+	bp->b_private = xp->xb_private;
 
 	mutex_enter(SD_MUTEX(un));
 
@@ -19827,52 +19963,127 @@ sd_send_scsi_PERSISTENT_RESERVE_OUT(struct sd_lun *un, uchar_t usr_cmd,
  */
 
 static int
-sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un)
+sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un, struct dk_callback *dkc)
 {
-	struct	scsi_extended_sense	sense_buf;
-	union scsi_cdb		cdb;
-	struct uscsi_cmd	ucmd_buf;
-	int			status;
-
-	ASSERT(un != NULL);
-	ASSERT(!mutex_owned(SD_MUTEX(un)));
+	struct sd_uscsi_info	*uip;
+	struct uscsi_cmd	*uscmd;
+	union scsi_cdb		*cdb;
+	struct buf		*bp;
+	int			rval = 0;
 
 	SD_TRACE(SD_LOG_IO, un,
 	    "sd_send_scsi_SYNCHRONIZE_CACHE: entry: un:0x%p\n", un);
 
-	bzero(&cdb, sizeof (cdb));
-	bzero(&ucmd_buf, sizeof (ucmd_buf));
-	bzero(&sense_buf, sizeof (struct scsi_extended_sense));
+	ASSERT(un != NULL);
+	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
-	cdb.scc_cmd = SCMD_SYNCHRONIZE_CACHE;
+	cdb = kmem_zalloc(CDB_GROUP1, KM_SLEEP);
+	cdb->scc_cmd = SCMD_SYNCHRONIZE_CACHE;
 
-	ucmd_buf.uscsi_cdb	= (char *)&cdb;
-	ucmd_buf.uscsi_cdblen	= CDB_GROUP1;
-	ucmd_buf.uscsi_bufaddr	= NULL;
-	ucmd_buf.uscsi_buflen	= 0;
-	ucmd_buf.uscsi_rqbuf	= (caddr_t)&sense_buf;
-	ucmd_buf.uscsi_rqlen	= sizeof (struct scsi_extended_sense);
-	ucmd_buf.uscsi_flags	= USCSI_RQENABLE | USCSI_SILENT;
-	ucmd_buf.uscsi_timeout	= 240;
+	/*
+	 * First get some memory for the uscsi_cmd struct and cdb
+	 * and initialize for SYNCHRONIZE_CACHE cmd.
+	 */
+	uscmd = kmem_zalloc(sizeof (struct uscsi_cmd), KM_SLEEP);
+	uscmd->uscsi_cdblen = CDB_GROUP1;
+	uscmd->uscsi_cdb = (caddr_t)cdb;
+	uscmd->uscsi_bufaddr = NULL;
+	uscmd->uscsi_buflen = 0;
+	uscmd->uscsi_rqbuf = kmem_zalloc(SENSE_LENGTH, KM_SLEEP);
+	uscmd->uscsi_rqlen = SENSE_LENGTH;
+	uscmd->uscsi_rqresid = SENSE_LENGTH;
+	uscmd->uscsi_flags = USCSI_RQENABLE | USCSI_SILENT;
+	uscmd->uscsi_timeout = sd_io_time;
 
-	status = sd_send_scsi_cmd(SD_GET_DEV(un), &ucmd_buf, UIO_SYSSPACE,
-	    UIO_SYSSPACE, UIO_SYSSPACE, SD_PATH_DIRECT);
+	/*
+	 * Allocate an sd_uscsi_info struct and fill it with the info
+	 * needed by sd_initpkt_for_uscsi().  Then put the pointer into
+	 * b_private in the buf for sd_initpkt_for_uscsi().  Note that
+	 * since we allocate the buf here in this function, we do not
+	 * need to preserve the prior contents of b_private.
+	 * The sd_uscsi_info struct is also used by sd_uscsi_strategy()
+	 */
+	uip = kmem_zalloc(sizeof (struct sd_uscsi_info), KM_SLEEP);
+	uip->ui_flags = SD_PATH_DIRECT;
+	uip->ui_cmdp  = uscmd;
 
+	bp = getrbuf(KM_SLEEP);
+	bp->b_private = uip;
+
+	/*
+	 * Setup buffer to carry uscsi request.
+	 */
+	bp->b_flags  = B_BUSY;
+	bp->b_bcount = 0;
+	bp->b_blkno  = 0;
+
+	if (dkc != NULL) {
+		bp->b_iodone = sd_send_scsi_SYNCHRONIZE_CACHE_biodone;
+		uip->ui_dkc = *dkc;
+	}
+
+	bp->b_edev = SD_GET_DEV(un);
+	bp->b_dev = cmpdev(bp->b_edev);	/* maybe unnecessary? */
+
+	(void) sd_uscsi_strategy(bp);
+
+	/*
+	 * If synchronous request, wait for completion
+	 * If async just return and let b_iodone callback
+	 * cleanup.
+	 * NOTE: On return, u_ncmds_in_driver will be decremented,
+	 * but it was also incremented in sd_uscsi_strategy(), so
+	 * we should be ok.
+	 */
+	if (dkc == NULL) {
+		(void) biowait(bp);
+		rval = sd_send_scsi_SYNCHRONIZE_CACHE_biodone(bp);
+	}
+
+	return (rval);
+}
+
+
+static int
+sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
+{
+	struct sd_uscsi_info *uip;
+	struct uscsi_cmd *uscmd;
+	struct scsi_extended_sense *sense_buf;
+	struct sd_lun *un;
+	int status;
+
+	uip = (struct sd_uscsi_info *)(bp->b_private);
+	ASSERT(uip != NULL);
+
+	uscmd = uip->ui_cmdp;
+	ASSERT(uscmd != NULL);
+
+	sense_buf = (struct scsi_extended_sense *)uscmd->uscsi_rqbuf;
+	ASSERT(sense_buf != NULL);
+
+	un = ddi_get_soft_state(sd_state, SD_GET_INSTANCE_FROM_BUF(bp));
+	ASSERT(un != NULL);
+
+	status = geterror(bp);
 	switch (status) {
 	case 0:
 		break;	/* Success! */
 	case EIO:
-		switch (ucmd_buf.uscsi_status) {
+		switch (uscmd->uscsi_status) {
 		case STATUS_RESERVATION_CONFLICT:
 			/* Ignore reservation conflict */
 			status = 0;
 			goto done;
 
 		case STATUS_CHECK:
-			if ((ucmd_buf.uscsi_rqstatus == STATUS_GOOD) &&
-			    (sense_buf.es_key == KEY_ILLEGAL_REQUEST)) {
+			if ((uscmd->uscsi_rqstatus == STATUS_GOOD) &&
+			    (sense_buf->es_key == KEY_ILLEGAL_REQUEST)) {
 				/* Ignore Illegal Request error */
-				status = 0;
+				mutex_enter(SD_MUTEX(un));
+				un->un_f_sync_cache_unsupported = TRUE;
+				mutex_exit(SD_MUTEX(un));
+				status = ENOTSUP;
 				goto done;
 			}
 			break;
@@ -19881,7 +20092,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un)
 		}
 		/* FALLTHRU */
 	default:
-		/* Ignore error if the media is not present. */
+		/* Ignore error if the media is not present */
 		if (sd_send_scsi_TEST_UNIT_READY(un, 0) != 0) {
 			status = 0;
 			goto done;
@@ -19893,7 +20104,16 @@ sd_send_scsi_SYNCHRONIZE_CACHE(struct sd_lun *un)
 	}
 
 done:
-	SD_TRACE(SD_LOG_IO, un, "sd_send_scsi_SYNCHRONIZE_CACHE: exit\n");
+	if (uip->ui_dkc.dkc_callback != NULL) {
+		(*uip->ui_dkc.dkc_callback)(uip->ui_dkc.dkc_cookie, status);
+	}
+
+	ASSERT((bp->b_flags & B_REMAPPED) == 0);
+	freerbuf(bp);
+	kmem_free(uip, sizeof (struct sd_uscsi_info));
+	kmem_free(uscmd->uscsi_rqbuf, SENSE_LENGTH);
+	kmem_free(uscmd->uscsi_cdb, (size_t)uscmd->uscsi_cdblen);
+	kmem_free(uscmd, sizeof (struct uscsi_cmd));
 
 	return (status);
 }
@@ -20641,6 +20861,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case DKIOCSVTOC:
 		case DKIOCSETEFI:
 		case DKIOCSMBOOT:
+		case DKIOCFLUSHWRITECACHE:
 			mutex_exit(SD_MUTEX(un));
 			err = sd_send_scsi_TEST_UNIT_READY(un, 0);
 			if (err != 0) {
@@ -21516,6 +21737,42 @@ skip_ready_valid:
 		break;
 
 #endif /* SD_FAULT_INJECTION */
+
+	case DKIOCFLUSHWRITECACHE:
+		{
+			struct dk_callback *dkc = (struct dk_callback *)arg;
+
+			mutex_enter(SD_MUTEX(un));
+			if (un->un_f_sync_cache_unsupported ||
+			    ! un->un_f_write_cache_enabled) {
+				err = un->un_f_sync_cache_unsupported ?
+					ENOTSUP : 0;
+				mutex_exit(SD_MUTEX(un));
+				if ((flag & FKIOCTL) && dkc != NULL &&
+				    dkc->dkc_callback != NULL) {
+					(*dkc->dkc_callback)(dkc->dkc_cookie,
+					    err);
+					/*
+					 * Did callback and reported error.
+					 * Since we did a callback, ioctl
+					 * should return 0.
+					 */
+					err = 0;
+				}
+				break;
+			}
+			mutex_exit(SD_MUTEX(un));
+
+			if ((flag & FKIOCTL) && dkc != NULL &&
+			    dkc->dkc_callback != NULL) {
+				/* async SYNC CACHE request */
+				err = sd_send_scsi_SYNCHRONIZE_CACHE(un, dkc);
+			} else {
+				/* synchronous SYNC CACHE request */
+				err = sd_send_scsi_SYNCHRONIZE_CACHE(un, NULL);
+			}
+		}
+		break;
 
 	default:
 		err = ENOTTY;

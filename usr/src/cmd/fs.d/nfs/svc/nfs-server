@@ -42,8 +42,7 @@ case "$1" in
 	fi
 
 	# If /etc/dfs/dfstab exists and has non-blank or non-commented-out
-	# lines, then run shareall to export them, and then start up mountd
-	# and nfsd if anything is exported.
+	# lines, then run shareall to export them.
 
 	startnfsd=0
 	if [ -f /etc/dfs/dfstab ] && /usr/bin/egrep -v '^[	 ]*(#|$)' \
@@ -51,6 +50,14 @@ case "$1" in
 
 		/usr/sbin/shareall -F nfs
 	fi
+
+	# Share any ZFS filesystems marked for sharing.
+
+	if [ -x /usr/sbin/zfs ]; then
+		/usr/sbin/zfs share -a
+	fi
+
+	# Start up mountd and nfsd if anything is exported.
 
 	if /usr/bin/grep -s nfs /etc/dfs/sharetab >/dev/null; then
 		startnfsd=1
@@ -87,6 +94,14 @@ case "$1" in
 
 'stop')
 	/usr/bin/pkill -x -u 0,1 -z $zone '(nfsd|mountd)'
+
+	# Unshare shared ZFS filesystems.
+
+	if [ -x /usr/sbin/zfs ]; then
+		/usr/sbin/zfs unshare -a
+	fi
+
+	# Unshare remaining shared filesystems.
 
 	if /usr/bin/grep -s nfs /etc/dfs/sharetab >/dev/null; then
 		/usr/sbin/unshareall -F nfs

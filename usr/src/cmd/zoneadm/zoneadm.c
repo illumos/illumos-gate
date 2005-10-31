@@ -65,6 +65,7 @@
 #include <sys/sockio.h>
 #include <sys/mntent.h>
 #include <limits.h>
+#include <libzfs.h>
 
 #include <fcntl.h>
 #include <door.h>
@@ -1899,6 +1900,117 @@ next_fs:
 	return (return_code);
 }
 
+const char *current_dataset;
+
+/*
+ * Custom error handler for errors incurred as part of the checks below.  We
+ * want to trim off the leading 'cannot open ...' to create a better error
+ * message.  The only other way this can fail is if we fail to set the 'zoned'
+ * property.  In this case we just pass the error on verbatim.
+ */
+static void
+zfs_error_handler(const char *fmt, va_list ap)
+{
+	char buf[1024];
+
+	(void) vsnprintf(buf, sizeof (buf), fmt, ap);
+
+	if (strncmp(gettext("cannot open "), buf,
+	    strlen(gettext("cannot open "))) == 0)
+		(void) fprintf(stderr, gettext("cannot verify zfs "
+		    "dataset %s%s\n"), current_dataset, strchr(buf, ':'));
+	else
+		(void) fprintf(stderr, gettext("cannot verify zfs dataset "
+		    "%s: %s\n"), current_dataset, buf);
+}
+
+/* ARGSUSED */
+static int
+check_zvol(zfs_handle_t *zhp, void *unused)
+{
+	int ret;
+
+	if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
+		(void) fprintf(stderr, gettext("cannot verify zfs dataset %s: "
+		    "volumes cannot be specified as a zone dataset resource\n"),
+		    zfs_get_name(zhp));
+		ret = -1;
+	} else {
+		ret = zfs_iter_children(zhp, check_zvol, NULL);
+	}
+
+	zfs_close(zhp);
+
+	return (ret);
+}
+
+/*
+ * Validate that the given dataset exists on the system, and that neither it nor
+ * its children are zvols.
+ *
+ * Note that we don't do anything with the 'zoned' property here.  All
+ * management is done in zoneadmd when the zone is actually rebooted.  This
+ * allows us to automatically set the zoned property even when a zone is
+ * rebooted by the administrator.
+ */
+static int
+verify_datasets(zone_dochandle_t handle)
+{
+	int return_code = Z_OK;
+	struct zone_dstab dstab;
+	zfs_handle_t *zhp;
+	char propbuf[ZFS_MAXPROPLEN];
+	char source[ZFS_MAXNAMELEN];
+	zfs_source_t srctype;
+
+	if (zonecfg_setdsent(handle) != Z_OK) {
+		(void) fprintf(stderr, gettext("cannot verify zfs datasets: "
+		    "unable to enumerate datasets\n"));
+		return (Z_ERR);
+	}
+
+	zfs_set_error_handler(zfs_error_handler);
+
+	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
+
+		current_dataset = dstab.zone_dataset_name;
+
+		if ((zhp = zfs_open(dstab.zone_dataset_name,
+		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME)) == NULL) {
+			return_code = Z_ERR;
+			continue;
+		}
+
+		if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, propbuf,
+		    sizeof (propbuf), &srctype, source,
+		    sizeof (source), 0) == 0 &&
+		    (srctype == ZFS_SRC_INHERITED)) {
+			(void) fprintf(stderr, gettext("cannot verify zfs "
+			    "dataset %s: mountpoint cannot be inherited\n"),
+			    dstab.zone_dataset_name);
+			return_code = Z_ERR;
+			zfs_close(zhp);
+			continue;
+		}
+
+		if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
+			(void) fprintf(stderr, gettext("cannot verify zfs "
+			    "dataset %s: volumes cannot be specified as a "
+			    "zone dataset resource\n"),
+			    dstab.zone_dataset_name);
+			return_code = Z_ERR;
+		}
+
+		if (zfs_iter_children(zhp, check_zvol, NULL) != 0)
+			return_code = Z_ERR;
+
+		zfs_close(zhp);
+	}
+	(void) zonecfg_enddsent(handle);
+
+	return (return_code);
+}
+
 static int
 verify_details(int cmd_num)
 {
@@ -2008,6 +2120,8 @@ no_net:
 	if (!in_alt_root && verify_rctls(handle) != Z_OK)
 		return_code = Z_ERR;
 	if (!in_alt_root && verify_pool(handle) != Z_OK)
+		return_code = Z_ERR;
+	if (!in_alt_root && verify_datasets(handle) != Z_OK)
 		return_code = Z_ERR;
 	zonecfg_fini_handle(handle);
 	if (return_code == Z_ERR)

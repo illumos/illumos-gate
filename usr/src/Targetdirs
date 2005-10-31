@@ -81,6 +81,7 @@ ROOT.SYS= \
 	/etc/dfs  \
 	/etc/fs  \
 	/etc/fs/nfs  \
+	/etc/fs/zfs \
 	/etc/ftpd  \
 	/etc/rpcsec	\
 	/etc/security	\
@@ -307,6 +308,7 @@ ROOT.SYS2= \
 	/usr/lib/fs \
 	/usr/lib/fs/nfs \
 	/usr/lib/fs/proc \
+	/usr/lib/fs/zfs \
 	/usr/lib/mdb \
 	/usr/lib/mdb/kvm \
 	/usr/lib/mdb/proc \

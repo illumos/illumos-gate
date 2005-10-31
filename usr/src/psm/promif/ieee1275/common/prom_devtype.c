@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-1994, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,7 +30,7 @@
 #include <sys/promimpl.h>
 
 int
-prom_devicetype(dnode_t id, char *type)
+prom_devicetype(pnode_t id, char *type)
 {
 	register int len;
 	char buf[OBP_MAXDRVNAME];
@@ -48,7 +48,7 @@ prom_devicetype(dnode_t id, char *type)
 }
 
 int
-prom_getnode_byname(dnode_t id, char *name)
+prom_getnode_byname(pnode_t id, char *name)
 {
 	int len;
 	char buf[OBP_MAXDRVNAME];

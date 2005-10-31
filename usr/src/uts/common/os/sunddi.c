@@ -4500,7 +4500,7 @@ impl_ddi_bus_prop_op(dev_t dev, dev_info_t *dip, dev_info_t *ch_dip,
 	if (((dev == DDI_DEV_T_NONE) || (dev == DDI_DEV_T_ANY)) &&
 	    ndi_dev_is_prom_node(ch_dip) &&
 	    ((mod_flags & DDI_PROP_NOTPROM) == 0)) {
-		len = prom_getproplen((dnode_t)DEVI(ch_dip)->devi_nodeid, name);
+		len = prom_getproplen((pnode_t)DEVI(ch_dip)->devi_nodeid, name);
 		if (len == -1) {
 			return (DDI_PROP_NOT_FOUND);
 		}
@@ -4555,7 +4555,7 @@ impl_ddi_bus_prop_op(dev_t dev, dev_info_t *dip, dev_info_t *ch_dip,
 		/*
 		 * Call the PROM function to do the copy.
 		 */
-		(void) prom_getprop((dnode_t)DEVI(ch_dip)->devi_nodeid,
+		(void) prom_getprop((pnode_t)DEVI(ch_dip)->devi_nodeid,
 			name, buffer);
 
 		*lengthp = len; /* return the actual length to the caller */

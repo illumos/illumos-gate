@@ -1110,12 +1110,12 @@ prom_cached_reply(int cache_present)
 	if ((len = pxe_ack_cache(&ack)) <= 0)
 		return (B_FALSE);
 #else
-	dnode_t	chosen;
+	pnode_t	chosen;
 	char	*prop = PROM_BOOT_CACHED;
 
 	chosen = prom_finddevice("/chosen");
 	if (chosen == OBP_NONODE || chosen == OBP_BADNODE)
-		chosen = prom_nextnode((dnode_t)0);	/* root node */
+		chosen = prom_nextnode((pnode_t)0);	/* root node */
 
 	if ((len = prom_getproplen(chosen, prop)) <= 0)
 		return (B_FALSE);

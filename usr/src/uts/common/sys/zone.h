@@ -84,6 +84,8 @@ typedef struct {
 	caddr32_t rctlbuf;
 	size32_t rctlbufsz;
 	caddr32_t extended_error;
+	caddr32_t zfsbuf;
+	size32_t  zfsbufsz;
 } zone_def32;
 #endif
 typedef struct {
@@ -93,6 +95,8 @@ typedef struct {
 	const char *rctlbuf;
 	size_t rctlbufsz;
 	int *extended_error;
+	const char *zfsbuf;
+	size_t zfsbufsz;
 } zone_def;
 
 /* extended error information */
@@ -185,6 +189,14 @@ typedef struct zone_cmd_rval {
 
 struct pool;
 
+/*
+ * Structure to record list of ZFS datasets exported to a zone.
+ */
+typedef struct zone_dataset {
+	char		*zd_dataset;
+	list_node_t	zd_linkage;
+} zone_dataset_t;
+
 typedef struct zone {
 	/*
 	 * zone_name is never modified once set.
@@ -259,6 +271,10 @@ typedef struct zone {
 	 */
 	int		zone_ncpus;  /* zone's idea of ncpus */
 	int		zone_ncpus_online; /* zone's idea of ncpus_online */
+	/*
+	 * List of ZFS datasets exported to this zone.
+	 */
+	list_t		zone_datasets;	/* list of datasets */
 } zone_t;
 
 /*
@@ -273,7 +289,7 @@ extern rctl_hndl_t rc_zone_nlwps;
 
 extern const char * const zone_initname;
 
-extern long zone(int, void *, void *, void *, void *, void *);
+extern long zone(int, void *, void *, void *, void *);
 extern void zone_zsd_init(void);
 extern void zone_init(void);
 extern void zone_hold(zone_t *);
@@ -423,6 +439,11 @@ extern void zone_pset_set(zone_t *, psetid_t);
  */
 extern int zone_ncpus_get(zone_t *);
 extern int zone_ncpus_online_get(zone_t *);
+
+/*
+ * Returns true if the named pool/dataset is visible in the current zone.
+ */
+extern int zone_dataset_visible(const char *, int *);
 
 /*
  * zone version of uadmin()

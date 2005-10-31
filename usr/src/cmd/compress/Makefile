@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -34,6 +34,7 @@ include ../Makefile.cmd
 
 CFLAGS += $(CCVERBOSE)
 CPPFLAGS += -D_FILE_OFFSET_BITS=64
+LDLIBS += -lsec
 
 all: $(PROG) 
 

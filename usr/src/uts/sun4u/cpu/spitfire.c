@@ -538,7 +538,7 @@ cpu_setup(void)
 }
 
 static int
-getintprop(dnode_t node, char *name, int deflt)
+getintprop(pnode_t node, char *name, int deflt)
 {
 	int	value;
 
@@ -563,7 +563,7 @@ getintprop(dnode_t node, char *name, int deflt)
  * Set the magic constants of the implementation.
  */
 void
-cpu_fiximp(dnode_t dnode)
+cpu_fiximp(pnode_t dnode)
 {
 	extern int vac_size, vac_shift;
 	extern uint_t vac_mask;

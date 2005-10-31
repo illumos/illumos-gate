@@ -1117,6 +1117,9 @@ prt_acl(private_t *pri, int raw, long val)	/* print acl() code */
 		case GETACL:		s = "GETACL";		break;
 		case SETACL:		s = "SETACL";		break;
 		case GETACLCNT:		s = "GETACLCNT";	break;
+		case ACE_GETACL:	s = "ACE_GETACL";	break;
+		case ACE_SETACL:	s = "ACE_SETACL";	break;
+		case ACE_GETACLCNT:	s = "ACE_GETACLCNT";	break;
 		}
 	}
 

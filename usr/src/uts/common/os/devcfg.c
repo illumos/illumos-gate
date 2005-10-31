@@ -80,7 +80,7 @@ struct mt_config_handle {
 };
 
 struct devi_nodeid {
-	dnode_t nodeid;
+	pnode_t nodeid;
 	dev_info_t *dip;
 	struct devi_nodeid *next;
 };
@@ -196,7 +196,7 @@ i_ddi_node_cache_init()
  * The allocated node has a reference count of 0.
  */
 dev_info_t *
-i_ddi_alloc_node(dev_info_t *pdip, char *node_name, dnode_t nodeid,
+i_ddi_alloc_node(dev_info_t *pdip, char *node_name, pnode_t nodeid,
     int instance, ddi_prop_t *sys_prop, int flag)
 {
 	struct dev_info *devi;
@@ -1666,7 +1666,7 @@ ndi_devi_tryenter(dev_info_t *dip, int *circular)
  * not allowed to sleep.
  */
 int
-ndi_devi_alloc(dev_info_t *parent, char *node_name, dnode_t nodeid,
+ndi_devi_alloc(dev_info_t *parent, char *node_name, pnode_t nodeid,
     dev_info_t **ret_dip)
 {
 	ASSERT(node_name != NULL);
@@ -1686,7 +1686,7 @@ ndi_devi_alloc(dev_info_t *parent, char *node_name, dnode_t nodeid,
  * This routine may sleep and should not be called at interrupt time
  */
 void
-ndi_devi_alloc_sleep(dev_info_t *parent, char *node_name, dnode_t nodeid,
+ndi_devi_alloc_sleep(dev_info_t *parent, char *node_name, pnode_t nodeid,
     dev_info_t **ret_dip)
 {
 	ASSERT(node_name != NULL);
@@ -3652,7 +3652,7 @@ init_spec_child(dev_info_t *pdip, struct hwc_spec *specp, uint_t flags)
 		return;
 	}
 
-	dip = i_ddi_alloc_node(pdip, node_name, (dnode_t)DEVI_PSEUDO_NODEID,
+	dip = i_ddi_alloc_node(pdip, node_name, (pnode_t)DEVI_PSEUDO_NODEID,
 	    -1, specp->hwc_devi_sys_prop_ptr, KM_SLEEP);
 
 	if (dip == NULL)
@@ -5367,7 +5367,7 @@ path_to_major(char *path)
 {
 	dev_info_t *dip;
 	char *p, *q;
-	dnode_t nodeid;
+	pnode_t nodeid;
 	major_t maj;
 
 	/*
@@ -6390,7 +6390,7 @@ mt_config_driver(struct mt_config_handle *hdl)
  * NOTE: This function will return NULL for .conf nodeids.
  */
 dev_info_t *
-e_ddi_nodeid_to_dip(dnode_t nodeid)
+e_ddi_nodeid_to_dip(pnode_t nodeid)
 {
 	dev_info_t		*dip = NULL;
 	struct devi_nodeid	*prev, *elem;

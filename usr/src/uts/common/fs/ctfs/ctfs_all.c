@@ -99,7 +99,7 @@ ctfs_adir_do_lookup(vnode_t *vp, const char *nm, vnode_t **vpp, ino64_t *inop)
 	if (*nm != '\0')
 		return (ENOENT);
 
-	ct = contract_ptr(i, VTOZ(vp)->zone_uniqid);
+	ct = contract_ptr(i, VTOZONE(vp)->zone_uniqid);
 	if (ct == NULL)
 		return (ENOENT);
 
@@ -118,7 +118,7 @@ ctfs_adir_do_readdir(vnode_t *vp, struct dirent64 *dp, int *eofp,
 	uint64_t zuniqid;
 	ctid_t next;
 
-	zuniqid = VTOZ(vp)->zone_uniqid;
+	zuniqid = VTOZONE(vp)->zone_uniqid;
 	next = contract_lookup(zuniqid, *offp);
 
 	if (next == -1) {

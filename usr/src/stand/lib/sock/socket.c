@@ -1248,7 +1248,7 @@ get_netconfig_strategy(void)
 	char	lbootpath[OBP_MAXPATHLEN];
 	char	net_options[NCT_BUFSIZE];
 	char	*op, *nop, *sp;
-	dnode_t	cn;
+	pnode_t	cn;
 	int	proplen;
 
 	/* If the PROM DHCP cache exists, we're done */

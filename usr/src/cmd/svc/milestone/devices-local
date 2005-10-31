@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -30,8 +30,6 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-# GLXXX - The SysV copyright should be unnecessary now?
-
 # Initiate the device reconfiguration process in case we need some
 # device links established so that we can successfully perform our
 # remaining standard mounts.
@@ -39,6 +37,8 @@
 if [ `/sbin/zonename` != "global" ]; then
 	exit 0
 fi
+
+. /lib/svc/share/smf_include.sh
 
 svcprop -q -p system/reconfigure system/svc/restarter:default
 if [ $? -eq 0 ]; then
@@ -72,6 +72,11 @@ if [ $? -eq 0 ]; then
 		rm -f /dev/fb
 		ln -s $1 /dev/fb
 	fi
+fi
+
+# Create any zvol devices
+if [ -x /usr/sbin/zfs ]; then
+	/usr/sbin/zfs volinit || exit $SMF_EXIT_ERR_FATAL
 fi
 
 exit 0

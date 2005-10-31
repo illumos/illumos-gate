@@ -44,6 +44,7 @@ d none usr/lib/mdb/disasm 755 root sys
 d none usr/lib/mdb/kvm 755 root sys
 d none usr/lib/mdb/proc 755 root sys
 f none usr/lib/mdb/proc/ld.so 555 root sys
+f none usr/lib/mdb/proc/libavl.so 555 root sys
 f none usr/lib/mdb/proc/libc.so 555 root sys
 f none usr/lib/mdb/proc/libnvpair.so 555 root sys
 f none usr/lib/mdb/proc/libsysevent.so 555 root sys

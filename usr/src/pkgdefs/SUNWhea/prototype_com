@@ -187,6 +187,7 @@ f none usr/include/libsysevent.h 644 root bin
 f none usr/include/libsysevent_impl.h 644 root bin
 f none usr/include/libsvm.h 644 root bin
 f none usr/include/libw.h 644 root bin
+f none usr/include/libzfs.h 644 root bin
 f none usr/include/libzoneinfo.h 644 root bin
 f none usr/include/limits.h 644 root bin
 f none usr/include/linenum.h 644 root bin
@@ -714,6 +715,7 @@ f none usr/include/sys/fs/ufs_prot.h 644 root bin
 f none usr/include/sys/fs/ufs_quota.h 644 root bin
 f none usr/include/sys/fs/ufs_snap.h 644 root bin
 f none usr/include/sys/fs/ufs_trans.h 644 root bin
+f none usr/include/sys/fs/zfs.h 644 root bin
 f none usr/include/sys/fs_subr.h 644 root bin
 f none usr/include/sys/fsid.h 644 root bin
 f none usr/include/sys/fssnap.h 644 root bin

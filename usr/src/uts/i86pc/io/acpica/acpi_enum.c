@@ -568,7 +568,7 @@ get_bus_dip(char *nodename, dev_info_t *isa_dip)
 	if (i8042_dip)
 		return (i8042_dip);
 
-	ndi_devi_alloc_sleep(isa_dip, "i8042", (dnode_t)DEVI_SID_NODEID,
+	ndi_devi_alloc_sleep(isa_dip, "i8042", (pnode_t)DEVI_SID_NODEID,
 	    &i8042_dip);
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, i8042_dip,
 	    "reg", (int *)i8042_regs, 6);
@@ -818,7 +818,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 			dip = get_bus_dip(devname, dip);
 		}
 		ndi_devi_alloc_sleep(dip, devname,
-		    (dnode_t)DEVI_SID_NODEID, &xdip);
+		    (pnode_t)DEVI_SID_NODEID, &xdip);
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 		    "compatible", hidstr);
 		(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
@@ -830,7 +830,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 			/* a keyboard device includes PNP03xx */
 			dip = get_bus_dip(keyboard_alias, dip);
 			ndi_devi_alloc_sleep(dip, keyboard_alias,
-			    (dnode_t)DEVI_SID_NODEID, &xdip);
+			    (pnode_t)DEVI_SID_NODEID, &xdip);
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
 			    "compatible", "pnpPNP,303");
 			(void) ndi_prop_update_string(DDI_DEV_T_NONE, xdip,
@@ -840,7 +840,7 @@ isa_acpi_callback(ACPI_HANDLE ObjHandle, uint32_t NestingLevel, void *a,
 				/* a mouse device include PNP0Fxx */
 				dip = get_bus_dip(mouse_alias, dip);
 				ndi_devi_alloc_sleep(dip, mouse_alias,
-				    (dnode_t)DEVI_SID_NODEID, &xdip);
+				    (pnode_t)DEVI_SID_NODEID, &xdip);
 				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
 				    xdip, "compatible", "pnpPNP,f03");
 				(void) ndi_prop_update_string(DDI_DEV_T_NONE,
@@ -1017,7 +1017,7 @@ acpi_isa_device_enum(dev_info_t *isa_dip)
 	usedrdip = ddi_find_devinfo(USED_RESOURCES, -1, 0);
 	if (usedrdip == NULL) {
 		ndi_devi_alloc_sleep(ddi_root_node(), USED_RESOURCES,
-		    (dnode_t)DEVI_SID_NODEID, &usedrdip);
+		    (pnode_t)DEVI_SID_NODEID, &usedrdip);
 
 	}
 

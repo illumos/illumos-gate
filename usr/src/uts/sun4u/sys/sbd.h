@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,7 +66,7 @@ typedef struct {
 } sbd_devattr_t;
 
 typedef struct {
-	dnode_t		dnodeid;
+	pnode_t		dnodeid;
 	uint64_t	*basepa;
 } sbd_basephys_t;
 

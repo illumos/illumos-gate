@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -128,7 +128,7 @@ prom_serengeti_tunnel_switch(uint_t node, uint_t board)
 }
 
 int
-prom_serengeti_cpu_off(dnode_t node)
+prom_serengeti_cpu_off(pnode_t node)
 {
 	cell_t ci[5];
 	int rv;
@@ -197,7 +197,7 @@ prom_serengeti_get_ecacheunum(int cpuid, unsigned long long physaddr, char *buf,
 }
 
 int
-prom_serengeti_wakeupcpu(dnode_t node)
+prom_serengeti_wakeupcpu(pnode_t node)
 {
 	cell_t ci[5];
 	int	rv;

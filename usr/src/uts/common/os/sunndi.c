@@ -957,7 +957,7 @@ i_dc_devi_create(struct devctl_iocdata *dcp, dev_info_t *pdip,
 	/*
 	 * construct a new dev_info node with a user-provided nodename
 	 */
-	ndi_devi_alloc_sleep(pdip, cname, (dnode_t)DEVI_SID_NODEID, &cdip);
+	ndi_devi_alloc_sleep(pdip, cname, (pnode_t)DEVI_SID_NODEID, &cdip);
 
 	/*
 	 * create hardware properties for each member in the property

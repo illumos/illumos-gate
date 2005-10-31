@@ -23,8 +23,8 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright (c) 1997 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -37,10 +37,4 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/acl.h>
-
-int aclcheck(aclent_t *aclbufp, int nentries, int *which);
-int aclfrommode(aclent_t *aclbufp, int nentries, mode_t *modep);
-aclent_t *aclfromtext(char *aclimport, int *aclcnt);
-int aclsort(int nentries, int calcmask, aclent_t *aclbufp);
-int acltomode(aclent_t *aclbufp, int nentries, mode_t *modep);
-char *acltotext(aclent_t *aclp, int aclcnt);
+#include <aclutils.h>

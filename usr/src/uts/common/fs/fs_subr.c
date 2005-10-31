@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@
 #include <sys/kmem.h>
 #include <sys/file.h>
 #include <sys/nbmlock.h>
+#include <acl/acl_common.h>
 
 static callb_cpr_t *frlock_serialize_blocked(flk_cb_when_t, void *);
 
@@ -631,4 +632,85 @@ fs_vnevent_support(vnode_t *vp, vnevent_t vnevent)
 {
 	ASSERT(vp != NULL);
 	return (0);
+}
+
+/*
+ * return 1 for non-trivial ACL.
+ *
+ * NB: It is not necessary for the caller to VOP_RWLOCK since
+ *	we only issue VOP_GETSECATTR.
+ *
+ * Returns 0 == trivial
+ *         1 == NOT Trivial
+ *	   <0 could not determine.
+ */
+int
+fs_acl_nontrivial(vnode_t *vp, cred_t *cr)
+{
+	ulong_t		acl_styles;
+	ulong_t		acl_flavor;
+	vsecattr_t 	vsecattr;
+	int 		error;
+	int		isnontrivial;
+
+	/* determine the forms of ACLs maintained */
+	error = VOP_PATHCONF(vp, _PC_ACL_ENABLED, &acl_styles, cr);
+
+	/* clear bits we don't understand and establish default acl_style */
+	acl_styles &= (_ACL_ACLENT_ENABLED | _ACL_ACE_ENABLED);
+	if (error || (acl_styles == 0))
+		acl_styles = _ACL_ACLENT_ENABLED;
+
+	vsecattr.vsa_aclentp = NULL;
+	vsecattr.vsa_dfaclentp = NULL;
+	vsecattr.vsa_aclcnt = 0;
+	vsecattr.vsa_dfaclcnt = 0;
+
+	while (acl_styles) {
+		/* select one of the styles as current flavor */
+		acl_flavor = 0;
+		if (acl_styles & _ACL_ACLENT_ENABLED) {
+			acl_flavor = _ACL_ACLENT_ENABLED;
+			vsecattr.vsa_mask = VSA_ACLCNT | VSA_DFACLCNT;
+		} else if (acl_styles & _ACL_ACE_ENABLED) {
+			acl_flavor = _ACL_ACE_ENABLED;
+			vsecattr.vsa_mask = VSA_ACECNT | VSA_ACE;
+		}
+
+		ASSERT(vsecattr.vsa_mask && acl_flavor);
+		error = VOP_GETSECATTR(vp, &vsecattr, 0, cr);
+		if (error == 0)
+			break;
+
+		/* that flavor failed */
+		acl_styles &= ~acl_flavor;
+	}
+
+	/* if all styles fail then assume trivial */
+	if (acl_styles == 0)
+		return (0);
+
+	/* process the flavor that worked */
+	isnontrivial = 0;
+	if (acl_flavor & _ACL_ACLENT_ENABLED) {
+		if (vsecattr.vsa_aclcnt > MIN_ACL_ENTRIES)
+			isnontrivial = 1;
+		if (vsecattr.vsa_aclcnt && vsecattr.vsa_aclentp != NULL)
+			kmem_free(vsecattr.vsa_aclentp,
+			    vsecattr.vsa_aclcnt * sizeof (aclent_t));
+		if (vsecattr.vsa_dfaclcnt && vsecattr.vsa_dfaclentp != NULL)
+			kmem_free(vsecattr.vsa_dfaclentp,
+			    vsecattr.vsa_dfaclcnt * sizeof (aclent_t));
+	}
+	if (acl_flavor & _ACL_ACE_ENABLED) {
+
+		isnontrivial = ace_trivial(vsecattr.vsa_aclentp,
+		    vsecattr.vsa_aclcnt);
+
+		if (vsecattr.vsa_aclcnt && vsecattr.vsa_aclentp != NULL)
+			kmem_free(vsecattr.vsa_aclentp,
+			    vsecattr.vsa_aclcnt * sizeof (ace_t));
+		/* ACE has no vsecattr.vsa_dfaclcnt */
+	}
+	return (isnontrivial);
 }

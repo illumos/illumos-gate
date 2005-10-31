@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,7 +19,14 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #
 # This package information file defines software dependencies associated
 # with the pkg.  You can define three types of pkg dependencies with this file:
@@ -56,3 +60,4 @@ P SUNWpool	Resource Pools
 P SUNWluu	Live Upgrade (usr)
 P SUNWluzone	Live Upgrade (zones support)
 P SUNWtecla	Tecla command-line editing library
+P SUNWzfsu	ZFS (Usr)

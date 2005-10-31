@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,6 +36,7 @@ SRCS=           $(OBJS:%.o=../%.c)
 
 include ../../Makefile.cmd
 
+LDLIBS += -lsec
 CFLAGS	+=	$(CCVERBOSE)
 $(XPG4) := CFLAGS += -DXPG4
 

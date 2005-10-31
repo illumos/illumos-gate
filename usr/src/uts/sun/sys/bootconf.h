@@ -171,7 +171,7 @@ typedef unsigned long long boot_cell_t;
 #define	boot_offt2cell(u)	((boot_cell_t)((off_t)(u)))
 #define	boot_size2cell(u)	((boot_cell_t)((size_t)(u)))
 #define	boot_phandle2cell(ph)	((boot_cell_t)((unsigned)((phandle_t)(ph))))
-#define	boot_dnode2cell(d)	((boot_cell_t)((unsigned)((dnode_t)(d))))
+#define	boot_dnode2cell(d)	((boot_cell_t)((unsigned)((pnode_t)(d))))
 #define	boot_ihandle2cell(ih)	((boot_cell_t)((unsigned)((ihandle_t)(ih))))
 
 #define	boot_cell2ptr(p)	((void *)(uintptr_t)((boot_cell_t)(p)))
@@ -181,7 +181,7 @@ typedef unsigned long long boot_cell_t;
 #define	boot_cell2offt(u)	((off_t)((boot_cell_t)(u)))
 #define	boot_cell2size(u)	((size_t)((boot_cell_t)(u)))
 #define	boot_cell2phandle(ph)	((phandle_t)((boot_cell_t)(ph)))
-#define	boot_cell2dnode(d)	((dnode_t)((boot_cell_t)(d)))
+#define	boot_cell2dnode(d)	((pnode_t)((boot_cell_t)(d)))
 #define	boot_cell2ihandle(ih)	((ihandle_t)((boot_cell_t)(ih)))
 #define	boot_cells2ull(h, l)	((unsigned long long)(boot_cell_t)(l))
 

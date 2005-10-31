@@ -717,7 +717,7 @@ scsa1394_create_children(scsa1394_state_t *sp)
 		scsa1394_dtype2name(dtype, &node_name, &driver_name);
 
 		ndi_devi_alloc_sleep(sp->s_dip, node_name,
-		    (dnode_t)DEVI_SID_NODEID, &cdip);
+		    (pnode_t)DEVI_SID_NODEID, &cdip);
 
 		ret = ndi_prop_update_int(DDI_DEV_T_NONE, cdip, "target", 0);
 		if (ret != DDI_PROP_SUCCESS) {

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,6 +112,14 @@ main(int argc, char *argv[])
 		/* Get ACL info of the files */
 		errno = 0;
 		if ((aclcnt = acl(filep, GETACLCNT, 0, NULL)) < 0) {
+			if (errno == ENOSYS) {
+				(void) fprintf(stderr,
+				    gettext("File system doesn't support "
+				    "aclent_t style ACL's.\n"
+				    "See acl(5) for more information on "
+				    "Solaris ACL support.\n"));
+				exit(2);
+			}
 			perror(filep);
 			exit(2);
 		}
@@ -301,7 +309,7 @@ pruname(uid_t uid)
 	static char	uidp[10];	/* big enough */
 
 	passwdp = getpwuid(uid);
-	if (passwdp == (struct passwd *) NULL) {
+	if (passwdp == (struct passwd *)NULL) {
 		/* could not get passwd information: display uid instead */
 		(void) sprintf(uidp, "%ld", (long)uid);
 		return (uidp);
@@ -316,7 +324,7 @@ prgname(gid_t gid)
 	static char	gidp[10];	/* big enough */
 
 	groupp = getgrgid(gid);
-	if (groupp == (struct group *) NULL) {
+	if (groupp == (struct group *)NULL) {
 		/* could not get group information: display gid instead */
 		(void) sprintf(gidp, "%ld", (long)gid);
 		return (gidp);

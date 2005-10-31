@@ -2327,7 +2327,7 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 	 */
 	if (cpu_nex_devi == NULL) {
 		if (ndi_devi_alloc(ddi_root_node(), "cpus",
-		    (dnode_t)DEVI_SID_NODEID, &cpu_nex_devi) != NDI_SUCCESS) {
+		    (pnode_t)DEVI_SID_NODEID, &cpu_nex_devi) != NDI_SUCCESS) {
 			mutex_exit(&cpu_node_lock);
 			return;
 		}

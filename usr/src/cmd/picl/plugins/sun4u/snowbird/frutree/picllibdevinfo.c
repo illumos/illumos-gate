@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,10 +73,10 @@ typedef struct {
 	int		n_serial;
 	int		n_parallel;
 	int		n_network;
-} list_t;
+} plist_t;
 
 static void
-free_list(list_t *listptr)
+free_list(plist_t *listptr)
 {
 	port_info_t	*tmp;
 	port_info_t	*nextptr;
@@ -110,7 +110,7 @@ compare(const void *a, const void *b)
  * assigns GeoAddr property for ports based on bus-addr
  */
 static picl_errno_t
-assign_geo_addr(list_t *list, frutree_port_type_t type)
+assign_geo_addr(plist_t *list, frutree_port_type_t type)
 {
 
 	int i = 0;
@@ -181,7 +181,7 @@ assign_geo_addr(list_t *list, frutree_port_type_t type)
 }
 
 static picl_errno_t
-create_port_config_info(list_t *list, frutree_device_args_t *devp)
+create_port_config_info(plist_t *list, frutree_device_args_t *devp)
 {
 	port_info_t *port_info = NULL;
 	frutree_cache_t	*cachep = NULL;
@@ -316,7 +316,7 @@ probe_tree(di_node_t node, void *arg)
 	char *devfs_path = NULL;
 	char *bus_addr = NULL;
 	char *drv_name = NULL;
-	list_t *listptr = NULL;
+	plist_t *listptr = NULL;
 	port_info_t *port_info = NULL;
 	frutree_port_type_t port_type = UNKNOWN_PORT;
 	di_minor_t minor = DI_MINOR_NIL;
@@ -324,7 +324,7 @@ probe_tree(di_node_t node, void *arg)
 	if (arg == NULL) {
 		return (DI_WALK_TERMINATE);
 	}
-	listptr = (list_t *)arg;
+	listptr = (plist_t *)arg;
 
 	while ((minor = di_minor_next(node, minor)) != DI_MINOR_NIL) {
 		nodetype = di_minor_nodetype(minor);
@@ -412,7 +412,7 @@ probe_libdevinfo(frutree_frunode_t *frup, frutree_device_args_t ** device,
 {
 	di_node_t	rnode;
 	picl_errno_t	rc;
-	list_t	list;
+	plist_t	list;
 
 	if (frup == NULL) {
 		return (PICL_FAILURE);

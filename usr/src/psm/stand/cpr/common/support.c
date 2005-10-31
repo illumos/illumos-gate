@@ -99,7 +99,7 @@ cpr_reset_properties(void)
 	int fd, len, rc, prop_errors;
 	cprop_t *prop, *tail;
 	cdef_t cdef;
-	dnode_t node;
+	pnode_t node;
 
 	str = "cpr_reset_properties";
 	default_path = CPR_DEFAULT;

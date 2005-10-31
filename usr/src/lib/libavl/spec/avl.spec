@@ -92,6 +92,12 @@ declaration	ulong_t avl_numnodes(avl_tree_t *tree)
 version		SUNWprivate_1.1
 end
 
+function	avl_add
+include		<sys/avl.h>
+declaration	void avl_remove(avl_tree_t *tree, void *data)
+version		SUNWprivate_1.1
+end
+
 function	avl_remove
 include		<sys/avl.h>
 declaration	void avl_remove(avl_tree_t *tree, void *data)

@@ -261,7 +261,7 @@ cb_alloc(size_t size, uint_t align, caddr_t *vap, physaddr_t *pap)
 
 
 static int
-get_intprop(dnode_t node, caddr_t prop, void *dst)
+get_intprop(pnode_t node, caddr_t prop, void *dst)
 {
 	int len, glen;
 
@@ -280,11 +280,11 @@ get_intprop(dnode_t node, caddr_t prop, void *dst)
  * sets globals:
  * 	cb_mid
  */
-static dnode_t
+static pnode_t
 get_cpu_node(void)
 {
 	static char *props[] = { "upa-portid", "portid", NULL };
-	dnode_t node;
+	pnode_t node;
 	char *str, *name, **propp;
 	uint_t cpu_id;
 	int err;
@@ -331,7 +331,7 @@ int
 cb_get_props(void)
 {
 	uint_t clock_mhz;
-	dnode_t node;
+	pnode_t node;
 	struct cb_props *cbp;
 	static struct cb_props cpu_data[] = {
 		"#dtlb-entries", &cb_dents,

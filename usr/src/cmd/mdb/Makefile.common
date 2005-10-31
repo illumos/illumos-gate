@@ -30,11 +30,13 @@
 # 
 COMMON_MODULES_PROC = \
 	dof \
+	libavl \
 	libc \
 	libnvpair \
 	libsysevent \
 	libumem \
 	libuutil \
+	libzpool \
 	mdb_ds \
 	mdb_test
 
@@ -72,4 +74,5 @@ COMMON_MODULES_KVM = \
 	sppp \
 	ufs \
 	ufs_log \
-	usba
+	usba \
+	zfs

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1989, 1998-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -84,7 +84,7 @@ $(ROOTSECDEV)/% :=              GROUP = bin
 
 $(ROOTSECLIB)/% :=		FILEMODE = 0751
 
-allocate :=	LDLIBS += -lbsm -lsecdb
+allocate :=	LDLIBS += -lbsm -lsec -lsecdb
 
 .KEEP_STATE:
 

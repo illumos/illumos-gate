@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,23 +101,23 @@ typedef struct node {
 typedef struct linked_list {
 	node_t *first;
 	int num_nodes;
-} list_t;
+} plist_t;
 
 typedef struct scsi_info {
 	frutree_frunode_t *frup;
 	cfga_list_data_t *cfgalist;
-	list_t *list;
+	plist_t *list;
 	int num_list;
 	boolean_t compare_cfgadm;
 	int geo_addr;
 } scsi_info_t;
 
-static list_t *scsi_list = NULL;
+static plist_t *scsi_list = NULL;
 static cfga_list_data_t *cfglist = NULL;
 static int nlist = 0;
 
 static void
-free_list(list_t *list)
+free_list(plist_t *list)
 {
 	node_t	*tmp = NULL, *tmp1 = NULL;
 
@@ -136,7 +136,7 @@ free_list(list_t *list)
  * This routine gets the list of scsi controllers present
  */
 static cfga_err_t
-populate_controllers_list(list_t *cntrl_list, cfga_list_data_t *list, int num)
+populate_controllers_list(plist_t *cntrl_list, cfga_list_data_t *list, int num)
 {
 	int i;
 	node_t *nodeptr = NULL;
@@ -202,7 +202,7 @@ scsi_info_init()
 		}
 	}
 
-	scsi_list = (list_t *)malloc(sizeof (list_t));
+	scsi_list = (plist_t *)malloc(sizeof (plist_t));
 	if (scsi_list == NULL) {
 		free(cfglist);
 		return (PICL_NOSPACE);
@@ -231,7 +231,7 @@ scsi_info_fini()
  * caller should allocate memory for ap_id
  */
 static picl_errno_t
-find_scsi_controller(char *devfs_path, list_t *list, char *ap_id)
+find_scsi_controller(char *devfs_path, plist_t *list, char *ap_id)
 {
 	node_t	*tmp = NULL;
 	char *lasts = NULL;
@@ -274,7 +274,7 @@ get_scsislot_name(char *devfs_path, char *bus_addr, char *name)
 	picl_errno_t	rc;
 	int target_id = 0;
 	int numlist;
-	list_t			list;
+	plist_t			list;
 	cfga_err_t		ap_list_err;
 	cfga_list_data_t 	*cfgalist = NULL;
 	char controller[MAXPATHLEN];
@@ -410,7 +410,7 @@ get_bus_addr(char *scsi_loc, char **bus_addr)
  */
 static picl_errno_t
 dyn_probe_for_scsi_frus(frutree_frunode_t *frup, cfga_list_data_t *cfgalist,
-	list_t *list, int numlist)
+	plist_t *list, int numlist)
 {
 	picl_errno_t rc;
 	int i, geo_addr = 0;
@@ -797,7 +797,7 @@ probe_disks(di_node_t node, void *arg)
 
 static picl_errno_t
 probe_scsi_in_libdevinfo(frutree_frunode_t *frup, cfga_list_data_t *cfgalist,
-	list_t *list, int num_list, boolean_t compare_cfgadm)
+	plist_t *list, int num_list, boolean_t compare_cfgadm)
 {
 	di_node_t	rnode;
 	scsi_info_t	*scsi_data = NULL;
@@ -840,7 +840,7 @@ probe_for_scsi_frus(frutree_frunode_t *frup)
 {
 	int numlist;
 	picl_errno_t rc;
-	list_t list;
+	plist_t list;
 	cfga_err_t ap_list_err;
 	cfga_list_data_t *cfgalist = NULL;
 

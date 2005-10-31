@@ -1,0 +1,83 @@
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+
+LIBRARY= libzpool.a
+VERS= .1
+
+include ../../../uts/common/Makefile.files
+KERNEL_OBJS = kernel.o taskq.o util.o
+LIST_OBJS = list.o
+
+OBJECTS=$(ZFS_COMMON_OBJS) $(ZFS_SHARED_OBJS) $(KERNEL_OBJS) $(LIST_OBJS)
+
+# include library definitions
+include ../../Makefile.lib
+
+ZFS_COMMON_SRCS=	$(ZFS_COMMON_OBJS:%.o=../../../uts/common/fs/zfs/%.c)
+SHARED_SRCS=		$(ZFS_SHARED_OBJS:%.o=../../../common/zfs/%.c)
+KERNEL_SRCS=		$(KERNEL_OBJS:%.o=../common/%.c)
+LIST_SRCS=		$(LIST_OBJS:%.o=../../../uts/common/os/%.c)
+
+SRCS=$(ZFS_COMMON_SRCS) $(KERNEL_SRCS) $(LIST_SRCS)
+SRCDIR=		../common
+
+LIBS +=		$(LINTLIB)
+
+INCS += -I../common
+INCS += -I../../../uts/common/fs/zfs
+INCS += -I../../../common/zfs
+
+$(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
+
+C99MODE=	-xc99=%all
+C99LMODE=	-Xc99=%all
+
+CFLAGS +=	-g $(CCVERBOSE) $(CNOGLOBAL)
+CFLAGS64 +=	-g $(CCVERBOSE) $(CNOGLOBAL)
+LDLIBS +=	-lumem -lavl -lnvpair -lc
+CPPFLAGS +=	$(INCS)
+
+.KEEP_STATE:
+
+all: $(LIBS)
+
+lint: $(LINTLIB)
+
+include ../../Makefile.targ
+
+objs/%.o pics/%.o: ../../../uts/common/fs/zfs/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+objs/%.o pics/%.o: ../../../common/zfs/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+
+objs/%.o pics/%.o: ../../../uts/common/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
+

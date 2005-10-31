@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1994, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,7 +39,7 @@ int
 prom_getmacaddr(ihandle_t hd, caddr_t ea)
 {
 	idprom_t idprom;
-	dnode_t macnodeid;
+	pnode_t macnodeid;
 
 	/*
 	 * Look for the 'mac-address' property in the device node
@@ -64,9 +64,9 @@ prom_getmacaddr(ihandle_t hd, caddr_t ea)
 	 * This code (idprom) is SMCC (and compatibles) platform-centric.
 	 * This code always returns the platform mac address.
 	 */
-	if (prom_getidprom((caddr_t) &idprom, sizeof (idprom)) == 0) {
-		register char *f = (char *) idprom.id_ether;
-		register char *t = ea;
+	if (prom_getidprom((caddr_t)&idprom, sizeof (idprom)) == 0) {
+		char *f = (char *)idprom.id_ether;
+		char *t = ea;
 		int i;
 
 		for (i = 0; i < sizeof (idprom.id_ether); ++i)

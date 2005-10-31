@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-1995, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,7 +45,7 @@
 int
 prom_version_name(char *buf, int buflen)
 {
-	dnode_t nodeid;
+	pnode_t nodeid;
 	int proplen;
 	char *unknown = "unknown";
 
@@ -59,7 +59,7 @@ prom_version_name(char *buf, int buflen)
 	 */
 
 	nodeid = prom_finddevice("/openprom");
-	if (nodeid == (dnode_t)-1)
+	if (nodeid == (pnode_t)-1)
 		return (-1);
 
 	proplen = prom_bounded_getprop(nodeid, "version", buf, buflen - 1);

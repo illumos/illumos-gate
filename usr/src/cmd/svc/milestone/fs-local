@@ -28,6 +28,8 @@
 
 . /lib/svc/share/smf_include.sh
 
+result=$SMF_EXIT_OK
+
 # Mount all local filesystems.
 
 cd /; /sbin/mountall -l >/dev/msglog
@@ -36,7 +38,7 @@ if [ $rc -ne 0 ]; then
 	msg="WARNING: /sbin/mountall -l failed: exit status $rc"
 	echo $msg
 	echo "$SMF_FMRI:" $msg >/dev/msglog
-	exit $SMF_EXIT_ERR_FATAL
+	result=$SMF_EXIT_ERR_FATAL
 fi
 
 # get rid of transient reboot entry in GRUB menu
@@ -82,4 +84,17 @@ if [ -n "$vlist" ]; then
 	fi
 fi
 
-exit $SMF_EXIT_OK
+# Mount all ZFS filesystems.
+
+if [ -x /usr/sbin/zfs ]; then
+	/usr/sbin/zfs mount -a >/dev/msglog 2>&1 
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		msg="WARNING: /usr/sbin/zfs mount -a failed: exit status $rc"
+		echo $msg
+		echo "$SMF_FMRI:" $msg >/dev/msglog
+		result=$SMF_EXIT_ERR_FATAL
+	fi
+fi
+
+exit $result

@@ -2937,7 +2937,7 @@ static void
 do_prom_version_check(void)
 {
 	int i;
-	dnode_t node;
+	pnode_t node;
 	char buf[64];
 	static char drev[] = "Down-rev firmware detected%s\n"
 		"\tPlease upgrade to the following minimum version:\n"

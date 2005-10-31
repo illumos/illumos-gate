@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@
 #include <sys/sendfile.h>
 #include <sys/sysmacros.h>
 #include <sys/wait.h>
+#include <aclutils.h>
 
 /*
  * It seems like Berkeley got these from pathnames.h?
@@ -83,6 +84,7 @@ static int iamremote;
 static int iamrecursive;
 static int targetshouldbedirectory;
 static int aclflag;
+static int acl_aclflag;
 static int retval = 0;
 static int portnumber = 0;
 
@@ -200,14 +202,14 @@ main(int argc, char *argv[])
 	}
 
 	fflag = tflag = 0;
-	while ((ch = getopt(argc, argv, "axdfprtz:D:k:P:")) != EOF) {
+	while ((ch = getopt(argc, argv, "axdfprtz:D:k:P:Z")) != EOF) {
 		switch (ch) {
 		case 'd':
 			targetshouldbedirectory = 1;
 			break;
 		case 'f':			/* "from" */
 			fflag = 1;
-			if (aclflag)
+			if (aclflag | acl_aclflag)
 				/* ok response */
 				(void) desrcpwrite(rem, "", 1);
 			break;
@@ -219,6 +221,9 @@ main(int argc, char *argv[])
 			break;
 		case 't':			/* "to" */
 			tflag = 1;
+			break;
+		case 'Z':
+			acl_aclflag++;
 			break;
 		case 'x':
 			if (!krb5_privacy_allowed()) {
@@ -652,9 +657,7 @@ toremote(char *targ, int argc, char *argv[])
 				if (response() < 0)
 					exit(1);
 
-				}
-				else
-				{
+				} else {
 
 				/*
 				 * ACL support: try to find out if the remote
@@ -663,8 +666,13 @@ toremote(char *targ, int argc, char *argv[])
 				 * purpose.
 				 */
 				aclflag = 1;
+				acl_aclflag = 1;
 
-				(void) snprintf(bp, buffersize, "%s -t %s",
+				/*
+				 * First see if the remote side will support
+				 * both aclent_t and ace_t acl's?
+				 */
+				(void) snprintf(bp, buffersize, "%s -tZ %s",
 							cmd_sunw, targ);
 				rem = rcmd_af(&host, portnumber, pwd->pw_name,
 					    tuser ? tuser : pwd->pw_name,
@@ -681,32 +689,49 @@ toremote(char *targ, int argc, char *argv[])
 				    != sizeof (resp))
 					lostconn();
 				if (resp != 0) {
-					/*
-					 * Not OK:
-					 * The other side is running
-					 * non-acl rcp. Try again with
-					 * normal stuff
-					 */
-					aclflag = 0;
+					acl_aclflag = 0;
 					(void) snprintf(bp, buffersize,
-						"%s -t %s", cmd, targ);
+					    "%s -t %s", cmd_sunw, targ);
+
 					(void) close(rem);
 					host = thost;
 					rem = rcmd_af(&host, portnumber,
-							pwd->pw_name,
-							tuser ? tuser :
-							pwd->pw_name, bp, 0,
-							AF_INET6);
+					    pwd->pw_name,
+					    tuser ? tuser : pwd->pw_name,
+					    bp, 0, AF_INET6);
 					if (rem < 0)
 						exit(1);
-					if (response() < 0)
-						exit(1);
+
+					if (read(rem, &resp, sizeof (resp))
+					    != sizeof (resp))
+						lostconn();
+					if (resp != 0) {
+						/*
+						 * Not OK:
+						 * The other side is running
+						 * non-acl rcp. Try again with
+						 * normal stuff
+						 */
+						aclflag = 0;
+						(void) snprintf(bp, buffersize,
+						    "%s -t %s", cmd, targ);
+						(void) close(rem);
+						host = thost;
+						rem = rcmd_af(&host, portnumber,
+						    pwd->pw_name,
+						    tuser ? tuser :
+						    pwd->pw_name, bp, 0,
+						    AF_INET6);
+						if (rem < 0)
+							exit(1);
+						if (response() < 0)
+						    exit(1);
+					}
 				}
 				/* everything should be fine now */
 				(void) setuid(userid);
 
 				}
-
 			}
 			source(1, argv + i);
 		}
@@ -843,8 +868,9 @@ tolocal(int argc, char *argv[])
 		 * running acl cognizant version of rcp.
 		 */
 		aclflag = 1;
+		acl_aclflag = 1;
 
-		(void) snprintf(bp, buffersize, "%s -f %s", cmd_sunw, src);
+		(void) snprintf(bp, buffersize, "%s -Zf %s", cmd_sunw, src);
 		rem = rcmd_af(&host, portnumber, pwd->pw_name, suser,
 			    bp, 0, AF_INET6);
 
@@ -862,6 +888,24 @@ tolocal(int argc, char *argv[])
 		if (read(rem, &resp, sizeof (resp)) != sizeof (resp))
 			lostconn();
 		if (resp != 0) {
+
+			/*
+			 * Try again without ace_acl support
+			 */
+			acl_aclflag = 0;
+			(void) snprintf(bp, buffersize, "%s -f %s",
+			    cmd_sunw, src);
+			rem = rcmd_af(&host, portnumber, pwd->pw_name, suser,
+			    bp, 0, AF_INET6);
+
+			if (rem < 0) {
+				++errs;
+				continue;
+			}
+
+			if (read(rem, &resp, sizeof (resp)) != sizeof (resp))
+				lostconn();
+
 			/*
 			 * NOT ok:
 			 * The other side is running non-acl rcp.
@@ -1118,7 +1162,7 @@ notreg:
 		}
 
 		/* ACL support: send */
-		if (aclflag) {
+		if (aclflag | acl_aclflag) {
 			/* get acl from f and send it over */
 			if (sendacl(f) == ACL_FAIL) {
 				(void) close(f);
@@ -1414,7 +1458,7 @@ sink(int argc, char *argv[])
 		if (buf[0] == 'D') {
 			if (exists) {
 				if ((stb.st_mode&S_IFMT) != S_IFDIR) {
-					if (aclflag) {
+					if (aclflag | acl_aclflag) {
 						/*
 						 * consume acl in the pipe
 						 * fd = -1 to indicate the
@@ -1439,7 +1483,7 @@ sink(int argc, char *argv[])
 			}
 
 			/* acl support for directories */
-			if (aclflag) {
+			if (aclflag | acl_aclflag) {
 				int dfd;
 
 				if ((dfd = open(np, O_RDONLY)) == -1)
@@ -1486,7 +1530,7 @@ bad:
 		/*
 		 * ACL support: receiving
 		 */
-		if (aclflag) {
+		if (aclflag | acl_aclflag) {
 			/* get acl and set it to ofd */
 			if (recvacl(ofd, exists, pflag) == ACL_FAIL) {
 				(void) close(ofd);
@@ -1733,49 +1777,78 @@ static int
 sendacl(int f)
 {
 	int		aclcnt;
-	aclent_t	*aclbufp;
-	int		aclsize;
 	char		*acltext;
 	char		buf[BUFSIZ];
+	acl_t		*aclp;
+	char		acltype;
+	int		aclerror;
+	int		trivial;
 
-	if ((aclcnt = facl(f, GETACLCNT, 0, NULL)) < 0) {
-		error("can't get acl count \n");
+
+	aclerror = facl_get(f, ACL_NO_TRIVIAL, &aclp);
+	if (aclerror != 0) {
+		error("can't retrieve ACL: %s \n", acl_strerror(aclerror));
 		return (ACL_FAIL);
 	}
 
+	/*
+	 * if acl type is not ACLENT_T and were operating in acl_aclflag == 0
+	 * then don't do the malloc and facl(fd, getcntcmd,...);
+	 * since the remote side doesn't support alternate style ACL's.
+	 */
+
+	if (aclp && (acl_type(aclp) != ACLENT_T) && (acl_aclflag == 0)) {
+		aclcnt = MIN_ACL_ENTRIES;
+		acltype = 'A';
+		trivial = ACL_IS_TRIVIAL;
+	} else {
+
+		aclcnt = (aclp != NULL) ? acl_cnt(aclp) : 0;
+
+		if (aclp) {
+			acltype = (acl_type(aclp) != ACLENT_T) ? 'Z' : 'A';
+			aclcnt = acl_cnt(aclp);
+			trivial = (acl_flags(aclp) & ACL_IS_TRIVIAL);
+		} else {
+			acltype = 'A';
+			aclcnt = MIN_ACL_ENTRIES;
+			trivial = ACL_IS_TRIVIAL;
+		}
+
+	}
+
 	/* send the acl count over */
-	(void) snprintf(buf, sizeof (buf), "A%d\n", aclcnt);
+	(void) snprintf(buf, sizeof (buf), "%c%d\n", acltype, aclcnt);
 	(void) desrcpwrite(rem, buf, strlen(buf));
 
-	/* only send acl when it is non-trivial */
-	if (aclcnt > MIN_ACL_ENTRIES) {
-		aclsize = aclcnt * sizeof (aclent_t);
-		if ((aclbufp = (aclent_t *)malloc(aclsize)) == NULL) {
-			error("rcp: cant allocate memory: aclcnt %d\n",
-					aclcnt);
-			exit(1);
-		}
-		if (facl(f, GETACL, aclcnt, aclbufp) < 0) {
-			error("rcp: failed to get acl\n");
-			return (ACL_FAIL);
-		}
-		acltext = acltotext(aclbufp, aclcnt);
+	/*
+	 * only send acl when we have an aclp, which would
+	 * imply its not trivial.
+	 */
+	if (aclp && (trivial != ACL_IS_TRIVIAL)) {
+		acltext = acl_totext(aclp);
 		if (acltext == NULL) {
 			error("rcp: failed to convert to text\n");
+			acl_free(aclp);
 			return (ACL_FAIL);
 		}
 
 		/* send ACLs over: send the length first */
-		(void) snprintf(buf, sizeof (buf), "A%d\n", strlen(acltext));
+		(void) snprintf(buf, sizeof (buf), "%c%d\n",
+		    acltype, strlen(acltext));
 
 		(void) desrcpwrite(rem, buf, strlen(buf));
 		(void) desrcpwrite(rem, acltext, strlen(acltext));
 		free(acltext);
-		free(aclbufp);
-		if (response() < 0)
+		if (response() < 0) {
+			acl_free(aclp);
 			return (ACL_FAIL);
+		}
 
 	}
+
+	if (aclp)
+		acl_free(aclp);
 	return (ACL_OK);
 }
 
@@ -1783,7 +1856,7 @@ sendacl(int f)
  * Use this routine to get acl entry count and acl text size (in bytes)
  */
 static int
-getaclinfo(int *cnt)
+getaclinfo(int *cnt, int *acltype)
 {
 	char		buf[BUFSIZ];
 	char		*cp;
@@ -1793,7 +1866,15 @@ getaclinfo(int *cnt)
 	cp = buf;
 	if (desrcpread(rem, cp, 1) <= 0)
 		return (ACL_FAIL);
-	if (*cp++ != 'A') {
+
+	switch (*cp++) {
+	case 'A':
+		*acltype = 0;
+		break;
+	case 'Z':
+		*acltype = 1;
+		break;
+	default:
 		error("rcp: expect an ACL record, but got %c\n", *cp);
 		return (ACL_FAIL);
 	}
@@ -1829,15 +1910,24 @@ recvacl(int f, int exists, int preserve)
 	int		j;
 	char		*tp;
 	char		*acltext;	/* external format */
-	aclent_t	*aclbufp;	/* internal format */
+	acl_t		*aclp;
+	int		acltype;
+	int		min_entries;
+	int		aclerror;
 
 	/* get acl count */
-	if (getaclinfo(&aclcnt) != ACL_OK)
+	if (getaclinfo(&aclcnt, &acltype) != ACL_OK)
 		return (ACL_FAIL);
 
-	if (aclcnt > MIN_ACL_ENTRIES) {
+	if (acltype == 0) {
+		min_entries = MIN_ACL_ENTRIES;
+	} else {
+		min_entries = 1;
+	}
+
+	if (aclcnt > min_entries) {
 		/* get acl text size */
-		if (getaclinfo(&aclsize) != ACL_OK)
+		if (getaclinfo(&aclsize, &acltype) != ACL_OK)
 			return (ACL_FAIL);
 		if ((acltext = malloc(aclsize + 1)) == NULL) {
 			error("rcp: cant allocate memory: %d\n", aclsize);
@@ -1858,19 +1948,21 @@ recvacl(int f, int exists, int preserve)
 		*tp = '\0';
 
 		if (preserve || !exists) {
-			aclbufp = aclfromtext(acltext, &aclcnt);
-			if (aclbufp == NULL) {
-				error("rcp: failed to parse acl\n");
+			aclerror = acl_fromtext(acltext, &aclp);
+			if (aclerror != 0) {
+				error("rcp: failed to parse acl : %s\n",
+				    acl_strerror(aclerror));
 				return (ACL_FAIL);
 			}
+
 			if (f != -1) {
-				if (facl(f, SETACL, aclcnt, aclbufp) < 0) {
+				if (facl_set(f, aclp) < 0) {
 					error("rcp: failed to set acl\n");
 					return (ACL_FAIL);
 				}
 			}
 			/* -1 means that just consume the data in the pipe */
-			free(aclbufp);
+			acl_free(aclp);
 		}
 		free(acltext);
 		(void) desrcpwrite(rem, "", 1);

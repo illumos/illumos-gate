@@ -1265,8 +1265,8 @@ extern int	vs_aent_to_ace4(vsecattr_t *, vsecattr_t *, int, int);
 extern int	vs_ace4_to_aent(vsecattr_t *, vsecattr_t *, uid_t, gid_t,
     int, int, int);
 extern int	vs_ace4_to_acet(vsecattr_t *, vsecattr_t *, uid_t, gid_t,
-    int, int, int);
-extern int	vs_acet_to_ace4(vsecattr_t *, vsecattr_t *, int, int);
+    int, int);
+extern int	vs_acet_to_ace4(vsecattr_t *, vsecattr_t *, int);
 extern void	vs_acet_destroy(vsecattr_t *);
 extern void	vs_ace4_destroy(vsecattr_t *);
 extern void	vs_aent_destroy(vsecattr_t *);

@@ -336,7 +336,7 @@ update_mem_bounds(int boardid, int cpuid, int bankid,
  * the cpu memory decoder registers at boot time.
  */
 void
-plat_fill_mc(dnode_t nodeid)
+plat_fill_mc(pnode_t nodeid)
 {
 	uint64_t	mc_addr, saf_addr;
 	uint64_t	mc_decode[DAK_BANKS_PER_MC];

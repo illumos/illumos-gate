@@ -912,7 +912,9 @@ extern uint_t pvn_vmodsort_supported;
  * Generally useful macros.
  */
 #define	VBSIZE(vp)	((vp)->v_vfsp->vfs_bsize)
-#define	VTOZ(vp)	((vp)->v_vfsp->vfs_zone)
+
+#define	VTOZONE(vp)	((vp)->v_vfsp->vfs_zone)
+
 #define	NULLVP		((struct vnode *)0)
 #define	NULLVPP		((struct vnode **)0)
 

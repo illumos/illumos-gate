@@ -422,8 +422,8 @@ struct sd_lun {
 						/* a part of error recovery. */
 	    un_f_is_fibre		:1,	/* The device supports fibre */
 						/* channel */
-	    un_f_available		:1,	/* Not use */
-						/* available */
+	    un_f_sync_cache_unsupported	:1,	/* sync cache cmd not */
+						/* supported */
 	    un_f_format_in_progress	:1,	/* The device is currently */
 						/* executing a FORMAT cmd. */
 	    un_f_opt_queueing		:1,	/* Enable Command Queuing to */
@@ -433,7 +433,9 @@ struct sd_lun {
 	    un_f_opt_disable_cache	:1,	/* Read/Write disk cache is */
 						/* disabled.  */
 	    un_f_cfg_is_atapi		:1,	/* This is an ATAPI device.  */
-	    un_f_cfg_obsolete		:1,	/* available for reuse  */
+	    un_f_write_cache_enabled	:1,	/* device return success on */
+						/* writes before transfer to */
+						/* physical media complete */
 	    un_f_cfg_playmsf_bcd	:1,	/* Play Audio, BCD params. */
 	    un_f_cfg_readsub_bcd	:1,	/* READ SUBCHANNEL BCD resp. */
 	    un_f_cfg_read_toc_trk_bcd	:1,	/* track # is BCD */
@@ -1414,6 +1416,11 @@ _NOTE(SCHEME_PROTECTS_DATA("unique per pkt", sd_xbuf))
 struct sd_uscsi_info {
 	int			ui_flags;
 	struct uscsi_cmd	*ui_cmdp;
+	/*
+	 * ui_dkc is used by sd_send_scsi_SYNCHRONIZE_CACHE() to allow
+	 * for async completion notification.
+	 */
+	struct dk_callback	ui_dkc;
 };
 
 _NOTE(SCHEME_PROTECTS_DATA("Unshared data", sd_uscsi_info))

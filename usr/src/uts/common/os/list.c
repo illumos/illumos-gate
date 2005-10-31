@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -179,4 +179,17 @@ list_move_tail(list_t *dst, list_t *src)
 
 	/* empty src list */
 	srcnode->list_next = srcnode->list_prev = srcnode;
+}
+
+int
+list_link_active(list_node_t *link)
+{
+	ASSERT((link->list_next == NULL) == (link->list_prev == NULL));
+	return (link->list_next != NULL);
+}
+
+int
+list_is_empty(list_t *list)
+{
+	return (list_empty(list));
 }

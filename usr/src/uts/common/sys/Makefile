@@ -720,7 +720,8 @@ FSHDRS=				\
 	ufs_prot.h		\
 	ufs_quota.h		\
 	ufs_snap.h              \
-	ufs_trans.h
+	ufs_trans.h		\
+	zfs.h
 
 PCMCIAHDRS=		\
 	pcata.h		\

@@ -34,7 +34,7 @@
 
 static prom_node_t *promif_top;
 
-static prom_node_t *promif_find_node(dnode_t nodeid);
+static prom_node_t *promif_find_node(pnode_t nodeid);
 static int getproplen(prom_node_t *pnp, char *name);
 static void *getprop(prom_node_t *pnp, char *name);
 
@@ -137,7 +137,7 @@ promif_create_device_tree(void)
 }
 
 static prom_node_t *
-find_node_work(prom_node_t *pnp, dnode_t n)
+find_node_work(prom_node_t *pnp, pnode_t n)
 {
 	prom_node_t *qnp;
 
@@ -156,7 +156,7 @@ find_node_work(prom_node_t *pnp, dnode_t n)
 }
 
 static prom_node_t *
-promif_find_node(dnode_t nodeid)
+promif_find_node(pnode_t nodeid)
 {
 	if (nodeid == OBP_NONODE)
 		return (promif_top);
@@ -167,8 +167,8 @@ promif_find_node(dnode_t nodeid)
 	return (find_node_work(promif_top, nodeid));
 }
 
-dnode_t
-promif_nextnode(dnode_t nodeid)
+pnode_t
+promif_nextnode(pnode_t nodeid)
 {
 	prom_node_t *pnp;
 
@@ -184,8 +184,8 @@ promif_nextnode(dnode_t nodeid)
 	return (OBP_NONODE);
 }
 
-dnode_t
-promif_childnode(dnode_t nodeid)
+pnode_t
+promif_childnode(pnode_t nodeid)
 {
 	prom_node_t *pnp;
 
@@ -213,7 +213,7 @@ getproplen(prom_node_t *pnp, char *name)
 }
 
 int
-promif_getproplen(dnode_t nodeid, char *name)
+promif_getproplen(pnode_t nodeid, char *name)
 {
 	prom_node_t *pnp;
 
@@ -237,7 +237,7 @@ getprop(prom_node_t *pnp, char *name)
 }
 
 int
-promif_getprop(dnode_t nodeid, char *name, void *value)
+promif_getprop(pnode_t nodeid, char *name, void *value)
 {
 	prom_node_t *pnp;
 	void *v;
@@ -276,7 +276,7 @@ nextprop(prom_node_t *pnp, char *name)
 }
 
 char *
-promif_nextprop(dnode_t nodeid, char *name, char *next)
+promif_nextprop(pnode_t nodeid, char *name, char *next)
 {
 	prom_node_t *pnp;
 	char *s;

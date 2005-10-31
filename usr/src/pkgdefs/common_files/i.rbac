@@ -25,7 +25,7 @@
 #
 # i.rbac
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # class action script for "rbac" class files
@@ -45,14 +45,17 @@
 
 tmp_dir=/tmp
 
-basename_cmd=/usr/bin/basename
-cp_cmd=/usr/bin/cp
-egrep_cmd=/usr/bin/egrep
-mv_cmd=/usr/bin/mv
-nawk_cmd=/usr/bin/nawk
-rm_cmd=/usr/bin/rm
-sed_cmd=/usr/bin/sed
-sort_cmd=/usr/bin/sort
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
+
+basename_cmd=basename
+cp_cmd=cp
+egrep_cmd=egrep
+mv_cmd=mv
+nawk_cmd=nawk
+rm_cmd=rm
+sed_cmd=sed
+sort_cmd=sort
 
 # $1 is the type
 # $2 is the "old/existing file"

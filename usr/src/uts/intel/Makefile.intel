@@ -395,7 +395,7 @@ SCHED_KMODS	+= IA RT TS RT_DPTBL TS_DPTBL FSS FX FX_DPTBL
 #	File System Modules (/kernel/fs):
 #
 FS_KMODS	+= autofs cachefs ctfs devfs fdfs fifofs hsfs lofs
-FS_KMODS	+= mntfs namefs nfs objfs
+FS_KMODS	+= mntfs namefs nfs objfs zfs
 FS_KMODS	+= pcfs procfs sockfs specfs tmpfs udfs ufs xmemfs
 
 #

@@ -339,7 +339,7 @@ get_device_list(ihandle_t ihdl, ihandle_t *ihdls, size_t maxi)
  * The caller is responsible for freeing the memory.
  */
 static int
-read_prop(dnode_t node, char *propname, char **propval)
+read_prop(pnode_t node, char *propname, char **propval)
 {
 	int	proplen = -1;
 
@@ -744,7 +744,7 @@ find_consoles(sm_mux_state_t *ms, dev_info_t *dip, dev_t dev)
 	int	len;
 	char	*propval;
 	char	devtype[32];
-	dnode_t	node;
+	pnode_t	node;
 	uint_t	flags;
 
 	/*
@@ -872,7 +872,7 @@ ttymux_config(dacf_infohdl_t info_hdl, dacf_arghdl_t arg_hdl, int flags)
 	ms->sm_cons_stdout.sm_o_ihdl = prom_stdout_ihandle();
 
 	if (prom_is_openprom()) {
-		dnode_t	node = prom_optionsnode();
+		pnode_t	node = prom_optionsnode();
 
 		if (prom_getproplen(node, INPUT_ALIAS) > 0) {
 			ms->sm_ialias = kmem_alloc(

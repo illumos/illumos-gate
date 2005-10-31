@@ -67,6 +67,7 @@
 #define	DTD_ELEM_RCTL		(const xmlChar *) "rctl"
 #define	DTD_ELEM_RCTLVALUE	(const xmlChar *) "rctl-value"
 #define	DTD_ELEM_ZONE		(const xmlChar *) "zone"
+#define	DTD_ELEM_DATASET	(const xmlChar *) "dataset"
 
 #define	DTD_ATTR_ACTION		(const xmlChar *) "action"
 #define	DTD_ATTR_ADDRESS	(const xmlChar *) "address"
@@ -1907,6 +1908,7 @@ static const char *standard_devs[] = {
 #endif
 	"cpu/self/cpuid",
 	"dtrace/helper",
+	"zfs",
 	NULL
 };
 
@@ -3517,4 +3519,177 @@ zonecfg_valid_rctl(const char *name, const rctlblk_t *rctlblk)
 		return (B_FALSE);
 
 	return (B_TRUE);
+}
+
+static int
+zonecfg_add_ds_core(zone_dochandle_t handle, struct zone_dstab *tabptr)
+{
+	xmlNodePtr newnode, cur = handle->zone_dh_cur;
+	int err;
+
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_DATASET, NULL);
+	if ((err = newprop(newnode, DTD_ATTR_NAME,
+	    tabptr->zone_dataset_name)) != Z_OK)
+		return (err);
+	return (Z_OK);
+}
+
+int
+zonecfg_add_ds(zone_dochandle_t handle, struct zone_dstab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_ds_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+static int
+zonecfg_delete_ds_core(zone_dochandle_t handle, struct zone_dstab *tabptr)
+{
+	xmlNodePtr cur = handle->zone_dh_cur;
+
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_DATASET))
+			continue;
+
+		if (match_prop(cur, DTD_ATTR_NAME,
+		    tabptr->zone_dataset_name)) {
+			xmlUnlinkNode(cur);
+			xmlFreeNode(cur);
+			return (Z_OK);
+		}
+	}
+	return (Z_NO_RESOURCE_ID);
+}
+
+int
+zonecfg_delete_ds(zone_dochandle_t handle, struct zone_dstab *tabptr)
+{
+	int err;
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_ds_core(handle, tabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_modify_ds(
+	zone_dochandle_t handle,
+	struct zone_dstab *oldtabptr,
+	struct zone_dstab *newtabptr)
+{
+	int err;
+
+	if (oldtabptr == NULL || newtabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_delete_ds_core(handle, oldtabptr)) != Z_OK)
+		return (err);
+
+	if ((err = zonecfg_add_ds_core(handle, newtabptr)) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_lookup_ds(zone_dochandle_t handle, struct zone_dstab *tabptr)
+{
+	xmlNodePtr cur, firstmatch;
+	int err;
+	char dataset[MAXNAMELEN];
+
+	if (tabptr == NULL)
+		return (Z_INVAL);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	firstmatch = NULL;
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_DATASET))
+			continue;
+		if (strlen(tabptr->zone_dataset_name) > 0) {
+			if ((fetchprop(cur, DTD_ATTR_NAME, dataset,
+			    sizeof (dataset)) == Z_OK) &&
+			    (strcmp(tabptr->zone_dataset_name,
+			    dataset) == 0)) {
+				if (firstmatch == NULL)
+					firstmatch = cur;
+				else
+					return (Z_INSUFFICIENT_SPEC);
+			}
+		}
+	}
+	if (firstmatch == NULL)
+		return (Z_NO_RESOURCE_ID);
+
+	cur = firstmatch;
+
+	if ((err = fetchprop(cur, DTD_ATTR_NAME, tabptr->zone_dataset_name,
+	    sizeof (tabptr->zone_dataset_name))) != Z_OK)
+		return (err);
+
+	return (Z_OK);
+}
+
+int
+zonecfg_setdsent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getdsent(zone_dochandle_t handle, struct zone_dstab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_DATASET))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_NAME, tabptr->zone_dataset_name,
+	    sizeof (tabptr->zone_dataset_name))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_enddsent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
 }

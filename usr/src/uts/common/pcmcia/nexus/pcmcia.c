@@ -1383,7 +1383,7 @@ pcmcia_number_socket(dev_info_t *dip, int localsocket)
 	dev_info_t *child = NULL;
 	struct pcmcia_parent_private *ppd;
 
-	if (ndi_devi_alloc(dip, "pcs", (dnode_t)DEVI_SID_NODEID,
+	if (ndi_devi_alloc(dip, "pcs", (pnode_t)DEVI_SID_NODEID,
 	    &child) == NDI_SUCCESS) {
 		ppd = kmem_zalloc(sizeof (struct pcmcia_parent_private),
 		    KM_SLEEP);
@@ -3224,7 +3224,7 @@ pcmcia_init_devinfo(dev_info_t *pdip, struct pcm_device_info *info)
 		else
 			name = info->pd_bind_name;
 
-		if (ndi_devi_alloc(pdip, name, (dnode_t)DEVI_SID_NODEID,
+		if (ndi_devi_alloc(pdip, name, (pnode_t)DEVI_SID_NODEID,
 		    &dip) !=
 		    NDI_SUCCESS) {
 			cmn_err(CE_WARN,

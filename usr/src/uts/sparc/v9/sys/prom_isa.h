@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,7 +56,7 @@ typedef	unsigned long long cell_t;
 #define	p1275_uint2cell(u)	((cell_t)((unsigned int)(u)))
 #define	p1275_size2cell(u)	((cell_t)((size_t)(u)))
 #define	p1275_phandle2cell(ph)	((cell_t)((unsigned int)((phandle_t)(ph))))
-#define	p1275_dnode2cell(d)	((cell_t)((unsigned int)((dnode_t)(d))))
+#define	p1275_dnode2cell(d)	((cell_t)((unsigned int)((pnode_t)(d))))
 #define	p1275_ihandle2cell(ih)	((cell_t)((unsigned int)((ihandle_t)(ih))))
 #define	p1275_ull2cell_high(ll)	(0LL)
 #define	p1275_ull2cell_low(ll)	((cell_t)(ll))
@@ -67,7 +67,7 @@ typedef	unsigned long long cell_t;
 #define	p1275_cell2uint(u)	((unsigned int)((cell_t)(u)))
 #define	p1275_cell2size(u)	((size_t)((cell_t)(u)))
 #define	p1275_cell2phandle(ph)	((phandle_t)((cell_t)(ph)))
-#define	p1275_cell2dnode(d)	((dnode_t)((cell_t)(d)))
+#define	p1275_cell2dnode(d)	((pnode_t)((cell_t)(d)))
 #define	p1275_cell2ihandle(ih)	((ihandle_t)((cell_t)(ih)))
 #define	p1275_cells2ull(h, l)	((unsigned long long)(cell_t)(l))
 #define	p1275_cell2uintptr(i)	((uintptr_t)((cell_t)(i)))

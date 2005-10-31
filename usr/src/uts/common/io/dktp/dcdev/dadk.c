@@ -159,6 +159,7 @@ static char	*dadk_cmds[] = {
 	"\030cdrom read offset",	/* DCMD_READOFFSET  24	*/
 	"\031cdrom read mode 2",	/* DCMD_READMODE2  25	*/
 	"\032cdrom volume control",	/* DCMD_VOLCTRL  26	*/
+	"\033flush cache",		/* DCMD_FLUSH_CACHE  27	*/
 	NULL
 };
 
@@ -384,6 +385,8 @@ int
 dadk_open(opaque_t objp, int flag)
 {
 	struct dadk *dadkp = (struct dadk *)objp;
+	int error;
+	int wce;
 
 	if (!dadkp->dad_rmb) {
 		if (dadkp->dad_phyg.g_cap) {
@@ -408,6 +411,23 @@ dadk_open(opaque_t objp, int flag)
 	    cv_broadcast(&dadkp->dad_state_cv);
 	    mutex_exit(&dadkp->dad_mutex);
 	}
+
+	/*
+	 * get write cache enable state
+	 * If there is an error, must assume that write cache
+	 * is enabled.
+	 * NOTE: Since there is currently no Solaris mechanism to
+	 * change the state of the Write Cache Enable feature,
+	 * this code just checks the value of the WCE bit
+	 * obtained at device init time.  If a mechanism
+	 * is added to the driver to change WCE, dad_wce
+	 * must be updated appropriately.
+	 */
+	error = CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETWCE,
+	    (uintptr_t)&wce, 0);
+	mutex_enter(&dadkp->dad_mutex);
+	dadkp->dad_wce = (error != 0) || (wce != 0);
+	mutex_exit(&dadkp->dad_mutex);
 
 	/* logical disk geometry */
 	CTL_IOCTL(dadkp->dad_ctlobjp, DIOCTL_GETGEOM,
@@ -625,6 +645,91 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 				return (EINVAL);
 		}
 	    }
+	case DKIOCFLUSHWRITECACHE:
+		{
+			struct buf *bp;
+			int err = 0;
+			struct dk_callback *dkc = (struct dk_callback *)arg;
+			struct cmpkt *pktp;
+			int is_sync = 1;
+
+			mutex_enter(&dadkp->dad_mutex);
+			if (dadkp->dad_noflush || !  dadkp->dad_wce) {
+				err = dadkp->dad_noflush ? ENOTSUP : 0;
+				mutex_exit(&dadkp->dad_mutex);
+				/*
+				 * If a callback was requested: a
+				 * callback will always be done if the
+				 * caller saw the DKIOCFLUSHWRITECACHE
+				 * ioctl return 0, and never done if the
+				 * caller saw the ioctl return an error.
+				 */
+				if ((flag & FKIOCTL) && dkc != NULL &&
+				    dkc->dkc_callback != NULL) {
+					(*dkc->dkc_callback)(dkc->dkc_cookie,
+					    err);
+					/*
+					 * Did callback and reported error.
+					 * Since we did a callback, ioctl
+					 * should return 0.
+					 */
+					err = 0;
+				}
+				return (err);
+			}
+			mutex_exit(&dadkp->dad_mutex);
+
+			bp = getrbuf(KM_SLEEP);
+
+			bp->b_edev = dev;
+			bp->b_dev  = cmpdev(dev);
+			bp->b_flags = B_BUSY;
+			bp->b_resid = 0;
+			bp->b_bcount = 0;
+			SET_BP_SEC(bp, 0);
+
+			if ((flag & FKIOCTL) && dkc != NULL &&
+			    dkc->dkc_callback != NULL) {
+				struct dk_callback *dkc2 =
+				    (struct dk_callback *)kmem_zalloc(
+				    sizeof (struct dk_callback), KM_SLEEP);
+
+				bcopy(dkc, dkc2, sizeof (*dkc2));
+				/*
+				 * Borrow b_list to carry private data
+				 * to the b_iodone func.
+				 */
+				bp->b_list = (struct buf *)dkc2;
+				bp->b_iodone = dadk_flushdone;
+				is_sync = 0;
+			}
+
+			/*
+			 * Setup command pkt
+			 * dadk_pktprep() can't fail since DDI_DMA_SLEEP set
+			 */
+			pktp = dadk_pktprep(dadkp, NULL, bp,
+			    dadk_iodone, DDI_DMA_SLEEP, NULL);
+
+			pktp->cp_time = DADK_FLUSH_CACHE_TIME;
+
+			*((char *)(pktp->cp_cdbp)) = DCMD_FLUSH_CACHE;
+			pktp->cp_byteleft = 0;
+			pktp->cp_private = NULL;
+			pktp->cp_secleft = 0;
+			pktp->cp_srtsec = -1;
+			pktp->cp_bytexfer = 0;
+
+			CTL_IOSETUP(dadkp->dad_ctlobjp, pktp);
+
+			FLC_ENQUE(dadkp->dad_flcobjp, bp);
+
+			if (is_sync) {
+				err = biowait(bp);
+				freerbuf(bp);
+			}
+			return (err);
+		}
 	default:
 		if (!dadkp->dad_rmb)
 			return (CTL_IOCTL(dadkp->dad_ctlobjp, cmd, arg, flag));
@@ -702,6 +807,20 @@ dadk_ioctl(opaque_t objp, dev_t dev, int cmd, intptr_t arg, int flag,
 		break;
 	}
 	return (dadk_rmb_ioctl(dadkp, cmd, arg, flag, 0));
+}
+
+int
+dadk_flushdone(struct buf *bp)
+{
+	struct dk_callback *dkc = (struct dk_callback *)bp->b_list;
+
+	ASSERT(dkc != NULL && dkc->dkc_callback != NULL);
+
+	(*dkc->dkc_callback)(dkc->dkc_cookie, geterror(bp));
+
+	kmem_free(dkc, sizeof (*dkc));
+	freerbuf(bp);
+	return (0);
 }
 
 int
@@ -957,11 +1076,10 @@ static int
 dadk_ioretry(struct cmpkt *pktp, int action)
 {
 	struct buf *bp;
-	struct dadk *dadkp;
+	struct dadk *dadkp = PKT2DADK(pktp);
 
 	switch (action) {
 	case QUE_COMMAND:
-		dadkp = PKT2DADK(pktp);
 		if (pktp->cp_retry++ < DADK_RETRY_COUNT) {
 			CTL_IOSETUP(dadkp->dad_ctlobjp, pktp);
 			if (CTL_TRANSPORT(dadkp->dad_ctlobjp, pktp) ==
@@ -981,8 +1099,22 @@ dadk_ioretry(struct cmpkt *pktp, int action)
 		bp = pktp->cp_bp;
 		bp->b_resid += pktp->cp_byteleft - pktp->cp_bytexfer +
 		    pktp->cp_resid;
-		if (geterror(bp) == 0)
-			bioerror(bp, EIO);
+		if (geterror(bp) == 0) {
+			if ((*((char *)(pktp->cp_cdbp)) == DCMD_FLUSH_CACHE) &&
+			    (pktp->cp_dev_private == (opaque_t)dadkp) &&
+			    ((int)(*(char *)pktp->cp_scbp) == DERR_ABORT)) {
+				/*
+				 * Flag "unimplemented" responses for
+				 * DCMD_FLUSH_CACHE as ENOTSUP
+				 */
+				bioerror(bp, ENOTSUP);
+				mutex_enter(&dadkp->dad_mutex);
+				dadkp->dad_noflush = 1;
+				mutex_exit(&dadkp->dad_mutex);
+			} else {
+				bioerror(bp, EIO);
+			}
+		}
 		/*FALLTHROUGH*/
 	case COMMAND_DONE:
 	default:

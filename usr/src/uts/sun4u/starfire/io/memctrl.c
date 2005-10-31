@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1998, 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -85,7 +85,7 @@ mc_get_mem_alignment()
 }
 
 uint64_t
-mc_get_asr_addr(dnode_t nodeid)
+mc_get_asr_addr(pnode_t nodeid)
 {
 	int		rlen;
 	uint64_t	psi_addr;
@@ -105,7 +105,7 @@ mc_get_asr_addr(dnode_t nodeid)
 }
 
 uint64_t
-mc_get_idle_addr(dnode_t nodeid)
+mc_get_idle_addr(pnode_t nodeid)
 {
 	int		rlen;
 	uint64_t	psi_addr;
@@ -125,7 +125,7 @@ mc_get_idle_addr(dnode_t nodeid)
 }
 
 int
-mc_get_dimm_size(dnode_t nodeid)
+mc_get_dimm_size(pnode_t nodeid)
 {
 	uint64_t	psi_addr;
 	uint_t		dimmtype;
@@ -157,7 +157,7 @@ mc_get_dimm_size(dnode_t nodeid)
 }
 
 uint64_t
-mc_get_alignment_mask(dnode_t nodeid)
+mc_get_alignment_mask(pnode_t nodeid)
 {
 	uint64_t	psi_addr, seg_sz;
 	uint_t		mcreg, seg_sz_mask;
@@ -199,7 +199,7 @@ mc_get_alignment_mask(dnode_t nodeid)
 }
 
 int
-mc_read_asr(dnode_t nodeid, uint_t *mcregp)
+mc_read_asr(pnode_t nodeid, uint_t *mcregp)
 {
 	uint64_t	psi_addr;
 
@@ -215,7 +215,7 @@ mc_read_asr(dnode_t nodeid, uint_t *mcregp)
 }
 
 int
-mc_write_asr(dnode_t nodeid, uint_t mcreg)
+mc_write_asr(pnode_t nodeid, uint_t mcreg)
 {
 	uint_t		mcreg_rd;
 	uint64_t	psi_addr;

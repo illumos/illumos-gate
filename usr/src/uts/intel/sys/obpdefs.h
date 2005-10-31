@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-1994,1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_OBPDEFS_H
@@ -40,14 +40,14 @@ extern "C" {
 
 typedef int	ihandle_t;		/* 1275 device instance number */
 typedef int	phandle_t;		/* 1275 device tree node ptr */
-typedef	phandle_t dnode_t;
+typedef	phandle_t pnode_t;
 
 /*
  * Device type matching
  */
 
-#define	OBP_NONODE	((dnode_t)0)
-#define	OBP_BADNODE	((dnode_t)-1)
+#define	OBP_NONODE	((pnode_t)0)
+#define	OBP_BADNODE	((pnode_t)-1)
 
 /*
  * Property Defines

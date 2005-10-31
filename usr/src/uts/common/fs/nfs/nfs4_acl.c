@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,10 +80,15 @@ static int ace4_list_to_aent(ace4_list_t *, aclent_t **, int *, uid_t, gid_t,
 static int ln_ace4_to_aent(nfsace4 *ace4, int n, uid_t, gid_t,
     aclent_t **, int *, aclent_t **, int *, int, int, int);
 static int ace4_cmp(nfsace4 *, nfsace4 *);
-static int acet_to_ace4(ace_t *, nfsace4 *, int, int);
-static int ace4_to_acet(nfsace4 *, ace_t *, uid_t, gid_t, int, int, int);
+static int acet_to_ace4(ace_t *, nfsace4 *, int);
+static int ace4_to_acet(nfsace4 *, ace_t *, uid_t, gid_t, int, int);
 static int validate_idmapping(utf8string *, uid_t, int, int, int);
 static int u8s_mapped_to_nobody(utf8string *, uid_t, int);
+static void ace4_mask_to_acet_mask(acemask4, uint32_t *);
+static void acet_mask_to_ace4_mask(uint32_t, acemask4 *);
+static void ace4_flags_to_acet_flags(aceflag4, uint16_t *);
+static void acet_flags_to_ace4_flags(uint16_t, aceflag4 *);
+
 /*
  * The following two functions check and set ACE4_SYNCRONIZE, ACE4_WRITE_OWNER,
  * ACE4_DELETE and ACE4_WRITE_ATTRIBUTES.
@@ -1651,7 +1656,7 @@ ln_ace4_cmp(nfsace4 *a, nfsace4* b, int n)
  * strings versus integer uid/gids.
  */
 static int
-acet_to_ace4(ace_t *ace, nfsace4 *nfsace4, int isdir, int isserver)
+acet_to_ace4(ace_t *ace, nfsace4 *nfsace4, int isserver)
 {
 	int error = 0;
 
@@ -1669,44 +1674,45 @@ acet_to_ace4(ace_t *ace, nfsace4 *nfsace4, int isdir, int isserver)
 	}
 
 	switch (ace->a_type) {
-	case ALLOW:
+	case ACE_ACCESS_ALLOWED_ACE_TYPE:
 		nfsace4->type = ACE4_ACCESS_ALLOWED_ACE_TYPE;
 		break;
-	case DENY:
+	case ACE_ACCESS_DENIED_ACE_TYPE:
 		nfsace4->type = ACE4_ACCESS_DENIED_ACE_TYPE;
 		break;
 	default:
+		NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+		    "acet_to_ace4: unsupported type: %x", ace->a_type));
 		error = ENOTSUP;
 		break;
 	}
 	if (error != 0)
 		goto out;
 
-	nfsace4->access_mask = mode_to_ace4_access(ace->a_access_mask,
-	    isdir, ace->a_flags & ACE_OWNER, ace->a_type == ALLOW, isserver);
+	acet_mask_to_ace4_mask(ace->a_access_mask, &nfsace4->access_mask);
+	acet_flags_to_ace4_flags(ace->a_flags, &nfsace4->flag);
 
-	nfsace4->flag = (ace->a_flags & ACE_NFSV4_SUP_FLAGS);
-	if (ace->a_flags & ACE_GROUPS) {
-		nfsace4->flag |= ACE4_IDENTIFIER_GROUP;
-		error = nfs_idmap_gid_str(ace->a_who, &nfsace4->who, isserver);
-	} else if (ace->a_flags & ACE_USER) {
-		error = nfs_idmap_uid_str(ace->a_who, &nfsace4->who, isserver);
-	} else if (ace->a_flags & ACE_OWNER) {
-		(void) str_to_utf8(ACE4_WHO_OWNER, &nfsace4->who);
-	} else if (ace->a_flags & ACE_GROUP) {
+	if (ace->a_flags & ACE_GROUP) {
 		nfsace4->flag |= ACE4_IDENTIFIER_GROUP;
 		(void) str_to_utf8(ACE4_WHO_GROUP, &nfsace4->who);
-	} else if (ace->a_flags & ACE_OTHER) {
+	} else if (ace->a_flags & ACE_IDENTIFIER_GROUP) {
+		nfsace4->flag |= ACE4_IDENTIFIER_GROUP;
+		error = nfs_idmap_gid_str(ace->a_who, &nfsace4->who, isserver);
+		if (error != 0)
+			NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+			    "acet_to_ace4: idmap failed with %d", error));
+	} else if (ace->a_flags & ACE_OWNER) {
+		(void) str_to_utf8(ACE4_WHO_OWNER, &nfsace4->who);
+	} else if (ace->a_flags & ACE_EVERYONE) {
 		(void) str_to_utf8(ACE4_WHO_EVERYONE, &nfsace4->who);
+	} else {
+		error = nfs_idmap_uid_str(ace->a_who, &nfsace4->who, isserver);
+		if (error != 0)
+			NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+			    "acet_to_ace4: idmap failed with %d", error));
 	}
 
 out:
-#ifdef DEBUG
-	if (error != 0)
-	    NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
-		"acet_to_ace4: idmap failed with %d", error));
-#endif
-
 	return (error);
 }
 
@@ -1716,10 +1722,9 @@ out:
  */
 static int
 ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
-    int isdir, int isserver, int just_count)
+    int isserver, int just_count)
 {
 	int error = 0;
-	o_mode_t mode;
 
 	if (nfsace4 == NULL) {
 		NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
@@ -1734,12 +1739,14 @@ ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
 
 	switch (nfsace4->type) {
 	case ACE4_ACCESS_ALLOWED_ACE_TYPE:
-		ace->a_type = ALLOW;
+		ace->a_type = ACE_ACCESS_ALLOWED_ACE_TYPE;
 		break;
 	case ACE4_ACCESS_DENIED_ACE_TYPE:
-		ace->a_type = DENY;
+		ace->a_type = ACE_ACCESS_DENIED_ACE_TYPE;
 		break;
 	default:
+		NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+		    "ace4_to_acet: unsupported type: %x", nfsace4->type));
 		error = ENOTSUP;
 		break;
 	}
@@ -1761,16 +1768,15 @@ ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
 		goto out;
 	}
 
-	ace->a_access_mask = nfsace4->access_mask;
-	error = ace4_mask_to_mode(nfsace4->access_mask, &mode, isdir);
-	if (error != 0)
-		goto out;
-	ace->a_access_mask = mode;
-	if (nfsace4->flag & ~(ACE_NFSV4_SUP_FLAGS | ACE4_IDENTIFIER_GROUP)) {
+	ace4_mask_to_acet_mask(nfsace4->access_mask, &ace->a_access_mask);
+
+	if (nfsace4->flag & ~ACE_NFSV4_SUP_FLAGS) {
+		NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
+		    "ace4_to_acet: unsupported flags: %x", nfsace4->flag));
 		error = ENOTSUP;
 		goto out;
 	}
-	ace->a_flags = (nfsace4->flag & ACE_NFSV4_SUP_FLAGS);
+	ace4_flags_to_acet_flags(nfsace4->flag, &ace->a_flags);
 
 	if (nfsace4->flag & ACE4_IDENTIFIER_GROUP) {
 		if ((nfsace4->who.utf8string_len == 6) &&
@@ -1780,7 +1786,7 @@ ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
 			ace->a_flags |= ACE_GROUP;
 			error = 0;
 		} else {
-			ace->a_flags |= ACE_GROUPS;
+			ace->a_flags |= ACE_IDENTIFIER_GROUP;
 			error = nfs_idmap_str_gid(&nfsace4->who,
 			    &ace->a_who, isserver);
 			if (error != 0) {
@@ -1807,10 +1813,9 @@ ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
 		} else if ((nfsace4->who.utf8string_len == 9) &&
 		    (bcmp(ACE4_WHO_EVERYONE,
 		    nfsace4->who.utf8string_val, 9) == 0)) {
-			ace->a_flags |= ACE_OTHER;
+			ace->a_flags |= ACE_EVERYONE;
 			ace->a_who = 0;
 		} else {
-			ace->a_flags |= ACE_USER;
 			error = nfs_idmap_str_uid(&nfsace4->who,
 			    &ace->a_who, isserver);
 			if (error != 0) {
@@ -1830,18 +1835,124 @@ ace4_to_acet(nfsace4 *nfsace4, ace_t *ace, uid_t owner, gid_t group,
 	}
 
 out:
-#ifdef DEBUG
-	if (error != 0)
-		NFS4_DEBUG(nfs4_acl_debug, (CE_NOTE,
-		    "ace4_to_acet: idmap failed with %d", error));
-#endif
-
 	return (error);
+}
+
+static void
+ace4_mask_to_acet_mask(acemask4 ace4_mask, uint32_t *acet_mask)
+{
+	*acet_mask = 0;
+
+	if (ace4_mask & ACE4_READ_DATA)
+		*acet_mask |= ACE_READ_DATA;
+	if (ace4_mask & ACE4_WRITE_DATA)
+		*acet_mask |= ACE_WRITE_DATA;
+	if (ace4_mask & ACE4_APPEND_DATA)
+		*acet_mask |= ACE_APPEND_DATA;
+	if (ace4_mask & ACE4_READ_NAMED_ATTRS)
+		*acet_mask |= ACE_READ_NAMED_ATTRS;
+	if (ace4_mask & ACE4_WRITE_NAMED_ATTRS)
+		*acet_mask |= ACE_WRITE_NAMED_ATTRS;
+	if (ace4_mask & ACE4_EXECUTE)
+		*acet_mask |= ACE_EXECUTE;
+	if (ace4_mask & ACE4_DELETE_CHILD)
+		*acet_mask |= ACE_DELETE_CHILD;
+	if (ace4_mask & ACE4_READ_ATTRIBUTES)
+		*acet_mask |= ACE_READ_ATTRIBUTES;
+	if (ace4_mask & ACE4_WRITE_ATTRIBUTES)
+		*acet_mask |= ACE_WRITE_ATTRIBUTES;
+	if (ace4_mask & ACE4_DELETE)
+		*acet_mask |= ACE_DELETE;
+	if (ace4_mask & ACE4_READ_ACL)
+		*acet_mask |= ACE_READ_ACL;
+	if (ace4_mask & ACE4_WRITE_ACL)
+		*acet_mask |= ACE_WRITE_ACL;
+	if (ace4_mask & ACE4_WRITE_OWNER)
+		*acet_mask |= ACE_WRITE_OWNER;
+	if (ace4_mask & ACE4_SYNCHRONIZE)
+		*acet_mask |= ACE_SYNCHRONIZE;
+}
+
+static void
+acet_mask_to_ace4_mask(uint32_t acet_mask, acemask4 *ace4_mask)
+{
+	*ace4_mask = 0;
+
+	if (acet_mask & ACE_READ_DATA)
+		*ace4_mask |= ACE4_READ_DATA;
+	if (acet_mask & ACE_WRITE_DATA)
+		*ace4_mask |= ACE4_WRITE_DATA;
+	if (acet_mask & ACE_APPEND_DATA)
+		*ace4_mask |= ACE_APPEND_DATA;
+	if (acet_mask & ACE4_READ_NAMED_ATTRS)
+		*ace4_mask |= ACE_READ_NAMED_ATTRS;
+	if (acet_mask & ACE_WRITE_NAMED_ATTRS)
+		*ace4_mask |= ACE4_WRITE_NAMED_ATTRS;
+	if (acet_mask & ACE_EXECUTE)
+		*ace4_mask |= ACE4_EXECUTE;
+	if (acet_mask & ACE_DELETE_CHILD)
+		*ace4_mask |= ACE4_DELETE_CHILD;
+	if (acet_mask & ACE_READ_ATTRIBUTES)
+		*ace4_mask |= ACE4_READ_ATTRIBUTES;
+	if (acet_mask & ACE_WRITE_ATTRIBUTES)
+		*ace4_mask |= ACE4_WRITE_ATTRIBUTES;
+	if (acet_mask & ACE_DELETE)
+		*ace4_mask |= ACE4_DELETE;
+	if (acet_mask & ACE_READ_ACL)
+		*ace4_mask |= ACE4_READ_ACL;
+	if (acet_mask & ACE_WRITE_ACL)
+		*ace4_mask |= ACE4_WRITE_ACL;
+	if (acet_mask & ACE_WRITE_OWNER)
+		*ace4_mask |= ACE4_WRITE_OWNER;
+	if (acet_mask & ACE_SYNCHRONIZE)
+		*ace4_mask |= ACE4_SYNCHRONIZE;
+}
+
+static void
+ace4_flags_to_acet_flags(aceflag4 ace4_flags, uint16_t *acet_flags)
+{
+	*acet_flags = 0;
+
+	if (ace4_flags & ACE4_FILE_INHERIT_ACE)
+		*acet_flags |= ACE_FILE_INHERIT_ACE;
+	if (ace4_flags & ACE4_DIRECTORY_INHERIT_ACE)
+		*acet_flags |= ACE_DIRECTORY_INHERIT_ACE;
+	if (ace4_flags & ACE4_NO_PROPAGATE_INHERIT_ACE)
+		*acet_flags |= ACE_NO_PROPAGATE_INHERIT_ACE;
+	if (ace4_flags & ACE4_INHERIT_ONLY_ACE)
+		*acet_flags |= ACE_INHERIT_ONLY_ACE;
+	if (ace4_flags & ACE4_SUCCESSFUL_ACCESS_ACE_FLAG)
+		*acet_flags |= ACE_SUCCESSFUL_ACCESS_ACE_FLAG;
+	if (ace4_flags & ACE4_FAILED_ACCESS_ACE_FLAG)
+		*acet_flags |= ACE_FAILED_ACCESS_ACE_FLAG;
+	if (ace4_flags & ACE4_IDENTIFIER_GROUP)
+		*acet_flags |= ACE_IDENTIFIER_GROUP;
+}
+
+static void
+acet_flags_to_ace4_flags(uint16_t acet_flags, aceflag4 *ace4_flags)
+{
+	*ace4_flags = 0;
+
+	if (acet_flags & ACE_FILE_INHERIT_ACE)
+		*ace4_flags |= ACE4_FILE_INHERIT_ACE;
+	if (acet_flags & ACE_DIRECTORY_INHERIT_ACE)
+		*ace4_flags |= ACE4_DIRECTORY_INHERIT_ACE;
+	if (acet_flags & ACE_NO_PROPAGATE_INHERIT_ACE)
+		*ace4_flags |= ACE4_NO_PROPAGATE_INHERIT_ACE;
+	if (acet_flags & ACE_INHERIT_ONLY_ACE)
+		*ace4_flags |= ACE4_INHERIT_ONLY_ACE;
+	if (acet_flags & ACE_SUCCESSFUL_ACCESS_ACE_FLAG)
+		*ace4_flags |= ACE4_SUCCESSFUL_ACCESS_ACE_FLAG;
+	if (acet_flags & ACE_FAILED_ACCESS_ACE_FLAG)
+		*ace4_flags |= ACE4_FAILED_ACCESS_ACE_FLAG;
+	if (acet_flags & ACE_IDENTIFIER_GROUP)
+		*ace4_flags |= ACE4_IDENTIFIER_GROUP;
 }
 
 int
 vs_ace4_to_acet(vsecattr_t *vs_ace4, vsecattr_t *vs_acet,
-    uid_t owner, gid_t group, int isdir, int isserver, int just_count)
+    uid_t owner, gid_t group, int isserver, int just_count)
 {
 	int error;
 	int i;
@@ -1865,7 +1976,7 @@ vs_ace4_to_acet(vsecattr_t *vs_ace4, vsecattr_t *vs_acet,
 	for (i = 0; i < vs_ace4->vsa_aclcnt; i++) {
 		error = ace4_to_acet((nfsace4 *)(vs_ace4->vsa_aclentp) + i,
 		    (ace_t *)(vs_acet->vsa_aclentp) + i, owner, group,
-		    isdir, isserver, just_count);
+		    isserver, just_count);
 		if (error != 0)
 			goto out;
 	}
@@ -1879,7 +1990,7 @@ out:
 
 int
 vs_acet_to_ace4(vsecattr_t *vs_acet, vsecattr_t *vs_ace4,
-    int isdir, int isserver)
+    int isserver)
 {
 	int error = 0;
 	int i;
@@ -1900,7 +2011,7 @@ vs_acet_to_ace4(vsecattr_t *vs_acet, vsecattr_t *vs_ace4,
 
 	for (i = 0; i < vs_acet->vsa_aclcnt; i++) {
 		error = acet_to_ace4((ace_t *)(vs_acet->vsa_aclentp) + i,
-		    (nfsace4 *)(vs_ace4->vsa_aclentp) + i, isdir, isserver);
+		    (nfsace4 *)(vs_ace4->vsa_aclentp) + i, isserver);
 		if (error != 0)
 			goto out;
 	}

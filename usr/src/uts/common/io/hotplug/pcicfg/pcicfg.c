@@ -558,7 +558,7 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 	bus = pci_bus_range.lo; /* primary bus number of this bus node */
 
 	ndi_devi_alloc_sleep(devi, "hp_attachment",
-		(dnode_t)DEVI_SID_NODEID, &attach_point);
+		(pnode_t)DEVI_SID_NODEID, &attach_point);
 
 	ndi_devi_enter(devi, &circ);
 	for (func = 0; func < PCICFG_MAX_FUNCTION; func++) {
@@ -776,7 +776,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	for (devno = pcicfg_start_devno; devno < max_devs; devno++) {
 
 		ndi_devi_alloc_sleep(new_device, DEVI_PSEUDO_NEXNAME,
-		    (dnode_t)DEVI_SID_NODEID, &new_ntbridgechild);
+		    (pnode_t)DEVI_SID_NODEID, &new_ntbridgechild);
 
 		if (pcicfg_add_config_reg(new_ntbridgechild, next_bus, devno, 0)
 					!= DDI_PROP_SUCCESS) {
@@ -1104,7 +1104,7 @@ pcicfg_ntbridge_unconfigure_child(dev_info_t *new_device, uint_t devno)
 	bus = pci_bus_range.lo; /* primary bus number of this bus node */
 
 	ndi_devi_alloc_sleep(new_device, DEVI_PSEUDO_NEXNAME,
-	    (dnode_t)DEVI_SID_NODEID, &new_ntbridgechild);
+	    (pnode_t)DEVI_SID_NODEID, &new_ntbridgechild);
 
 	if (pcicfg_add_config_reg(new_ntbridgechild, bus, devno, 0)
 				!= DDI_PROP_SUCCESS) {
@@ -3255,7 +3255,7 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 
 	ndi_devi_enter(parent, &circ);
 	ndi_devi_alloc_sleep(parent, DEVI_PSEUDO_NEXNAME,
-		(dnode_t)DEVI_SID_NODEID, &new_child);
+		(pnode_t)DEVI_SID_NODEID, &new_child);
 
 	if (pcicfg_add_config_reg(new_child, bus,
 		device, func) != DDI_SUCCESS) {
@@ -3908,7 +3908,7 @@ pcicfg_create_ac_child(dev_info_t *dip)
 	dev_info_t	*cdip;
 	char		*compat[1];
 
-	ndi_devi_alloc_sleep(dip, "se", (dnode_t)DEVI_SID_NODEID, &cdip);
+	ndi_devi_alloc_sleep(dip, "se", (pnode_t)DEVI_SID_NODEID, &cdip);
 	compat[0] = kmem_alloc(strlen("acse") + 1, KM_SLEEP);
 	(void) strcpy(compat[0], "acse");
 	if (ndi_prop_update_string_array(DDI_DEV_T_NONE, cdip,

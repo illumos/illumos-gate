@@ -906,7 +906,7 @@ todds1337_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 static int
 todds1337_setup_prom()
 {
-	dnode_t todnode;
+	pnode_t todnode;
 	char tod1337_devpath[MAXNAMELEN];
 
 	if ((todnode = prom_findnode_bydevtype(prom_rootnode(),

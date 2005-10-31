@@ -167,6 +167,33 @@ struct dk_geom {
 #define	DKIOCSVTOC	(DKIOC|12)		/* Set VTOC & Write to Disk */
 
 /*
+ * Disk Cache Controls.  These ioctls should be supported by
+ * all disk drivers.
+ *
+ * DKIOCFLUSHWRITECACHE when used from user-mode ignores the ioctl
+ * argument, but it should be passed as NULL to allow for future
+ * reinterpretation.  From user-mode, this ioctl request is synchronous.
+ *
+ * When invoked from within the kernel, the arg can be NULL to indicate
+ * a synchronous request or can be the address of a struct dk_callback
+ * to request an asynchronous callback when the flush request is complete.
+ * In this case, the flag to the ioctl must include FKIOCTL and the
+ * dkc_callback field of the pointed to struct must be non-null or the
+ * request is made synchronously.
+ *
+ * In the callback case: if the ioctl returns 0, a callback WILL be performed.
+ * If the ioctl returns non-zero, a callback will NOT be performed.
+ * NOTE: In some cases, the callback may be done BEFORE the ioctl call
+ * returns.  The caller's locking strategy should be prepared for this case.
+ */
+#define	DKIOCFLUSHWRITECACHE	(DKIOC|34)	/* flush cache to phys medium */
+
+struct dk_callback {
+	void (*dkc_callback)(void *dkc_cookie, int error);
+	void *dkc_cookie;
+};
+
+/*
  * The following ioctls are used by Sun drivers to communicate
  * with their associated format routines. Support of these ioctls
  * is not required of foreign drivers

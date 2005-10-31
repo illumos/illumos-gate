@@ -72,6 +72,7 @@
 #include <regex.h>
 #include <signal.h>
 #include <libtecla.h>
+#include <libzfs.h>
 
 #include <libzonecfg.h>
 #include "zonecfg.h"
@@ -153,6 +154,7 @@ static char *res_types[] = {
 	"device",
 	"rctl",
 	"attr",
+	"dataset",
 	NULL
 };
 
@@ -219,6 +221,7 @@ static const char *add_cmds[] = {
 	"add device",
 	"add rctl",
 	"add attr",
+	"add dataset",
 	NULL
 };
 
@@ -229,6 +232,7 @@ static const char *select_cmds[] = {
 	"select device ",
 	"select rctl ",
 	"select attr ",
+	"select dataset ",
 	NULL
 };
 
@@ -308,6 +312,16 @@ static const char *rctl_res_scope_cmds[] = {
 	NULL
 };
 
+static const char *dataset_res_scope_cmds[] = {
+	"cancel",
+	"end",
+	"exit",
+	"help",
+	"info",
+	"set name=",
+	NULL
+};
+
 /* Global variables */
 
 /* set early in main(), never modified thereafter, used all over the place */
@@ -365,6 +379,7 @@ static struct zone_nwiftab	old_nwiftab, in_progress_nwiftab;
 static struct zone_devtab	old_devtab, in_progress_devtab;
 static struct zone_rctltab	old_rctltab, in_progress_rctltab;
 static struct zone_attrtab	old_attrtab, in_progress_attrtab;
+static struct zone_dstab	old_dstab, in_progress_dstab;
 
 static GetLine *gl;	/* The gl_get_line() resource object */
 
@@ -426,6 +441,8 @@ CPL_MATCH_FN(cmd_cpl_fn)
 		return (add_stuff(cpl, line, rctl_res_scope_cmds, word_end));
 	case RT_ATTR:
 		return (add_stuff(cpl, line, attr_res_scope_cmds, word_end));
+	case RT_DATASET:
+		return (add_stuff(cpl, line, dataset_res_scope_cmds, word_end));
 	}
 	return (0);
 }
@@ -784,6 +801,14 @@ usage(bool verbose, uint_t flags)
 			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
 			    pt_to_str(PT_VALUE), gettext("<unsigned integer>"));
 			break;
+		case RT_DATASET:
+			(void) fprintf(fp, gettext("The '%s' resource scope is "
+			    "used to export ZFS datasets.\n"),
+			    rt_to_str(resource_scope));
+			(void) fprintf(fp, gettext("Valid commands:\n"));
+			(void) fprintf(fp, "\t%s %s=%s\n", cmd_to_str(CMD_SET),
+			    pt_to_str(PT_NAME), gettext("<name>"));
+			break;
 		}
 		(void) fprintf(fp, gettext("And from any resource scope, you "
 		    "can:\n"));
@@ -872,6 +897,8 @@ usage(bool verbose, uint_t flags)
 		(void) fprintf(fp, "\t%s\t\t%s, %s, %s\n", rt_to_str(RT_ATTR),
 		    pt_to_str(PT_NAME), pt_to_str(PT_TYPE),
 		    pt_to_str(PT_VALUE));
+		(void) fprintf(fp, "\t%s\t\t%s\n", rt_to_str(RT_DATASET),
+		    pt_to_str(PT_NAME));
 	}
 	if (need_to_close)
 		(void) pclose(fp);
@@ -1242,6 +1269,7 @@ export_func(cmd_t *cmd)
 	struct zone_devtab devtab;
 	struct zone_attrtab attrtab;
 	struct zone_rctltab rctltab;
+	struct zone_dstab dstab;
 	struct zone_rctlvaltab *valptr;
 	int err, arg;
 	char zonepath[MAXPATHLEN], outfile[MAXPATHLEN], pool[MAXNAMELEN];
@@ -1411,6 +1439,18 @@ export_func(cmd_t *cmd)
 	}
 	(void) zonecfg_endattrent(handle);
 
+	if ((err = zonecfg_setdsent(handle)) != Z_OK) {
+		zone_perror(zone, err, FALSE);
+		goto done;
+	}
+	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
+		(void) fprintf(of, "%s %s\n", cmd_to_str(CMD_ADD),
+		    rt_to_str(RT_DATASET));
+		export_prop(of, PT_NAME, dstab.zone_dataset_name);
+		(void) fprintf(of, "%s\n", cmd_to_str(CMD_END));
+	}
+	(void) zonecfg_enddsent(handle);
+
 done:
 	if (need_to_close)
 		(void) fclose(of);
@@ -1506,6 +1546,9 @@ add_resource(cmd_t *cmd)
 		return;
 	case RT_ATTR:
 		bzero(&in_progress_attrtab, sizeof (in_progress_attrtab));
+		return;
+	case RT_DATASET:
+		bzero(&in_progress_dstab, sizeof (in_progress_dstab));
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, TRUE);
@@ -2077,6 +2120,39 @@ fill_in_attrtab(cmd_t *cmd, struct zone_attrtab *attrtab, bool fill_in_only)
 	return (err);
 }
 
+static int
+fill_in_dstab(cmd_t *cmd, struct zone_dstab *dstab, bool fill_in_only)
+{
+	int err, i;
+	property_value_ptr_t pp;
+
+	if ((err = initialize(TRUE)) != Z_OK)
+		return (err);
+
+	dstab->zone_dataset_name[0] = '\0';
+	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
+		pp = cmd->cmd_property_ptr[i];
+		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
+			zerr(gettext("A simple value was expected here."));
+			saw_error = TRUE;
+			return (Z_INSUFFICIENT_SPEC);
+		}
+		switch (cmd->cmd_prop_name[i]) {
+		case PT_NAME:
+			(void) strlcpy(dstab->zone_dataset_name, pp->pv_simple,
+			    sizeof (dstab->zone_dataset_name));
+			break;
+		default:
+			zone_perror(pt_to_str(cmd->cmd_prop_name[i]),
+			    Z_NO_PROPERTY_TYPE, TRUE);
+			return (Z_INSUFFICIENT_SPEC);
+		}
+	}
+	if (fill_in_only)
+		return (Z_OK);
+	return (zonecfg_lookup_ds(handle, dstab));
+}
+
 static void
 remove_resource(cmd_t *cmd)
 {
@@ -2086,6 +2162,7 @@ remove_resource(cmd_t *cmd)
 	struct zone_devtab devtab;
 	struct zone_attrtab attrtab;
 	struct zone_rctltab rctltab;
+	struct zone_dstab dstab;
 
 	if ((type = cmd->cmd_res_type) == RT_UNKNOWN) {
 		long_usage(CMD_REMOVE, TRUE);
@@ -2161,6 +2238,16 @@ remove_resource(cmd_t *cmd)
 		}
 		if ((err = zonecfg_delete_attr(handle, &attrtab)) != Z_OK)
 			z_cmd_rt_perror(CMD_REMOVE, RT_ATTR, err, TRUE);
+		else
+			need_to_commit = TRUE;
+		return;
+	case RT_DATASET:
+		if ((err = fill_in_dstab(cmd, &dstab, FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
+			return;
+		}
+		if ((err = zonecfg_delete_ds(handle, &dstab)) != Z_OK)
+			z_cmd_rt_perror(CMD_REMOVE, RT_DATASET, err, TRUE);
 		else
 			need_to_commit = TRUE;
 		return;
@@ -2397,6 +2484,14 @@ select_func(cmd_t *cmd)
 		}
 		bcopy(&old_attrtab, &in_progress_attrtab,
 		    sizeof (struct zone_attrtab));
+		return;
+	case RT_DATASET:
+		if ((err = fill_in_dstab(cmd, &old_dstab, FALSE)) != Z_OK) {
+			z_cmd_rt_perror(CMD_SELECT, RT_DATASET, err, TRUE);
+			global_scope = TRUE;
+		}
+		bcopy(&old_dstab, &in_progress_dstab,
+		    sizeof (struct zone_dstab));
 		return;
 	default:
 		zone_perror(rt_to_str(type), Z_NO_RESOURCE_TYPE, TRUE);
@@ -2801,6 +2896,20 @@ set_func(cmd_t *cmd)
 			return;
 		}
 		return;
+	case RT_DATASET:
+		switch (prop_type) {
+		case PT_NAME:
+			(void) strlcpy(in_progress_dstab.zone_dataset_name,
+			    prop_id,
+			    sizeof (in_progress_dstab.zone_dataset_name));
+			return;
+		default:
+			break;
+		}
+		zone_perror(pt_to_str(prop_type), Z_NO_PROPERTY_TYPE, TRUE);
+		long_usage(CMD_SET, TRUE);
+		usage(FALSE, HELP_PROPS);
+		return;
 	default:
 		zone_perror(rt_to_str(res_type), Z_NO_RESOURCE_TYPE, TRUE);
 		long_usage(CMD_SET, TRUE);
@@ -3149,6 +3258,46 @@ info_attr(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
 		    rt_to_str(RT_ATTR));
 }
 
+static void
+output_ds(FILE *fp, struct zone_dstab *dstab)
+{
+	(void) fprintf(fp, "%s:\n", rt_to_str(RT_DATASET));
+	output_prop(fp, PT_NAME, dstab->zone_dataset_name, B_TRUE);
+}
+
+static void
+info_ds(zone_dochandle_t handle, FILE *fp, cmd_t *cmd)
+{
+	struct zone_dstab lookup, user;
+	bool output = FALSE;
+
+	if (zonecfg_setdevent(handle) != Z_OK)
+		return;
+	while (zonecfg_getdsent(handle, &lookup) == Z_OK) {
+		if (cmd->cmd_prop_nv_pairs == 0) {
+			output_ds(fp, &lookup);
+			continue;
+		}
+		if (fill_in_dstab(cmd, &user, TRUE) != Z_OK)
+			continue;
+		if (strlen(user.zone_dataset_name) > 0 &&
+		    strcmp(user.zone_dataset_name,
+		    lookup.zone_dataset_name) != 0)
+			continue;	/* no match */
+		output_ds(fp, &lookup);
+		output = TRUE;
+	}
+	(void) zonecfg_enddsent(handle);
+	/*
+	 * If a property n/v pair was specified, warn the user if there was
+	 * nothing to output.
+	 */
+	if (!output && cmd->cmd_prop_nv_pairs > 0)
+		(void) printf(gettext("No such %s resource.\n"),
+		    rt_to_str(RT_DATASET));
+}
+
+
 void
 info_func(cmd_t *cmd)
 {
@@ -3192,6 +3341,9 @@ info_func(cmd_t *cmd)
 		case RT_ATTR:
 			output_attr(fp, &in_progress_attrtab);
 			break;
+		case RT_DATASET:
+			output_ds(fp, &in_progress_dstab);
+			break;
 		}
 		goto cleanup;
 	}
@@ -3208,6 +3360,7 @@ info_func(cmd_t *cmd)
 		info_dev(handle, fp, cmd);
 		info_rctl(handle, fp, cmd);
 		info_attr(handle, fp, cmd);
+		info_ds(handle, fp, cmd);
 		break;
 	case RT_ZONENAME:
 		info_zonename(handle, fp);
@@ -3238,6 +3391,9 @@ info_func(cmd_t *cmd)
 		break;
 	case RT_ATTR:
 		info_attr(handle, fp, cmd);
+		break;
+	case RT_DATASET:
+		info_ds(handle, fp, cmd);
 		break;
 	default:
 		zone_perror(rt_to_str(cmd->cmd_res_type), Z_NO_RESOURCE_TYPE,
@@ -3281,6 +3437,7 @@ verify_func(cmd_t *cmd)
 	struct zone_fstab fstab;
 	struct zone_attrtab attrtab;
 	struct zone_rctltab rctltab;
+	struct zone_dstab dstab;
 	char zonepath[MAXPATHLEN];
 	int err, ret_val = Z_OK, arg;
 	bool save = FALSE;
@@ -3391,6 +3548,29 @@ verify_func(cmd_t *cmd)
 	}
 	(void) zonecfg_endattrent(handle);
 
+	if ((err = zonecfg_setdsent(handle)) != Z_OK) {
+		zone_perror(zone, err, TRUE);
+		return;
+	}
+	while (zonecfg_getdsent(handle, &dstab) == Z_OK) {
+		if (strlen(dstab.zone_dataset_name) == 0) {
+			zerr("%s: %s %s", rt_to_str(RT_DATASET),
+			    pt_to_str(PT_NAME), gettext("not specified"));
+			saw_error = TRUE;
+			if (ret_val == Z_OK)
+				ret_val = Z_REQD_PROPERTY_MISSING;
+		} else if (!zfs_name_valid(dstab.zone_dataset_name,
+		    ZFS_TYPE_FILESYSTEM)) {
+			zerr("%s: %s %s", rt_to_str(RT_DATASET),
+			    pt_to_str(PT_NAME), gettext("invalid"));
+			saw_error = TRUE;
+			if (ret_val == Z_OK)
+				ret_val = Z_BAD_PROPERTY;
+		}
+
+	}
+	(void) zonecfg_enddsent(handle);
+
 	if (!global_scope) {
 		zerr(gettext("resource specification incomplete"));
 		saw_error = TRUE;
@@ -3442,10 +3622,12 @@ cancel_func(cmd_t *cmd)
 	zonecfg_free_fs_option_list(in_progress_fstab.zone_fs_options);
 	bzero(&in_progress_fstab, sizeof (in_progress_fstab));
 	bzero(&in_progress_nwiftab, sizeof (in_progress_nwiftab));
+	bzero(&in_progress_ipdtab, sizeof (in_progress_ipdtab));
 	bzero(&in_progress_devtab, sizeof (in_progress_devtab));
 	zonecfg_free_rctl_value_list(in_progress_rctltab.zone_rctl_valptr);
 	bzero(&in_progress_rctltab, sizeof (in_progress_rctltab));
 	bzero(&in_progress_attrtab, sizeof (in_progress_attrtab));
+	bzero(&in_progress_dstab, sizeof (in_progress_dstab));
 }
 
 static int
@@ -3539,6 +3721,7 @@ end_func(cmd_t *cmd)
 	struct zone_devtab tmp_devtab;
 	struct zone_rctltab tmp_rctltab;
 	struct zone_attrtab tmp_attrtab;
+	struct zone_dstab tmp_dstab;
 	int err, arg;
 
 	assert(cmd != NULL);
@@ -3806,6 +3989,37 @@ end_func(cmd_t *cmd)
 		} else {
 			err = zonecfg_modify_attr(handle, &old_attrtab,
 			    &in_progress_attrtab);
+		}
+		break;
+	case RT_DATASET:
+		/* First make sure everything was filled in. */
+		if (strlen(in_progress_dstab.zone_dataset_name) == 0) {
+			zerr("%s %s", pt_to_str(PT_NAME),
+			    gettext("not specified"));
+			saw_error = TRUE;
+			validation_failed = TRUE;
+		}
+		if (validation_failed)
+			return;
+		if (end_op == CMD_ADD) {
+			/* Make sure there isn't already one like this. */
+			bzero(&tmp_dstab, sizeof (tmp_dstab));
+			(void) strlcpy(tmp_dstab.zone_dataset_name,
+			    in_progress_dstab.zone_dataset_name,
+			    sizeof (tmp_dstab.zone_dataset_name));
+			err = zonecfg_lookup_ds(handle, &tmp_dstab);
+			if (err == Z_OK) {
+				zerr(gettext("A %s resource "
+				    "with the %s '%s' already exists."),
+				    rt_to_str(RT_DATASET), pt_to_str(PT_NAME),
+				    in_progress_dstab.zone_dataset_name);
+				saw_error = TRUE;
+				return;
+			}
+			err = zonecfg_add_ds(handle, &in_progress_dstab);
+		} else {
+			err = zonecfg_modify_ds(handle, &old_dstab,
+			    &in_progress_dstab);
 		}
 		break;
 	default:

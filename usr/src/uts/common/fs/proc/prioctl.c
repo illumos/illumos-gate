@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -498,7 +498,7 @@ startover:
 			 */
 			t = pr_thread(pnp);	/* returns locked thread */
 			thread_unlock(t);
-			oprgetstatus(t, &un.prstat, VTOZ(vp));
+			oprgetstatus(t, &un.prstat, VTOZONE(vp));
 			prunlock(pnp);
 			if (copyout(&un.prstat, cmaddr, sizeof (un.prstat)))
 				error = EFAULT;
@@ -835,7 +835,7 @@ startover:
 		break;
 
 	case PIOCSTATUS:	/* get process/lwp status */
-		oprgetstatus(t, &un.prstat, VTOZ(vp));
+		oprgetstatus(t, &un.prstat, VTOZONE(vp));
 		prunlock(pnp);
 		if (copyout(&un.prstat, cmaddr, sizeof (un.prstat)))
 			error = EFAULT;
@@ -866,13 +866,13 @@ startover:
 		Bprsp = thing;
 		thing = NULL;
 		prsp = Bprsp;
-		oprgetstatus(t, prsp, VTOZ(vp));
+		oprgetstatus(t, prsp, VTOZONE(vp));
 		t = p->p_tlist;
 		do {
 			ASSERT(!(t->t_proc_flag & TP_LWPEXIT));
 			ASSERT(nlwp > 0);
 			--nlwp;
-			oprgetstatus(t, ++prsp, VTOZ(vp));
+			oprgetstatus(t, ++prsp, VTOZONE(vp));
 		} while ((t = t->t_forw) != p->p_tlist);
 		ASSERT(nlwp == 0);
 		prunlock(pnp);
@@ -2053,7 +2053,7 @@ startover:
 			 */
 			t = pr_thread(pnp);	/* returns locked thread */
 			thread_unlock(t);
-			oprgetstatus32(t, &un32.prstat, VTOZ(vp));
+			oprgetstatus32(t, &un32.prstat, VTOZONE(vp));
 			prunlock(pnp);
 			if (copyout(&un32.prstat, cmaddr, sizeof (un32.prstat)))
 				error = EFAULT;
@@ -2430,7 +2430,7 @@ startover:
 			error = EOVERFLOW;
 			break;
 		}
-		oprgetstatus32(t, &un32.prstat, VTOZ(vp));
+		oprgetstatus32(t, &un32.prstat, VTOZONE(vp));
 		prunlock(pnp);
 		if (copyout(&un32.prstat, cmaddr, sizeof (un32.prstat)))
 			error = EFAULT;
@@ -2471,13 +2471,13 @@ startover:
 		Bprsp = (prstatus32_t *)thing;
 		thing = NULL;
 		prsp = Bprsp;
-		oprgetstatus32(t, prsp, VTOZ(vp));
+		oprgetstatus32(t, prsp, VTOZONE(vp));
 		t = p->p_tlist;
 		do {
 			ASSERT(!(t->t_proc_flag & TP_LWPEXIT));
 			ASSERT(nlwp > 0);
 			--nlwp;
-			oprgetstatus32(t, ++prsp, VTOZ(vp));
+			oprgetstatus32(t, ++prsp, VTOZONE(vp));
 		} while ((t = t->t_forw) != p->p_tlist);
 		ASSERT(nlwp == 0);
 		prunlock(pnp);

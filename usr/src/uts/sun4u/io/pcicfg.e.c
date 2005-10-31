@@ -745,7 +745,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	for (devno = pcicfg_start_devno; devno < max_devs; devno++) {
 
 		if (ndi_devi_alloc(new_device, DEVI_PSEUDO_NEXNAME,
-		    (dnode_t)DEVI_SID_NODEID, &new_ntbridgechild)
+		    (pnode_t)DEVI_SID_NODEID, &new_ntbridgechild)
 							!= NDI_SUCCESS) {
 
 			DEBUG0("pcicfg: Failed to alloc test node\n");
@@ -1082,7 +1082,7 @@ pcicfg_ntbridge_unconfigure_child(dev_info_t *new_device, uint_t devno)
 	bus = pci_bus_range.lo; /* primary bus number of this bus node */
 
 	if (ndi_devi_alloc(new_device, DEVI_PSEUDO_NEXNAME,
-	    (dnode_t)DEVI_SID_NODEID, &new_ntbridgechild) != NDI_SUCCESS) {
+	    (pnode_t)DEVI_SID_NODEID, &new_ntbridgechild) != NDI_SUCCESS) {
 
 		DEBUG0("pcicfg: Failed to alloc test node\n");
 		return (PCICFG_FAILURE);
@@ -3240,7 +3240,7 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	 * ndi_devi_alloc() is called as ndi_devi_alloc_sleep()
 	 */
 	if (ndi_devi_alloc(parent, DEVI_PSEUDO_NEXNAME,
-		(dnode_t)DEVI_SID_NODEID, &new_child)
+		(pnode_t)DEVI_SID_NODEID, &new_child)
 		!= NDI_SUCCESS) {
 		DEBUG0("pcicfg_probe_children(): Failed to alloc child node\n");
 		ndi_devi_exit(parent, circ);
@@ -3485,7 +3485,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	 */
 
 	if (ndi_devi_alloc(parent, DEVI_PSEUDO_NEXNAME,
-		(dnode_t)DEVI_SID_NODEID, &new_child)
+		(pnode_t)DEVI_SID_NODEID, &new_child)
 		!= NDI_SUCCESS) {
 		DEBUG0("pcicfg_fcode_probe(): Failed to alloc child node\n");
 		return (PCICFG_FAILURE);

@@ -162,3 +162,5 @@ mdesc:* 0666 root sys
 dld:* 0666 root sys
 aggr:* 0666 root sys
 ntwdt:* 0644 root sys
+zfs:* 0600 root sys
+zfs:zfs 0666 root sys

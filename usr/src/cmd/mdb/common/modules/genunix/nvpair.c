@@ -91,9 +91,45 @@ nvpair_walk_step(mdb_walk_state_t *wsp)
 	return (status);
 }
 
+/*
+ * ::nvlist [-v]
+ *
+ * Print out an entire nvlist.  This is shorthand for '::walk nvpair |
+ * ::nvpair -rq'.  The '-v' option invokes '::nvpair' without the "-q" option.
+ */
+/*ARGSUSED*/
+int
+nvlist_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	int verbose = B_FALSE;
+	mdb_arg_t v;
+
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'v', MDB_OPT_SETBITS, TRUE, &verbose,
+	    NULL) != argc)
+		return (DCMD_USAGE);
+
+	v.a_type = MDB_TYPE_STRING;
+	if (verbose)
+		v.a_un.a_str = "-r";
+	else
+		v.a_un.a_str = "-rq";
+
+	return (mdb_pwalk_dcmd("nvpair", "nvpair", 1, &v, addr));
+}
 
 /*
- * nvpair dcmd
+ * ::nvpair [-rq]
+ *
+ * 	-r	Recursively print any nvlist elements
+ * 	-q	Quiet mode; print members only as "name=value"
+ *
+ * Prints out a single nvpair.  By default, all information is printed.  When
+ * given the '-q' option, the type of elements is hidden, and elements are
+ * instead printed simply as 'name=value'.
  */
 typedef struct {
 	data_type_t	type;
@@ -136,7 +172,6 @@ nvpair_print_value(char *data, int32_t elem_size, int32_t nelem,
 {
 	int32_t i;
 
-	mdb_printf("value=");
 	if (elem_size == 0) {
 		char *p = data;
 
@@ -186,8 +221,16 @@ nvpair_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	char		*data = NULL, *data_end = NULL;
 	char		*type_name = NULL;
 	data_type_t	type = DATA_TYPE_UNKNOWN;
+	int		quiet = FALSE;
+	int		recurse = FALSE;
 
-	if (!(flags & DCMD_ADDRSPEC) || argc != 0)
+	if (!(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'r', MDB_OPT_SETBITS, TRUE, &recurse,
+	    'q', MDB_OPT_SETBITS, TRUE, &quiet,
+	    NULL) != argc)
 		return (DCMD_USAGE);
 
 	/* read in the nvpair header so we can get the size */
@@ -218,19 +261,30 @@ nvpair_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 			break;
 		}
 	}
-	/* print out the first line of nvpair info */
-	mdb_printf("name='%s'", NVP_NAME(nvpair));
-	if (type_name != NULL) {
-		mdb_printf(" type=%s", type_name);
+
+	if (quiet) {
+		mdb_printf("%s", NVP_NAME(nvpair));
 	} else {
-		/* if the nvpair type is unknown we print the type number */
-		mdb_printf(" type=0x%x", type);
+		/* print out the first line of nvpair info */
+		mdb_printf("name='%s'", NVP_NAME(nvpair));
+		if (type_name != NULL) {
+			mdb_printf(" type=%s", type_name);
+		} else {
+			/*
+			 * If the nvpair type is unknown we print the type
+			 * number
+			 */
+			mdb_printf(" type=0x%x", type);
+		}
+		mdb_printf(" items=%d\n", nelem);
 	}
-	mdb_printf(" items=%d\n", nelem);
 
 	/* if there is no data and the type is known then we're done */
-	if ((nelem == 0) && (type_name != NULL))
+	if ((nelem == 0) && (type_name != NULL)) {
+		if (quiet)
+			mdb_printf("(unknown)\n");
 		return (DCMD_OK);
+	}
 
 	/* get pointers to the data to print out */
 	data = (char *)NVP_VALUE(nvpair);
@@ -249,20 +303,54 @@ nvpair_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	 */
 	if (type == DATA_TYPE_NVLIST) {
 		char *p = (char *)addr + (data - (char *)nvpair);
-		mdb_inc_indent(NVPAIR_VALUE_INDENT);
-		mdb_printf("value=%p\n", p);
-		mdb_dec_indent(NVPAIR_VALUE_INDENT);
+		if (recurse) {
+			if (quiet)
+				mdb_printf("\n");
+			mdb_inc_indent(NVPAIR_VALUE_INDENT);
+			if (mdb_pwalk_dcmd("nvpair", "nvpair", argc, argv,
+			    (uintptr_t)p) != DCMD_OK)
+				return (DCMD_ERR);
+			mdb_dec_indent(NVPAIR_VALUE_INDENT);
+		} else {
+			if (!quiet) {
+				mdb_inc_indent(NVPAIR_VALUE_INDENT);
+				mdb_printf("value", p);
+			}
+			mdb_printf("=%p\n", p);
+			if (!quiet)
+				mdb_dec_indent(NVPAIR_VALUE_INDENT);
+		}
 		return (DCMD_OK);
 
 	} else if (type == DATA_TYPE_NVLIST_ARRAY) {
-		mdb_inc_indent(NVPAIR_VALUE_INDENT);
-		mdb_printf("value=");
-		for (i = 0; i < nelem; i++, data += sizeof (nvlist_t *)) {
-			nvlist_t **nl = (nvlist_t **)(void *)data;
-			mdb_printf("%c%p", " "[i == 0], *nl);
+		if (recurse) {
+			for (i = 0; i < nelem; i++,
+			    data += sizeof (nvlist_t *)) {
+				nvlist_t **nl = (nvlist_t **)(void *)data;
+				if (quiet && i != 0)
+					mdb_printf("%s", NVP_NAME(nvpair));
+				mdb_printf("[%d]\n", i);
+				mdb_inc_indent(NVPAIR_VALUE_INDENT);
+				if (mdb_pwalk_dcmd("nvpair", "nvpair", argc,
+				    argv, (uintptr_t)*nl) != DCMD_OK)
+					return (DCMD_ERR);
+				mdb_dec_indent(NVPAIR_VALUE_INDENT);
+			}
+		} else {
+			if (!quiet) {
+				mdb_inc_indent(NVPAIR_VALUE_INDENT);
+				mdb_printf("value");
+			}
+			mdb_printf("=");
+			for (i = 0; i < nelem; i++,
+			    data += sizeof (nvlist_t *)) {
+				nvlist_t **nl = (nvlist_t **)(void *)data;
+				mdb_printf("%c%p", " "[i == 0], *nl);
+			}
+			mdb_printf("\n");
+			if (!quiet)
+				mdb_dec_indent(NVPAIR_VALUE_INDENT);
 		}
-		mdb_printf("\n");
-		mdb_dec_indent(NVPAIR_VALUE_INDENT);
 		return (DCMD_OK);
 	}
 
@@ -298,9 +386,15 @@ nvpair_print(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		}
 	}
 
-	mdb_inc_indent(NVPAIR_VALUE_INDENT);
+	if (!quiet) {
+		mdb_inc_indent(NVPAIR_VALUE_INDENT);
+		mdb_printf("value=");
+	} else {
+		mdb_printf("=");
+	}
 	nvpair_print_value(data, elem_size, nelem, type);
-	mdb_dec_indent(NVPAIR_VALUE_INDENT);
+	if (!quiet)
+		mdb_dec_indent(NVPAIR_VALUE_INDENT);
 
 	return (DCMD_OK);
 }

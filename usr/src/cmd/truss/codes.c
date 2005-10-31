@@ -88,6 +88,7 @@
 #include <sys/ptms.h>
 #include <sys/aggr.h>
 #include <sys/dld.h>
+#include <sys/fs/zfs.h>
 
 #include "ramdata.h"
 #include "proto.h"
@@ -855,9 +856,75 @@ const struct ioc {
 	/* dld data-link ioctls */
 	{ (uint_t)DLDIOCATTR,		"DLDIOCATTR",		"dld_ioc_attr"},
 	{ (uint_t)DLDIOCVLAN,		"DLDIOCVLAN",		"dld_ioc_vlan"},
+
+	/* ZFS ioctls */
+	{ (uint_t)ZFS_IOC_POOL_CREATE,		"ZFS_IOC_POOL_CREATE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_DESTROY,		"ZFS_IOC_POOL_DESTROY",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_IMPORT,		"ZFS_IOC_POOL_IMPORT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_EXPORT,		"ZFS_IOC_POOL_EXPORT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_CONFIGS,		"ZFS_IOC_POOL_CONFIGS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_GUID,		"ZFS_IOC_POOL_GUID",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_STATS,		"ZFS_IOC_POOL_STATS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_TRYIMPORT,	"ZFS_IOC_POOL_TRYIMPORT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_SCRUB,		"ZFS_IOC_POOL_SCRUB",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_POOL_FREEZE,		"ZFS_IOC_POOL_FREEZE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_VDEV_ADD,		"ZFS_IOC_VDEV_ADD",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_VDEV_REMOVE,		"ZFS_IOC_VDEV_REMOVE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_VDEV_ONLINE,		"ZFS_IOC_VDEV_ONLINE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_VDEV_OFFLINE,		"ZFS_IOC_VDEV_OFFLINE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_VDEV_ATTACH,		"ZFS_IOC_VDEV_ATTACH",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_VDEV_DETACH,		"ZFS_IOC_VDEV_DETACH",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_OBJSET_STATS,		"ZFS_IOC_OBJSET_STATS",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_DATASET_LIST_NEXT,	"ZFS_IOC_DATASET_LIST_NEXT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SNAPSHOT_LIST_NEXT,	"ZFS_IOC_SNAPSHOT_LIST_NEXT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SET_PROP,		"ZFS_IOC_SET_PROP",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SET_QUOTA,		"ZFS_IOC_SET_QUOTA",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SET_RESERVATION,	"ZFS_IOC_SET_RESERVATION",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SET_VOLSIZE,		"ZFS_IOC_SET_VOLSIZE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SET_VOLBLOCKSIZE,	"ZFS_IOC_SET_VOLBLOCKSIZE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_CREATE_MINOR,		"ZFS_IOC_CREATE_MINOR",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_REMOVE_MINOR,		"ZFS_IOC_REMOVE_MINOR",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_CREATE,		"ZFS_IOC_CREATE",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_DESTROY,		"ZFS_IOC_DESTROY",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_ROLLBACK,		"ZFS_IOC_ROLLBACK",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_RENAME,		"ZFS_IOC_RENAME",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_RECVBACKUP,		"ZFS_IOC_RECVBACKUP",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_SENDBACKUP,		"ZFS_IOC_SENDBACKUP",
+		"zfs_cmd_t" },
+
 	{ (uint_t)0, NULL, NULL	}
 };
-
 
 void
 ioctl_ioccom(char *buf, size_t size, uint_t code, int nbytes, int x, int y)

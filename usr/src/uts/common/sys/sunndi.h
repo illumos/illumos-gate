@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,11 +119,11 @@ ndi_prop_remove_all(dev_info_t *dip);
  * not allowed to sleep.
  */
 int
-ndi_devi_alloc(dev_info_t *parent, char *node_name, dnode_t nodeid,
+ndi_devi_alloc(dev_info_t *parent, char *node_name, pnode_t nodeid,
     dev_info_t **ret_dip);
 
 void
-ndi_devi_alloc_sleep(dev_info_t *parent, char *node_name, dnode_t nodeid,
+ndi_devi_alloc_sleep(dev_info_t *parent, char *node_name, pnode_t nodeid,
     dev_info_t **ret_dip);
 
 /*

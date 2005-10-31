@@ -66,6 +66,7 @@
 #include <libintl.h>
 #include <dirent.h>
 #include <limits.h>
+#include <aclutils.h>
 
 /*
  * Special kludge for off_t being a signed quantity.
@@ -170,7 +171,6 @@ static int g_read(int, int, char *, unsigned);
 static int g_write(int, int, char *, unsigned);
 static int is_floppy(int);
 static int is_tape(int);
-static int append_secattr(char **, int *, int, char *, char);
 static void write_ancillary(char *secinfo, int len);
 static int remove_dir(char *);
 static int save_cwd(void);
@@ -477,9 +477,9 @@ static struct sec_attr {
 } *attr;
 
 static int	Pflag = 0;	/* flag indicates that acl is preserved */
-static int	aclcnt = 0;	/* acl entry count */
-static aclent_t *aclp = NULL;	/* pointer to ACL */
-static int	acl_set = 0;	/* True if an acl was set on the file */
+static int	acl_is_set = 0; /* True if an acl was set on the file */
+
+acl_t *aclp;
 
 /*
  *
@@ -595,7 +595,7 @@ static struct xattr_buf	*xattrp;
 static struct xattr_buf	*xattr_linkp;
 static int 		xattrbadhead;	/* is extended attribute header bad? */
 
-static int	append_secattr(char **, int *, int, char *, char);
+static int	append_secattr(char **, int *, acl_t *);
 static void	write_ancillary(char *, int);
 
 /*
@@ -676,11 +676,10 @@ main(int argc, char **argv)
 				 * the next file.
 				 */
 				if (aclp != NULL) {
-					free(aclp);
-					aclcnt = 0;
+					acl_free(aclp);
 					aclp = NULL;
 				}
-				acl_set = 0;
+				acl_is_set = 0;
 			}
 			(void) memset(&Gen, 0, sizeof (Gen));
 		}
@@ -710,10 +709,9 @@ main(int argc, char **argv)
 				Hiddendir = 0;
 			}
 			if (aclp != NULL) {
-				free(aclp);
-				aclcnt = 0;
+				acl_free(aclp);
 				aclp = NULL;
-				acl_set = 0;
+				acl_is_set = 0;
 			}
 		}
 		write_trail();
@@ -736,10 +734,9 @@ main(int argc, char **argv)
 			}
 			passret = file_pass();
 			if (aclp != NULL) {
-				free(aclp);
-				aclcnt = 0;
+				acl_free(aclp);
 				aclp = NULL;
-				acl_set = 0;
+				acl_is_set = 0;
 			}
 			if (Gen.g_passdirfd != -1)
 				(void) close(Gen.g_passdirfd);
@@ -1577,9 +1574,9 @@ creat_lnk(int dirfd, char *name1_p, char *name2_p)
 		errno = 0;
 		if (!link(name1_p, name2_p)) {
 			if (aclp != NULL) {
-				free(aclp);
+				acl_free(aclp);
 				aclp = NULL;
-				acl_set = 0;
+				acl_is_set = 0;
 			}
 			cnt = 0;
 			break;
@@ -1709,16 +1706,16 @@ creat_spec(int dirfd)
 			    "file %s\"", G_p->g_attrfnam_p);
 		}
 
-		acl_set = 0;
+		acl_is_set = 0;
 		if (Pflag && aclp != NULL) {
-			if (facl(dirfd, SETACL, aclcnt, aclp) < 0) {
+			if (facl_set(dirfd, aclp) < 0) {
 				msg(ERRN,
 				    "failed to set acl on attribute"
 				    " directory of %s ", G_p->g_attrfnam_p);
 			} else {
-				acl_set = 1;
+				acl_is_set = 1;
 			}
-			free(aclp);
+			acl_free(aclp);
 			aclp = NULL;
 		}
 
@@ -1754,18 +1751,18 @@ creat_spec(int dirfd)
 			/* A file by the same name exists. */
 
 			/* Take care of ACLs */
-			acl_set = 0;
+			acl_is_set = 0;
 
 			if (Pflag && aclp != NULL) {
-				if (acl(nam_p, SETACL, aclcnt, aclp) < 0) {
+				if (acl_set(nam_p, aclp) < 0) {
 					msg(ERRN,
 					    "\"%s\": failed to set acl",
 					    nam_p);
 				} else {
-					acl_set = 1;
+					acl_is_set = 1;
 				}
 
-				free(aclp);
+				acl_free(aclp);
 				aclp = NULL;
 			}
 			if (Args & OCd) {
@@ -1829,17 +1826,17 @@ creat_spec(int dirfd)
 			 * The file creation succeeded.  Take care of the ACLs.
 			 */
 
-			acl_set = 0;
+			acl_is_set = 0;
 
 			if (Pflag && aclp != NULL) {
-				if (acl(nam_p, SETACL, aclcnt, aclp) < 0) {
+				if (acl_set(nam_p, aclp) < 0) {
 					msg(ERRN,
 					    "\"%s\": failed to set acl", nam_p);
 				} else {
-					acl_set = 1;
+					acl_is_set = 1;
 				}
 
-				free(aclp);
+				acl_free(aclp);
 				aclp = NULL;
 			}
 
@@ -2206,8 +2203,7 @@ data_out(void)
 			int	len = 0;
 
 			/* append security attributes */
-			if (append_secattr(&secinfo, &len, aclcnt,
-				(char *)aclp, UFSD_ACL) == -1) {
+			if (append_secattr(&secinfo, &len, aclp) == -1) {
 				msg(ERR,
 				    "can create security information");
 			}
@@ -2328,8 +2324,7 @@ data_out(void)
 		int	len = 0;
 
 		/* append security attributes */
-		if ((append_secattr(&secinfo, &len, aclcnt, (char *)aclp,
-		    UFSD_ACL)) == -1)
+		if ((append_secattr(&secinfo, &len, aclp)) == -1)
 			msg(ERR, "can create security information");
 
 		/* call append_secattr() if more than one */
@@ -2926,8 +2921,7 @@ file_out(void)
 			int	len = 0;
 
 			/* append security attributes */
-			if ((append_secattr(&secinfo, &len, aclcnt,
-			    (char *)aclp, UFSD_ACL)) == -1)
+			if ((append_secattr(&secinfo, &len, aclp)) == -1)
 				msg(ERR, "can create security information");
 
 			/* call append_secattr() if more than one */
@@ -3248,6 +3242,8 @@ gethdr(void)
 	char *preptr;
 	int k = 0;
 	int j;
+	int error;
+	int aclcnt;
 
 	Gen.g_nam_p = Nam_p;
 	do { /* hit == NONE && (Args & OCk) && Buffr.b_cnt > 0 */
@@ -3629,20 +3625,29 @@ gethdr(void)
 				attr = (struct sec_attr *)tp;
 				switch (attr->attr_type) {
 				case UFSD_ACL:
+				case ACE_ACL:
 					(void) sscanf(attr->attr_len, "%7lo",
 					    (ulong_t *)&aclcnt);
-				/* header is 8 */
+					/* header is 8 */
 					attrsize = 8 +
 					    strlen(&attr->attr_info[0])
 					    + 1;
-					aclp = aclfromtext(&attr->attr_info[0],
-					    &cnt);
-					if (aclp == NULL) {
-						msg(ERR, "aclfromtext failed");
+
+					error =
+					    acl_fromtext(&attr->attr_info[0],
+					    &aclp);
+
+					if (error != 0) {
+						msg(ERR,
+						    "aclfromtext failed: %s",
+						    acl_strerror(error));
+						bytes -= attrsize;
 						break;
 					}
-					if (aclcnt != cnt) {
+
+					if (aclcnt != acl_cnt(aclp)) {
 						msg(ERR, "acl count error");
+						bytes -= attrsize;
 						break;
 					}
 					bytes -= attrsize;
@@ -3909,21 +3914,10 @@ getname(void)
 	 * standard permissions, i.e. ACL count < 4
 	 */
 	if ((SrcSt.st_mode & Ftype) != S_IFLNK && Pflag) {
-		if ((aclcnt = acl(Gen.g_nam_p, GETACLCNT, 0, NULL)) < 0)
+		if (acl_get(Gen.g_nam_p, ACL_NO_TRIVIAL, &aclp) != 0)
 			msg(ERRN, "Error with acl() of \"%s\"", Gen.g_nam_p);
-		if (aclcnt > MIN_ACL_ENTRIES) {
-			aclp = e_zalloc(E_EXIT, sizeof (aclent_t) * aclcnt);
-
-			if (acl(Gen.g_nam_p, GETACL, aclcnt, aclp) < 0) {
-				msg(ERRN,
-				    "Error with getacl() of \"%s\"",
-				    Gen.g_nam_p);
-				free(aclp);
-				aclp = NULL;
-			}
-		}
-	/* else: only traditional permissions, so proceed as usual */
 	}
+	/* else: only traditional permissions, so proceed as usual */
 	if (creat_hdr())
 		return (1);
 	else return (2);
@@ -4332,17 +4326,16 @@ openout(int dirfd)
 			if ((result = openat(dirfd, get_component(nam_p),
 			    O_CREAT|O_RDWR|O_TRUNC, (int)G_p->g_mode)) >= 0) {
 				/* acl support */
-				acl_set = 0;
+				acl_is_set = 0;
 				if (Pflag && aclp != NULL) {
-					if (facl(result, SETACL, aclcnt, aclp)
-					    < 0) {
+					if (facl_set(result, aclp) < 0) {
 						msg(ERRN,
 						    "\"%s\": failed to set acl",
 						    nam_p);
 					} else {
-						acl_set = 1;
+						acl_is_set = 1;
 					}
-					free(aclp);
+					acl_free(aclp);
 					aclp = NULL;
 				}
 				cnt = 0;
@@ -4879,7 +4872,7 @@ rstfiles(int over, int dirfd)
 		mode_t orig_mask, new_mask;
 		struct stat sbuf;
 
-		if (!(Pflag && acl_set)) {
+		if (!(Pflag && acl_is_set)) {
 			/* Acl was not set, so we must chmod */
 			if (LSTAT(dirfd, G_p->g_nam_p, &sbuf) == 0) {
 				if ((sbuf.st_mode & Ftype) != S_IFLNK) {
@@ -4927,7 +4920,7 @@ rstfiles(int over, int dirfd)
 			set_tym(dirfd, get_component(onam_p),
 			    G_p->g_mtime, G_p->g_mtime);
 		}
-		if (!acl_set) {
+		if (!acl_is_set) {
 			if (G_p->g_attrnam_p != (char *)NULL) {
 				error = fchmod(Ofile, (int)G_p->g_mode);
 			} else {
@@ -6636,11 +6629,9 @@ is_floppy(int fd)
  */
 static int
 append_secattr(
-	char	**secinfo,	/* existing security info */
-	int	*secinfo_len,	/* length of existing security info */
-	int	size,		/* new attribute size: unit depends on type */
-	char	*attrp,		/* new attribute data pointer */
-	char	attr_type)	/* new attribute type */
+	char		**secinfo,	/* existing security info */
+	int		*secinfo_len,	/* length of existing security info */
+	acl_t		*aclp) 	/* new attribute data pointer */
 {
 	char	*new_secinfo;
 	char	*attrtext;
@@ -6648,14 +6639,15 @@ append_secattr(
 	int	oldsize;
 
 	/* no need to add */
-	if (attrp == (char *)NULL) {
+	if (aclp == NULL) {
 		return (0);
 	}
 
-	switch (attr_type) {
-	case UFSD_ACL:
+	switch (acl_type(aclp)) {
+	case ACLENT_T:
+	case ACE_T:
 		/* LINTED alignment */
-		attrtext = acltotext((aclent_t *)attrp, size);
+		attrtext = acl_totext(aclp);
 		if (attrtext == NULL) {
 			(void) fprintf(stderr, "acltotext failed\n");
 			return (-1);
@@ -6667,9 +6659,10 @@ append_secattr(
 			(void) fprintf(stderr, "can't allocate memory\n");
 			return (-1);
 		}
-		attr->attr_type = '1';		/* UFSD_ACL */
+		attr->attr_type = (acl_type(aclp) == ACLENT_T) ?
+		    UFSD_ACL : ACE_ACL;
 		/* acl entry count */
-		(void) sprintf(attr->attr_len, "%06o", size);
+		(void) sprintf(attr->attr_len, "%06o", acl_cnt(aclp));
 		(void) strcpy((char *)&attr->attr_info[0], attrtext);
 		free(attrtext);
 		break;
@@ -6853,11 +6846,10 @@ xattrs_out(int (*func)())
 	 * If aclp still exists then free it since it is was set when base
 	 * file was extracted.
 	 */
-	if (aclp != (aclent_t *)NULL) {
-		free(aclp);
-		aclcnt = 0;
+	if (aclp != NULL) {
+		acl_free(aclp);
 		aclp = NULL;
-		acl_set = 0;
+		acl_is_set = 0;
 	}
 
 	Gen.g_dirfd = attropen(G_p->g_nam_p, ".", O_RDONLY);
@@ -6943,23 +6935,10 @@ xattrs_out(int (*func)())
 				free(namep);
 				continue;
 			}
-			if ((aclcnt = facl(filefd, GETACLCNT,
-			    0, NULL)) < 0) {
+			if (facl_get(filefd, ACL_NO_TRIVIAL, &aclp) != 0) {
 				msg(ERRN,
 				    "Error with acl() on %s",
 				    Gen.g_nam_p);
-			}
-			if (aclcnt > MIN_ACL_ENTRIES) {
-				aclp = e_zalloc(E_EXIT,
-					sizeof (aclent_t) * aclcnt);
-
-				if (facl(filefd, GETACL, aclcnt, aclp) < 0) {
-					msg(ERRN,
-					    "Error with getacl() on %s",
-					    Gen.g_nam_p);
-					free(aclp);
-					aclp = NULL;
-				}
 			}
 			(void) close(filefd);
 		}
@@ -6973,11 +6952,10 @@ xattrs_out(int (*func)())
 		Gen.g_attrfnam_p = (char *)NULL;
 		Gen.g_linktoattrfnam_p = (char *)NULL;
 		Gen.g_linktoattrnam_p = (char *)NULL;
-		if (aclp != (aclent_t *)NULL) {
-			free(aclp);
-			aclcnt = 0;
+		if (aclp != NULL) {
+			acl_free(aclp);
 			aclp = NULL;
-			acl_set = 0;
+			acl_is_set = 0;
 		}
 		free(namep);
 	}

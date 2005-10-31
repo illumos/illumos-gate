@@ -20,70 +20,49 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1993-1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libsec/Makefile
 
-include		../../Makefile.master
 include		../Makefile.lib
 
-SUBDIRS=	spec .WAIT $(MACH) $(BUILD64) $(MACH64)
+HDRDIR=		common
+HDRS=		aclutils.h
+SUBDIRS=	$(MACH) $(BUILD64) $(MACH64)
 
 all :=		TARGET= all
 clean :=	TARGET= clean
 clobber :=	TARGET= clobber
-delete :=	TARGET= delete
 install :=	TARGET= install
 lint :=		TARGET= lint
-_msg :=		TARGET= _msg
-package :=	TARGET= package
 
-LIBRARY= 	libsec.a
-TEXT_DOMAIN=	SUNW_OST_OSLIB
-XGETFLAGS=	-a
-POFILE=		$(LIBRARY:.a=.po)
-POFILES=	generic.po
-
-SED=	sed
-GREP=	grep
-CP=	cp
+MSGFILES=	common/acltext.c common/aclutils.c common/aclmode.c \
+		common/aclsort.c common/aclcheck.c
+POFILE=		libsec.po
 
 .KEEP_STATE:
 
-all clean clobber delete install lint package: $(SUBDIRS)
+all clean clobber install: spec .WAIT $(SUBDIRS) 
 
-# definitions for install_h target
-HDRS=
-ROOTHDRDIR=	$(ROOT)/usr/include
-ROOTHDRS=	$(HDRS:%=$(ROOTHDRDIR)/%)
-CHECKHDRS=	$(HDRS:%.h=%.check)
+$(POFILE):	pofile_MSGFILES
+
+lint: $(SUBDIRS)
 
 # install rule for install_h target
-$(ROOTHDRDIR)/%: common/%
-	$(INS.file)
 
 install_h: $(ROOTHDRS)
 
 check: $(CHECKHDRS)
 
-$(MACH) $(MACH64) spec:	FRC
+_msg: $(MSGDOMAINPOFILE)
+
+$(SUBDIRS) spec: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
-_msg:	$(MSGDOMAIN) $(POFILE)
-	$(RM) $(MSGDOMAIN)/$(POFILE)
-	$(CP) $(POFILE) $(MSGDOMAIN)
-
-$(POFILE):	$(POFILES)
-	$(RM) $@
-	$(CAT) $(POFILES) > $@
-
-$(POFILES):
-	$(RM) messages.po
-	$(XGETTEXT) $(XGETFLAGS) *.[ch]* */*.[ch]*
-	$(SED) -e '/^# msg/d' -e '/^domain/d' messages.po > $@
-	$(RM) messages.po
-
 FRC:
+
+include ../Makefile.targ
+include ../../Makefile.msg.targ

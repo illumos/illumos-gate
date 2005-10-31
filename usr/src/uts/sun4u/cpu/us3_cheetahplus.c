@@ -109,7 +109,7 @@ cpu_init_trap(void)
  */
 /*ARGSUSED*/
 void
-cpu_fiximp(dnode_t dnode)
+cpu_fiximp(pnode_t dnode)
 {
 	int i, a;
 	extern int vac_size, vac_shift;

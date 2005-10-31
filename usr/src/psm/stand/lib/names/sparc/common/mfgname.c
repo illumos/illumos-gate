@@ -43,7 +43,7 @@
 char *
 get_mfg_name(void)
 {
-	dnode_t n;
+	pnode_t n;
 	int len;
 
 	static char mfgname[MAXNMLEN];

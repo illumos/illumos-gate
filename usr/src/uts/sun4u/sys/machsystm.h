@@ -374,7 +374,7 @@ typedef struct devi_branch {
 	void		(*devi_branch_callback)(dev_info_t *, void *, uint_t);
 	int		type;
 	union {
-		int	(*prom_branch_select)(dnode_t, void *, uint_t);
+		int	(*prom_branch_select)(pnode_t, void *, uint_t);
 		int	(*sid_branch_create)(dev_info_t *, void *, uint_t);
 	} create;
 } devi_branch_t;

@@ -31,7 +31,7 @@
 #include <vm/seg_map.h>
 
 void
-cpu_fiximp(dnode_t dnode)
+cpu_fiximp(pnode_t dnode)
 {}
 
 void

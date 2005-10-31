@@ -3563,7 +3563,7 @@ pcihp_config_setup(dev_info_t **dip, ddi_acc_handle_t *handle,
 	bus = pci_bus_range.lo;
 
 	if (ndi_devi_alloc(pdip, DEVI_PSEUDO_NEXNAME,
-	    (dnode_t)DEVI_SID_NODEID, dip) != NDI_SUCCESS) {
+	    (pnode_t)DEVI_SID_NODEID, dip) != NDI_SUCCESS) {
 
 		PCIHP_DEBUG((CE_NOTE, "Failed to alloc probe node\n"));
 		return (PCIHP_FAILURE);

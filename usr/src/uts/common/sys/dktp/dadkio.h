@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@ extern "C" {
 #define	DIOCTL_GETMODEL		3	/* get model number		*/
 #define	DIOCTL_GETSERIAL	4	/* get serial number		*/
 #define	DIOCTL_RWCMD		5	/* read/write a disk		*/
-
+#define	DIOCTL_GETWCE		6	/* get write cache enabled state */
 /*
  * arg structure for DIOCTL_GETMODEL and DIOCTL_GETSERIAL
  * On input to the ioctl, is_size contains the size of the buffer
@@ -92,6 +92,8 @@ typedef struct dadk_ioc_string
 #define	DCMD_READOFFSET	24	/* cdrom read offset			*/
 #define	DCMD_READMODE2	25	/* cdrom mode 2				*/
 #define	DCMD_VOLCTRL	26	/* cdrom volume control			*/
+/* additional disk commands */
+#define	DCMD_FLUSH_CACHE 27	/* flush write cache to physical medium	*/
 
 /*	driver error code						*/
 #define	DERR_SUCCESS	0	/* success				*/

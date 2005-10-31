@@ -206,7 +206,7 @@ plat_lgrp_cpu_to_hand(processorid_t id)
 void
 plat_lgrp_init(void)
 {
-	dnode_t		curnode;
+	pnode_t		curnode;
 	char		tmp_name[MAXSYSNAME];
 	int		portid;
 	int		cpucnt = 0;
@@ -309,7 +309,7 @@ plat_pfn_to_mem_node(pfn_t pfn)
  * Assign memnode to lgroups
  */
 void
-plat_fill_mc(dnode_t nodeid)
+plat_fill_mc(pnode_t nodeid)
 {
 	int		portid;
 
@@ -396,7 +396,7 @@ plat_shared_i2c_exit(dev_info_t *i2cnexus_dip)
 static void
 get_ebus_rtc_vaddr()
 {
-	dnode_t node;
+	pnode_t node;
 	int size;
 	uint32_t eaddr;
 
