@@ -4328,7 +4328,7 @@ mondo_loop() {
 	#
 	find $root/kernel/drv -name zpool | xargs rm -f
 	rm -f $root/kernel/drv/zpool.conf
-	rm -r $root/kernel/drv/zpool.cache
+	rm -f $root/kernel/drv/zpool.cache
 
 	find $root/kernel/drv -name zvol | xargs rm -f
 	rm -f $root/kernel/drv/zvol.conf
