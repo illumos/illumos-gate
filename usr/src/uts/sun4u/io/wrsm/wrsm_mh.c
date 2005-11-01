@@ -20,8 +20,9 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -250,7 +251,7 @@ wrsm_mh_link_is_up(ncwci_handle_t ncwci, uint32_t local_linknum,
 
 	wci->mh_state->link_state[local_linknum] = mh_link_up;
 
-	ASSERT(remote_wnode >= 0 && remote_wnode < WRSM_MAX_WNODES);
+	ASSERT(remote_wnode < WRSM_MAX_WNODES);
 
 	/*
 	 * Use the one hop route if the current route uses more hops, or

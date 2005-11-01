@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,8 +225,8 @@ wrsmlib_align(wrsmlib_raw_message_t *raw_msg)
 
 	DEBUGP(PLUGIN_DEBUG, ("librsmwrsm: wrsmlib_align\n"));
 
-	addr = (void *)(((uint64_t)raw_msg + WRSMLIB_ALIGN) &
-	    ~WRSMLIB_CACHELINE_MASK);
+	addr = (void *)(((uintptr_t)raw_msg + (uintptr_t)WRSMLIB_ALIGN) &
+	    ~(uintptr_t)WRSMLIB_CACHELINE_MASK);
 
 	return (addr);
 
@@ -869,7 +869,7 @@ wrsm_memseg_import_get16(rsm_memseg_import_handle_t im_memseg, off_t offset,
 	size_t len = (size_t)(sizeof (uint16_t) * rep_cnt);
 
 	/* Check for valid alignment */
-	if ((((uint64_t)datap & 0x1) != 0) ||
+	if ((((uintptr_t)datap & 0x1) != 0) ||
 	    (((uint64_t)offset & 0x1) != 0)) {
 		return (RSMERR_BAD_MEM_ALIGNMENT);
 	}
@@ -884,7 +884,7 @@ wrsm_memseg_import_get32(rsm_memseg_import_handle_t im_memseg, off_t offset,
 	size_t len = (size_t)(sizeof (uint32_t) * rep_cnt);
 
 	/* Check for valid alignment */
-	if ((((uint64_t)datap & 0x3) != 0) ||
+	if ((((uintptr_t)datap & 0x3) != 0) ||
 	    (((uint64_t)offset & 0x3) != 0)) {
 		return (RSMERR_BAD_MEM_ALIGNMENT);
 	}
@@ -899,7 +899,7 @@ wrsm_memseg_import_get64(rsm_memseg_import_handle_t im_memseg, off_t offset,
 	size_t len = (size_t)(sizeof (uint64_t) * rep_cnt);
 
 	/* Check for valid alignment */
-	if ((((uint64_t)datap & 0x7) != 0) ||
+	if ((((uintptr_t)datap & 0x7) != 0) ||
 	    (((uint64_t)offset & 0x7) != 0)) {
 		return (RSMERR_BAD_MEM_ALIGNMENT);
 	}
@@ -1003,7 +1003,7 @@ wrsm_memseg_import_get(rsm_memseg_import_handle_t im_memseg, off_t offset,
 		seg = RSMNDI_GET_MAPADDR(im_memseg, offset);
 		ASSERT(seg);
 
-		if (((uint64_t)dp & (uint64_t)WRSMLIB_CACHELINE_MASK)
+		if (((uintptr_t)dp & (uintptr_t)WRSMLIB_CACHELINE_MASK)
 		    == 0) {
 			/* aligned cacheline - this is to be fixed */
 			if (!importsegp->isloopback) {
@@ -1069,7 +1069,7 @@ wrsm_memseg_import_put16(rsm_memseg_import_handle_t im_memseg, off_t offset,
 	size_t len = (size_t)(sizeof (uint16_t) * rep_cnt);
 
 	/* Check for valid alignment */
-	if ((((uint64_t)datap & 0x1) != 0) ||
+	if ((((uintptr_t)datap & 0x1) != 0) ||
 	    (((uint64_t)offset & 0x1) != 0)) {
 		return (RSMERR_BAD_MEM_ALIGNMENT);
 	}
@@ -1084,7 +1084,7 @@ wrsm_memseg_import_put32(rsm_memseg_import_handle_t im_memseg, off_t offset,
 	size_t len = (size_t)(sizeof (uint32_t) * rep_cnt);
 
 	/* Check for valid alignment */
-	if ((((uint64_t)datap & 0x3) != 0) ||
+	if ((((uintptr_t)datap & 0x3) != 0) ||
 	    (((uint64_t)offset & 0x3) != 0)) {
 		return (RSMERR_BAD_MEM_ALIGNMENT);
 	}
@@ -1099,7 +1099,7 @@ wrsm_memseg_import_put64(rsm_memseg_import_handle_t im_memseg, off_t offset,
 	size_t len = (size_t)(sizeof (uint64_t) * rep_cnt);
 
 	/* Check for valid alignment */
-	if ((((uint64_t)datap & 0x7) != 0) ||
+	if ((((uintptr_t)datap & 0x7) != 0) ||
 	    (((uint64_t)offset & 0x7) != 0)) {
 		return (RSMERR_BAD_MEM_ALIGNMENT);
 	}

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,7 +122,6 @@ config_new_node(wrsm_node_t *node)
 	 * used by the remote node.
 	 */
 	ASSERT(node->config->imported_ncslices.id[0]);
-	ASSERT(node->config->imported_ncslices.id[0] < WRSM_MAX_NCSLICES);
 	/*
 	 * Note:  no lock is needed because config operations are single
 	 * threaded, and only imported ncslices are managed during
@@ -143,7 +142,6 @@ config_new_node(wrsm_node_t *node)
 	for (i = 1; i < WRSM_NODE_NCSLICES; i++) {
 		id = node->config->imported_ncslices.id[i];
 		if (id != 0) {
-			ASSERT(id < WRSM_MAX_NCSLICES);
 			/*
 			 * Note:  no lock is needed because config
 			 * operations are single threaded, and only

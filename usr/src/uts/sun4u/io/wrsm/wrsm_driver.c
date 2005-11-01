@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -384,7 +384,7 @@ wrsm_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		instance = minor_to_instance[minor];
 		if (instance == -1)
 			return (DDI_FAILURE);
-		*result = (void *) instance;
+		*result = (void *)(uintptr_t)instance;
 		return (DDI_SUCCESS);
 
 	default:

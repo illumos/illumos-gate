@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -154,7 +154,7 @@ typedef union {
 static boolean_t msg_test = B_FALSE;
 
 #define	NOT_FOUND	0xffffffff
-#define	NOT_FOUND64	0xffffffffffffffff
+#define	NOT_FOUND64	0xffffffffffffffffULL
 static uint32_t find_named(kstat_t *ksp, char *name);
 static uint64_t find_named64(kstat_t *ksp, char *name);
 static char *find_named_char(kstat_t *ksp, char *name);

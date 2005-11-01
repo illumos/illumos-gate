@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,11 +123,6 @@ wrsm_check_config(wrsm_controller_t *cont)
 		wrsm_net_member_t *member = cont->WRSM_ALIGN_PTR(members)[i];
 		if (member == NULL) {
 			DPRINTF(("ERROR: members[%d] is null\n", i));
-			return (EINVAL);
-		}
-		if (member->cnodeid >= WRSM_MAX_CNODES) {
-			DPRINTF(("ERROR: cnode id %d exceeds max of %d\n",
-			    member->cnodeid, WRSM_MAX_CNODES));
 			return (EINVAL);
 		}
 		if (WRSM_IN_SET(cnode_bitmask, member->cnodeid)) {

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6421,15 +6421,6 @@ pt_ptlist_recv_hdlr(wrsm_network_t *network, wrsm_message_t *msg)
 		wrsm_tl_dump_message("pt_ptlist_recv_hdlr: ", msg);
 #endif
 
-	if (cnodeid > WRSM_MAX_CNODES) {
-		/*
-		 * ignore message! can't send a response to a non-existent
-		 * node
-		 */
-		DPRINTF(DBG_ROUTE_EXTRA, (CE_CONT, "ctlr %d no node %d\n",
-		    network->rsm_ctlr_id, cnodeid));
-		return (B_FALSE);
-	}
 	node = network->nodes[cnodeid];
 
 	bcopy(&(msg->body), &args, sizeof (args));

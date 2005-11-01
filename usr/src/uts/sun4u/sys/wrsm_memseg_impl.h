@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ extern "C" {
 #define	WRSM_PTR_HASH_MASK \
 	((WRSM_PTR_HASH_SIZE - 1) << WRSM_PTR_HASH_SHIFT)
 #define	WRSM_PTR_HASH_FUNC(r) \
-	((((uint_t)r) & WRSM_PTR_HASH_MASK) >> WRSM_PTR_HASH_SHIFT)
+	((((uint_t)(uintptr_t)r) & WRSM_PTR_HASH_MASK) >> WRSM_PTR_HASH_SHIFT)
 
 
 

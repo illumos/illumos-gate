@@ -127,8 +127,9 @@ static uint_t wrsm_intr_debug = INTRERR;
  * Macro RECVQ2MONDO extracts the mondo value from the aforementioned format.
  * Macro RECVQ_VALID tests to see if the item is indeed a valid recvq pointer.
  */
-#define	CAST_MONDO2RECVQ(mondo)	(wrsm_intr_recvq_t *)(((mondo) << 16) | 0x1)
-#define	CAST_RECVQ2MONDO(recvq)	(((uint_t)(recvq)) >> 16)
+#define	CAST_MONDO2RECVQ(mondo)	\
+	(wrsm_intr_recvq_t *)(uintptr_t)(((mondo) << 16) | 0x1)
+#define	CAST_RECVQ2MONDO(recvq)	(((uint_t)(uintptr_t)(recvq)) >> 16)
 #define	RECVQ_VALID(recvq)	((recvq) && (((uint64_t)(recvq)) & 0x1) == 0)
 
 /*

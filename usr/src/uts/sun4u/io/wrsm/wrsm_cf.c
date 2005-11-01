@@ -1693,12 +1693,6 @@ verify_config(wrsm_controller_t *config, ncslice_bitmask_t *new_ncslices)
 	int err;
 	wrsm_net_member_t *member;
 
-	if (config->cnodeid < 0 || config->cnodeid >= WRSM_MAX_CNODES) {
-		cmn_err(CE_NOTE, "verify: illegal local cnodeid %d",
-		    config->cnodeid);
-		return (EINVAL);
-	}
-
 	/*
 	 * Verify that the local wnode is mentioned in the reachable
 	 * list and that it points to the local cnode
@@ -1754,14 +1748,6 @@ verify_config(wrsm_controller_t *config, ncslice_bitmask_t *new_ncslices)
 			cmn_err(CE_NOTE,
 			    "verify: comm_slice 0x%x not in exported set",
 			    member->comm_ncslice);
-			return (EINVAL);
-		}
-
-		/* Check that the remote cnodeid is valid */
-		if (member->cnodeid < 0 ||
-		    member->cnodeid >= WRSM_MAX_CNODES) {
-			cmn_err(CE_NOTE, "verify: illegal local cnodeid %d",
-			    member->cnodeid);
 			return (EINVAL);
 		}
 
@@ -2739,7 +2725,7 @@ wrsm_cf_ncslicelist_to_bitmask(wrsm_node_ncslice_array_t slice_array,
 	int i;
 
 	*small_ncslicep = slice_array.id[0];
-	if (*small_ncslicep == 0 || *small_ncslicep >= WRSM_MAX_NCSLICES) {
+	if (*small_ncslicep == 0) {
 		return (EINVAL);
 	}
 
@@ -2753,9 +2739,6 @@ wrsm_cf_ncslicelist_to_bitmask(wrsm_node_ncslice_array_t slice_array,
 	for (i = 1; i < WRSM_NODE_NCSLICES; i++) {
 		if (slice_array.id[i] == 0) {
 			continue;
-		}
-		if (slice_array.id[i] >= WRSM_MAX_NCSLICES) {
-			return (EINVAL);
 		}
 		if (!wrsm_large_pages_supported) {
 			cmn_err(CE_NOTE,

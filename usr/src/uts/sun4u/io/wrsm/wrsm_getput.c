@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -733,7 +733,7 @@ wrsm_smallput_plugin_ioctl(int minor, int cmd, intptr_t arg, int mode,
 		pluginmsg.remote_cnodeid = pluginmsg32.remote_cnodeid;
 		pluginmsg.offset = pluginmsg32.offset;
 
-		if (ddi_copyin((void *)pluginmsg32.buf, msg->putdata,
+		if (ddi_copyin((void *)(uintptr_t)pluginmsg32.buf, msg->putdata,
 		    pluginmsg32.len, mode)
 		    != 0) {
 			DPRINTF(DBG_SMPUT, (CE_WARN, "wrsm_smallput_plugin_"

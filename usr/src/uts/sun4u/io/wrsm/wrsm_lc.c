@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1270,7 +1270,7 @@ wrsm_lc_wciinit(wrsm_softstate_t *softsp, cnodeid_t local_cnode,
 	DPRINTF(LC_DEBUG, (CE_CONT, "in wrsm_lc_wciinit wci %d",
 	    softsp->portid));
 	ASSERT(softsp != NULL);
-	ASSERT(local_wnode < 16 && local_wnode >= 0);
+	ASSERT(local_wnode < 16);
 
 
 	softsp->restart_timeout_id = 0;
@@ -2830,7 +2830,7 @@ wrsm_lc_err_cnt(wrsm_softstate_t *softsp, boolean_t do_shortterm)
 				cmn_err(CE_NOTE, "wci %u link %d, "
 				    "wci_sw_link_error_count = %lu, "
 				    "wci_sw_link_error_sum = %lu, "
-				    "crc = %ld, framing = %ld, clocking = %ld",
+				    "crc = %d, framing = %d, clocking = %d",
 				    softsp->portid, i, num_errs,
 				    softsp->wci_common_softst.
 				    wci_sw_link_error_count_sum[i],
