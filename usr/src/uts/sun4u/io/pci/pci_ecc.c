@@ -443,12 +443,26 @@ ecc_err_handler(ecc_errstate_t *ecc_err_p)
 		}
 		if (sec_err) {
 			ecc_errstate_t ecc_sec_err;
+			uint64_t sec_tmp;
+			int i;
+			uint64_t afsr_err[] = {COMMON_ECC_UE_AFSR_E_PIO,
+				COMMON_ECC_UE_AFSR_E_DRD,
+				COMMON_ECC_UE_AFSR_E_DWR};
 
 			ecc_sec_err = *ecc_err_p;
 			ecc_sec_err.ecc_pri = 0;
-			pci_ecc_classify(sec_err, &ecc_sec_err);
-			ecc_ereport_post(pci_p->pci_dip,
-					&ecc_sec_err);
+			/*
+			 * Secondary errors are cummulative so we need to loop
+			 * through to capture them all.
+			 */
+			for (i = 0; i < 3; i++) {
+				sec_tmp = sec_err & afsr_err[i];
+				if (sec_tmp) {
+					pci_ecc_classify(sec_tmp, &ecc_sec_err);
+					ecc_ereport_post(pci_p->pci_dip,
+					    &ecc_sec_err);
+				}
+			}
 		}
 		/*
 		 * Check for PCI bus errors that may have resulted from or

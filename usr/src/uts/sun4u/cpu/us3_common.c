@@ -141,7 +141,7 @@ static void cpu_ereport_init(struct async_flt *aflt);
 static int cpu_check_secondary_errors(ch_async_flt_t *, uint64_t, uint64_t);
 static uint8_t cpu_flt_bit_to_plat_error(struct async_flt *aflt);
 static void cpu_log_fast_ecc_error(caddr_t tpc, int priv, int tl, uint64_t ceen,
-    ch_cpu_logout_t *clop);
+    uint64_t nceen, ch_cpu_logout_t *clop);
 static int cpu_ce_delayed_ec_logout(uint64_t);
 static int cpu_matching_ecache_line(uint64_t, void *, int, int *);
 
@@ -1196,7 +1196,7 @@ void
 cpu_fast_ecc_error(struct regs *rp, ulong_t p_clo_flags)
 {
 	ch_cpu_logout_t *clop;
-	uint64_t ceen;
+	uint64_t ceen, nceen;
 
 	/*
 	 * Get the CPU log out info. If we can't find our CPU private
@@ -1206,13 +1206,15 @@ cpu_fast_ecc_error(struct regs *rp, ulong_t p_clo_flags)
 	if (CPU_PRIVATE(CPU) == NULL) {
 		clop = NULL;
 		ceen = p_clo_flags & EN_REG_CEEN;
+		nceen = p_clo_flags & EN_REG_NCEEN;
 	} else {
 		clop = CPU_PRIVATE_PTR(CPU, chpr_fecctl0_logout);
 		ceen = clop->clo_flags & EN_REG_CEEN;
+		nceen = clop->clo_flags & EN_REG_NCEEN;
 	}
 
 	cpu_log_fast_ecc_error((caddr_t)rp->r_pc,
-	    (rp->r_tstate & TSTATE_PRIV) ? 1 : 0, 0, ceen, clop);
+	    (rp->r_tstate & TSTATE_PRIV) ? 1 : 0, 0, ceen, nceen, clop);
 }
 
 /*
@@ -1222,7 +1224,7 @@ cpu_fast_ecc_error(struct regs *rp, ulong_t p_clo_flags)
  */
 static void
 cpu_log_fast_ecc_error(caddr_t tpc, int priv, int tl, uint64_t ceen,
-    ch_cpu_logout_t *clop)
+    uint64_t nceen, ch_cpu_logout_t *clop)
 {
 	struct async_flt *aflt;
 	ch_async_flt_t ch_flt;
@@ -1342,9 +1344,10 @@ cpu_log_fast_ecc_error(caddr_t tpc, int priv, int tl, uint64_t ceen,
 	 * deferred or disrupting error happening between checking the AFSR and
 	 * enabling NCEEN/CEEN.
 	 *
-	 * Note: CEEN reenabled only if it was on when trap taken.
+	 * Note: CEEN and NCEEN are only reenabled if they were on when trap
+	 * taken.
 	 */
-	set_error_enable(get_error_enable() | (EN_REG_NCEEN | ceen));
+	set_error_enable(get_error_enable() | (nceen | ceen));
 	if (clear_errors(&ch_flt)) {
 		aflt->flt_panic |= ((ch_flt.afsr_errs &
 		    (C_AFSR_EXT_ASYNC_ERRS | C_AFSR_ASYNC_ERRS)) != 0);
@@ -1379,7 +1382,7 @@ cpu_tl1_error(struct regs *rp, int panic)
 	ch_err_tl1_data_t *cl1p, cl1;
 	int i, ncl1ps;
 	uint64_t me_flags;
-	uint64_t ceen;
+	uint64_t ceen, nceen;
 
 	if (ch_err_tl1_paddrs[CPU->cpu_id] == 0) {
 		cl1p = &ch_err_tl1_data;
@@ -1409,8 +1412,9 @@ cpu_tl1_error(struct regs *rp, int panic)
 		 */
 		if (cl1.ch_err_tl1_flags & CH_ERR_FECC) {
 			ceen = get_error_enable() & EN_REG_CEEN;
+			nceen = get_error_enable() & EN_REG_NCEEN;
 			cpu_log_fast_ecc_error((caddr_t)cl1.ch_err_tl1_tpc, 1,
-			    1, ceen, &cl1.ch_err_tl1_logout);
+			    1, ceen, nceen, &cl1.ch_err_tl1_logout);
 		}
 #if defined(CPU_IMP_L1_CACHE_PARITY)
 		if (cl1.ch_err_tl1_flags & (CH_ERR_IPE | CH_ERR_DPE)) {
@@ -1444,8 +1448,9 @@ cpu_tl1_error(struct regs *rp, int panic)
 			    (cpu_error_regs.afsr & C_AFSR_ALL_ERRS);
 			if (t_afsr_errs != 0) {
 				ceen = get_error_enable() & EN_REG_CEEN;
+				nceen = get_error_enable() & EN_REG_NCEEN;
 				cpu_log_fast_ecc_error((caddr_t)NULL, 1,
-				    1, ceen, NULL);
+				    1, ceen, nceen, NULL);
 			}
 		}
 #if defined(CPU_IMP_L1_CACHE_PARITY)

@@ -1294,9 +1294,9 @@ ch_pil15_interrupt(void)
  *    yet initialized such that we can't even check the logout struct, then
  *    we place the clo_flags data into %g2 (sys_trap->have_win arg #1) and
  *    call cpu_fast_ecc_error via systrap. The clo_flags parameter is used
- *    to determine information such as TL, TT, CEEN settings, etc in the
- *    high level trap handler since we don't have access to detailed logout
- *    information in cases where the cpu_private struct is not yet
+ *    to determine information such as TL, TT, CEEN and NCEEN settings, etc
+ *    in the high level trap handler since we don't have access to detailed
+ *    logout information in cases where the cpu_private struct is not yet
  *    initialized.
  *
  * We flush the E$ and D$ here on TL=1 code to prevent getting nested
@@ -1398,7 +1398,8 @@ fast_ecc_err(void)
 	 *   %g3 = scr3
 	 *   %g4 = scr4
 	 */
-	and	%g3, EN_REG_CEEN, %g4		! store the CEEN value, TL=0
+	 /* store the CEEN and NCEEN values, TL=0 */
+	and	%g3, EN_REG_CEEN + EN_REG_NCEEN, %g4
 	set	CHPR_FECCTL0_LOGOUT, %g6
 	DO_CPU_LOGOUT(%g3, %g2, %g6, %g4, %g5, %g6, %g3, %g4)
 

@@ -1026,12 +1026,6 @@ pci_do_caut_put(pci_t *pci_p, peekpoke_ctlops_t *cautacc_ctlops_arg)
 	size_t repcount = cautacc_ctlops_arg->repcount;
 	uint_t flags = cautacc_ctlops_arg->flags;
 
-	pbm_t *pbm_p = pci_p->pci_pbm_p;
-	int err = DDI_SUCCESS;
-
-	/* Use ontrap data in handle set up by FMA */
-	pbm_p->pbm_ontrap_data = (on_trap_data_t *)hp->ahi_err->err_ontrap;
-
 	hp->ahi_err->err_expected = DDI_FM_ERR_EXPECTED;
 
 	/*
@@ -1070,28 +1064,20 @@ pci_do_caut_put(pci_t *pci_p, peekpoke_ctlops_t *cautacc_ctlops_arg)
 			if (flags == DDI_DEV_AUTOINCR)
 				dev_addr += size;
 
-			/*
-			 * Read the async fault register for the PBM to see if
-			 * it sees a master-abort.
-			 */
-			pbm_clear_error(pbm_p);
-
-			if (pbm_p->pbm_ontrap_data->ot_trap & OT_DATA_ACCESS) {
-				err = DDI_FAILURE;
-#ifdef  DEBUG
-				pci_pokefault_cnt++;
-#endif
-				break;
-			}
 		}
 	}
 
 	i_ddi_notrap((ddi_acc_handle_t)hp);
-	pbm_p->pbm_ontrap_data = NULL;
 	i_ndi_busop_access_exit(hp->ahi_common.ah_dip, (ddi_acc_handle_t)hp);
 	hp->ahi_err->err_expected = DDI_FM_ERR_UNEXPECTED;
 
-	return (err);
+	if (hp->ahi_err->err_status != DDI_FM_OK) {
+		/* Clear the expected fault from the handle before returning */
+		hp->ahi_err->err_status = DDI_FM_OK;
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
 }
 
 
@@ -1138,50 +1124,31 @@ pci_do_caut_get(pci_t *pci_p, peekpoke_ctlops_t *cautacc_ctlops_arg)
 	size_t repcount = cautacc_ctlops_arg->repcount;
 	uint_t flags = cautacc_ctlops_arg->flags;
 
-	pbm_t *pbm_p = pci_p->pci_pbm_p;
 	int err = DDI_SUCCESS;
 
 	hp->ahi_err->err_expected = DDI_FM_ERR_EXPECTED;
 	i_ndi_busop_access_enter(hp->ahi_common.ah_dip, (ddi_acc_handle_t)hp);
 
-	/* Can this code be optimized? */
-
-	if (repcount == 1) {
-		if (!i_ddi_ontrap((ddi_acc_handle_t)hp)) {
+	if (!i_ddi_ontrap((ddi_acc_handle_t)hp)) {
+		for (; repcount; repcount--) {
 			i_ddi_caut_get(size, (void *)dev_addr,
 			    (void *)host_addr);
-		} else {
-			int i;
-			uint8_t *ff_addr = (uint8_t *)host_addr;
-			for (i = 0; i < size; i++)
-				*ff_addr++ = 0xff;
 
-			err = DDI_FAILURE;
-#ifdef  DEBUG
-			pci_peekfault_cnt++;
-#endif
+			host_addr += size;
+
+			if (flags == DDI_DEV_AUTOINCR)
+				dev_addr += size;
 		}
 	} else {
-		if (!i_ddi_ontrap((ddi_acc_handle_t)hp)) {
-			for (; repcount; repcount--) {
-				i_ddi_caut_get(size, (void *)dev_addr,
-				    (void *)host_addr);
+		int i;
+		uint8_t *ff_addr = (uint8_t *)host_addr;
+		for (i = 0; i < size; i++)
+			*ff_addr++ = 0xff;
 
-				host_addr += size;
-
-				if (flags == DDI_DEV_AUTOINCR)
-					dev_addr += size;
-			}
-		} else {
-			err = DDI_FAILURE;
-#ifdef  DEBUG
-			pci_peekfault_cnt++;
-#endif
-		}
+		err = DDI_FAILURE;
 	}
 
 	i_ddi_notrap((ddi_acc_handle_t)hp);
-	pbm_p->pbm_ontrap_data = NULL;
 	i_ndi_busop_access_exit(hp->ahi_common.ah_dip, (ddi_acc_handle_t)hp);
 	hp->ahi_err->err_expected = DDI_FM_ERR_UNEXPECTED;
 

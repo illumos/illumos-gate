@@ -228,7 +228,18 @@ pbm_error_intr(caddr_t a)
 	bzero(&derr, sizeof (ddi_fm_error_t));
 	derr.fme_version = DDI_FME_VERSION;
 	mutex_enter(&pci_p->pci_common_p->pci_fm_mutex);
-	if ((otp != NULL) && (otp->ot_prot & OT_DATA_ACCESS)) {
+	if (pbm_p->pbm_excl_handle != NULL) {
+		/*
+		 * cautious write protection, protected from all errors.
+		 */
+		ASSERT(MUTEX_HELD(&pbm_p->pbm_pokefault_mutex));
+		ddi_fm_acc_err_get(pbm_p->pbm_excl_handle, &derr,
+				DDI_FME_VERSION);
+		ASSERT(derr.fme_flag == DDI_FM_ERR_EXPECTED);
+		derr.fme_acc_handle = pbm_p->pbm_excl_handle;
+		err = pci_pbm_err_handler(pci_p->pci_dip, &derr, (void *)pci_p,
+		    PCI_INTR_CALL);
+	} else if ((otp != NULL) && (otp->ot_prot & OT_DATA_ACCESS)) {
 		/*
 		 * ddi_poke protection, check nexus and children for
 		 * expected errors.
@@ -236,17 +247,6 @@ pbm_error_intr(caddr_t a)
 		otp->ot_trap |= OT_DATA_ACCESS;
 		membar_sync();
 		derr.fme_flag = DDI_FM_ERR_POKE;
-		err = pci_pbm_err_handler(pci_p->pci_dip, &derr, (void *)pci_p,
-				PCI_INTR_CALL);
-	} else if (pbm_p->pbm_excl_handle != NULL) {
-		/*
-		 * cautious write protection, protected from all errors.
-		 */
-		ASSERT(MUTEX_HELD(&pbm_p->pbm_pokefault_mutex));
-		ddi_fm_acc_err_get(pbm_p->pbm_excl_handle, &derr,
-				DDI_FME_VERSION);
-		derr.fme_flag = DDI_FM_ERR_EXPECTED;
-		derr.fme_acc_handle = pbm_p->pbm_excl_handle;
 		err = pci_pbm_err_handler(pci_p->pci_dip, &derr, (void *)pci_p,
 				PCI_INTR_CALL);
 	} else if (pci_check_error(pci_p) != 0) {
