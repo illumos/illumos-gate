@@ -159,63 +159,6 @@ nfs_fhhash(fsid_t *fsid, fid_t *fid)
 }
 
 /*
- * Counted byte string compare routine, optimized for file ids.
- */
-int
-nfs_fhbcmp(char *d1, char *d2, int l)
-{
-	int k;
-
-	if (l > NFS_FHMAXDATA)
-		return (1);
-
-	/*
-	 * We are always passed pointers to the data portions of
-	 * two fids, where pointers are always 2 bytes from 32 bit
-	 * alignment. If the length is also 2 bytes off word alignment,
-	 * we can do word compares, because the two bytes before the fid
-	 * data are always the length packed into a 16 bit short, so we
-	 * can safely start our comparisons at d1-2 and d2-2.
-	 * If the length is 2 bytes off word alignment, that probably
-	 * means that first two bytes are zeroes. This means that
-	 * first word in each fid, including the length are going to be
-	 * equal (we wouldn't call fhbcmp if the lengths weren't the
-	 * same). Thus it makes the most sense to start comparing the
-	 * last words of each data portion.
-	 */
-
-	if ((l & 0x3) == 2) {
-		/*
-		 * We are going move the data pointers to the
-		 * last word. Adding just the length, puts us to the
-		 * word past end of the data. So reduce length by one
-		 * word length.
-		 */
-		k = l - 4;
-		/*
-		 * Both adjusted length and the data pointer are offset two
-		 * bytes from word alignment. Adding them together gives
-		 * us word alignment.
-		 */
-		d1 += k;
-		d2 += k;
-		l += 2;
-		while (l -= 4) {
-			if (*(int *)d1 != *(int *)d2)
-				return (1);
-			d1 -= 4;
-			d2 -= 4;
-		}
-	} else {
-		while (l--) {
-			if (*d1++ != *d2++)
-				return (1);
-		}
-	}
-	return (0);
-}
-
-/*
  * Free the memory allocated within a secinfo entry.
  */
 void
@@ -1964,7 +1907,14 @@ makefh4(nfs_fh4 *fh, vnode_t *vp, struct exportinfo *exi)
 
 	fh->nfs_fh4_len = NFS_FH4_LEN;
 
-	fh_fmtp->fh4_i = exi->exi_fh;	/* copy the fhandle template */
+	fh_fmtp->fh4_i.fhx_fsid = exi->exi_fh.fh_fsid;
+	fh_fmtp->fh4_i.fhx_xlen = exi->exi_fh.fh_xlen;
+
+	bzero(fh_fmtp->fh4_i.fhx_data, sizeof (fh_fmtp->fh4_i.fhx_data));
+	bzero(fh_fmtp->fh4_i.fhx_xdata, sizeof (fh_fmtp->fh4_i.fhx_xdata));
+	bcopy(exi->exi_fh.fh_xdata, fh_fmtp->fh4_i.fhx_xdata,
+		exi->exi_fh.fh_xlen);
+
 	fh_fmtp->fh4_len = fid.fid_len;
 	ASSERT(fid.fid_len <= sizeof (fh_fmtp->fh4_data));
 	bcopy(fid.fid_data, fh_fmtp->fh4_data, fid.fid_len);
@@ -2407,7 +2357,7 @@ static struct ex_vol_rename *
 find_volrnm_fh(struct exportinfo *exi, nfs_fh4 *fh4p)
 {
 	struct ex_vol_rename *p = NULL;
-	fhandle_t *fhp;
+	fhandle_ext_t *fhp;
 
 	/* XXX shouldn't we assert &exported_lock held? */
 	ASSERT(MUTEX_HELD(&exi->exi_vol_rename_lock));
@@ -2415,9 +2365,10 @@ find_volrnm_fh(struct exportinfo *exi, nfs_fh4 *fh4p)
 	if (fh4p->nfs_fh4_len != NFS_FH4_LEN) {
 		return (NULL);
 	}
-	fhp = &((struct nfs_fh4_fmt *)fh4p->nfs_fh4_val)->fh4_i;
+	fhp = &((nfs_fh4_fmt_t *)fh4p->nfs_fh4_val)->fh4_i;
 	for (p = exi->exi_vol_rename; p != NULL; p = p->vrn_next) {
-		if (bcmp(fhp, &p->vrn_fh_fmt.fh4_i, sizeof (fhandle_t)) == 0)
+		if (bcmp(fhp, &p->vrn_fh_fmt.fh4_i,
+		    sizeof (fhandle_ext_t)) == 0)
 			break;
 	}
 	return (p);

@@ -984,8 +984,8 @@ static struct rpcdisp rfsdisptab_v4[] = {
 
 	/* RFS4_compound = 1 */
 	{rfs4_compound,
-	    xdr_COMPOUND4args, NULL_xdrproc_t, sizeof (COMPOUND4args),
-	    xdr_COMPOUND4res, NULL_xdrproc_t, sizeof (COMPOUND4res),
+	    xdr_COMPOUND4args_srv, NULL_xdrproc_t, sizeof (COMPOUND4args),
+	    xdr_COMPOUND4res_srv, NULL_xdrproc_t, sizeof (COMPOUND4res),
 	    rfs4_compound_free, 0, 0},
 };
 

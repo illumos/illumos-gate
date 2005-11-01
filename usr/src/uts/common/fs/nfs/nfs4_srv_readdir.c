@@ -990,6 +990,7 @@ reencode_attrs:
 			    FATTR4_FILEID_MASK)) {
 
 				if (ae & FATTR4_FILEHANDLE_MASK) {
+					bool_t fh_error;
 					struct {
 						uint_t len;
 						char *val;
@@ -998,11 +999,12 @@ reencode_attrs:
 					fh.len = 0;
 					fh.val = fh.fh;
 					(void) makefh4((nfs_fh4 *)&fh, vp,
-						(newexi ? newexi : cs->exi));
+					    (newexi ? newexi : cs->exi));
 
-					if ((ptr +
-					    (fh.len / BYTES_PER_XDR_UNIT) + 1)
-					    > ptr_redzone) {
+					fh_error = xdr_inline_encode_nfs_fh4(
+					    &ptr, ptr_redzone,
+					    (nfs_fh4_fmt_t *)fh.val);
+					if (fh_error) {
 						if (nents ||
 						    IS_MIN_ATTR_MASK(ar)) {
 							no_space = TRUE;
@@ -1013,13 +1015,6 @@ reencode_attrs:
 						ptr = lastentry_ptr;
 						goto reencode_attrs;
 					}
-					IXDR_PUT_U_INT32(ptr, fh.len);
-					/* encode the RNDUP FILL first */
-					rndup = RNDUP(fh.len) /
-						BYTES_PER_XDR_UNIT;
-					ptr[rndup - 1] = 0;
-					bcopy(fh.fh, ptr, fh.len);
-					ptr += rndup;
 				}
 				if (ae & FATTR4_FILEID_MASK) {
 					IXDR_PUT_HYPER(ptr, va.va_nodeid);

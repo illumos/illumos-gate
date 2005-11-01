@@ -944,16 +944,16 @@ void nfs4_debug_mutex_exit(kmutex_t *, char *, int);
 #ifdef VOLATILE_FH_TEST
 
 struct nfs_fh4_fmt {
-	fhandle_t fh4_i;
-	uint32_t  fh4_flag;
-	uint32_t  fh4_volatile_id;
+	fhandle_ext_t	fh4_i;
+	uint32_t	fh4_flag;
+	uint32_t	fh4_volatile_id;
 };
 
 #else /* VOLATILE_FH_TEST */
 
 struct nfs_fh4_fmt {
-	fhandle_t fh4_i;
-	uint32_t  fh4_flag;
+	fhandle_ext_t	fh4_i;
+	uint32_t	fh4_flag;
 };
 
 #endif /* VOLATILE_FH_TEST */
@@ -961,11 +961,11 @@ struct nfs_fh4_fmt {
 #define	FH4_NAMEDATTR	1
 #define	FH4_ATTRDIR	2
 
-#define	fh4_fsid	fh4_i.fh_fsid
-#define	fh4_len		fh4_i.fh_len 	/* fid length */
-#define	fh4_data	fh4_i.fh_data 	/* fid bytes */
-#define	fh4_xlen	fh4_i.fh_xlen
-#define	fh4_xdata	fh4_i.fh_xdata
+#define	fh4_fsid	fh4_i.fhx_fsid
+#define	fh4_len		fh4_i.fhx_len 	/* fid length */
+#define	fh4_data	fh4_i.fhx_data 	/* fid bytes */
+#define	fh4_xlen	fh4_i.fhx_xlen
+#define	fh4_xdata	fh4_i.fhx_xdata
 typedef struct nfs_fh4_fmt nfs_fh4_fmt_t;
 
 #define	fh4_to_fmt4(fh4p) ((nfs_fh4_fmt_t *)(fh4p)->nfs_fh4_val)
@@ -1285,6 +1285,9 @@ extern const struct	fs_operation_def nfs4_vnodeops_template[];
 
 extern uint_t nfs4_tsize(struct knetconfig *);
 extern uint_t rfs4_tsize(struct svc_req *);
+
+extern bool_t	xdr_inline_encode_nfs_fh4(uint32_t **, uint32_t *,
+			nfs_fh4_fmt_t *);
 
 #ifdef DEBUG
 extern int		rfs4_do_pre_op_attr;

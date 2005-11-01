@@ -22,7 +22,7 @@
 #
 # uts/intel/nfs/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,9 +62,15 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOTLINK)
 #
 #	Overrides.
 #
+VOLFH_debug32	= -DVOLATILE_FH_TEST
+VOLFH_debug64	= -DVOLATILE_FH_TEST
+VOLFH_obj32	=
+VOLFH_obj64	=
+
 MODSTUBS_DIR	 = $(OBJS_DIR)
 $(MODSTUBS_O)	:= AS_CPPFLAGS += -DNFS_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
+CFLAGS		+= $(VOLFH_$(OBJS_DIR))
 
 #
 #	Default build targets.

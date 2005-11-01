@@ -58,9 +58,13 @@ vop_fid_pseudo(vnode_t *vp, fid_t *fidp)
 	 * XXX nfs4_fid() does nothing and returns EREMOTE.
 	 * XXX nfs3_fid()/nfs_fid() returns nfs filehandle as its fid
 	 * which has a bigger length than local fid.
-	 * NFS_FHMAXDATA is the size of fhandle_t.fh_xdata[NFS_FHMAXDATA].
+	 * NFS_FHMAXDATA_EXT is the size of
+	 * fhandle_ext_t.fh_xdata[NFS_FHMAXDATA_EXT].
+	 *
+	 * Note: nfs[2,3,4]_fid() only gets called for diskless clients.
 	 */
-	if (error == EREMOTE || (error == 0 && fidp->fid_len > NFS_FHMAXDATA)) {
+	if (error == EREMOTE ||
+	    (error == 0 && fidp->fid_len > NFS_FHMAXDATA_EXT)) {
 
 		va.va_mask = AT_NODEID;
 		error = VOP_GETATTR(vp, &va, 0, CRED());

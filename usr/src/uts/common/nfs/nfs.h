@@ -390,24 +390,12 @@ struct nfs_fid {
 };
 
 /*
- * File access handle
- * This structure is the Sun server representation of a file.
- * It is handed out by a server for the client to use in further
- * file transactions.
+ * "Legacy" filehandles use NFS_FHMAXDATA (10) byte fids. Filesystems that
+ * return a larger fid than NFS_FHMAXDATA, such as ZFS's .zfs snapshot
+ * directory, can use up to NFS_FHMAXDATA_EXT bytes for their fid.
  */
-
-/*
- * This struct is only used to find the size of the data field in the
- * fhandle structure below.
- */
-struct fhsize {
-	fsid_t	f1;
-	ushort_t f2;
-	char	f3[4];
-	ushort_t f4;
-	char	f5[4];
-};
-#define	NFS_FHMAXDATA	((NFS_FHSIZE - sizeof (struct fhsize) + 8) / 2)
+#define	NFS_FHMAXDATA		10
+#define	NFS_FHMAXDATA_EXT	26
 
 /*
  * The current nfs file handle size for version 3 is currently 32 which is
@@ -420,9 +408,11 @@ struct fhsize {
 #define	NFS3_CURFHSIZE	32
 
 /*
- * This is the actual definition of a filehandle.  There is some dependence
- * on this layout in NFS-related code, particularly in the user-level lock
- * manager, so be careful about changing it.
+ * This is the actual definition of a legacy filehandle.  There is some
+ * dependence on this layout in NFS-related code, particularly in the
+ * user-level lock manager, so be careful about changing it.
+ *
+ * Currently NFSv2 and NFSv3 only use this structure.
  */
 
 struct svcfh {
@@ -434,6 +424,18 @@ struct svcfh {
 };
 
 typedef struct svcfh fhandle_t;
+
+/*
+ * This is the actual definition of a extended filehandle.  This is currently
+ * only used for NFSv4.
+ */
+typedef struct fhandle_ext {
+	fsid_t	fhx_fsid;			/* filesystem id */
+	ushort_t fhx_len;			/* file number length */
+	char	fhx_data[NFS_FHMAXDATA_EXT];	/* and data */
+	ushort_t fhx_xlen;			/* export file number length */
+	char	fhx_xdata[NFS_FHMAXDATA_EXT];	/* and data */
+} fhandle_ext_t;
 
 /*
  * Arguments to remote write and writecache

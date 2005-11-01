@@ -503,7 +503,7 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 	/*
 	 * Send out the replayed reply or the 'real' one.
 	 */
-	if (!svc_sendreply(xprt,  xdr_COMPOUND4res, (char *)rbp)) {
+	if (!svc_sendreply(xprt,  xdr_COMPOUND4res_srv, (char *)rbp)) {
 		DTRACE_PROBE2(nfss__e__dispatch_sendfail,
 			struct svc_req *, xprt,
 			char *, rbp);

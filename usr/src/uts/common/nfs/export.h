@@ -347,7 +347,7 @@ struct exp_visible {
 
 #define	EQFID(fidp1, fidp2)	\
 	((fidp1)->fid_len == (fidp2)->fid_len && \
-	    nfs_fhbcmp((char *)(fidp1)->fid_data, (char *)(fidp2)->fid_data, \
+	    bcmp((char *)(fidp1)->fid_data, (char *)(fidp2)->fid_data, \
 	    (uint_t)(fidp1)->fid_len) == 0)
 
 #define	exportmatch(exi, fsid, fid)	\
