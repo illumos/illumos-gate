@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -459,7 +459,7 @@ void **result)
 		}
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)(unit / 2);
+		*result = (void *)(uintptr_t)(unit / 2);
 		error = DDI_SUCCESS;
 		break;
 	default:

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,7 +217,7 @@ xcalwd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd,
 		}
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*resultp = (void *)getminor(dev);
+		*resultp = (void *)(uintptr_t)getminor(dev);
 		retval = DDI_SUCCESS;
 		break;
 	default:
@@ -306,7 +306,7 @@ xcalwd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 static void
 xcalwd_timeout(void *arg)
 {
-	int	instance = (int)arg;
+	int	instance = (int)(uintptr_t)arg;
 	xcalwd_state_t	*tsp;
 
 	if (instance < 0)
@@ -456,7 +456,7 @@ xcalwd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		}
 		tsp->intvl = intvl;
 		tsp->tid = realtime_timeout(xcalwd_timeout,
-		    (void *)instance,
+		    (void *)(uintptr_t)instance,
 		    drv_usectohz(1000000) * tsp->intvl);
 		tsp->started = B_TRUE;
 		mutex_exit(&tsp->lock);
@@ -473,7 +473,7 @@ xcalwd_ioctl(dev_t dev, int cmd, intptr_t arg, int flag,
 		mutex_enter(&tsp->lock);
 		if (tsp->started == B_TRUE)	/* reinstate */
 			tsp->tid = realtime_timeout(xcalwd_timeout,
-			    (void *)instance,
+			    (void *)(uintptr_t)instance,
 			    drv_usectohz(1000000) * tsp->intvl);
 		mutex_exit(&tsp->lock);
 		return (0);

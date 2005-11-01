@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,6 +155,8 @@ mcookie_to_rlen(fstack_t mcookie)
 	}
 	log_message(MSG_WARN, "Warning: mcookie_to_rlen: invalid"
 	    " mcookie: %llx\n", (uint64_t)mcookie);
+
+	return (0);
 }
 
 fstack_t
@@ -172,6 +174,8 @@ mcookie_to_rvirt(fstack_t mcookie)
 	}
 	log_message(MSG_WARN, "Warning: mcookie_to_rvirt: invalid"
 	    " mcookie: %llx\n", (uint64_t)mcookie);
+
+	return (0);
 }
 
 static void

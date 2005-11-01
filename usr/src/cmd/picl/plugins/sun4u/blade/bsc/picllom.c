@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1033,7 +1033,7 @@ add_led(const lom_led_state_t *led_state, picl_nodehdl_t lominfh)
 	picl_nodehdl_t	ledh;
 	picl_nodehdl_t	proph;
 
-	if ((led_state->state == LOM_LED_STATE_NOT_PRESENT) ||
+	if (((unsigned char)led_state->state == LOM_LED_STATE_NOT_PRESENT) ||
 	    (led_state->label[0] == '\0')) {
 		return;
 	}

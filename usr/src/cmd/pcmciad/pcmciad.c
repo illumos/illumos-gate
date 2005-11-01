@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -252,7 +252,7 @@ static void *event_read(void *);
 static void task_create(int);
 static void task_init(int);
 
-void
+int
 main(int argc, char *argv[])
 {
 	sigset_t	sigs;
@@ -338,7 +338,7 @@ main(int argc, char *argv[])
 		perror("thr_sigsetmask");
 #endif
 	(void) sigpause(1);
-	exit(0x22);
+	return (0x22);
 }
 
 /*

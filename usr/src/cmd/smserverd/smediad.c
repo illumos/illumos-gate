@@ -1403,7 +1403,7 @@ my_create(door_info_t *dip)
 	if (dip == NULL) {
 		return;
 	}
-	door_dp = (door_data_t *)dip->di_data;
+	door_dp = (door_data_t *)(uintptr_t)dip->di_data;
 
 	debug(10, "entering my_create\n");
 
@@ -1427,7 +1427,7 @@ my_create(door_info_t *dip)
 		"pthread_attr_setdetachstate failed. errno = %d\n"),
 			errno);
 	ret_val = pthread_create(&tid, &attr, my_server_thread,
-		(void *)(dip->di_data));
+		(void *)(uintptr_t)(dip->di_data));
 
 	if (ret_val != 0) {
 		warning(gettext(
@@ -2764,7 +2764,7 @@ usage()
 
 
 /*ARGSUSED*/
-void
+int
 main(int argc, char **argv)
 {
 	int c;
@@ -2871,6 +2871,7 @@ main(int argc, char **argv)
 		(void) init_server(NULL);
 		for (;;) (void) pause();
 	}
+	return (0);
 }
 
 

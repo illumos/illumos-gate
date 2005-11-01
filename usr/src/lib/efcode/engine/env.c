@@ -67,7 +67,7 @@ do_emit(fcode_env_t *env, uchar_t c)
 		if ((c >= 0x20 && c <= 0x7f) || c == '\n' || c == '\r' ||
 		    c == '\b')
 			putchar(c);
-		else if (c >= 0 && c < 0x20)
+		else if (c < 0x20)
 			printf("@%c", c + '@');
 		else
 			printf("\\%x", c);

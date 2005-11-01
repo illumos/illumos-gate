@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6487,6 +6487,7 @@ fas_illegal_cmd_or_bus_reset(struct fas *fas)
 		return (ACTION_RESET);
 	}
 	/*NOTREACHED*/
+	return (ACTION_RETURN);
 }
 
 /*

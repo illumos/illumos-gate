@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -812,7 +812,7 @@ dump_line(uchar_t *ptr)
 	uchar_t *byte;
 	int i;
 
-	log_message(MSG_INFO, "%p  ", (uint32_t)ptr);
+	log_message(MSG_INFO, "%p  ", ptr);
 	for (i = 0, byte = ptr; i < 16; i++) {
 		if (i == 8)
 			log_message(MSG_INFO, " ");
@@ -1048,7 +1048,7 @@ dump(fcode_env_t *env)
 	offset = ((long)data) & 0xf;
 	len += offset;
 	data = (uchar_t *)((long)data & ~0xf);
-	sprintf(buf, "%p", (uint32_t)data);
+	sprintf(buf, "%p", data);
 	print_bytes_header(strlen(buf), offset);
 	for (len += offset; len > 0; len -= 16, data += 16)
 		dump_line(data);

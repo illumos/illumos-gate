@@ -556,7 +556,7 @@ psvc_ps_overcurrent_check_policy_0(psvc_opaque_t hdlp, char *system)
 	int32_t status = PSVC_SUCCESS;
 	boolean_t present;
 	static char *sensor_id[DAKTARI_MAX_PS][DAK_MAX_PS_I_SENSORS];
-	static char *power_supply_id[DAKTARI_MAX_PS] = {{NULL}};
+	static char *power_supply_id[DAKTARI_MAX_PS] = {NULL};
 	int32_t i, j;
 	int32_t amps, oc_flag = 0, ps_present = 0;
 	static int32_t hi_warn[DAKTARI_MAX_PS][DAK_MAX_PS_I_SENSORS];
@@ -687,7 +687,7 @@ psvc_ps_overcurrent_check_policy_0(psvc_opaque_t hdlp, char *system)
 int32_t
 psvc_ps_device_fail_notifier_policy_0(psvc_opaque_t hdlp, char *system)
 {
-	static char *ps_id[DAKTARI_MAX_PS] = {{NULL}};
+	static char *ps_id[DAKTARI_MAX_PS] = {NULL};
 	static char *sensor_id[DAKTARI_MAX_PS][DAK_MAX_FAULT_SENSORS];
 	char *led_id = "FSP_POWER_FAULT_LED";
 	int i, j;
@@ -886,7 +886,7 @@ int32_t
 psvc_ps_check_and_disable_dr_policy_0(psvc_opaque_t hdlp, char *id)
 {
 	char		state[32];
-	static char	*name[DAKTARI_MAX_PS] = {{NULL}};
+	static char	*name[DAKTARI_MAX_PS] = {NULL};
 	int		ps_cnt = 0;
 	int		i, j;
 	int		dr_conf;
@@ -993,7 +993,7 @@ psvc_fan_blast_shutoff_policy_0(psvc_opaque_t hdlp, char *id)
 int32_t
 psvc_fan_fault_check_policy_0(psvc_opaque_t hdlp, char *system)
 {
-	static char *fan_id[DAK_MAX_FANS] = {{NULL}};
+	static char *fan_id[DAK_MAX_FANS] = {NULL};
 	boolean_t enabled;
 	int32_t speed;
 	int32_t status = PSVC_SUCCESS;
@@ -1590,9 +1590,9 @@ psvc_check_disk_fault_policy_0(psvc_opaque_t hdlp, char *id)
 	int32_t		i;
 	char		curr_state[32], prev_state[32], led_state[32];
 	char		disk_fault[32], disk_state[32];
-	static char	*disk_id[DAK_MAX_DISKS] = {{NULL}};
-	static char	*led_id[DAK_MAX_DISKS] = {{NULL}};
-	static char	*parent_id[DAK_MAX_DISKS] = {{NULL}};
+	static char	*disk_id[DAK_MAX_DISKS] = {NULL};
+	static char	*led_id[DAK_MAX_DISKS] = {NULL};
+	static char	*parent_id[DAK_MAX_DISKS] = {NULL};
 	boolean_t	present;
 	int8_t		retry;
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1172,7 +1172,7 @@ process_fru_envseg()
 
 				observed = (tempr_t)
 				    datap->obs2exp_map[i].observed;
-				expected = expected = (tempr_t)
+				expected = (tempr_t)
 				    datap->obs2exp_map[i].expected;
 
 				/* ignore if duplicate entry */

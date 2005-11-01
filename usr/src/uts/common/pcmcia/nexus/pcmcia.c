@@ -4668,7 +4668,7 @@ pcmcia_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	handler.handler = (f_tt *)hdlp->ih_cb_func;
 	handler.arg1 = hdlp->ih_cb_arg1;
 	handler.arg2 = hdlp->ih_cb_arg2;
-	handler.handler_id = (uint32_t)rdip;
+	handler.handler_id = (uint32_t)(uintptr_t)rdip;
 
 	/*
 	 * check if multifunction and do the right thing
@@ -4692,7 +4692,7 @@ pcmcia_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 			return (DDI_FAILURE);
 		}
 		intr->intr = hdlp->ih_cb_func;
-		intr->handler_id = (uint_t)rdip;
+		intr->handler_id = (uint_t)(uintptr_t)rdip;
 		intr->arg1 = hdlp->ih_cb_arg1;
 		intr->arg2 = hdlp->ih_cb_arg2;
 		intr->socket = socket;
@@ -4763,7 +4763,7 @@ pcmcia_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 #endif
 
 	if (!(sockp->ls_flags & PCS_COOKIES_VALID)) {
-		hdlp->ih_pri = (uint_t)*handler.iblk_cookie;
+		hdlp->ih_pri = (uint_t)(uintptr_t)*handler.iblk_cookie;
 		sockp->ls_iblk = *handler.iblk_cookie;
 		sockp->ls_idev = *handler.idev_cookie;
 		sockp->ls_flags |= PCS_COOKIES_VALID;
@@ -4815,7 +4815,7 @@ pcmcia_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 
 		/* Check if there is only one handler left */
 		if ((intr->next == intr) && (intr->prev == intr)) {
-			if (intr->handler_id == (unsigned)rdip) {
+			if (intr->handler_id == (unsigned)(uintptr_t)rdip) {
 				sockp->ls_inthandlers = NULL;
 				remhandler++;
 				kmem_free(intr, sizeof (inthandler_t));
@@ -4827,7 +4827,8 @@ pcmcia_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 			for (done = 0, first = intr; !done; intr = intr->next) {
 				if (intr->next == first)
 					done++;
-				if (intr->handler_id == (unsigned)rdip) {
+				if (intr->handler_id ==
+				    (unsigned)(uintptr_t)rdip) {
 					done++;
 
 					/*
@@ -4867,7 +4868,7 @@ pcmcia_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 #endif
 
 	handler.socket = sockp->ls_socket;
-	handler.handler_id = (uint32_t)rdip;
+	handler.handler_id = (uint32_t)(uintptr_t)rdip;
 	handler.handler = (f_tt *)pispec->intrspec_func;
 	CLEAR_IRQ(sockp->ls_if, dip, &handler);
 }

@@ -248,7 +248,7 @@ ebus_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 
 	switch (infocmd) {
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		break;
 	case DDI_INFO_DEVT2DEVINFO:
 		if (ebus_p == NULL)

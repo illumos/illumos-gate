@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -118,7 +118,7 @@ set_platform_defaults(void)
 		 * Versions 5 to 50 and 150 or above  can support this OS
 		 */
 		sprintf(buf, "cpu-prom-version swap l!");
-		prom_interpret(buf, (uint32_t)&revlevel, 0, 0, 0, 0);
+		prom_interpret(buf, (uintptr_t)&revlevel, 0, 0, 0, 0);
 		if ((revlevel < 5) || ((revlevel > 50) && (revlevel < 150)))
 			halt("Firmware upgrade is required to boot this OS!");
 	}

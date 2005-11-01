@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -417,17 +417,18 @@ xcppm_blink_led(void *action)
 		return;
 	}
 
-	if ((int)action == PPM_LEDON) {
+	if ((int)(uintptr_t)action == PPM_LEDON) {
 		new_action = PPM_LEDOFF;
 		intvl = PPM_LEDOFF_INTERVAL;
 	} else {
-		ASSERT((int)action == PPM_LEDOFF);
+		ASSERT((int)(uintptr_t)action == PPM_LEDOFF);
 		new_action = PPM_LEDON;
 		intvl = PPM_LEDON_INTERVAL;
 	}
 
 	xcppm_set_led(new_action);
-	unitp->led_tid = timeout(xcppm_blink_led, (void *)new_action, intvl);
+	unitp->led_tid = timeout(xcppm_blink_led, (void *)(uintptr_t)new_action,
+	    intvl);
 	mutex_exit(&unitp->unit_lock);
 }
 
@@ -438,7 +439,8 @@ xcppm_freeze_led(void *action)
 	xcppm_unit_t *unitp;
 	timeout_id_t tid;
 
-	DPRINTF(D_LOWEST, ("xcppm_freeze_led: action %d\n", (int)action));
+	DPRINTF(D_LOWEST, ("xcppm_freeze_led: action %d\n",
+	    (int)(uintptr_t)action));
 	unitp = ddi_get_soft_state(ppm_statep, ppm_inst);
 	mutex_enter(&unitp->unit_lock);
 	tid = unitp->led_tid;
@@ -446,7 +448,7 @@ xcppm_freeze_led(void *action)
 	mutex_exit(&unitp->unit_lock);
 	untimeout(tid);
 	mutex_enter(&unitp->unit_lock);
-	xcppm_set_led((int)action);
+	xcppm_set_led((int)(uintptr_t)action);
 	mutex_exit(&unitp->unit_lock);
 }
 
@@ -1173,7 +1175,7 @@ xcppm_manage_pciupa(dev_info_t *dip, power_req_t *reqp, int *result)
 
 #ifdef DEBUG
 	if (flags & ~(XCPPMF_PCIB|XCPPMF_UPA))
-		DPRINTF(D_ERROR, ("%s: invalid ppmd->flags value 0x%x\n",
+		DPRINTF(D_ERROR, ("%s: invalid ppmd->flags value 0x%x\n", str,
 		    ppmd->flags));
 #endif
 

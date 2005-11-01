@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,7 @@ extern int64_t my_atoll(char *ptr);
 extern void my_perror(char *err_string);
 void process_options();
 
-
+int
 main(int32_t argc, char **argv)
 {
 	char i;

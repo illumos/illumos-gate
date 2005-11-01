@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1996-2000 by Sun Microsystems Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_DADA_IMPL_UDCD_H
@@ -74,9 +74,9 @@ struct udcd_cmd32 {
 	ucmd->udcd_flags	= u32->udcd_flags;			\
 	ucmd->udcd_resid	= u32->udcd_resid;			\
 	ucmd->udcd_buflen	= u32->udcd_buflen;			\
-	ucmd->udcd_bufaddr	= (caddr_t)u32->udcd_bufaddr;		\
-	ucmd->udcd_cmd		= (struct  dcd_cmd *)u32->udcd_cmd;	\
-	ucmd->udcd_reserved	= (caddr_t)u32->udcd_reserved;		\
+	ucmd->udcd_bufaddr	= (caddr_t)(uintptr_t)u32->udcd_bufaddr; \
+	ucmd->udcd_cmd		= (struct  dcd_cmd *)(uintptr_t)u32->udcd_cmd; \
+	ucmd->udcd_reserved	= (caddr_t)(uintptr_t)u32->udcd_reserved; \
 	ucmd->version_no	= u32->version_no;
 
 #define	udcd_cmdtoudcd_cmd32(ucmd, u32)					\
@@ -87,9 +87,9 @@ struct udcd_cmd32 {
 	u32->udcd_flags		= ucmd->udcd_flags;			\
 	u32->udcd_resid		= ucmd->udcd_resid;			\
 	u32->udcd_buflen	= ucmd->udcd_buflen;			\
-	u32->udcd_bufaddr	= (caddr32_t)ucmd->udcd_bufaddr;	\
-	u32->udcd_cmd		= (caddr32_t)ucmd->udcd_cmd;		\
-	u32->udcd_reserved	= (caddr32_t)ucmd->udcd_reserved;	\
+	u32->udcd_bufaddr	= (caddr32_t)(uintptr_t)ucmd->udcd_bufaddr; \
+	u32->udcd_cmd		= (caddr32_t)(uintptr_t)ucmd->udcd_cmd;	\
+	u32->udcd_reserved	= (caddr32_t)(uintptr_t)ucmd->udcd_reserved; \
 	u32->version_no		= ucmd->version_no;
 
 #endif /* _SYSCALL32 */
