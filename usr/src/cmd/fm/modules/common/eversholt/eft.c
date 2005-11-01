@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@ int Verbose;
 int Estats;
 int Warn;	/* zero -- eft.so should not issue language warnings */
 char **Efts;
+int Max_fme;		/* Maximum number of open FMEs */
 
 /* stuff exported by yacc-generated parsers */
 extern void yyparse(void);
@@ -116,6 +117,7 @@ static const fmd_prop_t eft_props[] = {
 	{ "verbose", FMD_TYPE_INT32, "0" },
 	{ "warn", FMD_TYPE_BOOL, "false" },
 	{ "status", FMD_TYPE_STRING, NULL },
+	{ "maxfme", FMD_TYPE_INT32, "0" },
 	{ NULL, 0, NULL }
 };
 
@@ -266,6 +268,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	Autoclose = fmd_prop_get_string(hdl, "autoclose");
 	Hesitate = fmd_prop_get_int64(hdl, "hesitate");
 	Autoconvict = fmd_prop_get_int32(hdl, "autoconvict");
+	Max_fme = fmd_prop_get_int32(hdl, "maxfme");
 
 	if ((fname = fmd_prop_get_string(hdl, "status")) != NULL) {
 		FILE *fp;
@@ -285,9 +288,9 @@ _fmd_init(fmd_hdl_t *hdl)
 	}
 
 	out(O_DEBUG,
-	    "initialized, verbose %d warn %d autoclose %s autoconvict %d",
-	    Verbose, Warn, Autoclose == NULL ? "(NULL)" : Autoclose,
-	    Autoconvict);
+	    "initialized, verbose %d warn %d autoclose %s autoconvict %d "
+	    "maxfme %d", Verbose, Warn,
+	    Autoclose == NULL ? "(NULL)" : Autoclose, Autoconvict, Max_fme);
 
 	out(O_DEBUG, "reconstituting any existing fmes");
 	while ((casep = fmd_case_next(hdl, casep)) != NULL) {

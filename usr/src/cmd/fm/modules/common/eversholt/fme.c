@@ -60,6 +60,7 @@ extern int Autoconvict;
 extern char *Autoclose;
 extern hrtime_t Hesitate;
 extern nv_alloc_t Eft_nv_hdl;
+extern int Max_fme;
 
 /* fme under construction is global so we can free it on module abort */
 static struct fme *Nfmep;
@@ -67,6 +68,8 @@ static struct fme *Nfmep;
 static const char *Undiag_reason;
 
 static int Nextid = 0;
+
+static int Open_fme_count = 0;	/* Count of open FMEs */
 
 /* list of fault management exercises underway */
 static struct fme {
@@ -99,6 +102,7 @@ static struct fme {
 	int hesitated;			/* true if we hesitated */
 	int uniqobs;			/* number of unique events observed */
 	int peek;			/* just peeking, don't track suspects */
+	int overflow;			/* true if overflow FME */
 	enum fme_state {
 		FME_NOTHING = 5000,	/* not evaluated yet */
 		FME_WAIT,		/* need to wait for more info */
@@ -215,6 +219,7 @@ newfme(const char *e0class, const struct ipath *e0ipp)
 	Nfmep->uniqobs = 0;
 	Nfmep->state = FME_NOTHING;
 	Nfmep->pull = 0ULL;
+	Nfmep->overflow = 0;
 
 	Nfmep->fmcase = NULL;
 	Nfmep->hdl = NULL;
@@ -592,6 +597,8 @@ fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress)
 	if (reconstitute_observations(fmep) != 0)
 		goto badcase;
 
+	Open_fme_count++;
+
 	/* give the diagnosis algorithm a shot at the new FME state */
 	fme_eval(fmep, NULL);
 	return;
@@ -939,8 +946,10 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 {
 	struct event *ep;
 	struct fme *fmep = NULL;
-	struct fme *ofmep, *svfmep;
+	struct fme *ofmep = NULL;
+	struct fme *cfmep, *svfmep;
 	int matched = 0;
+	nvlist_t *defect;
 
 	out(O_ALTFP|O_NONL, "fme_receive_report: ");
 	ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
@@ -951,6 +960,13 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		int prev_verbose;
 		unsigned long long my_delay = TIMEVAL_EVENTUALLY;
 		enum fme_state state;
+
+		if (fmep->overflow) {
+			if (!(fmd_case_closed(fmep->hdl, fmep->fmcase)))
+				ofmep = fmep;
+
+			continue;
+		}
 
 		/* look up event in event tree for this FME */
 		if ((ep = itree_lookup(fmep->eventtree,
@@ -1017,13 +1033,53 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		return;	/* explained by at least one existing FME */
 
 	/* clean up closed fmes */
-	ofmep = ClosedFMEs;
-	while (ofmep != NULL) {
-		svfmep = ofmep->next;
-		destroy_fme(ofmep);
-		ofmep = svfmep;
+	cfmep = ClosedFMEs;
+	while (cfmep != NULL) {
+		svfmep = cfmep->next;
+		destroy_fme(cfmep);
+		cfmep = svfmep;
 	}
 	ClosedFMEs = NULL;
+
+	if (ofmep) {
+		out(O_ALTFP|O_NONL, "[");
+		ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
+		out(O_ALTFP, " ADDING TO OVERFLOW FME]");
+		if (ffep)
+			fmd_case_add_ereport(hdl, ofmep->fmcase, ffep);
+
+		return;
+
+	} else if (Max_fme && (Open_fme_count >= Max_fme)) {
+		out(O_ALTFP|O_NONL, "[");
+		ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
+		out(O_ALTFP, " MAX OPEN FME REACHED]");
+		/* Create overflow fme */
+		if ((fmep = newfme(eventstring, ipp)) == NULL) {
+			out(O_ALTFP|O_NONL, "[");
+			ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
+			out(O_ALTFP, " CANNOT OPEN OVERFLOW FME]");
+			publish_undiagnosable(hdl, ffep);
+			return;
+		}
+
+		Open_fme_count++;
+
+		fmep->fmcase = fmd_case_open(hdl, NULL);
+		fmep->hdl = hdl;
+		init_fme_bufs(fmep);
+		fmep->overflow = B_TRUE;
+
+		if (ffep)
+			fmd_case_add_ereport(hdl, fmep->fmcase, ffep);
+
+		defect = fmd_nvl_create_fault(hdl, UNDIAGNOSABLE_DEFECT, 100,
+		    NULL, NULL, NULL);
+		(void) nvlist_add_string(defect, UNDIAG_REASON, UD_MAXFME);
+		fmd_case_add_suspect(hdl, fmep->fmcase, defect);
+		fmd_case_solve(hdl, fmep->fmcase);
+		return;
+	}
 
 	/* start a new FME */
 	if ((fmep = newfme(eventstring, ipp)) == NULL) {
@@ -1033,6 +1089,8 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		publish_undiagnosable(hdl, ffep);
 		return;
 	}
+
+	Open_fme_count++;
 
 	/* open a case */
 	fmep->fmcase = fmd_case_open(hdl, NULL);
@@ -1769,6 +1827,20 @@ fme_close_case(fmd_hdl_t *hdl, fmd_case_t *fmcase)
 	} else {
 		fmep->next = ClosedFMEs;
 		ClosedFMEs = fmep;
+	}
+
+	Open_fme_count--;
+
+	/* See if we can close the overflow FME */
+	if (Open_fme_count <= Max_fme) {
+		for (fmep = FMElist; fmep; fmep = fmep->next) {
+			if (fmep->overflow && !(fmd_case_closed(fmep->hdl,
+			    fmep->fmcase)))
+				break;
+		}
+
+		if (fmep != NULL)
+			fmd_case_close(fmep->hdl, fmep->fmcase);
 	}
 }
 
