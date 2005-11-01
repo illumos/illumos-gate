@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -159,3 +159,9 @@ f none lib/amd64/nss_nis.so.1 755 root bin
 f none lib/amd64/nss_nisplus.so.1 755 root bin
 f none lib/amd64/nss_user.so.1 755 root bin
 v none lib/libc.so.1 755 root bin
+d none etc 755 root sys
+d none etc/flash 755 root sys
+d none etc/flash/precreation 700 root sys
+d none etc/flash/preexit 700 root sys
+d none etc/flash/postcreation 700 root sys
+f none etc/flash/precreation/caplib 500 root sys
