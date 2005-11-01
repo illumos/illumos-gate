@@ -3930,6 +3930,7 @@ page_hashout(page_t *pp, kmutex_t *phm)
 	 */
 	sep = page_se_mutex(pp);
 	mutex_enter(sep);
+	pp->p_selock &= ~SE_EWANTED;
 	if (CV_HAS_WAITERS(&pp->p_cv))
 		cv_broadcast(&pp->p_cv);
 	mutex_exit(sep);
@@ -4885,6 +4886,7 @@ page_do_relocate_hash(page_t *new, page_t *old)
 	 */
 	sep = page_se_mutex(old);
 	mutex_enter(sep);
+	old->p_selock &= ~SE_EWANTED;
 	if (CV_HAS_WAITERS(&old->p_cv))
 		cv_broadcast(&old->p_cv);
 	mutex_exit(sep);
