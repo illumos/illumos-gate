@@ -237,8 +237,12 @@ g11n_setlocale(int category, const char *locale)
      */
     switch (category) {
     case LC_ALL:
+	/*
+	 * We must not set LC_ALL environment variable here because if we
+	 * did it would later override any other LC_* variables that were
+	 * requested from the other side.
+	 */
 	setenv("LANG", locale, 1);
-	setenv("LC_ALL", locale, 1);
 	break;
     case LC_CTYPE:
 	setenv("LC_CTYPE", locale, 1);
