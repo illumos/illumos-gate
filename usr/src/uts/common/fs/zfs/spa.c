@@ -1311,6 +1311,12 @@ spa_scrub_thread(spa_t *spa)
 
 	CALLB_CPR_INIT(&cprinfo, &spa->spa_scrub_lock, callb_generic_cpr, FTAG);
 
+	/*
+	 * If we're restarting due to a snapshot create/delete,
+	 * wait for that to complete.
+	 */
+	txg_wait_synced(spa_get_dsl(spa), 0);
+
 	spa_config_enter(spa, RW_WRITER);
 	vdev_reopen(rvd, NULL);		/* purge all vdev caches */
 	vdev_config_dirty(rvd);		/* rewrite all disk labels */

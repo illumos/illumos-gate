@@ -932,6 +932,12 @@ ztest_vdev_attach_detach(ztest_args_t *za)
 	    (error == 0 || error == ENODEV || error == EOVERFLOW))
 		expected_error = error;
 
+	/*
+	 * If someone grew the LUN, the replacement may be too small.
+	 */
+	if (error == EOVERFLOW)
+		expected_error = error;
+
 	if (error != expected_error) {
 		fatal(0, "attach (%s, %s, %d) returned %d, expected %d",
 		    path0, path1, replacing, error, expected_error);
