@@ -3489,6 +3489,13 @@ version		SUNWprivate_1.1
 exception	$return == -1
 end
 
+function	zone_version
+include		<zone.h>
+declaration	int zone_version(int *)
+version		SUNWprivate_1.1
+exception	$return == -1
+end
+
 function	getzoneidbyname
 include		<zone.h>
 declaration	zoneid_t getzoneidbyname(const char *)

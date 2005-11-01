@@ -305,6 +305,20 @@ const char * const zone_initname = "/sbin/init";
 static int zone_shutdown(zoneid_t zoneid);
 
 /*
+ * Bump this number when you alter the zone syscall interfaces; this is
+ * because we need to have support for previous API versions in libc
+ * to support patching; libc calls into the kernel to determine this number.
+ *
+ * Version 1 of the API is the version originally shipped with Solaris 10
+ * Version 2 alters the zone_create system call in order to support more
+ *     arguments by moving the args into a structure; and to do better
+ *     error reporting when zone_create() fails.
+ * Version 3 alters the zone_create system call in order to support the
+ *     import of ZFS datasets to zones.
+ */
+static const int ZONE_SYSCALL_API_VERSION = 3;
+
+/*
  * Certain filesystems (such as NFS and autofs) need to know which zone
  * the mount is being placed in.  Because of this, we need to be able to
  * ensure that a zone isn't in the process of being created such that
@@ -2416,9 +2430,13 @@ zone_is_nested(const char *rootpath)
 }
 
 static int
-zone_set_privset(zone_t *zone, const priv_set_t *zone_privs)
+zone_set_privset(zone_t *zone, const priv_set_t *zone_privs,
+    size_t zone_privssz)
 {
 	priv_set_t *privs = kmem_alloc(sizeof (priv_set_t), KM_SLEEP);
+
+	if (zone_privssz < sizeof (priv_set_t))
+		return (set_errno(ENOMEM));
 
 	if (copyin(zone_privs, privs, sizeof (priv_set_t))) {
 		kmem_free(privs, sizeof (priv_set_t));
@@ -2576,7 +2594,8 @@ parse_zfs(zone_t *zone, caddr_t ubuf, size_t buflen)
  */
 static zoneid_t
 zone_create(const char *zone_name, const char *zone_root,
-    const priv_set_t *zone_privs, caddr_t rctlbuf, size_t rctlbufsz,
+    const priv_set_t *zone_privs, size_t zone_privssz,
+    caddr_t rctlbuf, size_t rctlbufsz,
     caddr_t zfsbuf, size_t zfsbufsz, int *extended_error)
 {
 	struct zsched_arg zarg;
@@ -2595,7 +2614,7 @@ zone_create(const char *zone_name, const char *zone_root,
 	/* can't boot zone from within chroot environment */
 	if (PTOU(pp)->u_rdir != NULL && PTOU(pp)->u_rdir != rootdir)
 		return (zone_create_error(ENOTSUP, ZE_CHROOTED,
-			extended_error));
+		    extended_error));
 
 	zone = kmem_zalloc(sizeof (zone_t), KM_SLEEP);
 	zoneid = zone->zone_id = id_alloc(zoneid_space);
@@ -2622,7 +2641,7 @@ zone_create(const char *zone_name, const char *zone_root,
 		zone_free(zone);
 		return (zone_create_error(error, 0, extended_error));
 	}
-	if ((error = zone_set_privset(zone, zone_privs)) != 0) {
+	if ((error = zone_set_privset(zone, zone_privs, zone_privssz)) != 0) {
 		zone_free(zone);
 		return (zone_create_error(error, 0, extended_error));
 	}
@@ -3794,6 +3813,16 @@ zone_lookup(const char *zone_name)
 	return (zoneid);
 }
 
+static int
+zone_version(int *version_arg)
+{
+	int version = ZONE_SYSCALL_API_VERSION;
+
+	if (copyout(&version, version_arg, sizeof (int)) != 0)
+		return (set_errno(EFAULT));
+	return (0);
+}
+
 /* ARGSUSED */
 long
 zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
@@ -3832,9 +3861,10 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 		}
 
 		return (zone_create(zs.zone_name, zs.zone_root,
-			zs.zone_privs, (caddr_t)zs.rctlbuf, zs.rctlbufsz,
-			(caddr_t)zs.zfsbuf, zs.zfsbufsz,
-			zs.extended_error));
+		    zs.zone_privs, zs.zone_privssz,
+		    (caddr_t)zs.rctlbuf, zs.rctlbufsz,
+		    (caddr_t)zs.zfsbuf, zs.zfsbufsz,
+		    zs.extended_error));
 	case ZONE_BOOT:
 		return (zone_boot((zoneid_t)(uintptr_t)arg1,
 		    (const char *)arg2));
@@ -3851,6 +3881,8 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 		return (zone_shutdown((zoneid_t)(uintptr_t)arg1));
 	case ZONE_LOOKUP:
 		return (zone_lookup((const char *)arg1));
+	case ZONE_VERSION:
+		return (zone_version((int *)arg1));
 	default:
 		return (set_errno(EINVAL));
 	}

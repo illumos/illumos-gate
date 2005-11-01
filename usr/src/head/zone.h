@@ -64,6 +64,7 @@ extern ssize_t	zone_getattr(zoneid_t, int, void *, size_t);
 extern int	zone_enter(zoneid_t);
 extern int	zone_list(zoneid_t *, uint_t *);
 extern int	zone_shutdown(zoneid_t);
+extern int	zone_version(int *);
 
 #ifdef	__cplusplus
 }

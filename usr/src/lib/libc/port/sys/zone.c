@@ -35,6 +35,7 @@
 #include <sys/syscall.h>
 #include <sys/zone.h>
 #include <sys/priv.h>
+#include <priv_private.h>
 #include <zone.h>
 #include <dlfcn.h>
 #include <stdlib.h>
@@ -46,10 +47,14 @@ zone_create(const char *name, const char *root, const struct priv_set *privs,
     int *extended_error)
 {
 	zone_def  zd;
+	priv_data_t *d;
+
+	LOADPRIVDATA(d);
 
 	zd.zone_name = name;
 	zd.zone_root = root;
 	zd.zone_privs = privs;
+	zd.zone_privssz = d->pd_setsize;
 	zd.rctlbuf = rctls;
 	zd.rctlbufsz = rctlsz;
 	zd.zfsbuf = zfs;
@@ -200,4 +205,10 @@ ssize_t
 getzonenamebyid(zoneid_t zoneid, char *buf, size_t buflen)
 {
 	return (zone_getattr(zoneid, ZONE_ATTR_NAME, buf, buflen));
+}
+
+int
+zone_version(int *version)
+{
+	return (syscall(SYS_zone, ZONE_VERSION, version));
 }

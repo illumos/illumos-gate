@@ -66,6 +66,7 @@ extern "C" {
 #define	ZONE_SHUTDOWN	5
 #define	ZONE_LOOKUP	6
 #define	ZONE_BOOT	7
+#define	ZONE_VERSION	8
 
 /* zone attributes */
 #define	ZONE_ATTR_ROOT		1
@@ -81,6 +82,7 @@ typedef struct {
 	caddr32_t zone_name;
 	caddr32_t zone_root;
 	caddr32_t zone_privs;
+	size32_t zone_privssz;
 	caddr32_t rctlbuf;
 	size32_t rctlbufsz;
 	caddr32_t extended_error;
@@ -92,6 +94,7 @@ typedef struct {
 	const char *zone_name;
 	const char *zone_root;
 	const struct priv_set *zone_privs;
+	size_t zone_privssz;
 	const char *rctlbuf;
 	size_t rctlbufsz;
 	int *extended_error;

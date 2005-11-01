@@ -87,6 +87,9 @@
 #include <ucred.h>
 #include <sys/ucred.h>
 #include <sys/port_impl.h>
+#include <sys/zone.h>
+#include <sys/priv_impl.h>
+#include <sys/priv.h>
 
 #include "ramdata.h"
 #include "systable.h"
@@ -3687,7 +3690,7 @@ show_ucred(private_t *pri, long offset)
 }
 
 static void
-show_privset(private_t *pri, long offset, size_t size)
+show_privset(private_t *pri, long offset, size_t size, char *label)
 {
 	priv_set_t *tmp = priv_allocset();
 	size_t sz;
@@ -3700,7 +3703,7 @@ show_privset(private_t *pri, long offset, size_t size)
 	if (sz == size) {
 		char *str = priv_set_to_str(tmp, ',', PRIV_STR_SHORT);
 		if (str != NULL) {
-			(void) printf("%s\t%s\n", pri->pname, str);
+			(void) printf("%s\t%s%s\n", pri->pname, label, str);
 			free(str);
 		}
 	}
@@ -4391,6 +4394,133 @@ show_getrusage32(long offset)
 }
 #endif
 
+static void
+show_zone_create_args(private_t *pri, long offset)
+{
+	zone_def args;
+	char zone_name[ZONENAME_MAX];
+	char zone_root[MAXPATHLEN];
+	char *zone_zfs = NULL;
+
+	if (Pread(Proc, &args, sizeof (args), offset) == sizeof (args)) {
+
+		if (Pread_string(Proc, zone_name, sizeof (zone_name),
+		    (uintptr_t)args.zone_name) == -1)
+			(void) strcpy(zone_name, "<?>");
+
+		if (Pread_string(Proc, zone_root, sizeof (zone_root),
+		    (uintptr_t)args.zone_root) == -1)
+			(void) strcpy(zone_root, "<?>");
+
+		if (args.zfsbufsz > 0) {
+			zone_zfs = malloc(MIN(4, args.zfsbufsz));
+			if (zone_zfs != NULL) {
+				if (Pread(Proc, zone_zfs, args.zfsbufsz,
+				    (uintptr_t)args.zfsbuf) == -1)
+					(void) strcpy(zone_zfs, "<?>");
+			}
+		} else {
+			zone_zfs = "";
+		}
+
+		(void) printf("%s\t     zone_name: %s\n", pri->pname,
+		    zone_name);
+		(void) printf("%s\t     zone_root: %s\n", pri->pname,
+		    zone_root);
+
+		show_privset(pri, (uintptr_t)args.zone_privs,
+		    args.zone_privssz, "    zone_privs: ");
+
+		(void) printf("%s\t       rctlbuf: 0x%p\n", pri->pname,
+		    (void *)args.rctlbuf);
+		(void) printf("%s\t     rctlbufsz: %lu\n", pri->pname,
+		    (ulong_t)args.rctlbufsz);
+
+		(void) printf("%s\t           zfs: %s\n", pri->pname, zone_zfs);
+
+		(void) printf("%s\textended_error: 0x%p\n", pri->pname,
+		    (void *)args.extended_error);
+
+		if (args.zfsbufsz > 0)
+			free(zone_zfs);
+	}
+}
+
+
+#ifdef _LP64
+
+static void
+show_zone_create_args32(private_t *pri, long offset)
+{
+	zone_def32 args;
+	char zone_name[ZONENAME_MAX];
+	char zone_root[MAXPATHLEN];
+	char *zone_zfs = NULL;
+
+	if (Pread(Proc, &args, sizeof (args), offset) == sizeof (args)) {
+
+		if (Pread_string(Proc, zone_name, sizeof (zone_name),
+		    (uintptr_t)args.zone_name) == -1)
+			(void) strcpy(zone_name, "<?>");
+
+		if (Pread_string(Proc, zone_root, sizeof (zone_root),
+		    (uintptr_t)args.zone_root) == -1)
+			(void) strcpy(zone_root, "<?>");
+
+		if (args.zfsbufsz > 0) {
+			zone_zfs = malloc(MIN(4, args.zfsbufsz));
+			if (zone_zfs != NULL) {
+				if (Pread(Proc, zone_zfs, args.zfsbufsz,
+				    (uintptr_t)args.zfsbuf) == -1)
+					(void) strcpy(zone_zfs, "<?>");
+			}
+		} else {
+			zone_zfs = "";
+		}
+
+		(void) printf("%s\t     zone_name: %s\n", pri->pname,
+		    zone_name);
+		(void) printf("%s\t     zone_root: %s\n", pri->pname,
+		    zone_root);
+
+		show_privset(pri, (uintptr_t)args.zone_privs,
+		    args.zone_privssz, "    zone_privs: ");
+
+		(void) printf("%s\t       rctlbuf: 0x%p\n", pri->pname,
+		    (void *)args.rctlbuf);
+		(void) printf("%s\t     rctlbufsz: %lu\n", pri->pname,
+		    (ulong_t)args.rctlbufsz);
+
+		(void) printf("%s\t           zfs: %s\n", pri->pname, zone_zfs);
+
+		(void) printf("%s\textended_error: 0x%p\n", pri->pname,
+		    (void *)args.extended_error);
+
+		if (args.zfsbufsz > 0)
+			free(zone_zfs);
+	}
+}
+
+#endif
+
+static void
+show_zones(private_t *pri)
+{
+	switch (pri->sys_args[0]) {
+	case ZONE_CREATE:
+#ifdef _LP64
+		if (data_model == PR_MODEL_LP64)
+			show_zone_create_args(pri, (long)pri->sys_args[1]);
+		else
+			show_zone_create_args32(pri, (long)pri->sys_args[1]);
+#else
+		show_zone_create_args(pri, (long)pri->sys_args[1]);
+#endif
+		break;
+	}
+}
+
+
 /* expound verbosely upon syscall arguments */
 /*ARGSUSED*/
 void
@@ -4756,7 +4886,7 @@ expound(private_t *pri, long r0, int raw)
 		case PRIVSYS_GETPPRIV:
 			if (!err)
 				show_privset(pri, (long)pri->sys_args[3],
-					(size_t)pri->sys_args[4]);
+					(size_t)pri->sys_args[4], "");
 		}
 		break;
 	case SYS_ucredsys:
@@ -4866,6 +4996,10 @@ expound(private_t *pri, long r0, int raw)
 		break;
 	case SYS_port:
 		show_ports(pri);
+		break;
+
+	case SYS_zone:
+		show_zones(pri);
 		break;
 	}
 }

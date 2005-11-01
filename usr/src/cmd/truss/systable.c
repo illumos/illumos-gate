@@ -781,7 +781,7 @@ const	struct systable portfstable[] = {
 #define	NPORTCODE	(sizeof (portfstable) / sizeof (struct systable))
 
 static const struct systable zonetable[] = {
-{"zone_create",	6, DEC, NOV, HID, STG, STG, PRS, HEX, DEC},	/* 0 */
+{"zone_create",	2, DEC, NOV, HID, HEX},				/* 0 */
 {"zone_destroy", 2, DEC, NOV, HID, DEC},			/* 1 */
 {"zone_getattr", 5, DEC, NOV, HID, DEC, ZGA, HEX, DEC},		/* 2 */
 {"zone_enter",	2, DEC, NOV, HID, DEC},				/* 3 */
@@ -789,6 +789,7 @@ static const struct systable zonetable[] = {
 {"zone_shutdown", 2, DEC, NOV, HID, DEC},			/* 5 */
 {"zone_lookup", 2, DEC, NOV, HID, STG},				/* 6 */
 {"zone_boot", 3, DEC, NOV, HID, DEC, STG},			/* 7 */
+{"zone_version", 2, HEX, NOV, HID, DEC},			/* 8 */
 };
 #define	NZONECODE	(sizeof (zonetable) / sizeof (struct systable))
 
