@@ -374,7 +374,7 @@ drt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 #if defined(DRT_DEBUG)
 	if (drt_debug)
-		cmn_err(CE_CONT, "drt_attach: drt=%p\n", drt);
+		cmn_err(CE_CONT, "drt_attach: drt=%p\n", (void *)drt);
 #endif
 	drt_nexus = (struct pcmcia_adapter_nexus_private *)
 		kmem_zalloc(sizeof (struct pcmcia_adapter_nexus_private),
@@ -400,7 +400,7 @@ drt_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT, "drt_attach: %x->%p\n", DRMAP_ASIC_CSRS,
-				drt->pc_csr);
+				(void *)drt->pc_csr);
 	}
 #endif
 
@@ -620,7 +620,8 @@ drt_callback(dev_info_t *dip, int (*handler)(), int arg)
 		cmn_err(CE_CONT, "drt_callback: drt=%x, lock=%x\n",
 						(int)drt, (int)drt->pc_lock);
 #endif
-		cmn_err(CE_CONT, "\thandler=%p, arg=%x\n", handler, arg);
+		cmn_err(CE_CONT, "\thandler=%p, arg=%x\n", (void *)handler,
+		    arg);
 	}
 #endif
 	if (handler != NULL) {
@@ -852,8 +853,8 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 				cmn_err(CE_CONT,
 					"\tmapped: handle = 0x%p base = %p, "
 					"len=%x\n",
-					winp->drtw_handle,
-					winp->drtw_base,
+					(void *)winp->drtw_handle,
+					(void *)winp->drtw_base,
 					(int)window->WindowSize);
 #endif
 		}
@@ -896,9 +897,9 @@ drt_set_window(dev_info_t *dip, set_window_t *window)
 		cmn_err(CE_CONT,
 			"\tbase now set to %p (->%p), csrp=%p, winreg=%p"
 			", len=%x\n",
-			window->handle,
-			winp->drtw_base, csrp,
-			&csrp->window[win].ctl0,
+			(void *)window->handle,
+			(void *)winp->drtw_base, (void *)csrp,
+			(void *)&csrp->window[win].ctl0,
 			(int)window->WindowSize);
 		cmn_err(CE_CONT,
 			"\twindow type is now %s\n", window->state & WS_IO ?
@@ -928,8 +929,8 @@ drt_card_state(drt_dev_t *drt, int socket)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 		cmn_err(CE_CONT, "drt_card_state: socket=%d, *lock=%p\n",
-			socket, &drt->pc_lock);
-		cmn_err(CE_CONT, "\tcsr@%p\n", drt->pc_csr);
+			socket, (void *)&drt->pc_lock);
+		cmn_err(CE_CONT, "\tcsr@%p\n", (void *)drt->pc_csr);
 
 		cmn_err(CE_CONT, "\tstat0=%b\n", value,
 			"\020\1PWRON\2WAIT\3WP\4RDYBSY\5BVD1\6BVD2\7CD1"
@@ -939,8 +940,8 @@ drt_card_state(drt_dev_t *drt, int socket)
 			"\tstat1=%x\n",
 			(int)drt->pc_csr->socket[socket].stat1);
 		cmn_err(CE_CONT, "\t&stat0=%p, &stat1=%p\n",
-			&drt->pc_csr->socket[socket].stat0,
-			&drt->pc_csr->socket[socket].stat1);
+			(void *)&drt->pc_csr->socket[socket].stat0,
+			(void *)&drt->pc_csr->socket[socket].stat1);
 	}
 #endif
 
@@ -1052,7 +1053,7 @@ drt_set_page(dev_info_t *dip, set_page_t *page)
 		cmn_err(CE_CONT, "\ta2p=%x, base=%x, csrp=%p\n",
 			(int)ADDR2PAGE(page->offset),
 			SET_DRWIN_BASE(ADDR2PAGE(page->offset)),
-			csrp);
+			(void *)csrp);
 #endif
 	which |= SET_DRWIN_BASE(ADDR2PAGE(page->offset));
 	winp->drtw_addr = (caddr_t)page->offset;
@@ -1080,11 +1081,11 @@ drt_set_page(dev_info_t *dip, set_page_t *page)
 	if (drt_debug) {
 		cmn_err(CE_CONT,
 			"\tpage offset=%x, base=%p (PC addr=%p, sockets=%d)\n",
-			(int)page->offset, winp->drtw_base,
-			winp->drtw_addr, drt->pc_numsockets);
+			(int)page->offset, (void *)winp->drtw_base,
+			(void *)winp->drtw_addr, drt->pc_numsockets);
 		cmn_err(CE_CONT, "\t*base=%x, win reg=%p\n",
 			*(ushort_t *)winp->drtw_base,
-			&csrp->window[win].ctl0);
+			(void *)&csrp->window[win].ctl0);
 		if (drt_debug > 1)
 			drt_dmp_regs(csrp);
 	}
@@ -1332,7 +1333,7 @@ drt_inquire_window(dev_info_t *dip, inquire_window_t *window)
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
 	    cmn_err(CE_CONT, "\tFirstByte=%p, LastByte=%p\n",
-		    mem->FirstByte, mem->LastByte);
+		    (void *)mem->FirstByte, (void *)mem->LastByte);
 	}
 #endif
 	mem->MinSize = DRWINSIZE;
@@ -1442,7 +1443,7 @@ drt_get_status(dev_info_t *dip, get_ss_status_t *status)
 	drt_dev_t *drt = drt_get_driver_private(dip);
 #if defined(DRT_DEBUG)
 	if (drt_debug) {
-		cmn_err(CE_CONT, "drt_get_status: drt=%p\n", drt);
+		cmn_err(CE_CONT, "drt_get_status: drt=%p\n", (void *)drt);
 	}
 #endif
 
@@ -1739,8 +1740,8 @@ drt_do_intr(drt_dev_t *drt, int socket, int priority)
 
 #if defined(DRT_DEBUG)
 	if (drt_debug > 2)
-		cmn_err(CE_CONT, "drt_do_intr(%p, %d, %d)\n", drt, socket,
-							priority);
+		cmn_err(CE_CONT, "drt_do_intr(%p, %d, %d)\n",
+		    (void *)drt, socket, priority);
 #endif
 
 	/*
@@ -1770,8 +1771,8 @@ drt_do_intr(drt_dev_t *drt, int socket, int priority)
 			cmn_err(CE_CONT,
 				"\tintr-> socket=%d, priority=%d, intr=%p,"
 				"arg1=%p arg2=%p (drt_flags=%x:%s)\n",
-				intr->socket, intr->priority, intr->intr,
-				intr->arg1, intr->arg2,
+				intr->socket, intr->priority,
+				(void *)intr->intr, intr->arg1, intr->arg2,
 				drt->pc_sockets[socket].drt_flags,
 				(drt->pc_sockets[socket].drt_flags &
 				    DRT_INTR_ENABLED) ?
@@ -2065,7 +2066,7 @@ drt_lo_intr(caddr_t arg)
 
 #if defined(DRT_DEBUG)
 	if (drt_debug)
-		cmn_err(CE_CONT, "drt_lo_intr(%p)\n", arg);
+		cmn_err(CE_CONT, "drt_lo_intr(%p)\n", (void *)arg);
 #endif
 	/*
 	 * we need to look at all known sockets to determine
@@ -2142,7 +2143,7 @@ drt_dmp_regs(stp4020_socket_csr_t *csrp)
 {
 	int i;
 
-	cmn_err(CE_CONT, "drt_dmp_regs (%p):\n", csrp);
+	cmn_err(CE_CONT, "drt_dmp_regs (%p):\n", (void *)csrp);
 	cmn_err(CE_CONT, "\tctl0: %b\n", csrp->ctl0,
 		"\020\1IFTYPE\2SFTRST\3SPKREN\4IOILVL\5IOIE\6RSVD"
 		"\7CTOIE\010WPIE\011RDYIE\012BVD1IE\013BVD2IE\014CDIE"
