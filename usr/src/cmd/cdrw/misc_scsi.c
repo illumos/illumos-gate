@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -735,6 +735,24 @@ write_init(int mode)
 		err_msg(gettext("Audio mode is only supported for CD media\n"));
 		exit(1);
 	}
+	if (simulation &&
+	    check_device(target, CHECK_MEDIA_IS_NOT_BLANK) &&
+	    !check_device(target, CHECK_MEDIA_IS_NOT_ERASABLE) &&
+	    device_type != DVD_PLUS_W) {
+		/*
+		 * If we were in simulation mode, and media wasn't blank,
+		 * but medium was erasable, then cdrw goes to erase the
+		 * contents of the media after the simulation writing in order
+		 * to cleanup the ghost TOC (see write_fini() calls blank()).
+		 * This is bad because it removes existing data if media was
+		 * multi-session. Therefore, we no longer allow simulation
+		 * writing if such condition is met. we don't blank the DVD+RW
+		 * media, so DVD+RWs are fine.
+		 */
+		err_msg(gettext(
+		    "Cannot perform simulation for non-blank media\n"));
+		exit(1);
+	}
 
 	if (!prepare_for_write(target, mode, simulation, keep_disc_open)) {
 		/* l10n_NOTE : 'failed' as in Initializing device...failed  */
@@ -828,10 +846,8 @@ write_fini(void)
 		 * the drive re-initialize the media.
 		 */
 
-		if (!vol_running) {
-			blanking_type = "clear";
-			blank();
-		}
+		blanking_type = "clear_ghost";
+		blank();
 
 	}
 	/* l10n_NOTE : 'done' as in "Finishing up...done"  */

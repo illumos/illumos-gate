@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,23 @@ blank(void)
 	uchar_t *di, *buf;
 	int immediate, err;
 	int silent_pass = 0;
+	/*
+	 * silent_pass is set to 1 whenever we do not want to print
+	 * information messages. This is the case where blank() function
+	 * is called within the blank() function or the blank() function
+	 * is called from other functions within cdrw to blank the media
+	 * as part of other operations (clearing ghost TOC, closing the media
+	 * after a write operation, etc). In all those cases we need not print
+	 * or duplicate information messages. We should also return from the
+	 * blank() function to the calling function in those cases.
+	 */
+	int ignore_error = 0;
+	/*
+	 * ignore_error is set to 1 whenever we do not want to report any
+	 * error messages to the user and make things transparent to the
+	 * user (For eg: Clearing ghost TOC during write simulation).
+	 */
+
 	invalid = 0;
 	err = 0;
 
@@ -66,17 +83,6 @@ blank(void)
 	}
 
 	get_media_type(target->d_fd);
-
-	/*
-	 * many DVD+RW drives do not allow blanking the media, it is also
-	 * not included in the spec, we would just reformat the media prior
-	 * to writing. This is not the equivelent to blanking as the media
-	 * contains a TOC when formatted.
-	 */
-	if (device_type == DVD_PLUS_W) {
-		err_msg(gettext("Blanking cannot be done on DVD+RW media\n"));
-		exit(1);
-	}
 
 	if (strcmp(blanking_type, "all") == 0) {
 		/* erase the whole disk */
@@ -100,6 +106,14 @@ blank(void)
 		 */
 		type = CLEAR;
 		silent_pass = 1;
+	} else if (strcmp(blanking_type, "clear_ghost") == 0) {
+		/*
+		 * used for drives in simulation mode to blank ghost
+		 * TOC after simulation write is complete.
+		 */
+		type = CLEAR;
+		silent_pass = 1;
+		ignore_error = 1;
 	} else {
 		/* invalid blank type was passed on the command line */
 		invalid = 1;
@@ -109,6 +123,20 @@ blank(void)
 		err_msg(gettext("Invalid blanking type specified\n"));
 		exit(1);
 	}
+
+	/*
+	 * many DVD+RW drives do not allow blanking the media, it is also
+	 * not included in the spec, we would just reformat the media prior
+	 * to writing. This is not the equivelent to blanking as the media
+	 * contains a TOC when formatted.
+	 */
+	if (device_type == DVD_PLUS_W) {
+		if (ignore_error)
+			return;
+		err_msg(gettext("Blanking cannot be done on DVD+RW media\n"));
+		exit(1);
+	}
+
 	if ((target->d_inq[2] & 7) != 0) {
 		/* SCSI device */
 		immediate = 0;
@@ -126,6 +154,8 @@ blank(void)
 
 	/* get mode page for test writing if it fails we cannot turn it off */
 	if (!get_mode_page(target->d_fd, 5, 0, 64, buf)) {
+		if (ignore_error)
+			return;
 		err_msg(gettext("Device not supported\n"));
 		exit(1);
 	}
@@ -134,6 +164,8 @@ blank(void)
 
 	/* turn laser on */
 	if (!set_mode_page(target->d_fd, buf)) {
+		if (ignore_error)
+			return;
 		err_msg(gettext("Unable to configure device\n"));
 		exit(1);
 	}
@@ -148,6 +180,8 @@ blank(void)
 		    "Blanking the media (Can take several minutes)..."));
 	}
 	if (!blank_disc(target->d_fd, type, immediate)) {
+		if (ignore_error)
+			return;
 		err_msg(gettext("Blank command failed\n"));
 		if (debug)
 			(void) printf("%x %x %x %x\n", uscsi_status,
@@ -183,6 +217,8 @@ blank(void)
 				err = 1;
 			}
 			if (err == 1) {
+				if (ignore_error)
+					break;
 				err_msg(gettext("Blanking operation failed\n"));
 				if (debug) {
 					(void) printf("%x %x %x %x\n",
@@ -196,7 +232,10 @@ blank(void)
 		}
 		free(di);
 		if (count == (16*60)) {
-			(void) printf(gettext("Blank command timed out.\n"));
+			if (!silent_pass) {
+				(void) printf(gettext(
+				    "Blank command timed out.\n"));
+			}
 			goto blank_failed;
 		}
 	}
@@ -213,10 +252,11 @@ blank(void)
 	 * lead-in.
 	 */
 	if (type == ALL) {
-		if ((check_device(target,  CHECK_MEDIA_IS_NOT_BLANK)) &&
-		    (!vol_running)) {
+		if (check_device(target,  CHECK_MEDIA_IS_NOT_BLANK)) {
 			blanking_type = "clear";
 			blank();
+			if (silent_pass)
+				return;
 			exit(0);
 		}
 	}
@@ -236,6 +276,8 @@ blank_failed:
 	if ((type != ALL) && !silent_pass) {
 		(void) printf("Try using blanking type 'all'\n");
 	}
+	if (silent_pass)
+		return;
 	if (vol_running)
 		(void) eject_media(target);
 	exit(1);
