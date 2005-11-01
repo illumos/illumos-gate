@@ -80,14 +80,6 @@ static	void set_cache(int, void *, uint_t);
 static	void *get_cache(int);
 static	void free_cache();
 
-/* These are the pools of buffers, etc. */
-#define	NBUFS	(NIADDR+1)
-/* Compilers like to play with alignment, so force the issue here */
-static union {
-	char		*blk[NBUFS];
-	daddr32_t		*dummy;
-} b;
-daddr32_t		blknos[NBUFS];
 
 /*
  *	There is only 1 open (mounted) device at any given time.
@@ -226,6 +218,14 @@ sbmap(fileid_t *filep, daddr32_t bn)
 	daddr32_t nb, *bap;
 	daddr32_t *db;
 	devid_t	*devp;
+
+	/* These are the pools of buffers, etc. */
+	/* Compilers like to play with alignment, so force the issue here */
+	static union {
+		char		*blk[NIADDR + 1];
+		daddr32_t	*dummy;
+	} b;
+	daddr32_t blknos[NIADDR + 1];
 
 	devp = filep->fi_devp;
 	inodep = filep->fi_inode;
