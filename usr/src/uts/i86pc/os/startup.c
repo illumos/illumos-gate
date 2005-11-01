@@ -2060,9 +2060,9 @@ kphysm_init(
 			size -= addr - pmem->address;
 		}
 
-		/* only process pages below physmax */
-		if (btop(addr + size) > physmax)
-			size = ptob(physmax - btop(addr));
+		/* only process pages below or equal to physmax */
+		if ((btop(addr + size) - 1) > physmax)
+			size = ptob(physmax - btop(addr) + 1);
 
 		num = btop(size);
 		if (num == 0)

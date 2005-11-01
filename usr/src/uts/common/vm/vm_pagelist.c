@@ -508,7 +508,7 @@ page_ctrs_sz(void)
 			r_base = mem_node_config[mnode].physbase;
 			r_base &= ~(r_align - 1);
 			r_pgcnt = howmany(mem_node_config[mnode].physmax -
-			r_base, r_align);
+			    r_base + 1, r_align);
 			/*
 			 * Round up to always allocate on pointer sized
 			 * boundaries.
@@ -622,7 +622,7 @@ page_ctrs_alloc(caddr_t alloc_base)
 			/* base needs to be aligned - lower to aligned value */
 			r_base &= ~(r_align - 1);
 			r_pgcnt = howmany(mem_node_config[mnode].physmax -
-			r_base, r_align);
+			    r_base + 1, r_align);
 			r_shift = PAGE_BSZS_SHIFT(r);
 
 			PAGE_COUNTERS_SHIFT(mnode, r) = r_shift;
