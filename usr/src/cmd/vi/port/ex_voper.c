@@ -216,8 +216,7 @@ nocount:
 /*
  *	Find the line on the screen
  */
-		for (i = 0; i <= WECHO; i++)
-		{
+		for (i = 0; i <= WECHO; i++) {
 			if (vlinfo[i].vliny >= mouse_y)
 				break;
 		}
@@ -226,10 +225,8 @@ nocount:
 /*
  *	Look for lines longer than one line - note  odd case at zero
  */
-		if (i)
-		{
-			if (vlinfo[i - 1].vdepth > 1)
-			{
+		if (i) {
+			if (vlinfo[i - 1].vdepth > 1) {
 				mouse_x += WCOLS * (mouse_y -
 					(vlinfo[i].vliny -
 					(vlinfo[i - 1].vdepth - 1)));
