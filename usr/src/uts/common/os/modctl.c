@@ -2820,7 +2820,7 @@ detach_driver(char *name)
 		return (0);
 
 	error = ndi_devi_unconfig_driver(ddi_root_node(),
-	    NDI_DETACH_DRIVER, major);
+	    NDI_DETACH_DRIVER | NDI_UNCONFIG, major);
 	return (error == NDI_SUCCESS ? 0 : -1);
 }
 
