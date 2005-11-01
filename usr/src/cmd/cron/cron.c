@@ -93,7 +93,6 @@
 
 #define	INFINITY	2147483647L	/* upper bound on time	*/
 #define	CUSHION		180L
-#define	MAXRUN		100		/* max total jobs allowed in system */
 #define	ZOMB		100		/* proc slot used for mailing output */
 
 #define	JOBF		'j'
@@ -215,7 +214,7 @@ static struct	queue
 	qt[NQUEUE];
 static struct	queue	qq;
 
-struct runinfo
+static struct runinfo
 {
 	pid_t	pid;
 	short	que;
@@ -224,7 +223,8 @@ struct runinfo
 	short	jobtype;	/* what type of event: 0=cron, 1=at */
 	char	*jobname;	/* command for "cron", jobname for "at" */
 	int	mailwhendone;	/* 1 = send mail even if no ouptut */
-}	rt[MAXRUN];
+	struct runinfo *next;
+}	*rthead;
 
 static struct miscpid {
 	pid_t		pid;
@@ -1955,11 +1955,7 @@ ex(struct event *e)
 		resched(qp->nwait);
 		return (0);
 	}
-	if ((rp = rinfo_get(0)) == NULL) {
-		msg("MAXRUN (%d) procs reached", MAXRUN);
-		resched(qp->nwait);
-		return (0);
-	}
+	rp = rinfo_get(0); /* allocating a new runinfo struct */
 
 #ifdef ATLIMIT
 	if ((e->u)->uid != 0 && (e->u)->aruncnt >= ATLIMIT) {
@@ -2619,31 +2615,49 @@ process_msg(struct message *pmsg, time_t reftime)
 	pmsg->etype = NULL;
 }
 
+/*
+ * Allocate a new or find an existing runinfo structure
+ */
 static struct runinfo *
 rinfo_get(pid_t pid)
 {
 	struct runinfo *rp;
 
-	for (rp = rt; rp < rt+MAXRUN; rp++) {
+	if (pid == 0) {		/* allocate a new entry */
+		rp = xcalloc(1, sizeof (struct runinfo));
+		rp->next = rthead;	/* link the entry into the list */
+		rthead = rp;
+		return (rp);
+	}
+	/* search the list for an existing entry */
+	for (rp = rthead; rp != NULL; rp = rp->next) {
 		if (rp->pid == pid)
 			break;
 	}
-	if (rp >= rt+MAXRUN)
-		return (NULL);
-	else
-		return (rp);
+	return (rp);
 }
 
 /*
- * Free memory used for output file name and job name in runinfo structure
+ * Free a runinfo structure and its associated memory
  */
 static void
-rinfo_free(struct runinfo *rp)
+rinfo_free(struct runinfo *entry)
 {
-	free(rp->outfile);
-	free(rp->jobname);
-	rp->outfile = rp->jobname = NULL;
-	rp->pid = 0;
+	struct runinfo **rpp;
+	struct runinfo *rp;
+
+#ifdef DEBUG
+	(void) fprintf(stderr, "freeing job %s\n", entry->jobname);
+#endif
+	for (rpp = &rthead; (rp = *rpp) != NULL; rpp = &rp->next) {
+		if (rp == entry) {
+			*rpp = rp->next;	/* unlink the entry */
+			free(rp->outfile);
+			free(rp->jobname);
+			free(rp);
+			break;
+		}
+	}
 }
 
 /* ARGSUSED */
