@@ -37,7 +37,7 @@
 #include "ex_tty.h"
 #include "ex_vis.h"
 
-extern char	getchar();
+extern int	getchar();
 /*
  * Unix escapes, filtering
  */
@@ -217,7 +217,7 @@ loop_check:
 	if (warn && hush == 0 && chng && xchng != chng && value(vi_WARN) && dol > zero) {
 		xchng = chng;
 		vnfl();
-		printf(mesg(value(vi_TERSE) ? gettext("[No write]") :
+		viprintf(mesg(value(vi_TERSE) ? gettext("[No write]") :
 gettext("[No write since last change]")));
 		noonl();
 		flush();
@@ -311,8 +311,10 @@ unixex(opt, up, newstdin, mode)
 		signal(SIGQUIT, oldquit);
 		if (ruptible)
 			signal(SIGINT, SIG_DFL);
-	 	execlp(svalue(vi_SHELL), svalue(vi_SHELL), opt, up, (char *) 0);
-		printf(gettext("Invalid SHELL value: %s\n"), svalue(vi_SHELL));
+		execlp((char *)svalue(vi_SHELL), (char *)svalue(vi_SHELL),
+		    opt, up, (char *)0);
+		viprintf(gettext("Invalid SHELL value: %s\n"),
+		    svalue(vi_SHELL));
 		flush();
 		error(NOSTR);
 	}
@@ -330,6 +332,7 @@ unixex(opt, up, newstdin, mode)
  * F is for restoration of tty mode if from open/visual.
  * C flags suppression of printing.
  */
+void
 unixwt(c, f)
 	bool c;
 	ttymode f;
@@ -344,7 +347,7 @@ unixwt(c, f)
 		setty(f);
 	setrupt();
 	if (!inopen && c && hush == 0) {
-		printf("!\n");
+		viprintf("!\n");
 		flush();
 		termreset();
 		gettmode();
@@ -357,12 +360,12 @@ unixwt(c, f)
  * the filter, then a child editor is created to write it.
  * If output is catch it from io which is created by unixex.
  */
-vi_filter(mode)
-	register int mode;
+int
+vi_filter(int mode)
 {
 	static int pvec[2];
 	ttymode f;	/* was register */
-	register int nlines = lineDOL();
+	int nlines = lineDOL();
 	int status2;
 	pid_t pid2 = 0;
 
@@ -399,7 +402,7 @@ vi_filter(mode)
 	}
 	f = unixex("-c", uxb, (mode & 2) ? pvec[0] : 0, mode);
 	if (mode == 3) {
-		delete(0);
+		(void) delete(0);
 		addr2 = addr1 - 1;
 	}
 	if (mode == 1)
@@ -423,13 +426,15 @@ vi_filter(mode)
 		while (rpid == (pid_t)-1 && errno == EINTR);
 	}
 	netchHAD(nlines);
+	return (0);
 }
 
 /*
  * Set up to do a recover, getting io to be a pipe from
  * the recover process.
  */
-recover()
+void
+recover(void)
 {
 	static int pvec[2];
 
@@ -466,7 +471,8 @@ recover()
 /*
  * Wait for the process (pid an external) to complete.
  */
-waitfor()
+void
+waitfor(void)
 {
 
 	do
@@ -479,11 +485,12 @@ waitfor()
 		 * TRANSLATION_NOTE
 		 *	Reference order of arguments must not
 		 *	be changed using '%digit$', since vi's
-		 *	printf() does not support it.
+		 *	viprintf() does not support it.
 		 */
-		printf(gettext("%d: terminated with signal %d"), pid, status & 0177);
+		viprintf(gettext("%d: terminated with signal %d"), pid,
+		    status & 0177);
 		if (status & 0200)
-			printf(gettext(" -- core dumped"));
+			viprintf(gettext(" -- core dumped"));
 		putchar('\n');
 	}
 }
@@ -493,7 +500,8 @@ waitfor()
  * exits non-zero, force not edited; otherwise force
  * a write.
  */
-revocer()
+void
+revocer(void)
 {
 
 	waitfor();

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,7 +73,7 @@ int (*
 setlist(t))()
 	bool t;
 {
-	register int (*P)();
+	int (*P)();
 
 	listf = t;
 	P = Putchar;
@@ -85,11 +85,11 @@ int (*
 setnumb(t))()
 	bool t;
 {
-	register int (*P)();
+	int (*P)();
 
 	numberf = t;
 	P = Pline;
-	Pline = t ? numbline : normline;
+	Pline = t ? (int (*)())numbline : normline;
 	return (P);
 }
 
@@ -97,8 +97,8 @@ setnumb(t))()
  * Format c for list mode; leave things in common
  * with normal print mode to be done by normchar.
  */
-listchar(c)
-	register wchar_t c;
+int
+listchar(wchar_t c)
 {
 
 	c &= (int)(TRIM|QUOTE);
@@ -123,21 +123,22 @@ listchar(c)
 		if (c < ' ' && c != '\n' || c == DELETE)
 			outchar('^'), c = ctlof(c);
 	}
-	normchar(c);
+	(void) normchar(c);
+	return (0);
 }
 
 /*
  * Format c for printing.  Handle funnies of upper case terminals
  * and hazeltines which don't have ~.
  */
-normchar(c)
-register wchar_t c;
+int
+normchar(wchar_t c)
 {
-	register char *colp;
+	char *colp;
 
 	c &= (int)(TRIM|QUOTE);
 	if (c == '~' && tilde_glitch) {
-		normchar('\\');
+		(void) normchar('\\');
 		c = '^';
 	}
 	if ((int)(c & QUOTE))
@@ -148,7 +149,7 @@ register wchar_t c;
 			break;
 
 		case (int)QUOTE:
-			return;
+			return (0);
 
 		default:
 			c &= (int)TRIM;
@@ -160,7 +161,7 @@ register wchar_t c;
 		outchar(((c >> 6) & 07) + '0');
 		outchar(((c >> 3) & 07) + '0');
 		outchar((c & 07) + '0');
-		return;
+		return (0);
 	} else if (UPPERCASE)
 		if (isupper(c)) {
 			outchar('\\');
@@ -175,28 +176,31 @@ register wchar_t c;
 				}
 		}
 	outchar(c);
+	return (0);
 }
 
 /*
  * Print a line with a number.
  */
-numbline(i)
-	int i;
+int
+numbline(int i)
 {
 
 	if (shudclob)
 		slobber(' ');
-	printf("%6d  ", i);
-	normline();
+	viprintf("%6d  ", i);
+	(void) normline();
+	return (0);
 }
 
 /*
  * Normal line output, no numbering.
  */
-normline()
+int
+normline(void)
 {
-	register unsigned char *cp;
-	register int n;
+	unsigned char *cp;
+	int n;
 	wchar_t wchar;
 	if (shudclob)
 		slobber(linebuf[0]);
@@ -213,6 +217,7 @@ normline()
 		}
 	if (!inopen)
 		putchar((int)('\n' | QUOTE));
+	return (0);
 }
 
 /*
@@ -220,8 +225,8 @@ normline()
  * the printing of the line will erase or otherwise obliterate
  * the prompt which was printed before.  If it won't, do it now.
  */
-slobber(c)
-int c;
+void
+slobber(int c)
 {
 
 	shudclob = 0;
@@ -242,7 +247,7 @@ int c;
 	if (over_strike)
 		return;
 	flush();
-	putch(' ');
+	(void) putch(' ');
 	tputs(cursor_left, 0, putch);
 }
 
@@ -264,9 +269,10 @@ static	bool phadnl;
 /*
  * Indirect to current definition of putchar.
  */
+int
 putchar(int c)
 {
-	(*Putchar)((wchar_t)c);
+	return ((*Putchar)((wchar_t)c));
 }
 
 /*
@@ -275,8 +281,8 @@ putchar(int c)
  * Otherwise flush into next level of buffering when
  * small buffer fills or at a newline.
  */
-termchar(c)
-wchar_t c;
+int
+termchar(wchar_t c)
 {
 
 	if (pfast == 0 && phadnl)
@@ -290,9 +296,11 @@ wchar_t c;
 		fgoto();
 		flush1();
 	}
+	return (0);
 }
 
-flush()
+void
+flush(void)
 {
 
 	flush1();
@@ -304,16 +312,17 @@ flush()
  * Work here is destroying motion into positions, and then
  * letting fgoto do the optimized motion.
  */
-flush1()
+void
+flush1(void)
 {
-	register wchar_t *lp;
-	register wchar_t c;
+	wchar_t *lp;
+	wchar_t c;
 #ifdef PRESUNEUC
 	/* used for multibyte characters split between lines */
-	register int splitcnt = 0;
+	int splitcnt = 0;
 #else
 	/* used for multicolumn character substitution and padding */
-	register int fillercnt = 0;
+	int fillercnt = 0;
 #endif /* PRESUNEUC */
 	*linp = 0;
 	lp = linb;
@@ -366,7 +375,7 @@ flush1()
 						fillercnt = columns -
 							    (destcol % columns);
 						while(fillercnt) {
-							putch(mc_filler);
+							(void) putch(mc_filler);
 							outcol++;
 							destcol++;
 							fillercnt--;
@@ -381,7 +390,7 @@ flush1()
 				length2 = wctomb((char *)multic, c);
 				p = multic;
 				while(length2--)
-					putch(*p++);
+					(void) putch(*p++);
 				if (c == '\b') {
 					outcol--;
 					destcol--;
@@ -389,7 +398,8 @@ flush1()
 					outcol += length;
 					destcol += length;
 					if (eat_newline_glitch && outcol % columns == 0)
-						putch('\r'), putch('\n');
+						(void) putch('\r'),
+						    (void) putch('\n');
 				}
 #ifdef PRESUNEUC
 				if(splitcnt) {
@@ -415,7 +425,8 @@ flush1()
 	linp = linb;
 }
 
-flush2()
+void
+flush2(void)
 {
 
 	fgoto();
@@ -429,9 +440,10 @@ flush2()
  * column position implied by wraparound or the lack thereof and
  * rolling up the screen to get destline on the screen.
  */
-fgoto()
+void
+fgoto(void)
 {
-	register int l, c;
+	int l, c;
 
 	if (destcol > columns - 1) {
 		destline += destcol / columns;
@@ -483,7 +495,7 @@ fgoto()
 			if (scroll_forward /* && !beehive_glitch */ && pfast)
 				tputs(scroll_forward, 0, putch);
 			else
-				putch('\n');
+				(void) putch('\n');
 			l--;
 			if (pfast == 0)
 				outcol = 0;
@@ -506,8 +518,8 @@ fgoto()
  * Tab to column col by flushing and then setting destcol.
  * Used by "set all".
  */
-gotab(col)
-	int col;
+void
+gotab(int col)
 {
 
 	flush1();
@@ -535,13 +547,15 @@ char c;
 	if (plodflg)
 		plodcnt--;
 	else
-		putch(c);
+		(void) putch(c);
+	return (0);
 }
 
-plod(cnt)
+int
+plod(int cnt)
 {
-	register int i, j, k;
-	register int soutcol, soutline;
+	int i, j, k;
+	int soutcol, soutline;
 
 	plodcnt = plodflg = cnt;
 	soutcol = outcol;
@@ -673,7 +687,7 @@ dontcr:
 			if (cursor_down && pfast)
 				tputs(cursor_down, 0, plodput);
 			else
-				plodput('\n');
+				(void) plodput('\n');
 		}
 		if (plodcnt < 0)
 			goto out;
@@ -731,7 +745,7 @@ dontcr:
 			if (tab)
 				tputs(tab, 0, plodput);
 			else
-				plodput('\t');
+				(void) plodput('\t');
 			outcol = i;
 		}
 		/* consider another tab and then some backspaces */
@@ -774,8 +788,8 @@ dontcr:
 			 * a null or a tab we want to print a space.  Other
 			 * random chars we use space for instead, too.
 			 */
-			register wchar_t wchar;
-			register int length, scrlength;
+			wchar_t wchar;
+			int length, scrlength;
 			unsigned char multic[MB_LEN_MAX];
 
 			if (!inopen || vtube[outline]==NULL ||
@@ -795,7 +809,7 @@ dontcr:
 					tputs(cursor_right, 0, plodput);
 				}
 			} else {
-				plodput((char)multic[0]);
+				(void) plodput((char)multic[0]);
 				outcol++;
 			}
 		}
@@ -816,7 +830,8 @@ out:
  * Approximate because kill character echoes newline with
  * no feedback and also because of long input lines.
  */
-noteinp()
+void
+noteinp(void)
 {
 
 	outline++;
@@ -834,12 +849,13 @@ noteinp()
  * On cursor addressable terminals setting to unknown
  * will force a cursor address soon.
  */
-termreset()
+void
+termreset(void)
 {
 
 	endim();
 	if (enter_ca_mode)
-		putpad(enter_ca_mode);	
+		putpad((unsigned char *)enter_ca_mode);
 	destcol = 0;
 	destline = lines - 1;
 	if (cursor_address) {
@@ -857,13 +873,15 @@ termreset()
  */
 unsigned char	*obp = obuf;
 
-draino()
+void
+draino(void)
 {
 
 	obp = obuf;
 }
 
-flusho()
+void
+flusho(void)
 {
 	if (obp != obuf) {
 		write(1, obuf, obp - obuf);
@@ -875,38 +893,35 @@ flusho()
 	}
 }
 
-putnl()
+void
+putnl(void)
 {
 
 	putchar('\n');
 }
 
-putS(cp)
-	unsigned char *cp;
+void
+putS(unsigned char *cp)
 {
 
 	if (cp == NULL)
 		return;
 	while (*cp)
-		putch(*cp++);
+		(void) putch(*cp++);
 }
 
 int
-#ifdef __STDC__
 putch(char c)
-#else
-putch(c)
-	char c;
-#endif
 {
 
 #ifdef OLD3BTTY		
 	if(c == '\n')	/* Fake "\n\r" for '\n' til fix in 3B firmware */
-		putch('\r');	/* vi does "stty -icanon" => -onlcr !! */
+		(void) putch('\r'); /* vi does "stty -icanon" => -onlcr !! */
 #endif
 	*obp++ = c;
 	if (obp >= &obuf[sizeof obuf])
 		flusho();
+	return (0);
 }
 
 /*
@@ -916,8 +931,8 @@ putch(c)
 /*
  * Put with padding
  */
-putpad(cp)
-	unsigned char *cp;
+void
+putpad(unsigned char *cp)
 {
 
 	flush();
@@ -927,7 +942,8 @@ putpad(cp)
 /*
  * Set output through normal command mode routine.
  */
-setoutt()
+void
+setoutt(void)
 {
 
 	Outchar = termchar;
@@ -937,16 +953,16 @@ setoutt()
  * Printf (temporarily) in list mode.
  */
 /*VARARGS2*/
-lprintf(cp, dp)
-	unsigned char *cp, *dp;
+void
+lprintf(unsigned char *cp, unsigned char *dp, ...)
 {
-	register int (*P)();
+	int (*P)();
 
 	P = setlist(1);
 #ifdef PRESUNEUC
-	printf(cp, dp);
+	viprintf(cp, dp);
 #else
-	printf((char *)cp, (char *)dp);
+	viprintf((char *)cp, (char *)dp);
 #endif /* PRESUNEUC */
 	Putchar = P;
 }
@@ -954,6 +970,7 @@ lprintf(cp, dp)
 /*
  * Newline + flush.
  */
+void
 putNFL()
 {
 
@@ -964,7 +981,8 @@ putNFL()
 /*
  * Try to start -nl mode.
  */
-pstart()
+void
+pstart(void)
 {
 
 	if (NONL)
@@ -987,7 +1005,8 @@ pstart()
 /*
  * Stop -nl mode.
  */
-pstop()
+void
+pstop(void)
 {
 
 	if (inopen)
@@ -1011,7 +1030,7 @@ ostart()
 	if (!intty)
 		error("Open and visual must be used interactively");
 	*/
-	gTTY(2);
+	(void) gTTY(2);
 	normtty++;
 	f = tty;
 	tty = normf;
@@ -1029,13 +1048,14 @@ ostart()
 }
 
 /* actions associated with putting the terminal in open mode */
-tostart()
+void
+tostart(void)
 {
-	putpad(cursor_visible);
-	putpad(keypad_xmit);
+	putpad((unsigned char *)cursor_visible);
+	putpad((unsigned char *)keypad_xmit);
 	if (!value(vi_MESG)) {
 		if (ttynbuf[0] == 0) {
-			register char *tn;
+			char *tn;
 			if ((tn=ttyname(2)) == NULL &&
 			    (tn=ttyname(1)) == NULL &&
 			    (tn=ttyname(0)) == NULL)
@@ -1059,7 +1079,8 @@ tostart()
  * right arrow key.
  */
 
-ttcharoff()
+void
+ttcharoff(void)
 {
 	/*
 	 * use 200 instead of 377 because 377 is y-umlaut
@@ -1082,8 +1103,8 @@ ttcharoff()
 /*
  * Stop open, restoring tty modes.
  */
-ostop(f)
-	ttymode f;
+void
+ostop(ttymode f)
 {
 
 	pfast = (f.c_oflag & ONLCR) == 0;
@@ -1093,11 +1114,12 @@ ostop(f)
 }
 
 /* Actions associated with putting the terminal in the right mode. */
-tostop()
+void
+tostop(void)
 {
-	putpad(clr_eos);
-	putpad(cursor_normal);
-	putpad(keypad_local);
+	putpad((unsigned char *)clr_eos);
+	putpad((unsigned char *)cursor_normal);
+	putpad((unsigned char *)keypad_local);
 	if (!value(vi_MESG) && ttynbuf[0]>1)
 		chmod((char *)ttynbuf, ttymesg);
 }
@@ -1127,8 +1149,8 @@ vraw()
 /*
  * Restore flags to normal state f.
  */
-normal(f)
-	ttymode f;
+void
+normal(ttymode f)
 {
 
 	if (normtty > 0) {
@@ -1161,8 +1183,8 @@ setty(f)
 
 static struct termio termio;
 
-gTTY(i)
-int i;
+int
+gTTY(int i)
 {
 	if(termiosflag < 0) {
 		if(ioctl(i, TCGETS, &tty) == 0)
@@ -1170,7 +1192,7 @@ int i;
 		else  {
 			termiosflag = 0;
 			if(ioctl(i, TCGETA, &termio) < 0)
-				return -1;
+				return (-1);
 			tty.c_iflag = termio.c_iflag;
 			tty.c_oflag = termio.c_oflag;
 			tty.c_cflag = termio.c_cflag;
@@ -1178,27 +1200,27 @@ int i;
 			for(i = 0; i < NCC; i++)
 				tty.c_cc[i] = termio.c_cc[i];
 		}
-		return 0;
+		return (0);
 	}
 	if(termiosflag)
-		return ioctl(i, TCGETS, &tty);
+		return (ioctl(i, TCGETS, &tty));
 	if(ioctl(i, TCGETA, &termio) < 0)
-		return -1;
+		return (-1);
 	tty.c_iflag = termio.c_iflag;
 	tty.c_oflag = termio.c_oflag;
 	tty.c_cflag = termio.c_cflag;
 	tty.c_lflag = termio.c_lflag;
 	for(i = 0; i < NCC; i++)
 		tty.c_cc[i] = termio.c_cc[i];
-	return 0;
+	return (0);
 }
 
 /*
  * sTTY: set the tty modes on file descriptor i to be what's
  * currently in global "tty".  (Also use nttyc if needed.)
  */
-sTTY(i)
-int i;
+void
+sTTY(int i)
 {
 	int j;
 	if(termiosflag)
@@ -1217,7 +1239,8 @@ int i;
 /*
  * Print newline, or blank if in open/visual
  */
-noonl()
+void
+noonl(void)
 {
 
 	putchar(Outchar != termchar ? ' ' : '\n');

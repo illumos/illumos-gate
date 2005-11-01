@@ -19,12 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.6	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_tty.h"
@@ -42,8 +48,9 @@
  * New position for cursor is curs.
  * Like most routines here, we vsave().
  */
+void
 vmoveto(addr, curs, context)
-	register line *addr;
+	line *addr;
 	unsigned char *curs;
 	unsigned char context;
 {
@@ -57,10 +64,8 @@ vmoveto(addr, curs, context)
  * Vjumpto is like vmoveto, but doesn't mark previous
  * context or save linebuf as current line.
  */
-vjumpto(addr, curs, context)
-	register line *addr;
-	unsigned char *curs;
-	unsigned char context;
+void
+vjumpto(line *addr, unsigned char *curs, unsigned char context)
 {
 
 	noteit(0);
@@ -75,9 +80,8 @@ vjumpto(addr, curs, context)
 /*
  * Go up or down cnt (negative is up) to new position curs.
  */
-vupdown(cnt, curs)
-	register int cnt;
-	unsigned char *curs;
+void
+vupdown(int cnt, unsigned char *curs)
 {
 
 	if (cnt > 0)
@@ -96,14 +100,13 @@ vupdown(cnt, curs)
  * If scroll, then we MUST use a scroll.
  * Otherwise clear and redraw if motion is far.
  */
-vup(cnt, ind, scroll)
-	register int cnt, ind;
-	bool scroll;
+void
+vup(int cnt, int ind, bool scroll)
 {
-	register int i, tot;
+	int i, tot;
 
 	if (dot == one) {
-		beep();
+		(void) beep();
 		return;
 	}
 	vsave();
@@ -145,14 +148,13 @@ okr:
 /*
  * Like vup, but scrolling down.
  */
-vdown(cnt, ind, scroll)
-	register int cnt, ind;
-	bool scroll;
+void
+vdown(int cnt, int ind, bool scroll)
 {
-	register int i, tot;
+	int i, tot;
 
 	if (dot == dol) {
-		beep();
+		(void) beep();
 		return;
 	}
 	vsave();
@@ -194,11 +196,10 @@ dcontxt:
  * Work here is in determining new top line implied by
  * this placement of line addr, since we always draw from the top.
  */
-vcontext(addr, where)
-	register line *addr;
-	unsigned char where;
+void
+vcontext(line *addr, unsigned char where)
 {
-	register line *top;
+	line *top;
 
 	getline(*addr);
 	if (state != VISUAL)
@@ -238,7 +239,8 @@ vcontext(addr, where)
  * we may be able to reuse the line we are on
  * if it is blank.  This is a real win.
  */
-vclean()
+void
+vclean(void)
 {
 
 	if (state != VISUAL && state != CRTOPEN) {
@@ -255,14 +257,14 @@ vclean()
  * (and call us recursively).  Eventually, we clear the screen
  * (or its open mode equivalent) and redraw.
  */
-vshow(addr, top)
-	line *addr, *top;
+void
+vshow(line *addr, line *top)
 {
 #ifndef CBREAK
-	register bool fried = 0;
+	bool fried = 0;
 #endif
-	register int cnt = addr - dot;
-	register int i = vcline + cnt;
+	int cnt = addr - dot;
+	int i = vcline + cnt;
 	short oldhold = hold;
 
 	if (state != HARDOPEN && state != ONEOPEN && i >= 0 && i < vcnt) {
@@ -308,8 +310,8 @@ vshow(addr, top)
  * area;  we are called this way in the middle of a :e escape
  * from visual, e.g.
  */
-vreset(inecho)
-	bool inecho;
+void
+vreset(bool inecho)
 {
 
 	vcnt = vcline = 0;
@@ -325,10 +327,10 @@ vreset(inecho)
  */
 line *
 vback(tp, cnt)
-	register int cnt;
-	register line *tp;
+	int cnt;
+	line *tp;
 {
-	register int d;
+	int d;
 
 	if (cnt > 0)
 		for (; tp > one; tp--) {
@@ -344,11 +346,10 @@ vback(tp, cnt)
 /*
  * How much scrolling will it take to roll cnt lines starting at tp?
  */
-vfit(tp, cnt)
-	register line *tp;
-	int cnt;
+int
+vfit(line *tp, int cnt)
 {
-	register int j;
+	int j;
 
 	j = 0;
 	while (cnt > 0) {
@@ -364,11 +365,11 @@ vfit(tp, cnt)
 /*
  * Roll cnt lines onto the screen.
  */
-vroll(cnt)
-	register int cnt;
+void
+vroll(int cnt)
 {
 #ifndef CBREAK
-	register bool fried = 0;
+	bool fried = 0;
 #endif
 	short oldhold = hold;
 
@@ -405,10 +406,10 @@ vroll(cnt)
 /*
  * Roll backwards (scroll up).
  */
-vrollR(cnt)
-	register int cnt;
+void
+vrollR(int cnt)
 {
-	register bool fried = 0;
+	bool fried = 0;
 	short oldhold = hold;
 
 #ifdef ADEBUG
@@ -447,8 +448,8 @@ vrollR(cnt)
  * BUG:		An interrupt during a scroll in this way
  *		dumps to command mode.
  */
-vcookit(cnt)
-	register int cnt;
+int
+vcookit(int cnt)
 {
 
 	return (cnt > 1 && (ospeed < B1200 && !initev || cnt > lines * 2));
@@ -457,9 +458,10 @@ vcookit(cnt)
 /*
  * Determine displayed depth of current line.
  */
-vdepth()
+int
+vdepth(void)
 {
-	register int d;
+	int d;
 
 	d = (column(NOSTR) + WCOLS - 1 + (Putchar == listchar) + insert_null_glitch) / WCOLS;
 #ifdef ADEBUG
@@ -472,8 +474,8 @@ vdepth()
 /*
  * Move onto a new line, with cursor at position curs.
  */
-vnline(curs)
-	unsigned char *curs;
+void
+vnline(unsigned char *curs)
 {
 	unsigned char *owcursor;
 	int j;
@@ -501,5 +503,5 @@ vnline(curs)
 	else
 		wcursor = vskipwh(linebuf);
 	cursor = linebuf;
-	vmove();
+	(void) vmove();
 }

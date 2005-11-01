@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,13 +54,14 @@
 extern unsigned char	*vUA1, *vUA2;		/* extern; also in ex_vops.c */
 extern unsigned char	*vUD1, *vUD2;		/* extern; also in ex_vops.c */
 
+int vmaxrep(unsigned char, int);
+
 /*
  * Obleeperate characters in hardcopy
  * open with \'s.
  */
-bleep(i, cp)
-	register int i;
-	unsigned char *cp;
+void
+bleep(int i, unsigned char *cp)
 {
 
 	i -= lcolumn(nextchr(cp));
@@ -74,9 +75,10 @@ bleep(i, cp)
  * Common code for middle part of delete
  * and change operating on parts of lines.
  */
-vdcMID()
+int
+vdcMID(void)
 {
-	register unsigned char *cp;
+	unsigned char *cp;
 
 	squish();
 	setLAST();
@@ -93,15 +95,15 @@ vdcMID()
  * in the VBSIZE buffer BUF.  Used to save
  * deleted text of part of line.
  */
-takeout(BUF)
-	unsigned char *BUF;
+void
+takeout(unsigned char *BUF)
 {
-	register unsigned char *cp;
+	unsigned char *cp;
 
 	if (wcursor < linebuf)
 		wcursor = linebuf;
 	if (cursor == wcursor) {
-		beep();
+		(void) beep();
 		return;
 	}
 	if (wcursor < cursor) {
@@ -111,17 +113,18 @@ takeout(BUF)
 	}
 	setBUF(BUF);
 	if ((unsigned char)BUF[128] == 0200)
-		beep();
+		(void) beep();
 }
 
 /*
  * Are we at the end of the printed representation of the
  * line?  Used internally in hardcopy open.
  */
-ateopr()
+int
+ateopr(void)
 {
-	register wchar_t i, c;
-	register wchar_t *cp = vtube[destline] + destcol;
+	wchar_t i, c;
+	wchar_t *cp = vtube[destline] + destcol;
 
 	for (i = WCOLS - destcol; i > 0; i--) {
 		c = *cp++;
@@ -160,12 +163,11 @@ static int 	inscdcnt; /*
 		 	   * repeat of insertion
 			   */
 
-vappend(ch, cnt, indent)
-	int ch;		/* char --> int */
-	int cnt, indent;
+void
+vappend(int ch, int cnt, int indent)
 {
-	register int i;
-	register unsigned char *gcursor;
+	int i;
+	unsigned char *gcursor;
 	bool escape;
 	int repcnt, savedoomed;
 	short oldhold = hold;
@@ -183,7 +185,7 @@ vappend(ch, cnt, indent)
 		i = *gcursor;
 		*gcursor = ' ';
 		wcursor = gcursor;
-		vmove();
+		(void) vmove();
 		*gcursor = i;
 	}
 	vaifirst = indent == 0;
@@ -333,7 +335,7 @@ vappend(ch, cnt, indent)
 	ixlatctl(1);
 	if ((vglobp && *vglobp == 0) || peekbr()) {
 		if (INS[128] == 0200) {
-			beep();
+			(void) beep();
 			if (!splitw)
 				ungetkey('u');
 			doomed = 0;
@@ -431,7 +433,7 @@ vappend(ch, cnt, indent)
 
 				Outchar = vinschar;
 				hold |= HOLDQIK;
-				printf("%s", genbuf);
+				viprintf("%s", genbuf);
 				hold = oldhold;
 				Outchar = vputchar;
 			}
@@ -450,7 +452,7 @@ vappend(ch, cnt, indent)
 			DEPTH(vcline) = 0;
 			savedoomed = doomed;
 			if (doomed > 0) {
-				register int cind = cindent();
+				int cind = cindent();
 
 				physdc(cind, cind + doomed);
 				doomed = 0;
@@ -604,7 +606,7 @@ vappend(ch, cnt, indent)
 		back1();
 	doomed = 0;
 	wcursor = cursor;
-	vmove();
+	(void) vmove();
 }
 
 /*
@@ -612,7 +614,8 @@ vappend(ch, cnt, indent)
  * backwards around end of lines (vgoto can't hack columns which are
  * less than 0 in general).
  */
-back1()
+void
+back1(void)
 {
 
 	vgoto(destline - 1, WCOLS + destcol - 1);
@@ -636,12 +639,12 @@ back1()
 unsigned char *
 vgetline(cnt, gcursor, aescaped, commch)
 	int cnt;
-	register unsigned char *gcursor;
+	unsigned char *gcursor;
 	bool *aescaped;
 	unsigned char commch;
 {
-	register int c, ch;
-	register unsigned char *cp, *pcp;
+	int c, ch;
+	unsigned char *cp, *pcp;
 	int x, y, iwhite, backsl=0;
 	unsigned char *iglobp;
 	int (*OO)() = Outchar;
@@ -754,7 +757,7 @@ bakchar:
 						ungetkey(c);
 						goto vadone;
 					}
-					beep();
+					(void) beep();
 					continue;
 				}
 				goto vbackup;
@@ -780,7 +783,7 @@ bakchar:
 				cp = ogcursor;
 vbackup:
 				if (cp == gcursor) {
-					beep();
+					(void) beep();
 					continue;
 				}
 				endim();
@@ -852,7 +855,7 @@ vbackup:
 		if(!backsl) {
 			ungetkey(c);
 			if((length = _mbftowc((char *)multic, &wchar, getkey, &Peekkey)) <= 0) {
-				beep();
+				(void) beep();
 				continue;
 			} 
 		} else {
@@ -891,7 +894,7 @@ vbackup:
 #else
 					if((length = _mbftowc((char *)multic, &wchar, getkey, &Peekkey)) <= 0) {
 #endif /* PRESUNEUC */
-						beep();
+						(void) beep();
 						continue;
 					} 
 					strncpy(gcursor, multic, length);
@@ -993,7 +996,7 @@ ws:
 						gcursor -= length;
 						c = *gcursor;
 						*gcursor = 0;
-						beep();
+						(void) beep();
 						goto dontbreak;
 					}
 					/*
@@ -1149,7 +1152,7 @@ ws:
 					CDCNT = 1;
 					endim();
 					back1();
-					vputchar(' ');
+					(void) vputchar(' ');
 					goto vbackup;
 				}
 
@@ -1172,7 +1175,7 @@ ws:
 			 * Possibly discard control inputs.
 			 */
 			if (!vglobp && junk(c)) {
-				beep();
+				(void) beep();
 				continue;
 			}
 def:
@@ -1206,10 +1209,10 @@ unsigned char	*vsplitpt;
  * Append the line in buffer at lp
  * to the buffer after dot.
  */
-vdoappend(lp)
-	unsigned char *lp;
+void
+vdoappend(unsigned char *lp)
 {
-	register int oing = inglobal;
+	int oing = inglobal;
 
 	vsplitpt = lp;
 	inglobal = 1;
@@ -1220,7 +1223,8 @@ vdoappend(lp)
 /*
  * Subroutine for vdoappend to pass to append.
  */
-vgetsplit()
+int
+vgetsplit(void)
 {
 
 	if (vsplitpt == 0)
@@ -1235,11 +1239,10 @@ vgetsplit()
  * allowed that will yield total line length less than
  * LBSIZE characters and also does hacks for the R command.
  */
-vmaxrep(ch, cnt)
-	unsigned char ch;
-	register int cnt;
+int
+vmaxrep(unsigned char ch, int cnt)
 {
-	register int len;
+	int len;
 	unsigned char *cp;
 	int repcnt, oldcnt, replen;
 	if (cnt > LBSIZE - 2)
@@ -1289,11 +1292,10 @@ vmaxrep(ch, cnt)
  * Note that the beginning and end of 'MAPTO' are considered to be
  * valid nonword delimiters.
  */
-reccnt(cap, mapto)
-unsigned char *cap;
-unsigned char *mapto;
+int
+reccnt(unsigned char *cap, unsigned char *mapto)
 {
-	register int i, cnt, final;
+	int i, cnt, final;
 
 	cnt = 0;
 	final = strlen(mapto) - strlen(cap);

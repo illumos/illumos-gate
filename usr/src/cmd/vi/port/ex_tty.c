@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,8 @@ static unsigned char *freespace;
  */
 static short GT;
 
-gettmode()
+void
+gettmode(void)
 {
 	short speed;
 
@@ -66,20 +67,20 @@ gettmode()
 	NONL = (tty.c_oflag & ONLCR) == 0;
 }
 
-setterm(type)
-	unsigned char *type;
+void
+setterm(unsigned char *type)
 {
 	char *tparm(); 
 	unsigned char *chrptr;
-	register int unknown, i;
-	register int l;
+	int unknown, i;
+	int l;
 	int errret;
 	extern unsigned char termtype[];
 	extern void setsize();
 
 	unknown = 0;
 	if (cur_term && exit_ca_mode)
-		putpad(exit_ca_mode);
+		putpad((unsigned char *)exit_ca_mode);
 	/*
 	 * The code in this if statement is from 4.1.2 and fixes a bug where
 	 * you couldn't change the term type using the ":set term" command.
@@ -144,13 +145,20 @@ setterm(type)
 	freespace = allocspace;
 
 #ifdef sun
-	kpadd(arrows, key_ic, "i", "inschar");
-	kpadd(arrows, key_eic, "i", "inschar");
-	kpadd(arrows, key_up, "k", "up");
-	kpadd(arrows, key_down, "j", "down");
-	kpadd(arrows, key_left, "h", "left");
-	kpadd(arrows, key_right, "l", "right");
-	kpadd(arrows, key_home, "H", "home");
+	kpadd(arrows, (unsigned char *)key_ic, (unsigned char *)"i",
+	    (unsigned char *)"inschar");
+	kpadd(arrows, (unsigned char *)key_eic, (unsigned char *)"i",
+	    (unsigned char *)"inschar");
+	kpadd(arrows, (unsigned char *)key_up, (unsigned char *)"k",
+	    (unsigned char *)"up");
+	kpadd(arrows, (unsigned char *)key_down, (unsigned char *)"j",
+	    (unsigned char *)"down");
+	kpadd(arrows, (unsigned char *)key_left, (unsigned char *)"h",
+	    (unsigned char *)"left");
+	kpadd(arrows, (unsigned char *)key_right, (unsigned char *)"l",
+	    (unsigned char *)"right");
+	kpadd(arrows, (unsigned char *)key_home, (unsigned char *)"H",
+	    (unsigned char *)"home");
 #else
 	kpadd(arrows, key_ic, "i", "inschar");
 	kpadd(immacs, key_ic, "\033", "inschar");
@@ -172,7 +180,7 @@ setterm(type)
 	kpboth(arrows, immacs, key_ppage, "\002", "ppage");
 	kpboth(arrows, immacs, key_sr, "\031", "sr");
 	kpboth(arrows, immacs, key_eos, "dG", "clreos");
-#endif sun
+#endif /* sun */
 
 	/*
 	 * Handle funny termcap capabilities
@@ -201,7 +209,7 @@ setterm(type)
 	 */
 	{
 		static unsigned char sc[2];
-		int i, fnd;
+		int i;
 
 		if (!value(vi_NOVICE)) {
 			sc[0] = tty.c_cc[VSUSP];
@@ -245,7 +253,8 @@ setterm(type)
 	if (ospeed == B1200 && !value(vi_REDRAW))
 		value(vi_SLOWOPEN) = 1;	/* see also gettmode above */
 	if (unknown)
-		serror(gettext("%s: Unknown terminal type"), type);
+		serror((unsigned char *)gettext("%s: Unknown terminal type"),
+		    type);
 }
 
 #ifndef sun
@@ -277,16 +286,16 @@ unsigned char *key, *mapto, *desc;
 	freespace += strlen(surmapto) + 1;
 	kpadd(map2, key, p, desc);
 }
-#endif !sun
+#endif /* !sun */
 
 /*
  * Define a macro.  mapstr is the structure (mode) in which it applies.
  * key is the input sequence, mapto what it turns into, and desc is a
  * human-readable description of what's going on.
  */
-kpadd(mapstr, key, mapto, desc)
-struct maps *mapstr;
-unsigned char *key, *mapto, *desc;
+void
+kpadd(struct maps *mapstr, unsigned char *key, unsigned char *mapto,
+unsigned char *desc)
 {
 	int i;
 
@@ -305,20 +314,21 @@ fkey(i)
 	int i;
 {
 	if (i < 0 || i > 9)
-		return (unsigned char *)NOSTR;
+		return ((unsigned char *)NOSTR);
 	switch (i) {
-	case 0: return (unsigned char *)key_f0;
-	case 1: return (unsigned char *)key_f1;
-	case 2: return (unsigned char *)key_f2;
-	case 3: return (unsigned char *)key_f3;
-	case 4: return (unsigned char *)key_f4;
-	case 5: return (unsigned char *)key_f5;
-	case 6: return (unsigned char *)key_f6;
-	case 7: return (unsigned char *)key_f7;
-	case 8: return (unsigned char *)key_f8;
-	case 9: return (unsigned char *)key_f9;
-	case 10: return (unsigned char *)key_f0;
+	case 0: return ((unsigned char *)key_f0);
+	case 1: return ((unsigned char *)key_f1);
+	case 2: return ((unsigned char *)key_f2);
+	case 3: return ((unsigned char *)key_f3);
+	case 4: return ((unsigned char *)key_f4);
+	case 5: return ((unsigned char *)key_f5);
+	case 6: return ((unsigned char *)key_f6);
+	case 7: return ((unsigned char *)key_f7);
+	case 8: return ((unsigned char *)key_f8);
+	case 9: return ((unsigned char *)key_f9);
+	case 10: return ((unsigned char *)key_f0);
 	}
+	return ((unsigned char *)NOSTR);
 }
 
 /*
@@ -336,18 +346,14 @@ static int costnum;
 
 /* ARGSUSED */
 int
-#ifdef __STDC__
 countnum(char ch)
-#else
-countnum(ch)
-char ch;
-#endif
 {
 	costnum++;
+	return (0);
 }
 
-cost(str)
-unsigned char *str;
+int
+cost(unsigned char *str)
 {
 
 	if (str == NULL || *str=='O')	/* OOPS */

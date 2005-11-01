@@ -19,11 +19,17 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.8	*/
+void
 bcopy(from, to, count)
 #ifdef vax
 	unsigned char *from, *to;
@@ -34,14 +40,14 @@ bcopy(from, to, count)
 }
 #else
 #ifdef u3b		/* movblkb only works with register args */
-	register unsigned char *from, *to;
-	register int count;
+	unsigned char *from, *to;
+	int count;
 {
 	asm("	movblkb	%r6, %r8, %r7");
 }
 #else
-	register unsigned char *from, *to;
-	register int count;
+	unsigned char *from, *to;
+	int count;
 {
 	while ((count--) > 0)
 		*to++ = *from++;

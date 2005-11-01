@@ -29,6 +29,7 @@
 
 
 /* Copyright (c) 1981 Regents of the University of California */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdio.h>	/* BUFSIZ: stdio = 1024, VMUNIX = 1024 */
@@ -79,14 +80,20 @@ unsigned char	mydir[PATH_MAX+1];
 
 unsigned char	nb[BUFSIZE];
 int	vercnt;			/* Count number of versions of file found */
+void rputfile(void);
+void rsyserror(void);
+void searchdir(unsigned char *);
+void scrapbad(void);
+void findtmp(unsigned char *);
+void listfiles(unsigned char *);
 
 int
-main(int argc, unsigned char *argv[])
+main(int argc, char *argv[])
 {
 	unsigned char string[50];
-	register unsigned char *cp;
-	register int c, b, i;
-	register int rflg = 0, errflg = 0;
+	unsigned char *cp;
+	int c, b, i;
+	int rflg = 0, errflg = 0;
 	int label;
 	line *tmpadr;
 	extern unsigned char *mypass();
@@ -143,7 +150,7 @@ main(int argc, unsigned char *argv[])
 		fprintf(stderr,"%s:\n", mydir);
 		listfiles(mydir);
 		fprintf(stderr,"%s:\n", TMPDIR);
-		listfiles(TMPDIR);
+		listfiles((unsigned char *)TMPDIR);
 		exit(0);
 	}
 	
@@ -155,7 +162,7 @@ main(int argc, unsigned char *argv[])
 	/*
 	 * Search for this file.
 	 */
-	findtmp(argv[0]);
+	findtmp((unsigned char *)argv[0]);
 
 	/*
 	 * Got (one of the versions of) it, write it back to the editor.
@@ -232,7 +239,7 @@ main(int argc, unsigned char *argv[])
 	 */
 	if (dol > zero) {
 		addr1 = one; addr2 = dol; io = 1;
-		putfile();
+		rputfile();
 	}
 	/*
 	 * Trash the saved buffer.
@@ -251,7 +258,7 @@ main(int argc, unsigned char *argv[])
 		sprintf((char *)rmcmd, "rmdir %s 2> /dev/null", (char *)mydir);
 		system((char *)rmcmd);
 	}
-	exit(0);
+	return (0);
 }
 
 /*
@@ -261,6 +268,7 @@ main(int argc, unsigned char *argv[])
  * a newline which would mess up the screen.
  */
 /*VARARGS2*/
+void
 error(str, inf)
 	unsigned char *str;
 	int inf;
@@ -291,14 +299,15 @@ struct svfile {
 	time_t	sf_time;
 	short	sf_encrypted;
 };
+void enter(struct svfile *, unsigned char *, int);
 
-listfiles(dirname)
-	unsigned char *dirname;
+void
+listfiles(unsigned char *dirname)
 {
-	register DIR *dir;
+	DIR *dir;
 	struct dirent64 *direntry;
 	int ecount, qucmp();
-	register int f;
+	int f;
 	unsigned char cp[50];
 	unsigned char cp2[50];
 	unsigned char *filname;
@@ -391,12 +400,11 @@ listfiles(dirname)
 /*
  * Enter a new file into the saved file information.
  */
-enter(fp, fname, count)
-	struct svfile *fp;
-	unsigned char *fname;
+void
+enter(struct svfile *fp, unsigned char *fname, int count)
 {
-	register unsigned char *cp, *cp2;
-	register struct svfile *f, *fl;
+	unsigned char *cp, *cp2;
+	struct svfile *f, *fl;
 	time_t curtime;
 
 	f = 0;
@@ -433,10 +441,10 @@ enter(fp, fname, count)
  * Do the qsort compare to sort the entries first by file name,
  * then by modify time.
  */
-qucmp(p1, p2)
-	struct svfile *p1, *p2;
+int
+qucmp(struct svfile *p1, struct svfile *p2)
 {
-	register int t;
+	int t;
 
 	if (t = strcmp(p1->sf_name, p2->sf_name))
 		return(t);
@@ -457,8 +465,8 @@ int	bestfd;			/* Keep best file open so it dont vanish */
  * (i.e. usually /tmp) and in usrpath(preserve).
  * Want to find the newest so we search on and on.
  */
-findtmp(dir)
-	unsigned char *dir;
+void
+findtmp(unsigned char *dir)
 {
 
 	/*
@@ -496,7 +504,7 @@ findtmp(dir)
 	/*
 	 * Extreme lossage...
 	 */
-	error(gettext(" File not found"), 0);
+	error((unsigned char *)gettext(" File not found"), 0);
 }
 
 /*
@@ -510,11 +518,11 @@ findtmp(dir)
  * name of the file we want to unlink is relative, rather than absolute
  * we won't be able to find it again.
  */
-searchdir(dirname)
-	unsigned char *dirname;
+void
+searchdir(unsigned char *dirname)
 {
 	struct dirent64 *direntry;
-	register DIR *dir;
+	DIR *dir;
 	unsigned char dbuf[BUFSIZE];
 	unsigned char *filname;
 	if ((dir = opendir((char *)dirname)) == NULL) 
@@ -560,8 +568,8 @@ searchdir(dirname)
  * if it's really an editor temporary and of this
  * user and the file specified.
  */
-yeah(name)
-	unsigned char *name;
+int
+yeah(unsigned char *name)
 {
 
 	tfile = open(name, 2);
@@ -599,9 +607,10 @@ nope:
  * This only seems to happen on very heavily loaded systems, and
  * not very often.
  */
-scrapbad()
+void
+scrapbad(void)
 {
-	register line *ip;
+	line *ip;
 	struct stat64 stbuf;
 	off_t size, maxt;
 	int bno, cnt, bad, was;
@@ -625,7 +634,7 @@ scrapbad()
 		cnt = read(tfile, (char *) bk, BUFSIZE);
 	if(xtflag)
 		if (run_crypt(0L, bk, CRSIZE, tperm) == -1)
-		    syserror();
+		    rsyserror();
 #ifdef DEBUG
 	fprintf(stderr,"UNENCRYPTED: BLK %d\n",bno);
 #endif
@@ -683,11 +692,12 @@ int	cntch, cntln, cntodd, cntnull;
 /*
  * Following routines stolen mercilessly from ex.
  */
-putfile()
+void
+rputfile(void)
 {
 	line *a1;
-	register unsigned char *fp, *lp;
-	register int nib;
+	unsigned char *fp, *lp;
+	int nib;
 
 	a1 = addr1;
 	clrstats();
@@ -726,13 +736,15 @@ putfile()
 	cntch += nib;
 }
 
-wrerror()
+void
+wrerror(void)
 {
 
-	syserror();
+	rsyserror();
 }
 
-clrstats()
+void
+clrstats(void)
 {
 
 	ninbuf = 0;
@@ -745,11 +757,11 @@ clrstats()
 #define	READ	0
 #define	WRITE	1
 
-getline(tl)
-	line tl;
+void
+getline(line tl)
 {
-	register unsigned char *bp, *lp;
-	register int nl;
+	unsigned char *bp, *lp;
+	int nl;
 
 	lp = linebuf;
 	bp = getblock(tl);
@@ -769,9 +781,9 @@ unsigned char *
 getblock(atl)
 	line atl;
 {
-	register int bno, off;
-        register unsigned char *p1, *p2;
-        register int n;
+	int bno, off;
+        unsigned char *p1, *p2;
+        int n;
 	
 	bno = (atl >> OFFBTS) & BLKMSK;
 #ifdef DEBUG
@@ -779,7 +791,7 @@ getblock(atl)
 #endif
 	off = (atl << SHFT) & LBTMSK;
 	if (bno >= NMBLKS)
-		error(gettext(" Tmp file too large"));
+		error((unsigned char *)gettext(" Tmp file too large"));
 	nleft = BUFSIZE - off;
 	if (bno == iblock) 
 		return (ibuff + off);
@@ -787,17 +799,15 @@ getblock(atl)
 	blkio(bno, ibuff, read);
 	if(xtflag)
 		if (run_crypt(0L, ibuff, CRSIZE, tperm) == -1)
-		    syserror();
+		    rsyserror();
 #ifdef DEBUG
 	fprintf(stderr,"UNENCRYPTED: BLK %d\n",bno);
 #endif
 	return (ibuff + off);
 }
 
-blkio(b, buf, iofcn)
-	short b;
-	unsigned char *buf;
-	int (*iofcn)();
+void
+blkio(short b, unsigned char *buf, int (*iofcn)())
 {
 
 	int rc;
@@ -805,11 +815,12 @@ blkio(b, buf, iofcn)
 	if ((rc =(*iofcn)(tfile, buf, BUFSIZE)) != BUFSIZE) {
 		(void)fprintf(stderr,gettext("Failed on BLK: %d with %d/%d\n"),b,rc,BUFSIZE); 
 		perror("");
-		syserror();
+		rsyserror();
 	}
 }
 
-syserror()
+void
+rsyserror(void)
 {
 	int save_err = errno;
 
@@ -819,7 +830,6 @@ syserror()
 	exit(1);
 }
 
-extern findiop();
 static int intrupt;
 
 unsigned char *
@@ -828,8 +838,8 @@ unsigned char	*prompt;
 {
 	struct termio ttyb;
 	unsigned short flags;
-	register unsigned char *p;
-	register int c;
+	unsigned char *p;
+	int c;
 	static unsigned char pbuf[9];
 	void	(*sig)(); 
 	static void catch();

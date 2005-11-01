@@ -61,14 +61,15 @@
 unsigned char	*vUA1, *vUA2;
 unsigned char	*vUD1, *vUD2;
 
-vUndo()
+void
+vUndo(void)
 {
 
 	/*
 	 * Avoid UU which clobbers ability to do u.
 	 */
 	if (vundkind == VNONE || vundkind == VCAPU || vUNDdot != dot) {
-		beep();
+		(void) beep();
 		return;
 	}
 	CP(vutmp, linebuf);
@@ -91,12 +92,13 @@ vUndo()
 	vfixcurs();
 }
 
+void
 vundo(show)
 bool show;	/* if true update the screen */
 {
-	register int cnt;
-	register line *addr;
-	register unsigned char *cp;
+	int cnt;
+	line *addr;
+	unsigned char *cp;
 	unsigned char temp[LBSIZE];
 	bool savenote;
 	int (*OO)();
@@ -112,7 +114,7 @@ bool show;	/* if true update the screen */
 		addr1 = undap1;
 		addr2 = undap2 - 1;
 		vsave();
-		YANKreg('1');
+		(void) YANKreg('1');
 		notecnt = 0;
 		/* fall into ... */
 
@@ -122,7 +124,7 @@ bool show;	/* if true update the screen */
 		addr = dot - vcline;
 		notecnt = 1;
 		if (undkind == UNDPUT && undap1 == undap2) {
-			beep();
+			(void) beep();
 			break;
 		}
 		/*
@@ -144,7 +146,7 @@ bool show;	/* if true update the screen */
 		cnt = dot - addr;
 		if (cnt < 0 || cnt > vcnt || state != VISUAL) {
 			if (show)
-				vjumpto(dot, NOSTR, '.');
+				vjumpto(dot, (unsigned char *)NOSTR, '.');
 			break;
 		}
 		if (!savenote)
@@ -213,7 +215,7 @@ bool show;	/* if true update the screen */
 		break;
 
 	case VNONE:
-		beep();
+		(void) beep();
 		break;
 	}
 }
@@ -224,6 +226,7 @@ bool show;	/* if true update the screen */
  * opposed to an ex command).  This has nothing to do with being
  * in open/visual mode as :s/foo/bar is not fromvis.
  */
+void
 vmacchng(fromvis)
 bool fromvis;
 {
@@ -231,7 +234,7 @@ bool fromvis;
 	unsigned char *savecursor;
 	unsigned char savelb[LBSIZE];
 	int nlines, more;
-	register line *a1, *a2;
+	line *a1, *a2;
 	unsigned char ch;	/* DEBUG */
 	int copyw(), copywR();
 
@@ -313,7 +316,8 @@ bool fromvis;
 /*
  * Initialize undo information before an append.
  */
-vnoapp()
+void
+vnoapp(void)
 {
 
 	vUD1 = vUD2 = cursor;
@@ -332,21 +336,22 @@ vnoapp()
 /*
  * Move is simple, except for moving onto new lines in hardcopy open mode.
  */
-vmove()
+int
+vmove(void)
 {
-	register int cnt;
+	int cnt;
 
 	if (wdot) {
 		if (wdot < one || wdot > dol) {
-			beep();
-			return;
+			(void) beep();
+			return (0);
 		}
 		cnt = wdot - dot;
 		wdot = NOLINE;
 		if (cnt)
 			killU();
 		vupdown(cnt, wcursor);
-		return;
+		return (0);
 	}
 
 	/*
@@ -367,9 +372,9 @@ vmove()
 	 * if we let it get more out of sync since column() won't work right.
 	 */
 	if (state == HARDOPEN) {
-		register unsigned char *cp;
+		unsigned char *cp;
 		if (rubble) {
-			register int c;
+			int c;
 			int oldhold = hold;
 
 			sethard();
@@ -377,11 +382,11 @@ vmove()
 			c = *cp;
 			*cp = 0;
 			hold |= HOLDDOL;
-			vreopen(WTOP, lineDOT(), vcline);
+			(void) vreopen(WTOP, lineDOT(), vcline);
 			hold = oldhold;
 			*cp = c;
 		} else if (wcursor > cursor) {
-			register int length;
+			int length;
 			char multic[MULTI_BYTE_MAX];
 			wchar_t wchar;
 			vfixcurs();
@@ -401,6 +406,7 @@ vmove()
 		}
 	}
 	vsetcurs(wcursor);
+	return (0);
 }
 
 /*
@@ -411,22 +417,22 @@ vmove()
  * by vchange (although vchange may pass it back if it degenerates
  * to a full line range delete.)
  */
-vdelete(c)
-	unsigned char c;
+int
+vdelete(unsigned char c)
 {
-	register unsigned char *cp;
-	register int i;
+	unsigned char *cp;
+	int i;
 
 	if (wdot) {
 		if (wcursor) {
-			vchange('d');
-			return;
+			(void) vchange('d');
+			return (0);
 		}
 		if ((i = xdw()) < 0)
-			return;
+			return (0);
 		if (state != VISUAL) {
 			vgoto(LINE(0), 0);
-			vputchar('@');
+			(void) vputchar('@');
 		}
 		wdot = dot;
 		vremote(i, delete, 0);
@@ -437,13 +443,13 @@ vdelete(c)
 		if (wdot > dol)
 			vcline--;
 		vrepaint(NOSTR);
-		return;
+		return (0);
 	}
 	if (wcursor < linebuf)
 		wcursor = linebuf;
 	if (cursor == wcursor) {
-		beep();
-		return;
+		(void) beep();
+		return (0);
 	}
 	i = vdcMID();
 	cp = cursor;
@@ -454,17 +460,18 @@ vdelete(c)
 	if (state == HARDOPEN) {
 		bleep(i, cp);
 		cursor = cp;
-		return;
+		return (0);
 	}
 	physdc(lcolumn(cursor), i);
 	DEPTH(vcline) = 0;
 	if(MB_CUR_MAX > 1)
 		rewrite = _ON;
-	vreopen(LINE(vcline), lineDOT(), vcline);
+	(void) vreopen(LINE(vcline), lineDOT(), vcline);
 	if(MB_CUR_MAX > 1)
 		rewrite = _OFF;
 	vsyncCL();
 	vsetcurs(cp);
+	return (0);
 }
 
 /*
@@ -475,11 +482,11 @@ vdelete(c)
  * Across lines with both wcursor and wdot given, we delete
  * and sync then append (but one operation for undo).
  */
-vchange(c)
-	unsigned char c;
+int
+vchange(unsigned char c)
 {
-	register unsigned char *cp;
-	register int i, ind, cnt;
+	unsigned char *cp;
+	int i, ind, cnt;
 	line *addr;
 
 	if (wdot) {
@@ -487,7 +494,7 @@ vchange(c)
 		 * Change/delete of lines or across line boundaries.
 		 */
 		if ((cnt = xdw()) < 0)
-			return;
+			return (0);
 		getDOT();
 		if (wcursor && cnt == 1) {
 			/*
@@ -495,8 +502,8 @@ vchange(c)
 			 */
 			wdot = 0;
 			if (c == 'd') {
-				vdelete(c);
-				return;
+				(void) vdelete(c);
+				return (0);
 			}
 			goto smallchange;
 		}
@@ -511,8 +518,8 @@ vchange(c)
 			getline(*wdot);
 			if (strlen(genbuf) + strlen(wcursor) > LBSIZE - 2) {
 				getDOT();
-				beep();
-				return;
+				(void) beep();
+				return (0);
 			}
 			strcat(genbuf, wcursor);
 			if (c == 'd' && *vpastwh(genbuf) == 0) {
@@ -527,13 +534,13 @@ vchange(c)
 				op = 0;
 				notpart(lastreg);
 				notpart('1');
-				vdelete(c);
-				return;
+				(void) vdelete(c);
+				return (0);
 			}
 			ind = -1;
 		} else if (c == 'd' && wcursor == 0) {
-			vdelete(c);
-			return;
+			(void) vdelete(c);
+			return (0);
 		} else
 			/*
 			 * We are just substituting text for whole lines,
@@ -620,12 +627,12 @@ vchange(c)
 				vcursat(cursor);
 			}
 			vappend('x', 1, ind);
-			return;
+			return (0);
 		}
 		if (*cursor == 0 && cursor > linebuf)
 			cursor = lastchr(linebuf, cursor);
 		vrepaint(cursor);
-		return;
+		return (0);
 	}
 
 smallchange:
@@ -636,8 +643,8 @@ smallchange:
 	if (wcursor < linebuf)
 		wcursor = linebuf;
 	if (cursor == wcursor) {
-		beep();
-		return;
+		(void) beep();
+		return (0);
 	}
 	i = vdcMID();
 	cp = cursor;
@@ -679,6 +686,7 @@ smallchange:
 	}
 	prepapp();
 	vappend('c', 1, 0);
+	return (0);
 }
 
 /*
@@ -691,11 +699,10 @@ smallchange:
  * Actually counts are obsoleted, since if your terminal is slow
  * you are better off with slowopen.
  */
-voOpen(c, cnt)
-	int c;	/* mjm: char --> int */
-	register int cnt;
+void
+voOpen(int c, int cnt)
 {
-	register int ind = 0, i;
+	int ind = 0, i;
 	short oldhold = hold;
 
 	if (value(vi_SLOWOPEN) || value(vi_REDRAW) && insert_line && delete_line)
@@ -755,13 +762,14 @@ voOpen(c, cnt)
  */
 unsigned char	vshnam[2] = { 'x', 0 };
 
-vshftop()
+int
+vshftop(void)
 {
-	register line *addr;
-	register int cnt;
+	line *addr;
+	int cnt;
 
 	if ((cnt = xdw()) < 0)
-		return;
+		return (0);
 	addr = dot;
 	vremote(cnt, vshift, 0);
 	vshnam[0] = op;
@@ -771,6 +779,7 @@ vshftop()
 	if (state == HARDOPEN)
 		vcnt = 0;
 	vrepaint(NOSTR);
+	return (0);
 }
 
 /*
@@ -778,19 +787,20 @@ vshftop()
  *
  * Filter portions of the buffer through unix commands.
  */
-vfilter()
+int
+vfilter(void)
 {
-	register line *addr;
-	register int cnt;
+	line *addr;
+	int cnt;
 	unsigned char *oglobp;
 	short d;
 
 	if ((cnt = xdw()) < 0)
-		return;
+		return (0);
 	if (vglobp)
 		vglobp = (unsigned char *)uxb;
 	if (readecho('!'))
-		return;
+		return (0);
 	oglobp = globp; globp = genbuf + 1;
 	d = peekc; ungetchar(0);
 	CATCH
@@ -801,7 +811,7 @@ vfilter()
 		ungetchar(d);
 		vrepaint(cursor);
 		globp = oglobp;
-		return;
+		return (0);
 	ENDCATCH
 	ungetchar(d); globp = oglobp;
 	addr = dot;
@@ -829,6 +839,7 @@ vfilter()
 		vcline--;
 	}
 	vrepaint(NOSTR);
+	return (0);
 }
 
 /*
@@ -836,22 +847,23 @@ vfilter()
  * that wdot is reasonable.  Its name comes from
  *	xchange dotand wdot
  */
-xdw()
+int
+xdw(void)
 {
-	register unsigned char *cp;
-	register int cnt;
+	unsigned char *cp;
+	int cnt;
 /*
 	register int notp = 0;
  */
 
 	if (wdot == NOLINE || wdot < one || wdot > dol) {
-		beep();
+		(void) beep();
 		return (-1);
 	}
 	vsave();
 	setLAST();
 	if (dot > wdot || (dot == wdot && wcursor != 0 && cursor > wcursor)) {
-		register line *addr;
+		line *addr;
 
 		vcline -= dot - wdot;
 		addr = dot; dot = wdot; wdot = addr;
@@ -907,25 +919,27 @@ xdw()
 /*
  * Routine for vremote to call to implement shifts.
  */
-vshift()
+int
+vshift(void)
 {
 
 	shift(op, 1);
+	return (0);
 }
 
 /*
  * Replace a single character with the next input character.
  * A funny kind of insert.
  */
-vrep(cnt)
-	register int cnt;
+void
+vrep(int cnt)
 {
-	register int i, c;
-	register unsigned char *endcurs;
+	int i, c;
+	unsigned char *endcurs;
 	endcurs = cursor;
 	for(i = 1; i <= cnt; i++) {
 		if(!*endcurs) {
-			beep();
+			(void) beep();
 			return;
 		}
 		endcurs = nextchr(endcurs);
@@ -971,13 +985,14 @@ vrep(cnt)
  * Yanking to string registers occurs for free (essentially)
  * in the routine xdw().
  */
-vyankit()
+int
+vyankit(void)
 {
-	register int cnt;
+	int cnt;
 
 	if (wdot) {
 		if ((cnt = xdw()) < 0)
-			return;
+			return (0);
 		vremote(cnt, yank, 0);
 		setpk();
 		notenam = (unsigned char *)"yank";
@@ -988,9 +1003,11 @@ vyankit()
 		if (notecnt <= vcnt - vcline && notecnt < value(vi_REPORT))
 			notecnt = 0;
 		vrepaint(cursor);
-		return;
+		return (0);
 	}
 	takeout(DEL);
+	return (0);
+
 }
 
 /*
@@ -1001,7 +1018,8 @@ vyankit()
  * the first and last lines.  The compromise
  * is for put to be more clever.
  */
-setpk()
+void
+setpk(void)
 {
 
 	if (wcursor) {

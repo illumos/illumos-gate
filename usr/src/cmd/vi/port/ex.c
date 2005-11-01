@@ -131,8 +131,10 @@ static void usage(unsigned char *);
 
 static int validate_exrc(unsigned char *);
 
+void init(void);
+
 int
-main(int ac, unsigned char *av[])
+main(int ac, char *av[])
 {
 	extern 	char 	*optarg;
 	extern 	int	optind;
@@ -164,7 +166,7 @@ main(int ac, unsigned char *av[])
 	 * Immediately grab the tty modes so that we won't
 	 * get messed up if an interrupt comes in quickly.
 	 */
-	gTTY(2);
+	(void) gTTY(2);
 	normf = tty;
 	ppid = getpid();
 	/* Note - this will core dump if you didn't -DSINGLE in CFLAGS */
@@ -177,9 +179,9 @@ main(int ac, unsigned char *av[])
 	if ((cmdnam = (unsigned char *)strrchr(av[0], '/')) != 0)
 		cmdnam++;
 	else
-		cmdnam = av[0];
+		cmdnam = (unsigned char *)av[0];
 
-	if (EQ(cmdnam, "vi"))
+	if (EQ((char *)cmdnam, "vi"))
 		ivis = 1;
 	else if (EQ(cmdnam, "view")) {
 		ivis = 1;
@@ -282,7 +284,7 @@ main(int ac, unsigned char *av[])
 				trace = fopen((char *)tracef, "w");
 #define	tracbuf	NULL
 				if (trace == NULL)
-					printf("Trace create error\n");
+					viprintf("Trace create error\n");
 				else
 					setbuf(trace, (char *)tracbuf);
 				break;
@@ -370,7 +372,7 @@ main(int ac, unsigned char *av[])
 			}
 		if (av[optind] && av[optind][0] == '+' &&
 		    av[optind-1] && strcmp(av[optind-1], "--")) {
-				firstpat = &av[optind][1];
+				firstpat = (unsigned char *)&av[optind][1];
 				optind++;
 				continue;
 		} else if (av[optind] && av[optind][0] == '-' &&
@@ -445,7 +447,7 @@ main(int ac, unsigned char *av[])
 	/*
 	 * Perform locale-specific initialization
 	 */
-	(void) localize();
+	localize();
 #endif /* PRESUNEUC */
 
 	/*
@@ -485,9 +487,9 @@ main(int ac, unsigned char *av[])
 	/*
 	 * Initialize the argument list.
 	 */
-	argv0 = av;
+	argv0 = (unsigned char **)av;
 	argc0 = ac;
-	args0 = av[0];
+	args0 = (unsigned char *)av[0];
 	erewind();
 
 	/*
@@ -505,7 +507,7 @@ main(int ac, unsigned char *av[])
 			}
 		}
 		if (fast)
-			setterm("dumb");
+			setterm((unsigned char *)"dumb");
 		else {
 			gettmode();
 			cp = (unsigned char *)getenv("TERM");
@@ -524,7 +526,7 @@ main(int ac, unsigned char *av[])
 	dot = zero = truedol = unddol = dol = fendcore;
 	one = zero+1;
 	{
-	register int i;
+	int i;
 
 	for (i = 0; i <= 'z'-'a'+1; i++)
 		names[i] = 1;
@@ -679,7 +681,7 @@ main(int ac, unsigned char *av[])
 	setexit();
 	commands(0, 0);
 	cleanup(1);
-	exit(errcnt);
+	return (errcnt);
 }
 
 /*
@@ -687,9 +689,10 @@ main(int ac, unsigned char *av[])
  * Main thing here is to get a new buffer (in fileinit),
  * rest is peripheral state resetting.
  */
-init()
+void
+init(void)
 {
-	register int i;
+	int i;
 	void (*pstat)();
 	fileinit();
 	dot = zero = truedol = unddol = dol = fendcore;
@@ -721,9 +724,9 @@ init()
  */
 unsigned char *
 tailpath(p)
-register unsigned char *p;
+unsigned char *p;
 {
-	register unsigned char *r;
+	unsigned char *r;
 
 	for (r = p; *p; p++)
 		if (*p == '/')

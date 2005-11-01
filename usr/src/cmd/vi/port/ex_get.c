@@ -19,18 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-/*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_tty.h"
@@ -43,14 +43,16 @@
 static	bool junkbs;
 short	lastc = '\n';
 
-ignchar()
+void
+ignchar(void)
 {
 	(void)getchar();
 }
 
-getchar()
+int
+getchar(void)
 {
-	register int c;
+	int c;
 
 	do
 		c = getcd();
@@ -58,9 +60,10 @@ getchar()
 	return (c);
 }
 
-getcd()
+int
+getcd(void)
 {
-	register int c;
+	int c;
 	extern short slevel;
 
 again:
@@ -77,7 +80,8 @@ again:
 	return (c);
 }
 
-peekchar()
+int
+peekchar(void)
 {
 
 	if (peekc == 0)
@@ -85,7 +89,8 @@ peekchar()
 	return (peekc);
 }
 
-peekcd()
+int
+peekcd(void)
 {
 	if (peekc == 0)
 		peekc = getcd();
@@ -93,9 +98,10 @@ peekcd()
 }
 
 int verbose;
-getach()
+int
+getach(void)
 {
-	register int c, i, prev;
+	int c, i, prev;
 	static unsigned char inputline[128];
 
 	c = peekc;
@@ -149,12 +155,12 @@ top:
  */
 static	short	lastin;
 
-gettty()
+int
+gettty(void)
 {
-	register int c = 0;
-	register unsigned char *cp = genbuf;
+	int c = 0;
+	unsigned char *cp = genbuf;
 	unsigned char hadup = 0;
-	int numbline();
 	extern int (*Pline)();
 	int offset = Pline == numbline ? 8 : 0;
 	int ch;
@@ -162,7 +168,7 @@ gettty()
 	if (intty && !inglobal) {
 		if (offset) {
 			holdcm = 1;
-			printf("  %4d  ", lineDOT() + 1);
+			viprintf("  %4d  ", lineDOT() + 1);
 			flush();
 			holdcm = 0;
 		}
@@ -251,11 +257,10 @@ gettty()
  * This should really be done differently so as to use the whitecnt routine
  * and also to hack indenting for LISP.
  */
-smunch(col, ocp)
-	register int col;
-	unsigned char *ocp;
+int
+smunch(int col, unsigned char *ocp)
 {
-	register unsigned char *cp;
+	unsigned char *cp;
 
 	cp = ocp;
 	for (;;)
@@ -278,8 +283,8 @@ smunch(col, ocp)
 
 unsigned char	*cntrlhm =	(unsigned char *)"^H discarded\n";
 
-checkjunk(c)
-	unsigned char c;
+void
+checkjunk(unsigned char c)
 {
 
 	if (junkbs == 0 && c == '\b') {
@@ -288,9 +293,8 @@ checkjunk(c)
 	}
 }
 
-line *
-setin(addr)
-	line *addr;
+void
+setin(line *addr)
 {
 
 	if (addr == zero)

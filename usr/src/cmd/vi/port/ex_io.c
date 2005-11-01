@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -38,6 +38,7 @@
 #include "ex_tty.h"
 #include "ex_vis.h"
 #include <stdlib.h>
+#include <unistd.h>
 
 /*
  * File input/output, source, preserve and recover
@@ -62,18 +63,18 @@ long	cntnull;		/* Count of nulls " */
 long	cntodd;			/* Count of non-ascii characters " */
 
 static void chkmdln();
-extern char	getchar();
+extern int	getchar();
 
 /*
  * Parse file name for command encoded by comm.
  * If comm is E then command is doomed and we are
  * parsing just so user won't have to retype the name.
  */
-filename(comm)
-	int comm;
+void
+filename(int comm)
 {
-	register int c = comm, d;
-	register int i;
+	int c = comm, d;
+	int i;
 
 	d = getchar();
 	if (endcmd(d)) {
@@ -127,15 +128,15 @@ gettext("No current filename"));
 		lprintf("\"%s\"", file);
 		if (comm == 'f') {
 			if (value(vi_READONLY))
-				printf(gettext(" [Read only]"));
+				viprintf(gettext(" [Read only]"));
 			if (!edited)
-				printf(gettext(" [Not edited]"));
+				viprintf(gettext(" [Not edited]"));
 			if (tchng)
-				printf(gettext(" [Modified]"));
+				viprintf(gettext(" [Modified]"));
 		}
 		flush();
 	} else
-		printf(gettext("No file "));
+		viprintf(gettext("No file "));
 	if (comm == 'f') {
 		if (!(i = lineDOL()))
 			i++;
@@ -143,10 +144,10 @@ gettext("No current filename"));
 		 * TRANSLATION_NOTE
 		 *	Reference order of arguments must not
 		 *	be changed using '%digit$', since vi's
-		 *	printf() does not support it.
+		 *	viprintf() does not support it.
 		 */
-		printf(gettext(" line %d of %d --%ld%%--"), lineDOT(), lineDOL(),
-		    (long) 100 * lineDOT() / i);
+		viprintf(gettext(" line %d of %d --%ld%%--"), lineDOT(),
+		    lineDOL(), (long)(100 * lineDOT() / i));
 	}
 }
 
@@ -154,10 +155,11 @@ gettext("No current filename"));
  * Get the argument words for a command into genbuf
  * expanding # and %.
  */
-getargs()
+int
+getargs(void)
 {
-	register int c;
-	register unsigned char *cp, *fp;
+	int c;
+	unsigned char *cp, *fp;
 	static unsigned char fpatbuf[32];	/* hence limit on :next +/pat */
 	char	multic[MB_LEN_MAX + 1];
 	int	len;
@@ -255,19 +257,19 @@ filexp:
  * Glob the argument words in genbuf, or if no globbing
  * is implied, just split them up directly.
  */
-glob(gp)
-	struct glob *gp;
+void
+glob(struct glob *gp)
 {
 	int pvec[2];
-	register unsigned char **argv = gp->argv;
-	register unsigned char *cp = gp->argspac;
-	register int c;
+	unsigned char **argv = gp->argv;
+	unsigned char *cp = gp->argspac;
+	int c;
 	unsigned char ch;
 	int nleft = NCARGS;
 
 	gp->argc0 = 0;
 	if (gscan() == 0) {
-		register unsigned char *v = genbuf + 5;		/* strlen("echo ") */
+		unsigned char *v = genbuf + 5;		/* strlen("echo ") */
 
 		for (;;) {
 			while (isspace(*v))
@@ -299,7 +301,7 @@ glob(gp)
 		close(pvec[0]);
 		close(2);	/* so errors don't mess up the screen */
 		open("/dev/null", 1);
-		execlp(svalue(vi_SHELL), "sh", "-c", genbuf, (char *)0);
+		execlp((char *)svalue(vi_SHELL), "sh", "-c", genbuf, (char *)0);
 		oerrno = errno; close(1); dup(2); errno = oerrno;
 		filioerr(svalue(vi_SHELL));
 	}
@@ -336,9 +338,10 @@ glob(gp)
  * Scan genbuf for shell metacharacters.
  * Set is union of v7 shell and csh metas.
  */
-gscan()
+int
+gscan(void)
 {
-	register unsigned char *cp;
+	unsigned char *cp;
 	int	len;
 
 	for (cp = genbuf; *cp; cp += len) {
@@ -354,9 +357,10 @@ gscan()
  * Parse one filename into file.
  */
 struct glob G;
-getone()
+void
+getone(void)
 {
-	register unsigned char *str;
+	unsigned char *str;
 
 	if (getargs() == 0)
 		error(gettext("Missing filename"));
@@ -377,10 +381,10 @@ samef:
  * Read a file from the world.
  * C is command, 'e' if this really an edit (or a recover).
  */
-rop(c)
-	int c;
+void
+rop(int c)
 {
-	register int i;
+	int i;
 	struct stat64 stbuf;
 	short magic;
 	static int ovro;	/* old value(vi_READONLY) */
@@ -396,7 +400,7 @@ rop(c)
 			 * this is ugly, and it messes up the + option.
 			 */
 			if (!seenprompt) {
-				printf(gettext(" [New file]"));
+				viprintf(gettext(" [New file]"));
 				noonl();
 				return;
 			}
@@ -431,14 +435,14 @@ rop(c)
 			value(vi_READONLY) = ovro;
 			denied = 0;
 		}
-		if ((FMODE(stbuf) & 0222) == 0 || access(file, 2) < 0) {
+		if ((FMODE(stbuf) & 0222) == 0 || access((char *)file, 2) < 0) {
 			ovro = value(vi_READONLY);
 			denied = 1;
 			value(vi_READONLY) = 1;
 		}
 	}
 	if (hush == 0 && value(vi_READONLY)) {
-		printf(gettext(" [Read only]"));
+		viprintf(gettext(" [Read only]"));
 		flush();
 	}
 	if (c == 'r')
@@ -462,7 +466,8 @@ rop(c)
 	rop3(c);
 }
 
-rop2()
+void
+rop2(void)
 {
 	line *first, *last, *a;
 
@@ -480,15 +485,15 @@ rop2()
 		}
 }
 
-rop3(c)
-	int c;
+void
+rop3(int c)
 {
 
 	if (iostats() == 0 && c == 'e')
 		edited++;
 	if (c == 'e') {
 		if (wasalt || firstpat) {
-			register line *addr = zero + oldadot;
+			line *addr = zero + oldadot;
 
 			if (addr > dol)
 				addr = dol;
@@ -528,9 +533,8 @@ other:
 /*
  * Are these two really the same inode?
  */
-samei(sp, cp)
-	struct stat64 *sp;
-	unsigned char *cp;
+int
+samei(struct stat64 *sp, unsigned char *cp)
 {
 	struct stat64 stb;
 
@@ -547,10 +551,11 @@ samei(sp, cp)
 /*
  * Write a file.
  */
+void
 wop(dofname)
 bool dofname;	/* if 1 call filename, else use savedfile */
 {
-	register int c, exclam, nonexist;
+	int c, exclam, nonexist;
 	line *saddr1, *saddr2;
 	struct stat64 stbuf;
 	char *messagep;
@@ -592,17 +597,19 @@ gettext("No current filename"));
 			if (nonexist)
 				break;
 			if (ISCHR(stbuf)) {
-				if (samei(&stbuf, "/dev/null"))
+				if (samei(&stbuf, (unsigned char *)"/dev/null"))
 					break;
-				if (samei(&stbuf, "/dev/tty"))
+				if (samei(&stbuf, (unsigned char *)"/dev/tty"))
 					break;
 			}
 			io = open(file, 1);
 			if (io < 0)
 				syserror(0);
 			if (!isatty(io))
-				serror(value(vi_TERSE) ? gettext(" File exists") :
-gettext(" File exists - use \"w! %s\" to overwrite"), file);
+				serror(value(vi_TERSE) ?
+				    (unsigned char *)gettext(" File exists") :
+(unsigned char *)gettext(" File exists - use \"w! %s\" to overwrite"),
+				    file);
 			close(io);
 			break;
 
@@ -626,9 +633,9 @@ cre:
 		writing = 1;
 		if (hush == 0)
 			if (nonexist)
-				printf(gettext(" [New file]"));
+				viprintf(gettext(" [New file]"));
 			else if (value(vi_WRITEANY) && edfile() != EDF)
-				printf(gettext(" [Existing file]"));
+				viprintf(gettext(" [Existing file]"));
 		break;
 
 	case 2:
@@ -645,14 +652,16 @@ cre:
 		setty(normf);
 	putfile(0);
 	if (fsync(io) < 0) {
-	  /* For NFS files write in putfile doesn't return error, but fsync does.
-	     So, catch it here. */
-	  messagep = (char *)gettext
-	    ("\r\nYour file has been preserved\r\n");
-	  preserve();
-	  write(1, messagep, strlen(messagep));
+		/*
+		 * For NFS files write in putfile doesn't return error, but
+		 * fsync does.  So, catch it here.
+		 */
+		messagep = (char *)gettext(
+		    "\r\nYour file has been preserved\r\n");
+		(void) preserve();
+		write(1, messagep, strlen(messagep));
 
-	  wrerror();
+		wrerror();
 	}
 	(void)iostats();
 	if (c != 2 && addr1 == one && addr2 == dol) {
@@ -673,7 +682,8 @@ cre:
  * if this is a partial buffer, and distinguish
  * all cases.
  */
-edfile()
+int
+edfile(void)
 {
 
 	if (!edited || !eq(file, savedfile))
@@ -686,11 +696,12 @@ edfile()
  */
 unsigned char *nextip;
 
-getfile()
+int
+getfile(void)
 {
-	register short c;
-	register unsigned char *lp; 
-	register unsigned char *fp;
+	short c;
+	unsigned char *lp;
+	unsigned char *fp;
 
 	lp = linebuf;
 	fp = nextip;
@@ -700,7 +711,8 @@ getfile()
 			if (ninbuf < 0) {
 				if (lp != linebuf) {
 					lp++;
-					printf(gettext(" [Incomplete last line]"));
+					viprintf(
+					    gettext(" [Incomplete last line]"));
 					break;
 				}
 				return (EOF);
@@ -737,13 +749,14 @@ getfile()
 /*
  * Write a range onto the io stream.
  */
+void
 putfile(int isfilter)
 {
 	line *a1;
-	register unsigned char *lp;
-	register unsigned char *fp;
-	register int nib;
-	register bool ochng = chng;
+	unsigned char *lp;
+	unsigned char *fp;
+	int nib;
+	bool ochng = chng;
 	char *messagep;
 
 	chng = 1;		/* set to force file recovery procedures in */
@@ -763,14 +776,14 @@ putfile(int isfilter)
                                         if (run_crypt(cntch, genbuf, nib, perm) == -1)
 					  wrerror();
 				if (write(io, genbuf, nib) != nib) {
-				  messagep = (char *)gettext
-				    ("\r\nYour file has been preserved\r\n");
-				  preserve();
-				  write(1, messagep, strlen(messagep));
+				    messagep = (char *)gettext(
+					"\r\nYour file has been preserved\r\n");
+				    (void) preserve();
+				    write(1, messagep, strlen(messagep));
 
-					if(!isfilter)
-						wrerror();
-					return;
+				    if (!isfilter)
+					wrerror();
+				    return;
 				}
 				cntch += nib;
 				nib = BUFSIZE - 1;
@@ -791,9 +804,10 @@ putfile(int isfilter)
 		return;
 	}
 	if (write(io, genbuf, nib) != nib) {
-		  messagep = (char *)gettext("\r\nYour file has been preserved\r\n");
-		  preserve();
-		  write(1, messagep, strlen(messagep));
+		messagep = (char *)gettext(
+		    "\r\nYour file has been preserved\r\n");
+		(void) preserve();
+		write(1, messagep, strlen(messagep));
 
 		if(!isfilter)
 			wrerror();
@@ -808,7 +822,8 @@ putfile(int isfilter)
  * the edited file then we consider it to have changed since it is
  * now likely scrambled.
  */
-wrerror()
+void
+wrerror(void)
 {
 
 	if (eq(file, savedfile) && edited)
@@ -823,12 +838,13 @@ wrerror()
 short slevel;
 short ttyindes;
 
+void
 source(fil, okfail)
 	unsigned char *fil;
 	bool okfail;
 {
 	jmp_buf osetexit;
-	register int saveinp, ointty, oerrno;
+	int saveinp, ointty, oerrno;
 	unsigned char *saveglobp;
 	short savepeekc;
 
@@ -883,7 +899,8 @@ source(fil, okfail)
 /*
  * Clear io statistics before a read or write.
  */
-clrstats()
+void
+clrstats(void)
 {
 
 	ninbuf = 0;
@@ -896,40 +913,41 @@ clrstats()
 /*
  * Io is finished, close the unit and print statistics.
  */
-iostats()
+int
+iostats(void)
 {
 
 	close(io);
 	io = -1;
 	if (hush == 0) {
 		if (value(vi_TERSE))
-			printf(" %d/%D", cntln, cntch);
+			viprintf(" %d/%D", cntln, cntch);
 		else if (cntln == 1 && cntch == 1) {
-			printf(gettext(" 1 line, 1 character"));
+			viprintf(gettext(" 1 line, 1 character"));
 		} else if (cntln == 1 && cntch != 1) {
-			printf(gettext(" 1 line, %D characters"), cntch);
+			viprintf(gettext(" 1 line, %D characters"), cntch);
 		} else if (cntln != 1 && cntch != 1) {
 			/*
 			 * TRANSLATION_NOTE
 			 *	Reference order of arguments must not
 			 *	be changed using '%digit$', since vi's
-			 *	printf() does not support it.
+			 *	viprintf() does not support it.
 			 */
-			printf(gettext(" %d lines, %D characters"), cntln,
+			viprintf(gettext(" %d lines, %D characters"), cntln,
 			    cntch);
 		} else {
 			/* ridiculous */
-			printf(gettext(" %d lines, 1 character"), cntln);
+			viprintf(gettext(" %d lines, 1 character"), cntln);
 		}
 		if (cntnull || cntodd) {
-			printf(" (");
+			viprintf(" (");
 			if (cntnull) {
-				printf(gettext("%D null"), cntnull);
+				viprintf(gettext("%D null"), cntnull);
 				if (cntodd)
-					printf(", ");
+					viprintf(", ");
 			}
 			if (cntodd)
-				printf(gettext("%D non-ASCII"), cntodd);
+				viprintf(gettext("%D non-ASCII"), cntodd);
 			putchar(')');
 		}
 		noonl();

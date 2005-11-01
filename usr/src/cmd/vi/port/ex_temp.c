@@ -36,6 +36,7 @@
 #include "ex_temp.h"
 #include "ex_vis.h"
 #include "ex_tty.h"
+#include <unistd.h>
 
 /*
  * Editor temporary file routines.
@@ -52,13 +53,13 @@ short	tfile = -1;
 static short	rfile = -1;
 
 extern int junk();
-extern int checkjunk();
 
-fileinit()
+void
+fileinit(void)
 {
-	register unsigned char *p;
-	register pid_t j;
-	register int i;
+	unsigned char *p;
+	pid_t j;
+	int i;
 	struct stat64 stbuf;
 
 	if (tline == INCRMT * (HBLKS+2))
@@ -98,7 +99,7 @@ dumbness:
 		goto dumbness;
 #ifdef VMUNIX
 	{
-		extern stilinc;		/* see below */
+		extern int stilinc;		/* see below */
 		stilinc = 0;
 	}
 #endif
@@ -106,8 +107,8 @@ dumbness:
 /* 	brk((unsigned char *)fendcore); */
 }
 
-cleanup(all)
-	bool all;
+void
+cleanup(bool all)
 {
 	pid_t pgrp;
 	if (all) {
@@ -115,7 +116,7 @@ cleanup(all)
 			crypt_close(perm);
 		if (xtflag)
 			crypt_close(tperm);
-		putpad(exit_ca_mode);
+		putpad((unsigned char *)exit_ca_mode);
 		flush();
 		if (ioctl(2, TIOCGPGRP, &pgrp) == 0) {
 			if (pgrp == getpgid(0)) {
@@ -144,10 +145,10 @@ cleanup(all)
 		}
 	}
 	if (havetmp)
-		unlink(tfname);
+		unlink((char *)tfname);
 	havetmp = 0;
 	if (all && rfile >= 0) {
-		unlink(rfname);
+		unlink((char *)rfname);
 		close(rfile);
 		rfile = -1;
 	}
@@ -155,11 +156,11 @@ cleanup(all)
 		exit(errcnt);
 }
 
-getline(tl)
-	line tl;
+void
+getline(line tl)
 {
-	register unsigned char *bp, *lp;
-	register int nl;
+	unsigned char *bp, *lp;
+	int nl;
 
 	lp = linebuf;
 	bp = getblock(tl, READ);
@@ -194,7 +195,7 @@ putline(void)
 			linebp = lp;
 			break;
 		} else if (junk(*bp++)) {
-			(void) checkjunk(tmpbp);
+			checkjunk(tmpbp);
 			*--bp;
 		}
 		if (--nl == 0) {
@@ -215,9 +216,9 @@ getblock(atl, iof)
 	line atl;
 	int iof;
 {
-	register int bno, off;
-	register unsigned char *p1, *p2;
-	register int n;
+	int bno, off;
+	unsigned char *p1, *p2;
+	int n;
 	line *tmpptr;
 
 	bno = (atl >> OFFBTS) & BLKMSK;
@@ -310,10 +311,8 @@ unsigned char	incorb[INCORB+1][BUFSIZE];
 int	stilinc;	/* up to here not written yet */
 #endif
 
-blkio(b, buf, iofcn)
-	short b;
-	unsigned char *buf;
-	int (*iofcn)();
+void
+blkio(short b, unsigned char *buf, int (*iofcn)())
 {
 
 #ifdef VMUNIX
@@ -337,14 +336,16 @@ blkio(b, buf, iofcn)
 }
 
 #ifdef VMUNIX
-tlaste()
+void
+tlaste(void)
 {
 
 	if (stilinc)
 		dirtcnt = 0;
 }
 
-tflush()
+void
+tflush(void)
 {
 	int i = stilinc;
 
@@ -359,13 +360,14 @@ tflush()
  * Synchronize the state of the temporary file in case
  * a crash occurs.
  */
-synctmp()
+void
+synctmp(void)
 {
-	register int cnt;
-	register line *a;
-	register short *bp;
-	register unsigned char *p1, *p2;
-	register int n;
+	int cnt;
+	line *a;
+	short *bp;
+	unsigned char *p1, *p2;
+	int n;
 
 #ifdef VMUNIX
 	if (stilinc)
@@ -439,7 +441,8 @@ oops:
 		goto oops;
 }
 
-TSYNC()
+void
+TSYNC(void)
 {
 
 	if (dirtcnt > MAXDIRT) {
@@ -490,9 +493,8 @@ short	rblock;
 short	rnext;
 unsigned char	*rbufcp;
 
-regio(b, iofcn)
-	short b;
-	int (*iofcn)();
+void
+regio(short b, int (*iofcn)())
 {
 
 	if (rfile == -1) {
@@ -507,9 +509,10 @@ regio(b, iofcn)
 	rblock = b;
 }
 
-REGblk()
+int
+REGblk(void)
 {
-	register int i, j, m;
+	int i, j, m;
 
 	for (i = 0; i < sizeof (rused) / sizeof (rused[0]); i++) {
 		m = (rused[i] ^ 0177777) & 0177777;
@@ -521,18 +524,19 @@ REGblk()
 				j++, m >>= 1;
 			rused[i] |= (1 << j);
 #ifdef RDEBUG
-			printf("allocating block %d\n", i * 16 + j);
+			viprintf("allocating block %d\n", i * 16 + j);
 #endif
 			return (i * 16 + j);
 		}
 	}
 	error(gettext("Out of register space (ugh)"));
 	/*NOTREACHED*/
+	return (0);
 }
 
 struct	strreg *
 mapreg(c)
-	register int c;
+	int c;
 {
 
 	if (isupper(c))
@@ -542,10 +546,10 @@ mapreg(c)
 
 int	shread();
 
-KILLreg(c)
-	register int c;
+void
+KILLreg(int c)
 {
-	register struct strreg *sp;
+	struct strreg *sp;
 
 	rbuf = &KILLrbuf;
 	sp = mapreg(c);
@@ -554,7 +558,7 @@ KILLreg(c)
 	sp->rg_flags = sp->rg_nleft = 0;
 	while (rblock != 0) {
 #ifdef RDEBUG
-		printf("freeing block %d\n", rblock);
+		viprintf("freeing block %d\n", rblock);
 #endif
 		rused[rblock / 16] &= ~(1 << (rblock % 16));
 		regio(rblock, shread);
@@ -563,7 +567,8 @@ KILLreg(c)
 }
 
 /*VARARGS*/
-shread()
+int
+shread(void)
 {
 	struct front { short a; short b; };
 
@@ -575,12 +580,12 @@ shread()
 
 int	getREG();
 
-putreg(c)
-	unsigned char c;
+int
+putreg(unsigned char c)
 {
-	register line *odot = dot;
-	register line *odol = dol;
-	register int cnt;
+	line *odot = dot;
+	line *odol = dol;
+	int cnt;
 
 	deletenone();
 	appendnone();
@@ -614,27 +619,29 @@ putreg(c)
 	}
 	killcnt(cnt);
 	notecnt = cnt;
+	return (0);
 }
 
-partreg(c)
-	unsigned char c;
+short
+partreg(unsigned char c)
 {
 
 	return (mapreg(c)->rg_flags);
 }
 
-notpart(c)
-	register int c;
+void
+notpart(int c)
 {
 
 	if (c)
 		mapreg(c)->rg_flags = 0;
 }
 
-getREG()
+int
+getREG(void)
 {
-	register unsigned char *lp = linebuf;
-	register int c;
+	unsigned char *lp = linebuf;
+	int c;
 
 	for (;;) {
 		if (rnleft == 0) {
@@ -657,11 +664,11 @@ getREG()
 	}
 }
 
-YANKreg(c)
-	register int c;
+int
+YANKreg(int c)
 {
-	register line *addr;
-	register struct strreg *sp;
+	line *addr;
+	struct strreg *sp;
 	unsigned char savelb[LBSIZE];
 
 	if (isdigit(c))
@@ -693,22 +700,25 @@ YANKreg(c)
 	rbflush();
 	killed();
 	CP(linebuf, savelb);
+	return (0);
 }
 
-kshift()
+void
+kshift(void)
 {
-	register int i;
+	int i;
 
 	KILLreg('9');
 	for (i = '8'; i >= '0'; i--)
 		copy(mapreg(i+1), mapreg(i), sizeof (struct strreg));
 }
 
-YANKline()
+void
+YANKline(void)
 {
-	register unsigned char *lp = linebuf;
-	register struct rbuf *rp = rbuf;
-	register int c;
+	unsigned char *lp = linebuf;
+	struct rbuf *rp = rbuf;
+	int c;
 
 	do {
 		c = *lp++;
@@ -730,9 +740,10 @@ YANKline()
 		*rbufcp = 0;
 }
 
-rbflush()
+void
+rbflush(void)
 {
-	register struct strreg *sp = strp;
+	struct strreg *sp = strp;
 
 	if (rblock == 0)
 		return;
@@ -744,12 +755,13 @@ rbflush()
 }
 
 /* Register c to char buffer buf of size buflen */
+void
 regbuf(c, buf, buflen)
 unsigned char c;
 unsigned char *buf;
 int buflen;
 {
-	register unsigned char *p, *lp;
+	unsigned char *p, *lp;
 
 	rbuf = &regrbuf;
 	rnleft = 0;
@@ -785,18 +797,18 @@ shownam()
 {
 	int k;
 
-	printf("\nRegister   Contents\n");
-	printf("========   ========\n");
+	viprintf("\nRegister   Contents\n");
+	viprintf("========   ========\n");
 	for (k = 'a'; k <= 'z'; k++) {
 		rbuf = &putrbuf;
 		rnleft = 0;
 		rblock = 0;
 		rnext = mapreg(k)->rg_first;
-		printf(" %c:", k);
+		viprintf(" %c:", k);
 		if (rnext == 0)
-			printf("\t\tNothing in register.\n");
+			viprintf("\t\tNothing in register.\n");
 		while (getREG() == 0) {
-			printf("\t\t%s\n", linebuf);
+			viprintf("\t\t%s\n", linebuf);
 		}
 	}
 	return (0);
@@ -810,18 +822,18 @@ shownbr()
 {
 	int k;
 
-	printf("\nRegister   Contents\n");
-	printf("========   ========\n");
+	viprintf("\nRegister   Contents\n");
+	viprintf("========   ========\n");
 	for (k = '1'; k <= '9'; k++) {
 		rbuf = &putrbuf;
 		rnleft = 0;
 		rblock = 0;
 		rnext = mapreg(k)->rg_first;
-		printf(" %c:", k);
+		viprintf(" %c:", k);
 		if (rnext == 0)
-			printf("\t\tNothing in register.\n");
+			viprintf("\t\tNothing in register.\n");
 		while (getREG() == 0) {
-			printf("\t\t%s\n", linebuf);
+			viprintf("\t\t%s\n", linebuf);
 		}
 	}
 	return (0);

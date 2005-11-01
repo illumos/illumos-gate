@@ -51,6 +51,7 @@ int	poffset;
  * processing and call command routines to do the real work.
  */
 extern unsigned char *Version;
+void
 commands(noprompt, exitoneof)
 	bool noprompt, exitoneof;
 {
@@ -267,7 +268,7 @@ notinvis:
 			case 'h':
 				ignchar();
 				if (peekchar() == 'd') {
-					register unsigned char *p;
+					unsigned char *p;
 					tail2of("chdir");
 changdir:
 					if (savedfile[0] == '/' ||
@@ -286,14 +287,15 @@ changdir:
 					} else
 						getone(), p = file;
 					eol();
-					if (chdir(p) < 0)
+					if (chdir((char *)p) < 0)
 						filioerr(p);
 					if (savedfile[0] != '/')
 						edited = 0;
 					continue;
 				}
 				if (inopen)
-					tailprim("change", 2, 1);
+					tailprim((unsigned char *)"change",
+					    2, 1);
 				tail2of("change");
 				break;
 
@@ -313,7 +315,7 @@ changdir:
 #endif /* XPG4ONLY */
 			vmacchng(0);
 			setin(addr1);
-			delete(0);
+			(void) delete(0);
 			inappend = 1;
 			if (append(gettty, addr1 - 1) == 0) {
 #ifdef XPG4
@@ -349,8 +351,8 @@ changdir:
 #endif /* XPG4ONLY */
 			vmacchng(0);
 			if (c)
-				YANKreg(c);
-			delete(0);
+				(void) YANKreg(c);
+			(void) delete(0);
 			appendnone();
 			continue;
 
@@ -455,7 +457,7 @@ doecmd:
 			if (given < 2 && addr2 != dol)
 				addr2++;
 #endif /* XPG4ONLY */
-			join(c);
+			(void) join(c);
 			continue;
 
 /* k */
@@ -464,9 +466,11 @@ casek:
 			pastwh();
 			c = getchar();
 			if (endcmd(c))
-				serror((vi_TERSE) ? gettext("Mark what?") :
-					gettext("%s requires following "
-					    "letter"), Command);
+				serror((vi_TERSE) ?
+				    (unsigned char *)gettext("Mark what?") :
+				    (unsigned char *)
+				    gettext("%s requires following "
+				    "letter"), Command);
 			donewline();
 			if (!islower(c))
 				error((vi_TERSE) ? gettext("Bad mark") :
@@ -568,9 +572,9 @@ casek:
 				eol();
 				vmacchng(0);
 				if (c)
-					putreg(c);
+					(void) putreg(c);
 				else
-					put();
+					(void) put();
 				continue;
 
 			case 'r':
@@ -721,7 +725,7 @@ quit:
 				setdot();
 				ignchar();
 				unix0(0, 1);
-				vi_filter(0);
+				(void) vi_filter(0);
 				continue;
 			}
 			filename(c);
@@ -750,7 +754,7 @@ quit:
 				tail("shell");
 				setNAEOL();
 				vnfl();
-				putpad(exit_ca_mode);
+				putpad((unsigned char *)exit_ca_mode);
 				flush();
 				resetterm();
 				unixwt(1, unixex("-i", (char *)0, 0, 0));
@@ -869,7 +873,7 @@ suspend:
 /* version */
 				tail("version");
 				setNAEOL();
-				printf("%s", Version);
+				viprintf("%s", Version);
 				noonl();
 				continue;
 
@@ -901,7 +905,7 @@ wq:
 				ignchar();
 				setall();
 				unix0(0, 1);
-				vi_filter(1);
+				(void) vi_filter(1);
 			} else {
 				setall();
 				if (c == 'q')
@@ -943,9 +947,9 @@ wq:
 			eol();
 			vmacchng(0);
 			if (c)
-				YANKreg(c);
+				(void) YANKreg(c);
 			else
-				yank();
+				(void) yank();
 			continue;
 
 /* z */
@@ -1029,7 +1033,7 @@ numberit:
 			setall();
 			if (inglobal == 2)
 				pofix();
-			printf("%d", lineno(addr2));
+			viprintf("%d", lineno(addr2));
 			noonl();
 			continue;
 
@@ -1039,11 +1043,11 @@ numberit:
 				vmacchng(0);
 				unix0(0, 1);
 				setdot();
-				vi_filter(2);
+				(void) vi_filter(2);
 			} else {
 				unix0(1, 1);
 				pofix();
-				putpad(exit_ca_mode);
+				putpad((unsigned char *)exit_ca_mode);
 				flush();
 				resetterm();
 				unixwt(1, unixex("-c", uxb, 0, 0));
@@ -1098,7 +1102,7 @@ numberit:
 			if (!isalpha(c) || !isascii(c))
 				break;
 			ungetchar(c);
-			tailprim("", 0, 0);
+			tailprim((unsigned char *)"", 0, 0);
 		}
 		ungetchar(c);
 		{

@@ -19,16 +19,26 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-/*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.10	*/
+
+#ifndef _EX_VIS_H
+#define	_EX_VIS_H
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Ex version 3
  *
@@ -292,8 +302,8 @@ var	unsigned char	wcharfiller;	/* Right margin filler for wide char */
  */
 int	beep();
 int	qcount();
-int	vchange();
-int	vdelete();
+int	vchange(unsigned char);
+int	vdelete(unsigned char);
 int	vgrabit();
 int	vinschar();
 int	vmove();
@@ -302,3 +312,9 @@ int	vshift();
 int	vyankit();
 
 #define FILLER 0177 /* fill positions for multibyte characters */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _EX_VIS_H */

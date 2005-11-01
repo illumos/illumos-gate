@@ -19,18 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.21	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_re.h"
@@ -58,7 +58,7 @@ char *_compile(const char *, char *, char *, int);
  * handle these differences, but that effort was flawed.
  */
 
-extern char	getchar();
+extern int	getchar();
 #ifdef XPG4
 void regex_comp_free(void *);
 extern size_t regexc_size;	/* compile.c: size of regex_comp structure */
@@ -69,6 +69,7 @@ extern size_t regexc_size;	/* compile.c: size of regex_comp structure */
  * Very similar to ed, with some re extensions and
  * confirmed substitute.
  */
+void
 global(k)
 	bool k;
 {
@@ -226,7 +227,8 @@ out:
  * and g/r.e./.,/r.e.2/d are not treated specially.  There is no
  * good reason for this except the question: where to you draw the line?
  */
-gdelete()
+void
+gdelete(void)
 {
 	line *a1, *a2, *a3;
 
@@ -252,8 +254,8 @@ gdelete()
 bool	cflag;
 int	scount, slines, stotal;
 
-substitute(c)
-	int c;
+int
+substitute(int c)
 {
 	line *addr;
 	int n;
@@ -297,7 +299,8 @@ gettext("Substitute pattern match failed"));
 	return (stotal);
 }
 
-compsub(ch)
+int
+compsub(int ch)
 {
 	int seof, c, uselastre; 
 	static int gsubf;
@@ -384,8 +387,8 @@ gettext("No previous substitute to repeat"));
 	}
 }
 
-comprhs(seof)
-	int seof;
+void
+comprhs(int seof)
 {
 	unsigned char *rp, *orp;
 	int c;
@@ -494,7 +497,8 @@ endrhs:
 	*rp++ = 0;
 }
 
-getsub()
+int
+getsub(void)
 {
 	unsigned char *p;
 
@@ -505,9 +509,8 @@ getsub()
 	return (0);
 }
 
-dosubcon(f, a)
-	bool f;
-	line *a;
+int
+dosubcon(bool f, line *a)
 {
 
 	if (execute(f, a) == 0)
@@ -519,8 +522,8 @@ dosubcon(f, a)
 	return (1);
 }
 
-confirmed(a)
-	line *a;
+int
+confirmed(line *a)
 {
 	int c, cnt, ch;
 
@@ -563,9 +566,8 @@ again:
 	return (ch == 'y');
 }
 
-ugo(cnt, with)
-	int with;
-	int cnt;
+void
+ugo(int cnt, int with)
 {
 
 	if (cnt > 0)
@@ -577,7 +579,8 @@ ugo(cnt, with)
 int	casecnt;
 bool	destuc;
 
-dosub()
+void
+dosub(void)
 {
 	unsigned char *lp, *sp, *rp;
 	int c;
@@ -670,8 +673,8 @@ gettext("Line overflow in substitute"));
 	strcLIN(genbuf);
 }
 
-fixcase(c)
-	int c;
+int
+fixcase(int c)
 {
 
 	if (casecnt == 0)
@@ -699,31 +702,31 @@ place(sp, l1, l2)
 	return (sp);
 }
 
-snote(total, nlines)
-	int total, nlines;
+void
+snote(int total, int nlines)
 {
 
 	if (!notable(total))
 		return;
 	if (nlines != 1 && nlines != total)
-		printf(mesg(value(vi_TERSE) ?
+		viprintf(mesg(value(vi_TERSE) ?
 			/*
 			 * TRANSLATION_NOTE
 			 *	Reference order of arguments must not
 			 *	be changed using '%digit$', since vi's
-			 *	printf() does not support it.
+			 *	viprintf() does not support it.
 			 */
 			    gettext("%d subs on %d lines") :
 			/*
 			 * TRANSLATION_NOTE
 			 *	Reference order of arguments must not
 			 *	be changed using '%digit$', since vi's
-			 *	printf() does not support it.
+			 *	viprintf() does not support it.
 			 */
 			    gettext("%d substitutions on %d lines")),
 		       total, nlines);
 	else
-		printf(mesg(value(vi_TERSE) ?
+		viprintf(mesg(value(vi_TERSE) ?
 			    gettext("%d subs") :
 			    gettext("%d substitutions")),
 		       total);
@@ -737,9 +740,8 @@ snote(total, nlines)
 extern int regcomp_flags;	/* use to specify cflags for regcomp() */
 #endif /* XPG4 */
 
-vi_compile(eof, oknl)
-	int eof;
-	int oknl;
+int
+vi_compile(int eof, int oknl)
 {
 	int c;
 	unsigned char *gp, *p1;
@@ -811,8 +813,10 @@ gettext("Missing closing delimiter for regular expression"));
 		}
 		if (gp >= &genbuf[LBSIZE - 3])
 complex:
-			cerror(value(vi_TERSE) ? gettext("Re too complex") :
-gettext("Regular expression too complicated"));
+			cerror(value(vi_TERSE) ?
+			    (unsigned char *)gettext("Re too complex") :
+			    (unsigned char *)
+			    gettext("Regular expression too complicated"));
 
 		if (!(isascii(c) || MB_CUR_MAX == 1)) {
 			ungetchar(c);
@@ -895,10 +899,13 @@ magic:
 					if (*rhsp == '\\') {
 						c = *++rhsp;
 						if (c == '&')
-cerror(value(vi_TERSE) ? gettext("Replacement pattern contains &") :
-gettext("Replacement pattern contains & - cannot use in re"));
+cerror(value(vi_TERSE) ? (unsigned char *)
+gettext("Replacement pattern contains &") :
+(unsigned char *)gettext("Replacement pattern contains & - cannot use in re"));
 						if (c >= '1' && c <= '9')
-cerror(value(vi_TERSE) ? gettext("Replacement pattern contains \\d") :
+cerror(value(vi_TERSE) ? (unsigned char *)
+gettext("Replacement pattern contains \\d") :
+(unsigned char *)
 gettext("Replacement pattern contains \\d - cannot use in re"));
 						if ((len = mbtowc((wchar_t *)0, (char *)rhsp, MB_CUR_MAX)) <= 1) {
 							len = 1;
@@ -953,7 +960,8 @@ gettext("Replacement pattern contains \\d - cannot use in re"));
 						*gp++ = ']';
 					}
 					else if (c == '\n' || c == EOF)
-						cerror(gettext("Missing ]"));
+						cerror((unsigned char *)
+						    gettext("Missing ]"));
 					else
 						*gp++ = (value(vi_IGNORECASE) ? tolower(c) : c);
 					c = getchar();
@@ -968,8 +976,8 @@ gettext("Replacement pattern contains \\d - cannot use in re"));
 				continue;
 			}
 			if (c == '\n')
-cerror(value(vi_TERSE) ? gettext("No newlines in re's") :
-gettext("Can't escape newlines into regular expressions"));
+cerror(value(vi_TERSE) ? (unsigned char *)gettext("No newlines in re's") :
+(unsigned char *)gettext("Can't escape newlines into regular expressions"));
 			*gp++ = '\\';
 			*gp++ = (value(vi_IGNORECASE) ? tolower(c) : c);
 			continue;
@@ -979,8 +987,8 @@ gettext("Can't escape newlines into regular expressions"));
 				ungetchar(c);
 				goto out;
 			}
-cerror(value(vi_TERSE) ? gettext("Badly formed re") :
-gettext("Missing closing delimiter for regular expression"));
+cerror(value(vi_TERSE) ? (unsigned char *)gettext("Badly formed re") :
+(unsigned char *)gettext("Missing closing delimiter for regular expression"));
 
 		case '.':
 		case '~':
@@ -1006,8 +1014,9 @@ out:
 		 * this should never happen. but it's critical that we
 		 * check here, otherwise .bss would get overwritten.
 		 */
-		cerror(value(vi_TERSE) ? gettext("RE's can't fit") :
-			gettext("Regular expressions can't fit"));
+		cerror(value(vi_TERSE) ? (unsigned char *)
+		    gettext("RE's can't fit") :
+		    (unsigned char *)gettext("Regular expressions can't fit"));
 		return(eof);
 	}
 
@@ -1036,22 +1045,23 @@ out:
 		switch(regerrno) {
 	
 		case 42:
-cerror(gettext("\\( \\) Imbalance"));
+cerror((unsigned char *)gettext("\\( \\) Imbalance"));
 		case 43:
-cerror(value(vi_TERSE) ? gettext("Awash in \\('s!") :
+cerror(value(vi_TERSE) ? (unsigned char *)gettext("Awash in \\('s!") :
+(unsigned char *)
 gettext("Too many \\('d subexpressions in a regular expression"));
 		case 50:
 			goto complex;
 		case 67:
-cerror(value(vi_TERSE) ? gettext("Illegal byte sequence") :
-gettext("Regular expression has illegal byte sequence"));
+cerror(value(vi_TERSE) ? (unsigned char *)gettext("Illegal byte sequence") :
+(unsigned char *)gettext("Regular expression has illegal byte sequence"));
 		}
 	re->Nbra = nbra;
 	return(eof);
 }
 
-cerror(s)
-	unsigned char *s;
+void
+cerror(unsigned char *s)
 {
 	if (re) {
 		re->Expbuf[0] = re->Expbuf[1] = 0;
@@ -1059,8 +1069,8 @@ cerror(s)
 	error(s);
 }
 
-execute(gf, addr)
-	line *addr;
+int
+execute(int gf, line *addr)
 {
 	unsigned char *p1, *p2;
 	char *start;

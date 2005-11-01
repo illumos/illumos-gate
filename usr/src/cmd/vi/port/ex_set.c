@@ -19,12 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.14	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_temp.h"
@@ -35,11 +41,12 @@
  */
 unsigned char	optname[ONMSZ];
 
-set()
+void
+set(void)
 {
-	register unsigned char *cp;
-	register struct option *op;
-	register int c;
+	unsigned char *cp;
+	struct option *op;
+	int c;
 	bool no;
 	extern short ospeed;
 #ifdef TRACE
@@ -74,12 +81,12 @@ set()
  		 * General purpose test code for looking at address of those
  		 * invisible marks (as well as the visible ones).
  		 */
- 		if (eq("marks",cp)) {
- 			printf("Marks   Address\n\r");
- 			printf("					\n");
- 			printf("\n");
- 			for (k=0; k<=25; k++) 
- 				printf("Mark:%c\t%d\n",k+'a',names[k]);
+ 		if (eq("marks", cp)) {
+			viprintf("Marks   Address\n\r");
+			viprintf("					\n");
+			viprintf("\n");
+			for (k = 0; k <= 25; k++)
+				viprintf("Mark:%c\t%d\n", k+'a', names[k]);
  		goto next;
  		}
 
@@ -115,71 +122,73 @@ set()
  		if (eq("buffers",cp)) {
  			if (inopen)
 				pofix();
-			printf("\nLabels   Address	Contents\n");
- 			printf("======   =======	========");
+			viprintf("\nLabels   Address	Contents\n");
+ 			viprintf("======   =======	========");
 			for (tmpadr = zero; tmpadr <= dol; tmpadr++) {
  				label =0;
- 				if (tmpadr == zero) {
- 					printf("ZERO:\t");
+				if (tmpadr == zero) {
+					viprintf("ZERO:\t");
  					label = 2;
  				}
  				if (tmpadr == one) {
- 					if (label > 0)
- 						printf("\nONE:\t");
- 					else
- 						printf("ONE:\t");
+					if (label > 0)
+						viprintf("\nONE:\t");
+					else
+						viprintf("ONE:\t");
  					label = 1;
  				}
  				if (tmpadr == dot) {
- 					if (label > 0) 
- 						printf("\nDOT:\t");
- 					else
- 						printf("DOT:\t");
+					if (label > 0)
+						viprintf("\nDOT:\t");
+					else
+						viprintf("DOT:\t");
  					label = 1;
  				}
  				if (tmpadr == undap1) {
  					if (label > 0)
- 						printf("\nUNDAP1:\t");
+						viprintf("\nUNDAP1:\t");
  					else
- 						printf("UNDAP1:\t");
+						viprintf("UNDAP1:\t");
  					label = 1;
  				}
  				if (tmpadr == undap2) {
  					if (label > 0)
- 						printf("\nUNDAP2:\t");
+						viprintf("\nUNDAP2:\t");
  					else
- 						printf("UNDAP2:\t");
+						viprintf("UNDAP2:\t");
  					label = 1;
  				}
  				if (tmpadr == unddel) {
  					if (label > 0)
- 						printf("\nUNDDEL:\t");
+						viprintf("\nUNDDEL:\t");
  					else
- 						printf("UNDDEL:\t");
+						viprintf("UNDDEL:\t");
  					label = 1;
  				}
  				if (tmpadr == dol) {
  					if (label > 0)
- 						printf("\nDOL:\t");
+						viprintf("\nDOL:\t");
  					else
- 						printf("DOL:\t");
+						viprintf("DOL:\t");
  					label = 1;
  				}
  				for (k=0; k<=25; k++) 
  					if (names[k] == (*tmpadr &~ 01)) {
  						if (label > 0)
- 							printf("\nMark:%c\t%d\t",k+'a',names[k]);
+							viprintf(
+"\nMark:%c\t%d\t", k+'a', names[k]);
  						else
- 							printf("Mark:%c\t%d\t",k+'a',names[k]);
+							viprintf(
+"Mark:%c\t%d\t", k+'a', names[k]);
  						label=1;
  					}
  				if (label == 0) 
  					continue;
 
  				if (label == 2)
- 					printf("%d\n",tmpadr);
+					viprintf("%d\n", tmpadr);
  				else  {
- 					printf("%d\t",tmpadr);
+					viprintf("%d\t", tmpadr);
  					getline(*tmpadr);
  					pline(lineno(tmpadr));
  					putchar('\n');
@@ -189,37 +198,39 @@ set()
  			for (tmpadr = dol+1; tmpadr <= unddol; tmpadr++) {
  				label =0;
  				if (tmpadr == dol+1) {
- 					printf("DOL+1:\t");
+					viprintf("DOL+1:\t");
  					label = 1;
  				}
  				if (tmpadr == unddel) {
  					if (label > 0)
- 						printf("\nUNDDEL:\t");
+						viprintf("\nUNDDEL:\t");
  					else
- 						printf("UNDDEL:\t");
+						viprintf("UNDDEL:\t");
  					label = 1;
  				}
  				if (tmpadr == unddol) {
  					if (label > 0)
- 						printf("\nUNDDOL:\t");
+						viprintf("\nUNDDOL:\t");
  					else
- 						printf("UNDDOL:\t");
+						viprintf("UNDDOL:\t");
  					label = 1;
  				}
  				for (k=0; k<=25; k++) 
  					if (names[k] == (*tmpadr &~ 01)) {
  						if (label > 0)
- 							printf("\nMark:%c\t%d\t",k+'a',names[k]);
+							viprintf(
+"\nMark:%c\t%d\t", k+'a', names[k]);
  						else
- 							printf("Mark:%c\t%d\t",k+'a',names[k]);
+							viprintf(
+"Mark:%c\t%d\t", k+'a', names[k]);
  						label=1;
  					}
  				if (label == 0)
  					continue;
  				if (label == 2)
- 					printf("%d\n",tmpadr);
+					viprintf("%d\n", tmpadr);
  				else  {
- 					printf("%d\t",tmpadr);
+					viprintf("%d\t", tmpadr);
  					getline(*tmpadr);
  					pline(lineno(tmpadr));
  					putchar('\n');
@@ -254,7 +265,9 @@ dontset:
 			if (eq(op->oname, cp) || op->oabbrev && eq(op->oabbrev, cp))
 				break;
 		if (op->oname == 0)
-			serror(value(vi_TERSE) ? gettext("%s: No such option") :
+			serror(value(vi_TERSE) ? (unsigned char *)
+			    gettext("%s: No such option") :
+			    (unsigned char *)
 gettext("%s: No such option - 'set all' gives all option values"), cp);
 		c = skipwh();
 		if (peekchar() == '?') {
@@ -271,12 +284,16 @@ printone:
 			goto next;
 		}
 		if (no)
-			serror(gettext("Option %s is not a toggle"), op->oname);
+			serror((unsigned char *)
+			    gettext("Option %s is not a toggle"), op->oname);
 		if (c != 0 || setend())
 			goto printone;
 		if (getchar() != '=')
-			serror(value(vi_TERSE) ? gettext("Missing =") :
-gettext("Missing = in assignment to option %s"), op->oname);
+			serror(value(vi_TERSE) ? (unsigned char *)
+			    gettext("Missing =") :
+			    (unsigned char *)
+			    gettext("Missing = in assignment to option %s"),
+			    op->oname);
 		switch (op->otype) {
 
 		case NUMERIC:
@@ -337,7 +354,8 @@ next:
 	eol();
 }
 
-unterm()
+void
+unterm(void)
 {
 	/*
 	 *  All terminal mapped statements must be deleted.
@@ -368,17 +386,19 @@ unterm()
 }
 
 
-setend()
+int
+setend(void)
 {
 
 	return (iswhite(peekchar()) || endcmd(peekchar()));
 }
 
-prall()
+void
+prall(void)
 {
-	register int incr = (vi_NOPTS + 2) / 3;
-	register int rows = incr;
-	register struct option *op = options;
+	int incr = (vi_NOPTS + 2) / 3;
+	int rows = incr;
+	struct option *op = options;
 
 	for (; rows; rows--, op++) {
 		propt(op);
@@ -392,9 +412,10 @@ prall()
 	}
 }
 
-propts()
+void
+propts(void)
 {
-	register struct option *op;
+	struct option *op;
 
 	for (op = options; op < &options[vi_NOPTS]; op++) {
 		if (op == &options[vi_TTYTYPE])
@@ -419,26 +440,26 @@ propts()
 	flush();
 }
 
-propt(op)
-	register struct option *op;
+void
+propt(struct option *op)
 {
-	register unsigned char *name;
+	unsigned char *name;
 
 	name = (unsigned char *)op->oname;
 
 	switch (op->otype) {
 
 	case ONOFF:
-		printf("%s%s", op->ovalue ? "" : "no", name);
+		viprintf("%s%s", op->ovalue ? "" : "no", name);
 		break;
 
 	case NUMERIC:
-		printf("%s=%d", name, op->ovalue);
+		viprintf("%s=%d", name, op->ovalue);
 		break;
 
 	case STRING:
 	case OTERM:
-		printf("%s=%s", name, op->osvalue);
+		viprintf("%s=%s", name, op->osvalue);
 		break;
 	}
 }

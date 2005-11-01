@@ -19,16 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-/*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.22	*/
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_tty.h"
@@ -62,9 +64,10 @@ void redraw(), windowinit();
 extern int P_cursor_offset;
 #endif
 
-vmain()
+void
+vmain(void)
 {
-	register int c, cnt, i;
+	int c, cnt, i;
 	wchar_t esave[TUBECOLS];
 	extern wchar_t atube[];
 	unsigned char *oglobp;
@@ -201,7 +204,7 @@ reread:
 			 * #1 to something else.
 			 */
 			c = op;
-			op = map(c,arrows,0);
+			op = map(c, arrows, 0);
 #ifdef MDEBUG
 			if (trace)
 				fprintf(trace,"pca=%c,",c);
@@ -288,7 +291,7 @@ reread:
 		 *		with a little feedback.
 		 */
 		case ESCAPE:
-			beep();
+			(void) beep();
 			continue;
 
 		/*
@@ -309,7 +312,7 @@ reread:
 			CATCH
 				unsigned char tmpbuf[BUFSIZE];
 
-				regbuf(c,tmpbuf,sizeof(vmacbuf));
+				regbuf(c, tmpbuf, sizeof (vmacbuf));
 				macpush(tmpbuf, 1);
 			ONERR
 				lastmac = 0;
@@ -370,7 +373,7 @@ reread:
 				ind = 0;
 			vmoving = 0;
 			vup(cnt, ind, 1);
-			vnline(NOSTR);
+			vnline((unsigned char *)NOSTR);
 			continue;
 
 		/*
@@ -394,7 +397,7 @@ reread:
 		if (trace)
 			fprintf(trace, "before vnline in ^D, dot=%d, wdot=%d, dol=%d\n", lineno(dot), lineno(wdot), lineno(dol));
 #endif
-			vnline(NOSTR);
+			vnline((unsigned char *)NOSTR);
 #ifdef TRACE
 		if (trace)
 			fprintf(trace, "after vnline in ^D, dot=%d, wdot=%d, dol=%d\n", lineno(dot), lineno(wdot), lineno(dol));
@@ -777,7 +780,7 @@ insrt:
 		 *	two ATTN's will drop you back to command mode.
 		 */
 		case ATTN:
-			beep();
+			(void) beep();
 			if (initev || peekkey() != ATTN)
 				continue;
 			/* fall into... */
@@ -926,7 +929,8 @@ insrt:
 			 */
 			addr = dol;	/* old dol */
 			CATCH
-				vremote(1, vreg ? putreg : put, vreg);
+				vremote(1,
+				    vreg ? (int (*)())putreg : put, vreg);
 			ONERR
 				if (vreg == -1) {
 					splitw = 0;
@@ -1213,7 +1217,7 @@ fixup:
 					vup1();
 				if (vcnt > 0)
 					vcnt = 0;
-				vjumpto(dot, (char *) 0, '.');
+				vjumpto(dot, (unsigned char *) 0, '.');
 			} else {
 				/*
 				 * Current line IS on screen.
@@ -1257,7 +1261,7 @@ fixup:
 					if (esave[i] == 0)
 						break;
 					if(esave[i] != FILLER)
-						vputchar(esave[i]);
+						(void) vputchar(esave[i]);
 				}
 				splitw = 0;
 				vgoto(sdl, sdc);
@@ -1283,7 +1287,7 @@ fixup:
 			continue;
 
 fonfon:
-			beep();
+			(void) beep();
 			vmacp = 0;
 			inopen = 1;	/* might have been -1 */
 			continue;
@@ -1300,9 +1304,10 @@ fonfon:
 /*
  * Grab the word after the cursor so we can look for it as a tag.
  */
-grabtag()
+void
+grabtag(void)
 {
-	register unsigned char *cp, *dp;
+	unsigned char *cp, *dp;
 
 	cp = vpastwh(cursor);
 	if (*cp) {
@@ -1321,7 +1326,8 @@ grabtag()
  * Before appending lines, set up addr1 and
  * the command mode undo information.
  */
-prepapp()
+void
+prepapp(void)
 {
 
 	addr1 = dot;
@@ -1334,10 +1340,11 @@ prepapp()
  * Execute function f with the address bounds addr1
  * and addr2 surrounding cnt lines starting at dot.
  */
+void
 vremote(cnt, f, arg)
 	int cnt, (*f)(), arg;
 {
-	register int oing = inglobal;
+	int oing = inglobal;
 
 	addr1 = dot;
 	addr2 = dot + cnt - 1;
@@ -1354,7 +1361,8 @@ vremote(cnt, f, arg)
 /*
  * Save the current contents of linebuf, if it has changed.
  */
-vsave()
+void
+vsave(void)
 {
 	unsigned char temp[LBSIZE];
 
@@ -1389,18 +1397,16 @@ vsave()
 }
 
 #undef	forbid
-#define	forbid(a)	if (a) { beep(); return; }
+#define	forbid(a)	if (a) { (void) beep(); return; }
 
 /*
  * Do a z operation.
  * Code here is rather long, and very uninteresting.
  */
-vzop(hadcnt, cnt, c)
-	bool hadcnt;
-	int cnt;
-	register int c;
+void
+vzop(bool hadcnt, int cnt, int c)
 {
-	register line *addr;
+	line *addr;
 
 	if (state != VISUAL) {
 		/*
@@ -1470,9 +1476,9 @@ vzop(hadcnt, cnt, c)
 		break;
 
 	default:
-		beep();
+		(void) beep();
 		return;
 	}
 	vmoving = 0;
-	vjumpto(addr, NOSTR, c);
+	vjumpto(addr, (unsigned char *)NOSTR, c);
 }

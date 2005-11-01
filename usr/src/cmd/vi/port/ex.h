@@ -19,18 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-/*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#ifndef	_EX_H
+#ifndef _EX_H
 #define	_EX_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -58,7 +58,6 @@ extern "C" {
  * is much more carefully documented, and still rough in spots.
  *
  */
-
 #ifdef UCBV7
 #include <whoami.h>
 #endif
@@ -389,6 +388,10 @@ var	int	errcnt;		/* number of error/warning messages in */
 #define	NOSTR	(char *) 0
 #define	NOLINE	(line *) 0
 
+#define	setterm visetterm
+#define	draino vidraino
+#define	gettmode vigettmode
+
 extern	int	(*Outchar)();
 extern	int	(*Pline)();
 extern	int	(*Putchar)();
@@ -413,7 +416,7 @@ unsigned char	*mesg();
 unsigned char	*place();
 unsigned char	*plural();
 line	*scanfor();
-line	*setin();
+void setin(line *);
 unsigned char	*strend();
 unsigned char	*tailpath();
 char	*tgetstr();
@@ -425,20 +428,19 @@ unsigned char	*vgetline();
 unsigned char	*vinit();
 unsigned char	*vpastwh();
 unsigned char	*vskipwh();
-int	put();
-int	putreg();
-int	YANKreg();
-int	delete();
+int	put(void);
+int	putreg(unsigned char);
+int	YANKreg(int);
+int	delete(bool);
 int	vi_filter();
 int	getfile();
 int	getsub();
 int	gettty();
-int	join();
-int	listchar();
-off_t	lseek();
-int	normchar();
-int	normline();
-int	numbline();
+int	join(int);
+int	listchar(wchar_t);
+int	normchar(wchar_t);
+int	normline(void);
+int	numbline(int);
 var	void	(*oldquit)();
 #ifdef __STDC__
 void	onhup(int);
@@ -466,22 +468,156 @@ int	plodput();
 int	vputch();
 #endif /* __STDC__ */
 
-int	shift();
-int	termchar();
+void	shift(int, int);
+int	termchar(wchar_t);
 int	vfilter();
 int	vshftop();
-int	yank();
+int	yank(void);
 unsigned char *lastchr();
 unsigned char *nextchr();
 bool putoctal;
-int	shift();
-int	termchar();
-int	vfilter();
-int	vshftop();
-int	yank();
+
+void	error();
+void	error0(void);
+void error1(unsigned char *);
+void fixol(void);
+void resetflav(void);
+void serror(unsigned char *, unsigned char *);
+void setflav(void);
+void tailprim(unsigned char *, int, bool);
+void vcontin(bool);
+void squish(void);
+void move1(int, line *);
+void pragged(bool);
+void zop2(int, int);
+void plines(line *, line *, bool);
+void pofix(void);
+void undo(bool);
+void somechange(void);
+void savetag(char *);
+void unsavetag(void);
+void checkjunk(unsigned char);
+void getone(void);
+void rop3(int);
+void rop2(void);
+void putfile(int);
+void wrerror(void);
+void clrstats(void);
+void slobber(int);
+void flush(void);
+void flush1(void);
+void flush2(void);
+void fgoto(void);
+void flusho(void);
+void comprhs(int);
+int dosubcon(bool, line *);
+void ugo(int, int);
+void dosub(void);
+void snote(int, int);
+void cerror(unsigned char *);
+void unterm(void);
+int setend(void);
+void prall(void);
+void propts(void);
+void propt(struct option *);
+void killcnt(int);
+void markpr(line *);
+void merror1(unsigned char *);
+void notempty(void);
+int qcolumn(unsigned char *, unsigned char *);
+void netchange(int);
+void putmk1(line *, int);
+int nqcolumn(unsigned char *, unsigned char *);
+void syserror(int);
+void cleanup(bool);
+void blkio(short, unsigned char *, int (*)());
+void tflush(void);
+short partreg(unsigned char);
+void kshift(void);
+void YANKline(void);
+void rbflush(void);
+void waitfor(void);
+void ovbeg(void);
+void fixzero(void);
+void savevis(void);
+void undvis(void);
+void setwind(void);
+void vok(wchar_t *, int);
+void vsetsiz(int);
+void vinslin(int, int, int);
+void vopenup(int, bool, int);
+void vadjAL(int, int);
+void vup1(void);
+void vmoveitup(int, bool);
+void vscroll(int);
+void vscrap(void);
+void vredraw(int);
+void vdellin(int, int, int);
+void vadjDL(int, int);
+void vsyncCL(void);
+void vsync(int);
+void vsync1(int);
+void vcloseup(int, int);
+void sethard(void);
+void vdirty(int, int);
+void setBUF(unsigned char *);
+void addto(unsigned char *, unsigned char *);
+void macpush();
+void setalarm(void);
+void cancelalarm(void);
+void grabtag(void);
+void prepapp(void);
+void vremote();
+void vsave(void);
+void vzop(bool, int, int);
+void warnf();
+int wordof(unsigned char, unsigned char *);
+void setpk(void);
+void back1(void);
+void vdoappend(unsigned char *);
+void vclrbyte(wchar_t *, int);
+void vclreol(void);
+void vsetcurs(unsigned char *);
+void vigoto(int, int);
+void vcsync(void);
+void vgotoCL(int);
+void vgoto(int, int);
+void vmaktop(int, wchar_t *);
+void vrigid(void);
+void vneedpos(int);
+void vnpins(int);
+void vishft(void);
+void viin(wchar_t);
+void godm(void);
+void enddm(void);
+void goim(void);
+void endim(void);
+void vjumpto(line *, unsigned char *, unsigned char);
+void vup(int, int, bool);
+void vdown(int, int, bool);
+void vcontext(line *, unsigned char);
+void vclean(void);
+void vshow(line *, line*);
+void vreset(bool);
+void vroll(int);
+void vrollR(int);
+void vnline(unsigned char *);
+void noerror();
+void getline(line);
+void viprintf();
+void gettmode(void);
+void setterm(unsigned char *);
+void draino(void);
+int lfind();
+void source();
+void commands();
+void addmac();
+
 unsigned char *lastchr();
 unsigned char *nextchr();
 bool putoctal;
+
+void setdot1(void);
 
 #ifdef __cplusplus
 }

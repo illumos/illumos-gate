@@ -19,17 +19,21 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /*
  * Copyright (c) 1981 Regents of the University of California
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #include "ex.h"
 #include "ex_tty.h"
 #include "ex_vis.h"
@@ -62,15 +66,15 @@ unsigned char	vscandir[2] =	{ '/', 0 };
  * and if wcursor is zero, then the first non-blank location of the
  * other line is implied.
  */
-operate(c, cnt)
-	register int c, cnt;
+void
+operate(int c, int cnt)
 {
-	register wchar_t i;
+	wchar_t i;
 	int (*moveop)(), (*deleteop)();
-	register int (*opf)();
+	int (*opf)();
 	bool subop = 0;
 	unsigned char *oglobp, *ocurs;
-	register line *addr;
+	line *addr;
 	line *odot;
 	int oc;
 	static unsigned char lastFKND;
@@ -83,7 +87,7 @@ operate(c, cnt)
 	static int get_addr();
 /* #endif PTR_ADDRESSES */
 
-	moveop = vmove, deleteop = vdelete;
+	moveop = vmove, deleteop = (int (*)())vdelete;
 	wcursor = cursor;
 	wdot = NOLINE;
 	notecnt = 0;
@@ -94,7 +98,7 @@ operate(c, cnt)
 	 * d		delete operator.
 	 */
 	case 'd':
-		moveop = vdelete;
+		moveop = (int (*)())vdelete;
 		deleteop = beep;
 		break;
 
@@ -112,7 +116,7 @@ operate(c, cnt)
 	case 'c':
 		if (c == 'c' && workcmd[0] == 'C' || workcmd[0] == 'S')
 			subop++;
-		moveop = vchange;
+		moveop = (int (*)())vchange;
 		deleteop = beep;
 		break;
 
@@ -465,7 +469,7 @@ ein:
 			wchar_t wchar;
 			length = _mbftowc(lastcp, &wchar, getesc, &Peekkey);
 			if (length <= 0 || wchar == 0) {
-				beep();
+				(void) beep();
 				return;
 			}
 			i = wchar;
@@ -608,7 +612,7 @@ deleteit:
 		 */
 		if (opf == vmove || c != workcmd[0]) {
 errlab:
-			beep();
+			(void) beep();
 			vmacp = 0;
 			return;
 		}
@@ -851,7 +855,7 @@ slerr:
 			c = *globp++;
 		if (*globp) {
 			/* random junk after the pattern */
-			beep();
+			(void) beep();
 			goto slerr;
 		}
 		globp = oglobp;
@@ -868,7 +872,7 @@ slerr:
 			if (loc1 > (char *)linebuf && *loc1 == 0)
 				loc1 = (char *)lastchr(linebuf, loc1);
 			if (c)
-				vjumpto(addr, loc1, c);
+				vjumpto(addr, (unsigned char *)loc1, c);
 			else {
 				vmoving = 0;
 				if (loc1) {
@@ -923,10 +927,10 @@ lfixol()
 	if (inopen > 0 && clr_eol)
 		vclreol();
 	if (enter_standout_mode && exit_bold)
-		putpad(enter_standout_mode);
+		putpad((unsigned char *)enter_standout_mode);
 	lprintf(gettext("[Hit return to continue] "), 0);
 	if (enter_standout_mode && exit_bold)
-		putpad(exit_bold);
+		putpad((unsigned char *)exit_bold);
 
 	/* Get key input for confirmation */
 	savevglobp = vglobp;
@@ -946,8 +950,8 @@ lfixol()
 	splitw = savesplit;
 }
 
-warnf(str, cp)
-	char *str, *cp;
+void
+warnf(char *str, char *cp)
 {
 	int saveline, savecol, savesplit;
 
@@ -961,10 +965,10 @@ warnf(str, cp)
 	if (clr_eol)
 		vclreol();
 	if (enter_standout_mode && exit_bold)
-		putpad(enter_standout_mode);
+		putpad((unsigned char *)enter_standout_mode);
 	lprintf(str, cp);
 	if (enter_standout_mode && exit_bold)
-		putpad(exit_bold);
+		putpad((unsigned char *)exit_bold);
 	lfixol();
 	vgoto(saveline, savecol);
 	splitw = savesplit;
@@ -978,8 +982,8 @@ warnf(str, cp)
 static int
 get_addr()
 {
-	register short  c;
-	register short  next;
+	short  c;
+	short  next;
 
 	c = getkey();
 	next = 0;
@@ -1003,8 +1007,8 @@ get_addr()
 /*
  * Find single character c, in direction dir from cursor.
  */
-find(c)
-	wchar_t c;
+int
+find(wchar_t c)
 {
 
 	wchar_t wchar;
@@ -1026,13 +1030,12 @@ find(c)
  * Do a word motion with operator op, and cnt more words
  * to go after this.
  */
-word(op, cnt)
-	register int (*op)();
-	int cnt;
+int
+word(int (*op)(), int cnt)
 {
-	register int which;
-	register unsigned char *iwc;
-	register line *iwdot = wdot;
+	int which;
+	unsigned char *iwc;
+	line *iwdot = wdot;
 	wchar_t wchar;
 	int length;
 
@@ -1054,7 +1057,7 @@ word(op, cnt)
 				break;
 		}
 		/* Unless last segment of a change skip blanks */
-		if (op != vchange || cnt > 1)
+		if (op != (int (*)())vchange || cnt > 1)
 			while (!margin() && blank()) {
 				if (!lnext())
 					return (0);
@@ -1098,10 +1101,10 @@ word(op, cnt)
  * To end of word, with operator op and cnt more motions
  * remaining after this.
  */
-eend(op)
-	register int (*op)();
+int
+eend(int (*op)())
 {
-	register int which;
+	int which;
 
 	if (!lnext())
 		return (0);
@@ -1119,7 +1122,8 @@ eend(op)
 	}
 	if (op == vyankit)
 		wcursor = lastchr(linebuf, wcursor) + 1;
-	else if (op != vchange && op != vdelete && wcursor > linebuf)
+	else if (op != (int (*)())vchange && op != (int (*)())vdelete &&
+	    wcursor > linebuf)
 		wcursor = lastchr(linebuf, wcursor);
 	return (1);
 }
@@ -1128,9 +1132,8 @@ eend(op)
  * Wordof tells whether the character at *wc is in a word of
  * kind which (blank/nonblank words are 0, conservative words 1).
  */
-wordof(which, wc)
-	unsigned char which;
-	register unsigned char *wc;
+int
+wordof(unsigned char which, unsigned char *wc)
 {
 #ifdef PRESUNEUC
 
@@ -1154,10 +1157,10 @@ wordof(which, wc)
 #define	SS3 0217
 #endif /* PRESUNEUC */
 
-wordch(wc)
-	unsigned char *wc;
+int
+wordch(unsigned char *wc)
 {
-	register int length;
+	int length;
 	wchar_t c;
 
 	length = mbtowc(&c, (char *)wc, MULTI_BYTE_MAX);
@@ -1180,7 +1183,8 @@ wordch(wc)
 /*
  * Edge tells when we hit the last character in the current line.
  */
-edge()
+int
+edge(void)
 {
 
 	if (linebuf[0] == 0)
@@ -1194,7 +1198,8 @@ edge()
 /*
  * Margin tells us when we have fallen off the end of the line.
  */
-margin()
+int
+margin(void)
 {
 
 	return (wcursor < linebuf || wcursor[0] == 0);
@@ -1206,7 +1211,8 @@ margin()
  * NEWLINE, FORMFEED, bertical tab, or SPACE character from EUC
  * primary and supplementary codesets.
  */
-blank()
+int
+blank(void)
 {
 	wchar_t z;
 

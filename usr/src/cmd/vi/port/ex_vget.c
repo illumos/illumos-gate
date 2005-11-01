@@ -19,6 +19,11 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
@@ -26,11 +31,6 @@
 /* Copyright (c) 1981 Regents of the University of California */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-
-/*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
- */
 
 #include "ex.h"
 #include "ex_tty.h"
@@ -46,8 +46,8 @@
 /*
  * Return the key.
  */
-ungetkey(c)
-	int c;		/* char --> int */
+void
+ungetkey(int c)
 {
 
 	if (Peekkey != ATTN)
@@ -57,14 +57,15 @@ ungetkey(c)
 /*
  * Return a keystroke, but never a ^@.
  */
-getkey()
+int
+getkey(void)
 {
-	register int c;		/* char --> int */
+	int c;		/* char --> int */
 
 	do {
 		c = getbr();
 		if (c==0)
-			beep();
+			(void) beep();
 	} while (c == 0);
 	return (c);
 }
@@ -72,7 +73,8 @@ getkey()
 /*
  * Tell whether next keystroke would be a ^@.
  */
-peekbr()
+int
+peekbr(void)
 {
 
 	Peekkey = getbr();
@@ -91,11 +93,12 @@ short	precbksl;
  * The hard work here is in mapping of \ escaped
  * characters on upper case only terminals.
  */
-getbr()
+int
+getbr(void)
 {
 	unsigned char ch;
-	register int c, d;
-	register unsigned char *colp;
+	int c, d;
+	unsigned char *colp;
 	int cnt;
 	static unsigned char Peek2key;
 	extern short slevel, ttyindes;
@@ -216,9 +219,10 @@ again:
  * Get a key, but if a delete, quit or attention
  * is typed return 0 so we will abort a partial command.
  */
-getesc()
+int
+getesc(void)
 {
-	register int c;
+	int c;
 
 	c = getkey();
 	switch (c) {
@@ -242,7 +246,8 @@ getesc()
 /*
  * Peek at the next keystroke.
  */
-peekkey()
+int
+peekkey(void)
 {
 
 	Peekkey = getkey();
@@ -253,13 +258,14 @@ peekkey()
  * Read a line from the echo area, with single character prompt c.
  * A return value of 1 means the user blewit or blewit away.
  */
+int
 readecho(c)
 	unsigned char c;
 {
-	register unsigned char *sc = cursor;
-	register int (*OP)();
+	unsigned char *sc = cursor;
+	int (*OP)();
 	bool waste;
-	register int OPeek;
+	int OPeek;
 
 	if (WBOT == WECHO)
 		vclean();
@@ -307,7 +313,8 @@ blewit:
  * the purposes of repeat, so copy it from
  * the working to the previous command buffer.
  */
-setLAST()
+void
+setLAST(void)
 {
 
 	if (vglobp || vmacp)
@@ -324,8 +331,8 @@ setLAST()
  * If the insertion buffer oveflows, then destroy
  * the repeatability of the insert.
  */
-addtext(cp)
-	unsigned char *cp;
+void
+addtext(unsigned char *cp)
 {
 
 	if (vglobp)
@@ -335,7 +342,8 @@ addtext(cp)
 		lastcmd[0] = 0;
 }
 
-setDEL()
+void
+setDEL(void)
 {
 
 	setBUF(DEL);
@@ -344,11 +352,11 @@ setDEL()
 /*
  * Put text from cursor upto wcursor in BUF.
  */
-setBUF(BUF)
-	register unsigned char *BUF;
+void
+setBUF(unsigned char *BUF)
 {
-	register int c;
-	register unsigned char *wp = wcursor;
+	int c;
+	unsigned char *wp = wcursor;
 
 	c = *wp;
 	*wp = 0;
@@ -358,8 +366,8 @@ setBUF(BUF)
 	*wp = c;
 }
 
-addto(buf, str)
-	register unsigned char *buf, *str;
+void
+addto(unsigned char *buf, unsigned char *str)
 {
 
 	if ((unsigned char)buf[128] == 0200)
@@ -386,8 +394,9 @@ char *cmdstr, *sgn;
 		switch (cmdstr[0]) {
 		    case 'c':
 			if (cmdstr[1] == 'h') {
-				printf((cnt == 1) ? gettext("1 line changed") :
-					gettext("%d lines changed"), cnt);
+				viprintf((cnt == 1) ?
+				    gettext("1 line changed") :
+				    gettext("%d lines changed"), cnt);
 				break;
 			} else if (cmdstr[1] != 'o') {
 				goto Default;
@@ -395,52 +404,52 @@ char *cmdstr, *sgn;
 		    case 't':
 			if (cmdstr[1] != '\0')
 				goto Default;
-			printf((cnt == 1) ? gettext("1 line copied") :
+			viprintf((cnt == 1) ? gettext("1 line copied") :
 			       gettext("%d lines copied"), cnt);
 			break;
 		    case 'd':
-			printf((cnt == 1) ? gettext("1 line deleted") :
+			viprintf((cnt == 1) ? gettext("1 line deleted") :
 			       gettext("%d lines deleted"), cnt);
 			break;
 		    case 'j':
-			printf((cnt == 1) ? gettext("1 line joined") :
+			viprintf((cnt == 1) ? gettext("1 line joined") :
 			       gettext("%d lines joined"), cnt);
 			break;
 		    case 'm':
-			printf((cnt == 1) ? gettext("1 line moved") :
+			viprintf((cnt == 1) ? gettext("1 line moved") :
 			       gettext("%d lines moved"), cnt);
 			break;
 		    case 'p':
-			printf((cnt == 1) ? gettext("1 line put") :
+			viprintf((cnt == 1) ? gettext("1 line put") :
 			       gettext("%d lines put"), cnt);
 			break;
 		    case 'y':
-			printf((cnt == 1) ? gettext("1 line yanked") :
+			viprintf((cnt == 1) ? gettext("1 line yanked") :
 			       gettext("%d lines yanked"), cnt);
 			break;
 		    case '>':
-			printf((cnt == 1) ? gettext("1 line >>ed") :
+			viprintf((cnt == 1) ? gettext("1 line >>ed") :
 			       gettext("%d lines >>ed"), cnt);
 			break;
 		    case '=':
-			printf((cnt == 1) ? gettext("1 line =ed") :
+			viprintf((cnt == 1) ? gettext("1 line =ed") :
 			       gettext("%d lines =ed"), cnt);
 			break;
 		    case '<':
-			printf((cnt == 1) ? gettext("1 line <<ed") :
+			viprintf((cnt == 1) ? gettext("1 line <<ed") :
 			       gettext("%d lines <<ed"), cnt);
 			break;
 		    default:
 Default:
-			printf((cnt == 1) ? gettext("1 line") :
+			viprintf((cnt == 1) ? gettext("1 line") :
 			       gettext("%d lines"), cnt);
 			break;
 		}
 	} else if (sgn[0] == 'm') {
-		printf((cnt == 1) ? gettext("1 more line") :
+		viprintf((cnt == 1) ? gettext("1 more line") :
 			gettext("%d more lines"), cnt);
 	} else {
-		printf((cnt == 1) ? gettext("1 fewer line") :
+		viprintf((cnt == 1) ? gettext("1 fewer line") :
 			gettext("%d fewer lines"), cnt);
 	}
 	return (NULL);
@@ -452,10 +461,11 @@ Default:
  * to do this for open modes now; return and save for later
  * notification in visual.
  */
+int
 noteit(must)
 	bool must;
 {
-	register int sdl = destline, sdc = destcol;
+	int sdl = destline, sdc = destcol;
 
 	if (notecnt < 1 || !must && state == VISUAL)
 		return (0);
@@ -480,13 +490,15 @@ noteit(must)
  * Ring or beep.
  * If possible, flash screen.
  */
-beep()
+int
+beep(void)
 {
 
 	if (flash_screen && value(vi_FLASH))
 		vputp(flash_screen, 0);
 	else if (bell)
 		vputp(bell, 0);
+	return (0);
 }
 
 /*
@@ -496,13 +508,14 @@ beep()
  * DM1520 for example has a lot of mappable characters.
  */
 
-map(c,maps,commch)
-	register int c;
-	register struct maps *maps;
-	unsigned char commch;		/* indicate if in append/insert/replace mode */
+int
+map(c, maps, commch)
+	int c;
+	struct maps *maps;
+	unsigned char commch; /* indicate if in append/insert/replace mode */
 {
-	register int d;
-	register unsigned char *p, *q;
+	int d;
+	unsigned char *p, *q;
 	unsigned char b[10];	/* Assumption: no keypad sends string longer than 10 */
 	unsigned char *st;
 
@@ -671,9 +684,8 @@ gettext("Macro too long") : gettext("Macro too long  - maybe recursive?"));
  * is false for, for example, pushing back lookahead from fastpeekkey(),
  * since otherwise two fast escapes can clobber our undo.
  */
-macpush(st, canundo)
-unsigned char *st;
-int canundo;
+void
+macpush(unsigned char *st, int canundo)
 {
 	unsigned char tmpbuf[BUFSIZE];
 
@@ -712,7 +724,7 @@ gettext("Macro too long  - maybe recursive?"));
 visdump(s)
 unsigned char *s;
 {
-	register int i;
+	int i;
 
 	if (!trace) return;
 
@@ -729,7 +741,7 @@ unsigned char *s;
 vudump(s)
 unsigned char *s;
 {
-	register line *p;
+	line *p;
 	unsigned char savelb[1024];
 
 	if (!trace) return;
@@ -755,9 +767,10 @@ unsigned char *s;
  * Get a count from the keyed input stream.
  * A zero count is indistinguishable from no count.
  */
-vgetcnt()
+int
+vgetcnt(void)
 {
-	register int c, cnt;
+	int c, cnt;
 
 	cnt = 0;
 	for (;;) {
@@ -778,10 +791,11 @@ vgetcnt()
  * a machine generated sequence (such as a function pad from an escape
  * flavor terminal) but fail for a human hitting escape then waiting.
  */
-fastpeekkey()
+int
+fastpeekkey(void)
 {
 	void trapalarm();
-	register int c;
+	int c;
 
 	/*
 	 * If the user has set notimeout, we wait forever for a key.
@@ -819,7 +833,8 @@ struct requestbuf {
  * hang very long if the user didn't type anything.  There are
  * various ways to do this on different systems.
  */
-setalarm()
+void
+setalarm(void)
 {
 	unsigned char ftname[20];
 	struct requestbuf rb;
@@ -859,7 +874,8 @@ setalarm()
 /*
  * Get rid of any impending incoming SIGALRM.
  */
-cancelalarm()
+void
+cancelalarm(void)
 {
 	struct requestbuf rb;
 #ifdef FTIOCSET

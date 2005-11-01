@@ -19,9 +19,13 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -43,11 +47,12 @@
 
 int	fold =  80;
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+void putch(int c);
+
+int
+main(int argc, char *argv[])
 {
-	register c;
+	int c;
 	FILE *f;
 	char obuf[BUFSIZ];
 
@@ -79,15 +84,15 @@ main(argc, argv)
 			putch(c);
 		}
 	} while (argc > 0);
-	exit(0);
+	return (0);
 }
 
 int	col;
 
-putch(c)
-	register c;
+void
+putch(int c)
 {
-	register ncol;
+	int ncol;
 
 	switch (c) {
 		case '\n':

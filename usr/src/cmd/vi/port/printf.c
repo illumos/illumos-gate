@@ -19,9 +19,13 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 /*
  * University Copyright- Copyright (c) 1982, 1986, 1988
@@ -37,11 +41,6 @@
 static char *printf_id = "@(#) printf.c:2.2 6/5/79";
 /* The local sccs version within ex */
 
-/*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <stdarg.h>
@@ -50,8 +49,8 @@ static char *printf_id = "@(#) printf.c:2.2 6/5/79";
 extern short putoctal;
 /*
  * This version of printf is compatible with the Version 7 C
- * printf. The differences are only minor except that this
- * printf assumes it is to print through putchar. Version 7
+ * printf. The differences are only minor except that
+ * viprintf assumes it is to print through putchar. Version 7
  * printf is more general (and is much larger) and includes
  * provisions for floating point.
  */
@@ -65,8 +64,11 @@ extern short putoctal;
 static int width, sign, fill;
 
 unsigned char *_p_dconv();
+void _p_emit(unsigned char *, unsigned char *);
 
-printf(unsigned char *fmt, ...)
+/*VARARGS*/
+void
+viprintf(unsigned char *fmt, ...)
 {
 	va_list ap;
 	unsigned char fcode;
@@ -75,7 +77,7 @@ printf(unsigned char *fmt, ...)
 	int length,mask1,nbits,n;
 	int length2;
 	long int mask2, num;
-	register unsigned char *bptr;
+	unsigned char *bptr;
 	unsigned char *ptr;
 	unsigned char buf[134];
 
@@ -295,8 +297,8 @@ _p_dconv(value, buffer)
 	long value;
 	unsigned char *buffer;
 {
-	register unsigned char *bp;
-	register int svalue;
+	unsigned char *bp;
+	int svalue;
 	int n;
 	long lval;
 	
@@ -362,12 +364,11 @@ _p_dconv(value, buffer)
  * any padding in right-justification (to avoid printing "-3" as
  * "000-3" where "-0003" was intended).
  */
-_p_emit(s, send)
-	register unsigned char *s;
-	unsigned char *send;
+void
+_p_emit(unsigned char *s, unsigned char *send)
 {
 	unsigned char cfill;
-	register int alen;
+	int alen;
 	int npad, length;
 	wchar_t wchar;
 	

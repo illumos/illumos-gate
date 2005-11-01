@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
-
-/*
- * Copyright 2000, 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -37,6 +37,7 @@
 #include "ex_temp.h"
 #include "ex_tty.h"
 #include "ex_vis.h"
+#include <unistd.h>
 
 extern bool	pflag, nflag;		/* extern; also in ex_cmds.c */
 extern int	poffset;		/* extern; also in ex_cmds.c */
@@ -49,10 +50,11 @@ extern short	slevel;			/* extern; has level of source() */
 /*
  * Is there a single letter indicating a named buffer next?
  */
-cmdreg()
+int
+cmdreg(void)
 {
-	register int c = 0;
-	register int wh = skipwh();
+	int c = 0;
+	int wh = skipwh();
 
 #ifdef XPG4
 	if (wh && isalpha(c = peekchar()) && isascii(c) && !isdigit(c))
@@ -72,8 +74,8 @@ cmdreg()
 /*
  * Tell whether the character ends a command
  */
-endcmd(ch)
-	int ch;
+int
+endcmd(int ch)
 {
 	switch (ch) {
 
@@ -93,7 +95,8 @@ endcmd(ch)
 /*
  * Insist on the end of the command.
  */
-eol()
+void
+eol(void)
 {
 
 	if (!skipend())
@@ -108,8 +111,9 @@ eol()
  * with i an integer argument to printf.
  */
 /*VARARGS2*/
+void
 error(str, i)
-	register unsigned char *str;
+	unsigned char *str;
 	int i;
 {
 
@@ -125,15 +129,17 @@ error(str, i)
  * so we follow those procedures.
  */
 /*VARARGS2*/
+void
 noerror(str, i)
-	register unsigned char *str;
+	unsigned char *str;
 	int i;
 {
 
 	error0();
 	merror(str, i);
 	if (writing) {
-		serror(gettext(" [Warning - %s is incomplete]"), file);
+		serror((unsigned char *)
+		    gettext(" [Warning - %s is incomplete]"), file);
 		writing = 0;
 	}
 	error1(str);
@@ -145,8 +151,9 @@ noerror(str, i)
  * with i an integer argument to printf.
  */
 /*VARARGS2*/
+void
 error(str, i)
-	register unsigned char *str;
+	unsigned char *str;
 	int i;
 {
 
@@ -154,7 +161,8 @@ error(str, i)
 	error0();
 	merror(str, i);
 	if (writing) {
-		serror(gettext(" [Warning - %s is incomplete]"), file);
+		serror((unsigned char *)
+		    gettext(" [Warning - %s is incomplete]"), file);
 		writing = 0;
 	}
 	error1(str);
@@ -164,14 +172,15 @@ error(str, i)
 /*
  * Rewind the argument list.
  */
-erewind()
+void
+erewind(void)
 {
 
 	argc = argc0;
 	argv = argv0;
 	args = args0;
 	if (argc > 1 && !hush && cur_term) {
-		printf(mesg(value(vi_TERSE) ? gettext("%d files") :
+		viprintf(mesg(value(vi_TERSE) ? gettext("%d files") :
 			gettext("%d files to edit")), argc);
 		if (inopen)
 			putchar(' ');
@@ -186,7 +195,8 @@ erewind()
  * just fixing up the echo area for the print.
  * Otherwise we reset a number of externals, and discard unused input.
  */
-error0()
+void
+error0(void)
 {
 
 	if (laste) {
@@ -240,8 +250,8 @@ error0()
  * Otherwise, in the normal command mode error case,
  * finish state reset, and throw to top.
  */
-error1(str)
-	unsigned char *str;
+void
+error1(unsigned char *str)
 {
 	bool die;
 	extern short ttyindes;
@@ -285,7 +295,8 @@ error1(str)
 	reset();
 }
 
-fixol()
+void
+fixol(void)
 {
 	if (Outchar != vputchar) {
 		flush();
@@ -308,7 +319,8 @@ fixol()
 /*
  * Does an ! character follow in the command stream?
  */
-exclam()
+int
+exclam(void)
 {
 
 	if (peekchar() == '!') {
@@ -321,7 +333,8 @@ exclam()
 /*
  * Make an argument list for e.g. next.
  */
-makargs()
+void
+makargs(void)
 {
 
 	glob(&frob);
@@ -334,13 +347,15 @@ makargs()
 /*
  * Advance to next file in argument list.
  */
-next()
+void
+next(void)
 {
 	extern short isalt;	/* defined in ex_io.c */
 
 	if (argc == 0)
-		error(value(vi_TERSE) ? gettext("No more files") :
-			gettext("No more files to edit"));
+		error(value(vi_TERSE) ?
+			(unsigned char *)gettext("No more files") :
+			(unsigned char *)gettext("No more files to edit"));
 	morargc = argc;
 	isalt = (strcmp(altfile, args)==0) + 1;
 	if (savedfile[0])
@@ -357,9 +372,10 @@ next()
  * Eat trailing flags and offsets after a command,
  * saving for possible later post-command prints.
  */
-donewline()
+void
+donewline(void)
 {
-	register int c;
+	int c;
 
 	resetflav();
 	for (;;) {
@@ -398,8 +414,11 @@ donewline()
 
 		default:
 			if (!endcmd(c))
-serror(value(vi_TERSE) ? gettext("Extra chars") :
-	gettext("Extra characters at end of \"%s\" command"), Command);
+			    serror(value(vi_TERSE) ?
+				(unsigned char *)gettext("Extra chars") :
+				(unsigned char *)gettext(
+				"Extra characters at end of \"%s\" command"),
+				    Command);
 			if (c == EOF)
 				ungetchar(c);
 			setflav();
@@ -413,7 +432,8 @@ serror(value(vi_TERSE) ? gettext("Extra chars") :
  * Before quit or respec of arg list, check that there are
  * no more files in the arg list.
  */
-nomore()
+int
+nomore(void)
 {
 
 	if (argc == 0 || morargc == argc)
@@ -433,7 +453,8 @@ nomore()
  * Before edit of new file check that either an ! follows
  * or the file has not been changed.
  */
-quickly()
+int
+quickly(void)
 {
 
 	if (exclam())
@@ -443,8 +464,10 @@ quickly()
 		chng = 0;
 */
 		xchng = 0;
-		error(value(vi_TERSE) ? gettext("No write") :
-			gettext("No write since last change (:%s! overrides)"), Command);
+		error(value(vi_TERSE) ? (unsigned char *)gettext("No write") :
+		    (unsigned char *)
+		    gettext("No write since last change (:%s! overrides)"),
+		    Command);
 	}
 	return (0);
 }
@@ -452,7 +475,8 @@ quickly()
 /*
  * Reset the flavor of the output to print mode with no numbering.
  */
-resetflav()
+void
+resetflav(void)
 {
 
 	if (inopen)
@@ -468,9 +492,8 @@ resetflav()
  * Print an error message with a %s type argument to printf.
  * Message text comes from error message file.
  */
-serror(str, cp)
-	register unsigned char *str;
-	unsigned char *cp;
+void
+serror(unsigned char *str, unsigned char *cp)
 {
 
 	error0();
@@ -484,7 +507,8 @@ serror(str, cp)
  * and either use normally decoded (ARPAnet standard) characters or list mode,
  * where end of lines are marked and tabs print as ^I.
  */
-setflav()
+void
+setflav(void)
 {
 
 	if (inopen)
@@ -498,7 +522,8 @@ setflav()
 /*
  * Skip white space and tell whether command ends then.
  */
-skipend()
+int
+skipend(void)
 {
 
 	pastwh();
@@ -508,8 +533,8 @@ skipend()
 /*
  * Set the command name for non-word commands.
  */
-tailspec(c)
-	int c;
+void
+tailspec(int c)
 {
 	static unsigned char foocmd[2];
 
@@ -521,15 +546,15 @@ tailspec(c)
  * Try to read off the rest of the command word.
  * If alphabetics follow, then this is not the command we seek.
  */
-tail(comm)
-	unsigned char *comm;
+void
+tail(unsigned char *comm)
 {
 
 	tailprim(comm, 1, 0);
 }
 
-tail2of(comm)
-	unsigned char *comm;
+void
+tail2of(unsigned char *comm)
 {
 
 	tailprim(comm, 2, 0);
@@ -537,13 +562,11 @@ tail2of(comm)
 
 unsigned char	tcommand[20];
 
-tailprim(comm, i, notinvis)
-	register unsigned char *comm;
-	int i;
-	bool notinvis;
+void
+tailprim(unsigned char *comm, int i, bool notinvis)
 {
-	register unsigned char *cp;
-	register int c;
+	unsigned char *cp;
+	int c;
 
 	Command = comm;
 	for (cp = tcommand; i > 0; i--)
@@ -564,11 +587,15 @@ tailprim(comm, i, notinvis)
 			*cp++ = getchar();
 		*cp = 0;
 		if (notinvis)
-			serror(value(vi_TERSE) ? gettext("What?") :
-				gettext("%s: No such command from open/visual"), tcommand);
+			serror(value(vi_TERSE) ?
+			    (unsigned char *)gettext("What?") :
+			    (unsigned char *)gettext(
+			    "%s: No such command from open/visual"), tcommand);
 		else
-			serror(value(vi_TERSE) ? gettext("What?") :
-				gettext("%s: Not an editor command"), tcommand);
+			serror(value(vi_TERSE) ?
+			    (unsigned char *)gettext("What?") :
+			    (unsigned char *)gettext(
+			    "%s: Not an editor command"), tcommand);
 	}
 ret:
 	*cp = 0;
@@ -577,8 +604,8 @@ ret:
 /*
  * Continue after a : command from open/visual.
  */
-vcontin(ask)
-	bool ask;
+void
+vcontin(bool ask)
 {
 
 	if (vcnt > 0)
@@ -600,8 +627,8 @@ vcontin(ask)
 				vgoto(WECHO, 0);
 			}
 			if (!ask) {
-				putch('\r');
-				putch('\n');
+				(void) putch('\r');
+				(void) putch('\n');
 			}
 			return;
 		}
@@ -623,7 +650,7 @@ vcontin(ask)
 #endif
 			if(getkey() == ':') {
 				/* Extra newlines, but no other way */
-				putch('\n');
+				(void) putch('\n');
 				outline = WECHO;
 				ungetkey(':');
 			}
@@ -631,7 +658,7 @@ vcontin(ask)
 		vclrech(1);
 		if (Peekkey != ':') {
 			fixterm();
-			putpad(enter_ca_mode);
+			putpad((unsigned char *)enter_ca_mode);
 			tostart();
 		}
 	}
@@ -641,7 +668,8 @@ vcontin(ask)
  * Put out a newline (before a shell escape)
  * if in open/visual.
  */
-vnfl()
+void
+vnfl(void)
 {
 
 	if (inopen) {

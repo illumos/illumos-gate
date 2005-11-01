@@ -19,18 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-/* 
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.17	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "ex.h"
 #include "ex_argv.h"
@@ -50,9 +50,9 @@
 
 bool	endline = 1;
 line	*tad1;
-static	jnoop();
-static int splitit();
-int putchar(), getchar(); 
+static int jnoop(void);
+static void splitit(void);
+int putchar(), getchar();
 int tags_flag;
 
 /*
@@ -60,11 +60,10 @@ int tags_flag;
  * Be careful about intermediate states to avoid scramble
  * if an interrupt comes in.
  */
-append(f, a)
-	int (*f)();
-	line *a;
+int
+append(int (*f)(), line *a)
 {
-	register line *a1, *a2, *rdot;
+	line *a1, *a2, *rdot;
 	int nline;
 
 	nline = 0;
@@ -104,7 +103,8 @@ gettext("Out of memory- too many lines in file"));
 	return (nline);
 }
 
-appendnone()
+void
+appendnone(void)
 {
 
 	if(FIXUNDO) {
@@ -116,19 +116,20 @@ appendnone()
 /*
  * Print out the argument list, with []'s around the current name.
  */
-pargs()
+void
+pargs(void)
 {
-	register unsigned char **av = argv0, *as = args0;
-	register int ac;
+	unsigned char **av = argv0, *as = args0;
+	int ac;
 
 	for (ac = 0; ac < argc0; ac++) {
 		if (ac != 0)
 			putchar(' ');
 		if (ac + argc == argc0 - 1)
-			printf("[");
+			viprintf("[");
 		lprintf("%s", as);
 		if (ac + argc == argc0 - 1)
-			printf("]");
+			viprintf("]");
 		as = av ? *++av : strend(as) + 1;
 	}
 	noonl();
@@ -138,10 +139,10 @@ pargs()
  * Delete lines; two cases are if we are really deleting,
  * more commonly we are just moving lines to the undo save area.
  */
-delete(hush)
-	bool hush;
+int
+delete(bool hush)
 {
-	register line *a1, *a2;
+	line *a1, *a2;
 
 	nonzero();
 	if(FIXUNDO) {
@@ -174,8 +175,8 @@ delete(hush)
 			vudump("after delete");
 #endif
 	} else {
-		register line *a3;
-		register int i;
+		line *a3;
+		int i;
 
 		change();
 		a1 = addr1;
@@ -196,9 +197,11 @@ delete(hush)
 	}
 	if (!hush)
 		killed();
+	return (0);
 }
 
-deletenone()
+void
+deletenone(void)
 {
 
 	if(FIXUNDO) {
@@ -212,9 +215,10 @@ deletenone()
  * Crush out the undo save area, moving the open/visual
  * save area down in its place.
  */
-squish()
+void
+squish(void)
 {
-	register line *a1 = dol + 1, *a2 = unddol + 1, *a3 = truedol + 1;
+	line *a1 = dol + 1, *a2 = unddol + 1, *a3 = truedol + 1;
 
 	if(FIXUNDO) {
 		if (inopen == -1)
@@ -232,16 +236,16 @@ squish()
  * Join lines.  Special hacks put in spaces, two spaces if
  * preceding line ends with '.', or no spaces if next line starts with ).
  */
-static	int jcount, jnoop();
+static	int jcount;
 
-join(c)
-	int c;
+int
+join(int c)
 {
-	register line *a1;
-	register unsigned char *cp, *cp1;
+	line *a1;
+	unsigned char *cp, *cp1;
 #ifndef PRESUNEUC
-	register unsigned char *pcp;
-	register wchar_t *delim;
+	unsigned char *pcp;
+	wchar_t *delim;
 	wchar_t wc1, wc2;
 	int n;
 #endif /* PRESUNEUC */
@@ -299,17 +303,18 @@ gettext("Result line of join would be too long"));
 		cp--;
 	}
 	strcLIN(genbuf);
-	delete(0);
+	(void) delete(0);
 	jcount = 1;
 	if (FIXUNDO)
 		undap1 = undap2 = addr1;
 	(void)append(jnoop, --addr1);
 	if (FIXUNDO)
 		vundkind = VMANY;
+	return (0);
 }
 
-static
-jnoop()
+static int
+jnoop(void)
 {
 
 	return(--jcount);
@@ -321,9 +326,10 @@ jnoop()
  */
 int	getcopy();
 
-vi_move()
+void
+vi_move(void)
 {
-	register line *adt;
+	line *adt;
 	bool iscopy = 0;
 
 	if (Command[0] == 'm') {
@@ -336,18 +342,19 @@ vi_move()
 	nonzero();
 	adt = address((char*)0);
 	if (adt == 0)
-		serror(value(vi_TERSE) ? gettext("%s where?") :
-			gettext("%s requires a trailing address"), Command);
+		serror(value(vi_TERSE) ?
+		    (unsigned char *)gettext("%s where?") :
+		    (unsigned char *)gettext("%s requires a trailing address"),
+		    Command);
 	donewline();
 	move1(iscopy, adt);
 	killed();
 }
 
-move1(cflag, addrt)
-	int cflag;
-	line *addrt;
+void
+move1(int cflag, line *addrt)
 {
-	register line *adt, *ad1, *ad2;
+	line *adt, *ad1, *ad2;
 	int nlines;
 
 	adt = addrt;
@@ -397,7 +404,8 @@ move1(cflag, addrt)
 		}
 }
 
-getcopy()
+int
+getcopy(void)
 {
 
 	if (tad1 > addr2)
@@ -409,7 +417,8 @@ getcopy()
 /*
  * Put lines in the buffer from the undo save area.
  */
-getput()
+int
+getput(void)
 {
 
 	if (tad1 > unddol)
@@ -419,22 +428,24 @@ getput()
 	return (0);
 }
 
-put()
+int
+put(void)
 {
-	register int cnt;
+	int cnt;
 
 	if (!FIXUNDO)
 		error(gettext("Cannot put inside global/macro"));
 	cnt = unddol - dol;
 	if (cnt && inopen && pkill[0] && pkill[1]) {
 		pragged(1);
-		return;
+		return (0);
 	}
 	tad1 = dol + 1;
 	(void)append(getput, addr2);
 	undkind = UNDPUT;
 	notecnt = cnt;
 	netchange(cnt);
+	return (0);
 }
 
 /*
@@ -443,14 +454,14 @@ put()
  * Argument says pkills have meaning, e.g. called from
  * put; it is 0 on calls from putreg.
  */
-pragged(kill)
-	bool kill;
+void
+pragged(bool kill)
 {
 	extern unsigned char *cursor;
 #ifdef XPG4
 	extern int P_cursor_offset;
 #endif
-	register unsigned char *gp = &genbuf[cursor - linebuf];
+	unsigned char *gp = &genbuf[cursor - linebuf];
 
 	/*
 	 * Assume the editor has:
@@ -550,14 +561,13 @@ pragged(kill)
  * Shift lines, based on c.
  * If c is neither < nor >, then this is a lisp aligning =.
  */
-shift(c, cnt)
-	int c;
-	int cnt;
+void
+shift(int c, int cnt)
 {
-	register line *addr;
-	register unsigned char *cp;
+	line *addr;
+	unsigned char *cp;
 	unsigned char *dp;
-	register int i;
+	int i;
 
 	if(FIXUNDO)
 		save12(), undkind = UNDCHANGE;
@@ -603,13 +613,14 @@ gettext("Result line after shift would be too long"));
  * Find a tag in the tags file.
  * Most work here is in parsing the tags file itself.
  */
+void
 tagfind(quick)
 	bool quick;
 {
 	unsigned char cmdbuf[BUFSIZE];
 	unsigned char filebuf[FNSIZE];
 	unsigned char tagfbuf[BUFSIZE];
-	register int c, d;
+	int c, d;
 	bool samef = 1;
 	int tfcount = 0;
 	int omagic, tl;
@@ -629,7 +640,7 @@ tagfind(quick)
 	omagic = value(vi_MAGIC);
 	tl = value(vi_TAGLENGTH);
 	if (!skipend()) {
-		register unsigned char *lp = lasttag;
+		unsigned char *lp = lasttag;
 
 		while (!iswhite(peekchar()) && !endcmd(peekchar()))
 			if (lp < &lasttag[sizeof lasttag - 2])
@@ -680,8 +691,8 @@ badtag:
 		bot = 0L;
 		while (top >= bot) {
 			/* loop for each tags file entry */
-			register unsigned char *cp = linebuf;
-			register unsigned char *lp = lasttag;
+			unsigned char *cp = linebuf;
+			unsigned char *lp = lasttag;
 			unsigned char *oglobp;
 
 			mid = (top + bot) / 2;
@@ -741,7 +752,9 @@ goleft:
 				cp++;
 			if (!*cp)
 badtags:
-				serror(gettext("%s: Bad tags file entry"), lasttag);
+				serror((unsigned char *)
+				    gettext("%s: Bad tags file entry"),
+				    lasttag);
 			lp = filebuf;
 			while (*cp && *cp != ' ' && *cp != '\t') {
 				if (lp < &filebuf[sizeof filebuf - 2])
@@ -766,7 +779,7 @@ badtags:
 			}
 #ifdef TAG_STACK
                         if (*savedfile) {
-                                savetag(savedfile);
+				savetag((char *)savedfile);
                         }
 #endif 
 			strcpy(cmdbuf, cp);
@@ -832,8 +845,8 @@ gettext("No write") : gettext("No write since last change (:tag! overrides)"));
 		/* tfcount++; */
 		while (getfile() == 0) {
 			/* loop for each tags file entry */
-			register unsigned char *cp = linebuf;
-			register unsigned char *lp = lasttag;
+			unsigned char *cp = linebuf;
+			unsigned char *lp = lasttag;
 			unsigned char *oglobp;
 
 			while (*cp && *lp == *cp)
@@ -867,7 +880,9 @@ gettext("No write") : gettext("No write since last change (:tag! overrides)"));
 				cp++;
 			if (!*cp)
 badtags2:
-				serror(gettext("%s: Bad tags file entry"), lasttag);
+				serror((unsigned char *)
+				    gettext("%s: Bad tags file entry"),
+				    lasttag);
 			lp = filebuf;
 			while (*cp && *cp != ' ' && *cp != '\t') {
 				if (lp < &filebuf[sizeof filebuf - 2])
@@ -892,7 +907,7 @@ badtags2:
 			}
 #ifdef TAG_STACK
                         if (*savedfile) {
-                                savetag(savedfile);
+				savetag((char *)savedfile);
                         }
 #endif 
 			strcpy(cmdbuf, cp);
@@ -954,15 +969,18 @@ gettext("No write") : gettext("No write since last change (:tag! overrides)"));
 	if (tfcount <= 0)
 		error(gettext("No tags file"));
 	else
-		serror(value(vi_TERSE) ? gettext("%s: No such tag") :
-			gettext("%s: No such tag in tags file"), lasttag);
+		serror(value(vi_TERSE) ?
+		    (unsigned char *)gettext("%s: No such tag") :
+		    (unsigned char *)gettext("%s: No such tag in tags file"),
+		    lasttag);
 }
 
 /*
  * Save lines from addr1 thru addr2 as though
  * they had been deleted.
  */
-yank()
+int
+yank(void)
 {
 
 	if (!FIXUNDO)
@@ -970,6 +988,7 @@ yank()
 	save12();
 	undkind = UNDNONE;
 	killcnt(addr2 - addr1 + 1);
+	return (0);
 }
 
 /*
@@ -986,10 +1005,10 @@ bool	zhadpr;
 bool	znoclear;
 short	zweight;
 
-zop(hadpr)
-	int hadpr;
+void
+zop(int hadpr)
 {
-	register int c, nlines, op;
+	int c, nlines, op;
 	bool excl;
 
 	zhadpr = hadpr;
@@ -1050,11 +1069,10 @@ zop(hadpr)
 	zop2(nlines, op);
 }
 
-zop2(nlines, op)
-	register int nlines;
-	register int op;
+void
+zop2(int nlines, int op)
 {
-	register line *split;
+	line *split;
 
 	split = NULL;
 	switch (op) {
@@ -1130,22 +1148,20 @@ zop2(nlines, op)
 	plines(addr1, addr2, 0);
 }
 
-static
-splitit()
+static void
+splitit(void)
 {
-	register int l;
+	int l;
 
 	for (l = columns > 80 ? 40 : columns / 2; l > 0; l--)
 		putchar('-');
 	putnl();
 }
 
-plines(adr1, adr2, movedot)
-	line *adr1;
-	register line *adr2;
-	bool movedot;
+void
+plines(line *adr1, line *adr2, bool movedot)
 {
-	register line *addr;
+	line *addr;
 
 	pofix();
 	for (addr = adr1; addr <= adr2; addr++) {
@@ -1158,7 +1174,8 @@ plines(adr1, adr2, movedot)
 	}
 }
 
-pofix()
+void
+pofix(void)
 {
 
 	if (inopen && Outchar != termchar) {
@@ -1179,11 +1196,11 @@ pofix()
  *
  * Undo is its own inverse.
  */
-undo(c)
-	bool c;
+void
+undo(bool c)
 {
-	register int i, k;
-	register line *jp, *kp, *j;
+	int i, k;
+	line *jp, *kp, *j;
 	line *dolp1, *newdol, *newadot;
 
 #ifdef UNDOTRACE
@@ -1446,9 +1463,10 @@ undo(c)
  * Be (almost completely) sure there really
  * was a change, before claiming to undo.
  */
-somechange()
+void
+somechange(void)
 {
-	register line *ip, *jp;
+	line *ip, *jp;
 
 	switch (undkind) {
 
@@ -1483,14 +1501,16 @@ somechange()
 /*
  * Map command:
  * map src dest
+ *
+ * un is true if this is unmap command
+ * ab is true if this is abbr command
  */
-mapcmd(un, ab)
-	int un;	/* true if this is unmap command */
-	int ab;	/* true if this is abbr command */
+void
+mapcmd(int un, int ab)
 {
 	unsigned char lhs[100], rhs[100];	/* max sizes resp. */
-	register unsigned char *p;
-	register int c;		/* char --> int */
+	unsigned char *p;
+	int c;		/* char --> int */
 	unsigned char *dname;
 	struct maps *mp;	/* the map structure we are working on */
 
@@ -1530,7 +1550,8 @@ mapcmd(un, ab)
 			if (un) {
 				donewline();
 				*p = 0;
-				addmac(lhs, NOSTR, NOSTR, mp);
+				addmac(lhs, (unsigned char *)NOSTR,
+				    (unsigned char *)NOSTR, mp);
 				return;
 			} else
 				error(gettext("Missing rhs"));
@@ -1580,11 +1601,11 @@ mapcmd(un, ab)
  * using NOSTR for dest.  Dname is what to show in listings.  mp is
  * the structure to affect (arrows, etc).
  */
-addmac(src,dest,dname,mp)
-	register unsigned char *src, *dest, *dname;
-	register struct maps *mp;
+void
+addmac(unsigned char *src, unsigned char *dest, unsigned char *dname,
+    struct maps *mp)
 {
-	register int slot, zer;
+	int slot, zer;
 
 #ifdef UNDOTRACE
 	if (trace)
@@ -1677,6 +1698,7 @@ addmac(src,dest,dname,mp)
  * Implements macros from command mode. c is the buffer to
  * get the macro from.
  */
+void
 cmdmac(c)
 unsigned char c;
 {
@@ -1708,15 +1730,15 @@ unsigned char *
 vgetpass(prompt)
 unsigned char *prompt;
 {
-	register unsigned char *p;
-	register c;
+	unsigned char *p;
+	int c;
 	static unsigned char pbuf[9];
 	char *getpass();
 
 	/* In ex mode, let the system hassle with setting no echo */
 	if (!inopen)
 		return (unsigned char *)getpass(prompt);
-	printf("%s", prompt); flush();
+	viprintf("%s", prompt); flush();
 	for (p=pbuf; (c = getkey())!='\n' && c!=EOF && c!='\r';) {
 		if (p < &pbuf[8])
 			*p++ = c;
@@ -1737,8 +1759,8 @@ static int tag_depth = 0;
 static char tag_buf[ 1024 ];
 static char *tag_end = tag_buf;
 
-savetag( name )	/* saves location where we are */
-char *name;
+void
+savetag(char *name)	/* saves location where we are */
 {
 	if( !value(vi_TAGSTACK) )
 		return;
@@ -1757,7 +1779,8 @@ char *name;
 /*
  * Undo a "savetag".
  */
-unsavetag()
+void
+unsavetag(void)
 {
 	if (!value(vi_TAGSTACK))
 		return;
@@ -1765,6 +1788,7 @@ unsavetag()
 		tag_end = tagstack[--tag_depth].tag_file;
 }
 
+void
 poptag(quick)	/* puts us back where we came from */
 bool quick;
 {

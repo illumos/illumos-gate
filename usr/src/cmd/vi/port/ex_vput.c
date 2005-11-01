@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,8 @@
  * Really hard stuff here is utilizing insert character operations
  * on intelligent terminals which differs widely from terminal to terminal.
  */
-vclear()
+void
+vclear(void)
 {
 
 #ifdef TRACE
@@ -61,9 +62,8 @@ vclear()
 /*
  * Clear memory.
  */
-vclrbyte(cp, i)
-	register wchar_t *cp;
-	register int i;
+void
+vclrbyte(wchar_t *cp, int i)
 {
 
 	if (i > 0)
@@ -75,9 +75,8 @@ vclrbyte(cp, i)
 /*
  * Clear a physical display line, high level.
  */
-vclrlin(l, tp)
-	int l;
-	line *tp;
+void
+vclrlin(int l, line *tp)
 {
 
 	vigoto(l, 0);
@@ -91,10 +90,11 @@ vclrlin(l, tp)
 /*
  * Clear to the end of the current physical line
  */
-vclreol()
+void
+vclreol(void)
 {
-	register int i;
-	register wchar_t *tp, j;
+	int i;
+	wchar_t *tp, j;
 
 #ifdef TRACE
 	if (trace)
@@ -121,7 +121,7 @@ vclreol()
 	while (i > 0 && (j = *tp & (QUOTE|TRIM))) {
 		if (j != ' ' && (j & QUOTE) == 0) {
 			destcol = WCOLS - i;
-			vputchar(' ');
+			(void) vputchar(' ');
 		}
 		--i, *tp++ = 0;
 	}
@@ -135,6 +135,7 @@ vclreol()
  * If work here is being held off, just remember, in
  * heldech, if work needs to be done, don't do anything.
  */
+void
 vclrech(didphys)
 	bool didphys;
 {
@@ -206,7 +207,8 @@ vclrech(didphys)
  * the state variable splitw so we wont rollup
  * when we move the cursor there.
  */
-fixech()
+void
+fixech(void)
 {
 
 	splitw++;
@@ -220,8 +222,8 @@ fixech()
 /*
  * Put the cursor ``before'' cp.
  */
-vcursbef(cp)
-	register unsigned char *cp;
+void
+vcursbef(unsigned char *cp)
 {
 
 	if (cp <= linebuf)
@@ -233,8 +235,8 @@ vcursbef(cp)
 /*
  * Put the cursor ``at'' cp.
  */
-vcursat(cp)
-	register unsigned char *cp;
+void
+vcursat(unsigned char *cp)
 {
 
 	if (cp <= linebuf && linebuf[0] == 0)
@@ -246,8 +248,8 @@ vcursat(cp)
 /*
  * Put the cursor ``after'' cp.
  */
-vcursaft(cp)
-	register unsigned char *cp;
+void
+vcursaft(unsigned char *cp)
 {
 
 	vgotoCL(lcolumn(nextchr(cp)));
@@ -257,7 +259,8 @@ vcursaft(cp)
  * Fix the cursor to be positioned in the correct place
  * to accept a command.
  */
-vfixcurs()
+void
+vfixcurs(void)
 {
 
 	vsetcurs(cursor);
@@ -267,10 +270,10 @@ vfixcurs()
  * Compute the column position implied by the cursor at ``nc'',
  * and move the cursor there.
  */
-vsetcurs(nc)
-	register unsigned char *nc;
+void
+vsetcurs(unsigned char *nc)
 {
-	register int col;
+	int col;
 
 	col = column(nc);
 	if (linebuf[0])
@@ -282,8 +285,8 @@ vsetcurs(nc)
 /*
  * Move the cursor invisibly, i.e. only remember to do it.
  */
-vigoto(y, x)
-	int y, x;
+void
+vigoto(int y, int x)
 {
 
 	destline = y;
@@ -294,7 +297,8 @@ vigoto(y, x)
  * Move the cursor to the position implied by any previous
  * vigoto (or low level hacking with destcol/destline as in readecho).
  */
-vcsync()
+void
+vcsync(void)
 {
 
 	vgoto(destline, destcol);
@@ -303,8 +307,8 @@ vcsync()
 /*
  * Goto column x of the current line.
  */
-vgotoCL(x)
-	register int x;
+void
+vgotoCL(int x)
 {
 
 	if (splitw)
@@ -316,8 +320,8 @@ vgotoCL(x)
 /*
  * Invisible goto column x of current line.
  */
-vigotoCL(x)
-	register int x;
+void
+vigotoCL(int x)
 {
 
 	if (splitw)
@@ -330,8 +334,8 @@ vigotoCL(x)
  * Show the current mode in the right hand part of the echo line,
  * then return the cursor to where it is now.
  */
-vshowmode(msg)
-unsigned char *msg;
+void
+vshowmode(unsigned char *msg)
 {
 	int savecol, saveline, savesplit;
 	unsigned char *p;
@@ -364,7 +368,7 @@ unsigned char *msg;
 				vclreol();
 				break;
 			} else {
-				vputchar(wchar);
+				(void) vputchar(wchar);
 				p += length;
 			}
 		}
@@ -383,11 +387,11 @@ unsigned char *msg;
 /*
  * Move cursor to line y, column x, handling wraparound and scrolling.
  */
-vgoto(y, x)
-	register int y, x;
+void
+vgoto(int y, int x)
 {
-	register wchar_t *tp;
-	register wchar_t c;
+	wchar_t *tp;
+	wchar_t c;
 	int		 col;
 
 	/*
@@ -429,7 +433,9 @@ vgoto(y, x)
 				if(length == 0)
 					length = 1;
 				while(length--)
-					vputc(c && (!over_strike || erase_overstrike) ? c : ' ');
+					(void) vputc(c &&
+					    (!over_strike || erase_overstrike)
+					    ? c : ' ');
 				if (c) {
 					if ((col = wcwidth(c)) < 0)
 						col = 0;
@@ -536,9 +542,10 @@ vgoto(y, x)
  * with a QUOTE.  We use QUOTE internally to represent a position
  * which is part of the expansion of a tab.
  */
-vgotab()
+void
+vgotab(void)
 {
-	register int i = tabcol(destcol, value(vi_TABSTOP)) - destcol;
+	int i = tabcol(destcol, value(vi_TABSTOP)) - destcol;
 
 	do
 		(*Outchar)(QUOTE);
@@ -564,10 +571,11 @@ int	slakused;		/* This much of tabslack will be used up */
  * of the screen image buffer so it is easier for us to
  * manipulate them.
  */
-vprepins()
+void
+vprepins(void)
 {
-	register int i;
-	register wchar_t *cp = vtube0;
+	int i;
+	wchar_t *cp = vtube0;
 
 	for (i = 0; i < DEPTH(vcline); i++) {
 		vmaktop(LINE(vcline) + i, cp);
@@ -575,11 +583,10 @@ vprepins()
 	}
 }
 
-vmaktop(p, cp)
-	register int p;
-	wchar_t *cp;
+void
+vmaktop(int p, wchar_t *cp)
 {
-	register int i;
+	int i;
 	wchar_t temp[TUBECOLS];
 
 	if (p < 0 || vtube[p] == cp)
@@ -604,11 +611,11 @@ vmaktop(p, cp)
  * and code assumes this in several place
  * to make life simpler.
  */
-vinschar(c)
-	wchar_t c;		/* char --> int */
+int
+vinschar(wchar_t c)
 {
-	register int i;
-	register wchar_t *tp, wchar;
+	int i;
+	wchar_t *tp, wchar;
 
 	if ((!enter_insert_mode || !exit_insert_mode) && ((hold & HOLDQIK) || !value(vi_REDRAW) || value(vi_SLOWOPEN))) {
 		/*
@@ -619,12 +626,12 @@ vinschar(c)
 		 */
 		if (c == '\t') {
 			vgotab();
-			return;
+			return (0);
 		}
-		vputchar(c);
+		(void) vputchar(c);
 		if (DEPTH(vcline) * WCOLS + !value(vi_REDRAW) >
 		    (destline - LINE(vcline)) * WCOLS + destcol)
-			return;
+			return (0);
 		/*
 		 * The next line is about to be clobbered
 		 * make space for another segment of this line
@@ -637,14 +644,14 @@ vinschar(c)
 		} else {
 			int i2 = LINE(vcline) + DEPTH(vcline);
 			if (i2 < LINE(vcline + 1) || i2 > WBOT)
-				return;
+				return (0);
 			i = destcol;
 			vinslin(i2, 1, vcline);
 			DEPTH(vcline)++;
 			vigoto(i2, i);
 			vprepins();
 		}
-		return;
+		return (0);
 	}
 	
 	/*
@@ -700,13 +707,13 @@ vinschar(c)
 		if (inscol != linend)
 			doomed -= inssiz;
 		do {
-			vputchar(c);
+			(void) vputchar(c);
 			if(c & QUOTE)
 				inssiz--;
 			else
 				break;
 		} while (inssiz);
-		return;
+		return (0);
 	}
 	
 	/*
@@ -787,22 +794,24 @@ vinschar(c)
 	destline = LINE(vcline);
 	destcol = inscol + inssiz;
 	vcsync();
+	return (0);
 }
 
 /*
  * Rigidify the rest of the line after the first
  * group of following tabs, typing blanks over ``spaces''.
  */
-vrigid()
+void
+vrigid(void)
 {
-	register int col;
-	register wchar_t *tp = vtube0 + tabend;
+	int col;
+	wchar_t *tp = vtube0 + tabend;
 
 	for (col = tabend; col < linend; col++)
 		if ((*tp++ & TRIM) == 0) {
 			endim();
 			vgotoCL(col);
-			vputchar(' ' | QUOTE);
+			(void) vputchar(' ' | QUOTE);
 		}
 }
 
@@ -814,22 +823,22 @@ vrigid()
  * On a dumb terminal we may infact redisplay the rest of the
  * screen here brute force to keep it pretty.
  */
-vneedpos(cnt)
-	int cnt;
+void
+vneedpos(int cnt)
 {
-	register int d = DEPTH(vcline);
-	register int rmdr = d * WCOLS - linend;
+	int d = DEPTH(vcline);
+	int rmdr = d * WCOLS - linend;
 	if (cnt <= rmdr - insert_null_glitch)
 		return;
 	endim();
 	vnpins(1);
 }
 
-vnpins(dosync)
-	int dosync;
+void
+vnpins(int dosync)
 {
-	register int d = DEPTH(vcline);
-	register int e;
+	int d = DEPTH(vcline);
+	int e;
 
 	e = LINE(vcline) + DEPTH(vcline);
 	if (e < LINE(vcline + 1)) {
@@ -859,13 +868,14 @@ vnpins(dosync)
  * Do the shift of the next tabstop implied by
  * insertion so it expands.
  */
-vishft()
+void
+vishft(void)
 {
 	int tshft = 0;
 	int j;
-	register int i;
-	register wchar_t *tp = vtube0;
-	register wchar_t *up, wchar;
+	int i;
+	wchar_t *tp = vtube0;
+	wchar_t *up, wchar;
 	short oldhold = hold;
 
 	shft = value(vi_TABSTOP);
@@ -879,7 +889,7 @@ vishft()
 		up = tp + tabend;
 		for (i = tabend; i < linend; i++)
 			if((wchar = *up++) != FILLER)
-				vputchar(wchar);
+				(void) vputchar(wchar);
 	} else if (insert_null_glitch) {
 		/*
 		 * CONCEPT-like terminals do most of the work for us,
@@ -899,7 +909,7 @@ vishft()
 			vgotoCL(tabend);
 			goim();
 			do
-				vputchar(' ' | QUOTE);
+				(void) vputchar(' ' | QUOTE);
 			while (--i);
 		}
 	} else {
@@ -919,7 +929,7 @@ vishft()
 				wchar_t wchar;
 				if (wchar = *up) {
 					if(wchar != FILLER)
-						vputchar(wchar);
+						(void) vputchar(wchar);
 					up++;
 				} else
 					break;
@@ -932,7 +942,7 @@ vishft()
 			vcsync();
 			goim();
 			do
-				vputchar(' ');
+				(void) vputchar(' ');
 			while (--i);
 		}
 	}
@@ -959,12 +969,12 @@ vishft()
 /*
  * Now do the insert of the characters (finally).
  */
-viin(c)
-	wchar_t c;		/* char --> int */
+void
+viin(wchar_t c)
 {
-	register wchar_t *tp, *up;
-	register int i, j;
-	register bool noim = 0;
+	wchar_t *tp, *up;
+	int i, j;
+	bool noim = 0;
 	int remdoom;
 	short oldhold = hold;
 
@@ -1024,7 +1034,7 @@ viin(c)
 			vcsync();
 			goim();
 		}
-		vputchar(c);
+		(void) vputchar(c);
 		if((c & QUOTE) == 0)
 			break;
 	}
@@ -1041,13 +1051,13 @@ viin(c)
 		tp = vtube0 + inscol + doomed;
 		for (i = inscol + doomed; i < tabstart; i++) {
 			if(*tp != FILLER)
-				vputchar(*tp);
+				(void) vputchar(*tp);
 			tp++;
 		}
 		hold = oldhold;
 		vigotoCL(tabstart + inssiz - doomed);
 		for (i = tabsize - (inssiz - doomed) + shft; i > 0; i--)
-			vputchar(' ' | QUOTE);
+			(void) vputchar(' ' | QUOTE);
 	} else {
 		if (!insert_null_glitch) {
 			/*
@@ -1068,7 +1078,7 @@ viin(c)
 				do {
 					wchar_t wchar;
 					if((wchar = *up++) != FILLER)
-						vputchar(wchar);
+						(void) vputchar(wchar);
 				} while (--i && *up);
 			}
 		} else {
@@ -1129,7 +1139,8 @@ viin(c)
  * is the same as that which goes into insert
  * mode, then we are in delete mode already.
  */
-godm()
+void
+godm(void)
 {
 
 	if (insmode) {
@@ -1148,7 +1159,8 @@ godm()
  * if we just moved over to delete space from part of
  * a tab (above).
  */
-enddm()
+void
+enddm(void)
 {
 
 	if (eq(enter_delete_mode, enter_insert_mode)) {
@@ -1165,7 +1177,8 @@ enddm()
  * if the terminal does all insertions a single character
  * at a time, since it branches based on whether enter_insert_mode is null.
  */
-goim()
+void
+goim(void)
 {
 
 	if (!insmode)
@@ -1173,7 +1186,8 @@ goim()
 	insmode = 1;
 }
 
-endim()
+void
+endim(void)
 {
 
 	if (insmode) {
@@ -1192,13 +1206,13 @@ endim()
  * you can erase overstrikes with some work.  CRT's which do underlining
  * implicitly which has to be erased (like CONCEPTS) are also handled.
  */
-vputchar(c)
-	register wchar_t c;
+int
+vputchar(wchar_t c)
 {
 	unsigned char multic[MULTI_BYTE_MAX];
-	register wchar_t *tp;
-	register int d, length, length2, bytelength;
-	register unsigned char *p;
+	wchar_t *tp;
+	int d, length, length2, bytelength;
+	unsigned char *p;
 	short oldhold = hold;
 
 	c &= (QUOTE|TRIM);
@@ -1228,29 +1242,29 @@ vputchar(c)
 		hold |= HOLDPUPD;
 #ifdef PRESUNEUC
 		while(length--)
-			vputchar('>');
+			(void) vputchar('>');
 #else
 		if (mc_wrap == 0)
 			while(length--)
-				vputchar(mc_filler);
+				(void) vputchar(mc_filler);
 		else {
 			for (length = WCOLS - destcol; length; length--)
-				vputchar(mc_filler);
+				(void) vputchar(mc_filler);
 			hold = oldhold;
 			if ((length = wcwidth(c)) < 0)
 				length = 0;
-			vputchar(c);
+			(void) vputchar(c);
 		}
 #endif /* PRESUNEUC */
 		hold = oldhold;
-		return;
+		return (0);
 	}
 	tp = vtube[destline] + destcol;
 	switch (c) {
 
 	case '\t':
 		vgotab();
-		return;
+		return (0);
 
 	case ' ':
 		/*
@@ -1265,7 +1279,7 @@ vputchar(c)
 		if (!insmode && !insert_null_glitch && (state != HARDOPEN || over_strike) && (*tp&TRIM) == 0) {
 			*tp = ' ';
 			destcol++;
-			return;
+			return (0);
 		}
 		goto def;
 
@@ -1285,14 +1299,14 @@ vputchar(c)
 			if ((hold & HOLDPUPD) == 0)
 				*tp = QUOTE;
 			destcol++;
-			return;
+			return (0);
 		}
 		/*
 		 * A ``space'' ontop of a part of a tab.
 		 */
 		if (*tp & QUOTE) {
 			destcol++;
-			return;
+			return (0);
 		}
 		c = ' ' | QUOTE;
 		/* fall into ... */
@@ -1320,7 +1334,7 @@ def:
 				}
 			}
 			destcol += length;
-			return;
+			return (0);
 		}
 		/*
 		 * Backwards looking optimization.
@@ -1334,7 +1348,7 @@ def:
 		 * to be printed.
 		 */
 		if (destcol == outcol + 1 && tp[-1] == ' ' && outline == destline) {
-			vputc(' ');
+			(void) vputc(' ');
 			outcol++;
 		}
 
@@ -1355,7 +1369,7 @@ def:
 		 */
 		if (!insmode && d && d != ' ' && d != (c & TRIM)) {
 			if (erase_overstrike && (over_strike || transparent_underline && (c == '_' || d == '_'))) {
-				vputc(' ');
+				(void) vputc(' ');
 				outcol++, destcol++;
 				back1();
 			} else
@@ -1389,7 +1403,7 @@ def:
 		bytelength = wctomb((char *)multic, c);
 		p = multic;
 		while(bytelength--)
-			vputc(*p++);
+			(void) vputc(*p++);
 
 		/*
 		 * In insert mode, insert_padding is a post insert pad.
@@ -1407,23 +1421,24 @@ def:
 		 * on vt100/tab132 as well as concept.
 		 */
 		if (eat_newline_glitch && outcol % WCOLS == 0) {
-			vputc('\r');
-			vputc('\n');
+			(void) vputc('\r');
+			(void) vputc('\n');
 		}
 	}
+	return (0);
 }
 
 /*
  * Delete display positions stcol through endcol.
  * Amount of use of special terminal features here is limited.
  */
-physdc(stcol, endcol)
-	int stcol, endcol;
+void
+physdc(int stcol, int endcol)
 {
-	register wchar_t *tp, *up;
+	wchar_t *tp, *up;
 	wchar_t *tpe;
-	register int i;
-	register int nc = endcol - stcol;
+	int i;
+	int nc = endcol - stcol;
 
 #ifdef IDEBUG
 	if (trace)
@@ -1516,7 +1531,7 @@ tfixnl()
 
 tvliny()
 {
-	register int i;
+	int i;
 
 	if (!trace)
 		return;
@@ -1555,12 +1570,7 @@ tracec(c)
  * Put a character with possible tracing.
  */
 int
-#ifdef __STDC__
 vputch(char c)
-#else
-vputch(c)
-	char c;
-#endif
 {
 
 #ifdef TRACE
@@ -1568,5 +1578,6 @@ vputch(c)
 		tracec(c);
 	}
 #endif
-	vputc(c);
+	(void) vputc(c);
+	return (0);
 }

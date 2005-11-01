@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,7 @@
 void setsize();
 void winch();
 void vintr();
+void ovend(ttymode);
 
 wchar_t	atube[TUBESIZE];
 jmp_buf	venv;
@@ -130,7 +131,7 @@ int sig;
 #endif
 {
 	struct winsize jwin;
-	register int l;
+	int l;
 
 	if(ioctl(0, TIOCGWINSZ, &jwin) != -1) {
 #ifdef XPG4
@@ -151,7 +152,7 @@ void
 setsize()
 {
 	struct winsize jwin;
-	register int l;
+	int l;
 
 	if(ioctl(0, TIOCGWINSZ, &jwin) != -1) {
 		if (jwin.ws_col > 0)
@@ -193,9 +194,10 @@ setsize()
 /*
  * Enter open mode
  */
-oop()
+void
+oop(void)
 {
-	register unsigned char *ic;
+	unsigned char *ic;
 	ttymode f;	/* was register */
 	int resize;
 
@@ -261,7 +263,8 @@ gettext("Pattern not found on addressed line"));
 	(void)signal(SIGWINCH, SIG_DFL);
 }
 
-ovbeg()
+void
+ovbeg(void)
 {
 
 	if (inopen)
@@ -273,8 +276,8 @@ ovbeg()
 	dot = addr2;
 }
 
-ovend(f)
-	ttymode f;
+void
+ovend(ttymode f)
 {
 
 	splitw++;
@@ -295,9 +298,10 @@ ovend(f)
 /*
  * Enter visual mode
  */
-vop()
+void
+vop(void)
 {
-	register int c;
+	int c;
 	ttymode f;	/* was register */
 	extern unsigned char termtype[];
 
@@ -348,7 +352,7 @@ toopen:
 	f = ostart();
 	if (initev == 0) {
 		vcontext(dot, c);
-		vnline(NOSTR);
+		vnline((unsigned char *)NOSTR);
 	}
 	vmain();
 	Command = (unsigned char *)"visual";
@@ -361,13 +365,14 @@ toopen:
  * empty buffer since routines internally
  * demand at least one line.
  */
-fixzero()
+void
+fixzero(void)
 {
 
 	if (dol == zero) {
-		register bool ochng = chng;
+		bool ochng = chng;
 
-		vdoappend("");
+		vdoappend((unsigned char *)"");
 		if (!ochng)
 			sync();
 		addr1 = addr2 = one;
@@ -388,7 +393,8 @@ fixzero()
  * at some point, and then quit from the visual and undo
  * you get the old file back.  Somewhat weird.
  */
-savevis()
+void
+savevis(void)
 {
 
 	if (inglobal)
@@ -403,7 +409,8 @@ savevis()
  * Restore a sensible state after a visual/open, moving the saved
  * stuff back to [unddol,dol], and killing the partial line kill indicators.
  */
-undvis()
+void
+undvis(void)
 {
 
 	if (ruptible)
@@ -423,7 +430,8 @@ undvis()
  * Set the window parameters based on the base state bastate
  * and the available buffer space.
  */
-setwind()
+void
+setwind(void)
 {
 
 	WCOLS = columns;
@@ -464,15 +472,16 @@ setwind()
  */
 static unsigned char vlinebuf[LBSIZE];
 
-vok(atube, undo)
-	register wchar_t *atube;
+void
+vok(wchar_t *atube, int undo)
 {
-	register int i;
+	int i;
 	static int beenhere;
 
 	if (WCOLS == 1000)
-		serror(gettext("Don't know enough about your terminal to use %s"),
-			Command);
+		serror((unsigned char *)
+		    gettext("Don't know enough about your terminal to use %s"),
+		    Command);
 	if (WCOLS > TUBECOLS)
 		error(gettext("Terminal too wide"));
 	if (WLINES >= TUBELINES || WCOLS * (WECHO - ZERO + 1) > TUBESIZE)
@@ -533,10 +542,10 @@ int sig;
  * Set the size of the screen to size lines, to take effect the
  * next time the screen is redrawn.
  */
-vsetsiz(size)
-	int size;
+void
+vsetsiz(int size)
 {
-	register int b;
+	int b;
 
 	if (bastate != VISUAL)
 		return;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,14 @@
 
 /* Copyright (c) 1981 Regents of the University of California */
 
+#ifndef _EX_TTY_H
+#define	_EX_TTY_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Capabilities from termcap
@@ -109,6 +116,14 @@ var	ttymode	normf;		/* Restore tty flags to this (someday) */
 var	bool	normtty;	/* Have to restore normal mode from normf */
 
 ttymode ostart(), setty(), unixex();
+void putpad(unsigned char *cp);
+void pstart(void);
+void pstop(void);
+void tostart(void);
+void ttcharoff(void);
+void tostop(void);
+void normal(ttymode);
+void sTTY(int);
 
 var	short	costCM;	/* # chars to output a typical cursor_address, with padding etc. */
 var	short	costSR;	/* likewise for scroll reverse */
@@ -131,6 +146,7 @@ struct maps {
 	unsigned char *mapto;	/* .. maps to this string */
 	unsigned char *descr;	/* legible description of key */
 };
+void kpadd(struct maps *, unsigned char *, unsigned char *, unsigned char *);
 var	struct maps arrows[MAXNOMACS];	/* macro defs - 1st 5 built in */
 var	struct maps immacs[MAXNOMACS];	/* for while in insert mode */
 var	struct maps abbrevs[MAXNOMACS];	/* for word abbreviations */
@@ -156,3 +172,9 @@ var int envcolumns;
 var int oldlines;
 var int oldcolumns;
 #endif /* XPG4 */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* _EX_TTY_H */

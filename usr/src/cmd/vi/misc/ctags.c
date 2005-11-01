@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@
 #ifndef lint
 char copyright[] = "@(#) Copyright (c) 1980 Regents of the University of "
 			"California.\nAll rights reserved.\n";
-#endif not lint
+#endif
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 		/* from UCB 5.1 5/31/85 */
@@ -60,7 +60,6 @@ char copyright[] = "@(#) Copyright (c) 1980 Regents of the University of "
  * ctags: create a tags file
  */
 
-#define	reg	register
 #define	bool	char
 
 #define	TRUE	(1)
@@ -190,10 +189,8 @@ static void	toss_yysec();
 static void	Usage();
 static void	parseargs(int ac, char **av);
 
-void
-main(ac, av)
-int	ac;
-char	*av[];
+int
+main(int ac, char *av[])
 {
 	int i;
 	char cmd[100];
@@ -291,8 +288,7 @@ char	*av[];
 		(void) sprintf(cmd, "sort %s -o %s", outfile, outfile);
 		(void) system(cmd);
 	}
-	exit(infile_fail > 0 ? 2 : 0); /* Fix for #1082298 */
-	/* NOTREACHED */
+	return (infile_fail > 0 ? 2 : 0); /* Fix for #1082298 */
 }
 
 /*
@@ -306,8 +302,8 @@ char	*av[];
 static void
 init()
 {
-	reg	char	*sp;
-	reg	int	i;
+	char	*sp;
+	int	i;
 
 	for (i = 0; i < 0177; i++) {
 		_wht[i] = _etk[i] = _itk[i] = _btk[i] = FALSE;
@@ -417,9 +413,9 @@ char	*name;
 int	ln;
 bool	f;		/* f == TRUE when function */
 {
-	register char *fp;
-	register NODE *np;
-	register char *nametk;	/* hold temporary tokens from name */
+	char *fp;
+	NODE *np;
+	char *nametk;	/* hold temporary tokens from name */
 	char nbuf[BUFSIZ];
 
 	if ((np = malloc(sizeof (NODE))) == NULL) {
@@ -487,8 +483,8 @@ bool	f;		/* f == TRUE when function */
 static void
 C_entries()
 {
-	register int c;
-	register char *token, *tp;
+	int c;
+	char *token, *tp;
 	bool incomm, inquote, inchar, midtoken, isoperator, optfound;
 	int level;
 	char *sp;
@@ -729,8 +725,8 @@ start_entry(lp, token, f)
 char	**lp, *token;
 int	*f;
 {
-	reg	char	*sp;
-	register int	c;
+	char	*sp;
+	int	c;
 	static	bool	found;
 	bool	firsttok;	/* T if have seen first token in ()'s	*/
 	int	bad;
@@ -842,9 +838,9 @@ ret:
 static void
 Y_entries()
 {
-	register char	*sp, *orig_sp;
-	register int	brace;
-	register bool	in_rule, toklen;
+	char	*sp, *orig_sp;
+	int	brace;
+	bool	in_rule, toklen;
 	char		tok[BUFSIZ];
 
 	brace = 0;
@@ -926,7 +922,7 @@ static char *
 toss_comment(start)
 char	*start;
 {
-	register char	*sp;
+	char	*sp;
 
 	/*
 	 * first, see if the end-of-comment is on the same line
@@ -959,7 +955,7 @@ getline(where)
 long int where;
 {
 	long saveftell = ftell(inf);
-	register char *cp;
+	char *cp;
 
 	(void) fseek(inf, where, 0);
 	(void) fgets(lbuf, sizeof (lbuf), inf);
@@ -990,7 +986,7 @@ static void
 add_node(node, cur_node)
 NODE *node, *cur_node;
 {
-	register int dif;
+	int dif;
 
 	dif = strcmp(node->entry, cur_node->entry);
 	if (dif == 0) {
@@ -1031,9 +1027,9 @@ NODE *node, *cur_node;
 
 static void
 put_entries(node)
-reg NODE	*node;
+NODE	*node;
 {
-	reg char	*sp;
+	char	*sp;
 
 	if (node == NULL)
 		return;
@@ -1171,7 +1167,7 @@ static int
 tail(cp)
 char *cp;
 {
-	register int len = 0;
+	int len = 0;
 
 	while (*cp && (*cp&~' ') == ((*(dbp+len))&~' '))
 		cp++, len++;
@@ -1205,7 +1201,7 @@ takeprec()
 static void
 getit()
 {
-	register char *cp;
+	char *cp;
 	char c;
 	char nambuf[BUFSIZ];
 
@@ -1230,8 +1226,8 @@ static char *
 savestr(cp)
 char *cp;
 {
-	register int len;
-	register char *dp;
+	int len;
+	char *dp;
 
 	len = strlen(cp);
 	dp = (char *)malloc(len+1);
@@ -1250,9 +1246,9 @@ char *cp;
 
 static char *
 rindex(sp, c)
-register char *sp, c;
+char *sp, c;
 {
-	register char *r;
+	char *r;
 
 	r = NULL;
 	do {
@@ -1272,7 +1268,7 @@ static void
 L_funcs(fi)
 FILE *fi;
 {
-	register int	special;
+	int	special;
 
 	pfcnt = 0;
 	while (fgets(lbuf, sizeof (lbuf), fi)) {
@@ -1302,8 +1298,8 @@ static void
 L_getit(special)
 int	special;
 {
-	register char	*cp;
-	register char	c;
+	char	*cp;
+	char	c;
 	char		nambuf[BUFSIZ];
 
 	for (cp = lbuf; *cp; cp++)
@@ -1347,9 +1343,9 @@ int	special;
  */
 static int
 striccmp(str, pat)
-register char	*str, *pat;
+char	*str, *pat;
 {
-	register int	c1;
+	int	c1;
 
 	while (*pat) {
 		if (isupper(*str))
@@ -1373,8 +1369,8 @@ register char	*str, *pat;
 static int
 first_char()
 {
-	register int	c;
-	register long	off;
+	int	c;
+	long	off;
 
 	off = ftell(inf);
 	while ((c = getc(inf)) != EOF)

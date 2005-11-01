@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,8 @@ int	lindent();
 
 bool	wasend;
 
+int endsent(bool);
+
 /*
  * Find over structure, repeated count times.
  * Don't go past line limit.  F is the operation to
@@ -66,13 +68,14 @@ bool	wasend;
  * rather than (), implying past atoms in a list (or a paragraph
  * rather than a sentence.
  */
+int
 lfind(pastatom, cnt, f, limit)
 	bool pastatom;
 	int cnt, (*f)();
 	line *limit;
 {
-	register int c;
-	register int rc = 0;
+	int c;
+	int rc = 0;
 	unsigned char save[LBSIZE];
 
 	/*
@@ -189,7 +192,7 @@ begin:
 			 */
 			if (linebuf[0] == 0 && !pastatom && 
 			   (wdot != dot - 1 || cursor != linebuf)) {
-				lnext();
+				(void) lnext();
 				goto ret;
 			}
 		}
@@ -255,11 +258,11 @@ ret:
 /*
  * Is this the end of a sentence?
  */
-endsent(pastatom)
-	bool pastatom;
+int
+endsent(bool pastatom)
 {
-	register unsigned char *cp = wcursor;
-	register int c, d;
+	unsigned char *cp = wcursor;
+	int c, d;
 	int	len;
 
 	/*
@@ -301,7 +304,8 @@ tryps:
  * End of paragraphs/sections are respective
  * macros as well as blank lines and form feeds.
  */
-endPS()
+int
+endPS(void)
 {
 
 	return (linebuf[0] == 0 ||
@@ -314,17 +318,17 @@ endPS()
 	    
 }
 
-lindent(addr)
-	line *addr;
+int
+lindent(line *addr)
 {
-	register int i;
+	int i;
 	unsigned char *swcurs = wcursor;
 	line *swdot = wdot;
 
 again:
 	if (addr > one) {
-		register unsigned char *cp;
-		register int cnt = 0;
+		unsigned char *cp;
+		int cnt = 0;
 
 		addr--;
 		getline(*addr);
@@ -351,7 +355,7 @@ again:
 	else if (wcursor == linebuf)
 		i = 2;
 	else {
-		register unsigned char *wp = wcursor;
+		unsigned char *wp = wcursor;
 
 		dir = 1;
 		llimit = wdot;
@@ -369,11 +373,11 @@ again:
 	return (i);
 }
 
-lmatchp(addr)
-	line *addr;
+int
+lmatchp(line *addr)
 {
-	register int i;
-	register unsigned char *parens, *cp;
+	int i;
+	unsigned char *parens, *cp;
 
 	for (cp = cursor; !any(*cp, "({[)}]");) {
 		if (*cp == 0)
@@ -402,12 +406,12 @@ lmatchp(addr)
 	return (i);
 }
 
-lsmatch(cp)
-	unsigned char *cp;
+void
+lsmatch(unsigned char *cp)
 {
 	unsigned char save[LBSIZE];
-	register unsigned char *sp = save;
-	register unsigned char *scurs = cursor;
+	unsigned char *sp = save;
+	unsigned char *scurs = cursor;
 
 	wcursor = cp;
 	strcpy(sp, linebuf);
@@ -416,9 +420,9 @@ lsmatch(cp)
 	cursor = strend(linebuf);
 	cursor = lastchr(linebuf, cursor);
 	if (lmatchp(dot - vcline)) {
-		register int i = insmode;
-		register int c = outcol;
-		register int l = outline;
+		int i = insmode;
+		int c = outcol;
+		int l = outline;
 
 		if (!move_insert_mode)
 			endim();
@@ -433,7 +437,7 @@ lsmatch(cp)
 		strcLIN(sp);
 		strcpy(scurs, genbuf);
 		if (!lmatchp((line *) 0))
-			beep();
+			(void) beep();
 	}
 	strcLIN(sp);
 	wdot = 0;
@@ -441,16 +445,17 @@ lsmatch(cp)
 	cursor = scurs;
 }
 
-ltosolid()
+int
+ltosolid(void)
 {
 
 	return (ltosol1("()"));
 }
 
-ltosol1(parens)
-	register unsigned char *parens;
+int
+ltosol1(unsigned char *parens)
 {
-	register unsigned char *cp;
+	unsigned char *cp;
 	int	len;
 	unsigned char	*ocp;
 
@@ -478,11 +483,11 @@ ltosol1(parens)
 	return (1);
 }
 
-lskipbal(parens)
-	register unsigned char *parens;
+int
+lskipbal(unsigned char *parens)
 {
-	register int level = dir;
-	register int c;
+	int level = dir;
+	int c;
 
 	do {
 		if (!lnext()) {
@@ -498,16 +503,17 @@ lskipbal(parens)
 	return (1);
 }
 
-lskipatom()
+int
+lskipatom(void)
 {
 
 	return (lskipa1("()"));
 }
 
-lskipa1(parens)
-	register unsigned char *parens;
+int
+lskipa1(unsigned char *parens)
 {
-	register int c;
+	int c;
 
 	for (;;) {
 		if (dir < 0 && wcursor == linebuf) {
@@ -527,7 +533,8 @@ lskipa1(parens)
 	return (ltosol1(parens));
 }
 
-lnext()
+int
+lnext(void)
 {
 
 	if (dir > 0) {
@@ -566,11 +573,10 @@ lnext()
 	}
 }
 
-lbrack(c, f)
-	register int c;
-	int (*f)();
+int
+lbrack(int c, int (*f)())
 {
-	register line *addr;
+	line *addr;
 
 	addr = dot;
 	for (;;) {
@@ -607,8 +613,8 @@ lbrack(c, f)
 	return (1);
 }
 
-isa(cp)
-	register unsigned char *cp;
+int
+isa(unsigned char *cp)
 {
 
 	if (linebuf[0] != '.')

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <pwd.h>
 #include <locale.h>
 #include <limits.h>
+#include <unistd.h>
 
 #define	BUFSIZE	(LINE_MAX*2)	/* This should agree with what's in ex.h */
 
@@ -84,16 +85,16 @@ struct 	header {
 	short	encrypted;		/* Encrypted temp file flag */
 } H;
 
-struct	passwd *getpwuid();
-off_t	lseek();
-FILE	*popen();
-void exit(), perror();
 #define	eq(a, b) strcmp(a, b) == 0
 
+void notify(int, unsigned char *, int, int);
+void mkdigits(unsigned char *);
+
+int
 main(argc)
 	int argc;
 {
-	register DIR *tf;
+	DIR *tf;
 	struct dirent64 *direntry;
 	unsigned char *filname;
 	struct stat64 stbuf;
@@ -107,9 +108,9 @@ main(argc)
 	 * If only one argument, then preserve the standard input.
 	 */
 	if (argc == 1) {
-		if (copyout((char *) 0))
-			exit(1);
-		exit(0);
+		if (copyout((unsigned char *) 0))
+			return (1);
+		return (0);
 	}
 
 	/*
@@ -117,7 +118,7 @@ main(argc)
 	 */
 	if (getuid()) {
 		fprintf(stderr, gettext("NOT super user\n"));
-		exit(1);
+		return (1);
 	}
 
 	/*
@@ -126,13 +127,13 @@ main(argc)
 	 */
 	if (chdir(TMPDIR) < 0) {
 		perror(TMPDIR);
-		exit(1);
+		return (1);
 	}
 
 	if ((tf = opendir(".")) == NULL)
 	{
 		perror(TMPDIR);
-		exit(1);
+		return (1);
 	}
 	while ((direntry = readdir64(tf)) != NULL)
 	{
@@ -155,7 +156,7 @@ main(argc)
 		(void) copyout(filname);
 	}
 	closedir(tf);
-	exit(0);
+	return (0);
 }
 
 unsigned char	mydir[] =	USRPRESERVE;
@@ -169,8 +170,8 @@ unsigned char	pattern[] =	"/Exaa`XXXXXXXXXX";
  * file (this is the slowest thing since we must stat
  * to find a unique name), and finally copy the file.
  */
-copyout(name)
-	unsigned char *name;
+int
+copyout(unsigned char *name)
 {
 	int i;
 	static int reenter;
@@ -221,7 +222,7 @@ format:
 
 			if (stat64((char *)name, &stbuf) == 0)
 			if (stbuf.st_size == 0)
-				(void) unlink(name);
+				(void) unlink((char *)name);
 		}
 		return (-1);
 	}
@@ -279,7 +280,7 @@ format:
 	}
 	if (lstat64((char *)savdir, &stbuf) < 0 || !S_ISDIR(stbuf.st_mode)) {
 		/* It doesn't exist or it isn't a directory, safe to unlink */
-		(void) unlink(savdir);
+		(void) unlink((char *)savdir);
 		if (mkdir((char *)savdir, 0700) < 0) {
 			fprintf(stderr,
 				gettext("Unable to create directory \"%s\"\n"),
@@ -288,7 +289,7 @@ format:
 			return (-1);
 		}
 		(void) chmod((char *)savdir, 0700);
-		(void) chown(savdir, H.Uid, 2);
+		(void) chown((char *)savdir, H.Uid, 2);
 	}
 
 	/*
@@ -316,19 +317,19 @@ format:
 		if (i < 0) {
 			if (name)
 				perror(gettext("Buffer read error"));
-			(void) unlink(savfil);
+			(void) unlink((char *)savfil);
 			return (-1);
 		}
 		if (i == 0) {
 			if (name)
-				(void) unlink(name);
+				(void) unlink((char *)name);
 			notify(H.Uid, H.Savedfile, (int) name, H.encrypted);
 			return (0);
 		}
 		if (write(savfild, buf, i) != i) {
 			if (name == 0)
 				perror((char *)savfil);
-			(void) unlink(savfil);
+			(void) unlink((char *)savfil);
 			return (-1);
 		}
 	}
@@ -337,11 +338,11 @@ format:
 /*
  * Blast the last 5 characters of cp to be the process number.
  */
-mkdigits(cp)
-	unsigned char *cp;
+void
+mkdigits(unsigned char *cp)
 {
-	register pid_t i;
-	register int j;
+	pid_t i;
+	int j;
 
 	for (i = getpid(), j = 10, cp += strlen(cp); j > 0; i /= 10, j--)
 		*--cp = i % 10 | '0';
@@ -352,9 +353,8 @@ mkdigits(cp)
  * three alphabetic characters into a sequence of the form 'aab', 'aac', etc.
  * Mktemp gets weird names too quickly to be useful here.
  */
-mknext(dir, cp)
-	unsigned char *dir;
-	unsigned char *cp;
+int
+mknext(unsigned char *dir, unsigned char *cp)
 {
 	unsigned char *dcp;
 	struct stat stb;
@@ -394,15 +394,14 @@ mknext(dir, cp)
 /*
  * Notify user uid that his file fname has been saved.
  */
-notify(uid, fname, flag, cryflag)
-	int uid;
-	unsigned char *fname;
+void
+notify(int uid, unsigned char *fname, int flag, int cryflag)
 {
 
 #define MAXHOSTNAMELEN 256
 
 	struct passwd *pp = getpwuid(uid);
-	register FILE *mf;
+	FILE *mf;
 	unsigned char cmd[BUFSIZE];
 
 	char hostname[MAXHOSTNAMELEN];

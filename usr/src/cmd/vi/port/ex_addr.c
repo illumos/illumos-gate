@@ -19,18 +19,18 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
 /* Copyright (c) 1981 Regents of the University of California */
 
-/*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
- * Use is subject to license terms.
- */
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.7	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #include "ex.h"
 #include "ex_re.h"
 
@@ -54,7 +54,8 @@ static	bool bigmove;
 /*
  * Set up addr1 and addr2 for commands whose default address is dot.
  */
-setdot()
+void
+setdot(void)
 {
 
 	setdot1();
@@ -66,7 +67,8 @@ setdot()
  * Call setdot1 to set up default addresses without ever
  * setting the previous context mark.
  */
-setdot1()
+void
+setdot1(void)
 {
 
 	if (addr2 == 0)
@@ -85,9 +87,10 @@ setdot1()
  * to delete 5 lines, etc.
  * Such nonsense is implemented by setcount.
  */
-setcount()
+void
+setcount(void)
 {
-	register int cnt;
+	int cnt;
 
 	pastwh();
 	if (!isdigit(peekchar())) {
@@ -123,9 +126,10 @@ setcount()
  *	will use [count] to modify the range. E.g.:
  *		change, delete, join, list, yank.
  */
-setcount2()
+void
+setcount2(void)
 {
-	register int cnt;
+	int cnt;
 
 	pastwh();
 	if (!isdigit(peekchar())) {
@@ -152,9 +156,10 @@ setcount2()
 /*
  * Parse a number out of the command input stream.
  */
-getnum()
+int
+getnum(void)
 {
-	register int cnt;
+	int cnt;
 
 	/*CSTYLED*/
 	for (cnt = 0; isdigit(peekcd());)
@@ -166,7 +171,8 @@ getnum()
  * Set the default addresses for commands which use the whole
  * buffer as default, notably write.
  */
-setall()
+void
+setall(void)
 {
 
 	if (addr2 == 0) {
@@ -186,7 +192,8 @@ setall()
 /*
  * No address allowed on, e.g. the file command.
  */
-setnoaddr()
+void
+setnoaddr(void)
 {
 
 	if (addr2 != 0)
@@ -207,8 +214,8 @@ line *
 address(inputline)
 	unsigned char *inputline;
 {
-	register line *addr;
-	register int offset, c;
+	line *addr;
+	int offset, c;
 	short lastsign;
 
 	bigmove = 0;
@@ -386,14 +393,16 @@ error(value(vi_TERSE) ?
  * Left over from squashing ex version 1.1 into
  * 11/34's and 11/40's.
  */
-setCNL()
+void
+setCNL(void)
 {
 
 	setcount();
 	donewline();
 }
 
-setNAEOL()
+void
+setNAEOL(void)
 {
 
 	setnoaddr();

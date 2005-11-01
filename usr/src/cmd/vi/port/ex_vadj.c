@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,12 +53,11 @@
  * on the screen in which case the line may actually end up
  * somewhere other than line p.
  */
-vopen(tp, p)
-	line *tp;
-	int p;
+void
+vopen(line *tp, int p)
 {
-	register int cnt;
-	register struct vlinfo *vp, *vpc;
+	int cnt;
+	struct vlinfo *vp, *vpc;
 
 #ifdef ADEBUG
 	if (trace != NULL)
@@ -116,11 +115,11 @@ vopen(tp, p)
 /*
  * Redisplay logical line l at physical line p with line number lineno.
  */
-vreopen(p, lineno, l)
-	int p, lineno, l;
+int
+vreopen(int p, int lineno, int l)
 {
-	register int d;
-	register struct vlinfo *vp = &vlinfo[l];
+	int d;
+	struct vlinfo *vp = &vlinfo[l];
 
 	d = vp->vdepth;
 	if (d == 0 || (vp->vflags & VDIRT))
@@ -150,7 +149,7 @@ vreopen(p, lineno, l)
 	if (state == VISUAL && l == vcline && vp->vliny < 0) {
 		vp->vliny = 0;
 		vscrap();
-		return d;
+		return (d);
 	}
 
 	/*
@@ -209,12 +208,12 @@ vreopen(p, lineno, l)
  * delete some (blank) lines from the top of the screen so that
  * later inserts will not push stuff off the bottom.
  */
-vglitchup(l, o)
-	int l, o;
+int
+vglitchup(int l, int o)
 {
-	register struct vlinfo *vp = &vlinfo[l];
-	register int need;
-	register int p = vp->vliny;
+	struct vlinfo *vp = &vlinfo[l];
+	int need;
+	int p = vp->vliny;
 	short oldhold, oldheldech;
 	bool glitched = 0;
 
@@ -250,11 +249,10 @@ vglitchup(l, o)
  * Insert cnt blank lines before line p,
  * logically and (if supported) physically.
  */
-vinslin(p, cnt, l)
-	register int p, cnt;
-	int l;
+void
+vinslin(int p, int cnt, int l)
 {
-	register int i;
+	int i;
 	bool could = 1;
 
 #ifdef ADEBUG
@@ -331,12 +329,11 @@ vinslin(p, cnt, l)
  * it ourselves (brute force) we will squish out @ lines in the process
  * if this will save us work.
  */
-vopenup(cnt, could, l)
-	int cnt;
-	bool could;
+void
+vopenup(int cnt, bool could, int l)
 {
-	register struct vlinfo *vc = &vlinfo[l + 1];
-	register struct vlinfo *ve = &vlinfo[vcnt];
+	struct vlinfo *vc = &vlinfo[l + 1];
+	struct vlinfo *ve = &vlinfo[vcnt];
 
 #ifdef ADEBUG
 	if (trace)
@@ -361,7 +358,7 @@ vopenup(cnt, could, l)
 		 */
 		vc->vliny += cnt, vc->vflags |= VDIRT;
 		while (vc < ve) {
-			register int i = vc->vliny + vc->vdepth;
+			int i = vc->vliny + vc->vdepth;
 
 			vc++;
 			if (i <= vc->vliny)
@@ -376,11 +373,11 @@ vopenup(cnt, could, l)
  * Adjust data structure internally to account for insertion of
  * blank lines on the screen.
  */
-vadjAL(p, cnt)
-	int p, cnt;
+void
+vadjAL(int p, int cnt)
 {
 	wchar_t *tlines[TUBELINES];
-	register int from, to;
+	int from, to;
 
 #ifdef ADEBUG
 	if (trace)
@@ -404,11 +401,11 @@ vadjAL(p, cnt)
  * Roll the screen up logically and physically
  * so that line dl is the bottom line on the screen.
  */
-vrollup(dl)
-	int dl;
+void
+vrollup(int dl)
 {
-	register int cnt;
-	register int dc = destcol;
+	int cnt;
+	int dc = destcol;
 
 #ifdef ADEBUG
 	if (trace)
@@ -422,7 +419,8 @@ vrollup(dl)
 	destline = dl - cnt, destcol = dc;
 }
 
-vup1()
+void
+vup1(void)
 {
 
 	vrollup(WBOT + 1);
@@ -433,9 +431,8 @@ vup1()
  * If doclr is true, do a clear eol if the terminal
  * has standout (to prevent it from scrolling up)
  */
-vmoveitup(cnt, doclr)
-	register int cnt;
-	bool doclr;
+void
+vmoveitup(int cnt, bool doclr)
 {
 
 	if (cnt == 0)
@@ -470,10 +467,10 @@ vmoveitup(cnt, doclr)
 /*
  * Scroll the screen up cnt lines logically.
  */
-vscroll(cnt)
-	register int cnt;
+void
+vscroll(int cnt)
 {
-	register int from, to;
+	int from, to;
 	wchar_t *tlines[TUBELINES];
 
 #ifdef ADEBUG
@@ -498,9 +495,10 @@ vscroll(cnt)
 /*
  * Discard logical lines due to physical wandering off the screen.
  */
-vscrap()
+void
+vscrap(void)
 {
-	register int i, j;
+	int i, j;
 
 #ifdef ADEBUG
 	if (trace)
@@ -551,8 +549,8 @@ vscrap()
  * Repaint the screen, with cursor at curs, aftern an arbitrary change.
  * Handle notification on large changes.
  */
-vrepaint(curs)
-	unsigned char *curs;
+void
+vrepaint(unsigned char *curs)
 {
 
 	wdot = NOLINE;
@@ -566,7 +564,7 @@ vrepaint(curs)
 	 * Deal with a totally useless display.
 	 */
 	if (vcnt == 0 || vcline < 0 || vcline > vcnt || holdupd && state != VISUAL) {
-		register line *odol = dol;
+		line *odol = dol;
 
 		vcnt = 0;
 		if (holdupd)
@@ -613,7 +611,7 @@ vrepaint(curs)
 		short oldhold = hold;
 		hold |= HOLDAT, vredraw(LASTLINE), hold = oldhold;
 		if (vcline >= vcnt) {
-			register int i = vcline - vcnt + 1;
+			int i = vcline - vcnt + 1;
 
 			dot -= i;
 			vcline -= i;
@@ -641,11 +639,11 @@ vrepaint(curs)
  * line after last won't completely fit.  The routine vsync is
  * more conservative and much less work on dumb terminals.
  */
-vredraw(p)
-	register int p;
+void
+vredraw(int p)
 {
-	register int l;
-	register line *tp;
+	int l;
+	line *tp;
 	unsigned char temp[LBSIZE];
 	bool anydl = 0;
 	short oldhold = hold;
@@ -715,7 +713,7 @@ vredraw(p)
 				break;
 			}
 			FLAGS(l) &= ~VDIRT;
-			vreopen(p, lineno(tp), l);
+			(void) vreopen(p, lineno(tp), l);
 			p = LINE(l) + DEPTH(l);
 		} else
 			p += DEPTH(l);
@@ -762,10 +760,10 @@ vredraw(p)
  * Do the real work in deleting cnt lines starting at line p from
  * the display.  First affected line is line l.
  */
-vdellin(p, cnt, l)
-	int p, cnt, l;
+void
+vdellin(int p, int cnt, int l)
 {
-	register int i;
+	int i;
 
 	if (cnt == 0)
 		return;
@@ -794,7 +792,7 @@ vdellin(p, cnt, l)
 		vputp(tparm(change_scroll_region, p, lines-1), 1);
 		vputp(tparm(cursor_address, lines-1, 0), 1);/* Go to lower left corner */
 		for (i=0; i<cnt; i++)		/* .. and scroll cnt times */
-			putch('\n');		/* should check NL too */
+			(void) putch('\n');	/* should check NL too */
 		vputp(tparm(change_scroll_region, 0, lines-1), 1);/* restore scrolling region */
 		vputp(restore_cursor, 1);			/* put cursor back */
 	}
@@ -808,11 +806,11 @@ vdellin(p, cnt, l)
 /*
  * Adjust internal physical screen image to account for deleted lines.
  */
-vadjDL(p, cnt)
-	int p, cnt;
+void
+vadjDL(int p, int cnt)
 {
 	wchar_t *tlines[TUBELINES];
-	register int from, to;
+	int from, to;
 
 #ifdef ADEBUG
 	if (trace)
@@ -837,14 +835,15 @@ vadjDL(p, cnt)
  * In any case, if the redraw option is set then all syncs map to redraws
  * as if vsync didn't exist.
  */
-vsyncCL()
+void
+vsyncCL(void)
 {
 
 	vsync(LINE(vcline));
 }
 
-vsync(p)
-	register int p;
+void
+vsync(int p)
 {
 
 	if (value(vi_REDRAW))
@@ -857,12 +856,12 @@ vsync(p)
  * The guts of a sync.  Similar to redraw but
  * just less ambitious.
  */
-vsync1(p)
-	register int p;
+void
+vsync1(int p)
 {
-	register int l;
+	int l;
 	unsigned char temp[LBSIZE];
-	register struct vlinfo *vp = &vlinfo[0];
+	struct vlinfo *vp = &vlinfo[0];
 	short oldhold = hold;
 
 #ifdef ADEBUG
@@ -909,7 +908,7 @@ vsync1(p)
 					if (p + vp->vdepth - 1 > WBOT)
 						break;
 				}
-				vreopen(p, lineDOT() + (l - vcline), l);
+				(void) vreopen(p, lineDOT() + (l - vcline), l);
 			}
 			p = vp->vliny + vp->vdepth;
 			vp++;
@@ -931,11 +930,10 @@ vsync1(p)
  * Subtract (logically) cnt physical lines from the 
  * displayed position of lines starting with line l.
  */
-vcloseup(l, cnt)
-	int l;
-	register int cnt;
+void
+vcloseup(int l, int cnt)
 {
-	register int i;
+	int i;
 
 #ifdef ADEBUG
 	if (trace)
@@ -955,10 +953,10 @@ vcloseup(l, cnt)
  *
  * Many boundary conditions here.
  */
-vreplace(l, cnt, newcnt)
-	int l, cnt, newcnt;
+void
+vreplace(int l, int cnt, int newcnt)
 {
-	register int from, to, i;
+	int from, to, i;
 	bool savenote = 0;
 
 #ifdef ADEBUG
@@ -1094,7 +1092,8 @@ skip:
  * If we are in a scroll ^D within hardcopy open then all this
  * is suppressed.
  */
-sethard()
+void
+sethard(void)
 {
 
 	if (state == VISUAL)
@@ -1106,7 +1105,7 @@ sethard()
 	vup1();
 	LINE(0) = WBOT;
 	if (Pline == numbline)
-		vgoto(WBOT, 0), printf("%6d  ", lineDOT());
+		vgoto(WBOT, 0), viprintf("%6d  ", lineDOT());
 }
 
 /*
@@ -1114,10 +1113,10 @@ sethard()
  * as dirty so that they will be checked for correct
  * display at next sync/redraw.
  */
-vdirty(base, i)
-	register int base, i;
+void
+vdirty(int base, int i)
 {
-	register int l;
+	int l;
 	
 	for (l = base; l < vcnt; l++) {
 		if (--i < 0)

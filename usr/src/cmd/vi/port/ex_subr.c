@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1996 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,11 +54,10 @@
  * Random routines, in alphabetical order.
  */
 
-any(c, s)
-	int c;
-	register unsigned char *s;
+int
+any(int c, unsigned char *s)
 {
-	register int x;
+	int x;
 
 	while (x = *s++)
 		if (x == c)
@@ -66,10 +65,10 @@ any(c, s)
 	return (0);
 }
 
-backtab(i)
-	register int i;
+int
+backtab(int i)
 {
-	register int j;
+	int j;
 
 	j = i % value(vi_SHIFTWIDTH);
 	if (j == 0)
@@ -80,7 +79,8 @@ backtab(i)
 	return (i);
 }
 
-change()
+void
+change(void)
 {
 
 	tchng++;
@@ -93,35 +93,36 @@ change()
  * characters through position cp of the
  * current line.
  */
-column(cp)
-	register unsigned char *cp;
+int
+column(unsigned char *cp)
 {
 
 	if (cp == 0)
 		cp = &linebuf[LBSIZE - 2];
-	return (qcolumn(cp, (char *) 0));
+	return (qcolumn(cp, (unsigned char *)0));
 }
 
 /* lcolumn is same as column except it returns number of columns
  * occupied by characters before position
  * cp of the current line
  */
-lcolumn(cp)
-	register unsigned char *cp;
+int
+lcolumn(unsigned char *cp)
 {
 
 	if (cp == 0)
 		cp = &linebuf[LBSIZE - 2];
-	return(nqcolumn(lastchr(linebuf, cp), (char *)0));
+	return (nqcolumn(lastchr(linebuf, cp), (unsigned char *)0));
 }
 
 /*
  * Ignore a comment to the end of the line.
  * This routine eats the trailing newline so don't call donewline().
  */
-comment()
+void
+comment(void)
 {
-	register int c;
+	int c;
 
 	do {
 		c = getchar();
@@ -130,9 +131,8 @@ comment()
 		ungetchar(c);
 }
 
-Copy(to, from, size)
-	register unsigned char *from, *to;
-	register int size;
+void
+Copy(unsigned char *to, unsigned char *from, int size)
 {
 
 	if (size > 0)
@@ -141,9 +141,8 @@ Copy(to, from, size)
 		while (--size > 0);
 }
 
-copyw(to, from, size)
-	register line *from, *to;
-	register int size;
+void
+copyw(line *to, line *from, int size)
 {
 
 	if (size > 0)
@@ -152,36 +151,36 @@ copyw(to, from, size)
 		while (--size > 0);
 }
 
-copywR(to, from, size)
-	register line *from, *to;
-	register int size;
+void
+copywR(line *to, line *from, int size)
 {
 
 	while (--size >= 0)
 		to[size] = from[size];
 }
 
-ctlof(c)
-	int c;
+int
+ctlof(int c)
 {
 
 	return (c == DELETE ? '?' : c | ('A' - 1));
 }
 
-dingdong()
+void
+dingdong(void)
 {
 
 	if (flash_screen && value(vi_FLASH))
-		putpad(flash_screen);
+		putpad((unsigned char *)flash_screen);
 	else if (value(vi_ERRORBELLS))
-		putpad(bell);
+		putpad((unsigned char *)bell);
 }
 
-fixindent(indent)
-	int indent;
+int
+fixindent(int indent)
 {
-	register int i;
-	register unsigned char *cp;
+	int i;
+	unsigned char *cp;
 
 	i = whitecnt(genbuf);
 	cp = vpastwh(genbuf);
@@ -193,10 +192,10 @@ fixindent(indent)
 	return (i);
 }
 
-filioerr(cp)
-	unsigned char *cp;
+void
+filioerr(unsigned char *cp)
 {
-	register int oerrno = errno;
+	int oerrno = errno;
 
 	lprintf("\"%s\"", cp);
 	errno = oerrno;
@@ -205,9 +204,9 @@ filioerr(cp)
 
 unsigned char *
 genindent(indent)
-	register int indent;
+	int indent;
 {
-	register unsigned char *cp;
+	unsigned char *cp;
 
 	for (cp = genbuf; indent >= value(vi_TABSTOP); indent -= value(vi_TABSTOP))
 		*cp++ = '\t';
@@ -216,7 +215,8 @@ genindent(indent)
 	return (cp);
 }
 
-getDOT()
+void
+getDOT(void)
 {
 
 	getline(*dot);
@@ -224,9 +224,9 @@ getDOT()
 
 line *
 getmark(c)
-	register int c;
+	int c;
 {
-	register line *addr;
+	line *addr;
 	
 	for (addr = one; addr <= dol; addr++)
 		if (names[c - 'a'] == (*addr &~ 01)) {
@@ -235,21 +235,10 @@ getmark(c)
 	return (0);
 }
 
-getn(cp)
-	register unsigned char *cp;
+void
+ignnEOF(void)
 {
-	register int i = 0;
-
-	while (isdigit(*cp))
-		i = i * 10 + *cp++ - '0';
-	if (*cp)
-		return (0);
-	return (i);
-}
-
-ignnEOF()
-{
-	register int c = getchar();
+	int c = getchar();
 
 	if (c == EOF)
 		ungetchar(c);
@@ -257,15 +246,15 @@ ignnEOF()
 		comment();
 }
 
-iswhite(c)
-	int c;
+int
+iswhite(int c)
 {
 
 	return (c == ' ' || c == '\t');
 }
 
-junk(c)
-	register wchar_t c;
+int
+junk(wchar_t c)
 {
 
 	if (c && !value(vi_BEAUTIFY))
@@ -284,14 +273,15 @@ junk(c)
 	}
 }
 
-killed()
+void
+killed(void)
 {
 
 	killcnt(addr2 - addr1 + 1);
 }
 
-killcnt(cnt)
-	register int cnt;
+void
+killcnt(int cnt)
 {
 	extern char *verbalize();
 
@@ -306,41 +296,44 @@ killcnt(cnt)
 		verbalize(cnt, Command, "");
 	} else {
 		if (cnt == 1) {
-			printf(gettext("1 line"), cnt);
+			viprintf(gettext("1 line"), cnt);
 		} else {
-			printf(gettext("%d lines"), cnt);
+			viprintf(gettext("%d lines"), cnt);
 		}
 	}
 	putNFL();
 }
 
-lineno(a)
-	line *a;
+int
+lineno(line *a)
 {
 
 	return (a - zero);
 }
 
-lineDOL()
+int
+lineDOL(void)
 {
 
 	return (lineno(dol));
 }
 
-lineDOT()
+int
+lineDOT(void)
 {
 
 	return (lineno(dot));
 }
 
-markDOT()
+void
+markDOT(void)
 {
 
 	markpr(dot);
 }
 
-markpr(which)
-	line *which;
+void
+markpr(line *which)
 {
 
 	if ((inglobal == 0 || inopen) && which <= endcore) {
@@ -350,8 +343,8 @@ markpr(which)
 	}
 }
 
-markreg(c)
-	register int c;
+int
+markreg(int c)
 {
 
 	if (c == '\'' || c == '`')
@@ -372,9 +365,9 @@ markreg(c)
  */
 unsigned char *
 mesg(str)
-	register unsigned char *str;
+	unsigned char *str;
 {
-	register unsigned char *cp;
+	unsigned char *cp;
 
 	str = (unsigned char *)strcpy(genbuf, str);
 	/* commented out for localizable messaging */
@@ -398,11 +391,10 @@ mesg(str)
 }
 
 /*VARARGS2*/
-merror(seekpt, i)
-	unsigned char *seekpt;
-	int i;
+void
+merror(unsigned char *seekpt, int i)
 {
-	register unsigned char *cp = linebuf;
+	unsigned char *cp = linebuf;
 
 	if (seekpt == 0)
 		return;
@@ -412,27 +404,28 @@ merror(seekpt, i)
 	if (inopen > 0 && clr_eol)
 		vclreol();
 	if (enter_standout_mode && exit_bold)
-		putpad(enter_standout_mode);
+		putpad((unsigned char *)enter_standout_mode);
 #ifdef PRESUNEUC
-	printf(mesg(cp), i);
+	viprintf(mesg(cp), i);
 #else
-	printf((char *)mesg(cp), i);
+	viprintf((char *)mesg(cp), i);
 #endif /* PRESUNEUC */
 	if (enter_standout_mode && exit_bold)
-		putpad(exit_bold);
+		putpad((unsigned char *)exit_bold);
 }
 
-merror1(seekpt)
-	unsigned char *seekpt;
+void
+merror1(unsigned char *seekpt)
 {
 
 	strcpy(linebuf, seekpt);
 }
 
 #define MAXDATA (56*1024)
-morelines()
+int
+morelines(void)
 {
-	register unsigned char *end;
+	unsigned char *end;
 
 	if ((int) sbrk(1024 * sizeof (line)) == -1) {
 		if (endcore >= (line *) MAXDATA)
@@ -452,7 +445,8 @@ morelines()
 	return (0);
 }
 
-nonzero()
+void
+nonzero(void)
 {
 
 	if (addr1 == zero) {
@@ -462,15 +456,16 @@ gettext("Nonzero address required on this command"));
 	}
 }
 
-notable(i)
-	int i;
+int
+notable(int i)
 {
 
 	return (hush == 0 && !inglobal && i > value(vi_REPORT));
 }
 
 
-notempty()
+void
+notempty(void)
 {
 
 	if (dol == zero)
@@ -479,17 +474,17 @@ gettext("No lines in the buffer"));
 }
 
 
-netchHAD(cnt)
-	int cnt;
+void
+netchHAD(int cnt)
 {
 
 	netchange(lineDOL() - cnt);
 }
 
-netchange(i)
-	register int i;
+void
+netchange(int i)
 {
-	register unsigned char *cp;
+	unsigned char *cp;
 
 	if (i > 0)
 		notesgn = cp = (unsigned char *)"more ";
@@ -504,48 +499,47 @@ netchange(i)
 		return;
 	if (*cp == 'm')	/* for ease of messge localization */
 #ifdef PRESUNEUC
-		printf(mesg(value(vi_TERSE) ?
+		viprintf(mesg(value(vi_TERSE) ?
 #else
-		printf((char *)mesg(value(vi_TERSE) ?
+		viprintf((char *)mesg(value(vi_TERSE) ?
 #endif /* PRESUNEUC */
 gettext("%d more lines") :
 		/*
 		 * TRANSLATION_NOTE
 		 *	Reference order of arguments must not
 		 *	be changed using '%digit$', since vi's
-		 *	printf() does not support it.
+		 *	viprintf() does not support it.
 		 */
 gettext("%d more lines in file after %s")), i, Command);
 	else
 #ifdef PRESUNEUC
-		printf(mesg(value(vi_TERSE) ?
+		viprintf(mesg(value(vi_TERSE) ?
 #else
-		printf((char *)mesg(value(vi_TERSE) ?
+		viprintf((char *)mesg(value(vi_TERSE) ?
 #endif /* PRESUNEUC */
 gettext("%d fewer lines") :
 		/*
 		 * TRANSLATION_NOTE
 		 *	Reference order of arguments must not
 		 *	be changed using '%digit$', since vi's
-		 *	printf() does not support it.
+		 *	viprintf() does not support it.
 		 */
 gettext("%d fewer lines in file after %s")), i, Command);
 	putNFL();
 }
 
-putmark(addr)
-	line *addr;
+void
+putmark(line *addr)
 {
 
 	putmk1(addr, putline());
 }
 
-putmk1(addr, n)
-	register line *addr;
-	int n;
+void
+putmk1(line *addr, int n)
 {
-	register line *markp;
-	register oldglobmk;
+	line *markp;
+	int oldglobmk;
 
 	oldglobmk = *addr & 1;
 	*addr &= ~1;
@@ -567,10 +561,10 @@ plural(i)
 int	qcount();
 short	vcntcol;
 
-qcolumn(lim, gp)
-	register unsigned char *lim, *gp;
+int
+qcolumn(unsigned char *lim, unsigned char *gp)
 {
-	register int x, length;
+	int x, length;
 	int	col;
 	wchar_t wchar;
 	int (*OO)();
@@ -614,10 +608,10 @@ qcolumn(lim, gp)
 }
 
 /* This routine puts cursor after multibyte character */
-nqcolumn(lim, gp)
-	register unsigned char *lim, *gp;
+int
+nqcolumn(unsigned char *lim, unsigned char *gp)
 {
-	register int x, length;
+	int x, length;
 	wchar_t wchar;
 	int (*OO)();
 
@@ -657,15 +651,15 @@ int
 qcount(c)
 wchar_t c;
 {
-	register int cols;
+	int cols;
 #ifndef PRESUNEUC
-	register int remcols;
-	register short OWCOLS;
+	int remcols;
+	short OWCOLS;
 #endif /* PRESUNEUC */
 
 	if (c == '\t') {
 		vcntcol += value(vi_TABSTOP) - vcntcol % value(vi_TABSTOP);
-		return;
+		return (0);
 	}
 #ifdef PRESUNEUC
 	if ((cols = wcwidth(c)) > 0)
@@ -681,12 +675,13 @@ wchar_t c;
 	WCOLS = OWCOLS;
 	vcntcol += cols;
 #endif /* PRESUNEUC */
+	return (0);
 }
 
-reverse(a1, a2)
-	register line *a1, *a2;
+void
+reverse(line *a1, line *a2)
 {
-	register line t;
+	line t;
 
 	for (;;) {
 		t = *--a2;
@@ -697,11 +692,10 @@ reverse(a1, a2)
 	}
 }
 
-save(a1, a2)
-	line *a1;
-	register line *a2;
+void
+save(line *a1, line *a2)
 {
-	register int more;
+	int more;
 
 	if (!FIXUNDO)
 		return;
@@ -732,25 +726,29 @@ gettext("Out of memory saving lines for undo - try using ed"));
 #endif
 }
 
-save12()
+void
+save12(void)
 {
 
 	save(addr1, addr2);
 }
 
-saveall()
+void
+saveall(void)
 {
 
 	save(one, dol);
 }
 
-span()
+int
+span(void)
 {
 
 	return (addr2 - addr1 + 1);
 }
 
-sync()
+void
+sync(void)
 {
 
 	chng = 0;
@@ -759,9 +757,10 @@ sync()
 }
 
 
-skipwh()
+int
+skipwh(void)
 {
-	register int wh;
+	int wh;
 
 	wh = 0;
 	while (iswhite(peekchar())) {
@@ -772,9 +771,8 @@ skipwh()
 }
 
 /*VARARGS2*/
-smerror(seekpt, cp)
-	unsigned char *seekpt;
-	unsigned char *cp;
+void
+smerror(unsigned char *seekpt, unsigned char *cp)
 {
 
 	errcnt++;
@@ -782,15 +780,15 @@ smerror(seekpt, cp)
 	if (inopen && clr_eol)
 		vclreol();
 	if (enter_standout_mode && exit_bold)
-		putpad(enter_standout_mode);
+		putpad((unsigned char *)enter_standout_mode);
 	lprintf(mesg(linebuf), cp);
 	if (enter_standout_mode && exit_bold)
-		putpad(exit_bold);
+		putpad((unsigned char *)exit_bold);
 }
 
 unsigned char *
 strend(cp)
-	register unsigned char *cp;
+	unsigned char *cp;
 {
 
 	while (*cp)
@@ -798,8 +796,8 @@ strend(cp)
 	return (cp);
 }
 
-strcLIN(dp)
-	unsigned char *dp;
+void
+strcLIN(unsigned char *dp)
 {
 
 	CP(linebuf, dp);
@@ -811,10 +809,10 @@ strcLIN(dp)
  * the file or our buffer, e.g. a write error in the
  * middle of a write operation, or a temp file error.
  */
-syserror(danger)
-int danger;
+void
+syserror(int danger)
 {
-	register int e = errno;
+	int e = errno;
 	char *errstr;
 	extern char *strerror();
 
@@ -833,8 +831,8 @@ int danger;
  * hitting a tab, where tabs are set every ts columns.  Work right for
  * the case where col > columns, even if ts does not divide columns.
  */
-tabcol(col, ts)
-int col, ts;
+int
+tabcol(int col, int ts)
 {
 	int offset, result;
 
@@ -851,14 +849,14 @@ unsigned char *
 vfindcol(i)
 	int i;
 {
-	register unsigned char *cp, *oldcp;
-	register int (*OO)() = Outchar;
-	register int length;
+	unsigned char *cp, *oldcp;
+	int (*OO)() = Outchar;
+	int length;
 	unsigned char x;
 	wchar_t wchar;
 
 	Outchar = qcount;
-	(void)qcolumn(linebuf - 1, NOSTR);
+	(void) qcolumn(linebuf - 1, (unsigned char *)NOSTR);
 	for (cp = linebuf; *cp && vcntcol < i; ) {
 		oldcp = cp;
 		length = mbtowc(&wchar, (char *)cp, MULTI_BYTE_MAX);
@@ -879,7 +877,7 @@ vfindcol(i)
 
 unsigned char *
 vskipwh(cp)
-	register unsigned char *cp;
+	unsigned char *cp;
 {
 
 	while (iswhite(*cp) && cp[1])
@@ -890,7 +888,7 @@ vskipwh(cp)
 
 unsigned char *
 vpastwh(cp)
-	register unsigned char *cp;
+	unsigned char *cp;
 {
 
 	while (iswhite(*cp))
@@ -898,10 +896,10 @@ vpastwh(cp)
 	return (cp);
 }
 
-whitecnt(cp)
-	register unsigned char *cp;
+int
+whitecnt(unsigned char *cp)
 {
-	register int i;
+	int i;
 
 	i = 0;
 	for (;;)
@@ -920,8 +918,8 @@ whitecnt(cp)
 		}
 }
 
-markit(addr)
-	line *addr;
+void
+markit(line *addr)
 {
 
 	if (addr != dot && addr >= one && addr <= dol)
@@ -1013,7 +1011,7 @@ int sig;
 	if (timescalled++ == 0 && chng && setexit() == 0) {
 		if (inopen)
 			vsave();
-		preserve();
+		(void) preserve();
 		write(1, messagep, strlen(messagep));
 	}
 	if (timescalled < 2) {
@@ -1067,7 +1065,8 @@ int sig;
  * In some critical sections we turn interrupts off,
  * but not very often.
  */
-setrupt()
+void
+setrupt(void)
 {
 
 	if (ruptible) {
@@ -1083,7 +1082,8 @@ setrupt()
 	}
 }
 
-preserve()
+int
+preserve(void)
 {
 
 #ifdef VMUNIX
@@ -1110,6 +1110,7 @@ void exit(i)
 	int i;
 {
 
+	extern void _exit(int) __NORETURN;
 #ifdef TRACE
 	if (trace)
 		fclose(trace);
@@ -1134,7 +1135,7 @@ int sig;
 
 	f = setty(normf);
 	vnfl();
-	putpad(exit_ca_mode);
+	putpad((unsigned char *)exit_ca_mode);
 	flush();
 	resetterm();
 	savenormtty = normtty;
@@ -1199,8 +1200,8 @@ unsigned char *linebuf, *cursor;
 	return(ocursor);
 }		 	
 
-ixlatctl(flag)
-	int flag;
+int
+ixlatctl(int flag)
 {
 	static struct strioctl sb = {0, 0, 0, 0};
 
@@ -1231,7 +1232,8 @@ ixlatctl(flag)
 #ifndef PRESUNEUC
 
 /* locale specific initialization */
-int localize()
+void
+localize(void)
 {
 	wchar_t fillerchar;
 	extern int	wdchkind();
