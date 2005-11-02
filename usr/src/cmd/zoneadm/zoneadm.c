@@ -850,9 +850,15 @@ validate_zonepath(char *path, int cmd_num)
 		zperror(rpath, B_FALSE);
 		return (Z_ERR);
 	}
-	if (strncmp(vfsbuf.f_basetype, "nfs", 3) == 0) {
-		(void) fprintf(stderr, gettext("Zonepath %s is over NFS, "
-		    "which is not currently supported.\n"), rpath);
+	if (strcmp(vfsbuf.f_basetype, MNTTYPE_NFS) == 0) {
+		(void) fprintf(stderr, gettext("Zonepath %s is on a NFS "
+		    "mounted file system.\n"
+		    "\tA local file system must be used.\n"), rpath);
+		return (Z_ERR);
+	}
+	if (vfsbuf.f_flag & ST_NOSUID) {
+		(void) fprintf(stderr, gettext("Zonepath %s is on a nosuid "
+		    "file system.\n"), rpath);
 		return (Z_ERR);
 	}
 
@@ -1678,6 +1684,8 @@ reboot_func(int argc, char *argv[])
 	 */
 	if (sanity_check(target_zone, CMD_REBOOT, B_TRUE, B_FALSE) != Z_OK)
 		return (Z_ERR);
+	if (verify_details(CMD_REBOOT) != Z_OK)
+		return (Z_ERR);
 
 	zarg.cmd = Z_REBOOT;
 	return ((call_zoneadmd(target_zone, &zarg) == 0) ? Z_OK : Z_ERR);
@@ -1810,6 +1818,44 @@ verify_pool(zone_dochandle_t handle)
 }
 
 static int
+verify_ipd(zone_dochandle_t handle)
+{
+	int return_code = Z_OK;
+	struct zone_fstab fstab;
+	struct stat st;
+	char specdir[MAXPATHLEN];
+
+	if (zonecfg_setipdent(handle) != Z_OK) {
+		(void) fprintf(stderr, gettext("cannot verify "
+		    "inherit-pkg-dirs: unable to enumerate mounts\n"));
+		return (Z_ERR);
+	}
+	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
+		/*
+		 * Verify fs_dir exists.
+		 */
+		(void) snprintf(specdir, sizeof (specdir), "%s%s",
+		    zonecfg_get_root(), fstab.zone_fs_dir);
+		if (stat(specdir, &st) != 0) {
+			(void) fprintf(stderr, gettext("cannot verify "
+			    "inherit-pkg-dir %s: %s\n"),
+			    fstab.zone_fs_dir, strerror(errno));
+			return_code = Z_ERR;
+		}
+		if (strcmp(st.st_fstype, MNTTYPE_NFS) == 0) {
+			(void) fprintf(stderr, gettext("cannot verify "
+			    "inherit-pkg-dir %s: NFS mounted file system.\n"
+			    "\tA local file system must be used.\n"),
+			    fstab.zone_fs_dir);
+			return_code = Z_ERR;
+		}
+	}
+	(void) zonecfg_endipdent(handle);
+
+	return (return_code);
+}
+
+static int
 verify_filesystems(zone_dochandle_t handle)
 {
 	int return_code = Z_OK;
@@ -1889,6 +1935,32 @@ verify_filesystems(zone_dochandle_t handle)
 			    "'raw' device specified but "
 			    "no fsck executable exists for %s\n"),
 			    fstab.zone_fs_dir, fstab.zone_fs_type);
+			return_code = Z_ERR;
+			goto next_fs;
+		}
+		/*
+		 * Verify fs_special and optionally fs_raw, exists.
+		 */
+		if (stat(fstab.zone_fs_special, &st) != 0) {
+			(void) fprintf(stderr, gettext("cannot verify fs %s: "
+			    "can't access %s: %s\n"), fstab.zone_fs_dir,
+			    fstab.zone_fs_special, strerror(errno));
+			return_code = Z_ERR;
+			goto next_fs;
+		}
+		if (strcmp(st.st_fstype, MNTTYPE_NFS) == 0) {
+			(void) fprintf(stderr, gettext("cannot verify "
+			    "fs %s: NFS mounted file system.\n"
+			    "\tA local file system must be used.\n"),
+			    fstab.zone_fs_special);
+			return_code = Z_ERR;
+			goto next_fs;
+		}
+		if (fstab.zone_fs_raw[0] != '\0' &&
+		    stat(fstab.zone_fs_raw, &st) != 0) {
+			(void) fprintf(stderr, gettext("cannot verify fs %s: "
+			    "can't access %s: %s\n"), fstab.zone_fs_dir,
+			    fstab.zone_fs_raw, strerror(errno));
 			return_code = Z_ERR;
 			goto next_fs;
 		}
@@ -2116,6 +2188,8 @@ verify_details(int cmd_num)
 no_net:
 
 	if (verify_filesystems(handle) != Z_OK)
+		return_code = Z_ERR;
+	if (verify_ipd(handle) != Z_OK)
 		return_code = Z_ERR;
 	if (!in_alt_root && verify_rctls(handle) != Z_OK)
 		return_code = Z_ERR;
