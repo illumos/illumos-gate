@@ -259,6 +259,7 @@ DRV_KMODS	+= ib ibd
 DRV_KMODS	+= xge
 DRV_KMODS	+= chxge
 DRV_KMODS	+= pci_pci px_pci pcie
+DRV_KMODS	+= i8042 kb8042 mouse8042
 
 #
 #	I/O framework test drivers
@@ -309,6 +310,7 @@ STRMOD_KMODS	+= usbkbm usbms usb_ah
 STRMOD_KMODS	+= drcompat
 STRMOD_KMODS	+= nattymod
 STRMOD_KMODS	+= cryptmod
+STRMOD_KMODS	+= vuid3ps2
 
 #
 #	'System' Modules (/kernel/sys):

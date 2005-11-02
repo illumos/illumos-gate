@@ -61,6 +61,12 @@
  * of the key on a keyboard. We refer to the code as "station number".
  * The following table is used to map the station numbers from ps2
  * AT/XT keyboards to that of a USB one.
+ *
+ * A mapping was added for entry K8042_STOP, to map to USB key code 120 (which
+ * maps to the STOP key) when in KB_USB mode, and maps to a HOLE entry
+ * when in KB_PC mode.  Note that this does not need to be made conditional
+ * on the architecture for which this module is complied because there are no
+ * keys that map to K8042_STOP on non-SPARC platforms.
  */
 static kbtrans_key_t keytab_pc2usb[KBTRANS_KEYNUMS_MAX] = {
 /*  0 */	0,	53,	30,	31,	32,	33,	34,	35,
@@ -83,7 +89,7 @@ static kbtrans_key_t keytab_pc2usb[KBTRANS_KEYNUMS_MAX] = {
 /* 136 */	0,	0,	0,	0,	0,	0,	0,	0,
 /* 144 */	0,	0,	0,	0,	0,	0,	0,	0,
 /* 152 */	0,	0,	0,	0,	0,	0,	0,	0,
-/* 160 */	0,	0,	0,	0,	0,	0,	0,	0,
+/* 160 */	120,	0,	0,	0,	0,	0,	0,	0,
 /* 168 */	0,	0,	0,	0,	0,	0,	0,	0,
 /* 176 */	0,	0,	0,	0,	0,	0,	0,	0,
 /* 184 */	0,	0,	0,	0,	0,	0,	0,	0,
@@ -123,15 +129,26 @@ boolean_t	kb8042_pressrelease_debug = B_FALSE;
 static void kb8042_debug_hotkey(int scancode);
 #endif
 
+#ifdef __sparc
+#define	USECS_PER_WAIT 100
+#define	MAX_WAIT_USECS 100000 /* in usecs = 100 ms */
+#define	MIN_DELAY_USECS USECS_PER_WAIT
+
+boolean_t kb8042_warn_unknown_scanset = B_TRUE;
+int kb8042_default_scanset = 2;
+
+#endif
+
 enum state_return { STATE_NORMAL, STATE_INTERNAL };
 
-static void kb8042_init(struct kb8042 *kb8042);
+static void kb8042_init(struct kb8042 *kb8042, boolean_t from_resume);
 static uint_t kb8042_intr(caddr_t arg);
 static void kb8042_wait_poweron(struct kb8042 *kb8042);
 static void kb8042_start_state_machine(struct kb8042 *, boolean_t);
 static enum state_return kb8042_state_machine(struct kb8042 *, int, boolean_t);
 static void kb8042_send_to_keyboard(struct kb8042 *, int, boolean_t);
 static int kb8042_xlate_leds(int);
+static void kb8042_setled(struct kb8042 *, int led_state, boolean_t polled);
 static void kb8042_streams_setled(struct kbtrans_hardware *hw, int led_state);
 static void kb8042_polled_setled(struct kbtrans_hardware *hw, int led_state);
 static boolean_t kb8042_polled_keycheck(
@@ -146,6 +163,7 @@ static void kb8042_iocdatamsg(queue_t *, mblk_t *);
 static void kb8042_process_key(struct kb8042 *, kbtrans_key_t, enum keystate);
 static int kb8042_polled_ischar(struct cons_polledio_arg *arg);
 static int kb8042_polled_getchar(struct cons_polledio_arg *arg);
+static void kb8042_cleanup(struct kb8042 *kb8042);
 
 static struct kbtrans_callbacks kb8042_callbacks = {
 	kb8042_streams_setled,
@@ -183,11 +201,12 @@ struct streamtab
 	kb8042_str_info = { &kb8042_rinit, &kb8042_winit, NULL, NULL };
 
 struct kb8042	Kdws = {0};
-static dev_info_t *kb8042_dip;
+static dev_info_t *kb8042_dip = NULL;
 
 static int kb8042_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		void **result);
 static int kb8042_attach(dev_info_t *, ddi_attach_cmd_t);
+static int kb8042_detach(dev_info_t *, ddi_detach_cmd_t);
 
 static 	struct cb_ops cb_kb8042_ops = {
 	nulldev,		/* cb_open */
@@ -214,7 +233,7 @@ struct dev_ops kb8042_ops = {
 	nulldev,		/* devo_identify */
 	nulldev,		/* devo_probe */
 	kb8042_attach,		/* devo_attach */
-	nodev,			/* devo_detach */
+	kb8042_detach,		/* devo_detach */
 	nodev,			/* devo_reset */
 	&cb_kb8042_ops,		/* devo_cb_ops */
 	(struct bus_ops *)NULL	/* devo_bus_ops */
@@ -263,24 +282,166 @@ _info(struct modinfo *modinfop)
 	return (mod_info(&modlinkage, modinfop));
 }
 
+#ifdef __sparc
+static boolean_t
+kb8042_is_input_avail(struct kb8042 *kb8042, int timeout_usec, boolean_t polled)
+{
+	int i;
+	int port = (polled == B_TRUE) ? I8042_POLL_INPUT_AVAIL :
+	    I8042_INT_INPUT_AVAIL;
+	int reps = timeout_usec / USECS_PER_WAIT;
+
+	for (i = 0; i < reps; i++) {
+		if (ddi_get8(kb8042->handle, kb8042->addr + port) != 0)
+			return (B_TRUE);
+
+		if (i < (reps - 1))
+			drv_usecwait(USECS_PER_WAIT);
+	}
+	return (B_FALSE);
+}
+
+static void
+kb8042_clear_input_buffer(struct kb8042 *kb8042, boolean_t polled)
+{
+	int port = (polled == B_TRUE) ? I8042_POLL_INPUT_DATA :
+	    I8042_INT_INPUT_DATA;
+
+	while (kb8042_is_input_avail(kb8042, MIN_DELAY_USECS, polled)) {
+		(void) ddi_get8(kb8042->handle, kb8042->addr + port);
+	}
+}
+
+static boolean_t
+kb8042_send_and_expect(struct kb8042 *kb8042, uint8_t send, uint8_t expect,
+    boolean_t polled, int timeout, int *error, uint8_t *got)
+{
+	int port = (polled == B_TRUE) ? I8042_POLL_INPUT_DATA :
+	    I8042_INT_INPUT_DATA;
+	uint8_t datab;
+	int err;
+	boolean_t rval;
+
+	kb8042_send_to_keyboard(kb8042, send, polled);
+
+	if (kb8042_is_input_avail(kb8042, timeout, polled)) {
+		err = 0;
+		datab = ddi_get8(kb8042->handle, kb8042->addr + port);
+		rval = ((datab == expect) ? B_TRUE : B_FALSE);
+	} else {
+		err = EAGAIN;
+		rval = B_FALSE;
+	}
+
+	if (error != NULL)
+		*error = err;
+	if (got != NULL)
+		*got = datab;
+	return (rval);
+}
+
+static const char *
+kb8042_error_string(int errcode)
+{
+	switch (errcode) {
+	case EAGAIN:
+		return ("Timed out");
+	default:
+		return ("Unknown error");
+	}
+}
+
+static int
+kb8042_read_scanset(struct kb8042 *kb8042, boolean_t polled)
+{
+	int scanset = -1;
+	int port = (polled == B_TRUE) ? I8042_POLL_INPUT_DATA :
+	    I8042_INT_INPUT_DATA;
+	int err;
+	uint8_t got;
+
+	kb8042_clear_input_buffer(kb8042, B_TRUE);
+
+	/*
+	 * Send a "change scan code set" command to the keyboard.
+	 * It should respond with an ACK.
+	 */
+	if (kb8042_send_and_expect(kb8042, KB_SET_SCAN, KB_ACK, polled,
+	    MAX_WAIT_USECS, &err, &got) != B_TRUE) {
+		goto fail_read_scanset;
+	}
+
+	/*
+	 * Send a 0.  The keyboard should ACK the 0, then it send the scan code
+	 * set in use.
+	 */
+	if (kb8042_send_and_expect(kb8042, 0, KB_ACK, polled,
+	    MAX_WAIT_USECS, &err, &got) != B_TRUE) {
+		goto fail_read_scanset;
+	}
+
+	/*
+	 * The next input byte from the keyboard should be the scan code
+	 * set in use, though some keyboards like to send a few more acks
+	 * just for fun, so blow past those to get the keyboard scan code.
+	 */
+	while (kb8042_is_input_avail(kb8042, MAX_WAIT_USECS, B_TRUE) &&
+		(scanset = ddi_get8(kb8042->handle, kb8042->addr + port))
+		    == KB_ACK)
+		;
+
+#ifdef KD_DEBUG
+	cmn_err(CE_NOTE, "!Scan code set from keyboard is `%d'.",
+	    scanset);
+#endif
+
+	return (scanset);
+
+fail_read_scanset:
+#ifdef KD_DEBUG
+	if (err == 0)
+		cmn_err(CE_NOTE, "Could not read current scan set from "
+		    "keyboard: %s. (Expected 0x%x, but got 0x%x).",
+		    kb8042_error_string(err), KB_ACK, got);
+	else
+		cmn_err(CE_NOTE, "Could not read current scan set from "
+		    "keyboard: %s.", kb8042_error_string(err));
+#endif
+	return (-1);
+}
+#endif
+
 static int
 kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 {
 	int	rc;
+	int	scanset;
+	int	leds;
 
-	struct kb8042	*kb8042;
+	struct kb8042	*kb8042 = &Kdws;
 	static ddi_device_acc_attr_t attr = {
 		DDI_DEVICE_ATTR_V0,
 		DDI_NEVERSWAP_ACC,
 		DDI_STRICTORDER_ACC,
 	};
 
-	if (cmd != DDI_ATTACH)
+	switch (cmd) {
+	case DDI_RESUME:
+		leds = kb8042->leds.commanded;
+		kb8042->w_init = 0;
+		kb8042_init(kb8042, B_TRUE);
+		kb8042_setled(kb8042, leds, B_FALSE);
+		return (DDI_SUCCESS);
+
+	case DDI_ATTACH:
+		if (kb8042_dip != NULL)
+			return (DDI_FAILURE);
+		/* The rest of the function is for attach */
+		break;
+
+	default:
 		return (DDI_FAILURE);
-
-	kb8042 = &Kdws;
-
-	KeyboardConvertScan_init(kb8042);
+	}
 
 	kb8042->debugger.mod1 = 58;	/* Left Ctrl */
 	kb8042->debugger.mod2 = 60;	/* Left Alt */
@@ -289,14 +450,17 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	kb8042->debugger.mod2_down = B_FALSE;
 	kb8042->debugger.enabled = B_FALSE;
 
+	kb8042_dip = devi;
+	kb8042->init_state = KB8042_UNINITIALIZED;
+
 	kb8042->polled_synthetic_release_pending = B_FALSE;
 
 	if (ddi_create_minor_node(devi, module_name, S_IFCHR, 0,
 		    DDI_NT_KEYBOARD, 0) == DDI_FAILURE) {
-		ddi_remove_minor_node(devi, NULL);
-		return (-1);
+		goto failure;
 	}
-	kb8042_dip = devi;
+
+	kb8042->init_state |= KB8042_MINOR_NODE_CREATED;
 
 	rc = ddi_regs_map_setup(devi, 0, (caddr_t *)&kb8042->addr,
 		(offset_t)0, (offset_t)0, &attr, &kb8042->handle);
@@ -304,18 +468,56 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 #if	defined(KD_DEBUG)
 		cmn_err(CE_WARN, "kb8042_attach:  can't map registers");
 #endif
-		return (rc);
+		goto failure;
 	}
+
+	kb8042->init_state |= KB8042_REGS_MAPPED;
 
 	if (ddi_get_iblock_cookie(devi, 0, &kb8042->w_iblock) !=
 		DDI_SUCCESS) {
 		cmn_err(CE_WARN, "kb8042_attach:  Can't get iblock cookie");
-		return (DDI_FAILURE);
+		goto failure;
 	}
 
 	mutex_init(&kb8042->w_hw_mutex, NULL, MUTEX_DRIVER, kb8042->w_iblock);
 
-	kb8042_init(kb8042);
+	kb8042->init_state |= KB8042_HW_MUTEX_INITTED;
+
+	kb8042_init(kb8042, B_FALSE);
+
+#ifdef __sparc
+	/* Detect the scan code set currently in use */
+	scanset = kb8042_read_scanset(kb8042, B_TRUE);
+
+	if (scanset < 0 && kb8042_warn_unknown_scanset) {
+
+		cmn_err(CE_WARN, "Cannot determine keyboard scan code set ");
+		cmn_err(CE_CONT, "(is the keyboard plugged in?). ");
+		cmn_err(CE_CONT, "Defaulting to scan code set %d.  If the "
+		    "keyboard does not ", kb8042_default_scanset);
+		cmn_err(CE_CONT, "work properly, add "
+		    "`set kb8042:kb8042_default_scanset=%d' to /etc/system ",
+		    (kb8042_default_scanset == 1) ? 2 : 1);
+		cmn_err(CE_CONT, "(via network or with a USB keyboard) and "
+		    "restart the system.  If you ");
+		cmn_err(CE_CONT, "do not want to see this message in the "
+		    "future, add ");
+		cmn_err(CE_CONT, "`set kb8042:kb8042_warn_unknown_scanset=0' "
+		    "to /etc/system.\n");
+
+		/* Use the default scan code set. */
+		scanset = kb8042_default_scanset;
+	}
+#else
+	/* x86 systems use scan code set 1 -- no detection required */
+	scanset = 1;
+#endif
+	if (KeyboardConvertScan_init(kb8042, scanset) != DDI_SUCCESS) {
+		cmn_err(CE_WARN, "Cannot initialize keyboard scan converter: "
+		    "Unknown scan code set `%d'.", scanset);
+		/* Scan code set is not supported */
+		goto failure;
+	}
 
 	/*
 	 * Turn on interrupts...
@@ -324,16 +526,50 @@ kb8042_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		&kb8042->w_iblock, (ddi_idevice_cookie_t *)NULL,
 		kb8042_intr, (caddr_t)kb8042) != DDI_SUCCESS) {
 		cmn_err(CE_WARN, "kb8042_attach: cannot add interrupt");
-		return (DDI_FAILURE);
+		goto failure;
 	}
 
+	kb8042->init_state |= KB8042_INTR_ADDED;
+
 	ddi_report_dev(devi);
+
 #ifdef	KD_DEBUG
 	cmn_err(CE_CONT, "?%s #%d: version %s\n",
 	    DRIVER_NAME(devi), ddi_get_instance(devi), "%I% (%E%)");
 #endif
+
 	return (DDI_SUCCESS);
+
+failure:
+	kb8042_cleanup(kb8042);
+	return (DDI_FAILURE);
 }
+
+static int
+kb8042_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+	struct kb8042 *kb8042 = &Kdws;
+
+	switch (cmd) {
+	case DDI_SUSPEND:
+		return (DDI_SUCCESS);
+
+	case DDI_DETACH:
+		/* If someone has a stream open, fail to detach */
+		if (kb8042->w_qp != NULL)
+			return (DDI_FAILURE);
+
+		ASSERT(kb8042_dip == dip);
+
+		kb8042_cleanup(kb8042);
+
+		return (DDI_SUCCESS);
+
+	default:
+		return (DDI_FAILURE);
+	}
+}
+
 
 /*ARGSUSED*/
 static int
@@ -366,24 +602,43 @@ kb8042_getinfo(
 }
 
 static void
-kb8042_init(struct kb8042 *kb8042)
+kb8042_cleanup(struct kb8042 *kb8042)
+{
+
+	if (kb8042->init_state & KB8042_HW_MUTEX_INITTED)
+		mutex_destroy(&kb8042->w_hw_mutex);
+
+	if (kb8042->init_state & KB8042_INTR_ADDED)
+		ddi_remove_intr(kb8042_dip, 0, kb8042->w_iblock);
+
+	if (kb8042->init_state & KB8042_REGS_MAPPED)
+		ddi_regs_map_free(&kb8042->handle);
+
+	if (kb8042->init_state & KB8042_MINOR_NODE_CREATED)
+		ddi_remove_minor_node(kb8042_dip, NULL);
+
+	kb8042->init_state = KB8042_UNINITIALIZED;
+}
+
+static void
+kb8042_init(struct kb8042 *kb8042, boolean_t from_resume)
 {
 	if (kb8042->w_init)
 		return;
 
-	kb8042->w_kblayout = 0;	/* Default to US */
-
-	kb8042->w_qp = (queue_t *)NULL;
+	if (!from_resume) {
+		kb8042->w_kblayout = 0;	/* Default to US */
+		kb8042->w_qp = (queue_t *)NULL;
+		kb8042->simulated_kbd_type = KB_PC;
+		kb8042->leds.commanded = -1;	/* Unknown initial state */
+		kb8042->leds.desired = -1;	/* Unknown initial state */
+	}
 
 	kb8042_wait_poweron(kb8042);
 
 	kb8042->kb_old_key_pos = 0;
 
-	kb8042->simulated_kbd_type = KB_PC;
-
 	/* Set up the command state machine and start it running. */
-	kb8042->leds.commanded = -1;	/* Unknown initial state */
-	kb8042->leds.desired = -1;	/* Unknown initial state */
 	kb8042->command_state = KB_COMMAND_STATE_WAIT;
 	kb8042_send_to_keyboard(kb8042, KB_ENABLE, B_FALSE);
 
@@ -506,19 +761,6 @@ kb8042_wsrv(queue_t *qp)
 		}
 	}
 	return (0);
-}
-
-static void
-kb8042_streams_setled(struct kbtrans_hardware *hw, int led_state)
-{
-	struct kb8042 *kb8042 = (struct kb8042 *)hw;
-
-	kb8042->leds.desired = led_state;
-	mutex_enter(&kb8042->w_hw_mutex);
-
-	kb8042_start_state_machine(kb8042, B_FALSE);
-
-	mutex_exit(&kb8042->w_hw_mutex);
 }
 
 static void
@@ -805,6 +1047,9 @@ kb8042_intr(caddr_t arg)
 
 	rc = DDI_INTR_UNCLAIMED;
 
+	if (kb8042->init_state == KB8042_UNINITIALIZED)
+		return (DDI_INTR_UNCLAIMED);
+
 	/* don't care if drv_setparm succeeds */
 	(void) drv_setparm(SYSRINT, 1);
 
@@ -947,13 +1192,31 @@ kb8042_polled_keycheck(
 }
 
 static void
+kb8042_setled(struct kb8042 *kb8042, int led_state, boolean_t polled)
+{
+	kb8042->leds.desired = led_state;
+
+	if (!polled)
+		mutex_enter(&kb8042->w_hw_mutex);
+
+	kb8042_start_state_machine(kb8042, polled);
+
+	if (!polled)
+		mutex_exit(&kb8042->w_hw_mutex);
+}
+
+static void
 kb8042_polled_setled(struct kbtrans_hardware *hw, int led_state)
 {
 	struct kb8042 *kb8042 = (struct kb8042 *)hw;
+	kb8042_setled(kb8042, led_state, B_TRUE);
+}
 
-	kb8042->leds.desired = led_state;
-
-	kb8042_start_state_machine(kb8042, B_TRUE);
+static void
+kb8042_streams_setled(struct kbtrans_hardware *hw, int led_state)
+{
+	struct kb8042 *kb8042 = (struct kb8042 *)hw;
+	kb8042_setled(kb8042, led_state, B_FALSE);
 }
 
 static void
@@ -989,7 +1252,7 @@ kb8042_wait_poweron(struct kb8042 *kb8042)
 	int ready;
 	unsigned char byt;
 
-	/* wait for up to about a quarter-second for response */
+	/* wait for up to 250 ms for a response */
 	for (cnt = 0; cnt < 250; cnt++) {
 		ready = ddi_get8(kb8042->handle,
 			kb8042->addr + I8042_INT_INPUT_AVAIL);

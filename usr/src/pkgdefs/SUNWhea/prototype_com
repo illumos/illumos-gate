@@ -852,6 +852,7 @@ f none usr/include/sys/model.h 644 root bin
 f none usr/include/sys/modhash.h 644 root bin
 f none usr/include/sys/modhash_impl.h 644 root bin
 f none usr/include/sys/mount.h 644 root bin
+f none usr/include/sys/mouse.h 644 root bin
 f none usr/include/sys/msacct.h 644 root bin
 f none usr/include/sys/msg.h 644 root bin
 f none usr/include/sys/msg_impl.h 644 root bin

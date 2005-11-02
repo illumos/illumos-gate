@@ -78,6 +78,7 @@ f none kernel/drv/sparcv9/dad 755 root sys
 f none kernel/drv/sparcv9/devinfo 755 root sys
 f none kernel/drv/sparcv9/dld 755 root sys
 f none kernel/drv/sparcv9/esp 755 root sys
+f none kernel/drv/sparcv9/i8042 755 root sys
 f none kernel/drv/sparcv9/icmp 755 root sys
 f none kernel/drv/sparcv9/icmp6 755 root sys
 f none kernel/drv/sparcv9/ip 755 root sys
@@ -87,12 +88,14 @@ f none kernel/drv/sparcv9/ipsecah 755 root sys
 f none kernel/drv/sparcv9/ipsecesp 755 root sys
 f none kernel/drv/sparcv9/isp 755 root sys
 f none kernel/drv/sparcv9/iwscn 755 root sys
+f none kernel/drv/sparcv9/kb8042 755 root sys
 f none kernel/drv/sparcv9/keysock 755 root sys
 f none kernel/drv/sparcv9/kmdb 755 root sys
 f none kernel/drv/sparcv9/llc1 755 root sys
 f none kernel/drv/sparcv9/lofi 755 root sys
 f none kernel/drv/sparcv9/log 755 root sys
 f none kernel/drv/sparcv9/mm 755 root sys
+f none kernel/drv/sparcv9/mouse8042 755 root sys
 f none kernel/drv/sparcv9/openeepr 755 root sys
 f none kernel/drv/sparcv9/options 755 root sys
 f none kernel/drv/sparcv9/pci_pci 755 root sys
@@ -207,6 +210,7 @@ f none kernel/strmod/sparcv9/tirdwr 755 root sys
 f none kernel/strmod/sparcv9/ttcompat 755 root sys
 f none kernel/strmod/sparcv9/tun 755 root sys
 l none kernel/strmod/sparcv9/udp=../../../kernel/drv/sparcv9/udp
+f none kernel/strmod/sparcv9/vuid3ps2 755 root sys
 d none kernel/sys/sparcv9 755 root sys
 l none kernel/sys/sparcv9/autofs=../../../kernel/fs/sparcv9/autofs
 f none kernel/sys/sparcv9/c2audit 755 root sys

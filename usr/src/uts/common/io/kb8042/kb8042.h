@@ -46,7 +46,7 @@ extern "C" {
 #define	KB_ACK		0xFA	/* Acknowledgement byte from keyboard */
 #define	KB_POST_FAIL	0xFC	/* Power On Self Test failed */
 #define	KB_RESEND	0xFE	/* response from keyboard to resend data */
-
+#define	KB_REPLY_MAXLEN	8	/* Maximum # of bytes the keyboard can reply */
 /*
  * Commands to keyboard.
  */
@@ -109,6 +109,8 @@ struct kb8042 {
 	boolean_t	polled_synthetic_release_pending;
 	int		polled_synthetic_release_key;
 	int		simulated_kbd_type;
+	uint32_t	init_state;
+	int		break_received;
 };
 
 #define	KB_COMMAND_STATE_IDLE	0
@@ -117,7 +119,7 @@ struct kb8042 {
 
 extern boolean_t KeyboardConvertScan(struct kb8042 *, unsigned char scan,
 			int *keynum, enum keystate *, boolean_t *);
-extern void KeyboardConvertScan_init(struct kb8042 *);
+extern int KeyboardConvertScan_init(struct kb8042 *, int scanset);
 
 #if	defined(i86pc)
 /*
@@ -128,6 +130,20 @@ extern void KeyboardConvertScan_init(struct kb8042 *);
 #define	BIOS_NUM_STATE		0x20
 #define	BIOS_CAPS_STATE		0x40
 #endif
+
+/*
+ * Initialization states
+ */
+#define	KB8042_UNINITIALIZED		0x00000000
+#define	KB8042_MINOR_NODE_CREATED	0x00000001
+#define	KB8042_REGS_MAPPED		0x00000002
+#define	KB8042_HW_MUTEX_INITTED		0x00000004
+#define	KB8042_INTR_ADDED		0x00000008
+
+/*
+ * Key values that map into the USB translation table in kb8042.c
+ */
+#define	K8042_STOP	160
 
 #endif
 

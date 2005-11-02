@@ -258,7 +258,15 @@ VUID_INIT_TIMEOUT(void *q)
 
 	STATEP->init_tid = 0;
 
-	if ((STATEP->state == PS2_WAIT_WHEEL_SMPL1_RATE_ACK) ||
+	/*
+	 * Some mice do not even send an error in response to
+	 * the wheel mouse sample commands, so if we're in any of
+	 * the PS2_WAIT_WHEEL_SMPL* states, and there has been
+	 * a timeout, assume the mouse cannot handle the extended
+	 * (wheel mouse) commands.
+	 */
+	if ((STATEP->state == PS2_WAIT_WHEEL_SMPL1_CMD_ACK) ||
+	    (STATEP->state == PS2_WAIT_WHEEL_SMPL1_RATE_ACK) ||
 	    (STATEP->state == PS2_WAIT_WHEEL_SMPL2_RATE_ACK) ||
 	    (STATEP->state == PS2_WAIT_WHEEL_SMPL3_RATE_ACK)) {
 		/*

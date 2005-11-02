@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,16 +34,6 @@
 #include <sys/consdev.h>
 #include <sys/promif.h>
 #include "kb8042.h"
-
-/*
- * A note on the SCAN_SET_2 #ifdef's:  This module was originally
- * intended for handling Set 2 keyboard scan codes.  Now it has been
- * switched to handle Set 1 keyboard scan codes.  The Set 2 tables
- * and some other Set 2 specific elements have been preserved with
- * these #ifdef's.  Also, the "break_prefix_received" variable and
- * its surrounding structure were removed from the kb8042 struct,
- * since Set 1 scan codes don't use this approach.
- */
 
 /*
  * Debugging for this module is enabled by the kb8042_debug flag
@@ -76,20 +66,35 @@ extern boolean_t kb8042_debug;
 #define	INVALID		KEYBAD
 #define	IGNORE		KEYIGN
 
+#define	NELEM(a)	(sizeof (a) / sizeof (a)[0])
+
 /*
  * These are the states of our parsing machine:
  */
-#define	STATE_IDLE	0x10000000	/* Awaiting the start of a sequence */
-#define	STATE_E0	0x100000e0	/* Rec'd an E0 */
-#define	STATE_E1	0x100000e1	/* Rec'd an E1 (Pause key only) */
-#define	STATE_E1_1D	0x1000e11d	/* Rec'd an E1 1D (Pause key only) */
-#ifdef SCAN_SET_2
-#define	STATE_E1_14	0x1000e114	/* Rec'd an E1 14 (Pause key only) */
-#endif
+#define	STATE_IDLE	0x00000001 /* Awaiting the start of a sequence */
+#define	STATE_E0	0x00000002 /* Rec'd an E0 */
+#define	STATE_E1	0x00000004 /* Rec'd an E1 (Pause key only) */
+#define	STATE_E1_1D	0x00000008 /* Rec'd an E1 1D (Pause key only) */
+#define	STATE_E1_14	0x00000010 /* Rec'd an E1 14 (Pause key only) */
+#define	STATE_E1_14_77			0x00000020
+#define	STATE_E1_14_77_E1		0x00000040
+#define	STATE_E1_14_77_E1_F0		0x00000080
+#define	STATE_E1_14_77_E1_F0_14		0x00000100
+#define	STATE_E1_14_77_E1_F0_14_F0	0x00000200
 
-#define	NELEM(a)	(sizeof (a) / sizeof (a)[0])
+static boolean_t KeyboardConvertScan_set1(struct kb8042	*, unsigned char, int *,
+    enum keystate *, boolean_t *);
+static boolean_t KeyboardConvertScan_set2(struct kb8042	*, unsigned char, int *,
+    enum keystate *, boolean_t *);
 
-static const unsigned char	keytab_base[] = {
+static const unsigned char *keytab_base = NULL;
+static int keytab_base_length = 0;
+static const unsigned char *keytab_e0 = NULL;
+static int keytab_e0_length = 0;
+static boolean_t (*KeyboardConvertScan_fn)(struct kb8042 *, unsigned char,
+    int *, enum keystate *, boolean_t *) = NULL;
+
+static const unsigned char	keytab_base_set1[] = {
 /* scan		key number	keycap */
 /* 00 */	INVALID,
 /* 01 */	KEY(110),	/* Esc */
@@ -238,7 +243,7 @@ static const unsigned char	keytab_base[] = {
  * and releases for compatibility; these are also prefixed with E0.
  * We ignore these fake shifts.
  */
-static const unsigned char	keytab_e0[] = {
+static const unsigned char	keytab_e0_set1[] = {
 /* 00 */	INVALID,
 /* 01 */	INVALID,
 /* 02 */	INVALID,
@@ -376,13 +381,17 @@ static const unsigned char	keytab_e0[] = {
 };
 
 
-#ifdef SCAN_SET_2
 /*
  *	Parse table for the base keyboard state.  The index is the start of
  *	a new sequence.
  *
  * Questionable or unusual cases:
- * 02		Old kd code says F7. Manual says no.
+ * 02		On some SPARC keyboards, this is the scan code for the STOP
+ *		key.  The KEY() value was chosen so that it maps to a
+ *		HOLE entry in the keytables in kb8042_keytables.c; therefore,
+ *		the STOP key code is only translated properly when kb8042
+ *		is "emulating" a USB keyboard (which it is by default--
+ *		see conskbd.c).
  * 7f		Old kd code says this is an 84-key SysReq.  Manual says no.
  * 87		Old kd code says 1 (num).  Manual says no.
  * 8c		Old kd code says / (num).  Manual says no.
@@ -397,11 +406,15 @@ static const unsigned char	keytab_e0[] = {
  * Other values past the end of the table are treated as INVALID.
  */
 
-static const unsigned char	keytab_base[] = {
+static const unsigned char	keytab_base_set2[] = {
 /* scan		state		keycap */
 /* 00 */	INVALID,
 /* 01 */	KEY(120),	/* F9 */
+#if defined(__sparc)
+/* 02 */	KEY(K8042_STOP), /* STOP */
+#else
 /* 02 */	INVALID,	/* F7?  Old code says so but manual doesn't */
+#endif
 /* 03 */	KEY(116),	/* F5 */
 /* 04 */	KEY(114),	/* F3 */
 /* 05 */	KEY(112),	/* F1 */
@@ -544,7 +557,7 @@ static const unsigned char	keytab_base[] = {
  * and releases for compatibility; these are also prefixed with E0.
  * We ignore these fake shifts.
  */
-static const unsigned char	keytab_e0[] = {
+static const unsigned char	keytab_e0_set2[] = {
 /* 00 */	INVALID,
 /* 01 */	INVALID,
 /* 02 */	INVALID,
@@ -674,15 +687,47 @@ static const unsigned char	keytab_e0[] = {
 /* 7e */	KEY(126),	/* Pause (w/Ctrl = Break) */
 };
 
-#endif /* SCAN_SET_2 */
 
 /*
  * Initialize the translation state machine.
  */
-void
-KeyboardConvertScan_init(struct kb8042 *kb8042)
+int
+KeyboardConvertScan_init(struct kb8042 *kb8042, int scanset)
 {
 	kb8042->parse_scan_state = STATE_IDLE;
+	kb8042->break_received = 0;
+
+	if (scanset == 1) {
+		KeyboardConvertScan_fn = &KeyboardConvertScan_set1;
+		keytab_base = keytab_base_set1;
+		keytab_base_length = NELEM(keytab_base_set1);
+		keytab_e0 = keytab_e0_set1;
+		keytab_e0_length = NELEM(keytab_e0_set1);
+	} else if (scanset == 2) {
+		KeyboardConvertScan_fn = &KeyboardConvertScan_set2;
+		keytab_base = keytab_base_set2;
+		keytab_base_length = NELEM(keytab_base_set2);
+		keytab_e0 = keytab_e0_set2;
+		keytab_e0_length = NELEM(keytab_e0_set2);
+	} else {
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+boolean_t
+KeyboardConvertScan(
+    struct kb8042	*kb8042,
+    unsigned char	scan,
+    int			*keynum,
+    enum keystate	*state,
+    boolean_t		*synthetic_release_needed)
+{
+	ASSERT(KeyboardConvertScan_fn != NULL);
+
+	return ((*KeyboardConvertScan_fn)(kb8042, scan, keynum, state,
+	    synthetic_release_needed));
 }
 
 /*
@@ -699,14 +744,14 @@ KeyboardConvertScan_init(struct kb8042 *kb8042)
  *	upper layer to synthesize the release.
  */
 boolean_t
-KeyboardConvertScan(
+KeyboardConvertScan_set1(
     struct kb8042	*kb8042,
     unsigned char	scan,
     int			*keynum,
     enum keystate	*state,
     boolean_t		*synthetic_release_needed)
 {
-	DEBUG_KD(("KeyboardConvertScan: 0x%02x ", scan));
+	DEBUG_KD(("KeyboardConvertScan_set1: 0x%02x ", scan));
 
 	*synthetic_release_needed = B_FALSE;
 	*state = KEY_PRESSED;
@@ -716,17 +761,6 @@ KeyboardConvertScan(
 	 * First, handle special cases.
 	 * ACK has already been handled by our caller.
 	 */
-
-#ifdef SCAN_SET_2
-	/*
-	 * KAT_BREAK is 0xF0 and is not used for Set 1.   It is
-	 * also the same as the break code for Japanese key 133.
-	 * Therefore we don't treat it specially here.
-	 */
-	case KAT_BREAK:
-		DEBUG_KD(("-> break prefix\n"));
-		return (B_FALSE);	/* not a final keycode */
-#endif
 	case KB_ERROR:
 		/*
 		 * Perhaps we should reset state here,
@@ -734,13 +768,6 @@ KeyboardConvertScan(
 		 */
 		DEBUG_KD(("-> overrun\n"));
 		return (B_FALSE);
-#ifdef SCAN_SET_2
-	/*
-	 * The KB_POST_OK code is 0xAA, which is the same as the Set 1
-	 * break code for L-Shift.  Therefore, we don't treat it specially.
-	 */
-	case KB_POST_OK:
-#endif
 	case KB_POST_FAIL:
 		/*
 		 * Perhaps we should reset the LEDs now.
@@ -773,6 +800,11 @@ KeyboardConvertScan(
 			scan -= 0x80;
 		}
 		break;
+	}
+
+	if (kb8042->break_received) {
+		*state = KEY_RELEASED;
+		kb8042->break_received = 0;
 	}
 
 	switch (kb8042->parse_scan_state) {
@@ -809,7 +841,7 @@ KeyboardConvertScan(
 			/*
 			 * Regular scan code
 			 */
-			if (scan < NELEM(keytab_base))
+			if (scan < keytab_base_length)
 				*keynum = keytab_base[scan];
 			else
 				*keynum = INVALID;
@@ -818,7 +850,7 @@ KeyboardConvertScan(
 		break;
 
 	case STATE_E0:		/* Mostly 101-key additions */
-		if (scan < NELEM(keytab_e0))
+		if (scan < keytab_e0_length)
 			*keynum = keytab_e0[scan];
 		else
 			*keynum = INVALID;
@@ -830,12 +862,6 @@ KeyboardConvertScan(
 			kb8042->parse_scan_state = STATE_E1_1D;
 			DEBUG_KD(("-> state E1 1D\n"));
 			return (B_FALSE);
-#ifdef SCAN_SET_2
-		case 0x14:
-			kb8042->parse_scan_state = STATE_E1_14;
-			DEBUG_KD(("-> state E1 14\n"));
-			return (B_FALSE);
-#endif
 		default:
 			*keynum = INVALID;
 			break;
@@ -852,18 +878,6 @@ KeyboardConvertScan(
 			break;
 		}
 		break;
-#ifdef SCAN_SET_2
-	case STATE_E1_14:	/* Pause key only */
-		switch (scan) {
-		case 0x77:
-			*keynum = KEY(126);	/* Pause */
-			break;
-		default:
-			*keynum = INVALID;
-			break;
-		}
-		break;
-#endif
 	}
 
 	/*
@@ -872,6 +886,230 @@ KeyboardConvertScan(
 	 * B_TRUE which is only done below.  If we make it to here, we
 	 * have completed a scan code sequence, so reset parse_scan_state.
 	 */
+
+	kb8042->parse_scan_state = STATE_IDLE;
+
+	switch (*keynum) {
+	case KEYIGN:				/* not a key, nor an error */
+		DEBUG_KD(("-> hole -> ignored\n"));
+		return (B_FALSE);		/* also not a final keycode */
+
+	case KEYBAD:		/* not part of a legit sequence? */
+		DEBUG_KD(("-> bad -> ignored\n"));
+		return (B_FALSE);	/* and return not a final keycode */
+
+	default:
+		/*
+		 * If we're here, it's a valid keycode.  We've already
+		 * filled in the return values; return success.
+		 */
+
+		DEBUG_KD(("-> %s keypos %d\n",
+			*state == KEY_RELEASED ? "released" : "pressed",
+			*keynum));
+
+		return (B_TRUE);		/* resolved to a key */
+	}
+}
+
+/*
+ *	KeyboardConvertScan(*kb8042, scan, *keynum, *state
+ *		*synthetic_release_needed)
+ *
+ *	State machine that takes scan codes from the keyboard and resolves
+ *	them to key numbers using the above tables.  Returns B_TRUE if this
+ *	scan code completes a scan code sequence, in which case "keynum",
+ *	"state", and "synthetic_release_needed" will be filled in correctly.
+ *
+ *	"synthetic_release_needed" is a hack to handle the additional two
+ *	keys on a Korean keyboard.  They report press only, so we tell the
+ *	upper layer to synthesize the release.
+ */
+boolean_t
+KeyboardConvertScan_set2(
+    struct kb8042	*kb8042,
+    unsigned char	scan,
+    int			*keynum,
+    enum keystate	*state,
+    boolean_t		*synthetic_release_needed)
+{
+	DEBUG_KD(("KeyboardConvertScan_set2: 0x%02x ", scan));
+
+	*synthetic_release_needed = B_FALSE;
+	*state = KEY_PRESSED;
+
+	switch (scan) {
+	/*
+	 * First, handle special cases.
+	 * ACK has already been handled by our caller.
+	 */
+
+	/*
+	 * KAT_BREAK is 0xF0. It is the same as the break code for Japanese
+	 * key 133.
+	 * Therefore we don't treat it specially here.
+	 */
+	case KAT_BREAK:
+		/* Switch states so we can recognize the code that follows */
+		kb8042->break_received = 1;
+		DEBUG_KD(("-> break prefix\n"));
+		return (B_FALSE);	/* not a final keycode */
+
+	case KB_ERROR:
+		/*
+		 * Perhaps we should reset state here,
+		 * since we no longer know what's going on.
+		 */
+		DEBUG_KD(("-> overrun\n"));
+		return (B_FALSE);
+
+	case KB_POST_OK:
+	case KB_POST_FAIL:
+		/*
+		 * Perhaps we should reset the LEDs now.
+		 * If so, this check should probably be in the main line.
+		 * Perhaps we should tell the higher layers that the
+		 * keyboard has been reset.
+		 */
+		/*
+		 * Reset to idle
+		 */
+		kb8042->parse_scan_state = STATE_IDLE;
+		DEBUG_KD(("-> POST %s\n", scan == KB_POST_OK ? "OK" : "FAIL"));
+		return (B_FALSE);
+	}
+
+	if (kb8042->break_received) {
+		*state = KEY_RELEASED;
+		kb8042->break_received = 0;
+	}
+
+	switch (kb8042->parse_scan_state) {
+	case STATE_IDLE:
+		switch (scan) {
+		case KXT_EXTEND:
+			kb8042->parse_scan_state = STATE_E0;
+			DEBUG_KD(("-> state E0\n"));
+			return (B_FALSE);
+
+		case KXT_EXTEND2:
+			kb8042->parse_scan_state = STATE_E1;
+			DEBUG_KD(("-> state E1\n"));
+			return (B_FALSE);
+
+		/*
+		 * We could do the next two in the table, but it would
+		 * require nearly doubling the size of the table.
+		 *
+		 * Also, for some stupid reason these two report presses
+		 * only.  We tell the upper layer to synthesize a release.
+		 */
+		case KXT_HANGUL_HANJA:
+			*keynum = KEY(150);
+			*synthetic_release_needed = B_TRUE;
+			break;
+
+		case KXT_HANGUL:
+			*keynum = KEY(151);
+			*synthetic_release_needed = B_TRUE;
+			break;
+
+		default:
+			/*
+			 * Regular scan code
+			 */
+			if (scan < keytab_base_length)
+				*keynum = keytab_base[scan];
+			else
+				*keynum = INVALID;
+			break;
+		}
+		break;
+
+	case STATE_E0:		/* Mostly 101-key additions */
+		if (scan < keytab_e0_length)
+			*keynum = keytab_e0[scan];
+		else
+			*keynum = INVALID;
+		break;
+
+	case STATE_E1:		/* Pause key only */
+		switch (scan) {
+		case 0x14:
+			kb8042->parse_scan_state = STATE_E1_14;
+			DEBUG_KD(("-> state E1 14\n"));
+			return (B_FALSE);
+		default:
+			*keynum = INVALID;
+			break;
+		}
+		break;
+
+	case STATE_E1_14:	/* Pause key only */
+		if (scan == 0x77) {
+			kb8042->parse_scan_state = STATE_E1_14_77;
+			return (B_FALSE);
+		} else {
+			*keynum = INVALID;
+		}
+		break;
+
+	case STATE_E1_14_77:
+		if (scan == 0xE1) {
+			kb8042->parse_scan_state = STATE_E1_14_77_E1;
+			return (B_FALSE);
+		} else {
+			*keynum = INVALID;
+		}
+		break;
+
+	case STATE_E1_14_77_E1:
+		if (scan == 0xF0) {
+			kb8042->parse_scan_state = STATE_E1_14_77_E1_F0;
+			return (B_FALSE);
+		} else {
+			*keynum = INVALID;
+		}
+		break;
+
+	case STATE_E1_14_77_E1_F0:
+		if (scan == 0x14) {
+			kb8042->parse_scan_state = STATE_E1_14_77_E1_F0_14;
+			return (B_FALSE);
+		} else {
+			*keynum = INVALID;
+		}
+		break;
+
+	case STATE_E1_14_77_E1_F0_14:
+		if (scan == 0xF0) {
+			kb8042->parse_scan_state = STATE_E1_14_77_E1_F0_14_F0;
+			return (B_FALSE);
+		} else {
+			*keynum = INVALID;
+		}
+		break;
+
+	case STATE_E1_14_77_E1_F0_14_F0:
+		if (scan == 0x77) {
+			*keynum = KEY(126);	/* Pause */
+		} else {
+			*keynum = INVALID;
+		}
+		break;
+	}
+
+	/*
+	 * The results (*keynum, *state, and *synthetic_release_needed)
+	 * have been filled in, but they are valid only if we return
+	 * B_TRUE which is only done below.  If we make it to here, we
+	 * have completed a scan code sequence, so reset parse_scan_state.
+	 */
+
+	if (kb8042->break_received) {
+		*state = KEY_RELEASED;
+		kb8042->break_received = 0;
+	}
 
 	kb8042->parse_scan_state = STATE_IDLE;
 

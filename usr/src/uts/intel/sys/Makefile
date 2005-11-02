@@ -58,7 +58,6 @@ HDRS	=			\
 	mii.h			\
 	miipriv.h		\
 	mmu.h			\
-	mouse.h			\
 	mutex_impl.h		\
 	obpdefs.h		\
 	old_procfs.h		\

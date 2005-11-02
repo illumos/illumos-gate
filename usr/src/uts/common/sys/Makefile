@@ -51,6 +51,7 @@ i386_HDRS=			\
 	fd_debug.h		\
 	fdc.h			\
 	fdmedia.h		\
+	mouse.h			\
 	mse.h			\
 	vuidmice.h
 
@@ -60,6 +61,7 @@ AVHDRS=				\
 sparc_HDRS= 			\
 	audio/audiots.h		\
 	audio/am_src2.h		\
+	mouse.h			\
 	scsi/targets/ssddef.h	\
 	$(MDESCHDRS)		\
 	$(AVHDRS)
@@ -316,6 +318,7 @@ CHKHDRS=			\
 	modhash.h		\
 	modhash_impl.h		\
 	mount.h			\
+	mouse.h			\
 	msacct.h		\
 	msg.h			\
 	msg_impl.h		\

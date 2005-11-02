@@ -244,6 +244,7 @@ static int
 mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	struct mouse_state *state;
+	mblk_t *mp;
 	int instance = ddi_get_instance(dip);
 	static ddi_device_acc_attr_t attr = {
 		DDI_DEVICE_ATTR_V0,
@@ -258,6 +259,26 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		cmn_err(CE_CONT, MODULE_NAME "_attach entry\n");
 	}
 #endif
+
+	if (cmd == DDI_RESUME) {
+		state = (struct mouse_state *)ddi_get_driver_private(dip);
+
+		/*
+		 * Send a 0xaa 0x00 upstream.
+		 * This causes the vuid module to reset the mouse.
+		 */
+		if (state->ms_rqp != NULL) {
+			if (mp = allocb(1, BPRI_MED)) {
+				*mp->b_wptr++ = 0xaa;
+				putnext(state->ms_rqp, mp);
+			}
+			if (mp = allocb(1, BPRI_MED)) {
+				*mp->b_wptr++ = 0x0;
+				putnext(state->ms_rqp, mp);
+			}
+		}
+		return (DDI_SUCCESS);
+	}
 
 	if (cmd != DDI_ATTACH)
 		return (DDI_FAILURE);
@@ -286,7 +307,7 @@ mouse8042_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * 	external node minor num == instance * 2
 	 *	internal node minor num == instance * 2 + 1
 	 */
-	rc = ddi_create_minor_node(dip, "l", S_IFCHR, instance * 2,
+	rc = ddi_create_minor_node(dip, "mouse", S_IFCHR, instance * 2,
 	    DDI_NT_MOUSE, NULL);
 	if (rc != DDI_SUCCESS) {
 #if	defined(MOUSE8042_DEBUG)
@@ -362,6 +383,8 @@ mouse8042_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	state = ddi_get_driver_private(dip);
 
 	switch (cmd) {
+	case DDI_SUSPEND:
+		return (DDI_SUCCESS);
 
 	case DDI_DETACH:
 		ddi_remove_intr(dip, 0, state->ms_iblock_cookie);
@@ -549,7 +572,8 @@ mouse8042_close(queue_t *q, int flag, cred_t *cred_p)
 		 *
 		 * Link it back to virtual mouse, and
 		 * mouse8042_open will be called as a result
-		 * of the consconfig_link call.
+		 * of the consconfig_link call.  Do NOT try
+		 * this if the mouse is about to be detached!
 		 *
 		 * If linking back fails, this specific mouse
 		 * will not be available underneath the virtual

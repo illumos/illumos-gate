@@ -77,7 +77,6 @@ f none usr/include/sys/fdc.h 644 root bin
 f none usr/include/sys/fdmedia.h 644 root bin
 f none usr/include/sys/mii.h 644 root bin
 f none usr/include/sys/miipriv.h 644 root bin
-f none usr/include/sys/mouse.h 644 root bin
 f none usr/include/sys/mse.h 644 root bin
 f none usr/include/sys/sbpro.h 644 root bin
 f none usr/include/sys/vuidmice.h 644 root bin
