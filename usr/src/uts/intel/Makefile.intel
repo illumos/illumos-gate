@@ -229,6 +229,7 @@ DRV_KMODS	+= dld
 DRV_KMODS	+= dump
 DRV_KMODS	+= ecpp
 DRV_KMODS	+= fssnap
+DRV_KMODS	+= glm
 DRV_KMODS	+= i8042
 DRV_KMODS	+= icmp
 DRV_KMODS	+= icmp6

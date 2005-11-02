@@ -22,9 +22,10 @@
 #
 
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 # SUNWpd postremove script
-# Copyright (c) 1995,1999-2000 by Sun Microsystems, Inc.
-# All rights reserved.
 
 killproc() {            # kill the named process(es)
 	pid=`/usr/bin/ps -e |
@@ -38,10 +39,23 @@ PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 status=0
 
+ISA_TYPE_I386="i386"
+ISA_TYPE_SPARC="sparc"
+
+ISA_TYPE="$ARCH"
+
 NAMEMAJOR="${BASEDIR}/etc/name_to_major"
 MINORPERM="${BASEDIR}/etc/minor_perm"
 DEVLINKTB="$BASEDIR/etc/devlink.tab"
 DRIVERALS="$BASEDIR/etc/driver_aliases"
+
+#
+# Driver info
+#
+DRV=glm
+DRVPERM='* 0600 root sys'
+DRVALIAS="\"pci1000,b\""
+PATH_TO_INST="$BASEDIR/etc/path_to_inst"
 
 rm -f /dev/pmc
 
@@ -191,5 +205,64 @@ if [ "$modnum" = "1" ]; then
 fi
 
 rm -f /tmp/$$.*
+
+# Do not update on sparc machine
+if [ "${ISA_TYPE}" = "${ISA_TYPE_I386}" ]; then
+	#
+	# Select the correct rem_drv options to execute.
+	# Only attempt to unload the driver on a running system.
+	#
+	if [ "${BASEDIR}" = "/" ]; then
+		REM_DRV="rem_drv"
+	else
+		REM_DRV="rem_drv -b ${BASEDIR}"
+	fi
+
+	#
+	# before attempting to remove the driver.
+	#
+	grep -w "${DRV}" ${BASEDIR}/etc/name_to_major > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
+		${REM_DRV} ${DRV}
+		if [ $? -ne 0 ]; then
+			echo "\nFailed rem_drv!\n" >&2
+			exit 1
+		fi
+	fi
+
+	#
+	# rem_drv doesn't remove the entry in /dev therefore this script
+	# will have to finish off that clean up.
+	#
+	rm -f ${BASEDIR}/dev/${DRV}
+
+	#
+	# restore symhisl entries
+	#
+	# Select the correct add_drv options to execute for symhisl
+	#
+	if [ "${BASEDIR}" = "/" ]; then
+		#
+		# Irrespective of whether hardware exists
+		# or not don't attempt to attach driver
+		# to the hardware. This is to avoid problems
+		# with installing a 32 bit driver on a 64 bit
+		# running system.
+		#
+		ADD_DRV="add_drv -n"
+	else
+		#
+		# On a client,
+		# modify the system files and touch/reconfigure
+		# for reconfigure reboot
+		#
+		ADD_DRV="add_drv -b ${BASEDIR}"
+	fi
+	echo "symhisl ${DRVALIAS}" >> ${BASEDIR}/etc/driver_aliases
+	# Remove references to glm if any in /etc/path_to_inst to
+	# avoid confusion.
+	grep -v "pci1000,b@" $PATH_TO_INST >> $PATH_TO_INST.new
+	mv $PATH_TO_INST.new $PATH_TO_INST
+fi
 
 exit $status

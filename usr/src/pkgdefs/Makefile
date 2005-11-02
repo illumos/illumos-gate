@@ -71,7 +71,6 @@ sparc_SUBDIRS= \
 	SUNWluxl \
 	SUNWonmtst.u \
 	SUNWonmtst.v \
-	SUNWpd    \
 	SUNWpdu	  \
 	SUNWpstl.u \
 	SUNWsckmr \
@@ -237,6 +236,7 @@ COMMON_SUBDIRS= \
 	SUNWpcr	\
 	SUNWpcser \
 	SUNWpcu	\
+	SUNWpd    \
 	SUNWphx \
 	PHXext \
 	SUNWperl584core \

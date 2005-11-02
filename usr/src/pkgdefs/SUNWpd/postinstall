@@ -20,22 +20,34 @@
 #
 # CDDL HEADER END
 #
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
-# SUNWpd postinstall script
-# Copyright (c) 1995-2000 by Sun Microsystems, Inc.
-# All rights reserved.
 #
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+# SUNWpd postinstall script
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 EXIT=0
 status=0
 
+ISA_TYPE_I386="i386"
+ISA_TYPE_SPARC="sparc"
+
+ISA_TYPE="$ARCH"
+
+# 
+# Driver info 
+# 
+DRV=glm
+DRVALIAS="pci1000,b"
+DRVPERM='* 0755 root sys'
+
 NAMEMAJOR="$BASEDIR/etc/name_to_major"
 MINORPERM="$BASEDIR/etc/minor_perm"
 DEVLINKTB="$BASEDIR/etc/devlink.tab"
 DRIVERALS="$BASEDIR/etc/driver_aliases"
+PATH_TO_INST="$BASEDIR/etc/path_to_inst"
 IUAP="$BASEDIR/etc/iu.ap"
 
 if test ! -f ${NAMEMAJOR} -o ! -w ${NAMEMAJOR}; then
@@ -240,5 +252,55 @@ if [ "$modnum" = "0" ]; then
 fi
 
 rm -f /tmp/$$.*
+
+# Do nothing on sparc machine.
+if [ "${ISA_TYPE}" = "${ISA_TYPE_I386}" ]; then
+	
+	#
+	# Select the correct add_drv options to execute for glm
+	#
+	if [ "${BASEDIR}" = "/" ]; then
+		#
+		# Irrespective of whether hardware exists
+		# or not don't attempt to attach driver
+		# to the hardware. This is to avoid problems
+		# with installing a 32 bit driver on a 64 bit
+		# running system.
+		#
+		ADD_DRV="add_drv -n"
+	else
+		#
+		# On a client,
+		# modify the system files and touch/reconfigure
+		# for reconfigure reboot
+		#
+		ADD_DRV="add_drv -b ${BASEDIR}"
+	fi
+
+	# Remove references to symhisl if any in /etc/driver_aliases to
+	# avoid confusion.
+	grep -v "symhisl \"${DRVALIAS}\"\>" $DRIVERALS > $DRIVERALS.new
+	mv $DRIVERALS.new $DRIVERALS
+
+	# Remove references to symhisl if any in /etc/path_to_inst to
+	# avoid confusion.
+	grep -v $DRVALIAS $PATH_TO_INST > $PATH_TO_INST.new
+	mv $PATH_TO_INST.new $PATH_TO_INST
+
+	#
+	# Make sure add_drv has *not* been previously executed
+	# before attempting to add glm driver.
+	#
+	grep -w "${DRV}" ${BASEDIR}/etc/name_to_major > /dev/null 2>&1
+	if [ $? -eq 1 ]; then
+		${ADD_DRV} -m "${DRVPERM}" -i "\"${DRVALIAS}\"" -c scsi ${DRV}
+		if [ $? -ne 0 ]; then
+			echo "\nFailed add_drv!\n" >&2
+			exit 1
+		fi
+	else
+		exit 0
+	fi
+fi
 
 exit $status
