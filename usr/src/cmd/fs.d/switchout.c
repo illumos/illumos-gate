@@ -113,11 +113,13 @@ struct commands {
 };
 struct 	commands *c_ptr;
 
-main(argc, argv)
-int	argc;
-char	*argv[];
+static void usage(char *cmd, char **usg);
+static void lookup(void);
+
+int
+main(int argc, char *argv[])
 {
-	register char *ptr;
+	char 	*ptr;
 	char	full_path[PATH_MAX];
 	char	*vfs_path = VFS_PATH;
 	char	*alt_path = ALT_PATH;
@@ -332,12 +334,11 @@ char	*argv[];
 	(void) fprintf(stderr,
 	    gettext("%s: Operation not applicable for FSType %s \n"),
 	    cbasename, fstype);
-	exit(2);
+	return (2);
 }
 
-usage(cmd, usg)
-char *cmd;
-char **usg;
+static void
+usage(char *cmd, char **usg)
 {
 	int i;
 	(void) fprintf(stderr, gettext("Usage:\n"));
@@ -356,7 +357,8 @@ char **usg;
  *	special, fstype
  */
 
-lookup()
+static void
+lookup(void)
 {
 	FILE	*fd;
 	int	ret;
@@ -401,10 +403,7 @@ lookup()
 }
 
 void
-stat_snap(cmd, mountpoint, opts)
-char *cmd;
-char *mountpoint;
-char *opts;
+stat_snap(char *cmd, char *mountpoint, char *opts)
 {
 	int fd; /* check mount point if given */
 	int en;

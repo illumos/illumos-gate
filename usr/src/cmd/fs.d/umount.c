@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -151,9 +151,8 @@ static mountent_t	*getmntall();
 static mountent_t 	*new_mountent(struct mnttab *);
 static mountent_t	*getmntlast(mountent_t *, char *, char *);
 
-main(argc, argv)
-	int	argc;
-	char	**argv;
+int
+main(int argc, char **argv)
 {
 	int 	cc;
 	struct mnttab  mget;
@@ -334,7 +333,7 @@ main(argc, argv)
 	else
 		doexec(&mget);
 
-	exit(0);
+	return (0);
 }
 
 void
@@ -466,8 +465,7 @@ doexec(struct mnttab *ment)
 }
 
 void
-rpterr(sp)
-	char	*sp;
+rpterr(char *sp)
 {
 	switch (errno) {
 	case EPERM:
@@ -502,7 +500,7 @@ rpterr(sp)
 }
 
 void
-usage()
+usage(void)
 {
 	fprintf(stderr, gettext(
 "Usage:\n%s [-f] [-V] [-o specific_options] {special | mount-point}\n"),
@@ -513,8 +511,7 @@ usage()
 }
 
 void
-mnterror(flag)
-	int	flag;
+mnterror(int flag)
 {
 	switch (flag) {
 	case MNT_TOOLONG:
@@ -744,7 +741,7 @@ make_mntarray(char **mntlist, int count)
  * Returns NULL if none are found.
  */
 mountent_t *
-getmntall()
+getmntall(void)
 {
 	FILE		*fp;
 	mountent_t	*mtail;
@@ -892,7 +889,7 @@ cleanup(int asig)
  * Sets the global exitcode if an error occurred.
  */
 int
-dowait()
+dowait(void)
 {
 	int		wstat, child, ret;
 	mountent_t 	*mp, *prevp;
@@ -1056,7 +1053,7 @@ doio(mountent_t *mp)
 }
 
 void
-nomem()
+nomem(void)
 {
 	fprintf(stderr, gettext("%s: out of memory\n"), myname);
 	/*

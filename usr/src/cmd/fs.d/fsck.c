@@ -107,6 +107,15 @@ static struct devlist {
  */
 static struct vfstab	vfsave = {NULL, NULL, NULL, NULL, NULL, NULL, NULL};
 
+static void usage(void);
+static void fsck_dopreen(struct devlist **devp, int ndevs);
+static void waiter(struct devlist **blp, struct devlist **badlist);
+static void print_badlist(struct devlist *lp);
+static void startdisk(struct devlist *dp);
+static void do_exec(char *fstype, char *nargv[]);
+static void prnt_cmd(FILE *fd, char *fstype);
+static void vfserror(int flag);
+
 static int
 vfdup(struct vfstab *vp)
 {
@@ -204,9 +213,8 @@ mygetvfsany(FILE *fp, struct vfstab *vp, struct vfstab *vrefp)
 	return (vfdup(vp));
 }
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	int	cc, ret, other_than_ufs = 0;
 	int	questflg = 0, Fflg = 0, Vflg = 0, sanity = 0;
@@ -538,17 +546,15 @@ try_again:
 			fsck_dopreen(&devs, preencnt);
 		}
 	}
-	exit(exitstat);
+	return (exitstat);
 }
 
-static
-fsck_dopreen(devp, ndevs)
-	struct devlist **devp;
-	int ndevs;
+static void
+fsck_dopreen(struct devlist **devp, int ndevs)
 {
 	char name[1024];
 	int rc;
-	register int i;
+	int i;
 	struct devlist *bl, *bdp;
 	struct devlist *badlist;
 
@@ -591,9 +597,8 @@ fsck_dopreen(devp, ndevs)
 		print_badlist(badlist);
 }
 
-static
-startdisk(dp)
-	struct devlist *dp;
+static void
+startdisk(struct devlist *dp)
 {
 	pid_t pid;
 
@@ -609,14 +614,12 @@ startdisk(dp)
 	}
 }
 
-static
-waiter(blp, badlist)
-	struct devlist **blp;
-	struct devlist **badlist;
+static void
+waiter(struct devlist **blp, struct devlist **badlist)
 {
 	pid_t curpid;
 	int status;
-	register struct devlist *bdp, *pbdp;
+	struct devlist *bdp, *pbdp;
 
 	curpid = wait(&status);
 	if (curpid == -1) {
@@ -654,9 +657,8 @@ waiter(blp, badlist)
 	}
 }
 
-static
-print_badlist(lp)
-	struct devlist *lp;
+static void
+print_badlist(struct devlist *lp)
 {
 	int x, len;
 
@@ -681,8 +683,7 @@ gettext("\nTHE FOLLOWING FILE SYSTEM(S) HAD AN UNEXPECTED INCONSISTENCY:"));
  */
 static
 struct devlist *
-newdev(vfsp)
-	struct vfstab *vfsp;
+newdev(struct vfstab *vfsp)
 {
 	struct devlist *dp;
 	extern char *strdup();
@@ -708,11 +709,9 @@ newdev(vfsp)
  */
 static
 struct devlist *
-getdev(name, list)
-	char *name;
-	struct devlist **list;
+getdev(char *name, struct devlist **list)
 {
-	register struct devlist *p, *lp;
+	struct devlist *p, *lp;
 
 	for (lp = NULL, p = *list; p != NULL; lp = p, p = p->nxt) {
 		if (strcmp(p->name, name) == 0)
@@ -729,8 +728,8 @@ getdev(name, list)
 }
 
 /* see if all numbers */
-numbers(yp)
-	char	*yp;
+int
+numbers(char *yp)
 {
 	if (yp == NULL)
 		return (0);
@@ -741,10 +740,8 @@ numbers(yp)
 	return (1);
 }
 
-execute(fsckdev, fstype, Vflg, fd)
-	char	*fsckdev, *fstype;
-	int	Vflg;
-	FILE	*fd;
+int
+execute(char *fsckdev, char *fstype, int Vflg, FILE *fd)
 {
 	int	st;
 	pid_t	fk;
@@ -810,8 +807,8 @@ execute(fsckdev, fstype, Vflg, fd)
 	return (status);
 }
 
-do_exec(fstype, nargv)
-	char	*fstype, *nargv[];
+static void
+do_exec(char *fstype, char *nargv[])
 {
 	char	full_path[PATH_MAX];
 	char	*vfs_path = VFS_PATH;
@@ -865,9 +862,8 @@ do_exec(fstype, nargv)
 	exit(1);
 }
 
-prnt_cmd(fd, fstype)
-	FILE	*fd;
-	char	*fstype;
+static void
+prnt_cmd(FILE *fd, char *fstype)
 {
 	char	**argp;
 
@@ -877,8 +873,8 @@ prnt_cmd(fd, fstype)
 	fprintf(fd, "\n");
 }
 
-vfserror(flag)
-	int	flag;
+static void
+vfserror(int flag)
 {
 	switch (flag) {
 	case VFS_TOOLONG:
@@ -907,8 +903,8 @@ int
 getopt(int argc, char * const *argv, const char *opts)
 {
 	static int sp = 1;
-	register int c;
-	register char *cp;
+	int c;
+	char *cp;
 
 	if (sp == 1)
 		if (optind >= argc ||
@@ -966,9 +962,8 @@ getopt(int argc, char * const *argv, const char *opts)
 	return (c);
 }
 
-isoptarg(cc, arg)
-	int	cc;
-	char	*arg;
+int
+isoptarg(int cc, char *arg)
 {
 	if (cc == 's' || cc == 'S') {
 		while (*arg >= '0' && *arg <= '9')
@@ -984,7 +979,8 @@ isoptarg(cc, arg)
 	return (0);
 }
 
-usage()
+static void
+usage(void)
 {
 	fprintf(stderr,
 		gettext("Usage:\n%s [-F FSType] [-V] [-m] [special ...]\n"

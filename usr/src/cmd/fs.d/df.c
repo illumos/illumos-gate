@@ -234,7 +234,7 @@ static int		scale;
 
 static void usage(void);
 static void do_devnm(int, char **);
-static void do_df(int, char **);
+static void do_df(int, char **)	__NORETURN;
 static void parse_options(int, char **);
 static char *basename(char *);
 
@@ -251,7 +251,7 @@ static void (*_zfs_close)(zfs_handle_t *);
 static uint64_t (*_zfs_prop_get_int)(zfs_handle_t *, zfs_prop_t);
 static void (*_zfs_set_error_handler)(void (*)(const char *, va_list));
 
-void
+int
 main(int argc, char *argv[])
 {
 	void *hdl;
@@ -351,7 +351,7 @@ errmsg(int flags, char *fmt, ...)
 
 
 static void
-usage()
+usage(void)
 {
 #ifdef  XPG4
 	errmsg(ERR_NONAME,
@@ -395,6 +395,7 @@ xmalloc(size_t size)
 		return (p);
 	errmsg(ERR_FATAL, "out of memory");
 	/* NOTREACHED */
+	return (NULL);
 }
 
 
@@ -410,6 +411,7 @@ xrealloc(void *ptr, size_t size)
 		return (p);
 	errmsg(ERR_FATAL, "out of memory");
 	/* NOTREACHED */
+	return (NULL);
 }
 
 
@@ -432,7 +434,7 @@ xfopen(char *file)
  * remote_fstypes array.
  */
 static void
-init_remote_fs()
+init_remote_fs(void)
 {
 	FILE	*fp;
 	char	line_buf[LINEBUF_SIZE];
@@ -533,7 +535,7 @@ mtab_error(char *mtab_file, int status)
  * We keep the table in memory for faster lookups.
  */
 static void
-mtab_read_file()
+mtab_read_file(void)
 {
 	char		*mtab_file = MOUNT_TAB;
 	FILE		*fp;
@@ -1030,7 +1032,7 @@ prune_list(struct df_request request_list[],
  * Options are checked in order of their precedence.
  */
 static void
-print_header()
+print_header(void)
 {
 	if (use_scaling) { /* this comes from the -h option */
 		int arg = 'h';
@@ -1517,7 +1519,7 @@ static char	*total_str;
 static char	*kilobytes_str;
 
 static void
-strings_init()
+strings_init(void)
 {
 	total_str = TRANSLATE("total");
 #ifdef	_iBCS2
@@ -1898,7 +1900,7 @@ create_request_list(
  * the SVR4 df.
  */
 static struct df_output *
-select_output()
+select_output(void)
 {
 	static struct df_output dfo;
 

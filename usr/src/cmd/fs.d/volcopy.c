@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,10 +45,10 @@ static int perr(const char *fmt, ...);
 
 #define	VFS_PATH	"/usr/lib/fs"
 
-#define	EQ(X,Y,Z)	!strncmp(X,Y,Z)
+#define	EQ(X, Y, Z)	!strncmp(X, Y, Z)
 #define	NEWARG()\
 	(nargv[nargc++] = &argv[1][0],\
-	 nargc == ARGV_MAX ? perr("volcopy:  too many arguments.\n") : 1)
+		nargc == ARGV_MAX ? perr("volcopy:  too many arguments.\n") : 1)
 
 extern char	*default_fstype();
 
@@ -57,19 +57,20 @@ int	nargc = 2;
 
 char	vfstab[] = VFSTAB;
 
-main(argc, argv)
-	int	argc;
-	char	**argv;
+static void doexec(char *fstype, char *nargv[]);
+
+int
+main(int argc, char **argv)
 {
-	register char	cc;
-	register int	ii, Vflg = 0, Fflg = 0;
-	register char	*fstype = NULL;
-	register FILE	*fd;
+	char	cc;
+	int	ii, Vflg = 0, Fflg = 0;
+	char	*fstype = NULL;
+	FILE	*fd;
 	struct vfstab	vget, vref;
 
-	(void) setlocale(LC_ALL,"");
+	(void) setlocale(LC_ALL, "");
 #if !defined(TEXT_DOMAIN)
-#define TEXT_DOMAIN "SYS_TEST"
+#define	TEXT_DOMAIN	"SYS_TEST"
 #endif
 	(void) textdomain(TEXT_DOMAIN);
 
@@ -123,18 +124,25 @@ main(argc, argv)
 			Vflg++;
 		} else if (EQ(argv[1], "-F", 2)) {
 			if (Fflg)
-				perr("volcopy: More than one FSType specified.\nUsage:\nvolcopy [-F FSType] [-V] [current_options] [-o specific_options] operands\n");
+				perr("volcopy: More than one"
+					"FSType specified.\n"
+					"Usage:\nvolcopy [-F FSType] [-V]"
+					" [current_options] [-o "
+					"specific_options] operands\n");
 			Fflg++;
 			if (argv[1][2] == '\0') {
 				++argv;
 				--argc;
 				if (argc == 1)
-					perr("Usage:\nvolcopy [-F FSType] [-V] [current_options] [-o specific_options] operands\n");
+					perr("Usage:\nvolcopy [-F FSType] [-V]"
+						" [current_options] [-o "
+						"specific_options] operands\n");
 				fstype = &argv[1][0];
 			} else
 				fstype = &argv[1][2];
 			if (strlen(fstype) > FSTYPE_MAX)
-				perr("volcopy: FSType %s exceeds %d characters\n", fstype, FSTYPE_MAX);
+				perr("volcopy: FSType %s exceeds %d"
+					" characters\n", fstype, FSTYPE_MAX);
 		} else if (EQ(argv[1], "-o", 2)) {
 			NEWARG();
 			if (argv[1][2] == '\0') {
@@ -143,25 +151,35 @@ main(argc, argv)
 				NEWARG();
 			}
 			if (Fflg && strlen(fstype) > FSTYPE_MAX)
-				perr("volcopy: FSType %s exceeds %d characters.\nUsage:\nvolcopy [-F FSType] [-V] [current_options] [-o specific_options] operands\n",fstype, FSTYPE_MAX);
+				perr("volcopy: FSType %s exceeds %d "
+					"characters.\nUsage:\nvolcopy "
+					"[-F FSType] [-V] [current_options] "
+					"[-o specific_options] "
+					"operands\n", fstype, FSTYPE_MAX);
 		} else if (EQ(argv[1], "-nosh", 5)) { /* 3b15 only */
 			NEWARG();
-		} else if (EQ(argv[1], "-?", 2)) { 
+		} else if (EQ(argv[1], "-?", 2)) {
 			if (Fflg) {
 				nargv[2] = "-?";
 				doexec(fstype, nargv);
-			}
-			else {
-				perr("Usage:\nvolcopy [-F FSType] [-V] [current_options] [-o specific_options] operands\n");
+			} else {
+				perr("Usage:\nvolcopy [-F FSType] [-V] "
+					"[current_options] [-o "
+					"specific_options] operands\n");
 		}
 		} else
-			perr("<%s> invalid option\nUsage:\nvolcopy [-F FSType] [-V] [current_options] [-o specific_options] operands\n",argv[1]);
+			perr("<%s> invalid option\nUsage:\n"
+				"volcopy [-F FSType] [-V] "
+				"[current_options] [-o "
+				"specific_options] operands\n", argv[1]);
 		++argv;
 		--argc;
 	} /* argv[1][0] == '-' */
 
 	if (argc != 6) /* if mandatory fields not present */
-		perr("Usage:\nvolcopy [-F FSType] [-V] [current_options] [-o specific_options] operands\n");
+		perr("Usage:\nvolcopy [-F FSType] [-V] "
+			"[current_options] [-o "
+			"specific_options] operands\n");
 
 	if (nargc + 5 >= ARGV_MAX)
 		perr("volcopy: too many arguments.\n");
@@ -193,13 +211,16 @@ main(argc, argv)
 			fstype = vget.vfs_fstype;
 			break;
 		case VFS_TOOLONG:
-			perr("volcopy: line in vfstab exceeds %d characters\n", VFS_LINE_MAX-2);
+			perr("volcopy: line in vfstab exceeds "
+				"%d characters\n", VFS_LINE_MAX-2);
 			break;
 		case VFS_TOOFEW:
 			perr("volcopy: line in vfstab has too few entries\n");
 			break;
 		case VFS_TOOMANY:
 			perr("volcopy: line in vfstab has too many entries\n");
+			break;
+		default:
 			break;
 		}
 	}
@@ -213,10 +234,11 @@ main(argc, argv)
 	}
 
 	doexec(fstype, nargv);
+	return (0);
 }
 
-doexec(fstype, nargv)
-	char	*fstype, *nargv[];
+static void
+doexec(char *fstype, char *nargv[])
 {
 	char	full_path[PATH_MAX];
 	char	*vfs_path = VFS_PATH;
@@ -230,7 +252,8 @@ doexec(fstype, nargv)
 	/* Try to exec the fstype dependent portion of the mount. */
 	execv(full_path, &nargv[1]);
 	if (errno == EACCES) {
-		perr("volcopy: cannot execute %s - permission denied\n", full_path);
+		perr("volcopy: cannot execute %s"
+			" - permission denied\n", full_path);
 		exit(1);
 	}
 	if (errno == ENOEXEC) {
@@ -252,7 +275,7 @@ perr(const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	(void)vfprintf(stderr, gettext(fmt), ap);
+	(void) vfprintf(stderr, gettext(fmt), ap);
 	va_end(ap);
 	exit(1);
 	return (0);

@@ -21,8 +21,8 @@
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
- * Copyright (c) 1992,1996, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*
@@ -40,7 +40,7 @@
 /*
  * data structures for parallelization
  */
-static struct driver {
+struct driver {
 	char 	*name;			/* driver name (from DKIOCINFO) */
 	uint_t	mapsize;		/* size of `busymap' */
 	uint_t	*busymap;		/* bitmask of active units */
@@ -48,14 +48,14 @@ static struct driver {
 	void	*data;			/* driver private data */
 };
 
-static struct onedev {
+struct onedev {
 	int	drvid;			/* index in driver array */
 	uint_t	mapsize;		/* size of `unitmap' */
 	uint_t	*unitmap;		/* unit #'s (from DKIOCINFO) */
 	struct onedev *nxtdev;
 };
 
-static struct rawdev {
+struct rawdev {
 	char	*devname;		/* name passed to preen_addev */
 	struct	onedev *alldevs;	/* info about each component device */
 	struct rawdev *nxtrd;		/* next entry in list */
@@ -101,6 +101,7 @@ static void	notbusy(struct rawdev *);
 /*
  * add the given device to the list of devices to be checked
  */
+int
 preen_addev(char *devnm)
 {
 	struct rawdev *rdp;
@@ -139,6 +140,7 @@ preen_addev(char *devnm)
 	return (0);
 }
 
+int
 preen_subdev(char *name, struct dk_cinfo *dkiop, void *dp)
 {
 	char modname[255];
@@ -167,10 +169,11 @@ preen_subdev(char *name, struct dk_cinfo *dkiop, void *dp)
  * select a device from the "unchecked" list, and add it to the
  * active list.
  */
+int
 preen_getdev(char *devnm)
 {
 	struct rawdev *rdp;
-	register struct onedev *dp;
+	struct onedev *dp;
 
 	if (unchecked == NULL)
 		return (0);
@@ -190,9 +193,10 @@ preen_getdev(char *devnm)
 	}
 }
 
+int
 preen_releasedev(char *name)
 {
-	register struct rawdev *dp, *ldp;
+	struct rawdev *dp, *ldp;
 
 	for (ldp = NULL, dp = active; dp != NULL; ldp = dp, dp = dp->nxtrd) {
 		if (strcmp(dp->devname, name) == 0)
@@ -219,9 +223,9 @@ static
 struct rawdev *
 get_runnable(struct rawdev **devlist)
 {
-	register struct rawdev *last, *rdp;
-	register struct onedev *devp;
-	register struct driver *drvp;
+	struct rawdev *last, *rdp;
+	struct onedev *devp;
+	struct driver *drvp;
 	int rc = 1;
 
 	for (last = NULL, rdp = *devlist; rdp; last = rdp, rdp = rdp->nxtrd) {
@@ -264,9 +268,9 @@ preen_addunit(
 	void	*datap,		/* driver private data */
 	uint_t	unit)		/* unit number */
 {
-	register int drvid;
-	register struct driver *dp;
-	register struct onedev *devp;
+	int drvid;
+	struct driver *dp;
+	struct onedev *devp;
 	struct rawdev *rdp = (struct rawdev *)cookie;
 
 	/*
@@ -318,7 +322,7 @@ static
 int
 alloc_driver(char *name, int (*cf)(), void *datap)
 {
-	register struct driver *dp;
+	struct driver *dp;
 	extern char *strdup();
 
 	if (ndrivers == ndalloc) {
@@ -351,7 +355,7 @@ static
 struct onedev *
 alloc_dev(int did)
 {
-	register struct onedev *devp;
+	struct onedev *devp;
 
 	devp = (struct onedev *)malloc(sizeof (struct onedev));
 	if (devp == NULL) {
@@ -388,10 +392,10 @@ addunit(struct onedev *devp, uint_t unit)
 	devp->unitmap[unit / WORDSIZE] |= (1 << (unit % WORDSIZE));
 }
 
-static
+static int
 chooseone(int devmapsize, ulong_t *devmap, int drvmapsize, ulong_t *drvmap)
 {
-	register int i;
+	int i;
 
 	for (i = 0; i < min(devmapsize, drvmapsize); i++) {
 		if (devmap[i] & drvmap[i])
@@ -410,7 +414,7 @@ makebusy(struct onedev *dev)
 {
 	struct driver *drvp = &dlist[dev->drvid];
 	int newsize = dev->mapsize;
-	register int i;
+	int i;
 
 	if (drvp->mapsize < newsize) {
 		drvp->busymap = drvp->mapsize ?
@@ -440,7 +444,7 @@ notbusy(struct rawdev *rd)
 {
 	struct onedev *devp;
 	struct driver *drvp;
-	register int i;
+	int i;
 
 	for (devp = rd->alldevs; devp; devp = devp->nxtdev) {
 		drvp = &dlist[devp->drvid];

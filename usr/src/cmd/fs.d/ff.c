@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,13 +69,16 @@ struct commands {
 	};
 struct 	commands *c_ptr;
 
-main(argc, argv)
-int	argc;
-char	*argv[];
+static void usage(char *cmd, char *usg);
+static void exec_specific(void);
+static void lookup(void);
+
+int
+main(int argc, char *argv[])
 {
 	FILE *fp;
 	struct vfstab	vfsbuf;
-	register char *ptr;
+	char *ptr;
 	int	i;
 	int	verbose = 0;		/* set if -V is specified */
 	int	F_flg = 0;
@@ -238,12 +241,12 @@ char	*argv[];
 		if (!F_flg)
 			fstype = NULL;
 	}
-	exit(0);
+	return (0);
 }
 
 /* see if all numbers */
-numbers(yp)
-	char	*yp;
+int
+numbers(char *yp)
 {
 	if (yp == NULL)
 		return (0);
@@ -254,9 +257,8 @@ numbers(yp)
 	return (1);
 }
 
-
-usage(cmd, usg)
-char *cmd, *usg;
+static void
+usage(char *cmd, char *usg)
 {
 	fprintf(stderr, "Usage:\n");
 	fprintf(stderr, "%s %s\n", cmd, usg);
@@ -272,7 +274,8 @@ char *cmd, *usg;
  *	special, fstype
  */
 
-lookup()
+static void
+lookup(void)
 {
 	FILE	*fd;
 	int	ret;
@@ -317,7 +320,9 @@ lookup()
 		break;
 	}
 }
-exec_specific()
+
+static void
+exec_specific(void)
 {
 int status, pid, ret;
 

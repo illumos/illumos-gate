@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,10 +217,8 @@ static int	ignore(char *);
  * -V will print the built command on the stdout.
  * It isn't passed either.
  */
-void
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	char	*special,		/* argument of special/resource */
 		*mountp,		/* argument of mount directory */
@@ -538,11 +536,11 @@ out:
 	newargv[ii] = NULL;
 
 	doexec(fstype, newargv);
-	exit(0);
+	return (0);
 }
 
 void
-usage()
+usage(void)
 {
 	fprintf(stderr,	gettext("Usage:\n%s [-v | -p]\n"), myname);
 	fprintf(stderr, gettext(
@@ -592,8 +590,7 @@ elide_dev(char *mntopts)
 }
 
 void
-print_mnttab(vflg, pflg)
-	int	vflg, pflg;
+print_mnttab(int vflg, int pflg)
 {
 	FILE	*fd;
 	FILE	*rfp;			/* this will be NULL if fopen fails */
@@ -645,9 +642,7 @@ print_mnttab(vflg, pflg)
 }
 
 char	*
-flags(mntopts, flag)
-	char	*mntopts;
-	int	flag;
+flags(char *mntopts, int flag)
 {
 	char	opts[sizeof (mntflags)];
 	char	*value;
@@ -729,9 +724,7 @@ flags(mntopts, flag)
 }
 
 char	*
-remote(fstype, rfp)
-	char	*fstype;
-	FILE	*rfp;
+remote(char *fstype, FILE *rfp)
 {
 	char	buf[BUFSIZ];
 	char	*fs;
@@ -779,8 +772,7 @@ gettext("%s: Warning: Line for \"%s\" in vfstab has too many entries\n"),
 }
 
 void
-mnterror(flag)
-	int	flag;
+mnterror(int flag)
 {
 	switch (flag) {
 	case MNT_TOOLONG:
@@ -803,8 +795,7 @@ mnterror(flag)
 }
 
 void
-doexec(fstype, newargv)
-	char	*fstype, *newargv[];
+doexec(char *fstype, char *newargv[])
 {
 	char	full_path[PATH_MAX];
 	char	alter_path[PATH_MAX];
@@ -870,8 +861,7 @@ char *mntopts[] = { MNTOPT_IGNORE, NULL };
  * Return 1 if "ignore" appears in the options string
  */
 int
-ignore(opts)
-	char *opts;
+ignore(char *opts)
 {
 	char *value;
 	char *saveptr, *my_opts;
@@ -1184,7 +1174,7 @@ make_vfsarray(char **mntlist, int count)
  * Sets exitcode to non-zero if any errors occurred.
  */
 void
-do_mounts()
+do_mounts(void)
 {
 	int 		i, isave, cnt;
 	vfsent_t 	*vp, *vpprev, **vl;
@@ -1400,7 +1390,7 @@ doio(vfsent_t *vp)
  * Returns 1 if a child died with an error.
  */
 int
-dowait()
+dowait(void)
 {
 	int child, wstat;
 
@@ -1553,6 +1543,7 @@ mlevelcmp(const void *a, const void *b)
 }
 
 /* sort by vfstab order.  0..N */
+static int
 mordercmp(const void *a, const void *b)
 {
 	vfsent_t *a1, *b1;
@@ -1623,7 +1614,7 @@ check_fields(char *fstype, char *mountp)
 }
 
 void
-nomem()
+nomem(void)
 {
 	fprintf(stderr, gettext("%s: Out of memory\n"), myname);
 	while (nrun > 0 && (dowait() != -1))
