@@ -3509,7 +3509,7 @@ rehash:
 	 * static portion of the kernel's address space, for instance.
 	 */
 	pp = osfhmep->hme_page;
-	if (pp == NULL) {
+	if (pp == NULL || pp->p_vnode != &kvp) {
 		SFMMU_HASH_UNLOCK(hmebp);
 		kmem_cache_free(pa_hment_cache, pahmep);
 		*rpfn = pfn;
@@ -3520,15 +3520,25 @@ rehash:
 
 	if ((flags & HAC_PAGELOCK) && !locked) {
 		if (!page_trylock(pp, SE_SHARED)) {
+			page_t *tpp;
+
 			/*
 			 * Somebody is holding SE_EXCL lock.  Drop all
 			 * our locks, lookup the page in &kvp, and
-			 * retry.
+			 * retry. If it doesn't exist in &kvp, then we
+			 * die here; we should have caught it above,
+			 * meaning the page must have changed identity
+			 * (e.g. the caller didn't hold onto the page
+			 * lock after establishing the kernel mapping)
 			 */
 			sfmmu_mlist_exit(pml);
 			SFMMU_HASH_UNLOCK(hmebp);
-			pp = page_lookup(&kvp, (u_offset_t)saddr, SE_SHARED);
-			ASSERT(pp != NULL);
+			tpp = page_lookup(&kvp, (u_offset_t)saddr, SE_SHARED);
+			if (tpp == NULL) {
+				panic("hat_add_callback: page not found: 0x%p",
+				    pp);
+			}
+			pp = tpp;
 			rpp = PP_PAGEROOT(pp);
 			if (rpp != pp) {
 				page_unlock(pp);
@@ -3688,7 +3698,7 @@ rehash:
 	ASSERT(TTE_IS_VALID(&tte));
 
 	pp = osfhmep->hme_page;
-	if (pp == NULL) {
+	if (pp == NULL || pp->p_vnode != &kvp) {
 		SFMMU_HASH_UNLOCK(hmebp);
 		return;
 	}
