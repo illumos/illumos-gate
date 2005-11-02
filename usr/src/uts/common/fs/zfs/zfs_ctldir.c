@@ -656,24 +656,31 @@ domount:
 	margs.optlen = 0;
 
 	err = domount("zfs", &margs, *vpp, kcred, &vfsp);
-	ASSERT3U(err, ==, 0);
-
 	kmem_free(mountpoint, mountpoint_len);
 
-	VFS_RELE(vfsp);
+	if (err == 0) {
+		/*
+		 * Return the mounted root rather than the covered mount point.
+		 */
+		VFS_RELE(vfsp);
+		err = traverse(vpp);
+	}
 
-	/*
-	 * Fix up the root vnode.
-	 */
-	VERIFY(traverse(vpp) == 0);
-	ASSERT(VTOZ(*vpp)->z_zfsvfs != zfsvfs);
-	VTOZ(*vpp)->z_zfsvfs->z_parent = zfsvfs;
-	(*vpp)->v_vfsp = zfsvfs->z_vfs;
-	(*vpp)->v_flag &= ~VROOT;
+	if (err == 0) {
+		/*
+		 * Fix up the root vnode.
+		 */
+		ASSERT(VTOZ(*vpp)->z_zfsvfs != zfsvfs);
+		VTOZ(*vpp)->z_zfsvfs->z_parent = zfsvfs;
+		(*vpp)->v_vfsp = zfsvfs->z_vfs;
+		(*vpp)->v_flag &= ~VROOT;
+	}
 	mutex_exit(&sdp->sd_lock);
 	ZFS_EXIT(zfsvfs);
 
-	return (0);
+	if (err)
+		VN_RELE(*vpp);
+	return (err);
 }
 
 /* ARGSUSED */

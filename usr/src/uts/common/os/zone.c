@@ -4172,8 +4172,8 @@ zone_dataset_visible(const char *dataset, int *write)
 		len = strlen(zd->zd_dataset);
 		if (strlen(dataset) >= len &&
 		    bcmp(dataset, zd->zd_dataset, len) == 0 &&
-		    (zd->zd_dataset[len-1] == '/' ||
-		    dataset[len] == '\0' || dataset[len] == '/')) {
+		    (dataset[len] == '\0' || dataset[len] == '/' ||
+		    dataset[len] == '@')) {
 			if (write)
 				*write = 1;
 			return (1);
