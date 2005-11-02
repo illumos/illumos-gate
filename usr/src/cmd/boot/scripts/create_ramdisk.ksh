@@ -96,8 +96,10 @@ function getsize {
 	total_size=0
 	for file in $filelist
 	do
-		du -sk ${ALT_ROOT}/${file} | read size name
-		(( total_size += size ))
+		if [ -e $file ] ; then
+			du -sk ${ALT_ROOT}/${file} | read size name
+			(( total_size += size ))
+		fi
 	done
 	(( total_size += total_size * 10 / 100 ))
 }

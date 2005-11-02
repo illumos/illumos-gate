@@ -190,7 +190,6 @@ get_bootargs(char *args, int grub)
 			 */
 			switch (params.gos_last_opt) {
 			case 'D':
-			case 'O':
 				printf("boot: -%c flag missing required "
 				    "argument.  Ignoring.\n",
 				    params.gos_last_opt);
