@@ -447,16 +447,23 @@ nonresumable_error(void)
 	ldxa	[%g4]ASI_QUEUE, %g2		! %g2 = Q head offset 
 	mov	CPU_NRQ_TL, %g4
 	ldxa	[%g4]ASI_QUEUE, %g3		! %g3 = Q tail offset
-	mov	%g2, %g6			! save head in %g2
 
-	cmp	%g6, %g3
+	cmp	%g2, %g3
 	be,pn	%xcc, 0f			! head == tail
 	nop
 
-	CPU_ADDR(%g1, %g4)			! %g1 = cpu struct addr
+	/* force %gl to 1 as sys_trap requires */
+	wrpr	%g0, 1, %gl
+	mov	CPU_NRQ_HD, %g4
+	ldxa	[%g4]ASI_QUEUE, %g2		! %g2 = Q head offset 
+	mov	CPU_NRQ_TL, %g4
+	ldxa	[%g4]ASI_QUEUE, %g3		! %g3 = Q tail offset
+	mov	%g2, %g6			! save head in %g2
+
+	CPU_PADDR(%g1, %g4)			! %g1 = cpu struct paddr
 
 2:	set	CPU_NRQ_BASE_OFF, %g4
-	ldx	[%g1 + %g4], %g4		! %g4 = queue base PA
+	ldxa	[%g1 + %g4]ASI_MEM, %g4		! %g4 = queue base PA
 	add	%g6, %g4, %g4			! %g4 = PA of ER in Q		
 	set	CPU_NRQ_SIZE, %g7
 	add	%g4, %g7, %g7			! %g7 = PA of ER in kernel buf
@@ -534,12 +541,14 @@ nonresumable_error(void)
 	/*
 	 * We are here because the C routine is not able to process
 	 * errors in time. So the first 8 bytes of ER in buf has not
-	 * been cleared. We update head to tail and call sys_trap to
-	 * print out an error message
+	 * been cleared. We call sys_trap to panic.
+	 * Run at PIL 14 unless we're already at PIL 15.
 	 */
-	
-1:	mov	CPU_NRQ_HD, %g4
-	stxa	%g3, [%g4]ASI_QUEUE		! set head equal to tail
+1:	set	nrq_overflow, %g1
+	rdpr	%pil, %g4
+	cmp	%g4, PIL_14
+	ba	sys_trap
+	  movl	%icc, PIL_14, %g4
 
 0:	retry
 

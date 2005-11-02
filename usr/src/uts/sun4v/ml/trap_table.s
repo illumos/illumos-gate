@@ -1315,7 +1315,11 @@ trap_table1:
 	NOT;				/* 071  reserved */
 	NOT;				/* 072  reserved */
 	NOT;				/* 073  reserved */
-	NOT4; NOT4; NOT4;		/* 074 - 07F reserved */
+	NOT4; NOT4;			/* 074 - 07B reserved */
+	NOT;				/* 07C  reserved */
+	NOT;				/* 07D  reserved */
+	NOT;				/* 07E  resumable error */
+	GOTO_TT(nonresumable_error, trace_gen);	/* 07F  nonresumable error */
 	NOTP4;				/* 080	spill 0 normal */
 	SPILL_32bit_tt1(ASI_AIUP,sn1);	/* 084	spill 1 normal */
 	SPILL_64bit_tt1(ASI_AIUP,sn1);	/* 088	spill 2 normal */

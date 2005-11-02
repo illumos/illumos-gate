@@ -743,3 +743,13 @@ error_init(void)
 		}
 	}
 }
+
+/*
+ * Nonresumable queue is full, panic here
+ */
+/*ARGSUSED*/
+void
+nrq_overflow(struct regs *rp)
+{
+	fm_panic("Nonresumable queue full");
+}
