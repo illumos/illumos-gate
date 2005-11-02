@@ -7235,13 +7235,12 @@ hat_page_demote(page_t *pp)
 	cpuset_t tset;
 	pgcnt_t npgs;
 	kmutex_t *pml;
-	kmutex_t *pmtx;
+	kmutex_t *pmtx = NULL;
 
 	ASSERT(PAGE_EXCL(pp));
 	ASSERT(!PP_ISFREE(pp));
 	ASSERT(page_szc_lock_assert(pp));
 	pml = sfmmu_mlist_enter(pp);
-	pmtx = sfmmu_page_enter(pp);
 
 	pszc = pp->p_szc;
 	if (pszc == 0) {
@@ -7291,6 +7290,8 @@ hat_page_demote(page_t *pp)
 		}
 	}
 
+	pmtx = sfmmu_page_enter(pp);
+
 	ASSERT(pp->p_szc == pszc);
 	rootpp = PP_PAGEROOT(pp);
 	ASSERT(rootpp->p_szc == pszc);
@@ -7325,7 +7326,9 @@ hat_page_demote(page_t *pp)
 	}
 out:
 	ASSERT(pp->p_szc == 0);
-	sfmmu_page_exit(pmtx);
+	if (pmtx != NULL) {
+		sfmmu_page_exit(pmtx);
+	}
 	sfmmu_mlist_exit(pml);
 }
 
