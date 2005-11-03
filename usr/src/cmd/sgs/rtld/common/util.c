@@ -1483,7 +1483,12 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 			 * Replaceable and permanent audit objects can exist.
 			 */
 			select |= SEL_ACT_STR;
-			str = (select & SEL_REPLACE) ? &rpl_audit : &prm_audit;
+			if (select & SEL_REPLACE)
+				str = &rpl_audit;
+			else {
+				str = &prm_audit;
+				rpl_audit = 0;
+			}
 			variable = ENV_FLG_AUDIT;
 		} else if ((len == MSG_LD_AUDIT_ARGS_SIZE) &&
 		    (strncmp(s1, MSG_ORIG(MSG_LD_AUDIT_ARGS),
@@ -1585,7 +1590,12 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		if ((len == MSG_LD_DEBUG_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_DEBUG), MSG_LD_DEBUG_SIZE) == 0)) {
 			select |= SEL_ACT_STR;
-			str = (select & SEL_REPLACE) ? &rpl_debug : &prm_debug;
+			if (select & SEL_REPLACE)
+				str = &rpl_debug;
+			else {
+				str = &prm_debug;
+				rpl_debug = 0;
+			}
 			variable = ENV_FLG_DEBUG;
 		} else if ((len == MSG_LD_DEBUG_OUTPUT_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_DEBUG_OUTPUT),
@@ -1609,8 +1619,12 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		if ((len == MSG_LD_FLAGS_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_FLAGS), MSG_LD_FLAGS_SIZE) == 0)) {
 			select |= SEL_ACT_SPEC_1;
-			str =
-			(select & SEL_REPLACE) ? &rpl_ldflags : &prm_ldflags;
+			if (select & SEL_REPLACE)
+				str = &rpl_ldflags;
+			else {
+				str = &prm_ldflags;
+				rpl_ldflags = 0;
+			}
 			variable = ENV_FLG_FLAGS;
 		}
 	}
@@ -1632,8 +1646,12 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		if ((len == MSG_LD_LIBPATH_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_LIBPATH), MSG_LD_LIBPATH_SIZE) == 0)) {
 			select |= SEL_ACT_SPEC_1;
-			str =
-			(select & SEL_REPLACE) ? &rpl_libpath : &prm_libpath;
+			if (select & SEL_REPLACE)
+				str = &rpl_libpath;
+			else {
+				str = &prm_libpath;
+				rpl_libpath = 0;
+			}
 			variable = ENV_FLG_LIBPATH;
 		} else if ((len == MSG_LD_LOADAVAIL_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_LOADAVAIL), MSG_LD_LOADAVAIL_SIZE) == 0)) {
@@ -1737,8 +1755,12 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		if ((len == MSG_LD_PRELOAD_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_PRELOAD), MSG_LD_PRELOAD_SIZE) == 0)) {
 			select |= SEL_ACT_STR;
-			str =
-			(select & SEL_REPLACE) ? &rpl_preload : &prm_preload;
+			if (select & SEL_REPLACE)
+				str = &rpl_preload;
+			else  {
+				str = &prm_preload;
+				rpl_preload = 0;
+			}
 			variable = ENV_FLG_PRELOAD;
 		} else if ((len == MSG_LD_PROFILE_SIZE) && (strncmp(s1,
 		    MSG_ORIG(MSG_LD_PROFILE), MSG_LD_PROFILE_SIZE) == 0)) {
@@ -1857,7 +1879,10 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		return;
 
 	/*
-	 * Now mark the appropriate variables
+	 * Now mark the appropriate variables.
+	 * If the replaceable variable is already set, then the
+	 * process environment variable must be set. Any replaceable
+	 * variable specified in a configuration file can be ignored.
 	 */
 	if (env_flags & ENV_TYP_ISA) {
 		/*
@@ -1867,6 +1892,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		 * the setting.
 		 */
 		if (select & SEL_REPLACE) {
+			if (rplisa & variable)
+				return;
 			rplisa |= variable;
 		} else {
 			prmisa |= variable;
@@ -1876,6 +1903,8 @@ ld_generic_env(const char *s1, size_t len, const char *s2, Word *lmflags,
 		 * This is non0-ISA setting
 		 */
 		if (select & SEL_REPLACE) {
+			if (rplgen & variable)
+				return;
 			rplgen |= variable;
 		} else
 			prmgen |= variable;
