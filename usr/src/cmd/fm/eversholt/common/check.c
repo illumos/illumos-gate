@@ -49,7 +49,6 @@ static int check_num(enum nodetype t, const char *s, struct node *np);
 static int check_quote(enum nodetype t, const char *s, struct node *np);
 static int check_num_func(enum nodetype t, const char *s, struct node *np);
 static int check_fru_asru(enum nodetype t, const char *s, struct node *np);
-static int check_name(enum nodetype t, const char *s, struct node *np);
 static int check_engine(enum nodetype t, const char *s, struct node *np);
 static int check_timeval(enum nodetype t, const char *s, struct node *np);
 static int check_id(enum nodetype t, const char *s, struct node *np);
@@ -78,10 +77,8 @@ static struct {
 	{ T_SERD, "N", 1, check_num, O_ERR },
 	{ T_SERD, "T", 1, check_timeval, O_ERR },
 	{ T_SERD, "method", 1, check_serd_method, O_ERR },
-	{ T_SERD, "count", 0, check_reportlist, O_ERR },
 	{ T_SERD, "trip", 1, check_reportlist, O_ERR },
 	{ T_SERD, "FRU", 0, check_fru_asru, O_ERR },
-	{ T_SERD, "FRUID", 0, check_name, O_ERR },
 	{ T_ERROR, "ASRU", 0, check_fru_asru, O_ERR },
 	{ T_CONFIG, NULL, 0, check_quote, O_ERR },
 	{ 0, NULL, 0 },
@@ -292,17 +289,6 @@ check_fru_asru(enum nodetype t, const char *s, struct node *np)
 		outfl(O_ERR, np->file, np->line,
 		    "illegal type used for %s property: %s",
 		    s, ptree_nodetype2str(np->t));
-	return (1);
-}
-
-static int
-check_name(enum nodetype t, const char *s, struct node *np)
-{
-	ASSERTinfo(np != NULL, ptree_nodetype2str(t));
-	if (np->t != T_NAME)
-		outfl(O_ERR, np->file, np->line,
-		    "%s %s property must be a single name",
-		    ptree_nodetype2str(t), s);
 	return (1);
 }
 
