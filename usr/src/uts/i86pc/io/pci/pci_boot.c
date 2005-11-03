@@ -257,18 +257,21 @@ enumerate_bus_devs(uchar_t bus, int config_op)
 				 */
 				dip = new_func_pci(bus, dev, func, header,
 				    venid, config_op);
-			}
-			/*
-			 * If dip isn't null, reprogram the device later.
-			 * This only happens for CONFIG_INFO case.
-			 */
-			if (dip) {
-				entry = kmem_alloc(sizeof (*entry), KM_SLEEP);
-				entry->dip = dip;
-				entry->dev = dev;
-				entry->func = func;
-				entry->next = devlist;
-				devlist = entry;
+				/*
+				 * If dip isn't null, put on a list to
+				 * save for reprogramming when config_op
+				 * is CONFIG_NEW.
+				 */
+
+				if (dip) {
+					entry = kmem_alloc(sizeof (*entry),
+					    KM_SLEEP);
+					entry->dip = dip;
+					entry->dev = dev;
+					entry->func = func;
+					entry->next = devlist;
+					devlist = entry;
+				}
 			}
 		}
 	}
@@ -826,8 +829,8 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 				}
 				if (base == 0) {
 					cmn_err(CE_WARN, "failed to program"
-					    " IO space [%d/%d/%d] BAR@0x%x "
-					    " length 0x%x\n",
+					    " IO space [%d/%d/%d] BAR@0x%x"
+					    " length 0x%x",
 					    bus, dev, func, offset, len);
 				} else
 					enable |= PCI_COMM_IO;
@@ -891,7 +894,7 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 				if (base == 0) {
 					cmn_err(CE_WARN, "failed to program "
 					    "mem space [%d/%d/%d] BAR@0x%x"
-					    " length 0x%x\n",
+					    " length 0x%x",
 					    bus, dev, func, offset, len);
 				} else
 					enable |= PCI_COMM_MAE;
