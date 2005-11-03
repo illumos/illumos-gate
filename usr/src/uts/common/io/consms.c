@@ -415,7 +415,7 @@ consmsuwput(q, mp)
 		if (consms_state.consms_num_lqs > 0) {
 			consms_mux_disp_data(mp);
 		} else {
-			error = EINVAL;
+			freemsg(mp);
 		}
 		break;
 
