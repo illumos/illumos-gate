@@ -631,6 +631,11 @@ ehci_register_intrs_and_init_mutex(ehci_state_t	*ehcip)
 	 * Make sure that the interrupt pin is connected to the
 	 * interrupt controller on x86.	 Interrupt line 255 means
 	 * "unknown" or "not connected" (PCI spec 6.2.4, footnote 43).
+	 * If we return failure when interrupt line equals 255, then
+	 * high speed devices will be routed to companion host controllers.
+	 * Actually it is not necessary to return failure here, and
+	 * o/uhci codes don't check the interrupt line too.
+	 * But it's good to print message here for debug.
 	 */
 	iline = pci_config_get8(ehcip->ehci_config_handle,
 	    PCI_CONF_ILINE);
@@ -640,8 +645,6 @@ ehci_register_intrs_and_init_mutex(ehci_state_t	*ehcip)
 		    "ehci_register_intrs_and_init_mutex: "
 		    "interrupt line value out of range (%d)",
 		    iline);
-
-		return (DDI_FAILURE);
 	}
 #endif	/* __x86 */
 
