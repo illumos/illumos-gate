@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,7 @@ int hrm_allocfailmsg = 0;	/* print a message when allocations fail */
 int hrm_allocfail = 0;
 
 static struct hrmstat	*hrm_balloc(void);
-static int	hrm_init(void);
+static void	hrm_init(void);
 static void	hrm_link(struct hrmstat *);
 static void	hrm_setbits(struct hrmstat *, caddr_t, uint_t);
 static void	hrm_hashout(struct hrmstat *);
@@ -105,8 +105,7 @@ hat_startstat(struct as *as)
 	/*
 	 * Initialize global data, if needed.
 	 */
-	if (hrm_init() == -1)
-		return (-1);
+	hrm_init();
 
 	/*
 	 * If the refmod saving memory allocator runs out, print
@@ -175,10 +174,19 @@ hat_setstat(struct as *as, caddr_t addr, size_t len, uint_t rmbits)
 	/*
 	 * Initialize global data, if needed.
 	 */
-	if (hrm_init() == -1)
-		return;
+	hrm_init();
 
 	mutex_enter(&hat_statlock);
+
+	/*
+	 * The previous owner of hat_statlock could have been
+	 * hat_freestat(). Check whether hrm_hashtab is NULL, if it is,
+	 * we bail out.
+	 */
+	if (hrm_hashtab == NULL) {
+		mutex_exit(&hat_statlock);
+		return;
+	}
 
 	/*
 	 * Search the hash list for the as and addr we are looking for
@@ -293,7 +301,7 @@ hat_freestat(struct as *as, int id)
  * Hrm_lock protects the globally allocted memory:
  *	hrm_memlist and hrm_hashtab.
  */
-static int
+static void
 hrm_init(void)
 {
 	/*
@@ -304,7 +312,6 @@ hrm_init(void)
 		hrm_hashtab =
 			kmem_zalloc(HRM_HASHSIZE * sizeof (char *), KM_SLEEP);
 	mutex_exit(&hat_statlock);
-	return (0);
 }
 
 /*
@@ -320,7 +327,7 @@ hrm_getblk(int chunk)
 	mutex_enter(&hat_statlock);
 	if ((hrm_blist == NULL) ||
 	    (hrm_blist_num <= hrm_blist_lowater) ||
-	    chunk) {
+	    (chunk && (hrm_blist_num < chunk))) {
 
 		mutex_exit(&hat_statlock);
 
