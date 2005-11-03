@@ -4486,15 +4486,15 @@ show_zone_create_args32(private_t *pri, long offset)
 		show_privset(pri, (uintptr_t)args.zone_privs,
 		    args.zone_privssz, "    zone_privs: ");
 
-		(void) printf("%s\t       rctlbuf: 0x%p\n", pri->pname,
-		    (void *)args.rctlbuf);
+		(void) printf("%s\t       rctlbuf: 0x%x\n", pri->pname,
+		    (caddr32_t)args.rctlbuf);
 		(void) printf("%s\t     rctlbufsz: %lu\n", pri->pname,
 		    (ulong_t)args.rctlbufsz);
 
 		(void) printf("%s\t           zfs: %s\n", pri->pname, zone_zfs);
 
-		(void) printf("%s\textended_error: 0x%p\n", pri->pname,
-		    (void *)args.extended_error);
+		(void) printf("%s\textended_error: 0x%x\n", pri->pname,
+		    (caddr32_t)args.extended_error);
 
 		if (args.zfsbufsz > 0)
 			free(zone_zfs);
