@@ -617,13 +617,20 @@ main(int argc, char *argv[])
 	if (needlog) {
 		char *user = getlogin();
 		struct passwd *pw;
+		char *tty;
 
 		openlog(cmdname, 0, LOG_AUTH);
 		if (user == NULL && (pw = getpwuid(getuid())) != NULL)
 			user = pw->pw_name;
 		if (user == NULL)
 			user = "root";
-		syslog(LOG_CRIT, "%sed by %s", cmdname, user);
+
+		tty = ttyname(1);
+
+		if (tty == NULL)
+			syslog(LOG_CRIT, "initiated by %s", user);
+		else
+			syslog(LOG_CRIT, "initiated by %s on %s", user, tty);
 	}
 
 	/*
