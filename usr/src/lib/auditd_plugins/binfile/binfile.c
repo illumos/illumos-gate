@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * write binary audit records directly to a file.
@@ -563,7 +563,7 @@ open_log(dirlist_t *current_dir)
 		    "%s/%s.not_terminated.%s",
 		    current_dir->dl_dirname, auditdate, host);
 		newfd = open(newname,
-		    O_RDWR | O_APPEND | O_CREAT | O_EXCL, 0600);
+		    O_RDWR | O_APPEND | O_CREAT | O_EXCL, 0640);
 		if (newfd < 0) {
 			switch (errno) {
 			case EEXIST:
