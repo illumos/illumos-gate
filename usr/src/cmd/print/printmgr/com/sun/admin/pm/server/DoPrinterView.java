@@ -254,9 +254,7 @@ public class DoPrinterView {
 	}
 
 	int j = -1;
-	Host h = new Host();
-
-	printserver = h.getLocalHostName();
+	printserver = p.getPrintServer();
 
 	printertype = getToken(o, "Printer types:");
 	i = o.indexOf("enabled since");

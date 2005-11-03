@@ -142,7 +142,8 @@ user_host(const char *user)
 		snprintf(host, sizeof (host), "%s", user);
 		*tmp = '!';
 	} else
-		sysinfo(SI_HOSTNAME, host, sizeof (host));
+		snprintf(host, sizeof (host), "%s", "localhost");
+
 
 	return (host);
 }

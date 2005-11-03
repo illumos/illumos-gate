@@ -23,7 +23,7 @@
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Comment which describes the contents of this file.
@@ -229,7 +229,8 @@ public class pmAccess extends pmButtonScreen {
 	}
 
 	try {
-	    if (server.equals(mytop.host.getLocalHostName())) {
+	    if (server.equals(mytop.host.getLocalHostName()) ||
+		server.equals("localhost")) {
 		snameText.requestFocus();
 		getHostOk = false;
 	    }

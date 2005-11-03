@@ -217,7 +217,6 @@ static void
 startup()
 {
     struct passwd		*p;
-    struct utsname		utsbuf;
 
     
     Starting = 1;
@@ -240,11 +239,7 @@ startup()
 
     setuid (0);
 
-    uname(&utsbuf);
-    if (utsbuf.nodename[0] != '\0')
-    	Local_System = Strdup(utsbuf.nodename);
-    else
-	Local_System = Strdup("localhost");
+    Local_System = Strdup("localhost");
 
     /*
      * Make sure that all critical directories are present and that 

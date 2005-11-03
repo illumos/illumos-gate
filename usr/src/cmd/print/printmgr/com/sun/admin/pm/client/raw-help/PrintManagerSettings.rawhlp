@@ -1,0 +1,79 @@
+<TITLE> Print Manager Settings </TITLE> 
+<!-- Tag=Overview --> 
+
+<CONTENT>
+
+<p> 
+ 
+The Solaris Print Manager has tool-wide settings that may be selected.
+Each of these choices applies to all further tasks utilized within the
+Solaris Print Manager.  For example, once Show Command-Line Console has been
+selected, or checked, the Console will be visible for all tasks until
+this selection is turned off, or unchecked.
+
+
+<p> 
+
+<b> Show Command-Line Console: </b> 
+The Command-Line Console displays the command-line version of add, modify,
+delete actions. Errors and warnings may also be displayed after the
+command. 
+
+<p>
+The default is off.
+
+<p> 
+
+<b> Confirm All Actions: </b> 
+When Confirm All Actions is selected, all subsequent Solaris Print
+Manager actions will require confirmation before being performed.
+
+<p>
+The default is off.
+
+<p>
+<b> Use PPD files: </b> 
+When configuring local printers, PPD files may be used to describe the
+printer. If selected, the New Attached Printer and New Network Printer
+screens offer the selection of printer Make, Model, and PPD file.
+
+<p>
+The default is on.
+
+<p>
+<b> Use localhost for Print Server Name: </b> 
+
+The print server name utilized by the Solaris Print System  may be 
+either the hostname or "localhost". This applies to the tasks for adding 
+new local printers in the "files" Name Service: New Attached Printer
+and New Network Printer. The use of "localhost" is recommended.
+
+<p>
+The default is on.
+<p>
+
+Documentation about Printing Services is found in the System Administration
+Guide: Advanced Administration.
+
+</CONTENT> 
+
+<KEYWORDS>
+confirm action all actions "command-line" log console show "local printer"
+"printer model" "printer driver" "printer make" localhost hostname 
+</KEYWORDS>
+
+<p>
+
+<SEEALSO> 
+Overview
+MainWindow
+ShowCommandConsole
+ToConfirmActions
+ToShowCommand
+InstallLocalPPD
+InstallNetworkPPD
+ToExit
+HelpOnHelp
+
+</SEEALSO>   
+

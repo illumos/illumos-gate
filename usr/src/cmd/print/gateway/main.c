@@ -104,14 +104,12 @@ remote_host_name(FILE *fp)
 	char myname[MAXHOSTNAMELEN], tmp_buf[INET6_ADDRSTRLEN];
 	char *hostname;
 
-	(void) sysinfo(SI_HOSTNAME, myname, sizeof (myname));
-
 	/* who is our peer ? */
 	if (getpeername(fd, (struct sockaddr *)&peer, &peer_len) < 0) {
 		if ((errno != ENOTSOCK) && (errno != EINVAL))
 			return (NULL);
 		else
-			return (strdup(myname));
+			return (strdup("localhost"));
 	}
 
 	/* get their name or return a string containing their address */
@@ -124,10 +122,11 @@ remote_host_name(FILE *fp)
 
 	/* is it "localhost" ? */
 	if (strcasecmp(hp->h_name, "localhost") == 0)
-		return (strdup(myname));
+		return (strdup("localhost"));
 
 	/* duplicate the name because gethostbyXXXX() is not reentrant */
 	hostname = strdup(hp->h_name);
+	(void) sysinfo(SI_HOSTNAME, myname, sizeof (myname));
 
 	/* is it from one of my addresses ? */
 	if ((hp = getipnodebyname(myname, AF_INET6, AI_ALL|AI_V4MAPPED,
@@ -139,7 +138,7 @@ remote_host_name(FILE *fp)
 			if (memcmp(tmp[i++], &peer.sin6_addr, hp->h_length)
 			    == 0) {
 				free(hostname);
-				return (strdup(myname));
+				return (strdup("localhost"));
 			}
 		}
 	}

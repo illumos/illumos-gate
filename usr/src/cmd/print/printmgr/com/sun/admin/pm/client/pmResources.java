@@ -119,7 +119,10 @@ public class pmResources extends ListResourceBundle {
         {"Confirm.All.Actions.mnemonic", "C"},
 
 	{"Use.PPD.files", "Use PPD files"},
-	{"Use.PPD.files.mnemonic", "U"},
+	{"Use.PPD.files.mnemonic", "F"},
+
+	{"Use.localhost", "Use localhost for Printer Server"},
+	{"Use.localhost.mnemonic", "U"},
 
 	{"Exit", "Exit"},
 	{"Exit.mnemonic", "X"},
@@ -161,6 +164,9 @@ public class pmResources extends ListResourceBundle {
 
 	{"About.Print.Manager", "About Print Manager..."},
 	{"About.Print.Manager.mnemonic", "A"},
+
+	{"Print.Manager.Settings", "Print Manager Settings"},
+	{"Print.Manager.Settings.mnemonic", "P"},
 
 
 	/*

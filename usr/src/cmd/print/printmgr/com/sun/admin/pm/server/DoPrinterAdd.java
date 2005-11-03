@@ -154,6 +154,8 @@ public class  DoPrinterAdd {
 	}
 
 	cmd = "/usr/sbin/lpadmin -p " + printername;
+	if (printserver != null)
+		cmd = cmd.concat(" -s " + printserver);
 	if (device != null) {
 		cmd = cmd.concat(" -v " + device);
 

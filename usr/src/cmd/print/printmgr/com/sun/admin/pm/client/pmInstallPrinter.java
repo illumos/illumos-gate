@@ -92,6 +92,7 @@ public class pmInstallPrinter extends pmInstallScreen {
    	Component defaultComponent = null;
 
 	boolean usePPD;
+	boolean useLocalhost;
  
     public pmInstallPrinter(pmTop myTop, int action) throws pmGuiException {
         boolean failed = false;
@@ -103,8 +104,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	workingPrinter = new Printer(myTop.ns);
 
 	usePPD = myTop.getUsePPD();
-
-	
+	useLocalhost = myTop.getUseLocalhost();
 
 	switch (action) {
 
@@ -665,12 +665,12 @@ public class pmInstallPrinter extends pmInstallScreen {
 
 			TextFieldConstraints(c);
 			destinationField(north, c);
-			if (action == Constants.MODIFYNETWORK)
-				setNetworkInfo();
 			c.gridy++;
 			comboboxConstraints(c);
 			protocolField(north, c);
 			c.gridy++;
+			if (action == Constants.MODIFYNETWORK)
+				setNetworkInfo();
 		}
 
 		optionsConstraints(c);
@@ -697,12 +697,13 @@ public class pmInstallPrinter extends pmInstallScreen {
 	String p = workingPrinter.getProtocol();
 
 	if (p != null)  {
-		if (p.equals("bsd"))
+		if (p.equals("bsd")) 
 			protocolCombo.setSelectedItem("BSD");
 		else if (p.equals("tcp"))
 			protocolCombo.setSelectedItem("TCP");
 		else if (p.equals("uri"))
 			protocolCombo.setSelectedItem("URI");
+
 	}
 
 	if (destText != null)
@@ -896,7 +897,10 @@ public class pmInstallPrinter extends pmInstallScreen {
 
 	server = null;
 	try {
-		server = myTop.host.getLocalHostName();
+		if ((useLocalhost))
+			server = "localhost";
+		else
+			server = myTop.host.getLocalHostName();
 	} catch (Exception e) {
 		Debug.warning(
 		"CLNT:pmInstPr:getLocalHostName exception " + e);
@@ -1109,8 +1113,9 @@ public class pmInstallPrinter extends pmInstallScreen {
         if (workingPrinter != null) {
             if (printer != null)
                 workingPrinter.setPrinterName(printer);
-            if (server != null)
+            if (server != null) {
                 workingPrinter.setPrintServer(server);
+	    }
             if (description != null)
                 workingPrinter.setComment(description);
 	    if ((port != null) &&
@@ -1319,7 +1324,7 @@ public class pmInstallPrinter extends pmInstallScreen {
 	try {
            	workingPrinter.modifyPrinter();
 	} catch (Exception e) {
-		Debug.warning("CLNT:pmInstPr:doModifyLocalAttached: " + e);
+		Debug.warning("CLNT:pmInstPr:doModifyLocalNetwork: " + e);
 		failed = true;
 	} finally {
        		gatherLogs(workingPrinter);

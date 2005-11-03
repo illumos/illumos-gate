@@ -23,7 +23,7 @@
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * pmTop.java
@@ -79,6 +79,7 @@ public class pmTop extends JPanel {
     JCheckBoxMenuItem logCheck;
     JCheckBoxMenuItem confirmCheck;
     JCheckBoxMenuItem usePPD;
+    JCheckBoxMenuItem useLocalhost;
     JMenuItem modifyMenuItem = null;
     JMenuItem deleteMenuItem = null;
 
@@ -479,15 +480,9 @@ public class pmTop extends JPanel {
 	appMenu.addMouseListener(new MouseAdapter() {
 		public void mouseClicked(MouseEvent e) {
 			Debug.message("CLNT: appMenu MouseListener");
-			if (pmMisc.isppdCachefile()) {
-				usePPD.setEnabled(true);
-			} else {
-				usePPD.setEnabled(false);
-			}
 		};
 	});
-		
-            
+
         JMenuItem load = new JMenuItem(
             pmUtility.getResource("Select.Naming.Service"), 
             pmUtility.getIntResource("Select.Naming.Service.mnemonic"));
@@ -544,9 +539,18 @@ public class pmTop extends JPanel {
 		pmUtility.getResource("Use.PPD.files"), true);
 	usePPD.setMnemonic(pmUtility.getIntResource("Use.PPD.files.mnemonic"));	
 
-	if (!runningAuth)
+	useLocalhost = new JCheckBoxMenuItem(
+		pmUtility.getResource("Use.localhost"), true);
+	useLocalhost.setMnemonic(
+		pmUtility.getIntResource("Use.localhost.mnemonic"));	
+
+
+	if (!runningAuth) {
 		usePPD.setEnabled(false);
+		useLocalhost.setEnabled(false);
+	}
 	appMenu.add(usePPD);
+	appMenu.add(useLocalhost);
 
         appMenu.addSeparator();
         
@@ -564,6 +568,7 @@ public class pmTop extends JPanel {
  
         exit.setEnabled(true);
         appMenu.add(exit);
+
         return appMenu;
     }
 
@@ -788,6 +793,19 @@ public class pmTop extends JPanel {
         });
 
         helpMenu.add(about);
+        helpMenu.addSeparator();
+
+        JMenuItem settings = new JMenuItem(
+            pmUtility.getResource("Print.Manager.Settings"),
+            pmUtility.getIntResource("Print.Manager.Settings.mnemonic"));
+	    settings.addActionListener(new ActionListener() {
+		public void actionPerformed(ActionEvent e) {
+		    Debug.message("CLNT:  print manager settings help action");
+		    myTop.showHelpItem("PrintManagerSettings");
+		};
+        });
+
+        helpMenu.add(settings);
         return helpMenu;
     }
 
@@ -805,12 +823,15 @@ public class pmTop extends JPanel {
 		
 		} else {
 
-		    if ((host.getLocalHostName()).equals(selprinterServer)) {
+		    if ((host.getLocalHostName()).equals(selprinterServer) ||
+			selprinterServer.equals("localhost")) {
 
 			if (isNetwork()) {
+
 			    modifyView = new 
 				pmInstallPrinter(
 					myTop, Constants.MODIFYNETWORK);
+
 			} else {
 			    modifyView = new 
 				pmInstallPrinter(
@@ -894,6 +915,7 @@ public class pmTop extends JPanel {
 		} else
 			ns = systemns;
 	}
+	
 
 	// This tool is read-only unless the user is root on the
 	// print server. Thus, don't check for namespace authorization
@@ -970,6 +992,7 @@ public class pmTop extends JPanel {
 			logCheck.setEnabled(false);
 			confirmCheck.setEnabled(false);
 			usePPD.setEnabled(false);
+			useLocalhost.setEnabled(false);
 			access.setEnabled(false);
 			local.setEnabled(false);
 			network.setEnabled(false);
@@ -985,7 +1008,12 @@ public class pmTop extends JPanel {
 				usePPD.setEnabled(true);
 			else
 				usePPD.setEnabled(false);
-		
+        		if (ns.getNameService().equals("system") == true) {
+				useLocalhost.setEnabled(true);
+				useLocalhost.setVisible(true);
+			} else {
+				useLocalhost.setVisible(false);
+			}
 		}
 
 	} else {
@@ -1038,6 +1066,10 @@ public class pmTop extends JPanel {
 
     public boolean getUsePPD() {
 	return usePPD.getState();
+    }
+
+    public boolean getUseLocalhost() {
+	return useLocalhost.getState();
     }
 
     public void doFind(String printer) {

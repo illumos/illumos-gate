@@ -22,7 +22,7 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * DoPrinterUtil class
@@ -529,5 +529,30 @@ public class  DoPrinterUtil {
 		return (false);
 	}
 	return (true);
+    }
+
+    public static boolean isLocalhost(
+	String queue) throws Exception
+    {
+	int exitvalue;
+	String o = null;
+
+	Debug.message("SVR: DoPrinterUtil.isLocalhost():queue " + queue);
+
+	SysCommand syscmd = new SysCommand();
+	syscmd.exec("/usr/bin/grep " + queue +  " /etc/printers.conf");
+	exitvalue = syscmd.getExitValue();
+	if (exitvalue != 0) {
+	    Debug.message(
+		"SVR:DoPrinterUtil:isLocalhost:failed:queue: " + queue);
+	    return (false);
+	}
+	o = syscmd.getOutput();
+	syscmd = null;
+	Debug.message("SVR:DoPrinterUtil.java:isLocalhost: output: " + o);
+	if (o.indexOf("localhost") != -1)
+		return (true);
+	else
+		return (false);
     }
 }

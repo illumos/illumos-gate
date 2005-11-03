@@ -1060,7 +1060,8 @@ main(int ac, char *av[])
 			"/etc/lp/printers/%s/configuration", binding->printer);
 		(void) snprintf(cpath, sizeof (cpath),
 			"/etc/lp/classes/%s", binding->printer);
-		if ((strcasecmp(binding->server, hostname) == 0) &&
+		if (((strcasecmp(binding->server, hostname) == 0) ||
+			(strcasecmp(binding->server, "localhost") == 0)) &&
 			((access(ppath, F_OK) == 0) ||
 			(access(cpath, F_OK) == 0)) &&
 			(access(OLD_LP, F_OK) == 0)) {

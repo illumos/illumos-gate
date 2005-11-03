@@ -478,7 +478,9 @@ void			options (argc, argv)
 			if ((cp = strchr(optarg, '!')))
 				*cp = '\0';
 
-			if (STREQU(optarg, NAME_NONE))
+			if ((STREQU(optarg, NAME_NONE)) ||
+				(STREQU(optarg, "localhost")))
+
 				s = Local_System;
 			else if (STREQU(optarg, Local_System)) {
 				if (cp) {

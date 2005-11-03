@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,6 +35,7 @@ LPSET=/usr/bin/lpset
 LPGET=/usr/bin/lpget
 
 HOST=`/bin/uname -n`
+LHOST="localhost"
 PID=$$
 
 cmd_name=lpadmin
@@ -63,9 +64,12 @@ delete_local() {
 # grep /etc/printers.conf for each bsdaddr for this server
 # get printer name from that line
 
-for LINE in `grep bsdaddr=${HOST}, /etc/printers.conf`
+for LINE in `/bin/grep bsdaddr /etc/printers.conf |
+	/bin/egrep -e ${HOST}\|${LHOST}`
 do
-        PRINTER=`echo ${LINE} | sed -e 's/^:bsdaddr='$HOST',//' -e 's/[,:].*//'`
+        PRINTER=`echo ${LINE} | /bin/sed -e 's/^:bsdaddr='$LHOST',//' \
+		-e 's/^:bsdaddr='$HOST',//' \
+		-e 's/[,:].*//'`
 
 # If there is not an entry for this printer in
 #       /etc/lp/printers or /etc/lp/classes
@@ -110,7 +114,7 @@ fi
 
 # remove _default 
 
-DEFAULTP=`${LPGET} _default | grep use | sed -e 's/[    ]*use=//'`
+DEFAULTP=`${LPGET} _default | /bin/grep use | /bin/sed -e 's/[    ]*use=//'`
 ${LPGET} -k bsdaddr ${DEFAULTP} >/dev/null 2>&1
 status=$?
 
@@ -132,9 +136,9 @@ delete_local
 
 # Delete all the remote printers using bsdaddr
 
-for LINE in `grep bsdaddr /etc/printers.conf | grep -v ${HOST}`
+for LINE in `/bin/grep bsdaddr /etc/printers.conf | /bin/egrep -v -e ${HOST}\|${LHOST}`
 do
-        PRINTER=`echo $LINE | sed -e 's/^:bsdaddr=[^,]*,//' -e 's/[,:].*//'`
+        PRINTER=`echo $LINE | /bin/sed -e 's/^:bsdaddr=[^,]*,//' -e 's/[,:].*//'`
         ${LPSET} -x $PRINTER
 	status=$?
 
@@ -221,7 +225,9 @@ do
 	;;
 	v|U)
 		device=${OPTARG}
-		server=`uname -n`
+		if [ ! -n "${server}" ] ; then
+			server=${HOST}
+		fi
 	;;
 	x)
 		if [ -n "${printer}" -o -n "${server}" -o \
@@ -308,7 +314,7 @@ if [ -f /usr/lib/lp/local/$cmd_name ] ; then
 		# if adding a printer, make sure scheduler is running
 		if [ -n "${printer}" -a ! -n "${delete}" -a \
 		    ! -p /var/spool/lp/fifos/FIFO ]; then
-			svcadm enable svc:/application/print/server:default
+			svcadm enable -s svc:/application/print/server:default
 		fi
 		eval $CMD
 		exit_code=$?
@@ -322,7 +328,7 @@ fi
 
 #	split the "server" into printer and server
 if [ -n "${server}" ] ; then
-	if [ `echo ${server} | grep -c !` = 1 ] ; then
+	if [ `echo ${server} | /bin/grep -c !` = 1 ] ; then
 		rem_printer=`echo ${server} | cut -d! -f2`
 	fi
 	server=`echo ${server} | cut -d! -f1`
@@ -371,10 +377,14 @@ else
 
 #		If the class doesn't already exist in printers.conf, add it.
 
+		if [ -n "${server}" ] ; then
+			CHOST=$server
+		else
+			CHOST=$HOST
+		fi
 		if [ ${lpget_class} -ne 0 ] ; then
-			this_server=`uname -n`
 			${LPSET} -n system \
-				-a "bsdaddr=${this_server},${class},Solaris" ${class}
+				-a "bsdaddr=${CHOST},${class},Solaris" ${class}
 			exit_code=$?
 		fi
 	fi

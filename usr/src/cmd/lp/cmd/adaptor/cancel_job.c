@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1995-1997,2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -72,7 +72,8 @@ cancel_requestor(const char *printer, const char *user, const char *host)
 			char thost[MAXHOSTNAMELEN];
 
 			sysinfo(SI_HOSTNAME, thost, sizeof (thost));
-			if (strcmp(host, thost) == 0)
+			if ((strcasecmp(host, thost) == 0) ||
+				((strcasecmp(host, "localhost") == 0)))
 				host = "all"; 	/* cancel from anywhere */
 		}
 	}

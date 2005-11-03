@@ -150,6 +150,7 @@ public class  DoPrinterMod {
 	String banner = null;
 	boolean enable = false;
 	boolean accept = false;
+	boolean isURI = false;
 
 	boolean allow_changed = false;
 	boolean default_printer_changed = false;
@@ -173,12 +174,28 @@ public class  DoPrinterMod {
 			comment = "";
 		}
 	}
-	if (!strings_equal(curr.getDevice(), p.getDevice()))
+	if (!strings_equal(curr.getDevice(), p.getDevice())) 
 		device = p.getDevice();
+
 	if (!strings_equal(curr.getNotify(), p.getNotify()))
 		notify = p.getNotify();
-	if (!strings_equal(curr.getProtocol(), p.getProtocol()))
+
+	if (!strings_equal(curr.getProtocol(), p.getProtocol())) {
 		protocol = p.getProtocol();
+	}
+
+	// Need to know if the new protocol is uri or if the
+	// protocol did not change and the current one is uri
+	if (((protocol == null) && (curr.getProtocol() == "uri")) ||
+		((protocol != null) && (protocol.equals("uri"))))  {
+		isURI = true;
+	}
+	Debug.message("SVR:DoPrinterMod:isURI: " + isURI);
+	Debug.message("SVR:DoPrinterMod:protocol: " + protocol);
+	Debug.message(
+	    "SVR:DoPrinterMod:curr.getProtocol(): " + curr.getProtocol());
+	Debug.message("SVR:DoPrinterMod:p.getProtocol(): " + p.getProtocol());
+	
 	if (!strings_equal(curr.getDestination(), p.getDestination()))
 		destination = p.getDestination();
 
@@ -249,27 +266,6 @@ public class  DoPrinterMod {
 	if (allow_changed) {
 		user_allow_list = p.getUserAllowList();
 		user_deny_list = p.getUserDenyList();
-	}
-
-	//
-	// if we transitioned from a "uri" pseudo protocol to a real
-	// network protocol supported by netstandard* / netpr,
-	// the device should be reset to /dev/null
-	//
-	if ((protocol != null) && (!protocol.equals("uri")) &&
-	    ((strings_equal(curr.getProtocol(), "uri"))))
-		device = "/dev/null";
-
-	// 
-	// "uri" is a pseudo protocol and really means that the
-	// destination contains a device name
-	//
-	if (((protocol != null) && (protocol.equals("uri"))) ||
-	    ((destination != null) &&
-			(strings_equal(curr.getProtocol(), "uri")))) {
-		device = destination;
-		destination = null;
-		protocol = null;
 	}
 
 	//
@@ -383,27 +379,52 @@ public class  DoPrinterMod {
 		syscmd = null;
 	}
 
+
+	//
+	// Do some slight of hand to deal with overloading of destination
+	// with device for uri protocol
+	// Done at the last moment to prevent modifying logic for old/new
+	// properties of the queue
+
+	if (isURI) {
+		if (destination != null) 
+			device = destination;
+		else
+			device = curr.getDestination();
+		destination = null;
+		protocol = null;
+	} else {
+		if (protocol != null) {
+			device = "/dev/null";
+		}
+	}
+
+
+
 	//
 	// Build the modify command
 	//
+
 	cmd = "/usr/sbin/lpadmin -p " + printername;
+
+	if (printername != null)
+		if (DoPrinterUtil.isLocalhost(printername)) {
+			cmd = cmd.concat(" -s localhost");
+			Debug.message("SVR:DoModifyPrinter:isLocalhost:true");
+	}
+
 	if (device != null) {
 		cmd = cmd.concat(" -v " + device);
+	}
 
-		//
-		// If the device is a device uri, it must use the "uri"
-		// model/interface script.  If it's "/dev/null" and the
-		// protocol is set (to something other than "uri"), it should
-		// be reset to netstandard or netstandard_foomatic
-		//
-                if (device.indexOf("://") != 0)
-                        cmd = cmd.concat(" -m uri");
-		else if ((!device.equals("/dev/null")) && (protocol != null) &&
-		         (!protocol.equals("uri"))) {
-                       	cmd = cmd.concat(" -m netstandard");
-                	if (ppd != null)
-                        	cmd = cmd.concat("_foomatic");
-		}
+	// Network printer
+	if (isURI) {
+                cmd = cmd.concat(" -m uri");
+	} else {
+		if (curr.getPPD() != null)
+               		cmd = cmd.concat(" -m netstandard_foomatic");
+		else
+               		cmd = cmd.concat(" -m netstandard");
 	}
 
 	if (printertype != null)
@@ -421,11 +442,19 @@ public class  DoPrinterMod {
 	if (notify != null)
 		cmd = cmd.concat(" -A " + notify);
 
-	if (destination != null) {
-		cmd = cmd.concat(" -o dest=" + destination);
+	// destination is overloaded to hold uri device for network printers
+	// if the protocol is uri, don't set either destination or protocol
+	// the device has been set to the destination above
+
+	if (isURI) {
+			cmd = cmd.concat(" -o dest=");
+			cmd = cmd.concat(" -o protocol=");
+	} else {
+		if (destination != null)
+		    cmd = cmd.concat(" -o dest=" + destination);
+		if (protocol != null)
+		    cmd = cmd.concat(" -o protocol=" + protocol);
 	}
-	if ((protocol != null) && (!protocol.equals("uri")))
-		cmd = cmd.concat(" -o protocol=" + protocol);
 
 	if ((file_contents != null) && (file_contents.length != 0)) {
 		String tmpstr = file_contents[0];
@@ -606,6 +635,7 @@ public class  DoPrinterMod {
 	printername = p.getPrinterName();
 	if (!strings_equal(curr.getPrintServer(), p.getPrintServer()))
 		printserver = p.getPrintServer();
+
 	if (!strings_equal(curr.getComment(), p.getComment())) {
 		comment = p.getComment();
 		if (comment == null) {
