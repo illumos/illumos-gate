@@ -2610,7 +2610,8 @@ drmach_cpu_shutdown_self(void)
 	(void) spl8();
 
 	ASSERT(cp->cpu_intr_actv == 0);
-	ASSERT(cp->cpu_thread == cp->cpu_idle_thread);
+	ASSERT(cp->cpu_thread == cp->cpu_idle_thread ||
+	    cp->cpu_thread == cp->cpu_startup_thread);
 
 	cp->cpu_flags = CPU_OFFLINE | CPU_QUIESCED | CPU_POWEROFF;
 

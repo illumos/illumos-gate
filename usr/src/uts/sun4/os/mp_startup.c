@@ -167,6 +167,7 @@ common_startup_init(cpu_t *cp, int cpuid)
 	cp->cpu_lwp = NULL;
 	cp->cpu_dispthread = tp;
 	cp->cpu_dispatch_pri = DISP_PRIO(tp);
+	cp->cpu_startup_thread = tp;
 }
 
 /*

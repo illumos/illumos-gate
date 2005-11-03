@@ -129,9 +129,12 @@ struct	machcpu {
 	 */
 
 	uint64_t	intrstat[PIL_MAX+1][2];
+	kthread_t	*startup_thread;
 };
 
 typedef	struct machcpu	machcpu_t;
+
+#define	cpu_startup_thread	cpu_m.startup_thread
 
 /*
  * Macro to access the "cpu private" data structure.

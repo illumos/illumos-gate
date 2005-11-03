@@ -237,7 +237,8 @@ mp_cpu_quiesce(cpu_t *cp0)
 
 	for (i = 0; i < sanity_limit; i++) {
 		if (cp->cpu_intr_actv == 0 &&
-		    cp->cpu_thread == cp->cpu_idle_thread) {
+		    (cp->cpu_thread == cp->cpu_idle_thread ||
+		    cp->cpu_thread == cp->cpu_startup_thread)) {
 			found_intr = 0;
 			break;
 		}
@@ -248,9 +249,10 @@ mp_cpu_quiesce(cpu_t *cp0)
 
 		if (cp->cpu_intr_actv) {
 			cmn_err(CE_PANIC, "%s: cpu_intr_actv != 0", f);
-		} else if (cp->cpu_thread != cp->cpu_idle_thread) {
-			cmn_err(CE_PANIC, "%s: cpu_thread != cpu_idle_thread",
-				f);
+		} else if (cp->cpu_thread != cp->cpu_idle_thread &&
+		    cp->cpu_thread != cp->cpu_startup_thread) {
+			cmn_err(CE_PANIC, "%s: CPU %d is not quiesced",
+			    f, cpuid);
 		}
 
 	}

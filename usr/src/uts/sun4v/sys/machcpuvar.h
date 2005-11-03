@@ -158,9 +158,12 @@ struct	machcpu {
 	uint16_t	*cpu_list;		/* uint16_t [NCPU] */
 	uint64_t	cpu_list_ra;		/* cpu list ra */
 	id_t		cpu_ipipe;		/* cpu exec unit id */
+	kthread_t	*startup_thread;
 };
 
 typedef	struct machcpu	machcpu_t;
+
+#define	cpu_startup_thread	cpu_m.startup_thread
 
 /*
  * Macro to access the "cpu private" data structure.
