@@ -604,6 +604,7 @@ kb8042_getinfo(
 static void
 kb8042_cleanup(struct kb8042 *kb8042)
 {
+	ASSERT(kb8042_dip != NULL);
 
 	if (kb8042->init_state & KB8042_HW_MUTEX_INITTED)
 		mutex_destroy(&kb8042->w_hw_mutex);
@@ -618,6 +619,7 @@ kb8042_cleanup(struct kb8042 *kb8042)
 		ddi_remove_minor_node(kb8042_dip, NULL);
 
 	kb8042->init_state = KB8042_UNINITIALIZED;
+	kb8042_dip = NULL;
 }
 
 static void
