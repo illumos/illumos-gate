@@ -1545,6 +1545,14 @@ apic_error_intr()
 	error = error0 | error1;
 
 	/*
+	 * Clear the APIC error status (do this on all cpus that enter here)
+	 * (two writes are required due to the semantics of accessing the
+	 * error status register.)
+	 */
+	apicadr[APIC_ERROR_STATUS] = 0;
+	apicadr[APIC_ERROR_STATUS] = 0;
+
+	/*
 	 * Prevent more than 1 CPU from handling error interrupt causing
 	 * double printing (interleave of characters from multiple
 	 * CPU's when using prom_printf)
