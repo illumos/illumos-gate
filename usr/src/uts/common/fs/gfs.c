@@ -220,7 +220,7 @@ gfs_readdir_emit_int(gfs_readdir_state_t *st, uio_t *uiop, offset_t off,
 		return (-1);
 	}
 
-	st->grd_dirent->d_off = off;
+	st->grd_dirent->d_off = next;
 	st->grd_dirent->d_reclen = (ushort_t)reclen;
 
 	if (uiomove((caddr_t)st->grd_dirent, reclen, UIO_READ, uiop))
