@@ -160,6 +160,8 @@ int kobj_file_bufsize;	/* set in /etc/system */
 caddr_t	rm_platter_va;
 uint32_t rm_platter_pa;
 
+int	auto_lpg_disable = 1;
+
 /*
  * Some CPUs have holes in the middle of the 64-bit virtual address range.
  */
@@ -1706,8 +1708,11 @@ startup_vm(void)
 	cmn_err(CE_CONT, "?mem = %luK (0x%lx)\n",
 	    physinstalled << (MMU_PAGESHIFT - 10), ptob(physinstalled));
 
-	/* For small memory systems disable automatic large pages. */
-	if (physmem < auto_lpg_min_physmem) {
+	/*
+	 * disable automatic large pages for small memory systems or
+	 * when the disable flag is set.
+	 */
+	if (physmem < auto_lpg_min_physmem || auto_lpg_disable) {
 		exec_lpg_disable = 1;
 		use_brk_lpg = 0;
 		use_stk_lpg = 0;

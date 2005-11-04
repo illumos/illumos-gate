@@ -95,11 +95,22 @@ int	ptcpthreshold;
 
 /*
  * Limit page get contig page search based on failure cnts in pgcpfailcnt[].
- * use slot 0 (base page size unused) to enable or disable limiting search.
- * Enabled by default.
+ * Enabled by default via pgcplimitsearch.
+ *
+ * pgcpfailcnt[] is bounded by PGCPFAILMAX (>= 1/2 of installed
+ * memory). When reached, pgcpfailcnt[] is reset to 1/2 of this upper
+ * bound. This upper bound range guarantees:
+ *    - all large page 'slots' will be searched over time
+ *    - the minimum (1) large page candidates considered on each pgcp call
+ *    - count doesn't wrap around to 0
  */
-int	pgcpfailcnt[MMU_PAGE_SIZES];
+pgcnt_t	pgcpfailcnt[MMU_PAGE_SIZES];
 int	pgcplimitsearch = 1;
+
+#define	PGCPFAILMAX		(1 << (highbit(physinstalled) - 1))
+#define	SETPGCPFAILCNT(szc)						\
+	if (++pgcpfailcnt[szc] >= PGCPFAILMAX)				\
+		pgcpfailcnt[szc] = PGCPFAILMAX / 2;
 
 #ifdef VM_STATS
 struct vmm_vmstats_str  vmm_vmstats;
@@ -2805,7 +2816,7 @@ trimkcage(struct memseg *mseg, pfn_t *lo, pfn_t *hi, pfn_t pfnlo, pfn_t pfnhi)
 
 static page_t *
 page_geti_contig_pages(int mnode, uint_t bin, uchar_t szc, int flags,
-    pfn_t pfnlo, pfn_t pfnhi, int pfnflag)
+    pfn_t pfnlo, pfn_t pfnhi, pgcnt_t pfnflag)
 {
 	struct memseg *mseg;
 	pgcnt_t	szcpgcnt = page_get_pagecnt(szc);
@@ -2980,7 +2991,7 @@ page_get_contig_pages(int mnode, uint_t bin, int mtype, uchar_t szc,
 {
 	pfn_t		pfnlo, pfnhi;	/* contig pages pfn range */
 	page_t		*pp;
-	int		pfnflag = 0;	/* no limit on search if 0 */
+	pgcnt_t		pfnflag = 0;	/* no limit on search if 0 */
 
 	VM_STAT_ADD(vmm_vmstats.pgcp_alloc[szc]);
 
@@ -3174,7 +3185,7 @@ pgretry:
 	}
 
 	if (pgcplimitsearch && page_get_func == page_get_contig_pages)
-		pgcpfailcnt[szc]++;
+		SETPGCPFAILCNT(szc);
 
 	VM_STAT_ADD(vmm_vmstats.pgf_allocfailed[szc]);
 	return (NULL);
