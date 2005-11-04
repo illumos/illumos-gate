@@ -2027,6 +2027,8 @@ libscf_get_template_values(scf_instance_t *inst, scf_snapshot_t *snap,
 	int ret = 0, r;
 	char *cname = startd_alloc(max_scf_value_size);
 	char *c_cname = startd_alloc(max_scf_value_size);
+	int common_name_initialized = B_FALSE;
+	int c_common_name_initialized = B_FALSE;
 
 	h = scf_instance_handle(inst);
 	pg = safe_scf_pg_create(h);
@@ -2063,8 +2065,6 @@ libscf_get_template_values(scf_instance_t *inst, scf_snapshot_t *snap,
 	 */
 	if (st->st_locale != NULL) {
 		if (scf_pg_get_property(pg, st->st_locale, prop) == -1) {
-			startd_free(cname, max_scf_value_size);
-
 			switch (scf_error()) {
 			case SCF_ERROR_DELETED:
 			case SCF_ERROR_NOT_FOUND:
@@ -2085,11 +2085,11 @@ libscf_get_template_values(scf_instance_t *inst, scf_snapshot_t *snap,
 			    0) {
 				if (r != LIBSCF_PROPERTY_ABSENT)
 					ret = ECHILD;
-				startd_free(cname, max_scf_value_size);
 				goto template_values_out;
 			}
 
 			*common_name = cname;
+			common_name_initialized = B_TRUE;
 		}
 	}
 
@@ -2098,8 +2098,6 @@ libscf_get_template_values(scf_instance_t *inst, scf_snapshot_t *snap,
 	 * service offers no localized name.
 	 */
 	if (scf_pg_get_property(pg, "C", prop) == -1) {
-		startd_free(c_cname, max_scf_value_size);
-
 		switch (scf_error()) {
 		case SCF_ERROR_DELETED:
 			ret = ENOENT;
@@ -2126,10 +2124,15 @@ libscf_get_template_values(scf_instance_t *inst, scf_snapshot_t *snap,
 		}
 
 		*c_common_name = c_cname;
+		c_common_name_initialized = B_TRUE;
 	}
 
 
 template_values_out:
+	if (common_name_initialized == B_FALSE)
+		startd_free(cname, max_scf_value_size);
+	if (c_common_name_initialized == B_FALSE)
+		startd_free(c_cname, max_scf_value_size);
 	scf_property_destroy(prop);
 	scf_pg_destroy(pg);
 

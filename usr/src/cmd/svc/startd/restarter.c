@@ -306,7 +306,7 @@ restarter_insert_inst(scf_handle_t *h, const char *name)
 	uu_list_index_t idx;
 	scf_service_t *scf_svc;
 	scf_instance_t *scf_inst;
-	scf_snapshot_t *snap;
+	scf_snapshot_t *snap = NULL;
 	scf_propertygroup_t *pg;
 	char *svc_name, *inst_name;
 	char logfilebuf[PATH_MAX];
@@ -358,6 +358,19 @@ restarter_insert_inst(scf_handle_t *h, const char *name)
 	inst_name = startd_alloc(max_scf_name_size);
 
 rep_retry:
+	if (snap != NULL)
+		scf_snapshot_destroy(snap);
+	if (inst->ri_logstem != NULL)
+		startd_free(inst->ri_logstem, PATH_MAX);
+	if (inst->ri_common_name != NULL)
+		startd_free(inst->ri_common_name, max_scf_value_size);
+	if (inst->ri_C_common_name != NULL)
+		startd_free(inst->ri_C_common_name, max_scf_value_size);
+	snap = NULL;
+	inst->ri_logstem = NULL;
+	inst->ri_common_name = NULL;
+	inst->ri_C_common_name = NULL;
+
 	if (scf_handle_decode_fmri(h, name, NULL, scf_svc, scf_inst, NULL,
 	    NULL, SCF_DECODE_FMRI_EXACT) != 0) {
 		switch (scf_error()) {
@@ -366,17 +379,7 @@ rep_retry:
 			goto rep_retry;
 
 		case SCF_ERROR_NOT_FOUND:
-deleted:
-			MUTEX_UNLOCK(&instance_list.ril_lock);
-			startd_free(inst_name, max_scf_name_size);
-			startd_free(svc_name, max_scf_name_size);
-			scf_pg_destroy(pg);
-			scf_instance_destroy(scf_inst);
-			scf_service_destroy(scf_svc);
-			startd_free((void *)inst->ri_i.i_fmri,
-			    strlen(inst->ri_i.i_fmri) + 1);
-			startd_free(inst, sizeof (restarter_inst_t));
-			return (ENOENT);
+			goto deleted;
 		}
 
 		uu_die("Can't decode FMRI %s: %s\n", name,
@@ -405,7 +408,6 @@ deleted:
 			abort();
 		}
 
-		scf_snapshot_destroy(snap);
 		goto deleted;
 	}
 
@@ -434,7 +436,6 @@ deleted:
 			goto rep_retry;
 
 		case SCF_ERROR_NOT_SET:
-			scf_snapshot_destroy(snap);
 			goto deleted;
 
 		case SCF_ERROR_NOT_FOUND:
@@ -491,8 +492,6 @@ deleted:
 		goto rep_retry;
 
 	case ECANCELED:
-		scf_snapshot_destroy(snap);
-		startd_free(inst->ri_utmpx_prefix, max_scf_value_size);
 		goto deleted;
 
 	case ENOENT:
@@ -521,9 +520,6 @@ deleted:
 		goto rep_retry;
 
 	case ECANCELED:
-		scf_snapshot_destroy(snap);
-		startd_free(inst->ri_common_name, max_scf_value_size);
-		inst->ri_common_name = NULL;
 		goto deleted;
 
 	case ECHILD:
@@ -546,7 +542,6 @@ deleted:
 		goto rep_retry;
 
 	case ECANCELED:
-		scf_snapshot_destroy(snap);
 		goto deleted;
 
 	default:
@@ -566,7 +561,6 @@ deleted:
 			goto rep_retry;
 
 		case ECANCELED:
-			scf_snapshot_destroy(snap);
 			goto deleted;
 
 		default:
@@ -585,7 +579,6 @@ deleted:
 			goto rep_retry;
 
 		case ECANCELED:
-			scf_snapshot_destroy(snap);
 			goto deleted;
 
 		default:
@@ -651,6 +644,27 @@ deleted:
 	    name);
 
 	return (0);
+
+deleted:
+	MUTEX_UNLOCK(&instance_list.ril_lock);
+	startd_free(inst_name, max_scf_name_size);
+	startd_free(svc_name, max_scf_name_size);
+	if (snap != NULL)
+		scf_snapshot_destroy(snap);
+	scf_pg_destroy(pg);
+	scf_instance_destroy(scf_inst);
+	scf_service_destroy(scf_svc);
+	startd_free((void *)inst->ri_i.i_fmri, strlen(inst->ri_i.i_fmri) + 1);
+	uu_list_destroy(inst->ri_queue);
+	if (inst->ri_logstem != NULL)
+		startd_free(inst->ri_logstem, PATH_MAX);
+	if (inst->ri_common_name != NULL)
+		startd_free(inst->ri_common_name, max_scf_value_size);
+	if (inst->ri_C_common_name != NULL)
+		startd_free(inst->ri_C_common_name, max_scf_value_size);
+	startd_free(inst->ri_utmpx_prefix, max_scf_value_size);
+	startd_free(inst, sizeof (restarter_inst_t));
+	return (ENOENT);
 }
 
 static void
