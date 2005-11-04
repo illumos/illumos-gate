@@ -1087,7 +1087,8 @@ typedef struct config_page_raid_vol_0 {
 	uint32_t		Reserved3;
 	uint8_t			NumPhysDisks;
 	uint8_t			Reserved4;
-	uint16_t		Reserved5;
+	uint8_t			ResyncRate;
+	uint8_t			Reserved5;
 	raid_vol0_phys_disk_t	PhysDisk[MPI_RAID_VOL_PAGE_0_PHYSDISK_MAX];
 } config_page_raid_vol_0_t;
 
@@ -1395,16 +1396,19 @@ typedef struct config_page_sas_expander_1 {
 
 typedef struct config_page_sas_device_0 {
 	config_extended_page_header_t	Header;
-	uint32_t			Reserved1;
+	uint16_t			Slot;
+	uint16_t			EnclosureHandle;
 	uint64_t			SASAddress;
-	uint32_t			Reserved2;
+	uint16_t			ParentDevHandle;
+	uint8_t				PhyNum;
+	uint8_t				AccessStatus;
 	uint16_t			DevHandle;
 	uint8_t				TargetID;
 	uint8_t				Bus;
 	uint32_t			DeviceInfo;
 	uint16_t			Flags;
 	uint8_t				PhysicalPort;
-	uint8_t				Reserved3;
+	uint8_t				Reserved2;
 } config_page_sas_device_0_t;
 
 #define	MPI_SASDEVICE0_PAGEVERSION		0x00

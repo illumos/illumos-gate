@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,8 @@ extern "C" {
 #define	RAID_CREATE		(RAID_IOC|2)	/* Create raid mirror */
 #define	RAID_DELETE		(RAID_IOC|3)	/* Delete raid mirror */
 #define	RAID_UPDATEFW		(RAID_IOC|4)	/* Update IOC firmware */
+#define	RAID_GETDEVID		(RAID_IOC|5)	/* Retrieve devid of chip */
+#define	RAID_NUMVOLUMES		(RAID_IOC|6)	/* Retrieve max RAID volumes */
 
 /*
  * define raid status flags
@@ -73,6 +75,7 @@ typedef struct raid_config {
 	int disk[RAID_MAXDISKS];
 	int diskstatus[RAID_MAXDISKS];
 	diskaddr_t raid_capacity;
+	int unitid;
 } raid_config_t;
 
 /*

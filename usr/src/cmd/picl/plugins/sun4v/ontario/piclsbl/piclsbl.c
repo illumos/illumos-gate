@@ -44,6 +44,11 @@
 #include <dlfcn.h>
 #include <link.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/param.h>
+#include <sys/raidioctl.h>
 #include <libpcp.h>
 #include "piclsbl.h"
 
@@ -52,6 +57,8 @@
 #pragma init(piclsbl_register)
 
 static void *pcp_handle;
+
+static char hba_devctl[MAXPATHLEN];
 
 static int (* pcp_init_ptr)();
 static int (* pcp_send_recv_ptr)();
@@ -106,6 +113,7 @@ cb_find_disk(picl_nodehdl_t node, void *args)
 {
 	disk_lookup_t *lookup  = (disk_lookup_t *)args;
 	int status = -1;
+	char *n;
 	char path[PICL_PROPNAMELEN_MAX];
 
 	status = ptree_get_propval_by_name(node, "Path", (void *)&path,
@@ -117,10 +125,67 @@ cb_find_disk(picl_nodehdl_t node, void *args)
 	if (strcmp(path, lookup->path) == 0) {
 		lookup->disk = node;
 		lookup->result = DISK_FOUND;
+
+		/* store the HBA's device path for use in check_raid() */
+		n = strstr(path, "/sd");
+		strncpy(n, "\0", 1);
+		(void) snprintf(hba_devctl, MAXPATHLEN, "/devices%s:devctl",
+				path);
+
 		return (PICL_WALK_TERMINATE);
 	}
 
 	return (PICL_WALK_CONTINUE);
+}
+
+/*
+ * check a target for RAID membership
+ */
+static int
+check_raid(int target)
+{
+	raid_config_t config;
+	int fd;
+	int numvols;
+	int i;
+	int j;
+
+	/*
+	 * hba_devctl is set to the onboard hba, so it will
+	 * always house any onboard RAID volumes
+	 */
+	if ((fd = open(hba_devctl, O_RDONLY)) < 0) {
+		syslog(LOG_ERR, "%s", strerror(errno));
+		return (0);
+	}
+
+	/*
+	 * look up the RAID configurations for the onboard
+	 * HBA and check target against all member targets
+	 */
+	if (ioctl(fd, RAID_NUMVOLUMES, &numvols)) {
+		syslog(LOG_ERR, "%s", strerror(errno));
+		(void) close(fd);
+		return (0);
+	}
+
+	for (i = 0; i < numvols; i++) {
+		config.unitid = i;
+		if (ioctl(fd, RAID_GETCONFIG, &config)) {
+			syslog(LOG_ERR, "%s", strerror(errno));
+			(void) close(fd);
+			return (0);
+		}
+
+		for (j = 0; j < config.ndisks; j++) {
+			if (config.disk[j] == target) {
+				(void) close(fd);
+				return (1);
+			}
+		}
+	}
+	(void) close(fd);
+	return (0);
 }
 
 /*
@@ -140,6 +205,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 	pcp_sbl_req_t	*req_ptr = NULL;
 	pcp_sbl_resp_t	*resp_ptr = NULL;
 	int		status = -1;
+	int		target;
 	disk_lookup_t	lookup;
 	int		channel_fd;
 
@@ -199,15 +265,28 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 		}
 	}
 
-	if (strcmp(hdd_location, HDD0) == 0)
+	if (strcmp(hdd_location, HDD0) == 0) {
 		req_ptr->sbl_id = PCP_SBL_HDD0;
-	else if (strcmp(hdd_location, HDD1) == 0)
+		target = 0;
+	} else if (strcmp(hdd_location, HDD1) == 0) {
 		req_ptr->sbl_id = PCP_SBL_HDD1;
-	else if (strcmp(hdd_location, HDD2) == 0)
+		target = 1;
+	} else if (strcmp(hdd_location, HDD2) == 0) {
 		req_ptr->sbl_id = PCP_SBL_HDD2;
-	else if (strcmp(hdd_location, HDD3) == 0)
+		target = 2;
+	} else if (strcmp(hdd_location, HDD3) == 0) {
 		req_ptr->sbl_id = PCP_SBL_HDD3;
-	else
+		target = 3;
+	} else {
+		/* this is not one of the onboard disks */
+		goto sbl_return;
+	}
+
+	/*
+	 * check the onboard RAID configuration for this disk. if it is
+	 * a member of a RAID and is not the RAID itself, ignore the event
+	 */
+	if (check_raid(target))
 		goto sbl_return;
 
 	/*
@@ -221,7 +300,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 		/* failed to init; wait and retry up to 3 times */
 		int s = PCPINIT_TIMEOUT;
 		int retries = 0;
-		while (retries++) {
+		while (++retries) {
 			(void) sleep(s);
 			if ((channel_fd = (*pcp_init_ptr)(LED_CHANNEL)) >= 0)
 				break;
@@ -289,6 +368,7 @@ piclsbl_handler(const char *ename, const void *earg, size_t size,
 		syslog(LOG_ERR, "piclsbl: OK2RM LED set to unknown state");
 
 sbl_return:
+
 	(*pcp_close_ptr)(channel_fd);
 	if (req_ptr != NULL)
 		umem_free(req_ptr, sizeof (pcp_sbl_req_t));

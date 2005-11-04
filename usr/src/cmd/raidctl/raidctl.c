@@ -26,7 +26,6 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
@@ -90,6 +89,10 @@ static int ctrl_nums = 0;
 #define	DO_HW_RAID_DELETE	2
 #define	DO_HW_RAID_FLASH	3
 
+/* values to use for raid level in raidctl */
+#define	RAID_STRIPE		0
+#define	RAID_MIRROR		1
+
 /*
  * Error return codes
  */
@@ -124,6 +127,12 @@ static int ctrl_nums = 0;
 #define	FW_ROM_OFFSET_VERSION		0x24	/* (U16) */
 #define	FW_ROM_OFFSET_VERSION_NAME	0x44	/* (32 U8) */
 
+/* ID's for supported chips */
+#define	LSI_1030	0x30
+#define	LSI_1064	0x50
+#define	LSI_1064E	0x56
+#define	LSI_1068E	0x58
+
 /* Key to search for when looking for fcode version */
 #define	FCODE_VERS_KEY1		0x12
 #define	FCODE_VERS_KEY2		0x7
@@ -132,20 +141,23 @@ static int ctrl_nums = 0;
 /* get a word from a buffer (works with non-word aligned offsets) */
 #define	gw(x) (((x)[0]) + (((x)[1]) << 8))
 
-/* Number of disks currently supported */
-#define	N_DISKS		2
+/* Number of disks currently supported, per RAID volume */
+#define	N_DISKS		8
+
+/* Maximum number of RAID volumes currently supported per HBA */
+#define	N_RAIDVOLS	2
 
 /*
  * Function and strings to properly localize our prompt.
  * So for example in german it would ask (ja/nein) or (yes/no) in
  * english.
  */
-static int	yes(int c);
+static int	yes(void);
 static char	yeschr[SCHAR_MAX + 2];
 static char	nochr[SCHAR_MAX +2];
 
 typedef struct raidlist {
-	raid_config_t	raid_config;
+	raid_config_t	raid_config[N_RAIDVOLS];
 	int	controller;
 	char	devctl[MAXPATHLEN];
 	struct raidlist *next;
@@ -153,14 +165,36 @@ typedef struct raidlist {
 
 static raidlist_t	*raids;
 
+/*
+ * usage: raidctl
+ * usage: raidctl [-f] -c primary secondary
+ * usage: raidctl [-f] -c -r 1 primary secondary
+ * usage: raidctl [-f] -c -r 0 disk1 disk2 [disk3] ...
+ * usage: raidctl [-f] -d volume
+ * usage: raidctl [-f] -F image_file controller
+ * usage: raidctl -l [controller...]
+ *   example:
+ *   raidctl -c c1t1d0 c1t2d0
+ *   raidctl -c -r 0 c1t1d0 c1t2d0 c1t3d0 c1t4d0
+ *   raidctl -d c1t1d0
+ *   raidctl -F image 1
+ */
 static void
 usage(char *prog_name)
 {
 	(void) fprintf(stderr, gettext("usage: %s\n"), prog_name);
 
-	(void) fprintf(stderr, gettext("usage: %s -c disk1 disk2\n"),
+	(void) fprintf(stderr, gettext("usage: %s [-f] -c primary secondary\n"),
 		prog_name);
-	(void) fprintf(stderr, gettext("usage: %s -d disk1\n"), prog_name);
+
+	(void) fprintf(stderr, gettext("usage: %s [-f] -c -r 1 primary "
+		"secondary\n"), prog_name);
+
+	(void) fprintf(stderr, gettext("usage: %s [-f] -c -r 0 disk1 disk2 "
+		"[disk3] ...\n"), prog_name);
+
+	(void) fprintf(stderr, gettext("usage: %s [-f] -d volume\n"),
+		prog_name);
 
 	(void) fprintf(stderr,
 		gettext("usage: %s [-f] -F image_file controller \n"),
@@ -171,6 +205,8 @@ usage(char *prog_name)
 
 	(void) fprintf(stderr, gettext("example:\n"));
 	(void) fprintf(stderr, "%s -c c1t1d0 c1t2d0\n", prog_name);
+	(void) fprintf(stderr, "%s -c -r 0 c1t1d0 c1t2d0 "
+		"c1t3d0 c1t4d0\n", prog_name);
 	(void) fprintf(stderr, "%s -d c1t1d0\n", prog_name);
 	(void) fprintf(stderr, "%s -F image 1\n", prog_name);
 
@@ -250,7 +286,9 @@ get_devctl(char *disk, char *b)
 
 	(void) snprintf(devctl_buf, MAXPATHLEN, "%s%s:devctl",
 		devctl_buf, devname);
+
 	(void) strlcpy(b, devctl_buf, MAXPATHLEN);
+
 	return (0);
 }
 
@@ -262,6 +300,7 @@ already_there(int controller)
 	while (curr != NULL) {
 		if (curr->controller == controller)
 			return (1);
+
 		curr = curr->next;
 	}
 
@@ -312,12 +351,13 @@ print_no_raids()
 static void
 add_raid_to_raidlist(char *ctrl_name, int controller)
 {
-	raid_config_t	config;
 	raidlist_t		*curr;
 	char			buf[MAXPATHLEN] = {0};
 	char			buf1[MAXPATHLEN] = {0};
+	int			nvols;
 	int			fd;
 	int			i;
+	int			n;
 
 	if (readlink(ctrl_name, buf, sizeof (buf)) < 0)
 		return;
@@ -330,16 +370,14 @@ add_raid_to_raidlist(char *ctrl_name, int controller)
 	 * listed as part of the command line input.
 	 */
 	if (info_ctrl != NULL) {
-		int found = 0;
 		for (i = 0; i < ctrl_nums; i++) {
 			if (info_ctrl[i][INFO_STATUS] == RAID_DONT_USE)
 				continue;
-			if (controller == info_ctrl[i][INFO_CTRL]) {
-				found = 1;
+			if (controller == info_ctrl[i][INFO_CTRL])
 				break;
-			}
 		}
-		if (!found)
+		/* return if we didn't find a controller */
+		if (i == ctrl_nums)
 			return;
 	}
 
@@ -350,54 +388,78 @@ add_raid_to_raidlist(char *ctrl_name, int controller)
 		return;
 	}
 
-	if (ioctl(fd, RAID_GETCONFIG, &config) < 0) {
+	/*
+	 * query the HBA driver for volume capacity
+	 */
+	if (ioctl(fd, RAID_NUMVOLUMES, &nvols) < 0) {
 		if (info_ctrl != NULL)
 			info_ctrl[i][INFO_STATUS] = RAID_NOT_SUPPORTED;
 		(void) close(fd);
-		/* Fail silently */
-		return;
-	}
-	(void) close(fd);
-
-	if (config.ndisks == 0) {
-		if (info_ctrl != NULL)
-			info_ctrl[i][INFO_STATUS] = RAID_NOT_FOUND;
 		return;
 	}
 
-	if (info_ctrl != NULL)
-		info_ctrl[i][INFO_STATUS] = RAID_FOUND;
+	/*
+	 * now iterate through nvols configurations
+	 */
+	for (n = 0; n < nvols; n++) {
+		raid_config_t		config;
 
-	if (raids == NULL) {
-		raids = (raidlist_t *)malloc(sizeof (raidlist_t));
-		curr = raids;
-	} else {
-		if (already_there(controller)) {
+		/* use unitid to retrieve this volume */
+		config.unitid = n;
+		if (ioctl(fd, RAID_GETCONFIG, &config) < 0) {
+			if (info_ctrl != NULL)
+				info_ctrl[i][INFO_STATUS] = RAID_NOT_SUPPORTED;
+			(void) close(fd);
 			return;
 		}
 
-		curr = raids;
-		/* Seek to the end */
-		while (curr->next != NULL)
+		/* if ndisks is 0, this volume is not configured */
+		if (config.ndisks == 0)
+			continue;
+
+		/* otherwise, we have a raid volume */
+		if (info_ctrl != NULL)
+			info_ctrl[i][INFO_STATUS] = RAID_FOUND;
+
+		/*
+		 * if raids has not been initialized, do it.
+		 * otherwise, see if this controller is in
+		 * raids.
+		 */
+		if (raids == NULL) {
+			raids = (raidlist_t *)malloc(sizeof (raidlist_t));
+			curr = raids;
+		} else {
+			curr = raids;
+			if (already_there(controller))
+				goto already_there;
+
+			/* add this controller to raids */
+			while (curr->next != NULL)
+				curr = curr->next;
+			curr->next = (raidlist_t *)malloc(sizeof (raidlist_t));
 			curr = curr->next;
+		}
 
-		curr->next = (raidlist_t *)malloc(sizeof (raidlist_t));
-		curr = curr->next;
+already_there:
+		curr->next = NULL;
+		curr->controller = controller;
+		(void) strlcpy(curr->devctl, buf1, sizeof (curr->devctl));
+		(void) fflush(stdout);
+		(void) memcpy(&curr->raid_config[n], &config,
+				(sizeof (raid_config_t)));
 	}
-	curr->next = NULL;
-	curr->controller = controller;
 
-	(void) strlcpy(curr->devctl, buf1, sizeof (curr->devctl));
-	(void) fflush(stdout);
-	(void) memcpy(&curr->raid_config, &config, sizeof (raid_config_t));
+	if (info_ctrl != NULL && info_ctrl[i][INFO_STATUS] != RAID_FOUND)
+		info_ctrl[i][INFO_STATUS] = RAID_NOT_FOUND;
 }
 
 static void
 print_header()
 {
-	(void) printf(gettext("RAID\t\tRAID\t\tRAID\t\tDisk"));
+	(void) printf(gettext("RAID\tVolume\tRAID\t\tRAID\t\tDisk"));
 	(void) printf("\n");
-	(void) printf(gettext("Volume\t\tStatus\t\tDisk\t\tStatus"));
+	(void) printf(gettext("Volume\tType\tStatus\t\tDisk\t\tStatus"));
 	(void) printf("\n");
 	(void) printf("------------------------------------------------------");
 	(void) printf("\n");
@@ -407,9 +469,16 @@ static void
 print_raidconfig(int c, raid_config_t config)
 {
 	int	i;
+	char	voltype[8];
 
-	/* Get RAID Volume */
-	(void) printf("c%dt%dd0\t\t", c, config.targetid);
+	/* print RAID volume target ID and volume type */
+	if (config.raid_level == RAID_STRIPE) {
+		(void) snprintf(voltype, sizeof (voltype), "IS");
+	} else if (config.raid_level == RAID_MIRROR) {
+		(void) snprintf(voltype, sizeof (voltype), "IM");
+	}
+
+	(void) printf("c%dt%dd0\t%s\t", c, config.targetid, voltype);
 
 	/* Get RAID Info */
 	if (config.flags & RAID_FLAG_RESYNCING &&
@@ -453,8 +522,15 @@ static void
 print_disklist()
 {
 	raidlist_t	*curr = raids;
+	int i;
+
 	while (curr != NULL) {
-		print_raidconfig(curr->controller, curr->raid_config);
+		for (i = 0; i < N_RAIDVOLS; i++) {
+			if (curr->raid_config[i].ndisks != 0) {
+				print_raidconfig(curr->controller,
+						curr->raid_config[i]);
+			}
+		}
 		curr = curr->next;
 	}
 }
@@ -557,6 +633,34 @@ do_info()
 }
 
 static int
+disk_in_raid(int c, int t)
+{
+	raidlist_t	*curr;
+	raid_config_t	raid;
+	int i, j, n;
+
+	do_search();
+	curr = raids;
+
+	while (curr != NULL) {
+		if (curr->controller == c) {
+			for (i = 0; i < N_RAIDVOLS; i++) {
+				raid = curr->raid_config[i];
+				if ((n = raid.ndisks) != 0) {
+					for (j = 0; j < n; j++) {
+						if (raid.disk[j] == t) {
+							return (1);
+						}
+					}
+				}
+			}
+		}
+		curr = curr->next;
+	}
+	return (0);
+}
+
+static int
 disk_there(int c, int t)
 {
 	char	disk[100];
@@ -601,6 +705,7 @@ disk_mounted(char *d)
 	while (getmntent(f, &mt) != EOF)
 		if (strstr(mt.mnt_special, d) != NULL)
 			return (1);
+
 	return (0);
 }
 
@@ -609,17 +714,18 @@ disk_big_enough(char **d, diskaddr_t *cap, int *errcond)
 {
 	struct dk_minfo minfo;
 	char		disk[N_DISKS][MAXPATHLEN];
-	diskaddr_t	disk_lbsize[N_DISKS];
+	uint_t		disk_lbsize[N_DISKS];
 	diskaddr_t	disk_capacity[N_DISKS];
 	int		i, fd;
 
 	for (i = 0; i < N_DISKS; i++) {
-		(void) snprintf(disk[i], sizeof (disk[i]), DEVDIR"/%ss2", d[i]);
-		fd = open(disk[i],  O_RDWR | O_NDELAY);
-		if (fd == -1) {
-			return (FAILURE);
-		}
+		if (d[i] == NULL)
+			break;
 
+		(void) snprintf(disk[i], sizeof (disk[i]), DEVDIR"/%ss2", d[i]);
+		fd = open(disk[i], O_RDWR | O_NDELAY);
+		if (fd == -1)
+			return (FAILURE);
 		if (ioctl(fd, DKIOCGMEDIAINFO, &minfo) == -1) {
 			(void) close(fd);
 			return (FAILURE);
@@ -627,22 +733,25 @@ disk_big_enough(char **d, diskaddr_t *cap, int *errcond)
 
 		disk_lbsize[i] = minfo.dki_lbsize;
 		disk_capacity[i] = minfo.dki_capacity;
+
+		/* lbsize must be the same on all disks */
+		if (disk_lbsize[0] != disk_lbsize[i]) {
+			*errcond = 2;
+			return (INVALID_ARG);
+		}
+
+		/* ensure drive capacity is greater than or equal to first */
+		if (disk_capacity[0] > disk_capacity[i]) {
+			*errcond = 1;
+			return (INVALID_ARG);
+		}
 		(void) close(fd);
 	}
 
-	/* lbsize must be the same on both disks */
-	if (disk_lbsize[0] != disk_lbsize[1]) {
-		*errcond = 2;
-		return (INVALID_ARG);
-	}
-
-	/* secondary size is not greater than or equal to primary size */
-	if (disk_capacity[0] > disk_capacity[1]) {
-		*errcond = 1;
-		return (INVALID_ARG);
-	}
-
-	/* Secondary disk is big enough */
+	/*
+	 * setting capacity as the dk_minfo.dki_capacity of d[0]
+	 *   this is the number of dki_lbsize blocks on disk
+	 */
 	*cap = disk_capacity[0];
 	return (SUCCESS);
 }
@@ -687,69 +796,89 @@ do_config_change_state(cfga_cmd_t cmd, int d, int c)
 }
 
 static int
-do_create(char **d)
+do_create(char **d, int rlevel, int force)
 {
 	raid_config_t	config;
+	raid_config_t	newvol;
 	char		disk[N_DISKS][MAXPATHLEN] = {0};
+	int		map[N_DISKS];
 	char		channel1[MAXPATHLEN];
 	char		channel2[MAXPATHLEN];
 	diskaddr_t	capacity;
-	int		fd, fd2, size, errcond, disk_here = 1;
+	int		fd, fd2, size, errcond;
 	int		c[N_DISKS];
 	int		t[N_DISKS];
 	char		*tmp;
-	int		i;
+	int		loc, i, devid, n, ndisks = 0;
 
 	(void) chdir(DEVDIR);
 
+	/* initialize target map */
+	for (i = 0; i < N_DISKS; i++)
+		map[i] = -1;
+
 	for (i = 0; i < N_DISKS; i++) {
+		if (d[i] == NULL)
+			break;
+
 		if ((sscanf(d[i], "c%dt%dd0", &c[i], &t[i])) != 2 ||
 		    t[i] < 0) {
 			(void) fprintf(stderr,
 				gettext("Invalid disk format.\n"));
 			return (INVALID_ARG);
 		}
+
+		/* ensure that all disks are on the same controller, */
+		if (c[i] != c[0]) {
+			(void) fprintf(stderr, gettext("Disks must be "
+					"on the same controller.\n"));
+			return (INVALID_ARG);
+		}
+
+		/* that all disks are online, */
+		if (disk_there(c[0], t[i])) {
+			(void) printf(gettext("Disk 'c%dt%dd0' is not "
+				"present.\n"), c[0], t[i]);
+			(void) printf(gettext("Cannot create RAID volume.\n"));
+			return (INVALID_ARG);
+		}
+
+		/* that there are no duplicate disks, */
+		loc = t[i];
+		if (map[loc] == -1) {
+			map[loc] = t[i];
+		} else {
+			(void) fprintf(stderr,
+				gettext("Disks must be different.\n"));
+			return (INVALID_ARG);
+		}
+
+		/* that no disk is already in use by another volume, */
+		if (disk_in_raid(c[0], t[i])) {
+			(void) fprintf(stderr, gettext("Disk %s is already in "
+				"a RAID volume.\n"), d[i]);
+			return (INVALID_ARG);
+		}
+
+		/* that no target's id is lower than the raidtarg, */
+		if (t[0] > t[i]) {
+			(void) fprintf(stderr, gettext("First target ID must "
+				"be less than other member target IDs.\n"));
+			return (INVALID_ARG);
+		}
+
 		(void) snprintf(disk[i], sizeof (disk[i]), DEVDIR"/%ss2", d[i]);
+		ndisks++;
 	}
 
-	/* Must be on same controller */
-	if (c[0] != c[1]) {
-		(void) fprintf(stderr,
-			gettext("Disks must be on the same controller.\n"));
+	/* confirm minimum number of disks */
+	if (ndisks < 2) {
+		(void) fprintf(stderr, gettext("At least two disks are required"
+			" for RAID creation.\n"));
 		return (INVALID_ARG);
 	}
 
-	/* primary disk target must be lower than secondary disk target */
-	if (t[0] > t[1]) {
-		(void) fprintf(stderr, gettext("Primary target ID "
-				"must be less than secondary target ID.\n"));
-		return (INVALID_ARG);
-	}
-
-	/* disks must not be the same */
-	if (t[0] == t[1]) {
-		(void) fprintf(stderr, gettext("Disks must be different.\n"));
-		return (INVALID_ARG);
-	}
-
-	/* disks must be present */
-	if (disk_there(c[0], t[0])) {
-		(void) printf(gettext("Disk 'c%dt%dd0' is not present.\n"),
-			c[0], t[0]);
-		disk_here = 0;
-	}
-	if (disk_there(c[1], t[1])) {
-		(void) printf(gettext("Disk 'c%dt%dd0' is not present.\n"),
-			c[0], t[1]);
-		disk_here = 0;
-	}
-
-	if (!disk_here) {
-		(void) printf(gettext("Cannot create RAID volume.\n"));
-		return (INVALID_ARG);
-	}
-
-	/* secondary disk's size must be greater or equal to primary disk's */
+	/* validate the drive capacities */
 	switch (disk_big_enough(d, &capacity, &errcond)) {
 	case FAILURE:
 		return (FAILURE);
@@ -766,14 +895,14 @@ do_create(char **d)
 		return (INVALID_ARG);
 	}
 
-	/* secondary disk must not be mounted */
-	if (disk_mounted(d[1])) {
-		(void) fprintf(stderr, gettext("Cannot create RAID volume when "
-				"secondary disk \"%s\" is mounted.\n"), d[1]);
-		return (INVALID_ARG);
-	}
+	/*
+	 * capacity is now set to the number of blocks on a disk, which is
+	 * the total capacity of a mirror.  the capacity of a stripe is the
+	 * cumulative amount of blocks on all disks
+	 */
+	if (rlevel == RAID_STRIPE)
+		capacity *= ndisks;
 
-	/* Only one RAID can exist per controller */
 	if (get_devctl(disk[0], channel1))
 		return (FAILURE);
 
@@ -783,20 +912,113 @@ do_create(char **d)
 		return (FAILURE);
 	}
 
+	/*
+	 * query the HBA driver for volume capacity
+	 */
+	if (ioctl(fd, RAID_NUMVOLUMES, &n) < 0) {
+		raidctl_error("RAID_NUMVOLUMES");
+		goto fail;
+	}
+
+	/*
+	 * current support for both LSI1030 and LSI1064/1068 HBAs
+	 */
+	if (ioctl(fd, RAID_GETDEVID, &devid) < 0) {
+		raidctl_error("RAID_GETDEVID");
+		goto fail;
+	}
+
+	if ((devid == LSI_1064) || (devid == LSI_1064E) || (devid ==
+	    LSI_1068E)) {
+		/*
+		 * no secondary channel, just check to make
+		 * sure we can fit a new volume
+		 */
+		for (i = 0; i < n; i++) {
+			config.unitid = i;
+			if (ioctl(fd, RAID_GETCONFIG, &config) < 0) {
+				raidctl_error("RAID_GETCONFIG");
+				goto fail;
+			}
+
+			if (config.ndisks == 0)
+				break;
+		}
+
+		if (i == n) {
+			(void) printf(gettext("HBA supports a maximum of %d "
+				"RAID Volumes, HBA is full\n"), n);
+			goto fail;
+		}
+
+		/*
+		 * we have the capacity to add a volume, now confirm the
+		 * creation. the 1064 uses a much larger metadata region
+		 * than the 1030 (64MB, as opposed to 16KB).  this larger
+		 * reservation is enough to alter the disk label. therefore,
+		 * once the volume is created, it must be relabeled.
+		 * first, confirm that no file systems are mounted, as
+		 * we will be pulling the disk out from under them
+		 */
+		for (i = 0; i < ndisks; i++) {
+			if (disk_mounted(d[i])) {
+				(void) fprintf(stderr, gettext("Cannot create "
+					"RAID volume, disk \"%s\" is mounted "
+					".\n"), d[i]);
+				return (INVALID_ARG);
+			}
+		}
+
+		/*
+		 * will not support data migration or disk relabeling with
+		 * this utility, and so next we must confirm the creation as
+		 * all data on member disks will be lost.
+		 */
+		if (!force) {
+			(void) fprintf(stderr, gettext("Creating RAID volume "
+			    "c%dt%dd0 will destroy all data on member disks, "
+			    "proceed (%s/%s)? "), c[0], t[0], yeschr, nochr);
+			if (!yes()) {
+				(void) fprintf(stderr, gettext("RAID volume "
+				    "c%dt%dd0 not created.\n\n"), c[0], t[0]);
+				(void) close(fd);
+				return (SUCCESS);
+			}
+		}
+
+		/*
+		 * we are ready to move onto the creation
+		 */
+		goto no_secondary_channel;
+	}
+
+	/*
+	 * LSI1030, support for single IM volume
+	 */
+	if (rlevel != RAID_MIRROR) {
+		(void) printf(gettext("HBA only supports RAID "
+			"level 1 (mirrored) volumes\n"));
+		goto fail;
+	}
+	/*
+	 * look up the volume configuration
+	 */
+	config.unitid = n;
 	if (ioctl(fd, RAID_GETCONFIG, &config) < 0) {
 		raidctl_error("RAID_GETCONFIG");
-		goto fail1;
+		goto fail;
 	}
 
 	if (config.ndisks != 0) {
-		(void) printf(gettext("RAID Volume already exists on this "
-			"controller 'c%dt%dd0'\n"), c[0], config.targetid);
-		goto fail1;
+		(void) printf(gettext("RAID Volume already exists "
+			"on this controller 'c%dt%dd0'\n"),
+			c[0], config.targetid);
+		goto fail;
 	}
 
 	/*
 	 * Make sure there isn't a raid created on this controller's
-	 * other channel
+	 * other channel, if it has multiple channels
 	 */
 	(void) strlcpy(channel2, channel1, sizeof (channel2));
 	tmp = strrchr(channel2, ':');
@@ -804,20 +1026,29 @@ do_create(char **d)
 	size = strlen(channel2);
 
 	/*
+	 * Make sure that the secondary disk is not mounted
+	 */
+	if (disk_mounted(disk[1])) {
+		(void) fprintf(stderr, gettext("Cannot create RAID volume when "
+			"secondary disk \"%s\" is mounted.\n"), disk[1]);
+		return (INVALID_ARG);
+	}
+
+	/*
 	 * Format the channel string for the other channel so we can
-	 * see if a raid exists on it.  In this case if we are being asked
-	 * to create a raid on channel 2 (indicated by the 1,1 at the end
-	 * of the string) we want to check channel 1) otherwise we will
-	 * check channel 2.
+	 * see if a raid exists on it.  In this case if we are being
+	 * asked to create a raid on channel 2 (indicated by the 1,1
+	 * at the end of the string) we want to check channel 1),
+	 * otherwise we will check channel 2.
 	 */
 	if (channel2[size - 2] == ',') {
 		channel2[size - 1] = 0;
 		channel2[size - 2] = 0;
-		(void) snprintf(channel2, sizeof (channel2), "%s:devctl",
-			channel2);
+		(void) snprintf(channel2, sizeof (channel2),
+				"%s:devctl", channel2);
 	} else {
-		(void) snprintf(channel2, sizeof (channel2), "%s,1:devctl",
-			channel2);
+		(void) snprintf(channel2, sizeof (channel2),
+				"%s,1:devctl", channel2);
 	}
 
 	fd2 = open(channel2, O_RDONLY);
@@ -825,42 +1056,49 @@ do_create(char **d)
 		if (errno == ENOENT)
 			goto no_secondary_channel;
 		perror(channel2);
-		goto fail1;
+		goto fail;
 	}
 
 	if (ioctl(fd2, RAID_GETCONFIG, &config) < 0) {
-		goto fail2;
+		goto fail;
 	}
 
 	if (config.ndisks != 0) {
 		int	cx;
 		cx = get_controller(channel2);
-		(void) printf(gettext("RAID Volume already exists on this "
-			"controller 'c%dt%dd0'\n"), cx, config.targetid);
-		goto fail2;
+		(void) printf(gettext("RAID Volume already exists "
+			"on this controller 'c%dt%dd0'\n"), cx,
+			config.targetid);
+		goto fail;
 	}
 
 no_secondary_channel:
 
-	/* No other RAID volumes exist, so we may continue */
-	config.raid_capacity = capacity;
-	config.raid_level = 1;	/* RAID 1: Mirror */
-	config.targetid = t[0];	/* Assume identity of first disk */
-	config.disk[0] = t[0];	/* Primary Disk */
-	config.disk[1] = t[1];	/* Secondary Disk */
+	/* all checks complete, fill in the config */
+	newvol.targetid = t[0];
+	newvol.disk[0] = t[0];
+	newvol.raid_level = rlevel;
+	newvol.ndisks = ndisks;
+	newvol.raid_capacity = capacity;
 
-	/* Make secondary disk inaccessible to the system */
-	if (do_config_change_state(CFGA_CMD_UNCONFIGURE,
-		config.disk[1], c[0])) {
-		perror("config_change_state");
-		goto fail2;
+	/* populate config.disk, and unconfigure all disks, except targetid */
+	for (i = 1; i < ndisks; i++) {
+		if (do_config_change_state(CFGA_CMD_UNCONFIGURE,
+		    t[i], c[0])) {
+			perror("config_change_state");
+			goto fail;
+		}
+		newvol.disk[i] = t[i];
 	}
 
-	if (ioctl(fd, RAID_CREATE, &config)) {
-		(void) do_config_change_state(CFGA_CMD_CONFIGURE,
-			config.disk[1], c[0]);
+	if (ioctl(fd, RAID_CREATE, &newvol)) {
+		/* reconfigure all disks, except targetid */
+		for (i = 1; i < ndisks; i++) {
+			(void) do_config_change_state(CFGA_CMD_CONFIGURE,
+				newvol.disk[i], c[0]);
+		}
 		raidctl_error("RAID_CREATE");
-		goto fail2;
+		goto fail;
 	}
 
 	(void) printf(gettext("Volume 'c%dt%dd0' created\n"), c[0], t[0]);
@@ -868,15 +1106,14 @@ no_secondary_channel:
 	(void) close(fd2);
 	return (SUCCESS);
 
-fail2:
-	(void) close(fd2);
-fail1:
+fail:
 	(void) close(fd);
+	(void) close(fd2);
 	return (FAILURE);
 }
 
 static int
-do_delete(char *d)
+do_delete(char *d, int force)
 {
 	raid_config_t	config;
 	char		disk1[MAXPATHLEN];
@@ -884,6 +1121,9 @@ do_delete(char *d)
 	int		fd;
 	int		target;
 	int		ctrl;
+	int		i, j;
+	int		wrong_targ = 0;
+	int		nvols;
 	uint8_t		t;
 
 	(void) chdir(DEVDIR);
@@ -897,6 +1137,7 @@ do_delete(char *d)
 	(void) snprintf(disk1, sizeof (disk1), DEVDIR"/%ss2", d);
 
 	if (get_devctl(disk1, buf) != 0) {
+		(void) fprintf(stderr, gettext("Not a volume '%s'\n"), d);
 		return (FAILURE);
 	}
 
@@ -906,22 +1147,62 @@ do_delete(char *d)
 		return (FAILURE);
 	}
 
-	if (ioctl(fd, RAID_GETCONFIG, &config)) {
-		raidctl_error("RAID_GETCONFIG");
+	if (ioctl(fd, RAID_NUMVOLUMES, &nvols)) {
+		raidctl_error("RAID_NUMVOLUMES");
 		goto fail;
 	}
 
-	if (config.ndisks == 0) {
-		(void) fprintf(stderr, gettext("No RAID Volume exists on "
+	for (i = 0; i < nvols; i++) {
+		config.unitid = i;
+		if (ioctl(fd, RAID_GETCONFIG, &config)) {
+			raidctl_error("RAID_GETCONFIG");
+			goto fail;
+		}
+		if (config.ndisks != 0) {
+			/* there is a RAID volume in this slot */
+			if (config.targetid != t) {
+				wrong_targ++;
+				continue;
+			}
+			/* and it's our target */
+			break;
+		}
+	}
+
+	if (i == nvols) {
+		/* we found no RAID volumes */
+		(void) fprintf(stderr, gettext("No RAID volumes exist on "
 			"controller '%d'\n"), ctrl);
 		goto fail;
 	}
 
-	if (config.targetid != t) {
+	if (wrong_targ == nvols) {
+		/* we found RAID volumes, but none matched */
 		(void) fprintf(stderr,
 			gettext("RAID volume 'c%dt%dd0' does not exist\n"),
 			ctrl, t);
 		goto fail;
+	}
+
+	/* if this volume is a stripe, all data will be lost */
+	if (config.raid_level == RAID_STRIPE) {
+		if (disk_mounted(d)) {
+			(void) fprintf(stderr, gettext("Cannot delete "
+				"RAID0 volume, \"%s\" is mounted.\n"), d);
+			return (INVALID_ARG);
+		}
+
+		if (!force) {
+			(void) fprintf(stderr, gettext("Deleting volume "
+				"c%dt%dd0 will destroy all data it contains, "
+				"proceed (%s/%s)? "), ctrl, t, yeschr, nochr);
+			if (!yes()) {
+				(void) fprintf(stderr, gettext("RAID volume "
+					"c%dt%dd0 not deleted.\n\n"), ctrl, t);
+				(void) close(fd);
+				return (SUCCESS);
+			}
+		}
 	}
 
 	if (ioctl(fd, RAID_DELETE, &t)) {
@@ -929,11 +1210,11 @@ do_delete(char *d)
 		goto fail;
 	}
 
-	/*
-	 * Make secondary disk accessible to the system.
-	 * Ignore return value from do_config_change_state.
-	 */
-	(void) do_config_change_state(CFGA_CMD_CONFIGURE, config.disk[1], ctrl);
+	/* reconfigure all disks, except targetid */
+	for (j = 1; j < config.ndisks; j++) {
+		(void) do_config_change_state(CFGA_CMD_CONFIGURE,
+			config.disk[j], ctrl);
+	}
 
 	(void) fprintf(stderr, gettext("Volume 'c%dt%dd0' deleted.\n"),
 		ctrl, target);
@@ -1219,7 +1500,7 @@ readfile(char *filespec, uint8_t **rombuf, uint32_t *nbytes, uint32_t *chksum)
 }
 
 static int
-yes(int c)
+yes(void)
 {
 	int	i, b;
 	char    ans[SCHAR_MAX + 1];
@@ -1237,13 +1518,10 @@ yes(int c)
 		i = SCHAR_MAX;
 		ans[SCHAR_MAX] = 0;
 	}
-	if ((i != 0) && ((strncmp(yeschr, ans, i)) == 0)) {
+	if ((i != 0) && ((strncmp(yeschr, ans, i)) == 0))
 		return (1);
-	} else {
-		(void) fprintf(stderr, gettext("User response is \"%s\", "
-		    "Controller %d not flashed.\n\n"), ans, c);
-		return (0);
-	}
+
+	return (0);
 }
 
 static int
@@ -1288,7 +1566,9 @@ do_flash(int c, char *fpath, int force)
 	if (!force) {
 		(void) fprintf(stderr, gettext("Update flash image on "
 			"controller %d (%s/%s)? "), c, yeschr, nochr);
-		if (!yes(c)) {
+		if (!yes()) {
+			(void) fprintf(stderr, gettext("Controller %d not "
+			    "flashed.\n\n"), c);
 			return (SUCCESS);
 		}
 	}
@@ -1348,9 +1628,10 @@ main(int argc, char **argv)
 	int	i, c;
 	int	findex = DO_HW_RAID_INFO;
 	int	controller;
-	char	*disks[N_DISKS];
+	char	*disks[N_DISKS] = {0};
 	char	*darg;
 	char	*farg;
+	char	*rarg;
 	char	*progname;
 
 	int	l_flag = 0;
@@ -1358,7 +1639,9 @@ main(int argc, char **argv)
 	int	d_flag = 0;
 	int	f_flag = 0;
 	int	F_flag = 0;
+	int	r_flag = 0;
 	int	no_flags = 1;
+	int	r = RAID_MIRROR;  /* default raid level is 1 */
 	char	*current_dir;
 
 	(void) setlocale(LC_ALL, "");
@@ -1379,16 +1662,21 @@ main(int argc, char **argv)
 	(void) strncpy(yeschr, nl_langinfo(YESSTR), SCHAR_MAX + 1);
 	(void) strncpy(nochr, nl_langinfo(NOSTR), SCHAR_MAX + 1);
 
-	while ((c = getopt(argc, argv, "clfd:F:")) != EOF) {
+	while ((c = getopt(argc, argv, "cr:lfd:F:")) != EOF) {
 		switch (c) {
 		case 'c':
-			if (f_flag || argc != 4) {
+			if (argc < 4)
 				usage(progname);
-			}
-
 			findex = DO_HW_RAID_CREATE;
 			c_flag = 1;
 			no_flags = 0;
+			break;
+		case 'r':
+			rarg = optarg;
+			r = atoi(rarg);
+			if ((r != RAID_STRIPE) && (r != RAID_MIRROR))
+				usage(progname);
+			r_flag = 1;
 			break;
 		case 'd':
 			darg = optarg;
@@ -1411,7 +1699,8 @@ main(int argc, char **argv)
 			f_flag = 1;
 			no_flags = 0;
 			break;
-		case '?': default:
+		case '?':
+		default:
 			usage(progname);
 		}
 	}
@@ -1422,9 +1711,9 @@ main(int argc, char **argv)
 	/* compatibility rules */
 	if (c_flag && d_flag)
 		usage(progname);
-	if (l_flag && (d_flag || c_flag || f_flag || F_flag))
+	if (l_flag && (d_flag || c_flag || f_flag || F_flag || r_flag))
 		usage(progname);
-	if (F_flag && (d_flag || c_flag || l_flag))
+	if (F_flag && (d_flag || c_flag || l_flag || r_flag))
 		usage(progname);
 
 	switch (findex) {
@@ -1470,25 +1759,30 @@ main(int argc, char **argv)
 		break;
 	case DO_HW_RAID_CREATE:
 		for (i = 0; i < N_DISKS; i++) {
-			disks[i] = argv[argc - 2 + i];
+			int p = 2 + (r_flag * 2) + f_flag + i;
+
+			if (p == argc)
+				break;
+
+			disks[i] = argv[p];
+
 			if (!canonical_name(disks[i]))
 				usage(progname);
+
+			/* no more than 2 disks for raid level 1 */
+			if ((r == RAID_MIRROR) && (i > 1))
+				usage(progname);
 		}
-		rv = do_create(disks);
+
+		rv = do_create(disks, r, f_flag);
 		break;
 	case DO_HW_RAID_DELETE:
 		if (!canonical_name(darg))
 			usage(progname);
 
-		rv = do_delete(darg);
+		rv = do_delete(darg, f_flag);
 		break;
 	case DO_HW_RAID_FLASH:
-		/*
-		 * "raidctl"	makes argc == 1
-		 * "-F"		makes argc == 2
-		 * "filename"	makes argc == 3
-		 * "-f"		makes argc == 4 if added.
-		 */
 		ctrl_nums = argc - f_flag - 3;
 		if (ctrl_nums == 0)
 			usage(progname);

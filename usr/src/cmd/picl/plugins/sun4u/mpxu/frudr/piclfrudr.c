@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1918,7 +1918,6 @@ update_disk_node(char *fruname, char *devpath)
 	}
 }
 
-
 static int
 get_raid_config(raid_config_t *config)
 {
@@ -1939,6 +1938,12 @@ get_raid_config(raid_config_t *config)
 		return (1);
 	}
 
+	/*
+	 * We are running on chalupa, so we know just a single
+	 * RAID volume is supported. We can go ahead and
+	 * explicitly request the unitid 0 RAID volume.
+	 */
+	config->unitid = 0;
 	if (ioctl(fd, RAID_GETCONFIG, config)) {
 		syslog(LOG_ERR, "%s", strerror(errno));
 		(void) close(fd);
@@ -1946,7 +1951,6 @@ get_raid_config(raid_config_t *config)
 	}
 
 	(void) close(fd);
-
 	return (0);
 }
 
