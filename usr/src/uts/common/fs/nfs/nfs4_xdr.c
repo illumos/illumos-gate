@@ -195,8 +195,8 @@ xdr_inline_encode_nfs_fh4(uint32_t **ptrp, uint32_t *ptr_redzone,
 	ptr[padword] = 0;
 
 	/* fh4_fsid */
-	IXDR_PUT_INT32(ptr, fhp->fh4_fsid.val[0]);
-	IXDR_PUT_INT32(ptr, fhp->fh4_fsid.val[1]);
+	*ptr++ = (uint32_t)fhp->fh4_fsid.val[0];
+	*ptr++ = (uint32_t)fhp->fh4_fsid.val[1];
 
 	/*
 	 * Since the next pieces are unaligned, we need to
@@ -226,11 +226,11 @@ xdr_inline_encode_nfs_fh4(uint32_t **ptrp, uint32_t *ptr_redzone,
 	ASSERT(((uintptr_t)ptr % BYTES_PER_XDR_UNIT) == 0);
 
 	/* fh4_flag */
-	IXDR_PUT_INT32(ptr, fhp->fh4_flag);
+	*ptr++ = (uint32_t)fhp->fh4_flag;
 
 #ifdef VOLATILE_FH_TEST
 	/* fh4_volatile_id */
-	IXDR_PUT_INT32(ptr, fhp->fh4_volatile_id);
+	*ptr++ = (uint32_t)fhp->fh4_volatile_id;
 #endif
 	*ptrp = ptr;
 
@@ -278,10 +278,9 @@ xdr_decode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 	/*
 	 * Decode what should be fh4_fsid.
 	 */
-	if (!XDR_GETINT32(xdrs, (int32_t *)&fh_fmtp->fh4_fsid.val[0]))
+	if (!XDR_GETBYTES(xdrs, (caddr_t)&fh_fmtp->fh4_fsid, sizeof (fsid_t)))
 		return (FALSE);
-	if (!XDR_GETINT32(xdrs, (int32_t *)&fh_fmtp->fh4_fsid.val[1]))
-		return (FALSE);
+
 	fhsize -= sizeof (fsid_t);
 
 	/*
@@ -402,9 +401,7 @@ xdr_encode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 	if (!XDR_PUTINT32(xdrs, (int32_t *)&otwsize))
 		return (FALSE);
 
-	if (!XDR_PUTINT32(xdrs, (int32_t *)&fh_fmtp->fh4_fsid.val[0]))
-		return (FALSE);
-	if (!XDR_PUTINT32(xdrs, (int32_t *)&fh_fmtp->fh4_fsid.val[1]))
+	if (!XDR_PUTBYTES(xdrs, (caddr_t)&fh_fmtp->fh4_fsid, sizeof (fsid_t)))
 		return (FALSE);
 
 	if (!XDR_PUTBYTES(xdrs, (caddr_t)&fh_fmtp->fh4_len, fsize +
@@ -425,11 +422,12 @@ xdr_encode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 		if (!XDR_PUTBYTES(xdrs, (caddr_t)&zero_word, rsize - dsize))
 			return (FALSE);
 
-	if (!XDR_PUTINT32(xdrs, (int32_t *)&fh_fmtp->fh4_flag))
+	if (!XDR_PUTBYTES(xdrs, (caddr_t)&fh_fmtp->fh4_flag, sizeof (uint32_t)))
 		return (FALSE);
 
 #ifdef VOLATILE_FH_TEST
-	if (!XDR_PUTINT32(xdrs, (int32_t *)&fh_fmtp->fh4_volatile_id))
+	if (!XDR_PUTBYTES(xdrs, (caddr_t)&fh_fmtp->fh4_volatile_id,
+	    sizeof (uint32_t)))
 		return (FALSE);
 #endif
 
