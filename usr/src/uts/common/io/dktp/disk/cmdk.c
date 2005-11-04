@@ -574,7 +574,7 @@ cmdkdump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
 	bp->b_flags = B_BUSY;
 	bp->b_un.b_addr = addr;
 	bp->b_bcount = nblk << SCTRSHFT;
-	SET_BP_SEC(bp, (p_lblksrt + blkno));
+	SET_BP_SEC(bp, ((ulong_t)(p_lblksrt + blkno)));
 
 	(void) dadk_dump(DKTP_DATA, bp);
 	return (bp->b_error);
@@ -1089,7 +1089,7 @@ cmdkstrategy(struct buf *bp)
 		bp->b_bcount -= bp->b_resid;
 	}
 
-	SET_BP_SEC(bp, (p_lblksrt + dkblock(bp)));
+	SET_BP_SEC(bp, ((ulong_t)(p_lblksrt + dkblock(bp))));
 	if (dadk_strategy(DKTP_DATA, bp) != DDI_SUCCESS) {
 		bp->b_resid += bp->b_bcount;
 		biodone(bp);
