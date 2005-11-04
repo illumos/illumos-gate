@@ -1649,7 +1649,6 @@ genent_group(char *line, int (*cback)())
 	entry_col ecol[5];
 
 	struct group	data;
-	char *memb;
 	int ctr = 0;
 	int retval = 1;
 	int rc = GENENT_OK;
@@ -1737,29 +1736,36 @@ genent_group(char *line, int (*cback)())
 
 	data.gr_mem = NULL;
 
+	/* Compute maximum amount of members */
+	s = t;
+	while (s = strchr(s, ',')) {
+		s++;
+		ctr++;
+	}
+
+	/* Allocate memory for all members */
+	data.gr_mem = calloc(ctr + 2, sizeof (char **));
+	if (data.gr_mem == NULL) {
+		(void) fprintf(stderr, gettext("out of memory\n"));
+		exit(1);
+	}
+
+	ctr = 0;
 	while (s = strchr(t, ',')) {
 
 		*s++ = 0;
 		ecol[3].ec_value.ec_value_val = t;
 		t = s;
-		ctr++;
-		memb = strdup(ecol[3].ec_value.ec_value_val);
-		if ((data.gr_mem = (char **)realloc(data.gr_mem,
-			ctr * sizeof (char **))) == NULL) {
-			(void) fprintf(stderr, gettext("out of memory\n"));
-			exit(1);
-		}
-		data.gr_mem[ctr-1] = memb;
+		/* Send to server only non empty member names */
+		if (strlen(ecol[3].ec_value.ec_value_val) != 0)
+			data.gr_mem[ctr++] = ecol[3].ec_value.ec_value_val;
 	}
 
-	/* End the list of all the aliases by NULL */
-	if ((data.gr_mem = (char **)realloc(data.gr_mem,
-		(ctr + 2) * sizeof (char **))) == NULL) {
-		(void) fprintf(stderr, gettext("out of memory\n"));
-		exit(1);
-	}
-	data.gr_mem[ctr] = t;
-	data.gr_mem[ctr+1] = NULL;
+	/* Send to server only non empty member names */
+	if (strlen(t) != 0)
+		data.gr_mem[ctr++] = t;
+
+	/* Array of members completed, finished by NULL, see calloc() */
 
 	if (flags & F_VERBOSE)
 		(void) fprintf(stdout,
@@ -3985,7 +3991,8 @@ main(int argc, char **argv)
 		(void) fprintf(stdout, gettext("%d entries added\n"), nent_add);
 	}
 
-	exit(exit_val);
+	/* exit() -> return for make lint */
+	return (exit_val);
 }
 
 
