@@ -140,7 +140,8 @@ installed_top_size(
 /*
  * Copy in a memory list from boot to kernel, with a filter function
  * to remove pages. The filter function can increase the address and/or
- * decrease the size to filter out pages.
+ * decrease the size to filter out pages.  It will also align addresses and
+ * sizes to PAGESIZE.
  */
 void
 copy_memlist_filter(
@@ -162,8 +163,8 @@ copy_memlist_filter(
 	 * filter multiple times against each memlist entry.
 	 */
 	for (; src; src = src->next) {
-		addr = src->address;
-		eaddr = addr + src->size;
+		addr = P2ROUNDUP(src->address, PAGESIZE);
+		eaddr = P2ALIGN(src->address + src->size, PAGESIZE);
 		while (addr < eaddr) {
 			size = eaddr - addr;
 			if (filter != NULL)
