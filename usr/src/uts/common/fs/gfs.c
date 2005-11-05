@@ -200,12 +200,10 @@ gfs_readdir_init(gfs_readdir_state_t *st, int name_max, int ureclen,
  *   st		- the current readdir state, which must have d_ino and d_name
  *                set
  *   uiop	- caller-supplied uio pointer
- *   off	- the offset of the current entry
  *   next	- the offset of the next entry
  */
 static int
-gfs_readdir_emit_int(gfs_readdir_state_t *st, uio_t *uiop, offset_t off,
-    offset_t next)
+gfs_readdir_emit_int(gfs_readdir_state_t *st, uio_t *uiop, offset_t next)
 {
 	int reclen;
 
@@ -255,7 +253,7 @@ gfs_readdir_emit(gfs_readdir_state_t *st, uio_t *uiop, offset_t voff,
 	 * Inter-entry offsets are invalid, so we assume a record size of
 	 * grd_ureclen and explicitly set the offset appropriately.
 	 */
-	return (gfs_readdir_emit_int(st, uiop, off, off + st->grd_ureclen));
+	return (gfs_readdir_emit_int(st, uiop, off + st->grd_ureclen));
 }
 
 /*
@@ -814,7 +812,7 @@ gfs_dir_readdir(vnode_t *dvp, uio_t *uiop, int *eofp, void *data)
 			next += dp->gfsd_nstatic + 2;
 
 			if ((error = gfs_readdir_emit_int(&gstate, uiop,
-			    off, next)) != 0)
+			    next)) != 0)
 				break;
 		} else {
 			/*
