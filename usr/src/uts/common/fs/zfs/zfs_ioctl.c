@@ -1216,7 +1216,7 @@ zfs_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)(uintptr_t)getminor((dev_t)arg);
+		*result = (void *)0;
 		return (DDI_SUCCESS);
 	}
 
@@ -1282,15 +1282,19 @@ _init(void)
 {
 	int error;
 
-	if ((error = mod_install(&modlinkage)) != 0)
-		return (error);
-
-	error = ldi_ident_from_mod(&modlinkage, &zfs_li);
-	ASSERT(error == 0);
-
 	spa_init(FREAD | FWRITE);
 	zfs_init();
 	zvol_init();
+
+	if ((error = mod_install(&modlinkage)) != 0) {
+		zvol_fini();
+		zfs_fini();
+		spa_fini();
+		return (error);
+	}
+
+	error = ldi_ident_from_mod(&modlinkage, &zfs_li);
+	ASSERT(error == 0);
 
 	return (0);
 }

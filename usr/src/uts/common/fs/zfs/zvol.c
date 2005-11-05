@@ -73,7 +73,6 @@
 
 #define	ZVOL_OBJ		1ULL
 #define	ZVOL_ZAP_OBJ		2ULL
-#define	ZVOL_MAX_MINOR		MAXMIN32
 
 static void *zvol_state;
 

@@ -355,8 +355,8 @@ struct {
 	const char *name;
 	uint64_t value;
 } snapdir_table[] = {
-	{ "hidden",	HIDDEN },
-	{ "visible",	VISIBLE },
+	{ "hidden",	ZFS_SNAPDIR_HIDDEN },
+	{ "visible",	ZFS_SNAPDIR_VISIBLE },
 	{ NULL }
 };
 

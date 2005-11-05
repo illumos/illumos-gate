@@ -117,7 +117,7 @@ zio_init(void)
 			char name[30];
 			(void) sprintf(name, "zio_buf_%lu", size);
 			zio_buf_cache[c] = kmem_cache_create(name, size,
-			    align, NULL, NULL, NULL, NULL, NULL, 0);
+			    align, NULL, NULL, NULL, NULL, NULL, KMC_NODEBUG);
 			dprintf("creating cache for size %5lx align %5lx\n",
 			    size, align);
 		}

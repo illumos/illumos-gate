@@ -53,10 +53,11 @@
 #include <sys/modctl.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_ctldir.h>
+#include <sys/sunddi.h>
 
 int zfsfstype;
 vfsops_t *zfs_vfsops = NULL;
-static major_t	zfs_major;
+static major_t zfs_major;
 static minor_t zfs_minor;
 static kmutex_t	zfs_dev_mtx;
 
@@ -380,7 +381,7 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	zfsvfs->z_parent = zfsvfs;
 	zfsvfs->z_assign = TXG_NOWAIT;
 	zfsvfs->z_max_blksz = SPA_MAXBLOCKSIZE;
-	zfsvfs->z_show_ctldir = VISIBLE;
+	zfsvfs->z_show_ctldir = ZFS_SNAPDIR_VISIBLE;
 
 	mutex_init(&zfsvfs->z_znodes_lock, NULL, MUTEX_DEFAULT, NULL);
 	list_create(&zfsvfs->z_all_znodes, sizeof (znode_t),
@@ -398,12 +399,23 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 */
 	do {
 		ASSERT3U(zfs_minor, <=, MAXMIN32);
-		int start = zfs_minor;
+		minor_t start = zfs_minor;
 		do {
 			mutex_enter(&zfs_dev_mtx);
-			zfs_minor++;
-			if (zfs_minor > MAXMIN32)
-				zfs_minor = 0;
+			if (zfs_minor >= MAXMIN32) {
+				/*
+				 * If we're still using the real major number,
+				 * keep out of /dev/zfs and /dev/zvol minor
+				 * number space.  If we're using a getudev()'ed
+				 * major number, we can use all of its minors.
+				 */
+				if (zfs_major == ddi_name_to_major(ZFS_DRIVER))
+					zfs_minor = ZFS_MIN_MINOR;
+				else
+					zfs_minor = 0;
+			} else {
+				zfs_minor++;
+			}
 			mount_dev = makedevice(zfs_major, zfs_minor);
 			mutex_exit(&zfs_dev_mtx);
 		} while (vfs_devismounted(mount_dev) && zfs_minor != start);
@@ -1018,16 +1030,11 @@ zfs_vfsinit(int fstype, char *name)
 	mutex_init(&zfs_dev_mtx, NULL, MUTEX_DEFAULT, NULL);
 
 	/*
-	 * unique major number for all zfs mounts
+	 * Unique major number for all zfs mounts.
+	 * If we run out of 32-bit minors, we'll getudev() another major.
 	 */
-	if ((zfs_major = getudev()) == (major_t)-1) {
-		cmn_err(CE_WARN,
-		    "zfs_vfsinit: Can't get unique device number.");
-		zfs_remove_op_tables();
-		(void) vfs_freevfsops_by_type(zfsfstype);
-		return (error);
-	}
-	zfs_minor = 0;
+	zfs_major = ddi_name_to_major(ZFS_DRIVER);
+	zfs_minor = ZFS_MIN_MINOR;
 
 	return (0);
 }

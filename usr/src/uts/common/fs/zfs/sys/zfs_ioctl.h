@@ -36,14 +36,11 @@
 extern "C" {
 #endif
 
-#define	ZFS_DRIVER_NAME "zfs"
-#define	ZFS_DS_TYPE	"zfs"
-
 /*
  * Property values for snapdir
  */
-#define	HIDDEN		0
-#define	VISIBLE		1
+#define	ZFS_SNAPDIR_HIDDEN		0
+#define	ZFS_SNAPDIR_VISIBLE		1
 
 typedef struct zfs_stats {
 	uint64_t	zs_atime;
@@ -149,6 +146,9 @@ typedef struct zfs_cmd {
 	dmu_objset_stats_t zc_objset_stats;
 	struct drr_begin zc_begin_record;
 } zfs_cmd_t;
+
+#define	ZVOL_MAX_MINOR	(1 << 16)
+#define	ZFS_MIN_MINOR	(ZVOL_MAX_MINOR + 1)
 
 #ifdef _KERNEL
 
