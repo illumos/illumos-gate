@@ -2080,9 +2080,8 @@ segmap_release(struct seg *seg, caddr_t addr, uint_t flags)
 
 	if (--smp->sm_refcnt == 0) {
 
-		if (is_kpm) {
-			smp->sm_flags &= ~(SM_WRITE_DATA | SM_READ_DATA);
-		}
+		smp->sm_flags &= ~(SM_WRITE_DATA | SM_READ_DATA);
+
 		if (flags & (SM_INVAL|SM_DESTROY)) {
 			segmap_hashout(smp);	/* remove map info */
 			if (is_kpm) {
