@@ -383,6 +383,17 @@ create_devinfo_tree(void)
 	 * next sibling until the function returns, unlike ddi_walk_devs().
 	 */
 	di_dfs(ddi_root_node(), get_neighbors, 0);
+
+#if !defined(__sparc)
+	/*
+	 * On x86, there is no prom. Create device tree by
+	 * probing pci config space
+	 */
+	{
+		extern void impl_setup_ddi(void);
+		impl_setup_ddi();
+	}
+#endif /* x86 */
 }
 
 /*

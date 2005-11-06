@@ -1264,7 +1264,6 @@ static void
 startup_modules(void)
 {
 	unsigned int i;
-	extern void impl_setup_ddi(void);
 	extern void prom_setup(void);
 
 	PRM_POINT("startup_modules() starting...");
@@ -1338,7 +1337,6 @@ startup_modules(void)
 	 * then invoke bus specific code to probe devices.
 	 */
 	setup_ddi();
-	impl_setup_ddi();
 	/*
 	 * Fake a prom tree such that /dev/openprom continues to work
 	 */

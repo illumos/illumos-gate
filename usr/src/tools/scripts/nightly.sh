@@ -811,7 +811,7 @@ NIGHTLY_OPTIONS variable in the <env_file> as follows:
 	-T	do a build with TRACE on
 	-U	update proto area in the parent
 	-V VERS set the build version string to VERS
-	-X	copy x86 IHV packages
+	-X	copy x86 IHV proto area
 	-a	create cpio archives
 	-d	use Distributed Make (default uses Parallel Make)
 	-f	find unreferenced files
@@ -1257,6 +1257,20 @@ if [ "$V_FLAG" = "y" ]; then
 	VERSION=$V_ARG
 fi
 
+#
+# Check for IHV root for copying ihv proto area
+#
+if [ "$X_FLAG" = "y" ]; then
+        if [ "$IA32_IHV_ROOT" = "" ]; then
+		echo "IA32_IHV_ROOT: must be set for copying ihv proto"
+		args_ok=n
+        fi
+        if [ ! -d "$IA32_IHV_ROOT" ]; then
+                echo "$IA32_IHV_ROOT: not found"
+                args_ok=n
+        fi
+fi
+
 # Append source version
 if [ "$SE_FLAG" = "y" ]; then
 	VERSION="${VERSION}:EXPORT"
@@ -1616,6 +1630,14 @@ if [ "$t_FLAG" = "n" ]; then
 		    "the -t flag; ignoring VERIFY_ELFSIGN\n" | \
 		    tee -a $mail_msg_file >> $LOGFILE
 	fi
+fi
+
+# copy ihv proto area in addition to the build itself
+
+if [ "$X_FLAG" = "y" ]; then
+
+	# Install IA32 IHV proto area
+	copy_ihv_proto
 fi
 
 echo "==== Build environment ====\n" | tee -a $mail_msg_file >> $LOGFILE
