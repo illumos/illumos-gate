@@ -118,7 +118,7 @@ sctp_listen(sctp_t *sctp)
 	RUN_SCTP(sctp);
 	/*
 	 * TCP handles listen() increasing the backlog, need to check
-	 * if it should be handled here too - VENU.
+	 * if it should be handled here too
 	 */
 	if (sctp->sctp_state > SCTPS_BOUND) {
 		WAKE_SCTP(sctp);
@@ -146,7 +146,6 @@ sctp_listen(sctp_t *sctp)
 	bzero(sctp->sctp_old_secret, SCTP_SECRET_LEN);
 	tf = &sctp_listen_fanout[SCTP_LISTEN_HASH(ntohs(sctp->sctp_lport))];
 	sctp_listen_hash_insert(tf, sctp);
-
 	WAKE_SCTP(sctp);
 	return (0);
 }
@@ -207,9 +206,10 @@ sctp_bind(sctp_t *sctp, struct sockaddr *sa, socklen_t len)
 		goto done;
 	}
 
-	if ((err = sctp_bind_add(sctp, sa, 1, B_TRUE)) != 0)
+	if ((err = sctp_bind_add(sctp, sa, 1, B_TRUE,
+	    user_specified == 1 ? htons(requested_port) : 0)) != 0) {
 		goto done;
-
+	}
 	allocated_port = sctp_bindi(sctp, requested_port,
 	    bind_to_req_port_only, user_specified);
 	if (allocated_port == 0) {
@@ -240,7 +240,8 @@ sctp_bindx(sctp_t *sctp, const void *addrs, int addrcnt, int bindop)
 
 	switch (bindop) {
 	case SCTP_BINDX_ADD_ADDR:
-		return (sctp_bind_add(sctp, addrs, addrcnt, B_FALSE));
+		return (sctp_bind_add(sctp, addrs, addrcnt, B_FALSE,
+		    sctp->sctp_lport));
 	case SCTP_BINDX_REM_ADDR:
 		return (sctp_bind_del(sctp, addrs, addrcnt, B_FALSE));
 	default:
@@ -253,7 +254,7 @@ sctp_bindx(sctp_t *sctp, const void *addrs, int addrcnt, int bindop)
  */
 int
 sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
-    boolean_t caller_hold_lock)
+    boolean_t caller_hold_lock, in_port_t port)
 {
 	int		err = 0;
 	boolean_t	do_asconf = B_FALSE;
@@ -280,13 +281,76 @@ sctp_bind_add(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 		}
 		do_asconf = B_TRUE;
 	}
-	err = sctp_valid_addr_list(sctp, addrs, addrcnt);
+	/*
+	 * On a clustered node, for an inaddr_any bind, we will pass the list
+	 * of all the addresses in the global list, minus any address on the
+	 * loopback interface, and expect the clustering susbsystem to give us
+	 * the correct list for the 'port'. For explicit binds we give the
+	 * list of addresses  and the clustering module validates it for the
+	 * 'port'.
+	 *
+	 * On a non-clustered node, cl_sctp_check_addrs will be NULL and
+	 * we proceed as usual.
+	 */
+	if (cl_sctp_check_addrs != NULL) {
+		uchar_t		*addrlist = NULL;
+		size_t		size = 0;
+		int		unspec = 0;
+		boolean_t	do_listen;
+		uchar_t		*llist = NULL;
+		size_t		lsize = 0;
+
+		/*
+		 * If we are adding addresses after listening, but before
+		 * an association is established, we need to update the
+		 * clustering module with this info.
+		 */
+		do_listen = !do_asconf && sctp->sctp_state > SCTPS_BOUND &&
+		    cl_sctp_listen != NULL;
+
+		err = sctp_get_addrlist(sctp, addrs, &addrcnt, &addrlist,
+		    &unspec, &size);
+		if (err != 0) {
+			ASSERT(addrlist == NULL);
+			ASSERT(addrcnt == 0);
+			ASSERT(size == 0);
+			if (!caller_hold_lock)
+				WAKE_SCTP(sctp);
+			return (err);
+		}
+		ASSERT(addrlist != NULL);
+		(*cl_sctp_check_addrs)(sctp->sctp_family, port, &addrlist,
+		    size, &addrcnt, unspec == 1);
+		if (addrcnt == 0) {
+			/* We free the list */
+			kmem_free(addrlist, size);
+			if (!caller_hold_lock)
+				WAKE_SCTP(sctp);
+			return (EINVAL);
+		}
+		if (do_listen) {
+			lsize = sizeof (in6_addr_t) * addrcnt;
+			llist = kmem_alloc(lsize, KM_SLEEP);
+		}
+		err = sctp_valid_addr_list(sctp, addrlist, addrcnt, llist,
+		    lsize);
+		if (err == 0 && do_listen) {
+			(*cl_sctp_listen)(sctp->sctp_family, llist,
+			    addrcnt, sctp->sctp_lport);
+			/* list will be freed by the clustering module */
+		} else if (err != 0 && llist != NULL) {
+			kmem_free(llist, lsize);
+		}
+		/* free the list we allocated */
+		kmem_free(addrlist, size);
+	} else {
+		err = sctp_valid_addr_list(sctp, addrs, addrcnt, NULL, 0);
+	}
 	if (err != 0) {
 		if (!caller_hold_lock)
 			WAKE_SCTP(sctp);
 		return (err);
 	}
-
 	/* Need to send  ASCONF messages */
 	if (do_asconf) {
 		err = sctp_add_ip(sctp, addrs, addrcnt);
@@ -313,6 +377,8 @@ sctp_bind_del(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 {
 	int		error = 0;
 	boolean_t	do_asconf = B_FALSE;
+	uchar_t		*ulist = NULL;
+	size_t		usize = 0;
 
 	if (!caller_hold_lock)
 		RUN_SCTP(sctp);
@@ -343,10 +409,30 @@ sctp_bind_del(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
 		return (EINVAL);
 	}
 
-	error = sctp_del_ip(sctp, addrs, addrcnt);
+	if (cl_sctp_unlisten != NULL && !do_asconf &&
+	    sctp->sctp_state > SCTPS_BOUND) {
+		usize = sizeof (in6_addr_t) * addrcnt;
+		ulist = kmem_alloc(usize, KM_SLEEP);
+	}
+
+	error = sctp_del_ip(sctp, addrs, addrcnt, ulist, usize);
+	if (error != 0) {
+		if (ulist != NULL)
+			kmem_free(ulist, usize);
+		if (!caller_hold_lock)
+			WAKE_SCTP(sctp);
+		return (error);
+	}
+	/* ulist will be non-NULL only if cl_sctp_unlisten is non-NULL */
+	if (ulist != NULL) {
+		ASSERT(cl_sctp_unlisten != NULL);
+		(*cl_sctp_unlisten)(sctp->sctp_family, ulist, addrcnt,
+		    sctp->sctp_lport);
+		/* ulist will be freed by the clustering module */
+	}
 	if (!caller_hold_lock)
 		WAKE_SCTP(sctp);
-	if (error == 0 && do_asconf)
+	if (do_asconf)
 		sctp_process_sendq(sctp);
 	return (error);
 }

@@ -565,6 +565,7 @@ typedef struct sctp_s {
 	list_node_t	sctp_list;
 
 	sctp_faddr_t		*sctp_faddrs;
+	int			sctp_nfaddrs;
 	sctp_ipif_hash_t	sctp_saddrs[SCTP_IPIF_HASH];
 	int			sctp_nsaddrs;
 
@@ -680,6 +681,7 @@ typedef struct sctp_s {
 
 	/* Inbound flow control */
 	int32_t		sctp_rwnd;		/* Current receive window */
+	int32_t		sctp_irwnd;		/* Initial receive window */
 	int32_t		sctp_rxqueued;		/* No. of bytes in RX q's */
 
 	/* Pre-initialized composite headers */
@@ -938,7 +940,8 @@ extern void	sctp_assoc_event(sctp_t *, uint16_t, uint16_t,
 extern void	sctp_bind_hash_insert(sctp_tf_t *, sctp_t *, int);
 extern void	sctp_bind_hash_remove(sctp_t *);
 extern in_port_t sctp_bindi(sctp_t *, in_port_t, int, int);
-extern int	sctp_bind_add(sctp_t *, const void *, uint32_t, boolean_t);
+extern int	sctp_bind_add(sctp_t *, const void *, uint32_t, boolean_t,
+		    in_port_t);
 extern int	sctp_bind_del(sctp_t *, const void *, uint32_t, boolean_t);
 extern int	sctp_build_hdrs(sctp_t *);
 
@@ -983,12 +986,16 @@ extern void	sctp_free_set(sctp_set_t *);
 extern void	sctp_ftsn_sets_fini(void);
 extern void	sctp_ftsn_sets_init(void);
 
+extern int	sctp_get_addrlist(sctp_t *, const void *, uint32_t *,
+		    uchar_t **, int *, size_t *);
 extern int	sctp_get_addrparams(sctp_t *, sctp_t *, mblk_t *,
 		    sctp_chunk_hdr_t *, uint_t *);
+extern void	sctp_get_faddr_list(sctp_t *, uchar_t *, size_t);
 extern mblk_t	*sctp_get_first_sent(sctp_t *);
 extern mblk_t	*sctp_get_msg_to_send(sctp_t *, mblk_t **, mblk_t *, int  *,
 		    int32_t, uint32_t, sctp_faddr_t *);
 extern in_port_t sctp_get_next_priv_port();
+extern void	sctp_get_saddr_list(sctp_t *, uchar_t *, size_t);
 
 extern int	sctp_handle_error(sctp_t *, sctp_hdr_t *, sctp_chunk_hdr_t *,
 		    mblk_t *);
@@ -1102,6 +1109,18 @@ extern int	sctp_xmit_list_clean(sctp_t *, ssize_t);
 
 extern void	sctp_zap_addrs(sctp_t *);
 extern void	sctp_zap_faddrs(sctp_t *, int);
+
+/* Contract private interface between SCTP and Clustering - PSARC/2005/602 */
+
+extern void	(*cl_sctp_listen)(sa_family_t, uchar_t *, uint_t, in_port_t);
+extern void	(*cl_sctp_unlisten)(sa_family_t, uchar_t *, uint_t, in_port_t);
+extern void 	(*cl_sctp_connect)(sa_family_t, uchar_t *, uint_t, in_port_t,
+		    uchar_t *, uint_t, in_port_t, boolean_t, cl_sctp_handle_t);
+extern void	(*cl_sctp_disconnect)(sa_family_t, cl_sctp_handle_t);
+extern void	(*cl_sctp_assoc_change)(sa_family_t, uchar_t *, size_t, uint_t,
+		    uchar_t *, size_t, uint_t, int, cl_sctp_handle_t);
+extern void	(*cl_sctp_check_addrs)(sa_family_t, in_port_t, uchar_t **,
+		    size_t, uint_t *, boolean_t);
 
 /* Send a mp to IP. */
 #define	IP_PUT(mp, conn, isv4)						\

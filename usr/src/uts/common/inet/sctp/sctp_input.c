@@ -2210,6 +2210,217 @@ sctp_check_abandoned_data(sctp_t *sctp, sctp_faddr_t *fp)
 	}
 }
 
+/*
+ * The processing here follows the same logic in sctp_got_sack(), the reason
+ * we do this separately is because, usually, gap blocks are ordered and
+ * we can process it in sctp_got_sack(). However if they aren't we would
+ * need to do some additional non-optimal stuff when we start processing the
+ * unordered gaps. To that effect sctp_got_sack() does the processing in the
+ * simple case and this does the same in the more involved case.
+ */
+static uint32_t
+sctp_process_uo_gaps(sctp_t *sctp, uint32_t ctsn, sctp_sack_frag_t *ssf,
+    int num_gaps, mblk_t *umphead, mblk_t *mphead, int *trysend,
+    boolean_t *fast_recovery, uint32_t fr_xtsn)
+{
+	uint32_t		xtsn;
+	uint32_t		gapstart = 0;
+	uint32_t		gapend = 0;
+	int			gapcnt;
+	uint16_t		chunklen;
+	sctp_data_hdr_t		*sdc;
+	int			gstart;
+	mblk_t			*ump = umphead;
+	mblk_t			*mp = mphead;
+	sctp_faddr_t		*fp;
+	uint32_t		acked = 0;
+
+	/*
+	 * gstart tracks the last (in the order of TSN) gapstart that
+	 * we process in this SACK gaps walk.
+	 */
+	gstart = ctsn;
+
+	sdc = (sctp_data_hdr_t *)mp->b_rptr;
+	xtsn = ntohl(sdc->sdh_tsn);
+	for (gapcnt = 0; gapcnt < num_gaps; gapcnt++, ssf++) {
+		if (gapstart != 0) {
+			/*
+			 * If we have reached the end of the transmit list or
+			 * hit an unsent chunk or encountered an unordered gap
+			 * block start from the ctsn again.
+			 */
+			if (ump == NULL || !SCTP_CHUNK_ISSENT(mp) ||
+			    SEQ_LT(ctsn + ntohs(ssf->ssf_start), xtsn)) {
+				ump = umphead;
+				mp = mphead;
+				sdc = (sctp_data_hdr_t *)mp->b_rptr;
+				xtsn = ntohl(sdc->sdh_tsn);
+			}
+		}
+
+		gapstart = ctsn + ntohs(ssf->ssf_start);
+		gapend = ctsn + ntohs(ssf->ssf_end);
+
+		/* SACK for TSN we have not sent - ABORT */
+		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
+		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
+			BUMP_MIB(&sctp_mib, sctpInAckUnsent);
+			*trysend = -1;
+			return (acked);
+		} else if (SEQ_LT(gapend, gapstart)) {
+			break;
+		}
+		/*
+		 * The xtsn can be the TSN processed for the last gap
+		 * (gapend) or it could be the cumulative TSN. We continue
+		 * with the last xtsn as long as the gaps are ordered, when
+		 * we hit an unordered gap, we re-start from the cumulative
+		 * TSN. For the first gap it is always the cumulative TSN.
+		 */
+		while (xtsn != gapstart) {
+			/*
+			 * We can't reliably check for reneged chunks
+			 * when walking the unordered list, so we don't.
+			 * In case the peer reneges then we will end up
+			 * sending the reneged chunk via timeout.
+			 */
+			mp = mp->b_next;
+			if (mp == NULL) {
+				ump = ump->b_next;
+				/*
+				 * ump can't be NULL because of the sanity
+				 * check above.
+				 */
+				ASSERT(ump != NULL);
+				mp = ump->b_cont;
+			}
+			/*
+			 * mp can't be unsent because of the sanity check
+			 * above.
+			 */
+			ASSERT(SCTP_CHUNK_ISSENT(mp));
+			sdc = (sctp_data_hdr_t *)mp->b_rptr;
+			xtsn = ntohl(sdc->sdh_tsn);
+		}
+		/*
+		 * Now that we have found the chunk with TSN == 'gapstart',
+		 * let's walk till we hit the chunk with TSN == 'gapend'.
+		 * All intermediate chunks will be marked ACKED, if they
+		 * haven't already been.
+		 */
+		while (SEQ_LEQ(xtsn, gapend)) {
+			/*
+			 * SACKed
+			 */
+			SCTP_CHUNK_SET_SACKCNT(mp, 0);
+			if (!SCTP_CHUNK_ISACKED(mp)) {
+				SCTP_CHUNK_ACKED(mp);
+
+				fp = SCTP_CHUNK_DEST(mp);
+				chunklen = ntohs(sdc->sdh_len);
+				ASSERT(fp->suna >= chunklen);
+				fp->suna -= chunklen;
+				if (fp->suna == 0) {
+					/* All outstanding data acked. */
+					fp->pba = 0;
+					SCTP_FADDR_TIMER_STOP(fp);
+				}
+				fp->acked += chunklen;
+				acked += chunklen;
+				sctp->sctp_unacked -= chunklen - sizeof (*sdc);
+				ASSERT(sctp->sctp_unacked >= 0);
+			}
+			/*
+			 * Move to the next message in the transmit list
+			 * if we are done with all the chunks from the current
+			 * message. Note, it is possible to hit the end of the
+			 * transmit list here, i.e. if we have already completed
+			 * processing the gap block.
+			 */
+			mp = mp->b_next;
+			if (mp == NULL) {
+				ump = ump->b_next;
+				if (ump == NULL) {
+					ASSERT(xtsn == gapend);
+					break;
+				}
+				mp = ump->b_cont;
+			}
+			/*
+			 * Likewise, we can hit an unsent chunk once we have
+			 * completed processing the gap block.
+			 */
+			if (!SCTP_CHUNK_ISSENT(mp)) {
+				ASSERT(xtsn == gapend);
+				break;
+			}
+			sdc = (sctp_data_hdr_t *)mp->b_rptr;
+			xtsn = ntohl(sdc->sdh_tsn);
+		}
+		/*
+		 * We keep track of the last gap we successfully processed
+		 * so that we can terminate the walk below for incrementing
+		 * the SACK count.
+		 */
+		if (SEQ_LT(gstart, gapstart))
+			gstart = gapstart;
+	}
+	/*
+	 * Check if have incremented the SACK count for all unacked TSNs in
+	 * sctp_got_sack(), if so we are done.
+	 */
+	if (SEQ_LEQ(gstart, fr_xtsn))
+		return (acked);
+
+	ump = umphead;
+	mp = mphead;
+	sdc = (sctp_data_hdr_t *)mp->b_rptr;
+	xtsn = ntohl(sdc->sdh_tsn);
+	while (SEQ_LT(xtsn, gstart)) {
+		/*
+		 * We have incremented SACK count for TSNs less than fr_tsn
+		 * in sctp_got_sack(), so don't increment them again here.
+		 */
+		if (SEQ_GT(xtsn, fr_xtsn) && !SCTP_CHUNK_ISACKED(mp)) {
+			SCTP_CHUNK_SET_SACKCNT(mp, SCTP_CHUNK_SACKCNT(mp) + 1);
+			if (SCTP_CHUNK_SACKCNT(mp) == sctp_fast_rxt_thresh) {
+				SCTP_CHUNK_REXMIT(mp);
+				sctp->sctp_chk_fast_rexmit = B_TRUE;
+				*trysend = 1;
+				if (!*fast_recovery) {
+					/*
+					 * Entering fast recovery.
+					 */
+					fp = SCTP_CHUNK_DEST(mp);
+					fp->ssthresh = fp->cwnd / 2;
+					if (fp->ssthresh < 2 * fp->sfa_pmss) {
+						fp->ssthresh =
+						    2 * fp->sfa_pmss;
+					}
+					fp->cwnd = fp->ssthresh;
+					fp->pba = 0;
+					sctp->sctp_recovery_tsn =
+					    sctp->sctp_ltsn - 1;
+					*fast_recovery = B_TRUE;
+				}
+			}
+		}
+		mp = mp->b_next;
+		if (mp == NULL) {
+			ump = ump->b_next;
+			/* We can't get to the end of the transmit list here */
+			ASSERT(ump != NULL);
+			mp = ump->b_cont;
+		}
+		/* We can't hit an unsent chunk here */
+		ASSERT(SCTP_CHUNK_ISSENT(mp));
+		sdc = (sctp_data_hdr_t *)mp->b_rptr;
+		xtsn = ntohl(sdc->sdh_tsn);
+	}
+	return (acked);
+}
+
 static int
 sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 {
@@ -2218,10 +2429,11 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 	sctp_sack_frag_t	*ssf;
 	mblk_t			*ump;
 	mblk_t			*mp;
-	uint32_t		tsn;
+	mblk_t			*mp1;
+	uint32_t		cumtsn;
 	uint32_t		xtsn;
-	uint32_t		gapstart;
-	uint32_t		gapend;
+	uint32_t		gapstart = 0;
+	uint32_t		gapend = 0;
 	uint32_t		acked = 0;
 	uint16_t		chunklen;
 	sctp_faddr_t		*fp;
@@ -2238,18 +2450,19 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 		return (0);
 
 	sc = (sctp_sack_chunk_t *)(sch + 1);
-	tsn = ntohl(sc->ssc_cumtsn);
+	cumtsn = ntohl(sc->ssc_cumtsn);
 
-	dprint(2, ("got sack tsn %x -> %x\n", sctp->sctp_lastack_rxd, tsn));
+	dprint(2, ("got sack cumtsn %x -> %x\n", sctp->sctp_lastack_rxd,
+	    cumtsn));
 
 	/* out of order */
-	if (SEQ_LT(tsn, sctp->sctp_lastack_rxd))
+	if (SEQ_LT(cumtsn, sctp->sctp_lastack_rxd))
 		return (0);
 
-	if (SEQ_GT(tsn, sctp->sctp_ltsn - 1)) {
+	if (SEQ_GT(cumtsn, sctp->sctp_ltsn - 1)) {
 		BUMP_MIB(&sctp_mib, sctpInAckUnsent);
-		/* funky; don't go beyond our own last assigned TSN */
-		tsn = sctp->sctp_ltsn - 1;
+		/* Send an ABORT */
+		return (-1);
 	}
 
 	/*
@@ -2264,7 +2477,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 	if (SEQ_LT(sctp->sctp_lastack_rxd, sctp->sctp_adv_pap))
 		fwd_tsn = B_TRUE;
 
-	if (tsn == sctp->sctp_lastack_rxd &&
+	if (cumtsn == sctp->sctp_lastack_rxd &&
 	    (sctp->sctp_xmit_unacked == NULL ||
 	    !SCTP_CHUNK_ABANDONED(sctp->sctp_xmit_unacked))) {
 		if (sctp->sctp_xmit_unacked != NULL)
@@ -2275,7 +2488,7 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			mp = NULL;
 		BUMP_MIB(&sctp_mib, sctpInDupAck);
 	} else {
-		acked = sctp_cumack(sctp, tsn, &mp);
+		acked = sctp_cumack(sctp, cumtsn, &mp);
 		sctp->sctp_xmit_unacked = mp;
 		if (acked > 0) {
 			trysend = 1;
@@ -2292,21 +2505,81 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 	    num_gaps * sizeof (*ssf))) {
 		goto ret;
 	}
+#ifdef	DEBUG
+	/*
+	 * Since we delete any message that has been acked completely,
+	 * the unacked chunk must belong to sctp_xmit_head (as
+	 * we don't have a back pointer from the mp to the meta data
+	 * we do this).
+	 */
+	{
+		mblk_t	*mp2 = sctp->sctp_xmit_head->b_cont;
 
+		while (mp2 != NULL) {
+			if (mp2 == mp)
+				break;
+			mp2 = mp2->b_next;
+		}
+		ASSERT(mp2 != NULL);
+	}
+#endif
 	ump = sctp->sctp_xmit_head;
+
+	/*
+	 * Just remember where we started from, in case we need to call
+	 * sctp_process_uo_gaps() if the gap blocks are unordered.
+	 */
+	mp1 = mp;
+
+	sdc = (sctp_data_hdr_t *)mp->b_rptr;
+	xtsn = ntohl(sdc->sdh_tsn);
+	ASSERT(xtsn == cumtsn + 1);
 
 	/*
 	 * Go through SACK gaps. They are ordered based on start TSN.
 	 */
-	sdc = (sctp_data_hdr_t *)mp->b_rptr;
-	xtsn = ntohl(sdc->sdh_tsn);
-	ASSERT(xtsn == tsn + 1);
-
 	ssf = (sctp_sack_frag_t *)(sc + 1);
-	for (i = 0; i < num_gaps; i++) {
-		gapstart = tsn + ntohs(ssf->ssf_start);
-		gapend = tsn + ntohs(ssf->ssf_end);
+	for (i = 0; i < num_gaps; i++, ssf++) {
+		if (gapstart != 0) {
+			/* check for unordered gap */
+			if (SEQ_LEQ(cumtsn + ntohs(ssf->ssf_start), gapstart)) {
+				acked += sctp_process_uo_gaps(sctp,
+				    cumtsn, ssf, num_gaps - i,
+				    sctp->sctp_xmit_head, mp1,
+				    &trysend, &fast_recovery, gapstart);
+				if (trysend < 0) {
+					BUMP_MIB(&sctp_mib, sctpInAckUnsent);
+					return (-1);
+				}
+				break;
+			}
+		}
+		gapstart = cumtsn + ntohs(ssf->ssf_start);
+		gapend = cumtsn + ntohs(ssf->ssf_end);
 
+		/* SACK for TSN we have not sent - ABORT */
+		if (SEQ_GT(gapstart, sctp->sctp_ltsn - 1) ||
+		    SEQ_GT(gapend, sctp->sctp_ltsn - 1)) {
+			BUMP_MIB(&sctp_mib, sctpInAckUnsent);
+			return (-1);
+		} else if (SEQ_LT(gapend, gapstart)) {
+			break;
+		}
+		/*
+		 * Let's start at the current TSN (for the 1st gap we start
+		 * from the cumulative TSN, for subsequent ones we start from
+		 * where the previous gapend was found - second while loop
+		 * below) and walk the transmit list till we find the TSN
+		 * corresponding to gapstart. All the unacked chunks till we
+		 * get to the chunk with TSN == gapstart will have their
+		 * SACKCNT incremented by 1. Note since the gap blocks are
+		 * ordered, we won't be incrementing the SACKCNT for an
+		 * unacked chunk by more than one while processing the gap
+		 * blocks. If the SACKCNT for any unacked chunk exceeds
+		 * the fast retransmit threshold, we will fast retransmit
+		 * after processing all the gap blocks.
+		 */
+		ASSERT(SEQ_LT(xtsn, gapstart));
 		while (xtsn != gapstart) {
 			SCTP_CHUNK_SET_SACKCNT(mp, SCTP_CHUNK_SACKCNT(mp) + 1);
 			if (SCTP_CHUNK_SACKCNT(mp) == sctp_fast_rxt_thresh) {
@@ -2351,17 +2624,26 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 			mp = mp->b_next;
 			if (mp == NULL) {
 				ump = ump->b_next;
-				if (ump == NULL) {
-					goto ret;
-				}
+				/*
+				 * ump can't be NULL given the sanity check
+				 * above.
+				 */
+				ASSERT(ump != NULL);
 				mp = ump->b_cont;
 			}
-			if (!SCTP_CHUNK_ISSENT(mp)) {
-				goto ret;
-			}
+			/*
+			 * mp can't be unsent given the sanity check above.
+			 */
+			ASSERT(SCTP_CHUNK_ISSENT(mp));
 			sdc = (sctp_data_hdr_t *)mp->b_rptr;
 			xtsn = ntohl(sdc->sdh_tsn);
 		}
+		/*
+		 * Now that we have found the chunk with TSN == 'gapstart',
+		 * let's walk till we hit the chunk with TSN == 'gapend'.
+		 * All intermediate chunks will be marked ACKED, if they
+		 * haven't already been.
+		 */
 		while (SEQ_LEQ(xtsn, gapend)) {
 			/*
 			 * SACKed
@@ -2384,21 +2666,56 @@ sctp_got_sack(sctp_t *sctp, sctp_chunk_hdr_t *sch)
 				sctp->sctp_unacked -= chunklen - sizeof (*sdc);
 				ASSERT(sctp->sctp_unacked >= 0);
 			}
+			/* Go to the next chunk of the current message */
 			mp = mp->b_next;
+			/*
+			 * Move to the next message in the transmit list
+			 * if we are done with all the chunks from the current
+			 * message. Note, it is possible to hit the end of the
+			 * transmit list here, i.e. if we have already completed
+			 * processing the gap block.
+			 * Also, note that we break here, which means we
+			 * continue processing gap blocks, if any. In case of
+			 * ordered gap blocks there can't be any following
+			 * this (if there is it will fail the sanity check
+			 * above). In case of un-ordered gap blocks we will
+			 * switch to sctp_process_uo_gaps().  In either case
+			 * it should be fine to continue with NULL ump/mp,
+			 * but we just reset it to xmit_head.
+			 */
 			if (mp == NULL) {
 				ump = ump->b_next;
 				if (ump == NULL) {
-					goto ret;
+					ASSERT(xtsn == gapend);
+					ump = sctp->sctp_xmit_head;
+					mp = mp1;
+					sdc = (sctp_data_hdr_t *)mp->b_rptr;
+					xtsn = ntohl(sdc->sdh_tsn);
+					break;
 				}
 				mp = ump->b_cont;
 			}
+			/*
+			 * Likewise, we could hit an unsent chunk once we have
+			 * completed processing the gap block. Again, it is
+			 * fine to continue processing gap blocks with mp
+			 * pointing to the unsent chunk, because if there
+			 * are more ordered gap blocks, they will fail the
+			 * sanity check, and if there are un-ordered gap blocks,
+			 * we will continue processing in sctp_process_uo_gaps()
+			 * We just reset the mp to the one we started with.
+			 */
 			if (!SCTP_CHUNK_ISSENT(mp)) {
-				goto ret;
+				ASSERT(xtsn == gapend);
+				ump = sctp->sctp_xmit_head;
+				mp = mp1;
+				sdc = (sctp_data_hdr_t *)mp->b_rptr;
+				xtsn = ntohl(sdc->sdh_tsn);
+				break;
 			}
 			sdc = (sctp_data_hdr_t *)mp->b_rptr;
 			xtsn = ntohl(sdc->sdh_tsn);
 		}
-		ssf++;
 	}
 	if (sctp->sctp_prsctp_aware)
 		sctp_check_abandoned_data(sctp, sctp->sctp_current);
@@ -3212,6 +3529,15 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				 */
 				sctp_faddr_alive(sctp, fp);
 				trysend = sctp_got_sack(sctp, ch);
+				if (trysend < 0) {
+					sctp_send_abort(sctp, sctph->sh_verf,
+					    0, NULL, 0, mp, 0, B_FALSE);
+					sctp_assoc_event(sctp,
+					    SCTP_COMM_LOST, 0, NULL);
+					sctp_clean_death(sctp,
+					    ECONNABORTED);
+					goto done;
+				}
 				break;
 			case CHUNK_HEARTBEAT:
 				sctp_return_heartbeat(sctp, ch, mp);
@@ -3240,7 +3566,7 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				sctp_saddr_ipif_t *sp;
 
 				/* Ignore if delete pending */
-				sp = sctp_saddr_lookup(sctp, &dst);
+				sp = sctp_saddr_lookup(sctp, &dst, 0);
 				ASSERT(sp != NULL);
 				if (sp->saddr_ipif_delete_pending) {
 					BUMP_LOCAL(sctp->sctp_ibchunks);
@@ -3626,6 +3952,15 @@ sctp_input_data(sctp_t *sctp, mblk_t *mp, mblk_t *ipsec_mp)
 				break;
 			case CHUNK_SACK:
 				trysend = sctp_got_sack(sctp, ch);
+				if (trysend < 0) {
+					sctp_send_abort(sctp, sctph->sh_verf,
+					    0, NULL, 0, mp, 0, B_FALSE);
+					sctp_assoc_event(sctp,
+					    SCTP_COMM_LOST, 0, NULL);
+					sctp_clean_death(sctp,
+					    ECONNABORTED);
+					goto done;
+				}
 				break;
 			case CHUNK_ABORT:
 				sctp_process_abort(sctp, ch, ECONNRESET);

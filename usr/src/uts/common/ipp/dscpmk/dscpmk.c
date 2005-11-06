@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,7 @@
 
 #include <sys/types.h>
 #include <sys/atomic.h>
+#include <sys/pattr.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <inet/common.h>
@@ -146,9 +147,16 @@ dscpmk_process(mblk_t **mpp, dscpmk_data_t *dscpmk_data, ip_proc_t proc)
 
 	if (is_v4) {
 		ipha->ipha_type_of_service = new_dscp;
-		ipha->ipha_hdr_checksum = 0;
-		ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
-	}
+		/*
+		 * If the hardware supports checksumming, we don't need
+		 * to do anything.
+		 */
+		if (!(mp->b_datap->db_struioun.cksum.flags &
+		    HCK_IPV4_HDRCKSUM)) {
+			ipha->ipha_hdr_checksum = 0;
+			ipha->ipha_hdr_checksum = ip_csum_hdr(ipha);
+		}
+	} else {
 
 	/*
 	 * IPv6 : DSCP field structure is as given -- RFC 2474
@@ -160,13 +168,10 @@ dscpmk_process(mblk_t **mpp, dscpmk_data_t *dscpmk_data, ip_proc_t proc)
 	 *	+---+---+---+---+---+---+---+---+
 	 *
 	 * CU -- Currently Unused
-	 */
-
-	/*
+	 *
 	 * the 32 bit vcf consists of version (4 bits), Traffic class (8 bits)
 	 * and flow id (20 bits). Need to take care of Big/Little-Endianess.
 	 */
-	else {
 #ifdef _BIG_ENDIAN
 		ip6_hdr->ip6_vcf = (ip6_hdr->ip6_vcf & TCLASS_MASK) |
 		    (new_dscp << 20);

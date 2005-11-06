@@ -48,9 +48,22 @@
 #include "sctp_addr.h"
 
 typedef struct sctp_asconf_s {
-	mblk_t *head;
-	uint32_t cid;
+	mblk_t		*head;
+	uint32_t 	cid;
 } sctp_asconf_t;
+
+/*
+ * This is only used on a clustered node to maintain pre-allocated buffer info.
+ * before sending an ASCONF chunk. The reason for pre-allocation is we don't
+ * want to fail allocating memory when we get then ASCONF-ACK in order to
+ * update the clustering subsystem's state for this assoc.
+ */
+typedef struct sctp_cl_ainfo_s {
+	uchar_t	*sctp_cl_alist;
+	size_t	sctp_cl_asize;
+	uchar_t	*sctp_cl_dlist;
+	size_t	sctp_cl_dsize;
+} sctp_cl_ainfo_t;
 
 /*
  * The ASCONF chunk per-parameter request interface. ph is the
@@ -71,7 +84,7 @@ typedef struct sctp_asconf_s {
  * requestor.
  */
 typedef mblk_t *sctp_asconf_func_t(sctp_t *, sctp_parm_hdr_t *ph, uint32_t cid,
-    sctp_faddr_t *, int *cont, int act);
+    sctp_faddr_t *, int *cont, int act, in6_addr_t *addr);
 
 /*
  * The ASCONF chunk per-parameter ACK interface. ph is the parameter
@@ -87,7 +100,7 @@ typedef mblk_t *sctp_asconf_func_t(sctp_t *, sctp_parm_hdr_t *ph, uint32_t cid,
  * parameters will still be in network byte order.
  */
 typedef void sctp_asconf_ack_func_t(sctp_t *, sctp_parm_hdr_t *ph,
-    sctp_parm_hdr_t *oph, sctp_faddr_t *);
+    sctp_parm_hdr_t *oph, sctp_faddr_t *, in6_addr_t *addr);
 
 typedef struct {
 	uint16_t id;
@@ -158,7 +171,7 @@ sctp_asconf_prepend_errwrap(mblk_t *mp, uint32_t cid)
 /*ARGSUSED*/
 static mblk_t *
 sctp_asconf_unrec_parm(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
-    sctp_faddr_t *fp, int *cont, int act)
+    sctp_faddr_t *fp, int *cont, int act, in6_addr_t *addr)
 {
 	mblk_t *mp = NULL;
 
@@ -211,7 +224,7 @@ sctp_asconf_unrec_parm(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 /*ARGSUSED*/
 static void
 sctp_asconf_ack_unrec_parm(sctp_t *sctp, sctp_parm_hdr_t *ph,
-    sctp_parm_hdr_t *oph, sctp_faddr_t *fp)
+    sctp_parm_hdr_t *oph, sctp_faddr_t *fp, in6_addr_t *laddr)
 {
 	ASSERT(ph);
 	sctp_error_event(sctp, (sctp_chunk_hdr_t *)ph);
@@ -255,7 +268,8 @@ sctp_asconf_destroy(sctp_asconf_t *asc)
 }
 
 static int
-sctp_asconf_send(sctp_t *sctp, sctp_asconf_t *asc, sctp_faddr_t *fp)
+sctp_asconf_send(sctp_t *sctp, sctp_asconf_t *asc, sctp_faddr_t *fp,
+    sctp_cl_ainfo_t *ainfo)
 {
 	mblk_t			*mp, *nmp;
 	sctp_chunk_hdr_t	*ch;
@@ -288,6 +302,16 @@ sctp_asconf_send(sctp_t *sctp, sctp_asconf_t *asc, sctp_faddr_t *fp)
 		return (ENOMEM);
 	}
 
+	/*
+	 * Stash the address list and the count so that when the operation
+	 * completes, i.e. when as get an ACK, we can update the clustering's
+	 * state for this association.
+	 */
+	if (ainfo != NULL) {
+		ASSERT(cl_sctp_assoc_change != NULL);
+		ASSERT(nmp->b_prev == NULL);
+		nmp->b_prev = (mblk_t *)ainfo;
+	}
 	/* Clean up the temporary mblk chain */
 	freemsg(mp);
 	asc->head = NULL;
@@ -317,14 +341,31 @@ sctp_asconf_send(sctp_t *sctp, sctp_asconf_t *asc, sctp_faddr_t *fp)
  */
 /*ARGSUSED*/
 void
-sctp_asconf_unrec_chunk(sctp_t *sctp, sctp_chunk_hdr_t *ch)
+sctp_asconf_free_cxmit(sctp_t *sctp, sctp_chunk_hdr_t *ch)
 {
+	mblk_t		*mp;
+	mblk_t		*mp1;
+	sctp_cl_ainfo_t	*ainfo;
+
 	if (sctp->sctp_cxmit_list == NULL) {
 		/* Nothing pending */
 		return;
 	}
 
-	freemsg(sctp->sctp_cxmit_list);
+	mp = sctp->sctp_cxmit_list;
+	while (mp != NULL) {
+		mp1 = mp->b_cont;
+		mp->b_cont = NULL;
+		if (mp->b_prev != NULL) {
+			ainfo = (sctp_cl_ainfo_t *)mp->b_prev;
+			mp->b_prev = NULL;
+			kmem_free(ainfo->sctp_cl_alist, ainfo->sctp_cl_asize);
+			kmem_free(ainfo->sctp_cl_dlist, ainfo->sctp_cl_dsize);
+			kmem_free(ainfo, sizeof (*ainfo));
+		}
+		freeb(mp);
+		mp = mp1;
+	}
 	sctp->sctp_cxmit_list = NULL;
 }
 
@@ -342,6 +383,14 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	int			cont;
 	int			act;
 	uint16_t		plen;
+	uchar_t			*alist = NULL;
+	size_t			asize = 0;
+	uchar_t			*dlist = NULL;
+	size_t			dsize = 0;
+	uchar_t			*aptr = NULL;
+	uchar_t			*dptr = NULL;
+	int			acount = 0;
+	int			dcount = 0;
 
 	ASSERT(ch->sch_id == CHUNK_ASCONF);
 
@@ -393,8 +442,70 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	 */
 	rlen -= ntohs(ph->sph_len);
 	ph = (sctp_parm_hdr_t *)((char *)ph + ntohs(ph->sph_len));
+
+	/*
+	 * We need to pre-allocate buffer before processing the ASCONF
+	 * chunk. We don't want to fail allocating buffers after processing
+	 * the ASCONF chunk. So, we walk the list and get the number of
+	 * addresses added and/or deleted.
+	 */
+	if (cl_sctp_assoc_change != NULL) {
+		sctp_parm_hdr_t	*oph = ph;
+		ssize_t		orlen = rlen;
+
+		/*
+		 * This not very efficient, but there is no better way of
+		 * doing it.  It should be fine since normally the param list
+		 * will not be very long.
+		 */
+		while (orlen > 0) {
+			/* Sanity checks */
+			if (orlen < sizeof (*oph))
+				break;
+			plen = ntohs(oph->sph_len);
+			if (plen < sizeof (*oph) || plen > orlen)
+				break;
+			if (oph->sph_type == htons(PARM_ADD_IP))
+				acount++;
+			if (oph->sph_type == htons(PARM_DEL_IP))
+				dcount++;
+			oph = sctp_next_parm(oph, &orlen);
+			if (oph == NULL)
+				break;
+		}
+		if (acount > 0 || dcount > 0) {
+			if (acount > 0) {
+				asize = sizeof (in6_addr_t) * acount;
+				alist = kmem_alloc(asize, KM_NOSLEEP);
+				if (alist == NULL) {
+					freeb(hmp);
+					return;
+				}
+			}
+			if (dcount > 0) {
+				dsize = sizeof (in6_addr_t) * dcount;
+				dlist = kmem_alloc(dsize, KM_NOSLEEP);
+				if (dlist == NULL) {
+					if (acount > 0)
+						kmem_free(alist, asize);
+					freeb(hmp);
+					return;
+				}
+			}
+			aptr = alist;
+			dptr = dlist;
+			/*
+			 * We will get the actual count when we process
+			 * the chunk.
+			 */
+			acount = 0;
+			dcount = 0;
+		}
+	}
 	cont = 1;
 	while (rlen > 0 && cont) {
+		in6_addr_t	addr;
+
 		/* Sanity checks */
 		if (rlen < sizeof (*ph))
 			break;
@@ -406,7 +517,7 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 		dp = sctp_lookup_asconf_dispatch(ntohs(ph->sph_type));
 		ASSERT(dp);
 		if (dp->asconf) {
-			mp = dp->asconf(sctp, ph, *idp, fp, &cont, act);
+			mp = dp->asconf(sctp, ph, *idp, fp, &cont, act, &addr);
 			if (cont == -1) {
 				/*
 				 * Not even enough memory to create
@@ -415,10 +526,33 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 				 * should retransmit.
 				 */
 				freemsg(hmp);
+				if (alist != NULL)
+					kmem_free(alist, asize);
+				if (dlist != NULL)
+					kmem_free(dlist, dsize);
 				return;
 			}
 			if (mp != NULL) {
 				linkb(hmp, mp);
+			} else if (act != 0) {
+				/* update the add/delete list */
+				if (cl_sctp_assoc_change != NULL) {
+					if (ph->sph_type ==
+					    htons(PARM_ADD_IP)) {
+						ASSERT(alist != NULL);
+						bcopy(&addr, aptr,
+						    sizeof (addr));
+						aptr += sizeof (addr);
+						acount++;
+					} else if (ph->sph_type ==
+					    htons(PARM_DEL_IP)) {
+						ASSERT(dlist != NULL);
+						bcopy(&addr, dptr,
+						    sizeof (addr));
+						dptr += sizeof (addr);
+						dcount++;
+					}
+				}
 			}
 		}
 		ph = sctp_next_parm(ph, &rlen);
@@ -426,6 +560,18 @@ sctp_input_asconf(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 			break;
 	}
 
+	/*
+	 * Update clustering's state for this assoc. Note acount/dcount
+	 * could be zero (i.e. if the add/delete address(es) were not
+	 * processed successfully). Regardless, if the ?size is > 0,
+	 * it is the clustering module's responsibility to free the lists.
+	 */
+	if (cl_sctp_assoc_change != NULL) {
+		(*cl_sctp_assoc_change)(sctp->sctp_family, alist, asize,
+		    acount, dlist, dsize, dcount, SCTP_CL_PADDR,
+		    (cl_sctp_handle_t)sctp);
+		/* alist and dlist will be freed by the clustering module */
+	}
 	/* Now that the params have been processed, increment the fcsn */
 	if (act) {
 		sctp->sctp_fcsn++;
@@ -474,6 +620,14 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	sctp_chunk_hdr_t	*och;
 	int			redosrcs = 0;
 	uint16_t		param_len;
+	uchar_t			*alist;
+	uchar_t			*dlist;
+	uint_t			acount = 0;
+	uint_t			dcount = 0;
+	uchar_t			*aptr;
+	uchar_t			*dptr;
+	sctp_cl_ainfo_t		*ainfo;
+	in6_addr_t		addr;
 
 	ASSERT(ch->sch_id == CHUNK_ASCONF_ACK);
 
@@ -491,6 +645,20 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	}
 	sctp->sctp_cchunk_pend = 0;
 	SCTP_FADDR_RC_TIMER_STOP(fp);
+
+	mp = sctp->sctp_cxmit_list;
+	/*
+	 * We fill in the addresses here to update the clustering's state for
+	 * this assoc.
+	 */
+	if (mp != NULL && cl_sctp_assoc_change != NULL) {
+		ASSERT(mp->b_prev != NULL);
+		ainfo = (sctp_cl_ainfo_t *)mp->b_prev;
+		alist = ainfo->sctp_cl_alist;
+		dlist = ainfo->sctp_cl_dlist;
+		aptr = alist;
+		dptr = dlist;
+	}
 
 	/*
 	 * Pass explicit replies to callbacks:
@@ -523,12 +691,33 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 			dp = sctp_lookup_asconf_dispatch(ntohs(oph->sph_type));
 			ASSERT(dp);
 			if (dp->asconf_ack) {
-				dp->asconf_ack(sctp, ph, oph, fp);
+				dp->asconf_ack(sctp, ph, oph, fp, &addr);
 
 				/* hack. see below */
 				if (oph->sph_type == htons(PARM_ADD_IP) ||
 				    oph->sph_type == htons(PARM_DEL_IP)) {
 					redosrcs = 1;
+					/*
+					 * If the address was sucessfully
+					 * processed, add it to the add/delete
+					 * list to send to the clustering
+					 * module.
+					 */
+					if (cl_sctp_assoc_change != NULL &&
+					    !IN6_IS_ADDR_UNSPECIFIED(&addr)) {
+						if (oph->sph_type ==
+						    htons(PARM_ADD_IP)) {
+							bcopy(&addr, aptr,
+							    sizeof (addr));
+							aptr += sizeof (addr);
+							acount++;
+						} else {
+							bcopy(&addr, dptr,
+							    sizeof (addr));
+							dptr += sizeof (addr);
+							dcount++;
+						}
+					}
 				}
 			}
 		}
@@ -557,12 +746,33 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 			dp = sctp_lookup_asconf_dispatch(ntohs(oph->sph_type));
 			ASSERT(dp);
 			if (dp->asconf_ack) {
-				dp->asconf_ack(sctp, NULL, oph, fp);
+				dp->asconf_ack(sctp, NULL, oph, fp, &addr);
 
 				/* hack. see below */
 				if (oph->sph_type == htons(PARM_ADD_IP) ||
 				    oph->sph_type == htons(PARM_DEL_IP)) {
 					redosrcs = 1;
+					/*
+					 * If the address was sucessfully
+					 * processed, add it to the add/delete
+					 * list to send to the clustering
+					 * module.
+					 */
+					if (cl_sctp_assoc_change != NULL &&
+					    !IN6_IS_ADDR_UNSPECIFIED(&addr)) {
+						if (oph->sph_type ==
+						    htons(PARM_ADD_IP)) {
+							bcopy(&addr, aptr,
+							    sizeof (addr));
+							aptr += sizeof (addr);
+							acount++;
+						} else {
+							bcopy(&addr, dptr,
+							    sizeof (addr));
+							dptr += sizeof (addr);
+							dcount++;
+						}
+					}
 				}
 			}
 		}
@@ -573,13 +783,32 @@ sctp_input_asconf_ack(sctp_t *sctp, sctp_chunk_hdr_t *ch, sctp_faddr_t *fp)
 	}
 
 	/* We can now free up the first chunk in the cxmit list */
-	mp = sctp->sctp_cxmit_list;
 	sctp->sctp_cxmit_list = mp->b_cont;
 	mp->b_cont = NULL;
 
 	fp = SCTP_CHUNK_DEST(mp);
 	ASSERT(fp != NULL && fp->suna >= MBLKL(mp));
 	fp->suna -= MBLKL(mp);
+
+	/*
+	 * Update clustering's state for this assoc. Note acount/dcount
+	 * could be zero (i.e. if the add/delete address(es) did not
+	 * succeed). Regardless, if the ?size is > 0, it is the clustering
+	 * module's responsibility to free the lists.
+	 */
+	if (cl_sctp_assoc_change != NULL) {
+		ASSERT(mp->b_prev != NULL);
+		mp->b_prev = NULL;
+		ainfo->sctp_cl_alist = NULL;
+		ainfo->sctp_cl_dlist = NULL;
+		(*cl_sctp_assoc_change)(sctp->sctp_family, alist,
+		    ainfo->sctp_cl_asize, acount, dlist, ainfo->sctp_cl_dsize,
+		    dcount, SCTP_CL_LADDR, (cl_sctp_handle_t)sctp);
+		/* alist and dlist will be freed by the clustering module */
+		ainfo->sctp_cl_asize = 0;
+		ainfo->sctp_cl_dsize = 0;
+		kmem_free(ainfo, sizeof (*ainfo));
+	}
 	freeb(mp);
 
 	/* can now send the next control chunk */
@@ -903,7 +1132,7 @@ sctp_check_addip_addr(sctp_parm_hdr_t *ph, sctp_parm_hdr_t *oph, int *cont,
  */
 static mblk_t *
 sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
-    sctp_faddr_t *fp, int *cont, int act)
+    sctp_faddr_t *fp, int *cont, int act, in6_addr_t *raddr)
 {
 	in6_addr_t	addr;
 	uint16_t	type;
@@ -936,7 +1165,8 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 	mp = sctp_check_addip_addr(ph, oph, cont, cid, &addr);
 	if (mp != NULL)
 		return (mp);
-
+	if (raddr != NULL)
+		*raddr = addr;
 	if (type == PARM_ADD_IP) {
 		if (sctp_lookup_faddr(sctp, &addr) != NULL) {
 			/* Address is already part of association */
@@ -1045,7 +1275,7 @@ sctp_addip_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 /*ARGSUSED*/
 static void
 sctp_addip_ack(sctp_t *sctp, sctp_parm_hdr_t *ph, sctp_parm_hdr_t *oph,
-    sctp_faddr_t *fp)
+    sctp_faddr_t *fp, in6_addr_t *laddr)
 {
 	in6_addr_t		addr;
 	sctp_saddr_ipif_t	*sp;
@@ -1053,6 +1283,10 @@ sctp_addip_ack(sctp_t *sctp, sctp_parm_hdr_t *ph, sctp_parm_hdr_t *oph,
 	boolean_t		backout = B_FALSE;
 	uint16_t		type;
 	uint32_t		*cid;
+
+	/* could be an ASSERT */
+	if (laddr != NULL)
+		IN6_IPADDR_TO_V4MAPPED(0, laddr);
 
 	/* If the peer doesn't understand Add-IP, remember it */
 	if (ph != NULL && ph->sph_type == htons(PARM_UNRECOGNIZED)) {
@@ -1079,7 +1313,11 @@ sctp_addip_ack(sctp_t *sctp, sctp_parm_hdr_t *ph, sctp_parm_hdr_t *oph,
 		bcopy(oph + 1, &addr, sizeof (addr));
 	}
 
-	sp = sctp_saddr_lookup(sctp, &addr);
+	/* Signifies that the address was sucessfully processed */
+	if (!backout && laddr != NULL)
+		*laddr = addr;
+
+	sp = sctp_saddr_lookup(sctp, &addr, 0);
 	ASSERT(sp != NULL);
 
 	if (type == PARM_ADD_IP) {
@@ -1104,7 +1342,7 @@ sctp_addip_ack(sctp_t *sctp, sctp_parm_hdr_t *ph, sctp_parm_hdr_t *oph,
 /*ARGSUSED*/
 static mblk_t *
 sctp_setprim_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
-    sctp_faddr_t *fp, int *cont, int act)
+    sctp_faddr_t *fp, int *cont, int act, in6_addr_t *raddr)
 {
 	mblk_t *mp;
 	sctp_parm_hdr_t *oph;
@@ -1165,7 +1403,7 @@ sctp_setprim_req(sctp_t *sctp, sctp_parm_hdr_t *ph, uint32_t cid,
 /*ARGSUSED*/
 static void
 sctp_setprim_ack(sctp_t *sctp, sctp_parm_hdr_t *ph, sctp_parm_hdr_t *oph,
-    sctp_faddr_t *fp)
+    sctp_faddr_t *fp, in6_addr_t *laddr)
 {
 	if (ph != NULL && ph->sph_type != htons(PARM_SUCCESS)) {
 		/* If the peer doesn't understand Add-IP, remember it */
@@ -1191,10 +1429,27 @@ sctp_add_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
 	sctp_asconf_t		asc[1];
 	uint16_t		type = htons(PARM_ADD_IP);
 	boolean_t		v4mapped = B_FALSE;
+	sctp_cl_ainfo_t		*ainfo = NULL;
 
 	/* Does the peer understand ASCONF and Add-IP? */
 	if (!sctp->sctp_understands_asconf || !sctp->sctp_understands_addip)
 		return (EOPNOTSUPP);
+
+	/*
+	 * On a clustered node, we need to pass this list when
+	 * we get an ASCONF-ACK. We only pre-allocate memory for the
+	 * list, but fill in the addresses when it is processed
+	 * successfully after we get an ASCONF-ACK.
+	 */
+	if (cl_sctp_assoc_change != NULL) {
+		ainfo = kmem_zalloc(sizeof (*ainfo), KM_SLEEP);
+		/*
+		 * Reserve space for the list of new addresses
+		 */
+		ainfo->sctp_cl_asize = sizeof (in6_addr_t) * cnt;
+		ainfo->sctp_cl_alist = kmem_alloc(ainfo->sctp_cl_asize,
+		    KM_SLEEP);
+	}
 
 	sctp_asconf_init(asc);
 
@@ -1256,19 +1511,25 @@ sctp_add_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
 		if (error != 0)
 			goto fail;
 	}
-	error = sctp_asconf_send(sctp, asc, sctp->sctp_current);
+	error = sctp_asconf_send(sctp, asc, sctp->sctp_current, ainfo);
 	if (error != 0)
 		goto fail;
 
 	return (0);
 
 fail:
+	if (ainfo != NULL) {
+		kmem_free(ainfo->sctp_cl_alist, ainfo->sctp_cl_asize);
+		ainfo->sctp_cl_asize = 0;
+		kmem_free(ainfo, sizeof (*ainfo));
+	}
 	sctp_asconf_destroy(asc);
 	return (error);
 }
 
 int
-sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
+sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt, uchar_t *ulist,
+    size_t usize)
 {
 	struct sockaddr_in	*sin4;
 	struct sockaddr_in6	*sin6;
@@ -1284,6 +1545,10 @@ sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
 	boolean_t		v4mapped = B_FALSE;
 	in6_addr_t		addr;
 	boolean_t		asconf = B_TRUE;
+	uint_t			ifindex;
+	sctp_cl_ainfo_t		*ainfo = NULL;
+	uchar_t			*p = ulist;
+	boolean_t		check_lport = B_FALSE;
 
 	/* Does the peer understand ASCONF and Add-IP? */
 	if (sctp->sctp_state <= SCTPS_LISTEN || !sctp_addip_enabled ||
@@ -1291,8 +1556,24 @@ sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
 		asconf = B_FALSE;
 	}
 
-	if (asconf)
+	if (sctp->sctp_state > SCTPS_BOUND)
+		check_lport = B_TRUE;
+
+	if (asconf) {
+		/*
+		 * On a clustered node, we need to pass this list when
+		 * we get an ASCONF-ACK. We only pre-allocate memory for the
+		 * list, but fill in the addresses when it is processed
+		 * successfully after we get an ASCONF-ACK.
+		 */
+		if (cl_sctp_assoc_change != NULL) {
+			ainfo = kmem_alloc(sizeof (*ainfo), KM_SLEEP);
+			ainfo->sctp_cl_dsize = sizeof (in6_addr_t) * cnt;
+			ainfo->sctp_cl_dlist = kmem_alloc(ainfo->sctp_cl_dsize,
+			    KM_SLEEP);
+		}
 		sctp_asconf_init(asc);
+	}
 	/*
 	 * Screen addresses:
 	 * If adding:
@@ -1305,24 +1586,42 @@ sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
 	 *   o Must be part of the association
 	 */
 	for (i = 0; i < cnt; i++) {
+		ifindex = 0;
+
 		switch (sctp->sctp_family) {
 		case AF_INET:
 			sin4 = (struct sockaddr_in *)addrs + i;
+			if (check_lport && sin4->sin_port != sctp->sctp_lport) {
+				error = EINVAL;
+				goto fail;
+			}
 			v4mapped = B_TRUE;
 			IN6_IPADDR_TO_V4MAPPED(sin4->sin_addr.s_addr, &addr);
 			break;
 
 		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *)addrs + i;
+			if (check_lport &&
+			    sin6->sin6_port != sctp->sctp_lport) {
+				error = EINVAL;
+				goto fail;
+			}
 			addr = sin6->sin6_addr;
+			ifindex = sin6->sin6_scope_id;
 			break;
 		}
-		nsp = sctp_saddr_lookup(sctp, &addr);
+		nsp = sctp_saddr_lookup(sctp, &addr, ifindex);
 		if (nsp == NULL) {
 			error = EADDRNOTAVAIL;
 			goto fail;
 		}
 
+		/* Collect the list of addresses, if required */
+		if (usize >= sizeof (addr)) {
+			bcopy(&addr, p, sizeof (addr));
+			p += sizeof (addr);
+			usize -= sizeof (addr);
+		}
 		if (!asconf)
 			continue;
 
@@ -1370,16 +1669,23 @@ sctp_del_ip(sctp_t *sctp, const void *addrs, uint32_t cnt)
 		sctp_del_saddr_list(sctp, addrs, cnt, B_FALSE);
 		return (0);
 	}
-	error = sctp_asconf_send(sctp, asc, sctp->sctp_current);
+	error = sctp_asconf_send(sctp, asc, sctp->sctp_current, ainfo);
 	if (error != 0)
 		goto fail;
 	sctp_redo_faddr_srcs(sctp);
 	return (0);
 
 fail:
+	if (ainfo != NULL) {
+		kmem_free(ainfo->sctp_cl_dlist, ainfo->sctp_cl_dsize);
+		ainfo->sctp_cl_dsize = 0;
+		kmem_free(ainfo, sizeof (*ainfo));
+	}
 	if (!asconf)
 		return (error);
 	for (i = 0; i < addrcnt; i++) {
+		ifindex = 0;
+
 		switch (sctp->sctp_family) {
 		case AF_INET:
 			sin4 = (struct sockaddr_in *)addrs + i;
@@ -1388,9 +1694,10 @@ fail:
 		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *)addrs + i;
 			addr = sin6->sin6_addr;
+			ifindex = sin6->sin6_scope_id;
 			break;
 		}
-		nsp = sctp_saddr_lookup(sctp, &addr);
+		nsp = sctp_saddr_lookup(sctp, &addr, ifindex);
 		ASSERT(nsp != NULL);
 		nsp->saddr_ipif_delete_pending = 0;
 		nsp->saddr_ipif_dontsrc = 0;
@@ -1414,6 +1721,7 @@ sctp_set_peerprim(sctp_t *sctp, const void *inp, uint_t inlen)
 	sctp_addip6_t *ad6;
 	sctp_asconf_t asc[1];
 	int error = 0;
+	uint_t	ifindex = 0;
 
 	/* Does the peer understand ASCONF and Add-IP? */
 	if (!sctp->sctp_understands_asconf || !sctp->sctp_understands_addip) {
@@ -1436,10 +1744,11 @@ sctp_set_peerprim(sctp_t *sctp, const void *inp, uint_t inlen)
 	} else if (ss->ss_family == AF_INET6) {
 		sin6 = (struct sockaddr_in6 *)ss;
 		addr = sin6->sin6_addr;
+		ifindex = sin6->sin6_scope_id;
 	} else {
 		return (EAFNOSUPPORT);
 	}
-	sp = sctp_saddr_lookup(sctp, &addr);
+	sp = sctp_saddr_lookup(sctp, &addr, ifindex);
 	if (sp == NULL)
 		return (EADDRNOTAVAIL);
 	sctp_asconf_init(asc);
@@ -1478,7 +1787,7 @@ sctp_set_peerprim(sctp_t *sctp, const void *inp, uint_t inlen)
 		goto fail;
 	}
 
-	error = sctp_asconf_send(sctp, asc, sctp->sctp_current);
+	error = sctp_asconf_send(sctp, asc, sctp->sctp_current, NULL);
 	if (error == 0) {
 		return (0);
 	}

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,8 +53,8 @@ extern "C" {
 	}
 
 extern int sctp_add_ip(sctp_t *, const void *, uint32_t);
-extern int sctp_del_ip(sctp_t *, const void *, uint32_t);
-extern void sctp_asconf_unrec_chunk(sctp_t *, sctp_chunk_hdr_t *);
+extern int sctp_del_ip(sctp_t *, const void *, uint32_t, uchar_t *, size_t);
+extern void sctp_asconf_free_cxmit(sctp_t *, sctp_chunk_hdr_t *);
 extern void sctp_input_asconf(sctp_t *, sctp_chunk_hdr_t *, sctp_faddr_t *);
 extern void sctp_input_asconf_ack(sctp_t *, sctp_chunk_hdr_t *, sctp_faddr_t *);
 extern int sctp_set_peerprim(sctp_t *, const void *, uint_t);

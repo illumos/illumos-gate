@@ -734,7 +734,7 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		(void) mdb_pwalk("sctp_walk_saddr", print_saddr, NULL, addr);
 
 		/* Display peer addresses */
-		mdb_printf("faddrs\t\t%?p\n", sctp.sctp_faddrs);
+		mdb_printf("nfaddrs\t\t%?d\n", sctp.sctp_nfaddrs);
 		i = 1;
 		(void) mdb_pwalk("sctp_walk_faddr", print_faddr, &i, addr);
 
@@ -794,10 +794,11 @@ sctp(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("%<b>Flow Control%</b>\n");
 		mdb_printf("txmit_hiwater\t%?d\n"
 		    "xmit_lowater\t%?d\tfrwnd\t\t%?u\n"
-		    "rwnd\t\t%?u\trxqueued\t%?u\n"
-		    "cwnd_max\t%?u\n", sctp.sctp_xmit_hiwater,
+		    "rwnd\t\t%?u\tinitial rwnd\t%?u\n"
+		    "rxqueued\t%?u\tcwnd_max\t%?u\n", sctp.sctp_xmit_hiwater,
 		    sctp.sctp_xmit_lowater, sctp.sctp_frwnd,
-		    sctp.sctp_rwnd, sctp.sctp_rxqueued, sctp.sctp_cwnd_max);
+		    sctp.sctp_rwnd, sctp.sctp_irwnd, sctp.sctp_rxqueued,
+		    sctp.sctp_cwnd_max);
 	}
 
 	if (opts & MDB_SCTP_SHOW_HDR) {

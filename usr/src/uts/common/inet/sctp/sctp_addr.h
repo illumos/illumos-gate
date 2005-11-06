@@ -155,10 +155,12 @@ krwlock_t			sctp_g_ipifs_lock;
 extern void		sctp_update_ill(ill_t *, int);
 extern void		sctp_update_ipif(ipif_t *, int);
 
-extern int		sctp_valid_addr_list(sctp_t *, const void *, uint32_t);
+extern int		sctp_valid_addr_list(sctp_t *, const void *, uint32_t,
+			    uchar_t *, size_t);
 extern int		sctp_dup_saddrs(sctp_t *, sctp_t *, int);
 extern int		sctp_compare_saddrs(sctp_t *, sctp_t *);
-extern sctp_saddr_ipif_t	*sctp_saddr_lookup(sctp_t *, in6_addr_t *);
+extern sctp_saddr_ipif_t	*sctp_saddr_lookup(sctp_t *, in6_addr_t *,
+				    uint_t);
 extern in6_addr_t	sctp_get_valid_addr(sctp_t *, boolean_t isv6);
 extern size_t		sctp_saddr_info(sctp_t *, int, uchar_t *, boolean_t);
 extern void		sctp_del_saddr_list(sctp_t *, const void *, int,
@@ -169,7 +171,7 @@ extern void		sctp_saddr_init();
 extern void		sctp_saddr_fini();
 extern sctp_saddr_ipif_t	*sctp_ipif_lookup(sctp_t *, uint_t);
 extern int		sctp_getmyaddrs(void *, void *, int *);
-extern int		sctp_saddr_add_addr(sctp_t *, in6_addr_t *);
+extern int		sctp_saddr_add_addr(sctp_t *, in6_addr_t *, uint_t);
 extern void		sctp_check_saddr(sctp_t *, int, boolean_t);
 
 #ifdef	__cplusplus

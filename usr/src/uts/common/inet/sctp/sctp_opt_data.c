@@ -1298,9 +1298,8 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 				 */
 				*i1 = MAX(*i1,
 				    sctp_recv_hiwat_minmss * sctp->sctp_mss);
-				*i1 = MSS_ROUNDUP(*i1, (sctp->sctp_mss -
-					sizeof (sctp_data_hdr_t)));
 				sctp->sctp_rwnd = *i1;
+				sctp->sctp_irwnd = sctp->sctp_rwnd;
 			}
 			/*
 			 * XXX should we return the rwnd here
@@ -1409,7 +1408,7 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 			}
 			if (name == SCTP_ADD_ADDR) {
 				retval = sctp_bind_add(sctp, invalp, addrcnt,
-				    B_TRUE);
+				    B_TRUE, sctp->sctp_lport);
 			} else {
 				retval = sctp_bind_del(sctp, invalp, addrcnt,
 				    B_TRUE);

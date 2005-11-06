@@ -730,6 +730,7 @@ sctp_find_fast_rexmit_mblks(sctp_t *sctp, int *total, sctp_faddr_t **fp)
 						return (start_mp);
 					}
 				}
+				BUMP_MIB(&sctp_mib, sctpOutFastRetrans);
 				SCTP_CHUNK_CLEAR_REXMIT(mp);
 				if (start_mp == NULL) {
 					start_mp = nmp;

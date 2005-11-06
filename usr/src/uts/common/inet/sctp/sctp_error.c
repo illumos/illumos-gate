@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -395,7 +395,7 @@ sctp_handle_error(sctp_t *sctp, sctp_hdr_t *sctph, sctp_chunk_hdr_t *ch,
 				dprint(0, ("Malformed Unrec Chunk error\n"));
 				return (0);
 			}
-			sctp_asconf_unrec_chunk(sctp, uch);
+			sctp_asconf_free_cxmit(sctp, uch);
 			return (0);
 		}
 		/* Else drop it */

@@ -498,6 +498,7 @@ sctp_add_faddr(sctp_t *sctp, in6_addr_t *addr, int sleep)
 		sctp->sctp_faddrs = faddr;
 	}
 	sctp->sctp_lastfaddr = faddr;
+	sctp->sctp_nfaddrs++;
 
 	return (0);
 }
@@ -526,6 +527,7 @@ sctp_add_faddr_first(sctp_t *sctp, in6_addr_t *addr, int sleep)
 		sctp->sctp_lastfaddr = faddr;
 	}
 	sctp->sctp_faddrs = faddr;
+	sctp->sctp_nfaddrs++;
 
 	return (0);
 }
@@ -797,6 +799,7 @@ gotit:
 	mutex_exit(&sctp->sctp_conn_tfp->tf_lock);
 	/* XXX faddr2ire? */
 	kmem_cache_free(sctp_kmem_faddr_cache, fp);
+	sctp->sctp_nfaddrs--;
 }
 
 void
@@ -826,10 +829,11 @@ sctp_zap_faddrs(sctp_t *sctp, int caller_holds_lock)
 		if (fp->ire != NULL)
 			IRE_REFRELE_NOTR(fp->ire);
 		kmem_cache_free(sctp_kmem_faddr_cache, fp);
+		sctp->sctp_nfaddrs--;
 	}
 
 	sctp->sctp_faddrs = NULL;
-
+	ASSERT(sctp->sctp_nfaddrs == 0);
 	if (sctp->sctp_conn_tfp != NULL && !caller_holds_lock) {
 		mutex_exit(&sctp->sctp_conn_tfp->tf_lock);
 	}
@@ -1203,6 +1207,7 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 	sctp_faddr_t		*fp;
 	int			supp_af = 0;
 	boolean_t		check_saddr = B_TRUE;
+	in6_addr_t		curaddr;
 
 	if (sctp_options != NULL)
 		*sctp_options = 0;
@@ -1253,6 +1258,10 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 		fp = sctp->sctp_faddrs;
 	}
 	/* make the header addr the primary */
+
+	if (cl_sctp_assoc_change != NULL && psctp == NULL)
+		curaddr = sctp->sctp_current->faddr;
+
 	sctp->sctp_primary = fp;
 	sctp->sctp_current = fp;
 	sctp->sctp_mss = fp->sfa_pmss;
@@ -1261,7 +1270,7 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 	if (sctp->sctp_loopback || sctp->sctp_linklocal) {
 		if (sctp->sctp_nsaddrs != 0)
 			sctp_free_saddrs(sctp);
-		if ((err = sctp_saddr_add_addr(sctp, hdrdaddr)) != 0)
+		if ((err = sctp_saddr_add_addr(sctp, hdrdaddr, 0)) != 0)
 			return (err);
 		/* For loopback ignore address list */
 		if (sctp->sctp_loopback)
@@ -1277,7 +1286,7 @@ sctp_get_addrparams(sctp_t *sctp, sctp_t *psctp, mblk_t *pkt,
 			sctp_check_saddr(sctp, supp_af, psctp == NULL ?
 			    B_FALSE : B_TRUE);
 		}
-		ASSERT(sctp_saddr_lookup(sctp, hdrdaddr) != NULL);
+		ASSERT(sctp_saddr_lookup(sctp, hdrdaddr, 0) != NULL);
 		return (0);
 	}
 
@@ -1386,7 +1395,43 @@ next:
 		sctp_check_saddr(sctp, supp_af, psctp == NULL ? B_FALSE :
 		    B_TRUE);
 	}
-	ASSERT(sctp_saddr_lookup(sctp, hdrdaddr) != NULL);
+	ASSERT(sctp_saddr_lookup(sctp, hdrdaddr, 0) != NULL);
+	/*
+	 * We have the right address list now, update clustering's
+	 * knowledge because when we sent the INIT we had just added
+	 * the address the INIT was sent to.
+	 */
+	if (psctp == NULL && cl_sctp_assoc_change != NULL) {
+		uchar_t	*alist;
+		size_t	asize;
+		uchar_t	*dlist;
+		size_t	dsize;
+
+		asize = sizeof (in6_addr_t) * sctp->sctp_nfaddrs;
+		alist = kmem_alloc(asize, KM_NOSLEEP);
+		if (alist == NULL)
+			return (ENOMEM);
+		/*
+		 * Just include the address the INIT was sent to in the
+		 * delete list and send the entire faddr list. We could
+		 * do it differently (i.e include all the addresses in the
+		 * add list even if it contains the original address OR
+		 * remove the original address from the add list etc.), but
+		 * this seems reasonable enough.
+		 */
+		dsize = sizeof (in6_addr_t);
+		dlist = kmem_alloc(dsize, KM_NOSLEEP);
+		if (dlist == NULL) {
+			kmem_free(alist, asize);
+			return (ENOMEM);
+		}
+		bcopy(&curaddr, dlist, sizeof (curaddr));
+		sctp_get_faddr_list(sctp, alist, asize);
+		(*cl_sctp_assoc_change)(sctp->sctp_family, alist, asize,
+		    sctp->sctp_nfaddrs, dlist, dsize, 1, SCTP_CL_PADDR,
+		    (cl_sctp_handle_t)sctp);
+		/* alist and dlist will be freed by the clustering module */
+	}
 	return (0);
 }
 

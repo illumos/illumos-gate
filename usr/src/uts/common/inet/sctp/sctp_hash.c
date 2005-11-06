@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,14 @@ sctp_tf_t	sctp_listen_fanout[SCTP_LISTEN_FANOUT_SIZE];
 
 sctp_tf_t	*sctp_conn_fanout;
 uint_t		sctp_conn_hash_size = SCTP_CONN_HASH_SIZE;
+
+/*
+ * Cluster networking hook for traversing current assoc list.
+ * This routine is used to extract the current list of live associations
+ * which must continue to to be dispatched to this node.
+ */
+int cl_sctp_walk_list(int (*cl_callback)(cl_sctp_info_t *, void *), void *,
+    boolean_t);
 
 void
 sctp_hash_init()
@@ -166,6 +174,84 @@ sctp_ire_cache_flush(ipif_t *ipif)
 		SCTP_REFRELE(sctp_prev);
 }
 
+/*
+ * Exported routine for extracting active SCTP associations.
+ * Like TCP, we terminate the walk if the callback returns non-zero.
+ */
+int
+cl_sctp_walk_list(int (*cl_callback)(cl_sctp_info_t *, void *), void *arg,
+    boolean_t cansleep)
+{
+	sctp_t		*sctp;
+	sctp_t		*sctp_prev;
+	cl_sctp_info_t	cl_sctpi;
+	uchar_t		*slist;
+	uchar_t		*flist;
+
+	sctp = gsctp;
+	sctp_prev = NULL;
+	mutex_enter(&sctp_g_lock);
+	while (sctp != NULL) {
+		size_t	ssize;
+		size_t	fsize;
+
+		mutex_enter(&sctp->sctp_reflock);
+		if (sctp->sctp_condemned || sctp->sctp_state <= SCTPS_LISTEN) {
+			mutex_exit(&sctp->sctp_reflock);
+			sctp = list_next(&sctp_g_list, sctp);
+			continue;
+		}
+		sctp->sctp_refcnt++;
+		mutex_exit(&sctp->sctp_reflock);
+		mutex_exit(&sctp_g_lock);
+		if (sctp_prev != NULL)
+			SCTP_REFRELE(sctp_prev);
+		RUN_SCTP(sctp);
+		ssize = sizeof (in6_addr_t) * sctp->sctp_nsaddrs;
+		fsize = sizeof (in6_addr_t) * sctp->sctp_nfaddrs;
+
+		slist = kmem_alloc(ssize, cansleep ? KM_SLEEP : KM_NOSLEEP);
+		flist = kmem_alloc(fsize, cansleep ? KM_SLEEP : KM_NOSLEEP);
+		if (slist == NULL || flist == NULL) {
+			WAKE_SCTP(sctp);
+			if (slist != NULL)
+				kmem_free(slist, ssize);
+			if (flist != NULL)
+				kmem_free(flist, fsize);
+			SCTP_REFRELE(sctp);
+			return (1);
+		}
+		cl_sctpi.cl_sctpi_version = CL_SCTPI_V1;
+		sctp_get_saddr_list(sctp, slist, ssize);
+		sctp_get_faddr_list(sctp, flist, fsize);
+		cl_sctpi.cl_sctpi_nladdr = sctp->sctp_nsaddrs;
+		cl_sctpi.cl_sctpi_nfaddr = sctp->sctp_nfaddrs;
+		cl_sctpi.cl_sctpi_family = sctp->sctp_family;
+		cl_sctpi.cl_sctpi_ipversion = sctp->sctp_ipversion;
+		cl_sctpi.cl_sctpi_state = sctp->sctp_state;
+		cl_sctpi.cl_sctpi_lport = sctp->sctp_lport;
+		cl_sctpi.cl_sctpi_fport = sctp->sctp_fport;
+		cl_sctpi.cl_sctpi_handle = (cl_sctp_handle_t)sctp;
+		WAKE_SCTP(sctp);
+		cl_sctpi.cl_sctpi_laddrp = slist;
+		cl_sctpi.cl_sctpi_faddrp = flist;
+		if ((*cl_callback)(&cl_sctpi, arg) != 0) {
+			kmem_free(slist, ssize);
+			kmem_free(flist, fsize);
+			SCTP_REFRELE(sctp);
+			return (1);
+		}
+		/* list will be freed by cl_callback */
+		sctp_prev = sctp;
+		mutex_enter(&sctp_g_lock);
+		sctp = list_next(&sctp_g_list, sctp);
+	}
+	mutex_exit(&sctp_g_lock);
+	if (sctp_prev != NULL)
+		SCTP_REFRELE(sctp_prev);
+	return (0);
+}
+
 sctp_t *
 sctp_conn_match(in6_addr_t *faddr, in6_addr_t *laddr, uint32_t ports,
     uint_t ipif_seqid, zoneid_t zoneid)
@@ -197,7 +283,7 @@ sctp_conn_match(in6_addr_t *faddr, in6_addr_t *laddr, uint32_t ports,
 
 		/* check for laddr match */
 		if (ipif_seqid == 0) {
-			if (sctp_saddr_lookup(sctp, laddr) != NULL) {
+			if (sctp_saddr_lookup(sctp, laddr, 0) != NULL) {
 				SCTP_REFHOLD(sctp);
 				goto done;
 			}
@@ -235,7 +321,7 @@ listen_match(in6_addr_t *laddr, uint32_t ports, uint_t ipif_seqid,
 		}
 
 		if (ipif_seqid == 0) {
-			if (sctp_saddr_lookup(sctp, laddr) != NULL) {
+			if (sctp_saddr_lookup(sctp, laddr, 0) != NULL) {
 				SCTP_REFHOLD(sctp);
 				goto done;
 			}
@@ -432,6 +518,15 @@ sctp_conn_hash_remove(sctp_t *sctp)
 	if (!tf) {
 		return;
 	}
+	/*
+	 * On a clustered note send this notification to the clustering
+	 * subsystem.
+	 */
+	if (cl_sctp_disconnect != NULL) {
+		(*cl_sctp_disconnect)(sctp->sctp_family,
+		    (cl_sctp_handle_t)sctp);
+	}
+
 	mutex_enter(&tf->tf_lock);
 	ASSERT(tf->tf_sctp);
 	if (tf->tf_sctp == sctp) {
@@ -492,6 +587,21 @@ sctp_listen_hash_remove(sctp_t *sctp)
 	if (!tf) {
 		return;
 	}
+	/*
+	 * On a clustered note send this notification to the clustering
+	 * subsystem.
+	 */
+	if (cl_sctp_unlisten != NULL) {
+		uchar_t	*slist;
+		ssize_t	ssize;
+
+		ssize = sizeof (in6_addr_t) * sctp->sctp_nsaddrs;
+		slist = kmem_alloc(ssize, KM_SLEEP);
+		sctp_get_saddr_list(sctp, slist, ssize);
+		(*cl_sctp_unlisten)(sctp->sctp_family, slist,
+		    sctp->sctp_nsaddrs, sctp->sctp_lport);
+		/* list will be freed by the clustering module */
+	}
 
 	mutex_enter(&tf->tf_lock);
 	ASSERT(tf->tf_sctp);
@@ -538,6 +648,21 @@ sctp_listen_hash_insert(sctp_tf_t *tf, sctp_t *sctp)
 	tf->tf_sctp = sctp;
 	sctp->sctp_listen_tfp = tf;
 	mutex_exit(&tf->tf_lock);
+	/*
+	 * On a clustered note send this notification to the clustering
+	 * subsystem.
+	 */
+	if (cl_sctp_listen != NULL) {
+		uchar_t	*slist;
+		ssize_t	ssize;
+
+		ssize = sizeof (in6_addr_t) * sctp->sctp_nsaddrs;
+		slist = kmem_alloc(ssize, KM_SLEEP);
+		sctp_get_saddr_list(sctp, slist, ssize);
+		(*cl_sctp_listen)(sctp->sctp_family, slist,
+		    sctp->sctp_nsaddrs, sctp->sctp_lport);
+		/* list will be freed by the clustering module */
+	}
 }
 
 /*

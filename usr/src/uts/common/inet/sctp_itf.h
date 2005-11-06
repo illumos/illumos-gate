@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include <netinet/sctp.h>
 
 /*
  * Kernel SCTP programming interface.  Note that this interface
@@ -125,6 +127,40 @@ extern int sctp_set_opt(struct sctp_s *conn, int level, int opt,
 
 /* Use by sockfs to do sctp_peeloff(). */
 #define	SCTP_UC_SWAP			255
+
+/*
+ * The following are private interfaces between Solaris SCTP and SunCluster.
+ * Hence, these interfaces are only for use by SunCluster and are *not* part
+ * of the general SCTP kernel interface.
+ */
+
+typedef uintptr_t cl_sctp_handle_t;
+
+typedef struct cl_sctp_info_s {
+	ushort_t		cl_sctpi_version;
+	ushort_t		cl_sctpi_family;
+	ushort_t		cl_sctpi_ipversion;
+	int32_t			cl_sctpi_state;
+	in_port_t		cl_sctpi_lport;
+	in_port_t		cl_sctpi_fport;
+	uint_t			cl_sctpi_nladdr;
+	uchar_t			*cl_sctpi_laddrp;
+	uint_t			cl_sctpi_nfaddr;
+	uchar_t			*cl_sctpi_faddrp;
+	cl_sctp_handle_t	cl_sctpi_handle;
+} cl_sctp_info_t;
+
+#define	CL_SCTPI_V1	1	/* cl_sctpi_version number */
+
+/* Used to indicate if the local or peer address list has changed */
+#define	SCTP_CL_LADDR	1
+#define	SCTP_CL_PADDR	2
+
+extern int cl_sctp_cookie_paddr(sctp_chunk_hdr_t *, in6_addr_t *);
+extern int cl_sctp_walk_list(int (*callback)(cl_sctp_info_t *, void *), void *,
+    boolean_t);
+
+/* End of private SunCluster interfaces */
 
 #endif /* _KERNEL */
 

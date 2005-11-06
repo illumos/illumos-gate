@@ -135,9 +135,8 @@ sctp_accept_comm(sctp_t *listener, sctp_t *acceptor, mblk_t *cr_pkt,
 	 * listener->sctp_rwnd should be the default window size or a
 	 * window size changed via SO_RCVBUF option.
 	 */
-	acceptor->sctp_rwnd = MSS_ROUNDUP(listener->sctp_rwnd,
-	    (acceptor->sctp_mss - sizeof (sctp_data_hdr_t)));
-
+	acceptor->sctp_rwnd = listener->sctp_rwnd;
+	acceptor->sctp_irwnd = acceptor->sctp_rwnd;
 	bcopy(&listener->sctp_upcalls, &acceptor->sctp_upcalls,
 	    sizeof (sctp_upcalls_t));
 
@@ -241,6 +240,38 @@ sctp_conn_request(sctp_t *sctp, mblk_t *mp, uint_t ifindex, uint_t ip_hdr_len,
 		return (NULL);
 	}
 
+	/*
+	 * On a clustered note send this notification to the clustering
+	 * subsystem.
+	 */
+	if (cl_sctp_connect != NULL) {
+		uchar_t	*slist;
+		uchar_t	*flist;
+		size_t	fsize;
+		size_t	ssize;
+
+		fsize = sizeof (in6_addr_t) * eager->sctp_nfaddrs;
+		ssize = sizeof (in6_addr_t) * eager->sctp_nsaddrs;
+		slist = kmem_alloc(ssize, KM_NOSLEEP);
+		flist = kmem_alloc(fsize, KM_NOSLEEP);
+		if (slist == NULL || flist == NULL) {
+			if (slist != NULL)
+				kmem_free(slist, ssize);
+			if (flist != NULL)
+				kmem_free(flist, fsize);
+			sctp_close_eager(eager);
+			BUMP_MIB(&sctp_mib, sctpListenDrop);
+			return (NULL);
+		}
+		/* The clustering module frees these list */
+		sctp_get_saddr_list(eager, slist, ssize);
+		sctp_get_faddr_list(eager, flist, fsize);
+		(*cl_sctp_connect)(eager->sctp_family, slist,
+		    eager->sctp_nsaddrs, eager->sctp_lport, flist,
+		    eager->sctp_nfaddrs, eager->sctp_fport, B_FALSE,
+		    (cl_sctp_handle_t)eager);
+	}
+
 	/* Connection established, so send up the conn_ind */
 	if ((eager->sctp_ulpd = sctp->sctp_ulp_newconn(sctp->sctp_ulpd,
 	    eager)) == NULL) {
@@ -273,7 +304,6 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 {
 	sin_t		*sin;
 	sin6_t		*sin6;
-	in_port_t	lport;
 	in6_addr_t	dstaddr;
 	in_port_t	dstport;
 	mblk_t		*initmp;
@@ -376,7 +406,9 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 
 	switch (sctp->sctp_state) {
 	case SCTPS_IDLE: {
-		int	err;
+		int			err;
+		struct sockaddr_storage	ss;
+
 		/*
 		 * We support a quick connect capability here, allowing
 		 * clients to transition directly from IDLE to COOKIE_WAIT.
@@ -388,18 +420,14 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		dprint(1, ("sctp_connect: idle, attempting bind...\n"));
 		ASSERT(sctp->sctp_nsaddrs == 0);
 
-		err = sctp_dup_saddrs(NULL, sctp, sleep);
-		if (err != 0) {
-			WAKE_SCTP(sctp);
+		bzero(&ss, sizeof (ss));
+		ss.ss_family = sctp->sctp_family;
+		WAKE_SCTP(sctp);
+		if ((err = sctp_bind(sctp, (struct sockaddr *)&ss,
+		    sizeof (ss))) != 0) {
 			return (err);
 		}
-		lport = sctp_update_next_port(sctp_next_port_to_try);
-		lport = sctp_bindi(sctp, lport, 0, 0);
-		if (lport == 0) {
-			WAKE_SCTP(sctp);
-			sctp_free_saddrs(sctp);
-			return (EADDRNOTAVAIL);
-		}
+		RUN_SCTP(sctp);
 		sctp->sctp_bound_to_all = 1;
 		/* FALLTHRU */
 	}
@@ -500,6 +528,28 @@ sctp_connect(sctp_t *sctp, const struct sockaddr *dst, uint32_t addrlen)
 		}
 		mutex_exit(&tbf->tf_lock);
 		sctp->sctp_state = SCTPS_COOKIE_WAIT;
+		/*
+		 * On a clustered note send this notification to the clustering
+		 * subsystem.
+		 */
+		if (cl_sctp_connect != NULL) {
+			uchar_t		*slist;
+			uchar_t		*flist;
+			size_t		ssize;
+			size_t		fsize;
+
+			fsize = sizeof (in6_addr_t) * sctp->sctp_nfaddrs;
+			ssize = sizeof (in6_addr_t) * sctp->sctp_nsaddrs;
+			slist = kmem_alloc(ssize, KM_SLEEP);
+			flist = kmem_alloc(fsize, KM_SLEEP);
+			/* The clustering module frees the lists */
+			sctp_get_saddr_list(sctp, slist, ssize);
+			sctp_get_faddr_list(sctp, flist, fsize);
+			(*cl_sctp_connect)(sctp->sctp_family, slist,
+			    sctp->sctp_nsaddrs, sctp->sctp_lport,
+			    flist, sctp->sctp_nfaddrs, sctp->sctp_fport,
+			    B_TRUE, (cl_sctp_handle_t)sctp);
+		}
 		WAKE_SCTP(sctp);
 		/* OK to call IP_PUT() here instead of sctp_add_sendq(). */
 		CONN_INC_REF(sctp->sctp_connp);

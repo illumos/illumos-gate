@@ -68,6 +68,7 @@
 
 #include "sctp_impl.h"
 #include "sctp_addr.h"
+#include "sctp_asconf.h"
 
 extern major_t SCTP6_MAJ;
 extern major_t SCTP_MAJ;
@@ -157,6 +158,19 @@ struct kmem_cache	*sctp_conn_cache;
 	list_remove(&sctp_g_list, (sctp));		\
 	mutex_exit(&sctp_g_lock);
 
+/*
+ * Hooks for Sun Cluster. On non-clustered nodes these will remain NULL.
+ * PSARC/2005/602.
+ */
+void (*cl_sctp_listen)(sa_family_t, uchar_t *, uint_t, in_port_t) = NULL;
+void (*cl_sctp_unlisten)(sa_family_t, uchar_t *, uint_t, in_port_t) = NULL;
+void (*cl_sctp_connect)(sa_family_t, uchar_t *, uint_t, in_port_t,
+    uchar_t *, uint_t, in_port_t, boolean_t, cl_sctp_handle_t) = NULL;
+void (*cl_sctp_disconnect)(sa_family_t, cl_sctp_handle_t) = NULL;
+void (*cl_sctp_assoc_change)(sa_family_t, uchar_t *, size_t, uint_t,
+    uchar_t *, size_t, uint_t, int, cl_sctp_handle_t) = NULL;
+void (*cl_sctp_check_addrs)(sa_family_t, in_port_t, uchar_t **, size_t,
+    uint_t *, boolean_t) = NULL;
 /*
  * Return the version number of the SCTP kernel interface.
  */
@@ -329,6 +343,14 @@ sctp_disconnect(sctp_t *sctp)
 			break;
 		}
 
+		/*
+		 * In there is unread data, send an ABORT
+		 */
+		if (sctp->sctp_rxqueued > 0 || sctp->sctp_irwnd >
+		    sctp->sctp_rwnd) {
+			sctp_user_abort(sctp, NULL, B_FALSE);
+			break;
+		}
 		/*
 		 * Transmit the shutdown before detaching the sctp_t.
 		 * After sctp_detach returns this queue/perimeter
@@ -640,10 +662,9 @@ sctp_free(conn_t *connp)
 	sctp_free_xmit_data(sctp);
 	sctp->sctp_unacked = 0;
 	sctp->sctp_unsent = 0;
-	if (sctp->sctp_cxmit_list != NULL) {
-		freemsg(sctp->sctp_cxmit_list);
-		sctp->sctp_cxmit_list = NULL;
-	}
+	if (sctp->sctp_cxmit_list != NULL)
+		sctp_asconf_free_cxmit(sctp, NULL);
+
 	sctp->sctp_lastdata = NULL;
 
 	/* Clear out default xmit settings */
@@ -913,6 +934,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 		sctp->sctp_xmit_hiwater = psctp->sctp_xmit_hiwater;
 		sctp->sctp_cwnd_max = psctp->sctp_cwnd_max;
 		sctp->sctp_rwnd = psctp->sctp_rwnd;
+		sctp->sctp_irwnd = psctp->sctp_rwnd;
 
 		sctp->sctp_rto_max = psctp->sctp_rto_max;
 		sctp->sctp_init_rto_max = psctp->sctp_init_rto_max;
@@ -966,7 +988,7 @@ sctp_init_values(sctp_t *sctp, sctp_t *psctp, int sleep)
 		sctp->sctp_xmit_hiwater = sctp_xmit_hiwat;
 		sctp->sctp_cwnd_max = sctp_cwnd_max_;
 		sctp->sctp_rwnd = sctp_recv_hiwat;
-
+		sctp->sctp_irwnd = sctp->sctp_rwnd;
 		sctp->sctp_rto_max = MSEC_TO_TICK(sctp_rto_maxg);
 		sctp->sctp_init_rto_max = sctp->sctp_rto_max;
 		sctp->sctp_rto_min = MSEC_TO_TICK(sctp_rto_ming);

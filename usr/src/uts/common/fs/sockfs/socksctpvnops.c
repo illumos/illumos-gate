@@ -200,9 +200,9 @@ socksctpv_close(struct vnode *vp, int flag, int count, offset_t offset,
 
 		/*
 		 * Initiate connection shutdown.  Update SCTP's receive
-		 * window as if everything is read.
+		 * window.
 		 */
-		sctp_recvd(so->so_priv, so->so_rcvbuf);
+		sctp_recvd(so->so_priv, so->so_rcvbuf - ss->ss_rxqueued);
 		(void) sctp_disconnect(so->so_priv);
 
 		/*
@@ -218,7 +218,8 @@ socksctpv_close(struct vnode *vp, int flag, int count, offset_t offset,
 				sosctp_assoc_isdisconnected(ssa, 0);
 				mutex_exit(&so->so_lock);
 
-				sctp_recvd(ssa->ssa_conn, so->so_rcvbuf);
+				sctp_recvd(ssa->ssa_conn, so->so_rcvbuf -
+				    ssa->ssa_rxqueued);
 				(void) sctp_disconnect(ssa->ssa_conn);
 
 				mutex_enter(&so->so_lock);

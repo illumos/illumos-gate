@@ -51,9 +51,10 @@
 
 static void		sctp_ipif_inactive(sctp_ipif_t *);
 static sctp_ipif_t	*sctp_lookup_ipif_addr(in6_addr_t *, boolean_t,
-			    zoneid_t zoneid);
+			    zoneid_t zoneid, uint_t);
 static int		sctp_get_all_ipifs(sctp_t *, int);
-int			sctp_valid_addr_list(sctp_t *, const void *, uint32_t);
+int			sctp_valid_addr_list(sctp_t *, const void *, uint32_t,
+			    uchar_t *, size_t);
 sctp_saddr_ipif_t	*sctp_ipif_lookup(sctp_t *, uint_t);
 static int		sctp_ipif_hash_insert(sctp_t *, sctp_ipif_t *, int,
 			    boolean_t dontsrc);
@@ -70,7 +71,7 @@ void			sctp_move_ipif(ipif_t *, ill_t *, ill_t *);
 void			sctp_del_saddr(sctp_t *, sctp_saddr_ipif_t *);
 void			sctp_del_saddr_list(sctp_t *, const void *, int,
 			    boolean_t);
-sctp_saddr_ipif_t	*sctp_saddr_lookup(sctp_t *, in6_addr_t *);
+sctp_saddr_ipif_t	*sctp_saddr_lookup(sctp_t *, in6_addr_t *, uint_t);
 in6_addr_t		sctp_get_valid_addr(sctp_t *, boolean_t);
 int			sctp_getmyaddrs(void *, void *, int *);
 void			sctp_saddr_init();
@@ -83,11 +84,12 @@ void			sctp_saddr_fini();
 #define	SCTP_IPIF_DISCARD(sctp_ipif_flags)	\
 	((sctp_ipif_flags) & (IPIF_PRIVATE | IPIF_DEPRECATED))
 
-/* True if this is a loopback ILL or a LINKLOCAL addr */
-#define	SCTP_IS_LL_LB(ill, ipif)	\
-	(((ill)->sctp_ill_flags & PHYI_LOOPBACK) ||	\
-	((ipif)->sctp_ipif_isv6 && 			\
-	IN6_IS_ADDR_LINKLOCAL(&(ipif)->sctp_ipif_saddr)))
+#define	SCTP_IS_IPIF_LOOPBACK(ipif)		\
+	((ipif)->sctp_ipif_ill->sctp_ill_flags & PHYI_LOOPBACK)
+
+#define	SCTP_IS_IPIF_LINKLOCAL(ipif)		\
+	((ipif)->sctp_ipif_isv6 && 		\
+	IN6_IS_ADDR_LINKLOCAL(&(ipif)->sctp_ipif_saddr))
 
 #define	SCTP_UNSUPP_AF(ipif, supp_af)	\
 	((!(ipif)->sctp_ipif_isv6 && !((supp_af) & PARM_SUPP_V4)) ||	\
@@ -103,8 +105,7 @@ uint32_t	sctp_ills_count = 0;
 
 /* Global list of SCTP IPIFs */
 sctp_ipif_hash_t	sctp_g_ipifs[SCTP_IPIF_HASH];
-uint32_t		sctp_g_ipifs_count;
-
+uint32_t		sctp_g_ipifs_count = 0;
 /*
  *
  *
@@ -167,7 +168,8 @@ sctp_ipif_inactive(sctp_ipif_t *sctp_ipif)
  * Called with no locks held.
  */
 static sctp_ipif_t *
-sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, zoneid_t zoneid)
+sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, zoneid_t zoneid,
+    uint_t ifindex)
 {
 	int		i;
 	int		j;
@@ -182,6 +184,8 @@ sctp_lookup_ipif_addr(in6_addr_t *addr, boolean_t refhold, zoneid_t zoneid)
 			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
 			if (zoneid == sctp_ipif->sctp_ipif_zoneid &&
 			    SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) &&
+			    (ifindex == 0 || ifindex ==
+			    sctp_ipif->sctp_ipif_ill->sctp_ill_index) &&
 			    IN6_ARE_ADDR_EQUAL(&sctp_ipif->sctp_ipif_saddr,
 			    addr)) {
 				rw_exit(&sctp_ipif->sctp_ipif_lock);
@@ -252,11 +256,16 @@ free_stuff:
 /*
  * Given a list of address, fills in the list of SCTP ipifs if all the addresses
  * are present in the SCTP interface list, return number of addresses filled
- * or error.
+ * or error. If the caller wants the list of addresses, it sends a pre-allocated
+ * buffer - list. Currently, this list is only used on a clustered node when
+ * the SCTP is in the listen state (from sctp_bind_add()). When called on a
+ * clustered node, the input is always a list of addresses (even if the
+ * original bind() was to INADDR_ANY).
  * Called with no locks held.
  */
 int
-sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt)
+sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt,
+    uchar_t *list, size_t lsize)
 {
 	struct sockaddr_in	*sin4;
 	struct sockaddr_in6	*sin6;
@@ -269,6 +278,7 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt)
 	boolean_t		bind_to_all = B_FALSE;
 	boolean_t		check_addrs = B_FALSE;
 	boolean_t		check_lport = B_FALSE;
+	uchar_t			*p = list;
 
 	/*
 	 * Need to check for port and address depending on the state.
@@ -282,12 +292,14 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt)
 		if (sctp->sctp_state > SCTPS_LISTEN)
 			check_addrs = B_TRUE;
 	}
+
 	if (sctp->sctp_conn_tfp != NULL)
 		mutex_enter(&sctp->sctp_conn_tfp->tf_lock);
 	if (sctp->sctp_listen_tfp != NULL)
 		mutex_enter(&sctp->sctp_listen_tfp->tf_lock);
 	for (cnt = 0; cnt < addrcnt; cnt++) {
 		boolean_t	lookup_saddr = B_TRUE;
+		uint_t		ifindex = 0;
 
 		switch (sctp->sctp_family) {
 		case AF_INET:
@@ -320,6 +332,8 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt)
 				goto free_ret;
 			}
 			addr = sin6->sin6_addr;
+			/* Contains the interface index */
+			ifindex = sin6->sin6_scope_id;
 			if (sctp->sctp_connp->conn_ipv6_v6only &&
 			    IN6_IS_ADDR_V4MAPPED(&addr)) {
 				err = EAFNOSUPPORT;
@@ -344,14 +358,13 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt)
 		}
 		if (lookup_saddr) {
 			ipif = sctp_lookup_ipif_addr(&addr, B_TRUE,
-			    sctp->sctp_zoneid);
+			    sctp->sctp_zoneid, ifindex);
 			if (ipif == NULL) {
 				/* Address not in the list */
 				err = EINVAL;
 				goto free_ret;
-			} else if (check_addrs &&
-			    (ipif->sctp_ipif_ill->sctp_ill_flags &
-			    PHYI_LOOPBACK)) {
+			} else if (check_addrs && SCTP_IS_IPIF_LOOPBACK(ipif) &&
+			    cl_sctp_check_addrs == NULL) {
 				SCTP_IPIF_REFRELE(ipif);
 				err = EINVAL;
 				goto free_ret;
@@ -374,6 +387,11 @@ sctp_valid_addr_list(sctp_t *sctp, const void *addrs, uint32_t addrcnt)
 				goto free_ret;
 			}
 			saddr_cnt++;
+			if (lsize >= sizeof (addr)) {
+				bcopy(&addr, p, sizeof (addr));
+				p += sizeof (addr);
+				lsize -= sizeof (addr);
+			}
 		}
 	}
 	if (bind_to_all) {
@@ -930,8 +948,9 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 	int			cnt;
 	in6_addr_t		addr;
 	sctp_ipif_t		*sctp_ipif;
+	int			ifindex = 0;
 
-	ASSERT(sctp->sctp_nsaddrs > addcnt);
+	ASSERT(sctp->sctp_nsaddrs >= addcnt);
 
 	if (!fanout_locked) {
 		if (sctp->sctp_conn_tfp != NULL)
@@ -950,10 +969,11 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
 		case AF_INET6:
 			sin6 = (struct sockaddr_in6 *)addrs + cnt;
 			addr = sin6->sin6_addr;
+			ifindex = sin6->sin6_scope_id;
 			break;
 		}
 		sctp_ipif = sctp_lookup_ipif_addr(&addr, B_FALSE,
-		    sctp->sctp_zoneid);
+		    sctp->sctp_zoneid, ifindex);
 		ASSERT(sctp_ipif != NULL);
 		sctp_ipif_hash_remove(sctp, sctp_ipif);
 	}
@@ -973,12 +993,13 @@ sctp_del_saddr_list(sctp_t *sctp, const void *addrs, int addcnt,
  * Called with no locks held.
  */
 sctp_saddr_ipif_t *
-sctp_saddr_lookup(sctp_t *sctp, in6_addr_t *addr)
+sctp_saddr_lookup(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
 {
 	sctp_saddr_ipif_t	*saddr_ipifs;
 	sctp_ipif_t		*sctp_ipif;
 
-	sctp_ipif = sctp_lookup_ipif_addr(addr, B_FALSE, sctp->sctp_zoneid);
+	sctp_ipif = sctp_lookup_ipif_addr(addr, B_FALSE, sctp->sctp_zoneid,
+	    ifindex);
 	if (sctp_ipif == NULL)
 		return (NULL);
 
@@ -988,11 +1009,12 @@ sctp_saddr_lookup(sctp_t *sctp, in6_addr_t *addr)
 
 /* Given an address, add it to the source address list */
 int
-sctp_saddr_add_addr(sctp_t *sctp, in6_addr_t *addr)
+sctp_saddr_add_addr(sctp_t *sctp, in6_addr_t *addr, uint_t ifindex)
 {
 	sctp_ipif_t		*sctp_ipif;
 
-	sctp_ipif = sctp_lookup_ipif_addr(addr, B_TRUE, sctp->sctp_zoneid);
+	sctp_ipif = sctp_lookup_ipif_addr(addr, B_TRUE, sctp->sctp_zoneid,
+	    ifindex);
 	if (sctp_ipif == NULL)
 		return (EINVAL);
 
@@ -1035,17 +1057,20 @@ sctp_check_saddr(sctp_t *sctp, int supp_af, boolean_t delete)
 		naddr = sctp->sctp_saddrs[i].ipif_count;
 		for (l = 0; l < naddr; l++) {
 			sctp_ipif_t	*ipif;
-			sctp_ill_t	*ill;
 
 			ipif = obj->saddr_ipifp;
-			ill = ipif->sctp_ipif_ill;
 			scanned++;
 
 			/*
 			 * Delete/mark dontsrc loopback/linklocal addresses and
 			 * unsupported address.
+			 * On a clustered node, we trust the clustering module
+			 * to do the right thing w.r.t loopback addresses, so
+			 * we ignore loopback addresses in this check.
 			 */
-			if (SCTP_IS_LL_LB(ill, ipif) ||
+			if ((SCTP_IS_IPIF_LOOPBACK(ipif) &&
+			    cl_sctp_check_addrs == NULL) ||
+			    SCTP_IS_IPIF_LINKLOCAL(ipif) ||
 			    SCTP_UNSUPP_AF(ipif, supp_af)) {
 				if (!delete) {
 					obj->saddr_ipif_unconfirmed = 1;
@@ -1134,23 +1159,27 @@ sctp_getmyaddrs(void *conn, void *myaddrs, int *addrcnt)
 	if (sctp->sctp_nsaddrs == 0)
 		return (EINVAL);
 
-	/* Skip loopback addresses for non-loopback assoc. */
-	if (sctp->sctp_state >= SCTPS_ESTABLISHED && !sctp->sctp_loopback)
+	/*
+	 * Skip loopback addresses for non-loopback assoc., ignore
+	 * this on a clustered node.
+	 */
+	if (sctp->sctp_state >= SCTPS_ESTABLISHED && !sctp->sctp_loopback &&
+	    (cl_sctp_check_addrs == NULL)) {
 		skip_lback = B_TRUE;
+	}
+
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
 		if (sctp->sctp_saddrs[i].ipif_count == 0)
 			continue;
 		obj = list_head(&sctp->sctp_saddrs[i].sctp_ipif_list);
 		for (l = 0; l < sctp->sctp_saddrs[i].ipif_count; l++) {
 			sctp_ipif_t	*ipif = obj->saddr_ipifp;
-			sctp_ill_t	*ill = ipif->sctp_ipif_ill;
 			in6_addr_t	addr = ipif->sctp_ipif_saddr;
 
 			scanned++;
 			if ((ipif->sctp_ipif_state == SCTP_IPIFS_CONDEMNED) ||
 			    SCTP_DONT_SRC(obj) ||
-			    ((ill->sctp_ill_flags & PHYI_LOOPBACK) &&
-			    skip_lback)) {
+			    (SCTP_IS_IPIF_LOOPBACK(ipif) && skip_lback)) {
 				if (scanned >= sctp->sctp_nsaddrs)
 					goto done;
 				obj = list_next(&sctp->sctp_saddrs[i].
@@ -1204,10 +1233,19 @@ sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p, boolean_t modify)
 	int			scanned = 0;
 	int			naddr;
 	int			nsaddr;
-	boolean_t		del_ll_lb = B_FALSE;
+	boolean_t		del_ll = B_FALSE;
+	boolean_t		del_lb = B_FALSE;
 
-	if (modify && !sctp->sctp_loopback && !sctp->sctp_linklocal)
-		del_ll_lb = B_TRUE;
+
+	/*
+	 * On a clustered node don't bother changing anything
+	 * on the loopback interface.
+	 */
+	if (modify && !sctp->sctp_loopback && (cl_sctp_check_addrs == NULL))
+		del_lb = B_TRUE;
+
+	if (modify && !sctp->sctp_linklocal)
+		del_ll = B_TRUE;
 
 	nsaddr = sctp->sctp_nsaddrs;
 	for (i = 0; i < SCTP_IPIF_HASH; i++) {
@@ -1218,21 +1256,22 @@ sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p, boolean_t modify)
 		for (l = 0; l < naddr; l++) {
 			in6_addr_t	addr;
 			sctp_ipif_t	*ipif;
-			sctp_ill_t	*ill;
-			boolean_t	ll_lb;
+			boolean_t	ipif_lb;
+			boolean_t	ipif_ll;
 			boolean_t	unsupp_af;
 
 			ipif = obj->saddr_ipifp;
-			ill = ipif->sctp_ipif_ill;
 			scanned++;
 
-			ll_lb = SCTP_IS_LL_LB(ill, ipif);
+			ipif_lb = SCTP_IS_IPIF_LOOPBACK(ipif);
+			ipif_ll = SCTP_IS_IPIF_LINKLOCAL(ipif);
 			unsupp_af = SCTP_UNSUPP_AF(ipif, supp_af);
 			/*
 			 * We need to either delete or skip loopback/linklocal
-			 * or unsupported addresses.
+			 * or unsupported addresses, if required.
 			 */
-			if ((ll_lb && del_ll_lb) || (unsupp_af && modify)) {
+			if ((ipif_ll && del_ll) || (ipif_lb && del_lb) ||
+			    (unsupp_af && modify)) {
 				if (sctp->sctp_bound_to_all == 1)
 					sctp->sctp_bound_to_all = 0;
 				if (scanned < nsaddr) {
@@ -1243,7 +1282,8 @@ sctp_saddr_info(sctp_t *sctp, int supp_af, uchar_t *p, boolean_t modify)
 				}
 				sctp_ipif_hash_remove(sctp, ipif);
 				goto next_addr;
-			} else if (ll_lb || unsupp_af) {
+			} else if (ipif_ll || unsupp_af ||
+			    (ipif_lb && (cl_sctp_check_addrs == NULL))) {
 				goto next_addr;
 			}
 
@@ -1280,6 +1320,220 @@ next_addr:
 	return (paramlen);
 }
 
+/*
+ * This is used on a clustered node to obtain a list of addresses, the list
+ * consists of sockaddr_in structs for v4 and sockaddr_in6 for v6. The list
+ * is then passed onto the clustering module which sends back the correct
+ * list based on the port info. Regardless of the input, i.e INADDR_ANY
+ * or specific address(es), we create the list since it could be modified by
+ * the clustering module. When given a list of addresses, we simply
+ * create the list of sockaddr_in or sockaddr_in6 structs using those
+ * addresses. If there is an INADDR_ANY in the input list, or if the
+ * input is INADDR_ANY, we create a list of sockaddr_in or sockaddr_in6
+ * structs consisting all the addresses in the global interface list
+ * except those that are hosted on the loopback interface. We create
+ * a list of sockaddr_in[6] structs just so that it can be directly input
+ * to sctp_valid_addr_list() once the clustering module has processed it.
+ */
+int
+sctp_get_addrlist(sctp_t *sctp, const void *addrs, uint32_t *addrcnt,
+    uchar_t **addrlist, int *uspec, size_t *size)
+{
+	int			cnt;
+	int			icnt;
+	sctp_ipif_t		*sctp_ipif;
+	struct sockaddr_in	*s4;
+	struct sockaddr_in6	*s6;
+	uchar_t			*p;
+	int			err = 0;
+
+	*addrlist = NULL;
+	*size = 0;
+
+	/*
+	 * Create a list of sockaddr_in[6] structs using the input list.
+	 */
+	if (sctp->sctp_family == AF_INET) {
+		*size = sizeof (struct sockaddr_in) * *addrcnt;
+		*addrlist = kmem_zalloc(*size,  KM_SLEEP);
+		p = *addrlist;
+		for (cnt = 0; cnt < *addrcnt; cnt++) {
+			s4 = (struct sockaddr_in *)addrs + cnt;
+			/*
+			 * We need to create a list of all the available
+			 * addresses if there is an INADDR_ANY. However,
+			 * if we are beyond LISTEN, then this is invalid
+			 * (see sctp_valid_addr_list(). So, we just fail
+			 * it here rather than wait till it fails in
+			 * sctp_valid_addr_list().
+			 */
+			if (s4->sin_addr.s_addr == INADDR_ANY) {
+				kmem_free(*addrlist, *size);
+				*addrlist = NULL;
+				*size = 0;
+				if (sctp->sctp_state > SCTPS_LISTEN) {
+					*addrcnt = 0;
+					return (EINVAL);
+				}
+				if (uspec != NULL)
+					*uspec = 1;
+				goto get_all_addrs;
+			} else {
+				bcopy(s4, p, sizeof (*s4));
+				p += sizeof (*s4);
+			}
+		}
+	} else {
+		*size = sizeof (struct sockaddr_in6) * *addrcnt;
+		*addrlist = kmem_zalloc(*size, KM_SLEEP);
+		p = *addrlist;
+		for (cnt = 0; cnt < *addrcnt; cnt++) {
+			s6 = (struct sockaddr_in6 *)addrs + cnt;
+			/*
+			 * Comments for INADDR_ANY, above, apply here too.
+			 */
+			if (IN6_IS_ADDR_UNSPECIFIED(&s6->sin6_addr)) {
+				kmem_free(*addrlist, *size);
+				*size = 0;
+				*addrlist = NULL;
+				if (sctp->sctp_state > SCTPS_LISTEN) {
+					*addrcnt = 0;
+					return (EINVAL);
+				}
+				if (uspec != NULL)
+					*uspec = 1;
+				goto get_all_addrs;
+			} else {
+				bcopy(addrs, p, sizeof (*s6));
+				p += sizeof (*s6);
+			}
+		}
+	}
+	return (err);
+get_all_addrs:
+
+	/*
+	 * Allocate max possible size. We allocate the max. size here because
+	 * the clustering module could end up adding addresses to the list.
+	 * We allocate upfront so that the clustering module need to bother
+	 * re-sizing the list.
+	 */
+	if (sctp->sctp_family == AF_INET)
+		*size = sizeof (struct sockaddr_in) * sctp_g_ipifs_count;
+	else
+		*size = sizeof (struct sockaddr_in6) * sctp_g_ipifs_count;
+
+	*addrlist = kmem_zalloc(*size, KM_SLEEP);
+	*addrcnt = 0;
+	p = *addrlist;
+	rw_enter(&sctp_g_ipifs_lock, RW_READER);
+
+	/*
+	 * Walk through the global interface list and add all addresses,
+	 * except those that are hosted on loopback interfaces.
+	 */
+	for (cnt = 0; cnt <  SCTP_IPIF_HASH; cnt++) {
+		if (sctp_g_ipifs[cnt].ipif_count == 0)
+			continue;
+		sctp_ipif = list_head(&sctp_g_ipifs[cnt].sctp_ipif_list);
+		for (icnt = 0; icnt < sctp_g_ipifs[cnt].ipif_count; icnt++) {
+			in6_addr_t	addr;
+
+			rw_enter(&sctp_ipif->sctp_ipif_lock, RW_READER);
+			addr = sctp_ipif->sctp_ipif_saddr;
+			if (SCTP_IPIF_DISCARD(sctp_ipif->sctp_ipif_flags) ||
+			    !SCTP_IPIF_USABLE(sctp_ipif->sctp_ipif_state) ||
+			    SCTP_IS_IPIF_LOOPBACK(sctp_ipif) ||
+			    SCTP_IS_IPIF_LINKLOCAL(sctp_ipif) ||
+			    sctp_ipif->sctp_ipif_zoneid != sctp->sctp_zoneid ||
+			    (sctp->sctp_ipversion == IPV4_VERSION &&
+			    sctp_ipif->sctp_ipif_isv6) ||
+			    (sctp->sctp_connp->conn_ipv6_v6only &&
+			    !sctp_ipif->sctp_ipif_isv6)) {
+				rw_exit(&sctp_ipif->sctp_ipif_lock);
+				sctp_ipif = list_next(
+				    &sctp_g_ipifs[cnt].sctp_ipif_list,
+				    sctp_ipif);
+				continue;
+			}
+			rw_exit(&sctp_ipif->sctp_ipif_lock);
+			if (sctp->sctp_family == AF_INET) {
+				s4 = (struct sockaddr_in *)p;
+				IN6_V4MAPPED_TO_INADDR(&addr, &s4->sin_addr);
+				s4->sin_family = AF_INET;
+				p += sizeof (*s4);
+			} else {
+				s6 = (struct sockaddr_in6 *)p;
+				s6->sin6_addr = addr;
+				s6->sin6_family = AF_INET6;
+				s6->sin6_scope_id =
+				    sctp_ipif->sctp_ipif_ill->sctp_ill_index;
+				p += sizeof (*s6);
+			}
+			(*addrcnt)++;
+			sctp_ipif = list_next(&sctp_g_ipifs[cnt].sctp_ipif_list,
+			    sctp_ipif);
+		}
+	}
+	rw_exit(&sctp_g_ipifs_lock);
+	return (err);
+}
+
+/*
+ * Get a list of addresses from the source address list. The  caller is
+ * responsible for allocating sufficient buffer for this.
+ */
+void
+sctp_get_saddr_list(sctp_t *sctp, uchar_t *p, size_t psize)
+{
+	int			cnt;
+	int			icnt;
+	sctp_saddr_ipif_t	*obj;
+	int			naddr;
+	int			scanned = 0;
+
+	for (cnt = 0; cnt < SCTP_IPIF_HASH; cnt++) {
+		if (sctp->sctp_saddrs[cnt].ipif_count == 0)
+			continue;
+		obj = list_head(&sctp->sctp_saddrs[cnt].sctp_ipif_list);
+		naddr = sctp->sctp_saddrs[cnt].ipif_count;
+		for (icnt = 0; icnt < naddr; icnt++) {
+			sctp_ipif_t	*ipif;
+
+			if (psize < sizeof (ipif->sctp_ipif_saddr))
+				return;
+
+			scanned++;
+			ipif = obj->saddr_ipifp;
+			bcopy(&ipif->sctp_ipif_saddr, p,
+			    sizeof (ipif->sctp_ipif_saddr));
+			p += sizeof (ipif->sctp_ipif_saddr);
+			psize -= sizeof (ipif->sctp_ipif_saddr);
+			if (scanned >= sctp->sctp_nsaddrs)
+				return;
+			obj = list_next(&sctp->sctp_saddrs[icnt].sctp_ipif_list,
+			    obj);
+		}
+	}
+}
+
+/*
+ * Get a list of addresses from the remote address list. The  caller is
+ * responsible for allocating sufficient buffer for this.
+ */
+void
+sctp_get_faddr_list(sctp_t *sctp, uchar_t *p, size_t psize)
+{
+	sctp_faddr_t	*fp;
+
+	for (fp = sctp->sctp_faddrs; fp != NULL; fp = fp->next) {
+		if (psize < sizeof (fp->faddr))
+			return;
+		bcopy(&fp->faddr, p, sizeof (fp->faddr));
+		p += sizeof (fp->faddr);
+		psize -= sizeof (fp->faddr);
+	}
+}
 
 /* Initialize the SCTP ILL list and lock */
 void
