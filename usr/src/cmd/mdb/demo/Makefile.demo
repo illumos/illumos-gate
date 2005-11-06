@@ -20,8 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,7 +33,11 @@ clean.lint := TARGET = clean.lint
 clobber := TARGET = clobber
 lint := TARGET = lint
 
-SUBDIRS :sh= [ `uname -p` = sparc ] && echo sparc sparcv9 || uname -p
+MACH :sh= uname -p
+SUBDIRS_sparc = sparc sparcv9
+SUBDIRS_i386 = i386 amd64
+SUBDIRS = $(SUBDIRS_$(MACH))
+
 TARGET =
 
 all clean clean.lint clobber lint: $(SUBDIRS)

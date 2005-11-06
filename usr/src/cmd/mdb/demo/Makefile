@@ -20,8 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -39,11 +39,12 @@ DEMOFILES = \
 	Makefile \
 	Makefile.common \
 	Makefile.i386 \
+	Makefile.amd64 \
 	Makefile.sparc \
 	Makefile.sparcv9 \
 	README
 
-DEMOSUBDIRS = common i386 sparc sparcv9
+DEMOSUBDIRS = common i386 amd64 sparc sparcv9
 
 ROOTDEMODIR = $(ROOT)/usr/demo/mdb
 ROOTDEMOFILES = $(DEMOFILES:%=$(ROOTDEMODIR)/%)

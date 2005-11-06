@@ -24,27 +24,15 @@
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
-#
-i pkginfo
-i copyright
-i depend
-#
-# SUNWmdbdm
-#
-d none usr 755 root sys
-d none usr/demo 755 root bin
-d none usr/demo/mdb 755 root bin
-d none usr/demo/mdb/amd64 755 root bin
-d none usr/demo/mdb/common 755 root bin
-f none usr/demo/mdb/common/example1.c 644 root bin
-f none usr/demo/mdb/common/example2.c 644 root bin
-d none usr/demo/mdb/i386 755 root bin
-d none usr/demo/mdb/sparc 755 root bin
-d none usr/demo/mdb/sparcv9 755 root bin
-f none usr/demo/mdb/Makefile 644 root bin
-f none usr/demo/mdb/Makefile.amd64 644 root bin
-f none usr/demo/mdb/Makefile.common 644 root bin
-f none usr/demo/mdb/Makefile.i386 644 root bin
-f none usr/demo/mdb/Makefile.sparc 644 root bin
-f none usr/demo/mdb/Makefile.sparcv9 644 root bin
-f none usr/demo/mdb/README 644 root bin
+
+CC = cc
+LINT = lint
+
+CFLAGS = -xarch=amd64
+CPPFLAGS =
+LDFLAGS =
+LIBS =
+
+LINTFLAGS = -Xarch=amd64
+
+include ../Makefile.common

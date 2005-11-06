@@ -20,8 +20,8 @@
 # CDDL HEADER END
 #
 
-Copyright (c) 1999 by Sun Microsystems, Inc.
-All rights reserved.
+Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+Use is subject to license terms.
 
 #ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -31,26 +31,27 @@ This directory contains source code for sample debugger modules for the Modular
 Debugger (MDB).  These modules demonstrate how developers can use the MDB
 programming API to extend the capabilities of MDB itself.  MDB is an extensible
 utility for low-level debugging and editing of the live operating system,
-operating system crash dumps, user processes,  user process core dumps, and
+operating system crash dumps, user processes, user process core dumps, and
 object files.  For a more detailed description of MDB features and documentation
 for the MDB programming API, refer to the manual, "Solaris Modular Debugger
-Guide".  This document is available on-line at http://docs.sun.com and can
-be ordered from Fatbrain.com at http://www1.fatbrain.com/documentation/sun.
+Guide".  This document is available on-line at http://docs.sun.com.
 
 2. Configuration
 
 As the files in this directory are owned by the administrator, you should make
 a copy of this directory to your home directory or other location before you
 begin experimenting with MDB.  If you wish to change the configuration, edit
-the CC and LINT macro definitions in Makefile.sparc, Makefile.sparcv9, and
-Makefile.i386 to point to the appropriate pathnames.  The Makefiles contained
-in this directory are set up to use the C compiler (cc) and lint utility found
-in your $PATH.  These three Makefiles can also be used to define base compiler
-settings for the corresponding instruction set architecture (ISA):
+the CC and LINT macro definitions in Makefile.sparc, Makefile.sparcv9, 
+Makefile.i386 and Makefile.amd64 to point to the appropriate pathnames.
+The Makefiles contained in this directory are set up to use the C compiler (cc)
+and lint utility found in your $PATH.  These four Makefiles can also be used
+to define base compiler settings for the corresponding instruction set
+architecture (ISA):
 
 	Makefile.sparc		- rules for building 32-bit SPARC objects
 	Makefile.sparcv9	- rules for building 64-bit SPARC objects
-	Makefile.i386		- rules for building 32-bit IA objects
+	Makefile.i386		- rules for building 32-bit x86 objects
+	Makefile.amd64		- rules for building 64-bit x86 objects
 
 The Makefile.common file adds common compiler and linker flags to these base
 definitions, and defines the rules for building the example modules.  You will
@@ -83,7 +84,7 @@ execute the default "make all" target.
 4. Loading Modules
 
 After you successfully compile the example modules, the module object files
-reside in one or more of the i386/, sparc/, and sparcv9/ subdirectories
+reside in one or more of the i386/, amd64/, sparc/, and sparcv9/ subdirectories
 depending on the ISAs supported on your machine.  In order to load the example
 modules, you can either use the ::load built-in dcmd with the absolute pathname
 of a given module, or you can adjust the module library path to include the
