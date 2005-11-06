@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,13 +41,12 @@ extern "C" {
 #endif
 
 #define	LOG_CONSMIN	0		/* /dev/conslog minor */
-#define	LOG_LOGMIN	5		/* /dev/log minor */
+#define	LOG_LOGMIN	5		/* /dev/log clone-open minor */
 #define	LOG_BACKLOG	LOG_LOGMIN	/* console backlog queue */
 
 #define	LOG_LOGMINIDX	0		/* index of smallest /dev/log clone */
 #define	LOG_LOGMAXIDX	15		/* up to 16 /dev/log clones */
 #define	LOG_NUMCLONES	(LOG_LOGMAXIDX - LOG_LOGMINIDX + 1)
-#define	LOG_NUMCONS	1024		/* up to 1024 /dev/conslog clones */
 
 #define	LOG_MID		44		/* module ID */
 #define	LOG_MINPS	0		/* min packet size */
@@ -71,11 +70,9 @@ struct log {
 	short		log_inuse;	/* is this log device open? */
 	int		log_overflow;	/* messages lost due to QFULL */
 	zoneid_t	log_zoneid;	/* zone id of log */
-	major_t		log_major;	/* major number of associated device */
 	minor_t		log_minor;	/* minor number of associated device */
 };
 
-/* Array of /dev/log minor devices */
 typedef struct log_zone {
 	log_t lz_clones[LOG_NUMCLONES];
 	uint16_t lz_active;	/* active types (OR of all log_flags fields) */
@@ -115,7 +112,6 @@ extern void log_sendmsg(mblk_t *, zoneid_t);
 extern void log_flushq(queue_t *);
 extern void log_printq(queue_t *);
 extern log_t *log_alloc(minor_t);
-extern void log_free(log_t *);
 
 #endif	/* _KERNEL */
 

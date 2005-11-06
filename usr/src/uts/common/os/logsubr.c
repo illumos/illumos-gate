@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,8 +59,7 @@ static int log_seq_no[SL_CONSOLE + 1];
 static stdata_t log_fakestr;
 static id_space_t *log_minorspace;
 static log_t log_backlog;
-static struct kmem_cache *log_cons_cache;	/* log_t cache */
-static vmem_t *log_cons_minor_arena; 		/* Arena for device minors */
+static log_t log_conslog;
 
 static queue_t *log_recentq;
 static queue_t *log_freeq;
@@ -83,8 +82,6 @@ static char log_fac[LOG_NFACILITIES + 1][LOG_FACSIZE] = {
 	"local4",	"local5",	"local6",	"local7",
 	"unknown"
 };
-static int log_cons_constructor(void *, void *, int);
-static void log_cons_destructor(void *, void *);
 
 /*
  * Get exclusive access to the logging system; this includes all minor
@@ -237,15 +234,11 @@ log_init(void)
 	log_backlog.log_zoneid = GLOBAL_ZONEID;
 	log_backlog.log_minor = LOG_BACKLOG;
 
-	/* Allocate integer space for conslog's minor numbers */
-	log_cons_minor_arena = vmem_create("log_cons_minor", (void *)1,
-	    LOG_NUMCONS, 1, NULL, NULL, NULL, 0,
-	    VM_SLEEP | VMC_IDENTIFIER);
-
-	/* Allocate kmem cache for conslog's log structures */
-	log_cons_cache = kmem_cache_create("log_cons_cache",
-	    sizeof (struct log), 0, log_cons_constructor, log_cons_destructor,
-	    NULL, NULL, NULL, 0);
+	/*
+	 * Initialize conslog structure.
+	 */
+	log_conslog.log_zoneid = GLOBAL_ZONEID;
+	log_conslog.log_minor = LOG_CONSMIN;
 
 	/*
 	 * Let the logging begin.
@@ -265,10 +258,10 @@ log_init(void)
 }
 
 /*
- * Allocate a log device corresponding to supplied device type.
- * Both devices are clonable. /dev/log devices are allocated per zone.
- * /dev/conslog devices are allocated from kmem cache, with minor numbers
- * supplied from a vmem arena.
+ * Allocate a log device corresponding to supplied device type.  All
+ * processes within a given zone that open /dev/conslog share the same
+ * device; processes opening /dev/log get distinct devices (if
+ * available).
  */
 log_t *
 log_alloc(minor_t type)
@@ -277,45 +270,26 @@ log_alloc(minor_t type)
 	log_zone_t *lzp;
 	log_t *lp;
 	int i;
-	minor_t minor;
 
 	if (type == LOG_CONSMIN) {
-
-		/*
-		 * Return a write-only /dev/conslog device.
-		 * No point allocating log_t until there's a free minor number.
-		 */
-		minor = (minor_t)(uintptr_t)
-		    vmem_alloc(log_cons_minor_arena, 1, VM_SLEEP);
-		lp = kmem_cache_alloc(log_cons_cache, KM_SLEEP);
-		lp->log_minor = minor;
-		return (lp);
-	} else {
-		ASSERT(type == LOG_LOGMIN);
-
-		lzp = zone_getspecific(log_zone_key, zptr);
-		ASSERT(lzp != NULL);
-
-		/* search for an available /dev/log device for the zone */
-		for (i = LOG_LOGMINIDX; i <= LOG_LOGMAXIDX; i++) {
-			lp = &lzp->lz_clones[i];
-			if (lp->log_inuse == 0)
-				break;
-		}
-		if (i > LOG_LOGMAXIDX)
-			lp = NULL;
-		lp->log_major = LOG_LOGMIN;
-		return (lp);
+		/* return the dedicated /dev/conslog device */
+		return (&log_conslog);
 	}
-}
 
-void
-log_free(log_t *lp)
-{
-	/* Return minor number to the pool */
-	vmem_free(log_cons_minor_arena, (void *)(uintptr_t)lp->log_minor, 1);
-	/* Return log to the cache */
-	kmem_cache_free(log_cons_cache, lp);
+	ASSERT(type == LOG_LOGMIN);
+
+	lzp = zone_getspecific(log_zone_key, zptr);
+	ASSERT(lzp != NULL);
+
+	/* search for an available /dev/log device for the zone */
+	for (i = LOG_LOGMINIDX; i <= LOG_LOGMAXIDX; i++) {
+		lp = &lzp->lz_clones[i];
+		if (lp->log_inuse == 0)
+			break;
+	}
+	if (i > LOG_LOGMAXIDX)
+		lp = NULL;
+	return (lp);
 }
 
 /*
@@ -421,6 +395,7 @@ log_update(log_t *target, queue_t *q, short flags, log_filter_t *filter)
 		lzp = zone_getspecific(log_zone_key, zptr);
 	}
 	ASSERT(lzp != NULL);
+
 	for (i = LOG_LOGMAXIDX; i >= LOG_LOGMINIDX; i--) {
 		lp = &lzp->lz_clones[i];
 		if (zoneid == GLOBAL_ZONEID && (lp->log_flags & SL_CONSOLE))
@@ -736,25 +711,4 @@ log_printq(queue_t *qfirst)
 			console_printf("%s", cp);
 		}
 	} while ((qlast = q) != qfirst);
-}
-
-/* ARGSUSED */
-static int
-log_cons_constructor(void *buf, void *cdrarg, int kmflags)
-{
-	struct log *lp = buf;
-	lp->log_zoneid = GLOBAL_ZONEID;
-	lp->log_major = LOG_CONSMIN;
-	lp->log_data = NULL;
-	return (0);
-}
-
-/* ARGSUSED */
-static void
-log_cons_destructor(void *buf, void *cdrarg)
-{
-	struct log *lp = buf;
-	ASSERT(lp->log_zoneid == GLOBAL_ZONEID);
-	ASSERT(lp->log_major == LOG_CONSMIN);
-	ASSERT(lp->log_data == NULL);
 }
