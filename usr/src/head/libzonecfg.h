@@ -86,14 +86,19 @@ extern "C" {
 #define	Z_IPV6_ADDR_PREFIX_LEN	35	/* IPv6 address prefix length needed */
 #define	Z_BOGUS_ADDRESS		36	/* not IPv[4|6] address or host name */
 
+/*
+ * Warning: these are shared with the admin/install consolidation.
+ * Do not insert states between any of the currently defined states,
+ * and any new states must be evaluated for impact on range comparisons.
+ */
 #define	ZONE_STATE_CONFIGURED		0
 #define	ZONE_STATE_INCOMPLETE		1
 #define	ZONE_STATE_INSTALLED		2
 #define	ZONE_STATE_READY		3
-#define	ZONE_STATE_MOUNTED		4
-#define	ZONE_STATE_RUNNING		5
-#define	ZONE_STATE_SHUTTING_DOWN	6
-#define	ZONE_STATE_DOWN			7
+#define	ZONE_STATE_RUNNING		4
+#define	ZONE_STATE_SHUTTING_DOWN	5
+#define	ZONE_STATE_DOWN			6
+#define	ZONE_STATE_MOUNTED		7
 
 #define	ZONE_STATE_MAXSTRLEN	14
 
