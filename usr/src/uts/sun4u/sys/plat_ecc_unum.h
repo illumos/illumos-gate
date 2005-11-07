@@ -106,7 +106,7 @@ typedef struct plat_ecc_error_data {
 	char		Jnumber[60];	/* Jnumber of the Dimm or Ecache */
 } plat_ecc_error_data_t;
 
-#define	PLAT_ECC_VERSION	2
+#define	PLAT_ECC_VERSION	3
 #define	PLAT_ERROR_CODE_UNK	0x0	/* Unknown */
 #define	PLAT_ERROR_CODE_CE	0x1	/* Correctable ECC error */
 #define	PLAT_ERROR_CODE_UE	0x2	/* Uncorrectable ECC error */
@@ -136,13 +136,13 @@ typedef struct plat_ecc_error_data {
 
 /*
  * Based on "UltraSPARC-III Programmer's Reference Manual", these values are
- * obtained when you use the syndrom bits from the AFSR to index into the
- * ECC syndroms table.  See cheetah.c for more details on the definitions
+ * obtained when you use the syndrome bits from the AFSR to index into the
+ * ECC syndrome table.  See us3_common.c for more details on the definitions
  * of C0, C1, C2, ... C8, MT0, MT1, ... M3, M4 ... etc.
  */
 
 #define	ECC_SYND_DATA_BEGIN	0
-#define	ECC_SYND_DATA_LENGTH	127	/* data bits 0-127 */
+#define	ECC_SYND_DATA_LENGTH	128	/* data bits 0-127 */
 #define	ECC_SYND_ECC_BEGIN	(ECC_SYND_DATA_BEGIN + ECC_SYND_DATA_LENGTH)
 #define	ECC_SYND_ECC_LENGTH	9	/* ECC bits C0 - C* */
 #define	ECC_SYND_MTAG_BEGIN	(ECC_SYND_ECC_BEGIN + ECC_SYND_ECC_LENGTH)
