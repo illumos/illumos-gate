@@ -102,16 +102,7 @@ set_platform_tsb_spares()
 void
 set_platform_defaults(void)
 {
-	extern int ts_dispatch_extended;
-	extern uchar_t *ctx_pgsz_array;
 	extern void mmu_init_large_pages(size_t);
-
-	/*
-	 * Use the alternate TS dispatch table for USIII+ forward,
-	 * which is better tuned for large servers.
-	 */
-	if ((ts_dispatch_extended == -1) && (ctx_pgsz_array != NULL))
-		ts_dispatch_extended = 1;
 
 	if ((mmu_page_sizes == max_mmu_page_sizes) &&
 	    (mmu_ism_pagesize != MMU_PAGESIZE32M)) {
