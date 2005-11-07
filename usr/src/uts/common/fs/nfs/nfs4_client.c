@@ -2940,7 +2940,8 @@ nfs_free_mi4(mntinfo4_t *mi)
 	 *
 	 * By the time we get here the last VFS_RELE() has already been called,
 	 * or this is an aborted mount; in either case the async manager thread
-	 * and the recovery thread should be dead by now.
+	 * should be dead by now.  The recovery thread has called recov_done(),
+	 * but may not have exited yet.
 	 */
 	mutex_enter(&mi->mi_lock);
 	ASSERT(mi->mi_recovthread == NULL);
@@ -2977,6 +2978,15 @@ nfs_free_mi4(mntinfo4_t *mi)
 	}
 
 	mutex_exit(&mi->mi_async_lock);
+
+	/*
+	 * Wait for the recovery thread to complete, that is, it will signal
+	 * when it is done using the "mi" structure and about to exit.
+	 */
+	mutex_enter(&mi->mi_lock);
+	while (mi->mi_in_recovery > 0)
+		cv_wait(&mi->mi_cv_in_recov, &mi->mi_lock);
+	mutex_exit(&mi->mi_lock);
 
 	mutex_enter(&mi->mi_msg_list_lock);
 	while (msgp = list_head(&mi->mi_msg_list)) {

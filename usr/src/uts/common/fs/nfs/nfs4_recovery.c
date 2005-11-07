@@ -621,7 +621,8 @@ again:
 out_no_thread:
 	mutex_enter(&mi->mi_lock);
 	mi->mi_in_recovery--;
-	cv_broadcast(&mi->mi_cv_in_recov);
+	if (mi->mi_in_recovery == 0)
+		cv_broadcast(&mi->mi_cv_in_recov);
 	mutex_exit(&mi->mi_lock);
 
 	VFS_RELE(mi->mi_vfsp);
@@ -1310,7 +1311,7 @@ nfs4_recov_thread(recov_info_t *recovp)
 			 * user process exits).
 			 */
 			if (!(mi->mi_recovflags & MI4R_LOST_STATE)) {
-				recov_done(mi, recovp);
+				done = 1;
 				mutex_exit(&mi->mi_lock);
 				break;
 			}
@@ -1493,7 +1494,6 @@ nfs4_recov_thread(recov_info_t *recovp)
 			list_move_tail(&local_lost_state, &mi->mi_lost_state);
 
 			done = 1;
-			recov_done(mi, recovp);
 			mutex_exit(&mi->mi_lock);
 			/*
 			 * Now officially free the "moved"
@@ -1524,11 +1524,6 @@ nfs4_recov_thread(recov_info_t *recovp)
 
 	} while (!done);
 
-	mutex_enter(&mi->mi_lock);
-	mi->mi_in_recovery--;
-	cv_broadcast(&mi->mi_cv_in_recov);
-	mutex_exit(&mi->mi_lock);
-
 	if (sp != NULL)
 		nfs4_server_rele(sp);
 
@@ -1537,6 +1532,10 @@ nfs4_recov_thread(recov_info_t *recovp)
 	 */
 	nfs4_dlistclean();
 
+	mutex_enter(&mi->mi_lock);
+	recov_done(mi, recovp);
+	mutex_exit(&mi->mi_lock);
+
 	/*
 	 * Free up resources that were allocated for us.
 	 */
@@ -1544,7 +1543,21 @@ nfs4_recov_thread(recov_info_t *recovp)
 		VN_RELE(recovp->rc_vp1);
 	if (recovp->rc_vp2 != NULL)
 		VN_RELE(recovp->rc_vp2);
+	/*
+	 * We can't be the last reference to this vfsp.  If we were, then
+	 * this RELE would cause nfs_free_mi4() to be called and blow away
+	 * the mi structure.  start_recovery() puts a HOLD on the vfsp.
+	 */
+	ASSERT(mi->mi_vfsp->vfs_count > 1);
 	VFS_RELE(mi->mi_vfsp);
+
+	/* now we are done using the mi struct, signal the waiters */
+	mutex_enter(&mi->mi_lock);
+	mi->mi_in_recovery--;
+	if (mi->mi_in_recovery == 0)
+		cv_broadcast(&mi->mi_cv_in_recov);
+	mutex_exit(&mi->mi_lock);
+
 	kmem_free(recovp, sizeof (recov_info_t));
 	mutex_enter(&cpr_lock);
 	CALLB_CPR_EXIT(&cpr_info);
