@@ -2154,7 +2154,7 @@ rv:
 		}
 	}
 	if ((async->async_ocnt <= 0 && (async->async_flags & ASYNC_BUSY)) ||
-	    async->async_queue_full) {
+	    (async->async_flowc != '\0')) {
 		async->async_flags &= ~ASYNC_BUSY;
 		mutex_exit(asy->asy_excl_hi);
 		if (async->async_xmitblk)
