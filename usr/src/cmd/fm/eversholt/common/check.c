@@ -58,6 +58,7 @@ static void check_cycle_lhs(struct node *stmtnp, struct node *arrow);
 static void check_cycle_lhs_try(struct node *stmtnp, struct node *lhs,
     struct node *rhs);
 static void check_cycle_rhs(struct node *rhs);
+static void check_proplists_lhs(enum nodetype t, struct node *lhs);
 
 static struct {
 	enum nodetype t;
@@ -787,7 +788,12 @@ check_cycle_lhs(struct node *stmtnp, struct node *arrow)
 		/* first recurse left */
 		check_cycle_lhs(stmtnp, arrow->u.arrow.lhs);
 
-		ASSERT(arrow->u.arrow.lhs->u.arrow.rhs->t == T_EVENT);
+		/*
+		 * return if there's a list of events internal to
+		 * cascaded props (which is not allowed)
+		*/
+		if (arrow->u.arrow.lhs->u.arrow.rhs->t != T_EVENT)
+			return;
 
 		/* then try this arrow (thing cascaded *to*) */
 		trylhs = arrow->u.arrow.lhs->u.arrow.rhs;
@@ -1148,4 +1154,37 @@ check_required_props(struct node *lhs, struct node *rhs, void *arg)
 	ASSERTeq(rhs->t, t, ptree_nodetype2str);
 
 	check_stmt_required_properties(rhs);
+}
+
+/*
+ * check that cascading prop statements do not contain lists internally.
+ * the first and last event lists in the cascading prop may be single
+ * events or lists of events.
+ */
+/*ARGSUSED*/
+void
+check_proplists(enum nodetype t, struct node *np)
+{
+	ASSERT(np->t == T_ARROW);
+	/*
+	 * not checking the right hand side of the top level prop
+	 * since it is the last part of the propagation and can be
+	 * an event or list of events
+	 */
+	check_proplists_lhs(t, np->u.arrow.lhs);
+}
+
+/*ARGSUSED*/
+static void
+check_proplists_lhs(enum nodetype t, struct node *lhs)
+{
+	if (lhs->t == T_ARROW) {
+		if (lhs->u.arrow.rhs->t == T_LIST) {
+			outfl(O_ERR, lhs->file, lhs->line,
+				"lists are not allowed internally on"
+				" cascading %s",
+				(t == T_PROP) ? "propagations" : "masks");
+		}
+		check_proplists_lhs(t, lhs->u.arrow.lhs);
+	}
 }

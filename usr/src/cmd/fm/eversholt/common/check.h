@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * check.h -- public definitions for check module
@@ -48,6 +48,7 @@ void check_stmt_allowed_properties(enum nodetype t,
     struct node *nvpairnp, struct lut *lutp);
 void check_propnames(enum nodetype t, struct node *np, int from, int to);
 void check_propscope(struct node *np);
+void check_proplists(enum nodetype t, struct node *np);
 void check_upset_engine(struct node *lhs, struct node *rhs, void *arg);
 void check_refcount(struct node *lhs, struct node *rhs, void *arg);
 int check_cycle_level(long long val);

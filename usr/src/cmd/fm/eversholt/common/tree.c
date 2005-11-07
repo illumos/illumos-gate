@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * tree.c -- routines for manipulating the prop tree
@@ -1081,6 +1081,7 @@ tree_stmt(enum nodetype t, struct node *np, const char *file, int line)
 
 	switch (t) {
 	case T_PROP:
+		check_proplists(t, np);
 		check_propnames(t, np, 0, 0);
 		check_propscope(np);
 		set_arrow_prop(ret, np);
@@ -1104,6 +1105,7 @@ tree_stmt(enum nodetype t, struct node *np, const char *file, int line)
 		break;
 
 	case T_MASK:
+		check_proplists(t, np);
 		check_propnames(t, np, 0, 0);
 		check_propscope(np);
 		set_arrow_prop(ret, np);
