@@ -802,7 +802,7 @@ xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
 #endif
 	movq	%gs:CPU_THREAD, %r9
 	cmpq	%rax, %rdi		/* test uaddr < kernelbase */
-	jae	3f
+	jae	4f
 	cmpq	$0, %rcx		/* No non-temporal access? */
 	/*
 	 * pass lofault value as 4th argument to do_copy_fault
@@ -827,6 +827,10 @@ xcopyin_nta(const void *uaddr, void *kaddr, size_t count, int copy_cached)
 	jnz	do_copy_fault
 	jmp	do_copy_fault_nta	/* use non-temporal access */
 	
+4:
+	movl	$EFAULT, %eax
+	jmp	3f
+
 	/*
 	 * A fault during do_copy_fault or do_copy_fault_nta is
 	 * indicated through an errno value in %rax and we iret from the
@@ -866,7 +870,7 @@ _xcopyin_err:
 	lea	_xcopyin_err, %eax
 	movl	%gs:CPU_THREAD, %edx
 	cmpl	%ecx, ARG_UADDR(%esp)	/* test uaddr < kernelbase */
-	jae	3f
+	jae	4f
 
 	cmpl	$0, use_sse_copy	/* no sse support */
 	jz	do_copy_fault
@@ -892,6 +896,10 @@ _xcopyin_err:
 	jnz	do_copy_fault
 
 	jmp	do_copy_fault_nta	/* use regular access */
+
+4:
+	movl	$EFAULT, %eax
+	jmp	3f
 
 	/*
 	 * A fault during do_copy_fault or do_copy_fault_nta is
@@ -1067,7 +1075,7 @@ xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
 #endif
 	movq	%gs:CPU_THREAD, %r9
 	cmpq	%rax, %rsi		/* test uaddr < kernelbase */
-	jae	3f
+	jae	4f
 
 	cmpq	$0, %rcx		/* No non-temporal access? */
 	/*
@@ -1092,6 +1100,10 @@ xcopyout_nta(const void *kaddr, void *uaddr, size_t count, int copy_cached)
 	andq	$COUNT_ALIGN_MASK, %r10
 	jnz	do_copy_fault
 	jmp	do_copy_fault_nta
+
+4:
+	movl	$EFAULT, %eax
+	jmp	3f
 
 	/*
 	 * A fault during do_copy_fault or do_copy_fault_nta is
@@ -1130,7 +1142,7 @@ _xcopyout_err:
 	lea	_xcopyout_err, %eax
 	movl	%gs:CPU_THREAD, %edx
 	cmpl	%ecx, ARG_UADDR(%esp)	/* test uaddr < kernelbase */
-	jae	3f
+	jae	4f
 
 	cmpl	$0, use_sse_copy	/* no sse support */
 	jz	do_copy_fault
@@ -1155,6 +1167,10 @@ _xcopyout_err:
 	andl	$COUNT_ALIGN_MASK, %ecx
 	jnz	do_copy_fault
 	jmp	do_copy_fault_nta
+
+4:
+	movl	$EFAULT, %eax
+	jmp	3f
 
 	/*
 	 * A fault during do_copy_fault or do_copy_fault_nta is
