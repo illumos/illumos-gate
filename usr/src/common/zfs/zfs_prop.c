@@ -289,47 +289,120 @@ zfs_prop_column_format(zfs_prop_t prop)
 }
 
 /*
- * Returns an array of names suitable for passing to getsubopt() to determine
- * the property index.
+ * Given a comma-separated list of fields, fills in the specified array with a
+ * list of properties.  The keyword "all" can be used to specify all properties.
+ * The 'count' parameter returns the number of matching properties placed into
+ * the list.  The 'props' parameter must point to an array of at least
+ * ZFS_NPROP_ALL elements.
  */
-char **
-zfs_prop_column_subopts(void)
+int
+zfs_get_proplist(char *fields, zfs_prop_t *props, int max,
+    int *count, char **badopt)
 {
-	char **ret = malloc((ZFS_NPROP_ALL + 1) * sizeof (char *));
 	int i;
+	size_t len;
+	char *s, *p;
 
-	for (i = 0; i < ZFS_NPROP_ALL; i++)
-		ret[i] = (char *)zfs_prop_table[i].pd_name;
+	*count = 0;
 
-	ret[i] = NULL;
+	/*
+	 * Check for the special value "all", which indicates all properties
+	 * should be displayed.
+	 */
+	if (strcmp(fields, "all") == 0) {
+		if (max < ZFS_NPROP_VISIBLE)
+			return (EOVERFLOW);
 
-	return (ret);
-}
-
-/*
- * Same as above, but using the short (abbreviated) column names as indices.
- */
-char **
-zfs_prop_column_short_subopts(void)
-{
-	char **ret = malloc((ZFS_NPROP_ALL + 1) * sizeof (char *) * 2);
-	char *cur;
-	int i;
-
-	for (i = 0; i < ZFS_NPROP_ALL; i++) {
-		if (zfs_prop_table[i].pd_colname == NULL) {
-			ret[i] = "";
-		} else {
-			ret[i] = strdup(zfs_prop_table[i].pd_colname);
-			for (cur = ret[i]; *cur != '\0'; cur++)
-				*cur = tolower(*cur);
-		}
+		for (i = 0; i < ZFS_NPROP_VISIBLE; i++)
+			props[i] = i;
+		*count = ZFS_NPROP_VISIBLE;
+		return (0);
 	}
 
+	/*
+	 * It would be nice to use getsubopt() here, but the inclusion of column
+	 * aliases makes this more effort than it's worth.
+	 */
+	s = fields;
+	while (*s != '\0') {
+		if ((p = strchr(s, ',')) == NULL) {
+			len = strlen(s);
+			p = s + len;
+		} else {
+			len = p - s;
+		}
 
-	ret[i] = NULL;
+		/*
+		 * Check for empty options.
+		 */
+		if (len == 0) {
+			*badopt = "";
+			return (EINVAL);
+		}
 
-	return (ret);
+		/*
+		 * Check all regular property names.
+		 */
+		for (i = 0; i < ZFS_NPROP_ALL; i++) {
+			if (zfs_prop_table[i].pd_colname == NULL)
+				continue;
+
+			if (len == strlen(zfs_prop_table[i].pd_name) &&
+			    strncmp(s, zfs_prop_table[i].pd_name, len) == 0)
+				break;
+		}
+
+		/*
+		 * Check all abbreviated column names.
+		 */
+		if (i == ZFS_NPROP_ALL) {
+			for (i = 0; i < ZFS_NPROP_ALL; i++) {
+				if (zfs_prop_table[i].pd_colname == NULL)
+					continue;
+
+				if (len ==
+				    strlen(zfs_prop_table[i].pd_colname) &&
+				    strncasecmp(s, zfs_prop_table[i].pd_colname,
+				    len) == 0)
+					break;
+			}
+		}
+
+		/*
+		 * If no column is specified, then return failure, setting
+		 * 'badopt' to point to the invalid option.
+		 */
+		if (i == ZFS_NPROP_ALL) {
+			s[len] = '\0';
+			*badopt = s;
+			return (EINVAL);
+		}
+
+		/*
+		 * If the user specified too many options (by using the same one
+		 * multiple times). return an error with 'badopt' set to NULL to
+		 * indicate this condition.
+		 */
+		if (*count == max)
+			return (EOVERFLOW);
+
+		props[*count] = i;
+		*count += 1;
+
+		s = p;
+		if (*s == ',')
+			s++;
+	}
+
+	/*
+	 * If no fields were specified, return an error.
+	 */
+	if (*count == 0) {
+		*badopt = "";
+		return (EINVAL);
+	}
+
+	return (0);
 }
 
 #endif

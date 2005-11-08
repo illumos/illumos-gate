@@ -52,6 +52,10 @@ function zfs_get_name
 version SUNWprivate_1.1
 end
 
+function zfs_get_proplist
+version SUNWprivate_1.1
+end
+
 function zfs_get_type
 version SUNWprivate_1.1
 end
@@ -109,14 +113,6 @@ version SUNWprivate_1.1
 end
 
 function zfs_prop_column_format
-version SUNWprivate_1.1
-end
-
-function zfs_prop_column_subopts
-version SUNWprivate_1.1
-end
-
-function zfs_prop_column_short_subopts
 version SUNWprivate_1.1
 end
 

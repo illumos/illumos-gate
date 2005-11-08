@@ -184,8 +184,8 @@ uint64_t zfs_prop_default_numeric(zfs_prop_t);
 int zfs_prop_is_string(zfs_prop_t prop);
 const char *zfs_prop_column_name(zfs_prop_t);
 const char *zfs_prop_column_format(zfs_prop_t);
-char ** zfs_prop_column_subopts(void);
-char ** zfs_prop_column_short_subopts(void);
+int zfs_get_proplist(char *fields, zfs_prop_t *proplist, int max, int *count,
+    char **badopt);
 
 #define	ZFS_MOUNTPOINT_NONE	"none"
 #define	ZFS_MOUNTPOINT_LEGACY	"legacy"

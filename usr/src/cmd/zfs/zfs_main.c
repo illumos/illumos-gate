@@ -611,8 +611,8 @@ zfs_do_destroy(int argc, char **argv)
 }
 
 /*
- * zfs get [-rH] [-o field[,field]...] [-s source[,source]...]
- * 	prop[,prop...] < fs | snap | vol > ...
+ * zfs get [-rHp] [-o field[,field]...] [-s source[,source]...]
+ * 	< all | property[,property]... > < fs | snap | vol > ...
  *
  *	-r	recurse over any child datasets
  *	-H	scripted mode.  Headers are stripped, and fields are separated
@@ -634,6 +634,7 @@ typedef struct get_cbdata {
 	int cb_columns[4];
 	zfs_prop_t cb_prop[ZFS_NPROP_ALL];
 	int cb_nprop;
+	int cb_isall;
 } get_cbdata_t;
 
 #define	GET_COL_NAME		1
@@ -732,32 +733,18 @@ get_callback(zfs_handle_t *zhp, void *data)
 	get_cbdata_t *cbp = data;
 	int i;
 
-	/*
-	 * If we've been given a list of properties, always list properties
-	 * in the order given.  Otherwise, iterate over all properties and
-	 * determine if we should display them.
-	 */
-	if (cbp->cb_nprop != 0) {
-		for (i = 0; i < cbp->cb_nprop; i++) {
-			if (zfs_prop_get(zhp, cbp->cb_prop[i], buf,
-			    sizeof (buf), &sourcetype, source, sizeof (source),
-			    cbp->cb_literal) != 0) {
-				(void) strlcpy(buf, "-", sizeof (buf));
-				sourcetype = ZFS_SRC_NONE;
-			}
+	for (i = 0; i < cbp->cb_nprop; i++) {
+		if (zfs_prop_get(zhp, cbp->cb_prop[i], buf,
+		    sizeof (buf), &sourcetype, source, sizeof (source),
+		    cbp->cb_literal) != 0) {
+			if (cbp->cb_isall)
+				continue;
+			(void) strlcpy(buf, "-", sizeof (buf));
+			sourcetype = ZFS_SRC_NONE;
+		}
 
-			print_one_property(zhp, cbp, cbp->cb_prop[i],
-			    buf, sourcetype, source);
-		}
-	} else {
-		for (i = 0; i < ZFS_NPROP_VISIBLE; i++) {
-			if (zfs_prop_get(zhp, i, buf,
-			    sizeof (buf), &sourcetype, source, sizeof (source),
-			    cbp->cb_literal) == 0) {
-				print_one_property(zhp, cbp, i,
-				    buf, sourcetype, source);
-			}
-		}
+		print_one_property(zhp, cbp, cbp->cb_prop[i],
+		    buf, sourcetype, source);
 	}
 
 	return (0);
@@ -769,11 +756,9 @@ zfs_do_get(int argc, char **argv)
 	get_cbdata_t cb = { 0 };
 	int recurse = 0;
 	int c;
-	char **subopts = zfs_prop_column_subopts();
-	char **shortsubopts = zfs_prop_column_short_subopts();
-	int prop;
-	char *value, *fields, *save_fields;
+	char *value, *fields, *badopt;
 	int i;
+	int ret;
 
 	/*
 	 * Set up default columns and sources.
@@ -895,43 +880,22 @@ zfs_do_get(int argc, char **argv)
 	fields = argv[0];
 
 	/*
-	 * Leaving 'cb_nprop' at 0 will cause the callback to iterate over all
-	 * known properties.
+	 * If the user specifies 'all', the behavior of 'zfs get' is slightly
+	 * different, because we don't show properties which don't apply to the
+	 * given dataset.
 	 */
-	if (strcmp(fields, "all") != 0) {
-		while (*fields != '\0') {
-			if (cb.cb_nprop == ZFS_NPROP_ALL) {
-				(void) fprintf(stderr, gettext("too many "
-				    "properties given to -o option\n"));
-				usage(FALSE);
-			}
+	if (strcmp(fields, "all") == 0)
+		cb.cb_isall = TRUE;
 
-			save_fields = fields;
-			if ((prop = getsubopt(&fields, subopts,
-			    &value)) == -1) {
-				fields = save_fields;
-				prop = getsubopt(&fields, shortsubopts, &value);
-			}
-
-			if (prop == -1) {
-				(void) fprintf(stderr,
-				    gettext("invalid property '%s'\n"), value);
-				usage(FALSE);
-			}
-
-			/*
-			 * The 'name' property is a one-off special for 'zfs
-			 * list', but is not a valid property for 'zfs get'.
-			 */
-			if (zfs_prop_column_name(prop) == NULL ||
-			    prop == ZFS_PROP_NAME) {
-				(void) fprintf(stderr, gettext("invalid "
-				    "property '%s'\n"), zfs_prop_to_name(prop));
-				usage(FALSE);
-			}
-
-			cb.cb_prop[cb.cb_nprop++] = prop;
-		}
+	if ((ret = zfs_get_proplist(fields, cb.cb_prop, ZFS_NPROP_ALL,
+	    &cb.cb_nprop, &badopt)) != 0) {
+		if (ret == EINVAL)
+			(void) fprintf(stderr, gettext("invalid property "
+			    "'%s'\n"), badopt);
+		else
+			(void) fprintf(stderr, gettext("too many properties "
+			    "specified\n"));
+		usage(FALSE);
 	}
 
 	argc--;
@@ -966,12 +930,6 @@ zfs_do_get(int argc, char **argv)
 		}
 		(void) printf("\n");
 	}
-
-	free(subopts);
-	for (i = 0; i < ZFS_NPROP_ALL; i++)
-		if (shortsubopts[i][0])
-			free(shortsubopts[i]);
-	free(shortsubopts);
 
 	/* run for each object */
 	return (zfs_for_each(argc, argv, recurse, ZFS_TYPE_ANY,
@@ -1063,35 +1021,29 @@ zfs_do_inherit(int argc, char **argv)
 }
 
 /*
- * list [-rH] [-a | -s] [-o prop[,prop]*] [fs | vol] ...
+ * list [-rH] [-o property[,property]...] [-t type[,type]...] <dataset> ...
  *
  * 	-r	Recurse over all children
  * 	-H	Scripted mode; elide headers and separate colums by tabs
- * 	-a	Display all datasets
- * 	-s	Display only snapshots
  * 	-o	Control which fields to display.
+ * 	-t	Control which object types to display.
  *
  * When given no arguments, lists all filesystems in the system.
  * Otherwise, list the specified datasets, optionally recursing down them if
  * '-r' is specified.
- *
- * If '-a' is given, then all datasets (including snapshots) are displayed.  If
- * '-s' is given, then only snapshots are displayed.  Use of these options
- * change the default set of fields output, which can still be overridden with
- * '-o'.
  */
 typedef struct list_cbdata {
-	int	cb_first;
-	int	cb_scripted;
-	int	cb_fields[ZFS_NPROP_ALL];
-	int	cb_fieldcount;
+	int		cb_first;
+	int		cb_scripted;
+	zfs_prop_t	cb_fields[ZFS_NPROP_ALL];
+	int		cb_fieldcount;
 } list_cbdata_t;
 
 /*
  * Given a list of columns to display, output appropriate headers for each one.
  */
 static void
-print_header(int *fields, size_t count)
+print_header(zfs_prop_t *fields, size_t count)
 {
 	int i;
 
@@ -1113,7 +1065,7 @@ print_header(int *fields, size_t count)
  * to the described layout.
  */
 static void
-print_dataset(zfs_handle_t *zhp, int *fields, size_t count, int scripted)
+print_dataset(zfs_handle_t *zhp, zfs_prop_t *fields, size_t count, int scripted)
 {
 	int i;
 	char property[ZFS_MAXPROPLEN];
@@ -1130,7 +1082,13 @@ print_dataset(zfs_handle_t *zhp, int *fields, size_t count, int scripted)
 		    sizeof (property), NULL, NULL, 0, FALSE) != 0)
 			(void) strlcpy(property, "-", sizeof (property));
 
-		if (scripted || i == count - 1)
+		/*
+		 * If this is being called in scripted mode, or if this is the
+		 * last column and it is left-justified, don't include a width
+		 * format specifier.
+		 */
+		if (scripted || (i == count - 1 &&
+		    strchr(zfs_prop_column_format(fields[i]), '-') != NULL))
 			(void) printf("%s", property);
 		else	/* LINTED - format specifier */
 			(void) printf(zfs_prop_column_format(fields[i]),
@@ -1174,12 +1132,9 @@ zfs_do_list(int argc, char **argv)
 	list_cbdata_t cb = { 0 };
 	char *value;
 	int ret;
-	char **subopts = zfs_prop_column_subopts();
-	char **shortsubopts = zfs_prop_column_short_subopts();
-	int prop;
 	char *type_subopts[] = { "filesystem", "volume", "snapshot", NULL };
-	char *save_fields;
-	int i;
+	char *badopt;
+	int alloffset;
 
 	/* check options */
 	while ((c = getopt(argc, argv, ":o:rt:H")) != -1) {
@@ -1233,34 +1188,30 @@ zfs_do_list(int argc, char **argv)
 	if (fields == NULL)
 		fields = basic_fields;
 
-	while (*fields != '\0') {
-		if (cb.cb_fieldcount == ZFS_NPROP_ALL) {
-			(void) fprintf(stderr, gettext("too many "
-			    "properties given to -o option\n"));
-			usage(FALSE);
-		}
-
-		save_fields = fields;
-		if ((prop = getsubopt(&fields, subopts, &value)) == -1) {
-			fields = save_fields;
-			prop = getsubopt(&fields, shortsubopts, &value);
-		}
-
-		if (prop == -1) {
-			(void) fprintf(stderr, gettext("invalid property "
-			    "'%s'\n"), value);
-			usage(FALSE);
-		}
-
-		if (zfs_prop_column_name(prop) == NULL) {
-			(void) fprintf(stderr, gettext("invalid property "
-			    "'%s'\n"), zfs_prop_to_name(prop));
-			usage(FALSE);
-		}
-
-		cb.cb_fields[cb.cb_fieldcount++] = prop;
+	/*
+	 * If the user specifies '-o all', the zfs_get_proplist() doesn't
+	 * normally include the name of the dataset.  For 'zfs list', we always
+	 * want this property to be first.
+	 */
+	if (strcmp(fields, "all") == 0) {
+		cb.cb_fields[0] = ZFS_PROP_NAME;
+		alloffset = 1;
+	} else {
+		alloffset = 0;
 	}
 
+	if ((ret = zfs_get_proplist(fields, cb.cb_fields + alloffset,
+	    ZFS_NPROP_ALL - alloffset, &cb.cb_fieldcount, &badopt)) != 0) {
+		if (ret == EINVAL)
+			(void) fprintf(stderr, gettext("invalid property "
+			    "'%s'\n"), badopt);
+		else
+			(void) fprintf(stderr, gettext("too many properties "
+			    "specified\n"));
+		usage(FALSE);
+	}
+
+	cb.cb_fieldcount += alloffset;
 	cb.cb_scripted = scripted;
 	cb.cb_first = TRUE;
 
@@ -1268,12 +1219,6 @@ zfs_do_list(int argc, char **argv)
 
 	if (ret == 0 && cb.cb_first == TRUE)
 		(void) printf(gettext("no datasets available\n"));
-
-	free(subopts);
-	for (i = 0; i < ZFS_NPROP_ALL; i++)
-		if (shortsubopts[i][0])
-			free(shortsubopts[i]);
-	free(shortsubopts);
 
 	return (ret);
 }
