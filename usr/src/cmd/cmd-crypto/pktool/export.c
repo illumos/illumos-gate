@@ -1201,6 +1201,10 @@ convert_token_objs(CK_SESSION_HANDLE sess, CK_OBJECT_HANDLE obj,
 int
 pk_export(int argc, char *argv[])
 {
+	int		opt;
+	extern int	optind_av;
+	extern char	*optarg_av;
+	char		*token_spec = NULL;
 	char		*token_name = NULL;
 	char		*manuf_id = NULL;
 	char		*serial_no = NULL;
@@ -1230,15 +1234,49 @@ pk_export(int argc, char *argv[])
 
 	cryptodebug("inside pk_export");
 
-	/* Get rid of subcommand work "export". */
-	argc--;
-	argv++;
+	/* Parse command line options.  Do NOT i18n/l10n. */
+	while ((opt = getopt_av(argc, argv, "T:(token)o:(outfile)")) != EOF) {
+		switch (opt) {
+		case 'T':	/* token specifier */
+			if (token_spec)
+				return (PK_ERR_USAGE);
+			token_spec = optarg_av;
+			break;
+		case 'o':	/* output file name */
+			if (filename)
+				return (PK_ERR_USAGE);
+			filename = optarg_av;
+			break;
+		default:
+			return (PK_ERR_USAGE);
+			break;
+		}
+	}
 
-	/* One additional arg required:  filename. */
-	if (argc != 1)
+	/* If nothing is specified, default is to use softtoken. */
+	if (token_spec == NULL) {
+		token_name = SOFT_TOKEN_LABEL;
+		manuf_id = SOFT_MANUFACTURER_ID;
+		serial_no = SOFT_TOKEN_SERIAL;
+	} else {
+		/*
+		 * Parse token specifier into token_name, manuf_id, serial_no.
+		 * Token_name is required; manuf_id and serial_no are optional.
+		 */
+		if (parse_token_spec(token_spec, &token_name, &manuf_id,
+		    &serial_no) < 0)
+			return (PK_ERR_USAGE);
+	}
+
+	/* Filename arg is required. */
+	if (filename == NULL)
 		return (PK_ERR_USAGE);
 
-	filename = argv[0];
+	/* No additional args allowed. */
+	argc -= optind_av;
+	argv += optind_av;
+	if (argc)
+		return (PK_ERR_USAGE);
 	/* Done parsing command line options. */
 
 	/* Check if the file exists and might be overwritten. */
@@ -1251,13 +1289,6 @@ pk_export(int argc, char *argv[])
 		}
 	}
 
-	/* Export operation only supported on softtoken. */
-	if (token_name == NULL)
-		token_name = SOFT_TOKEN_LABEL;
-	if (manuf_id == NULL)
-		manuf_id = SOFT_MANUFACTURER_ID;
-	if (serial_no == NULL)
-		serial_no = SOFT_TOKEN_SERIAL;
 	full_token_name(token_name, manuf_id, serial_no, full_name);
 
 	/* Find the slot with token. */

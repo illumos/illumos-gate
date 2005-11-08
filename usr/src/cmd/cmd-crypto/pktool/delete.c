@@ -45,11 +45,13 @@ int
 pk_delete(int argc, char *argv[])
 {
 	int		opt;
-	extern int	optind;
-	extern char	*optarg;
+	extern int	optind_av;
+	extern char	*optarg_av;
+	char		*token_spec = NULL;
 	char		*token_name = NULL;
 	char		*manuf_id = NULL;
 	char		*serial_no = NULL;
+	char		*type_spec = NULL;
 	char		full_name[FULL_NAME_LEN];
 	boolean_t	public_objs = B_FALSE;
 	boolean_t	private_objs = B_FALSE;
@@ -69,27 +71,68 @@ pk_delete(int argc, char *argv[])
 	cryptodebug("inside pk_delete");
 
 	/* Parse command line options.  Do NOT i18n/l10n. */
-	while ((opt = getopt(argc, argv, "p(private)P(public)l:(label)")) !=
-	    EOF) {
+	while ((opt = getopt_av(argc, argv,
+	    "T:(token)y:(objtype)l:(label)")) != EOF) {
 		switch (opt) {
-		case 'p':	/* private objects */
-			private_objs = B_TRUE;
-			obj_type |= PK_PRIVATE_OBJ;
+		case 'T':	/* token specifier */
+			if (token_spec)
+				return (PK_ERR_USAGE);
+			token_spec = optarg_av;
 			break;
-		case 'P':	/* public objects */
-			public_objs = B_TRUE;
-			obj_type |= PK_PUBLIC_OBJ;
+		case 'y':	/* object type:  public, private, both */
+			if (type_spec)
+				return (PK_ERR_USAGE);
+			type_spec = optarg_av;
 			break;
 		case 'l':	/* objects with specific label */
 			if (object_label)
 				return (PK_ERR_USAGE);
-			object_label = (CK_BYTE *)optarg;
+			object_label = (CK_BYTE *)optarg_av;
 			break;
 		default:
 			return (PK_ERR_USAGE);
 			break;
 		}
 	}
+
+	/* If no token is specified, default is to use softtoken. */
+	if (token_spec == NULL) {
+		token_name = SOFT_TOKEN_LABEL;
+		manuf_id = SOFT_MANUFACTURER_ID;
+		serial_no = SOFT_TOKEN_SERIAL;
+	} else {
+		/*
+		 * Parse token specifier into token_name, manuf_id, serial_no.
+		 * Token_name is required; manuf_id and serial_no are optional.
+		 */
+		if (parse_token_spec(token_spec, &token_name, &manuf_id,
+		    &serial_no) < 0)
+			return (PK_ERR_USAGE);
+	}
+
+	/* If no object type specified, default is public objects. */
+	if (!type_spec) {
+		public_objs = B_TRUE;
+	} else {
+		/*
+		 * Otherwise, the object type must be "public", "private",
+		 * or "both".
+		 */
+		if (strcmp(type_spec, "private") == 0) {
+			private_objs = B_TRUE;
+		} else if (strcmp(type_spec, "public") == 0) {
+			public_objs = B_TRUE;
+		} else if (strcmp(type_spec, "both") == 0) {
+			private_objs = B_TRUE;
+			public_objs = B_TRUE;
+		} else
+			return (PK_ERR_USAGE);
+	}
+
+	if (private_objs)
+		obj_type |= PK_PRIVATE_OBJ;
+	if (public_objs)
+		obj_type |= PK_PUBLIC_OBJ;
 
 	/* At least one of public, private, or object label is required. */
 	if (!private_objs && !public_objs && object_label == NULL)
@@ -103,19 +146,12 @@ pk_delete(int argc, char *argv[])
 		obj_type = PK_ALL_OBJ;
 
 	/* No additional args allowed. */
-	argc -= optind;
-	argv += optind;
+	argc -= optind_av;
+	argv += optind_av;
 	if (argc)
 		return (PK_ERR_USAGE);
 	/* Done parsing command line options. */
 
-	/* Delete operation only supported on softtoken. */
-	if (token_name == NULL)
-		token_name = SOFT_TOKEN_LABEL;
-	if (manuf_id == NULL)
-		manuf_id = SOFT_MANUFACTURER_ID;
-	if (serial_no == NULL)
-		serial_no = SOFT_TOKEN_SERIAL;
 	full_token_name(token_name, manuf_id, serial_no, full_name);
 
 	/* Find the slot with token. */

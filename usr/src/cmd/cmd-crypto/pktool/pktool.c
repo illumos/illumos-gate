@@ -69,15 +69,19 @@ static int	pk_help(int argc, char *argv[]);
 /* Command structure for verbs and their actions.  Do NOT i18n/l10n. */
 static verbcmd	cmds[] = {
 	{ "tokens",	pk_tokens,	0,	"tokens" },
-	{ "setpin",	pk_setpin,	0,	"setpin" },
-	{ "list",	pk_list,	0,	"list [-p] [-P] [-l <label>]"
-	    "\n\t\tor list [--public] [--private] [--label[=]<label>]" },
+	{ "setpin",	pk_setpin,	0,
+	    "setpin [token=<token>[:<manuf>[:<serial>]]]" },
+	{ "list",	pk_list,	0,
+	    "list [token=<token>[:<manuf>[:<serial>]]] "
+	    "[objtype=private|public|both] [label=<label>]" },
 	{ "delete",	pk_delete,	0,
-	    "delete { [-p] [-P] [-l <label>] }"
-	    "\n\t\tor delete { [--public] [--private] [--label[=]<label>] }" },
-	{ "import",	pk_import,	0,	"import <file>" },
-	{ "export",	pk_export,	0,	"export <file>" },
-	{ "-?",		pk_help,	0,	"--help\t(help and usage)" },
+	    "delete [token=<token>[:<manuf>[:<serial>]]] "
+	    "{ [objtype=private|public|both] [label=<label>] }" },
+	{ "import",	pk_import,	0,
+	    "import [token=<token>[:<manuf>[:<serial>]]] infile=<file>" },
+	{ "export",	pk_export,	0,
+	    "export [token=<token>[:<manuf>[:<serial>]]] outfile=<file>" },
+	{ "-?",		pk_help,	0,	"help\t(help and usage)" },
 };
 static int	num_cmds = sizeof (cmds) / sizeof (verbcmd);
 

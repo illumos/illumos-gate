@@ -104,6 +104,8 @@ extern CK_RV	find_obj_count(CK_SESSION_HANDLE sess, int obj_type,
 extern CK_RV	find_objs(CK_SESSION_HANDLE sess, int obj_type,
 		    CK_BYTE *label, CK_OBJECT_HANDLE_PTR *obj, CK_ULONG *count);
 
+extern int	parse_token_spec(char *spec, char **label, char **manuf,
+		    char **buf);
 extern void	full_token_name(char *token, char *manuf, char *serial,
 		    char *buf);
 
@@ -123,6 +125,10 @@ extern void	copy_attr_to_string(CK_ATTRIBUTE_PTR attr, CK_BYTE **buf,
 		    CK_ULONG *buflen);
 extern void	copy_attr_to_date(CK_ATTRIBUTE_PTR attr, CK_DATE **buf,
 		    CK_ULONG *buflen);
+
+extern int	getopt_av(int argc, char * const argv[], const char *optstring);
+extern char	*optarg_av;
+extern int	optind_av;
 
 #ifdef __cplusplus
 }

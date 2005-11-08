@@ -53,6 +53,20 @@ static boolean_t	session_opened = B_FALSE;
 static boolean_t	session_writable = B_FALSE;
 static boolean_t	logged_in = B_FALSE;
 
+/* Supporting structures and global variables for getopt_av(). */
+typedef struct	av_opts_s {
+	int		shortnm;	/* short name character */
+	char		*longnm;	/* long name string, NOT terminated */
+	int		longnm_len;	/* length of long name string */
+	boolean_t	has_arg;	/* takes optional argument */
+} av_opts;
+static av_opts		*opts_av = NULL;
+static const char	*_save_optstr = NULL;
+static int		_save_numopts = 0;
+
+int			optind_av = 1;
+char			*optarg_av = NULL;
+
 /*
  * Perform PKCS#11 setup here.  Currently only C_Initialize is required,
  * along with setting/resetting state variables.
@@ -604,6 +618,120 @@ find_token_slot(char *token_name, char *manuf_id, char *serial_no,
 }
 
 /*
+ * Returns pointer to either null-terminator or next unescaped colon.  The
+ * string to be extracted starts at the beginning and goes until one character
+ * before this pointer.  If NULL is returned, the string itself is NULL.
+ */
+static char *
+find_unescaped_colon(char *str)
+{
+	char *end;
+
+	if (str == NULL)
+		return (NULL);
+
+	while ((end = strchr(str, ':')) != NULL) {
+		if (end != str && *(end-1) != '\\')
+			return (end);
+		str = end + 1;		/* could point to null-terminator */
+	}
+	if (end == NULL)
+		end = strchr(str, '\0');
+	return (end);
+}
+
+/*
+ * Compresses away any characters escaped with backslash from given string.
+ * The string is altered in-place.  Example, "ab\:\\e" becomes "ab:\e".
+ */
+static void
+unescape_str(char *str)
+{
+	boolean_t	escaped = B_FALSE;
+	char		*mark;
+
+	if (str == NULL)
+		return;
+
+	for (mark = str; *str != '\0'; str++) {
+		if (*str != '\\' || escaped == B_TRUE) {
+			*mark++ = *str;
+			escaped = B_FALSE;
+		} else {
+			escaped = B_TRUE;
+		}
+	}
+	*mark = '\0';
+}
+
+/*
+ * Given a colon-separated token specifier, this functions splits it into
+ * its label, manufacturer ID (if any), and serial number (if any).  Literal
+ * colons within the label/manuf/serial can be escaped with a backslash.
+ * Fields can left blank and trailing colons can be omitted, however leading
+ * colons are required as placeholders.  For example, these are equivalent:
+ *	(a) "lbl", "lbl:", "lbl::"	(b) "lbl:man", "lbl:man:"
+ * but these are not:
+ *	(c) "man", ":man"	(d) "ser", "::ser"
+ * Furthermore, the token label is required always.
+ *
+ * The buffer containing the token specifier is altered by replacing the
+ * colons to null-terminators, and pointers returned are pointers into this
+ * string.  No new memory is allocated.
+ */
+int
+parse_token_spec(char *token_spec, char **token_name, char **manuf_id,
+	char **serial_no)
+{
+	char	*mark;
+
+	if (token_spec == NULL || *token_spec == '\0') {
+		cryptodebug("token specifier is empty");
+		return (-1);
+	}
+
+	*token_name = NULL;
+	*manuf_id = NULL;
+	*serial_no = NULL;
+
+	/* Token label (required) */
+	mark = find_unescaped_colon(token_spec);
+	*token_name = token_spec;
+	if (*mark != '\0')
+		*mark++ = '\0';		/* mark points to next field, if any */
+	unescape_str(*token_name);
+
+	if (*(*token_name) == '\0') {	/* token label is required */
+		cryptodebug("no token label found");
+		return (-1);
+	}
+
+	if (*mark == '\0' || *(mark+1) == '\0')		/* no more fields */
+		return (0);
+	token_spec = mark;
+
+	/* Manufacturer identifier (optional) */
+	mark = find_unescaped_colon(token_spec);
+	*manuf_id = token_spec;
+	if (*mark != '\0')
+		*mark++ = '\0';		/* mark points to next field, if any */
+	unescape_str(*manuf_id);
+
+	if (*mark == '\0' || *(mark+1) == '\0')		/* no more fields */
+		return (0);
+	token_spec = mark;
+
+	/* Serial number (optional) */
+	mark = find_unescaped_colon(token_spec);
+	*serial_no = token_spec;
+	if (*mark != '\0')
+		*mark++ = '\0';		/* null-terminate, just in case */
+	unescape_str(*serial_no);
+
+	return (0);
+}
+
+/*
  * Constructs a fully qualified token name from its label, manufacturer ID
  * (if any), and its serial number (if any).  Note that the given buf must
  * be big enough.  Do NOT i18n/l10n.
@@ -1080,4 +1208,117 @@ copy_attr_to_date(CK_ATTRIBUTE_PTR attr, CK_DATE **buf, CK_ULONG *buflen)
 {
 	*buf = (CK_DATE *)attr->pValue;
 	*buflen = attr->ulValueLen;
+}
+
+/*
+ * Breaks out the getopt-style option string into a structure that can be
+ * traversed later for calls to getopt_av().  Option string is NOT altered,
+ * but the struct fields point to locations within option string.
+ */
+static int
+populate_opts(char *optstring)
+{
+	int		i;
+	av_opts		*temp;
+	char		*marker;
+
+	if (optstring == NULL || *optstring == '\0')
+		return (0);
+
+	/*
+	 * This tries to imitate getopt(3c) Each option must conform to:
+	 * <short name char> [ ':' ] [ '(' <long name string> ')' ]
+	 * If long name is missing, the short name is used for long name.
+	 */
+	for (i = 0; *optstring != '\0'; i++) {
+		if ((temp = (av_opts *)((i == 0) ? malloc(sizeof (av_opts)) :
+		    realloc(opts_av, (i+1) * sizeof (av_opts)))) == NULL) {
+			free(opts_av);
+			opts_av = NULL;
+			return (0);
+		} else
+			opts_av = (av_opts *)temp;
+
+		marker = optstring;		/* may need optstring later */
+
+		opts_av[i].shortnm = *marker++;	/* set short name */
+
+		if (*marker == ':') {		/* check for opt arg */
+			marker++;
+			opts_av[i].has_arg = B_TRUE;
+		}
+
+		if (*marker == '(') {		/* check and set long name */
+			marker++;
+			opts_av[i].longnm = marker;
+			opts_av[i].longnm_len = strcspn(marker, ")");
+			optstring = marker + opts_av[i].longnm_len + 1;
+		} else {
+			/* use short name option character */
+			opts_av[i].longnm = optstring;
+			opts_av[i].longnm_len = 1;
+			optstring = marker;
+		}
+	}
+
+	return (i);
+}
+
+/*
+ * getopt_av() is very similar to getopt(3c) in that the takes an option
+ * string, compares command line arguments for matches, and returns a single
+ * letter option when a match is found.  However, getopt_av() differs from
+ * getopt(3c) by requiring that only longname options and values be found
+ * on the command line and all leading dashes are omitted.  In other words,
+ * it tries to enforce only longname "option=value" arguments on the command
+ * line.  Boolean options are not allowed either.
+ */
+int
+getopt_av(int argc, char * const *argv, const char *optstring)
+{
+	int	i;
+	int	len;
+
+	if (optind_av >= argc)
+		return (EOF);
+
+	/* First time or when optstring changes from previous one */
+	if (_save_optstr != optstring) {
+		if (opts_av != NULL)
+		    free(opts_av);
+		opts_av = NULL;
+		_save_optstr = optstring;
+		_save_numopts = populate_opts((char *)optstring);
+	}
+
+	for (i = 0; i < _save_numopts; i++) {
+		if (strcmp(argv[optind_av], "--") == 0) {
+			optind_av++;
+			break;
+		}
+
+		len = strcspn(argv[optind_av], "=");
+
+		if (len == opts_av[i].longnm_len && strncmp(argv[optind_av],
+		    opts_av[i].longnm, opts_av[i].longnm_len) == 0) {
+			/* matched */
+			if (!opts_av[i].has_arg) {
+				optind_av++;
+				return (opts_av[i].shortnm);
+			}
+
+			/* needs optarg */
+			if (argv[optind_av][len] == '=') {
+				optarg_av = &(argv[optind_av][len+1]);
+				optind_av++;
+				return (opts_av[i].shortnm);
+			}
+
+			optarg_av = NULL;
+			optind_av++;
+			return ((int)'?');
+		}
+	}
+
+	return (EOF);
 }
