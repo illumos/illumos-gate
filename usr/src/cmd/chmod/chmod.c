@@ -462,6 +462,11 @@ parse_acl_args(char *arg, acl_args_t **acl_args)
 		}
 		break;
 	case '=':
+		/*
+		 * Was slot specified?
+		 */
+		if (arg[1] == '=')
+			slot = -1;
 		action = ACL_REPLACE;
 		acl_spec = ++end;
 		break;

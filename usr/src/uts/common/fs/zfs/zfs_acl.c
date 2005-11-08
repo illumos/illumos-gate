@@ -956,14 +956,17 @@ zfs_acl_inherit(znode_t *zp, zfs_acl_t *paclp)
 
 				/*
 				 * If we are inheriting an ACE targeted for
-				 * only files, then leave the inherit_only
-				 * one for future propagation.
+				 * only files, then make sure inherit_only
+				 * is on for future propagation.
 				 */
 				if ((acep[j].a_flags & (ACE_FILE_INHERIT_ACE |
-				    ACE_DIRECTORY_INHERIT_ACE)) !=
-				    ACE_FILE_INHERIT_ACE)
+				    ACE_DIRECTORY_INHERIT_ACE)) ==
+				    ACE_FILE_INHERIT_ACE) {
+					acep[j].a_flags |= ACE_INHERIT_ONLY_ACE;
+				} else {
 					acep[j].a_flags &=
 					    ~ACE_INHERIT_ONLY_ACE;
+				}
 
 				zfs_securemode_update(zfsvfs, &acep[j]);
 				j++;
