@@ -24,8 +24,8 @@
 
 
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,6 +80,17 @@ alarm(int deltat)
 		ret = 0;
 	else
 		ret = (del + hz - 1) / hz;	/* convert to seconds */
+
+	/*
+	 * Our implementation defined limit for alarm is
+	 * INT_MAX / hz. Anything larger gets truncated
+	 * to that limit. If deltat is negative we can
+	 * assume a wrap has occurred so peg deltat in
+	 * that case too.
+	 */
+	if (deltat > (INT_MAX / hz) || deltat < 0)
+		deltat = INT_MAX / hz;
+
 	if (deltat)
 		p->p_alarmid = realtime_timeout(sigalarm2proc, p, deltat * hz);
 	mutex_exit(&p->p_lock);
