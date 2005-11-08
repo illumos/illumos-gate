@@ -398,10 +398,12 @@ restarter_set_states(restarter_event_handle_t *h, const char *inst,
 	assert(h->reh_master_subscriber_id != NULL);
 
 	/* Validate format of auxiliary state: no spaces allowed */
-	while (p != NULL) {
-		if (isspace(*p))
-			return (EINVAL);
-		p++;
+	if (p != NULL) {
+		while (*p != '\0') {
+			if (isspace(*p))
+				return (EINVAL);
+			p++;
+		}
 	}
 
 	if ((scf_h = scf_handle_create(SCF_VERSION)) == NULL) {
