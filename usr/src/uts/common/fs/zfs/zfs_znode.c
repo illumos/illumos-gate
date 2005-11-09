@@ -612,6 +612,7 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, uint64_t obj_num, int blksz)
 			vp->v_flag |= V_XATTRDIR;
 		} else
 			vn_setops(vp, zfs_dvnodeops);
+		zp->z_zn_prefetch = B_TRUE; /* z_prefetch default is enabled */
 		break;
 	case VBLK:
 	case VCHR:

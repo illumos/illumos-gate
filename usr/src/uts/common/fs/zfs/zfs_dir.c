@@ -246,6 +246,7 @@ zfs_dirlook(znode_t *dzp, char *name, vnode_t **vpp)
 		if (error == 0) {
 			*vpp = ZTOV(zp);
 			zfs_dirent_unlock(dl);
+			dzp->z_zn_prefetch = B_TRUE; /* enable prefetching */
 		}
 	}
 

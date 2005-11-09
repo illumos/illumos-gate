@@ -1605,6 +1605,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 	iovec_t		*iovp;
 	dirent64_t	*odp;
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
+	objset_t	*os;
 	caddr_t		outbuf;
 	size_t		bufsize;
 	zap_cursor_t	zc;
@@ -1614,8 +1615,9 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 	uint64_t	offset; /* must be unsigned; checks for < 1 */
 	off64_t		*next;
 	int		local_eof;
-	int		outcount = 0;
-	int		error = 0;
+	int		outcount;
+	int		error;
+	uint8_t		prefetch;
 
 	ZFS_ENTER(zfsvfs);
 
@@ -1642,21 +1644,24 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 		return (0);
 	}
 
+	error = 0;
+	os = zfsvfs->z_os;
+	offset = uio->uio_loffset;
+	prefetch = zp->z_zn_prefetch;
+
 	/*
 	 * Initialize the iterator cursor.
 	 */
-	offset = uio->uio_loffset;
 	if (offset <= 3) {
 		/*
 		 * Start iteration from the beginning of the directory.
 		 */
-		zap_cursor_init(&zc, zfsvfs->z_os, zp->z_id);
+		zap_cursor_init(&zc, os, zp->z_id);
 	} else {
 		/*
 		 * The offset is a serialized cursor.
 		 */
-		zap_cursor_init_serialized(&zc, zfsvfs->z_os, zp->z_id,
-		    offset);
+		zap_cursor_init_serialized(&zc, os, zp->z_id, offset);
 	}
 
 	/*
@@ -1745,7 +1750,8 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 		ASSERT(outcount <= bufsize);
 
 		/* Prefetch znode */
-		dmu_prefetch(zfsvfs->z_os, zap.za_first_integer, 0, 0);
+		if (prefetch)
+			dmu_prefetch(os, zap.za_first_integer, 0, 0);
 
 		/*
 		 * Move to the next entry, fill in the previous offset.
@@ -1758,6 +1764,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 		}
 		*next = offset;
 	}
+	zp->z_zn_prefetch = B_FALSE; /* a lookup will re-enable pre-fetching */
 
 	if (uio->uio_segflg == UIO_SYSSPACE && uio->uio_iovcnt == 1) {
 		iovp->iov_base += outcount;

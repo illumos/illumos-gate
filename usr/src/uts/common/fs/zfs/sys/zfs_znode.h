@@ -148,6 +148,7 @@ typedef struct znode {
 	uint8_t		z_reap;		/* reap file at last reference */
 	uint8_t		z_atime_dirty;	/* atime needs to be synced */
 	uint8_t		z_dbuf_held;	/* Is z_dbuf already held? */
+	uint8_t		z_zn_prefetch;	/* Prefetch znodes? */
 	uint_t		z_mapcnt;	/* number of memory maps to file */
 	uint_t		z_blksz;	/* block size in bytes */
 	uint_t		z_seq;		/* modification sequence number */
