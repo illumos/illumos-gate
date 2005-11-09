@@ -2270,7 +2270,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 {
 	zfs_cmd_t zc = { 0 };
 	time_t begin_time;
-	int err, bytes;
+	int ioctl_err, err, bytes, size;
 	char *cp;
 	dmu_replay_record_t drr;
 	struct drr_begin *drrb = &zc.zc_begin_record;
@@ -2287,14 +2287,14 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	cp = (char *)&drr;
 	bytes = 0;
 	do {
-		err = read(STDIN_FILENO, cp, sizeof (drr) - bytes);
-		cp += err;
-		bytes += err;
-	} while (err > 0);
+		size = read(STDIN_FILENO, cp, sizeof (drr) - bytes);
+		cp += size;
+		bytes += size;
+	} while (size > 0);
 
-	if (err < 0 || bytes != sizeof (drr)) {
+	if (size < 0 || bytes != sizeof (drr)) {
 		zfs_error(dgettext(TEXT_DOMAIN,
-		    "Can't restore: invalid backup stream "
+		    "cannot restore: invalid backup stream "
 		    "(couldn't read first record)"));
 		return (-1);
 	}
@@ -2304,7 +2304,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	if (drrb->drr_magic != DMU_BACKUP_MAGIC &&
 	    drrb->drr_magic != BSWAP_64(DMU_BACKUP_MAGIC)) {
 		zfs_error(dgettext(TEXT_DOMAIN,
-		    "Can't restore: invalid backup stream "
+		    "cannot restore: invalid backup stream "
 		    "(invalid magic number)"));
 		return (-1);
 	}
@@ -2314,7 +2314,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		if (drrb->drr_magic == BSWAP_64(DMU_BACKUP_MAGIC))
 			drrb->drr_version = BSWAP_64(drrb->drr_version);
 		zfs_error(dgettext(TEXT_DOMAIN,
-		    "Can't restore: only backup version 0x%llx is supported, "
+		    "cannot restore: only backup version 0x%llx is supported, "
 		    "stream is version %llx."),
 		    DMU_BACKUP_VERSION, drrb->drr_version);
 		return (-1);
@@ -2327,7 +2327,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	if (isprefix) {
 		if (strchr(tosnap, '@') != NULL) {
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: "
+			    "cannot restore: "
 			    "argument to -d must be a filesystem"));
 			return (-1);
 		}
@@ -2348,7 +2348,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		cp = strchr(drr.drr_u.drr_begin.drr_toname, '@');
 		if (cp == NULL || strlen(tosnap) + strlen(cp) >= MAXNAMELEN) {
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: invalid backup stream "
+			    "cannot restore: invalid backup stream "
 			    "(invalid snapshot name)"));
 			return (-1);
 		}
@@ -2368,65 +2368,86 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		h = zfs_open(zc.zc_name, ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
 		if (h == NULL) {
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore incrememtal backup: destination\n"
+			    "cannot restore incrememtal backup: destination\n"
 			    "filesystem %s does not exist"),
 			    zc.zc_name);
 			return (-1);
 		}
-		/* unmount destination fs */
-		if (!dryrun)
-			(void) zfs_unmount(h, NULL, 0);
+		if (!dryrun) {
+			/* unmount destination fs or remove device link. */
+			if (h->zfs_type == ZFS_TYPE_FILESYSTEM) {
+				(void) zfs_unmount(h, NULL, 0);
+			} else {
+				(void) zvol_remove_link(h->zfs_name);
+			}
+		}
 		zfs_close(h);
-
-
 	} else {
 		/* full backup stream */
 
-		/* do the ioctl to the containing fs's parent */
 		(void) strcpy(zc.zc_name, drrb->drr_toname);
-		cp = strrchr(zc.zc_name, '/');
-		if (cp == NULL) {
+
+		/* make sure they aren't trying to restore into the root */
+		if (strchr(zc.zc_name, '/') == NULL) {
 			cp = strchr(zc.zc_name, '@');
 			if (cp)
 				*cp = '\0';
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: destination fs %s already exists"),
+			    "cannot restore: destination fs %s already exists"),
 			    zc.zc_name);
 			return (-1);
 		}
-		*cp = '\0';
-
-		/* make sure destination fs exists */
 
 		if (isprefix) {
-			/* make sure prefix exists */
 			zfs_handle_t *h;
 
-			/* make sure destination fs exists */
+			/* make sure prefix exists */
 			h = zfs_open(tosnap, ZFS_TYPE_FILESYSTEM |
 			    ZFS_TYPE_VOLUME);
 			if (h == NULL) {
 				zfs_error(dgettext(TEXT_DOMAIN,
-				    "Can't restore:"
+				    "cannot restore: "
 				    "filesystem %s does not exist"),
 				    tosnap);
 				return (-1);
 			}
 
 			/* create any necessary ancestors up to prefix */
+			zc.zc_objset_type = DMU_OST_ZFS;
+			/*
+			 * zc.zc_name is now the full name of the snap
+			 * we're restoring into
+			 */
 			cp = zc.zc_name + strlen(tosnap) + 1;
 			while (cp = strchr(cp, '/')) {
 				*cp = '\0';
 				err = ioctl(zfs_fd, ZFS_IOC_CREATE, &zc);
-				if (err && err != ENOENT && err != EEXIST) {
+				if (err && errno != ENOENT && errno != EEXIST) {
 					zfs_error(dgettext(TEXT_DOMAIN,
-					    "Can't restore:"
+					    "cannot restore: "
 					    "couldn't create ancestor %s"),
 					    zc.zc_name);
 					return (-1);
 				}
+				*cp = '/';
+				cp++;
 			}
 		}
+
+		/* Make sure destination fs does not exist */
+		cp = strchr(zc.zc_name, '@');
+		*cp = '\0';
+		if (ioctl(zfs_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0) {
+			zfs_error(dgettext(TEXT_DOMAIN,
+			    "cannot restore full backup: "
+			    "destination filesystem %s already exists"),
+			    zc.zc_name);
+			return (-1);
+		}
+
+		/* Do the recvbackup ioctl to the fs's parent. */
+		cp = strrchr(zc.zc_name, '/');
+		*cp = '\0';
 	}
 
 	(void) strcpy(zc.zc_prop_value, tosnap);
@@ -2442,21 +2463,21 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	}
 	if (dryrun)
 		return (0);
-	err = ioctl(zfs_fd, ZFS_IOC_RECVBACKUP, &zc);
-	if (err != 0) {
+	err = ioctl_err = ioctl(zfs_fd, ZFS_IOC_RECVBACKUP, &zc);
+	if (ioctl_err != 0) {
 		switch (errno) {
 		case ENODEV:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: "
-			    "Most recent snapshot does not "
+			    "cannot restore: "
+			    "most recent snapshot does not "
 			    "match incremental backup source"));
 			break;
 		case ETXTBSY:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: "
-			    "Destination has been modified since "
-			    "most recent snapshot.\n"
-			    "Use 'zfs rollback' to discard changes."));
+			    "cannot restore: "
+			    "destination has been modified since "
+			    "most recent snapshot --\n"
+			    "use 'zfs rollback' to discard changes"));
 			break;
 		case EEXIST:
 			if (drrb->drr_fromguid == 0) {
@@ -2465,37 +2486,36 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 				*cp = '\0';
 			}
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore to %s: Destination already exists"),
+			    "cannot restore to %s: destination already exists"),
 			    drrb->drr_toname);
 			break;
 		case ENOENT:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: "
-			    "Destination does not exist"));
+			    "cannot restore: destination does not exist"));
 			break;
 		case EBUSY:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: "
-			    "Destination is in use"));
+			    "cannot restore: destination is in use"));
 			break;
 		case ENOSPC:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: "
-			    "Out of space"));
+			    "cannot restore: out of space"));
 			break;
 		case EDQUOT:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: "
-			    "Quota exceeded"));
+			    "cannot restore: quota exceeded"));
 			break;
 		case EINTR:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Restore failed: signal recieved"));
+			    "restore failed: signal recieved"));
 			break;
 		case EINVAL:
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "Can't restore: "
-			    "invalid backup stream"));
+			    "cannot restore: invalid backup stream"));
+			break;
+		case EPERM:
+			zfs_error(dgettext(TEXT_DOMAIN,
+			    "cannot restore: permission denied"));
 			break;
 		default:
 			zfs_baderror(errno);
@@ -2503,45 +2523,35 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	}
 
 	/*
-	 * Mount or recreate the /dev links for the target filesystem.
+	 * Mount or recreate the /dev links for the target filesystem
+	 * (if created, or if we tore them down to do an incremental
+	 * restore), and the /dev links for the new snapshot (if
+	 * created).
 	 */
 	cp = strchr(drrb->drr_toname, '@');
-	if (cp && (err == 0 || drrb->drr_fromguid)) {
+	if (cp && (ioctl_err == 0 || drrb->drr_fromguid)) {
 		zfs_handle_t *h;
 
 		*cp = '\0';
 		h = zfs_open(drrb->drr_toname,
 		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
+		*cp = '@';
 		if (h) {
-			if (h->zfs_type == ZFS_TYPE_FILESYSTEM)
+			if (h->zfs_type == ZFS_TYPE_FILESYSTEM) {
 				err = zfs_mount(h, NULL, 0);
-			else
+			} else {
 				err = zvol_create_link(h->zfs_name);
+				if (err == 0 && ioctl_err == 0) {
+					err =
+					    zvol_create_link(drrb->drr_toname);
+				}
+			}
 			zfs_close(h);
 		}
 	}
 
-	/*
-	 * If the destination snapshot was also specified, and it was a volume,
-	 * make sure that the appropriate /dev link was created as well.
-	 */
-	if (err == 0) {
-		zfs_handle_t *h;
-
-		if (cp)
-			*cp = '@';
-
-		h = zfs_open(drrb->drr_toname, ZFS_TYPE_SNAPSHOT |
-		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
-		if (h) {
-			if (h->zfs_volblocksize)
-				err = zvol_create_link(h->zfs_name);
-			zfs_close(h);
-		}
-	}
-
-	if (err)
-		return (err);
+	if (err || ioctl_err)
+		return (-1);
 
 	if (verbose) {
 		char buf1[64];
