@@ -23,7 +23,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1995, 2000 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 
-echo_file usr/src/common/lvm/md_crc.c
+find_files "s.*" usr/src/common/lvm
