@@ -753,7 +753,7 @@ C_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	if (rv != CKR_OK)
 		return (rv);
 
-	if ((pMechanism == NULL) || (phKey == NULL)) {
+	if (pMechanism == NULL) {
 		REFRELE(session_p, ses_lock_held);
 		return (CKR_ARGUMENTS_BAD);
 	}

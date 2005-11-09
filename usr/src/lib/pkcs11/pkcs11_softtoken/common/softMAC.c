@@ -674,8 +674,8 @@ sha2_hmac_ctx_init(uint_t mech, sha2_hc_ctx_t *ctx, uint64_t *ipad,
 
 	/* XOR key with ipad (0x36) and opad (0x5c) */
 	for (i = 0; i < blocks_per_int64; i ++) {
-		ipad[i] ^= 0x3636363636363636;
-		opad[i] ^= 0x5c5c5c5c5c5c5c5c;
+		ipad[i] ^= 0x3636363636363636ULL;
+		opad[i] ^= 0x5c5c5c5c5c5c5c5cULL;
 	}
 
 	/* perform SHA2 on ipad */

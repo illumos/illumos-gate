@@ -375,6 +375,24 @@ P_SHA1(uchar_t *secret, uint_t secretlen, uchar_t *label, uint_t labellen,
 		SOFT_MAC_FINAL(SHA1, &sha1_hmac_ctx, A);
 	}
 }
+
+/* This function handles the call from C_DeriveKey for CKM_TLS_PRF */
+CK_RV
+derive_tls_prf(CK_TLS_PRF_PARAMS_PTR param, soft_object_t *basekey_p)
+{
+
+	if (param->pOutput == NULL || param->pulOutputLen == 0)
+		return (CKR_BUFFER_TOO_SMALL);
+
+	(void) soft_tls_prf(OBJ_SEC_VALUE(basekey_p),
+	    OBJ_SEC_VALUE_LEN(basekey_p), param->pLabel, param->ulLabelLen,
+	    param->pSeed, param->ulSeedLen, NULL, 0, param->pOutput,
+	    *param->pulOutputLen);
+
+	return (CKR_OK);
+}
+
+
 /*
  * soft_ssl_master_key_derive()
  *

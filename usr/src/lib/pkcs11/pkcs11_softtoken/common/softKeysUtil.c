@@ -1010,6 +1010,19 @@ common:
 		return (soft_ssl_key_and_mac_derive(session_p, pMechanism,
 		    basekey_p, pTemplate, ulAttributeCount));
 
+	case CKM_TLS_PRF:
+		if (pMechanism->pParameter == NULL ||
+		    pMechanism->ulParameterLen != sizeof (CK_TLS_PRF_PARAMS) ||
+		    phKey != NULL)
+			return (CKR_ARGUMENTS_BAD);
+
+		if (pTemplate != NULL)
+			return (CKR_TEMPLATE_INCONSISTENT);
+
+		return (derive_tls_prf(
+			(CK_TLS_PRF_PARAMS_PTR)pMechanism->pParameter,
+			basekey_p));
+
 	default:
 		return (CKR_MECHANISM_INVALID);
 	}

@@ -992,6 +992,7 @@ meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 
 	CK_ULONG slotnum;
 	boolean_t isSSL = B_FALSE;
+	boolean_t isTLSPRF = B_FALSE;
 	mechinfo_t **slots = NULL;
 	unsigned long i, slot_count = 0;
 	slot_session_t *derive_session = NULL;
@@ -1023,9 +1024,11 @@ meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 	}
 
 	if (pMechanism->mechanism == CKM_SSL3_KEY_AND_MAC_DERIVE ||
-	    pMechanism->mechanism == CKM_TLS_KEY_AND_MAC_DERIVE) {
+	    pMechanism->mechanism == CKM_TLS_KEY_AND_MAC_DERIVE)
 		isSSL = B_TRUE;
-	}
+
+	else if (pMechanism->mechanism == CKM_TLS_PRF)
+		isTLSPRF = B_TRUE;
 
 	rv = meta_slot_object_alloc(&slotkey1);
 	if (isSSL) {
@@ -1084,7 +1087,7 @@ meta_derive_key(meta_session_t *session, CK_MECHANISM *pMechanism,
 		rv = FUNCLIST(derive_session->fw_st_id)->C_DeriveKey(
 		    derive_session->hSession, pMechanism,
 		    slot_basekey1->hObject, pTemplate, ulAttributeCount,
-		    isSSL ? NULL : &hDerivedKey);
+		    (isSSL || isTLSPRF) ? NULL : &hDerivedKey);
 
 		if (rv == CKR_OK)
 			break;
@@ -1104,6 +1107,9 @@ loop_cleanup:
 		rv = save_rv;
 		goto finish;
 	}
+
+	if (isTLSPRF)
+		goto finish;
 
 	/*
 	 * These SSL/TLS are unique in that the parameter in the API for

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,7 @@ CK_RV soft_ssl_master_key_derive(soft_session_t *, CK_MECHANISM_PTR,
     soft_object_t *, CK_ATTRIBUTE_PTR, CK_ULONG, CK_OBJECT_HANDLE_PTR);
 CK_RV soft_ssl_key_and_mac_derive(soft_session_t *, CK_MECHANISM_PTR,
     soft_object_t *, CK_ATTRIBUTE_PTR, CK_ULONG);
+CK_RV derive_tls_prf(CK_TLS_PRF_PARAMS_PTR, soft_object_t *);
 
 #ifdef	__cplusplus
 }

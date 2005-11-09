@@ -545,6 +545,8 @@ soft_rsa_sign_verify_init_common(soft_session_t *session_p,
 
 	case CKM_SHA1_RSA_PKCS:
 		digest_mech.mechanism = CKM_SHA_1;
+		digest_mech.pParameter = pMechanism->pParameter;
+		digest_mech.ulParameterLen = pMechanism->ulParameterLen;
 		rv = soft_digest_init_internal(session_p, &digest_mech);
 		if (rv != CKR_OK)
 			return (rv);
@@ -1253,6 +1255,18 @@ clean0:
 	return (rv);
 }
 
+
+CK_ULONG
+get_rsa_sha1_prefix(CK_MECHANISM_PTR mech, CK_BYTE_PTR *prefix) {
+	if (mech->pParameter == NULL) {
+		*prefix = (CK_BYTE *)SHA1_DER_PREFIX;
+		return (SHA1_DER_PREFIX_Len);
+	}
+
+	*prefix = (CK_BYTE *)SHA1_DER_PREFIX_OID;
+	return (SHA1_DER_PREFIX_OID_Len);
+}
+
 CK_RV
 soft_rsa_digest_sign_common(soft_session_t *session_p, CK_BYTE_PTR pData,
     CK_ULONG ulDataLen, CK_BYTE_PTR pSigned,
@@ -1269,6 +1283,8 @@ soft_rsa_digest_sign_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	soft_object_t *key = rsa_ctx->key;
 	uchar_t modulus[MAX_KEY_ATTR_BUFLEN];
 	uint32_t modulus_len = sizeof (modulus);
+	CK_ULONG der_len;
+	CK_BYTE_PTR der_prefix;
 
 	rv = soft_get_private_attr(key, CKA_MODULUS, modulus, &modulus_len);
 	if (rv != CKR_OK) {
@@ -1311,10 +1327,8 @@ soft_rsa_digest_sign_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	}
 
 	/*
-	 * Prepare the DER encoding of the DigestInfo value as follows:
-	 * MD5:		MD5_DER_PREFIX || H
-	 * SHA-1:	SHA1_DER_PREFIX || H
-	 * SHA2:	SHA2_DER_PREFIX || H
+	 * Prepare the DER encoding of the DigestInfo value by setting it to:
+	 *	<MECH>_DER_PREFIX || H
 	 *
 	 * See rsa_impl.c for more details.
 	 */
@@ -1325,9 +1339,11 @@ soft_rsa_digest_sign_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 		der_data_len = MD5_DER_PREFIX_Len + hash_len;
 		break;
 	case CKM_SHA_1:
-		(void) memcpy(der_data, SHA1_DER_PREFIX, SHA1_DER_PREFIX_Len);
-		(void) memcpy(der_data + SHA1_DER_PREFIX_Len, hash, hash_len);
-		der_data_len = SHA1_DER_PREFIX_Len + hash_len;
+		der_len = get_rsa_sha1_prefix(&(session_p->digest.mech),
+		    &der_prefix);
+		(void) memcpy(der_data, der_prefix, der_len);
+		(void) memcpy(der_data + der_len, hash, hash_len);
+		der_data_len = der_len + hash_len;
 		break;
 	case CKM_SHA256:
 		(void) memcpy(der_data, SHA256_DER_PREFIX,
@@ -1380,6 +1396,8 @@ soft_rsa_digest_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 	CK_ULONG der_data_len;
 	soft_rsa_ctx_t *rsa_ctx = session_p->verify.context;
 	soft_object_t *key = rsa_ctx->key;
+	CK_ULONG der_len;
+	CK_BYTE_PTR der_prefix;
 
 	if (Final) {
 		rv = soft_digest_final(session_p, hash, &hash_len);
@@ -1409,9 +1427,11 @@ soft_rsa_digest_verify_common(soft_session_t *session_p, CK_BYTE_PTR pData,
 		der_data_len = MD5_DER_PREFIX_Len + hash_len;
 		break;
 	case CKM_SHA_1:
-		(void) memcpy(der_data, SHA1_DER_PREFIX, SHA1_DER_PREFIX_Len);
-		(void) memcpy(der_data + SHA1_DER_PREFIX_Len, hash, hash_len);
-		der_data_len = SHA1_DER_PREFIX_Len + hash_len;
+		der_len = get_rsa_sha1_prefix(&(session_p->digest.mech),
+		    &der_prefix);
+		(void) memcpy(der_data, der_prefix, der_len);
+		(void) memcpy(der_data + der_len, hash, hash_len);
+		der_data_len = der_len + hash_len;
 		break;
 	case CKM_SHA256:
 		(void) memcpy(der_data, SHA256_DER_PREFIX,

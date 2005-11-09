@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -256,12 +256,14 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	meta_object_t *newKey1 = NULL, *newKey2 = NULL, *newKey3 = NULL,
 		*newKey4 = NULL;
 	boolean_t ssl_keys = B_FALSE;
+	boolean_t tlsprf = B_FALSE;
 
 	CK_MECHANISM metaMech;
 	CK_OBJECT_HANDLE *phBaseKey2 = NULL;
 	CK_X9_42_DH2_DERIVE_PARAMS x942_params, *x9_tmpptr;
 	CK_ECDH2_DERIVE_PARAMS ecdh_params, *ec_tmpptr;
 	CK_SSL3_KEY_MAT_OUT *ssl_key_mat;
+	CK_SSL3_KEY_MAT_PARAMS *keyparams;
 
 	if (pMech == NULL) {
 		return (CKR_ARGUMENTS_BAD);
@@ -274,27 +276,30 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 	 * pMech->pParameter. In these cases the spec says (see 12.38.4
 	 * and 12.39.4) that phKey should be a NULL pointer, as it is not used.
 	 */
-	if (pMech->mechanism == CKM_SSL3_KEY_AND_MAC_DERIVE ||
-	    pMech->mechanism == CKM_TLS_KEY_AND_MAC_DERIVE) {
-		CK_SSL3_KEY_MAT_PARAMS *keyparams =
-			(CK_SSL3_KEY_MAT_PARAMS*)pMech->pParameter;
+	switch (pMech->mechanism) {
+	case CKM_SSL3_KEY_AND_MAC_DERIVE:
+	case CKM_TLS_KEY_AND_MAC_DERIVE:
+		keyparams = (CK_SSL3_KEY_MAT_PARAMS*)pMech->pParameter;
 
 		if ((keyparams == NULL) || (pMech->ulParameterLen
-		    != sizeof (CK_SSL3_KEY_MAT_PARAMS))) {
+		    != sizeof (CK_SSL3_KEY_MAT_PARAMS)))
 			return (CKR_ARGUMENTS_BAD);
-		}
 
 		ssl_key_mat = keyparams->pReturnedKeyMaterial;
-		if (ssl_key_mat == NULL) {
+		if (ssl_key_mat == NULL)
 			return (CKR_ARGUMENTS_BAD);
-		}
 
 		ssl_keys = B_TRUE;
-	} else {
-		if (phKey == NULL) {
+		break;
+
+	case CKM_TLS_PRF:
+		tlsprf = B_TRUE;
+		break;
+
+	default:
+		if (phKey == NULL)
 			return (CKR_ARGUMENTS_BAD);
-		}
-	}
+	};
 
 	rv = meta_handle2session(hSession, &session);
 	if (rv != CKR_OK)
@@ -424,7 +429,8 @@ meta_DeriveKey(CK_SESSION_HANDLE hSession, CK_MECHANISM_PTR pMechanism,
 		ssl_key_mat->hClientKey = (CK_OBJECT_HANDLE) newKey3;
 		ssl_key_mat->hServerKey = (CK_OBJECT_HANDLE) newKey4;
 		/* phKey is not used (it's NULL) for these SSL/TLS mechs. */
-	} else {
+
+	} else if (!tlsprf) {
 		*phKey = (CK_OBJECT_HANDLE) newKey1;
 	}
 

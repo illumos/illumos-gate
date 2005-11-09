@@ -92,6 +92,9 @@ soft_digest_init(soft_session_t *session_p, CK_MECHANISM_PTR pMechanism)
 		}
 
 		session_p->digest.mech.mechanism = CKM_SHA_1;
+		session_p->digest.mech.pParameter = pMechanism->pParameter;
+		session_p->digest.mech.ulParameterLen =
+		    pMechanism->ulParameterLen;
 		(void) pthread_mutex_unlock(&session_p->session_mutex);
 
 		SHA1Init((SHA1_CTX *)session_p->digest.context);
