@@ -95,13 +95,8 @@
 #include <errno.h>
 #include <ucontext.h>
 #include <limits.h>
-#include <alloca.h>
 #include <ctype.h>
-
-#define	_POSIX_PTHREAD_SEMANTICS
 #include <dirent.h>
-#undef	_POSIX_PTHREAD_SEMANTICS
-
 #include <dt_module.h>
 #include <dt_program.h>
 #include <dt_provider.h>
@@ -1646,7 +1641,7 @@ err:
 static int
 dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 {
-	struct dirent *dp, *ep;
+	struct dirent *dp;
 	const char *p;
 	DIR *dirp;
 
@@ -1659,10 +1654,7 @@ dt_load_libs_dir(dtrace_hdl_t *dtp, const char *path)
 		return (0);
 	}
 
-	ep = alloca(sizeof (struct dirent) + PATH_MAX + 1);
-	bzero(ep, sizeof (struct dirent) + PATH_MAX + 1);
-
-	while (readdir_r(dirp, ep, &dp) == 0 && dp != NULL) {
+	while ((dp = readdir(dirp)) != NULL) {
 		if ((p = strrchr(dp->d_name, '.')) == NULL || strcmp(p, ".d"))
 			continue; /* skip any filename not ending in .d */
 

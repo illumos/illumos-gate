@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1996,1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -172,7 +172,7 @@ filegen_open(gen, newid)
 		static u_long conflicts = 0;
 
 #ifndef	S_ISREG
-#define	S_ISREG(mode)	(((mode) & S_IFREG) == S_IFREG)
+#define	S_ISREG(mode)	(((mode) & S_IFMT) == S_IFREG)
 #endif
 		if (stat(basename, &stats) == 0) {
 			/* Hm, file exists... */

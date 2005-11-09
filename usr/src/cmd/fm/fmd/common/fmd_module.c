@@ -1006,17 +1006,14 @@ fmd_modhash_loaddir(fmd_modhash_t *mhp, const char *dir,
     const fmd_modops_t *ops)
 {
 	char path[PATH_MAX];
-	struct dirent *dp, *ep;
+	struct dirent *dp;
 	const char *p;
 	DIR *dirp;
 
 	if ((dirp = opendir(dir)) == NULL)
 		return; /* failed to open directory; just skip it */
 
-	ep = alloca(sizeof (struct dirent) + PATH_MAX + 1);
-	bzero(ep, sizeof (struct dirent) + PATH_MAX + 1);
-
-	while (readdir_r(dirp, ep, &dp) == 0 && dp != NULL) {
+	while ((dp = readdir(dirp)) != NULL) {
 		if (dp->d_name[0] == '.')
 			continue; /* skip "." and ".." */
 

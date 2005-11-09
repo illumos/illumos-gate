@@ -2832,8 +2832,8 @@ realcon()
 
 	if (stat(SYSCON, &sconbuf) != -1 &&
 	    stat(CONSOLE, &conbuf) != -1 &&
-	    sconbuf.st_mode & S_IFCHR &&
-	    conbuf.st_mode & S_IFCHR &&
+	    S_ISCHR(sconbuf.st_mode) &&
+	    S_ISCHR(conbuf.st_mode) &&
 	    sconbuf.st_rdev == conbuf.st_rdev) {
 		return (1);
 	} else {

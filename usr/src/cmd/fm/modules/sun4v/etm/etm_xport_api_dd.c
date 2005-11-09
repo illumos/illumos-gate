@@ -720,7 +720,7 @@ etm_xport_init(fmd_hdl_t *hdl)
 		rv = (-errno);
 		goto func_ret;
 	}
-	if ((stat_buf.st_mode & S_IFCHR) == 0) {
+	if (!S_ISCHR(stat_buf.st_mode)) {
 		etm_xport_should_fake_dd = 1;	/* not a char driver */
 	}
 	fmd_hdl_debug(hdl, "info: etm_xport_should_fake_dd %d\n",

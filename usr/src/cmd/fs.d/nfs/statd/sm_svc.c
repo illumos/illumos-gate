@@ -297,7 +297,7 @@ remove_dir(path_dir)
 char *path_dir;
 {
 	DIR	*dp;
-	struct dirent   *dirp, *entp;
+	struct dirent   *dirp;
 	char tmp_path[MAXPATHLEN];
 
 	if ((dp = opendir(path_dir)) == (DIR *)NULL) {
@@ -307,13 +307,7 @@ char *path_dir;
 		return (1);
 	}
 
-	entp = (struct dirent *)xmalloc(MAXDIRENT);
-	if (entp == NULL) {
-		(void) closedir(dp);
-		return (1);
-	}
-
-	while ((dirp = readdir_r(dp, entp)) != (struct dirent *)NULL) {
+	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") != 0 &&
 			strcmp(dirp->d_name, "..") != 0) {
 			if (strlen(path_dir) + strlen(dirp->d_name) +2 >
@@ -332,7 +326,6 @@ char *path_dir;
 		}
 	}
 
-	free(entp);
 	(void) closedir(dp);
 	return (0);
 }
@@ -348,7 +341,7 @@ char *to_dir;
 {
 	int	n;
 	DIR	*dp;
-	struct dirent   *dirp, *entp;
+	struct dirent   *dirp;
 	char rname[MAXNAMELEN + 1];
 	char path[MAXPATHLEN+MAXNAMELEN+2];
 
@@ -359,13 +352,7 @@ char *to_dir;
 		return;
 	}
 
-	entp = (struct dirent *)xmalloc(MAXDIRENT);
-	if (entp == NULL) {
-		(void) closedir(dp);
-		return;
-	}
-
-	while ((dirp = readdir_r(dp, entp)) != (struct dirent *)NULL) {
+	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") == 0 ||
 			strcmp(dirp->d_name, "..") == 0) {
 			continue;
@@ -403,7 +390,6 @@ char *to_dir;
 		}
 	}
 
-	free(entp);
 	(void) closedir(dp);
 }
 

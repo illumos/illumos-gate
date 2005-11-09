@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -752,40 +752,16 @@ build_event_table()
 	conftab_t	*cfp = NULL;
 	DIR		*dir;
 	struct dirent	*result;
-	struct dirent	*entry;
-	int		err;
 	conftab_t	*new_cfp;
 	char		*str;
-	long		max_name;
-	size_t		dirent_size;
-
-	max_name = pathconf(SYSEVENT_CONFIG_DIR, _PC_NAME_MAX);
-	if ((int)max_name == -1) {
-		syslog(LOG_ERR, PATHCONF_ERR,
-			SYSEVENT_CONFIG_DIR, strerror(errno));
-		return;
-	}
-
-	dirent_size = sizeof (struct dirent) + (int)max_name + 1;
-	entry = (struct dirent *)sc_malloc(dirent_size);
-	if (entry == NULL)
-		return;
 
 	if ((dir = opendir(SYSEVENT_CONFIG_DIR)) == NULL) {
 		syslog(LOG_ERR, CANNOT_OPEN_ERR,
 			SYSEVENT_CONFIG_DIR, strerror(errno));
-		sc_free(entry, dirent_size);
 		return;
 	}
 
-	for (;;) {
-		err = readdir_r(dir, entry, &result);
-		if (err != 0) {
-			syslog(LOG_ERR, READDIR_ERR, SYSEVENT_CONFIG_DIR, err);
-			goto err;
-		}
-		if (result == NULL)
-			break;
+	while ((result = readdir(dir)) != NULL) {
 		if (result->d_name[0] == '.')
 			continue;
 
@@ -833,7 +809,6 @@ err:
 		syslog(LOG_ERR, CLOSEDIR_ERR,
 			SYSEVENT_CONFIG_DIR, strerror(errno));
 	}
-	sc_free(entry, dirent_size);
 }
 
 

@@ -386,13 +386,15 @@ list(void)
 				(void) printf(gettext("%-20s ?,? "),
 					fullpath);
 		else {
-			if (statbuf.st_mode & (S_IFBLK | S_IFCHR))
+			if (S_ISBLK(statbuf.st_mode) ||
+			    S_ISCHR(statbuf.st_mode)) {
 				(void) printf(gettext("%-19s %2lu,%-2lu"),
 				    fullpath,
 				    major(statbuf.st_rdev),
 				    minor(statbuf.st_rdev));
-			else
+			} else {
 				(void) printf(gettext("%-20s  -  "), fullpath);
+			}
 		}
 		{
 		int diskblks_per_page =

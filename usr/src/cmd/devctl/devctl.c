@@ -251,7 +251,7 @@ main(int argc, char *argv[])
 	 * if the device is a logical name, get the physical name
 	 */
 	if (lstat(orig_path, &stat_buf) == 0) {
-		if ((stat_buf.st_mode & S_IFLNK) == S_IFLNK) {
+		if (S_ISLNK(stat_buf.st_mode)) {
 			if ((pathlen = readlink(orig_path, devctl_device,
 			    MAXPATHLEN)) == -1)  {
 				(void) fprintf(stderr,

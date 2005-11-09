@@ -766,10 +766,10 @@ get_removable_assocs(descriptor_t *desc, char *volm_path, int *errp)
 
 	/* get the media name from the descriptor */
 	if (desc->type == DM_MEDIA) {
-	    media_name = desc->name;
+		media_name = desc->name;
 	} else {
-	    /* must be a DM_PARTITION */
-	    media_name = desc->secondary_name;
+		/* must be a DM_PARTITION */
+		media_name = desc->secondary_name;
 	}
 
 	/*
@@ -781,113 +781,104 @@ get_removable_assocs(descriptor_t *desc, char *volm_path, int *errp)
 
 	if ((fd = open(volm_path, O_RDONLY|O_NDELAY)) < 0 ||
 	    fstat(fd, &buf) != 0) {
-	    *errp = ENODEV;
-	    return (NULL);
+		*errp = ENODEV;
+		return (NULL);
 	}
 
 	cnt = num_removable_slices(fd, &buf, volm_path);
 
 	/* allocate the array for the descriptors */
-	slices = (descriptor_t **)calloc(cnt + 1, sizeof (descriptor_t *));
+	slices = calloc(cnt + 1, sizeof (descriptor_t *));
 	if (slices == NULL) {
-	    *errp = ENOMEM;
-	    return (NULL);
+		*errp = ENOMEM;
+		return (NULL);
 	}
 
 	slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
 
 	pos = 0;
 	*errp = 0;
-	if (buf.st_mode & S_IFCHR) {
-	    struct dk_minfo	minfo;
+	if (S_ISCHR(buf.st_mode)) {
+		struct dk_minfo	minfo;
 
-	    /* Make sure media has readable label */
-	    if (media_read_info(fd, &minfo)) {
-		int		status;
-		int		data_format = FMT_UNKNOWN;
-		struct vtoc	vtoc;
-		struct dk_gpt	*efip;
+		/* Make sure media has readable label */
+		if (media_read_info(fd, &minfo)) {
+			int		status;
+			int		data_format = FMT_UNKNOWN;
+			struct vtoc	vtoc;
+			struct dk_gpt	*efip;
 
-		if ((status = read_vtoc(fd, &vtoc)) >= 0) {
-		    data_format = FMT_VTOC;
-		} else if (status == VT_ENOTSUP &&
-		    efi_alloc_and_read(fd, &efip) >= 0) {
-		    data_format = FMT_EFI;
+			if ((status = read_vtoc(fd, &vtoc)) >= 0) {
+				data_format = FMT_VTOC;
+			} else if (status == VT_ENOTSUP &&
+			    efi_alloc_and_read(fd, &efip) >= 0) {
+				data_format = FMT_EFI;
+			}
+
+			if (data_format != FMT_UNKNOWN) {
+			    /* has a readable label */
+				slices[pos++] =
+				    cache_get_desc(DM_SLICE, desc->p.disk,
+				    devpath, media_name, errp);
+			}
 		}
-
-		if (data_format != FMT_UNKNOWN) {
-		    /* has a readable label */
-		    slices[pos++] = cache_get_desc(DM_SLICE, desc->p.disk,
-			devpath, media_name, errp);
-		}
-	    }
-
-	} else if (buf.st_mode & S_IFDIR) {
-	    DIR			*dirp;
-#ifdef _LP64
-	    struct dirent 	*result;
-#endif
-
-	    /* rewind, num_removable_slices already traversed */
-	    (void) lseek(fd, 0, SEEK_SET);
-
-	    if ((dirp = fdopendir(fd)) != NULL) {
+		(void) close(fd);
+	} else if (S_ISDIR(buf.st_mode)) {
+		DIR		*dirp;
 		struct dirent	*dentp;
 
-		dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-		    PATH_MAX + 1);
-		if (dentp != NULL) {
-#ifdef _LP64
-		    while (readdir_r(dirp, dentp, &result) != NULL) {
-#else
-		    while (readdir_r(dirp, dentp) != NULL) {
-#endif
+		/* rewind, num_removable_slices already traversed */
+		(void) lseek(fd, 0, SEEK_SET);
+
+		if ((dirp = fdopendir(fd)) == NULL) {
+			*errp = errno;
+			(void) close(fd);
+			return (NULL);
+		}
+
+		while ((dentp = readdir(dirp)) != NULL) {
 			int	dfd;
 			int	is_dev = 0;
 			char	slice_path[MAXPATHLEN];
 
 			if (libdiskmgt_str_eq(".", dentp->d_name) ||
 			    libdiskmgt_str_eq("..", dentp->d_name)) {
-			    continue;
+				continue;
 			}
 
 			(void) snprintf(slice_path, sizeof (slice_path),
 			    "%s/%s", devpath, dentp->d_name);
 
 			if ((dfd = open(slice_path, O_RDONLY|O_NDELAY)) >= 0) {
-			    struct stat	buf;
+				struct stat	buf;
 
-			    if (fstat(dfd, &buf) == 0 &&
-				buf.st_mode & S_IFCHR) {
-				is_dev = 1;
-			    }
-			    (void) close(dfd);
+				if (fstat(dfd, &buf) == 0 &&
+				    S_ISCHR(buf.st_mode)) {
+					is_dev = 1;
+				}
+				(void) close(dfd);
 			}
 
 			if (!is_dev) {
-			    continue;
+				continue;
 			}
 
 			slices[pos++] = cache_get_desc(DM_SLICE, desc->p.disk,
 			    slice_path, media_name, errp);
 			if (*errp != 0) {
-			    break;
+				break;
 			}
-
-		    }
-		    free(dentp);
 		}
-		/* don't call closedir since it closes the fd */
-	    }
+		(void) closedir(dirp);
+	} else {
+		(void) close(fd);
 	}
-
-	(void) close(fd);
 
 	slices[pos] = NULL;
 
 	if (*errp != 0) {
-	    cache_free_descriptors(slices);
-	    return (NULL);
+		cache_free_descriptors(slices);
+		return (NULL);
 	}
 
 	return (slices);
@@ -1023,7 +1014,7 @@ make_removable_descriptors(disk_t *dp)
 	    struct stat	buf;
 
 	    if (fstat(fd, &buf) == 0) {
-		if (buf.st_mode & S_IFCHR) {
+		if (S_ISCHR(buf.st_mode)) {
 		    int			status;
 		    int			data_format = FMT_UNKNOWN;
 		    struct dk_minfo	minfo;
@@ -1054,7 +1045,7 @@ make_removable_descriptors(disk_t *dp)
 		    /* The media name is the volm_path in this case. */
 		    cache_load_desc(DM_SLICE, dp, devpath, volm_path, &error);
 
-		} else if (buf.st_mode & S_IFDIR) {
+		} else if (S_ISDIR(buf.st_mode)) {
 		    /* each device file in the dir represents a slice */
 		    error = make_volm_dir_descriptors(dp, fd, volm_path);
 		}
@@ -1076,56 +1067,48 @@ make_volm_dir_descriptors(disk_t *dp, int dirfd, char *volm_path)
 	int		error;
 	DIR		*dirp;
 	struct dirent	*dentp;
-#ifdef _LP64
-	struct dirent	*result;
-#endif
 	char		devpath[MAXPATHLEN];
 
+	dirfd = dup(dirfd);
+	if (dirfd < 0)
+		return (0);
 	if ((dirp = fdopendir(dirfd)) == NULL) {
-	    return (0);
+		(void) close(dirfd);
+		return (0);
 	}
 
 	slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
 
 	error = 0;
-	dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-	    PATH_MAX + 1);
-	if (dentp != NULL) {
-#ifdef _LP64
-	    while (readdir_r(dirp, dentp, &result) != NULL) {
-#else
-	    while (readdir_r(dirp, dentp) != NULL) {
-#endif
+	while ((dentp = readdir(dirp)) != NULL) {
 		int	fd;
 		char	slice_path[MAXPATHLEN];
 
 		if (libdiskmgt_str_eq(".", dentp->d_name) ||
 		    libdiskmgt_str_eq("..", dentp->d_name)) {
-		    continue;
+			continue;
 		}
 
 		(void) snprintf(slice_path, sizeof (slice_path), "%s/%s",
 		    devpath, dentp->d_name);
 
 		if ((fd = open(slice_path, O_RDONLY|O_NDELAY)) >= 0) {
-		    struct stat	buf;
+			struct stat	buf;
 
-		    if (fstat(fd, &buf) == 0 && buf.st_mode & S_IFCHR) {
 			/* The media name is the volm_path in this case. */
-			cache_load_desc(DM_SLICE, dp, slice_path, volm_path,
-			    &error);
-			if (error != 0) {
-			    (void) close(fd);
-			    break;
+			if (fstat(fd, &buf) == 0 && S_ISCHR(buf.st_mode)) {
+				cache_load_desc(DM_SLICE, dp, slice_path,
+				    volm_path, &error);
+				if (error != 0) {
+					(void) close(fd);
+					break;
+				}
 			}
-		    }
 
-		    (void) close(fd);
+			(void) close(fd);
 		}
-	    }
-	    free(dentp);
 	}
-	/* don't call closedir since it closes the fd */
+	(void) closedir(dirp);
 
 	return (error);
 }
@@ -1255,82 +1238,75 @@ match_removable_name(disk_t *diskp, char *name, int *errp)
 
 	*errp = 0;
 
-	found = 0;
-	if ((fd = open(volm_path, O_RDONLY|O_NDELAY)) >= 0 &&
-	    fstat(fd, &buf) == 0) {
+	if ((fd = open(volm_path, O_RDONLY|O_NDELAY)) == -1 ||
+	    fstat(fd, &buf) != 0) {
+		return (0);
+	}
 
-	    if (buf.st_mode & S_IFCHR) {
+	found = 0;
+
+	if (S_ISCHR(buf.st_mode)) {
 		char	devpath[MAXPATHLEN];
 
 		slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
 		if (libdiskmgt_str_eq(name, devpath)) {
-		    found = 1;
+			found = 1;
 		}
-
-	    } else if (buf.st_mode & S_IFDIR) {
+		(void) close(fd);
+		return (found);
+	} else if (S_ISDIR(buf.st_mode)) {
 		/* each device file in the dir represents a slice */
 		DIR		*dirp;
+		struct dirent	*dentp;
+		char		devpath[MAXPATHLEN];
 
-		if ((dirp = fdopendir(fd)) != NULL) {
-		    struct dirent	*dentp;
-#ifdef _LP64
-		    struct dirent	*result;
-#endif
-		    char		devpath[MAXPATHLEN];
+		if ((dirp = fdopendir(fd)) == NULL) {
+			(void) close(fd);
+			return (0);
+		}
 
-		    slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
+		slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
 
-		    dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-			PATH_MAX + 1);
-		    if (dentp != NULL) {
-#ifdef _LP64
-			while (readdir_r(dirp, dentp, &result) != NULL) {
-#else
-			while (readdir_r(dirp, dentp) != NULL) {
-#endif
-			    char	slice_path[MAXPATHLEN];
+		while ((dentp = readdir(dirp)) != NULL) {
+			char	slice_path[MAXPATHLEN];
 
-			    if (libdiskmgt_str_eq(".", dentp->d_name) ||
-				libdiskmgt_str_eq("..", dentp->d_name)) {
+			if (libdiskmgt_str_eq(".", dentp->d_name) ||
+			    libdiskmgt_str_eq("..", dentp->d_name)) {
 				continue;
-			    }
+			}
 
-			    (void) snprintf(slice_path, sizeof (slice_path),
-				"%s/%s", devpath, dentp->d_name);
+			(void) snprintf(slice_path, sizeof (slice_path),
+			    "%s/%s", devpath, dentp->d_name);
 
-			    if (libdiskmgt_str_eq(name, slice_path)) {
+			if (libdiskmgt_str_eq(name, slice_path)) {
 				/* found name, check device */
 				int	dfd;
 				int	is_dev = 0;
 
-				if ((dfd = open(slice_path, O_RDONLY|O_NDELAY))
-				    >= 0) {
-				    struct stat	buf;
+				dfd = open(slice_path, O_RDONLY|O_NDELAY);
+				if (dfd >= 0) {
+					struct stat	buf;
 
-				    if (fstat(dfd, &buf) == 0 &&
-					buf.st_mode & S_IFCHR) {
-					is_dev = 1;
-				    }
-				    (void) close(dfd);
+					if (fstat(dfd, &buf) == 0 &&
+					    S_ISCHR(buf.st_mode)) {
+						is_dev = 1;
+					}
+					(void) close(dfd);
 				}
 
 				/* we found the name */
 				found = 1;
 
 				if (!is_dev) {
-				    *errp = ENODEV;
+					*errp = ENODEV;
 				}
 
 				break;
-			    }
 			}
-			free(dentp);
-		    }
-		    /* don't call closedir since it closes the fd */
 		}
-	    } /* end of dir handling */
-
-	    (void) close(fd);
+		(void) closedir(dirp);
+	} else {
+		(void) close(fd);
 	}
 
 	return (found);
@@ -1341,56 +1317,50 @@ num_removable_slices(int fd, struct stat *bufp, char *volm_path)
 {
 	int cnt = 0;
 
-	if (bufp->st_mode & S_IFCHR) {
-	    cnt = 1;
+	if (S_ISCHR(bufp->st_mode))
+		return (1);
 
-	} else if (bufp->st_mode & S_IFDIR) {
-	    /* each device file in the dir represents a slice */
-	    DIR		*dirp;
-
-	    if ((dirp = fdopendir(fd)) != NULL) {
+	if (S_ISDIR(bufp->st_mode)) {
+		/* each device file in the dir represents a slice */
+		DIR		*dirp;
 		struct dirent	*dentp;
-#ifdef _LP64
-		struct dirent	*result;
-#endif
 		char		devpath[MAXPATHLEN];
+
+		fd = dup(fd);
+
+		if (fd < 0)
+			return (0);
+
+		if ((dirp = fdopendir(fd)) == NULL) {
+			(void) close(fd);
+			return (0);
+		}
 
 		slice_rdsk2dsk(volm_path, devpath, sizeof (devpath));
 
-		dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-		    PATH_MAX + 1);
-		if (dentp != NULL) {
-#ifdef _LP64
-		    while (readdir_r(dirp, dentp, &result) != NULL) {
-#else
-		    while (readdir_r(dirp, dentp) != NULL) {
-#endif
+		while ((dentp = readdir(dirp)) != NULL) {
 			int	dfd;
 			char	slice_path[MAXPATHLEN];
 
 			if (libdiskmgt_str_eq(".", dentp->d_name) ||
 			    libdiskmgt_str_eq("..", dentp->d_name)) {
-			    continue;
+				continue;
 			}
 
 			(void) snprintf(slice_path, sizeof (slice_path),
 			    "%s/%s", devpath, dentp->d_name);
 
 			if ((dfd = open(slice_path, O_RDONLY|O_NDELAY)) >= 0) {
-			    struct stat	buf;
+				struct stat	buf;
 
-			    if (fstat(dfd, &buf) == 0 &&
-				buf.st_mode & S_IFCHR) {
-				cnt++;
-			    }
-			    (void) close(dfd);
+				if (fstat(dfd, &buf) == 0 &&
+				    S_ISCHR(buf.st_mode)) {
+					cnt++;
+				}
+				(void) close(dfd);
 			}
-		    }
-		    free(dentp);
 		}
-		/* don't call closedir since it closes the fd */
-	    }
-	} /* end of dir handling */
-
+		(void) closedir(dirp);
+	}
 	return (cnt);
 }

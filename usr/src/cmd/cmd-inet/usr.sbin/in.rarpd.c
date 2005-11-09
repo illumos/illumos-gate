@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T	*/
@@ -128,7 +128,6 @@ static char	*cmdname;		/* command name from argv[0] */
 static int	dflag = 0;		/* enable diagnostics */
 static int	aflag = 0;		/* start rarpd on all interfaces */
 static char	*alarmmsg;		/* alarm() error message */
-static long	pc_name_max;		/* pathconf maximum path name */
 
 static void	getintf(void);
 static struct rarpdev *find_device(ifspec_t *);
@@ -218,16 +217,6 @@ main(int argc, char *argv[])
 	rl.rlim_max = RLIM_INFINITY;
 	if (setrlimit(RLIMIT_NOFILE, &rl) == -1)
 		syserr("setrlimit");
-
-	/*
-	 * Look up the maximum name length of the BOOTDIR, it may not
-	 * exist so use /, if that fails use a reasonable sized buffer.
-	 */
-	if ((pc_name_max = pathconf(BOOTDIR, _PC_NAME_MAX)) == -1) {
-		if ((pc_name_max = pathconf("/", _PC_NAME_MAX)) == -1) {
-			pc_name_max = 255;
-		}
-	}
 
 	(void) openlog(cmdname, LOG_PID, LOG_DAEMON);
 
@@ -1162,7 +1151,6 @@ mightboot(ipaddr_t ipa)
 	char path[MAXPATHL];
 	DIR *dirp;
 	struct dirent *dp;
-	struct dirent *dentry;
 
 	(void) snprintf(path, sizeof (path), "%s/%08X", BOOTDIR, ipa);
 
@@ -1181,18 +1169,7 @@ mightboot(ipaddr_t ipa)
 	if (!(dirp = opendir(BOOTDIR)))
 		return (0);
 
-	dentry = (struct dirent *)malloc(sizeof (struct dirent) +
-							pc_name_max + 1);
-	if (dentry == NULL) {
-		error("out of memory");
-	}
-#ifdef _POSIX_PTHREAD_SEMANTICS
-	while ((readdir_r(dirp, dentry, &dp)) != 0) {
-		if (dp == NULL)
-			break;
-#else
-	while ((dp = readdir_r(dirp, dentry)) != NULL) {
-#endif
+	while ((dp = readdir(dirp)) != NULL) {
 		if (strncmp(dp->d_name, path, 8) != 0)
 			continue;
 		if ((strlen(dp->d_name) != 8) && (dp->d_name[8] != '.'))
@@ -1201,7 +1178,6 @@ mightboot(ipaddr_t ipa)
 	}
 
 	(void) closedir(dirp);
-	(void) free(dentry);
 
 	return (dp? 1: 0);
 }

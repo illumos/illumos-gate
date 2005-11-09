@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -428,8 +428,7 @@ cat(FILE *fi, struct stat *statp, struct stat *outp, char *filenm)
 		(void) lseek(fi_desc, (off_t)mapoffset, SEEK_SET);
 		(void) munmap(bufferp, (size_t)munmapsize);
 	} else {
-		if (((statp->st_mode & S_IFREG) == S_IFREG) &&
-		    ((outp->st_mode & S_IFREG) == S_IFREG)) {
+		if (S_ISREG(statp->st_mode) && S_ISREG(outp->st_mode)) {
 			bufferp = (char *)buf;
 			buffsize = SMALLFILESIZE;
 		} else {

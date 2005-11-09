@@ -1615,7 +1615,7 @@ putfile(char *longname, char *shortname, char *parent,
 	 */
 	if ((split > NAMSIZ) ||
 	    (split == NAMSIZ && strlen(shortname) < NAMSIZ) ||
-	    (split == NAMSIZ && (stbuf.st_mode & S_IFDIR) && !Pflag)) {
+	    (split == NAMSIZ && S_ISDIR(stbuf.st_mode) && !Pflag)) {
 		/*
 		 * Since path is limited to PRESIZ characters, look for the
 		 * last slash within PRESIZ + 1 characters only.
@@ -1636,7 +1636,7 @@ putfile(char *longname, char *shortname, char *parent,
 		 * If the filename is greater than NAMSIZ we can't
 		 * archive the file unless we are using extended headers.
 		 */
-		if ((i > NAMSIZ) || (i == NAMSIZ && (stbuf.st_mode & S_IFDIR) &&
+		if ((i > NAMSIZ) || (i == NAMSIZ && S_ISDIR(stbuf.st_mode) &&
 		    !Pflag)) {
 			/* Determine which (filename or path) is too long. */
 			lastslash = strrchr(longname, '/');
@@ -1654,7 +1654,7 @@ putfile(char *longname, char *shortname, char *parent,
 					(void) strcpy(goodbuf, xhdr_dirname);
 			} else {
 				if ((i > NAMSIZ) || (i == NAMSIZ &&
-				    (stbuf.st_mode & S_IFDIR) && !Pflag))
+				    S_ISDIR(stbuf.st_mode) && !Pflag))
 					(void) fprintf(stderr, gettext(
 					    "tar: %s: filename is greater than "
 					    "%d\n"), lastslash == NULL ?
@@ -5041,7 +5041,7 @@ istape(int fd, int type)
 {
 	int result = 0;
 
-	if (type & S_IFCHR) {
+	if (S_ISCHR(type)) {
 		struct mtget mtg;
 
 		if (ioctl(fd, MTIOCGET, &mtg) != -1) {

@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#define	_POSIX_PTHREAD_SEMANTICS	/* for readdir_r */
+#define	_POSIX_PTHREAD_SEMANTICS	/* for getgrnam_r */
 #ifdef lint
 #define	_REENTRANT			/* for strtok_r */
 #endif
@@ -39,7 +39,6 @@
 #include <errno.h>
 #include <grp.h>
 #include <pwd.h>
-#include <alloca.h>
 #include <nss_dbdefs.h>
 #include <stdarg.h>
 #include <syslog.h>
@@ -375,7 +374,7 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 	struct stat stat_buf;
 	int err = 0;
 	DIR *dirp;
-	struct dirent *direntp, *result;
+	struct dirent *direntp;
 
 	/* path must be a valid name */
 	if (stat(path, &stat_buf) == -1) {
@@ -433,11 +432,7 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 			}
 		}
 
-		direntp = alloca(sizeof (struct dirent) + MAXPATHLEN);
-		while (readdir_r(dirp, direntp, &result) == 0) {
-			if (result == NULL)
-				break;
-
+		while ((direntp = readdir(dirp)) != NULL) {
 			name = direntp->d_name;
 			if ((strcmp(name, ".") == 0) ||
 			    (strcmp(name, "..") == 0))

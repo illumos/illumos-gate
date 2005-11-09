@@ -324,7 +324,7 @@ vol_name_to_dev_node(char *vname, char *found)
 		free(p1);
 		return (0);
 	}
-	if (statbuf.st_mode & S_IFDIR) {
+	if (S_ISDIR(statbuf.st_mode)) {
 		for (i = 0; i < 16; i++) {
 			(void) snprintf(found, PATH_MAX, "%s/s%d", p1, i);
 			if (access(found, F_OK) >= 0)
@@ -383,7 +383,7 @@ lookup_device(char *supplied, char *found)
 	char tmpstr[PATH_MAX];
 
 	/* If everything is fine and proper, no need to analyze */
-	if ((stat(supplied, &statbuf) == 0) && (statbuf.st_mode & S_IFCHR) &&
+	if ((stat(supplied, &statbuf) == 0) && S_ISCHR(statbuf.st_mode) &&
 	    ((fd = open(supplied, O_RDONLY|O_NDELAY)) >= 0)) {
 		(void) close(fd);
 		(void) strlcpy(found, supplied, PATH_MAX);

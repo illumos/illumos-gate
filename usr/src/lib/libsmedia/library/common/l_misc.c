@@ -470,7 +470,7 @@ get_handle_from_fd(int32_t fd)
 				clnt_destroy(handle->sm_clnt);
 			return (NULL);
 		}
-		if ((stat.st_mode & S_IFDOOR) != S_IFDOOR) {
+		if (!S_ISDOOR(stat.st_mode)) {
 			DPRINTF(
 		"Descriptor returned by door_call is not of type DOOR\n");
 			(void) dlclose(handle->sm_lib_handle);

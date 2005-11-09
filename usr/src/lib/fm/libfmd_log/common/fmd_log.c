@@ -38,11 +38,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <libgen.h>
-
-#define	_POSIX_PTHREAD_SEMANTICS
 #include <dirent.h>
-#undef	_POSIX_PTHREAD_SEMANTICS
-
 #include <fmd_log_impl.h>
 #include <fmd_log.h>
 
@@ -273,7 +269,7 @@ fmd_log_load_xrdir(fmd_log_t *lp)
 {
 	fmd_log_t *xlp;
 	char dirbuf[PATH_MAX], path[PATH_MAX], *dirpath;
-	struct dirent *dp, *ep;
+	struct dirent *dp;
 	DIR *dirp;
 
 	lp->log_flags |= FMD_LF_XREFS;
@@ -283,10 +279,7 @@ fmd_log_load_xrdir(fmd_log_t *lp)
 	if ((dirp = opendir(dirpath)) == NULL)
 		return; /* failed to open directory; just skip it */
 
-	ep = alloca(sizeof (struct dirent) + PATH_MAX + 1);
-	bzero(ep, sizeof (struct dirent) + PATH_MAX + 1);
-
-	while (readdir_r(dirp, ep, &dp) == 0 && dp != NULL) {
+	while ((dp = readdir(dirp)) != NULL) {
 		if (dp->d_name[0] == '.')
 			continue; /* skip "." and ".." and hidden files */
 

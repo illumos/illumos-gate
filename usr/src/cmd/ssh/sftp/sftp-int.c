@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -380,7 +380,7 @@ is_dir(char *path)
 	if (stat(path, &sb) == -1)
 		return(0);
 
-	return(sb.st_mode & S_IFDIR);
+	return (S_ISDIR(sb.st_mode));
 }
 
 static int
@@ -393,7 +393,7 @@ remote_is_dir(struct sftp_conn *conn, char *path)
 		return(0);
 	if (!(a->flags & SSH2_FILEXFER_ATTR_PERMISSIONS))
 		return(0);
-	return(a->perm & S_IFDIR);
+	return (S_ISDIR(a->perm));
 }
 
 static int

@@ -2237,8 +2237,7 @@ static void
 load_modules(void)
 {
 	DIR *mod_dir;
-	struct dirent *entp = NULL;
-	struct dirent *retp;
+	struct dirent *entp;
 	char cdir[PATH_MAX + 1];
 	char *last;
 	char *mdir = module_dirs;
@@ -2270,13 +2269,7 @@ load_modules(void)
 			continue;
 		}
 
-		entp = s_malloc(PATH_MAX + 1 + sizeof (struct  dirent));
-
-		while (readdir_r(mod_dir, entp, &retp) == 0) {
-
-			if (retp == NULL) {
-				break;
-			}
+		while ((entp = readdir(mod_dir)) != NULL) {
 
 			if ((strcmp(entp->d_name, ".") == 0) ||
 			    (strcmp(entp->d_name, "..") == 0)) {
@@ -2286,7 +2279,6 @@ load_modules(void)
 			load_module(entp->d_name, cdir);
 		}
 		s_closedir(mod_dir);
-		free(entp);
 	}
 }
 
@@ -3385,7 +3377,7 @@ devfsadm_rm_all(char *file)
 	devfsadm_rm_work(file, TRUE, TYPE_LINK);
 }
 
-static void
+static int
 s_rmdir(char *path)
 {
 	int	i;
@@ -3406,12 +3398,13 @@ s_rmdir(char *path)
 			if (strcmp(rpath, dir) == 0) {
 				vprint(REMOVE_MID, "%s: skipping packaged dir: "
 				    "%s\n", fcn, path);
-				return;
+				errno = EEXIST;
+				return (-1);
 			}
 		}
 	}
 
-	(void) rmdir(path);
+	return (rmdir(path));
 }
 
 /*
@@ -3424,16 +3417,10 @@ rm_parent_dir_if_empty(char *pathname)
 {
 	char *ptr, path[PATH_MAX + 1];
 	char *fcn = "rm_parent_dir_if_empty: ";
-	struct dirent *entp;
-	struct dirent *retp;
-	DIR *dp;
 
 	vprint(REMOVE_MID, "%schecking %s if empty\n", fcn, pathname);
 
 	(void) strcpy(path, pathname);
-
-	entp = (struct dirent *)s_malloc(PATH_MAX + 1 +
-					    sizeof (struct dirent));
 
 	/*
 	 * ascend up the dir tree, deleting all empty dirs.
@@ -3447,34 +3434,18 @@ rm_parent_dir_if_empty(char *pathname)
 
 		*ptr = '\0';
 
-		if ((dp = opendir(path)) == NULL) {
-			err_print(OPENDIR_FAILED, path, strerror(errno));
-			free(entp);
-			return;
+		if (s_rmdir(path) == 0) {
+			vprint(REMOVE_MID, "%sremoving empty dir %s\n",
+			    fcn, path);
+			continue;
 		}
-
-		while (readdir_r(dp, entp, &retp) == 0) {
-
-			if (retp == NULL) {
-				vprint(REMOVE_MID, "%sremoving empty dir %s\n",
-						fcn, path);
-				s_rmdir(path);
-				break;
-			}
-
-			if (strcmp(entp->d_name, ".") == 0 ||
-			    strcmp(entp->d_name, "..") == 0) {
-				continue;
-			}
-
-			/* some other file is here, so return */
+		if (errno == EEXIST) {
 			vprint(REMOVE_MID, "%sdir not empty: %s\n", fcn, path);
-			free(entp);
-			s_closedir(dp);
 			return;
-
 		}
-		s_closedir(dp);
+		vprint(REMOVE_MID, "%s can't remove %s: %s\n", fcn, path,
+		    strerror(errno));
+		return;
 	}
 }
 
@@ -4501,7 +4472,6 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 	char new_path[PATH_MAX + 1];
 	char *anchored_path_re;
 	struct dirent *entp;
-	struct dirent *retp;
 	DIR *dp;
 	size_t len;
 
@@ -4517,8 +4487,6 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 		len = (slash - path_re);
 	}
 
-	entp = s_malloc(PATH_MAX + 1 + sizeof (struct  dirent));
-
 	anchored_path_re = s_malloc(len + 3);
 	(void) sprintf(anchored_path_re, "^%.*s$", len, path_re);
 
@@ -4529,12 +4497,7 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 
 	free(anchored_path_re);
 
-	while (readdir_r(dp, entp, &retp) == 0) {
-
-		/* See 4062296 to understand readdir_r semantics */
-		if (retp == NULL) {
-			break;
-		}
+	while ((entp = readdir(dp)) != NULL) {
 
 		if (strcmp(entp->d_name, ".") == 0 ||
 		    strcmp(entp->d_name, "..") == 0) {
@@ -4564,7 +4527,6 @@ recurse_dev_re(char *current_dir, char *path_re, recurse_dev_t *rd)
 	regfree(&re1);
 
 out:
-	free(entp);
 	s_closedir(dp);
 }
 
@@ -5286,7 +5248,6 @@ int
 get_stat_info(char *namebuf, struct stat *sb)
 {
 	struct dirent *entp;
-	struct dirent *retp;
 	DIR *dp;
 	char *cp;
 
@@ -5309,16 +5270,11 @@ get_stat_info(char *namebuf, struct stat *sb)
 			return (DEVFSADM_FAILURE);
 		}
 
-		entp = s_malloc(PATH_MAX + 1 + sizeof (struct  dirent));
-
 		/*
 		 *  Search each dir entry looking for a symlink.  Return
 		 *  the first symlink found in namebuf.  Recurse dirs.
 		 */
-		while (readdir_r(dp,  entp, &retp) == 0) {
-			if (retp == NULL) {
-				break;
-			}
+		while ((entp = readdir(dp)) != NULL) {
 			if (strcmp(entp->d_name, ".") == 0 ||
 			    strcmp(entp->d_name, "..") == 0) {
 				continue;
@@ -5328,13 +5284,11 @@ get_stat_info(char *namebuf, struct stat *sb)
 			(void) strcat(namebuf, "/");
 			(void) strcat(namebuf, entp->d_name);
 			if (get_stat_info(namebuf, sb) == DEVFSADM_SUCCESS) {
-				free(entp);
 				s_closedir(dp);
 				return (DEVFSADM_SUCCESS);
 			}
 			*cp = '\0';
 		}
-		free(entp);
 		s_closedir(dp);
 	}
 
@@ -5461,7 +5415,6 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 	char *new_path;
 	char *numeral_id;
 	struct dirent *entp;
-	struct dirent *retp;
 	DIR *dp;
 
 	if ((dp = opendir(current_dir)) == NULL) {
@@ -5477,13 +5430,7 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 		*slash = '\0';
 	}
 
-	entp = s_malloc(PATH_MAX + 1 + sizeof (struct  dirent));
-
-	while (readdir_r(dp, entp, &retp) == 0) {
-
-		if (retp == NULL) {
-			break;
-		}
+	while ((entp = readdir(dp)) != NULL) {
 
 		if (strcmp(entp->d_name, ".") == 0 ||
 		    strcmp(entp->d_name, "..") == 0) {
@@ -5524,7 +5471,6 @@ enumerate_recurse(char *current_dir, char *path_left, numeral_set_t *setp,
 	if (slash != NULL) {
 		*slash = '/';
 	}
-	free(entp);
 	s_closedir(dp);
 }
 

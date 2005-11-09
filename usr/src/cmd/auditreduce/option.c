@@ -887,7 +887,7 @@ proc_file(char *fname, int mode)
 	if (stat(fname, &stat_buf)) {
 		return (0);
 	}
-	if ((stat_buf.st_mode & S_IFREG) == 0)
+	if (!S_ISREG(stat_buf.st_mode))
 		return (0);
 	/*
 	 * Allocate a new fcb to hold fcb and full filename.

@@ -460,9 +460,9 @@ bad_line(char *line)
 
 	/*
 	 * Check that the line refers to a character
-	 * special device see bugid: 1136978
+	 * special device.
 	 */
-	if ((stat(line, &statbuf) < 0) || (statbuf.st_mode & S_IFCHR) == 0) {
+	if ((stat(line, &statbuf) < 0) || !S_ISCHR(statbuf.st_mode)) {
 		dprintf("Bad line (stat failed) (Not S_IFCHR) = %s\n", line);
 		return (1);
 	}
@@ -490,9 +490,9 @@ bad_line(char *line)
 
 	/*
 	 * Check that the line refers to a character
-	 * special device see bugid: 1136978
+	 * special device.
 	 */
-	if ((fstat(fd, &statbuf) < 0) || (statbuf.st_mode & S_IFCHR) == 0) {
+	if ((fstat(fd, &statbuf) < 0) || !S_ISCHR(statbuf.st_mode)) {
 		dprintf("Bad line (fstat failed) (Not S_IFCHR) = %s\n", line);
 		(void) close(fd);
 		return (1);

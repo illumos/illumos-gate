@@ -279,25 +279,27 @@ proto(int type, int rm_ok, ...)
 		return;
 
 	case D:
-		if (exist && (stbuf.st_mode & S_IFDIR) == 0)
+		if (exist && !S_ISDIR(stbuf.st_mode)) {
 			if (!rm_ok)
 				fail ("%s is not a directory!\n", path);
 			else {
 				Unlink (path);
 				exist = 0;
 			}
+		}
 		if (!exist)
 			Mkdir (path, 0);
 		break;
 
 	case F:
-		if (exist && (stbuf.st_mode & S_IFREG) == 0)
+		if (exist && !S_ISREG(stbuf.st_mode)) {
 			if (!rm_ok)
 				fail ("%s is not a file!\n", path);
 			else {
 				Unlink (path);
 				exist = 0;
 			}
+		}
 		if (!exist)
 			Close(Creat(path, 0));
 		break;
@@ -306,13 +308,15 @@ proto(int type, int rm_ok, ...)
 		/*
 		 * Either a pipe or a file.
 		 */
-		if (exist && (stbuf.st_mode & (S_IFREG|S_IFIFO)) == 0)
+		if (exist &&
+		    !S_ISREG(stbuf.st_mode) && !S_ISFIFO(stbuf.st_mode)) {
 			if (!rm_ok)
 				fail ("%s is not a file or pipe!\n", path);
 			else {
 				Unlink (path);
 				exist = 0;
 			}
+		}
 		if (!exist)
 			Close(Creat(path, 0));
 		break;

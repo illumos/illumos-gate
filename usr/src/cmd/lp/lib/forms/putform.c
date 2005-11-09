@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,7 @@ putform(char *name, FORM *formp, FALERT *alertp, FILE **p_align_fp)
 	if (!(path = getformfile(name, (char *)0)))
 		return (-1);
 	if (Stat(path, &statbuf) == 0) {
-		if (!(statbuf.st_mode & S_IFDIR)) {
+		if (!S_ISDIR(statbuf.st_mode)) {
 			Free (path);
 			errno = ENOTDIR;
 			return (-1);

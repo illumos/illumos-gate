@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,7 @@ ypcheck_domain(domain)
 	strcat(path, domain);
 
 	if (stat(path, &filestat) != -1) {
-		if ((filestat.st_mode & S_IFDIR))
+		if (S_ISDIR(filestat.st_mode))
 				present = TRUE;
 		}
 	return (present);

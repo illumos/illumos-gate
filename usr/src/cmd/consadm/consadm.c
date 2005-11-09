@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -487,10 +487,10 @@ pathcmp(char *adev, char *bdev)
 	if (strcmp(adev, bdev) == 0)
 		return (0);
 
-	if (stat(adev, &st1) || (st1.st_mode & S_IFCHR) == 0)
+	if (stat(adev, &st1) != 0 || !S_ISCHR(st1.st_mode))
 		die(gettext("invalid device %s\n"), adev);
 
-	if (stat(bdev, &st2) || (st2.st_mode & S_IFCHR) == 0)
+	if (stat(bdev, &st2) != 0 || !S_ISCHR(st2.st_mode))
 		die(gettext("invalid device %s\n"), bdev);
 
 	if (st1.st_rdev == st2.st_rdev)

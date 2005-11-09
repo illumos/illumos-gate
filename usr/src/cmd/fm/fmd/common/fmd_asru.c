@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -328,7 +328,7 @@ fmd_asru_hash_logopen(fmd_asru_hash_t *ahp, const char *uuid)
 void
 fmd_asru_hash_refresh(fmd_asru_hash_t *ahp)
 {
-	struct dirent *dp, *ep;
+	struct dirent *dp;
 	DIR *dirp;
 	int zero;
 
@@ -339,12 +339,10 @@ fmd_asru_hash_refresh(fmd_asru_hash_t *ahp)
 	}
 
 	(void) fmd_conf_getprop(fmd.d_conf, "rsrc.zero", &zero);
-	ep = alloca(sizeof (struct dirent) + PATH_MAX + 1);
-	bzero(ep, sizeof (struct dirent) + PATH_MAX + 1);
 
 	(void) pthread_rwlock_wrlock(&ahp->ah_lock);
 
-	while (readdir_r(dirp, ep, &dp) == 0 && dp != NULL) {
+	while ((dp = readdir(dirp)) != NULL) {
 		if (dp->d_name[0] == '.')
 			continue; /* skip "." and ".." */
 

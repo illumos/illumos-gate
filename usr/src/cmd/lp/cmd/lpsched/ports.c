@@ -286,7 +286,7 @@ open_direct(char *ptype, PRINTER *pp)
 	 * If we have a stream and a list of modules to use, then pop the old
 	 * modules and push the new ones.
 	 */
-	if ((modules != NULL) && !(buf.st_mode & S_IFIFO) && isastream(1)) {
+	if ((modules != NULL) && !S_ISFIFO(buf.st_mode) && isastream(1)) {
 		/*
 		 * First, pop all current modules off, unless
 		 * instructed not to.

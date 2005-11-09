@@ -425,7 +425,7 @@ main(int argc, char **argv)
 				fatal("can't stat \"%s\"; %m\n", vold_root);
 				/*NOTREACHED*/
 			}
-		} else if (!(sb.st_mode & S_IFDIR)) {
+		} else if (!S_ISDIR(sb.st_mode)) {
 			/* ...and that it's a directory. */
 			fatal(gettext("\"%s\" is not a directory\n"),
 			    vold_root);

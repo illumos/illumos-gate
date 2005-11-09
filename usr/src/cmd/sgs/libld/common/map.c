@@ -24,7 +24,7 @@
  *	  All Rights Reserved
  *
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -2015,7 +2015,7 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 		    strerror(err));
 		return (S_ERROR);
 	}
-	if (stat_buf.st_mode & S_IFDIR) {
+	if (S_ISDIR(stat_buf.st_mode)) {
 		DIR		*dirp;
 		struct dirent	*denp;
 
@@ -2042,7 +2042,7 @@ map_parse(const char *mapfile, Ofl_desc *ofl)
 		}
 		(void) closedir(dirp);
 		return (1);
-	} else if (!(stat_buf.st_mode & S_IFREG)) {
+	} else if (!S_ISREG(stat_buf.st_mode)) {
 		eprintf(ERR_FATAL, MSG_INTL(MSG_SYS_NOTREG), mapfile);
 		return (S_ERROR);
 	}

@@ -746,8 +746,7 @@ static int		root_can_write (path)
 	 * If the device is a symlink (and it is not a root owned symlink),
 	 * verify that the owner matches the destination owner.
 	 */
-	if (((statbuf.st_mode & S_IFLNK) == S_IFLNK) &&
-	    (statbuf.st_uid != 0)) {
+	if (S_ISLNK(statbuf.st_mode) && statbuf.st_uid != 0) {
 		uid_t uid = statbuf.st_uid;
 
 		if (Stat(path, &statbuf) == -1) {

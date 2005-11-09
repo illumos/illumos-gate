@@ -42,11 +42,7 @@
 #include <limits.h>
 #include <assert.h>
 #include <errno.h>
-#include <alloca.h>
-
-#define	_POSIX_PTHREAD_SEMANTICS
 #include <dirent.h>
-#undef	_POSIX_PTHREAD_SEMANTICS
 
 #include <dt_strtab.h>
 #include <dt_module.h>
@@ -903,12 +899,9 @@ dtrace_update(dtrace_hdl_t *dtp)
 	 */
 	if (!(dtp->dt_oflags & DTRACE_O_NOSYS) &&
 	    (dirp = opendir(OBJFS_ROOT)) != NULL) {
-		struct dirent *dp, *ep;
+		struct dirent *dp;
 
-		ep = alloca(sizeof (struct dirent) + PATH_MAX + 1);
-		bzero(ep, sizeof (struct dirent) + PATH_MAX + 1);
-
-		while (readdir_r(dirp, ep, &dp) == 0 && dp != NULL) {
+		while ((dp = readdir(dirp)) != NULL) {
 			if (dp->d_name[0] != '.')
 				dt_module_update(dtp, dp->d_name);
 		}

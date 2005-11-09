@@ -1504,14 +1504,10 @@ rcmd_db_init()
 {
 	char *tmp;
 	DIR *mod_dir;
-	struct dirent *retp, *entp;
+	struct dirent *entp;
 	int i;
 	char *dir_name;
 	int rcm_script;
-
-#ifdef	lint
-extern int readdir_r(DIR *, struct dirent *, struct dirent **);
-#endif
 
 	rcm_log_message(RCM_DEBUG, "rcmd_db_init(): initialize database\n");
 
@@ -1519,8 +1515,6 @@ extern int readdir_r(DIR *, struct dirent *, struct dirent **);
 		rcmd_exit(errno);
 
 	rsrc_root = rn_alloc("/", RSRC_TYPE_NORMAL);
-
-	entp = s_malloc(PATH_MAX + 1 + sizeof (struct dirent));
 
 	for (i = 0; (dir_name = rcm_dir(i, &rcm_script)) != NULL; i++) {
 
@@ -1530,12 +1524,8 @@ extern int readdir_r(DIR *, struct dirent *, struct dirent **);
 
 		rcm_log_message(RCM_TRACE2, "search directory %s\n", dir_name);
 
-		while (readdir_r(mod_dir, entp, &retp) == 0) {
+		while ((entp = readdir(mod_dir)) != NULL) {
 			module_t *module;
-
-			if (retp == NULL) {
-				break;
-			}
 
 			if (strcmp(entp->d_name, ".") == 0 ||
 				strcmp(entp->d_name, "..") == 0)
@@ -1570,7 +1560,6 @@ extern int readdir_r(DIR *, struct dirent *, struct dirent **);
 		(void) closedir(mod_dir);
 	}
 
-	free(entp);
 	rcmd_db_print();
 }
 

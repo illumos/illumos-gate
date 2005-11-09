@@ -893,7 +893,7 @@ getkey(char *filename, CK_BYTE_PTR *pkeydata)
 			return (-1);
 		}
 
-		if (!(statbuf.st_mode & S_IFREG)) {
+		if (!S_ISREG(statbuf.st_mode)) {
 			cryptoerror(LOG_STDERR, gettext(
 				"%s not a regular file\n"), filename);
 			(void) close(fd);

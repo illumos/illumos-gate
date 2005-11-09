@@ -110,7 +110,7 @@ issubdir(dir1, dir2)
 				break;
 			}
 			child_ino[index++] = st.st_ino;
-			if (st.st_mode & S_IFDIR) {
+			if (S_ISDIR(st.st_mode)) {
 				p = strcpy(p, "/..") + 3;
 			} else {
 				p = strrchr(childdir, '/');

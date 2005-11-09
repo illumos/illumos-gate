@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -704,13 +704,9 @@ init_mc(void)
 	struct mc_memconf	mcmemconf;
 	int			fd;
 	DIR			*dirp;
-	struct dirent		*entp, *retp;
+	struct dirent		*retp;
 	char			path[PATH_MAX];
 	int 			found = 0;
-
-#ifdef lint
-extern struct dirent *readdir_r(DIR *__dp, struct dirent *__ent);
-#endif
 
 	/* open the directory */
 	if ((dirp = opendir(MC_DIR)) == NULL) {
@@ -724,14 +720,8 @@ extern struct dirent *readdir_r(DIR *__dp, struct dirent *__ent);
 		return (-1);
 	}
 
-	entp = (struct dirent *)malloc(PATH_MAX +
-				    sizeof (struct dirent));
-	if (entp == NULL)
-		return (-1);
-
-
 	/* start searching this directory */
-	while ((retp = (struct dirent *)readdir_r(dirp, entp)) != NULL) {
+	while ((retp = readdir(dirp)) != NULL) {
 		/* skip . .. etc... */
 		if (strcmp(retp->d_name, ".") == 0 ||
 		    strcmp(retp->d_name, "..") == 0)
@@ -745,7 +735,6 @@ extern struct dirent *readdir_r(DIR *__dp, struct dirent *__ent);
 			break;
 		}
 	}
-	free(entp);
 	(void) closedir(dirp);
 
 	if (!found) {

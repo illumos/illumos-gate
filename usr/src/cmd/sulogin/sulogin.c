@@ -403,10 +403,10 @@ pathcmp(char *adev, char *bdev)
 	if (strcmp(adev, bdev) == 0)
 		return (0);
 
-	if (stat(adev, &st1) || (st1.st_mode & S_IFCHR) == 0)
+	if (stat(adev, &st1) || !S_ISCHR(st1.st_mode))
 		return (1);
 
-	if (stat(bdev, &st2) || (st2.st_mode & S_IFCHR) == 0)
+	if (stat(bdev, &st2) || !S_ISCHR(st2.st_mode))
 		return (1);
 
 	if (st1.st_rdev == st2.st_rdev)

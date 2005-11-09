@@ -428,7 +428,7 @@ main(int argc, char *argv[])
 			continue;
 		}
 		fstat(infile, &status);
-		if (status.st_mode&S_IFDIR) {
+		if (S_ISDIR(status.st_mode)) {
 			fprintf(stderr, gettext(
 				"pack: %s: cannot pack a directory\n"),
 				    argv[k]);

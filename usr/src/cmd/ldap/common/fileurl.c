@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -289,7 +289,7 @@ ldaptool_berval_from_ldif_value( const char *value, int vlen,
 	case LDAPTOOL_FILEURL_SUCCESS:
 	    if ( stat( path, &fstats ) != 0 ) {
 		if ( reporterrs ) perror( path );
-	    } else if ( fstats.st_mode & S_IFDIR ) {	
+	    } else if (S_ISDIR(fstats.st_mode)) {	
 		if ( reporterrs ) fprintf( stderr,
 					   gettext("%s: %s is a directory, not a file\n"),
 					   ldaptool_progname, path );
@@ -306,7 +306,7 @@ ldaptool_berval_from_ldif_value( const char *value, int vlen,
 				       " -- unknown error\n"), ldaptool_progname, url );
 	}
     } else if ( always_try_file && (stat( value, &fstats ) == 0) &&
-		!(fstats.st_mode & S_IFDIR)) {	/* get value from file */
+		!S_ISDIR(fstats.st_mode)) {	/* get value from file */
 	rc = berval_from_file( value, bvp, reporterrs );
     } else {
 	bvp->bv_len = vlen;

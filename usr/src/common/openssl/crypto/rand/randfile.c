@@ -56,7 +56,7 @@
  * [including the GNU Public Licence.]
  */
 
-/* We need to define this to get macros like S_IFBLK and S_IFCHR */
+/* We need to define this to get macros like S_ISBLK and S_ISCHR */
 #ifndef	_BOOT
 #define _XOPEN_SOURCE 1
 #endif	/* _BOOT */
@@ -112,8 +112,8 @@ int RAND_load_file(const char *file, long bytes)
 
 	in=fopen(file,"rb");
 	if (in == NULL) goto err;
-#if defined(S_IFBLK) && defined(S_IFCHR)
-	if (sb.st_mode & (S_IFBLK | S_IFCHR)) {
+#if defined(S_ISBLK) && defined(S_ISCHR)
+	if (S_ISBLK(sb.st_mode) || S_ISCHR(sb.st_mode)) {
 	  /* this file is a device. we don't want read an infinite number
 	   * of bytes from a random device, nor do we want to use buffered
 	   * I/O because we will waste system entropy. 
@@ -155,8 +155,8 @@ int RAND_write_file(const char *file)
 	
 	i=stat(file,&sb);
 	if (i != -1) { 
-#if defined(S_IFBLK) && defined(S_IFCHR)
-	  if (sb.st_mode & (S_IFBLK | S_IFCHR)) {
+#if defined(S_ISBLK) && defined(S_ISCHR)
+	  if (S_ISBLK(sb.st_mode) || S_ISCHR(sb.st_mode)) {
 	    /* this file is a device. we don't write back to it. 
 	     * we "succeed" on the assumption this is some sort 
 	     * of random device. Otherwise attempting to write to 

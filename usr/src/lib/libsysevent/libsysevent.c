@@ -1756,7 +1756,7 @@ sysevent_open_channel_common(const char *channel_path)
 		errno = EACCES;
 		return (NULL);
 	} else if (chan_stat.st_uid != getuid() ||
-	    !(chan_stat.st_mode & S_IFDIR)) {
+	    !S_ISDIR(chan_stat.st_mode)) {
 		dprint("sysevent_open_channel: Invalid "
 		    "permissions for channel %s\n: %d:%d:%d", channel_path,
 		    (int)chan_stat.st_uid, (int)chan_stat.st_gid,

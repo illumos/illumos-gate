@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1104,8 +1104,7 @@ int
 list_dn(const char *location, char ***listppp, uint_t *countp)
 {
 	char		ipaddr[INET_ADDRSTRLEN];
-	uint64_t	direntbuf[(MAXPATHLEN + sizeof (struct dirent)) / 8];
-	struct dirent	*result, *dirent = (struct dirent *)&direntbuf;
+	struct dirent	*result;
 	DIR		*dirp;
 	unsigned int	i, count = 0;
 	char		*re, **new_listpp, **listpp = NULL;
@@ -1137,14 +1136,7 @@ list_dn(const char *location, char ***listppp, uint_t *countp)
 	if (re == NULL)
 		return (DSVC_NO_MEMORY);
 
-	for (;;) {
-		/*
-		 * readdir_r() is very broken; see 4329196 -- in the
-		 * meantime, workaround as best we can.
-		 */
-		error = readdir_r(dirp, dirent, &result);
-		if (error != 0 || result == NULL)
-			break;
+	while ((result = readdir(dirp)) != NULL) {
 
 		if (regex(re, result->d_name, conver, ipaddr) != NULL) {
 			if (atoi(conver) != DSVC_CONVER)

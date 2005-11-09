@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1991-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -321,7 +321,7 @@ doit(info_t *info, char *dev)
 		(void) close(fd);
 		return (1);
 	}
-	if (!(buf.st_mode & S_IFCHR)) {
+	if (!S_ISCHR(buf.st_mode)) {
 		(void) fprintf(stderr,
 		    gettext("%s: %s is not a character special device\n"),
 		    info->pgm, dev);

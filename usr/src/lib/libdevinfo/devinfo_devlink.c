@@ -2405,7 +2405,7 @@ do_recurse(
 	struct stat sbuf;
 	char cur[PATH_MAX], *cp;
 	int i, rv = DI_WALK_CONTINUE;
-	struct dirent *entp, *result;
+	struct dirent *entp;
 
 
 	if ((rel = rel_path(hdp, dir)) == NULL)
@@ -2427,23 +2427,12 @@ do_recurse(
 	if ((dp = opendir(dir)) == NULL)
 		return (DI_WALK_CONTINUE);
 
-	entp = malloc(sizeof (struct dirent) + PATH_MAX + 1);
-	if (entp == NULL) {
-		SET_DB_ERR(hdp);
-		(void) closedir(dp);
-		*retp = -1;
-		return (DI_WALK_TERMINATE);
-	}
-
 	(void) snprintf(cur, sizeof (cur), "%s/", dir);
 	len = strlen(cur);
 	cp = cur + len;
 	len = sizeof (cur) - len;
 
-	while (readdir_r(dp, entp, &result) == 0) {
-
-		if (result == NULL)
-			break;
+	while ((entp = readdir(dp)) != NULL) {
 
 		if (strcmp(entp->d_name, ".") == 0 ||
 		    strcmp(entp->d_name, "..") == 0) {
@@ -2486,7 +2475,6 @@ next_entry:
 			break;
 	}
 
-	free(entp);
 	(void) closedir(dp);
 
 	return (rv);

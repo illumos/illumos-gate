@@ -24,8 +24,8 @@
 
 
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -86,7 +86,7 @@ sourcedir(char *dirlist)
 		 * view path node)
 		 */
 		if (stat(compath(dir), &statstruct) == 0 &&
-		    (statstruct.st_mode & S_IFDIR)) {
+		    S_ISDIR(statstruct.st_mode)) {
 			if (srcdirs == NULL) {
 				srcdirs = mymalloc(msrcdirs * sizeof (char *));
 			} else if (nsrcdirs == msrcdirs) {
@@ -120,7 +120,7 @@ includedir(char *dirlist)
 		 * view path node)
 		 */
 		if (stat(compath(dir), &statstruct) == 0 &&
-		    (statstruct.st_mode & S_IFDIR)) {
+		    S_ISDIR(statstruct.st_mode)) {
 			if (incdirs == NULL) {
 				incdirs = mymalloc(mincdirs * sizeof (char *));
 			} else if (nincdirs == mincdirs) {
@@ -253,7 +253,7 @@ makefilelist(void)
 
 				/* make sure it is a directory */
 				if (stat(compath(dir), &statstruct) == 0 &&
-				    (statstruct.st_mode & S_IFDIR)) {
+				    S_ISDIR(statstruct.st_mode)) {
 					getsrcfiles(dir, s);
 				}
 			}
@@ -330,7 +330,7 @@ issrcfile(char *file)
 				 * suffixes so make sure it is a file
 				 */
 				if (vpstat(file, &statstruct) == 0 &&
-				    (statstruct.st_mode & S_IFREG)) {
+				    S_ISREG(statstruct.st_mode)) {
 					return (YES);
 				}
 			}

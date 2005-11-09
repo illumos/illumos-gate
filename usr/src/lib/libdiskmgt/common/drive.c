@@ -658,21 +658,18 @@ drive_open_disk(disk_t *diskp, char *opath, int len)
 		return (-1);
 	    }
 
-	    if (buf.st_mode & S_IFCHR) {
+	    if (S_ISCHR(buf.st_mode)) {
 		/* opened, is device, so done */
 		if (opath != NULL) {
 		    (void) strlcpy(opath, rmmedia_devpath, len);
 		}
 		return (fd);
 
-	    } else if (buf.st_mode & S_IFDIR) {
+	    } else if (S_ISDIR(buf.st_mode)) {
 		/* disk w/ slices so handle the directory */
 		DIR		*dirp;
 		struct dirent	*dentp;
 		int		dfd;
-#ifdef _LP64
-		struct  dirent *result;
-#endif
 
 		/* each device file in the dir represents a slice */
 
@@ -681,17 +678,7 @@ drive_open_disk(disk_t *diskp, char *opath, int len)
 		    return (-1);
 		}
 
-		if ((dentp = (struct dirent *)malloc(sizeof (struct dirent) +
-		    PATH_MAX + 1)) == NULL) {
-		    /* out of memory */
-		    (void) close(fd);
-		    return (-1);
-		}
-#ifdef _LP64
-		while (readdir_r(dirp, dentp, &result) != NULL) {
-#else
-		while (readdir_r(dirp, dentp) != NULL) {
-#endif
+		while ((dentp = readdir(dirp)) != NULL) {
 		    char	slice_path[MAXPATHLEN];
 
 		    if (libdiskmgt_str_eq(".", dentp->d_name) ||
@@ -706,10 +693,9 @@ drive_open_disk(disk_t *diskp, char *opath, int len)
 			continue;
 		    }
 
-		    if (fstat(dfd, &buf) == 0 && (buf.st_mode & S_IFCHR)) {
+		    if (fstat(dfd, &buf) == 0 && S_ISCHR(buf.st_mode)) {
 			/* opened, is device, so done */
-			free(dentp);
-			(void) close(fd);
+			(void) closedir(dirp);
 			if (opath != NULL) {
 			    (void) strlcpy(opath, slice_path, len);
 			}
@@ -721,11 +707,12 @@ drive_open_disk(disk_t *diskp, char *opath, int len)
 		}
 
 		/* did not find a device under the rmmedia_path */
-		free(dentp);
-		(void) close(fd);
+		(void) closedir(dirp);
+		return (-1);
 	    }
 
 	    /* didn't find a device under volume management control */
+	    (void) close(fd);
 	    return (-1);
 	}
 

@@ -404,7 +404,7 @@ static void add_link_to_cache(char *devlink, char *physpath);
 static linkhead_t *get_cached_links(char *dir_re);
 static void build_devlink_list(char *check_link, void *data);
 static void instance_flush_thread(void);
-static void s_rmdir(char *path);
+static int s_rmdir(char *path);
 static void rm_parent_dir_if_empty(char *path);
 static void free_link_list(link_list_t *head);
 static void free_selector_list(selector_list_t *head);

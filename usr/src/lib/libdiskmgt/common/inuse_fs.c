@@ -210,7 +210,7 @@ load_heuristics()
 		(void) snprintf(path, sizeof (path), "/usr/lib/fs/%s",
 		    dp->d_name);
 
-		if (stat(path, &buf) != 0 || !(buf.st_mode & S_IFDIR)) {
+		if (stat(path, &buf) != 0 || !S_ISDIR(buf.st_mode)) {
 		    continue;
 		}
 
@@ -226,7 +226,7 @@ load_heuristics()
 				"/usr/lib/fs/%s/fstyp", dp->d_name);
 
 			    if (stat(progpath, &buf) == 0 &&
-				buf.st_mode & S_IFREG) {
+				S_ISREG(buf.st_mode)) {
 
 				struct heuristic *hp;
 

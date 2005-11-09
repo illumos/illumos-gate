@@ -254,7 +254,7 @@ mkzonedir(zlog_t *zlogp)
 		return (-1);
 	}
 	/* paranoia */
-	if ((stat(ZONES_TMPDIR, &st) < 0) || ((st.st_mode & S_IFDIR) == 0)) {
+	if ((stat(ZONES_TMPDIR, &st) < 0) || !S_ISDIR(st.st_mode)) {
 		zerror(zlogp, B_TRUE, "'%s' is not a directory", ZONES_TMPDIR);
 		return (-1);
 	}

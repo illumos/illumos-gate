@@ -3668,7 +3668,7 @@ char *ls_file(const char *file, int nameonly, char remove_path, char classify)
     }
 
 #ifdef HAVE_LSTAT
-    if ((s.st_mode & S_IFLNK) == S_IFLNK) {
+    if (S_ISLNK(s.st_mode)) {
 	link = (char *) malloc(MAXPATHLEN);
 	memset(link, 0, MAXPATHLEN);
 	if (readlink(file, link, MAXPATHLEN) == -1) {

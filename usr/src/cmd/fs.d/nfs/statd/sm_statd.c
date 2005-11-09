@@ -100,7 +100,7 @@ static char *family2string(sa_family_t family);
 void
 statd_init()
 {
-	struct dirent *dirp, *entp;
+	struct dirent *dirp;
 	DIR 	*dp;
 	FILE *fp, *fp_tmp;
 	int i, tmp_state;
@@ -222,12 +222,7 @@ statd_init()
 		exit(1);
 	}
 
-	entp = (struct dirent *)xmalloc(MAXDIRENT);
-	if (entp == NULL) {
-		exit(1);
-	}
-
-	while ((dirp = readdir_r(dp, entp)) != (struct dirent *)NULL) {
+	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") != 0 &&
 			strcmp(dirp->d_name, "..") != 0) {
 		/* rename all entries from CURRENT to BACKUP */
@@ -235,7 +230,6 @@ statd_init()
 		}
 	}
 
-	free(entp);
 	(void) closedir(dp);
 
 	/* Contact hosts' statd */
@@ -252,7 +246,7 @@ statd_init()
 void *
 thr_statd_init()
 {
-	struct dirent *dirp, *entp;
+	struct dirent *dirp;
 	DIR 	*dp;
 	int num_threads;
 	int num_join;
@@ -266,11 +260,6 @@ thr_statd_init()
 		exit(1);
 	}
 
-	entp = (struct dirent *)xmalloc(MAXDIRENT);
-	if (entp == NULL) {
-		exit(1);
-	}
-
 	/*
 	 * Create "UNDETACHED" threads for each symlink and (unlinked)
 	 * regular file in backup directory to initiate statd_call_statd.
@@ -278,7 +267,7 @@ thr_statd_init()
 	 * program and thus, the thread id is not needed to join the threads.
 	 */
 	num_threads = 0;
-	while ((dirp = readdir_r(dp, entp)) != (struct dirent *)NULL) {
+	while ((dirp = readdir(dp)) != NULL) {
 		/*
 		 * If host file is not a symlink, don't bother to
 		 * spawn a thread for it.  If any link(s) refer to
@@ -335,9 +324,6 @@ thr_statd_init()
 		thr_join(0, 0, 0);
 	}
 
-	/* Reuse the buffer for readdir_r use */
-	(void) memset(entp, 0, MAXDIRENT);
-
 	/*
 	 * The second pass checks for `legacies':  regular files which
 	 * never had symlinks pointing to them at all, just like in the
@@ -347,7 +333,7 @@ thr_statd_init()
 	 */
 	rewinddir(dp);
 	num_threads = 0;
-	while ((dirp = readdir_r(dp, entp)) != (struct dirent *)NULL) {
+	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") == 0 ||
 			strcmp(dirp->d_name, "..") == 0) {
 			continue;
@@ -404,7 +390,6 @@ thr_statd_init()
 		num_threads++;
 	}
 
-	free(entp);
 	(void) closedir(dp);
 
 	/*
@@ -1132,7 +1117,7 @@ count_symlinks(char *dir, char *name, int *count)
 	int cnt = 0;
 	int n;
 	DIR *dp;
-	struct dirent *dirp, *entp;
+	struct dirent *dirp;
 	char lpath[MAXPATHLEN];
 	char rname[MAXNAMELEN + 1]; /* +1 for term NULL */
 
@@ -1142,13 +1127,7 @@ count_symlinks(char *dir, char *name, int *count)
 		return (-1);
 	}
 
-	entp = (struct dirent *)xmalloc(MAXDIRENT);
-	if (entp == NULL) {
-		(void) closedir(dp);
-		return (-1);
-	}
-
-	while ((dirp = readdir_r(dp, entp)) != (struct dirent *)NULL) {
+	while ((dirp = readdir(dp)) != NULL) {
 		if (strcmp(dirp->d_name, ".") == 0 ||
 			strcmp(dirp->d_name, "..") == 0) {
 			continue;
@@ -1181,7 +1160,6 @@ count_symlinks(char *dir, char *name, int *count)
 		}
 	}
 
-	free(entp);
 	(void) closedir(dp);
 
 	if (debug) {

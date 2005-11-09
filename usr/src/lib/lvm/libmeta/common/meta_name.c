@@ -95,13 +95,13 @@ rawname(
 			    "line containing device %s\n"), uname);
 			exit(1);
 		}
-		if ((sbuf1.st_mode & S_IFBLK) == 0) {
+		if (!S_ISBLK(sbuf1.st_mode)) {
 			(void) printf(dgettext(TEXT_DOMAIN,
 			    "/etc/vfstab device to mount is not a "
 			    "block device for device %s\n"), uname);
 			exit(1);
 		}
-		if ((sbuf2.st_mode & S_IFCHR) == 0) {
+		if (!S_ISCHR(sbuf2.st_mode)) {
 			(void) printf(dgettext(TEXT_DOMAIN,
 			    "/etc/vfstab device to fsck is not a "
 			    "raw device for device %s\n"), p);

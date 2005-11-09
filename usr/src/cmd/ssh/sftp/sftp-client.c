@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -771,7 +771,7 @@ do_download(struct sftp_conn *conn, char *remote_path, char *local_path,
 		mode = 0666;
 
 	if ((a->flags & SSH2_FILEXFER_ATTR_PERMISSIONS) &&
-	    (a->perm & S_IFDIR)) {
+	    S_ISDIR(a->perm)) {
 		error("Cannot download a directory: %s", remote_path);
 		return(-1);
 	}

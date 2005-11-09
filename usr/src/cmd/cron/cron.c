@@ -2376,8 +2376,8 @@ cleanup(struct runinfo *pr, int rc)
 	else
 		--p->cruncnt;
 
-	if (!lstat(pr->outfile, &buf)) {
-		if ((buf.st_mode != S_IFLNK) &&
+	if (lstat(pr->outfile, &buf) == 0) {
+		if (!S_ISLNK(buf.st_mode) &&
 		    (buf.st_size > 0 || pr->mailwhendone)) {
 			/* mail user stdout and stderr */
 			for (;;) {

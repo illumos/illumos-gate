@@ -506,7 +506,7 @@ conf_action(int argc, char **argv, uint_t ln)
 		return (FALSE);
 	}
 
-	if (!(S_IFREG & sb.st_mode)) {
+	if (!S_ISREG(sb.st_mode)) {
 		warning(gettext(
 		    "config file (%s) line %d: %s not a regular file\n"),
 		    vold_config, ln, pname);

@@ -19,11 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-#ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.13	*/
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /* EMACS_MODES: !fill, lnumb, !overwrite, !nodelete, !picture */
 
 #include "string.h"
@@ -131,7 +135,7 @@ putpwheel (name, pwheelp)
 	if (!(path = makepath(Lp_A_PrintWheels, name, (char *)0)))
 		return (-1);
 	if (Stat(path, &statbuf) == 0) {
-		if (!(statbuf.st_mode & S_IFDIR)) {
+		if (!S_ISDIR(statbuf.st_mode)) {
 			Free (path);
 			errno = ENOTDIR;
 			return (-1);

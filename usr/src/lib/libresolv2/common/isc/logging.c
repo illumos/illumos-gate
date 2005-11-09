@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,7 +121,7 @@ log_open_stream(log_channel chan) {
 		}
 		regular = 1;
 	} else
-		regular = (sb.st_mode & S_IFREG);
+		regular = S_ISREG(sb.st_mode);
 
 	if (chan->out.file.versions) {
 		if (!regular) {

@@ -6474,8 +6474,8 @@ g_init(int *devtype, int *fdes)
 	bufsize = -1;
 	if (fstat(*fdes, &st_buf) == -1)
 		return (-1);
-	if (!(st_buf.st_mode & S_IFCHR) || !(st_buf.st_mode & S_IFBLK)) {
-		if (st_buf.st_mode & S_IFIFO) {
+	if (!S_ISCHR(st_buf.st_mode) && !S_ISBLK(st_buf.st_mode)) {
+		if (S_ISFIFO(st_buf.st_mode)) {
 			bufsize = 512;
 		} else {
 			/* find block size for this file system */

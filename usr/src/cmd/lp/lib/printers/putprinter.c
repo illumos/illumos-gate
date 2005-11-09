@@ -138,7 +138,7 @@ putprinter(char *name, PRINTER *prbufp)
 	if (!(path = getprinterfile(name, (char *)0)))
 		return (-1);
 	if (Stat(path, &statbuf1) == 0) {
-		if (!(statbuf1.st_mode & S_IFDIR)) {
+		if (!S_ISDIR(statbuf1.st_mode)) {
 			Free (path);
 			errno = ENOTDIR;
 			return (-1);

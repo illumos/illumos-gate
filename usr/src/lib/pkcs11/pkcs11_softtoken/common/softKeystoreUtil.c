@@ -835,27 +835,13 @@ cleanup:
 
 static CK_RV
 get_all_objs_in_dir(DIR *dirp, ks_obj_handle_t *ks_handle,
-    ks_obj_t **result_obj_list, boolean_t lock_held, char *dir_name)
+    ks_obj_t **result_obj_list, boolean_t lock_held)
 {
-	struct dirent *dp = NULL, *result = NULL;
+	struct dirent *dp;
 	ks_obj_t *obj;
 	CK_RV rv;
-	long path_limit;
 
-	if ((path_limit = pathconf(dir_name, _PC_NAME_MAX)) == -1) {
-		path_limit = PATH_MAX;
-	}
-
-	dp = malloc(path_limit + 1 + sizeof (struct dirent));
-	if (dp == NULL) {
-		return (CKR_HOST_MEMORY);
-	}
-
-	while (readdir_r(dirp, dp, &result) == 0) {
-		if (result == NULL) {
-			break;
-		}
-
+	while ((dp = readdir(dirp)) != NULL) {
 
 		if ((strcmp(dp->d_name, ".") == 0) ||
 		    (strcmp(dp->d_name, "..") == 0)) {
@@ -865,7 +851,6 @@ get_all_objs_in_dir(DIR *dirp, ks_obj_handle_t *ks_handle,
 		(void) strcpy((char *)ks_handle->name, dp->d_name);
 		rv = soft_keystore_get_single_obj(ks_handle, &obj, lock_held);
 		if (rv != CKR_OK) {
-			free(dp);
 			return (rv);
 		}
 		if (obj != NULL) {
@@ -877,7 +862,6 @@ get_all_objs_in_dir(DIR *dirp, ks_obj_handle_t *ks_handle,
 			}
 		}
 	}
-	free(dp);
 	return (CKR_OK);
 }
 
@@ -1497,7 +1481,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 	soft_object_t *new_crypt_key = NULL, *new_hmac_key = NULL;
 	char filebuf[BUFSIZ];
 	DIR	*pri_dirp;
-	struct dirent *pri_ent = NULL, *result = NULL;
+	struct dirent *pri_ent;
 	char pri_obj_path[MAXPATHLEN], ks_desc_file[MAXPATHLEN],
 	    tmp_ks_desc_name[MAXPATHLEN];
 	typedef struct priobjs {
@@ -1741,16 +1725,7 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 		}
 	}
 
-	pri_ent = malloc(pathconf(pri_obj_path, _PC_NAME_MAX) + 1
-	    + sizeof (struct dirent));
-	if (pri_ent == NULL) {
-		goto cleanup2;
-	}
-
-	while (readdir_r(pri_dirp, pri_ent, &result) == 0) {
-		if (result == NULL) {
-			break;
-		}
+	while ((pri_ent = readdir(pri_dirp)) != NULL) {
 
 		if ((strcmp(pri_ent->d_name, ".") == 0) ||
 		    (strcmp(pri_ent->d_name, "..") == 0) ||
@@ -1761,7 +1736,6 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 
 		obj = malloc(sizeof (priobjs_t));
 		if (obj == NULL) {
-			free(pri_ent);
 			goto cleanup2;
 		}
 		(void) snprintf(obj->orig_name, MAXPATHLEN,
@@ -1771,7 +1745,6 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 		    (pri_ent->d_name) + strlen(OBJ_PREFIX));
 		if (reencrypt_obj(new_crypt_key, new_hmac_key,
 		    obj->orig_name, obj->tmp_name) != 0) {
-			free(pri_ent);
 			free(obj);
 			goto cleanup2;
 		}
@@ -1785,7 +1758,6 @@ soft_keystore_setpin(uchar_t *oldpin, uchar_t *newpin, boolean_t lock_held)
 			pri_objs = obj;
 		}
 	}
-	free(pri_ent);
 
 	/* rename all the private objects */
 	tmp = pri_objs;
@@ -2007,7 +1979,7 @@ soft_keystore_get_objs(ks_search_type_t search_type,
 			return (CKR_FUNCTION_FAILED);
 		}
 		rv = get_all_objs_in_dir(dirp, &ks_handle, result_obj_list,
-		    lock_held, pub_obj_path);
+		    lock_held);
 		if (rv != CKR_OK) {
 			(void) closedir(dirp);
 			goto cleanup;
@@ -2036,7 +2008,7 @@ soft_keystore_get_objs(ks_search_type_t search_type,
 			return (CKR_OK);
 		}
 		rv = get_all_objs_in_dir(dirp, &ks_handle, result_obj_list,
-		    lock_held, pri_obj_path);
+		    lock_held);
 		if (rv != CKR_OK) {
 			(void) closedir(dirp);
 			goto cleanup;

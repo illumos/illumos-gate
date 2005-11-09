@@ -1152,7 +1152,7 @@ load_modules(char *dirname)
 	int client_id;
 	DIR *mod_dir;
 	module_t *mod;
-	struct dirent *retp, *entp;
+	struct dirent *entp;
 	struct slm_mod_ops *mod_ops;
 	struct sysevent_client *scp;
 
@@ -1168,24 +1168,12 @@ load_modules(char *dirname)
 
 	syseventd_print(3, "loading modules from %s\n", dirname);
 
-	entp = malloc(PATH_MAX + 1 + sizeof (struct dirent));
-	if (entp == NULL) {
-		syseventd_err_print(LOAD_MOD_ALLOC_ERR, "entp",
-			strerror(errno));
-		(void) closedir(mod_dir);
-		return;
-	}
-
 	/*
 	 * Go through directory, looking for files ending with .so
 	 */
-	while (readdir_r(mod_dir, entp, &retp) == 0) {
+	while ((entp = readdir(mod_dir)) != NULL) {
 		void *dlh, *f;
 		char *tmp, modpath[MAXPATHLEN];
-
-		if (retp == NULL) {
-			break;
-		}
 
 		if (((tmp = strstr(entp->d_name, MODULE_SUFFIX)) == NULL) ||
 		    (tmp[strlen(MODULE_SUFFIX)] != '\0')) {
@@ -1293,7 +1281,6 @@ load_modules(char *dirname)
 		syseventd_print(3, "loaded module %s\n", entp->d_name);
 	}
 
-	free(entp);
 	(void) closedir(mod_dir);
 	syseventd_print(3, "modules loaded\n");
 }

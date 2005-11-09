@@ -1460,7 +1460,7 @@ lock()
 		 * link. Its link count should be 1. The owner should be
 		 * root and the file should be empty.
 		 */
-		if (((sbuf1.st_mode & (S_IFREG|S_IFLNK)) != S_IFREG) ||
+		if (!S_ISREG(sbuf1.st_mode) ||
 		    sbuf1.st_nlink != 1 ||
 		    sbuf1.st_uid != 0 ||
 		    sbuf1.st_size != 0) {

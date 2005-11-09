@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 by Sun Microsystems, Inc. All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,7 +36,7 @@ __writev(int fd, struct iovec *iov, int iovlen)
 	/*
 	 * Allow for atomic writes to network.
 	 */
-	if (statbuf.st_mode & S_IFSOCK) {
+	if (S_ISSOCK(statbuf.st_mode)) {
 		struct msghdr   mesg;		
 
 		memset(&mesg, 0, sizeof(mesg));
