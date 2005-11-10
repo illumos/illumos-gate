@@ -1940,8 +1940,16 @@ walk_kern(struct radix_node *rn, void *argp)
 		 * If it is a "remote" interface, it is also a "gateway" to
 		 * the kernel if is not a alias.
 		 */
-		if (RT->rt_ifp == NULL || (RT->rt_ifp->int_state & IS_REMOTE))
-			ags |= (AGS_GATEWAY | AGS_SUPPRESS | AGS_AGGREGATE);
+		if (RT->rt_ifp == NULL || (RT->rt_ifp->int_state & IS_REMOTE)) {
+
+			ags |= (AGS_GATEWAY | AGS_SUPPRESS);
+
+			/*
+			 * Do not aggregate IS_PASSIVE routes.
+			 */
+			if (!(RT->rt_ifp->int_state & IS_PASSIVE))
+				ags |= AGS_AGGREGATE;
+		}
 	}
 
 	metric = RT->rt_metric;
