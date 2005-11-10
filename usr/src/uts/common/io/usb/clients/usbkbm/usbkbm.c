@@ -51,8 +51,8 @@
 #include <sys/policy.h>
 
 /* debugging information */
-static uint_t	usbkbm_errmask = (uint_t)PRINT_MASK_ALL;
-static uint_t	usbkbm_errlevel = USB_LOG_L2;
+uint_t	usbkbm_errmask = (uint_t)PRINT_MASK_ALL;
+uint_t	usbkbm_errlevel = USB_LOG_L2;
 static usb_log_handle_t usbkbm_log_handle;
 
 typedef void (*process_key_callback_t)(usbkbm_state_t *, int, enum keystate);

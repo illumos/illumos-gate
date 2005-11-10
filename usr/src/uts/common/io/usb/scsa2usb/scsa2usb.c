@@ -376,11 +376,11 @@ static void *scsa2usb_statep;				/* for soft state */
 static boolean_t scsa2usb_sync_message = B_TRUE;	/* for syncing */
 
 /* for debug messages */
-static uint_t	scsa2usb_errmask	= (uint_t)DPRINT_MASK_ALL;
-static uint_t	scsa2usb_errlevel	= USB_LOG_L4;
-static uint_t	scsa2usb_instance_debug = (uint_t)-1;
-static uint_t	scsa2usb_scsi_bus_config_debug = 0;
-static uint_t	scsa2usb_long_timeout	= 50 * SCSA2USB_BULK_PIPE_TIMEOUT;
+uint_t	scsa2usb_errmask	= (uint_t)DPRINT_MASK_ALL;
+uint_t	scsa2usb_errlevel	= USB_LOG_L4;
+uint_t	scsa2usb_instance_debug = (uint_t)-1;
+uint_t	scsa2usb_scsi_bus_config_debug = 0;
+uint_t	scsa2usb_long_timeout	= 50 * SCSA2USB_BULK_PIPE_TIMEOUT;
 
 
 /*
@@ -388,7 +388,7 @@ static uint_t	scsa2usb_long_timeout	= 50 * SCSA2USB_BULK_PIPE_TIMEOUT;
  * transfers >= 128kbytes hang the device.  This tunable allows to
  * limit the maximum bulk transfers rate.
  */
-static uint_t	scsa2usb_max_bulk_xfer_size = SCSA2USB_MAX_BULK_XFER_SIZE;
+uint_t	scsa2usb_max_bulk_xfer_size = SCSA2USB_MAX_BULK_XFER_SIZE;
 
 
 #ifdef	SCSA2USB_BULK_ONLY_TEST
@@ -1370,7 +1370,7 @@ scsa2usb_override(scsa2usb_state_t *scsa2usbp)
 			scsa2usbp->scsa2usb_subclass_override = ov.subclass;
 			scsa2usbp->scsa2usb_protocol_override = ov.protocol;
 
-			USB_DPRINTF_L1(DPRINT_MASK_SCSA,
+			USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 			    scsa2usbp->scsa2usb_log_handle,
 			    "vid=0x%x pid=0x%x rev=0x%x subclass=0x%x "
 			    "protocol=0x%x "
@@ -1527,7 +1527,7 @@ scsa2usb_parse_input_str(char *str, scsa2usb_ov_t *ovp,
 				return (USB_FAILURE);
 			}
 		} else {
-			scsa2usb_override_error("entry", scsa2usbp);
+			scsa2usb_override_error(input_field, scsa2usbp);
 
 			return (USB_FAILURE);
 		}
@@ -1545,7 +1545,7 @@ static void
 scsa2usb_override_error(char *input_field, scsa2usb_state_t *scsa2usbp)
 {
 	USB_DPRINTF_L1(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-	    "invalid %s in scsa2usb conf file entry", input_field);
+	    "invalid %s in scsa2usb.conf file entry", input_field);
 }
 
 /*
@@ -2051,9 +2051,6 @@ scsa2usb_restore_device_state(dev_info_t *dip, scsa2usb_state_t *scsa2usbp)
 
 		return;
 	}
-
-	USB_DPRINTF_L0(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
-	    "Reinserted device is accessible again.");
 
 	/*
 	 * if the device had remote wakeup earlier,
@@ -2941,6 +2938,9 @@ int
 scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
     scsa2usb_cmd_t *cmd, uchar_t opcode)
 {
+	struct scsi_inquiry *inq =
+	    &scsa2usbp->scsa2usb_lun_inquiry[cmd->cmd_pkt->pkt_address.a_lun];
+
 	USB_DPRINTF_L4(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 	    "scsa2usb_check_bulkonly_blacklist_attrs: opcode = %s",
 	    scsi_cname(opcode, scsa2usb_cmds));
@@ -2957,10 +2957,16 @@ scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
 
 			return (SCSA2USB_JUST_ACCEPT);
 
-		} else if (scsa2usbp->scsa2usb_lun_inquiry[cmd->cmd_pkt->
-		    pkt_address.a_lun].inq_rmb) {
+		/*
+		 * only lock the door for CD and DVD drives
+		 */
+		} else if ((inq->inq_dtype == DTYPE_RODIRECT) ||
+		    (inq->inq_dtype == DTYPE_OPTICAL)) {
 
-			break;
+			if (inq->inq_rmb) {
+
+				break;
+			}
 		}
 
 		return (SCSA2USB_JUST_ACCEPT);
@@ -2983,8 +2989,7 @@ scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
 			 * if the device is really a removable then
 			 * pass it on to the device, else just accept
 			 */
-			if (scsa2usbp->scsa2usb_lun_inquiry[cmd->cmd_pkt->
-			    pkt_address.a_lun].inq_rmb) {
+			if (inq->inq_rmb) {
 
 				break;
 			}
@@ -3024,8 +3029,8 @@ scsa2usb_check_bulkonly_blacklist_attrs(scsa2usb_state_t *scsa2usbp,
 		break;
 
 	/*
-	 * Fake accepting the following two Opcodes
-	 * (as the drive doesn't support it.)
+	 * Fake accepting the following  Opcodes
+	 * (as most drives don't support these)
 	 * These are needed by format command.
 	 */
 	case SCMD_RESERVE:
@@ -4997,6 +5002,9 @@ scsa2usb_reconnect_event_cb(dev_info_t *dip)
 	    "scsa2usb_reconnect_event_cb: dip = 0x%p", dip);
 
 	scsa2usb_restore_device_state(dip, scsa2usbp);
+
+	USB_DPRINTF_L0(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
+	    "Reinserted device is accessible again.");
 
 	ndi_devi_enter(dip, &circ);
 	for (cdip = ddi_get_child(dip); cdip; ) {

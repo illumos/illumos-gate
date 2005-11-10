@@ -37,7 +37,7 @@ rm -f $BASEDIR/var/volfs.tmp > /dev/null 2>&1
 # If this is an upgrade and volfs service was already present we should
 # not change the state (the user may have disabled volfs service)
 
-if pkginfo SUNWvolr >/dev/null 2>&1; then
+if [ "$UPDATE" = yes ]; then
 	if [ -f $BASEDIR/etc/rc3.d/S81volmgt ]; then 
 		touch $BASEDIR/var/volfs.tmp
 	fi

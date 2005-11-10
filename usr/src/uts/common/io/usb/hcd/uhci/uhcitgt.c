@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,7 @@ static void	uhci_update_intr_td_data_toggle(uhci_state_t *uhcip,
 
 
 /* Maximum bulk transfer size */
-static int uhci_bulk_transfer_size = UHCI_BULK_MAX_XFER_SIZE;
+int uhci_bulk_transfer_size = UHCI_BULK_MAX_XFER_SIZE;
 
 /*
  * uhci_hcdi_pipe_open:

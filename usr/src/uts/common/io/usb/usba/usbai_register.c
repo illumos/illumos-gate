@@ -109,9 +109,9 @@ int usb_log_descr_tree(usb_client_dev_data_t *, usb_log_handle_t,
 
 /* Debug stuff */
 usb_log_handle_t	usbai_reg_log_handle;
-static uint_t		usbai_register_errlevel = USB_LOG_L2;
-static uint_t		usbai_register_dump_errlevel = USB_LOG_L2;
-static uint_t		usbai_register_errmask = (uint_t)-1;
+uint_t			usbai_register_errlevel = USB_LOG_L2;
+uint_t			usbai_register_dump_errlevel = USB_LOG_L2;
+uint_t			usbai_register_errmask = (uint_t)-1;
 
 /* Function prototypes */
 static int usba_build_descr_tree(dev_info_t *, usba_device_t *,

@@ -84,9 +84,9 @@
 #include <sys/usb/clients/audio/usb_as/usb_as.h>
 
 /* debug support */
-static uint_t	usb_as_errlevel	= USB_LOG_L4;
-static uint_t	usb_as_errmask	= (uint_t)-1;
-static uint_t	usb_as_instance_debug = (uint_t)-1;
+uint_t	usb_as_errlevel	= USB_LOG_L4;
+uint_t	usb_as_errmask	= (uint_t)-1;
+uint_t	usb_as_instance_debug = (uint_t)-1;
 
 /*
  * Module linkage routines for the kernel
@@ -1517,7 +1517,7 @@ done:
 		}
 	}
 
-	USB_DPRINTF_L2(PRINT_MASK_ALL, uasp->usb_as_log_handle,
+	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_play_isoc_data: SEND CNT=%d, RCV COUNT=%d",
 	    uasp->usb_as_send_debug_count, uasp->usb_as_rcv_debug_count);
 
@@ -1572,7 +1572,7 @@ usb_as_play_cb(usb_pipe_handle_t ph, usb_isoc_req_t *isoc_req)
 	uasp->usb_as_rcv_debug_count++;
 	usb_as_continue_play(uasp);
 
-	USB_DPRINTF_L2(PRINT_MASK_CB, uasp->usb_as_log_handle,
+	USB_DPRINTF_L4(PRINT_MASK_CB, uasp->usb_as_log_handle,
 	    "usb_as_play_cb: SEND CNT=%d, RCV COUNT=%d",
 	    uasp->usb_as_send_debug_count, uasp->usb_as_rcv_debug_count);
 
@@ -2695,7 +2695,7 @@ usb_as_handle_descriptors(usb_as_state_t *uasp)
 		    cs_ep->bDescriptorSubType,
 		    cs_ep->bmAttributes,
 		    cs_ep->bLockDelayUnits,
-		    cs_ep->bLockDelay);
+		    cs_ep->wLockDelay);
 
 		uasp->usb_as_alts[alternate].alt_cs_ep = cs_ep;
 

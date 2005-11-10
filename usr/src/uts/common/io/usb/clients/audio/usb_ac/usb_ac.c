@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,16 +83,16 @@
 #include <sys/usb/clients/audio/usb_ac/usb_ac.h>
 
 /* debug support */
-static uint_t	usb_ac_errlevel 	= USB_LOG_L4;
-static uint_t	usb_ac_errmask		= (uint_t)-1;
-static uint_t	usb_ac_instance_debug	= (uint_t)-1;
+uint_t	usb_ac_errlevel 	= USB_LOG_L4;
+uint_t	usb_ac_errmask		= (uint_t)-1;
+uint_t	usb_ac_instance_debug	= (uint_t)-1;
 
 #ifdef DEBUG
 /*
  * tunable timeout for usb_as response, allow at least 3 secs for control
  * cmd to timeout
  */
-static int	usb_ac_wait_timeout = 4000000;
+int	usb_ac_wait_timeout = 4000000;
 #endif
 
 /*

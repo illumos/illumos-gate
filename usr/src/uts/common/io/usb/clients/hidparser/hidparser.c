@@ -38,8 +38,8 @@
  * in HID devices.
  */
 
-static uint_t hparser_errmask = (uint_t)PRINT_MASK_ALL;
-static uint_t  hparser_errlevel = (uint_t)USB_LOG_L1;
+uint_t hparser_errmask = (uint_t)PRINT_MASK_ALL;
+uint_t  hparser_errlevel = (uint_t)USB_LOG_L1;
 static usb_log_handle_t hparser_log_handle;
 
 /*

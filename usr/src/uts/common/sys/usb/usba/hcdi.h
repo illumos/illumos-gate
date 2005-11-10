@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,9 @@ typedef struct usba_hcdi_ops {
 	int	usba_hcdi_ops_version;	/* implementation version */
 
 	dev_info_t	*usba_hcdi_dip;	/* HCD's devinfo ptr */
+
+	/* can this hcd support pm? */
+	int	(*usba_hcdi_pm_support)(dev_info_t *dip);
 
 	/*
 	 * usba_hcdi_pipe_open:

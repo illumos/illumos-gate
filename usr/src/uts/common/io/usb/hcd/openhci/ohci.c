@@ -50,8 +50,8 @@ static void *ohci_statep;
 #define	OHCI_INSTS	1
 
 /* Adjustable variables for the size of the pools */
-static int ohci_ed_pool_size = OHCI_ED_POOL_SIZE;
-static int ohci_td_pool_size = OHCI_TD_POOL_SIZE;
+int ohci_ed_pool_size = OHCI_ED_POOL_SIZE;
+int ohci_td_pool_size = OHCI_TD_POOL_SIZE;
 
 /*
  * Initialize the values which are used for setting up head pointers for
@@ -1752,6 +1752,16 @@ ohci_take_control(ohci_state_t	*ohcip)
 	return (DDI_SUCCESS);
 }
 
+/*
+ * ohci_pm_support:
+ *	always return success since PM has been quite reliable on ohci
+ */
+/*ARGSUSED*/
+int
+ohci_hcdi_pm_support(dev_info_t *dip)
+{
+	return (USB_SUCCESS);
+}
 
 /*
  * ohci_alloc_hcdi_ops:
@@ -1773,6 +1783,7 @@ ohci_alloc_hcdi_ops(ohci_state_t	*ohcip)
 
 	usba_hcdi_ops->usba_hcdi_ops_version = HCDI_OPS_VERSION;
 
+	usba_hcdi_ops->usba_hcdi_pm_support = ohci_hcdi_pm_support;
 	usba_hcdi_ops->usba_hcdi_pipe_open = ohci_hcdi_pipe_open;
 	usba_hcdi_ops->usba_hcdi_pipe_close = ohci_hcdi_pipe_close;
 

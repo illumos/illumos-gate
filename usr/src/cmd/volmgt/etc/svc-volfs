@@ -47,11 +47,6 @@ getpropstring() {
 
 config_file=/etc/vold.conf
 
-if [ `/sbin/zonename` != "global" ]; then
-	echo "vold can only run in the global zone"
-	exit $SMF_EXIT_ERR_FATAL 
-fi
-
 val=`svcprop -c -p vold/config_file $FMRI`
 [ -n "$val" ] && [ "$val" != '""' ] && config_file="$val"
 
@@ -62,9 +57,21 @@ fi
 
 case "$1" in
 'start')
+        # volume management is not supported in a local zone
+        if [ `/sbin/zonename` != "global" ] ; then
+                /usr/sbin/svcadm disable -t svc:/system/filesystem/volfs
+                echo "Volume management is not supported in a local zone"
+                sleep 5 &
+                exit $SMF_EXIT_OK
+        fi
+
 	if [ ! -x /usr/sbin/vold ]; then
 		echo "/usr/sbin/vold is not executable"
 		exit $SMF_EXIT_ERR_CONFIG
+	fi
+
+	if [ ! -f /dev/volctl ]; then
+		devfsadm -i vol
 	fi
 
 	args="$args `getpropstring -d vold/root_dir`"

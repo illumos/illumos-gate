@@ -62,9 +62,9 @@ static void hcdi_autoclearing(usba_req_wrapper_t *);
 void	usba_pipe_clear(usb_pipe_handle_t);
 
 /* for debug messages */
-static uint_t	hcdi_errmask	= (uint_t)DPRINT_MASK_ALL;
-static uint_t	hcdi_errlevel	= USB_LOG_L4;
-static uint_t	hcdi_instance_debug = (uint_t)-1;
+uint_t	hcdi_errmask	= (uint_t)DPRINT_MASK_ALL;
+uint_t	hcdi_errlevel	= USB_LOG_L4;
+uint_t	hcdi_instance_debug = (uint_t)-1;
 
 void
 usba_hcdi_initialization()

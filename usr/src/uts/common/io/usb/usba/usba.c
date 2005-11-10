@@ -93,8 +93,8 @@ struct modlinkage modlinkage = {
 
 
 static usb_log_handle_t	usba_log_handle;
-static uint_t		usba_errlevel = USB_LOG_L4;
-static uint_t		usba_errmask = (uint_t)-1;
+uint_t		usba_errlevel = USB_LOG_L4;
+uint_t		usba_errmask = (uint_t)-1;
 
 extern usb_log_handle_t	hubdi_log_handle;
 

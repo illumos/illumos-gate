@@ -63,9 +63,9 @@ extern void consconfig_link(major_t major, minor_t minor);
 extern int consconfig_unlink(major_t major, minor_t minor);
 
 /* Debugging support */
-static uint_t	hid_errmask	= (uint_t)PRINT_MASK_ALL;
-static uint_t	hid_errlevel	= USB_LOG_L4;
-static uint_t	hid_instance_debug = (uint_t)-1;
+uint_t	hid_errmask	= (uint_t)PRINT_MASK_ALL;
+uint_t	hid_errlevel	= USB_LOG_L4;
+uint_t	hid_instance_debug = (uint_t)-1;
 
 /* tunables */
 int	hid_default_pipe_drain_timeout = HID_DEFAULT_PIPE_DRAIN_TIMEOUT;
@@ -2508,17 +2508,25 @@ hid_is_pm_enabled(dev_info_t *dip)
 							ddi_get_instance(dip));
 
 	if (strcmp(ddi_node_name(dip), "mouse") == 0) {
+		/* check for overrides first */
+		if (hid_pm_mouse ||
+		    (ddi_prop_exists(DDI_DEV_T_ANY, dip,
+		    (DDI_PROP_DONTPASS | DDI_PROP_NOTPROM),
+		    "hid-mouse-pm-enable") == 1)) {
+
+			return (USB_SUCCESS);
+		}
+
 		/*
-		 * Always enable PM for new SUN mouse
+		 * Always enable PM for 1.05 or greater SUN mouse
 		 * hidp->hid_dev_descr won't be NULL.
 		 */
-		if (hid_pm_mouse ||
-		    ((hidp->hid_dev_descr->idVendor ==
+		if ((hidp->hid_dev_descr->idVendor ==
 		    HID_SUN_MOUSE_VENDOR_ID) &&
 		    (hidp->hid_dev_descr->idProduct ==
 		    HID_SUN_MOUSE_PROD_ID) &&
 		    (hidp->hid_dev_descr->bcdDevice >=
-		    HID_SUN_MOUSE_BCDDEVICE))) {
+		    HID_SUN_MOUSE_BCDDEVICE)) {
 
 			return (USB_SUCCESS);
 		}

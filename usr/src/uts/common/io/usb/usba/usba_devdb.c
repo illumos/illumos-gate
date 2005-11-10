@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,8 +32,8 @@
 #include <sys/usb/usba/usba_devdb_impl.h>
 
 static usb_log_handle_t	usba_devdb_log_handle;
-static uint_t	usba_devdb_errlevel = USB_LOG_L4;
-static uint_t	usba_devdb_errmask = (uint_t)-1;
+uint_t	usba_devdb_errlevel = USB_LOG_L4;
+uint_t	usba_devdb_errmask = (uint_t)-1;
 
 boolean_t	usba_build_devdb = B_FALSE;
 

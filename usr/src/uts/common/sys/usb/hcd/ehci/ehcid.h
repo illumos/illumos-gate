@@ -1013,6 +1013,14 @@ typedef struct setup_pkt {
 #define	PCI_VENDOR_ALI		0x10b9		/* PCI Vendor-id Acer */
 
 /*
+ * NEC on COMBO and Uli M1575 can support PM
+ */
+#define	PCI_VENDOR_NEC_COMBO	0x1033
+#define	PCI_DEVICE_NEC_COMBO	0xe0
+#define	PCI_VENDOR_ULi_M1575	0x10b9
+#define	PCI_DEVICE_ULi_M1575	0x5239
+
+/*
  * VIA chips have some problems, the workaround can ensure those chips
  * work reliably. Revisions >= 0x80 are part of a southbridge and appear
  * to be reliable.

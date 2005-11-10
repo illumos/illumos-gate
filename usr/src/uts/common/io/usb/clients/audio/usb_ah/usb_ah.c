@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,9 +62,9 @@
 #include <sys/usb/clients/audio/usb_ah/usb_ah.h>
 
 /* debugging information */
-static uint_t			usb_ah_errmask = (uint_t)PRINT_MASK_ALL;
-static uint_t			usb_ah_errlevel = USB_LOG_L4;
-static usb_log_handle_t 	usb_ah_log_handle;
+uint_t			usb_ah_errmask = (uint_t)PRINT_MASK_ALL;
+uint_t			usb_ah_errlevel = USB_LOG_L4;
+static usb_log_handle_t	usb_ah_log_handle;
 
 /*
  * Internal Function Prototypes

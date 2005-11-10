@@ -54,20 +54,20 @@
 #include "sys/usb/usba/usba_ugend.h"
 
 /* Debugging information */
-static uint_t ugen_errmask		= (uint_t)UGEN_PRINT_ALL;
-static uint_t ugen_errlevel		= USB_LOG_L4;
-static uint_t ugen_instance_debug	= (uint_t)-1;
+uint_t	ugen_errmask		= (uint_t)UGEN_PRINT_ALL;
+uint_t	ugen_errlevel		= USB_LOG_L4;
+uint_t	ugen_instance_debug	= (uint_t)-1;
 
 /* default endpoint descriptor */
 static usb_ep_descr_t  ugen_default_ep_descr =
 	{7, 5, 0, USB_EP_ATTR_CONTROL, 8, 0};
 
 /* tunables */
-static int	ugen_busy_loop		= 60;	/* secs */
-static int	ugen_ctrl_timeout	= 10;
-static int	ugen_bulk_timeout	= 10;
-static int	ugen_intr_timeout	= 10;
-static int	ugen_enable_pm		= 0;
+int	ugen_busy_loop		= 60;	/* secs */
+int	ugen_ctrl_timeout	= 10;
+int	ugen_bulk_timeout	= 10;
+int	ugen_intr_timeout	= 10;
+int	ugen_enable_pm		= 0;
 
 
 /* local function prototypes */

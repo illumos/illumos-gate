@@ -46,10 +46,10 @@
 void usba_free_evdata(usba_evdata_t *);
 
 /* Debugging support */
-static uint_t usb_mid_errlevel = USB_LOG_L4;
-static uint_t usb_mid_errmask = (uint_t)DPRINT_MASK_ALL;
-static uint_t usb_mid_instance_debug = (uint_t)-1;
-static uint_t usb_mid_bus_config_debug = 0;
+uint_t usb_mid_errlevel = USB_LOG_L4;
+uint_t usb_mid_errmask = (uint_t)DPRINT_MASK_ALL;
+uint_t usb_mid_instance_debug = (uint_t)-1;
+uint_t usb_mid_bus_config_debug = 0;
 
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_mid_errlevel))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(usb_mid_errmask))
@@ -1078,6 +1078,11 @@ usb_mid_create_children(usb_mid_t *usb_mid)
 	 */
 	for (i = 0; i < n_ifs; i++) {
 		if (usb_mid->mi_children_dips[i] != NULL) {
+			if (i_ddi_node_state(
+				usb_mid->mi_children_dips[i]) >=
+				DS_BOUND) {
+					bound_children++;
+			}
 
 			continue;
 		}

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,9 +145,9 @@ usb_event_t usbser_usb_events = {
 };
 
 /* debug support */
-static uint_t   usbser_errlevel = USB_LOG_L4;
-static uint_t   usbser_errmask = DPRINT_MASK_ALL;
-static uint_t   usbser_instance_debug = (uint_t)-1;
+uint_t   usbser_errlevel = USB_LOG_L4;
+uint_t   usbser_errmask = DPRINT_MASK_ALL;
+uint_t   usbser_instance_debug = (uint_t)-1;
 
 /* various statistics. TODO: replace with kstats */
 static int usbser_st_tx_data_loss = 0;

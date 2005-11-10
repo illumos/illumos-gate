@@ -67,10 +67,10 @@
  * Loadable module info.
  */
 #if (defined(__fibre))
-#define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver 1.471"
+#define	SD_MODULE_NAME	"SCSI SSA/FCAL Disk Driver %I%"
 char _depends_on[]	= "misc/scsi drv/fcp";
 #else
-#define	SD_MODULE_NAME	"SCSI Disk Driver 1.471"
+#define	SD_MODULE_NAME	"SCSI Disk Driver %I%"
 char _depends_on[]	= "misc/scsi";
 #endif
 
@@ -24112,7 +24112,6 @@ sd_media_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 
 	if (resultp->pkt->pkt_reason == CMD_DEV_GONE) {
 		un->un_mediastate = DKIO_DEV_GONE;
-		printf("sd_media_watch_cb: dev gone\n");
 		cv_broadcast(&un->un_state_cv);
 		mutex_exit(SD_MUTEX(un));
 

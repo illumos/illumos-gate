@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +157,7 @@ usb_parse_data(char	*format,
 		} else if (isdigit(fmt)) {
 			multiplier = (multiplier * 10) + (fmt - '0');
 			format++;
+			counter--;
 		} else {
 			multiplier = 0;
 			break;

@@ -44,8 +44,8 @@
 #include <sys/usb/clients/usbms/usbms.h>
 
 /* debugging information */
-static uint_t	usbms_errmask = (uint_t)PRINT_MASK_ALL;
-static uint_t	usbms_errlevel = USB_LOG_L2;
+uint_t	usbms_errmask = (uint_t)PRINT_MASK_ALL;
+uint_t	usbms_errlevel = USB_LOG_L2;
 static usb_log_handle_t usbms_log_handle;
 
 static struct streamtab		usbms_streamtab;

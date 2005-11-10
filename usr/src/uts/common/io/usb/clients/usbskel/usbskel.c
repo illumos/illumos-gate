@@ -88,7 +88,7 @@
 #include <sys/usb/usba.h>
 #include <sys/usb/clients/usbskel/usbskel.h>
 
-static int	usbskel_errlevel = USBSKEL_LOG_LOG;
+int		usbskel_errlevel = USBSKEL_LOG_LOG;
 static char	*name = "usbskl";	/* Driver name, used all over. */
 
 /*

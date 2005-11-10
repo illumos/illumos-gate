@@ -38,6 +38,7 @@
 #define	USBA_FRAMEWORK
 #include <sys/varargs.h>
 #include <sys/usb/usba/usba_impl.h>
+#include <sys/usb/usba/hcdi_impl.h>
 #include <sys/usb/usba/usba10.h>
 
 /*
@@ -52,27 +53,30 @@ kmutex_t usbai_mutex;
  * debug stuff
  */
 usb_log_handle_t	usbai_log_handle;
-static uint_t		usbai_errlevel = USB_LOG_L4;
-static uint_t		usbai_errmask = (uint_t)-1;
+uint_t			usbai_errlevel = USB_LOG_L4;
+uint_t			usbai_errmask = (uint_t)-1;
 
 #define	USBA_DEBUG_SIZE_EXTRA_ALLOC	8
 #ifdef	DEBUG
-#define	USBA_DEBUG_BUF_SIZE		0x40000
+#define	USBA_DEBUG_BUF_SIZE \
+			(0x40000 -  USBA_DEBUG_SIZE_EXTRA_ALLOC)
 #else
-#define	USBA_DEBUG_BUF_SIZE		0x4000
+#define	USBA_DEBUG_BUF_SIZE \
+			(0x4000 -  USBA_DEBUG_SIZE_EXTRA_ALLOC)
 #endif	/* DEBUG */
 
 #define	USBA_POWER_STR_SIZE		40
 
-static int usba_suppress_dprintf;		/* Suppress debug printing */
-static int usba_clear_debug_buf_flag;		/* clear debug buf */
-static int usba_buffer_dprintf = 1;		/* Use a debug print buffer */
-static int usba_timestamp_dprintf = 0;		/* get time stamps in trace */
-static hrtime_t usba_last_timestamp;		/* last time stamp in trace */
-static int usba_debug_buf_size = USBA_DEBUG_BUF_SIZE;	/* Size of debug buf */
-static char *usba_debug_buf = NULL;			/* The debug buf */
+int	usba_suppress_dprintf;		/* Suppress debug printing */
+int	usba_clear_debug_buf_flag;	/* clear debug buf */
+int	usba_buffer_dprintf = 1;	/* Use a debug print buffer */
+int	usba_timestamp_dprintf = 0;	/* get time stamps in trace */
+int	usba_debug_buf_size = USBA_DEBUG_BUF_SIZE;	/* Size of debug buf */
+int	usba_debug_chatty;		/* L1 msg on console */
+
+static char *usba_debug_buf = NULL;	/* The debug buf */
 static char *usba_buf_sptr, *usba_buf_eptr;
-static int usba_debug_chatty;			/* L1 msg on console */
+static hrtime_t usba_last_timestamp;	/* last time stamp in trace */
 
 /*
  * Set to 1 to enable PM.
@@ -675,9 +679,7 @@ usb_req_lower_power(dev_info_t *dip, int comp, int level,
 int
 usb_is_pm_enabled(dev_info_t *dip)
 {
-#if defined(__sparc)
 	usba_device_t  *usba_device = usba_get_usba_device(dip);
-#endif
 
 	switch (usb_force_enable_pm) {
 	case -1:
@@ -695,24 +697,34 @@ usb_is_pm_enabled(dev_info_t *dip)
 
 	}
 
-#if defined(__sparc)
-	/* uhci does not have PM support, ehci has resume problems */
-	if (usba_device &&
-	    ((strcmp(ddi_driver_name(usba_device->usb_root_hub_dip),
-	    "uhci") == 0) ||
-	    (strcmp(ddi_driver_name(usba_device->usb_root_hub_dip),
-	    "ehci") == 0))) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usbai_log_handle,
-		    "%s%d: no PM enabled for this device",
-		    ddi_driver_name(dip), ddi_get_instance(dip));
+	if (usba_device) {
+		dev_info_t *root_hub_dip;
+		usba_hcdi_t *hcdi;
+		int rval;
 
-		return (USB_FAILURE);
+		root_hub_dip = usba_device->usb_root_hub_dip;
+		if (root_hub_dip == NULL) {
+
+			return (USB_FAILURE);
+		}
+
+		hcdi = usba_hcdi_get_hcdi(root_hub_dip);
+		if (hcdi && hcdi->hcdi_ops->usba_hcdi_pm_support) {
+			rval = hcdi->hcdi_ops->
+				usba_hcdi_pm_support(root_hub_dip);
+			if (rval != USB_SUCCESS) {
+				USB_DPRINTF_L1(DPRINT_MASK_USBA,
+				    usbai_log_handle,
+				    "%s%d: no PM enabled for this device",
+				    ddi_driver_name(dip),
+				    ddi_get_instance(dip));
+			}
+
+			return (rval);
+		}
 	}
 
-	return (USB_SUCCESS);
-#else
 	return (USB_FAILURE);
-#endif
 }
 
 

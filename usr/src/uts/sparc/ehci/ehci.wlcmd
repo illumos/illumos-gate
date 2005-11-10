@@ -46,6 +46,7 @@ root ehci_hcdi_pipe_ctrl_xfer
 root ehci_hcdi_pipe_bulk_xfer
 root ehci_hcdi_pipe_intr_xfer
 root ehci_hcdi_pipe_isoc_xfer
+root ehci_hcdi_pm_support
 
 root hubd_hotplug_thread
 root hubd_exception_cb

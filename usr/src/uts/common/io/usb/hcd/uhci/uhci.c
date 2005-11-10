@@ -98,9 +98,9 @@ static struct modlinkage modlinkage = {
  *  Globals
  */
 void		*uhci_statep;
-static uint_t	uhci_errlevel = USB_LOG_L2;
-static uint_t	uhci_errmask = PRINT_MASK_ALL;
-static uint_t	uhci_instance_debug = (uint_t)-1;
+uint_t		uhci_errlevel = USB_LOG_L2;
+uint_t		uhci_errmask = PRINT_MASK_ALL;
+uint_t		uhci_instance_debug = (uint_t)-1;
 
 uint_t		uhci_td_pool_size = 256;			/* Num TDs */
 uint_t		uhci_qh_pool_size = 130;			/* Num QHs */
@@ -110,7 +110,7 @@ ushort_t	uhci_tree_bottom_nodes[NUM_FRAME_LST_ENTRIES];
 /*
  * tunable, delay during attach in seconds
  */
-static int uhci_attach_wait = 1;
+int 		uhci_attach_wait = 1;
 
 /* function prototypes */
 static void	uhci_handle_intr_td_errors(uhci_state_t *uhcip, uhci_td_t *td,

@@ -63,9 +63,9 @@
 #include <sys/usb/clients/printer/usbprn.h>
 
 /* Debugging support */
-static uint_t	usbprn_errmask		= (uint_t)PRINT_MASK_ALL;
-static uint_t	usbprn_errlevel 	= USB_LOG_L4;
-static uint_t	usbprn_instance_debug	= (uint_t)-1;
+uint_t	usbprn_errmask		= (uint_t)PRINT_MASK_ALL;
+uint_t	usbprn_errlevel 	= USB_LOG_L4;
+uint_t	usbprn_instance_debug	= (uint_t)-1;
 
 /* local variables */
 static uint_t usbprn_ifcap =

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -150,7 +150,7 @@ typedef struct usb_audio_cs_if_descr {
 } usb_audio_cs_if_descr_t;
 
 #define	CS_AC_IF_HEADER_FORMAT "cccsscc"
-#define	CS_AC_IF_HEADER_SIZE 10
+#define	CS_AC_IF_HEADER_SIZE 9
 
 /* input terminal descriptor (4.3.2.1) */
 typedef struct usb_audio_input_term_descr {
@@ -258,8 +258,8 @@ typedef struct usb_audio_processing_unit_descr1 {
 	uint8_t baSourceID[1];	/* ID of pins */
 } usb_audio_processing_unit_descr1_t;
 
-#define	CS_AC_PROCESSING_UNIT_DESCR1_FORMAT	"ccccwcc"
-#define	CS_AC_PROCESSING_UNIT_DESCR1_SIZE	8
+#define	CS_AC_PROCESSING_UNIT_DESCR1_FORMAT	"ccccccc"
+#define	CS_AC_PROCESSING_UNIT_DESCR1_SIZE	7
 
 typedef struct usb_audio_processing_unit_descr2 {
 	uint8_t	bNrChannels;	/* # log. output channels */
@@ -285,8 +285,8 @@ typedef struct usb_audio_extension_unit_descr1 {
 	uint8_t baSourceID[1];	/* ID of pins */
 } usb_audio_extension_unit_descr1_t;
 
-#define	CS_AC_EXTENSION_UNIT_DESCR1_FORMAT	"ccccwcc"
-#define	CS_AC_EXTENSION_UNIT_DESCR1_SIZE	8
+#define	CS_AC_EXTENSION_UNIT_DESCR1_FORMAT	"ccccccc"
+#define	CS_AC_EXTENSION_UNIT_DESCR1_SIZE	7
 
 typedef struct usb_audio_extension_unit_descr2 {
 	uint8_t	bNrChannels;	/* # log. output channels */
@@ -324,7 +324,7 @@ typedef struct usb_audio_as_if_descr {
 } usb_audio_as_if_descr_t;
 
 #define	AS_IF_DESCR_FORMAT	"cccccs"
-#define	AS_IF_DESCR_SIZE	8
+#define	AS_IF_DESCR_SIZE	7
 
 
 /* class specific AS isochronous audio data ep descr (4.6.1.2) */
@@ -334,11 +334,11 @@ typedef struct usb_audio_as_isoc_ep_descr {
 	uint8_t bDescriptorSubType; /* EP_GENERAL */
 	uint8_t bmAttributes;	/* bitmap of attributes */
 	uint8_t bLockDelayUnits; /* type of units */
-	uint8_t bLockDelay;	/* lock of internal clock */
+	uint16_t wLockDelay;	/* lock of internal clock */
 } usb_audio_as_isoc_ep_descr_t;
 
-#define	AS_ISOC_EP_DESCR_FORMAT "cccccc"
-#define	AS_ISOC_EP_DESCR_SIZE 6
+#define	AS_ISOC_EP_DESCR_FORMAT "5cs"
+#define	AS_ISOC_EP_DESCR_SIZE 7
 
 /*
  * data format descriptor, no need for parse format since
@@ -356,7 +356,7 @@ typedef struct usb_audio_type1_format_descr {
 	uint8_t bSamFreqs[6];	/* sampling freqs */
 } usb_audio_type1_format_descr_t;
 
-#define	AUDIO_TYPE1_FORMAT_FORMAT "cccccccccc"
+#define	AUDIO_TYPE1_FORMAT_FORMAT "10c"
 #define	AUDIO_TYPE1_FORMAT_SIZE	10
 
 /* audio data format codes */

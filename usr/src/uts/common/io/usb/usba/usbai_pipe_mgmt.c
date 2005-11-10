@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,7 @@ static	int	usba_pipe_sync_drain_reqs(dev_info_t *, usba_ph_impl_t *,
 			usba_pipe_async_req_t *, usb_flags_t);
 
 /* local tunables */
-static	int	usba_drain_timeout = 1000;	/* in ms */
+int	usba_drain_timeout = 1000;	/* in ms */
 
 /* return the default pipe for this device */
 usb_pipe_handle_t

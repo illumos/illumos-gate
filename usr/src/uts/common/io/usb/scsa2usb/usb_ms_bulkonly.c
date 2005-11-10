@@ -86,14 +86,14 @@ extern void	scsa2usb_print_cdb(scsa2usb_state_t *, scsa2usb_cmd_t *);
  *
  * NOTE: This is for testing only. It will be replaced by a uscsi test.
  */
-static int scsa2usb_test_case_2 = 0;
-static int scsa2usb_test_case_3 = 0;
-static int scsa2usb_test_case_4 = 0;
-static int scsa2usb_test_case_7 = 0;
+int scsa2usb_test_case_2 = 0;
+int scsa2usb_test_case_3 = 0;
+int scsa2usb_test_case_4 = 0;
+int scsa2usb_test_case_7 = 0;
 extern int scsa2usb_test_case_8;
-static int scsa2usb_test_case_9 = 0;
+int scsa2usb_test_case_9 = 0;
 extern int scsa2usb_test_case_10;
-static int scsa2usb_test_case_13 = 0;
+int scsa2usb_test_case_13 = 0;
 #endif	/* SCSA2USB_BULK_ONLY_TEST */
 
 

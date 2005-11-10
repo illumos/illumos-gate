@@ -274,6 +274,30 @@ void		ehci_do_byte_stats(ehci_state_t		*ehcip,
 				uint8_t		addr);
 
 /*
+ * check if this ehci controller can support PM
+ */
+int
+ehci_hcdi_pm_support(dev_info_t *dip)
+{
+	ehci_state_t *ehcip = ddi_get_soft_state(ehci_statep,
+				ddi_get_instance(dip));
+
+	if (((ehcip->ehci_vendor_id == PCI_VENDOR_NEC_COMBO) &&
+	    (ehcip->ehci_device_id == PCI_DEVICE_NEC_COMBO)) ||
+
+	    ((ehcip->ehci_vendor_id == PCI_VENDOR_ULi_M1575) &&
+	    (ehcip->ehci_device_id == PCI_DEVICE_ULi_M1575)) ||
+
+	    (ehcip->ehci_vendor_id == PCI_VENDOR_VIA)) {
+
+		return (USB_SUCCESS);
+	}
+
+	return (USB_FAILURE);
+}
+
+
+/*
  * Host Controller Driver (HCD) initialization functions
  */
 
@@ -631,11 +655,11 @@ ehci_register_intrs_and_init_mutex(ehci_state_t	*ehcip)
 	 * Make sure that the interrupt pin is connected to the
 	 * interrupt controller on x86.	 Interrupt line 255 means
 	 * "unknown" or "not connected" (PCI spec 6.2.4, footnote 43).
-	 * If we return failure when interrupt line equals 255, then
+	 * If we would return failure when interrupt line equals 255, then
 	 * high speed devices will be routed to companion host controllers.
-	 * Actually it is not necessary to return failure here, and
-	 * o/uhci codes don't check the interrupt line too.
-	 * But it's good to print message here for debug.
+	 * However, it is not necessary to return failure here, and
+	 * o/uhci codes don't check the interrupt line either.
+	 * But it's good to log a message here for debug purposes.
 	 */
 	iline = pci_config_get8(ehcip->ehci_config_handle,
 	    PCI_CONF_ILINE);
@@ -964,7 +988,7 @@ ehci_init_ctlr(ehci_state_t	*ehcip)
 	 * VIA chips have some issues and may not work reliably.
 	 * Revisions >= 0x80 are part of a southbridge and appear
 	 * to be reliable with the workaround.
-	 * For revisions < 0x80, if we  were bound using class
+	 * For revisions < 0x80, if we	were bound using class
 	 * complain, else proceed. This will allow the user to
 	 * bind ehci specifically to this chip and not have the
 	 * warnings
@@ -1415,6 +1439,7 @@ ehci_alloc_hcdi_ops(ehci_state_t	*ehcip)
 
 	usba_hcdi_ops->usba_hcdi_ops_version = HCDI_OPS_VERSION;
 
+	usba_hcdi_ops->usba_hcdi_pm_support = ehci_hcdi_pm_support;
 	usba_hcdi_ops->usba_hcdi_pipe_open = ehci_hcdi_pipe_open;
 	usba_hcdi_ops->usba_hcdi_pipe_close = ehci_hcdi_pipe_close;
 
@@ -1489,9 +1514,6 @@ ehci_cleanup(ehci_state_t	*ehcip)
 
 		mutex_enter(&ehcip->ehci_int_mutex);
 
-		/* Route all Root hub ports to Classic host controller */
-		Set_OpReg(ehci_config_flag, EHCI_CONFIG_FLAG_CLASSIC);
-
 		/* Disable all EHCI QH list processing */
 		Set_OpReg(ehci_command, (Get_OpReg(ehci_command) &
 		    ~(EHCI_CMD_ASYNC_SCHED_ENABLE |
@@ -1502,6 +1524,9 @@ ehci_cleanup(ehci_state_t	*ehcip)
 
 		/* wait for the next SOF */
 		(void) ehci_wait_for_sof(ehcip);
+
+		/* Route all Root hub ports to Classic host controller */
+		Set_OpReg(ehci_config_flag, EHCI_CONFIG_FLAG_CLASSIC);
 
 		/* Stop the EHCI host controller */
 		Set_OpReg(ehci_command,

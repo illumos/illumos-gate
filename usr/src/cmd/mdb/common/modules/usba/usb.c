@@ -146,7 +146,7 @@ usba_device2dip(uintptr_t usb_dev_addr, uintptr_t *dip_addr)
 	cb_data.u2d_dip_addr = dip_addr;
 	cb_data.u2d_found = FALSE;
 
-	if (mdb_vread((void *)&usb_dev, sizeof (usba_device_t),
+	if (mdb_vread(&usb_dev, sizeof (usba_device_t),
 	    usb_dev_addr) == -1) {
 		mdb_warn("failed to read usba_device struct");
 
@@ -159,7 +159,7 @@ usba_device2dip(uintptr_t usb_dev_addr, uintptr_t *dip_addr)
 	 * find_dip does).
 	 * Result is placed in cb_data.dip_addr.
 	 */
-	if (mdb_pwalk("devinfo_children", find_dip, (void *)&cb_data,
+	if (mdb_pwalk("devinfo_children", find_dip, &cb_data,
 	    (uintptr_t)usb_dev.usb_root_hub_dip) != 0) {
 		mdb_warn("failed to walk devinfo_children");
 
@@ -251,7 +251,7 @@ usb_pipe_handle_walk_init(mdb_walk_state_t *wsp)
 	 * Read the usb_ph_list array into local memory.
 	 * Set start address to first element/endpoint in usb_pipehandle_list
 	 */
-	if (mdb_vread((void *)wsp->walk_data,
+	if (mdb_vread(wsp->walk_data,
 	    (sizeof (usba_ph_impl_t)) * USBA_N_ENDPOINTS,
 	    (uintptr_t)((size_t)(wsp->walk_addr) +
 	    offsetof(usba_device_t, usb_ph_list))) == -1) {
@@ -411,7 +411,7 @@ usba_device_walk_init(mdb_walk_state_t *wsp)
 		return (WALK_ERR);
 	}
 
-	if (mdb_readvar((void*)&list_entry, "usba_device_list") == -1) {
+	if (mdb_readvar(&list_entry, "usba_device_list") == -1) {
 		mdb_warn("failed to read usba_device_list");
 
 		return (WALK_ERR);
@@ -493,7 +493,7 @@ usba_device(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	/* Figure out what driver (name) is attached to this node. */
 	(void) mdb_devinfo2driver(dip_addr, (char *)dname, sizeof (dname));
 
-	if (mdb_vread((void *)&devinfo, sizeof (struct dev_info),
+	if (mdb_vread(&devinfo, sizeof (struct dev_info),
 	    dip_addr) == -1) {
 		mdb_warn("failed to read devinfo");
 
@@ -516,7 +516,7 @@ usba_device(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		usb_dev_descr_t	usb_dev_descr;
 		usba_device_t	usba_device_struct;
 
-		if (mdb_vread((void *)&usba_device_struct,
+		if (mdb_vread(&usba_device_struct,
 		    sizeof (usba_device_t), addr) == -1) {
 			mdb_warn("failed to read usba_device struct");
 
@@ -676,7 +676,7 @@ usba_debug_buf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 	}
 
-	if (mdb_readvar((void*)&being_cleared, "usba_clear_debug_buf_flag") ==
+	if (mdb_readvar(&being_cleared, "usba_clear_debug_buf_flag") ==
 	    -1) {
 		mdb_warn("failed to read usba_clear_debug_buf_flag");
 
@@ -687,7 +687,7 @@ usba_debug_buf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_OK);
 	}
 
-	if (mdb_readvar((void*)&debug_buf_addr, "usba_debug_buf") == -1) {
+	if (mdb_readvar(&debug_buf_addr, "usba_debug_buf") == -1) {
 		mdb_warn("failed to read usba_debug_buf");
 
 		return (DCMD_ERR);
@@ -700,7 +700,7 @@ usba_debug_buf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 
-	if (mdb_readvar((void*)&debug_buf_size, "usba_debug_buf_size") == -1) {
+	if (mdb_readvar(&debug_buf_size, "usba_debug_buf_size") == -1) {
 		mdb_warn("failed to read usba_debug_buf_size");
 
 		return (DCMD_ERR);
@@ -709,7 +709,7 @@ usba_debug_buf(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	debug_buf_size += USB_DEBUG_SIZE_EXTRA_ALLOC;
 	local_debug_buf = (char *)mdb_alloc(debug_buf_size, UM_SLEEP | UM_GC);
 
-	if ((int)(mdb_vread(local_debug_buf, debug_buf_size,
+	if ((mdb_vread(local_debug_buf, debug_buf_size,
 	    (uintptr_t)debug_buf_addr)) == -1) {
 		mdb_warn("failed to read usba_debug_buf at %p",
 		    local_debug_buf);
