@@ -1330,14 +1330,15 @@ segdev_softunlock(
 	if (dhp_head != NULL) {
 		devmap_handle_t *dhp;
 		size_t mlen;
+		size_t tlen = len;
 		ulong_t off;
 
 		dhp = devmap_find_handle(dhp_head, addr);
 		ASSERT(dhp != NULL);
 
 		off = (ulong_t)(addr - dhp->dh_uvaddr);
-		while (len != 0) {
-			mlen = MIN(len, (dhp->dh_len - off));
+		while (tlen != 0) {
+			mlen = MIN(tlen, (dhp->dh_len - off));
 
 			/*
 			 * unlock segkp memory, locked during F_SOFTLOCK
@@ -1356,7 +1357,7 @@ segdev_softunlock(
 					btopr(mlen), F_SOFTLOCK);
 			}
 
-			len -= mlen;
+			tlen -= mlen;
 			dhp = dhp->dh_next;
 			off = 0;
 		}
