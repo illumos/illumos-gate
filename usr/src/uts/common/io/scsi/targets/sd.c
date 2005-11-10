@@ -4622,20 +4622,6 @@ sd_read_fdisk(struct sd_lun *un, uint_t capacity, int lbasize, int path_flag)
 		}
 	}
 
-	/*
-	 * Next, look for 'no-bef-lba-access' prop on parent.
-	 * Its presence means the realmode driver doesn't support
-	 * LBA, so the target driver shouldn't advertise it as ok.
-	 * This should be a temporary condition; one day all
-	 * BEFs should support the LBA access functions.
-	 */
-	if ((lba != 0) && (ddi_getprop(DDI_DEV_T_ANY,
-	    ddi_get_parent(SD_DEVINFO(un)), DDI_PROP_DONTPASS,
-	    "no-bef-lba-access", 0) != 0)) {
-		/* BEF doesn't support LBA; don't advertise it as ok */
-		lba = 0;
-	}
-
 	if (lba != 0) {
 		dev_t dev = sd_make_device(SD_DEVINFO(un));
 
