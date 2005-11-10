@@ -992,6 +992,13 @@ process_devinfo_tree()
 		} else {
 			vprint(CHATTY_MID, "%sattaching all drivers\n", fcn);
 			flags |= DINFOFORCE;
+			if (cleanup) {
+				/*
+				 * remove dangling entries from /etc/devices
+				 * files.
+				 */
+				flags |= DINFOCLEANUP;
+			}
 		}
 	}
 
@@ -1011,13 +1018,6 @@ process_devinfo_tree()
 
 	/* handle post-cleanup operations desired by the modules. */
 	pre_and_post_cleanup(RM_POST);
-
-	/*
-	 * Remove dangling entries from /etc/devices/devid_cache
-	 * if we forceloaded the entire device tree.
-	 */
-	if (cleanup && (flags & DINFOFORCE) == 0)
-		(void) modctl(MODCLEANUP, NULL, 0, NULL);
 
 	unlock_dev(SYNC_STATE);
 }

@@ -1093,7 +1093,6 @@ prt_mod(private_t *pri, int raw, long val)	/* print modctl() code */
 		case MODALLOCPRIV:	s = "MODALLOCPRIV";	break;
 		case MODGETDEVPOLICYBYNAME:
 					s = "MODGETDEVPOLICYBYNAME"; break;
-		case MODCLEANUP:	s = "MODCLEANUP"; break;
 		case MODLOADMINORPERM:	s = "MODLOADMINORPERM"; break;
 		case MODADDMINORPERM:	s = "MODADDMINORPERM"; break;
 		case MODREMMINORPERM:	s = "MODREMMINORPERM"; break;

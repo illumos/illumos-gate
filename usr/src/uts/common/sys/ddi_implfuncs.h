@@ -255,6 +255,7 @@ void ddi_rele_driver(major_t);
  */
 void i_ddi_devices_init(void);
 void i_ddi_read_devices_files(void);
+void i_ddi_clean_devices_files(void);
 
 int i_ddi_devi_get_devid(dev_t, dev_info_t *, ddi_devid_t *);
 
@@ -262,7 +263,6 @@ int e_ddi_devid_discovery(ddi_devid_t);
 
 int e_devid_cache_register(dev_info_t *, ddi_devid_t);
 void e_devid_cache_unregister(dev_info_t *);
-void e_devid_cache_cleanup(void);
 
 int e_devid_cache_to_devt_list(ddi_devid_t, char *, int *, dev_t **);
 void e_devid_cache_free_devt_list(int, dev_t *);

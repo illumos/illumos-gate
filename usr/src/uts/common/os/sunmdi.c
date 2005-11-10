@@ -64,6 +64,7 @@
 #include <sys/taskq.h>
 #include <sys/epm.h>
 #include <sys/sunpm.h>
+#include <sys/modhash.h>
 
 #ifdef	DEBUG
 #include <sys/debug.h>
@@ -107,13 +108,27 @@ static int	mdi_client_table_size = CLIENT_HASH_TABLE_SIZE;
 taskq_t				*mdi_taskq;
 static uint_t			mdi_taskq_n_threads = MDI_TASKQ_N_THREADS;
 
-static int		mdi_max_bus_config_threads = 100;
+#define	TICKS_PER_SECOND	(drv_usectohz(1000000))
+
 /*
- * To reduce unnecessary BUS_CONFIG_ALLs, do not BUS_CONFIG_ALL phcis in the
- * context of a BUS_CONFIG_ONE if a BUS_CONFIG_ALL has already been performed
- * in the last mdi_bus_config_timeout seconds.
+ * The data should be "quiet" for this interval (in seconds) before the
+ * vhci cached data is flushed to the disk.
  */
-static int		mdi_bus_config_timeout = 60;	/* in seconds */
+static int mdi_vhcache_flush_delay = 10;
+
+/* number of seconds the vhcache flush daemon will sleep idle before exiting */
+static int mdi_vhcache_flush_daemon_idle_time = 60;
+
+/*
+ * number of seconds the asynchronous configuration thread will sleep idle
+ * before exiting.
+ */
+static int mdi_async_config_idle_time = 600;
+
+static int mdi_bus_config_cache_hash_size = 256;
+
+/* turns off multithreaded configuration for certain operations */
+static int mdi_mtc_off = 0;
 
 /*
  * MDI component property name/value string definitions
@@ -181,8 +196,7 @@ static void		i_mdi_phci_lock(mdi_phci_t *, mdi_pathinfo_t *);
 static void		i_mdi_phci_get_client_lock(mdi_phci_t *,
 			    mdi_client_t *);
 static void		i_mdi_phci_unlock(mdi_phci_t *);
-static mdi_pathinfo_t	*i_mdi_pi_alloc(mdi_phci_t *, char *,
-			    mdi_client_t *, int);
+static mdi_pathinfo_t	*i_mdi_pi_alloc(mdi_phci_t *, char *, mdi_client_t *);
 static void		i_mdi_phci_add_path(mdi_phci_t *, mdi_pathinfo_t *);
 static void		i_mdi_client_add_path(mdi_client_t *, mdi_pathinfo_t *);
 static void		i_mdi_pi_free(mdi_phci_t *ph, mdi_pathinfo_t *,
@@ -195,14 +209,14 @@ static int		i_mdi_pi_state_change(mdi_pathinfo_t *,
 			    mdi_pathinfo_state_t, int);
 static int		i_mdi_pi_offline(mdi_pathinfo_t *, int);
 static dev_info_t	*i_mdi_devinfo_create(mdi_vhci_t *, char *, char *,
-			    char **, int, int);
+			    char **, int);
 static dev_info_t	*i_mdi_devinfo_find(mdi_vhci_t *, char *, char *);
 static int		i_mdi_devinfo_remove(dev_info_t *, dev_info_t *, int);
 static int		i_mdi_is_child_present(dev_info_t *, dev_info_t *);
-static mdi_client_t	*i_mdi_client_alloc(mdi_vhci_t *, char *, char *, int);
+static mdi_client_t	*i_mdi_client_alloc(mdi_vhci_t *, char *, char *);
 static void		i_mdi_client_enlist_table(mdi_vhci_t *, mdi_client_t *);
 static void		i_mdi_client_delist_table(mdi_vhci_t *, mdi_client_t *);
-static mdi_client_t	*i_mdi_client_find(mdi_vhci_t *, char *);
+static mdi_client_t	*i_mdi_client_find(mdi_vhci_t *, char *, char *);
 static void		i_mdi_client_update_state(mdi_client_t *);
 static int		i_mdi_client_compute_state(mdi_client_t *,
 			    mdi_phci_t *);
@@ -224,6 +238,33 @@ static int		i_mdi_get_hash_key(char *);
 static int		i_map_nvlist_error_to_mdi(int);
 static void		i_mdi_report_path_state(mdi_client_t *,
 			    mdi_pathinfo_t *);
+
+static void		setup_vhci_cache(mdi_vhci_t *);
+static int		destroy_vhci_cache(mdi_vhci_t *);
+static void		setup_phci_driver_list(mdi_vhci_t *);
+static void		free_phci_driver_list(mdi_vhci_config_t *);
+static int		stop_vhcache_async_threads(mdi_vhci_config_t *);
+static boolean_t	stop_vhcache_flush_thread(void *, int);
+static void		free_string_array(char **, int);
+static void		free_vhcache_phci(mdi_vhcache_phci_t *);
+static void		free_vhcache_pathinfo(mdi_vhcache_pathinfo_t *);
+static void		free_vhcache_client(mdi_vhcache_client_t *);
+static int		mainnvl_to_vhcache(mdi_vhci_cache_t *, nvlist_t *);
+static nvlist_t		*vhcache_to_mainnvl(mdi_vhci_cache_t *);
+static void		vhcache_phci_add(mdi_vhci_config_t *, mdi_phci_t *);
+static void		vhcache_phci_remove(mdi_vhci_config_t *, mdi_phci_t *);
+static void		vhcache_pi_add(mdi_vhci_config_t *,
+			    struct mdi_pathinfo *);
+static void		vhcache_pi_remove(mdi_vhci_config_t *,
+			    struct mdi_pathinfo *);
+static void		free_phclient_path_list(mdi_phys_path_t *);
+static void		sort_vhcache_paths(mdi_vhcache_client_t *);
+static int		flush_vhcache(mdi_vhci_config_t *, int);
+static void		vhcache_dirty(mdi_vhci_config_t *);
+static void		free_async_client_config(mdi_async_client_config_t *);
+static nvlist_t		*read_on_disk_vhci_cache(char *);
+extern int		fread_nvlist(char *, nvlist_t **);
+extern int		fwrite_nvlist(char *, nvlist_t *);
 
 /* called once when first vhci registers with mdi */
 static void
@@ -343,11 +384,7 @@ mdi_vhci_register(char *class, dev_info_t *vdip, mdi_vhci_ops_t *vops,
 		vh->vh_dip = vdip;
 		vh->vh_ops = vops;
 
-		/*
-		 * other members of vh_bus_config are initialized by
-		 * the above kmem_zalloc of the vhci structure.
-		 */
-		cv_init(&vh->vh_bus_config.vhc_cv, NULL, CV_DRIVER, NULL);
+		setup_vhci_cache(vh);
 
 		if (mdi_vhci_head == NULL) {
 			mdi_vhci_head = vh;
@@ -387,7 +424,6 @@ int
 mdi_vhci_unregister(dev_info_t *vdip, int flags)
 {
 	mdi_vhci_t	*found, *vh, *prev = NULL;
-	mdi_phci_config_t *phc, *next_phc;
 
 	/*
 	 * Check for invalid VHCI
@@ -416,9 +452,7 @@ mdi_vhci_unregister(dev_info_t *vdip, int flags)
 	 * should have been unregistered, before a vHCI can be
 	 * unregistered.
 	 */
-	if (vh->vh_phci_count || vh->vh_client_count) {
-		MDI_DEBUG(1, (CE_NOTE, NULL,
-		    "!mdi_vhci_unregister: pHCI in registered state.\n"));
+	if (vh->vh_phci_count || vh->vh_client_count || vh->vh_refcnt) {
 		mutex_exit(&mdi_mutex);
 		return (MDI_FAILURE);
 	}
@@ -435,31 +469,28 @@ mdi_vhci_unregister(dev_info_t *vdip, int flags)
 		mdi_vhci_tail = prev;
 	}
 
-	vh->vh_ops = NULL;
 	mdi_vhci_count--;
 	mutex_exit(&mdi_mutex);
+
+	if (destroy_vhci_cache(vh) != MDI_SUCCESS) {
+		/* add vhci to the global list */
+		mutex_enter(&mdi_mutex);
+		if (mdi_vhci_head == NULL)
+			mdi_vhci_head = vh;
+		else
+			mdi_vhci_tail->vh_next = vh;
+		mdi_vhci_tail = vh;
+		mdi_vhci_count++;
+		mutex_exit(&mdi_mutex);
+		return (MDI_FAILURE);
+	}
+
+	vh->vh_ops = NULL;
 	DEVI(vdip)->devi_mdi_component &= ~MDI_COMPONENT_VHCI;
 	DEVI(vdip)->devi_mdi_xhci = NULL;
 	kmem_free(vh->vh_class, strlen(vh->vh_class)+1);
 	kmem_free(vh->vh_client_table,
 	    mdi_client_table_size * sizeof (struct client_hash));
-
-	/*
-	 * there must be no more tasks on the bus config taskq as the vhci
-	 * driver can not be detached while bus config is in progress.
-	 */
-	ASSERT(vh->vh_bus_config.vhc_start_time == 0);
-
-	if (vh->vh_bus_config.vhc_taskq != NULL)
-		taskq_destroy(vh->vh_bus_config.vhc_taskq);
-
-	for (phc = vh->vh_bus_config.vhc_phc; phc != NULL; phc = next_phc) {
-		next_phc = phc->phc_next;
-		kmem_free(phc, sizeof (*phc));
-	}
-
-	cv_destroy(&vh->vh_bus_config.vhc_cv);
-
 	kmem_free(vh, sizeof (mdi_vhci_t));
 	return (MDI_SUCCESS);
 }
@@ -573,6 +604,8 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
 	DEVI(pdip)->devi_mdi_component |= MDI_COMPONENT_PHCI;
 	DEVI(pdip)->devi_mdi_xhci = (caddr_t)ph;
 
+	vhcache_phci_add(vh->vh_config, ph);
+
 	mutex_enter(&mdi_mutex);
 	if (vh->vh_phci_head == NULL) {
 		vh->vh_phci_head = ph;
@@ -582,8 +615,6 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
 	}
 	vh->vh_phci_tail = ph;
 	vh->vh_phci_count++;
-	/* to force discovery of all phci children during busconfig */
-	vh->vh_bus_config.vhc_cutoff_time = -1;
 	mutex_exit(&mdi_mutex);
 	return (MDI_SUCCESS);
 }
@@ -645,27 +676,9 @@ mdi_phci_unregister(dev_info_t *pdip, int flags)
 
 	vh->vh_phci_count--;
 
-	/*
-	 * If no busconfig is in progress, release the phci busconfig resources.
-	 * We only need vh->vh_phci_count of busconfig resources.
-	 */
-	if (vh->vh_bus_config.vhc_start_time == 0 &&
-	    vh->vh_bus_config.vhc_phc_cnt > vh->vh_phci_count) {
-		int count;
-
-		count = vh->vh_bus_config.vhc_phc_cnt - vh->vh_phci_count;
-		while (count--) {
-			mdi_phci_config_t *phc;
-
-			phc = vh->vh_bus_config.vhc_phc;
-			vh->vh_bus_config.vhc_phc = phc->phc_next;
-			kmem_free(phc, sizeof (*phc));
-		}
-		vh->vh_bus_config.vhc_phc_cnt = vh->vh_phci_count;
-	}
-
 	mutex_exit(&mdi_mutex);
 
+	vhcache_phci_remove(vh->vh_config, ph);
 	cv_destroy(&ph->ph_unstable_cv);
 	cv_destroy(&ph->ph_powerchange_cv);
 	mutex_destroy(&ph->ph_mutex);
@@ -836,7 +849,7 @@ i_mdi_phci_unlock(mdi_phci_t *ph)
  */
 static dev_info_t *
 i_mdi_devinfo_create(mdi_vhci_t *vh, char *name, char *guid,
-	char **compatible, int ncompatible, int flags)
+	char **compatible, int ncompatible)
 {
 	dev_info_t *cdip = NULL;
 
@@ -851,13 +864,7 @@ i_mdi_devinfo_create(mdi_vhci_t *vh, char *name, char *guid,
 			(void *)cdip);
 	}
 
-	if (flags == DDI_SLEEP) {
-		ndi_devi_alloc_sleep(vh->vh_dip, name,
-		    DEVI_SID_NODEID, &cdip);
-	} else {
-		(void) ndi_devi_alloc(vh->vh_dip, name,
-		    DEVI_SID_NODEID, &cdip);
-	}
+	ndi_devi_alloc_sleep(vh->vh_dip, name, DEVI_SID_NODEID, &cdip);
 	if (cdip == NULL)
 		goto fail;
 
@@ -1058,38 +1065,24 @@ i_mdi_client_unlock(mdi_client_t *ct)
  */
 /*ARGSUSED*/
 static mdi_client_t *
-i_mdi_client_alloc(mdi_vhci_t *vh, char *name, char *lguid, int flags)
+i_mdi_client_alloc(mdi_vhci_t *vh, char *name, char *lguid)
 {
 	mdi_client_t	*ct;
-	char		*drvname = NULL;
-	char		*guid = NULL;
-	client_lb_args_t 	*lb_args = NULL;
 
 	ASSERT(MUTEX_HELD(&mdi_mutex));
 
 	/*
 	 * Allocate and initialize a component structure.
 	 */
-	ct = kmem_zalloc(sizeof (*ct),
-	    (flags == DDI_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (ct == NULL)
-		goto fail;
+	ct = kmem_zalloc(sizeof (*ct), KM_SLEEP);
 	mutex_init(&ct->ct_mutex, NULL, MUTEX_DEFAULT, NULL);
 	ct->ct_hnext = NULL;
 	ct->ct_hprev = NULL;
 	ct->ct_dip = NULL;
 	ct->ct_vhci = vh;
-	drvname = kmem_alloc(strlen(name) + 1,
-	    (flags == DDI_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (drvname == NULL)
-		goto fail;
-	ct->ct_drvname = drvname;
+	ct->ct_drvname = kmem_alloc(strlen(name) + 1, KM_SLEEP);
 	(void) strcpy(ct->ct_drvname, name);
-	guid = kmem_alloc(strlen(lguid) + 1,
-	    (flags == DDI_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (guid == NULL)
-		goto fail;
-	ct->ct_guid = guid;
+	ct->ct_guid = kmem_alloc(strlen(lguid) + 1, KM_SLEEP);
 	(void) strcpy(ct->ct_guid, lguid);
 	ct->ct_cprivate = NULL;
 	ct->ct_vprivate = NULL;
@@ -1105,33 +1098,18 @@ i_mdi_client_alloc(mdi_vhci_t *vh, char *name, char *lguid, int flags)
 	cv_init(&ct->ct_unstable_cv, NULL, CV_DRIVER, NULL);
 	cv_init(&ct->ct_powerchange_cv, NULL, CV_DRIVER, NULL);
 	ct->ct_lb = vh->vh_lb;
-	lb_args =  kmem_zalloc(sizeof (client_lb_args_t),
-		(flags == DDI_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (lb_args == NULL)
-		goto fail;
-	ct->ct_lb_args = lb_args;
+	ct->ct_lb_args =  kmem_zalloc(sizeof (client_lb_args_t), KM_SLEEP);
 	ct->ct_lb_args->region_size = LOAD_BALANCE_DEFAULT_REGION_SIZE;
 	ct->ct_path_count = 0;
 	ct->ct_path_head = NULL;
 	ct->ct_path_tail = NULL;
 	ct->ct_path_last = NULL;
 
-
 	/*
 	 * Add this client component to our client hash queue
 	 */
 	i_mdi_client_enlist_table(vh, ct);
 	return (ct);
-
-fail:
-	if (guid)
-		kmem_free(guid, strlen(lguid) + 1);
-	if (drvname)
-		kmem_free(drvname, strlen(name) + 1);
-	if (lb_args)
-		kmem_free(lb_args, sizeof (client_lb_args_t));
-	kmem_free(ct, sizeof (*ct));
-	return (NULL);
 }
 
 /*
@@ -1254,7 +1232,7 @@ i_mdi_client_free(mdi_vhci_t *vh, mdi_client_t *ct)
  *		Caller should hold the mdi_mutex
  */
 static mdi_client_t *
-i_mdi_client_find(mdi_vhci_t *vh, char *guid)
+i_mdi_client_find(mdi_vhci_t *vh, char *cname, char *guid)
 {
 	int			index;
 	struct client_hash	*head;
@@ -1266,7 +1244,8 @@ i_mdi_client_find(mdi_vhci_t *vh, char *guid)
 
 	ct = head->ct_hash_head;
 	while (ct != NULL) {
-		if (strcmp(ct->ct_guid, guid) == 0) {
+		if (strcmp(ct->ct_guid, guid) == 0 &&
+		    (cname == NULL || strcmp(ct->ct_drvname, cname) == 0)) {
 			break;
 		}
 		ct = ct->ct_hnext;
@@ -2373,10 +2352,23 @@ mdi_pi_find(dev_info_t *pdip, char *caddr, char *paddr)
 	}
 
 	/*
+	 * XXX - Is the rest of the code in this function really necessary?
+	 * The consumers of mdi_pi_find() can search for the desired pathinfo
+	 * node by calling mdi_pi_find(pdip, NULL, paddr). Irrespective of
+	 * whether the search is based on the pathinfo nodes attached to
+	 * the pHCI or the client node, the result will be the same.
+	 */
+
+	/*
 	 * Find the client device corresponding to 'caddr'
 	 */
 	mutex_enter(&mdi_mutex);
-	ct = i_mdi_client_find(vh, caddr);
+
+	/*
+	 * XXX - Passing NULL to the following function works as long as the
+	 * the client addresses (caddr) are unique per vhci basis.
+	 */
+	ct = i_mdi_client_find(vh, NULL, caddr);
 	if (ct == NULL) {
 		/*
 		 * Client not found, Obviously mdi_pathinfo node has not been
@@ -2444,6 +2436,7 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	mdi_pathinfo_t	*pip = NULL;
 	dev_info_t	*cdip;
 	int		rv = MDI_NOMEM;
+	int		path_allocated = 0;
 
 	if (pdip == NULL || cname == NULL || caddr == NULL || paddr == NULL ||
 	    ret_pip == NULL) {
@@ -2484,16 +2477,12 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 	MDI_PHCI_UNSTABLE(ph);
 	MDI_PHCI_UNLOCK(ph);
 
-	/*
-	 * Look for a client device with matching guid identified by caddr,
-	 * If not found create one
-	 */
+	/* look for a matching client, create one if not found */
 	mutex_enter(&mdi_mutex);
-	ct = i_mdi_client_find(vh, caddr);
+	ct = i_mdi_client_find(vh, cname, caddr);
 	if (ct == NULL) {
-		ct = i_mdi_client_alloc(vh, cname, caddr, flags);
-		if (ct == NULL)
-			goto fail;
+		ct = i_mdi_client_alloc(vh, cname, caddr);
+		ASSERT(ct != NULL);
 	}
 
 	if (ct->ct_dip == NULL) {
@@ -2501,7 +2490,7 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 		 * Allocate a devinfo node
 		 */
 		ct->ct_dip = i_mdi_devinfo_create(vh, cname, caddr,
-		    compatible, ncompatible, flags);
+		    compatible, ncompatible);
 		if (ct->ct_dip == NULL) {
 			(void) i_mdi_client_free(vh, ct);
 			goto fail;
@@ -2529,11 +2518,9 @@ mdi_pi_alloc_compatible(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 		 * This is a new path for this client device.  Allocate and
 		 * initialize a new pathinfo node
 		 */
-		pip = i_mdi_pi_alloc(ph, paddr, ct, flags);
-		if (pip == NULL) {
-			(void) i_mdi_client_free(vh, ct);
-			goto fail;
-		}
+		pip = i_mdi_pi_alloc(ph, paddr, ct);
+		ASSERT(pip != NULL);
+		path_allocated = 1;
 	}
 	rv = MDI_SUCCESS;
 
@@ -2550,6 +2537,10 @@ fail:
 	MDI_PHCI_STABLE(ph);
 	MDI_PHCI_UNLOCK(ph);
 	*ret_pip = pip;
+
+	if (path_allocated)
+		vhcache_pi_add(vh->vh_config, MDI_PI(pip));
+
 	return (rv);
 }
 
@@ -2571,19 +2562,13 @@ mdi_pi_alloc(dev_info_t *pdip, char *cname, char *caddr, char *paddr,
 
 /*ARGSUSED*/
 static mdi_pathinfo_t *
-i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct, int flags)
+i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 {
-	mdi_pathinfo_t	*pip = NULL;
-	char		*pi_addr = NULL;
-	nvlist_t	*pi_prop = NULL;
-
+	mdi_pathinfo_t	*pip;
 	int		ct_circular;
 	int		ph_circular;
 
-	pip = kmem_zalloc(sizeof (struct mdi_pathinfo),
-	    (flags == DDI_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (pip == NULL)
-		goto fail;
+	pip = kmem_zalloc(sizeof (struct mdi_pathinfo), KM_SLEEP);
 	mutex_init(&MDI_PI(pip)->pi_mutex, NULL, MUTEX_DEFAULT, NULL);
 	MDI_PI(pip)->pi_state = MDI_PATHINFO_STATE_INIT |
 	    MDI_PATHINFO_STATE_TRANSIENT;
@@ -2601,17 +2586,10 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct, int flags)
 	cv_init(&MDI_PI(pip)->pi_state_cv, NULL, CV_DEFAULT, NULL);
 	MDI_PI(pip)->pi_client = ct;
 	MDI_PI(pip)->pi_phci = ph;
-	pi_addr =
-	    MDI_PI(pip)->pi_addr = kmem_alloc(strlen(paddr) + 1,
-	    (flags == DDI_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (pi_addr == NULL)
-		goto fail;
+	MDI_PI(pip)->pi_addr = kmem_alloc(strlen(paddr) + 1, KM_SLEEP);
 	(void) strcpy(MDI_PI(pip)->pi_addr, paddr);
-	(void) nvlist_alloc(&pi_prop, NV_UNIQUE_NAME,
-	    (flags == DDI_SLEEP) ? KM_SLEEP : KM_NOSLEEP);
-	if (pi_prop == NULL)
-		goto fail;
-	MDI_PI(pip)->pi_prop = pi_prop;
+	(void) nvlist_alloc(&MDI_PI(pip)->pi_prop, NV_UNIQUE_NAME, KM_SLEEP);
+	ASSERT(MDI_PI(pip)->pi_prop != NULL);
 	MDI_PI(pip)->pi_pprivate = NULL;
 	MDI_PI(pip)->pi_cprivate = NULL;
 	MDI_PI(pip)->pi_vprivate = NULL;
@@ -2635,14 +2613,6 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct, int flags)
 	ndi_devi_exit(ct->ct_dip, ct_circular);
 
 	return (pip);
-
-fail:
-	if (pi_prop)
-		(void) nvlist_free(pi_prop);
-	if (pi_addr)
-		kmem_free(pi_addr, strlen(paddr) + 1);
-	kmem_free(pip, sizeof (struct mdi_pathinfo));
-	return (NULL);
 }
 
 /*
@@ -2788,6 +2758,8 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 	}
 	MDI_PI_UNLOCK(pip);
 
+	vhcache_pi_remove(vh->vh_config, MDI_PI(pip));
+
 	MDI_CLIENT_LOCK(ct);
 
 	/* Prevent further failovers till mdi_mutex is held */
@@ -2833,6 +2805,10 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 	}
 	MDI_CLIENT_UNLOCK(ct);
 	mutex_exit(&mdi_mutex);
+
+	if (rv == MDI_FAILURE)
+		vhcache_pi_add(vh->vh_config, MDI_PI(pip));
+
 	return (rv);
 }
 
@@ -6289,390 +6265,6 @@ mdi_component_is_client(dev_info_t *dip, const char **mdi_class)
 	return (MDI_SUCCESS);
 }
 
-/*
- * XXX This list should include all phci drivers needed during boot time
- * though it currently contains "fp" only.
- * Hopefully, the mechanism provided here will be replaced with a better
- * mechanism by vhci driven enumeration project.
- */
-static char *phci_driver_list[] = { "fp" };
-#define	N_PHCI_DRIVERS	(sizeof (phci_driver_list) / sizeof (char *))
-
-static void
-i_mdi_attach_phci_drivers()
-{
-	int  i;
-	major_t m;
-
-	for (i = 0; i < N_PHCI_DRIVERS; i++) {
-		m = ddi_name_to_major(phci_driver_list[i]);
-		if (m != (major_t)-1) {
-			if (ddi_hold_installed_driver(m) != NULL)
-				ddi_rele_driver(m);
-		}
-	}
-}
-
-/* bus config the specified phci */
-static void
-i_mdi_phci_bus_config(void *arg)
-{
-	mdi_phci_config_t *phc = (mdi_phci_config_t *)arg;
-	mdi_vhci_config_t *vhc;
-	dev_info_t	*ph_dip;
-	int		rv;
-
-	ASSERT(phc);
-	vhc = phc->phc_vhc;
-	ASSERT(vhc->vhc_op == BUS_CONFIG_ALL ||
-	    vhc->vhc_op == BUS_CONFIG_DRIVER);
-
-	/*
-	 * Must have already held the phci parent in
-	 * i_mdi_bus_config_all_phcis().
-	 * First configure the phci itself.
-	 */
-	rv = ndi_devi_config_one(phc->phc_parent_dip, phc->phc_devnm + 1,
-	    &ph_dip, vhc->vhc_flags);
-
-	/* release the hold that i_mdi_bus_config_all_phcis() placed */
-	ndi_rele_devi(phc->phc_parent_dip);
-
-	if (rv == NDI_SUCCESS) {
-		/* now bus config the phci */
-		if (vhc->vhc_op == BUS_CONFIG_DRIVER) {
-			(void) ndi_devi_config_driver(ph_dip, vhc->vhc_flags,
-				vhc->vhc_major);
-		} else
-			(void) ndi_devi_config(ph_dip, vhc->vhc_flags);
-
-		/* release the hold that ndi_devi_config_one() placed */
-		ndi_rele_devi(ph_dip);
-	}
-}
-
-/*
- * Bus config all registered phcis associated with the vhci in parallel.
- * This process guarantees that the child nodes are enumerated under the vhci,
- * but not necessarily attached.
- * op must be BUS_CONFIG_DRIVER or BUS_CONFIG_ALL.
- */
-static int
-i_mdi_bus_config_all_phcis(dev_info_t *vdip, uint_t flags,
-    ddi_bus_config_op_t op, major_t maj, int optimize)
-{
-	mdi_vhci_t		*vh;
-	mdi_phci_t		*ph;
-	mdi_phci_config_t	*phc;
-	int64_t			req_time;
-	int			phci_count, rv;
-	static int		first_time = 1;
-
-	ASSERT(op == BUS_CONFIG_ALL || op == BUS_CONFIG_DRIVER);
-	ASSERT(!DEVI_BUSY_OWNED(vdip));
-
-	MDI_DEBUG(2, (CE_NOTE, vdip,
-	    "!MDI: %s on all phcis: major = %d, flags = 0x%x, optimize = %d\n",
-	    (op == BUS_CONFIG_DRIVER) ? "BUS_CONFIG_DRIVER" : "BUS_CONFIG_ALL",
-	    (int)maj, flags, optimize));
-
-	vh = i_devi_get_vhci(vdip);
-	ASSERT(vh);
-
-	mutex_enter(&mdi_mutex);
-
-	req_time = lbolt64;
-
-	/*
-	 * Reduce unnecessary BUS_CONFIG_ALLs when opening stale
-	 * /dev/[r]dsk links.
-	 */
-	if (optimize && (req_time < vh->vh_bus_config.vhc_cutoff_time)) {
-		mutex_exit(&mdi_mutex);
-		return (MDI_SUCCESS);
-	}
-
-	/*
-	 * To initiate bus configs on all phcis in parallel, create a taskq
-	 * with multiple threads. Since creation of a taskq is a heavy weight
-	 * operation, taskq is created once per vhci and destroyed only when
-	 * vhci unregisters with mdi.
-	 *
-	 * If multiple bus config requests arrive at a time, bus configs on
-	 * phcis are initiated on behalf of one of the requests. Other requests
-	 * wait until the bus configs on phcis is done.
-	 *
-	 * When a BUS_CONFIG_ALL on phcis completes, the following is done
-	 * to avoid more of unnecessary bus configs.
-	 *
-	 *	o all BUS_CONFIG_ALL requests currently waiting with optimize
-	 *	flag set are returned, i.e., no new BUS_CONFIG_ALL is initiated
-	 *	on phcis on behalf of these requests.
-	 *
-	 *	o all BUS_CONFIG_ALL or BUS_CONFIG_DRIVER requests currently
-	 *	waiting but have arrived prior to initiating BUS_CONFIG_ALL on
-	 *	phcis are also returned.
-	 *
-	 * In other cases a new BUS_CONFIG_ALL or BUS_CONFIG_DRIVER is
-	 * initiated on phcis on behalf of a new request.
-	 */
-
-	/* check if a bus config on phcis is in progress */
-	while (vh->vh_bus_config.vhc_start_time != 0) {
-		ddi_bus_config_op_t current_op;
-		int64_t start_time;
-
-		current_op = vh->vh_bus_config.vhc_op;
-		start_time = vh->vh_bus_config.vhc_start_time;
-
-		/* wait until the current bus configs on phcis are done */
-		while (vh->vh_bus_config.vhc_start_time == start_time)
-			cv_wait(&vh->vh_bus_config.vhc_cv, &mdi_mutex);
-
-		if (current_op == BUS_CONFIG_ALL &&
-		    vh->vh_bus_config.vhc_cutoff_time > 0 && (optimize ||
-		    req_time < start_time)) {
-			mutex_exit(&mdi_mutex);
-			return (MDI_SUCCESS);
-		}
-	}
-
-	/*
-	 * At this point we are single threaded until vh_bus_config.start_time
-	 * is reset to 0 at the end of this function.
-	 */
-
-	vh->vh_bus_config.vhc_op = op;
-	vh->vh_bus_config.vhc_major = maj;
-	vh->vh_bus_config.vhc_flags = flags;
-	vh->vh_bus_config.vhc_start_time = lbolt64;
-
-	if (first_time && strcmp(vh->vh_class, MDI_HCI_CLASS_SCSI) == 0) {
-		mutex_exit(&mdi_mutex);
-		i_mdi_attach_phci_drivers();
-		mutex_enter(&mdi_mutex);
-		first_time = 0;
-	}
-
-	ASSERT(vh->vh_phci_count >= 0);
-	if (vh->vh_phci_count == 0) {
-		rv = MDI_SUCCESS;
-		goto out1;
-	}
-
-	/*
-	 * Create a taskq to initiate bus configs in parallel on phcis.
-	 * Taskq allocation can be done in mdi_vhci_register() routine
-	 * instead of here. For most systems, doing it here on demand saves
-	 * resources as this code path is never called most of the times.
-	 */
-	if (vh->vh_bus_config.vhc_taskq == NULL) {
-		/*
-		 * it is ok even if vh->vh_phci_count changes after we release
-		 * the mdi_mutex as phci_count is used just as an
-		 * advisory number to taskq_create.
-		 */
-		phci_count = vh->vh_phci_count;
-		mutex_exit(&mdi_mutex);
-
-		/*
-		 * As we are single threaded, it is ok to access the
-		 * vh_bus_config.taskq member of vh outside of mdi_mutex
-		 */
-		if ((vh->vh_bus_config.vhc_taskq = taskq_create(
-		    "mdi_bus_config_taskq", mdi_max_bus_config_threads,
-		    MDI_TASKQ_PRI, phci_count, INT_MAX,
-		    TASKQ_PREPOPULATE | TASKQ_DYNAMIC)) == NULL) {
-			rv = MDI_FAILURE;
-			goto out;
-		}
-
-		mutex_enter(&mdi_mutex);
-	}
-
-	/* allocate at least vh->vh_phci_count phci bus config structures */
-	while (vh->vh_bus_config.vhc_phc_cnt < vh->vh_phci_count) {
-		int count;
-
-		count = vh->vh_phci_count - vh->vh_bus_config.vhc_phc_cnt;
-		mutex_exit(&mdi_mutex);
-		while (count--) {
-			phc = kmem_alloc(sizeof (*phc), KM_SLEEP);
-			phc->phc_vhc = &vh->vh_bus_config;
-			/*
-			 * there is no need to hold a lock here as we
-			 * are single threaded and no one else manipulates
-			 * the list while we are here.
-			 */
-			phc->phc_next = vh->vh_bus_config.vhc_phc;
-			vh->vh_bus_config.vhc_phc = phc;
-			vh->vh_bus_config.vhc_phc_cnt++;
-		}
-		mutex_enter(&mdi_mutex);
-		/*
-		 * as new phcis could register with mdi after we dropped
-		 * the mdi_mutex, we need to recheck the vh->vh_phci_count.
-		 * Hence the while loop.
-		 */
-	}
-
-	for (ph = vh->vh_phci_head, phc = vh->vh_bus_config.vhc_phc;
-	    ph != NULL; ph = ph->ph_next, phc = phc->phc_next) {
-
-		ASSERT(phc != NULL);
-
-		/* build a phci config handle to be passed to a taskq thread */
-		MDI_PHCI_LOCK(ph);
-		ASSERT(ph->ph_dip);
-
-		/*
-		 * We need to hold the phci dip before bus configuring the phci.
-		 * But placing a hold on the phci dip is not safe here due to
-		 * the race with phci detach. To get around this race,
-		 * we place a hold on the phci dip's parent and note down
-		 * the phci's name@addr. Later, in i_mdi_phci_bus_config(),
-		 * we'll first configure the phci itself before bus
-		 * configuring the phci.
-		 */
-		phc->phc_parent_dip = ddi_get_parent(ph->ph_dip);
-		ndi_hold_devi(phc->phc_parent_dip);
-		(void) ddi_deviname(ph->ph_dip, phc->phc_devnm);
-		MDI_PHCI_UNLOCK(ph);
-	}
-
-	phci_count = vh->vh_phci_count;
-	if (vh->vh_bus_config.vhc_cutoff_time == -1)
-		vh->vh_bus_config.vhc_cutoff_time = 0;
-	mutex_exit(&mdi_mutex);
-
-	MDI_DEBUG(2, (CE_NOTE, vdip,
-	    "!MDI: initiating %s on all phcis, major = %d, flags = 0x%x\n",
-	    (op == BUS_CONFIG_DRIVER) ? "BUS_CONFIG_DRIVER" : "BUS_CONFIG_ALL",
-	    (int)maj, flags));
-
-	/*
-	 * again, no need to hold a lock here as we are single threaded and
-	 * no one else manipulates the list while we are here.
-	 */
-	for (phc = vh->vh_bus_config.vhc_phc; phci_count--;
-	    phc = phc->phc_next) {
-		(void) taskq_dispatch(vh->vh_bus_config.vhc_taskq,
-		    i_mdi_phci_bus_config, phc, TQ_SLEEP);
-	}
-
-	/* wait until all phci bus configs are done */
-	taskq_wait(vh->vh_bus_config.vhc_taskq);
-	rv = MDI_SUCCESS;
-
-out:
-	mutex_enter(&mdi_mutex);
-out1:
-	vh->vh_bus_config.vhc_start_time = 0;
-	if (op == BUS_CONFIG_ALL && vh->vh_bus_config.vhc_cutoff_time != -1) {
-		vh->vh_bus_config.vhc_cutoff_time = lbolt64 +
-		    (int64_t)drv_usectohz(mdi_bus_config_timeout * 1000000);
-	}
-	cv_broadcast(&vh->vh_bus_config.vhc_cv);
-	mutex_exit(&mdi_mutex);
-
-	MDI_DEBUG(2, (CE_NOTE, vdip, "!MDI: %s on all phcis %s\n",
-	    (op == BUS_CONFIG_DRIVER) ? "BUS_CONFIG_DRIVER" : "BUS_CONFIG_ALL",
-	    (rv == MDI_SUCCESS) ? "successful" : "failed"));
-
-	return (rv);
-}
-
-/*
- * A simple bus config implementation for vhcis with the assumption that all
- * phcis are always registered with MDI.
- *
- * BUS_CONFIG_ALL
- *
- * 	Do BUS_CONFIG_ALL on all phcis associated with the vhci.
- *
- * BUS_CONFIG_DRIVER
- *
- * 	Do BUS_CONFIG_DRIVER on all phcis associated with the vhci.
- *
- * BUS_CONFIG_ONE
- *
- *	If the requested child has already been enumerated under the vhci
- *	configure the child and return. Otherwise do BUS_CONFIG_ALL on all
- *	phcis associated with the vhci.
- */
-int
-mdi_vhci_bus_config(dev_info_t *vdip, uint_t flags, ddi_bus_config_op_t op,
-    void *arg, dev_info_t **child)
-{
-	int rv = MDI_SUCCESS;
-
-	/*
-	 * While bus configuring phcis, the phci driver interactions with MDI
-	 * cause child nodes to be enumerated under the vhci node for which
-	 * they need to ndi_devi_enter the vhci node.
-	 *
-	 * Unfortunately, to avoid the deadlock, we ourself can not wait for
-	 * for the bus config operations on phcis to finish while holding the
-	 * ndi_devi_enter lock. To avoid this deadlock, skip bus configs on
-	 * phcis and call the default framework provided bus config function
-	 * if we are called with ndi_devi_enter lock held.
-	 */
-	if (DEVI_BUSY_OWNED(vdip)) {
-		MDI_DEBUG(2, (CE_NOTE, vdip,
-		    "!MDI: vhci bus config: vhci dip is busy owned\n"));
-		goto default_bus_config;
-	}
-
-	switch (op) {
-	case BUS_CONFIG_ONE:
-		/*
-		 * First try to directly configure the requested child.
-		 * This will work only if the requested child has already
-		 * been enumerated under vhci, which is usually the most common
-		 * case.
-		 */
-		if (ndi_busop_bus_config(vdip, flags, op, arg, child, 0) ==
-		    NDI_SUCCESS) {
-			return (MDI_SUCCESS);
-		}
-
-		MDI_DEBUG(2, (CE_NOTE, vdip, "!MDI: BUS_CONFIG_ONE on %s: "
-		    "will do BUS_CONFIG_ALL on all phcis\n", (char *)arg));
-
-		/* now do BUS_CONFIG_ALL on all phcis */
-		rv = i_mdi_bus_config_all_phcis(vdip, flags,
-		    BUS_CONFIG_ALL, -1, 1);
-		break;
-
-	case BUS_CONFIG_DRIVER:
-		rv = i_mdi_bus_config_all_phcis(vdip, flags, op,
-		    (major_t)(uintptr_t)arg, 0);
-		break;
-
-	case BUS_CONFIG_ALL:
-		rv = i_mdi_bus_config_all_phcis(vdip, flags, op, -1, 0);
-		break;
-
-	default:
-		break;
-	}
-
-default_bus_config:
-	/*
-	 * i_mdi_bus_config_all_phcis() guarantees that child nodes are
-	 * enumerated under the vhci, but not necessarily attached.
-	 * Now configure the appropriate child nodes.
-	 */
-	if (rv == MDI_SUCCESS &&
-	    ndi_busop_bus_config(vdip, flags, op, arg, child, 0) ==
-	    NDI_SUCCESS) {
-		return (MDI_SUCCESS);
-	}
-
-	return (MDI_FAILURE);
-}
-
-
 void *
 mdi_client_get_vhci_private(dev_info_t *dip)
 {
@@ -6752,4 +6344,2021 @@ mdi_phci_set_vhci_private(dev_info_t *dip, void *priv)
 		ph = i_devi_get_phci(dip);
 		ph->ph_vprivate = priv;
 	}
+}
+
+/*
+ * List of vhci class names:
+ * A vhci class name must be in this list only if the corresponding vhci
+ * driver intends to use the mdi provided bus config implementation
+ * (i.e., mdi_vhci_bus_config()).
+ */
+static char *vhci_class_list[] = { MDI_HCI_CLASS_SCSI, MDI_HCI_CLASS_IB };
+#define	N_VHCI_CLASSES	(sizeof (vhci_class_list) / sizeof (char *))
+
+/*
+ * Built-in list of phci drivers for every vhci class.
+ * All phci drivers expect iscsi have root device support.
+ */
+static mdi_phci_driver_info_t scsi_phci_driver_list[] = {
+	{ "fp", 1 },
+	{ "iscsi", 0 },
+	{ "ibsrp", 1 }
+	};
+
+static mdi_phci_driver_info_t ib_phci_driver_list[] = { "tavor", 1 };
+
+/*
+ * During boot time, the on-disk vhci cache for every vhci class is read
+ * in the form of an nvlist and stored here.
+ */
+static nvlist_t *vhcache_nvl[N_VHCI_CLASSES];
+
+/* nvpair names in vhci cache nvlist */
+#define	MDI_VHCI_CACHE_VERSION	1
+#define	MDI_NVPNAME_VERSION	"version"
+#define	MDI_NVPNAME_PHCIS	"phcis"
+#define	MDI_NVPNAME_CTADDRMAP	"clientaddrmap"
+
+typedef enum {
+	VHCACHE_NOT_REBUILT,
+	VHCACHE_PARTIALLY_BUILT,
+	VHCACHE_FULLY_BUILT
+} vhcache_build_status_t;
+
+/*
+ * Given vhci class name, return its on-disk vhci cache filename.
+ * Memory for the returned filename which includes the full path is allocated
+ * by this function.
+ */
+static char *
+vhclass2vhcache_filename(char *vhclass)
+{
+	char *filename;
+	int len;
+	static char *fmt = "/etc/devices/mdi_%s_cache";
+
+	/*
+	 * fmt contains the on-disk vhci cache file name format;
+	 * for scsi_vhci the filename is "/etc/devices/mdi_scsi_vhci_cache".
+	 */
+
+	/* the -1 below is to account for "%s" in the format string */
+	len = strlen(fmt) + strlen(vhclass) - 1;
+	filename = kmem_alloc(len, KM_SLEEP);
+	(void) snprintf(filename, len, fmt, vhclass);
+	ASSERT(len == (strlen(filename) + 1));
+	return (filename);
+}
+
+/*
+ * initialize the vhci cache related data structures and read the on-disk
+ * vhci cached data into memory.
+ */
+static void
+setup_vhci_cache(mdi_vhci_t *vh)
+{
+	mdi_vhci_config_t *vhc;
+	mdi_vhci_cache_t *vhcache;
+	int i;
+	nvlist_t *nvl = NULL;
+
+	vhc = kmem_zalloc(sizeof (mdi_vhci_config_t), KM_SLEEP);
+	vh->vh_config = vhc;
+	vhcache = &vhc->vhc_vhcache;
+
+	vhc->vhc_vhcache_filename = vhclass2vhcache_filename(vh->vh_class);
+
+	mutex_init(&vhc->vhc_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&vhc->vhc_cv, NULL, CV_DRIVER, NULL);
+
+	rw_init(&vhcache->vhcache_lock, NULL, RW_DRIVER, NULL);
+
+	/*
+	 * Create string hash; same as mod_hash_create_strhash() except that
+	 * we use NULL key destructor.
+	 */
+	vhcache->vhcache_client_hash = mod_hash_create_extended(vh->vh_class,
+	    mdi_bus_config_cache_hash_size,
+	    mod_hash_null_keydtor, mod_hash_null_valdtor,
+	    mod_hash_bystr, NULL, mod_hash_strkey_cmp, KM_SLEEP);
+
+	setup_phci_driver_list(vh);
+
+	/*
+	 * The on-disk vhci cache is read during booting prior to the
+	 * lights-out period by mdi_read_devices_files().
+	 */
+	for (i = 0; i < N_VHCI_CLASSES; i++) {
+		if (strcmp(vhci_class_list[i], vh->vh_class) == 0) {
+			nvl = vhcache_nvl[i];
+			vhcache_nvl[i] = NULL;
+			break;
+		}
+	}
+
+	/*
+	 * this is to cover the case of some one manually causing unloading
+	 * (or detaching) and reloading (or attaching) of a vhci driver.
+	 */
+	if (nvl == NULL && modrootloaded)
+		nvl = read_on_disk_vhci_cache(vh->vh_class);
+
+	if (nvl != NULL) {
+		rw_enter(&vhcache->vhcache_lock, RW_WRITER);
+		if (mainnvl_to_vhcache(vhcache, nvl) == MDI_SUCCESS)
+			vhcache->vhcache_flags |= MDI_VHCI_CACHE_SETUP_DONE;
+		else  {
+			cmn_err(CE_WARN,
+			    "%s: data file corrupted, will recreate\n",
+			    vhc->vhc_vhcache_filename);
+		}
+		rw_exit(&vhcache->vhcache_lock);
+		nvlist_free(nvl);
+	}
+
+	vhc->vhc_cbid = callb_add(stop_vhcache_flush_thread, vhc,
+	    CB_CL_UADMIN_PRE_VFS, "mdi_vhcache_flush");
+}
+
+/*
+ * free all vhci cache related resources
+ */
+static int
+destroy_vhci_cache(mdi_vhci_t *vh)
+{
+	mdi_vhci_config_t *vhc = vh->vh_config;
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	mdi_vhcache_phci_t *cphci, *cphci_next;
+	mdi_vhcache_client_t *cct, *cct_next;
+	mdi_vhcache_pathinfo_t *cpi, *cpi_next;
+
+	if (stop_vhcache_async_threads(vhc) != MDI_SUCCESS)
+		return (MDI_FAILURE);
+
+	kmem_free(vhc->vhc_vhcache_filename,
+	    strlen(vhc->vhc_vhcache_filename) + 1);
+
+	if (vhc->vhc_phci_driver_list)
+		free_phci_driver_list(vhc);
+
+	mod_hash_destroy_strhash(vhcache->vhcache_client_hash);
+
+	for (cphci = vhcache->vhcache_phci_head; cphci != NULL;
+	    cphci = cphci_next) {
+		cphci_next = cphci->cphci_next;
+		free_vhcache_phci(cphci);
+	}
+
+	for (cct = vhcache->vhcache_client_head; cct != NULL; cct = cct_next) {
+		cct_next = cct->cct_next;
+		for (cpi = cct->cct_cpi_head; cpi != NULL; cpi = cpi_next) {
+			cpi_next = cpi->cpi_next;
+			free_vhcache_pathinfo(cpi);
+		}
+		free_vhcache_client(cct);
+	}
+
+	rw_destroy(&vhcache->vhcache_lock);
+
+	mutex_destroy(&vhc->vhc_lock);
+	cv_destroy(&vhc->vhc_cv);
+	kmem_free(vhc, sizeof (mdi_vhci_config_t));
+	return (MDI_SUCCESS);
+}
+
+/*
+ * Setup the list of phci drivers associated with the specified vhci class.
+ * MDI uses this information to rebuild bus config cache if in case the
+ * cache is not available or corrupted.
+ */
+static void
+setup_phci_driver_list(mdi_vhci_t *vh)
+{
+	mdi_vhci_config_t *vhc = vh->vh_config;
+	mdi_phci_driver_info_t *driver_list;
+	char **driver_list1;
+	uint_t ndrivers, ndrivers1;
+	int i, j;
+
+	if (strcmp(vh->vh_class, MDI_HCI_CLASS_SCSI) == 0) {
+		driver_list = scsi_phci_driver_list;
+		ndrivers = sizeof (scsi_phci_driver_list) /
+		    sizeof (mdi_phci_driver_info_t);
+	} else if (strcmp(vh->vh_class, MDI_HCI_CLASS_IB) == 0) {
+		driver_list = ib_phci_driver_list;
+		ndrivers = sizeof (ib_phci_driver_list) /
+		    sizeof (mdi_phci_driver_info_t);
+	} else {
+		driver_list = NULL;
+		ndrivers = 0;
+	}
+
+	/*
+	 * The driver.conf file of a vhci driver can specify additional
+	 * phci drivers using a project private "phci-drivers" property.
+	 */
+	if (ddi_prop_lookup_string_array(DDI_DEV_T_ANY, vh->vh_dip,
+	    DDI_PROP_DONTPASS, "phci-drivers", &driver_list1,
+	    &ndrivers1) != DDI_PROP_SUCCESS)
+		ndrivers1 = 0;
+
+	vhc->vhc_nphci_drivers = ndrivers + ndrivers1;
+	if (vhc->vhc_nphci_drivers == 0)
+		return;
+
+	vhc->vhc_phci_driver_list = kmem_alloc(
+	    sizeof (mdi_phci_driver_info_t) * vhc->vhc_nphci_drivers, KM_SLEEP);
+
+	for (i = 0; i < ndrivers; i++) {
+		vhc->vhc_phci_driver_list[i].phdriver_name =
+		    i_ddi_strdup(driver_list[i].phdriver_name, KM_SLEEP);
+		vhc->vhc_phci_driver_list[i].phdriver_root_support =
+		    driver_list[i].phdriver_root_support;
+	}
+
+	for (j = 0; j < ndrivers1; j++, i++) {
+		vhc->vhc_phci_driver_list[i].phdriver_name =
+		    i_ddi_strdup(driver_list1[j], KM_SLEEP);
+		vhc->vhc_phci_driver_list[i].phdriver_root_support = 1;
+	}
+
+	if (ndrivers1)
+		ddi_prop_free(driver_list1);
+}
+
+/*
+ * Free the memory allocated for the phci driver list
+ */
+static void
+free_phci_driver_list(mdi_vhci_config_t *vhc)
+{
+	int i;
+
+	if (vhc->vhc_phci_driver_list == NULL)
+		return;
+
+	for (i = 0; i < vhc->vhc_nphci_drivers; i++) {
+		kmem_free(vhc->vhc_phci_driver_list[i].phdriver_name,
+		    strlen(vhc->vhc_phci_driver_list[i].phdriver_name) + 1);
+	}
+
+	kmem_free(vhc->vhc_phci_driver_list,
+	    sizeof (mdi_phci_driver_info_t) * vhc->vhc_nphci_drivers);
+}
+
+/*
+ * Stop all vhci cache related async threads and free their resources.
+ */
+static int
+stop_vhcache_async_threads(mdi_vhci_config_t *vhc)
+{
+	mdi_async_client_config_t *acc, *acc_next;
+
+	mutex_enter(&vhc->vhc_lock);
+	vhc->vhc_flags |= MDI_VHC_EXIT;
+	ASSERT(vhc->vhc_acc_thrcount >= 0);
+	cv_broadcast(&vhc->vhc_cv);
+
+	while ((vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_THREAD) ||
+	    (vhc->vhc_flags & MDI_VHC_BUILD_VHCI_CACHE_THREAD) ||
+	    vhc->vhc_acc_thrcount != 0) {
+		mutex_exit(&vhc->vhc_lock);
+		delay(1);
+		mutex_enter(&vhc->vhc_lock);
+	}
+
+	vhc->vhc_flags &= ~MDI_VHC_EXIT;
+
+	for (acc = vhc->vhc_acc_list_head; acc != NULL; acc = acc_next) {
+		acc_next = acc->acc_next;
+		free_async_client_config(acc);
+	}
+	vhc->vhc_acc_list_head = NULL;
+	vhc->vhc_acc_list_tail = NULL;
+	vhc->vhc_acc_count = 0;
+
+	if (vhc->vhc_flags & MDI_VHC_VHCACHE_DIRTY) {
+		vhc->vhc_flags &= ~MDI_VHC_VHCACHE_DIRTY;
+		mutex_exit(&vhc->vhc_lock);
+		if (flush_vhcache(vhc, 0) != MDI_SUCCESS) {
+			vhcache_dirty(vhc);
+			return (MDI_FAILURE);
+		}
+	} else
+		mutex_exit(&vhc->vhc_lock);
+
+	if (callb_delete(vhc->vhc_cbid) != 0)
+		return (MDI_FAILURE);
+
+	return (MDI_SUCCESS);
+}
+
+/*
+ * Stop vhci cache flush thread
+ */
+/* ARGSUSED */
+static boolean_t
+stop_vhcache_flush_thread(void *arg, int code)
+{
+	mdi_vhci_config_t *vhc = (mdi_vhci_config_t *)arg;
+
+	mutex_enter(&vhc->vhc_lock);
+	vhc->vhc_flags |= MDI_VHC_EXIT;
+	cv_broadcast(&vhc->vhc_cv);
+
+	while (vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_THREAD) {
+		mutex_exit(&vhc->vhc_lock);
+		delay(1);
+		mutex_enter(&vhc->vhc_lock);
+	}
+
+	if (vhc->vhc_flags & MDI_VHC_VHCACHE_DIRTY) {
+		vhc->vhc_flags &= ~MDI_VHC_VHCACHE_DIRTY;
+		mutex_exit(&vhc->vhc_lock);
+		(void) flush_vhcache(vhc, 1);
+	} else
+		mutex_exit(&vhc->vhc_lock);
+
+	return (B_TRUE);
+}
+
+/*
+ * Enqueue the vhcache phci (cphci) at the tail of the list
+ */
+static void
+enqueue_vhcache_phci(mdi_vhci_cache_t *vhcache, mdi_vhcache_phci_t *cphci)
+{
+	cphci->cphci_next = NULL;
+	if (vhcache->vhcache_phci_head == NULL)
+		vhcache->vhcache_phci_head = cphci;
+	else
+		vhcache->vhcache_phci_tail->cphci_next = cphci;
+	vhcache->vhcache_phci_tail = cphci;
+}
+
+/*
+ * Enqueue the vhcache pathinfo (cpi) at the tail of the list
+ */
+static void
+enqueue_tail_vhcache_pathinfo(mdi_vhcache_client_t *cct,
+    mdi_vhcache_pathinfo_t *cpi)
+{
+	cpi->cpi_next = NULL;
+	if (cct->cct_cpi_head == NULL)
+		cct->cct_cpi_head = cpi;
+	else
+		cct->cct_cpi_tail->cpi_next = cpi;
+	cct->cct_cpi_tail = cpi;
+}
+
+/*
+ * Enqueue the vhcache pathinfo (cpi) at the correct location in the
+ * ordered list. All cpis which do not have MDI_CPI_HINT_PATH_DOES_NOT_EXIST
+ * flag set come at the beginning of the list. All cpis which have this
+ * flag set come at the end of the list.
+ */
+static void
+enqueue_vhcache_pathinfo(mdi_vhcache_client_t *cct,
+    mdi_vhcache_pathinfo_t *newcpi)
+{
+	mdi_vhcache_pathinfo_t *cpi, *prev_cpi;
+
+	if (cct->cct_cpi_head == NULL ||
+	    (newcpi->cpi_flags & MDI_CPI_HINT_PATH_DOES_NOT_EXIST))
+		enqueue_tail_vhcache_pathinfo(cct, newcpi);
+	else {
+		for (cpi = cct->cct_cpi_head, prev_cpi = NULL; cpi != NULL &&
+		    !(cpi->cpi_flags & MDI_CPI_HINT_PATH_DOES_NOT_EXIST);
+		    prev_cpi = cpi, cpi = cpi->cpi_next)
+			;
+
+		if (prev_cpi == NULL)
+			cct->cct_cpi_head = newcpi;
+		else
+			prev_cpi->cpi_next = newcpi;
+
+		newcpi->cpi_next = cpi;
+
+		if (cpi == NULL)
+			cct->cct_cpi_tail = newcpi;
+	}
+}
+
+/*
+ * Enqueue the vhcache client (cct) at the tail of the list
+ */
+static void
+enqueue_vhcache_client(mdi_vhci_cache_t *vhcache,
+    mdi_vhcache_client_t *cct)
+{
+	cct->cct_next = NULL;
+	if (vhcache->vhcache_client_head == NULL)
+		vhcache->vhcache_client_head = cct;
+	else
+		vhcache->vhcache_client_tail->cct_next = cct;
+	vhcache->vhcache_client_tail = cct;
+}
+
+static void
+free_string_array(char **str, int nelem)
+{
+	int i;
+
+	if (str) {
+		for (i = 0; i < nelem; i++) {
+			if (str[i])
+				kmem_free(str[i], strlen(str[i]) + 1);
+		}
+		kmem_free(str, sizeof (char *) * nelem);
+	}
+}
+
+static void
+free_vhcache_phci(mdi_vhcache_phci_t *cphci)
+{
+	kmem_free(cphci->cphci_path, strlen(cphci->cphci_path) + 1);
+	kmem_free(cphci, sizeof (*cphci));
+}
+
+static void
+free_vhcache_pathinfo(mdi_vhcache_pathinfo_t *cpi)
+{
+	kmem_free(cpi->cpi_addr, strlen(cpi->cpi_addr) + 1);
+	kmem_free(cpi, sizeof (*cpi));
+}
+
+static void
+free_vhcache_client(mdi_vhcache_client_t *cct)
+{
+	kmem_free(cct->cct_name_addr, strlen(cct->cct_name_addr) + 1);
+	kmem_free(cct, sizeof (*cct));
+}
+
+static char *
+vhcache_mknameaddr(char *ct_name, char *ct_addr, int *ret_len)
+{
+	char *name_addr;
+	int len;
+
+	len = strlen(ct_name) + strlen(ct_addr) + 2;
+	name_addr = kmem_alloc(len, KM_SLEEP);
+	(void) snprintf(name_addr, len, "%s@%s", ct_name, ct_addr);
+
+	if (ret_len)
+		*ret_len = len;
+	return (name_addr);
+}
+
+/*
+ * Copy the contents of paddrnvl to vhci cache.
+ * paddrnvl nvlist contains path information for a vhci client.
+ * See the comment in mainnvl_to_vhcache() for the format of this nvlist.
+ */
+static void
+paddrnvl_to_vhcache(nvlist_t *nvl, mdi_vhcache_phci_t *cphci_list[],
+    mdi_vhcache_client_t *cct)
+{
+	nvpair_t *nvp = NULL;
+	mdi_vhcache_pathinfo_t *cpi;
+	uint_t nelem;
+	uint32_t *val;
+
+	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
+		ASSERT(nvpair_type(nvp) == DATA_TYPE_UINT32_ARRAY);
+		cpi = kmem_zalloc(sizeof (*cpi), KM_SLEEP);
+		cpi->cpi_addr = i_ddi_strdup(nvpair_name(nvp), KM_SLEEP);
+		(void) nvpair_value_uint32_array(nvp, &val, &nelem);
+		ASSERT(nelem == 2);
+		cpi->cpi_cphci = cphci_list[val[0]];
+		cpi->cpi_flags = val[1];
+		enqueue_tail_vhcache_pathinfo(cct, cpi);
+	}
+}
+
+/*
+ * Copy the contents of caddrmapnvl to vhci cache.
+ * caddrmapnvl nvlist contains vhci client address to phci client address
+ * mappings. See the comment in mainnvl_to_vhcache() for the format of
+ * this nvlist.
+ */
+static void
+caddrmapnvl_to_vhcache(mdi_vhci_cache_t *vhcache, nvlist_t *nvl,
+    mdi_vhcache_phci_t *cphci_list[])
+{
+	nvpair_t *nvp = NULL;
+	nvlist_t *paddrnvl;
+	mdi_vhcache_client_t *cct;
+
+	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
+		ASSERT(nvpair_type(nvp) == DATA_TYPE_NVLIST);
+		cct = kmem_zalloc(sizeof (*cct), KM_SLEEP);
+		cct->cct_name_addr = i_ddi_strdup(nvpair_name(nvp), KM_SLEEP);
+		(void) nvpair_value_nvlist(nvp, &paddrnvl);
+		paddrnvl_to_vhcache(paddrnvl, cphci_list, cct);
+		/* the client must contain at least one path */
+		ASSERT(cct->cct_cpi_head != NULL);
+
+		enqueue_vhcache_client(vhcache, cct);
+		(void) mod_hash_insert(vhcache->vhcache_client_hash,
+		    (mod_hash_key_t)cct->cct_name_addr, (mod_hash_val_t)cct);
+	}
+}
+
+/*
+ * Copy the contents of the main nvlist to vhci cache.
+ *
+ * VHCI busconfig cached data is stored in the form of a nvlist on the disk.
+ * The nvlist contains the mappings between the vhci client addresses and
+ * their corresponding phci client addresses.
+ *
+ * The structure of the nvlist is as follows:
+ *
+ * Main nvlist:
+ *	NAME		TYPE		DATA
+ *	version		int32		version number
+ *	phcis		string array	array of phci paths
+ *	clientaddrmap	nvlist_t	c2paddrs_nvl (see below)
+ *
+ * structure of c2paddrs_nvl:
+ *	NAME		TYPE		DATA
+ *	caddr1		nvlist_t	paddrs_nvl1
+ *	caddr2		nvlist_t	paddrs_nvl2
+ *	...
+ * where caddr1, caddr2, ... are vhci client name and addresses in the
+ * form of "<clientname>@<clientaddress>".
+ * (for example: "ssd@2000002037cd9f72");
+ * paddrs_nvl1, paddrs_nvl2, .. are nvlists that contain path information.
+ *
+ * structure of paddrs_nvl:
+ *	NAME		TYPE		DATA
+ *	pi_addr1	uint32_array	(phci-id, cpi_flags)
+ *	pi_addr2	uint32_array	(phci-id, cpi_flags)
+ *	...
+ * where pi_addr1, pi_addr2, ... are bus specific addresses of pathinfo nodes
+ * (so called pi_addrs, for example: "w2100002037cd9f72,0");
+ * phci-ids are integers that identify PHCIs to which the
+ * the bus specific address belongs to. These integers are used as an index
+ * into to the phcis string array in the main nvlist to get the PHCI path.
+ */
+static int
+mainnvl_to_vhcache(mdi_vhci_cache_t *vhcache, nvlist_t *nvl)
+{
+	char **phcis, **phci_namep;
+	uint_t nphcis;
+	mdi_vhcache_phci_t *cphci, **cphci_list;
+	nvlist_t *caddrmapnvl;
+	int32_t ver;
+	int i;
+	size_t cphci_list_size;
+
+	ASSERT(RW_WRITE_HELD(&vhcache->vhcache_lock));
+
+	if (nvlist_lookup_int32(nvl, MDI_NVPNAME_VERSION, &ver) != 0 ||
+	    ver != MDI_VHCI_CACHE_VERSION)
+		return (MDI_FAILURE);
+
+	if (nvlist_lookup_string_array(nvl, MDI_NVPNAME_PHCIS, &phcis,
+	    &nphcis) != 0)
+		return (MDI_SUCCESS);
+
+	ASSERT(nphcis > 0);
+
+	cphci_list_size = sizeof (mdi_vhcache_phci_t *) * nphcis;
+	cphci_list = kmem_alloc(cphci_list_size, KM_SLEEP);
+	for (i = 0, phci_namep = phcis; i < nphcis; i++, phci_namep++) {
+		cphci = kmem_zalloc(sizeof (mdi_vhcache_phci_t), KM_SLEEP);
+		cphci->cphci_path = i_ddi_strdup(*phci_namep, KM_SLEEP);
+		enqueue_vhcache_phci(vhcache, cphci);
+		cphci_list[i] = cphci;
+	}
+
+	ASSERT(vhcache->vhcache_phci_head != NULL);
+
+	if (nvlist_lookup_nvlist(nvl, MDI_NVPNAME_CTADDRMAP, &caddrmapnvl) == 0)
+		caddrmapnvl_to_vhcache(vhcache, caddrmapnvl, cphci_list);
+
+	kmem_free(cphci_list, cphci_list_size);
+	return (MDI_SUCCESS);
+}
+
+/*
+ * Build paddrnvl for the specified client using the information in the
+ * vhci cache and add it to the caddrmapnnvl.
+ * Returns 0 on success, errno on failure.
+ */
+static int
+vhcache_to_paddrnvl(mdi_vhci_cache_t *vhcache, mdi_vhcache_client_t *cct,
+    nvlist_t *caddrmapnvl)
+{
+	mdi_vhcache_pathinfo_t *cpi;
+	nvlist_t *nvl;
+	int err;
+	uint32_t val[2];
+
+	ASSERT(RW_LOCK_HELD(&vhcache->vhcache_lock));
+
+	if ((err = nvlist_alloc(&nvl, 0, KM_SLEEP)) != 0)
+		return (err);
+
+	for (cpi = cct->cct_cpi_head; cpi != NULL; cpi = cpi->cpi_next) {
+		val[0] = cpi->cpi_cphci->cphci_id;
+		val[1] = cpi->cpi_flags;
+		if ((err = nvlist_add_uint32_array(nvl, cpi->cpi_addr, val, 2))
+		    != 0)
+			goto out;
+	}
+
+	err = nvlist_add_nvlist(caddrmapnvl, cct->cct_name_addr, nvl);
+out:
+	nvlist_free(nvl);
+	return (err);
+}
+
+/*
+ * Build caddrmapnvl using the information in the vhci cache
+ * and add it to the mainnvl.
+ * Returns 0 on success, errno on failure.
+ */
+static int
+vhcache_to_caddrmapnvl(mdi_vhci_cache_t *vhcache, nvlist_t *mainnvl)
+{
+	mdi_vhcache_client_t *cct;
+	nvlist_t *nvl;
+	int err;
+
+	ASSERT(RW_LOCK_HELD(&vhcache->vhcache_lock));
+
+	if ((err = nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP)) != 0)
+		return (err);
+
+	for (cct = vhcache->vhcache_client_head; cct != NULL;
+	    cct = cct->cct_next) {
+		if ((err = vhcache_to_paddrnvl(vhcache, cct, nvl)) != 0)
+			goto out;
+	}
+
+	err = nvlist_add_nvlist(mainnvl, MDI_NVPNAME_CTADDRMAP, nvl);
+out:
+	nvlist_free(nvl);
+	return (err);
+}
+
+/*
+ * Build nvlist using the information in the vhci cache.
+ * See the comment in mainnvl_to_vhcache() for the format of the nvlist.
+ * Returns nvl on success, NULL on failure.
+ */
+static nvlist_t *
+vhcache_to_mainnvl(mdi_vhci_cache_t *vhcache)
+{
+	mdi_vhcache_phci_t *cphci;
+	uint_t phci_count;
+	char **phcis;
+	nvlist_t *nvl;
+	int err, i;
+
+	if ((err = nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP)) != 0) {
+		nvl = NULL;
+		goto out;
+	}
+
+	if ((err = nvlist_add_int32(nvl, MDI_NVPNAME_VERSION,
+	    MDI_VHCI_CACHE_VERSION)) != 0)
+		goto out;
+
+	rw_enter(&vhcache->vhcache_lock, RW_READER);
+	if (vhcache->vhcache_phci_head == NULL) {
+		rw_exit(&vhcache->vhcache_lock);
+		return (nvl);
+	}
+
+	phci_count = 0;
+	for (cphci = vhcache->vhcache_phci_head; cphci != NULL;
+	    cphci = cphci->cphci_next)
+		cphci->cphci_id = phci_count++;
+
+	/* build phci pathname list */
+	phcis = kmem_alloc(sizeof (char *) * phci_count, KM_SLEEP);
+	for (cphci = vhcache->vhcache_phci_head, i = 0; cphci != NULL;
+	    cphci = cphci->cphci_next, i++)
+		phcis[i] = i_ddi_strdup(cphci->cphci_path, KM_SLEEP);
+
+	err = nvlist_add_string_array(nvl, MDI_NVPNAME_PHCIS, phcis,
+	    phci_count);
+	free_string_array(phcis, phci_count);
+
+	if (err == 0 &&
+	    (err = vhcache_to_caddrmapnvl(vhcache, nvl)) == 0) {
+		rw_exit(&vhcache->vhcache_lock);
+		return (nvl);
+	}
+
+	rw_exit(&vhcache->vhcache_lock);
+out:
+	if (nvl)
+		nvlist_free(nvl);
+	return (NULL);
+}
+
+/*
+ * Lookup vhcache phci structure for the specified phci path.
+ */
+static mdi_vhcache_phci_t *
+lookup_vhcache_phci_by_name(mdi_vhci_cache_t *vhcache, char *phci_path)
+{
+	mdi_vhcache_phci_t *cphci;
+
+	ASSERT(RW_LOCK_HELD(&vhcache->vhcache_lock));
+
+	for (cphci = vhcache->vhcache_phci_head; cphci != NULL;
+	    cphci = cphci->cphci_next) {
+		if (strcmp(cphci->cphci_path, phci_path) == 0)
+			return (cphci);
+	}
+
+	return (NULL);
+}
+
+/*
+ * Lookup vhcache phci structure for the specified phci.
+ */
+static mdi_vhcache_phci_t *
+lookup_vhcache_phci_by_addr(mdi_vhci_cache_t *vhcache, mdi_phci_t *ph)
+{
+	mdi_vhcache_phci_t *cphci;
+
+	ASSERT(RW_LOCK_HELD(&vhcache->vhcache_lock));
+
+	for (cphci = vhcache->vhcache_phci_head; cphci != NULL;
+	    cphci = cphci->cphci_next) {
+		if (cphci->cphci_phci == ph)
+			return (cphci);
+	}
+
+	return (NULL);
+}
+
+/*
+ * Add the specified phci to the vhci cache if not already present.
+ */
+static void
+vhcache_phci_add(mdi_vhci_config_t *vhc, mdi_phci_t *ph)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	mdi_vhcache_phci_t *cphci;
+	char *pathname;
+	int cache_updated;
+
+	rw_enter(&vhcache->vhcache_lock, RW_WRITER);
+
+	pathname = kmem_alloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(ph->ph_dip, pathname);
+	if ((cphci = lookup_vhcache_phci_by_name(vhcache, pathname))
+	    != NULL) {
+		cphci->cphci_phci = ph;
+		cache_updated = 0;
+	} else {
+		cphci = kmem_zalloc(sizeof (*cphci), KM_SLEEP);
+		cphci->cphci_path = i_ddi_strdup(pathname, KM_SLEEP);
+		cphci->cphci_phci = ph;
+		enqueue_vhcache_phci(vhcache, cphci);
+		cache_updated = 1;
+	}
+	rw_exit(&vhcache->vhcache_lock);
+
+	kmem_free(pathname, MAXPATHLEN);
+	if (cache_updated)
+		vhcache_dirty(vhc);
+}
+
+/*
+ * Remove the reference to the specified phci from the vhci cache.
+ */
+static void
+vhcache_phci_remove(mdi_vhci_config_t *vhc, mdi_phci_t *ph)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	mdi_vhcache_phci_t *cphci;
+
+	rw_enter(&vhcache->vhcache_lock, RW_WRITER);
+	if ((cphci = lookup_vhcache_phci_by_addr(vhcache, ph)) != NULL) {
+		/* do not remove the actual mdi_vhcache_phci structure */
+		cphci->cphci_phci = NULL;
+	}
+	rw_exit(&vhcache->vhcache_lock);
+}
+
+static void
+init_vhcache_lookup_token(mdi_vhcache_lookup_token_t *dst,
+    mdi_vhcache_lookup_token_t *src)
+{
+	if (src == NULL) {
+		dst->lt_cct = NULL;
+		dst->lt_cct_lookup_time = 0;
+	} else {
+		dst->lt_cct = src->lt_cct;
+		dst->lt_cct_lookup_time = src->lt_cct_lookup_time;
+	}
+}
+
+/*
+ * Look up vhcache client for the specified client.
+ */
+static mdi_vhcache_client_t *
+lookup_vhcache_client(mdi_vhci_cache_t *vhcache, char *ct_name, char *ct_addr,
+    mdi_vhcache_lookup_token_t *token)
+{
+	mod_hash_val_t hv;
+	char *name_addr;
+	int len;
+
+	ASSERT(RW_LOCK_HELD(&vhcache->vhcache_lock));
+
+	/*
+	 * If no vhcache clean occurred since the last lookup, we can
+	 * simply return the cct from the last lookup operation.
+	 * It works because ccts are never freed except during the vhcache
+	 * cleanup operation.
+	 */
+	if (token != NULL &&
+	    vhcache->vhcache_clean_time < token->lt_cct_lookup_time)
+		return (token->lt_cct);
+
+	name_addr = vhcache_mknameaddr(ct_name, ct_addr, &len);
+	if (mod_hash_find(vhcache->vhcache_client_hash,
+	    (mod_hash_key_t)name_addr, &hv) == 0) {
+		if (token) {
+			token->lt_cct = (mdi_vhcache_client_t *)hv;
+			token->lt_cct_lookup_time = lbolt64;
+		}
+	} else {
+		if (token) {
+			token->lt_cct = NULL;
+			token->lt_cct_lookup_time = 0;
+		}
+		hv = NULL;
+	}
+	kmem_free(name_addr, len);
+	return ((mdi_vhcache_client_t *)hv);
+}
+
+/*
+ * Add the specified path to the vhci cache if not already present.
+ * Also add the vhcache client for the client corresponding to this path
+ * if it doesn't already exist.
+ */
+static void
+vhcache_pi_add(mdi_vhci_config_t *vhc, struct mdi_pathinfo *pip)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	mdi_vhcache_client_t *cct;
+	mdi_vhcache_pathinfo_t *cpi;
+	mdi_phci_t *ph = pip->pi_phci;
+	mdi_client_t *ct = pip->pi_client;
+	int cache_updated = 0;
+
+	rw_enter(&vhcache->vhcache_lock, RW_WRITER);
+
+	/* if vhcache client for this pip doesn't already exist, add it */
+	if ((cct = lookup_vhcache_client(vhcache, ct->ct_drvname, ct->ct_guid,
+	    NULL)) == NULL) {
+		cct = kmem_zalloc(sizeof (*cct), KM_SLEEP);
+		cct->cct_name_addr = vhcache_mknameaddr(ct->ct_drvname,
+		    ct->ct_guid, NULL);
+		enqueue_vhcache_client(vhcache, cct);
+		(void) mod_hash_insert(vhcache->vhcache_client_hash,
+		    (mod_hash_key_t)cct->cct_name_addr, (mod_hash_val_t)cct);
+		cache_updated = 1;
+	}
+
+	for (cpi = cct->cct_cpi_head; cpi != NULL; cpi = cpi->cpi_next) {
+		if (cpi->cpi_cphci->cphci_phci == ph &&
+		    strcmp(cpi->cpi_addr, pip->pi_addr) == 0) {
+			cpi->cpi_pip = pip;
+			if (cpi->cpi_flags & MDI_CPI_HINT_PATH_DOES_NOT_EXIST) {
+				cpi->cpi_flags &=
+				    ~MDI_CPI_HINT_PATH_DOES_NOT_EXIST;
+				sort_vhcache_paths(cct);
+				cache_updated = 1;
+			}
+			break;
+		}
+	}
+
+	if (cpi == NULL) {
+		cpi = kmem_zalloc(sizeof (*cpi), KM_SLEEP);
+		cpi->cpi_addr = i_ddi_strdup(pip->pi_addr, KM_SLEEP);
+		cpi->cpi_cphci = lookup_vhcache_phci_by_addr(vhcache, ph);
+		ASSERT(cpi->cpi_cphci != NULL);
+		cpi->cpi_pip = pip;
+		enqueue_vhcache_pathinfo(cct, cpi);
+		cache_updated = 1;
+	}
+
+	rw_exit(&vhcache->vhcache_lock);
+
+	if (cache_updated)
+		vhcache_dirty(vhc);
+}
+
+/*
+ * Remove the reference to the specified path from the vhci cache.
+ */
+static void
+vhcache_pi_remove(mdi_vhci_config_t *vhc, struct mdi_pathinfo *pip)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	mdi_client_t *ct = pip->pi_client;
+	mdi_vhcache_client_t *cct;
+	mdi_vhcache_pathinfo_t *cpi;
+
+	rw_enter(&vhcache->vhcache_lock, RW_WRITER);
+	if ((cct = lookup_vhcache_client(vhcache, ct->ct_drvname, ct->ct_guid,
+	    NULL)) != NULL) {
+		for (cpi = cct->cct_cpi_head; cpi != NULL;
+		    cpi = cpi->cpi_next) {
+			if (cpi->cpi_pip == pip) {
+				cpi->cpi_pip = NULL;
+				break;
+			}
+		}
+	}
+	rw_exit(&vhcache->vhcache_lock);
+}
+
+/*
+ * Flush the vhci cache to disk.
+ * Returns MDI_SUCCESS on success, MDI_FAILURE on failure.
+ */
+static int
+flush_vhcache(mdi_vhci_config_t *vhc, int force_flag)
+{
+	nvlist_t *nvl;
+	int err;
+	int rv;
+
+	/*
+	 * It is possible that the system may shutdown before
+	 * i_ddi_io_initialized (during stmsboot for example). To allow for
+	 * flushing the cache in this case do not check for
+	 * i_ddi_io_initialized when force flag is set.
+	 */
+	if (force_flag == 0 && !i_ddi_io_initialized())
+		return (MDI_FAILURE);
+
+	if ((nvl = vhcache_to_mainnvl(&vhc->vhc_vhcache)) != NULL) {
+		err = fwrite_nvlist(vhc->vhc_vhcache_filename, nvl);
+		nvlist_free(nvl);
+	} else
+		err = EFAULT;
+
+	rv = MDI_SUCCESS;
+	mutex_enter(&vhc->vhc_lock);
+	if (err != 0) {
+		if (err == EROFS) {
+			vhc->vhc_flags |= MDI_VHC_READONLY_FS;
+			vhc->vhc_flags &= ~(MDI_VHC_VHCACHE_FLUSH_ERROR |
+			    MDI_VHC_VHCACHE_DIRTY);
+		} else {
+			if (!(vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_ERROR)) {
+				cmn_err(CE_CONT, "%s: update failed\n",
+				    vhc->vhc_vhcache_filename);
+				vhc->vhc_flags |= MDI_VHC_VHCACHE_FLUSH_ERROR;
+			}
+			rv = MDI_FAILURE;
+		}
+	} else if (vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_ERROR) {
+		cmn_err(CE_CONT,
+		    "%s: update now ok\n", vhc->vhc_vhcache_filename);
+		vhc->vhc_flags &= ~MDI_VHC_VHCACHE_FLUSH_ERROR;
+	}
+	mutex_exit(&vhc->vhc_lock);
+
+	return (rv);
+}
+
+/*
+ * Call flush_vhcache() to flush the vhci cache at the scheduled time.
+ * Exits itself if left idle for the idle timeout period.
+ */
+static void
+vhcache_flush_thread(void *arg)
+{
+	mdi_vhci_config_t *vhc = (mdi_vhci_config_t *)arg;
+	clock_t idle_time, quit_at_ticks;
+	callb_cpr_t cprinfo;
+
+	/* number of seconds to sleep idle before exiting */
+	idle_time = mdi_vhcache_flush_daemon_idle_time * TICKS_PER_SECOND;
+
+	CALLB_CPR_INIT(&cprinfo, &vhc->vhc_lock, callb_generic_cpr,
+	    "mdi_vhcache_flush");
+	mutex_enter(&vhc->vhc_lock);
+	for (; ; ) {
+		while (!(vhc->vhc_flags & MDI_VHC_EXIT) &&
+		    (vhc->vhc_flags & MDI_VHC_VHCACHE_DIRTY)) {
+			if (ddi_get_lbolt() < vhc->vhc_flush_at_ticks) {
+				CALLB_CPR_SAFE_BEGIN(&cprinfo);
+				(void) cv_timedwait(&vhc->vhc_cv,
+				    &vhc->vhc_lock, vhc->vhc_flush_at_ticks);
+				CALLB_CPR_SAFE_END(&cprinfo, &vhc->vhc_lock);
+			} else {
+				vhc->vhc_flags &= ~MDI_VHC_VHCACHE_DIRTY;
+				mutex_exit(&vhc->vhc_lock);
+
+				if (flush_vhcache(vhc, 0) != MDI_SUCCESS)
+					vhcache_dirty(vhc);
+
+				mutex_enter(&vhc->vhc_lock);
+			}
+		}
+
+		quit_at_ticks = ddi_get_lbolt() + idle_time;
+
+		while (!(vhc->vhc_flags & MDI_VHC_EXIT) &&
+		    !(vhc->vhc_flags & MDI_VHC_VHCACHE_DIRTY) &&
+		    ddi_get_lbolt() < quit_at_ticks) {
+			CALLB_CPR_SAFE_BEGIN(&cprinfo);
+			(void) cv_timedwait(&vhc->vhc_cv, &vhc->vhc_lock,
+			    quit_at_ticks);
+			CALLB_CPR_SAFE_END(&cprinfo, &vhc->vhc_lock);
+		}
+
+		if ((vhc->vhc_flags & MDI_VHC_EXIT) ||
+		    !(vhc->vhc_flags & MDI_VHC_VHCACHE_DIRTY))
+			goto out;
+	}
+
+out:
+	vhc->vhc_flags &= ~MDI_VHC_VHCACHE_FLUSH_THREAD;
+	/* CALLB_CPR_EXIT releases the vhc->vhc_lock */
+	CALLB_CPR_EXIT(&cprinfo);
+}
+
+/*
+ * Make vhci cache dirty and schedule flushing by vhcache flush thread.
+ */
+static void
+vhcache_dirty(mdi_vhci_config_t *vhc)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	int create_thread;
+
+	rw_enter(&vhcache->vhcache_lock, RW_READER);
+	/* do not flush cache until the cache is fully built */
+	if (!(vhcache->vhcache_flags & MDI_VHCI_CACHE_SETUP_DONE)) {
+		rw_exit(&vhcache->vhcache_lock);
+		return;
+	}
+	rw_exit(&vhcache->vhcache_lock);
+
+	mutex_enter(&vhc->vhc_lock);
+	if (vhc->vhc_flags & MDI_VHC_READONLY_FS) {
+		mutex_exit(&vhc->vhc_lock);
+		return;
+	}
+
+	vhc->vhc_flags |= MDI_VHC_VHCACHE_DIRTY;
+	vhc->vhc_flush_at_ticks = ddi_get_lbolt() +
+	    mdi_vhcache_flush_delay * TICKS_PER_SECOND;
+	if (vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_THREAD) {
+		cv_broadcast(&vhc->vhc_cv);
+		create_thread = 0;
+	} else {
+		vhc->vhc_flags |= MDI_VHC_VHCACHE_FLUSH_THREAD;
+		create_thread = 1;
+	}
+	mutex_exit(&vhc->vhc_lock);
+
+	if (create_thread)
+		(void) thread_create(NULL, 0, vhcache_flush_thread, vhc,
+		    0, &p0, TS_RUN, minclsyspri);
+}
+
+/*
+ * phci bus config structure - one for for each phci bus config operation that
+ * we initiate on behalf of a vhci.
+ */
+typedef struct mdi_phci_bus_config_s {
+	char *phbc_phci_path;
+	struct mdi_vhci_bus_config_s *phbc_vhbusconfig;	/* vhci bus config */
+	struct mdi_phci_bus_config_s *phbc_next;
+} mdi_phci_bus_config_t;
+
+/* vhci bus config structure - one for each vhci bus config operation */
+typedef struct mdi_vhci_bus_config_s {
+	ddi_bus_config_op_t vhbc_op;	/* bus config op */
+	major_t vhbc_op_major;		/* bus config op major */
+	uint_t vhbc_op_flags;		/* bus config op flags */
+	kmutex_t vhbc_lock;
+	kcondvar_t vhbc_cv;
+	int vhbc_thr_count;
+} mdi_vhci_bus_config_t;
+
+/*
+ * bus config the specified phci
+ */
+static void
+bus_config_phci(void *arg)
+{
+	mdi_phci_bus_config_t *phbc = (mdi_phci_bus_config_t *)arg;
+	mdi_vhci_bus_config_t *vhbc = phbc->phbc_vhbusconfig;
+	dev_info_t *ph_dip;
+
+	/*
+	 * first configure all path components upto phci and then configure
+	 * the phci children.
+	 */
+	if ((ph_dip = e_ddi_hold_devi_by_path(phbc->phbc_phci_path, 0))
+	    != NULL) {
+		if (vhbc->vhbc_op == BUS_CONFIG_DRIVER ||
+		    vhbc->vhbc_op == BUS_UNCONFIG_DRIVER) {
+			(void) ndi_devi_config_driver(ph_dip,
+			    vhbc->vhbc_op_flags,
+			    vhbc->vhbc_op_major);
+		} else
+			(void) ndi_devi_config(ph_dip,
+			    vhbc->vhbc_op_flags);
+
+		/* release the hold that e_ddi_hold_devi_by_path() placed */
+		ndi_rele_devi(ph_dip);
+	}
+
+	kmem_free(phbc->phbc_phci_path, strlen(phbc->phbc_phci_path) + 1);
+	kmem_free(phbc, sizeof (*phbc));
+
+	mutex_enter(&vhbc->vhbc_lock);
+	vhbc->vhbc_thr_count--;
+	if (vhbc->vhbc_thr_count == 0)
+		cv_broadcast(&vhbc->vhbc_cv);
+	mutex_exit(&vhbc->vhbc_lock);
+}
+
+/*
+ * Bus config all phcis associated with the vhci in parallel.
+ * op must be BUS_CONFIG_DRIVER or BUS_CONFIG_ALL.
+ */
+static void
+bus_config_all_phcis(mdi_vhci_cache_t *vhcache, uint_t flags,
+    ddi_bus_config_op_t op, major_t maj)
+{
+	mdi_phci_bus_config_t *phbc_head = NULL, *phbc, *phbc_next;
+	mdi_vhci_bus_config_t *vhbc;
+	mdi_vhcache_phci_t *cphci;
+
+	rw_enter(&vhcache->vhcache_lock, RW_READER);
+	if (vhcache->vhcache_phci_head == NULL) {
+		rw_exit(&vhcache->vhcache_lock);
+		return;
+	}
+
+	vhbc = kmem_zalloc(sizeof (*vhbc), KM_SLEEP);
+
+	for (cphci = vhcache->vhcache_phci_head; cphci != NULL;
+	    cphci = cphci->cphci_next) {
+		phbc = kmem_zalloc(sizeof (*phbc), KM_SLEEP);
+		phbc->phbc_phci_path = i_ddi_strdup(cphci->cphci_path,
+		    KM_SLEEP);
+		phbc->phbc_vhbusconfig = vhbc;
+		phbc->phbc_next = phbc_head;
+		phbc_head = phbc;
+		vhbc->vhbc_thr_count++;
+	}
+	rw_exit(&vhcache->vhcache_lock);
+
+	vhbc->vhbc_op = op;
+	vhbc->vhbc_op_major = maj;
+	vhbc->vhbc_op_flags = NDI_NO_EVENT |
+	    (flags & (NDI_CONFIG_REPROBE | NDI_DRV_CONF_REPROBE));
+	mutex_init(&vhbc->vhbc_lock, NULL, MUTEX_DEFAULT, NULL);
+	cv_init(&vhbc->vhbc_cv, NULL, CV_DRIVER, NULL);
+
+	/* now create threads to initiate bus config on all phcis in parallel */
+	for (phbc = phbc_head; phbc != NULL; phbc = phbc_next) {
+		phbc_next = phbc->phbc_next;
+		if (mdi_mtc_off)
+			bus_config_phci((void *)phbc);
+		else
+			(void) thread_create(NULL, 0, bus_config_phci, phbc,
+			    0, &p0, TS_RUN, minclsyspri);
+	}
+
+	mutex_enter(&vhbc->vhbc_lock);
+	/* wait until all threads exit */
+	while (vhbc->vhbc_thr_count > 0)
+		cv_wait(&vhbc->vhbc_cv, &vhbc->vhbc_lock);
+	mutex_exit(&vhbc->vhbc_lock);
+
+	mutex_destroy(&vhbc->vhbc_lock);
+	cv_destroy(&vhbc->vhbc_cv);
+	kmem_free(vhbc, sizeof (*vhbc));
+}
+
+/*
+ * Perform BUS_CONFIG_ONE on the specified child of the phci.
+ * The path includes the child component in addition to the phci path.
+ */
+static int
+bus_config_one_phci_child(char *path)
+{
+	dev_info_t *ph_dip, *child;
+	char *devnm;
+	int rv = MDI_FAILURE;
+
+	/* extract the child component of the phci */
+	devnm = strrchr(path, '/');
+	*devnm++ = '\0';
+
+	/*
+	 * first configure all path components upto phci and then
+	 * configure the phci child.
+	 */
+	if ((ph_dip = e_ddi_hold_devi_by_path(path, 0)) != NULL) {
+		if (ndi_devi_config_one(ph_dip, devnm, &child, NDI_NO_EVENT) ==
+		    NDI_SUCCESS) {
+			/*
+			 * release the hold that ndi_devi_config_one() placed
+			 */
+			ndi_rele_devi(child);
+			rv = MDI_SUCCESS;
+		}
+
+		/* release the hold that e_ddi_hold_devi_by_path() placed */
+		ndi_rele_devi(ph_dip);
+	}
+
+	devnm--;
+	*devnm = '/';
+	return (rv);
+}
+
+/*
+ * Build a list of phci client paths for the specified vhci client.
+ * The list includes only those phci client paths which aren't configured yet.
+ */
+static mdi_phys_path_t *
+build_phclient_path_list(mdi_vhcache_client_t *cct, char *ct_name)
+{
+	mdi_vhcache_pathinfo_t *cpi;
+	mdi_phys_path_t *pp_head = NULL, *pp_tail = NULL, *pp;
+	int config_path, len;
+
+	for (cpi = cct->cct_cpi_head; cpi != NULL; cpi = cpi->cpi_next) {
+		/*
+		 * include only those paths that aren't configured.
+		 */
+		config_path = 0;
+		if (cpi->cpi_pip == NULL)
+			config_path = 1;
+		else {
+			MDI_PI_LOCK(cpi->cpi_pip);
+			if (MDI_PI_IS_INIT(cpi->cpi_pip))
+				config_path = 1;
+			MDI_PI_UNLOCK(cpi->cpi_pip);
+		}
+
+		if (config_path) {
+			pp = kmem_alloc(sizeof (*pp), KM_SLEEP);
+			len = strlen(cpi->cpi_cphci->cphci_path) +
+			    strlen(ct_name) + strlen(cpi->cpi_addr) + 3;
+			pp->phys_path = kmem_alloc(len, KM_SLEEP);
+			(void) snprintf(pp->phys_path, len, "%s/%s@%s",
+			    cpi->cpi_cphci->cphci_path, ct_name,
+			    cpi->cpi_addr);
+			pp->phys_path_next = NULL;
+
+			if (pp_head == NULL)
+				pp_head = pp;
+			else
+				pp_tail->phys_path_next = pp;
+			pp_tail = pp;
+		}
+	}
+
+	return (pp_head);
+}
+
+/*
+ * Free the memory allocated for phci client path list.
+ */
+static void
+free_phclient_path_list(mdi_phys_path_t *pp_head)
+{
+	mdi_phys_path_t *pp, *pp_next;
+
+	for (pp = pp_head; pp != NULL; pp = pp_next) {
+		pp_next = pp->phys_path_next;
+		kmem_free(pp->phys_path, strlen(pp->phys_path) + 1);
+		kmem_free(pp, sizeof (*pp));
+	}
+}
+
+/*
+ * Allocated async client structure and initialize with the specified values.
+ */
+static mdi_async_client_config_t *
+alloc_async_client_config(char *ct_name, char *ct_addr,
+    mdi_phys_path_t *pp_head, mdi_vhcache_lookup_token_t *tok)
+{
+	mdi_async_client_config_t *acc;
+
+	acc = kmem_alloc(sizeof (*acc), KM_SLEEP);
+	acc->acc_ct_name = i_ddi_strdup(ct_name, KM_SLEEP);
+	acc->acc_ct_addr = i_ddi_strdup(ct_addr, KM_SLEEP);
+	acc->acc_phclient_path_list_head = pp_head;
+	init_vhcache_lookup_token(&acc->acc_token, tok);
+	acc->acc_next = NULL;
+	return (acc);
+}
+
+/*
+ * Free the memory allocated for the async client structure and their members.
+ */
+static void
+free_async_client_config(mdi_async_client_config_t *acc)
+{
+	if (acc->acc_phclient_path_list_head)
+		free_phclient_path_list(acc->acc_phclient_path_list_head);
+	kmem_free(acc->acc_ct_name, strlen(acc->acc_ct_name) + 1);
+	kmem_free(acc->acc_ct_addr, strlen(acc->acc_ct_addr) + 1);
+	kmem_free(acc, sizeof (*acc));
+}
+
+/*
+ * Sort vhcache pathinfos (cpis) of the specified client.
+ * All cpis which do not have MDI_CPI_HINT_PATH_DOES_NOT_EXIST
+ * flag set come at the beginning of the list. All cpis which have this
+ * flag set come at the end of the list.
+ */
+static void
+sort_vhcache_paths(mdi_vhcache_client_t *cct)
+{
+	mdi_vhcache_pathinfo_t *cpi, *cpi_next, *cpi_head;
+
+	cpi_head = cct->cct_cpi_head;
+	cct->cct_cpi_head = cct->cct_cpi_tail = NULL;
+	for (cpi = cpi_head; cpi != NULL; cpi = cpi_next) {
+		cpi_next = cpi->cpi_next;
+		enqueue_vhcache_pathinfo(cct, cpi);
+	}
+}
+
+/*
+ * Verify whether MDI_CPI_HINT_PATH_DOES_NOT_EXIST flag setting is correct for
+ * every vhcache pathinfo of the specified client. If not adjust the flag
+ * setting appropriately.
+ *
+ * Note that MDI_CPI_HINT_PATH_DOES_NOT_EXIST flag is persisted in the
+ * on-disk vhci cache. So every time this flag is updated the cache must be
+ * flushed.
+ */
+static void
+adjust_sort_vhcache_paths(mdi_vhci_config_t *vhc, char *ct_name, char *ct_addr,
+    mdi_vhcache_lookup_token_t *tok)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	mdi_vhcache_client_t *cct;
+	mdi_vhcache_pathinfo_t *cpi;
+
+	rw_enter(&vhcache->vhcache_lock, RW_READER);
+	if ((cct = lookup_vhcache_client(vhcache, ct_name, ct_addr, tok))
+	    == NULL) {
+		rw_exit(&vhcache->vhcache_lock);
+		return;
+	}
+
+	/*
+	 * to avoid unnecessary on-disk cache updates, first check if an
+	 * update is really needed. If no update is needed simply return.
+	 */
+	for (cpi = cct->cct_cpi_head; cpi != NULL; cpi = cpi->cpi_next) {
+		if ((cpi->cpi_pip != NULL &&
+		    (cpi->cpi_flags & MDI_CPI_HINT_PATH_DOES_NOT_EXIST)) ||
+		    (cpi->cpi_pip == NULL &&
+		    !(cpi->cpi_flags & MDI_CPI_HINT_PATH_DOES_NOT_EXIST))) {
+			break;
+		}
+	}
+	if (cpi == NULL) {
+		rw_exit(&vhcache->vhcache_lock);
+		return;
+	}
+
+	if (rw_tryupgrade(&vhcache->vhcache_lock) == 0) {
+		rw_exit(&vhcache->vhcache_lock);
+		rw_enter(&vhcache->vhcache_lock, RW_WRITER);
+		if ((cct = lookup_vhcache_client(vhcache, ct_name, ct_addr,
+		    tok)) == NULL) {
+			rw_exit(&vhcache->vhcache_lock);
+			return;
+		}
+	}
+
+	for (cpi = cct->cct_cpi_head; cpi != NULL; cpi = cpi->cpi_next) {
+		if (cpi->cpi_pip != NULL)
+			cpi->cpi_flags &= ~MDI_CPI_HINT_PATH_DOES_NOT_EXIST;
+		else
+			cpi->cpi_flags |= MDI_CPI_HINT_PATH_DOES_NOT_EXIST;
+	}
+	sort_vhcache_paths(cct);
+
+	rw_exit(&vhcache->vhcache_lock);
+	vhcache_dirty(vhc);
+}
+
+/*
+ * Configure all specified paths of the client.
+ */
+static void
+config_client_paths_sync(mdi_vhci_config_t *vhc, char *ct_name, char *ct_addr,
+    mdi_phys_path_t *pp_head, mdi_vhcache_lookup_token_t *tok)
+{
+	mdi_phys_path_t *pp;
+
+	for (pp = pp_head; pp != NULL; pp = pp->phys_path_next)
+		(void) bus_config_one_phci_child(pp->phys_path);
+	adjust_sort_vhcache_paths(vhc, ct_name, ct_addr, tok);
+}
+
+/*
+ * Dequeue elements from vhci async client config list and bus configure
+ * their corresponding phci clients.
+ */
+static void
+config_client_paths_thread(void *arg)
+{
+	mdi_vhci_config_t *vhc = (mdi_vhci_config_t *)arg;
+	mdi_async_client_config_t *acc;
+	clock_t quit_at_ticks;
+	clock_t idle_time = mdi_async_config_idle_time * TICKS_PER_SECOND;
+	callb_cpr_t cprinfo;
+
+	CALLB_CPR_INIT(&cprinfo, &vhc->vhc_lock, callb_generic_cpr,
+	    "mdi_config_client_paths");
+
+	for (; ; ) {
+		quit_at_ticks = ddi_get_lbolt() + idle_time;
+
+		mutex_enter(&vhc->vhc_lock);
+		while (!(vhc->vhc_flags & MDI_VHC_EXIT) &&
+		    vhc->vhc_acc_list_head == NULL &&
+		    ddi_get_lbolt() < quit_at_ticks) {
+			CALLB_CPR_SAFE_BEGIN(&cprinfo);
+			(void) cv_timedwait(&vhc->vhc_cv, &vhc->vhc_lock,
+			    quit_at_ticks);
+			CALLB_CPR_SAFE_END(&cprinfo, &vhc->vhc_lock);
+		}
+
+		if ((vhc->vhc_flags & MDI_VHC_EXIT) ||
+		    vhc->vhc_acc_list_head == NULL)
+			goto out;
+
+		acc = vhc->vhc_acc_list_head;
+		vhc->vhc_acc_list_head = acc->acc_next;
+		if (vhc->vhc_acc_list_head == NULL)
+			vhc->vhc_acc_list_tail = NULL;
+		vhc->vhc_acc_count--;
+		mutex_exit(&vhc->vhc_lock);
+
+		config_client_paths_sync(vhc, acc->acc_ct_name,
+		    acc->acc_ct_addr, acc->acc_phclient_path_list_head,
+		    &acc->acc_token);
+
+		free_async_client_config(acc);
+	}
+
+out:
+	vhc->vhc_acc_thrcount--;
+	/* CALLB_CPR_EXIT releases the vhc->vhc_lock */
+	CALLB_CPR_EXIT(&cprinfo);
+}
+
+/*
+ * Arrange for all the phci client paths (pp_head) for the specified client
+ * to be bus configured asynchronously by a thread.
+ */
+static void
+config_client_paths_async(mdi_vhci_config_t *vhc, char *ct_name, char *ct_addr,
+    mdi_phys_path_t *pp_head, mdi_vhcache_lookup_token_t *tok)
+{
+	mdi_async_client_config_t *acc, *newacc;
+	int create_thread;
+
+	if (pp_head == NULL)
+		return;
+
+	if (mdi_mtc_off) {
+		config_client_paths_sync(vhc, ct_name, ct_addr, pp_head, tok);
+		free_phclient_path_list(pp_head);
+		return;
+	}
+
+	newacc = alloc_async_client_config(ct_name, ct_addr, pp_head, tok);
+	ASSERT(newacc);
+
+	mutex_enter(&vhc->vhc_lock);
+	for (acc = vhc->vhc_acc_list_head; acc != NULL; acc = acc->acc_next) {
+		if (strcmp(ct_name, acc->acc_ct_name) == 0 &&
+		    strcmp(ct_addr, acc->acc_ct_addr) == 0) {
+			free_async_client_config(newacc);
+			mutex_exit(&vhc->vhc_lock);
+			return;
+		}
+	}
+
+	if (vhc->vhc_acc_list_head == NULL)
+		vhc->vhc_acc_list_head = newacc;
+	else
+		vhc->vhc_acc_list_tail->acc_next = newacc;
+	vhc->vhc_acc_list_tail = newacc;
+	vhc->vhc_acc_count++;
+	if (vhc->vhc_acc_count <= vhc->vhc_acc_thrcount) {
+		cv_broadcast(&vhc->vhc_cv);
+		create_thread = 0;
+	} else {
+		vhc->vhc_acc_thrcount++;
+		create_thread = 1;
+	}
+	mutex_exit(&vhc->vhc_lock);
+
+	if (create_thread)
+		(void) thread_create(NULL, 0, config_client_paths_thread, vhc,
+		    0, &p0, TS_RUN, minclsyspri);
+}
+
+/*
+ * Return number of online paths for the specified client.
+ */
+static int
+nonline_paths(mdi_vhcache_client_t *cct)
+{
+	mdi_vhcache_pathinfo_t *cpi;
+	int online_count = 0;
+
+	for (cpi = cct->cct_cpi_head; cpi != NULL; cpi = cpi->cpi_next) {
+		if (cpi->cpi_pip != NULL) {
+			MDI_PI_LOCK(cpi->cpi_pip);
+			if (cpi->cpi_pip->pi_state == MDI_PATHINFO_STATE_ONLINE)
+				online_count++;
+			MDI_PI_UNLOCK(cpi->cpi_pip);
+		}
+	}
+
+	return (online_count);
+}
+
+/*
+ * Bus configure all paths for the specified vhci client.
+ * If at least one path for the client is already online, the remaining paths
+ * will be configured asynchronously. Otherwise, it synchronously configures
+ * the paths until at least one path is online and then rest of the paths
+ * will be configured asynchronously.
+ */
+static void
+config_client_paths(mdi_vhci_config_t *vhc, char *ct_name, char *ct_addr)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	mdi_phys_path_t *pp_head, *pp;
+	mdi_vhcache_client_t *cct;
+	mdi_vhcache_lookup_token_t tok;
+
+	ASSERT(RW_LOCK_HELD(&vhcache->vhcache_lock));
+
+	init_vhcache_lookup_token(&tok, NULL);
+
+	if (ct_name == NULL || ct_addr == NULL ||
+	    (cct = lookup_vhcache_client(vhcache, ct_name, ct_addr, &tok))
+	    == NULL ||
+	    (pp_head = build_phclient_path_list(cct, ct_name)) == NULL) {
+		rw_exit(&vhcache->vhcache_lock);
+		return;
+	}
+
+	/* if at least one path is online, configure the rest asynchronously */
+	if (nonline_paths(cct) > 0) {
+		rw_exit(&vhcache->vhcache_lock);
+		config_client_paths_async(vhc, ct_name, ct_addr, pp_head, &tok);
+		return;
+	}
+
+	rw_exit(&vhcache->vhcache_lock);
+
+	for (pp = pp_head; pp != NULL; pp = pp->phys_path_next) {
+		if (bus_config_one_phci_child(pp->phys_path) == MDI_SUCCESS) {
+			rw_enter(&vhcache->vhcache_lock, RW_READER);
+
+			if ((cct = lookup_vhcache_client(vhcache, ct_name,
+			    ct_addr, &tok)) == NULL) {
+				rw_exit(&vhcache->vhcache_lock);
+				goto out;
+			}
+
+			if (nonline_paths(cct) > 0 &&
+			    pp->phys_path_next != NULL) {
+				rw_exit(&vhcache->vhcache_lock);
+				config_client_paths_async(vhc, ct_name, ct_addr,
+				    pp->phys_path_next, &tok);
+				pp->phys_path_next = NULL;
+				goto out;
+			}
+
+			rw_exit(&vhcache->vhcache_lock);
+		}
+	}
+
+	adjust_sort_vhcache_paths(vhc, ct_name, ct_addr, &tok);
+out:
+	free_phclient_path_list(pp_head);
+}
+
+static void
+single_threaded_vhconfig_enter(mdi_vhci_config_t *vhc)
+{
+	mutex_enter(&vhc->vhc_lock);
+	while (vhc->vhc_flags & MDI_VHC_SINGLE_THREADED)
+		cv_wait(&vhc->vhc_cv, &vhc->vhc_lock);
+	vhc->vhc_flags |= MDI_VHC_SINGLE_THREADED;
+	mutex_exit(&vhc->vhc_lock);
+}
+
+static void
+single_threaded_vhconfig_exit(mdi_vhci_config_t *vhc)
+{
+	mutex_enter(&vhc->vhc_lock);
+	vhc->vhc_flags &= ~MDI_VHC_SINGLE_THREADED;
+	cv_broadcast(&vhc->vhc_cv);
+	mutex_exit(&vhc->vhc_lock);
+}
+
+/*
+ * Attach the phci driver instances associated with the vhci:
+ * If root is mounted attach all phci driver instances.
+ * If root is not mounted, attach the instances of only those phci
+ * drivers that have the root support.
+ */
+static void
+attach_phci_drivers(mdi_vhci_config_t *vhc, int root_mounted)
+{
+	int  i;
+	major_t m;
+
+	for (i = 0; i < vhc->vhc_nphci_drivers; i++) {
+		if (root_mounted == 0 &&
+		    vhc->vhc_phci_driver_list[i].phdriver_root_support == 0)
+			continue;
+
+		m = ddi_name_to_major(
+		    vhc->vhc_phci_driver_list[i].phdriver_name);
+		if (m != (major_t)-1) {
+			if (ddi_hold_installed_driver(m) != NULL)
+				ddi_rele_driver(m);
+		}
+	}
+}
+
+/*
+ * Build vhci cache:
+ *
+ * Attach phci driver instances and then drive BUS_CONFIG_ALL on
+ * the phci driver instances. During this process the cache gets built.
+ *
+ * Cache is built fully if the root is mounted (i.e., root_mounted is nonzero).
+ *
+ * If the root is not mounted, phci drivers that do not have root support
+ * are not attached. As a result the cache is built partially. The entries
+ * in the cache reflect only those phci drivers that have root support.
+ */
+static vhcache_build_status_t
+build_vhci_cache(mdi_vhci_config_t *vhc, int root_mounted)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+
+	rw_enter(&vhcache->vhcache_lock, RW_READER);
+	if (vhcache->vhcache_flags & MDI_VHCI_CACHE_SETUP_DONE) {
+		rw_exit(&vhcache->vhcache_lock);
+		return (VHCACHE_NOT_REBUILT);
+	}
+	rw_exit(&vhcache->vhcache_lock);
+
+	attach_phci_drivers(vhc, root_mounted);
+	bus_config_all_phcis(vhcache, NDI_DRV_CONF_REPROBE | NDI_NO_EVENT,
+	    BUS_CONFIG_ALL, (major_t)-1);
+
+	if (root_mounted) {
+		rw_enter(&vhcache->vhcache_lock, RW_WRITER);
+		vhcache->vhcache_flags |= MDI_VHCI_CACHE_SETUP_DONE;
+		rw_exit(&vhcache->vhcache_lock);
+		vhcache_dirty(vhc);
+		return (VHCACHE_FULLY_BUILT);
+	} else
+		return (VHCACHE_PARTIALLY_BUILT);
+}
+
+/*
+ * Wait until the root is mounted and then build the vhci cache.
+ */
+static void
+build_vhci_cache_thread(void *arg)
+{
+	mdi_vhci_config_t *vhc = (mdi_vhci_config_t *)arg;
+
+	mutex_enter(&vhc->vhc_lock);
+	while (!modrootloaded && !(vhc->vhc_flags & MDI_VHC_EXIT)) {
+		(void) cv_timedwait(&vhc->vhc_cv, &vhc->vhc_lock,
+		    ddi_get_lbolt() + 10 * TICKS_PER_SECOND);
+	}
+	if (vhc->vhc_flags & MDI_VHC_EXIT)
+		goto out;
+
+	mutex_exit(&vhc->vhc_lock);
+
+	/*
+	 * Now that the root is mounted. So build_vhci_cache() will build
+	 * the full cache.
+	 */
+	(void) build_vhci_cache(vhc, 1);
+
+	mutex_enter(&vhc->vhc_lock);
+out:
+	vhc->vhc_flags &= ~MDI_VHC_BUILD_VHCI_CACHE_THREAD;
+	mutex_exit(&vhc->vhc_lock);
+}
+
+/*
+ * Build vhci cache - a wrapper for build_vhci_cache().
+ *
+ * In a normal case on-disk vhci cache is read and setup during booting.
+ * But if the on-disk vhci cache is not there or deleted or corrupted then
+ * this function sets up the vhci cache.
+ *
+ * The cache is built fully if the root is mounted.
+ *
+ * If the root is not mounted, initially the cache is built reflecting only
+ * those driver entries that have the root support. A separate thread is
+ * created to handle the creation of full cache. This thread will wait
+ * until the root is mounted and then rebuilds the cache.
+ */
+static int
+e_build_vhci_cache(mdi_vhci_config_t *vhc)
+{
+	vhcache_build_status_t rv;
+
+	single_threaded_vhconfig_enter(vhc);
+
+	mutex_enter(&vhc->vhc_lock);
+	if (vhc->vhc_flags & MDI_VHC_BUILD_VHCI_CACHE_THREAD) {
+		if (modrootloaded) {
+			cv_broadcast(&vhc->vhc_cv);
+			/* wait until build vhci cache thread exits */
+			while (vhc->vhc_flags & MDI_VHC_BUILD_VHCI_CACHE_THREAD)
+				cv_wait(&vhc->vhc_cv, &vhc->vhc_lock);
+			rv = VHCACHE_FULLY_BUILT;
+		} else {
+			/*
+			 * The presense of MDI_VHC_BUILD_VHCI_CACHE_THREAD
+			 * flag indicates that the cache has already been
+			 * partially built.
+			 */
+			rv = VHCACHE_PARTIALLY_BUILT;
+		}
+
+		mutex_exit(&vhc->vhc_lock);
+		single_threaded_vhconfig_exit(vhc);
+		return (rv);
+	}
+	mutex_exit(&vhc->vhc_lock);
+
+	rv = build_vhci_cache(vhc, modrootloaded);
+
+	if (rv == VHCACHE_PARTIALLY_BUILT) {
+		/*
+		 * create a thread; this thread will wait until the root is
+		 * mounted and then fully rebuilds the cache.
+		 */
+		mutex_enter(&vhc->vhc_lock);
+		vhc->vhc_flags |= MDI_VHC_BUILD_VHCI_CACHE_THREAD;
+		mutex_exit(&vhc->vhc_lock);
+		(void) thread_create(NULL, 0, build_vhci_cache_thread,
+		    vhc, 0, &p0, TS_RUN, minclsyspri);
+	}
+
+	single_threaded_vhconfig_exit(vhc);
+	return (rv);
+}
+
+/*
+ * Generic vhci bus config implementation:
+ *
+ * Parameters
+ *	vdip	vhci dip
+ *	flags	bus config flags
+ *	op	bus config operation
+ *	The remaining parameters are bus config operation specific
+ *
+ * for BUS_CONFIG_ONE
+ *	arg	pointer to name@addr
+ *	child	upon successful return from this function, *child will be
+ *		set to the configured and held devinfo child node of vdip.
+ *	ct_addr	pointer to client address (i.e. GUID)
+ *
+ * for BUS_CONFIG_DRIVER
+ *	arg	major number of the driver
+ *	child and ct_addr parameters are ignored
+ *
+ * for BUS_CONFIG_ALL
+ *	arg, child, and ct_addr parameters are ignored
+ *
+ * Note that for the rest of the bus config operations, this function simply
+ * calls the framework provided default bus config routine.
+ */
+int
+mdi_vhci_bus_config(dev_info_t *vdip, uint_t flags, ddi_bus_config_op_t op,
+    void *arg, dev_info_t **child, char *ct_addr)
+{
+	mdi_vhci_t *vh = i_devi_get_vhci(vdip);
+	mdi_vhci_config_t *vhc = vh->vh_config;
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	vhcache_build_status_t rv = VHCACHE_NOT_REBUILT;
+	char *cp;
+
+	/*
+	 * While bus configuring phcis, the phci driver interactions with MDI
+	 * cause child nodes to be enumerated under the vhci node for which
+	 * they need to ndi_devi_enter the vhci node.
+	 *
+	 * Unfortunately, to avoid the deadlock, we ourself can not wait for
+	 * for the bus config operations on phcis to finish while holding the
+	 * ndi_devi_enter lock. To avoid this deadlock, skip bus configs on
+	 * phcis and call the default framework provided bus config function
+	 * if we are called with ndi_devi_enter lock held.
+	 */
+	if (DEVI_BUSY_OWNED(vdip)) {
+		MDI_DEBUG(2, (CE_NOTE, vdip,
+		    "!MDI: vhci bus config: vhci dip is busy owned\n"));
+		goto default_bus_config;
+	}
+
+	rw_enter(&vhcache->vhcache_lock, RW_READER);
+	if (!(vhcache->vhcache_flags & MDI_VHCI_CACHE_SETUP_DONE)) {
+		rw_exit(&vhcache->vhcache_lock);
+		rv = e_build_vhci_cache(vhc);
+		rw_enter(&vhcache->vhcache_lock, RW_READER);
+	}
+
+	switch (op) {
+	case BUS_CONFIG_ONE:
+		/* extract node name */
+		cp = (char *)arg;
+		while (*cp != '\0' && *cp != '@')
+			cp++;
+		if (*cp == '@') {
+			*cp = '\0';
+			config_client_paths(vhc, (char *)arg, ct_addr);
+			/* config_client_paths() releases the cache_lock */
+			*cp = '@';
+		} else
+			rw_exit(&vhcache->vhcache_lock);
+		break;
+
+	case BUS_CONFIG_DRIVER:
+		rw_exit(&vhcache->vhcache_lock);
+		if (rv == VHCACHE_NOT_REBUILT)
+			bus_config_all_phcis(vhcache, flags, op,
+			    (major_t)(uintptr_t)arg);
+		break;
+
+	case BUS_CONFIG_ALL:
+		rw_exit(&vhcache->vhcache_lock);
+		if (rv == VHCACHE_NOT_REBUILT)
+			bus_config_all_phcis(vhcache, flags, op, -1);
+		break;
+
+	default:
+		rw_exit(&vhcache->vhcache_lock);
+		break;
+	}
+
+
+default_bus_config:
+	/*
+	 * All requested child nodes are enumerated under the vhci.
+	 * Now configure them.
+	 */
+	if (ndi_busop_bus_config(vdip, flags, op, arg, child, 0) ==
+	    NDI_SUCCESS) {
+		return (MDI_SUCCESS);
+	}
+
+	return (MDI_FAILURE);
+}
+
+/*
+ * Read the on-disk vhci cache into an nvlist for the specified vhci class.
+ */
+static nvlist_t *
+read_on_disk_vhci_cache(char *vhci_class)
+{
+	nvlist_t *nvl;
+	int err;
+	char *filename;
+
+	filename = vhclass2vhcache_filename(vhci_class);
+
+	if ((err = fread_nvlist(filename, &nvl)) == 0) {
+		kmem_free(filename, strlen(filename) + 1);
+		return (nvl);
+	} else if (err == EIO)
+		cmn_err(CE_WARN, "%s: I/O error, will recreate\n", filename);
+	else if (err == EINVAL)
+		cmn_err(CE_WARN,
+		    "%s: data file corrupted, will recreate\n", filename);
+
+	kmem_free(filename, strlen(filename) + 1);
+	return (NULL);
+}
+
+/*
+ * Read on-disk vhci cache into nvlists for all vhci classes.
+ * Called during booting by i_ddi_read_devices_files().
+ */
+void
+mdi_read_devices_files(void)
+{
+	int i;
+
+	for (i = 0; i < N_VHCI_CLASSES; i++)
+		vhcache_nvl[i] = read_on_disk_vhci_cache(vhci_class_list[i]);
+}
+
+/*
+ * Remove all stale entries from vhci cache.
+ */
+static void
+clean_vhcache(mdi_vhci_config_t *vhc)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	mdi_vhcache_phci_t *cphci, *cphci_head, *cphci_next;
+	mdi_vhcache_client_t *cct, *cct_head, *cct_next;
+	mdi_vhcache_pathinfo_t *cpi, *cpi_head, *cpi_next;
+
+	rw_enter(&vhcache->vhcache_lock, RW_WRITER);
+
+	cct_head = vhcache->vhcache_client_head;
+	vhcache->vhcache_client_head = vhcache->vhcache_client_tail = NULL;
+	for (cct = cct_head; cct != NULL; cct = cct_next) {
+		cct_next = cct->cct_next;
+
+		cpi_head = cct->cct_cpi_head;
+		cct->cct_cpi_head = cct->cct_cpi_tail = NULL;
+		for (cpi = cpi_head; cpi != NULL; cpi = cpi_next) {
+			cpi_next = cpi->cpi_next;
+			if (cpi->cpi_pip != NULL) {
+				ASSERT(cpi->cpi_cphci->cphci_phci != NULL);
+				enqueue_tail_vhcache_pathinfo(cct, cpi);
+			} else
+				free_vhcache_pathinfo(cpi);
+		}
+
+		if (cct->cct_cpi_head != NULL)
+			enqueue_vhcache_client(vhcache, cct);
+		else {
+			(void) mod_hash_destroy(vhcache->vhcache_client_hash,
+			    (mod_hash_key_t)cct->cct_name_addr);
+			free_vhcache_client(cct);
+		}
+	}
+
+	cphci_head = vhcache->vhcache_phci_head;
+	vhcache->vhcache_phci_head = vhcache->vhcache_phci_tail = NULL;
+	for (cphci = cphci_head; cphci != NULL; cphci = cphci_next) {
+		cphci_next = cphci->cphci_next;
+		if (cphci->cphci_phci != NULL)
+			enqueue_vhcache_phci(vhcache, cphci);
+		else
+			free_vhcache_phci(cphci);
+	}
+
+	vhcache->vhcache_clean_time = lbolt64;
+	rw_exit(&vhcache->vhcache_lock);
+	vhcache_dirty(vhc);
+}
+
+/*
+ * Remove all stale entries from vhci cache.
+ * Called by i_ddi_clean_devices_files() during the execution of devfsadm -C
+ */
+void
+mdi_clean_vhcache(void)
+{
+	mdi_vhci_t *vh;
+
+	mutex_enter(&mdi_mutex);
+	for (vh = mdi_vhci_head; vh != NULL; vh = vh->vh_next) {
+		vh->vh_refcnt++;
+		mutex_exit(&mdi_mutex);
+		clean_vhcache(vh->vh_config);
+		mutex_enter(&mdi_mutex);
+		vh->vh_refcnt--;
+	}
+	mutex_exit(&mdi_mutex);
 }

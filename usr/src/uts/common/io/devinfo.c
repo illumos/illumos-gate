@@ -259,6 +259,14 @@ static uint_t	di_chunk = 32;		/* I/O chunk size in pages */
 #define	DI_CACHE_UNLOCK(c)	(mutex_exit(&(c).cache_lock))
 #define	DI_CACHE_LOCKED(c)	(mutex_owned(&(c).cache_lock))
 
+/*
+ * Check that whole device tree is being configured as a pre-condition for
+ * cleaning up /etc/devices files.
+ */
+#define	DEVICES_FILES_CLEANABLE(st)	\
+	(((st)->command & DINFOSUBTREE) && ((st)->command & DINFOFORCE) && \
+	strcmp(DI_ALL_PTR(st)->root_path, "/") == 0)
+
 #define	CACHE_DEBUG(args)	\
 	{ if (di_cache_debug != DI_QUIET) di_cache_print args; }
 
@@ -270,7 +278,7 @@ static int di_attach(dev_info_t *, ddi_attach_cmd_t);
 static int di_detach(dev_info_t *, ddi_detach_cmd_t);
 
 static di_off_t di_copyformat(di_off_t, struct di_state *, intptr_t, int);
-static di_off_t di_snapshot(struct di_state *);
+static di_off_t di_snapshot_and_clean(struct di_state *);
 static di_off_t di_copydevnm(di_off_t *, struct di_state *);
 static di_off_t di_copytree(struct dev_info *, di_off_t *, struct di_state *);
 static di_off_t di_copynode(struct di_stack *, struct di_state *);
@@ -726,6 +734,12 @@ di_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		return (EFAULT);
 	}
 
+	if ((st->command & DINFOCLEANUP) && !DEVICES_FILES_CLEANABLE(st)) {
+		di_freemem(st);
+		(void) di_setstate(st, IOC_IDLE);
+		return (EINVAL);
+	}
+
 	error = 0;
 	if ((st->command & DINFOCACHE) && !cache_args_valid(st, &error)) {
 		di_freemem(st);
@@ -792,11 +806,8 @@ di_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		DI_CACHE_LOCK(di_cache);
 		*rvalp = di_cache_update(st);
 		DI_CACHE_UNLOCK(di_cache);
-	} else {
-		modunload_disable();
-		*rvalp = di_snapshot(st);
-		modunload_enable();
-	}
+	} else
+		*rvalp = di_snapshot_and_clean(st);
 
 	if (*rvalp) {
 		DI_ALL_PTR(st)->map_size = *rvalp;
@@ -1346,6 +1357,32 @@ di_snapshot(struct di_state *st)
 	 */
 	all->snapshot_time = ddi_get_time();
 	all->cache_checksum = 0;
+
+	return (off);
+}
+
+/*
+ * Take a snapshot and clean /etc/devices files if DINFOCLEANUP is set
+ */
+static di_off_t
+di_snapshot_and_clean(struct di_state *st)
+{
+	di_off_t off;
+
+	modunload_disable();
+	off = di_snapshot(st);
+	if (off != 0 && (st->command & DINFOCLEANUP)) {
+		ASSERT(DEVICES_FILES_CLEANABLE(st));
+		/*
+		 * Cleanup /etc/devices files:
+		 * In order to accurately account for the system configuration
+		 * in /etc/devices files, the appropriate drivers must be
+		 * fully configured before the cleanup starts.
+		 * So enable modunload only after the cleanup.
+		 */
+		i_ddi_clean_devices_files();
+	}
+	modunload_enable();
 
 	return (off);
 }
@@ -3649,7 +3686,8 @@ snapshot_is_cacheable(struct di_state *st)
 	ASSERT(st->mem_size > 0);
 	ASSERT(st->memlist != NULL);
 
-	if (st->command != (DI_CACHE_SNAPSHOT_FLAGS & DIIOC_MASK)) {
+	if ((st->command & DI_CACHE_SNAPSHOT_FLAGS) !=
+	    (DI_CACHE_SNAPSHOT_FLAGS & DIIOC_MASK)) {
 		CACHE_DEBUG((DI_INFO,
 		    "not cacheable: incompatible flags: 0x%x",
 		    st->command));
@@ -3774,9 +3812,7 @@ di_cache_update(struct di_state *st)
 	 */
 	atomic_or_32(&di_cache.cache_valid, 1);
 
-	modunload_disable();
-	rval = di_snapshot(st);
-	modunload_enable();
+	rval = di_snapshot_and_clean(st);
 
 	if (rval == 0) {
 		CACHE_DEBUG((DI_ERR, "can't update cache: bad snapshot"));

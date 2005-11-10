@@ -1830,11 +1830,6 @@ modctl(int cmd, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t a4,
 		    (devplcysys_t *)a2, (char *)a3);
 		break;
 
-	case MODCLEANUP:
-		e_devid_cache_cleanup();
-		error = 0;
-		break;
-
 	case MODLOADMINORPERM:
 	case MODADDMINORPERM:
 	case MODREMMINORPERM:

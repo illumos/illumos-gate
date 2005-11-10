@@ -239,7 +239,7 @@ caddr_t mdi_pi_get_phci_private(mdi_pathinfo_t *);
 void mdi_pi_set_phci_private(mdi_pathinfo_t *, caddr_t);
 
 int mdi_vhci_bus_config(dev_info_t *, uint_t, ddi_bus_config_op_t, void *,
-    dev_info_t **);
+    dev_info_t **, char *);
 
 #endif /* _KERNEL */
 

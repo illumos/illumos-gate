@@ -30,7 +30,10 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/note.h>
+#include <sys/types.h>
 #include <sys/sunmdi.h>
+#include <sys/modhash.h>
+#include <sys/callb.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -217,30 +220,6 @@ typedef struct mdi_vhci_ops {
 } mdi_vhci_ops_t;
 
 /*
- * phci bus config structure - one for for each phci bus config operation that
- * we initiate on behalf of a vhci.
- */
-typedef struct mdi_phci_config {
-	struct mdi_vhci_config	*phc_vhc;	/* vhci bus config */
-	struct mdi_phci_config	*phc_next;	/* next one on this list */
-	dev_info_t	*phc_parent_dip;	/* parent of the phci */
-	char		phc_devnm[MAXNAMELEN];	/* /name@addr of the phci */
-} mdi_phci_config_t;
-
-/* vhci bus config structure - one for vhci instance */
-typedef struct mdi_vhci_config {
-	volatile ddi_bus_config_op_t vhc_op;	/* bus config - op type */
-	major_t			vhc_major;	/* bus config - major */
-	int			vhc_flags;	/* bus config - flags */
-	volatile int64_t	vhc_start_time;	/* bus config start time */
-	int64_t			vhc_cutoff_time; /* end time + some timeout */
-	taskq_t			*vhc_taskq;
-	kcondvar_t		vhc_cv;		/* mutex is mdi_mutex */
-	mdi_phci_config_t	*vhc_phc;	/* phci bus config list */
-	int			vhc_phc_cnt;	/* # of phcs on vhc_phc list */
-} mdi_vhci_config_t;
-
-/*
  * An mdi_vhci structure is created and bound to the devinfo node of every
  * registered vHCI class driver; this happens when a vHCI registers itself from
  * attach(9e).  This structure is unbound and freed when the vHCI unregisters
@@ -267,7 +246,8 @@ typedef struct mdi_vhci {
 	struct mdi_phci		*vh_phci_tail;	/* pHCI list tail	*/
 	int			vh_client_count;	/* Client count	*/
 	struct client_hash	*vh_client_table;	/* Client hash	*/
-	mdi_vhci_config_t	vh_bus_config;
+	int			vh_refcnt;	/* reference count */
+	struct mdi_vhci_config	*vh_config;	/* vhci config */
 } mdi_vhci_t;
 
 /*
@@ -899,6 +879,126 @@ struct pi_errs {
 
 #define	MDI_PI_IS_SUSPENDED(pip) \
 	    ((MDI_PI(pip))->pi_phci->ph_flags & MDI_PHCI_FLAGS_SUSPEND)
+
+/*
+ * mdi_vhcache_client, mdi_vhcache_pathinfo, and mdi_vhcache_phci structures
+ * hold the vhci to phci client mappings of the on-disk vhci busconfig cache.
+ */
+
+/* phci structure of vhci cache */
+typedef struct mdi_vhcache_phci {
+	char			*cphci_path;	/* phci path name */
+	uint32_t		cphci_id;	/* used when building nvlist */
+	mdi_phci_t		*cphci_phci;	/* pointer to actual phci */
+	struct mdi_vhcache_phci	*cphci_next;	/* next in vhci phci list */
+} mdi_vhcache_phci_t;
+
+/* pathinfo structure of vhci cache */
+typedef struct mdi_vhcache_pathinfo {
+	char			*cpi_addr;	/* path address */
+	mdi_vhcache_phci_t	*cpi_cphci;	/* phci the path belongs to */
+	struct mdi_pathinfo	*cpi_pip;	/* ptr to actual pathinfo */
+	uint32_t		cpi_flags;	/* see below */
+	struct mdi_vhcache_pathinfo *cpi_next;	/* next path for the client */
+} mdi_vhcache_pathinfo_t;
+
+/*
+ * cpi_flags
+ *
+ * MDI_CPI_HINT_PATH_DOES_NOT_EXIST - set when configuration of the path has
+ * failed.
+ */
+#define	MDI_CPI_HINT_PATH_DOES_NOT_EXIST	0x0001
+
+/* client structure of vhci cache */
+typedef struct mdi_vhcache_client {
+	char			*cct_name_addr;	/* client address */
+	mdi_vhcache_pathinfo_t	*cct_cpi_head;	/* client's path list head */
+	mdi_vhcache_pathinfo_t	*cct_cpi_tail;	/* client's path list tail */
+	struct mdi_vhcache_client *cct_next;	/* next in vhci client list */
+} mdi_vhcache_client_t;
+
+/* vhci cache structure - one for vhci instance */
+typedef struct mdi_vhci_cache {
+	mdi_vhcache_phci_t	*vhcache_phci_head;	/* phci list head */
+	mdi_vhcache_phci_t	*vhcache_phci_tail;	/* phci list tail */
+	mdi_vhcache_client_t	*vhcache_client_head;	/* client list head */
+	mdi_vhcache_client_t	*vhcache_client_tail;	/* client list tail */
+	mod_hash_t		*vhcache_client_hash;	/* client hash */
+	int			vhcache_flags;		/* see below */
+	int64_t			vhcache_clean_time;	/* last clean time */
+	krwlock_t		vhcache_lock;		/* cache lock */
+} mdi_vhci_cache_t;
+
+/* vhcache_flags */
+#define	MDI_VHCI_CACHE_SETUP_DONE	0x0001	/* cache setup completed */
+
+typedef struct mdi_phci_driver_info {
+	char			*phdriver_name;	/* name of the phci driver */
+
+	/* set to non zero if the phci driver supports root device */
+	int			phdriver_root_support;
+} mdi_phci_driver_info_t;
+
+/* vhci bus config structure - one for vhci instance */
+typedef struct mdi_vhci_config {
+	char			*vhc_vhcache_filename;	/* on-disk file name */
+	mdi_vhci_cache_t	vhc_vhcache;		/* vhci cache */
+	mdi_phci_driver_info_t	*vhc_phci_driver_list;	/* ph drv info array */
+	int			vhc_nphci_drivers;	/* # of phci drivers */
+	kmutex_t		vhc_lock;		/* vhci config lock */
+	kcondvar_t		vhc_cv;
+	int			vhc_flags;		/* see below */
+
+	/* flush vhci cache when lbolt reaches vhc_flush_at_ticks */
+	clock_t			vhc_flush_at_ticks;
+
+	/*
+	 * Head and tail of the client list whose paths are being configured
+	 * asynchronously. vhc_acc_count is the number of clients on this list.
+	 * vhc_acc_thrcount is the number threads running to configure
+	 * the paths for these clients.
+	 */
+	struct mdi_async_client_config *vhc_acc_list_head;
+	struct mdi_async_client_config *vhc_acc_list_tail;
+	int			vhc_acc_count;
+	int			vhc_acc_thrcount;
+
+	/* callback id - for flushing the cache during system shutdown */
+	callb_id_t		vhc_cbid;
+} mdi_vhci_config_t;
+
+/* vhc_flags */
+#define	MDI_VHC_SINGLE_THREADED		0x0001	/* config single threaded */
+#define	MDI_VHC_EXIT			0x0002	/* exit all config activity */
+#define	MDI_VHC_VHCACHE_DIRTY		0x0004	/* cache dirty */
+#define	MDI_VHC_VHCACHE_FLUSH_THREAD	0x0008	/* cache flush thead running */
+#define	MDI_VHC_VHCACHE_FLUSH_ERROR	0x0010	/* failed to flush cache */
+#define	MDI_VHC_READONLY_FS		0x0020	/* filesys is readonly */
+#define	MDI_VHC_BUILD_VHCI_CACHE_THREAD	0x0040	/* cachebuild thread running */
+
+typedef struct mdi_phys_path {
+	char			*phys_path;
+	struct mdi_phys_path	*phys_path_next;
+} mdi_phys_path_t;
+
+/*
+ * Lookup tokens are used to cache the result of the vhci cache client lookup
+ * operations (to reduce the number of real lookup operations).
+ */
+typedef struct mdi_vhcache_lookup_token {
+	mdi_vhcache_client_t	*lt_cct;		/* vhcache client */
+	int64_t			lt_cct_lookup_time;	/* last lookup time */
+} mdi_vhcache_lookup_token_t;
+
+/* asynchronous configuration of client paths */
+typedef struct mdi_async_client_config {
+	char			*acc_ct_name;	/* client name */
+	char			*acc_ct_addr;	/* client address */
+	mdi_phys_path_t		*acc_phclient_path_list_head;	/* path head */
+	mdi_vhcache_lookup_token_t acc_token;	/* lookup token */
+	struct mdi_async_client_config *acc_next; /* next in vhci acc list */
+} mdi_async_client_config_t;
 
 /*
  * vHCI driver instance registration/unregistration

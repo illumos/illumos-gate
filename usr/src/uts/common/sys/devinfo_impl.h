@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,7 @@ extern "C" {
 #define	DINFOPRIVDATA	(DIIOC | 0x10)	/* include private data */
 #define	DINFOFORCE	(DIIOC | 0x20)	/* force load all drivers */
 #define	DINFOCACHE	(DIIOC | 0x100000) /* use cached data  */
+#define	DINFOCLEANUP	(DIIOC | 0x200000) /* cleanup /etc/devices files */
 
 /* new public flag for the layered drivers framework */
 #define	DINFOLYR	(DIIOC | 0x40)	/* get device layering information */

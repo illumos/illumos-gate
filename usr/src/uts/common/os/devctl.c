@@ -90,6 +90,9 @@ static nvfd_t *dcfd = &devid_cache_fd;
 extern int modrootloaded;
 extern struct bootops *bootops;
 
+extern void mdi_read_devices_files(void);
+extern void mdi_clean_vhcache(void);
+
 #ifdef	DEBUG
 int nvp_devid_debug = 0;
 int nvpdaemon_debug = 0;
@@ -140,7 +143,7 @@ nvp_cksum(uchar_t *buf, int64_t buflen)
 	return (cksum);
 }
 
-static int
+int
 fread_nvlist(char *filename, nvlist_t **ret_nvlist)
 {
 	struct _buf	*file;
@@ -435,26 +438,25 @@ kfrename(char *oldname, char *newname)
 	return (rval);
 }
 
-static int
-fwrite_nvlist(nvfd_t *nvfd, nvlist_t *nvl)
+int
+fwrite_nvlist(char *filename, nvlist_t *nvl)
 {
 	char	*buf;
 	char	*nvbuf;
 	kfile_t	*fp;
 	char	*newname;
-	int	len, err;
-	int	rval;
+	int	len, err, err1;
 	size_t	buflen;
 	ssize_t	n;
 
 	ASSERT(modrootloaded);
 
 	nvbuf = NULL;
-	rval = nvlist_pack(nvl, &nvbuf, &buflen, NV_ENCODE_NATIVE, 0);
-	if (rval != 0) {
+	err = nvlist_pack(nvl, &nvbuf, &buflen, NV_ENCODE_NATIVE, 0);
+	if (err != 0) {
 		KFIOERR((CE_CONT, "%s: error %d packing nvlist\n",
-			nvfd->nvf_name, rval));
-		return (DDI_FAILURE);
+			filename, err));
+		return (err);
 	}
 
 	buf = kmem_alloc(sizeof (nvpf_hdr_t) + buflen, KM_SLEEP);
@@ -471,12 +473,12 @@ fwrite_nvlist(nvfd_t *nvfd, nvlist_t *nvl)
 	kmem_free(nvbuf, buflen);
 	buflen += sizeof (nvpf_hdr_t);
 
-	len = strlen(nvfd->nvf_name) + MAX_SUFFIX_LEN + 2;
+	len = strlen(filename) + MAX_SUFFIX_LEN + 2;
 	newname = kmem_alloc(len, KM_SLEEP);
 
 
 	(void) sprintf(newname, "%s.%s",
-		nvfd->nvf_name, NEW_FILENAME_SUFFIX);
+		filename, NEW_FILENAME_SUFFIX);
 
 	/*
 	 * To make it unlikely we suffer data loss, write
@@ -485,15 +487,11 @@ fwrite_nvlist(nvfd_t *nvfd, nvlist_t *nvl)
 	 * to replace the previous.
 	 */
 
-	rval = DDI_SUCCESS;
 	if ((err = kfcreate(newname, &fp)) == 0) {
 		err = kfwrite(fp, buf, buflen, &n);
 		if (err) {
 			KFIOERR((CE_CONT, "%s: write error - %d\n",
 				newname, err));
-			if (err == EROFS)
-				NVF_MARK_READONLY(nvfd);
-			rval = DDI_FAILURE;
 		} else {
 			if (n != buflen) {
 				KFIOERR((CE_CONT,
@@ -501,14 +499,15 @@ fwrite_nvlist(nvfd_t *nvfd, nvlist_t *nvl)
 				    newname, n, buflen));
 				KFIOERR((CE_CONT,
 				    "%s: filesystem may be full?\n", newname));
-				rval = DDI_FAILURE;
+				err = EIO;
 			}
 		}
-		if ((err = kfclose(fp)) != 0) {
+		if ((err1 = kfclose(fp)) != 0) {
 			KFIOERR((CE_CONT, "%s: close error\n", newname));
-			rval = DDI_FAILURE;
+			if (err == 0)
+				err = err1;
 		}
-		if (rval != DDI_SUCCESS) {
+		if (err != 0) {
 			if (kfremove(newname) != 0) {
 				KFIOERR((CE_CONT, "%s: remove failed\n",
 				    newname));
@@ -516,26 +515,35 @@ fwrite_nvlist(nvfd_t *nvfd, nvlist_t *nvl)
 		}
 	} else {
 		KFIOERR((CE_CONT, "%s: create failed - %d\n",
-			nvfd->nvf_name, err));
-		if (err == EROFS)
-			NVF_MARK_READONLY(nvfd);
-		rval = DDI_FAILURE;
+			filename, err));
 	}
 
-	if (rval == DDI_SUCCESS) {
-		if (kfrename(newname, nvfd->nvf_name) != 0) {
+	if (err == 0) {
+		if ((err = kfrename(newname, filename)) != 0) {
 			KFIOERR((CE_CONT, "%s: rename from %s failed\n",
-				newname, nvfd->nvf_name));
-			rval = DDI_FAILURE;
+				newname, filename));
 		}
 	}
 
 	kmem_free(newname, len);
 	kmem_free(buf, buflen);
 
-	return (rval);
+	return (err);
 }
 
+static int
+e_fwrite_nvlist(nvfd_t *nvfd, nvlist_t *nvl)
+{
+	int err;
+
+	if ((err = fwrite_nvlist(nvfd->nvf_name, nvl)) == 0)
+		return (DDI_SUCCESS);
+	else {
+		if (err == EROFS)
+			NVF_MARK_READONLY(nvfd);
+		return (DDI_FAILURE);
+	}
+}
 
 static void
 nvp_free(nvp_list_t *np)
@@ -833,6 +841,8 @@ i_ddi_read_devices_files(void)
 {
 	nvfd_t nvfd;
 	int rval;
+
+	mdi_read_devices_files();
 
 	if (devid_cache_read_disable)
 		return;
@@ -1603,7 +1613,7 @@ nvpflush_one(nvfd_t *nvfd)
 	nvfd->nvf_flags |= NVF_FLUSHING;
 	rw_exit(&nvfd->nvf_lock);
 
-	rval = fwrite_nvlist(nvfd, nvl);
+	rval = e_fwrite_nvlist(nvfd, nvl);
 	nvlist_free(nvl);
 
 	rw_enter(&nvfd->nvf_lock, RW_WRITER);
@@ -1703,6 +1713,13 @@ nvpflush_daemon(void)
 		mutex_enter(&nvpflush_lock);
 		nvpbusy = 0;
 	}
+}
+
+void
+i_ddi_clean_devices_files(void)
+{
+	e_devid_cache_cleanup();
+	mdi_clean_vhcache();
 }
 
 #ifdef	DEBUG

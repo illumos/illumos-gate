@@ -8,6 +8,8 @@ etc/driver_classes
 etc/path_to_inst
 etc/mach
 etc/devices/devid_cache
+etc/devices/mdi_scsi_vhci_cache
+etc/devices/mdi_ib_cache
 kernel
 platform/i86pc/biosint
 platform/i86pc/kernel
