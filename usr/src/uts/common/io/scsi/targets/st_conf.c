@@ -1748,6 +1748,53 @@ const struct st_drivetype st_drivetypes[] =
   },
 
   /*
+   * Sun StorageTek T10000A tape drive.
+   *
+   *     NOTES
+   *     -----
+   *  o  The T10000A has special needs - support for SCSI LOCATE and
+   *     READ POSITION commands - so we must be sure to place this
+   *     entry before the one for ST_TYPE_STC3490 (generic STK
+   *     half-inch cartridge drives).
+   * [1] Compression on the T10000A is controlled
+   *     via the Device Configuration mode page.
+   * [2] The T10000A has only one writable density, 0x4A. 
+   * [3] The T10000A has only one speed (if the driver ever cares).
+   * [4] max_rretries and max_wretries are driver anachronisms.
+   */
+  {                           /* Structure member    Description              */
+                              /* ----------------    -----------              */
+    "Sun StorageTek T10000A", /* .name               Display ("pretty") name  */
+    15,                       /* .length             Length of next item...   */
+    "STK     T10000A",        /* .vid                Vendor-product ID string */
+    ST_TYPE_STK9840,          /* .type               Numeric type (cf. mtio.h)*/
+    0,                        /* .bsize              Block size (0 = variable)*/
+                              /* .options            Drive option flags:      */
+    ST_VARIABLE         |     /*    00001            Supports variable length */
+    ST_BSF              |     /*    00008            Supports SPACE block fwd */
+    ST_BSR              |     /*    00010            Supports SPACE block rev */
+    ST_AUTODEN_OVERRIDE |     /*    00040            Autodensity override flag*/
+    ST_KNOWS_EOD        |     /*    00200            Recognizes end-of-data   */
+    ST_UNLOADABLE       |     /*    00400            Driver can be unloaded   */
+    ST_NO_RECSIZE_LIMIT |     /*    08000            Supports blocks > 64KB   */
+    ST_MODE_SEL_COMP,         /*    10000            [Note 1]                 */
+                              /*    -----                                     */
+                              /*    18659                                     */
+    -1,                       /* .max_rretries       [Note 4]                 */
+    -1,                       /* .max_wretries       [Note 4]                 */
+    {0x4A,0x4A,0x4A,0x4A},    /* .densities          Density codes [Note 2]   */
+    MT_DENSITY4,              /* .default_density    (.densities[x])          */
+    {0,0,0,0},                /* .speeds             Speed codes [Note 3]     */
+    0,                        /* .non_motion_timeout Nothing Special          */
+    MINUTES(5),               /* .io_timeout Five    Five Minutes             */
+    0,                        /* .rewind_timeout     Nothing Special          */
+    0,                        /* .space_timeout      Nothing Special          */
+    0,                        /* .load_timeout       Nothing Special          */
+    0,                        /* .unload_timeout     Nothing Special          */
+    MINUTES(180)              /* .erase_timeout      Three Hours              */
+  },
+
+  /*
    * STK 9840C cartridge drive.
    *
    *     NOTES
