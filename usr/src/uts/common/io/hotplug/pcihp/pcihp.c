@@ -967,15 +967,18 @@ pcihp_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 * CONFIGURE the occupant in the slot.
 		 * **************************************
 		 */
+		slotinfop = &pcihp_p->slotinfo[pci_dev];
+
+		mutex_enter(&slotinfop->slot_mutex);
 
 		rv = pcihp_configure_ap(pcihp_p, pci_dev);
 		if (rv == HPC_SUCCESS) {
-			slotinfop = &pcihp_p->slotinfo[pci_dev];
 			pcihp_gen_sysevent(slotinfop->name,
 			    PCIHP_DR_AP_STATE_CHANGE,
 			    SE_NO_HINT, pcihp_p->dip, KM_SLEEP);
 			pcihp_create_occupant_props(self, dev, pci_dev);
 		}
+		mutex_exit(&slotinfop->slot_mutex);
 
 		break;
 
@@ -985,17 +988,19 @@ pcihp_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		 * UNCONFIGURE the occupant in the slot.
 		 * **************************************
 		 */
+		slotinfop = &pcihp_p->slotinfo[pci_dev];
+
+		mutex_enter(&slotinfop->slot_mutex);
 
 		rv = pcihp_unconfigure_ap(pcihp_p, pci_dev);
 
 		if (rv == HPC_SUCCESS) {
-
-			slotinfop = &pcihp_p->slotinfo[pci_dev];
 			pcihp_gen_sysevent(slotinfop->name,
 			    PCIHP_DR_AP_STATE_CHANGE,
 			    SE_NO_HINT, pcihp_p->dip, KM_SLEEP);
 			pcihp_delete_occupant_props(pcihp_p->dip, dev);
 		}
+		mutex_exit(&slotinfop->slot_mutex);
 
 		break;
 
@@ -1461,11 +1466,11 @@ pcihp_configure_ap(pcihp_t *pcihp_p, int pci_dev)
 	 */
 	slotinfop = &pcihp_p->slotinfo[pci_dev];
 
-	mutex_enter(&slotinfop->slot_mutex);
+
 
 	if ((pci_dev >= PCI_MAX_DEVS) || (slotinfop->slot_hdl == NULL) ||
 			(slotinfop->slot_flags & PCIHP_SLOT_DISABLED)) {
-		mutex_exit(&slotinfop->slot_mutex);
+
 		return (ENXIO);
 	}
 
@@ -1508,7 +1513,7 @@ pcihp_configure_ap(pcihp_t *pcihp_p, int pci_dev)
 		else
 			slotinfop->last_change = (time32_t)time;
 
-		mutex_exit(&slotinfop->slot_mutex);
+
 		return (rv);
 	}
 
@@ -1519,19 +1524,19 @@ pcihp_configure_ap(pcihp_t *pcihp_p, int pci_dev)
 	/* Check if the receptacle is in the CONNECTED state. */
 	if (hpc_nexus_control(slotinfop->slot_hdl,
 			HPC_CTRL_GET_SLOT_STATE, (caddr_t)&rstate) != 0) {
-		mutex_exit(&slotinfop->slot_mutex);
+
 		return (ENXIO);
 	}
 
 	if (rstate == HPC_SLOT_EMPTY) {
 		/* error. slot is empty */
-		mutex_exit(&slotinfop->slot_mutex);
+
 		return (ENXIO);
 	}
 
 	if (rstate != HPC_SLOT_CONNECTED) {
 		/* error. either the slot is empty or connect failed */
-		mutex_exit(&slotinfop->slot_mutex);
+
 		return (ENXIO);
 	}
 
@@ -1564,7 +1569,7 @@ pcihp_configure_ap(pcihp_t *pcihp_p, int pci_dev)
 		/* tell HPC driver occupant configure Error */
 		(void) hpc_nexus_control(slotinfop->slot_hdl,
 			HPC_CTRL_DEV_CONFIG_FAILURE, NULL);
-		mutex_exit(&slotinfop->slot_mutex);
+
 		return (EIO);
 	}
 
@@ -1607,7 +1612,7 @@ pcihp_configure_ap(pcihp_t *pcihp_p, int pci_dev)
 	(void) hpc_nexus_control(slotinfop->slot_hdl,
 		HPC_CTRL_DEV_CONFIGURED, NULL);
 
-	mutex_exit(&slotinfop->slot_mutex);
+
 	return (rv);
 }
 
@@ -1633,11 +1638,11 @@ pcihp_unconfigure_ap(pcihp_t *pcihp_p, int pci_dev)
 	 */
 	slotinfop = &pcihp_p->slotinfo[pci_dev];
 
-	mutex_enter(&slotinfop->slot_mutex);
+
 
 	if ((pci_dev >= PCI_MAX_DEVS) || (slotinfop->slot_hdl == NULL) ||
 			(slotinfop->slot_flags & PCIHP_SLOT_DISABLED)) {
-		mutex_exit(&slotinfop->slot_mutex);
+
 		return (ENXIO);
 	}
 	/*
@@ -1657,7 +1662,7 @@ pcihp_unconfigure_ap(pcihp_t *pcihp_p, int pci_dev)
 		if (slotinfop->slot_flags &
 				PCIHP_SLOT_DEV_NON_HOTPLUG) {
 			/* Operation unsupported if no HS board/slot */
-			mutex_exit(&slotinfop->slot_mutex);
+
 			return (ENOTSUP);
 		}
 	}
@@ -1759,7 +1764,7 @@ pcihp_unconfigure_ap(pcihp_t *pcihp_p, int pci_dev)
 	else
 		slotinfop->last_change = (time32_t)time;
 
-	mutex_exit(&slotinfop->slot_mutex);
+
 
 	/* unmask enum events again */
 	if ((slotinfop->slot_flags & PCIHP_SLOT_AUTO_CFG_EN) == 0) {
@@ -2297,6 +2302,8 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 	struct pcihp_config_ctrl ctrl;
 	int circular_count;
 	int rval;
+	int hint;
+	hpc_slot_state_t rstate;
 
 	/*
 	 * Get the soft state structure.
@@ -2352,6 +2359,12 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 	}
 
 	mutex_enter(&slotinfop->slot_mutex);
+
+	if (hpc_nexus_control(slotinfop->slot_hdl,
+	    HPC_CTRL_GET_SLOT_STATE, (caddr_t)&rstate) != 0)
+		rv = HPC_ERR_FAILED;
+
+	slotinfop->rstate = (ap_rstate_t)rstate;
 
 	switch (event_mask) {
 
@@ -2641,19 +2654,21 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 		 * unconfigured before this event.
 		 */
 		if (slotinfop->ostate != AP_OSTATE_UNCONFIGURED) {
-			panic("pcihp (%s%d): card is removed from"
-			    " the slot %s before doing unconfigure!!",
+			slotinfop->condition = AP_COND_FAILED;
+			cmn_err(CE_WARN, "pcihp (%s%d): card is removed"
+			    " from the slot %s",
 			    ddi_driver_name(pcihp_p->dip),
 			    ddi_get_instance(pcihp_p->dip),
 			    slotinfop->name);
-			/*NOTREACHED*/
 		}
+		else
+			cmn_err(CE_NOTE, "pcihp (%s%d): card is removed"
+			    " from the slot %s",
+			    ddi_driver_name(pcihp_p->dip),
+			    ddi_get_instance(pcihp_p->dip),
+			    slotinfop->name);
 
-		cmn_err(CE_NOTE, "pcihp (%s%d): card is removed"
-		    " from the slot %s",
-		    ddi_driver_name(pcihp_p->dip),
-		    ddi_get_instance(pcihp_p->dip),
-		    slotinfop->name);
+		slotinfop->rstate = AP_RSTATE_EMPTY;
 
 		/* +++ HOOK for RCM to report this hotplug event? +++ */
 
@@ -2862,6 +2877,78 @@ pcihp_event_handler(caddr_t slot_arg, uint_t event_mask)
 		slotinfop->condition = AP_COND_OK;
 
 		/* +++ HOOK for RCM to report this hotplug event? +++ */
+
+		break;
+
+	case HPC_EVENT_SLOT_ATTN:
+		/*
+		 * Attention button is pressed.
+		 */
+		if (((slotinfop->slot_flags & PCIHP_SLOT_AUTO_CFG_EN) == 0) ||
+		    (slotinfop->slot_flags & PCIHP_SLOT_DISABLED)) {
+			/*
+			 * either auto-conifiguration or the slot is disabled,
+			 * ignore this event.
+			 */
+			break;
+		}
+
+		if (slotinfop->ostate == AP_OSTATE_UNCONFIGURED)
+			hint = SE_INCOMING_RES;
+		else
+			hint = SE_OUTGOING_RES;
+
+		if (ddi_getprop(DDI_DEV_T_ANY, pcihp_p->dip, DDI_PROP_DONTPASS,
+		    "inkernel-autoconfig", 0) == 0) {
+			pcihp_gen_sysevent(slotinfop->name, PCIHP_DR_REQ, hint,
+			    pcihp_p->dip, KM_SLEEP);
+			break;
+		}
+
+		if ((slotinfop->ostate == AP_OSTATE_UNCONFIGURED) &&
+		    (slotinfop->rstate != AP_RSTATE_EMPTY) &&
+		    (slotinfop->condition != AP_COND_FAILED)) {
+			if (slotinfop->rstate == AP_RSTATE_DISCONNECTED) {
+				rv = hpc_nexus_connect(slotinfop->slot_hdl,
+				    NULL, 0);
+				if (rv == HPC_SUCCESS)
+					slotinfop->rstate = AP_RSTATE_CONNECTED;
+				else
+					break;
+			}
+
+			rv = pcihp_configure_ap(pcihp_p, pci_dev);
+
+		} else if ((slotinfop->ostate == AP_OSTATE_CONFIGURED) &&
+		    (slotinfop->rstate == AP_RSTATE_CONNECTED) &&
+		    (slotinfop->condition != AP_COND_FAILED)) {
+			rv = pcihp_unconfigure_ap(pcihp_p, pci_dev);
+
+			if (rv != HPC_SUCCESS)
+				break;
+
+			rv = hpc_nexus_disconnect(slotinfop->slot_hdl,
+			    NULL, 0);
+			if (rv == HPC_SUCCESS)
+				slotinfop->rstate = AP_RSTATE_DISCONNECTED;
+		}
+
+		break;
+
+	case HPC_EVENT_SLOT_POWER_FAULT:
+		/*
+		 * Power fault is detected.
+		 */
+		cmn_err(CE_NOTE, "pcihp (%s%d): power-fault"
+		    " for this slot %s",
+		    ddi_driver_name(pcihp_p->dip),
+		    ddi_get_instance(pcihp_p->dip),
+		    slotinfop->name);
+
+		slotinfop->condition = AP_COND_FAILED;
+
+		pcihp_gen_sysevent(slotinfop->name, PCIHP_DR_AP_STATE_CHANGE,
+		    SE_NO_HINT, pcihp_p->dip, KM_SLEEP);
 
 		break;
 
@@ -3247,7 +3334,9 @@ pcihp_handle_enum_extraction(pcihp_t *pcihp_p, int pci_dev, int opcode,
 		return (PCIHP_SUCCESS);
 	}
 
+	mutex_enter(&slotinfop->slot_mutex);
 	rv = pcihp_unconfigure_ap(pcihp_p, pci_dev);
+	mutex_exit(&slotinfop->slot_mutex);
 	if (rv != HPC_SUCCESS && rv != EBUSY) {
 		cmn_err(CE_NOTE, "%s%d: PCI device %x Failed on Unconfigure",
 		    ddi_driver_name(pcihp_p->dip),
@@ -3320,7 +3409,9 @@ pcihp_handle_enum_insertion(pcihp_t *pcihp_p, int pci_dev, int opcode,
 
 	if ((slotinfop->slot_flags & PCIHP_SLOT_AUTO_CFG_EN) ==
 					PCIHP_SLOT_AUTO_CFG_EN) {
+		mutex_enter(&slotinfop->slot_mutex);
 		rv = pcihp_configure_ap(pcihp_p, pci_dev);
+		mutex_exit(&slotinfop->slot_mutex);
 		if (rv != HPC_SUCCESS) {	/* configure failed */
 			cmn_err(CE_NOTE, "%s%d: PCI device %x Failed on"
 				" Configure", ddi_driver_name(pcihp_p->dip),
@@ -3518,7 +3609,6 @@ pcihp_config_setup(dev_info_t **dip, ddi_acc_handle_t *handle,
 		uint32_t lo;
 		uint32_t hi;
 	} pci_bus_range;
-	int flags = 0;
 
 	slotinfop = &pcihp_p->slotinfo[pci_dev];
 
@@ -3588,16 +3678,12 @@ pcihp_config_setup(dev_info_t **dip, ddi_acc_handle_t *handle,
 		return (PCIHP_FAILURE);
 	}
 
-	if (pcihp_indirect_map(*dip) == DDI_SUCCESS)
-		flags |= PCICFG_CONF_INDIRECT_MAP;
-
 	/*
 	 * See if there is any PCI HW at this location
 	 * by reading the Vendor ID.  If it returns with 0xffff
 	 * then there is no hardware at this location.
 	 */
-	if (flags & PCICFG_CONF_INDIRECT_MAP) {
-
+	if (pcihp_indirect_map(*dip) == DDI_SUCCESS) {
 		if (pci_config_get16(*handle, 0) == 0xffff) {
 			pci_config_teardown(handle);
 			(void) ndi_devi_free(*dip);
@@ -3886,11 +3972,11 @@ pcihp_indirect_map(dev_info_t *dip)
 	int rc = DDI_FAILURE;
 
 	if (ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip), 0,
-			PCICFG_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
+			PCI_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
 		rc = DDI_SUCCESS;
 	else
 		if (ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip),
-				0, PCICFG_BUS_CONF_MAP_PROP,
+				0, PCI_BUS_CONF_MAP_PROP,
 				DDI_FAILURE) != DDI_FAILURE)
 			rc = DDI_SUCCESS;
 	return (rc);

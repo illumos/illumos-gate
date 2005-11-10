@@ -88,6 +88,7 @@ extern volatile int32_t	*apicioadr[MAX_IO_APIC];
 extern lock_t		apic_ioapic_lock;
 extern kmutex_t		airq_mutex;
 extern apic_cpus_info_t	*apic_cpus;
+extern int apic_first_avail_irq;
 
 
 /*
@@ -372,7 +373,7 @@ apic_alloc_vectors(dev_info_t *dip, int inum, int count, int pri, int type)
 	idx = (short)((type == DDI_INTR_TYPE_MSI) ? MSI_INDEX : MSIX_INDEX);
 	major = (dip != NULL) ? ddi_name_to_major(ddi_get_name(dip)) : 0;
 	for (i = 0; i < rcount; i++) {
-		if ((irqno = apic_allocate_irq(APIC_FIRST_FREE_IRQ)) ==
+		if ((irqno = apic_allocate_irq(apic_first_avail_irq)) ==
 		    (uchar_t)-1) {
 			mutex_exit(&airq_mutex);
 			DDI_INTR_IMPLDBG((CE_CONT, "apic_alloc_vectors: "
@@ -458,26 +459,32 @@ apic_check_msi_support(dev_info_t *dip)
 {
 
 	dev_info_t *rootdip;
+	char dev_type[16];
+	int dev_len;
 
 	DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: dip: 0x%p\n",
 	    (void *)dip));
 
 	/* check whether the device or its ancestors have PCI-E capability */
-	for (rootdip = ddi_root_node(); dip != rootdip &&
-	    pci_check_pciex(dip) != DDI_SUCCESS; dip = ddi_get_parent(dip));
+	for (rootdip = ddi_root_node(); dip != rootdip;
+	    dip = ddi_get_parent(dip)) {
 
-	/* PCI-E capability found */
-	if (dip != rootdip) {
-		DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: "
-		    "PCI-E capability found @ nodename %s driver %s%d\n",
-		    ddi_node_name(dip), ddi_driver_name(dip),
-		    ddi_get_instance(dip)));
-		return (PSM_SUCCESS);
+		DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: dip: 0x%p,"
+		    " driver: %s, binding: %s, nodename: %s\n", (void *)dip,
+		    ddi_driver_name(dip), ddi_binding_name(dip),
+		    ddi_node_name(dip)));
+		dev_len = sizeof (dev_type);
+		if (ddi_getlongprop_buf(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+		    "device_type", (caddr_t)dev_type, &dev_len)
+		    != DDI_PROP_SUCCESS)
+			continue;
+		if (strcmp(dev_type, "pciex") == 0)
+			return (PSM_SUCCESS);
 	}
 
 	/* MSI is not supported on this system */
-	DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: "
-	    "no PCI-E capability found\n"));
+	DDI_INTR_IMPLDBG((CE_CONT, "apic_check_msi_support: no 'pciex' "
+	    "device_type found\n"));
 	return (PSM_FAILURE);
 }
 

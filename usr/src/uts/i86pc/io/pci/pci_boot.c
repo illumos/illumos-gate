@@ -34,11 +34,12 @@
 #include <sys/pci_cfgspace.h>
 #include <sys/memlist.h>
 #include <sys/bootconf.h>
-#include "mps_table.h"
+#include <io/pci/mps_table.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_cfgspace_impl.h>
 #include <sys/psw.h>
 #include "../../../../common/pci/pci_strings.h"
+#include <io/pciex/pcie_ck804_boot.h>
 
 #define	pci_getb	(*pci_getb_func)
 #define	pci_getw	(*pci_getw_func)
@@ -51,7 +52,7 @@
 #define	CONFIG_INFO	0
 #define	CONFIG_UPDATE	1
 #define	CONFIG_NEW	2
-#define	COMPAT_BUFSIZE	256
+#define	COMPAT_BUFSIZE	512
 
 extern int pci_bios_nbus;
 static uchar_t max_dev_pci = 32;	/* PCI standard */
@@ -66,9 +67,9 @@ static void create_root_bus_dip(uchar_t bus);
 static dev_info_t *new_func_pci(uchar_t, uchar_t, uchar_t, uchar_t,
     ushort_t, int);
 static void add_compatible(dev_info_t *, ushort_t, ushort_t,
-    ushort_t, ushort_t, uchar_t, uint_t);
+    ushort_t, ushort_t, uchar_t, uint_t, int);
 static int add_reg_props(dev_info_t *, uchar_t, uchar_t, uchar_t, int, int);
-static void add_ppb_props(dev_info_t *, uchar_t, uchar_t, uchar_t);
+static void add_ppb_props(dev_info_t *, uchar_t, uchar_t, uchar_t, int);
 static void add_model_prop(dev_info_t *, uint_t);
 static void add_bus_range_prop(int);
 static int pci_slot_names_prop(int, char *, int);
@@ -164,8 +165,6 @@ create_root_bus_dip(uchar_t bus)
 
 	ndi_devi_alloc_sleep(ddi_root_node(), "pci",
 	    (pnode_t)DEVI_SID_NODEID, &dip);
-	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
-	    "device_type", "pci");
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 	    "#address-cells", 3);
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
@@ -173,6 +172,13 @@ create_root_bus_dip(uchar_t bus)
 	pci_regs[0] = pci_bus_res[bus].root_addr;
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
 	    "reg", (int *)pci_regs, 3);
+
+	/*
+	 * If system has PCIe bus, then create different properties
+	 */
+	if (create_pcie_root_bus(bus, dip) == B_FALSE)
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
+		    "device_type", "pci");
 
 	(void) ndi_devi_bind_driver(dip, 0);
 	pci_bus_res[bus].dip = dip;
@@ -403,9 +409,12 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	dev_info_t *dip;
 	uchar_t basecl, subcl, intr, revid;
 	ushort_t subvenid, subdevid, status;
+	ushort_t slot_num;
 	uint_t classcode, revclass;
 	int reprogram = 0, pciide;
 	int power[2] = {1, 1};
+	int pciex = 0;
+	ushort_t is_pci_bridge = 0;
 
 	ushort_t deviceid = pci_getw(bus, dev, func, PCI_CONF_DEVID);
 
@@ -434,6 +443,9 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	subcl = (classcode >> 8) & 0xff;
 	pciide = is_pciide(basecl, subcl, revid, vendorid, deviceid,
 	    subvenid, subdevid);
+	if (check_if_device_is_pciex(bus, dev, func, &slot_num,
+	    &is_pci_bridge) == B_TRUE)
+		pciex = 1;
 
 	if (pciide)
 		(void) snprintf(nodename, sizeof (nodename), "pci-ide");
@@ -484,10 +496,12 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 			    "subsystem-vendor-id", subvenid);
 		}
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-		    "min-grant", mingrant);
-		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
-		    "max-latency", maxlatency);
+		if (!pciex)
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+			    "min-grant", mingrant);
+		if (!pciex)
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+			    "max-latency", maxlatency);
 	}
 
 	/* interrupt, record if not 0 */
@@ -503,26 +517,38 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 	    "devsel-speed", (status & PCI_STAT_DEVSELT) >> 9);
-	if (status & PCI_STAT_FBBC)
+	if (!pciex && (status & PCI_STAT_FBBC))
 		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
 		    "fast-back-to-back");
-	if (status & PCI_STAT_66MHZ)
+	if (!pciex && (status & PCI_STAT_66MHZ))
 		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
 		    "66mhz-capable");
 	if (status & PCI_STAT_UDF)
 		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
 		    "udf-supported");
+	if (pciex & slot_num)
+		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
+		    "physical-slot#", slot_num);
 
 	(void) ndi_prop_update_int_array(DDI_DEV_T_NONE, dip,
 	    "power-consumption", power, 2);
 
-	if ((basecl == PCI_CLASS_BRIDGE) && (subcl == PCI_BRIDGE_PCI)) {
-		add_ppb_props(dip, bus, dev, func);
-	}
+	if ((basecl == PCI_CLASS_BRIDGE) && (subcl == PCI_BRIDGE_PCI))
+		add_ppb_props(dip, bus, dev, func, pciex);
 
-	add_model_prop(dip, classcode);
+	/* check for ck8-04 based PCI ISA bridge only */
+	if (NVIDIA_IS_LPC_BRIDGE(vendorid, deviceid) && (dev == 1) &&
+	    (func == 0))
+		add_ck804_isa_bridge_props(dip, bus, dev, func);
+
+	if (pciex && is_pci_bridge)
+		(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip, "model",
+		    (char *)"PCIe-PCI bridge");
+	else
+		add_model_prop(dip, classcode);
+
 	add_compatible(dip, subvenid, subdevid, vendorid, deviceid,
-	    revid, classcode);
+	    revid, classcode, pciex);
 	reprogram = add_reg_props(dip, bus, dev, func, config_op, pciide);
 	(void) ndi_devi_bind_driver(dip, 0);
 
@@ -556,6 +582,7 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 		reprogram = 0;	/* don't reprogram pci-ide bridge */
 	}
 
+
 	if (reprogram)
 		return (dip);
 	return (NULL);
@@ -564,6 +591,7 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 /*
  * Set the compatible property to a value compliant with
  * rev 2.1 of the IEEE1275 PCI binding.
+ * (Also used for PCI-Express devices).
  *
  *   pciVVVV,DDDD.SSSS.ssss.RR	(0)
  *   pciVVVV,DDDD.SSSS.ssss	(1)
@@ -576,21 +604,61 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
  * The Subsystem (SSSS) forms are not inserted if
  * subsystem-vendor-id is 0.
  *
+ * NOTE: For PCI-Express devices "pci" is replaced with "pciex" in 0-6 above
+ * property 2 is not created as per "1275 bindings for PCI Express Interconnect"
+ *
  * Set with setprop and \x00 between each
  * to generate the encoded string array form.
  */
 void
 add_compatible(dev_info_t *dip, ushort_t subvenid, ushort_t subdevid,
-    ushort_t vendorid, ushort_t deviceid, uchar_t revid, uint_t classcode)
+    ushort_t vendorid, ushort_t deviceid, uchar_t revid, uint_t classcode,
+    int pciex)
 {
-	int i, size;
-	char *compat[7];
+	int i = 0;
+	int size = COMPAT_BUFSIZE;
+	char *compat[13];
 	char *buf, *curr;
 
-#define	COMPAT_BUFSIZE	256
-	i = 0;
-	size = COMPAT_BUFSIZE;
 	curr = buf = kmem_alloc(size, KM_SLEEP);
+
+	if (pciex) {
+		if (subvenid) {
+			compat[i++] = curr;	/* form 0 */
+			(void) snprintf(curr, size, "pciex%x,%x.%x.%x.%x",
+			    vendorid, deviceid, subvenid, subdevid, revid);
+			size -= strlen(curr) + 1;
+			curr += strlen(curr) + 1;
+
+			compat[i++] = curr;	/* form 1 */
+			(void) snprintf(curr, size, "pciex%x,%x.%x.%x",
+			    vendorid, deviceid, subvenid, subdevid);
+			size -= strlen(curr) + 1;
+			curr += strlen(curr) + 1;
+
+		}
+		compat[i++] = curr;	/* form 3 */
+		(void) snprintf(curr, size, "pciex%x,%x.%x",
+		    vendorid, deviceid, revid);
+		size -= strlen(curr) + 1;
+		curr += strlen(curr) + 1;
+
+		compat[i++] = curr;	/* form 4 */
+		(void) snprintf(curr, size, "pciex%x,%x", vendorid, deviceid);
+		size -= strlen(curr) + 1;
+		curr += strlen(curr) + 1;
+
+		compat[i++] = curr;	/* form 5 */
+		(void) snprintf(curr, size, "pciexclass,%06x", classcode);
+		size -= strlen(curr) + 1;
+		curr += strlen(curr) + 1;
+
+		compat[i++] = curr;	/* form 6 */
+		(void) snprintf(curr, size, "pciexclass,%04x",
+		    (classcode >> 8));
+		size -= strlen(curr) + 1;
+		curr += strlen(curr) + 1;
+	}
 
 	if (subvenid) {
 		compat[i++] = curr;	/* form 0 */
@@ -606,8 +674,7 @@ add_compatible(dev_info_t *dip, ushort_t subvenid, ushort_t subdevid,
 		curr += strlen(curr) + 1;
 
 		compat[i++] = curr;	/* form 2 */
-		(void) snprintf(curr, size, "pci%x,%x",
-		    subvenid, subdevid);
+		(void) snprintf(curr, size, "pci%x,%x", subvenid, subdevid);
 		size -= strlen(curr) + 1;
 		curr += strlen(curr) + 1;
 	}
@@ -628,6 +695,8 @@ add_compatible(dev_info_t *dip, ushort_t subvenid, ushort_t subdevid,
 
 	compat[i++] = curr;	/* form 6 */
 	(void) snprintf(curr, size, "pciclass,%04x", (classcode >> 8));
+	size -= strlen(curr) + 1;
+	curr += strlen(curr) + 1;
 
 	(void) ndi_prop_update_string_array(DDI_DEV_T_NONE, dip,
 	    "compatible", compat, i);
@@ -923,7 +992,10 @@ add_reg_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
 	pci_putl(bus, dev, func, offset, PCI_BASE_ROM_ADDR_M);
 	value = pci_getl(bus, dev, func, offset);
 	pci_putl(bus, dev, func, offset, base);
-	value &= PCI_BASE_ROM_ADDR_M;
+	if (value & PCI_BASE_ROM_ENABLE)
+		value &= PCI_BASE_ROM_ADDR_M;
+	else
+		value = 0;
 
 	if (value != 0) {
 		regs[nreg].pci_phys_hi = (PCI_ADDR_MEM32 | devloc) + offset;
@@ -1011,8 +1083,10 @@ done:
 }
 
 static void
-add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func)
+add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func,
+    int pciex)
 {
+	char *dev_type;
 	int i;
 	uint_t val, io_range[2], mem_range[2], pmem_range[2];
 	uchar_t secbus = pci_getb(bus, dev, func, PCI_BCNF_SECBUS);
@@ -1032,6 +1106,8 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func)
 	pci_bus_res[secbus].dip = dip;
 	pci_bus_res[secbus].par_bus = bus;
 
+	dev_type = pciex ? "pciex" : "pci";
+
 	/* setup bus number hierarchy */
 	pci_bus_res[secbus].sub_bus = subbus;
 	if (subbus > pci_bus_res[bus].sub_bus)
@@ -1040,7 +1116,7 @@ add_ppb_props(dev_info_t *dip, uchar_t bus, uchar_t dev, uchar_t func)
 		pci_bus_res[i].par_bus = bus;
 
 	(void) ndi_prop_update_string(DDI_DEV_T_NONE, dip,
-	    "device_type", "pci");
+	    "device_type", dev_type);
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 	    "#address-cells", 3);
 	(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
@@ -1321,7 +1397,7 @@ pci_slot_names_prop(int bus, char *buf, int len)
 	for (i = 0; i < pci_irq_nroutes; i++) {
 		if (slot[i] == 0xff)
 			continue;
-		(void) sprintf(buf + plen, "Slot %d", slot[i]);
+		(void) sprintf(buf + plen, "Slot%d", slot[i]);
 		plen += strlen(buf+plen) + 1;
 		*(buf + plen) = 0;
 	}

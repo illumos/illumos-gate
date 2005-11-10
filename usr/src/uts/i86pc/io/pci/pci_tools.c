@@ -29,12 +29,11 @@
 #include <sys/types.h>
 #include <sys/mkdev.h>
 #include <sys/stat.h>
-#include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <vm/seg_kmem.h>
 #include <sys/machparam.h>
 #include <sys/ontrap.h>
-#include <sys/pci.h>
+#include <sys/pcie.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_tools.h>
@@ -189,9 +188,8 @@ pcitool_pciex_cfg_access(dev_info_t *dip, pcitool_reg_t *prg,
 
 	prg->status = PCITOOL_SUCCESS;
 
-	/* XXX replace e0000000 value below with 0 once FW changes are made */
 	prg->phys_addr = ddi_prop_get_int64(DDI_DEV_T_ANY, dip, 0,
-	    "ecfga-base-address", 0xe00000000);
+	    "ecfga-base-address", 0);
 	if (prg->phys_addr == 0) {
 		prg->status = PCITOOL_IO_ERROR;
 		return (EIO);

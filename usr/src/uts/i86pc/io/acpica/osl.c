@@ -1288,7 +1288,8 @@ create_d2a_map(void)
 		    "device_type", &device_type_prop) != DDI_PROP_SUCCESS)
 			continue;
 
-		if (strcmp("pci", device_type_prop) != 0) {
+		if ((strcmp("pci", device_type_prop) != 0) &&
+		    (strcmp("pciex", device_type_prop) != 0)) {
 			ddi_prop_free(device_type_prop);
 			continue;
 		}

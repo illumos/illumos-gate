@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_HOTPLUG_PCI_PCIHP_H
@@ -33,17 +33,15 @@
 extern "C" {
 #endif
 
+#include <sys/hotplug/pci/pcihp_impl.h>
+
 /*
  * Interfaces exported by PCI Nexus extension module, kernel/misc/pcihp.
  */
 int pcihp_init(dev_info_t *);
 int pcihp_uninit(dev_info_t *);
 int pcihp_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
-
 struct cb_ops *pcihp_get_cb_ops(void);
-
-/* exported data definitions */
-extern struct cb_ops pcihp_cb_ops;
 
 /* definitions for minor numbers */
 #define	PCIHP_AP_MINOR_NUM(x, y)		(((uint_t)(x) << 8) | \

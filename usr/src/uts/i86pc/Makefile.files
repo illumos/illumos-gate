@@ -108,7 +108,7 @@ SPECIAL_OBJS += $(SPECIAL_OBJS_$(CLASS))
 #
 ROOTNEX_OBJS += rootnex.o
 ISANEXUS_OBJS += isa.o dma_engine.o i8237A.o
-PCINEXUS_OBJS += pci.o pci_tools.o
+PCINEXUS_OBJS += pci.o pci_common.o pci_tools.o
 
 TCIC_OBJS +=	tcic.o
 
@@ -146,12 +146,20 @@ BSCV_OBJS	+= bscv.o
 BSCBUS_OBJS	+= bscbus.o
 
 #
+#	PCI-Express driver modules
+#
+PCI_E_NEXUS_OBJS += npe.o npe_misc.o pci_common.o pci_tools.o pcie_error.o
+PCI_E_PCINEXUS_OBJS += pcie_pci.o pcie_error.o
+PCIEHPCNEXUS_OBJS += pciehpc_x86.o pciehpc_acpi.o pciehpc_ck804.o
+
+#
 #	platform specific modules
 #
 UPPC_OBJS += uppc.o psm_common.o
 PCI_AUTOCONFIG_OBJS += \
 	pci_autoconfig.o \
 	pci_boot.o	\
+	pcie_ck804_boot.o	\
 	pci_memlist.o	\
 	pci_resource.o
 

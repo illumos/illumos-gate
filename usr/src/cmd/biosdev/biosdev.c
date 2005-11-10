@@ -215,7 +215,8 @@ matchpcibdf(di_node_t node, void *arg)
 	len = di_prop_lookup_strings(DDI_DEV_T_ANY, parentnode,
 	    "device_type", (char **)&devtype);
 
-	if ((len <= 0) || (strcmp(devtype, "pci") != 0))
+	if ((len <= 0) ||
+	    ((strcmp(devtype, "pci") != 0) && (strcmp(devtype, "pciex") != 0)))
 		return (DI_WALK_CONTINUE);
 
 	len = di_prop_lookup_ints(DDI_DEV_T_ANY, node, "reg",

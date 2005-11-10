@@ -704,7 +704,9 @@ cfga_change_state(cfga_cmd_t state_change_cmd, const char *ap_id,
 		if (devctl_ap_configure(dcp, NULL) == -1) {
 			rv = CFGA_ERROR;
 			cfga_err(errstring, CMD_SLOT_CONFIGURE, 0);
-			if (devctl_ap_disconnect(dcp, NULL) == -1) {
+			if ((rs == AP_RSTATE_DISCONNECTED) &&
+					(devctl_ap_disconnect(dcp, NULL)
+								== -1)) {
 				rv = CFGA_ERROR;
 				cfga_err(errstring,
 				    CMD_SLOT_CONFIGURE, 0);

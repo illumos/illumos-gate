@@ -541,6 +541,7 @@ extern "C" {
  */
 #define	PCI_CAP_ID		0x0	/* capability identifier, 1 byte */
 #define	PCI_CAP_NEXT_PTR	0x1	/* next entry pointer, 1 byte */
+#define	PCI_CAP_ID_REGS_OFF	0x2	/* cap id register offset */
 #define	PCI_CAP_MAX_PTR		0x30	/* maximum number of cap pointers */
 #define	PCI_CAP_PTR_OFF		0x40	/* minimum cap pointer offset */
 #define	PCI_CAP_PTR_MASK	0xFC	/* mask for capability pointer */
@@ -699,6 +700,18 @@ extern "C" {
 #define	PCI_MSIX_MAX_INTRS	2048	/* maximum MSI-X interrupts supported */
 
 /*
+ * PCI Slot Id Capabilities, 2 bytes
+ */
+/* Byte 1: Expansion Slot Register (ESR), Byte 2: Chassis Number Register */
+#define	PCI_CAPSLOT_ESR_NSLOTS_MASK	0x1F	/* Number of slots mask */
+#define	PCI_CAPSLOT_ESR_FIC		0x20	/* First In Chassis bit */
+#define	PCI_CAPSLOT_ESR_FIC_MASK	0x01	/* First In Chassis mask */
+#define	PCI_CAPSLOT_ESR_FIC_SHIFT	5	/* First In Chassis shift */
+#define	PCI_CAPSLOT_FIC(esr_reg)	((esr_reg) & PCI_CAPSLOT_ESR_FIC)
+#define	PCI_CAPSLOT_NSLOTS(esr_reg)	((esr_reg) & \
+						PCI_CAPSLOT_ESR_NSLOTS_MASK)
+
+/*
  * other interesting PCI constants
  */
 #define	PCI_BASE_NUM	6	/* num of base regs in configuration header */
@@ -706,14 +719,10 @@ extern "C" {
 #define	PCI_BAR_SZ_64	8	/* size of 64 bit base addr reg in bytes */
 #define	PCI_BASE_SIZE	4	/* size of base reg in bytes */
 #define	PCI_CONF_HDR_SIZE	256	/* configuration header size */
+#define	PCI_MAX_BUS_NUM		256		/* Maximum PCI buses allowed */
 #define	PCI_CLK_33MHZ	(33 * 1000 * 1000)	/* 33MHz clock speed */
 #define	PCI_CLK_66MHZ	(66 * 1000 * 1000)	/* 66MHz clock speed */
 #define	PCI_CLK_133MHZ	(133 * 1000 * 1000)	/* 133MHz clock speed */
-
-/*
- * PCI-Express definitions
- */
-#define	PCIE_CONF_HDR_SIZE	4096	/* PCI-Ex config header size */
 
 /*
  * This structure represents one entry of the 1275 "reg" property and

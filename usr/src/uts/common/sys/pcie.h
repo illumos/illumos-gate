@@ -36,7 +36,8 @@ extern "C" {
 #include <sys/pci.h>
 
 /*
- * PCI-Express Capability Registers Offsets
+ * PCI Express capability registers in PCI configuration space relative to
+ * the PCI Express Capability structure.
  */
 #define	PCIE_CAP_ID			PCI_CAP_ID
 #define	PCIE_CAP_NEXT_PTR		PCI_CAP_NEXT_PTR
@@ -54,7 +55,12 @@ extern "C" {
 #define	PCIE_ROOTSTS			0x20	/* Root Status */
 
 /*
- * PCI-Express Capabilities Register
+ * PCI-Express Config Space size
+ */
+#define	PCIE_CONF_HDR_SIZE	4096	/* PCIe configuration header size */
+
+/*
+ * PCI-Express Capabilities Register (2 bytes)
  */
 #define	PCIE_PCIECAP_VER_1_0		0x1	/* PCI-E spec 1.0 */
 #define	PCIE_PCIECAP_VER_MASK		0xF	/* Version Mask */
@@ -70,7 +76,7 @@ extern "C" {
 #define	PCIE_PCIECAP_INT_MSG_NUM	0x3700	/* Interrupt Message Number */
 
 /*
- * Device Capabilities Register
+ * Device Capabilities Register (4 bytes)
  */
 #define	PCIE_DEVCAP_MAX_PAYLOAD_128	0x0
 #define	PCIE_DEVCAP_MAX_PAYLOAD_256	0x1
@@ -124,7 +130,7 @@ extern "C" {
 #define	PCIE_DEVCAP_PLMT_SCL_MASK	0xC000000	/* Power Limit Scale */
 
 /*
- * Device Control Register
+ * Device Control Register (2 bytes)
  */
 #define	PCIE_DEVCTL_CE_REPORTING_EN	0x1	/* Correctable Error Enable */
 #define	PCIE_DEVCTL_NFE_REPORTING_EN	0x2	/* Non-Fatal Error Enable */
@@ -154,7 +160,7 @@ extern "C" {
 #define	PCIE_DEVCTL_MAX_READ_REQ_MASK	0x7000	/* Max_Read_Request_Size */
 
 /*
- * Device Status Register
+ * Device Status Register (2 bytes)
  */
 #define	PCIE_DEVSTS_CE_DETECTED		0x1	/* Correctable Error Detected */
 #define	PCIE_DEVSTS_NFE_DETECTED	0x2	/* Non Fatal Error Detected */
@@ -164,7 +170,7 @@ extern "C" {
 #define	PCIE_DEVSTS_TRANS_PENDING	0x20	/* Transactions Pending */
 
 /*
- * Link Capability Register
+ * Link Capability Register (4 bytes)
  */
 #define	PCIE_LINKCAP_MAX_SPEED_2_5	0x1	/* 2.5 Gb/s Speed */
 #define	PCIE_LINKCAP_MAX_SPEED_MASK	0xF	/* Maximum Link Speed */
@@ -201,10 +207,14 @@ extern "C" {
 #define	PCIE_LINKCAP_L1_EXIT_LAT_MAX	0x38000	/* > 64 us */
 #define	PCIE_LINKCAP_L1_EXIT_LAT_MASK	0x38000	/* L1 Exit Latency */
 
+/* PCIe v1.1 spec based */
+#define	PCIE_LINKCAP_DLL_ACTIVE_REP_CAPABLE	0x100000    /* DLL Active */
+							    /* Capable bit */
+
 #define	PCIE_LINKCAP_PORT_NUMBER	0xF0000000	/* Port Number */
 
 /*
- * Link Control Register
+ * Link Control Register (2 bytes)
  */
 #define	PCIE_LINKCTL_ASPM_CTL_DIS	0x0	/* ASPM Disable */
 #define	PCIE_LINKCTL_ASPM_CTL_L0S	0x1	/* ASPM L0s only */
@@ -222,7 +232,7 @@ extern "C" {
 #define	PCIE_LINKCTL_EXT_SYNCH		0x80	/* Extended Synch */
 
 /*
- * Link Status Register
+ * Link Status Register (2 bytes)
  */
 #define	PCIE_LINKSTS_SPEED_2_5		0x1	/* Link Speed */
 #define	PCIE_LINKSTS_SPEED_MASK		0xF	/* Link Speed */
@@ -241,7 +251,7 @@ extern "C" {
 #define	PCIE_LINKSTS_SLOT_CLK_CFG	0x1000	/* Slot Clock Configuration */
 
 /*
- * Slot Capability Register
+ * Slot Capability Register (4 bytes)
  */
 #define	PCIE_SLOTCAP_ATTN_BUTTON	0x1	/* Attention Button Present */
 #define	PCIE_SLOTCAP_POWER_CONTROLLER	0x2	/* Power Controller Present */
@@ -259,12 +269,18 @@ extern "C" {
 #define	PCIE_SLOTCAP_PLMT_SCL_1_BY_100	0x10000	/* 0.01x Scale */
 #define	PCIE_SLOTCAP_PLMT_SCL_1_BY_1000	0x18000	/* 0.001x Scale */
 #define	PCIE_SLOTCAP_PLMT_SCL_MASK	0x18000	/* Slot Power Limit Scale */
+#define	PCIE_SLOTCAP_EMI_LOCK_PRESENT	0x20000 /* EMI Lock Present */
+#define	PCIE_SLOTCAP_NO_CMD_COMP_SUPP	0x40000 /* No Command Comp. Supported */
 
 #define	PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT	19	/* Physical Slot Num Shift */
 #define	PCIE_SLOTCAP_PHY_SLOT_NUM_MASK	0x1FFF	/* Physical Slot Num Mask */
 
+#define	PCIE_SLOTCAP_PHY_SLOT_NUM(reg) \
+	    (((reg) >> PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT) & \
+	    PCIE_SLOTCAP_PHY_SLOT_NUM_MASK)
+
 /*
- * Slot Control Register
+ * Slot Control Register (2 bytes)
  */
 #define	PCIE_SLOTCTL_ATTN_BTN_EN	0x1	/* Attn Button Pressed Enable */
 #define	PCIE_SLOTCTL_PWR_FAULT_EN	0x2	/* Pwr Fault Detected Enable */
@@ -272,40 +288,52 @@ extern "C" {
 #define	PCIE_SLOTCTL_PRESENCE_CHANGE_EN	0x8	/* Presence Detect Changed En */
 #define	PCIE_SLOTCTL_CMD_INTR_EN	0x10	/* CMD Completed Interrupt En */
 #define	PCIE_SLOTCTL_HP_INTR_EN		0x20	/* Hot-Plug Interrupt Enable */
+#define	PCIE_SLOTCTL_PWR_CONTROL	0x0400	/* Power controller Control */
+#define	PCIE_SLOTCTL_EMI_LOCK_CONTROL	0x0800	/* EMI Lock control */
+#define	PCIE_SLOTCTL_ATTN_INDICATOR_MASK 0x00C0	/* Attn Indicator mask */
+#define	PCIE_SLOTCTL_PWR_INDICATOR_MASK	0x0300	/* Power Indicator mask */
 
-#define	PCIE_SLOTCTL_ATTN_CTL_ON	0x40	/* On  */
-#define	PCIE_SLOTCTL_ATTN_CTL_BLINK	0x80	/* Blink */
-#define	PCIE_SLOTCTL_ATTN_CTL_OFF	0xC0	/* Off */
-#define	PCIE_SLOTCTL_ATTN_CTL_MASK	0xC0	/* Attn Indicator Control */
-
-#define	PCIE_SLOTCTL_PWR_CTL_ON		0x100	/* On  */
-#define	PCIE_SLOTCTL_PWR_CTL_BLINK	0x200	/* Blink */
-#define	PCIE_SLOTCTL_PWR_CTL_OFF	0x300	/* Off */
-#define	PCIE_SLOTCTL_PWR_CTL_MASK	0x300	/* Power Indicator Control */
-
-#define	PCIE_SLOTCTL_PWR_CONTROLLER_CTL	0x400	/* Power Controller Control */
+/* State values for the Power and Attention Indicators */
+#define	PCIE_SLOTCTL_INDICATOR_STATE_ON		0x1	/* indicator ON */
+#define	PCIE_SLOTCTL_INDICATOR_STATE_BLINK	0x2	/* indicator BLINK */
+#define	PCIE_SLOTCTL_INDICATOR_STATE_OFF	0x3	/* indicator OFF */
 
 /*
- * Slot Status Register
+ * Macros to set/get the state of Power and Attention Indicators
+ * in the PCI Express Slot Control Register.
+ */
+#define	pcie_slotctl_pwr_indicator_get(reg)	\
+	(((reg) & PCIE_SLOTCTL_PWR_INDICATOR_MASK) >> 8)
+#define	pcie_slotctl_attn_indicator_get(ctrl)	\
+	(((ctrl) & PCIE_SLOTCTL_ATTN_INDICATOR_MASK) >> 6)
+#define	pcie_slotctl_attn_indicator_set(ctrl, v)\
+	(((ctrl) & ~PCIE_SLOTCTL_ATTN_INDICATOR_MASK) | ((v) << 6))
+#define	pcie_slotctl_pwr_indicator_set(ctrl, v)\
+	(((ctrl) & ~PCIE_SLOTCTL_PWR_INDICATOR_MASK) | ((v) << 8))
+
+/*
+ * Slot Status register (2 bytes)
  */
 #define	PCIE_SLOTSTS_ATTN_BTN_PRESSED	0x1	/* Attention Button Pressed */
 #define	PCIE_SLOTSTS_PWR_FAULT_DETECTED	0x2	/* Power Fault Detected */
 #define	PCIE_SLOTSTS_MRL_SENSOR_CHANGED	0x4	/* MRL Sensor Changed */
 #define	PCIE_SLOTSTS_PRESENCE_CHANGED	0x8	/* Presence Detect Changed */
 #define	PCIE_SLOTSTS_COMMAND_COMPLETED	0x10	/* Command Completed */
-#define	PCIE_SLOTSTS_MRL_SENSOR_OPEN	0x20	/* MRL Open */
+#define	PCIE_SLOTSTS_MRL_SENSOR_OPEN	0x20	/* MRL Sensor Open */
 #define	PCIE_SLOTSTS_PRESENCE_DETECTED	0x40	/* Card Present in slot */
+#define	PCIE_SLOTSTS_EMI_LOCK_SET	0x0080	/* EMI Lock set */
+#define	PCIE_SLOTSTS_DLL_STATE_CHANGED	0x0100	/* DLL State Changed */
 
 /*
- * Root Control Register
+ * Root Control Register (2 bytes)
  */
 #define	PCIE_ROOTCTL_SYS_ERR_ON_CE_EN	0x1	/* Sys Err on Cor Err Enable */
 #define	PCIE_ROOTCTL_SYS_ERR_ON_NFE_EN	0x2	/* Sys Err on NF Err Enable */
-#define	PCIE_ROOTCTL_SYS_ERR_ON_FE_EN	0x3	/* Sys Err on Fatal Err En */
-#define	PCIE_ROOTCTL_PME_INTERRUPT_EN	0x4	/* PME Interrupt Enable */
+#define	PCIE_ROOTCTL_SYS_ERR_ON_FE_EN	0x4	/* Sys Err on Fatal Err En */
+#define	PCIE_ROOTCTL_PME_INTERRUPT_EN	0x8	/* PME Interrupt Enable */
 
 /*
- * Root Status Register
+ * Root Status Register (4 bytes)
  */
 #define	PCIE_ROOTSTS_PME_REQ_ID_SHIFT	0	/* PME Requestor ID */
 #define	PCIE_ROOTSTS_PME_REQ_ID_MASK	0xFFFF	/* PME Requestor ID */

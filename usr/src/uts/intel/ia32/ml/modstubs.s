@@ -975,6 +975,17 @@ fcnname/**/_info:							\
 	END_MODULE(pcicfg);
 #endif
 
+/*
+ * Stubs for PCIEHPC (pci-ex hot plug support) module (misc/pciehpc).
+ */
+#ifndef	PCIEHPC_MODULE
+	MODULE(pciehpc,misc);
+	STUB(pciehpc, pciehpc_init, 0);
+	STUB(pciehpc, pciehpc_uninit, 0);
+	WSTUB(pciehpc, pciehpc_intr, nomod_zero);
+	END_MODULE(pciehpc);
+#endif
+
 #ifndef WC_MODULE
 	MODULE(wc,drv);
 	STUB(wc, wcvnget, 0);

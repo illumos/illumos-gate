@@ -194,6 +194,7 @@ COMMON_SUBDIRS = \
 	cmd/pathchk \
 	cmd/pax \
 	cmd/pbind \
+	cmd/pcidr \
 	cmd/pfexec \
 	cmd/pgrep \
 	cmd/picl/picld \

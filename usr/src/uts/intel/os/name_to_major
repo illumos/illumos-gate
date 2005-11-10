@@ -116,4 +116,6 @@ aggr 179
 smbios 180
 power 181
 zfs 182
+npe 183
+pcie_pci 184
 did 239

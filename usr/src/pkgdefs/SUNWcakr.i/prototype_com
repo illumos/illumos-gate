@@ -67,7 +67,10 @@ f none platform/i86pc/kernel/drv/bscv 755 root sys
 f none platform/i86pc/kernel/drv/bscv.conf 644 root sys
 f none platform/i86pc/kernel/drv/isa 755 root sys
 f none platform/i86pc/kernel/drv/kb8042 755 root sys
+f none platform/i86pc/kernel/drv/npe 755 root sys
 f none platform/i86pc/kernel/drv/pci 755 root sys
+f none platform/i86pc/kernel/drv/pcie_pci 755 root sys
+f none platform/i86pc/kernel/drv/pcie_pci.conf 644 root sys
 f none platform/i86pc/kernel/drv/power 755 root sys
 f none platform/i86pc/kernel/drv/power.conf 644 root sys
 f none platform/i86pc/kernel/drv/rootnex 755 root sys
@@ -76,12 +79,15 @@ f none platform/i86pc/kernel/mach/uppc 755 root sys
 d none platform/i86pc/kernel/misc 755 root sys
 f none platform/i86pc/kernel/misc/bootdev 755 root sys
 f none platform/i86pc/kernel/misc/pci_autoconfig 755 root sys
+f none platform/i86pc/kernel/misc/pciehpc 755 root sys
 f none platform/i86pc/kernel/unix 755 root sys
 d none platform/i86pc/kernel/drv/amd64 755 root sys
 f none platform/i86pc/kernel/drv/amd64/bmc 755 root sys
 f none platform/i86pc/kernel/drv/amd64/isa 755 root sys
 f none platform/i86pc/kernel/drv/amd64/kb8042 755 root sys
+f none platform/i86pc/kernel/drv/amd64/npe 755 root sys
 f none platform/i86pc/kernel/drv/amd64/pci 755 root sys
+f none platform/i86pc/kernel/drv/amd64/pcie_pci 755 root sys
 f none platform/i86pc/kernel/drv/amd64/power 755 root sys
 f none platform/i86pc/kernel/drv/amd64/rootnex 755 root sys
 d none platform/i86pc/kernel/mach/amd64 755 root sys
@@ -89,5 +95,6 @@ f none platform/i86pc/kernel/mach/amd64/uppc 755 root sys
 d none platform/i86pc/kernel/misc/amd64 755 root sys
 f none platform/i86pc/kernel/misc/amd64/bootdev 755 root sys
 f none platform/i86pc/kernel/misc/amd64/pci_autoconfig 755 root sys
+f none platform/i86pc/kernel/misc/amd64/pciehpc 755 root sys
 d none platform/i86pc/kernel/amd64 755 root sys
 f none platform/i86pc/kernel/amd64/unix 755 root sys

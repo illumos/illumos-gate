@@ -103,6 +103,39 @@ struct bus_ops ppb_bus_ops = {
 	i_ddi_intr_ops	/* (*bus_intr_op)(); 		*/
 };
 
+/*
+ * The goal here is to leverage off of the pcihp.c source without making
+ * changes to it.  Call into it's cb_ops directly if needed.
+ */
+static int	ppb_open(dev_t *, int, int, cred_t *);
+static int	ppb_close(dev_t, int, int, cred_t *);
+static int	ppb_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+static int	ppb_prop_op(dev_t, dev_info_t *, ddi_prop_op_t, int, char *,
+		    caddr_t, int *);
+static int	ppb_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
+
+struct cb_ops ppb_cb_ops = {
+	ppb_open,			/* open */
+	ppb_close,			/* close */
+	nodev,				/* strategy */
+	nodev,				/* print */
+	nodev,				/* dump */
+	nodev,				/* read */
+	nodev,				/* write */
+	ppb_ioctl,			/* ioctl */
+	nodev,				/* devmap */
+	nodev,				/* mmap */
+	nodev,				/* segmap */
+	nochpoll,			/* poll */
+	ppb_prop_op,			/* cb_prop_op */
+	NULL,				/* streamtab */
+	D_NEW | D_MP | D_HOTPLUG,	/* Driver compatibility flag */
+	CB_REV,				/* rev */
+	nodev,				/* int (*cb_aread)() */
+	nodev				/* int (*cb_awrite)() */
+};
+
+
 static int ppb_probe(dev_info_t *);
 static int ppb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd);
 static int ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
@@ -110,13 +143,13 @@ static int ppb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
 struct dev_ops ppb_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* refcnt  */
-	pcihp_info,		/* info */
+	ppb_info,		/* info */
 	nulldev,		/* identify */
 	ppb_probe,		/* probe */
 	ppb_attach,		/* attach */
 	ppb_detach,		/* detach */
 	nulldev,		/* reset */
-	&pcihp_cb_ops,		/* driver operations */
+	&ppb_cb_ops,		/* driver operations */
 	&ppb_bus_ops		/* bus operations */
 };
 
@@ -813,4 +846,37 @@ ppb_restore_config_regs(ppb_devstate_t *ppb_p)
 #endif
 		pci_config_teardown(&config_handle);
 	}
+}
+
+static int
+ppb_open(dev_t *devp, int flags, int otyp, cred_t *credp)
+{
+	return ((pcihp_get_cb_ops())->cb_open(devp, flags, otyp, credp));
+}
+
+static int
+ppb_close(dev_t dev, int flags, int otyp, cred_t *credp)
+{
+	return ((pcihp_get_cb_ops())->cb_close(dev, flags, otyp, credp));
+}
+
+static int
+ppb_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
+{
+	return ((pcihp_get_cb_ops())->cb_ioctl(dev, cmd, arg, mode, credp,
+	    rvalp));
+}
+
+static int
+ppb_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+	int flags, char *name, caddr_t valuep, int *lengthp)
+{
+	return ((pcihp_get_cb_ops())->cb_prop_op(dev, dip, prop_op, flags,
+	    name, valuep, lengthp));
+}
+
+static int
+ppb_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
+{
+	return (pcihp_info(dip, cmd, arg, result));
 }

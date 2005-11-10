@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_HOTPLUG_PCI_PCICFG_H
@@ -32,6 +33,8 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <sys/hotplug/pci/pcihp_impl.h>
 
 /*
  * Interfaces exported by PCI configurator module, kernel/misc/pcicfg.
@@ -51,19 +54,8 @@ int pcicfg_unconfigure(dev_info_t *, uint_t);
 #define	PCICFG_CONF_INDIRECT_MAP	1
 #define	PCICFG_CONF_DIRECT_MAP		0
 
-/*
- * we recognize the non transparent bridge child nodes with the
- * following property. This is specific to an implementation only.
- * This property is specific to AP nodes only.
- */
-#define	PCICFG_DEV_CONF_MAP_PROP	"pci-parent-indirect"
-
-/*
- * If a non transparent bridge drives a hotplug/hotswap bus, then
- * the following property must be defined for the node either by
- * the driver or the OBP.
- */
-#define	PCICFG_BUS_CONF_MAP_PROP	"pci-conf-indirect"
+#define	PCICFG_DEV_CONF_MAP_PROP	PCI_DEV_CONF_MAP_PROP
+#define	PCICFG_BUS_CONF_MAP_PROP	PCI_BUS_CONF_MAP_PROP
 
 #ifdef	__cplusplus
 }

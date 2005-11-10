@@ -751,7 +751,8 @@ uppc_translate_irq(dev_info_t *dip, int irqno)
 		return (irqno);
 	}
 
-	if (strcmp(dev_type, "pci") == 0) {
+	if ((strcmp(dev_type, "pci") == 0) ||
+	    (strcmp(dev_type, "pciex") == 0)) {
 
 		/* pci device */
 		if (acpica_get_bdf(dip, &busid, &devid, NULL) != 0)

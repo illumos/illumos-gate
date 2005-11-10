@@ -243,6 +243,8 @@ DRV_KMODS	+= rootnex
 DRV_KMODS	+= isa
 DRV_KMODS	+= pci
 DRV_KMODS	+= pcic
+DRV_KMODS	+= pcie_pci
+DRV_KMODS	+= npe
 
 DRV_KMODS_32	+= bscv
 DRV_KMODS_32	+= bscbus
@@ -308,7 +310,7 @@ SYS_KMODS	+=
 #
 #	'Misc' Modules (/kernel/misc):
 #
-MISC_KMODS	+= pci_autoconfig bootdev acpica
+MISC_KMODS	+= pci_autoconfig bootdev acpica pciehpc
 
 #
 #	'Mach' Modules (/kernel/mach):

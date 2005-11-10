@@ -284,6 +284,7 @@ e renameold etc/security/priv_names 644 root sys
 d none etc/sysevent 755 root sys
 d none etc/sysevent/config 755 root sys
 f none etc/sysevent/config/README 444 root sys
+f none etc/sysevent/config/SUNW,EC_dr,ESC_dr_req,sysevent.conf 644 root sys
 e pamconf etc/pam.conf 644 root sys
 s none etc/services=./inet/services
 s none etc/setmnt=../usr/sbin/setmnt

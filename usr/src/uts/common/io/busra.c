@@ -141,7 +141,7 @@ static int ra_map_exist(dev_info_t *dip, char *type);
 
 static struct modlmisc modlmisc = {
 	&mod_miscops,		/* Type of module. This one is a module */
-	"Bus Resource Allocator (BUSRA) %I%",	/* Name of the module. */
+	"Bus Resource Allocator (BUSRA) 1.36",	/* Name of the module. */
 };
 
 static struct modlinkage modlinkage = {
@@ -931,15 +931,9 @@ pci_resource_setup(dev_info_t *dip)
 	    (caddr_t)&bus_type, &len) != DDI_SUCCESS)
 		return (NDI_FAILURE);
 
-	/* it is not a pci bus type */
+	/* it is not a pci/pci-ex bus type */
 	if ((strcmp(bus_type, "pci") != 0) && (strcmp(bus_type, "pciex") != 0))
 		return (NDI_FAILURE);
-
-	/* read the "available" property if it is available */
-	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "available", (caddr_t)&regs, &rlen) != DDI_SUCCESS)
-		return (NDI_FAILURE);
-
 
 	/*
 	 * The pci-hotplug project addresses adding the call
@@ -958,6 +952,15 @@ pci_resource_setup(dev_info_t *dip)
 	}
 
 
+	/*
+	 * Create empty resource maps first.
+	 *
+	 * NOTE: If all the allocated resources are already assigned to
+	 * device(s) in the hot plug slot then "available" property may not
+	 * be present. But, subsequent hot plug operation may unconfigure
+	 * the device in the slot and try to free up it's resources. So,
+	 * at the minimum we should create empty maps here.
+	 */
 	if (ndi_ra_map_setup(dip, NDI_RA_TYPE_MEM) == NDI_FAILURE) {
 		return (NDI_FAILURE);
 	}
@@ -975,12 +978,17 @@ pci_resource_setup(dev_info_t *dip)
 		return (NDI_FAILURE);
 	}
 
-
-	/* create the available resource list for both memory and io space */
-	rcount = rlen / sizeof (pci_regspec_t);
-	for (i = 0; i < rcount; i++) {
-		switch (PCI_REG_ADDR_G(regs[i].pci_phys_hi)) {
-		case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
+	/* read the "available" property if it is available */
+	if (ddi_getlongprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "available", (caddr_t)&regs, &rlen) == DDI_SUCCESS) {
+		/*
+		 * create the available resource list for both memory and
+		 * io space
+		 */
+		rcount = rlen / sizeof (pci_regspec_t);
+		for (i = 0; i < rcount; i++) {
+		    switch (PCI_REG_ADDR_G(regs[i].pci_phys_hi)) {
+		    case PCI_REG_ADDR_G(PCI_ADDR_MEM32):
 			(void) ndi_ra_free(dip,
 			    (uint64_t)regs[i].pci_phys_low,
 			    (uint64_t)regs[i].pci_size_low,
@@ -988,7 +996,7 @@ pci_resource_setup(dev_info_t *dip)
 			    NDI_RA_TYPE_PCI_PREFETCH_MEM : NDI_RA_TYPE_MEM,
 			    0);
 			break;
-		case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
+		    case PCI_REG_ADDR_G(PCI_ADDR_MEM64):
 			(void) ndi_ra_free(dip,
 			    ((uint64_t)(regs[i].pci_phys_mid) << 32) |
 			    ((uint64_t)(regs[i].pci_phys_low)),
@@ -998,27 +1006,27 @@ pci_resource_setup(dev_info_t *dip)
 			    NDI_RA_TYPE_PCI_PREFETCH_MEM : NDI_RA_TYPE_MEM,
 			    0);
 			break;
-		case PCI_REG_ADDR_G(PCI_ADDR_IO):
+		    case PCI_REG_ADDR_G(PCI_ADDR_IO):
 			(void) ndi_ra_free(dip,
 			    (uint64_t)regs[i].pci_phys_low,
 			    (uint64_t)regs[i].pci_size_low,
 			    NDI_RA_TYPE_IO,
 			    0);
 			break;
-		case PCI_REG_ADDR_G(PCI_ADDR_CONFIG):
+		    case PCI_REG_ADDR_G(PCI_ADDR_CONFIG):
 			break;
-		default:
+		    default:
 			cmn_err(CE_WARN,
 			    "pci_resource_setup: bad addr type: %x\n",
 			    PCI_REG_ADDR_G(regs[i].pci_phys_hi));
 			break;
+		    }
 		}
+		kmem_free((caddr_t)regs, rlen);
 	}
 
-	kmem_free((caddr_t)regs, rlen);
-
 	/*
-	 * Create resource map for available bus numbers if the node
+	 * update resource map for available bus numbers if the node
 	 * has available-bus-range or bus-range property.
 	 */
 	len = sizeof (struct bus_range);
@@ -1107,7 +1115,7 @@ claim_pci_busnum(dev_info_t *dip, void *arg)
 	    (caddr_t)&bus_type, &len) != DDI_SUCCESS)
 		return (DDI_WALK_PRUNECHILD);
 
-	/* it is not a pci bus type */
+	/* it is not a pci/pci-ex bus type */
 	if ((strcmp(bus_type, "pci") != 0) && (strcmp(bus_type, "pciex") != 0))
 		return (DDI_WALK_PRUNECHILD);
 

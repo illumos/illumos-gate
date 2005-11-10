@@ -278,6 +278,7 @@ COMMON_SUBDIRS=		\
 	pathchk		\
 	pax		\
 	pbind		\
+	pcidr		\
 	pcitool		\
 	pcmciad		\
 	pfexec		\

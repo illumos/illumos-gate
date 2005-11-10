@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -112,6 +112,7 @@ typedef struct hpc_slot_info {
 #define	HPC_SLOT_TYPE_PCI	0x1		/* PCI bus slot */
 #define	HPC_SLOT_TYPE_CPCI	0x2		/* Compact PCI bus slot */
 #define	HPC_SLOT_TYPE_SBD	0x3		/* System bus slot */
+#define	HPC_SLOT_TYPE_PCIE	0x4		/* PCI Express slot */
 
 /* bit definitions in slot_capabilities field for PCI or cPCI bus slots */
 #define	HPC_SLOT_64BITS		0x0001	/* slot is a 64bit slot */
@@ -195,7 +196,7 @@ typedef enum { HPC_SLOT_EMPTY, HPC_SLOT_DISCONNECTED,
  * type definition for board type.
  *
  *	HPC_BOARD_UNKNOWN	Board is either not present or unknown.
- *	HPC_BOARD_PCI_HOTPLUG	PCI bus adapter.
+ *	HPC_BOARD_PCI_HOTPLUG	PCI or PCIe adapter.
  *	HPC_BOARD_CPCI_NON_HS	Non Hot Swap cPCI board.
  *	HPC_BOARD_CPCI_BASIC_HS	Basic Hot Swap cPCI board.
  *	HPC_BOARD_CPCI_FULL_HS	Full Hot Swap cPCI board.
@@ -242,6 +243,8 @@ typedef enum { HPC_BOARD_UNKNOWN, HPC_BOARD_PCI_HOTPLUG,
 #define	HPC_EVENT_ENABLE_ENUM		0x00008000
 #define	HPC_EVENT_DISABLE_ENUM		0x00010000
 #define	HPC_EVENT_BUS_ENUM		HPC_EVENT_SLOT_ENUM
+#define	HPC_EVENT_SLOT_ATTN		0x00020000
+#define	HPC_EVENT_SLOT_POWER_FAULT  	0x00040000
 
 /*
  * return values for errors from HPS framework interfaces.

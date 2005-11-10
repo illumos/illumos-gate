@@ -488,6 +488,13 @@ static	uchar_t	apic_io_ver[MAX_IO_APIC];
 static	uchar_t	apic_io_vectbase[MAX_IO_APIC];
 static	uchar_t	apic_io_vectend[MAX_IO_APIC];
 volatile int32_t *apicioadr[MAX_IO_APIC];
+
+/*
+ * First available slot to be used as IRQ index into the apic_irq_table
+ * for those interrupts (like MSI/X) that don't have a physical IRQ.
+ */
+int apic_first_avail_irq  = APIC_FIRST_FREE_IRQ;
+
 /*
  * apic_ioapic_lock protects the ioapics (reg select), the status, temp_bound
  * and bound elements of cpus_info and the temp_cpu element of irq_struct
@@ -1130,6 +1137,8 @@ acpi_probe(void)
 		apic_io_ver[i] = (uchar_t)(ver & 0xff);
 		intmax = (ver >> 16) & 0xff;
 		apic_io_vectend[i] = apic_io_vectbase[i] + intmax;
+		if (apic_first_avail_irq <= apic_io_vectend[i])
+			apic_first_avail_irq = apic_io_vectend[i] + 1;
 	}
 
 
@@ -3133,7 +3142,8 @@ apic_introp_xlate(dev_info_t *dip, struct intrspec *ispec, int type)
 		goto nonpci;
 	}
 
-	if (strcmp(dev_type, "pci") == 0) {
+	if ((strcmp(dev_type, "pci") == 0) ||
+	    (strcmp(dev_type, "pciex") == 0)) {
 		/* pci device */
 		if (acpica_get_bdf(dip, &busid, &devid, NULL) != 0)
 			goto nonpci;
@@ -3482,7 +3492,7 @@ apic_setup_irq_table(dev_info_t *dip, int irqno, struct apic_io_intr *intrp,
 		intr_index = (type == DDI_INTR_TYPE_MSI) ? MSI_INDEX :
 		    MSIX_INDEX;
 		mutex_enter(&airq_mutex);
-		if ((irqno = apic_allocate_irq(APIC_FIRST_FREE_IRQ)) == -1) {
+		if ((irqno = apic_allocate_irq(apic_first_avail_irq)) == -1) {
 			mutex_exit(&airq_mutex);
 			/* need an irq for MSI/X to index into autovect[] */
 			cmn_err(CE_WARN, "No interrupt irq: %s instance %d",
@@ -3574,7 +3584,7 @@ apic_setup_irq_table(dev_info_t *dip, int irqno, struct apic_io_intr *intrp,
 			 * The slot is used by another irqno, so allocate
 			 * a free irqno for this interrupt
 			 */
-			newirq = apic_allocate_irq(APIC_FIRST_FREE_IRQ);
+			newirq = apic_allocate_irq(apic_first_avail_irq);
 			if (newirq == -1) {
 				mutex_exit(&airq_mutex);
 				return (-1);
