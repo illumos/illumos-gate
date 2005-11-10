@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -163,6 +164,15 @@ cfork(int isvfork, int isfork1)
 		error = EINTR;
 		goto forkerr;
 	}
+
+	/*
+	 * If this is vfork(), cancel any suspend request we might
+	 * have gotten from some other thread via lwp_suspend().
+	 * Otherwise we could end up with a deadlock on return
+	 * from the vfork() in both the parent and the child.
+	 */
+	if (isvfork)
+		curthread->t_proc_flag &= ~TP_HOLDLWP;
 
 #if defined(__sparc)
 	/*

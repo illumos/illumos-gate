@@ -875,6 +875,7 @@ lwp_suspend(kthread_t *t)
 	 * Set the thread's TP_HOLDLWP flag so it will stop in holdlwp().
 	 * If an lwp is stopping itself, there is no need to wait.
 	 */
+top:
 	t->t_proc_flag |= TP_HOLDLWP;
 	if (t == curthread) {
 		t->t_sig_check = 1;
@@ -930,13 +931,13 @@ lwp_suspend(kthread_t *t)
 
 			thread_lock(t);
 			/*
-			 * If TP_HOLDLWP flag goes away, lwp_continue() must
-			 * have been called while we were waiting, so cancel
-			 * the suspend.
+			 * If the TP_HOLDLWP flag went away, lwp_continue()
+			 * or vfork() must have been called while we were
+			 * waiting, so start over again.
 			 */
 			if ((t->t_proc_flag & TP_HOLDLWP) == 0) {
 				thread_unlock(t);
-				return (0);
+				goto top;
 			}
 		}
 		thread_unlock(t);
