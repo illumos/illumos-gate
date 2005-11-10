@@ -113,10 +113,10 @@ dnode_fini(void)
 }
 
 
+#ifdef ZFS_DEBUG
 void
 dnode_verify(dnode_t *dn)
 {
-#ifdef ZFS_DEBUG
 	int drop_struct_lock = FALSE;
 
 	ASSERT(dn->dn_phys);
@@ -164,8 +164,8 @@ dnode_verify(dnode_t *dn)
 	}
 	if (drop_struct_lock)
 		rw_exit(&dn->dn_struct_rwlock);
-#endif
 }
+#endif
 
 void
 dnode_byteswap(dnode_phys_t *dnp)
@@ -459,7 +459,7 @@ dnode_t *
 dnode_special_open(objset_impl_t *os, dnode_phys_t *dnp, uint64_t object)
 {
 	dnode_t *dn = dnode_create(os, dnp, NULL, object);
-	dnode_verify(dn);
+	DNODE_VERIFY(dn);
 	return (dn);
 }
 
@@ -515,7 +515,7 @@ dnode_hold_impl(objset_impl_t *os, uint64_t object, int flag, void *ref)
 
 	mdn = os->os_meta_dnode;
 
-	dnode_verify(mdn);
+	DNODE_VERIFY(mdn);
 
 	if (!RW_WRITE_HELD(&mdn->dn_struct_rwlock)) {
 		rw_enter(&mdn->dn_struct_rwlock, RW_READER);
@@ -570,7 +570,7 @@ dnode_hold_impl(objset_impl_t *os, uint64_t object, int flag, void *ref)
 	if (refcount_add(&dn->dn_holds, ref) == 1)
 		dbuf_add_ref(db, dn);
 
-	dnode_verify(dn);
+	DNODE_VERIFY(dn);
 	ASSERT3P(dn->dn_dbuf, ==, db);
 	ASSERT3U(dn->dn_object, ==, object);
 	dbuf_rele(db);
@@ -614,7 +614,7 @@ dnode_setdirty(dnode_t *dn, dmu_tx_t *tx)
 	if (IS_DNODE_DNODE(dn->dn_object))
 		return;
 
-	dnode_verify(dn);
+	DNODE_VERIFY(dn);
 
 #ifdef ZFS_DEBUG
 	mutex_enter(&dn->dn_mtx);

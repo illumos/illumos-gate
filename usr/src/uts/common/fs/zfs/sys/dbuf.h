@@ -287,10 +287,13 @@ _NOTE(CONSTCOND) } while (0)
 	} \
 _NOTE(CONSTCOND) } while (0)
 
+#define	DBUF_VERIFY(db)	dbuf_verify(db)
+
 #else
 
 #define	dprintf_dbuf(db, fmt, ...)
 #define	dprintf_dbuf_bp(db, bp, fmt, ...)
+#define	DBUF_VERIFY(db)
 
 #endif
 

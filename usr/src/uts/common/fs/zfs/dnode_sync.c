@@ -36,7 +36,6 @@
 #include <sys/spa.h>
 #include <sys/zio.h>
 
-
 static void
 dnode_increase_indirection(dnode_t *dn, dmu_tx_t *tx)
 {
@@ -126,10 +125,10 @@ free_blocks(dnode_t *dn, blkptr_t *bp, int num, dmu_tx_t *tx)
 	dnode_diduse_space(dn, -bytesfreed);
 }
 
+#ifdef ZFS_DEBUG
 static void
 free_verify(dmu_buf_impl_t *db, uint64_t start, uint64_t end, dmu_tx_t *tx)
 {
-#ifdef ZFS_DEBUG
 	int off, num;
 	int i, err, epbs;
 	uint64_t txg = tx->tx_txg;
@@ -197,8 +196,8 @@ free_verify(dmu_buf_impl_t *db, uint64_t start, uint64_t end, dmu_tx_t *tx)
 
 		dbuf_remove_ref(child, FTAG);
 	}
-#endif
 }
+#endif
 
 static int
 free_children(dmu_buf_impl_t *db, uint64_t blkid, uint64_t nblks, int trunc,
@@ -235,7 +234,7 @@ free_children(dmu_buf_impl_t *db, uint64_t blkid, uint64_t nblks, int trunc,
 	ASSERT3U(start, <=, end);
 
 	if (db->db_level == 1) {
-		free_verify(db, start, end, tx);
+		FREE_VERIFY(db, start, end, tx);
 		free_blocks(dn, bp, end-start+1, tx);
 		ASSERT(all || list_link_active(&db->db_dirty_node[txg_index]));
 		return (all);
@@ -423,7 +422,7 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 	    dn->dn_dirtyblksz[txgoff] > 0);
 
 	ASSERT(dnp->dn_type != DMU_OT_NONE || dn->dn_allocated_txg);
-	dnode_verify(dn);
+	DNODE_VERIFY(dn);
 	/*
 	 * Make sure the dbuf for the dn_phys is released before we modify it.
 	 */

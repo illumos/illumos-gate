@@ -288,9 +288,14 @@ int dnode_next_offset(dnode_t *dn, boolean_t hole, uint64_t *off, int minlvl,
 	} \
 _NOTE(CONSTCOND) } while (0)
 
+#define	DNODE_VERIFY(dn)		dnode_verify(dn)
+#define	FREE_VERIFY(db, start, end, tx)	free_verify(db, start, end, tx)
+
 #else
 
 #define	dprintf_dnode(db, fmt, ...)
+#define	DNODE_VERIFY(dn)
+#define	FREE_VERIFY(db, start, end, tx)
 
 #endif
 

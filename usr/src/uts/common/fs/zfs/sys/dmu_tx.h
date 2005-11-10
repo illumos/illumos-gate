@@ -141,9 +141,12 @@ extern int dmu_use_tx_debug_bufs;
 _NOTE(CONSTCOND) } while (0); \
 	else dprintf(fmt, __VA_ARGS__)
 
+#define	DMU_TX_DIRTY_BUF(tx, db)	dmu_tx_dirty_buf(tx, db)
+
 #else
 
 #define	dprintf_tx(tx, fmt, ...)
+#define	DMU_TX_DIRTY_BUF(tx, db)
 
 #endif
 

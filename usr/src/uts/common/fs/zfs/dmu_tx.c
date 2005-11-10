@@ -477,10 +477,10 @@ dmu_tx_holds(dmu_tx_t *tx, uint64_t object)
 	return (holds);
 }
 
+#ifdef ZFS_DEBUG
 void
 dmu_tx_dirty_buf(dmu_tx_t *tx, dmu_buf_impl_t *db)
 {
-#ifdef ZFS_DEBUG
 	dmu_tx_hold_t *dth;
 	int match_object = FALSE, match_offset = FALSE;
 	dnode_t *dn = db->db_dnode;
@@ -566,8 +566,8 @@ dmu_tx_dirty_buf(dmu_tx_t *tx, dmu_buf_impl_t *db)
 	panic("dirtying dbuf obj=%llx lvl=%u blkid=%llx but not tx_held\n",
 	    (u_longlong_t)db->db.db_object, db->db_level,
 	    (u_longlong_t)db->db_blkid);
-#endif
 }
+#endif
 
 static int
 dmu_tx_try_assign(dmu_tx_t *tx, uint64_t txg_how, dmu_tx_hold_t **last_dth)

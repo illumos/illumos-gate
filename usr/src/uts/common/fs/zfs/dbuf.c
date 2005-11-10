@@ -39,10 +39,7 @@
 #include <sys/dmu_zfetch.h>
 
 static void dbuf_destroy(dmu_buf_impl_t *db);
-static void dbuf_verify(dmu_buf_impl_t *db);
-static void dbuf_evict_user(dmu_buf_impl_t *db);
 static int dbuf_undirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
-static arc_done_func_t dbuf_read_done;
 static arc_done_func_t dbuf_write_done;
 
 /*
@@ -284,10 +281,10 @@ dbuf_fini(void)
  * Other stuff.
  */
 
+#ifdef ZFS_DEBUG
 static void
 dbuf_verify(dmu_buf_impl_t *db)
 {
-#ifdef ZFS_DEBUG
 	int i;
 	dnode_t *dn = db->db_dnode;
 
@@ -386,8 +383,8 @@ dbuf_verify(dmu_buf_impl_t *db)
 			}
 		}
 	}
-#endif
 }
+#endif
 
 static void
 dbuf_update_data(dmu_buf_impl_t *db)
@@ -854,7 +851,7 @@ dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx)
 
 	ASSERT(tx->tx_txg != 0);
 	ASSERT(!refcount_is_zero(&db->db_holds));
-	dmu_tx_dirty_buf(tx, db);
+	DMU_TX_DIRTY_BUF(tx, db);
 
 	/*
 	 * Shouldn't dirty a regular buffer in syncing context.  Private
@@ -1149,7 +1146,7 @@ void
 dbuf_fill_done(dmu_buf_impl_t *db, dmu_tx_t *tx)
 {
 	mutex_enter(&db->db_mtx);
-	dbuf_verify(db);
+	DBUF_VERIFY(db);
 
 	if (db->db_state == DB_FILL) {
 		if (db->db_level == 0 && db->db_d.db_freed_in_flight) {
@@ -1324,7 +1321,7 @@ dbuf_evictable(dmu_buf_impl_t *db)
 	int i;
 
 	ASSERT(MUTEX_HELD(&db->db_mtx));
-	dbuf_verify(db);
+	DBUF_VERIFY(db);
 
 	if (db->db_state != DB_UNCACHED && db->db_state != DB_CACHED)
 		return (FALSE);
@@ -1454,7 +1451,7 @@ dbuf_hold_impl(dnode_t *dn, uint8_t level, uint64_t blkid, int fail_sparse,
 
 	dbuf_add_ref(db, tag);
 	dbuf_update_data(db);
-	dbuf_verify(db);
+	DBUF_VERIFY(db);
 	mutex_exit(&db->db_mtx);
 
 	/* NOTE: we can't rele the parent until after we drop the db_mtx */
@@ -1518,7 +1515,7 @@ dbuf_remove_ref(dmu_buf_impl_t *db, void *tag)
 	}
 
 	mutex_enter(&db->db_mtx);
-	dbuf_verify(db);
+	DBUF_VERIFY(db);
 
 	holds = refcount_remove(&db->db_holds, tag);
 
@@ -1634,7 +1631,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 	} else {
 		ASSERT3U(db->db_state, ==, DB_CACHED);
 	}
-	dbuf_verify(db);
+	DBUF_VERIFY(db);
 
 	/*
 	 * Don't need a lock on db_dirty (dn_mtx), because it can't
@@ -1750,7 +1747,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 		ASSERT(db->db_parent == NULL);
 		db->db_parent = dn->dn_dbuf;
 		db->db_blkptr = &dn->dn_phys->dn_blkptr[db->db_blkid];
-		dbuf_verify(db);
+		DBUF_VERIFY(db);
 		mutex_exit(&db->db_mtx);
 	} else if (db->db_blkptr == NULL) {
 		dmu_buf_impl_t *parent = db->db_parent;
@@ -1789,7 +1786,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 
 		db->db_blkptr = (blkptr_t *)parent->db.db_data +
 		    (db->db_blkid & ((1ULL << epbs) - 1));
-		dbuf_verify(db);
+		DBUF_VERIFY(db);
 		mutex_exit(&db->db_mtx);
 	}
 	ASSERT(db->db_parent == NULL || arc_released(db->db_parent->db_buf));
