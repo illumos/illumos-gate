@@ -47,24 +47,32 @@
  * Pseudo-code to aid in understanding the control flow of the
  * bcopy/kcopy routine.
  *
- * On entry to kcopy:
- *	%l7 = curthread->t_lofault;
+ *	! WARNING : <Register usage convention>
+ *	! In kcopy() the %o5, holds previous error handler and a flag
+ *	! LOFAULT_SET (low bits). The %o5 is null in bcopy().
+ *	! The %o5 is not available for any other use.
+ *
+ * kcopy():
+ *	%o5 = curthread->t_lofault;		! save existing handler in %o5
+ *	%o5 |= LOFAULT_SET;			! ORed with LOFAULT_SET flag
  *	curthread->t_lofault = .copyerr;
- *	%o5 = %l7;			! save existing handler in %o5
  *	Call bcopy();
  *
- * On entry to bcopy:
- *
+ * bcopy():
  * 	if (length < 128)
- * 		goto_regular_copy;
+ * 		goto regular_copy;
  *
- * 	if (!use_vis)
- * 		goto_regular_copy;
+ * 	if (!use_hw_bcopy)
+ * 		goto regular_copy;
  *
- * 	do_blockcopy_here;
+ * 	blockcopy;
+ *	restore t_lofault handler if came from kcopy();
+ *
+ *	regular_copy;
+ *	restore t_lofault handler if came from kcopy();
  *
  * In lofault handler:
- *	curthread->t_lofault = %o5;	! restore old t_lofault
+ *	curthread->t_lofault = (%o5 & ~LOFAULT_SET);	! restore old t_lofault
  *	return (errno)
  *
  */
@@ -75,13 +83,8 @@
 #define	SMALL_LIMIT	7
 
 /*
- * Size of stack frame in order to accomodate a 64-byte aligned
- * floating-point register save area and 2 32-bit temp locations.
- */
-#define	HWCOPYFRAMESIZE	((64 * 5) + (2 * 4))
-
-/*
- * LOFAULT_SET : Flag set by kzero to indicate that lo_fault handler was set
+ * LOFAULT_SET : Flag set by kzero and kcopy to indicate that t_lofault
+ * handler was set
  */
 #define	LOFAULT_SET 2
 
@@ -128,20 +131,24 @@ kcopy(const void *from, void *to, size_t count)
 
 	ENTRY(kcopy)
 
-	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
-	set	.copyerr, %o5		! copyerr is lofault value
-	ldn	[THREAD_REG + T_LOFAULT], %l7	! save existing handler
-	membar	#Sync			! sync error barrier (see copy.s)
-	stn	%o5, [THREAD_REG + T_LOFAULT]	! set t_lofault
-	b	.do_copy		! common code
-	  mov	%l7, %o5
+	save	%sp, -SA(MINFRAME), %sp
+	set	.copyerr, %l7			! copyerr is lofault value
+	ldn	[THREAD_REG + T_LOFAULT], %o5	! save existing handler
+	or	%o5, LOFAULT_SET, %o5
+	membar	#Sync				! sync error barrier
+	b	.do_copy			! common code
+	stn	%l7, [THREAD_REG + T_LOFAULT]	! set t_lofault
 
 /*
  * We got here because of a fault during kcopy.
  * Errno value is in %g1.
  */
 .copyerr:
-	membar	#Sync			! sync error barrier
+	! The kcopy() *always* sets a t_lofault handler and it ORs LOFAULT_SET
+	! into %o5 to indicate it has set t_lofault handler. Need to clear
+	! LOFAULT_SET flag before restoring the error handler.
+	andn	%o5, LOFAULT_SET, %o5
+	membar	#Sync				! sync error barrier
 	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 	ret
 	restore	%g1, 0, %o0
@@ -152,9 +159,6 @@ kcopy(const void *from, void *to, size_t count)
 
 /*
  * Copy a block of storage - must not overlap (from + len <= to).
- *
- * Copy a page of memory.
- * Assumes double word alignment and a count >= 256.
  */
 #if defined(lint)
 
@@ -167,7 +171,8 @@ bcopy(const void *from, void *to, size_t count)
 
 	ENTRY(bcopy)
 
-	save	%sp, -SA(MINFRAME + HWCOPYFRAMESIZE), %sp
+	save	%sp, -SA(MINFRAME), %sp
+	clr	%o5			! flag LOFAULT_SET is not set for bcopy
 
 .do_copy:
 	cmp	%i2, 12			! for small counts
@@ -388,7 +393,6 @@ loop2:
 	add	%i0, 0x40, %i0
 
 .blkdone:
-	membar	#Sync
 	tst	%i2
 	bz,pt	%xcc, .blkexit
 	nop
@@ -402,6 +406,13 @@ loop2:
 	inc	%i0
 
 .blkexit:
+	membar	#Sync				! sync error barrier
+	! Restore t_lofault handler, if came here from kcopy().
+	tst	%o5
+	bz	%ncc, 1f
+	andn	%o5, LOFAULT_SET, %o5
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+1:
 	ret
 	restore	%g0, 0, %o0
 
@@ -623,7 +634,13 @@ loop2:
 	bgeu,a	%ncc, 1b		! loop till done
 	ldub	[%i0+%i1], %o4		! read from address
 .cpdone:
-	membar	#Sync			! sync error barrier
+	membar	#Sync				! sync error barrier
+	! Restore t_lofault handler, if came here from kcopy().
+	tst	%o5
+	bz	%ncc, 1f
+	andn	%o5, LOFAULT_SET, %o5
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+1:
 	ret
 	restore %g0, 0, %o0		! return (0)
 

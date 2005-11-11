@@ -47,9 +47,8 @@
 #define	SMALL_LIMIT	7
 
 /*
- * Flags used by uzero/kzero/bzero functions. They set lower bits of
- * the t_lofault address :
- * LOFAULT_SET : Set by kzero to indicate that lo_fault handler was set
+ * LOFAULT_SET : Flag set by kzero and kcopy to indicate that t_lofault
+ * handler was set
  */
 #define	LOFAULT_SET 2
 
@@ -77,18 +76,22 @@ kcopy(const void *from, void *to, size_t count)
 	ENTRY(kcopy)
 
 	save	%sp, -SA(MINFRAME), %sp
-	set	.copyerr, %o5		! copyerr is lofault value
-	ldn	[THREAD_REG + T_LOFAULT], %l7	! save existing handler
-	membar	#Sync			! sync error barrier (see copy.s)
-	stn	%o5, [THREAD_REG + T_LOFAULT]	! set t_lofault
-	b	.do_copy		! common code
-	  mov	%l7, %o5
+	set	.copyerr, %l7			! copyerr is lofault value
+	ldn	[THREAD_REG + T_LOFAULT], %o5	! save existing handler
+	or	%o5, LOFAULT_SET, %o5
+	membar	#Sync				! sync error barrier
+	b	.do_copy			! common code
+	stn	%l7, [THREAD_REG + T_LOFAULT]	! set t_lofault
 
 /*
  * We got here because of a fault during kcopy.
  * Errno value is in %g1.
  */
 .copyerr:
+	! The kcopy() *always* sets a t_lofault handler and it ORs LOFAULT_SET
+	! into %o5 to indicate it has set t_lofault handler. Need to clear
+	! LOFAULT_SET flag before restoring the error handler.
+	andn	%o5, LOFAULT_SET, %o5
 	membar	#Sync			! sync error barrier
 	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
 	ret
@@ -100,9 +103,6 @@ kcopy(const void *from, void *to, size_t count)
 
 /*
  * Copy a block of storage - must not overlap (from + len <= to).
- *
- * Copy a page of memory.
- * Assumes double word alignment and a count >= 256.
  */
 #if defined(lint)
 
@@ -116,6 +116,7 @@ bcopy(const void *from, void *to, size_t count)
 	ENTRY(bcopy)
 
 	save	%sp, -SA(MINFRAME), %sp
+	clr	%o5			! flag LOFAULT_SET is not set for bcopy
 
 .do_copy:
 	cmp	%i2, 12			! for small counts
@@ -339,7 +340,13 @@ bcopy(const void *from, void *to, size_t count)
 	bgeu,a	%ncc, 1b		! loop till done
 	ldub	[%i0+%i1], %o4		! read from address
 .cpdone:
-	membar	#Sync			! sync error barrier
+	membar	#Sync				! sync error barrier
+	! Restore t_lofault handler, if came here from kcopy().
+	tst	%o5
+	bz	%ncc, 1f
+	andn	%o5, LOFAULT_SET, %o5
+	stn	%o5, [THREAD_REG + T_LOFAULT]	! restore old t_lofault
+1:
 	ret
 	restore %g0, 0, %o0		! return (0)
 
