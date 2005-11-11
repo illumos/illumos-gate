@@ -30,8 +30,6 @@
 
 SUBDIRS=	frudata frutree
 
-MSGSUBDIRS=
-
 all :=		TARGET= all
 install :=	TARGET= install
 clean :=	TARGET= clean
@@ -42,8 +40,6 @@ _msg :=		TARGET= _msg
 .KEEP_STATE:
 
 all install clean clobber lint : $(SUBDIRS)
-
-_msg:	$(MSGSUBDIRS)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)

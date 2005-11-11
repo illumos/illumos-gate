@@ -35,7 +35,7 @@ SUBDIRS= lib .WAIT envmon .WAIT \
 
 MSGSUBDIRS=	lib frudata grover excalibur psvc littleneck daktari \
 	cherrystone lw8 lw2plus taco enchilada chicago blade envmon mpxu ents \
-	silverstone sebring snowbird schumacher
+	silverstone sebring snowbird
 
 all :=		TARGET= all
 install :=	TARGET= install
