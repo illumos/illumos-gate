@@ -1778,6 +1778,7 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp)
 	}
 
 update:
+	zap_cursor_fini(&zc);
 	if (uio->uio_segflg != UIO_SYSSPACE || uio->uio_iovcnt != 1)
 		kmem_free(outbuf, bufsize);
 

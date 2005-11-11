@@ -346,6 +346,7 @@ dump_zap(objset_t *os, uint64_t object, void *data, size_t size)
 		(void) printf("\n");
 		umem_free(prop, attr.za_num_integers * attr.za_integer_length);
 	}
+	zap_cursor_fini(&zc);
 }
 
 static void

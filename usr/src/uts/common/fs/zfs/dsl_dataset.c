@@ -489,7 +489,7 @@ dsl_dataset_create_root(dsl_pool_t *dp, uint64_t *ddobjp, dmu_tx_t *tx)
 	(void) random_get_pseudo_bytes((void*)&dsphys->ds_guid,
 	    sizeof (dsphys->ds_guid));
 	dsphys->ds_snapnames_zapobj =
-	    zap_create(mos, DMU_OT_DSL_OBJSET_SNAP_MAP, DMU_OT_NONE, 0, tx);
+	    zap_create(mos, DMU_OT_DSL_DS_SNAP_MAP, DMU_OT_NONE, 0, tx);
 	dsphys->ds_creation_time = gethrestime_sec();
 	dsphys->ds_creation_txg = tx->tx_txg;
 	dsphys->ds_deadlist_obj =
@@ -553,7 +553,7 @@ dsl_dataset_create_sync(dsl_dir_t *pds, const char *fullname,
 	(void) random_get_pseudo_bytes((void*)&dsphys->ds_guid,
 	    sizeof (dsphys->ds_guid));
 	dsphys->ds_snapnames_zapobj =
-	    zap_create(mos, DMU_OT_DSL_OBJSET_SNAP_MAP, DMU_OT_NONE, 0, tx);
+	    zap_create(mos, DMU_OT_DSL_DS_SNAP_MAP, DMU_OT_NONE, 0, tx);
 	dsphys->ds_creation_time = gethrestime_sec();
 	dsphys->ds_creation_txg = tx->tx_txg;
 	dsphys->ds_deadlist_obj =
@@ -944,6 +944,8 @@ dsl_dataset_destroy_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	if (ds->ds_phys->ds_bp.blk_birth >= tx->tx_txg) {
 		mutex_exit(&ds->ds_lock);
 		dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
+		if (drop_lock)
+			rw_exit(&dp->dp_config_rwlock);
 		return (EAGAIN);
 	}
 

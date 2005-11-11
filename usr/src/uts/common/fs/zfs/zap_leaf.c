@@ -314,6 +314,28 @@ zap_leaf_array_read(const zap_entry_handle_t *zeh, uint16_t chunk,
 
 	ASSERT3U(array_int_len, <=, buf_int_len);
 
+	/* Fast path for one 8-byte integer */
+	if (array_int_len == 8 && buf_int_len == 8 && len == 1) {
+		struct zap_leaf_array *la = &l->l_phys->l_chunk[chunk].l_array;
+		uint64_t *buf64 = (uint64_t *)buf;
+		uint64_t val = *(uint64_t *)la->la_array;
+		*buf64 = BE_64(val);
+		return;
+	}
+
+	/* Fast path for an array of 1-byte integers (eg. the entry name) */
+	if (array_int_len == 1 && buf_int_len == 1 &&
+	    buf_len > array_len + ZAP_LEAF_ARRAY_BYTES) {
+		while (chunk != CHAIN_END) {
+			struct zap_leaf_array *la =
+			    &l->l_phys->l_chunk[chunk].l_array;
+			bcopy(la->la_array, buf, ZAP_LEAF_ARRAY_BYTES);
+			buf += ZAP_LEAF_ARRAY_BYTES;
+			chunk = la->la_next;
+		}
+		return;
+	}
+
 	while (len > 0) {
 		struct zap_leaf_array *la = &l->l_phys->l_chunk[chunk].l_array;
 		int i;
@@ -408,15 +430,8 @@ again:
 }
 
 /* Return (h1,cd1 >= h2,cd2) */
-static int
-hcd_gteq(uint64_t h1, uint32_t cd1, uint64_t h2, uint32_t cd2)
-{
-	if (h1 > h2)
-		return (TRUE);
-	if (h1 == h2 && cd1 >= cd2)
-		return (TRUE);
-	return (FALSE);
-}
+#define	HCD_GTEQ(h1, cd1, h2, cd2) \
+	((h1 > h2) ? TRUE : ((h1 == h2 && cd1 >= cd2) ? TRUE : FALSE))
 
 int
 zap_leaf_lookup_closest(zap_leaf_t *l,
@@ -442,8 +457,8 @@ again:
 			ASSERT3U(chunk, <, ZAP_LEAF_NUMCHUNKS);
 			ASSERT3U(le->le_type, ==, ZAP_LEAF_ENTRY);
 
-			if (hcd_gteq(le->le_hash, le->le_cd, h, cd) &&
-			    hcd_gteq(besth, bestcd, le->le_hash, le->le_cd)) {
+			if (HCD_GTEQ(le->le_hash, le->le_cd, h, cd) &&
+			    HCD_GTEQ(besth, bestcd, le->le_hash, le->le_cd)) {
 				ASSERT3U(bestlh, >=, lh);
 				bestlh = lh;
 				besth = le->le_hash;

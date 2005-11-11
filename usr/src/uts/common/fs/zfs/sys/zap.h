@@ -200,9 +200,13 @@ int zap_count(objset_t *ds, uint64_t zapobj, uint64_t *count);
  */
 int zap_value_search(objset_t *os, uint64_t zapobj, uint64_t value, char *name);
 
+struct zap;
+struct zap_leaf;
 typedef struct zap_cursor {
 	/* This structure is opaque! */
 	objset_t *zc_objset;
+	struct zap *zc_zap;
+	struct zap_leaf *zc_leaf;
 	uint64_t zc_zapobj;
 	uint64_t zc_hash;
 	uint32_t zc_cd;
@@ -224,9 +228,10 @@ typedef struct {
 
 /*
  * Initialize a zap cursor, pointing to the "first" attribute of the
- * zapobj.
+ * zapobj.  You must _fini the cursor when you are done with it.
  */
 void zap_cursor_init(zap_cursor_t *zc, objset_t *ds, uint64_t zapobj);
+void zap_cursor_fini(zap_cursor_t *zc);
 
 /*
  * Get the attribute currently pointed to by the cursor.  Returns

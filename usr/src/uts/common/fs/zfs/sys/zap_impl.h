@@ -177,6 +177,7 @@ int fzap_length(zap_t *zap, const char *name,
 int fzap_remove(zap_t *zap, const char *name, dmu_tx_t *tx);
 int fzap_cursor_retrieve(zap_t *zap, zap_cursor_t *zc, zap_attribute_t *za);
 void fzap_get_stats(zap_t *zap, zap_stats_t *zs);
+void zap_put_leaf(struct zap_leaf *l);
 
 int fzap_add_cd(zap_t *zap, const char *name,
     uint64_t integer_size, uint64_t num_integers,

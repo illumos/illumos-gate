@@ -81,8 +81,8 @@ typedef enum dmu_object_type {
 	DMU_OT_OBJSET,			/* OBJSET */
 	/* dsl: */
 	DMU_OT_DSL_DATASET,		/* UINT64 */
-	DMU_OT_DSL_DATASET_CHILD_MAP,	/* ZAP */
-	DMU_OT_DSL_OBJSET_SNAP_MAP,	/* ZAP */
+	DMU_OT_DSL_DIR_CHILD_MAP,	/* ZAP */
+	DMU_OT_DSL_DS_SNAP_MAP,		/* ZAP */
 	DMU_OT_DSL_PROPS,		/* ZAP */
 	DMU_OT_DSL_OBJSET,		/* UINT64 */
 	/* zpl: */
@@ -586,11 +586,13 @@ extern dmu_objset_type_t dmu_objset_type(objset_t *os);
 extern uint64_t dmu_objset_id(objset_t *os);
 extern int dmu_snapshot_list_next(objset_t *os, int namelen, char *name,
     uint64_t *id, uint64_t *offp);
+extern int dmu_dir_list_next(objset_t *os, int namelen, char *name,
+    uint64_t *idp, uint64_t *offp);
 
 /*
  * Return the txg number for the given assigned transaction.
  */
-uint64_t dmu_tx_get_txg(dmu_tx_t *tx); /* XXX */
+uint64_t dmu_tx_get_txg(dmu_tx_t *tx);
 
 /*
  * Synchronous write.

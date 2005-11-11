@@ -305,6 +305,7 @@ dsl_dir_open_spa(spa_t *spa, const char *name, void *tag, const char **tailp)
 		err = getcomponent(next, buf, &nextnext);
 		if (err) {
 			dsl_dir_close(dd, tag);
+			rw_exit(&dp->dp_config_rwlock);
 			if (openedspa)
 				spa_close(spa, FTAG);
 			return (NULL);
@@ -377,7 +378,7 @@ dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx)
 	if (pds->dd_phys->dd_child_dir_zapobj == 0) {
 		dmu_buf_will_dirty(pds->dd_dbuf, tx);
 		pds->dd_phys->dd_child_dir_zapobj = zap_create(mos,
-		    DMU_OT_DSL_DATASET_CHILD_MAP, DMU_OT_NONE, 0, tx);
+		    DMU_OT_DSL_DIR_CHILD_MAP, DMU_OT_NONE, 0, tx);
 	}
 
 	rw_enter(&pds->dd_pool->dp_config_rwlock, RW_WRITER);
@@ -405,7 +406,7 @@ dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx)
 	dsphys->dd_props_zapobj = zap_create(mos,
 	    DMU_OT_DSL_PROPS, DMU_OT_NONE, 0, tx);
 	dsphys->dd_child_dir_zapobj = zap_create(mos,
-	    DMU_OT_DSL_DATASET_CHILD_MAP, DMU_OT_NONE, 0, tx);
+	    DMU_OT_DSL_DIR_CHILD_MAP, DMU_OT_NONE, 0, tx);
 	dmu_buf_rele(dbuf);
 
 	rw_exit(&pds->dd_pool->dp_config_rwlock);
@@ -519,7 +520,7 @@ dsl_dir_create_root(objset_t *mos, uint64_t *ddobjp, dmu_tx_t *tx)
 	dsp->dd_props_zapobj = zap_create(mos,
 	    DMU_OT_DSL_PROPS, DMU_OT_NONE, 0, tx);
 	dsp->dd_child_dir_zapobj = zap_create(mos,
-	    DMU_OT_DSL_DATASET_CHILD_MAP, DMU_OT_NONE, 0, tx);
+	    DMU_OT_DSL_DIR_CHILD_MAP, DMU_OT_NONE, 0, tx);
 
 	dmu_buf_rele(dbuf);
 }

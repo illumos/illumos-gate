@@ -55,7 +55,6 @@ static void zap_grow_ptrtbl(zap_t *zap, dmu_tx_t *tx);
 static int zap_tryupgradedir(zap_t *zap, dmu_tx_t *tx);
 static zap_leaf_t *zap_get_leaf_byblk(zap_t *zap, uint64_t blkid,
     dmu_tx_t *tx, krw_t lt);
-static void zap_put_leaf(zap_leaf_t *l);
 static void zap_leaf_pageout(dmu_buf_t *db, void *vl);
 
 
@@ -422,7 +421,7 @@ fzap_count(zap_t *zap, uint64_t *count)
  * Routines for obtaining zap_leaf_t's
  */
 
-static void
+void
 zap_put_leaf(zap_leaf_t *l)
 {
 	zap_leaf_t *nl = l->l_next;
@@ -893,6 +892,7 @@ zap_value_search(objset_t *os, uint64_t zapobj, uint64_t value, char *name)
 			break;
 		}
 	}
+	zap_cursor_fini(&zc);
 	kmem_free(za, sizeof (zap_attribute_t));
 	return (err);
 }
@@ -912,8 +912,22 @@ fzap_cursor_retrieve(zap_t *zap, zap_cursor_t *zc, zap_attribute_t *za)
 	/* retrieve the next entry at or after zc_hash/zc_cd */
 	/* if no entry, return ENOENT */
 
+	if (zc->zc_leaf &&
+	    (ZAP_HASH_IDX(zc->zc_hash, zc->zc_leaf->lh_prefix_len) !=
+	    zc->zc_leaf->lh_prefix)) {
+		rw_enter(&zc->zc_leaf->l_rwlock, RW_READER);
+		zap_put_leaf(zc->zc_leaf);
+		zc->zc_leaf = NULL;
+	}
+
 again:
-	l = zap_deref_leaf(zap, zc->zc_hash, NULL, RW_READER);
+	if (zc->zc_leaf == NULL) {
+		zc->zc_leaf = zap_deref_leaf(zap, zc->zc_hash, NULL, RW_READER);
+	} else {
+		rw_enter(&zc->zc_leaf->l_rwlock, RW_READER);
+	}
+	l = zc->zc_leaf;
+
 	err = zap_leaf_lookup_closest(l, zc->zc_hash, zc->zc_cd, &zeh);
 
 	if (err == ENOENT) {
@@ -923,7 +937,8 @@ again:
 		if (l->lh_prefix_len == 0 || zc->zc_hash == 0) {
 			zc->zc_hash = -1ULL;
 		} else {
-			zap_put_leaf(l);
+			zap_put_leaf(zc->zc_leaf);
+			zc->zc_leaf = NULL;
 			goto again;
 		}
 	}
@@ -943,7 +958,7 @@ again:
 		    sizeof (za->za_name), za->za_name);
 		ASSERT(err == 0);
 	}
-	zap_put_leaf(l);
+	rw_exit(&zc->zc_leaf->l_rwlock);
 	return (err);
 }
 

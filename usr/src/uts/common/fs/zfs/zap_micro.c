@@ -31,6 +31,7 @@
 #include <sys/zfs_context.h>
 #include <sys/zap.h>
 #include <sys/zap_impl.h>
+#include <sys/zap_leaf.h>
 #include <sys/avl.h>
 
 
@@ -694,15 +695,6 @@ zap_remove(objset_t *os, uint64_t zapobj, const char *name, dmu_tx_t *tx)
  * Routines for iterating over the attributes.
  */
 
-void
-zap_cursor_init(zap_cursor_t *zc, objset_t *os, uint64_t zapobj)
-{
-	zc->zc_objset = os;
-	zc->zc_zapobj = zapobj;
-	zc->zc_hash = 0;
-	zc->zc_cd = 0;
-}
-
 /*
  * We want to keep the high 32 bits of the cursor zero if we can, so
  * that 32-bit programs can access this.  So use a small hash value so
@@ -715,6 +707,8 @@ zap_cursor_init_serialized(zap_cursor_t *zc, objset_t *os, uint64_t zapobj,
     uint64_t serialized)
 {
 	zc->zc_objset = os;
+	zc->zc_zap = NULL;
+	zc->zc_leaf = NULL;
 	zc->zc_zapobj = zapobj;
 	if (serialized == -1ULL) {
 		zc->zc_hash = -1ULL;
@@ -725,6 +719,28 @@ zap_cursor_init_serialized(zap_cursor_t *zc, objset_t *os, uint64_t zapobj,
 		if (zc->zc_cd >= ZAP_MAXCD) /* corrupt serialized */
 			zc->zc_cd = 0;
 	}
+}
+
+void
+zap_cursor_init(zap_cursor_t *zc, objset_t *os, uint64_t zapobj)
+{
+	zap_cursor_init_serialized(zc, os, zapobj, 0);
+}
+
+void
+zap_cursor_fini(zap_cursor_t *zc)
+{
+	if (zc->zc_zap) {
+		rw_enter(&zc->zc_zap->zap_rwlock, RW_READER);
+		zap_unlockdir(zc->zc_zap);
+		zc->zc_zap = NULL;
+	}
+	if (zc->zc_leaf) {
+		rw_enter(&zc->zc_leaf->l_rwlock, RW_READER);
+		zap_put_leaf(zc->zc_leaf);
+		zc->zc_leaf = NULL;
+	}
+	zc->zc_objset = NULL;
 }
 
 uint64_t
@@ -741,7 +757,6 @@ zap_cursor_serialize(zap_cursor_t *zc)
 int
 zap_cursor_retrieve(zap_cursor_t *zc, zap_attribute_t *za)
 {
-	zap_t *zap;
 	int err;
 	avl_index_t idx;
 	mzap_ent_t mze_tofind;
@@ -750,25 +765,30 @@ zap_cursor_retrieve(zap_cursor_t *zc, zap_attribute_t *za)
 	if (zc->zc_hash == -1ULL)
 		return (ENOENT);
 
-	err = zap_lockdir(zc->zc_objset, zc->zc_zapobj, NULL,
-	    RW_READER, TRUE, &zap);
-	if (err)
-		return (err);
-	if (!zap->zap_ismicro) {
-		err = fzap_cursor_retrieve(zap, zc, za);
+	if (zc->zc_zap == NULL) {
+		err = zap_lockdir(zc->zc_objset, zc->zc_zapobj, NULL,
+		    RW_READER, TRUE, &zc->zc_zap);
+		if (err)
+			return (err);
+	} else {
+		rw_enter(&zc->zc_zap->zap_rwlock, RW_READER);
+	}
+	if (!zc->zc_zap->zap_ismicro) {
+		err = fzap_cursor_retrieve(zc->zc_zap, zc, za);
 	} else {
 		err = ENOENT;
 
 		mze_tofind.mze_hash = zc->zc_hash;
 		mze_tofind.mze_phys.mze_cd = zc->zc_cd;
 
-		mze = avl_find(&zap->zap_m.zap_avl, &mze_tofind, &idx);
+		mze = avl_find(&zc->zc_zap->zap_m.zap_avl, &mze_tofind, &idx);
 		ASSERT(mze == NULL || 0 == bcmp(&mze->mze_phys,
-		    &zap->zap_m.zap_phys->mz_chunk[mze->mze_chunkid],
+		    &zc->zc_zap->zap_m.zap_phys->mz_chunk[mze->mze_chunkid],
 		    sizeof (mze->mze_phys)));
-		if (mze == NULL)
-			mze = avl_nearest(&zap->zap_m.zap_avl, idx, AVL_AFTER);
-
+		if (mze == NULL) {
+			mze = avl_nearest(&zc->zc_zap->zap_m.zap_avl,
+			    idx, AVL_AFTER);
+		}
 		if (mze) {
 			za->za_integer_length = 8;
 			za->za_num_integers = 1;
@@ -781,7 +801,7 @@ zap_cursor_retrieve(zap_cursor_t *zc, zap_attribute_t *za)
 			zc->zc_hash = -1ULL;
 		}
 	}
-	zap_unlockdir(zap);
+	rw_exit(&zc->zc_zap->zap_rwlock);
 	return (err);
 }
 

@@ -700,19 +700,28 @@ retry:
 static int
 zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 {
-	dsl_dir_t *dd;
-	zap_cursor_t cursor;
-	zap_attribute_t attr;
+	objset_t *os;
 	int error;
 	char *p;
 
-	dd = dsl_dir_open(zc->zc_name, FTAG, NULL);
-	if (dd == NULL)
-		return (ESRCH);
-
-	if (dd->dd_phys->dd_child_dir_zapobj == 0) {
-		dsl_dir_close(dd, FTAG);
-		return (ESRCH);
+retry:
+	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
+	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+	if (error != 0) {
+		/*
+		 * This is ugly: dmu_objset_open() can return EBUSY if
+		 * the objset is held exclusively. Fortunately this hold is
+		 * only for a short while, so we retry here.
+		 * This avoids user code having to handle EBUSY,
+		 * for example for a "zfs list".
+		 */
+		if (error == EBUSY) {
+			delay(1);
+			goto retry;
+		}
+		if (error == ENOENT)
+			error = ESRCH;
+		return (error);
 	}
 
 	p = strrchr(zc->zc_name, '/');
@@ -721,103 +730,67 @@ zfs_ioc_dataset_list_next(zfs_cmd_t *zc)
 	p = zc->zc_name + strlen(zc->zc_name);
 
 	do {
-		zap_cursor_init_serialized(&cursor, dd->dd_pool->dp_meta_objset,
-		    dd->dd_phys->dd_child_dir_zapobj, zc->zc_cookie);
-
-		error = zap_cursor_retrieve(&cursor, &attr);
+		error = dmu_dir_list_next(os,
+		    sizeof (zc->zc_name) - (p - zc->zc_name), p,
+		    NULL, &zc->zc_cookie);
 		if (error == ENOENT)
 			error = ESRCH;
-		if (error != 0) {
-			dsl_dir_close(dd, FTAG);
-			*p = '\0';
-			return (error);
-		}
-
-		(void) strlcpy(p, attr.za_name, sizeof (zc->zc_name) -
-		    (p - zc->zc_name));
-
-		zap_cursor_advance(&cursor);
-		zc->zc_cookie = zap_cursor_serialize(&cursor);
-
-	} while (!INGLOBALZONE(curproc) &&
+	} while (error == 0 && !INGLOBALZONE(curproc) &&
 	    !zone_dataset_visible(zc->zc_name, NULL));
 
-	dsl_dir_close(dd, FTAG);
-
 	/*
-	 * If it's a hidden dataset, don't try to get stats for it.
-	 * User land will skip over it.
+	 * If it's a hidden dataset (ie. with a '$' in its name), don't
+	 * try to get stats for it.  Userland will skip over it.
 	 */
-	if (strchr(zc->zc_name, '$') != NULL)
-		return (0);
+	if (error == 0 && strchr(zc->zc_name, '$') == NULL)
+		error = zfs_ioc_objset_stats(zc); /* fill in the stats */
 
-	error = zfs_ioc_objset_stats(zc); /* will just fill in the stats */
+	dmu_objset_close(os);
 	return (error);
 }
 
 static int
 zfs_ioc_snapshot_list_next(zfs_cmd_t *zc)
 {
-	zap_cursor_t cursor;
-	zap_attribute_t attr;
-	dsl_dataset_t *ds;
+	objset_t *os;
 	int error;
 
 retry:
-	error = dsl_dataset_open(zc->zc_name,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ds);
-	if (error) {
+	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
+	    DS_MODE_STANDARD | DS_MODE_READONLY, &os);
+	if (error != 0) {
 		/*
-		 * This is ugly: dsl_dataset_open() can return EBUSY if
+		 * This is ugly: dmu_objset_open() can return EBUSY if
 		 * the objset is held exclusively. Fortunately this hold is
 		 * only for a short while, so we retry here.
 		 * This avoids user code having to handle EBUSY,
-		 * for example for a "zfs list -s".
+		 * for example for a "zfs list".
 		 */
 		if (error == EBUSY) {
 			delay(1);
 			goto retry;
 		}
 		if (error == ENOENT)
-			return (ESRCH);
+			error = ESRCH;
 		return (error);
 	}
 
-	/*
-	 * If ds_snapnames_zapobj is 0, someone is trying to iterate over
-	 * snapshots of a snapshot.  In this case, pretend that it has no
-	 * snapshots; otherwise zap_cursor_retrieve() will blow up.
-	 */
-	if (ds->ds_phys->ds_snapnames_zapobj == 0) {
-		error = ESRCH;
-		goto out;
+	if (strlcat(zc->zc_name, "@", sizeof (zc->zc_name)) >=
+	    sizeof (zc->zc_name)) {
+		dmu_objset_close(os);
+		return (ENAMETOOLONG);
 	}
 
-	zap_cursor_init_serialized(&cursor,
-	    ds->ds_dir->dd_pool->dp_meta_objset,
-	    ds->ds_phys->ds_snapnames_zapobj, zc->zc_cookie);
-
-	error = zap_cursor_retrieve(&cursor, &attr);
+	error = dmu_snapshot_list_next(os,
+	    sizeof (zc->zc_name) - strlen(zc->zc_name),
+	    zc->zc_name + strlen(zc->zc_name), NULL, &zc->zc_cookie);
 	if (error == ENOENT)
 		error = ESRCH;
-	if (error != 0)
-		goto out;
 
-	if (strlcat(zc->zc_name, "@", sizeof (zc->zc_name)) >=
-	    sizeof (zc->zc_name) ||
-	    strlcat(zc->zc_name, attr.za_name, sizeof (zc->zc_name)) >=
-	    sizeof (zc->zc_name)) {
-		error = ENAMETOOLONG;
-		goto out;
-	}
+	if (error == 0)
+		error = zfs_ioc_objset_stats(zc); /* fill in the stats */
 
-	zap_cursor_advance(&cursor);
-	zc->zc_cookie = zap_cursor_serialize(&cursor);
-
-	error = zfs_ioc_objset_stats(zc); /* will just fill in the stats */
-
-out:
-	dsl_dataset_close(ds, DS_MODE_STANDARD, FTAG);
+	dmu_objset_close(os);
 	return (error);
 }
 

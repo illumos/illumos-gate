@@ -294,6 +294,7 @@ dsl_prop_changed_notify(dsl_pool_t *dp, uint64_t ddobj,
 			dsl_prop_changed_notify(dp, za.za_first_integer,
 			    propname, value, FALSE);
 		}
+		zap_cursor_fini(&zc);
 	}
 	dsl_dir_close(dd, FTAG);
 }

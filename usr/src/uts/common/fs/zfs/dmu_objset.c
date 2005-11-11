@@ -620,7 +620,7 @@ dmu_objset_is_snapshot(objset_t *os)
 
 int
 dmu_snapshot_list_next(objset_t *os, int namelen, char *name,
-    uint64_t *id, uint64_t *offp)
+    uint64_t *idp, uint64_t *offp)
 {
 	dsl_dataset_t *ds = os->os->os_dsl_dataset;
 	zap_cursor_t cursor;
@@ -633,16 +633,62 @@ dmu_snapshot_list_next(objset_t *os, int namelen, char *name,
 	    ds->ds_dir->dd_pool->dp_meta_objset,
 	    ds->ds_phys->ds_snapnames_zapobj, *offp);
 
-	if (zap_cursor_retrieve(&cursor, &attr) != 0)
+	if (zap_cursor_retrieve(&cursor, &attr) != 0) {
+		zap_cursor_fini(&cursor);
 		return (ENOENT);
+	}
 
-	if (strlen(attr.za_name) + 1 > namelen)
+	if (strlen(attr.za_name) + 1 > namelen) {
+		zap_cursor_fini(&cursor);
 		return (ENAMETOOLONG);
+	}
 
 	(void) strcpy(name, attr.za_name);
-	*id = attr.za_first_integer;
+	if (idp)
+		*idp = attr.za_first_integer;
 	zap_cursor_advance(&cursor);
 	*offp = zap_cursor_serialize(&cursor);
+	zap_cursor_fini(&cursor);
+
+	return (0);
+}
+
+int
+dmu_dir_list_next(objset_t *os, int namelen, char *name,
+    uint64_t *idp, uint64_t *offp)
+{
+	dsl_dir_t *dd = os->os->os_dsl_dataset->ds_dir;
+	zap_cursor_t cursor;
+	zap_attribute_t attr;
+
+	if (dd->dd_phys->dd_child_dir_zapobj == 0)
+		return (ENOENT);
+
+	/* there is no next dir on a snapshot! */
+	if (os->os->os_dsl_dataset->ds_object !=
+	    dd->dd_phys->dd_head_dataset_obj)
+		return (ENOENT);
+
+	zap_cursor_init_serialized(&cursor,
+	    dd->dd_pool->dp_meta_objset,
+	    dd->dd_phys->dd_child_dir_zapobj, *offp);
+
+	if (zap_cursor_retrieve(&cursor, &attr) != 0) {
+		zap_cursor_fini(&cursor);
+		return (ENOENT);
+	}
+
+	if (strlen(attr.za_name) + 1 > namelen) {
+		zap_cursor_fini(&cursor);
+		return (ENAMETOOLONG);
+	}
+
+	(void) strcpy(name, attr.za_name);
+	if (idp)
+		*idp = attr.za_first_integer;
+	zap_cursor_advance(&cursor);
+	*offp = zap_cursor_serialize(&cursor);
+	zap_cursor_fini(&cursor);
 
 	return (0);
 }
@@ -689,6 +735,7 @@ dmu_objset_find(char *name, void func(char *, void *), void *arg, int flags)
 			dmu_objset_find(child, func, arg, flags);
 			kmem_free(child, MAXPATHLEN);
 		}
+		zap_cursor_fini(&zc);
 	}
 
 	/*
@@ -715,6 +762,7 @@ dmu_objset_find(char *name, void func(char *, void *), void *arg, int flags)
 			func(child, arg);
 			kmem_free(child, MAXPATHLEN);
 		}
+		zap_cursor_fini(&zc);
 	}
 
 	dsl_dir_close(dd, FTAG);

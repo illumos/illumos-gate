@@ -337,6 +337,7 @@ zfs_purgedir(znode_t *dzp)
 
 		VN_RELE(ZTOV(xzp));
 	}
+	zap_cursor_fini(&zc);
 	ASSERT(error == ENOENT);
 	return (skipped);
 }
@@ -397,6 +398,7 @@ zfs_drain_dq(zfsvfs_t *zfsvfs)
 		VN_RELE(ZTOV(zp));
 		break;
 	}
+	zap_cursor_fini(&zc);
 }
 
 void
