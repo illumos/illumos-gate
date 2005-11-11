@@ -236,11 +236,55 @@ donetable:
 	ret
 	SET_SIZE(munge_table)
 
-/ reset machine via triple fault
+/ reset machine
+/ Resetting by Triple-Fault only makes emulators like VMWare warn
+/ the user each time a reset is performed.  Here, we try a number
+/ of techniques and only fall back on triple faulting the CPU
+/ under extreme circumstances.
+
 	ENTRY(reset)
+	/ Try the PCI (soft) reset vector (should work on all modern systems)
+	/ When resetting via this method, 2 writes are required.  The first
+	/ targets bit 1 (0=hard reset without power cycle, 1=hard reset with power
+	/ cycle).
+	/ The reset occurs on the second write, during bit 2's transition from 0->1.
+	movw	$0xcf9, %dx
+	movb	$0x2, %al	/ Reset mode = hard, no power cycle
+	outb	(%dx)
+	movb	$0x6, %al
+	outb	(%dx)
+
+	/
+	/ Try the classic keyboard controller-triggered reset.
+	/
+	movw	$0x64, %dx
+	movb	$0xfe, %al
+	outb	(%dx)
+
+	/
+	/ Try port 0x92 fast reset
+	/
+	movw	$0x92, %dx
+	inb	(%dx)
+	cmpb	$0xff, %al	/ If port's not there, we should get back 0xFF
+	je	1f
+	testb	$1, %al		/ If bit 0
+	jz	2f		/ is clear, jump to perform the reset
+	andb	$0xfe, %al	/ otherwise,
+	outb	(%dx)		/ clear bit 0 first, then
+2:
+	orb	$1, %al		/ Set bit 0
+	outb	(%dx)		/ and reset the system
+1:
+	/
+	/ port 0x92 failed also.  Last-ditch effort is to
+	/ triple-fault the CPU.
+	/
 	movw	$0, IDTlimit	/ generate faulty table
 	lidt	IDTptr		/ load faulty table
 	int	$10		/ trigger an interrupt
+ 	hlt
+ 	/*NOTREACHED*/
 	SET_SIZE(reset)
 
 	ENTRY(_cmntrap)

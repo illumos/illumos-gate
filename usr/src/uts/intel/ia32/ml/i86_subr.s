@@ -1429,9 +1429,53 @@ pc_reset(void)
 #else	/* __lint */
 
 	ENTRY(pc_reset)
+	/ Try the PCI (soft) reset vector (should work on all modern systems)
+	/ When resetting via this method, 2 writes are required.  The first
+	/ targets bit 1 (0=hard reset without power cycle, 1=hard reset with power
+	/ cycle).
+	/ The reset occurs on the second write, during bit 2's transition from 0->1.
+	movw	$0xcf9, %dx
+	movb	$0x2, %al	/ Reset mode = hard, no power cycle
+	outb	(%dx)
+	movb	$0x6, %al
+	outb	(%dx)
+
+	/
+	/ Try the classic keyboard controller-triggered reset.
+	/
 	movw	$0x64, %dx
 	movb	$0xfe, %al
 	outb	(%dx)
+
+	/
+	/ Try port 0x92 fast reset
+	/
+	movw	$0x92, %dx
+	inb	(%dx)
+	cmpb	$0xff, %al	/ If port's not there, we should get back 0xFF
+	je	1f
+	testb	$1, %al		/ If bit 0
+	jz	2f		/ is clear, jump to perform the reset
+	andb	$0xfe, %al	/ otherwise,
+	outb	(%dx)		/ clear bit 0 first, then
+2:
+	orb	$1, %al		/ Set bit 0
+	outb	(%dx)		/ and reset the system
+1:
+	/
+	/ port 0x92 failed also.  Last-ditch effort is to
+	/ triple-fault the CPU.
+	/
+#if defined(__amd64)
+	pushq	$0x0
+	pushq	$0x0		/ IDT base of 0, limit of 0 + 2 unused bytes
+	lidt	(%rsp)
+#elif defined(__i386)
+	pushl	$0x0
+	pushl	$0x0		/ IDT base of 0, limit of 0 + 2 unused bytes
+	lidt	(%esp)
+#endif
+	int	$0x0		/ Trigger interrupt, generate triple-fault
 	hlt
 	/*NOTREACHED*/
 	SET_SIZE(pc_reset)
