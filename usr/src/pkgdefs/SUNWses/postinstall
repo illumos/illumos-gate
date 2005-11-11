@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # SUNWses postinstall script
@@ -63,9 +63,11 @@ rem_devlink()
 	rm -f $TMP.devlink
 }
 
+dev_aliases='"scsiclass,0d scsiclass,00.vSUN.pUniversal_Xport"'
+
 rem_devlink 'type=ddi_pseudo;name=ses' 'es/ses\\N0'
 
-${ADDDRV} -b ${BASEDIR} -n -m '* 0666 bin bin' -i '"scsiclass,0d"' ses
+${ADDDRV} -b ${BASEDIR} -n -m '* 0666 bin bin' -i ${dev_aliases} ses
 touch ${BASEDIR}/reconfigure
 rm -f $TMP.devlink
 
