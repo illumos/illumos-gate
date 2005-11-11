@@ -1378,11 +1378,16 @@ rc_node_setup(rc_node_t *cp, rc_node_lookup_t *nip, const char *name,
 		/*
 		 * make sure it matches our expectations
 		 */
-		assert(np->rn_parent == pp);
-		assert(memcmp(&np->rn_id, nip, sizeof (*nip)) == 0);
-		assert(strcmp(np->rn_name, name) == 0);
-		assert(np->rn_type == NULL);
-		assert(np->rn_flags & RC_NODE_IN_PARENT);
+		(void) pthread_mutex_lock(&np->rn_lock);
+		if (rc_node_hold_flag(np, RC_NODE_USING_PARENT)) {
+			assert(np->rn_parent == pp);
+			assert(memcmp(&np->rn_id, nip, sizeof (*nip)) == 0);
+			assert(strcmp(np->rn_name, name) == 0);
+			assert(np->rn_type == NULL);
+			assert(np->rn_flags & RC_NODE_IN_PARENT);
+			rc_node_rele_flag(np, RC_NODE_USING_PARENT);
+		}
+		(void) pthread_mutex_unlock(&np->rn_lock);
 
 		rc_node_destroy(cp);
 		return (np);
@@ -1438,11 +1443,16 @@ rc_node_setup_snapshot(rc_node_t *cp, rc_node_lookup_t *nip, const char *name,
 		/*
 		 * make sure it matches our expectations
 		 */
-		assert(np->rn_parent == pp);
-		assert(memcmp(&np->rn_id, nip, sizeof (*nip)) == 0);
-		assert(strcmp(np->rn_name, name) == 0);
-		assert(np->rn_type == NULL);
-		assert(np->rn_flags & RC_NODE_IN_PARENT);
+		(void) pthread_mutex_lock(&np->rn_lock);
+		if (rc_node_hold_flag(np, RC_NODE_USING_PARENT)) {
+			assert(np->rn_parent == pp);
+			assert(memcmp(&np->rn_id, nip, sizeof (*nip)) == 0);
+			assert(strcmp(np->rn_name, name) == 0);
+			assert(np->rn_type == NULL);
+			assert(np->rn_flags & RC_NODE_IN_PARENT);
+			rc_node_rele_flag(np, RC_NODE_USING_PARENT);
+		}
+		(void) pthread_mutex_unlock(&np->rn_lock);
 
 		rc_node_destroy(cp);
 		return (np);
@@ -1490,11 +1500,16 @@ rc_node_setup_snaplevel(rc_node_t *cp, rc_node_lookup_t *nip,
 		/*
 		 * make sure it matches our expectations
 		 */
-		assert(np->rn_parent == pp);
-		assert(memcmp(&np->rn_id, nip, sizeof (*nip)) == 0);
-		assert(np->rn_name == NULL);
-		assert(np->rn_type == NULL);
-		assert(np->rn_flags & RC_NODE_IN_PARENT);
+		(void) pthread_mutex_lock(&np->rn_lock);
+		if (rc_node_hold_flag(np, RC_NODE_USING_PARENT)) {
+			assert(np->rn_parent == pp);
+			assert(memcmp(&np->rn_id, nip, sizeof (*nip)) == 0);
+			assert(np->rn_name == NULL);
+			assert(np->rn_type == NULL);
+			assert(np->rn_flags & RC_NODE_IN_PARENT);
+			rc_node_rele_flag(np, RC_NODE_USING_PARENT);
+		}
+		(void) pthread_mutex_unlock(&np->rn_lock);
 
 		rc_node_destroy(cp);
 		return (np);
@@ -1546,11 +1561,16 @@ rc_node_setup_pg(rc_node_t *cp, rc_node_lookup_t *nip, const char *name,
 		 * have gotten a transaction through while we weren't
 		 * looking)
 		 */
-		assert(memcmp(&np->rn_id, nip, sizeof (*nip)) == 0);
-		assert(strcmp(np->rn_name, name) == 0);
-		assert(strcmp(np->rn_type, type) == 0);
-		assert(np->rn_pgflags == flags);
-		assert(np->rn_flags & RC_NODE_IN_PARENT);
+		(void) pthread_mutex_lock(&np->rn_lock);
+		if (rc_node_hold_flag(np, RC_NODE_USING_PARENT)) {
+			assert(memcmp(&np->rn_id, nip, sizeof (*nip)) == 0);
+			assert(strcmp(np->rn_name, name) == 0);
+			assert(strcmp(np->rn_type, type) == 0);
+			assert(np->rn_pgflags == flags);
+			assert(np->rn_flags & RC_NODE_IN_PARENT);
+			rc_node_rele_flag(np, RC_NODE_USING_PARENT);
+		}
+		(void) pthread_mutex_unlock(&np->rn_lock);
 
 		rc_node_destroy(cp);
 		return (np);
