@@ -404,6 +404,8 @@ extern int 	anon_copy_ptr(struct anon_hdr *, ulong_t,
 extern pgcnt_t	anon_grow(struct anon_hdr *, ulong_t *, pgcnt_t, pgcnt_t, int);
 extern void	anon_array_enter(struct anon_map *, ulong_t,
 			anon_sync_obj_t *);
+extern int	anon_array_try_enter(struct anon_map *, ulong_t,
+			anon_sync_obj_t *);
 extern void	anon_array_exit(anon_sync_obj_t *);
 
 /*

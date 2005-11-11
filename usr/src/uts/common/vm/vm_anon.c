@@ -3196,6 +3196,42 @@ anon_array_enter(struct anon_map *amp, ulong_t an_idx, anon_sync_obj_t *sobj)
 	mutex_exit(mtx);
 }
 
+int
+anon_array_try_enter(struct anon_map *amp, ulong_t an_idx,
+			anon_sync_obj_t *sobj)
+{
+	ulong_t		*ap_slot;
+	kmutex_t	*mtx;
+	int		hash;
+
+	/*
+	 * Try to lock a range of anon slots.
+	 * Use szc to determine anon slot(s) to appear atomic.
+	 * If szc = 0, then lock the anon slot and mark it busy.
+	 * If szc > 0, then lock the range of slots by getting the
+	 * anon_array_lock for the first anon slot, and mark only the
+	 * first anon slot busy to represent whole range being busy.
+	 * Fail if the mutex or the anon_array are busy.
+	 */
+
+	ASSERT(RW_READ_HELD(&amp->a_rwlock));
+	an_idx = P2ALIGN(an_idx, page_get_pagecnt(amp->a_szc));
+	hash = ANON_ARRAY_HASH(amp, an_idx);
+	sobj->sync_mutex = mtx = &anon_array_lock[hash].pad_mutex;
+	if (!mutex_tryenter(mtx)) {
+		return (EWOULDBLOCK);
+	}
+	ap_slot = anon_get_slot(amp->ahp, an_idx);
+	if (ANON_ISBUSY(ap_slot)) {
+		mutex_exit(mtx);
+		return (EWOULDBLOCK);
+	}
+	ANON_SETBUSY(ap_slot);
+	sobj->sync_data = ap_slot;
+	mutex_exit(mtx);
+	return (0);
+}
+
 void
 anon_array_exit(anon_sync_obj_t *sobj)
 {

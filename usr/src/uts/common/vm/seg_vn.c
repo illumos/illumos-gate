@@ -6018,7 +6018,11 @@ segvn_swapout(struct seg *seg)
 		ap = NULL;
 		if (amp != NULL) {
 			ANON_LOCK_ENTER(&amp->a_rwlock, RW_READER);
-			anon_array_enter(amp, anon_index + page, &cookie);
+			if (anon_array_try_enter(amp, anon_index + page,
+						&cookie)) {
+				ANON_LOCK_EXIT(&amp->a_rwlock);
+				continue;
+			}
 			ap = anon_get_ptr(amp->ahp, anon_index + page);
 			if (ap != NULL) {
 				swap_xlate(ap, &vp, &off);
