@@ -911,7 +911,7 @@ do_import(nvlist_t *config, const char *newname, const char *mntopts,
 
 	verify((zhp = zpool_open(name)) != NULL);
 
-	if (mount_datasets(zhp, mntopts) != 0) {
+	if (mount_share_datasets(zhp, mntopts) != 0) {
 		zpool_close(zhp);
 		return (1);
 	}

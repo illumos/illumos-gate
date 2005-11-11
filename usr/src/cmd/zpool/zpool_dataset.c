@@ -26,17 +26,22 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+/*
+ * For export and destroy, we have to support iterating over all datasets and
+ * unmounting and/or destroying them.
+ *
+ * For import, we need to iterate over all datasets, mounting and sharing
+ * them as indicated by the mountpoint and sharenfs properties.
+ *
+ * This file contains the routines to support this.
+ */
+
 #include <libintl.h>
 #include <libzfs.h>
 #include <sys/mount.h>
 
 #include "zpool_util.h"
 
-/*
- * For export and destroy, we have to support iterating over all datasets and
- * unmounting and/or destroying them.  This file contains the routines to
- * support this.
- */
 typedef struct cbdata {
 	int	cb_force;
 	int	cb_failed;
@@ -95,10 +100,10 @@ unmount_datasets(zpool_handle_t *zhp, int force)
 }
 
 /*
- * Mount a single dataset
+ * Mount and share a single dataset
  */
 static int
-do_mount(zfs_handle_t *zfsp, void *data)
+do_mount_share(zfs_handle_t *zfsp, void *data)
 {
 	cbdata_t *cbp = data;
 	int ret;
@@ -108,12 +113,13 @@ do_mount(zfs_handle_t *zfsp, void *data)
 
 	if (zfs_mount(zfsp, cbp->cb_mntopts, 0) != 0)
 		cbp->cb_failed = 1;
+	else if (zfs_share(zfsp) != 0)
+		cbp->cb_failed = 1;
 
-	ret = zfs_iter_children(zfsp, do_mount, data);
+	ret = zfs_iter_children(zfsp, do_mount_share, data);
 
 	return (ret);
 }
-
 
 /*
  * Go through and mount all datasets within a pool.  We need to mount all
@@ -121,9 +127,11 @@ do_mount(zfs_handle_t *zfsp, void *data)
  * fix would gather all mountpoints, sort them, and mount them in lexical order.
  * There are many more problems if you start to have nested filesystems - we
  * just want to get inherited filesystems right.
+ *
+ * Perform share as needed when mounting a dataset is successful.
  */
 int
-mount_datasets(zpool_handle_t *zhp, const char *options)
+mount_share_datasets(zpool_handle_t *zhp, const char *options)
 {
 	cbdata_t cb = { 0 };
 	zfs_handle_t *zfsp;
@@ -137,7 +145,7 @@ mount_datasets(zpool_handle_t *zhp, const char *options)
 	if ((zfsp = zfs_open(zpool_get_name(zhp), ZFS_TYPE_FILESYSTEM)) == NULL)
 		return (-1);
 
-	if (do_mount(zfsp, &cb) != 0 || cb.cb_failed != 0) {
+	if (do_mount_share(zfsp, &cb) != 0 || cb.cb_failed != 0) {
 		zfs_close(zfsp);
 		return (-1);
 	}

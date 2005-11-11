@@ -69,7 +69,7 @@ void pool_list_remove(zpool_list_t *, zpool_handle_t *);
  * Dataset functions
  */
 int unmount_datasets(zpool_handle_t *, int);
-int mount_datasets(zpool_handle_t *, const char *);
+int mount_share_datasets(zpool_handle_t *, const char *);
 
 #ifdef	__cplusplus
 }
