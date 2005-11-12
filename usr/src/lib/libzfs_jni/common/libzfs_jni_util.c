@@ -33,6 +33,20 @@
  * Package-private functions
  */
 
+void
+zjni_free_array(void **array, zjni_free_f freefunc)
+{
+	if (array != NULL) {
+		if (freefunc != NULL) {
+			int i;
+			for (i = 0; array[i] != NULL; i++) {
+				freefunc(array[i]);
+			}
+		}
+		free(array);
+	}
+}
+
 /*PRINTFLIKE2*/
 void
 zjni_throw_exception(JNIEnv *env, const char *fmt, ...)
@@ -231,7 +245,7 @@ zjni_str_to_date(JNIEnv *env, char *str)
 }
 
 jobjectArray
-zjni_string_array_to_String_array(JNIEnv *env, char **array, int n)
+zjni_c_string_array_to_java(JNIEnv *env, char **array, int n)
 {
 	int i;
 	jclass class_String = (*env)->FindClass(env, "java/lang/String");
@@ -245,6 +259,56 @@ zjni_string_array_to_String_array(JNIEnv *env, char **array, int n)
 	}
 
 	return (jarray);
+}
+
+/*
+ * Converts the non-null elements of the given Java String array into
+ * a NULL-terminated char* array.  When done, each element and then
+ * the array itself must be free()d.  Returns NULL if memory could not
+ * be allocated.
+ */
+char **
+zjni_java_string_array_to_c(JNIEnv *env, jobjectArray array)
+{
+	int i, n;
+	jsize length = (*env)->GetArrayLength(env, array);
+	char **result = (char **)calloc(length + 1, sizeof (char *));
+
+	if (result != NULL) {
+		for (i = 0, n = 0; i < length; i++) {
+			jboolean isCopy;
+
+			/* Retrive String from array */
+			jstring string = (*env)->GetObjectArrayElement(
+			    env, array, i);
+
+			if (string != NULL) {
+				/* Convert to char* */
+				const char *converted =
+				    (*env)->GetStringUTFChars(env, string,
+					&isCopy);
+
+				result[n] = strdup(converted);
+
+				if (isCopy == JNI_TRUE) {
+					/* Free chars in Java space */
+					(void) (*env)->ReleaseStringUTFChars(
+					    env, string, converted);
+				}
+
+				if (result[n++] == NULL) {
+					/* strdup failed */
+					zjni_free_array((void *)result, free);
+					break;
+				}
+			}
+		}
+
+		/* Terminate array */
+		result[n] = NULL;
+	}
+
+	return (result);
 }
 
 /*

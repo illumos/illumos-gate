@@ -28,6 +28,7 @@
 
 #include "availdevs.h"
 #include <libzfs_jni_diskmgt.h>
+#include <libzfs_jni_ipool.h>
 #include <libxml/parser.h>
 
 /*
@@ -36,6 +37,7 @@
 
 static void handle_error(const char *, va_list);
 static int add_disk_to_xml(dmgt_disk_t *, void *);
+static int add_pool_to_xml(char *, uint64_t, uint64_t, char *, void *);
 static xmlDocPtr create_doc();
 int main();
 
@@ -53,7 +55,7 @@ handle_error(const char *fmt, va_list ap)
 static int
 add_disk_to_xml(dmgt_disk_t *dp, void *data)
 {
-	int i, n;
+	int i;
 	char tmp[64];
 	xmlNodePtr available = *((xmlNodePtr *)data);
 
@@ -61,8 +63,7 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 	    available, NULL, (xmlChar *)ELEMENT_DISK, NULL);
 	xmlSetProp(disk,
 	    (xmlChar *)ATTR_DISK_NAME, (xmlChar *)dp->name);
-	n = snprintf(tmp, sizeof (tmp) - 1, "%llu", dp->size);
-	tmp[n] = '\0';
+	snprintf(tmp, sizeof (tmp), "%llu", dp->size);
 	xmlSetProp(disk, (xmlChar *)ATTR_DISK_SIZE, (xmlChar *)tmp);
 
 	if (dp->aliases != NULL) {
@@ -83,13 +84,11 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 			xmlSetProp(slice,
 			    (xmlChar *)ATTR_SLICE_NAME, (xmlChar *)sp->name);
 
-			n = snprintf(tmp, sizeof (tmp) - 1, "%llu", sp->size);
-			tmp[n] = '\0';
+			snprintf(tmp, sizeof (tmp), "%llu", sp->size);
 			xmlSetProp(slice, (xmlChar *)ATTR_SLICE_SIZE,
 			    (xmlChar *)tmp);
 
-			n = snprintf(tmp, sizeof (tmp) - 1, "%llu", sp->start);
-			tmp[n] = '\0';
+			snprintf(tmp, sizeof (tmp), "%llu", sp->start);
 			xmlSetProp(slice, (xmlChar *)ATTR_SLICE_START,
 			    (xmlChar *)tmp);
 
@@ -109,6 +108,31 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 	return (0);
 }
 
+static int
+add_pool_to_xml(char *name, uint64_t guid,
+    uint64_t pool_state, char *health, void *data)
+{
+	char *state;
+	char tmp[64];
+	xmlNodePtr importable = *((xmlNodePtr *)data);
+
+	xmlNodePtr pool = xmlNewChild(
+	    importable, NULL, (xmlChar *)ELEMENT_POOL, NULL);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_NAME, (xmlChar *)name);
+
+	state = zjni_get_state_str(pool_state);
+	if (state == NULL) {
+		state = "";
+	}
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATE, (xmlChar *)state);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_HEALTH, (xmlChar *)health);
+
+	snprintf(tmp, sizeof (tmp), "%llu", guid);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_ID, (xmlChar *)tmp);
+
+	return (0);
+}
+
 static xmlDocPtr
 create_doc(void)
 {
@@ -120,9 +144,6 @@ create_doc(void)
 	    doc, NULL, (xmlChar *)ELEMENT_ROOT, NULL);
 	xmlAddChild((xmlNodePtr) doc, (xmlNodePtr)root);
 
-	/* Create the available node */
-	xmlNewChild(root, NULL, (xmlChar *)ELEMENT_AVAILABLE, NULL);
-
 	return (doc);
 }
 
@@ -132,27 +153,68 @@ create_doc(void)
  * @return      0 on successful exit, non-zero otherwise
  */
 int
-main(void)
+main(int argc, char **argv)
 {
-	int error;
-	xmlDocPtr doc;
-	xmlNodePtr root;
-	xmlNodePtr available;
+	int error = 0;
+	int get_pools = 0;
+	int get_devices = 0;
 
-	/* diskmgt.o error handler */
-	dmgt_set_error_handler(handle_error);
+	/* Examine first arg */
+	int c = getopt(argc, argv, CLI_OPTSTRING);
+	switch (c) {
+		case CLI_ARG_ALL:
+			get_devices = 1;
+			get_pools = 1;
+			break;
 
-	doc = create_doc();
-	root = xmlDocGetRootElement(doc);
-	available = xmlGetLastChild(root);
+		case CLI_ARG_DEVICES:
+			get_devices = 1;
+			break;
 
-	error = dmgt_avail_disk_iter(add_disk_to_xml, &available);
-	if (!error) {
-		/* Print out XML */
-		xmlDocFormatDump(stdout, doc, 1);
+		case CLI_ARG_POOLS:
+			get_pools = 1;
+			break;
+
+		default:
+			return (1);
+			break;
 	}
 
-	xmlFreeDoc(doc);
+	argc -= optind;
+	argv += optind;
+
+	if (get_pools || get_devices) {
+		xmlDocPtr doc = create_doc();
+		xmlNodePtr root = xmlDocGetRootElement(doc);
+
+		if (get_devices) {
+			/* Create the available node */
+			xmlNodePtr available = xmlNewChild(root, NULL,
+			    (xmlChar *)ELEMENT_AVAILABLE, NULL);
+
+			/* libzfs_jni_diskmgt.o error handler */
+			dmgt_set_error_handler(handle_error);
+
+			error = dmgt_avail_disk_iter(
+			    add_disk_to_xml, &available);
+		}
+
+		if (get_pools && !error) {
+			/* Create the importable node */
+			xmlNodePtr importable = xmlNewChild(root, NULL,
+			    (xmlChar *)ELEMENT_IMPORTABLE, NULL);
+
+			error = zjni_ipool_iter(
+			    argc, argv, add_pool_to_xml, &importable);
+		}
+
+		if (!error) {
+			/* Print out XML */
+			xmlDocFormatDump(stdout, doc, 1);
+		}
+
+		xmlFreeDoc(doc);
+	}
 
 	return (error != 0);
 }

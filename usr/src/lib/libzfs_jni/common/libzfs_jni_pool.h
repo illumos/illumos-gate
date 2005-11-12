@@ -36,6 +36,7 @@ extern "C" {
 #include <jni.h>
 #include <libnvpair.h>
 #include <libzfs.h>
+#include "libzfs_jni_ipool.h"
 
 /*
  * Function prototypes
@@ -47,6 +48,8 @@ jobject zjni_get_VirtualDevice_from_vdev(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
 jobject zjni_get_VirtualDevices_from_vdev(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
+int zjni_create_add_ImportablePool(char *name,
+    uint64_t guid, uint64_t pool_state, char *health, void *data);
 
 #ifdef __cplusplus
 }

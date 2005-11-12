@@ -34,6 +34,15 @@
  * Types
  */
 
+typedef struct ImportablePoolBean {
+	zjni_Object_t super;
+
+	jmethodID method_setName;
+	jmethodID method_setId;
+	jmethodID method_setState;
+	jmethodID method_setHealth;
+} ImportablePoolBean_t;
+
 typedef struct VirtualDeviceBean {
 	zjni_Object_t super;
 
@@ -67,11 +76,15 @@ typedef struct MirrorVirtualDeviceBean {
  * Function prototypes
  */
 
+static void new_ImportablePoolBean(JNIEnv *, ImportablePoolBean_t *);
 static void new_VirtualDevice(JNIEnv *, VirtualDeviceBean_t *);
 static void new_DiskVirtualDeviceBean(JNIEnv *, DiskVirtualDeviceBean_t *);
 static void new_FileVirtualDeviceBean(JNIEnv *, FileVirtualDeviceBean_t *);
 static void new_RAIDVirtualDeviceBean(JNIEnv *, RAIDVirtualDeviceBean_t *);
 static void new_MirrorVirtualDeviceBean(JNIEnv *, MirrorVirtualDeviceBean_t *);
+static jobject uint64_to_state(JNIEnv *, uint64_t);
+static int populate_ImportablePoolBean(
+    JNIEnv *, ImportablePoolBean_t *, char *, uint64_t, uint64_t, char *);
 static int populate_VirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, VirtualDeviceBean_t *);
 static int populate_DiskVirtualDeviceBean(
@@ -82,6 +95,8 @@ static int populate_RAIDVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, RAIDVirtualDeviceBean_t *);
 static int populate_MirrorVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, MirrorVirtualDeviceBean_t *);
+static jobject create_ImportablePoolBean(
+    JNIEnv *, char *, uint64_t, uint64_t, char *);
 static jobject create_DiskVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
 static jobject create_FileVirtualDeviceBean(
@@ -94,6 +109,38 @@ static jobject create_MirrorVirtualDeviceBean(
 /*
  * Static functions
  */
+
+/* Create a ImportablePoolBean */
+static void
+new_ImportablePoolBean(JNIEnv *env, ImportablePoolBean_t *bean)
+{
+	zjni_Object_t *object = (zjni_Object_t *)bean;
+
+	if (object->object == NULL) {
+		object->class =
+		    (*env)->FindClass(env,
+			ZFSJNI_PACKAGE_DATA "ImportablePoolBean");
+
+		object->constructor =
+		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
+
+		object->object =
+		    (*env)->NewObject(env, object->class, object->constructor);
+	}
+
+	bean->method_setName = (*env)->GetMethodID(
+	    env, object->class, "setName", "(Ljava/lang/String;)V");
+
+	bean->method_setId = (*env)->GetMethodID(
+	    env, object->class, "setId", "(J)V");
+
+	bean->method_setState = (*env)->GetMethodID(
+	    env, object->class, "setState",
+	    "(L" ZFSJNI_PACKAGE_DATA "ImportablePool$State;)V");
+
+	bean->method_setHealth = (*env)->GetMethodID(
+	    env, object->class, "setHealth", "(Ljava/lang/String;)V");
+}
 
 /* Create a VirtualDeviceBean */
 static void
@@ -214,6 +261,56 @@ new_MirrorVirtualDeviceBean(JNIEnv *env, MirrorVirtualDeviceBean_t *bean)
 	new_VirtualDevice(env, (VirtualDeviceBean_t *)bean);
 }
 
+static jobject
+uint64_to_state(JNIEnv *env, uint64_t pool_state)
+{
+	jobject state_obj;
+
+	jclass class_State = (*env)->FindClass(
+	    env, ZFSJNI_PACKAGE_DATA "ImportablePool$State");
+
+	jmethodID method_valueOf = (*env)->GetStaticMethodID(
+	    env, class_State, "valueOf",
+	    "(Ljava/lang/String;)L"
+	    ZFSJNI_PACKAGE_DATA "ImportablePool$State;");
+
+	char *str = zjni_get_state_str(pool_state);
+	if (str != NULL) {
+	    jstring utf = (*env)->NewStringUTF(env, str);
+
+	    state_obj = (*env)->CallStaticObjectMethod(
+		env, class_State, method_valueOf, utf);
+	}
+
+	return (state_obj);
+}
+
+static int
+populate_ImportablePoolBean(JNIEnv *env, ImportablePoolBean_t *bean,
+    char *name, uint64_t guid, uint64_t pool_state, char *health)
+{
+	zjni_Object_t *object = (zjni_Object_t *)bean;
+
+	/* Set name */
+	(*env)->CallVoidMethod(env, object->object, bean->method_setName,
+	    (*env)->NewStringUTF(env, name));
+
+	/* Set state */
+	(*env)->CallVoidMethod(
+	    env, object->object, bean->method_setState,
+	    uint64_to_state(env, pool_state));
+
+	/* Set guid */
+	(*env)->CallVoidMethod(
+	    env, object->object, bean->method_setId, (jlong)guid);
+
+	/* Set health */
+	(*env)->CallVoidMethod(env, object->object, bean->method_setHealth,
+	    (*env)->NewStringUTF(env, health));
+
+	return (0);
+}
+
 static int
 populate_VirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
     nvlist_t *vdev, VirtualDeviceBean_t *bean)
@@ -332,6 +429,27 @@ populate_MirrorVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 }
 
 static jobject
+create_ImportablePoolBean(JNIEnv *env, char *name,
+    uint64_t guid, uint64_t pool_state, char *health)
+{
+	int result;
+	ImportablePoolBean_t bean_obj = {0};
+	ImportablePoolBean_t *bean = &bean_obj;
+
+	/* Construct ImportablePoolBean */
+	new_ImportablePoolBean(env, bean);
+
+	result = populate_ImportablePoolBean(
+	    env, bean, name, guid, pool_state, health);
+	if (result) {
+		/* Must not call any more Java methods to preserve exception */
+		return (NULL);
+	}
+
+	return (((zjni_Object_t *)bean)->object);
+}
+
+static jobject
 create_DiskVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp, nvlist_t *vdev)
 {
 	int result;
@@ -430,7 +548,6 @@ zjni_get_root_vdev(zpool_handle_t *zhp)
 			if (result != 0) {
 				root = NULL;
 			}
-			/*		nvlist_print(stderr, vdev_parent); */
 		}
 	}
 
@@ -502,13 +619,27 @@ zjni_get_VirtualDevice_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 		if (strcmp(type, VDEV_TYPE_DISK) == 0) {
 			obj = create_DiskVirtualDeviceBean(env, zhp, vdev);
 		} else if (strcmp(type, VDEV_TYPE_FILE) == 0) {
-			obj = create_FileVirtualDeviceBean(env, zhp,
-			    vdev);
+			obj = create_FileVirtualDeviceBean(env, zhp, vdev);
 		} else if (strcmp(type, VDEV_TYPE_RAIDZ) == 0) {
-			obj = create_RAIDVirtualDeviceBean(env,
-			    zhp, vdev);
+			obj = create_RAIDVirtualDeviceBean(env, zhp, vdev);
 		} else if (strcmp(type, VDEV_TYPE_MIRROR) == 0) {
 			obj = create_MirrorVirtualDeviceBean(env, zhp, vdev);
+		} else if (strcmp(type, VDEV_TYPE_REPLACING) == 0) {
+
+			/* Get the vdevs under this vdev */
+			nvlist_t **children;
+			uint_t nelem = 0;
+			int result = nvlist_lookup_nvlist_array(
+			    vdev, ZPOOL_CONFIG_CHILDREN, &children, &nelem);
+
+			if (result == 0 && nelem > 0) {
+
+				/* Get last vdev child (replacement device) */
+				nvlist_t *child = children[nelem - 1];
+
+				obj = zjni_get_VirtualDevice_from_vdev(env,
+				    zhp, child);
+			}
 		}
 	}
 
@@ -530,8 +661,6 @@ zjni_get_VirtualDevices_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 		vdev_parent = zjni_get_root_vdev(zhp);
 	}
 
-	/* nvlist_print(stderr, vdev_parent); */
-
 	if (vdev_parent != NULL) {
 
 		/* Get the vdevs under this vdev */
@@ -552,7 +681,7 @@ zjni_get_VirtualDevices_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 				    zjni_get_VirtualDevice_from_vdev(env,
 					zhp, child);
 
-				if (obj == NULL) {
+				if ((*env)->ExceptionOccurred(env) != NULL) {
 					/*
 					 * Must not call any more Java methods
 					 * to preserve exception
@@ -560,11 +689,13 @@ zjni_get_VirtualDevices_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 					return (NULL);
 				}
 
-				/* Add child to child vdev list */
-				(*env)->CallBooleanMethod(env,
-				    ((zjni_Object_t *)list_class_p)->object,
-				    ((zjni_Collection_t *)list_class_p)->
-				    method_add, obj);
+				if (obj != NULL) {
+				    /* Add child to child vdev list */
+				    (*env)->CallBooleanMethod(env,
+					((zjni_Object_t *)list_class_p)->object,
+					((zjni_Collection_t *)list_class_p)->
+					method_add, obj);
+				}
 			}
 		}
 	}
@@ -572,4 +703,101 @@ zjni_get_VirtualDevices_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 	return (zjni_Collection_to_array(
 	    env, (zjni_Collection_t *)list_class_p,
 	    ZFSJNI_PACKAGE_DATA "VirtualDevice"));
+}
+
+int
+zjni_create_add_ImportablePool(char *name,
+    uint64_t guid, uint64_t pool_state, char *health, void *data) {
+
+	JNIEnv *env = ((zjni_ArrayCallbackData_t *)data)->env;
+	zjni_Collection_t *list = ((zjni_ArrayCallbackData_t *)data)->list;
+
+	/* Construct ImportablePool object */
+	jobject bean = create_ImportablePoolBean(
+	    env, name, guid, pool_state, health);
+	if (bean == NULL) {
+		return (-1);
+	}
+
+	/* Add bean to list */
+	(*env)->CallBooleanMethod(env, ((zjni_Object_t *)list)->object,
+	    ((zjni_Collection_t *)list)->method_add, bean);
+
+	return (0);
+}
+
+/*
+ * Extern functions
+ */
+
+/*
+ * Iterates through each importable pool on the system.  For each
+ * importable pool, runs the given function with the given void as the
+ * last arg.
+ */
+int
+zjni_ipool_iter(int argc, char **argv, zjni_ipool_iter_f func, void *data)
+{
+	nvlist_t *pools = zpool_find_import(argc, argv);
+
+	if (pools != NULL) {
+
+		nvpair_t *elem = NULL;
+		while ((elem = nvlist_next_nvpair(pools, elem)) != NULL) {
+			nvlist_t *config;
+			char *name;
+			uint64_t guid;
+			uint64_t pool_state;
+			char *health;
+
+			if (nvpair_value_nvlist(elem, &config) != 0 ||
+			    nvlist_lookup_string(config,
+				ZPOOL_CONFIG_POOL_NAME, &name) != 0 ||
+			    nvlist_lookup_uint64(config,
+				ZPOOL_CONFIG_POOL_GUID, &guid) != 0 ||
+			    nvlist_lookup_uint64(config,
+				ZPOOL_CONFIG_POOL_STATE, &pool_state) != 0 ||
+			    nvlist_lookup_string(config,
+				ZPOOL_CONFIG_POOL_HEALTH, &health) != 0) {
+
+				return (-1);
+			}
+
+			/* Run the given function */
+			if (func(name, guid, pool_state, health, data)) {
+				return (-1);
+			}
+		}
+	}
+
+	return (0);
+}
+
+char *
+zjni_get_state_str(uint64_t pool_state)
+{
+	char *str = NULL;
+	switch (pool_state) {
+		case POOL_STATE_ACTIVE:
+			str = "POOL_STATE_ACTIVE";
+			break;
+
+		case POOL_STATE_EXPORTED:
+			str = "POOL_STATE_EXPORTED";
+			break;
+
+		case POOL_STATE_DESTROYED:
+			str = "POOL_STATE_DESTROYED";
+			break;
+
+		case POOL_STATE_UNINITIALIZED:
+			str = "POOL_STATE_UNINITIALIZED";
+			break;
+
+		case POOL_STATE_UNAVAIL:
+			str = "POOL_STATE_UNAVAIL";
+			break;
+	}
+
+	return (str);
 }

@@ -28,6 +28,10 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+function Java_com_sun_zfs_common_model_SystemDataModel_getImportablePools
+version SUNWprivate_1.1
+end
+
 function Java_com_sun_zfs_common_model_SystemDataModel_getPools
 version SUNWprivate_1.1
 end
@@ -109,5 +113,13 @@ version SUNWprivate_1.1
 end
 
 function dmgt_set_error_handler
+version SUNWprivate_1.1
+end
+
+function zjni_ipool_iter
+version SUNWprivate_1.1
+end
+
+function zjni_get_state_str
 version SUNWprivate_1.1
 end

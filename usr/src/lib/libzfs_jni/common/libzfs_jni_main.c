@@ -26,6 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <priv.h>
 #include "libzfs_jni_main.h"
 #include "libzfs_jni_util.h"
 #include "libzfs_jni_dataset.h"
@@ -75,6 +76,60 @@ init()
 /*
  * JNI functions
  */
+
+/*
+ * Class:     com_sun_zfs_common_model_SystemDataModel
+ * Method:    getImportablePools
+ * Signature: ([Ljava/lang/String;)[Ljava/lang/String;
+ */
+/* ARGSUSED */
+JNIEXPORT jobjectArray JNICALL
+Java_com_sun_zfs_common_model_SystemDataModel_getImportablePools(
+    JNIEnv *env, jobject obj, jobjectArray dirs) {
+
+	int error;
+	int argc = 0;
+	char **argv = NULL;
+	zjni_ArrayCallbackData_t data = {0};
+	zjni_ArrayList_t list_obj = {0};
+	zjni_ArrayList_t *list = &list_obj;
+
+	if (!priv_ineffect(PRIV_SYS_CONFIG)) {
+		zjni_throw_exception(env,
+		    "cannot discover pools: permission denied\n");
+		return (NULL);
+	}
+
+	if (dirs != NULL) {
+		argv = zjni_java_string_array_to_c(env, dirs);
+		if (argv == NULL) {
+			zjni_throw_exception(env, "out of memory");
+			return (NULL);
+		}
+
+		/* Count elements */
+		for (argc = 0; argv[argc] != NULL; argc++);
+	}
+
+	/* Create an array list to hold each ImportablePoolBean */
+	zjni_new_ArrayList(env, list);
+
+	data.env = env;
+	data.list = (zjni_Collection_t *)list;
+
+	/* Iterate through all importable pools, building list */
+	error = zjni_ipool_iter(
+	    argc, argv, zjni_create_add_ImportablePool, &data);
+
+	zjni_free_array((void **)argv, free);
+
+	if (error) {
+		return (NULL);
+	}
+
+	return (zjni_Collection_to_array(env, (zjni_Collection_t *)list,
+	    ZFSJNI_PACKAGE_DATA "ImportablePool"));
+}
 
 /*
  * Class:     com_sun_zfs_common_model_SystemDataModel

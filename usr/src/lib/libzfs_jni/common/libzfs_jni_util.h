@@ -74,10 +74,14 @@ typedef struct zjni_ArrayCallbackData {
 	zjni_Collection_t *list;
 } zjni_ArrayCallbackData_t;
 
+/* Signature for function to free data */
+typedef void (*zjni_free_f)(void *);
+
 /*
  * Function prototypes
  */
 
+void zjni_free_array(void **array, zjni_free_f);
 void zjni_throw_exception(JNIEnv *, const char *, ...);
 jstring zjni_get_matched_string(JNIEnv *, char *, regmatch_t *);
 void zjni_get_dataset_from_snapshot(const char *, char *, size_t);
@@ -88,7 +92,8 @@ jobject zjni_int_to_boolean(JNIEnv *, uint64_t);
 jobject zjni_str_to_long(JNIEnv *, char *);
 jobject zjni_long_to_Long(JNIEnv *, uint64_t);
 jobject zjni_str_to_date(JNIEnv *, char *);
-jobjectArray zjni_string_array_to_String_array(JNIEnv *, char **, int);
+jobjectArray zjni_c_string_array_to_java(JNIEnv *, char **, int);
+char **zjni_java_string_array_to_c(JNIEnv *, jobjectArray);
 int zjni_count_elements(void **);
 nvpair_t *zjni_nvlist_walk_nvpair(
 	nvlist_t *, const char *, data_type_t, nvpair_t *);

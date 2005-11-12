@@ -48,7 +48,7 @@ create_DiskDeviceBean(JNIEnv *env, dmgt_disk_t *dp)
 	jobject disk = NULL;
 
 	int naliases = zjni_count_elements((void **)dp->aliases);
-	jobjectArray aliases = zjni_string_array_to_String_array(
+	jobjectArray aliases = zjni_c_string_array_to_java(
 	    env, dp->aliases, naliases);
 	if (aliases != NULL) {
 		jobjectArray slices = create_SliceDeviceBean_array(env,

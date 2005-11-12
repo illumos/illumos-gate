@@ -41,6 +41,15 @@ extern "C" {
 
 /*
  * Class:     com_sun_zfs_common_model_SystemDataModel
+ * Method:    getImportablePools
+ * Signature: ([Ljava/lang/String;)[Ljava/lang/String;
+ */
+JNIEXPORT jobjectArray JNICALL
+Java_com_sun_zfs_common_model_SystemDataModel_getImportablePools(
+    JNIEnv *, jobject, jobjectArray);
+
+/*
+ * Class:     com_sun_zfs_common_model_SystemDataModel
  * Method:    getPools
  * Signature: ()[Lcom/sun/zfs/common/model/Pool;
  */

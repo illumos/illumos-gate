@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _AVAILDEVS_H
-#define	_AVAILDEVS_H
+#ifndef _LIBZFS_JNI_IPOOL_H
+#define	_LIBZFS_JNI_IPOOL_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -34,41 +34,23 @@ extern "C" {
 #endif
 
 /*
- * Constants
+ * Types
  */
 
-/* Command-line arguments */
-#define	CLI_ARG_ALL			'a'
-#define	CLI_ARG_DEVICES			'd'
-#define	CLI_ARG_POOLS			'p'
-#define	CLI_OPTSTRING			"apd"
+/* Callback function for importable pool iteration */
+typedef int (*zjni_ipool_iter_f)(char *name,
+    uint64_t guid, uint64_t pool_state, char *health, void *data);
 
-/* Must match the values in XMLDataModel.java */
-#define	ELEMENT_ALIAS			"alias"
-#define	ELEMENT_AVAILABLE		"available"
-#define	ELEMENT_DISK			"disk"
-#define	ELEMENT_IMPORTABLE		"importable"
-#define	ELEMENT_POOL			"pool"
-#define	ELEMENT_ROOT			"zfsconfig"
-#define	ELEMENT_SLICE			"slice"
-#define	ATTR_ALIAS_NAME			"name"
-#define	ATTR_DISK_INUSE			"inuse"
-#define	ATTR_DISK_NAME			"name"
-#define	ATTR_DISK_SIZE			"size"
-#define	ATTR_POOL_HEALTH		"health"
-#define	ATTR_POOL_ID			"id"
-#define	ATTR_POOL_NAME			"name"
-#define	ATTR_POOL_STATE			"state"
-#define	ATTR_SLICE_NAME			"name"
-#define	ATTR_SLICE_SIZE			"size"
-#define	ATTR_SLICE_START		"start"
-#define	ATTR_SLICE_USED_BY		"used-by"
-#define	ATTR_SLICE_USED_NAME		"used-name"
-#define	VAL_ATTR_FALSE			"false"
-#define	VAL_ATTR_TRUE			"true"
+/*
+ * Function prototypes
+ */
+
+extern int zjni_ipool_iter(
+    int argc, char **argv, zjni_ipool_iter_f func, void *data);
+extern char *zjni_get_state_str(uint64_t pool_state);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* _AVAILDEVS_H */
+#endif /* _LIBZFS_JNI_IPOOL_H */

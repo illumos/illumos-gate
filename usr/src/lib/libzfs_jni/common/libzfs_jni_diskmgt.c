@@ -42,7 +42,6 @@
  * Function prototypes
  */
 
-static void free_slice_array(dmgt_slice_t **slices);
 static char *get_device_name(dm_descriptor_t device, int *error);
 static dmgt_disk_t *get_disk(dm_descriptor_t disk, int *error);
 static char **get_disk_aliases(dm_descriptor_t disk, char *name, int *error);
@@ -71,18 +70,6 @@ static void (*error_func)(const char *, va_list);
 /*
  * Static functions
  */
-
-static void
-free_slice_array(dmgt_slice_t **slices)
-{
-	if (slices != NULL) {
-		int i;
-		for (i = 0; slices[i] != NULL; i++) {
-			dmgt_free_slice(slices[i]);
-		}
-		free(slices);
-	}
-}
 
 static char *
 get_device_name(dm_descriptor_t device, int *error)
@@ -239,12 +226,8 @@ get_disk_aliases(dm_descriptor_t disk, char *name, int *error)
 	}
 
 	if (*error && names != NULL) {
-		int i;
 		/* Free previously-allocated names */
-		for (i = 0; names[i] != NULL; i++) {
-			free(names[i]);
-		}
-		free(names);
+		zjni_free_array((void **)names, free);
 	}
 
 	return (names);
@@ -336,7 +319,7 @@ get_disk_slices(dm_descriptor_t media, const char *name, uint32_t blocksize,
 	}
 
 	if (*error && sap != NULL) {
-		free_slice_array(sap);
+		zjni_free_array((void **)sap, (zjni_free_f)dmgt_free_slice);
 		sap = NULL;
 	}
 
@@ -359,7 +342,7 @@ slices_overlap(dmgt_slice_t *slice1, dmgt_slice_t *slice2)
 	uint64_t start1 = slice1->start;
 	uint64_t end1 = start1 + slice1->size - 1;
 	uint64_t start2 = slice2->start;
-	uint64_t end2 = start2 + slice2->size - 2;
+	uint64_t end2 = start2 + slice2->size - 1;
 
 	int overlap = (start2 <= end1 && start1 <= end2);
 
@@ -728,17 +711,10 @@ void
 dmgt_free_disk(dmgt_disk_t *disk)
 {
 	if (disk != NULL) {
-		int i;
 		free(disk->name);
-
-		if (disk->aliases != NULL) {
-			for (i = 0; disk->aliases[i] != NULL; i++) {
-				free(disk->aliases[i]);
-			}
-			free(disk->aliases);
-		}
-
-		free_slice_array(disk->slices);
+		zjni_free_array((void **)disk->aliases, free);
+		zjni_free_array((void **)disk->slices,
+		    (zjni_free_f)dmgt_free_slice);
 		free(disk);
 	}
 }
