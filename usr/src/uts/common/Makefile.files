@@ -1176,6 +1176,7 @@ SCSI_VHCI_OBJS +=	scsi_vhci.o		\
 			lsi_asymmetric_fops.o	\
 			std_asymmetric_fops.o	\
 			emc_asymmetric_fops.o	\
+			mpapi_impl.o		\
 			proprietary_vhci_util.o
 
 STRPLUMB_OBJS += strplumb.o octet.o

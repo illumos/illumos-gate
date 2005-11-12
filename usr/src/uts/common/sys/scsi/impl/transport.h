@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -253,6 +253,12 @@ struct scsi_hba_tran {
 				pm_bus_power_op_t	op,
 				void			*arg,
 				void			*result);
+
+	/*
+	 * Inter-Connect type of trasnport as defined in
+	 * usr/src/uts/common/sys/scsi/impl/services.h
+	 */
+	int		tran_interconnect_type;
 };
 
 #ifdef __lock_lint
@@ -371,6 +377,8 @@ extern void		scsi_hba_nodename_compatible_free(
  */
 #define	SCSI_HBA_TRAN_CLONE	0x01		/* clone scsi_hba_tran_t */
 						/* structure per target */
+#define	SCSI_HBA_TRAN_ALLOC	0x02		/* set if scsi_hba_tran_alloc */
+						/* is called */
 
 /*
  * Flags for scsi_hba allocation functions

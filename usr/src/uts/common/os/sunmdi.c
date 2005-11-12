@@ -65,6 +65,8 @@
 #include <sys/epm.h>
 #include <sys/sunpm.h>
 #include <sys/modhash.h>
+#include <sys/disp.h>
+#include <sys/autoconf.h>
 
 #ifdef	DEBUG
 #include <sys/debug.h>
@@ -181,6 +183,7 @@ static void		i_mdi_pm_rele_client(mdi_client_t *, int);
 static void		i_mdi_pm_reset_client(mdi_client_t *);
 static void		i_mdi_pm_hold_all_phci(mdi_client_t *);
 static int		i_mdi_power_all_phci(mdi_client_t *);
+static void		i_mdi_log_sysevent(dev_info_t *, char *, char *);
 
 
 /*
@@ -448,7 +451,7 @@ mdi_vhci_unregister(dev_info_t *vdip, int flags)
 	}
 
 	/*
-	 * Check the pHCI and client count. All the pHCIs and clients
+	 * Check the vHCI, pHCI and client count. All the pHCIs and clients
 	 * should have been unregistered, before a vHCI can be
 	 * unregistered.
 	 */
@@ -616,6 +619,7 @@ mdi_phci_register(char *class, dev_info_t *pdip, int flags)
 	vh->vh_phci_tail = ph;
 	vh->vh_phci_count++;
 	mutex_exit(&mdi_mutex);
+	i_mdi_log_sysevent(pdip, class, ESC_DDI_INITIATOR_REGISTER);
 	return (MDI_SUCCESS);
 }
 
@@ -678,6 +682,8 @@ mdi_phci_unregister(dev_info_t *pdip, int flags)
 
 	mutex_exit(&mdi_mutex);
 
+	i_mdi_log_sysevent(pdip, ph->ph_vhci->vh_class,
+	    ESC_DDI_INITIATOR_UNREGISTER);
 	vhcache_phci_remove(vh->vh_config, ph);
 	cv_destroy(&ph->ph_unstable_cv);
 	cv_destroy(&ph->ph_powerchange_cv);
@@ -2567,6 +2573,8 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 	mdi_pathinfo_t	*pip;
 	int		ct_circular;
 	int		ph_circular;
+	int		se_flag;
+	int		kmem_flag;
 
 	pip = kmem_zalloc(sizeof (struct mdi_pathinfo), KM_SLEEP);
 	mutex_init(&MDI_PI(pip)->pi_mutex, NULL, MUTEX_DEFAULT, NULL);
@@ -2611,6 +2619,12 @@ i_mdi_pi_alloc(mdi_phci_t *ph, char *paddr, mdi_client_t *ct)
 
 	ndi_devi_exit(ph->ph_dip, ph_circular);
 	ndi_devi_exit(ct->ct_dip, ct_circular);
+
+	/* determine interrupt context */
+	se_flag = (servicing_interrupt()) ? SE_NOSLEEP : SE_SLEEP;
+	kmem_flag = (se_flag == SE_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
+
+	i_ddi_di_cache_invalidate(kmem_flag);
 
 	return (pip);
 }
@@ -2731,7 +2745,7 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 		/*
 		 * Give a chance for pending I/Os to complete.
 		 */
-		MDI_DEBUG(1, (CE_NOTE, ct->ct_vhci->vh_dip, "!i_mdi_pi_free: "
+		MDI_DEBUG(1, (CE_NOTE, ct->ct_vhci->vh_dip, "!mdi_pi_free: "
 		    "%d cmds still pending on path: %p\n",
 		    MDI_PI(pip)->pi_ref_cnt, pip));
 		if (cv_timedwait(&MDI_PI(pip)->pi_ref_cv,
@@ -2742,11 +2756,11 @@ mdi_pi_free(mdi_pathinfo_t *pip, int flags)
 			 * being signaled.
 			 */
 			MDI_DEBUG(1, (CE_NOTE, ct->ct_vhci->vh_dip,
-			    "!i_mdi_pi_free: "
+			    "!mdi_pi_free: "
 			    "Timeout reached on path %p without the cond\n",
 			    pip));
 			MDI_DEBUG(1, (CE_NOTE, ct->ct_vhci->vh_dip,
-			    "!i_mdi_pi_free: "
+			    "!mdi_pi_free: "
 			    "%d cmds still pending on path: %p\n",
 			    MDI_PI(pip)->pi_ref_cnt, pip));
 			MDI_PI_UNLOCK(pip);
@@ -2821,6 +2835,8 @@ i_mdi_pi_free(mdi_phci_t *ph, mdi_pathinfo_t *pip, mdi_client_t *ct)
 {
 	int	ct_circular;
 	int	ph_circular;
+	int	se_flag;
+	int	kmem_flag;
 
 	/*
 	 * remove any per-path kstats
@@ -2835,6 +2851,12 @@ i_mdi_pi_free(mdi_phci_t *ph, mdi_pathinfo_t *pip, mdi_client_t *ct)
 
 	ndi_devi_exit(ph->ph_dip, ph_circular);
 	ndi_devi_exit(ct->ct_dip, ct_circular);
+
+	/* determine interrupt context */
+	se_flag = (servicing_interrupt()) ? SE_NOSLEEP : SE_SLEEP;
+	kmem_flag = (se_flag == SE_SLEEP) ? KM_SLEEP : KM_NOSLEEP;
+
+	i_ddi_di_cache_invalidate(kmem_flag);
 
 	mutex_destroy(&MDI_PI(pip)->pi_mutex);
 	cv_destroy(&MDI_PI(pip)->pi_state_cv);
@@ -8361,4 +8383,163 @@ mdi_clean_vhcache(void)
 		vh->vh_refcnt--;
 	}
 	mutex_exit(&mdi_mutex);
+}
+
+/*
+ * mdi_vhci_walk_clients():
+ *		Walker routine to traverse client dev_info nodes
+ * ddi_walk_devs(ddi_get_child(vdip), f, arg) returns the entire tree
+ * below the client, including nexus devices, which we dont want.
+ * So we just traverse the immediate siblings, starting from 1st client.
+ */
+void
+mdi_vhci_walk_clients(dev_info_t *vdip,
+    int (*f)(dev_info_t *, void *), void *arg)
+{
+	dev_info_t	*cdip;
+	mdi_client_t	*ct;
+
+	mutex_enter(&mdi_mutex);
+
+	cdip = ddi_get_child(vdip);
+
+	while (cdip) {
+		ct = i_devi_get_client(cdip);
+		MDI_CLIENT_LOCK(ct);
+
+		switch ((*f)(cdip, arg)) {
+		case DDI_WALK_CONTINUE:
+			cdip = ddi_get_next_sibling(cdip);
+			MDI_CLIENT_UNLOCK(ct);
+			break;
+
+		default:
+			MDI_CLIENT_UNLOCK(ct);
+			mutex_exit(&mdi_mutex);
+			return;
+		}
+	}
+
+	mutex_exit(&mdi_mutex);
+}
+
+/*
+ * mdi_vhci_walk_phcis():
+ *		Walker routine to traverse phci dev_info nodes
+ */
+void
+mdi_vhci_walk_phcis(dev_info_t *vdip,
+    int (*f)(dev_info_t *, void *), void *arg)
+{
+	mdi_vhci_t	*vh = NULL;
+	mdi_phci_t	*ph = NULL;
+
+	mutex_enter(&mdi_mutex);
+
+	vh = i_devi_get_vhci(vdip);
+	ph = vh->vh_phci_head;
+
+	while (ph) {
+		MDI_PHCI_LOCK(ph);
+
+		switch ((*f)(ph->ph_dip, arg)) {
+		case DDI_WALK_CONTINUE:
+			MDI_PHCI_UNLOCK(ph);
+			ph = ph->ph_next;
+			break;
+
+		default:
+			MDI_PHCI_UNLOCK(ph);
+			mutex_exit(&mdi_mutex);
+			return;
+		}
+	}
+
+	mutex_exit(&mdi_mutex);
+}
+
+
+/*
+ * mdi_walk_vhcis():
+ *		Walker routine to traverse vhci dev_info nodes
+ */
+void
+mdi_walk_vhcis(int (*f)(dev_info_t *, void *), void *arg)
+{
+	mdi_vhci_t	*vh = NULL;
+
+	mutex_enter(&mdi_mutex);
+	/*
+	 * Scan for already registered vhci
+	 */
+	for (vh = mdi_vhci_head; vh != NULL; vh = vh->vh_next) {
+		vh->vh_refcnt++;
+		mutex_exit(&mdi_mutex);
+		if (((*f)(vh->vh_dip, arg)) != DDI_WALK_CONTINUE) {
+			mutex_enter(&mdi_mutex);
+			vh->vh_refcnt--;
+			break;
+		} else {
+			mutex_enter(&mdi_mutex);
+			vh->vh_refcnt--;
+		}
+	}
+
+	mutex_exit(&mdi_mutex);
+}
+
+/*
+ * i_mdi_log_sysevent():
+ *		Logs events for pickup by syseventd
+ */
+static void
+i_mdi_log_sysevent(dev_info_t *dip, char *ph_vh_class, char *subclass)
+{
+	char		*path_name;
+	nvlist_t	*attr_list;
+
+	if (nvlist_alloc(&attr_list, NV_UNIQUE_NAME_TYPE,
+	    KM_SLEEP) != DDI_SUCCESS) {
+		goto alloc_failed;
+	}
+
+	path_name = kmem_zalloc(MAXPATHLEN, KM_SLEEP);
+	(void) ddi_pathname(dip, path_name);
+
+	if (nvlist_add_string(attr_list, DDI_DRIVER_NAME,
+	    ddi_driver_name(dip)) != DDI_SUCCESS) {
+		goto error;
+	}
+
+	if (nvlist_add_int32(attr_list, DDI_DRIVER_MAJOR,
+	    (int32_t)ddi_driver_major(dip)) != DDI_SUCCESS) {
+		goto error;
+	}
+
+	if (nvlist_add_int32(attr_list, DDI_INSTANCE,
+	    (int32_t)ddi_get_instance(dip)) != DDI_SUCCESS) {
+		goto error;
+	}
+
+	if (nvlist_add_string(attr_list, DDI_PATHNAME,
+	    path_name) != DDI_SUCCESS) {
+		goto error;
+	}
+
+	if (nvlist_add_string(attr_list, DDI_CLASS,
+	    ph_vh_class) != DDI_SUCCESS) {
+		goto error;
+	}
+
+	(void) ddi_log_sysevent(dip, DDI_VENDOR_SUNW, EC_DDI, subclass,
+	    attr_list, NULL, DDI_SLEEP);
+
+error:
+	kmem_free(path_name, MAXPATHLEN);
+	nvlist_free(attr_list);
+	return;
+
+alloc_failed:
+	MDI_DEBUG(1, (CE_WARN, dip,
+	    "!i_mdi_log_sysevent: Unable to send sysevent"));
 }

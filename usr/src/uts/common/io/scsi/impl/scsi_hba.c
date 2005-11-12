@@ -278,8 +278,10 @@ scsi_hba_attach_setup(
 	int			value;
 	int			len;
 	char			*prop_name;
+	const char		*prop_value;
 	char			*errmsg =
 		"scsi_hba_attach: cannot create property '%s' for %s%d\n";
+	static const char	*interconnect[] = INTERCONNECT_TYPE_ASCII;
 
 	/*
 	 * Link this instance into the scsi_hba_list
@@ -307,7 +309,8 @@ scsi_hba_attach_setup(
 	 * later by scsi_hba_bus_ctl(), and scsi_hba_map().
 	 */
 	hba_tran->tran_hba_dip = dip;
-	hba_tran->tran_hba_flags = flags;
+	hba_tran->tran_hba_flags &= SCSI_HBA_TRAN_ALLOC;
+	hba_tran->tran_hba_flags |= (flags & ~SCSI_HBA_TRAN_ALLOC);
 
 	/*
 	 * Note: we only need dma_attr_minxfer and dma_attr_burstsizes
@@ -383,6 +386,24 @@ scsi_hba_attach_setup(
 		    prop_name, value) != DDI_PROP_SUCCESS) {
 			cmn_err(CE_CONT, errmsg, prop_name,
 				ddi_get_name(dip), ddi_get_instance(dip));
+		}
+	}
+	if ((hba_tran->tran_hba_flags & SCSI_HBA_TRAN_ALLOC) &&
+	    (hba_tran->tran_interconnect_type > 0) &&
+	    (hba_tran->tran_interconnect_type < INTERCONNECT_MAX)) {
+		prop_name = "initiator-interconnect-type";
+		len = 0;
+		if (ddi_prop_op(DDI_DEV_T_ANY, dip, PROP_LEN, 0, prop_name,
+				NULL, &len) == DDI_PROP_NOT_FOUND) {
+			value = hba_tran->tran_interconnect_type;
+			prop_value = interconnect[value];
+			if (ddi_prop_update_string(DDI_MAJOR_T_UNKNOWN, dip,
+			    prop_name, (char *)prop_value)
+			    != DDI_PROP_SUCCESS) {
+				cmn_err(CE_CONT, errmsg, prop_name,
+					ddi_get_name(dip),
+					ddi_get_instance(dip));
+			}
 		}
 	}
 
@@ -846,8 +867,15 @@ scsi_hba_tran_alloc(
 	dev_info_t		*dip,
 	int			flags)
 {
-	return (kmem_zalloc(sizeof (scsi_hba_tran_t),
-		(flags & SCSI_HBA_CANSLEEP) ? KM_SLEEP : KM_NOSLEEP));
+	scsi_hba_tran_t		*hba_tran;
+
+	hba_tran = kmem_zalloc(sizeof (scsi_hba_tran_t),
+		(flags & SCSI_HBA_CANSLEEP) ? KM_SLEEP : KM_NOSLEEP);
+
+	hba_tran->tran_interconnect_type = INTERCONNECT_PARALLEL;
+	hba_tran->tran_hba_flags |= SCSI_HBA_TRAN_ALLOC;
+
+	return (hba_tran);
 }
 
 

@@ -144,9 +144,36 @@ extern char *sense_keys[NUM_SENSE_KEYS + NUM_IMPL_SENSE_KEYS];
 #define	INTERCONNECT_ISCSI		8
 #define	INTERCONNECT_IBSRP		9
 #define	INTERCONNECT_SATA		10
+#define	INTERCONNECT_MAX		11	/* Change this appropriately, */
+						/* as new one(s) are added.   */
+						/* Is always the last & max.  */
+
+/*					INTERCONNECT TYPE STRINGS */
+#define	INTERCONNECT_PARALLEL_STR	"SPI"
+#define	INTERCONNECT_FIBRE_STR		"FIBRE"
+#define	INTERCONNECT_1394_STR		"1394"
+#define	INTERCONNECT_SSA_STR		""
+#define	INTERCONNECT_FABRIC_STR		"FABRIC"
+#define	INTERCONNECT_USB_STR		"USB"
+#define	INTERCONNECT_ATAPI_STR		"ATAPI"
+#define	INTERCONNECT_ISCSI_STR		"iSCSI"
+#define	INTERCONNECT_IBSRP_STR		"IB"
+#define	INTERCONNECT_SATA_STR		"SATA"
+
 #define	INTERCONNECT_TYPE_ASCII		{				\
-		"", "SPI", "FC", "1394", "", "FC", "USB",		\
-		"ATAPI", "iSCSI", "IB", "SATA", NULL }
+					"",				\
+					INTERCONNECT_PARALLEL_STR,	\
+					INTERCONNECT_FIBRE_STR,		\
+					INTERCONNECT_1394_STR,		\
+					INTERCONNECT_SSA_STR,		\
+					INTERCONNECT_FABRIC_STR,	\
+					INTERCONNECT_USB_STR,		\
+					INTERCONNECT_ATAPI_STR,		\
+					INTERCONNECT_ISCSI_STR,		\
+					INTERCONNECT_IBSRP_STR,		\
+					INTERCONNECT_SATA_STR,		\
+					NULL				\
+					};
 
 /*
  * Compatibility...

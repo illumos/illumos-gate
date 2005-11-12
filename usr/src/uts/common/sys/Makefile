@@ -788,7 +788,9 @@ SCSICADHDRS=		\
 	mptvar.h
 
 SCSIVHCIHDRS=		\
-	scsi_vhci.h
+	scsi_vhci.h	\
+	mpapi_impl.h	\
+	mpapi_scsi_vhci.h
 
 FCHDRS=			\
 	fc_transport.h	\

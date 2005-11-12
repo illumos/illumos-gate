@@ -36,6 +36,8 @@
 #include <sys/mhd.h>
 #include <sys/sunmdi.h>
 #include <sys/mdi_impldefs.h>
+#include <sys/scsi/adapters/mpapi_impl.h>
+#include <sys/scsi/adapters/mpapi_scsi_vhci.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -214,6 +216,13 @@ extern int vhci_debug;
 	(SCSI_IMPLICIT_FAILOVER |  SCSI_EXPLICIT_FAILOVER)
 
 #define	SCSI_OPTIONS_VHCI(n)	((n) & SCSI_OPTIONS_VHCI_MASK)
+
+typedef struct vhci_dev_vidpid_entry {
+	char	vid[10];
+	int	vid_len;
+	char	pid[20];
+	int	pid_len;
+} vhci_dev_vidpid_entry_t;
 
 struct	scsi_vhci_swarg;
 
@@ -459,6 +468,7 @@ struct scsi_vhci {
 	taskq_t				*vhci_update_pathstates_taskq;
 	struct scsi_reset_notify_entry	*vhci_reset_notify_listf;
 	uint16_t			vhci_conf_flags;
+	mpapi_priv_t			*mp_priv;
 };
 
 /*
@@ -724,6 +734,7 @@ typedef struct sv_switch_to_cntlr_iocdata {
 
 #define	SCSI_VHCI_PATH_DISABLE			(SCSI_VHCI_CTL_SUB_CMD + 0x0C)
 #define	SCSI_VHCI_PATH_ENABLE			(SCSI_VHCI_CTL_SUB_CMD + 0x0D)
+#define	SCSI_VHCI_MPAPI				(SCSI_VHCI_CTL_SUB_CMD + 0x0E)
 
 #ifdef	__cplusplus
 }

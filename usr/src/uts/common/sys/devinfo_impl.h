@@ -98,14 +98,16 @@ extern "C" {
 #define	MAX_TREE_DEPTH	64
 #define	MAX_PTR_IN_PRV	5
 #define	DI_SNAPSHOT_VERSION_0	0	/* reserved */
-#define	DI_SNAPSHOT_VERSION	DI_SNAPSHOT_VERSION_0	/* current version */
+#define	DI_SNAPSHOT_VERSION_1	1	/* reserved */
+#define	DI_SNAPSHOT_VERSION	DI_SNAPSHOT_VERSION_1	/* current version */
 #define	DI_PRIVDATA_VERSION_0	10	/* Start from 10 so caller must set */
 #define	DI_BIG_ENDIAN		0	/* reserved */
 #define	DI_LITTLE_ENDIAN	1	/* reserved */
 
 #define	DI_CACHE_MAGIC		0xdfcac6ed	/* magic # for cache */
 #define	DI_CACHE_PERMS		(0444)
-#define	DI_CACHE_SNAPSHOT_FLAGS	(DINFOFORCE|DINFOSUBTREE|DINFOMINOR|DINFOPROP)
+#define	DI_CACHE_SNAPSHOT_FLAGS	\
+	(DINFOFORCE|DINFOSUBTREE|DINFOMINOR|DINFOPROP|DINFOPATH)
 
 #define	DI_NODE(addr)		((struct di_node *)((void *)(addr)))
 #define	DI_MINOR(addr)		((struct di_minor *)((void *)(addr)))
@@ -126,6 +128,15 @@ extern "C" {
 #define	DIPATH(addr)		DI_PATH(addr)
 #define	DIPATHPROP(addr)	DI_PATHPROP(addr)
 
+/*
+ * multipath component definitions:  Follows the registered component of
+ * the mpxio system.
+ */
+#define	MULTIPATH_COMPONENT_NONE	0
+#define	MULTIPATH_COMPONENT_VHCI	0x1
+#define	MULTIPATH_COMPONENT_PHCI	0x2
+#define	MULTIPATH_COMPONENT_CLIENT	0x4
+
 typedef int32_t di_off_t;
 
 /*
@@ -140,6 +151,7 @@ struct di_all {
 	uint32_t	cache_checksum;	/* snapshot checksum */
 	uint64_t	snapshot_time;	/* snapshot timestamp */
 	di_off_t	top_devinfo;
+	di_off_t	top_vhci_devinfo;
 	di_off_t	devnames;
 	di_off_t	ppdata_format;	/* parent priv data format array */
 	di_off_t	dpdata_format;	/* driver priv data format array */
@@ -256,7 +268,15 @@ struct di_node {	/* useful info to export for each tree node */
 	di_off_t tgt_links;
 	di_off_t src_links;
 
-	uint64_t	user_private_data;
+	uint32_t di_pad1;	/* 4 byte padding for 32bit x86 app. */
+	uint64_t user_private_data;
+	/*
+	 * offset to link vhci/phci nodes.
+	 */
+	di_off_t next_vhci;
+	di_off_t top_phci;
+	di_off_t next_phci;
+	uint32_t multipath_component;	/* stores MDI_COMPONENT_* value. */
 };
 
 /*

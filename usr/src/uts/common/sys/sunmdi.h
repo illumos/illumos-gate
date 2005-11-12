@@ -241,6 +241,23 @@ void mdi_pi_set_phci_private(mdi_pathinfo_t *, caddr_t);
 int mdi_vhci_bus_config(dev_info_t *, uint_t, ddi_bus_config_op_t, void *,
     dev_info_t **, char *);
 
+/*
+ * mdi_vhci node walker function
+ */
+void mdi_walk_vhcis(int (*f)(dev_info_t *, void *), void *arg);
+
+/*
+ * mdi_phci node walker function
+ */
+void mdi_vhci_walk_phcis(dev_info_t *, int (*f)(dev_info_t *, void *),
+    void *arg);
+
+/*
+ * mdi_client node walker function
+ */
+void mdi_vhci_walk_clients(dev_info_t *, int (*f)(dev_info_t *, void *),
+    void *arg);
+
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

@@ -810,3 +810,10 @@ usr/lib/llib-lzpool			sparc
 usr/lib/sparcv9/llib-lzfs.ln		sparc
 usr/lib/sparcv9/llib-lzfs_jni.ln	sparc
 usr/lib/sparcv9/llib-lzpool.ln		sparc
+
+#
+# These files are installed in the proto area for Solaris scsi_vhci driver
+# (for MPAPI support) and should not be shipped
+#
+usr/include/sys/scsi/adapters/mpapi_impl.h	sparc
+usr/include/sys/scsi/adapters/mpapi_scsi_vhci.h	sparc

@@ -743,3 +743,10 @@ usr/lib/llib-lzpool.ln			i386
 usr/lib/amd64/llib-lzfs.ln		i386
 usr/lib/amd64/llib-lzfs_jni.ln		i386
 usr/lib/amd64/llib-lzpool.ln		i386
+
+#
+# These files are installed in the proto area for Solaris scsi_vhci driver
+# (for MPAPI support) and should not be shipped
+#
+usr/include/sys/scsi/adapters/mpapi_impl.h	i386
+usr/include/sys/scsi/adapters/mpapi_scsi_vhci.h	i386

@@ -164,3 +164,4 @@ aggr:* 0666 root sys
 ntwdt:* 0644 root sys
 zfs:* 0600 root sys
 zfs:zfs 0666 root sys
+scsi_vhci:* 0666 root sys

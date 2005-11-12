@@ -222,6 +222,7 @@ extern "C" {
  * DDI event definitions
  */
 #define	EC_DEVFS	"EC_devfs"	/* Event class devfs */
+#define	EC_DDI		"EC_ddi"	/* Event class ddi */
 
 /* Class devfs subclasses */
 #define	ESC_DEVFS_MINOR_CREATE	"ESC_devfs_minor_create"
@@ -232,14 +233,17 @@ extern "C" {
 #define	ESC_DEVFS_BRANCH_ADD	"ESC_devfs_branch_add"
 #define	ESC_DEVFS_BRANCH_REMOVE	"ESC_devfs_branch_remove"
 
+/* Class ddi subclasses */
+#define	ESC_DDI_INITIATOR_REGISTER	"ESC_ddi_initiator_register"
+#define	ESC_DDI_INITIATOR_UNREGISTER	"ESC_ddi_initiator_unregister"
+
 /* DDI/NDI event publisher */
 #define	EP_DDI	SUNW_KERN_PUB"ddi"
 
 /*
  * devfs event class attributes
  *
- * The following attributes are private to EC_DEVFS
- * event data.
+ * The following attributes are private to EC_DEVFS event data.
  */
 #define	DEVFS_DRIVER_NAME	"di.driver"
 #define	DEVFS_INSTANCE		"di.instance"
@@ -251,6 +255,17 @@ extern "C" {
 #define	DEVFS_MINOR_ISCLONE	"mi.isclone"
 #define	DEVFS_MINOR_MAJNUM	"mi.majorno"
 #define	DEVFS_MINOR_MINORNUM	"mi.minorno"
+
+/*
+ * ddi event class payload
+ *
+ * The following attributes are private to EC_DDI event data.
+ */
+#define	DDI_DRIVER_NAME		"ddi.driver"
+#define	DDI_DRIVER_MAJOR	"ddi.major"
+#define	DDI_INSTANCE		"ddi.instance"
+#define	DDI_PATHNAME		"ddi.path"
+#define	DDI_CLASS		"ddi.class"
 
 /*
  * Fault-related definitions

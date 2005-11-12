@@ -949,3 +949,27 @@ declaration	int devfs_rm_minor_perm(char *drv, \
 			void (*cb)(minorperm_err_t, int))
 version		SUNWprivate_1.1
 end
+
+function	di_vhci_first_node
+include		<libdevinfo.h>
+declaration	di_node_t di_vhci_first_node(di_node_t root)
+version		SUNWprivate_1.1
+end
+
+function	di_vhci_next_node
+include		<libdevinfo.h>
+declaration	di_node_t di_vhci_next_node(di_node_t vhci_node)
+version		SUNWprivate_1.1
+end
+
+function	di_phci_first_node
+include		<libdevinfo.h>
+declaration	di_node_t di_phci_first_node(di_node_t vhci_node)
+version		SUNWprivate_1.1
+end
+
+function	di_phci_next_node
+include		<libdevinfo.h>
+declaration	di_node_t di_phci_next_node(di_node_t phci_node)
+version		SUNWprivate_1.1
+end

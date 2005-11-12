@@ -78,6 +78,7 @@ vni		read_priv_set=net_rawaccess	write_priv_set=net_rawaccess
 #
 md:admin					write_priv_set=sys_config
 fssnap:ctl	read_priv_set=sys_config	write_priv_set=sys_config
+scsi_vhci:devctl				write_priv_set=sys_devices
 #
 # Other devices that require a privilege to open.
 #

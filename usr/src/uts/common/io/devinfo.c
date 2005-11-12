@@ -270,6 +270,11 @@ static uint_t	di_chunk = 32;		/* I/O chunk size in pages */
 #define	CACHE_DEBUG(args)	\
 	{ if (di_cache_debug != DI_QUIET) di_cache_print args; }
 
+static struct phci_walk_arg {
+	di_off_t	off;
+	struct di_state	*st;
+} phci_walk_arg_t;
+
 static int di_open(dev_t *, int, int, cred_t *);
 static int di_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 static int di_close(dev_t, int, int, cred_t *);
@@ -306,6 +311,8 @@ static int snapshot_is_cacheable(struct di_state *st);
 static int di_cache_lookup(struct di_state *st);
 static int di_cache_update(struct di_state *st);
 static void di_cache_print(di_cache_debug_t msglevel, char *fmt, ...);
+int build_vhci_list(dev_info_t *vh_devinfo, void *arg);
+int build_phci_list(dev_info_t *ph_devinfo, void *arg);
 
 static struct cb_ops di_cb_ops = {
 	di_open,		/* open */
@@ -715,6 +722,7 @@ di_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	all->devcnt = devcnt;
 	all->command = st->command;
 	all->version = DI_SNAPSHOT_VERSION;
+	all->top_vhci_devinfo = 0;	/* filled up by build_vhci_list. */
 
 	/*
 	 * Note the endianness in case we need to transport snapshot
@@ -1321,6 +1329,10 @@ di_snapshot(struct di_state *st)
 	 */
 	off = di_copytree(DEVI(rootnode), &all->top_devinfo, st);
 
+	if (DINFOPATH & st->command) {
+		mdi_walk_vhcis(build_vhci_list, st);
+	}
+
 	ddi_release_devi(rootnode);
 
 	/*
@@ -1367,7 +1379,7 @@ di_snapshot(struct di_state *st)
 static di_off_t
 di_snapshot_and_clean(struct di_state *st)
 {
-	di_off_t off;
+	di_off_t	off;
 
 	modunload_disable();
 	off = di_snapshot(st);
@@ -1385,6 +1397,95 @@ di_snapshot_and_clean(struct di_state *st)
 	modunload_enable();
 
 	return (off);
+}
+
+/*
+ * construct vhci linkage in the snapshot.
+ */
+int
+build_vhci_list(dev_info_t *vh_devinfo, void *arg)
+{
+	struct di_all *all;
+	struct di_node *me;
+	struct di_state *st;
+	di_off_t off;
+	struct phci_walk_arg pwa;
+
+	dcmn_err3((CE_CONT, "build_vhci list\n"));
+
+	dcmn_err3((CE_CONT, "vhci node %s, instance #%d\n",
+		DEVI(vh_devinfo)->devi_node_name,
+		DEVI(vh_devinfo)->devi_instance));
+
+	st = (struct di_state *)arg;
+	if (di_dip_find(st, vh_devinfo, &off) != 0) {
+		dcmn_err((CE_WARN, "di_dip_find error for the given node\n"));
+		return (DDI_WALK_TERMINATE);
+	}
+
+	dcmn_err3((CE_CONT, "st->mem_size: %d vh_devinfo off: 0x%x\n",
+		st->mem_size, off));
+
+	all = (struct di_all *)di_mem_addr(st, 0);
+	if (all->top_vhci_devinfo == 0) {
+		all->top_vhci_devinfo = off;
+	} else {
+		me = (struct di_node *)di_mem_addr(st, all->top_vhci_devinfo);
+
+		while (me->next_vhci != 0) {
+			me = (struct di_node *)di_mem_addr(st, me->next_vhci);
+		}
+
+		me->next_vhci = off;
+	}
+
+	pwa.off = off;
+	pwa.st = st;
+	mdi_vhci_walk_phcis(vh_devinfo, build_phci_list, &pwa);
+
+	return (DDI_WALK_CONTINUE);
+}
+
+/*
+ * construct phci linkage for the given vhci in the snapshot.
+ */
+int
+build_phci_list(dev_info_t *ph_devinfo, void *arg)
+{
+	struct di_node *vh_di_node;
+	struct di_node *me;
+	struct phci_walk_arg *pwa;
+	di_off_t off;
+
+	pwa = (struct phci_walk_arg *)arg;
+
+	dcmn_err3((CE_CONT, "build_phci list for vhci at offset: 0x%x\n",
+		pwa->off));
+
+	vh_di_node = (struct di_node *)di_mem_addr(pwa->st, pwa->off);
+
+	if (di_dip_find(pwa->st, ph_devinfo, &off) != 0) {
+		dcmn_err((CE_WARN, "di_dip_find error for the given node\n"));
+		return (DDI_WALK_TERMINATE);
+	}
+
+	dcmn_err3((CE_CONT, "phci node %s, instance #%d, at offset 0x%x\n",
+		DEVI(ph_devinfo)->devi_node_name,
+		DEVI(ph_devinfo)->devi_instance, off));
+
+	if (vh_di_node->top_phci == 0) {
+		vh_di_node->top_phci = off;
+		return (DDI_WALK_CONTINUE);
+	}
+
+	me = (struct di_node *)di_mem_addr(pwa->st, vh_di_node->top_phci);
+
+	while (me->next_phci != 0) {
+		me = (struct di_node *)di_mem_addr(pwa->st, me->next_phci);
+	}
+	me->next_phci = off;
+
+	return (DDI_WALK_CONTINUE);
 }
 
 /*
@@ -1607,6 +1708,10 @@ di_copynode(struct di_stack *dsp, struct di_state *st)
 	me->attributes = node->devi_node_attributes;
 	me->state = node->devi_state;
 	me->node_state = node->devi_node_state;
+	me->next_vhci = 0;		/* Filled up by build_vhci_list. */
+	me->top_phci = 0;		/* Filled up by build_phci_list. */
+	me->next_phci = 0;		/* Filled up by build_phci_list. */
+	me->multipath_component = MULTIPATH_COMPONENT_NONE; /* set default. */
 	me->user_private_data = NULL;
 
 	/*
@@ -1738,7 +1843,12 @@ path:
 		goto property;
 	}
 
+	if (MDI_VHCI(node)) {
+		me->multipath_component = MULTIPATH_COMPONENT_VHCI;
+	}
+
 	if (MDI_CLIENT(node)) {
+		me->multipath_component = MULTIPATH_COMPONENT_CLIENT;
 		me->multipath_client = DI_ALIGN(off);
 		off = di_getpath_data((dev_info_t *)node, &me->multipath_client,
 		    me->self, st, 1);
@@ -1749,6 +1859,7 @@ path:
 	}
 
 	if (MDI_PHCI(node)) {
+		me->multipath_component = MULTIPATH_COMPONENT_PHCI;
 		me->multipath_phci = DI_ALIGN(off);
 		off = di_getpath_data((dev_info_t *)node, &me->multipath_phci,
 		    me->self, st, 0);
@@ -3369,6 +3480,9 @@ chunk_write(struct vnode *vp, offset_t off, caddr_t buf, size_t len)
 }
 
 extern int modrootloaded;
+extern void mdi_walk_vhcis(int (*)(dev_info_t *, void *), void *);
+extern void mdi_vhci_walk_phcis(dev_info_t *,
+	int (*)(dev_info_t *, void *), void *);
 
 static void
 di_cache_write(struct di_cache *cache)

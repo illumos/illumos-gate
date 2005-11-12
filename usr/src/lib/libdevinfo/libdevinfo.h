@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -142,6 +142,10 @@ extern di_node_t di_sibling_node(di_node_t node);
 extern di_node_t di_child_node(di_node_t node);
 extern di_node_t di_drv_first_node(const char *drv_name, di_node_t root);
 extern di_node_t di_drv_next_node(di_node_t node);
+extern di_node_t di_vhci_first_node(di_node_t root);
+extern di_node_t di_vhci_next_node(di_node_t node);
+extern di_node_t di_phci_first_node(di_node_t vhci_node);
+extern di_node_t di_phci_next_node(di_node_t node);
 
 /*
  * tree walking assistants

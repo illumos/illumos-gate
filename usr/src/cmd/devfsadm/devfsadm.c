@@ -945,11 +945,15 @@ process_deferred_links(struct dca_impl *dcip, int flags)
  * Called in non-daemon mode to take a snap shot of the devinfo tree.
  * Then it calls the appropriate functions to build /devices and /dev.
  * It also flushes path_to_inst.
+ * DINFOCACHE snapshot needs to be updated when devfsadm is run.
+ * This will only happen if the flags that devfsadm uses matches the flags
+ * that DINFOCACHE uses and that is why flags is set to
+ * DI_CACHE_SNAPSHOT_FLAGS.
  */
 void
 process_devinfo_tree()
 {
-	uint_t		flags = DINFOCPYALL;
+	uint_t		flags = DI_CACHE_SNAPSHOT_FLAGS;
 	struct dca_impl	dci;
 	char		name[MAXNAMELEN];
 	char		*fcn = "process_devinfo_tree: ";

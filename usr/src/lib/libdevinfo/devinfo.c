@@ -2088,6 +2088,104 @@ int di_path_prop_lookup_strings(di_path_t path, const char *prop_name,
 	return (di_path_prop_strings(prop, prop_data));
 }
 
+/*
+ * Consolidation private interfaces for traversing vhci nodes.
+ */
+di_node_t
+di_vhci_first_node(di_node_t root)
+{
+	struct di_all *dap;
+	caddr_t		pa;		/* starting address of map */
+
+	DPRINTF((DI_INFO, "Get first vhci node\n"));
+
+	if (root == DI_NODE_NIL) {
+		errno = EINVAL;
+		return (DI_NODE_NIL);
+	}
+
+	pa = (caddr_t)root - DI_NODE(root)->self;
+	dap = DI_ALL(pa);
+
+	if (dap->top_vhci_devinfo == NULL) {
+		errno = ENXIO;
+		return (DI_NODE_NIL);
+	}
+
+	return (DI_NODE(pa + dap->top_vhci_devinfo));
+}
+
+di_node_t
+di_vhci_next_node(di_node_t node)
+{
+	caddr_t		pa;		/* starting address of map */
+
+	if (node == DI_NODE_NIL) {
+		errno = EINVAL;
+		return (DI_NODE_NIL);
+	}
+
+	DPRINTF((DI_TRACE, "next vhci node on the snap shot:"
+	    " current=%s\n", di_node_name(node)));
+
+	if (DI_NODE(node)->next_vhci == NULL) {
+		errno = ENXIO;
+		return (DI_NODE_NIL);
+	}
+
+	pa = (caddr_t)node - DI_NODE(node)->self;
+
+	return (DI_NODE(pa + DI_NODE(node)->next_vhci));
+}
+
+/*
+ * Consolidation private interfaces for traversing phci nodes.
+ */
+di_node_t
+di_phci_first_node(di_node_t vhci_node)
+{
+	caddr_t		pa;		/* starting address of map */
+
+	DPRINTF((DI_INFO, "Get first phci node:\n"
+	    " current=%s", di_node_name(vhci_node)));
+
+	if (vhci_node == DI_NODE_NIL) {
+		errno = EINVAL;
+		return (DI_NODE_NIL);
+	}
+
+	pa = (caddr_t)vhci_node - DI_NODE(vhci_node)->self;
+
+	if (DI_NODE(vhci_node)->top_phci == NULL) {
+		errno = ENXIO;
+		return (DI_NODE_NIL);
+	}
+
+	return (DI_NODE(pa + DI_NODE(vhci_node)->top_phci));
+}
+
+di_node_t
+di_phci_next_node(di_node_t node)
+{
+	caddr_t		pa;		/* starting address of map */
+
+	if (node == DI_NODE_NIL) {
+		errno = EINVAL;
+		return (DI_NODE_NIL);
+	}
+
+	DPRINTF((DI_TRACE, "next phci node on the snap shot:"
+	    " current=%s\n", di_node_name(node)));
+
+	if (DI_NODE(node)->next_phci == NULL) {
+		errno = ENXIO;
+		return (DI_NODE_NIL);
+	}
+
+	pa = (caddr_t)node - DI_NODE(node)->self;
+
+	return (DI_NODE(pa + DI_NODE(node)->next_phci));
+}
 
 /*
  * Consolidation private interfaces for private data
