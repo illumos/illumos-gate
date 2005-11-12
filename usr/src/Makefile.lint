@@ -293,6 +293,7 @@ COMMON_SUBDIRS = \
 	lib/libbsm \
 	lib/libc \
 	lib/libc_db \
+	lib/libc_i18n \
 	lib/libcfgadm \
 	lib/libcmdutils \
 	lib/libcontract \
