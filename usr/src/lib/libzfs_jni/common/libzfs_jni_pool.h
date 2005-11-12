@@ -36,7 +36,7 @@ extern "C" {
 #include <jni.h>
 #include <libnvpair.h>
 #include <libzfs.h>
-#include "libzfs_jni_ipool.h"
+#include <libzfs_jni_ipool.h>
 
 /*
  * Function prototypes
