@@ -96,9 +96,9 @@
 /*
  * Bit masks defining what's in Opteron DRAM Address Map base register
  */
-#define	OPT_DRAMBASE_MASK_RE		0x1		/* read enable */
-#define	OPT_DRAMBASE_MASK_WE		0x2		/* write enable */
-#define	OPT_DRAMBASE_MASK_INTRLVEN	0x700		/* interleave */
+#define	OPT_DRAMBASE_MASK_RE		0x1	/* read enable */
+#define	OPT_DRAMBASE_MASK_WE		0x2	/* write enable */
+#define	OPT_DRAMBASE_MASK_INTRLVEN	0x700	/* interleave */
 
 #define	OPT_DRAMBASE_MASK_ADDR	0xFFFF0000	/* address bits 39-24 */
 
@@ -215,6 +215,7 @@ typedef	struct opt_dram_addr_map {
 typedef	struct phys_addr_map {
 	pfn_t	start;
 	pfn_t	end;
+	int	exists;
 } phys_addr_map_t;
 
 
@@ -377,6 +378,12 @@ plat_pfn_to_mem_node(pfn_t pfn)
 		return (0);
 
 	for (node = 0; node < lgrp_plat_node_cnt; node++) {
+		/*
+		 * Skip nodes with no memory
+		 */
+		if (!lgrp_plat_node_memory[node].exists)
+			continue;
+
 		if (pfn >= lgrp_plat_node_memory[node].start &&
 		    pfn <= lgrp_plat_node_memory[node].end)
 			return (node);
@@ -392,8 +399,10 @@ plat_pfn_to_mem_node(pfn_t pfn)
 void
 plat_build_mem_nodes(struct memlist *list)
 {
-	pfn_t	cur_start, cur_end;	/* start & end addr of subrange */
-	pfn_t	start, end;		/* start & end addr of whole range */
+	pfn_t		cur_start;	/* start addr of subrange */
+	pfn_t		cur_end;	/* end addr of subrange */
+	pfn_t		start;		/* start addr of whole range */
+	pfn_t		end;		/* end addr of whole range */
 
 	/*
 	 * Boot install lists are arranged <addr, len>, ...
@@ -430,16 +439,29 @@ plat_build_mem_nodes(struct memlist *list)
 		cur_start = start;
 		do {
 			node = plat_pfn_to_mem_node(cur_start);
-			ASSERT(cur_start >=
-			    lgrp_plat_node_memory[node].start &&
-			    cur_start <= lgrp_plat_node_memory[node].end);
 
-			cur_end = end;
+			/*
+			 * Panic if DRAM address map registers or SRAT say
+			 * memory in node doesn't exist or address from
+			 * boot installed memory list entry isn't in this node.
+			 * This shouldn't happen and rest of code can't deal
+			 * with this if it does.
+			 */
+			if (node < 0 || node >= lgrp_plat_node_cnt ||
+			    !lgrp_plat_node_memory[node].exists ||
+			    cur_start < lgrp_plat_node_memory[node].start ||
+			    cur_start > lgrp_plat_node_memory[node].end) {
+				cmn_err(CE_PANIC, "Don't know which memnode "
+				    "to add installed memory address 0x%lx\n",
+				    cur_start);
+			}
 
 			/*
 			 * End of current subrange should not span memnodes
 			 */
-			if (cur_end > lgrp_plat_node_memory[node].end)
+			cur_end = end;
+			if (lgrp_plat_node_memory[node].exists &&
+			    cur_end > lgrp_plat_node_memory[node].end)
 				cur_end = lgrp_plat_node_memory[node].end;
 
 			mem_node_add_slice(cur_start, cur_end);
@@ -532,6 +554,23 @@ lgrp_plat_init(void)
 		dev++;
 
 		/*
+		 * Both read and write enable bits must be enabled in DRAM
+		 * address map base register for physical memory to exist in
+		 * node
+		 */
+		if ((opt_dram_map[node].base & OPT_DRAMBASE_MASK_RE) == 0 ||
+		    (opt_dram_map[node].base & OPT_DRAMBASE_MASK_WE) == 0) {
+			/*
+			 * Mark node memory as non-existent and set start and
+			 * end addresses to be same in lgrp_plat_node_memory[]
+			 */
+			lgrp_plat_node_memory[node].exists = 0;
+			lgrp_plat_node_memory[node].start =
+			    lgrp_plat_node_memory[node].end = (pfn_t)-1;
+			continue;
+		}
+
+		/*
 		 * Get PFN for first page in each node,
 		 * so we can probe memory to determine latency topology
 		 */
@@ -539,8 +578,10 @@ lgrp_plat_init(void)
 		    btop(OPT_DRAMBASE(opt_dram_map[node].base));
 
 		/*
-		 * Remember physical address range of each node for use later
+		 * Mark node memory as existing and remember physical address
+		 * range of each node for use later
 		 */
+		lgrp_plat_node_memory[node].exists = 1;
 		lgrp_plat_node_memory[node].start =
 		    btop(OPT_DRAMBASE(opt_dram_map[node].base));
 		lgrp_plat_node_memory[node].end =
