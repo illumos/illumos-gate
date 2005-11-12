@@ -729,7 +729,7 @@ zio_done(zio_t *zio)
 	spa_t *spa = zio->io_spa;
 	blkptr_t *bp = zio->io_bp;
 	vdev_t *vd = zio->io_vd;
-	char blkbuf[300];
+	char blkbuf[BP_SPRINTF_LEN];
 
 	ASSERT(zio->io_children_notready == 0);
 	ASSERT(zio->io_children_notdone == 0);
@@ -748,7 +748,8 @@ zio_done(zio_t *zio)
 		vdev_stat_update(zio);
 
 	if (zio->io_error) {
-		sprintf_blkptr(blkbuf, bp ? bp : &zio->io_bp_copy);
+		sprintf_blkptr(blkbuf, BP_SPRINTF_LEN,
+		    bp ? bp : &zio->io_bp_copy);
 		dprintf("ZFS: %s (%s on %s off %llx: zio %p %s): error %d\n",
 		    zio->io_error == ECKSUM ? "bad checksum" : "I/O failure",
 		    zio_type_name[zio->io_type],
@@ -758,7 +759,8 @@ zio_done(zio_t *zio)
 	}
 
 	if (zio->io_numerrors != 0 && zio->io_type == ZIO_TYPE_WRITE) {
-		sprintf_blkptr(blkbuf, bp ? bp : &zio->io_bp_copy);
+		sprintf_blkptr(blkbuf, BP_SPRINTF_LEN,
+		    bp ? bp : &zio->io_bp_copy);
 		dprintf("ZFS: %s (%s on %s off %llx: zio %p %s): %d errors\n",
 		    "partial write",
 		    zio_type_name[zio->io_type],
@@ -768,7 +770,8 @@ zio_done(zio_t *zio)
 	}
 
 	if (zio->io_error && !(zio->io_flags & ZIO_FLAG_CANFAIL)) {
-		sprintf_blkptr(blkbuf, bp ? bp : &zio->io_bp_copy);
+		sprintf_blkptr(blkbuf, BP_SPRINTF_LEN,
+		    bp ? bp : &zio->io_bp_copy);
 		panic("ZFS: %s (%s on %s off %llx: zio %p %s): error %d",
 		    zio->io_error == ECKSUM ? "bad checksum" : "I/O failure",
 		    zio_type_name[zio->io_type],

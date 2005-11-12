@@ -282,6 +282,8 @@ typedef struct blkptr {
 
 #define	BP_SHOULD_BYTESWAP(bp)	(BP_GET_BYTEORDER(bp) != ZFS_HOST_BYTEORDER)
 
+#define	BP_SPRINTF_LEN	256
+
 #include <sys/dmu.h>
 
 /*
@@ -377,7 +379,7 @@ extern boolean_t spa_guid_exists(uint64_t pool_guid, uint64_t device_guid);
 extern char *spa_strdup(const char *);
 extern void spa_strfree(char *);
 extern uint64_t spa_get_random(uint64_t range);
-extern void sprintf_blkptr(char *buf, blkptr_t *bp);
+extern void sprintf_blkptr(char *buf, int len, blkptr_t *bp);
 extern void spa_freeze(spa_t *spa);
 extern void spa_evict_all(void);
 
@@ -387,9 +389,9 @@ extern void spa_fini(void);
 
 #ifdef ZFS_DEBUG
 #define	dprintf_bp(bp, fmt, ...) do {			\
-	if (zfs_flags & ZFS_DEBUG_DPRINTF) { \
-	char __blkbuf[200];				\
-	sprintf_blkptr(__blkbuf, (bp));			\
+	if (zfs_flags & ZFS_DEBUG_DPRINTF) { 		\
+	char __blkbuf[BP_SPRINTF_LEN];			\
+	sprintf_blkptr(__blkbuf, BP_SPRINTF_LEN, (bp));	\
 	dprintf(fmt " %s\n", __VA_ARGS__, __blkbuf);	\
 	} \
 _NOTE(CONSTCOND) } while (0)

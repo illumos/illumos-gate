@@ -675,7 +675,8 @@ dump_dsl_dataset(objset_t *os, uint64_t object, void *data, size_t size)
 {
 	dsl_dataset_phys_t *ds = data;
 	time_t crtime;
-	char used[6], compressed[6], uncompressed[6], unique[6], blkbuf[300];
+	char used[6], compressed[6], uncompressed[6], unique[6];
+	char blkbuf[BP_SPRINTF_LEN];
 
 	if (ds == NULL)
 		return;
@@ -686,7 +687,7 @@ dump_dsl_dataset(objset_t *os, uint64_t object, void *data, size_t size)
 	nicenum(ds->ds_compressed_bytes, compressed);
 	nicenum(ds->ds_uncompressed_bytes, uncompressed);
 	nicenum(ds->ds_unique_bytes, unique);
-	sprintf_blkptr(blkbuf, &ds->ds_bp);
+	sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, &ds->ds_bp);
 
 	(void) printf("\t\tdataset_obj = %llu\n",
 	    (u_longlong_t)ds->ds_dir_obj);
@@ -1011,7 +1012,7 @@ dump_dir(objset_t *os)
 	dmu_objset_stats_t dds;
 	uint64_t object, object_count;
 	char numbuf[8];
-	char blkbuf[300];
+	char blkbuf[BP_SPRINTF_LEN];
 	char osname[MAXNAMELEN];
 	char *type = "UNKNOWN";
 	int verbosity = dump_opt['d'];
@@ -1037,7 +1038,8 @@ dump_dir(objset_t *os)
 
 	if (verbosity >= 4) {
 		(void) strcpy(blkbuf, ", rootbp ");
-		sprintf_blkptr(blkbuf + strlen(blkbuf), &os->os->os_rootbp);
+		sprintf_blkptr(blkbuf + strlen(blkbuf),
+		    BP_SPRINTF_LEN - strlen(blkbuf), &os->os->os_rootbp);
 	} else {
 		blkbuf[0] = '\0';
 	}
@@ -1100,8 +1102,8 @@ dump_uberblock(uberblock_t *ub)
 	(void) printf("\ttimestamp = %llu UTC = %s",
 	    (u_longlong_t)ub->ub_timestamp, asctime(localtime(&timestamp)));
 	if (dump_opt['u'] >= 3) {
-		char blkbuf[300];
-		sprintf_blkptr(blkbuf, &ub->ub_rootbp);
+		char blkbuf[BP_SPRINTF_LEN];
+		sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, &ub->ub_rootbp);
 		(void) printf("\trootbp = %s\n", blkbuf);
 	}
 	(void) printf("\n");
@@ -1423,7 +1425,7 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 	zdb_cb_t *zcb = arg;
 	blkptr_t *bp = &bc->bc_blkptr;
 	dmu_object_type_t type = BP_GET_TYPE(bp);
-	char blkbuf[300];
+	char blkbuf[BP_SPRINTF_LEN];
 	int error = 0;
 
 	if (bc->bc_errno) {
@@ -1437,7 +1439,7 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 		}
 
 		if (dump_opt['b'] >= 3 || (dump_opt['b'] >= 2 && bc->bc_errno))
-			sprintf_blkptr(blkbuf, bp);
+			sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, bp);
 		else
 			blkbuf[0] = '\0';
 
@@ -1461,7 +1463,7 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 	zdb_count_block(spa, zcb, bp, type);
 
 	if (dump_opt['b'] >= 4) {
-		sprintf_blkptr(blkbuf, bp);
+		sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, bp);
 		(void) printf("objset %llu object %llu offset 0x%llx %s\n",
 		    (u_longlong_t)zb->zb_objset,
 		    (u_longlong_t)zb->zb_object,
@@ -1530,8 +1532,8 @@ dump_block_stats(spa_t *spa)
 		while (bplist_iterate(bpl, &itor, &blk) == 0) {
 			zdb_count_block(spa, &zcb, &blk, DMU_OT_DEFERRED);
 			if (dump_opt['b'] >= 4) {
-				char blkbuf[300];
-				sprintf_blkptr(blkbuf, &blk);
+				char blkbuf[BP_SPRINTF_LEN];
+				sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, &blk);
 				(void) printf("[%s] %s\n",
 				    "deferred free", blkbuf);
 			}

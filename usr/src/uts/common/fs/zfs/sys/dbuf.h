@@ -260,8 +260,8 @@ void dbuf_fini(void);
 
 /*
  * There should be a ## between the string literal and fmt, to make it
- * clear that we're joining two strings together, but that piece of shit
- * gcc doesn't support that preprocessor token.
+ * clear that we're joining two strings together, but gcc does not
+ * support that preprocessor token.
  */
 #define	dprintf_dbuf(dbuf, fmt, ...) do { \
 	if (zfs_flags & ZFS_DEBUG_DPRINTF) { \
@@ -280,9 +280,9 @@ void dbuf_fini(void);
 _NOTE(CONSTCOND) } while (0)
 
 #define	dprintf_dbuf_bp(db, bp, fmt, ...) do {			\
-	if (zfs_flags & ZFS_DEBUG_DPRINTF) { \
-	char __blkbuf[200];					\
-	sprintf_blkptr(__blkbuf, bp);				\
+	if (zfs_flags & ZFS_DEBUG_DPRINTF) {			\
+	char __blkbuf[BP_SPRINTF_LEN];				\
+	sprintf_blkptr(__blkbuf, BP_SPRINTF_LEN, bp);		\
 	dprintf_dbuf(db, fmt " %s\n", __VA_ARGS__, __blkbuf);	\
 	} \
 _NOTE(CONSTCOND) } while (0)

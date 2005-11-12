@@ -46,9 +46,9 @@ extern uint8_t dump_opt[256];
 static void
 print_log_bp(blkptr_t *bp, const char *prefix)
 {
-	char blkbuf[200];
+	char blkbuf[BP_SPRINTF_LEN];
 
-	sprintf_blkptr(blkbuf, bp);
+	sprintf_blkptr(blkbuf, BP_SPRINTF_LEN, bp);
 	(void) printf("%s%s\n", prefix, blkbuf);
 }
 
@@ -268,7 +268,7 @@ print_log_record(zilog_t *zilog, lr_t *lr, void *arg, uint64_t first_txg)
 static void
 print_log_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t first_txg)
 {
-	char blkbuf[200];
+	char blkbuf[BP_SPRINTF_LEN];
 	int verbose = MAX(dump_opt['d'], dump_opt['i']);
 
 	if (verbose <= 3)
@@ -276,7 +276,8 @@ print_log_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t first_txg)
 
 	if (verbose >= 5) {
 		(void) strcpy(blkbuf, ", ");
-		sprintf_blkptr(blkbuf + strlen(blkbuf), bp);
+		sprintf_blkptr(blkbuf + strlen(blkbuf),
+		    BP_SPRINTF_LEN - strlen(blkbuf), bp);
 	} else {
 		blkbuf[0] = '\0';
 	}

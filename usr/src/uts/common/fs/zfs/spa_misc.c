@@ -604,23 +604,24 @@ spa_get_random(uint64_t range)
 }
 
 void
-sprintf_blkptr(char *buf, blkptr_t *bp)
+sprintf_blkptr(char *buf, int len, blkptr_t *bp)
 {
 	/* XXBP - Need to see if we want all DVAs or not */
 	dva_t *dva = BP_IDENTITY(bp);
 
 	if (bp == NULL) {
-		(void) sprintf(buf, "<NULL>");
+		(void) snprintf(buf, len, "<NULL>");
 		return;
 	}
 
 	if (BP_IS_HOLE(bp)) {
-		(void) sprintf(buf, "<hole>");
+		(void) snprintf(buf, len, "<hole>");
 		return;
 	}
 
-	(void) sprintf(buf, "[L%llu %s] vdev=%llu offset=%llx "
-	    "size=%llxL/%llxP/%llxA %s %s %s %s",
+	(void) snprintf(buf, len, "[L%llu %s] vdev=%llu offset=%llx "
+	    "size=%llxL/%llxP/%llxA %s %s %s %s "
+	    "birth=%llu fill=%llu cksum=%llx:%llx:%llx:%llx",
 	    (u_longlong_t)BP_GET_LEVEL(bp),
 	    dmu_ot[BP_GET_TYPE(bp)].ot_name,
 	    (u_longlong_t)DVA_GET_VDEV(dva),
@@ -631,10 +632,7 @@ sprintf_blkptr(char *buf, blkptr_t *bp)
 	    zio_checksum_table[BP_GET_CHECKSUM(bp)].ci_name,
 	    zio_compress_table[BP_GET_COMPRESS(bp)].ci_name,
 	    BP_GET_BYTEORDER(bp) == 0 ? "BE" : "LE",
-	    DVA_GET_GANG(dva) == 0 ? "contiguous" : "gang");
-
-	(void) sprintf(buf + strlen(buf), " birth=%llu fill=%llu"
-	    " cksum=%llx:%llx:%llx:%llx",
+	    DVA_GET_GANG(dva) == 0 ? "contiguous" : "gang",
 	    (u_longlong_t)bp->blk_birth,
 	    (u_longlong_t)bp->blk_fill,
 	    (u_longlong_t)bp->blk_cksum.zc_word[0],
