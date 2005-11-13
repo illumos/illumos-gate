@@ -317,9 +317,13 @@ zap_leaf_array_read(const zap_entry_handle_t *zeh, uint16_t chunk,
 	/* Fast path for one 8-byte integer */
 	if (array_int_len == 8 && buf_int_len == 8 && len == 1) {
 		struct zap_leaf_array *la = &l->l_phys->l_chunk[chunk].l_array;
+		uint8_t *ip = la->la_array;
 		uint64_t *buf64 = (uint64_t *)buf;
-		uint64_t val = *(uint64_t *)la->la_array;
-		*buf64 = BE_64(val);
+
+		*buf64 = (uint64_t)ip[0] << 56 | (uint64_t)ip[1] << 48 |
+		    (uint64_t)ip[2] << 40 | (uint64_t)ip[3] << 32 |
+		    (uint64_t)ip[4] << 24 | (uint64_t)ip[5] << 16 |
+		    (uint64_t)ip[6] << 8 | (uint64_t)ip[7];
 		return;
 	}
 
