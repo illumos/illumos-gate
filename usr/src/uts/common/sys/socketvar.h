@@ -50,6 +50,7 @@
 #include <sys/file.h>
 #include <sys/param.h>
 #include <sys/zone.h>
+#include <inet/kssl/ksslapi.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -324,6 +325,11 @@ struct sonode {
 	int64_t		so_nl7c_rcv_rval;
 	void		*so_nl7c_uri;
 	time_t		so_nl7c_rtime;
+
+	/* For sockets acting as an in-kernel SSL proxy */
+	kssl_endpt_type_t	so_kssl_type;	/* is proxy/is proxied/none */
+	kssl_ent_t		so_kssl_ent;	/* SSL config entry */
+	kssl_ctx_t		so_kssl_ctx;	/* SSL session context */
 };
 
 /* flags */

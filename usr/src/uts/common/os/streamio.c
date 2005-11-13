@@ -370,6 +370,7 @@ ckreturn:
 	stp->sd_rerror = 0;
 	stp->sd_werror = 0;
 	stp->sd_wroff = 0;
+	stp->sd_tail = 0;
 	stp->sd_iocblk = NULL;
 	stp->sd_pushcnt = 0;
 	stp->sd_qn_minpsz = 0;
@@ -2269,6 +2270,8 @@ strrput_nondata(queue_t *q, mblk_t *bp)
 		}
 		if (sop->so_flags & SO_WROFF)
 			stp->sd_wroff = sop->so_wroff;
+		if (sop->so_flags & SO_TAIL)
+			stp->sd_tail = sop->so_tail;
 		if (sop->so_flags & SO_MINPSZ)
 			q->q_minpsz = sop->so_minpsz;
 		if (sop->so_flags & SO_MAXPSZ)
@@ -5884,7 +5887,7 @@ strdoioctl(
 	/*
 	 * Timed wait for acknowledgment.  The wait time is limited by the
 	 * timeout value, which must be a positive integer (number of
-	 * milliseconds to wait, or 0 (use default value of STRTIMOUT
+	 * milliseconds) to wait, or 0 (use default value of STRTIMOUT
 	 * milliseconds), or -1 (wait forever).  This will be awakened
 	 * either by an ACK/NAK message arriving, the timer expiring, or
 	 * the timer expiring on another ioctl waiting for control of the
@@ -7053,6 +7056,19 @@ retry:
 	 */
 	stp->sd_flag |= STRGETINPROG;
 	mutex_exit(&stp->sd_lock);
+
+	if ((stp->sd_rputdatafunc != NULL) && (DB_TYPE(bp) == M_DATA) &&
+	    (!(DB_FLAGS(bp) & DBLK_COOKED))) {
+
+		bp = (stp->sd_rputdatafunc)(
+		    stp->sd_vnode, bp, NULL,
+		    NULL, NULL, NULL);
+
+		if (bp == NULL)
+			goto retry;
+
+		DB_FLAGS(bp) |= DBLK_COOKED;
+	}
 
 	if (STREAM_NEEDSERVICE(stp))
 		stream_runservice(stp);

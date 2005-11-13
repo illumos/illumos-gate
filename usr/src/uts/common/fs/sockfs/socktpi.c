@@ -78,6 +78,8 @@
 #include <fs/sockfs/nl7c.h>
 #include <sys/zone.h>
 
+#include <inet/kssl/ksslapi.h>
+
 /*
  * Possible failures when memory can't be allocated. The documented behavior:
  *
@@ -173,6 +175,12 @@ extern	void sigunintr(k_sigset_t *);
 extern	void *nl7c_lookup_addr(void *, t_uscalar_t);
 extern	void *nl7c_add_addr(void *, t_uscalar_t);
 extern	void nl7c_listener_addr(void *, queue_t *);
+
+/* Sockets acting as an in-kernel SSL proxy */
+extern mblk_t	*strsock_kssl_input(vnode_t *, mblk_t *, strwakeup_t *,
+		    strsigset_t *, strsigset_t *, strpollset_t *);
+extern mblk_t	*strsock_kssl_output(vnode_t *, mblk_t *, strwakeup_t *,
+		    strsigset_t *, strsigset_t *, strpollset_t *);
 
 static int	sotpi_unbind(struct sonode *, int);
 
@@ -289,6 +297,12 @@ sotpi_create(vnode_t *accessvp, int domain, int type, int protocol, int version,
 		version = so_default_version;
 
 	so->so_version = (short)version;
+
+	/* Initialize the kernel SSL proxy fields */
+	so->so_kssl_type = KSSL_NO_PROXY;
+	so->so_kssl_ent = NULL;
+	so->so_kssl_ctx = NULL;
+
 	return (so);
 }
 
@@ -773,8 +787,36 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 	mp = soallocproto2(&bind_req, sizeof (bind_req),
 				addr, addrlen, 0, _ALLOC_SLEEP);
 	so->so_state &= ~SS_LADDR_VALID;
+
 	/* Done using so_laddr_sa - can drop the lock */
 	mutex_exit(&so->so_lock);
+
+	/*
+	 * Intercept the bind_req message here to check if this <address/port>
+	 * was configured as an SSL proxy server, or if another endpoint was
+	 * already configured to act as a proxy for us.
+	 */
+	if ((so->so_family == AF_INET || so->so_family == AF_INET6) &&
+	    so->so_type == SOCK_STREAM) {
+
+		if (so->so_kssl_ent != NULL) {
+			kssl_release_ent(so->so_kssl_ent, so, so->so_kssl_type);
+			so->so_kssl_ent = NULL;
+		}
+
+		so->so_kssl_type = kssl_check_proxy(mp, so, &so->so_kssl_ent);
+		switch (so->so_kssl_type) {
+		case KSSL_NO_PROXY:
+			break;
+
+		case KSSL_HAS_PROXY:
+			mutex_enter(&so->so_lock);
+			goto skip_transport;
+
+		case KSSL_IS_PROXY:
+			break;
+		}
+	}
 
 	error = kstrputmsg(SOTOV(so), mp, NULL, 0, 0,
 			MSG_BAND|MSG_HOLDSIG|MSG_IGNERROR, 0);
@@ -791,6 +833,7 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 		eprintsoline(so, error);
 		goto done;
 	}
+skip_transport:
 	ASSERT(mp);
 	/*
 	 * Even if some TPI message (e.g. T_DISCON_IND) was received in
@@ -1155,7 +1198,18 @@ sotpi_unbind(struct sonode *so, int flags)
 		vnode_t *vp;
 
 		if ((vp = so->so_ux_bound_vp) != NULL) {
-			ASSERT(vp->v_stream);
+
+			/* Undo any SSL proxy setup */
+			if ((so->so_family == AF_INET ||
+			    so->so_family == AF_INET6) &&
+			    (so->so_type == SOCK_STREAM) &&
+			    (so->so_kssl_ent != NULL)) {
+				kssl_release_ent(so->so_kssl_ent, so,
+				    so->so_kssl_type);
+				so->so_kssl_ent = NULL;
+				so->so_kssl_type = KSSL_NO_PROXY;
+			}
+
 			so->so_ux_bound_vp = NULL;
 			vn_rele_stream(vp);
 		}
@@ -1164,6 +1218,7 @@ sotpi_unbind(struct sonode *so, int flags)
 	}
 	so->so_state &= ~(SS_ISBOUND|SS_ACCEPTCONN|SS_LADDR_VALID);
 done:
+
 	/* If the caller held the lock don't release it here */
 	ASSERT(MUTEX_HELD(&so->so_lock));
 	ASSERT(so->so_flag & SOLOCKED);
@@ -1356,7 +1411,7 @@ sotpi_accept(struct sonode *so, int fflag, struct sonode **nsop)
 	struct T_conn_ind	*conn_ind;
 	struct T_conn_res	*conn_res;
 	int			error = 0;
-	mblk_t			*mp;
+	mblk_t			*mp, *ctxmp;
 	struct sonode		*nso;
 	vnode_t			*nvp;
 	void			*src;
@@ -1384,6 +1439,8 @@ again:
 
 	ASSERT(mp);
 	conn_ind = (struct T_conn_ind *)mp->b_rptr;
+	ctxmp = mp->b_cont;
+
 	/*
 	 * Save SEQ_number for error paths.
 	 */
@@ -1476,6 +1533,23 @@ again:
 	}
 	nvp = SOTOV(nso);
 
+	/*
+	 * If the transport sent up an SSL connection context, then attach
+	 * it the new socket, and set the (sd_wputdatafunc)() and
+	 * (sd_rputdatafunc)() stream head hooks to intercept and process
+	 * SSL records.
+	 */
+	if (ctxmp != NULL) {
+		/*
+		 * This kssl_ctx_t is already held for us by the transport.
+		 * So, we don't need to do a kssl_hold_ctx() here.
+		 */
+		nso->so_kssl_ctx = *((kssl_ctx_t *)ctxmp->b_rptr);
+		freemsg(ctxmp);
+		mp->b_cont = NULL;
+		strsetrwputdatahooks(nvp, strsock_kssl_input,
+		    strsock_kssl_output);
+	}
 #ifdef DEBUG
 	/*
 	 * SO_DEBUG is used to trigger the dprint* and eprint* macros thus
@@ -4288,6 +4362,7 @@ sostream_direct(struct sonode *so, struct uio *uiop, mblk_t *mp, cred_t *cr)
 	struct stdata *stp = SOTOV(so)->v_stream;
 	ssize_t iosize, rmax, maxblk;
 	queue_t *tcp_wq = stp->sd_wrq->q_next;
+	mblk_t *newmp;
 	int error = 0, wflag = 0;
 
 	ASSERT(so->so_mode & SM_BYTESTREAM);
@@ -4305,6 +4380,15 @@ sostream_direct(struct sonode *so, struct uio *uiop, mblk_t *mp, cred_t *cr)
 		 * data to tcp.
 		 */
 		ASSERT(mp != NULL);
+		if (stp->sd_wputdatafunc != NULL) {
+			newmp = (stp->sd_wputdatafunc)(SOTOV(so), mp, NULL,
+			    NULL, NULL, NULL);
+			if (newmp == NULL) {
+				/* The caller will free mp */
+				return (ECOMM);
+			}
+			mp = newmp;
+		}
 		tcp_wput(tcp_wq, mp);
 		return (0);
 	}
@@ -4347,6 +4431,15 @@ sostream_direct(struct sonode *so, struct uio *uiop, mblk_t *mp, cred_t *cr)
 		 * to tcp and let the rest be handled in strwrite().
 		 */
 		ASSERT(error == 0 || error == ENOMEM);
+		if (stp->sd_wputdatafunc != NULL) {
+			newmp = (stp->sd_wputdatafunc)(SOTOV(so), mp, NULL,
+			    NULL, NULL, NULL);
+			if (newmp == NULL) {
+				/* The caller will free mp */
+				return (ECOMM);
+			}
+			mp = newmp;
+		}
 		tcp_wput(tcp_wq, mp);
 
 		wflag |= NOINTR;

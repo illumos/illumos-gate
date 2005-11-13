@@ -94,6 +94,7 @@ const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
 #include <inet/ip_if.h>
 #include <inet/ipp_common.h>
 #include <sys/squeue.h>
+#include <inet/kssl/ksslapi.h>
 
 /*
  * TCP Notes: aka FireEngine Phase I (PSARC 2002/433)
@@ -759,7 +760,7 @@ static void	tcp_wput_proto(void *arg, mblk_t *mp, void *arg2);
 void 		tcp_input(void *arg, mblk_t *mp, void *arg2);
 void		tcp_rput_data(void *arg, mblk_t *mp, void *arg2);
 static void	tcp_close_output(void *arg, mblk_t *mp, void *arg2);
-static void	tcp_output(void *arg, mblk_t *mp, void *arg2);
+void		tcp_output(void *arg, mblk_t *mp, void *arg2);
 static void	tcp_rsrv_input(void *arg, mblk_t *mp, void *arg2);
 static void	tcp_timer_handler(void *arg, mblk_t *mp, void *arg2);
 
@@ -980,6 +981,8 @@ static mblk_t	*tcp_zcopy_disable(tcp_t *, mblk_t *);
 static mblk_t	*tcp_zcopy_backoff(tcp_t *, mblk_t *, int);
 static void	tcp_ire_ill_check(tcp_t *, ire_t *, ill_t *, boolean_t);
 
+extern void	tcp_kssl_input(tcp_t *, mblk_t *);
+
 /*
  * Routines related to the TCP_IOC_ABORT_CONN ioctl command.
  *
@@ -1111,7 +1114,7 @@ static uint_t	tcp_next_port_to_try;
 
 
 /* TCP bind hash list - all tcp_t with state >= BOUND. */
-static tf_t	tcp_bind_fanout[TCP_BIND_FANOUT_SIZE];
+tf_t	tcp_bind_fanout[TCP_BIND_FANOUT_SIZE];
 
 /* TCP queue hash list - all tcp_t in case they will be an acceptor. */
 static tf_t	tcp_acceptor_fanout[TCP_FANOUT_SIZE];
@@ -1675,6 +1678,18 @@ tcp_cleanup(tcp_t *tcp)
 
 	tcp_bind_hash_remove(tcp);
 	tcp_free(tcp);
+
+	/* Release any SSL context */
+	if (tcp->tcp_kssl_ent != NULL) {
+		kssl_release_ent(tcp->tcp_kssl_ent, NULL, KSSL_NO_PROXY);
+		tcp->tcp_kssl_ent = NULL;
+	}
+
+	if (tcp->tcp_kssl_ctx != NULL) {
+		kssl_release_ctx(tcp->tcp_kssl_ctx);
+		tcp->tcp_kssl_ctx = NULL;
+	}
+	tcp->tcp_kssl_pending = B_FALSE;
 
 	conn_delete_ire(connp, NULL);
 	if (connp->conn_flags & IPCL_TCPCONN) {
@@ -3713,6 +3728,7 @@ tcp_close(queue_t *q, int flags)
 	    tcp_close_output, connp, SQTAG_IP_TCP_CLOSE);
 
 	mutex_enter(&tcp->tcp_closelock);
+
 	while (!tcp->tcp_closed)
 		cv_wait(&tcp->tcp_closecv, &tcp->tcp_closelock);
 	mutex_exit(&tcp->tcp_closelock);
@@ -3996,6 +4012,7 @@ finish:
 		tcp->tcp_rq = tcp_g_q;
 		tcp->tcp_wq = WR(tcp_g_q);
 	}
+
 	/* Signal tcp_close() to finish closing. */
 	tcp->tcp_closed = 1;
 	cv_signal(&tcp->tcp_closecv);
@@ -4086,6 +4103,7 @@ tcp_closei_local(tcp_t *tcp)
 	tcp->tcp_ibsegs = 0;
 	UPDATE_MIB(&tcp_mib, tcpOutSegs, tcp->tcp_obsegs);
 	tcp->tcp_obsegs = 0;
+
 	/*
 	 * If we are an eager connection hanging off a listener that
 	 * hasn't formally accepted the connection yet, get off his
@@ -4164,6 +4182,17 @@ tcp_closei_local(tcp_t *tcp)
 	ASSERT(tcp->tcp_time_wait_prev == NULL);
 	ASSERT(tcp->tcp_time_wait_expire == 0);
 	tcp->tcp_state = TCPS_CLOSED;
+
+	/* Release any SSL context */
+	if (tcp->tcp_kssl_ent != NULL) {
+		kssl_release_ent(tcp->tcp_kssl_ent, NULL, KSSL_NO_PROXY);
+		tcp->tcp_kssl_ent = NULL;
+	}
+	if (tcp->tcp_kssl_ctx != NULL) {
+		kssl_release_ctx(tcp->tcp_kssl_ctx);
+		tcp->tcp_kssl_ctx = NULL;
+	}
+	tcp->tcp_kssl_pending = B_FALSE;
 }
 
 /*
@@ -4691,6 +4720,13 @@ tcp_conn_create_v6(conn_t *lconnp, conn_t *connp, mblk_t *mp,
 	}
 	tcp->tcp_conn.tcp_eager_conn_ind = tpi_mp;
 
+	/* Inherit the listener's SSL protection state */
+
+	if ((tcp->tcp_kssl_ent = ltcp->tcp_kssl_ent) != NULL) {
+		kssl_hold_ent(tcp->tcp_kssl_ent);
+		tcp->tcp_kssl_pending = B_TRUE;
+	}
+
 	return (0);
 }
 
@@ -4805,6 +4841,12 @@ tcp_conn_create_v4(conn_t *lconnp, conn_t *connp, ipha_t *ipha,
 		DB_CPID(tpi_mp) = DB_CPID(idmp);
 	}
 	tcp->tcp_conn.tcp_eager_conn_ind = tpi_mp;
+
+	/* Inherit the listener's SSL protection state */
+	if ((tcp->tcp_kssl_ent = ltcp->tcp_kssl_ent) != NULL) {
+		kssl_hold_ent(tcp->tcp_kssl_ent);
+		tcp->tcp_kssl_pending = B_TRUE;
+	}
 
 	return (0);
 }
@@ -7170,6 +7212,20 @@ tcp_reinit(tcp_t *tcp)
 	ASSERT(tcp->tcp_time_wait_prev == NULL);
 	ASSERT(tcp->tcp_time_wait_expire == 0);
 
+	if (tcp->tcp_kssl_pending) {
+		tcp->tcp_kssl_pending = B_FALSE;
+
+		/* Don't reset if the initialized by bind. */
+		if (tcp->tcp_kssl_ent != NULL) {
+			kssl_release_ent(tcp->tcp_kssl_ent, NULL,
+			    KSSL_NO_PROXY);
+		}
+	}
+	if (tcp->tcp_kssl_ctx != NULL) {
+		kssl_release_ctx(tcp->tcp_kssl_ctx);
+		tcp->tcp_kssl_ctx = NULL;
+	}
+
 	/*
 	 * Reset/preserve other values
 	 */
@@ -7527,6 +7583,10 @@ tcp_reinit_values(tcp)
 	tcp->tcp_cork = B_FALSE;
 
 	PRESERVE(tcp->tcp_squeue_bytes);
+
+	ASSERT(tcp->tcp_kssl_ctx == NULL);
+	ASSERT(!tcp->tcp_kssl_pending);
+	PRESERVE(tcp->tcp_kssl_ent);
 
 #undef	DONTCARE
 #undef	PRESERVE
@@ -8663,7 +8723,10 @@ tcp_maxpsz_set(tcp_t *tcp, boolean_t set_maxblk)
 		 * chunks.  We round up the buffer size to the nearest SMSS.
 		 */
 		maxpsz = MSS_ROUNDUP(tcp->tcp_xmit_hiwater, mss);
-		mss = INFPSZ;
+		if (tcp->tcp_kssl_ctx == NULL)
+			mss = INFPSZ;
+		else
+			mss = SSL3_MAX_RECORD_LEN;
 	} else {
 		/*
 		 * Set sd_qn_maxpsz to approx half the (receivers) buffer
@@ -11003,6 +11066,11 @@ tcp_rcv_drain(queue_t *q, tcp_t *tcp)
 #ifdef DEBUG
 		cnt += msgdsize(mp);
 #endif
+		/* Does this need SSL processing first? */
+		if ((tcp->tcp_kssl_ctx  != NULL) && (DB_TYPE(mp) == M_DATA)) {
+			tcp_kssl_input(tcp, mp);
+			continue;
+		}
 		putnext(q, mp);
 	}
 	ASSERT(cnt == tcp->tcp_rcv_cnt);
@@ -12532,7 +12600,22 @@ tcp_rput_data(void *arg, mblk_t *mp, void *arg2)
 		BUMP_MIB(&tcp_mib, tcpInClosed);
 		TCP_RECORD_TRACE(tcp,
 		    mp, TCP_TRACE_RECV_PKT);
+
 		freemsg(mp);
+		/*
+		 * This could be an SSL closure alert. We're detached so just
+		 * acknowledge it this last time.
+		 */
+		if (tcp->tcp_kssl_ctx != NULL) {
+			kssl_release_ctx(tcp->tcp_kssl_ctx);
+			tcp->tcp_kssl_ctx = NULL;
+
+			tcp->tcp_rnxt += seg_len;
+			U32_TO_ABE32(tcp->tcp_rnxt, tcp->tcp_tcph->th_ack);
+			flags |= TH_ACK_NEEDED;
+			goto ack_check;
+		}
+
 		tcp_xmit_ctl("new data when detached", tcp,
 		    tcp->tcp_snxt, 0, TH_RST);
 		(void) tcp_clean_death(tcp, EPROTO, 12);
@@ -13241,7 +13324,8 @@ process_ack:
 	if (tcp->tcp_ipversion == IPV6_VERSION && bytes_acked > 0)
 		tcp->tcp_ip_forward_progress = B_TRUE;
 	if (tcp->tcp_state == TCPS_SYN_RCVD) {
-		if (tcp->tcp_conn.tcp_eager_conn_ind != NULL) {
+		if ((tcp->tcp_conn.tcp_eager_conn_ind != NULL) &&
+		    ((tcp->tcp_kssl_ent == NULL) || !tcp->tcp_kssl_pending)) {
 			/* 3-way handshake complete - pass up the T_CONN_IND */
 			tcp_t	*listener = tcp->tcp_listener;
 			mblk_t	*mp = tcp->tcp_conn.tcp_eager_conn_ind;
@@ -13968,6 +14052,7 @@ swnd_update:
 	}
 est:
 	if (tcp->tcp_state > TCPS_ESTABLISHED) {
+
 		switch (tcp->tcp_state) {
 		case TCPS_FIN_WAIT_1:
 			if (tcp->tcp_fin_acked) {
@@ -14170,7 +14255,12 @@ est:
 		 *	Removing tcp_listener check for TH_URG
 		 *	Making M_PCPROTO and MARK messages skip the eager case
 		 */
-		tcp_rcv_enqueue(tcp, mp, seg_len);
+
+		if (tcp->tcp_kssl_pending) {
+			tcp_kssl_input(tcp, mp);
+		} else {
+			tcp_rcv_enqueue(tcp, mp, seg_len);
+		}
 	} else {
 		if (mp->b_datap->db_type != M_DATA ||
 		    (flags & TH_MARKNEXT_NEEDED)) {
@@ -14189,9 +14279,16 @@ est:
 				mp->b_flag |= MSGMARKNEXT;
 				flags &= ~TH_MARKNEXT_NEEDED;
 			}
-			putnext(tcp->tcp_rq, mp);
-			if (!canputnext(tcp->tcp_rq))
-				tcp->tcp_rwnd -= seg_len;
+
+			/* Does this need SSL processing first? */
+			if ((tcp->tcp_kssl_ctx  != NULL) &&
+			    (DB_TYPE(mp) == M_DATA)) {
+				tcp_kssl_input(tcp, mp);
+			} else {
+				putnext(tcp->tcp_rq, mp);
+				if (!canputnext(tcp->tcp_rq))
+					tcp->tcp_rwnd -= seg_len;
+			}
 		} else if (((flags & (TH_PUSH|TH_FIN)) ||
 		    tcp->tcp_rcv_cnt + seg_len >= tcp->tcp_rq->q_hiwat >> 3) &&
 		    (sqp != NULL)) {
@@ -14212,9 +14309,15 @@ est:
 				tcp_rcv_enqueue(tcp, mp, seg_len);
 				flags |= tcp_rcv_drain(tcp->tcp_rq, tcp);
 			} else {
-				putnext(tcp->tcp_rq, mp);
-				if (!canputnext(tcp->tcp_rq))
-					tcp->tcp_rwnd -= seg_len;
+				/* Does this need SSL processing first? */
+				if ((tcp->tcp_kssl_ctx  != NULL) &&
+				    (DB_TYPE(mp) == M_DATA)) {
+					tcp_kssl_input(tcp, mp);
+				} else {
+					putnext(tcp->tcp_rq, mp);
+					if (!canputnext(tcp->tcp_rq))
+						tcp->tcp_rwnd -= seg_len;
+				}
 			}
 		} else {
 			/*
@@ -16561,7 +16664,7 @@ tcp_wput_nondata(void *arg, mblk_t *mp, void *arg2)
  * NOTE: the logic of the fast path is duplicated from tcp_wput_data()
  */
 /* ARGSUSED */
-static void
+void
 tcp_output(void *arg, mblk_t *mp, void *arg2)
 {
 	int		len;
@@ -17024,6 +17127,26 @@ tcp_accept_finish(void *arg, mblk_t *mp, void *arg2)
 		    tcp_wroff_xtra);
 	}
 
+	/*
+	 * If this is endpoint is handling SSL, then reserve extra
+	 * offset and space at the end.
+	 * Also have the stream head allocate SSL3_MAX_RECORD_LEN packets,
+	 * overriding the previous setting. The extra cost of signing and
+	 * encrypting multiple MSS-size records (12 of them with Ethernet),
+	 * instead of a single contiguous one by the stream head
+	 * largely outweighs the statistical reduction of ACKs, when
+	 * applicable. The peer will also save on decyption and verification
+	 * costs.
+	 */
+	if (tcp->tcp_kssl_ctx != NULL) {
+		stropt->so_wroff += SSL3_WROFFSET;
+
+		stropt->so_flags |= SO_TAIL;
+		stropt->so_tail = SSL3_MAX_TAIL_LEN;
+
+		stropt->so_maxblk = SSL3_MAX_RECORD_LEN;
+	}
+
 	/* Send the options up */
 	putnext(q, stropt_mp);
 
@@ -17335,12 +17458,16 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 			 * order as how the 3WHS is completed.
 			 */
 			while (tcp != listener) {
-				if (!tcp->tcp_eager_prev_q0->tcp_conn_def_q0)
+				if (!tcp->tcp_eager_prev_q0->tcp_conn_def_q0 &&
+				    !tcp->tcp_kssl_pending)
 					break;
 				else
 					tcp = tcp->tcp_eager_prev_q0;
 			}
-			ASSERT(tcp != listener);
+			/* None of the pending eagers can be sent up now */
+			if (tcp == listener)
+				goto no_more_eagers;
+
 			mp1 = tcp->tcp_conn.tcp_eager_conn_ind;
 			tcp->tcp_conn.tcp_eager_conn_ind = NULL;
 			/* Move from q0 to q */
@@ -17376,6 +17503,7 @@ tcp_wput_accept(queue_t *q, mblk_t *mp)
 			    tcp_send_pending, listener->tcp_connp,
 			    SQTAG_TCP_SEND_PENDING);
 		}
+no_more_eagers:
 		tcp_eager_unlink(eager);
 		mutex_exit(&listener->tcp_eager_lock);
 
@@ -20577,6 +20705,28 @@ tcp_wput_proto(void *arg, mblk_t *mp, void *arg2)
 non_urgent_data:
 
 	switch ((int)tprim->type) {
+	case T_SSL_PROXY_BIND_REQ:	/* an SSL proxy endpoint bind request */
+		/*
+		 * save the kssl_ent_t from the next block, and convert this
+		 * back to a normal bind_req.
+		 */
+		if (mp->b_cont != NULL) {
+		    ASSERT(MBLKL(mp->b_cont) >= sizeof (kssl_ent_t));
+
+			if (tcp->tcp_kssl_ent != NULL) {
+				kssl_release_ent(tcp->tcp_kssl_ent, NULL,
+				    KSSL_NO_PROXY);
+				tcp->tcp_kssl_ent = NULL;
+			}
+			bcopy(mp->b_cont->b_rptr, &tcp->tcp_kssl_ent,
+			    sizeof (kssl_ent_t));
+			kssl_hold_ent(tcp->tcp_kssl_ent);
+			freemsg(mp->b_cont);
+			mp->b_cont = NULL;
+		}
+		tprim->type = T_BIND_REQ;
+
+	/* FALLTHROUGH */
 	case O_T_BIND_REQ:	/* bind request */
 	case T_BIND_REQ:	/* new semantics bind request */
 		tcp_bind(tcp, mp);

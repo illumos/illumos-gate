@@ -542,6 +542,9 @@ dblk_lastfree(mblk_t *mp, dblk_t *dbp)
 	dbp->db_struioflag = 0;
 	dbp->db_struioun.cksum.flags = 0;
 
+	/* and the COOKED flag */
+	dbp->db_flags &= ~DBLK_COOKED;
+
 	kmem_cache_free(dbp->db_cache, dbp);
 }
 

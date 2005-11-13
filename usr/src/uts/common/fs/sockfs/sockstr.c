@@ -65,6 +65,8 @@
 #define	_SUN_TPI_VERSION	2
 #include <sys/tihdr.h>
 
+#include <inet/kssl/ksslapi.h>
+
 #include <c2/audit.h>
 
 int so_default_version = SOV_SOCKSTREAM;
@@ -1202,6 +1204,20 @@ soflushconnind(struct sonode *so, t_scalar_t seqno)
 			}
 			so->so_error = ECONNABORTED;
 			mutex_exit(&so->so_lock);
+
+			/*
+			 * T_KSSL_PROXY_CONN_IND may carry a handle for
+			 * an SSL context, and needs to be released.
+			 */
+			if ((tci->PRIM_type == T_SSL_PROXY_CONN_IND) &&
+			    (mp->b_cont != NULL)) {
+				kssl_ctx_t kssl_ctx;
+
+				ASSERT(MBLKL(mp->b_cont) ==
+				    sizeof (kssl_ctx_t));
+				kssl_ctx = *((kssl_ctx_t *)mp->b_cont->b_rptr);
+				kssl_release_ctx(kssl_ctx);
+			}
 			freemsg(mp);
 			return (0);
 		}
@@ -2148,6 +2164,11 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		return (NULL);
 	}
 
+	/*
+	 * Extra processing in case of an SSL proxy, before queuing or
+	 * forwarding to the fallback endpoint
+	 */
+	case T_SSL_PROXY_CONN_IND:
 	case T_CONN_IND:
 		/*
 		 * Verify the min size and queue the message on
@@ -2169,6 +2190,28 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			cmn_err(CE_WARN,
 			    "sockfs: T_conn_ind on non-listening socket\n");
 			freemsg(mp);
+			return (NULL);
+		}
+
+		if (tpr->type == T_SSL_PROXY_CONN_IND && mp->b_cont == NULL) {
+			/* No context: need to fall back */
+			struct sonode *fbso;
+			stdata_t *fbstp;
+
+			tpr->type = T_CONN_IND;
+
+			fbso = kssl_find_fallback(so->so_kssl_ent);
+
+			/*
+			 * No fallback: the remote will timeout and
+			 * disconnect.
+			 */
+			if (fbso == NULL) {
+				freemsg(mp);
+				return (NULL);
+			}
+			fbstp = SOTOV(fbso)->v_stream;
+			qreply(fbstp->sd_wrq->q_next, mp);
 			return (NULL);
 		}
 		soqueueconnind(so, mp);

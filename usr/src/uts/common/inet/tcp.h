@@ -40,6 +40,7 @@ extern "C" {
 #include <inet/tcp_sack.h>
 #include <sys/socket.h>
 #include <sys/multidata.h>
+#include <inet/kssl/ksslapi.h>
 
 /*
  * Private (and possibly temporary) ioctl used by configuration code
@@ -543,6 +544,13 @@ typedef struct tcp_s {
 	boolean_t	tcp_issocket;	/* this is a socket tcp */
 
 	uint32_t	tcp_squeue_bytes;
+	/*
+	 * Kernel SSL session information
+	 */
+	boolean_t		tcp_kssl_pending; /* waiting for 1st SSL rec. */
+	boolean_t		tcp_kssl_inhandshake; /* during SSL handshake */
+	kssl_ent_t		tcp_kssl_ent;	/* SSL table entry */
+	kssl_ctx_t		tcp_kssl_ctx;	/* SSL session */
 } tcp_t;
 
 extern void 	tcp_free(tcp_t *tcp);

@@ -89,6 +89,7 @@ kstrwritemp(struct vnode *vp, mblk_t *mp, ushort_t fmode)
 {
 	struct stdata *stp;
 	struct queue *wqp;
+	mblk_t *newmp;
 	char waitflag;
 	int tempmode;
 	int error = 0;
@@ -137,6 +138,15 @@ kstrwritemp(struct vnode *vp, mblk_t *mp, ushort_t fmode)
 	do {
 		if (canputnext(wqp)) {
 			mutex_exit(&stp->sd_lock);
+			if (stp->sd_wputdatafunc != NULL) {
+				newmp = (stp->sd_wputdatafunc)(vp, mp, NULL,
+				    NULL, NULL, NULL);
+				if (newmp == NULL) {
+					/* The caller will free mp */
+					return (ECOMM);
+				}
+				mp = newmp;
+			}
 			putnext(wqp, mp);
 			return (0);
 		}
@@ -494,6 +504,8 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 	size_t	iov_len;
 	mblk_t  *head, *tmp;
 	size_t  size = total_size;
+	size_t  extra;
+	int tail_len;
 
 	fflag = fp->f_flag;
 	vp = fp->f_vnode;
@@ -502,8 +514,11 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 	ASSERT(maxblk > 0);
 
 	wroff = (int)vp->v_stream->sd_wroff;
+	tail_len = (int)vp->v_stream->sd_tail;
+	extra = wroff + tail_len;
+
 	buf_left = MIN(total_size, maxblk);
-	head = dmp = allocb(buf_left + wroff, BPRI_HI);
+	head = dmp = allocb(buf_left + extra, BPRI_HI);
 	if (head == NULL)
 		return (ENOMEM);
 	head->b_wptr = head->b_rptr = head->b_rptr + wroff;
@@ -552,7 +567,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					tmp = dmp;
 					buf_left = MIN(total_size, maxblk);
 					iov_len = MIN(buf_left, sfv_len);
-					dmp = allocb(buf_left + wroff, BPRI_HI);
+					dmp = allocb(buf_left + extra, BPRI_HI);
 					if (dmp == NULL) {
 						freemsg(head);
 						return (ENOMEM);
@@ -647,7 +662,7 @@ sendvec_small_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					tmp = dmp;
 					buf_left = MIN(total_size, maxblk);
 					iov_len = MIN(buf_left, sfv_len);
-					dmp = allocb(buf_left + wroff, BPRI_HI);
+					dmp = allocb(buf_left + extra, BPRI_HI);
 					if (dmp == NULL) {
 						VOP_RWUNLOCK(readvp, readflg,
 									NULL);
@@ -753,9 +768,22 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 #endif
 	mblk_t	*dmp = NULL;
 	char	*buf = NULL;
+	size_t  extra;
+	int maxblk, wroff, tail_len;
+	struct sonode *so;
+	stdata_t *stp;
 
 	fflag = fp->f_flag;
 	vp = fp->f_vnode;
+
+	if (vp->v_type == VSOCK) {
+		so = VTOSO(vp);
+		stp = vp->v_stream;
+		wroff = (int)stp->sd_wroff;
+		tail_len = (int)stp->sd_tail;
+		maxblk = (int)stp->sd_maxblk;
+		extra = wroff + tail_len;
+	}
 
 	auio.uio_extflg = UIO_COPY_DEFAULT;
 	for (i = 0; i < copy_cnt; i++) {
@@ -829,9 +857,8 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				/*
 				 * Optimize for the socket case
 				 */
-				int wroff = (int)vp->v_stream->sd_wroff;
 
-				dmp = allocb(sfv_len + wroff, BPRI_HI);
+				dmp = allocb(sfv_len + extra, BPRI_HI);
 				if (dmp == NULL)
 					return (ENOMEM);
 				dmp->b_wptr = dmp->b_rptr = dmp->b_rptr + wroff;
@@ -926,6 +953,14 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 					releasef(sfv->sfv_fd);
 					return (ENOMEM);
 				}
+			} else {
+				/*
+				 * For sockets acting as an SSL proxy, we
+				 * need to adjust the size to the maximum
+				 * SSL record size set in the stream head.
+				 */
+				if (so->so_kssl_ctx != NULL)
+					size = MIN(size, maxblk);
 			}
 
 			while (sfv_len > 0) {
@@ -934,13 +969,15 @@ sendvec_chunk(file_t *fp, u_offset_t *fileoff, struct sendfilevec *sfv,
 				iov_len = MIN(size, sfv_len);
 
 				if (vp->v_type == VSOCK) {
-					dmp = allocb(iov_len, BPRI_HI);
+					dmp = allocb(iov_len + extra, BPRI_HI);
 					if (dmp == NULL) {
 						VOP_RWUNLOCK(readvp, readflg,
 						    NULL);
 						releasef(sfv->sfv_fd);
 						return (ENOMEM);
 					}
+					dmp->b_wptr = dmp->b_rptr =
+					    dmp->b_rptr + wroff;
 					ptr = (caddr_t)dmp->b_rptr;
 				} else {
 					ptr = buf;
@@ -1129,7 +1166,8 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 			}
 
 			if ((so->so_state & SS_DIRECT) &&
-			    (so->so_priv != NULL)) {
+			    (so->so_priv != NULL) &&
+			    (so->so_kssl_ctx == NULL)) {
 				maxblk = ((tcp_t *)so->so_priv)->tcp_mss;
 			} else {
 				maxblk = (int)vp->v_stream->sd_maxblk;

@@ -46,6 +46,7 @@ extern "C" {
 #define	DB_LIM(mp)	((mp)->b_datap->db_lim)
 #define	DB_REF(mp)	((mp)->b_datap->db_ref)
 #define	DB_TYPE(mp)	((mp)->b_datap->db_type)
+#define	DB_FLAGS(mp)	((mp)->b_datap->db_flags)
 
 #define	MBLKL(mp)	((mp)->b_wptr - (mp)->b_rptr)
 #define	MBLKSIZE(mp)	((mp)->b_datap->db_lim - (mp)->b_datap->db_base)

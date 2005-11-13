@@ -149,6 +149,8 @@ f none usr/include/inet/sctp_itf.h 644 root bin
 f none usr/include/inet/snmpcom.h 644 root bin
 f none usr/include/inet/tcp.h 644 root bin
 f none usr/include/inet/tcp_sack.h 644 root bin
+d none usr/include/inet/kssl 755 root bin
+f none usr/include/inet/kssl/ksslapi.h 644 root bin
 f none usr/include/inttypes.h 644 root bin
 f none usr/include/ipmp.h 644 root bin
 f none usr/include/ipmp_mpathd.h 644 root bin

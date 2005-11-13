@@ -922,6 +922,7 @@ fcnname/**/_info:							\
 	NO_UNLOAD_STUB(c2audit, audit_setfsat_path,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_cryptoadm,	nomod_zero);
 	NO_UNLOAD_STUB(c2audit, audit_update_context,	nomod_zero);
+	NO_UNLOAD_STUB(c2audit, audit_kssl,		nomod_zero);
 	END_MODULE(c2audit);
 #endif
 
@@ -1152,6 +1153,24 @@ fcnname/**/_info:							\
 	STUB(dld, dld_init_ops, nomod_void);
 	STUB(dld, dld_fini_ops, nomod_void);
 	END_MODULE(dld);
+#endif
+
+/*
+ * Stubs for kssl, the kernel SSL proxy
+ */
+#ifndef KSSL_MODULE
+	MODULE(kssl,drv);
+	NO_UNLOAD_STUB(kssl, kssl_check_proxy, nomod_zero);
+	NO_UNLOAD_STUB(kssl, kssl_handle_record, nomod_zero);
+	NO_UNLOAD_STUB(kssl, kssl_input, nomod_zero);
+	NO_UNLOAD_STUB(kssl, kssl_build_record, nomod_zero);
+	NO_UNLOAD_STUB(kssl, kssl_hold_ent, nomod_void);
+	NO_UNLOAD_STUB(kssl, kssl_release_ent, nomod_void);
+	NO_UNLOAD_STUB(kssl, kssl_find_fallback, nomod_zero);
+	NO_UNLOAD_STUB(kssl, kssl_init_context, nomod_zero);
+	NO_UNLOAD_STUB(kssl, kssl_hold_ctx, nomod_void);
+	NO_UNLOAD_STUB(kssl, kssl_release_ctx, nomod_void);
+	END_MODULE(kssl);
 #endif
 
 / this is just a marker for the area of text that contains stubs 

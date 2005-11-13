@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -579,6 +579,7 @@ void	audit_priv(int, const struct priv_set *, int);
 void	audit_setppriv(int, int, const struct priv_set *, const cred_t *);
 void	audit_devpolicy(int, const struct devplcysys *);
 void	audit_update_context(proc_t *, cred_t *);
+void	audit_kssl(int, void *, int);
 
 #endif
 

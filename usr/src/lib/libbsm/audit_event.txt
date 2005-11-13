@@ -326,6 +326,7 @@
 290:AUE_MODDEVPLCY:modctl(2) - configure device policy:as
 291:AUE_MODADDPRIV:modctl(2) - configure additional privilege:as
 292:AUE_CRYPTOADM:kernel cryptographic framework:as
+293:AUE_CONFIGSSL:configure kernel SSL:as
 #
 # user level audit events
 #

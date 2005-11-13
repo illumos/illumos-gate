@@ -531,6 +531,10 @@ usr/include/inet/nca/ncakmem.h		sparc
 usr/include/inet/nca/ncalogd.h		sparc
 usr/include/inet/nca/ncandd.h		sparc
 usr/include/inet/nca/ncaio.h		sparc
+usr/include/inet/kssl			sparc
+usr/include/inet/kssl/kssl.h		sparc
+usr/include/inet/kssl/ksslimpl.h	sparc
+usr/include/inet/kssl/ksslproto.h	sparc
 #
 # other contents (packages removed in source product)
 usr/bin/des				sparc

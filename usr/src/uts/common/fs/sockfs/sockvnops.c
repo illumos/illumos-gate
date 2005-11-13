@@ -91,6 +91,8 @@
 #include <inet/udp_impl.h>
 #include <inet/tcp_impl.h>
 
+#include <inet/kssl/ksslapi.h>
+
 static int socktpi_close(struct vnode *, int, int, offset_t, struct cred *);
 static int socktpi_read(struct vnode *, struct uio *, int, struct cred *,
 	struct caller_context *);
@@ -369,6 +371,19 @@ socktpi_close(
 			ASSERT(ux_vp->v_stream);
 			so->so_ux_bound_vp = NULL;
 			vn_rele_stream(ux_vp);
+		}
+		if (so->so_family == AF_INET || so->so_family == AF_INET6) {
+			strsetrwputdatahooks(SOTOV(so), NULL, NULL);
+			if (so->so_kssl_ent != NULL) {
+				kssl_release_ent(so->so_kssl_ent, so,
+				    so->so_kssl_type);
+				so->so_kssl_ent = NULL;
+			}
+			if (so->so_kssl_ctx != NULL) {
+				kssl_release_ctx(so->so_kssl_ctx);
+				so->so_kssl_ctx = NULL;
+			}
+			so->so_kssl_type = KSSL_NO_PROXY;
 		}
 		error = strclose(vp, flag, cr);
 		vp->v_stream = NULL;

@@ -84,6 +84,7 @@ f none kernel/drv/ipsecesp 755 root sys
 f none kernel/drv/iwscn 755 root sys
 f none kernel/drv/keysock 755 root sys
 f none kernel/drv/kmdb 755 root sys
+f none kernel/drv/kssl 755 root sys
 f none kernel/drv/llc1 755 root sys
 f none kernel/drv/lofi 755 root sys
 f none kernel/drv/log 755 root sys
@@ -252,6 +253,7 @@ f none kernel/drv/amd64/ipsecesp 755 root sys
 f none kernel/drv/amd64/iwscn 755 root sys
 f none kernel/drv/amd64/keysock 755 root sys
 f none kernel/drv/amd64/kmdb 755 root sys
+f none kernel/drv/amd64/kssl 755 root sys
 f none kernel/drv/amd64/llc1 755 root sys
 f none kernel/drv/amd64/lofi 755 root sys
 f none kernel/drv/amd64/log 755 root sys

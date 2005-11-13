@@ -1,0 +1,1185 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#include <sys/types.h>
+#include <sys/stream.h>
+#include <sys/strsun.h>
+#include <sys/cmn_err.h>
+#include <sys/kmem.h>
+#include <sys/cpuvar.h>
+#include <sys/atomic.h>
+#include <sys/sysmacros.h>
+
+#include <inet/common.h>
+#include <inet/ip.h>
+#include <inet/ip6.h>
+
+#include <sys/systm.h>
+#include <sys/param.h>
+#include <sys/tihdr.h>
+
+#include "ksslimpl.h"
+#include "ksslproto.h"
+#include "ksslapi.h"
+
+static kssl_cmd_t kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp,
+    mblk_t **decrmp, kssl_callback_t cbfn, void *arg);
+static boolean_t kssl_enqueue(kssl_chain_t **head, void *item);
+static void kssl_dequeue(kssl_chain_t **head, void *item);
+static kssl_status_t kssl_build_single_record(ssl_t *ssl, mblk_t *mp);
+
+/*
+ * The socket T_bind_req message is intercepted and re-routed here
+ * to see is there is SSL relevant job to do, based on the kssl config
+ * in the kssl_entry_tab.
+ * Looks up the kernel SSL proxy table, to find an entry that matches the
+ * same serveraddr, and has one of the following two criteria:
+ * 1. in_port is an ssl_port. This endpoint can be used later as a fallback
+ *    to complete connections that cannot be handled by the SSL kernel proxy
+ *    (typically non supported ciphersuite). The cookie for the calling client
+ *    is saved with the kssl_entry to be retrieved for the fallback.
+ *    The function returns KSSL_HAS_PROXY.
+ *
+ * 2. in_port is a proxy port for another ssl port. The ssl port is then
+ *    substituted to the in_port in the bind_req TPI structure, so that
+ *    the bind falls through to the SSL port. At the end of this operation,
+ *    all the packets arriving to the SSL port will be delivered to an
+ *    accepted endpoint child of this bound socket.
+ *    The  kssl_entry_t is returned in *ksslent, for later use by the
+ *    lower modules' SSL hooks that handle the Handshake messages.
+ *    The function returns KSSL_IS_PROXY.
+ *
+ * The function returns KSSL_NO_PROXY otherwise. We do not suppport
+ * IPv6 addresses.
+ */
+
+kssl_endpt_type_t
+kssl_check_proxy(mblk_t *bindmp, void *cookie, kssl_ent_t *ksslent)
+{
+	int i;
+	kssl_endpt_type_t ret;
+	kssl_entry_t *ep;
+	sin_t *sin;
+	struct T_bind_req *tbr;
+	ipaddr_t v4addr;
+	in_port_t in_port;
+
+	if (kssl_enabled == 0) {
+		return (KSSL_NO_PROXY);
+	}
+
+	tbr = (struct T_bind_req *)bindmp->b_rptr;
+
+	ret = KSSL_NO_PROXY;
+
+
+	switch (tbr->ADDR_length) {
+	case sizeof (sin_t):
+		sin = (sin_t *)(bindmp->b_rptr + tbr->ADDR_length);
+		in_port = ntohs(sin->sin_port);
+		v4addr = sin->sin_addr.s_addr;
+		break;
+
+	case sizeof (sin6_t):
+		/* Future support of IPv6 goes here */
+	default:
+		/* Should ASSERT() here? */
+		return (ret);
+	}
+
+	mutex_enter(&kssl_tab_mutex);
+
+	for (i = 0; i < kssl_entry_tab_size; i++) {
+		if ((ep = kssl_entry_tab[i]) == NULL)
+			continue;
+
+		if ((ep->ke_laddr == v4addr) || (ep->ke_laddr == INADDR_ANY)) {
+
+			/* This is an SSL port to fallback to */
+			if (ep->ke_ssl_port == in_port) {
+
+				/*
+				 * Let's see first if there's at least
+				 * an endpoint for a proxy server.
+				 * If there's none, then we return as we have
+				 * no proxy, so that the bind() to the
+				 * transport layer goes through.
+				 * The calling module will ask for this
+				 * cookie if it wants to fall back to it,
+				 * so add this one to the list of fallback
+				 * clients.
+				 */
+				if (!kssl_enqueue((kssl_chain_t **)
+				    &(ep->ke_fallback_head), cookie)) {
+					break;
+				}
+
+				/*
+				 * Now transform the T_BIND_REQ into
+				 * a T_BIND_ACK.
+				 */
+				tbr->PRIM_type = T_BIND_ACK;
+				bindmp->b_datap->db_type = M_PCPROTO;
+
+				KSSL_ENTRY_REFHOLD(ep);
+				*ksslent = (kssl_ent_t)ep;
+
+				ret = KSSL_HAS_PROXY;
+				break;
+			}
+
+			/* This is a proxy port. */
+			if (ep->ke_proxy_port == in_port) {
+				mblk_t *entmp;
+
+				/* Append this entry to the bind_req mblk */
+
+				entmp = allocb(sizeof (kssl_entry_t),
+				    BPRI_MED);
+				if (entmp == NULL)
+					break;
+				*((kssl_entry_t **)entmp->b_rptr) = ep;
+
+				entmp->b_wptr = entmp->b_rptr +
+				    sizeof (kssl_entry_t);
+
+				bindmp->b_cont = entmp;
+
+				/* Add the caller's cookie to proxies list */
+
+				if (!kssl_enqueue((kssl_chain_t **)
+				    &(ep->ke_proxy_head), cookie)) {
+					freeb(bindmp->b_cont);
+					bindmp->b_cont = NULL;
+					break;
+				}
+
+				/*
+				 * Make this look  like the SSL port to the
+				 * transport below
+				 */
+				sin->sin_port = htons(ep->ke_ssl_port);
+
+				tbr->PRIM_type = T_SSL_PROXY_BIND_REQ;
+
+				KSSL_ENTRY_REFHOLD(ep);
+				*ksslent = (kssl_ent_t)ep;
+
+				ret = KSSL_IS_PROXY;
+				break;
+			}
+		}
+	}
+
+	mutex_exit(&kssl_tab_mutex);
+	return (ret);
+}
+
+/*
+ * Retrieved an endpoint "bound" to the SSL entry.
+ * Such endpoint has previously called kssl_check_proxy(), got itself
+ * linked to the kssl_entry's ke_fallback_head list.
+ * This routine returns the cookie from that SSL entry ke_fallback_head list.
+ */
+void *
+kssl_find_fallback(kssl_ent_t ksslent)
+{
+	kssl_entry_t *kssl_entry = (kssl_entry_t *)ksslent;
+
+	if (kssl_entry->ke_fallback_head != NULL)
+		return (kssl_entry->ke_fallback_head->fallback_bound);
+
+	KSSL_COUNTER(proxy_fallback_failed, 1);
+
+	return (NULL);
+}
+
+/*
+ * Re-usable code for adding and removing an element to/from a chain that
+ * matches "item"
+ * The chain is simple-linked and NULL ended.
+ */
+
+/*
+ * This routine returns TRUE if the item was either successfully added to
+ * the chain, or is already there. It returns FALSE otherwise.
+ */
+static boolean_t
+kssl_enqueue(kssl_chain_t **head, void *item)
+{
+	kssl_chain_t *newchain, *cur;
+
+	/* Lookup the existing entries to avoid duplicates */
+	cur = *head;
+	while (cur != NULL) {
+		if (cur->item == item) {
+			return (B_TRUE);
+		}
+		cur = cur->next;
+	}
+
+	newchain = kmem_alloc(sizeof (kssl_chain_t), KM_NOSLEEP);
+	if (newchain == NULL) {
+		return (B_FALSE);
+	}
+
+	newchain->item = item;
+	newchain->next = *head;
+	*head = newchain;
+	return (B_TRUE);
+}
+
+static void
+kssl_dequeue(kssl_chain_t **head, void *item)
+{
+	kssl_chain_t *prev, *cur;
+
+	prev = cur = *head;
+	while (cur != NULL) {
+		if (cur->item == item) {
+			if (cur == *head)
+				*head = (*head)->next;
+			else
+				prev->next = cur->next;
+			kmem_free(cur, sizeof (kssl_chain_t));
+			return;
+		}
+		prev = cur;
+		cur = cur->next;
+	}
+}
+
+/*
+ * Holds the kssl_entry
+ */
+void
+kssl_hold_ent(kssl_ent_t ksslent)
+{
+	KSSL_ENTRY_REFHOLD((kssl_entry_t *)ksslent);
+}
+
+/*
+ * Releases the kssl_entry
+ * If the caller passes a cookie, then it should be removed from both
+ * proxies and fallbacks chains.
+ */
+void
+kssl_release_ent(kssl_ent_t ksslent, void *cookie, kssl_endpt_type_t endpt_type)
+{
+	kssl_entry_t *kssl_entry = (kssl_entry_t *)ksslent;
+
+	if (cookie != NULL) {
+		if (endpt_type == KSSL_IS_PROXY)
+			ASSERT(kssl_entry->ke_proxy_head != NULL);
+			kssl_dequeue(
+			    (kssl_chain_t **)&kssl_entry->ke_proxy_head,
+			    cookie);
+		if (endpt_type == KSSL_HAS_PROXY)
+			ASSERT(kssl_entry->ke_fallback_head != NULL);
+			kssl_dequeue(
+			    (kssl_chain_t **)&kssl_entry->ke_fallback_head,
+			    cookie);
+	}
+	KSSL_ENTRY_REFRELE(kssl_entry);
+}
+
+/*
+ * Holds the kssl context
+ */
+void
+kssl_hold_ctx(kssl_ctx_t ksslctx)
+{
+	ssl_t *ssl = (ssl_t *)ksslctx;
+
+	KSSL_SSL_REFHOLD(ssl);
+}
+
+/*
+ * Releases the kssl_context
+ */
+void
+kssl_release_ctx(kssl_ctx_t ksslctx)
+{
+	KSSL_SSL_REFRELE((ssl_t *)ksslctx);
+}
+
+/*
+ * Packets are accumulated here, if there are packets already queued,
+ * or if the context is active.
+ * The context is active when an incoming record processing function
+ * is already executing on a different thread.
+ * Queued packets are handled either when an mblk arrived and completes
+ * a record, or, when the active context processor finishes the task at
+ * hand.
+ * The caller has to keep calling this routine in a loop until it returns
+ * B_FALSE in *more. The reason for this is SSL3: The protocol
+ * allows the client to send its first application_data message right
+ * after it had sent its Finished message, and not wait for the server
+ * ChangeCipherSpec and Finished. This overlap means we can't batch up
+ * a returned Handshake message to be sent on the wire
+ * with a decrypted application_data to be delivered to the application.
+ */
+kssl_cmd_t
+kssl_input(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp, boolean_t *more,
+    kssl_callback_t cbfn, void *arg)
+{
+	mblk_t *recmp, *outmp = NULL;
+	kssl_cmd_t kssl_cmd;
+	ssl_t *ssl;
+	uint8_t *rec_sz_p;
+	int mplen;
+	SSL3ContentType content_type;
+	uint16_t rec_sz;
+
+	ASSERT(ctx != NULL);
+
+	if (mp != NULL) {
+		ASSERT(mp->b_prev == NULL && mp->b_next == NULL);
+	}
+
+	ssl = (ssl_t *)(ctx);
+
+	*decrmp = NULL;
+	*more = B_FALSE;
+
+	mutex_enter(&ssl->kssl_lock);
+
+	if (ssl->close_notify == B_TRUE) {
+		goto sendnewalert;
+	}
+
+	/* Whomever is currently processing this connection will get to this */
+	if (ssl->activeinput) {
+		if (mp != NULL) {
+			KSSL_ENQUEUE_MP(ssl, mp);
+		}
+		mutex_exit(&ssl->kssl_lock);
+		return (KSSL_CMD_NONE);
+	}
+
+	/*
+	 * Fast path for complete incoming application_data records on an empty
+	 * queue.
+	 * This is by far the most frequently encountered case
+	 */
+
+	if ((!ssl->activeinput) && (ssl->rec_ass_head == NULL) &&
+	    ((mp != NULL) && (mplen = MBLKL(mp)) > SSL3_HDR_LEN)) {
+
+		content_type = (SSL3ContentType)mp->b_rptr[0];
+
+		if ((content_type == content_application_data) &&
+		    (ssl->hs_waitstate == idle_handshake)) {
+			rec_sz_p = SSL3_REC_SIZE(mp);
+			rec_sz = BE16_TO_U16(rec_sz_p);
+
+			if ((mp->b_cont == NULL) && (mplen == rec_sz)) {
+
+				mp->b_flag &= ~DBLK_COOKED;
+				*decrmp = mp;
+				mutex_exit(&ssl->kssl_lock);
+				return (KSSL_CMD_DELIVER_PROXY);
+			}
+		}
+	}
+
+	ssl->activeinput = B_TRUE;
+	/* Accumulate at least one record */
+	if (mp != NULL) {
+		KSSL_ENQUEUE_MP(ssl, mp);
+		mp = NULL;
+	}
+	recmp = kssl_get_next_record(ssl);
+
+	if (recmp == NULL) {
+		ssl->activeinput = B_FALSE;
+		if (ssl->alert_sendbuf != NULL) {
+			goto sendalert;
+		}
+		/* Not even a complete header yet. wait for the rest */
+		mutex_exit(&ssl->kssl_lock);
+		return (KSSL_CMD_NONE);
+	}
+
+	do {
+		if ((SSL3ContentType)recmp->b_rptr[0] ==
+		    content_application_data) {
+			/*
+			 * application_data records are decrypted and
+			 * MAC-verified by the stream head, and in the context
+			 * a read()'ing thread. This avoids unfairly charging
+			 * the cost of handling this record on the whole system,
+			 * and prevents doing it while in the shared IP
+			 * perimeter.
+			 */
+			ssl->activeinput = B_FALSE;
+			if (ssl->hs_waitstate != idle_handshake) {
+				goto sendnewalert;
+			}
+			outmp = recmp;
+			kssl_cmd = KSSL_CMD_DELIVER_PROXY;
+		} else {
+			/*
+			 * If we're past the initial handshake, start letting
+			 * the stream head process all records, in particular
+			 * the close_notify.
+			 * This is needed to avoid processing them out of
+			 * sequence when previous application data packets are
+			 * waiting to be decrypted/MAC'ed and delivered.
+			 */
+			if (ssl->hs_waitstate == idle_handshake) {
+				ssl->activeinput = B_FALSE;
+				outmp = recmp;
+				kssl_cmd = KSSL_CMD_DELIVER_PROXY;
+			} else {
+				kssl_cmd = kssl_handle_any_record(ssl, recmp,
+				    &outmp, cbfn, arg);
+			}
+		}
+
+		/* Priority to Alert messages */
+		if (ssl->alert_sendbuf != NULL) {
+			goto sendalert;
+		}
+
+		/* Then handshake messages */
+		if (ssl->handshake_sendbuf) {
+			if (*decrmp != NULL) {
+				linkb(*decrmp, ssl->handshake_sendbuf);
+			} else {
+				*decrmp = ssl->handshake_sendbuf;
+			}
+			ssl->handshake_sendbuf = NULL;
+
+			*more = ((ssl->rec_ass_head != NULL) &&
+			    (!ssl->activeinput));
+			mutex_exit(&ssl->kssl_lock);
+			return (kssl_cmd);
+		}
+
+		if (ssl->hs_waitstate == idle_handshake) {
+			*more = ((ssl->rec_ass_head != NULL) &&
+			    (!ssl->activeinput));
+		}
+
+		if (outmp != NULL) {
+			*decrmp = outmp;
+			/*
+			 * Don't process any packet after an application_data.
+			 * We could well receive the close_notify which should
+			 * be handled separately.
+			 */
+			mutex_exit(&ssl->kssl_lock);
+			return (kssl_cmd);
+		}
+		/*
+		 * The current record isn't done yet. Don't start the next one
+		 */
+		if (ssl->activeinput) {
+			mutex_exit(&ssl->kssl_lock);
+			return (kssl_cmd);
+		}
+	} while ((recmp = kssl_get_next_record(ssl)) != NULL);
+
+	mutex_exit(&ssl->kssl_lock);
+	return (kssl_cmd);
+
+sendnewalert:
+	kssl_send_alert(ssl, alert_fatal, unexpected_message);
+	if (mp != NULL) {
+		freeb(mp);
+	}
+
+sendalert:
+	*decrmp = ssl->alert_sendbuf;
+	ssl->alert_sendbuf = NULL;
+	mutex_exit(&ssl->kssl_lock);
+	return (KSSL_CMD_SEND);
+}
+
+/*
+ * Decrypt and verify the MAC of an incoming chain of application_data record.
+ * Each block has exactly one SSL record.
+ * This routine recycles its incoming mblk, and flags it as DBLK_COOKED
+ */
+kssl_cmd_t
+kssl_handle_record(kssl_ctx_t ctx, mblk_t **mpp, mblk_t **outmp)
+{
+	uchar_t *recend, *rec_sz_p;
+	uchar_t *real_recend;
+	mblk_t *prevmp = NULL, *nextmp, *mp = *mpp, *copybp;
+	int mac_sz;
+	uchar_t version[2];
+	uint16_t rec_sz;
+	SSL3AlertDescription desc;
+	SSL3ContentType content_type;
+	ssl_t *ssl;
+	KSSLCipherSpec *spec;
+	int error = 0, ret;
+	kssl_cmd_t kssl_cmd = KSSL_CMD_DELIVER_PROXY;
+	boolean_t deliverit = B_FALSE;
+	crypto_data_t cipher_data;
+
+	ASSERT(ctx != NULL);
+
+	ssl = (ssl_t *)(ctx);
+
+	*outmp = NULL;
+
+more:
+
+	while (mp != NULL) {
+
+		if (DB_REF(mp) > 1) {
+			/*
+			 * Fortunately copyb() preserves the offset,
+			 * tail space and alignement so the copy is
+			 * ready to be made an SSL record.
+			 */
+			if ((copybp = copyb(mp)) == NULL)
+				return (NULL);
+
+			copybp->b_cont = mp->b_cont;
+			if (mp == *mpp) {
+				*mpp = copybp;
+			} else {
+				prevmp->b_cont = copybp;
+			}
+			freeb(mp);
+			mp = copybp;
+		}
+
+		content_type = (SSL3ContentType)mp->b_rptr[0];
+
+		if (content_type != content_application_data) {
+			nextmp = mp->b_cont;
+
+			/* Remove this message */
+			if (prevmp != NULL) {
+				prevmp->b_cont = nextmp;
+
+				/*
+				 * If we had processed blocks that need to
+				 * be delivered, then remember that error code
+				 */
+				if (kssl_cmd == KSSL_CMD_DELIVER_PROXY)
+					deliverit = B_TRUE;
+			}
+
+			mutex_enter(&ssl->kssl_lock);
+			kssl_cmd = kssl_handle_any_record(ssl, mp, outmp,
+			    NULL, NULL);
+
+			if (ssl->alert_sendbuf != NULL) {
+				goto sendalert;
+			}
+			mutex_exit(&ssl->kssl_lock);
+
+			if (deliverit) {
+				kssl_cmd = KSSL_CMD_DELIVER_PROXY;
+			}
+
+			mp = nextmp;
+			continue;
+		}
+
+		version[0] = mp->b_rptr[1];
+		version[1] = mp->b_rptr[2];
+		rec_sz_p = SSL3_REC_SIZE(mp);
+		rec_sz = BE16_TO_U16(rec_sz_p);
+
+		mp->b_rptr += SSL3_HDR_LEN;
+		recend = mp->b_rptr + rec_sz;
+		real_recend = recend;
+
+		spec = &ssl->spec[KSSL_READ];
+		mac_sz = spec->mac_hashsz;
+		if (spec->cipher_ctx != 0) {
+			cipher_data.cd_format = CRYPTO_DATA_RAW;
+			cipher_data.cd_offset = 0;
+			cipher_data.cd_length = rec_sz;
+			cipher_data.cd_miscdata = NULL;
+			cipher_data.cd_raw.iov_base = (char *)mp->b_rptr;
+			cipher_data.cd_raw.iov_len = rec_sz;
+			error = crypto_decrypt_update(spec->cipher_ctx,
+			    &cipher_data, NULL, NULL);
+			if (CRYPTO_ERR(error)) {
+#ifdef	DEBUG
+				cmn_err(CE_WARN, "kssl_handle_record: "
+				    "crypto_decrypt_update failed: 0x%02X",
+				    error);
+#endif	/* DEBUG */
+				KSSL_COUNTER(record_decrypt_failure, 1);
+				mp->b_rptr = recend;
+				desc = decrypt_error;
+				goto makealert;
+			}
+		}
+		if (spec->cipher_type == type_block) {
+			uint_t pad_sz = recend[-1];
+			pad_sz++;
+			if (pad_sz + mac_sz > rec_sz) {
+				mp->b_rptr = recend;
+				desc = bad_record_mac;
+				goto makealert;
+			}
+			rec_sz -= pad_sz;
+			recend -= pad_sz;
+		}
+		if (mac_sz != 0) {
+			uchar_t hash[MAX_HASH_LEN];
+			if (rec_sz < mac_sz) {
+				mp->b_rptr = real_recend;
+				desc = bad_record_mac;
+				goto makealert;
+			}
+			rec_sz -= mac_sz;
+			recend -= mac_sz;
+			ret = kssl_compute_record_mac(ssl, KSSL_READ,
+				ssl->seq_num[KSSL_READ], content_type,
+				version, mp->b_rptr, rec_sz, hash);
+			if (ret != CRYPTO_SUCCESS ||
+			    bcmp(hash, recend, mac_sz)) {
+				mp->b_rptr = real_recend;
+				desc = bad_record_mac;
+#ifdef	DEBUG
+				cmn_err(CE_WARN, "kssl_handle_record: "
+					"msg MAC mismatch");
+#endif	/* DEBUG */
+				KSSL_COUNTER(verify_mac_failure, 1);
+				goto makealert;
+			}
+			ssl->seq_num[KSSL_READ]++;
+		}
+
+		if (ssl->hs_waitstate != idle_handshake) {
+			mp->b_rptr = real_recend;
+			desc = unexpected_message;
+			goto makealert;
+		}
+		mp->b_wptr = recend;
+
+		prevmp = mp;
+		mp = mp->b_cont;
+	}
+
+	KSSL_COUNTER(appdata_record_ins, 1);
+	return (kssl_cmd);
+
+makealert:
+	nextmp = mp->b_cont;
+	freeb(mp);
+	mp = nextmp;
+	mutex_enter(&ssl->kssl_lock);
+	kssl_send_alert(ssl, alert_fatal, desc);
+
+	if (ssl->alert_sendbuf == NULL) {
+		/* internal memory allocation failure. just return. */
+#ifdef	DEBUG
+		cmn_err(CE_WARN, "kssl_handle_record: "
+		    "alert message allocation failed");
+#endif	/* DEBUG */
+		mutex_exit(&ssl->kssl_lock);
+
+		if (mp) {
+			prevmp = NULL;
+			goto more;
+		}
+
+		return (KSSL_CMD_NONE);
+	}
+	kssl_cmd = KSSL_CMD_SEND;
+sendalert:
+	if (*outmp == NULL) {
+		*outmp = ssl->alert_sendbuf;
+	} else {
+		linkb(*outmp, ssl->alert_sendbuf);
+	}
+	ssl->alert_sendbuf = NULL;
+	mutex_exit(&ssl->kssl_lock);
+
+	if (mp) {
+		prevmp = NULL;
+		goto more;
+	}
+
+	return (kssl_cmd);
+}
+/*
+ * This is the routine that handles incoming SSL records.
+ * When called the first time, with a NULL context, this routine expects
+ * a ClientHello SSL Handshake packet and shall allocate a context
+ * of a new SSL connection.
+ * During the rest of the handshake packets, the routine adjusts the
+ * state of the context according to the record received.
+ * After the ChangeCipherSpec message is received, the routine first
+ * decrypts/authenticated the packet using the key materials in the
+ * connection's context.
+ * The return code tells the caller what to do with the returned packet.
+ */
+static kssl_cmd_t
+kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
+    kssl_callback_t cbfn, void *arg)
+{
+	uchar_t *recend, *rec_sz_p;
+	uchar_t version[2];
+	uchar_t *real_recend, *save_rptr, *save_wptr;
+	int rhsz = SSL3_HDR_LEN;
+	uint16_t rec_sz;
+	int sz;
+	int mac_sz;
+	SSL3AlertDescription desc;
+	SSL3AlertLevel level;
+	SSL3ContentType content_type;
+	ssl_t *ssl;
+	KSSLCipherSpec *spec;
+	int error = 0, ret;
+
+	ASSERT(ctx != NULL);
+
+	ssl = (ssl_t *)(ctx);
+
+	*decrmp = NULL;
+
+	save_rptr = mp->b_rptr;
+	save_wptr = mp->b_wptr;
+
+	ASSERT(MUTEX_HELD(&ssl->kssl_lock));
+
+	content_type = (SSL3ContentType)mp->b_rptr[0];
+	if (content_type == content_handshake_v2) {
+		if (ssl->hs_waitstate == wait_client_hello) {
+			/* V2 compatible ClientHello */
+			if (mp->b_rptr[3] == 0x03 &&
+			    (mp->b_rptr[4] == 0x01 ||
+				mp->b_rptr[4] == 0x00)) {
+				ssl->major_version = version[0] = mp->b_rptr[3];
+				ssl->minor_version = version[1] = mp->b_rptr[4];
+			} else {
+			/* We don't support "pure" SSLv2 */
+				desc = protocol_version;
+				goto sendalert;
+			}
+		}
+		rec_sz = (uint16_t)mp->b_rptr[1];
+		rhsz = 2;
+	} else {
+		ssl->major_version = version[0] = mp->b_rptr[1];
+		ssl->minor_version = version[1] = mp->b_rptr[2];
+		rec_sz_p = SSL3_REC_SIZE(mp);
+		rec_sz = BE16_TO_U16(rec_sz_p);
+	}
+
+	mp->b_rptr += rhsz;
+	recend = mp->b_rptr + rec_sz;
+	real_recend = recend;
+
+	spec = &ssl->spec[KSSL_READ];
+	mac_sz = spec->mac_hashsz;
+	if (spec->cipher_ctx != 0) {
+		spec->cipher_data.cd_length = rec_sz;
+		spec->cipher_data.cd_raw.iov_base = (char *)mp->b_rptr;
+		spec->cipher_data.cd_raw.iov_len = rec_sz;
+		error = crypto_decrypt_update(spec->cipher_ctx,
+		    &spec->cipher_data, NULL, NULL);
+		if (CRYPTO_ERR(error)) {
+#ifdef	DEBUG
+			cmn_err(CE_WARN,
+				"kssl_handle_any_record: crypto_decrypt_update "
+				"failed: 0x%02X", error);
+#endif	/* DEBUG */
+			KSSL_COUNTER(record_decrypt_failure, 1);
+			mp->b_rptr = recend;
+			desc = decrypt_error;
+			goto sendalert;
+		}
+	}
+	if (spec->cipher_type == type_block) {
+		uint_t pad_sz = recend[-1];
+		pad_sz++;
+		if (pad_sz + mac_sz > rec_sz) {
+			mp->b_rptr = recend;
+			desc = bad_record_mac;
+			goto sendalert;
+		}
+		rec_sz -= pad_sz;
+		recend -= pad_sz;
+	}
+	if (mac_sz != 0) {
+		uchar_t hash[MAX_HASH_LEN];
+		if (rec_sz < mac_sz) {
+			mp->b_rptr = real_recend;
+			desc = bad_record_mac;
+			goto sendalert;
+		}
+		rec_sz -= mac_sz;
+		recend -= mac_sz;
+		ret = kssl_compute_record_mac(ssl, KSSL_READ,
+			ssl->seq_num[KSSL_READ], content_type,
+			version, mp->b_rptr, rec_sz, hash);
+		if (ret != CRYPTO_SUCCESS ||
+		    bcmp(hash, recend, mac_sz)) {
+			mp->b_rptr = real_recend;
+			desc = bad_record_mac;
+#ifdef	DEBUG
+			cmn_err(CE_WARN, "kssl_handle_any_record: "
+				"msg MAC mismatch");
+#endif	/* DEBUG */
+			KSSL_COUNTER(verify_mac_failure, 1);
+			goto sendalert;
+		}
+		ssl->seq_num[KSSL_READ]++;
+	}
+
+	switch (content_type) {
+	case content_handshake:
+		do {
+			if (error != 0 ||
+			    /* ignore client renegotiation for now */
+			    ssl->hs_waitstate == idle_handshake) {
+				mp->b_rptr = recend;
+			}
+			if (mp->b_rptr == recend) {
+				mp->b_rptr = real_recend;
+				if (error != 0) {
+					goto error;
+				}
+				freeb(mp);
+
+				if (ssl->hs_waitstate == wait_client_key_done)
+					return (KSSL_CMD_QUEUED);
+
+				return ((ssl->handshake_sendbuf != NULL) ?
+				    KSSL_CMD_SEND : KSSL_CMD_NONE);
+			}
+			if (ssl->msg.state < MSG_BODY) {
+				if (ssl->msg.state == MSG_INIT) {
+					ssl->msg.type =
+					    (SSL3HandshakeType)*mp->b_rptr++;
+					ssl->msg.state = MSG_INIT_LEN;
+				}
+				if (ssl->msg.state == MSG_INIT_LEN) {
+					int msglenb =
+					    ssl->msg.msglen_bytes;
+					int msglen = ssl->msg.msglen;
+					while (mp->b_rptr < recend &&
+					    msglenb < 3) {
+						msglen = (msglen << 8) +
+						    (uint_t)(*mp->b_rptr++);
+						msglenb++;
+					}
+					ssl->msg.msglen_bytes = msglenb;
+					ssl->msg.msglen = msglen;
+					if (msglenb == 3) {
+						ssl->msg.state = MSG_BODY;
+					}
+				}
+				if (mp->b_rptr == recend) {
+					mp->b_rptr = real_recend;
+					freeb(mp);
+					return (KSSL_CMD_NONE);
+				}
+			}
+			ASSERT(ssl->msg.state == MSG_BODY);
+
+			sz = recend - mp->b_rptr;
+
+			if (ssl->msg.head == NULL &&
+			    ssl->msg.msglen <= sz) {
+				continue;
+			}
+			if (ssl->msg.head != NULL) {
+				sz += msgdsize(ssl->msg.head);
+				if (ssl->msg.msglen <= sz) {
+					ssl->msg.tail->b_cont = mp;
+					mp = ssl->msg.head;
+					ssl->sslcnt = 100;
+					ssl->msg.head = NULL;
+					ssl->msg.tail = NULL;
+					if (pullupmsg(mp, -1)) {
+						recend = mp->b_rptr + sz;
+						ASSERT(recend <= mp->b_wptr);
+						continue;
+					}
+					mp->b_rptr = real_recend;
+					error = ENOMEM;
+					KSSL_COUNTER(alloc_fails, 1);
+					goto error;
+				}
+			}
+
+			mp->b_wptr = recend;
+
+			if (ssl->msg.head == NULL) {
+				ssl->msg.head = mp;
+				ssl->msg.tail = mp;
+				return (KSSL_CMD_NONE);
+			} else {
+				ssl->msg.tail->b_cont = mp;
+				ssl->msg.tail = mp;
+				return (KSSL_CMD_NONE);
+			}
+		} while (kssl_handle_handshake_message(ssl, mp, &error, cbfn,
+		    arg));
+		if (error == SSL_MISS) {
+			mp->b_rptr = save_rptr;
+			mp->b_wptr = save_wptr;
+			KSSL_COUNTER(fallback_connections, 1);
+			return (KSSL_CMD_NOT_SUPPORTED);
+		}
+		if (ssl->hs_waitstate == wait_client_key_done) {
+			return (KSSL_CMD_QUEUED);
+		} else {
+			return (KSSL_CMD_NONE);
+		}
+	case content_alert:
+		if (rec_sz != 2) {
+			mp->b_rptr = real_recend;
+			desc = illegal_parameter;
+			goto sendalert;
+		} else {
+			level = *mp->b_rptr++;
+			desc = *mp->b_rptr++;
+			mp->b_rptr = real_recend;
+			if (level != alert_warning || desc != close_notify) {
+				if (ssl->sid.cached == B_TRUE) {
+					kssl_uncache_sid(&ssl->sid,
+					    ssl->kssl_entry);
+					ssl->sid.cached = B_FALSE;
+				}
+				ssl->fatal_alert = B_TRUE;
+				error = EBADMSG;
+				goto error;
+			} else {
+				ssl->close_notify = B_TRUE;
+				ssl->activeinput = B_FALSE;
+				freeb(mp);
+				return (KSSL_CMD_NONE);
+			}
+		}
+	case content_change_cipher_spec:
+		if (ssl->hs_waitstate != wait_change_cipher) {
+			desc = unexpected_message;
+		} else if (rec_sz != 1 || *mp->b_rptr != 1) {
+			desc = illegal_parameter;
+		} else {
+			mp->b_rptr = real_recend;
+			ssl->hs_waitstate = wait_finished;
+			ssl->seq_num[KSSL_READ] = 0;
+			if ((error = kssl_spec_init(ssl, KSSL_READ)) != 0) {
+#ifdef	DEBUG
+				cmn_err(CE_WARN,
+					"kssl_spec_init returned error "
+					"0x%02X", error);
+#endif	/* DEBUG */
+				goto error;
+			}
+			ssl->activeinput = B_FALSE;
+			freeb(mp);
+			return (KSSL_CMD_NONE);
+		}
+		mp->b_rptr = real_recend;
+		goto sendalert;
+
+	case content_application_data:
+		if (ssl->hs_waitstate != idle_handshake) {
+			mp->b_rptr = real_recend;
+			desc = unexpected_message;
+			goto sendalert;
+		}
+		mp->b_wptr = recend;
+		*decrmp = mp;
+		ssl->activeinput = B_FALSE;
+		return (KSSL_CMD_DELIVER_PROXY);
+
+	case content_handshake_v2:
+		error = kssl_handle_v2client_hello(ssl, mp, rec_sz);
+		if (error == SSL_MISS) {
+			mp->b_rptr = save_rptr;
+			mp->b_wptr = save_wptr;
+			KSSL_COUNTER(fallback_connections, 1);
+			return (KSSL_CMD_NOT_SUPPORTED);
+		} else if (error != 0) {
+			goto error;
+		}
+		freeb(mp);
+		return (KSSL_CMD_SEND);
+	default:
+		mp->b_rptr = real_recend;
+		desc = unexpected_message;
+		break;
+	}
+
+sendalert:
+	kssl_send_alert(ssl, alert_fatal, desc);
+	*decrmp = ssl->alert_sendbuf;
+	ssl->alert_sendbuf = NULL;
+	freeb(mp);
+	return ((*decrmp != NULL) ? KSSL_CMD_SEND : KSSL_CMD_NONE);
+error:
+	freeb(mp);
+	return (KSSL_CMD_NONE);
+}
+
+/*
+ * Initialize the context of an SSL connection, coming to the specified
+ * address.
+ * the ssl structure returned is held.
+ */
+kssl_status_t
+kssl_init_context(kssl_ent_t kssl_ent, ipaddr_t faddr, int mss,
+    kssl_ctx_t *kssl_ctxp)
+{
+	ssl_t *ssl = kmem_cache_alloc(kssl_cache, KM_NOSLEEP);
+
+	if (ssl == NULL) {
+		return (KSSL_STS_ERR);
+	}
+
+	kssl_cache_count++;
+
+	bzero(ssl, sizeof (ssl_t));
+
+	ssl->kssl_entry = (kssl_entry_t *)kssl_ent;
+	KSSL_ENTRY_REFHOLD(ssl->kssl_entry);
+
+	ssl->faddr = faddr;
+	ssl->tcp_mss = mss;
+	ssl->sendalert_level = alert_warning;
+	ssl->sendalert_desc = close_notify;
+	ssl->sid.cached = B_FALSE;
+
+	*kssl_ctxp = (kssl_ctx_t)ssl;
+	KSSL_SSL_REFHOLD(ssl);
+	return (KSSL_STS_OK);
+}
+
+/*
+ * Builds SSL records out of the chain of mblks, and returns it.
+ * Taked a copy of the message before encypting it if it has another
+ * reference.
+ * In case of failure, NULL is returned, and the message will be
+ * freed by the caller.
+ * A NULL mp means a close_notify is requested.
+ */
+mblk_t *
+kssl_build_record(kssl_ctx_t ctx, mblk_t *mp)
+{
+	ssl_t *ssl = (ssl_t *)ctx;
+	mblk_t *retmp = mp, *bp = mp, *prevbp = mp, *copybp;
+
+	ASSERT(ssl != NULL);
+	ASSERT(mp != NULL);
+
+	do {
+		if (DB_REF(bp) > 1) {
+			/*
+			 * Fortunately copyb() preserves the offset,
+			 * tail space and alignement so the copy is
+			 * ready to be made an SSL record.
+			 */
+			if ((copybp = copyb(bp)) == NULL)
+				return (NULL);
+
+			copybp->b_cont = bp->b_cont;
+			if (bp == mp) {
+				retmp = copybp;
+			} else {
+				prevbp->b_cont = copybp;
+			}
+			freeb(bp);
+			bp = copybp;
+		}
+
+		if (kssl_build_single_record(ssl, bp) != KSSL_STS_OK)
+			return (NULL);
+
+		prevbp = bp;
+		bp = bp->b_cont;
+	} while (bp != NULL);
+
+	return (retmp);
+}
+
+/*
+ * Builds a single SSL record
+ * In-line encryption of the record.
+ */
+static kssl_status_t
+kssl_build_single_record(ssl_t *ssl, mblk_t *mp)
+{
+	int len;
+	int reclen = 0;
+	uchar_t *recstart, *versionp;
+	KSSLCipherSpec *spec;
+	int mac_sz;
+	int pad_sz = 0;
+
+
+	spec = &ssl->spec[KSSL_WRITE];
+	mac_sz = spec->mac_hashsz;
+
+
+	ASSERT(DB_REF(mp) == 1);
+	ASSERT((mp->b_rptr - mp->b_datap->db_base >= SSL3_HDR_LEN) &&
+	    (mp->b_datap->db_lim - mp->b_wptr >= mac_sz + spec->cipher_bsize));
+
+	len = MBLKL(mp);
+
+	ASSERT(len > 0);
+
+	mutex_enter(&ssl->kssl_lock);
+
+	recstart = mp->b_rptr = mp->b_rptr - SSL3_HDR_LEN;
+	recstart[0] = content_application_data;
+	recstart[1] = ssl->major_version;
+	recstart[2] = ssl->minor_version;
+	versionp = &recstart[1];
+
+	reclen = len + mac_sz;
+	if (spec->cipher_type == type_block) {
+		pad_sz = spec->cipher_bsize -
+		    (reclen & (spec->cipher_bsize - 1));
+		ASSERT(reclen + pad_sz <=
+		    SSL3_MAX_RECORD_LENGTH);
+		reclen += pad_sz;
+	}
+	recstart[3] = (reclen >> 8) & 0xff;
+	recstart[4] = reclen & 0xff;
+
+	if (kssl_mac_encrypt_record(ssl, content_application_data, versionp,
+	    recstart, mp) != 0) {
+		/* Do we need an internal_error Alert here? */
+		mutex_exit(&ssl->kssl_lock);
+		return (KSSL_STS_ERR);
+	}
+
+	KSSL_COUNTER(appdata_record_outs, 1);
+	mutex_exit(&ssl->kssl_lock);
+	return (KSSL_STS_OK);
+}

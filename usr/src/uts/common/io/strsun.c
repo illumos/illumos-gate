@@ -253,6 +253,7 @@ mcopyinuio(struct stdata *stp, uio_t *uiop, ssize_t iosize,
 {
 	mblk_t	*head = NULL, **tail = &head;
 	size_t	offset = stp->sd_wroff;
+	size_t tail_len = stp->sd_tail;
 
 	if (iosize == INFPSZ || iosize > uiop->uio_resid)
 		iosize = uiop->uio_resid;
@@ -279,7 +280,8 @@ mcopyinuio(struct stdata *stp, uio_t *uiop, ssize_t iosize,
 
 		blocksize = MIN(iosize, maxblk);
 		ASSERT(blocksize >= 0);
-		if ((mp = allocb_cred(offset + blocksize, CRED())) == NULL) {
+		if ((mp = allocb_cred(offset + blocksize + tail_len,
+		    CRED())) == NULL) {
 			*errorp = ENOMEM;
 			return (head);
 		}

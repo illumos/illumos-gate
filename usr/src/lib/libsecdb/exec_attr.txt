@@ -198,6 +198,7 @@ Network Security:solaris:cmd:::/usr/sbin/ikecert:privs=sys_net_config
 Network Security:solaris:cmd:::/usr/sbin/ipsecconf:privs=sys_net_config
 Network Security:solaris:cmd:::/usr/sbin/ipseckey:privs=sys_net_config
 Network Security:solaris:cmd:::/usr/sbin/ipsecalgs:privs=sys_net_config
+Network Security:solaris:cmd:::/usr/sbin/ksslcfg:euid=0
 Network Security:suser:cmd:::/usr/bin/ssh-keygen:uid=0;gid=sys
 Network Security:suser:cmd:::/usr/lib/inet/certdb:euid=0
 Network Security:suser:cmd:::/usr/lib/inet/certlocal:euid=0

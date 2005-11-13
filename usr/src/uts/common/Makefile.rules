@@ -349,6 +349,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/ip/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/kssl/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/inet/sctp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -1135,6 +1139,9 @@ $(LINTS_DIR)/%.ln:		$(SRC)/common/ipf/%.c
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/ipf/%.c
 	@($(LHEAD) $(LINT.c) $(IPFFLAG2) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/kssl/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/inet/udp/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

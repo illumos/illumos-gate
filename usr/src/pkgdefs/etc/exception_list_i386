@@ -524,6 +524,11 @@ usr/include/inet/nca/ncalogd.h		i386
 usr/include/inet/nca/ncandd.h		i386
 usr/include/inet/nca/ncaio.h		i386
 #
+usr/include/inet/kssl			i386
+usr/include/inet/kssl/kssl.h		i386
+usr/include/inet/kssl/ksslimpl.h	i386
+usr/include/inet/kssl/ksslproto.h	i386
+#
 # other contents (packages removed in source product)
 usr/bin/des				i386
 usr/include/des/desdata.h		i386

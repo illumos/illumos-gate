@@ -95,7 +95,7 @@ static devfsadm_create_t misc_cbt[] = {
 	    "(^eeprom$)|(^ptsl$)|(^mm$)|(^wc$)|(^dump$)|(^cn$)|(^lo$)|(^ptm$)|"
 	    "(^ptc$)|(^openeepr$)|(^poll$)|(^sysmsg$)|(^random$)|(^trapstat$)|"
 	    "(^cryptoadm$)|(^crypto$)|(^pool$)|(^poolctl$)|(^bl$)|(^kmdb$)|"
-	    "(^sysevent$)",
+	    "(^sysevent$)|(^kssl$)",
 	    TYPE_EXACT | DRV_RE, ILEVEL_1, minor_name
 	},
 	{ "pseudo", "ddi_pseudo",

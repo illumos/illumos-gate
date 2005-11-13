@@ -2836,6 +2836,8 @@ strmakedata(
 	mblk_t *mp = NULL;
 	mblk_t *bp;
 	int wroff = (int)stp->sd_wroff;
+	int tail_len = (int)stp->sd_tail;
+	int extra = wroff + tail_len;
 	int error = 0;
 	ssize_t maxblk;
 	ssize_t count = *iosize;
@@ -2860,10 +2862,10 @@ strmakedata(
 
 		size = MIN(count, maxblk);
 
-		while ((bp = allocb_cred(size + wroff, cr)) == NULL) {
+		while ((bp = allocb_cred(size + extra, cr)) == NULL) {
 			error = EAGAIN;
 			if ((uiop->uio_fmode & (FNDELAY|FNONBLOCK)) ||
-			    (error = strwaitbuf(size + wroff, BPRI_MED)) != 0) {
+			    (error = strwaitbuf(size + extra, BPRI_MED)) != 0) {
 				if (count == *iosize) {
 					freemsg(mp);
 					return (error);
@@ -2889,6 +2891,7 @@ strmakedata(
 			dp->db_cksumstuff = 0;
 			dp->db_cksumend = size;
 			*(long long *)dp->db_struioun.data = 0ll;
+			bp->b_wptr += size;
 		} else {
 			if (stp->sd_copyflag & STRCOPYCACHED)
 				uiop->uio_extflg |= UIO_COPY_CACHED;
@@ -2902,9 +2905,22 @@ strmakedata(
 					return (error);
 				}
 			}
+			bp->b_wptr += size;
+
+			if (stp->sd_wputdatafunc != NULL) {
+				mblk_t *newbp;
+
+				newbp = (stp->sd_wputdatafunc)(stp->sd_vnode,
+				    bp, NULL, NULL, NULL, NULL);
+				if (newbp == NULL) {
+					freeb(bp);
+					freemsg(mp);
+					return (ECOMM);
+				}
+				bp = newbp;
+			}
 		}
 
-		bp->b_wptr += size;
 		count -= size;
 
 		if (mp == NULL)
@@ -3238,6 +3254,7 @@ shalloc(queue_t *qp)
 	stp->sd_rprotofunc = strrput_proto;
 	stp->sd_rmiscfunc = strrput_misc;
 	stp->sd_rderrfunc = stp->sd_wrerrfunc = NULL;
+	stp->sd_rputdatafunc = stp->sd_wputdatafunc = NULL;
 	stp->sd_ciputctrl = NULL;
 	stp->sd_nciputctrl = 0;
 	stp->sd_qhead = NULL;
@@ -3246,6 +3263,7 @@ shalloc(queue_t *qp)
 	stp->sd_nqueues = 0;
 	stp->sd_svcflags = 0;
 	stp->sd_copyflag = 0;
+
 	return (stp);
 }
 
@@ -7971,6 +7989,19 @@ strsetwputhooks(vnode_t *vp, uint_t flags, clock_t closetime)
 		stp->sd_wput_opt |= SW_RECHECK_ERR;
 	else
 		stp->sd_wput_opt &= ~SW_RECHECK_ERR;
+
+	mutex_exit(&stp->sd_lock);
+}
+
+void
+strsetrwputdatahooks(vnode_t *vp, msgfunc_t rdatafunc, msgfunc_t wdatafunc)
+{
+	struct stdata *stp = vp->v_stream;
+
+	mutex_enter(&stp->sd_lock);
+
+	stp->sd_rputdatafunc = rdatafunc;
+	stp->sd_wputdatafunc = wdatafunc;
 
 	mutex_exit(&stp->sd_lock);
 }

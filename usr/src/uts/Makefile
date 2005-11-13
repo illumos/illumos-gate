@@ -92,8 +92,8 @@ $(PMTMO_FILE) pmtmo_file: $(PATCH_MAKEUP_TABLE)
 #
 COMMON_HDRDIRS= common/des common/fs common/gssapi common/inet common/net \
 	common/netinet common/nfs common/rpc common/sys common/vm \
-	common/c2 common/pcmcia/sys common/rpcsvc common/inet/nca \
-	common/ipp
+	common/c2 common/pcmcia/sys common/rpcsvc common/inet/kssl \
+	common/inet/nca common/ipp
 
 sparc_HDRDIRS= sun/sys
 i386_HDRDIRS= i86pc/vm

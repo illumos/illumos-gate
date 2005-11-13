@@ -83,6 +83,7 @@ extern "C" {
  *	sd_sidp
  *	sd_pgidp
  *	sd_wroff
+ *	sd_tail
  *	sd_rerror
  *	sd_werror
  *	sd_pushcnt
@@ -181,6 +182,7 @@ typedef struct stdata {
 	ushort_t	sd_unused;	/* UNUSED, retained for binary */
 					/* compatibility */
 	ushort_t	sd_wroff;	/* write offset */
+	ushort_t	sd_tail;	/* reserved space in written mblks */
 	int		sd_rerror;	/* error to return on read ops */
 	int		sd_werror;	/* error to return on write ops */
 	int		sd_pushcnt;	/* number of pushes done on stream */
@@ -213,7 +215,9 @@ typedef struct stdata {
 	uint_t		sd_wput_opt;	/* options/flags for write/putmsg */
 	uint_t		sd_read_opt;	/* options/flags for strread */
 	msgfunc_t	sd_rprotofunc;	/* rput M_*PROTO routine */
+	msgfunc_t	sd_rputdatafunc; /* read M_DATA routine */
 	msgfunc_t	sd_rmiscfunc;	/* rput routine (non-data/proto) */
+	msgfunc_t	sd_wputdatafunc; /* wput M_DATA routine */
 	errfunc_t	sd_rderrfunc;	/* read side error callback */
 	errfunc_t	sd_wrerrfunc;	/* write side error callback */
 	/*
@@ -1198,6 +1202,7 @@ extern void strseteof(vnode_t *, int);
 extern void strflushrq(vnode_t *, int);
 extern void strsetrputhooks(vnode_t *, uint_t, msgfunc_t, msgfunc_t);
 extern void strsetwputhooks(vnode_t *, uint_t, clock_t);
+extern void strsetrwputdatahooks(vnode_t *, msgfunc_t, msgfunc_t);
 extern int strwaitmark(vnode_t *);
 extern void strsignal_nolock(stdata_t *, int, int32_t);
 

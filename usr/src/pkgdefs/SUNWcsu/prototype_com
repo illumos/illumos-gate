@@ -548,6 +548,7 @@ f none usr/lib/inet/in.mpathd 555 root bin
 f none usr/lib/inet/inetd 555 root bin
 f none usr/lib/intrd 555 root bin
 f none usr/lib/isaexec 555 root bin
+f none usr/lib/kssladm 555 root bin
 s none usr/lib/ld.so.1=../../lib/ld.so.1
 d none usr/lib/locale 755 root bin
 d none usr/lib/locale/C 755 root bin
@@ -755,6 +756,7 @@ s none usr/sbin/init=../../sbin/init
 f none usr/sbin/install 555 root bin
 f none usr/sbin/keyserv 555 root sys
 f none usr/sbin/killall 555 root bin
+f none usr/sbin/ksslcfg 555 root bin
 s none usr/sbin/labelit=./clri
 f none usr/sbin/link 555 root bin
 s none usr/sbin/lockfs=../lib/fs/ufs/lockfs

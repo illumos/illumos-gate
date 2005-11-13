@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -333,6 +333,7 @@ extern "C" {
 #define	AUE_MODDEVPLCY		290	/* =ad modctl(2) */
 #define	AUE_MODADDPRIV		291	/* =ad modctl(2) */
 #define	AUE_CRYPTOADM		292	/* =as kernel cryptographic framework */
+#define	AUE_CONFIGKSSL		293	/* =as kernel SSL */
 
 /*
  * Maximum number of kernel events in the event to class table

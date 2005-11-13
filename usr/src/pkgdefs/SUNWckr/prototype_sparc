@@ -91,6 +91,7 @@ f none kernel/drv/sparcv9/iwscn 755 root sys
 f none kernel/drv/sparcv9/kb8042 755 root sys
 f none kernel/drv/sparcv9/keysock 755 root sys
 f none kernel/drv/sparcv9/kmdb 755 root sys
+f none kernel/drv/sparcv9/kssl 755 root sys
 f none kernel/drv/sparcv9/llc1 755 root sys
 f none kernel/drv/sparcv9/lofi 755 root sys
 f none kernel/drv/sparcv9/log 755 root sys

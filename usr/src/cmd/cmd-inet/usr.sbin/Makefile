@@ -68,12 +68,13 @@ K5RSHDOBJS=	in.rshd.o
 SRCS=		$(PROGSRCS) $(OTHERSRC)
 
 SUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed \
-		in.talkd inetadm inetconv ipqosconf mipagentconfig \
-		mipagentstat ping snoop sppptun traceroute
+		in.talkd inetadm inetconv ipqosconf kssl/kssladm \
+		kssl/ksslcfg  mipagentconfig mipagentstat ping snoop \
+		sppptun traceroute
 
 MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd \
-		inetadm inetconv ipqosconf mipagentconfig mipagentstat \
-		sppptun snoop
+		inetadm inetconv ipqosconf kssl/ksslcfg mipagentconfig \
+		mipagentstat sppptun snoop
 
 # As programs get lint-clean, add them here and to the 'lint' target.
 # Eventually this hack should go away, and all in PROG should be

@@ -116,3 +116,4 @@ smbios:smbios 0444 root sys
 zfs:* 0600 root sys
 zfs:zfs 0666 root sys
 scsi_vhci:* 0666 root sys
+kssl:* 0666 root sys

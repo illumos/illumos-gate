@@ -376,6 +376,7 @@ typedef	struct	bcache {
  * db_flags values (all implementation private!)
  */
 #define	DBLK_REFMIN	0x01		/* min refcnt stored in low bit */
+#define	DBLK_COOKED	0x02		/* message has been processed once */
 
 /*
  * db_struioflag values:
@@ -577,6 +578,7 @@ struct stroptions {
 	ushort_t so_erropt;		/* error option */
 	ssize_t	so_maxblk;		/* maximum message block size */
 	ushort_t so_copyopt;		/* copy options (see stropts.h) */
+	ushort_t so_tail;		/* space available at the end */
 };
 
 /* flags for stream options set message */
@@ -603,6 +605,7 @@ struct stroptions {
 #define	SO_ERROPT	0x040000	/* set error option */
 #define	SO_COPYOPT	0x080000	/* copy option(s) present */
 #define	SO_MAXBLK	0x100000	/* set maximum message block size */
+#define	SO_TAIL		0x200000	/* set the extra allocated space */
 
 #ifdef _KERNEL
 /*

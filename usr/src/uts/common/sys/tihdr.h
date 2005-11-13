@@ -24,8 +24,8 @@
 
 
 /*
- * Copyright (c) 1995,1996 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _SYS_TIHDR_H
@@ -171,7 +171,8 @@ extern "C" {
 #ifdef _KERNEL
 /*
  * Sun private TPI extensions. They are currently used for transparently
- * passing options through the connection-oriented loopback transport.
+ * passing options through the connection-oriented loopback transport,
+ * and for setting the kernel SSL proxy.
  * Values assigned to them may change.
  *
  * T_EXTCONN_IND (extended T_CONN_IND) is used to return dst as well as
@@ -180,6 +181,12 @@ extern "C" {
 #define	T_OPTDATA_REQ	0x1001	/* data (with options) request	*/
 #define	T_OPTDATA_IND	0x1002	/* data (with options) indication */
 #define	T_EXTCONN_IND	0x1003	/* extended T_CONN_IND to return dst as well */
+
+#define	T_SSL_PROXY_BIND_REQ	0x1004	/* extended T_BIND_REQ to carry a */
+					/* kssl_entry_t to the transport. */
+#define	T_SSL_PROXY_CONN_IND	0x1005	/* conn_ind from an SSL proxy */
+					/* endpoint, carrying a kssl_ctx_t */
+
 #endif /* _KERNEL */
 
 /*
