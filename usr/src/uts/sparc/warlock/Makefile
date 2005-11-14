@@ -84,6 +84,7 @@ warlock.usb:
 	@cd ../usbprn; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usbser; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usbser_edge; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../usbsksp; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usbskel; rm -f *.ll *.ok; $(MAKE) warlock
 
 warlock.scsi:

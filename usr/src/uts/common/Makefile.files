@@ -586,6 +586,8 @@ USBSER_EDGE_OBJS += usbser_edge.o edge_dsd.o edge_dsd_sp.o edge_dsd_ti.o \
 		edge_pipe.o edge_subr.o	\
 		edge_fw_down.o edge_fw_down_g2.o edge_fw_down_ti.o
 
+USBSER_KEYSPAN_OBJS += usbser_keyspan.o keyspan_dsd.o keyspan_pipe.o
+
 WC_OBJS += wscons.o
 
 SCSI_OBJS +=	scsi_capabilities.o	scsi_control.o	scsi_watch.o \
