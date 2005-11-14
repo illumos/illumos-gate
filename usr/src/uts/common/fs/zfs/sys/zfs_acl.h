@@ -50,7 +50,7 @@ typedef struct zfs_znode_acl {
 	uint64_t	z_acl_extern_obj;	  /* ext acl pieces */
 	uint32_t	z_acl_count;		  /* Number of ACEs */
 	uint16_t	z_acl_version;		  /* acl version */
-	uint16_t	z_acl_state;		  /* goop */
+	uint16_t	z_acl_pad;		  /* pad */
 	ace_t		z_ace_data[ACE_SLOT_CNT]; /* 6 standard ACEs */
 } zfs_znode_acl_t;
 

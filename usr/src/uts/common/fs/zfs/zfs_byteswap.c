@@ -94,6 +94,6 @@ zfs_znode_byteswap(void *buf, size_t size)
 	zp->zp_acl.z_acl_extern_obj = BSWAP_64(zp->zp_acl.z_acl_extern_obj);
 	zp->zp_acl.z_acl_count = BSWAP_32(zp->zp_acl.z_acl_count);
 	zp->zp_acl.z_acl_version = BSWAP_16(zp->zp_acl.z_acl_version);
-	zp->zp_acl.z_acl_state = BSWAP_16(zp->zp_acl.z_acl_state);
+	zp->zp_acl.z_acl_pad = BSWAP_16(zp->zp_acl.z_acl_pad);
 	zfs_ace_byteswap(&zp->zp_acl.z_ace_data[0], ACE_SLOT_CNT);
 }

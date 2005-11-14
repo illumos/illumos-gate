@@ -433,10 +433,13 @@ zfs_aclset_common(znode_t *zp, zfs_acl_t *aclp, dmu_tx_t *tx, int *ihp)
 		    aclp->z_acl_count * sizeof (ace_t));
 		zacl->z_acl_count = aclp->z_acl_count;
 	}
-	if (inherit)
+
+	zp->z_phys->zp_flags &= ~(ZFS_ACL_TRIVIAL|ZFS_INHERIT_ACE);
+	if (inherit) {
 		zp->z_phys->zp_flags |= ZFS_INHERIT_ACE;
-	else
-		zp->z_phys->zp_flags &= ~ZFS_INHERIT_ACE;
+	} else if (ace_trivial(zacl->z_ace_data, zacl->z_acl_count) == 0) {
+		zp->z_phys->zp_flags |= ZFS_ACL_TRIVIAL;
+	}
 
 	zphys->zp_mode = zfs_mode_compute(zp, aclp);
 	zfs_time_stamper_locked(zp, STATE_CHANGED, tx);
@@ -750,6 +753,8 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 	int 		entry_type;
 	int 		reuse_deny;
 	int 		need_canonical_six = 1;
+	int		inherit = 0;
+	int		iflags;
 
 	ASSERT(MUTEX_HELD(&zp->z_acl_lock));
 	ASSERT(MUTEX_HELD(&zp->z_lock));
@@ -758,10 +763,13 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 	while (i < aclp->z_acl_count) {
 		acep = aclp->z_acl;
 		entry_type = (acep[i].a_flags & 0xf040);
+		iflags = (acep[i].a_flags & ALL_INHERIT);
 
 		if ((acep[i].a_type != ALLOW && acep[i].a_type != DENY) ||
-		    (acep[i].a_flags & ACE_INHERIT_ONLY_ACE)) {
+		    (iflags & ACE_INHERIT_ONLY_ACE)) {
 			i++;
+			if (iflags)
+				inherit = 1;
 			continue;
 		}
 
@@ -774,11 +782,12 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 		/*
 		 * Need to split ace into two?
 		 */
-		if ((acep[i].a_flags & (ACE_FILE_INHERIT_ACE|
+		if ((iflags & (ACE_FILE_INHERIT_ACE|
 		    ACE_DIRECTORY_INHERIT_ACE)) &&
-		    (!(acep[i].a_flags & ACE_INHERIT_ONLY_ACE))) {
+		    (!(iflags & ACE_INHERIT_ONLY_ACE))) {
 			zfs_acl_split_ace(aclp, i);
 			i++;
+			inherit = 1;
 			continue;
 		}
 
@@ -851,7 +860,7 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 	zfs_acl_fixup_canonical_six(aclp, mode);
 
 	zp->z_phys->zp_mode = mode;
-	error = zfs_aclset_common(zp, aclp, tx, NULL);
+	error = zfs_aclset_common(zp, aclp, tx, &inherit);
 	return (error);
 }
 

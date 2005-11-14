@@ -48,6 +48,7 @@ extern "C" {
  */
 #define	ZFS_XATTR	0x1		/* is an extended attribute */
 #define	ZFS_INHERIT_ACE	0x2		/* ace has inheritable ACEs */
+#define	ZFS_ACL_TRIVIAL 0x4		/* files ACL is trivial */
 
 #define	MASTER_NODE_OBJ	1
 

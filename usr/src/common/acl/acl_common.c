@@ -120,9 +120,11 @@ ace_trivial(ace_t *acep, int aclcnt)
 		/*
 		 * Special check for some special bits
 		 *
-		 * Don't allow anybody to deny reading an ACL
+		 * Don't allow anybody to deny reading basic
+		 * attributes or a files ACL.
 		 */
-		if ((acep[i].a_access_mask & ACE_READ_ACL) &&
+		if ((acep[i].a_access_mask &
+		    (ACE_READ_ACL|ACE_READ_ATTRIBUTES)) &&
 		    (acep[i].a_type == ACE_ACCESS_DENIED_ACE_TYPE))
 			return (1);
 

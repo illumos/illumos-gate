@@ -687,7 +687,7 @@ zfs_prop_validate(zfs_prop_t prop, const char *value, uint64_t *intval)
 			if (acl_inherit_table[i].name == NULL) {
 				zfs_error(dgettext(TEXT_DOMAIN,
 				    "bad %s value '%s': must be 'discard', "
-				    "'noallow', 'groupmask' or 'passthrough'"),
+				    "'noallow', 'secure' or 'passthrough'"),
 				    propname, value);
 				return (-1);
 			}
