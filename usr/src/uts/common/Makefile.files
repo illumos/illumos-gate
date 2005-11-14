@@ -1034,6 +1034,9 @@ CRYPTO_OBJS +=	crypto.o
 
 DPROV_OBJS +=	dprov.o
 
+DCA_OBJS +=	dca.o dca_3des.o dca_debug.o dca_dsa.o dca_kstat.o dca_rng.o \
+		dca_rsa.o
+
 AESPROV_OBJS +=	aes.o aes_cbc_crypt.o aes_impl.o 
 
 ARCFOURPROV_OBJS += arcfour.o arcfour_crypt.o

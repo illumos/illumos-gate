@@ -339,6 +339,8 @@ COMMON_XMODS= \
 	SUNWcry \
 	SUNWcryr \
 	SUNWcryptoint \
+	SUNWdcaf \
+	SUNWdcar \
 	SUNWintgige \
 	SUNWkdcr \
 	SUNWkdcu \

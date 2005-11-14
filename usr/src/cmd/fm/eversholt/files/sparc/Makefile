@@ -26,7 +26,7 @@
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 SUBDIRS=sun4u sun4v SUNW,Sun-Fire-15000
-EFT_COMMON_FILES= pci.eft
+EFT_COMMON_FILES= pci.eft sca500.eft sca1000.eft
 
 include ../../../Makefile.subdirs
 

@@ -44,6 +44,7 @@ LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 LINT_XMODLIBS	= $(XMODS:e1000g=)
 LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 DRV_KMODS	+= dprov
+DRV_KMODS	+= dca
 #
 # CRYPTO_EK_KMODS modules go in the encryption pack (SUNWcry*)
 # They need to be listed separately since they duplicate global symbols

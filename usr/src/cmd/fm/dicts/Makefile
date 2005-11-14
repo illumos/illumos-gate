@@ -32,7 +32,9 @@ common_DCNAMES = \
 	SMF \
 	SUNOS \
 	PCI \
-	ZFS
+	ZFS \
+	SCA500 \
+	SCA1000
 
 sparc_DCNAMES = \
 	SUN4U \

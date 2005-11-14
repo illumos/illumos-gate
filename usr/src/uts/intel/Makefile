@@ -51,6 +51,11 @@ LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 DRV_KMODS	+= dprov
 
 #
+# dca is delivered in the SUNWdcar package.
+#
+DRV_KMODS	+= dca
+
+#
 # CRYPTO_EK_KMODS modules go in the encryption pack (SUNWcry*)
 # They need to be listed separately since they duplicate global symbols
 # causing the 2nd pass of lint on the kernel to complain. CRYPTO_EK_KMODS
