@@ -224,6 +224,7 @@ smbios:smbios
 zfs:*
 zfs:zfs
 scsi_vhci:*
+kssl:kssl
 EOF
 }
 
