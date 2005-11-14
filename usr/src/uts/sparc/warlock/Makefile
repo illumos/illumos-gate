@@ -114,6 +114,7 @@ warlock.audio:
 	@cd ../mixer; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../amsrc1; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../amsrc2; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../audio1575; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audio810; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audiovia823x; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audiocs; rm -f *.ll *.ok; $(MAKE) warlock

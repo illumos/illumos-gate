@@ -1,4 +1,6 @@
-#! /bin/sh
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # CDDL HEADER START
 #
@@ -20,40 +22,24 @@
 #
 # CDDL HEADER END
 #
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
-# SUNWaudd preremove script
+# warlock command file
 
-PATH=/usr/bin:/usr/sbin:${PATH}
-export PATH
+one	audio1575_state
 
-EXIT=0
+root	audio1575_ad_pause_play
+root	audio1575_ad_set_config
+root	audio1575_ad_set_format
+root	audio1575_ad_start_play
+root	audio1575_ad_start_record
+root	audio1575_ad_stop_play
+root	audio1575_ad_stop_record
 
-installed() {
-	driver=$1
-	grep "^${driver} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
-	if [ "$?" -eq 0 ]; then
-		return 1
-	else
-		return 0
-	fi
-}
-
-case "${ARCH}" in
-	sparc)
-		installed audiocs || rem_drv -b ${BASEDIR} audiocs || EXIT=1
-		installed audioens || rem_drv -b ${BASEDIR} audioens || EXIT=1
-		installed dbri || rem_drv -b ${BASEDIR} dbri || EXIT=1
-		installed audiots || rem_drv -b ${BASEDIR} audiots || EXIT=1
-		installed audio1575 || rem_drv -b ${BASEDIR} audio1575 || EXIT=1
-	;;
-	i386)
-		installed audioens || rem_drv -b ${BASEDIR} audioens || EXIT=1
-	;;
-esac
-
-exit ${EXIT}
+add	bus_ops::bus_add_eventcall	targets	warlock_dummy
+add	bus_ops::bus_get_eventcookie	targets	warlock_dummy
+add	bus_ops::bus_intr_ctl		targets	warlock_dummy
+add	bus_ops::bus_post_event		targets	warlock_dummy
+add	bus_ops::bus_remove_eventcall	targets	warlock_dummy
+add	bus_ops::bus_config		targets	warlock_dummy
+add	bus_ops::bus_unconfig		targets	warlock_dummy

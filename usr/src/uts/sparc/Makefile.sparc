@@ -242,7 +242,7 @@ DRV_KMODS	+= rge
 #
 #	Machine Specific Driver Modules (/kernel/drv):
 #
-DRV_KMODS	+= audiovia823x audio810 audiocs audioens audiots dbri
+DRV_KMODS	+= audio1575 audiovia823x audio810 audiocs audioens audiots dbri
 DRV_KMODS	+= bge bpp eri esp fas hme
 DRV_KMODS	+= openeepr options sd ses sgen st
 DRV_KMODS	+= ssd socal

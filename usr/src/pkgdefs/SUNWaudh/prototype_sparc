@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,4 +47,5 @@
 f none usr/include/sys/dbriio.h 644 root bin
 f none usr/include/sys/audio/audio_4231.h 644 root bin
 f none usr/include/sys/audio/audiots.h 644 root bin
+f none usr/include/sys/audio/audio1575.h 644 root bin
 f none usr/include/sys/audio/am_src2.h 644 root bin

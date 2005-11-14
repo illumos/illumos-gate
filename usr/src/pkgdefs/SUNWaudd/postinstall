@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -56,6 +56,9 @@ case "${ARCH}" in
 
 		not_installed audiots || \
 		add_drv -b ${BASEDIR} -i '"pci10b9,5451"' -n audiots || EXIT=1
+
+		not_installed audio1575 || \
+		add_drv -b ${BASEDIR} -i '"pci10b9,5455"' -n audio1575 || EXIT=1
 	;;
 	i386)
 		not_installed audioens || \

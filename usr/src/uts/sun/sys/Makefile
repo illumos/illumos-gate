@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -63,7 +63,8 @@ ttymux.h		ttymuxuser.h \
 zsdev.h
 
 AUDIOHDRS= \
-audio_4231.h
+audio_4231.h \
+audio1575.h
 
 SCSIADHDRS= \
 espcmd.h	espreg.h	espvar.h	fascmd.h	fasdma.h \
