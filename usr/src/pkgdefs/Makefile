@@ -310,6 +310,7 @@ COMMON_SUBDIRS= \
 	SUNWuksp \
 	SUNWugen \
 	SUNWugenu \
+	SUNWuprl \
 	SUNWusb \
 	SUNWusbs \
 	SUNWusbu \
