@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -33,7 +32,7 @@
 #
 # Ignore text files.
 #
-./OPENSOLARIS.LICENSE
+./src/OPENSOLARIS.LICENSE
 *.txt
 */*[Rr][Ee][Aa][Dd][Mm][Ee]*
 */ChangeLog
@@ -46,29 +45,29 @@
 # Ignore oddly-named text files scattered about -- someday these should be
 # suffixed with .txt so we don't have to list them.
 #
-./cmd/oawk/EXPLAIN
-./cmd/rpcsvc/nis/rpc.nisd/resolv_server/DNS_FWD
-./cmd/vi/port/ex.news
-./uts/common/io/dktp/controller/ata/capacity.notes
-./cmd/ssh/doc/*
+./src/cmd/oawk/EXPLAIN
+./src/cmd/rpcsvc/nis/rpc.nisd/resolv_server/DNS_FWD
+./src/cmd/vi/port/ex.news
+./src/uts/common/io/dktp/controller/ata/capacity.notes
+./src/cmd/ssh/doc/*
 
 #
 # Ignore everything under trees that may be resynched from outside ON.
 #
-./cmd/perl
-./cmd/svc/configd/sqlite
-./cmd/tcpd
-./common/openssl
-./grub
-./uts/intel/sys/acpi
+./src/cmd/perl
+./src/cmd/svc/configd/sqlite
+./src/cmd/tcpd
+./src/common/openssl
+./src/grub
+./src/uts/intel/sys/acpi
 
 #
 # Ignore any files built as part of the nightly program itself.
 #
 # ISUSED - let checkpaths know that the next entry is good.
-./*.out
+./src/*.out
 # ISUSED - let checkpaths know that the next entry is good.
-./*.ref
+./src/*.ref
 
 #
 # Ignore warlock-related goop; not used during a nightly.
@@ -77,7 +76,7 @@
 *.wlcmd
 */wlcmd
 */warlock
-./uts/sparc/amsrc*/main.c
+./src/uts/sparc/amsrc*/main.c
 
 #
 # Ignore ITU's; not used during a nightly.
@@ -97,136 +96,136 @@
 */test
 *Test.java
 *_test.[ch]
-./cmd/ldap/common/*test.c
-./cmd/logadm/tester
-./cmd/print/printmgr/com/sun/admin/pm/client/helptools/extract
-./cmd/print/printmgr/com/sun/admin/pm/server/pmtest
-./cmd/sendmail/libsm/t-*.c
-./cmd/sort/common/convert.c
-./cmd/sort/common/invoke.c
-./lib/efcode/fcode_test
-./lib/libkvm/common/test.c
+./src/cmd/ldap/common/*test.c
+./src/cmd/logadm/tester
+./src/cmd/print/printmgr/com/sun/admin/pm/client/helptools/extract
+./src/cmd/print/printmgr/com/sun/admin/pm/server/pmtest
+./src/cmd/sendmail/libsm/t-*.c
+./src/cmd/sort/common/convert.c
+./src/cmd/sort/common/invoke.c
+./src/lib/efcode/fcode_test
+./src/lib/libkvm/common/test.c
 
 #
 # Ignore debugging code.
 #
-./cmd/fs.d/pcfs/fsck/inject.c
-./cmd/sort/common/statistics.c
+./src/cmd/fs.d/pcfs/fsck/inject.c
+./src/cmd/sort/common/statistics.c
 
 #
 # Ignore internal packages, scripts, and tools that are intentionally not
 # built or used during a nightly.
 #
-./cmd/mdb/packages
-./cmd/sgs/packages
-./cmd/sgs/rtld.4.x
-./cmd/zic/makefile.tzpkg
-./cmd/zic/tzpkg.awk
-./prototypes
+./src/cmd/mdb/packages
+./src/cmd/sgs/packages
+./src/cmd/sgs/rtld.4.x
+./src/cmd/zic/makefile.tzpkg
+./src/cmd/zic/tzpkg.awk
+./src/prototypes
 */tools
-./cmd/pools/poold/com/sun/solaris/*/*/package.html
+./src/cmd/pools/poold/com/sun/solaris/*/*/package.html
 
 #
 # Ignore files that are only used by internal packages.
 #
-./cmd/sgs/*/*/*chk.msg
+./src/cmd/sgs/*/*/*chk.msg
 
 #
 # Ignore files that get used during a EXPORT_SRC or CRYPT_SRC build only.
 #
-./common/crypto/aes/Makefile
-./common/crypto/arcfour/Makefile
-./common/crypto/blowfish/Makefile
-./common/crypto/des/Makefile
-./common/crypto/rsa/Makefile
-./lib/gss_mechs/mech_dh/backend/mapfile-vers
-./lib/gss_mechs/mech_dh/dh1024/mapfile-vers
-./lib/gss_mechs/mech_dh/dh192/mapfile-vers
-./lib/gss_mechs/mech_dh/dh640/mapfile-vers
-./lib/gss_mechs/mech_krb5/spec/krb5_clean.spec
-./lib/gss_mechs/mech_spnego/spec/clean.spec
-./lib/pkcs11/pkcs11_softtoken/common/Makefile
-./uts/common/Makefile
-./uts/common/crypto/io/Makefile
-./uts/common/gssapi/include/Makefile
-./uts/common/gssapi/mechs/dummy/Makefile
-./uts/common/gssapi/mechs/krb5/Makefile
-./uts/sun4v/io/ncp/Makefile
-./xmod
+./src/common/crypto/aes/Makefile
+./src/common/crypto/arcfour/Makefile
+./src/common/crypto/blowfish/Makefile
+./src/common/crypto/des/Makefile
+./src/common/crypto/rsa/Makefile
+./src/lib/gss_mechs/mech_dh/backend/mapfile-vers
+./src/lib/gss_mechs/mech_dh/dh1024/mapfile-vers
+./src/lib/gss_mechs/mech_dh/dh192/mapfile-vers
+./src/lib/gss_mechs/mech_dh/dh640/mapfile-vers
+./src/lib/gss_mechs/mech_krb5/spec/krb5_clean.spec
+./src/lib/gss_mechs/mech_spnego/spec/clean.spec
+./src/lib/pkcs11/pkcs11_softtoken/common/Makefile
+./src/uts/common/Makefile
+./src/uts/common/crypto/io/Makefile
+./src/uts/common/gssapi/include/Makefile
+./src/uts/common/gssapi/mechs/dummy/Makefile
+./src/uts/common/gssapi/mechs/krb5/Makefile
+./src/uts/sun4v/io/ncp/Makefile
+./src/xmod
 
 #
 # Ignore Makefiles which are used by developers but not used by nightly
 # itself.  This is a questionable practice, since they tend to rot.
 #
-./cmd/syslogd/sparcv9/Makefile
-./uts/sparc/uhci/Makefile
+./src/cmd/syslogd/sparcv9/Makefile
+./src/uts/sparc/uhci/Makefile
 
 #
 # Ignore files only used by lint.  Eventually, linting in these areas should
 # be tied into nightly, at which point these exceptions should be removed.
 #
-./cmd/sgs/*/*/lintsup.c
-./cmd/sgs/lib*/common/llib-*
-./cmd/sgs/sgsdemangler/common/llib-ldemangle
+./src/cmd/sgs/*/*/lintsup.c
+./src/cmd/sgs/lib*/common/llib-*
+./src/cmd/sgs/sgsdemangler/common/llib-ldemangle
 
 #
 # Ignore sample source code.
 #
-./lib/libdhcpsvc/modules/templates
+./src/lib/libdhcpsvc/modules/templates
 
 #
 # Ignore .xcl files that aren't used because the program is statically linked.
 #
-./cmd/cmd-inet/sbin/dhcpagent/dhcpagent.xcl
+./src/cmd/cmd-inet/sbin/dhcpagent/dhcpagent.xcl
 
 #
 # Ignore sendmail files included for completeness' sake, but which won't
 # be used until certain _FFR (for future release) #define's go live.
 #
-./cmd/sendmail/include/libmilter/milter.h
-./cmd/sendmail/src/statusd_shm.h
+./src/cmd/sendmail/include/libmilter/milter.h
+./src/cmd/sendmail/src/statusd_shm.h
 
 #
 # Ignore libbsm files which won't be used until later.
 #
-./lib/libbsm/common/adt_ucred.h
+./src/lib/libbsm/common/adt_ucred.h
 
 #
 # Ignore libdiskmgt.h. Used for building but not delivered.
 #
-./lib/libdiskmgt/common/libdiskmgt.h
+./src/lib/libdiskmgt/common/libdiskmgt.h
 
 #
 # Ignore files originally supplied by ISC (Internet Software Consortium) 
 # as part of a BIND release.
 #
-./lib/libresolv2/common/cylink/bn68000.c
-./lib/libresolv2/common/cylink/bn8086.c
-./lib/libresolv2/common/cylink/lbn68000.c
-./lib/libresolv2/common/cylink/lbn68000.h
-./lib/libresolv2/common/cylink/lbn68020.c
-./lib/libresolv2/common/cylink/lbn68020.h
-./lib/libresolv2/common/cylink/lbn80386.h
-./lib/libresolv2/common/cylink/lbn8086.h
-./lib/libresolv2/common/cylink/lbnppc.c
-./lib/libresolv2/common/cylink/lbnppc.h
-./lib/libresolv2/common/cylink/ppcasm.h
-./lib/libresolv2/common/cylink/sizetest.c
-./lib/libresolv2/common/irs/getaddrinfo.c
-./lib/libresolv2/common/irs/nis_p.h
-./lib/libresolv2/common/resolv/res_mkupdate.h
-./lib/libresolv2/include/err.h
-./lib/libresolv2/common/inet/inet_addr.c
+./src/lib/libresolv2/common/cylink/bn68000.c
+./src/lib/libresolv2/common/cylink/bn8086.c
+./src/lib/libresolv2/common/cylink/lbn68000.c
+./src/lib/libresolv2/common/cylink/lbn68000.h
+./src/lib/libresolv2/common/cylink/lbn68020.c
+./src/lib/libresolv2/common/cylink/lbn68020.h
+./src/lib/libresolv2/common/cylink/lbn80386.h
+./src/lib/libresolv2/common/cylink/lbn8086.h
+./src/lib/libresolv2/common/cylink/lbnppc.c
+./src/lib/libresolv2/common/cylink/lbnppc.h
+./src/lib/libresolv2/common/cylink/ppcasm.h
+./src/lib/libresolv2/common/cylink/sizetest.c
+./src/lib/libresolv2/common/irs/getaddrinfo.c
+./src/lib/libresolv2/common/irs/nis_p.h
+./src/lib/libresolv2/common/resolv/res_mkupdate.h
+./src/lib/libresolv2/include/err.h
+./src/lib/libresolv2/common/inet/inet_addr.c
 
 #
 # Ignore ufs unix version of the boot block, useful for testing.
 #
-./psm/stand/bootblks/ufs/common/iob.h
-./psm/stand/bootblks/ufs/common/ufs.c
-./psm/stand/bootblks/obp-c/common/cbootblk.h
+./src/psm/stand/bootblks/ufs/common/iob.h
+./src/psm/stand/bootblks/ufs/common/ufs.c
+./src/psm/stand/bootblks/obp-c/common/cbootblk.h
 
 #
 # Ignore mont_mulf.c. It is used as a starting point for some hand optimized
 # assembly files. We keep it around for future reference.
 #
-./common/bignum/mont_mulf.c
+./src/common/bignum/mont_mulf.c

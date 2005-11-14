@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -619,7 +618,7 @@ Usage:  $ME command [-D] [args]
                         src-root-dir: optional path relative to top of 
                                       workspace where wx will search for files.
                                       Use "." to set src-root to top of
-                                      workspace.  Default is usr/src.
+                                      workspace.  Default is usr.
         $ME update [-q|-r] [-s]
                         Update the active and renamed file lists by
                         appending names of all files that have been
@@ -1476,7 +1475,8 @@ update_renamed_dir() {
 	typeset -i rc
 
 	if [[ $# -eq 0 ]]; then
-		# No args so we need to create the renamed list from usr/src
+		# No args so we need to create the renamed list from
+		# the source root.
 		append=false
 		if [ -r $wxdir/srcroot_dir ]; then
 			pb_files=$(cat $wxdir/srcroot_dir)
@@ -4480,7 +4480,7 @@ fi
 unset CDPATH	# if set "cd" will print the new directory on stdout
 		# which screws up wx_eval.
 
-DEFAULT_SRCDIR=usr/src
+DEFAULT_SRCDIR=usr
 
 if [[ $# -eq 0 || "$1" == help ]]; then
 	# output usage now to avoid unnecessary checking below.

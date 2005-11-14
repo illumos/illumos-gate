@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -238,7 +237,7 @@ clone_source() {
 	cd ${WS}
 
 	echo "creating ${DEST}." >> $LOGFILE
-	find usr/src -name 's\.*' -a -type f -print | \
+	find usr -name 's\.*' -a -type f -print | \
 	    sed -e 's,SCCS\/s.,,' | \
 	    grep -v '/\.del-*' | \
 	    cpio -pd ${DEST} >>$LOGFILE 2>&1
@@ -295,7 +294,7 @@ clone_source() {
 	    tee -a $mail_msg_file >> $LOGFILE
 	cd ${DEST}
 	rm -f ${MAKETARG}.cpio.Z
-	find usr/src -depth -print | \
+	find usr -depth -print | \
 	    grep -v usr/src/${MAKETARG}.out | \
 	    cpio -ocB 2>/dev/null | \
 	    compress > ${CODEMGR_WS}/${MAKETARG}.cpio.Z
@@ -1013,10 +1012,10 @@ if [ "$BRINGOVER_WS" = "" ]; then
 fi
 
 #
-# If BRINGOVER_FILES was not specified, default to usr/src
+# If BRINGOVER_FILES was not specified, default to usr
 #
 if [ "$BRINGOVER_FILES" = "" ]; then
-	BRINGOVER_FILES="usr/src"
+	BRINGOVER_FILES="usr"
 fi
 
 #
@@ -1145,6 +1144,14 @@ PATH="$OPTHOME/onbld/bin:$OPTHOME/onbld/bin/${MACH}:/usr/ccs/bin"
 PATH="$PATH:$OPTHOME/SUNWspro/bin:$TEAMWARE/bin:/usr/bin:/usr/sbin:/usr/ucb"
 PATH="$PATH:/usr/openwin/bin:/usr/sfw/bin:/opt/sfw/bin:."
 export PATH
+
+# roots of source trees, both relative to $SRC and absolute.
+relsrcdirs="."
+[ -d $SRC/../closed ] && relsrcdirs="$relsrcdirs ../closed"
+abssrcdirs=""
+for d in $relsrcdirs; do
+	abssrcdirs="$abssrcdirs $SRC/$d"
+done
 
 unset CH
 if [ "$o_FLAG" = "y" ]; then
@@ -1760,12 +1767,14 @@ if [ "$i_FLAG" = "n" -a -d "$SRC" ]; then
 	# Get back to a clean workspace as much as possible to catch
 	# problems that only occur on fresh workspaces.
 	# Remove all .make.state* files, libraries, and .o's that may
-	# have been ommitted from clobber.
+	# have been omitted from clobber.  A couple of libraries are
+	# under SCCS, so leave them alone.
 	# We should probably blow away temporary directories too.
 	cd $SRC
-	find . \( -name SCCS -o -name 'interfaces.*' \) -prune -o \
+	find $relsrcdirs \( -name SCCS -o -name 'interfaces.*' \) -prune -o \
 	    \( -name '.make.*' -o -name 'lib*.a' -o -name 'lib*.so*' -o \
-	       -name '*.o' \) -print | xargs rm -f
+	       -name '*.o' \) -print | \
+	    grep -v 'tools/ctf/dwarf/.*/libdwarf' | xargs rm -f
 else
 	echo "\n==== No clobber at `date` ====\n" >> $LOGFILE
 fi
@@ -1789,16 +1798,6 @@ if [ "$n_FLAG" = "n" ]; then
 	then
 		echo "trouble with bringover, quitting at `date`." >> $LOGFILE
 		exit 1
-	fi
-	if [ -d $SRC/cmd/lp/cmd/lpsched/lpsched -a \
-	    ! -f $SRC/cmd/lp/cmd/lpsched/lpsched/Makefile ]; then
-		# on297 printing
-		rm -rf $SRC/cmd/lp/cmd/lpsched/lpsched
-	fi
-	if [ -d $SRC/cmd/localedef/localedef -a \
-	    ! -f $SRC/cmd/localedef/localedef/Makefile ]; then
-		# on297 CSI project
-		rm -rf $SRC/cmd/localedef/localedef
 	fi
 else
 	echo "\n==== No bringover to $CODEMGR_WS ====\n" >> $LOGFILE
@@ -1841,7 +1840,7 @@ sccs get SCCS >/dev/null 2>&1
 EOF
 	cd $SRC
 	chmod +x ${SCCSHELPER}
-	find . -name SCCS | xargs -L 1 ${SCCSHELPER}
+	find $relsrcdirs -name SCCS | xargs -L 1 ${SCCSHELPER}
 	rm -f ${SCCSHELPER}
 fi
 
@@ -1919,7 +1918,12 @@ if [ "$build_ok" = "y" ]; then
 		# Compare the build's proto list with current package
 		# definitions to audit the quality of package definitions
 		# and makefile install targets. Use the current exception list.
-		PKGDEFS_LIST="-d $SRC/pkgdefs"
+		PKGDEFS_LIST=""
+		for d in $abssrcdirs; do
+			if [ -d $d/pkgdefs ]; then
+				PKGDEFS_LIST="$PKGDEFS_LIST -d $d/pkgdefs"
+			fi
+		done
 
 		$PROTOCMPTERSE \
 		    "Files missing from the proto area:" \
@@ -2168,7 +2172,7 @@ fi
 echo "\n==== Find core files ====\n" | \
     tee -a $LOGFILE >> $mail_msg_file
 
-find $SRC -name core -a -type f -exec file {} \; | \
+find $abssrcdirs -name core -a -type f -exec file {} \; | \
 	tee -a $LOGFILE >> $mail_msg_file
 
 if [ "$f_FLAG" = "y" -a "$build_ok" = "y" ]; then
@@ -2179,8 +2183,11 @@ if [ "$f_FLAG" = "y" -a "$build_ok" = "y" ]; then
 		mv $SRC/unref-${MACH}.out $SRC/unref-${MACH}.ref
 	fi
 
-	findunref $SRC ${TOOLS}/findunref/exception_list \
-	    2>> $mail_msg_file | sort > $SRC/unref-${MACH}.out
+	findunref -t $SRC/.build.tstamp $SRC/.. \
+	    ${TOOLS}/findunref/exception_list \
+	    2>> $mail_msg_file | sort | \
+	    sed -e s=^./src/=./= -e s=^./closed/=../closed/= \
+	    > $SRC/unref-${MACH}.out
 
 	if [ ! -f $SRC/unref-${MACH}.ref ]; then
 		cp $SRC/unref-${MACH}.out $SRC/unref-${MACH}.ref
@@ -2208,7 +2215,7 @@ if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
 	# Get pkginfo files from usr/src/pkgdefs
 	#
 	pmodes -qvdP \
-	`for d in $SRC/pkgdefs; do
+	`for d in $SRC/pkgdefs $SRC/../closed/pkgdefs; do
 		if [ -d "$d" ]
 		then
 			find $d -name pkginfo.tmpl -print -o -name .del\* -prune

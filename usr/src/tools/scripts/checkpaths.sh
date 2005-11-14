@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -85,7 +84,7 @@ done
 # marked with ISUSED are always known to be good, thus the Latin quote
 # at the top of the file.
 if [ -r $SRC/tools/findunref/exception_list ]; then
-	validate_paths -k ISUSED -r -e '^\*' -b $SRC \
+	validate_paths -k ISUSED -r -e '^\*' -b $SRC/.. \
 		$SRC/tools/findunref/exception_list
 fi
 
