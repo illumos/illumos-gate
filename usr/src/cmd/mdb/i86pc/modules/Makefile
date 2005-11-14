@@ -20,10 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = unix
+SUBDIRS = unix pcplusmp
 include ../../Makefile.subdirs

@@ -25,23 +25,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-include ../../Makefile.common
-
-MODULES = \
-	$(COMMON_MODULES_PROC) \
-	$(COMMON_MODULES_KVM) \
-	intr \
-	isp \
-	sd \
-	sparcdis \
-	ssd
-
-#
-# a "$(MODULES): kmdb" rule would seem to do the trick but, for some reason,
-# it serializes $(MODULES).
-#
-SUBDIRS = mdb mdb_ks kmdb libstandctf libstand .WAIT $(MODULES)
-
-include ../../Makefile.subdirs
-
-.PARALLEL: $(SUBDIRS)
+include $(SRC)/Makefile.master
+SUBDIRS =		ia32
+$(BUILD64)SUBDIRS += 	$(MACH64)
+include ../../../Makefile.subdirs

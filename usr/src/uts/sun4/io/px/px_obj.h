@@ -37,7 +37,6 @@ extern "C" {
 #include <sys/pcie_impl.h>
 #include <sys/fm/io/sun4_fire.h>
 #include <sys/pci_intr_lib.h>
-#include "px_nexus.h"
 #include "px_ioapi.h"
 #include "px_lib.h"
 #include "px_fm.h"

@@ -570,8 +570,20 @@ px_pwr_setup(dev_info_t *dip)
 	px_lib_msg_setmsiq(dip, PCIE_PME_ACK_MSG, px_p->px_pm_msiq_id);
 	px_lib_msg_setvalid(dip, PCIE_PME_ACK_MSG, PCIE_MSG_VALID);
 
+	if (px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
+	    px_msiqid_to_devino(px_p, px_p->px_pm_msiq_id),
+	    PX_INTR_STATE_ENABLE, MSG_REC, PCIE_PME_ACK_MSG) != DDI_SUCCESS) {
+		DBG(DBG_PWR, dip, "px_pwr_setup: PME_TO_ACK update interrupt"
+		    " state failed\n");
+		goto px_pwrsetup_err_state;
+	}
+
 	return (DDI_SUCCESS);
 
+px_pwrsetup_err_state:
+	px_lib_msg_setvalid(dip, PCIE_PME_ACK_MSG, PCIE_MSG_INVALID);
+	(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC, PCIE_PME_ACK_MSG,
+	    px_p->px_pm_msiq_id);
 px_pwrsetup_err:
 	ddi_remove_softintr(px_p->px_lupsoft_id);
 pwr_setup_err2:
@@ -607,6 +619,10 @@ px_pwr_teardown(dev_info_t *dip)
 	px_lib_msg_setvalid(dip, PCIE_PME_ACK_MSG, PCIE_MSG_INVALID);
 	(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC, PCIE_PME_ACK_MSG,
 	    px_p->px_pm_msiq_id);
+
+	(void) px_ib_update_intr_state(px_p, px_p->px_dip, hdl.ih_inum,
+	    px_msiqid_to_devino(px_p, px_p->px_pm_msiq_id),
+	    PX_INTR_STATE_DISABLE, MSG_REC, PCIE_PME_ACK_MSG);
 
 	px_p->px_pm_msiq_id = -1;
 
@@ -765,7 +781,7 @@ px_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
 		goto freehandle;
 
 	switch (PX_DMA_TYPE(mp)) {
-	case DMAI_FLAGS_DVMA:	/* LINTED E_EQUALITY_NOT_ASSIGNMENT */
+	case PX_DMAI_FLAGS_DVMA:	/* LINTED E_EQUALITY_NOT_ASSIGNMENT */
 		if ((ret = px_dvma_win(px_p, dmareq, mp)) || !handlep)
 			goto freehandle;
 		if (!PX_DMA_CANCACHE(mp)) {	/* try fast track */
@@ -780,11 +796,11 @@ px_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
 		if (ret = px_dvma_map(mp, dmareq, mmu_p))
 			goto freehandle;
 		break;
-	case DMAI_FLAGS_PTP:	/* LINTED E_EQUALITY_NOT_ASSIGNMENT */
+	case PX_DMAI_FLAGS_PTP:	/* LINTED E_EQUALITY_NOT_ASSIGNMENT */
 		if ((ret = px_dma_physwin(px_p, dmareq, mp)) || !handlep)
 			goto freehandle;
 		break;
-	case DMAI_FLAGS_BYPASS:
+	case PX_DMAI_FLAGS_BYPASS:
 	default:
 		cmn_err(CE_PANIC, "%s%d: px_dma_setup: bad dma type 0x%x",
 			ddi_driver_name(rdip), ddi_get_instance(rdip),
@@ -792,7 +808,7 @@ px_dma_setup(dev_info_t *dip, dev_info_t *rdip, ddi_dma_req_t *dmareq,
 		/*NOTREACHED*/
 	}
 	*handlep = (ddi_dma_handle_t)mp;
-	mp->dmai_flags |= DMAI_FLAGS_INUSE;
+	mp->dmai_flags |= PX_DMAI_FLAGS_INUSE;
 	px_dump_dma_handle(DBG_DMA_MAP, dip, mp);
 
 	return ((mp->dmai_nwin == 1) ? DDI_DMA_MAPPED : DDI_DMA_PARTIAL_MAP);
@@ -829,7 +845,7 @@ px_dma_allochdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_attr_t *attrp,
 	 * Save requestor's information
 	 */
 	mp->dmai_attr	= *attrp; /* whole object - augmented later  */
-	*DEV_ATTR(mp)	= *attrp; /* whole object - device orig attr */
+	*PX_DEV_ATTR(mp)	= *attrp; /* whole object - device orig attr */
 	DBG(DBG_DMA_ALLOCH, dip, "mp=%p\n", mp);
 
 	/* check and convert dma attributes to handle parameters */
@@ -878,11 +894,11 @@ px_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	DBG(DBG_DMA_BINDH, dip, "rdip=%s%d mp=%p dmareq=%p\n",
 		ddi_driver_name(rdip), ddi_get_instance(rdip), mp, dmareq);
 
-	if (mp->dmai_flags & DMAI_FLAGS_INUSE)
+	if (mp->dmai_flags & PX_DMAI_FLAGS_INUSE)
 		return (DDI_DMA_INUSE);
 
-	ASSERT((mp->dmai_flags & ~DMAI_FLAGS_PRESERVE) == 0);
-	mp->dmai_flags |= DMAI_FLAGS_INUSE;
+	ASSERT((mp->dmai_flags & ~PX_DMAI_FLAGS_PRESERVE) == 0);
+	mp->dmai_flags |= PX_DMAI_FLAGS_INUSE;
 
 	if (ret = px_dma_type(px_p, dmareq, mp))
 		goto err;
@@ -890,7 +906,7 @@ px_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 		goto err;
 
 	switch (PX_DMA_TYPE(mp)) {
-	case DMAI_FLAGS_DVMA:
+	case PX_DMAI_FLAGS_DVMA:
 		if (ret = px_dvma_win(px_p, dmareq, mp))
 			goto map_err;
 		if (!PX_DMA_CANCACHE(mp)) {	/* try fast track */
@@ -907,12 +923,13 @@ mapped:
 		*ccountp = 1;
 		MAKE_DMA_COOKIE(cookiep, mp->dmai_mapping, mp->dmai_size);
 		break;
-	case DMAI_FLAGS_BYPASS:
-	case DMAI_FLAGS_PTP:
+	case PX_DMAI_FLAGS_BYPASS:
+	case PX_DMAI_FLAGS_PTP:
 		if (ret = px_dma_physwin(px_p, dmareq, mp))
 			goto map_err;
-		*ccountp = WINLST(mp)->win_ncookies;
-		*cookiep = *(ddi_dma_cookie_t *)(WINLST(mp) + 1); /* wholeobj */
+		*ccountp = PX_WINLST(mp)->win_ncookies;
+		*cookiep =
+		    *(ddi_dma_cookie_t *)(PX_WINLST(mp) + 1); /* wholeobj */
 		break;
 	default:
 		cmn_err(CE_PANIC, "%s%d: px_dma_bindhdl(%p): bad dma type",
@@ -931,7 +948,7 @@ mapped:
 map_err:
 	px_dma_freepfn(mp);
 err:
-	mp->dmai_flags &= DMAI_FLAGS_PRESERVE;
+	mp->dmai_flags &= PX_DMAI_FLAGS_PRESERVE;
 	return (ret);
 }
 
@@ -949,7 +966,7 @@ px_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 
 	DBG(DBG_DMA_UNBINDH, dip, "rdip=%s%d, mp=%p\n",
 		ddi_driver_name(rdip), ddi_get_instance(rdip), handle);
-	if ((mp->dmai_flags & DMAI_FLAGS_INUSE) == 0) {
+	if ((mp->dmai_flags & PX_DMAI_FLAGS_INUSE) == 0) {
 		DBG(DBG_DMA_UNBINDH, dip, "handle not inuse\n");
 		return (DDI_FAILURE);
 	}
@@ -967,13 +984,13 @@ px_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 	 * translations.
 	 */
 	switch (PX_DMA_TYPE(mp)) {
-	case DMAI_FLAGS_DVMA:
+	case PX_DMAI_FLAGS_DVMA:
 		px_mmu_unmap_window(mmu_p, mp);
 		px_dvma_unmap(mmu_p, mp);
 		px_dma_freepfn(mp);
 		break;
-	case DMAI_FLAGS_BYPASS:
-	case DMAI_FLAGS_PTP:
+	case PX_DMAI_FLAGS_BYPASS:
+	case PX_DMAI_FLAGS_PTP:
 		px_dma_freewin(mp);
 		break;
 	default:
@@ -989,7 +1006,7 @@ px_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle)
 		DBG(DBG_DMA_UNBINDH, dip, "run handle callback\n");
 		ddi_run_callback(&px_kmem_clid);
 	}
-	mp->dmai_flags &= DMAI_FLAGS_PRESERVE;
+	mp->dmai_flags &= PX_DMAI_FLAGS_PRESERVE;
 
 	return (DDI_SUCCESS);
 }
@@ -1015,7 +1032,7 @@ px_dma_win(dev_info_t *dip, dev_info_t *rdip,
 	}
 
 	switch (PX_DMA_TYPE(mp)) {
-	case DMAI_FLAGS_DVMA:
+	case PX_DMAI_FLAGS_DVMA:
 		if (win != PX_DMA_CURWIN(mp)) {
 			px_t *px_p = DIP_TO_STATE(dip);
 			px_mmu_t *mmu_p = px_p->px_mmu_p;
@@ -1033,8 +1050,8 @@ px_dma_win(dev_info_t *dip, dev_info_t *rdip,
 		if (ccountp)
 			*ccountp = 1;
 		break;
-	case DMAI_FLAGS_PTP:
-	case DMAI_FLAGS_BYPASS: {
+	case PX_DMAI_FLAGS_PTP:
+	case PX_DMAI_FLAGS_BYPASS: {
 		int i;
 		ddi_dma_cookie_t *ck_p;
 		px_dma_win_t *win_p = mp->dmai_winlst;
@@ -1128,11 +1145,11 @@ px_dma_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	}
 
 	switch (PX_DMA_TYPE(mp)) {
-	case DMAI_FLAGS_DVMA:
+	case PX_DMAI_FLAGS_DVMA:
 		return (px_dvma_ctl(dip, rdip, mp, cmd, offp, lenp, objp,
 			cache_flags));
-	case DMAI_FLAGS_PTP:
-	case DMAI_FLAGS_BYPASS:
+	case PX_DMAI_FLAGS_PTP:
+	case PX_DMAI_FLAGS_BYPASS:
 		return (px_dma_ctl(dip, rdip, mp, cmd, offp, lenp, objp,
 			cache_flags));
 	default:

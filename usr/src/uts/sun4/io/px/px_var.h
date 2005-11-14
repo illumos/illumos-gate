@@ -173,7 +173,7 @@ struct px {
 #define	INST_TO_STATE(inst)	ddi_get_soft_state(px_state_p, inst)
 #define	DIP_TO_STATE(dip)	INST_TO_STATE(DIP_TO_INST(dip))
 
-#define	DEV_TO_SOFTSTATE(dev)	((px_t *)ddi_get_soft_state( \
+#define	PX_DEV_TO_SOFTSTATE(dev)	((px_t *)ddi_get_soft_state( \
 	px_state_p, PCIHP_AP_MINOR_NUM_TO_INSTANCE(getminor(dev))))
 
 extern void *px_state_p;

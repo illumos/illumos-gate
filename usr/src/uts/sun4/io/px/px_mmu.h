@@ -103,9 +103,9 @@ typedef struct px_dvma_range_prop {
 #define	MMU_PAGE_INDEX(mmu_p, dvma_pg) ((dvma_pg) - (mmu_p)->dvma_base_pg)
 
 /* dvma debug */
-#define	DVMA_DBG_ON(mmu_p)  \
+#define	PX_DVMA_DBG_ON(mmu_p)  \
 	((1ull << (mmu_p)->mmu_inst) & px_dvma_debug_on)
-#define	DVMA_DBG_OFF(mmu_p) \
+#define	PX_DVMA_DBG_OFF(mmu_p) \
 	((1ull << (mmu_p)->mmu_inst) & px_dvma_debug_off)
 
 extern	void px_dvma_debug_fini(px_mmu_t *mmu_p);

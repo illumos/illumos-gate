@@ -147,7 +147,7 @@ px_mmu_detach(px_t *px_p)
 	kmem_free(mmu_p->mmu_dvma_cache_locks,
 	    px_dvma_page_cache_entries);
 
-	if (DVMA_DBG_ON(mmu_p))
+	if (PX_DVMA_DBG_ON(mmu_p))
 		px_dvma_debug_fini(mmu_p);
 
 	mutex_destroy(&mmu_p->dvma_debug_lock);
@@ -182,7 +182,7 @@ px_mmu_map_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
 		return (ret);
 	}
 
-	if (DVMA_DBG_ON(mmu_p))
+	if (PX_DVMA_DBG_ON(mmu_p))
 		px_dvma_alloc_debug(mmu_p, (char *)mp->dmai_mapping,
 		    mp->dmai_size, mp);
 
@@ -254,7 +254,7 @@ px_mmu_unmap_window(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 
 	px_mmu_unmap_pages(mmu_p, dvma_pg, npages);
 
-	if (DVMA_DBG_ON(mmu_p))
+	if (PX_DVMA_DBG_ON(mmu_p))
 		px_dvma_free_debug(mmu_p, (char *)mp->dmai_mapping,
 		    mp->dmai_size, mp);
 }

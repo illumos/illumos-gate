@@ -133,7 +133,8 @@ extern px_ih_t *px_ib_alloc_ih(dev_info_t *rdip, uint32_t inum,
 	caddr_t int_handler_arg2, msiq_rec_type_t rec_type, msgcode_t msg_code);
 extern void px_ib_free_ih(px_ih_t *ih_p);
 extern int px_ib_update_intr_state(px_t *px_p, dev_info_t *rdip, uint_t inum,
-	devino_t ino, uint_t new_intr_state);
+	devino_t ino, uint_t new_intr_state, msiq_rec_type_t rec_type,
+	msgcode_t msg_code);
 extern uint8_t pxtool_ib_get_ino_devs(px_t *px_p, uint32_t ino,
 	uint8_t *devs_ret, pcitool_intr_dev_t *devs);
 extern void px_ib_log_new_cpu(px_ib_t *ib_p, uint32_t old_cpu_id,

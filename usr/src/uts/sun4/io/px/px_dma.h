@@ -92,9 +92,9 @@ struct px_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
 #define	dmai_winlst		dmai_minfo
 #define	dmai_pfn0		dmai_sbi
 #define	dmai_roffset		dmai_pool
-#define	MP_PFN0(mp)		((px_iopfn_t)(mp)->dmai_pfn0)
-#define	WINLST(mp)		((px_dma_win_t *)(mp)->dmai_winlst)
-#define	DEV_ATTR(mp)		((ddi_dma_attr_t *)(mp + 1))
+#define	PX_MP_PFN0(mp)		((px_iopfn_t)(mp)->dmai_pfn0)
+#define	PX_WINLST(mp)		((px_dma_win_t *)(mp)->dmai_winlst)
+#define	PX_DEV_ATTR(mp)		((ddi_dma_attr_t *)(mp + 1))
 #define	SET_DMAATTR(p, lo, hi, nocross, cntmax)	\
 	(p)->dma_attr_addr_lo	= (lo); \
 	(p)->dma_attr_addr_hi	= (hi); \
@@ -104,48 +104,49 @@ struct px_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
 #define	SET_DMAALIGN(p, align)	\
 	(p)->dma_attr_align = (align);
 
-#define	DMAI_FLAGS_INUSE	0x1
-#define	DMAI_FLAGS_BYPASSREQ	0x2
-#define	DMAI_FLAGS_PEER_ONLY	0x4
-#define	DMAI_FLAGS_NOCTX	0x8
-#define	DMAI_FLAGS_DVMA		0x10
-#define	DMAI_FLAGS_BYPASS	0x20
-#define	DMAI_FLAGS_PTP		0x40
-#define	DMAI_FLAGS_DMA		(DMAI_FLAGS_BYPASS | DMAI_FLAGS_PTP)
-#define	DMAI_FLAGS_DMA_TYPE	(DMAI_FLAGS_DMA | DMAI_FLAGS_DVMA)
-#define	DMAI_FLAGS_CONTEXT	0x100
-#define	DMAI_FLAGS_FASTTRACK	0x200
-#define	DMAI_FLAGS_VMEMCACHE	0x400
-#define	DMAI_FLAGS_PGPFN	0x800
-#define	DMAI_FLAGS_NOSYSLIMIT	0x1000
-#define	DMAI_FLAGS_NOFASTLIMIT	0x2000
-#define	DMAI_FLAGS_NOSYNC	0x4000
-#define	DMAI_FLAGS_PTP32	0x10000
-#define	DMAI_FLAGS_PTP64	0x20000
-#define	DMAI_FLAGS_PRESERVE	(DMAI_FLAGS_PEER_ONLY | DMAI_FLAGS_BYPASSREQ | \
-	DMAI_FLAGS_NOSYSLIMIT | DMAI_FLAGS_NOFASTLIMIT | DMAI_FLAGS_NOCTX)
+#define	PX_DMAI_FLAGS_INUSE		0x1
+#define	PX_DMAI_FLAGS_BYPASSREQ		0x2
+#define	PX_DMAI_FLAGS_PEER_ONLY		0x4
+#define	PX_DMAI_FLAGS_NOCTX		0x8
+#define	PX_DMAI_FLAGS_DVMA		0x10
+#define	PX_DMAI_FLAGS_BYPASS		0x20
+#define	PX_DMAI_FLAGS_PTP		0x40
+#define	PX_DMAI_FLAGS_DMA	(PX_DMAI_FLAGS_BYPASS | PX_DMAI_FLAGS_PTP)
+#define	PX_DMAI_FLAGS_DMA_TYPE	(PX_DMAI_FLAGS_DMA | PX_DMAI_FLAGS_DVMA)
+#define	PX_DMAI_FLAGS_CONTEXT		0x100
+#define	PX_DMAI_FLAGS_FASTTRACK		0x200
+#define	PX_DMAI_FLAGS_VMEMCACHE		0x400
+#define	PX_DMAI_FLAGS_PGPFN		0x800
+#define	PX_DMAI_FLAGS_NOSYSLIMIT	0x1000
+#define	PX_DMAI_FLAGS_NOFASTLIMIT	0x2000
+#define	PX_DMAI_FLAGS_NOSYNC		0x4000
+#define	PX_DMAI_FLAGS_PTP32		0x10000
+#define	PX_DMAI_FLAGS_PTP64		0x20000
+#define	PX_DMAI_FLAGS_PRESERVE	(PX_DMAI_FLAGS_PEER_ONLY | \
+	PX_DMAI_FLAGS_BYPASSREQ | PX_DMAI_FLAGS_NOSYSLIMIT | \
+	PX_DMAI_FLAGS_NOFASTLIMIT | PX_DMAI_FLAGS_NOCTX)
 
-#define	HAS_NOFASTLIMIT(mp)	((mp)->dmai_flags & DMAI_FLAGS_NOFASTLIMIT)
-#define	HAS_NOSYSLIMIT(mp)	((mp)->dmai_flags & DMAI_FLAGS_NOSYSLIMIT)
-#define	PX_DMA_ISPEERONLY(mp)	((mp)->dmai_flags & DMAI_FLAGS_PEER_ONLY)
-#define	PX_DMA_ISPGPFN(mp)	((mp)->dmai_flags & DMAI_FLAGS_PGPFN)
-#define	PX_DMA_TYPE(mp)	((mp)->dmai_flags & DMAI_FLAGS_DMA_TYPE)
-#define	PX_DMA_ISDVMA(mp)	(PX_DMA_TYPE(mp) == DMAI_FLAGS_DVMA)
-#define	PX_DMA_ISBYPASS(mp)	(PX_DMA_TYPE(mp) == DMAI_FLAGS_BYPASS)
-#define	PX_DMA_ISPTP(mp)	(PX_DMA_TYPE(mp) == DMAI_FLAGS_PTP)
-#define	PX_DMA_ISPTP32(mp)	((mp)->dmai_flags & DMAI_FLAGS_PTP32)
-#define	PX_DMA_ISPTP64(mp)	((mp)->dmai_flags & DMAI_FLAGS_PTP64)
+#define	PX_HAS_NOFASTLIMIT(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_NOFASTLIMIT)
+#define	PX_HAS_NOSYSLIMIT(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_NOSYSLIMIT)
+#define	PX_DMA_ISPEERONLY(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_PEER_ONLY)
+#define	PX_DMA_ISPGPFN(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_PGPFN)
+#define	PX_DMA_TYPE(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_DMA_TYPE)
+#define	PX_DMA_ISDVMA(mp)	(PX_DMA_TYPE(mp) == PX_DMAI_FLAGS_DVMA)
+#define	PX_DMA_ISBYPASS(mp)	(PX_DMA_TYPE(mp) == PX_DMAI_FLAGS_BYPASS)
+#define	PX_DMA_ISPTP(mp)	(PX_DMA_TYPE(mp) == PX_DMAI_FLAGS_PTP)
+#define	PX_DMA_ISPTP32(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_PTP32)
+#define	PX_DMA_ISPTP64(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_PTP64)
 #define	PX_DMA_CANFAST(mp)	(((mp)->dmai_ndvmapages + HAS_REDZONE(mp) \
-		<= px_dvma_page_cache_clustsz) && HAS_NOFASTLIMIT(mp))
+		<= px_dvma_page_cache_clustsz) && PX_HAS_NOFASTLIMIT(mp))
 #define	PX_DMA_WINNPGS(mp)	MMU_BTOP((mp)->dmai_winsize)
 #define	PX_DMA_CANCACHE(mp)	(!HAS_REDZONE(mp) && \
-		(PX_DMA_WINNPGS(mp) == 1) && HAS_NOSYSLIMIT(mp))
+		(PX_DMA_WINNPGS(mp) == 1) && PX_HAS_NOSYSLIMIT(mp))
 
-#define	DEV_NOFASTLIMIT(lo, hi, fastlo, fasthi, align_pg) \
+#define	PX_DEV_NOFASTLIMIT(lo, hi, fastlo, fasthi, align_pg) \
 	(((lo) <= (fastlo)) && ((hi) >= (fasthi)) && \
 	((align_pg) <= px_dvma_page_cache_clustsz))
 
-#define	DEV_NOSYSLIMIT(lo, hi, syslo, syshi, align_pg) \
+#define	PX_DEV_NOSYSLIMIT(lo, hi, syslo, syshi, align_pg) \
 	(((lo) <= (syslo)) && ((hi) >= (syshi)) && (align_pg == 1))
 
 #define	PX_DMA_NOCTX(rdip) (!px_use_contexts || (px_ctx_no_active_flush && \

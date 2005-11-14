@@ -183,25 +183,25 @@ px_dma_lmts2hdl(dev_info_t *dip, dev_info_t *rdip, px_mmu_t *mmu_p,
 		return (NULL);
 
 	/* store original dev input at the 2nd ddi_dma_attr */
-	attr_p = DEV_ATTR(mp);
+	attr_p = PX_DEV_ATTR(mp);
 	SET_DMAATTR(attr_p, lo, hi, -1, count_max);
 	SET_DMAALIGN(attr_p, 1);
 
 	lo = MAX(lo, syslo);
 	hi = MIN(hi, syshi);
 	if (hi <= lo)
-		mp->dmai_flags |= DMAI_FLAGS_PEER_ONLY;
+		mp->dmai_flags |= PX_DMAI_FLAGS_PEER_ONLY;
 	count_max = MIN(count_max, hi - lo);
 
-	if (DEV_NOSYSLIMIT(lo, hi, syslo, fasthi, 1))
-		mp->dmai_flags |= DMAI_FLAGS_NOFASTLIMIT |
-			DMAI_FLAGS_NOSYSLIMIT;
+	if (PX_DEV_NOSYSLIMIT(lo, hi, syslo, fasthi, 1))
+		mp->dmai_flags |= PX_DMAI_FLAGS_NOFASTLIMIT |
+			PX_DMAI_FLAGS_NOSYSLIMIT;
 	else {
-		if (DEV_NOFASTLIMIT(lo, hi, syslo, syshi, 1))
-			mp->dmai_flags |= DMAI_FLAGS_NOFASTLIMIT;
+		if (PX_DEV_NOFASTLIMIT(lo, hi, syslo, syshi, 1))
+			mp->dmai_flags |= PX_DMAI_FLAGS_NOFASTLIMIT;
 	}
 	if (PX_DMA_NOCTX(rdip))
-		mp->dmai_flags |= DMAI_FLAGS_NOCTX;
+		mp->dmai_flags |= PX_DMAI_FLAGS_NOCTX;
 
 	/* store augumented dev input to mp->dmai_attr */
 	mp->dmai_minxfer	= lim_p->dlim_minxfer;
@@ -250,7 +250,7 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 	px_mmu_t *mmu_p = px_p->px_mmu_p;
 	uint64_t syslo, syshi;
 	int	ret;
-	ddi_dma_attr_t *attrp		= DEV_ATTR(mp);
+	ddi_dma_attr_t *attrp		= PX_DEV_ATTR(mp);
 	uint64_t hi			= attrp->dma_attr_addr_hi;
 	uint64_t lo			= attrp->dma_attr_addr_lo;
 	uint64_t align			= attrp->dma_attr_align;
@@ -275,7 +275,7 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 		 */
 		if (!(px_p->px_soft_state & PX_BYPASS_DMA_ALLOWED))
 			return (DDI_DMA_BADATTR);
-		mp->dmai_flags |= DMAI_FLAGS_BYPASSREQ;
+		mp->dmai_flags |= PX_DMAI_FLAGS_BYPASSREQ;
 		if (nocross != UINT64_MAX)
 			return (DDI_DMA_BADATTR);
 		if (align && (align > MMU_PAGE_SIZE))
@@ -318,20 +318,20 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 				NAMEINST(rdip));
 			return (DDI_DMA_BADATTR);
 		}
-		mp->dmai_flags |= DMAI_FLAGS_PEER_ONLY;
+		mp->dmai_flags |= PX_DMAI_FLAGS_PEER_ONLY;
 	} else /* set practical counter_max value */
 		count_max = MIN(count_max, hi - lo);
 
-	if (DEV_NOSYSLIMIT(lo, hi, syslo, syshi, align))
-		mp->dmai_flags |= DMAI_FLAGS_NOSYSLIMIT |
-			DMAI_FLAGS_NOFASTLIMIT;
+	if (PX_DEV_NOSYSLIMIT(lo, hi, syslo, syshi, align))
+		mp->dmai_flags |= PX_DMAI_FLAGS_NOSYSLIMIT |
+			PX_DMAI_FLAGS_NOFASTLIMIT;
 	else {
 		syshi = mmu_p->mmu_dvma_fast_end;
-		if (DEV_NOFASTLIMIT(lo, hi, syslo, syshi, align))
-			mp->dmai_flags |= DMAI_FLAGS_NOFASTLIMIT;
+		if (PX_DEV_NOFASTLIMIT(lo, hi, syslo, syshi, align))
+			mp->dmai_flags |= PX_DMAI_FLAGS_NOFASTLIMIT;
 	}
 	if (PX_DMA_NOCTX(mp->dmai_rdip))
-		mp->dmai_flags |= DMAI_FLAGS_NOCTX;
+		mp->dmai_flags |= PX_DMAI_FLAGS_NOCTX;
 
 	mp->dmai_minxfer	= attrp->dma_attr_minxfer;
 	mp->dmai_burstsizes	= attrp->dma_attr_burstsizes;
@@ -380,7 +380,7 @@ px_dma_type(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		DBG(DBG_DMA_MAP, dip, "vaddr=%p pplist=%p\n", vaddr, pplist);
 		offset = (ulong_t)vaddr & MMU_PAGE_OFFSET;
 		if (pplist) {				/* shadow list */
-			mp->dmai_flags |= DMAI_FLAGS_PGPFN;
+			mp->dmai_flags |= PX_DMAI_FLAGS_PGPFN;
 			pfn0 = page_pptonum(*pplist);
 		} else {
 			struct as *as_p = dobj_p->dmao_obj.virt_obj.v_as;
@@ -392,7 +392,7 @@ px_dma_type(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 
 	case DMA_OTYP_PAGES:
 		offset = dobj_p->dmao_obj.pp_obj.pp_offset;
-		mp->dmai_flags |= DMAI_FLAGS_PGPFN;
+		mp->dmai_flags |= PX_DMAI_FLAGS_PGPFN;
 		pfn0 = page_pptonum(dobj_p->dmao_obj.pp_obj.pp_pp);
 		break;
 
@@ -409,11 +409,11 @@ px_dma_type(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	}
 	if (TGT_PFN_INBETWEEN(pfn0, pec_p->pec_base32_pfn,
 			pec_p->pec_last32_pfn)) {
-		mp->dmai_flags |= DMAI_FLAGS_PTP|DMAI_FLAGS_PTP32;
+		mp->dmai_flags |= PX_DMAI_FLAGS_PTP|PX_DMAI_FLAGS_PTP32;
 		goto done;	/* leave bypass and dvma flag as 0 */
 	} else if (TGT_PFN_INBETWEEN(pfn0, pec_p->pec_base64_pfn,
 			pec_p->pec_last64_pfn)) {
-		mp->dmai_flags |= DMAI_FLAGS_PTP|DMAI_FLAGS_PTP64;
+		mp->dmai_flags |= PX_DMAI_FLAGS_PTP|PX_DMAI_FLAGS_PTP64;
 		goto done;	/* leave bypass and dvma flag as 0 */
 	}
 	if (PX_DMA_ISPEERONLY(mp)) {
@@ -421,8 +421,8 @@ px_dma_type(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		cmn_err(CE_WARN, "Bad peer-to-peer req %s%d", NAMEINST(rdip));
 		return (DDI_DMA_NOMAPPING);
 	}
-	mp->dmai_flags |= (mp->dmai_flags & DMAI_FLAGS_BYPASSREQ) ?
-		DMAI_FLAGS_BYPASS : DMAI_FLAGS_DVMA;
+	mp->dmai_flags |= (mp->dmai_flags & PX_DMAI_FLAGS_BYPASSREQ) ?
+		PX_DMAI_FLAGS_BYPASS : PX_DMAI_FLAGS_DVMA;
 done:
 	mp->dmai_object	 = *dobj_p;			/* whole object    */
 	mp->dmai_pfn0	 = (void *)pfn0;		/* cache pfn0	   */
@@ -532,10 +532,10 @@ px_dma_pfn(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	px_iopfn_t pfn_adj = peer ? pfn_base : 0;
 
 	DBG(DBG_DMA_BINDH, dip, "px_dma_pfn: mp=%p pfn0=%x\n",
-		mp, MP_PFN0(mp) - pfn_adj);
+		mp, PX_MP_PFN0(mp) - pfn_adj);
 	/* 1 page: no array alloc/fill, no mixed mode check */
 	if (npages == 1) {
-		PX_SET_MP_PFN(mp, 0, MP_PFN0(mp) - pfn_adj);
+		PX_SET_MP_PFN(mp, 0, PX_MP_PFN0(mp) - pfn_adj);
 		return (DDI_SUCCESS);
 	}
 	/* allocate pfn array */
@@ -547,7 +547,7 @@ px_dma_pfn(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		return (DDI_DMA_NORESOURCES);
 	}
 	/* fill pfn array */
-	PX_SET_MP_PFN(mp, 0, MP_PFN0(mp) - pfn_adj);	/* pfnlst[0] */
+	PX_SET_MP_PFN(mp, 0, PX_MP_PFN0(mp) - pfn_adj);	/* pfnlst[0] */
 	if ((ret = PX_DMA_ISPGPFN(mp) ? px_dma_pgpfn(px_p, mp, npages) :
 		px_dma_vapfn(px_p, mp, npages)) != DDI_SUCCESS)
 		goto err;
@@ -557,7 +557,7 @@ px_dma_pfn(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		px_iopfn_t pfn = PX_GET_MP_PFN1(mp, i);
 		if (peer ^ TGT_PFN_INBETWEEN(pfn, pfn_base, pfn_last)) {
 			cmn_err(CE_WARN, "%s%d mixed mode DMA %lx %lx",
-				NAMEINST(mp->dmai_rdip), MP_PFN0(mp), pfn);
+				NAMEINST(mp->dmai_rdip), PX_MP_PFN0(mp), pfn);
 			ret = DDI_DMA_NOMAPPING;	/* mixed mode */
 			goto err;
 		}
@@ -707,9 +707,9 @@ px_dvma_map_fast(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 #endif
 	mp->dmai_mapping = mp->dmai_roffset | MMU_PTOB(dvma_pg);
 	mp->dmai_offset = 0;
-	mp->dmai_flags |= DMAI_FLAGS_FASTTRACK;
+	mp->dmai_flags |= PX_DMAI_FLAGS_FASTTRACK;
 	PX_SAVE_MP_TTE(mp, attr);	/* save TTE template for unmapping */
-	if (DVMA_DBG_ON(mmu_p))
+	if (PX_DVMA_DBG_ON(mmu_p))
 		px_dvma_alloc_debug(mmu_p, (char *)mp->dmai_mapping,
 			mp->dmai_size, mp);
 	return (DDI_SUCCESS);
@@ -736,10 +736,10 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 	 *	size_t align, size_t phase, size_t nocross,
 	 *	void *minaddr, void *maxaddr, int vmflag)
 	 */
-	if ((npages == 1) && HAS_NOSYSLIMIT(mp)) {
+	if ((npages == 1) && PX_HAS_NOSYSLIMIT(mp)) {
 		dvma_addr = vmem_alloc(mmu_p->mmu_dvma_map,
 			MMU_PAGE_SIZE, sleep);
-		mp->dmai_flags |= DMAI_FLAGS_VMEMCACHE;
+		mp->dmai_flags |= PX_DMAI_FLAGS_VMEMCACHE;
 #ifdef	PX_DMA_PROF
 		px_dvma_vmem_alloc++;
 #endif	/* PX_DMA_PROF */
@@ -769,7 +769,7 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 
 	if ((ret = px_mmu_map_pages(mmu_p,
 	    mp, dvma_pg, npages, 0)) != DDI_SUCCESS) {
-		if (mp->dmai_flags & DMAI_FLAGS_VMEMCACHE) {
+		if (mp->dmai_flags & PX_DMAI_FLAGS_VMEMCACHE) {
 			vmem_free(mmu_p->mmu_dvma_map, (void *)dvma_addr,
 			    MMU_PAGE_SIZE);
 #ifdef PX_DMA_PROF
@@ -802,7 +802,7 @@ px_dvma_unmap(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 	px_dvma_addr_t dvma_pg = MMU_BTOP(dvma_addr);
 	dvma_addr = MMU_PTOB(dvma_pg);
 
-	if (mp->dmai_flags & DMAI_FLAGS_FASTTRACK) {
+	if (mp->dmai_flags & PX_DMAI_FLAGS_FASTTRACK) {
 		px_iopfn_t index = dvma_pg - mmu_p->dvma_base_pg;
 		ASSERT(index % px_dvma_page_cache_clustsz == 0);
 		index /= px_dvma_page_cache_clustsz;
@@ -814,7 +814,7 @@ px_dvma_unmap(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 		return;
 	}
 
-	if (mp->dmai_flags & DMAI_FLAGS_VMEMCACHE) {
+	if (mp->dmai_flags & PX_DMAI_FLAGS_VMEMCACHE) {
 		vmem_free(mmu_p->mmu_dvma_map, (void *)dvma_addr,
 			MMU_PAGE_SIZE);
 #ifdef PX_DMA_PROF
@@ -1173,7 +1173,7 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 
 	ASSERT(PX_DMA_ISPTP(mp) || PX_DMA_ISBYPASS(mp));
 	if (PX_DMA_ISPTP(mp)) { /* ignore sys limits for peer-to-peer */
-		ddi_dma_attr_t *dev_attr_p = DEV_ATTR(mp);
+		ddi_dma_attr_t *dev_attr_p = PX_DEV_ATTR(mp);
 		uint64_t nocross = dev_attr_p->dma_attr_seg;
 		px_pec_t *pec_p = px_p->px_pec_p;
 		px_iopfn_t pfn_last = PX_DMA_ISPTP32(mp) ?
@@ -1260,9 +1260,9 @@ px_dma_physwin(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	mp->dmai_nwin = win_no;
 	mp->dmai_rflags |= DDI_DMA_CONSISTENT | DMP_NOSYNC;
 	mp->dmai_rflags &= ~DDI_DMA_REDZONE;
-	mp->dmai_flags |= DMAI_FLAGS_NOSYNC;
-	cookie0_p = (ddi_dma_cookie_t *)(WINLST(mp) + 1);
-	mp->dmai_cookie = WINLST(mp)->win_ncookies > 1 ? cookie0_p + 1 : 0;
+	mp->dmai_flags |= PX_DMAI_FLAGS_NOSYNC;
+	cookie0_p = (ddi_dma_cookie_t *)(PX_WINLST(mp) + 1);
+	mp->dmai_cookie = PX_WINLST(mp)->win_ncookies > 1 ? cookie0_p + 1 : 0;
 	mp->dmai_mapping = cookie0_p->dmac_laddress;
 
 	px_dma_freepfn(mp);
@@ -1485,7 +1485,7 @@ px_dvma_alloc_debug(px_mmu_t *mmu_p, char *address, uint_t len,
 
 	if (!mmu_p->dvma_alloc_rec)
 		px_dvma_debug_init(mmu_p);
-	if (DVMA_DBG_OFF(mmu_p)) {
+	if (PX_DVMA_DBG_OFF(mmu_p)) {
 		px_dvma_debug_fini(mmu_p);
 		goto done;
 	}
@@ -1518,7 +1518,7 @@ px_dvma_free_debug(px_mmu_t *mmu_p, char *address, uint_t len,
 
 	if (!mmu_p->dvma_alloc_rec)
 		px_dvma_debug_init(mmu_p);
-	if (DVMA_DBG_OFF(mmu_p)) {
+	if (PX_DVMA_DBG_OFF(mmu_p)) {
 		px_dvma_debug_fini(mmu_p);
 		goto done;
 	}

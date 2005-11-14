@@ -705,12 +705,10 @@ px_ib_alloc_ih(dev_info_t *rdip, uint32_t inum,
 	return (ih_p);
 }
 
-/*
- * Only used for fixed or legacy interrupts.
- */
 int
 px_ib_update_intr_state(px_t *px_p, dev_info_t *rdip,
-    uint_t inum, devino_t ino, uint_t new_intr_state)
+    uint_t inum, devino_t ino, uint_t new_intr_state,
+    msiq_rec_type_t rec_type, msgcode_t msg_code)
 {
 	px_ib_t		*ib_p = px_p->px_ib_p;
 	px_ib_ino_info_t *ino_p;
@@ -724,7 +722,8 @@ px_ib_update_intr_state(px_t *px_p, dev_info_t *rdip,
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
 	if (ino_p = px_ib_locate_ino(ib_p, ino)) {
-		if (ih_p = px_ib_ino_locate_intr(ino_p, rdip, inum, 0, 0)) {
+		if (ih_p = px_ib_ino_locate_intr(ino_p, rdip, inum, rec_type,
+		    msg_code)) {
 			ih_p->ih_intr_state = new_intr_state;
 			ret = DDI_SUCCESS;
 		}

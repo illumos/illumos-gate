@@ -637,6 +637,9 @@ pci_add_intr(dev_info_t *dip, dev_info_t *rdip, ddi_intr_handle_impl_t *hdlp)
 
 	hdlp->ih_vector = CB_MONDO_TO_XMONDO(cb_p, mondo);
 
+	/* Store this global mondo */
+	ino_p->ino_mondo = hdlp->ih_vector;
+
 	DEBUG2(DBG_A_INTX, dip, "pci_add_intr:  pil=0x%x mondo=0x%x\n",
 	    hdlp->ih_pri, hdlp->ih_vector);
 

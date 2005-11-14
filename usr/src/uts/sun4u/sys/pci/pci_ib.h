@@ -141,6 +141,7 @@ struct ib_ino_info {
 	int ino_established;		/* ino has been associated with a cpu */
 	uint32_t ino_cpuid;		/* cpu that ino is targeting */
 	int32_t ino_intr_weight;	/* intr weight of devices sharing ino */
+	uint64_t ino_mondo;		/* store mondo number */
 };
 
 #define	IB_INTR_WAIT	1		/* wait for interrupt completion */

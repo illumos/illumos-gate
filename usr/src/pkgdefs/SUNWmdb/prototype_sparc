@@ -46,6 +46,7 @@ f none usr/lib/mdb/kvm/sparcv9/audiosup.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/cpc.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/crypto.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/genunix.so 555 root sys
+f none usr/lib/mdb/kvm/sparcv9/intr.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/ip.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/ipc.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/ipp.so 555 root sys
@@ -58,7 +59,10 @@ f none usr/lib/mdb/kvm/sparcv9/mdb_ks.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/mpxio.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/nca.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/nfs.so 555 root sys
+s none usr/lib/mdb/kvm/sparcv9/pcisch.so=intr.so
+s none usr/lib/mdb/kvm/sparcv9/pcipsy.so=intr.so
 f none usr/lib/mdb/kvm/sparcv9/ptm.so 555 root sys
+s none usr/lib/mdb/kvm/sparcv9/px.so=intr.so
 f none usr/lib/mdb/kvm/sparcv9/random.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/sctp.so 555 root sys
 f none usr/lib/mdb/kvm/sparcv9/s1394.so 555 root sys

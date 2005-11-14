@@ -422,13 +422,13 @@ px_lib_dma_sync(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	    "handle 0x%llx off 0x%x len 0x%x flags 0x%x\n",
 	    dip, rdip, handle, off, len, cache_flags);
 
-	if (!(mp->dmai_flags & DMAI_FLAGS_INUSE)) {
+	if (!(mp->dmai_flags & PX_DMAI_FLAGS_INUSE)) {
 		cmn_err(CE_WARN, "%s%d: Unbound dma handle %p.",
 		    ddi_driver_name(rdip), ddi_get_instance(rdip), (void *)mp);
 		return (DDI_FAILURE);
 	}
 
-	if (mp->dmai_flags & DMAI_FLAGS_NOSYNC)
+	if (mp->dmai_flags & PX_DMAI_FLAGS_NOSYNC)
 		return (DDI_SUCCESS);
 
 	if (!len)

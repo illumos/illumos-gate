@@ -25,23 +25,17 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-include ../../Makefile.common
+MODULE = pcplusmp.so
+MDBTGT = kvm
 
-MODULES = \
-	$(COMMON_MODULES_PROC) \
-	$(COMMON_MODULES_KVM) \
-	intr \
-	isp \
-	sd \
-	sparcdis \
-	ssd
+MODSRCS = apic.c
 
-#
-# a "$(MODULES): kmdb" rule would seem to do the trick but, for some reason,
-# it serializes $(MODULES).
-#
-SUBDIRS = mdb mdb_ks kmdb libstandctf libstand .WAIT $(MODULES)
+include ../../../../../Makefile.cmd
+include ../../../../intel/Makefile.ia32
+include ../../../Makefile.i86pc
+include ../../../../Makefile.module
 
-include ../../Makefile.subdirs
-
-.PARALLEL: $(SUBDIRS)
+CPPFLAGS += -DMP -D_MACHDEP
+CPPFLAGS += -I../../../../common
+CPPFLAGS += -I$(SRC)/uts/intel
+CPPFLAGS += -I$(SRC)/uts/i86pc

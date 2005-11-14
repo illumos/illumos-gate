@@ -92,7 +92,7 @@ px_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	/*
 	 * Get the soft state structure for the device.
 	 */
-	px_p = DEV_TO_SOFTSTATE(*devp);
+	px_p = PX_DEV_TO_SOFTSTATE(*devp);
 	if (px_p == NULL)
 		return (ENXIO);
 
@@ -131,7 +131,7 @@ px_close(dev_t dev, int flags, int otyp, cred_t *credp)
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
 
-	px_p = DEV_TO_SOFTSTATE(dev);
+	px_p = PX_DEV_TO_SOFTSTATE(dev);
 	if (px_p == NULL)
 		return (ENXIO);
 
@@ -154,7 +154,7 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 	int rv = DDI_SUCCESS;
 	int minor = getminor(dev);
 
-	px_p = DEV_TO_SOFTSTATE(dev);
+	px_p = PX_DEV_TO_SOFTSTATE(dev);
 	if (px_p == NULL)
 		return (ENXIO);
 

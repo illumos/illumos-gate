@@ -563,11 +563,11 @@ px_intx_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		break;
 	case DDI_INTROP_ENABLE:
 		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
-		    hdlp->ih_vector, PX_INTR_STATE_ENABLE);
+		    hdlp->ih_vector, PX_INTR_STATE_ENABLE, 0, 0);
 		break;
 	case DDI_INTROP_DISABLE:
 		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
-		    hdlp->ih_vector, PX_INTR_STATE_DISABLE);
+		    hdlp->ih_vector, PX_INTR_STATE_DISABLE, 0, 0);
 		break;
 	case DDI_INTROP_SETMASK:
 		ret = pci_intx_set_mask(rdip);
@@ -714,7 +714,17 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 				return (ret);
 		}
 
-		ret = pci_msi_clr_mask(rdip, hdlp->ih_type, hdlp->ih_inum);
+		if ((ret = pci_msi_clr_mask(rdip, hdlp->ih_type,
+		    hdlp->ih_inum)) != DDI_SUCCESS)
+			return (ret);
+
+		if ((ret = px_lib_msi_getmsiq(dip, msi_num,
+		    &msiq_id)) != DDI_SUCCESS)
+			return (ret);
+
+		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
+		    px_msiqid_to_devino(px_p, msiq_id), PX_INTR_STATE_ENABLE,
+		    MSI32_REC, msi_num);
 
 		break;
 	case DDI_INTROP_DISABLE:
@@ -724,7 +734,18 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		    hdlp->ih_inum)) != DDI_SUCCESS)
 			return (ret);
 
-		ret = px_lib_msi_setvalid(dip, msi_num, PCI_MSI_INVALID);
+		if ((ret = px_lib_msi_setvalid(dip, msi_num,
+		    PCI_MSI_INVALID)) != DDI_SUCCESS)
+			return (ret);
+
+		if ((ret = px_lib_msi_getmsiq(dip, msi_num,
+		    &msiq_id)) != DDI_SUCCESS)
+			return (ret);
+
+		ret = px_ib_update_intr_state(px_p, rdip,
+		    hdlp->ih_inum, px_msiqid_to_devino(px_p, msiq_id),
+		    PX_INTR_STATE_DISABLE, MSI32_REC, msi_num);
+
 		break;
 	case DDI_INTROP_BLOCKENABLE:
 		nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
@@ -738,6 +759,16 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		for (i = 0; i < nintrs; i++, msi_num++) {
 			if ((ret = px_lib_msi_setvalid(dip, msi_num,
 			    PCI_MSI_VALID)) != DDI_SUCCESS)
+				return (ret);
+
+			if ((ret = px_lib_msi_getmsiq(dip, msi_num,
+			    &msiq_id)) != DDI_SUCCESS)
+				return (ret);
+
+			if ((ret = px_ib_update_intr_state(px_p, rdip,
+			    hdlp->ih_inum + i, px_msiqid_to_devino(px_p,
+			    msiq_id), PX_INTR_STATE_ENABLE, MSI32_REC, msi_num))
+			    != DDI_SUCCESS)
 				return (ret);
 		}
 
@@ -754,6 +785,16 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		for (i = 0; i < nintrs; i++, msi_num++) {
 			if ((ret = px_lib_msi_setvalid(dip, msi_num,
 			    PCI_MSI_INVALID)) != DDI_SUCCESS)
+				return (ret);
+
+			if ((ret = px_lib_msi_getmsiq(dip, msi_num,
+			    &msiq_id)) != DDI_SUCCESS)
+				return (ret);
+
+			if ((ret = px_ib_update_intr_state(px_p, rdip,
+			    hdlp->ih_inum + i, px_msiqid_to_devino(px_p,
+			    msiq_id), PX_INTR_STATE_DISABLE, MSI32_REC,
+			    msi_num)) != DDI_SUCCESS)
 				return (ret);
 		}
 
