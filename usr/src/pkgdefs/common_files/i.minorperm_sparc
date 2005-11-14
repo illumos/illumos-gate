@@ -119,6 +119,7 @@ clone:pcelx			0600 root sys 0666 root sys	/dev/pcelx
 pcelx:*				0600 root sys 0666 root sys	/dev/pcelx*
 ipf:*				0600 root sys 0666 root sys	/dev/ipf
 pfil:*				0600 root sys 0666 root sys	/dev/pfil
+scsi_vhci:devctl	0600 root sys 0666 root sys /devices/scsi_vhci:devctl
 EOF
 }
 
@@ -285,6 +286,7 @@ aggr:*
 mdesc:*
 zfs:*
 zfs:zfs
+scsi_vhci:*
 EOF
 }
 

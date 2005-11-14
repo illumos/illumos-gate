@@ -99,6 +99,7 @@ spwr:*			0600 root sys 0666 root sys	/dev/spwr*
 cpc:*			0600 root sys 0666 root sys	/devices/pseudo/cpc*
 ipf:*			0600 root sys 0666 root sys	/dev/ipf
 pfil:*			0600 root sys 0666 root sys	/dev/pfil
+scsi_vhci:devctl	0600 root sys 0666 root sys /devices/scsi_vhci:devctl
 EOF
 }
 
@@ -222,6 +223,7 @@ aggr:*
 smbios:smbios
 zfs:*
 zfs:zfs
+scsi_vhci:*
 EOF
 }
 

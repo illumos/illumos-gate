@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #  NOTE:  When a change is made to the source file for
@@ -50,7 +50,7 @@ do
 	rm -f $dest.$$
 
 	# potential additions
-	additions="bge dnet ibd icmp icmp6 openeepr random vni ipf pfil"
+	additions="bge dnet ibd icmp icmp6 openeepr random vni ipf pfil scsi_vhci"
 
 	for dev in $additions
 	do
