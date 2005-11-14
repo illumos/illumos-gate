@@ -325,13 +325,13 @@ htrap_trace_register(int cpuid)
 		if (ret != H_EOK) {
 			cmn_err(CE_WARN,
 			    "!cpu%d: HV traptracing not enabled, "
-			    "ta: 0x%x returned error: %d",
+			    "ta: 0x%x returned error: %ld",
 			    cpuid, TTRACE_ENABLE, ret);
 		}
 	} else {
 		cmn_err(CE_WARN,
 		    "!cpu%d: HV traptrace buffer not configured, "
-		    "ta: 0x%x returned error: %d",
+		    "ta: 0x%x returned error: %ld",
 		    cpuid, TTRACE_BUF_CONF, ret);
 	}
 	/* set hvaddr_base to NULL when traptrace buffer registration fails */

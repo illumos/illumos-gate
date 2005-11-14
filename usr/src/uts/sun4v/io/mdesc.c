@@ -197,7 +197,7 @@ mdesc_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 			*resultp = NULL;
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*resultp = (void *)getminor((dev_t)arg);
+		*resultp = (void *)(uintptr_t)getminor((dev_t)arg);
 		retval = DDI_SUCCESS;
 		break;
 	}

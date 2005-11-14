@@ -45,7 +45,7 @@ md_init_intern(uint64_t *ptr, void *(*allocp)(size_t),
 	 * Very basic checkup for alignment to avoid
 	 * bus error issues.
 	 */
-	if ((((uint64_t)ptr)&7) != 0)
+	if ((((uintptr_t)ptr)&7) != 0)
 		return (NULL);
 
 	mdp = (md_impl_t *)allocp(sizeof (md_impl_t));

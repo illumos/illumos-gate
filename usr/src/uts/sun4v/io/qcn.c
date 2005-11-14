@@ -376,7 +376,7 @@ qcn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    (ddi_iblock_cookie_t)(uint64_t)soft_prip;
 
 	mutex_init(&qcn_state->qcn_hi_lock, NULL, MUTEX_DRIVER,
-	    (void *)(qcn_state->qcn_intr_pri));
+	    (void *)(uintptr_t)(qcn_state->qcn_intr_pri));
 	mutex_init(&qcn_state->qcn_softlock, NULL, MUTEX_DRIVER,
 	    (void *)(qcn_state->qcn_soft_pri));
 	}
@@ -448,7 +448,7 @@ qcn_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		prom_printf("qcn_getinfo(): devt2instance %lx\n", arg);
 #endif
 		if (getminor((dev_t)arg) == 0) {
-			*result = (void *)instance;
+			*result = (void *)(uintptr_t)instance;
 			error = DDI_SUCCESS;
 		}
 		break;
@@ -831,7 +831,7 @@ qcn_flush(void)
 
 	q = qcn_state->qcn_writeq;
 
-	prom_printf("qcn_flush(): WARNING console output is dropped time=%x\n",
+	prom_printf("qcn_flush(): WARNING console output is dropped time=%lx\n",
 	    gethrestime_sec());
 	while (mp = getq(q))
 		freemsg(mp);

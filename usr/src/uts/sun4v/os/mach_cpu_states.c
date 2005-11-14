@@ -410,7 +410,8 @@ ptl1_init_cpu(struct cpu *cpu)
 	/*CONSTCOND*/
 	if (sizeof (struct cpu) + PTL1_SSIZE > CPU_ALLOC_SIZE) {
 		panic("ptl1_init_cpu: not enough space left for ptl1_panic "
-		    "stack, sizeof (struct cpu) = %d", sizeof (struct cpu));
+		    "stack, sizeof (struct cpu) = %lu",
+		    (unsigned long)sizeof (struct cpu));
 	}
 
 	pstate->ptl1_stktop = (uintptr_t)cpu + CPU_ALLOC_SIZE;

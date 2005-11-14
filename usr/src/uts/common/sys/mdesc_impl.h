@@ -33,7 +33,7 @@
 extern "C" {
 #endif
 
-#define	LIBMD_MAGIC	0x4d61636844657363	/* MachDesc */
+#define	LIBMD_MAGIC	0x4d61636844657363ULL	/* MachDesc */
 
 #ifndef _ASM
 

@@ -410,7 +410,7 @@ ni_cntr_kstat_update(kstat_t *ksp, int rw)
 	if (rw == KSTAT_WRITE) {
 #ifdef DEBUG
 		if (ni_perf_debug)
-			printf("ni_cntr_kstat_update: wr pcr-%d: %llx\n",
+			printf("ni_cntr_kstat_update: wr pcr-%d: %lx\n",
 			    ksinfop->pcr_reg, data_p[0].value.ui64);
 #endif
 		if (hv_niagara_setperf(ksinfop->pcr_reg, data_p[0].value.ui64))

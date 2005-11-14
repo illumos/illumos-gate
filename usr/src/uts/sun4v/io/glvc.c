@@ -936,7 +936,7 @@ glvc_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *cred_p,
 					    glvc_peek_msg.buflen;
 
 				if (ddi_copyout((caddr_t)glvc_peek_msg.buf,
-				    (caddr_t)msg_peek_cmd32.buf32,
+				    (caddr_t)(uintptr_t)msg_peek_cmd32.buf32,
 				    msg_peek_cmd32.buflen32, mode) == -1) {
 					retval = EFAULT;
 					break;
