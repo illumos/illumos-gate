@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,17 +29,145 @@
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
+#include <sys/sysmacros.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/impl.h>
 #include <sys/crypto/api.h>
 #include <sys/crypto/spi.h>
 #include <sys/crypto/sched_impl.h>
 
+#define	CRYPTO_OPS_OFFSET(f)		offsetof(crypto_ops_t, co_##f)
+#define	CRYPTO_CIPHER_MAC_OFFSET(f) offsetof(crypto_dual_cipher_mac_ops_t, f)
 
 static int crypto_mac_decrypt_common(crypto_mechanism_t *,
     crypto_mechanism_t *, crypto_dual_data_t *, crypto_key_t *, crypto_key_t *,
     crypto_ctx_template_t, crypto_ctx_template_t, crypto_data_t *,
     crypto_data_t *, crypto_call_req_t *, boolean_t);
+
+static int crypto_mac_decrypt_common_prov(crypto_provider_t provider,
+    crypto_session_id_t sid, crypto_mechanism_t *, crypto_mechanism_t *,
+    crypto_dual_data_t *, crypto_key_t *, crypto_key_t *,
+    crypto_ctx_template_t, crypto_ctx_template_t, crypto_data_t *,
+    crypto_data_t *, crypto_call_req_t *, boolean_t);
+
+int
+crypto_encrypt_mac_prov(crypto_provider_t provider, crypto_session_id_t sid,
+    crypto_mechanism_t *encr_mech, crypto_mechanism_t *mac_mech,
+    crypto_data_t *pt, crypto_key_t *encr_key, crypto_key_t *mac_key,
+    crypto_ctx_template_t encr_tmpl, crypto_ctx_template_t mac_tmpl,
+    crypto_dual_data_t *ct, crypto_data_t *mac, crypto_call_req_t *crq)
+{
+	/*
+	 * First try to find a provider for the encryption mechanism, that
+	 * is also capable of the MAC mechanism.
+	 */
+	int rv;
+	kcf_mech_entry_t *me;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	kcf_ctx_template_t *ctx_encr_tmpl, *ctx_mac_tmpl;
+	kcf_req_params_t params;
+	kcf_encrypt_mac_ops_params_t *cmops;
+	crypto_spi_ctx_template_t spi_encr_tmpl = NULL, spi_mac_tmpl = NULL;
+
+	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(encr_mech->cm_type,
+		    mac_mech->cm_type, CRYPTO_OPS_OFFSET(dual_cipher_mac_ops),
+		    CRYPTO_CIPHER_MAC_OFFSET(encrypt_mac_atomic),
+		    CHECK_RESTRICT(crq), pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
+
+	/*
+	 * For SW providers, check the validity of the context template
+	 * It is very rare that the generation number mis-matches, so
+	 * is acceptable to fail here, and let the consumer recover by
+	 * freeing this tmpl and create a new one for the key and new SW
+	 * provider
+	 * Warning! will need to change when multiple software providers
+	 * per mechanism are supported.
+	 */
+
+	if (real_provider->pd_prov_type == CRYPTO_SW_PROVIDER) {
+		if (encr_tmpl != NULL) {
+			if (kcf_get_mech_entry(encr_mech->cm_type, &me) !=
+			    KCF_SUCCESS) {
+				rv = CRYPTO_MECHANISM_INVALID;
+				goto out;
+			}
+			ctx_encr_tmpl = (kcf_ctx_template_t *)encr_tmpl;
+			if (ctx_encr_tmpl->ct_generation != me->me_gen_swprov) {
+				rv = CRYPTO_OLD_CTX_TEMPLATE;
+				goto out;
+			}
+			spi_encr_tmpl = ctx_encr_tmpl->ct_prov_tmpl;
+		}
+
+		if (mac_tmpl != NULL) {
+			if (kcf_get_mech_entry(mac_mech->cm_type, &me) !=
+			    KCF_SUCCESS) {
+				rv = CRYPTO_MECHANISM_INVALID;
+				goto out;
+			}
+			ctx_mac_tmpl = (kcf_ctx_template_t *)mac_tmpl;
+			if (ctx_mac_tmpl->ct_generation != me->me_gen_swprov) {
+				rv = CRYPTO_OLD_CTX_TEMPLATE;
+				goto out;
+			}
+			spi_mac_tmpl = ctx_mac_tmpl->ct_prov_tmpl;
+		}
+	}
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(crq, real_provider)) {
+		crypto_mechanism_t lencr_mech;
+		crypto_mechanism_t lmac_mech;
+
+		/* careful! structs assignments */
+		lencr_mech = *encr_mech;
+		KCF_SET_PROVIDER_MECHNUM(encr_mech->cm_type, real_provider,
+		    &lencr_mech);
+
+		lmac_mech = *mac_mech;
+		KCF_SET_PROVIDER_MECHNUM(mac_mech->cm_type, real_provider,
+		    &lmac_mech);
+
+		rv = KCF_PROV_ENCRYPT_MAC_ATOMIC(real_provider, sid,
+		    &lencr_mech, encr_key, &lmac_mech, mac_key, pt, ct,
+		    mac, spi_encr_tmpl, spi_mac_tmpl, KCF_SWFP_RHNDL(crq));
+
+		KCF_PROV_INCRSTATS(pd, rv);
+	} else {
+		KCF_WRAP_ENCRYPT_MAC_OPS_PARAMS(&params, KCF_OP_ATOMIC,
+		    sid, encr_key, mac_key, pt, ct, mac, spi_encr_tmpl,
+		    spi_mac_tmpl);
+
+		cmops = &(params.rp_u.encrypt_mac_params);
+
+		/* careful! structs assignments */
+		cmops->em_encr_mech = *encr_mech;
+		KCF_SET_PROVIDER_MECHNUM(encr_mech->cm_type, real_provider,
+		    &cmops->em_encr_mech);
+		cmops->em_framework_encr_mechtype = encr_mech->cm_type;
+
+		cmops->em_mac_mech = *mac_mech;
+		KCF_SET_PROVIDER_MECHNUM(mac_mech->cm_type, real_provider,
+		    &cmops->em_mac_mech);
+		cmops->em_framework_mac_mechtype = mac_mech->cm_type;
+
+		rv = kcf_submit_request(real_provider, NULL, crq, &params,
+		    B_FALSE);
+	}
+
+out:
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
+	return (rv);
+}
 
 /*
  * Performs a dual encrypt/mac atomic operation. The provider and session
@@ -284,6 +412,140 @@ retry:
 
 	KCF_PROV_REFRELE(pd);
 	return (error);
+}
+
+int
+crypto_encrypt_mac_init_prov(crypto_provider_t provider,
+    crypto_session_id_t sid, crypto_mechanism_t *encr_mech,
+    crypto_mechanism_t *mac_mech, crypto_key_t *encr_key,
+    crypto_key_t *mac_key, crypto_ctx_template_t encr_tmpl,
+    crypto_ctx_template_t mac_tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *cr)
+{
+	/*
+	 * First try to find a provider for the encryption mechanism, that
+	 * is also capable of the MAC mechanism.
+	 */
+	int rv;
+	kcf_mech_entry_t *me;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	kcf_ctx_template_t *ctx_encr_tmpl, *ctx_mac_tmpl;
+	kcf_req_params_t params;
+	kcf_encrypt_mac_ops_params_t *cmops;
+	crypto_spi_ctx_template_t spi_encr_tmpl = NULL, spi_mac_tmpl = NULL;
+	crypto_ctx_t *ctx;
+	kcf_context_t *encr_kcf_context = NULL;
+
+	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(encr_mech->cm_type,
+		    mac_mech->cm_type, CRYPTO_OPS_OFFSET(dual_cipher_mac_ops),
+		    CRYPTO_CIPHER_MAC_OFFSET(encrypt_mac_init),
+		    CHECK_RESTRICT(cr), pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
+
+	/*
+	 * For SW providers, check the validity of the context template
+	 * It is very rare that the generation number mis-matches, so
+	 * is acceptable to fail here, and let the consumer recover by
+	 * freeing this tmpl and create a new one for the key and new SW
+	 * provider
+	 * Warning! will need to change when multiple software providers
+	 * per mechanism are supported.
+	 */
+
+	if (real_provider->pd_prov_type == CRYPTO_SW_PROVIDER) {
+		if (encr_tmpl != NULL) {
+			if (kcf_get_mech_entry(encr_mech->cm_type, &me) !=
+			    KCF_SUCCESS) {
+				rv = CRYPTO_MECHANISM_INVALID;
+				goto out;
+			}
+			ctx_encr_tmpl = (kcf_ctx_template_t *)encr_tmpl;
+			if (ctx_encr_tmpl->ct_generation != me->me_gen_swprov) {
+				rv = CRYPTO_OLD_CTX_TEMPLATE;
+				goto out;
+			}
+			spi_encr_tmpl = ctx_encr_tmpl->ct_prov_tmpl;
+		}
+
+		if (mac_tmpl != NULL) {
+			if (kcf_get_mech_entry(mac_mech->cm_type, &me) !=
+			    KCF_SUCCESS) {
+				rv = CRYPTO_MECHANISM_INVALID;
+				goto out;
+			}
+			ctx_mac_tmpl = (kcf_ctx_template_t *)mac_tmpl;
+			if (ctx_mac_tmpl->ct_generation != me->me_gen_swprov) {
+				rv = CRYPTO_OLD_CTX_TEMPLATE;
+				goto out;
+			}
+			spi_mac_tmpl = ctx_mac_tmpl->ct_prov_tmpl;
+		}
+	}
+
+	ctx = kcf_new_ctx(cr, real_provider, sid);
+	if (ctx == NULL) {
+		rv = CRYPTO_HOST_MEMORY;
+		goto out;
+	}
+	encr_kcf_context = (kcf_context_t *)ctx->cc_framework_private;
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(cr, real_provider)) {
+		crypto_mechanism_t lencr_mech;
+		crypto_mechanism_t lmac_mech;
+
+		/* careful! structs assignments */
+		lencr_mech = *encr_mech;
+		KCF_SET_PROVIDER_MECHNUM(encr_mech->cm_type, real_provider,
+		    &lencr_mech);
+
+		lmac_mech = *mac_mech;
+		KCF_SET_PROVIDER_MECHNUM(mac_mech->cm_type, real_provider,
+		    &lmac_mech);
+
+		rv = KCF_PROV_ENCRYPT_MAC_INIT(real_provider, ctx, &lencr_mech,
+		    encr_key, &lmac_mech, mac_key, spi_encr_tmpl, spi_mac_tmpl,
+		    KCF_SWFP_RHNDL(cr));
+
+		KCF_PROV_INCRSTATS(pd, rv);
+	} else {
+		KCF_WRAP_ENCRYPT_MAC_OPS_PARAMS(&params, KCF_OP_INIT,
+		    sid, encr_key, mac_key, NULL, NULL, NULL,
+		    spi_encr_tmpl, spi_mac_tmpl);
+
+		cmops = &(params.rp_u.encrypt_mac_params);
+
+		/* careful! structs assignments */
+		cmops->em_encr_mech = *encr_mech;
+		KCF_SET_PROVIDER_MECHNUM(encr_mech->cm_type, real_provider,
+		    &cmops->em_encr_mech);
+		cmops->em_framework_encr_mechtype = encr_mech->cm_type;
+
+		cmops->em_mac_mech = *mac_mech;
+		KCF_SET_PROVIDER_MECHNUM(mac_mech->cm_type, real_provider,
+		    &cmops->em_mac_mech);
+		cmops->em_framework_mac_mechtype = mac_mech->cm_type;
+
+		rv = kcf_submit_request(real_provider, ctx, cr, &params,
+		    B_FALSE);
+	}
+
+	if (rv != CRYPTO_SUCCESS && rv != CRYPTO_QUEUED) {
+		KCF_CONTEXT_REFRELE(encr_kcf_context);
+	} else
+		*ctxp = (crypto_context_t)ctx;
+
+out:
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
+	return (rv);
 }
 
 /*
@@ -622,6 +884,7 @@ crypto_encrypt_mac_update(crypto_context_t context,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
 
 	if ((kcf_mac_ctx = kcf_ctx->kc_secondctx) != NULL) {
@@ -698,7 +961,7 @@ crypto_encrypt_mac_update(crypto_context_t context,
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
 		KCF_WRAP_ENCRYPT_MAC_OPS_PARAMS(&params, KCF_OP_UPDATE,
-		    pd->pd_sid, NULL, NULL, pt, ct, NULL, NULL, NULL);
+		    ctx->cc_session, NULL, NULL, pt, ct, NULL, NULL, NULL);
 
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
@@ -726,6 +989,7 @@ int crypto_encrypt_mac_final(crypto_context_t context, crypto_dual_data_t *ct,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
 
 	if ((kcf_mac_ctx = kcf_ctx->kc_secondctx) != NULL) {
@@ -800,7 +1064,7 @@ int crypto_encrypt_mac_final(crypto_context_t context, crypto_dual_data_t *ct,
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
 		KCF_WRAP_ENCRYPT_MAC_OPS_PARAMS(&params, KCF_OP_FINAL,
-		    pd->pd_sid, NULL, NULL, NULL, ct, mac, NULL, NULL);
+		    ctx->cc_session, NULL, NULL, NULL, ct, mac, NULL, NULL);
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 out:
@@ -825,6 +1089,18 @@ crypto_mac_decrypt(crypto_mechanism_t *mac_mech,
 	    decr_key, mac_tmpl, decr_tmpl, mac, pt, crq, B_FALSE));
 }
 
+int
+crypto_mac_decrypt_prov(crypto_provider_t provider, crypto_session_id_t sid,
+    crypto_mechanism_t *mac_mech, crypto_mechanism_t *decr_mech,
+    crypto_dual_data_t *ct, crypto_key_t *mac_key, crypto_key_t *decr_key,
+    crypto_ctx_template_t mac_tmpl, crypto_ctx_template_t decr_tmpl,
+    crypto_data_t *mac, crypto_data_t *pt, crypto_call_req_t *crq)
+{
+	return (crypto_mac_decrypt_common_prov(provider, sid, mac_mech,
+	    decr_mech, ct, mac_key, decr_key, mac_tmpl, decr_tmpl, mac, pt,
+	    crq, B_FALSE));
+}
+
 /*
  * Performs an atomic dual mac/decrypt operation. The provider to use
  * is determined by the KCF dispatcher. 'mac' specifies the expected
@@ -840,6 +1116,19 @@ crypto_mac_verify_decrypt(crypto_mechanism_t *mac_mech,
 {
 	return (crypto_mac_decrypt_common(mac_mech, decr_mech, ct, mac_key,
 	    decr_key, mac_tmpl, decr_tmpl, mac, pt, crq, B_TRUE));
+}
+
+int
+crypto_mac_verify_decrypt_prov(crypto_provider_t provider,
+    crypto_session_id_t sid, crypto_mechanism_t *mac_mech,
+    crypto_mechanism_t *decr_mech, crypto_dual_data_t *ct,
+    crypto_key_t *mac_key, crypto_key_t *decr_key,
+    crypto_ctx_template_t mac_tmpl, crypto_ctx_template_t decr_tmpl,
+    crypto_data_t *mac, crypto_data_t *pt, crypto_call_req_t *crq)
+{
+	return (crypto_mac_decrypt_common_prov(provider, sid, mac_mech,
+	    decr_mech, ct, mac_key, decr_key, mac_tmpl, decr_tmpl, mac, pt,
+	    crq, B_TRUE));
 }
 
 /*
@@ -1105,6 +1394,143 @@ retry:
 	if (next_req != NULL)
 		kmem_free(next_req, sizeof (kcf_dual_req_t));
 	KCF_PROV_REFRELE(pd);
+	return (error);
+}
+
+static int
+crypto_mac_decrypt_common_prov(crypto_provider_t provider,
+    crypto_session_id_t sid, crypto_mechanism_t *mac_mech,
+    crypto_mechanism_t *decr_mech, crypto_dual_data_t *ct,
+    crypto_key_t *mac_key, crypto_key_t *decr_key,
+    crypto_ctx_template_t mac_tmpl, crypto_ctx_template_t decr_tmpl,
+    crypto_data_t *mac, crypto_data_t *pt, crypto_call_req_t *crq,
+    boolean_t do_verify)
+{
+	/*
+	 * First try to find a provider for the decryption mechanism, that
+	 * is also capable of the MAC mechanism.
+	 * We still favor optimizing the costlier decryption.
+	 */
+	int error;
+	kcf_mech_entry_t *me;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	kcf_ctx_template_t *ctx_decr_tmpl, *ctx_mac_tmpl;
+	kcf_req_params_t params;
+	kcf_mac_decrypt_ops_params_t *cmops;
+	crypto_spi_ctx_template_t spi_decr_tmpl = NULL, spi_mac_tmpl = NULL;
+
+	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		if (do_verify) {
+			error = kcf_get_hardware_provider(decr_mech->cm_type,
+			    mac_mech->cm_type,
+			    CRYPTO_OPS_OFFSET(dual_cipher_mac_ops),
+			    CRYPTO_CIPHER_MAC_OFFSET(mac_verify_decrypt_atomic),
+			    CHECK_RESTRICT(crq), pd, &real_provider);
+		} else {
+			error = kcf_get_hardware_provider(decr_mech->cm_type,
+			    mac_mech->cm_type,
+			    CRYPTO_OPS_OFFSET(dual_cipher_mac_ops),
+			    CRYPTO_CIPHER_MAC_OFFSET(mac_decrypt_atomic),
+			    CHECK_RESTRICT(crq), pd, &real_provider);
+		}
+
+		if (error != CRYPTO_SUCCESS)
+			return (error);
+	}
+
+	/*
+	 * For SW providers, check the validity of the context template
+	 * It is very rare that the generation number mis-matches, so
+	 * is acceptable to fail here, and let the consumer recover by
+	 * freeing this tmpl and create a new one for the key and new SW
+	 * provider
+	 */
+
+	if (real_provider->pd_prov_type == CRYPTO_SW_PROVIDER) {
+		if (decr_tmpl != NULL) {
+			if (kcf_get_mech_entry(decr_mech->cm_type, &me) !=
+			    KCF_SUCCESS) {
+				error = CRYPTO_MECHANISM_INVALID;
+				goto out;
+			}
+			ctx_decr_tmpl = (kcf_ctx_template_t *)decr_tmpl;
+			if (ctx_decr_tmpl->ct_generation != me->me_gen_swprov) {
+				error = CRYPTO_OLD_CTX_TEMPLATE;
+				goto out;
+			}
+			spi_decr_tmpl = ctx_decr_tmpl->ct_prov_tmpl;
+		}
+
+		if (mac_tmpl != NULL) {
+			if (kcf_get_mech_entry(mac_mech->cm_type, &me) !=
+			    KCF_SUCCESS) {
+				error = CRYPTO_MECHANISM_INVALID;
+				goto out;
+			}
+			ctx_mac_tmpl = (kcf_ctx_template_t *)mac_tmpl;
+			if (ctx_mac_tmpl->ct_generation != me->me_gen_swprov) {
+				error = CRYPTO_OLD_CTX_TEMPLATE;
+				goto out;
+			}
+			spi_mac_tmpl = ctx_mac_tmpl->ct_prov_tmpl;
+		}
+	}
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(crq, pd)) {
+		crypto_mechanism_t lmac_mech;
+		crypto_mechanism_t ldecr_mech;
+
+		/* careful! structs assignments */
+		ldecr_mech = *decr_mech;
+		KCF_SET_PROVIDER_MECHNUM(decr_mech->cm_type, real_provider,
+		    &ldecr_mech);
+
+		lmac_mech = *mac_mech;
+		KCF_SET_PROVIDER_MECHNUM(mac_mech->cm_type, real_provider,
+		    &lmac_mech);
+
+		if (do_verify)
+			error = KCF_PROV_MAC_VERIFY_DECRYPT_ATOMIC(
+			    real_provider, sid, &lmac_mech, mac_key,
+			    &ldecr_mech, decr_key, ct, mac, pt, spi_mac_tmpl,
+			    spi_decr_tmpl, KCF_SWFP_RHNDL(crq));
+		else
+			error = KCF_PROV_MAC_DECRYPT_ATOMIC(real_provider, sid,
+			    &lmac_mech, mac_key, &ldecr_mech, decr_key,
+			    ct, mac, pt, spi_mac_tmpl, spi_decr_tmpl,
+			    KCF_SWFP_RHNDL(crq));
+
+		KCF_PROV_INCRSTATS(pd, error);
+	} else {
+		KCF_WRAP_MAC_DECRYPT_OPS_PARAMS(&params,
+		    (do_verify) ? KCF_OP_MAC_VERIFY_DECRYPT_ATOMIC :
+		    KCF_OP_ATOMIC, sid, mac_key, decr_key, ct, mac, pt,
+		    spi_mac_tmpl, spi_decr_tmpl);
+
+		cmops = &(params.rp_u.mac_decrypt_params);
+
+		/* careful! structs assignments */
+		cmops->md_decr_mech = *decr_mech;
+		KCF_SET_PROVIDER_MECHNUM(decr_mech->cm_type, real_provider,
+		    &cmops->md_decr_mech);
+		cmops->md_framework_decr_mechtype = decr_mech->cm_type;
+
+		cmops->md_mac_mech = *mac_mech;
+		KCF_SET_PROVIDER_MECHNUM(mac_mech->cm_type, real_provider,
+		    &cmops->md_mac_mech);
+		cmops->md_framework_mac_mechtype = mac_mech->cm_type;
+
+		error = kcf_submit_request(real_provider, NULL, crq, &params,
+		    B_FALSE);
+	}
+
+out:
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
 	return (error);
 }
 
@@ -1429,6 +1855,140 @@ retry:
 	return (error);
 }
 
+int
+crypto_mac_decrypt_init_prov(crypto_provider_t provider,
+    crypto_session_id_t sid, crypto_mechanism_t *mac_mech,
+    crypto_mechanism_t *decr_mech, crypto_key_t *mac_key,
+    crypto_key_t *decr_key, crypto_ctx_template_t mac_tmpl,
+    crypto_ctx_template_t decr_tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *cr)
+{
+	/*
+	 * First try to find a provider for the decryption mechanism, that
+	 * is also capable of the MAC mechanism.
+	 * We still favor optimizing the costlier decryption.
+	 */
+	int rv;
+	kcf_mech_entry_t *me;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	kcf_ctx_template_t *ctx_decr_tmpl, *ctx_mac_tmpl;
+	kcf_req_params_t params;
+	kcf_mac_decrypt_ops_params_t *mdops;
+	crypto_spi_ctx_template_t spi_decr_tmpl = NULL, spi_mac_tmpl = NULL;
+	crypto_ctx_t *ctx;
+	kcf_context_t *decr_kcf_context = NULL;
+
+	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(decr_mech->cm_type,
+		    mac_mech->cm_type, CRYPTO_OPS_OFFSET(dual_cipher_mac_ops),
+		    CRYPTO_CIPHER_MAC_OFFSET(mac_decrypt_init),
+		    CHECK_RESTRICT(cr), pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
+
+	/*
+	 * For SW providers, check the validity of the context template
+	 * It is very rare that the generation number mis-matches, so
+	 * is acceptable to fail here, and let the consumer recover by
+	 * freeing this tmpl and create a new one for the key and new SW
+	 * provider
+	 * Warning! will need to change when multiple software providers
+	 * per mechanism are supported.
+	 */
+
+	if (real_provider->pd_prov_type == CRYPTO_SW_PROVIDER) {
+		if (decr_tmpl != NULL) {
+			if (kcf_get_mech_entry(decr_mech->cm_type, &me) !=
+			    KCF_SUCCESS) {
+				rv = CRYPTO_MECHANISM_INVALID;
+				goto out;
+			}
+			ctx_decr_tmpl = (kcf_ctx_template_t *)decr_tmpl;
+			if (ctx_decr_tmpl->ct_generation != me->me_gen_swprov) {
+				rv = CRYPTO_OLD_CTX_TEMPLATE;
+				goto out;
+			}
+			spi_decr_tmpl = ctx_decr_tmpl->ct_prov_tmpl;
+		}
+
+		if (mac_tmpl != NULL) {
+			if (kcf_get_mech_entry(mac_mech->cm_type, &me) !=
+			    KCF_SUCCESS) {
+				rv = CRYPTO_MECHANISM_INVALID;
+				goto out;
+			}
+			ctx_mac_tmpl = (kcf_ctx_template_t *)mac_tmpl;
+			if (ctx_mac_tmpl->ct_generation != me->me_gen_swprov) {
+				rv = CRYPTO_OLD_CTX_TEMPLATE;
+				goto out;
+			}
+			spi_mac_tmpl = ctx_mac_tmpl->ct_prov_tmpl;
+		}
+	}
+
+	ctx = kcf_new_ctx(cr, real_provider, sid);
+	if (ctx == NULL) {
+		rv = CRYPTO_HOST_MEMORY;
+		goto out;
+	}
+	decr_kcf_context = (kcf_context_t *)ctx->cc_framework_private;
+
+	/* The fast path for SW providers. */
+	if (CHECK_FASTPATH(cr, pd)) {
+		crypto_mechanism_t ldecr_mech;
+		crypto_mechanism_t lmac_mech;
+
+		/* careful! structs assignments */
+		ldecr_mech = *decr_mech;
+		KCF_SET_PROVIDER_MECHNUM(decr_mech->cm_type, real_provider,
+		    &ldecr_mech);
+
+		lmac_mech = *mac_mech;
+		KCF_SET_PROVIDER_MECHNUM(mac_mech->cm_type, real_provider,
+		    &lmac_mech);
+
+		rv = KCF_PROV_MAC_DECRYPT_INIT(real_provider, ctx, &lmac_mech,
+		    mac_key, &ldecr_mech, decr_key, spi_mac_tmpl, spi_decr_tmpl,
+		    KCF_SWFP_RHNDL(cr));
+
+		KCF_PROV_INCRSTATS(pd, rv);
+	} else {
+		KCF_WRAP_MAC_DECRYPT_OPS_PARAMS(&params, KCF_OP_INIT,
+		    sid, mac_key, decr_key, NULL, NULL, NULL,
+		    spi_mac_tmpl, spi_decr_tmpl);
+
+		mdops = &(params.rp_u.mac_decrypt_params);
+
+		/* careful! structs assignments */
+		mdops->md_decr_mech = *decr_mech;
+		KCF_SET_PROVIDER_MECHNUM(decr_mech->cm_type, real_provider,
+		    &mdops->md_decr_mech);
+		mdops->md_framework_decr_mechtype = decr_mech->cm_type;
+
+		mdops->md_mac_mech = *mac_mech;
+		KCF_SET_PROVIDER_MECHNUM(mac_mech->cm_type, real_provider,
+		    &mdops->md_mac_mech);
+		mdops->md_framework_mac_mechtype = mac_mech->cm_type;
+
+		rv = kcf_submit_request(real_provider, ctx, cr, &params,
+		    B_FALSE);
+	}
+
+	if (rv != CRYPTO_SUCCESS && rv != CRYPTO_QUEUED) {
+		KCF_CONTEXT_REFRELE(decr_kcf_context);
+	} else
+		*ctxp = (crypto_context_t)ctx;
+
+out:
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
+	return (rv);
+}
 /*
  * Continues a multi-part dual mac/decrypt operation.
  */
@@ -1449,6 +2009,7 @@ crypto_mac_decrypt_update(crypto_context_t context,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
 
 	if ((kcf_mac_ctx = kcf_ctx->kc_secondctx) != NULL) {
@@ -1511,7 +2072,7 @@ crypto_mac_decrypt_update(crypto_context_t context,
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
 		KCF_WRAP_MAC_DECRYPT_OPS_PARAMS(&params, KCF_OP_UPDATE,
-		    pd->pd_sid, NULL, NULL, ct, NULL, pt, NULL, NULL);
+		    ctx->cc_session, NULL, NULL, ct, NULL, pt, NULL, NULL);
 
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
@@ -1540,6 +2101,7 @@ crypto_mac_decrypt_final(crypto_context_t context, crypto_data_t *mac,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
 
 	if ((kcf_mac_ctx = kcf_ctx->kc_secondctx) != NULL) {
@@ -1589,7 +2151,7 @@ crypto_mac_decrypt_final(crypto_context_t context, crypto_data_t *mac,
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
 		KCF_WRAP_MAC_DECRYPT_OPS_PARAMS(&params, KCF_OP_FINAL,
-		    pd->pd_sid, NULL, NULL, NULL, mac, pt, NULL, NULL);
+		    ctx->cc_session, NULL, NULL, NULL, mac, pt, NULL, NULL);
 
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}

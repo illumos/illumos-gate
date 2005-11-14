@@ -203,6 +203,83 @@ kcf_prov_tab_lookup(crypto_provider_id_t prov_id)
 	return (prov_desc);
 }
 
+static void
+allocate_ops_v1(crypto_ops_t *src, crypto_ops_t *dst, uint_t *mech_list_count)
+{
+	if (src->co_control_ops != NULL)
+		dst->co_control_ops = kmem_alloc(sizeof (crypto_control_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_digest_ops != NULL)
+		dst->co_digest_ops = kmem_alloc(sizeof (crypto_digest_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_cipher_ops != NULL)
+		dst->co_cipher_ops = kmem_alloc(sizeof (crypto_cipher_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_mac_ops != NULL)
+		dst->co_mac_ops = kmem_alloc(sizeof (crypto_mac_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_sign_ops != NULL)
+		dst->co_sign_ops = kmem_alloc(sizeof (crypto_sign_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_verify_ops != NULL)
+		dst->co_verify_ops = kmem_alloc(sizeof (crypto_verify_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_dual_ops != NULL)
+		dst->co_dual_ops = kmem_alloc(sizeof (crypto_dual_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_dual_cipher_mac_ops != NULL)
+		dst->co_dual_cipher_mac_ops = kmem_alloc(
+		    sizeof (crypto_dual_cipher_mac_ops_t), KM_SLEEP);
+
+	if (src->co_random_ops != NULL) {
+		dst->co_random_ops = kmem_alloc(
+		    sizeof (crypto_random_number_ops_t), KM_SLEEP);
+
+		/*
+		 * Allocate storage to store the array of supported mechanisms
+		 * specified by provider. We allocate extra mechanism storage
+		 * if the provider has random_ops since we keep an internal
+		 * mechanism, SUN_RANDOM, in this case.
+		 */
+		(*mech_list_count)++;
+	}
+
+	if (src->co_session_ops != NULL)
+		dst->co_session_ops = kmem_alloc(sizeof (crypto_session_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_object_ops != NULL)
+		dst->co_object_ops = kmem_alloc(sizeof (crypto_object_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_key_ops != NULL)
+		dst->co_key_ops = kmem_alloc(sizeof (crypto_key_ops_t),
+		    KM_SLEEP);
+
+	if (src->co_provider_ops != NULL)
+		dst->co_provider_ops = kmem_alloc(
+		    sizeof (crypto_provider_management_ops_t), KM_SLEEP);
+
+	if (src->co_ctx_ops != NULL)
+		dst->co_ctx_ops = kmem_alloc(sizeof (crypto_ctx_ops_t),
+		    KM_SLEEP);
+}
+
+static void
+allocate_ops_v2(crypto_ops_t *src, crypto_ops_t *dst)
+{
+	if (src->co_mech_ops != NULL)
+		dst->co_mech_ops = kmem_alloc(sizeof (crypto_mech_ops_t),
+		    KM_SLEEP);
+}
+
 /*
  * Allocate a provider descriptor. mech_list_count specifies the
  * number of mechanisms supported by the providers, and is used
@@ -246,72 +323,9 @@ kcf_alloc_provider_desc(crypto_provider_info_t *info)
 	desc->pd_ops_vector = kmem_zalloc(sizeof (crypto_ops_t), KM_SLEEP);
 
 	if (info->pi_provider_type != CRYPTO_LOGICAL_PROVIDER) {
-		if (src_ops->control_ops != NULL)
-			desc->pd_ops_vector->control_ops = kmem_alloc(
-			    sizeof (crypto_control_ops_t), KM_SLEEP);
-
-		if (src_ops->digest_ops != NULL)
-			desc->pd_ops_vector->digest_ops = kmem_alloc(
-			    sizeof (crypto_digest_ops_t), KM_SLEEP);
-
-		if (src_ops->cipher_ops != NULL)
-			desc->pd_ops_vector->cipher_ops = kmem_alloc(
-			    sizeof (crypto_cipher_ops_t), KM_SLEEP);
-
-		if (src_ops->mac_ops != NULL)
-			desc->pd_ops_vector->mac_ops = kmem_alloc(
-			    sizeof (crypto_mac_ops_t), KM_SLEEP);
-
-		if (src_ops->sign_ops != NULL)
-			desc->pd_ops_vector->sign_ops = kmem_alloc(
-			    sizeof (crypto_sign_ops_t), KM_SLEEP);
-
-		if (src_ops->verify_ops != NULL)
-			desc->pd_ops_vector->verify_ops = kmem_alloc(
-			    sizeof (crypto_verify_ops_t), KM_SLEEP);
-
-		if (src_ops->dual_ops != NULL)
-			desc->pd_ops_vector->dual_ops = kmem_alloc(
-			    sizeof (crypto_dual_ops_t), KM_SLEEP);
-
-		if (src_ops->dual_cipher_mac_ops != NULL)
-			desc->pd_ops_vector->dual_cipher_mac_ops = kmem_alloc(
-			    sizeof (crypto_dual_cipher_mac_ops_t), KM_SLEEP);
-
-		if (src_ops->random_ops != NULL)
-			desc->pd_ops_vector->random_ops = kmem_alloc(
-			    sizeof (crypto_random_number_ops_t), KM_SLEEP);
-
-		if (src_ops->session_ops != NULL)
-			desc->pd_ops_vector->session_ops = kmem_alloc(
-			    sizeof (crypto_session_ops_t), KM_SLEEP);
-
-		if (src_ops->object_ops != NULL)
-			desc->pd_ops_vector->object_ops = kmem_alloc(
-			    sizeof (crypto_object_ops_t), KM_SLEEP);
-
-		if (src_ops->key_ops != NULL)
-			desc->pd_ops_vector->key_ops = kmem_alloc(
-			    sizeof (crypto_key_ops_t), KM_SLEEP);
-
-		if (src_ops->provider_ops != NULL)
-			desc->pd_ops_vector->provider_ops = kmem_alloc(
-			    sizeof (crypto_provider_management_ops_t),
-			    KM_SLEEP);
-
-		if (src_ops->ctx_ops != NULL)
-			desc->pd_ops_vector->ctx_ops = kmem_alloc(
-			    sizeof (crypto_ctx_ops_t), KM_SLEEP);
-
-		/*
-		 * Allocate storage to store the array of supported
-		 * mechanisms specified by provider. We allocate an extra
-		 * crypto_mech_info_t element if the provider has random_ops
-		 * since we keep an internal mechanism, SUN_RANDOM,
-		 * in this case.
-		 */
-		if (src_ops->random_ops != NULL)
-			mech_list_count++;
+		allocate_ops_v1(src_ops, desc->pd_ops_vector, &mech_list_count);
+		if (info->pi_interface_version == CRYPTO_SPI_VERSION_2)
+			allocate_ops_v2(src_ops, desc->pd_ops_vector);
 	}
 
 	desc->pd_mech_list_count = mech_list_count;
@@ -382,61 +396,65 @@ kcf_free_provider_desc(kcf_provider_desc_t *desc)
 
 	if (desc->pd_ops_vector != NULL) {
 
-		if (desc->pd_ops_vector->control_ops != NULL)
-			kmem_free(desc->pd_ops_vector->control_ops,
+		if (desc->pd_ops_vector->co_control_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_control_ops,
 			    sizeof (crypto_control_ops_t));
 
-		if (desc->pd_ops_vector->digest_ops != NULL)
-			kmem_free(desc->pd_ops_vector->digest_ops,
+		if (desc->pd_ops_vector->co_digest_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_digest_ops,
 			    sizeof (crypto_digest_ops_t));
 
-		if (desc->pd_ops_vector->cipher_ops != NULL)
-			kmem_free(desc->pd_ops_vector->cipher_ops,
+		if (desc->pd_ops_vector->co_cipher_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_cipher_ops,
 			    sizeof (crypto_cipher_ops_t));
 
-		if (desc->pd_ops_vector->mac_ops != NULL)
-			kmem_free(desc->pd_ops_vector->mac_ops,
+		if (desc->pd_ops_vector->co_mac_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_mac_ops,
 			    sizeof (crypto_mac_ops_t));
 
-		if (desc->pd_ops_vector->sign_ops != NULL)
-			kmem_free(desc->pd_ops_vector->sign_ops,
+		if (desc->pd_ops_vector->co_sign_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_sign_ops,
 			    sizeof (crypto_sign_ops_t));
 
-		if (desc->pd_ops_vector->verify_ops != NULL)
-			kmem_free(desc->pd_ops_vector->verify_ops,
+		if (desc->pd_ops_vector->co_verify_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_verify_ops,
 			    sizeof (crypto_verify_ops_t));
 
-		if (desc->pd_ops_vector->dual_ops != NULL)
-			kmem_free(desc->pd_ops_vector->dual_ops,
+		if (desc->pd_ops_vector->co_dual_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_dual_ops,
 			    sizeof (crypto_dual_ops_t));
 
-		if (desc->pd_ops_vector->dual_cipher_mac_ops != NULL)
-			kmem_free(desc->pd_ops_vector->dual_cipher_mac_ops,
+		if (desc->pd_ops_vector->co_dual_cipher_mac_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_dual_cipher_mac_ops,
 			    sizeof (crypto_dual_cipher_mac_ops_t));
 
-		if (desc->pd_ops_vector->random_ops != NULL)
-			kmem_free(desc->pd_ops_vector->random_ops,
+		if (desc->pd_ops_vector->co_random_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_random_ops,
 			    sizeof (crypto_random_number_ops_t));
 
-		if (desc->pd_ops_vector->session_ops != NULL)
-			kmem_free(desc->pd_ops_vector->session_ops,
+		if (desc->pd_ops_vector->co_session_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_session_ops,
 			    sizeof (crypto_session_ops_t));
 
-		if (desc->pd_ops_vector->object_ops != NULL)
-			kmem_free(desc->pd_ops_vector->object_ops,
+		if (desc->pd_ops_vector->co_object_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_object_ops,
 			    sizeof (crypto_object_ops_t));
 
-		if (desc->pd_ops_vector->key_ops != NULL)
-			kmem_free(desc->pd_ops_vector->key_ops,
+		if (desc->pd_ops_vector->co_key_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_key_ops,
 			    sizeof (crypto_key_ops_t));
 
-		if (desc->pd_ops_vector->provider_ops != NULL)
-			kmem_free(desc->pd_ops_vector->provider_ops,
+		if (desc->pd_ops_vector->co_provider_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_provider_ops,
 			    sizeof (crypto_provider_management_ops_t));
 
-		if (desc->pd_ops_vector->ctx_ops != NULL)
-			kmem_free(desc->pd_ops_vector->ctx_ops,
+		if (desc->pd_ops_vector->co_ctx_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_ctx_ops,
 			    sizeof (crypto_ctx_ops_t));
+
+		if (desc->pd_ops_vector->co_mech_ops != NULL)
+			kmem_free(desc->pd_ops_vector->co_mech_ops,
+			    sizeof (crypto_mech_ops_t));
 
 		kmem_free(desc->pd_ops_vector, sizeof (crypto_ops_t));
 	}
@@ -545,7 +563,8 @@ kcf_get_slot_list(uint_t *count, kcf_provider_desc_t ***array,
 	mutex_enter(&prov_tab_mutex);
 	for (i = 0; i < KCF_MAX_PROVIDERS; i++) {
 		if ((prov_desc = prov_tab[i]) != NULL &&
-		    (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER ||
+		    ((prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER &&
+		    (prov_desc->pd_flags & CRYPTO_HIDE_PROVIDER) == 0) ||
 		    prov_desc->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)) {
 			if (KCF_IS_PROV_USABLE(prov_desc) ||
 			    (unverified && KCF_IS_PROV_UNVERIFIED(prov_desc))) {
@@ -569,7 +588,8 @@ again:
 	/* fill the slot list */
 	for (i = 0, j = 0; i < KCF_MAX_PROVIDERS; i++) {
 		if ((prov_desc = prov_tab[i]) != NULL &&
-		    (prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER ||
+		    ((prov_desc->pd_prov_type == CRYPTO_HW_PROVIDER &&
+		    (prov_desc->pd_flags & CRYPTO_HIDE_PROVIDER) == 0) ||
 		    prov_desc->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)) {
 			if (KCF_IS_PROV_USABLE(prov_desc) ||
 			    (unverified && KCF_IS_PROV_UNVERIFIED(prov_desc))) {

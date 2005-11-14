@@ -91,6 +91,7 @@ typedef uint32_t crypto_keysize_unit_t;
 #define	SUN_CKM_BLOWFISH_ECB		"CKM_BLOWFISH_ECB"
 #define	SUN_CKM_AES_CBC			"CKM_AES_CBC"
 #define	SUN_CKM_AES_ECB			"CKM_AES_ECB"
+#define	SUN_CKM_AES_CTR			"CKM_AES_CTR"
 #define	SUN_CKM_RC4			"CKM_RC4"
 #define	SUN_CKM_RSA_PKCS		"CKM_RSA_PKCS"
 #define	SUN_CKM_RSA_X_509		"CKM_RSA_X_509"
@@ -248,6 +249,8 @@ typedef struct crypto_version {
 
 /* session data structure opaque to the consumer */
 typedef void *crypto_session_t;
+
+typedef void *crypto_provider_t;
 
 typedef uint_t		crypto_session_id_t;
 

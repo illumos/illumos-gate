@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,8 +78,13 @@ extern void crypto_destroy_ctx_template(crypto_ctx_template_t tmpl);
  */
 extern int crypto_digest(crypto_mechanism_t *mech, crypto_data_t *data,
     crypto_data_t *digest, crypto_call_req_t *cr);
+extern int crypto_digest_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_data_t *, crypto_data_t *,
+    crypto_call_req_t *);
 extern int crypto_digest_init(crypto_mechanism_t *mech, crypto_context_t *ctxp,
     crypto_call_req_t *cr);
+extern int crypto_digest_init_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_context_t *, crypto_call_req_t *);
 extern int crypto_digest_update(crypto_context_t ctx, crypto_data_t *data,
     crypto_call_req_t *cr);
 extern int crypto_digest_final(crypto_context_t ctx, crypto_data_t *digest,
@@ -91,11 +96,20 @@ extern int crypto_digest_final(crypto_context_t ctx, crypto_data_t *digest,
 extern int crypto_mac(crypto_mechanism_t *mech, crypto_data_t *data,
     crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *mac,
     crypto_call_req_t *cr);
+extern int crypto_mac_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_data_t *, crypto_key_t *,
+    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 extern int crypto_mac_verify(crypto_mechanism_t *mech, crypto_data_t *data,
     crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *mac,
     crypto_call_req_t *cr);
+extern int crypto_mac_verify_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_data_t *, crypto_key_t *,
+    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 extern int crypto_mac_init(crypto_mechanism_t *mech, crypto_key_t *key,
     crypto_ctx_template_t tmpl, crypto_context_t *ctxp, crypto_call_req_t *cr);
+extern int crypto_mac_init_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
+    crypto_context_t *, crypto_call_req_t *);
 extern int crypto_mac_update(crypto_context_t ctx, crypto_data_t *data,
     crypto_call_req_t *cr);
 extern int crypto_mac_final(crypto_context_t ctx, crypto_data_t *data,
@@ -107,15 +121,27 @@ extern int crypto_mac_final(crypto_context_t ctx, crypto_data_t *data,
 extern int crypto_sign(crypto_mechanism_t *mech, crypto_key_t *key,
     crypto_data_t *data, crypto_ctx_template_t tmpl,
     crypto_data_t *signature, crypto_call_req_t *cr);
+extern int crypto_sign_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
+    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 extern int crypto_sign_init(crypto_mechanism_t *mech, crypto_key_t *key,
     crypto_ctx_template_t tmpl, crypto_context_t *ctxp, crypto_call_req_t *cr);
+extern int crypto_sign_init_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
+    crypto_context_t *, crypto_call_req_t *);
 extern int crypto_sign_update(crypto_context_t ctx, crypto_data_t *data,
     crypto_call_req_t *cr);
 extern int crypto_sign_final(crypto_context_t ctx, crypto_data_t *signature,
     crypto_call_req_t *cr);
+extern int crypto_sign_recover_init_prov(crypto_provider_t,
+    crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
+    crypto_ctx_template_t tmpl, crypto_context_t *, crypto_call_req_t *);
 extern int crypto_sign_recover(crypto_mechanism_t *mech, crypto_key_t *key,
     crypto_data_t *data, crypto_ctx_template_t tmpl, crypto_data_t *signature,
     crypto_call_req_t *cr);
+extern int crypto_sign_recover_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
+    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 
 /*
  * Single and multi-part verify with public key operations.
@@ -123,15 +149,27 @@ extern int crypto_sign_recover(crypto_mechanism_t *mech, crypto_key_t *key,
 extern int crypto_verify(crypto_mechanism_t *mech, crypto_key_t *key,
     crypto_data_t *data, crypto_ctx_template_t tmpl, crypto_data_t *signature,
     crypto_call_req_t *cr);
+extern int crypto_verify_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
+    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 extern int crypto_verify_init(crypto_mechanism_t *mech, crypto_key_t *key,
     crypto_ctx_template_t tmpl, crypto_context_t *ctxp, crypto_call_req_t *cr);
+extern int crypto_verify_init_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
+    crypto_context_t *, crypto_call_req_t *);
 extern int crypto_verify_update(crypto_context_t ctx, crypto_data_t *data,
     crypto_call_req_t *cr);
 extern int crypto_verify_final(crypto_context_t ctx, crypto_data_t *signature,
     crypto_call_req_t *cr);
+extern int crypto_verify_recover_init_prov(crypto_provider_t,
+    crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
+    crypto_ctx_template_t tmpl, crypto_context_t *, crypto_call_req_t *);
 extern int crypto_verify_recover(crypto_mechanism_t *mech, crypto_key_t *key,
     crypto_data_t *signature, crypto_ctx_template_t tmpl, crypto_data_t *data,
     crypto_call_req_t *cr);
+extern int crypto_verify_recover_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
+    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 
 /*
  * Single and multi-part encryption operations.
@@ -139,8 +177,14 @@ extern int crypto_verify_recover(crypto_mechanism_t *mech, crypto_key_t *key,
 extern int crypto_encrypt(crypto_mechanism_t *mech, crypto_data_t *plaintext,
     crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *ciphertext,
     crypto_call_req_t *cr);
+extern int crypto_encrypt_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_data_t *, crypto_key_t *,
+    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 extern int crypto_encrypt_init(crypto_mechanism_t *mech, crypto_key_t *key,
     crypto_ctx_template_t tmpl, crypto_context_t *ctxp, crypto_call_req_t *cr);
+extern int crypto_encrypt_init_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
+    crypto_context_t *, crypto_call_req_t *);
 extern int crypto_encrypt_update(crypto_context_t ctx,
     crypto_data_t *plaintext, crypto_data_t *ciphertext,
     crypto_call_req_t *cr);
@@ -153,9 +197,15 @@ extern int crypto_encrypt_final(crypto_context_t ctx,
 extern int crypto_decrypt(crypto_mechanism_t *mech, crypto_data_t *ciphertext,
     crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *plaintext,
     crypto_call_req_t *cr);
+extern int crypto_decrypt_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_data_t *, crypto_key_t *,
+    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 extern int crypto_decrypt_init(crypto_mechanism_t *mech, crypto_key_t *key,
     crypto_ctx_template_t tmpl, crypto_context_t *ctxp,
     crypto_call_req_t *cr);
+extern int crypto_decrypt_init_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
+    crypto_context_t *, crypto_call_req_t *);
 extern int crypto_decrypt_update(crypto_context_t ctx,
     crypto_data_t *ciphertext, crypto_data_t *plaintext,
     crypto_call_req_t *cr);
@@ -170,11 +220,20 @@ extern int crypto_encrypt_mac(crypto_mechanism_t *encr_mech,
     crypto_key_t *encr_key, crypto_key_t *mac_key,
     crypto_ctx_template_t encr_tmpl, crypto_ctx_template_t mac_tmpl,
     crypto_dual_data_t *ct, crypto_data_t *mac, crypto_call_req_t *cr);
+extern int crypto_encrypt_mac_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_mechanism_t *, crypto_data_t *,
+    crypto_key_t *, crypto_key_t *, crypto_ctx_template_t,
+    crypto_ctx_template_t, crypto_dual_data_t *, crypto_data_t *,
+    crypto_call_req_t *);
 extern int crypto_encrypt_mac_init(crypto_mechanism_t *encr_mech,
     crypto_mechanism_t *mac_mech, crypto_key_t *encr_key,
     crypto_key_t *mac_key, crypto_ctx_template_t encr_tmpl,
     crypto_ctx_template_t mac_tmpl, crypto_context_t *ctxp,
     crypto_call_req_t *cr);
+extern int crypto_encrypt_mac_init_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_mechanism_t *, crypto_key_t *, crypto_key_t *,
+    crypto_ctx_template_t, crypto_ctx_template_t, crypto_context_t *,
+    crypto_call_req_t *);
 extern int crypto_encrypt_mac_update(crypto_context_t ctx,
     crypto_data_t *pt, crypto_dual_data_t *ct, crypto_call_req_t *cr);
 extern int crypto_encrypt_mac_final(crypto_context_t ctx,
@@ -188,7 +247,18 @@ extern int crypto_mac_decrypt(crypto_mechanism_t *mac_mech,
     crypto_key_t *mac_key, crypto_key_t *decr_key,
     crypto_ctx_template_t mac_tmpl, crypto_ctx_template_t decr_tmpl,
     crypto_data_t *mac, crypto_data_t *pt, crypto_call_req_t *cr);
+extern int crypto_mac_decrypt_prov(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *mac_mech, crypto_mechanism_t *decr_mech,
+    crypto_dual_data_t *ct, crypto_key_t *mac_key, crypto_key_t *decr_key,
+    crypto_ctx_template_t mac_tmpl, crypto_ctx_template_t decr_tmpl,
+    crypto_data_t *mac, crypto_data_t *pt, crypto_call_req_t *cr);
 extern int crypto_mac_verify_decrypt(crypto_mechanism_t *mac_mech,
+    crypto_mechanism_t *decr_mech, crypto_dual_data_t *ct,
+    crypto_key_t *mac_key, crypto_key_t *decr_key,
+    crypto_ctx_template_t mac_tmpl, crypto_ctx_template_t decr_tmpl,
+    crypto_data_t *mac, crypto_data_t *pt, crypto_call_req_t *cr);
+extern int crypto_mac_verify_decrypt_prov(crypto_provider_t,
+    crypto_session_id_t, crypto_mechanism_t *mac_mech,
     crypto_mechanism_t *decr_mech, crypto_dual_data_t *ct,
     crypto_key_t *mac_key, crypto_key_t *decr_key,
     crypto_ctx_template_t mac_tmpl, crypto_ctx_template_t decr_tmpl,
@@ -198,10 +268,73 @@ extern int crypto_mac_decrypt_init(crypto_mechanism_t *mac_mech,
     crypto_key_t *decr_key, crypto_ctx_template_t mac_tmpl,
     crypto_ctx_template_t decr_tmpl, crypto_context_t *ctxp,
     crypto_call_req_t *cr);
+extern int crypto_mac_decrypt_init_prov(crypto_provider_t,
+    crypto_session_id_t, crypto_mechanism_t *mac_mech,
+    crypto_mechanism_t *decr_mech, crypto_key_t *mac_key,
+    crypto_key_t *decr_key, crypto_ctx_template_t mac_tmpl,
+    crypto_ctx_template_t decr_tmpl, crypto_context_t *ctxp,
+    crypto_call_req_t *cr);
 extern int crypto_mac_decrypt_update(crypto_context_t ctx,
     crypto_dual_data_t *ct, crypto_data_t *pt, crypto_call_req_t *cr);
 extern int crypto_mac_decrypt_final(crypto_context_t ctx, crypto_data_t *mac,
     crypto_data_t *pt, crypto_call_req_t *cr);
+
+/* Session Management */
+extern int crypto_session_open(crypto_provider_t, crypto_session_id_t *,
+    crypto_call_req_t *);
+extern int crypto_session_close(crypto_provider_t, crypto_session_id_t,
+    crypto_call_req_t *);
+extern int crypto_session_login(crypto_provider_t, crypto_session_id_t,
+    crypto_user_type_t, char *, size_t, crypto_call_req_t *);
+extern int crypto_session_logout(crypto_provider_t, crypto_session_id_t,
+    crypto_call_req_t *);
+
+/* Object Management */
+extern int crypto_object_copy(crypto_provider_t, crypto_session_id_t,
+    crypto_object_id_t, crypto_object_attribute_t *, uint_t,
+    crypto_object_id_t *, crypto_call_req_t *);
+extern int crypto_object_create(crypto_provider_t, crypto_session_id_t,
+    crypto_object_attribute_t *, uint_t, crypto_object_id_t *,
+    crypto_call_req_t *);
+extern int crypto_object_destroy(crypto_provider_t, crypto_session_id_t,
+    crypto_object_id_t, crypto_call_req_t *);
+extern int crypto_object_get_attribute_value(crypto_provider_t,
+    crypto_session_id_t, crypto_object_id_t, crypto_object_attribute_t *,
+    uint_t, crypto_call_req_t *);
+extern int crypto_object_get_size(crypto_provider_t, crypto_session_id_t,
+    crypto_object_id_t, size_t *, crypto_call_req_t *);
+extern int crypto_object_find_final(crypto_provider_t, void *,
+    crypto_call_req_t *);
+extern int crypto_object_find_init(crypto_provider_t, crypto_session_id_t,
+    crypto_object_attribute_t *, uint_t, void **, crypto_call_req_t *);
+extern int crypto_object_find(crypto_provider_t, void *, crypto_object_id_t *,
+    uint_t *, uint_t, crypto_call_req_t *);
+extern int crypto_object_set_attribute_value(crypto_provider_t,
+    crypto_session_id_t, crypto_object_id_t, crypto_object_attribute_t *,
+    uint_t, crypto_call_req_t *);
+
+/* Key Management */
+extern int crypto_key_derive(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_object_attribute_t *,
+    uint_t, crypto_object_id_t *, crypto_call_req_t *);
+extern int crypto_key_generate(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_object_attribute_t *, uint_t,
+    crypto_object_id_t *, crypto_call_req_t *);
+extern int crypto_key_generate_pair(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_object_attribute_t *, uint_t,
+    crypto_object_attribute_t *, uint_t, crypto_object_id_t *,
+    crypto_object_id_t *, crypto_call_req_t *);
+extern int crypto_key_unwrap(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, uchar_t *, size_t *,
+    crypto_object_attribute_t *, uint_t, crypto_object_id_t *,
+    crypto_call_req_t *);
+extern int crypto_key_wrap(crypto_provider_t, crypto_session_id_t,
+    crypto_mechanism_t *, crypto_key_t *, crypto_object_id_t *, uchar_t *,
+    size_t *, crypto_call_req_t *);
+extern int crypto_key_check_prov(crypto_provider_t, crypto_mechanism_t *mech,
+    crypto_key_t *key);
+extern int crypto_key_check(crypto_mechanism_t *mech, crypto_key_t *key);
+
 
 /*
  * Routines to cancel a single asynchronous request or all asynchronous
@@ -217,6 +350,9 @@ extern void crypto_cancel_ctx(crypto_context_t ctx);
 extern crypto_mech_name_t *crypto_get_mech_list(uint_t *count, int kmflag);
 extern void crypto_free_mech_list(crypto_mech_name_t *mech_names,
     uint_t count);
+
+extern crypto_provider_t crypto_get_provider(char *, char *, char *);
+extern void crypto_release_provider(crypto_provider_t);
 
 /*
  * A kernel consumer can request to be notified when some particular event
@@ -252,8 +388,6 @@ extern crypto_bc_t crypto_bufcall_alloc(void);
 extern int crypto_bufcall_free(crypto_bc_t bc);
 extern int crypto_bufcall(crypto_bc_t bc, void (*func)(void *arg), void *arg);
 extern int crypto_unbufcall(crypto_bc_t bc);
-
-extern int crypto_key_check(crypto_mechanism_t *mech, crypto_key_t *key);
 
 /*
  * To obtain the list of key size ranges supported by a mechanism.

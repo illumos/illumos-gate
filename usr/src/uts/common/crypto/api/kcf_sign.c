@@ -29,11 +29,15 @@
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
+#include <sys/sysmacros.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/impl.h>
 #include <sys/crypto/api.h>
 #include <sys/crypto/spi.h>
 #include <sys/crypto/sched_impl.h>
+
+#define	CRYPTO_OPS_OFFSET(f)		offsetof(crypto_ops_t, co_##f)
+#define	CRYPTO_SIGN_OFFSET(f)		offsetof(crypto_sign_ops_t, f)
 
 /*
  * Sign entry points.
@@ -43,30 +47,49 @@
  * See comments for crypto_digest_init_prov().
  */
 int
-crypto_sign_init_prov(kcf_provider_desc_t *pd, crypto_session_id_t sid,
+crypto_sign_init_prov(crypto_provider_t provider, crypto_session_id_t sid,
     crypto_mechanism_t *mech, crypto_key_t *key, crypto_ctx_template_t tmpl,
     crypto_context_t *ctxp, crypto_call_req_t *crq)
 {
-	int error;
+	int rv;
 	crypto_ctx_t *ctx;
 	kcf_req_params_t params;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
 
-	/* First, allocate and initialize the canonical context */
-	if ((ctx = kcf_new_ctx(crq, pd, sid)) == NULL)
+	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(sign_ops),
+		    CRYPTO_SIGN_OFFSET(sign_init),
+		    CHECK_RESTRICT(crq), pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
+
+	/* Allocate and initialize the canonical context */
+	if ((ctx = kcf_new_ctx(crq, real_provider, sid)) == NULL) {
+		if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+			KCF_PROV_REFRELE(real_provider);
 		return (CRYPTO_HOST_MEMORY);
+	}
 
 	KCF_WRAP_SIGN_OPS_PARAMS(&params, KCF_OP_INIT, sid, mech,
 	    key, NULL, NULL, tmpl);
+	rv = kcf_submit_request(real_provider, ctx, crq, &params, B_FALSE);
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
 
-	error = kcf_submit_request(pd, ctx, crq, &params, B_FALSE);
-	if ((error == CRYPTO_SUCCESS) || (error == CRYPTO_QUEUED))
+	if ((rv == CRYPTO_SUCCESS) || (rv == CRYPTO_QUEUED))
 		*ctxp = (crypto_context_t)ctx;
 	else {
 		/* Release the hold done in kcf_new_ctx(). */
 		KCF_CONTEXT_REFRELE((kcf_context_t *)ctx->cc_framework_private);
 	}
 
-	return (error);
+	return (rv);
 }
 
 int
@@ -161,8 +184,8 @@ crypto_sign_update(crypto_context_t context, crypto_data_t *data,
 	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
 	kcf_context_t *kcf_ctx;
 	kcf_provider_desc_t *pd;
-	int error;
 	kcf_req_params_t params;
+	int rv;
 
 	if ((ctx == NULL) ||
 	    ((kcf_ctx = (kcf_context_t *)ctx->cc_framework_private) == NULL) ||
@@ -170,13 +193,14 @@ crypto_sign_update(crypto_context_t context, crypto_data_t *data,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
-	KCF_WRAP_SIGN_OPS_PARAMS(&params, KCF_OP_UPDATE, 0, NULL,
+	KCF_WRAP_SIGN_OPS_PARAMS(&params, KCF_OP_UPDATE, ctx->cc_session, NULL,
 	    NULL, data, NULL, NULL);
-	error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+	rv = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	KCF_PROV_REFRELE(pd);
 
-	return (error);
+	return (rv);
 }
 
 /*
@@ -189,7 +213,7 @@ crypto_sign_final(crypto_context_t context, crypto_data_t *signature,
 	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
 	kcf_context_t *kcf_ctx;
 	kcf_provider_desc_t *pd;
-	int error;
+	int rv;
 	kcf_req_params_t params;
 
 	if ((ctx == NULL) ||
@@ -198,30 +222,47 @@ crypto_sign_final(crypto_context_t context, crypto_data_t *signature,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
-	KCF_WRAP_SIGN_OPS_PARAMS(&params, KCF_OP_FINAL, 0, NULL,
+	KCF_WRAP_SIGN_OPS_PARAMS(&params, KCF_OP_FINAL, ctx->cc_session, NULL,
 	    NULL, NULL, signature, NULL);
-	error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+	rv = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	KCF_PROV_REFRELE(pd);
 
 	/* Release the hold done in kcf_new_ctx() during init step. */
-	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
-	return (error);
+	KCF_CONTEXT_COND_RELEASE(rv, kcf_ctx);
+	return (rv);
 }
 
 int
-crypto_sign_prov(kcf_provider_desc_t *pd, crypto_session_id_t sid,
+crypto_sign_prov(crypto_provider_t provider, crypto_session_id_t sid,
     crypto_mechanism_t *mech, crypto_key_t *key, crypto_data_t *data,
     crypto_ctx_template_t tmpl, crypto_data_t *signature,
     crypto_call_req_t *crq)
 {
 	kcf_req_params_t params;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	int rv;
 
 	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(sign_ops),
+		    CRYPTO_SIGN_OFFSET(sign_atomic), CHECK_RESTRICT(crq),
+		    pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
 	KCF_WRAP_SIGN_OPS_PARAMS(&params, KCF_OP_ATOMIC, sid, mech,
 	    key, data, signature, tmpl);
+	rv = kcf_submit_request(real_provider, NULL, crq, &params, B_FALSE);
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
 
-	return (kcf_submit_request(pd, NULL, crq, &params, B_FALSE));
+	return (rv);
 }
 
 static int
@@ -315,18 +356,34 @@ crypto_sign(crypto_mechanism_t *mech, crypto_key_t *key, crypto_data_t *data,
 }
 
 int
-crypto_sign_recover_prov(kcf_provider_desc_t *pd,
-    crypto_session_id_t sid, crypto_mechanism_t *mech, crypto_key_t *key,
-    crypto_data_t *data, crypto_ctx_template_t tmpl, crypto_data_t *signature,
+crypto_sign_recover_prov(crypto_provider_t provider, crypto_session_id_t sid,
+    crypto_mechanism_t *mech, crypto_key_t *key, crypto_data_t *data,
+    crypto_ctx_template_t tmpl, crypto_data_t *signature,
     crypto_call_req_t *crq)
 {
 	kcf_req_params_t params;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	int rv;
 
 	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(sign_ops),
+		    CRYPTO_SIGN_OFFSET(sign_recover_atomic),
+		    CHECK_RESTRICT(crq), pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
 	KCF_WRAP_SIGN_OPS_PARAMS(&params, KCF_OP_SIGN_RECOVER_ATOMIC, sid, mech,
 	    key, data, signature, tmpl);
+	rv = kcf_submit_request(real_provider, NULL, crq, &params, B_FALSE);
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
 
-	return (kcf_submit_request(pd, NULL, crq, &params, B_FALSE));
+	return (rv);
 }
 
 int
@@ -339,30 +396,49 @@ crypto_sign_recover(crypto_mechanism_t *mech, crypto_key_t *key,
 }
 
 int
-crypto_sign_recover_init_prov(kcf_provider_desc_t *pd, crypto_session_id_t sid,
-    crypto_mechanism_t *mech, crypto_key_t *key, crypto_ctx_template_t tmpl,
-    crypto_context_t *ctxp, crypto_call_req_t *crq)
+crypto_sign_recover_init_prov(crypto_provider_t provider,
+    crypto_session_id_t sid, crypto_mechanism_t *mech, crypto_key_t *key,
+    crypto_ctx_template_t tmpl, crypto_context_t *ctxp, crypto_call_req_t *crq)
 {
-	int error;
+	int rv;
 	crypto_ctx_t *ctx;
 	kcf_req_params_t params;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
 
-	/* First, allocate and initialize the canonical context */
-	if ((ctx = kcf_new_ctx(crq, pd, sid)) == NULL)
+	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(sign_ops),
+		    CRYPTO_SIGN_OFFSET(sign_recover_init),
+		    CHECK_RESTRICT(crq), pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
+
+	/* Allocate and initialize the canonical context */
+	if ((ctx = kcf_new_ctx(crq, real_provider, sid)) == NULL) {
+		if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+			KCF_PROV_REFRELE(real_provider);
 		return (CRYPTO_HOST_MEMORY);
+	}
 
 	KCF_WRAP_SIGN_OPS_PARAMS(&params, KCF_OP_SIGN_RECOVER_INIT, sid, mech,
 	    key, NULL, NULL, tmpl);
+	rv = kcf_submit_request(real_provider, ctx, crq, &params, B_FALSE);
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
 
-	error = kcf_submit_request(pd, ctx, crq, &params, B_FALSE);
-	if ((error == CRYPTO_SUCCESS) || (error == CRYPTO_QUEUED))
+	if ((rv == CRYPTO_SUCCESS) || (rv == CRYPTO_QUEUED))
 		*ctxp = (crypto_context_t)ctx;
 	else {
 		/* Release the hold done in kcf_new_ctx(). */
 		KCF_CONTEXT_REFRELE((kcf_context_t *)ctx->cc_framework_private);
 	}
 
-	return (error);
+	return (rv);
 }
 
 int

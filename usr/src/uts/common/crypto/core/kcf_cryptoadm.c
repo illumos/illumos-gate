@@ -55,7 +55,6 @@ kmutex_t soft_config_mutex;
  */
 kcf_soft_conf_entry_t *soft_config_list;
 
-static boolean_t in_soft_config_list(char *);
 static int add_soft_config(char *, uint_t, crypto_mech_name_t *);
 static int dup_mech_names(kcf_provider_desc_t *, crypto_mech_name_t **,
     uint_t *, int);
@@ -928,7 +927,7 @@ get_sw_provider_for_mech(crypto_mech_name_t mech, char **name)
  * This routine searches the soft_config_list for the specified
  * software provider, returning B_TRUE if it is in the list.
  */
-static boolean_t
+boolean_t
 in_soft_config_list(char *provider_name)
 {
 	kcf_soft_conf_entry_t *p;

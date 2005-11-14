@@ -92,7 +92,12 @@
 #include <sys/sysmacros.h>
 #include <sys/crypto/impl.h>
 #include <sys/crypto/sched_impl.h>
+
 #include <sys/sha2.h>
+#include <aes/aes_cbc_crypt.h>
+#include <des/des_impl.h>
+#include <blowfish/blowfish_impl.h>
+
 /*
  * Debugging macros.
  */
@@ -217,6 +222,7 @@ typedef enum dprov_mech_type {
 	BLOWFISH_ECB_MECH_INFO_TYPE,	/* SUN_CKM_BLOWFISH_ECB */
 	AES_CBC_MECH_INFO_TYPE,		/* SUN_CKM_AES_CBC */
 	AES_ECB_MECH_INFO_TYPE,		/* SUN_CKM_AES_ECB */
+	AES_CTR_MECH_INFO_TYPE,		/* SUN_CKM_AES_CTR */
 	RC4_MECH_INFO_TYPE,		/* SUN_CKM_RC4 */
 	RSA_PKCS_MECH_INFO_TYPE,	/* SUN_CKM_RSA_PKCS */
 	RSA_X_509_MECH_INFO_TYPE,	/* SUN_CKM_RSA_X_509 */
@@ -443,6 +449,13 @@ static crypto_mech_info_t dprov_mech_info_tab[] = {
 	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
 	/* AES-ECB */
 	{SUN_CKM_AES_ECB, AES_ECB_MECH_INFO_TYPE,
+	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_DECRYPT | CRYPTO_FG_ENCRYPT_MAC |
+	    CRYPTO_FG_MAC_DECRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
+	    CRYPTO_FG_DECRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
+	    CRYPTO_FG_MAC_DECRYPT_ATOMIC,
+	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	/* AES-CTR */
+	{SUN_CKM_AES_CTR, AES_CTR_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_DECRYPT | CRYPTO_FG_ENCRYPT_MAC |
 	    CRYPTO_FG_MAC_DECRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT_ATOMIC | CRYPTO_FG_ENCRYPT_MAC_ATOMIC |
@@ -868,10 +881,22 @@ static crypto_provider_management_ops_t dprov_management_ops = {
 };
 
 static int dprov_free_context(crypto_ctx_t *);
+static int dprov_copyin_mechanism(crypto_provider_handle_t,
+    crypto_mechanism_t *, crypto_mechanism_t *, int *error, int);
+static int dprov_copyout_mechanism(crypto_provider_handle_t,
+    crypto_mechanism_t *, crypto_mechanism_t *, int *error, int);
+static int dprov_free_mechanism(crypto_provider_handle_t,
+    crypto_mechanism_t *);
 
 static crypto_ctx_ops_t dprov_ctx_ops = {
 	NULL,
 	dprov_free_context
+};
+
+static crypto_mech_ops_t dprov_mech_ops = {
+	dprov_copyin_mechanism,
+	dprov_copyout_mechanism,
+	dprov_free_mechanism
 };
 
 static crypto_ops_t dprov_crypto_ops = {
@@ -888,7 +913,8 @@ static crypto_ops_t dprov_crypto_ops = {
 	&dprov_object_ops,
 	&dprov_key_ops,
 	&dprov_management_ops,
-	&dprov_ctx_ops
+	&dprov_ctx_ops,
+	&dprov_mech_ops
 };
 
 
@@ -963,6 +989,7 @@ typedef struct dprov_object {
 #define	DPROV_CKA_TOKEN			0x00000001
 #define	DPROV_CKA_PRIVATE		0x00000002
 #define	DPROV_CKA_VALUE			0x00000011
+#define	DPROV_CKA_CERTIFICATE_TYPE	0x00000080
 #define	DPROV_CKA_KEY_TYPE		0x00000100
 #define	DPROV_CKA_ENCRYPT		0x00000104
 #define	DPROV_CKA_DECRYPT		0x00000105
@@ -980,6 +1007,7 @@ typedef struct dprov_object {
 #define	DPROV_CKA_VALUE_BITS		0x00000160
 #define	DPROV_CKA_VALUE_LEN		0x00000161
 #define	DPROV_CKA_EXTRACTABLE		0x00000162
+#define	DPROV_HW_FEATURE_TYPE		0x00000300
 
 /*
  * Object classes from PKCS#11
@@ -1036,7 +1064,7 @@ typedef struct dprov_session {
 
 
 static crypto_provider_info_t dprov_prov_info = {
-	CRYPTO_SPI_VERSION_1,
+	CRYPTO_SPI_VERSION_2,
 	"Dummy Pseudo HW Provider",
 	CRYPTO_HW_PROVIDER,
 	NULL,				/* pi_provider_dev */
@@ -1602,6 +1630,9 @@ dprov_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* initialized done by init_token entry point */
 	softc->ds_token_initialized = B_TRUE;
 
+	(void) memset(softc->ds_label, ' ', CRYPTO_EXT_SIZE_LABEL);
+	bcopy("Dummy Pseudo HW Provider", softc->ds_label, 24);
+
 	bcopy("changeme", softc->ds_user_pin, 8);
 	softc->ds_user_pin_len = 8;
 	softc->ds_user_pin_set = B_TRUE;
@@ -2075,6 +2106,7 @@ dprov_valid_cipher_mech(crypto_mech_type_t mech_type)
 		mech_type == BLOWFISH_ECB_MECH_INFO_TYPE ||
 		mech_type == AES_CBC_MECH_INFO_TYPE ||
 		mech_type == AES_ECB_MECH_INFO_TYPE ||
+		mech_type == AES_CTR_MECH_INFO_TYPE ||
 		mech_type == RC4_MECH_INFO_TYPE ||
 		mech_type == RSA_PKCS_MECH_INFO_TYPE ||
 		mech_type == RSA_X_509_MECH_INFO_TYPE ||
@@ -4045,6 +4077,244 @@ dprov_free_context(crypto_ctx_t *ctx)
 	return (CRYPTO_SUCCESS);
 }
 
+/*
+ * Resource control checks don't need to be done. Why? Because this routine
+ * knows the size of the structure, and it can't be overridden by a user.
+ * This is different from the crypto module, which has no knowledge of
+ * specific mechanisms, and therefore has to trust specified size of the
+ * parameter.  This trust, or lack of trust, is why the size of the
+ * parameter has to be charged against the project resource control.
+ */
+static int
+copyin_aes_ctr_mech(crypto_mechanism_t *in_mech, crypto_mechanism_t *out_mech,
+    int *out_error, int mode)
+{
+	STRUCT_DECL(crypto_mechanism, mech);
+	STRUCT_DECL(CK_AES_CTR_PARAMS, params);
+	CK_AES_CTR_PARAMS *aes_ctr_params;
+	caddr_t pp;
+	size_t param_len;
+	int error = 0;
+	int rv = 0;
+
+	STRUCT_INIT(mech, mode);
+	STRUCT_INIT(params, mode);
+	bcopy(in_mech, STRUCT_BUF(mech), STRUCT_SIZE(mech));
+	pp = STRUCT_FGETP(mech, cm_param);
+	param_len = STRUCT_FGET(mech, cm_param_len);
+
+	if (param_len != STRUCT_SIZE(params)) {
+		rv = CRYPTO_ARGUMENTS_BAD;
+		goto out;
+	}
+
+	out_mech->cm_type = STRUCT_FGET(mech, cm_type);
+	out_mech->cm_param = NULL;
+	out_mech->cm_param_len = 0;
+	if (pp != NULL) {
+		if (copyin((char *)pp, STRUCT_BUF(params), param_len) != 0) {
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+		/* allocate param structure and counter block */
+		aes_ctr_params = kmem_alloc(sizeof (CK_AES_CTR_PARAMS) + 16,
+		    KM_NOSLEEP);
+		if (aes_ctr_params == NULL) {
+			rv = CRYPTO_HOST_MEMORY;
+			goto out;
+		}
+		aes_ctr_params->cb = (uchar_t *)aes_ctr_params +
+		    sizeof (CK_AES_CTR_PARAMS);
+		aes_ctr_params->ulCounterBits = STRUCT_FGET(params,
+		    ulCounterBits);
+		if (copyin((char *)STRUCT_FGETP(params, cb),
+		    &aes_ctr_params->cb[0], 16) != 0) {
+			kmem_free(aes_ctr_params,
+			    sizeof (CK_AES_CTR_PARAMS) + 16);
+			out_mech->cm_param = NULL;
+			error = EFAULT;
+			goto out;
+		}
+		out_mech->cm_param = (char *)aes_ctr_params;
+		out_mech->cm_param_len = sizeof (CK_AES_CTR_PARAMS);
+	}
+out:
+	*out_error = error;
+	return (rv);
+}
+
+/* ARGSUSED */
+static int
+copyout_aes_ctr_mech(crypto_mechanism_t *in_mech, crypto_mechanism_t *out_mech,
+    int *out_error, int mode)
+{
+	STRUCT_DECL(crypto_mechanism, mech);
+	STRUCT_DECL(CK_AES_CTR_PARAMS, params);
+	uint8_t cb[16];
+	caddr_t pp;
+	size_t param_len;
+	int error = 0;
+	int rv = 0;
+
+	STRUCT_INIT(mech, mode);
+	STRUCT_INIT(params, mode);
+	bcopy(out_mech, STRUCT_BUF(mech), STRUCT_SIZE(mech));
+	pp = STRUCT_FGETP(mech, cm_param);
+	param_len = STRUCT_FGET(mech, cm_param_len);
+	if (param_len != STRUCT_SIZE(params)) {
+		rv = CRYPTO_ARGUMENTS_BAD;
+		goto out;
+	}
+
+	if (copyin((char *)pp, STRUCT_BUF(params), param_len) != 0) {
+		error = EFAULT;
+		goto out;
+	}
+
+	/* for testing, overwrite the iv with 16 X 'A' */
+	if (pp != NULL) {
+		(void) memset(cb, 'A', 16);
+		if (copyout(cb, STRUCT_FGETP(params, cb),  16) != 0) {
+			error = EFAULT;
+			goto out;
+		}
+	}
+out:
+	*out_error = error;
+	return (rv);
+}
+
+/* ARGSUSED */
+static int
+dprov_copyin_mechanism(crypto_provider_handle_t provider,
+    crypto_mechanism_t *umech, crypto_mechanism_t *kmech,
+    int *out_error, int mode)
+{
+	STRUCT_DECL(crypto_mechanism, mech);
+	size_t param_len, expected_param_len;
+	caddr_t pp;
+	char *param;
+	int rv;
+	int error = 0;
+
+	ASSERT(!servicing_interrupt());
+
+	STRUCT_INIT(mech, mode);
+	bcopy(umech, STRUCT_BUF(mech), STRUCT_SIZE(mech));
+	pp = STRUCT_FGETP(mech, cm_param);
+	param_len = STRUCT_FGET(mech, cm_param_len);
+
+	kmech->cm_param = NULL;
+	kmech->cm_param_len = 0;
+
+	switch (kmech->cm_type) {
+	case AES_ECB_MECH_INFO_TYPE:
+	case BLOWFISH_ECB_MECH_INFO_TYPE:
+	case DES_ECB_MECH_INFO_TYPE:
+	case DES3_ECB_MECH_INFO_TYPE:
+		rv = CRYPTO_SUCCESS;
+		goto out;
+
+	case DES_CBC_MECH_INFO_TYPE:
+	case DES3_CBC_MECH_INFO_TYPE:
+		expected_param_len = DES_BLOCK_LEN;
+		break;
+
+	case BLOWFISH_CBC_MECH_INFO_TYPE:
+		expected_param_len = BLOWFISH_BLOCK_LEN;
+		break;
+
+	case AES_CBC_MECH_INFO_TYPE:
+		expected_param_len = AES_BLOCK_LEN;
+		break;
+
+	case AES_CTR_MECH_INFO_TYPE:
+	case SHA1_KEY_DERIVATION_MECH_INFO_TYPE:	/* for testing only */
+		rv = copyin_aes_ctr_mech(umech, kmech, &error, mode);
+		goto out;
+
+	case RC4_MECH_INFO_TYPE:
+	case RSA_PKCS_MECH_INFO_TYPE:
+	case RSA_X_509_MECH_INFO_TYPE:
+	case MD5_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA1_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA256_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA384_RSA_PKCS_MECH_INFO_TYPE:
+	case SHA512_RSA_PKCS_MECH_INFO_TYPE:
+		rv = CRYPTO_SUCCESS;
+		goto out;
+
+	default:
+		rv = CRYPTO_MECHANISM_INVALID;
+		goto out;
+	}
+
+	if (param_len != expected_param_len) {
+		rv = CRYPTO_MECHANISM_PARAM_INVALID;
+		goto out;
+	}
+	if (pp == NULL) {
+		rv = CRYPTO_MECHANISM_PARAM_INVALID;
+		goto out;
+	}
+	if ((param = kmem_alloc(param_len, KM_NOSLEEP)) == NULL) {
+		rv = CRYPTO_HOST_MEMORY;
+		goto out;
+	}
+	if (copyin((char *)pp, param, param_len) != 0) {
+		kmem_free(param, param_len);
+		error = EFAULT;
+		rv = CRYPTO_FAILED;
+		goto out;
+	}
+	kmech->cm_param = (char *)param;
+	kmech->cm_param_len = param_len;
+	rv = CRYPTO_SUCCESS;
+out:
+	*out_error = error;
+	return (rv);
+}
+
+/* ARGSUSED */
+static int
+dprov_copyout_mechanism(crypto_provider_handle_t provider,
+    crypto_mechanism_t *kmech, crypto_mechanism_t *umech,
+    int *out_error, int mode)
+{
+	ASSERT(!servicing_interrupt());
+
+	switch (kmech->cm_type) {
+	case AES_CTR_MECH_INFO_TYPE:
+	case SHA1_KEY_DERIVATION_MECH_INFO_TYPE:	/* for testing only */
+		return (copyout_aes_ctr_mech(kmech, umech, out_error, mode));
+	default:
+		return (CRYPTO_MECHANISM_INVALID);
+	}
+}
+
+/*
+ * Free mechanism parameter that was allocated by the provider.
+ */
+/* ARGSUSED */
+static int
+dprov_free_mechanism(crypto_provider_handle_t provider,
+    crypto_mechanism_t *mech)
+{
+	size_t len;
+
+	if (mech->cm_param == NULL || mech->cm_param_len == 0)
+		return (CRYPTO_SUCCESS);
+
+	if (mech->cm_type == AES_CTR_MECH_INFO_TYPE ||
+	    mech->cm_type == SHA1_KEY_DERIVATION_MECH_INFO_TYPE) {
+		len = sizeof (CK_AES_CTR_PARAMS) + 16;
+	} else {
+		len = mech->cm_param_len;
+	}
+	kmem_free(mech->cm_param, len);
+	return (CRYPTO_SUCCESS);
+}
 
 /*
  * Allocate a dprov taskq request and initialize the common fields.
@@ -4540,9 +4810,9 @@ dprov_digest_task(dprov_req_t *taskq_req)
 			break;
 
 		/* use a session id of zero since we use a software provider */
-		error = crypto_digest_prov(&mech,
+		error = crypto_digest_prov(pd, 0, &mech,
 		    taskq_req->dr_digest_req.dr_data,
-		    taskq_req->dr_digest_req.dr_digest, NULL, pd, 0);
+		    taskq_req->dr_digest_req.dr_digest, NULL);
 
 		/* release provider reference */
 		KCF_PROV_REFRELE(pd);
@@ -4652,15 +4922,13 @@ dprov_mac_task(dprov_req_t *taskq_req)
 
 		/* use a session id of zero since we use a software provider */
 		if (taskq_req->dr_type == DPROV_REQ_MAC_ATOMIC)
-			error = crypto_mac_prov(&mech,
+			error = crypto_mac_prov(pd, 0, &mech,
 			    taskq_req->dr_mac_req.dr_data,
-			    &key, NULL, taskq_req->dr_mac_req.dr_mac, NULL,
-			    pd, 0);
+			    &key, NULL, taskq_req->dr_mac_req.dr_mac, NULL);
 		else
-			error = crypto_mac_verify_prov(&mech,
+			error = crypto_mac_verify_prov(pd, 0, &mech,
 			    taskq_req->dr_mac_req.dr_data,
-			    &key, NULL, taskq_req->dr_mac_req.dr_mac, NULL,
-			    pd, 0);
+			    &key, NULL, taskq_req->dr_mac_req.dr_mac, NULL);
 
 		/* release provider reference */
 		KCF_PROV_REFRELE(pd);
@@ -5222,16 +5490,15 @@ dprov_cipher_task(dprov_req_t *taskq_req)
 
 		/* use a session id of zero since we use a software provider */
 		if (taskq_req->dr_type == DPROV_REQ_ENCRYPT_ATOMIC)
-			error = crypto_encrypt_prov(&mech,
+			error = crypto_encrypt_prov(pd, 0, &mech,
 			    taskq_req->dr_cipher_req.dr_plaintext,
 			    keyp, NULL,
-			    taskq_req->dr_cipher_req.dr_ciphertext, NULL, pd,
-			    0);
+			    taskq_req->dr_cipher_req.dr_ciphertext, NULL);
 		else
-			error = crypto_decrypt_prov(&mech,
+			error = crypto_decrypt_prov(pd, 0, &mech,
 			    taskq_req->dr_cipher_req.dr_ciphertext,
 			    keyp, NULL,
-			    taskq_req->dr_cipher_req.dr_plaintext, NULL, pd, 0);
+			    taskq_req->dr_cipher_req.dr_plaintext, NULL);
 
 		/* release provider reference */
 		KCF_PROV_REFRELE(pd);
@@ -5258,7 +5525,7 @@ dprov_cipher_mac_key_pd(dprov_state_t *softc, crypto_session_id_t sid,
 
 	/* get the cipher key value */
 	mutex_enter(&softc->ds_lock);
-	error = dprov_key_value_secret(softc, sid, taskq_req->dr_type,
+	error = dprov_key_value_secret(softc, sid, DPROV_REQ_ENCRYPT_ATOMIC,
 	    taskq_req->dr_cipher_mac_req.mr_cipher_key, cipher_key);
 	if (error != CRYPTO_SUCCESS) {
 		mutex_exit(&softc->ds_lock);
@@ -5266,7 +5533,7 @@ dprov_cipher_mac_key_pd(dprov_state_t *softc, crypto_session_id_t sid,
 	}
 
 	/* get the mac key value */
-	error = dprov_key_value_secret(softc, sid, taskq_req->dr_type,
+	error = dprov_key_value_secret(softc, sid, DPROV_REQ_MAC_ATOMIC,
 	    taskq_req->dr_cipher_mac_req.mr_mac_key, mac_key);
 	mutex_exit(&softc->ds_lock);
 	if (error != CRYPTO_SUCCESS)
@@ -5525,17 +5792,17 @@ dprov_cipher_mac_task(dprov_req_t *taskq_req)
 			break;
 
 		/* do the atomic encrypt */
-		if ((error = crypto_encrypt_prov(
+		if ((error = crypto_encrypt_prov(cipher_pd, 0,
 		    &cipher_mech, plaintext_tmp, &cipher_key, NULL,
-		    ciphertext_tmp, NULL, cipher_pd, 0)) != CRYPTO_SUCCESS)
+		    ciphertext_tmp, NULL)) != CRYPTO_SUCCESS)
 			break;
 
 		/* do the atomic mac */
 		mac_data = cipher_data;
 		mac_data.cd_length = dual_data->dd_len2;
 		mac_data.cd_offset = dual_data->dd_offset2;
-		error = crypto_mac_prov(&mac_mech, &mac_data, &mac_key, NULL,
-		    taskq_req->dr_cipher_mac_req.mr_mac, NULL, mac_pd, 0);
+		error = crypto_mac_prov(mac_pd, 0, &mac_mech, &mac_data,
+		    &mac_key, NULL, taskq_req->dr_cipher_mac_req.mr_mac, NULL);
 
 		dual_data->dd_len1 = cipher_data.cd_length;
 
@@ -5649,14 +5916,14 @@ dprov_cipher_mac_task(dprov_req_t *taskq_req)
 
 		/* do the atomic mac */
 		if (taskq_req->dr_type == DPROV_REQ_MAC_DECRYPT_ATOMIC)
-			error = crypto_mac_prov(&mac_mech, &cipher_data,
-			    &mac_key, NULL, taskq_req->dr_cipher_mac_req.mr_mac,
-			    NULL, mac_pd, 0);
+			error = crypto_mac_prov(mac_pd, 0, &mac_mech,
+			    &cipher_data, &mac_key, NULL,
+			    taskq_req->dr_cipher_mac_req.mr_mac, NULL);
 		else
 			/* DPROV_REQ_MAC_VERIFY_DECRYPT_ATOMIC */
-			error = crypto_mac_verify_prov(&mac_mech, &cipher_data,
-			    &mac_key, NULL, taskq_req->dr_cipher_mac_req.mr_mac,
-			    NULL, mac_pd, 0);
+			error = crypto_mac_verify_prov(mac_pd, 0, &mac_mech,
+			    &cipher_data, &mac_key, NULL,
+			    taskq_req->dr_cipher_mac_req.mr_mac, NULL);
 
 		if (error != CRYPTO_SUCCESS)
 			break;
@@ -5664,9 +5931,9 @@ dprov_cipher_mac_task(dprov_req_t *taskq_req)
 		/* do the atomic decrypt */
 		cipher_data.cd_length = dual_data->dd_len2;
 		cipher_data.cd_offset = dual_data->dd_offset2;
-		error = crypto_decrypt_prov(&cipher_mech, &cipher_data,
-		    &cipher_key, NULL, taskq_req->dr_cipher_mac_req.mr_data,
-		    NULL, cipher_pd, 0);
+		error = crypto_decrypt_prov(cipher_pd, 0, &cipher_mech,
+		    &cipher_data, &cipher_key, NULL,
+		    taskq_req->dr_cipher_mac_req.mr_data, NULL);
 
 		break;
 	}
@@ -5914,6 +6181,31 @@ dprov_session_task(dprov_req_t *taskq_req)
 	DPROV_DEBUG(D_SESSION, ("(%d) dprov_session_task: end\n", instance));
 }
 
+/* return true if attribute is defined to be a PKCS#11 long */
+static boolean_t
+fixed_size_attribute(crypto_attr_type_t type)
+{
+	return (type == DPROV_CKA_CLASS ||
+	    type == DPROV_CKA_CERTIFICATE_TYPE ||
+	    type == DPROV_CKA_KEY_TYPE ||
+	    type == DPROV_HW_FEATURE_TYPE);
+}
+
+/*
+ * Attributes defined to be a PKCS#11 long causes problems for dprov
+ * because 32-bit applications set the size to 4 and 64-bit applications
+ * set the size to 8. dprov always stores these fixed-size attributes
+ * as uint32_t.
+ */
+static ssize_t
+attribute_size(crypto_attr_type_t type, ssize_t len)
+{
+	if (fixed_size_attribute(type))
+		return (sizeof (uint32_t));
+
+	return (len);
+}
+
 /*
  * taskq dispatcher function for object management operations.
  */
@@ -6011,6 +6303,9 @@ dprov_object_task(dprov_req_t *taskq_req)
 		break;
 
 	case DPROV_REQ_OBJECT_GET_ATTRIBUTE_VALUE: {
+		crypto_attr_type_t type;
+		size_t olen, tlen;
+		offset_t offset;
 		int tmpl_idx;
 		int object_idx;
 		ulong_t class = DPROV_CKO_DATA;
@@ -6037,17 +6332,16 @@ dprov_object_task(dprov_req_t *taskq_req)
 			 * Attribute can't be revealed if the CKA_EXTRACTABLE
 			 * attribute is set to false.
 			 */
+			type = template[tmpl_idx].oa_type;
 			if (!extractable && class == DPROV_CKO_SECRET_KEY) {
-				if (template[tmpl_idx].oa_type ==
-				    DPROV_CKA_VALUE) {
+				if (type == DPROV_CKA_VALUE) {
 					template[tmpl_idx].oa_value_len = -1;
 					error = CRYPTO_ATTRIBUTE_SENSITIVE;
 					continue;
 				}
 			}
 			if (!extractable && class == DPROV_CKO_PRIVATE_KEY) {
-				if (template[tmpl_idx].oa_type ==
-				    DPROV_CKA_PRIVATE_EXPONENT) {
+				if (type == DPROV_CKA_PRIVATE_EXPONENT) {
 					template[tmpl_idx].oa_value_len = -1;
 					error = CRYPTO_ATTRIBUTE_SENSITIVE;
 					continue;
@@ -6055,7 +6349,7 @@ dprov_object_task(dprov_req_t *taskq_req)
 			}
 
 			object_idx = dprov_find_attr(object->do_attr,
-			    DPROV_MAX_ATTR, template[tmpl_idx].oa_type);
+			    DPROV_MAX_ATTR, type);
 			if (object_idx == -1) {
 				/* attribute not found in object */
 				template[tmpl_idx].oa_value_len = -1;
@@ -6063,28 +6357,42 @@ dprov_object_task(dprov_req_t *taskq_req)
 				continue;
 			}
 
+			tlen = template[tmpl_idx].oa_value_len;
+			olen = object->do_attr[object_idx].oa_value_len;
+			/* return attribute length */
 			if (template[tmpl_idx].oa_value == NULL) {
-				/* return attribute length */
-				template[tmpl_idx].oa_value_len =
-				    object->do_attr[object_idx].oa_value_len;
+				/*
+				 * The size of the attribute is set by the
+				 * library according to the data model of the
+				 * application, so don't overwrite it with
+				 * dprov's size.
+				 */
+				if (!fixed_size_attribute(type))
+					template[tmpl_idx].oa_value_len = olen;
 				continue;
 			}
-			if (template[tmpl_idx].oa_value_len <
-			    object->do_attr[object_idx].oa_value_len) {
-				/*
-				 * Template buffer for attribute value too
-				 * small.
-				 */
+
+			if (tlen < olen) {
 				template[tmpl_idx].oa_value_len = -1;
 				error = CRYPTO_BUFFER_TOO_SMALL;
 				continue;
 			}
-			/* copy attribute value, update length */
+
+			/* copy attribute value */
+			bzero(template[tmpl_idx].oa_value, tlen);
+
+			offset = 0;
+#ifdef _BIG_ENDIAN
+			if (fixed_size_attribute(type)) {
+				offset = tlen - olen;
+			}
+#endif
 			bcopy(object->do_attr[object_idx].oa_value,
-			    template[tmpl_idx].oa_value,
-			    object->do_attr[object_idx].oa_value_len);
-			template[tmpl_idx].oa_value_len =
-			    object->do_attr[object_idx].oa_value_len;
+			    &template[tmpl_idx].oa_value[offset], olen);
+
+			/* don't update length for fixed-size attributes */
+			if (!fixed_size_attribute(type))
+				template[tmpl_idx].oa_value_len = olen;
 		}
 
 		break;
@@ -6776,8 +7084,8 @@ destroy_public_object:
 		ciphertext.cd_raw.iov_len = ciphertext.cd_length;
 		ciphertext.cd_miscdata = NULL;
 
-		error = crypto_encrypt_prov(&mech, &plaintext, keyp,
-		    NULL, &ciphertext, NULL, pd, 0);
+		error = crypto_encrypt_prov(pd, 0, &mech, &plaintext, keyp,
+		    NULL, &ciphertext, NULL);
 
 		KCF_PROV_REFRELE(pd);
 		if (error == CRYPTO_SUCCESS ||
@@ -6859,8 +7167,8 @@ destroy_public_object:
 		plaintext.cd_raw.iov_len = wrapped_key_len;
 		plaintext.cd_miscdata = NULL;
 
-		error = crypto_decrypt_prov(&mech, &ciphertext, keyp,
-		    NULL, &plaintext, NULL, pd, 0);
+		error = crypto_decrypt_prov(pd, 0, &mech, &ciphertext, keyp,
+		    NULL, &plaintext, NULL);
 
 		KCF_PROV_REFRELE(pd);
 
@@ -7047,8 +7355,8 @@ free_unwrapped_key:
 		digest.cd_raw.iov_base = digest_buf;
 		digest.cd_raw.iov_len = hash_size;
 
-		error = crypto_digest_prov(&digest_mech, &data,
-		    &digest, NULL, pd, 0);
+		error = crypto_digest_prov(pd, 0, &digest_mech, &data,
+		    &digest, NULL);
 
 		KCF_PROV_REFRELE(pd);
 
@@ -7349,6 +7657,7 @@ dprov_key_can_use(dprov_object_t *object, dprov_req_type_t req_type)
 	case DPROV_REQ_SIGN_ATOMIC:
 	case DPROV_REQ_MAC_INIT:
 	case DPROV_REQ_MAC_ATOMIC:
+	case DPROV_REQ_MAC_VERIFY_ATOMIC:
 		rv = dprov_get_object_attr_boolean(object,
 		    DPROV_CKA_SIGN, &ret);
 		break;
@@ -7693,7 +8002,6 @@ dprov_template_can_create(dprov_session_t *session,
 	return (CRYPTO_SUCCESS);
 }
 
-
 /*
  * Create an object from the specified template. Checks whether the
  * object can be created according to its attributes and the state
@@ -7715,6 +8023,9 @@ dprov_create_object_from_template(dprov_state_t *softc,
 	int error;
 	uint_t attr;
 	uint_t oattr;
+	crypto_attr_type_t type;
+	size_t old_len, new_len;
+	offset_t offset;
 
 	if (nattr > DPROV_MAX_ATTR)
 		return (CRYPTO_HOST_MEMORY);
@@ -7765,19 +8076,29 @@ dprov_create_object_from_template(dprov_state_t *softc,
 	for (attr = 0, oattr = 0; attr < nattr; attr++) {
 		if (template[attr].oa_value == NULL)
 			continue;
-		object->do_attr[oattr].oa_type = template[attr].oa_type;
-		if (template[attr].oa_type == DPROV_CKA_EXTRACTABLE) {
+		type = template[attr].oa_type;
+		old_len = template[attr].oa_value_len;
+		new_len = attribute_size(type, old_len);
+
+		if (type == DPROV_CKA_EXTRACTABLE) {
 			extractable_attribute_present = B_TRUE;
-		} else if (template[attr].oa_type == DPROV_CKA_PRIVATE) {
+		} else if (type == DPROV_CKA_PRIVATE) {
 			private_attribute_present = B_TRUE;
 		}
-		object->do_attr[oattr].oa_value_len =
-		    template[attr].oa_value_len;
+		object->do_attr[oattr].oa_type = type;
+		object->do_attr[oattr].oa_value_len = new_len;
 
-		object->do_attr[oattr].oa_value = kmem_alloc(
-		    template[attr].oa_value_len, KM_SLEEP);
-		bcopy(template[attr].oa_value, object->do_attr[oattr].oa_value,
-		    template[attr].oa_value_len);
+		object->do_attr[oattr].oa_value = kmem_zalloc(new_len,
+		    KM_SLEEP);
+
+		offset = 0;
+#ifdef _BIG_ENDIAN
+		if (fixed_size_attribute(type)) {
+			offset = old_len - new_len;
+		}
+#endif
+		bcopy(&template[attr].oa_value[offset],
+		    object->do_attr[oattr].oa_value, new_len);
 		oattr++;
 	}
 
@@ -7803,11 +8124,16 @@ dprov_create_object_from_template(dprov_state_t *softc,
 
 /*
  * Checks whether or not the object matches the specified attributes.
+ *
+ * PKCS#11 attributes which are longs are stored in uint32_t containers
+ * so they can be matched by both 32 and 64-bit applications.
  */
 static boolean_t
 dprov_attributes_match(dprov_object_t *object,
     crypto_object_attribute_t *template, uint_t nattr)
 {
+	crypto_attr_type_t type;
+	size_t tlen, olen, diff;
 	int ta_idx;	/* template attribute index */
 	int oa_idx;	/* object attribute index */
 
@@ -7817,21 +8143,27 @@ dprov_attributes_match(dprov_object_t *object,
 			continue;
 
 		/* find attribute in object */
-		oa_idx = dprov_find_attr(object->do_attr, DPROV_MAX_ATTR,
-		    template[ta_idx].oa_type);
+		type = template[ta_idx].oa_type;
+		oa_idx = dprov_find_attr(object->do_attr, DPROV_MAX_ATTR, type);
 
 		if (oa_idx == -1)
 			/* attribute not found in object */
 			return (B_FALSE);
 
-		if (template[ta_idx].oa_value_len !=
-		    object->do_attr[oa_idx].oa_value_len)
-			/* value length mismatch */
+		tlen = template[ta_idx].oa_value_len;
+		olen = object->do_attr[oa_idx].oa_value_len;
+		if (tlen < olen)
 			return (B_FALSE);
 
-		if (bcmp(template[ta_idx].oa_value,
-		    object->do_attr[oa_idx].oa_value,
-		    template[ta_idx].oa_value_len) != 0)
+		diff = 0;
+#ifdef _BIG_ENDIAN
+		/* application may think attribute is 8 bytes */
+		if (fixed_size_attribute(type))
+			diff = tlen - olen;
+#endif
+
+		if (bcmp(&template[ta_idx].oa_value[diff],
+		    object->do_attr[oa_idx].oa_value, olen) != 0)
 			/* value mismatch */
 			return (B_FALSE);
 	}
@@ -7925,7 +8257,9 @@ dprov_object_set_attr(dprov_session_t *session, crypto_object_id_t object_id,
     crypto_object_attribute_t *template, uint_t nattr,
     boolean_t check_attributes)
 {
+	crypto_attr_type_t type;
 	dprov_object_t *object;
+	size_t old_len, new_len;
 	uint_t i, j;
 	int error;
 
@@ -7945,8 +8279,8 @@ dprov_object_set_attr(dprov_session_t *session, crypto_object_id_t object_id,
 			continue;
 
 		/* find attribute in object */
-		j = dprov_find_attr(object->do_attr, DPROV_MAX_ATTR,
-				    template[i].oa_type);
+		type = template[i].oa_type;
+		j = dprov_find_attr(object->do_attr, DPROV_MAX_ATTR, type);
 
 		if (j != -1) {
 			/* attribute already exists, free old value */
@@ -7962,16 +8296,17 @@ dprov_object_set_attr(dprov_session_t *session, crypto_object_id_t object_id,
 				return (CRYPTO_HOST_MEMORY);
 		}
 
+		old_len = template[i].oa_value_len;
+		new_len = attribute_size(type, old_len);
+
 		/* set object attribute value */
-		object->do_attr[j].oa_value =
-		    kmem_alloc(template[i].oa_value_len, KM_SLEEP);
-		bcopy(template[i].oa_value, object->do_attr[j].oa_value,
-		    template[i].oa_value_len);
-		object->do_attr[j].oa_value_len =
-		    template[i].oa_value_len;
+		object->do_attr[j].oa_value = kmem_alloc(new_len, KM_SLEEP);
+		bcopy(&template[i].oa_value[old_len - new_len],
+		    object->do_attr[j].oa_value, new_len);
+		object->do_attr[j].oa_value_len = new_len;
 
 		/* and the type */
-		object->do_attr[j].oa_type = template[i].oa_type;
+		object->do_attr[j].oa_type = type;
 	}
 
 	return (CRYPTO_SUCCESS);

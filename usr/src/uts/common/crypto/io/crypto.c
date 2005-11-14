@@ -75,7 +75,7 @@ static int crypto_open(dev_t *, int, int, cred_t *);
 static int crypto_close(dev_t, int, int, cred_t *);
 static int crypto_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
 
-static int cipher_init(dev_t, caddr_t, int, int (*)(kcf_provider_desc_t *,
+static int cipher_init(dev_t, caddr_t, int, int (*)(crypto_provider_t,
     crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
     crypto_ctx_template_t, crypto_context_t *, crypto_call_req_t *));
 
@@ -91,7 +91,7 @@ static int cipher_update(dev_t, caddr_t, int, int (*)(crypto_context_t,
 static int common_final(dev_t, caddr_t, int, int (*)(crypto_context_t,
     crypto_data_t *, crypto_call_req_t *));
 
-static int sign_verify_init(dev_t, caddr_t, int, int (*)(kcf_provider_desc_t *,
+static int sign_verify_init(dev_t, caddr_t, int, int (*)(crypto_provider_t,
     crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
     crypto_ctx_template_t, crypto_context_t *, crypto_call_req_t *));
 
@@ -159,7 +159,7 @@ static kcondvar_t crypto_cv;
 #define	RETURN_LIST			B_TRUE
 #define	DONT_RETURN_LIST		B_FALSE
 
-#define	CRYPTO_OPS_OFFSET(f)		offsetof(crypto_ops_t, f)
+#define	CRYPTO_OPS_OFFSET(f)		offsetof(crypto_ops_t, co_##f)
 #define	CRYPTO_DIGEST_OFFSET(f)		offsetof(crypto_digest_ops_t, f)
 #define	CRYPTO_CIPHER_OFFSET(f)		offsetof(crypto_cipher_ops_t, f)
 #define	CRYPTO_SIGN_OFFSET(f)		offsetof(crypto_sign_ops_t, f)
@@ -588,7 +588,7 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 	if ((ops = pd->pd_ops_vector) == NULL)
 		return;
 
-	if ((digest_ops = ops->digest_ops) != NULL) {
+	if ((digest_ops = ops->co_digest_ops) != NULL) {
 		if (digest_ops->digest_init != NULL)
 			fl->fl_digest_init = B_TRUE;
 		if (digest_ops->digest != NULL)
@@ -600,7 +600,7 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		if (digest_ops->digest_final != NULL)
 			fl->fl_digest_final = B_TRUE;
 	}
-	if ((cipher_ops = ops->cipher_ops) != NULL) {
+	if ((cipher_ops = ops->co_cipher_ops) != NULL) {
 		if (cipher_ops->encrypt_init != NULL)
 			fl->fl_encrypt_init = B_TRUE;
 		if (cipher_ops->encrypt != NULL)
@@ -618,7 +618,7 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		if (cipher_ops->decrypt_final != NULL)
 			fl->fl_decrypt_final = B_TRUE;
 	}
-	if ((mac_ops = ops->mac_ops) != NULL) {
+	if ((mac_ops = ops->co_mac_ops) != NULL) {
 		if (mac_ops->mac_init != NULL)
 			fl->fl_mac_init = B_TRUE;
 		if (mac_ops->mac != NULL)
@@ -628,7 +628,7 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		if (mac_ops->mac_final != NULL)
 			fl->fl_mac_final = B_TRUE;
 	}
-	if ((sign_ops = ops->sign_ops) != NULL) {
+	if ((sign_ops = ops->co_sign_ops) != NULL) {
 		if (sign_ops->sign_init != NULL)
 			fl->fl_sign_init = B_TRUE;
 		if (sign_ops->sign != NULL)
@@ -642,7 +642,7 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		if (sign_ops->sign_recover != NULL)
 			fl->fl_sign_recover = B_TRUE;
 	}
-	if ((verify_ops = ops->verify_ops) != NULL) {
+	if ((verify_ops = ops->co_verify_ops) != NULL) {
 		if (verify_ops->verify_init != NULL)
 			fl->fl_verify_init = B_TRUE;
 		if (verify_ops->verify != NULL)
@@ -656,7 +656,7 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		if (verify_ops->verify_recover != NULL)
 			fl->fl_verify_recover = B_TRUE;
 	}
-	if ((dual_ops = ops->dual_ops) != NULL) {
+	if ((dual_ops = ops->co_dual_ops) != NULL) {
 		if (dual_ops->digest_encrypt_update != NULL)
 			fl->fl_digest_encrypt_update = B_TRUE;
 		if (dual_ops->decrypt_digest_update != NULL)
@@ -666,13 +666,13 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		if (dual_ops->decrypt_verify_update != NULL)
 			fl->fl_decrypt_verify_update = B_TRUE;
 	}
-	if ((random_number_ops = ops->random_ops) != NULL) {
+	if ((random_number_ops = ops->co_random_ops) != NULL) {
 		if (random_number_ops->seed_random != NULL)
 			fl->fl_seed_random = B_TRUE;
 		if (random_number_ops->generate_random != NULL)
 			fl->fl_generate_random = B_TRUE;
 	}
-	if ((session_ops = ops->session_ops) != NULL) {
+	if ((session_ops = ops->co_session_ops) != NULL) {
 		if (session_ops->session_open != NULL)
 			fl->fl_session_open = B_TRUE;
 		if (session_ops->session_close != NULL)
@@ -682,7 +682,7 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		if (session_ops->session_logout != NULL)
 			fl->fl_session_logout = B_TRUE;
 	}
-	if ((object_ops = ops->object_ops) != NULL) {
+	if ((object_ops = ops->co_object_ops) != NULL) {
 		if (object_ops->object_create != NULL)
 			fl->fl_object_create = B_TRUE;
 		if (object_ops->object_copy != NULL)
@@ -702,7 +702,7 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		if (object_ops->object_find_final != NULL)
 			fl->fl_object_find_final = B_TRUE;
 	}
-	if ((key_ops = ops->key_ops) != NULL) {
+	if ((key_ops = ops->co_key_ops) != NULL) {
 		if (key_ops->key_generate != NULL)
 			fl->fl_key_generate = B_TRUE;
 		if (key_ops->key_generate_pair != NULL)
@@ -714,7 +714,7 @@ crypto_build_function_list(crypto_function_list_t *fl, kcf_provider_desc_t *pd)
 		if (key_ops->key_derive != NULL)
 			fl->fl_key_derive = B_TRUE;
 	}
-	if ((provider_ops = ops->provider_ops) != NULL) {
+	if ((provider_ops = ops->co_provider_ops) != NULL) {
 		if (provider_ops->init_token != NULL)
 			fl->fl_init_token = B_TRUE;
 		if (provider_ops->init_pin != NULL)
@@ -1154,7 +1154,7 @@ get_provider_info(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	(void) kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(provider_ops), CRYPTO_PROVIDER_OFFSET(ext_info),
-	    provider, &real_provider);
+	    CHECK_RESTRICT_FALSE, provider, &real_provider);
 
 	if (real_provider != NULL) {
 		ASSERT(real_provider == provider ||
@@ -1164,6 +1164,7 @@ get_provider_info(dev_t dev, caddr_t arg, int mode, int *rval)
 		rv = kcf_submit_request(real_provider, NULL, NULL, &params,
 		    B_FALSE);
 		ASSERT(rv != CRYPTO_NOT_SUPPORTED);
+		KCF_PROV_REFRELE(real_provider);
 	} else {
 		/* do the best we can */
 		fabricate_ext_info(provider, ext_info);
@@ -1415,7 +1416,8 @@ again:
 
 	/* find a hardware provider that supports session ops */
 	(void) kcf_get_hardware_provider_nomech(CRYPTO_OPS_OFFSET(session_ops),
-	    CRYPTO_SESSION_OFFSET(session_open), pd, &real_provider);
+	    CRYPTO_SESSION_OFFSET(session_open), CHECK_RESTRICT_FALSE,
+	    pd, &real_provider);
 
 	if (real_provider != NULL) {
 		ASSERT(real_provider == pd ||
@@ -1427,6 +1429,7 @@ again:
 		    B_FALSE);
 		if (rv != CRYPTO_SUCCESS) {
 			mutex_enter(&cm->cm_lock);
+			KCF_PROV_REFRELE(real_provider);
 			return (rv);
 		}
 	}
@@ -1450,6 +1453,7 @@ again:
 				    pd);
 				(void) kcf_submit_request(real_provider, NULL,
 				    NULL, &params, B_FALSE);
+				KCF_PROV_REFRELE(real_provider);
 			}
 			mutex_enter(&cm->cm_lock);
 			goto again;
@@ -1463,7 +1467,6 @@ again:
 	KCF_PROV_REFHOLD(pd);
 	new_ps->ps_provider = pd;
 	if (real_provider != NULL) {
-		KCF_PROV_REFHOLD(real_provider);
 		new_ps->ps_real_provider = real_provider;
 	}
 	new_ps->ps_next = cm->cm_provider_session;
@@ -1788,16 +1791,7 @@ close_session(dev_t dev, caddr_t arg, int mode, int *rval)
 		return (EFAULT);
 
 	rv = crypto_close_session(dev, close_session.cs_session);
-	if (rv != CRYPTO_SUCCESS) {
-		close_session.cs_return_value = rv;
-		if (copyout(&close_session, arg, sizeof (close_session)) != 0) {
-			return (EFAULT);
-		}
-		return (0);
-	}
-
-	close_session.cs_return_value = CRYPTO_SUCCESS;
-
+	close_session.cs_return_value = rv;
 	if (copyout(&close_session, arg, sizeof (close_session)) != 0) {
 		return (EFAULT);
 	}
@@ -2230,17 +2224,114 @@ decrypt_init(dev_t dev, caddr_t arg, int mode, int *rval)
 }
 
 /*
+ * umech is a mechanism structure that has been copied from user address
+ * space into kernel address space. Only one copyin has been done.
+ * The mechanism parameter, if non-null, still points to user address space.
+ * If the mechanism parameter contains pointers, they are pointers into
+ * user address space.
+ *
+ * kmech is a umech with all pointers and structures in kernel address space.
+ *
+ * This routine calls the provider's entry point to copy a umech parameter
+ * into kernel address space. Kernel memory is allocated by the provider.
+ */
+static int
+crypto_provider_copyin_mech_param(kcf_provider_desc_t *pd,
+    crypto_mechanism_t *umech, crypto_mechanism_t *kmech, int mode, int *error)
+{
+	crypto_mech_type_t provider_mech_type;
+	kcf_ops_class_t class;
+	int index;
+	int rv;
+
+	/* get the provider's mech number */
+	class = KCF_MECH2CLASS(umech->cm_type);
+	index = KCF_MECH2INDEX(umech->cm_type);
+	provider_mech_type = pd->pd_map_mechnums[class][index];
+
+	kmech->cm_param = NULL;
+	kmech->cm_param_len = 0;
+	kmech->cm_type = provider_mech_type;
+	rv = KCF_PROV_COPYIN_MECH(pd, umech, kmech, error, mode);
+	kmech->cm_type = umech->cm_type;
+
+	return (rv);
+}
+
+/*
+ * umech is a mechanism structure that has been copied from user address
+ * space into kernel address space. Only one copyin has been done.
+ * The mechanism parameter, if non-null, still points to user address space.
+ * If the mechanism parameter contains pointers, they are pointers into
+ * user address space.
+ *
+ * kmech is a umech with all pointers and structures in kernel address space.
+ *
+ * This routine calls the provider's entry point to copy a kmech parameter
+ * into user address space using umech as a template containing
+ * user address pointers.
+ */
+static int
+crypto_provider_copyout_mech_param(kcf_provider_desc_t *pd,
+    crypto_mechanism_t *kmech, crypto_mechanism_t *umech, int mode, int *error)
+{
+	crypto_mech_type_t provider_mech_type;
+	kcf_ops_class_t class;
+	int index;
+	int rv;
+
+	/* get the provider's mech number */
+	class = KCF_MECH2CLASS(umech->cm_type);
+	index = KCF_MECH2INDEX(umech->cm_type);
+	provider_mech_type = pd->pd_map_mechnums[class][index];
+
+	kmech->cm_type = provider_mech_type;
+	rv = KCF_PROV_COPYOUT_MECH(pd, kmech, umech, error, mode);
+	kmech->cm_type = umech->cm_type;
+
+	return (rv);
+}
+
+/*
+ * Call the provider's entry point to free kernel memory that has been
+ * allocated for the mechanism's parameter.
+ */
+static void
+crypto_free_mech(kcf_provider_desc_t *pd, boolean_t allocated_by_crypto_module,
+    crypto_mechanism_t *mech)
+{
+	crypto_mech_type_t provider_mech_type;
+	kcf_ops_class_t class;
+	int index;
+
+	if (allocated_by_crypto_module) {
+		if (mech->cm_param != NULL)
+			kmem_free(mech->cm_param, mech->cm_param_len);
+	} else {
+		/* get the provider's mech number */
+		class = KCF_MECH2CLASS(mech->cm_type);
+		index = KCF_MECH2INDEX(mech->cm_type);
+		provider_mech_type = pd->pd_map_mechnums[class][index];
+
+		if (mech->cm_param != NULL && mech->cm_param_len != 0) {
+			mech->cm_type = provider_mech_type;
+			(void) KCF_PROV_FREE_MECH(pd, mech);
+		}
+	}
+}
+
+/*
  * ASSUMPTION: crypto_encrypt_init and crypto_decrypt_init
  * structures are identical except for field names.
  */
 static int
-cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(kcf_provider_desc_t *,
+cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(crypto_provider_t,
     crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
     crypto_ctx_template_t, crypto_context_t *, crypto_call_req_t *))
 {
 	STRUCT_DECL(crypto_encrypt_init, encrypt_init);
 	kproject_t *mech_projp, *key_projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	crypto_session_id_t session_id;
 	crypto_mechanism_t mech;
 	crypto_key_t key;
@@ -2254,6 +2345,7 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(kcf_provider_desc_t *,
 	offset_t offset;
 	int error = 0;
 	int rv;
+	boolean_t allocated_by_crypto_module = B_FALSE;
 
 	STRUCT_INIT(encrypt_init, mode);
 
@@ -2277,20 +2369,34 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(kcf_provider_desc_t *,
 		goto release_minor;
 	}
 
-	if (!copyin_mech(mode, STRUCT_FADDR(encrypt_init, ei_mech), &mech,
-	    &mech_rctl_bytes, &carry, &rv, &error, &mech_projp)) {
-		goto out;
-	}
+	bcopy(STRUCT_FADDR(encrypt_init, ei_mech), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
 
 	if (init == crypto_encrypt_init_prov)
 	    offset = CRYPTO_CIPHER_OFFSET(encrypt_init);
 	else
 	    offset = CRYPTO_CIPHER_OFFSET(decrypt_init);
 
-	if ((rv = kcf_get_hardware_provider(mech.cm_type,
-	    CRYPTO_OPS_OFFSET(cipher_ops), offset,
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CRYPTO_OPS_OFFSET(cipher_ops), offset, CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
+	}
+
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(encrypt_init, ei_mech), &mech, mode, &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(encrypt_init, ei_mech),
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
+		    &mech_projp)) {
+			goto out;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto out;
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(encrypt_init, ei_key), &key,
@@ -2311,6 +2417,7 @@ cipher_init(dev_t dev, caddr_t arg, int mode, int (*init)(kcf_provider_desc_t *,
 	if (*ctxpp != NULL)
 		CRYPTO_CANCEL_CTX(ctxpp);
 	*ctxpp = (rv == CRYPTO_SUCCESS) ? cc : NULL;
+
 out:
 	CRYPTO_SESSION_RELE(sp);
 
@@ -2323,17 +2430,22 @@ release_minor:
 	mutex_exit(&crypto_rctl_lock);
 	crypto_release_minor(cm);
 
-	if (mech.cm_param != NULL)
-		kmem_free(mech.cm_param, mech.cm_param_len);
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
 
 	free_crypto_key(&key);
 
 	if (error != 0)
+		/* XXX free context */
 		return (error);
 
 	STRUCT_FSET(encrypt_init, ei_return_value, rv);
 	if (copyout(STRUCT_BUF(encrypt_init), arg,
 	    STRUCT_SIZE(encrypt_init)) != 0) {
+		/* XXX free context */
 		return (EFAULT);
 	}
 	return (0);
@@ -2788,7 +2900,7 @@ digest_init(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_digest_init, digest_init);
 	kproject_t *mech_projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	crypto_session_id_t session_id;
 	crypto_mechanism_t mech;
 	crypto_minor_t *cm;
@@ -2824,10 +2936,10 @@ digest_init(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto out;
 	}
 
-	if ((rv = kcf_get_hardware_provider(mech.cm_type,
-	    CRYPTO_OPS_OFFSET(digest_ops),
-	    CRYPTO_DIGEST_OFFSET(digest_init),
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CRYPTO_OPS_OFFSET(digest_ops), CRYPTO_DIGEST_OFFSET(digest_init),
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -2851,6 +2963,9 @@ release_minor:
 		mutex_exit(&crypto_rctl_lock);
 	}
 	crypto_release_minor(cm);
+
+	if (real_provider != NULL)
+		KCF_PROV_REFRELE(real_provider);
 
 	if (mech.cm_param != NULL)
 		kmem_free(mech.cm_param, mech.cm_param_len);
@@ -3261,7 +3376,8 @@ set_pin(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(provider_ops), CRYPTO_PROVIDER_OFFSET(set_pin),
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -3270,6 +3386,7 @@ set_pin(dev_t dev, caddr_t arg, int mode, int *rval)
 	    new_pin, new_pin_len, NULL, NULL, real_provider);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+	KCF_PROV_REFRELE(real_provider);
 
 out:
 	CRYPTO_SESSION_RELE(sp);
@@ -3339,7 +3456,8 @@ login(dev_t dev, caddr_t arg, int mode, int *rval)
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(session_ops),
 	    CRYPTO_SESSION_OFFSET(session_login),
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -3348,6 +3466,7 @@ login(dev_t dev, caddr_t arg, int mode, int *rval)
 	    real_provider);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+	KCF_PROV_REFRELE(real_provider);
 
 out:
 	CRYPTO_SESSION_RELE(sp);
@@ -3398,7 +3517,7 @@ logout(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(session_ops),
-	    CRYPTO_SESSION_OFFSET(session_logout),
+	    CRYPTO_SESSION_OFFSET(session_logout), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
@@ -3406,6 +3525,7 @@ logout(dev_t dev, caddr_t arg, int mode, int *rval)
 	KCF_WRAP_SESSION_OPS_PARAMS(&params, KCF_OP_SESSION_LOGOUT, NULL,
 	    sp->sd_provider_session->ps_session, 0, NULL, 0, real_provider);
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+	KCF_PROV_REFRELE(real_provider);
 
 out:
 	CRYPTO_SESSION_RELE(sp);
@@ -3460,13 +3580,13 @@ verify_recover_init(dev_t dev, caddr_t arg, int mode, int *rval)
  */
 static int
 sign_verify_init(dev_t dev, caddr_t arg, int mode,
-    int (*init)(kcf_provider_desc_t *, crypto_session_id_t,
+    int (*init)(crypto_provider_t, crypto_session_id_t,
     crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
     crypto_context_t *, crypto_call_req_t *))
 {
 	STRUCT_DECL(crypto_sign_init, sign_init);
 	kproject_t *mech_projp, *key_projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	crypto_session_id_t session_id;
 	crypto_mechanism_t mech;
 	crypto_key_t key;
@@ -3480,6 +3600,7 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 	offset_t offset_1, offset_2;
 	int error = 0;
 	int rv;
+	boolean_t allocated_by_crypto_module = B_FALSE;
 
 	STRUCT_INIT(sign_init, mode);
 
@@ -3502,10 +3623,8 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 		goto release_minor;
 	}
 
-	if (!copyin_mech(mode, STRUCT_FADDR(sign_init, si_mech), &mech,
-	    &mech_rctl_bytes, &carry, &rv, &error, &mech_projp)) {
-		goto out;
-	}
+	bcopy(STRUCT_FADDR(sign_init, si_mech), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
 
 	ASSERT(init == crypto_sign_init_prov ||
 	    init == crypto_verify_init_prov ||
@@ -3530,9 +3649,26 @@ sign_verify_init(dev_t dev, caddr_t arg, int mode,
 		ctxpp = &sp->sd_verify_recover_ctx;
 	}
 
-	if ((rv = kcf_get_hardware_provider(mech.cm_type, offset_1,
-	    offset_2, sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    offset_1, offset_2, CHECK_RESTRICT_FALSE, sp->sd_provider,
+	    &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
+	}
+
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(sign_init, si_mech), &mech, mode, &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(sign_init, si_mech),
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
+		    &mech_projp)) {
+			goto out;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto out;
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(sign_init, si_key), &key,
@@ -3563,8 +3699,11 @@ release_minor:
 	mutex_exit(&crypto_rctl_lock);
 	crypto_release_minor(cm);
 
-	if (mech.cm_param != NULL)
-		kmem_free(mech.cm_param, mech.cm_param_len);
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
 
 	free_crypto_key(&key);
 
@@ -3900,7 +4039,7 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_seed_random, seed_random);
 	kproject_t *projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
@@ -3953,10 +4092,10 @@ seed_random(dev_t dev, caddr_t arg, int mode, int *rval)
 	if (random_mech == CRYPTO_MECH_INVALID)
 		random_mech = crypto_mech2id_common(SUN_RANDOM, B_FALSE);
 
-	if ((rv = kcf_get_hardware_provider(random_mech,
-	    CRYPTO_OPS_OFFSET(random_ops),
-	    CRYPTO_RANDOM_OFFSET(seed_random),
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	if ((rv = kcf_get_hardware_provider(random_mech, CRYPTO_MECH_INVALID,
+	    CRYPTO_OPS_OFFSET(random_ops), CRYPTO_RANDOM_OFFSET(seed_random),
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -3975,6 +4114,9 @@ release_minor:
 		mutex_exit(&crypto_rctl_lock);
 	}
 	crypto_release_minor(cm);
+
+	if (real_provider != NULL)
+		KCF_PROV_REFRELE(real_provider);
 
 	if (seed_buffer != NULL)
 		kmem_free(seed_buffer, seed_len);
@@ -3996,7 +4138,7 @@ generate_random(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_generate_random, generate_random);
 	kproject_t *projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_session_id_t session_id;
 	crypto_minor_t *cm;
@@ -4043,9 +4185,9 @@ generate_random(dev_t dev, caddr_t arg, int mode, int *rval)
 	if (random_mech == CRYPTO_MECH_INVALID)
 		random_mech = crypto_mech2id_common(SUN_RANDOM, B_FALSE);
 
-	if ((rv = kcf_get_hardware_provider(random_mech,
+	if ((rv = kcf_get_hardware_provider(random_mech, CRYPTO_MECH_INVALID,
 	    CRYPTO_OPS_OFFSET(random_ops),
-	    CRYPTO_RANDOM_OFFSET(generate_random),
+	    CRYPTO_RANDOM_OFFSET(generate_random), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
@@ -4072,6 +4214,9 @@ release_minor:
 		mutex_exit(&crypto_rctl_lock);
 	}
 	crypto_release_minor(cm);
+
+	if (real_provider != NULL)
+		KCF_PROV_REFRELE(real_provider);
 
 	if (buffer != NULL) {
 		/* random numbers are often used to create keys */
@@ -4147,7 +4292,7 @@ object_create(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_create, object_create);
 	kproject_t *projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
 	crypto_session_id_t session_id;
@@ -4190,7 +4335,8 @@ object_create(dev_t dev, caddr_t arg, int mode, int *rval)
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
 	    CRYPTO_OBJECT_OFFSET(object_create),
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
@@ -4235,6 +4381,8 @@ out:
 	if (sp != NULL)
 		CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
+	if (real_provider != NULL)
+		KCF_PROV_REFRELE(real_provider);
 	return (error);
 }
 
@@ -4244,7 +4392,7 @@ object_copy(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_copy, object_copy);
 	kproject_t *projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
 	crypto_session_id_t session_id;
@@ -4286,7 +4434,7 @@ object_copy(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_copy),
+	    CRYPTO_OBJECT_OFFSET(object_copy), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
@@ -4333,6 +4481,8 @@ out:
 	if (sp != NULL)
 		CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
+	if (real_provider != NULL)
+		KCF_PROV_REFRELE(real_provider);
 	return (error);
 }
 
@@ -4371,7 +4521,7 @@ object_destroy(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_destroy),
+	    CRYPTO_OBJECT_OFFSET(object_destroy), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
@@ -4382,6 +4532,7 @@ object_destroy(dev_t dev, caddr_t arg, int mode, int *rval)
 	    NULL, NULL, 0, NULL);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+	KCF_PROV_REFRELE(real_provider);
 
 out:
 	CRYPTO_SESSION_RELE(sp);
@@ -4456,7 +4607,8 @@ object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
 	    CRYPTO_OBJECT_OFFSET(object_get_attribute_value),
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -4466,6 +4618,7 @@ object_get_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	    0, NULL, NULL, 0, NULL);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+	KCF_PROV_REFRELE(real_provider);
 
 out:
 	CRYPTO_SESSION_RELE(sp);
@@ -4539,7 +4692,7 @@ object_get_size(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_get_size),
+	    CRYPTO_OBJECT_OFFSET(object_get_size), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
@@ -4550,6 +4703,7 @@ object_get_size(dev_t dev, caddr_t arg, int mode, int *rval)
 	    NULL, NULL, 0, NULL);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+	KCF_PROV_REFRELE(real_provider);
 
 out:
 	CRYPTO_SESSION_RELE(sp);
@@ -4621,7 +4775,8 @@ object_set_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
 	    CRYPTO_OBJECT_OFFSET(object_set_attribute_value),
-	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
@@ -4631,6 +4786,7 @@ object_set_attribute_value(dev_t dev, caddr_t arg, int mode, int *rval)
 	    NULL, 0, NULL, NULL, 0, NULL);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+	KCF_PROV_REFRELE(real_provider);
 
 out:
 	CRYPTO_SESSION_RELE(sp);
@@ -4663,7 +4819,7 @@ object_find_init(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_find_init, find_init);
 	kproject_t *projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
 	crypto_session_id_t session_id;
@@ -4704,7 +4860,7 @@ object_find_init(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_find_init),
+	    CRYPTO_OBJECT_OFFSET(object_find_init), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
@@ -4743,6 +4899,9 @@ release_minor:
 		mutex_exit(&crypto_rctl_lock);
 	}
 	crypto_release_minor(cm);
+
+	if (real_provider != NULL)
+		KCF_PROV_REFRELE(real_provider);
 
 	if (k_attrs != NULL)
 		kmem_free(k_attrs, k_attrs_size);
@@ -4808,7 +4967,7 @@ object_find_update(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_find),
+	    CRYPTO_OBJECT_OFFSET(object_find), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		goto out;
 	}
@@ -4818,6 +4977,7 @@ object_find_update(dev_t dev, caddr_t arg, int mode, int *rval)
 	    NULL, sp->sd_find_init_cookie, max_count, &count);
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+	KCF_PROV_REFRELE(real_provider);
 
 out:
 	CRYPTO_SESSION_RELE(sp);
@@ -4873,7 +5033,7 @@ crypto_free_find_ctx(crypto_session_data_t *sp)
 
 	if ((rv = kcf_get_hardware_provider_nomech(
 	    CRYPTO_OPS_OFFSET(object_ops),
-	    CRYPTO_OBJECT_OFFSET(object_find_final),
+	    CRYPTO_OBJECT_OFFSET(object_find_final), CHECK_RESTRICT_FALSE,
 	    sp->sd_provider, &real_provider)) != CRYPTO_SUCCESS) {
 		return (rv);
 	}
@@ -4882,8 +5042,9 @@ crypto_free_find_ctx(crypto_session_data_t *sp)
 	    sp->sd_provider_session->ps_session, 0, NULL, 0, NULL, 0,
 	    NULL, sp->sd_find_init_cookie, 0, NULL);
 
-	return (kcf_submit_request(real_provider,
-	    NULL, NULL, &params, B_FALSE));
+	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
+	KCF_PROV_REFRELE(real_provider);
+	return (rv);
 }
 
 /* ARGSUSED */
@@ -4943,7 +5104,7 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_generate_key, generate_key);
 	kproject_t *mech_projp, *key_projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
 	crypto_object_attribute_t *k_attrs = NULL;
@@ -4958,6 +5119,7 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	uint_t count;
 	int error = 0;
 	int rv;
+	boolean_t allocated_by_crypto_module = B_FALSE;
 
 	STRUCT_INIT(generate_key, mode);
 
@@ -4978,16 +5140,30 @@ object_generate_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if (!copyin_mech(mode, STRUCT_FADDR(generate_key, gk_mechanism),
-	    &mech, &mech_rctl_bytes, &carry, &rv, &error, &mech_projp)) {
+	bcopy(STRUCT_FADDR(generate_key, gk_mechanism), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
+
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_generate),
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
-	if ((rv = kcf_get_hardware_provider(mech.cm_type,
-	    CRYPTO_OPS_OFFSET(key_ops),
-	    CRYPTO_KEY_OFFSET(key_generate), sp->sd_provider,
-	    &real_provider)) != CRYPTO_SUCCESS) {
-		goto release_minor;
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(generate_key, gk_mechanism), &mech, mode, &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(generate_key, gk_mechanism),
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
+		    &mech_projp)) {
+			goto release_minor;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto release_minor;
 	}
 
 	count = STRUCT_FGET(generate_key, gk_count);
@@ -5040,6 +5216,12 @@ out:
 	if (sp != NULL)
 		CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
+
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
 	return (error);
 }
 
@@ -5049,7 +5231,7 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_generate_key_pair, generate_key_pair);
 	kproject_t *pub_projp, *pri_projp, *mech_projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
 	crypto_object_attribute_t *k_pub_attrs = NULL;
@@ -5070,6 +5252,7 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 	uint_t pri_count;
 	int error = 0;
 	int rv;
+	boolean_t allocated_by_crypto_module = B_FALSE;
 
 	STRUCT_INIT(generate_key_pair, mode);
 
@@ -5091,16 +5274,30 @@ object_generate_key_pair(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if (!copyin_mech(mode, STRUCT_FADDR(generate_key_pair, kp_mechanism),
-	    &mech, &mech_rctl_bytes, &carry, &rv, &error, &mech_projp)) {
+	bcopy(STRUCT_FADDR(generate_key_pair, kp_mechanism), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
+
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_generate_pair),
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
-	if ((rv = kcf_get_hardware_provider(mech.cm_type,
-	    CRYPTO_OPS_OFFSET(key_ops),
-	    CRYPTO_KEY_OFFSET(key_generate_pair), sp->sd_provider,
-	    &real_provider)) != CRYPTO_SUCCESS) {
-		goto release_minor;
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(generate_key_pair, kp_mechanism), &mech, mode, &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(generate_key_pair,
+		    kp_mechanism), &mech, &mech_rctl_bytes, &carry, &rv,
+		    &error, &mech_projp)) {
+			goto release_minor;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto release_minor;
 	}
 
 	pub_count = STRUCT_FGET(generate_key_pair, kp_public_count);
@@ -5178,6 +5375,12 @@ out:
 	if (sp != NULL)
 		CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
+
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
 	return (error);
 }
 
@@ -5187,7 +5390,7 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_object_wrap_key, wrap_key);
 	kproject_t *mech_projp, *key_projp, *wrapped_key_projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
 	crypto_key_t key;
@@ -5203,6 +5406,7 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	char *wrapped_key_buffer;
 	int error = 0;
 	int rv;
+	boolean_t allocated_by_crypto_module = B_FALSE;
 
 	STRUCT_INIT(wrap_key, mode);
 
@@ -5224,16 +5428,30 @@ object_wrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if (!copyin_mech(mode, STRUCT_FADDR(wrap_key, wk_mechanism),
-	    &mech, &mech_rctl_bytes, &carry, &rv, &error, &mech_projp)) {
+	bcopy(STRUCT_FADDR(wrap_key, wk_mechanism), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
+
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_wrap),
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto out;
 	}
 
-	if ((rv = kcf_get_hardware_provider(mech.cm_type,
-	    CRYPTO_OPS_OFFSET(key_ops),
-	    CRYPTO_KEY_OFFSET(key_wrap), sp->sd_provider,
-	    &real_provider)) != CRYPTO_SUCCESS) {
-		goto out;
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(wrap_key, wk_mechanism), &mech, mode, &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(wrap_key, wk_mechanism),
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
+		    &mech_projp)) {
+			goto out;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto out;
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(wrap_key, wk_wrapping_key), &key,
@@ -5308,6 +5526,12 @@ release_minor:
 	mutex_exit(&crypto_rctl_lock);
 	crypto_release_minor(cm);
 
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
+
 	if (wrapped_key != NULL)
 		kmem_free(wrapped_key, wrapped_key_len);
 
@@ -5330,7 +5554,7 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	STRUCT_DECL(crypto_object_unwrap_key, unwrap_key);
 	kproject_t *mech_projp, *unwrapping_key_projp, *wrapped_key_projp,
 	    *k_attrs_projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_mechanism_t mech;
 	crypto_key_t unwrapping_key;
@@ -5349,6 +5573,7 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	int rv;
 	uint_t count;
 	caddr_t uk_attributes;
+	boolean_t allocated_by_crypto_module = B_FALSE;
 
 	STRUCT_INIT(unwrap_key, mode);
 
@@ -5370,16 +5595,30 @@ object_unwrap_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if (!copyin_mech(mode, STRUCT_FADDR(unwrap_key, uk_mechanism),
-		&mech, &mech_rctl_bytes, &carry, &rv, &error, &mech_projp)) {
+	bcopy(STRUCT_FADDR(unwrap_key, uk_mechanism), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
+
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_unwrap),
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
-	if ((rv = kcf_get_hardware_provider(mech.cm_type,
-	    CRYPTO_OPS_OFFSET(key_ops),
-	    CRYPTO_KEY_OFFSET(key_unwrap), sp->sd_provider,
-	    &real_provider)) != CRYPTO_SUCCESS) {
-		goto release_minor;
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(unwrap_key, uk_mechanism), &mech, mode, &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(unwrap_key, uk_mechanism),
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
+		    &mech_projp)) {
+			goto release_minor;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto release_minor;
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(unwrap_key, uk_unwrapping_key),
@@ -5471,6 +5710,13 @@ out:
 	if (sp != NULL)
 		CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
+
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
+
 	return (error);
 }
 
@@ -5480,7 +5726,7 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 {
 	STRUCT_DECL(crypto_derive_key, derive_key);
 	kproject_t *key_projp, *mech_projp, *attributes_projp;
-	kcf_provider_desc_t *real_provider;
+	kcf_provider_desc_t *real_provider = NULL;
 	kcf_req_params_t params;
 	crypto_object_attribute_t *k_attrs = NULL;
 	crypto_mechanism_t mech;
@@ -5497,6 +5743,8 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 	uint_t count;
 	int error = 0;
 	int rv;
+	boolean_t allocated_by_crypto_module = B_FALSE;
+	boolean_t please_destroy_object = B_FALSE;
 
 	STRUCT_INIT(derive_key, mode);
 
@@ -5518,16 +5766,30 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 		goto release_minor;
 	}
 
-	if (!copyin_mech(mode, STRUCT_FADDR(derive_key, dk_mechanism),
-	    &mech, &mech_rctl_bytes, &carry, &rv, &error, &mech_projp)) {
+	bcopy(STRUCT_FADDR(derive_key, dk_mechanism), &mech.cm_type,
+	    sizeof (crypto_mech_type_t));
+
+	if ((rv = kcf_get_hardware_provider(mech.cm_type, CRYPTO_MECH_INVALID,
+	    CRYPTO_OPS_OFFSET(key_ops), CRYPTO_KEY_OFFSET(key_derive),
+	    CHECK_RESTRICT_FALSE, sp->sd_provider, &real_provider))
+	    != CRYPTO_SUCCESS) {
 		goto release_minor;
 	}
 
-	if ((rv = kcf_get_hardware_provider(mech.cm_type,
-	    CRYPTO_OPS_OFFSET(key_ops),
-	    CRYPTO_KEY_OFFSET(key_derive), sp->sd_provider,
-	    &real_provider)) != CRYPTO_SUCCESS) {
-		goto release_minor;
+	carry = 0;
+	rv = crypto_provider_copyin_mech_param(real_provider,
+	    STRUCT_FADDR(derive_key, dk_mechanism), &mech, mode, &error);
+
+	if (rv == CRYPTO_NOT_SUPPORTED) {
+		allocated_by_crypto_module = B_TRUE;
+		if (!copyin_mech(mode, STRUCT_FADDR(derive_key, dk_mechanism),
+		    &mech, &mech_rctl_bytes, &carry, &rv, &error,
+		    &mech_projp)) {
+			goto release_minor;
+		}
+	} else {
+		if (rv != CRYPTO_SUCCESS)
+			goto release_minor;
 	}
 
 	if (!copyin_key(mode, STRUCT_FADDR(derive_key, dk_base_key),
@@ -5550,8 +5812,21 @@ object_derive_key(dev_t dev, caddr_t arg, int mode, int *rval)
 
 	rv = kcf_submit_request(real_provider, NULL, NULL, &params, B_FALSE);
 
-	if (rv == CRYPTO_SUCCESS)
+	if (rv == CRYPTO_SUCCESS) {
 		STRUCT_FSET(derive_key, dk_object_handle, handle);
+
+		rv = crypto_provider_copyout_mech_param(real_provider,
+		    &mech, STRUCT_FADDR(derive_key, dk_mechanism),
+		    mode, &error);
+
+		if (rv == CRYPTO_NOT_SUPPORTED) {
+			rv = CRYPTO_SUCCESS;
+			goto release_minor;
+		}
+
+		if (rv != CRYPTO_SUCCESS)
+			please_destroy_object = B_TRUE;
+	}
 
 release_minor:
 	mutex_enter(&crypto_rctl_lock);
@@ -5575,21 +5850,29 @@ release_minor:
 	if (copyout(STRUCT_BUF(derive_key), arg,
 	    STRUCT_SIZE(derive_key)) != 0) {
 		if (rv == CRYPTO_SUCCESS) {
-			KCF_WRAP_OBJECT_OPS_PARAMS(&params,
-			    KCF_OP_OBJECT_DESTROY,
-			    sp->sd_provider_session->ps_session, handle,
-			    NULL, 0, NULL, 0, NULL, NULL, 0, NULL);
-
-			(void) kcf_submit_request(real_provider, NULL,
-			    NULL, &params, B_FALSE);
-
+			please_destroy_object = B_TRUE;
 			error = EFAULT;
 		}
 	}
 out:
+	if (please_destroy_object) {
+		KCF_WRAP_OBJECT_OPS_PARAMS(&params, KCF_OP_OBJECT_DESTROY,
+		    sp->sd_provider_session->ps_session, handle,
+		    NULL, 0, NULL, 0, NULL, NULL, 0, NULL);
+
+		(void) kcf_submit_request(real_provider, NULL,
+		    NULL, &params, B_FALSE);
+	}
+
 	if (sp != NULL)
 		CRYPTO_SESSION_RELE(sp);
 	crypto_release_minor(cm);
+
+	if (real_provider != NULL) {
+		crypto_free_mech(real_provider,
+		    allocated_by_crypto_module, &mech);
+		KCF_PROV_REFRELE(real_provider);
+	}
 	return (error);
 }
 

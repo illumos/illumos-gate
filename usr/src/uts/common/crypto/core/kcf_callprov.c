@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,8 +127,10 @@ is_valid_provider_for_mech(kcf_provider_desc_t *pd, kcf_mech_entry_t *me)
  * Returns NULL if no provider can be found.
  */
 int
-kcf_get_hardware_provider(crypto_mech_type_t mech_type, offset_t offset_1,
-offset_t offset_2, kcf_provider_desc_t *old, kcf_provider_desc_t **new)
+kcf_get_hardware_provider(crypto_mech_type_t mech_type_1,
+    crypto_mech_type_t mech_type_2, offset_t offset_1, offset_t offset_2,
+    boolean_t call_restrict, kcf_provider_desc_t *old,
+    kcf_provider_desc_t **new)
 {
 	kcf_provider_desc_t *provider, *gpd = NULL, *real_pd = old;
 	kcf_provider_list_t *p;
@@ -139,13 +141,13 @@ offset_t offset_2, kcf_provider_desc_t *old, kcf_provider_desc_t **new)
 	int index, len, gqlen = INT_MAX, rv = CRYPTO_SUCCESS;
 
 	/* get the mech entry for the specified mechanism */
-	class = KCF_MECH2CLASS(mech_type);
+	class = KCF_MECH2CLASS(mech_type_1);
 	if ((class < KCF_FIRST_OPSCLASS) || (class > KCF_LAST_OPSCLASS)) {
 		return (CRYPTO_MECHANISM_INVALID);
 	}
 
 	me_tab = &kcf_mech_tabs_tab[class];
-	index = KCF_MECH2INDEX(mech_type);
+	index = KCF_MECH2INDEX(mech_type_1);
 	if ((index < 0) || (index >= me_tab->met_size)) {
 		return (CRYPTO_MECHANISM_INVALID);
 	}
@@ -180,7 +182,8 @@ offset_t offset_2, kcf_provider_desc_t *old, kcf_provider_desc_t **new)
 			ASSERT(provider->pd_prov_type !=
 			    CRYPTO_LOGICAL_PROVIDER);
 
-			if (!KCF_IS_PROV_USABLE(provider)) {
+			if (!KCF_IS_PROV_USABLE(provider) ||
+			    (call_restrict && provider->pd_restricted)) {
 				p = p->pl_next;
 				continue;
 			}
@@ -188,6 +191,28 @@ offset_t offset_2, kcf_provider_desc_t *old, kcf_provider_desc_t **new)
 			if (!is_valid_provider_for_mech(provider, me)) {
 				p = p->pl_next;
 				continue;
+			}
+
+			/* provider does second mech */
+			if (mech_type_2 != CRYPTO_MECH_INVALID) {
+				crypto_mech_type_t mech_type;
+				int i;
+
+				/* convert from kef to provider's number */
+				mech_type = provider->pd_map_mechnums
+				    [KCF_MECH2CLASS(mech_type_2)]
+				    [KCF_MECH2INDEX(mech_type_2)];
+
+				for (i = 0; i < provider->pd_mech_list_count;
+				    i++) {
+					if (provider->pd_mechanisms[i]
+					    .cm_mech_number == mech_type)
+						break;
+				}
+				if (i == provider->pd_mech_list_count) {
+					p = p->pl_next;
+					continue;
+				}
 			}
 
 			if (KCF_PROV_NULL_ENTRY_POINT(provider, offset_1,
@@ -204,18 +229,20 @@ offset_t offset_2, kcf_provider_desc_t *old, kcf_provider_desc_t **new)
 
 			p = p->pl_next;
 		}
-		mutex_exit(&old->pd_lock);
 
-		if (gpd != NULL)
+		if (gpd != NULL) {
 			real_pd = gpd;
-		else {
+			KCF_PROV_REFHOLD(real_pd);
+		} else {
 			/* can't find provider */
 			real_pd = NULL;
 			rv = CRYPTO_MECHANISM_INVALID;
 		}
+		mutex_exit(&old->pd_lock);
 
 	} else {
-		if (!KCF_IS_PROV_USABLE(old)) {
+		if (!KCF_IS_PROV_USABLE(old) ||
+		    (call_restrict && old->pd_restricted)) {
 			real_pd = NULL;
 			rv = CRYPTO_DEVICE_ERROR;
 			goto out;
@@ -230,7 +257,9 @@ offset_t offset_2, kcf_provider_desc_t *old, kcf_provider_desc_t **new)
 		if (KCF_PROV_NULL_ENTRY_POINT(old, offset_1, offset_2, ops)) {
 			real_pd = NULL;
 			rv = CRYPTO_NOT_SUPPORTED;
+			goto out;
 		}
+		KCF_PROV_REFHOLD(real_pd);
 	}
 out:
 	mutex_exit(&me->me_mutex);
@@ -249,7 +278,8 @@ out:
  */
 int
 kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
-    kcf_provider_desc_t *old, kcf_provider_desc_t **new)
+    boolean_t call_restrict, kcf_provider_desc_t *old,
+    kcf_provider_desc_t **new)
 {
 	kcf_provider_desc_t *provider, *gpd = NULL, *real_pd = old;
 	kcf_provider_list_t *p;
@@ -283,7 +313,8 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 			ASSERT(provider->pd_prov_type !=
 			    CRYPTO_LOGICAL_PROVIDER);
 
-			if (!KCF_IS_PROV_USABLE(provider)) {
+			if (!KCF_IS_PROV_USABLE(provider) ||
+			    (call_restrict && provider->pd_restricted)) {
 				p = p->pl_next;
 				continue;
 			}
@@ -304,16 +335,18 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 		}
 		mutex_exit(&old->pd_lock);
 
-		if (gpd != NULL)
+		if (gpd != NULL) {
 			real_pd = gpd;
-		else {
+			KCF_PROV_REFHOLD(real_pd);
+		} else {
 			/* can't find provider */
 			real_pd = NULL;
 			rv = CRYPTO_DEVICE_ERROR;
 		}
 
 	} else {
-		if (!KCF_IS_PROV_USABLE(old)) {
+		if (!KCF_IS_PROV_USABLE(old) ||
+		    (call_restrict && old->pd_restricted)) {
 			real_pd = NULL;
 			rv = CRYPTO_DEVICE_ERROR;
 			goto out;
@@ -322,7 +355,9 @@ kcf_get_hardware_provider_nomech(offset_t offset_1, offset_t offset_2,
 		if (KCF_PROV_NULL_ENTRY_POINT(old, offset_1, offset_2, ops)) {
 			real_pd = NULL;
 			rv = CRYPTO_NOT_SUPPORTED;
+			goto out;
 		}
+		KCF_PROV_REFHOLD(real_pd);
 	}
 out:
 	*new = real_pd;

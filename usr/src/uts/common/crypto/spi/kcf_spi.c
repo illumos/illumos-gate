@@ -56,7 +56,8 @@ static void free_provider_list(kcf_provider_list_t *);
 static void remove_provider(kcf_provider_desc_t *);
 static void process_logical_providers(crypto_provider_info_t *,
     kcf_provider_desc_t *);
-static void copy_ops_vector(crypto_ops_t *, crypto_ops_t *);
+static void copy_ops_vector_v1(crypto_ops_t *, crypto_ops_t *);
+static void copy_ops_vector_v2(crypto_ops_t *, crypto_ops_t *);
 static int init_prov_mechs(crypto_provider_info_t *, kcf_provider_desc_t *);
 static int kcf_prov_kstat_update(kstat_t *, int);
 
@@ -92,7 +93,7 @@ crypto_register_provider(crypto_provider_info_t *info,
 	kcf_provider_desc_t *prov_desc = NULL;
 	int ret = CRYPTO_ARGUMENTS_BAD;
 
-	if (info->pi_interface_version != CRYPTO_SPI_VERSION_1)
+	if (info->pi_interface_version > CRYPTO_SPI_VERSION_2)
 		return (CRYPTO_VERSION_MISMATCH);
 
 	/*
@@ -134,7 +135,13 @@ crypto_register_provider(crypto_provider_info_t *info,
 		if (info->pi_ops_vector == NULL) {
 			return (CRYPTO_ARGUMENTS_BAD);
 		}
-		copy_ops_vector(info->pi_ops_vector, prov_desc->pd_ops_vector);
+		copy_ops_vector_v1(info->pi_ops_vector,
+		    prov_desc->pd_ops_vector);
+		if (info->pi_interface_version == CRYPTO_SPI_VERSION_2) {
+			copy_ops_vector_v2(info->pi_ops_vector,
+			    prov_desc->pd_ops_vector);
+			prov_desc->pd_flags = info->pi_flags;
+		}
 	}
 
 	/*
@@ -606,22 +613,28 @@ crypto_kmflag(crypto_req_handle_t handle)
  * persistent.
  */
 static void
-copy_ops_vector(crypto_ops_t *src_ops, crypto_ops_t *dst_ops)
+copy_ops_vector_v1(crypto_ops_t *src_ops, crypto_ops_t *dst_ops)
 {
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, control_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, digest_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, cipher_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, mac_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, sign_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, verify_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, dual_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, dual_cipher_mac_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, random_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, session_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, object_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, key_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, provider_ops);
-	KCF_SPI_COPY_OPS(src_ops, dst_ops, ctx_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_control_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_digest_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_cipher_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_mac_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_sign_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_verify_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_dual_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_dual_cipher_mac_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_random_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_session_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_object_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_key_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_provider_ops);
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_ctx_ops);
+}
+
+static void
+copy_ops_vector_v2(crypto_ops_t *src_ops, crypto_ops_t *dst_ops)
+{
+	KCF_SPI_COPY_OPS(src_ops, dst_ops, co_mech_ops);
 }
 
 /*
@@ -662,7 +675,7 @@ init_prov_mechs(crypto_provider_info_t *info, kcf_provider_desc_t *desc)
 	 * mechanism, SUN_RANDOM, in this case.
 	 */
 	if (info != NULL) {
-		if (info->pi_ops_vector->random_ops != NULL) {
+		if (info->pi_ops_vector->co_random_ops != NULL) {
 			crypto_mech_info_t *rand_mi;
 
 			/*

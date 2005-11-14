@@ -64,7 +64,8 @@ static struct modlinkage modlinkage = {
 typedef enum aes_mech_type {
 	AES_ECB_MECH_INFO_TYPE,		/* SUN_CKM_AES_ECB */
 	AES_CBC_MECH_INFO_TYPE,		/* SUN_CKM_AES_CBC */
-	AES_CBC_PAD_MECH_INFO_TYPE	/* SUN_CKM_AES_CBC_PAD */
+	AES_CBC_PAD_MECH_INFO_TYPE,	/* SUN_CKM_AES_CBC_PAD */
+	AES_CTR_MECH_INFO_TYPE		/* SUN_CKM_AES_CTR */
 } aes_mech_type_t;
 
 /*
@@ -91,12 +92,18 @@ static crypto_mech_info_t aes_mech_info_tab[] = {
 	{SUN_CKM_AES_CBC, AES_CBC_MECH_INFO_TYPE,
 	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
 	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
+	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES},
+	/* AES_CTR */
+	{SUN_CKM_AES_CTR, AES_CTR_MECH_INFO_TYPE,
+	    CRYPTO_FG_ENCRYPT | CRYPTO_FG_ENCRYPT_ATOMIC |
+	    CRYPTO_FG_DECRYPT | CRYPTO_FG_DECRYPT_ATOMIC,
 	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES}
 };
 
 #define	AES_VALID_MECH(mech)					\
 	(((mech)->cm_type == AES_ECB_MECH_INFO_TYPE ||		\
-	(mech)->cm_type == AES_CBC_MECH_INFO_TYPE) ? 1 : 0)
+	(mech)->cm_type == AES_CBC_MECH_INFO_TYPE ||		\
+	(mech)->cm_type == AES_CTR_MECH_INFO_TYPE) ? 1 : 0)
 
 /* operations are in-place if the output buffer is NULL */
 #define	AES_ARG_INPLACE(input, output)				\
@@ -317,9 +324,16 @@ aes_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 	if (!AES_VALID_MECH(mechanism))
 		return (CRYPTO_MECHANISM_INVALID);
 
-	if (mechanism->cm_param != NULL &&
-	    mechanism->cm_param_len != AES_BLOCK_LEN)
-		return (CRYPTO_MECHANISM_PARAM_INVALID);
+	if (mechanism->cm_param != NULL) {
+		if (mechanism->cm_type == AES_CTR_MECH_INFO_TYPE) {
+			if (mechanism->cm_param_len !=
+			    sizeof (CK_AES_CTR_PARAMS))
+				return (CRYPTO_MECHANISM_PARAM_INVALID);
+		} else {
+			if (mechanism->cm_param_len != AES_BLOCK_LEN)
+				return (CRYPTO_MECHANISM_PARAM_INVALID);
+		}
+	}
 
 	/*
 	 * Allocate an AES context.
@@ -534,16 +548,16 @@ aes_encrypt(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 
 	aes_ctx_t *aes_ctx;
 
-	/*
-	 * Plaintext must be a multiple of AES block size.
-	 * This test only works for non-padded mechanisms
-	 * when blocksize is 2^N.
-	 */
-	if ((plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
-		return (CRYPTO_DATA_LEN_RANGE);
-
 	ASSERT(ctx->cc_provider_private != NULL);
 	aes_ctx = ctx->cc_provider_private;
+
+	/*
+	 * For block ciphers, plaintext must be a multiple of AES block size.
+	 * This test is only valid for ciphers whose blocksize is a power of 2.
+	 */
+	if (((aes_ctx->ac_flags & AES_CTR_MODE) == 0) &&
+	    (plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
+		return (CRYPTO_DATA_LEN_RANGE);
 
 	AES_ARG_INPLACE(plaintext, ciphertext);
 
@@ -580,16 +594,16 @@ aes_decrypt(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 
 	aes_ctx_t *aes_ctx;
 
-	/*
-	 * Ciphertext must be a multiple of AES block size.
-	 * This test only works for non-padded mechanisms
-	 * when blocksize is 2^N.
-	 */
-	if ((ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
-		return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
-
 	ASSERT(ctx->cc_provider_private != NULL);
 	aes_ctx = ctx->cc_provider_private;
+
+	/*
+	 * For block ciphers, ciphertext must be a multiple of AES block size.
+	 * This test is only valid for ciphers whose blocksize is a power of 2.
+	 */
+	if (((aes_ctx->ac_flags & AES_CTR_MODE) == 0) &&
+	    (ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
+		return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
 
 	AES_ARG_INPLACE(ciphertext, plaintext);
 
@@ -623,6 +637,7 @@ aes_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 	off_t saved_offset;
 	size_t saved_length, out_len;
 	int ret = CRYPTO_SUCCESS;
+	aes_ctx_t *aes_ctx;
 
 	ASSERT(ctx->cc_provider_private != NULL);
 
@@ -662,6 +677,18 @@ aes_encrypt_update(crypto_ctx_t *ctx, crypto_data_t *plaintext,
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
+	/*
+	 * Since AES counter mode is a stream cipher, we call
+	 * aes_counter_final() to pick up any remaining bytes.
+	 * It is an internal function that does not destroy
+	 * the context like *normal* final routines.
+	 */
+	aes_ctx = ctx->cc_provider_private;
+	if ((aes_ctx->ac_flags & AES_CTR_MODE) &&
+	    (aes_ctx->ac_remainder_len > 0)) {
+		ret = aes_counter_final(aes_ctx, ciphertext);
+	}
+
 	if (ret == CRYPTO_SUCCESS) {
 		if (plaintext != ciphertext)
 			ciphertext->cd_length =
@@ -682,6 +709,7 @@ aes_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 	off_t saved_offset;
 	size_t saved_length, out_len;
 	int ret = CRYPTO_SUCCESS;
+	aes_ctx_t *aes_ctx;
 
 	ASSERT(ctx->cc_provider_private != NULL);
 
@@ -721,6 +749,18 @@ aes_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
+	/*
+	 * Since AES counter mode is a stream cipher, we call
+	 * aes_counter_final() to pick up any remaining bytes.
+	 * It is an internal function that does not destroy
+	 * the context like *normal* final routines.
+	 */
+	aes_ctx = ctx->cc_provider_private;
+	if ((aes_ctx->ac_flags & AES_CTR_MODE) &&
+	    (aes_ctx->ac_remainder_len > 0)) {
+		ret = aes_counter_final(aes_ctx, plaintext);
+	}
+
 	if (ret == CRYPTO_SUCCESS) {
 		if (ciphertext != plaintext)
 			plaintext->cd_length =
@@ -729,6 +769,7 @@ aes_decrypt_update(crypto_ctx_t *ctx, crypto_data_t *ciphertext,
 		plaintext->cd_length = saved_length;
 	}
 	plaintext->cd_offset = saved_offset;
+
 
 	return (ret);
 }
@@ -742,20 +783,36 @@ aes_encrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 /* EXPORT DELETE START */
 
 	aes_ctx_t *aes_ctx;
+	int ret;
 
 	ASSERT(ctx->cc_provider_private != NULL);
 	aes_ctx = ctx->cc_provider_private;
+
+	if (data->cd_format != CRYPTO_DATA_RAW &&
+	    data->cd_format != CRYPTO_DATA_UIO &&
+	    data->cd_format != CRYPTO_DATA_MBLK) {
+		return (CRYPTO_ARGUMENTS_BAD);
+	}
 
 	/*
 	 * There must be no unprocessed plaintext.
 	 * This happens if the length of the last data is
 	 * not a multiple of the AES block length.
 	 */
-	if (aes_ctx->ac_remainder_len > 0)
-		return (CRYPTO_DATA_LEN_RANGE);
+	if (aes_ctx->ac_remainder_len > 0) {
+		if ((aes_ctx->ac_flags & AES_CTR_MODE) == 0)
+			return (CRYPTO_DATA_LEN_RANGE);
+		else {
+			ret = aes_counter_final(aes_ctx, data);
+			if (ret != CRYPTO_SUCCESS)
+				return (ret);
+		}
+	}
+
+	if ((aes_ctx->ac_flags & AES_CTR_MODE) == 0)
+		data->cd_length = 0;
 
 	(void) aes_free_context(ctx);
-	data->cd_length = 0;
 
 /* EXPORT DELETE END */
 
@@ -771,20 +828,36 @@ aes_decrypt_final(crypto_ctx_t *ctx, crypto_data_t *data,
 /* EXPORT DELETE START */
 
 	aes_ctx_t *aes_ctx;
+	int ret;
 
 	ASSERT(ctx->cc_provider_private != NULL);
 	aes_ctx = ctx->cc_provider_private;
+
+	if (data->cd_format != CRYPTO_DATA_RAW &&
+	    data->cd_format != CRYPTO_DATA_UIO &&
+	    data->cd_format != CRYPTO_DATA_MBLK) {
+		return (CRYPTO_ARGUMENTS_BAD);
+	}
 
 	/*
 	 * There must be no unprocessed ciphertext.
 	 * This happens if the length of the last ciphertext is
 	 * not a multiple of the AES block length.
 	 */
-	if (aes_ctx->ac_remainder_len > 0)
-		return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
+	if (aes_ctx->ac_remainder_len > 0) {
+		if ((aes_ctx->ac_flags & AES_CTR_MODE) == 0)
+			return (CRYPTO_ENCRYPTED_DATA_LEN_RANGE);
+		else {
+			ret = aes_counter_final(aes_ctx, data);
+			if (ret != CRYPTO_SUCCESS)
+				return (ret);
+		}
+	}
+
+	if ((aes_ctx->ac_flags & AES_CTR_MODE) == 0)
+		data->cd_length = 0;
 
 	(void) aes_free_context(ctx);
-	data->cd_length = 0;
 
 /* EXPORT DELETE END */
 
@@ -805,13 +878,15 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 
 	AES_ARG_INPLACE(plaintext, ciphertext);
 
-	/*
-	 * Plaintext must be a multiple of AES block size.
-	 * This test only works for non-padded mechanisms
-	 * when blocksize is 2^N.
-	 */
-	if ((plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
-		return (CRYPTO_DATA_LEN_RANGE);
+	if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
+		/*
+		 * Plaintext must be a multiple of AES block size.
+		 * This test only works for non-padded mechanisms
+		 * when blocksize is 2^N.
+		 */
+		if ((plaintext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
+			return (CRYPTO_DATA_LEN_RANGE);
+	}
 
 	/* return length needed to store the output */
 	if (ciphertext->cd_length < plaintext->cd_length) {
@@ -822,9 +897,16 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 	if (!AES_VALID_MECH(mechanism))
 		return (CRYPTO_MECHANISM_INVALID);
 
-	if (mechanism->cm_param_len != 0 &&
-	    mechanism->cm_param_len != AES_BLOCK_LEN)
-		return (CRYPTO_MECHANISM_PARAM_INVALID);
+	if (mechanism->cm_param != NULL) {
+		if (mechanism->cm_type == AES_CTR_MECH_INFO_TYPE) {
+			if (mechanism->cm_param_len !=
+			    sizeof (CK_AES_CTR_PARAMS))
+				return (CRYPTO_MECHANISM_PARAM_INVALID);
+		} else {
+			if (mechanism->cm_param_len != AES_BLOCK_LEN)
+				return (CRYPTO_MECHANISM_PARAM_INVALID);
+		}
+	}
 
 	bzero(&aes_ctx, sizeof (aes_ctx_t));
 
@@ -856,20 +938,32 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
-	if (aes_ctx.ac_flags & AES_PROVIDER_OWNS_KEY_SCHEDULE) {
-		bzero(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
-		kmem_free(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
-	}
-
 	if (ret == CRYPTO_SUCCESS) {
-		ASSERT(aes_ctx.ac_remainder_len == 0);
-		if (plaintext != ciphertext)
-			ciphertext->cd_length =
-			    ciphertext->cd_offset - saved_offset;
+		if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
+			ASSERT(aes_ctx.ac_remainder_len == 0);
+			if (plaintext != ciphertext)
+				ciphertext->cd_length =
+				    ciphertext->cd_offset - saved_offset;
+		} else {
+			if (aes_ctx.ac_remainder_len > 0) {
+				ret = aes_counter_final(&aes_ctx, ciphertext);
+				if (ret != CRYPTO_SUCCESS)
+					goto out;
+			}
+			if (plaintext != ciphertext)
+				ciphertext->cd_length =
+				    ciphertext->cd_offset - saved_offset;
+		}
 	} else {
 		ciphertext->cd_length = saved_length;
 	}
 	ciphertext->cd_offset = saved_offset;
+
+out:
+	if (aes_ctx.ac_flags & AES_PROVIDER_OWNS_KEY_SCHEDULE) {
+		bzero(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
+		kmem_free(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
+	}
 
 	return (ret);
 }
@@ -888,13 +982,15 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 
 	AES_ARG_INPLACE(ciphertext, plaintext);
 
-	/*
-	 * Ciphertext must be a multiple of AES block size.
-	 * This test only works for non-padded mechanisms
-	 * when blocksize is 2^N.
-	 */
-	if ((ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
-		return (CRYPTO_DATA_LEN_RANGE);
+	if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
+		/*
+		 * Ciphertext must be a multiple of AES block size.
+		 * This test only works for non-padded mechanisms
+		 * when blocksize is 2^N.
+		 */
+		if ((ciphertext->cd_length & (AES_BLOCK_LEN - 1)) != 0)
+			return (CRYPTO_DATA_LEN_RANGE);
+	}
 
 	/* return length needed to store the output */
 	if (plaintext->cd_length < ciphertext->cd_length) {
@@ -905,9 +1001,16 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 	if (!AES_VALID_MECH(mechanism))
 		return (CRYPTO_MECHANISM_INVALID);
 
-	if (mechanism->cm_param_len != 0 &&
-	    mechanism->cm_param_len != AES_BLOCK_LEN)
-		return (CRYPTO_MECHANISM_PARAM_INVALID);
+	if (mechanism->cm_param != NULL) {
+		if (mechanism->cm_type == AES_CTR_MECH_INFO_TYPE) {
+			if (mechanism->cm_param_len !=
+			    sizeof (CK_AES_CTR_PARAMS))
+				return (CRYPTO_MECHANISM_PARAM_INVALID);
+		} else {
+			if (mechanism->cm_param_len != AES_BLOCK_LEN)
+				return (CRYPTO_MECHANISM_PARAM_INVALID);
+		}
+	}
 
 	bzero(&aes_ctx, sizeof (aes_ctx_t));
 
@@ -939,20 +1042,32 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 		ret = CRYPTO_ARGUMENTS_BAD;
 	}
 
-	if (aes_ctx.ac_flags & AES_PROVIDER_OWNS_KEY_SCHEDULE) {
-		bzero(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
-		kmem_free(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
-	}
-
 	if (ret == CRYPTO_SUCCESS) {
-		ASSERT(aes_ctx.ac_remainder_len == 0);
-		if (ciphertext != plaintext)
-			plaintext->cd_length =
-			    plaintext->cd_offset - saved_offset;
+		if (mechanism->cm_type != AES_CTR_MECH_INFO_TYPE) {
+			ASSERT(aes_ctx.ac_remainder_len == 0);
+			if (ciphertext != plaintext)
+				plaintext->cd_length =
+				    plaintext->cd_offset - saved_offset;
+		} else {
+			if (aes_ctx.ac_remainder_len > 0) {
+				ret = aes_counter_final(&aes_ctx, plaintext);
+				if (ret != CRYPTO_SUCCESS)
+					goto out;
+			}
+			if (ciphertext != plaintext)
+				plaintext->cd_length =
+				    plaintext->cd_offset - saved_offset;
+		}
 	} else {
 		plaintext->cd_length = saved_length;
 	}
 	plaintext->cd_offset = saved_offset;
+
+out:
+	if (aes_ctx.ac_flags & AES_PROVIDER_OWNS_KEY_SCHEDULE) {
+		bzero(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
+		kmem_free(aes_ctx.ac_keysched, aes_ctx.ac_keysched_len);
+	}
 
 	return (ret);
 }
@@ -1036,25 +1151,11 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 	void *keysched;
 	size_t size;
 
-	if (template == NULL) {
-		if ((keysched = aes_alloc_keysched(&size, kmflag)) == NULL)
-			return (CRYPTO_HOST_MEMORY);
-		/*
-		 * Initialize key schedule.
-		 * Key length is stored in the key.
-		 */
-		if ((rv = init_keysched(key, keysched)) != CRYPTO_SUCCESS)
-			kmem_free(keysched, size);
-
-		aes_ctx->ac_flags = AES_PROVIDER_OWNS_KEY_SCHEDULE;
-		aes_ctx->ac_keysched_len = size;
-	} else {
-		keysched = template;
-	}
+	aes_ctx->ac_flags = 0;
 
 	if (mechanism->cm_type == AES_CBC_MECH_INFO_TYPE) {
 		/*
-		 * Copy IV into AES context.
+		 * Copy 128-bit IV into context.
 		 *
 		 * If cm_param == NULL then the IV comes from the
 		 * cd_miscdata field in the crypto_data structure.
@@ -1095,6 +1196,69 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 
 		aes_ctx->ac_lastp = (uint8_t *)&aes_ctx->ac_iv[0];
 		aes_ctx->ac_flags |= AES_CBC_MODE;
+
+	} else if (mechanism->cm_type == AES_CTR_MECH_INFO_TYPE) {
+		if (mechanism->cm_param != NULL) {
+			CK_AES_CTR_PARAMS *pp;
+			uint64_t mask = 0;
+			ulong_t count;
+			uint8_t *iv8;
+			uint8_t *p8;
+
+			pp = (CK_AES_CTR_PARAMS *)mechanism->cm_param;
+			iv8 = (uint8_t *)&aes_ctx->ac_iv;
+			p8 = (uint8_t *)&pp->cb[0];
+
+			/* XXX what to do about miscdata */
+			count = pp->ulCounterBits;
+			if (count == 0 || count > 64) {
+				return (CRYPTO_MECHANISM_PARAM_INVALID);
+			}
+			while (count-- > 0)
+				mask |= (1ULL << count);
+
+			aes_ctx->ac_counter_mask = mask;
+
+			iv8[0] = p8[0];
+			iv8[1] = p8[1];
+			iv8[2] = p8[2];
+			iv8[3] = p8[3];
+			iv8[4] = p8[4];
+			iv8[5] = p8[5];
+			iv8[6] = p8[6];
+			iv8[7] = p8[7];
+			iv8[8] = p8[8];
+			iv8[9] = p8[9];
+			iv8[10] = p8[10];
+			iv8[11] = p8[11];
+			iv8[12] = p8[12];
+			iv8[13] = p8[13];
+			iv8[14] = p8[14];
+			iv8[15] = p8[15];
+		} else {
+			return (CRYPTO_MECHANISM_PARAM_INVALID);
+		}
+
+		aes_ctx->ac_lastp = (uint8_t *)&aes_ctx->ac_iv[0];
+		aes_ctx->ac_flags |= AES_CTR_MODE;
+	} else {
+		aes_ctx->ac_flags |= AES_ECB_MODE;
+	}
+
+	if (template == NULL) {
+		if ((keysched = aes_alloc_keysched(&size, kmflag)) == NULL)
+			return (CRYPTO_HOST_MEMORY);
+		/*
+		 * Initialize key schedule.
+		 * Key length is stored in the key.
+		 */
+		if ((rv = init_keysched(key, keysched)) != CRYPTO_SUCCESS)
+			kmem_free(keysched, size);
+
+		aes_ctx->ac_flags |= AES_PROVIDER_OWNS_KEY_SCHEDULE;
+		aes_ctx->ac_keysched_len = size;
+	} else {
+		keysched = template;
 	}
 	aes_ctx->ac_keysched = keysched;
 

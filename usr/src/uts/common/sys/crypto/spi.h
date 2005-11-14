@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@ extern "C" {
 #ifdef	_KERNEL
 
 #define	CRYPTO_SPI_VERSION_1	1
+#define	CRYPTO_SPI_VERSION_2	2
 
 /*
  * Provider-private handle. This handle is specified by a provider
@@ -484,6 +485,14 @@ typedef struct crypto_provider_management_ops {
 	    char *, size_t, char *, size_t, crypto_req_handle_t);
 } crypto_provider_management_ops_t;
 
+typedef struct crypto_mech_ops {
+	int (*copyin_mechanism)(crypto_provider_handle_t,
+	    crypto_mechanism_t *, crypto_mechanism_t *, int *, int);
+	int (*copyout_mechanism)(crypto_provider_handle_t,
+	    crypto_mechanism_t *, crypto_mechanism_t *, int *, int);
+	int (*free_mechanism)(crypto_provider_handle_t, crypto_mechanism_t *);
+} crypto_mech_ops_t;
+
 /*
  * The crypto_ops(9S) structure contains the structures containing
  * the pointers to functions implemented by cryptographic providers.
@@ -491,22 +500,50 @@ typedef struct crypto_provider_management_ops {
  * supplied by a provider when it registers with the kernel
  * by calling crypto_register_provider(9F).
  */
+typedef struct crypto_ops_v1 {
+	crypto_control_ops_t			*co_control_ops;
+	crypto_digest_ops_t			*co_digest_ops;
+	crypto_cipher_ops_t			*co_cipher_ops;
+	crypto_mac_ops_t			*co_mac_ops;
+	crypto_sign_ops_t			*co_sign_ops;
+	crypto_verify_ops_t			*co_verify_ops;
+	crypto_dual_ops_t			*co_dual_ops;
+	crypto_dual_cipher_mac_ops_t		*co_dual_cipher_mac_ops;
+	crypto_random_number_ops_t		*co_random_ops;
+	crypto_session_ops_t			*co_session_ops;
+	crypto_object_ops_t			*co_object_ops;
+	crypto_key_ops_t			*co_key_ops;
+	crypto_provider_management_ops_t	*co_provider_ops;
+	crypto_ctx_ops_t			*co_ctx_ops;
+} crypto_ops_v1_t;
+
+typedef struct crypto_ops_v2 {
+	crypto_ops_v1_t				v1_ops;
+	crypto_mech_ops_t			*co_mech_ops;
+} crypto_ops_v2_t;
+
 typedef struct crypto_ops {
-	crypto_control_ops_t			*control_ops;
-	crypto_digest_ops_t			*digest_ops;
-	crypto_cipher_ops_t			*cipher_ops;
-	crypto_mac_ops_t			*mac_ops;
-	crypto_sign_ops_t			*sign_ops;
-	crypto_verify_ops_t			*verify_ops;
-	crypto_dual_ops_t			*dual_ops;
-	crypto_dual_cipher_mac_ops_t		*dual_cipher_mac_ops;
-	crypto_random_number_ops_t		*random_ops;
-	crypto_session_ops_t			*session_ops;
-	crypto_object_ops_t			*object_ops;
-	crypto_key_ops_t			*key_ops;
-	crypto_provider_management_ops_t	*provider_ops;
-	crypto_ctx_ops_t			*ctx_ops;
+	union {
+		crypto_ops_v2_t	cou_v2;
+		crypto_ops_v1_t	cou_v1;
+	} cou;
 } crypto_ops_t;
+
+#define	co_control_ops			cou.cou_v1.co_control_ops
+#define	co_digest_ops			cou.cou_v1.co_digest_ops
+#define	co_cipher_ops			cou.cou_v1.co_cipher_ops
+#define	co_mac_ops			cou.cou_v1.co_mac_ops
+#define	co_sign_ops			cou.cou_v1.co_sign_ops
+#define	co_verify_ops			cou.cou_v1.co_verify_ops
+#define	co_dual_ops			cou.cou_v1.co_dual_ops
+#define	co_dual_cipher_mac_ops		cou.cou_v1.co_dual_cipher_mac_ops
+#define	co_random_ops			cou.cou_v1.co_random_ops
+#define	co_session_ops			cou.cou_v1.co_session_ops
+#define	co_object_ops			cou.cou_v1.co_object_ops
+#define	co_key_ops			cou.cou_v1.co_key_ops
+#define	co_provider_ops			cou.cou_v1.co_provider_ops
+#define	co_ctx_ops			cou.cou_v1.co_ctx_ops
+#define	co_mech_ops			cou.cou_v2.co_mech_ops
 
 /*
  * Provider device specification passed during registration.
@@ -622,7 +659,7 @@ typedef uint_t crypto_kcf_provider_handle_t;
  * register for the same device instance. In this case, the same
  * pi_provider_dev must be specified with a different pi_provider_handle.
  */
-typedef struct crypto_provider_info {
+typedef struct crypto_provider_info_v1 {
 	uint_t				pi_interface_version;
 	char				*pi_provider_description;
 	crypto_provider_type_t		pi_provider_type;
@@ -633,7 +670,34 @@ typedef struct crypto_provider_info {
 	crypto_mech_info_t		*pi_mechanisms;
 	uint_t				pi_logical_provider_count;
 	crypto_kcf_provider_handle_t	*pi_logical_providers;
+} crypto_provider_info_v1_t;
+
+typedef struct crypto_provider_info_v2 {
+	crypto_provider_info_v1_t	v1_info;
+	uint_t				pi_flags;
+} crypto_provider_info_v2_t;
+
+typedef struct crypto_provider_info {
+	union {
+		crypto_provider_info_v2_t piu_v2;
+		crypto_provider_info_v1_t piu_v1;
+	} piu;
 } crypto_provider_info_t;
+
+#define	pi_interface_version		piu.piu_v1.pi_interface_version
+#define	pi_provider_description		piu.piu_v1.pi_provider_description
+#define	pi_provider_type		piu.piu_v1.pi_provider_type
+#define	pi_provider_dev			piu.piu_v1.pi_provider_dev
+#define	pi_provider_handle		piu.piu_v1.pi_provider_handle
+#define	pi_ops_vector			piu.piu_v1.pi_ops_vector
+#define	pi_mech_list_count		piu.piu_v1.pi_mech_list_count
+#define	pi_mechanisms			piu.piu_v1.pi_mechanisms
+#define	pi_logical_provider_count	piu.piu_v1.pi_logical_provider_count
+#define	pi_logical_providers		piu.piu_v1.pi_logical_providers
+#define	pi_flags			piu.piu_v2.pi_flags
+
+/* hidden providers can only be accessed via a logical provider */
+#define	CRYPTO_HIDE_PROVIDER		1
 
 /*
  * Provider status passed by a provider to crypto_provider_notification(9F)

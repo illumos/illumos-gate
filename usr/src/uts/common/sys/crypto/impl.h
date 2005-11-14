@@ -220,6 +220,7 @@ typedef struct kcf_provider_desc {
 	kcondvar_t			pd_remove_cv;
 	boolean_t			pd_restricted;
 	struct kcf_provider_list	*pd_provider_list;
+	uint_t				pd_flags;
 } kcf_provider_desc_t;
 
 /* useful for making a list of providers */
@@ -503,21 +504,22 @@ extern rctl_hndl_t rc_project_crypto_mem;
  * of type kcf_prov_desc_t.
  */
 
-#define	KCF_PROV_CONTROL_OPS(pd)	((pd)->pd_ops_vector->control_ops)
-#define	KCF_PROV_CTX_OPS(pd)		((pd)->pd_ops_vector->ctx_ops)
-#define	KCF_PROV_DIGEST_OPS(pd)		((pd)->pd_ops_vector->digest_ops)
-#define	KCF_PROV_CIPHER_OPS(pd)		((pd)->pd_ops_vector->cipher_ops)
-#define	KCF_PROV_MAC_OPS(pd)		((pd)->pd_ops_vector->mac_ops)
-#define	KCF_PROV_SIGN_OPS(pd)		((pd)->pd_ops_vector->sign_ops)
-#define	KCF_PROV_VERIFY_OPS(pd)		((pd)->pd_ops_vector->verify_ops)
-#define	KCF_PROV_DUAL_OPS(pd)		((pd)->pd_ops_vector->dual_ops)
+#define	KCF_PROV_CONTROL_OPS(pd)	((pd)->pd_ops_vector->co_control_ops)
+#define	KCF_PROV_CTX_OPS(pd)		((pd)->pd_ops_vector->co_ctx_ops)
+#define	KCF_PROV_DIGEST_OPS(pd)		((pd)->pd_ops_vector->co_digest_ops)
+#define	KCF_PROV_CIPHER_OPS(pd)		((pd)->pd_ops_vector->co_cipher_ops)
+#define	KCF_PROV_MAC_OPS(pd)		((pd)->pd_ops_vector->co_mac_ops)
+#define	KCF_PROV_SIGN_OPS(pd)		((pd)->pd_ops_vector->co_sign_ops)
+#define	KCF_PROV_VERIFY_OPS(pd)		((pd)->pd_ops_vector->co_verify_ops)
+#define	KCF_PROV_DUAL_OPS(pd)		((pd)->pd_ops_vector->co_dual_ops)
 #define	KCF_PROV_DUAL_CIPHER_MAC_OPS(pd) \
-	((pd)->pd_ops_vector->dual_cipher_mac_ops)
-#define	KCF_PROV_RANDOM_OPS(pd)		((pd)->pd_ops_vector->random_ops)
-#define	KCF_PROV_SESSION_OPS(pd)	((pd)->pd_ops_vector->session_ops)
-#define	KCF_PROV_OBJECT_OPS(pd)		((pd)->pd_ops_vector->object_ops)
-#define	KCF_PROV_KEY_OPS(pd)		((pd)->pd_ops_vector->key_ops)
-#define	KCF_PROV_PROVIDER_OPS(pd)	((pd)->pd_ops_vector->provider_ops)
+	((pd)->pd_ops_vector->co_dual_cipher_mac_ops)
+#define	KCF_PROV_RANDOM_OPS(pd)		((pd)->pd_ops_vector->co_random_ops)
+#define	KCF_PROV_SESSION_OPS(pd)	((pd)->pd_ops_vector->co_session_ops)
+#define	KCF_PROV_OBJECT_OPS(pd)		((pd)->pd_ops_vector->co_object_ops)
+#define	KCF_PROV_KEY_OPS(pd)		((pd)->pd_ops_vector->co_key_ops)
+#define	KCF_PROV_PROVIDER_OPS(pd)	((pd)->pd_ops_vector->co_provider_ops)
+#define	KCF_PROV_MECH_OPS(pd)		((pd)->pd_ops_vector->co_mech_ops)
 
 /*
  * Wrappers for crypto_control_ops(9S) entry points.
@@ -543,6 +545,23 @@ extern rctl_hndl_t rc_project_crypto_mem;
 #define	KCF_PROV_FREE_CONTEXT(pd, ctx) ( \
 	(KCF_PROV_CTX_OPS(pd) && KCF_PROV_CTX_OPS(pd)->free_context) ? \
 	KCF_PROV_CTX_OPS(pd)->free_context(ctx) : CRYPTO_NOT_SUPPORTED)
+
+#define	KCF_PROV_COPYIN_MECH(pd, umech, kmech, errorp, mode) ( \
+	(KCF_PROV_MECH_OPS(pd) && KCF_PROV_MECH_OPS(pd)->copyin_mechanism) ? \
+	KCF_PROV_MECH_OPS(pd)->copyin_mechanism( \
+	    (pd)->pd_prov_handle, umech, kmech, errorp, mode) : \
+	CRYPTO_NOT_SUPPORTED)
+
+#define	KCF_PROV_COPYOUT_MECH(pd, kmech, umech, errorp, mode) ( \
+	(KCF_PROV_MECH_OPS(pd) && KCF_PROV_MECH_OPS(pd)->copyout_mechanism) ? \
+	KCF_PROV_MECH_OPS(pd)->copyout_mechanism( \
+	    (pd)->pd_prov_handle, kmech, umech, errorp, mode) : \
+	CRYPTO_NOT_SUPPORTED)
+
+#define	KCF_PROV_FREE_MECH(pd, prov_mech) ( \
+	(KCF_PROV_MECH_OPS(pd) && KCF_PROV_MECH_OPS(pd)->free_mechanism) ? \
+	KCF_PROV_MECH_OPS(pd)->free_mechanism( \
+	    (pd)->pd_prov_handle, prov_mech) : CRYPTO_NOT_SUPPORTED)
 
 /*
  * Wrappers for crypto_digest_ops(9S) entry points.
@@ -1125,41 +1144,15 @@ extern rctl_hndl_t rc_project_crypto_mem;
  */
 
 /* Digest/mac/cipher entry points that take a provider descriptor and session */
-extern int crypto_digest_prov(crypto_mechanism_t *, crypto_data_t *,
-    crypto_data_t *, crypto_call_req_t *, kcf_provider_desc_t *,
-    crypto_session_id_t);
-extern int crypto_digest_init_prov(kcf_provider_desc_t *, crypto_session_id_t,
-    crypto_mechanism_t *, crypto_context_t *, crypto_call_req_t *);
 extern int crypto_digest_single(crypto_context_t, crypto_data_t *,
     crypto_data_t *, crypto_call_req_t *);
 
-extern int crypto_mac_prov(crypto_mechanism_t *, crypto_data_t *,
-    crypto_key_t *, crypto_ctx_template_t, crypto_data_t *,
-    crypto_call_req_t *, kcf_provider_desc_t *, crypto_session_id_t);
-extern int crypto_mac_verify_prov(crypto_mechanism_t *, crypto_data_t *,
-    crypto_key_t *, crypto_ctx_template_t, crypto_data_t *,
-    crypto_call_req_t *, kcf_provider_desc_t *, crypto_session_id_t);
-extern int crypto_mac_init_prov(kcf_provider_desc_t *, crypto_session_id_t,
-    crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
-    crypto_context_t *, crypto_call_req_t *);
 extern int crypto_mac_single(crypto_context_t, crypto_data_t *,
     crypto_data_t *, crypto_call_req_t *);
 
-extern int crypto_encrypt_prov(crypto_mechanism_t *, crypto_data_t *,
-    crypto_key_t *, crypto_ctx_template_t, crypto_data_t *,
-    crypto_call_req_t *, kcf_provider_desc_t *, crypto_session_id_t);
-extern int crypto_encrypt_init_prov(kcf_provider_desc_t *,
-    crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
-    crypto_ctx_template_t, crypto_context_t *, crypto_call_req_t *);
 extern int crypto_encrypt_single(crypto_context_t, crypto_data_t *,
     crypto_data_t *, crypto_call_req_t *);
 
-extern int crypto_decrypt_prov(crypto_mechanism_t *, crypto_data_t *,
-    crypto_key_t *, crypto_ctx_template_t, crypto_data_t *,
-    crypto_call_req_t *, kcf_provider_desc_t *, crypto_session_id_t);
-extern int crypto_decrypt_init_prov(kcf_provider_desc_t *, crypto_session_id_t,
-    crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
-    crypto_context_t *, crypto_call_req_t *);
 extern int crypto_decrypt_single(crypto_context_t, crypto_data_t *,
     crypto_data_t *, crypto_call_req_t *);
 
@@ -1169,44 +1162,18 @@ extern int crypto_digest_key_prov(crypto_context_t, crypto_key_t *,
     crypto_call_req_t *);
 
 /* Private sign entry points exported by KCF */
-extern int crypto_sign_init_prov(kcf_provider_desc_t *, crypto_session_id_t,
-    crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
-    crypto_context_t *, crypto_call_req_t *);
 extern int crypto_sign_single(crypto_context_t, crypto_data_t *,
     crypto_data_t *, crypto_call_req_t *);
-extern int crypto_sign_prov(kcf_provider_desc_t *, crypto_session_id_t,
-    crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
-    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 
-extern int crypto_sign_recover_init_prov(kcf_provider_desc_t *,
-    crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
-    crypto_ctx_template_t tmpl, crypto_context_t *, crypto_call_req_t *);
 extern int crypto_sign_recover_single(crypto_context_t, crypto_data_t *,
     crypto_data_t *, crypto_call_req_t *);
-extern int crypto_sign_recover_prov(kcf_provider_desc_t *,
-    crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
-    crypto_data_t *, crypto_ctx_template_t, crypto_data_t *,
-    crypto_call_req_t *);
 
 /* Private verify entry points exported by KCF */
-extern int crypto_verify_init_prov(kcf_provider_desc_t *, crypto_session_id_t,
-    crypto_mechanism_t *, crypto_key_t *, crypto_ctx_template_t,
-    crypto_context_t *, crypto_call_req_t *);
 extern int crypto_verify_single(crypto_context_t, crypto_data_t *,
     crypto_data_t *, crypto_call_req_t *);
-extern int crypto_verify_prov(kcf_provider_desc_t *, crypto_session_id_t,
-    crypto_mechanism_t *, crypto_key_t *, crypto_data_t *,
-    crypto_ctx_template_t, crypto_data_t *, crypto_call_req_t *);
 
-extern int crypto_verify_recover_init_prov(kcf_provider_desc_t *,
-    crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
-    crypto_ctx_template_t tmpl, crypto_context_t *, crypto_call_req_t *);
 extern int crypto_verify_recover_single(crypto_context_t, crypto_data_t *,
     crypto_data_t *, crypto_call_req_t *);
-extern int crypto_verify_recover_prov(kcf_provider_desc_t *,
-    crypto_session_id_t, crypto_mechanism_t *, crypto_key_t *,
-    crypto_data_t *, crypto_ctx_template_t, crypto_data_t *,
-    crypto_call_req_t *);
 
 /* Private dual operations entry points exported by KCF */
 extern int crypto_digest_encrypt_update(crypto_context_t, crypto_context_t,
@@ -1223,72 +1190,6 @@ int crypto_seed_random(crypto_provider_handle_t provider, uchar_t *buf,
     size_t len, crypto_call_req_t *req);
 int crypto_generate_random(crypto_provider_handle_t provider, uchar_t *buf,
     size_t len, crypto_call_req_t *req);
-
-/* Session Management */
-int crypto_session_open(crypto_provider_handle_t provider,
-    crypto_session_id_t *session_id, crypto_call_req_t *req);
-int crypto_session_close(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_call_req_t *req);
-int crypto_session_login(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_user_type_t user_type, char *pin,
-    size_t pin_len, crypto_call_req_t *req);
-int crypto_session_logout(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_call_req_t *req);
-
-/* Object Management */
-int crypto_object_create(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_object_attribute_t *template,
-    uint_t attribute_count, crypto_object_id_t *object_handle,
-    crypto_call_req_t *req);
-int crypto_object_copy(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_object_id_t object_handle,
-    crypto_object_attribute_t *template, uint_t attribute_count,
-    crypto_object_id_t *new_object_handle, crypto_call_req_t *req);
-int crypto_object_destroy(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_object_id_t object_handle,
-    crypto_call_req_t *req);
-int crypto_object_get_size(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_object_id_t object_handle,
-    size_t *size, crypto_call_req_t *req);
-int crypto_object_get_attribute_value(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_object_id_t object_handle,
-    crypto_object_attribute_t *template, uint_t attribute_count,
-    crypto_call_req_t *req);
-int crypto_object_set_attribute_value(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_object_id_t object_handle,
-    crypto_object_attribute_t *template, uint_t count, crypto_call_req_t *req);
-int crypto_object_find_init(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_object_attribute_t *template,
-    uint_t attribute_count, void **provider_private, crypto_call_req_t *req);
-int crypto_object_find(crypto_provider_handle_t provider,
-    void *provider_private, crypto_object_id_t *objects,
-    uint_t max_object_count, uint_t *object_count, crypto_call_req_t *req);
-int crypto_object_find_final(crypto_provider_handle_t provider,
-    void *provider_private, crypto_call_req_t *req);
-
-/* Key Generation */
-int crypto_generate_key(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_mechanism_t *mech,
-    crypto_object_attribute_t *key_attributes, uint_t attributes_count,
-    crypto_object_id_t *key_handle, crypto_call_req_t *req);
-int crypto_generate_key_pair(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_mechanism_t *mech,
-    crypto_object_attribute_t *public_attributes, uint_t public_count,
-    crypto_object_attribute_t *private_attributes, uint_t private_count,
-    crypto_object_id_t *public_handle, crypto_object_id_t *private_handle,
-    crypto_call_req_t *req);
-int crypto_wrap_key(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_mechanism_t *mech,
-    crypto_key_t *wrapping_key, crypto_object_id_t *key_handle,
-    uchar_t *wrapped_key, size_t wrapped_key_len, crypto_call_req_t *req);
-int crypto_unwrap_key(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_mechanism_t *mech, crypto_key_t *key,
-    uchar_t *wrapped_key, size_t wrapped_key_len,
-    crypto_object_id_t *key_handle, crypto_call_req_t *req);
-int crypto_derive_key(crypto_provider_handle_t provider,
-    crypto_session_id_t session_id, crypto_mechanism_t *mech, crypto_key_t *key,
-    crypto_object_attribute_t *attributes, uint_t attribute_count,
-    crypto_object_id_t *object_handle, crypto_call_req_t *req);
 
 /* Provider Management */
 int crypto_get_provider_info(crypto_provider_id_t id,
@@ -1380,6 +1281,7 @@ extern int kcf_policy_load_soft_disabled(char *, uint_t, crypto_mech_name_t *,
     uint_t *, crypto_mech_name_t **);
 extern int kcf_policy_load_dev_disabled(char *, uint_t, uint_t,
     crypto_mech_name_t *, uint_t *, crypto_mech_name_t **);
+extern boolean_t in_soft_config_list(char *);
 
 #endif	/* _KERNEL */
 

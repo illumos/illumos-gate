@@ -65,6 +65,8 @@ typedef enum kcf_call_type {
 #define	CHECK_RESTRICT(crq) (crq != NULL &&	\
 	((crq)->cr_flag & CRYPTO_RESTRICTED))
 
+#define	CHECK_RESTRICT_FALSE	B_FALSE
+
 #define	CHECK_FASTPATH(crq, pd) ((crq) == NULL ||	\
 	!((crq)->cr_flag & CRYPTO_ALWAYS_QUEUE)) &&	\
 	(pd)->pd_prov_type == CRYPTO_SW_PROVIDER
@@ -484,10 +486,11 @@ extern kcondvar_t ntfy_list_cv;
 
 boolean_t kcf_get_next_logical_provider_member(kcf_provider_desc_t *,
     kcf_provider_desc_t *, kcf_provider_desc_t **);
-extern int kcf_get_hardware_provider(crypto_mech_type_t, offset_t, offset_t,
-    kcf_provider_desc_t *, kcf_provider_desc_t **);
+extern int kcf_get_hardware_provider(crypto_mech_type_t, crypto_mech_type_t,
+    offset_t, offset_t, boolean_t, kcf_provider_desc_t *,
+    kcf_provider_desc_t **);
 extern int kcf_get_hardware_provider_nomech(offset_t, offset_t,
-    kcf_provider_desc_t *, kcf_provider_desc_t **);
+    boolean_t, kcf_provider_desc_t *, kcf_provider_desc_t **);
 extern void kcf_free_triedlist(kcf_prov_tried_t *);
 extern kcf_prov_tried_t *kcf_insert_triedlist(kcf_prov_tried_t **,
     kcf_provider_desc_t *, int);

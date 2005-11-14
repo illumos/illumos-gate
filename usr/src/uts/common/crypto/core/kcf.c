@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -192,10 +192,10 @@ kcf_verify_signature(kcf_provider_desc_t *pd)
 	 * the module if it carries a signature. Any operation set which has
 	 * a encryption/decryption component is a candidate for verification.
 	 */
-	if (prov_ops->cipher_ops == NULL && prov_ops->dual_ops == NULL &&
-	    prov_ops->dual_cipher_mac_ops == NULL &&
-	    prov_ops->key_ops == NULL && prov_ops->sign_ops == NULL &&
-	    prov_ops->verify_ops == NULL && mp->sigdata == NULL) {
+	if (prov_ops->co_cipher_ops == NULL && prov_ops->co_dual_ops == NULL &&
+	    prov_ops->co_dual_cipher_mac_ops == NULL &&
+	    prov_ops->co_key_ops == NULL && prov_ops->co_sign_ops == NULL &&
+	    prov_ops->co_verify_ops == NULL && mp->sigdata == NULL) {
 		return (0);
 	}
 

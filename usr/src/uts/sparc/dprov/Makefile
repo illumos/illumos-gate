@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,6 +34,7 @@
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
 UTSBASE	= ../..
+COM_DIR = $(SRC)/common/crypto
 
 #
 #	Define the module and object file sets.
@@ -71,7 +72,8 @@ LDFLAGS += -dy -Nmisc/kcf
 #
 # lint pass one enforcement
 #
-CFLAGS += $(CCVERBOSE)
+CFLAGS		+= $(CCVERBOSE) -I$(COM_DIR)
+LINTFLAGS	+= -I$(COM_DIR)
 
 #
 #	Default build targets.

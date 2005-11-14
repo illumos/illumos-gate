@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,11 +30,15 @@
 #include <sys/types.h>
 #include <sys/kmem.h>
 #include <sys/cmn_err.h>
+#include <sys/sysmacros.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/impl.h>
 #include <sys/crypto/api.h>
 #include <sys/crypto/spi.h>
 #include <sys/crypto/sched_impl.h>
+
+#define	CRYPTO_OPS_OFFSET(f)		offsetof(crypto_ops_t, co_##f)
+#define	CRYPTO_DIGEST_OFFSET(f)		offsetof(crypto_digest_ops_t, f)
 
 /*
  * Message digest routines
@@ -92,18 +96,35 @@
  *	See comment in the beginning of the file.
  */
 int
-crypto_digest_prov(crypto_mechanism_t *mech, crypto_data_t *data,
-    crypto_data_t *digest, crypto_call_req_t *crq, kcf_provider_desc_t *pd,
-    crypto_session_id_t sid)
+crypto_digest_prov(crypto_provider_t provider, crypto_session_id_t sid,
+    crypto_mechanism_t *mech, crypto_data_t *data, crypto_data_t *digest,
+    crypto_call_req_t *crq)
 {
 	kcf_req_params_t params;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	int rv;
 
 	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(digest_ops),
+		    CRYPTO_DIGEST_OFFSET(digest_atomic), CHECK_RESTRICT(crq),
+		    pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
 	KCF_WRAP_DIGEST_OPS_PARAMS(&params, KCF_OP_ATOMIC, sid, mech, NULL,
 	    data, digest);
 
 	/* no crypto context to carry between multiple parts. */
-	return (kcf_submit_request(pd, NULL, crq, &params, B_FALSE));
+	rv = kcf_submit_request(real_provider, NULL, crq, &params, B_FALSE);
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
+
+	return (rv);
 }
 
 /*
@@ -184,34 +205,52 @@ retry:
  *	descriptor before calling this function.
  */
 int
-crypto_digest_init_prov(kcf_provider_desc_t *pd,
-    crypto_session_id_t sid, crypto_mechanism_t *mech,
-    crypto_context_t *ctxp, crypto_call_req_t  *crq)
+crypto_digest_init_prov(crypto_provider_t provider, crypto_session_id_t sid,
+    crypto_mechanism_t *mech, crypto_context_t *ctxp, crypto_call_req_t  *crq)
 {
 	int error;
 	crypto_ctx_t *ctx;
 	kcf_req_params_t params;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
 
 	ASSERT(KCF_PROV_REFHELD(pd));
 
-	/* First, allocate and initialize the canonical context */
-	if ((ctx = kcf_new_ctx(crq, pd, sid)) == NULL)
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		error = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(digest_ops),
+		    CRYPTO_DIGEST_OFFSET(digest_init),
+		    CHECK_RESTRICT(crq), pd, &real_provider);
+
+		if (error != CRYPTO_SUCCESS)
+			return (error);
+	}
+
+	/* Allocate and initialize the canonical context */
+	if ((ctx = kcf_new_ctx(crq, real_provider, sid)) == NULL) {
+		if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+			KCF_PROV_REFRELE(real_provider);
 		return (CRYPTO_HOST_MEMORY);
+	}
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(crq, pd)) {
 		crypto_mechanism_t lmech;
 
 		lmech = *mech;
-		KCF_SET_PROVIDER_MECHNUM(mech->cm_type, pd, &lmech);
-		error = KCF_PROV_DIGEST_INIT(pd, ctx, &lmech,
+		KCF_SET_PROVIDER_MECHNUM(mech->cm_type, real_provider, &lmech);
+		error = KCF_PROV_DIGEST_INIT(real_provider, ctx, &lmech,
 		    KCF_SWFP_RHNDL(crq));
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
 		KCF_WRAP_DIGEST_OPS_PARAMS(&params, KCF_OP_INIT, sid,
 		    mech, NULL, NULL, NULL);
-		error = kcf_submit_request(pd, ctx, crq, &params, B_FALSE);
+		error = kcf_submit_request(real_provider, ctx, crq, &params,
+		    B_FALSE);
 	}
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
 
 	if ((error == CRYPTO_SUCCESS) || (error == CRYPTO_QUEUED))
 		*ctxp = (crypto_context_t)ctx;
@@ -295,6 +334,7 @@ crypto_digest_update(crypto_context_t context, crypto_data_t *data,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
@@ -302,8 +342,8 @@ crypto_digest_update(crypto_context_t context, crypto_data_t *data,
 		error = KCF_PROV_DIGEST_UPDATE(pd, ctx, data, NULL);
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
-		KCF_WRAP_DIGEST_OPS_PARAMS(&params, KCF_OP_UPDATE, pd->pd_sid,
-		    NULL, NULL, data, NULL);
+		KCF_WRAP_DIGEST_OPS_PARAMS(&params, KCF_OP_UPDATE,
+		    ctx->cc_session, NULL, NULL, data, NULL);
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
@@ -345,6 +385,7 @@ crypto_digest_final(crypto_context_t context, crypto_data_t *digest,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
@@ -352,8 +393,8 @@ crypto_digest_final(crypto_context_t context, crypto_data_t *digest,
 		error = KCF_PROV_DIGEST_FINAL(pd, ctx, digest, NULL);
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
-		KCF_WRAP_DIGEST_OPS_PARAMS(&params, KCF_OP_FINAL, pd->pd_sid,
-		    NULL, NULL, NULL, digest);
+		KCF_WRAP_DIGEST_OPS_PARAMS(&params, KCF_OP_FINAL,
+		    ctx->cc_session, NULL, NULL, NULL, digest);
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
@@ -383,6 +424,7 @@ crypto_digest_key_prov(crypto_context_t context, crypto_key_t *key,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
@@ -391,11 +433,11 @@ crypto_digest_key_prov(crypto_context_t context, crypto_key_t *key,
 		KCF_PROV_INCRSTATS(pd, error);
 	} else {
 		KCF_WRAP_DIGEST_OPS_PARAMS(&params, KCF_OP_DIGEST_KEY,
-		    pd->pd_sid, NULL, key, NULL, NULL);
+		    ctx->cc_session, NULL, key, NULL, NULL);
 		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
-
 	KCF_PROV_REFRELE(pd);
+
 	return (error);
 }
 

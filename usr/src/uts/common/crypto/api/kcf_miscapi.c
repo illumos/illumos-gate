@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,10 +30,19 @@
 #include <sys/sunddi.h>
 #include <sys/disp.h>
 #include <sys/modctl.h>
+#include <sys/sysmacros.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/api.h>
 #include <sys/crypto/impl.h>
 #include <sys/crypto/sched_impl.h>
+
+#define	isspace(ch)	(((ch) == ' ') || ((ch) == '\r') || ((ch) == '\n') || \
+			((ch) == '\t') || ((ch) == '\f'))
+
+#define	CRYPTO_OPS_OFFSET(f)		offsetof(crypto_ops_t, co_##f)
+#define	CRYPTO_KEY_OFFSET(f)		offsetof(crypto_key_ops_t, f)
+#define	CRYPTO_PROVIDER_OFFSET(f)	\
+	offsetof(crypto_provider_management_ops_t, f)
 
 /* Miscellaneous exported entry points */
 
@@ -571,6 +580,40 @@ crypto_key_check(crypto_mechanism_t *mech, crypto_key_t *key)
 	return (CRYPTO_SUCCESS);
 }
 
+int
+crypto_key_check_prov(crypto_provider_t provider, crypto_mechanism_t *mech,
+    crypto_key_t *key)
+{
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	crypto_mechanism_t lmech;
+	int rv;
+
+	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if ((mech == NULL) || (key == NULL) ||
+	    (key->ck_format == CRYPTO_KEY_REFERENCE))
+		return (CRYPTO_ARGUMENTS_BAD);
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(key_ops),
+		    CRYPTO_KEY_OFFSET(key_check), CHECK_RESTRICT_FALSE,
+		    pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
+
+	lmech = *mech;
+	KCF_SET_PROVIDER_MECHNUM(mech->cm_type, real_provider, &lmech);
+	rv = KCF_PROV_KEY_CHECK(real_provider, &lmech, key);
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
+
+	return (rv);
+}
+
 /*
  * Initialize the specified crypto_mechanism_info_t structure for
  * the specified mechanism provider descriptor. Used by
@@ -661,4 +704,158 @@ bail:
 	*mech_infos = infos;
 	*num_mech_infos = ninfos;
 	return (rv);
+}
+
+/*
+ * memcmp_pad_max() is a specialized version of memcmp() which
+ * compares two pieces of data up to a maximum length.  If the
+ * the two data match up the maximum length, they are considered
+ * matching.  Trailing blanks do not cause the match to fail if
+ * one of the data is shorter.
+ *
+ * Examples of matches:
+ *	"one"           |
+ *	"one      "     |
+ *	                ^maximum length
+ *
+ *	"Number One     |  X"	(X is beyond maximum length)
+ *	"Number One   " |
+ *	                ^maximum length
+ *
+ * Examples of mismatches:
+ *	" one"
+ *	"one"
+ *
+ *	"Number One    X|"
+ *	"Number One     |"
+ *	                ^maximum length
+ */
+static int
+memcmp_pad_max(void *d1, uint_t d1_len, void *d2, uint_t d2_len, uint_t max_sz)
+{
+	uint_t		len, extra_len;
+	char		*marker;
+
+	/* No point in comparing anything beyond max_sz */
+	if (d1_len > max_sz)
+		d1_len = max_sz;
+	if (d2_len > max_sz)
+		d2_len = max_sz;
+
+	/* Find shorter of the two data. */
+	if (d1_len <= d2_len) {
+		len = d1_len;
+		extra_len = d2_len;
+		marker = d2;
+	} else {	/* d1_len > d2_len */
+		len = d2_len;
+		extra_len = d1_len;
+		marker = d1;
+	}
+
+	/* Have a match in the shortest length of data? */
+	if (memcmp(d1, d2, len) != 0)
+		/* CONSTCOND */
+		return (!0);
+
+	/* If the rest of longer data is nulls or blanks, call it a match. */
+	while (len < extra_len)
+		if (!isspace(marker[len++]))
+			/* CONSTCOND */
+			return (!0);
+	return (0);
+}
+
+/*
+ * Obtain ext info for specified provider and see if it matches.
+ */
+static boolean_t
+match_ext_info(kcf_provider_desc_t *pd, char *label, char *manuf, char *serial,
+    crypto_provider_ext_info_t *ext_info)
+{
+	kcf_provider_desc_t *real_provider;
+	int rv;
+	kcf_req_params_t params;
+
+	(void) kcf_get_hardware_provider_nomech(
+	    CRYPTO_OPS_OFFSET(provider_ops), CRYPTO_PROVIDER_OFFSET(ext_info),
+	    CHECK_RESTRICT_FALSE, pd, &real_provider);
+
+	if (real_provider != NULL) {
+		ASSERT(real_provider == pd ||
+		    pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER);
+		KCF_WRAP_PROVMGMT_OPS_PARAMS(&params, KCF_OP_MGMT_EXTINFO,
+		    0, NULL, 0, NULL, 0, NULL, ext_info, pd);
+		rv = kcf_submit_request(real_provider, NULL, NULL, &params,
+		    B_FALSE);
+		ASSERT(rv != CRYPTO_NOT_SUPPORTED);
+		KCF_PROV_REFRELE(real_provider);
+	}
+
+	if (rv != CRYPTO_SUCCESS)
+		return (B_FALSE);
+
+	if (memcmp_pad_max(ext_info->ei_label, CRYPTO_EXT_SIZE_LABEL,
+	    label, strlen(label), CRYPTO_EXT_SIZE_LABEL))
+		return (B_FALSE);
+
+	if (manuf != NULL) {
+		if (memcmp_pad_max(ext_info->ei_manufacturerID,
+		    CRYPTO_EXT_SIZE_MANUF, manuf, strlen(manuf),
+		    CRYPTO_EXT_SIZE_MANUF))
+			return (B_FALSE);
+	}
+
+	if (serial != NULL) {
+		if (memcmp_pad_max(ext_info->ei_serial_number,
+		    CRYPTO_EXT_SIZE_SERIAL, label, strlen(label),
+		    CRYPTO_EXT_SIZE_SERIAL))
+			return (B_FALSE);
+	}
+	return (B_TRUE);
+}
+
+/*
+ * Find a provider based on its label, manufacturer ID, and serial number.
+ */
+crypto_provider_t
+crypto_get_provider(char *label, char *manuf, char *serial)
+{
+	kcf_provider_desc_t **provider_array, *pd;
+	crypto_provider_ext_info_t *ext_info;
+	uint_t count;
+	int i;
+
+	/* manuf and serial are optional */
+	if (label == NULL)
+		return (NULL);
+
+	if (kcf_get_slot_list(&count, &provider_array, B_FALSE)
+	    != CRYPTO_SUCCESS)
+		return (NULL);
+
+	if (count == 0)
+		return (NULL);
+
+	ext_info = kmem_zalloc(sizeof (crypto_provider_ext_info_t), KM_SLEEP);
+
+	for (i = 0; i < count; i++) {
+		pd = provider_array[i];
+		if (match_ext_info(pd, label, manuf, serial, ext_info)) {
+			KCF_PROV_REFHOLD(pd);
+			break;
+		}
+	}
+	if (i == count)
+		pd = NULL;
+
+	kcf_free_provider_tab(count, provider_array);
+	kmem_free(ext_info, sizeof (crypto_provider_ext_info_t));
+	return (pd);
+}
+
+void
+crypto_release_provider(crypto_provider_t provider)
+{
+	KCF_PROV_REFRELE((kcf_provider_desc_t *)provider);
 }

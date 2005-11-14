@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,11 +29,15 @@
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/kmem.h>
+#include <sys/sysmacros.h>
 #include <sys/crypto/common.h>
 #include <sys/crypto/impl.h>
 #include <sys/crypto/api.h>
 #include <sys/crypto/spi.h>
 #include <sys/crypto/sched_impl.h>
+
+#define	CRYPTO_OPS_OFFSET(f)		offsetof(crypto_ops_t, co_##f)
+#define	CRYPTO_MAC_OFFSET(f)		offsetof(crypto_mac_ops_t, f)
 
 /*
  * Message authentication codes routines.
@@ -92,17 +96,34 @@
  *	See comment in the beginning of the file.
  */
 int
-crypto_mac_prov(crypto_mechanism_t *mech, crypto_data_t *data,
-    crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *mac,
-    crypto_call_req_t *crq, kcf_provider_desc_t *pd, crypto_session_id_t sid)
+crypto_mac_prov(crypto_provider_t provider, crypto_session_id_t sid,
+    crypto_mechanism_t *mech, crypto_data_t *data, crypto_key_t *key,
+    crypto_ctx_template_t tmpl, crypto_data_t *mac, crypto_call_req_t *crq)
 {
 	kcf_req_params_t params;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	int rv;
 
 	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(mac_ops),
+		    CRYPTO_MAC_OFFSET(mac_atomic),
+		    CHECK_RESTRICT(crq), pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
+
 	KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_ATOMIC, sid, mech, key,
 	    data, mac, tmpl);
+	rv = kcf_submit_request(real_provider, NULL, crq, &params, B_FALSE);
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
 
-	return (kcf_submit_request(pd, NULL, crq, &params, B_FALSE));
+	return (rv);
 }
 
 /*
@@ -189,17 +210,34 @@ retry:
  * The other arguments are the same as the function crypto_mac_prov().
  */
 int
-crypto_mac_verify_prov(crypto_mechanism_t *mech, crypto_data_t *data,
-    crypto_key_t *key, crypto_ctx_template_t tmpl, crypto_data_t *mac,
-    crypto_call_req_t *crq, kcf_provider_desc_t *pd, crypto_session_id_t sid)
+crypto_mac_verify_prov(crypto_provider_t provider, crypto_session_id_t sid,
+    crypto_mechanism_t *mech, crypto_data_t *data, crypto_key_t *key,
+    crypto_ctx_template_t tmpl, crypto_data_t *mac, crypto_call_req_t *crq)
 {
 	kcf_req_params_t params;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
+	int rv;
 
 	ASSERT(KCF_PROV_REFHELD(pd));
+
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(mac_ops),
+		    CRYPTO_MAC_OFFSET(mac_verify_atomic),
+		    CHECK_RESTRICT(crq), pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
+
 	KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_MAC_VERIFY_ATOMIC, sid, mech,
 	    key, data, mac, tmpl);
+	rv = kcf_submit_request(real_provider, NULL, crq, &params, B_FALSE);
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
 
-	return (kcf_submit_request(pd, NULL, crq, &params, B_FALSE));
+	return (rv);
 }
 
 /*
@@ -318,43 +356,62 @@ retry:
  *	See comment in the beginning of the file.
  */
 int
-crypto_mac_init_prov(kcf_provider_desc_t *pd, crypto_session_id_t sid,
+crypto_mac_init_prov(crypto_provider_t provider, crypto_session_id_t sid,
     crypto_mechanism_t *mech, crypto_key_t *key, crypto_spi_ctx_template_t tmpl,
     crypto_context_t *ctxp, crypto_call_req_t *crq)
 {
-	int error;
+	int rv;
 	crypto_ctx_t *ctx;
 	kcf_req_params_t params;
+	kcf_provider_desc_t *pd = provider;
+	kcf_provider_desc_t *real_provider = pd;
 
 	ASSERT(KCF_PROV_REFHELD(pd));
 
-	/* First, allocate and initialize the canonical context */
-	if ((ctx = kcf_new_ctx(crq, pd, sid)) == NULL)
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER) {
+		rv = kcf_get_hardware_provider(mech->cm_type,
+		    CRYPTO_MECH_INVALID, CRYPTO_OPS_OFFSET(mac_ops),
+		    CRYPTO_MAC_OFFSET(mac_init),
+		    CHECK_RESTRICT(crq), pd, &real_provider);
+
+		if (rv != CRYPTO_SUCCESS)
+			return (rv);
+	}
+
+	/* Allocate and initialize the canonical context */
+	if ((ctx = kcf_new_ctx(crq, real_provider, sid)) == NULL) {
+		if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+			KCF_PROV_REFRELE(real_provider);
 		return (CRYPTO_HOST_MEMORY);
+	}
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(crq, pd)) {
 		crypto_mechanism_t lmech;
 
 		lmech = *mech;
-		KCF_SET_PROVIDER_MECHNUM(mech->cm_type, pd, &lmech);
-		error = KCF_PROV_MAC_INIT(pd, ctx, &lmech, key, tmpl,
+		KCF_SET_PROVIDER_MECHNUM(mech->cm_type, real_provider, &lmech);
+		rv = KCF_PROV_MAC_INIT(real_provider, ctx, &lmech, key, tmpl,
 		    KCF_SWFP_RHNDL(crq));
-		KCF_PROV_INCRSTATS(pd, error);
+		KCF_PROV_INCRSTATS(pd, rv);
 	} else {
 		KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_INIT, sid, mech, key,
 		    NULL, NULL, tmpl);
-		error = kcf_submit_request(pd, ctx, crq, &params, B_FALSE);
+		rv = kcf_submit_request(real_provider, ctx, crq, &params,
+		    B_FALSE);
 	}
 
-	if ((error == CRYPTO_SUCCESS) || (error == CRYPTO_QUEUED))
+	if (pd->pd_prov_type == CRYPTO_LOGICAL_PROVIDER)
+		KCF_PROV_REFRELE(real_provider);
+
+	if ((rv == CRYPTO_SUCCESS) || (rv == CRYPTO_QUEUED))
 		*ctxp = (crypto_context_t)ctx;
 	else {
 		/* Release the hold done in kcf_new_ctx(). */
 		KCF_CONTEXT_REFRELE((kcf_context_t *)ctx->cc_framework_private);
 	}
 
-	return (error);
+	return (rv);
 }
 
 /*
@@ -444,9 +501,8 @@ crypto_mac_update(crypto_context_t context, crypto_data_t *data,
 	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
 	kcf_context_t *kcf_ctx;
 	kcf_provider_desc_t *pd;
-	int error;
 	kcf_req_params_t params;
-
+	int rv;
 
 	if ((ctx == NULL) ||
 	    ((kcf_ctx = (kcf_context_t *)ctx->cc_framework_private) == NULL) ||
@@ -454,20 +510,21 @@ crypto_mac_update(crypto_context_t context, crypto_data_t *data,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {
-		error = KCF_PROV_MAC_UPDATE(pd, ctx, data, NULL);
-		KCF_PROV_INCRSTATS(pd, error);
+		rv = KCF_PROV_MAC_UPDATE(pd, ctx, data, NULL);
+		KCF_PROV_INCRSTATS(pd, rv);
 	} else {
-		KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_UPDATE, pd->pd_sid,
-		    NULL, NULL, data, NULL, NULL);
-		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+		KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_UPDATE,
+		    ctx->cc_session, NULL, NULL, data, NULL, NULL);
+		rv = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
 	KCF_PROV_REFRELE(pd);
-	return (error);
+	return (rv);
 }
 
 /*
@@ -495,8 +552,8 @@ crypto_mac_final(crypto_context_t context, crypto_data_t *mac,
 	crypto_ctx_t *ctx = (crypto_ctx_t *)context;
 	kcf_context_t *kcf_ctx;
 	kcf_provider_desc_t *pd;
-	int error;
 	kcf_req_params_t params;
+	int rv;
 
 	if ((ctx == NULL) ||
 	    ((kcf_ctx = (kcf_context_t *)ctx->cc_framework_private) == NULL) ||
@@ -504,22 +561,23 @@ crypto_mac_final(crypto_context_t context, crypto_data_t *mac,
 		return (CRYPTO_INVALID_CONTEXT);
 	}
 
+	ASSERT(pd->pd_prov_type != CRYPTO_LOGICAL_PROVIDER);
 	KCF_PROV_REFHOLD(pd);
 
 	/* The fast path for SW providers. */
 	if (CHECK_FASTPATH(cr, pd)) {
-		error = KCF_PROV_MAC_FINAL(pd, ctx, mac, NULL);
-		KCF_PROV_INCRSTATS(pd, error);
+		rv = KCF_PROV_MAC_FINAL(pd, ctx, mac, NULL);
+		KCF_PROV_INCRSTATS(pd, rv);
 	} else {
-		KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_FINAL, pd->pd_sid, NULL,
-		    NULL, NULL, mac, NULL);
-		error = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
+		KCF_WRAP_MAC_OPS_PARAMS(&params, KCF_OP_FINAL,
+		    ctx->cc_session, NULL, NULL, NULL, mac, NULL);
+		rv = kcf_submit_request(pd, ctx, cr, &params, B_FALSE);
 	}
 
 	KCF_PROV_REFRELE(pd);
 	/* Release the hold done in kcf_new_ctx() during init step. */
-	KCF_CONTEXT_COND_RELEASE(error, kcf_ctx);
-	return (error);
+	KCF_CONTEXT_COND_RELEASE(rv, kcf_ctx);
+	return (rv);
 }
 
 /*

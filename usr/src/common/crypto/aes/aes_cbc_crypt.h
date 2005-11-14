@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,9 +63,7 @@ extern "C" {
  *			aes_decrypt_init().  If allocated by the latter,
  *			then it needs to be freed.
  *
- *			AES_CBC_MODE
- *			If flag is not set, the mode is AES_ECB_MODE.
- *
+ *			AES_ECB_MODE, AES_CBC_MODE, or AES_CTR_MODE
  */
 typedef struct aes_ctx {
 	void *ac_keysched;
@@ -79,13 +77,39 @@ typedef struct aes_ctx {
 	uint32_t ac_flags;
 } aes_ctx_t;
 
+/*
+ * ac_cb		Counter block.
+ *
+ * ac_counter_mask	Mask of counter bits in the last 8 bytes of the
+ * 			counter block.
+ */
+#define	ac_cb		ac_iv
+#define	ac_counter_mask	ac_lastblock[0]
+
 #define	AES_PROVIDER_OWNS_KEY_SCHEDULE	0x00000001
-#define	AES_CBC_MODE			0x00000002
+#define	AES_ECB_MODE			0x00000002
+#define	AES_CBC_MODE			0x00000004
+#define	AES_CTR_MODE			0x00000008
+
+/* CK_AES_CTR_PARAMS provides parameters to the CKM_AES_CTR mechanism */
+typedef struct CK_AES_CTR_PARAMS {
+	ulong_t	ulCounterBits;
+	uchar_t *cb;
+} CK_AES_CTR_PARAMS;
+
+#ifdef _KERNEL
+/* needed for 32-bit applications running on 64-bit kernels */
+typedef struct CK_AES_CTR_PARAMS32 {
+	uint32_t ulCounterBits;
+	caddr32_t cb;
+} CK_AES_CTR_PARAMS32;
+#endif /* _KERNEL */
 
 extern int aes_encrypt_contiguous_blocks(aes_ctx_t *, char *, size_t,
     crypto_data_t *);
 extern int aes_decrypt_contiguous_blocks(aes_ctx_t *, char *, size_t,
     crypto_data_t *);
+extern int aes_counter_final(aes_ctx_t *, crypto_data_t *);
 
 #ifdef	__cplusplus
 }

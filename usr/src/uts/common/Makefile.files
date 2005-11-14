@@ -1023,9 +1023,10 @@ LMODT_OBJS +=	lmodt.o
 #			kernel cryptographic framework
 #
 KCF_OBJS +=	kcf.o kcf_callprov.o kcf_cbufcall.o kcf_cipher.o kcf_crypto.o \
-		kcf_cryptoadm.o kcf_ctxops.o kcf_digest.o kcf_dual.o kcf_mac.o \
-		kcf_mech_tabs.o kcf_miscapi.o kcf_policy.o kcf_prov_tabs.o \
-		kcf_sched.o kcf_sign.o kcf_spi.o kcf_verify.o kcf_random.o
+		kcf_cryptoadm.o kcf_ctxops.o kcf_digest.o kcf_dual.o \
+		kcf_keys.o kcf_mac.o kcf_mech_tabs.o kcf_miscapi.o \
+		kcf_object.o kcf_policy.o kcf_prov_tabs.o kcf_sched.o \
+		kcf_session.o kcf_sign.o kcf_spi.o kcf_verify.o kcf_random.o
 
 CRYPTOADM_OBJS += cryptoadm.o
 

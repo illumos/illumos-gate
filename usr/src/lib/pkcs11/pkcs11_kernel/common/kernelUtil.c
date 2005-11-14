@@ -600,12 +600,9 @@ process_object_attributes(CK_ATTRIBUTE_PTR pTemplate, CK_ULONG ulCount,
 		case CKA_CERTIFICATE_TYPE:
 		case CKA_KEY_TYPE:
 		case CKA_HW_FEATURE_TYPE:
-			if (pTemplate[i].ulValueLen == 0) {
-				value_len = 0;
-				break;
-			}
 			value_len = sizeof (ulong_t);
-			if (pTemplate[i].ulValueLen < value_len) {
+			if (pTemplate[i].pValue != NULL &&
+			    (pTemplate[i].ulValueLen < value_len)) {
 				rv = CKR_BUFFER_TOO_SMALL;
 				cur_i = i;
 				goto fail_cleanup;
