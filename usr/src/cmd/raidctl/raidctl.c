@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -136,7 +135,7 @@ static int ctrl_nums = 0;
 /* Key to search for when looking for fcode version */
 #define	FCODE_VERS_KEY1		0x12
 #define	FCODE_VERS_KEY2		0x7
-#define	BIOS_STR		"LSI1030 SCSI Host Adapter BIOS  Driver: "
+#define	BIOS_STR		"LSI SCSI Host Adapter BIOS Driver: "
 
 /* get a word from a buffer (works with non-word aligned offsets) */
 #define	gw(x) (((x)[0]) + (((x)[1]) << 8))
@@ -1226,6 +1225,20 @@ fail:
 	return (FAILURE);
 }
 
+static void
+getimagetype(uint8_t *rombuf, int *imagetype)
+{
+	uint8_t type = rombuf[gw(&rombuf[PCIR_OFF]) + PCIR_CODETYPE];
+	if (type == 0) {
+		*imagetype = BIOS_IMAGE;
+		return;
+	}
+	if (type == 1) {
+		*imagetype = FCODE_IMAGE;
+		return;
+	}
+}
+
 static int
 getfcodever(uint8_t *rombuf, uint32_t nbytes, char **fcodeversion)
 {
@@ -1284,7 +1297,7 @@ process_image:
 	}
 
 	/*
-	 * Scan through the bois/fcode file to get the fcode version
+	 * Scan through the bios/fcode file to get the fcode version
 	 * 0x12 and 0x7 indicate the start of the fcode version string
 	 */
 	for (x = 0; x < (nbytes - 8); x++) {
@@ -1323,7 +1336,7 @@ process_image:
 	}
 
 	/*
-	 * Scan through the bois/fcode file to get the Bios version
+	 * Scan through the bios/fcode file to get the Bios version
 	 * "@(#)" string indicates the start of the Bios version string
 	 * Append this version string, after already existing fcode version.
 	 */
@@ -1364,30 +1377,64 @@ getfwver(uint8_t *rombuf, char *fwversion)
 }
 
 static int
+getbioscodever(uint8_t *rombuf, uint32_t nbytes, char **biosversion)
+{
+	int x, size;
+	int found = 0;
+
+	for (x = 0; x < (nbytes - 4); x++) {
+		if ((rombuf[x] == '@') && (rombuf[x+1] == '(') &&
+		    (rombuf[x+2] == '#') && (rombuf[x+3] == ')')) {
+			found = 1;
+			break;
+		}
+	}
+
+	if (found) {
+		x += 4;
+		size = strlen((char *)(rombuf + x)) + strlen(BIOS_STR) + 1;
+		*biosversion = (char *)realloc((*biosversion), size);
+		bcopy((char *)(rombuf + x), *biosversion, size - 1);
+		(*biosversion)[size - 1] = '\0';
+	}
+
+	return (found);
+
+}
+
+static int
 checkfile(uint8_t *rombuf, uint32_t nbytes, uint32_t chksum, int *imagetype)
 {
 	char *imageversion = NULL;
+	char *biosversion = NULL;
 	char *fwversion;
 
 	fwversion = (char *)malloc(8);
 
 	if (gw(&rombuf[0]) == PCIROM_SIG) {
-		/* imageversion is malloc(2)'ed in getfcodever() */
-		if (getfcodever(rombuf, nbytes, &imageversion) == 0) {
-			*imagetype = FCODE_IMAGE;
-		} else {
-			*imagetype = UNKNOWN_IMAGE;
-		}
-		if (*imagetype != UNKNOWN_IMAGE) {
-			(void) printf(gettext("Image file contains:\n%s\n"),
-			    imageversion);
-			free(imageversion);
-		} else {
-			if (imageversion != NULL) {
+
+		*imagetype = UNKNOWN_IMAGE;
+		getimagetype(rombuf, imagetype);
+
+		if (*imagetype == FCODE_IMAGE) {
+			if (getfcodever(rombuf, nbytes, &imageversion) == 0 &&
+			    imageversion != NULL) {
+				(void) printf(gettext("Image file contains "
+				    "fcode version \t%s\n"), imageversion);
 				free(imageversion);
 			}
+		} else if (*imagetype == BIOS_IMAGE) {
+			if (getbioscodever(rombuf, nbytes, &biosversion) == 1 &&
+			    biosversion != NULL) {
+				(void) printf(gettext("Image file contains "
+				    "BIOS version \t%s\n"), biosversion);
+				free(biosversion);
+			}
+		} else {
+			/* When imagetype equals to UNKNOWN_IMAGE */
 			return (-1);
 		}
+
 	} else if (gw(&rombuf[3]) == FW_ROM_ID) {
 			if (chksum != 0) {
 				(void) fprintf(stderr,

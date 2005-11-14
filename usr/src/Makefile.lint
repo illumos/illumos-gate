@@ -218,6 +218,7 @@ COMMON_SUBDIRS = \
 	cmd/ptools \
 	cmd/pwck \
 	cmd/ramdiskadm \
+	cmd/raidctl \
 	cmd/rcap \
 	cmd/rcm_daemon \
 	cmd/rctladm \
@@ -394,7 +395,6 @@ sparc_SUBDIRS= \
 	cmd/fruadm \
 	cmd/mtst \
 	cmd/prtfru \
-	cmd/raidctl \
 	cmd/sckmd \
 	cmd/wrsmconf \
 	cmd/wrsmstat \
