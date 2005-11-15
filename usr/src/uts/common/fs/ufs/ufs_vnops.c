@@ -908,7 +908,7 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 			 * is done here before we up the file size.
 			 */
 			error = bmap_write(ip, uoff, (int)(on + n),
-							mapon == 0, cr);
+			    mapon == 0, NULL, cr);
 			/*
 			 * bmap_write never drops i_contents so if
 			 * the flags are set it changed the file.
@@ -946,7 +946,8 @@ wrip(struct inode *ip, struct uio *uio, int ioflag, struct cred *cr)
 			 * needed blocks are allocated first.
 			 */
 			iblocks = ip->i_blocks;
-			error = bmap_write(ip, uoff, (int)(on + n), 1, cr);
+			error = bmap_write(ip, uoff, (int)(on + n),
+			    BI_ALLOC_ONLY, NULL, cr);
 			/*
 			 * bmap_write never drops i_contents so if
 			 * the flags are set it changed the file.
@@ -4228,31 +4229,33 @@ ufs_frlock(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
 
 /* ARGSUSED */
 static int
-ufs_space(
-	struct vnode *vp,
-	int cmd,
-	struct flock64 *bfp,
-	int flag,
-	offset_t offset,
-	cred_t *cr,
-	caller_context_t *ct)
+ufs_space(struct vnode *vp, int cmd, struct flock64 *bfp, int flag,
+	offset_t offset, cred_t *cr, caller_context_t *ct)
 {
-	struct ufsvfs *ufsvfsp	= VTOI(vp)->i_ufsvfs;
+	struct ufsvfs *ufsvfsp = VTOI(vp)->i_ufsvfs;
 	struct ulockfs *ulp;
 	int error;
 
-	error = ufs_lockfs_begin(ufsvfsp, &ulp, ULOCKFS_SPACE_MASK);
-	if (error)
-		return (error);
+	if ((error = convoff(vp, bfp, 0, offset)) == 0) {
+		if (cmd == F_FREESP) {
+			error = ufs_lockfs_begin(ufsvfsp, &ulp,
+			    ULOCKFS_SPACE_MASK);
+			if (error)
+				return (error);
+			error = ufs_freesp(vp, bfp, flag, cr);
+		} else if (cmd == F_ALLOCSP) {
+			error = ufs_lockfs_begin(ufsvfsp, &ulp,
+			    ULOCKFS_FALLOCATE_MASK);
+			if (error)
+				return (error);
+			error = ufs_allocsp(vp, bfp, cr);
+		} else
+			return (EINVAL); /* Command not handled here */
 
+		if (ulp)
+			ufs_lockfs_end(ulp);
 
-	if (cmd != F_FREESP)
-		error =  EINVAL;
-	else if ((error = convoff(vp, bfp, 0, offset)) == 0)
-		error = ufs_freesp(vp, bfp, flag, cr);
-
-	if (ulp)
-		ufs_lockfs_end(ulp);
+	}
 	return (error);
 }
 
@@ -4455,7 +4458,8 @@ retrylock:
 		offset = uoff & (offset_t)fs->fs_bmask;
 		while (offset < uoff + len) {
 			blk_size = (int)blksize(fs, ip, lblkno(fs, offset));
-			err = bmap_write(ip, offset, blk_size, 0, cr);
+			err = bmap_write(ip, offset, blk_size,
+			    BI_NORMAL, NULL, cr);
 			if (ip->i_flag & (ICHG|IUPD))
 				ip->i_seq++;
 			if (err)
@@ -4657,7 +4661,7 @@ ufs_getpage_miss(struct vnode *vp, u_offset_t off, size_t len, struct seg *seg,
 	page_t		*pp;
 	daddr_t		bn;
 	size_t		io_len;
-	int		crpage;
+	int		crpage = 0;
 	int		err;
 	int		contig;
 	int		bsize = ip->i_fs->fs_bsize;
@@ -4672,7 +4676,16 @@ ufs_getpage_miss(struct vnode *vp, u_offset_t off, size_t len, struct seg *seg,
 		contig = 0;
 		if (err = bmap_read(ip, off, &bn, &contig))
 			return (err);
+
 		crpage = (bn == UFS_HOLE);
+
+		/*
+		 * If its also a fallocated block that hasn't been written to
+		 * yet, we will treat it just like a UFS_HOLE and create
+		 * a zero page for it
+		 */
+		if (ISFALLOCBLK(ip, bn))
+			crpage = 1;
 	}
 
 	if (crpage) {
@@ -4684,6 +4697,7 @@ ufs_getpage_miss(struct vnode *vp, u_offset_t off, size_t len, struct seg *seg,
 
 		if (rw != S_CREATE)
 			pagezero(pp, 0, PAGESIZE);
+
 		io_len = PAGESIZE;
 	} else {
 		u_offset_t	io_off;
@@ -4777,6 +4791,7 @@ ufs_getpage_ra(struct vnode *vp, u_offset_t off, struct seg *seg, caddr_t addr)
 	struct buf	*bp;
 	daddr_t		bn;
 	size_t		io_len;
+	int		err;
 	int		contig;
 	int		xlen;
 	int		bsize = ip->i_fs->fs_bsize;
@@ -4799,7 +4814,12 @@ ufs_getpage_ra(struct vnode *vp, u_offset_t off, struct seg *seg, caddr_t addr)
 		return (0);
 
 	contig = 0;
-	if (bmap_read(ip, io_off, &bn, &contig) != 0 || bn == UFS_HOLE)
+	err = bmap_read(ip, io_off, &bn, &contig);
+	/*
+	 * If its a UFS_HOLE or a fallocated block, do not perform
+	 * any read ahead's since there probably is nothing to read ahead
+	 */
+	if (err || bn == UFS_HOLE || ISFALLOCBLK(ip, bn))
 		return (0);
 
 	/*
@@ -5199,6 +5219,18 @@ ufs_putapage(
 		}
 		err = ufs_fault(ITOV(ip), "ufs_putapage: bn == UFS_HOLE");
 		goto out;
+	}
+
+	/*
+	 * If it is an fallocate'd block, reverse the negativity since
+	 * we are now writing to it
+	 */
+	if (ISFALLOCBLK(ip, bn)) {
+		err = bmap_set_bn(vp, off, dbtofsb(fs, -bn));
+		if (err)
+			goto out;
+
+		bn = -bn;
 	}
 
 	/*

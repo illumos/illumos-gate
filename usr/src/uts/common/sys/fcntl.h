@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,7 +122,6 @@ extern "C" {
 #define	F_CHKFL		8	/* Unused */
 #define	F_DUP2FD	9	/* Duplicate fildes at third arg */
 
-#define	F_ALLOCSP	10	/* Reserved */
 #define	F_ISSTREAM	13	/* Is the file desc. a stream ? */
 #define	F_PRIV		15	/* Turn on private access to file */
 #define	F_NPRIV		16	/* Turn off private access to file */
@@ -153,6 +152,7 @@ extern "C" {
 /* "Native" application compilation environment */
 #define	F_SETLK		6	/* Set file lock */
 #define	F_SETLKW	7	/* Set file lock and wait */
+#define	F_ALLOCSP	10	/* Allocate file space */
 #define	F_FREESP	11	/* Free file space */
 #define	F_GETLK		14	/* Get file lock */
 #define	F_SETLK_NBMAND	42	/* private */
@@ -160,6 +160,7 @@ extern "C" {
 /* ILP32 large file application compilation environment version */
 #define	F_SETLK		34	/* Set file lock */
 #define	F_SETLKW	35	/* Set file lock and wait */
+#define	F_ALLOCSP	28	/* Alllocate file space */
 #define	F_FREESP	27	/* Free file space */
 #define	F_GETLK		33	/* Get file lock */
 #define	F_SETLK_NBMAND	44	/* private */
@@ -176,12 +177,14 @@ extern "C" {
  */
 #define	F_SETLK64	34	/* Set file lock */
 #define	F_SETLKW64	35	/* Set file lock and wait */
+#define	F_ALLOCSP64	28	/* Allocate file space */
 #define	F_FREESP64	27	/* Free file space */
 #define	F_GETLK64	33	/* Get file lock */
 #define	F_SETLK64_NBMAND	44	/* private */
 #else
 #define	F_SETLK64	6	/* Set file lock */
 #define	F_SETLKW64	7	/* Set file lock and wait */
+#define	F_ALLOCSP64	10	/* Allocate file space */
 #define	F_FREESP64	11	/* Free file space */
 #define	F_GETLK64	14	/* Get file lock */
 #define	F_SETLK64_NBMAND	42	/* private */

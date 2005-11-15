@@ -321,8 +321,8 @@ ufs_alloc_data(
 			DEBUGF((CE_CONT, "?ufs_alloc_data: grow %llx -> %llx\n",
 			    ip->i_size, uoff + nbytes));
 
-			error = bmap_write(ip, uoff, (offsetn + nbytes), 1,
-			    credp);
+			error = bmap_write(ip, uoff, (offsetn + nbytes),
+			    BI_ALLOC_ONLY, NULL, credp);
 			if (ip->i_flag & (ICHG|IUPD))
 				ip->i_seq++;
 			if (error) {
@@ -456,7 +456,7 @@ ufs_alloc_data(
 				 * We have to allocate blocks for the hole.
 				 */
 				error = bmap_write(ip, uoff, (offsetn + nbytes),
-				    1, credp);
+				    BI_ALLOC_ONLY, NULL, credp);
 				if (ip->i_flag & (ICHG|IUPD))
 					ip->i_seq++;
 				if (error) {

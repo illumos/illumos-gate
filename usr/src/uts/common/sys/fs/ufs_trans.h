@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,7 +99,8 @@ typedef enum top_type {
 	TOP_SETSECATTR,		/* 31 */
 	TOP_QUOTA,		/* 32 */
 	TOP_ITRUNC,		/* 33 */
-	TOP_MAX			/* 34 */
+	TOP_ALLOCSP,		/* 34 */
+	TOP_MAX			/* 35 TOP_MAX MUST be the last entry */
 } top_t;
 
 struct inode;
@@ -509,6 +510,8 @@ extern void		ufs_trans_write_resv(struct inode *, struct uio *,
 				int *, int *);
 extern int		ufs_trans_check(dev_t);
 extern void		ufs_trans_redev(dev_t odev, dev_t ndev);
+extern void		ufs_trans_trunc_resv(struct inode *, u_offset_t, int *,
+				u_offset_t *);
 
 /*
  * transaction prototypes

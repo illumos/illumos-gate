@@ -625,6 +625,14 @@ pass1check(struct inodesc *idesc)
 	daddr32_t fragno = idesc->id_blkno;
 	struct dinode *dp;
 
+	/*
+	 * If this is a fallocate'd file, block numbers may be stored
+	 * as negative. In that case negate the negative numbers.
+	 */
+	dp = ginode(idesc->id_number);
+	if (dp->di_cflags & IFALLOCATE && fragno < 0)
+		fragno = -fragno;
+
 	if ((anyout = chkrange(fragno, idesc->id_numfrags)) != 0) {
 		/*
 		 * Note that blkerror() exits when preening.

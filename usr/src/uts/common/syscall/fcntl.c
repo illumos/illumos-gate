@@ -21,7 +21,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,8 @@
 #include <sys/debug.h>
 #include <sys/rctl.h>
 #include <sys/nbmlock.h>
+
+#include <sys/cmn_err.h>
 
 /* ONC_PLUS EXTRACT START */
 static int flock_check(vnode_t *, flock64_t *, offset_t, offset_t);
@@ -402,17 +404,27 @@ fcntl(int fdes, int cmd, intptr_t arg)
 
 	case F_ALLOCSP:
 	case F_FREESP:
+	case F_ALLOCSP64:
+	case F_FREESP64:
 		if ((flag & FWRITE) == 0) {
 			error = EBADF;
 			break;
 		}
+
 		if (vp->v_type != VREG) {
 			error = EINVAL;
 			break;
 		}
 
+		if (datamodel != DATAMODEL_ILP32 &&
+		    (cmd == F_ALLOCSP64 || cmd == F_FREESP64)) {
+			error = EINVAL;
+			break;
+		}
+
 #if defined(_ILP32) || defined(_SYSCALL32_IMPL)
-		if (datamodel == DATAMODEL_ILP32) {
+		if (datamodel == DATAMODEL_ILP32 &&
+		    (cmd == F_ALLOCSP || cmd == F_FREESP)) {
 			struct flock32 sbf32;
 			/*
 			 * For compatibility we overlay an SVR3 flock on an SVR4
@@ -434,15 +446,47 @@ fcntl(int fdes, int cmd, intptr_t arg)
 #endif /* _ILP32 || _SYSCALL32_IMPL */
 
 #if defined(_LP64)
-		if (datamodel == DATAMODEL_LP64) {
+		if (datamodel == DATAMODEL_LP64 &&
+		    (cmd == F_ALLOCSP || cmd == F_FREESP)) {
 			if (copyin((void *)arg, &bf, sizeof (bf))) {
 				error = EFAULT;
 				break;
 			}
 		}
-#endif
+#endif /* defined(_LP64) */
 
-		if ((error = flock_check(vp, &bf, offset, maxoffset)) != 0)
+#if !defined(_LP64) || defined(_SYSCALL32_IMPL)
+		if (datamodel == DATAMODEL_ILP32 &&
+		    (cmd == F_ALLOCSP64 || cmd == F_FREESP64)) {
+			if (copyin((void *)arg, &bf64_32, sizeof (bf64_32))) {
+				error = EFAULT;
+				break;
+			} else {
+				/*
+				 * Note that the size of flock64 is different in
+				 * the ILP32 and LP64 models, due to the l_pad
+				 * field. We do not want to assume that the
+				 * flock64 structure is laid out the same in
+				 * ILP32 and LP64 environments, so we will
+				 * copy in the ILP32 version of flock64
+				 * explicitly and copy it to the native
+				 * flock64 structure.
+				 */
+				bf.l_type = (short)bf64_32.l_type;
+				bf.l_whence = (short)bf64_32.l_whence;
+				bf.l_start = bf64_32.l_start;
+				bf.l_len = bf64_32.l_len;
+				bf.l_sysid = (int)bf64_32.l_sysid;
+				bf.l_pid = (pid_t)bf64_32.l_pid;
+			}
+		}
+#endif /* !defined(_LP64) || defined(_SYSCALL32_IMPL) */
+
+		if (cmd == F_ALLOCSP || cmd == F_FREESP)
+			error = flock_check(vp, &bf, offset, maxoffset);
+		else if (cmd == F_ALLOCSP64 || cmd == F_FREESP64)
+			error = flock_check(vp, &bf, offset, MAXOFFSET_T);
+		if (error)
 			break;
 
 		if (vp->v_type == VREG && bf.l_len == 0 &&
@@ -476,7 +520,14 @@ fcntl(int fdes, int cmd, intptr_t arg)
 				break;
 			}
 		}
+
+		if (cmd == F_ALLOCSP64)
+			cmd = F_ALLOCSP;
+		else if (cmd == F_FREESP64)
+			cmd = F_FREESP;
+
 		error = VOP_SPACE(vp, cmd, &bf, flag, offset, fp->f_cred, NULL);
+
 		break;
 
 #if !defined(_LP64) || defined(_SYSCALL32_IMPL)
@@ -519,6 +570,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 			error = EFAULT;
 			break;
 		}
+
 		bf.l_type = (short)bf64_32.l_type;
 		bf.l_whence = (short)bf64_32.l_whence;
 		bf.l_start = bf64_32.l_start;
@@ -563,79 +615,7 @@ fcntl(int fdes, int cmd, intptr_t arg)
 		}
 		break;
 /* ONC_PLUS EXTRACT END */
-
-	case F_FREESP64:
-		if (datamodel != DATAMODEL_ILP32) {
-			error = EINVAL;
-			break;
-		}
-		cmd = F_FREESP;
-		if ((flag & FWRITE) == 0)
-			error = EBADF;
-		else if (vp->v_type != VREG)
-			error = EINVAL;
-		else if (copyin((void *)arg, &bf64_32, sizeof (bf64_32)))
-			error = EFAULT;
-		else {
-			/*
-			 * Note that the size of flock64 is different in
-			 * the ILP32 and LP64 models, due to the l_pad field.
-			 * We do not want to assume that the flock64 structure
-			 * is laid out the same in ILP32 and LP64
-			 * environments, so we will copy in the ILP32
-			 * version of flock64 explicitly and copy it to
-			 * the native flock64 structure.
-			 */
-			bf.l_type = (short)bf64_32.l_type;
-			bf.l_whence = (short)bf64_32.l_whence;
-			bf.l_start = bf64_32.l_start;
-			bf.l_len = bf64_32.l_len;
-			bf.l_sysid = (int)bf64_32.l_sysid;
-			bf.l_pid = (pid_t)bf64_32.l_pid;
-
-			if ((error = flock_check(vp, &bf, offset,
-			    MAXOFFSET_T)) != 0)
-				break;
-
-			if (vp->v_type == VREG && bf.l_len == 0 &&
-			    bf.l_start > OFFSET_MAX(fp)) {
-				error = EFBIG;
-				break;
-			}
-			/*
-			 * Make sure that there are no conflicting non-blocking
-			 * mandatory locks in the region being manipulated. If
-			 * there are such locks then return EACCES.
-			 */
-			if ((error = flock_get_start(vp, &bf, offset,
-			    &start)) != 0)
-				break;
-			if (nbl_need_check(vp)) {
-				u_offset_t	begin;
-				ssize_t		length;
-
-				nbl_start_crit(vp, RW_READER);
-				in_crit = 1;
-				vattr.va_mask = AT_SIZE;
-				if ((error = VOP_GETATTR(vp, &vattr, 0,
-				    CRED())) != 0)
-					break;
-				begin = start > vattr.va_size ?
-					vattr.va_size : start;
-				length = vattr.va_size > start ?
-						vattr.va_size - start :
-						start - vattr.va_size;
-				if (nbl_conflict(vp, NBL_WRITE, begin,
-				    length, 0)) {
-					error = EACCES;
-					break;
-				}
-			}
-			error = VOP_SPACE(vp, cmd, &bf, flag, offset,
-			    fp->f_cred, NULL);
-		}
-		break;
-#endif /*  !_LP64 || _SYSCALL32_IMPL */
+#endif /* !defined(_LP64) || defined(_SYSCALL32_IMPL) */
 
 /* ONC_PLUS EXTRACT START */
 	case F_SHARE:

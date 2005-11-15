@@ -1444,7 +1444,7 @@ ufs_unmount(struct vfs *vfsp, int fflag, struct cred *cr)
 	/*
 	 * if the file system is busy; return EBUSY
 	 */
-	if (ulp->ul_vnops_cnt || ULOCKFS_IS_SLOCK(ulp)) {
+	if (ulp->ul_vnops_cnt || ulp->ul_falloc_cnt || ULOCKFS_IS_SLOCK(ulp)) {
 		error = EBUSY;
 		goto out;
 	}

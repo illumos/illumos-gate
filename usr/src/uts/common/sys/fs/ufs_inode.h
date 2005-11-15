@@ -368,7 +368,8 @@ struct dinode {
 #define	IQUIET		0x20000		/* No file system full messages */
 
 /* cflags */
-#define	IXATTR		0x0001		/* Extended attribute */
+#define	IXATTR		0x0001		/* extended attribute */
+#define	IFALLOCATE	0x0002		/* fallocate'd file */
 
 /* modes */
 #define	IFMT		0170000		/* type of file */
@@ -562,7 +563,7 @@ extern kmutex_t ufs_iuniqtime_lock;
  * and make sure any in-core pages are initialized.
  */
 #define	BMAPALLOC(ip, off, size, cr) \
-	bmap_write((ip), (u_offset_t)(off), (size), 0, cr)
+	bmap_write((ip), (u_offset_t)(off), (size), BI_NORMAL, NULL, cr)
 
 #define	ESAME	(-1)		/* trying to rename linked files (special) */
 
@@ -577,6 +578,16 @@ enum de_op { DE_CREATE, DE_MKDIR, DE_LINK, DE_RENAME, DE_SYMLINK, DE_ATTRDIR};
 
 /* dirremove ops */
 enum dr_op { DR_REMOVE, DR_RMDIR, DR_RENAME };
+
+/*
+ * block initialization type for bmap_write
+ *
+ * BI_NORMAL - allocate and zero fill pages in memory
+ * BI_ALLOC_ONLY - only allocate the block, do not zero out pages in mem
+ * BI_FALLOCATE - allocate only, do not zero out pages, and store as negative
+ *                block number in inode block list
+ */
+enum bi_type { BI_NORMAL, BI_ALLOC_ONLY, BI_FALLOCATE };
 
 /*
  * This overlays the fid structure (see vfs.h)
@@ -796,6 +807,10 @@ typedef struct ufsvfs {
 /* inohsz is guaranteed to be a power of 2 */
 #define	INOHASH(ino)	(((int)ino) & (inohsz - 1))
 
+#define	ISFALLOCBLK(ip, bn)	\
+	(((bn) < 0) && ((bn) % ip->i_fs->fs_bsize == 0) && \
+	((ip)->i_cflags & IFALLOCATE && (bn) != UFS_HOLE))
+
 union ihead {
 	union	ihead	*ih_head[2];
 	struct	inode	*ih_chain[2];
@@ -857,6 +872,7 @@ extern	void	free(struct inode *, daddr_t, off_t, int);
 extern	int	alloc(struct inode *, daddr_t, int, daddr_t *, cred_t *);
 extern	int	realloccg(struct inode *, daddr_t, daddr_t, int, int,
     daddr_t *, cred_t *);
+extern	int	ufs_allocsp(struct vnode *, struct flock64 *, cred_t *);
 extern	int	ufs_freesp(struct vnode *, struct flock64 *, int, cred_t *);
 extern	ino_t	dirpref(inode_t *);
 extern	daddr_t	blkpref(struct inode *, daddr_t, int, daddr32_t *);
@@ -866,9 +882,11 @@ extern	int	ufs_rdwri(enum uio_rw, int, struct inode *, caddr_t, ssize_t,
 	offset_t, enum uio_seg, int *, cred_t *);
 
 extern	int	bmap_read(struct inode *, u_offset_t, daddr_t *, int *);
-extern	int	bmap_write(struct inode *, u_offset_t, int, int, struct cred *);
+extern	int	bmap_write(struct inode *, u_offset_t, int, enum bi_type,
+    daddr_t *, struct cred *);
 extern	int	bmap_has_holes(struct inode *);
 extern	int	bmap_find(struct inode *, boolean_t, u_offset_t *);
+extern	int	bmap_set_bn(struct vnode *, u_offset_t, daddr32_t);
 
 extern	void	ufs_vfs_add(struct ufsvfs *);
 extern	void	ufs_vfs_remove(struct ufsvfs *);

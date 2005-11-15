@@ -40,6 +40,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/condvar_impl.h>
 #include <sys/types.h>
 #include <sys/t_lock.h>
 #include <sys/debug.h>
@@ -116,9 +117,9 @@ alloc(struct inode *ip, daddr_t bpref, int size, daddr_t *bnp, cred_t *cr)
 	ufsvfsp = ip->i_ufsvfs;
 	fs = ufsvfsp->vfs_fs;
 	if ((unsigned)size > fs->fs_bsize || fragoff(fs, size) != 0) {
-		err = ufs_fault(ITOV(ip),
-	    "alloc: bad size, dev = 0x%lx, bsize = %d, size = %d, fs = %s\n",
-	    ip->i_dev, fs->fs_bsize, size, fs->fs_fsmnt);
+		err = ufs_fault(ITOV(ip), "alloc: bad size, dev = 0x%lx,"
+		    " bsize = %d, size = %d, fs = %s\n",
+		    ip->i_dev, fs->fs_bsize, size, fs->fs_fsmnt);
 		return (err);
 	}
 	if (size == fs->fs_bsize && fs->fs_cstotal.cs_nbfree == 0)
@@ -194,9 +195,9 @@ realloccg(struct inode *ip, daddr_t bprev, daddr_t bpref, int osize,
 	if ((unsigned)osize > fs->fs_bsize || fragoff(fs, osize) != 0 ||
 	    (unsigned)nsize > fs->fs_bsize || fragoff(fs, nsize) != 0) {
 		err = ufs_fault(ITOV(ip),
-	"realloccg: bad size, dev=0x%lx, bsize=%d, osize=%d, nsize=%d, fs=%s\n",
-		    ip->i_dev, fs->fs_bsize, osize, nsize,
-		    fs->fs_fsmnt);
+		    "realloccg: bad size, dev=0x%lx, bsize=%d, "
+		    "osize=%d, nsize=%d, fs=%s\n",
+		    ip->i_dev, fs->fs_bsize, osize, nsize, fs->fs_fsmnt);
 		return (err);
 	}
 	if (freespace(fs, ufsvfsp) <= 0 &&
@@ -204,8 +205,8 @@ realloccg(struct inode *ip, daddr_t bprev, daddr_t bpref, int osize,
 		goto nospace;
 	if (bprev == 0) {
 		err = ufs_fault(ITOV(ip),
-	"realloccg: bad bprev, dev = 0x%lx, bsize = %d, bprev = %ld, fs = %s\n",
-		    ip->i_dev, fs->fs_bsize, bprev,
+		    "realloccg: bad bprev, dev = 0x%lx, bsize = %d,"
+		    " bprev = %ld, fs = %s\n", ip->i_dev, fs->fs_bsize, bprev,
 		    fs->fs_fsmnt);
 		return (err);
 	}
@@ -403,9 +404,9 @@ loop:
 
 		if (ip->i_size) {
 			cmn_err(CE_WARN,
-			"%s: free inode %d had size 0x%llx, run fsck(1M)%s",
-			fs->fs_fsmnt, (int)ino, ip->i_size,
-			(TRANS_ISTRANS(ufsvfsp) ? " -o f" : ""));
+			    "%s: free inode %d had size 0x%llx, run fsck(1M)%s",
+			    fs->fs_fsmnt, (int)ino, ip->i_size,
+			    (TRANS_ISTRANS(ufsvfsp) ? " -o f" : ""));
 		}
 		/*
 		 * Clear any garbage left behind.
@@ -581,16 +582,27 @@ blkpref(struct inode *ip, daddr_t lbn, int indx, daddr32_t *bap)
 	 * next block is requested contiguously, otherwise it is
 	 * requested rotationally delayed by fs_rotdelay milliseconds.
 	 */
-	nextblk = bap[indx - 1] + fs->fs_frag;
-	if (indx > fs->fs_maxcontig &&
-	    bap[indx - fs->fs_maxcontig] + blkstofrags(fs, fs->fs_maxcontig)
-	    != nextblk)
+
+	nextblk = bap[indx - 1];
+	/*
+	 * Provision for fallocate to return positive
+	 * blk preference based on last allocation
+	 */
+	if (nextblk < 0 && nextblk != UFS_HOLE) {
+		nextblk = (-bap[indx - 1]) + fs->fs_frag;
+	} else {
+		nextblk = bap[indx - 1] + fs->fs_frag;
+	}
+
+	if (indx > fs->fs_maxcontig && bap[indx - fs->fs_maxcontig] +
+	    blkstofrags(fs, fs->fs_maxcontig) != nextblk) {
 		return (nextblk);
+	}
 	if (fs->fs_rotdelay != 0)
 		/*
 		 * Here we convert ms of delay to frags as:
 		 * (frags) = (ms) * (rev/sec) * (sect/rev) /
-		 *	((sect/frag) * (ms/sec))
+		 * 	((sect/frag) * (ms/sec))
 		 * then round up to the next block.
 		 */
 		nextblk += roundup(fs->fs_rotdelay * fs->fs_rps * fs->fs_nsect /
@@ -621,16 +633,25 @@ free(struct inode *ip, daddr_t bno, off_t size, int flags)
 	short *blks;
 	daddr_t blkno, cylno, rpos;
 
+	/*
+	 * fallocate'd files will have negative block address.
+	 * So negate it again to get original block address.
+	 */
+	if (bno < 0 && bno % fs->fs_bsize == 0 && bno != UFS_HOLE) {
+		bno = -bno;
+	}
+
 	if ((unsigned long)size > fs->fs_bsize || fragoff(fs, size) != 0) {
 		(void) ufs_fault(ITOV(ip),
-		"free: bad size, dev = 0x%lx, bsize = %d, size = %d, fs = %s\n",
-		    ip->i_dev, fs->fs_bsize, (int)size, fs->fs_fsmnt);
+		    "free: bad size, dev = 0x%lx, bsize = %d, size = %d, "
+		    "fs = %s\n", ip->i_dev, fs->fs_bsize,
+		    (int)size, fs->fs_fsmnt);
 		return;
 	}
 	cg = dtog(fs, bno);
 	ASSERT(!ufs_badblock(ip, bno));
 	bp = UFS_BREAD(ufsvfsp, ip->i_dev, (daddr_t)fsbtodb(fs, cgtod(fs, cg)),
-		    (int)fs->fs_cgsize);
+	    (int)fs->fs_cgsize);
 
 	cgp = bp->b_un.b_cg;
 	if (bp->b_flags & B_ERROR || !cg_chkmagic(cgp)) {
@@ -770,7 +791,7 @@ ufs_ifree(struct inode *ip, ino_t ino, mode_t mode)
 	}
 	cg = (int)itog(fs, ino);
 	bp = UFS_BREAD(ufsvfsp, ip->i_dev, (daddr_t)fsbtodb(fs, cgtod(fs, cg)),
-		    (int)fs->fs_cgsize);
+	    (int)fs->fs_cgsize);
 
 	cgp = bp->b_un.b_cg;
 	if (bp->b_flags & B_ERROR || !cg_chkmagic(cgp)) {
@@ -785,9 +806,9 @@ ufs_ifree(struct inode *ip, ino_t ino, mode_t mode)
 		mutex_exit(&ufsvfsp->vfs_lock);
 		brelse(bp);
 		(void) ufs_fault(ITOV(ip), "ufs_ifree: freeing free inode, "
-				    "mode: (imode) %o, (omode) %o, ino:%d, "
-				    "fs:%s",
-				    ip->i_mode, mode, (int)ino, fs->fs_fsmnt);
+		    "mode: (imode) %o, (omode) %o, ino:%d, "
+		    "fs:%s",
+		    ip->i_mode, mode, (int)ino, fs->fs_fsmnt);
 		return;
 	}
 	clrbit(iused, inot);
@@ -889,7 +910,7 @@ fragextend(struct inode *ip, int cg, long bprev, int osize, int nsize)
 	}
 
 	bp = UFS_BREAD(ufsvfsp, ip->i_dev, (daddr_t)fsbtodb(fs, cgtod(fs, cg)),
-		    (int)fs->fs_cgsize);
+	    (int)fs->fs_cgsize);
 	cgp = bp->b_un.b_cg;
 	if (bp->b_flags & B_ERROR || !cg_chkmagic(cgp)) {
 		brelse(bp);
@@ -963,7 +984,7 @@ alloccg(struct inode *ip, int cg, daddr_t bpref, int size)
 	if (fs->fs_cs(fs, cg).cs_nbfree == 0 && size == fs->fs_bsize)
 		return (0);
 	bp = UFS_BREAD(ufsvfsp, ip->i_dev, (daddr_t)fsbtodb(fs, cgtod(fs, cg)),
-		    (int)fs->fs_cgsize);
+	    (int)fs->fs_cgsize);
 
 	cgp = bp->b_un.b_cg;
 	if (bp->b_flags & B_ERROR || !cg_chkmagic(cgp) ||
@@ -1162,8 +1183,8 @@ alloccgblk(
 
 		if (fs_postbl(ufsvfsp, pos)[i] == -1) {
 			(void) ufs_fault(ufsvfsp->vfs_root,
-	    "alloccgblk: cyl groups corrupted, pos = %d, i = %d, fs = %s\n",
-				    pos, i, fs->fs_fsmnt);
+			    "alloccgblk: cyl groups corrupted, pos = %d, "
+			    "i = %d, fs = %s\n", pos, i, fs->fs_fsmnt);
 			return (0);
 		}
 
@@ -1196,8 +1217,8 @@ alloccgblk(
 			i += delta;
 		}
 		(void) ufs_fault(ufsvfsp->vfs_root,
-	"alloccgblk: can't find blk in cyl, pos:%d, i:%d, fs:%s bno: %x\n",
-		    pos, i, fs->fs_fsmnt, (int)bno);
+		    "alloccgblk: can't find blk in cyl, pos:%d, i:%d, "
+		    "fs:%s bno: %x\n", pos, i, fs->fs_fsmnt, (int)bno);
 		return (0);
 	}
 norot:
@@ -1290,8 +1311,8 @@ ialloccg(struct inode *ip, int cg, daddr_t ipref, int mode)
 		if (loc == 0) {
 			mutex_exit(&ufsvfsp->vfs_lock);
 			(void) ufs_fault(ITOV(ip),
-		    "ialloccg: map corrupted, cg = %d, irotor = %d, fs = %s\n",
-				    cg, (int)cgp->cg_irotor, fs->fs_fsmnt);
+			    "ialloccg: map corrupted, cg = %d, irotor = %d, "
+			    "fs = %s\n", cg, (int)cgp->cg_irotor, fs->fs_fsmnt);
 			return (0);
 		}
 	}
@@ -1409,9 +1430,10 @@ mapsearch(struct ufsvfs *ufsvfsp, struct cg *cgp, daddr_t bpref,
 			 * metadata into userdata (harpy).  If so, ignore.
 			 */
 			if (!TRANS_ISCANCEL(ufsvfsp,
-				ldbtob(fsbtodb(fs, (cfrag+bno))),
-				allocsiz * fs->fs_fsize))
+			    ldbtob(fsbtodb(fs, (cfrag+bno))),
+			    allocsiz * fs->fs_fsize))
 				return (bno);
+
 			/*
 			 * keep looking -- this block is being converted
 			 */
@@ -1443,6 +1465,348 @@ mapsearch(struct ufsvfs *ufsvfsp, struct cg *cgp, daddr_t bpref,
 #define	SINGLE	0		/* single indirect block ptr */
 #define	DOUBLE	1		/* double indirect block ptr */
 #define	TRIPLE	2		/* triple indirect block ptr */
+
+/*
+ * Acquire a write lock, and keep trying till we get it
+ */
+static int
+allocsp_wlockfs(struct vnode *vp, struct lockfs *lf)
+{
+	int err = 0;
+
+lockagain:
+	do {
+		err = ufs_fiolfss(vp, lf);
+		if (err)
+			return (err);
+	} while (!LOCKFS_IS_ULOCK(lf));
+
+	lf->lf_lock = LOCKFS_WLOCK;
+	lf->lf_flags = 0;
+	lf->lf_comment = NULL;
+	err = ufs__fiolfs(vp, lf, 1, 0);
+
+	if (err == EBUSY || err == EINVAL)
+		goto lockagain;
+
+	return (err);
+}
+
+/*
+ * Release the write lock
+ */
+static int
+allocsp_unlockfs(struct vnode *vp, struct lockfs *lf)
+{
+	int err = 0;
+
+	lf->lf_lock = LOCKFS_ULOCK;
+	lf->lf_flags = 0;
+	err = ufs__fiolfs(vp, lf, 1, 0);
+	return (err);
+}
+
+struct allocsp_undo {
+	daddr_t offset;
+	daddr_t blk;
+	struct allocsp_undo *next;
+};
+
+/*
+ * ufs_allocsp() can be used to pre-allocate blocks for a file on a given
+ * file system. The blocks are not initialized and are only marked as allocated.
+ * These addresses are then stored as negative block numbers in the inode to
+ * imply special handling. UFS has been modified where necessary to understand
+ * this new notion. Successfully fallocated files will have IFALLOCATE cflag
+ * set in the inode.
+ */
+int
+ufs_allocsp(struct vnode *vp, struct flock64 *lp, cred_t *cr)
+{
+	struct lockfs lf;
+	int berr, err, resv, issync;
+	off_t start, istart, len; /* istart, special for idb */
+	struct inode *ip;
+	struct fs *fs;
+	struct ufsvfs *ufsvfsp;
+	u_offset_t resid, i;
+	daddr32_t db_undo[NDADDR];	/* old direct blocks */
+	struct allocsp_undo *ib_undo = NULL;	/* ib undo */
+	struct allocsp_undo *undo = NULL;
+	u_offset_t osz;			/* old file size */
+	int chunkblks = 0;		/* # of blocks in 1 allocation */
+	int cnt = 0;
+	daddr_t allocblk;
+	daddr_t totblks = 0;
+	struct ulockfs	*ulp;
+
+	ASSERT(vp->v_type == VREG);
+
+	ip = VTOI(vp);
+	fs = ip->i_fs;
+	if ((ufsvfsp = ip->i_ufsvfs) == NULL) {
+		err = EIO;
+		goto out_allocsp;
+	}
+
+	istart = start = blkroundup(fs, (lp->l_start));
+	len = blkroundup(fs, (lp->l_len));
+	chunkblks = blkroundup(fs, ufsvfsp->vfs_iotransz) / fs->fs_bsize;
+	ulp = &ufsvfsp->vfs_ulockfs;
+
+	if (lp->l_start < 0 || lp->l_len <= 0)
+		return (EINVAL);
+
+	/* Quickly check to make sure we have space before we proceed */
+	if (lblkno(fs, len) > fs->fs_cstotal.cs_nbfree) {
+		if (TRANS_ISTRANS(ufsvfsp)) {
+			ufs_delete_drain_wait(ufsvfsp, 1);
+			if (lblkno(fs, len) > fs->fs_cstotal.cs_nbfree)
+				return (ENOSPC);
+		} else
+			return (ENOSPC);
+	}
+
+	/*
+	 * We will keep i_rwlock locked as WRITER through out the function
+	 * since we don't want anyone else reading or writing to the inode
+	 * while we are in the middle of fallocating the file.
+	 */
+	rw_enter(&ip->i_rwlock, RW_WRITER);
+
+	/* Back up the direct block list, used for undo later if necessary */
+	rw_enter(&ip->i_contents, RW_READER);
+	for (i = 0; i < NDADDR; i++)
+		db_undo[i] = ip->i_db[i];
+	osz = ip->i_size;
+	rw_exit(&ip->i_contents);
+
+	/* Allocate any direct blocks now before we write lock the fs */
+	if (lblkno(fs, start) < NDADDR) {
+		ufs_trans_trunc_resv(ip, ip->i_size + (NDADDR * fs->fs_bsize),
+		    &resv, &resid);
+		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_ALLOCSP, resv);
+
+		rw_enter(&ufsvfsp->vfs_dqrwlock, RW_READER);
+		rw_enter(&ip->i_contents, RW_WRITER);
+
+		for (i = start; (i < len) && (lblkno(fs, i) < NDADDR);
+		    i += fs->fs_bsize) {
+			berr = bmap_write(ip, i, fs->fs_bsize, BI_FALLOCATE,
+			    &allocblk, cr);
+			/* Yikes error, quit */
+			if (berr) {
+				TRANS_INODE(ufsvfsp, ip);
+				rw_exit(&ip->i_contents);
+				rw_exit(&ufsvfsp->vfs_dqrwlock);
+				TRANS_END_CSYNC(ufsvfsp, err, issync,
+				    TOP_ALLOCSP, resv);
+				goto exit;
+			}
+
+			if (allocblk) {
+				totblks++;
+				ip->i_size += fs->fs_bsize;
+			}
+		}
+
+		TRANS_INODE(ufsvfsp, ip);
+		rw_exit(&ip->i_contents);
+		rw_exit(&ufsvfsp->vfs_dqrwlock);
+		TRANS_END_CSYNC(ufsvfsp, err, issync, TOP_ALLOCSP, resv);
+
+		istart =  i;	/* start offset for indirect allocation */
+	}
+
+	/* Write lock the file system */
+	if (err = allocsp_wlockfs(vp, &lf))
+		goto exit;
+
+	/* Break the transactions into vfs_iotransz units */
+	ufs_trans_trunc_resv(ip, ip->i_size +
+	    blkroundup(fs, ufsvfsp->vfs_iotransz), &resv, &resid);
+	TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_ALLOCSP, resv);
+
+	rw_enter(&ufsvfsp->vfs_dqrwlock, RW_READER);
+	rw_enter(&ip->i_contents, RW_WRITER);
+
+	/* Now go about fallocating necessary indirect blocks */
+	for (i = istart; i < len; i += fs->fs_bsize) {
+		berr = bmap_write(ip, i, fs->fs_bsize, BI_FALLOCATE,
+		    &allocblk, cr);
+		if (berr) {
+			TRANS_INODE(ufsvfsp, ip);
+			rw_exit(&ip->i_contents);
+			rw_exit(&ufsvfsp->vfs_dqrwlock);
+			TRANS_END_CSYNC(ufsvfsp, err, issync,
+			    TOP_ALLOCSP, resv);
+			err = allocsp_unlockfs(vp, &lf);
+			goto exit;
+		}
+
+		/* Update the blk counter only if new block was added */
+		if (allocblk) {
+			/* Save undo information */
+			undo = kmem_alloc(sizeof (struct allocsp_undo),
+			    KM_SLEEP);
+			undo->offset = i;
+			undo->blk = allocblk;
+			undo->next = ib_undo;
+			ib_undo = undo;
+			totblks++;
+			ip->i_size += fs->fs_bsize;
+		}
+		cnt++;
+
+		/* Being a good UFS citizen, let others get a share */
+		if (cnt == chunkblks) {
+			/*
+			 * If there are waiters or the fs is hard locked,
+			 * error locked, or read-only error locked,
+			 * quit with EIO
+			 */
+			if (ULOCKFS_IS_HLOCK(ulp) || ULOCKFS_IS_ELOCK(ulp) ||
+			    ULOCKFS_IS_ROELOCK(ulp)) {
+				ip->i_cflags |= IFALLOCATE;
+				TRANS_INODE(ufsvfsp, ip);
+				rw_exit(&ip->i_contents);
+				rw_exit(&ufsvfsp->vfs_dqrwlock);
+
+				TRANS_END_CSYNC(ufsvfsp, err, issync,
+				    TOP_ALLOCSP, resv);
+				rw_exit(&ip->i_rwlock);
+				return (EIO);
+			}
+
+			TRANS_INODE(ufsvfsp, ip);
+			rw_exit(&ip->i_contents);
+			rw_exit(&ufsvfsp->vfs_dqrwlock);
+
+			/* End the current transaction */
+			TRANS_END_CSYNC(ufsvfsp, err, issync,
+			    TOP_ALLOCSP, resv);
+
+			if (CV_HAS_WAITERS(&ulp->ul_cv)) {
+				/* Release the write lock */
+				if (err = allocsp_unlockfs(vp, &lf))
+					goto exit;
+
+				/* Wake up others waiting to do operations */
+				mutex_enter(&ulp->ul_lock);
+				cv_broadcast(&ulp->ul_cv);
+				mutex_exit(&ulp->ul_lock);
+
+				/* Grab the write lock again */
+				if (err = allocsp_wlockfs(vp, &lf))
+					goto exit;
+			} /* end of CV_HAS_WAITERS(&ulp->ul_cv) */
+
+			/* Reserve more space in log for this file */
+			ufs_trans_trunc_resv(ip,
+			    ip->i_size + blkroundup(fs, ufsvfsp->vfs_iotransz),
+			    &resv, &resid);
+			TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_ALLOCSP, resv);
+
+			rw_enter(&ufsvfsp->vfs_dqrwlock, RW_READER);
+			rw_enter(&ip->i_contents, RW_WRITER);
+
+			cnt = 0;	/* reset cnt b/c of new transaction */
+		}
+	}
+
+	if (!err && !berr)
+		ip->i_cflags |= IFALLOCATE;
+
+	/* Release locks, end log transaction and unlock fs */
+	TRANS_INODE(ufsvfsp, ip);
+	rw_exit(&ip->i_contents);
+	rw_exit(&ufsvfsp->vfs_dqrwlock);
+
+	TRANS_END_CSYNC(ufsvfsp, err, issync, TOP_ALLOCSP, resv);
+	err = allocsp_unlockfs(vp, &lf);
+
+	/*
+	 * @ exit label, we should no longer be holding the fs write lock, and
+	 * all logging transactions should have been ended. We still hold
+	 * ip->i_rwlock.
+	 */
+exit:
+	/*
+	 * File has grown larger than 2GB. Set flag
+	 * in superblock to indicate this, if it
+	 * is not already set.
+	 */
+	if ((ip->i_size > MAXOFF32_T) &&
+		!(fs->fs_flags & FSLARGEFILES)) {
+		ASSERT(ufsvfsp->vfs_lfflags & UFS_LARGEFILES);
+		mutex_enter(&ufsvfsp->vfs_lock);
+		fs->fs_flags |= FSLARGEFILES;
+		ufs_sbwrite(ufsvfsp);
+		mutex_exit(&ufsvfsp->vfs_lock);
+	}
+
+	/*
+	 * Since we couldn't allocate completely, we will undo the allocations.
+	 */
+	if (berr) {
+		ufs_trans_trunc_resv(ip, totblks * fs->fs_bsize, &resv, &resid);
+		TRANS_BEGIN_CSYNC(ufsvfsp, issync, TOP_ALLOCSP, resv);
+
+		rw_enter(&ufsvfsp->vfs_dqrwlock, RW_READER);
+		rw_enter(&ip->i_contents, RW_WRITER);
+
+		/* Direct blocks */
+		for (i = 0; i < NDADDR; i++) {
+			/*
+			 * Only free the block if they are not same, and
+			 * the old one isn't zero (the fragment was
+			 * re-allocated).
+			 */
+			if (db_undo[i] != ip->i_db[i] && db_undo[i] == 0) {
+				free(ip, ip->i_db[i], fs->fs_bsize, 0);
+				ip->i_db[i] = 0;
+			}
+		}
+
+		/* Undo the indirect blocks */
+		while (ib_undo != NULL) {
+			undo = ib_undo;
+			err = bmap_set_bn(vp, undo->offset, 0);
+			if (err)
+				cmn_err(CE_PANIC, "ufs_allocsp(): failed to "
+				    "undo allocation of block %ld",
+				    undo->offset);
+			free(ip, undo->blk, fs->fs_bsize, I_IBLK);
+			ib_undo = undo->next;
+			kmem_free(undo, sizeof (struct allocsp_undo));
+		}
+
+		ip->i_size = osz;
+		TRANS_INODE(ufsvfsp, ip);
+
+		rw_exit(&ip->i_contents);
+		rw_exit(&ufsvfsp->vfs_dqrwlock);
+
+		TRANS_END_CSYNC(ufsvfsp, err, issync, TOP_ALLOCSP, resv);
+
+		rw_exit(&ip->i_rwlock);
+		return (berr);
+	}
+
+	/*
+	 * Don't forget to free the undo chain :)
+	 */
+	while (ib_undo != NULL) {
+		undo = ib_undo;
+		ib_undo = undo->next;
+		kmem_free(undo, sizeof (struct allocsp_undo));
+	}
+
+	rw_exit(&ip->i_rwlock);
+
+out_allocsp:
+	return (err);
+}
 
 /*
  * Free storage space associated with the specified inode.  The portion
@@ -1556,8 +1920,8 @@ contigpref(ufsvfs_t *ufsvfsp, size_t nb)
 		 * find the largest contiguous range in this cg
 		 */
 		bp = UFS_BREAD(ufsvfsp, ufsvfsp->vfs_dev,
-			(daddr_t)fsbtodb(fs, cgtod(fs, cg)),
-			(int)fs->fs_cgsize);
+		    (daddr_t)fsbtodb(fs, cgtod(fs, cg)),
+		    (int)fs->fs_cgsize);
 		cgp = bp->b_un.b_cg;
 		if (bp->b_flags & B_ERROR || !cg_chkmagic(cgp)) {
 			brelse(bp);

@@ -207,6 +207,11 @@
 #define	RC_KEYWORD	1
 #define	RC_POSITIONAL	2
 
+/*
+ * ufs hole
+ */
+#define	UFS_HOLE	-1
+
 #ifndef	STANDALONE
 #include	<stdio.h>
 #include	<sys/mnttab.h>
@@ -4399,8 +4404,15 @@ findcsfragino()
 		frags   = dbtofsb(&sblock, dp->di_blocks);
 
 		checkdirect((ino_t)i, &frags, &dp->di_db[0], NDADDR+NIADDR);
-		for (j = 0; j < NIADDR && frags; ++j)
-			checkindirect((ino_t)i, &frags, dp->di_ib[j], j);
+		for (j = 0; j < NIADDR && frags; ++j) {
+			/* Negate the block if its an fallocate'd block */
+			if (dp->di_ib[j] < 0 && dp->di_ib[j] != UFS_HOLE)
+				checkindirect((ino_t)i, &frags,
+				    -(dp->di_ib[j]), j);
+			else
+				checkindirect((ino_t)i, &frags,
+				    dp->di_ib[j], j);
+		}
 	}
 }
 

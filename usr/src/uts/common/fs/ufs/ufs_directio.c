@@ -515,15 +515,16 @@ ufs_directio_write(struct inode *ip, uio_t *arg_uio, int ioflag, int rewrite,
 		n = (int)MIN(fs->fs_bsize - on, resid);
 		if ((uoff + n) > ip->i_size) {
 			error = bmap_write(ip, uoff, (int)(on + n),
-				    (int)(uoff & (offset_t)MAXBOFFSET) == 0,
-			    cr);
+			    (int)(uoff & (offset_t)MAXBOFFSET) == 0,
+			    NULL, cr);
 			/* Caller is responsible for updating i_seq if needed */
 			if (error)
 				break;
 			ip->i_size = uoff + n;
 			ip->i_flag |= IATTCHG;
 		} else if (n == MAXBSIZE) {
-			error = bmap_write(ip, uoff, (int)(on + n), 1, cr);
+			error = bmap_write(ip, uoff, (int)(on + n),
+			    BI_ALLOC_ONLY, NULL, cr);
 			/* Caller is responsible for updating i_seq if needed */
 		} else {
 			if (has_holes < 0)
@@ -535,7 +536,8 @@ ufs_directio_write(struct inode *ip, uio_t *arg_uio, int ioflag, int rewrite,
 				offset = uoff & (offset_t)fs->fs_bmask;
 				blk_size = (int)blksize(fs, ip,
 				    (daddr_t)lblkno(fs, offset));
-				error = bmap_write(ip, uoff, blk_size, 0, cr);
+				error = bmap_write(ip, uoff, blk_size,
+				    BI_NORMAL, NULL, cr);
 				/*
 				 * Caller is responsible for updating
 				 * i_seq if needed

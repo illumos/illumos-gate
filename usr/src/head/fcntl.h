@@ -77,6 +77,9 @@ extern "C" {
 #ifdef __PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname	open	open64
 #pragma redefine_extname	creat	creat64
+#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#pragma redefine_extname	posix_fallocate posix_fallocate64
+#endif /* defined(__EXTENSIONS__) || defined(_XPG6) ||  ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 #pragma redefine_extname	openat	openat64
@@ -85,6 +88,9 @@ extern "C" {
 #else
 #define	open			open64
 #define	creat			creat64
+#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#define	posix_fallocate		posix_fallocate64
+#endif /* defined(__EXTENSIONS__) || defined(_XPG6) ||  ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 #define	openat			openat64
@@ -97,6 +103,9 @@ extern "C" {
 #ifdef __PRAGMA_REDEFINE_EXTNAME
 #pragma	redefine_extname	open64	open
 #pragma	redefine_extname	creat64	creat
+#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#pragma redefine_extname	posix_fallocate64 posix_fallocate
+#endif /* defined(__EXTENSIONS__) || defined(_XPG6) ||  ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 #pragma	redefine_extname	openat64	openat
@@ -105,6 +114,9 @@ extern "C" {
 #else
 #define	open64				open
 #define	creat64				creat
+#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+#define	posix_fallocate64		posix_fallocate
+#endif /* defined(__EXTENSIONS__) || defined(_XPG6) ||  ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 #define	openat64			openat
@@ -118,6 +130,9 @@ extern "C" {
 extern int fcntl(int, int, ...);
 extern int open(const char *, int, ...);
 extern int creat(const char *, mode_t);
+#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+extern int posix_fallocate(int fd, off_t offset, off_t len);
+#endif /* defined(__EXTENSIONS__) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern int openat(int, const char *, int, ...);
@@ -132,6 +147,9 @@ extern int directio(int, int);
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int open64(const char *, int, ...);
 extern int creat64(const char *, mode_t);
+#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+extern int posix_fallocate64(int fd, off64_t offset, off64_t len);
+#endif /* defined(__EXTENSIONS__) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern int openat64(int, const char *, int, ...);
@@ -144,6 +162,9 @@ extern int attropen64(const char *, const char *, int, ...);
 extern int fcntl();
 extern int open();
 extern int creat();
+#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+extern int posix_fallocate();
+#endif /* defined(__EXTENSIONS__) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern int openat();
@@ -159,6 +180,9 @@ extern int directio();
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int open64();
 extern int creat64();
+#if defined(__EXTENSIONS__) || defined(_XPG6) || !defined(__XOPEN_OR_POSIX)
+extern int posix_fallocate64();
+#endif /* defined(__EXTENSIONS__) || defined(_XPG6) || ... */
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || \
 	defined(_ATFILE_SOURCE)
 extern int openat64();

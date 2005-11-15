@@ -60,9 +60,9 @@
 #include <sys/errno.h>
 #include <sys/sysmacros.h>
 #include <sys/vfs.h>
-#include <sys/cmn_err.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>
+#include <sys/cmn_err.h>
 
 /*
  * This structure is used to track blocks as we allocate them, so that
@@ -165,14 +165,14 @@ static void ufs_undo_allocation(inode_t *ip, int block_count,
 #define	VERYLARGEFILESIZE	0x7FE00000
 
 /*
- * bmap{rd,wr} define the structure of file system storage by mapping
+ * bmap{read,write} define the structure of file system storage by mapping
  * a logical offset in a file to a physical block number on the device.
  * It should be called with a locked inode when allocation is to be
- * done (bmapwr).  Note this strangeness: bmapwr is always called from
+ * done (bmap_write).  Note this strangeness: bmap_write is always called from
  * getpage(), not putpage(), since getpage() is where all the allocation
  * is done.
  *
- * S_READ, S_OTHER -> bmaprd; S_WRITE -> bmapwr.
+ * S_READ, S_OTHER -> bmap_read; S_WRITE -> bmap_write.
  *
  * NOTICE: the block number returned is the disk block number, not the
  * file system block number.  All the worries about block offsets and
@@ -296,24 +296,21 @@ bmap_read(struct inode *ip, u_offset_t off, daddr_t *bnp, int *lenp)
 }
 
 /*
- * See bmaprd for general notes.
+ * See bmap_read for general notes.
  *
  * The block must be at least size bytes and will be extended or
- * allocated as needed.  If alloc_only is set, bmap will not create
- * any in-core pages that correspond to the new disk allocation.
- * Otherwise, the in-core pages will be created and initialized as
- * needed.
+ * allocated as needed.  If alloc_type is of type BI_ALLOC_ONLY, then bmap
+ * will not create any in-core pages that correspond to the new disk allocation.
+ * If alloc_type is of BI_FALLOCATE, blocks will be stored as (-1) * block addr
+ * and security is maintained b/c upon reading a negative block number pages
+ * are zeroed. For all other allocation types (BI_NORMAL) the in-core pages will
+ * be created and initialized as needed.
  *
  * Returns 0 on success, or a non-zero errno if an error occurs.
  */
-
 int
-bmap_write(
-	struct inode	*ip,
-	u_offset_t	off,
-	int		size,
-	int		alloc_only,
-	struct cred	*cr)
+bmap_write(struct inode	*ip, u_offset_t	off, int size,
+    enum bi_type alloc_type, daddr_t *allocblk, struct cred *cr)
 {
 	struct	fs *fs;
 	struct	buf *bp;
@@ -340,6 +337,9 @@ bmap_write(
 
 	ASSERT(RW_WRITE_HELD(&ip->i_contents));
 
+	if (allocblk)
+		*allocblk = 0;
+
 	ufsvfsp = ip->i_ufsvfs;
 	fs = ufsvfsp->vfs_bufp->b_un.b_fs;
 	lbn = (daddr_t)lblkno(fs, off);
@@ -360,7 +360,7 @@ bmap_write(
 	issync = ((ip->i_flag & ISYNC) != 0);
 
 	if (isdirquota || issync) {
-		alloc_only = 0;		/* make sure */
+		alloc_type = BI_NORMAL;	/* make sure */
 	}
 
 	/*
@@ -422,6 +422,7 @@ bmap_write(
 			ASSERT((unsigned)ip->i_blocks <= INT_MAX);
 			TRANS_INODE(ufsvfsp, ip);
 			ip->i_flag |= IUPD | ICHG | IATTCHG;
+
 			/* Caller is responsible for updating i_seq */
 			/*
 			 * Don't check metaflag here, directories won't do this
@@ -465,7 +466,7 @@ bmap_write(
 					}
 				}
 				/*
-				 * need to allocate a block or frag
+				 * need to re-allocate a block or frag
 				 */
 				ob = nb;
 				pref = blkpref(ip, lbn, (int)lbn,
@@ -474,6 +475,8 @@ bmap_write(
 						(int)nsize, &nb, cr);
 				if (err)
 					return (err);
+				if (allocblk)
+					*allocblk = nb;
 				ASSERT(!ufs_badblock(ip, nb));
 
 			} else {
@@ -501,6 +504,8 @@ bmap_write(
 				err = alloc(ip, pref, (int)nsize, &nb, cr);
 				if (err)
 					return (err);
+				if (allocblk)
+					*allocblk = nb;
 				ASSERT(!ufs_badblock(ip, nb));
 				ob = nb;
 			}
@@ -513,7 +518,13 @@ bmap_write(
 				/*
 				 * mmap S_WRITE faults always enter here
 				 */
-				if (!alloc_only || P2ROUNDUP_TYPED(size,
+				/*
+				 * We zero it if its also BI_FALLOCATE, but
+				 * only for direct blocks!
+				 */
+				if (alloc_type == BI_NORMAL ||
+				    alloc_type == BI_FALLOCATE ||
+				    P2ROUNDUP_TYPED(size,
 				    PAGESIZE, u_offset_t) < nsize) {
 					/* fbzero doesn't cause a pagefault */
 					fbzero(ITOV(ip),
@@ -548,6 +559,7 @@ bmap_write(
 			ASSERT((unsigned)ip->i_blocks <= INT_MAX);
 			TRANS_INODE(ufsvfsp, ip);
 			ip->i_flag |= IUPD | ICHG | IATTCHG;
+
 			/* Caller is responsible for updating i_seq */
 
 			/*
@@ -708,6 +720,7 @@ gotit:
 		shft -= nindirshift;		/* sh /= nindir */
 		i = (tbn >> shft) & nindiroffset; /* (tbn / sh) % nindir */
 		nb = bap[i];
+
 		if (nb == 0) {
 			/*
 			 * Check to see if doing this will make the
@@ -750,8 +763,10 @@ gotit:
 			}
 
 			ASSERT(!ufs_badblock(ip, nb));
-
 			ASSERT(alloced_blocks <= NIADDR);
+
+			if (allocblk)
+				*allocblk = nb;
 
 			undo_table[alloced_blocks].this_block = nb;
 			undo_table[alloced_blocks].block_size = bsize;
@@ -787,7 +802,8 @@ gotit:
 					return (err);
 				}
 				brelse(nbp);
-			} else if (!alloc_only || P2ROUNDUP_TYPED(size,
+			} else if (alloc_type == BI_NORMAL ||
+			    P2ROUNDUP_TYPED(size,
 			    PAGESIZE, u_offset_t) < bsize) {
 				TRANS_MATA_ALLOC(ufsvfsp, ip, nb, bsize, 0);
 				fbzero(ITOV(ip),
@@ -846,12 +862,24 @@ gotit:
 			}
 			bap = bp->b_un.b_daddr;
 			bap[i] = nb;
+
+			/*
+			 * The magic explained: j will be equal to NIADDR
+			 * when we are at the lowest level, this is where the
+			 * array entries point directly to data blocks. Since
+			 * we will be 'fallocate'ing we will go ahead and negate
+			 * the addresses.
+			 */
+			if (alloc_type == BI_FALLOCATE && j == NIADDR)
+				bap[i] = -bap[i];
+
 			TRANS_BUF_ITEM_128(ufsvfsp, bap[i], bap, bp, DT_AB);
 			added_sectors += btodb(bsize);
 			ip->i_blocks += btodb(bsize);
 			ASSERT((unsigned)ip->i_blocks <= INT_MAX);
 			TRANS_INODE(ufsvfsp, ip);
 			ip->i_flag |= IUPD | ICHG | IATTCHG;
+
 			/* Caller is responsible for updating i_seq */
 
 			undo_table[alloced_blocks-1].owner =
@@ -910,8 +938,8 @@ bmap_has_holes(struct inode *ip)
 	 */
 	if (dblks <= NDADDR)
 		return (mblks < dblks);
-
 	nindirshift = ip->i_ufsvfs->vfs_nindirshift;
+
 	nindiroffset = ip->i_ufsvfs->vfs_nindiroffset;
 	nindirblks = nindiroffset + 1;
 
@@ -965,6 +993,7 @@ findextent(struct fs *fs, daddr32_t *sbp, int n, int *lenp, int maxtransfer)
 	bn = *sbp;
 	if (bn == 0)
 		return (0);
+
 	diff = fs->fs_frag;
 	if (*lenp) {
 		n = MIN(n, lblkno(fs, *lenp));
@@ -1285,4 +1314,96 @@ out:
 		}
 	}
 	return (error);
+}
+
+/*
+ * Set a particular offset in the inode list to be a certain block.
+ * User is responsible for calling TRANS* functions
+ */
+int
+bmap_set_bn(struct vnode *vp, u_offset_t off, daddr32_t bn)
+{
+	daddr_t lbn;
+	struct inode *ip;
+	ufsvfs_t *ufsvfsp;
+	struct	fs *fs;
+	struct	buf *bp;
+	int	i, j;
+	int	shft;			/* we maintain sh = 1 << shft */
+	int err;
+	daddr_t	ob, nb, tbn;
+	daddr32_t *bap;
+	int	nindirshift, nindiroffset;
+
+	ip = VTOI(vp);
+	ufsvfsp = ip->i_ufsvfs;
+	fs = ufsvfsp->vfs_fs;
+	lbn = (daddr_t)lblkno(fs, off);
+
+	ASSERT(RW_LOCK_HELD(&ip->i_contents));
+
+	if (lbn < 0)
+		return (EFBIG);
+
+	/*
+	 * Take care of direct block assignment
+	 */
+	if (lbn < NDADDR) {
+		ip->i_db[lbn] = bn;
+		return (0);
+	}
+
+	nindirshift = ip->i_ufsvfs->vfs_nindirshift;
+	nindiroffset = ip->i_ufsvfs->vfs_nindiroffset;
+	/*
+	 * Determine how many levels of indirection.
+	 */
+	shft = 0;				/* sh = 1 */
+	tbn = lbn - NDADDR;
+	for (j = NIADDR; j > 0; j--) {
+		longlong_t	sh;
+
+		shft += nindirshift;		/* sh *= nindir */
+		sh = 1LL << shft;
+		if (tbn < sh)
+			break;
+		tbn -= sh;
+	}
+	if (j == 0)
+		return (EFBIG);
+
+	/*
+	 * Fetch the first indirect block.
+	 */
+	nb = ip->i_ib[NIADDR - j];
+	if (nb == 0)
+		err = ufs_fault(ITOV(ip), "ufs_set_bn: nb == UFS_HOLE");
+
+	/*
+	 * Fetch through the indirect blocks.
+	 */
+	for (; j <= NIADDR; j++) {
+		ob = nb;
+		bp = UFS_BREAD(ufsvfsp,
+				ip->i_dev, fsbtodb(fs, ob), fs->fs_bsize);
+		if (bp->b_flags & B_ERROR) {
+			err = geterror(bp);
+			brelse(bp);
+			return (err);
+		}
+		bap = bp->b_un.b_daddr;
+
+		ASSERT(!ufs_indir_badblock(ip, bap));
+
+		shft -= nindirshift;		/* sh / nindir */
+		i = (tbn >> shft) & nindiroffset; /* (tbn / sh) % nindir */
+
+		if (j == NIADDR) {
+			bap[i] = bn;
+			bdrwrite(bp);
+			return (0);
+		}
+		brelse(bp);
+	}
+	return (0);
 }

@@ -79,14 +79,18 @@ extern "C" {
 #define	ULOCKFS_BUSY	0x00000001	/* ul_fs_lock is being set */
 #define	ULOCKFS_NOIACC	0x00000004	/* don't keep access times */
 #define	ULOCKFS_NOIDEL	0x00000008	/* don't free deleted files */
+#define	ULOCKFS_FALLOC	0x00000010	/* fallocate threads exist */
 
 #define	ULOCKFS_IS_BUSY(LF)	((LF)->ul_flag & ULOCKFS_BUSY)
 #define	ULOCKFS_IS_NOIACC(LF)	((LF)->ul_flag & ULOCKFS_NOIACC)
 #define	ULOCKFS_IS_NOIDEL(LF)	((LF)->ul_flag & ULOCKFS_NOIDEL)
+#define	ULOCKFS_IS_FALLOC(LF)	((LF)->ul_flag & ULOCKFS_FALLOC)
 
 #define	ULOCKFS_CLR_BUSY(LF)	((LF)->ul_flag &= ~ULOCKFS_BUSY)
-
 #define	ULOCKFS_SET_BUSY(LF)	((LF)->ul_flag |= ULOCKFS_BUSY)
+
+#define	ULOCKFS_CLR_FALLOC(LF)	((LF)->ul_flag &= ~ULOCKFS_FALLOC)
+#define	ULOCKFS_SET_FALLOC(LF)	((LF)->ul_flag |= ULOCKFS_FALLOC)
 
 /*
  * ul_fs_mod
@@ -100,15 +104,20 @@ extern "C" {
  *
  * softlock will temporarily block most ufs_vnodeops.
  * it is used so that a waiting lockfs command will not be starved
+ *
+ * fwlock will block other fallocate threads wanting to obtain a write lock
+ * on the file system.
  */
-#define	ULOCKFS_ULOCK    ((1 << LOCKFS_ULOCK))	/* unlock */
-#define	ULOCKFS_WLOCK    ((1 << LOCKFS_WLOCK))	/* write  lock */
-#define	ULOCKFS_NLOCK    ((1 << LOCKFS_NLOCK))	/* name   lock */
-#define	ULOCKFS_DLOCK    ((1 << LOCKFS_DLOCK))	/* delete lock */
-#define	ULOCKFS_HLOCK    ((1 << LOCKFS_HLOCK))	/* hard   lock */
-#define	ULOCKFS_ELOCK    ((1 << LOCKFS_ELOCK))	/* error  lock */
-#define	ULOCKFS_ROELOCK  ((1 << LOCKFS_ROELOCK)) /* error lock (read-only) */
-#define	ULOCKFS_SLOCK    0x80000000		/* soft   lock */
+#define	ULOCKFS_ULOCK	((1 << LOCKFS_ULOCK))	/* unlock */
+#define	ULOCKFS_WLOCK	((1 << LOCKFS_WLOCK))	/* write  lock */
+#define	ULOCKFS_NLOCK	((1 << LOCKFS_NLOCK))	/* name   lock */
+#define	ULOCKFS_DLOCK	((1 << LOCKFS_DLOCK))	/* delete lock */
+#define	ULOCKFS_HLOCK	((1 << LOCKFS_HLOCK))	/* hard   lock */
+#define	ULOCKFS_ELOCK	((1 << LOCKFS_ELOCK))	/* error  lock */
+#define	ULOCKFS_ROELOCK	((1 << LOCKFS_ROELOCK)) /* error lock (read-only) */
+/* Maximum number of LOCKFS lockfs defined in sys/lockfs.h are 6 */
+#define	ULOCKFS_FWLOCK	(1 << (LOCKFS_MAXLOCK + 1)) /* fallocate write lock */
+#define	ULOCKFS_SLOCK	0x80000000		/* soft   lock */
 
 #define	ULOCKFS_IS_WLOCK(LF)	((LF)->ul_fs_lock & ULOCKFS_WLOCK)
 #define	ULOCKFS_IS_HLOCK(LF)	((LF)->ul_fs_lock & ULOCKFS_HLOCK)
@@ -118,11 +127,15 @@ extern "C" {
 #define	ULOCKFS_IS_NLOCK(LF)	((LF)->ul_fs_lock & ULOCKFS_NLOCK)
 #define	ULOCKFS_IS_DLOCK(LF)	((LF)->ul_fs_lock & ULOCKFS_DLOCK)
 #define	ULOCKFS_IS_SLOCK(LF)	((LF)->ul_fs_lock & ULOCKFS_SLOCK)
+#define	ULOCKFS_IS_FWLOCK(LF)	((LF)->ul_fs_lock & ULOCKFS_FWLOCK)
 #define	ULOCKFS_IS_JUSTULOCK(LF) \
 	(((LF)->ul_fs_lock & (ULOCKFS_SLOCK | ULOCKFS_ULOCK)) == ULOCKFS_ULOCK)
 
 #define	ULOCKFS_SET_SLOCK(LF)	((LF)->ul_fs_lock |= ULOCKFS_SLOCK)
 #define	ULOCKFS_CLR_SLOCK(LF)	((LF)->ul_fs_lock &= ~ULOCKFS_SLOCK)
+
+#define	ULOCKFS_SET_FWLOCK(LF)	((LF)->ul_fs_lock |= ULOCKFS_FWLOCK)
+#define	ULOCKFS_CLR_FWLOCK(LF)	((LF)->ul_fs_lock &= ~ULOCKFS_FWLOCK)
 
 #define	ULOCKFS_READ_MASK	(ULOCKFS_HLOCK | ULOCKFS_ELOCK | ULOCKFS_SLOCK)
 #define	ULOCKFS_WRITE_MASK	(ULOCKFS_HLOCK | ULOCKFS_ELOCK | \
@@ -161,6 +174,9 @@ extern "C" {
 #define	ULOCKFS_FRLOCK_MASK	(ULOCKFS_HLOCK | ULOCKFS_ELOCK | ULOCKFS_SLOCK)
 #define	ULOCKFS_SPACE_MASK	(ULOCKFS_HLOCK | ULOCKFS_ELOCK | \
 				ULOCKFS_ROELOCK | ULOCKFS_SLOCK | ULOCKFS_WLOCK)
+#define	ULOCKFS_FALLOCATE_MASK	(ULOCKFS_HLOCK | ULOCKFS_ELOCK | \
+				ULOCKFS_ROELOCK | ULOCKFS_SLOCK | \
+				ULOCKFS_WLOCK | ULOCKFS_FWLOCK)
 #define	ULOCKFS_QUOTA_MASK	(ULOCKFS_HLOCK | ULOCKFS_ELOCK | \
 				ULOCKFS_ROELOCK | ULOCKFS_SLOCK | ULOCKFS_WLOCK)
 /* GETPAGE breaks up into two masks */
@@ -188,6 +204,7 @@ struct ulockfs {
 	kcondvar_t 	ul_cv;
 	kthread_id_t	ul_sbowner;	/* thread than can write superblock */
 	struct lockfs	ul_lockfs;	/* ioctl lock struct */
+	ulong_t		ul_falloc_cnt;	/* # of on-going fallocate ops */
 };
 
 extern ulong_t ufs_quiesce_pend;

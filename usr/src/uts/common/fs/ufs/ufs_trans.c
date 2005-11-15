@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -740,7 +740,7 @@ ufs_log_amt(struct inode *ip, offset_t offset, ssize_t resid, int trunc)
  * trunc request.  If the amount of log space is too large, then
  * calculate the the size that the requests needs to be split into.
  */
-static void
+void
 ufs_trans_trunc_resv(
 	struct inode *ip,
 	u_offset_t length,

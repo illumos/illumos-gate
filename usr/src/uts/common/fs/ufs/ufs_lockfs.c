@@ -99,7 +99,10 @@ uint_t ufs_lockfs_key;
 typedef struct _ulockfs_info {
 	struct _ulockfs_info *next;
 	struct ulockfs *ulp;
+	uint_t flags;
 } ulockfs_info_t;
+
+#define	ULOCK_INFO_FALLOCATE	0x00000001	/* fallocate thread */
 
 /*
  * Check in TSD that whether we are already doing any VOP on this filesystem
@@ -238,6 +241,11 @@ int
 ufs_quiesce(struct ulockfs *ulp)
 {
 	int error = 0;
+	ulockfs_info_t *head;
+	ulockfs_info_t *info;
+
+	head = (ulockfs_info_t *)tsd_get(ufs_lockfs_key);
+	SEARCH_ULOCKFSP(head, ulp, info);
 
 	/*
 	 * Set a softlock to suspend future ufs_vnops so that
@@ -247,16 +255,27 @@ ufs_quiesce(struct ulockfs *ulp)
 	ASSERT(ufs_quiesce_pend);
 
 	/* check if there is any outstanding ufs vnodeops calls */
-	while (ulp->ul_vnops_cnt)
+	while (ulp->ul_vnops_cnt || ulp->ul_falloc_cnt) {
 		/*
 		 * use timed version of cv_wait_sig() to make sure we don't
 		 * miss a wake up call from ufs_pageio() when it doesn't use
 		 * ul_lock.
+		 *
+		 * when a fallocate thread comes in, the only way it returns
+		 * from this function is if there are no other vnode operations
+		 * going on (remember fallocate threads are tracked using
+		 * ul_falloc_cnt not ul_vnops_cnt), and another fallocate thread
+		 * hasn't already grabbed the fs write lock.
 		 */
+		if (info && (info->flags & ULOCK_INFO_FALLOCATE)) {
+			if (!ulp->ul_vnops_cnt && !ULOCKFS_IS_FWLOCK(ulp))
+				goto out;
+		}
 		if (!cv_timedwait_sig(&ulp->ul_cv, &ulp->ul_lock, lbolt + hz)) {
 			error = EINTR;
 			goto out;
 		}
+	}
 
 out:
 	/*
@@ -266,6 +285,7 @@ out:
 
 	return (error);
 }
+
 /*
  * ufs_flush_inode
  */
@@ -843,6 +863,8 @@ ufs__fiolfs(
 	int		 errlck		= NO_ERRLCK;
 	int		 poll_events	= POLLPRI;
 	extern struct pollhead ufs_pollhd;
+	ulockfs_info_t *head;
+	ulockfs_info_t *info;
 
 	/* check valid lock type */
 	if (!lockfsp || lockfsp->lf_lock > LOCKFS_MAXLOCK)
@@ -854,6 +876,9 @@ ufs__fiolfs(
 	vfsp = vp->v_vfsp;
 	ufsvfsp = (struct ufsvfs *)vfsp->vfs_data;
 	ulp = &ufsvfsp->vfs_ulockfs;
+
+	head = (ulockfs_info_t *)tsd_get(ufs_lockfs_key);
+	SEARCH_ULOCKFSP(head, ulp, info);
 
 	/*
 	 * Suspend both the reclaim thread and the delete thread.
@@ -950,10 +975,29 @@ ufs__fiolfs(
 	LOCKFS_SET_BUSY(&ulp->ul_lockfs);
 
 	/*
+	 * We  need to unset FWLOCK status before we call ufs_quiesce
+	 * so that the thread doesnt get suspended. We do this only if
+	 * this (fallocate) thread requested an unlock operation.
+	 */
+	if (info && (info->flags & ULOCK_INFO_FALLOCATE)) {
+		if (!ULOCKFS_IS_WLOCK(ulp))
+			ULOCKFS_CLR_FWLOCK(ulp);
+	}
+
+	/*
 	 * Quiesce (wait for outstanding accesses to finish)
 	 */
 	if (error = ufs_quiesce(ulp))
 		goto errout;
+
+	/*
+	 * If the fallocate thread requested a write fs lock operation
+	 * then we set fwlock status in the ulp.
+	 */
+	if (info && (info->flags & ULOCK_INFO_FALLOCATE)) {
+		if (ULOCKFS_IS_WLOCK(ulp))
+			ULOCKFS_SET_FWLOCK(ulp);
+	}
 
 	/*
 	 * can't wlock or (ro)elock fs with accounting or local swap file
@@ -1195,7 +1239,14 @@ ufs_check_lockfs(struct ufsvfs *ufsvfsp, struct ulockfs *ulp, ulong_t mask)
 				return (EINTR);
 		}
 	}
-	atomic_add_long(&ulp->ul_vnops_cnt, 1);
+
+	if (mask & ULOCKFS_FWLOCK) {
+		atomic_add_long(&ulp->ul_falloc_cnt, 1);
+		ULOCKFS_SET_FALLOC(ulp);
+	} else {
+		atomic_add_long(&ulp->ul_vnops_cnt, 1);
+	}
+
 	return (0);
 }
 
@@ -1260,9 +1311,14 @@ ufs_lockfs_begin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 	 * First time VOP call
 	 */
 	mutex_enter(&ulp->ul_lock);
-	if (ULOCKFS_IS_JUSTULOCK(ulp))
-		atomic_add_long(&ulp->ul_vnops_cnt, 1);
-	else {
+	if (ULOCKFS_IS_JUSTULOCK(ulp)) {
+		if (mask & ULOCKFS_FWLOCK) {
+			atomic_add_long(&ulp->ul_falloc_cnt, 1);
+			ULOCKFS_SET_FALLOC(ulp);
+		} else {
+			atomic_add_long(&ulp->ul_vnops_cnt, 1);
+		}
+	} else {
 		if (error = ufs_check_lockfs(ufsvfsp, ulp, mask)) {
 			mutex_exit(&ulp->ul_lock);
 			if (ulockfs_info_free == NULL)
@@ -1275,9 +1331,13 @@ ufs_lockfs_begin(struct ufsvfs *ufsvfsp, struct ulockfs **ulpp, ulong_t mask)
 
 	if (ulockfs_info_free != NULL) {
 		ulockfs_info_free->ulp = ulp;
+		if (mask & ULOCKFS_FWLOCK)
+			ulockfs_info_free->flags |= ULOCK_INFO_FALLOCATE;
 	} else {
 		ulockfs_info_temp->ulp = ulp;
 		ulockfs_info_temp->next = ulockfs_info;
+		if (mask & ULOCKFS_FWLOCK)
+			ulockfs_info_temp->flags |= ULOCK_INFO_FALLOCATE;
 		ASSERT(ufs_lockfs_key != 0);
 		(void) tsd_set(ufs_lockfs_key, (void *)ulockfs_info_temp);
 	}
@@ -1339,7 +1399,20 @@ ufs_lockfs_end(struct ulockfs *ulp)
 
 	mutex_enter(&ulp->ul_lock);
 
-	if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+	/* fallocate thread */
+	if (ULOCKFS_IS_FALLOC(ulp) && info->flags & ULOCK_INFO_FALLOCATE) {
+		if (!atomic_add_long_nv(&ulp->ul_falloc_cnt, -1))
+			ULOCKFS_CLR_FALLOC(ulp);
+	} else  { /* normal thread */
+		if (!atomic_add_long_nv(&ulp->ul_vnops_cnt, -1))
+			cv_broadcast(&ulp->ul_cv);
+	}
+
+	/* Clear the thread's fallocate state */
+	if (info->flags & ULOCK_INFO_FALLOCATE)
+		info->flags &= ~ULOCK_INFO_FALLOCATE;
+
+	if (ulp->ul_vnops_cnt == 0 && ulp->ul_falloc_cnt)
 		cv_broadcast(&ulp->ul_cv);
 
 	mutex_exit(&ulp->ul_lock);

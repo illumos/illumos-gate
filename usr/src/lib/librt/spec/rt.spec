@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,6 +18,10 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -74,6 +75,13 @@ declaration	int aio_suspend(const struct aiocb *const list[], int nent, \
 			const struct timespec *timeout)
 version		SUNW_0.7
 errno		EAGAIN EINTR ENOSYS
+end
+
+function	posix_fallocate
+include		<fcntl.h>
+declaration	int posix_fallocate(int fd, off_t offset, off_t len)
+version		SUNW_1.5
+errno		EBADF EFBIG EINTR EINVAL EIO ENODEV ENOSPC ESPIPE
 end
 
 function	fdatasync
@@ -155,6 +163,12 @@ declaration	int aio_waitn64(struct aiocb64 *list[], uint_t nent, \
 			uint_t *nwait, const struct timespec *timeout)
 arch		i386 sparc
 version		SUNW_1.3
+end
+
+function	posix_fallocate64 extends librt/spec/rt.spec posix_fallocate
+declaration	int posix_fallocate(int fd, off64_t offset, off64_t len)
+arch		i386 sparc
+version		SUNW_1.5
 end
 
 function	mq_close
