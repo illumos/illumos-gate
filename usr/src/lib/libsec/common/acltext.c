@@ -61,6 +61,8 @@ extern acl_t *acl_alloc(enum acl_type);
 #define	PERMS		4
 #define	ACL_ENTRY_SIZE	(ENTRYTYPELEN + LOGNAME_MAX + PERMS)
 
+#define	UPDATE_WHERE	where = dstr->aclexport + strlen(dstr->aclexport)
+
 struct dynaclstr {
 	size_t bufsize;		/* current size of aclexport */
 	char *aclexport;
@@ -140,14 +142,13 @@ acltotext(aclent_t *aclp, int aclcnt)
 			if (passwdp == (struct passwd *)NULL) {
 				/* put in uid instead */
 				(void) sprintf(where, "%d", aclp->a_id);
+				UPDATE_WHERE;
 			} else {
 				excess = strlen(passwdp->pw_name) - LOGNAME_MAX;
 				if (excess > 0) {
 					rtn = increase_length(dstr, excess);
 					if (rtn == 1) {
-						/* reset where */
-						where = dstr->aclexport +
-							strlen(dstr->aclexport);
+						UPDATE_WHERE;
 					} else {
 						free(dstr->aclexport);
 						free(dstr);
@@ -177,14 +178,13 @@ acltotext(aclent_t *aclp, int aclcnt)
 			if (groupp == (struct group *)NULL) {
 				/* put in gid instead */
 				(void) sprintf(where, "%d", aclp->a_id);
+				UPDATE_WHERE;
 			} else {
 				excess = strlen(groupp->gr_name) - LOGNAME_MAX;
 				if (excess > 0) {
 					rtn = increase_length(dstr, excess);
 					if (rtn == 1) {
-						/* reset where */
-						where = dstr->aclexport +
-							strlen(dstr->aclexport);
+						UPDATE_WHERE;
 					} else {
 						free(dstr->aclexport);
 						free(dstr);
