@@ -41,7 +41,6 @@
 #include <sys/hotplug/pci/pcihp.h>
 #include <io/pci/pci_common.h>
 #include <io/pci/pci_tools_ext.h>
-#include <io/pci/pci_var.h>
 #include <io/pciex/pcie_error.h>
 
 /*
@@ -247,6 +246,7 @@ npe_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
+	/* Second arg: initialize for pci_express root nexus */
 	if (pcitool_init(devi, B_TRUE) != DDI_SUCCESS) {
 		(void) pcihp_uninit(devi);
 		ddi_soft_state_free(npe_statep, instance);

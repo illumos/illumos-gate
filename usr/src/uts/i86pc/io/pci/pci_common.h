@@ -34,6 +34,10 @@
 extern "C" {
 #endif
 
+/* State structure. */
+typedef struct pci_state {
+	dev_info_t *pci_dip;
+} pci_state_t;
 
 /*
  *	Common header file with definitions shared between

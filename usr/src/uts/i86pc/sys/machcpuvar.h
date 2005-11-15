@@ -91,7 +91,7 @@ struct	machcpu {
 	void		*mcpu_caddr2pte;
 	struct softint mcpu_softinfo;
 	uint64_t	pil_high_start[HIGH_LEVELS];
-	uint64_t	intrstat[PIL_MAX + 1];
+	uint64_t	intrstat[PIL_MAX + 1][2];
 	struct cpuid_info	 *mcpu_cpi;
 #if defined(__amd64)
 	greg_t	mcpu_rtmp_rsp;		/* syscall: temporary %rsp stash */

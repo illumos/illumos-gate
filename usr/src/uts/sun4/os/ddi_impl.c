@@ -972,6 +972,18 @@ i_ddi_set_softint_pri(ddi_softint_hdl_impl_t *hdlp, uint_t old_pri)
 	return (ret);
 }
 
+/*ARGSUSED*/
+void
+i_ddi_alloc_intr_phdl(ddi_intr_handle_impl_t *hdlp)
+{
+}
+
+/*ARGSUSED*/
+void
+i_ddi_free_intr_phdl(ddi_intr_handle_impl_t *hdlp)
+{
+}
+
 /*
  * SECTION: DDI Memory/DMA
  */

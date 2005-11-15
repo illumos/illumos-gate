@@ -60,6 +60,7 @@
 #include <sys/sunndi.h>
 #include <sys/vmem.h>
 #include <sys/pci_impl.h>
+#include <sys/mach_intr.h>
 
 /*
  * DDI Boot Configuration
@@ -890,6 +891,19 @@ i_ddi_set_softint_pri(ddi_softint_hdl_impl_t *hdlp, uint_t old_pri)
 	/* Now, remove the softint at the old priority */
 	(void) rem_avsoftintr((void *)hdlp, old_pri, hdlp->ih_cb_func);
 	return (DDI_SUCCESS);
+}
+
+void
+i_ddi_alloc_intr_phdl(ddi_intr_handle_impl_t *hdlp)
+{
+	hdlp->ih_private = (void *)kmem_zalloc(sizeof (ihdl_plat_t), KM_SLEEP);
+}
+
+void
+i_ddi_free_intr_phdl(ddi_intr_handle_impl_t *hdlp)
+{
+	kmem_free(hdlp->ih_private, sizeof (ihdl_plat_t));
+	hdlp->ih_private = NULL;
 }
 
 /*

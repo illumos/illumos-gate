@@ -287,13 +287,13 @@ cbe_init(void)
 	mutex_exit(&cpu_lock);
 
 	(void) add_avintr(NULL, CBE_HIGH_PIL, (avfunc)cbe_fire,
-	    "cbe_fire_master", cbe_vector, 0, NULL, NULL);
+	    "cbe_fire_master", cbe_vector, 0, NULL, NULL, NULL);
 
 	if (psm_get_ipivect != NULL) {
 		(void) add_avintr(NULL, CBE_HIGH_PIL, (avfunc)cbe_fire,
 		    "cbe_fire_slave",
 		    (*psm_get_ipivect)(CBE_HIGH_PIL, PSM_INTR_IPI_HI),
-		    0, NULL, NULL);
+		    0, NULL, NULL, NULL);
 	}
 
 	(void) add_avsoftintr((void *)&cbe_clock_hdl, CBE_LOCK_PIL,

@@ -49,7 +49,8 @@
 #include <sys/ddi_impldefs.h>
 
 static int insert_av(void *intr_id, struct av_head *vectp, avfunc f,
-	caddr_t arg1, caddr_t arg2, int pri_level, dev_info_t *dip);
+	caddr_t arg1, caddr_t arg2, uint64_t *ticksp, int pri_level,
+	dev_info_t *dip);
 static void remove_av(void *intr_id, struct av_head *vectp, avfunc f,
 	int pri_level, int vect);
 
@@ -157,7 +158,7 @@ add_nmintr(int lvl, avfunc nmintr, char *name, caddr_t arg)
  */
 int
 add_avintr(void *intr_id, int lvl, avfunc xxintr, char *name, int vect,
-    caddr_t arg1, caddr_t arg2, dev_info_t *dip)
+    caddr_t arg1, caddr_t arg2, uint64_t *ticksp, dev_info_t *dip)
 {
 	struct av_head *vecp = (struct av_head *)0;
 	avfunc f;
@@ -190,7 +191,7 @@ add_avintr(void *intr_id, int lvl, avfunc xxintr, char *name, int vect,
 			cmn_err(CE_NOTE, multilevel, vect);
 	}
 
-	if (!insert_av(intr_id, vecp, f, arg1, arg2, lvl, dip))
+	if (!insert_av(intr_id, vecp, f, arg1, arg2, ticksp, lvl, dip))
 		return (0);
 	s = splhi();
 	/*
@@ -235,7 +236,7 @@ add_avsoftintr(void *intr_id, int lvl, avfunc xxintr, char *name,
 
 	if ((slvl = slvltovect(lvl)) != -1)
 		return (add_avintr(intr_id, lvl, xxintr,
-		    name, slvl, arg1, arg2, NULL));
+		    name, slvl, arg1, arg2, NULL, NULL));
 
 	if (intr_id == NULL) {
 		printf("Attempt to add null intr_id for %s on level %d\n",
@@ -253,7 +254,7 @@ add_avsoftintr(void *intr_id, int lvl, avfunc xxintr, char *name,
 		printf(badsoft, lvl, name);
 		return (0);
 	}
-	if (!insert_av(intr_id, &softvect[lvl], xxintr, arg1, arg2,
+	if (!insert_av(intr_id, &softvect[lvl], xxintr, arg1, arg2, NULL,
 	    lvl, NULL)) {
 		return (0);
 	}
@@ -263,7 +264,7 @@ add_avsoftintr(void *intr_id, int lvl, avfunc xxintr, char *name,
 /* insert an interrupt vector into chain */
 static int
 insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
-    caddr_t arg2, int pri_level, dev_info_t *dip)
+    caddr_t arg2, uint64_t *ticksp, int pri_level, dev_info_t *dip)
 {
 	/*
 	 * Protect rewrites of the list
@@ -274,6 +275,7 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 	mem->av_vector = f;
 	mem->av_intarg1 = arg1;
 	mem->av_intarg2 = arg2;
+	mem->av_ticksp = ticksp;
 	mem->av_intr_id = intr_id;
 	mem->av_prilevel = pri_level;
 	mem->av_dip = dip;
@@ -295,6 +297,7 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 			kmem_free(mem, sizeof (struct autovec));
 			p->av_intarg1 = arg1;
 			p->av_intarg2 = arg2;
+			p->av_ticksp = ticksp;
 			p->av_intr_id = intr_id;
 			p->av_prilevel = pri_level;
 			p->av_dip = dip;
@@ -437,11 +440,13 @@ remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
 	}
 
 	target->av_vector = NULL;
+	target->av_ticksp = NULL;
 	wait_till_seen(ipl);
 	if (endp != target) {	/* vector to be removed is not last in chain */
 		target->av_vector = endp->av_vector;
 		target->av_intarg1 = endp->av_intarg1;
 		target->av_intarg2 = endp->av_intarg2;
+		target->av_ticksp = endp->av_ticksp;
 		target->av_intr_id = endp->av_intr_id;
 		target->av_prilevel = endp->av_prilevel;
 		target->av_dip = endp->av_dip;
@@ -452,6 +457,7 @@ remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
 		 */
 		wait_till_seen(ipl);
 		endp->av_vector = NULL;
+		endp->av_ticksp = NULL;
 	}
 
 	if (lo_pri > hi_pri) {	/* the chain is now empty */
@@ -482,6 +488,9 @@ siron(void)
  * Walk the autovector table for this vector, invoking each
  * interrupt handler as we go.
  */
+
+extern uint64_t intr_get_time(void);
+
 void
 av_dispatch_autovect(uint_t vec)
 {
@@ -510,6 +519,8 @@ av_dispatch_autovect(uint_t vec)
 			DTRACE_PROBE4(interrupt__complete, dev_info_t *, dip,
 			    void *, intr, caddr_t, arg1, uint_t, r);
 			claimed |= r;
+			if (av->av_ticksp && av->av_prilevel <= LOCK_LEVEL)
+				atomic_add_64(av->av_ticksp, intr_get_time());
 		}
 
 		/*

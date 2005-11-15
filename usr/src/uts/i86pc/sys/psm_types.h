@@ -56,7 +56,9 @@ typedef enum psm_intr_op_e {
 	PSM_INTR_OP_SET_CAP,		/* 8.  Set devices's capabilities */
 	PSM_INTR_OP_SET_PRI,		/* 9.  Set the interrupt priority */
 	PSM_INTR_OP_GET_SHARED,		/* 10. Get the shared intr info */
-	PSM_INTR_OP_CHECK_MSI		/* 11. Chk if device supports MSI */
+	PSM_INTR_OP_CHECK_MSI,		/* 11. Chk if device supports MSI */
+	PSM_INTR_OP_SET_CPU,		/* 12. Set vector's CPU */
+	PSM_INTR_OP_GET_INTR		/* 13. Get vector's info */
 } psm_intr_op_t;
 
 struct 	psm_ops {
@@ -174,6 +176,12 @@ struct 	psm_info {
 #define	PSM_INTR_IPI_HI		0x01
 #define	PSM_INTR_IPI_LO		0x02
 #define	PSM_INTR_POKE		0x03
+
+/*
+ *	Get INTR flags
+ */
+#define	PSMGI_CPU_USER_BOUND	0x80000000 /* user requested bind if set */
+#define	PSMGI_CPU_FLAGS		0x80000000 /* all possible flags */
 
 /*
  *	return code

@@ -449,7 +449,7 @@ AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
 #endif
 
 	retval = add_avintr(NULL, SCI_IPL, (avfunc)acpi_wrapper_isr,
-				"ACPI SCI", sci_vect, NULL, NULL, NULL);
+				"ACPI SCI", sci_vect, NULL, NULL, NULL, NULL);
 	if (retval) {
 		intr_hooked = 1;
 		return (AE_OK);

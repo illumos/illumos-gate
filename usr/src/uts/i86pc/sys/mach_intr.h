@@ -22,33 +22,41 @@
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * PCItool interfaces internal to the i86pc PCI nexus driver.
  */
 
-#ifndef	_PCI_VAR_H
-#define	_PCI_VAR_H
+#ifndef _SYS_MACH_INTR_H
+#define	_SYS_MACH_INTR_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifdef	__cplusplus
+/*
+ * Platform-dependent interrupt data structures
+ *
+ * This file should not be included by code that purports to be
+ * platform-independent.
+ *
+ */
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Functions exported from pci_common.c */
-#define	IS_IRQ	B_TRUE
-#define	IS_VEC	B_FALSE
-extern int pci_get_intr_from_vecirq(apic_get_intr_t *intrinfo_p,
-    int vecirq, boolean_t is_irq);
-extern int pci_get_cpu_from_vecirq(int vecirq, boolean_t is_irq);
+#ifdef _KERNEL
 
-/* Functions exported from pci_kstats.c */
-extern void pci_kstat_create(kstat_t **kspp, dev_info_t *nexus_dip,
-    ddi_intr_handle_impl_t *hdlp);
-extern void pci_kstat_delete(kstat_t *kspp);
+/*
+ * Platform dependent data which hangs off the ih_private field of a
+ * ddi_intr_handle_impl_t
+ */
+typedef struct ihdl_plat {
+	struct intrspec *ip_ispecp;	/* intr spec */
+	kstat_t		*ip_ksp;	/* Kstat pointer */
+	uint64_t	ip_ticks;	/* Interrupt ticks for this device */
+} ihdl_plat_t;
 
-#ifdef	__cplusplus
+#endif /* _KERNEL */
+
+#ifdef __cplusplus
 }
 #endif
 
-#endif	/* _PCI_VAR_H */
+#endif	/* _SYS_MACH_INTR_H */

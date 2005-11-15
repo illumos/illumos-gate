@@ -40,7 +40,6 @@
 #include <sys/pci_cfgspace.h>
 #include <io/pci/pci_common.h>
 #include <io/pci/pci_tools_ext.h>
-#include <io/pci/pci_var.h>
 
 /* Save minimal state. */
 void *pci_statep;
@@ -302,13 +301,15 @@ bad_soft_state:
 static int
 pci_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 {
+	int instance = ddi_get_instance(devi);
+
 	/* Uninitialize pcitool support. */
 	pcitool_uninit(devi);
 
 	/* Uninitialize hotplug support on this bus. */
 	(void) pcihp_uninit(devi);
 
-	ddi_soft_state_free(pci_statep, DIP_TO_MINOR(devi));
+	ddi_soft_state_free(pci_statep, instance);
 
 	return (DDI_SUCCESS);
 }

@@ -96,10 +96,8 @@ typedef struct ddi_intr_handle_impl {
 	 *	scratch2	- used to send 'behavior' flag
 	 *			  information to the nexus drivers
 	 *			  from ddi_intr_alloc()
-	 *	private		- used by the DDI framework to
-	 *			  pass back and forth 'vector' information
-	 *			  It is extensively used on the SPARC side
-	 *			  to temporarily hold the 'ddi_ispec_t'
+	 *	private		- On X86 it usually carries a pointer to
+	 *			  ihdl_plat_t.  Not used on SPARC platforms.
 	 */
 	void			*ih_private;	/* Platform specific data */
 	uint_t			ih_scratch1;	/* Scratch1: #interrupts */
@@ -222,6 +220,9 @@ void	i_ddi_set_msix(dev_info_t *dip, ddi_intr_msix_t *msix_p);
 
 int32_t i_ddi_get_intr_weight(dev_info_t *);
 int32_t i_ddi_set_intr_weight(dev_info_t *, int32_t);
+
+void	i_ddi_alloc_intr_phdl(ddi_intr_handle_impl_t *);
+void	i_ddi_free_intr_phdl(ddi_intr_handle_impl_t *);
 
 #define	DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, func, arg1, arg2) \
 	hdlp->ih_cb_func = func; \

@@ -169,6 +169,7 @@ autovec		AUTOVECSIZE
 	av_vector
 	av_intarg1
 	av_intarg2
+	av_ticksp
 	av_link
 	av_prilevel
 	av_dip

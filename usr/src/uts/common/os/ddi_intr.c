@@ -324,6 +324,7 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 		hdlp->ih_state = DDI_IHDL_STATE_ALLOC;
 		hdlp->ih_dip = dip;
 		hdlp->ih_inum = inum + i;
+		i_ddi_alloc_intr_phdl(hdlp);
 		if (type & DDI_INTR_TYPE_FIXED)
 			i_ddi_set_intr_handle(dip, hdlp->ih_inum, &h_array[i]);
 
@@ -368,6 +369,7 @@ ddi_intr_free(ddi_intr_handle_t h)
 				    hdlp->ih_inum, NULL);
 		}
 
+		i_ddi_free_intr_phdl(hdlp);
 		rw_destroy(&hdlp->ih_rwlock);
 		kmem_free(hdlp, sizeof (ddi_intr_handle_impl_t));
 	}

@@ -137,7 +137,7 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 		ASSERT(nestpil < pil);
 		intrtime = tsc_read() -
 		    mcpu->pil_high_start[nestpil - (LOCK_LEVEL + 1)];
-		mcpu->intrstat[nestpil] += intrtime;
+		mcpu->intrstat[nestpil][0] += intrtime;
 		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 		/*
 		 * Another high-level interrupt is active below this one, so
@@ -155,7 +155,7 @@ hilevel_intr_prolog(struct cpu *cpu, uint_t pil, uint_t oldpil, struct regs *rp)
 		 */
 		if ((t->t_flag & T_INTR_THREAD) != 0 && t->t_intr_start != 0) {
 			intrtime = tsc_read() - t->t_intr_start;
-			mcpu->intrstat[t->t_pil] += intrtime;
+			mcpu->intrstat[t->t_pil][0] += intrtime;
 			cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 			t->t_intr_start = 0;
 		}
@@ -228,7 +228,7 @@ hilevel_intr_epilog(struct cpu *cpu, uint_t pil, uint_t oldpil, uint_t vecnum)
 	ASSERT(mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)] != 0);
 
 	intrtime = tsc_read() - mcpu->pil_high_start[pil - (LOCK_LEVEL + 1)];
-	mcpu->intrstat[pil] += intrtime;
+	mcpu->intrstat[pil][0] += intrtime;
 	cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 
 	/*
@@ -298,7 +298,7 @@ intr_thread_prolog(struct cpu *cpu, caddr_t stackptr, uint_t pil)
 	t = cpu->cpu_thread;
 	if (t->t_flag & T_INTR_THREAD) {
 		hrtime_t intrtime = tsc_read() - t->t_intr_start;
-		mcpu->intrstat[t->t_pil] += intrtime;
+		mcpu->intrstat[t->t_pil][0] += intrtime;
 		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 		t->t_intr_start = 0;
 	}
@@ -352,7 +352,7 @@ intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
 
 	ASSERT(it->t_intr_start != 0);
 	intrtime = tsc_read() - it->t_intr_start;
-	mcpu->intrstat[pil] += intrtime;
+	mcpu->intrstat[pil][0] += intrtime;
 	cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 
 	ASSERT(cpu->cpu_intr_actv & (1 << pil));
@@ -411,6 +411,36 @@ intr_thread_epilog(struct cpu *cpu, uint_t vec, uint_t oldpil)
 	(*setlvlx)(pil, vec);
 	t->t_intr_start = tsc_read();
 	cpu->cpu_thread = t;
+}
+
+/*
+ * Called with interrupts disabled by an interrupt thread to determine
+ * how much time has elapsed. See interrupt.s:intr_get_time() for detailed
+ * theory of operation.
+ */
+uint64_t
+intr_thread_get_time(struct cpu *cpu)
+{
+	struct machcpu *mcpu = &cpu->cpu_m;
+	kthread_t *t = cpu->cpu_thread;
+	uint64_t time, delta, ret;
+	uint_t pil = t->t_pil;
+
+	ASSERT((cpu->cpu_intr_actv & CPU_INTR_ACTV_HIGH_LEVEL_MASK) == 0);
+	ASSERT(t->t_flag & T_INTR_THREAD);
+	ASSERT(pil != 0);
+	ASSERT(t->t_intr_start != 0);
+
+	time = tsc_read();
+	delta = time - t->t_intr_start;
+	t->t_intr_start = time;
+
+	time = mcpu->intrstat[pil][0] + delta;
+	ret = time - mcpu->intrstat[pil][1];
+	mcpu->intrstat[pil][0] = time;
+	mcpu->intrstat[pil][1] = time;
+
+	return (ret);
 }
 
 caddr_t
@@ -483,7 +513,7 @@ top:
 	t = cpu->cpu_thread;
 	if (t->t_flag & T_INTR_THREAD) {
 		hrtime_t intrtime = tsc_read() - t->t_intr_start;
-		mcpu->intrstat[pil] += intrtime;
+		mcpu->intrstat[pil][0] += intrtime;
 		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 	}
 	it->t_lwp = t->t_lwp;
@@ -534,7 +564,7 @@ dosoftint_epilog(struct cpu *cpu, uint_t oldpil)
 	ASSERT(cpu->cpu_intr_actv & (1 << pil));
 	cpu->cpu_intr_actv &= ~(1 << pil);
 	intrtime = tsc_read() - it->t_intr_start;
-	mcpu->intrstat[pil] += intrtime;
+	mcpu->intrstat[pil][0] += intrtime;
 	cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
 
 	/*
@@ -676,7 +706,7 @@ cpu_kstat_intrstat_update(kstat_t *ksp, int rw)
 		return (EACCES);
 
 	for (i = 0; i < PIL_MAX; i++) {
-		hrt = (hrtime_t)cpup->cpu_m.intrstat[i + 1];
+		hrt = (hrtime_t)cpup->cpu_m.intrstat[i + 1][0];
 		tsc_scalehrtime(&hrt);
 		knp[i * 2].value.ui64 = (uint64_t)hrt;
 		knp[(i * 2) + 1].value.ui64 = cpup->cpu_stats.sys.intr[i];
@@ -717,7 +747,7 @@ cpu_intr_swtch_enter(kthread_id_t t)
 			interval = tsc_read() - start;
 		} while (cas64(&t->t_intr_start, start, 0) != start);
 		cpu = CPU;
-		cpu->cpu_m.intrstat[t->t_pil] += interval;
+		cpu->cpu_m.intrstat[t->t_pil][0] += interval;
 
 		atomic_add_64((uint64_t *)&cpu->cpu_intracct[cpu->cpu_mstate],
 		    interval);

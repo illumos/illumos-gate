@@ -185,7 +185,7 @@ int
 psm_add_intr(int lvl, avfunc xxintr, char *name, int vect, caddr_t arg)
 {
 	return (add_avintr((void *)NULL, lvl, xxintr, name, vect,
-	    arg, NULL, NULL));
+	    arg, NULL, NULL, NULL));
 }
 
 int

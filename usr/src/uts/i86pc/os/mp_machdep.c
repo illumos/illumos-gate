@@ -43,6 +43,7 @@
 #include <sys/disp.h>
 #include <sys/cpu.h>
 #include <sys/archsystm.h>
+#include <sys/mach_intr.h>
 
 #define	OFFSETOF(s, m)		(size_t)(&(((s *)0)->m))
 
@@ -637,10 +638,10 @@ mach_smpinit(void)
 
 	(void) add_avintr((void *)NULL, XC_HI_PIL, xc_serv, "xc_hi_intr",
 		(*pops->psm_get_ipivect)(XC_HI_PIL, PSM_INTR_IPI_HI),
-		(caddr_t)X_CALL_HIPRI, NULL, NULL);
+		(caddr_t)X_CALL_HIPRI, NULL, NULL, NULL);
 	(void) add_avintr((void *)NULL, XC_MED_PIL, xc_serv, "xc_med_intr",
 		(*pops->psm_get_ipivect)(XC_MED_PIL, PSM_INTR_IPI_LO),
-		(caddr_t)X_CALL_MEDPRI, NULL, NULL);
+		(caddr_t)X_CALL_MEDPRI, NULL, NULL, NULL);
 
 	(void) (*pops->psm_get_ipivect)(XC_CPUPOKE_PIL, PSM_INTR_POKE);
 }
@@ -1108,7 +1109,7 @@ mach_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 			*result = 0;
 		break;
 	case PSM_INTR_OP_XLATE_VECTOR:
-		ispec = (struct intrspec *)hdlp->ih_private;
+		ispec = ((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp;
 		*result = psm_translate_irq(dip, ispec->intrspec_vec);
 		break;
 	case PSM_INTR_OP_GET_CAP:
@@ -1120,6 +1121,8 @@ mach_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 	case PSM_INTR_OP_GET_SHARED:
 	case PSM_INTR_OP_SET_PRI:
 	case PSM_INTR_OP_SET_CAP:
+	case PSM_INTR_OP_SET_CPU:
+	case PSM_INTR_OP_GET_INTR:
 	default:
 		return (PSM_FAILURE);
 	}

@@ -96,6 +96,7 @@ patch_tsc(void)
 	movw	%cx, _tsc_patch14
 	movw	%cx, _tsc_patch15
 	movw	%cx, _tsc_patch16
+	movw	%cx, _tsc_patch17
 	ret
 _rdtsc_insn:
 	rdtsc
@@ -387,9 +388,13 @@ _interrupt(void)
  * The following macros assume the time value is in %edx:%eax
  * e.g. from a rdtsc instruction.
  */
-#define	TSC_MOV(reg, offset)		\
+#define	TSC_STORE(reg, offset)		\
 	movl	%eax, offset(reg);	\
 	movl	%edx, offset + 4(reg)
+
+#define	TSC_LOAD(reg, offset)	\
+	movl	offset(reg), %eax;	\
+	movl	offset + 4(reg), %edx
 
 #define	TSC_ADD_TO(reg, offset)		\
 	addl	%eax, offset(reg);	\
@@ -402,7 +407,6 @@ _interrupt(void)
 /*
  * basereg   - pointer to cpu struct
  * pilreg    - pil or converted pil (pil - (LOCK_LEVEL + 1))
- * pilreg_32 - 32-bit version of pilreg
  *
  * Returns (base + pil * 8) in pilreg
  */
@@ -412,9 +416,16 @@ _interrupt(void)
 /*
  * Returns (base + (pil - (LOCK_LEVEL + 1)) * 8) in pilreg
  */
-#define	HIGHPILBASE(basereg, pilreg, pilreg_32)		\
-	subl	$LOCK_LEVEL + 1, pilreg_32;		\
+#define	HIGHPILBASE(basereg, pilreg)		\
+	subl	$LOCK_LEVEL + 1, pilreg;	\
 	PILBASE(basereg, pilreg)
+
+/*
+ * Returns (base + pil * 16) in pilreg
+ */
+#define	PILBASE_INTRSTAT(basereg, pilreg)	\
+	shl	$4, pilreg;			\
+	addl	basereg, pilreg;
 
 /*
  * Returns (cpu + cpu_mstate * 8) in tgt
@@ -623,12 +634,14 @@ _dosoftint_actv_bit_not_set:
 	/ Load starting timestamp, compute interval, update cumulative counter.
 	/
 	bsrl	%eax, %ecx		/* find PIL of interrupted handler */
-	HIGHPILBASE(%ebx, %ecx, %ecx)
+	movl	%ecx, %esi		/* save PIL for later */
+	HIGHPILBASE(%ebx, %ecx)
 _tsc_patch1:
 	nop; nop			/* patched to rdtsc if available */
 	TSC_SUB_FROM(%ecx, CPU_PIL_HIGH_START)
-	addl	$CPU_INTRSTAT_LOW_PIL_OFFSET, %ecx	/* offset PILs 0-10 */
-	TSC_ADD_TO(%ecx, CPU_INTRSTAT)
+
+	PILBASE_INTRSTAT(%ebx, %esi)
+	TSC_ADD_TO(%esi, CPU_INTRSTAT)
 	INTRACCTBASE(%ebx, %ecx)
 	TSC_ADD_TO(%ecx, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
 	/
@@ -654,7 +667,7 @@ _tsc_patch1:
 	je	1f
 0:
 	movzbl	T_PIL(%esi), %ecx /* %ecx has PIL of interrupted handler */
-	PILBASE(%ebx, %ecx)
+	PILBASE_INTRSTAT(%ebx, %ecx)
 _tsc_patch2:
 	nop; nop			/* patched to rdtsc if available */
 	TSC_SUB_FROM(%esi, T_INTR_START)
@@ -666,10 +679,10 @@ _tsc_patch2:
 	/ Store starting timestamp in CPU structure for this PIL.
 	popl	%ecx			/* restore new PIL */
 	pushl	%ecx
-	HIGHPILBASE(%ebx, %ecx, %ecx)
+	HIGHPILBASE(%ebx, %ecx)
 _tsc_patch3:
 	nop; nop			/* patched to rdtsc if available */
-	TSC_MOV(%ecx, CPU_PIL_HIGH_START)
+	TSC_STORE(%ecx, CPU_PIL_HIGH_START)
 
 	popl	%eax			/* restore new pil */
 	popl	%ecx			/* vec */
@@ -770,13 +783,15 @@ loop1:
 	/ esi = PIL
 _tsc_patch4:
 	nop; nop			/* patched to rdtsc if available */
-	HIGHPILBASE(%ebx, %esi, %esi)
+	movl	%esi, %ecx		/* save for later */
+	HIGHPILBASE(%ebx, %esi)
 
 	ASSERT_CPU_PIL_HIGH_START_NZ(%esi)
 
 	TSC_SUB_FROM(%esi, CPU_PIL_HIGH_START)
-	addl	$CPU_INTRSTAT_LOW_PIL_OFFSET, %esi	/* offset PILs 0-10 */
-	TSC_ADD_TO(%esi, CPU_INTRSTAT)
+	
+	PILBASE_INTRSTAT(%ebx, %ecx)
+	TSC_ADD_TO(%ecx, CPU_INTRSTAT)
 	INTRACCTBASE(%ebx, %esi)
 	TSC_ADD_TO(%esi, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
 	/
@@ -788,10 +803,10 @@ _tsc_patch4:
 	andl	$CPU_INTR_ACTV_HIGH_LEVEL_MASK, %eax
 	jz	0f
 	bsrl	%eax, %ecx		/* find PIL of nested interrupt */
-	HIGHPILBASE(%ebx, %ecx, %ecx)
+	HIGHPILBASE(%ebx, %ecx)
 _tsc_patch5:
 	nop; nop			/* patched to rdtsc if available */
-	TSC_MOV(%ecx, CPU_PIL_HIGH_START)
+	TSC_STORE(%ecx, CPU_PIL_HIGH_START)
 	/
 	/ Another high-level interrupt is active below this one, so
 	/ there is no need to check for an interrupt thread. That will be
@@ -806,7 +821,7 @@ _tsc_patch5:
 	jz	1f
 _tsc_patch6:
 	nop; nop			/* patched to rdtsc if available */
-	TSC_MOV(%esi, T_INTR_START)
+	TSC_STORE(%esi, T_INTR_START)
 1:
 	movl	%edi, CPU_PRI(%ebx)
 				/* interrupt vector already on stack */
@@ -887,7 +902,7 @@ _tsc_patch7:
 	TSC_SUB_FROM(%esi, T_INTR_START)
 	TSC_CLR(%esi, T_INTR_START)
 	movzbl	T_PIL(%esi), %ecx
-	PILBASE(%ebx, %ecx)
+	PILBASE_INTRSTAT(%ebx, %ecx)
 	TSC_ADD_TO(%ecx, CPU_INTRSTAT)
 	INTRACCTBASE(%ebx, %ecx)
 	TSC_ADD_TO(%ecx, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
@@ -931,7 +946,7 @@ _tsc_patch7:
 	movl	%eax, %ebx		/* save priority over rdtsc */
 _tsc_patch8:
 	nop; nop			/* patched to rdtsc if available */
-	TSC_MOV(%esi, T_INTR_START)
+	TSC_STORE(%esi, T_INTR_START)
 	movl	%ebx, %eax		/* restore priority */
 
 	/ The following 3 instructions need not be in cli.
@@ -984,6 +999,13 @@ loop2:
 	call	__dtrace_probe_interrupt__complete
 	addl	$20, %esp
 	orb	%al, %bl		/* see if anyone claims intpt. */
+	movl	AV_TICKSP(%esi), %ecx
+	testl	%ecx, %ecx
+	jz	no_time
+	call	intr_get_time
+	movl	AV_TICKSP(%esi), %ecx
+	TSC_ADD_TO(%ecx, 0)
+no_time:
 	movl	AV_LINK(%esi), %esi	/* get next routine on list */
 	testl	%esi, %esi		/* if pointer is non-null */
 	jnz	loop2			/* continue */
@@ -1022,7 +1044,7 @@ loop_done2:
 _tsc_patch9:
 	nop; nop			/* patched to rdtsc if available */
 	TSC_SUB_FROM(%esi, T_INTR_START)
-	PILBASE(%ebx, %edi)
+	PILBASE_INTRSTAT(%ebx, %edi)
 	TSC_ADD_TO(%edi, CPU_INTRSTAT)
 	INTRACCTBASE(%ebx, %edi)
 	TSC_ADD_TO(%edi, CPU_INTRACCT)	/* cpu_intracct[cpu_mstate] += tsc */
@@ -1067,7 +1089,7 @@ intr_restore_ipl:
 	/ Place starting timestamp in interrupted thread's thread structure.
 _tsc_patch10:
 	nop; nop			/* patched to rdtsc if available */
-	TSC_MOV(%ecx, T_INTR_START)
+	TSC_STORE(%ecx, T_INTR_START)
 
 	movl	T_SP(%ecx), %esp	/* restore stack pointer */
 	movl	%esp, %ebp
@@ -1309,7 +1331,7 @@ _fakesoftint_size:
 	movl	%eax, %ebp
 _tsc_patch11:
 	nop; nop			/* patched to rdtsc if available */
-	PILBASE(%ebx, %ebp)
+	PILBASE_INTRSTAT(%ebx, %ebp)
 	TSC_SUB_FROM(%ecx, T_INTR_START)
 	TSC_ADD_TO(%ebp, CPU_INTRSTAT)
 	INTRACCTBASE(%ebx, %ebp)
@@ -1361,7 +1383,7 @@ _tsc_patch11:
 	movl	%eax, %ecx		/* save PIL from rdtsc clobber */
 _tsc_patch12:
 	nop; nop			/* patched to rdtsc if available */
-	TSC_MOV(%esi, T_INTR_START)
+	TSC_STORE(%esi, T_INTR_START)
 
 	sti				/* enable interrupts */
 
@@ -1399,7 +1421,7 @@ _tsc_patch12:
 	/ Take timestamp, compute interval, update cumulative counter.
 	/ esi = thread, ebx = cpu, ecx = PIL
 	/
-	PILBASE(%ebx, %ecx)
+	PILBASE_INTRSTAT(%ebx, %ecx)
 _tsc_patch13:
 	nop; nop		/* patched to rdtsc if available */
 	TSC_SUB_FROM(%esi, T_INTR_START)
@@ -1433,7 +1455,7 @@ _tsc_patch13:
 	jz	0f
 _tsc_patch14:
 	nop; nop			/* patched to rdtsc if available */
-	TSC_MOV(%ecx, T_INTR_START)
+	TSC_STORE(%ecx, T_INTR_START)
 0:
 	movl	CPU_BASE_SPL(%ebx), %eax
 	cmpl	%eax, %edi		/* if (oldipl >= basespl) */
@@ -1478,3 +1500,162 @@ softintr_thread_exit:
 
 #endif	/* __i386 */
 #endif	/* __lint */
+
+#if defined(lint)
+
+/*
+ * intr_get_time() is a resource for interrupt handlers to determine how
+ * much time has been spent handling the current interrupt. Such a function
+ * is needed because higher level interrupts can arrive during the
+ * processing of an interrupt, thus making direct comparisons of %tick by
+ * the handler inaccurate. intr_get_time() only returns time spent in the
+ * current interrupt handler.
+ *
+ * The caller must be calling from an interrupt handler running at a pil
+ * below or at lock level. Timings are not provided for high-level
+ * interrupts.
+ *
+ * The first time intr_get_time() is called while handling an interrupt,
+ * it returns the time since the interrupt handler was invoked. Subsequent
+ * calls will return the time since the prior call to intr_get_time(). Time
+ * is returned as ticks. Use tsc_scalehrtime() to convert ticks to nsec.
+ *
+ * Theory Of Intrstat[][]:
+ *
+ * uint64_t intrstat[pil][0..1] is an array indexed by pil level, with two
+ * uint64_ts per pil.
+ *
+ * intrstat[pil][0] is a cumulative count of the number of ticks spent
+ * handling all interrupts at the specified pil on this CPU. It is
+ * exported via kstats to the user.
+ *
+ * intrstat[pil][1] is always a count of ticks less than or equal to the
+ * value in [0]. The difference between [1] and [0] is the value returned
+ * by a call to intr_get_time(). At the start of interrupt processing,
+ * [0] and [1] will be equal (or nearly so). As the interrupt consumes
+ * time, [0] will increase, but [1] will remain the same. A call to
+ * intr_get_time() will return the difference, then update [1] to be the
+ * same as [0]. Future calls will return the time since the last call.
+ * Finally, when the interrupt completes, [1] is updated to the same as [0].
+ *
+ * Implementation:
+ *
+ * intr_get_time() works much like a higher level interrupt arriving. It
+ * "checkpoints" the timing information by incrementing intrstat[pil][0]
+ * to include elapsed running time, and by setting t_intr_start to rdtsc.
+ * It then sets the return value to intrstat[pil][0] - intrstat[pil][1],
+ * and updates intrstat[pil][1] to be the same as the new value of
+ * intrstat[pil][0].
+ *
+ * In the normal handling of interrupts, after an interrupt handler returns
+ * and the code in intr_thread() updates intrstat[pil][0], it then sets
+ * intrstat[pil][1] to the new value of intrstat[pil][0]. When [0] == [1],
+ * the timings are reset, i.e. intr_get_time() will return [0] - [1] which
+ * is 0.
+ *
+ * Whenever interrupts arrive on a CPU which is handling a lower pil
+ * interrupt, they update the lower pil's [0] to show time spent in the
+ * handler that they've interrupted. This results in a growing discrepancy
+ * between [0] and [1], which is returned the next time intr_get_time() is
+ * called. Time spent in the higher-pil interrupt will not be returned in
+ * the next intr_get_time() call from the original interrupt, because
+ * the higher-pil interrupt's time is accumulated in intrstat[higherpil][].
+ */
+
+/*ARGSUSED*/
+uint64_t
+intr_get_time(void)
+{ return 0; }
+#else	/* lint */
+
+
+#if defined(__amd64)
+	ENTRY_NP(intr_get_time)
+	cli				/* make this easy -- block intrs */
+	LOADCPU(%rdi)
+	call	intr_thread_get_time
+	sti
+	ret
+	SET_SIZE(intr_get_time)
+	
+#elif defined(__i386)
+
+#ifdef DEBUG
+
+
+_intr_get_time_high_pil:
+	.string	"intr_get_time(): %pil > LOCK_LEVEL"
+_intr_get_time_not_intr:
+	.string	"intr_get_time(): not called from an interrupt thread"
+_intr_get_time_no_start_time:
+	.string	"intr_get_time(): t_intr_start == 0"
+
+/*
+ * ASSERT(%pil <= LOCK_LEVEL)
+ */
+#define	ASSERT_PIL_BELOW_LOCK_LEVEL(cpureg)				\
+	testl	$CPU_INTR_ACTV_HIGH_LEVEL_MASK, CPU_INTR_ACTV(cpureg);	\
+	jz	0f;							\
+	__PANIC(_intr_get_time_high_pil, 0f);				\
+0:	
+
+/*
+ * ASSERT((t_flags & T_INTR_THREAD) != 0 && t_pil > 0)
+ */
+#define	ASSERT_NO_PIL_0_INTRS(thrreg)			\
+	testw	$T_INTR_THREAD, T_FLAGS(thrreg);	\
+	jz	1f;					\
+	cmpb	$0, T_PIL(thrreg);			\
+	jne	0f;					\
+1:							\
+	__PANIC(_intr_get_time_not_intr, 0f);		\
+0:	
+	
+/*
+ * ASSERT(t_intr_start != 0)
+ */
+#define	ASSERT_INTR_START_NOT_0(thrreg)			\
+	cmpl	$0, T_INTR_START(thrreg);		\
+	jnz	0f;					\
+	cmpl	$0, T_INTR_START+4(thrreg);		\
+	jnz	0f;					\
+	__PANIC(_intr_get_time_no_start_time, 0f);	\
+0:
+
+#endif /* DEBUG */
+	
+	ENTRY_NP(intr_get_time)
+
+	cli				/* make this easy -- block intrs */
+	pushl	%esi			/* and free up some registers */
+
+	LOADCPU(%esi)
+	movl	CPU_THREAD(%esi), %ecx
+
+#ifdef DEBUG
+	ASSERT_PIL_BELOW_LOCK_LEVEL(%esi)
+	ASSERT_NO_PIL_0_INTRS(%ecx)
+	ASSERT_INTR_START_NOT_0(%ecx)
+#endif /* DEBUG */
+	
+_tsc_patch17:
+	nop; nop			/* patched to rdtsc if available */
+	TSC_SUB_FROM(%ecx, T_INTR_START)	/* get elapsed time */
+	TSC_ADD_TO(%ecx, T_INTR_START)		/* T_INTR_START = rdtsc */
+
+	movzbl	T_PIL(%ecx), %ecx		/* %ecx = pil */
+	PILBASE_INTRSTAT(%esi, %ecx)		/* %ecx = CPU + pil*16 */
+	TSC_ADD_TO(%ecx, CPU_INTRSTAT)		/* intrstat[0] += elapsed */
+	TSC_LOAD(%ecx, CPU_INTRSTAT)		/* get new intrstat[0] */
+	TSC_SUB_FROM(%ecx, CPU_INTRSTAT+8)	/* diff with intrstat[1] */
+	TSC_ADD_TO(%ecx, CPU_INTRSTAT+8)	/* intrstat[1] = intrstat[0] */
+	
+	/* %edx/%eax contain difference between old and new intrstat[1] */
+
+	popl	%esi
+	sti
+	ret
+	SET_SIZE(intr_get_time)
+#endif	/* __i386 */
+
+#endif  /* lint */

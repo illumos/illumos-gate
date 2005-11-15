@@ -64,6 +64,11 @@ $(MODSTUBS_O)	:= AS_CPPFLAGS += -DPCMCIA_MODULE
 CLEANFILES	+= $(MODSTUBS_O)
 
 #
+#	Include i86pc specific header files
+#
+INC_PATH        += -I$(UTSBASE)/i86pc
+
+#
 #	dependency
 #
 LDFLAGS	+=	-dy -Nmisc/busra -Nmisc/pci_autoconfig

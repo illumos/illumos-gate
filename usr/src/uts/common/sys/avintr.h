@@ -60,6 +60,7 @@ struct autovec {
 	uint_t	(*av_vector)();
 	caddr_t	av_intarg1;
 	caddr_t	av_intarg2;
+	uint64_t *av_ticksp;
 	uint_t	av_prilevel;		/* priority level */
 
 	/*
@@ -88,7 +89,7 @@ struct softint {
 extern kmutex_t av_lock;
 extern ddi_softint_hdl_impl_t softlevel1_hdl;
 extern int add_avintr(void *intr_id, int lvl, avfunc xxintr, char *name,
-	int vect, caddr_t arg1, caddr_t arg2, dev_info_t *);
+	int vect, caddr_t arg1, caddr_t arg2, uint64_t *, dev_info_t *);
 extern int add_nmintr(int lvl, avfunc nmintr, char *name, caddr_t arg);
 extern int add_avsoftintr(void *intr_id, int lvl, avfunc xxintr,
 	char *name, caddr_t arg1, caddr_t arg2);

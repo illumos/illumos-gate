@@ -41,6 +41,7 @@
 #include <sys/modctl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#include <sys/mach_intr.h>
 #include <sys/kmem.h>
 #include <sys/pci.h>
 #include <sys/promif.h>
@@ -678,10 +679,8 @@ pciide_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		    NULL)
 			return (DDI_FAILURE);
 		*(int *)result = hdlp->ih_scratch1;
-		hdlp->ih_private = (void *)ispecp;
 		break;
 	case DDI_INTROP_FREE:
-		hdlp->ih_private = NULL;
 		break;
 	case DDI_INTROP_GETPRI:
 		if (pciide_get_pri(dip, rdip, hdlp, &pri) != DDI_SUCCESS) {
@@ -694,7 +693,7 @@ pciide_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		if ((ispecp = pciide_get_ispec(dip, rdip, hdlp->ih_inum)) ==
 		    NULL)
 			return (DDI_FAILURE);
-		hdlp->ih_private = (void *)ispecp;
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispecp;
 		ispecp->intrspec_func = hdlp->ih_cb_func;
 		break;
 	case DDI_INTROP_REMISR:

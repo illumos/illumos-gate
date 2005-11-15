@@ -55,6 +55,7 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
+#include <sys/mach_intr.h>
 #include <sys/psm.h>
 #include <sys/ontrap.h>
 #include <sys/atomic.h>
@@ -1423,14 +1424,14 @@ rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		if (psm_intr_ops == NULL)
 			return (DDI_FAILURE);
 
-		hdlp->ih_private = (void *)ispec;
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
 		(void) (*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR,
 		    (int *)&hdlp->ih_vector);
 
 		/* Add the interrupt handler */
 		if (!add_avintr((void *)hdlp, ispec->intrspec_pri,
 		    hdlp->ih_cb_func, DEVI(rdip)->devi_name, hdlp->ih_vector,
-		    hdlp->ih_cb_arg1, hdlp->ih_cb_arg2, rdip))
+		    hdlp->ih_cb_arg1, hdlp->ih_cb_arg2, NULL, rdip))
 			return (DDI_FAILURE);
 		break;
 	case DDI_INTROP_DISABLE:
@@ -1441,7 +1442,7 @@ rootnex_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		if (psm_intr_ops == NULL)
 			return (DDI_FAILURE);
 
-		hdlp->ih_private = (void *)ispec;
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispec;
 		(void) (*psm_intr_ops)(rdip, hdlp,
 		    PSM_INTR_OP_XLATE_VECTOR, (int *)&hdlp->ih_vector);
 

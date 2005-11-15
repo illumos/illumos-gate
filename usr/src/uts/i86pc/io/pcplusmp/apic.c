@@ -107,7 +107,7 @@ uchar_t apic_bind_intr(dev_info_t *dip, int irq, uchar_t ioapicid,
     uchar_t intin);
 static int apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock,
     int when);
-static int apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu, int safe);
+int apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu, int safe);
 static void apic_intr_redistribute();
 static void apic_cleanup_busy();
 static void apic_set_pwroff_method_from_mpcnfhdr(struct apic_mp_cnf_hdr *hdrp);
@@ -287,7 +287,7 @@ int	apic_verbose = 0;
 
 
 /* Now the ones for Dynamic Interrupt distribution */
-int	apic_enable_dynamic_migration = 1;
+int	apic_enable_dynamic_migration = 0;
 
 /*
  * If enabled, the distribution works as follows:
@@ -1443,6 +1443,12 @@ apic_parse_mpct(caddr_t mpct, int bypass_cpus_and_ioapics)
 	return (PSM_SUCCESS);
 }
 
+boolean_t
+apic_cpu_in_range(int cpu)
+{
+	return ((cpu & ~IRQ_USER_BOUND) < apic_nproc);
+}
+
 static struct apic_mpfps_hdr *
 apic_find_fps_sig(caddr_t cptr, int len)
 {
@@ -1666,7 +1672,7 @@ apic_init_intr()
 			ASSERT(apic_cpcovf_vect);
 			(void) add_avintr(NULL, ipl,
 			    (avfunc)kcpc_hw_overflow_intr,
-			    "apic pcint", irq, NULL, NULL, NULL);
+			    "apic pcint", irq, NULL, NULL, NULL, NULL);
 			kcpc_hw_overflow_intr_installed = 1;
 			kcpc_hw_enable_cpc_intr = apic_cpcovf_mask_clear;
 		}
@@ -1689,7 +1695,7 @@ apic_init_intr()
 			 */
 			(void) add_avintr((void *)NULL, ipl,
 			    (avfunc)apic_error_intr, "apic error intr",
-			    irq, NULL, NULL, NULL);
+			    irq, NULL, NULL, NULL, NULL);
 		}
 		apicadr[APIC_ERR_VECT] = apic_errvect;
 		apicadr[APIC_ERROR_STATUS] = 0;
@@ -1796,6 +1802,8 @@ apic_picinit(void)
 
 		/* Program I/O APIC */
 		(void) apic_setup_io_intr(irqptr, apic_sci_vect);
+
+		irqptr->airq_share++;
 	}
 }
 
@@ -4336,14 +4344,17 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 		WRITE_IOAPIC_RDT_ENTRY_LOW_DWORD(ioapic, intin_no,
 		    AV_PDEST | AV_FIXED | irq_ptr->airq_rdt_entry);
 	} else {
+		int type = (irq_ptr->airq_mps_intr_index == MSI_INDEX) ?
+		    DDI_INTR_TYPE_MSI : DDI_INTR_TYPE_MSIX;
+		(void) pci_msi_disable_mode(irq_ptr->airq_dip, type,
+		    irq_ptr->airq_ioapicindex);
 		if (irq_ptr->airq_ioapicindex == irq_ptr->airq_origirq) {
 			/* first one */
 			DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
 			    "apic_pci_msi_enable_vector\n"));
-			if (apic_pci_msi_enable_vector(irq_ptr->airq_dip,
-			    (irq_ptr->airq_mps_intr_index == MSI_INDEX) ?
-			    DDI_INTR_TYPE_MSI : DDI_INTR_TYPE_MSIX, which_irq,
-			    irq_ptr->airq_vector, irq_ptr->airq_intin_no,
+			if (apic_pci_msi_enable_vector(irq_ptr->airq_dip, type,
+			    which_irq, irq_ptr->airq_vector,
+			    irq_ptr->airq_intin_no,
 			    cpu_infop->aci_local_id) != PSM_SUCCESS) {
 				cmn_err(CE_WARN, "pcplusmp: "
 					"apic_pci_msi_enable_vector "
@@ -4354,9 +4365,7 @@ apic_rebind(apic_irq_t *irq_ptr, int bind_cpu, int acquire_lock, int when)
 		    irq_ptr->airq_origirq) { /* last one */
 			DDI_INTR_IMPLDBG((CE_CONT, "apic_rebind: call "
 			    "pci_msi_enable_mode\n"));
-			if (pci_msi_enable_mode(irq_ptr->airq_dip,
-			    (irq_ptr->airq_mps_intr_index == MSI_INDEX) ?
-			    DDI_INTR_TYPE_MSI : DDI_INTR_TYPE_MSIX,
+			if (pci_msi_enable_mode(irq_ptr->airq_dip, type,
 			    which_irq) != DDI_SUCCESS) {
 				DDI_INTR_IMPLDBG((CE_CONT, "pcplusmp: "
 				    "pci_msi_enable failed\n"));
@@ -4605,7 +4614,7 @@ apic_reprogram_timeout_handler(void *arg)
  * context and hence it is safe to do a lock_set. If false
  * do only a lock_try and return failure ( non 0 ) if we cannot get it
  */
-static int
+int
 apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu, int safe)
 {
 	apic_irq_t	*irqptr = irq_ptr;

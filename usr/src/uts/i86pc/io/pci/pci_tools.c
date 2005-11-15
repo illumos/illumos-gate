@@ -32,13 +32,16 @@
 #include <sys/sunddi.h>
 #include <vm/seg_kmem.h>
 #include <sys/machparam.h>
+#include <sys/sunndi.h>
 #include <sys/ontrap.h>
+#include <sys/psm.h>
 #include <sys/pcie.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_tools.h>
 #include "pci_tools_ext.h"
-#include "pci_var.h"
+#include <io/pcplusmp/apic.h>
+#include <io/pci/pci_var.h>
 #include <sys/promif.h>
 
 #define	PCIEX_BDF_OFFSET_DELTA	4
@@ -80,6 +83,10 @@ static int pcitool_mem_access(dev_info_t *dip, pcitool_reg_t *prg,
 static uint64_t pcitool_map(uint64_t phys_addr, size_t size, size_t *num_pages);
 static void pcitool_unmap(uint64_t virt_addr, size_t num_pages);
 
+/* Extern decalrations */
+extern int	(*psm_intr_ops)(dev_info_t *, ddi_intr_handle_impl_t *,
+		    psm_intr_op_t, int *);
+
 int
 pcitool_init(dev_info_t *dip, boolean_t is_pciex)
 {
@@ -114,6 +121,268 @@ pcitool_uninit(dev_info_t *dip)
 }
 
 
+/* Return the number of interrupts on a pci bus. */
+static int
+pcitool_intr_get_max_ino(uint32_t *arg, int mode)
+{
+	uint32_t num_intr = APIC_MAX_VECTOR;
+
+	if (ddi_copyout(&num_intr, arg, sizeof (uint32_t), mode) !=
+	    DDI_SUCCESS)
+		return (EFAULT);
+	else
+		return (SUCCESS);
+}
+
+
+/*ARGSUSED*/
+static int
+pcitool_set_intr(dev_info_t *dip, void *arg, int mode)
+{
+	ddi_intr_handle_impl_t info_hdl;
+	pcitool_intr_set_t iset;
+	uint32_t old_cpu;
+	int ret, result;
+	int rval = SUCCESS;
+
+	if (ddi_copyin(arg, &iset, sizeof (pcitool_intr_set_t), mode) !=
+	    DDI_SUCCESS)
+		return (EFAULT);
+
+	if (iset.ino > APIC_MAX_VECTOR) {
+		rval = EINVAL;
+		iset.status = PCITOOL_INVALID_INO;
+		goto done_set_intr;
+	}
+
+	iset.status = PCITOOL_SUCCESS;
+
+	if ((old_cpu = pci_get_cpu_from_vecirq(iset.ino, IS_VEC)) == -1) {
+		iset.status = PCITOOL_IO_ERROR;
+		rval = EINVAL;
+		goto done_set_intr;
+	}
+
+	old_cpu &= ~PSMGI_CPU_USER_BOUND;
+
+	/*
+	 * For this locally-declared and used handle, ih_private will contain a
+	 * CPU value, not an ihdl_plat_t as used for global interrupt handling.
+	 */
+	info_hdl.ih_vector = iset.ino;
+	info_hdl.ih_private = (void *)(uintptr_t)iset.cpu_id;
+	ret = (*psm_intr_ops)(NULL, &info_hdl, PSM_INTR_OP_SET_CPU, &result);
+
+	iset.drvr_version = PCITOOL_DRVR_VERSION;
+	if (ret != PSM_SUCCESS) {
+		switch (result) {
+		case EIO:		/* Error making the change */
+			rval = EIO;
+			iset.status = PCITOOL_IO_ERROR;
+			break;
+		case ENXIO:		/* Couldn't convert vector to irq */
+			rval = EINVAL;
+			iset.status = PCITOOL_INVALID_INO;
+			break;
+		case EINVAL:		/* CPU out of range */
+			rval = EINVAL;
+			iset.status = PCITOOL_INVALID_CPUID;
+			break;
+		}
+	}
+
+	/* Return original CPU. */
+	iset.cpu_id = old_cpu;
+
+done_set_intr:
+	if (ddi_copyout(&iset, arg, sizeof (pcitool_intr_set_t), mode) !=
+	    DDI_SUCCESS)
+		rval = EFAULT;
+	return (rval);
+}
+
+
+/* It is assumed that dip != NULL */
+static void
+pcitool_get_intr_dev_info(dev_info_t *dip, pcitool_intr_dev_t *devs)
+{
+	(void) strncpy(devs->driver_name,
+	    ddi_driver_name(dip), MAXMODCONFNAME-1);
+	devs->driver_name[MAXMODCONFNAME] = '\0';
+	(void) ddi_pathname(dip, devs->path);
+	devs->dev_inst = ddi_get_instance(dip);
+}
+
+
+/*ARGSUSED*/
+static int
+pcitool_get_intr(dev_info_t *dip, void *arg, int mode)
+{
+	/* Array part isn't used here, but oh well... */
+	pcitool_intr_get_t partial_iget;
+	pcitool_intr_get_t *iget = &partial_iget;
+	size_t	iget_kmem_alloc_size = 0;
+	uint8_t num_devs_ret;
+	int copyout_rval;
+	int rval = SUCCESS;
+	int circ;
+	int i;
+
+	ddi_intr_handle_impl_t info_hdl;
+	apic_get_intr_t intr_info;
+
+	/* Read in just the header part, no array section. */
+	if (ddi_copyin(arg, &partial_iget, PCITOOL_IGET_SIZE(0), mode) !=
+	    DDI_SUCCESS)
+		return (EFAULT);
+
+	/* Validate argument. */
+	if (partial_iget.ino > APIC_MAX_VECTOR) {
+		partial_iget.status = PCITOOL_INVALID_INO;
+		partial_iget.num_devs_ret = 0;
+		rval = EINVAL;
+		goto done_get_intr;
+	}
+
+	num_devs_ret = partial_iget.num_devs_ret;
+	intr_info.avgi_dip_list = NULL;
+	intr_info.avgi_req_flags =
+	    PSMGI_REQ_CPUID | PSMGI_REQ_NUM_DEVS | PSMGI_INTRBY_VEC;
+	/*
+	 * For this locally-declared and used handle, ih_private will contain a
+	 * pointer to apic_get_intr_t, not an ihdl_plat_t as used for
+	 * global interrupt handling.
+	 */
+	info_hdl.ih_private = &intr_info;
+	info_hdl.ih_vector = partial_iget.ino;
+
+	/* Caller wants device information returned. */
+	if (num_devs_ret > 0) {
+
+		intr_info.avgi_req_flags |= PSMGI_REQ_GET_DEVS;
+
+		/*
+		 * Allocate room.
+		 * If num_devs_ret == 0 iget remains pointing to partial_iget.
+		 */
+		iget_kmem_alloc_size = PCITOOL_IGET_SIZE(num_devs_ret);
+		iget = kmem_alloc(iget_kmem_alloc_size, KM_SLEEP);
+
+		/* Read in whole structure to verify there's room. */
+		if (ddi_copyin(arg, iget, iget_kmem_alloc_size, mode) !=
+		    SUCCESS) {
+
+			/* Be consistent and just return EFAULT here. */
+			kmem_free(iget, iget_kmem_alloc_size);
+
+			return (EFAULT);
+		}
+	}
+
+	bzero(iget, PCITOOL_IGET_SIZE(num_devs_ret));
+	iget->ino = info_hdl.ih_vector;
+
+	/*
+	 * Lock device tree branch from the pci root nexus on down if info will
+	 * be extracted from dips returned from the tree.
+	 */
+	if (intr_info.avgi_req_flags & PSMGI_REQ_GET_DEVS) {
+		ndi_devi_enter(dip, &circ);
+	}
+
+	/* Call psm_intr_ops(PSM_INTR_OP_GET_INTR) to get information. */
+	if ((rval = (*psm_intr_ops)(NULL, &info_hdl,
+	    PSM_INTR_OP_GET_INTR, NULL)) != PSM_SUCCESS) {
+		iget->status = PCITOOL_IO_ERROR;
+		iget->num_devs_ret = 0;
+		rval = EINVAL;
+		goto done_get_intr;
+	}
+
+	/*
+	 * Fill in the pcitool_intr_get_t to be returned,
+	 * with the CPU, num_devs_ret and num_devs.
+	 */
+	iget->cpu_id = intr_info.avgi_cpu_id & ~PSMGI_CPU_USER_BOUND;
+
+	/* Number of devices returned by apic. */
+	iget->num_devs = intr_info.avgi_num_devs;
+
+	/* Device info was returned. */
+	if (intr_info.avgi_req_flags & PSMGI_REQ_GET_DEVS) {
+
+		/*
+		 * num devs returned is num devs ret by apic,
+		 * space permitting.
+		 */
+		iget->num_devs_ret = min(num_devs_ret, intr_info.avgi_num_devs);
+
+		/*
+		 * Loop thru list of dips and extract driver, name and instance.
+		 * Fill in the pcitool_intr_dev_t's with this info.
+		 */
+		for (i = 0; i < iget->num_devs_ret; i++)
+			pcitool_get_intr_dev_info(intr_info.avgi_dip_list[i],
+			    &iget->dev[i]);
+
+		/* Free kmem_alloc'ed memory of the apic_get_intr_t */
+		kmem_free(intr_info.avgi_dip_list,
+		    intr_info.avgi_num_devs * sizeof (dev_info_t *));
+	}
+
+done_get_intr:
+
+	if (intr_info.avgi_req_flags & PSMGI_REQ_GET_DEVS) {
+		ndi_devi_exit(dip, circ);
+	}
+
+	iget->drvr_version = PCITOOL_DRVR_VERSION;
+	copyout_rval = ddi_copyout(iget, arg,
+	    PCITOOL_IGET_SIZE(num_devs_ret), mode);
+
+	if (iget_kmem_alloc_size > 0)
+		kmem_free(iget, iget_kmem_alloc_size);
+
+	if (copyout_rval != DDI_SUCCESS)
+		rval = EFAULT;
+
+	return (rval);
+}
+
+
+/*
+ * Main function for handling interrupt CPU binding requests and queries.
+ * Need to implement later
+ */
+/*ARGSUSED*/
+int
+pcitool_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
+{
+	int rval;
+
+	switch (cmd) {
+
+	/* Associate a new CPU with a given vector */
+	case PCITOOL_DEVICE_SET_INTR:
+		rval = pcitool_set_intr(dip, arg, mode);
+		break;
+
+	case PCITOOL_DEVICE_GET_INTR:
+		rval = pcitool_get_intr(dip, arg, mode);
+		break;
+
+	case PCITOOL_DEVICE_NUM_INTR:
+		rval = pcitool_intr_get_max_ino(arg, mode);
+		break;
+
+	default:
+		rval = ENOTSUP;
+	}
+
+	return (rval);
+}
+
+
 /*
  * A note about ontrap handling:
  *
@@ -124,21 +393,10 @@ pcitool_uninit(dev_info_t *dip)
  */
 
 /*
- * Main function for handling interrupt CPU binding requests and queries.
- * Need to implement later
- */
-/*ARGSUSED*/
-int
-pcitool_intr_admn(dev_info_t *dip, void *arg, int cmd, int mode)
-{
-	return (ENOTSUP);
-}
-
-
-/*
  * Perform register accesses on the nexus device itself.
  * No explicit PCI nexus device for X86, so not applicable.
  */
+
 /*ARGSUSED*/
 int
 pcitool_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)

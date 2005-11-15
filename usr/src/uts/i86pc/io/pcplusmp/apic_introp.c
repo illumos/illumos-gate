@@ -36,9 +36,13 @@
 #include "apic.h"
 #include <sys/sunddi.h>
 #include <sys/ddi_impldefs.h>
+#include <sys/mach_intr.h>
+#include <sys/sysmacros.h>
 #include <sys/trap.h>
 #include <sys/pci.h>
 #include <sys/pci_intr_lib.h>
+
+extern struct av_head autovect[];
 
 /*
  *	Local Function Prototypes
@@ -61,6 +65,8 @@ extern void	intr_restore(uint_t);
 extern uchar_t	apic_bind_intr(dev_info_t *, int, uchar_t, uchar_t);
 extern int	apic_allocate_irq(int);
 extern int	apic_introp_xlate(dev_info_t *, struct intrspec *, int);
+extern int	apic_rebind_all(apic_irq_t *irq_ptr, int bind_cpu, int safe);
+extern boolean_t apic_cpu_in_range(int cpu);
 
 /*
  * MSI support flag:
@@ -488,6 +494,97 @@ apic_check_msi_support(dev_info_t *dip)
 	return (PSM_FAILURE);
 }
 
+int
+apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
+{
+	struct autovec *av_dev;
+	uchar_t irq;
+	int i;
+
+	/* Sanity check the vector/irq argument. */
+	ASSERT((vecirq >= 0) || (vecirq <= APIC_MAX_VECTOR));
+
+	mutex_enter(&airq_mutex);
+
+	/*
+	 * Convert the vecirq arg to an irq using vector_to_irq table
+	 * if the arg is a vector.  Pass thru if already an irq.
+	 */
+	if ((intr_params_p->avgi_req_flags & PSMGI_INTRBY_FLAGS) ==
+	    PSMGI_INTRBY_VEC)
+		irq = apic_vector_to_irq[vecirq];
+	else
+		irq = vecirq;
+
+	if (intr_params_p->avgi_req_flags & PSMGI_REQ_CPUID) {
+
+		/* Get the (temp) cpu from apic_irq table, indexed by irq. */
+		intr_params_p->avgi_cpu_id = apic_irq_table[irq]->airq_temp_cpu;
+
+		/* Return user bound info for intrd. */
+		if (intr_params_p->avgi_cpu_id & IRQ_USER_BOUND) {
+			intr_params_p->avgi_cpu_id &= ~IRQ_USER_BOUND;
+			intr_params_p->avgi_cpu_id |= PSMGI_CPU_USER_BOUND;
+		}
+	}
+
+	if (intr_params_p->avgi_req_flags & PSMGI_REQ_VECTOR) {
+		intr_params_p->avgi_vector = apic_irq_table[irq]->airq_vector;
+	}
+
+	if (intr_params_p->avgi_req_flags &
+	    (PSMGI_REQ_NUM_DEVS | PSMGI_REQ_GET_DEVS)) {
+		/* Get number of devices from apic_irq table shared field. */
+		intr_params_p->avgi_num_devs = apic_irq_table[irq]->airq_share;
+	}
+
+	if (intr_params_p->avgi_req_flags &  PSMGI_REQ_GET_DEVS) {
+
+		intr_params_p->avgi_req_flags  |= PSMGI_REQ_NUM_DEVS;
+
+		/* Some devices have NULL dip.  Don't count these. */
+		if (intr_params_p->avgi_num_devs > 0) {
+			for (i = 0, av_dev = autovect[irq].avh_link;
+			    av_dev; av_dev = av_dev->av_link)
+				if (av_dev->av_vector && av_dev->av_dip)
+					i++;
+			intr_params_p->avgi_num_devs =
+			    MIN(intr_params_p->avgi_num_devs, i);
+		}
+
+		/* There are no viable dips to return. */
+		if (intr_params_p->avgi_num_devs == 0)
+			intr_params_p->avgi_dip_list = NULL;
+
+		else {	/* Return list of dips */
+
+			/* Allocate space in array for that number of devs. */
+			intr_params_p->avgi_dip_list = kmem_zalloc(
+			    intr_params_p->avgi_num_devs *
+			    sizeof (dev_info_t *),
+			    KM_SLEEP);
+
+			/*
+			 * Loop through the device list of the autovec table
+			 * filling in the dip array.
+			 *
+			 * Note that the autovect table may have some special
+			 * entries which contain NULL dips.  These will be
+			 * ignored.
+			 */
+			for (i = 0, av_dev = autovect[irq].avh_link;
+			    av_dev; av_dev = av_dev->av_link)
+				if (av_dev->av_vector && av_dev->av_dip)
+					intr_params_p->avgi_dip_list[i++] =
+					    av_dev->av_dip;
+		}
+	}
+
+	mutex_exit(&airq_mutex);
+
+	return (PSM_SUCCESS);
+}
+
 /*
  * This function provides external interface to the nexus for all
  * functionalities related to the new DDI interrupt framework.
@@ -507,8 +604,9 @@ int
 apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
     psm_intr_op_t intr_op, int *result)
 {
-	int		cap;
+	int		cap, ret;
 	int		count_vec;
+	int		cpu;
 	int		old_priority;
 	int		new_priority;
 	apic_irq_t	*irqp;
@@ -562,7 +660,7 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		*result = apic_navail_vector(dip, hdlp->ih_pri);
 		break;
 	case PSM_INTR_OP_XLATE_VECTOR:
-		ispec = (struct intrspec *)hdlp->ih_private;
+		ispec = ((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp;
 		*result = apic_introp_xlate(dip, ispec, hdlp->ih_type);
 		break;
 	case PSM_INTR_OP_GET_PENDING:
@@ -621,6 +719,46 @@ apic_intr_ops(dev_info_t *dip, ddi_intr_handle_impl_t *hdlp,
 		apic_free_vectors(dip, hdlp->ih_inum, count_vec,
 		    old_priority, hdlp->ih_type);
 		hdlp->ih_pri = new_priority; /* set the new value */
+		break;
+	case PSM_INTR_OP_SET_CPU:
+		/*
+		 * The interrupt handle given here has been allocated
+		 * specifically for this command, and ih_private carries
+		 * a CPU value.
+		 */
+		cpu = (int)(intptr_t)hdlp->ih_private;
+
+		if (!apic_cpu_in_range(cpu)) {
+			*result = EINVAL;
+			return (PSM_FAILURE);
+		}
+
+		mutex_enter(&airq_mutex);
+
+		/* Convert the vector to the irq using vector_to_irq table. */
+		irqp = apic_irq_table[apic_vector_to_irq[hdlp->ih_vector]];
+		if (irqp == NULL) {
+			mutex_exit(&airq_mutex);
+			*result = ENXIO;
+			return (PSM_FAILURE);
+		}
+		ret = apic_rebind_all(irqp, cpu, 1);
+		mutex_exit(&airq_mutex);
+		if (ret) {
+			*result = EIO;
+			return (PSM_FAILURE);
+		}
+		*result = 0;
+		break;
+	case PSM_INTR_OP_GET_INTR:
+		/*
+		 * The interrupt handle given here has been allocated
+		 * specifically for this command, and ih_private carries
+		 * a pointer to a apic_get_intr_t.
+		 */
+		if (apic_get_vector_intr_info(
+		    hdlp->ih_vector, hdlp->ih_private) != PSM_SUCCESS)
+			return (PSM_FAILURE);
 		break;
 	case PSM_INTR_OP_SET_CAP:
 	default:

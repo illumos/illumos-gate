@@ -126,8 +126,6 @@ main(int argc, char *argv[])
 
 	printf("#define\tCPU_READY 0x%x\n", CPU_READY);
 	printf("#define\tCPU_QUIESCED 0x%x\n", CPU_QUIESCED);
-	printf("#define\tCPU_INTRSTAT_LOW_PIL_OFFSET 0x%x\n",
-	    (LOCK_LEVEL + 1) * sizeof (uint64_t));
 
 	printf("#define\tMCMD_PORT 0x%x\n", MCMD_PORT);
 	printf("#define\tSCMD_PORT 0x%x\n", SCMD_PORT);

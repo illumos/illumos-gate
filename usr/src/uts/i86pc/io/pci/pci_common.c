@@ -39,11 +39,14 @@
 #include <sys/conf.h>
 #include <sys/pci.h>
 #include <sys/sunndi.h>
+#include <sys/mach_intr.h>
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/pci_intr_lib.h>
 #include <sys/psm.h>
 #include <sys/policy.h>
 #include <sys/sysmacros.h>
+#include <sys/clock.h>
+#include <io/pcplusmp/apic.h>
 #include <sys/pci_tools.h>
 #include <io/pci/pci_var.h>
 #include <io/pci/pci_tools_ext.h>
@@ -587,13 +590,55 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	return (DDI_SUCCESS);
 }
 
+int
+pci_get_intr_from_vecirq(apic_get_intr_t *intrinfo_p,
+    int vecirq, boolean_t is_irq)
+{
+	ddi_intr_handle_impl_t	get_info_ii_hdl;
+
+	if (is_irq)
+		intrinfo_p->avgi_req_flags |= PSMGI_INTRBY_IRQ;
+
+	/*
+	 * For this locally-declared and used handle, ih_private will contain a
+	 * pointer to apic_get_intr_t, not an ihdl_plat_t as used for
+	 * global interrupt handling.
+	 */
+	get_info_ii_hdl.ih_private = intrinfo_p;
+	get_info_ii_hdl.ih_vector = (ushort_t)vecirq;
+
+	if ((*psm_intr_ops)(NULL, &get_info_ii_hdl,
+	    PSM_INTR_OP_GET_INTR, NULL) == PSM_FAILURE)
+		return (DDI_FAILURE);
+
+	return (DDI_SUCCESS);
+}
+
+
+int
+pci_get_cpu_from_vecirq(int vecirq, boolean_t is_irq)
+{
+	int rval;
+
+	apic_get_intr_t	intrinfo;
+	intrinfo.avgi_req_flags = PSMGI_REQ_CPUID;
+	rval = pci_get_intr_from_vecirq(&intrinfo, vecirq, is_irq);
+
+	if (rval == DDI_SUCCESS)
+		return (intrinfo.avgi_cpu_id);
+	else
+		return (-1);
+}
+
 
 static int
 pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp, uint32_t inum)
 {
-	int		vector;
 	struct intrspec	*ispec;
+	int		irq;
+	int		cpu_id;
+	ihdl_plat_t	*ihdl_plat_datap = (ihdl_plat_t *)hdlp->ih_private;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_enable_intr: hdlp %p inum %x\n",
 	    (void *)hdlp, inum));
@@ -602,18 +647,26 @@ pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
 	ispec = (struct intrspec *)pci_intx_get_ispec(pdip, rdip, (int)inum);
 	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type) && ispec)
 		ispec->intrspec_vec = inum;
-	hdlp->ih_private = (void *)ispec;
+	ihdl_plat_datap->ip_ispecp = ispec;
 
 	/* translate the interrupt if needed */
-	(void) (*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR, &vector);
-	DDI_INTR_NEXDBG((CE_CONT, "pci_enable_intr: priority=%x vector=%x\n",
-	    hdlp->ih_pri, vector));
+	(void) (*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR, &irq);
+	DDI_INTR_NEXDBG((CE_CONT, "pci_enable_intr: priority=%x irq=%x\n",
+	    hdlp->ih_pri, irq));
 
 	/* Add the interrupt handler */
 	if (!add_avintr((void *)hdlp, hdlp->ih_pri, hdlp->ih_cb_func,
-	    DEVI(rdip)->devi_name, vector, hdlp->ih_cb_arg1,
-	    hdlp->ih_cb_arg2, rdip))
+	    DEVI(rdip)->devi_name, irq, hdlp->ih_cb_arg1,
+	    hdlp->ih_cb_arg2, &ihdl_plat_datap->ip_ticks, rdip))
 		return (DDI_FAILURE);
+
+	/* Note this really is an irq. */
+	hdlp->ih_vector = (ushort_t)irq;
+
+	/* Don't create kstats for unmoveable interrupts */
+	if (((cpu_id = pci_get_cpu_from_vecirq(irq, IS_IRQ)) != -1) &&
+	    (!(cpu_id & PSMGI_CPU_USER_BOUND)))
+		pci_kstat_create(&ihdl_plat_datap->ip_ksp, pdip, hdlp);
 
 	return (DDI_SUCCESS);
 }
@@ -623,20 +676,26 @@ static void
 pci_disable_intr(dev_info_t *pdip, dev_info_t *rdip,
     ddi_intr_handle_impl_t *hdlp, uint32_t inum)
 {
-	int		vector;
+	int		irq;
 	struct intrspec	*ispec;
+	ihdl_plat_t	*ihdl_plat_datap = (ihdl_plat_t *)hdlp->ih_private;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_disable_intr: \n"));
+	if (ihdl_plat_datap->ip_ksp != NULL) {
+		pci_kstat_delete(ihdl_plat_datap->ip_ksp);
+		ihdl_plat_datap->ip_ksp = NULL;
+	}
 	ispec = (struct intrspec *)pci_intx_get_ispec(pdip, rdip, (int)inum);
 	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type) && ispec)
 		ispec->intrspec_vec = inum;
-	hdlp->ih_private = (void *)ispec;
+	ihdl_plat_datap->ip_ispecp = ispec;
 
 	/* translate the interrupt if needed */
-	(void) (*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR, &vector);
+	(void) (*psm_intr_ops)(rdip, hdlp, PSM_INTR_OP_XLATE_VECTOR, &irq);
 
 	/* Disable the interrupt handler */
-	rem_avintr((void *)hdlp, hdlp->ih_pri, hdlp->ih_cb_func, vector);
+	rem_avintr((void *)hdlp, hdlp->ih_pri, hdlp->ih_cb_func, irq);
+	ihdl_plat_datap->ip_ispecp = NULL;
 }
 
 /*

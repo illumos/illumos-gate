@@ -74,6 +74,9 @@
 
 #ifdef sparc
 #include <sys/ddi_subrdefs.h>
+
+#elif defined(__x86) || defined(__amd64)
+#include <sys/mach_intr.h>
 #endif
 
 #undef SocketServices
@@ -5069,7 +5072,7 @@ pcmcia_intr_add_isr(dev_info_t *dip, dev_info_t *rdip,
 			 * multiplex the meaning when ENABLE is called.
 			 */
 			ispecp = &sockp->ls_intrspec;
-			hdlp->ih_private = (void *)ispecp;
+			((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispecp;
 		}
 
 		if (adapt->pca_flags & PCA_IRQ_ISA) {
@@ -5135,7 +5138,8 @@ pcmcia_intr_enable_isr(dev_info_t *dip, dev_info_t *rdip,
 
 	mutex_enter(&sockp->ls_ilock);
 	if ((sockp->ls_inthandlers != NULL) &&
-	    (struct intrspec *)hdlp->ih_private != &sockp->ls_intrspec) {
+	    ((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp !=
+	    &sockp->ls_intrspec) {
 		inthandler_t *intr = sockp->ls_inthandlers;
 
 		ASSERT(ppd->ppd_flags & PPD_CARD_MULTI);
@@ -5245,7 +5249,8 @@ pcmcia_intr_remove_isr(dev_info_t *dip, dev_info_t *rdip,
 	/* first handle the multifunction case since it is simple */
 	mutex_enter(&sockp->ls_ilock);
 	if (sockp->ls_inthandlers != NULL &&
-	    (struct intrspec *)hdlp->ih_private != &sockp->ls_intrspec) {
+	    ((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp !=
+	    &sockp->ls_intrspec) {
 
 		intr = sockp->ls_inthandlers;
 
@@ -5305,6 +5310,8 @@ pcmcia_intr_disable_isr(dev_info_t *dip, dev_info_t *rdip,
 	struct pcmcia_adapter		*adapt;
 	pcmcia_logical_socket_t		*sockp;
 	struct pcmcia_parent_private	*ppd;
+	ihdl_plat_t			*ihdl_plat_datap =
+					    (ihdl_plat_t *)hdlp->ih_private;
 
 #if defined(PCMCIA_DEBUG)
 	if (pcmcia_debug)
@@ -5322,7 +5329,7 @@ pcmcia_intr_disable_isr(dev_info_t *dip, dev_info_t *rdip,
 
 	mutex_enter(&sockp->ls_ilock);
 	if (sockp->ls_inthandlers != NULL &&
-	    (struct intrspec *)hdlp->ih_private != &sockp->ls_intrspec) {
+	    ihdl_plat_datap->ip_ispecp != &sockp->ls_intrspec) {
 		inthandler_t	*intr = sockp->ls_inthandlers;
 
 		/* Check if there is only one handler left */
@@ -5342,9 +5349,9 @@ pcmcia_intr_disable_isr(dev_info_t *dip, dev_info_t *rdip,
 	}
 	mutex_exit(&sockp->ls_ilock);
 
-	if ((struct intrspec *)hdlp->ih_private ==
+	if (ihdl_plat_datap->ip_ispecp ==
 	    (struct intrspec *)&sockp->ls_intrspec)
-		ispecp = (struct intrspec *)hdlp->ih_private;
+		ispecp = ihdl_plat_datap->ip_ispecp;
 
 	if (adapt->pca_flags & PCA_RES_NEED_IRQ) {
 		ret = ispecp->intrspec_vec;
@@ -5409,10 +5416,8 @@ pcmcia_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		    &sockp)) == NULL)
 			return (DDI_FAILURE);
 		*(int *)result = hdlp->ih_scratch1;
-		hdlp->ih_private = (void *)ispecp;
 		break;
 	case DDI_INTROP_FREE:
-		hdlp->ih_private = NULL;
 		break;
 	case DDI_INTROP_GETPRI:
 		ispecp = pcmcia_intr_get_ispec(rdip, hdlp->ih_inum, &sockp);
@@ -5433,7 +5438,7 @@ pcmcia_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_ADDISR:
 		if ((ispecp = pcmcia_intr_add_isr(dip, rdip, hdlp)) == NULL)
 			return (DDI_FAILURE);
-		hdlp->ih_private = (void *)ispecp;
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ispecp = ispecp;
 		break;
 	case DDI_INTROP_REMISR:
 		pcmcia_intr_remove_isr(dip, rdip, hdlp);

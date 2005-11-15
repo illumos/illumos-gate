@@ -527,6 +527,28 @@ typedef struct apic_cpus_info {
 	(addr)[APIC_IO_REG] = APIC_RDT_CMD2 + (2 * (ipin));\
 	(addr)[APIC_IO_DATA] = (value)
 
+/* Used by PSM_INTR_OP_GET_INTR to return device information. */
+typedef struct {
+	uint16_t	avgi_req_flags;	/* request flags - to kernel */
+	uint8_t		avgi_num_devs;	/* # devs on this ino - from kernel */
+	uint8_t		avgi_vector;	/* vector */
+	uint32_t	avgi_cpu_id;	/* cpu of interrupt - from kernel */
+	dev_info_t	**avgi_dip_list; /* kmem_alloc'ed list of dev_infos. */
+					/* Contains num_devs elements. */
+} apic_get_intr_t;
+
+/* Masks for avgi_req_flags. */
+#define	PSMGI_REQ_CPUID		0x1	/* Request CPU ID */
+#define	PSMGI_REQ_NUM_DEVS	0x2	/* Request num of devices on vector */
+#define	PSMGI_REQ_VECTOR	0x4
+#define	PSMGI_REQ_GET_DEVS	0x8	/* Request device list */
+#define	PSMGI_REQ_ALL		0xf	/* Request everything */
+
+/* Other flags */
+#define	PSMGI_INTRBY_VEC	0	/* Vec passed.  xlate to IRQ needed */
+#define	PSMGI_INTRBY_IRQ	0x8000	/* IRQ passed.  no xlate needed */
+#define	PSMGI_INTRBY_FLAGS	0x8000	/* Mask for this flag */
+
 #ifdef	__cplusplus
 }
 #endif
