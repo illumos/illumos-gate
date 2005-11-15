@@ -460,47 +460,51 @@ mmioctl_vtop(intptr_t data)
 }
 
 /*
- * Given a PA, retire that page or check whether it has already been retired.
+ * Given a PA, execute the given page retire command on it.
  */
 static int
 mmioctl_page_retire(int cmd, intptr_t data)
 {
+	extern int page_retire_test(void);
 	uint64_t pa;
-	pfn_t pfn;
-	page_t *pp;
 
-	if (copyin((void *)data, &pa, sizeof (uint64_t)))
+	if (copyin((void *)data, &pa, sizeof (uint64_t))) {
 		return (EFAULT);
-
-	pfn = pa >> MMU_PAGESHIFT;
-
-	if (!pf_is_memory(pfn) || (pp = page_numtopp_nolock(pfn)) == NULL)
-		return (EINVAL);
-
-	/*
-	 * If we're checking, see if the page is retired; if not, confirm that
-	 * its status is at least set to be failing.  If neither, return EIO.
-	 */
-	if (cmd == MEM_PAGE_ISRETIRED) {
-		if (page_isretired(pp))
-			return (0);
-
-		if (!page_isfailing(pp))
-			return (EIO);
-
-		return (EAGAIN);
 	}
 
-	/*
-	 * Try to retire the page. If the retire fails, it will be scheduled to
-	 * occur when the page is freed.  If this page is out of circulation
-	 * already, or is in the process of being retired, we fail.
-	 */
-	if (page_isretired(pp) || page_isfailing(pp))
-		return (EIO);
+	switch (cmd) {
+	case MEM_PAGE_ISRETIRED:
+		return (page_retire_check(pa, NULL));
 
-	page_settoxic(pp, PAGE_IS_FAULTY);
-	return (page_retire(pp, PAGE_IS_FAILING) ? EAGAIN : 0);
+	case MEM_PAGE_UNRETIRE:
+		return (page_unretire(pa));
+
+	case MEM_PAGE_RETIRE:
+		return (page_retire(pa, PR_FMA));
+
+	case MEM_PAGE_RETIRE_MCE:
+		return (page_retire(pa, PR_MCE));
+
+	case MEM_PAGE_RETIRE_UE:
+		return (page_retire(pa, PR_UE));
+
+	case MEM_PAGE_GETERRORS:
+		{
+			uint64_t page_errors;
+			int rc = page_retire_check(pa, &page_errors);
+			if (copyout(&page_errors, (void *)data,
+			    sizeof (uint64_t))) {
+				return (EFAULT);
+			}
+			return (rc);
+		}
+
+	case MEM_PAGE_RETIRE_TEST:
+		return (page_retire_test());
+
+	}
+
+	return (EINVAL);
 }
 
 #ifdef __sparc
@@ -606,6 +610,11 @@ mmioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cred, int *rvalp)
 
 	case MEM_PAGE_RETIRE:
 	case MEM_PAGE_ISRETIRED:
+	case MEM_PAGE_UNRETIRE:
+	case MEM_PAGE_RETIRE_MCE:
+	case MEM_PAGE_RETIRE_UE:
+	case MEM_PAGE_GETERRORS:
+	case MEM_PAGE_RETIRE_TEST:
 		if (getminor(dev) != M_MEM)
 			return (ENXIO);
 		return (mmioctl_page_retire(cmd, data));

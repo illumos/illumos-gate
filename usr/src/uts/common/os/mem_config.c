@@ -1770,31 +1770,13 @@ delete_memory_thread(caddr_t amhp)
 				}
 
 				if (!page_try_reclaim_lock(pp, SE_EXCL,
-				    SE_EXCL_WANTED)) {
-					if (page_isretired(pp)) {
-						/*
-						 * Page has been retired.
-						 *
-						 * Its shared lock can and
-						 * must be upgraded to an
-						 * exclusive lock in order
-						 * to hashout the page when
-						 * the delete completes.
-						 */
-						page_lock_clr_exclwanted(pp);
-						if (!page_tryupgrade(pp)) {
-							mutex_enter(
-							    &mhp->mh_mutex);
-							continue;
-						}
-					} else {
-						/*
-						 * Page in use elsewhere.
-						 */
-						MDSTAT_INCR(mhp, lockfail);
-						mutex_enter(&mhp->mh_mutex);
-						continue;
-					}
+				    SE_EXCL_WANTED | SE_RETIRED)) {
+					/*
+					 * Page in use elsewhere.  Skip it.
+					 */
+					MDSTAT_INCR(mhp, lockfail);
+					mutex_enter(&mhp->mh_mutex);
+					continue;
 				}
 				/*
 				 * See if the cage expanded into the delete.
@@ -1802,15 +1784,12 @@ delete_memory_thread(caddr_t amhp)
 				 * cage to expand.
 				 */
 				if (PP_ISNORELOC(pp)) {
-					if (page_isretired(pp))
-						page_downgrade(pp);
-					else
-						page_unlock(pp);
+					page_unlock(pp);
 					mutex_enter(&mhp->mh_mutex);
 					mhp->mh_cancel = KPHYSM_ENONRELOC;
 					break;
 				}
-				if (page_isretired(pp)) {
+				if (PP_RETIRED(pp)) {
 					/*
 					 * Page has been retired and is
 					 * not part of the cage so we
@@ -1861,11 +1840,11 @@ delete_memory_thread(caddr_t amhp)
 				}
 				/*
 				 * Keep stats on pages encountered that
-				 * are toxic or failing but not retired.
+				 * are marked for retirement.
 				 */
-				if (page_istoxic(pp)) {
+				if (PP_TOXIC(pp)) {
 					MDSTAT_INCR(mhp, toxic);
-				} else if (page_isfailing(pp)) {
+				} else if (PP_PR_REQ(pp)) {
 					MDSTAT_INCR(mhp, failing);
 				}
 				/*
@@ -1876,7 +1855,7 @@ delete_memory_thread(caddr_t amhp)
 				 * previously associated with the page.
 				 */
 				if (pp->p_lckcnt != 0 || pp->p_cowcnt != 0) {
-					if (!page_istoxic(pp)) {
+					if (!PP_TOXIC(pp)) {
 						/*
 						 * Must relocate locked in
 						 * memory pages.
@@ -1949,7 +1928,7 @@ delete_memory_thread(caddr_t amhp)
 #ifdef MEM_DEL_STATS
 				start_pgrp = ddi_get_lbolt();
 #endif /* MEM_DEL_STATS */
-				if (mod && !page_istoxic(pp)) {
+				if (mod && !PP_TOXIC(pp)) {
 					/*
 					 * Lock all constituent pages
 					 * of a large page to ensure
@@ -2020,7 +1999,7 @@ delete_memory_thread(caddr_t amhp)
 				 * set, we cannot do anything here to deal
 				 * with it.
 				 */
-				if (page_istoxic(pp)) {
+				if (PP_TOXIC(pp)) {
 					page_unlock(pp);
 #ifdef MEM_DEL_STATS
 					ntick_pgrp = (uint64_t)ddi_get_lbolt() -
@@ -2067,7 +2046,7 @@ delete_memory_thread(caddr_t amhp)
 					continue;
 				}
 				if (page_try_reclaim_lock(pp, SE_EXCL,
-				    SE_EXCL_WANTED)) {
+				    SE_EXCL_WANTED | SE_RETIRED)) {
 					if (PP_ISFREE(pp)) {
 						goto free_page_collect;
 					}
@@ -2229,12 +2208,8 @@ delete_memory_thread(caddr_t amhp)
 
 	/*
 	 * If the memory delete was cancelled, exclusive-wanted bits must
-	 * be cleared, and also any retired pages that
-	 * were accounted for above must have their exclusive lock
-	 * downgraded to a shared lock to return them to their previous
-	 * state.
-	 * Otherwise, if the memory delete has completed, retired pages
-	 * must be hashed out.
+	 * be cleared. If there are retired pages being deleted, they need
+	 * to be unretired.
 	 */
 	for (mdsp = mhp->mh_transit.trl_spans; mdsp != NULL;
 	    mdsp = mdsp->mds_next) {
@@ -2264,16 +2239,16 @@ delete_memory_thread(caddr_t amhp)
 					pp = page_numtopp_nolock(pfn);
 				}
 				ASSERT(pp != NULL);
-				ASSERT(page_isretired(pp));
+				ASSERT(PP_RETIRED(pp));
 				if (mhp->mh_cancel != 0) {
-					page_downgrade(pp);
+					page_unlock(pp);
 					/*
 					 * To satisfy ASSERT below in
 					 * cancel code.
 					 */
 					mhp->mh_hold_todo++;
 				} else {
-					page_hashout(pp, (kmutex_t *)NULL);
+					(void) page_unretire_pp(pp, 0);
 				}
 			}
 		}

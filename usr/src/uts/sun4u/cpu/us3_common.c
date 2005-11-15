@@ -2205,7 +2205,7 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 {
 	ch_async_flt_t *ch_flt = (ch_async_flt_t *)flt;
 	struct async_flt *aflt = (struct async_flt *)flt;
-	page_t *pp;
+	uint64_t errors;
 
 	switch (ch_flt->flt_type) {
 	case CPU_INV_AFSR:
@@ -2236,9 +2236,6 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 	 */
 	case CPU_CE:
 	case CPU_EMC:
-		pp = page_numtopp_nolock((pfn_t)
-		    (aflt->flt_addr >> MMU_PAGESHIFT));
-
 		/*
 		 * We want to skip logging and further classification
 		 * only if ALL the following conditions are true:
@@ -2258,7 +2255,7 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 		    (C_AFSR_ALL_ERRS | C_AFSR_EXT_ALL_ERRS)) == C_AFSR_CE &&
 		    aflt->flt_prot == AFLT_PROT_EC) {
 
-			if (pp != NULL && page_isretired(pp)) {
+			if (page_retire_check(aflt->flt_addr, NULL) == 0) {
 			    if (ch_flt->flt_trapped_ce & CE_CEEN_DEFER) {
 
 				/*
@@ -2289,17 +2286,17 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 		 *
 		 * Note: Check cpu_impl_async_log_err if changing this
 		 */
-		if (pp) {
-			if (page_isretired(pp) || page_deteriorating(pp)) {
+		if (page_retire_check(aflt->flt_addr, &errors) == EINVAL) {
+			CE_XDIAG_SETSKIPCODE(aflt->flt_disp,
+			    CE_XDIAG_SKIP_NOPP);
+		} else {
+			if (errors != PR_OK) {
 				CE_XDIAG_SETSKIPCODE(aflt->flt_disp,
 				    CE_XDIAG_SKIP_PAGEDET);
 			} else if (ce_scrub_xdiag_recirc(aflt, ce_queue, eqep,
 			    offsetof(ch_async_flt_t, cmn_asyncflt))) {
 				return (0);
 			}
-		} else {
-			CE_XDIAG_SETSKIPCODE(aflt->flt_disp,
-			    CE_XDIAG_SKIP_NOPP);
 		}
 		/*FALLTHRU*/
 
@@ -2325,11 +2322,7 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 		if (!panicstr && (ch_flt->afsr_errs &
 		    (C_AFSR_ALL_ERRS | C_AFSR_EXT_ALL_ERRS)) == C_AFSR_UE &&
 		    aflt->flt_prot == AFLT_PROT_EC) {
-			page_t *pp = page_numtopp_nolock((pfn_t)
-			    (aflt->flt_addr >> MMU_PAGESHIFT));
-
-			if (pp != NULL && page_isretired(pp)) {
-
+			if (page_retire_check(aflt->flt_addr, NULL) == 0) {
 				/* Zero the address to clear the error */
 				softcall(ecc_page_zero, (void *)aflt->flt_addr);
 				return (0);
@@ -2387,12 +2380,7 @@ void
 cpu_page_retire(ch_async_flt_t *ch_flt)
 {
 	struct async_flt *aflt = (struct async_flt *)ch_flt;
-	page_t *pp = page_numtopp_nolock(aflt->flt_addr >> MMU_PAGESHIFT);
-
-	if (pp != NULL) {
-		page_settoxic(pp, PAGE_IS_FAULTY);
-		(void) page_retire(pp, PAGE_IS_TOXIC);
-	}
+	(void) page_retire(aflt->flt_addr, PR_UE);
 }
 
 /*

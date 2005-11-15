@@ -66,7 +66,6 @@ extern int disable_watchdog_on_exit;
 void
 mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 {
-	page_t *first, *pp;
 	extern void pm_cfb_check_and_powerup(void);
 
 	/*
@@ -76,25 +75,6 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 		mutex_enter(&tod_lock);
 		(void) tod_ops.tod_clear_watchdog_timer();
 		mutex_exit(&tod_lock);
-	}
-
-	/*
-	 * Clear any unresolved UEs from memory.  We rely on the fact that on
-	 * sun4u, pagezero() will always clear UEs.  Since we're rebooting, we
-	 * just force p_selock to appear locked so pagezero()'s assert works.
-	 *
-	 * Pages that were retired successfully due to multiple CEs will
-	 * also be cleared.
-	 */
-	if (memsegs != NULL) {
-		pp = first = page_first();
-		do {
-			if (page_isretired(pp) || page_istoxic(pp)) {
-				/* pagezero asserts PAGE_LOCKED */
-				pp->p_selock = -1;
-				pagezero(pp, 0, PAGESIZE);
-			}
-		} while ((pp = page_next(pp)) != first);
 	}
 
 	/*
@@ -121,6 +101,12 @@ mdboot(int cmd, int fcn, char *bootstr, boolean_t invoke_cb)
 
 	if (invoke_cb)
 		(void) callb_execute_class(CB_CL_MDBOOT, NULL);
+
+	/*
+	 * Clear any unresolved UEs from memory.
+	 */
+	if (memsegs != NULL)
+		page_retire_hunt(page_retire_mdboot_cb);
 
 	/*
 	 * stop other cpus which also raise our priority. since there is only

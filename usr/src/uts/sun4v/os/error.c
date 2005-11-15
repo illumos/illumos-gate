@@ -87,8 +87,7 @@ static uint32_t rq_overflow_count = 0;		/* counter for rq overflow */
 
 static void cpu_queue_one_event(errh_async_flt_t *);
 static uint32_t count_entries_on_queue(uint64_t, uint64_t, uint32_t);
-static void errh_page_settoxic(errh_async_flt_t *, uchar_t);
-static void errh_page_retire(errh_async_flt_t *);
+static void errh_page_retire(errh_async_flt_t *, uchar_t);
 static int errh_error_protected(struct regs *, struct async_flt *, int *);
 static void errh_rq_full(struct async_flt *);
 static void ue_drain(void *, struct async_flt *, errorq_elem_t *);
@@ -300,12 +299,10 @@ process_nonresumable_error(struct regs *rp, uint64_t tl,
 		}
 
 		/*
-		 * If it is a memory error, we turn on the PAGE_IS_TOXIC
-		 * flag. The page will be retired later and scrubbed when
-		 * it is freed.
+		 * Call page_retire() to handle memory errors.
 		 */
 		if (errh_flt.errh_er.attr & ERRH_ATTR_MEM)
-			(void) errh_page_settoxic(&errh_flt, PAGE_IS_TOXIC);
+			errh_page_retire(&errh_flt, PR_UE);
 
 		/*
 		 * If we queued an error and the it was in user mode or
@@ -443,10 +440,10 @@ cpu_async_log_err(void *flt)
 	case ERRH_DESC_UCOR_RE:
 		if (errh_erp->attr & ERRH_ATTR_MEM) {
 			/*
-			 * Turn on the PAGE_IS_TOXIC flag. The page will be
+			 * Turn on the PR_UE flag. The page will be
 			 * scrubbed when it is freed.
 			 */
-			(void) errh_page_settoxic(errh_fltp, PAGE_IS_TOXIC);
+			errh_page_retire(errh_fltp, PR_UE);
 		}
 
 		break;
@@ -458,7 +455,7 @@ cpu_async_log_err(void *flt)
 			 * For non-resumable memory error, retire
 			 * the page here.
 			 */
-			errh_page_retire(errh_fltp);
+			errh_page_retire(errh_fltp, PR_UE);
 
 			/*
 			 * If we are going to panic, scrub the page first
@@ -518,9 +515,8 @@ cpu_ue_log_err(struct async_flt *aflt)
  * Turn on flag on the error memory region.
  */
 static void
-errh_page_settoxic(errh_async_flt_t *errh_fltp, uchar_t flag)
+errh_page_retire(errh_async_flt_t *errh_fltp, uchar_t flag)
 {
-	page_t *pp;
 	uint64_t flt_real_addr_start = errh_fltp->errh_er.ra;
 	uint64_t flt_real_addr_end = flt_real_addr_start +
 	    errh_fltp->errh_er.sz - 1;
@@ -531,38 +527,7 @@ errh_page_settoxic(errh_async_flt_t *errh_fltp, uchar_t flag)
 
 	for (current_addr = flt_real_addr_start;
 	    current_addr < flt_real_addr_end; current_addr += MMU_PAGESIZE) {
-		pp = page_numtopp_nolock((pfn_t)
-		    (current_addr >> MMU_PAGESHIFT));
-
-		if (pp != NULL) {
-			page_settoxic(pp, flag);
-		}
-	}
-}
-
-/*
- * Retire the page(s) indicated in the error report.
- */
-static void
-errh_page_retire(errh_async_flt_t *errh_fltp)
-{
-	page_t *pp;
-	uint64_t flt_real_addr_start = errh_fltp->errh_er.ra;
-	uint64_t flt_real_addr_end = flt_real_addr_start +
-	    errh_fltp->errh_er.sz - 1;
-	int64_t current_addr;
-
-	if (errh_fltp->errh_er.sz == 0)
-		return;
-
-	for (current_addr = flt_real_addr_start;
-	    current_addr < flt_real_addr_end; current_addr += MMU_PAGESIZE) {
-		pp = page_numtopp_nolock((pfn_t)
-		    (current_addr >> MMU_PAGESHIFT));
-
-		if (pp != NULL) {
-			(void) page_retire(pp, PAGE_IS_TOXIC);
-		}
+		(void) page_retire(current_addr, flag);
 	}
 }
 

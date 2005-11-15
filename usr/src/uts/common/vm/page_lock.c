@@ -189,15 +189,16 @@ uint_t	page_lock_reclaim;
 uint_t	page_lock_bad_reclaim;
 uint_t	page_lock_same_page;
 uint_t	page_lock_upgrade;
+uint_t	page_lock_retired;
 uint_t	page_lock_upgrade_failed;
 uint_t	page_lock_deleted;
 
 uint_t	page_trylock_locked;
+uint_t	page_trylock_failed;
 uint_t	page_trylock_missed;
 
 uint_t	page_try_reclaim_upgrade;
 #endif /* VM_STATS */
-
 
 /*
  * Acquire the "shared/exclusive" lock on a page.
@@ -222,27 +223,47 @@ page_lock(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim)
  * callers wanting an exclusive (writer) lock may prevent shared-lock
  * (reader) starvation by setting the es parameter to SE_EXCL_WANTED.
  * In this case, when an exclusive lock cannot be acquired, p_selock's
- * SE_EWANTED bit is set.
- * This bit, along with the se and es parameters, are used to decide
- * if the requested lock should be granted:
+ * SE_EWANTED bit is set. Shared-lock (reader) requests are also denied
+ * if the page is slated for retirement.
  *
- * Lock wanted SE_EXCL_WANTED p_selock/SE_EWANTED  Action
- * ----------  -------------- -------------------  ---------
- * SE_EXCL        no           dont-care/1         deny lock
- * SE_EXCL     any(see note)   unlocked/any        grant lock, clear SE_EWANTED
- * SE_EXCL        yes          any lock/any        deny, set SE_EWANTED
- * SE_EXCL        no           any lock/any        deny
- * SE_SHARED   not applicable    shared/0          grant
- * SE_SHARED   not applicable  unlocked/0          grant
- * SE_SHARED   not applicable    shared/1          deny
- * SE_SHARED   not applicable  unlocked/1          deny
- * SE_SHARED   not applicable      excl/any        deny
+ * The se and es parameters determine if the lock should be granted
+ * based on the following decision table:
  *
- * Note: the code grants an exclusive lock to the caller and clears
- * SE_EWANTED whenever p_selock is unlocked, regardless of the SE_EWANTED
- * bit's value.  This was deemed acceptable as we are not concerned about
- * exclusive-lock starvation. If this ever becomes an issue, a priority or
- * fifo mechanism should also be implemented.
+ * Lock wanted   es flags     p_selock/SE_EWANTED  Action
+ * ----------- -------------- -------------------  ---------
+ * SE_EXCL        any [1][2]   unlocked/any        grant lock, clear SE_EWANTED
+ * SE_EXCL        SE_EWANTED   any lock/any        deny, set SE_EWANTED
+ * SE_EXCL        none         any lock/any        deny
+ * SE_SHARED      n/a [2][3]     shared/0          grant
+ * SE_SHARED      n/a [2][3]   unlocked/0          grant
+ * SE_SHARED      n/a            shared/1          deny
+ * SE_SHARED      n/a          unlocked/1          deny
+ * SE_SHARED      n/a              excl/any        deny
+ *
+ * Notes:
+ * [1] The code grants an exclusive lock to the caller and clears the bit
+ *   SE_EWANTED whenever p_selock is unlocked, regardless of the SE_EWANTED
+ *   bit's value.  This was deemed acceptable as we are not concerned about
+ *   exclusive-lock starvation. If this ever becomes an issue, a priority or
+ *   fifo mechanism should also be implemented. Meantime, the thread that
+ *   set SE_EWANTED should be prepared to catch this condition and reset it
+ *
+ * [2] Retired pages may not be locked at any time, regardless of the
+ *   dispostion of se, unless the es parameter has SE_RETIRED flag set.
+ *
+ * [3] If the page is slated for retirement the lock is denied.
+ *
+ * Notes on values of "es":
+ *
+ *   es & 1: page_lookup_create will attempt page relocation
+ *   es & SE_EXCL_WANTED: caller wants SE_EWANTED set (eg. delete
+ *       memory thread); this prevents reader-starvation of waiting
+ *       writer thread(s) by giving priority to writers over readers.
+ *   es & SE_RETIRED: caller wants to lock pages even if they are
+ *       retired.  Default is to deny the lock if the page is retired.
+ *
+ * And yes, we know, the semantics of this function are too complicated.
+ * It's on the list to be cleaned up.
  */
 int
 page_lock_es(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim, int es)
@@ -261,17 +282,14 @@ page_lock_es(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim, int es)
 
 	mutex_enter(pse);
 
-	/*
-	 * Current uses of 'es':
-	 * es == 1 page_lookup_create will attempt page relocation
-	 * es == SE_EXCL_WANTED caller wants SE_EWANTED set (eg. delete
-	 * memory thread); this prevents reader-starvation of waiting
-	 * writer thread(s).
-	 */
-
-
 	ASSERT(((es & SE_EXCL_WANTED) == 0) ||
-	    ((es == SE_EXCL_WANTED) && (se == SE_EXCL)));
+	    ((es & SE_EXCL_WANTED) && (se == SE_EXCL)));
+
+	if (PP_RETIRED(pp) && !(es & SE_RETIRED)) {
+		mutex_exit(pse);
+		VM_STAT_ADD(page_lock_retired);
+		return (0);
+	}
 
 	if (se == SE_SHARED && es == 1 && pp->p_selock == 0) {
 		se = SE_EXCL;
@@ -312,7 +330,7 @@ page_lock_es(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim, int es)
 	}
 
 	if (se == SE_EXCL) {
-		if ((es != SE_EXCL_WANTED) && (pp->p_selock & SE_EWANTED)) {
+		if (!(es & SE_EXCL_WANTED) && (pp->p_selock & SE_EWANTED)) {
 			/*
 			 * if the caller wants a writer lock (but did not
 			 * specify exclusive access), and there is a pending
@@ -327,7 +345,7 @@ page_lock_es(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim, int es)
 			retval = 1;
 		} else {
 			/* page is locked */
-			if (es == SE_EXCL_WANTED) {
+			if (es & SE_EXCL_WANTED) {
 				/* set the SE_EWANTED bit */
 				pp->p_selock |= SE_EWANTED;
 			}
@@ -336,10 +354,17 @@ page_lock_es(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim, int es)
 	} else {
 		retval = 0;
 		if (pp->p_selock >= 0) {
-			/* readers are not allowed when excl wanted */
-			if (!(pp->p_selock & SE_EWANTED)) {
-				pp->p_selock += SE_READER;
-				retval = 1;
+			/*
+			 * Readers are not allowed when excl wanted or
+			 * a retire is pending. Since kvp pages can take
+			 * a long time to be retired, we make an exception
+			 * for them to avoid hanging threads unnecessarily.
+			 */
+			if ((pp->p_selock & SE_EWANTED) == 0) {
+				if (!PP_PR_REQ(pp) || pp->p_vnode == &kvp) {
+					pp->p_selock += SE_READER;
+					retval = 1;
+				}
 			}
 		}
 	}
@@ -468,7 +493,13 @@ page_try_reclaim_lock(page_t *pp, se_t se, int es)
 	old = pp->p_selock;
 
 	ASSERT(((es & SE_EXCL_WANTED) == 0) ||
-	    ((es == SE_EXCL_WANTED) && (se == SE_EXCL)));
+	    ((es & SE_EXCL_WANTED) && (se == SE_EXCL)));
+
+	if (PP_RETIRED(pp) && !(es & SE_RETIRED)) {
+		mutex_exit(pse);
+		VM_STAT_ADD(page_trylock_failed);
+		return (0);
+	}
 
 	if (se == SE_SHARED && es == 1 && old == 0) {
 		se = SE_EXCL;
@@ -477,11 +508,20 @@ page_try_reclaim_lock(page_t *pp, se_t se, int es)
 	if (se == SE_SHARED) {
 		if (!PP_ISFREE(pp)) {
 			if (old >= 0) {
-				/* readers are not allowed when excl wanted */
-				if (!(old & SE_EWANTED)) {
-					pp->p_selock = old + SE_READER;
-					mutex_exit(pse);
-					return (1);
+				/*
+				 * Readers are not allowed when excl wanted
+				 * or a retire is pending. Since kvp pages can
+				 * take a long time to be retired, we make an
+				 * exception for them to avoid hanging threads
+				 * unnecessarily.
+				 */
+				if ((old & SE_EWANTED) == 0) {
+					if (!PP_PR_REQ(pp) ||
+					    pp->p_vnode == &kvp) {
+						pp->p_selock = old + SE_READER;
+						mutex_exit(pse);
+						return (1);
+					}
 				}
 			}
 			mutex_exit(pse);
@@ -498,7 +538,7 @@ page_try_reclaim_lock(page_t *pp, se_t se, int es)
 	 * SE_EWANTED is not set, or if the caller specified
 	 * SE_EXCL_WANTED.
 	 */
-	if (!(old & SE_EWANTED) || (es == SE_EXCL_WANTED)) {
+	if (!(old & SE_EWANTED) || (es & SE_EXCL_WANTED)) {
 		if ((old & ~SE_EWANTED) == 0) {
 			/* no reader/writer lock held */
 			THREAD_KPRI_REQUEST();
@@ -508,7 +548,7 @@ page_try_reclaim_lock(page_t *pp, se_t se, int es)
 			return (1);
 		}
 	}
-	if (es == SE_EXCL_WANTED) {
+	if (es & SE_EXCL_WANTED) {
 		/* page is locked, set the SE_EWANTED bit */
 		pp->p_selock |= SE_EWANTED;
 	}
@@ -526,9 +566,15 @@ page_trylock(page_t *pp, se_t se)
 	kmutex_t *pse = PAGE_SE_MUTEX(pp);
 
 	mutex_enter(pse);
-	if (pp->p_selock & SE_EWANTED) {
-		/* fail if a thread wants exclusive access */
+	if (pp->p_selock & SE_EWANTED || PP_RETIRED(pp) ||
+	    (se == SE_SHARED && PP_PR_REQ(pp) && pp->p_vnode != &kvp)) {
+		/*
+		 * Fail if a thread wants exclusive access and page is
+		 * retired, if the page is slated for retirement, or a
+		 * share lock is requested.
+		 */
 		mutex_exit(pse);
+		VM_STAT_ADD(page_trylock_failed);
 		return (0);
 	}
 
@@ -551,6 +597,41 @@ page_trylock(page_t *pp, se_t se)
 }
 
 /*
+ * Variant of page_unlock() specifically for the page freelist
+ * code. The mere existence of this code is a vile hack that
+ * has resulted due to the backwards locking order of the page
+ * freelist manager; please don't call it.
+ */
+void
+page_unlock_noretire(page_t *pp)
+{
+	kmutex_t *pse = PAGE_SE_MUTEX(pp);
+	selock_t old;
+
+	mutex_enter(pse);
+
+	old = pp->p_selock;
+	if ((old & ~SE_EWANTED) == SE_READER) {
+		pp->p_selock = old & ~SE_READER;
+		if (CV_HAS_WAITERS(&pp->p_cv))
+			cv_broadcast(&pp->p_cv);
+	} else if ((old & ~SE_EWANTED) == SE_DELETED) {
+		panic("page_unlock_noretire: page %p is deleted", pp);
+	} else if (old < 0) {
+		THREAD_KPRI_RELEASE();
+		pp->p_selock &= SE_EWANTED;
+		if (CV_HAS_WAITERS(&pp->p_cv))
+			cv_broadcast(&pp->p_cv);
+	} else if ((old & ~SE_EWANTED) > SE_READER) {
+		pp->p_selock = old - SE_READER;
+	} else {
+		panic("page_unlock_noretire: page %p is not locked", pp);
+	}
+
+	mutex_exit(pse);
+}
+
+/*
  * Release the page's "shared/exclusive" lock and wake up anyone
  * who might be waiting for it.
  */
@@ -561,6 +642,7 @@ page_unlock(page_t *pp)
 	selock_t old;
 
 	mutex_enter(pse);
+
 	old = pp->p_selock;
 	if ((old & ~SE_EWANTED) == SE_READER) {
 		pp->p_selock = old & ~SE_READER;
@@ -578,7 +660,29 @@ page_unlock(page_t *pp)
 	} else {
 		panic("page_unlock: page %p is not locked", pp);
 	}
-	mutex_exit(pse);
+
+	if (pp->p_selock == 0 && PP_PR_REQ(pp)) {
+		/*
+		 * Try to retire the page. If it retires, great.
+		 * If not, oh well, we'll get it in the next unlock
+		 * request, and repeat the cycle.  Regardless,
+		 * page_tryretire() will drop the page lock.
+		 */
+		if ((pp->p_toxic & PR_BUSY) == 0) {
+			THREAD_KPRI_REQUEST();
+			pp->p_selock = SE_WRITER;
+			page_settoxic(pp, PR_BUSY);
+			mutex_exit(pse);
+			page_tryretire(pp);
+		} else {
+			pp->p_selock = SE_WRITER;
+			page_clrtoxic(pp, PR_BUSY);
+			pp->p_selock = 0;
+			mutex_exit(pse);
+		}
+	} else {
+		mutex_exit(pse);
+	}
 }
 
 /*

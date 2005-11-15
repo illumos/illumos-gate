@@ -51,6 +51,7 @@ COMMON_CORE_OBJS +=		\
 		lgrp_topo.o	\
 		mutex.o		\
 		page_lock.o	\
+		page_retire.o	\
 		panic.o		\
 		param.o		\
 		putnext.o	\

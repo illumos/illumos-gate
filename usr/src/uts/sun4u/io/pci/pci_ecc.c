@@ -534,21 +534,21 @@ ecc_err_handler(ecc_errstate_t *ecc_err_p)
  * Called from ecc_err_drain below for CBINTR_CE case.
  */
 static int
-ecc_err_cexdiag(page_t *pp, ecc_errstate_t *ecc_err,
-		errorq_elem_t *eqep)
+ecc_err_cexdiag(ecc_errstate_t *ecc_err, errorq_elem_t *eqep)
 {
 	struct async_flt *ecc = &ecc_err->ecc_aflt;
+	uint64_t errors;
 
-	if (!pp) {
+	if (page_retire_check(ecc->flt_addr, &errors) == EINVAL) {
 		CE_XDIAG_SETSKIPCODE(ecc->flt_disp, CE_XDIAG_SKIP_NOPP);
 		return (0);
-	} else if (page_isretired(pp) || page_deteriorating(pp)) {
+	} else if (errors != PR_OK) {
 		CE_XDIAG_SETSKIPCODE(ecc->flt_disp, CE_XDIAG_SKIP_PAGEDET);
 		return (0);
+	} else {
+		return (ce_scrub_xdiag_recirc(ecc, pci_ecc_queue, eqep,
+		    offsetof(ecc_errstate_t, ecc_aflt)));
 	}
-
-	return (ce_scrub_xdiag_recirc(ecc, pci_ecc_queue, eqep,
-	    offsetof(ecc_errstate_t, ecc_aflt)));
 }
 
 /*
@@ -561,7 +561,6 @@ ecc_err_drain(void *not_used, ecc_errstate_t *ecc_err, errorq_elem_t *eqep)
 {
 	struct async_flt *ecc = &ecc_err->ecc_aflt;
 	pci_t *pci_p = ecc_err->ecc_p->ecc_pci_cmn_p->pci_p[0];
-	page_t *pp;
 	int ecc_type = ecc_err->ecc_ii_p.ecc_type;
 
 	if (pci_p == NULL)
@@ -581,13 +580,10 @@ ecc_err_drain(void *not_used, ecc_errstate_t *ecc_err, errorq_elem_t *eqep)
 	ecc_cpu_call(ecc, ecc_err->ecc_unum, (ecc_type == CBNINTR_UE) ?
 			ECC_IO_UE : ECC_IO_CE);
 
-	pp = page_numtopp_nolock(ecc->flt_addr >> MMU_PAGESHIFT);
-
 	switch (ecc_type) {
 	case CBNINTR_UE:
-		if (pp && ecc_err->ecc_pg_ret == 1) {
-			page_settoxic(pp, PAGE_IS_FAULTY);
-			(void) page_retire(pp, PAGE_IS_TOXIC);
+		if (ecc_err->ecc_pg_ret == 1) {
+			(void) page_retire(ecc->flt_addr, PR_UE);
 		}
 		ecc_err->ecc_err_type = flt_to_error_type(ecc);
 		break;
@@ -609,7 +605,7 @@ ecc_err_drain(void *not_used, ecc_errstate_t *ecc_err, errorq_elem_t *eqep)
 
 		/* ecc_err_cexdiag returns nonzero to recirculate */
 		if (CE_XDIAG_EXT_ALG_APPLIED(ecc->flt_disp) &&
-		    ecc_err_cexdiag(pp, ecc_err, eqep))
+		    ecc_err_cexdiag(ecc_err, eqep))
 			return;
 		ecc_err->ecc_err_type = flt_to_error_type(ecc);
 		break;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,10 +60,24 @@ typedef struct mem_vtop {
  * and drivers should not make use of these interfaces: they can change without
  * notice and programs that consume them will fail to run on future releases.
  */
-#define	MEM_PAGE_RETIRE		(('M' << 8) | 0x02)
-#define	MEM_PAGE_ISRETIRED	(('M' << 8) | 0x03)
 #define	MEM_NAME		(('M' << 8) | 0x04)
 #define	MEM_INFO		(('M' << 8) | 0x05)
+
+#define	MEM_PAGE_RETIRE		(('M' << 8) | 0x02)
+#define	MEM_PAGE_ISRETIRED	(('M' << 8) | 0x03)
+#define	MEM_PAGE_UNRETIRE	(('M' << 8) | 0x06)
+#define	MEM_PAGE_GETERRORS	(('M' << 8) | 0x07)
+#define	MEM_PAGE_RETIRE_MCE	(('M' << 8) | 0x08)
+#define	MEM_PAGE_RETIRE_UE	(('M' << 8) | 0x09)
+#define	MEM_PAGE_RETIRE_TEST	(('M' << 8) | 0x0A)
+
+/*
+ * Bits returned from MEM_PAGE_GETERRORS ioctl for use by fmd(1M).
+ */
+#define	MEM_PAGE_ERR_NONE	0x0
+#define	MEM_PAGE_ERR_MULTI_CE	0x1
+#define	MEM_PAGE_ERR_UE		0x2
+#define	MEM_PAGE_ERR_FMA_REQ	0x8
 
 typedef struct mem_name {
 	uint64_t	m_addr;		/* memory address */

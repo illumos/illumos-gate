@@ -316,7 +316,7 @@ cpu_impl_async_log_err(void *flt, errorq_elem_t *eqep)
 {
 	ch_async_flt_t *ch_flt = (ch_async_flt_t *)flt;
 	struct async_flt *aflt = (struct async_flt *)flt;
-	page_t *pp;
+	uint64_t errors;
 
 	switch (ch_flt->flt_type) {
 
@@ -329,19 +329,15 @@ cpu_impl_async_log_err(void *flt, errorq_elem_t *eqep)
 		return (CH_ASYNC_LOG_DONE);
 
 	case CPU_RCE:
-		pp = page_numtopp_nolock((pfn_t)
-		    (aflt->flt_addr >> MMU_PAGESHIFT));
-		if (pp) {
-			if (page_isretired(pp) || page_deteriorating(pp)) {
-				CE_XDIAG_SETSKIPCODE(aflt->flt_disp,
-				    CE_XDIAG_SKIP_PAGEDET);
-			} else if (ce_scrub_xdiag_recirc(aflt, ce_queue, eqep,
-			    offsetof(ch_async_flt_t, cmn_asyncflt))) {
-				return (CH_ASYNC_LOG_RECIRC);
-			}
-		} else {
+		if (page_retire_check(aflt->flt_addr, &errors) == EINVAL) {
 			CE_XDIAG_SETSKIPCODE(aflt->flt_disp,
 			    CE_XDIAG_SKIP_NOPP);
+		} else if (errors != PR_OK) {
+			CE_XDIAG_SETSKIPCODE(aflt->flt_disp,
+			    CE_XDIAG_SKIP_PAGEDET);
+		} else if (ce_scrub_xdiag_recirc(aflt, ce_queue, eqep,
+		    offsetof(ch_async_flt_t, cmn_asyncflt))) {
+			return (CH_ASYNC_LOG_RECIRC);
 		}
 		/*FALLTHRU*/
 	/*

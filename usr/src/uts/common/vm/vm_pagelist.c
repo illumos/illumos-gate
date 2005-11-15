@@ -1305,7 +1305,7 @@ page_list_add_pages(page_t *pp, int flags)
 			kcage_freemem_add(pgcnt);
 #endif
 		for (i = 0; i < pgcnt; i++, pp++)
-			page_unlock(pp);
+			page_unlock_noretire(pp);
 	}
 }
 
@@ -1753,7 +1753,7 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags)
 			index = PAGE_HASH_FUNC(pp->p_vnode, pp->p_offset);
 			phm = PAGE_HASH_MUTEX(index);
 			if (!mutex_tryenter(phm)) {
-				page_unlock(pp);
+				page_unlock_noretire(pp);
 				goto fail_promote;
 			}
 
@@ -1761,7 +1761,7 @@ page_promote(int mnode, pfn_t pfnum, uchar_t new_szc, int flags)
 			page_hashout(pp, phm);
 			mutex_exit(phm);
 			PP_SETAGED(pp);
-			page_unlock(pp);
+			page_unlock_noretire(pp);
 			which_list = PG_CACHE_LIST;
 		}
 		page_ctr_sub(mnode, mtype, pp, which_list);
@@ -2209,7 +2209,7 @@ page_trylock_cons(page_t *pp, se_t se)
 			 * have locked so far.
 			 */
 			while (first_pp != tpp) {
-				page_unlock(first_pp);
+				page_unlock_noretire(first_pp);
 				first_pp = first_pp->p_next;
 			}
 			return (0);
@@ -2575,7 +2575,7 @@ skipptcpcheck:
 			while (--i != (pgcnt_t)-1) {
 				pp = &spp[i];
 				ASSERT(PAGE_EXCL(pp));
-				page_unlock(pp);
+				page_unlock_noretire(pp);
 			}
 			return (0);
 		}
@@ -2584,7 +2584,7 @@ skipptcpcheck:
 		    !PP_ISFREE(pp)) {
 			VM_STAT_ADD(vmm_vmstats.ptcpfailszc[szc]);
 			ASSERT(i == 0);
-			page_unlock(pp);
+			page_unlock_noretire(pp);
 			return (0);
 		}
 		if (PP_ISNORELOC(pp)) {
@@ -2592,7 +2592,7 @@ skipptcpcheck:
 			while (i != (pgcnt_t)-1) {
 				pp = &spp[i];
 				ASSERT(PAGE_EXCL(pp));
-				page_unlock(pp);
+				page_unlock_noretire(pp);
 				i--;
 			}
 			return (0);
@@ -2687,7 +2687,7 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
 			 */
 			while (pgcnt--) {
 				ASSERT(PAGE_EXCL(pp));
-				page_unlock(pp);
+				page_unlock_noretire(pp);
 				pp++;
 			}
 			/*
@@ -2702,7 +2702,7 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
 				ASSERT(PP_ISAGED(pp));
 				pp->p_szc = 0;
 				page_list_add(pp, PG_FREE_LIST | PG_LIST_TAIL);
-				page_unlock(pp);
+				page_unlock_noretire(pp);
 			}
 
 			if (replpp != NULL)
@@ -2734,7 +2734,7 @@ page_claim_contig_pages(page_t *pp, uchar_t szc, int flags)
 			page_sub(&replpp, rpp);
 			ASSERT(PAGE_EXCL(rpp));
 			ASSERT(!PP_ISFREE(rpp));
-			page_unlock(rpp);
+			page_unlock_noretire(rpp);
 		}
 		ASSERT(targpp == hpp);
 		ASSERT(replpp == NULL);

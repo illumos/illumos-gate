@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,8 +79,6 @@ static struct memlist	*memlist_del_span(struct memlist *mlist,
 					uint64_t base, uint64_t len);
 static struct memlist	*memlist_cat_span(struct memlist *mlist,
 					uint64_t base, uint64_t len);
-
-extern void		page_unretire_pages(void);
 
 /*
  * dr_mem_unit_t.sbm_flags
@@ -427,57 +425,13 @@ dr_mem_ecache_scrub(dr_mem_unit_t *mp, struct memlist *mlist)
 #endif /* DEBUG */
 }
 
-/*
- * This function marks as clean, all the faulty pages that belong to the
- * board that is copy-renamed since they are not likely to be bad pages
- * after the rename. This includes the retired pages on the board.
- */
-
-static void
-dr_memlist_clrpages(struct memlist *r_ml)
-{
-	struct memlist	*t_ml;
-	page_t		*pp, *epp;
-	pfn_t		pfn, epfn;
-	struct memseg	*seg;
-
-	if (r_ml == NULL)
-		return;
-
-	for (t_ml = r_ml; (t_ml != NULL); t_ml = t_ml->next) {
-		pfn = _b64top(t_ml->address);
-		epfn = _b64top(t_ml->address + t_ml->size);
-
-		for (seg = memsegs; seg != NULL; seg = seg->next) {
-			if (pfn >= seg->pages_end || epfn < seg->pages_base)
-				continue;
-
-			pp = seg->pages;
-			if (pfn > seg->pages_base)
-				pp += pfn - seg->pages_base;
-
-			epp = seg->epages;
-			if (epfn < seg->pages_end)
-				epp -= seg->pages_end - epfn;
-
-			ASSERT(pp < epp);
-			while (pp < epp) {
-				if (page_isfaulty((page_t *)pp))
-					page_clrtoxic_flag((page_t *)pp,
-					    PAGE_IS_FAULTY);
-				pp++;
-			}
-		}
-	}
-}
-
 static int
 dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 {
 	time_t		 copytime;
 	drmachid_t	 cr_id;
 	dr_sr_handle_t	*srhp;
-	struct memlist	*c_ml, *d_ml, *r_ml;
+	struct memlist	*c_ml, *d_ml;
 	sbd_error_t	*err;
 	static fn_t	 f = "dr_move_memory";
 
@@ -507,11 +461,6 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 		d_ml = d_ml->next;
 	}
 
-	/*
-	 * create a copy of the memlist to be used for retiring pages.
-	 */
-	r_ml = memlist_dup(c_ml);
-
 	affinity_set(drmach_mem_cpu_affinity(t_mp->sbm_cm.sbdev_id));
 
 	err = drmach_copy_rename_init(
@@ -520,7 +469,6 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 	if (err) {
 		DRERR_SET_C(&s_mp->sbm_cm.sbdev_error, &err);
 		affinity_clear();
-		memlist_delete(r_ml);
 		return (-1);
 	}
 
@@ -553,7 +501,6 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 		hp->h_err = NULL;
 
 		affinity_clear();
-		memlist_delete(r_ml);
 		return (-1);
 	}
 
@@ -573,12 +520,6 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 
 	drmach_copy_rename(cr_id);
 
-	/*
-	 * Clear pages that have been marked as faulty since we are
-	 * changing the physical memory for the pages.
-	 */
-	dr_memlist_clrpages(r_ml);
-
 	/* Resume the OS.  */
 	dr_resume(srhp);
 
@@ -593,11 +534,6 @@ dr_move_memory(dr_handle_t *hp, dr_mem_unit_t *s_mp, dr_mem_unit_t *t_mp)
 
 	PR_MEM("%s: copy-rename elapsed time = %ld ticks (%ld secs)\n",
 		f, copytime, copytime / hz);
-
-	memlist_delete(r_ml);
-
-	/* Unretire any pages cleared after copy-rename */
-	page_unretire_pages();
 
 	/* return -1 if dr_suspend or copy/rename recorded an error */
 	return (err == NULL ? 0 : -1);

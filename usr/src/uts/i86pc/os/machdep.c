@@ -226,6 +226,8 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 	if (invoke_cb)
 		(void) callb_execute_class(CB_CL_MDBOOT, NULL);
 
+	page_retire_hunt(page_retire_mdboot_cb);
+
 	/*
 	 * stop other cpus and raise our priority.  since there is only
 	 * one active cpu after this, and our priority will be too high

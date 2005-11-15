@@ -432,6 +432,7 @@ void
 cpu_setup(void)
 {
 	extern int page_retire_messages;
+	extern int page_retire_first_ue;
 	extern int at_flags;
 #if defined(SF_ERRATA_57)
 	extern caddr_t errata57_limit;
@@ -445,9 +446,11 @@ cpu_setup(void)
 
 	/*
 	 * Spitfire isn't currently FMA-aware, so we have to enable the
-	 * page retirement messages.
+	 * page retirement messages. We also change the default policy
+	 * for UE retirement to allow clearing of transient errors.
 	 */
 	page_retire_messages = 1;
+	page_retire_first_ue = 0;
 
 	/*
 	 * save the cache bootup state.
@@ -895,10 +898,7 @@ cpu_ce_error(struct regs *rp, ulong_t p_afar, ulong_t p_afsr,
 	    curthread->t_ontrap != NULL) {
 
 		if (curthread->t_ontrap->ot_prot & OT_DATA_EC) {
-			page_t *pp = page_numtopp_nolock((pfn_t)
-			    (ecc->flt_addr >> MMU_PAGESHIFT));
-
-			if (pp != NULL && page_isretired(pp)) {
+			if (page_retire_check(ecc->flt_addr, NULL) == 0) {
 				queue = 0;
 			}
 		}
@@ -1093,6 +1093,7 @@ cpu_ce_log_err(struct async_flt *ecc, errorq_elem_t *eqep)
 	char unum[UNUM_NAMLEN];
 	int len = 0;
 	int ce_verbose = 0;
+	int err;
 
 	ASSERT(ecc->flt_func != NULL);
 
@@ -1107,15 +1108,9 @@ cpu_ce_log_err(struct async_flt *ecc, errorq_elem_t *eqep)
 	 * Count errors per unum.
 	 * Non-memory errors are all counted via a special unum string.
 	 */
-	if (ce_count_unum(ecc->flt_status, len, unum) == PAGE_IS_FAILING &&
+	if ((err = ce_count_unum(ecc->flt_status, len, unum)) != PR_OK &&
 	    automatic_page_removal) {
-		page_t *pp = page_numtopp_nolock((pfn_t)
-		    (ecc->flt_addr >> MMU_PAGESHIFT));
-
-		if (pp) {
-			page_settoxic(pp, PAGE_IS_FAULTY);
-			(void) page_retire(pp, PAGE_IS_FAILING);
-		}
+		(void) page_retire(ecc->flt_addr, err);
 	}
 
 	if (ecc->flt_panic) {
@@ -2092,11 +2087,7 @@ cpu_async_log_err(void *flt)
 		if (!panicstr &&
 		    (aflt->flt_stat & S_AFSR_ALL_ERRS) == P_AFSR_UE &&
 		    aflt->flt_prot == AFLT_PROT_EC) {
-			page_t *pp = page_numtopp_nolock((pfn_t)
-			    (aflt->flt_addr >> MMU_PAGESHIFT));
-
-			if (pp != NULL && page_isretired(pp)) {
-
+			if (page_retire_check(aflt->flt_addr, NULL) == 0) {
 				/* Zero the address to clear the error */
 				softcall(ecc_page_zero, (void *)aflt->flt_addr);
 				return;
@@ -2305,25 +2296,7 @@ cpu_async_log_err(void *flt)
 
 	if (aflt->flt_addr != AFLT_INV_ADDR && aflt->flt_in_memory) {
 		if (!panicstr) {
-			/*
-			 * Retire the bad page that caused the error
-			 */
-			page_t *pp = page_numtopp_nolock((pfn_t)
-			    (aflt->flt_addr >> MMU_PAGESHIFT));
-
-			if (pp != NULL) {
-				page_settoxic(pp, PAGE_IS_FAULTY);
-				(void) page_retire(pp, PAGE_IS_TOXIC);
-			} else {
-				uint64_t pa =
-				    P2ALIGN(aflt->flt_addr, MMU_PAGESIZE);
-
-				cpu_aflt_log(CE_CONT, 3, spf_flt,
-				    CPU_ERRID_FIRST, NULL,
-				    ": cannot schedule clearing of error on "
-				    "page 0x%08x.%08x; page not in VM system",
-				    (uint32_t)(pa >> 32), (uint32_t)pa);
-			}
+			(void) page_retire(aflt->flt_addr, PR_UE);
 		} else {
 			/*
 			 * Clear UEs on panic so that we don't
@@ -4089,12 +4062,7 @@ static void
 ecache_page_retire(void *arg)
 {
 	uint64_t paddr = (uint64_t)arg;
-	page_t *pp = page_numtopp_nolock((pfn_t)(paddr >> MMU_PAGESHIFT));
-
-	if (pp) {
-		page_settoxic(pp, PAGE_IS_FAULTY);
-		(void) page_retire(pp, PAGE_IS_TOXIC);
-	}
+	(void) page_retire(paddr, PR_UE);
 }
 
 void
@@ -4331,15 +4299,14 @@ add_leaky_bucket_timeout(void)
  * false intermittents, so these intermittents can be safely ignored.
  *
  * If the error count is excessive for a DIMM, this function will return
- * PAGE_IS_FAILING, and the CPU module may then decide to remove that page
- * from use.
+ * PR_MCE, and the CPU module may then decide to remove that page from use.
  */
 static int
 ce_count_unum(int status, int len, char *unum)
 {
 	int i;
 	struct ce_info *psimm = mem_ce_simm;
-	int page_status = PAGE_IS_OK;
+	int page_status = PR_OK;
 
 	ASSERT(psimm != NULL);
 
@@ -4375,7 +4342,7 @@ ce_count_unum(int status, int len, char *unum)
 				cmn_err(CE_WARN,
 				    "[AFT0] Sticky Softerror encountered "
 				    "on Memory Module %s\n", unum);
-				page_status = PAGE_IS_FAILING;
+				page_status = PR_MCE;
 			} else if (status & ECC_PERSISTENT) {
 				psimm[i].leaky_bucket_cnt = 1;
 				psimm[i].intermittent_total = 0;
@@ -4404,7 +4371,7 @@ ce_count_unum(int status, int len, char *unum)
 				cmn_err(CE_WARN,
 				    "[AFT0] Sticky Softerror encountered "
 				    "on Memory Module %s\n", unum);
-				page_status = PAGE_IS_FAILING;
+				page_status = PR_MCE;
 			} else if (status & ECC_PERSISTENT) {
 				int new_value;
 
@@ -4422,7 +4389,7 @@ ce_count_unum(int status, int len, char *unum)
 					    ecc_softerr_interval % 60);
 					atomic_add_16(
 					    &psimm[i].leaky_bucket_cnt, -1);
-					page_status = PAGE_IS_FAILING;
+					page_status = PR_MCE;
 				}
 			} else { /* Intermittent */
 				psimm[i].intermittent_total++;
@@ -4444,15 +4411,11 @@ ce_count_unum(int status, int len, char *unum)
 void
 cpu_ce_count_unum(struct async_flt *ecc, int len, char *unum)
 {
-	if (ce_count_unum(ecc->flt_status, len, unum) == PAGE_IS_FAILING &&
-	    automatic_page_removal) {
-		page_t *pp = page_numtopp_nolock((pfn_t)
-		    (ecc->flt_addr >> MMU_PAGESHIFT));
+	int err;
 
-		if (pp) {
-			page_settoxic(pp, PAGE_IS_FAULTY);
-			(void) page_retire(pp, PAGE_IS_FAILING);
-		}
+	err = ce_count_unum(ecc->flt_status, len, unum);
+	if (err != PR_OK && automatic_page_removal) {
+		(void) page_retire(ecc->flt_addr, err);
 	}
 }
 

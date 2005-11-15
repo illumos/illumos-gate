@@ -76,6 +76,12 @@ typedef enum {
  */
 #define	SE_EXCL_WANTED	0x02
 
+/*
+ * All page_*lock() requests will be denied unless this flag is set in
+ * the 'es' parameter.
+ */
+#define	SE_RETIRED	0x04
+
 #endif	/* _KERNEL | _KMEMUSER */
 
 typedef int	selock_t;
@@ -630,37 +636,6 @@ struct lgrp;
 #define	PG_LIST_ISCAGE	0x2000
 
 /*
- * Flags for setting the p_toxic flag when a page has errors
- * These flags may be OR'ed into the p_toxic page flag to
- * indicate that error(s) have occurred on a page,
- * (see page_settoxic()). If both PAGE_IS_TOXIC and
- * PAGE_IS_FAILING are set, PAGE_IS_FAILING takes precedence.
- *
- * When an error happens on a page, the trap handler sets
- * PAGE_IS_FAULTY on the page to indicate that an error has been
- * seen on the page. The error could be really a memory error or
- * something else (like a datapath error). When it is determined
- * that it is a memory error, the page is marked as PAGE_IS_TOXIC
- * or PAGE_IS_FAILING depending on the type of error and then
- * retired.
- *
- * We use the page's 'toxic' flag to determine whether the page
- * has just got a single error - PAGE_IS_TOXIC - or is being
- * retired due to multiple soft errors - PAGE_IS_FAILING. In
- * page_free(), a page that has been marked PAGE_IS_FAILING will
- * not be cleaned, it will always be retired. A page marked
- * PAGE_IS_TOXIC is cleaned and is retired only if this attempt at
- * cleaning fails.
- *
- * When a page has been successfully retired, we set PAGE_IS_RETIRED.
- */
-#define	PAGE_IS_OK		0x0
-#define	PAGE_IS_TOXIC		0x1
-#define	PAGE_IS_FAILING		0x2
-#define	PAGE_IS_RETIRED		0x4
-#define	PAGE_IS_FAULTY		0x8
-
-/*
  * Page frame operations.
  */
 page_t	*page_lookup(struct vnode *, u_offset_t, se_t);
@@ -707,6 +682,7 @@ void	page_boot_demote(page_t *);
 void	page_promote_size(page_t *, uint_t);
 void	page_list_add_pages(page_t *, int);
 void	page_list_sub(page_t *, int);
+void	page_list_sub_pages(page_t *, uint_t);
 void	page_list_xfer(page_t *, int, int);
 void	page_list_break(page_t **, page_t **, size_t);
 void	page_list_concat(page_t **, page_t **);
@@ -720,6 +696,7 @@ int	page_try_reclaim_lock(page_t *, se_t, int);
 int	page_tryupgrade(page_t *);
 void	page_downgrade(page_t *);
 void	page_unlock(page_t *);
+void	page_unlock_noretire(page_t *);
 void	page_lock_delete(page_t *);
 int	page_pp_lock(page_t *, int, int);
 void	page_pp_unlock(page_t *, int, int);
@@ -759,19 +736,22 @@ int	page_isfree(page_t *);
 int	page_isref(page_t *);
 int	page_ismod(page_t *);
 int	page_release(page_t *, int);
-int	page_retire(page_t *, uchar_t);
-int	page_istoxic(page_t *);
-int	page_isfailing(page_t *);
-int	page_isretired(page_t *);
-int	page_deteriorating(page_t *);
+void	page_retire_init(void);
+int	page_retire(uint64_t, uchar_t);
+int	page_retire_check(uint64_t, uint64_t *);
+int	page_unretire(uint64_t);
+int	page_unretire_pp(page_t *, int);
+void	page_tryretire(page_t *);
+void	page_retire_hunt(void (*)(page_t *));
+void	page_retire_mdboot_cb(page_t *);
+void	page_clrtoxic(page_t *, uchar_t);
 void	page_settoxic(page_t *, uchar_t);
-void	page_clrtoxic(page_t *);
-void	page_clrtoxic_flag(page_t *, uchar_t);
-int	page_isfaulty(page_t *);
+
 int	page_mem_avail(pgcnt_t);
 
 void page_set_props(page_t *, uint_t);
 void page_clr_all_props(page_t *);
+int page_clear_lck_cow(page_t *, int);
 
 kmutex_t	*page_vnode_mutex(struct vnode *);
 kmutex_t	*page_se_mutex(struct page *);
@@ -792,6 +772,7 @@ void page_free_replacement_page(page_t *);
 int page_relocate_cage(page_t **, page_t **);
 
 int page_try_demote_pages(page_t *);
+int page_try_demote_free_pages(page_t *);
 void page_demote_free_pages(page_t *);
 
 struct anon_map;
@@ -879,7 +860,56 @@ int	page_szc_user_filtered(size_t);
 #define	PP_CLRMIGRATE(pp)	((pp)->p_state &= ~P_MIGRATE)
 #define	PP_CLRSWAP(pp)		((pp)->p_state &= ~P_SWAP)
 
+/*
+ * Flags for page_t p_toxic, for tracking memory hardware errors.
+ *
+ * These flags are OR'ed into p_toxic with page_settoxic() to track which
+ * error(s) have occurred on a given page. The flags are cleared with
+ * page_clrtoxic(). Both page_settoxic() and page_cleartoxic use atomic
+ * primitives to manipulate the p_toxic field so no other locking is needed.
+ *
+ * When an error occurs on a page, p_toxic is set to record the error. The
+ * error could be a memory error or something else (i.e. a datapath). The Page
+ * Retire mechanism does not try to determine the exact cause of the error;
+ * Page Retire rightly leaves that sort of determination to FMA's Diagnostic
+ * Engine (DE).
+ *
+ * Note that, while p_toxic bits can be set without holding any locks, they
+ * should only be cleared while holding the page exclusively locked.
+ *
+ * Pages with PR_UE or PR_FMA flags are retired unconditionally, while pages
+ * with PR_MCE are retired if the system has not retired too many of them.
+ *
+ * A page must be exclusively locked to be retired. Pages can be retired if
+ * they are mapped, modified, or both, as long as they are not marked PR_UE,
+ * since pages with uncorrectable errors cannot be relocated in memory.
+ * Once a page has been successfully retired it is zeroed, attached to the
+ * retired_pages vnode and, finally, PR_RETIRED is set in p_toxic. The other
+ * p_toxic bits are NOT cleared. Pages are not left locked after retiring them
+ * to avoid special case code throughout the kernel; rather, page_*lock() will
+ * fail to lock the page, unless SE_RETIRED is passed as an argument.
+ *
+ * While we have your attention, go take a look at the comments at the
+ * beginning of page_retire.c too.
+ */
+#define	PR_OK		0x00	/* no problem */
+#define	PR_MCE		0x01	/* page has seen two or more CEs */
+#define	PR_UE		0x02	/* page has an unhandled UE */
+#define	PR_UE_SCRUBBED	0x04	/* page has seen a UE but was cleaned */
+#define	PR_FMA		0x08	/* A DE wants this page retired */
+#define	PR_RESV		0x10	/* Reserved for future use */
+#define	PR_BUSY		0x20	/* Page retire is in progress */
+#define	PR_MSG		0x40	/* message(s) already printed for this page */
+#define	PR_RETIRED	0x80	/* This page has been retired */
 
+#define	PR_REASONS	(PR_UE | PR_MCE | PR_FMA)
+#define	PR_TOXIC	(PR_UE)
+#define	PR_ERRMASK	(PR_UE | PR_UE_SCRUBBED | PR_MCE | PR_FMA)
+#define	PR_ALLFLAGS	(0xFF)
+
+#define	PP_RETIRED(pp)	((pp)->p_toxic & PR_RETIRED)
+#define	PP_TOXIC(pp)	((pp)->p_toxic & PR_TOXIC)
+#define	PP_PR_REQ(pp)	(((pp)->p_toxic & PR_REASONS) && !PP_RETIRED(pp))
 
 /*
  * kpm large page description.

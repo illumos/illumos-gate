@@ -247,23 +247,21 @@ error_init(void)
 }
 
 /*
- * Success flags for ecc_page_zero
+ * Flags for ecc_page_zero DTrace probe since ecc_page_zero() is called
+ * as a softint handler.
  */
 #define	PAGE_ZERO_SUCCESS	0
 #define	PAGE_ZERO_FAIL_NOLOCK	1
 #define	PAGE_ZERO_FAIL_ONTRAP	2
 
-/*
- * arg is a physical address - zero out the page that contains it
- */
 void
 ecc_page_zero(void *arg)
 {
 	uint64_t pa = (uint64_t)arg;
-	page_t *pp = page_numtopp_nolock((pfn_t)(pa >> MMU_PAGESHIFT));
 	int ret, success_flag;
+	page_t *pp = page_numtopp_nolock(mmu_btop(pa));
 
-	if (pp == NULL || !page_isretired(pp))
+	if (page_retire_check(pa, NULL) != 0)
 		return;
 
 	/*

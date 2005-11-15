@@ -87,90 +87,6 @@ static pgcnt_t max_page_get;	/* max page_get request size in pages */
 pgcnt_t total_pages = 0;	/* total number of pages (used by /proc) */
 
 /*
- * vnode for all pages which are retired from the VM system;
- * such as pages with Uncorrectable Errors.
- */
-struct vnode retired_ppages;
-
-static void	page_retired_init(void);
-static void	retired_dispose(vnode_t *vp, page_t *pp, int flag,
-			int dn, cred_t *cr);
-static void	retired_inactive(vnode_t *vp, cred_t *cr);
-static void	page_retired(page_t *pp);
-static void	retired_page_removed(page_t *pp);
-void		page_unretire_pages(void);
-
-/*
- * The maximum number of pages that will be unretired in one iteration.
- * This number is totally arbitrary.
- */
-#define	UNRETIRE_PAGES		256
-
-/*
- * We limit the number of pages that may be retired to
- * a percentage of the total physical memory. Note that
- * the percentage values are  stored as 'basis points',
- * ie, 100 basis points is 1%.
- */
-#define	MAX_PAGES_RETIRED_BPS_DEFAULT	10	/* .1% */
-
-uint64_t max_pages_retired_bps = MAX_PAGES_RETIRED_BPS_DEFAULT;
-
-static int	pages_retired_limit_exceeded(void);
-
-/*
- * operations vector for vnode with retired pages. Only VOP_DISPOSE
- * and VOP_INACTIVE are intercepted.
- */
-struct vnodeops retired_vnodeops = {
-	"retired_vnodeops",
-	fs_nosys,	/* open */
-	fs_nosys,	/* close */
-	fs_nosys,	/* read */
-	fs_nosys,	/* write */
-	fs_nosys,	/* ioctl */
-	fs_nosys,	/* setfl */
-	fs_nosys,	/* getattr */
-	fs_nosys,	/* setattr */
-	fs_nosys,	/* access */
-	fs_nosys,	/* lookup */
-	fs_nosys,	/* create */
-	fs_nosys,	/* remove */
-	fs_nosys,	/* link */
-	fs_nosys,	/* rename */
-	fs_nosys,	/* mkdir */
-	fs_nosys,	/* rmdir */
-	fs_nosys,	/* readdir */
-	fs_nosys,	/* symlink */
-	fs_nosys,	/* readlink */
-	fs_nosys,	/* fsync */
-	retired_inactive,
-	fs_nosys,	/* fid */
-	fs_rwlock,	/* rwlock */
-	fs_rwunlock,	/* rwunlock */
-	fs_nosys,	/* seek */
-	fs_nosys,	/* cmp */
-	fs_nosys,	/* frlock */
-	fs_nosys,	/* space */
-	fs_nosys,	/* realvp */
-	fs_nosys,	/* getpage */
-	fs_nosys,	/* putpage */
-	fs_nosys_map,
-	fs_nosys_addmap,
-	fs_nosys,	/* delmap */
-	fs_nosys_poll,
-	fs_nosys,	/* dump */
-	fs_nosys,	/* l_pathconf */
-	fs_nosys,	/* pageio */
-	fs_nosys,	/* dumpctl */
-	retired_dispose,
-	fs_nosys,	/* setsecattr */
-	fs_nosys,	/* getsecatt */
-	fs_nosys,	/* shrlock */
-	fs_vnevent_nosupport	/* vnevent */
-};
-
-/*
  * freemem_lock protects all freemem variables:
  * availrmem. Also this lock protects the globals which track the
  * availrmem changes for accurate kernel footprint calculation.
@@ -288,15 +204,6 @@ static kcondvar_t	pcgs_cv;	/* cv for delay in pcgs */
 
 #define	PAGE_LOCK_MAXIMUM \
 	((1 << (sizeof (((page_t *)0)->p_lckcnt) * NBBY)) - 1)
-
-/*
- * Control over the verbosity of page retirement.  When set to zero, no messages
- * will be printed.  A value of one will trigger messages for retirement
- * operations, and is intended for processors which don't yet support FMA
- * (spitfire).  Two will cause verbose messages to be printed when retirements
- * complete, and is intended only for debugging purposes.
- */
-int page_retire_messages = 0;
 
 #ifdef VM_STATS
 
@@ -440,11 +347,7 @@ vm_init(void)
 
 	(void) callb_add(callb_vm_cpr, 0, CB_CL_CPR_VM, "vm");
 	page_init_mem_config();
-
-	/*
-	 * initialise the vnode for retired pages
-	 */
-	page_retired_init();
+	page_retire_init();
 }
 
 /*
@@ -2799,153 +2702,6 @@ page_free(page_t *pp, int dontneed)
 	ASSERT((PAGE_EXCL(pp) &&
 	    !page_iolock_assert(pp)) || panicstr);
 
-	if (page_deteriorating(pp)) {
-		volatile int i = 0;
-		char *kaddr;
-		volatile int rb, wb;
-		uint64_t pa;
-		volatile int ue = 0;
-		on_trap_data_t otd;
-
-		if (pp->p_vnode != NULL) {
-			/*
-			 * Let page_destroy() do its bean counting and
-			 * hash out the page; it will then call back
-			 * into page_free() with pp->p_vnode == NULL.
-			 */
-			page_destroy(pp, 0);
-			return;
-		}
-
-		if (page_isfailing(pp)) {
-			/*
-			 * If we have already exceeded the limit for
-			 * pages retired, we will treat this page as
-			 * 'toxic' rather than failing. That will ensure
-			 * that the page is at least cleaned, and if
-			 * a UE is detected, the page will be retired
-			 * anyway.
-			 */
-			if (pages_retired_limit_exceeded()) {
-				/*
-				 * clear the flag and reset to toxic
-				 */
-				page_clrtoxic(pp);
-				page_settoxic(pp, PAGE_IS_TOXIC);
-			} else {
-				pa = ptob((uint64_t)page_pptonum(pp));
-				if (page_retire_messages) {
-					cmn_err(CE_NOTE, "Page 0x%08x.%08x "
-					    "removed from service",
-					    (uint32_t)(pa >> 32), (uint32_t)pa);
-				}
-				goto page_failed;
-			}
-		}
-
-		pagescrub(pp, 0, PAGESIZE);
-
-		/*
-		 * We want to determine whether the error that occurred on
-		 * this page is transient or persistent, so we get a mapping
-		 * to the page and try every possible bit pattern to compare
-		 * what we write with what we read back.  A smaller number
-		 * of bit patterns might suffice, but there's no point in
-		 * getting fancy.  If this is the hot path on your system,
-		 * you've got bigger problems.
-		 */
-		kaddr = ppmapin(pp, PROT_READ | PROT_WRITE, (caddr_t)-1);
-		for (wb = 0xff; wb >= 0; wb--) {
-			if (on_trap(&otd, OT_DATA_EC)) {
-				pa = ptob((uint64_t)page_pptonum(pp)) + i;
-				page_settoxic(pp, PAGE_IS_FAILING);
-
-				if (page_retire_messages) {
-					cmn_err(CE_WARN, "Uncorrectable Error "
-					    "occurred at PA 0x%08x.%08x while "
-					    "attempting to clear previously "
-					    "reported error; page removed from "
-					    "service", (uint32_t)(pa >> 32),
-					    (uint32_t)pa);
-				}
-
-				ue++;
-				break;
-			}
-
-			/*
-			 * Write out the bit pattern, flush it to memory, and
-			 * read it back while under on_trap() protection.
-			 */
-			for (i = 0; i < PAGESIZE; i++)
-				kaddr[i] = wb;
-
-			sync_data_memory(kaddr, PAGESIZE);
-
-			for (i = 0; i < PAGESIZE; i++) {
-				if ((rb = (uchar_t)kaddr[i]) != wb) {
-					page_settoxic(pp, PAGE_IS_FAILING);
-					goto out;
-				}
-			}
-		}
-out:
-		no_trap();
-		ppmapout(kaddr);
-
-		if (wb >= 0 && !ue) {
-			pa = ptob((uint64_t)page_pptonum(pp)) + i;
-			if (page_retire_messages) {
-				cmn_err(CE_WARN, "Data Mismatch occurred at PA "
-				    "0x%08x.%08x [ 0x%x != 0x%x ] while "
-				    "attempting to clear previously reported "
-				    "error; page removed from service",
-				    (uint32_t)(pa >> 32), (uint32_t)pa, rb, wb);
-			}
-		}
-page_failed:
-		/*
-		 * DR operations change the association between a page_t
-		 * and the physical page it represents. Check if the
-		 * page is still bad. If it is, then retire it.
-		 */
-		if (page_isfaulty(pp) && page_isfailing(pp)) {
-			/*
-			 * In the future, it might be useful to have a platform
-			 * callback here to tell the hardware to fence off this
-			 * page during the next reboot.
-			 *
-			 * We move the page to the retired_vnode here
-			 */
-			(void) page_hashin(pp, &retired_ppages,
-			    (u_offset_t)ptob((uint64_t)page_pptonum(pp)), NULL);
-			mutex_enter(&freemem_lock);
-			availrmem--;
-			mutex_exit(&freemem_lock);
-			page_retired(pp);
-			page_downgrade(pp);
-
-			/*
-			 * If DR raced with the above page retirement code,
-			 * we might have retired a good page. If so, unretire
-			 * the page.
-			 */
-			if (!page_isfaulty(pp))
-				page_unretire_pages();
-			return;
-		}
-
-		pa = ptob((uint64_t)page_pptonum(pp));
-
-		if (page_retire_messages) {
-			cmn_err(CE_NOTE, "Previously reported error on page "
-			    "0x%08x.%08x cleared", (uint32_t)(pa >> 32),
-			    (uint32_t)pa);
-		}
-
-		page_clrtoxic(pp);
-	}
-
 	if (PP_ISFREE(pp)) {
 		panic("page_free: page %p is free", (void *)pp);
 	}
@@ -3089,7 +2845,6 @@ page_free_pages(page_t *pp)
 	pgcnt_t	pgcnt = page_get_pagecnt(pp->p_szc);
 	pgcnt_t	i;
 	uint_t	szc = pp->p_szc;
-	int	toxic = 0;
 
 	VM_STAT_ADD(pagecnt.pc_free_pages);
 	TRACE_1(TR_FAC_VM, TR_PAGE_FREE_FREE,
@@ -3118,9 +2873,6 @@ page_free_pages(page_t *pp)
 		ASSERT(tpp->p_vnode == NULL);
 		ASSERT(tpp->p_szc == szc);
 
-		if (page_deteriorating(tpp))
-			toxic = 1;
-
 		PP_SETFREE(tpp);
 		page_clr_all_props(tpp);
 		PP_SETAGED(tpp);
@@ -3131,10 +2883,6 @@ page_free_pages(page_t *pp)
 	}
 	ASSERT(rootpp == pp);
 
-	if (toxic) {
-		page_free_toxic_pages(rootpp);
-		return;
-	}
 	page_list_add_pages(rootpp, 0);
 	page_create_putback(pgcnt);
 }
@@ -3219,12 +2967,13 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 	struct pcf	*p;
 	uint_t		pcf_index;
 	struct cpu	*cpup;
-	int		enough;
 	uint_t		i;
+	pgcnt_t		npgs, need, collected;
 
 	ASSERT(lock != NULL ? MUTEX_HELD(lock) : 1);
 	ASSERT(PAGE_EXCL(pp) && PP_ISFREE(pp));
-	ASSERT(pp->p_szc == 0);
+
+	npgs = page_get_pagecnt(pp->p_szc);
 
 	/*
 	 * If `freemem' is 0, we cannot reclaim this page from the
@@ -3254,18 +3003,19 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 		goto page_reclaim_nomem;
 	}
 
-	enough = 0;
+	collected = 0;
 	pcf_index = PCF_INDEX();
 	p = &pcf[pcf_index];
 	p->pcf_touch = 1;
 	mutex_enter(&p->pcf_lock);
-	if (p->pcf_count >= 1) {
-		enough = 1;
-		p->pcf_count--;
+	if (p->pcf_count >= npgs) {
+		collected = npgs;
+		p->pcf_count -= npgs;
 	}
 	mutex_exit(&p->pcf_lock);
+	need = npgs - collected;
 
-	if (!enough) {
+	if (need > 0) {
 		VM_STAT_ADD(page_reclaim_zero);
 		/*
 		 * Check again. Its possible that some other thread
@@ -3277,15 +3027,22 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 		for (i = 0; i < PCF_FANOUT; i++) {
 			p->pcf_touch = 1;
 			mutex_enter(&p->pcf_lock);
-			if (p->pcf_count >= 1) {
-				p->pcf_count -= 1;
-				enough = 1;
-				break;
+			if (p->pcf_count) {
+				if (p->pcf_count >= need) {
+					p->pcf_count -= need;
+					collected += need;
+					need = 0;
+					break;
+				} else if (p->pcf_count) {
+					collected += p->pcf_count;
+					need -= p->pcf_count;
+					p->pcf_count = 0;
+				}
 			}
 			p++;
 		}
 
-		if (!enough) {
+		if (need > 0) {
 page_reclaim_nomem:
 			/*
 			 * We really can't have page `pp'.
@@ -3309,6 +3066,7 @@ page_reclaim_nomem:
 			mutex_enter(&new_freemem_lock);
 
 			p = pcf;
+			p->pcf_count += collected;
 			for (i = 0; i < PCF_FANOUT; i++) {
 				p->pcf_wait++;
 				mutex_exit(&p->pcf_lock);
@@ -3328,11 +3086,13 @@ page_reclaim_nomem:
 		}
 
 		/*
-		 * There was a page to be found.
+		 * We beat the PCF bins over the head until
+		 * we got the memory that we wanted.
 		 * The pcf accounting has been done,
 		 * though none of the pcf_wait flags have been set,
 		 * drop the locks and continue on.
 		 */
+		ASSERT(collected == npgs);
 		while (p >= pcf) {
 			mutex_exit(&p->pcf_lock);
 			p--;
@@ -3343,14 +3103,19 @@ page_reclaim_nomem:
 	 * freemem is not protected by any lock. Thus, we cannot
 	 * have any assertion containing freemem here.
 	 */
-	freemem -= 1;
+	freemem -= npgs;
 
 	VM_STAT_ADD(pagecnt.pc_reclaim);
 	if (PP_ISAGED(pp)) {
-		page_list_sub(pp, PG_FREE_LIST);
+		if (npgs > 1) {
+			page_list_sub_pages(pp, pp->p_szc);
+		} else {
+			page_list_sub(pp, PG_FREE_LIST);
+		}
 		TRACE_1(TR_FAC_VM, TR_PAGE_UNFREE_FREE,
 		    "page_reclaim_free:pp %p", pp);
 	} else {
+		ASSERT(npgs == 1);
 		page_list_sub(pp, PG_CACHE_LIST);
 		TRACE_1(TR_FAC_VM, TR_PAGE_UNFREE_CACHE,
 		    "page_reclaim_cache:pp %p", pp);
@@ -3363,9 +3128,11 @@ page_reclaim_nomem:
 	 *
 	 * Set the reference bit to protect against immediate pageout.
 	 */
-	PP_CLRFREE(pp);
-	PP_CLRAGED(pp);
-	page_set_props(pp, P_REF);
+	for (i = 0; i < npgs; i++, pp = page_next(pp)) {
+		PP_CLRFREE(pp);
+		PP_CLRAGED(pp);
+		page_set_props(pp, P_REF);
+	}
 
 	CPU_STATS_ENTER_K();
 	cpup = CPU;	/* get cpup now that CPU cannot change */
@@ -3441,7 +3208,6 @@ page_destroy_pages(page_t *pp)
 	pgcnt_t	pgcnt = page_get_pagecnt(pp->p_szc);
 	pgcnt_t	i, pglcks = 0;
 	uint_t	szc = pp->p_szc;
-	int	toxic = 0;
 
 	ASSERT(pp->p_szc != 0 && pp->p_szc < page_num_pagesizes());
 
@@ -3471,9 +3237,6 @@ page_destroy_pages(page_t *pp)
 		ASSERT(tpp->p_vnode == NULL);
 		ASSERT(tpp->p_szc == szc);
 
-		if (page_deteriorating(tpp))
-			toxic = 1;
-
 		PP_SETFREE(tpp);
 		page_clr_all_props(tpp);
 		PP_SETAGED(tpp);
@@ -3489,10 +3252,6 @@ page_destroy_pages(page_t *pp)
 		mutex_exit(&freemem_lock);
 	}
 
-	if (toxic) {
-		page_free_toxic_pages(rootpp);
-		return;
-	}
 	page_list_add_pages(rootpp, 0);
 	page_create_putback(pgcnt);
 }
@@ -3914,14 +3673,6 @@ page_hashout(page_t *pp, kmutex_t *phm)
 	mutex_exit(vphm);
 	if (phm == NULL)
 		mutex_exit(nphm);
-
-	/*
-	 * If the page was retired, update the pages_retired
-	 * total and clear the page flag
-	 */
-	if (page_isretired(pp)) {
-		retired_page_removed(pp);
-	}
 
 	/*
 	 * Wake up processes waiting for this page.  The page's
@@ -5397,6 +5148,63 @@ page_release(page_t *pp, int checkmod)
 	return (status);
 }
 
+/*
+ * Given a constituent page, try to demote the large page on the freelist.
+ *
+ * Returns nonzero if the page could be demoted successfully. Returns with
+ * the constituent page still locked.
+ */
+int
+page_try_demote_free_pages(page_t *pp)
+{
+	page_t *rootpp = pp;
+	pfn_t	pfn = page_pptonum(pp);
+	spgcnt_t npgs;
+	uint_t	szc = pp->p_szc;
+
+	ASSERT(PP_ISFREE(pp));
+	ASSERT(PAGE_EXCL(pp));
+
+	/*
+	 * Adjust rootpp and lock it, if `pp' is not the base
+	 * constituent page.
+	 */
+	npgs = page_get_pagecnt(pp->p_szc);
+	if (npgs == 1) {
+		return (0);
+	}
+
+	if (!IS_P2ALIGNED(pfn, npgs)) {
+		pfn = P2ALIGN(pfn, npgs);
+		rootpp = page_numtopp_nolock(pfn);
+	}
+
+	if (pp != rootpp && !page_trylock(rootpp, SE_EXCL)) {
+		return (0);
+	}
+
+	if (rootpp->p_szc != szc) {
+		if (pp != rootpp)
+			page_unlock(rootpp);
+		return (0);
+	}
+
+	page_demote_free_pages(rootpp);
+
+	if (pp != rootpp)
+		page_unlock(rootpp);
+
+	ASSERT(PP_ISFREE(pp));
+	ASSERT(PAGE_EXCL(pp));
+	return (1);
+}
+
+/*
+ * Given a constituent page, try to demote the large page.
+ *
+ * Returns nonzero if the page could be demoted successfully. Returns with
+ * the constituent page still locked.
+ */
 int
 page_try_demote_pages(page_t *pp)
 {
@@ -5406,27 +5214,27 @@ page_try_demote_pages(page_t *pp)
 	uint_t	szc = pp->p_szc;
 	vnode_t *vp = pp->p_vnode;
 
-	ASSERT(PAGE_EXCL(rootpp));
+	ASSERT(PAGE_EXCL(pp));
 
 	VM_STAT_ADD(pagecnt.pc_try_demote_pages[0]);
 
-	if (rootpp->p_szc == 0) {
+	if (pp->p_szc == 0) {
 		VM_STAT_ADD(pagecnt.pc_try_demote_pages[1]);
 		return (1);
 	}
 
 	if (vp != NULL && !IS_SWAPFSVP(vp) && vp != &kvp) {
 		VM_STAT_ADD(pagecnt.pc_try_demote_pages[2]);
-		page_demote_vp_pages(rootpp);
+		page_demote_vp_pages(pp);
 		ASSERT(pp->p_szc == 0);
 		return (1);
 	}
 
 	/*
-	 * Adjust rootpp if  passed in is not the base
+	 * Adjust rootpp if passed in is not the base
 	 * constituent page.
 	 */
-	npgs = page_get_pagecnt(rootpp->p_szc);
+	npgs = page_get_pagecnt(pp->p_szc);
 	ASSERT(npgs > 1);
 	if (!IS_P2ALIGNED(pfn, npgs)) {
 		pfn = P2ALIGN(pfn, npgs);
@@ -5455,12 +5263,11 @@ page_try_demote_pages(page_t *pp)
 			break;
 		ASSERT(tpp->p_szc == rootpp->p_szc);
 		ASSERT(page_pptonum(tpp) == page_pptonum(rootpp) + i);
-		(void) hat_pageunload(tpp, HAT_FORCE_PGUNLOAD);
 	}
 
 	/*
-	 * If we failed to lock them all then unlock what we have locked
-	 * so far and bail.
+	 * If we failed to lock them all then unlock what we have
+	 * locked so far and bail.
 	 */
 	if (i < npgs) {
 		tpp = rootpp;
@@ -5473,12 +5280,9 @@ page_try_demote_pages(page_t *pp)
 		return (0);
 	}
 
-	/*
-	 * XXX probably p_szc clearing and page unlocking can be done within
-	 * one loop but since this is rare code we can play very safe.
-	 */
 	for (tpp = rootpp, i = 0; i < npgs; i++, tpp++) {
 		ASSERT(PAGE_EXCL(tpp));
+		(void) hat_pageunload(tpp, HAT_FORCE_PGUNLOAD);
 		tpp->p_szc = 0;
 	}
 
@@ -5490,6 +5294,7 @@ page_try_demote_pages(page_t *pp)
 		if (tpp != pp)
 			page_unlock(tpp);
 	}
+
 	VM_STAT_ADD(pagecnt.pc_try_demote_pages[5]);
 	return (1);
 }
@@ -5576,221 +5381,6 @@ page_demote_vp_pages(page_t *pp)
 		mutex_exit(mtx);
 	}
 	ASSERT(pp->p_szc == 0);
-}
-
-/*
- * Page retire operation.
- *
- * page_retire()
- * Attempt to retire (throw away) page pp.  We cannot do this if
- * the page is dirty; if the page is clean, we can try.  We return 0 on
- * success, -1 on failure.  This routine should be invoked by the platform's
- * memory error detection code.
- *
- * pages_retired_limit_exceeded()
- * We set a limit on the number of pages which may be retired. This
- * is set to a percentage of total physical memory. This limit is
- * enforced here.
- */
-
-static pgcnt_t	retired_pgcnt = 0;
-
-/*
- * routines to update the count of retired pages
- */
-static void
-page_retired(page_t *pp)
-{
-	ASSERT(pp);
-
-	page_settoxic(pp, PAGE_IS_RETIRED);
-	atomic_add_long(&retired_pgcnt, 1);
-}
-
-static void
-retired_page_removed(page_t *pp)
-{
-	ASSERT(pp);
-	ASSERT(page_isretired(pp));
-	ASSERT(retired_pgcnt > 0);
-
-	page_clrtoxic(pp);
-	atomic_add_long(&retired_pgcnt, -1);
-}
-
-
-static int
-pages_retired_limit_exceeded()
-{
-	pgcnt_t	retired_max;
-
-	/*
-	 * If the percentage is zero or is not set correctly,
-	 * return TRUE so that pages are not retired.
-	 */
-	if (max_pages_retired_bps <= 0 ||
-	    max_pages_retired_bps >= 10000)
-		return (1);
-
-	/*
-	 * Calculate the maximum number of pages allowed to
-	 * be retired as a percentage of total physical memory
-	 * (Remember that we are using basis points, hence the 10000.)
-	 */
-	retired_max = (physmem * max_pages_retired_bps) / 10000;
-
-	/*
-	 * return 'TRUE' if we have already retired more
-	 * than the legal limit
-	 */
-	return (retired_pgcnt >= retired_max);
-}
-
-#define	PAGE_RETIRE_SELOCK	0
-#define	PAGE_RETIRE_NORECLAIM	1
-#define	PAGE_RETIRE_LOCKED	2
-#define	PAGE_RETIRE_COW		3
-#define	PAGE_RETIRE_DIRTY	4
-#define	PAGE_RETIRE_LPAGE	5
-#define	PAGE_RETIRE_SUCCESS	6
-#define	PAGE_RETIRE_LIMIT	7
-#define	PAGE_RETIRE_NCODES	8
-
-typedef struct page_retire_op {
-	int	pr_count;
-	short	pr_unlock;
-	short	pr_retval;
-	char	*pr_message;
-} page_retire_op_t;
-
-page_retire_op_t page_retire_ops[PAGE_RETIRE_NCODES] = {
-	{	0,	0,	-1,	"cannot lock page"		},
-	{	0,	0,	-1,	"cannot reclaim cached page"	},
-	{	0,	1,	-1,	"page is locked"		},
-	{	0,	1,	-1,	"copy-on-write page"		},
-	{	0,	1,	-1,	"page is dirty"			},
-	{	0,	1,	-1,	"cannot demote large page"	},
-	{	0,	0,	0,	"page successfully retired"	},
-	{	0,	0,	-1,	"excess pages retired already"	},
-};
-
-static int
-page_retire_done(page_t *pp, int code)
-{
-	page_retire_op_t *prop = &page_retire_ops[code];
-
-	prop->pr_count++;
-
-	if (prop->pr_unlock)
-		page_unlock(pp);
-
-	if (page_retire_messages > 1) {
-		printf("page_retire(%p) pfn 0x%lx %s: %s\n",
-		    (void *)pp, page_pptonum(pp),
-		    prop->pr_retval == -1 ? "failed" : "succeeded",
-		    prop->pr_message);
-	}
-
-	return (prop->pr_retval);
-}
-
-int
-page_retire(page_t *pp, uchar_t flag)
-{
-	uint64_t pa = ptob((uint64_t)page_pptonum(pp));
-
-	ASSERT(flag == PAGE_IS_FAILING || flag == PAGE_IS_TOXIC);
-
-	/*
-	 * DR operations change the association between a page_t
-	 * and the physical page it represents. Check if the
-	 * page is still bad.
-	 */
-	if (!page_isfaulty(pp)) {
-		page_clrtoxic(pp);
-		return (page_retire_done(pp, PAGE_RETIRE_SUCCESS));
-	}
-
-	/*
-	 * We set the flag here so that even if we fail due
-	 * to exceeding the limit for retired pages, the
-	 * page will still be checked and either cleared
-	 * or retired in page_free().
-	 */
-	page_settoxic(pp, flag);
-
-	if (flag == PAGE_IS_TOXIC) {
-		if (page_retire_messages) {
-			cmn_err(CE_NOTE, "Scheduling clearing of error on"
-			    " page 0x%08x.%08x",
-			    (uint32_t)(pa >> 32), (uint32_t)pa);
-		}
-
-	} else { /* PAGE_IS_FAILING */
-		if (pages_retired_limit_exceeded()) {
-			/*
-			 * Return as we have already exceeded the
-			 * maximum number of pages allowed to be
-			 * retired
-			 */
-			return (page_retire_done(pp, PAGE_RETIRE_LIMIT));
-		}
-
-		if (page_retire_messages) {
-			cmn_err(CE_NOTE, "Scheduling removal of "
-			    "page 0x%08x.%08x",
-			    (uint32_t)(pa >> 32), (uint32_t)pa);
-		}
-	}
-
-	if (PAGE_LOCKED(pp) || !page_trylock(pp, SE_EXCL))
-		return (page_retire_done(pp, PAGE_RETIRE_SELOCK));
-
-	/*
-	 * If this is a large page we first try and demote it
-	 * to PAGESIZE pages and then dispose of the toxic page.
-	 * On failure we will let the page free/destroy
-	 * code handle it later since this is a mapped page.
-	 * Note that free large pages can always be demoted.
-	 *
-	 */
-	if (pp->p_szc != 0) {
-		if (PP_ISFREE(pp))
-			(void) page_demote_free_pages(pp);
-		else
-			(void) page_try_demote_pages(pp);
-
-		if (pp->p_szc != 0)
-			return (page_retire_done(pp, PAGE_RETIRE_LPAGE));
-	}
-
-	if (PP_ISFREE(pp)) {
-		if (!page_reclaim(pp, NULL))
-			return (page_retire_done(pp, PAGE_RETIRE_NORECLAIM));
-		/*LINTED: constant in conditional context*/
-		VN_DISPOSE(pp, pp->p_vnode ? B_INVAL : B_FREE, 0, kcred)
-		return (page_retire_done(pp, PAGE_RETIRE_SUCCESS));
-	}
-
-	if (pp->p_lckcnt != 0)
-		return (page_retire_done(pp, PAGE_RETIRE_LOCKED));
-
-	if (pp->p_cowcnt != 0)
-		return (page_retire_done(pp, PAGE_RETIRE_COW));
-
-	/*
-	 * Unload all translations to this page.  No new translations
-	 * can be created while we hold the exclusive lock on the page.
-	 */
-	(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
-
-	if (hat_ismod(pp))
-		return (page_retire_done(pp, PAGE_RETIRE_DIRTY));
-
-	/*LINTED: constant in conditional context*/
-	VN_DISPOSE(pp, B_INVAL, 0, kcred);
-
-	return (page_retire_done(pp, PAGE_RETIRE_SUCCESS));
 }
 
 /*
@@ -6126,140 +5716,6 @@ next:
 		ppa += page_cnt;
 		npages -= page_cnt;
 	}
-}
-
-/*
- * initialize the vnode for retired pages
- */
-static void
-page_retired_init(void)
-{
-	vn_setops(&retired_ppages, &retired_vnodeops);
-}
-
-/* ARGSUSED */
-static void
-retired_dispose(vnode_t *vp, page_t *pp, int flag, int dn, cred_t *cr)
-{
-	panic("retired_dispose invoked");
-}
-
-/* ARGSUSED */
-static void
-retired_inactive(vnode_t *vp, cred_t *cr)
-{}
-
-void
-page_unretire_pages(void)
-{
-	page_t		*pp;
-	kmutex_t	*vphm;
-	vnode_t		*vp;
-	page_t		*rpages[UNRETIRE_PAGES];
-	pgcnt_t		i, npages, rmem;
-	uint64_t	pa;
-
-	rmem = 0;
-
-	for (;;) {
-		/*
-		 * We do this in 2 steps:
-		 *
-		 * 1. We walk the retired pages list and collect a list of
-		 *    pages that have the toxic field cleared.
-		 *
-		 * 2. We iterate through the page list and unretire each one.
-		 *
-		 * We have to do it in two steps on account of the mutexes that
-		 * we need to acquire.
-		 */
-
-		vp = &retired_ppages;
-		vphm = page_vnode_mutex(vp);
-		mutex_enter(vphm);
-
-		if ((pp = vp->v_pages) == NULL) {
-			mutex_exit(vphm);
-			break;
-		}
-
-		i = 0;
-		do {
-			ASSERT(pp != NULL);
-			ASSERT(pp->p_vnode == vp);
-
-			/*
-			 * DR operations change the association between a page_t
-			 * and the physical page it represents. Check if the
-			 * page is still bad. If not, unretire it.
-			 */
-			if (!page_isfaulty(pp))
-				rpages[i++] = pp;
-
-			pp = pp->p_vpnext;
-		} while ((pp != vp->v_pages) && (i < UNRETIRE_PAGES));
-
-		mutex_exit(vphm);
-
-		npages = i;
-		for (i = 0; i < npages; i++) {
-			pp = rpages[i];
-			pa = ptob((uint64_t)page_pptonum(pp));
-
-			/*
-			 * Need to upgrade the shared lock to an exclusive
-			 * lock in order to hash out the page.
-			 *
-			 * The page could have been retired but the page lock
-			 * may not have been downgraded yet. If so, skip this
-			 * page. page_free() will call this function after the
-			 * lock is downgraded.
-			 */
-
-			if (!PAGE_SHARED(pp) || !page_tryupgrade(pp))
-				continue;
-
-			/*
-			 * Both page_free() and DR call this function. They
-			 * can potentially call this function at the same
-			 * time and race with each other.
-			 */
-			if (!page_isretired(pp) || page_isfaulty(pp)) {
-				page_downgrade(pp);
-				continue;
-			}
-
-			cmn_err(CE_NOTE,
-				"unretiring retired page 0x%08x.%08x",
-				(uint32_t)(pa >> 32), (uint32_t)pa);
-
-			/*
-			 * When a page is removed from the retired pages vnode,
-			 * its toxic field is also cleared. So, we do not have
-			 * to do that seperately here.
-			 */
-			page_hashout(pp, (kmutex_t *)NULL);
-
-			/*
-			 * This is a good page. So, free it.
-			 */
-			pp->p_vnode = NULL;
-			page_free(pp, 1);
-			rmem++;
-		}
-
-		/*
-		 * If the rpages array was filled up, then there could be more
-		 * retired pages that are not faulty. We need to iterate
-		 * again and unretire them. Otherwise, we are done.
-		 */
-		if (npages < UNRETIRE_PAGES)
-			break;
-	}
-
-	mutex_enter(&freemem_lock);
-	availrmem += rmem;
-	mutex_exit(&freemem_lock);
 }
 
 ulong_t mem_waiters 	= 0;
@@ -6621,6 +6077,39 @@ page_clr_all_props(page_t *pp)
 }
 
 /*
+ * Clear p_lckcnt and p_cowcnt, adjusting freemem if required.
+ */
+int
+page_clear_lck_cow(page_t *pp, int adjust)
+{
+	int	f_amount;
+
+	ASSERT(PAGE_EXCL(pp));
+
+	/*
+	 * The page_struct_lock need not be acquired here since
+	 * we require the caller hold the page exclusively locked.
+	 */
+	f_amount = 0;
+	if (pp->p_lckcnt) {
+		f_amount = 1;
+		pp->p_lckcnt = 0;
+	}
+	if (pp->p_cowcnt) {
+		f_amount += pp->p_cowcnt;
+		pp->p_cowcnt = 0;
+	}
+
+	if (adjust && f_amount) {
+		mutex_enter(&freemem_lock);
+		availrmem += f_amount;
+		mutex_exit(&freemem_lock);
+	}
+
+	return (f_amount);
+}
+
+/*
  * The following functions is called from free_vp_pages()
  * for an inexact estimate of a newly free'd page...
  */
@@ -6630,81 +6119,6 @@ page_share_cnt(page_t *pp)
 	return (hat_page_getshare(pp));
 }
 
-/*
- * The following functions are used in handling memory
- * errors.
- */
-
-int
-page_istoxic(page_t *pp)
-{
-	return ((pp->p_toxic & PAGE_IS_TOXIC) == PAGE_IS_TOXIC);
-}
-
-int
-page_isfailing(page_t *pp)
-{
-	return ((pp->p_toxic & PAGE_IS_FAILING) == PAGE_IS_FAILING);
-}
-
-int
-page_isretired(page_t *pp)
-{
-	return ((pp->p_toxic & PAGE_IS_RETIRED) == PAGE_IS_RETIRED);
-}
-
-int
-page_deteriorating(page_t *pp)
-{
-	return ((pp->p_toxic & (PAGE_IS_TOXIC | PAGE_IS_FAILING)) != 0);
-}
-
-void
-page_settoxic(page_t *pp, uchar_t flag)
-{
-	uchar_t new_flag = 0;
-	while ((new_flag & flag) != flag) {
-		uchar_t old_flag = pp->p_toxic;
-		new_flag = old_flag | flag;
-		(void) cas8(&pp->p_toxic, old_flag, new_flag);
-		new_flag = ((volatile page_t *)pp)->p_toxic;
-	}
-}
-
-void
-page_clrtoxic(page_t *pp)
-{
-	/*
-	 * We don't need to worry about atomicity on the
-	 * p_toxic flag here as this is only called from
-	 * page_free() while holding an exclusive lock on
-	 * the page
-	 */
-	pp->p_toxic = PAGE_IS_OK;
-}
-
-void
-page_clrtoxic_flag(page_t *pp, uchar_t flag)
-{
-	uchar_t new_flag = ((volatile page_t *)pp)->p_toxic;
-	while ((new_flag & flag) == flag) {
-		uchar_t old_flag = new_flag;
-		new_flag = old_flag & ~flag;
-		(void) cas8(&pp->p_toxic, old_flag, new_flag);
-		new_flag = ((volatile page_t *)pp)->p_toxic;
-	}
-}
-
-int
-page_isfaulty(page_t *pp)
-{
-	return ((pp->p_toxic & PAGE_IS_FAULTY) == PAGE_IS_FAULTY);
-}
-
-/*
- * The following four functions are called from /proc code
- * for the /proc/<pid>/xmap interface.
- */
 int
 page_isshared(page_t *pp)
 {
