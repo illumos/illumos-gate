@@ -1953,6 +1953,14 @@ top:
 		int	take_group;
 
 		/*
+		 * NOTE: even if a new mode is being set,
+		 * we may clear S_ISUID/S_ISGID bits.
+		 */
+
+		if (!(mask & AT_MODE))
+			vap->va_mode = pzp->zp_mode;
+
+		/*
 		 * Take ownership or chgrp to group we are a member of
 		 */
 
@@ -1980,7 +1988,6 @@ top:
 				    (vap->va_mode & S_ISUID) != 0 &&
 				    (mask & AT_UID) != 0 &&
 				    vap->va_uid == 0) != 0) {
-					vap->va_mode = pzp->zp_mode;
 					vap->va_mask |= AT_MODE;
 					vap->va_mode &= ~(S_ISUID|S_ISGID);
 				}
