@@ -98,7 +98,8 @@ static prop_desc_t zfs_prop_table[ZFS_NPROP_ALL] = {
 	{ "mounted",	prop_type_boolean,	0,	NULL,	prop_readonly,
 	    ZFS_TYPE_FILESYSTEM, "yes | no | -", "MOUNTED", "%7s" },
 	{ "origin",	prop_type_string,	0,	NULL,	prop_readonly,
-	    ZFS_TYPE_FILESYSTEM, "<snapshot>", "ORIGIN", "%-20s" },
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, "<snapshot>", "ORIGIN",
+	    "%-20s" },
 	{ "quota",	prop_type_number,	0,	NULL,	prop_default,
 	    ZFS_TYPE_FILESYSTEM, "<size> | none", "QUOTA", "%5s" },
 	{ "reservation", prop_type_number,	0,	NULL,	prop_default,
@@ -118,10 +119,10 @@ static prop_desc_t zfs_prop_table[ZFS_NPROP_ALL] = {
 	{ "sharenfs",	prop_type_string,	0,	"off",	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
 	    "on | off | share(1M) options", "SHARENFS", "%-15s" },
-	{ "checksum",	prop_type_index,	ZIO_CHECKSUM_DEFAULT,	NULL,
+	{ "checksum",	prop_type_index,	ZIO_CHECKSUM_DEFAULT,	"on",
 	    prop_inherit,	ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "on | off | fletcher2 | fletcher4 | sha256", "CHECKSUM", "%10s" },
-	{ "compression", prop_type_index,	ZIO_COMPRESS_DEFAULT,	NULL,
+	{ "compression", prop_type_index,	ZIO_COMPRESS_DEFAULT,	"off",
 	    prop_inherit,	ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME,
 	    "on | off | lzjb", "COMPRESS", "%8s" },
 	{ "atime",	prop_type_boolean,	1,	NULL,	prop_inherit,
@@ -141,14 +142,14 @@ static prop_desc_t zfs_prop_table[ZFS_NPROP_ALL] = {
 	{ "zoned",	prop_type_boolean,	0,	NULL,	prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
 	    "on | off", "ZONED", "%5s" },
-	{ "snapdir",	prop_type_index,	ZFS_SNAPDIR_VISIBLE,	NULL,
+	{ "snapdir",	prop_type_index,	ZFS_SNAPDIR_VISIBLE, "visible",
 	    prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
 	    "hidden | visible", "SNAPDIR", "%7s" },
-	{ "aclmode", prop_type_index,	GROUPMASK,	 NULL,	prop_inherit,
+	{ "aclmode", prop_type_index,	GROUPMASK, "groupmask", prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
 	    "discard | groupmask | passthrough", "ACLMODE", "%11s" },
-	{ "aclinherit", prop_type_index,	SECURE,	NULL, 	prop_inherit,
+	{ "aclinherit", prop_type_index,	SECURE,	"secure", prop_inherit,
 	    ZFS_TYPE_FILESYSTEM,
 	    "discard | noallow | secure | passthrough", "ACLINHERIT", "%11s" },
 	{ "createtxg",	prop_type_number,	0,	NULL,	prop_readonly,
@@ -191,17 +192,7 @@ zfs_name_to_prop(const char *propname)
 void
 zfs_prop_default_string(zfs_prop_t prop, char *buf, size_t buflen)
 {
-	/*
-	 * For index types (compression and checksum), we want the numeric value
-	 * in the kernel, but the string value in userland.  The kernel will
-	 * call zfs_prop_default_numeric() based on the property type.  In
-	 * userland, the zfs_prop_is_string() will return TRUE for index types,
-	 * and we'll return "on" from this function.
-	 */
-	if (zfs_prop_table[prop].pd_proptype == prop_type_index)
-		(void) strncpy(buf, "on", buflen);
-	else
-		(void) strncpy(buf, zfs_prop_table[prop].pd_strdefault, buflen);
+	(void) strncpy(buf, zfs_prop_table[prop].pd_strdefault, buflen);
 }
 
 uint64_t

@@ -36,6 +36,10 @@
 extern "C" {
 #endif
 
+/*
+ * For index types (e.g. compression and checksum), we want the numeric value
+ * in the kernel, but the string value in userland.
+ */
 typedef enum {
 	prop_type_number,	/* numeric value */
 	prop_type_string,	/* string value */
