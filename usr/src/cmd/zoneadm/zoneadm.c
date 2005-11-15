@@ -466,7 +466,7 @@ again:
 			if (fp == NULL ||
 			    zonecfg_reverse_scratch(fp, name, altname,
 			    sizeof (altname), NULL, 0) == -1) {
-				zerror(gettext("cannot resolve scratch "
+				zerror(gettext("could not resolve scratch "
 				    "zone %s"), name);
 				retv = Z_ERR;
 				continue;
@@ -701,6 +701,10 @@ crosscheck_zonepaths(char *path)
 		(void) snprintf(rpath_copy, sizeof (rpath_copy), "%s/", rpath);
 		if (strncmp(path_copy, rpath_copy,
 		    min(strlen(path_copy), strlen(rpath_copy))) == 0) {
+			/*
+			 * TRANSLATION_NOTE
+			 * zonepath is a literal that should not be translated.
+			 */
 			(void) fprintf(stderr, gettext("%s zonepath (%s) and "
 			    "%s zonepath (%s) overlap.\n"),
 			    target_zone, path, ze->zone_name, rpath);
@@ -738,12 +742,16 @@ validate_zonepath(char *path, int cmd_num)
 			return (Z_ERR);
 		}
 		if (cmd_num == CMD_VERIFY) {
+			/*
+			 * TRANSLATION_NOTE
+			 * zoneadm is a literal that should not be translated.
+			 */
 			(void) fprintf(stderr, gettext("WARNING: %s does not "
-			    "exist, so it cannot be verified.\nWhen 'zoneadm "
-			    "%s' is run, '%s' will try to create\n%s, and '%s' "
-			    "will be tried again,\nbut the '%s' may fail if:\n"
-			    "the parent directory of %s is group- or other-"
-			    "writable\nor\n%s overlaps with any other "
+			    "exist, so it could not be verified.\nWhen "
+			    "'zoneadm %s' is run, '%s' will try to create\n%s, "
+			    "and '%s' will be tried again,\nbut the '%s' may "
+			    "fail if:\nthe parent directory of %s is group- or "
+			    "other-writable\nor\n%s overlaps with any other "
 			    "installed zones.\n"), path,
 			    cmd_to_str(CMD_INSTALL), cmd_to_str(CMD_INSTALL),
 			    path, cmd_to_str(CMD_VERIFY),
@@ -851,14 +859,23 @@ validate_zonepath(char *path, int cmd_num)
 		return (Z_ERR);
 	}
 	if (strcmp(vfsbuf.f_basetype, MNTTYPE_NFS) == 0) {
-		(void) fprintf(stderr, gettext("Zonepath %s is on a NFS "
-		    "mounted file system.\n"
-		    "\tA local file system must be used.\n"), rpath);
+		/*
+		 * TRANSLATION_NOTE
+		 * Zonepath and NFS are literals that should not be translated.
+		 */
+		(void) fprintf(stderr, gettext("Zonepath %s is on an NFS "
+		    "mounted file-system.\n"
+		    "\tA local file-system must be used.\n"), rpath);
 		return (Z_ERR);
 	}
 	if (vfsbuf.f_flag & ST_NOSUID) {
+		/*
+		 * TRANSLATION_NOTE
+		 * Zonepath and nosuid are literals that should not be
+		 * translated.
+		 */
 		(void) fprintf(stderr, gettext("Zonepath %s is on a nosuid "
-		    "file system.\n"), rpath);
+		    "file-system.\n"), rpath);
 		return (Z_ERR);
 	}
 
@@ -875,6 +892,10 @@ validate_zonepath(char *path, int cmd_num)
 	if (state == ZONE_STATE_CONFIGURED) {
 		if (snprintf(rootpath, sizeof (rootpath), "%s/root", rpath) >=
 		    sizeof (rootpath)) {
+			/*
+			 * TRANSLATION_NOTE
+			 * Zonepath is a literal that should not be translated.
+			 */
 			(void) fprintf(stderr,
 			    gettext("Zonepath %s is too long.\n"), rpath);
 			return (Z_ERR);
@@ -1040,6 +1061,10 @@ start_zoneadmd(const char *zone_name)
 		*ap = NULL;
 
 		(void) execv("/usr/lib/zones/zoneadmd", (char * const *)argv);
+		/*
+		 * TRANSLATION_NOTE
+		 * zoneadmd is a literal that should not be translated.
+		 */
 		zperror(gettext("could not exec zoneadmd"), B_FALSE);
 		_exit(Z_ERR);
 	} else {
@@ -1826,7 +1851,11 @@ verify_ipd(zone_dochandle_t handle)
 	char specdir[MAXPATHLEN];
 
 	if (zonecfg_setipdent(handle) != Z_OK) {
-		(void) fprintf(stderr, gettext("cannot verify "
+		/*
+		 * TRANSLATION_NOTE
+		 * inherit-pkg-dirs is a literal that should not be translated.
+		 */
+		(void) fprintf(stderr, gettext("could not verify "
 		    "inherit-pkg-dirs: unable to enumerate mounts\n"));
 		return (Z_ERR);
 	}
@@ -1837,15 +1866,25 @@ verify_ipd(zone_dochandle_t handle)
 		(void) snprintf(specdir, sizeof (specdir), "%s%s",
 		    zonecfg_get_root(), fstab.zone_fs_dir);
 		if (stat(specdir, &st) != 0) {
-			(void) fprintf(stderr, gettext("cannot verify "
+			/*
+			 * TRANSLATION_NOTE
+			 * inherit-pkg-dir is a literal that should not be
+			 * translated.
+			 */
+			(void) fprintf(stderr, gettext("could not verify "
 			    "inherit-pkg-dir %s: %s\n"),
 			    fstab.zone_fs_dir, strerror(errno));
 			return_code = Z_ERR;
 		}
 		if (strcmp(st.st_fstype, MNTTYPE_NFS) == 0) {
+			/*
+			 * TRANSLATION_NOTE
+			 * inherit-pkg-dir and NFS are literals that should
+			 * not be translated.
+			 */
 			(void) fprintf(stderr, gettext("cannot verify "
-			    "inherit-pkg-dir %s: NFS mounted file system.\n"
-			    "\tA local file system must be used.\n"),
+			    "inherit-pkg-dir %s: NFS mounted file-system.\n"
+			    "\tA local file-system must be used.\n"),
 			    fstab.zone_fs_dir);
 			return_code = Z_ERR;
 		}
@@ -1873,7 +1912,7 @@ verify_filesystems(zone_dochandle_t handle)
 	 * happen later when zoneadmd actually does the mounts.
 	 */
 	if (zonecfg_setfsent(handle) != Z_OK) {
-		(void) fprintf(stderr, gettext("cannot verify file-systems: "
+		(void) fprintf(stderr, gettext("could not verify file-systems: "
 		    "unable to enumerate mounts\n"));
 		return (Z_ERR);
 	}
@@ -1897,16 +1936,16 @@ verify_filesystems(zone_dochandle_t handle)
 			goto next_fs;
 		}
 		if (stat(cmdbuf, &st) != 0) {
-			(void) fprintf(stderr, gettext("cannot verify fs %s: "
-			    "can't access %s: %s\n"), fstab.zone_fs_dir,
+			(void) fprintf(stderr, gettext("could not verify fs "
+			    "%s: could not access %s: %s\n"), fstab.zone_fs_dir,
 			    cmdbuf, strerror(errno));
 			return_code = Z_ERR;
 			goto next_fs;
 		}
 		if (!S_ISREG(st.st_mode)) {
-			(void) fprintf(stderr, gettext("cannot verify fs %s: "
-			    "%s is not a regular file\n"), fstab.zone_fs_dir,
-			    cmdbuf);
+			(void) fprintf(stderr, gettext("could not verify fs "
+			    "%s: %s is not a regular file\n"),
+			    fstab.zone_fs_dir, cmdbuf);
 			return_code = Z_ERR;
 			goto next_fs;
 		}
@@ -1923,8 +1962,9 @@ verify_filesystems(zone_dochandle_t handle)
 			goto next_fs;
 		}
 		if (fstab.zone_fs_raw[0] == '\0' && stat(cmdbuf, &st) == 0) {
-			(void) fprintf(stderr, gettext("cannot verify fs %s: "
-			    "must specify 'raw' device for %s file-systems\n"),
+			(void) fprintf(stderr, gettext("could not verify fs "
+			    "%s: must specify 'raw' device for %s "
+			    "file-systems\n"),
 			    fstab.zone_fs_dir, fstab.zone_fs_type);
 			return_code = Z_ERR;
 			goto next_fs;
@@ -1942,24 +1982,33 @@ verify_filesystems(zone_dochandle_t handle)
 		 * Verify fs_special and optionally fs_raw, exists.
 		 */
 		if (stat(fstab.zone_fs_special, &st) != 0) {
-			(void) fprintf(stderr, gettext("cannot verify fs %s: "
-			    "can't access %s: %s\n"), fstab.zone_fs_dir,
+			(void) fprintf(stderr, gettext("could not verify fs "
+			    "%s: could not access %s: %s\n"), fstab.zone_fs_dir,
 			    fstab.zone_fs_special, strerror(errno));
 			return_code = Z_ERR;
 			goto next_fs;
 		}
 		if (strcmp(st.st_fstype, MNTTYPE_NFS) == 0) {
+			/*
+			 * TRANSLATION_NOTE
+			 * fs and NFS are literals that should
+			 * not be translated.
+			 */
 			(void) fprintf(stderr, gettext("cannot verify "
-			    "fs %s: NFS mounted file system.\n"
-			    "\tA local file system must be used.\n"),
+			    "fs %s: NFS mounted file-system.\n"
+			    "\tA local file-system must be used.\n"),
 			    fstab.zone_fs_special);
 			return_code = Z_ERR;
 			goto next_fs;
 		}
 		if (fstab.zone_fs_raw[0] != '\0' &&
 		    stat(fstab.zone_fs_raw, &st) != 0) {
-			(void) fprintf(stderr, gettext("cannot verify fs %s: "
-			    "can't access %s: %s\n"), fstab.zone_fs_dir,
+			/*
+			 * TRANSLATION_NOTE
+			 * fs is a literal that should not be translated.
+			 */
+			(void) fprintf(stderr, gettext("could not verify fs "
+			    "%s: could not access %s: %s\n"), fstab.zone_fs_dir,
 			    fstab.zone_fs_raw, strerror(errno));
 			return_code = Z_ERR;
 			goto next_fs;
@@ -1989,10 +2038,14 @@ zfs_error_handler(const char *fmt, va_list ap)
 
 	if (strncmp(gettext("cannot open "), buf,
 	    strlen(gettext("cannot open "))) == 0)
-		(void) fprintf(stderr, gettext("cannot verify zfs "
+		/*
+		 * TRANSLATION_NOTE
+		 * zfs and dataset are literals that should not be translated.
+		 */
+		(void) fprintf(stderr, gettext("could not verify zfs "
 		    "dataset %s%s\n"), current_dataset, strchr(buf, ':'));
 	else
-		(void) fprintf(stderr, gettext("cannot verify zfs dataset "
+		(void) fprintf(stderr, gettext("could not verify zfs dataset "
 		    "%s: %s\n"), current_dataset, buf);
 }
 
@@ -2003,6 +2056,10 @@ check_zvol(zfs_handle_t *zhp, void *unused)
 	int ret;
 
 	if (zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
+		/*
+		 * TRANSLATION_NOTE
+		 * zfs and dataset are literals that should not be translated.
+		 */
 		(void) fprintf(stderr, gettext("cannot verify zfs dataset %s: "
 		    "volumes cannot be specified as a zone dataset resource\n"),
 		    zfs_get_name(zhp));
@@ -2036,7 +2093,11 @@ verify_datasets(zone_dochandle_t handle)
 	zfs_source_t srctype;
 
 	if (zonecfg_setdsent(handle) != Z_OK) {
-		(void) fprintf(stderr, gettext("cannot verify zfs datasets: "
+		/*
+		 * TRANSLATION_NOTE
+		 * zfs and dataset are literals that should not be translated.
+		 */
+		(void) fprintf(stderr, gettext("could not verify zfs datasets: "
 		    "unable to enumerate datasets\n"));
 		return (Z_ERR);
 	}
@@ -2057,7 +2118,7 @@ verify_datasets(zone_dochandle_t handle)
 		    sizeof (propbuf), &srctype, source,
 		    sizeof (source), 0) == 0 &&
 		    (srctype == ZFS_SRC_INHERITED)) {
-			(void) fprintf(stderr, gettext("cannot verify zfs "
+			(void) fprintf(stderr, gettext("could not verify zfs "
 			    "dataset %s: mountpoint cannot be inherited\n"),
 			    dstab.zone_dataset_name);
 			return_code = Z_ERR;
@@ -2122,6 +2183,10 @@ verify_details(int cmd_num)
 		return (Z_ERR);
 	}
 	if (strcmp(zonepath, checkpath) != 0) {
+		/*
+		 * TRANSLATION_NOTE
+		 * XML and zonepath are literals that should not be translated.
+		 */
 		(void) fprintf(stderr, gettext("The XML repository has "
 		    "zonepath '%s',\nbut the index file has zonepath '%s'.\n"
 		    "These must match, so fix the incorrect entry.\n"),
