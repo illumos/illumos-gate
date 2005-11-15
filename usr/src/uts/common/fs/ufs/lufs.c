@@ -50,6 +50,8 @@
 #include <sys/kstat.h>
 #include <sys/cmn_err.h>
 
+extern	kmutex_t	ufs_scan_lock;
+
 static kmutex_t	log_mutex;	/* general purpose log layer lock */
 kmutex_t	ml_scan;	/* Scan thread syncronization */
 kcondvar_t	ml_scan_cv;	/* Scan thread syncronization */
@@ -384,10 +386,19 @@ lufs_snarf(ufsvfs_t *ufsvfsp, struct fs *fs, int ronly)
 		ul->un_matamap = map_get(ul, matamaptype, DELTAMAP_NHASH);
 	mutex_init(&ul->un_log_mutex, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&ul->un_state_mutex, NULL, MUTEX_DEFAULT, NULL);
+
+	/*
+	 * Aquire the ufs_scan_lock before linking the mtm data
+	 * structure so that we keep ufs_sync() and ufs_update() away
+	 * when they execute the ufs_scan_inodes() run while we're in
+	 * progress of enabling/disabling logging.
+	 */
+	mutex_enter(&ufs_scan_lock);
 	ufsvfsp->vfs_log = ul;
 
 	/* remember the state of the log before the log scan */
 	logmap_logscan(ul);
+	mutex_exit(&ufs_scan_lock);
 
 	/*
 	 * Error during scan
@@ -398,7 +409,16 @@ lufs_snarf(ufsvfs_t *ufsvfsp, struct fs *fs, int ronly)
 	 */
 	if (ul->un_flags & LDL_ERROR) {
 		if (!ronly) {
+			/*
+			 * Aquire the ufs_scan_lock before de-linking
+			 * the mtm data structure so that we keep ufs_sync()
+			 * and ufs_update() away when they execute the
+			 * ufs_scan_inodes() run while we're in progress of
+			 * enabling/disabling logging.
+			 */
+			mutex_enter(&ufs_scan_lock);
 			lufs_unsnarf(ufsvfsp);
+			mutex_exit(&ufs_scan_lock);
 			return (EIO);
 		}
 		ul->un_flags &= ~LDL_ERROR;
@@ -840,8 +860,14 @@ lufs_disable(vnode_t *vp, struct fiolog *flp)
 
 	/*
 	 * Free all of the incore structs
+	 * Aquire the ufs_scan_lock before de-linking the mtm data
+	 * structure so that we keep ufs_sync() and ufs_update() away
+	 * when they execute the ufs_scan_inodes() run while we're in
+	 * progress of enabling/disabling logging.
 	 */
+	mutex_enter(&ufs_scan_lock);
 	(void) lufs_unsnarf(ufsvfsp);
+	mutex_exit(&ufs_scan_lock);
 
 	atomic_add_long(&ufs_quiesce_pend, -1);
 	mutex_exit(&ulp->ul_lock);
@@ -964,6 +990,14 @@ recheck:
 	}
 
 	/*
+	 * Grab appropriate locks to synchronize with the rest
+	 * of the system
+	 */
+	vfs_lock_wait(vfsp);
+	ulp = &ufsvfsp->vfs_ulockfs;
+	mutex_enter(&ulp->ul_lock);
+
+	/*
 	 * File system must be fairly consistent to enable logging
 	 */
 	if (fs->fs_clean != FSLOG &&
@@ -994,6 +1028,9 @@ recheck:
 		 * this point.  Disabling sets fs->fs_logbno to 0, so this
 		 * will not put us into an infinite loop.
 		 */
+		mutex_exit(&ulp->ul_lock);
+		vfs_unlock(vfsp);
+
 		lf.lf_lock = LOCKFS_ULOCK;
 		lf.lf_flags = 0;
 		error = ufs_fiolfs(vp, &lf, 1);
@@ -1024,19 +1061,12 @@ recheck:
 
 	/*
 	 * Pretend we were just mounted with logging enabled
-	 *	freeze and drain the file system of readers
 	 *		Get the ops vector
 	 *		If debug, record metadata locations with log subsystem
 	 *		Start the delete thread
 	 *		Start the reclaim thread, if necessary
-	 *	Thaw readers
 	 */
-	vfs_lock_wait(vfsp);
 	vfs_setmntopt(vfsp, MNTOPT_LOGGING, NULL, 0);
-	ulp = &ufsvfsp->vfs_ulockfs;
-	mutex_enter(&ulp->ul_lock);
-	atomic_add_long(&ufs_quiesce_pend, 1);
-	(void) ufs_quiesce(ulp);
 
 	TRANS_DOMATAMAP(ufsvfsp);
 	TRANS_MATA_MOUNT(ufsvfsp);
@@ -1050,7 +1080,6 @@ recheck:
 	} else
 		fs->fs_reclaim |= reclaim;
 
-	atomic_add_long(&ufs_quiesce_pend, -1);
 	mutex_exit(&ulp->ul_lock);
 	vfs_unlock(vfsp);
 
@@ -1080,9 +1109,21 @@ recheck:
 	return (0);
 
 errout:
+	/*
+	 * Aquire the ufs_scan_lock before de-linking the mtm data
+	 * structure so that we keep ufs_sync() and ufs_update() away
+	 * when they execute the ufs_scan_inodes() run while we're in
+	 * progress of enabling/disabling logging.
+	 */
+	mutex_enter(&ufs_scan_lock);
 	(void) lufs_unsnarf(ufsvfsp);
+	mutex_exit(&ufs_scan_lock);
+
 	(void) lufs_free(ufsvfsp);
 unlockout:
+	mutex_exit(&ulp->ul_lock);
+	vfs_unlock(vfsp);
+
 	lf.lf_lock = LOCKFS_ULOCK;
 	lf.lf_flags = 0;
 	(void) ufs_fiolfs(vp, &lf, 1);
