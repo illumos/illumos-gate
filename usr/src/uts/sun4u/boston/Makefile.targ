@@ -1,0 +1,77 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	Common targets for sun4u implementation specific modules.
+#
+
+.KEEP_STATE:
+
+IMPLEMENTED_PLATFORM   = SUNW,Sun-Fire-V445
+#
+# Rules for implementation subdirectories.
+#
+$(ROOT_BOSTON_DIR): $(ROOT_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_BOSTON_MOD_DIR): $(ROOT_BOSTON_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_BOSTON_MISC_DIR_32): $(ROOT_BOSTON_MOD_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_BOSTON_MISC_DIR_64): $(ROOT_BOSTON_MISC_DIR_32)
+	-$(INS.dir.root.sys)
+
+$(ROOT_BOSTON_DRV_DIR_32): $(ROOT_BOSTON_MOD_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_BOSTON_DRV_DIR_64): $(ROOT_BOSTON_DRV_DIR_32)
+	-$(INS.dir.root.sys)
+
+$(ROOT_BOSTON_CRYPTO_DIR_32): $(ROOT_BOSTON_MOD_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_BOSTON_CRYPTO_DIR_64): $(ROOT_BOSTON_CRYPTO_DIR_32)
+	-$(INS.dir.root.sys)
+
+$(USR_BOSTON_DIR): $(USR_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_BOSTON_INC_DIR): $(USR_BOSTON_DIR)
+	-$(INS.slink4)
+
+$(USR_BOSTON_SBIN_DIR): $(USR_BOSTON_DIR)
+	$(INS.dir.root.bin)
+
+$(USR_BOSTON_SBIN_EEPROM): $(USR_BOSTON_SBIN_DIR)
+	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/eeprom $@ $(CHOWNLINK) $(CHGRPLINK)
+
+$(USR_BOSTON_SBIN_PRTDIAG): $(USR_BOSTON_SBIN_DIR)
+	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@ $(CHOWNLINK) $(CHGRPLINK)
+
+$(USR_BOSTON_SBIN_TRAPSTAT): $(USR_BOSTON_SBIN_DIR)
+	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/trapstat $@ $(CHOWNLINK) $(CHGRPLINK)
+
+$(USR_BOSTON_LIB_DIR): $(USR_BOSTON_DIR)
+	-$(INS.dir.root.bin)
+
+$(USR_BOSTON_ISYS_DIR): $(USR_BOSTON_INC_DIR)
+	$(INS.dir.root.bin)
+
+$(ROOT_BOSTON_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_BOSTON_MOD_DIR)
+	$(INS.file)
+
+$(ROOT_BOSTON_MISC_DIR)/%: $(OBJS_DIR)/% $(ROOT_BOSTON_MISC_DIR)
+	$(INS.file)
+
+$(ROOT_BOSTON_DRV_DIR)/%: $(OBJS_DIR)/% $(ROOT_BOSTON_DRV_DIR)
+	$(INS.file)
+
+#
+#	Include common targets.
+#
+include $(UTSBASE)/sun4u/boston/Makefile.rules
+include $(UTSBASE)/sun4u/Makefile.targ

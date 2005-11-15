@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,35 @@
 #include <sys/devops.h>
 
 /*
+ * The pmugpio driver supports ALOM GPIO bits for resetSC and
+ * watchdog heartbeat on all relevant platforms.  Historically,
+ * pmugpio is a leaf off the Chalupa pmubus.  In addition to
+ * this support the pmugpio driver has been modified to support
+ * Minneapolis/Boston Controller (MBC) FPGA GPIO and Seattle CPLD
+ * GPIO.
+ */
+
+typedef enum {
+	PMUGPIO_MBC,		/* Boston MBC FPGA GPIO - 8-bit */
+	PMUGPIO_CPLD,		/* Seattle CPLD GPIO - 8-bit */
+	PMUGPIO_OTHER		/* Chalupa - 8-bit */
+} pmugpio_access_type_t;
+
+/*
+ * CPLD GPIO Register defines.
+ */
+#define	CPLD_RESET_SC		0x01	/* Reset SC */
+#define	CPLD_WATCHDOG		0x02	/* Watchdog */
+
+#define	CPLD_RESET_DELAY	3	/* microsecond delay */
+
+/*
+ * MBC FPGA CSR defines.
+ */
+#define	MBC_PPC_RESET		0x10	/* Reset ALOM */
+#define	MBC_WATCHDOG		0x40	/* Watchdog heartbeat bit */
+
+/*
  * Time periods, in nanoseconds
  */
 #define	PMUGPIO_TWO_SEC		2000000000LL
@@ -48,6 +77,7 @@ typedef struct pmugpio_state {
 	uint8_t			*pmugpio_watchdog_reg;
 	ddi_acc_handle_t	pmugpio_watchdog_reg_handle;
 	hrtime_t		hw_last_pat;
+	pmugpio_access_type_t	access_type;
 } pmugpio_state_t;
 
 static void *pmugpio_statep;
@@ -241,12 +271,37 @@ pmugpio_watchdog_pat(void)
 		/*
 		 * fetch current reg value and invert it
 		 */
-		value = (uint8_t)(0xff ^
-		    ddi_get8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
-		    pmugpio_ptr->pmugpio_watchdog_reg));
+		switch (pmugpio_ptr->access_type) {
+		case PMUGPIO_CPLD:
+			value = (CPLD_WATCHDOG ^
+			    ddi_get8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
+				pmugpio_ptr->pmugpio_watchdog_reg));
 
-		ddi_put8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
-		    pmugpio_ptr->pmugpio_watchdog_reg, value);
+			ddi_put8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
+			    pmugpio_ptr->pmugpio_watchdog_reg, value);
+			break;
+
+		case PMUGPIO_MBC:
+			value = (uint8_t)(MBC_WATCHDOG ^
+			    ddi_get8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
+			    pmugpio_ptr->pmugpio_watchdog_reg));
+
+			ddi_put8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
+			    pmugpio_ptr->pmugpio_watchdog_reg, value);
+			break;
+
+		case PMUGPIO_OTHER:
+			value = (uint8_t)(0xff ^
+			    ddi_get8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
+			    pmugpio_ptr->pmugpio_watchdog_reg));
+
+			ddi_put8(pmugpio_ptr->pmugpio_watchdog_reg_handle,
+			    pmugpio_ptr->pmugpio_watchdog_reg, value);
+			break;
+
+		default:
+			cmn_err(CE_WARN, "pmugpio_watchdog_pat: Invalid type");
+		}
 		pmugpio_ptr->hw_last_pat = now;
 	}
 }
@@ -257,6 +312,7 @@ pmugpio_reset(void)
 	dev_info_t *dip = pmugpio_dip;
 	int instance;
 	pmugpio_state_t *pmugpio_ptr;
+	uint8_t value;
 
 	if (dip == NULL) {
 		return;
@@ -268,35 +324,102 @@ pmugpio_reset(void)
 	}
 
 	/*
-	 * turn all bits on then off again - pmubus nexus will ensure
-	 * that only unmasked bit is affected
+	 * For Chalupa, turn all bits on then off again - pmubus nexus
+	 * will ensure that only unmasked bit is affected.
+	 * For CPLD and MBC, turn just reset bit on, then off.
 	 */
-	ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
-	    pmugpio_ptr->pmugpio_reset_reg, ~0);
-	ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
-	    pmugpio_ptr->pmugpio_reset_reg, 0);
+	switch (pmugpio_ptr->access_type) {
+	case PMUGPIO_CPLD:
+		value = ddi_get8(pmugpio_ptr->pmugpio_reset_reg_handle,
+		    pmugpio_ptr->pmugpio_reset_reg);
+		ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
+		    pmugpio_ptr->pmugpio_reset_reg, (value | CPLD_RESET_SC));
+
+		drv_usecwait(CPLD_RESET_DELAY);
+
+		ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
+		    pmugpio_ptr->pmugpio_reset_reg, (value & ~CPLD_RESET_SC));
+		break;
+
+	case PMUGPIO_MBC:
+		value = ddi_get8(pmugpio_ptr->pmugpio_reset_reg_handle,
+		    pmugpio_ptr->pmugpio_reset_reg);
+		ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
+		    pmugpio_ptr->pmugpio_reset_reg,
+			(value | MBC_PPC_RESET));
+		ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
+		    pmugpio_ptr->pmugpio_reset_reg,
+			(value & ~MBC_PPC_RESET));
+		break;
+
+	case PMUGPIO_OTHER:
+		ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
+		    pmugpio_ptr->pmugpio_reset_reg, ~0);
+		ddi_put8(pmugpio_ptr->pmugpio_reset_reg_handle,
+		    pmugpio_ptr->pmugpio_reset_reg, 0);
+		break;
+
+	default:
+		cmn_err(CE_WARN, "pmugpio_reset: Invalid type");
+	}
 }
 
 static int
 pmugpio_map_regs(dev_info_t *dip, pmugpio_state_t *pmugpio_ptr)
 {
 	ddi_device_acc_attr_t attr;
+	char *binding_name;
 
 	/* The host controller will be little endian */
 	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 	attr.devacc_attr_endian_flags  = DDI_STRUCTURE_LE_ACC;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
-	if (ddi_regs_map_setup(dip, 1,
-	    (caddr_t *)&pmugpio_ptr->pmugpio_watchdog_reg, 0, 1, &attr,
-	    &pmugpio_ptr->pmugpio_watchdog_reg_handle) != DDI_SUCCESS) {
+	binding_name = ddi_binding_name(dip);
+
+	/*
+	 * Determine access type.
+	 */
+	if (strcmp(binding_name, "mbcgpio") == 0)
+		pmugpio_ptr->access_type = PMUGPIO_MBC;
+	else if (strcmp(binding_name, "cpldgpio") == 0)
+		pmugpio_ptr->access_type = PMUGPIO_CPLD;
+	else
+		pmugpio_ptr->access_type = PMUGPIO_OTHER;
+
+	switch (pmugpio_ptr->access_type) {
+	case PMUGPIO_CPLD:
+	case PMUGPIO_MBC:
+		if (ddi_regs_map_setup(dip, 0,
+		    (caddr_t *)&pmugpio_ptr->pmugpio_reset_reg, 0, 1, &attr,
+		    &pmugpio_ptr->pmugpio_reset_reg_handle) != DDI_SUCCESS)
+			return (DDI_FAILURE);
+		/* MBC and CPLD have reset and watchdog bits in same reg. */
+		pmugpio_ptr->pmugpio_watchdog_reg_handle =
+			pmugpio_ptr->pmugpio_reset_reg_handle;
+		pmugpio_ptr->pmugpio_watchdog_reg =
+			pmugpio_ptr->pmugpio_reset_reg;
+		break;
+
+	case PMUGPIO_OTHER:
+		if (ddi_regs_map_setup(dip, 1,
+		    (caddr_t *)&pmugpio_ptr->pmugpio_watchdog_reg, 0, 1, &attr,
+		    &pmugpio_ptr->pmugpio_watchdog_reg_handle) != DDI_SUCCESS) {
+			return (DDI_FAILURE);
+		}
+		if (ddi_regs_map_setup(dip, 0,
+		    (caddr_t *)&pmugpio_ptr->pmugpio_reset_reg, 0, 1, &attr,
+		    &pmugpio_ptr->pmugpio_reset_reg_handle) != DDI_SUCCESS) {
+			ddi_regs_map_free(
+				&pmugpio_ptr->pmugpio_watchdog_reg_handle);
+			return (DDI_FAILURE);
+		}
+		break;
+
+	default:
+		cmn_err(CE_WARN, "pmugpio_map_regs: Invalid type");
 		return (DDI_FAILURE);
 	}
-	if (ddi_regs_map_setup(dip, 0,
-	    (caddr_t *)&pmugpio_ptr->pmugpio_reset_reg, 0, 1, &attr,
-	    &pmugpio_ptr->pmugpio_reset_reg_handle) != DDI_SUCCESS) {
-		ddi_regs_map_free(&pmugpio_ptr->pmugpio_watchdog_reg_handle);
-		return (DDI_FAILURE);
-	}
+
 	return (DDI_SUCCESS);
 }

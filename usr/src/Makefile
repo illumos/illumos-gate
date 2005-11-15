@@ -255,6 +255,8 @@ EXPORT_SRC:
 	@cd uts/sun4u/ents;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/excalibur;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/chicago;	pwd;	$(MAKE) EXPORT_SRC
+	@cd uts/sun4u/boston;	pwd;	$(MAKE) EXPORT_SRC
+	@cd uts/sun4u/seattle;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/littleneck;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/lw2plus;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/lw8;	pwd;	$(MAKE) EXPORT_SRC

@@ -1,0 +1,83 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	Common targets for sun4u implementation specific modules.
+#
+
+.KEEP_STATE:
+
+IMPLEMENTED_PLATFORM   = SUNW,Sun-Fire-V215
+#
+# Rules for implementation subdirectories.
+#
+$(ROOT_SEATTLE_DIR): $(ROOT_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_SEATTLE_MOD_DIR): $(ROOT_SEATTLE_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_SEATTLE_MISC_DIR_32): $(ROOT_SEATTLE_MOD_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_SEATTLE_MISC_DIR_64): $(ROOT_SEATTLE_MISC_DIR_32)
+	-$(INS.dir.root.sys)
+
+$(ROOT_SEATTLE_DRV_DIR_32): $(ROOT_SEATTLE_MOD_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_SEATTLE_DRV_DIR_64): $(ROOT_SEATTLE_DRV_DIR_32)
+	-$(INS.dir.root.sys)
+
+$(ROOT_SEATTLE_CRYPTO_DIR_32): $(ROOT_SEATTLE_MOD_DIR)
+	-$(INS.dir.root.sys)
+
+$(ROOT_SEATTLE_CRYPTO_DIR_64): $(ROOT_SEATTLE_CRYPTO_DIR_32)
+	-$(INS.dir.root.sys)
+
+$(USR_SEATTLE_DIR): $(USR_PLAT_DIR)
+	-$(INS.dir.root.sys)
+
+$(USR_SEATTLE_INC_DIR): $(USR_SEATTLE_DIR)
+	-$(INS.slink4)
+
+$(USR_SEATTLE_SBIN_DIR): $(USR_SEATTLE_DIR)
+	$(INS.dir.root.bin)
+
+$(USR_SEATTLE_SBIN_EEPROM): $(USR_SEATTLE_SBIN_DIR)
+	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/eeprom $@ $(CHOWNLINK) $(CHGRPLINK)
+
+$(USR_SEATTLE_SBIN_PRTDIAG): $(USR_SEATTLE_SBIN_DIR)
+	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/prtdiag $@ $(CHOWNLINK) $(CHGRPLINK)
+
+$(USR_SEATTLE_SBIN_TRAPSTAT): $(USR_SEATTLE_SBIN_DIR)
+	$(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/sbin/trapstat $@ $(CHOWNLINK) $(CHGRPLINK)
+
+$(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%): $(ROOT_PLAT_DIR)
+	$(INS.slink3)
+
+$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%): $(USR_PLAT_DIR)
+	$(INS.slink3)
+
+$(USR_SEATTLE_LIB_DIR): $(USR_SEATTLE_DIR)
+	-$(INS.dir.root.bin)
+
+$(USR_SEATTLE_ISYS_DIR): $(USR_SEATTLE_INC_DIR)
+	$(INS.dir.root.bin)
+
+$(ROOT_SEATTLE_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_SEATTLE_MOD_DIR)
+	$(INS.file)
+
+$(ROOT_SEATTLE_MISC_DIR)/%: $(OBJS_DIR)/% $(ROOT_SEATTLE_MISC_DIR)
+	$(INS.file)
+
+$(ROOT_SEATTLE_DRV_DIR)/%: $(OBJS_DIR)/% $(ROOT_SEATTLE_DRV_DIR)
+	$(INS.file)
+
+#
+#	Include common targets.
+#
+include $(UTSBASE)/sun4u/seattle/Makefile.rules
+include $(UTSBASE)/sun4u/Makefile.targ

@@ -85,6 +85,7 @@ extern void plat_log_fruid_error(int synd_code, struct async_flt *ecc,
 #pragma	weak	plat_log_fruid_error2
 
 struct plat_ecc_ch_async_flt;
+struct rmc_comm_msg;
 
 extern void plat_log_fruid_error2(int msg_type, char *unum,
     struct async_flt *aflt, struct plat_ecc_ch_async_flt *plat_ecc_ch_flt);
@@ -106,12 +107,14 @@ extern int starcat_dr_name(char *name);
 #pragma	weak	plat_shared_i2c_enter
 #pragma	weak	plat_shared_i2c_exit
 #pragma weak	plat_fan_blast
+#pragma weak    plat_rmc_comm_req
 
 extern	void plat_setprop_enter(void);
 extern	void plat_setprop_exit(void);
 extern	void plat_shared_i2c_enter(dev_info_t *);
 extern	void plat_shared_i2c_exit(dev_info_t *);
 extern	void plat_fan_blast(void);
+extern  void plat_rmc_comm_req(struct rmc_comm_msg *);
 
 /*
  * Used to communicate DR updates to platform lgroup framework

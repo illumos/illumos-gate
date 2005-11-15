@@ -1,0 +1,33 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+#
+#	This Makefile defines the build rules for the directory
+#	uts/sun4u/seattle.
+#
+#	The following two-level ordering must be maintained in this file.
+#	  Lines are sorted first in order of decreasing specificity based on
+#	  the first directory component.  That is, sun4u rules come before
+#	  sparc rules come before common rules.
+#
+#	  Lines whose initial directory components are equal are sorted
+#	  alphabetically by the remaining components.
+
+#
+#	Section 1a: C object build rules
+#
+
+$(OBJS_DIR)/%.o:	$(UTSBASE)/sun4u/seattle/os/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+#
+#	Section 1b: Lint `object' build rules
+#
+
+$(LINTS_DIR)/%.ln:	$(UTSBASE)/sun4u/seattle/os/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))

@@ -60,6 +60,8 @@ d none usr/platform/SUNW,Sun-Blade-1000 755 root sys
 d none usr/platform/SUNW,Sun-Blade-1500 755 root sys
 d none usr/platform/SUNW,Sun-Blade-2500 755 root sys
 d none usr/platform/SUNW,A70 755 root sys
+d none usr/platform/SUNW,Sun-Fire-V445 755 root sys
+d none usr/platform/SUNW,Sun-Fire-V215 755 root sys
 d none usr/platform/SUNW,Sun-Fire 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V240 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V250 755 root sys
@@ -93,6 +95,14 @@ s none usr/platform/SUNW,Sun-Blade-1000/sbin=../sun4u/sbin
 s none usr/platform/SUNW,Sun-Blade-1500/sbin=../sun4u/sbin
 s none usr/platform/SUNW,Sun-Blade-2500/sbin=../sun4u/sbin
 s none usr/platform/SUNW,A70/sbin=../sun4u/sbin
+d none usr/platform/SUNW,Sun-Fire-V445/sbin 755 root bin
+s none usr/platform/SUNW,Sun-Fire-V445/sbin/eeprom=../../sun4u/sbin/eeprom
+s none usr/platform/SUNW,Sun-Fire-V445/sbin/prtdiag=../../sun4u/sbin/prtdiag
+s none usr/platform/SUNW,Sun-Fire-V445/sbin/trapstat=../../sun4u/sbin/trapstat
+d none usr/platform/SUNW,Sun-Fire-V215/sbin 755 root bin
+s none usr/platform/SUNW,Sun-Fire-V215/sbin/eeprom=../../sun4u/sbin/eeprom
+s none usr/platform/SUNW,Sun-Fire-V215/sbin/prtdiag=../../sun4u/sbin/prtdiag
+s none usr/platform/SUNW,Sun-Fire-V215/sbin/trapstat=../../sun4u/sbin/trapstat
 s none usr/platform/SUNW,Sun-Fire/sbin=../sun4u/sbin
 d none usr/platform/SUNW,Sun-Fire-V240/sbin 755 root bin
 s none usr/platform/SUNW,Sun-Fire-V240/sbin/eeprom=../../sun4u/sbin/eeprom
@@ -164,6 +174,8 @@ d none usr/platform/SUNW,Sun-Blade-1000/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-1500/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-2500/lib 755 root bin
 d none usr/platform/SUNW,A70/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V445/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V215/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V240/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V250/lib 755 root bin
@@ -196,6 +208,8 @@ s none usr/platform/SUNW,Sun-Blade-1000/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,Sun-Blade-1500/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,Sun-Blade-2500/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,A70/lib/cfgadm=../../sun4u/lib/cfgadm
+s none usr/platform/SUNW,Sun-Fire-V445/lib/cfgadm=../../sun4u/lib/cfgadm
+s none usr/platform/SUNW,Sun-Fire-V215/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,Sun-Fire/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,Sun-Fire-V240/lib/cfgadm=../../sun4u/lib/cfgadm
 s none usr/platform/SUNW,Sun-Fire-V250/lib/cfgadm=../../sun4u/lib/cfgadm
@@ -235,6 +249,8 @@ s none usr/platform/SUNW,Sun-Blade-1000/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,Sun-Blade-1500/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,Sun-Blade-2500/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,A70/lib/fs=../../sun4u/lib/fs
+s none usr/platform/SUNW,Sun-Fire-V445/lib/fs=../../sun4u/lib/fs
+s none usr/platform/SUNW,Sun-Fire-V215/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,Sun-Fire/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,Sun-Fire-V240/lib/fs=../../sun4u/lib/fs
 s none usr/platform/SUNW,Sun-Fire-V250/lib/fs=../../sun4u/lib/fs
@@ -275,6 +291,10 @@ s none usr/platform/SUNW,Sun-Fire-V210=SUNW,Sun-Fire-V240
 s none usr/platform/SUNW,Netra-240=SUNW,Sun-Fire-V240
 s none usr/platform/SUNW,Netra-210=SUNW,Sun-Fire-V240
 #
+# make the link for Sun-Fire-V245 from Sun-Fire-V215
+#
+s none usr/platform/SUNW,Sun-Fire-V245=SUNW,Sun-Fire-V215
+#
 # system controller administration code
 #
 f none usr/platform/SUNW,Sun-Fire-V240/sbin/scadm 2755 root sys
@@ -288,6 +308,14 @@ s none usr/platform/SUNW,Sun-Fire-V250/lib/librsc.so=../../SUNW,Sun-Fire-V240/li
 s none usr/platform/SUNW,Sun-Fire-V440/lib/librsc.so.1=../../SUNW,Sun-Fire-V240/lib/librsc.so.1
 s none usr/platform/SUNW,Sun-Fire-V440/lib/librsc.so=../../SUNW,Sun-Fire-V240/lib/librsc.so
 s none usr/platform/SUNW,Sun-Fire-V440/lib/llib-lrsc.ln=../../SUNW,Sun-Fire-V240/lib/llib-lrsc.ln
+s none usr/platform/SUNW,Sun-Fire-V445/sbin/scadm=../../SUNW,Sun-Fire-V240/sbin/scadm
+s none usr/platform/SUNW,Sun-Fire-V445/lib/llib-lrsc.ln=../../SUNW,Sun-Fire-V240/lib/llib-lrsc.ln
+s none usr/platform/SUNW,Sun-Fire-V445/lib/librsc.so.1=../../SUNW,Sun-Fire-V240/lib/librsc.so.1
+s none usr/platform/SUNW,Sun-Fire-V445/lib/librsc.so=../../SUNW,Sun-Fire-V240/lib/librsc.so
+s none usr/platform/SUNW,Sun-Fire-V215/sbin/scadm=../../SUNW,Sun-Fire-V240/sbin/scadm
+s none usr/platform/SUNW,Sun-Fire-V215/lib/llib-lrsc.ln=../../SUNW,Sun-Fire-V240/lib/llib-lrsc.ln
+s none usr/platform/SUNW,Sun-Fire-V215/lib/librsc.so.1=../../SUNW,Sun-Fire-V240/lib/librsc.so.1
+s none usr/platform/SUNW,Sun-Fire-V215/lib/librsc.so=../../SUNW,Sun-Fire-V240/lib/librsc.so
 #
 # make link for Netra-440 from Sun-Fire-V440, basically the same hardware in
 # a different case

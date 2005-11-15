@@ -1,3 +1,4 @@
+
 /*
  * CDDL HEADER START
  *
@@ -59,9 +60,29 @@
 #include <sys/stat.h>
 #include <sys/poll.h>
 #include <sys/pbio.h>
+
 #ifdef	ACPI_POWER_BUTTON
+
 #include <sys/acpi/acpi.h>
 #include <sys/acpica.h>
+
+#else
+
+#include <sys/epic.h>
+/*
+ * Some #defs that must be here as they differ for power.c
+ * and epic.c
+ */
+#define	EPIC_REGS_OFFSET	0x00
+#define	EPIC_REGS_LEN		0x82
+
+
+/*
+ * This flag, which is set for platforms,  that have EPIC processor
+ * to process power button interrupt, helps in executing platform
+ * specific code.
+ */
+static char 	hasEPIC = B_FALSE;
 #endif	/* ACPI_POWER_BUTTON */
 
 /*
@@ -390,6 +411,7 @@ power_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	    DDI_FAILURE);
 }
 
+
 #ifndef	ACPI_POWER_BUTTON
 /*
  * Handler for the high-level interrupt.
@@ -408,17 +430,39 @@ power_high_intr(caddr_t arg)
 
 	if (softsp->power_regs_mapped) {
 		mutex_enter(&softsp->power_intr_mutex);
-		reg = ddi_get8(hdl, softsp->power_btn_reg);
-		if (reg & softsp->power_btn_bit) {
-			reg &= softsp->power_btn_bit;
-			ddi_put8(hdl, softsp->power_btn_reg, reg);
-			(void) ddi_get8(hdl, softsp->power_btn_reg);
-		} else {
-			if (!softsp->power_btn_ioctl) {
-				mutex_exit(&softsp->power_intr_mutex);
-				return (DDI_INTR_CLAIMED);
+
+		/* Check if power button interrupt is delivered by EPIC HW */
+		if (hasEPIC) {
+			/* read isr - first issue command */
+			EPIC_WR(hdl, softsp->power_btn_reg,
+				EPIC_ATOM_INTR_READ);
+			/* next, read the reg */
+			EPIC_RD(hdl, softsp->power_btn_reg, reg);
+
+			if (reg & EPIC_FIRE_INTERRUPT) {  /* PB pressed */
+				/* clear the interrupt */
+				EPIC_WR(hdl, softsp->power_btn_reg,
+					EPIC_ATOM_INTR_CLEAR);
+			} else {
+				if (!softsp->power_btn_ioctl) {
+					mutex_exit(&softsp->power_intr_mutex);
+					return (DDI_INTR_CLAIMED);
+				}
+				softsp->power_btn_ioctl = B_FALSE;
 			}
-			softsp->power_btn_ioctl = B_FALSE;
+		} else {
+			reg = ddi_get8(hdl, softsp->power_btn_reg);
+			if (reg & softsp->power_btn_bit) {
+				reg &= softsp->power_btn_bit;
+				ddi_put8(hdl, softsp->power_btn_reg, reg);
+				(void) ddi_get8(hdl, softsp->power_btn_reg);
+			} else {
+				if (!softsp->power_btn_ioctl) {
+					mutex_exit(&softsp->power_intr_mutex);
+					return (DDI_INTR_CLAIMED);
+				}
+				softsp->power_btn_ioctl = B_FALSE;
+			}
 		}
 		mutex_exit(&softsp->power_intr_mutex);
 	}
@@ -1033,6 +1077,44 @@ power_detach_acpi(struct power_soft_state *softsp)
 
 #else
 /*
+ * Code for platforms that have EPIC processor for processing power
+ * button interrupts.
+ */
+static int
+power_setup_epic_regs(dev_info_t *dip, struct power_soft_state *softsp)
+{
+	ddi_device_acc_attr_t	attr;
+	uint8_t *reg_base;
+
+	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+	if (ddi_regs_map_setup(dip, 0, (caddr_t *)&reg_base,
+		EPIC_REGS_OFFSET, EPIC_REGS_LEN, &attr,
+		&softsp->power_rhandle) != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+
+	softsp->power_btn_reg = reg_base;
+	softsp->power_regs_mapped = B_TRUE;
+
+	/* Clear power button interrupt first */
+	EPIC_WR(softsp->power_rhandle, softsp->power_btn_reg,
+		EPIC_ATOM_INTR_CLEAR);
+
+	/* Enable EPIC interrupt for power button single press event */
+	EPIC_WR(softsp->power_rhandle, softsp->power_btn_reg,
+		EPIC_ATOM_INTR_ENABLE);
+
+	/*
+	 * At this point, EPIC interrupt processing is fully initialised.
+	 */
+	hasEPIC = B_TRUE;
+	return (DDI_SUCCESS);
+}
+
+/*
+ *
  * power button register definitions for acpi register on m1535d
  */
 #define	M1535D_PWR_BTN_REG_01		0x1
@@ -1058,10 +1140,47 @@ power_setup_m1535_regs(dev_info_t *dip, struct power_soft_state *softsp)
 }
 
 /*
+ * MBC Fire/SSI Interrupt Status Register definitions
+ */
+#define	FIRE_SSI_ISR			0x0
+#define	FIRE_SSI_INTR_ENA		0x8
+#define	FIRE_SSI_SHUTDOWN_REQ		0x4
+
+static int
+power_setup_mbc_regs(dev_info_t *dip, struct power_soft_state *softsp)
+{
+	ddi_device_acc_attr_t   attr;
+	uint8_t *reg_base;
+	ddi_acc_handle_t hdl;
+	uint8_t reg;
+
+	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+	if (ddi_regs_map_setup(dip, 0, (caddr_t *)&reg_base, 0, 0, &attr,
+		&softsp->power_rhandle) != DDI_SUCCESS) {
+		return (DDI_FAILURE);
+	}
+	softsp->power_btn_reg = &reg_base[FIRE_SSI_ISR];
+	softsp->power_btn_bit = FIRE_SSI_SHUTDOWN_REQ;
+	/*
+	 * Enable MBC Fire Power Button interrupt.
+	 */
+	hdl = softsp->power_rhandle;
+	reg = ddi_get8(hdl, &reg_base[FIRE_SSI_INTR_ENA]);
+	reg |= FIRE_SSI_SHUTDOWN_REQ;
+	ddi_put8(hdl, &reg_base[FIRE_SSI_INTR_ENA], reg);
+
+	softsp->power_regs_mapped = B_TRUE;
+
+	return (DDI_SUCCESS);
+}
+
+/*
  * Setup register map for the power button
  * NOTE:- we only map registers for platforms
  * binding with the ali1535d+-power compatible
- * property.
+ * property or mbc-power or epic property.
  */
 static int
 power_setup_regs(struct power_soft_state *softsp)
@@ -1071,9 +1190,18 @@ power_setup_regs(struct power_soft_state *softsp)
 	softsp->power_regs_mapped = B_FALSE;
 	softsp->power_btn_ioctl = B_FALSE;
 	binding_name = ddi_binding_name(softsp->dip);
-	if (strcmp(binding_name, "ali1535d+-power") == 0)
+	if (strcmp(binding_name, "mbc-power") == 0)
+		return (power_setup_mbc_regs(softsp->dip, softsp));
+	else if (strcmp(binding_name, "SUNW,ebus-pic18lf65j10-power") == 0)
+		return (power_setup_epic_regs(softsp->dip, softsp));
+	else if (strcmp(binding_name, "ali1535d+-power") == 0)
 		return (power_setup_m1535_regs(softsp->dip, softsp));
 
+	/*
+	 * If the binding name is not one of these, that means there is no
+	 * additional HW and hence no extra processing is necessary. Just
+	 * return SUCCESS.
+	 */
 	return (DDI_SUCCESS);
 }
 

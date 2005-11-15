@@ -133,6 +133,10 @@ d none usr/platform/SUNW,Sun-Blade-2500 755 root sys
 s none usr/platform/SUNW,Sun-Blade-2500/include=../sun4u/include
 d none usr/platform/SUNW,A70 755 root sys
 s none usr/platform/SUNW,A70/include=../sun4u/include
+d none usr/platform/SUNW,Sun-Fire-V445 755 root sys
+s none usr/platform/SUNW,Sun-Fire-V445/include=../sun4u/include
+d none usr/platform/SUNW,Sun-Fire-V215 755 root sys
+s none usr/platform/SUNW,Sun-Fire-V215/include=../sun4u/include
 d none usr/platform/SUNW,Sun-Fire 755 root sys
 s none usr/platform/SUNW,Sun-Fire/include=../sun4u/include
 d none usr/platform/SUNW,Sun-Fire-V240 755 root sys

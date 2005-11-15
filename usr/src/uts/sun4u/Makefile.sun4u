@@ -100,6 +100,8 @@ IMPLEMENTATIONS		+= lw2plus .WAIT
 IMPLEMENTATIONS		+= snowbird .WAIT
 IMPLEMENTATIONS		+= schumacher .WAIT
 IMPLEMENTATIONS		+= blade .WAIT
+IMPLEMENTATIONS		+= boston .WAIT
+IMPLEMENTATIONS		+= seattle .WAIT
 IMPLEMENTATIONS		+= chicago
 
 
@@ -363,6 +365,7 @@ DRV_KMODS	+= su
 DRV_KMODS	+= tod
 DRV_KMODS	+= sf
 DRV_KMODS	+= power
+DRV_KMODS	+= epic
 DRV_KMODS       += fcode
 DRV_KMODS	+= grbeep
 DRV_KMODS	+= pcf8584 mi2cv i2bsc max1617 seeprom tda8444 pca9556 ics951601 adm1031
@@ -370,6 +373,7 @@ DRV_KMODS	+= lm75 ltc1427 pcf8591 pcf8574 smbus_ara ssc050 ssc100
 DRV_KMODS	+= pic16f819
 DRV_KMODS	+= pic16f747
 DRV_KMODS	+= scmi2c
+DRV_KMODS	+= adm1026
 DRV_KMODS	+= us
 DRV_KMODS	+= ppm schppm jbusppm m1535ppm
 DRV_KMODS	+= mc-us3

@@ -75,6 +75,8 @@ d none platform/SUNW,Sun-Blade-1000 755 root sys
 d none platform/SUNW,Sun-Blade-1500 755 root sys
 d none platform/SUNW,Sun-Blade-2500 755 root sys
 d none platform/SUNW,A70 755 root sys
+d none platform/SUNW,Sun-Fire-V445 755 root sys
+d none platform/SUNW,Sun-Fire-V215 755 root sys
 d none platform/SUNW,Netra-CP3010 755 root sys
 d none platform/SUNW,Sun-Fire 755 root sys
 d none platform/SUNW,Sun-Fire-15000 755 root sys
@@ -100,6 +102,14 @@ d none platform/SUNW,A70/kernel 755 root sys
 d none platform/SUNW,A70/kernel/crypto 755 root sys
 d none platform/SUNW,A70/kernel/crypto/sparcv9 755 root sys
 s none platform/SUNW,A70/kernel/crypto/sparcv9/aes256=../../../../sun4u-us3/kernel/crypto/sparcv9/aes256
+d none platform/SUNW,Sun-Fire-V445/kernel 755 root sys
+d none platform/SUNW,Sun-Fire-V445/kernel/crypto 755 root sys
+d none platform/SUNW,Sun-Fire-V445/kernel/crypto/sparcv9 755 root sys
+s none platform/SUNW,Sun-Fire-V445/kernel/crypto/sparcv9/aes256=../../../../sun4u-us3/kernel/crypto/sparcv9/aes256
+d none platform/SUNW,Sun-Fire-V215/kernel 755 root sys
+d none platform/SUNW,Sun-Fire-V215/kernel/crypto 755 root sys
+d none platform/SUNW,Sun-Fire-V215/kernel/crypto/sparcv9 755 root sys
+s none platform/SUNW,Sun-Fire-V215/kernel/crypto/sparcv9/aes256=../../../../sun4u-us3/kernel/crypto/sparcv9/aes256
 d none platform/SUNW,Netra-CP3010/kernel 755 root sys
 d none platform/SUNW,Netra-CP3010/kernel/crypto 755 root sys
 d none platform/SUNW,Netra-CP3010/kernel/crypto/sparcv9 755 root sys

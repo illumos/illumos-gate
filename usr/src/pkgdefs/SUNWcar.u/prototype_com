@@ -56,6 +56,8 @@ d none platform/SUNW,Sun-Blade-1000 755 root sys
 d none platform/SUNW,Sun-Blade-1500 755 root sys
 d none platform/SUNW,Sun-Blade-2500 755 root sys
 d none platform/SUNW,A70 755 root sys
+d none platform/SUNW,Sun-Fire-V445 755 root sys
+d none platform/SUNW,Sun-Fire-V215 755 root sys
 d none platform/SUNW,Sun-Fire 755 root sys
 d none platform/SUNW,Sun-Fire-15000 755 root sys
 d none platform/SUNW,Sun-Fire-V240 755 root sys
@@ -83,6 +85,7 @@ d none platform/SUNW,UltraSPARC-IIi-Netract 755 root sys
 s none platform/SUNW,Sun-Fire-V210=SUNW,Sun-Fire-V240
 s none platform/SUNW,Netra-240=SUNW,Sun-Fire-V240
 s none platform/SUNW,Netra-210=SUNW,Sun-Fire-V240
+s none platform/SUNW,Sun-Fire-V245=SUNW,Sun-Fire-V215
 d none platform/sun4u 755 root sys
 d none platform/sun4u/lib/sparcv9 755 root bin
 d none platform/SUNW,Ultra-2/lib/sparcv9 755 root bin
@@ -100,6 +103,8 @@ d none platform/SUNW,Sun-Blade-1000/lib/sparcv9 755 root bin
 d none platform/SUNW,Sun-Blade-1500/lib/sparcv9 755 root bin
 d none platform/SUNW,Sun-Blade-2500/lib/sparcv9 755 root bin
 d none platform/SUNW,A70/lib/sparcv9 755 root bin
+d none platform/SUNW,Sun-Fire-V445/lib/sparcv9 755 root bin
+d none platform/SUNW,Sun-Fire-V215/lib/sparcv9 755 root bin
 d none platform/SUNW,Sun-Fire-15000/lib/sparcv9 755 root bin
 d none platform/SUNW,Sun-Fire-V240/lib/sparcv9 755 root bin
 d none platform/SUNW,Sun-Fire-V250/lib/sparcv9 755 root bin
@@ -127,6 +132,8 @@ s none platform/SUNW,Sun-Blade-1000/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3
 s none platform/SUNW,Sun-Blade-1500/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
 s none platform/SUNW,Sun-Blade-2500/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
 s none platform/SUNW,A70/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
+s none platform/SUNW,Sun-Fire-V445/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
+s none platform/SUNW,Sun-Fire-V215/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
 s none platform/SUNW,Netra-CP3010/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
 s none platform/SUNW,Sun-Fire-15000/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
 s none platform/SUNW,Sun-Fire-V240/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
@@ -159,6 +166,8 @@ s none platform/SUNW,Sun-Blade-1000/lib/sparcv9/libmd5_psr.so.1=../../../sun4u/l
 s none platform/SUNW,Sun-Blade-1500/lib/sparcv9/libmd5_psr.so.1=../../../sun4u/lib/sparcv9/libmd5_psr.so.1
 s none platform/SUNW,Sun-Blade-2500/lib/sparcv9/libmd5_psr.so.1=../../../sun4u/lib/sparcv9/libmd5_psr.so.1
 s none platform/SUNW,A70/lib/sparcv9/libmd5_psr.so.1=../../../sun4u/lib/sparcv9/libmd5_psr.so.1
+s none platform/SUNW,Sun-Fire-V445/lib/sparcv9/libmd5_psr.so.1=../../../sun4u/lib/sparcv9/libmd5_psr.so.1
+s none platform/SUNW,Sun-Fire-V215/lib/sparcv9/libmd5_psr.so.1=../../../sun4u/lib/sparcv9/libmd5_psr.so.1
 s none platform/SUNW,Netra-CP3010/lib/sparcv9/libmd5_psr.so.1=../../../sun4u/lib/sparcv9/libmd5_psr.so.1
 s none platform/SUNW,Sun-Fire-15000/lib/sparcv9/libmd5_psr.so.1=../../../sun4u/lib/sparcv9/libmd5_psr.so.1
 s none platform/SUNW,Sun-Fire-480R/lib/sparcv9/libmd5_psr.so.1=../../../sun4u/lib/sparcv9/libmd5_psr.so.1
@@ -194,6 +203,8 @@ d none platform/SUNW,Sun-Blade-1000/lib 755 root bin
 d none platform/SUNW,Sun-Blade-1500/lib 755 root bin
 d none platform/SUNW,Sun-Blade-2500/lib 755 root bin
 d none platform/SUNW,A70/lib 755 root bin
+d none platform/SUNW,Sun-Fire-V445/lib 755 root bin
+d none platform/SUNW,Sun-Fire-V215/lib 755 root bin
 d none platform/SUNW,Sun-Fire-15000/lib 755 root bin
 d none platform/SUNW,Sun-Fire-V240/lib 755 root bin
 d none platform/SUNW,Sun-Fire-V250/lib 755 root bin
@@ -236,6 +247,8 @@ s none platform/SUNW,Sun-Blade-1000/lib/libc_psr.so.1=../../sun4u-us3/lib/libc_p
 s none platform/SUNW,Sun-Blade-1500/lib/libc_psr.so.1=../../sun4u-us3/lib/libc_psr.so.1
 s none platform/SUNW,Sun-Blade-2500/lib/libc_psr.so.1=../../sun4u-us3/lib/libc_psr.so.1
 s none platform/SUNW,A70/lib/libc_psr.so.1=../../sun4u-us3/lib/libc_psr.so.1
+s none platform/SUNW,Sun-Fire-V445/lib/libc_psr.so.1=../../sun4u-us3/lib/libc_psr.so.1
+s none platform/SUNW,Sun-Fire-V215/lib/libc_psr.so.1=../../sun4u-us3/lib/libc_psr.so.1
 s none platform/SUNW,Netra-CP3010/lib/libc_psr.so.1=../../sun4u-us3/lib/libc_psr.so.1
 s none platform/SUNW,Sun-Fire/lib/libc_psr.so.1=../../sun4u-us3/lib/libc_psr.so.1
 s none platform/SUNW,Sun-Fire-V240/lib/libc_psr.so.1=../../sun4u-us3/lib/libc_psr.so.1
@@ -271,6 +284,8 @@ s none platform/SUNW,Sun-Blade-1000/lib/libmd5_psr.so.1=../../sun4u/lib/libmd5_p
 s none platform/SUNW,Sun-Blade-1500/lib/libmd5_psr.so.1=../../sun4u/lib/libmd5_psr.so.1
 s none platform/SUNW,Sun-Blade-2500/lib/libmd5_psr.so.1=../../sun4u/lib/libmd5_psr.so.1
 s none platform/SUNW,A70/lib/libmd5_psr.so.1=../../sun4u/lib/libmd5_psr.so.1
+s none platform/SUNW,Sun-Fire-V445/lib/libmd5_psr.so.1=../../sun4u/lib/libmd5_psr.so.1
+s none platform/SUNW,Sun-Fire-V215/lib/libmd5_psr.so.1=../../sun4u/lib/libmd5_psr.so.1
 s none platform/SUNW,Netra-CP3010/lib/libmd5_psr.so.1=../../sun4u/lib/libmd5_psr.so.1
 s none platform/SUNW,Sun-Fire/lib/libmd5_psr.so.1=../../sun4u/lib/libmd5_psr.so.1
 s none platform/SUNW,Sun-Fire-V240/lib/libmd5_psr.so.1=../../sun4u/lib/libmd5_psr.so.1

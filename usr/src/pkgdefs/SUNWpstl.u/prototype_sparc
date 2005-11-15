@@ -58,6 +58,8 @@ d none usr/platform/SUNW,Sun-Blade-1000 755 root sys
 d none usr/platform/SUNW,Sun-Blade-1500 755 root sys
 d none usr/platform/SUNW,Sun-Blade-2500 755 root sys
 d none usr/platform/SUNW,A70 755 root sys
+d none usr/platform/SUNW,Sun-Fire-V445 755 root sys
+d none usr/platform/SUNW,Sun-Fire-V215 755 root sys
 d none usr/platform/SUNW,Sun-Fire 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V240 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V250 755 root sys
@@ -89,6 +91,8 @@ d none usr/platform/SUNW,Sun-Blade-1000/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-1500/lib 755 root bin
 d none usr/platform/SUNW,Sun-Blade-2500/lib 755 root bin
 d none usr/platform/SUNW,A70/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V445/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-V215/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V240/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire-V250/lib 755 root bin

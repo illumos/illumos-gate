@@ -164,6 +164,22 @@ f none platform/SUNW,A70/kernel/drv/ppm.conf 644 root sys
 d none platform/SUNW,A70/kernel/misc 755 root sys
 d none platform/SUNW,A70/kernel/misc/sparcv9 755 root sys
 f none platform/SUNW,A70/kernel/misc/sparcv9/platmod 755 root sys
+d none platform/SUNW,Sun-Fire-V445 755 root sys
+d none platform/SUNW,Sun-Fire-V445/kernel 755 root sys
+d none platform/SUNW,Sun-Fire-V445/kernel/crypto 755 root sys
+d none platform/SUNW,Sun-Fire-V445/kernel/crypto/sparcv9 755 root sys
+s none platform/SUNW,Sun-Fire-V445/kernel/crypto/sparcv9/aes=../../../../sun4u-us3/kernel/crypto/sparcv9/aes
+d none platform/SUNW,Sun-Fire-V445/kernel/misc 755 root sys
+d none platform/SUNW,Sun-Fire-V445/kernel/misc/sparcv9 755 root sys
+f none platform/SUNW,Sun-Fire-V445/kernel/misc/sparcv9/platmod 755 root sys
+d none platform/SUNW,Sun-Fire-V215 755 root sys
+d none platform/SUNW,Sun-Fire-V215/kernel 755 root sys
+d none platform/SUNW,Sun-Fire-V215/kernel/crypto 755 root sys
+d none platform/SUNW,Sun-Fire-V215/kernel/crypto/sparcv9 755 root sys
+s none platform/SUNW,Sun-Fire-V215/kernel/crypto/sparcv9/aes=../../../../sun4u-us3/kernel/crypto/sparcv9/aes
+d none platform/SUNW,Sun-Fire-V215/kernel/misc 755 root sys
+d none platform/SUNW,Sun-Fire-V215/kernel/misc/sparcv9 755 root sys
+f none platform/SUNW,Sun-Fire-V215/kernel/misc/sparcv9/platmod 755 root sys
 d none platform/SUNW,Sun-Fire 755 root sys
 d none platform/SUNW,Sun-Fire-15000 755 root sys
 d none platform/SUNW,Sun-Fire-15000/kernel 755 root sys
@@ -376,6 +392,7 @@ f none platform/sun4u/kernel/drv/rmcadm.conf 644 root sys
 f none platform/sun4u/kernel/drv/rmclomv.conf 644 root sys
 f none platform/sun4u/kernel/drv/sbusmem.conf 644 root sys
 d none platform/sun4u/kernel/drv/sparcv9 755 root sys
+f none platform/sun4u/kernel/drv/sparcv9/adm1026 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/adm1031 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/bbc_beep 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/ctsmc 755 root sys
@@ -383,6 +400,7 @@ f none platform/sun4u/kernel/drv/sparcv9/db21554 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/dma 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/dmfe 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/ebus 755 root sys
+f none platform/sun4u/kernel/drv/sparcv9/epic 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/fd 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/gpio_87317 755 root sys
 f none platform/sun4u/kernel/drv/sparcv9/grbeep 755 root sys

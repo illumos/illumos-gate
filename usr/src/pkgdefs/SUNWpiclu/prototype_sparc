@@ -111,6 +111,12 @@ f none usr/platform/SUNW,A70/lib/picl/plugins/libpiclenvd.so.1 755 root sys
 s none usr/platform/SUNW,A70/lib/picl/plugins/libpiclenvd.so=./libpiclenvd.so.1 755 root sys
 f none usr/platform/SUNW,A70/lib/picl/plugins/envmodel.conf 644 root sys
 f none usr/platform/SUNW,A70/lib/picl/plugins/piclfrutree.conf 644 root sys
+d none usr/platform/SUNW,Sun-Fire-V445 755 root sys
+d none usr/platform/SUNW,Sun-Fire-V445/lib 755 root bin
+s none usr/platform/SUNW,Sun-Fire-V445/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
+d none usr/platform/SUNW,Sun-Fire-V215 755 root sys
+d none usr/platform/SUNW,Sun-Fire-V215/lib 755 root bin
+s none usr/platform/SUNW,Sun-Fire-V215/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
 f none usr/platform/SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1 644 root bin
 s none usr/platform/SUNW,Sun-Blade-1000/lib/libprtdiag_psr.so.1=../../SUNW,Sun-Blade-100/lib/libprtdiag_psr.so.1
 f none usr/platform/SUNW,Netra-T12/lib/libprtdiag_psr.so.1 644 root bin

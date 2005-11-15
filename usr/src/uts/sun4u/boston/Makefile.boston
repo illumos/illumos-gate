@@ -1,0 +1,62 @@
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+#	Global definitions for sun4u implementation specific modules.
+#
+
+#
+#	Define directories.
+#
+ROOT_BOSTON_DIR               = $(ROOT_PLAT_DIR)/SUNW,Sun-Fire-V445
+ROOT_BOSTON_MOD_DIR		= $(ROOT_BOSTON_DIR)/kernel
+
+ROOT_BOSTON_MISC_DIR_32	= $(ROOT_BOSTON_MOD_DIR)/misc
+ROOT_BOSTON_MISC_DIR_64	= $(ROOT_BOSTON_MISC_DIR_32)/$(SUBDIR64)
+ROOT_BOSTON_DRV_DIR_32	= $(ROOT_BOSTON_MOD_DIR)/drv
+ROOT_BOSTON_DRV_DIR_64	= $(ROOT_BOSTON_DRV_DIR_32)/$(SUBDIR64)
+ROOT_BOSTON_CRYPTO_DIR_32	= $(ROOT_BOSTON_MOD_DIR)/crypto
+ROOT_BOSTON_CRYPTO_DIR_64	= $(ROOT_BOSTON_CRYPTO_DIR_32)/$(SUBDIR64)
+
+ROOT_BOSTON_MISC_DIR		= $(ROOT_BOSTON_MISC_DIR_$(CLASS))
+ROOT_BOSTON_DRV_DIR		= $(ROOT_BOSTON_DRV_DIR_$(CLASS))
+ROOT_BOSTON_CRYPTO_DIR	= $(ROOT_BOSTON_CRYPTO_DIR_$(CLASS))
+
+ROOT_PLAT_MOD_DIRS	+= $(ROOT_BOSTON_MOD_DIR)
+ROOT_PLAT_MISC_DIRS	+= $(ROOT_BOSTON_MISC_DIR)
+
+USR_BOSTON_DIR        = $(USR_PLAT_DIR)/SUNW,Sun-Fire-V445
+USR_BOSTON_LINKED_DIR = $(USR_PLAT_DIR)/$(LINKED_PLATFORM)
+USR_BOSTON_INC_DIR	= $(USR_BOSTON_DIR)/include
+USR_BOSTON_ISYS_DIR	= $(USR_BOSTON_INC_DIR)/sys
+USR_BOSTON_SBIN_DIR	= $(USR_BOSTON_DIR)/sbin
+USR_BOSTON_SBIN_EEPROM	= $(USR_BOSTON_SBIN_DIR)/eeprom
+USR_BOSTON_SBIN_PRTDIAG	= $(USR_BOSTON_SBIN_DIR)/prtdiag
+USR_BOSTON_SBIN_TRAPSTAT = $(USR_BOSTON_SBIN_DIR)/trapstat
+USR_BOSTON_LIB_DIR	= $(USR_BOSTON_DIR)/lib
+
+BOSTON_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/boston/lint-libs/$(OBJS_DIR)
+
+#
+# Define objects.
+#
+BOSTON_OBJS	= boston.o
+
+#
+#	Define modules.
+#
+BOSTON_KMODS	= platmod
+
+#
+#	Links to UltraSparc III crypto modules
+#
+BOSTON_CRYPTO_LINKS	= aes
+
+include $(UTSBASE)/sun4u/boston/Makefile.files
+
+#
+#	Include common rules.
+#
+include $(UTSBASE)/sun4u/Makefile.sun4u

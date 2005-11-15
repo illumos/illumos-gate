@@ -20,14 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * tod driver module for ALI M5823 part
+ * tod driver module for ALI M5823 and compatible devices
  */
 
 #include <sys/types.h>
@@ -38,11 +38,14 @@
 #include <sys/sunddi.h>
 
 #include <sys/todm5823.h>
+#include <sys/rmc_comm_dp.h>
+#include <sys/rmc_comm_drvintf.h>
 #include <sys/modctl.h>
 #include <sys/stat.h>
 #include <sys/clock.h>
 #include <sys/reboot.h>
 #include <sys/machsystm.h>
+#include <sys/platform_module.h>
 #if 0
 #include <sys/poll.h>
 #include <sys/pbio.h>
@@ -76,7 +79,7 @@ uint_t m5823_uip_count = 0;
  * Module linkage information for the kernel.
  */
 static struct modlmisc modlmisc = {
-	&mod_miscops, "tod module for ALI M5823"
+	&mod_miscops, "tod module v%I% for M5823 and compatible devices"
 };
 
 static struct modlinkage modlinkage = {
@@ -155,6 +158,23 @@ todm5823_get(void)
 	struct rtc_t rtc;
 
 	ASSERT(MUTEX_HELD(&tod_lock));
+
+	/*
+	 * Set the hw watchdog timer if it's been activated.
+	 * This will toggle the watchdog.
+	 */
+	if (watchdog_activated) {
+		int ret = 0;
+		ret = tod_ops.tod_set_watchdog_timer(0);
+		/*
+		 * The empty set_watchdog routine returns a 0. So if a
+		 * coded routine fails we will look for a -1 for a failure.
+		 */
+		if (ret == -1)
+			cmn_err(CE_WARN, "todm5823: failed to set hardware "
+				"watchdog timer.");
+	}
+
 
 	if (!read_rtc(&rtc)) {
 		/*
@@ -257,6 +277,8 @@ todm5823_set(timestruc_t ts)
 	struct rtc_t	rtc;
 	todinfo_t tod = utc_to_tod(ts.tv_sec);
 	int year;
+	rmc_comm_msg_t request;
+	dp_set_date_time_t set_time_msg;
 
 	ASSERT(MUTEX_HELD(&tod_lock));
 
@@ -274,6 +296,45 @@ todm5823_set(timestruc_t ts)
 	    rtc.rtc_year, rtc.rtc_dom, rtc.rtc_hrs, rtc.rtc_min, rtc.rtc_sec);
 
 	write_rtc_time(&rtc);
+
+	if (&plat_rmc_comm_req) {
+		/*
+		 * We are running on a platform that has ALOM.
+		 * Example: Boston, Seattle.
+		 *
+		 * On these platforms, the RTC value does not persist across
+		 * power cycles.  However, ALOM has its own TOD clock that
+		 * is battery backed and *does* hold its value across power
+		 * cycles.
+		 *
+		 * On these platforms, on startup OBP reads ALOM's TOD and
+		 * populates the RTC.  However, this means that we need to
+		 * update ALOM's TOD whenever Solaris updates the RTC.
+		 *
+		 * Send ALOM an RMC message telling it about the new time
+		 * value.  ALOM will update its own TOD clock with this new
+		 * value.
+		 *
+		 * plat_rmc_comm_req() is a pragma weak function implemented
+		 * in the Boston/Seattle platmod.  This function in turn
+		 * calls rmc_comm_request_nowait() in the rmc_comm module.
+		 * On platforms without ALOM, plat_rmc_comm_req() will be
+		 * empty, and this section of code will be skipped.
+		 */
+
+		set_time_msg.year	= year - 1900;
+		set_time_msg.month	= tod.tod_month - 1;
+		set_time_msg.day	= tod.tod_day;
+		set_time_msg.hour	= tod.tod_hour;
+		set_time_msg.minute	= tod.tod_min;
+		set_time_msg.second	= tod.tod_sec;
+
+		request.msg_type = DP_SET_DATE_TIME;
+		request.msg_len = sizeof (set_time_msg);
+		request.msg_buf = (caddr_t)&set_time_msg;
+
+		plat_rmc_comm_req(&request);
+	}
 }
 
 void
