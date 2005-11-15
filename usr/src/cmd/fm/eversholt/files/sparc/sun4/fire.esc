@@ -203,7 +203,7 @@ event ereport.io.fire.fabric@hostbridge/pciexrc {within(5s)};
  *  - mmu data parity errors ttc_dpe*, tbw_dpe*
  *  - ingress/egress buffer parity errors ihb_pe, iip, edp, ehp
  *  - misc egress eru, ero, emp, epe, erp, eip
- *  - too many link up/down/reset etc. events
+ *  - too many link down/reset events
  *  - EQ overflow
  */ 
 
@@ -635,10 +635,8 @@ prop upset.io.fire.link-events@hostbridge/pciexrc (0)->
     error.io.fire.link-events@hostbridge/pciexrc ;
   
 prop error.io.fire.link-events@hostbridge/pciexrc (1)->
-    ereport.io.fire.pec.lin@hostbridge/pciexrc ,
     ereport.io.fire.pec.lrs@hostbridge/pciexrc ,
-    ereport.io.fire.pec.ldn@hostbridge/pciexrc ,
-    ereport.io.fire.pec.lup@hostbridge/pciexrc ;
+    ereport.io.fire.pec.ldn@hostbridge/pciexrc ;
 
 
 /*
@@ -652,7 +650,7 @@ event fault.io.fire.pciex.device@hostbridge/pciexrc/pciexbus/pciexdev/pciexfn,
 
 /*
  * Faulty adjacent node may cause
- *    too many link int/up/down/reset events
+ *    too many link down/reset events
  */
 prop fault.io.fire.pciex.device@hostbridge/pciexrc/pciexbus/pciexdev/pciexfn 
 (0) ->
@@ -706,17 +704,10 @@ event ereport.io.fire.pec.wuc@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.ruc@hostbridge/pciexrc{within(5s)};
 event ereport.io.fire.pec.crs@hostbridge/pciexrc{within(5s)};
 
-event ereport.io.fire.nodiag@hostbridge; 
- 
 /* 
  * Upset used to hide ereports that are not currently diagnosed. 
  */ 
-engine serd.io.fire.nodiag@hostbridge, 
-    N=1000, T=1s, method=persistent, 
-    trip=ereport.io.fire.nodiag@hostbridge; 
- 
-event upset.io.fire.nodiag@hostbridge, 
-    engine=serd.io.fire.nodiag@hostbridge; 
+event upset.io.fire.nodiag@hostbridge;
  
 prop upset.io.fire.nodiag@hostbridge (0)-> 
     ereport.io.fire.jbc.ue_asyn@hostbridge/pciexrc, 
@@ -728,7 +719,8 @@ prop upset.io.fire.nodiag@hostbridge (0)->
     ereport.io.fire.pec.wuc@hostbridge/pciexrc,
     ereport.io.fire.pec.ruc@hostbridge/pciexrc,
     ereport.io.fire.pec.crs@hostbridge/pciexrc,
-    ereport.io.fire.nodiag@hostbridge, 
+    ereport.io.fire.pec.lin@hostbridge/pciexrc,
+    ereport.io.fire.pec.lup@hostbridge/pciexrc,
     error.io.fire.pec.secondary@hostbridge/pciexrc,
     error.io.fire.pec.fabric_error@hostbridge/pciexrc,
     ereport.io.fire.fabric@hostbridge/pciexrc
