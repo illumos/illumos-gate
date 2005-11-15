@@ -499,6 +499,9 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data", scsi_device scsi_address))
 /* drain timeout in seconds on the work thread */
 #define	SCSA2USB_DRAIN_TIMEOUT		60
 
+/* scsa2usb pkt xfer status phase retry times */
+#define	SCSA2USB_STATUS_RETRIES		3
+
 /*
  * limit on the number of requests that can be queued per LUN:
  * 3 for untagged queueing, 1 for scsiwatch and a margin of 2

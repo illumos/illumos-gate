@@ -144,6 +144,9 @@ typedef struct  usbkbm_state {
 
 	int			usbkbm_vkbd_type;
 
+	/* keyboard device info from hid */
+	hid_vid_pid_t		usbkbm_vid_pid;
+
 	/* These entries are for polled input */
 	uint_t		usbkbm_polled_buffer_num_characters;
 	poll_keystate_t	usbkbm_polled_scancode_buffer[USB_POLLED_BUFFER_SIZE];
@@ -154,6 +157,13 @@ typedef struct  usbkbm_state {
 
 #define	USB_PRESSED	0x00	/* key was pressed */
 #define	USB_RELEASED	0x01	/* key was released */
+
+/* Sun Japanese type6 and type7 keyboards layout numbers, vid and pid */
+#define	SUN_JAPANESE_TYPE6		271
+#define	SUN_JAPANESE_TYPE7		15
+#define	HID_SUN_JAPANESE_TYPE6_KBD_VID	0x0430
+#define	HID_SUN_JAPANESE_TYPE6_KBD_PID	0x0005
+
 
 /* Number of entries in the keytable */
 #define	KEYMAP_SIZE_USB		255

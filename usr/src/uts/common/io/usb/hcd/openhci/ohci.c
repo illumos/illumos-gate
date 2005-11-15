@@ -1529,11 +1529,6 @@ ohci_init_hcca(ohci_state_t	*ohcip)
 
 	bzero((void *)ohcip->ohci_hccap, real_length);
 
-	/*
-	 * DMA addresses for HCCA are bound
-	 */
-	ohcip->ohci_dma_addr_bind_flag |= OHCI_HCCA_DMA_BOUND;
-
 	/* Figure out the alignment requirements */
 	Set_OpReg(hcr_HCCA, 0xFFFFFFFF);
 
@@ -1590,6 +1585,11 @@ ohci_init_hcca(ohci_state_t	*ohcip)
 
 		return (DDI_FAILURE);
 	}
+
+	/*
+	 * DMA addresses for HCCA are bound
+	 */
+	ohcip->ohci_dma_addr_bind_flag |= OHCI_HCCA_DMA_BOUND;
 
 	USB_DPRINTF_L4(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
 	    "ohci_init_hcca: physical 0x%p",

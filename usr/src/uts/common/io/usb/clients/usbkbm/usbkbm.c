@@ -80,6 +80,7 @@ static int usbkbm_kioccmd(usbkbm_state_t *, mblk_t *, char, size_t *);
 static void	usbkbm_usb2pc_xlate(usbkbm_state_t *, int, enum keystate);
 static void	usbkbm_wrap_kbtrans(usbkbm_state_t *, int, enum keystate);
 static int 	usbkbm_set_protocol(usbkbm_state_t *, uint16_t);
+static int 	usbkbm_get_vid_pid(usbkbm_state_t *);
 
 /* stream qinit functions defined here */
 static int	usbkbm_open(queue_t *, dev_t *, int, int, cred_t *);
@@ -116,7 +117,7 @@ struct kbtrans_callbacks kbd_usb_callbacks = {
 static uchar_t  usbkbm_led_state = 0;
 
 /* This variable saves the layout state */
-static uchar_t usbkbm_layout = 0;
+static uint16_t usbkbm_layout = 0;
 
 /*
  * Function pointer array for mapping of scancodes.
@@ -571,6 +572,30 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 
 			usbkbmd->usbkbm_packet_size =
 				USB_KBD_DEFAULT_PACKET_SIZE;
+	}
+
+	/*
+	 * Although Sun Japanese type6 and type7 keyboards have the same
+	 * layout number(15), they should be recognized for loading the
+	 * different keytables on upper apps (e.g. X). The new layout
+	 * number (271) is defined for the Sun Japanese type6 keyboards.
+	 * The layout number (15) specified in HID spec is used for other
+	 * Japanese keyboards. It is a workaround for the old Sun Japanese
+	 * type6 keyboards defect.
+	 */
+	if (usbkbmd->usbkbm_layout == SUN_JAPANESE_TYPE7) {
+
+		if ((ret = usbkbm_get_vid_pid(usbkbmd)) != 0) {
+
+			return (ret);
+		}
+
+		if ((usbkbmd->usbkbm_vid_pid.VendorId ==
+			HID_SUN_JAPANESE_TYPE6_KBD_VID) &&
+			(usbkbmd->usbkbm_vid_pid.ProductId ==
+			HID_SUN_JAPANESE_TYPE6_KBD_PID)) {
+			usbkbmd->usbkbm_layout = SUN_JAPANESE_TYPE6;
+		}
 	}
 
 	kbtrans_streams_set_keyboard(usbkbmd->usbkbm_kbtrans, KB_USB,
@@ -1126,6 +1151,17 @@ usbkbm_mctl_receive(register queue_t *q, register mblk_t *mp)
 			    *(hidparser_handle_t *)data;
 		} else {
 			usbkbmd->usbkbm_report_descr = NULL;
+		}
+		freemsg(mp);
+		usbkbmd->usbkbm_flags &= ~USBKBM_QWAIT;
+
+		break;
+	case HID_GET_VID_PID:
+		if ((data != NULL) &&
+		    (iocp->ioc_count == sizeof (hid_vid_pid_t)) &&
+		    ((mp->b_cont->b_wptr - mp->b_cont->b_rptr) ==
+		    iocp->ioc_count)) {
+			bcopy(data, &usbkbmd->usbkbm_vid_pid, iocp->ioc_count);
 		}
 		freemsg(mp);
 		usbkbmd->usbkbm_flags &= ~USBKBM_QWAIT;
@@ -1896,6 +1932,46 @@ usbkbm_set_protocol(usbkbm_state_t *usbkbmd, uint16_t protocol)
 	usbkbmd->usbkbm_flags |= USBKBM_QWAIT;
 	putnext(usbkbmd->usbkbm_writeq, mctl_ptr);
 
+	while (usbkbmd->usbkbm_flags & USBKBM_QWAIT) {
+		if (qwait_sig(q) == 0) {
+			usbkbmd->usbkbm_flags = 0;
+			(void) kbtrans_streams_fini(usbkbmd->usbkbm_kbtrans);
+			qprocsoff(q);
+			kmem_free(usbkbmd, sizeof (usbkbm_state_t));
+
+			return (EINTR);
+		}
+	}
+
+	return (0);
+}
+
+
+/*
+ * usbkbm_get_vid_pid
+ *	Issue a M_CTL to hid to get the device info
+ */
+static int
+usbkbm_get_vid_pid(usbkbm_state_t *usbkbmd)
+{
+	struct iocblk mctlmsg;
+	mblk_t *mctl_ptr;
+	queue_t *q = usbkbmd->usbkbm_readq;
+
+	mctlmsg.ioc_cmd = HID_GET_VID_PID;
+	mctlmsg.ioc_count = 0;
+
+	mctl_ptr = usba_mk_mctl(mctlmsg, NULL, 0);
+	if (mctl_ptr == NULL) {
+		(void) kbtrans_streams_fini(usbkbmd->usbkbm_kbtrans);
+		qprocsoff(q);
+		kmem_free(usbkbmd, sizeof (usbkbm_state_t));
+
+		return (ENOMEM);
+	}
+
+	putnext(usbkbmd->usbkbm_writeq, mctl_ptr);
+	usbkbmd->usbkbm_flags |= USBKBM_QWAIT;
 	while (usbkbmd->usbkbm_flags & USBKBM_QWAIT) {
 		if (qwait_sig(q) == 0) {
 			usbkbmd->usbkbm_flags = 0;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1524,27 +1524,18 @@ uhci_insert_intr_td(
 		length = req->intr_len;
 	} else {
 		ASSERT(pipe_dir == USB_EP_DIR_IN);
-		length = ((usb_intr_req_t *)pp->pp_client_periodic_in_reqp)->
-								intr_len;
+		length = (pp->pp_client_periodic_in_reqp) ?
+		    (((usb_intr_req_t *)pp->
+		    pp_client_periodic_in_reqp)->intr_len) :
+		    ph->p_ep.wMaxPacketSize;
 	}
 
-	if (pipe_dir == USB_EP_DIR_IN) {
+	/* Check the size of interrupt request */
+	if (length > UHCI_MAX_TD_XFER_SIZE) {
 
-		/* For IN xfer, the length shouldn't exceed wMaxPacketSize. */
-		if (length > ph->p_ep.wMaxPacketSize) {
-
-			USB_DPRINTF_L2(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-			    "uhci_insert_intr_td: Intr in req size 0x%lx is "
-			    "more than 0x%x", length, ph->p_ep.wMaxPacketSize);
-
-			return (USB_INVALID_REQUEST);
-		}
-
-	} else if (length > UHCI_MAX_TD_XFER_SIZE) {
-
-		/* For Out xfer, the length shouldn't exceed 8K */
+		/* the length shouldn't exceed 8K */
 		USB_DPRINTF_L2(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
-		    "uhci_insert_intr_td: Intr out req size 0x%lx is "
+		    "uhci_insert_intr_td: Intr request size 0x%lx is "
 		    "more than 0x%x", length, UHCI_MAX_TD_XFER_SIZE);
 
 	    return (USB_INVALID_REQUEST);

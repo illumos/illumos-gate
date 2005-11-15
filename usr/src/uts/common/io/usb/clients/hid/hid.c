@@ -2085,6 +2085,7 @@ hid_mctl_receive(register queue_t *q, register mblk_t *mp)
 	uchar_t		request_type;
 	hid_req_t	*hid_req_data = NULL;
 	hid_polled_input_callback_t hid_polled_input;
+	hid_vid_pid_t	hid_vid_pid;
 
 	USB_DPRINTF_L4(PRINT_MASK_ALL, hidp->hid_log_handle,
 	    "hid_mctl_receive");
@@ -2125,6 +2126,35 @@ hid_mctl_receive(register queue_t *q, register mblk_t *mp)
 			} else {
 				iocp->ioc_count =
 				    sizeof (hidp->hid_report_descr);
+			}
+			qreply(q, mp);
+
+			return (HID_SUCCESS);
+		} else {
+
+			/* retry */
+			return (HID_ENQUEUE);
+		}
+	case HID_GET_VID_PID:
+		if (canputnext(RD(q))) {
+			freemsg(mp->b_cont);
+
+			hid_vid_pid.VendorId =
+				hidp->hid_dev_descr->idVendor;
+			hid_vid_pid.ProductId =
+				hidp->hid_dev_descr->idProduct;
+
+			mp->b_cont = hid_data2mblk(
+			    (uchar_t *)&hid_vid_pid, sizeof (hid_vid_pid_t));
+			if (mp->b_cont == NULL) {
+				/*
+				 * can't allocate mblk, indicate that nothing
+				 * is being returned.
+				 */
+				iocp->ioc_count = 0;
+			} else {
+				iocp->ioc_count =
+				    sizeof (hid_vid_pid_t);
 			}
 			qreply(q, mp);
 

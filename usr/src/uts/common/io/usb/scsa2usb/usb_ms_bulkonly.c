@@ -197,6 +197,7 @@ int
 scsa2usb_bulk_only_transport(scsa2usb_state_t *scsa2usbp, scsa2usb_cmd_t *cmd)
 {
 	int	rval;
+	int	nretry;
 	usb_bulk_req_t *req;
 
 	ASSERT(mutex_owned(&scsa2usbp->scsa2usb_mutex));
@@ -286,24 +287,31 @@ Status_Phase:
 	 * Start status phase
 	 * read in CSW
 	 */
-	if ((rval = scsa2usb_handle_status_start(scsa2usbp, req)) ==
-	    USB_SUCCESS) {
+	for (nretry = 0; nretry < SCSA2USB_STATUS_RETRIES; nretry++) {
+		rval = scsa2usb_handle_status_start(scsa2usbp, req);
+
+		if ((rval != USB_SUCCESS) &&
+		    (req->bulk_completion_reason == USB_CR_STALL)) {
+			/*
+			 * We ran into STALL condition here.
+			 * If the condition cannot be cleared
+			 * successfully, retry for limited times.
+			 */
+			scsa2usbp->scsa2usb_pkt_state =
+				    SCSA2USB_PKT_PROCESS_CSW;
+		} else {
+
+			break;
+		}
+	}
+
+	if (rval == USB_SUCCESS) {
 		/* process CSW */
 		rval = scsa2usb_handle_csw_result(scsa2usbp, req->bulk_data);
 	} else {
-		/*
-		 * we ran into an error, check if it was a STALL
-		 */
-		if (req->bulk_completion_reason == USB_CR_STALL)  {
-			scsa2usbp->scsa2usb_pkt_state =
-					SCSA2USB_PKT_PROCESS_CSW;
+		scsa2usb_bulk_only_handle_error(scsa2usbp, req);
 
-			goto Status_Phase;
-		} else {
-			scsa2usb_bulk_only_handle_error(scsa2usbp, req);
-
-			return (TRAN_FATAL_ERROR);
-		}
+		return (TRAN_FATAL_ERROR);
 	}
 
 	SCSA2USB_FREE_BULK_REQ(req);	/* free request */

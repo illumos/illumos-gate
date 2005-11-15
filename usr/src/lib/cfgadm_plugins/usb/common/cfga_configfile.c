@@ -558,7 +558,7 @@ usb_get_conf_rec(char *buf, usb_configrec_t **rec, char **errmsg)
 						break;
 					default:
 						parse_state = USB_ERROR;
-						free((char *)(uintptr_t)llptr);
+						free((void *)(uintptr_t)llptr);
 					}
 				} else {
 					parse_state = USB_ERROR;

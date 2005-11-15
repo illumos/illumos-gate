@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,14 @@ typedef struct usb_hid_descr {
 	uchar_t		bReportDescriptorType;	/* Class descr. type */
 	ushort_t	wReportDescriptorLength; /* size of report descr */
 } usb_hid_descr_t;
+
+/*
+ * Hid device information
+ */
+typedef struct hid_vid_pid {
+	uint16_t	VendorId;		/* vendor ID */
+	uint16_t	ProductId;		/* product ID */
+} hid_vid_pid_t;
 
 /*
  * Hid will turn the M_CTL request into a request control request on the
@@ -112,6 +120,11 @@ _NOTE(SCHEME_PROTECTS_DATA("unique per call", hid_req_t))
  * hold any data pointer.
  */
 #define	HID_GET_PARSER_HANDLE	0x0100		/* obtain parser handle */
+
+/*
+ * The M_CTL command is to get the device vendor ID and product ID.
+ */
+#define	HID_GET_VID_PID		0x0200		/* obtain device info */
 
 /*
  * M_CTL commands for event notifications

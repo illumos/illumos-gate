@@ -49,7 +49,7 @@ LAYOUTS= \
         layout_0f layout_10 layout_12 layout_13 layout_16 layout_19 \
         layout_1a layout_1b layout_1c layout_1e layout_20 layout_21 \
         layout_100 layout_18 layout_101 layout_102 layout_103 layout_104 \
-        layout_105 layout_106 layout_107 layout_108
+        layout_105 layout_106 layout_107 layout_108 layout_10f
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
@@ -157,6 +157,9 @@ $(ROOTKEYDIR)/layout_107: $(ROOTKEYDIR)/maltauk
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/maltauk  $@
 
 $(ROOTKEYDIR)/layout_108: $(ROOTKEYDIR)/albania
-	$(RM) $@; $(LN) $(ROOTKEYDIR)/albania  $@ 
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/albania  $@
+
+$(ROOTKEYDIR)/layout_10f: $(ROOTKEYDIR)/japan
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/japan $@ 
 
 include ../../Makefile.targ
