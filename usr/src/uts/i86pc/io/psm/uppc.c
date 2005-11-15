@@ -728,7 +728,7 @@ uppc_translate_irq(dev_info_t *dip, int irqno)
 	char dev_type[16];
 	int dev_len, pci_irq, devid, busid;
 	ddi_acc_handle_t cfg_handle;
-	uchar_t ipin;
+	uchar_t ipin, iline;
 	iflag_t intr_flag;
 
 	if (dip == NULL) {
@@ -762,7 +762,7 @@ uppc_translate_irq(dev_info_t *dip, int irqno)
 			return (irqno);
 
 		ipin = pci_config_get8(cfg_handle, PCI_CONF_IPIN) - PCI_INTA;
-		pci_config_teardown(&cfg_handle);
+		iline = pci_config_get8(cfg_handle, PCI_CONF_ILINE);
 		if (uppc_acpi_translate_pci_irq(dip, busid, devid,
 		    ipin, &pci_irq, &intr_flag) == ACPI_PSM_SUCCESS) {
 
@@ -774,9 +774,25 @@ uppc_translate_irq(dev_info_t *dip, int irqno)
 			 * Make sure pci_irq is within range.
 			 * Otherwise, fall through and return irqno.
 			 */
-			if (pci_irq <= MAX_ISA_IRQ)
+			if (pci_irq <= MAX_ISA_IRQ) {
+				if (iline != pci_irq) {
+					/*
+					 * Update the device's ILINE byte,
+					 * in case uppc_acpi_translate_pci_irq
+					 * has choosen a different pci_irq
+					 * than the BIOS has configured.
+					 * Some chipsets use the value in
+					 * ILINE to control interrupt routing,
+					 * in conflict with the PCI spec.
+					 */
+					pci_config_put8(cfg_handle,
+					    PCI_CONF_ILINE, pci_irq);
+				}
+				pci_config_teardown(&cfg_handle);
 				return (pci_irq);
+			}
 		}
+		pci_config_teardown(&cfg_handle);
 
 		/* FALLTHRU to common case - returning irqno */
 	} else {
