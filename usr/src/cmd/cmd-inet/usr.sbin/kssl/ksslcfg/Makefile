@@ -43,11 +43,8 @@ POFILE = $(PROG)_all.po
 
 SRCS = $(OBJS:%.o=%.c)
 
-ROOTMANIFESTDIR= $(ROOTSVCNETWORK)/ssl
+ROOTMANIFESTDIR= $(ROOTSVCNETWORKSSL)
 $(ROOTMANIFEST):= FILEMODE= 444
-
-$(ROOTMANIFESTDIR)/%: %
-	$(INS.file)
 
 .KEEP_STATE:
 
@@ -77,11 +74,6 @@ lint:	lint_SRCS
 $(ROOTUSRSBINPROG): $(ROOTUSRSBIN)
 
 $(ROOTUSRSBIN):
-	$(MKDIR) -p $@
-
-$(ROOTMANIFEST): $(ROOTSVCNETWORK)/ssl
-
-$(ROOTSVCNETWORK)/ssl:
 	$(MKDIR) -p $@
 
 include ../../../../Makefile.targ
