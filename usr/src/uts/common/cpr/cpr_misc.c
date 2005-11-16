@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -631,7 +631,8 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 		int ndvram;
 
 		ndvram = 0;
-		(void) callb_execute_class(CB_CL_CPR_FB, (int)&ndvram);
+		(void) callb_execute_class(CB_CL_CPR_FB,
+		    (int)(uintptr_t)&ndvram);
 		if (cpr_debug & (LEVEL1 | LEVEL6))
 			errp("ndvram size = %d\n", ndvram);
 
@@ -671,7 +672,7 @@ cpr_statefile_ok(vnode_t *vp, int alloc_retry)
 		 */
 		STAT->cs_est_statefsz = size;
 		if (cpr_debug & (LEVEL1 | LEVEL6))
-			errp("%s Estimated statefile size %d, space %lu\n",
+			errp("%s Estimated statefile size %llu, space %lu\n",
 			    str, size, space);
 		if (size > space) {
 			cpr_err(CE_CONT, "Statefile partition too small.");
@@ -897,7 +898,7 @@ cpr_mp_offline(void)
 		}
 	} while ((cp = cp->cpu_next) != cpu_list);
 	if (brought_up_boot && (cpr_debug & (LEVEL1 | LEVEL6)))
-		errp("changed cpu %d to state %d\n", bootcpu, CPU_CPR_ONLINE);
+		errp("changed cpu %p to state %d\n", bootcpu, CPU_CPR_ONLINE);
 	mutex_exit(&cpu_lock);
 
 	return (rc);
@@ -1016,6 +1017,7 @@ cpr_build_statefile_path(void)
 	default:
 		cpr_err(CE_PANIC, "invalid statefile type");
 		/*NOTREACHED*/
+		return (NULL);
 	}
 }
 

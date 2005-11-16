@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2965,7 +2965,7 @@ idn_final_con(int domid)
 	 * he's not waiting on his protojob queue.
 	 */
 	targ |= domid & 0x0f;
-	(void) timeout(idn_link_established, (void *)targ, 50);
+	(void) timeout(idn_link_established, (void *)(uintptr_t)targ, 50);
 
 	cmn_err(CE_NOTE,
 		"!IDN: 200: link (domain %d, CPU %d) connected",
@@ -4463,7 +4463,7 @@ idn_xphase_transition(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 static int
 idn_xstate_transfunc(int domid, void *transarg)
 {
-	uint_t		msg = (uint_t)transarg;
+	uint_t		msg = (uint_t)(uintptr_t)transarg;
 	uint_t		token;
 	procname_t	proc = "idn_xstate_transfunc";
 
@@ -4787,7 +4787,7 @@ idn_link_established(void *arg)
 {
 	int	first_link;
 	int	domid, masterid;
-	uint_t	info = (uint_t)arg;
+	uint_t	info = (uint_t)(uintptr_t)arg;
 
 	first_link = (int)(info & 0xf0);
 	domid = (int)(info & 0x0f);
@@ -5386,7 +5386,7 @@ retry:
 		 */
 #ifdef DEBUG
 		if (bufoffset != sizeof (smr_pkthdr_t))
-			PR_DATA("%s:%d: offset ALIGNMENT (%d -> %ld) "
+			PR_DATA("%s:%d: offset ALIGNMENT (%lu -> %u) "
 				"(data_rptr = %p)\n",
 				proc, dst_domid, sizeof (smr_pkthdr_t),
 				bufoffset, data_rptr);
@@ -5791,7 +5791,7 @@ idn_recv_proto(idn_protomsg_t *hp)
 		cmn_err(CE_WARN,
 #endif /* DEBUG */
 			"IDN: 216: (0x%x)msgtype/(0x%x)acktype rcvd from "
-			"domain %d", proc, msgtype, acktype, domid);
+			"domain %d", msgtype, acktype, domid);
 		break;
 	}
 
@@ -6090,7 +6090,7 @@ idn_send_master_config(int domid, int phase)
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending BOARDSET (0x%x), MTU (0x%lx), "
-			"BUFSIZE (0x%lx)\n", proc, domid, phase,
+			"BUFSIZE (0x%x)\n", proc, domid, phase,
 			ldp->dhw.dh_boardset, IDN_MTU, IDN_SMR_BUFSIZE);
 
 		IDNXDC(domid, &mt, cfg_subtype.val,
@@ -6310,7 +6310,7 @@ idn_send_slave_config(int domid, int phase)
 		dp->dcfgphase = phase;
 
 		PR_PROTO("%s:%d:%d: sending BOARDSET (0x%x), MTU (0x%lx), "
-			"BUFSIZE (0x%lx)\n",
+			"BUFSIZE (0x%x)\n",
 			proc, domid, phase, ldp->dhw.dh_boardset, IDN_MTU,
 			IDN_SMR_BUFSIZE);
 
@@ -6990,7 +6990,7 @@ idn_check_slave_config(int domid, uint_t *exp, uint_t *act)
 	if ((int)dp->dncfgitems < IDN_SLAVE_NCFGITEMS)
 		return (CFG_CONTINUE);
 
-	if ((dp->dnetid == -1) ||
+	if ((dp->dnetid == (ushort_t)-1) ||
 	    CPUSET_ISNULL(dp->dcpuset) ||
 	    (dp->dhw.dh_boardset == 0) ||
 	    (dp->dmbox.m_send->mm_smr_mboxp == NULL) ||
@@ -7152,7 +7152,7 @@ idn_check_master_config(int domid, uint_t *exp, uint_t *act)
 	IDN_GLOCK_SHARED();
 	if ((idn.smr.rempfn == PFN_INVALID) ||
 	    (idn.smr.rempfnlim == PFN_INVALID) ||
-	    (dp->dnetid == -1) ||
+	    (dp->dnetid == (ushort_t)-1) ||
 	    CPUSET_ISNULL(dp->dcpuset) ||
 	    (dp->dhw.dh_boardset == 0) ||
 	    (nmcadr != dp->dhw.dh_nmcadr) ||
@@ -8299,7 +8299,7 @@ idn_recv_cmd(int domid, idn_msgtype_t *mtp, idn_xdcargs_t xargs)
 
 				if (dp->dstate == IDNDS_CONNECTED)
 					(void) timeout(idn_retry_nodename_req,
-							(void *)domid, hz);
+					    (void *)(uintptr_t)domid, hz);
 			default:
 				break;
 			}
@@ -8931,7 +8931,7 @@ idn_send_slabfree_resp(int domid, idn_msgtype_t *mtp,
 static void
 idn_retry_nodename_req(void *arg)
 {
-	int	domid = (int)arg;
+	int	domid = (int)(uintptr_t)arg;
 
 	idn_send_nodename_req(domid);
 }
@@ -8971,7 +8971,8 @@ idn_send_nodename_req(int domid)
 		 */
 		PR_PROTO("%s:%d: buffer alloc failed [dstate = %s]\n",
 			proc, domid, idnds_str[dp->dstate]);
-		(void) timeout(idn_retry_nodename_req, (void *)domid, hz);
+		(void) timeout(idn_retry_nodename_req, (void *)(uintptr_t)domid,
+		    hz);
 		IDN_DUNLOCK(domid);
 		return;
 	}
@@ -9027,7 +9028,7 @@ idn_recv_nodename_req(int domid, idn_msgtype_t *mtp, smr_offset_t bufoffset)
 	length = (int)(*b_bufp++ & 0xff);
 
 	if (length < strlen(ldp->dname)) {
-		PR_PROTO("%s:%d: buffer not big enough (req %d, got %d)\n",
+		PR_PROTO("%s:%d: buffer not big enough (req %lu, got %d)\n",
 			proc, domid, strlen(ldp->dname), length);
 		IDN_DUNLOCK(idn.localid);
 		idn_send_nodename_resp(domid, mtp, bufoffset, EINVAL);
@@ -9099,7 +9100,7 @@ idn_master_init()
 	 */
 	reserved_size = IDNROUNDUP(IDN_MBOXAREA_SIZE, IDN_SMR_BUFSIZE);
 
-	PR_PROTO("%s: reserving %d bytes for mailbox area\n",
+	PR_PROTO("%s: reserving %lu bytes for mailbox area\n",
 		proc, reserved_size);
 
 #ifdef DEBUG
@@ -9590,7 +9591,7 @@ idn_retry_submit(void (*func)(uint_t token, void *arg),
 	procname_t		proc = "idn_retry_submit";
 
 	if (ticks < 0) {
-		PR_PROTO("%s: (token = 0x%x) WARNING ticks = %l\n",
+		PR_PROTO("%s: (token = 0x%x) WARNING ticks = %ld\n",
 			proc, token, ticks);
 		return;
 	}
@@ -9848,8 +9849,8 @@ idn_protocol_server(int *id)
 
 	ASSERT(pq->q_id == *id);
 
-	PR_PROTO("%s: id %d starting up (pq = 0x%x)\n",
-		proc, pq->q_id, (uint_t)pq);
+	PR_PROTO("%s: id %d starting up (pq = 0x%p)\n",
+		proc, pq->q_id, pq);
 
 	/*CONSTCOND*/
 	while (1) {
@@ -10002,8 +10003,8 @@ idn_mboxarea_init(idn_mboxtbl_t *mtp, register int ntbls)
 
 	ASSERT(mtp && (ntbls > 0));
 
-	PR_PROTO("%s: init mboxtbl (0x%x) ntbls = %d\n",
-		proc, (uint_t)mtp, ntbls);
+	PR_PROTO("%s: init mboxtbl (0x%p) ntbls = %d\n",
+		proc, mtp, ntbls);
 
 	for (d = 0; d < ntbls; d++) {
 		register int	pd, sd;
@@ -10161,7 +10162,7 @@ idn_mainmbox_deactivate(ushort_t domset)
 		return;
 
 	PR_PROTO("%s: %s deactivating main mailboxes for domset 0x%x\n",
-		proc, (domset == (uint_t)-1) ? "STOP-ALL" : "NORMAL", domset);
+		proc, (domset == (ushort_t)-1) ? "STOP-ALL" : "NORMAL", domset);
 
 	svr_count = idn_mainmbox_chan_unregister(domset, -1);
 
@@ -10603,7 +10604,7 @@ idn_chan_server_syncheader(int channel)
 	}
 	IDN_DUNLOCK(idn.localid);
 
-	PR_CHAN("%s: channel(%d) mainhp = 0x%x\n", proc, channel, (uint_t)mhp);
+	PR_CHAN("%s: channel(%d) mainhp = 0x%p\n", proc, channel, mhp);
 
 	return (mhp);
 }
@@ -10628,7 +10629,7 @@ idn_chan_server_syncheader(int channel)
 }
 #define	CHANSVR_NEXT_DOMID(csp, i, d) \
 { \
-	(i) = ++(i) & (MAX_DOMAINS - 1); \
+	(i) = ((i) + 1) & (MAX_DOMAINS - 1); \
 	(d) = (int)(((csp)->ch_recv_scanset >> ((i) << 2)) & 0xf); \
 }
 #define	CHANSVR_RESET_INDEX(i)	((i) = -1)
@@ -10946,8 +10947,8 @@ cc_die:
 				tot_pktcount, tot_dropcount);
 			PR_CHAN("%s: (channel %d) TERMINATING\n",
 				proc, channel);
-			PR_CHAN("%s: (channel %d) ch_morguep = %x\n",
-				proc, channel, (uint_t)csp->ch_recv_morguep);
+			PR_CHAN("%s: (channel %d) ch_morguep = %p\n",
+				proc, channel, csp->ch_recv_morguep);
 
 			csp->ch_recv_threadp = NULL;
 #ifdef DEBUG
@@ -11398,7 +11399,7 @@ idn_chan_addmbox(int channel, ushort_t domset)
 		IDN_CHAN_DOMAIN_REGISTER(csp, d);
 
 		PR_CHAN("%s: domain %d (channel %d) RECV (pending) "
-			"scanset = 0x%llx\n", proc, d, channel,
+			"scanset = 0x%lx\n", proc, d, channel,
 			csp->ch_recv_scanset_pending);
 		PR_CHAN("%s: domain %d (channel %d) domset = 0x%x\n",
 			proc, d, channel, (uint_t)csp->ch_reg_domset);
@@ -11457,7 +11458,7 @@ idn_chan_delmbox(int channel, ushort_t domset)
 		IDN_CHAN_DOMAIN_UNREGISTER(csp, d);
 
 		PR_CHAN("%s: domain %d (channel %d) RECV (pending) "
-			"scanset = 0x%llx\n", proc, d, channel,
+			"scanset = 0x%lx\n", proc, d, channel,
 			csp->ch_recv_scanset_pending);
 		PR_CHAN("%s: domain %d (channel %d) domset = 0x%x\n",
 			proc, d, channel, (uint_t)csp->ch_reg_domset);
@@ -11477,9 +11478,6 @@ idn_valid_etherheader(struct ether_header *ehp)
 {
 	uchar_t	*eap;
 
-	if (ehp->ether_type > ETHERTYPE_MAX)
-		return (0);
-
 	eap = &ehp->ether_dhost.ether_addr_octet[0];
 
 	if ((eap[IDNETHER_ZERO] != 0) && (eap[IDNETHER_ZERO] != 0xff))
@@ -11497,11 +11495,11 @@ idn_valid_etherheader(struct ether_header *ehp)
 		(eap[IDNETHER_RESERVED] != 0xff))
 		return (0);
 
-	if (!VALID_CHANNEL(eap[IDNETHER_CHANNEL]) &&
+	if (!VALID_UCHANNEL(eap[IDNETHER_CHANNEL]) &&
 		(eap[IDNETHER_CHANNEL] != 0xff))
 		return (0);
 
-	if (!VALID_DOMAINID(IDN_NETID2DOMID(eap[IDNETHER_NETID])) &&
+	if (!VALID_UDOMAINID(IDN_NETID2DOMID(eap[IDNETHER_NETID])) &&
 		(eap[IDNETHER_NETID] != 0xff))
 		return (0);
 
@@ -11724,7 +11722,7 @@ idn_recv_mboxdata(int channel, caddr_t bufp)
 	apktlen = pktlen;
 
 	if ((pktlen <= 0) || (pktlen > IDN_DATA_SIZE)) {
-		PR_DATA("%s: invalid packet length (%d) <= 0 || > %d\n",
+		PR_DATA("%s: invalid packet length (%d) <= 0 || > %lu\n",
 			proc, pktlen, IDN_DATA_SIZE);
 		IDN_KSTAT_INC(sip, si_buff);
 		IDN_KSTAT_INC(sip, si_toolong_errors);
@@ -12464,8 +12462,8 @@ idn_activate_channel(idn_chanset_t chanset, idn_chanop_t chanop)
 		 */
 		if (IDN_CHANNEL_IS_ENABLED(csp) &&
 			((mainhp = idn_chan_server_syncheader(c)) != NULL)) {
-			PR_CHAN("%s: marking chansvr (mhp=0x%x) %d READY\n",
-				proc, (uint_t)mainhp, c);
+			PR_CHAN("%s: marking chansvr (mhp=0x%p) %d READY\n",
+				proc, mainhp, c);
 			mainhp->mh_svr_ready = 1;
 		}
 
@@ -12716,9 +12714,9 @@ idn_deactivate_channel_services(int channel, idn_chanop_t chanop)
 			continue;
 		}
 
-		PR_CHAN("%s: pointing chansvr %d to morgue (0x%x)\n",
-			proc, c, central_morguep ? (uint_t)central_morguep
-						: (uint_t)csp->ch_recv_morguep);
+		PR_CHAN("%s: pointing chansvr %d to morgue (0x%p)\n",
+			proc, c, central_morguep ? central_morguep
+						: csp->ch_recv_morguep);
 
 		if (central_morguep == NULL) {
 			central_morguep = csp->ch_recv_morguep;
@@ -12751,7 +12749,7 @@ idn_deactivate_channel_services(int channel, idn_chanop_t chanop)
 
 	PR_CHAN("%s: waiting for %d (chnset=0x%x) chan svrs to term\n",
 		proc, cs_count, chanset);
-	PR_CHAN("%s: morguep = 0x%x\n", proc, (uint_t)central_morguep);
+	PR_CHAN("%s: morguep = 0x%p\n", proc, central_morguep);
 
 	ASSERT((cs_count > 0) ? (central_morguep != NULL) : 1);
 	while (cs_count-- > 0)
@@ -12821,7 +12819,7 @@ idn_exec_chanactivate(void *chn)
 	int		not_active, channel;
 	idn_chansvr_t	*csp;
 
-	channel = (int)chn;
+	channel = (int)(uintptr_t)chn;
 
 	IDN_GLOCK_SHARED();
 	if (idn.chan_servers == NULL) {
@@ -12872,7 +12870,7 @@ idn_submit_chanactivate_job(int channel)
 	if (lock_try(&csp->ch_initlck) == 0)
 		return;
 
-	(void) timeout(idn_exec_chanactivate, (caddr_t)channel, 1);
+	(void) timeout(idn_exec_chanactivate, (caddr_t)(uintptr_t)channel, 1);
 }
 
 /*ARGSUSED0*/

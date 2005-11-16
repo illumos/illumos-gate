@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -732,8 +732,8 @@ idndl_proto(queue_t *wq, mblk_t *mp)
 		"idndl_proto start:  wq %p dlprim %X", wq, prim);
 
 #ifdef DEBUG
-	PR_DLPI("%s: stp = 0x%x, wq = 0x%x, dlprim = 0x%lx(%s)\n",
-		proc, (uint_t)stp, (uint_t)wq, prim, dlprim2str(prim));
+	PR_DLPI("%s: stp = 0x%p, wq = 0x%p, dlprim = 0x%x(%s)\n",
+		proc, stp, wq, prim, dlprim2str(prim));
 #endif /* DEBUG */
 
 	rw_enter(&stp->ss_rwlock, RW_WRITER);
@@ -1845,7 +1845,7 @@ idndl_read(struct idn *sip, mblk_t *mp)
 	int		pktlen;
 	procname_t	proc = "idndl_read";
 
-	PR_DLPI("%s: incoming msgsize = %d, msgdsize = %d\n",
+	PR_DLPI("%s: incoming msgsize = %lu, msgdsize = %lu\n",
 		proc, msgsize(mp), msgdsize(mp));
 
 	ehp = (struct ether_header *)mp->b_rptr;

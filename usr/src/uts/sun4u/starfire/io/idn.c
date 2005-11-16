@@ -1048,7 +1048,7 @@ idn_size_check()
 	mboxareasize &= ~((ulong_t)IDN_SMR_BUFSIZE - 1);
 #ifdef DEBUG
 	if ((ulong_t)IDN_SLAB_SIZE < mboxareasize) {
-		PR_DRV("%s: slab size(%ld) < mailbox area(%ld)",
+		PR_DRV("%s: slab size(%d) < mailbox area(%ld)",
 			proc, IDN_SLAB_SIZE, mboxareasize);
 		/* not fatal */
 	}
@@ -1143,7 +1143,7 @@ idn_init_smr()
 	if (idn_prom_getsmr(&smr_size, &obp_paddr, &obp_size) < 0)
 		return (-1);
 
-	PR_PROTO("%s: smr_size = %d, obp_paddr = 0x%llx, obp_size = 0x%llx\n",
+	PR_PROTO("%s: smr_size = %d, obp_paddr = 0x%lx, obp_size = 0x%lx\n",
 		proc, smr_size, obp_paddr, obp_size);
 
 	if (IDN_SMR_SIZE)
@@ -1227,8 +1227,8 @@ idn_init(dev_info_t *dip)
 	}
 
 	if (idn.dip != NULL) {
-		PR_DRV("%s: already initialized (dip = 0x%x)\n",
-			proc, (uint_t)idn.dip);
+		PR_DRV("%s: already initialized (dip = 0x%p)\n",
+			proc, idn.dip);
 		return (0);
 	}
 
@@ -1261,7 +1261,7 @@ idn_init(dev_info_t *dip)
 		for (s = 0; (1 << s) < IDN_SMR_BUFSIZE_MIN; s++)
 			;
 		idn.bframe_shift = s;
-		PR_DRV("%s: idn.bframe_shift = %d, minbuf = %ld\n",
+		PR_DRV("%s: idn.bframe_shift = %d, minbuf = %d\n",
 			proc, idn.bframe_shift, IDN_SMR_BUFSIZE_MIN);
 
 		ASSERT((uint_t)IDN_OFFSET2BFRAME(MB2B(idn_smr_size)) <
@@ -1641,7 +1641,7 @@ idnwput(register queue_t *wq, register mblk_t *mp)
 		if (((stp->ss_flags & (IDNSFAST|IDNSRAW)) == 0) ||
 				(stp->ss_state != DL_IDLE) ||
 				(sip == NULL)) {
-			PR_DLPI("%s: fl=0x%lx, st=0x%lx, ret(EPROTO)\n",
+			PR_DLPI("%s: fl=0x%x, st=0x%x, ret(EPROTO)\n",
 				proc, stp->ss_flags, stp->ss_state);
 			merror(wq, mp, EPROTO);
 
@@ -1666,8 +1666,8 @@ idnwput(register queue_t *wq, register mblk_t *mp)
 			qenable(wq);
 
 		} else {
-			PR_DLPI("%s: idndl_start(sip=0x%x)\n",
-				proc, (uint_t)sip);
+			PR_DLPI("%s: idndl_start(sip=0x%p)\n",
+				proc, sip);
 			rw_enter(&stp->ss_rwlock, RW_READER);
 			(void) idndl_start(wq, mp, sip);
 			rw_exit(&stp->ss_rwlock);
@@ -1730,8 +1730,8 @@ idnwsrv(queue_t *wq)
 		switch (DB_TYPE(mp)) {
 		case M_DATA:
 			if (sip) {
-				PR_DLPI("%s: idndl_start(sip=0x%x)\n",
-					proc, (uint_t)sip);
+				PR_DLPI("%s: idndl_start(sip=0x%p)\n",
+					proc, sip);
 				rw_enter(&stp->ss_rwlock, RW_READER);
 				err = idndl_start(wq, mp, sip);
 				rw_exit(&stp->ss_rwlock);
@@ -1777,7 +1777,7 @@ idnrput(register queue_t *rq, register mblk_t *mp)
 		 */
 		cmn_err(CE_WARN,
 			"IDN: 123: unexpected M_DATA packets for "
-			"q_stream 0x%x", (uint_t)rq->q_stream);
+			"q_stream 0x%p", rq->q_stream);
 		freemsg(mp);
 		err = ENXIO;
 		break;
@@ -1929,8 +1929,8 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 
 	sbp = *sbpp;
 
-	PR_PROTO("%s: KICKED OFF (sigbintr pointer = 0x%x)\n",
-		proc, (uint_t)sbp);
+	PR_PROTO("%s: KICKED OFF (sigbintr pointer = 0x%p)\n",
+		proc, sbp);
 
 	ASSERT(sbp == &idn.sigbintr);
 
@@ -1981,7 +1981,7 @@ idn_sigbhandler_thread(struct sigbintr **sbpp)
 
 		if (mbp->len != sizeof (idnsb_data_t)) {
 			PR_PROTO("%s: sigblk mbox length (%d) != "
-				"expected (%d)\n", proc, mbp->len,
+				"expected (%lu)\n", proc, mbp->len,
 				sizeof (idnsb_data_t));
 			SET_IDNKERR_ERRNO(sep, EINVAL);
 			SET_IDNKERR_IDNERR(sep, IDNKERR_DATA_LEN);
@@ -2214,7 +2214,7 @@ idn_sigbhandler_create()
 	if (idn.sigb_threadp) {
 		cmn_err(CE_WARN,
 			"IDN: 126: sigbhandler thread already "
-			"exists (0x%x)", (uint_t)idn.sigb_threadp);
+			"exists (0x%p)", idn.sigb_threadp);
 		return;
 	}
 	cv_init(&idn.sigbintr.sb_cv, NULL, CV_DEFAULT, NULL);
@@ -4054,10 +4054,17 @@ _hexspace(uint64_t v, int sz, int width, int padding)
 #define	HEXSPACE(v, t, w, s)	_hexspace((uint64_t)(v), sizeof (t), (w), (s))
 
 #define	DECSPACE(n, w, s) \
-	(_SSS((n) >= 10000000, 8, (w), (s)) : \
-	_SSS((n) >= 1000000, 7, (w), (s)) : \
-	_SSS((n) >= 100000, 6, (w), (s)) : \
-	_SSS((n) >= 10000, 5, (w), (s)) : \
+	(_SSS((uint_t)(n) >= 10000000, 8, (w), (s)) : \
+	_SSS((uint_t)(n) >= 1000000, 7, (w), (s)) : \
+	_SSS((uint_t)(n) >= 100000, 6, (w), (s)) : \
+	_SSS((uint_t)(n) >= 10000, 5, (w), (s)) : \
+	_SSS((uint_t)(n) >= 1000, 4, (w), (s)) : \
+	_SSS((uint_t)(n) >= 100, 3, (w), (s)) : \
+	_SSS((uint_t)(n) >= 10, 2, (w), (s)) : \
+	_get_spaces((w), (s), 1))
+
+#define	DECSPACE16(n, w, s) \
+	(_SSS((n) >= 10000, 5, (w), (s)) : \
 	_SSS((n) >= 1000, 4, (w), (s)) : \
 	_SSS((n) >= 100, 3, (w), (s)) : \
 	_SSS((n) >= 10, 2, (w), (s)) : \
@@ -4073,11 +4080,11 @@ _hexspace(uint64_t v, int sz, int width, int padding)
 		HEXSPACE(mtp->mt_header.mh_svr_active_ptr, \
 			mtp->mt_header.mh_svr_active_ptr, 8, 2), \
 	*(ushort_t *)(IDN_OFFSET2ADDR(mtp->mt_header.mh_svr_ready_ptr)), \
-	DECSPACE(*(ushort_t *) \
+	DECSPACE16(*(ushort_t *) \
 			(IDN_OFFSET2ADDR(mtp->mt_header.mh_svr_ready_ptr)), \
 			1, 1), \
 	*(ushort_t *)(IDN_OFFSET2ADDR(mtp->mt_header.mh_svr_active_ptr)), \
-	DECSPACE(*(ushort_t *) \
+	DECSPACE16(*(ushort_t *) \
 			(IDN_OFFSET2ADDR(mtp->mt_header.mh_svr_active_ptr)), \
 			1, 5), \
 	mtp->mt_header.mh_cookie, \
@@ -4598,7 +4605,7 @@ idn_domain_report(queue_t *wq, mblk_t *mp, caddr_t cp, cred_t *cr)
 	if ((dbp = dbuffer = ALLOC_DISPSTRING()) == NULL)
 		dbp = alt_dbuffer;
 
-	if ((int)cp == 0)
+	if (cp == NULL)
 		domset = DOMAINSET(idn.localid);
 	else
 		domset = DOMAINSET_ALL;
@@ -4785,9 +4792,9 @@ idn_init_handler()
 	len += NCPU * idn_dmv_pending_max * sizeof (idn_dmv_msg_t);
 	len = roundup(len, PAGESIZE);
 
-	PR_PROTO("%s: sizeof (idn_dmv_data_t) = %d\n",
+	PR_PROTO("%s: sizeof (idn_dmv_data_t) = %lu\n",
 		proc, sizeof (idn_dmv_data_t));
-	PR_PROTO("%s: allocating %d bytes for dmv data area\n", proc, len);
+	PR_PROTO("%s: allocating %lu bytes for dmv data area\n", proc, len);
 
 	idn.intr.dmv_data_len = len;
 	idn.intr.dmv_data = kmem_zalloc(len, KM_SLEEP);
@@ -5368,14 +5375,14 @@ cpuset2str(cpuset_t cset, char buffer[])
 			PR_PROTO("cpuset2str(cpu = %d) buffer "
 				"OVERFLOW <<<<<<\n", c);
 			PR_PROTO("*******************************\n");
-			(void) sprintf(&buffer[_DSTRLEN-6], "*OVER\0");
+			(void) sprintf(&buffer[_DSTRLEN-6], "*OVER");
 			return;
 		}
 #endif /* DEBUG */
 		if (n == 0)
-			(void) sprintf(buffer, "%d\0", c);
+			(void) sprintf(buffer, "%d", c);
 		else
-			(void) sprintf(buffer, "%s, %d\0", buffer, c);
+			(void) sprintf(buffer, "%s, %d", buffer, c);
 		n++;
 	}
 }
@@ -5407,9 +5414,9 @@ mask2str(uint_t mask, char buffer[], int maxnum)
 		if ((mask & (1 << i)) == 0)
 			continue;
 		if (n == 0)
-			(void) sprintf(buffer, "%d\0", i);
+			(void) sprintf(buffer, "%d", i);
 		else
-			(void) sprintf(buffer, "%s, %d\0", buffer, i);
+			(void) sprintf(buffer, "%s, %d", buffer, i);
 		n++;
 	}
 }
@@ -5602,12 +5609,12 @@ idn_prom_getsmr(uint_t *smrsz, uint64_t *paddrp, uint64_t *sizep)
 		}
 	} else if (obpsize < (uint64_t)MB2B(smrsize)) {
 		cmn_err(CE_WARN,
-			"!IDN: 140: OBP region (%lld B) smaller "
+			"!IDN: 140: OBP region (%ld B) smaller "
 			"than requested size (%ld B)",
 			obpsize, MB2B(smrsize));
 	} else if ((obpaddr & ((uint64_t)IDN_SMR_ALIGN - 1)) != 0) {
 		cmn_err(CE_WARN,
-			"!IDN: 141: OBP region (0x%llx) not on (0x%lx) "
+			"!IDN: 141: OBP region (0x%lx) not on (0x%x) "
 			"boundary", obpaddr, IDN_SMR_ALIGN);
 	} else {
 		*sizep = obpsize;
@@ -5759,8 +5766,8 @@ _idn_getstruct(char *structname, int size)
 
 	ptr = kmem_zalloc(size, KM_SLEEP);
 
-	PR_ALLOC("%s: ptr 0x%x, struct(%s), size = %d\n",
-		proc, (uint_t)ptr, structname, size);
+	PR_ALLOC("%s: ptr 0x%p, struct(%s), size = %d\n",
+		proc, ptr, structname, size);
 
 	return (ptr);
 }
@@ -5770,8 +5777,8 @@ _idn_freestruct(caddr_t ptr, char *structname, int size)
 {
 	procname_t	proc = "FREESTRUCT";
 
-	PR_ALLOC("%s: ptr 0x%x, struct(%s), size = %d\n",
-		proc, (uint_t)ptr, structname, size);
+	PR_ALLOC("%s: ptr 0x%p, struct(%s), size = %d\n",
+		proc, ptr, structname, size);
 
 	ASSERT(ptr != NULL);
 	kmem_free(ptr, size);

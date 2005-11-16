@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,16 +196,16 @@ cpr_check_user_threads()
 			DEBUG1(errp("Suspend failed: cannt stop "
 				"uthread\n"));
 			cpr_err(CE_WARN, "Suspend cannot stop "
-				"process %s (%x:%x).",
-				ttoproc(tp)->p_user.u_psargs, (int)tp,
+				"process %s (%p:%x).",
+				ttoproc(tp)->p_user.u_psargs, (void *)tp,
 				tp->t_state);
 			cpr_err(CE_WARN, "Process may be waiting for"
 				" network request, please try again.");
 			}
 
-			DEBUG2(errp("cant stop t=%x state=%x pfg=%x sched=%x\n",
+			DEBUG2(errp("cant stop t=%p state=%x pfg=%x sched=%x\n",
 			tp, tp->t_state, tp->t_proc_flag, tp->t_schedflag));
-			DEBUG2(errp("proc %x state=%x pid=%d\n",
+			DEBUG2(errp("proc %p state=%x pid=%d\n",
 				ttoproc(tp), ttoproc(tp)->p_stat,
 				ttoproc(tp)->p_pidp->pid_id));
 			return (1);

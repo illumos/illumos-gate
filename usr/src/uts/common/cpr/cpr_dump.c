@@ -275,7 +275,7 @@ cpr_write_terminator(vnode_t *vp)
 	cpr_term.real_statef_size = STAT->cs_real_statefsz +
 		btod(cpr_wptr - cpr_buf) * DEV_BSIZE;
 
-	DEBUG9(errp("cpr_dump: Real Statefile Size: %d\n",
+	DEBUG9(errp("cpr_dump: Real Statefile Size: %ld\n",
 		STAT->cs_real_statefsz));
 
 	cpr_tod_get(&cpr_term.tm_shutdown);
@@ -684,7 +684,7 @@ cpr_count_kpages(int mapflag, bitfunc_t bitfunc)
 	kas_cnt = i_cpr_count_special_kpages(mapflag, bitfunc);
 	kas_cnt += cpr_count_seg_pages(mapflag, bitfunc);
 
-	DEBUG9(errp("cpr_count_kpages: kas_cnt=%d\n", kas_cnt));
+	DEBUG9(errp("cpr_count_kpages: kas_cnt=%ld\n", kas_cnt));
 	DEBUG7(errp("\ncpr_count_kpages: %ld pages, 0x%lx bytes\n",
 		kas_cnt, mmu_ptob(kas_cnt)));
 	return (kas_cnt);
@@ -902,7 +902,7 @@ cpr_compress_and_write(vnode_t *vp, uint_t va, pfn_t pfn, pgcnt_t npg)
 
 	i_cpr_mapin(CPR->c_mapping_area, npg, pfn);
 
-	DEBUG3(errp("mapped-in %d pages, vaddr 0x%p, pfn 0x%x\n",
+	DEBUG3(errp("mapped-in %ld pages, vaddr 0x%p, pfn 0x%lx\n",
 		npg, CPR->c_mapping_area, pfn));
 
 	/*
@@ -979,7 +979,7 @@ cpr_write(vnode_t *vp, caddr_t buffer, size_t size)
 				return (ENOSPC);
 		}
 
-		DEBUG3(errp("cpr_write: frmp=%x wptr=%x cnt=%x...",
+		DEBUG3(errp("cpr_write: frmp=%p wptr=%p cnt=%lx...",
 			fromp, cpr_wptr, bytes));
 		/*
 		 * cross check, this should not happen!

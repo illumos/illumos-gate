@@ -191,8 +191,8 @@ mc_get_alignment_mask(pnode_t nodeid)
 		seg_sz = mc_seg_table[i].seg_size;
 
 #ifdef DEBUG
-	printf("nodeid %x, mc asr addr %llx, val %x, seg_sz_mask %x, "
-	    "seg_sz %llx\n", nodeid, psi_addr, mcreg, seg_sz_mask, seg_sz);
+	printf("nodeid %x, mc asr addr %lx, val %x, seg_sz_mask %x, "
+	    "seg_sz %lx\n", nodeid, psi_addr, mcreg, seg_sz_mask, seg_sz);
 #endif /* DEBUG */
 
 	return (seg_sz - 1);

@@ -376,8 +376,10 @@ typedef ushort_t domainset_t;	/* assumes max of 16 domains */
 		(((caddr_t)(addr) >= idn.smr.vaddr) && \
 		VALID_NWROFFSET(((caddr_t)(addr) - idn.smr.vaddr), (align)))
 #define	VALID_DOMAINID(d)	(((d) >= 0) && ((d) < MAX_DOMAINS))
+#define	VALID_UDOMAINID(d)	((d) < MAX_DOMAINS)
 #define	VALID_CPUID(c)		(((c) >= 0) && ((c) < NCPU))
-#define	VALID_CHANNEL(c)	(((int)(c) >= 0) && ((int)(c) < IDN_MAX_NETS))
+#define	VALID_CHANNEL(c)	(((c) >= 0) && ((c) < IDN_MAX_NETS))
+#define	VALID_UCHANNEL(c)	((c) < IDN_MAX_NETS)
 
 /*
  * The following are bit values of idn_debug, currently
@@ -655,7 +657,7 @@ typedef struct idnsb {
 		IDN_HISTORY_LOG(IDNH_GSTATE, (ns), 0, 0); \
 		tstamp = TIMESTAMP(); \
 		ASSERT(IDN_GLOCK_IS_EXCL()); \
-		PR_STATE("GSTATE:%lld: (l=%d) %s(%d) -> %s(%d)\n", \
+		PR_STATE("GSTATE:%ld: (l=%d) %s(%d) -> %s(%d)\n", \
 			(uint64_t)tstamp, __LINE__, \
 			idngs_str[idn.state], idn.state, \
 			idngs_str[ns], (ns)); \
@@ -1320,7 +1322,7 @@ typedef enum {
 			hrtime_t	tstamp; \
 			tstamp = TIMESTAMP(); \
 			IDN_HISTORY_LOG(IDNH_FIN, _id, (ns), 0); \
-			PR_STATE("FSTATE:%lld:%d: (l=%d, b/p=%d/%d) " \
+			PR_STATE("FSTATE:%ld:%d: (l=%d, b/p=%d/%d) " \
 				"%s(%d) -> %s(%d)\n", \
 				(uint64_t)tstamp, _id, \
 				__LINE__, \
@@ -1490,7 +1492,7 @@ typedef struct idn_timer {
 		id = (dp)->domid; \
 		IDN_HISTORY_LOG(IDNH_DSTATE, id, (ns), \
 				(uint_t)(dp)->dcpu); \
-		PR_STATE("DSTATE:%lld:%d: (l=%d, b/p=%d/%d) " \
+		PR_STATE("DSTATE:%ld:%d: (l=%d, b/p=%d/%d) " \
 			"%s(%d) -> %s(%d)\n", \
 			(uint64_t)tstamp, id, \
 			__LINE__, \
@@ -3493,7 +3495,7 @@ struct idn_gkstat_named {
 		idn_i2s_table[i] = (s); \
 	}
 
-#define	IDN_NETID2DOMID(n)	(VALID_DOMAINID((int)(n)) ? \
+#define	IDN_NETID2DOMID(n)	(VALID_UDOMAINID(n) ? \
 					((int)(n)) : IDN_NIL_DOMID)
 #define	IDN_DOMID2NETID(d)	((ushort_t)(d))
 

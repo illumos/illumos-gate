@@ -1089,8 +1089,8 @@ i_cpr_compress_and_save(int chunks, pfn_t spfn, pgcnt_t pages)
 		descp->csd_usum = cpd.cpd_usum;
 		if (test_usum != descp->csd_usum) {
 			DEBUG1(errp("\nWARNING: i_cpr_compress_and_save: "
-			    "Data in the range of pfn 0x%x to pfn "
-			    "0x%x has changed after they are saved "
+			    "Data in the range of pfn 0x%lx to pfn "
+			    "0x%lx has changed after they are saved "
 			    "into storage.", spfn, (spfn + pages - 1)));
 		}
 #endif
@@ -1203,7 +1203,7 @@ i_cpr_storage_desc_alloc(csd_t **basepp, pgcnt_t *pgsp, csd_t **endpp,
 	*pgsp = npages;
 	len = mmu_ptob(npages);
 	end = *endpp = descp + (len / (sizeof (**basepp)));
-	DEBUG7(errp("npages 0x%x, len 0x%x, items 0x%x\n\t*basepp "
+	DEBUG7(errp("npages 0x%lx, len 0x%lx, items 0x%lx\n\t*basepp "
 	    "%p, *endpp %p\n", npages, len, (len / (sizeof (**basepp))),
 	    *basepp, *endpp));
 	i_cpr_storage_desc_init(descp, npages, end);
@@ -1252,7 +1252,7 @@ i_cpr_dump_sensitive_kpages(vnode_t *vp)
 		prom_printf(" \b");
 	}
 
-	DEBUG7(errp("\ni_cpr_dump_sensitive_kpages: dumped %d\n",
+	DEBUG7(errp("\ni_cpr_dump_sensitive_kpages: dumped %ld\n",
 	    i_cpr_sensitive_pgs_dumped));
 	return (0);
 }
@@ -1326,7 +1326,7 @@ cpr_dump_sensitive(vnode_t *vp, csd_t *descp)
 	/* Write cpr page descriptor */
 	error = cpr_write(vp, (caddr_t)&cpd, sizeof (cpd));
 	if (error) {
-		DEBUG7(errp("descp: %x\n", descp));
+		DEBUG7(errp("descp: %p\n", descp));
 #ifdef DEBUG
 		debug_enter("cpr_dump_sensitive: cpr_write() page "
 			"descriptor failed!\n");
@@ -1340,8 +1340,8 @@ cpr_dump_sensitive(vnode_t *vp, csd_t *descp)
 	error = cpr_write(vp, (caddr_t)datap, cpd.cpd_length);
 	if (error) {
 		DEBUG7(errp("error: %x\n", error));
-		DEBUG7(errp("descp: %x\n", descp));
-		DEBUG7(errp("cpr_write(%x, %x , %x)\n", vp, datap,
+		DEBUG7(errp("descp: %p\n", descp));
+		DEBUG7(errp("cpr_write(%p, %p , %lx)\n", vp, datap,
 			cpd.cpd_length));
 #ifdef DEBUG
 		debug_enter("cpr_dump_sensitive: cpr_write() data failed!\n");
@@ -1367,7 +1367,7 @@ i_cpr_check_pgs_dumped(uint_t pgs_expected, uint_t regular_pgs_dumped)
 
 	total_pgs_dumped = regular_pgs_dumped + i_cpr_sensitive_pgs_dumped;
 
-	DEBUG7(errp("\ncheck_pgs: reg %d + sens %d = %d, expect %d\n\n",
+	DEBUG7(errp("\ncheck_pgs: reg %d + sens %ld = %d, expect %d\n\n",
 	    regular_pgs_dumped, i_cpr_sensitive_pgs_dumped,
 	    total_pgs_dumped, pgs_expected));
 
@@ -1633,7 +1633,7 @@ i_cpr_save_ppages(void)
 		dst += MMU_PAGESIZE;
 	}
 
-	DEBUG1(errp("saved %d prom pages\n", ppage_count));
+	DEBUG1(errp("saved %ld prom pages\n", ppage_count));
 }
 
 
@@ -1662,7 +1662,7 @@ i_cpr_restore_ppages(void)
 
 	dcache_flushall();
 
-	DEBUG1(errp("restored %d prom pages\n", ppage_count));
+	DEBUG1(errp("restored %ld prom pages\n", ppage_count));
 }
 
 
@@ -1693,7 +1693,7 @@ i_cpr_prom_pages(int action)
 		if (ppage_buf) {
 			ASSERT(ppage_count);
 			kmem_free(ppage_buf, mmu_ptob(ppage_count));
-			DEBUG1(errp("freed %d prom pages\n", ppage_count));
+			DEBUG1(errp("freed %ld prom pages\n", ppage_count));
 			ppage_buf = NULL;
 			ppage_count = 0;
 		}
@@ -1831,7 +1831,7 @@ i_cpr_blockzero(char *base, char **bufpp, int *blkno, vnode_t *vp)
 		bcopy(cpr_sector, base, sizeof (cpr_sector));
 		*bufpp = base + sizeof (cpr_sector);
 		*blkno = cpr_statefile_offset();
-		DEBUG1(errp("statefile data size: %lld\n\n", bytes));
+		DEBUG1(errp("statefile data size: %ld\n\n", bytes));
 		return (cpr_flush_write(vp));
 	}
 }
