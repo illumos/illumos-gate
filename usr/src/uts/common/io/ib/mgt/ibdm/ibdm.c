@@ -159,7 +159,7 @@ struct modlinkage ibdm_modlinkage = {
 };
 
 static ibt_clnt_modinfo_t ibdm_ibt_modinfo = {
-	IBTI_V1,
+	IBTI_V2,
 	IBT_DM,
 	ibdm_event_hdlr,
 	NULL,

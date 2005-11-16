@@ -56,6 +56,7 @@ typedef	struct	ibtl_cq_s	*ibt_cq_hdl_t;	    /* ibt_alloc_cq() */
 typedef	struct	ibcm_svc_info_s	*ibt_srv_hdl_t;	    /* ibt_register_service() */
 typedef	struct	ibcm_svc_bind_s	*ibt_sbind_hdl_t;   /* ibt_bind_service() */
 
+typedef	struct	ibc_fmr_pool_s	*ibt_fmr_pool_hdl_t; /* ibt_create_fmr_pool() */
 typedef	struct	ibc_ma_s	*ibt_ma_hdl_t;	    /* ibt_map_mem_area() */
 typedef	struct	ibc_pd_s	*ibt_pd_hdl_t;	    /* ibt_alloc_pd() */
 typedef	struct	ibc_sched_s	*ibt_sched_hdl_t;   /* ibt_alloc_cq_sched() */
@@ -307,7 +308,8 @@ typedef enum ibt_hca_flags_e {
 	IBT_HCA_BASE_QUEUE_MGT	= 1 << 24,	/* Base Queue Mgt supported? */
 	IBT_HCA_CKSUM_FULL	= 1 << 25,	/* Checksum offload supported */
 	IBT_HCA_MEM_WIN_TYPE_2B	= 1 << 26,	/* Type 2B memory windows */
-	IBT_HCA_PHYS_BUF_BLOCK	= 1 << 27	/* Block mode phys buf lists */
+	IBT_HCA_PHYS_BUF_BLOCK	= 1 << 27,	/* Block mode phys buf lists */
+	IBT_HCA_FMR		= 1 << 28	/* FMR Support */
 } ibt_hca_flags_t;
 
 /*
@@ -428,6 +430,8 @@ typedef struct ibt_hca_attr_s {
 	size_t		hca_block_sz_hi;	/* supported by the HCA */
 	uint_t		hca_max_cq_handlers;
 	ibt_lkey_t	hca_reserved_lkey;
+	uint_t		hca_max_fmrs;		/* Max FMR Supported */
+	uint_t		hca_opaque9;
 } ibt_hca_attr_t;
 
 /*
@@ -733,7 +737,8 @@ typedef enum ibt_mr_attr_flags_e {
 	IBT_MR_REMOTE_ATOMIC		= (1 << 4),
 	IBT_MR_ZERO_BASED_VA		= (1 << 5),
 	IBT_MR_CONSUMER_OWNED_KEY	= (1 << 6),
-	IBT_MR_SHARED			= (1 << 7)
+	IBT_MR_SHARED			= (1 << 7),
+	IBT_MR_FMR			= (1 << 8)
 } ibt_mr_attr_flags_t;
 
 /* Memory region physical descriptor. */
@@ -802,9 +807,12 @@ typedef struct ibt_pmr_attr_s {
 	ibt_lkey_t	pmr_lkey;	/* Reregister only */
 	ibt_rkey_t	pmr_rkey;	/* Reregister only */
 	uint8_t		pmr_key;	/* Key to use on new Lkey & Rkey */
-	uint_t		pmr_num_buf;	/* Num of entries in the mr_buf_list */
+	uint_t		pmr_num_buf;	/* Num of entries in the pmr_buf_list */
+	size_t		pmr_buf_sz;
 	ibt_phys_buf_t	*pmr_buf_list;	/* List of physical buffers accessed */
 					/* as an array */
+	ibt_ma_hdl_t	pmr_ma;		/* Memory handle used to obtain the */
+					/* pmr_buf_list */
 } ibt_pmr_attr_t;
 
 
@@ -873,7 +881,11 @@ typedef struct ibt_mr_sync_s {
  * Flags for Virtual Address to HCA Physical Address translation.
  */
 typedef enum ibt_va_flags_e {
-	IBT_VA_NO_FLAGS		= 0
+	IBT_VA_SLEEP		= 0,
+	IBT_VA_NOSLEEP		= (1 << 0),
+	IBT_VA_NONCOHERENT	= (1 << 1),
+	IBT_VA_FMR		= (1 << 2),
+	IBT_VA_BLOCK_MODE	= (1 << 3)
 } ibt_va_flags_t;
 
 
@@ -883,8 +895,32 @@ typedef struct ibt_va_attr_s {
 	ib_memlen_t	va_len;		/* Length of region to register */
 	struct as	*va_as;		/* A pointer to an address space */
 					/* structure. */
+	size_t		va_phys_buf_min;
+	size_t		va_phys_buf_max;
 	ibt_va_flags_t	va_flags;
 } ibt_va_attr_t;
+
+
+/*
+ * Fast Memory Registration (FMR) support.
+ */
+
+/* FMR flush function handler. */
+typedef void (*ibt_fmr_flush_handler_t)(ibt_fmr_pool_hdl_t fmr_pool,
+    void *fmr_func_arg);
+
+/* FMR Pool create attributes. */
+typedef struct ibt_fmr_pool_attr_s {
+	uint_t			fmr_max_pages_per_fmr;
+	uint_t			fmr_pool_size;
+	uint_t			fmr_dirty_watermark;
+	size_t			fmr_page_sz;
+	boolean_t		fmr_cache;
+	ibt_mr_flags_t		fmr_flags;
+	ibt_fmr_flush_handler_t	fmr_func_hdlr;
+	void			*fmr_func_arg;
+} ibt_fmr_pool_attr_t;
+
 
 /*
  * WORK REQUEST AND WORK REQUEST COMPLETION DEFINITIONS.
@@ -1286,7 +1322,8 @@ typedef enum ibt_failure_type_e {
 	IBT_FAILURE_IBMF,
 	IBT_FAILURE_IBTL,
 	IBT_FAILURE_IBCM,
-	IBT_FAILURE_IBDM
+	IBT_FAILURE_IBDM,
+	IBT_FAILURE_IBSM
 } ibt_failure_type_t;
 
 #ifdef	__cplusplus

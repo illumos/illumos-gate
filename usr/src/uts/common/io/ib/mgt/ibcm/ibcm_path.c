@@ -2011,13 +2011,13 @@ ibcm_update_cep_info(sa_path_record_t *prec_resp, ibtl_cm_port_list_t *sl,
 		IBTF_DPRINTF_L2(cmlog, "ibcm_update_cep_info: Path's Packet "
 		    "LifeTime too high %d, Maximum allowed %d IB Time (4 sec)",
 		    prec_resp->PacketLifeTime, ibcm_max_ib_pkt_lt);
-		return (IBT_PATH_PKT_LT_TOO_HIGH);
+		return (ibt_get_module_failure(IBT_FAILURE_IBSM, 0));
 	}
 
 	if ((prec_resp->Mtu > IB_MTU_4K) || (prec_resp->Mtu < IB_MTU_256)) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_update_cep_info: MTU (%d) from "
 		    "pathrecord is invalid, reject it.", prec_resp->Mtu);
-		return (ibt_get_module_failure(IBT_FAILURE_IBCM, 0));
+		return (ibt_get_module_failure(IBT_FAILURE_IBSM, 0));
 	}
 
 	/* Source Node Information. */
@@ -2030,7 +2030,7 @@ ibcm_update_cep_info(sa_path_record_t *prec_resp, ibtl_cm_port_list_t *sl,
 			/* Failed to get pkey_index from pkey */
 			IBTF_DPRINTF_L2(cmlog, "ibcm_update_cep_info: "
 			    "Pkey2Index conversion failed: %d", retval);
-			return (retval);
+			return (ibt_get_module_failure(IBT_FAILURE_IBSM, 0));
 		}
 		cep_p->cep_adds_vect.av_sgid_ix = hport->hp_sgid_ix;
 		cep_p->cep_adds_vect.av_src_path =
@@ -2049,7 +2049,8 @@ ibcm_update_cep_info(sa_path_record_t *prec_resp, ibtl_cm_port_list_t *sl,
 					IBTF_DPRINTF_L2(cmlog,
 					    "ibcm_update_cep_info: Pkey2Index "
 					    "conversion failed: %d", retval);
-					return (retval);
+					return (ibt_get_module_failure(
+					    IBT_FAILURE_IBSM, 0));
 				}
 
 				cep_p->cep_adds_vect.av_sgid_ix =
@@ -2078,7 +2079,7 @@ ibcm_update_cep_info(sa_path_record_t *prec_resp, ibtl_cm_port_list_t *sl,
 	default:
 		IBTF_DPRINTF_L2(cmlog, "ibcm_update_cep_info: SRate (%d) from "
 		    "pathrecord is invalid, reject it.", prec_resp->Rate);
-		return (IBT_STATIC_RATE_INVALID);
+		return (ibt_get_module_failure(IBT_FAILURE_IBSM, 0));
 	}
 	/*
 	 * If both Source and Destination GID prefix are same, then GRH is not

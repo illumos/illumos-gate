@@ -66,6 +66,7 @@ typedef struct ibc_qpn_s	*ibc_qpn_hdl_t;	/* Queue Pair Number Handle */
 typedef struct ibc_cq_s		*ibc_cq_hdl_t;	/* Completion Queue Handle */
 typedef struct ibc_eec_s	*ibc_eec_hdl_t; /* End-to-End Context Handle */
 
+#define	ibc_fmr_pool_hdl_t	ibt_fmr_pool_hdl_t /* FMR Pool Handle */
 #define	ibc_mr_hdl_t	ibt_mr_hdl_t	/* Memory Region Handle */
 #define	ibc_mw_hdl_t	ibt_mw_hdl_t	/* Memory Window Handle */
 #define	ibc_ma_hdl_t	ibt_ma_hdl_t	/* Memory Area Handle */
@@ -149,6 +150,7 @@ typedef struct ibtl_hca_devinfo_s *ibc_clnt_hdl_t;	/* ibc_attach() */
 #define	hca_max_ether_qp	hca_max_ether_chan
 #define	hca_eec_max_ci_priv_sz	hca_opaque7
 #define	hca_rdd_max_ci_priv_sz	hca_opaque8
+#define	hca_max_map_per_fmr	hca_opaque9
 
 
 /*
@@ -159,7 +161,8 @@ typedef struct ibtl_hca_devinfo_s *ibc_clnt_hdl_t;	/* ibc_attach() */
 
 /* Channel Interface version */
 typedef enum ibc_version_e {
-	IBCI_V1		= 1
+	IBCI_V1		= 1,
+	IBCI_V2		= 2		/* FMR Support */
 } ibc_version_t;
 
 
@@ -360,7 +363,8 @@ typedef struct ibc_operations_s {
 	ibt_status_t (*ibc_map_mem_area)(ibc_hca_hdl_t hca_hdl,
 	    ibt_va_attr_t *va_attrs, void *ibtl_reserved,
 	    uint_t paddr_list_len, ibt_phys_buf_t *paddr_list_p,
-	    uint_t *num_paddr_p, ibc_ma_hdl_t *ibc_ma_hdl_p);
+	    uint_t *num_paddr_p, size_t *paddr_bufsz_p,
+	    ib_memlen_t *paddr_offset_p, ibc_ma_hdl_t *ma_hdl_p);
 	ibt_status_t (*ibc_unmap_mem_area)(ibc_hca_hdl_t hca_hdl,
 	    ibc_ma_hdl_t ma_hdl);
 
@@ -377,6 +381,19 @@ typedef struct ibc_operations_s {
 	    ibc_mr_hdl_t mr, ibc_pd_hdl_t pd, ibt_pmr_attr_t *mem_pattr,
 	    void *ibtl_reserved, ibc_mr_hdl_t *mr_p,
 	    ibt_pmr_desc_t *mem_desc_p);
+
+	/* Fast Memory Registration (FMR) */
+	ibt_status_t (*ibc_create_fmr_pool)(ibc_hca_hdl_t hca, ibc_pd_hdl_t pd,
+	    ibt_fmr_pool_attr_t *fmr_params, ibc_fmr_pool_hdl_t *fmr_pool_p);
+	ibt_status_t (*ibc_destroy_fmr_pool)(ibc_hca_hdl_t hca,
+	    ibc_fmr_pool_hdl_t fmr_pool);
+	ibt_status_t (*ibc_flush_fmr_pool)(ibc_hca_hdl_t hca,
+	    ibc_fmr_pool_hdl_t fmr_pool);
+	ibt_status_t (*ibc_register_physical_fmr)(ibc_hca_hdl_t hca,
+	    ibc_fmr_pool_hdl_t fmr_pool, ibt_pmr_attr_t *mem_pattr,
+	    void *ibtl_reserved, ibc_mr_hdl_t *mr_hdl_p,
+	    ibt_pmr_desc_t *mem_desc_p);
+	ibt_status_t (*ibc_deregister_fmr)(ibc_hca_hdl_t hca, ibc_mr_hdl_t mr);
 } ibc_operations_t;
 
 

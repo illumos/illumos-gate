@@ -100,7 +100,8 @@ extern "C" {
 
 /* Transport Interface version */
 typedef enum ibt_version_e {
-	IBTI_V1 = 1
+	IBTI_V1 = 1,
+	IBTI_V2 = 2		/* FMR Support */
 } ibt_version_t;
 
 /*
@@ -1322,7 +1323,7 @@ ibt_status_t ibt_reregister_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl,
  */
 ibt_status_t ibt_map_mem_area(ibt_hca_hdl_t hca_hdl, ibt_va_attr_t *va_attrs,
     uint_t paddr_list_len, ibt_phys_buf_t *paddr_list_p, uint_t *num_paddr_p,
-    ibt_ma_hdl_t *ma_hdl_p);
+    size_t *paddr_bufsz_p, ib_memlen_t *paddr_offset_p, ibt_ma_hdl_t *ma_hdl_p);
 
 /*
  * ibt_unmap_mem_area()
@@ -1678,6 +1679,57 @@ ibt_status_t ibt_get_port_state(ibt_hca_hdl_t hca_hdl, uint8_t port,
 
 ibt_status_t ibt_get_port_state_byguid(ib_guid_t hca_guid, uint8_t port,
     ib_gid_t *sgid_p, ib_lid_t *base_lid_p);
+
+
+/*
+ * Fast Memory Registration (FMR).
+ *
+ * ibt_create_fmr_pool
+ *	Not fast-path.
+ *	ibt_create_fmr_pool() verifies that the HCA supports FMR and allocates
+ *	and initializes an "FMR pool".  This pool contains state specific to
+ *	this registration, including the watermark setting to determine when
+ *	to sync, and the total number of FMR regions available within this pool.
+ *
+ * ibt_destroy_fmr_pool
+ *	ibt_destroy_fmr_pool() deallocates all of the FMR regions in a specific
+ *	pool.  All state and information regarding the pool are destroyed and
+ *	returned as free space once again.  No more use of FMR regions in this
+ *	pool are possible without a subsequent call to ibt_create_fmr_pool().
+ *
+ * ibt_flush_fmr_pool
+ *	ibt_flush_fmr_pool forces a flush to occur.  At the client's request,
+ *	any unmapped FMR regions (See 'ibt_deregister_mr())') are returned to
+ *	a free state.  This function allows for an asynchronous cleanup of
+ *	formerly used FMR regions.  Sync operation is also performed internally
+ *	by HCA driver, when 'watermark' settings for the number of free FMR
+ *	regions left in the "pool" is reached.
+ *
+ * ibt_register_physical_fmr
+ *	ibt_register_physical_fmr() assigns a "free" entry from the FMR Pool.
+ *	It first consults the "FMR cache" to see if this is a duplicate memory
+ *	registration to something already in use.  If not, then a free entry
+ *	in the "pool" is marked used.
+ *
+ * ibt_deregister_fmr
+ *	The ibt_deregister_fmr un-maps the resources reserved from the FMR
+ *	pool by ibt_register_physical_fmr().   The ibt_deregister_fmr() will
+ *	mark the region as free in the FMR Pool.
+ */
+ibt_status_t ibt_create_fmr_pool(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
+    ibt_fmr_pool_attr_t *fmr_params, ibt_fmr_pool_hdl_t *fmr_pool_p);
+
+ibt_status_t ibt_destroy_fmr_pool(ibt_hca_hdl_t hca_hdl,
+    ibt_fmr_pool_hdl_t fmr_pool);
+
+ibt_status_t ibt_flush_fmr_pool(ibt_hca_hdl_t hca_hdl,
+    ibt_fmr_pool_hdl_t fmr_pool);
+
+ibt_status_t ibt_register_physical_fmr(ibt_hca_hdl_t hca_hdl,
+    ibt_fmr_pool_hdl_t fmr_pool, ibt_pmr_attr_t *mem_pattr,
+    ibt_mr_hdl_t *mr_hdl_p, ibt_pmr_desc_t *mem_desc_p);
+
+ibt_status_t ibt_deregister_fmr(ibt_hca_hdl_t hca, ibt_mr_hdl_t mr_hdl);
 
 #ifdef __cplusplus
 }

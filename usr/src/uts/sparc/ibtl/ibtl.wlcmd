@@ -53,8 +53,11 @@ root	ibt_map_mem_area
 root	ibt_unmap_mem_area
 root	ibt_register_phys_mr
 root	ibt_reregister_phys_mr
-root	ibc_async_handler
-root	ibc_cq_handler
+root	ibt_create_fmr_pool
+root	ibt_destroy_fmr_pool
+root	ibt_flush_fmr_pool
+root	ibt_register_physical_fmr
+root	ibt_deregister_fmr
 root	ibt_enable_cq_notify
 root	ibt_set_cq_handler
 root	ibt_alloc_qp
@@ -155,6 +158,7 @@ root	ibc_pre_detach
 root	ibc_detach
 root	ibc_async_handler
 root	ibc_cq_handler
+root	ibc_fmr_flush_handler
 
 # IBTF Debug entry points
 root	ibtl_dprintf_intr
@@ -274,8 +278,14 @@ add	ibc_operations_s::ibc_unmap_mem_area		targets warlock_dummy
 add	ibc_operations_s::ibc_alloc_lkey		targets warlock_dummy
 add	ibc_operations_s::ibc_register_physical_mr	targets warlock_dummy
 add	ibc_operations_s::ibc_reregister_physical_mr	targets warlock_dummy
+add	ibc_operations_s::ibc_create_fmr_pool		targets warlock_dummy
+add	ibc_operations_s::ibc_destroy_fmr_pool		targets warlock_dummy
+add	ibc_operations_s::ibc_flush_fmr_pool		targets warlock_dummy
+add	ibc_operations_s::ibc_register_physical_fmr	targets warlock_dummy
+add	ibc_operations_s::ibc_deregister_fmr		targets warlock_dummy
 add	ibt_clnt_modinfo_s::mi_async_handler		targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_async_client_call/async_handler	targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_cq_handler_call/cq_handler	targets	warlock_dummy
+add	ibtl_handlers.c:ibtl_fmr_flush_handler_call/fmr_handler	targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_sm_notice_task/sm_notice_handler	targets	warlock_dummy
 add	ibtl_mgr_s::mgr_async_handler			targets	warlock_dummy

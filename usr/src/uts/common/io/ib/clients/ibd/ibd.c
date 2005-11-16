@@ -326,7 +326,7 @@ static struct modlinkage ibd_modlinkage = {
  *	    data).
  */
 static struct ibt_clnt_modinfo_s ibd_clnt_modinfo = {
-	IBTI_V1,
+	IBTI_V2,
 	IBT_NETWORK,
 	ibd_async_handler,
 	NULL,

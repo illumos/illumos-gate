@@ -170,7 +170,7 @@ _NOTE(MUTEX_PROTECTS_DATA(ibcm_timeout_list_lock,
     ibcm_ud_state_data_s::ud_timeout_next))
 
 static ibt_clnt_modinfo_t ibcm_ibt_modinfo = {	/* Client's modinfop */
-	IBTI_V1,
+	IBTI_V2,
 	IBT_CM,
 	ibcm_async_handler,
 	NULL,

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,9 +155,12 @@ typedef enum ibt_status_e {
 	IBT_HCA_CNTR_VAL_INVALID	= 205,	/* Invalid Counter value */
 	IBT_HCA_PORT_NOT_ACTIVE		= 206,	/* Port is down */
 	IBT_HCA_SRQ_NOT_SUPPORTED	= 207,	/* Shared Receive Queue */
-	IBT_HCA_RESIZE_SRQ_NOT_SUPPORTED = 208,	/* Not supported */
-	IBT_HCA_PAGE_MODE		= 209,	/* HCA operating in page mode */
-	IBT_HCA_BLOCK_MODE		= 210,	/* HCA in block mode */
+						/* not supported */
+	IBT_HCA_RESIZE_SRQ_NOT_SUPPORTED = 208,	/* SRQ Resize not supported */
+	IBT_HCA_PAGE_MODE		= 209,	/* Not opened in page mode */
+	IBT_HCA_BLOCK_MODE		= 210,	/* HCA does not support Block */
+						/* mode or Not opened in */
+						/* Block mode */
 	IBT_HCA_BMM_NOT_SUPPORTED	= 211,	/* Base Memory Management */
 						/* Extensions not supported */
 	IBT_HCA_BQM_NOT_SUPPORTED	= 212,	/* Base Queue Management */
@@ -169,6 +172,8 @@ typedef enum ibt_status_e {
 	IBT_HCA_TYPE_2_MW_NOT_SUPPORTED	= 215,
 
 	IBT_HCA_LIF_NOT_SUPPORTED	= 216,	/* Local Invalidate Fencing */
+						/* not supported */
+	IBT_HCA_FMR_NOT_SUPPORTED	= 217,	/* Fast Memory Registration */
 						/* not supported */
 	/*
 	 * Address errors
@@ -247,6 +252,7 @@ typedef enum ibt_status_e {
 	IBT_MW_HDL_INVALID 		= 809,	/* Invalid Memory Window */
 						/* Handle */
 	IBT_MW_TYPE_INVALID		= 810,
+	IBT_MA_HDL_INVALID		= 811,  /* Invalid Memory Area Hdl */
 
 	/*
 	 * Multicast errors
@@ -277,8 +283,14 @@ typedef enum ibt_status_e {
 	IBT_SRQ_SZ_INSUFFICIENT		= 1203,	/* The Size of the WQ is too */
 						/* small, there are more */
 						/* outstanding entries than */
-	IBT_SRQ_IN_USE			= 1204	/* SRQ Still has QPs */
+	IBT_SRQ_IN_USE			= 1204,	/* SRQ Still has QPs */
 						/* associated with it */
+	/*
+	 * FMR Errors
+	 */
+	IBT_FMR_POOL_HDL_INVALID	= 1300,	/* Invalid FMR Pool handle */
+	IBT_FMR_POOL_IN_USE		= 1301,	/* FMR Pool in use. */
+	IBT_PBL_TOO_SMALL		= 1302
 
 } ibt_status_t;
 

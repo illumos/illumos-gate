@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -225,7 +225,8 @@ ibt_close_hca(ibt_hca_hdl_t hca_hdl)
 	/* Make sure resources have been freed. */
 	if (hca_hdl->ha_qp_cnt | hca_hdl->ha_cq_cnt | hca_hdl->ha_eec_cnt |
 	    hca_hdl->ha_ah_cnt | hca_hdl->ha_mr_cnt | hca_hdl->ha_mw_cnt |
-	    hca_hdl->ha_pd_cnt) {
+	    hca_hdl->ha_pd_cnt | hca_hdl->ha_fmr_pool_cnt |
+	    hca_hdl->ha_ma_cnt) {
 		IBTF_DPRINTF_L2(ibtf_hca, "ibt_close_hca: "
 		    "some resources have not been freed by '%s': hca_hdl = %p",
 		    hca_hdl->ha_clnt_devp->clnt_modinfop->mi_clnt_name,

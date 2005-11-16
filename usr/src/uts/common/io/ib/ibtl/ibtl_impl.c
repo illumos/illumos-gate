@@ -236,11 +236,11 @@ ibt_attach(ibt_clnt_modinfo_t *mod_infop, dev_info_t *arg, void *clnt_private,
 	/*
 	 * Validate the Transport API version.
 	 */
-	if (mod_infop->mi_ibt_version != IBTI_V1) {
+	if (mod_infop->mi_ibt_version != IBTI_V2) {
 		IBTF_DPRINTF_L1(ibtf, "ibt_attach: IB client '%s' has an "
 		    "invalid IB TI Version '%d'", mod_infop->mi_clnt_name,
 		    mod_infop->mi_ibt_version);
-		return (IBT_INVALID_PARAM);
+		return (IBT_NOT_SUPPORTED);
 	}
 
 	if (mod_infop->mi_async_handler == NULL) {
@@ -526,8 +526,9 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 	IBTF_DPRINTF_L2(ibtf, "ibc_attach(%p, %p)", ibc_hdl_p, info_p);
 
 	/* Validate the Transport API version */
-	if (info_p->hca_ci_vers != IBCI_V1) {
-		IBTF_DPRINTF_L1(ibtf, "ibc_attach: Invalid IB CI Version");
+	if (info_p->hca_ci_vers != IBCI_V2) {
+		IBTF_DPRINTF_L1(ibtf, "ibc_attach: Invalid IB CI Version '%d'",
+		    info_p->hca_ci_vers);
 		return (IBC_FAILURE);
 	}
 
@@ -1039,6 +1040,7 @@ ibt_get_module_failure(ibt_failure_type_t type, uint64_t ena)
 	case IBT_FAILURE_IBCM:
 	case IBT_FAILURE_IBDM:
 	case IBT_FAILURE_IBTL:
+	case IBT_FAILURE_IBSM:
 		ret = IBTL_ENA_POSSIBLE | (type << IBTL_TYPE_SHIFT);
 		break;
 	default:

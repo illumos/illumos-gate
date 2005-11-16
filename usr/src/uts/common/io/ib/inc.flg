@@ -73,7 +73,9 @@ find_files "s.*"	\
 	usr/src/uts/intel/ibmf		\
 	usr/src/uts/intel/ibtl		\
 	usr/src/uts/intel/tavor		\
-	usr/src/uts/intel/daplt
+	usr/src/uts/intel/ibd		\
+	usr/src/uts/intel/daplt		\
+	usr/src/uts/intel/rpcib	
 
 # packaging files
 find_files "s.*"	\
@@ -120,6 +122,8 @@ echo_file  usr/src/uts/intel/Makefile.rules
 echo_file  usr/src/uts/intel/Makefile.intel
 echo_file  usr/src/uts/intel/Makefile.targ
 echo_file  usr/src/uts/intel/ia32/ml/ia32.il
+echo_file  usr/src/uts/sun4/Makefile.files
+echo_file  usr/src/uts/sun4/Makefile.rules
 echo_file  usr/src/uts/sun4u/Makefile
 echo_file  usr/src/uts/sun4u/Makefile.files
 echo_file  usr/src/uts/sun4u/Makefile.rules

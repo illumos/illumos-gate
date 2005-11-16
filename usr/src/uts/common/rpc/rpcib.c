@@ -291,7 +291,7 @@ static rdma_stat rib_chk_srv_ats(rib_hca_t *, struct netbuf *, int,
  * Registration with IBTF as a consumer
  */
 static struct ibt_clnt_modinfo_s rib_modinfo = {
-	IBTI_V1,
+	IBTI_V2,
 	IBT_GENERIC,
 	rib_async_handler,	/* async event handler */
 	NULL,			/* Memory Region Handler */

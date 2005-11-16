@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -517,16 +517,25 @@ ibt_free_mw(ibt_hca_hdl_t hca_hdl, ibt_mw_hdl_t mw_hdl)
 ibt_status_t
 ibt_map_mem_area(ibt_hca_hdl_t hca_hdl, ibt_va_attr_t *va_attrs,
     uint_t paddr_list_len, ibt_phys_buf_t *paddr_list_p, uint_t *num_paddr_p,
-    ibt_ma_hdl_t *ma_hdl_p)
+    size_t *paddr_bufsz_p, ib_memlen_t *paddr_offset_p, ibt_ma_hdl_t *ma_hdl_p)
 {
+	ibt_status_t 	status;
+
 	IBTF_DPRINTF_L3(ibtl_mem, "ibt_map_mem_area(%p, %p, %d)",
 	    hca_hdl, va_attrs, paddr_list_len);
 
-	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_map_mem_area(
+	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_map_mem_area(
 	    IBTL_HCA2CIHCA(hca_hdl), va_attrs,
 	    NULL, /* IBTL_HCA2MODI_P(hca_hdl)->mi_reserved */
-	    paddr_list_len, paddr_list_p,
-	    num_paddr_p, ma_hdl_p));
+	    paddr_list_len, paddr_list_p, num_paddr_p,  paddr_bufsz_p,
+	    paddr_offset_p, ma_hdl_p);
+	if (status == IBT_SUCCESS) {
+		mutex_enter(&hca_hdl->ha_mutex);
+		hca_hdl->ha_ma_cnt++;
+		mutex_exit(&hca_hdl->ha_mutex);
+	}
+
+	return (status);
 }
 
 
@@ -546,11 +555,20 @@ ibt_map_mem_area(ibt_hca_hdl_t hca_hdl, ibt_va_attr_t *va_attrs,
 ibt_status_t
 ibt_unmap_mem_area(ibt_hca_hdl_t hca_hdl, ibt_ma_hdl_t ma_hdl)
 {
+	ibt_status_t 	status;
+
 	IBTF_DPRINTF_L3(ibtl_mem, "ibt_unmap_mem_area(%p, %p)",
 	    hca_hdl, ma_hdl);
 
-	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_unmap_mem_area(
+	status = (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_unmap_mem_area(
 	    IBTL_HCA2CIHCA(hca_hdl), ma_hdl));
+	if (status == IBT_SUCCESS) {
+		mutex_enter(&hca_hdl->ha_mutex);
+		hca_hdl->ha_ma_cnt--;
+		mutex_exit(&hca_hdl->ha_mutex);
+	}
+
+	return (status);
 }
 
 
@@ -577,12 +595,21 @@ ibt_alloc_lkey(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd, ibt_lkey_flags_t flags,
     uint_t phys_buf_list_sz, ibt_mr_hdl_t *mr_hdl_p,
     ibt_pmr_desc_t *mem_desc_p)
 {
+	ibt_status_t 	status;
+
 	IBTF_DPRINTF_L3(ibtl_mem, "ibt_alloc_lkey(%p, %p, 0x%X, %d)",
 	    hca_hdl, pd, flags, phys_buf_list_sz);
 
-	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_alloc_lkey(
+	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_alloc_lkey(
 	    IBTL_HCA2CIHCA(hca_hdl), pd, flags, phys_buf_list_sz, mr_hdl_p,
-	    mem_desc_p));
+	    mem_desc_p);
+	if (status == IBT_SUCCESS) {
+		mutex_enter(&hca_hdl->ha_mutex);
+		hca_hdl->ha_mr_cnt++;
+		mutex_exit(&hca_hdl->ha_mutex);
+	}
+
+	return (status);
 }
 
 
@@ -606,13 +633,22 @@ ibt_register_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
     ibt_pmr_attr_t *mem_pattr, ibt_mr_hdl_t *mr_hdl_p,
     ibt_pmr_desc_t *mem_desc_p)
 {
+	ibt_status_t 	status;
+
 	IBTF_DPRINTF_L3(ibtl_mem, "ibt_register_phys_mr(%p, %p, %p)",
 	    hca_hdl, pd, mem_pattr);
 
-	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_register_physical_mr(
+	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_register_physical_mr(
 	    IBTL_HCA2CIHCA(hca_hdl), pd, mem_pattr,
 	    NULL, /* IBTL_HCA2MODI_P(hca_hdl)->mi_reserved */
-	    mr_hdl_p, mem_desc_p));
+	    mr_hdl_p, mem_desc_p);
+	if (status == IBT_SUCCESS) {
+		mutex_enter(&hca_hdl->ha_mutex);
+		hca_hdl->ha_mr_cnt++;
+		mutex_exit(&hca_hdl->ha_mutex);
+	}
+
+	return (status);
 }
 
 
@@ -637,11 +673,148 @@ ibt_reregister_phys_mr(ibt_hca_hdl_t hca_hdl, ibt_mr_hdl_t mr_hdl,
     ibt_pd_hdl_t pd, ibt_pmr_attr_t *mem_pattr, ibt_mr_hdl_t *mr_hdl_p,
     ibt_pmr_desc_t *mem_desc_p)
 {
+	ibt_status_t 	status;
+
 	IBTF_DPRINTF_L3(ibtl_mem, "ibt_reregister_phys_mr(%p, %p, %p, %p)",
 	    hca_hdl, mr_hdl, pd, mem_pattr);
 
-	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_reregister_physical_mr(
+	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_reregister_physical_mr(
 	    IBTL_HCA2CIHCA(hca_hdl), mr_hdl, pd, mem_pattr,
 	    NULL, /* IBTL_HCA2MODI_P(hca_hdl)->mi_reserved */
+	    mr_hdl_p, mem_desc_p);
+
+	if (!(status == IBT_SUCCESS || status == IBT_MR_IN_USE ||
+	    status == IBT_HCA_HDL_INVALID || status == IBT_MR_HDL_INVALID)) {
+		IBTF_DPRINTF_L2(ibtl_mem, "ibt_reregister_phys_mr: "
+		    "Re-registration Mem Failed: %d", status);
+
+		/* we lost one memory region resource */
+		mutex_enter(&hca_hdl->ha_mutex);
+		hca_hdl->ha_mr_cnt--;
+		mutex_exit(&hca_hdl->ha_mutex);
+
+	}
+	return (status);
+}
+
+
+/*
+ * Fast Memory Registration (FMR).
+ *
+ * ibt_create_fmr_pool
+ *      Not fast-path.
+ *      ibt_create_fmr_pool() verifies that the HCA supports FMR and allocates
+ *      and initializes an "FMR pool".  This pool contains state specific to
+ *      this registration, including the watermark setting to determine when
+ *      to sync, and the total number of FMR regions available within this pool.
+ *
+ */
+ibt_status_t
+ibt_create_fmr_pool(ibt_hca_hdl_t hca_hdl, ibt_pd_hdl_t pd,
+    ibt_fmr_pool_attr_t *fmr_params, ibt_fmr_pool_hdl_t *fmr_pool_p)
+{
+	ibt_status_t 		status;
+
+	IBTF_DPRINTF_L3(ibtl_mem, "ibt_create_fmr_pool(%p, %p, %p)",
+	    hca_hdl, pd, fmr_params);
+
+	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_create_fmr_pool(
+	    IBTL_HCA2CIHCA(hca_hdl), pd, fmr_params, fmr_pool_p);
+	if (status != IBT_SUCCESS) {
+		*fmr_pool_p = NULL;
+		return (status);
+	}
+
+	/* Update the FMR resource count */
+	mutex_enter(&hca_hdl->ha_mutex);
+	hca_hdl->ha_fmr_pool_cnt++;
+	mutex_exit(&hca_hdl->ha_mutex);
+
+	return (status);
+}
+
+
+/*
+ * ibt_destroy_fmr_pool
+ *      ibt_destroy_fmr_pool() deallocates all of the FMR regions in a specific
+ *      pool.  All state and information regarding the pool are destroyed and
+ *      returned as free space once again.  No more use of FMR regions in this
+ *      pool are possible without a subsequent call to ibt_create_fmr_pool().
+ */
+ibt_status_t
+ibt_destroy_fmr_pool(ibt_hca_hdl_t hca_hdl, ibt_fmr_pool_hdl_t fmr_pool)
+{
+	ibt_status_t 	status;
+
+	IBTF_DPRINTF_L3(ibtl_mem, "ibt_destroy_fmr_pool(%p, %p)",
+	    hca_hdl, fmr_pool);
+
+	status = IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_destroy_fmr_pool(
+	    IBTL_HCA2CIHCA(hca_hdl), fmr_pool);
+	if (status != IBT_SUCCESS) {
+		IBTF_DPRINTF_L2(ibtl_mem, "ibt_destroy_fmr_pool: "
+		    "CI FMR Pool destroy failed (%d)", status);
+		return (status);
+	}
+
+	mutex_enter(&hca_hdl->ha_mutex);
+	hca_hdl->ha_fmr_pool_cnt--;
+	mutex_exit(&hca_hdl->ha_mutex);
+
+	return (status);
+}
+
+/*
+ * ibt_flush_fmr_pool
+ *      ibt_flush_fmr_pool forces a flush to occur.  At the client's request,
+ *      any unmapped FMR regions (See 'ibt_deregister_mr())') are returned to
+ *      a free state.  This function allows for an asynchronous cleanup of
+ *      formerly used FMR regions.  Sync operation is also performed internally
+ *      by HCA driver, when 'watermark' settings for the number of free FMR
+ *      regions left in the "pool" is reached.
+ */
+ibt_status_t
+ibt_flush_fmr_pool(ibt_hca_hdl_t hca_hdl, ibt_fmr_pool_hdl_t fmr_pool)
+{
+	IBTF_DPRINTF_L3(ibtl_mem, "ibt_flush_fmr_pool(%p, %p)",
+	    hca_hdl, fmr_pool);
+
+	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_flush_fmr_pool(
+	    IBTL_HCA2CIHCA(hca_hdl), fmr_pool));
+}
+
+/*
+ * ibt_register_physical_fmr
+ *      ibt_register_physical_fmr() assigns a "free" entry from the FMR Pool.
+ *      It first consults the "FMR cache" to see if this is a duplicate memory
+ *      registration to something already in use.  If not, then a free entry
+ *      in the "pool" is marked used.
+ */
+ibt_status_t
+ibt_register_physical_fmr(ibt_hca_hdl_t hca_hdl, ibt_fmr_pool_hdl_t fmr_pool,
+    ibt_pmr_attr_t *mem_pattr, ibt_mr_hdl_t *mr_hdl_p,
+    ibt_pmr_desc_t *mem_desc_p)
+{
+	IBTF_DPRINTF_L3(ibtl_mem, "ibt_register_physical_fmr(%p, %p, %p, %p)",
+	    hca_hdl, fmr_pool, mem_pattr, mem_desc_p);
+
+	return (IBTL_HCA2CIHCAOPS_P(hca_hdl)->ibc_register_physical_fmr(
+	    IBTL_HCA2CIHCA(hca_hdl), fmr_pool, mem_pattr,
+	    NULL, /* IBTL_HCA2MODI_P(hca_hdl)->mi_reserved */
 	    mr_hdl_p, mem_desc_p));
+}
+
+/*
+ * ibt_deregister_fmr
+ *	The ibt_deregister_fmr un-maps the resources reserved from the FMR
+ *	pool by ibt_register_physical_fmr().   The ibt_deregister_fmr() will
+ *	mark the region as free in the FMR Pool.
+ */
+ibt_status_t
+ibt_deregister_fmr(ibt_hca_hdl_t hca, ibt_mr_hdl_t mr_hdl)
+{
+	IBTF_DPRINTF_L3(ibtl_mem, "ibt_deregister_fmr(%p, %p)", hca, mr_hdl);
+
+	return (IBTL_HCA2CIHCAOPS_P(hca)->ibc_deregister_fmr(
+	    IBTL_HCA2CIHCA(hca), mr_hdl));
 }

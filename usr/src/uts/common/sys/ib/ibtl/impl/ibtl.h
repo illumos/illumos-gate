@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,6 +206,8 @@ typedef struct ibtl_hca_s {
 	uint32_t		ha_srq_cnt;	/* SRQ resource counter */
 	ibtl_async_flags_t	ha_async_flags;	/* see *_async_flags above */
 	uint32_t		ha_async_cnt;	/* #asyncs in progress */
+	uint32_t		ha_fmr_pool_cnt; /* FMR Pool resource count */
+	uint32_t		ha_ma_cnt;	/* Mem Area resource count */
 } ibtl_hca_t;
 
 /* ha_flags values */

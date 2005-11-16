@@ -168,7 +168,7 @@ ibmf_init(void)
 	    IBMF_TNF_TRACE, "", "ibmf_init() enter\n");
 
 	/* setup the IBT module information */
-	ibmf_statep->ibmf_ibt_modinfo.mi_ibt_version = IBTI_V1;
+	ibmf_statep->ibmf_ibt_modinfo.mi_ibt_version = IBTI_V2;
 	ibmf_statep->ibmf_ibt_modinfo.mi_clnt_class = IBT_IBMA;
 	ibmf_statep->ibmf_ibt_modinfo.mi_async_handler
 	    = ibmf_ibt_async_handler;
