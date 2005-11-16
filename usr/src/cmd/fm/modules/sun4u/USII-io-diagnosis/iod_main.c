@@ -96,6 +96,7 @@ iod_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 		IOD_STAT_BUMP(ue);
 		cp = fmd_case_open(hdl, NULL);
 		fault = fmd_nvl_create_fault(hdl, flt, 100, NULL, NULL, NULL);
+		fmd_case_add_ereport(hdl, cp, ep);
 		fmd_case_add_suspect(hdl, cp, fault);
 		fmd_case_solve(hdl, cp);
 	} else if (fmd_nvl_class_match(hdl, nvl, "*ce")) {
