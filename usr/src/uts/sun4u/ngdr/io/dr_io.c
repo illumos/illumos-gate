@@ -188,7 +188,7 @@ dr_check_io_refs(dr_handle_t *hp, dr_common_unit_t **devlist, int devnum)
 			reftotal += ref;
 		} else {
 			PR_IO("%s: NO dip for id (0x%x)\n",
-				f, (uint_t)ip->sbi_cm.sbdev_id);
+				f, (uint_t)(uintptr_t)ip->sbi_cm.sbdev_id);
 		}
 	}
 

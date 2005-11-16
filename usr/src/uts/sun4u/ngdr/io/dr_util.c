@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -257,6 +257,6 @@ memlist_dump(struct memlist *mlist)
 	if (mlist == NULL)
 		printf("memlist> EMPTY\n");
 	else for (ml = mlist; ml; ml = ml->next)
-		printf("memlist> 0x%llx, 0x%llx\n", ml->address, ml->size);
+		printf("memlist> 0x%lx, 0x%lx\n", ml->address, ml->size);
 }
 #endif

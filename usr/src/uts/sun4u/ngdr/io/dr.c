@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -884,7 +884,7 @@ dr_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 		break;
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		break;
 
 	default:
@@ -929,13 +929,13 @@ dr_copyin_iocmd(dr_handle_t *hp)
 			&scp->cmd_cm.c_id.c_name[0], OBP_MAXPROPNAME);
 		scp->cmd_cm.c_flags = scmd32.cmd_cm.c_flags;
 		scp->cmd_cm.c_len = scmd32.cmd_cm.c_len;
-		scp->cmd_cm.c_opts = (caddr_t)scmd32.cmd_cm.c_opts;
+		scp->cmd_cm.c_opts = (caddr_t)(uintptr_t)scmd32.cmd_cm.c_opts;
 
 		switch (hp->h_cmd) {
 		case SBD_CMD_STATUS:
 			scp->cmd_stat.s_nbytes = scmd32.cmd_stat.s_nbytes;
 			scp->cmd_stat.s_statp =
-				(caddr_t)scmd32.cmd_stat.s_statp;
+				(caddr_t)(uintptr_t)scmd32.cmd_stat.s_statp;
 			break;
 		default:
 			break;
@@ -983,7 +983,7 @@ dr_copyout_iocmd(dr_handle_t *hp)
 
 		scmd32.cmd_cm.c_flags = scp->cmd_cm.c_flags;
 		scmd32.cmd_cm.c_len = scp->cmd_cm.c_len;
-		scmd32.cmd_cm.c_opts = (caddr32_t)scp->cmd_cm.c_opts;
+		scmd32.cmd_cm.c_opts = (caddr32_t)(uintptr_t)scp->cmd_cm.c_opts;
 
 		switch (hp->h_cmd) {
 		case SBD_CMD_GETNCM:
@@ -1075,7 +1075,7 @@ dr_pre_op(dr_handle_t *hp)
 	cmd = hp->h_cmd;
 	devset = shp->h_devset;
 
-	PR_ALL("%s (cmd = %s)...\n", f, (uint_t)SBD_CMD_STR(cmd));
+	PR_ALL("%s (cmd = %s)...\n", f, SBD_CMD_STR(cmd));
 
 	hp->h_err = drmach_pre_op(cmd, bp->b_id, &hp->h_opts);
 	if (hp->h_err != NULL) {
@@ -1138,7 +1138,7 @@ dr_post_op(dr_handle_t *hp)
 
 	cmd = hp->h_cmd;
 
-	PR_ALL("%s (cmd = %s)...\n", f, (uint_t)SBD_CMD_STR(cmd));
+	PR_ALL("%s (cmd = %s)...\n", f, SBD_CMD_STR(cmd));
 
 	/* errors should have been caught by now */
 	ASSERT(hp->h_err == NULL);
@@ -1625,7 +1625,7 @@ dr_dev_make_list(dr_handle_t *hp, sbd_comp_type_t type, int present_only,
 	list = kmem_zalloc(len, KM_SLEEP);
 
 	/* record length of storage in first element */
-	*list++ = (dr_common_unit_t *)len;
+	*list++ = (dr_common_unit_t *)(uintptr_t)len;
 
 	/* get bit array signifying which units are to be involved */
 	uset = DEVSET_GET_UNITSET(hp->h_devset, type);
@@ -1711,7 +1711,7 @@ dr_dev_clean_up(dr_handle_t *hp, dr_common_unit_t **list, int devnum)
 
 	/* free list */
 	list -= 1;
-	len = (int)list[0];
+	len = (int)(uintptr_t)list[0];
 	kmem_free(list, len);
 }
 
@@ -2342,7 +2342,7 @@ dr_dev_status(dr_handle_t *hp)
 
 		/* Alignment Paranoia */
 		if ((ulong_t)dstat32p & 0x1) {
-			PR_ALL("%s: alignment: sz=0x%x dstat32p=0x%x\n",
+			PR_ALL("%s: alignment: sz=0x%lx dstat32p=0x%p\n",
 				f, sizeof (sbd_stat32_t), dstat32p);
 			DR_OP_INTERNAL_ERROR(hp);
 			rv = EINVAL;
@@ -3031,7 +3031,7 @@ dr_check_unit_attached(dr_common_unit_t *cp)
 		break;
 
 	default:
-		PR_ALL("%s: unexpected nodetype(%d) for id 0x%x\n",
+		PR_ALL("%s: unexpected nodetype(%d) for id 0x%p\n",
 			f, cp->sbdev_type, cp->sbdev_id);
 		rv = -1;
 		break;

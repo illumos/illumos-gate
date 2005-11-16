@@ -366,7 +366,7 @@ _info(struct modinfo *modinfop)
 static pnode_t
 drmach_node_obp_get_dnode(drmach_node_t *np)
 {
-	return ((pnode_t)np->here);
+	return ((pnode_t)(uintptr_t)np->here);
 }
 
 static int
@@ -384,7 +384,7 @@ drmach_node_obp_walk(drmach_node_t *np, void *data,
 	nodeid = prom_childnode(prom_rootnode());
 
 	/* save our new position with in the tree */
-	np->here = (void *)nodeid;
+	np->here = (void *)(uintptr_t)nodeid;
 
 	rv = 0;
 	while (nodeid != OBP_NONODE) {
@@ -395,7 +395,7 @@ drmach_node_obp_walk(drmach_node_t *np, void *data,
 		nodeid = prom_nextnode(nodeid);
 
 		/* save our new position with in the tree */
-		np->here = (void *)nodeid;
+		np->here = (void *)(uintptr_t)nodeid;
 	}
 
 	return (rv);
@@ -1450,15 +1450,15 @@ drmach_prep_rename_script(drmach_device_t *s_mem, drmach_device_t *t_mem,
 
 		DRMACH_PR("mc idle register address list:");
 		isp = (drmach_mc_idle_script_t *)buf;
-		DRMACH_PR("source mc idle addr 0x%llx, mem id %p",
+		DRMACH_PR("source mc idle addr 0x%lx, mem id %p",
 			isp[0].idle_addr, isp[0].mem);
-		DRMACH_PR("target mc idle addr 0x%llx, mem id %p",
+		DRMACH_PR("target mc idle addr 0x%lx, mem id %p",
 			isp[1].idle_addr, isp[1].mem);
 		ASSERT(isp[2].idle_addr == 0);
 
 		DRMACH_PR("copy-rename script:");
 		for (j = 0; j < m; j++) {
-			DRMACH_PR("0x%llx = 0x%08x",
+			DRMACH_PR("0x%lx = 0x%08x",
 				rsp[j].masr_addr, rsp[j].masr);
 		}
 
@@ -1669,11 +1669,11 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	while (x_ml->next != NULL)
 		x_ml = x_ml->next;
 
-	DRMACH_PR("source copy span: base pa 0x%llx, end pa 0x%llx\n",
+	DRMACH_PR("source copy span: base pa 0x%lx, end pa 0x%lx\n",
 		s_copybasepa,
 		s_copybasepa + x_ml->address + x_ml->size);
 
-	DRMACH_PR("target copy span: base pa 0x%llx, end pa 0x%llx\n",
+	DRMACH_PR("target copy span: base pa 0x%lx, end pa 0x%lx\n",
 		t_copybasepa,
 		t_copybasepa + x_ml->address + x_ml->size);
 
@@ -1689,9 +1689,9 @@ drmach_copy_rename_init(drmachid_t t_id, uint64_t t_slice_offset,
 	err = drmach_mem_get_size(t_id, &t_size);
 	ASSERT(err == NULL);
 
-	DRMACH_PR("current source base pa 0x%llx, size 0x%llx\n",
+	DRMACH_PR("current source base pa 0x%lx, size 0x%lx\n",
 		s_basepa, s_size);
-	DRMACH_PR("current target base pa 0x%llx, size 0x%llx\n",
+	DRMACH_PR("current target base pa 0x%lx, size 0x%lx\n",
 		t_basepa, t_size);
 
 	ASSERT(s_copybasepa + x_ml->address + x_ml->size <= s_basepa + s_size);
@@ -3012,7 +3012,7 @@ drmach_mem_add_span(drmachid_t id, uint64_t basepa, uint64_t size)
 	rv = kcage_range_add(basepfn, npages, 1);
 	kcage_range_unlock();
 	if (rv == ENOMEM) {
-		cmn_err(CE_WARN, "%lld megabytes not available to kernel cage",
+		cmn_err(CE_WARN, "%ld megabytes not available to kernel cage",
 			(size == 0 ? 0 : size / MBYTE));
 	} else if (rv != 0) {
 		/* catch this in debug kernels */

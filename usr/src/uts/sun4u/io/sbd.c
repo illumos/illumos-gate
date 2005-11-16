@@ -496,7 +496,7 @@ sbd_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, char *event)
 	static fn_t	f = "sbd_ioctl";
 	int		dr_avail;
 
-	PR_BYP("sbd_ioctl cmd=%x, arg=%x\n", cmd, arg);
+	PR_BYP("sbd_ioctl cmd=%x, arg=%lx\n", cmd, arg);
 
 	/* Note: this must also be changed in tandem with sbd_ioctl.h */
 	switch (cmd) {
@@ -1618,12 +1618,12 @@ sbd_copyin_ioarg(sbd_handle_t *hp, int mode, int cmd, sbd_cmd_t *cmdp,
 			&cmdp->cmd_cm.c_id.c_name[0], OBP_MAXPROPNAME);
 		cmdp->cmd_cm.c_flags = scmd32.cmd_cm.c_flags;
 		cmdp->cmd_cm.c_len = scmd32.cmd_cm.c_len;
-		cmdp->cmd_cm.c_opts = (caddr_t)scmd32.cmd_cm.c_opts;
+		cmdp->cmd_cm.c_opts = (caddr_t)(uintptr_t)scmd32.cmd_cm.c_opts;
 
 		if (cmd == SBD_CMD_PASSTHRU) {
-			PR_BYP("passthru copyin: iap=%p, sz=%d", iap,
+			PR_BYP("passthru copyin: iap=%p, sz=%ld", iap,
 				sizeof (sbd_cmd32_t));
-			PR_BYP("passthru copyin: c_opts=%p, c_len=%d",
+			PR_BYP("passthru copyin: c_opts=%x, c_len=%d",
 				scmd32.cmd_cm.c_opts,
 				scmd32.cmd_cm.c_len);
 		}
@@ -1632,7 +1632,7 @@ sbd_copyin_ioarg(sbd_handle_t *hp, int mode, int cmd, sbd_cmd_t *cmdp,
 		case SBD_CMD_STATUS:
 			cmdp->cmd_stat.s_nbytes = scmd32.cmd_stat.s_nbytes;
 			cmdp->cmd_stat.s_statp =
-				(caddr_t)scmd32.cmd_stat.s_statp;
+				(caddr_t)(uintptr_t)scmd32.cmd_stat.s_statp;
 			break;
 		default:
 			break;

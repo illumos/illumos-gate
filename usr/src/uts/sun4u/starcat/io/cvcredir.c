@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,7 +213,7 @@ cvcr_open(queue_t *q, dev_t *dev, int flag, int sflag, cred_t *cred)
 	 * cvcd which has us open and is reading console data.
 	 */
 	if (cvc_register(RD(q)) == -1) {
-		cmn_err(CE_WARN, "cvcr_open: cvc_register failed for q = 0x%x",
+		cmn_err(CE_WARN, "cvcr_open: cvc_register failed for q = 0x%p",
 			q);
 	}
 	return (0);

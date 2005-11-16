@@ -624,7 +624,7 @@ dr_stop_user_threads(dr_sr_handle_t *srh)
 					    f, p->p_user.u_psargs, p->p_pid);
 
 					PR_QR("%s: failed to stop thread: "
-					    "process=%s, pid=%d, t_id=0x%lx, "
+					    "process=%s, pid=%d, t_id=0x%p, "
 					    "t_state=0x%x, t_proc_flag=0x%x, "
 					    "t_schedflag=0x%x\n",
 					    f, p->p_user.u_psargs, p->p_pid,
@@ -1081,10 +1081,10 @@ drerr_int(int e_code, uint64_t *arr, int idx, int majors)
 					"%s, ", dname);
 			} else {
 				n = snprintf(&buf[buf_idx], buf_avail,
-					"major %llu, ", arr[i]);
+					"major %lu, ", arr[i]);
 			}
 		} else {
-			n = snprintf(&buf[buf_idx], buf_avail, "%llu, ",
+			n = snprintf(&buf[buf_idx], buf_avail, "%lu, ",
 				arr[i]);
 		}
 

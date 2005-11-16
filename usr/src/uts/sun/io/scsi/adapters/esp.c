@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3058,9 +3058,6 @@ alloc:
 	tag_slots = esp->e_tagQ[slot];
 	if (tag_slots != NULL) {
 		tag = (esp->e_tagQ[slot]->e_tags)++;
-		if (esp->e_tagQ[slot]->e_tags >= NTAGS) {
-			esp->e_tagQ[slot]->e_tags = 0;
-		}
 		EPRINTF1("tagged cmd, tag = %d\n", tag);
 
 		/* Validate tag, should never fail. */
@@ -3108,9 +3105,7 @@ done:
 					EPRINTF1("found free tag %d\n", tag);
 					break;
 				}
-				if (++(esp->e_tagQ[slot]->e_tags) >= NTAGS) {
-					esp->e_tagQ[slot]->e_tags = 0;
-				}
+				++(esp->e_tagQ[slot]->e_tags);
 				EPRINTF1("found in use tag %d\n", tag);
 			}
 
@@ -4882,6 +4877,7 @@ step_done:
 	}
 	_NOTE(NOT_REACHED)
 	/* NOTREACHED */
+	return (ACTION_FINSEL);
 }
 
 /*
@@ -10474,7 +10470,7 @@ esp_dump_state(struct esp *esp)
 	for (x = 1; x <= NPHASE; x++) {
 		short y;
 
-		z = --z & (NPHASE - 1);
+		z = (z - 1) & (NPHASE - 1);
 		y = esp->e_phase[z].e_save_state;
 		if (y == STATE_FREE)
 			break;

@@ -391,13 +391,13 @@ dr_mem_ecache_scrub(dr_mem_unit_t *mp, struct memlist *mlist)
 		dst_pa = ml->address;
 		if (ml->address & PAGEOFFSET)
 			cmn_err(CE_WARN,
-				"%s: address (0x%llx) not on "
+				"%s: address (0x%lx) not on "
 				"page boundary", f, ml->address);
 
 		nbytes = ml->size;
 		if (ml->size & PAGEOFFSET)
 			cmn_err(CE_WARN,
-				"%s: size (0x%llx) not on "
+				"%s: size (0x%lx) not on "
 				"page boundary", f, ml->size);
 
 		/*LINTED*/
@@ -1199,8 +1199,8 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 	    &s_new_basepa);
 	ASSERT(err == NULL);
 
-	PR_MEM("%s:s_old_basepa: 0x%llx\n", f, s_old_basepa);
-	PR_MEM("%s:s_new_basepa: 0x%llx\n", f, s_new_basepa);
+	PR_MEM("%s:s_old_basepa: 0x%lx\n", f, s_old_basepa);
+	PR_MEM("%s:s_new_basepa: 0x%lx\n", f, s_new_basepa);
 
 	if (t_mp != NULL) {
 		struct memlist *s_copy_mlist;
@@ -1210,8 +1210,8 @@ dr_post_detach_mem_unit(dr_mem_unit_t *s_mp)
 		    &t_new_basepa);
 		ASSERT(err == NULL);
 
-		PR_MEM("%s:t_old_basepa: 0x%llx\n", f, t_old_basepa);
-		PR_MEM("%s:t_new_basepa: 0x%llx\n", f, t_new_basepa);
+		PR_MEM("%s:t_old_basepa: 0x%lx\n", f, t_old_basepa);
+		PR_MEM("%s:t_new_basepa: 0x%lx\n", f, t_new_basepa);
 
 		/*
 		 * Construct copy list with original source addresses.
@@ -1386,7 +1386,7 @@ cleanup:
 		/* reduce target size if new PAs go past end of usable slice */
 		if (t_new_smallsize > 0) {
 			t_mp->sbm_npages = _b64top(t_new_smallsize);
-			PR_MEM("%s: target new size 0x%llx bytes\n",
+			PR_MEM("%s: target new size 0x%lx bytes\n",
 				f, t_new_smallsize);
 		}
 	}
@@ -2009,7 +2009,7 @@ dr_init_mem_unit_data(dr_mem_unit_t *mp)
 
 	lgrp_plat_config(LGRP_CONFIG_MEM_ADD, (uintptr_t)&umb);
 
-	PR_MEM("%s: %s (basepfn = 0x%x, npgs = %d)\n",
+	PR_MEM("%s: %s (basepfn = 0x%lx, npgs = %ld)\n",
 		f, mp->sbm_cm.sbdev_path, mp->sbm_basepfn, mp->sbm_npages);
 }
 
@@ -2655,11 +2655,11 @@ dr_select_mem_target(dr_handle_t *hp,
 	s_mp->sbm_flags &= ~DR_MFLAG_MEMRESIZE;
 	if (c_mp->sbm_npages > s_mp->sbm_npages) {
 		s_mp->sbm_flags |= DR_MFLAG_MEMUPSIZE;
-		PR_MEM("%s: upsize detected (source=%d < target=%d)\n",
+		PR_MEM("%s: upsize detected (source=%ld < target=%ld)\n",
 			f, s_mp->sbm_npages, c_mp->sbm_npages);
 	} else if (c_mp->sbm_npages < s_mp->sbm_npages) {
 		s_mp->sbm_flags |= DR_MFLAG_MEMDOWNSIZE;
-		PR_MEM("%s: downsize detected (source=%d > target=%d)\n",
+		PR_MEM("%s: downsize detected (source=%ld > target=%ld)\n",
 			f, s_mp->sbm_npages, c_mp->sbm_npages);
 	}
 

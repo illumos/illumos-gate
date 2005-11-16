@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -384,7 +384,7 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			break;
 		}
 
-		if ((ioctl_bit.bit_num < 0) && (ioctl_bit.bit_num > 7)) {
+		if (ioctl_bit.bit_num > 7) {
 			D2CMN_ERR((CE_WARN, "%s: In I2C_GET_BIT bit num"
 					" was not between 0 and 7\n",
 					unitp->pcf8574_name));
@@ -426,7 +426,7 @@ pcf8574_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			break;
 		}
 
-		if ((ioctl_bit.bit_num < 0) && (ioctl_bit.bit_num > 7)) {
+		if (ioctl_bit.bit_num > 7) {
 			D2CMN_ERR((CE_WARN, "%s: I2C_SET_BIT: bit_num sent"
 					" in was not between 0 and 7",
 					unitp->pcf8574_name));
@@ -519,7 +519,7 @@ pcf8574_do_attach(dev_info_t *dip)
 	}
 
 	(void) snprintf(unitp->pcf8574_name, sizeof (unitp->pcf8574_name),
-			"%sd", ddi_node_name(dip), instance);
+			"%s%d", ddi_node_name(dip), instance);
 
 
 	if (ddi_create_minor_node(dip, "pcf8574", S_IFCHR, instance,
