@@ -80,11 +80,11 @@ typedef enum dmu_object_type {
 	DMU_OT_DNODE,			/* DNODE */
 	DMU_OT_OBJSET,			/* OBJSET */
 	/* dsl: */
-	DMU_OT_DSL_DATASET,		/* UINT64 */
+	DMU_OT_DSL_DIR,			/* UINT64 */
 	DMU_OT_DSL_DIR_CHILD_MAP,	/* ZAP */
 	DMU_OT_DSL_DS_SNAP_MAP,		/* ZAP */
 	DMU_OT_DSL_PROPS,		/* ZAP */
-	DMU_OT_DSL_OBJSET,		/* UINT64 */
+	DMU_OT_DSL_DATASET,		/* UINT64 */
 	/* zpl: */
 	DMU_OT_ZNODE,			/* ZNODE */
 	DMU_OT_ACL,			/* ACL */

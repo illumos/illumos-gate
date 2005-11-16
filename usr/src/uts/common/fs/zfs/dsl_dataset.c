@@ -479,8 +479,8 @@ dsl_dataset_create_root(dsl_pool_t *dp, uint64_t *ddobjp, dmu_tx_t *tx)
 	dd = dsl_dir_open_obj(dp, *ddobjp, NULL, FTAG);
 	ASSERT(dd != NULL);
 
-	dsobj = dmu_object_alloc(mos, DMU_OT_DSL_OBJSET, 0,
-	    DMU_OT_DSL_OBJSET, sizeof (dsl_dataset_phys_t), tx);
+	dsobj = dmu_object_alloc(mos, DMU_OT_DSL_DATASET, 0,
+	    DMU_OT_DSL_DATASET, sizeof (dsl_dataset_phys_t), tx);
 	dbuf = dmu_bonus_hold(mos, dsobj);
 	dmu_buf_will_dirty(dbuf, tx);
 	dsphys = dbuf->db_data;
@@ -542,8 +542,8 @@ dsl_dataset_create_sync(dsl_dir_t *pds, const char *fullname,
 
 	/* This is the point of no (unsuccessful) return */
 
-	dsobj = dmu_object_alloc(mos, DMU_OT_DSL_OBJSET, 0,
-	    DMU_OT_DSL_OBJSET, sizeof (dsl_dataset_phys_t), tx);
+	dsobj = dmu_object_alloc(mos, DMU_OT_DSL_DATASET, 0,
+	    DMU_OT_DSL_DATASET, sizeof (dsl_dataset_phys_t), tx);
 	dbuf = dmu_bonus_hold(mos, dsobj);
 	dmu_buf_will_dirty(dbuf, tx);
 	dsphys = dbuf->db_data;
@@ -1215,8 +1215,8 @@ dsl_dataset_snapshot_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 
 	rw_enter(&dp->dp_config_rwlock, RW_WRITER);
 
-	dsobj = dmu_object_alloc(mos, DMU_OT_DSL_OBJSET, 0,
-	    DMU_OT_DSL_OBJSET, sizeof (dsl_dataset_phys_t), tx);
+	dsobj = dmu_object_alloc(mos, DMU_OT_DSL_DATASET, 0,
+	    DMU_OT_DSL_DATASET, sizeof (dsl_dataset_phys_t), tx);
 	dbuf = dmu_bonus_hold(mos, dsobj);
 	dmu_buf_will_dirty(dbuf, tx);
 	dsphys = dbuf->db_data;

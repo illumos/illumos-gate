@@ -93,7 +93,7 @@ dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
 	{
 		dmu_object_info_t doi;
 		dmu_object_info_from_db(dbuf, &doi);
-		ASSERT3U(doi.doi_type, ==, DMU_OT_DSL_DATASET);
+		ASSERT3U(doi.doi_type, ==, DMU_OT_DSL_DIR);
 	}
 #endif
 	/* XXX assert bonus buffer size is correct */
@@ -389,8 +389,8 @@ dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx)
 		return (err ? err : EEXIST);
 	}
 
-	ddobj = dmu_object_alloc(mos, DMU_OT_DSL_DATASET, 0,
-	    DMU_OT_DSL_DATASET, sizeof (dsl_dir_phys_t), tx);
+	ddobj = dmu_object_alloc(mos, DMU_OT_DSL_DIR, 0,
+	    DMU_OT_DSL_DIR, sizeof (dsl_dir_phys_t), tx);
 	err = zap_add(mos, pds->dd_phys->dd_child_dir_zapobj,
 	    name, sizeof (uint64_t), 1, &ddobj, tx);
 	ASSERT3U(err, ==, 0);
@@ -505,8 +505,8 @@ dsl_dir_create_root(objset_t *mos, uint64_t *ddobjp, dmu_tx_t *tx)
 	dmu_buf_t *dbuf;
 	int error;
 
-	*ddobjp = dmu_object_alloc(mos, DMU_OT_DSL_DATASET, 0,
-	    DMU_OT_DSL_DATASET, sizeof (dsl_dir_phys_t), tx);
+	*ddobjp = dmu_object_alloc(mos, DMU_OT_DSL_DIR, 0,
+	    DMU_OT_DSL_DIR, sizeof (dsl_dir_phys_t), tx);
 
 	error = zap_add(mos, DMU_POOL_DIRECTORY_OBJECT, DMU_POOL_ROOT_DATASET,
 	    sizeof (uint64_t), 1, ddobjp, tx);

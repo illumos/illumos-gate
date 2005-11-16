@@ -498,7 +498,7 @@ traverse_segment(traverse_handle_t *th, zseg_t *zseg, blkptr_t *mosbp)
 		dsl_dataset_phys_t *dsp;
 
 		rc = get_dnode(th, 0, dn, &objset, &dn_tmp, 0,
-		    DMU_OT_DSL_OBJSET, ZB_MOS_CACHE);
+		    DMU_OT_DSL_DATASET, ZB_MOS_CACHE);
 
 		if (objset != zb->zb_objset)
 			rc = advance_objset(zseg, objset, th->th_advance);
