@@ -43,6 +43,7 @@
 #include "main.h"
 #include "toshiba.h"
 #include "msgs.h"
+#include "device.h"
 
 uint32_t
 read_scsi32(void *addr)
@@ -597,104 +598,246 @@ eject_media(cd_device *dev)
 }
 
 /*
- * Get CD speed from Page code 2A. since GET PERFORMANCE is not supported
- * (which is already checked before) this mode page *will* have the speed.
+ * Get current Read or Write Speed from Mode Page 0x2a.
+ *
+ * Use the size of the Page to determine which Multimedia Command
+ * set (MMC) is present.  Based on the MMC version, get the
+ * specified Read/Write Speed.
+ *
+ * Note that some MMC versions do not necessarily support a
+ * (current) Read or Write Speed.  As a result, this function
+ * _can_ return a value of zero.
+ *
+ * The newer standards (reserve and) mark the field(s) as Obsolete,
+ * yet many vendors populate the Obsolete fields with valid values
+ * (assumedly for backward compatibility).  This is important, as
+ * a command like GET PERFORMANCE cannot return _the_ speed; it can
+ * only return a Logical-Block-Address-dependent (LBA) speed.  Such
+ * values can vary widely between the innermost and outermost Track.
+ * Mode Page 0x2a is the best solution identifying "the current
+ * (nominal) speed".
  */
 static uint16_t
-i_cd_speed_read(cd_device *dev, int cmd)
+cd_speed_get(cd_device *dev, int cmd)
 {
-	uchar_t *mp2a;
-	uint16_t rate;
+	uchar_t		*mp2a;
+	uint16_t	rate = 0;
+	int		offset;
+	uint_t		buflen = 254;
 
-	mp2a = (uchar_t *)my_zalloc(PAGE_CODE_2A_SIZE);
-	if (get_mode_page(dev->d_fd, 0x2A, 0, PAGE_CODE_2A_SIZE,
-	    mp2a) == 0) {
-		rate = 0;
-	} else {
+	/*
+	 * Allocate a buffer acceptably larger than any nominal
+	 * Page for Page Code 0x2A.
+	 */
+	mp2a = (uchar_t *)my_zalloc(buflen);
+	if (get_mode_page(dev->d_fd, 0x2A, 0, buflen, mp2a) == 0)
+		goto end;
+
+	/* Determine MMC version based on 'Page Length' field */
+	switch (mp2a[1]) {
+	case 0x14:  /* MMC-1 */
+		if (debug)
+			(void) printf("Mode Page 2A: MMC-1\n");
+
+		offset = (cmd == GET_READ_SPEED) ? 14 : 20;
+		rate = read_scsi16(&mp2a[offset]);
+		break;
+
+
+	case 0x18: /* MMC-2 */
+		if (debug)
+			(void) printf("Mode Page 2A: MMC-2;"
+			    " Read and Write Speeds are "
+			    "obsolete\n");
+
+		/* see if "Obsolete" values are valid: */
+		offset = (cmd == GET_READ_SPEED) ? 14 : 20;
+		rate = read_scsi16(&mp2a[offset]);
+		break;
+
+	default: /* MMC-3 or newer */
+		if (debug)
+			(void) printf("Mode Page 2A: MMC-3 or"
+			    " newer; Read Speed is obsolete.\n");
+
 		if (cmd == GET_READ_SPEED) {
-			rate = ((uint16_t)mp2a[14] << 8) | mp2a[15];
+			/* this is Obsolete, but try it */
+			offset = 14;
+			rate = read_scsi16(&mp2a[offset]);
 		} else {
-			rate = ((uint16_t)mp2a[20] << 8) | mp2a[21];
+			/* Write Speed is not obsolete */
+			offset = 28;
+			rate = read_scsi16(&mp2a[offset]);
+
+			if (rate == 0) {
+				/*
+				 * then try an Obsolete field
+				 * (but this shouldn't happen!)
+				 */
+				offset = 20;
+				rate = read_scsi16(&mp2a[offset]);
+			}
 		}
+		break;
 	}
+end:
 	free(mp2a);
+
+	if (debug)
+		(void) printf("cd_speed_get: %s Speed is "
+		    "%uX\n", (cmd == GET_READ_SPEED) ?
+		    "Read" : "Write", cdrw_bandwidth_to_x(rate));
 	return (rate);
 }
 
 /*
  * CD speed related functions (ioctl style) for drives which do not support
  * real time streaming.
+ *
+ * For the SET operations, the SET CD SPEED command needs
+ * both the Read Speed and the Write Speed.  Eg, if
+ * we're trying to set the Write Speed (SET_WRITE_SPEED),
+ * then we first need to obtain the current Read Speed.
+ * That speed is specified along with the chosen_speed (the
+ * Write Speed in this case) in the SET CD SPEED command.
  */
 int
 cd_speed_ctrl(cd_device *dev, int cmd, int speed)
 {
 	uint16_t rate;
 
-	if ((cmd == GET_READ_SPEED) || (cmd == GET_WRITE_SPEED))
-		return (XFER_RATE_TO_SPEED(i_cd_speed_read(dev, cmd)));
-	if (cmd == SET_READ_SPEED) {
-		rate = i_cd_speed_read(dev, GET_WRITE_SPEED);
-		return (set_cd_speed(dev->d_fd, SPEED_TO_XFER_RATE(speed),
-		    rate));
-	}
-	if (cmd == SET_WRITE_SPEED) {
-		rate = i_cd_speed_read(dev, GET_READ_SPEED);
+	switch (cmd) {
+	case GET_READ_SPEED:
+		rate = cd_speed_get(dev, GET_READ_SPEED);
+		return (cdrw_bandwidth_to_x(rate));
+
+	case GET_WRITE_SPEED:
+		rate = cd_speed_get(dev, GET_WRITE_SPEED);
+		return (cdrw_bandwidth_to_x(rate));
+
+	case SET_READ_SPEED:
+		rate = cd_speed_get(dev, GET_WRITE_SPEED);
+		return (set_cd_speed(dev->d_fd,
+		    cdrw_x_to_bandwidth(speed), rate));
+		break;
+
+	case SET_WRITE_SPEED:
+		rate = cd_speed_get(dev, GET_READ_SPEED);
 		return (set_cd_speed(dev->d_fd, rate,
-		    SPEED_TO_XFER_RATE(speed)));
+		    cdrw_x_to_bandwidth(speed)));
+		break;
+
+	default:
+		return (0);
 	}
-	return (0);
 }
 
 /*
- * cd speed related functions for drives which support RT-streaming
+ * Manage sending of SET STREAMING command using the specified
+ * read_speed and write_speed.
+ *
+ * This function allocates and initializes a Performance
+ * Descriptor, which is sent as part of the SET STREAMING
+ * command.  The descriptor is deallocated before function
+ * exit.
+ */
+static int
+do_set_streaming(cd_device *dev, uint_t read_speed,
+	uint_t write_speed)
+{
+	int ret;
+	uchar_t *str;
+
+	/* Allocate and initialize the Performance Descriptor */
+	str = (uchar_t *)my_zalloc(SET_STREAM_DATA_LEN);
+
+	/* Read Time (in milliseconds) */
+	load_scsi32(&str[16], 1000);
+	/* Write Time (in milliseconds) */
+	load_scsi32(&str[24], 1000);
+
+	/* Read Speed */
+	load_scsi32(&str[12], (uint32_t)read_speed);
+	/* Write Speed */
+	load_scsi32(&str[20], (uint32_t)write_speed);
+
+	/* issue SET STREAMING command */
+	ret = set_streaming(dev->d_fd, str);
+	free(str);
+
+	return (ret);
+}
+
+/*
+ * cd speed related functions for drives which support
+ * Real-Time Streaming Feature.
+ *
+ * For the SET operations, the SET STREAMING command needs
+ * both the Read Speed and the Write Speed.  Eg, if
+ * we're trying to set the Write Speed (SET_WRITE_SPEED),
+ * then we first need to obtain the current Read Speed.
+ * That speed is specified along with the chosen_speed (the
+ * Write Speed in this case) in the SET STREAMING command.
  */
 int
 rt_streaming_ctrl(cd_device *dev, int cmd, int speed)
 {
-	uchar_t *perf, *str;
-	int write_perf;
-	int ret;
-	uint16_t perf_got;
+	int ret = 0;
+	uint_t rate;
 
-	write_perf = 0;
-	if ((cmd == GET_WRITE_SPEED) || (cmd == SET_READ_SPEED))
-		write_perf = 1;
-	perf = (uchar_t *)my_zalloc(GET_PERF_DATA_LEN);
-	if (!get_performance(dev->d_fd, write_perf, perf)) {
-		ret = 0;
-		goto end_rsc;
-	}
-	perf_got = (uint16_t)read_scsi32(&perf[20]);
-	if ((cmd == GET_READ_SPEED) || (cmd == GET_WRITE_SPEED)) {
-		ret = XFER_RATE_TO_SPEED(perf_got);
-		goto end_rsc;
-	}
-	str = (uchar_t *)my_zalloc(SET_STREAM_DATA_LEN);
-	(void) memcpy(&str[8], &perf[16], 4);
-	load_scsi32(&str[16], 1000);
-	load_scsi32(&str[24], 1000);
-	if (cmd == SET_WRITE_SPEED) {
-		load_scsi32(&str[12], (uint32_t)perf_got);
-		load_scsi32(&str[20], (uint32_t)SPEED_TO_XFER_RATE(speed));
-	} else {
-		load_scsi32(&str[20], (uint32_t)perf_got);
-		load_scsi32(&str[12], (uint32_t)SPEED_TO_XFER_RATE(speed));
-	}
-	ret = set_streaming(dev->d_fd, str);
-	free(str);
+	switch (cmd) {
+	case GET_WRITE_SPEED:
+		rate = cd_speed_get(dev, GET_WRITE_SPEED);
+		ret = (int)cdrw_bandwidth_to_x(rate);
+		break;
 
-	/* If rt_speed_ctrl fails for any reason use cd_speed_ctrl */
-	if (ret == 0) {
-		if (debug)
-			(void) printf(" real time speed control"
-			    " failed, using CD speed control\n");
+	case GET_READ_SPEED:
+		rate = cd_speed_get(dev, GET_READ_SPEED);
+		ret = (int)cdrw_bandwidth_to_x(rate);
+		break;
 
-		dev->d_speed_ctrl = cd_speed_ctrl;
-		ret = dev->d_speed_ctrl(dev, cmd, speed);
+	case SET_READ_SPEED: {
+		uint_t write_speed = cd_speed_get(dev, GET_WRITE_SPEED);
+
+		/* set Read Speed using SET STREAMING */
+		ret = do_set_streaming(dev,
+		    cdrw_x_to_bandwidth(speed), write_speed);
+
+		/* If rt_speed_ctrl fails for any reason use cd_speed_ctrl */
+		if (ret == 0) {
+			if (debug)
+				(void) printf(" real time speed control"
+				    " failed, using CD speed control\n");
+
+			dev->d_speed_ctrl = cd_speed_ctrl;
+			ret = dev->d_speed_ctrl(dev, cmd, speed);
+		}
+		break;
 	}
 
-end_rsc:
-	free(perf);
+	case SET_WRITE_SPEED: {
+		uint_t read_speed = cd_speed_get(dev, GET_READ_SPEED);
+
+		/* set Write Speed using SET STREAMING */
+		ret = do_set_streaming(dev, read_speed,
+		    cdrw_x_to_bandwidth(speed));
+
+		/* If rt_speed_ctrl fails for any reason use cd_speed_ctrl */
+		if (ret == 0) {
+			if (debug)
+				(void) printf(" real time speed control"
+				    " failed, using CD speed control\n");
+
+			dev->d_speed_ctrl = cd_speed_ctrl;
+			ret = dev->d_speed_ctrl(dev, cmd, speed);
+		}
+		break;
+	}
+
+	default:
+		break;
+	}
+
 	return (ret);
 }
 
@@ -780,6 +923,9 @@ write_init(int mode)
 			if (speed == requested_speed) {
 				(void) printf(gettext("Speed set to %dX.\n"),
 				    speed);
+			} else if (speed == 0) {
+				(void) printf(gettext("Could not obtain "
+				    "current Write Speed.\n"));
 			} else {
 				(void) printf(
 				gettext("Speed set to closest approximation "

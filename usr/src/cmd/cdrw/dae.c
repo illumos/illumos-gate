@@ -184,12 +184,13 @@ read_audio_track(cd_device *dev, struct track_info *ti, bstreamhandle h)
 			if (speed == requested_speed) {
 				(void) printf(gettext("Speed set to %dX.\n"),
 				    speed);
+			} else if (speed == 0) {
+				(void) printf(gettext("Could not obtain "
+				    "current Read Speed.\n"));
 			} else {
-				(void) printf(gettext(
-				    "Speed set to closest approximation "));
-
-				(void) printf(gettext(
-				    "of %dX allowed by device (%dX).\n"),
+				(void) printf(gettext("Speed set to "
+				    "closest approximation of %dX allowed "
+				    "by device (%dX).\n"),
 				    requested_speed, speed);
 			}
 		}

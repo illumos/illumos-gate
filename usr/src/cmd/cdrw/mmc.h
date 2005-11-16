@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,8 +33,8 @@
 extern "C" {
 #endif
 
+/* bytelengths for some SCSI data structures */
 #define	SENSE_DATA_SIZE		16
-#define	PAGE_CODE_2A_SIZE	26
 #define	TRACK_INFO_SIZE		36
 #define	DISC_INFO_BLOCK_SIZE	32
 #define	INQUIRY_DATA_LENGTH	96

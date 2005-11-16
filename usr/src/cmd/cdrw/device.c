@@ -864,3 +864,35 @@ get_media_type(int fd)
 		}
 	}
 }
+
+/* Translate a transfer rate (eg, KB/s) into a Speed (eg, "2X") */
+uint_t
+cdrw_bandwidth_to_x(uint_t rate)
+{
+	switch (device_type) {
+	case DVD_PLUS_W:
+	case DVD_MINUS:
+	case DVD_PLUS:
+		return (DVD_RATE_TO_X(rate));
+
+	default:
+	case CD_RW:
+		return (CD_RATE_TO_X(rate));
+	}
+}
+
+/* Translate a Speed (eg, "2X") into a transfer rate (eg, KB/s) */
+uint_t
+cdrw_x_to_bandwidth(uint_t x)
+{
+	switch (device_type) {
+	case DVD_PLUS_W:
+	case DVD_MINUS:
+	case DVD_PLUS:
+		return (DVD_X_TO_RATE(x));
+
+	default:
+	case CD_RW:
+		return (CD_X_TO_RATE(x));
+	}
+}

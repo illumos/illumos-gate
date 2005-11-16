@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,22 +39,23 @@ extern "C" {
 
 #define	DEFAULT_CAPACITY	(74*60*75)
 
-#define	DEV_CAP_EXTRACT_CDDA			1
-#define	DEV_CAP_ACCURATE_CDDA			2
-#define	DEV_CAP_SETTING_SPEED_NOT_ALLOWED	4
-
 typedef struct _device {
 	char		*d_node;
 	char		*d_name;
 	int		d_fd;
 	uint_t		d_blksize;
-	uchar_t		*d_inq;
-	uint32_t	d_cap;
+	uchar_t		*d_inq;		/* INQUIRY response data */
+	uint32_t	d_cap;		/* capabilities */
 	int		(*d_read_audio)(struct _device *dev, uint_t start_blk,
 			    uint_t nblks, uchar_t *buf);
 	int		(*d_speed_ctrl)(struct _device *dev, int cmd,
 			    int speed);
 } cd_device;
+
+/* values for d_cap */
+#define	DEV_CAP_EXTRACT_CDDA			1
+#define	DEV_CAP_ACCURATE_CDDA			2
+#define	DEV_CAP_SETTING_SPEED_NOT_ALLOWED	4
 
 /*
  * Speed commands
@@ -77,6 +78,8 @@ int scan_for_cd_device(int mode, cd_device **found);
 void write_next_track(int mode, bstreamhandle h);
 int check_device(cd_device *dev, int cond);
 void get_media_type(int fd);
+uint_t cdrw_bandwidth_to_x(uint_t rate);
+uint_t cdrw_x_to_bandwidth(uint_t x);
 
 #ifdef	__cplusplus
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,11 +74,22 @@ struct track_info {
 #define	MAX_DVD_BLKS		2295100
 
 /*
+ * Macros to translate between a bandwidth ("RATE") and a Speed ("X")
+ * for CDs.  Eg, "1X == 176,400 bytes/second".
+ *
  * Some devices just multiply speed by 176. But more accurate ones
  * multiply speed by 176.4.
  */
-#define	XFER_RATE_TO_SPEED(r)	((r) % 176 ? ((((r)*10)+5)/1764) : (r) / 176)
-#define	SPEED_TO_XFER_RATE(s)	((((s)*1764)+5)/10)
+#define	CD_RATE_TO_X(r)	((r) % 176 ? ((((r)*10)+5)/1764) : (r) / 176)
+#define	CD_X_TO_RATE(s)	((((s)*1764)+5)/10)
+
+/*
+ * Macros to translate between a bandwidth ("RATE") and a Speed ("X")
+ * for DVDs. Eg, "1X == 1,385,000 bytes/second".
+ */
+#define	DVD_RATE_TO_X(r)	(((ulong_t)(r)*1000)/1385000)
+#define	DVD_X_TO_RATE(s)	(((s)*1385000)/1000)
+
 
 #define	FINALIZE_TIMEOUT		(6 * 12)	/* Six minutes */
 
