@@ -985,7 +985,13 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 		 * ENOTSUP, so that the as_pagelock() code will
 		 * then try the slower F_SOFTLOCK path.
 		 */
-		sptd->spt_ppa = NULL;
+		if (pl_built) {
+			/*
+			 * No one else has referenced the ppa[].
+			 * We created it and we need to destroy it.
+			 */
+			sptd->spt_ppa = NULL;
+		}
 		ret = ENOTSUP;
 		goto insert_fail;
 	}
