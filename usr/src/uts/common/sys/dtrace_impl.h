@@ -1005,6 +1005,7 @@ typedef struct dtrace_helpers {
 	uint_t dthps_nprovs;			/* count of providers */
 	int dthps_generation;			/* current generation */
 	pid_t dthps_pid;			/* pid of associated proc */
+	int dthps_deferred;			/* helper in deferred list */
 	struct dtrace_helpers *dthps_next;	/* next pointer */
 	struct dtrace_helpers *dthps_prev;	/* prev pointer */
 } dtrace_helpers_t;

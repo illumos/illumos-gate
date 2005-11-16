@@ -158,8 +158,8 @@ static void fasttrap_tracepoint_disable(proc_t *, fasttrap_probe_t *, uint_t);
 
 static fasttrap_provider_t *fasttrap_provider_lookup(pid_t, const char *,
     const dtrace_pattr_t *);
+static void fasttrap_provider_retire(pid_t, const char *, int);
 static void fasttrap_provider_free(fasttrap_provider_t *);
-static void fasttrap_provider_retire(fasttrap_provider_t *);
 
 static fasttrap_proc_t *fasttrap_proc_lookup(pid_t);
 static void fasttrap_proc_release(fasttrap_proc_t *);
@@ -441,8 +441,6 @@ fasttrap_fork(proc_t *p, proc_t *cp)
 static void
 fasttrap_exec_exit(proc_t *p)
 {
-	fasttrap_provider_t *provider;
-
 	ASSERT(p == curproc);
 	ASSERT(MUTEX_HELD(&p->p_lock));
 
@@ -451,10 +449,11 @@ fasttrap_exec_exit(proc_t *p)
 	/*
 	 * We clean up the pid provider for this process here; user-land
 	 * static probes are handled by the meta-provider remove entry point.
+	 * Note that the consumer count is not artificially elevated on the
+	 * pid provider as it is on USDT providers so there's no need to drop
+	 * it here.
 	 */
-	if ((provider = fasttrap_provider_lookup(p->p_pid,
-	    FASTTRAP_PID_NAME, NULL)) != NULL)
-		fasttrap_provider_retire(provider);
+	fasttrap_provider_retire(p->p_pid, FASTTRAP_PID_NAME, 0);
 
 	mutex_enter(&p->p_lock);
 }
@@ -1282,6 +1281,7 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	uid_t uid = (uid_t)-1;
 
 	ASSERT(strlen(name) < sizeof (fp->ftp_name));
+	ASSERT(pattr != NULL);
 
 	bucket = &fasttrap_provs.fth_table[FASTTRAP_PROVS_INDEX(pid, name)];
 	mutex_enter(&bucket->ftb_mtx);
@@ -1303,12 +1303,6 @@ fasttrap_provider_lookup(pid_t pid, const char *name,
 	 * allocation under it.
 	 */
 	mutex_exit(&bucket->ftb_mtx);
-
-	/*
-	 * If we didn't want to create a new provider, just return failure.
-	 */
-	if (pattr == NULL)
-		return (NULL);
 
 	/*
 	 * Make sure the process exists, isn't a child created as the result
@@ -1428,9 +1422,28 @@ fasttrap_provider_free(fasttrap_provider_t *provider)
 }
 
 static void
-fasttrap_provider_retire(fasttrap_provider_t *provider)
+fasttrap_provider_retire(pid_t pid, const char *name, int ccount)
 {
-	dtrace_provider_id_t provid = provider->ftp_provid;
+	fasttrap_provider_t *fp;
+	fasttrap_bucket_t *bucket;
+	dtrace_provider_id_t provid;
+
+	ASSERT(strlen(name) < sizeof (fp->ftp_name));
+	ASSERT(ccount == 0 || ccount == 1);
+
+	bucket = &fasttrap_provs.fth_table[FASTTRAP_PROVS_INDEX(pid, name)];
+	mutex_enter(&bucket->ftb_mtx);
+
+	for (fp = bucket->ftb_data; fp != NULL; fp = fp->ftp_next) {
+		if (fp->ftp_pid == pid && strcmp(fp->ftp_name, name) == 0 &&
+		    !fp->ftp_retired)
+			break;
+	}
+
+	if (fp == NULL) {
+		mutex_exit(&bucket->ftb_mtx);
+		return;
+	}
 
 	/*
 	 * Mark the provider to be removed in our post-processing step,
@@ -1440,11 +1453,22 @@ fasttrap_provider_retire(fasttrap_provider_t *provider)
 	 * setting the retired flag indicates that we're done with this
 	 * provider; setting the proc to be defunct indicates that all
 	 * tracepoints associated with the traced process should be ignored.
+	 * We also drop the consumer count here by the amount specified.
+	 *
+	 * We obviously need to take the bucket lock before the provider lock
+	 * to perform the lookup, but we need to drop the provider lock
+	 * before calling into the DTrace framework since we acquire the
+	 * provider lock in callbacks invoked from the DTrace framework. The
+	 * bucket lock therefore protects the integrity of the provider hash
+	 * table.
 	 */
-	provider->ftp_proc->ftpc_defunct = 1;
-	provider->ftp_retired = 1;
-	provider->ftp_marked = 1;
-	mutex_exit(&provider->ftp_mtx);
+	mutex_enter(&fp->ftp_mtx);
+	fp->ftp_proc->ftpc_defunct = 1;
+	fp->ftp_retired = 1;
+	fp->ftp_marked = 1;
+	fp->ftp_ccount -= ccount;
+	provid = fp->ftp_provid;
+	mutex_exit(&fp->ftp_mtx);
 
 	/*
 	 * We don't have to worry about invalidating the same provider twice
@@ -1452,6 +1476,8 @@ fasttrap_provider_retire(fasttrap_provider_t *provider)
 	 * been marked as retired.
 	 */
 	dtrace_invalidate(provid);
+
+	mutex_exit(&bucket->ftb_mtx);
 
 	fasttrap_pid_cleanup();
 }
@@ -1750,19 +1776,13 @@ fasttrap_meta_create_probe(void *arg, void *parg,
 static void
 fasttrap_meta_remove(void *arg, dtrace_helper_provdesc_t *dhpv, pid_t pid)
 {
-	fasttrap_provider_t *provider;
-
-	if ((provider = fasttrap_provider_lookup(pid,
-	    dhpv->dthpv_provname, NULL)) != NULL) {
-		/*
-		 * Drop the consumer count now that we're done with this
-		 * provider. If there are no other consumers retire it now.
-		 */
-		if (--provider->ftp_ccount == 0)
-			fasttrap_provider_retire(provider);
-		else
-			mutex_exit(&provider->ftp_mtx);
-	}
+	/*
+	 * Clean up the USDT provider. There may be active consumers of the
+	 * provider busy adding probes, no damage will actually befall the
+	 * provider until that count has dropped to zero. This just puts
+	 * the provider on death row.
+	 */
+	fasttrap_provider_retire(pid, dhpv->dthpv_provname, 1);
 }
 
 static dtrace_mops_t fasttrap_mops = {
@@ -2118,7 +2138,7 @@ fasttrap_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			 * waiting for any other consumer to finish with
 			 * this provider. A thread must first acquire the
 			 * bucket lock so there's no chance of another thread
-			 * blocking on the providers lock.
+			 * blocking on the provider's lock.
 			 */
 			mutex_enter(&fp->ftp_mtx);
 			mutex_exit(&fp->ftp_mtx);

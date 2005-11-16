@@ -6696,6 +6696,7 @@ dtrace_meta_register(const char *name, const dtrace_mops_t *mops, void *arg,
 		next = help->dthps_next;
 		help->dthps_next = NULL;
 		help->dthps_prev = NULL;
+		help->dthps_deferred = 0;
 		help = next;
 	}
 
@@ -12080,6 +12081,7 @@ dtrace_helper_provider_register(proc_t *p, dtrace_helpers_t *help,
 
 		if (help->dthps_next == NULL && help->dthps_prev == NULL &&
 		    dtrace_deferred_pid != help) {
+			help->dthps_deferred = 1;
 			help->dthps_pid = p->p_pid;
 			help->dthps_next = dtrace_deferred_pid;
 			help->dthps_prev = NULL;
@@ -12397,7 +12399,7 @@ dtrace_helper_slurp(dof_hdr_t *dof, dof_helper_t *dhp)
 
 	if (dhp != NULL) {
 		uintptr_t daddr = (uintptr_t)dof;
-		int err = 0;
+		int err = 0, count = 0;
 
 		/*
 		 * Look for helper probes.
@@ -12413,10 +12415,13 @@ dtrace_helper_slurp(dof_hdr_t *dof, dof_helper_t *dhp)
 				err = 1;
 				break;
 			}
+
+			count++;
 		}
 
 		dhp->dofhp_dof = (uint64_t)(uintptr_t)dof;
-		if (err == 0 && dtrace_helper_provider_add(dhp) == 0)
+		if (err == 0 && count > 0 &&
+		    dtrace_helper_provider_add(dhp) == 0)
 			destroy = 0;
 		else
 			dhp = NULL;
@@ -12506,7 +12511,10 @@ dtrace_helpers_destroy(void)
 			}
 		} else {
 			mutex_enter(&dtrace_lock);
-			ASSERT(dtrace_deferred_pid != NULL);
+			ASSERT(help->dthps_deferred == 0 ||
+			    help->dthps_next != NULL ||
+			    help->dthps_prev != NULL ||
+			    help == dtrace_deferred_pid);
 
 			/*
 			 * Remove the helper from the deferred list.
