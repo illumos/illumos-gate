@@ -74,6 +74,34 @@
 		}							\
 	}
 
+/*
+ * get an available contig mem header, cp.
+ * when big_enough is true, we will return NULL, if no big enough
+ * contig mem is found.
+ * when big_enough is false, we will try to find cp containing big
+ * enough contig mem. if not found, we will ruturn the last cp available.
+ *
+ * used by st_get_contig_mem()
+ */
+#define	ST_GET_CONTIG_MEM_HEAD(un, cp, len, big_enough) {		\
+	struct contig_mem *tmp_cp = NULL;				\
+	for ((cp) = (un)->un_contig_mem;				\
+	    (cp) != NULL;						\
+	    tmp_cp = (cp), (cp) = (cp)->cm_next) { 			\
+		if (((cp)->cm_len >= (len)) || 				\
+		    (!(big_enough) && ((cp)->cm_next == NULL))) { 	\
+			if (tmp_cp == NULL) { 				\
+				(un)->un_contig_mem = (cp)->cm_next; 	\
+			} else { 					\
+				tmp_cp->cm_next = (cp)->cm_next; 	\
+			} 						\
+			(cp)->cm_next = NULL; 				\
+			(un)->un_contig_mem_available_num--; 		\
+			break; 						\
+		} 							\
+	} 								\
+}
+
 #define	ST_NUM_MEMBERS(array)	(sizeof (array) / sizeof (array[0]))
 
 /*
@@ -2749,16 +2777,15 @@ error:
 		if (cp->cm_addr) {
 			ddi_dma_mem_free(&cp->cm_acc_hdl);
 		}
-		if (cp->cm_bp) {
-			freerbuf(cp->cm_bp);
-		}
 		cp_temp = cp;
 		cp = cp->cm_next;
-		kmem_free(cp_temp, sizeof (struct contig_mem));
+		kmem_free(cp_temp,
+		    sizeof (struct contig_mem) + biosize());
 	}
 	un->un_contig_mem_total_num = 0;
 	un->un_contig_mem_available_num = 0;
 	un->un_contig_mem = NULL;
+	un->un_max_contig_mem_len = 0;
 #endif
 
 	ST_DEBUG(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -11497,29 +11524,31 @@ st_get_contig_mem(struct scsi_tape *un, size_t len, int alloc_flags)
 	struct contig_mem *cp = NULL;
 	ddi_acc_handle_t acc_hdl;
 	caddr_t addr;
+	int big_enough = 0;
 	int (*dma_alloc_cb)() = (alloc_flags == KM_SLEEP) ?
 		DDI_DMA_SLEEP : DDI_DMA_DONTWAIT;
 
 	/* Try to get one available contig_mem */
 	mutex_enter(ST_MUTEX);
 	if (un->un_contig_mem_available_num > 0) {
-		cp = un->un_contig_mem;
-		un->un_contig_mem = cp->cm_next;
-		cp->cm_next = NULL;
-		un->un_contig_mem_available_num--;
+		ST_GET_CONTIG_MEM_HEAD(un, cp, len, big_enough);
 	} else if (un->un_contig_mem_total_num < st_max_contig_mem_num) {
 		/*
 		 * we failed to get one. we're going to
 		 * alloc one more contig_mem for this I/O
 		 */
 		mutex_exit(ST_MUTEX);
-		cp = (struct contig_mem *)
-		    kmem_zalloc(sizeof (struct contig_mem), alloc_flags);
+		cp = (struct contig_mem *)kmem_zalloc(
+		    sizeof (struct contig_mem) + biosize(),
+		    alloc_flags);
 		if (cp == NULL) {
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "alloc contig_mem failure\n");
 			return (NULL); /* cannot get one */
 		}
+		cp->cm_bp = (struct buf *)
+		    (((caddr_t)cp) + sizeof (struct contig_mem));
+		bioinit(cp->cm_bp);
 		mutex_enter(ST_MUTEX);
 		un->un_contig_mem_total_num++; /* one more available */
 	} else {
@@ -11532,10 +11561,7 @@ st_get_contig_mem(struct scsi_tape *un, size_t len, int alloc_flags)
 				cv_wait(&un->un_contig_mem_cv,
 				    ST_MUTEX);
 			}
-			cp = un->un_contig_mem;
-			un->un_contig_mem = cp->cm_next;
-			cp->cm_next = NULL;
-			un->un_contig_mem_available_num--;
+			ST_GET_CONTIG_MEM_HEAD(un, cp, len, big_enough);
 		} else {
 			mutex_exit(ST_MUTEX);
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
@@ -11549,38 +11575,62 @@ st_get_contig_mem(struct scsi_tape *un, size_t len, int alloc_flags)
 	if (cp->cm_len < len) {
 		/* not big enough, need to alloc a new one */
 		if (ddi_dma_mem_alloc(un->un_contig_mem_hdl, len, &st_acc_attr,
-			DDI_DMA_RDWR, dma_alloc_cb, NULL,
+			DDI_DMA_STREAMING, dma_alloc_cb, NULL,
 			&addr, &rlen, &acc_hdl) != DDI_SUCCESS) {
 			ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
 			    "alloc contig_mem failure: not enough mem\n");
 			st_release_contig_mem(un, cp);
-			return (NULL);
-		}
-		if (cp->cm_addr) {
-			/* release previous one before we attach new one */
-			ddi_dma_mem_free(&cp->cm_acc_hdl);
-		}
-		/* attach new mem to this cp */
-		cp->cm_addr = addr;
-		cp->cm_acc_hdl = acc_hdl;
-		cp->cm_len = len;
-
-		if (cp->cm_bp == NULL) {
-			cp->cm_bp = getrbuf(alloc_flags);
-			if (cp->cm_bp == NULL) {
-				ST_DEBUG2(ST_DEVINFO, st_label, SCSI_DEBUG,
-				    "alloc contig_mem failure:"
-				    "no enough mem for bp\n");
-				st_release_contig_mem(un, cp);
-				return (NULL);
+			cp = NULL;
+		} else {
+			if (cp->cm_addr) {
+				/* release previous one before attach new one */
+				ddi_dma_mem_free(&cp->cm_acc_hdl);
 			}
+			mutex_enter(ST_MUTEX);
+			un->un_max_contig_mem_len =
+			    un->un_max_contig_mem_len >= len ?
+			    un->un_max_contig_mem_len : len;
+			mutex_exit(ST_MUTEX);
+
+			/* attach new mem to this cp */
+			cp->cm_addr = addr;
+			cp->cm_acc_hdl = acc_hdl;
+			cp->cm_len = len;
+
+			goto alloc_ok; /* get one usable cp */
 		}
+	} else {
+		goto alloc_ok; /* get one usable cp */
 	}
 
+	/* cannot find/alloc a usable cp, when we get here */
+
+	if ((un->un_max_contig_mem_len < len) ||
+	    (alloc_flags != KM_SLEEP)) {
+		return (NULL);
+	}
+
+	/*
+	 * we're allowed to sleep, and there is one big enough
+	 * contig mem in the system, which is currently in use,
+	 * wait for it...
+	 */
+	mutex_enter(ST_MUTEX);
+	big_enough = 1;
+	do {
+		cv_wait(&un->un_contig_mem_cv, ST_MUTEX);
+		ST_GET_CONTIG_MEM_HEAD(un, cp, len, big_enough);
+	} while (cp == NULL);
+	mutex_exit(ST_MUTEX);
+
+	/* we get the big enough contig mem, finally */
+
+alloc_ok:
 	/* init bp attached to this cp */
-	bioinit(cp->cm_bp);
+	bioreset(cp->cm_bp);
 	cp->cm_bp->b_un.b_addr = cp->cm_addr;
 	cp->cm_bp->b_private = (void *)cp;
+
 	return (cp);
 }
 

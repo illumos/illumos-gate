@@ -639,6 +639,7 @@ struct scsi_tape {
 	struct contig_mem *un_contig_mem;
 	int un_contig_mem_available_num;
 	int un_contig_mem_total_num;
+	size_t un_max_contig_mem_len;
 	kcondvar_t un_contig_mem_cv;
 #endif
 };
