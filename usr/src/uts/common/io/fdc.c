@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,8 @@
  */
 static void *fdc_state_head;		/* opaque handle top of state structs */
 static ddi_dma_attr_t fdc_dma_attr;
+static ddi_device_acc_attr_t fdc_accattr = {DDI_DEVICE_ATTR_V0,
+	DDI_STRUCTURE_LE_ACC, DDI_STRICTORDER_ACC};
 
 /*
  * Local static data
@@ -302,7 +304,6 @@ int fdc_select(struct fcu_obj *, int, int);
 int fdgetchng(struct fcu_obj *, int);
 int fdresetchng(struct fcu_obj *, int);
 int fdrecalseek(struct fcu_obj *, int, int, int);
-int fdrwbuf(struct fcu_obj *, int, int, int, int, int, struct buf *);
 int fdrw(struct fcu_obj *, int, int, int, int, int, caddr_t, uint_t);
 int fdtrkformat(struct fcu_obj *, int, int, int, int);
 int fdrawioctl(struct fcu_obj *, int, caddr_t);
@@ -318,7 +319,7 @@ static struct fcobjops fdc_iops = {
 		fdgetchng,	/* get media change */
 		fdresetchng,	/* reset media change */
 		fdrecalseek,	/* recal / seek */
-		fdrwbuf,	/* read /write request */
+		NULL,		/* read /write request (UNUSED) */
 		fdrw,		/* read /write sector */
 		fdtrkformat,	/* format track */
 		fdrawioctl	/* raw ioctl */
@@ -560,6 +561,7 @@ fdc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 			goto no_attach;
 		}
 		(void) ddi_dmae_getattr(dip, &fdc_dma_attr);
+		fdc_dma_attr.dma_attr_align = MMU_PAGESIZE;
 
 		mutex_init(&fcp->c_dorlock, NULL, MUTEX_DRIVER, fcp->c_iblock);
 		cv_init(&fcp->c_iocv, NULL, CV_DRIVER, fcp->c_iblock);
@@ -1092,102 +1094,6 @@ out:
 }
 
 
-int
-fdrwbuf(struct fcu_obj *fjp, int funit, int rw, int cyl, int head,
-    int sector, struct buf *bp)
-{
-	struct fdcntlr *fcp = fjp->fj_fdc;
-	struct fdcsb *csb;
-	ddi_dma_attr_t dmaattr;
-	uint_t dmar_flags = 0;
-	int unit = funit & 3;
-	int rval;
-
-	FCERRPRINT(FDEP_L2, FDEM_RW, (CE_NOTE, "fdrwbuf unit %d", funit));
-
-	csb = &fcp->c_csb;
-	if (rw) {
-		dmar_flags = DDI_DMA_READ;
-		csb->csb_opflags = CSB_OFDMARD | CSB_OFINRPT;
-		*csb->csb_cmd = FO_MT | FO_MFM | FO_SK | FO_RDDAT;
-	} else { /* write */
-		dmar_flags = DDI_DMA_WRITE;
-		csb->csb_opflags = CSB_OFDMAWT | CSB_OFINRPT;
-		*csb->csb_cmd = FO_MT | FO_MFM | FO_WRDAT;
-	}
-	csb->csb_cmd[1] = (uchar_t)(unit | ((head & 0x1) << 2));
-	csb->csb_cmd[2] = (uchar_t)cyl;
-	csb->csb_cmd[3] = (uchar_t)head;
-	csb->csb_cmd[4] = (uchar_t)sector;
-	encode(sector_size, fjp->fj_chars->fdc_sec_size,
-	    &csb->csb_cmd[5]);
-	csb->csb_cmd[6] = fjp->fj_chars->fdc_secptrack;
-	csb->csb_cmd[7] = fjp->fj_attr->fda_gapl;
-	csb->csb_cmd[8] = 0xFF;
-
-	csb->csb_ncmds = 9;
-	csb->csb_nrslts = 7;
-	csb->csb_timer = 36;
-	if (rw == FDRDONE)
-		csb->csb_maxretry = 1;
-	else
-		csb->csb_maxretry = rwretry;
-
-	csb->csb_dmahandle = NULL;
-	csb->csb_handle_bound = 0;
-	csb->csb_dmacookiecnt = 0;
-	csb->csb_dmacurrcookie = 0;
-	csb->csb_dmawincnt = 0;
-	csb->csb_dmacurrwin = 0;
-	dmar_flags |= (DDI_DMA_STREAMING | DDI_DMA_PARTIAL);
-
-	dmaattr = fdc_dma_attr;
-	dmaattr.dma_attr_granular = fjp->fj_chars->fdc_sec_size;
-	if (ddi_dma_alloc_handle(fcp->c_dip, &dmaattr, DDI_DMA_SLEEP,
-			0, &csb->csb_dmahandle) != DDI_SUCCESS) {
-		rval = EINVAL;
-		goto out;
-	}
-
-	rval = ddi_dma_buf_bind_handle(csb->csb_dmahandle, bp, dmar_flags,
-	    DDI_DMA_SLEEP, 0, &csb->csb_dmacookie, &csb->csb_dmacookiecnt);
-
-	if (rval == DDI_DMA_MAPPED) {
-		csb->csb_dmawincnt = 1;
-		csb->csb_handle_bound = 1;
-	} else if (rval == DDI_DMA_PARTIAL_MAP) {
-		csb->csb_handle_bound = 1;
-		if (ddi_dma_numwin(csb->csb_dmahandle, &csb->csb_dmawincnt) !=
-					DDI_SUCCESS) {
-			cmn_err(CE_WARN, "fdrwbuf: dma numwin failed\n");
-			rval = EINVAL;
-			goto out;
-		}
-	} else {
-		cmn_err(CE_WARN,
-			"fdrwbuf: dma buf bind handle failed, rval = %d\n",
-			rval);
-		rval = EINVAL;
-		goto out;
-	}
-	rval = fdc_exec(fcp, 1, 1);
-
-out:
-	if (csb->csb_dmahandle) {
-		if (csb->csb_handle_bound) {
-			if (ddi_dma_unbind_handle(csb->csb_dmahandle) !=
-			    DDI_SUCCESS)
-				cmn_err(CE_WARN, "fdrwbuf: "
-				    "dma unbind handle failed\n");
-			csb->csb_handle_bound = 0;
-		}
-		ddi_dma_free_handle(&csb->csb_dmahandle);
-		csb->csb_dmahandle = NULL;
-	}
-	return (rval);
-}
-
-
 /*
  * fdrw- used only for read/writing sectors into/from kernel buffers.
  */
@@ -1197,10 +1103,12 @@ fdrw(struct fcu_obj *fjp, int funit, int rw, int cyl, int head,
 {
 	struct fdcntlr *fcp = fjp->fj_fdc;
 	struct fdcsb *csb;
-	ddi_dma_attr_t dmaattr;
 	uint_t dmar_flags = 0;
 	int unit = funit & 3;
 	int rval;
+	ddi_acc_handle_t mem_handle = NULL;
+	caddr_t aligned_buf;
+	size_t real_size;
 
 	FCERRPRINT(FDEP_L1, FDEM_RW, (CE_CONT, "fdrw unit %d\n", funit));
 
@@ -1240,17 +1148,32 @@ fdrw(struct fcu_obj *fjp, int funit, int rw, int cyl, int head,
 	csb->csb_dmacurrwin = 0;
 	dmar_flags |= (DDI_DMA_STREAMING | DDI_DMA_PARTIAL);
 
-	dmaattr = fdc_dma_attr;
-	dmaattr.dma_attr_granular = fjp->fj_chars->fdc_sec_size;
-	if (ddi_dma_alloc_handle(fcp->c_dip, &dmaattr, DDI_DMA_SLEEP,
+	if (ddi_dma_alloc_handle(fcp->c_dip, &fdc_dma_attr, DDI_DMA_SLEEP,
 			0, &csb->csb_dmahandle) != DDI_SUCCESS) {
 		rval = EINVAL;
 		goto out;
 	}
 
-	rval = ddi_dma_addr_bind_handle(csb->csb_dmahandle, NULL, bufp, len,
-			dmar_flags, DDI_DMA_SLEEP, 0,
-			&csb->csb_dmacookie, &csb->csb_dmacookiecnt);
+	/*
+	 * allocate a page aligned buffer to dma to/from. This way we can
+	 * ensure the cookie is a whole multiple of granularity and avoids
+	 * any alignment issues.
+	 */
+	rval = ddi_dma_mem_alloc(csb->csb_dmahandle, len, &fdc_accattr,
+	    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &aligned_buf,
+	    &real_size, &mem_handle);
+	if (rval != DDI_SUCCESS) {
+		rval = EINVAL;
+		goto out;
+	}
+
+	if (dmar_flags & DDI_DMA_WRITE) {
+		bcopy(bufp, aligned_buf, len);
+	}
+
+	rval = ddi_dma_addr_bind_handle(csb->csb_dmahandle, NULL, aligned_buf,
+	    len, dmar_flags, DDI_DMA_SLEEP, 0, &csb->csb_dmacookie,
+	    &csb->csb_dmacookiecnt);
 
 	if (rval == DDI_DMA_MAPPED) {
 		csb->csb_dmawincnt = 1;
@@ -1272,6 +1195,10 @@ fdrw(struct fcu_obj *fjp, int funit, int rw, int cyl, int head,
 	}
 	rval = fdc_exec(fcp, 1, 1);
 
+	if (dmar_flags & DDI_DMA_READ) {
+		bcopy(aligned_buf, bufp, len);
+	}
+
 out:
 	if (csb->csb_dmahandle) {
 		if (csb->csb_handle_bound) {
@@ -1280,6 +1207,9 @@ out:
 				cmn_err(CE_WARN, "fdrw: "
 				    "dma unbind handle failed\n");
 			csb->csb_handle_bound = 0;
+		}
+		if (mem_handle != NULL) {
+			ddi_dma_mem_free(&mem_handle);
 		}
 		ddi_dma_free_handle(&csb->csb_dmahandle);
 		csb->csb_dmahandle = NULL;
@@ -1293,13 +1223,14 @@ fdtrkformat(struct fcu_obj *fjp, int funit, int cyl, int head, int filldata)
 {
 	struct fdcntlr *fcp = fjp->fj_fdc;
 	struct fdcsb *csb;
-	ddi_dma_attr_t dmaattr;
 	int unit = funit & 3;
 	int fmdatlen, lsector, lstart;
 	int interleave, numsctr, offset, psector;
 	uchar_t *dp;
-	uchar_t *fmdatp;
 	int rval;
+	ddi_acc_handle_t mem_handle = NULL;
+	caddr_t aligned_buf;
+	size_t real_size;
 
 	FCERRPRINT(FDEP_L2, FDEM_FORM,
 	    (CE_NOTE, "fdformattrk unit %d cyl=%d, hd=%d", funit, cyl, head));
@@ -1330,13 +1261,32 @@ fdtrkformat(struct fcu_obj *fjp, int funit, int cyl, int head, int filldata)
 	csb->csb_maxretry = rwretry;
 
 	/*
-	 * just kmem_alloc space for format track cmd
+	 * alloc space for format track cmd
 	 */
 	/*
 	 * NOTE: have to add size of fifo also - for dummy format action
 	 */
 	fmdatlen = 4 * numsctr;
-	dp = fmdatp = kmem_alloc(fmdatlen, KM_SLEEP);
+
+	if (ddi_dma_alloc_handle(fcp->c_dip, &fdc_dma_attr, DDI_DMA_SLEEP,
+			0, &csb->csb_dmahandle) != DDI_SUCCESS) {
+		rval = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * allocate a page aligned buffer to dma to/from. This way we can
+	 * ensure the cookie is a whole multiple of granularity and avoids
+	 * any alignment issues.
+	 */
+	rval = ddi_dma_mem_alloc(csb->csb_dmahandle, fmdatlen, &fdc_accattr,
+	    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &aligned_buf,
+	    &real_size, &mem_handle);
+	if (rval != DDI_SUCCESS) {
+		rval = EINVAL;
+		goto out;
+	}
+	dp = (uchar_t *)aligned_buf;
 
 	interleave = fjp->fj_attr->fda_intrlv;
 	offset = (numsctr + interleave - 1) / interleave;
@@ -1350,21 +1300,9 @@ fdtrkformat(struct fcu_obj *fjp, int funit, int cyl, int head, int filldata)
 		}
 	}
 
-	dmaattr = fdc_dma_attr;
-	for (; dmaattr.dma_attr_granular < fmdatlen;
-	    dmaattr.dma_attr_granular <<= 1);
-
-	if (ddi_dma_alloc_handle(fcp->c_dip, &dmaattr, DDI_DMA_SLEEP,
-			0, &csb->csb_dmahandle) != DDI_SUCCESS) {
-		rval = EINVAL;
-		goto out;
-	}
-
-	rval = ddi_dma_addr_bind_handle(csb->csb_dmahandle, NULL,
-			(caddr_t)fmdatp, fmdatlen,
-			DDI_DMA_WRITE | DDI_DMA_STREAMING | DDI_DMA_PARTIAL,
-			DDI_DMA_SLEEP, 0,
-			&csb->csb_dmacookie, &csb->csb_dmacookiecnt);
+	rval = ddi_dma_addr_bind_handle(csb->csb_dmahandle, NULL, aligned_buf,
+	    fmdatlen, DDI_DMA_WRITE | DDI_DMA_STREAMING | DDI_DMA_PARTIAL,
+	    DDI_DMA_SLEEP, 0, &csb->csb_dmacookie, &csb->csb_dmacookiecnt);
 
 	if (rval == DDI_DMA_MAPPED) {
 		csb->csb_dmawincnt = 1;
@@ -1395,10 +1333,12 @@ out:
 				    "dma unbind handle failed\n");
 			csb->csb_handle_bound = 0;
 		}
+		if (mem_handle != NULL) {
+			ddi_dma_mem_free(&mem_handle);
+		}
 		ddi_dma_free_handle(&csb->csb_dmahandle);
 		csb->csb_dmahandle = NULL;
 	}
-	kmem_free(fmdatp, fmdatlen);
 	return (rval);
 }
 
@@ -1409,13 +1349,15 @@ fdrawioctl(struct fcu_obj *fjp, int funit, caddr_t arg)
 	struct fdcntlr *fcp = fjp->fj_fdc;
 	struct fd_raw *fdrp = (struct fd_raw *)arg;
 	struct fdcsb *csb;
-	ddi_dma_attr_t dmaattr;
 	uint_t dmar_flags = 0;
 	int i;
 	int change = 1;
 	int sleep = 1;
 	int rval = 0;
 	int rval_exec = 0;
+	ddi_acc_handle_t mem_handle = NULL;
+	caddr_t aligned_buf;
+	size_t real_size;
 
 	FCERRPRINT(FDEP_L2, FDEM_RAWI,
 	    (CE_NOTE, "fdrawioctl: cmd[0]=0x%x", fdrp->fdr_cmd[0]));
@@ -1495,20 +1437,35 @@ fdrawioctl(struct fcu_obj *fjp, int funit, caddr_t arg)
 	csb->csb_dmacurrwin = 0;
 
 	if (csb->csb_opflags & (CSB_OFDMARD | CSB_OFDMAWT)) {
-		dmaattr = fdc_dma_attr;
-		dmaattr.dma_attr_granular = fjp->fj_chars->fdc_sec_size;
-
-		if (ddi_dma_alloc_handle(fcp->c_dip, &dmaattr, DDI_DMA_SLEEP,
-				0, &csb->csb_dmahandle) != DDI_SUCCESS) {
+		if (ddi_dma_alloc_handle(fcp->c_dip, &fdc_dma_attr,
+		    DDI_DMA_SLEEP, 0, &csb->csb_dmahandle) != DDI_SUCCESS) {
 			rval = EINVAL;
 			goto out;
 		}
 
+		/*
+		 * allocate a page aligned buffer to dma to/from. This way we
+		 * can ensure the cookie is a whole multiple of granularity and
+		 * avoids any alignment issues.
+		 */
+		rval = ddi_dma_mem_alloc(csb->csb_dmahandle,
+		    (uint_t)fdrp->fdr_nbytes, &fdc_accattr, DDI_DMA_CONSISTENT,
+		    DDI_DMA_SLEEP, NULL, &aligned_buf, &real_size, &mem_handle);
+		if (rval != DDI_SUCCESS) {
+			rval = EINVAL;
+			goto out;
+		}
+
+		if (dmar_flags & DDI_DMA_WRITE) {
+			bcopy(fdrp->fdr_addr, aligned_buf,
+			    (uint_t)fdrp->fdr_nbytes);
+		}
+
 		dmar_flags |= (DDI_DMA_STREAMING | DDI_DMA_PARTIAL);
 		rval = ddi_dma_addr_bind_handle(csb->csb_dmahandle, NULL,
-				fdrp->fdr_addr, (uint_t)fdrp->fdr_nbytes,
-				dmar_flags, DDI_DMA_SLEEP, 0,
-				&csb->csb_dmacookie, &csb->csb_dmacookiecnt);
+		    aligned_buf, (uint_t)fdrp->fdr_nbytes, dmar_flags,
+		    DDI_DMA_SLEEP, 0, &csb->csb_dmacookie,
+		    &csb->csb_dmacookiecnt);
 
 		if (rval == DDI_DMA_MAPPED) {
 			csb->csb_dmawincnt = 1;
@@ -1553,6 +1510,10 @@ fdrawioctl(struct fcu_obj *fjp, int funit, caddr_t arg)
 
 	rval_exec = fdc_exec(fcp, sleep, change);
 
+	if (dmar_flags & DDI_DMA_READ) {
+		bcopy(aligned_buf, fdrp->fdr_addr, (uint_t)fdrp->fdr_nbytes);
+	}
+
 	FCERRPRINT(FDEP_L1, FDEM_RAWI,
 	    (CE_CONT, "rslt: %x %x %x %x %x %x %x %x %x %x\n", csb->csb_rslt[0],
 	    csb->csb_rslt[1], csb->csb_rslt[2], csb->csb_rslt[3],
@@ -1572,6 +1533,9 @@ out:
 				cmn_err(CE_WARN, "fdrawioctl: "
 				    "dma unbind handle failed\n");
 			csb->csb_handle_bound = 0;
+		}
+		if (mem_handle != NULL) {
+			ddi_dma_mem_free(&mem_handle);
 		}
 		ddi_dma_free_handle(&csb->csb_dmahandle);
 		csb->csb_dmahandle = NULL;
