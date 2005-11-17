@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,9 @@ typedef struct mdb_gelf_file {
 	GElf_Phdr *gf_dynp;		/* Pointer to PT_DYNAMIC phdr */
 	GElf_Dyn *gf_dyns;		/* Array of dynamic entries */
 	size_t gf_ndyns;		/* Number of dynamic entries */
+	size_t gf_shnum;		/* Number of section headers */
+	size_t gf_shstrndx;		/* Index of section string table */
+	size_t gf_phnum;		/* Number of program headers */
 	mdb_gelf_sect_t *gf_sects;	/* Array of section structs */
 	mdb_io_t *gf_io;		/* I/o backend for ELF file */
 	int gf_mode;			/* Mode flag (see above) */

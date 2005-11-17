@@ -219,15 +219,15 @@ GElf_Phdr *
 gelf_getphdr(Elf *elf, int ndx, GElf_Phdr *dst)
 {
 	int		class;
-	GElf_Ehdr	ehdr;
+	size_t		phnum;
 
 	if (elf == NULL)
 		return (NULL);
 
-	if (gelf_getehdr(elf, &ehdr) == NULL)
+	if (elf_getphnum(elf, &phnum) == 0)
 		return (NULL);
 
-	if (ehdr.e_phnum < ndx) {
+	if (phnum <= ndx) {
 		_elf_seterr(EREQ_RAND, 0);
 		return (NULL);
 	}
@@ -266,15 +266,15 @@ int
 gelf_update_phdr(Elf *elf, int ndx, GElf_Phdr *src)
 {
 	int		class;
-	GElf_Ehdr	ehdr;
+	size_t		phnum;
 
 	if (elf == NULL)
 		return (0);
 
-	if (gelf_getehdr(elf, &ehdr) == NULL)
-		return (0);
+	if (elf_getphnum(elf, &phnum) == 0)
+		return (NULL);
 
-	if (ehdr.e_phnum < ndx) {
+	if (phnum < ndx) {
 		_elf_seterr(EREQ_RAND, 0);
 		return (0);
 	}

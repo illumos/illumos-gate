@@ -23,7 +23,7 @@
 /* PROTOLIB1 */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved. 
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved. 
  * Use is subject to license terms.
  */ 
 
@@ -144,6 +144,7 @@ Elf_Data *	elf_getdata(Elf_Scn *, Elf_Data *);
 Elf_Data *	_elf_getdata(Elf_Scn *, Elf_Data *);
 char *		elf_getident(Elf *, size_t *);
 char *		_elf_getident(Elf *, size_t *);
+int		elf_getphnum(Elf *, size_t *);
 int		elf_getshnum(Elf *, size_t *);
 int		elf_getshstrndx(Elf *, size_t *);
 Elf_Scn *	elf_getscn(Elf *elf, size_t);

@@ -1068,3 +1068,4 @@ All the above change is incorporated in the following patches:
     Solaris/SunOS 5.8_x86	patch T109148-40
 --------------------------------------------------------------------------------
 6307274 crle bug with LD_LIBRARY_PATH
+6317969 elfheader limited to 65535 segments (link-editor components only)

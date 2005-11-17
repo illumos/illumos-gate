@@ -22,10 +22,9 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- *	Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _LIBELF_H
@@ -192,6 +191,7 @@ char		*elf_getident	_((Elf *, size_t *));
 Elf32_Phdr	*elf32_getphdr	_((Elf *));
 Elf_Scn		*elf_getscn	_((Elf *elf, size_t));
 Elf32_Shdr	*elf32_getshdr	_((Elf_Scn *));
+int		elf_getphnum	_((Elf *, size_t *));
 int		elf_getshnum	_((Elf *, size_t *));
 int		elf_getshstrndx	_((Elf *, size_t *));
 unsigned long	elf_hash	_((const char *));

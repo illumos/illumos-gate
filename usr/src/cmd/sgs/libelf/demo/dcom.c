@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -101,6 +101,7 @@ delete_comment(Elf *elf, int fd, const char *file)
 	GElf_Phdr	tphdr;
 	size_t		shstrndx;
 	size_t		shnum;
+	size_t		phnum;
 	int		*shndx;
 	int		ndx = 1;
 	int		off = 0;
@@ -120,6 +121,12 @@ delete_comment(Elf *elf, int fd, const char *file)
 
 	if (elf_getshstrndx(elf, &shstrndx) == 0) {
 		(void) fprintf(stderr, "%s: elf_getshstrndx() failed: %s\n",
+			file, elf_errmsg(0));
+		return;
+	}
+
+	if (elf_getphnum(elf, &phnum) == 0) {
+		(void) fprintf(stderr, "%s: elf_getphnum() failed: %s\n",
 			file, elf_errmsg(0));
 		return;
 	}
@@ -313,14 +320,14 @@ delete_comment(Elf *elf, int fd, const char *file)
 	/*
 	 * Duplicate all program headers contained in the ELF file.
 	 */
-	if (ehdr.e_phnum) {
-		if (gelf_newphdr(telf, ehdr.e_phnum) == 0) {
+	if (phnum != 0) {
+		if (gelf_newphdr(telf, phnum) == 0) {
 			(void) fprintf(stderr,
 				"%s: elf_newphdr() failed: %s\n",
 				file, elf_errmsg(0));
 			return;
 		}
-		for (ndx = 0; ndx < (int)ehdr.e_phnum; ndx++) {
+		for (ndx = 0; ndx < (int)phnum; ndx++) {
 			if (gelf_getphdr(elf, ndx, &phdr) == 0 ||
 			    gelf_getphdr(telf, ndx, &tphdr) == 0) {
 				(void) fprintf(stderr,

@@ -30,6 +30,7 @@
 # (when it did contain symbols explicitly) may depend on it.
 #
 sparc {
+	SUNW_1.6:	{SUNW_1.5};
 	SUNW_1.5:	{SUNW_1.4};
 	SUNW_1.4:	{SUNW_1.3};
 	SUNW_1.3:	{SUNW_1.2};
@@ -39,6 +40,7 @@ sparc {
 	SUNWprivate_1.1;
 }
 sparcv9 {
+	SUNW_1.6:	{SUNW_1.5};
 	SUNW_1.5:	{SUNW_1.4};
 	SUNW_1.4:	{SUNW_1.3};
 	SUNW_1.3:	{SUNW_1.2};
@@ -48,6 +50,7 @@ sparcv9 {
 	SUNWprivate_1.1;
 }
 i386 {
+	SUNW_1.6:	{SUNW_1.5};
 	SUNW_1.5:	{SUNW_1.4};
 	SUNW_1.4:	{SUNW_1.3};
 	SUNW_1.3:	{SUNW_1.2};
@@ -57,6 +60,7 @@ i386 {
 	SUNWprivate_1.1;
 }
 amd64 {
+	SUNW_1.6:	{SUNW_1.5};
 	SUNW_1.5:	{SUNW_1.4};
 	SUNW_1.4:	{SUNW_1.3};
 	SUNW_1.3:	{SUNW_1.2};

@@ -46,6 +46,7 @@
 #include "P32ton.h"
 
 typedef enum {
+	STR_NONE,
 	STR_CTF,
 	STR_SYMTAB,
 	STR_DYNSYM,
@@ -56,6 +57,7 @@ typedef enum {
 } shstrtype_t;
 
 static const char *shstrtab_data[] = {
+	"",
 	".SUNW_ctf",
 	".symtab",
 	".dynsym",
@@ -94,7 +96,7 @@ shstrtab_ndx(shstrtab_t *s, shstrtype_t type)
 {
 	int ret;
 
-	if ((ret = s->sst_ndx[type]) != 0)
+	if ((ret = s->sst_ndx[type]) != 0 || type == STR_NONE)
 		return (ret);
 
 	ret = s->sst_ndx[type] = s->sst_cur;
@@ -908,15 +910,12 @@ write_shstrtab(struct ps_prochandle *P, pgcore_t *pgc)
 	(void) shstrtab_ndx(&pgc->pgc_shstrtab, STR_SHSTRTAB);
 	size = shstrtab_size(s);
 
-	if (pwrite64(pgc->pgc_fd, "", 1, off) != 1)
-		return (1);
-
 	/*
 	 * Dump all the strings that we used being sure we include the
 	 * terminating null character.
 	 */
 	for (i = 0; i < STR_NUM; i++) {
-		if ((ndx = s->sst_ndx[i]) != 0) {
+		if ((ndx = s->sst_ndx[i]) != 0 || i == STR_NONE) {
 			const char *str = shstrtab_data[i];
 			size_t len = strlen(str) + 1;
 			if (pwrite64(pgc->pgc_fd, str, len, off + ndx) != len)
@@ -1020,6 +1019,14 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 		zonename[0] = '\0';
 
 	/*
+	 * The core file contents may required zero section headers, but if we
+	 * overflow the 16 bits allotted to the program header count in the ELF
+	 * header, we'll need that program header at index zero.
+	 */
+	if (nshdrs == 0 && nphdrs >= PN_XNUM)
+		nshdrs = 1;
+
+	/*
 	 * Set up the ELF header.
 	 */
 	if (P->status.pr_dmodel == PR_MODEL_ILP32) {
@@ -1046,26 +1053,38 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 
 		ehdr.e_version = EV_CURRENT;
 		ehdr.e_ehsize = sizeof (ehdr);
+
+		if (nphdrs >= PN_XNUM)
+			ehdr.e_phnum = PN_XNUM;
+		else
+			ehdr.e_phnum = (unsigned short)nphdrs;
+
 		ehdr.e_phentsize = sizeof (Elf32_Phdr);
-		ehdr.e_phnum = (unsigned short)nphdrs;
 		ehdr.e_phoff = ehdr.e_ehsize;
 
-		if (nshdrs != 0) {
+		if (nshdrs > 0) {
+			if (nshdrs >= SHN_LORESERVE)
+				ehdr.e_shnum = 0;
+			else
+				ehdr.e_shnum = (unsigned short)nshdrs;
+
+			if (nshdrs - 1 >= SHN_LORESERVE)
+				ehdr.e_shstrndx = SHN_XINDEX;
+			else
+				ehdr.e_shstrndx = (unsigned short)(nshdrs - 1);
+
 			ehdr.e_shentsize = sizeof (Elf32_Shdr);
-			ehdr.e_shnum = (unsigned short)nshdrs;
-			ehdr.e_shoff = ehdr.e_phoff +
-			    ehdr.e_phentsize * ehdr.e_phnum;
-			ehdr.e_shstrndx = nshdrs - 1;
+			ehdr.e_shoff = ehdr.e_phoff + ehdr.e_phentsize * nphdrs;
 		}
 
 		if (pwrite64(fd, &ehdr, sizeof (ehdr), 0) != sizeof (ehdr))
 			goto err;
 
 		poff = ehdr.e_phoff;
-		soff = ehdr.e_shoff + ehdr.e_shentsize;
+		soff = ehdr.e_shoff;
 		doff = boff = ehdr.e_ehsize +
-		    ehdr.e_phentsize * ehdr.e_phnum +
-		    ehdr.e_shentsize * ehdr.e_shnum;
+		    ehdr.e_phentsize * nphdrs +
+		    ehdr.e_shentsize * nshdrs;
 
 #ifdef _LP64
 	} else {
@@ -1092,29 +1111,50 @@ Pfgcore(struct ps_prochandle *P, int fd, core_content_t content)
 
 		ehdr.e_version = EV_CURRENT;
 		ehdr.e_ehsize = sizeof (ehdr);
+
+		if (nphdrs >= PN_XNUM)
+			ehdr.e_phnum = PN_XNUM;
+		else
+			ehdr.e_phnum = (unsigned short)nphdrs;
+
 		ehdr.e_phentsize = sizeof (Elf64_Phdr);
-		ehdr.e_phnum = (unsigned short)nphdrs;
 		ehdr.e_phoff = ehdr.e_ehsize;
 
-		if (nshdrs != 0) {
+		if (nshdrs > 0) {
+			if (nshdrs >= SHN_LORESERVE)
+				ehdr.e_shnum = 0;
+			else
+				ehdr.e_shnum = (unsigned short)nshdrs;
+
+			if (nshdrs - 1 >= SHN_LORESERVE)
+				ehdr.e_shstrndx = SHN_XINDEX;
+			else
+				ehdr.e_shstrndx = (unsigned short)(nshdrs - 1);
+
 			ehdr.e_shentsize = sizeof (Elf64_Shdr);
-			ehdr.e_shnum = (unsigned short)nshdrs;
-			ehdr.e_shoff = ehdr.e_phoff +
-			    ehdr.e_phentsize * ehdr.e_phnum;
-			ehdr.e_shstrndx = nshdrs - 1;
+			ehdr.e_shoff = ehdr.e_phoff + ehdr.e_phentsize * nphdrs;
 		}
 
 		if (pwrite64(fd, &ehdr, sizeof (ehdr), 0) != sizeof (ehdr))
 			goto err;
 
 		poff = ehdr.e_phoff;
-		soff = ehdr.e_shoff + ehdr.e_shentsize;
-		doff = boff = sizeof (ehdr) +
-		    ehdr.e_phentsize * ehdr.e_phnum +
-		    ehdr.e_shentsize * ehdr.e_shnum;
+		soff = ehdr.e_shoff;
+		doff = boff = ehdr.e_ehsize +
+		    ehdr.e_phentsize * nphdrs +
+		    ehdr.e_shentsize * nshdrs;
 
 #endif	/* _LP64 */
 	}
+
+	/*
+	 * Write the zero indexed section if it exists.
+	 */
+	if (nshdrs > 0 && write_shdr(&pgc, STR_NONE, 0, 0, 0, 0,
+	    nshdrs >= SHN_LORESERVE ? nshdrs : 0,
+	    nshdrs - 1 >= SHN_LORESERVE ? nshdrs - 1 : 0,
+	    nphdrs >= PN_XNUM ? nphdrs : 0, 0, 0) != 0)
+		goto err;
 
 	/*
 	 * Construct the old-style note header and section.

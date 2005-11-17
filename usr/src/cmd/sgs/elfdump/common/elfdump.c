@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -309,8 +309,8 @@ detail_usage()
  * Print section headers.
  */
 static void
-sections(const char *file, Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr,
-    const char *name)
+sections(const char *file, Cache *cache, GElf_Word shnum, GElf_Word phnum,
+    GElf_Ehdr *ehdr, const char *name)
 {
 	GElf_Word	cnt;
 	Cache *		_cache;
@@ -354,8 +354,8 @@ sections(const char *file, Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr,
 }
 
 static void
-unwind(Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr, const char *name,
-    const char *file, Elf *elf)
+unwind(Cache *cache, GElf_Word shnum, GElf_Word phnum, GElf_Ehdr *ehdr,
+    const char *name, const char *file, Elf *elf)
 {
 	GElf_Word	cnt;
 	GElf_Phdr	unwind_phdr;
@@ -368,7 +368,7 @@ unwind(Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr, const char *name,
 
 	unwind_phdr.p_type = PT_NULL;
 
-	for (cnt = 0; cnt < ehdr->e_phnum; cnt++) {
+	for (cnt = 0; cnt < phnum; cnt++) {
 		GElf_Phdr	phdr;
 
 		if (gelf_getphdr(elf, cnt, &phdr) == NULL) {
@@ -661,8 +661,8 @@ unwind(Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr, const char *name,
  * this should be accompanied with a program header.
  */
 static void
-cap(const char *file, Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr,
-    Elf *elf)
+cap(const char *file, Cache *cache, GElf_Word shnum, GElf_Word phnum,
+    GElf_Ehdr *ehdr, Elf *elf)
 {
 	GElf_Word	cnt;
 	GElf_Shdr *	cshdr = 0;
@@ -673,7 +673,7 @@ cap(const char *file, Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr,
 	/*
 	 * Determine if a hardware/software capabilities header exists.
 	 */
-	for (cnt = 0; cnt < ehdr->e_phnum; cnt++) {
+	for (cnt = 0; cnt < phnum; cnt++) {
 		GElf_Phdr	phdr;
 
 		if (gelf_getphdr(elf, cnt, &phdr) == NULL) {
@@ -763,8 +763,8 @@ cap(const char *file, Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr,
  * Print the interpretor.
  */
 static void
-interp(const char *file, Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr,
-    Elf *elf)
+interp(const char *file, Cache *cache, GElf_Word shnum, GElf_Word phnum,
+    GElf_Ehdr *ehdr, Elf *elf)
 {
 	GElf_Word	cnt;
 	GElf_Shdr *	ishdr = 0;
@@ -775,7 +775,7 @@ interp(const char *file, Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr,
 	/*
 	 * Determine if an interp header exists.
 	 */
-	for (cnt = 0; cnt < ehdr->e_phnum; cnt++) {
+	for (cnt = 0; cnt < phnum; cnt++) {
 		GElf_Phdr	phdr;
 
 		if (gelf_getphdr(elf, cnt, &phdr) == NULL) {
@@ -1151,8 +1151,8 @@ versions(Cache *cache, GElf_Word shnum, const char *file, uint32_t flags)
  * Search for and process any symbol tables.
  */
 static void
-symbols(Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr, const char *name,
-    Cache *versymcache, const char *file)
+symbols(Cache *cache, GElf_Word shnum, GElf_Word phnum, GElf_Ehdr *ehdr,
+    const char *name, Cache *versymcache, const char *file)
 {
 	GElf_Word	cnt;
 	char		is_core = (ehdr->e_type == ET_CORE);
@@ -1371,8 +1371,8 @@ symbols(Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr, const char *name,
  * Search for and process any relocation sections.
  */
 static void
-reloc(Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr, const char *name,
-    const char *file, uint32_t flags)
+reloc(Cache *cache, GElf_Word shnum, GElf_Word phnum, GElf_Ehdr *ehdr,
+    const char *name, const char *file, uint32_t flags)
 {
 	GElf_Word	cnt;
 
@@ -2281,7 +2281,8 @@ group(Cache *cache, GElf_Word shnum, const char *name, const char *file,
 
 
 static void
-got(Cache *cache, GElf_Word shnum, GElf_Ehdr *ehdr, const char *file)
+got(Cache *cache, GElf_Word shnum, GElf_Word phnum, GElf_Ehdr *ehdr,
+    const char *file)
 {
 	Cache		*gotcache = 0, *symtab = 0, *_cache;
 	GElf_Addr	gotbgn, gotend;
@@ -2524,8 +2525,8 @@ regular(const char *file, Elf *elf, uint32_t flags, char *Nname, int wfd)
 	GElf_Ehdr	ehdr;
 	Elf_Data	*data;
 	uint_t		cnt;
-	GElf_Word	shnum;
-	size_t		shstrndx, _shnum;
+	GElf_Word	shnum, phnum;
+	size_t		shstrndx, _shnum, _phnum;
 	GElf_Shdr	nameshdr;
 	GElf_Shdr	shdr0;
 	GElf_Shdr	*_shdr0;
@@ -2538,17 +2539,25 @@ regular(const char *file, Elf *elf, uint32_t flags, char *Nname, int wfd)
 		return;
 	}
 
-	if (elf_getshnum(elf, &_shnum) == NULL) {
+	if (elf_getshnum(elf, &_shnum) == 0) {
 		failure(file, MSG_ORIG(MSG_ELF_GETSHNUM));
 		return;
 	}
 	/* LINTED */
 	shnum = (GElf_Word)_shnum;
 
-	if (elf_getshstrndx(elf, &shstrndx) == NULL) {
+	if (elf_getshstrndx(elf, &shstrndx) == 0) {
 		failure(file, MSG_ORIG(MSG_ELF_GETSHSTRNDX));
 		return;
 	}
+
+	if (elf_getphnum(elf, &_phnum) == 0) {
+		failure(file, MSG_ORIG(MSG_ELF_GETPHNUM));
+		return;
+	}
+	/* LINTED */
+	phnum = (GElf_Word)_phnum;
+
 	if ((scn = elf_getscn(elf, 0)) != NULL) {
 		if ((_shdr0 = gelf_getshdr(scn, &shdr0)) == NULL) {
 			failure(file, MSG_ORIG(MSG_ELF_GETSHDR));
@@ -2568,10 +2577,10 @@ regular(const char *file, Elf *elf, uint32_t flags, char *Nname, int wfd)
 	/*
 	 * Print the program headers.
 	 */
-	if ((flags & FLG_PHDR) && ehdr.e_phnum) {
+	if ((flags & FLG_PHDR) && phnum != 0) {
 		GElf_Phdr phdr;
 
-		for (cnt = 0; cnt < ehdr.e_phnum; cnt++) {
+		for (cnt = 0; cnt < phnum; cnt++) {
 			if (gelf_getphdr(elf, cnt, &phdr) == NULL) {
 				failure(file, MSG_ORIG(MSG_ELF_GETPHDR));
 				return;
@@ -2585,15 +2594,15 @@ regular(const char *file, Elf *elf, uint32_t flags, char *Nname, int wfd)
 
 
 	/*
-	 * If there are no sections (core files), or if we don't want
-	 * any section information we might as well return now.
+	 * Return now if there are no section, if there's just one section to
+	 * act as an extension of the ELF header, or if on section information
+	 * was requested.
 	 */
-	if ((shnum == 0) || (flags && (flags & ~(FLG_EHDR | FLG_PHDR)) == 0)) {
+	if ((shnum <= 1) || (flags && (flags & ~(FLG_EHDR | FLG_PHDR)) == 0)) {
 		if ((ehdr.e_type == ET_CORE) && (flags & FLG_NOTE))
 			note(0, shnum, 0, file);
 		return;
 	}
-
 
 	/*
 	 * Obtain the .shstrtab data buffer to provide the required section
@@ -2704,21 +2713,21 @@ regular(const char *file, Elf *elf, uint32_t flags, char *Nname, int wfd)
 	}
 
 	if (flags & FLG_SHDR)
-		sections(file, cache, shnum, &ehdr, Nname);
+		sections(file, cache, shnum, phnum, &ehdr, Nname);
 
 	if (flags & FLG_INTERP)
-		interp(file, cache, shnum, &ehdr, elf);
+		interp(file, cache, shnum, phnum, &ehdr, elf);
 
 	versymcache = versions(cache, shnum, file, flags);
 
 	if (flags & FLG_SYMBOLS)
-		symbols(cache, shnum, &ehdr, Nname, versymcache, file);
+		symbols(cache, shnum, phnum, &ehdr, Nname, versymcache, file);
 
 	if (flags & FLG_HASH)
 		hash(cache, shnum, Nname, file, flags);
 
 	if (flags & FLG_GOT)
-		got(cache, shnum, &ehdr, file);
+		got(cache, shnum, phnum, &ehdr, file);
 
 	if (flags & FLG_GROUP)
 		group(cache, shnum, Nname, file, flags);
@@ -2727,7 +2736,7 @@ regular(const char *file, Elf *elf, uint32_t flags, char *Nname, int wfd)
 		syminfo(cache, shnum, file);
 
 	if (flags & FLG_RELOC)
-		reloc(cache, shnum, &ehdr, Nname, file, flags);
+		reloc(cache, shnum, phnum, &ehdr, Nname, file, flags);
 
 	if (flags & FLG_DYNAMIC)
 		dynamic(cache, shnum, &ehdr, file);
@@ -2742,10 +2751,10 @@ regular(const char *file, Elf *elf, uint32_t flags, char *Nname, int wfd)
 		checksum(elf);
 
 	if (flags & FLG_CAP)
-		cap(file, cache, shnum, &ehdr, elf);
+		cap(file, cache, shnum, phnum, &ehdr, elf);
 
 	if (flags & FLG_UNWIND)
-		unwind(cache, shnum, &ehdr, Nname, file, elf);
+		unwind(cache, shnum, phnum, &ehdr, Nname, file, elf);
 
 	free(cache);
 }

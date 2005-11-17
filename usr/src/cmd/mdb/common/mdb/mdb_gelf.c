@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,15 +48,15 @@ static const char *gelf_strtab;	/* Active string table for qsort callbacks */
 static mdb_gelf_file_t *
 gelf_sect_init(mdb_gelf_file_t *gf)
 {
-	mdb_gelf_sect_t *gsp, *shstr = &gf->gf_sects[gf->gf_ehdr.e_shstrndx];
+	mdb_gelf_sect_t *gsp, *shstr = &gf->gf_sects[gf->gf_shstrndx];
 	GElf_Half i, npbit = 0;
 	GElf_Shdr *shp;
 	GElf_Phdr *gpp;
 
 	if (gf->gf_mode == GF_PROGRAM)
-		gf->gf_ehdr.e_shnum = 0; /* Simplifies other code paths */
+		gf->gf_shnum = 0; /* Simplifies other code paths */
 
-	if (gf->gf_ehdr.e_shnum == 0)
+	if (gf->gf_shnum == 0)
 		return (gf); /* If no section headers we're done here */
 
 	if (IOP_SEEK(gf->gf_io, shstr->gs_shdr.sh_offset, SEEK_SET) == -1) {
@@ -73,7 +73,7 @@ gelf_sect_init(mdb_gelf_file_t *gf)
 		return (NULL);
 	}
 
-	for (gsp = gf->gf_sects, i = 0; i < gf->gf_ehdr.e_shnum; i++, gsp++) {
+	for (gsp = gf->gf_sects, i = 0; i < gf->gf_shnum; i++, gsp++) {
 		shp = &gsp->gs_shdr;
 		gsp->gs_name = (const char *)shstr->gs_data + shp->sh_name;
 
@@ -101,13 +101,13 @@ gelf_sect_init(mdb_gelf_file_t *gf)
 	 */
 	if (gf->gf_ehdr.e_type == ET_REL && npbit != 0) {
 		gf->gf_phdrs = mdb_zalloc(sizeof (GElf_Phdr) * npbit, UM_SLEEP);
-		gf->gf_ehdr.e_phnum = npbit;
+		gf->gf_phnum = npbit;
 		gf->gf_npload = npbit;
 
 		gpp = gf->gf_phdrs;
 		gsp = gf->gf_sects;
 
-		for (i = 0; i < gf->gf_ehdr.e_shnum; i++, gsp++) {
+		for (i = 0; i < gf->gf_shnum; i++, gsp++) {
 			shp = &gsp->gs_shdr;
 
 			if ((shp->sh_type == SHT_PROGBITS) &&
@@ -238,9 +238,9 @@ gelf_shdrs_init(mdb_gelf_file_t *gf, size_t shdr_size,
 	size_t nbytes;
 
 	mdb_dprintf(MDB_DBG_ELF, "loading %s section headers (%hu entries)\n",
-	    IOP_NAME(gf->gf_io), gf->gf_ehdr.e_shnum);
+	    IOP_NAME(gf->gf_io), gf->gf_shnum);
 
-	if (gf->gf_ehdr.e_shnum == 0)
+	if (gf->gf_shnum == 0)
 		return (gf);
 
 	if (IOP_SEEK(gf->gf_io, (off64_t)gf->gf_ehdr.e_shoff, SEEK_SET) == -1) {
@@ -248,7 +248,7 @@ gelf_shdrs_init(mdb_gelf_file_t *gf, size_t shdr_size,
 		return (NULL);
 	}
 
-	nbytes = shdr_size * gf->gf_ehdr.e_shnum;
+	nbytes = shdr_size * gf->gf_shnum;
 	shdrs = mdb_alloc(nbytes, UM_SLEEP);
 
 	if (IOP_READ(gf->gf_io, shdrs, nbytes) != nbytes) {
@@ -257,13 +257,13 @@ gelf_shdrs_init(mdb_gelf_file_t *gf, size_t shdr_size,
 		return (NULL);
 	}
 
-	gf->gf_sects = mdb_zalloc(sizeof (mdb_gelf_sect_t) *
-	    gf->gf_ehdr.e_shnum, UM_SLEEP);
+	gf->gf_sects = mdb_zalloc(sizeof (mdb_gelf_sect_t) * gf->gf_shnum,
+	    UM_SLEEP);
 
 	shp = shdrs;
 	gsp = gf->gf_sects;
 
-	for (i = 0; i < gf->gf_ehdr.e_shnum; i++, shp += shdr_size, gsp++)
+	for (i = 0; i < gf->gf_shnum; i++, shp += shdr_size, gsp++)
 		(void) elf2gelf(shp, &gsp->gs_shdr);
 
 	mdb_free(shdrs, nbytes);
@@ -359,10 +359,10 @@ gelf_phdrs_init(mdb_gelf_file_t *gf, size_t phdr_size,
 	GElf_Phdr *gpp;
 	size_t nbytes;
 
-	mdb_dprintf(MDB_DBG_ELF, "loading %s program headers (%hu entries)\n",
-	    IOP_NAME(gf->gf_io), gf->gf_ehdr.e_phnum);
+	mdb_dprintf(MDB_DBG_ELF, "loading %s program headers (%lu entries)\n",
+	    IOP_NAME(gf->gf_io), gf->gf_phnum);
 
-	if (gf->gf_ehdr.e_phnum == 0)
+	if (gf->gf_phnum == 0)
 		return (gf);
 
 	if (IOP_SEEK(gf->gf_io, (off64_t)gf->gf_ehdr.e_phoff, SEEK_SET) == -1) {
@@ -370,7 +370,7 @@ gelf_phdrs_init(mdb_gelf_file_t *gf, size_t phdr_size,
 		return (NULL);
 	}
 
-	nbytes = phdr_size * gf->gf_ehdr.e_phnum;
+	nbytes = phdr_size * gf->gf_phnum;
 	phdrs = mdb_alloc(nbytes, UM_SLEEP);
 
 	if (IOP_READ(gf->gf_io, phdrs, nbytes) != nbytes) {
@@ -379,8 +379,7 @@ gelf_phdrs_init(mdb_gelf_file_t *gf, size_t phdr_size,
 		return (NULL);
 	}
 
-	gf->gf_phdrs = mdb_zalloc(sizeof (GElf_Phdr) *
-	    gf->gf_ehdr.e_phnum, UM_SLEEP);
+	gf->gf_phdrs = mdb_zalloc(sizeof (GElf_Phdr) * gf->gf_phnum, UM_SLEEP);
 
 	php = phdrs;
 	gpp = gf->gf_phdrs;
@@ -389,7 +388,7 @@ gelf_phdrs_init(mdb_gelf_file_t *gf, size_t phdr_size,
 	 * Iterate through the list of phdrs locating those that are of type
 	 * PT_LOAD; increment gf_npload so we know how many are loadable.
 	 */
-	for (i = 0; i < gf->gf_ehdr.e_phnum; i++, php += phdr_size, gpp++) {
+	for (i = 0; i < gf->gf_phnum; i++, php += phdr_size, gpp++) {
 		(void) elf2gelf(php, gpp);
 		if (gpp->p_type != PT_LOAD)
 			continue;
@@ -407,18 +406,18 @@ gelf_phdrs_init(mdb_gelf_file_t *gf, size_t phdr_size,
 	 * arranges for the PT_LOAD phdrs with non-zero virtual addresses
 	 * to come first sorted by virtual address.  This means that we
 	 * can access the complete phdr table by examining the array
-	 * gf->gf_phdrs[0 .. gf->gf_ehdr.e_phnum - 1], and we can access a
-	 * sorted array of valid PT_LOAD pdhrs by examining the array
+	 * gf->gf_phdrs[0 .. gf->gf_phnum - 1], and we can access a sorted
+	 * array of valid PT_LOAD pdhrs by examining the array
 	 * gf->gf_phdrs[0 .. gf->gf_npload - 1].
 	 */
-	qsort(gf->gf_phdrs, gf->gf_ehdr.e_phnum, sizeof (GElf_Phdr),
+	qsort(gf->gf_phdrs, gf->gf_phnum, sizeof (GElf_Phdr),
 	    gelf_phdr_compare);
 
 	/*
 	 * Locate the PT_DYNAMIC Phdr if one is present; we save this
 	 * Phdr pointer in gf->gf_dynp for future use.
 	 */
-	for (gpp = gf->gf_phdrs, i = 0; i < gf->gf_ehdr.e_phnum; i++, gpp++) {
+	for (gpp = gf->gf_phdrs, i = 0; i < gf->gf_phnum; i++, gpp++) {
 		if (gpp->p_type == PT_DYNAMIC) {
 			mdb_dprintf(MDB_DBG_ELF, "PT_DYNAMIC "
 			    "filesize = %lluULL off=%lluULL\n",
@@ -502,14 +501,14 @@ gelf_dyns_init(mdb_gelf_file_t *gf, size_t dyn_size,
 	} else {
 		mdb_gelf_sect_t *gsp = gf->gf_sects;
 
-		for (i = 0; i < gf->gf_ehdr.e_shnum; i++, gsp++) {
+		for (i = 0; i < gf->gf_shnum; i++, gsp++) {
 			if (gsp->gs_shdr.sh_type == SHT_DYNAMIC) {
 				dyn_addr = gsp->gs_shdr.sh_offset;
 				break;
 			}
 		}
 
-		if (i == gf->gf_ehdr.e_shnum)
+		if (i == gf->gf_shnum)
 			return (NULL); /* No SHT_DYNAMIC entry was found */
 	}
 
@@ -543,7 +542,7 @@ gelf_dyns_init(mdb_gelf_file_t *gf, size_t dyn_size,
 }
 
 static mdb_gelf_file_t *
-gelf32_init(mdb_gelf_file_t *gf, const Elf32_Ehdr *ehdr)
+gelf32_init(mdb_gelf_file_t *gf, mdb_io_t *io, const Elf32_Ehdr *ehdr)
 {
 	/*
 	 * Convert the Elf32_Ehdr to a GElf_Ehdr
@@ -563,6 +562,38 @@ gelf32_init(mdb_gelf_file_t *gf, const Elf32_Ehdr *ehdr)
 	gf->gf_ehdr.e_shentsize = ehdr->e_shentsize;
 	gf->gf_ehdr.e_shnum = ehdr->e_shnum;
 	gf->gf_ehdr.e_shstrndx = ehdr->e_shstrndx;
+
+	gf->gf_shnum = gf->gf_ehdr.e_shnum;
+	gf->gf_shstrndx = gf->gf_ehdr.e_shstrndx;
+	gf->gf_phnum = gf->gf_ehdr.e_phnum;
+
+	if ((gf->gf_shnum == 0 && ehdr->e_shoff != 0) ||
+	    gf->gf_shstrndx == SHN_XINDEX || gf->gf_phnum == PN_XNUM) {
+		Elf32_Shdr shdr0;
+
+		if (ehdr->e_shoff == 0)
+			return (NULL);
+
+		if (IOP_SEEK(io, (off64_t)ehdr->e_shoff, SEEK_SET) == -1) {
+			warn("failed to seek %s", IOP_NAME(io));
+			return (NULL);
+		}
+
+		if (IOP_READ(io, &shdr0, sizeof (shdr0)) != sizeof (shdr0)) {
+			warn("failed to read extended ELF header from %s",
+			    IOP_NAME(io));
+			return (NULL);
+		}
+
+		if (gf->gf_shnum == 0)
+			gf->gf_shnum = shdr0.sh_size;
+
+		if (gf->gf_shstrndx == SHN_XINDEX)
+			gf->gf_shstrndx = shdr0.sh_link;
+
+		if (gf->gf_phnum == PN_XNUM)
+			gf->gf_phnum = shdr0.sh_info;
+	}
 
 	/*
 	 * Initialize the section and program headers.  We skip initializing
@@ -584,12 +615,44 @@ gelf32_init(mdb_gelf_file_t *gf, const Elf32_Ehdr *ehdr)
 }
 
 static mdb_gelf_file_t *
-gelf64_init(mdb_gelf_file_t *gf, Elf64_Ehdr *ehdr)
+gelf64_init(mdb_gelf_file_t *gf, mdb_io_t *io, Elf64_Ehdr *ehdr)
 {
 	/*
 	 * Save a copy of the ELF file header
 	 */
 	bcopy(ehdr, &gf->gf_ehdr, sizeof (Elf64_Ehdr));
+
+	gf->gf_shnum = gf->gf_ehdr.e_shnum;
+	gf->gf_shstrndx = gf->gf_ehdr.e_shstrndx;
+	gf->gf_phnum = gf->gf_ehdr.e_phnum;
+
+	if ((gf->gf_shnum == 0 && ehdr->e_shoff != 0) ||
+	    gf->gf_shstrndx == SHN_XINDEX || gf->gf_phnum == PN_XNUM) {
+		Elf64_Shdr shdr0;
+
+		if (ehdr->e_shoff == 0)
+			return (NULL);
+
+		if (IOP_SEEK(io, (off64_t)ehdr->e_shoff, SEEK_SET) == -1) {
+			warn("failed to seek %s", IOP_NAME(io));
+			return (NULL);
+		}
+
+		if (IOP_READ(io, &shdr0, sizeof (shdr0)) != sizeof (shdr0)) {
+			warn("failed to read extended ELF header from %s",
+			    IOP_NAME(io));
+			return (NULL);
+		}
+
+		if (gf->gf_shnum == 0)
+			gf->gf_shnum = shdr0.sh_size;
+
+		if (gf->gf_shstrndx == SHN_XINDEX)
+			gf->gf_shstrndx = shdr0.sh_link;
+
+		if (gf->gf_phnum == PN_XNUM)
+			gf->gf_phnum = shdr0.sh_info;
+	}
 
 	/*
 	 * Initialize the section and program headers.  We skip initializing
@@ -682,7 +745,7 @@ mdb_gelf_create(mdb_io_t *io, GElf_Half etype, int mode)
 
 	switch (ehdr.h32.e_ident[EI_CLASS]) {
 	case ELFCLASS32:
-		gf = gelf32_init(gf, &ehdr.h32);
+		gf = gelf32_init(gf, io, &ehdr.h32);
 		break;
 
 	case ELFCLASS64:
@@ -697,7 +760,7 @@ mdb_gelf_create(mdb_io_t *io, GElf_Half etype, int mode)
 			goto err;
 		}
 
-		gf = gelf64_init(gf, &ehdr.h64);
+		gf = gelf64_init(gf, io, &ehdr.h64);
 		break;
 
 	default:
@@ -714,7 +777,7 @@ mdb_gelf_create(mdb_io_t *io, GElf_Half etype, int mode)
 err:
 	if (gf != NULL) {
 		if (gf->gf_sects != NULL) {
-			mdb_free(gf->gf_sects, gf->gf_ehdr.e_shnum *
+			mdb_free(gf->gf_sects, gf->gf_shnum *
 			    sizeof (mdb_gelf_sect_t));
 		}
 		mdb_free(gf, sizeof (mdb_gelf_file_t));
@@ -728,16 +791,15 @@ mdb_gelf_destroy(mdb_gelf_file_t *gf)
 	mdb_gelf_sect_t *gsp;
 	GElf_Half i;
 
-	for (gsp = gf->gf_sects, i = 0; i < gf->gf_ehdr.e_shnum; i++, gsp++) {
+	for (gsp = gf->gf_sects, i = 0; i < gf->gf_shnum; i++, gsp++) {
 		if (gsp->gs_data != NULL)
 			mdb_free(gsp->gs_data, gsp->gs_shdr.sh_size);
 	}
 
 	mdb_free(gf->gf_sects,
-	    gf->gf_ehdr.e_shnum * sizeof (mdb_gelf_sect_t));
+	    gf->gf_shnum * sizeof (mdb_gelf_sect_t));
 
-	mdb_free(gf->gf_phdrs,
-	    gf->gf_ehdr.e_phnum * sizeof (GElf_Phdr));
+	mdb_free(gf->gf_phdrs, gf->gf_phnum * sizeof (GElf_Phdr));
 
 	mdb_io_rele(gf->gf_io);
 	mdb_free(gf, sizeof (mdb_gelf_file_t));
@@ -871,7 +933,7 @@ gelf32_symtab_init(mdb_gelf_symtab_t *gst)
 	}
 
 	if (gst->gst_ehdr->e_type == ET_REL && gst->gst_file != NULL) {
-		GElf_Word smax = gst->gst_ehdr->e_shnum;
+		GElf_Word smax = gst->gst_file->gf_shnum;
 		mdb_gelf_sect_t *gsp;
 
 		for (sym = gst->gst_dsect->gs_data, i = 0; i < n; i++, sym++) {
@@ -964,7 +1026,7 @@ gelf64_symtab_init(mdb_gelf_symtab_t *gst)
 	}
 
 	if (gst->gst_ehdr->e_type == ET_REL && gst->gst_file != NULL) {
-		GElf_Word smax = gst->gst_ehdr->e_shnum;
+		GElf_Word smax = gst->gst_file->gf_shnum;
 		mdb_gelf_sect_t *gsp;
 
 		for (sym = gst->gst_dsect->gs_data, i = 0; i < n; i++, sym++) {
@@ -999,7 +1061,7 @@ mdb_gelf_symtab_create_file(mdb_gelf_file_t *gf, GElf_Word elftype,
 	 * Examine the sh_link field in the the Elf header to get the name
 	 * of the corresponding strings section
 	 */
-	for (gsp = gf->gf_sects, i = 0; i < gf->gf_ehdr.e_shnum; i++, gsp++) {
+	for (gsp = gf->gf_sects, i = 0; i < gf->gf_shnum; i++, gsp++) {
 		if (gsp->gs_shdr.sh_type == elftype) {
 			dsname = gsp->gs_name;
 			link = gsp->gs_shdr.sh_link;
@@ -1010,12 +1072,12 @@ mdb_gelf_symtab_create_file(mdb_gelf_file_t *gf, GElf_Word elftype,
 	if (dsname == NULL)
 		return (NULL);
 
-	if (link > gf->gf_ehdr.e_shnum) {
+	if (link > gf->gf_shnum) {
 		/*
 		 * Invalid link number due to corrupt elf file.
 		 */
 		warn("link number %ud larger than number of sections %d\n",
-		    link, gf->gf_ehdr.e_shnum);
+		    link, gf->gf_shnum);
 		return (NULL);
 	}
 
@@ -1045,14 +1107,14 @@ mdb_gelf_symtab_create_file_by_name(mdb_gelf_file_t *gf,
 	gst->gst_id = 0;
 	gst->gst_tabid = tabid;
 
-	for (gsp = gf->gf_sects, i = 0; i < gf->gf_ehdr.e_shnum; i++, gsp++) {
+	for (gsp = gf->gf_sects, i = 0; i < gf->gf_shnum; i++, gsp++) {
 		if (strcmp(gsp->gs_name, dsname) == 0) {
 			gst->gst_dsect = gsp;
 			break;
 		}
 	}
 
-	for (gsp = gf->gf_sects, i = 0; i < gf->gf_ehdr.e_shnum; i++, gsp++) {
+	for (gsp = gf->gf_sects, i = 0; i < gf->gf_shnum; i++, gsp++) {
 		if (strcmp(gsp->gs_name, ssname) == 0) {
 			gst->gst_ssect = gsp;
 			break;

@@ -765,7 +765,7 @@ stubs_base:
 	MODULE(shmsys,sys);
 	WSTUB(shmsys, shmexit,		nomod_zero);
 	WSTUB(shmsys, shmfork,		nomod_zero);
-	WSTUB(shmsys, shmgetid,		nomod_zero);
+	WSTUB(shmsys, shmgetid,		nomod_minus_one);
 	END_MODULE(shmsys);
 #endif
 

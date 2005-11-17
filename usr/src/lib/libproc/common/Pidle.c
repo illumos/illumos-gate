@@ -113,6 +113,7 @@ Pgrab_file(const char *fname, int *perr)
 	struct ps_prochandle *P = NULL;
 	GElf_Ehdr ehdr;
 	Elf *elf = NULL;
+	size_t phnum;
 	file_info_t *fp = NULL;
 	int fd;
 	int i;
@@ -195,12 +196,17 @@ Pgrab_file(const char *fname, int *perr)
 		goto err;
 	}
 
-	dprintf("Pgrab_file: ehdr.e_phnum = %d\n", ehdr.e_phnum);
+	if (elf_getphnum(elf, &phnum) == 0) {
+		*perr = G_STRANGE;
+		goto err;
+	}
+
+	dprintf("Pgrab_file: program header count = %lu\n", (ulong_t)phnum);
 
 	/*
 	 * Sift through the program headers making the relevant maps.
 	 */
-	for (i = 0; i < ehdr.e_phnum; i++) {
+	for (i = 0; i < phnum; i++) {
 		GElf_Phdr phdr, *php;
 
 		if ((php = gelf_getphdr(elf, i, &phdr)) == NULL) {

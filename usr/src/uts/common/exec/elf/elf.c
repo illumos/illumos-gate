@@ -69,12 +69,13 @@ extern int at_flags;
 #define	ORIGIN_STR	"ORIGIN"
 #define	ORIGIN_STR_SIZE	6
 
-static int getelfhead(vnode_t *, cred_t *, Ehdr *);
-static int getelfphdr(vnode_t *, cred_t *, const Ehdr *, caddr_t *, ssize_t *);
-static int getelfshdr(vnode_t *, cred_t *, const Ehdr *, caddr_t *, ssize_t *,
-    caddr_t *, ssize_t *);
-static size_t elfsize(Ehdr *, caddr_t, uintptr_t *);
-static int mapelfexec(vnode_t *, Ehdr *, caddr_t,
+static int getelfhead(vnode_t *, cred_t *, Ehdr *, int *, int *, int *);
+static int getelfphdr(vnode_t *, cred_t *, const Ehdr *, int, caddr_t *,
+    ssize_t *);
+static int getelfshdr(vnode_t *, cred_t *, const Ehdr *, int, int, caddr_t *,
+    ssize_t *, caddr_t *, ssize_t *);
+static size_t elfsize(Ehdr *, int, caddr_t, uintptr_t *);
+static int mapelfexec(vnode_t *, Ehdr *, int, caddr_t,
     Phdr **, Phdr **, Phdr **, Phdr **, Phdr *,
     caddr_t *, caddr_t *, intptr_t *, size_t, long *, size_t *);
 
@@ -199,7 +200,8 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		struct vattr	vattr;
 		struct execenv	exenv;
 	} *bigwad;	/* kmem_alloc this behemoth so we don't blow stack */
-	Ehdr	*ehdrp;
+	Ehdr		*ehdrp;
+	int		nshdrs, shstrndx, nphdrs;
 	char		*dlnp;
 	char		*pathbufp;
 	rlim64_t	limit;
@@ -215,8 +217,10 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	/*
 	 * Obtain ELF and program header information.
 	 */
-	if ((error = getelfhead(vp, CRED(), ehdrp)) != 0 ||
-	    (error = getelfphdr(vp, CRED(), ehdrp, &phdrbase, &phdrsize)) != 0)
+	if ((error = getelfhead(vp, CRED(), ehdrp, &nshdrs, &shstrndx,
+	    &nphdrs)) != 0 ||
+	    (error = getelfphdr(vp, CRED(), ehdrp, nphdrs, &phdrbase,
+	    &phdrsize)) != 0)
 		goto out;
 
 	/*
@@ -250,7 +254,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 */
 	hsize = ehdrp->e_phentsize;
 	phdrp = (Phdr *)phdrbase;
-	for (i = ehdrp->e_phnum; i > 0; i--) {
+	for (i = nphdrs; i > 0; i--) {
 		switch (phdrp->p_type) {
 		case PT_INTERP:
 			hasauxv = hasdy = 1;
@@ -358,15 +362,15 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 	 * determine its memory size so that mapelfexec() can load it.
 	 */
 	if (ehdrp->e_type == ET_DYN)
-		len = elfsize(ehdrp, phdrbase, NULL);
+		len = elfsize(ehdrp, nphdrs, phdrbase, NULL);
 	else
 		len = 0;
 
 	dtrphdr = NULL;
 
-	if ((error = mapelfexec(vp, ehdrp, phdrbase, &uphdr, &dyphdr, &stphdr,
-	    &dtrphdr, dataphdrp, &bssbase, &brkbase, &voffset, len, execsz,
-	    &brksize)) != 0)
+	if ((error = mapelfexec(vp, ehdrp, nphdrs, phdrbase, &uphdr, &dyphdr,
+	    &stphdr, &dtrphdr, dataphdrp, &bssbase, &brkbase, &voffset, len,
+	    execsz, &brksize)) != 0)
 		goto bad;
 
 	if (uphdr != NULL && dyphdr == NULL)
@@ -483,7 +487,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 			ADDAUX(aux, AT_PHDR, uphdr->p_vaddr + voffset)
 			ADDAUX(aux, AT_PHENT, ehdrp->e_phentsize)
-			ADDAUX(aux, AT_PHNUM, ehdrp->e_phnum)
+			ADDAUX(aux, AT_PHNUM, nphdrs)
 			ADDAUX(aux, AT_ENTRY, ehdrp->e_entry + voffset)
 		} else {
 			if ((error = execopen(&vp, &fd)) != 0) {
@@ -506,8 +510,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 */
 		kmem_free(phdrbase, phdrsize);
 		phdrbase = NULL;
-		if ((error = getelfhead(nvp, CRED(), ehdrp)) != 0 ||
-		    (error = getelfphdr(nvp, CRED(), ehdrp, &phdrbase,
+		if ((error = getelfhead(nvp, CRED(), ehdrp, &nshdrs,
+		    &shstrndx, &nphdrs)) != 0 ||
+		    (error = getelfphdr(nvp, CRED(), ehdrp, nphdrs, &phdrbase,
 		    &phdrsize)) != 0) {
 			VN_RELE(nvp);
 			uprintf("%s: Cannot read %s\n", exec_file, dlnp);
@@ -520,7 +525,7 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * address of a hole, in the user's address space, large
 		 * enough to map the "interpreter".
 		 */
-		if ((len = elfsize(ehdrp, phdrbase, &lddata)) == 0) {
+		if ((len = elfsize(ehdrp, nphdrs, phdrbase, &lddata)) == 0) {
 			VN_RELE(nvp);
 			uprintf("%s: Nothing to load in %s\n", exec_file, dlnp);
 			goto bad;
@@ -528,8 +533,9 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 
 		dtrphdr = NULL;
 
-		error = mapelfexec(nvp, ehdrp, phdrbase, &junk, &junk, &junk,
-		    &dtrphdr, NULL, NULL, NULL, &voffset, len, execsz, NULL);
+		error = mapelfexec(nvp, ehdrp, nphdrs, phdrbase, &junk, &junk,
+		    &junk, &dtrphdr, NULL, NULL, NULL, &voffset, len, execsz,
+		    NULL);
 		if (error || junk != NULL) {
 			VN_RELE(nvp);
 			uprintf("%s: Cannot map %s\n", exec_file, dlnp);
@@ -681,7 +687,7 @@ out:
  * Compute the memory size requirement for the ELF file.
  */
 static size_t
-elfsize(Ehdr *ehdrp, caddr_t phdrbase, uintptr_t *lddata)
+elfsize(Ehdr *ehdrp, int nphdrs, caddr_t phdrbase, uintptr_t *lddata)
 {
 	size_t	len;
 	Phdr	*phdrp = (Phdr *)phdrbase;
@@ -693,7 +699,7 @@ elfsize(Ehdr *ehdrp, caddr_t phdrbase, uintptr_t *lddata)
 	uintptr_t lo, hi;
 	int	i;
 
-	for (i = ehdrp->e_phnum; i > 0; i--) {
+	for (i = nphdrs; i > 0; i--) {
 		if (phdrp->p_type == PT_LOAD) {
 			lo = phdrp->p_vaddr;
 			hi = lo + phdrp->p_memsz;
@@ -735,7 +741,8 @@ elfsize(Ehdr *ehdrp, caddr_t phdrbase, uintptr_t *lddata)
  *	EINVAL	Format recognized but execution not supported
  */
 static int
-getelfhead(vnode_t *vp, cred_t *credp, Ehdr *ehdr)
+getelfhead(vnode_t *vp, cred_t *credp, Ehdr *ehdr, int *nshdrs, int *shstrndx,
+    int *nphdrs)
 {
 	int error;
 	ssize_t resid;
@@ -758,6 +765,7 @@ getelfhead(vnode_t *vp, cred_t *credp, Ehdr *ehdr)
 	    ehdr->e_ident[EI_MAG2] != ELFMAG2 ||
 	    ehdr->e_ident[EI_MAG3] != ELFMAG3)
 		return (ENOEXEC);
+
 	if ((ehdr->e_type != ET_EXEC && ehdr->e_type != ET_DYN) ||
 #if defined(_ILP32) || defined(_ELF32_COMPAT)
 	    ehdr->e_ident[EI_CLASS] != ELFCLASS32 ||
@@ -765,8 +773,37 @@ getelfhead(vnode_t *vp, cred_t *credp, Ehdr *ehdr)
 	    ehdr->e_ident[EI_CLASS] != ELFCLASS64 ||
 #endif
 	    !elfheadcheck(ehdr->e_ident[EI_DATA], ehdr->e_machine,
-		ehdr->e_flags))
+	    ehdr->e_flags))
 		return (EINVAL);
+
+	*nshdrs = ehdr->e_shnum;
+	*shstrndx = ehdr->e_shstrndx;
+	*nphdrs = ehdr->e_phnum;
+
+	/*
+	 * If e_shnum, e_shstrndx, or e_phnum is its sentinel value, we need
+	 * to read in the section header at index zero to acces the true
+	 * values for those fields.
+	 */
+	if ((*nshdrs == 0 && ehdr->e_shoff != 0) ||
+	    *shstrndx == SHN_XINDEX || *nphdrs == PN_XNUM) {
+		Shdr shdr;
+
+		if (ehdr->e_shoff == 0)
+			return (EINVAL);
+
+		if ((error = vn_rdwr(UIO_READ, vp, (caddr_t)&shdr,
+		    sizeof (shdr), (offset_t)ehdr->e_shoff, UIO_SYSSPACE, 0,
+		    (rlim64_t)0, credp, &resid)) != 0)
+			return (error);
+
+		if (*nshdrs == 0)
+			*nshdrs = shdr.sh_size;
+		if (*shstrndx == SHN_XINDEX)
+			*shstrndx = shdr.sh_link;
+		if (*nphdrs == PN_XNUM && shdr.sh_info != 0)
+			*nphdrs = shdr.sh_info;
+	}
 
 	return (0);
 }
@@ -778,7 +815,7 @@ size_t elf_nphdr_max = 1000;
 #endif
 
 static int
-getelfphdr(vnode_t *vp, cred_t *credp, const Ehdr *ehdr,
+getelfphdr(vnode_t *vp, cred_t *credp, const Ehdr *ehdr, int nphdrs,
     caddr_t *phbasep, ssize_t *phsizep)
 {
 	ssize_t resid, minsize;
@@ -800,7 +837,7 @@ getelfphdr(vnode_t *vp, cred_t *credp, const Ehdr *ehdr,
 	if (ehdr->e_phentsize < minsize || (ehdr->e_phentsize & 3))
 		return (EINVAL);
 
-	*phsizep = ehdr->e_phnum * ehdr->e_phentsize;
+	*phsizep = nphdrs * ehdr->e_phentsize;
 
 	if (*phsizep > sizeof (Phdr) * elf_nphdr_max) {
 		if ((*phbasep = kmem_alloc(*phsizep, KM_NOSLEEP)) == NULL)
@@ -831,7 +868,7 @@ size_t elf_shstrtab_max = 100 * 1024;
 
 static int
 getelfshdr(vnode_t *vp, cred_t *credp, const Ehdr *ehdr,
-    caddr_t *shbasep, ssize_t *shsizep,
+    int nshdrs, int shstrndx, caddr_t *shbasep, ssize_t *shsizep,
     char **shstrbasep, ssize_t *shstrsizep)
 {
 	ssize_t resid, minsize;
@@ -843,15 +880,15 @@ getelfshdr(vnode_t *vp, cred_t *credp, const Ehdr *ehdr,
 	 * array of section headers, it must be 8-byte aligned or else
 	 * a we might cause a misaligned access. We use all members through
 	 * sh_entsize (on both 32- and 64-bit ELF files) so e_shentsize
-	 * must be at least large enough to include that member. The
-	 * index of the string table section must be valid.
+	 * must be at least large enough to include that member. The index
+	 * of the string table section must also be valid.
 	 */
 	minsize = offsetof(Shdr, sh_entsize) + sizeof (shdr->sh_entsize);
 	if (ehdr->e_shentsize < minsize || (ehdr->e_shentsize & 3) ||
-	    ehdr->e_shstrndx >= ehdr->e_shnum)
+	    shstrndx >= nshdrs)
 		return (EINVAL);
 
-	*shsizep = ehdr->e_shnum * ehdr->e_shentsize;
+	*shsizep = nshdrs * ehdr->e_shentsize;
 
 	if (*shsizep > sizeof (Shdr) * elf_nshdr_max) {
 		if ((*shbasep = kmem_alloc(*shsizep, KM_NOSLEEP)) == NULL)
@@ -871,7 +908,7 @@ getelfshdr(vnode_t *vp, cred_t *credp, const Ehdr *ehdr,
 	 * Pull the section string table out of the vnode; fail if the size
 	 * is zero.
 	 */
-	shdr = (Shdr *)(*shbasep + ehdr->e_shstrndx * ehdr->e_shentsize);
+	shdr = (Shdr *)(*shbasep + shstrndx * ehdr->e_shentsize);
 	if ((*shstrsizep = shdr->sh_size) == 0) {
 		kmem_free(*shbasep, *shsizep);
 		return (EINVAL);
@@ -908,6 +945,7 @@ static int
 mapelfexec(
 	vnode_t *vp,
 	Ehdr *ehdr,
+	int nphdrs,
 	caddr_t phdrbase,
 	Phdr **uphdr,
 	Phdr **dyphdr,
@@ -943,7 +981,7 @@ mapelfexec(
 		*voffset = 0;
 	}
 	phdr = (Phdr *)phdrbase;
-	for (i = (int)ehdr->e_phnum; i > 0; i--) {
+	for (i = nphdrs; i > 0; i--) {
 		switch (phdr->p_type) {
 		case PT_LOAD:
 			if ((*dyphdr != NULL) && (*uphdr == NULL))
@@ -1175,6 +1213,7 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 		size_t segsize;
 
 		Ehdr ehdr;
+		int nshdrs, shstrndx, nphdrs;
 		caddr_t shbase;
 		ssize_t shsize;
 		char *shstrbase;
@@ -1212,13 +1251,14 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 		if ((prot & (PROT_WRITE | PROT_EXEC)) != PROT_EXEC)
 			continue;
 
-		if (getelfhead(mvp, credp, &ehdr) != 0 ||
-		    getelfshdr(mvp, credp, &ehdr, &shbase, &shsize,
-		    &shstrbase, &shstrsize) != 0)
+		if (getelfhead(mvp, credp, &ehdr, &nshdrs, &shstrndx,
+		    &nphdrs) != 0 ||
+		    getelfshdr(mvp, credp, &ehdr, nshdrs, shstrndx,
+		    &shbase, &shsize, &shstrbase, &shstrsize) != 0)
 			continue;
 
 		off = ehdr.e_shentsize;
-		for (j = 1; j < ehdr.e_shnum; j++, off += ehdr.e_shentsize) {
+		for (j = 1; j < nshdrs; j++, off += ehdr.e_shentsize) {
 			Shdr *symtab = NULL, *strtab;
 
 			shdr = (Shdr *)(shbase + off);
@@ -1234,7 +1274,7 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 					continue;
 
 				if (shdr->sh_link > 0 &&
-				    shdr->sh_link < ehdr.e_shnum) {
+				    shdr->sh_link < nshdrs) {
 					symtab = (Shdr *)(shbase +
 					    shdr->sh_link * ehdr.e_shentsize);
 				}
@@ -1298,7 +1338,7 @@ process_scns(core_content_t content, proc_t *p, cred_t *credp, vnode_t *vp,
 				if ((symtab->sh_type != SHT_DYNSYM &&
 				    symtab->sh_type != SHT_SYMTAB) ||
 				    symtab->sh_link == 0 ||
-				    symtab->sh_link >= ehdr.e_shnum)
+				    symtab->sh_link >= nshdrs)
 					continue;
 
 				strtab = (Shdr *)(shbase +
@@ -1476,6 +1516,16 @@ top:
 	}
 	AS_LOCK_EXIT(as, &as->a_lock);
 
+	ASSERT(nshdrs == 0 || nshdrs > 1);
+
+	/*
+	 * The core file contents may required zero section headers, but if
+	 * we overflow the 16 bits allotted to the program header count in
+	 * the ELF header, we'll need that program header at index zero.
+	 */
+	if (nshdrs == 0 && nphdrs >= PN_XNUM)
+		nshdrs = 1;
+
 	phdrsz = nphdrs * sizeof (Phdr);
 	shdrsz = nshdrs * sizeof (Shdr);
 
@@ -1518,18 +1568,37 @@ top:
 
 #endif	/* !defined(_LP64) || defined(_ELF32_COMPAT) */
 
+	/*
+	 * If the count of program headers or section headers or the index
+	 * of the section string table can't fit in the mere 16 bits
+	 * shortsightedly allotted to them in the ELF header, we use the
+	 * extended formats and put the real values in the section header
+	 * as index 0.
+	 */
 	ehdr->e_version = EV_CURRENT;
-	ehdr->e_phoff = sizeof (Ehdr);
 	ehdr->e_ehsize = sizeof (Ehdr);
+
+	if (nphdrs >= PN_XNUM)
+		ehdr->e_phnum = PN_XNUM;
+	else
+		ehdr->e_phnum = (unsigned short)nphdrs;
+
+	ehdr->e_phoff = sizeof (Ehdr);
 	ehdr->e_phentsize = sizeof (Phdr);
-	ehdr->e_phnum = (unsigned short)nphdrs;
 
 	if (nshdrs > 0) {
-		ehdr->e_shstrndx = (unsigned short)(nshdrs - 1);
+		if (nshdrs >= SHN_LORESERVE)
+			ehdr->e_shnum = 0;
+		else
+			ehdr->e_shnum = (unsigned short)nshdrs;
+
+		if (nshdrs - 1 >= SHN_LORESERVE)
+			ehdr->e_shstrndx = SHN_XINDEX;
+		else
+			ehdr->e_shstrndx = (unsigned short)(nshdrs - 1);
+
+		ehdr->e_shoff = ehdr->e_phoff + ehdr->e_phentsize * nphdrs;
 		ehdr->e_shentsize = sizeof (Shdr);
-		ehdr->e_shnum = (unsigned short)nshdrs;
-		ehdr->e_shoff = ehdr->e_phoff +
-		    ehdr->e_phentsize * ehdr->e_phnum;
 	}
 
 	if (error = core_write(vp, UIO_SYSSPACE, (offset_t)0, ehdr,
@@ -1723,14 +1792,25 @@ exclude:
 	if (nshdrs > 0) {
 		bzero(&bigwad->shdr[0], shdrsz);
 
-		AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
-		if ((error = process_scns(content, p, credp, vp,
-		    &bigwad->shdr[0], nshdrs, rlimit, &doffset, NULL)) != 0) {
-			AS_LOCK_EXIT(as, &as->a_lock);
-			goto done;
-		}
-		AS_LOCK_EXIT(as, &as->a_lock);
+		if (nshdrs >= SHN_LORESERVE)
+			bigwad->shdr[0].sh_size = nshdrs;
 
+		if (nshdrs - 1 >= SHN_LORESERVE)
+			bigwad->shdr[0].sh_link = nshdrs - 1;
+
+		if (nphdrs >= PN_XNUM)
+			bigwad->shdr[0].sh_info = nphdrs;
+
+		if (nshdrs > 1) {
+			AS_LOCK_ENTER(as, &as->a_lock, RW_WRITER);
+			if ((error = process_scns(content, p, credp, vp,
+			    &bigwad->shdr[0], nshdrs, rlimit, &doffset,
+			    NULL)) != 0) {
+				AS_LOCK_EXIT(as, &as->a_lock);
+				goto done;
+			}
+			AS_LOCK_EXIT(as, &as->a_lock);
+		}
 
 		if ((error = core_write(vp, UIO_SYSSPACE, soffset,
 		    &bigwad->shdr[0], shdrsz, rlimit, credp)) != 0)

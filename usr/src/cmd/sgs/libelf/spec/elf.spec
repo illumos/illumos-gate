@@ -27,6 +27,12 @@
 # cmd/sgs/libelf/spec/elf.spec
 
 
+function	elf_getphnum
+include		<libelf.h>
+declaration	int elf_getphnum(Elf *elf, size_t *phnum)
+version		SUNW_1.6
+end		
+
 function	elf_getshnum
 include		<libelf.h>
 declaration	int elf_getshnum(Elf *elf, size_t *shnum)

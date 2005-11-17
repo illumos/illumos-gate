@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,7 @@ COMOBJS=	ar.o		begin.o		cntl.o		cook.o \
 		getarhdr.o	getarsym.o	getbase.o	getdata.o \
 		getehdr.o	getident.o	getphdr.o	getscn.o \
 		getshdr.o \
-		getshnum.o	getshstrndx.o \
+		getphnum.o	getshnum.o	getshstrndx.o \
 		hash.o		input.o		kind.o \
 		ndxscn.o	newdata.o	newehdr.o	newphdr.o \
 		newscn.o	next.o		nextscn.o	output.o \

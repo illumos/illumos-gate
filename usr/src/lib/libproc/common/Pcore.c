@@ -800,7 +800,7 @@ core_name_mapping(struct ps_prochandle *P, uintptr_t addr, const char *name)
  * in a memory backed elf file.
  */
 static void
-fake_up_symtab(struct ps_prochandle *P, GElf_Ehdr *ehdr,
+fake_up_symtab(struct ps_prochandle *P, const elf_file_header_t *ehdr,
     GElf_Shdr *symtab, GElf_Shdr *strtab)
 {
 	size_t size;
@@ -829,7 +829,12 @@ fake_up_symtab(struct ps_prochandle *P, GElf_Ehdr *ehdr,
 		if ((b = calloc(1, size)) == NULL)
 			return;
 
-		(void) memcpy(&b->ehdr, ehdr, offsetof(GElf_Ehdr, e_entry));
+		(void) memcpy(b->ehdr.e_ident, ehdr->e_ident,
+		    sizeof (ehdr->e_ident));
+		b->ehdr.e_type = ehdr->e_type;
+		b->ehdr.e_machine = ehdr->e_machine;
+		b->ehdr.e_version = ehdr->e_version;
+		b->ehdr.e_flags = ehdr->e_flags;
 		b->ehdr.e_ehsize = sizeof (b->ehdr);
 		b->ehdr.e_shoff = sizeof (b->ehdr);
 		b->ehdr.e_shentsize = sizeof (b->shdr[0]);
@@ -888,7 +893,12 @@ fake_up_symtab(struct ps_prochandle *P, GElf_Ehdr *ehdr,
 		if ((b = calloc(1, size)) == NULL)
 			return;
 
-		(void) memcpy(&b->ehdr, ehdr, offsetof(GElf_Ehdr, e_entry));
+		(void) memcpy(b->ehdr.e_ident, ehdr->e_ident,
+		    sizeof (ehdr->e_ident));
+		b->ehdr.e_type = ehdr->e_type;
+		b->ehdr.e_machine = ehdr->e_machine;
+		b->ehdr.e_version = ehdr->e_version;
+		b->ehdr.e_flags = ehdr->e_flags;
 		b->ehdr.e_ehsize = sizeof (b->ehdr);
 		b->ehdr.e_shoff = sizeof (b->ehdr);
 		b->ehdr.e_shentsize = sizeof (b->shdr[0]);
@@ -959,25 +969,6 @@ err:
 }
 
 static void
-core_ehdr_to_gelf(const Elf32_Ehdr *src, GElf_Ehdr *dst)
-{
-	(void) memcpy(dst->e_ident, src->e_ident, EI_NIDENT);
-	dst->e_type = src->e_type;
-	dst->e_machine = src->e_machine;
-	dst->e_version = src->e_version;
-	dst->e_entry = (Elf64_Addr)src->e_entry;
-	dst->e_phoff = (Elf64_Off)src->e_phoff;
-	dst->e_shoff = (Elf64_Off)src->e_shoff;
-	dst->e_flags = src->e_flags;
-	dst->e_ehsize = src->e_ehsize;
-	dst->e_phentsize = src->e_phentsize;
-	dst->e_phnum = src->e_phnum;
-	dst->e_shentsize = src->e_shentsize;
-	dst->e_shnum = src->e_shnum;
-	dst->e_shstrndx = src->e_shstrndx;
-}
-
-static void
 core_phdr_to_gelf(const Elf32_Phdr *src, GElf_Phdr *dst)
 {
 	dst->p_type = src->p_type;
@@ -1044,24 +1035,180 @@ core_elf_fdopen(elf_file_t *efp, GElf_Half type, int *perr)
 
 	/*
 	 * If the file is 64-bit and we are 32-bit, fail with G_LP64.  If the
-	 * file is 64-bit and we are 64-bit, re-read the header as a Elf64_Ehdr.
-	 * Otherwise, the file is 32-bit, so convert e32 to a GElf_Ehdr.
+	 * file is 64-bit and we are 64-bit, re-read the header as a Elf64_Ehdr,
+	 * and convert it to a elf_file_header_t.  Otherwise, the file is
+	 * 32-bit, so convert e32 to a elf_file_header_t.
 	 */
 	if (e32.e_ident[EI_CLASS] == ELFCLASS64) {
 #ifdef _LP64
-		if (pread64(efp->e_fd, &efp->e_hdr,
-		    sizeof (GElf_Ehdr), 0) != sizeof (GElf_Ehdr)) {
+		Elf64_Ehdr e64;
+
+		if (pread64(efp->e_fd, &e64, sizeof (e64), 0) != sizeof (e64)) {
 			if (perr != NULL)
 				*perr = G_FORMAT;
 			goto err;
 		}
+
+		(void) memcpy(efp->e_hdr.e_ident, e64.e_ident, EI_NIDENT);
+		efp->e_hdr.e_type = e64.e_type;
+		efp->e_hdr.e_machine = e64.e_machine;
+		efp->e_hdr.e_version = e64.e_version;
+		efp->e_hdr.e_entry = e64.e_entry;
+		efp->e_hdr.e_phoff = e64.e_phoff;
+		efp->e_hdr.e_shoff = e64.e_shoff;
+		efp->e_hdr.e_flags = e64.e_flags;
+		efp->e_hdr.e_ehsize = e64.e_ehsize;
+		efp->e_hdr.e_phentsize = e64.e_phentsize;
+		efp->e_hdr.e_phnum = (Elf64_Word)e64.e_phnum;
+		efp->e_hdr.e_shentsize = e64.e_shentsize;
+		efp->e_hdr.e_shnum = (Elf64_Word)e64.e_shnum;
+		efp->e_hdr.e_shstrndx = (Elf64_Word)e64.e_shstrndx;
 #else	/* _LP64 */
 		if (perr != NULL)
 			*perr = G_LP64;
 		goto err;
 #endif	/* _LP64 */
-	} else
-		core_ehdr_to_gelf(&e32, &efp->e_hdr);
+	} else {
+		(void) memcpy(efp->e_hdr.e_ident, e32.e_ident, EI_NIDENT);
+		efp->e_hdr.e_type = e32.e_type;
+		efp->e_hdr.e_machine = e32.e_machine;
+		efp->e_hdr.e_version = e32.e_version;
+		efp->e_hdr.e_entry = (Elf64_Addr)e32.e_entry;
+		efp->e_hdr.e_phoff = (Elf64_Off)e32.e_phoff;
+		efp->e_hdr.e_shoff = (Elf64_Off)e32.e_shoff;
+		efp->e_hdr.e_flags = e32.e_flags;
+		efp->e_hdr.e_ehsize = e32.e_ehsize;
+		efp->e_hdr.e_phentsize = e32.e_phentsize;
+		efp->e_hdr.e_phnum = (Elf64_Word)e32.e_phnum;
+		efp->e_hdr.e_shentsize = e32.e_shentsize;
+		efp->e_hdr.e_shnum = (Elf64_Word)e32.e_shnum;
+		efp->e_hdr.e_shstrndx = (Elf64_Word)e32.e_shstrndx;
+	}
+
+	/*
+	 * If the number of section headers or program headers or the section
+	 * header string table index would overflow their respective fields
+	 * in the ELF header, they're stored in the section header at index
+	 * zero. To simplify use elsewhere, we look for those sentinel values
+	 * here.
+	 */
+	if ((efp->e_hdr.e_shnum == 0 && efp->e_hdr.e_shoff != 0) ||
+	    efp->e_hdr.e_shstrndx == SHN_XINDEX ||
+	    efp->e_hdr.e_phnum == PN_XNUM) {
+		GElf_Shdr shdr;
+
+		dprintf("extended ELF header\n");
+
+		if (efp->e_hdr.e_shoff == 0) {
+			if (perr != NULL)
+				*perr = G_FORMAT;
+			goto err;
+		}
+
+		if (efp->e_hdr.e_ident[EI_CLASS] == ELFCLASS32) {
+			Elf32_Shdr shdr32;
+
+			if (pread64(efp->e_fd, &shdr32, sizeof (shdr32),
+			    efp->e_hdr.e_shoff) != sizeof (shdr32)) {
+				if (perr != NULL)
+					*perr = G_FORMAT;
+				goto err;
+			}
+
+			core_shdr_to_gelf(&shdr32, &shdr);
+		} else {
+			if (pread64(efp->e_fd, &shdr, sizeof (shdr),
+			    efp->e_hdr.e_shoff) != sizeof (shdr)) {
+				if (perr != NULL)
+					*perr = G_FORMAT;
+				goto err;
+			}
+		}
+
+		if (efp->e_hdr.e_shnum == 0) {
+			efp->e_hdr.e_shnum = shdr.sh_size;
+			dprintf("section header count %lu\n",
+			    (ulong_t)shdr.sh_size);
+		}
+
+		if (efp->e_hdr.e_shstrndx == SHN_XINDEX) {
+			efp->e_hdr.e_shstrndx = shdr.sh_link;
+			dprintf("section string index %u\n", shdr.sh_link);
+		}
+
+		if (efp->e_hdr.e_phnum == PN_XNUM && shdr.sh_info != 0) {
+			efp->e_hdr.e_phnum = shdr.sh_info;
+			dprintf("program header count %u\n", shdr.sh_info);
+		}
+
+	} else if (efp->e_hdr.e_phoff != 0) {
+		GElf_Phdr phdr;
+		uint64_t phnum;
+
+		/*
+		 * It's possible this core file came from a system that
+		 * accidentally truncated the e_phnum field without correctly
+		 * using the extended format in the section header at index
+		 * zero. We try to detect and correct that specific type of
+		 * corruption by using the knowledge that the core dump
+		 * routines usually place the data referenced by the first
+		 * program header immediately after the last header element.
+		 */
+		if (efp->e_hdr.e_ident[EI_CLASS] == ELFCLASS32) {
+			Elf32_Phdr phdr32;
+
+			if (pread64(efp->e_fd, &phdr32, sizeof (phdr32),
+			    efp->e_hdr.e_phoff) != sizeof (phdr32)) {
+				if (perr != NULL)
+					*perr = G_FORMAT;
+				goto err;
+			}
+
+			core_phdr_to_gelf(&phdr32, &phdr);
+		} else {
+			if (pread64(efp->e_fd, &phdr, sizeof (phdr),
+			    efp->e_hdr.e_phoff) != sizeof (phdr)) {
+				if (perr != NULL)
+					*perr = G_FORMAT;
+				goto err;
+			}
+		}
+
+		phnum = phdr.p_offset - efp->e_hdr.e_ehsize -
+		    (uint64_t)efp->e_hdr.e_shnum * efp->e_hdr.e_shentsize;
+		phnum /= efp->e_hdr.e_phentsize;
+
+		if (phdr.p_offset != 0 && phnum != efp->e_hdr.e_phnum) {
+			dprintf("suspicious program header count %u %u\n",
+			    (uint_t)phnum, efp->e_hdr.e_phnum);
+
+			/*
+			 * If the new program header count we computed doesn't
+			 * jive with count in the ELF header, we'll use the
+			 * data that's there and hope for the best.
+			 *
+			 * If it does, it's also possible that the section
+			 * header offset is incorrect; we'll check that and
+			 * possibly try to fix it.
+			 */
+			if (phnum <= INT_MAX &&
+			    (uint16_t)phnum == efp->e_hdr.e_phnum) {
+
+				if (efp->e_hdr.e_shoff == efp->e_hdr.e_phoff +
+				    efp->e_hdr.e_phentsize *
+				    (uint_t)efp->e_hdr.e_phnum) {
+					efp->e_hdr.e_shoff =
+					    efp->e_hdr.e_phoff +
+					    efp->e_hdr.e_phentsize * phnum;
+				}
+
+				efp->e_hdr.e_phnum = (Elf64_Word)phnum;
+				dprintf("using new program header count\n");
+			} else {
+				dprintf("inconsistent program header count\n");
+			}
+		}
+	}
 
 	/*
 	 * The libelf implementation was never ported to be large-file aware.
@@ -1132,17 +1279,18 @@ core_elf_close(elf_file_t *efp)
 static map_info_t *
 core_find_text(struct ps_prochandle *P, Elf *elf, rd_loadobj_t *rlp)
 {
-	GElf_Ehdr ehdr;
 	GElf_Phdr phdr;
 	uint_t i;
+	size_t nphdrs;
 
-	if (gelf_getehdr(elf, &ehdr) != NULL) {
-		for (i = 0; i < ehdr.e_phnum; i++) {
-			if (gelf_getphdr(elf, i, &phdr) != NULL &&
-			    phdr.p_type == PT_LOAD && (phdr.p_flags & PF_X)) {
-				rlp->rl_base = phdr.p_vaddr;
-				return (Paddr2mptr(P, rlp->rl_base));
-			}
+	if (elf_getphnum(elf, &nphdrs) == 0)
+		return (NULL);
+
+	for (i = 0; i < nphdrs; i++) {
+		if (gelf_getphdr(elf, i, &phdr) != NULL &&
+		    phdr.p_type == PT_LOAD && (phdr.p_flags & PF_X)) {
+			rlp->rl_base = phdr.p_vaddr;
+			return (Paddr2mptr(P, rlp->rl_base));
 		}
 	}
 
@@ -1159,9 +1307,9 @@ core_find_data(struct ps_prochandle *P, Elf *elf, rd_loadobj_t *rlp)
 {
 	GElf_Ehdr ehdr;
 	GElf_Phdr phdr;
-
 	map_info_t *mp;
 	uint_t i, pagemask;
+	size_t nphdrs;
 
 	rlp->rl_data_base = NULL;
 
@@ -1169,16 +1317,17 @@ core_find_data(struct ps_prochandle *P, Elf *elf, rd_loadobj_t *rlp)
 	 * Find the first loadable, writeable Phdr and compute rl_data_base
 	 * as the virtual address at which is was loaded.
 	 */
-	if (gelf_getehdr(elf, &ehdr) != NULL) {
-		for (i = 0; i < ehdr.e_phnum; i++) {
-			if (gelf_getphdr(elf, i, &phdr) != NULL &&
-			    phdr.p_type == PT_LOAD && (phdr.p_flags & PF_W)) {
+	if (gelf_getehdr(elf, &ehdr) == NULL ||
+	    elf_getphnum(elf, &nphdrs) == 0)
+		return (NULL);
 
-				rlp->rl_data_base = phdr.p_vaddr;
-				if (ehdr.e_type == ET_DYN)
-					rlp->rl_data_base += rlp->rl_base;
-				break;
-			}
+	for (i = 0; i < nphdrs; i++) {
+		if (gelf_getphdr(elf, i, &phdr) != NULL &&
+		    phdr.p_type == PT_LOAD && (phdr.p_flags & PF_W)) {
+			rlp->rl_data_base = phdr.p_vaddr;
+			if (ehdr.e_type == ET_DYN)
+				rlp->rl_data_base += rlp->rl_base;
+			break;
 		}
 	}
 
@@ -1357,7 +1506,7 @@ core_load_shdrs(struct ps_prochandle *P, elf_file_t *efp)
 
 	if (efp->e_hdr.e_shstrndx >= efp->e_hdr.e_shnum) {
 		dprintf("corrupt shstrndx (%u) exceeds shnum (%u)\n",
-		    (uint_t)efp->e_hdr.e_shstrndx, (uint_t)efp->e_hdr.e_shnum);
+		    efp->e_hdr.e_shstrndx, efp->e_hdr.e_shnum);
 		return;
 	}
 

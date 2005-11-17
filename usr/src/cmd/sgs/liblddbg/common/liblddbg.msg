@@ -793,11 +793,16 @@
 			 e_shnum:    [sh[0].sh_size]"
 @ MSG_ELF_PHOFF		"  e_phoff:    %#18llx  e_phentsize:  %2d  \
 			 e_phnum:      %2d"
+@ MSG_ELFX_PHOFF	"  e_phoff:    %#18llx  e_phentsize:  %2d  \
+			 e_phnum:    [sh[0].sh_info]"
 
 # Shdr[0] messages
 @ MSG_SHD0_TITLE	"Section Header[0]: {ELF Ehdr extensions}"
 @ MSG_SHD0_SIZE		"    sh_size:      %-6lld [shnum]  sh_type:    %s"
-@ MSG_SHD0_LINK		"    sh_link:      %-6d [strndx] sh_info:    %s"
+@ MSG_SHD0_LINK1	"    sh_link:      %-6d [strndx] sh_info:    %d [phnum]"
+@ MSG_SHD0_LINK2	"    sh_link:      %-6d [strndx] sh_info:    %d"
+@ MSG_SHD0_LINK3	"    sh_link:      %-14d  sh_info:    %d [phnum]"
+@ MSG_SHD0_LINK4	"    sh_link:      %-14d  sh_info:    %d"
 
 # Section header messages
 

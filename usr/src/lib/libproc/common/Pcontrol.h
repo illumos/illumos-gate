@@ -53,15 +53,15 @@ extern "C" {
  * These may change without affecting clients of libproc.
  */
 
-typedef struct {		/* symbol table */
+typedef struct sym_tbl {	/* symbol table */
 	Elf_Data *sym_data;	/* start of table */
 	size_t	sym_symn;	/* number of entries */
 	char	*sym_strs;	/* ptr to strings */
 	size_t	sym_strsz;	/* size of string table */
 	GElf_Shdr sym_hdr;	/* symbol table section header */
 	GElf_Shdr sym_strhdr;	/* string table section header */
-	Elf	*sym_elf;	/* faked-up elf handle from core file */
-	void	*sym_elfmem;	/* data for faked-up elf handle */
+	Elf	*sym_elf;	/* faked-up ELF handle from core file */
+	void	*sym_elfmem;	/* data for faked-up ELF handle */
 	uint_t	*sym_byname;	/* symbols sorted by name */
 	uint_t	*sym_byaddr;	/* symbols sorted by addr */
 	size_t	sym_count;	/* number of symbols in each sorted list */
@@ -79,8 +79,8 @@ typedef struct file_info {	/* symbol information for a mapped file */
 	rd_loadobj_t *file_lo;	/* load object structure from rtld_db */
 	char	*file_lname;	/* load object name from rtld_db */
 	char	*file_lbase;	/* pointer to basename of file_lname */
-	Elf	*file_elf;	/* elf handle so we can close */
-	void	*file_elfmem;	/* data for faked-up elf handle */
+	Elf	*file_elf;	/* ELF handle so we can close */
+	void	*file_elfmem;	/* data for faked-up ELF handle */
 	sym_tbl_t file_symtab;	/* symbol table */
 	sym_tbl_t file_dynsym;	/* dynamic symbol table */
 	uintptr_t file_dyn_base;	/* load address for ET_DYN files */
@@ -135,8 +135,25 @@ typedef struct core_info {	/* information specific to core files */
 #endif
 } core_info_t;
 
+typedef struct elf_file_header { /* extended ELF header */
+	unsigned char e_ident[EI_NIDENT];
+	Elf64_Half e_type;
+	Elf64_Half e_machine;
+	Elf64_Word e_version;
+	Elf64_Addr e_entry;
+	Elf64_Off e_phoff;
+	Elf64_Off e_shoff;
+	Elf64_Word e_flags;
+	Elf64_Half e_ehsize;
+	Elf64_Half e_phentsize;
+	Elf64_Half e_shentsize;
+	Elf64_Word e_phnum;	/* phdr count extended to 32 bits */
+	Elf64_Word e_shnum;	/* shdr count extended to 32 bits */
+	Elf64_Word e_shstrndx;	/* shdr string index extended to 32 bits */
+} elf_file_header_t;
+
 typedef struct elf_file {	/* convenience for managing ELF files */
-	GElf_Ehdr e_hdr;	/* ELF file header information */
+	elf_file_header_t e_hdr; /* Extended ELF header */
 	Elf *e_elf;		/* ELF library handle */
 	int e_fd;		/* file descriptor */
 } elf_file_t;

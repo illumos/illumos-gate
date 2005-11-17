@@ -346,6 +346,8 @@ typedef struct {
 
 #define	PF_SUNW_FAILURE	0x00100000	/* mapping absent due to failure */
 
+#define	PN_XNUM		0xffff		/* extended program header index */
+
 /*
  *	Section header
  */

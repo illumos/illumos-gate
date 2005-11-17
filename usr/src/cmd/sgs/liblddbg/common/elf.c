@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -124,11 +124,16 @@ Gelf_elf_header(GElf_Ehdr *ehdr, GElf_Shdr *shdr0)
 		dbg_print(MSG_ORIG(MSG_ELF_SHOFF), EC_OFF(ehdr->e_shoff),
 		    ehdr->e_shentsize, ehdr->e_shnum);
 
-	dbg_print(MSG_ORIG(MSG_ELF_PHOFF), EC_OFF(ehdr->e_phoff),
-	    ehdr->e_phentsize, ehdr->e_phnum);
+	if (ehdr->e_phnum == PN_XNUM)
+		dbg_print(MSG_ORIG(MSG_ELFX_PHOFF), EC_OFF(ehdr->e_phoff),
+		    ehdr->e_phentsize);
+	else
+		dbg_print(MSG_ORIG(MSG_ELF_PHOFF), EC_OFF(ehdr->e_phoff),
+		    ehdr->e_phentsize, ehdr->e_phnum);
 
-	if ((ehdr->e_shnum != 0) || (shdr0 == NULL) ||
-	    (shdr0->sh_size == 0))
+	if (shdr0 == NULL ||
+	    (ehdr->e_phnum != PN_XNUM &&
+	    (ehdr->e_shnum != 0 || shdr0->sh_size)))
 		return;
 
 	/*
@@ -138,17 +143,27 @@ Gelf_elf_header(GElf_Ehdr *ehdr, GElf_Shdr *shdr0)
 	dbg_print(MSG_ORIG(MSG_SHD_ADDR), EC_ADDR(shdr0->sh_addr),
 	    /* LINTED */
 	    conv_secflg_str(ehdr->e_machine, shdr0->sh_flags));
-	dbg_print(MSG_ORIG(MSG_SHD0_SIZE), EC_XWORD(shdr0->sh_size),
-		conv_sectyp_str(ehdr->e_machine, shdr0->sh_type));
+	if (ehdr->e_shnum == 0)
+		dbg_print(MSG_ORIG(MSG_SHD0_SIZE), EC_XWORD(shdr0->sh_size),
+		    conv_sectyp_str(ehdr->e_machine, shdr0->sh_type));
+	else
+		dbg_print(MSG_ORIG(MSG_SHD_SIZE), EC_XWORD(shdr0->sh_size),
+		    conv_sectyp_str(ehdr->e_machine, shdr0->sh_type));
 	dbg_print(MSG_ORIG(MSG_SHD_OFFSET), EC_OFF(shdr0->sh_offset),
 	    EC_XWORD(shdr0->sh_entsize));
-	if (ehdr->e_shstrndx == SHN_XINDEX)
-		dbg_print(MSG_ORIG(MSG_SHD0_LINK), EC_WORD(shdr0->sh_link),
-		    /* LINTED */
-		    conv_secinfo_str(shdr0->sh_info, shdr0->sh_flags));
+
+	if (ehdr->e_shstrndx == SHN_XINDEX && ehdr->e_phnum == PN_XNUM)
+		dbg_print(MSG_ORIG(MSG_SHD0_LINK1), EC_WORD(shdr0->sh_link),
+		    EC_WORD(shdr0->sh_info));
+	else if (ehdr->e_shstrndx == SHN_XINDEX)
+		dbg_print(MSG_ORIG(MSG_SHD0_LINK2), EC_WORD(shdr0->sh_link),
+		    EC_WORD(shdr0->sh_info));
+	else if (ehdr->e_phnum == PN_XNUM)
+		dbg_print(MSG_ORIG(MSG_SHD0_LINK3), EC_WORD(shdr0->sh_link),
+		    EC_WORD(shdr0->sh_info));
 	else
-		dbg_print(MSG_ORIG(MSG_SHD_LINK), EC_WORD(shdr0->sh_link),
-		    /* LINTED */
-		    conv_secinfo_str(shdr0->sh_info, shdr0->sh_flags));
+		dbg_print(MSG_ORIG(MSG_SHD0_LINK4), EC_WORD(shdr0->sh_link),
+		    EC_WORD(shdr0->sh_info));
+
 	dbg_print(MSG_ORIG(MSG_SHD_ALIGN), EC_XWORD(shdr0->sh_addralign));
 }

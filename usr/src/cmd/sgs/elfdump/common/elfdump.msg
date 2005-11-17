@@ -229,6 +229,7 @@
 @ MSG_ELF_GETARSYM	"elf_getarsym"
 @ MSG_ELF_RAND		"elf_rand"
 @ MSG_ELF_BEGIN		"elf_begin"
+@ MSG_ELF_GETPHNUM	"elf_getphnum"
 @ MSG_ELF_GETSHNUM	"elf_getshnum"
 @ MSG_ELF_GETSHSTRNDX	"elf_getshstrndx"
 @ MSG_ELF_ARSYM		"ARSYM"

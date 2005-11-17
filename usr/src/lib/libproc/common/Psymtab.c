@@ -56,9 +56,11 @@ static map_info_t *object_to_map(struct ps_prochandle *, Lmid_t, const char *);
 static map_info_t *object_name_to_map(struct ps_prochandle *,
 	Lmid_t, const char *);
 static GElf_Sym *sym_by_name(sym_tbl_t *, const char *, GElf_Sym *, uint_t *);
-static int read_ehdr32(struct ps_prochandle *, Elf32_Ehdr *, uintptr_t);
+static int read_ehdr32(struct ps_prochandle *, Elf32_Ehdr *, uint_t *,
+    uintptr_t);
 #ifdef _LP64
-static int read_ehdr64(struct ps_prochandle *, Elf64_Ehdr *, uintptr_t);
+static int read_ehdr64(struct ps_prochandle *, Elf64_Ehdr *, uint_t *,
+    uintptr_t);
 #endif
 
 #define	DATA_TYPES	\
@@ -121,13 +123,14 @@ file_info_new(struct ps_prochandle *P, map_info_t *mptr)
 	if (P->status.pr_dmodel == PR_MODEL_ILP32) {
 		Elf32_Ehdr ehdr;
 		Elf32_Phdr phdr;
+		uint_t phnum;
 
-		if (read_ehdr32(P, &ehdr, mptr->map_pmap.pr_vaddr) != 0)
+		if (read_ehdr32(P, &ehdr, &phnum, mptr->map_pmap.pr_vaddr) != 0)
 			return (fptr);
 
-		addrs = malloc(sizeof (uintptr_t) * ehdr.e_phnum * 2);
+		addrs = malloc(sizeof (uintptr_t) * phnum * 2);
 		a = mptr->map_pmap.pr_vaddr + ehdr.e_phoff;
-		for (i = 0; i < ehdr.e_phnum; i++, a += ehdr.e_phentsize) {
+		for (i = 0; i < phnum; i++, a += ehdr.e_phentsize) {
 			if (Pread(P, &phdr, sizeof (phdr), a) != sizeof (phdr))
 				goto out;
 			if (phdr.p_type != PT_LOAD || phdr.p_memsz == 0)
@@ -145,13 +148,14 @@ file_info_new(struct ps_prochandle *P, map_info_t *mptr)
 	} else {
 		Elf64_Ehdr ehdr;
 		Elf64_Phdr phdr;
+		uint_t phnum;
 
-		if (read_ehdr64(P, &ehdr, mptr->map_pmap.pr_vaddr) != 0)
+		if (read_ehdr64(P, &ehdr, &phnum, mptr->map_pmap.pr_vaddr) != 0)
 			return (fptr);
 
-		addrs = malloc(sizeof (uintptr_t) * ehdr.e_phnum * 2);
+		addrs = malloc(sizeof (uintptr_t) * phnum * 2);
 		a = mptr->map_pmap.pr_vaddr + ehdr.e_phoff;
-		for (i = 0; i < ehdr.e_phnum; i++, a += ehdr.e_phentsize) {
+		for (i = 0; i < phnum; i++, a += ehdr.e_phentsize) {
 			if (Pread(P, &phdr, sizeof (phdr), a) != sizeof (phdr))
 				goto out;
 			if (phdr.p_type != PT_LOAD || phdr.p_memsz == 0)
@@ -935,7 +939,8 @@ build_map_symtab(struct ps_prochandle *P, map_info_t *mptr)
 }
 
 static int
-read_ehdr32(struct ps_prochandle *P, Elf32_Ehdr *ehdr, uintptr_t addr)
+read_ehdr32(struct ps_prochandle *P, Elf32_Ehdr *ehdr, uint_t *phnum,
+    uintptr_t addr)
 {
 	if (Pread(P, ehdr, sizeof (*ehdr), addr) != sizeof (*ehdr))
 		return (-1);
@@ -953,16 +958,28 @@ read_ehdr32(struct ps_prochandle *P, Elf32_Ehdr *ehdr, uintptr_t addr)
 	    ehdr->e_ident[EI_VERSION] != EV_CURRENT)
 		return (-1);
 
+	if ((*phnum = ehdr->e_phnum) == PN_XNUM) {
+		Elf32_Shdr shdr0;
+
+		if (ehdr->e_shoff == 0 || ehdr->e_shentsize < sizeof (shdr0) ||
+		    Pread(P, &shdr0, sizeof (shdr0), addr + ehdr->e_shoff) !=
+		    sizeof (shdr0))
+			return (-1);
+
+		if (shdr0.sh_info != 0)
+			*phnum = shdr0.sh_info;
+	}
+
 	return (0);
 }
 
 static int
 read_dynamic_phdr32(struct ps_prochandle *P, const Elf32_Ehdr *ehdr,
-    Elf32_Phdr *phdr, uintptr_t addr)
+    uint_t phnum, Elf32_Phdr *phdr, uintptr_t addr)
 {
 	uint_t i;
 
-	for (i = 0; i < ehdr->e_phnum; i++) {
+	for (i = 0; i < phnum; i++) {
 		uintptr_t a = addr + ehdr->e_phoff + i * ehdr->e_phentsize;
 		if (Pread(P, phdr, sizeof (*phdr), a) != sizeof (*phdr))
 			return (-1);
@@ -976,7 +993,8 @@ read_dynamic_phdr32(struct ps_prochandle *P, const Elf32_Ehdr *ehdr,
 
 #ifdef _LP64
 static int
-read_ehdr64(struct ps_prochandle *P, Elf64_Ehdr *ehdr, uintptr_t addr)
+read_ehdr64(struct ps_prochandle *P, Elf64_Ehdr *ehdr, uint_t *phnum,
+    uintptr_t addr)
 {
 	if (Pread(P, ehdr, sizeof (Elf64_Ehdr), addr) != sizeof (Elf64_Ehdr))
 		return (-1);
@@ -994,16 +1012,28 @@ read_ehdr64(struct ps_prochandle *P, Elf64_Ehdr *ehdr, uintptr_t addr)
 	    ehdr->e_ident[EI_VERSION] != EV_CURRENT)
 		return (-1);
 
+	if ((*phnum = ehdr->e_phnum) == PN_XNUM) {
+		Elf64_Shdr shdr0;
+
+		if (ehdr->e_shoff == 0 || ehdr->e_shentsize < sizeof (shdr0) ||
+		    Pread(P, &shdr0, sizeof (shdr0), addr + ehdr->e_shoff) !=
+		    sizeof (shdr0))
+			return (-1);
+
+		if (shdr0.sh_info != 0)
+			*phnum = shdr0.sh_info;
+	}
+
 	return (0);
 }
 
 static int
 read_dynamic_phdr64(struct ps_prochandle *P, const Elf64_Ehdr *ehdr,
-    Elf64_Phdr *phdr, uintptr_t addr)
+    uint_t phnum, Elf64_Phdr *phdr, uintptr_t addr)
 {
 	uint_t i;
 
-	for (i = 0; i < ehdr->e_phnum; i++) {
+	for (i = 0; i < phnum; i++) {
 		uintptr_t a = addr + ehdr->e_phoff + i * ehdr->e_phentsize;
 		if (Pread(P, phdr, sizeof (*phdr), a) != sizeof (*phdr))
 			return (-1);
@@ -1113,10 +1143,10 @@ found_cksum:
 		Elf32_Ehdr ehdr;
 		Elf32_Phdr phdr;
 		Elf32_Dyn dync, *dynp;
-		uint_t i;
+		uint_t phnum, i;
 
-		if (read_ehdr32(P, &ehdr, addr) != 0 ||
-		    read_dynamic_phdr32(P, &ehdr, &phdr, addr) != 0)
+		if (read_ehdr32(P, &ehdr, &phnum, addr) != 0 ||
+		    read_dynamic_phdr32(P, &ehdr, phnum, &phdr, addr) != 0)
 			return (0);
 
 		if (ehdr.e_type == ET_DYN)
@@ -1148,10 +1178,10 @@ found_cksum:
 		Elf64_Ehdr ehdr;
 		Elf64_Phdr phdr;
 		Elf64_Dyn dync, *dynp;
-		uint_t i;
+		uint_t phnum, i;
 
-		if (read_ehdr64(P, &ehdr, addr) != 0 ||
-		    read_dynamic_phdr64(P, &ehdr, &phdr, addr) != 0)
+		if (read_ehdr64(P, &ehdr, &phnum, addr) != 0 ||
+		    read_dynamic_phdr64(P, &ehdr, phnum, &phdr, addr) != 0)
 			return (0);
 
 		if (ehdr.e_type == ET_DYN)
@@ -1287,12 +1317,12 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		Elf32_Shdr *sp;
 		Elf32_Dyn *dp;
 		Elf32_Dyn *d[DI_NENT] = { 0 };
-		uint_t i, dcount = 0;
+		uint_t phnum, i, dcount = 0;
 		uint32_t off;
 		size_t pltsz = 0, pltentsz;
 
-		if (read_ehdr32(P, &ehdr, addr) != 0 ||
-		    read_dynamic_phdr32(P, &ehdr, &phdr, addr) != 0)
+		if (read_ehdr32(P, &ehdr, &phnum, addr) != 0 ||
+		    read_dynamic_phdr32(P, &ehdr, phnum, &phdr, addr) != 0)
 			return (NULL);
 
 		if (ehdr.e_type == ET_DYN)
@@ -1382,7 +1412,7 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		size = sizeof (Elf32_Ehdr);
 
 		/* program headers from in-core elf fragment */
-		size += ehdr.e_phnum * ehdr.e_phentsize;
+		size += phnum * ehdr.e_phentsize;
 
 		/* unused shdr, and .shstrtab section */
 		size += sizeof (Elf32_Shdr);
@@ -1457,8 +1487,8 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		ep->e_ehsize = sizeof (Elf32_Ehdr);
 		ep->e_phoff = sizeof (Elf32_Ehdr);
 		ep->e_phentsize = ehdr.e_phentsize;
-		ep->e_phnum = ehdr.e_phnum;
-		ep->e_shoff = ep->e_phoff + ep->e_phnum * ep->e_phentsize;
+		ep->e_phnum = phnum;
+		ep->e_shoff = ep->e_phoff + phnum * ep->e_phentsize;
 		ep->e_shentsize = sizeof (Elf32_Shdr);
 		ep->e_shnum = (pltsz == 0) ? 5 : 6;
 		ep->e_shstrndx = 1;
@@ -1472,9 +1502,8 @@ fake_elf(struct ps_prochandle *P, file_info_t *fptr)
 		 * address space is a little suspect, but since we only
 		 * use them for their address and size values, this is fine.
 		 */
-		if (Pread(P, &elfdata[ep->e_phoff],
-		    ep->e_phnum * ep->e_phentsize, addr + ehdr.e_phoff) !=
-		    ep->e_phnum * ep->e_phentsize) {
+		if (Pread(P, &elfdata[ep->e_phoff], phnum * ep->e_phentsize,
+		    addr + ehdr.e_phoff) != phnum * ep->e_phentsize) {
 			free(elfdata);
 			goto bad32;
 		}
@@ -1610,12 +1639,12 @@ bad32:
 		Elf64_Shdr *sp;
 		Elf64_Dyn *dp;
 		Elf64_Dyn *d[DI_NENT] = { 0 };
-		uint_t i, dcount = 0;
+		uint_t phnum, i, dcount = 0;
 		uint64_t off;
 		size_t pltsz = 0, pltentsz;
 
-		if (read_ehdr64(P, &ehdr, addr) != 0 ||
-		    read_dynamic_phdr64(P, &ehdr, &phdr, addr) != 0)
+		if (read_ehdr64(P, &ehdr, &phnum, addr) != 0 ||
+		    read_dynamic_phdr64(P, &ehdr, phnum, &phdr, addr) != 0)
 			return (NULL);
 
 		if (ehdr.e_type == ET_DYN)
@@ -1705,7 +1734,7 @@ bad32:
 		size = sizeof (Elf64_Ehdr);
 
 		/* program headers from in-core elf fragment */
-		size += ehdr.e_phnum * ehdr.e_phentsize;
+		size += phnum * ehdr.e_phentsize;
 
 		/* unused shdr, and .shstrtab section */
 		size += sizeof (Elf64_Shdr);
@@ -1780,8 +1809,8 @@ bad32:
 		ep->e_ehsize = sizeof (Elf64_Ehdr);
 		ep->e_phoff = sizeof (Elf64_Ehdr);
 		ep->e_phentsize = ehdr.e_phentsize;
-		ep->e_phnum = ehdr.e_phnum;
-		ep->e_shoff = ep->e_phoff + ep->e_phnum * ep->e_phentsize;
+		ep->e_phnum = phnum;
+		ep->e_shoff = ep->e_phoff + phnum * ep->e_phentsize;
 		ep->e_shentsize = sizeof (Elf64_Shdr);
 		ep->e_shnum = (pltsz == 0) ? 5 : 6;
 		ep->e_shstrndx = 1;
@@ -1795,9 +1824,8 @@ bad32:
 		 * address space is a little suspect, but since we only
 		 * use them for their address and size values, this is fine.
 		 */
-		if (Pread(P, &elfdata[ep->e_phoff],
-		    ep->e_phnum * ep->e_phentsize, addr + ehdr.e_phoff) !=
-		    ep->e_phnum * ep->e_phentsize) {
+		if (Pread(P, &elfdata[ep->e_phoff], phnum * ep->e_phentsize,
+		    addr + ehdr.e_phoff) != phnum * ep->e_phentsize) {
 			free(elfdata);
 			goto bad64;
 		}
@@ -2100,6 +2128,7 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	Elf_Data *shdata;
 	Elf_Scn *scn;
 	Elf *elf;
+	size_t nshdrs, shstrndx;
 
 	struct {
 		GElf_Shdr c_shdr;
@@ -2150,7 +2179,9 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		if ((elf = fake_elf(P, fptr)) == NULL ||
 		    elf_kind(elf) != ELF_K_ELF ||
 		    gelf_getehdr(elf, &ehdr) == NULL ||
-		    (scn = elf_getscn(elf, ehdr.e_shstrndx)) == NULL ||
+		    elf_getshnum(elf, &nshdrs) == 0 ||
+		    elf_getshstrndx(elf, &shstrndx) == 0 ||
+		    (scn = elf_getscn(elf, shstrndx)) == NULL ||
 		    (shdata = elf_getdata(scn, NULL)) == NULL) {
 			dprintf("failed to fake up ELF file\n");
 			return;
@@ -2159,7 +2190,9 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	} else if ((elf = elf_begin(fptr->file_fd, ELF_C_READ, NULL)) == NULL ||
 	    elf_kind(elf) != ELF_K_ELF ||
 	    gelf_getehdr(elf, &ehdr) == NULL ||
-	    (scn = elf_getscn(elf, ehdr.e_shstrndx)) == NULL ||
+	    elf_getshnum(elf, &nshdrs) == 0 ||
+	    elf_getshstrndx(elf, &shstrndx) == 0 ||
+	    (scn = elf_getscn(elf, shstrndx)) == NULL ||
 	    (shdata = elf_getdata(scn, NULL)) == NULL) {
 		dprintf("failed to process ELF file %s: %s\n",
 		    objectfile, elf_errmsg(elf_errno()));
@@ -2167,7 +2200,9 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		if ((elf = fake_elf(P, fptr)) == NULL ||
 		    elf_kind(elf) != ELF_K_ELF ||
 		    gelf_getehdr(elf, &ehdr) == NULL ||
-		    (scn = elf_getscn(elf, ehdr.e_shstrndx)) == NULL ||
+		    elf_getshnum(elf, &nshdrs) == 0 ||
+		    elf_getshstrndx(elf, &shstrndx) == 0 ||
+		    (scn = elf_getscn(elf, shstrndx)) == NULL ||
 		    (shdata = elf_getdata(scn, NULL)) == NULL) {
 			dprintf("failed to fake up ELF file\n");
 			goto bad;
@@ -2190,7 +2225,9 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		if ((newelf = fake_elf(P, fptr)) == NULL ||
 		    elf_kind(newelf) != ELF_K_ELF ||
 		    gelf_getehdr(newelf, &ehdr) == NULL ||
-		    (scn = elf_getscn(newelf, ehdr.e_shstrndx)) == NULL ||
+		    elf_getshnum(newelf, &nshdrs) == 0 ||
+		    elf_getshstrndx(newelf, &shstrndx) == 0 ||
+		    (scn = elf_getscn(newelf, shstrndx)) == NULL ||
 		    (shdata = elf_getdata(scn, NULL)) == NULL) {
 			dprintf("failed to fake up ELF file\n");
 		} else {
@@ -2201,7 +2238,7 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 		}
 	}
 
-	if ((cache = malloc(ehdr.e_shnum * sizeof (*cache))) == NULL) {
+	if ((cache = malloc(nshdrs * sizeof (*cache))) == NULL) {
 		dprintf("failed to malloc section cache for %s\n", objectfile);
 		goto bad;
 	}
@@ -2232,7 +2269,7 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	 * Now iterate through the section cache in order to locate info
 	 * for the .symtab, .dynsym, .dynamic, .plt, and .SUNW_ctf sections:
 	 */
-	for (i = 1, cp = cache + 1; i < ehdr.e_shnum; i++, cp++) {
+	for (i = 1, cp = cache + 1; i < nshdrs; i++, cp++) {
 		GElf_Shdr *shp = &cp->c_shdr;
 
 		if (shp->sh_type == SHT_SYMTAB || shp->sh_type == SHT_DYNSYM) {
@@ -2272,7 +2309,7 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 			 * to haunt us later.
 			 */
 			if (shp->sh_link == 0 ||
-			    shp->sh_link > ehdr.e_shnum ||
+			    shp->sh_link >= nshdrs ||
 			    (cache[shp->sh_link].c_shdr.sh_type != SHT_DYNSYM &&
 			    cache[shp->sh_link].c_shdr.sh_type != SHT_SYMTAB)) {
 				dprintf("Bad sh_link %d for "
