@@ -783,7 +783,6 @@ typedef struct ilm_s {
 	uint_t		ilm_flags;
 	boolean_t	ilm_is_new;	/* new ilm */
 	boolean_t	ilm_notify_driver; /* Need to notify the driver */
-	boolean_t	ilm_join_mld;	/* call mld_joingroup */
 	zoneid_t	ilm_zoneid;
 	int		ilm_no_ilg_cnt;	/* number of joins w/ no ilg */
 	mcast_record_t	ilm_fmode;	/* MODE_IS_INCLUDE/MODE_IS_EXCLUDE */

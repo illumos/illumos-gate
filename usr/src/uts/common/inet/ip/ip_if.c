@@ -15598,9 +15598,10 @@ ilm_send_multicast_reqs(ill_t *from_ill, ill_t *to_ill)
 	ASSERT(IAM_WRITER_ILL(from_ill));
 
 	ILM_WALKER_HOLD(to_ill);
-	for (ilm = to_ill->ill_ilm; ilm != NULL && ilm->ilm_is_new &&
-	    !(ilm->ilm_flags & ILM_DELETED); ilm = ilm->ilm_next) {
+	for (ilm = to_ill->ill_ilm; ilm != NULL; ilm = ilm->ilm_next) {
 
+		if (!ilm->ilm_is_new || (ilm->ilm_flags & ILM_DELETED))
+			continue;
 		/*
 		 * no locks held, ill/ipif cannot dissappear as long
 		 * as we are writer.
@@ -15623,16 +15624,13 @@ ilm_send_multicast_reqs(ill_t *from_ill, ill_t *to_ill)
 		if (to_ill->ill_phyint->phyint_flags & PHYI_MULTI_BCAST) {
 			ip1dbg(("ilm_send_multicast_reqs: "
 			    "to_ill MULTI_BCAST\n"));
-			ilm->ilm_join_mld = B_FALSE;
 			goto from;
 		}
 
-		if (ilm->ilm_join_mld) {
-			ASSERT(to_ill->ill_isv6);
+		if (to_ill->ill_isv6)
 			mld_joingroup(ilm);
-		}
-
-		ilm->ilm_join_mld = B_FALSE;
+		else
+			igmp_joingroup(ilm);
 
 		if (to_ill->ill_ipif_up_count == 0) {
 			/*
@@ -15749,8 +15747,11 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 	}
 
 	ilmp = &from_ill->ill_ilm;
-	for (ilm = from_ill->ill_ilm; ilm != NULL &&
-	    !(ilm->ilm_flags & ILM_DELETED); ilm = ilm_next) {
+	for (ilm = from_ill->ill_ilm; ilm != NULL; ilm = ilm_next) {
+
+		if (ilm->ilm_flags & ILM_DELETED)
+			continue;
+
 		ilm_next = ilm->ilm_next;
 		new_ilm = ilm_lookup_ill_index_v6(to_ill, &ilm->ilm_v6addr,
 		    ilm->ilm_orig_ifindex, ilm->ilm_zoneid);
@@ -15768,7 +15769,7 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 				new_ilm->ilm_refcnt += ilm->ilm_refcnt;
 				if (new_ilm->ilm_fmode != MODE_IS_EXCLUDE ||
 				    !SLIST_IS_EMPTY(new_ilm->ilm_filter)) {
-					new_ilm->ilm_join_mld = B_TRUE;
+					new_ilm->ilm_is_new = B_TRUE;
 				}
 			} else {
 				/*
@@ -15816,15 +15817,6 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 					new_ilm = ilm;
 				}
 
-				new_ilm->ilm_ill = to_ill;
-				/* Add to the to_ill's list */
-				new_ilm->ilm_next = to_ill->ill_ilm;
-				to_ill->ill_ilm = new_ilm;
-				/*
-				 * set the flag so that mld_joingroup is
-				 * called in ilm_send_multicast_reqs().
-				 */
-				new_ilm->ilm_join_mld = B_TRUE;
 				/*
 				 * if this is the first ilm for the group
 				 * set ilm_notify_driver so that we notify the
@@ -15833,6 +15825,16 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 				if (ilm_lookup_ill_v6(to_ill,
 				    &new_ilm->ilm_v6addr, ALL_ZONES) == NULL)
 					new_ilm->ilm_notify_driver = B_TRUE;
+
+				new_ilm->ilm_ill = to_ill;
+				/* Add to the to_ill's list */
+				new_ilm->ilm_next = to_ill->ill_ilm;
+				to_ill->ill_ilm = new_ilm;
+				/*
+				 * set the flag so that mld_joingroup is
+				 * called in ilm_send_multicast_reqs().
+				 */
+				new_ilm->ilm_is_new = B_TRUE;
 			}
 			goto bottom;
 		} else if (ifindex != 0) {
@@ -15908,7 +15910,7 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 				new_ilm->ilm_refcnt += count;
 				if (new_ilm->ilm_fmode != MODE_IS_EXCLUDE ||
 				    !SLIST_IS_EMPTY(new_ilm->ilm_filter)) {
-					new_ilm->ilm_join_mld = B_TRUE;
+					new_ilm->ilm_is_new = B_TRUE;
 				}
 			} else {
 				new_ilm = (ilm_t *)mi_zalloc(sizeof (ilm_t));
@@ -15926,13 +15928,9 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 				*new_ilm = *ilm;
 				new_ilm->ilm_filter = NULL;
 				new_ilm->ilm_refcnt = count;
-				new_ilm->ilm_ill = to_ill;
 				new_ilm->ilm_timer = INFINITY;
 				new_ilm->ilm_rtx.rtx_timer = INFINITY;
-				new_ilm->ilm_join_mld = B_TRUE;
-				/* Add to the to_ill's list */
-				new_ilm->ilm_next = to_ill->ill_ilm;
-				to_ill->ill_ilm = new_ilm;
+				new_ilm->ilm_is_new = B_TRUE;
 				/*
 				 * If the to_ill has not joined this
 				 * group we need to tell the driver in
@@ -15941,12 +15939,16 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 				if (ilm_lookup_ill_v6(to_ill,
 				    &new_ilm->ilm_v6addr, ALL_ZONES) == NULL)
 					new_ilm->ilm_notify_driver = B_TRUE;
+
+				new_ilm->ilm_ill = to_ill;
+				/* Add to the to_ill's list */
+				new_ilm->ilm_next = to_ill->ill_ilm;
+				to_ill->ill_ilm = new_ilm;
 				ASSERT(new_ilm->ilm_ipif == NULL);
 			}
 			if (ilm->ilm_refcnt == 0) {
 				goto bottom;
 			} else {
-				new_ilm->ilm_is_new = B_TRUE;
 				new_ilm->ilm_fmode = MODE_IS_EXCLUDE;
 				CLEAR_SLIST(new_ilm->ilm_filter);
 				ilmp = &ilm->ilm_next;
@@ -15982,7 +15984,7 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 				new_ilm->ilm_refcnt += ilm->ilm_refcnt;
 				if (new_ilm->ilm_fmode != MODE_IS_EXCLUDE ||
 				    !SLIST_IS_EMPTY(new_ilm->ilm_filter)) {
-					new_ilm->ilm_join_mld = B_TRUE;
+					new_ilm->ilm_is_new = B_TRUE;
 				}
 			} else {
 				if (from_ill->ill_ilm_walker_cnt != 0) {
@@ -16009,12 +16011,6 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 					*ilmp = ilm->ilm_next;
 					new_ilm = ilm;
 				}
-				/* Add to the to_ill's list */
-				new_ilm->ilm_next = to_ill->ill_ilm;
-				to_ill->ill_ilm = new_ilm;
-				ASSERT(ilm->ilm_ipif == NULL);
-				new_ilm->ilm_ill = to_ill;
-				new_ilm->ilm_join_mld = B_TRUE;
 				/*
 				 * If the to_ill has not joined this
 				 * group we need to tell the driver in
@@ -16023,19 +16019,21 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 				if (ilm_lookup_ill_v6(to_ill,
 				    &new_ilm->ilm_v6addr, ALL_ZONES) == NULL)
 					new_ilm->ilm_notify_driver = B_TRUE;
+
+				/* Add to the to_ill's list */
+				new_ilm->ilm_next = to_ill->ill_ilm;
+				to_ill->ill_ilm = new_ilm;
+				ASSERT(ilm->ilm_ipif == NULL);
+				new_ilm->ilm_ill = to_ill;
+				new_ilm->ilm_is_new = B_TRUE;
 			}
 
 		}
 
 bottom:
 		/*
-		 * set ilm_send_multicast_reqs so that we inform the
-		 * driver about the multicast group.
-		 */
-		new_ilm->ilm_is_new = B_TRUE;
-		/*
 		 * Revert multicast filter state to (EXCLUDE, NULL).
-		 * new_ilm->ilm_join_mld should already be set if needed.
+		 * new_ilm->ilm_is_new should already be set if needed.
 		 */
 		new_ilm->ilm_fmode = MODE_IS_EXCLUDE;
 		CLEAR_SLIST(new_ilm->ilm_filter);
@@ -16080,8 +16078,11 @@ ilm_move_v4(ill_t *from_ill, ill_t *to_ill, ipif_t *ipif)
 	ASSERT(RW_WRITE_HELD(&ill_g_lock));
 
 	ilmp = &from_ill->ill_ilm;
-	for (ilm = from_ill->ill_ilm; ilm != NULL &&
-	    !(ilm->ilm_flags & ILM_DELETED); ilm = ilm_next) {
+	for (ilm = from_ill->ill_ilm; ilm != NULL; ilm = ilm_next) {
+
+		if (ilm->ilm_flags & ILM_DELETED)
+			continue;
+
 		ilm_next = ilm->ilm_next;
 		ASSERT(ilm->ilm_ipif != NULL);
 
