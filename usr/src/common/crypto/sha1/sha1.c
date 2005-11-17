@@ -325,12 +325,12 @@ SHA1Init(SHA1_CTX *ctx)
 
 #ifdef VIS_SHA1
 
-static int usevis = 0;
 
 #ifdef _KERNEL
 
 #include <sys/regset.h>
 #include <sys/vis.h>
+#include <sys/fpu/fpusystm.h>
 
 /* the alignment for block stores to save fp registers */
 #define	VIS_ALIGN	(64)
@@ -343,6 +343,7 @@ uint32_t	vis_sha1_svfp_threshold = 128;
 #else /* !_KERNEL */
 
 static boolean_t checked_vis = B_FALSE;
+static int usevis = 0;
 
 static int
 havevis()
@@ -432,8 +433,10 @@ void
 SHA1Update(SHA1_CTX *ctx, const uint8_t *input, uint32_t input_len)
 {
 	uint32_t i, buf_index, buf_len;
-
 	uint64_t X0[40], input64[8];
+#ifdef _KERNEL
+	int usevis = 0;
+#endif /* _KERNEL */
 
 	/* check for noop */
 	if (input_len == 0)
@@ -462,7 +465,7 @@ SHA1Update(SHA1_CTX *ctx, const uint8_t *input, uint32_t input_len)
 
 		fpu = (kfpu_t *)P2ROUNDUP((uintptr_t)fpua, 64);
 		svfp_ok = ((len >= vis_sha1_svfp_threshold) ? 1 : 0);
-		usevis = sha1_savefp(fpu, svfp_ok);
+		usevis = fpu_exists && sha1_savefp(fpu, svfp_ok);
 #else
 		if (!checked_vis)
 			usevis = havevis();
