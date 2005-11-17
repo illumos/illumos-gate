@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 190 $
+ *              $Revision: 1.192 $
  *
  ******************************************************************************/
 
@@ -243,18 +243,19 @@ AcpiNsRootInitialize (
                 ObjDesc->Method.ParamCount = (UINT8) ACPI_TO_INTEGER (Val);
                 ObjDesc->Common.Flags |= AOPOBJ_DATA_VALID;
 
-#if defined (ACPI_ASL_COMPILER) || defined (ACPI_DUMP_APP)
+#if defined (ACPI_ASL_COMPILER)
 
-                /*
-                 * iASL Compiler cheats by putting parameter count
-                 * in the OwnerID (ParamCount max is 7)
-                 */
-                NewNode->OwnerId = ObjDesc->Method.ParamCount;
+                /* Save the parameter count for the iASL compiler */
+
+                NewNode->Value = ObjDesc->Method.ParamCount;
 #else
                 /* Mark this as a very SPECIAL method */
 
                 ObjDesc->Method.MethodFlags = AML_METHOD_INTERNAL_ONLY;
+
+#ifndef ACPI_DUMP_APP
                 ObjDesc->Method.Implementation = AcpiUtOsiImplementation;
+#endif
 #endif
                 break;
 
@@ -600,7 +601,7 @@ AcpiNsLookup (
             Path++;
 
             ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-                "Multi Pathname (%d Segments, Flags=%X) \n",
+                "Multi Pathname (%d Segments, Flags=%X)\n",
                 NumSegments, Flags));
             break;
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: acparser.h - AML Parser subcomponent prototypes and defines
- *       $Revision: 76 $
+ *       $Revision: 1.77 $
  *
  *****************************************************************************/
 
@@ -150,12 +150,7 @@
  * psxface - Parser external interfaces
  */
 ACPI_STATUS
-AcpiPsxLoadTable (
-    UINT8                   *PcodeAddr,
-    UINT32                  PcodeLength);
-
-ACPI_STATUS
-AcpiPsxExecute (
+AcpiPsExecuteMethod (
     ACPI_PARAMETER_INFO     *Info);
 
 

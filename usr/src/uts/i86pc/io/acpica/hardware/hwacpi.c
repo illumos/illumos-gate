@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwacpi - ACPI Hardware Initialization/Mode Interface
- *              $Revision: 69 $
+ *              $Revision: 1.70 $
  *
  *****************************************************************************/
 
@@ -301,21 +301,21 @@ AcpiHwGetMode (
      */
     if (!AcpiGbl_FADT->SmiCmd)
     {
-        return_VALUE (ACPI_SYS_MODE_ACPI);
+        return_UINT32 (ACPI_SYS_MODE_ACPI);
     }
 
     Status = AcpiGetRegister (ACPI_BITREG_SCI_ENABLE, &Value, ACPI_MTX_LOCK);
     if (ACPI_FAILURE (Status))
     {
-        return_VALUE (ACPI_SYS_MODE_LEGACY);
+        return_UINT32 (ACPI_SYS_MODE_LEGACY);
     }
 
     if (Value)
     {
-        return_VALUE (ACPI_SYS_MODE_ACPI);
+        return_UINT32 (ACPI_SYS_MODE_ACPI);
     }
     else
     {
-        return_VALUE (ACPI_SYS_MODE_LEGACY);
+        return_UINT32 (ACPI_SYS_MODE_LEGACY);
     }
 }

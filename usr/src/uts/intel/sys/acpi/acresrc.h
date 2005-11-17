@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acresrc.h - Resource Manager function prototypes
- *       $Revision: 42 $
+ *       $Revision: 1.48 $
  *
  *****************************************************************************/
 
@@ -118,6 +118,55 @@
 #ifndef __ACRESRC_H__
 #define __ACRESRC_H__
 
+/* Need the AML resource descriptor structs */
+
+#include "amlresrc.h"
+
+
+/*
+ * Resource dispatch and info tables
+ */
+typedef struct acpi_resource_info
+{
+    UINT8                   LengthType;
+    UINT8                   MinimumAmlResourceLength;
+    UINT8                   MinimumInternalStructLength;
+
+} ACPI_RESOURCE_INFO;
+
+/* Types for LengthType above */
+
+#define ACPI_FIXED_LENGTH           0
+#define ACPI_VARIABLE_LENGTH        1
+#define ACPI_SMALL_VARIABLE_LENGTH  2
+
+/* Handlers */
+
+typedef ACPI_STATUS (*ACPI_SET_RESOURCE_HANDLER) (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
+
+typedef ACPI_STATUS (*ACPI_GET_RESOURCE_HANDLER) (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
+
+typedef void (*ACPI_DUMP_RESOURCE_HANDLER) (
+    ACPI_RESOURCE_DATA      *Data);
+
+/* Tables indexed by internal resource type */
+
+extern UINT8                        AcpiGbl_AmlResourceSizes[];
+extern ACPI_SET_RESOURCE_HANDLER    AcpiGbl_SetResourceDispatch[];
+extern ACPI_DUMP_RESOURCE_HANDLER   AcpiGbl_DumpResourceDispatch[];
+
+/* Tables indexed by raw AML resource descriptor type */
+
+extern ACPI_RESOURCE_INFO           AcpiGbl_SmResourceInfo[];
+extern ACPI_RESOURCE_INFO           AcpiGbl_LgResourceInfo[];
+extern ACPI_GET_RESOURCE_HANDLER    AcpiGbl_SmGetResourceDispatch[];
+extern ACPI_GET_RESOURCE_HANDLER    AcpiGbl_LgGetResourceDispatch[];
+
 
 /*
  *  Function prototypes called from Acpi* APIs
@@ -126,7 +175,6 @@ ACPI_STATUS
 AcpiRsGetPrtMethodData (
     ACPI_HANDLE             Handle,
     ACPI_BUFFER             *RetBuffer);
-
 
 ACPI_STATUS
 AcpiRsGetCrsMethodData (
@@ -151,11 +199,11 @@ AcpiRsSetSrsMethodData (
 
 ACPI_STATUS
 AcpiRsCreateResourceList (
-    ACPI_OPERAND_OBJECT     *ByteStreamBuffer,
+    ACPI_OPERAND_OBJECT     *AmlBuffer,
     ACPI_BUFFER             *OutputBuffer);
 
 ACPI_STATUS
-AcpiRsCreateByteStream (
+AcpiRsCreateAmlResources (
     ACPI_RESOURCE           *LinkedListBuffer,
     ACPI_BUFFER             *OutputBuffer);
 
@@ -181,19 +229,13 @@ AcpiRsDumpIrqList (
  * rscalc
  */
 ACPI_STATUS
-AcpiRsGetByteStreamStart (
-    UINT8                   *ByteStreamBuffer,
-    UINT8                   **ByteStreamStart,
-    UINT32                  *Size);
-
-ACPI_STATUS
 AcpiRsGetListLength (
-    UINT8                   *ByteStreamBuffer,
-    UINT32                  ByteStreamBufferLength,
+    UINT8                   *AmlBuffer,
+    UINT32                  AmlBufferLength,
     ACPI_SIZE               *SizeNeeded);
 
 ACPI_STATUS
-AcpiRsGetByteStreamLength (
+AcpiRsGetAmlLength (
     ACPI_RESOURCE           *LinkedListBuffer,
     ACPI_SIZE               *SizeNeeded);
 
@@ -203,214 +245,351 @@ AcpiRsGetPciRoutingTableLength (
     ACPI_SIZE               *BufferSizeNeeded);
 
 ACPI_STATUS
-AcpiRsByteStreamToList (
-    UINT8                   *ByteStreamBuffer,
-    UINT32                  ByteStreamBufferLength,
+AcpiRsConvertAmlToResources (
+    UINT8                   *AmlBuffer,
+    UINT32                  AmlBufferLength,
     UINT8                   *OutputBuffer);
 
 ACPI_STATUS
-AcpiRsListToByteStream (
-    ACPI_RESOURCE           *LinkedList,
-    ACPI_SIZE               ByteStreamSizeNeeded,
+AcpiRsConvertResourcesToAml (
+    ACPI_RESOURCE           *Resource,
+    ACPI_SIZE               AmlSizeNeeded,
     UINT8                   *OutputBuffer);
 
+
+/*
+ * rsio
+ */
 ACPI_STATUS
-AcpiRsIoResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsGetIo (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsFixedIoResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsSetIo (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsIoStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsGetFixedIo (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsFixedIoStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetFixedIo (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsIrqResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsGetDma (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsIrqStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetDma (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
+
+
+/*
+ * rsirq
+ */
+ACPI_STATUS
+AcpiRsGetIrq (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsDmaResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsSetIrq (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsDmaStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsGetExtIrq (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsAddress16Resource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsSetExtIrq (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
+
+
+/*
+ * rsaddr
+ */
+ACPI_STATUS
+AcpiRsGetAddress16 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsAddress16Stream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetAddress16 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsAddress32Resource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsGetAddress32 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsAddress32Stream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetAddress32 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsAddress64Resource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsGetAddress64 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsAddress64Stream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetAddress64 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsStartDependFnsResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsGetExtAddress64 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsEndDependFnsResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsSetExtAddress64 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
+
+
+/*
+ * rsmemory
+ */
+ACPI_STATUS
+AcpiRsGetMemory24 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsStartDependFnsStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetMemory24 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsEndDependFnsStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsGetMemory32 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsMemory24Resource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsSetMemory32 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsMemory24Stream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsGetFixedMemory32 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsMemory32RangeResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsSetFixedMemory32 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
+
+
+/* 
+ * rsmisc
+ */
+ACPI_STATUS
+AcpiRsGetGenericReg (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsFixedMemory32Resource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsSetGenericReg (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsMemory32RangeStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsGetVendor (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsFixedMemory32Stream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetVendor (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsExtendedIrqResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsGetStartDpf (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsExtendedIrqStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetStartDpf (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsEndTagResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsGetEndDpf (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsEndTagStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetEndDpf (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
 
 ACPI_STATUS
-AcpiRsVendorResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize);
+AcpiRsGetEndTag (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource);
 
 ACPI_STATUS
-AcpiRsVendorStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed);
+AcpiRsSetEndTag (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml);
+
+/*
+ * rsutils
+ */
+void
+AcpiRsMoveData (
+    void                    *Destination,
+    void                    *Source,
+    UINT16                  ItemCount,
+    UINT8                   MoveType);
+
+/* Types used in MoveType above */
+
+#define ACPI_MOVE_TYPE_16_TO_32        0
+#define ACPI_MOVE_TYPE_32_TO_16        1
+#define ACPI_MOVE_TYPE_32_TO_32        2
+#define ACPI_MOVE_TYPE_64_TO_64        3
+
+
+UINT16
+AcpiRsGetResourceSource (
+    UINT16                  ResourceLength,
+    ACPI_SIZE               MinimumLength,
+    ACPI_RESOURCE_SOURCE    *ResourceSource,
+    AML_RESOURCE            *Aml,
+    char                    *StringPtr);
+
+ACPI_SIZE
+AcpiRsSetResourceSource (
+    AML_RESOURCE            *Aml,
+    ACPI_SIZE               MinimumLength,
+    ACPI_RESOURCE_SOURCE    *ResourceSource);
 
 UINT8
 AcpiRsGetResourceType (
     UINT8                   ResourceStartByte);
+
+UINT32
+AcpiRsGetDescriptorLength (
+    AML_RESOURCE            *Aml);
+
+UINT16
+AcpiRsGetResourceLength (
+    AML_RESOURCE            *Aml);
+
+void
+AcpiRsSetResourceHeader (
+    UINT8                   DescriptorType,
+    ACPI_SIZE               TotalLength,
+    AML_RESOURCE            *Aml);
+
+ACPI_RESOURCE_INFO *
+AcpiRsGetResourceInfo (
+    UINT8                   ResourceType);
+
+
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
+/*
+ * rsdump
+ */
+void
+AcpiRsDumpIrq (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpAddress16 (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpAddress32 (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpAddress64 (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpExtAddress64 (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpDma (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpIo (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpExtIrq (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpFixedIo (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpFixedMemory32 (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpMemory24 (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpMemory32 (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpStartDpf (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpVendor (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpGenericReg (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpEndDpf (
+    ACPI_RESOURCE_DATA      *Resource);
+
+void
+AcpiRsDumpEndTag (
+    ACPI_RESOURCE_DATA      *Resource);
+
+#endif
 
 #endif  /* __ACRESRC_H__ */

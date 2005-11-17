@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsio - IO and DMA resource descriptors
- *              $Revision: 28 $
+ *              $Revision: 1.32 $
  *
  ******************************************************************************/
 
@@ -125,467 +125,299 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsIoResource
+ * FUNCTION:    AcpiRsGetIo
  *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsIoResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
+AcpiRsGetIo (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
 {
-    UINT8                   *Buffer = ByteStreamBuffer;
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-    ACPI_SIZE               StructSize = ACPI_SIZEOF_RESOURCE (
-                                            ACPI_RESOURCE_IO);
+    ACPI_FUNCTION_TRACE ("RsGetIo");
 
 
-    ACPI_FUNCTION_TRACE ("RsIoResource");
+    /* Get the Decode flag */
 
+    Resource->Data.Io.IoDecode = Aml->Io.Information & 0x01;
 
-    /* The number of bytes consumed are Constant */
+    /*
+     * Get the following contiguous fields from the AML descriptor:
+     * Minimum Base Address
+     * Maximum Base Address
+     * Address Alignment
+     * Length
+     */
+    ACPI_MOVE_16_TO_32 (&Resource->Data.Io.Minimum,
+        &Aml->Io.Minimum);
+    ACPI_MOVE_16_TO_32 (&Resource->Data.Io.Maximum,
+        &Aml->Io.Maximum);
+    Resource->Data.Io.Alignment = Aml->Io.Alignment;
+    Resource->Data.Io.AddressLength = Aml->Io.AddressLength;
 
-    *BytesConsumed = 8;
+    /* Complete the resource header */
 
-    OutputStruct->Id = ACPI_RSTYPE_IO;
-
-    /* Check Decode */
-
-    Buffer += 1;
-    Temp8 = *Buffer;
-
-    OutputStruct->Data.Io.IoDecode = Temp8 & 0x01;
-
-    /* Check MinBase Address */
-
-    Buffer += 1;
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-
-    OutputStruct->Data.Io.MinBaseAddress = Temp16;
-
-    /* Check MaxBase Address */
-
-    Buffer += 2;
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-
-    OutputStruct->Data.Io.MaxBaseAddress = Temp16;
-
-    /* Check Base alignment */
-
-    Buffer += 2;
-    Temp8 = *Buffer;
-
-    OutputStruct->Data.Io.Alignment = Temp8;
-
-    /* Check RangeLength */
-
-    Buffer += 1;
-    Temp8 = *Buffer;
-
-    OutputStruct->Data.Io.RangeLength = Temp8;
-
-    /* Set the Length parameter */
-
-    OutputStruct->Length = (UINT32) StructSize;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
+    Resource->Type = ACPI_RESOURCE_TYPE_IO;
+    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_IO);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsFixedIoResource
+ * FUNCTION:    AcpiRsSetIo
  *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsFixedIoResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
+AcpiRsSetIo (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
 {
-    UINT8                   *Buffer = ByteStreamBuffer;
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-    ACPI_SIZE               StructSize = ACPI_SIZEOF_RESOURCE (
-                                            ACPI_RESOURCE_FIXED_IO);
+    ACPI_FUNCTION_TRACE ("RsSetIo");
 
 
-    ACPI_FUNCTION_TRACE ("RsFixedIoResource");
+    /* I/O Information Byte */
 
+    Aml->Io.Information = (UINT8) (Resource->Data.Io.IoDecode & 0x01);
 
-    /* The number of bytes consumed are Constant */
+    /*
+     * Set the following contiguous fields in the AML descriptor:
+     * Minimum Base Address
+     * Maximum Base Address
+     * Address Alignment
+     * Length
+     */
+    ACPI_MOVE_32_TO_16 (&Aml->Io.Minimum, &Resource->Data.Io.Minimum);
+    ACPI_MOVE_32_TO_16 (&Aml->Io.Maximum, &Resource->Data.Io.Maximum);
+    Aml->Io.Alignment = (UINT8) Resource->Data.Io.Alignment;
+    Aml->Io.AddressLength = (UINT8) Resource->Data.Io.AddressLength;
 
-    *BytesConsumed = 4;
+    /* Complete the AML descriptor header */
 
-    OutputStruct->Id = ACPI_RSTYPE_FIXED_IO;
-
-    /* Check Range Base Address */
-
-    Buffer += 1;
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-
-    OutputStruct->Data.FixedIo.BaseAddress = Temp16;
-
-    /* Check RangeLength */
-
-    Buffer += 2;
-    Temp8 = *Buffer;
-
-    OutputStruct->Data.FixedIo.RangeLength = Temp8;
-
-    /* Set the Length parameter */
-
-    OutputStruct->Length = (UINT32) StructSize;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
+    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_IO, sizeof (AML_RESOURCE_IO), Aml);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsIoStream
+ * FUNCTION:    AcpiRsGetFixedIo
  *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        used in the OutputBuffer is returned
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsIoStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
+AcpiRsGetFixedIo (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
 {
-    UINT8                   *Buffer = *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
+    ACPI_FUNCTION_TRACE ("RsGetFixedIo");
 
 
-    ACPI_FUNCTION_TRACE ("RsIoStream");
+    /*
+     * Get the following contiguous fields from the AML descriptor:
+     * Base Address
+     * Length
+     */
+    ACPI_MOVE_16_TO_32 (&Resource->Data.FixedIo.Address,
+        &Aml->FixedIo.Address);
+    Resource->Data.FixedIo.AddressLength = Aml->FixedIo.AddressLength;
 
+    /* Complete the resource header */
 
-    /* The descriptor field is static */
-
-    *Buffer = 0x47;
-    Buffer += 1;
-
-    /* Io Information Byte */
-
-    Temp8 = (UINT8) (LinkedList->Data.Io.IoDecode & 0x01);
-
-    *Buffer = Temp8;
-    Buffer += 1;
-
-    /* Set the Range minimum base address */
-
-    Temp16 = (UINT16) LinkedList->Data.Io.MinBaseAddress;
-
-    ACPI_MOVE_16_TO_16 (Buffer, &Temp16);
-    Buffer += 2;
-
-    /* Set the Range maximum base address */
-
-    Temp16 = (UINT16) LinkedList->Data.Io.MaxBaseAddress;
-
-    ACPI_MOVE_16_TO_16 (Buffer, &Temp16);
-    Buffer += 2;
-
-    /* Set the base alignment */
-
-    Temp8 = (UINT8) LinkedList->Data.Io.Alignment;
-
-    *Buffer = Temp8;
-    Buffer += 1;
-
-    /* Set the range length */
-
-    Temp8 = (UINT8) LinkedList->Data.Io.RangeLength;
-
-    *Buffer = Temp8;
-    Buffer += 1;
-
-    /* Return the number of bytes consumed in this operation */
-
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
+    Resource->Type = ACPI_RESOURCE_TYPE_FIXED_IO;
+    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_IO);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsFixedIoStream
+ * FUNCTION:    AcpiRsSetFixedIo
  *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        used in the OutputBuffer is returned
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsFixedIoStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
+AcpiRsSetFixedIo (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
 {
-    UINT8                   *Buffer = *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
+    ACPI_FUNCTION_TRACE ("RsSetFixedIo");
 
 
-    ACPI_FUNCTION_TRACE ("RsFixedIoStream");
+    /*
+     * Set the following contiguous fields in the AML descriptor:
+     * Base Address
+     * Length
+     */
+    ACPI_MOVE_32_TO_16 (&Aml->FixedIo.Address,
+        &Resource->Data.FixedIo.Address);
+    Aml->FixedIo.AddressLength = (UINT8) Resource->Data.FixedIo.AddressLength;
 
+    /* Complete the AML descriptor header */
 
-    /* The descriptor field is static */
-
-    *Buffer = 0x4B;
-
-    Buffer += 1;
-
-    /* Set the Range base address */
-
-    Temp16 = (UINT16) LinkedList->Data.FixedIo.BaseAddress;
-
-    ACPI_MOVE_16_TO_16 (Buffer, &Temp16);
-    Buffer += 2;
-
-    /* Set the range length */
-
-    Temp8 = (UINT8) LinkedList->Data.FixedIo.RangeLength;
-
-    *Buffer = Temp8;
-    Buffer += 1;
-
-    /* Return the number of bytes consumed in this operation */
-
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
+    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_FIXED_IO,
+        sizeof (AML_RESOURCE_FIXED_IO), Aml);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsDmaResource
+ * FUNCTION:    AcpiRsGetDma
  *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsDmaResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
+AcpiRsGetDma (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
 {
-    UINT8                   *Buffer = ByteStreamBuffer;
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    UINT8                   Temp8 = 0;
-    UINT8                   Index;
-    UINT8                   i;
-    ACPI_SIZE               StructSize = ACPI_SIZEOF_RESOURCE (
-                                            ACPI_RESOURCE_DMA);
+    UINT32                  ChannelCount = 0;
+    UINT32                  i;
+    UINT8                   Temp8;
 
 
-    ACPI_FUNCTION_TRACE ("RsDmaResource");
+    ACPI_FUNCTION_TRACE ("RsGetDma");
 
-
-    /* The number of bytes consumed are Constant */
-
-    *BytesConsumed = 3;
-    OutputStruct->Id = ACPI_RSTYPE_DMA;
-
-    /* Point to the 8-bits of Byte 1 */
-
-    Buffer += 1;
-    Temp8 = *Buffer;
 
     /* Decode the DMA channel bits */
 
-    for (i = 0, Index = 0; Index < 8; Index++)
+    for (i = 0; i < 8; i++)
     {
-        if ((Temp8 >> Index) & 0x01)
+        if ((Aml->Dma.DmaChannelMask >> i) & 0x01)
         {
-            OutputStruct->Data.Dma.Channels[i] = Index;
-            i++;
+            Resource->Data.Dma.Channels[ChannelCount] = i;
+            ChannelCount++;
         }
     }
 
-    /* Zero DMA channels is valid */
+    Resource->Length = 0;
+    Resource->Data.Dma.ChannelCount = ChannelCount;
 
-    OutputStruct->Data.Dma.NumberOfChannels = i;
-    if (i > 0)
+    /*
+     * Calculate the structure size based upon the number of channels
+     * Note: Zero DMA channels is valid
+     */
+    if (ChannelCount > 0)
     {
-        /* Calculate the structure size based upon the number of interrupts */
-
-        StructSize += ((ACPI_SIZE) i - 1) * 4;
+        Resource->Length = (UINT32) (ChannelCount - 1) * 4;
     }
 
-    /* Point to Byte 2 */
+    /* Get the flags: transfer preference, bus mastering, channel speed */
 
-    Buffer += 1;
-    Temp8 = *Buffer;
+    Temp8 = Aml->Dma.Flags;
+    Resource->Data.Dma.Transfer  =  Temp8 & 0x03;
+    Resource->Data.Dma.BusMaster = (Temp8 >> 2) & 0x01;
+    Resource->Data.Dma.Type      = (Temp8 >> 5) & 0x03;
 
-    /* Check for transfer preference (Bits[1:0]) */
-
-    OutputStruct->Data.Dma.Transfer = Temp8 & 0x03;
-
-    if (0x03 == OutputStruct->Data.Dma.Transfer)
+    if (Resource->Data.Dma.Transfer == 0x03)
     {
         ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
             "Invalid DMA.Transfer preference (3)\n"));
         return_ACPI_STATUS (AE_BAD_DATA);
     }
 
-    /* Get bus master preference (Bit[2]) */
+    /* Complete the resource header */
 
-    OutputStruct->Data.Dma.BusMaster = (Temp8 >> 2) & 0x01;
-
-    /* Get channel speed support (Bits[6:5]) */
-
-    OutputStruct->Data.Dma.Type = (Temp8 >> 5) & 0x03;
-
-    /* Set the Length parameter */
-
-    OutputStruct->Length = (UINT32) StructSize;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
+    Resource->Type = ACPI_RESOURCE_TYPE_DMA;
+    Resource->Length += ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_DMA);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsDmaStream
+ * FUNCTION:    AcpiRsSetDma
  *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        used in the OutputBuffer is returned
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsDmaStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
+AcpiRsSetDma (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
 {
-    UINT8                   *Buffer = *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-    UINT8                   Index;
+    UINT8                   i;
 
 
-    ACPI_FUNCTION_TRACE ("RsDmaStream");
+    ACPI_FUNCTION_TRACE ("RsSetDma");
 
 
-    /* The descriptor field is static */
+    /* Convert channel list to 8-bit DMA channel bitmask */
 
-    *Buffer = 0x2A;
-    Buffer += 1;
-    Temp8 = 0;
-
-    /* Loop through all of the Channels and set the mask bits */
-
-    for (Index = 0;
-         Index < LinkedList->Data.Dma.NumberOfChannels;
-         Index++)
+    Aml->Dma.DmaChannelMask = 0;
+    for (i = 0; i < Resource->Data.Dma.ChannelCount; i++)
     {
-        Temp16 = (UINT16) LinkedList->Data.Dma.Channels[Index];
-        Temp8 |= 0x1 << Temp16;
+        Aml->Dma.DmaChannelMask |= (1 << Resource->Data.Dma.Channels[i]);
     }
 
-    *Buffer = Temp8;
-    Buffer += 1;
+    /* Set the DMA Flag bits */
 
-    /* Set the DMA Info */
+    Aml->Dma.Flags = (UINT8)
+        (((Resource->Data.Dma.Type & 0x03) << 5) |
+         ((Resource->Data.Dma.BusMaster & 0x01) << 2) |
+          (Resource->Data.Dma.Transfer & 0x03));
 
-    Temp8 = (UINT8) ((LinkedList->Data.Dma.Type & 0x03) << 5);
-    Temp8 |= ((LinkedList->Data.Dma.BusMaster & 0x01) << 2);
-    Temp8 |= (LinkedList->Data.Dma.Transfer & 0x03);
+    /* Complete the AML descriptor header */
 
-    *Buffer = Temp8;
-    Buffer += 1;
-
-    /* Return the number of bytes consumed in this operation */
-
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
+    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_DMA, sizeof (AML_RESOURCE_DMA), Aml);
     return_ACPI_STATUS (AE_OK);
 }
 

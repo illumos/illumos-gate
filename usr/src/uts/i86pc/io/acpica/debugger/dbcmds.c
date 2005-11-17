@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbcmds - debug commands and output routines
- *              $Revision: 127 $
+ *              $Revision: 1.131 $
  *
  ******************************************************************************/
 
@@ -720,7 +720,7 @@ AcpiDbDumpNamespace (
 
     AcpiDbSetOutputDestination (ACPI_DB_DUPLICATE_OUTPUT);
     AcpiOsPrintf ("ACPI Namespace (from %4.4s (%p) subtree):\n",
-        &((ACPI_NAMESPACE_NODE *) SubtreeEntry)->Name, SubtreeEntry);
+        ((ACPI_NAMESPACE_NODE *) SubtreeEntry)->Name.Ascii, SubtreeEntry);
 
     /* Display the subtree */
 
@@ -983,13 +983,12 @@ AcpiDbWalkForSpecificObjects (
     void                    *Context,
     void                    **ReturnValue)
 {
-    ACPI_OPERAND_OBJECT     *ObjDesc;
-    ACPI_STATUS             Status;
+    ACPI_WALK_INFO          *Info = (ACPI_WALK_INFO *) Context;
     ACPI_BUFFER             Buffer;
-    ACPI_WALK_INFO          Info;
+    ACPI_STATUS             Status;
 
 
-    ObjDesc = AcpiNsGetAttachedObject ((ACPI_NAMESPACE_NODE *) ObjHandle);
+    Info->Count++;
 
     /* Get and display the full pathname to this object */
 
@@ -1001,62 +1000,13 @@ AcpiDbWalkForSpecificObjects (
         return (AE_OK);
     }
 
-    Info.OwnerId = ACPI_OWNER_ID_MAX;
-    Info.DebugLevel = ACPI_UINT32_MAX;
-    Info.DisplayType = ACPI_DISPLAY_SUMMARY | ACPI_DISPLAY_SHORT;
-
     AcpiOsPrintf ("%32s", (char *) Buffer.Pointer);
-    AcpiNsDumpOneObject (ObjHandle, NestingLevel, &Info, NULL);
     ACPI_MEM_FREE (Buffer.Pointer);
+
+    /* Dump short info about the object */
+
+    (void) AcpiNsDumpOneObject (ObjHandle, NestingLevel, Info, NULL);
     return (AE_OK);
-
-#ifdef ACPI_OBSOLETE_CODE
-    /* Display short information about the object */
-
-    if (ObjDesc)
-    {
-        AcpiOsPrintf ("  %p/%p", ObjHandle, ObjDesc);
-
-        switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
-        {
-        case ACPI_TYPE_METHOD:
-            AcpiOsPrintf ("  #Args %d  Concurrency %X",
-                    ObjDesc->Method.ParamCount, ObjDesc->Method.Concurrency);
-            break;
-
-        case ACPI_TYPE_INTEGER:
-            AcpiOsPrintf ("  Value %8.8X%8.8X",
-                    ACPI_FORMAT_UINT64 (ObjDesc->Integer.Value));
-            break;
-
-        case ACPI_TYPE_STRING:
-            AcpiOsPrintf ("  \"%s\"", ObjDesc->String.Pointer);
-            break;
-
-        case ACPI_TYPE_REGION:
-            AcpiOsPrintf ("  SpaceId %X Length %X Address %8.8X%8.8X",
-                    ObjDesc->Region.SpaceId,
-                    ObjDesc->Region.Length,
-                    ACPI_FORMAT_UINT64 (ObjDesc->Region.Address));
-            break;
-
-        case ACPI_TYPE_PACKAGE:
-            AcpiOsPrintf ("  #Elements %X", ObjDesc->Package.Count);
-            break;
-
-        case ACPI_TYPE_BUFFER:
-            AcpiOsPrintf ("  Length %X", ObjDesc->Buffer.Length);
-            break;
-
-        default:
-            /* Ignore other object types */
-            break;
-        }
-    }
-
-    AcpiOsPrintf ("\n");
-    return (AE_OK);
-#endif
 }
 
 
@@ -1078,6 +1028,7 @@ AcpiDbDisplayObjects (
     char                    *ObjTypeArg,
     char                    *DisplayCountArg)
 {
+    ACPI_WALK_INFO          Info;
     ACPI_OBJECT_TYPE        Type;
 
 
@@ -1092,15 +1043,24 @@ AcpiDbDisplayObjects (
 
     AcpiDbSetOutputDestination (ACPI_DB_DUPLICATE_OUTPUT);
     AcpiOsPrintf (
-        "Objects of type [%s] defined in the current ACPI Namespace: \n",
+        "Objects of type [%s] defined in the current ACPI Namespace:\n",
         AcpiUtGetTypeName (Type));
 
     AcpiDbSetOutputDestination (ACPI_DB_REDIRECTABLE_OUTPUT);
 
+    Info.Count = 0;
+    Info.OwnerId = ACPI_OWNER_ID_MAX;
+    Info.DebugLevel = ACPI_UINT32_MAX;
+    Info.DisplayType = ACPI_DISPLAY_SUMMARY | ACPI_DISPLAY_SHORT;
+
     /* Walk the namespace from the root */
 
     (void) AcpiWalkNamespace (Type, ACPI_ROOT_OBJECT, ACPI_UINT32_MAX,
-                        AcpiDbWalkForSpecificObjects, (void *) &Type, NULL);
+                AcpiDbWalkForSpecificObjects, (void *) &Info, NULL);
+
+    AcpiOsPrintf (
+        "\nFound %u objects of type [%s] in the current ACPI Namespace\n",
+        Info.Count, AcpiUtGetTypeName (Type));
 
     AcpiDbSetOutputDestination (ACPI_DB_CONSOLE_OUTPUT);
     return (AE_OK);
@@ -1164,7 +1124,7 @@ AcpiDbWalkAndMatchName (
         Info.DisplayType = ACPI_DISPLAY_SUMMARY | ACPI_DISPLAY_SHORT;
 
         AcpiOsPrintf ("%32s", (char *) Buffer.Pointer);
-        AcpiNsDumpOneObject (ObjHandle, NestingLevel, &Info, NULL);
+        (void) AcpiNsDumpOneObject (ObjHandle, NestingLevel, &Info, NULL);
         ACPI_MEM_FREE (Buffer.Pointer);
     }
 
@@ -1640,7 +1600,7 @@ AcpiDbBusWalk (
     if (ACPI_SUCCESS (Status))
     {
         AcpiOsPrintf (" _CID=%s", Cid->Id[0].Value);
-        ACPI_MEM_FREE (Cid);    
+        ACPI_MEM_FREE (Cid);
     }
 
     AcpiOsPrintf ("\n");

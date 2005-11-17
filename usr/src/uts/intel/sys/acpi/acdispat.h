@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acdispat.h - dispatcher (parser to interpreter interface)
- *       $Revision: 65 $
+ *       $Revision: 1.67 $
  *
  *****************************************************************************/
 
@@ -309,7 +309,7 @@ AcpiDsMethodDataInit (
  */
 ACPI_STATUS
 AcpiDsParseMethod (
-    ACPI_HANDLE             ObjHandle);
+    ACPI_NAMESPACE_NODE     *Node);
 
 ACPI_STATUS
 AcpiDsCallControlMethod (
@@ -322,7 +322,7 @@ AcpiDsRestartControlMethod (
     ACPI_WALK_STATE         *WalkState,
     ACPI_OPERAND_OBJECT     *ReturnDesc);
 
-ACPI_STATUS
+void
 AcpiDsTerminateControlMethod (
     ACPI_WALK_STATE         *WalkState);
 
@@ -464,7 +464,7 @@ AcpiDsInitAmlWalk (
     UINT8                   *AmlStart,
     UINT32                  AmlLength,
     ACPI_PARAMETER_INFO     *Info,
-    UINT32                  PassNumber);
+    UINT8                   PassNumber);
 
 ACPI_STATUS
 AcpiDsObjStackPopAndDelete (

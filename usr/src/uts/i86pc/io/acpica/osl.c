@@ -423,7 +423,7 @@ acpi_wrapper_isr(char *arg)
 	}
 }
 
-int intr_hooked = 0;
+static int acpi_intr_hooked = 0;
 
 ACPI_STATUS
 AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
@@ -451,11 +451,10 @@ AcpiOsInstallInterruptHandler(UINT32 InterruptNumber,
 	retval = add_avintr(NULL, SCI_IPL, (avfunc)acpi_wrapper_isr,
 				"ACPI SCI", sci_vect, NULL, NULL, NULL, NULL);
 	if (retval) {
-		intr_hooked = 1;
+		acpi_intr_hooked = 1;
 		return (AE_OK);
-	} else {
+	} else
 		return (AE_BAD_PARAMETER);
-	}
 }
 
 ACPI_STATUS
@@ -467,10 +466,10 @@ AcpiOsRemoveInterruptHandler(UINT32 InterruptNumber,
 #ifdef	DEBUG
 	cmn_err(CE_NOTE, "!acpica: detaching SCI %d", InterruptNumber);
 #endif
-	if (intr_hooked) {
+	if (acpi_intr_hooked) {
 		rem_avintr(NULL, LOCK_LEVEL - 1, (avfunc)acpi_wrapper_isr,
 				InterruptNumber);
-		intr_hooked = 0;
+		acpi_intr_hooked = 0;
 	}
 	return (AE_OK);
 }
@@ -919,6 +918,63 @@ void ACPI_INTERNAL_VAR_XFACE
 AcpiOsPrintf(const char *Format, ...)
 {
 	va_list ap;
+
+	va_start(ap, Format);
+	AcpiOsVprintf(Format, ap);
+	va_end(ap);
+}
+
+/*
+ * When != 0, sends output to console
+ * Patchable with kmdb or /etc/system.
+ */
+int acpica_console_out = 0;
+
+#define	ACPICA_OUTBUF_LEN	160
+char	acpica_outbuf[ACPICA_OUTBUF_LEN];
+int	acpica_outbuf_offset;
+
+/*
+ *
+ */
+static void
+acpica_pr_buf(char *buf, int buflen)
+{
+	char c, *bufp, *outp;
+	int	out_remaining;
+
+	/*
+	 * copy the supplied buffer into the output buffer
+	 * when we hit a '\n' or overflow the output buffer,
+	 * output and reset the output buffer
+	 */
+	bufp = buf;
+	outp = acpica_outbuf + acpica_outbuf_offset;
+	out_remaining = ACPICA_OUTBUF_LEN - acpica_outbuf_offset - 1;
+	while (c = *bufp++) {
+		*outp++ = c;
+		if (c == '\n' || --out_remaining == 0) {
+			*outp = '\0';
+			if (acpica_console_out)
+				printf(acpica_outbuf);
+			else
+				(void) strlog(0, 0, 0,
+				    SL_CONSOLE | SL_NOTE | SL_LOGONLY,
+				    acpica_outbuf);
+			acpica_outbuf_offset = 0;
+			outp = acpica_outbuf;
+			out_remaining = ACPICA_OUTBUF_LEN - 1;
+		}
+	}
+
+	acpica_outbuf_offset = outp - acpica_outbuf;
+	kmem_free(buf, buflen);
+}
+
+void
+AcpiOsVprintf(const char *Format, va_list Args)
+{
+	va_list	save;
 	int	buflen;
 	char	*buf;
 
@@ -931,29 +987,15 @@ AcpiOsPrintf(const char *Format, ...)
 	 * If we fail to allocate a string buffer, we resort
 	 * to printf().
 	 */
-	va_start(ap, Format);
-	buflen = vsnprintf(NULL, 0, Format, ap) + 1;
-	va_end(ap);
-
+	va_copy(save, Args);
+	buflen = vsnprintf(NULL, 0, Format, save) + 1;
 	buf = kmem_alloc(buflen, KM_NOSLEEP);
 	if (buf == NULL) {
-		va_start(ap, Format);
-		vprintf(Format, ap);
-		va_end(ap);
+		vprintf(Format, Args);
 		return;
 	}
-	va_start(ap, Format);
-	(void) vsnprintf(buf, buflen, Format, ap);
-	va_end(ap);
-
-	(void) strlog(0, 0, 0, SL_CONSOLE | SL_NOTE | SL_LOGONLY, buf);
-	kmem_free(buf, buflen);
-}
-
-void
-AcpiOsVprintf(const char *Format, va_list Args)
-{
-	vprintf(Format, Args);
+	(void) vsnprintf(buf, buflen, Format, Args);
+	acpica_pr_buf(buf, buflen);
 }
 
 void
@@ -1351,7 +1393,7 @@ create_d2a_subtree(dev_info_t *dip, ACPI_HANDLE acpiobj, int bus)
 	int dev, func;
 
 	acld = NULL;
-	while (AcpiGetNextObject(ACPI_TYPE_ANY, acpiobj, acld, &acld)
+	while (AcpiGetNextObject(ACPI_TYPE_DEVICE, acpiobj, acld, &acld)
 	    == AE_OK) {
 
 		/*

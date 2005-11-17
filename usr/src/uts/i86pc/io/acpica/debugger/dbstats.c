@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbstats - Generation and display of ACPI table statistics
- *              $Revision: 78 $
+ *              $Revision: 1.79 $
  *
  ******************************************************************************/
 
@@ -141,6 +141,10 @@ AcpiDbClassifyOneObject (
     void                    *Context,
     void                    **ReturnValue);
 
+static void
+AcpiDbListInfo (
+    ACPI_MEMORY_LIST        *List);
+
 
 /*
  * Statistics subcommands
@@ -178,7 +182,7 @@ static ARGUMENT_INFO        AcpiDbStatTypes [] =
  *
  ******************************************************************************/
 
-void
+static void
 AcpiDbListInfo (
     ACPI_MEMORY_LIST        *List)
 {
@@ -377,7 +381,7 @@ AcpiDbClassifyOneObject (
     return AE_OK;
 
 
-#if ACPI_FUTURE_IMPLEMENTATION
+#ifdef ACPI_FUTURE_IMPLEMENTATION
 
     /* TBD: These need to be counted during the initial parsing phase */
 

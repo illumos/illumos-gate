@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbutils - AML debugger utilities
- *              $Revision: 74 $
+ *              $Revision: 1.76 $
  *
  ******************************************************************************/
 
@@ -116,11 +116,8 @@
 
 
 #include "acpi.h"
-#include "acparser.h"
-#include "amlcode.h"
 #include "acnamesp.h"
 #include "acdebug.h"
-#include "acdispat.h"
 #include "acdisasm.h"
 
 
@@ -249,7 +246,7 @@ AcpiDbDumpExternalObject (
     {
     case ACPI_TYPE_ANY:
 
-        AcpiOsPrintf ("[Object Reference] = ", ObjDesc->Reference.Handle);
+        AcpiOsPrintf ("[Object Reference] = %p", ObjDesc->Reference.Handle);
         AcpiDmDisplayInternalObject (ObjDesc->Reference.Handle, NULL);
         break;
 
@@ -289,7 +286,7 @@ AcpiDbDumpExternalObject (
 
     case ACPI_TYPE_PACKAGE:
 
-        AcpiOsPrintf ("[Package]  Contains %d Elements: \n",
+        AcpiOsPrintf ("[Package]  Contains %d Elements:\n",
                 ObjDesc->Package.Count);
 
         for (i = 0; i < ObjDesc->Package.Count; i++)
@@ -301,7 +298,7 @@ AcpiDbDumpExternalObject (
 
     case ACPI_TYPE_LOCAL_REFERENCE:
 
-        AcpiOsPrintf ("[Object Reference] = ", ObjDesc->Reference.Handle);
+        AcpiOsPrintf ("[Object Reference] = %p", ObjDesc->Reference.Handle);
         AcpiDmDisplayInternalObject (ObjDesc->Reference.Handle, NULL);
         break;
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psparse - Parser top level AML parse routines
- *              $Revision: 157 $
+ *              $Revision: 1.158 $
  *
  *****************************************************************************/
 
@@ -533,7 +533,6 @@ AcpiPsParseAml (
     ACPI_WALK_STATE         *WalkState)
 {
     ACPI_STATUS             Status;
-    ACPI_STATUS             TerminateStatus;
     ACPI_THREAD_STATE       *Thread;
     ACPI_THREAD_STATE       *PrevWalkList = AcpiGbl_CurrentWalkList;
     ACPI_WALK_STATE         *PreviousWalkState;
@@ -610,6 +609,10 @@ AcpiPsParseAml (
             ACPI_REPORT_METHOD_ERROR ("Method execution failed",
                 WalkState->MethodNode, NULL, Status);
 
+            /* Ensure proper cleanup */
+
+            WalkState->ParseFlags |= ACPI_PARSE_EXECUTE;
+
             /* Check for possible multi-thread reentrancy problem */
 
             if ((Status == AE_ALREADY_EXISTS) &&
@@ -623,16 +626,6 @@ AcpiPsParseAml (
                  */
                 WalkState->MethodDesc->Method.MethodFlags |= AML_METHOD_SERIALIZED;
                 WalkState->MethodDesc->Method.Concurrency = 1;
-            }
-        }
-
-        if (WalkState->MethodDesc)
-        {
-            /* Decrement the thread count on the method parse tree */
-
-            if (WalkState->MethodDesc->Method.ThreadCount)
-            {
-                WalkState->MethodDesc->Method.ThreadCount--;
             }
         }
 
@@ -650,14 +643,14 @@ AcpiPsParseAml (
          */
         if ((WalkState->ParseFlags & ACPI_PARSE_MODE_MASK) == ACPI_PARSE_EXECUTE)
         {
-            TerminateStatus = AcpiDsTerminateControlMethod (WalkState);
-            if (ACPI_FAILURE (TerminateStatus))
+            if (WalkState->MethodDesc)
             {
-                ACPI_REPORT_ERROR ((
-                    "Could not terminate control method properly\n"));
+                /* Decrement the thread count on the method parse tree */
 
-                /* Ignore error and continue */
+                WalkState->MethodDesc->Method.ThreadCount--;
             }
+
+            AcpiDsTerminateControlMethod (WalkState);
         }
 
         /* Delete this walk state and all linked control states */

@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 133 $
+ *              $Revision: 1.134 $
  *
  ******************************************************************************/
 
@@ -458,6 +458,7 @@ AcpiNsEvaluateByHandle (
  *
  * PARAMETERS:  Info            - Method info block, contains:
  *                  Node            - Method Node to execute
+ *                  ObjDesc         - Method object
  *                  Parameters      - List of parameters to pass to the method,
  *                                    terminated by NULL. Params itself may be
  *                                    NULL if no parameters are being passed.
@@ -480,7 +481,6 @@ AcpiNsExecuteControlMethod (
     ACPI_PARAMETER_INFO     *Info)
 {
     ACPI_STATUS             Status;
-    ACPI_OPERAND_OBJECT     *ObjDesc;
 
 
     ACPI_FUNCTION_TRACE ("NsExecuteControlMethod");
@@ -488,8 +488,8 @@ AcpiNsExecuteControlMethod (
 
     /* Verify that there is a method associated with this object */
 
-    ObjDesc = AcpiNsGetAttachedObject (Info->Node);
-    if (!ObjDesc)
+    Info->ObjDesc = AcpiNsGetAttachedObject (Info->Node);
+    if (!Info->ObjDesc)
     {
         ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No attached method object\n"));
 
@@ -501,7 +501,7 @@ AcpiNsExecuteControlMethod (
         ACPI_LV_INFO, _COMPONENT);
 
     ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Method at AML address %p Length %X\n",
-        ObjDesc->Method.AmlStart + 1, ObjDesc->Method.AmlLength - 1));
+        Info->ObjDesc->Method.AmlStart + 1, Info->ObjDesc->Method.AmlLength - 1));
 
     /*
      * Unlock the namespace before execution.  This allows namespace access
@@ -526,7 +526,7 @@ AcpiNsExecuteControlMethod (
         return_ACPI_STATUS (Status);
     }
 
-    Status = AcpiPsxExecute (Info);
+    Status = AcpiPsExecuteMethod (Info);
     AcpiExExitInterpreter ();
 
     return_ACPI_STATUS (Status);

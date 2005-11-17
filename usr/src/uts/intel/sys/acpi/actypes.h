@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actypes.h - Common data types for the entire ACPI subsystem
- *       $Revision: 282 $
+ *       $Revision: 1.286 $
  *
  *****************************************************************************/
 
@@ -1151,57 +1151,61 @@ typedef struct acpi_mem_space_context
  */
 typedef struct acpi_resource_irq
 {
-    UINT32                      EdgeLevel;
-    UINT32                      ActiveHighLow;
-    UINT32                      SharedExclusive;
-    UINT32                      NumberOfInterrupts;
+    UINT32                      Triggering;
+    UINT32                      Polarity;
+    UINT32                      Sharable;
+    UINT32                      InterruptCount;
     UINT32                      Interrupts[1];
 
 } ACPI_RESOURCE_IRQ;
+
 
 typedef struct ACPI_RESOURCE_DMA
 {
     UINT32                      Type;
     UINT32                      BusMaster;
     UINT32                      Transfer;
-    UINT32                      NumberOfChannels;
+    UINT32                      ChannelCount;
     UINT32                      Channels[1];
 
 } ACPI_RESOURCE_DMA;
 
-typedef struct acpi_resource_start_dpf
+
+typedef struct acpi_resource_start_dependent
 {
     UINT32                      CompatibilityPriority;
     UINT32                      PerformanceRobustness;
 
-} ACPI_RESOURCE_START_DPF;
+} ACPI_RESOURCE_START_DEPENDENT;
+
 
 /*
  * END_DEPENDENT_FUNCTIONS_RESOURCE struct is not
  * needed because it has no fields
  */
 
+
 typedef struct acpi_resource_io
 {
     UINT32                      IoDecode;
-    UINT32                      MinBaseAddress;
-    UINT32                      MaxBaseAddress;
+    UINT32                      Minimum;
+    UINT32                      Maximum;
     UINT32                      Alignment;
-    UINT32                      RangeLength;
+    UINT32                      AddressLength;
 
 } ACPI_RESOURCE_IO;
 
 typedef struct acpi_resource_fixed_io
 {
-    UINT32                      BaseAddress;
-    UINT32                      RangeLength;
+    UINT32                      Address;
+    UINT32                      AddressLength;
 
 } ACPI_RESOURCE_FIXED_IO;
 
 typedef struct acpi_resource_vendor
 {
-    UINT32                      Length;
-    UINT8                       Reserved[1];
+    UINT32                      ByteLength;
+    UINT8                       ByteData[1];
 
 } ACPI_RESOURCE_VENDOR;
 
@@ -1211,33 +1215,33 @@ typedef struct acpi_resource_end_tag
 
 } ACPI_RESOURCE_END_TAG;
 
-typedef struct acpi_resource_mem24
+typedef struct acpi_resource_memory24
 {
     UINT32                      ReadWriteAttribute;
-    UINT32                      MinBaseAddress;
-    UINT32                      MaxBaseAddress;
+    UINT32                      Minimum;
+    UINT32                      Maximum;
     UINT32                      Alignment;
-    UINT32                      RangeLength;
+    UINT32                      AddressLength;
 
-} ACPI_RESOURCE_MEM24;
+} ACPI_RESOURCE_MEMORY24;
 
-typedef struct acpi_resource_mem32
+typedef struct acpi_resource_memory32
 {
     UINT32                      ReadWriteAttribute;
-    UINT32                      MinBaseAddress;
-    UINT32                      MaxBaseAddress;
+    UINT32                      Minimum;
+    UINT32                      Maximum;
     UINT32                      Alignment;
-    UINT32                      RangeLength;
+    UINT32                      AddressLength;
 
-} ACPI_RESOURCE_MEM32;
+} ACPI_RESOURCE_MEMORY32;
 
-typedef struct acpi_resource_fixed_mem32
+typedef struct acpi_resource_fixed_memory32
 {
     UINT32                      ReadWriteAttribute;
-    UINT32                      RangeBaseAddress;
-    UINT32                      RangeLength;
+    UINT32                      Address;
+    UINT32                      AddressLength;
 
-} ACPI_RESOURCE_FIXED_MEM32;
+} ACPI_RESOURCE_FIXED_MEMORY32;
 
 typedef struct acpi_memory_attribute
 {
@@ -1276,18 +1280,29 @@ typedef struct acpi_resource_source
 
 } ACPI_RESOURCE_SOURCE;
 
+/* Fields common to all address descriptors, 16/32/64 bit */
+
+#define ACPI_RESOURCE_ADDRESS_COMMON \
+    UINT32                      ResourceType; \
+    UINT32                      ProducerConsumer; \
+    UINT32                      Decode; \
+    UINT32                      MinAddressFixed; \
+    UINT32                      MaxAddressFixed; \
+    ACPI_RESOURCE_ATTRIBUTE     Attribute;
+
+typedef struct acpi_resource_address
+{
+    ACPI_RESOURCE_ADDRESS_COMMON
+
+} ACPI_RESOURCE_ADDRESS;
+
 typedef struct acpi_resource_address16
 {
-    UINT32                      ResourceType;
-    UINT32                      ProducerConsumer;
-    UINT32                      Decode;
-    UINT32                      MinAddressFixed;
-    UINT32                      MaxAddressFixed;
-    ACPI_RESOURCE_ATTRIBUTE     Attribute;
+    ACPI_RESOURCE_ADDRESS_COMMON
     UINT32                      Granularity;
-    UINT32                      MinAddressRange;
-    UINT32                      MaxAddressRange;
-    UINT32                      AddressTranslationOffset;
+    UINT32                      Minimum;
+    UINT32                      Maximum;
+    UINT32                      TranslationOffset;
     UINT32                      AddressLength;
     ACPI_RESOURCE_SOURCE        ResourceSource;
 
@@ -1295,16 +1310,11 @@ typedef struct acpi_resource_address16
 
 typedef struct acpi_resource_address32
 {
-    UINT32                      ResourceType;
-    UINT32                      ProducerConsumer;
-    UINT32                      Decode;
-    UINT32                      MinAddressFixed;
-    UINT32                      MaxAddressFixed;
-    ACPI_RESOURCE_ATTRIBUTE     Attribute;
+    ACPI_RESOURCE_ADDRESS_COMMON
     UINT32                      Granularity;
-    UINT32                      MinAddressRange;
-    UINT32                      MaxAddressRange;
-    UINT32                      AddressTranslationOffset;
+    UINT32                      Minimum;
+    UINT32                      Maximum;
+    UINT32                      TranslationOffset;
     UINT32                      AddressLength;
     ACPI_RESOURCE_SOURCE        ResourceSource;
 
@@ -1312,86 +1322,113 @@ typedef struct acpi_resource_address32
 
 typedef struct acpi_resource_address64
 {
-    UINT32                      ResourceType;
-    UINT32                      ProducerConsumer;
-    UINT32                      Decode;
-    UINT32                      MinAddressFixed;
-    UINT32                      MaxAddressFixed;
-    ACPI_RESOURCE_ATTRIBUTE     Attribute;
+    ACPI_RESOURCE_ADDRESS_COMMON
     UINT64                      Granularity;
-    UINT64                      MinAddressRange;
-    UINT64                      MaxAddressRange;
-    UINT64                      AddressTranslationOffset;
+    UINT64                      Minimum;
+    UINT64                      Maximum;
+    UINT64                      TranslationOffset;
     UINT64                      AddressLength;
-    UINT64                      TypeSpecificAttributes;
     ACPI_RESOURCE_SOURCE        ResourceSource;
 
 } ACPI_RESOURCE_ADDRESS64;
 
-typedef struct acpi_resource_ext_irq
+typedef struct acpi_resource_extended_address64
+{
+    ACPI_RESOURCE_ADDRESS_COMMON
+    UINT64                      Granularity;
+    UINT64                      Minimum;
+    UINT64                      Maximum;
+    UINT64                      TranslationOffset;
+    UINT64                      AddressLength;
+    UINT64                      TypeSpecificAttributes;
+    UINT8                       RevisionID;
+
+} ACPI_RESOURCE_EXTENDED_ADDRESS64;
+
+typedef struct acpi_resource_extended_irq
 {
     UINT32                      ProducerConsumer;
-    UINT32                      EdgeLevel;
-    UINT32                      ActiveHighLow;
-    UINT32                      SharedExclusive;
-    UINT32                      NumberOfInterrupts;
+    UINT32                      Triggering;
+    UINT32                      Polarity;
+    UINT32                      Sharable;
+    UINT32                      InterruptCount;
     ACPI_RESOURCE_SOURCE        ResourceSource;
     UINT32                      Interrupts[1];
 
-} ACPI_RESOURCE_EXT_IRQ;
+} ACPI_RESOURCE_EXTENDED_IRQ;
+
+typedef struct acpi_resource_generic_register
+{
+    UINT32                      SpaceId;
+    UINT32                      BitWidth;
+    UINT32                      BitOffset;
+    UINT32                      AccessSize;
+    UINT64                      Address;
+
+} ACPI_RESOURCE_GENERIC_REGISTER;
 
 
 /* ACPI_RESOURCE_TYPEs */
 
-#define ACPI_RSTYPE_IRQ                 0
-#define ACPI_RSTYPE_DMA                 1
-#define ACPI_RSTYPE_START_DPF           2
-#define ACPI_RSTYPE_END_DPF             3
-#define ACPI_RSTYPE_IO                  4
-#define ACPI_RSTYPE_FIXED_IO            5
-#define ACPI_RSTYPE_VENDOR              6
-#define ACPI_RSTYPE_END_TAG             7
-#define ACPI_RSTYPE_MEM24               8
-#define ACPI_RSTYPE_MEM32               9
-#define ACPI_RSTYPE_FIXED_MEM32         10
-#define ACPI_RSTYPE_ADDRESS16           11
-#define ACPI_RSTYPE_ADDRESS32           12
-#define ACPI_RSTYPE_ADDRESS64           13
-#define ACPI_RSTYPE_EXT_IRQ             14
+#define ACPI_RESOURCE_TYPE_IRQ                  0
+#define ACPI_RESOURCE_TYPE_DMA                  1
+#define ACPI_RESOURCE_TYPE_START_DEPENDENT      2
+#define ACPI_RESOURCE_TYPE_END_DEPENDENT        3
+#define ACPI_RESOURCE_TYPE_IO                   4
+#define ACPI_RESOURCE_TYPE_FIXED_IO             5
+#define ACPI_RESOURCE_TYPE_VENDOR               6
+#define ACPI_RESOURCE_TYPE_END_TAG              7
+#define ACPI_RESOURCE_TYPE_MEMORY24             8
+#define ACPI_RESOURCE_TYPE_MEMORY32             9
+#define ACPI_RESOURCE_TYPE_FIXED_MEMORY32       10
+#define ACPI_RESOURCE_TYPE_ADDRESS16            11
+#define ACPI_RESOURCE_TYPE_ADDRESS32            12
+#define ACPI_RESOURCE_TYPE_ADDRESS64            13
+#define ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64   14  /* ACPI 3.0 */
+#define ACPI_RESOURCE_TYPE_EXTENDED_IRQ         15
+#define ACPI_RESOURCE_TYPE_GENERIC_REGISTER     16
+#define ACPI_RESOURCE_TYPE_MAX                  16
 
-typedef UINT32                          ACPI_RESOURCE_TYPE;
 
 typedef union acpi_resource_data
 {
-    ACPI_RESOURCE_IRQ           Irq;
-    ACPI_RESOURCE_DMA           Dma;
-    ACPI_RESOURCE_START_DPF     StartDpf;
-    ACPI_RESOURCE_IO            Io;
-    ACPI_RESOURCE_FIXED_IO      FixedIo;
-    ACPI_RESOURCE_VENDOR        VendorSpecific;
-    ACPI_RESOURCE_END_TAG       EndTag;
-    ACPI_RESOURCE_MEM24         Memory24;
-    ACPI_RESOURCE_MEM32         Memory32;
-    ACPI_RESOURCE_FIXED_MEM32   FixedMemory32;
-    ACPI_RESOURCE_ADDRESS16     Address16;
-    ACPI_RESOURCE_ADDRESS32     Address32;
-    ACPI_RESOURCE_ADDRESS64     Address64;
-    ACPI_RESOURCE_EXT_IRQ       ExtendedIrq;
+    ACPI_RESOURCE_IRQ                   Irq;
+    ACPI_RESOURCE_DMA                   Dma;
+    ACPI_RESOURCE_START_DEPENDENT       StartDpf;
+    ACPI_RESOURCE_IO                    Io;
+    ACPI_RESOURCE_FIXED_IO              FixedIo;
+    ACPI_RESOURCE_VENDOR                Vendor;
+    ACPI_RESOURCE_END_TAG               EndTag;
+    ACPI_RESOURCE_MEMORY24              Memory24;
+    ACPI_RESOURCE_MEMORY32              Memory32;
+    ACPI_RESOURCE_FIXED_MEMORY32        FixedMemory32;
+    ACPI_RESOURCE_ADDRESS16             Address16;
+    ACPI_RESOURCE_ADDRESS32             Address32;
+    ACPI_RESOURCE_ADDRESS64             Address64;
+    ACPI_RESOURCE_EXTENDED_ADDRESS64    ExtAddress64;
+    ACPI_RESOURCE_EXTENDED_IRQ          ExtendedIrq;
+    ACPI_RESOURCE_GENERIC_REGISTER      GenericReg;
+
+    /* Common fields */
+
+    ACPI_RESOURCE_ADDRESS               Address;        /* Common 16/32/64 address fields */
 
 } ACPI_RESOURCE_DATA;
 
+
 typedef struct acpi_resource
 {
-    ACPI_RESOURCE_TYPE          Id;
+    UINT32                      Type;
     UINT32                      Length;
     ACPI_RESOURCE_DATA          Data;
 
 } ACPI_RESOURCE;
 
+
 #define ACPI_RESOURCE_LENGTH                12
 #define ACPI_RESOURCE_LENGTH_NO_DATA        8       /* Id + Length fields */
 
-#define ACPI_SIZEOF_RESOURCE(Type)          (ACPI_RESOURCE_LENGTH_NO_DATA + sizeof (Type))
+#define ACPI_SIZEOF_RESOURCE(Type)          (UINT32) (ACPI_RESOURCE_LENGTH_NO_DATA + sizeof (Type))
 
 #define ACPI_NEXT_RESOURCE(Res)             (ACPI_RESOURCE *)((UINT8 *) Res + Res->Length)
 

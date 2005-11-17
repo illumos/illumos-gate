@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 116 $
+ *              $Revision: 1.124 $
  *
  ******************************************************************************/
 
@@ -131,7 +131,11 @@
  *
  * PARAMETERS:  OwnerId         - Where the new owner ID is returned
  *
- * DESCRIPTION: Allocate a table or method owner id
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Allocate a table or method owner ID. The owner ID is used to
+ *              track objects created by the table or method, to be deleted
+ *              when the method exits or the table is unloaded.
  *
  ******************************************************************************/
 
@@ -141,11 +145,21 @@ AcpiUtAllocateOwnerId (
 {
     ACPI_NATIVE_UINT        i;
     ACPI_STATUS             Status;
-    
-    
+
+
     ACPI_FUNCTION_TRACE ("UtAllocateOwnerId");
-    
-    
+
+
+    /* Guard against multiple allocations of ID to the same location */
+
+    if (*OwnerId)
+    {
+        ACPI_REPORT_ERROR (("Owner ID [%2.2X] already exists\n", *OwnerId));
+        return_ACPI_STATUS (AE_ALREADY_EXISTS);
+    }
+
+    /* Mutex for the global ID mask */
+
     Status = AcpiUtAcquireMutex (ACPI_MTX_CACHES);
     if (ACPI_FAILURE (Status))
     {
@@ -154,28 +168,33 @@ AcpiUtAllocateOwnerId (
 
     /* Find a free owner ID */
 
-    for (i = 0; i < 32; i++) 
+    for (i = 0; i < 32; i++)
     {
         if (!(AcpiGbl_OwnerIdMask & (1 << i)))
         {
+            ACPI_DEBUG_PRINT ((ACPI_DB_VALUES,
+                "Current OwnerId mask: %8.8X New ID: %2.2X\n",
+                AcpiGbl_OwnerIdMask, (unsigned int) (i + 1)));
+
             AcpiGbl_OwnerIdMask |= (1 << i);
-            *OwnerId = (ACPI_OWNER_ID) i;
-            goto exit;
+            *OwnerId = (ACPI_OWNER_ID) (i + 1);
+            goto Exit;
         }
     }
 
-    /* 
+    /*
      * If we are here, all OwnerIds have been allocated. This probably should
      * not happen since the IDs are reused after deallocation. The IDs are
      * allocated upon table load (one per table) and method execution, and
      * they are released when a table is unloaded or a method completes
      * execution.
      */
+    *OwnerId = 0;
     Status = AE_OWNER_ID_LIMIT;
     ACPI_REPORT_ERROR ((
         "Could not allocate new OwnerId (32 max), AE_OWNER_ID_LIMIT\n"));
 
-exit:
+Exit:
     (void) AcpiUtReleaseMutex (ACPI_MTX_CACHES);
     return_ACPI_STATUS (Status);
 }
@@ -185,43 +204,60 @@ exit:
  *
  * FUNCTION:    AcpiUtReleaseOwnerId
  *
- * PARAMETERS:  OwnerId         - A previously allocated owner ID
+ * PARAMETERS:  OwnerIdPtr          - Pointer to a previously allocated OwnerID
  *
- * DESCRIPTION: Release a table or method owner id
+ * RETURN:      None. No error is returned because we are either exiting a
+ *              control method or unloading a table. Either way, we would
+ *              ignore any error anyway.
+ *
+ * DESCRIPTION: Release a table or method owner ID.  Valid IDs are 1 - 32
  *
  ******************************************************************************/
 
-ACPI_STATUS
+void
 AcpiUtReleaseOwnerId (
-    ACPI_OWNER_ID           OwnerId)
+    ACPI_OWNER_ID           *OwnerIdPtr)
 {
+    ACPI_OWNER_ID           OwnerId = *OwnerIdPtr;
     ACPI_STATUS             Status;
 
 
-    ACPI_FUNCTION_TRACE ("UtReleaseOwnerId");
+    ACPI_FUNCTION_TRACE_U32 ("UtReleaseOwnerId", OwnerId);
 
+
+    /* Always clear the input OwnerId (zero is an invalid ID) */
+
+    *OwnerIdPtr = 0;
+
+    /* Zero is not a valid OwnerID */
+
+    if ((OwnerId == 0) || (OwnerId > 32))
+    {
+        ACPI_REPORT_ERROR (("Invalid OwnerId: %2.2X\n", OwnerId));
+        return_VOID;
+    }
+
+    /* Mutex for the global ID mask */
 
     Status = AcpiUtAcquireMutex (ACPI_MTX_CACHES);
     if (ACPI_FAILURE (Status))
     {
-        return_ACPI_STATUS (Status);
+        return_VOID;
     }
 
-    /* Free the owner ID */
+    /* Normalize the ID to zero */
+
+    OwnerId--;
+
+    /* Free the owner ID only if it is valid */
 
     if (AcpiGbl_OwnerIdMask & (1 << OwnerId))
     {
         AcpiGbl_OwnerIdMask ^= (1 << OwnerId);
     }
-    else
-    {
-        /* This OwnerId has not been allocated */
-
-        Status = AE_NOT_EXIST;
-    }
 
     (void) AcpiUtReleaseMutex (ACPI_MTX_CACHES);
-    return_ACPI_STATUS (Status);
+    return_VOID;
 }
 
 
@@ -231,7 +267,7 @@ AcpiUtReleaseOwnerId (
  *
  * PARAMETERS:  SrcString       - The source string to convert
  *
- * RETURN:      Converted SrcString (same as input pointer)
+ * RETURN:      None
  *
  * DESCRIPTION: Convert string to uppercase
  *
@@ -239,7 +275,7 @@ AcpiUtReleaseOwnerId (
  *
  ******************************************************************************/
 
-char *
+void
 AcpiUtStrupr (
     char                    *SrcString)
 {
@@ -251,7 +287,7 @@ AcpiUtStrupr (
 
     if (!SrcString)
     {
-        return (NULL);
+        return;
     }
 
     /* Walk entire string, uppercasing the letters */
@@ -261,7 +297,7 @@ AcpiUtStrupr (
         *String = (char) ACPI_TOUPPER (*String);
     }
 
-    return (SrcString);
+    return;
 }
 
 
@@ -974,7 +1010,7 @@ AcpiUtGetResourceEndTag (
     while (Buffer < EndBuffer)
     {
         BufferByte = *Buffer;
-        if (BufferByte & ACPI_RDESC_TYPE_MASK)
+        if (BufferByte & ACPI_RESOURCE_NAME_LARGE)
         {
             /* Large Descriptor - Length is next 2 bytes */
 
@@ -984,7 +1020,7 @@ AcpiUtGetResourceEndTag (
         {
             /* Small Descriptor.  End Tag will be found here */
 
-            if ((BufferByte & ACPI_RDESC_SMALL_MASK) == ACPI_RDESC_TYPE_END_TAG)
+            if ((BufferByte & ACPI_RESOURCE_NAME_SMALL_MASK) == ACPI_RESOURCE_NAME_END_TAG)
             {
                 /* Found the end tag descriptor, all done. */
 

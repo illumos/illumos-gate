@@ -274,6 +274,13 @@ AcpiGetData (
     ACPI_OBJECT_HANDLER     Handler,
     void                    **Data);
 
+ACPI_STATUS
+AcpiDebugTrace (
+    char                    *Name,
+    UINT32                  DebugLevel,
+    UINT32                  DebugLayer,
+    UINT32                  Flags);
+
 
 /*
  * Object manipulation and enumeration

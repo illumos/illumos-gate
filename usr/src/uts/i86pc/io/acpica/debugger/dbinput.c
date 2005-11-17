@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbinput - user front-end to the AML debugger
- *              $Revision: 109 $
+ *              $Revision: 1.111 $
  *
  ******************************************************************************/
 
@@ -206,6 +206,7 @@ enum AcpiExDebuggerCommands
     CMD_TABLES,
     CMD_TERMINATE,
     CMD_THREADS,
+    CMD_TRACE,
     CMD_TREE,
     CMD_TYPE,
     CMD_UNLOAD
@@ -266,6 +267,7 @@ static const COMMAND_INFO       AcpiGbl_DbCommands[] =
     {"TABLES",       0},
     {"TERMINATE",    0},
     {"THREADS",      3},
+    {"TRACE",        1},
     {"TREE",         0},
     {"TYPE",         1},
     {"UNLOAD",       1},
@@ -383,6 +385,7 @@ AcpiDbDisplayHelp (
         AcpiOsPrintf ("Results                             Display method result stack\n");
         AcpiOsPrintf ("Set <A|L> <#> <Value>               Set method data (Arguments/Locals)\n");
         AcpiOsPrintf ("Stop                                Terminate control method\n");
+        AcpiOsPrintf ("Trace <method name>                 Trace method execution\n");
         AcpiOsPrintf ("Tree                                Display control method calling tree\n");
         AcpiOsPrintf ("<Enter>                             Single step next AML opcode (over calls)\n");
         return;
@@ -654,7 +657,7 @@ AcpiDbCommandDispatch (
         break;
 
     case CMD_DISASSEMBLE:
-        AcpiDbDisassembleMethod (AcpiGbl_DbArgs[1]);
+        (void) AcpiDbDisassembleMethod (AcpiGbl_DbArgs[1]);
         break;
 
     case CMD_DUMP:
@@ -860,6 +863,10 @@ AcpiDbCommandDispatch (
     case CMD_THREADS:
         AcpiDbCreateExecutionThreads (AcpiGbl_DbArgs[1], AcpiGbl_DbArgs[2],
             AcpiGbl_DbArgs[3]);
+        break;
+
+    case CMD_TRACE:
+        AcpiDebugTrace (AcpiGbl_DbArgs[1],0,0,1);
         break;
 
     case CMD_TREE:

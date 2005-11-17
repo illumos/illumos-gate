@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresop - AML Interpreter operand/object resolution
- *              $Revision: 85 $
+ *              $Revision: 1.86 $
  *
  *****************************************************************************/
 
@@ -250,7 +250,7 @@ AcpiExResolveOperands (
     }
 
     ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-        "Opcode %X [%s] RequiredOperandTypes=%8.8X \n",
+        "Opcode %X [%s] RequiredOperandTypes=%8.8X\n",
         Opcode, OpInfo->Name, ArgTypes));
 
     /*

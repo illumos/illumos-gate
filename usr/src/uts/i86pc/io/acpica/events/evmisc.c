@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evmisc - Miscellaneous event manager support functions
- *              $Revision: 84 $
+ *              $Revision: 1.86 $
  *
  *****************************************************************************/
 
@@ -506,6 +506,9 @@ AcpiEvInitGlobalLockHandler (
      */
     if (Status == AE_NO_HARDWARE_RESPONSE)
     {
+        ACPI_REPORT_ERROR ((
+            "No response from Global Lock hardware, disabling lock\n"));
+
         AcpiGbl_GlobalLockPresent = FALSE;
         Status = AE_OK;
     }

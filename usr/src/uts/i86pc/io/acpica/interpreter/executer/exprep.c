@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exprep - ACPI AML (p-code) execution - field prep utilities
- *              $Revision: 134 $
+ *              $Revision: 1.135 $
  *
  *****************************************************************************/
 
@@ -364,7 +364,7 @@ AcpiExDecodeFieldAccess (
         ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
             "Unknown field access type %X\n",
             Access));
-        return_VALUE (0);
+        return_UINT32 (0);
     }
 
     if (ACPI_GET_OBJECT_TYPE (ObjDesc) == ACPI_TYPE_BUFFER_FIELD)
@@ -378,7 +378,7 @@ AcpiExDecodeFieldAccess (
     }
 
     *ReturnByteAlignment = ByteAlignment;
-    return_VALUE (BitLength);
+    return_UINT32 (BitLength);
 }
 
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsutils - Dispatcher utilities
- *              $Revision: 113 $
+ *              $Revision: 1.115 $
  *
  ******************************************************************************/
 
@@ -273,7 +273,7 @@ AcpiDsIsResultUsed (
     if (!Op)
     {
         ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Op\n"));
-        return_VALUE (TRUE);
+        return_UINT8 (TRUE);
     }
 
     /*
@@ -303,7 +303,7 @@ AcpiDsIsResultUsed (
         ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
             "At Method level, result of [%s] not used\n",
             AcpiPsGetOpcodeName (Op->Common.AmlOpcode)));
-        return_VALUE (FALSE);
+        return_UINT8 (FALSE);
     }
 
     /* Get info on the parent. The RootOp is AML_SCOPE */
@@ -313,7 +313,7 @@ AcpiDsIsResultUsed (
     {
         ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
             "Unknown parent opcode. Op=%p\n", Op));
-        return_VALUE (FALSE);
+        return_UINT8 (FALSE);
     }
 
     /*
@@ -402,7 +402,7 @@ ResultUsed:
         AcpiPsGetOpcodeName (Op->Common.AmlOpcode),
         AcpiPsGetOpcodeName (Op->Common.Parent->Common.AmlOpcode), Op));
 
-    return_VALUE (TRUE);
+    return_UINT8 (TRUE);
 
 
 ResultNotUsed:
@@ -411,7 +411,7 @@ ResultNotUsed:
         AcpiPsGetOpcodeName (Op->Common.AmlOpcode),
         AcpiPsGetOpcodeName (Op->Common.Parent->Common.AmlOpcode), Op));
 
-    return_VALUE (FALSE);
+    return_UINT8 (FALSE);
 }
 
 
@@ -744,7 +744,7 @@ AcpiDsCreateOperand (
         if (OpInfo->Flags & AML_HAS_RETVAL)
         {
             ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH,
-                "Argument previously created, already stacked \n"));
+                "Argument previously created, already stacked\n"));
 
             ACPI_DEBUGGER_EXEC (AcpiDbDisplayArgumentObject (
                 WalkState->Operands [WalkState->NumOperands - 1], WalkState));

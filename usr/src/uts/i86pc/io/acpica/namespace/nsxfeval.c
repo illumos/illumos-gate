@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfeval - Public interfaces to the ACPI subsystem
  *                         ACPI Object evaluation interfaces
- *              $Revision: 17 $
+ *              $Revision: 1.17 $
  *
  ******************************************************************************/
 

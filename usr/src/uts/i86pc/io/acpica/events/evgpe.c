@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evgpe - General Purpose Event handling and dispatch
- *              $Revision: 50 $
+ *              $Revision: 1.52 $
  *
  *****************************************************************************/
 
@@ -728,7 +728,7 @@ AcpiEvGpeDispatch (
             ACPI_REPORT_ERROR ((
                 "AcpiEvGpeDispatch: %s, Unable to clear GPE[%2X]\n",
                 AcpiFormatException (Status), GpeNumber));
-            return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
+            return_UINT32 (ACPI_INTERRUPT_NOT_HANDLED);
         }
     }
 
@@ -772,7 +772,7 @@ AcpiEvGpeDispatch (
                 ACPI_REPORT_ERROR ((
                     "AcpiEvGpeDispatch: %s, Unable to clear GPE[%2X]\n",
                     AcpiFormatException (Status), GpeNumber));
-                return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
+                return_UINT32 (ACPI_INTERRUPT_NOT_HANDLED);
             }
         }
         break;
@@ -789,7 +789,7 @@ AcpiEvGpeDispatch (
             ACPI_REPORT_ERROR ((
                 "AcpiEvGpeDispatch: %s, Unable to disable GPE[%2X]\n",
                 AcpiFormatException (Status), GpeNumber));
-            return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
+            return_UINT32 (ACPI_INTERRUPT_NOT_HANDLED);
         }
 
         /*
@@ -824,12 +824,12 @@ AcpiEvGpeDispatch (
             ACPI_REPORT_ERROR ((
                 "AcpiEvGpeDispatch: %s, Unable to disable GPE[%2X]\n",
                 AcpiFormatException (Status), GpeNumber));
-            return_VALUE (ACPI_INTERRUPT_NOT_HANDLED);
+            return_UINT32 (ACPI_INTERRUPT_NOT_HANDLED);
         }
         break;
     }
 
-    return_VALUE (ACPI_INTERRUPT_HANDLED);
+    return_UINT32 (ACPI_INTERRUPT_HANDLED);
 }
 
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 167 $
+ *       $Revision: 1.168 $
  *
  *****************************************************************************/
 
@@ -155,6 +155,14 @@ extern      UINT32                      AcpiDbgLayer;
 
 extern      UINT32                      AcpiGbl_NestingLevel;
 
+/* Support for dynamic control method tracing mechanism */
+
+ACPI_EXTERN UINT32                      AcpiGbl_OriginalDbgLevel;
+ACPI_EXTERN UINT32                      AcpiGbl_OriginalDbgLayer;
+ACPI_EXTERN ACPI_NAME                   AcpiGbl_TraceMethodName;
+ACPI_EXTERN UINT32                      AcpiGbl_TraceDbgLevel;
+ACPI_EXTERN UINT32                      AcpiGbl_TraceDbgLayer;
+ACPI_EXTERN UINT32                      AcpiGbl_TraceFlags;
 
 /*****************************************************************************
  *

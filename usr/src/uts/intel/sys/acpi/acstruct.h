@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acstruct.h - Internal structs
- *       $Revision: 35 $
+ *       $Revision: 1.37 $
  *
  *****************************************************************************/
 
@@ -229,6 +229,7 @@ typedef struct acpi_device_walk_info
 typedef struct acpi_walk_info
 {
     UINT32                  DebugLevel;
+    UINT32                  Count;
     ACPI_OWNER_ID           OwnerId;
     UINT8                   DisplayType;
 
@@ -288,8 +289,10 @@ typedef union acpi_aml_operands
 typedef struct acpi_parameter_info
 {
     ACPI_NAMESPACE_NODE     *Node;
+    ACPI_OPERAND_OBJECT     *ObjDesc;
     ACPI_OPERAND_OBJECT     **Parameters;
     ACPI_OPERAND_OBJECT     *ReturnObject;
+    UINT8                   PassNumber;
     UINT8                   ParameterType;
     UINT8                   ReturnObjectType;
 

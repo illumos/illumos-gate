@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsmem24 - Memory resource descriptors
- *              $Revision: 28 $
+ *              $Revision: 1.31 $
  *
  ******************************************************************************/
 
@@ -125,476 +125,279 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsMemory24Resource
+ * FUNCTION:    AcpiRsGetMemory24
  *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsMemory24Resource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
+AcpiRsGetMemory24 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
 {
-    UINT8                   *Buffer = ByteStreamBuffer;
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-    ACPI_SIZE               StructSize = ACPI_SIZEOF_RESOURCE (
-                                            ACPI_RESOURCE_MEM24);
+    ACPI_FUNCTION_TRACE ("RsGetMemory24");
 
 
-    ACPI_FUNCTION_TRACE ("RsMemory24Resource");
+    /* Get the Read/Write bit */
 
-
-    /* Point past the Descriptor to get the number of bytes consumed */
-
-    Buffer += 1;
-
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-    Buffer += 2;
-    *BytesConsumed = (ACPI_SIZE) Temp16 + 3;
-    OutputStruct->Id = ACPI_RSTYPE_MEM24;
-
-    /* Check Byte 3 the Read/Write bit */
-
-    Temp8 = *Buffer;
-    Buffer += 1;
-    OutputStruct->Data.Memory24.ReadWriteAttribute = Temp8 & 0x01;
-
-    /* Get MinBaseAddress (Bytes 4-5) */
-
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-    Buffer += 2;
-    OutputStruct->Data.Memory24.MinBaseAddress = Temp16;
-
-    /* Get MaxBaseAddress (Bytes 6-7) */
-
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-    Buffer += 2;
-    OutputStruct->Data.Memory24.MaxBaseAddress = Temp16;
-
-    /* Get Alignment (Bytes 8-9) */
-
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-    Buffer += 2;
-    OutputStruct->Data.Memory24.Alignment = Temp16;
-
-    /* Get RangeLength (Bytes 10-11) */
-
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-    OutputStruct->Data.Memory24.RangeLength = Temp16;
-
-    /* Set the Length parameter */
-
-    OutputStruct->Length = (UINT32) StructSize;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
-    return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiRsMemory24Stream
- *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        used in the OutputBuffer is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiRsMemory24Stream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
-{
-    UINT8                   *Buffer = *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-
-
-    ACPI_FUNCTION_TRACE ("RsMemory24Stream");
-
-
-    /* The descriptor field is static */
-
-    *Buffer = 0x81;
-    Buffer += 1;
-
-    /* The length field is static */
-
-    Temp16 = 0x09;
-    ACPI_MOVE_16_TO_16 (Buffer, &Temp16);
-    Buffer += 2;
-
-    /* Set the Information Byte */
-
-    Temp8 = (UINT8) (LinkedList->Data.Memory24.ReadWriteAttribute & 0x01);
-    *Buffer = Temp8;
-    Buffer += 1;
-
-    /* Set the Range minimum base address */
-
-    ACPI_MOVE_32_TO_16 (Buffer, &LinkedList->Data.Memory24.MinBaseAddress);
-    Buffer += 2;
-
-    /* Set the Range maximum base address */
-
-    ACPI_MOVE_32_TO_16 (Buffer, &LinkedList->Data.Memory24.MaxBaseAddress);
-    Buffer += 2;
-
-    /* Set the base alignment */
-
-    ACPI_MOVE_32_TO_16 (Buffer, &LinkedList->Data.Memory24.Alignment);
-    Buffer += 2;
-
-    /* Set the range length */
-
-    ACPI_MOVE_32_TO_16 (Buffer, &LinkedList->Data.Memory24.RangeLength);
-    Buffer += 2;
-
-    /* Return the number of bytes consumed in this operation */
-
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
-    return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiRsMemory32RangeResource
- *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiRsMemory32RangeResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
-{
-    UINT8                   *Buffer = ByteStreamBuffer;
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-    ACPI_SIZE               StructSize = ACPI_SIZEOF_RESOURCE (
-                                            ACPI_RESOURCE_MEM32);
-
-
-    ACPI_FUNCTION_TRACE ("RsMemory32RangeResource");
-
-
-    /* Point past the Descriptor to get the number of bytes consumed */
-
-    Buffer += 1;
-
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-    Buffer += 2;
-    *BytesConsumed = (ACPI_SIZE) Temp16 + 3;
-
-    OutputStruct->Id = ACPI_RSTYPE_MEM32;
+    Resource->Data.Memory24.ReadWriteAttribute =
+        (Aml->Memory24.Information & 0x01);
 
     /*
-     *  Point to the place in the output buffer where the data portion will
-     *  begin.
-     *  1. Set the RESOURCE_DATA * Data to point to its own address, then
-     *  2. Set the pointer to the next address.
-     *
-     *  NOTE: OutputStruct->Data is cast to UINT8, otherwise, this addition adds
-     *  4 * sizeof(RESOURCE_DATA) instead of 4 * sizeof(UINT8)
+     * Get the following contiguous fields from the AML descriptor:
+     * Minimum Base Address
+     * Maximum Base Address
+     * Address Base Alignment
+     * Range Length
      */
+    AcpiRsMoveData (&Resource->Data.Memory24.Minimum,
+        &Aml->Memory24.Minimum, 4, ACPI_MOVE_TYPE_16_TO_32);
 
-    /* Check Byte 3 the Read/Write bit */
+    /* Complete the resource header */
 
-    Temp8 = *Buffer;
-    Buffer += 1;
-
-    OutputStruct->Data.Memory32.ReadWriteAttribute = Temp8 & 0x01;
-
-    /* Get MinBaseAddress (Bytes 4-7) */
-
-    ACPI_MOVE_32_TO_32 (&OutputStruct->Data.Memory32.MinBaseAddress, Buffer);
-    Buffer += 4;
-
-    /* Get MaxBaseAddress (Bytes 8-11) */
-
-    ACPI_MOVE_32_TO_32 (&OutputStruct->Data.Memory32.MaxBaseAddress, Buffer);
-    Buffer += 4;
-
-    /* Get Alignment (Bytes 12-15) */
-
-    ACPI_MOVE_32_TO_32 (&OutputStruct->Data.Memory32.Alignment, Buffer);
-    Buffer += 4;
-
-    /* Get RangeLength (Bytes 16-19) */
-
-    ACPI_MOVE_32_TO_32 (&OutputStruct->Data.Memory32.RangeLength, Buffer);
-
-    /* Set the Length parameter */
-
-    OutputStruct->Length = (UINT32) StructSize;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
+    Resource->Type = ACPI_RESOURCE_TYPE_MEMORY24;
+    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_MEMORY24);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsFixedMemory32Resource
+ * FUNCTION:    AcpiRsSetMemory24
  *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsFixedMemory32Resource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
+AcpiRsSetMemory24 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
 {
-    UINT8                   *Buffer = ByteStreamBuffer;
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-    ACPI_SIZE               StructSize = ACPI_SIZEOF_RESOURCE (
-                                            ACPI_RESOURCE_FIXED_MEM32);
+    ACPI_FUNCTION_TRACE ("RsSetMemory24");
 
-
-    ACPI_FUNCTION_TRACE ("RsFixedMemory32Resource");
-
-
-    /* Point past the Descriptor to get the number of bytes consumed */
-
-    Buffer += 1;
-    ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-
-    Buffer += 2;
-    *BytesConsumed = (ACPI_SIZE) Temp16 + 3;
-
-    OutputStruct->Id = ACPI_RSTYPE_FIXED_MEM32;
-
-    /* Check Byte 3 the Read/Write bit */
-
-    Temp8 = *Buffer;
-    Buffer += 1;
-    OutputStruct->Data.FixedMemory32.ReadWriteAttribute = Temp8 & 0x01;
-
-    /* Get RangeBaseAddress (Bytes 4-7) */
-
-    ACPI_MOVE_32_TO_32 (&OutputStruct->Data.FixedMemory32.RangeBaseAddress,
-        Buffer);
-    Buffer += 4;
-
-    /* Get RangeLength (Bytes 8-11) */
-
-    ACPI_MOVE_32_TO_32 (&OutputStruct->Data.FixedMemory32.RangeLength, Buffer);
-
-    /* Set the Length parameter */
-
-    OutputStruct->Length = (UINT32) StructSize;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
-    return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiRsMemory32RangeStream
- *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        used in the OutputBuffer is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiRsMemory32RangeStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
-{
-    UINT8                   *Buffer = *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-
-
-    ACPI_FUNCTION_TRACE ("RsMemory32RangeStream");
-
-
-    /* The descriptor field is static */
-
-    *Buffer = 0x85;
-    Buffer += 1;
-
-    /* The length field is static */
-
-    Temp16 = 0x11;
-
-    ACPI_MOVE_16_TO_16 (Buffer, &Temp16);
-    Buffer += 2;
 
     /* Set the Information Byte */
 
-    Temp8 = (UINT8) (LinkedList->Data.Memory32.ReadWriteAttribute & 0x01);
-    *Buffer = Temp8;
-    Buffer += 1;
+    Aml->Memory24.Information = (UINT8)
+        (Resource->Data.Memory24.ReadWriteAttribute & 0x01);
 
-    /* Set the Range minimum base address */
+    /*
+     * Set the following contiguous fields in the AML descriptor:
+     * Minimum Base Address
+     * Maximum Base Address
+     * Address Base Alignment
+     * Range Length
+     */
+    AcpiRsMoveData (&Aml->Memory24.Minimum,
+        &Resource->Data.Memory24.Minimum, 4, ACPI_MOVE_TYPE_32_TO_16);
 
-    ACPI_MOVE_32_TO_32 (Buffer, &LinkedList->Data.Memory32.MinBaseAddress);
-    Buffer += 4;
+    /* Complete the AML descriptor header */
 
-    /* Set the Range maximum base address */
-
-    ACPI_MOVE_32_TO_32 (Buffer, &LinkedList->Data.Memory32.MaxBaseAddress);
-    Buffer += 4;
-
-    /* Set the base alignment */
-
-    ACPI_MOVE_32_TO_32 (Buffer, &LinkedList->Data.Memory32.Alignment);
-    Buffer += 4;
-
-    /* Set the range length */
-
-    ACPI_MOVE_32_TO_32 (Buffer, &LinkedList->Data.Memory32.RangeLength);
-    Buffer += 4;
-
-    /* Return the number of bytes consumed in this operation */
-
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
+    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_MEMORY24,
+        sizeof (AML_RESOURCE_MEMORY24), Aml);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsFixedMemory32Stream
+ * FUNCTION:    AcpiRsGetMemory32
  *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        used in the OutputBuffer is returned
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsFixedMemory32Stream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
+AcpiRsGetMemory32 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
 {
-    UINT8                   *Buffer = *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
+    ACPI_FUNCTION_TRACE ("RsGetMemory32");
 
 
-    ACPI_FUNCTION_TRACE ("RsFixedMemory32Stream");
+    /* Get the Read/Write bit */
+
+    Resource->Data.Memory32.ReadWriteAttribute =
+        (Aml->Memory32.Information & 0x01);
+
+    /*
+     * Get the following contiguous fields from the AML descriptor:
+     * Minimum Base Address
+     * Maximum Base Address
+     * Address Base Alignment
+     * Range Length
+     */
+    AcpiRsMoveData (&Resource->Data.Memory32.Minimum,
+        &Aml->Memory32.Minimum, 4, ACPI_MOVE_TYPE_32_TO_32);
+
+    /* Complete the resource header */
+
+    Resource->Type = ACPI_RESOURCE_TYPE_MEMORY32;
+    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_MEMORY32);
+    return_ACPI_STATUS (AE_OK);
+}
 
 
-    /* The descriptor field is static */
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiRsSetMemory32
+ *
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
+ *
+ ******************************************************************************/
 
-    *Buffer = 0x86;
-    Buffer += 1;
+ACPI_STATUS
+AcpiRsSetMemory32 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
+{
+    ACPI_FUNCTION_TRACE ("RsSetMemory32");
 
-    /* The length field is static */
-
-    Temp16 = 0x09;
-
-    ACPI_MOVE_16_TO_16 (Buffer, &Temp16);
-    Buffer += 2;
 
     /* Set the Information Byte */
 
-    Temp8 = (UINT8) (LinkedList->Data.FixedMemory32.ReadWriteAttribute & 0x01);
-    *Buffer = Temp8;
-    Buffer += 1;
+    Aml->Memory32.Information = (UINT8)
+        (Resource->Data.Memory32.ReadWriteAttribute & 0x01);
 
-    /* Set the Range base address */
+    /*
+     * Set the following contiguous fields in the AML descriptor:
+     * Minimum Base Address
+     * Maximum Base Address
+     * Address Base Alignment
+     * Range Length
+     */
+    AcpiRsMoveData (&Aml->Memory32.Minimum,
+        &Resource->Data.Memory32.Minimum, 4, ACPI_MOVE_TYPE_32_TO_32);
 
-    ACPI_MOVE_32_TO_32 (Buffer,
-        &LinkedList->Data.FixedMemory32.RangeBaseAddress);
-    Buffer += 4;
+    /* Complete the AML descriptor header */
 
-    /* Set the range length */
+    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_MEMORY32,
+        sizeof (AML_RESOURCE_MEMORY32), Aml);
+    return_ACPI_STATUS (AE_OK);
+}
 
-    ACPI_MOVE_32_TO_32 (Buffer,
-        &LinkedList->Data.FixedMemory32.RangeLength);
-    Buffer += 4;
 
-    /* Return the number of bytes consumed in this operation */
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiRsGetFixedMemory32
+ *
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
+ *
+ ******************************************************************************/
 
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
+ACPI_STATUS
+AcpiRsGetFixedMemory32 (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
+{
+    ACPI_FUNCTION_TRACE ("RsGetFixedMemory32");
+
+
+    /* Get the Read/Write bit */
+
+    Resource->Data.FixedMemory32.ReadWriteAttribute =
+        (Aml->FixedMemory32.Information & 0x01);
+
+    /*
+     * Get the following contiguous fields from the AML descriptor:
+     * Base Address
+     * Range Length
+     */
+    ACPI_MOVE_32_TO_32 (&Resource->Data.FixedMemory32.Address,
+        &Aml->FixedMemory32.Address);
+    ACPI_MOVE_32_TO_32 (&Resource->Data.FixedMemory32.AddressLength,
+        &Aml->FixedMemory32.AddressLength);
+
+    /* Complete the resource header */
+
+    Resource->Type = ACPI_RESOURCE_TYPE_FIXED_MEMORY32;
+    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_FIXED_MEMORY32);
+    return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiRsSetFixedMemory32
+ *
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiRsSetFixedMemory32 (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
+{
+    ACPI_FUNCTION_TRACE ("RsSetFixedMemory32");
+
+
+    /* Set the Information Byte */
+
+    Aml->FixedMemory32.Information = (UINT8)
+        (Resource->Data.FixedMemory32.ReadWriteAttribute & 0x01);
+
+    /*
+     * Set the following contiguous fields in the AML descriptor:
+     * Base Address
+     * Range Length
+     */
+    ACPI_MOVE_32_TO_32 (&Aml->FixedMemory32.Address,
+        &Resource->Data.FixedMemory32.Address);
+    ACPI_MOVE_32_TO_32 (&Aml->FixedMemory32.AddressLength,
+        &Resource->Data.FixedMemory32.AddressLength);
+
+    /* Complete the AML descriptor header */
+
+    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_FIXED_MEMORY32,
+        sizeof (AML_RESOURCE_FIXED_MEMORY32), Aml);
     return_ACPI_STATUS (AE_OK);
 }
 

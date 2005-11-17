@@ -102,11 +102,6 @@ int psm_verbose = 0;
 static ACPI_HANDLE acpi_sbobj = NULL;
 static kmutex_t acpi_irq_cache_mutex;
 
-#define	D2A_INITLEN	20
-static int d2a_len = 0;
-static int d2a_valid = 0;
-static d2a *d2a_table;
-
 /*
  * irq_cache_table is a list that serves a two-key cache. It is used
  * as a pci busid/devid/ipin <-> irq cache and also as a acpi
@@ -476,7 +471,7 @@ acpi_set_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int irq)
 	ACPI_RESOURCE	*resp;
 	ACPI_RESOURCE	*srsp;
 	ACPI_HANDLE lnkobj;
-	int status;
+	int srs_len, status;
 
 	ASSERT(acpipsmlnkp != NULL);
 
@@ -498,20 +493,21 @@ acpi_set_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int irq)
 	 * Find an IRQ resource descriptor to use as template
 	 */
 	srsp = NULL;
-	for (resp = rsb.Pointer; resp->Length != 0;
+	for (resp = rsb.Pointer; resp->Type != ACPI_RESOURCE_TYPE_END_TAG;
 	    resp = ACPI_NEXT_RESOURCE(resp)) {
-		if ((resp->Id == ACPI_RSTYPE_IRQ) ||
-		    (resp->Id == ACPI_RSTYPE_EXT_IRQ)) {
+		if ((resp->Type == ACPI_RESOURCE_TYPE_IRQ) ||
+		    (resp->Type == ACPI_RESOURCE_TYPE_EXTENDED_IRQ)) {
+			ACPI_RESOURCE *endtag;
 			/*
-			 * Mild trickery here; allocate two
-			 * resource structures, and set the Length
-			 * field of the second one to 0 to terminate
-			 * the list. Copy the possible resource into
-			 * the first one as a template.
+			 * Allocate enough room for this resource entry
+			 * and one end tag following it
 			 */
-			srsp = kmem_zalloc(2 * sizeof (*srsp), KM_SLEEP);
-			srsp[1].Length = 0;
-			*srsp = *resp;
+			srs_len = resp->Length + sizeof (*endtag);
+			srsp = kmem_zalloc(srs_len, KM_SLEEP);
+			bcopy(resp, srsp, resp->Length);
+			endtag = ACPI_NEXT_RESOURCE(srsp);
+			endtag->Type = ACPI_RESOURCE_TYPE_END_TAG;
+			endtag->Length = 0;
 			break;	/* drop out of the loop */
 		}
 	}
@@ -528,21 +524,21 @@ acpi_set_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int irq)
 	 * The Interrupts[] array is always at least one entry
 	 * long; see the definition of ACPI_RESOURCE.
 	 */
-	switch (srsp->Id) {
-	case ACPI_RSTYPE_IRQ:
-		srsp->Data.Irq.NumberOfInterrupts = 1;
+	switch (srsp->Type) {
+	case ACPI_RESOURCE_TYPE_IRQ:
+		srsp->Data.Irq.InterruptCount = 1;
 		srsp->Data.Irq.Interrupts[0] = irq;
 		break;
-	case ACPI_RSTYPE_EXT_IRQ:
-		srsp->Data.ExtendedIrq.NumberOfInterrupts = 1;
+	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+		srsp->Data.ExtendedIrq.InterruptCount = 1;
 		srsp->Data.ExtendedIrq.Interrupts[0] = irq;
 		break;
 	}
 
 	rsb.Pointer = srsp;
-	rsb.Length = 2 * sizeof (*srsp);
+	rsb.Length = srs_len;
 	status = AcpiSetCurrentResources(lnkobj, &rsb);
-	kmem_free(srsp, 2 * sizeof (*srsp));
+	kmem_free(srsp, srs_len);
 	if (status != AE_OK) {
 		cmn_err(CE_WARN, "!psm: set_irq: _SRS failed");
 		return (ACPI_PSM_FAILURE);
@@ -630,8 +626,9 @@ acpi_get_current_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int *pci_irqp,
 	}
 
 	irq = -1;
-	for (rp = rb.Pointer; rp->Length != 0; rp = ACPI_NEXT_RESOURCE(rp)) {
-		if (rp->Id == ACPI_RSTYPE_IRQ) {
+	for (rp = rb.Pointer; rp->Type != ACPI_RESOURCE_TYPE_END_TAG;
+	    rp = ACPI_NEXT_RESOURCE(rp)) {
+		if (rp->Type == ACPI_RESOURCE_TYPE_IRQ) {
 			if (irq > 0) {
 				PSM_VERBOSE_IRQ((CE_WARN, "!psm: multiple IRQ"
 				" from _CRS "));
@@ -639,7 +636,7 @@ acpi_get_current_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int *pci_irqp,
 				break;
 			}
 
-			if (rp->Data.Irq.NumberOfInterrupts != 1) {
+			if (rp->Data.Irq.InterruptCount != 1) {
 				PSM_VERBOSE_IRQ((CE_WARN, "!psm: <>1 interrupt"
 				" from _CRS "));
 				status = ACPI_PSM_FAILURE;
@@ -647,12 +644,12 @@ acpi_get_current_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int *pci_irqp,
 			}
 
 			intr_flagp->intr_el = psm_acpi_edgelevel(
-					rp->Data.Irq.EdgeLevel);
+					rp->Data.Irq.Triggering);
 			intr_flagp->intr_po = psm_acpi_po(
-					rp->Data.Irq.ActiveHighLow);
+					rp->Data.Irq.Polarity);
 			irq = rp->Data.Irq.Interrupts[0];
 			status = ACPI_PSM_SUCCESS;
-		} else if (rp->Id == ACPI_RSTYPE_EXT_IRQ) {
+		} else if (rp->Type == ACPI_RESOURCE_TYPE_EXTENDED_IRQ) {
 			if (irq > 0) {
 				PSM_VERBOSE_IRQ((CE_WARN, "!psm: multiple IRQ"
 				" from _CRS "));
@@ -660,7 +657,7 @@ acpi_get_current_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int *pci_irqp,
 				break;
 			}
 
-			if (rp->Data.ExtendedIrq.NumberOfInterrupts != 1) {
+			if (rp->Data.ExtendedIrq.InterruptCount != 1) {
 				PSM_VERBOSE_IRQ((CE_WARN, "!psm: <>1 interrupt"
 				" from _CRS "));
 				status = ACPI_PSM_FAILURE;
@@ -668,9 +665,9 @@ acpi_get_current_irq_resource(acpi_psm_lnk_t *acpipsmlnkp, int *pci_irqp,
 			}
 
 			intr_flagp->intr_el = psm_acpi_edgelevel(
-					rp->Data.ExtendedIrq.EdgeLevel);
+					rp->Data.ExtendedIrq.Triggering);
 			intr_flagp->intr_po = psm_acpi_po(
-					rp->Data.ExtendedIrq.ActiveHighLow);
+					rp->Data.ExtendedIrq.Polarity);
 			irq = rp->Data.ExtendedIrq.Interrupts[0];
 			status = ACPI_PSM_SUCCESS;
 		}
@@ -795,20 +792,20 @@ acpi_get_possible_irq_resources(acpi_psm_lnk_t *acpipsmlnkp,
 	 * Scan the resources looking for an interrupt resource
 	 */
 	*irqlistp = 0;
-	for (resp = rsb.Pointer; resp->Length != 0;
+	for (resp = rsb.Pointer; resp->Type != ACPI_RESOURCE_TYPE_END_TAG;
 	    resp = ACPI_NEXT_RESOURCE(resp)) {
-		switch (resp->Id) {
-		case ACPI_RSTYPE_IRQ:
-			irqlist_len = resp->Data.Irq.NumberOfInterrupts;
+		switch (resp->Type) {
+		case ACPI_RESOURCE_TYPE_IRQ:
+			irqlist_len = resp->Data.Irq.InterruptCount;
 			tmplist = resp->Data.Irq.Interrupts;
-			el = resp->Data.Irq.EdgeLevel;
-			po = resp->Data.Irq.ActiveHighLow;
+			el = resp->Data.Irq.Triggering;
+			po = resp->Data.Irq.Polarity;
 			break;
-		case ACPI_RSTYPE_EXT_IRQ:
-			irqlist_len = resp->Data.ExtendedIrq.NumberOfInterrupts;
+		case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+			irqlist_len = resp->Data.ExtendedIrq.InterruptCount;
 			tmplist = resp->Data.ExtendedIrq.Interrupts;
-			el = resp->Data.ExtendedIrq.EdgeLevel;
-			po = resp->Data.ExtendedIrq.ActiveHighLow;
+			el = resp->Data.ExtendedIrq.Triggering;
+			po = resp->Data.ExtendedIrq.Polarity;
 			break;
 		default:
 			continue;

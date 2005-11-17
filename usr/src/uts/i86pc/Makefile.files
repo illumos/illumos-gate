@@ -182,7 +182,7 @@ ACPICA_OBJS	+= dbcmds.o dbdisply.o \
 		   nsload.o nsnames.o nsobject.o nsparse.o nssearch.o \
 		   nsutils.o nswalk.o nsxfeval.o nsxfname.o nsxfobj.o \
 		   rsaddr.o rscalc.o rscreate.o rsdump.o \
-		   rsio.o rsirq.o rslist.o rsmemory.o rsmisc.o \
+		   rsinfo.o rsio.o rsirq.o rslist.o rsmemory.o rsmisc.o \
 		   rsutils.o rsxface.o tbconvrt.o tbget.o tbgetall.o \
 		   tbinstal.o tbrsdt.o tbutils.o tbxface.o tbxfroot.o \
 		   utalloc.o utclib.o utcopy.o utdebug.o utdelete.o \

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsxface - Public interfaces to the resource manager
- *              $Revision: 33 $
+ *              $Revision: 1.36 $
  *
  ******************************************************************************/
 
@@ -134,9 +134,9 @@
     ACPI_COPY_FIELD(Out, In, MaxAddressFixed);           \
     ACPI_COPY_FIELD(Out, In, Attribute);                 \
     ACPI_COPY_FIELD(Out, In, Granularity);               \
-    ACPI_COPY_FIELD(Out, In, MinAddressRange);           \
-    ACPI_COPY_FIELD(Out, In, MaxAddressRange);           \
-    ACPI_COPY_FIELD(Out, In, AddressTranslationOffset);  \
+    ACPI_COPY_FIELD(Out, In, Minimum);                   \
+    ACPI_COPY_FIELD(Out, In, Maximum);                   \
+    ACPI_COPY_FIELD(Out, In, TranslationOffset);         \
     ACPI_COPY_FIELD(Out, In, AddressLength);             \
     ACPI_COPY_FIELD(Out, In, ResourceSource);
 
@@ -329,10 +329,10 @@ AcpiGetPossibleResources (
 
 ACPI_STATUS
 AcpiWalkResources (
-    ACPI_HANDLE                     DeviceHandle,
-    char                            *Path,
-    ACPI_WALK_RESOURCE_CALLBACK     UserFunction,
-    void                            *Context)
+    ACPI_HANDLE                 DeviceHandle,
+    char                        *Path,
+    ACPI_WALK_RESOURCE_CALLBACK UserFunction,
+    void                        *Context)
 {
     ACPI_STATUS                 Status;
     ACPI_BUFFER                 Buffer = {ACPI_ALLOCATE_BUFFER, NULL};
@@ -366,7 +366,7 @@ AcpiWalkResources (
 
     for (;;)
     {
-        if (!Resource || Resource->Id == ACPI_RSTYPE_END_TAG)
+        if (!Resource || Resource->Type == ACPI_RESOURCE_TYPE_END_TAG)
         {
             break;
         }
@@ -464,8 +464,8 @@ AcpiSetCurrentResources (
  *
  * FUNCTION:    AcpiResourceToAddress64
  *
- * PARAMETERS:  resource                - Pointer to a resource
- *              out                     - Pointer to the users's return
+ * PARAMETERS:  Resource                - Pointer to a resource
+ *              Out                     - Pointer to the users's return
  *                                        buffer (a struct
  *                                        acpi_resource_address64)
  *
@@ -487,28 +487,26 @@ AcpiResourceToAddress64 (
     ACPI_RESOURCE_ADDRESS32     *Address32;
 
 
-    switch (Resource->Id) {
-    case ACPI_RSTYPE_ADDRESS16:
+    switch (Resource->Type)
+    {
+    case ACPI_RESOURCE_TYPE_ADDRESS16:
 
         Address16 = (ACPI_RESOURCE_ADDRESS16 *) &Resource->Data;
         ACPI_COPY_ADDRESS (Out, Address16);
         break;
 
-
-    case ACPI_RSTYPE_ADDRESS32:
+    case ACPI_RESOURCE_TYPE_ADDRESS32:
 
         Address32 = (ACPI_RESOURCE_ADDRESS32 *) &Resource->Data;
         ACPI_COPY_ADDRESS (Out, Address32);
         break;
 
-
-    case ACPI_RSTYPE_ADDRESS64:
+    case ACPI_RESOURCE_TYPE_ADDRESS64:
 
         /* Simple copy for 64 bit source */
 
         ACPI_MEMCPY (Out, &Resource->Data, sizeof (ACPI_RESOURCE_ADDRESS64));
         break;
-
 
     default:
         return (AE_BAD_PARAMETER);

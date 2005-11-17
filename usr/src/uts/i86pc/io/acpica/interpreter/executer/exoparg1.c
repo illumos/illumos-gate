@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 171 $
+ *              $Revision: 1.172 $
  *
  *****************************************************************************/
 
@@ -1080,7 +1080,7 @@ AcpiExOpcode_1A_0T_1R (
                     ReturnDesc = *(Operand[0]->Reference.Where);
                     if (ReturnDesc)
                     {
-	                    AcpiUtAddReference (ReturnDesc);
+                        AcpiUtAddReference (ReturnDesc);
                     }
 
                     break;

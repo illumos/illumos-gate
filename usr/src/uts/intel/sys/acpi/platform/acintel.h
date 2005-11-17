@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acintel.h - VC specific defines, etc.
- *       $Revision: 13 $
+ *       $Revision: 1.14 $
  *
  *****************************************************************************/
 
@@ -159,6 +159,9 @@
 
 /* warn C4706: assignment within conditional expression */
 #pragma warning(disable:4706)
+
+/* warn C4214: bit field types other than int */
+#pragma warning(disable:4214)
 
 /* This macro is used to tag functions as "printf-like" because
  * some compilers can catch printf format string problems. MSVC

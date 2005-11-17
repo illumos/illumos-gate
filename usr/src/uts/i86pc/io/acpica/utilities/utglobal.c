@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 213 $
+ *              $Revision: 1.214 $
  *
  *****************************************************************************/
 
@@ -907,6 +907,9 @@ AcpiUtInitGlobals (
     AcpiGbl_PsFindCount                 = 0;
     AcpiGbl_AcpiHardwarePresent         = TRUE;
     AcpiGbl_OwnerIdMask                 = 0;
+    AcpiGbl_TraceMethodName             = 0;
+    AcpiGbl_TraceDbgLevel               = 0;
+    AcpiGbl_TraceDbgLayer               = 0;
     AcpiGbl_DebuggerConfiguration       = DEBUGGER_THREADING;
     AcpiGbl_DbOutputFlags               = ACPI_DB_CONSOLE_OUTPUT;
 

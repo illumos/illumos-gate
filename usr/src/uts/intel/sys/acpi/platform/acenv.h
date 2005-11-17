@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acenv.h - Generation environment specific items
- *       $Revision: 116 $
+ *       $Revision: 1.118 $
  *
  *****************************************************************************/
 
@@ -142,6 +142,7 @@
 #define ACPI_APPLICATION
 #define ACPI_DEBUGGER
 #define ACPI_DISASSEMBLER
+#define ACPI_MUTEX_DEBUG
 #endif
 
 #ifdef ACPI_ASL_COMPILER
@@ -317,15 +318,15 @@
 #define ACPI_MEMCPY(d,s,n)      (void) memcpy((d), (s), (ACPI_SIZE)(n))
 #define ACPI_MEMSET(d,s,n)      (void) memset((d), (s), (ACPI_SIZE)(n))
 
-#define ACPI_TOUPPER            toupper
-#define ACPI_TOLOWER            tolower
-#define ACPI_IS_XDIGIT          isxdigit
-#define ACPI_IS_DIGIT           isdigit
-#define ACPI_IS_SPACE           isspace
-#define ACPI_IS_UPPER           isupper
-#define ACPI_IS_PRINT           isprint
-#define ACPI_IS_ALPHA           isalpha
-#define ACPI_IS_ASCII           isascii
+#define ACPI_TOUPPER(i)         toupper((int) (i))
+#define ACPI_TOLOWER(i)         tolower((int) (i))
+#define ACPI_IS_XDIGIT(i)       isxdigit((int) (i))
+#define ACPI_IS_DIGIT(i)        isdigit((int) (i))
+#define ACPI_IS_SPACE(i)        isspace((int) (i))
+#define ACPI_IS_UPPER(i)        isupper((int) (i))
+#define ACPI_IS_PRINT(i)        isprint((int) (i))
+#define ACPI_IS_ALPHA(i)        isalpha((int) (i))
+#define ACPI_IS_ASCII(i)        isascii((int) (i))
 
 #else
 

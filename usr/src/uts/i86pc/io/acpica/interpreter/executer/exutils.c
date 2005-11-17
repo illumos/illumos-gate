@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 117 $
+ *              $Revision: 1.118 $
  *
  *****************************************************************************/
 
@@ -311,7 +311,7 @@ AcpiExAcquireGlobalLock (
         }
     }
 
-    return_VALUE (Locked);
+    return_UINT8 (Locked);
 }
 
 
@@ -388,7 +388,7 @@ AcpiExDigitsNeeded (
 
     if (Value == 0)
     {
-        return_VALUE (1);
+        return_UINT32 (1);
     }
 
     CurrentValue = Value;
@@ -402,7 +402,7 @@ AcpiExDigitsNeeded (
         NumDigits++;
     }
 
-    return_VALUE (NumDigits);
+    return_UINT32 (NumDigits);
 }
 
 

@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: rsmisc - Miscellaneous resource descriptors
- *              $Revision: 29 $
+ *              $Revision: 1.34 $
  *
  ******************************************************************************/
 
@@ -125,531 +125,466 @@
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsEndTagResource
+ * FUNCTION:    AcpiRsGetGenericReg
  *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsEndTagResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
+AcpiRsGetGenericReg (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
 {
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    ACPI_SIZE               StructSize = ACPI_RESOURCE_LENGTH;
+    ACPI_FUNCTION_TRACE ("RsGetGenericReg");
 
-
-    ACPI_FUNCTION_TRACE ("RsEndTagResource");
-
-
-    /* The number of bytes consumed is static */
-
-    *BytesConsumed = 2;
-
-    /*  Fill out the structure */
-
-    OutputStruct->Id = ACPI_RSTYPE_END_TAG;
-
-    /* Set the Length parameter */
-
-    OutputStruct->Length = 0;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
-    return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiRsEndTagStream
- *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        used in the OutputBuffer is returned
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiRsEndTagStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
-{
-    UINT8                   *Buffer = *OutputBuffer;
-    UINT8                   Temp8 = 0;
-
-
-    ACPI_FUNCTION_TRACE ("RsEndTagStream");
-
-
-    /* The descriptor field is static */
-
-    *Buffer = 0x79;
-    Buffer += 1;
 
     /*
-     * Set the Checksum - zero means that the resource data is treated as if
-     * the checksum operation succeeded (ACPI Spec 1.0b Section 6.4.2.8)
+     * Get the following fields from the AML descriptor:
+     * Address Space ID
+     * Register Bit Width
+     * Register Bit Offset
+     * Access Size
+     * Register Address
      */
-    Temp8 = 0;
+    Resource->Data.GenericReg.SpaceId = Aml->GenericReg.AddressSpaceId;
+    Resource->Data.GenericReg.BitWidth = Aml->GenericReg.BitWidth;
+    Resource->Data.GenericReg.BitOffset = Aml->GenericReg.BitOffset;
+    Resource->Data.GenericReg.AccessSize = Aml->GenericReg.AccessSize;
+    ACPI_MOVE_64_TO_64 (&Resource->Data.GenericReg.Address,
+        &Aml->GenericReg.Address);
 
-    *Buffer = Temp8;
-    Buffer += 1;
+    /* Complete the resource header */
 
-    /* Return the number of bytes consumed in this operation */
-
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
+    Resource->Type = ACPI_RESOURCE_TYPE_GENERIC_REGISTER;
+    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_GENERIC_REGISTER);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsVendorResource
+ * FUNCTION:    AcpiRsSetGenericReg
  *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsVendorResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
+AcpiRsSetGenericReg (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
 {
-    UINT8                   *Buffer = ByteStreamBuffer;
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-    UINT8                   Index;
-    ACPI_SIZE               StructSize = ACPI_SIZEOF_RESOURCE (
-                                            ACPI_RESOURCE_VENDOR);
+    ACPI_FUNCTION_TRACE ("RsSetGenericReg");
 
 
-    ACPI_FUNCTION_TRACE ("RsVendorResource");
+    /*
+     * Set the following fields in the AML descriptor:
+     * Address Space ID
+     * Register Bit Width
+     * Register Bit Offset
+     * Access Size
+     * Register Address
+     */
+    Aml->GenericReg.AddressSpaceId = (UINT8) Resource->Data.GenericReg.SpaceId;
+    Aml->GenericReg.BitWidth = (UINT8) Resource->Data.GenericReg.BitWidth;
+    Aml->GenericReg.BitOffset = (UINT8) Resource->Data.GenericReg.BitOffset;
+    Aml->GenericReg.AccessSize = (UINT8) Resource->Data.GenericReg.AccessSize;
+    ACPI_MOVE_64_TO_64 (&Aml->GenericReg.Address,
+        &Resource->Data.GenericReg.Address);
+
+    /* Complete the AML descriptor header */
+
+    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_GENERIC_REGISTER,
+        sizeof (AML_RESOURCE_GENERIC_REGISTER), Aml);
+    return_ACPI_STATUS (AE_OK);
+}
 
 
-    /* Dereference the Descriptor to find if this is a large or small item. */
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiRsGetVendor
+ *
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
+ *
+ ******************************************************************************/
 
-    Temp8 = *Buffer;
+ACPI_STATUS
+AcpiRsGetVendor (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
+{
+    UINT8                   *AmlByteData;
 
-    if (Temp8 & 0x80)
+
+    ACPI_FUNCTION_TRACE ("RsGetVendor");
+
+
+    /* Determine if this is a large or small vendor specific item */
+
+    if (Aml->LargeHeader.DescriptorType & ACPI_RESOURCE_NAME_LARGE)
     {
-        /* Large Item, point to the length field */
+        /* Large item, Point to the first vendor byte */
 
-        Buffer += 1;
-
-        /* Dereference */
-
-        ACPI_MOVE_16_TO_16 (&Temp16, Buffer);
-
-        /* Calculate bytes consumed */
-
-        *BytesConsumed = (ACPI_SIZE) Temp16 + 3;
-
-        /* Point to the first vendor byte */
-
-        Buffer += 2;
+        AmlByteData = ((UINT8 *) Aml) + sizeof (AML_RESOURCE_LARGE_HEADER);
     }
     else
     {
-        /* Small Item, dereference the size */
+        /* Small item, Point to the first vendor byte */
 
-        Temp16 = (UINT8)(*Buffer & 0x07);
-
-        /* Calculate bytes consumed */
-
-        *BytesConsumed = (ACPI_SIZE) Temp16 + 1;
-
-        /* Point to the first vendor byte */
-
-        Buffer += 1;
+        AmlByteData = ((UINT8 *) Aml) + sizeof (AML_RESOURCE_SMALL_HEADER);
     }
 
-    OutputStruct->Id = ACPI_RSTYPE_VENDOR;
-    OutputStruct->Data.VendorSpecific.Length = Temp16;
+    /* Copy the vendor-specific bytes */
 
-    for (Index = 0; Index < Temp16; Index++)
-    {
-        OutputStruct->Data.VendorSpecific.Reserved[Index] = *Buffer;
-        Buffer += 1;
-    }
+    ACPI_MEMCPY (Resource->Data.Vendor.ByteData,
+        AmlByteData, AmlResourceLength);
+    Resource->Data.Vendor.ByteLength = AmlResourceLength;
 
     /*
      * In order for the StructSize to fall on a 32-bit boundary,
      * calculate the length of the vendor string and expand the
      * StructSize to the next 32-bit boundary.
      */
-    StructSize += ACPI_ROUND_UP_TO_32BITS (Temp16);
-
-    /* Set the Length parameter */
-
-    OutputStruct->Length = (UINT32) StructSize;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
+    Resource->Type = ACPI_RESOURCE_TYPE_VENDOR;
+    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_VENDOR) +
+                       ACPI_ROUND_UP_TO_32BITS (AmlResourceLength);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsVendorStream
+ * FUNCTION:    AcpiRsSetVendor
  *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        used in the OutputBuffer is returned
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsVendorStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
+AcpiRsSetVendor (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
 {
-    UINT8                   *Buffer = *OutputBuffer;
-    UINT16                  Temp16 = 0;
-    UINT8                   Temp8 = 0;
-    UINT8                   Index;
+    UINT32                  ResourceLength;
+    UINT8                   *Source;
+    UINT8                   *Destination;
 
 
-    ACPI_FUNCTION_TRACE ("RsVendorStream");
+    ACPI_FUNCTION_TRACE ("RsSetVendor");
 
 
-    /* Dereference the length to find if this is a large or small item. */
+    ResourceLength = Resource->Data.Vendor.ByteLength;
+    Source = ACPI_CAST_PTR (UINT8, Resource->Data.Vendor.ByteData);
 
-    if(LinkedList->Data.VendorSpecific.Length > 7)
+    /* Length determines if this is a large or small resource */
+
+    if (ResourceLength > 7)
     {
-        /* Large Item, Set the descriptor field and length bytes */
+        /* Large item, get pointer to the data part of the descriptor */
 
-        *Buffer = 0x84;
-        Buffer += 1;
+        Destination = ((UINT8 *) Aml) + sizeof (AML_RESOURCE_LARGE_HEADER);
 
-        Temp16 = (UINT16) LinkedList->Data.VendorSpecific.Length;
+        /* Complete the AML descriptor header */
 
-        ACPI_MOVE_16_TO_16 (Buffer, &Temp16);
-        Buffer += 2;
+        AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_VENDOR_LARGE,
+            (UINT32) (ResourceLength + sizeof (AML_RESOURCE_LARGE_HEADER)), Aml);
     }
     else
     {
-        /* Small Item, Set the descriptor field */
+        /* Small item, get pointer to the data part of the descriptor */
 
-        Temp8 = 0x70;
-        Temp8 |= (UINT8) LinkedList->Data.VendorSpecific.Length;
+        Destination = ((UINT8 *) Aml) + sizeof (AML_RESOURCE_SMALL_HEADER);
 
-        *Buffer = Temp8;
-        Buffer += 1;
+        /* Complete the AML descriptor header */
+
+        AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_VENDOR_SMALL,
+            (UINT32) (ResourceLength + sizeof (AML_RESOURCE_SMALL_HEADER)), Aml);
     }
 
-    /* Loop through all of the Vendor Specific fields */
+    /* Copy the vendor-specific bytes */
 
-    for (Index = 0; Index < LinkedList->Data.VendorSpecific.Length; Index++)
-    {
-        Temp8 = LinkedList->Data.VendorSpecific.Reserved[Index];
-
-        *Buffer = Temp8;
-        Buffer += 1;
-    }
-
-    /* Return the number of bytes consumed in this operation */
-
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
+    ACPI_MEMCPY (Destination, Source, ResourceLength);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsStartDependFnsResource
+ * FUNCTION:    AcpiRsGetStartDpf
  *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsStartDependFnsResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
+AcpiRsGetStartDpf (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
 {
-    UINT8                   *Buffer = ByteStreamBuffer;
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    UINT8                   Temp8 = 0;
-    ACPI_SIZE               StructSize = ACPI_SIZEOF_RESOURCE (
-                                ACPI_RESOURCE_START_DPF);
+    ACPI_FUNCTION_TRACE ("RsGetStartDpf");
 
 
-    ACPI_FUNCTION_TRACE ("RsStartDependFnsResource");
+    /* Get the flags byte if present */
 
-
-    /* The number of bytes consumed are found in the descriptor (Bits:0-1) */
-
-    Temp8 = *Buffer;
-
-    *BytesConsumed = (Temp8 & 0x01) + 1;
-
-    OutputStruct->Id = ACPI_RSTYPE_START_DPF;
-
-    /* Point to Byte 1 if it is used */
-
-    if (2 == *BytesConsumed)
+    if (AmlResourceLength == 1)
     {
-        Buffer += 1;
-        Temp8 = *Buffer;
+        /* Get the Compatibility priority */
 
-        /* Check Compatibility priority */
+        Resource->Data.StartDpf.CompatibilityPriority =
+            (Aml->StartDpf.Flags & 0x03);
 
-        OutputStruct->Data.StartDpf.CompatibilityPriority = Temp8 & 0x03;
-
-        if (3 == OutputStruct->Data.StartDpf.CompatibilityPriority)
+        if (Resource->Data.StartDpf.CompatibilityPriority >= 3)
         {
             return_ACPI_STATUS (AE_AML_BAD_RESOURCE_VALUE);
         }
 
-        /* Check Performance/Robustness preference */
+        /* Get the Performance/Robustness preference */
 
-        OutputStruct->Data.StartDpf.PerformanceRobustness = (Temp8 >> 2) & 0x03;
+        Resource->Data.StartDpf.PerformanceRobustness =
+            ((Aml->StartDpf.Flags >> 2) & 0x03);
 
-        if (3 == OutputStruct->Data.StartDpf.PerformanceRobustness)
+        if (Resource->Data.StartDpf.PerformanceRobustness >= 3)
         {
             return_ACPI_STATUS (AE_AML_BAD_RESOURCE_VALUE);
         }
     }
     else
     {
-        OutputStruct->Data.StartDpf.CompatibilityPriority =
+        /* StartDependentNoPri(), no flags byte, set defaults */
+
+        Resource->Data.StartDpf.CompatibilityPriority =
             ACPI_ACCEPTABLE_CONFIGURATION;
 
-        OutputStruct->Data.StartDpf.PerformanceRobustness =
+        Resource->Data.StartDpf.PerformanceRobustness =
             ACPI_ACCEPTABLE_CONFIGURATION;
     }
 
-    /* Set the Length parameter */
+    /* Complete the resource header */
 
-    OutputStruct->Length = (UINT32) StructSize;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
+    Resource->Type = ACPI_RESOURCE_TYPE_START_DEPENDENT;
+    Resource->Length = ACPI_SIZEOF_RESOURCE (ACPI_RESOURCE_START_DEPENDENT);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsEndDependFnsResource
+ * FUNCTION:    AcpiRsSetStartDpf
  *
- * PARAMETERS:  ByteStreamBuffer        - Pointer to the resource input byte
- *                                        stream
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        consumed the ByteStreamBuffer is
- *                                        returned
- *              OutputBuffer            - Pointer to the return data buffer
- *              StructureSize           - Pointer to where the number of bytes
- *                                        in the return data struct is returned
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the resource byte stream and fill out the appropriate
- *              structure pointed to by the OutputBuffer.  Return the
- *              number of bytes consumed from the byte stream.
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsEndDependFnsResource (
-    UINT8                   *ByteStreamBuffer,
-    ACPI_SIZE               *BytesConsumed,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *StructureSize)
+AcpiRsSetStartDpf (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
 {
-    ACPI_RESOURCE           *OutputStruct = (void *) *OutputBuffer;
-    ACPI_SIZE               StructSize = ACPI_RESOURCE_LENGTH;
-
-
-    ACPI_FUNCTION_TRACE ("RsEndDependFnsResource");
-
-
-    /* The number of bytes consumed is static */
-
-    *BytesConsumed = 1;
-
-    /*  Fill out the structure */
-
-    OutputStruct->Id = ACPI_RSTYPE_END_DPF;
-
-    /* Set the Length parameter */
-
-    OutputStruct->Length = (UINT32) StructSize;
-
-    /* Return the final size of the structure */
-
-    *StructureSize = StructSize;
-    return_ACPI_STATUS (AE_OK);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    AcpiRsStartDependFnsStream
- *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - UINT32 pointer that is filled with
- *                                        the number of bytes of the
- *                                        OutputBuffer used
- *
- * RETURN:      Status
- *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
- *
- ******************************************************************************/
-
-ACPI_STATUS
-AcpiRsStartDependFnsStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
-{
-    UINT8                   *Buffer = *OutputBuffer;
-    UINT8                   Temp8 = 0;
-
-
-    ACPI_FUNCTION_TRACE ("RsStartDependFnsStream");
+    ACPI_FUNCTION_TRACE ("RsSetStartDpf");
 
 
     /*
-     * The descriptor field is set based upon whether a byte is needed
+     * The descriptor type field is set based upon whether a byte is needed
      * to contain Priority data.
      */
     if (ACPI_ACCEPTABLE_CONFIGURATION ==
-            LinkedList->Data.StartDpf.CompatibilityPriority &&
+            Resource->Data.StartDpf.CompatibilityPriority &&
         ACPI_ACCEPTABLE_CONFIGURATION ==
-            LinkedList->Data.StartDpf.PerformanceRobustness)
+            Resource->Data.StartDpf.PerformanceRobustness)
     {
-        *Buffer = 0x30;
+        AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_START_DEPENDENT,
+            sizeof (AML_RESOURCE_START_DEPENDENT_NOPRIO), Aml);
     }
     else
     {
-        *Buffer = 0x31;
-        Buffer += 1;
+        AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_START_DEPENDENT,
+            sizeof (AML_RESOURCE_START_DEPENDENT), Aml);
 
-        /* Set the Priority Byte Definition */
+        /* Set the Flags byte */
 
-        Temp8 = 0;
-        Temp8 = (UINT8) ((LinkedList->Data.StartDpf.PerformanceRobustness &
-                            0x03) << 2);
-        Temp8 |= (LinkedList->Data.StartDpf.CompatibilityPriority &
-                            0x03);
-        *Buffer = Temp8;
+        Aml->StartDpf.Flags = (UINT8)
+            (((Resource->Data.StartDpf.PerformanceRobustness & 0x03) << 2) |
+              (Resource->Data.StartDpf.CompatibilityPriority & 0x03));
     }
-
-    Buffer += 1;
-
-    /* Return the number of bytes consumed in this operation */
-
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
     return_ACPI_STATUS (AE_OK);
 }
 
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiRsEndDependFnsStream
+ * FUNCTION:    AcpiRsGetEndDpf
  *
- * PARAMETERS:  LinkedList              - Pointer to the resource linked list
- *              OutputBuffer            - Pointer to the user's return buffer
- *              BytesConsumed           - Pointer to where the number of bytes
- *                                        used in the OutputBuffer is returned
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Take the linked list resource structure and fills in the
- *              the appropriate bytes in a byte stream
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
  *
  ******************************************************************************/
 
 ACPI_STATUS
-AcpiRsEndDependFnsStream (
-    ACPI_RESOURCE           *LinkedList,
-    UINT8                   **OutputBuffer,
-    ACPI_SIZE               *BytesConsumed)
+AcpiRsGetEndDpf (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
 {
-    UINT8                   *Buffer = *OutputBuffer;
+    ACPI_FUNCTION_TRACE ("RsGetEndDpf");
 
 
-    ACPI_FUNCTION_TRACE ("RsEndDependFnsStream");
+    /* Complete the resource header */
 
-
-    /* The descriptor field is static */
-
-    *Buffer = 0x38;
-    Buffer += 1;
-
-    /* Return the number of bytes consumed in this operation */
-
-    *BytesConsumed = ACPI_PTR_DIFF (Buffer, *OutputBuffer);
+    Resource->Type = ACPI_RESOURCE_TYPE_END_DEPENDENT;
+    Resource->Length = (UINT32) ACPI_RESOURCE_LENGTH;
     return_ACPI_STATUS (AE_OK);
 }
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiRsSetEndDpf
+ *
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiRsSetEndDpf (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
+{
+    ACPI_FUNCTION_TRACE ("RsSetEndDpf");
+
+
+    /* Complete the AML descriptor header */
+
+    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_END_DEPENDENT,
+        sizeof (AML_RESOURCE_END_DEPENDENT), Aml);
+    return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiRsGetEndTag
+ *
+ * PARAMETERS:  Aml                 - Pointer to the AML resource descriptor
+ *              AmlResourceLength   - Length of the resource from the AML header
+ *              Resource            - Where the internal resource is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert a raw AML resource descriptor to the corresponding
+ *              internal resource descriptor, simplifying bitflags and handling
+ *              alignment and endian issues if necessary.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiRsGetEndTag (
+    AML_RESOURCE            *Aml,
+    UINT16                  AmlResourceLength,
+    ACPI_RESOURCE           *Resource)
+{
+    ACPI_FUNCTION_TRACE ("RsGetEndTag");
+
+
+    /* Complete the resource header */
+
+    Resource->Type = ACPI_RESOURCE_TYPE_END_TAG;
+    Resource->Length = ACPI_RESOURCE_LENGTH;
+    return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiRsSetEndTag
+ *
+ * PARAMETERS:  Resource            - Pointer to the resource descriptor
+ *              Aml                 - Where the AML descriptor is returned
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Convert an internal resource descriptor to the corresponding
+ *              external AML resource descriptor.
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiRsSetEndTag (
+    ACPI_RESOURCE           *Resource,
+    AML_RESOURCE            *Aml)
+{
+    ACPI_FUNCTION_TRACE ("RsSetEndTag");
+
+
+    /*
+     * Set the Checksum - zero means that the resource data is treated as if
+     * the checksum operation succeeded (ACPI Spec 1.0b Section 6.4.2.8)
+     */
+    Aml->EndTag.Checksum = 0;
+
+    /* Complete the AML descriptor header */
+
+    AcpiRsSetResourceHeader (ACPI_RESOURCE_NAME_END_TAG,
+        sizeof (AML_RESOURCE_END_TAG), Aml);
+    return_ACPI_STATUS (AE_OK);
+}
+
 

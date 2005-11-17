@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acwin.h - OS specific defines, etc.
- *       $Revision: 21 $
+ *       $Revision: 1.22 $
  *
  *****************************************************************************/
 
@@ -154,6 +154,9 @@
 #define ACPI_FLUSH_CPU_CACHE()  __asm {WBINVD}
 #endif
 
+#ifdef _DEBUG
+#define ACPI_SIMPLE_RETURN_MACROS
+#endif
 
 /*
  * For Acpi applications, we don't want to try to access the global lock

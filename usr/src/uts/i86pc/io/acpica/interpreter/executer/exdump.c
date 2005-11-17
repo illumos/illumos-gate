@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 186 $
+ *              $Revision: 1.188 $
  *
  *****************************************************************************/
 
@@ -321,7 +321,7 @@ AcpiExDumpOperand (
 
     case ACPI_TYPE_BUFFER:
 
-        AcpiOsPrintf ("Buffer len %X @ %p \n",
+        AcpiOsPrintf ("Buffer len %X @ %p\n",
             ObjDesc->Buffer.Length, ObjDesc->Buffer.Pointer);
 
         Length = ObjDesc->Buffer.Length;
@@ -437,19 +437,19 @@ AcpiExDumpOperand (
     case ACPI_TYPE_BUFFER_FIELD:
 
         AcpiOsPrintf (
-            "BufferField: %X bits at byte %X bit %X of \n",
+            "BufferField: %X bits at byte %X bit %X of\n",
             ObjDesc->BufferField.BitLength,
             ObjDesc->BufferField.BaseByteOffset,
             ObjDesc->BufferField.StartFieldBitOffset);
 
         if (!ObjDesc->BufferField.BufferObj)
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "*NULL* \n"));
+            ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "*NULL*\n"));
         }
         else if (ACPI_GET_OBJECT_TYPE (ObjDesc->BufferField.BufferObj) !=
                     ACPI_TYPE_BUFFER)
         {
-            AcpiOsPrintf ("*not a Buffer* \n");
+            AcpiOsPrintf ("*not a Buffer*\n");
         }
         else
         {
@@ -699,7 +699,7 @@ AcpiExDumpReference (
         }
         else
         {
-           AcpiOsPrintf ("%s\n", RetBuf.Pointer);
+           AcpiOsPrintf ("%s\n", (char *) RetBuf.Pointer);
            ACPI_MEM_FREE (RetBuf.Pointer);
         }
     }
@@ -792,7 +792,7 @@ AcpiExDumpPackage (
 
     case ACPI_TYPE_PACKAGE:
 
-        AcpiOsPrintf ("[Package] Contains %d Elements: \n",
+        AcpiOsPrintf ("[Package] Contains %d Elements:\n",
                 ObjDesc->Package.Count);
 
         for (i = 0; i < ObjDesc->Package.Count; i++)

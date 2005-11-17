@@ -2,7 +2,7 @@
  *
  * Module Name: evsci - System Control Interrupt configuration and
  *                      legacy to ACPI mode state transition functions
- *              $Revision: 97 $
+ *              $Revision: 1.98 $
  *
  ******************************************************************************/
 
@@ -171,7 +171,7 @@ AcpiEvSciXruptHandler (
      */
     InterruptHandled |= AcpiEvGpeDetect (GpeXruptList);
 
-    return_VALUE (InterruptHandled);
+    return_UINT32 (InterruptHandled);
 }
 
 
@@ -209,7 +209,7 @@ AcpiEvGpeXruptHandler (
      */
     InterruptHandled |= AcpiEvGpeDetect (GpeXruptList);
 
-    return_VALUE (InterruptHandled);
+    return_UINT32 (InterruptHandled);
 }
 
 

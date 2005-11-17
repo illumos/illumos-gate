@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisply - debug display commands
- *              $Revision: 111 $
+ *              $Revision: 1.112 $
  *
  ******************************************************************************/
 
@@ -845,7 +845,7 @@ AcpiDbDisplayGpes (
             AcpiOsPrintf ("\nBlock %d - Info %p  DeviceNode %p [%s]\n",
                 Block, GpeBlock, GpeBlock->Node, Buffer);
 
-            AcpiOsPrintf ("    Registers:    %u (%u GPEs) \n",
+            AcpiOsPrintf ("    Registers:    %u (%u GPEs)\n",
                 GpeBlock->RegisterCount,
                 ACPI_MUL_8 (GpeBlock->RegisterCount));
 

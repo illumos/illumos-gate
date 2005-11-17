@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbexec - debugger control method execution
- *              $Revision: 69 $
+ *              $Revision: 1.70 $
  *
  ******************************************************************************/
 
@@ -435,7 +435,7 @@ AcpiDbExecute (
      * Allow any handlers in separate threads to complete.
      * (Such as Notify handlers invoked from AML executed above).
      */
-    AcpiOsSleep (10);
+    AcpiOsSleep ((ACPI_INTEGER) 10);
 
 
 #ifdef ACPI_DEBUG_OUTPUT

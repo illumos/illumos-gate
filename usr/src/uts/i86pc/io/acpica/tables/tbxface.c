@@ -2,7 +2,7 @@
  *
  * Module Name: tbxface - Public interfaces to the ACPI subsystem
  *                         ACPI table oriented interfaces
- *              $Revision: 68 $
+ *              $Revision: 1.70 $
  *
  *****************************************************************************/
 
@@ -261,11 +261,26 @@ AcpiLoadTable (
         return_ACPI_STATUS (Status);
     }
 
+    /* Check signature for a valid table type */
+
+    Status = AcpiTbRecognizeTable (&TableInfo, ACPI_TABLE_ALL);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
+    }
+
     /* Install the new table into the local data structures */
 
     Status = AcpiTbInstallTable (&TableInfo);
     if (ACPI_FAILURE (Status))
     {
+        if (Status == AE_ALREADY_EXISTS)
+        {
+            /* Table already exists, no error */
+
+            Status = AE_OK;
+        }
+
         /* Free table allocated by AcpiTbGetTableBody */
 
         AcpiTbDeleteSingleTable (&TableInfo);
@@ -345,6 +360,7 @@ AcpiUnloadTable (
          * simply a position within the hierarchy
          */
         AcpiNsDeleteNamespaceByOwner (TableDesc->OwnerId);
+        AcpiUtReleaseOwnerId (&TableDesc->OwnerId);
         TableDesc = TableDesc->Next;
     }
 

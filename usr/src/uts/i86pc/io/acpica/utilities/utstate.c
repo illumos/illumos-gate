@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utstate - state object support procedures
- *              $Revision: 1 $
+ *              $Revision: 1.2 $
  *
  ******************************************************************************/
 
@@ -453,7 +453,5 @@ AcpiUtDeleteGenericState (
     (void) AcpiOsReleaseObject (AcpiGbl_StateCache, State);
     return_VOID;
 }
-
-
 
 

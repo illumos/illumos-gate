@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 140 $
+ *              $Revision: 1.141 $
  *
  *****************************************************************************/
 
@@ -363,10 +363,10 @@ AcpiNsGetType (
     if (!Node)
     {
         ACPI_REPORT_WARNING (("NsGetType: Null Node input pointer\n"));
-        return_VALUE (ACPI_TYPE_ANY);
+        return_UINT32 (ACPI_TYPE_ANY);
     }
 
-    return_VALUE ((ACPI_OBJECT_TYPE) Node->Type);
+    return_UINT32 ((ACPI_OBJECT_TYPE) Node->Type);
 }
 
 
@@ -395,10 +395,10 @@ AcpiNsLocal (
         /* Type code out of range  */
 
         ACPI_REPORT_WARNING (("NsLocal: Invalid Object Type\n"));
-        return_VALUE (ACPI_NS_NORMAL);
+        return_UINT32 (ACPI_NS_NORMAL);
     }
 
-    return_VALUE ((UINT32) AcpiGbl_NsProperties[Type] & ACPI_NS_LOCAL);
+    return_UINT32 ((UINT32) AcpiGbl_NsProperties[Type] & ACPI_NS_LOCAL);
 }
 
 
@@ -1018,10 +1018,10 @@ AcpiNsOpensScope (
         /* type code out of range  */
 
         ACPI_REPORT_WARNING (("NsOpensScope: Invalid Object Type %X\n", Type));
-        return_VALUE (ACPI_NS_NORMAL);
+        return_UINT32 (ACPI_NS_NORMAL);
     }
 
-    return_VALUE (((UINT32) AcpiGbl_NsProperties[Type]) & ACPI_NS_NEWSCOPE);
+    return_UINT32 (((UINT32) AcpiGbl_NsProperties[Type]) & ACPI_NS_NEWSCOPE);
 }
 
 

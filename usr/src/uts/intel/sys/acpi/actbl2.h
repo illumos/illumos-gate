@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actbl2.h - ACPI Specification Revision 2.0 Tables
- *       $Revision: 44 $
+ *       $Revision: 1.45 $
  *
  *****************************************************************************/
 
@@ -174,7 +174,7 @@ typedef struct facs_descriptor_rev2
     UINT32                  GlobalLock;             /* Global Lock used to synchronize access to shared hardware resources */
 
     /* Flags (32 bits) */
- 
+
     UINT8_BIT               S4Bios_f        : 1;    /* 00:    S4BIOS support is present */
     UINT8_BIT                               : 7;    /* 01-07: Reserved, must be zero */
     UINT8                   Reserved1[3];           /* 08-31: Reserved, must be zero */

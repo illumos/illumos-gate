@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsinit - Object initialization namespace walk
- *              $Revision: 16 $
+ *              $Revision: 1.17 $
  *
  *****************************************************************************/
 
@@ -160,20 +160,20 @@ AcpiDsInitOneObject (
     void                    *Context,
     void                    **ReturnValue)
 {
+    ACPI_INIT_WALK_INFO     *Info = (ACPI_INIT_WALK_INFO *) Context;
+    ACPI_NAMESPACE_NODE     *Node = (ACPI_NAMESPACE_NODE *) ObjHandle;
     ACPI_OBJECT_TYPE        Type;
     ACPI_STATUS             Status;
-    ACPI_INIT_WALK_INFO     *Info = (ACPI_INIT_WALK_INFO *) Context;
 
 
     ACPI_FUNCTION_NAME ("DsInitOneObject");
 
 
     /*
-     * We are only interested in objects owned by the table that
+     * We are only interested in NS nodes owned by the table that
      * was just loaded
      */
-    if (((ACPI_NAMESPACE_NODE *) ObjHandle)->OwnerId !=
-            Info->TableDesc->OwnerId)
+    if (Node->OwnerId != Info->TableDesc->OwnerId)
     {
         return (AE_OK);
     }
@@ -203,8 +203,6 @@ AcpiDsInitOneObject (
 
     case ACPI_TYPE_METHOD:
 
-        Info->MethodCount++;
-
         /*
          * Print a dot for each method unless we are going to print
          * the entire pathname
@@ -222,7 +220,7 @@ AcpiDsInitOneObject (
          */
         if (Info->TableDesc->Pointer->Revision == 1)
         {
-            ((ACPI_NAMESPACE_NODE *) ObjHandle)->Flags |= ANOBJ_DATA_WIDTH_32;
+            Node->Flags |= ANOBJ_DATA_WIDTH_32;
         }
 
         /*
@@ -233,22 +231,14 @@ AcpiDsInitOneObject (
         if (ACPI_FAILURE (Status))
         {
             ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "Method %p [%4.4s] - parse failure, %s\n",
+                "\n+Method %p [%4.4s] - parse failure, %s\n",
                 ObjHandle, AcpiUtGetNodeName (ObjHandle),
                 AcpiFormatException (Status)));
 
             /* This parse failed, but we will continue parsing more methods */
-
-            break;
         }
 
-        /*
-         * Delete the parse tree.  We simply re-parse the method
-         * for every execution since there isn't much overhead
-         */
-        AcpiNsDeleteNamespaceSubtree (ObjHandle);
-        AcpiNsDeleteNamespaceByOwner (
-            ((ACPI_NAMESPACE_NODE *) ObjHandle)->Object->Method.OwnerId);
+        Info->MethodCount++;
         break;
 
 

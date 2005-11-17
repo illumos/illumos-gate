@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exnames - interpreter/scanner name load/execute
- *              $Revision: 102 $
+ *              $Revision: 1.103 $
  *
  *****************************************************************************/
 
@@ -298,12 +298,12 @@ AcpiExNameSegment (
         {
             ACPI_STRCAT (NameString, CharBuf);
             ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-                "Appended to - %s \n", NameString));
+                "Appended to - %s\n", NameString));
         }
         else
         {
             ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-                "No Name string - %s \n", CharBuf));
+                "No Name string - %s\n", CharBuf));
         }
     }
     else if (Index == 0)

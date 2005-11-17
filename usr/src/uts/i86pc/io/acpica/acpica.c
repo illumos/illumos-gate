@@ -120,23 +120,11 @@ _info(struct modinfo *modinfop)
 int
 _fini(void)
 {
-	int status;
-	extern int intr_hooked;
-
-	status = AcpiTerminate();
-	if (status != AE_OK) {
-		cmn_err(CE_WARN, "!acpica: error terminating: %d", status);
-		return (EBUSY);
-	}
-
-	if (intr_hooked) {
-		/* also note this error; terminate should have detached intr */
-		cmn_err(CE_WARN, "!acpica: error terminating: SCI attached");
-		return (EBUSY);
-	}
-
-	mutex_destroy(&acpica_module_lock);
-	return (mod_remove(&modlinkage));
+	/*
+	 * acpica module is never unloaded at run-time; there's always
+	 * a PSM depending on it, at the very least
+	 */
+	return (EBUSY);
 }
 
 /*

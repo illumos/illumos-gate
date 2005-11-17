@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbxfroot - Find the root ACPI table (RSDT)
- *              $Revision: 89 $
+ *              $Revision: 1.91 $
  *
  *****************************************************************************/
 
@@ -167,7 +167,7 @@ AcpiTbValidateRsdp (
 
     /* Check the standard checksum */
 
-    if (AcpiTbChecksum (Rsdp, ACPI_RSDP_CHECKSUM_LENGTH) != 0)
+    if (AcpiTbGenerateChecksum (Rsdp, ACPI_RSDP_CHECKSUM_LENGTH) != 0)
     {
         return (AE_BAD_CHECKSUM);
     }
@@ -175,7 +175,7 @@ AcpiTbValidateRsdp (
     /* Check extended checksum if table version >= 2 */
 
     if ((Rsdp->Revision >= 2) &&
-        (AcpiTbChecksum (Rsdp, ACPI_RSDP_XCHECKSUM_LENGTH) != 0))
+        (AcpiTbGenerateChecksum (Rsdp, ACPI_RSDP_XCHECKSUM_LENGTH) != 0))
     {
         return (AE_BAD_CHECKSUM);
     }
@@ -364,7 +364,7 @@ AcpiGetFirmwareTable (
 
     AcpiTbGetRsdtAddress (&Address);
     ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
-        "RSDP located at %p, RSDT physical=%8.8X%8.8X \n",
+        "RSDP located at %p, RSDT physical=%8.8X%8.8X\n",
         AcpiGbl_RSDP,
         ACPI_FORMAT_UINT64 (Address.Pointer.Value)));
 

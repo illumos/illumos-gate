@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psargs - Parse AML opcode arguments
- *              $Revision: 80 $
+ *              $Revision: 1.81 $
  *
  *****************************************************************************/
 
@@ -202,7 +202,7 @@ AcpiPsGetNextPackageLength (
         break;
     }
 
-    return_VALUE (Length);
+    return_UINT32 (Length);
 }
 
 

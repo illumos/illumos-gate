@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsparse - namespace interface to AML parser
- *              $Revision: 9 $
+ *              $Revision: 1.10 $
  *
  *****************************************************************************/
 
@@ -141,7 +141,7 @@
 
 ACPI_STATUS
 AcpiNsOneCompleteParse (
-    UINT32                  PassNumber,
+    UINT8                   PassNumber,
     ACPI_TABLE_DESC         *TableDesc)
 {
     ACPI_PARSE_OBJECT       *ParseRoot;

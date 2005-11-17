@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsload - namespace loading/expanding/contracting procedures
- *              $Revision: 72 $
+ *              $Revision: 1.73 $
  *
  *****************************************************************************/
 
@@ -279,7 +279,7 @@ AcpiNsLoadTableByType (
     {
     case ACPI_TABLE_DSDT:
 
-        ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Loading DSDT\n"));
+        ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Namespace load: DSDT\n"));
 
         TableDesc = AcpiGbl_TableLists[ACPI_TABLE_DSDT].Next;
 
@@ -301,50 +301,21 @@ AcpiNsLoadTableByType (
 
 
     case ACPI_TABLE_SSDT:
-
-        ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Loading %d SSDTs\n",
-            AcpiGbl_TableLists[ACPI_TABLE_SSDT].Count));
-
-        /*
-         * Traverse list of SSDT tables
-         */
-        TableDesc = AcpiGbl_TableLists[ACPI_TABLE_SSDT].Next;
-        for (i = 0; i < AcpiGbl_TableLists[ACPI_TABLE_SSDT].Count; i++)
-        {
-            /*
-             * Only attempt to load table if it is not
-             * already loaded!
-             */
-            if (!TableDesc->LoadedIntoNamespace)
-            {
-                Status = AcpiNsLoadTable (TableDesc, AcpiGbl_RootNode);
-                if (ACPI_FAILURE (Status))
-                {
-                    break;
-                }
-
-                TableDesc->LoadedIntoNamespace = TRUE;
-            }
-
-            TableDesc = TableDesc->Next;
-        }
-        break;
-
-
     case ACPI_TABLE_PSDT:
 
-        ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Loading %d PSDTs\n",
-            AcpiGbl_TableLists[ACPI_TABLE_PSDT].Count));
+        ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Namespace load: %d SSDT or PSDTs\n",
+            AcpiGbl_TableLists[TableType].Count));
 
         /*
-         * Traverse list of PSDT tables
+         * Traverse list of SSDT or PSDT tables
          */
-        TableDesc = AcpiGbl_TableLists[ACPI_TABLE_PSDT].Next;
-
-        for (i = 0; i < AcpiGbl_TableLists[ACPI_TABLE_PSDT].Count; i++)
+        TableDesc = AcpiGbl_TableLists[TableType].Next;
+        for (i = 0; i < AcpiGbl_TableLists[TableType].Count; i++)
         {
-            /* Only attempt to load table if it is not already loaded! */
-
+            /*
+             * Only attempt to load table into namespace if it is not
+             * already loaded!
+             */
             if (!TableDesc->LoadedIntoNamespace)
             {
                 Status = AcpiNsLoadTable (TableDesc, AcpiGbl_RootNode);

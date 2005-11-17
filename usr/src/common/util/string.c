@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,9 @@ vsnprintf(char *buf, size_t buflen, const char *fmt, va_list aargs)
 {
 	uint64_t ul, tmp;
 	char *bufp = buf;	/* current buffer pointer */
-	int pad, width, ells, base, sign, c;
+	int pad, width, base, sign, c, num;
+	int prec, h_count, l_count, dot_count;
+	int pad_count, transfer_count, left_align;
 	char *digits, *sp, *bs;
 	char numbuf[65];	/* sufficient for a 64-bit binary value */
 	va_list args;
@@ -84,28 +86,64 @@ vsnprintf(char *buf, size_t buflen, const char *fmt, va_list aargs)
 			continue;
 		}
 
+		width = prec = 0;
+		left_align = base = sign = 0;
+		h_count = l_count = dot_count = 0;
+		pad = ' ';
+		digits = "0123456789abcdef";
+next_fmt:
 		if ((c = *fmt++) == '\0')
 			break;
-
-		for (pad = ' '; c == '0'; c = *fmt++)
-			pad = '0';
-
-		for (width = 0; c >= '0' && c <= '9'; c = *fmt++)
-			width = width * 10 + c - '0';
-
-		for (ells = 0; c == 'l'; c = *fmt++)
-			ells++;
-
-		digits = "0123456789abcdef";
 
 		if (c >= 'A' && c <= 'Z') {
 			c += 'a' - 'A';
 			digits = "0123456789ABCDEF";
 		}
 
-		base = sign = 0;
-
 		switch (c) {
+		case '-':
+			left_align++;
+			goto next_fmt;
+		case '0':
+			if (dot_count == 0)
+				pad = '0';
+			/*FALLTHROUGH*/
+		case '1':
+		case '2':
+		case '3':
+		case '4':
+		case '5':
+		case '6':
+		case '7':
+		case '8':
+		case '9':
+			num = 0;
+			for (;;) {
+				num = 10 * num + c - '0';
+				c = *fmt;
+				if (c < '0' || c > '9')
+					break;
+				else
+					fmt++;
+			}
+			if (dot_count > 0)
+				prec = num;
+			else
+				width = num;
+
+			goto next_fmt;
+		case '.':
+			dot_count++;
+			goto next_fmt;
+		case '*':
+			width = (int)va_arg(args, int);
+			goto next_fmt;
+		case 'l':
+			l_count++;
+			goto next_fmt;
+		case 'h':
+			h_count++;
+			goto next_fmt;
 		case 'd':
 			sign = 1;
 			/*FALLTHROUGH*/
@@ -113,7 +151,7 @@ vsnprintf(char *buf, size_t buflen, const char *fmt, va_list aargs)
 			base = 10;
 			break;
 		case 'p':
-			ells = 1;
+			l_count = 1;
 			/*FALLTHROUGH*/
 		case 'x':
 			base = 16;
@@ -122,19 +160,49 @@ vsnprintf(char *buf, size_t buflen, const char *fmt, va_list aargs)
 			base = 8;
 			break;
 		case 'b':
-			ells = 0;
+			l_count = 0;
 			base = 1;
 			break;
 		case 'c':
-			ul = (int64_t)va_arg(args, int);
-			ADDCHAR((int)ul & 0xff);
+			c = (char)va_arg(args, char);
+			ADDCHAR(c);
 			break;
 		case 's':
 			sp = va_arg(args, char *);
-			if (sp == NULL)
+			if (sp == NULL) {
 				sp = "<null string>";
-			while ((c = *sp++) != 0)
-				ADDCHAR(c);
+				/* avoid truncation */
+				prec = strlen(sp);
+			}
+			/*
+			 * Handle simple case specially to avoid
+			 * performance hit of strlen()
+			 */
+			if (prec == 0 && width == 0) {
+				while ((c = *sp++) != 0)
+					ADDCHAR(c);
+				break;
+			}
+			transfer_count = strlen(sp);
+			if (prec > 0) {
+				/* trim string if too long */
+				if (transfer_count > prec)
+					transfer_count = prec;
+				/* widen field if too narrow */
+				if (prec > width)
+					width = prec;
+			}
+			if (width > transfer_count)
+				pad_count = width - transfer_count;
+			else
+				pad_count = 0;
+			while ((!left_align) && (pad_count-- > 0))
+				ADDCHAR(' ');
+			/* ADDCHAR() evaluates arg at most once */
+			while (transfer_count-- > 0)
+				ADDCHAR(*sp++);
+			while ((left_align) && (pad_count-- > 0))
+				ADDCHAR(' ');
 			break;
 		case '%':
 			ADDCHAR('%');
@@ -144,30 +212,49 @@ vsnprintf(char *buf, size_t buflen, const char *fmt, va_list aargs)
 		if (base == 0)
 			continue;
 
-		if (ells == 0)
-			ul = (int64_t)va_arg(args, int);
-		else if (ells == 1)
-			ul = (int64_t)va_arg(args, long);
-		else
-			ul = (int64_t)va_arg(args, int64_t);
+		if (h_count == 0 && l_count == 0)
+			if (sign)
+				ul = (int64_t)va_arg(args, int);
+			else
+				ul = (int64_t)va_arg(args, unsigned int);
+		else if (l_count > 1)
+			if (sign)
+				ul = (int64_t)va_arg(args, int64_t);
+			else
+				ul = (int64_t)va_arg(args, uint64_t);
+		else if (l_count > 0)
+			if (sign)
+				ul = (int64_t)va_arg(args, long);
+			else
+				ul = (int64_t)va_arg(args, unsigned long);
+		else if (h_count > 1)
+			if (sign)
+				ul = (int64_t)va_arg(args, char);
+			else
+				ul = (int64_t)va_arg(args, unsigned char);
+		else if (h_count > 0)
+			if (sign)
+				ul = (int64_t)va_arg(args, short);
+			else
+				ul = (int64_t)va_arg(args, unsigned short);
 
 		if (sign && (int64_t)ul < 0)
 			ul = -ul;
 		else
 			sign = 0;
 
-		if (ells < 8 / sizeof (long))
-			ul &= 0xffffffffU;
-
 		if (c == 'b') {
 			bs = va_arg(args, char *);
 			base = *bs++;
 		}
 
-		tmp = ul;
-		do {
-			width--;
-		} while ((tmp /= base) != 0);
+		/* avoid repeated division if width is 0 */
+		if (width > 0) {
+			tmp = ul;
+			do {
+				width--;
+			} while ((tmp /= base) != 0);
+		}
 
 		if (sign && pad == '0')
 			ADDCHAR('-');

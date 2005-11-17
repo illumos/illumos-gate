@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmutex - local mutex support
- *              $Revision: 2 $
+ *              $Revision: 1.3 $
  *
  ******************************************************************************/
 
@@ -326,7 +326,7 @@ AcpiUtAcquireMutex (
          */
         for (i = MutexId; i < MAX_MUTEX; i++)
         {
-            if (AcpiGbl_MutexInfo[i].OwnerId == ThisThreadId)
+            if (AcpiGbl_MutexInfo[i].ThreadId == ThisThreadId)
             {
                 if (i == MutexId)
                 {
@@ -432,7 +432,7 @@ AcpiUtReleaseMutex (
          */
         for (i = MutexId; i < MAX_MUTEX; i++)
         {
-            if (AcpiGbl_MutexInfo[i].OwnerId == ThisThreadId)
+            if (AcpiGbl_MutexInfo[i].ThreadId == ThisThreadId)
             {
                 if (i == MutexId)
                 {

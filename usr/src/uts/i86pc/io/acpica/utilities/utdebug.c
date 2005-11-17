@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 118 $
+ *              $Revision: 1.126 $
  *
  *****************************************************************************/
 
@@ -128,6 +128,12 @@ static UINT32   AcpiGbl_PrevThreadId = 0xFFFFFFFF;
 static char     *AcpiGbl_FnEntryStr = "----Entry";
 static char     *AcpiGbl_FnExitStr  = "----Exit-";
 
+/* Local prototypes */
+
+static const char *
+AcpiUtTrimFunctionName (
+    const char              *FunctionName);
+
 
 /*******************************************************************************
  *
@@ -145,7 +151,7 @@ void
 AcpiUtInitStackPtrTrace (
     void)
 {
-    UINT32              CurrentSp;
+    UINT32                  CurrentSp;
 
 
     AcpiGbl_EntryStackPointer = ACPI_PTR_DIFF (&CurrentSp, NULL);
@@ -168,7 +174,7 @@ void
 AcpiUtTrackStackPtr (
     void)
 {
-    ACPI_SIZE           CurrentSp;
+    ACPI_SIZE               CurrentSp;
 
 
     CurrentSp = ACPI_PTR_DIFF (&CurrentSp, NULL);
@@ -182,6 +188,45 @@ AcpiUtTrackStackPtr (
     {
         AcpiGbl_DeepestNesting = AcpiGbl_NestingLevel;
     }
+}
+
+
+/*******************************************************************************
+ *
+ * FUNCTION:    AcpiUtTrimFunctionName
+ *
+ * PARAMETERS:  FunctionName        - Ascii string containing a procedure name
+ *
+ * RETURN:      Updated pointer to the function name
+ *
+ * DESCRIPTION: Remove the "Acpi" prefix from the function name, if present.
+ *              This allows compiler macros such as __FUNCTION__ to be used
+ *              with no change to the debug output.
+ *
+ ******************************************************************************/
+
+static const char *
+AcpiUtTrimFunctionName (
+    const char              *FunctionName)
+{
+
+    /* All Function names are longer than 4 chars, check is safe */
+
+    if (*(ACPI_CAST_PTR (UINT32, FunctionName)) == ACPI_PREFIX_MIXED)
+    {
+        /* This is the case where the original source has not been modified */
+
+        return (FunctionName + 4);
+    }
+
+    if (*(ACPI_CAST_PTR (UINT32, FunctionName)) == ACPI_PREFIX_LOWER)
+    {
+        /* This is the case where the source has been 'linuxized' */
+
+        return (FunctionName + 5);
+    }
+
+    return (FunctionName);
 }
 
 
@@ -208,7 +253,7 @@ void  ACPI_INTERNAL_VAR_XFACE
 AcpiUtDebugPrint (
     UINT32                  RequestedDebugLevel,
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId,
     char                    *Format,
@@ -256,7 +301,7 @@ AcpiUtDebugPrint (
     }
 
     AcpiOsPrintf ("[%02ld] %-22.22s: ",
-        AcpiGbl_NestingLevel, FunctionName);
+        AcpiGbl_NestingLevel, AcpiUtTrimFunctionName (FunctionName));
 
     va_start (args, Format);
     AcpiOsVprintf (Format, args);
@@ -286,7 +331,7 @@ void  ACPI_INTERNAL_VAR_XFACE
 AcpiUtDebugPrintRaw (
     UINT32                  RequestedDebugLevel,
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId,
     char                    *Format,
@@ -325,7 +370,7 @@ AcpiUtDebugPrintRaw (
 void
 AcpiUtTrace (
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId)
 {
@@ -333,7 +378,7 @@ AcpiUtTrace (
     AcpiGbl_NestingLevel++;
     AcpiUtTrackStackPtr ();
 
-    AcpiUtDebugPrint (ACPI_LV_FUNCTIONS, 
+    AcpiUtDebugPrint (ACPI_LV_FUNCTIONS,
         LineNumber, FunctionName, ModuleName, ComponentId,
         "%s\n", AcpiGbl_FnEntryStr);
 }
@@ -359,7 +404,7 @@ AcpiUtTrace (
 void
 AcpiUtTracePtr (
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId,
     void                    *Pointer)
@@ -393,7 +438,7 @@ AcpiUtTracePtr (
 void
 AcpiUtTraceStr (
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId,
     char                    *String)
@@ -428,7 +473,7 @@ AcpiUtTraceStr (
 void
 AcpiUtTraceU32 (
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId,
     UINT32                  Integer)
@@ -462,7 +507,7 @@ AcpiUtTraceU32 (
 void
 AcpiUtExit (
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId)
 {
@@ -495,7 +540,7 @@ AcpiUtExit (
 void
 AcpiUtStatusExit (
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId,
     ACPI_STATUS             Status)
@@ -540,7 +585,7 @@ AcpiUtStatusExit (
 void
 AcpiUtValueExit (
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId,
     ACPI_INTEGER            Value)
@@ -575,7 +620,7 @@ AcpiUtValueExit (
 void
 AcpiUtPtrExit (
     UINT32                  LineNumber,
-    char                    *FunctionName,
+    const char              *FunctionName,
     char                    *ModuleName,
     UINT32                  ComponentId,
     UINT8                   *Ptr)
@@ -689,8 +734,8 @@ AcpiUtDumpBuffer (
         }
 
         /*
-         * Print the ASCII equivalent characters
-         * But watch out for the bad unprintable ones...
+         * Print the ASCII equivalent characters but watch out for the bad
+         * unprintable ones (printable chars are 0x20 through 0x7E)
          */
         AcpiOsPrintf (" ");
         for (j = 0; j < 16; j++)
@@ -702,9 +747,7 @@ AcpiUtDumpBuffer (
             }
 
             BufChar = Buffer[i + j];
-            if ((BufChar > 0x1F && BufChar < 0x2E) ||
-                (BufChar > 0x2F && BufChar < 0x61) ||
-                (BufChar > 0x60 && BufChar < 0x7F))
+            if (ACPI_IS_PRINT (BufChar))
             {
                 AcpiOsPrintf ("%c", BufChar);
             }

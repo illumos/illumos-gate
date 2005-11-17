@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 65 $
+ *              $Revision: 1.70 $
  *
  *****************************************************************************/
 
@@ -135,6 +135,77 @@ AcpiTbHandleToObject (
 
 /*******************************************************************************
  *
+ * FUNCTION:    AcpiTbIsTableInstalled
+ *
+ * PARAMETERS:  NewTableDesc        - Descriptor for new table being installed
+ *
+ * RETURN:      Status - AE_ALREADY_EXISTS if the table is already installed
+ *
+ * DESCRIPTION: Determine if an ACPI table is already installed
+ *
+ * MUTEX:       Table data structures should be locked
+ *
+ ******************************************************************************/
+
+ACPI_STATUS
+AcpiTbIsTableInstalled (
+    ACPI_TABLE_DESC         *NewTableDesc)
+{
+    ACPI_TABLE_DESC         *TableDesc;
+
+
+    ACPI_FUNCTION_TRACE ("TbIsTableInstalled");
+
+
+    /* Get the list descriptor and first table descriptor */
+
+    TableDesc = AcpiGbl_TableLists[NewTableDesc->Type].Next;
+
+    /* Examine all installed tables of this type */
+
+    while (TableDesc)
+    {
+        /*
+         * If the table lengths match, perform a full bytewise compare. This
+         * means that we will allow tables with duplicate OemTableId(s), as
+         * long as the tables are different in some way.
+         *
+         * Checking if the table has been loaded into the namespace means that
+         * we don't check for duplicate tables during the initial installation
+         * of tables within the RSDT/XSDT.
+         */
+        if ((TableDesc->LoadedIntoNamespace) &&
+            (TableDesc->Pointer->Length == NewTableDesc->Pointer->Length) &&
+            (!ACPI_MEMCMP (
+                (const char *) TableDesc->Pointer,
+                (const char *) NewTableDesc->Pointer,
+                (ACPI_SIZE) NewTableDesc->Pointer->Length)))
+        {
+            /* Match: this table is already installed */
+
+            ACPI_DEBUG_PRINT ((ACPI_DB_TABLES,
+                "Table [%4.4s] already installed: Rev %X OemTableId [%8.8s]\n",
+                NewTableDesc->Pointer->Signature,
+                NewTableDesc->Pointer->Revision,
+                NewTableDesc->Pointer->OemTableId));
+
+            NewTableDesc->OwnerId       = TableDesc->OwnerId;
+            NewTableDesc->InstalledDesc = TableDesc;
+
+            return_ACPI_STATUS (AE_ALREADY_EXISTS);
+        }
+
+        /* Get next table on the list */
+
+        TableDesc = TableDesc->Next;
+    }
+
+    return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    AcpiTbValidateTableHeader
  *
  * PARAMETERS:  TableHeader         - Logical pointer to the table
@@ -234,7 +305,7 @@ AcpiTbVerifyTableChecksum (
 
     /* Compute the checksum on the table */
 
-    Checksum = AcpiTbChecksum (TableHeader, TableHeader->Length);
+    Checksum = AcpiTbGenerateChecksum (TableHeader, TableHeader->Length);
 
     /* Return the appropriate exception */
 
@@ -253,7 +324,7 @@ AcpiTbVerifyTableChecksum (
 
 /*******************************************************************************
  *
- * FUNCTION:    AcpiTbChecksum
+ * FUNCTION:    AcpiTbGenerateChecksum
  *
  * PARAMETERS:  Buffer              - Buffer to checksum
  *              Length              - Size of the buffer
@@ -265,7 +336,7 @@ AcpiTbVerifyTableChecksum (
  ******************************************************************************/
 
 UINT8
-AcpiTbChecksum (
+AcpiTbGenerateChecksum (
     void                    *Buffer,
     UINT32                  Length)
 {

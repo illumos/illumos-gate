@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psutils - Parser miscellaneous utilities (Parser only)
- *              $Revision: 65 $
+ *              $Revision: 1.66 $
  *
  *****************************************************************************/
 
@@ -280,11 +280,11 @@ AcpiPsFreeOp (
 
     if (Op->Common.Flags & ACPI_PARSEOP_GENERIC)
     {
-        AcpiOsReleaseObject (AcpiGbl_PsNodeCache, Op);
+        (void) AcpiOsReleaseObject (AcpiGbl_PsNodeCache, Op);
     }
     else
     {
-        AcpiOsReleaseObject (AcpiGbl_PsNodeExtCache, Op);
+        (void) AcpiOsReleaseObject (AcpiGbl_PsNodeExtCache, Op);
     }
 }
 

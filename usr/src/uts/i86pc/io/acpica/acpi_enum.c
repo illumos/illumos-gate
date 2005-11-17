@@ -135,7 +135,7 @@ parse_resources_irq(ACPI_RESOURCE *resource_ptr, int *interrupt_count)
 	int i;
 	ACPI_RESOURCE_IRQ irq = resource_ptr->Data.Irq;
 
-	for (i = 0; i < irq.NumberOfInterrupts; i++) {
+	for (i = 0; i < irq.InterruptCount; i++) {
 		interrupt[(*interrupt_count)++] =
 		    irq.Interrupts[i];
 		used_interrupts |= 1 << irq.Interrupts[i];
@@ -153,7 +153,7 @@ parse_resources_dma(ACPI_RESOURCE *resource_ptr, int *dma_count)
 	int i;
 	ACPI_RESOURCE_DMA acpi_dma = resource_ptr->Data.Dma;
 
-	for (i = 0; i < acpi_dma.NumberOfChannels; i++) {
+	for (i = 0; i < acpi_dma.ChannelCount; i++) {
 		dma[(*dma_count)++] = acpi_dma.Channels[i];
 		used_dmas |= 1 << acpi_dma.Channels[i];
 		if (acpi_enum_debug & PARSE_RES_DMA) {
@@ -171,25 +171,25 @@ parse_resources_io(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	ACPI_RESOURCE_IO acpi_io = resource_ptr->Data.Io;
 
 	io[*io_count].regspec_bustype = 1; /* io */
-	io[*io_count].regspec_size = acpi_io.RangeLength;
+	io[*io_count].regspec_size = acpi_io.AddressLength;
 	/* When Min equals Max, IO is 32-bit */
-	if (acpi_io.MinBaseAddress == acpi_io.MaxBaseAddress) {
+	if (acpi_io.Minimum == acpi_io.Maximum) {
 		io[*io_count].regspec_addr =
-		    acpi_io.MinBaseAddress;
+		    acpi_io.Minimum;
 	} else {
 		/* else IO is 10-bit ISA */
 		io[*io_count].regspec_addr =
-		    acpi_io.MinBaseAddress & 0x3FF;
+		    acpi_io.Minimum & 0x3FF;
 		cmn_err(CE_NOTE,
-		    "!ACPI source type ACPI_RSTYPE_IO"\
+		    "!ACPI source type ACPI_RESOURCE_TYPE_IO"\
 		    "10-bit ISA range not supported");
 	}
 	if (acpi_enum_debug & PARSE_RES_IO) {
 		cmn_err(CE_NOTE, "parse_resources() "\
 		    "IO min 0x%X, max 0x%X, length: 0x%X",
-		    acpi_io.MinBaseAddress,
-		    acpi_io.MaxBaseAddress,
-		    acpi_io.RangeLength);
+		    acpi_io.Minimum,
+		    acpi_io.Maximum,
+		    acpi_io.AddressLength);
 	}
 	(*io_count)++;
 }
@@ -201,12 +201,12 @@ parse_resources_fixed_io(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 	ACPI_RESOURCE_FIXED_IO fixed_io = resource_ptr->Data.FixedIo;
 
 	io[*io_count].regspec_bustype = 1; /* io */
-	io[*io_count].regspec_addr = fixed_io.BaseAddress;
-	io[*io_count].regspec_size = fixed_io.RangeLength;
+	io[*io_count].regspec_addr = fixed_io.Address;
+	io[*io_count].regspec_size = fixed_io.AddressLength;
 	if (acpi_enum_debug & PARSE_RES_IO) {
 		cmn_err(CE_NOTE, "parse_resources() "\
 		    "Fixed IO 0x%X, length: 0x%X",
-		    fixed_io.BaseAddress, fixed_io.RangeLength);
+		    fixed_io.Address, fixed_io.AddressLength);
 	}
 	(*io_count)++;
 }
@@ -215,16 +215,16 @@ static void
 parse_resources_fixed_mem32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
     int *io_count)
 {
-	ACPI_RESOURCE_FIXED_MEM32 fixed_mem32 =
+	ACPI_RESOURCE_FIXED_MEMORY32 fixed_mem32 =
 	    resource_ptr->Data.FixedMemory32;
 
 	io[*io_count].regspec_bustype = 0; /* memory */
-	io[*io_count].regspec_addr = fixed_mem32.RangeBaseAddress;
-	io[*io_count].regspec_size = fixed_mem32.RangeLength;
+	io[*io_count].regspec_addr = fixed_mem32.Address;
+	io[*io_count].regspec_size = fixed_mem32.AddressLength;
 	if (acpi_enum_debug & PARSE_RES_MEMORY) {
 		cmn_err(CE_NOTE, "parse_resources() "\
 		    "Fixed Mem 32 %ul, length: %ul",
-		    fixed_mem32.RangeBaseAddress, fixed_mem32.RangeLength);
+		    fixed_mem32.Address, fixed_mem32.AddressLength);
 	}
 	(*io_count)++;
 }
@@ -233,18 +233,18 @@ static void
 parse_resources_mem32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
     int *io_count)
 {
-	ACPI_RESOURCE_MEM32 mem32 = resource_ptr->Data.Memory32;
+	ACPI_RESOURCE_MEMORY32 mem32 = resource_ptr->Data.Memory32;
 
-	if (resource_ptr->Data.Memory32.MinBaseAddress ==
-	    resource_ptr->Data.Memory32.MaxBaseAddress) {
+	if (resource_ptr->Data.Memory32.Minimum ==
+	    resource_ptr->Data.Memory32.Maximum) {
 		io[*io_count].regspec_bustype = 0; /* memory */
-		io[*io_count].regspec_addr = mem32.MinBaseAddress;
-		io[*io_count].regspec_size = mem32.RangeLength;
+		io[*io_count].regspec_addr = mem32.Minimum;
+		io[*io_count].regspec_size = mem32.AddressLength;
 		(*io_count)++;
 		if (acpi_enum_debug & PARSE_RES_MEMORY) {
 			cmn_err(CE_NOTE, "parse_resources() "\
 			    "Mem 32 0x%X, length: 0x%X",
-			    mem32.MinBaseAddress, mem32.RangeLength);
+			    mem32.Minimum, mem32.AddressLength);
 		}
 		return;
 	}
@@ -252,8 +252,8 @@ parse_resources_mem32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		cmn_err(CE_NOTE, "parse_resources() "\
 		    "MEM32 Min Max not equal!");
 		cmn_err(CE_NOTE, "parse_resources() "\
-		    "Mem 32 MinBaseAddress 0x%X, MaxBaseAddress: 0x%X",
-		    mem32.MinBaseAddress, mem32.MaxBaseAddress);
+		    "Mem 32 Minimum 0x%X, Maximum: 0x%X",
+		    mem32.Minimum, mem32.Maximum);
 	}
 }
 
@@ -279,15 +279,15 @@ parse_resources_addr16(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    "%s "\
 		    "MinAddressFixed 0x%X, "\
 		    "MaxAddressFixed 0x%X, "\
-		    "MinAddressRange 0x%X, "\
-		    "MaxAddressRange 0x%X, "\
+		    "Minimum 0x%X, "\
+		    "Maximum 0x%X, "\
 		    "length: 0x%X\n",
 		    addr16.ProducerConsumer == ACPI_CONSUMER ?
 		    "CONSUMER" : "PRODUCER",
 		    addr16.MinAddressFixed,
 		    addr16.MaxAddressFixed,
-		    addr16.MinAddressRange,
-		    addr16.MaxAddressRange,
+		    addr16.Minimum,
+		    addr16.Maximum,
 		    addr16.AddressLength);
 	}
 	if (addr16.ResourceType != ACPI_MEMORY_RANGE &&
@@ -302,7 +302,7 @@ parse_resources_addr16(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 			/* io */
 			io[*io_count].regspec_bustype = 1;
 		}
-		io[*io_count].regspec_addr = addr16.MinAddressRange;
+		io[*io_count].regspec_addr = addr16.Minimum;
 		io[*io_count].regspec_size = addr16.AddressLength;
 		(*io_count)++;
 	}
@@ -330,15 +330,15 @@ parse_resources_addr32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    "%s "\
 		    "MinAddressFixed 0x%X, "\
 		    "MaxAddressFixed 0x%X, "\
-		    "MinAddressRange 0x%X, "\
-		    "MaxAddressRange 0x%X, "\
+		    "Minimum 0x%X, "\
+		    "Maximum 0x%X, "\
 		    "length: 0x%X\n",
 		    addr32.ProducerConsumer == ACPI_CONSUMER ?
 		    "CONSUMER" : "PRODUCER",
 		    addr32.MinAddressFixed,
 		    addr32.MaxAddressFixed,
-		    addr32.MinAddressRange,
-		    addr32.MaxAddressRange,
+		    addr32.Minimum,
+		    addr32.Maximum,
 		    addr32.AddressLength);
 	}
 	if (addr32.ResourceType != ACPI_MEMORY_RANGE &&
@@ -353,7 +353,7 @@ parse_resources_addr32(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 			/* io */
 			io[*io_count].regspec_bustype = 1;
 		}
-		io[*io_count].regspec_addr = addr32.MinAddressRange;
+		io[*io_count].regspec_addr = addr32.Minimum;
 		io[*io_count].regspec_size = addr32.AddressLength;
 		(*io_count)++;
 	}
@@ -382,24 +382,24 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 		    "%s "\
 		    "MinAddressFixed 0x%X, "\
 		    "MaxAddressFixed 0x%X, "\
-		    "MinAddressRange 0x%lX, "\
-		    "MaxAddressRange 0x%lX, "\
+		    "Minimum 0x%lX, "\
+		    "Maximum 0x%lX, "\
 		    "length: 0x%lX\n",
 #else
 		cmn_err(CE_NOTE, "parse_resources() "\
 		    "%s "\
 		    "MinAddressFixed 0x%X, "\
 		    "MaxAddressFixed 0x%X, "\
-		    "MinAddressRange 0x%llX, "\
-		    "MaxAddressRange 0x%llX, "\
+		    "Minimum 0x%llX, "\
+		    "Maximum 0x%llX, "\
 		    "length: 0x%llX\n",
 #endif
 		    addr64.ProducerConsumer == ACPI_CONSUMER ?
 		    "CONSUMER" : "PRODUCER",
 		    addr64.MinAddressFixed,
 		    addr64.MaxAddressFixed,
-		    addr64.MinAddressRange,
-		    addr64.MaxAddressRange,
+		    addr64.Minimum,
+		    addr64.Maximum,
 		    addr64.AddressLength);
 	}
 	if (addr64.ResourceType != ACPI_MEMORY_RANGE &&
@@ -414,7 +414,7 @@ parse_resources_addr64(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 			/* io */
 			io[*io_count].regspec_bustype = 1;
 		}
-		io[*io_count].regspec_addr = addr64.MinAddressRange;
+		io[*io_count].regspec_addr = addr64.Minimum;
 		io[*io_count].regspec_size = addr64.AddressLength;
 		(*io_count)++;
 	}
@@ -446,68 +446,73 @@ parse_resources(ACPI_HANDLE handle, dev_info_t *xdip)
 		}
 		resource_ptr = (ACPI_RESOURCE *)current_ptr;
 		current_ptr += resource_ptr->Length;
-		switch (resource_ptr->Id) {
-		case ACPI_RSTYPE_END_TAG:
+		switch (resource_ptr->Type) {
+		case ACPI_RESOURCE_TYPE_END_TAG:
 			current_ptr = last_ptr;
 			break;
-		case ACPI_RSTYPE_IO:
+		case ACPI_RESOURCE_TYPE_IO:
 			parse_resources_io(resource_ptr, io, &io_count);
 			break;
-		case ACPI_RSTYPE_FIXED_IO:
+		case ACPI_RESOURCE_TYPE_FIXED_IO:
 			parse_resources_fixed_io(resource_ptr, io, &io_count);
 			break;
-		case ACPI_RSTYPE_FIXED_MEM32:
+		case ACPI_RESOURCE_TYPE_FIXED_MEMORY32:
 			parse_resources_fixed_mem32(resource_ptr, io,
 			    &io_count);
 			break;
-		case ACPI_RSTYPE_MEM32:
+		case ACPI_RESOURCE_TYPE_MEMORY32:
 			parse_resources_mem32(resource_ptr, io, &io_count);
 			break;
-		case ACPI_RSTYPE_ADDRESS16:
+		case ACPI_RESOURCE_TYPE_ADDRESS16:
 			parse_resources_addr16(resource_ptr, io, &io_count);
 			break;
-		case ACPI_RSTYPE_ADDRESS32:
+		case ACPI_RESOURCE_TYPE_ADDRESS32:
 			parse_resources_addr32(resource_ptr, io, &io_count);
 			break;
-		case ACPI_RSTYPE_ADDRESS64:
+		case ACPI_RESOURCE_TYPE_ADDRESS64:
 			parse_resources_addr64(resource_ptr, io, &io_count);
 			break;
-		case ACPI_RSTYPE_IRQ:
+		case ACPI_RESOURCE_TYPE_IRQ:
 			parse_resources_irq(resource_ptr, &interrupt_count);
 			break;
-		case ACPI_RSTYPE_DMA:
+		case ACPI_RESOURCE_TYPE_DMA:
 			parse_resources_dma(resource_ptr, &dma_count);
 			break;
-		case ACPI_RSTYPE_START_DPF:
+		case ACPI_RESOURCE_TYPE_START_DEPENDENT:
 			cmn_err(CE_NOTE,
-			    "!ACPI source type ACPI_RSTYPE_START_DPF not "\
-			    "supported");
+			    "!ACPI source type"
+			    " ACPI_RESOURCE_TYPE_START_DEPENDENT"
+			    " not supported");
 			break;
-		case ACPI_RSTYPE_END_DPF:
+		case ACPI_RESOURCE_TYPE_END_DEPENDENT:
 			cmn_err(CE_NOTE,
-			    "!ACPI source type ACPI_RSTYPE_END_DPF not "\
-			    "supported");
+			    "!ACPI source type"
+			    " ACPI_RESOURCE_TYPE_END_DEPENDENT"
+			    " not supported");
 			break;
-		case ACPI_RSTYPE_VENDOR:
+		case ACPI_RESOURCE_TYPE_VENDOR:
 			cmn_err(CE_NOTE,
-			    "!ACPI source type ACPI_RSTYPE_VENDOR not "\
-			    "supported");
+			    "!ACPI source type"
+			    " ACPI_RESOURCE_TYPE_VENDOR"
+			    " not supported");
 			break;
-		case ACPI_RSTYPE_MEM24:
+		case ACPI_RESOURCE_TYPE_MEMORY24:
 			cmn_err(CE_NOTE,
-			    "!ACPI source type ACPI_RSTYPE_MEM24 not "\
-			    "supported");
+			    "!ACPI source type"
+			    " ACPI_RESOURCE_TYPE_MEMORY24"
+			    " not supported");
 			break;
-		case ACPI_RSTYPE_EXT_IRQ:
+		case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
 			cmn_err(CE_NOTE,
-			    "!ACPI source type ACPI_RSTYPE_EXT_IRQ not "\
-			    "supported");
+			    "!ACPI source type"
+			    " ACPI_RESOURCE_TYPE_EXT_IRQ"
+			    " not supported");
 			break;
 		default:
 		/* Some types are not yet implemented (See CA 6.4) */
 			cmn_err(CE_NOTE,
 			    "!ACPI resource type (0X%X) not yet supported",
-			    resource_ptr->Id);
+			    resource_ptr->Type);
 			break;
 		}
 	}

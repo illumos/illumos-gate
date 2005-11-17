@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconfig - Namespace reconfiguration (Load/Unload opcodes)
- *              $Revision: 85 $
+ *              $Revision: 1.87 $
  *
  *****************************************************************************/
 
@@ -175,6 +175,11 @@ AcpiExAddTable (
         return_ACPI_STATUS (AE_NO_MEMORY);
     }
 
+    /* Init the table handle */
+
+    ObjDesc->Reference.Opcode = AML_LOAD_OP;
+    *DdbHandle = ObjDesc;
+
     /* Install the new table into the local data structures */
 
     ACPI_MEMSET (&TableInfo, 0, sizeof (ACPI_TABLE_DESC));
@@ -185,8 +190,16 @@ AcpiExAddTable (
     TableInfo.Allocation = ACPI_MEM_ALLOCATED;
 
     Status = AcpiTbInstallTable (&TableInfo);
+    ObjDesc->Reference.Object = TableInfo.InstalledDesc;
+
     if (ACPI_FAILURE (Status))
     {
+        if (Status == AE_ALREADY_EXISTS)
+        {
+            /* Table already exists, just return the handle */
+
+            return_ACPI_STATUS (AE_OK);
+        }
         goto Cleanup;
     }
 
@@ -201,16 +214,12 @@ AcpiExAddTable (
         goto Cleanup;
     }
 
-    /* Init the table handle */
-
-    ObjDesc->Reference.Opcode = AML_LOAD_OP;
-    ObjDesc->Reference.Object = TableInfo.InstalledDesc;
-    *DdbHandle = ObjDesc;
     return_ACPI_STATUS (AE_OK);
 
 
 Cleanup:
     AcpiUtRemoveReference (ObjDesc);
+    *DdbHandle = NULL;
     return_ACPI_STATUS (Status);
 }
 
@@ -594,6 +603,7 @@ AcpiExUnloadTable (
      * (Offset contains the TableId)
      */
     AcpiNsDeleteNamespaceByOwner (TableInfo->OwnerId);
+    AcpiUtReleaseOwnerId (&TableInfo->OwnerId);
 
     /* Delete the table itself */
 
