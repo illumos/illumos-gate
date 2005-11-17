@@ -22,7 +22,7 @@
 /*
  * PPPoE common utilities and data.
  *
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -388,7 +388,7 @@ hexdecode(char chr)
 {
 	if (chr >= '0' && chr <= '9')
 		return ((int)(chr - '0'));
-	if (chr >= 'a' && chr <= 'F')
+	if (chr >= 'a' && chr <= 'f')
 		return ((int)(chr - 'a' + 10));
 	return ((int)(chr - 'A' + 10));
 }
