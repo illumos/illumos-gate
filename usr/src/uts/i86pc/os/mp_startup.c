@@ -63,6 +63,7 @@
 #include <sys/kdi.h>
 #include <vm/hat_i86.h>
 #include <sys/memnode.h>
+#include <sys/pci_cfgspace.h>
 
 struct cpu	cpus[1];			/* CPU data */
 struct cpu	*cpu[NCPU] = {&cpus[0]};	/* pointers to all CPUs */
@@ -503,6 +504,12 @@ extern void *long_mode_64(void);
  * pessimal set of workarounds needed to cope with *any* of the CPUs in the
  * system.
  *
+ * workaround_errata is invoked early in mlsetup() for CPU 0, and in
+ * mp_startup() for all slave CPUs. Slaves process workaround_errata prior
+ * to acknowledging their readiness to the master, so this routine will
+ * never be executed by multiple CPUs in parallel, thus making updates to
+ * global data safe.
+ *
  * These workarounds are based on Rev 3.57 of the Revision Guide for
  * AMD Athlon(tm) 64 and AMD Opteron(tm) Processors, August 2005.
  */
@@ -537,6 +544,11 @@ int opteron_erratum_123;	/* if non-zero -> at least one cpu has it */
 
 #if defined(OPTERON_ERRATUM_131)
 int opteron_erratum_131;	/* if non-zero -> at least one cpu has it */
+#endif
+
+#if defined(OPTERON_WORKAROUND_6336786)
+int opteron_workaround_6336786;	/* non-zero -> WA relevant and applied */
+int opteron_workaround_6336786_UP = 0;	/* Not needed for UP */
 #endif
 
 #define	WARNING(cpu, n)						\
@@ -775,8 +787,40 @@ workaround_errata(struct cpu *cpu)
 			if (!(rdmsr(MSR_AMD_NB_CFG) & AMD_NB_CFG_SRQ_HEARTBEAT))
 				opteron_erratum_131++;
 		}
-#endif
 	}
+#endif
+
+#if defined(OPTERON_WORKAROUND_6336786)
+	/*
+	 * This isn't really erratum, but for convenience the
+	 * detection/workaround code lives here and in cpuid_opteron_erratum.
+	 */
+	if (cpuid_opteron_erratum(cpu, 6336786) > 0) {
+		int	node;
+		uint8_t data;
+
+		/*
+		 * Disable C1-Clock ramping on multi-core/multi-processor
+		 * K8 platforms to guard against TSC drift.
+		 */
+		if (opteron_workaround_6336786) {
+			opteron_workaround_6336786++;
+		} else if ((lgrp_plat_node_cnt *
+		    cpuid_get_ncpu_per_chip(cpu) >= 2) ||
+		    opteron_workaround_6336786_UP) {
+			for (node = 0; node < lgrp_plat_node_cnt; node++) {
+				/*
+				 * Clear PMM7[1:0] (function 3, offset 0x87)
+				 * Northbridge device is the node id + 24.
+				 */
+				data = pci_getb_func(0, node + 24, 3, 0x87);
+				data &= 0xFC;
+				pci_putb_func(0, node + 24, 3, 0x87, data);
+			}
+			opteron_workaround_6336786++;
+		}
+	}
+#endif
 	return (missing);
 }
 

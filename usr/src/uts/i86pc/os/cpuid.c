@@ -1700,7 +1700,7 @@ int
 cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 {
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
-	uint_t eax;
+	uint_t eax, edx, junk;
 
 	if (cpi->cpi_vendor != X86_VENDOR_AMD)
 		return (0);
@@ -1854,7 +1854,16 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 		return (JH_E1(eax) || BH_E4(eax) || JH_E6(eax));
 	case 131:
 		return (1);
-
+	case 6336786:
+		/*
+		 * Test for AdvPowerMgmtInfo.TscPStateInvariant
+		 * if this is a K8 family processor
+		 */
+		if (CPI_FAMILY(cpi) == 0xf) {
+			(void) __cpuid_insn(0x80000007, &junk, &junk, &edx);
+			return (!(edx & 0x100));
+		}
+		return (0);
 	default:
 		return (-1);
 	}

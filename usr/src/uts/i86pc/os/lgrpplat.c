@@ -36,7 +36,8 @@
 #include <sys/memlist.h>
 #include <sys/memnode.h>
 #include <sys/mman.h>
-#include <sys/pci_impl.h>	/* for PCI configuration space macros */
+#include <sys/pci_cfgspace.h>
+#include <sys/pci_impl.h>
 #include <sys/param.h>
 #include <sys/promif.h>		/* for prom_printf() */
 #include <sys/systm.h>
@@ -516,9 +517,8 @@ lgrp_plat_init(void)
 	/*
 	 * Read node ID register for node 0 to get node count
 	 */
-	outl(PCI_CONFADD, PCI_CADDR1(bus, dev, OPT_PCS_FUNC_HT,
-	    OPT_PCS_OFF_NODEID));
-	opt_node_info[0] = inl(PCI_CONFDATA);
+	opt_node_info[0] = pci_getl_func(bus, dev, OPT_PCS_FUNC_HT,
+	    OPT_PCS_OFF_NODEID);
 	lgrp_plat_node_cnt = OPT_NODE_CNT(opt_node_info[0]) + 1;
 
 	for (node = 0; node < lgrp_plat_node_cnt; node++) {
@@ -526,25 +526,22 @@ lgrp_plat_init(void)
 		 * Read node ID register (except for node 0 which we just read)
 		 */
 		if (node > 0) {
-			outl(PCI_CONFADD, PCI_CADDR1(bus, dev,
-			    OPT_PCS_FUNC_HT, OPT_PCS_OFF_NODEID));
-			opt_node_info[node] = inl(PCI_CONFDATA);
+			opt_node_info[node] = pci_getl_func(bus, dev,
+			    OPT_PCS_FUNC_HT, OPT_PCS_OFF_NODEID);
 		}
 
 		/*
 		 * Read DRAM base and limit registers which specify
 		 * physical memory range of each node
 		 */
-		outl(PCI_CONFADD, PCI_CADDR1(bus, dev, OPT_PCS_FUNC_ADDRMAP,
-		    off));
-		opt_dram_map[node].base = inl(PCI_CONFDATA);
+		opt_dram_map[node].base = pci_getl_func(bus, dev,
+		    OPT_PCS_FUNC_ADDRMAP, off);
 		if (opt_dram_map[node].base & OPT_DRAMBASE_MASK_INTRLVEN)
 			lgrp_plat_mem_intrlv++;
 
 		off += 4;	/* limit register offset */
-		outl(PCI_CONFADD, PCI_CADDR1(bus, dev, OPT_PCS_FUNC_ADDRMAP,
-		    off));
-		opt_dram_map[node].limit = inl(PCI_CONFDATA);
+		opt_dram_map[node].limit = pci_getl_func(bus, dev,
+		    OPT_PCS_FUNC_ADDRMAP, off);
 
 		/*
 		 * Increment device number to next node and register offset for
