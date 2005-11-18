@@ -310,7 +310,7 @@ SYS_KMODS	+=
 #
 #	'Misc' Modules (/kernel/misc):
 #
-MISC_KMODS	+= pci_autoconfig bootdev acpica pciehpc
+MISC_KMODS	+= pci_autoconfig bootdev acpica pciehpc gfx_private
 
 #
 #	'Mach' Modules (/kernel/mach):

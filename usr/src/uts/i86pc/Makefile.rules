@@ -138,6 +138,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/agpgart/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/gfx_private/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 # ridiculous contortions ---
 ATOMIC_SUBDIR_32	= i386
 ATOMIC_SUBDIR_64	= amd64
@@ -320,5 +324,8 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/tables/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/utilities/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/gfx_private/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
