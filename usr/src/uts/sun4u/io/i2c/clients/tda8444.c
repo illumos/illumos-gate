@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -382,7 +382,7 @@ tda8444_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 		if (unitp->tda8444_oflag[channel] == FEXCL) {
 			err = EBUSY;
 		} else {
-			unitp->tda8444_oflag[channel] = FOPEN;
+			unitp->tda8444_oflag[channel] = (uint16_t)FOPEN;
 		}
 	}
 

@@ -207,7 +207,7 @@ wait_done:
 	IB_INO_INTR_PEND(ib_clear_intr_reg_addr(ib_p, ino));
 #ifdef _STARFIRE
 	pc_ittrans_cleanup(IB2CB(ib_p)->cb_ittrans_cookie,
-	    (volatile uint64_t *)ino);
+	    (volatile uint64_t *)(uintptr_t)ino);
 #endif /* _STARFIRE */
 }
 

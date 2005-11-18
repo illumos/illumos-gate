@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -471,7 +471,7 @@ lm75_do_attach(dev_info_t *dip)
 	}
 
 	(void) snprintf(unitp->lm75_name, sizeof (unitp->lm75_name),
-			"%sd", ddi_node_name(dip), instance);
+			"%s%d", ddi_node_name(dip), instance);
 
 	if (ddi_create_minor_node(dip, "lm75", S_IFCHR, instance,
 			"ddi_i2c:temperature_sensor", NULL) == DDI_FAILURE) {

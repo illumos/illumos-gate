@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -184,7 +184,7 @@ max1617_do_attach(dev_info_t *dip)
 	unitp = ddi_get_soft_state(max1617_soft_statep, instance);
 
 	(void) snprintf(unitp->max1617_name, sizeof (unitp->max1617_name),
-	    "%sd", ddi_node_name(dip), instance);
+	    "%s%d", ddi_node_name(dip), instance);
 
 	(void) sprintf(minor_name, "die_temp");
 	minor_number = MAX1617_INST_TO_MINOR(instance) |
@@ -484,7 +484,7 @@ max1617_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 		if (unitp->max1617_oflag == FEXCL) {
 			err = EBUSY;
 		} else {
-			unitp->max1617_oflag = FOPEN;
+			unitp->max1617_oflag = (uint16_t)FOPEN;
 		}
 	}
 

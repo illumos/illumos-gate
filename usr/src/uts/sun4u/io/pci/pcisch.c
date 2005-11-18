@@ -427,7 +427,7 @@ pci_pbm_dma_sync(pbm_t *pbm_p, ib_ino_t ino)
 	}
 
 	if (flag_val && SYNC_HW_BUSY(sync_reg_pa, ino_mask) && !panicstr)
-		cmn_err(CE_PANIC, "%s: pbm dma sync %llx,%llx timeout!",
+		cmn_err(CE_PANIC, "%s: pbm dma sync %lx,%lx timeout!",
 			pbm_p->pbm_nameaddr_str, sync_reg_pa, flag_val);
 done:
 	/* optional: stdphysio(sync_reg_pa - 8, ino_mask); */
@@ -2625,8 +2625,8 @@ pci_pbm_errstate_get(pci_t *pci_p, pbm_errstate_t *pbm_err_p)
 	 * Tomatillo specific registers
 	 */
 	if (CHIP_TYPE(pci_p) == PCI_CHIP_TOMATILLO) {
-		pbm_err_p->pbm_va_log = (uint64_t)va_to_pa((void *)*(a +
-				TOMATILLO_TGT_ERR_VALOG_OFFSET));
+		pbm_err_p->pbm_va_log = (uint64_t)va_to_pa(
+		    (void *)(uintptr_t)*(a + TOMATILLO_TGT_ERR_VALOG_OFFSET));
 		pbm_err_p->pbm_iommu.iommu_tfar = *iommu_p->iommu_tfar_reg;
 	}
 
@@ -2955,15 +2955,15 @@ iommu_tlb_scrub(iommu_t *iommu_p, int scrub)
 			continue;
 
 		cmn_err(CE_CONT, "%s%d: Error %x on IOMMU TLB entry %x:\n"
-		"\tContext=%x %sWritable %sStreamable\n"
-		"\tPCI Page Size=%sk Address in page %x\n",
+		"\tContext=%lx %sWritable %sStreamable\n"
+		"\tPCI Page Size=%sk Address in page %lx\n",
 			ddi_driver_name(dip), ddi_get_instance(dip), errstat, i,
 			(tag & TLBTAG_CONTEXT_BITS) >> TLBTAG_CONTEXT_SHIFT,
 			(tag & TLBTAG_WRITABLE_BIT) ? "" : neg,
 			(tag & TLBTAG_STREAM_BIT) ? "" : neg,
 			(tag & TLBTAG_PGSIZE_BIT) ? "64" : "8",
 			(tag & TLBTAG_PCIVPN_BITS) << 13);
-		cmn_err(CE_CONT, "Memory: %sValid %sCacheable Page Frame=%x\n",
+		cmn_err(CE_CONT, "Memory: %sValid %sCacheable Page Frame=%lx\n",
 			(data & TLBDATA_VALID_BIT) ? "" : neg,
 			(data & TLBDATA_CACHE_BIT) ? "" : neg, pfn);
 	}
@@ -2990,7 +2990,7 @@ pci_iommu_disp(iommu_t *iommu_p, uint64_t *ctl_p)
 	ctl_old = *iommu_p->iommu_ctrl_reg;
 	/* iommu ctrl reg error bits are W1C */
 	if (ctl_old >> TOMATIILO_IOMMU_ERR_REG_SHIFT) {
-		cmn_err(CE_WARN, "Tomatillo iommu err: %x", ctl_old);
+		cmn_err(CE_WARN, "Tomatillo iommu err: %lx", ctl_old);
 		*ctl_p |= (ctl_old >> TOMATIILO_IOMMU_ERR_REG_SHIFT)
 		    << TOMATIILO_IOMMU_ERR_REG_SHIFT;
 	}
@@ -3462,7 +3462,7 @@ pci_bus_quiesce(pci_t *pci_p, dev_info_t *dip, void *result)
 		ctrl_reg = *ctrl_reg_p;
 		if ((ctrl_reg & (SCHIZO_PCI_CTRL_ARB_EN_MASK |
 		    SCHIZO_PCI_CTRL_ARB_PARK)) != 0)
-			panic("ctrl_reg didn't quiesce: 0x%x\n", ctrl_reg);
+			panic("ctrl_reg didn't quiesce: 0x%lx\n", ctrl_reg);
 #endif
 		if (pbm_p->pbm_anychild_cfgpa)
 			(void) ldphysio(pbm_p->pbm_anychild_cfgpa);
@@ -3497,7 +3497,7 @@ pci_bus_unquiesce(pci_t *pci_p, dev_info_t *dip, void *result)
 		ctrl_reg = *ctrl_reg_p;
 		if ((ctrl_reg & (SCHIZO_PCI_CTRL_ARB_EN_MASK |
 		    SCHIZO_PCI_CTRL_ARB_PARK)) == 0)
-			panic("ctrl_reg didn't unquiesce: 0x%x\n", ctrl_reg);
+			panic("ctrl_reg didn't unquiesce: 0x%lx\n", ctrl_reg);
 #endif
 	}
 

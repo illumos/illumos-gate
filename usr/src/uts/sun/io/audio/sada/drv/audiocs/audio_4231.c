@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -141,7 +141,7 @@ static void cs4231_power_down(CS_state_t *);
 static void *cs_statep;
 
 /* driver name, so we don't have to call ddi_driver_name() or hard code strs */
-extern char *audiocs_name = CS4231_NAME;
+static char *audiocs_name = CS4231_NAME;
 
 /* File name for the cs4231_put8() and cs4231_reg_select() routines */
 static char *thisfile = __FILE__;
@@ -474,7 +474,8 @@ cs4231_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
 		}
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)audio_sup_devt_to_instance((dev_t)arg);
+		*result = (void *)(uintptr_t)
+			audio_sup_devt_to_instance((dev_t)arg);
 		error = DDI_SUCCESS;
 		break;
 	default:
@@ -2772,7 +2773,7 @@ cs4231_set_busy(CS_state_t *state)
 		(void) pm_idle_component(state->cs_dip, CS4231_COMPONENT);
 
 		audio_sup_log(state->cs_ahandle, CE_WARN,
-		    "!set_busy() power up failed",
+		    "!%s%d:set_busy() power up failed",
 		    audiocs_name, state->cs_instance);
 
 		mutex_enter(&state->cs_lock);

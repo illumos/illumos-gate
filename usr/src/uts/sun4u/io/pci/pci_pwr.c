@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,7 @@ pci_pwr_get_info(pci_pwr_t *pwr_p, dev_info_t *dip)
 	    ddi_node_name(dip), ddi_get_name_addr(dip));
 
 	/*NOTREACHED*/
+	return (NULL);
 }
 
 /*

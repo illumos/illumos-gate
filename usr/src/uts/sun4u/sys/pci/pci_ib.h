@@ -174,7 +174,8 @@ struct ib_ino_info {
  * return the 1st ino of the 4 that are sharing the same mapping register.
  */
 #define	IB_GET_MAPREG_INO(ino)	\
-	((volatile uint64_t *)((ino & 0x20) ? ino : ((ino >> 2) << 2)))
+	((volatile uint64_t *)(uintptr_t)((ino & 0x20) ? \
+	    ino : ((ino >> 2) << 2)))
 #endif /* _STARFIRE */
 
 #define	IB_IGN_TO_MONDO(ign, ino)	(((ign) << PCI_INO_BITS) | (ino))

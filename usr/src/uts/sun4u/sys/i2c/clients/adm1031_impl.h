@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -101,7 +101,7 @@ extern "C" {
  * Maximum speed for a fan is 0xf(100% PWM duty cycle) and minimum is
  * 0x0(0% PWM duty cycle).
  */
-#define	ADM1031_CHECK_INVALID_SPEED(x) ((x < 0x00) || (x > 0x0F))
+#define	ADM1031_CHECK_INVALID_SPEED(x) ((x) > 0x0F)
 
 /*
  * Check if the minor node corresponds with the correct function.

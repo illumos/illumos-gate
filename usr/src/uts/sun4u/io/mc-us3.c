@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -293,8 +293,8 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto bad2;
 	}
 
-	DPRINTF(MC_ATTACH_DEBUG, ("mc%d: dimminfop=0x%p data=0x%llx len=%d\n",
-	    instance, dimminfop, *dimminfop, len));
+	DPRINTF(MC_ATTACH_DEBUG, ("mc%d: dimminfop=0x%p data=0x%lx len=%d\n",
+	    instance, dimminfop, *(uint64_t *)dimminfop, len));
 
 	/* Get MC registers and construct all needed data structure */
 	if (mc_get_mcregs(softsp) == -1)
@@ -626,7 +626,7 @@ mc_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			return (EINVAL);
 		}
 
-		DPRINTF(MC_CMD_DEBUG, ("MCIOC_BANK: bank 0x%p valid %d\n",
+		DPRINTF(MC_CMD_DEBUG, ("MCIOC_BANK: bank %d (0x%p) valid %hu\n",
 		    bank->bank_node.id, bank, bank->valid));
 
 		/*
@@ -784,8 +784,8 @@ mc_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p,
 			mccontrol->devgrpids[i].globalid = mcport->devgrpids[i];
 			mccontrol->devgrpids[i].localid =
 			    mcport->devgrpids[i] % NDGRPS;
-			DPRINTF(MC_CMD_DEBUG, ("MCIOC_CONTROL: devgrp id %d\n",
-			    mccontrol->devgrpids[i]));
+			DPRINTF(MC_CMD_DEBUG, ("MCIOC_CONTROL: devgrp id %lu\n",
+			    *(uint64_t *)&mccontrol->devgrpids[i]));
 		}
 		mutex_exit(&mcdatamutex);
 
@@ -858,7 +858,7 @@ mc_get_mcregs(struct mc_soft_state *softsp)
 		kpreempt_enable();
 
 		DPRINTF(MC_REG_DEBUG, ("get_mcregs 2: memlayoutp=0x%p madreg "
-		    "reg=0x%llx\n", softsp->memlayoutp, madreg));
+		    "reg=0x%lx\n", softsp->memlayoutp, madreg));
 
 		ma_reg_array[i] = madreg;
 
@@ -1263,7 +1263,7 @@ mlayout_add(int mc_id, int bank_no, uint64_t reg, void *dimminfop)
 	mcreg.madreg = reg;
 
 	DPRINTF(MC_CNSTRC_DEBUG, ("mlayout_add: mc_id %d, bank num "
-	    "%d, reg 0x%llx\n", mc_id, bank_no, reg));
+	    "%d, reg 0x%lx\n", mc_id, bank_no, reg));
 
 	/* add the entry on bank_info list */
 	idx = mc_id * NBANKS + bank_no;
@@ -1306,8 +1306,8 @@ mlayout_add(int mc_id, int bank_no, uint64_t reg, void *dimminfop)
 	bank_curr->size = size;
 
 	DPRINTF(MC_CNSTRC_DEBUG, ("mlayout_add 3: logical bank num %d, "
-	"lk 0x%x uk 0x%x um 0x%x ifactor 0x%x size 0x%llx base 0x%llx\n",
-	    mcreg._s.lk, mcreg._s.uk, mcreg._s.um, ifactor, size, base));
+	"lk 0x%x uk 0x%x um 0x%x ifactor 0x%x size 0x%lx base 0x%lx\n",
+	    idx, mcreg._s.lk, mcreg._s.uk, mcreg._s.um, ifactor, size, base));
 
 	/* connect the entry and update the size on dgrp_info list */
 	idx = mc_id * NDGRPS + (bank_no % NDGRPS);
@@ -1339,7 +1339,7 @@ mlayout_add(int mc_id, int bank_no, uint64_t reg, void *dimminfop)
 
 		dev->size += (size / NDIMMS);
 
-		DPRINTF(MC_CNSTRC_DEBUG, ("mlayout_add DIMM:id %d, size %d\n",
+		DPRINTF(MC_CNSTRC_DEBUG, ("mlayout_add DIMM:id %d, size %lu\n",
 		    dmidx, size));
 	}
 
@@ -1527,7 +1527,7 @@ seg_match_base(u_longlong_t base)
 
 	seg_ptr = (struct seg_info *)seg_head;
 	while (seg_ptr != NULL) {
-		DPRINTF(MC_LIST_DEBUG, ("seg_match: base %d,given base %d\n",
+		DPRINTF(MC_LIST_DEBUG, ("seg_match: base %lu,given base %llu\n",
 		    seg_ptr->base, base));
 		if (seg_ptr->base == base)
 			break;

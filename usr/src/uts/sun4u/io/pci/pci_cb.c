@@ -145,7 +145,7 @@ cb_disable_nintr_reg(cb_t *cb_p, ib_ino_t ino, int wait)
 			COMMON_CLEAR_INTR_REG_PENDING) && !panicstr) {
 			if (gethrtime() - start_time > pci_intrpend_timeout) {
 				cmn_err(CE_WARN,
-				"pci@%x cb_disable_nintr_reg(%p,%x) timeout",
+				"pci@%x cb_disable_nintr_reg(%lx,%x) timeout",
 					cb_p->cb_pci_cmn_p->pci_common_id,
 					map_reg_pa,
 					CB_INO_TO_MONDO(cb_p, ino));
@@ -168,7 +168,8 @@ cb_disable_nintr(cb_t *cb_p, enum cb_nintr_index idx, int wait)
 	cb_p->cb_inos[idx] = 0;
 	mutex_exit(&cb_p->cb_intr_lock);
 #ifdef _STARFIRE
-	pc_ittrans_cleanup(cb_p->cb_ittrans_cookie, (volatile uint64_t *)ino);
+	pc_ittrans_cleanup(cb_p->cb_ittrans_cookie,
+	    (volatile uint64_t *)(uintptr_t)ino);
 #endif /* _STARFIRE */
 }
 

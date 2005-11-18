@@ -379,7 +379,7 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			break;
 		}
 
-		if ((ioctl_bit.bit_num < 0) && (ioctl_bit.bit_num > 7)) {
+		if (ioctl_bit.bit_num > 7) {
 			D2CMN_ERR((CE_WARN, "%s: In I2C_GET_BIT bit num"
 				" was not between 0 and 7",
 				    unitp->ssc100_name));
@@ -418,7 +418,7 @@ ssc100_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			break;
 		}
 
-		if ((ioctl_bit.bit_num < 0) && (ioctl_bit.bit_num > 7)) {
+		if (ioctl_bit.bit_num > 7) {
 			D2CMN_ERR((CE_WARN, "%s: I2C_SET_BIT: bit_num sent"
 				" in was not between 0 and 7",
 				    unitp->ssc100_name));

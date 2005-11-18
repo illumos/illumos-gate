@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -186,7 +186,7 @@ gpio_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 		break;
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		break;
 
 	default:
@@ -228,23 +228,32 @@ gpio_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    if (ddi_regs_map_setup(dip, 0, (caddr_t *)&softc->gp_regs, 0, 0,
 		    &dev_attr, &softc->gp_handle) != DDI_SUCCESS)
 		goto attach_failed;
-	    DBG(dip, "attach: regs=0x%x", softc->gp_regs, 0, 0, 0, 0);
+	    DBG(dip, "attach: regs=0x%p", (uintptr_t)softc->gp_regs,
+		0, 0, 0, 0);
 	    DBG(dip, "attach: port 1 data is %x",
-		ddi_get8(softc->gp_handle, &softc->gp_regs[0]), 0, 0, 0, 0);
+		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[0]),
+		0, 0, 0, 0);
 	    DBG(dip, "attach: port 1 direction is %x",
-		ddi_get8(softc->gp_handle, &softc->gp_regs[1]), 0, 0, 0, 0);
+		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[1]),
+		0, 0, 0, 0);
 	    DBG(dip, "attach: port 1 output type is %x",
-		ddi_get8(softc->gp_handle, &softc->gp_regs[2]), 0, 0, 0, 0);
+		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[2]),
+		0, 0, 0, 0);
 	    DBG(dip, "attach: port 1 pull up control type is %x",
-		ddi_get8(softc->gp_handle, &softc->gp_regs[3]), 0, 0, 0, 0);
+		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[3]),
+		0, 0, 0, 0);
 	    DBG(dip, "attach: port 2 data is %x",
-		ddi_get8(softc->gp_handle, &softc->gp_regs[4]), 0, 0, 0, 0);
+		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[4]),
+		0, 0, 0, 0);
 	    DBG(dip, "attach: port 2 direction is %x",
-		ddi_get8(softc->gp_handle, &softc->gp_regs[5]), 0, 0, 0, 0);
+		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[5]),
+		0, 0, 0, 0);
 	    DBG(dip, "attach: port 2 output type is %x",
-		ddi_get8(softc->gp_handle, &softc->gp_regs[6]), 0, 0, 0, 0);
+		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[6]),
+		0, 0, 0, 0);
 	    DBG(dip, "attach: port 2 pull up control type is %x",
-		ddi_get8(softc->gp_handle, &softc->gp_regs[7]), 0, 0, 0, 0);
+		(uintptr_t)ddi_get8(softc->gp_handle, &softc->gp_regs[7]),
+		0, 0, 0, 0);
 
 	    /* Create device minor nodes. */
 

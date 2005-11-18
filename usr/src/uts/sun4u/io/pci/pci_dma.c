@@ -127,7 +127,7 @@ done:
 		mutex_exit(&sc_p->sc_sync_mutex);
 
 	if (stack_buf[0] & PCI_SYNC_FLAG_FAILED)
-		cmn_err(CE_PANIC, "%p pci dma sync %llx %llx timeout!",
+		cmn_err(CE_PANIC, "%p pci dma sync %lx %lx timeout!",
 		    mp, sync_flag_pa, loops);
 }
 
@@ -788,7 +788,7 @@ pci_dma_pfn(pci_t *pci_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 	for (i = 1; i < npages; i++) {
 		iopfn_t pfn = PCI_GET_MP_PFN1(mp, i);
 		if (peer ^ TGT_PFN_INBETWEEN(pfn, pfn_base, pfn_last)) {
-			cmn_err(CE_WARN, "%s%d mixed mode DMA %x %x",
+			cmn_err(CE_WARN, "%s%d mixed mode DMA %lx %lx",
 				NAMEINST(mp->dmai_rdip), MP_PFN0(mp), pfn);
 			ret = DDI_DMA_NOMAPPING;	/* mixed mode */
 			goto err;

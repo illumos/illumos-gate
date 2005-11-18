@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +34,7 @@ extern "C" {
 #endif
 
 #define	HI32(x) ((uint32_t)(((uint64_t)(x)) >> 32))
-#define	LO32(x) ((uint32_t)(x))
+#define	LO32(x) ((uint32_t)(uintptr_t)(x))
 #define	UPA64S_PORTS	2	/* number of UPA ports per device */
 
 /*

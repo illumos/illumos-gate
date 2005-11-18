@@ -66,7 +66,7 @@ pci_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	int i;
 	uint64_t tte;
 
-	offset = (uint32_t)a & IOMMU_PAGE_OFFSET;
+	offset = (uint32_t)(uintptr_t)a & IOMMU_PAGE_OFFSET;
 	npages = IOMMU_BTOPR(len + offset);
 	if (!npages)
 		return;
@@ -75,7 +75,7 @@ pci_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	DEBUG3(DBG_FAST_DVMA, dip, "load index=%x: %p+%x ", index, a, len);
 	if (index + npages > mp->dmai_ndvmapages) {
 		cmn_err(pci_panic_on_fatal_errors ? CE_PANIC : CE_WARN,
-			"%s%d: kaddr_load index(%x)+pgs(%x) exceeds limit\n",
+			"%s%d: kaddr_load index(%x)+pgs(%lx) exceeds limit\n",
 			ddi_driver_name(dip), ddi_get_instance(dip),
 			index, npages);
 		return;
@@ -123,7 +123,7 @@ pci_fdvma_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	return;
 bad_pfn:
 	cmn_err(CE_WARN, "%s%d: kaddr_load can't get page frame for vaddr %x",
-		ddi_driver_name(dip), ddi_get_instance(dip), (int)a);
+		ddi_driver_name(dip), ddi_get_instance(dip), (int)(uintptr_t)a);
 }
 
 /*ARGSUSED*/

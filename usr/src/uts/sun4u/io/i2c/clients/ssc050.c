@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -478,7 +478,7 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			break;
 		}
 
-		if ((ioctl_bit.bit_num < 0) && (ioctl_bit.bit_num > 7)) {
+		if (ioctl_bit.bit_num > 7) {
 			err = EINVAL;
 			break;
 		}
@@ -526,7 +526,7 @@ ssc050_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			break;
 		}
 
-		if ((ioctl_bit.bit_num < 0) && (ioctl_bit.bit_num > 7)) {
+		if (ioctl_bit.bit_num > 7) {
 			err = EINVAL;
 			break;
 		}

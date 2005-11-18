@@ -2263,8 +2263,9 @@ cpu_async_log_err(void *flt, errorq_elem_t *eqep)
 				 * to schedule the re-enabling of CEEN
 				 */
 				(void) timeout(cpu_delayed_check_ce_errors,
-				    (void *)aflt->flt_inst, drv_usectohz(
-				    (clock_t)cpu_ceen_delay_secs * MICROSEC));
+				    (void *)(uintptr_t)aflt->flt_inst,
+				    drv_usectohz((clock_t)cpu_ceen_delay_secs
+						 * MICROSEC));
 			    }
 			    return (0);
 			}
@@ -2470,7 +2471,7 @@ cpu_log_err(struct async_flt *aflt)
 	 */
 	if (ch_flt->flt_trapped_ce & CE_CEEN_DEFER) {
 		(void) timeout(cpu_delayed_check_ce_errors,
-		    (void *)aflt->flt_inst,
+		    (void *)(uintptr_t)aflt->flt_inst,
 		    drv_usectohz((clock_t)cpu_ceen_delay_secs * MICROSEC));
 	}
 }
@@ -5663,7 +5664,7 @@ cpu_delayed_check_ce_errors(void *arg)
 static void
 cpu_check_ce_errors(void *arg)
 {
-	int	cpuid = (int)arg;
+	int	cpuid = (int)(uintptr_t)arg;
 	cpu_t	*cp;
 
 	/*
@@ -5725,7 +5726,8 @@ cpu_check_ce_errors(void *arg)
 		 * cpu_ceen_delay_secs.
 		 */
 		mutex_exit(&cpu_lock);
-		(void) timeout(cpu_delayed_check_ce_errors, (void *)cp->cpu_id,
+		(void) timeout(cpu_delayed_check_ce_errors,
+		    (void *)(uintptr_t)cp->cpu_id,
 		    drv_usectohz((clock_t)cpu_ceen_delay_secs * MICROSEC));
 	}
 }

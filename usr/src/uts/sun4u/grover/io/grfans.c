@@ -1,5 +1,5 @@
 /*
- * Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,7 +319,7 @@ grfans_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 		if (unitp->oflag[channel] == FEXCL)
 			err = EBUSY;
 		else
-			unitp->oflag[channel] = FOPEN;
+			unitp->oflag[channel] = (uint16_t)FOPEN;
 	}
 
 	mutex_exit(&unitp->mutex);

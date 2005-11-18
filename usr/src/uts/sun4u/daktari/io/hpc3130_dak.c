@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1123,7 +1123,7 @@ static int
 hpc3130_write(i2c_client_hdl_t handle, uint8_t offset,
 	uint8_t port, uint8_t data)
 {
-	ASSERT(port >= 0 && port < HPC3130_MAX_SLOT);
+	ASSERT(port < HPC3130_MAX_SLOT);
 	ASSERT(handle);
 
 	return (hpc3130_rw(handle,
@@ -1134,7 +1134,7 @@ static int
 hpc3130_read(i2c_client_hdl_t handle, uint8_t offset,
 	uint8_t port, uint8_t *data)
 {
-	ASSERT(port >= 0 && port < HPC3130_MAX_SLOT);
+	ASSERT(port < HPC3130_MAX_SLOT);
 	ASSERT(handle);
 
 	return (hpc3130_rw(handle,

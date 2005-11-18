@@ -746,7 +746,8 @@ pcf8584_type_to_state(int i2c_flags)
 
 		return (TRAN_STATE_WR_RD);
 	}
-/*NOTREACHED*/
+	/*NOTREACHED*/
+	return (TRAN_STATE_NULL);
 }
 
 /*
@@ -879,16 +880,16 @@ pcf8584_error(int status, uint8_t rdwr, pcf8584_t *i2c)
 
 	if (status & S1_BER) {
 		cmn_err(CE_WARN,
-		    "!%s bus error; Controller = 0x%x "
+		    "!%s bus error; Controller = 0x%p "
 		    " addr = 0x%x", i2c->pcf8584_name,
-		    (unsigned int)rp->pcf8584_regs_s1, addr);
+		    (void *)rp->pcf8584_regs_s1, addr);
 		pcf8584_init(i2c);
 
 		return (I2C_FAILURE);
 	} else if (status & S1_LAB) {
 		cmn_err(CE_WARN, "!%s lost arbitration; Controller ="
-		    " 0x%x addr = 0x%x", i2c->pcf8584_name,
-		    (unsigned int)rp->pcf8584_regs_s1, addr);
+		    " 0x%p addr = 0x%x", i2c->pcf8584_name,
+		    (void *)rp->pcf8584_regs_s1, addr);
 		pcf8584_init(i2c);
 
 		return (I2C_FAILURE);

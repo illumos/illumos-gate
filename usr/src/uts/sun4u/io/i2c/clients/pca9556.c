@@ -391,7 +391,7 @@ pca9556_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 		*result = (void *)pcap->pca9556_dip;
 		return (DDI_SUCCESS);
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		return (DDI_SUCCESS);
 	default:
 		return (DDI_FAILURE);
@@ -563,7 +563,7 @@ pca9556_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 			err = DDI_SUCCESS;
 		}
 	} else if (pcap->pca9556_oflag != FEXCL) {
-		pcap->pca9556_oflag = FOPEN;
+		pcap->pca9556_oflag = (uint16_t)FOPEN;
 		err = DDI_SUCCESS;
 	}
 	mutex_exit(&pcap->pca9556_mutex);

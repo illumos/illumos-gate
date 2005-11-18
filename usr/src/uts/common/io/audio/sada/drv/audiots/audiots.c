@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -495,7 +495,8 @@ audiots_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
 		}
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)audio_sup_devt_to_instance((dev_t)arg);
+		*result =
+		    (void *)(uintptr_t)audio_sup_devt_to_instance((dev_t)arg);
 		error = DDI_SUCCESS;
 		break;
 	default:
@@ -510,7 +511,7 @@ audiots_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd,
  *
  * Description:
  *	Attach an instance of the audiots driver. This routine does the
- * 	device dependent attach tasks. When it is complete it calls
+ *	device dependent attach tasks. When it is complete it calls
  *	audio_sup_register() and am_attach() so they may do their work.
  *
  *	NOTE: mutex_init() no longer needs a name string, so set
@@ -3631,7 +3632,8 @@ audiots_set_port(audiots_state_t *state, int dir, int port)
 
 		if (port & AUDIO_SPEAKER) {
 			audiots_and_ac97(state,
-			    AC97_MONO_MASTER_VOLUME_REGSITER, ~MMVR_MUTE);
+			    AC97_MONO_MASTER_VOLUME_REGSITER,
+			    (uint16_t)~MMVR_MUTE);
 			tmp_word |= AUDIO_SPEAKER;
 		} else {
 			audiots_or_ac97(state,
@@ -3640,7 +3642,8 @@ audiots_set_port(audiots_state_t *state, int dir, int port)
 
 		if (port & AUDIO_HEADPHONE) {
 			audiots_and_ac97(state,
-			    AC97_HEADPHONE_VOLUME_REGISTER, ~HPVR_MUTE);
+			    AC97_HEADPHONE_VOLUME_REGISTER,
+			    (uint16_t)~HPVR_MUTE);
 			tmp_word |= AUDIO_HEADPHONE;
 		} else {
 			audiots_or_ac97(state,
@@ -3649,7 +3652,7 @@ audiots_set_port(audiots_state_t *state, int dir, int port)
 
 		if (port & AUDIO_LINE_OUT) {
 			audiots_and_ac97(state, AC97_MASTER_VOLUME_REGISTER,
-			    ~MVR_MUTE);
+			    (uint16_t)~MVR_MUTE);
 			tmp_word |= AUDIO_LINE_OUT;
 		} else {
 			audiots_or_ac97(state, AC97_MASTER_VOLUME_REGISTER,
@@ -3800,7 +3803,7 @@ audiots_set_port(audiots_state_t *state, int dir, int port)
 		    (state->ts_shadow[TS_CODEC_REG(AC97_RECORD_GAIN_REGISTER)] &
 		    RGR_MUTE)) {
 			audiots_and_ac97(state, AC97_RECORD_GAIN_REGISTER,
-			    ~RGR_MUTE);
+			    (uint16_t)~RGR_MUTE);
 		}
 
 		state->ts_input_port = port;

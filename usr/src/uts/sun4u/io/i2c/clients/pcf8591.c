@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -366,8 +366,9 @@ pcf8591_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
 			err = EIO;
 			break;
 		} else {
-			if (ddi_copyout((caddr_t)current_value, (caddr_t)arg,
-				sizeof (int32_t), mode) != DDI_SUCCESS) {
+			if (ddi_copyout((caddr_t)(uintptr_t)current_value,
+			    (caddr_t)arg, sizeof (int32_t), mode)
+			    != DDI_SUCCESS) {
 				D2CMN_ERR((CE_WARN, "%s: Failed in "
 					"I2C_GET_OUTPUT ddi_copyout routine\n",
 					unitp->pcf8591_name));
@@ -477,7 +478,7 @@ pcf8591_do_attach(dev_info_t *dip)
 	}
 
 	(void) snprintf(unitp->pcf8591_name, sizeof (unitp->pcf8591_name),
-			"%sd", ddi_node_name(dip), instance);
+			"%s%d", ddi_node_name(dip), instance);
 
 	for (i = 0; i < 4; i++) {
 		(void) sprintf(name, "port_%d", i);

@@ -209,7 +209,7 @@ ics951601_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 			err = DDI_SUCCESS;
 		}
 	} else if (icsp->ics951601_oflag != FEXCL) {
-		icsp->ics951601_oflag = FOPEN;
+		icsp->ics951601_oflag = (uint16_t)FOPEN;
 		err = DDI_SUCCESS;
 	}
 	mutex_exit(&icsp->ics951601_mutex);
@@ -363,7 +363,7 @@ ics951601_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 
 		return (DDI_SUCCESS);
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 
 		return (DDI_SUCCESS);
 	default:

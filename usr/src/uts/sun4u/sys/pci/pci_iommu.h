@@ -216,7 +216,7 @@ typedef struct pci_dvma_range_prop {
 #define	IOMMU_CTX2TTE(ctx) (((uint64_t)(ctx)) << IOMMU_TTE_CTX_SHIFT)
 #define	IOMMU_TTE2CTX(tte) \
 		(((tte) >> (IOMMU_TTE_CTX_SHIFT - 32)) & IOMMU_CTX_MASK)
-#define	MP2CTX(mp)	IOMMU_TTE2CTX((uint32_t)(mp)->dmai_tte)
+#define	MP2CTX(mp)	IOMMU_TTE2CTX((uint32_t)(uintptr_t)(mp)->dmai_tte)
 
 /* dvma debug */
 #define	DVMA_DBG_ON(iommu_p)  \

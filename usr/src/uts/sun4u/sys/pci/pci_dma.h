@@ -257,7 +257,8 @@ extern void pci_vmem_do_free(iommu_t *iommu_p, void *base_addr, size_t npages,
 #define	PCI_GET_MP_PFN1_ADDR(mp)	(((iopfn_t *)(mp)->dmai_pfnlst) + 1)
 
 #define	PCI_GET_MP_TTE(tte) \
-	(((uint64_t)(tte) >> 5) << (32 + 5) | ((uint32_t)(tte)) & 0x12)
+	(((uint64_t)(uintptr_t)(tte) >> 5) << (32 + 5) | \
+	    ((uint32_t)(uintptr_t)(tte)) & 0x12)
 #define	PCI_SAVE_MP_TTE(mp, tte)	\
 	(mp)->dmai_tte = (caddr_t)(HI32(tte) | ((tte) & 0x12))
 

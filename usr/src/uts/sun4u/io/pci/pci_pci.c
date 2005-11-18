@@ -218,7 +218,7 @@ static struct modlinkage modlinkage = {
  */
 static void *ppb_state;
 
-static struct ppb_cfg_state {
+struct ppb_cfg_state {
 	dev_info_t *dip;
 	ushort_t command;
 	uchar_t cache_line_size;
@@ -309,7 +309,7 @@ static void ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *dip);
 static void ppb_pwr_teardown(ppb_devstate_t *ppb, dev_info_t *dip);
 static void ppb_init_hotplug(ppb_devstate_t *ppb);
 static void ppb_create_ranges_prop(dev_info_t *, ddi_acc_handle_t);
-extern uint64_t pci_debug_flags = 0;
+extern uint64_t pci_debug_flags;
 
 int
 _init(void)
@@ -353,7 +353,7 @@ ppb_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		return (DDI_FAILURE);
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2DEVINFO:
@@ -1211,7 +1211,8 @@ pci_pwr_current_lvl(pci_pwr_t *pwr_p)
 			return (PM_LEVEL_B3);
 		}
 	}
-/*NOTREACHED*/
+	/*NOTREACHED*/
+	return (PM_LEVEL_B3);
 }
 
 /*

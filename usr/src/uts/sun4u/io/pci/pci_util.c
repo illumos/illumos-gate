@@ -708,7 +708,7 @@ pci_get_cfg_pabase(pci_t *pci_p)
 	}
 
 	if (i >= nrange)
-		cmn_err(CE_PANIC, "no cfg space in pci(%x) ranges prop.\n",
+		cmn_err(CE_PANIC, "no cfg space in pci(%p) ranges prop.\n",
 			(void *)pci_p);
 
 	return (((uint64_t)rangep->parent_high << 32) | rangep->parent_low);

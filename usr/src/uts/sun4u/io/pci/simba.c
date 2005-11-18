@@ -215,7 +215,7 @@ static struct modlinkage modlinkage = {
 /*
  * Simba specific error state structure
  */
-static struct simba_errstate {
+struct simba_errstate {
 	char *error;
 	ushort_t pci_cfg_stat;
 	ushort_t pci_cfg_sec_stat;
@@ -224,7 +224,7 @@ static struct simba_errstate {
 	int bridge_secondary;
 };
 
-static struct simba_cfg_state {
+struct simba_cfg_state {
 	dev_info_t *dip;
 	ushort_t command;
 	uchar_t cache_line_size;
@@ -349,7 +349,7 @@ simba_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		return (DDI_FAILURE);
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2DEVINFO:
@@ -379,7 +379,7 @@ simba_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	switch (cmd) {
 	case DDI_ATTACH:
 
-		DEBUG1(D_ATTACH, "attach(%x) ATTACH\n", (int)devi);
+		DEBUG1(D_ATTACH, "attach(%p) ATTACH\n", devi);
 
 		/*
 		 * Make sure the "device_type" property exists.
@@ -514,8 +514,8 @@ simba_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 {
 	register dev_info_t *pdip;
 
-	DEBUG3(D_MAP, "simba_bus_map(): dip=%x, rdip=%x, mp=%x", dip, rdip, mp);
-	DEBUG3(D_MAP, "simba_bus_map(): offset=%x, len=%x, vaddrp=%x",
+	DEBUG3(D_MAP, "simba_bus_map(): dip=%p, rdip=%p, mp=%p", dip, rdip, mp);
+	DEBUG3(D_MAP, "simba_bus_map(): offset=%lx, len=%lx, vaddrp=%p",
 	    offset, len, vaddrp);
 
 	pdip = (dev_info_t *)DEVI(dip)->devi_parent;
@@ -597,7 +597,7 @@ simba_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	pci_regspec_t *drv_regp;
 
 	DEBUG6(D_CTLOPS,
-		"simba_ctlops(): dip=%x rdip=%x ctlop=%x-%s arg=%x result=%x",
+		"simba_ctlops(): dip=%p rdip=%p ctlop=%x-%s arg=%p result=%p",
 		dip, rdip, ctlop, ctlop < (sizeof (ops) / sizeof (ops[0])) ?
 		ops[ctlop] : "Unknown", arg, result);
 
@@ -652,7 +652,7 @@ simba_ctlops(dev_info_t *dip, dev_info_t *rdip, ddi_ctl_enum_t ctlop,
 	}
 
 	kmem_free(drv_regp, reglen);
-	DEBUG1(D_CTLOPS, "simba_ctlops(): *result=%x\n", *(off_t *)result);
+	DEBUG1(D_CTLOPS, "simba_ctlops(): *result=%lx\n", *(off_t *)result);
 	return (DDI_SUCCESS);
 }
 
@@ -715,7 +715,7 @@ simba_initchild(dev_info_t *child)
 	simba_devstate_t *simba;
 	uint_t n;
 
-	DEBUG1(D_INIT_CLD, "simba_initchild(): child=%x\n", child);
+	DEBUG1(D_INIT_CLD, "simba_initchild(): child=%p\n", child);
 
 	/*
 	 * Pseudo nodes indicate a prototype node with per-instance
@@ -938,7 +938,7 @@ simba_save_config_regs(simba_devstate_t *simba_p)
 			continue;
 		}
 
-		DEBUG3(D_DETACH, "%s%d: saving child dip=%x\n",
+		DEBUG3(D_DETACH, "%s%d: saving child dip=%p\n",
 			ddi_driver_name(simba_p->dip),
 			ddi_get_instance(simba_p->dip),
 			dip);
@@ -1008,7 +1008,7 @@ simba_restore_config_regs(simba_devstate_t *simba_p)
 			continue;
 		}
 
-		DEBUG5(D_ATTACH, "%s%d: restoring regs for %x-%s%d\n",
+		DEBUG5(D_ATTACH, "%s%d: restoring regs for %p-%s%d\n",
 			ddi_driver_name(simba_p->dip),
 			ddi_get_instance(simba_p->dip),
 			dip,

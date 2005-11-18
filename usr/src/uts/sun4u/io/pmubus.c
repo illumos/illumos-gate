@@ -412,8 +412,8 @@ pmubus_get8(ddi_acc_impl_t *hdlp, uint8_t *addr)
 	/* gets are simple, we just issue them no locking necessary */
 	value = pci_config_get8(softsp->pmubus_reghdl, offset) & mask;
 
-	DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_get8: addr=%p offset=%x value=%x "
-	    "mask=%lx\n", addr, offset, value, mask));
+	DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_get8: addr=%p offset=%lx value=%x "
+	    "mask=%x\n", addr, offset, value, mask));
 
 	return (value);
 }
@@ -455,8 +455,8 @@ pmubus_get32(ddi_acc_impl_t *hdlp, uint32_t *addr)
 	/* gets are simple, we just issue them no locking necessary */
 	value = pci_config_get32(softsp->pmubus_reghdl, offset) & mask;
 
-	DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_get32: addr=%p offset=%x value=%x "
-	    "mask=%lx\n", addr, offset, value, mask));
+	DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_get32: addr=%p offset=%lx value=%x "
+	    "mask=%x\n", addr, offset, value, mask));
 
 	return (value);
 }
@@ -485,7 +485,7 @@ pmubus_put8(ddi_acc_impl_t *hdlp, uint8_t *addr, uint8_t value)
 		/*
 		 * Process "bit lane" register
 		 */
-		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put8: addr=%p offset=%x "
+		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put8: addr=%p offset=%lx "
 		    "value=%x mask=%lx\n", addr, offset, value,
 		    pmubus_mapreqp->mapreq_mask));
 
@@ -507,7 +507,7 @@ pmubus_put8(ddi_acc_impl_t *hdlp, uint8_t *addr, uint8_t value)
 		/*
 		 * Process shared register
 		 */
-		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put8: addr=%p offset=%x "
+		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put8: addr=%p offset=%lx "
 		    "value=%x\n", addr, offset, value));
 		pci_config_put8(softsp->pmubus_reghdl, offset, value);
 	}
@@ -539,7 +539,7 @@ pmubus_put32(ddi_acc_impl_t *hdlp, uint32_t *addr, uint32_t value)
 		/*
 		 * Process "bit lane" register
 		 */
-		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put32: addr=%p offset=%x "
+		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put32: addr=%p offset=%lx "
 		    "value=%x mask=%lx\n", addr, offset, value,
 		    pmubus_mapreqp->mapreq_mask));
 
@@ -561,7 +561,7 @@ pmubus_put32(ddi_acc_impl_t *hdlp, uint32_t *addr, uint32_t value)
 		/*
 		 * Process shared register
 		 */
-		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put32: addr=%p offset=%x "
+		DPRINTF(PMUBUS_RW_DEBUG, ("pmubus_put32: addr=%p offset=%lx "
 		    "value=%x\n", addr, offset, value));
 		pci_config_put32(softsp->pmubus_reghdl, offset, value);
 	}
@@ -672,7 +672,7 @@ pmubus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	/*
 	 * Handle the mapping according to its type.
 	 */
-	DPRINTF(PMUBUS_MAP_DEBUG, ("rdip=%s%d: off=%x len=%x\n",
+	DPRINTF(PMUBUS_MAP_DEBUG, ("rdip=%s%d: off=%lx len=%lx\n",
 	    ddi_get_name(rdip), ddi_get_instance(rdip), off, len));
 	switch (mp->map_type) {
 	case DDI_MT_RNUMBER: {
@@ -684,7 +684,7 @@ pmubus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		 */
 		rnumber = mp->map_obj.rnumber;
 		DPRINTF(PMUBUS_MAP_DEBUG, ("rdip=%s%d: rnumber=%x "
-		    "handlep=%x\n", ddi_get_name(rdip), ddi_get_instance(rdip),
+		    "handlep=%p\n", ddi_get_name(rdip), ddi_get_instance(rdip),
 		    rnumber, mp->map_handlep));
 
 		if (ddi_getlongprop(DDI_DEV_T_ANY, rdip, DDI_PROP_DONTPASS,
@@ -778,7 +778,7 @@ pmubus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 				    pmubus_mask(pmubus_regs, rnumber,
 				    pmubus_regmask);
 				DPRINTF(PMUBUS_MAP_DEBUG, ("rnumber=%d "
-				    "mask=%llx\n", rnumber,
+				    "mask=%lx\n", rnumber,
 				    pmubus_mapreqp->mapreq_mask));
 				if (pmubus_mapreqp->mapreq_mask == 0) {
 					kmem_free(pmubus_mapreqp,

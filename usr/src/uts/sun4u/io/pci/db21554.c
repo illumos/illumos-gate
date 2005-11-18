@@ -494,7 +494,7 @@ db_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 			break;
 
 		case DDI_INFO_DEVT2INSTANCE:
-			*result = (void *)instance;
+			*result = (void *)(uintptr_t)instance;
 			rc = DDI_SUCCESS;
 			break;
 
@@ -2629,7 +2629,7 @@ db_ddi_get8(ddi_acc_impl_t *handle, uint8_t *addr)
 	uint32_t data;
 
 	data = db_ddi_get32(handle, (uint32_t *)addr);
-	return (db_get_data8((uint32_t)addr, data));
+	return (db_get_data8((uint32_t)(uintptr_t)addr, data));
 }
 
 /*
@@ -2642,7 +2642,7 @@ db_ddi_get16(ddi_acc_impl_t *handle, uint16_t *addr)
 	uint32_t data;
 
 	data = db_ddi_get32(handle, (uint32_t *)addr);
-	return (db_get_data16((uint32_t)addr, data));
+	return (db_get_data16((uint32_t)(uintptr_t)addr, data));
 }
 
 /*
@@ -2691,7 +2691,7 @@ db_ddi_get32(ddi_acc_impl_t *handle, uint32_t *addr)
 		wait_count = 0;
 	}
 
-	db_put_reg_conf_addr(db_pvt, (uint32_t)addr);
+	db_put_reg_conf_addr(db_pvt, (uint32_t)(uintptr_t)addr);
 	data = ddi_get32(db_pvt->handle, (uint32_t *)db_pvt->data);
 
 	if (db_use_config_own_bit) {
@@ -2750,7 +2750,7 @@ db_ddi_put8(ddi_acc_impl_t *handle, uint8_t *addr, uint8_t data)
 
 	rdata = db_ddi_get32(handle, (uint32_t *)addr);
 	db_ddi_put32(handle, (uint32_t *)addr,
-		db_put_data8((uint32_t)addr, rdata, data));
+		db_put_data8((uint32_t)(uintptr_t)addr, rdata, data));
 }
 
 /*
@@ -2764,7 +2764,7 @@ db_ddi_put16(ddi_acc_impl_t *handle, uint16_t *addr, uint16_t data)
 
 	rdata = db_ddi_get32(handle, (uint32_t *)addr);
 	db_ddi_put32(handle, (uint32_t *)addr,
-			db_put_data16((uint32_t)addr, rdata, data));
+			db_put_data16((uint32_t)(uintptr_t)addr, rdata, data));
 }
 
 /*
@@ -2813,7 +2813,7 @@ db_ddi_put32(ddi_acc_impl_t *handle, uint32_t *addr, uint32_t data)
 		wait_count = 0;
 	}
 
-	db_put_reg_conf_addr(db_pvt, (uint32_t)addr);
+	db_put_reg_conf_addr(db_pvt, (uint32_t)(uintptr_t)addr);
 	ddi_put32(db_pvt->handle, (uint32_t *)db_pvt->data, data);
 
 	if (db_use_config_own_bit) {

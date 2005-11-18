@@ -257,7 +257,7 @@ pci_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	/* non-hotplug or not attached */
 	switch (infocmd) {
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2DEVINFO:
@@ -1242,7 +1242,7 @@ pci_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		 * whatever alignment is passed in.
 		 */
 
-		if ((int)arg) {
+		if ((uintptr_t)arg) {
 			int val = *((int *)result);
 
 			val = maxbit(val, PCI_SBUF_LINE_SIZE);

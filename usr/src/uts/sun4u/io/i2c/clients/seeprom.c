@@ -245,7 +245,7 @@ seeprom_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 
 		return (DDI_SUCCESS);
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)getminor((dev_t)arg);
+		*result = (void *)(uintptr_t)getminor((dev_t)arg);
 
 		return (DDI_SUCCESS);
 	default:

@@ -163,13 +163,14 @@ pbm_register_intr(pbm_t *pbm_p)
 	VERIFY(add_ivintr(mondo, pci_pil[CBNINTR_PBM], pbm_error_intr,
 	    (caddr_t)pci_p, NULL) == 0);
 
-	pbm_p->pbm_iblock_cookie = (void *)pci_pil[CBNINTR_PBM];
+	pbm_p->pbm_iblock_cookie = (void *)(uintptr_t)pci_pil[CBNINTR_PBM];
 
 	/*
 	 * Create the pokefault mutex at the PIL below the error interrupt.
 	 */
 	mutex_init(&pbm_p->pbm_pokefault_mutex, NULL, MUTEX_DRIVER,
-	    (void *)ipltospl(spltoipl((int)pbm_p->pbm_iblock_cookie) - 1));
+	    (void *)(uintptr_t)ipltospl(spltoipl(
+	    (int)(uintptr_t)pbm_p->pbm_iblock_cookie) - 1));
 
 	if (!r)
 		r = pci_pbm_add_intr(pci_p);

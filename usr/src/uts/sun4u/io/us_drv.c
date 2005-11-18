@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -978,7 +978,7 @@ us_pm_monitor(void *arg)
 	 */
 	if (lbolt_cnt > cur_spd->quant_cnt) {
 		DPRINTF(D_PM_MONITOR_DELAY, ("us_pm_monitor: instance %d: "
-		    "lbolt count %d > quantum_count %d\n",
+		    "lbolt count %ld > quantum_count %u\n",
 		    ddi_get_instance(dip), lbolt_cnt, cur_spd->quant_cnt));
 	}
 #endif	/* DEBUG */

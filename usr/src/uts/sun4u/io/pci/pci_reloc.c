@@ -228,7 +228,7 @@ pci_fdvma_remap(ddi_dma_impl_t *mp, caddr_t kvaddr, dvma_addr_t dvma_pg,
 	    kvaddr, npages);
 	if (index + npages > mp->dmai_ndvmapages) {
 		cmn_err(pci_panic_on_fatal_errors ? CE_PANIC : CE_WARN,
-			"%s%d: fdvma remap index(%x)+pgs(%x) exceeds limit\n",
+			"%s%d: fdvma remap index(%lx)+pgs(%lx) exceeds limit\n",
 			ddi_driver_name(dip), ddi_get_instance(dip),
 			index, npages);
 		return;
