@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,6 +86,7 @@ extern "C" {
 #define	PICL_CLASS_CPU			"cpu"
 #define	PICL_CLASS_UPA			"upa"
 #define	PICL_CLASS_PCI			"pci"
+#define	PICL_CLASS_PCIEX		"pciex"
 #define	PICL_CLASS_PMU			"pmu"
 #define	PICL_CLASS_SOUND		"sound"
 #define	PICL_CLASS_SBUS			"sbus"

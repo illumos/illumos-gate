@@ -93,14 +93,12 @@ NODE frutree picl
 	NODE F0 location
 	    PROP SlotType string r 0 "fan-unit"
 	    PROP Label string r 0 "F0"
-	    NODE system-fan0 fru
-	    ENDNODE
+	    REFNODE system-fan0 fru WITH _class:/PLATFORM_CLASS/cpu?ID=0
 	ENDNODE
 	NODE F1 location
 	    PROP SlotType string r 0 "fan-unit"
 	    PROP Label string r 0 "F1"
-	    NODE system-fan1 fru
-	    ENDNODE
+	    REFNODE system-fan1 fru WITH _class:/PLATFORM_CLASS/cpu?ID=1
 	ENDNODE
 	NODE F2 location
 	    PROP SlotType string r 0 "fan-unit"

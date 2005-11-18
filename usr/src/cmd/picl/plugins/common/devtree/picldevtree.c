@@ -250,6 +250,7 @@ static	unitaddr_map_t unitaddr_map_table[] = {
 	{PICL_CLASS_JBUS, encode_gptwo_jbus_unitaddr, 0},
 	{PICL_CLASS_GPTWO, encode_gptwo_jbus_unitaddr, 0},
 	{PICL_CLASS_PCI, encode_pci_unitaddr, 0},
+	{PICL_CLASS_PCIEX, encode_pci_unitaddr, 0},
 	{PICL_CLASS_UPA, encode_upa_unitaddr, 0},
 	{PICL_CLASS_SCSI, encode_scsi_unitaddr, 0},
 	{PICL_CLASS_SCSI2, encode_scsi_unitaddr, 0},
@@ -264,7 +265,7 @@ static	unitaddr_map_t unitaddr_map_table[] = {
 static int add_unitaddr_prop_to_subtree(picl_nodehdl_t nodeh);
 static int get_unitaddr(picl_nodehdl_t parh, picl_nodehdl_t nodeh,
 	char *unitaddr, size_t ualen);
-
+static void set_pci_pciex_deviceid(picl_nodehdl_t plafh);
 
 /*
  * The mc event completion handler.
@@ -2689,7 +2690,7 @@ set_sbus_slot(picl_nodehdl_t plafh)
 }
 
 /*
- * add DeviceID property for children of PCI node
+ * add DeviceID property for children of PCI/PCIEX node
  */
 /* ARGSUSED */
 static int
@@ -2719,19 +2720,18 @@ add_pci_deviceids(picl_nodehdl_t pcih, void *args)
 }
 
 /*
- * This function creates a DeviceID property for PCI child nodes
+ * This function creates a DeviceID property for PCI/PCIEX child nodes
  * which can be correlated with the slot they are plugged into
  * on the motherboard.
  */
-static int
-set_pci_deviceid(picl_nodehdl_t plafh)
+static void
+set_pci_pciex_deviceid(picl_nodehdl_t plafh)
 {
-	int		err;
-
-	err = ptree_walk_tree_by_class(plafh, PICL_CLASS_PCI, NULL,
+	(void) ptree_walk_tree_by_class(plafh, PICL_CLASS_PCI, NULL,
 	    add_pci_deviceids);
 
-	return (err);
+	(void) ptree_walk_tree_by_class(plafh, PICL_CLASS_PCIEX, NULL,
+	    add_pci_deviceids);
 }
 
 /*
@@ -3222,7 +3222,7 @@ picldevtree_init(void)
 
 	(void) add_platform_info(plafh);
 
-	(void) set_pci_deviceid(plafh);
+	set_pci_pciex_deviceid(plafh);
 
 	(void) set_sbus_slot(plafh);
 
@@ -3426,7 +3426,7 @@ picldevtree_evhandler(const char *ename, const void *earg, size_t size,
 done:
 	(void) setup_cpus(plafh);
 	(void) add_ffb_config_info(plafh);
-	(void) set_pci_deviceid(plafh);
+	set_pci_pciex_deviceid(plafh);
 	(void) set_sbus_slot(plafh);
 	if (picldevtree_debug > 1)
 		syslog(LOG_INFO, "picldevtree: event handler done\n");
