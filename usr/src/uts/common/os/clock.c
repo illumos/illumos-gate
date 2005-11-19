@@ -278,6 +278,16 @@ static int tod_fault_reset_flag = 0;
 int tod_validate_enable = 1;
 
 /*
+ * On non-SPARC systems, TOD validation must be deferred until gethrtime
+ * returns non-zero values (after mach_clkinit's execution).
+ * On SPARC systems, it must be deferred until after hrtime_base
+ * and hres_last_tick are set (in the first invocation of hres_tick).
+ * Since in both cases the prerequisites occur before the invocation of
+ * tod_get() in clock(), the deferment is lifted there.
+ */
+static boolean_t tod_validate_deferred = B_TRUE;
+
+/*
  * tod_fault_table[] must be aligned with
  * enum tod_fault_type in systm.h
  */
@@ -856,6 +866,7 @@ clock(void)
 		 *	hrestime without any interference from the tod chip.
 		 */
 
+		tod_validate_deferred = B_FALSE;
 		mutex_enter(&tod_lock);
 		tod = tod_get();
 		drift = tod.tv_sec - hrestime.tv_sec;
@@ -2038,9 +2049,11 @@ tod_validate(time_t tod)
 
 	/*
 	 * tod_validate_enable is patchable via /etc/system.
-	 * If TOD is already faulted, there is nothing to do
+	 * If TOD is already faulted, or if TOD validation is deferred,
+	 * there is nothing to do.
 	 */
-	if ((tod_validate_enable == 0) || (tod_faulted != TOD_NOFAULT)) {
+	if ((tod_validate_enable == 0) || (tod_faulted != TOD_NOFAULT) ||
+	    tod_validate_deferred) {
 		return (tod);
 	}
 
