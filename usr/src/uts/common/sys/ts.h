@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1997-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -68,9 +69,10 @@ typedef struct tsproc {
 	pri_t	ts_uprilim;	/* user priority limit */
 	pri_t	ts_upri;	/* user priority */
 	pri_t	ts_umdpri;	/* user mode priority within ts class */
+	pri_t	ts_scpri;	/* remembered priority, for schedctl */
 	char	ts_nice;	/* nice value for compatibility */
 	char	ts_boost;	/* interactive priority offset */
-	unsigned char ts_flags;	/* flags defined below */
+	uchar_t	ts_flags;	/* flags defined below */
 	kthread_t *ts_tp;	/* pointer to thread */
 	struct tsproc *ts_next;	/* link to next tsproc on list */
 	struct tsproc *ts_prev;	/* link to previous tsproc on list */
@@ -83,6 +85,8 @@ typedef struct tsproc {
 #define	TSIA	0x04	/* thread is interactive */
 #define	TSIASET	0x08	/* interactive thread is "on" */
 #define	TSIANICED	0x10	/* interactive thread has been niced */
+#define	TSRESTORE	0x20	/* thread was not preempted, due to schedctl */
+				/* restore priority from ts_scpri */
 
 #ifdef	__cplusplus
 }

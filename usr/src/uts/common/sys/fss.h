@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,6 +120,7 @@ typedef struct fssproc {
 	pri_t	fss_upri;	/* user supplied priority (to priocntl)	*/
 	pri_t	fss_uprilim;	/* user priority limit			*/
 	pri_t	fss_umdpri;	/* user mode priority within fs class	*/
+	pri_t	fss_scpri;	/* remembered priority, for schedctl	*/
 	int	fss_nice;	/* nice value for compatibility with ts	*/
 	fsspri_t fss_fsspri;	/* internal fair share priority		*/
 	int	fss_runnable;	/* to indicate runnable/sleeping thread	*/
@@ -154,6 +156,8 @@ typedef struct fsszone {
 #define	FSSKPRI		0x01	/* the thread is in kernel mode	*/
 #define	FSSBACKQ	0x02	/* thread should be placed at the back of */
 				/* the dispatch queue if preempted */
+#define	FSSRESTORE	0x04	/* thread was not preempted, due to schedctl */
+				/* restore priority from fss_scpri */
 #ifdef	__cplusplus
 }
 #endif

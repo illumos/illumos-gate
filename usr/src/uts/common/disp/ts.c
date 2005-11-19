@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -701,7 +702,7 @@ ts_fork(kthread_t *t, kthread_t *ct, void *bufp)
 	TS_NEWUMDPRI(ctspp);
 	ctspp->ts_nice = ptspp->ts_nice;
 	ctspp->ts_dispwait = 0;
-	ctspp->ts_flags = ptspp->ts_flags & ~(TSKPRI | TSBACKQ);
+	ctspp->ts_flags = ptspp->ts_flags & ~(TSKPRI | TSBACKQ | TSRESTORE);
 	ctspp->ts_tp = ct;
 	thread_unlock(t);
 
@@ -1381,13 +1382,25 @@ ts_preempt(kthread_t *t)
 		if (tspp->ts_timeleft > -SC_MAX_TICKS) {
 			DTRACE_SCHED1(schedctl__nopreempt, kthread_t *, t);
 			if (!(tspp->ts_flags & TSKPRI)) {
+				/*
+				 * If not already remembered, remember current
+				 * priority for restoration in ts_yield().
+				 */
+				if (!(tspp->ts_flags & TSRESTORE)) {
+					tspp->ts_scpri = t->t_pri;
+					tspp->ts_flags |= TSRESTORE;
+				}
 				THREAD_CHANGE_PRI(t, ts_maxumdpri);
 				t->t_schedflag |= TS_DONT_SWAP;
-				schedctl_set_yield(t, 1);
 			}
+			schedctl_set_yield(t, 1);
 			setfrontdq(t);
 			goto done;
 		} else {
+			if (tspp->ts_flags & TSRESTORE) {
+				THREAD_CHANGE_PRI(t, tspp->ts_scpri);
+				tspp->ts_flags &= ~TSRESTORE;
+			}
 			schedctl_set_nopreempt(t, 0);
 			DTRACE_SCHED1(schedctl__preempt, kthread_t *, t);
 			TNF_PROBE_2(schedctl_preempt, "schedctl TS ts_preempt",
@@ -1676,6 +1689,7 @@ ts_tick(kthread_t *t)
 				    tnf_pid, pid, ttoproc(t)->p_pid,
 				    tnf_lwpid, lwpid, t->t_tid);
 			}
+			tspp->ts_flags &= ~TSRESTORE;
 			tspp->ts_cpupri = ts_dptbl[tspp->ts_cpupri].ts_tqexp;
 			TS_NEWUMDPRI(tspp);
 			tspp->ts_dispwait = 0;
@@ -1973,6 +1987,14 @@ ts_yield(kthread_t *t)
 	 */
 	if (t->t_schedctl)
 		schedctl_set_yield(t, 0);
+	/*
+	 * If ts_preempt() artifically increased the thread's priority
+	 * to avoid preemption, restore the original priority now.
+	 */
+	if (tspp->ts_flags & TSRESTORE) {
+		THREAD_CHANGE_PRI(t, tspp->ts_scpri);
+		tspp->ts_flags &= ~TSRESTORE;
+	}
 	if (tspp->ts_timeleft <= 0) {
 		/*
 		 * Time slice was artificially extended to avoid
@@ -2249,6 +2271,7 @@ ts_change_priority(kthread_t *t, tsproc_t *tspp)
 	ASSERT(THREAD_LOCK_HELD(t));
 	new_pri = ts_dptbl[tspp->ts_umdpri].ts_globpri;
 	ASSERT(new_pri >= 0 && new_pri <= ts_maxglobpri);
+	tspp->ts_flags &= ~TSRESTORE;
 	if (t == curthread || t->t_state == TS_ONPROC) {
 		/* curthread is always onproc */
 		cpu_t	*cp = t->t_disp_queue->disp_cpu;

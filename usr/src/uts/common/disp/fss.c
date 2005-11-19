@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -953,6 +954,7 @@ fss_change_priority(kthread_t *t, fssproc_t *fssproc)
 	new_pri = fssproc->fss_umdpri;
 	ASSERT(new_pri >= 0 && new_pri <= fss_maxglobpri);
 
+	fssproc->fss_flags &= ~FSSRESTORE;
 	if (t == curthread || t->t_state == TS_ONPROC) {
 		/*
 		 * curthread is always onproc
@@ -1566,7 +1568,8 @@ fss_fork(kthread_t *pt, kthread_t *ct, void *bufp)
 	cfssproc->fss_upri = pfssproc->fss_upri;
 	cfssproc->fss_tp = ct;
 	cfssproc->fss_nice = pfssproc->fss_nice;
-	cfssproc->fss_flags = pfssproc->fss_flags & ~(FSSKPRI | FSSBACKQ);
+	cfssproc->fss_flags =
+	    pfssproc->fss_flags & ~(FSSKPRI | FSSBACKQ | FSSRESTORE);
 	ct->t_cldata = (void *)cfssproc;
 	ct->t_schedflag |= TS_RUNQMATCH;
 	thread_unlock(pt);
@@ -1981,7 +1984,7 @@ fss_preempt(kthread_t *t)
 	 * we are, and if the user has requested that this thread not
 	 * be preempted, and if preemptions haven't been put off for
 	 * too long, let the preemption happen here but try to make
-	 * sure the thread is rescheduled as soon as possible.  We d
+	 * sure the thread is rescheduled as soon as possible.  We do
 	 * this by putting it on the front of the highest priority run
 	 * queue in the FSS class.  If the preemption has been put off
 	 * for too long, clear the "nopreempt" bit and let the thread
@@ -1991,13 +1994,25 @@ fss_preempt(kthread_t *t)
 		if (fssproc->fss_timeleft > -SC_MAX_TICKS) {
 			DTRACE_SCHED1(schedctl__nopreempt, kthread_t *, t);
 			if (!(fssproc->fss_flags & FSSKPRI)) {
+				/*
+				 * If not already remembered, remember current
+				 * priority for restoration in fss_yield().
+				 */
+				if (!(fssproc->fss_flags & FSSRESTORE)) {
+					fssproc->fss_scpri = t->t_pri;
+					fssproc->fss_flags |= FSSRESTORE;
+				}
 				THREAD_CHANGE_PRI(t, fss_maxumdpri);
 				t->t_schedflag |= TS_DONT_SWAP;
-				schedctl_set_yield(t, 1);
 			}
+			schedctl_set_yield(t, 1);
 			setfrontdq(t);
 			return;
 		} else {
+			if (fssproc->fss_flags & FSSRESTORE) {
+				THREAD_CHANGE_PRI(t, fssproc->fss_scpri);
+				fssproc->fss_flags &= ~FSSRESTORE;
+			}
 			schedctl_set_nopreempt(t, 0);
 			DTRACE_SCHED1(schedctl__preempt, kthread_t *, t);
 			/*
@@ -2146,6 +2161,7 @@ fss_tick(kthread_t *t)
 					return;
 				}
 			}
+			fssproc->fss_flags &= ~FSSRESTORE;
 
 			fss_newpri(fssproc);
 			new_pri = fssproc->fss_umdpri;
@@ -2325,6 +2341,14 @@ fss_yield(kthread_t *t)
 	 */
 	if (t->t_schedctl)
 		schedctl_set_yield(t, 0);
+	/*
+	 * If fss_preempt() artifically increased the thread's priority
+	 * to avoid preemption, restore the original priority now.
+	 */
+	if (fssproc->fss_flags & FSSRESTORE) {
+		THREAD_CHANGE_PRI(t, fssproc->fss_scpri);
+		fssproc->fss_flags &= ~FSSRESTORE;
+	}
 	if (fssproc->fss_timeleft < 0) {
 		/*
 		 * Time slice was artificially extended to avoid preemption,
