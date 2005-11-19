@@ -47,7 +47,6 @@
 #include <sys/file.h>
 #include <sys/mode.h>
 #include <sys/uio.h>
-#include <sys/ioreq.h>
 #include <sys/filio.h>
 #include <sys/debug.h>
 #include <sys/kmem.h>

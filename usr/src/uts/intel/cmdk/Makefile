@@ -46,7 +46,6 @@ OBJECTS		= $(CMDK_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(CMDK_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/intel/io/dktp/disk
-ITU_SRCDIR	= $(UTSBASE)/intel/io/dktp/disk
 
 #
 #	Include common rules.
@@ -56,9 +55,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
+ALL_TARGET	= $(BINARY) $(CONFMOD)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE) $(ROOT_ITUFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 #	Overrides.

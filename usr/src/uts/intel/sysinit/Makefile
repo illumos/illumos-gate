@@ -22,7 +22,7 @@
 #
 # uts/intel/sysinit/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -44,7 +44,6 @@ MODULE		= sysinit
 OBJECTS		= $(SYSINIT_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SYSINIT_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-ITU_SRCDIR	= $(UTSBASE)/common/io
 
 #
 #	Include common rules.
@@ -61,9 +60,9 @@ ELFSIGN_OBJECT	= true
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(ITUMOD)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_ITUFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Overrides.

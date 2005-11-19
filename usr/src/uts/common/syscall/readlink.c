@@ -45,7 +45,6 @@
 #include <sys/vnode.h>
 #include <sys/file.h>
 #include <sys/uio.h>
-#include <sys/ioreq.h>
 #include <sys/debug.h>
 
 /*

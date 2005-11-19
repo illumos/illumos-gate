@@ -45,7 +45,6 @@ MODULE		= dadk
 OBJECTS		= $(DADK_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DADK_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
-ITU_SRCDIR	= $(UTSBASE)/common/io/dktp/dcdev
 
 #
 #	Include common rules.
@@ -55,9 +54,9 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(ITUMOD)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_ITUFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Overrides.

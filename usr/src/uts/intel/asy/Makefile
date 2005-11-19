@@ -22,7 +22,7 @@
 #
 # uts/intel/asy/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -46,7 +46,6 @@ OBJECTS		= $(ASY_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(ASY_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/common/io
-ITU_SRCDIR	= $(UTSBASE)/common/io
 
 #
 #	Include common rules.
@@ -58,7 +57,7 @@ include $(UTSBASE)/intel/Makefile.intel
 #
 ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE) $(ROOT_ITUFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 #	Overrides.

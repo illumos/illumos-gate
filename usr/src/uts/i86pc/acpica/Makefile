@@ -32,9 +32,9 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
+ALL_TARGET	= $(BINARY) $(CONFMOD)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_ITUFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Overrides.

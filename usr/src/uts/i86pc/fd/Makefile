@@ -22,7 +22,7 @@
 #
 # uts/i86pc/fd/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,7 +45,6 @@ OBJECTS		= $(FD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(FD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/i86pc/io
-ITU_SRCDIR	= $(UTSBASE)/i86pc/io
 
 #
 #	Include common rules.
@@ -55,9 +54,9 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(CONFMOD) $(ITUMOD)
+ALL_TARGET	= $(BINARY) $(CONFMOD)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE) $(ROOT_ITUFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 
 #
 #	Overrides.

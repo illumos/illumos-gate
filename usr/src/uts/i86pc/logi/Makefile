@@ -22,7 +22,7 @@
 #
 # uts/i86pc/logi/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,7 +45,6 @@ MODULE		= logi
 OBJECTS		= $(LOGI_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(LOGI_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
-ITU_SRCDIR	= $(UTSBASE)/i86pc/io
 
 #
 #	Include common rules.
@@ -55,9 +54,9 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(ITUMOD)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_ITUFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Overrides.

@@ -22,7 +22,7 @@
 #
 # uts/i86pc/vuid2ps2/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,7 +45,6 @@ MODULE		= vuid2ps2
 OBJECTS		= $(VUIDPS2_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(VUIDPS2_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_PSM_STRMOD_DIR)/$(MODULE)
-ITU_SRCDIR	= $(UTSBASE)/common/io/vuidmice
 
 #
 #	Include common rules.
@@ -55,9 +54,9 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(ITUMOD)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_ITUFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
 #	Overrides.

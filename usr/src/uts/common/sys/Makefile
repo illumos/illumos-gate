@@ -255,7 +255,6 @@ CHKHDRS=			\
 	inttypes.h		\
 	ioccom.h		\
 	ioctl.h			\
-	ioreq.h			\
 	ipc.h			\
 	ipc_impl.h		\
 	isa_defs.h		\

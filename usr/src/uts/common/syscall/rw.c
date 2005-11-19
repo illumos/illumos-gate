@@ -48,7 +48,6 @@
 #include <sys/proc.h>
 #include <sys/cpuvar.h>
 #include <sys/uio.h>
-#include <sys/ioreq.h>
 #include <sys/debug.h>
 #include <sys/rctl.h>
 #include <sys/nbmlock.h>

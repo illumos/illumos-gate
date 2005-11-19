@@ -46,7 +46,6 @@ MODULE		= pcplusmp
 OBJECTS		= $(PCPLUSMP_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(PCPLUSMP_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MACH_DIR)/$(MODULE)
-ITU_SRCDIR	= $(UTSBASE)/i86pc/io/pcplusmp
 
 #
 #	Include common rules.
@@ -56,9 +55,9 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(ITUMOD)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_ITUFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 DEBUG_FLGS      =
 $(NOT_RELEASE_BUILD)DEBUG_DEFS	+= $(DEBUG_FLGS)

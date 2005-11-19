@@ -79,17 +79,6 @@
 ./src/uts/sparc/amsrc*/main.c
 
 #
-# Ignore ITU's; not used during a nightly.
-#
-*.itu
-
-#
-# Ignore IA64 stuff; not used yet.
-#
-*.ia64
-*/ia64
-
-#
 # Ignore internal test directories and test programs.
 #
 */tests
