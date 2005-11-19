@@ -30,6 +30,7 @@ include		../Makefile.lib
 HDRS=		libzfs_jni_dataset.h \
 		libzfs_jni_disk.h \
 		libzfs_jni_diskmgt.h \
+		libzfs_jni_ipool.h \
 		libzfs_jni_main.h \
 		libzfs_jni_pool.h \
 		libzfs_jni_property.h \
@@ -46,15 +47,9 @@ clobber :=	TARGET= clobber
 install :=	TARGET= install
 lint :=		TARGET= lint
 
-MSGFILES =
-
-POFILE =
-
 .KEEP_STATE:
 
 all clean clobber install: spec .WAIT $(SUBDIRS)
-
-$(POFILE):	pofile_MSGFILES
 
 lint: $(SUBDIRS)
 
@@ -62,12 +57,9 @@ install_h: $(ROOTHDRS)
 
 check: $(CHECKHDRS)
 
-_msg: $(MSGDOMAINPOFILE)
-
 $(SUBDIRS) spec: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
 
 include ../Makefile.targ
-include ../../Makefile.msg.targ

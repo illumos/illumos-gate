@@ -129,9 +129,8 @@ extern zpool_status_t zpool_import_status(nvlist_t *, char **msgid);
 /*
  * Statistics and configuration functions.
  */
-extern nvlist_t *zpool_get_config(zpool_handle_t *);
-extern int zpool_refresh_stats(zpool_handle_t *,
-    nvlist_t **oldconfig, nvlist_t **newconfig);
+extern nvlist_t *zpool_get_config(zpool_handle_t *, nvlist_t **oldconfig);
+extern int zpool_refresh_stats(zpool_handle_t *);
 
 /*
  * Import and export functions

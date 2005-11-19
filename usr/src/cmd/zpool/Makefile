@@ -29,8 +29,7 @@
 PROG= zpool
 OBJS= zpool_main.o zpool_vdev.o zpool_iter.o zpool_util.o zpool_dataset.o
 SRCS= $(OBJS:%.o=%.c)
-POFILES= zpool_main.po zpool_vdev.po zpool_iter.po zpool_util.po \
-	zpool_dataset.po
+POFILES=$(OBJS:%.o=%.po)
 POFILE= zpool.po
 
 include ../Makefile.cmd
@@ -43,13 +42,9 @@ CPPFLAGS += -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 LINTFLAGS += -xerroff=E_NAME_DEF_NOT_USED2 
 LINTFLAGS64 += -xerroff=E_NAME_DEF_NOT_USED2  
 
-CACHEDIR= $(ROOTETC)/zfs
-
 ROOTUSRSBINLINKS = $(PROG:%=$(ROOTUSRSBIN)/%)
 
 .KEEP_STATE:
-
-.PARALLEL:
 
 all: $(PROG)
 
@@ -57,14 +52,11 @@ $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all $(ROOTSBINPROG) $(CACHEDIR) $(ROOTUSRSBINLINKS)
-
-$(CACHEDIR):
-	$(INS.dir)
+install: all $(ROOTSBINPROG) $(ROOTUSRSBINLINKS)
 
 $(POFILE): $(POFILES)
 	$(RM) $@
-	cat $(POFILES) > $@
+	$(CAT) $(POFILES) > $@
 
 clean:
 	$(RM) $(OBJS)
@@ -74,7 +66,5 @@ lint:	lint_SRCS
 # Links from /usr/sbin to /sbin
 $(ROOTUSRSBINLINKS):
 	-$(RM) $@; $(SYMLINK) ../../sbin/$(@F) $@
-
-FRC:
 
 include ../Makefile.targ

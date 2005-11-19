@@ -56,6 +56,7 @@ struct zpool_handle {
 	int zpool_state;
 	size_t zpool_config_size;
 	nvlist_t *zpool_config;
+	nvlist_t *zpool_old_config;
 };
 
 void zfs_error(const char *, ...);

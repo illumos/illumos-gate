@@ -63,7 +63,7 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 	    available, NULL, (xmlChar *)ELEMENT_DISK, NULL);
 	xmlSetProp(disk,
 	    (xmlChar *)ATTR_DISK_NAME, (xmlChar *)dp->name);
-	snprintf(tmp, sizeof (tmp), "%llu", dp->size);
+	(void) snprintf(tmp, sizeof (tmp), "%llu", dp->size);
 	xmlSetProp(disk, (xmlChar *)ATTR_DISK_SIZE, (xmlChar *)tmp);
 
 	if (dp->aliases != NULL) {
@@ -84,11 +84,11 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 			xmlSetProp(slice,
 			    (xmlChar *)ATTR_SLICE_NAME, (xmlChar *)sp->name);
 
-			snprintf(tmp, sizeof (tmp), "%llu", sp->size);
+			(void) snprintf(tmp, sizeof (tmp), "%llu", sp->size);
 			xmlSetProp(slice, (xmlChar *)ATTR_SLICE_SIZE,
 			    (xmlChar *)tmp);
 
-			snprintf(tmp, sizeof (tmp), "%llu", sp->start);
+			(void) snprintf(tmp, sizeof (tmp), "%llu", sp->start);
 			xmlSetProp(slice, (xmlChar *)ATTR_SLICE_START,
 			    (xmlChar *)tmp);
 
@@ -127,7 +127,7 @@ add_pool_to_xml(char *name, uint64_t guid,
 	xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATE, (xmlChar *)state);
 	xmlSetProp(pool, (xmlChar *)ATTR_POOL_HEALTH, (xmlChar *)health);
 
-	snprintf(tmp, sizeof (tmp), "%llu", guid);
+	(void) snprintf(tmp, sizeof (tmp), "%llu", guid);
 	xmlSetProp(pool, (xmlChar *)ATTR_POOL_ID, (xmlChar *)tmp);
 
 	return (0);

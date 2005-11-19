@@ -100,6 +100,7 @@ ROOT.SYS= \
 	/etc/svc/volatile \
 	/etc/tm  \
 	/etc/usb   \
+	/etc/zfs  \
 	/etc/zones  \
 	/export  \
 	/home  \

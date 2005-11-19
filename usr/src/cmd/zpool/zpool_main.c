@@ -337,7 +337,7 @@ zpool_do_add(int argc, char **argv)
 	if ((zhp = zpool_open(poolname)) == NULL)
 		return (1);
 
-	if ((config = zpool_get_config(zhp)) == NULL) {
+	if ((config = zpool_get_config(zhp, NULL)) == NULL) {
 		(void) fprintf(stderr, gettext("pool '%s' is unavailable\n"),
 		    poolname);
 		zpool_close(zhp);
@@ -1254,6 +1254,20 @@ print_vdev_stats(const char *name, nvlist_t *oldnv, nvlist_t *newnv,
 		    oldnv ? oldchild[c] : NULL, newchild[c], cb, depth + 2);
 }
 
+static int
+refresh_iostat(zpool_handle_t *zhp, void *data)
+{
+	iostat_cbdata_t *cb = data;
+
+	/*
+	 * If the pool has disappeared, remove it from the list and continue.
+	 */
+	if (zpool_refresh_stats(zhp) != 0)
+		pool_list_remove(cb->cb_list, zhp);
+
+	return (0);
+}
+
 /*
  * Callback to print out the iostats for the given pool.
  */
@@ -1263,33 +1277,20 @@ print_iostat(zpool_handle_t *zhp, void *data)
 	iostat_cbdata_t *cb = data;
 	nvlist_t *oldconfig, *newconfig;
 	nvlist_t *oldnvroot, *newnvroot;
-	uint64_t oldtxg, newtxg;
 
-	if (zpool_refresh_stats(zhp, &oldconfig, &newconfig) != 0) {
-		/*
-		 * This pool has disappeared, so remove it
-		 * from the list and continue.
-		 */
-		pool_list_remove(cb->cb_list, zhp);
-		return (0);
-	}
+	newconfig = zpool_get_config(zhp, &oldconfig);
 
-	if (cb->cb_iteration == 1) {
-		if (oldconfig != NULL)
-			nvlist_free(oldconfig);
+	if (cb->cb_iteration == 1)
 		oldconfig = NULL;
-	}
 
-	verify(nvlist_lookup_uint64(newconfig, ZPOOL_CONFIG_POOL_TXG,
-	    &newtxg) == 0);
 	verify(nvlist_lookup_nvlist(newconfig, ZPOOL_CONFIG_VDEV_TREE,
 	    &newnvroot) == 0);
 
-	if (oldconfig == NULL ||
-	    nvlist_lookup_uint64(oldconfig, ZPOOL_CONFIG_POOL_TXG, &oldtxg) ||
-	    oldtxg != newtxg ||
-	    nvlist_lookup_nvlist(oldconfig, ZPOOL_CONFIG_VDEV_TREE, &oldnvroot))
+	if (oldconfig == NULL)
 		oldnvroot = NULL;
+	else
+		verify(nvlist_lookup_nvlist(oldconfig, ZPOOL_CONFIG_VDEV_TREE,
+		    &oldnvroot) == 0);
 
 	/*
 	 * Print out the statistics for the pool.
@@ -1298,9 +1299,6 @@ print_iostat(zpool_handle_t *zhp, void *data)
 
 	if (cb->cb_verbose)
 		print_iostat_separator(cb);
-
-	if (oldconfig != NULL)
-		nvlist_free(oldconfig);
 
 	return (0);
 }
@@ -1311,7 +1309,7 @@ get_namewidth(zpool_handle_t *zhp, void *data)
 	iostat_cbdata_t *cb = data;
 	nvlist_t *config, *nvroot;
 
-	if ((config = zpool_get_config(zhp)) != NULL) {
+	if ((config = zpool_get_config(zhp, NULL)) != NULL) {
 		verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 		    &nvroot) == 0);
 		if (!cb->cb_verbose)
@@ -1457,6 +1455,13 @@ zpool_do_iostat(int argc, char **argv)
 			break;
 
 		/*
+		 * Refresh all statistics.  This is done as an explicit step
+		 * before calculating the maximum name width, so that any
+		 * configuration changes are properly accounted for.
+		 */
+		(void) pool_list_iter(list, FALSE, refresh_iostat, &cb);
+
+		/*
 		 * Iterate over all pools to determine the maximum width
 		 * for the pool / device name column across all pools.
 		 */
@@ -1549,7 +1554,7 @@ list_callback(zpool_handle_t *zhp, void *data)
 	if (zpool_get_state(zhp) == POOL_STATE_UNAVAIL) {
 		config = NULL;
 	} else {
-		config = zpool_get_config(zhp);
+		config = zpool_get_config(zhp, NULL);
 		total = zpool_get_space_total(zhp);
 		used = zpool_get_space_used(zhp);
 	}
@@ -1813,7 +1818,7 @@ zpool_do_attach_or_replace(int argc, char **argv, int replacing)
 	if ((zhp = zpool_open(poolname)) == NULL)
 		return (1);
 
-	if ((config = zpool_get_config(zhp)) == NULL) {
+	if ((config = zpool_get_config(zhp, NULL)) == NULL) {
 		(void) fprintf(stderr, gettext("pool '%s' is unavailable\n"),
 		    poolname);
 		zpool_close(zhp);
@@ -2223,7 +2228,7 @@ status_callback(zpool_handle_t *zhp, void *data)
 	int reason;
 	char *health;
 
-	config = zpool_get_config(zhp);
+	config = zpool_get_config(zhp, NULL);
 	reason = zpool_get_status(zhp, &msgid);
 
 	cbp->cb_count++;

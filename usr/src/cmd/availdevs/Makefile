@@ -27,39 +27,31 @@
 #
 
 PROG=		availdevs
-OBJS_COMMON=	availdevs.o
-OBJS=		$(OBJS_COMMON)
-SRCS=		$(OBJS_COMMON:%.o=%.c)
 
 include ../Makefile.cmd
 
 ROOTCMDDIR=	$(ROOTLIB)/zfs
 
-INCS += -I../../lib/libzfs_jni/common \
-	-I/usr/include/libxml2
+INCS += -I/usr/include/libxml2
 
-LDLIBS += -lzfs_jni -lxml2
+#
+# There is no lint library for libxml2, so we need to avoid linking against
+# it during lint, as well as turning off the warnings lint would generate.
+#
+LDLIBS += -lzfs_jni
+all install := LDLIBS += -lxml2
+LINTFLAGS += -xerroff=E_NAME_USED_NOT_DEF2
+
 CPPFLAGS += $(INCS) -D_LARGEFILE64_SOURCE=1 -D_REENTRANT
 
 .KEEP_STATE:
 
-.PARALLEL:
-
 all: $(PROG)
-
-$(PROG): $(OBJS)
-	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
-	$(POST_PROCESS)
-
-%.o: %.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
 
 install: all $(ROOTCMD)
 
 clean:
-	$(RM) $(OBJS)
 
-FRC:
+lint: lint_PROG
 
 include ../Makefile.targ

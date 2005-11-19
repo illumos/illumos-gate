@@ -139,7 +139,6 @@ zpool_handle_t *
 zpool_open_canfail(const char *pool)
 {
 	zpool_handle_t *zhp;
-	nvlist_t *newconfig;
 	int error;
 
 	/*
@@ -155,7 +154,7 @@ zpool_open_canfail(const char *pool)
 
 	(void) strlcpy(zhp->zpool_name, pool, sizeof (zhp->zpool_name));
 
-	if ((error = zpool_refresh_stats(zhp, NULL, &newconfig)) != 0) {
+	if ((error = zpool_refresh_stats(zhp)) != 0) {
 		if (error == ENOENT || error == EINVAL) {
 			zfs_error(dgettext(TEXT_DOMAIN, "cannot open '%s': no "
 			    "such pool"), pool);
@@ -179,14 +178,13 @@ zpool_handle_t *
 zpool_open_silent(const char *pool)
 {
 	zpool_handle_t *zhp;
-	nvlist_t *newconfig;
 	int error;
 
 	zhp = zfs_malloc(sizeof (zpool_handle_t));
 
 	(void) strlcpy(zhp->zpool_name, pool, sizeof (zhp->zpool_name));
 
-	if ((error = zpool_refresh_stats(zhp, NULL, &newconfig)) != 0) {
+	if ((error = zpool_refresh_stats(zhp)) != 0) {
 		if (error == ENOENT || error == EINVAL) {
 			free(zhp);
 			return (NULL);
@@ -232,6 +230,8 @@ zpool_close(zpool_handle_t *zhp)
 {
 	if (zhp->zpool_config)
 		nvlist_free(zhp->zpool_config);
+	if (zhp->zpool_old_config)
+		nvlist_free(zhp->zpool_old_config);
 	free(zhp);
 }
 

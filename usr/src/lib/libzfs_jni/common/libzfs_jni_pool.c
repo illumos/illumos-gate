@@ -540,7 +540,7 @@ zjni_get_root_vdev(zpool_handle_t *zhp)
 	nvlist_t *root = NULL;
 
 	if (zhp != NULL) {
-		nvlist_t *attrs = zpool_get_config(zhp);
+		nvlist_t *attrs = zpool_get_config(zhp, NULL);
 
 		if (attrs != NULL) {
 			int result = nvlist_lookup_nvlist(

@@ -28,28 +28,24 @@
 LIBRARY= libzfs_jni.a
 VERS= .1
 
-OBJS_COMMON=	libzfs_jni_dataset.o \
+OBJECTS=	libzfs_jni_dataset.o \
 		libzfs_jni_disk.o \
 		libzfs_jni_diskmgt.o \
 		libzfs_jni_main.o \
 		libzfs_jni_pool.o \
 		libzfs_jni_property.o \
 		libzfs_jni_util.o
-OBJECTS= $(OBJS_COMMON)
 
 include ../../Makefile.lib
 
 LIBS=	$(DYNLIB) $(LINTLIB)
 
-INCS += -I$(SRCDIR) \
-	-I../../../common/zfsj \
-	-I$(JAVA_ROOT)/include \
+INCS += -I$(JAVA_ROOT)/include \
 	-I$(JAVA_ROOT)/include/solaris
 
 LDLIBS +=	-lc -lnvpair -ldiskmgt -lzfs
 CPPFLAGS +=	$(INCS)
 
-SRCS=	$(OBJS_COMMON:%.o=$(SRCDIR)/%.c)
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 
 SRCDIR=		../common
@@ -61,9 +57,5 @@ SPECMAPFILE=	$(MAPDIR)/mapfile
 all: $(LIBS)
 
 lint: lintcheck
-
-pics/%.o: ../../../common/zfsj/%.c
-	$(COMPILE.c) -o $@ $<
-	$(POST_PROCESS_O)
 
 include ../../Makefile.targ

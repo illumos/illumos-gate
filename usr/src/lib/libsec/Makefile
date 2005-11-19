@@ -51,8 +51,6 @@ $(POFILE):	pofile_MSGFILES
 
 lint: $(SUBDIRS)
 
-# install rule for install_h target
-
 install_h: $(ROOTHDRS)
 
 check: $(CHECKHDRS)

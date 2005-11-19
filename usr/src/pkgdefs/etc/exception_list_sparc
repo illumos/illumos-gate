@@ -814,6 +814,17 @@ usr/lib/llib-lzpool			sparc
 usr/lib/sparcv9/llib-lzfs.ln		sparc
 usr/lib/sparcv9/llib-lzfs_jni.ln	sparc
 usr/lib/sparcv9/llib-lzpool.ln		sparc
+#
+# ZFS JNI headers
+#
+usr/include/libzfs_jni_dataset.h	sparc
+usr/include/libzfs_jni_disk.h		sparc
+usr/include/libzfs_jni_diskmgt.h	sparc
+usr/include/libzfs_jni_ipool.h		sparc
+usr/include/libzfs_jni_main.h		sparc
+usr/include/libzfs_jni_pool.h		sparc
+usr/include/libzfs_jni_property.h	sparc
+usr/include/libzfs_jni_util.h		sparc
 
 #
 # These files are installed in the proto area for Solaris scsi_vhci driver

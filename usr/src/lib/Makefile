@@ -331,6 +331,7 @@ HDRSUBDIRS= libaio	\
 	libwrap		\
 	libxcurses2	\
 	libzfs		\
+	libzfs_jni	\
 	libzoneinfo	\
 	lvm		\
 	openssl		\

@@ -45,6 +45,7 @@ COMMON_SUBDIRS = \
 	cmd/auditstat \
 	cmd/auths \
 	cmd/autopush \
+	cmd/availdevs \
 	cmd/awk \
 	cmd/banner \
 	cmd/bart \

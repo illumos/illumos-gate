@@ -184,8 +184,10 @@ namespace_reload()
  * describing the vdevs, as well as the statistics associated with each one.
  */
 nvlist_t *
-zpool_get_config(zpool_handle_t *zhp)
+zpool_get_config(zpool_handle_t *zhp, nvlist_t **oldconfig)
 {
+	if (oldconfig)
+		*oldconfig = zhp->zpool_old_config;
 	return (zhp->zpool_config);
 }
 
@@ -196,11 +198,11 @@ zpool_get_config(zpool_handle_t *zhp)
  * been destroyed.
  */
 int
-zpool_refresh_stats(zpool_handle_t *zhp, nvlist_t **oldconfig,
-    nvlist_t **newconfig)
+zpool_refresh_stats(zpool_handle_t *zhp)
 {
 	zfs_cmd_t zc = { 0 };
 	int error;
+	nvlist_t *config;
 
 	(void) strcpy(zc.zc_name, zhp->zpool_name);
 
@@ -240,19 +242,33 @@ zpool_refresh_stats(zpool_handle_t *zhp, nvlist_t **oldconfig,
 	}
 
 	verify(nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,
-	    zc.zc_config_dst_size, newconfig, 0) == 0);
+	    zc.zc_config_dst_size, &config, 0) == 0);
 
 	zhp->zpool_config_size = zc.zc_config_dst_size;
 	free((void *)(uintptr_t)zc.zc_config_dst);
 
-	set_pool_health(*newconfig);
+	set_pool_health(config);
 
-	if (oldconfig != NULL)
-		*oldconfig = zhp->zpool_config;
-	else
-		nvlist_free(zhp->zpool_config);
+	if (zhp->zpool_config != NULL) {
+		uint64_t oldtxg, newtxg;
 
-	zhp->zpool_config = *newconfig;
+		verify(nvlist_lookup_uint64(zhp->zpool_config,
+		    ZPOOL_CONFIG_POOL_TXG, &oldtxg) == 0);
+		verify(nvlist_lookup_uint64(config,
+		    ZPOOL_CONFIG_POOL_TXG, &newtxg) == 0);
+
+		if (zhp->zpool_old_config != NULL)
+			nvlist_free(zhp->zpool_old_config);
+
+		if (oldtxg != newtxg) {
+			nvlist_free(zhp->zpool_config);
+			zhp->zpool_old_config = NULL;
+		} else {
+			zhp->zpool_old_config = zhp->zpool_config;
+		}
+	}
+
+	zhp->zpool_config = config;
 
 	return (error);
 }

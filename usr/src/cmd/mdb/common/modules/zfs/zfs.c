@@ -1374,6 +1374,14 @@ spa_vdevs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	/*
+	 * Unitialized spa_t structures can have a NULL root vdev.
+	 */
+	if (spa.spa_root_vdev == NULL) {
+		mdb_printf("no associated vdevs\n");
+		return (DCMD_OK);
+	}
+
 	v.a_type = MDB_TYPE_STRING;
 	v.a_un.a_str = errors ? "-re" : "-r";
 

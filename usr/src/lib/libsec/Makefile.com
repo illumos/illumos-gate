@@ -42,7 +42,6 @@ LIBS =		$(DYNLIB) $(LINTLIB)
 
 CFLAGS +=	$(CCVERBOSE)
 CPPFLAGS +=	-I$(SRCDIR) -I../../../common/acl
-DYNFLAGS +=	$(MAPOPTS)
 LDLIBS += -lc 
 
 # install this library in the root filesystem

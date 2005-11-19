@@ -720,7 +720,8 @@ zpool_in_use(int fd, char **statestr, char **namestr)
 			 * it's not in use.
 			 */
 			if ((zhp = zpool_open_canfail(name)) != NULL &&
-			    (pool_config = zpool_get_config(zhp)) != NULL) {
+			    (pool_config = zpool_get_config(zhp, NULL))
+			    != NULL) {
 				nvlist_t *nvroot;
 
 				verify(nvlist_lookup_nvlist(pool_config,
