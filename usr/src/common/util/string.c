@@ -164,7 +164,7 @@ next_fmt:
 			base = 1;
 			break;
 		case 'c':
-			c = (char)va_arg(args, char);
+			c = (char)va_arg(args, int);
 			ADDCHAR(c);
 			break;
 		case 's':
@@ -229,14 +229,16 @@ next_fmt:
 				ul = (int64_t)va_arg(args, unsigned long);
 		else if (h_count > 1)
 			if (sign)
-				ul = (int64_t)va_arg(args, char);
+				ul = (int64_t)((char)va_arg(args, int));
 			else
-				ul = (int64_t)va_arg(args, unsigned char);
+				ul = (int64_t)((unsigned char)va_arg(args,
+				    int));
 		else if (h_count > 0)
 			if (sign)
-				ul = (int64_t)va_arg(args, short);
+				ul = (int64_t)((short)va_arg(args, int));
 			else
-				ul = (int64_t)va_arg(args, unsigned short);
+				ul = (int64_t)((unsigned short)va_arg(args,
+				    int));
 
 		if (sign && (int64_t)ul < 0)
 			ul = -ul;
