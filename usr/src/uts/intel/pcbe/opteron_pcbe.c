@@ -468,7 +468,7 @@ opt_pcbe_sample(void *token)
 	int64_t			diff;
 
 	for (i = 0; i < 4; i++)
-		curpic[i] = rdmsr(PIC_BASE_ADDR);
+		curpic[i] = rdmsr(PIC_BASE_ADDR + i);
 
 	/*
 	 * Query kernel for all configs which are co-programmed.
