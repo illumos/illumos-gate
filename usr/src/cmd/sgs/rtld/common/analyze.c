@@ -1694,6 +1694,22 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 			 */
 			(void) fpavl_loaded(lml, fdesc.fd_nname,
 			    &(fdesc.fd_avlwhere));
+
+			/*
+			 * If the name and resolved pathname differ, duplicate
+			 * the pathname once more to provide for genric cleanup
+			 * by the caller.
+			 */
+			if (fdesc.fd_pname &&
+			    (fdesc.fd_nname != fdesc.fd_pname)) {
+				char	*pname;
+
+				if ((pname = strdup(fdesc.fd_pname)) == 0) {
+					(void) close(fdesc.fd_fd);
+					return (0);
+				}
+				fdesc.fd_pname = pname;
+			}
 		} else {
 			/*
 			 * If this object is already loaded, we're done.

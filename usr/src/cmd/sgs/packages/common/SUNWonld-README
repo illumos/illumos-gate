@@ -115,7 +115,7 @@ All the above changes are incorporated in the following patches:
 --------------------------------------------------------------------------------
 4267980 INITFIRST flag of the shard object could be ignored.
 --------------------------------------------------------------------------------
-All the above changes plus the following:
+All the above changes plus:
     4238973 fix for 4121152 affects linking of Ada objects
     4158744 patch 103627-02 causes core when RPATH has blank entry and
 	    dlopen/dlclose is used
@@ -138,7 +138,7 @@ All the above changes are incorporated in the following patches:
 All the above changes except for:
     4256518 miscalculated calloc() during dlclose/tsorting can result in segv
     4254171 DT_SPARC_REGISTER has invalid value associated with it.
-plus the following:
+plus:
     4238973 fix for 4121152 affects linking of Ada objects
     4158744 patch 103627-02 causes core when RPATH has blank entry and
 	    dlopen/dlclose is used
@@ -154,7 +154,7 @@ All the above changes are incorporated in the following patches:
 --------------------------------------------------------------------------------
 4295613 COMMON symbol resolution can be incorrect
 --------------------------------------------------------------------------------
-All the above changes plus the followings:
+All the above changes plus:
     4238973 fix for 4121152 affects linking of Ada objects
     4158744 patch 103627-02 causes core when RPATH has blank entry and
 	    dlopen/dlclose is used
@@ -162,9 +162,9 @@ are incorporated in the following patches:
 	Solaris/SunOS 5.5.1_sparc	patch 103627-14
 	Solaris/SunOS 5.5.1_x86		patch 103628-13
 --------------------------------------------------------------------------------
-The fix for the following bug:
+All the above changes plus:
     4351197 nfs performance problem by 103627-13
-is incorporated in the following patches:
+are incorporated in the following patches:
 	Solaris/SunOS 5.5.1_sparc	patch 103627-15
 	Solaris/SunOS 5.5.1_x86		patch 103628-14
 --------------------------------------------------------------------------------
@@ -506,14 +506,15 @@ All the above changes are incorporated in the following patches:
 	Solaris/SunOS 5.6_sparc		patch 107733-10
 	Solaris/SunOS 5.6_x86		patch 107734-10
 --------------------------------------------------------------------------------
-The fix for the following bug is incorporated in:
+All the above changes plus:
 	4616944 ar seg faults when order of object file is reversed.
+are incorporated in the following patches:
 	Solaris/SunOS 5.8_sparc		patch 109147-16
 	Solaris/SunOS 5.8_x86		patch 109148-16
 --------------------------------------------------------------------------------
-All the above changes plus the fix for the following bug
-are incorporated in the following patches:
+All the above changes plus:
 	4872634 Large LD_PRELOAD values can cause SEGV of process
+are incorporated in the following patches:
 	Solaris/SunOS 5.6_sparc		patch T107733-11
 	Solaris/SunOS 5.6_x86		patch T107734-11
 --------------------------------------------------------------------------------
@@ -673,10 +674,10 @@ All the above changes are incorporated in the following patches:
 4793721 Need a way to null all code in ISV objects enabling ld performance
 	tuning
 --------------------------------------------------------------------------------
-All the above change plus the fix for:
+All the above changes plus:
 	4796237 RFE: link-editor became extremely slow with patch 109147-20 and
 		static libraries
-is incorporated in the following patches:
+are incorporated in the following patches:
         Solaris/SunOS 5.9_sparc         patch T112963-07
         Solaris/SunOS 5.9_x86           patch T113986-03
         Solaris/SunOS 5.8_sparc         patch T109147-23
@@ -955,7 +956,7 @@ All the above changes are incorporated in the following patches:
 6257177 incremental builds of usr/src/cmd/sgs can fail...
 6219651 AMD64: Linker does not issue error for out of range R_AMD64_PC32
 --------------------------------------------------------------------------------
-All the above change is incorporated in the following patches:
+All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T117461-02
     Solaris/SunOS 5.10_x86	patch T118345-02
     Solaris/SunOS 5.9_sparc	patch T112963-20
@@ -990,7 +991,7 @@ NOTE: The fix for 6219651 is only applicable for 5.10_x86 platform.
 6268693 SHN_SUNW_IGNORE symbols should be allowed to be mulitiply defined
 6262789 Infosys wants a faster linker
 --------------------------------------------------------------------------------
-All the above change is incorporated in the following patches:
+All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T117461-03
     Solaris/SunOS 5.10_x86	patch T118345-03
     Solaris/SunOS 5.9_sparc	patch T112963-21
@@ -1006,7 +1007,7 @@ All the above change is incorporated in the following patches:
 6280467 dlclose() unmaps shared library before library's _fini() has finished
 6291547 ld.so mishandles LD_AUDIT causing security problems.
 --------------------------------------------------------------------------------
-All the above change is incorporated in the following patches:
+All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T117461-04
     Solaris/SunOS 5.10_x86	patch T118345-04
     Solaris/SunOS 5.9_sparc	patch T112963-22
@@ -1024,7 +1025,7 @@ All the above change is incorporated in the following patches:
 6290157 gcc and sgs/librtld_db/rdb_demo don't get along
 6301218 Matlab dumps core on startup when running on 112963-22  (D)
 --------------------------------------------------------------------------------
-All the above change is incorporated in the following patches:
+All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.9_sparc	patch T112963-23
     Solaris/SunOS 5.9_x86	patch T113986-19
     Solaris/SunOS 5.8_sparc	patch T109147-38
@@ -1033,7 +1034,7 @@ All the above change is incorporated in the following patches:
 6314115 Checkpoint refuses to start, crashes on start, after application of
 	linker patch 112963-22
 --------------------------------------------------------------------------------
-All the above change is incorporated in the following patches:
+All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.9_sparc	patch T112963-24
     Solaris/SunOS 5.9_x86	patch T113986-20
     Solaris/SunOS 5.8_sparc	patch T109147-39
@@ -1048,7 +1049,7 @@ PSARC 2005/514 - AMD64 - large section support
 6314743 Linker: incorrect resolution for R_AMD64_GOTPC32
 6311865 Linker: x86 medium model; invalid ELF program header
 --------------------------------------------------------------------------------
-All the above change is incorporated in the following patches:
+All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T117461-07
     Solaris/SunOS 5.10_x86	patch T118345-11
 --------------------------------------------------------------------------------
@@ -1059,7 +1060,7 @@ All the above change is incorporated in the following patches:
 	to boot
 6340814 ld.so.1 core dump with HWCAP relocatable object + updated statistics
 --------------------------------------------------------------------------------
-All the above change is incorporated in the following patches:
+All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T117461-08
     Solaris/SunOS 5.10_x86	patch T121208-02
     Solaris/SunOS 5.9_sparc	patch T112963-25
@@ -1069,3 +1070,4 @@ All the above change is incorporated in the following patches:
 --------------------------------------------------------------------------------
 6307274 crle bug with LD_LIBRARY_PATH
 6317969 elfheader limited to 65535 segments (link-editor components only)
+6350027 ld.so.1 aborts with assertion failed on amd64
