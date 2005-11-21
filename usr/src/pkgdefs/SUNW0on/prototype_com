@@ -48,6 +48,7 @@ f none usr/lib/locale/C/LC_MESSAGES/FMD.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SMF.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4.po              644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4U.po             644 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SUN4V.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUNOS.po             644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/PCI.po               644 root bin
 f none usr/lib/locale/C/LC_MESSAGES/ZFS.po               644 root bin

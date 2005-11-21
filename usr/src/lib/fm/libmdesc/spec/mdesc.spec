@@ -1,4 +1,7 @@
 #
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -19,33 +22,36 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-include ../Makefile.com
+function	md_fini
+version		SUNWprivate
+end
 
-SCHEME_COMMON = ../common
+function	md_find_name
+version		SUNWprivate
+end
 
-SRCS = \
-	mdesc_devinit.c \
-	mem.c \
-	mem_disc.c \
-	mem_read.c \
-	mem_unum.c \
-	mem_util.c
+function	md_find_node_prop
+version		SUNWprivate
+end
 
+function	md_get_prop_str
+version		SUNWprivate
+end
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc
-LDFLAGS += -R/usr/lib/fm
+function	md_get_prop_val
+version		SUNWprivate
+end
 
-include ../Makefile.targ
+function	md_init_intern
+version		SUNWprivate
+end
 
-%.o: $(SCHEME_COMMON)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
+function	md_node_count
+version		SUNWprivate
+end
 
-%.ln: $(SCHEME_COMMON)/%.c
-	$(LINT.c) -erroff=E_BAD_PTR_CAST_ALIGN -v -c $<
+function	md_scan_dag
+version		SUNWprivate
+end

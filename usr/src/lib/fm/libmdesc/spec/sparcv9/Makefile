@@ -25,27 +25,12 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-include ../Makefile.com
-
-SCHEME_COMMON = ../common
-
-SRCS = \
-	mdesc_devinit.c \
-	mem.c \
-	mem_disc.c \
-	mem_read.c \
-	mem_unum.c \
-	mem_util.c
-
-
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc
-LDFLAGS += -R/usr/lib/fm
+# To enable apptrace, comment out the next line
+DISABLE_APPTRACE=   $(POUND_SIGN)
 
 include ../Makefile.targ
+include $(SRC)/lib/Makefile.lib
+include $(SRC)/lib/Makefile.lib.64
+include $(SRC)/lib/Makefile.spec
 
-%.o: $(SCHEME_COMMON)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-%.ln: $(SCHEME_COMMON)/%.c
-	$(LINT.c) -erroff=E_BAD_PTR_CAST_ALIGN -v -c $<
+$(DISABLE_APPTRACE)install: $(ROOTABILIB64)

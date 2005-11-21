@@ -50,6 +50,15 @@ extern "C" {
 #define	FM_EREPORT_CPU_UST1_DSU			"dsu"
 #define	FM_EREPORT_CPU_UST1_DSC			"dsc"
 
+/*
+ * The following constants are also defined in UltraSPARC-III.h and
+ * could possibly be moved into a common header file
+ */
+
+#define	FM_EREPORT_PAYLOAD_NAME_RESOURCE	"resource"
+#define	FM_EREPORT_PAYLOAD_NAME_ERR_TYPE	"error-type"
+#define	FM_EREPORT_PAYLOAD_NAME_ERR_DISP	"error-disposition"
+
 #ifdef __cplusplus
 }
 #endif

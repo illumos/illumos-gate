@@ -38,7 +38,6 @@
 #include <unistd.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
-#include <sys/fm/cpu/UltraSPARC-III.h>
 #include <sys/mem.h>
 #include <sys/nvpair.h>
 

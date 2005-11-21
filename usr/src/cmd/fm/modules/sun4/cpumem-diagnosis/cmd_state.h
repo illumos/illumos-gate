@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,7 +95,11 @@ typedef enum cmd_ptrsubtype {
 	CMD_PTR_BANK_CASE,
 	CMD_PTR_PAGE_CASE,
 	CMD_PTR_CPU_FPU,
-	CMD_PTR_CPU_XR_RETRY
+	CMD_PTR_CPU_XR_RETRY,
+	CMD_PTR_CPU_IREG,
+	CMD_PTR_CPU_FREG,
+	CMD_PTR_CPU_MAU,
+	CMD_PTR_CPU_L2CTL
 } cmd_ptrsubtype_t;
 
 /*

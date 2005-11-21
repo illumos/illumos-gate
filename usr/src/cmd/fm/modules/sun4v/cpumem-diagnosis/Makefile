@@ -27,10 +27,6 @@
 
 ARCH = sun4v
 
-# A sun4v-specific build should not be #include 'ing files from a sun4u
-# directory, but this is necessary until the files can be reorganized
-# properly.
-
-INCDIRS = $(SRC)/uts/sun4u
+INCDIRS = $(SRC)/uts/sun4v
 
 include ../../sun4/cpumem-diagnosis/Makefile.cpumem

@@ -29,6 +29,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/types.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif

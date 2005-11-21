@@ -49,6 +49,7 @@ SUN4_HDRS=			\
 	ddi_subrdefs.h		\
 	dvma.h			\
 	eeprom.h		\
+	errclassify.h		\
 	fcode.h			\
 	idprom.h		\
 	intr.h			\
@@ -77,7 +78,6 @@ HDRS=	\
 	envctrl_gen.h		\
 	envctrl_ue250.h		\
 	envctrl_ue450.h		\
-	errclassify.h		\
 	gpio_87317.h		\
 	fc_plat.h		\
 	iocache.h		\

@@ -27,6 +27,8 @@
 
 ARCH = sun4u
 
+sun4u_SRCS = cmd_ecache.c
+
 INCDIRS = $(SRC)/uts/sun4u
 
 include ../../sun4/cpumem-diagnosis/Makefile.cpumem

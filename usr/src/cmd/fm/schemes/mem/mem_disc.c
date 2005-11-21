@@ -38,8 +38,7 @@
  * without PICL configuration files are acceptable (some platforms, like
  * Serengeti and Starcat, don't have configuration files as of this writing),
  * platforms with only one or the other aren't.
- */
-/*
+ *
  * On Sun4v platforms, we read the 'mdesc' machine description file in order
  * to obtain the mapping between dimm unum+jnum strings (which denote slot
  * names) and the serial numbers of the dimms occupying those slots.
@@ -370,8 +369,9 @@ mem_discover_mdesc(void)
 	for (idx = 0; idx < mdesc_dimm_count; idx++) {
 		char *unum, *serial;
 
-		if (md_get_prop_str(mdp, listp[idx], "nac", &unum)) unum = "";
-		if (md_get_prop_str(mdp, listp[idx], "serial#", &serial))
+		if (md_get_prop_str(mdp, listp[idx], "nac", &unum) < 0)
+			unum = "";
+		if (md_get_prop_str(mdp, listp[idx], "serial#", &serial) < 0)
 			serial = "";
 
 		dm = fmd_fmri_zalloc(sizeof (mem_dimm_map_t));

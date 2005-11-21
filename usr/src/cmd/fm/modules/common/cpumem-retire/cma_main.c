@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,8 +59,6 @@ typedef struct cma_subscriber {
 } cma_subscriber_t;
 
 static const cma_subscriber_t cma_subrs[] = {
-	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
-	    cma_cpu_retire },
 	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
 	{ "fault.memory.dimm", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
@@ -69,6 +67,24 @@ static const cma_subscriber_t cma_subrs[] = {
 	    NULL },
 	{ "fault.memory.datapath", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
+
+	/*
+	 * The following ultraSPARC-T1 faults do NOT retire a cpu thread,
+	 * and therefore must be intercepted before
+	 * the default "fault.cpu.*" dispatch to cma_cpu_retire.
+	 */
+	{ "fault.cpu.ultraSPARC-T1.freg", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T1.l2cachedata", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T1.l2cachetag", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T1.l2cachectl", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.ultraSPARC-T1.mau", FM_FMRI_SCHEME_CPU,
+	    FM_CPU_SCHEME_VERSION, NULL },
+	{ "fault.cpu.*", FM_FMRI_SCHEME_CPU, FM_CPU_SCHEME_VERSION,
+	    cma_cpu_retire },
 	{ NULL, NULL, 0, NULL }
 };
 

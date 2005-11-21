@@ -64,7 +64,7 @@ cpu_mdesc_init(void)
 
 	mdp = mdesc_devinit(&bufsiz);
 	if (mdp == NULL)
-	    return (0); /* successful, no mdesc */
+		return (0); /* successful, no mdesc */
 
 	num_nodes = md_node_count(mdp);
 
@@ -84,15 +84,16 @@ cpu_mdesc_init(void)
 	    idx++, mcmp++) {
 		uint64_t tl;
 
-		if (md_get_prop_val(mdp, listp[idx], "id", &tl)) tl = -1;
+		if (md_get_prop_val(mdp, listp[idx], "id", &tl) < 0)
+			tl = (uint64_t)-1; /* invalid value */
 		mcmp->cpumap_id = tl;
 
-		if (md_get_prop_val(mdp, listp[idx], "pid", &tl))
-		    tl = mcmp->cpumap_id;
+		if (md_get_prop_val(mdp, listp[idx], "pid", &tl) < 0)
+			tl = mcmp->cpumap_id;
 		mcmp->cpumap_pid = tl;
 
 		if (md_get_prop_val(mdp, listp[idx], "serial#",
-		    &mcmp->cpumap_serialno))
+		    &mcmp->cpumap_serialno) < 0)
 			mcmp->cpumap_serialno = 0;
 	}
 	fmd_fmri_free(listp, sizeof (mde_cookie_t)*num_nodes);

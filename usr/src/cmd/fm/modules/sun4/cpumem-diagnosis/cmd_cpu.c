@@ -31,7 +31,11 @@
  */
 
 #include <cmd_cpu.h>
+
+#ifdef sun4u
 #include <cmd_ecache.h>
+#endif /* sun4u */
+
 #include <cmd_mem.h>
 #include <cmd.h>
 
@@ -43,8 +47,6 @@
 #include <fm/fmd_api.h>
 #include <sys/async.h>
 #include <sys/fm/protocol.h>
-#include <sys/fm/cpu/UltraSPARC-III.h>
-#include <sys/fm/cpu/UltraSPARC-T1.h>
 
 #define	CMD_CPU_UEC_INCR	10
 #define	CPU_FRU_FMRI		FM_FMRI_SCHEME_HC":///" \
@@ -90,6 +92,7 @@ cpu_nname2type(fmd_hdl_t *hdl, const char *name, size_t n)
 	return (0);
 }
 
+#ifdef sun4u
 static void
 cpu_uec_write(fmd_hdl_t *hdl, cmd_cpu_t *cpu, cmd_cpu_uec_t *uec)
 {
@@ -305,8 +308,9 @@ cmd_cpu_uec_match(cmd_cpu_t *cpu, uint64_t pa)
 
 	return (0);
 }
+#endif /* sun4u */
 
-static void
+void
 cmd_xr_write(fmd_hdl_t *hdl, cmd_xr_t *xr)
 {
 	fmd_hdl_debug(hdl, "writing redelivery clcode %llx for case %s\n",
@@ -343,17 +347,11 @@ cmd_xr_create(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	int err = 0;
 
 	err |= nvlist_lookup_uint64(nvl, FM_EREPORT_ENA, &xr->xr_ena);
-	err |= nvlist_lookup_uint16(nvl, FM_EREPORT_PAYLOAD_NAME_SYND,
-	    &xr->xr_synd);
-	err |= nvlist_lookup_uint8(nvl, FM_EREPORT_PAYLOAD_NAME_SYND_STATUS,
-	    &xr->xr_synd_status);
-	err |= nvlist_lookup_uint64(nvl, FM_EREPORT_PAYLOAD_NAME_AFAR,
-	    &xr->xr_afar);
-	err |= nvlist_lookup_uint8(nvl, FM_EREPORT_PAYLOAD_NAME_AFAR_STATUS,
-	    &xr->xr_afar_status);
+
+	err |= cmd_xr_fill(hdl, nvl, xr, clcode);
 
 	(void) nvlist_lookup_nvlist(nvl, FM_EREPORT_PAYLOAD_NAME_RESOURCE,
-				&rsrc);
+	    &rsrc);
 
 	if (err != 0) {
 		fmd_hdl_free(hdl, xr, sizeof (cmd_xr_t));
@@ -470,6 +468,7 @@ typedef struct cmd_xxcu_train {
 #define	CMD_TRAIN(cause, side_effects)	{ (cause) | (side_effects), (cause) }
 
 static const cmd_xxcu_train_t cmd_xxcu_trains[] = {
+#ifdef sun4u
 	CMD_TRAIN(CMD_ERRCL_UCC,	CMD_ERRCL_WDC),
 	CMD_TRAIN(CMD_ERRCL_UCU,	CMD_ERRCL_WDU),
 	CMD_TRAIN(CMD_ERRCL_UCU,	CMD_ERRCL_L3_WDU | CMD_ERRCL_WDU),
@@ -494,6 +493,14 @@ static const cmd_xxcu_train_t cmd_xxcu_trains[] = {
 	CMD_TRAIN(CMD_ERRCL_L3_EDU_BL,	CMD_ERRCL_L3_WDU | CMD_ERRCL_WDU),
 	CMD_TRAIN(CMD_ERRCL_L3_CPC,	CMD_ERRCL_L3_WDC),
 	CMD_TRAIN(CMD_ERRCL_L3_CPU,	CMD_ERRCL_L3_WDU),
+#else /* sun4u */
+	CMD_TRAIN(CMD_ERRCL_LDAC,	CMD_ERRCL_LDWC),
+	CMD_TRAIN(CMD_ERRCL_LDRC,	CMD_ERRCL_LDWC),
+	CMD_TRAIN(CMD_ERRCL_LDSC,	CMD_ERRCL_LDWC),
+	CMD_TRAIN(CMD_ERRCL_LDAU,	CMD_ERRCL_LDWU),
+	CMD_TRAIN(CMD_ERRCL_LDRU,	CMD_ERRCL_LDWU),
+	CMD_TRAIN(CMD_ERRCL_LDSU,	CMD_ERRCL_LDWU),
+#endif /* sun4u */
 	CMD_TRAIN(0, 0)
 };
 
@@ -644,8 +651,10 @@ cmd_cpu_free(fmd_hdl_t *hdl, cmd_cpu_t *cpu, int destroy)
 		}
 	}
 
+#ifdef sun4u
 	cpu_uec_free(hdl, &cpu->cpu_uec, destroy);
 	cpu_uec_free(hdl, &cpu->cpu_olduec, destroy);
+#endif /* sun4u */
 
 	cmd_fmri_fini(hdl, &cpu->cpu_asru, destroy);
 	cmd_fmri_fini(hdl, &cpu->cpu_fru, destroy);
@@ -711,54 +720,59 @@ cpu_getfrustr(fmd_hdl_t *hdl, uint32_t cpuid)
 }
 
 static nvlist_t *
-cpu_getfru(fmd_hdl_t *hdl, uint32_t cpuid)
+cpu_mkfru(char *frustr)
 {
-	char *frustr, *comp;
+	char *comp;
 	nvlist_t *fru, *hcelem;
 
-	if ((frustr = cpu_getfrustr(hdl, cpuid)) == NULL) {
-		fmd_hdl_abort(hdl, "failed to retrieve FRU string for CPU %d",
-		    cpuid);
-	}
-
-	if (strncmp(frustr, CPU_FRU_FMRI, sizeof (CPU_FRU_FMRI) - 1) != 0) {
-		fmd_hdl_strfree(hdl, frustr);
+	if (strncmp(frustr, CPU_FRU_FMRI, sizeof (CPU_FRU_FMRI) - 1) != 0)
 		return (NULL);
-	}
+
 	comp = frustr + sizeof (CPU_FRU_FMRI) - 1;
 
-	if (nvlist_alloc(&hcelem, NV_UNIQUE_NAME, 0) != 0) {
-		fmd_hdl_strfree(hdl, frustr);
+	if (nvlist_alloc(&hcelem, NV_UNIQUE_NAME, 0) != 0)
 		return (NULL);
-	}
+
 	if (nvlist_add_string(hcelem, FM_FMRI_HC_NAME,
 	    FM_FMRI_LEGACY_HC) != 0 ||
 	    nvlist_add_string(hcelem, FM_FMRI_HC_ID, comp) != 0) {
 		nvlist_free(hcelem);
-		fmd_hdl_strfree(hdl, frustr);
 		return (NULL);
 	}
 
 	if (nvlist_alloc(&fru, NV_UNIQUE_NAME, 0) != 0) {
 		nvlist_free(hcelem);
-		fmd_hdl_strfree(hdl, frustr);
 		return (NULL);
 	}
+
 	if (nvlist_add_uint8(fru, FM_VERSION, FM_HC_SCHEME_VERSION) != 0 ||
 	    nvlist_add_string(fru, FM_FMRI_SCHEME,
 	    FM_FMRI_SCHEME_HC) != 0 ||
 	    nvlist_add_string(fru, FM_FMRI_HC_ROOT, "") != 0 ||
 	    nvlist_add_uint32(fru, FM_FMRI_HC_LIST_SZ, 1) != 0 ||
 	    nvlist_add_nvlist_array(fru, FM_FMRI_HC_LIST, &hcelem, 1) != 0) {
-		fmd_hdl_strfree(hdl, frustr);
 		nvlist_free(hcelem);
 		nvlist_free(fru);
 		return (NULL);
 	}
 
-	fmd_hdl_strfree(hdl, frustr);
 	nvlist_free(hcelem);
 	return (fru);
+}
+
+static nvlist_t *
+cpu_getfru(fmd_hdl_t *hdl, uint32_t cpuid)
+{
+	char *frustr;
+	nvlist_t *nvlp;
+
+	if ((frustr = cpu_getfrustr(hdl, cpuid)) == NULL) {
+		fmd_hdl_abort(hdl, "failed to retrieve FRU string for CPU %d",
+		    cpuid);
+	}
+	nvlp = cpu_mkfru(frustr);
+	fmd_hdl_strfree(hdl, frustr);
+	return (nvlp);
 }
 
 static void
@@ -812,6 +826,7 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, cmd_cpu_type_t type)
 {
 	cmd_cpu_t *cpu;
 	nvlist_t *fru;
+	char *frustr;
 
 	/*
 	 * No CPU state matches the CPU described in the ereport.  Create a new
@@ -829,13 +844,42 @@ cpu_create(fmd_hdl_t *hdl, nvlist_t *asru, uint32_t cpuid, cmd_cpu_type_t type)
 	cmd_bufname(cpu->cpu_bufname, sizeof (cpu->cpu_bufname),
 	    "cpu_%d", cpu->cpu_cpuid);
 
+#ifdef sun4u
 	cpu_uec_create(hdl, cpu, &cpu->cpu_uec, "cpu_uec_%d", cpu->cpu_cpuid);
 	cpu_uec_create(hdl, cpu, &cpu->cpu_olduec, "cpu_olduec_%d",
 	    cpu->cpu_cpuid);
+#endif /* sun4u */
 
 	cmd_fmri_init(hdl, &cpu->cpu_asru, asru, "cpu_asru_%d", cpu->cpu_cpuid);
 
-	if ((fru = cpu_getfru(hdl, cpuid)) != NULL) {
+	/*
+	 * If this ereport contains a 'cpufru' element, use it to construct
+	 * the FRU FMRI instead of going to kstats.
+	 *
+	 * Unfortunately, the string associated with 'cpufru' is
+	 * not in precisely the right form -- so the following code is
+	 * written to adjust.
+	 */
+	if (nvlist_lookup_string(asru, FM_FMRI_CPU_CPUFRU, &frustr) == 0) {
+		char *s1, *s2;
+		size_t frustrlen = strlen(frustr) + sizeof (CPU_FRU_FMRI) + 1;
+
+		s1 = fmd_hdl_zalloc(hdl, frustrlen, FMD_SLEEP);
+		s2 = strrchr(frustr, '/') + 1;
+		if (s2 == NULL)
+			s2 = "MB";
+
+		(void) snprintf(s1, frustrlen, "%s%s",
+		    CPU_FRU_FMRI, s2);
+
+		if ((fru = cpu_mkfru(s1)) != NULL) {
+			cmd_fmri_init(hdl, &cpu->cpu_fru, fru, "cpu_fru_%d",
+			    cpu->cpu_cpuid);
+			nvlist_free(fru);
+		}
+		fmd_hdl_free(hdl, s1, frustrlen);
+
+	} else if ((fru = cpu_getfru(hdl, cpuid)) != NULL) {
 		cmd_fmri_init(hdl, &cpu->cpu_fru, fru, "cpu_fru_%d",
 		    cpu->cpu_cpuid);
 		nvlist_free(fru);
@@ -1061,13 +1105,13 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 
 		cmd_fmri_restore(hdl, &cpu->cpu_asru);
 		cmd_fmri_restore(hdl, &cpu->cpu_fru);
-
+#ifdef sun4u
 		cpu_uec_restore(hdl, &cpu->cpu_uec);
 		cpu_uec_restore(hdl, &cpu->cpu_olduec);
 
 		if (cpu->cpu_uec.uec_cache != NULL)
 			cpu_uec_flush(hdl, cpu);
-
+#endif /* sun4u */
 		bzero(&cpu->cpu_xxu_retries, sizeof (cmd_list_t));
 
 		cmd_list_append(&cmd.cmd_cpus, cpu);
@@ -1114,6 +1158,18 @@ cmd_cpu_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 		break;
 	case CMD_PTR_CPU_XR_RETRY:
 		cmd_xr_restore(hdl, cpu, cp);
+		break;
+	case CMD_PTR_CPU_IREG:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_ireg, cp, "ireg");
+		break;
+	case CMD_PTR_CPU_FREG:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_freg, cp, "freg");
+		break;
+	case CMD_PTR_CPU_MAU:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_mau, cp, "mau");
+		break;
+	case CMD_PTR_CPU_L2CTL:
+		cpu_case_restore(hdl, cpu, &cpu->cpu_l2ctl, cp, "l2ctl");
 		break;
 	default:
 		fmd_hdl_abort(hdl, "invalid %s subtype %d\n",
@@ -1168,9 +1224,11 @@ cmd_xxcu_timeout(fmd_hdl_t *hdl, id_t id)
 	}
 }
 
+/*ARGSUSED*/
 static void
 cmd_xxu_flush_timeout(fmd_hdl_t *hdl, id_t id)
 {
+#ifdef sun4u
 	cmd_cpu_t *cpu;
 
 	for (cpu = cmd_list_next(&cmd.cmd_cpus); cpu != NULL;
@@ -1180,6 +1238,9 @@ cmd_xxu_flush_timeout(fmd_hdl_t *hdl, id_t id)
 			return;
 		}
 	}
+#else /* sun4u */
+	return;
+#endif /* sun4u */
 }
 
 void
@@ -1244,9 +1305,10 @@ cmd_cpu_gc(fmd_hdl_t *hdl)
 			    cpu->cpu_cpuid);
 			continue;
 		}
-
+#ifdef sun4u
 		if (cpu->cpu_uec.uec_cache != NULL)
 			cpu_uec_flush(hdl, cpu);
+#endif /* sun4u */
 		cpu->cpu_uec_nflushes = 0;
 	}
 }
@@ -1277,10 +1339,10 @@ cpu_family(char *knsp)
 	int j;
 
 	for (j = 0; j < sizeof (famdata_tbl)/sizeof (famdata_t); j++) {
-	    if (strncmp(knsp, famdata_tbl[j].fam_name,
-		strlen(famdata_tbl[j].fam_name)) == 0) {
-		    return (famdata_tbl[j].fam_value);
-	    }
+		if (strncmp(knsp, famdata_tbl[j].fam_name,
+		    strlen(famdata_tbl[j].fam_name)) == 0) {
+			return (famdata_tbl[j].fam_value);
+		}
 	}
 	return (CMD_CPU_FAM_UNSUPPORTED);
 }

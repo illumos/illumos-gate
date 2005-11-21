@@ -29,7 +29,12 @@
 
 f none usr/lib/fm/dict/SUN4.dict 444 root bin
 f none usr/lib/fm/dict/SUN4U.dict 444 root bin
+f none usr/lib/fm/dict/SUN4V.dict 444 root bin
 f none usr/lib/fm/fmd/schemes/mem.so 555 root bin
+f none usr/lib/fm/libmdesc.so.1 755 root bin
+s none usr/lib/fm/libmdesc.so=libmdesc.so.1 755 root bin
+f none usr/lib/fm/llib-lmdesc 644 root bin
+f none usr/lib/fm/llib-lmdesc.ln 644 root bin
 d none usr/lib/fm/sparcv9 755 root bin
 f none usr/lib/fm/sparcv9/libdiagcode.so.1 755 root bin
 s none usr/lib/fm/sparcv9/libdiagcode.so=libdiagcode.so.1
@@ -40,6 +45,9 @@ f none usr/lib/fm/sparcv9/llib-lfmd_adm.ln 644 root bin
 f none usr/lib/fm/sparcv9/libfmd_log.so.1 755 root bin
 s none usr/lib/fm/sparcv9/libfmd_log.so=libfmd_log.so.1
 f none usr/lib/fm/sparcv9/llib-lfmd_log.ln 644 root bin
+f none usr/lib/fm/sparcv9/libmdesc.so.1 755 root bin
+s none usr/lib/fm/sparcv9/libmdesc.so=libmdesc.so.1 755 root bin
+f none usr/lib/fm/sparcv9/llib-lmdesc.ln 644 root bin
 f none usr/lib/fm/sparcv9/libtopo.so.1 755 root bin
 s none usr/lib/fm/sparcv9/libtopo.so=libtopo.so.1
 f none usr/lib/fm/sparcv9/llib-ltopo.ln 644 root bin
@@ -109,6 +117,7 @@ f none usr/lib/fm/topo/SUNW,Sun-Fire-T200/pciexdev.topo 444 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Fire-T200/pcidev.topo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4U.mo 444 root bin
+f none usr/lib/locale/C/LC_MESSAGES/SUN4V.mo 444 root bin
 d none usr/platform 755 root sys
 d none usr/platform/sun4u 755 root sys
 d none usr/platform/sun4u/lib 755 root bin

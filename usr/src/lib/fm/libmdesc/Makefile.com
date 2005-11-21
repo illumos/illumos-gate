@@ -25,27 +25,54 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-include ../Makefile.com
+LIBRARY = libmdesc.a
+VERS = .1
 
-SCHEME_COMMON = ../common
+LIBSRCS =	\
+	mdesc_fini.c \
+	mdesc_findname.c \
+	mdesc_findnodeprop.c \
+	mdesc_getpropstr.c \
+	mdesc_getpropval.c \
+	mdesc_init_intern.c \
+	mdesc_nodecount.c \
+	mdesc_scandag.c
 
-SRCS = \
-	mdesc_devinit.c \
-	mem.c \
-	mem_disc.c \
-	mem_read.c \
-	mem_unum.c \
-	mem_util.c
+OBJECTS = $(LIBSRCS:%.c=%.o)
 
+include ../../../Makefile.lib
+include ../../Makefile.lib
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc
-LDFLAGS += -R/usr/lib/fm
+SRCS = $(LIBSRCS:%.c=$(SRC)/common/mdesc/%.c)
 
-include ../Makefile.targ
+LIBS = $(DYNLIB) $(LINTLIB)
 
-%.o: $(SCHEME_COMMON)/%.c
+SRCDIR = ../common
+SPECMAPFILE = $(MAPDIR)/mapfile
+
+CPPFLAGS += -I../common -I.
+CFLAGS += $(CCVERBOSE) -K PIC
+CFLAGS64 += $(CCVERBOSE) -K PIC
+LDLIBS += -lc
+
+LINTFLAGS += -erroff=E_BAD_PTR_CAST_ALIGN -v
+LINTFLAGS64 += -erroff=E_BAD_PTR_CAST_ALIGN -v
+$(LINTLIB) := SRCS = $(SRCDIR)/$(LINTSRC)
+$(LINTLIB) := LINTFLAGS = -nsvx
+$(LINTLIB) := LINTFLAGS64 = -nsvx -Xarch=$(MACH64:sparcv9=v9)
+
+.KEEP_STATE:
+
+all: $(LIBS)
+
+lint: $(LINTLIB) lintcheck
+
+pics/%.o: $(SRC)/common/mdesc/%.c
 	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
+	$(POST_PROCESS_O)
 
-%.ln: $(SCHEME_COMMON)/%.c
-	$(LINT.c) -erroff=E_BAD_PTR_CAST_ALIGN -v -c $<
+%.ln: $(SRC)/common/mdesc/%.c
+	$(LINT.c) -o $@ $<
+
+include ../../../Makefile.targ
+include ../../Makefile.targ

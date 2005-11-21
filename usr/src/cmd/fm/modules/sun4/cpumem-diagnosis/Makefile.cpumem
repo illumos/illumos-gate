@@ -31,9 +31,9 @@ SUN4DIR = ../../sun4/$(MODULE)
 SRCS = \
 	cmd_bank.c \
 	cmd_cpu.c \
+	cmd_cpu_arch.c \
 	cmd_cpuerr.c \
 	cmd_dimm.c \
-	cmd_ecache.c \
 	cmd_fmri.c \
 	cmd_list.c \
 	cmd_main.c \
@@ -43,7 +43,8 @@ SRCS = \
 	cmd_page.c \
 	cmd_pageerr.c \
 	cmd_state.c \
-	cmd_util.c
+	cmd_util.c \
+	$($(ARCH)_SRCS)
 
 include ../../Makefile.plugin
 
@@ -65,7 +66,3 @@ LDFLAGS += -lkstat
 
 %.ln: $(SUN4DIR)/%.c
 	$(LINT.c) -c $<
-
-$(CONF): $(SUN4DIR)/$(CONF)
-	$(RM) $(CONF); $(CP) $(SUN4DIR)/$@ $@
-

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,9 +38,7 @@
 #include <errno.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
-#include <sys/fm/cpu/UltraSPARC-III.h>
 #include <sys/async.h>
-#include <sys/cheetahregs.h>
 
 /*
  * We follow the same algorithm for handling all L1$, TLB, and L2/L3 cache
@@ -106,37 +104,62 @@ CMD_CPU_SIMPLEHANDLER(dcache, dcache, CMD_PTR_CPU_DCACHE, "dcache", "dcache")
 CMD_CPU_SIMPLEHANDLER(pcache, pcache, CMD_PTR_CPU_PCACHE, "pcache", "pcache")
 CMD_CPU_SIMPLEHANDLER(itlb, itlb, CMD_PTR_CPU_ITLB, "itlb", "itlb")
 CMD_CPU_SIMPLEHANDLER(dtlb, dtlb, CMD_PTR_CPU_DTLB, "dtlb", "dtlb")
+CMD_CPU_SIMPLEHANDLER(irc, ireg, CMD_PTR_CPU_IREG, "ireg", "ireg")
+CMD_CPU_SIMPLEHANDLER(frc, freg, CMD_PTR_CPU_FREG, "freg", "freg")
+CMD_CPU_SIMPLEHANDLER(mau, mau, CMD_PTR_CPU_MAU, "mau", "mau")
 
-/*ARGSUSED*/
-cmd_evdisp_t
-cmd_fpu(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
-    cmd_errcl_t clcode)
-{
-	const char *uuid;
-	cmd_cpu_t *cpu;
-	nvlist_t *flt;
+/*
+ * The following macro handles UE errors for CPUs.
+ * The UE may or may not share a fault with one or more
+ * CEs, but this doesn't matter.  We look for existence of a
+ * SERD engine, blow it away if it exists, and close the case
+ * as solved.
+ */
 
-	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class)) == NULL ||
-	    cpu->cpu_faulting)
-		return (CMD_EVD_UNUSED);
-
-	if (cpu->cpu_fpu.cc_cp != NULL && fmd_case_solved(hdl,
-	    cpu->cpu_fpu.cc_cp))
-		return (CMD_EVD_REDUND);
-
-	/*
-	 * Create a new case for FPU errors, add the ereport and fault
-	 * and solve the case.
-	 */
-	cpu->cpu_fpu.cc_cp = cmd_case_create(hdl, &cpu->cpu_header,
-	    CMD_PTR_CPU_FPU, &uuid);
-	fmd_case_add_ereport(hdl, cpu->cpu_fpu.cc_cp, ep);
-	flt = cmd_cpu_create_fault(hdl, cpu, "fpu", NULL, 100);
-	fmd_case_add_suspect(hdl, cpu->cpu_fpu.cc_cp, flt);
-	fmd_case_solve(hdl, cpu->cpu_fpu.cc_cp);
-
-	return (CMD_EVD_OK);
+#define	CMD_CPU_UEHANDLER(name, casenm, ptr, fltname)			\
+cmd_evdisp_t								\
+cmd_##name(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,		\
+    const char *class, cmd_errcl_t clcode)				\
+{									\
+	const char *uuid;						\
+	cmd_cpu_t *cpu;							\
+	nvlist_t *flt;							\
+	cmd_case_t *cc;							\
+									\
+	if ((cpu = cmd_cpu_lookup_from_detector(hdl, nvl, class)) ==	\
+	    NULL || cpu->cpu_faulting)					\
+		return (CMD_EVD_UNUSED);				\
+									\
+	cc = &cpu->cpu_##casenm;					\
+	if (cc->cc_cp != NULL && fmd_case_solved(hdl, cc->cc_cp))	\
+		return (CMD_EVD_REDUND);				\
+									\
+	if (cc->cc_cp == NULL) {					\
+		cc->cc_cp = cmd_case_create(hdl, &cpu->cpu_header,	\
+		    ptr, &uuid);					\
+	}								\
+									\
+	if (cc->cc_serdnm != NULL) {					\
+		fmd_hdl_debug(hdl,					\
+		    "destroying existing %s state for class %x\n",	\
+		    cc->cc_serdnm, clcode);				\
+		fmd_serd_destroy(hdl, cc->cc_serdnm);			\
+		fmd_hdl_strfree(hdl, cc->cc_serdnm);			\
+		cc->cc_serdnm = NULL;					\
+		fmd_case_reset(hdl, cc->cc_cp);				\
+	}								\
+									\
+	fmd_case_add_ereport(hdl, cc->cc_cp, ep);			\
+	flt = cmd_cpu_create_fault(hdl, cpu, fltname, NULL, 100);	\
+	fmd_case_add_suspect(hdl, cc->cc_cp, flt);			\
+	fmd_case_solve(hdl, cc->cc_cp);					\
+	return (CMD_EVD_OK);						\
 }
+
+CMD_CPU_UEHANDLER(fpu, fpu, CMD_PTR_CPU_FPU, "fpu")
+CMD_CPU_UEHANDLER(l2ctl, l2ctl, CMD_PTR_CPU_L2CTL, "l2ctl")
+CMD_CPU_UEHANDLER(iru, ireg, CMD_PTR_CPU_IREG, "ireg")
+CMD_CPU_UEHANDLER(fru, freg, CMD_PTR_CPU_FREG, "freg")
 
 typedef struct errdata {
 	cmd_serd_t *ed_serd;
@@ -166,24 +189,27 @@ cmd_xxu_hdlr(fmd_hdl_t *hdl, cmd_xr_t *xr, fmd_event_t *ep)
 		return;
 	}
 
-	if (xr->xr_synd_status == AFLT_STAT_VALID &&
-	    (xr->xr_synd == CH_POISON_SYND_FROM_XXU_WRITE ||
-	    xr->xr_synd == CH_POISON_SYND_FROM_XXU_WRMERGE ||
-	    xr->xr_synd == CH_POISON_SYND_FROM_DSTAT23)) {
-		fmd_hdl_debug(hdl, "xxU dropped due to syndrome\n");
-		return;
-	}
-
 	if (xr->xr_afar_status != AFLT_STAT_VALID) {
-		fmd_hdl_debug(hdl, "xxU dropped -- afar not VALID\n");
+		fmd_hdl_debug(hdl, "xxU dropped, afar not VALID\n");
 		return;
 	}
 
+	if (cmd_cpu_synd_check(xr->xr_synd) < 0) {
+		fmd_hdl_debug(hdl, "xxU/LDxU dropped due to syndrome\n");
+		return;
+	}
+
+#ifdef sun4u
+	/*
+	 * UE cache needed for sun4u only, because sun4u doesn't poison
+	 * uncorrectable data loaded into L2/L3 cache.
+	 */
 	if (cmd_cpu_uec_match(xr->xr_cpu, xr->xr_afar)) {
 		fmd_hdl_debug(hdl, "ue matched in UE cache\n");
 		CMD_STAT_BUMP(xxu_ue_match);
 		return;
 	}
+#endif /* sun4u */
 
 	/*
 	 * We didn't match in the UE cache.  We don't need to sleep for UE

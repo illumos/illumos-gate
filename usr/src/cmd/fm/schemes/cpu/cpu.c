@@ -43,9 +43,11 @@
  * The scheme plugin for cpu FMRIs.
  */
 
-#ifdef	sparc
+#ifdef sparc
+#define	ONTARIO_PLAT_NAME	"SUNW,Sun-Fire-T200"
+#define	ERIE_PLAT_NAME		"SUNW,Sun-Fire-T1000"
 cpu_t cpu;
-#endif	/* sparc */
+#endif /* sparc */
 
 ssize_t
 fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
@@ -104,11 +106,35 @@ cpu_get_serialid(uint32_t cpuid, uint64_t *serialidp)
 {
 #ifdef	sparc
 	if (cpu.cpu_mdesc_cpus != NULL)
-	    return (cpu_get_serialid_mdesc(cpuid, serialidp));
+		return (cpu_get_serialid_mdesc(cpuid, serialidp));
 	else
 #endif	/* sparc */
-	    return (cpu_get_serialid_kstat(cpuid, serialidp));
+		return (cpu_get_serialid_kstat(cpuid, serialidp));
 }
+
+#ifdef sparc
+static int
+cpu_phys2virt(uint32_t cpuid, uint32_t *cpuvidp)
+{
+	md_cpumap_t *mcmp;
+	int idx;
+
+	if (cpu.cpu_mdesc_cpus == NULL)
+		return (ENOENT);
+
+	for (idx = 0, mcmp = cpu.cpu_mdesc_cpus;
+	    idx < cpu.cpu_mdesc_ncpus; idx++, mcmp++) {
+		if (mcmp->cpumap_pid == (uint64_t)-1)
+			continue; /* ignore invalid value */
+		if (mcmp->cpumap_pid == cpuid) {
+			*cpuvidp = mcmp->cpumap_id;
+			return (0);
+		}
+	}
+
+	return (ENOENT);
+}
+#endif /* sparc */
 
 int
 fmd_fmri_expand(nvlist_t *nvl)
@@ -124,16 +150,35 @@ fmd_fmri_expand(nvlist_t *nvl)
 		return (fmd_fmri_set_errno(EINVAL));
 
 	if ((rc = nvlist_lookup_uint64(nvl, FM_FMRI_CPU_SERIAL_ID,
-	    &serialid)) == 0)
-		return (0); /* fmri is already expanded */
-	else if (rc != ENOENT)
-		return (fmd_fmri_set_errno(rc));
+	    &serialid)) != 0) {
+		if (rc != ENOENT)
+			return (fmd_fmri_set_errno(rc));
 
-	if (cpu_get_serialid(cpuid, &serialid) != 0)
-		return (-1); /* errno is set for us */
+		if (cpu_get_serialid(cpuid, &serialid) != 0)
+			return (-1); /* errno is set for us */
 
-	if ((rc = nvlist_add_uint64(nvl, FM_FMRI_CPU_SERIAL_ID, serialid)) != 0)
-		return (fmd_fmri_set_errno(rc));
+		if ((rc = nvlist_add_uint64(nvl, FM_FMRI_CPU_SERIAL_ID,
+		    serialid)) != 0)
+			return (fmd_fmri_set_errno(rc));
+	}
+
+#ifdef sparc
+	{
+		uint32_t cpuvid;
+		const char *platform = fmd_fmri_get_platform();
+
+		if (strcmp(platform, ONTARIO_PLAT_NAME) == 0 ||
+		    strcmp(platform, ERIE_PLAT_NAME) == 0) {
+			if (cpu_phys2virt(cpuid, &cpuvid) != 0)
+				return (fmd_fmri_set_errno(ENOENT));
+
+			(void) nvlist_remove_all(nvl, FM_FMRI_CPU_VID);
+			if ((rc = nvlist_add_uint32(nvl, FM_FMRI_CPU_VID,
+			    cpuvid)) != 0)
+				return (fmd_fmri_set_errno(rc));
+		}
+	}
+#endif /* sparc */
 
 	return (0);
 }
@@ -167,8 +212,23 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	    version > FM_CPU_SCHEME_VERSION ||
 	    nvlist_lookup_uint32(nvl, FM_FMRI_CPU_ID, &cpuid) != 0)
 		return (fmd_fmri_set_errno(EINVAL));
-	else
-		return (p_online(cpuid, P_STATUS) == P_FAULTED);
+#ifdef sparc
+	{
+		uint32_t cpuvid;
+		if (nvlist_lookup_uint32(nvl, FM_FMRI_CPU_VID, &cpuvid) == 0) {
+			/*
+			 * This FMRI has a 'cpuvid' member, but its value could
+			 * be stale -- especially when restoring saved state.
+			 * Do a fresh lookup and use the result for p_online().
+			 */
+			if (cpu_phys2virt(cpuid, &cpuvid) != 0)
+				return (fmd_fmri_set_errno(ENOENT));
+			return (p_online(cpuvid, P_STATUS) == P_FAULTED);
+		}
+	}
+#endif /* sparc */
+
+	return (p_online(cpuid, P_STATUS) == P_FAULTED);
 }
 
 #ifdef	sparc

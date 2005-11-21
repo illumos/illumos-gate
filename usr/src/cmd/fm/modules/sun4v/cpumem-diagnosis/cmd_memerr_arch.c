@@ -42,15 +42,11 @@
 #include <errno.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
-#include <sys/fm/cpu/UltraSPARC-III.h>
 
 #include <sys/fm/cpu/UltraSPARC-T1.h>
 #include <sys/async.h>
-#include <sys/cheetahregs.h>
-
 #include <sys/errclassify.h>
-
-#include <cmd_memerr_arch.h>
+#include <sys/niagararegs.h>
 
 /*ARGSUSED*/
 cmd_evdisp_t
@@ -97,9 +93,9 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	    FM_EREPORT_PAYLOAD_NAME_L2_AFSR, DATA_TYPE_UINT64, &l2_afsr,
 	    FM_EREPORT_PAYLOAD_NAME_DRAM_AFSR, DATA_TYPE_UINT64, &dram_afsr,
 	    FM_EREPORT_PAYLOAD_NAME_L2_REAL_AFAR, DATA_TYPE_UINT64,
-		&l2_real_afar,
+	    &l2_real_afar,
 	    FM_EREPORT_PAYLOAD_NAME_DRAM_REAL_AFAR, DATA_TYPE_UINT64,
-		&dram_real_afar,
+	    &dram_real_afar,
 	    FM_EREPORT_PAYLOAD_NAME_ERR_TYPE, DATA_TYPE_STRING, &typenm,
 	    FM_EREPORT_PAYLOAD_NAME_RESOURCE, DATA_TYPE_NVLIST, &rsrc,
 	    NULL) != 0)
@@ -119,32 +115,32 @@ xe_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	 * higher priority error will override.
 	 */
 	switch (clcode) {
-	    case CMD_ERRCL_DAC:
+	case CMD_ERRCL_DAC:
 		afar = l2_real_afar;
 		afar_status = ((l2_afsr & NI_L2AFSR_P10) == 0) ?
 		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		synd_status = ((dram_afsr & NI_DMAFSR_P01) == 0) ?
 		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		break;
-	    case CMD_ERRCL_DSC:
+	case CMD_ERRCL_DSC:
 		afar = dram_real_afar;
 		afar_status = ((dram_afsr & NI_DMAFSR_P01) == 0) ?
 		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		synd_status = afar_status;
 		break;
-	    case CMD_ERRCL_DAU:
+	case CMD_ERRCL_DAU:
 		afar = l2_real_afar;
 		afar_status = ((l2_afsr & NI_L2AFSR_P05) == 0) ?
 		    AFLT_STAT_VALID : AFLT_STAT_INVALID;
 		synd_status = AFLT_STAT_VALID;
 		break;
-	    case CMD_ERRCL_DSU:
+	case CMD_ERRCL_DSU:
 		afar = dram_real_afar;
 		afar_status = synd_status = AFLT_STAT_VALID;
 		break;
-	    default:
+	default:
 		fmd_hdl_debug(hdl, "Niagara unrecognized mem error %llx\n",
-					clcode);
+		    clcode);
 		return (CMD_EVD_UNUSED);
 	}
 

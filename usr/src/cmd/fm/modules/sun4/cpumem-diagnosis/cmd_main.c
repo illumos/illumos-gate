@@ -33,7 +33,11 @@
 
 #include <cmd_state.h>
 #include <cmd_cpu.h>
+
+#ifdef sun4u
 #include <cmd_ecache.h>
+#endif /* sun4u */
+
 #include <cmd_mem.h>
 #include <cmd_page.h>
 #include <cmd_dimm.h>
@@ -47,7 +51,6 @@
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
 #include <sys/async.h>
-#include <sys/cheetahregs.h>
 
 cmd_t cmd;
 
@@ -68,6 +71,7 @@ cmd_nop(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class,
 }
 
 static cmd_subscriber_t cmd_subscribers[] = {
+#ifdef sun4u
 	{ "ereport.cpu.*.ucc", 		cmd_xxc,	CMD_ERRCL_UCC },
 	{ "ereport.cpu.*.ucu",		cmd_xxu,	CMD_ERRCL_UCU },
 	{ "ereport.cpu.*.cpc",		cmd_xxc,	CMD_ERRCL_CPC },
@@ -108,13 +112,8 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.cpu.*.rce",		cmd_rxe,	CMD_ERRCL_RCE },
 	{ "ereport.cpu.*.fru",		cmd_frx,	CMD_ERRCL_FRU },
 	{ "ereport.cpu.*.rue",		cmd_rxe,	CMD_ERRCL_RUE },
-	{ "ereport.cpu.*.fpu.hwcopy",	cmd_fpu },
 	{ "ereport.cpu.*.eti",		cmd_txce },
 	{ "ereport.cpu.*.etc",		cmd_txce },
-	{ "ereport.cpu.*.dac",		cmd_ce,		CMD_ERRCL_DAC },
-	{ "ereport.cpu.*.dsc",		cmd_ce,		CMD_ERRCL_DSC },
-	{ "ereport.cpu.*.dau",		cmd_ue,		CMD_ERRCL_DAU },
-	{ "ereport.cpu.*.dsu",		cmd_ue,		CMD_ERRCL_DSU },
 	{ "ereport.io.*.ecc.drce",	cmd_ioxe,	CMD_ERRCL_IOCE },
 	{ "ereport.io.*.ecc.dwce",	cmd_ioxe,	CMD_ERRCL_IOCE },
 	{ "ereport.io.*.ecc.drue",	cmd_ioxe,	CMD_ERRCL_IOUE },
@@ -123,21 +122,38 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.io.*.ecc.s-dwce",	cmd_ioxe_sec },
 	{ "ereport.io.*.ecc.s-drue",	cmd_ioxe_sec },
 	{ "ereport.io.*.ecc.s-dwue",	cmd_ioxe_sec },
-	{ "ereport.cpu.*.ddc",		cmd_nop },
-	{ "ereport.cpu.*.dmdu",		cmd_nop },
-	{ "ereport.cpu.*.dmsu",		cmd_nop },
-	{ "ereport.cpu.*.dmtu",		cmd_nop },
-	{ "ereport.cpu.*.dtc",		cmd_nop },
-	{ "ereport.cpu.*.idc",		cmd_nop },
-	{ "ereport.cpu.*.imdu",		cmd_nop },
-	{ "ereport.cpu.*.imtu",		cmd_nop },
-	{ "ereport.cpu.*.irc",		cmd_nop },
-	{ "ereport.cpu.*.itc",		cmd_nop },
-	{ "ereport.cpu.*.ldac",		cmd_nop },
-	{ "ereport.cpu.*.ldrc",		cmd_nop },
-	{ "ereport.cpu.*.ldsc",		cmd_nop },
-	{ "ereport.cpu.*.ldwc",		cmd_nop },
-	{ "ereport.cpu.*.ltc",		cmd_nop },
+#else /* i.e. sun4v */
+	{ "ereport.cpu.*.irc",		cmd_irc },
+	{ "ereport.cpu.*.iru", 		cmd_iru },
+	{ "ereport.cpu.*.frc",		cmd_frc },
+	{ "ereport.cpu.*.fru",		cmd_fru },
+	{ "ereport.cpu.*.mau",		cmd_mau },
+	{ "ereport.cpu.*.imdu",		cmd_itlb },
+	{ "ereport.cpu.*.dmdu",		cmd_dtlb },
+	{ "ereport.cpu.*.dmsu",		cmd_dtlb },
+	{ "ereport.cpu.*.imtu",		cmd_itlb },
+	{ "ereport.cpu.*.dmtu",		cmd_dtlb },
+	{ "ereport.cpu.*.itc",		cmd_icache },
+	{ "ereport.cpu.*.idc",		cmd_icache },
+	{ "ereport.cpu.*.dtc",		cmd_dcache },
+	{ "ereport.cpu.*.ddc",		cmd_dcache },
+	{ "ereport.cpu.*.ldac",		cmd_xxc, 	CMD_ERRCL_LDAC },
+	{ "ereport.cpu.*.ldwc",		cmd_xxc,	CMD_ERRCL_LDWC },
+	{ "ereport.cpu.*.ldrc",		cmd_xxc,	CMD_ERRCL_LDRC },
+	{ "ereport.cpu.*.ldsc", 	cmd_xxc,	CMD_ERRCL_LDSC },
+	{ "ereport.cpu.*.ltc",		cmd_txce },
+	{ "ereport.cpu.*.ldau",		cmd_xxu, 	CMD_ERRCL_LDAU },
+	{ "ereport.cpu.*.ldwu",		cmd_xxu,	CMD_ERRCL_LDWU },
+	{ "ereport.cpu.*.ldru",		cmd_xxu,	CMD_ERRCL_LDRU },
+	{ "ereport.cpu.*.ldsu",		cmd_xxu,	CMD_ERRCL_LDSU },
+	{ "ereport.cpu.*.lvu",		cmd_l2ctl },
+	{ "ereport.cpu.*.lru",		cmd_l2ctl },
+	{ "ereport.cpu.*.dac",		cmd_ce,		CMD_ERRCL_DAC },
+	{ "ereport.cpu.*.dsc",		cmd_ce,		CMD_ERRCL_DSC },
+	{ "ereport.cpu.*.dau",		cmd_ue,		CMD_ERRCL_DAU },
+	{ "ereport.cpu.*.dsu",		cmd_ue,		CMD_ERRCL_DSU },
+#endif /* sun4u */
+	{ "ereport.cpu.*.fpu.hwcopy",	cmd_fpu },
 	{ NULL, NULL }
 };
 
@@ -247,6 +263,12 @@ static const fmd_prop_t fmd_props[] = {
 	{ "l3data_t", FMD_TYPE_TIME, "12h" },
 	{ "ce_n", FMD_TYPE_UINT32, "2" },
 	{ "ce_t", FMD_TYPE_TIME, "72h" },
+	{ "ireg_n", FMD_TYPE_UINT32, "2" },
+	{ "ireg_t", FMD_TYPE_TIME, "168h" },
+	{ "freg_n", FMD_TYPE_UINT32, "2" },
+	{ "freg_t", FMD_TYPE_TIME, "168h" },
+	{ "mau_n", FMD_TYPE_UINT32, "2" },
+	{ "mau_t", FMD_TYPE_TIME, "168h" },
 	{ "iorxefrx_window", FMD_TYPE_TIME, "3s" },
 	{ "xxcu_trdelay", FMD_TYPE_TIME, "200ms" },
 	{ "xxcu_restart_delay", FMD_TYPE_TIME, "1s" },
@@ -269,7 +291,7 @@ static const fmd_hdl_info_t fmd_info = {
 #ifdef sun4u
 	"UltraSPARC-III/IV CPU/Memory Diagnosis",
 #else
-	"UltraSPARC-T1 Memory Diagnosis",
+	"UltraSPARC-T1 CPU/Memory Diagnosis",
 #endif
 	CMD_VERSION, &fmd_ops, fmd_props
 };
@@ -318,26 +340,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-IIIiplus.*");
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-IV.*");
 	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-IVplus.*");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dac");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dsc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dau");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dsu");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ddc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dmdu");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dmsu");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dmtu");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.dtc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.frc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.idc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.imdu");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.imtu");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.irc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.itc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ldac");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ldrc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ldsc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ldwc");
-	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.ltc");
+	fmd_hdl_subscribe(hdl, "ereport.cpu.ultraSPARC-T1.*");
 
 	fmd_hdl_subscribe(hdl, "ereport.io.tom.ecc.drce");
 	fmd_hdl_subscribe(hdl, "ereport.io.tom.ecc.dwce");
@@ -387,6 +390,7 @@ _fmd_init(fmd_hdl_t *hdl)
 			(void) snprintf(stat->fmds_name,
 			    sizeof (stat->fmds_name),
 			    cmd_evdisp_names[i].evn_name, type);
+
 			stat->fmds_type = FMD_TYPE_UINT64;
 			(void) snprintf(stat->fmds_desc,
 			    sizeof (stat->fmds_desc),

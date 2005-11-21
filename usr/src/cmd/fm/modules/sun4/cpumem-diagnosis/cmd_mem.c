@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,6 @@
 #include <unistd.h>
 #include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
-#include <sys/fm/cpu/UltraSPARC-III.h>
 #include <sys/mem.h>
 #include <sys/nvpair.h>
 

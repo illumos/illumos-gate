@@ -25,27 +25,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+MAPDIR = ../spec/sparcv9
 include ../Makefile.com
+include ../../../Makefile.lib.64
 
-SCHEME_COMMON = ../common
-
-SRCS = \
-	mdesc_devinit.c \
-	mem.c \
-	mem_disc.c \
-	mem_read.c \
-	mem_unum.c \
-	mem_util.c
-
-
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc
-LDFLAGS += -R/usr/lib/fm
-
-include ../Makefile.targ
-
-%.o: $(SCHEME_COMMON)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-%.ln: $(SCHEME_COMMON)/%.c
-	$(LINT.c) -erroff=E_BAD_PTR_CAST_ALIGN -v -c $<
+install: all $(ROOTLIBS64) $(ROOTLINKS64) $(ROOTLINT64)

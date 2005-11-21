@@ -37,8 +37,9 @@ common_DCNAMES = \
 	SCA1000
 
 sparc_DCNAMES = \
+	SUN4 \
 	SUN4U \
-	SUN4
+	SUN4V
 
 DCNAMES = \
 	$(common_DCNAMES) \

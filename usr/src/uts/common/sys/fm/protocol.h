@@ -216,6 +216,8 @@ extern "C" {
 #define	FM_FMRI_CPU_ID			"cpuid"
 #define	FM_FMRI_CPU_SERIAL_ID		"serial"
 #define	FM_FMRI_CPU_MASK		"cpumask"
+#define	FM_FMRI_CPU_VID			"cpuvid"
+#define	FM_FMRI_CPU_CPUFRU		"cpufru"
 
 /* legacy-hc scheme member names */
 #define	FM_FMRI_LEGACY_HC		"component"

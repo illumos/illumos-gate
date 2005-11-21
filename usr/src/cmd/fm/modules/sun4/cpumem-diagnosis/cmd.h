@@ -46,7 +46,7 @@ extern "C" {
  * collisions with an earlier class code enum.  While we have 64 bits available
  * to us, cmd_errcl_t's are saved in persistent buffers, and thus can't easily
  * grow beyond that size.  As such, ereports should only be assigned class codes
- * when needed.
+ * when needed.  NEVER CHANGE the values of these constants once assigned.
  */
 #define	CMD_ERRCL_UCC		0x0000000000000008ULL
 #define	CMD_ERRCL_UCU		0x0000000000000010ULL
@@ -78,7 +78,16 @@ extern "C" {
 #define	CMD_ERRCL_DSC		0x0002000000000000ULL
 #define	CMD_ERRCL_DAU		0x0004000000000000ULL
 #define	CMD_ERRCL_DSU		0x0008000000000000ULL
+#define	CMD_ERRCL_LDAC		0x0010000000000000ULL
+#define	CMD_ERRCL_LDWC		0x0020000000000000ULL
+#define	CMD_ERRCL_LDRC		0x0040000000000000ULL
+#define	CMD_ERRCL_LDSC		0x0080000000000000ULL
+#define	CMD_ERRCL_LDAU		0x0100000000000000ULL
+#define	CMD_ERRCL_LDWU		0x0200000000000000ULL
+#define	CMD_ERRCL_LDRU		0x0400000000000000ULL
+#define	CMD_ERRCL_LDSU		0x0800000000000000ULL
 
+#ifdef sun4u
 #define	CMD_ERRCL_ISL2XXCU(clcode) \
 	((clcode) >= CMD_ERRCL_UCC && (clcode) <= CMD_ERRCL_EDU_BL)
 #define	CMD_ERRCL_ISL3XXCU(clcode) \
@@ -86,6 +95,12 @@ extern "C" {
 
 #define	CMD_ERRCL_ISIOXE(clcode) \
 	(((clcode) & (CMD_ERRCL_IOCE | CMD_ERRCL_IOUE)) != 0)
+#else /* sun4u */
+#define	CMD_ERRCL_ISL2XXCU(clcode) \
+	((clcode) >= CMD_ERRCL_LDAC && (clcode) <= CMD_ERRCL_LDSU)
+#define	CMD_ERRCL_ISL3XXCU(clcode) 0
+
+#endif /* sun4u */
 
 #define	CMD_ERRCL_MATCH(clcode, mask) \
 	(((clcode) & (mask)) != 0)

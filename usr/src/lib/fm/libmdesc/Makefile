@@ -25,27 +25,37 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-include ../Makefile.com
+include ../../Makefile.lib
+include ../Makefile.lib
 
-SCHEME_COMMON = ../common
+FMHDRS = 
+HDRDIR = common
 
-SRCS = \
-	mdesc_devinit.c \
-	mem.c \
-	mem_disc.c \
-	mem_read.c \
-	mem_unum.c \
-	mem_util.c
+SUBDIRS = $(MACH) 
+$(BUILD64)SUBDIRS += $(MACH64)
 
+all := TARGET = all
+clean := TARGET = clean
+clobber := TARGET = clobber
+install := TARGET = install
+lint := TARGET = lint
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc
-LDFLAGS += -R/usr/lib/fm
+.KEEP_STATE:
 
+all clean clobber: spec .WAIT $(SUBDIRS)
+
+install: install_h spec .WAIT $(SUBDIRS)
+
+lint: $(SUBDIRS)
+
+install_h: $(ROOTFMHDRS)
+
+check: $(CHECKHDRS)
+
+spec $(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
+
+include ../../Makefile.targ
 include ../Makefile.targ
-
-%.o: $(SCHEME_COMMON)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-%.ln: $(SCHEME_COMMON)/%.c
-	$(LINT.c) -erroff=E_BAD_PTR_CAST_ALIGN -v -c $<

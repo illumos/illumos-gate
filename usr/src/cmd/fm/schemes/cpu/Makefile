@@ -28,28 +28,19 @@
 include ../Makefile.com
 
 SCHEME_COMMON = ../common
-MDESC_COMMON = $(SRC)/common/mdesc
 
 sparc_SRCS =	\
 	cpu_mdesc.c \
-	mdesc_devinit.c \
-	mdesc_init_intern.c \
-	mdesc_findname.c \
-	mdesc_findnodeprop.c \
-	mdesc_fini.c \
-	mdesc_getpropval.c \
-	mdesc_nodecount.c \
-	mdesc_scandag.c
+	mdesc_devinit.c
 
 SRCS =	\
 	cpu.c \
 	$($(MACH)_SRCS)
 
-LDLIBS += -lkstat
+sparc_LDLIBS = -L$(ROOTLIB)/fm -lmdesc
+LDLIBS += -lkstat $($(MACH)_LDLIBS)
 
-# These LINTFLAGS are provided for benefit of mdesc routines
-
-LINTFLAGS +=	-erroff=E_BAD_PTR_CAST_ALIGN -v
+LDFLAGS += -R/usr/lib/fm
 
 include ../Makefile.targ
 
@@ -57,13 +48,5 @@ include ../Makefile.targ
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-%.o: $(MDESC_COMMON)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 %.ln: $(SCHEME_COMMON)/%.c
-	$(LINT.c) -c $<
-
-%.ln: $(MDESC_COMMON)/%.c
-	$(LINT.c) -c $<
-
+	$(LINT.c) -erroff=E_BAD_PTR_CAST_ALIGN -v -c $<

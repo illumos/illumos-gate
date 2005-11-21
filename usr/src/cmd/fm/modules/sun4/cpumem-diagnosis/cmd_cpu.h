@@ -52,6 +52,10 @@
  *     |        |       ,---------.                CMD_PTR_CPU_L3DATA_UERETRY
  *     | uec    | ----> |UE cache |                CMD_PTR_CPU_L3TAG
  *     \________/       `---------'                CMD_PTR_CPU_FPU
+ *						   CMD_PTR_CPU_IREG
+ *						   CMD_PTR_CPU_FREG
+ *						   CMD_PTR_CPU_MAU
+ *						   CMD_PTR_CPU_L2CTL
  *
  *      ________
  *     /        \       ,--------.
@@ -78,6 +82,14 @@
 #include <cmd.h>
 #include <cmd_state.h>
 #include <cmd_fmri.h>
+
+#ifdef sun4u
+#include <sys/cheetahregs.h>
+#include <sys/fm/cpu/UltraSPARC-III.h>
+#else /* sun4u */
+#include <sys/niagararegs.h>
+#include <sys/fm/cpu/UltraSPARC-T1.h>
+#endif /* sun4u */
 
 #ifdef __cplusplus
 extern "C" {
@@ -106,6 +118,10 @@ typedef struct cmd_cpu_cases {
 	cmd_case_t cpuc_l3data;		/* All correctable L3$ data errors */
 	cmd_case_t cpuc_l3tag;		/* All correctable L3$ tag errors */
 	cmd_case_t cpuc_fpu;		/* FPU errors */
+	cmd_case_t cpuc_ireg;		/* Integer reg errors (IRC, IRU) */
+	cmd_case_t cpuc_freg;		/* Floatpnt reg errors (frc, fru) */
+	cmd_case_t cpuc_mau;		/* Modular arith errors (MAU) */
+	cmd_case_t cpuc_l2ctl;		/* L2$ directory, VUAD parity */
 } cmd_cpu_cases_t;
 
 /*
@@ -207,6 +223,11 @@ typedef struct cmd_xr cmd_xr_t;
 
 typedef void cmd_xr_hdlr_f(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
 
+/*
+ * For sun4v, the size of xr_synd is expanded to 32 bits in order to
+ * accomodate the Niagara L2 syndrome (4x7 bits).
+ */
+
 struct cmd_xr {
 	cmd_list_t xr_list;
 	id_t xr_id;		/* ID of timer used for redelivery */
@@ -214,7 +235,11 @@ struct cmd_xr {
 	uint32_t xr_cpuid;	/* ID of detecting CPU */
 	uint64_t xr_ena;	/* ENA from ereport */
 	uint64_t xr_afar;	/* AFAR from ereport nvlist */
+#ifdef sun4u
 	uint16_t xr_synd;	/* syndrome from ereport nvlist */
+#else /* sun4u */
+	uint32_t xr_synd;	/* for Niagara, enlarged to 32 bits */
+#endif /* sun4u */
 	uint8_t xr_afar_status;	/* AFAR status from ereport nvlist */
 	uint8_t xr_synd_status;	/* syndrome status from ereport nvlist */
 	cmd_fmri_t xr_rsrc;	/* resource from ereport nvlist */
@@ -231,6 +256,7 @@ extern cmd_xr_t *cmd_xr_create(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     cmd_cpu_t *, cmd_errcl_t);
 extern cmd_evdisp_t cmd_xr_reschedule(fmd_hdl_t *, cmd_xr_t *, uint_t);
 extern void cmd_xr_deref(fmd_hdl_t *, cmd_xr_t *);
+extern void cmd_xr_write(fmd_hdl_t *, cmd_xr_t *);
 
 extern void cmd_xxc_resolve(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
 extern void cmd_xxu_resolve(fmd_hdl_t *, cmd_xr_t *, fmd_event_t *);
@@ -354,6 +380,11 @@ struct cmd_cpu {
 #define	cpu_l3data		cpu_cases.cpuc_l3data
 #define	cpu_l3tag		cpu_cases.cpuc_l3tag
 #define	cpu_fpu			cpu_cases.cpuc_fpu
+#define	cpu_ireg 		cpu_cases.cpuc_ireg
+#define	cpu_freg		cpu_cases.cpuc_freg
+#define	cpu_mau			cpu_cases.cpuc_mau
+#define	cpu_l2ctl		cpu_cases.cpuc_l2ctl
+
 #define	cpu_asru_nvl		cpu_asru.fmri_nvl
 #define	cpu_fru_nvl		cpu_fru.fmri_nvl
 
@@ -397,6 +428,7 @@ extern cmd_evdisp_t cmd_xxu(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
  *  ------- ----------- -------------------------------
  *   TxCE   l2cachetag  fault.cpu.<cputype>.l2cachetag
  *  L3_THCE l3cachetag  fault.cpu.<cputype>.l3cachetag
+ *    LTC   l2cachetag	fault.cpu.<cputype>.l2cachetag
  *
  * We'll never see the uncorrectable Tag errors - they'll cause the machine to
  * reset, and we'll be ne'er the wiser.
@@ -467,6 +499,64 @@ extern cmd_evdisp_t cmd_fpu(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
     const char *, cmd_errcl_t);
 
 /*
+ * ireg errors
+ *
+ *         SERD name
+ *   Type  (if any)   Fault
+ *  ------ --------- -------------------------------
+ *   IRC     ireg    fault.cpu.<cputype>.ireg
+ *   IRU      -				 "
+ *
+ * The expected resolution of ireg faults is the disabling of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_irc(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_iru(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+/*
+ * freg errors
+ *
+ *         SERD name
+ *   Type  (if any)   Fault
+ *  ------ --------- -------------------------------
+ *   FRC     freg    fault.cpu.ultraSPARC-T1.frc
+ *   FRU      -                           " .fru
+ *
+ * The expected resolution of freg faults is the repair of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_frc(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+extern cmd_evdisp_t cmd_fru(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+/*
+ * MAU errors
+ *
+ *         SERD name
+ *   Type  (if any)   Fault
+ *  ------ --------- -------------------------------
+ *   MAU     mau    fault.cpu.<cputype>.mau
+ *
+ * The expected resolution of mau faults is the repair of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_mau(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+/*
+ * L2CTL errors
+ *
+ *         SERD name
+ *   Type  (if any)   Fault
+ *  ------ --------- -------------------------------
+ *  L2CTL     -     fault.cpu.<cputype>.l2ctl
+ *
+ * The expected resolution of l2ctl faults is the repair of the indicated CPU.
+ */
+extern cmd_evdisp_t cmd_l2ctl(fmd_hdl_t *, fmd_event_t *, nvlist_t *,
+    const char *, cmd_errcl_t);
+
+/*
  * CPUs are described by FMRIs.  This routine will retrieve the CPU state
  * structure (creating a new one if necessary) described by the detector
  * FMRI in the passed ereport.
@@ -492,6 +582,14 @@ typedef enum {
 } cpu_family_t;
 
 extern cpu_family_t cmd_cpu_check_support(void);
+
+extern int cmd_xr_fill(fmd_hdl_t *, nvlist_t *, cmd_xr_t *, cmd_errcl_t);
+
+#ifdef sun4u
+extern int cmd_cpu_synd_check(uint16_t);
+#else /* sun4u */
+extern int cmd_cpu_synd_check(uint32_t);
+#endif /* sun4u */
 
 #ifdef __cplusplus
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,7 +59,11 @@ static cmd_case_closer_f *const cmd_case_closers[] = {
 	cmd_bank_close,		/* CMD_PTR_BANK_CASE */
 	cmd_page_close,		/* CMD_PTR_PAGE_CASE */
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_FPU */
-	NULL			/* CMD_PTR_CPU_XR_RETRY */
+	NULL,			/* CMD_PTR_CPU_XR_RETRY */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_IREG */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_FREG */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_MAU */
+	cmd_cpuerr_close	/* CMD_PTR_CPU_L2CTL */
 };
 
 fmd_case_t *
