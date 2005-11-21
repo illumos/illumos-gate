@@ -172,18 +172,7 @@ parse_resources_io(ACPI_RESOURCE *resource_ptr, struct regspec *io,
 
 	io[*io_count].regspec_bustype = 1; /* io */
 	io[*io_count].regspec_size = acpi_io.AddressLength;
-	/* When Min equals Max, IO is 32-bit */
-	if (acpi_io.Minimum == acpi_io.Maximum) {
-		io[*io_count].regspec_addr =
-		    acpi_io.Minimum;
-	} else {
-		/* else IO is 10-bit ISA */
-		io[*io_count].regspec_addr =
-		    acpi_io.Minimum & 0x3FF;
-		cmn_err(CE_NOTE,
-		    "!ACPI source type ACPI_RESOURCE_TYPE_IO"\
-		    "10-bit ISA range not supported");
-	}
+	io[*io_count].regspec_addr = acpi_io.Minimum;
 	if (acpi_enum_debug & PARSE_RES_IO) {
 		cmn_err(CE_NOTE, "parse_resources() "\
 		    "IO min 0x%X, max 0x%X, length: 0x%X",
