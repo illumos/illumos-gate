@@ -128,6 +128,7 @@ d none lib/svc 0755 root bin
 d none lib/svc/method 0755 root bin
 f none lib/svc/method/svc-dumpadm 0555 root bin
 f none lib/svc/method/svc-intrd 0555 root bin
+f none lib/svc/method/svc-scheduler 0555 root bin
 d none var 755 root sys
 d none var/fm 755 root sys
 d none var/fm/fmd 755 root sys
@@ -139,3 +140,4 @@ d none var/svc/manifest/system 755 root sys
 f manifest var/svc/manifest/system/dumpadm.xml 0444 root sys
 f manifest var/svc/manifest/system/fmd.xml 0444 root sys
 f manifest var/svc/manifest/system/intrd.xml 0444 root sys
+f manifest var/svc/manifest/system/scheduler.xml 0444 root sys

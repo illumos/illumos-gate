@@ -74,6 +74,9 @@
   <service name='system/sac' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>
+  <service name='system/scheduler' version='1' type='service'>
+    <instance name='default' enabled='true'/>
+  </service>
   <service name='system/system-log' version='1' type='service'>
     <instance name='default' enabled='true'/>
   </service>

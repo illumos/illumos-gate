@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,6 +29,8 @@
 #
 
 PROG= dispadmin
+MANIFEST= scheduler.xml
+SVCMETHOD= svc-scheduler
 RT=   RT$(PROG)
 TS=   TS$(PROG)
 IA=   IA$(PROG)
@@ -53,6 +55,9 @@ ROOTTS=		$(TS:%=$(ROOTDIR)/TS/%)
 ROOTIA=		$(IA:%=$(ROOTDIR)/IA/%)
 ROOTFSS=	$(FSS:%=$(ROOTDIR)/FSS/%)
 ROOTFX=		$(FX:%=$(ROOTDIR)/FX/%)
+ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
+
+$(ROOTMANIFEST)	:= FILEMODE = 0444
 
 GROUP = bin
 
@@ -90,11 +95,14 @@ llib-lsubr.ln:	subr.c
 
 lint :=	LDLIBS += -L. -lsubr
 
-install: all $(ROOTPROG) $(ROOTRT) $(ROOTTS) $(ROOTIA) $(ROOTFSS) $(ROOTFX)
+install: all $(ROOTPROG) $(ROOTRT) $(ROOTTS) $(ROOTIA) $(ROOTFSS) $(ROOTFX) \
+		$(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 # Don't re-install directories already installed by Targetdirs
 #$(ROOTDIRS):
 #	$(INS.dir)
+
+check: $(CHKMANIFEST)
 
 clean:
 	$(RM) $(OBJECTS) $(PROGS) llib-lsubr.ln

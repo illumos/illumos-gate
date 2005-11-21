@@ -32,3 +32,9 @@ if [ -f $BASEDIR/var/tmp/intrd.tmp ] ; then
 	    $BASEDIR/var/svc/profile/upgrade
 	rm -f $BASEDIR/var/tmp/intrd.tmp
 fi
+
+if [ -f $BASEDIR/tmp/scheduler.tmp ] ; then
+	echo "/usr/sbin/svcadm enable system/scheduler" >> \
+	    $BASEDIR/var/svc/profile/upgrade
+	rm -f $BASEDIR/tmp/scheduler.tmp
+fi

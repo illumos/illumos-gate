@@ -37,3 +37,9 @@ rm -f $BASEDIR/var/tmp/intrd.tmp
 if [ ! -f $BASEDIR/var/svc/manifest/system/intrd.xml ] ; then
 	touch $BASEDIR/var/tmp/intrd.tmp
 fi
+
+# Same as above, but for system/scheduler service
+rm -f $BASEDIR/tmp/scheduler.tmp
+if [ ! -f $BASEDIR/var/svc/manifest/system/scheduler.xml ] ; then
+	touch $BASEDIR/tmp/scheduler.tmp
+fi

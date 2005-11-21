@@ -315,6 +315,7 @@ superfluous_local_zone_files="
 	etc/zones
 	kernel
 	lib/svc/method/svc-intrd
+	lib/svc/method/svc-scheduler
 	var/adm/pool
 	var/fm
 	var/log/pool
@@ -332,6 +333,7 @@ superfluous_local_zone_files="
 	var/svc/manifest/system/metainit.xml
 	var/svc/manifest/system/picl.xml
 	var/svc/manifest/system/power.xml
+	var/svc/manifest/system/scheduler.xml
 	var/svc/manifest/system/sysevent.xml
 	var/svc/manifest/system/zones.xml
 "
@@ -1055,6 +1057,11 @@ smf_handle_new_services () {
 	if [[ $zone = global &&
 	    ! -f $rootprefix/var/svc/profile/system/filesystem/volfs.xml ]]; then
 		echo /usr/sbin/svcadm enable system/filesystem/volfs >> \
+		    $rootprefix/var/svc/profile/upgrade
+	fi
+	if [[ $zone = global &&
+	    ! -f $rootprefix/var/svc/manifest/system/scheduler.xml ]]; then
+		echo /usr/sbin/svcadm enable system/scheduler >> \
 		    $rootprefix/var/svc/profile/upgrade
 	fi
 }

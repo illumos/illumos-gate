@@ -736,6 +736,7 @@ MANIFEST_TOPDIRS=			\
 	coreadm				\
 	cron				\
 	cvcd				\
+	dispadmin			\
 	dumpadm				\
 	eeprom				\
 	fm				\

@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,43 +39,6 @@ fi
 # If there are trademark files, print them.
 
 [ -d /etc/tm ] && /usr/bin/cat /etc/tm/* 2>/dev/null
-
-#
-# Set default scheduling class
-#
-if [ -f /etc/dispadmin.conf ] && [ -x /usr/sbin/dispadmin ] && \
-     [ -x /usr/bin/priocntl ] && \
-     [ "${_INIT_ZONENAME:=`/sbin/zonename`}" = "global" ]; then
-	ERROR="$0: cannot set default scheduling class to "
-	DISPADMIN_D=`/usr/sbin/dispadmin -d`
-
-	if [ $? -eq 0 ]; then
-		#
-		# Inform the kernel about the default scheduling class.
-		#
-		dispadmin -u
-
-		DEFAULT_SCHEDULER=`echo $DISPADMIN_D | \
-			/usr/bin/awk '{ print $1 }'`
-
-		/usr/bin/priocntl -s -c $DEFAULT_SCHEDULER \
-			-i all >/dev/null 2>&1
-
-		if [ $? -ne 0 ]; then
-			echo $ERROR $DEFAULT_SCHEDULER
-		else
-			#
-			# Also need to move init process explicitly
-			# because it was ignored by "-i all". 
-			#
-			/usr/bin/priocntl -s -c $DEFAULT_SCHEDULER \
-				-i pid 1 >/dev/null 2>&1
-			if [ $? -ne 0 ]; then
-				echo $ERROR $DEFAULT_SCHEDULER
-			fi
-		fi
-	fi
-fi
 
 #
 # Run rctladm to configure system resource controls based on the settings
