@@ -1177,6 +1177,124 @@ cpu_aflt_size(void)
 }
 
 /*
+ * Tunable to disable the checking of other cpu logout areas during panic for
+ * potential syndrome 71 generating errors.
+ */
+int enable_check_other_cpus_logout = 1;
+
+/*
+ * Check other cpus logout area for potential synd 71 generating
+ * errors.
+ */
+static void
+cpu_check_cpu_logout(int cpuid, caddr_t tpc, int tl, int ecc_type,
+    ch_cpu_logout_t *clop)
+{
+	struct async_flt *aflt;
+	ch_async_flt_t ch_flt;
+	uint64_t t_afar, t_afsr, t_afsr_ext, t_afsr_errs;
+
+	if (clop == NULL || clop->clo_data.chd_afar == LOGOUT_INVALID) {
+		return;
+	}
+
+	bzero(&ch_flt, sizeof (ch_async_flt_t));
+
+	t_afar = clop->clo_data.chd_afar;
+	t_afsr = clop->clo_data.chd_afsr;
+	t_afsr_ext = clop->clo_data.chd_afsr_ext;
+#if defined(SERRANO)
+	ch_flt.afar2 = clop->clo_data.chd_afar2;
+#endif	/* SERRANO */
+
+	/*
+	 * In order to simplify code, we maintain this afsr_errs
+	 * variable which holds the aggregate of AFSR and AFSR_EXT
+	 * sticky bits.
+	 */
+	t_afsr_errs = (t_afsr_ext & C_AFSR_EXT_ALL_ERRS) |
+	    (t_afsr & C_AFSR_ALL_ERRS);
+
+	/* Setup the async fault structure */
+	aflt = (struct async_flt *)&ch_flt;
+	aflt->flt_id = gethrtime_waitfree();
+	ch_flt.afsr_ext = t_afsr_ext;
+	ch_flt.afsr_errs = t_afsr_errs;
+	aflt->flt_stat = t_afsr;
+	aflt->flt_addr = t_afar;
+	aflt->flt_bus_id = cpuid;
+	aflt->flt_inst = cpuid;
+	aflt->flt_pc = tpc;
+	aflt->flt_prot = AFLT_PROT_NONE;
+	aflt->flt_class = CPU_FAULT;
+	aflt->flt_priv = ((t_afsr & C_AFSR_PRIV) != 0);
+	aflt->flt_tl = tl;
+	aflt->flt_status = ecc_type;
+	aflt->flt_panic = C_AFSR_PANIC(t_afsr_errs);
+
+	/*
+	 * Queue events on the async event queue, one event per error bit.
+	 * If no events are queued, queue an event to complain.
+	 */
+	if (cpu_queue_events(&ch_flt, NULL, t_afsr_errs, clop) == 0) {
+		ch_flt.flt_type = CPU_INV_AFSR;
+		cpu_errorq_dispatch(FM_EREPORT_CPU_USIII_INVALID_AFSR,
+		    (void *)&ch_flt, sizeof (ch_async_flt_t), ue_queue,
+		    aflt->flt_panic);
+	}
+
+	/*
+	 * Zero out + invalidate CPU logout.
+	 */
+	bzero(clop, sizeof (ch_cpu_logout_t));
+	clop->clo_data.chd_afar = LOGOUT_INVALID;
+}
+
+/*
+ * Check the logout areas of all other cpus for unlogged errors.
+ */
+static void
+cpu_check_other_cpus_logout(void)
+{
+	int i, j;
+	processorid_t myid;
+	struct cpu *cp;
+	ch_err_tl1_data_t *cl1p;
+
+	myid = CPU->cpu_id;
+	for (i = 0; i < NCPU; i++) {
+		cp = cpu[i];
+
+		if ((cp == NULL) || !(cp->cpu_flags & CPU_EXISTS) ||
+		    (cp->cpu_id == myid) || (CPU_PRIVATE(cp) == NULL)) {
+			continue;
+		}
+
+		/*
+		 * Check each of the tl>0 logout areas
+		 */
+		cl1p = CPU_PRIVATE_PTR(cp, chpr_tl1_err_data[0]);
+		for (j = 0; j < CH_ERR_TL1_TLMAX; j++, cl1p++) {
+			if (cl1p->ch_err_tl1_flags == 0)
+				continue;
+
+			cpu_check_cpu_logout(i, (caddr_t)cl1p->ch_err_tl1_tpc,
+			    1, ECC_F_TRAP, &cl1p->ch_err_tl1_logout);
+		}
+
+		/*
+		 * Check each of the remaining logout areas
+		 */
+		cpu_check_cpu_logout(i, NULL, 0, ECC_F_TRAP,
+		    CPU_PRIVATE_PTR(cp, chpr_fecctl0_logout));
+		cpu_check_cpu_logout(i, NULL, 0, ECC_C_TRAP,
+		    CPU_PRIVATE_PTR(cp, chpr_cecc_logout));
+		cpu_check_cpu_logout(i, NULL, 0, ECC_D_TRAP,
+		    CPU_PRIVATE_PTR(cp, chpr_async_logout));
+	}
+}
+
+/*
  * The fast_ecc_err handler transfers control here for UCU, UCC events.
  * Note that we flush Ecache twice, once in the fast_ecc_err handler to
  * flush the error that caused the UCU/UCC, then again here at the end to
@@ -3512,6 +3630,20 @@ void
 cpu_disable_errors(void)
 {
 	xt_all(set_error_enable_tl1, EN_REG_DISABLE, EER_SET_ABSOLUTE);
+
+	/*
+	 * With error detection now turned off, check the other cpus
+	 * logout areas for any unlogged errors.
+	 */
+	if (enable_check_other_cpus_logout) {
+		cpu_check_other_cpus_logout();
+		/*
+		 * Make a second pass over the logout areas, in case
+		 * there is a failing CPU in an error-trap loop which
+		 * will write to the logout area once it is emptied.
+		 */
+		cpu_check_other_cpus_logout();
+	}
 }
 
 /*
