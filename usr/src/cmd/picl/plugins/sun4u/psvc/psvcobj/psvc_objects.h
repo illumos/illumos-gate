@@ -303,8 +303,8 @@ typedef struct psvc_opaque *psvc_opaque_t;
 #define	PSVC_I2C_SSC100		9
 
 /* numbers of attempts for retrying requests over the I2C bus */
-#define	PSVC_NUM_OF_RETRIES	2
-#define	PSVC_THRESHOLD_COUNTER	2
+#define	PSVC_NUM_OF_RETRIES	5
+#define	PSVC_THRESHOLD_COUNTER	5
 
 /* Prototypes */
 #ifndef LIBRARY_BUILD

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,8 @@
 #include <strings.h>
 #include <libintl.h>
 #include <sys/types.h>
+#include <string.h>
+#include <limits.h>
 #include <picl.h>
 #include <picltree.h>
 #include <sys/types.h>
@@ -102,6 +104,110 @@ static int32_t threshold_names[] = {
 	PSVC_HI_SHUT_ATTR,
 	PSVC_HW_HI_SHUT_ATTR
 };
+
+/*
+ * The I2C bus is noisy, and the state may be incorrectly reported as
+ * having changed.  When the state changes, we attempt to confirm by
+ * retrying.  If any retries indicate that the state has not changed, we
+ * assume the state change(s) were incorrect and the state has not changed.
+ * The following variables are used to store the tuneable values read in
+ * from the optional i2cparam.conf file for this shared object library.
+ */
+static int n_read_temp = PSVC_THRESHOLD_COUNTER;
+static int n_retry_keyswitch = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_keyswitch = 1;
+static int n_retry_hotplug = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_hotplug = 1;
+static int n_retry_fan_hotplug = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_fan_hotplug = 1;
+static int n_retry_fan_present = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_fan_present = 1;
+
+typedef struct {
+	int *pvar;
+	char *texttag;
+} i2c_noise_param_t;
+
+static i2c_noise_param_t i2cparams_sun4u[] = {
+	&n_read_temp, "n_read_temp",
+	&n_retry_keyswitch, "n_retry_keyswitch",
+	&retry_sleep_keyswitch, "retry_sleep_keyswitch",
+	&n_retry_hotplug, "n_retry_hotplug",
+	&retry_sleep_hotplug, "retry_sleep_hotplug",
+	&n_retry_fan_hotplug, "n_retry_fan_hotplug",
+	&retry_sleep_fan_hotplug, "retry_sleep_fan_hotplug",
+	&n_retry_fan_present, "n_retry_fan_present",
+	&retry_sleep_fan_present, "retry_sleep_fan_present",
+	NULL, NULL
+};
+
+#pragma init(i2cparams_sun4u_load)
+
+static void
+i2cparams_sun4u_debug(i2c_noise_param_t *pi2cparams, int usingDefaults)
+{
+	char s[128];
+	i2c_noise_param_t *p;
+
+	if (!usingDefaults) {
+		(void) strncpy(s,
+		    "# Values from /usr/platform/sun4u/lib/i2cparam.conf\n",
+			sizeof (s) - 1);
+		syslog(LOG_WARNING, "%s", s);
+	} else {
+		/* no file - we're using the defaults */
+		(void) strncpy(s,
+"# No /usr/platform/sun4u/lib/i2cparam.conf file, using defaults\n",
+			sizeof (s) - 1);
+	}
+	(void) fputs(s, stdout);
+	p = pi2cparams;
+	while (p->pvar != NULL) {
+		(void) snprintf(s, sizeof (s), "%s %d\n", p->texttag,
+		    *(p->pvar));
+		if (!usingDefaults)
+			syslog(LOG_WARNING, "%s", s);
+		(void) fputs(s, stdout);
+		p++;
+	}
+}
+
+static void
+i2cparams_sun4u_load(void)
+{
+	FILE *fp;
+	char *filename = "/usr/platform/sun4u/lib/i2cparam.conf";
+	char s[128];
+	char var[128];
+	int val;
+	i2c_noise_param_t *p;
+
+	/* read thru the i2cparam.conf file and set variables */
+	if ((fp = fopen(filename, "r")) != NULL) {
+		while (fgets(s, sizeof (s), fp) != NULL) {
+			if (s[0] == '#') /* skip comment lines */
+				continue;
+			/* try to find a string match and get the value */
+			if (sscanf(s, "%127s %d", var, &val) != 2)
+				continue;
+			if (val < 1)
+				val = 1;  /* clamp min value */
+			p = &(i2cparams_sun4u[0]);
+			while (p->pvar != NULL) {
+				if (strncmp(p->texttag, var, sizeof (var)) ==
+				    0) {
+					*(p->pvar) = val;
+					break;
+				}
+				p++;
+			}
+		}
+		(void) fclose(fp);
+	}
+	/* output the values of the parameters */
+	i2cparams_sun4u_debug(&(i2cparams_sun4u[0]), ((fp == NULL)? 1 : 0));
+}
+
 
 int32_t
 psvc_update_thresholds_0(psvc_opaque_t hdlp, char *id)
@@ -211,10 +317,10 @@ check_temp(psvc_opaque_t hdlp, char *id, int32_t silent)
 	boolean_t	pr;
 	int32_t		status = PSVC_SUCCESS;
 	int8_t		fail = 0;
-	static int8_t	threshold_low_shut[MAX_TEMP_SENSORS] = {0};
-	static int8_t	threshold_high_shut[MAX_TEMP_SENSORS] = {0};
-	static int8_t	threshold_low_warn[MAX_TEMP_SENSORS] = {0};
-	static int8_t	threshold_high_warn[MAX_TEMP_SENSORS] = {0};
+	static int	threshold_low_shut[MAX_TEMP_SENSORS] = {0};
+	static int	threshold_high_shut[MAX_TEMP_SENSORS] = {0};
+	static int	threshold_low_warn[MAX_TEMP_SENSORS] = {0};
+	static int	threshold_high_warn[MAX_TEMP_SENSORS] = {0};
 	int32_t		instance;
 
 	status = psvc_get_attr(hdlp, id, PSVC_INSTANCE_ATTR, &instance);
@@ -284,8 +390,8 @@ check_temp(psvc_opaque_t hdlp, char *id, int32_t silent)
 	/*
 	 * if any of the four temperature states (lo_shut, lo_warn,
 	 * hi_shut, hi_warn) is detected we will not take an action
-	 * until PSVC_THRESHOLD_COUNTER (i.e. 2) similar back-to-back readings
-	 * take place.
+	 * until the number of similar back-to-back readings equals
+	 * 'n_read_temp' (default is PSVC_THRESHOLD_COUNTER).
 	 */
 	if ((features & PSVC_LOW_SHUT) && temp < lo_shut) {
 		/*
@@ -298,7 +404,7 @@ check_temp(psvc_opaque_t hdlp, char *id, int32_t silent)
 		threshold_high_shut[instance] = 0;
 		threshold_high_warn[instance] = 0;
 		threshold_low_shut[instance]++;
-		if (threshold_low_shut[instance] == PSVC_THRESHOLD_COUNTER) {
+		if (threshold_low_shut[instance] == n_read_temp) {
 			threshold_low_shut[instance] = 0;
 			fail = 1;
 			strcpy(state, PSVC_ERROR);
@@ -315,7 +421,7 @@ check_temp(psvc_opaque_t hdlp, char *id, int32_t silent)
 		threshold_high_shut[instance] = 0;
 		threshold_high_warn[instance] = 0;
 		threshold_low_warn[instance]++;
-		if (threshold_low_warn[instance] == PSVC_THRESHOLD_COUNTER) {
+		if (threshold_low_warn[instance] == n_read_temp) {
 			threshold_low_warn[instance] = 0;
 			fail = 1;
 			strcpy(state, PSVC_ERROR);
@@ -332,7 +438,7 @@ check_temp(psvc_opaque_t hdlp, char *id, int32_t silent)
 		threshold_low_shut[instance] = 0;
 		threshold_high_warn[instance] = 0;
 		threshold_high_shut[instance]++;
-		if (threshold_high_shut[instance] == PSVC_THRESHOLD_COUNTER) {
+		if (threshold_high_shut[instance] == n_read_temp) {
 			threshold_high_shut[instance] = 0;
 			fail = 1;
 			strcpy(state, PSVC_ERROR);
@@ -349,7 +455,7 @@ check_temp(psvc_opaque_t hdlp, char *id, int32_t silent)
 		threshold_low_shut[instance] = 0;
 		threshold_high_shut[instance] = 0;
 		threshold_high_warn[instance]++;
-		if (threshold_high_warn[instance] == PSVC_THRESHOLD_COUNTER) {
+		if (threshold_high_warn[instance] == n_read_temp) {
 			threshold_high_warn[instance] = 0;
 			fail = 1;
 			strcpy(state, PSVC_ERROR);
@@ -365,7 +471,7 @@ check_temp(psvc_opaque_t hdlp, char *id, int32_t silent)
 
 	/*
 	 * If we reached this point then that means that we are either
-	 * okay, or we have showed error PSVC_THRESHOLD_COUNTER times.
+	 * okay, or we have showed error n_read_temp times.
 	 */
 	if (fail != 1) {
 		/* within limits */
@@ -431,14 +537,22 @@ psvc_fan_enable_disable_policy_0(psvc_opaque_t hdlp, char *id)
 	char label[32];
 	boolean_t presence;
 	boolean_t enable;
+	int retry;
 
 	status = psvc_get_attr(hdlp, id, PSVC_FEATURES_ATTR, &features);
 	if (status != PSVC_SUCCESS)
 		return (status);
 
-	status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &presence);
-	if (status != PSVC_SUCCESS)
-		return (status);
+	retry = 0;
+	do {
+		if (retry)
+			(void) sleep(retry_sleep_fan_present);
+
+		status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &presence);
+		if (status != PSVC_SUCCESS)
+			return (status);
+		retry++;
+	} while ((retry < n_retry_fan_present) && (presence == PSVC_ABSENT));
 
 	if (presence == PSVC_ABSENT) {
 		status = psvc_get_attr(hdlp, id, PSVC_LABEL_ATTR, label);
@@ -662,7 +776,7 @@ psvc_keyswitch_position_policy_0(psvc_opaque_t hdlp, char *id)
 	static int error_reported = 0;
 	static char local_previous_position[32];
 	static int32_t first_time = 1;
-	int8_t retry;
+	int retry;
 
 	if (first_time) {
 		first_time = 0;
@@ -675,7 +789,7 @@ psvc_keyswitch_position_policy_0(psvc_opaque_t hdlp, char *id)
 	retry = 0;
 	do {
 		if (retry)
-			sleep(1);
+			(void) sleep(retry_sleep_keyswitch);
 
 		status = psvc_get_attr(hdlp, id, PSVC_SWITCH_STATE_ATTR,
 		    position);
@@ -691,7 +805,7 @@ psvc_keyswitch_position_policy_0(psvc_opaque_t hdlp, char *id)
 			}
 		}
 		retry++;
-	} while ((retry < PSVC_NUM_OF_RETRIES) &&
+	} while ((retry < n_retry_keyswitch) &&
 	    (strcmp(position, local_previous_position) != 0));
 
 	status = psvc_set_attr(hdlp, id, PSVC_STATE_ATTR, position);
@@ -713,21 +827,22 @@ psvc_hotplug_notifier_policy_0(psvc_opaque_t hdlp, char *id)
 	boolean_t presence, previous_presence;
 	int32_t status = PSVC_SUCCESS;
 	char label[32];
-	int8_t retry;
+	int retry;
 
 	status = psvc_get_attr(hdlp, id, PSVC_PREV_PRESENCE_ATTR,
 		&previous_presence);
 	if (status != PSVC_SUCCESS)
 		return (status);
+
 	retry = 0;
 	do {
 		if (retry)
-			sleep(1);
+			(void) sleep(retry_sleep_hotplug);
 		status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &presence);
 		if (status != PSVC_SUCCESS)
 			return (status);
 		retry++;
-	} while ((retry < PSVC_NUM_OF_RETRIES) &&
+	} while ((retry < n_retry_hotplug) &&
 	    (presence != previous_presence));
 
 
@@ -787,7 +902,7 @@ psvc_fan_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 	boolean_t presence, previous_presence;
 	int32_t status = PSVC_SUCCESS;
 	char label[32];
-	int8_t retry;
+	int retry;
 
 	status = psvc_get_attr(hdlp, id, PSVC_PREV_PRESENCE_ATTR,
 		&previous_presence);
@@ -797,13 +912,13 @@ psvc_fan_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 	retry = 0;
 	do {
 		if (retry)
-			sleep(1);
+			(void) sleep(retry_sleep_fan_hotplug);
 
 		status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &presence);
 		if (status != PSVC_SUCCESS)
 			return (status);
 		retry++;
-	} while ((retry < PSVC_NUM_OF_RETRIES) &&
+	} while ((retry < n_retry_fan_hotplug) &&
 	    (presence != previous_presence));
 
 
@@ -1249,10 +1364,18 @@ psvc_fan_present_policy_0(psvc_opaque_t hdlp, char *id)
 	boolean_t	presence;
 	int fd;
 	FILE *fp;
+	int retry;
 
-	status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &presence);
-	if (status != PSVC_SUCCESS)
-		return (status);
+	retry = 0;
+	do {
+		if (retry)
+			(void) sleep(retry_sleep_fan_present);
+
+		status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &presence);
+		if (status != PSVC_SUCCESS)
+			return (status);
+		retry++;
+	} while ((retry < n_retry_fan_present) && (presence == PSVC_ABSENT));
 
 	if (presence == PSVC_ABSENT) {
 		/*

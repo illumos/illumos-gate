@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +47,8 @@
 #include	<libdevice.h>
 #include	<picl.h>
 #include	<picltree.h>
-
+#include	<limits.h>
+#include	<sys/systeminfo.h>
 #include	<psvc_objects.h>
 
 /*LINTLIBRARY*/
@@ -96,6 +97,110 @@ static int temp_attr[] = {
 #define	NUM_OF_SEG_ADDR	0x1805
 #define	SEG_DESC_START 	0x1806
 #define	PSVC_NO_DEVICE 	-2
+
+/*
+ * The I2C bus is noisy, and the state may be incorrectly reported as
+ * having changed.  When the state changes, we attempt to confirm by
+ * retrying.  If any retries indicate that the state has not changed, we
+ * assume the state change(s) were incorrect and the state has not changed.
+ * The following variables are used to store the tuneable values read in
+ * from the optional i2cparam.conf file for this shared object library.
+ */
+static int n_retry_temp = PSVC_THRESHOLD_COUNTER;
+static int retry_sleep_temp = 1;
+static int n_retry_hotplug = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_hotplug = 1;
+static int n_retry_temp_shutdown = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_temp_shutdown = 1;
+
+typedef struct {
+	int *pvar;
+	char *texttag;
+} i2c_noise_param_t;
+
+static i2c_noise_param_t i2cparams[] = {
+	&n_retry_temp, "n_retry_temp",
+	&retry_sleep_temp, "retry_sleep_temp",
+	&n_retry_hotplug, "n_retry_hotplug",
+	&retry_sleep_hotplug, "retry_sleep_hotplug",
+	NULL, NULL
+};
+
+#pragma init(i2cparams_load)
+
+static void
+i2cparams_debug(i2c_noise_param_t *pi2cparams, char *platform,
+	int usingDefaults)
+{
+	char s[128];
+	i2c_noise_param_t *p;
+
+	if (!usingDefaults) {
+		(void) snprintf(s, sizeof (s),
+		    "# Values from /usr/platform/%s/lib/i2cparam.conf\n",
+		    platform);
+		syslog(LOG_WARNING, "%s", s);
+	} else {
+		/* no file - we're using the defaults */
+		(void) snprintf(s, sizeof (s),
+"# No /usr/platform/%s/lib/i2cparam.conf file, using defaults\n",
+		    platform);
+	}
+	(void) fputs(s, stdout);
+	p = pi2cparams;
+	while (p->pvar != NULL) {
+		(void) snprintf(s, sizeof (s), "%s %d\n", p->texttag,
+		    *(p->pvar));
+		if (!usingDefaults)
+			syslog(LOG_WARNING, "%s", s);
+		(void) fputs(s, stdout);
+		p++;
+	}
+}
+
+static void
+i2cparams_load(void)
+{
+	FILE *fp;
+	char filename[PATH_MAX];
+	char platform[64];
+	char s[128];
+	char var[128];
+	int val;
+	i2c_noise_param_t *p;
+
+	if (sysinfo(SI_PLATFORM, platform, sizeof (platform)) == -1) {
+		syslog(LOG_ERR, "sysinfo error %s\n", strerror(errno));
+		return;
+	}
+	(void) snprintf(filename, sizeof (filename),
+	    "/usr/platform/%s/lib/i2cparam.conf", platform);
+	/* read thru the i2cparam.conf file and set variables */
+	if ((fp = fopen(filename, "r")) != NULL) {
+		while (fgets(s, sizeof (s), fp) != NULL) {
+			if (s[0] == '#') /* skip comment lines */
+				continue;
+			/* try to find a string match and get the value */
+			if (sscanf(s, "%127s %d", var, &val) != 2)
+				continue;
+			if (val < 1)
+				val = 1;  /* clamp min value */
+			p = &(i2cparams[0]);
+			while (p->pvar != NULL) {
+				if (strncmp(p->texttag, var, sizeof (var)) ==
+				    0) {
+					*(p->pvar) = val;
+					break;
+				}
+				p++;
+			}
+		}
+		(void) fclose(fp);
+	}
+	/* output the values of the parameters */
+	i2cparams_debug(&(i2cparams[0]), platform, ((fp == NULL)? 1 : 0));
+}
+
 
 int32_t
 find_segment(psvc_opaque_t hdlp, char *fru, seg_desc_t *segment,
@@ -309,18 +414,12 @@ psvc_check_temperature_policy_0(psvc_opaque_t hdlp, char *id)
 	char label[32];
 	boolean_t pr;
 	int32_t status = PSVC_SUCCESS;
+	int retry;
+	int8_t temp_oor;
 
 	status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &pr);
 	if ((status != PSVC_SUCCESS) || (pr != PSVC_PRESENT)) {
 		return (status);
-	}
-
-	status = psvc_get_attr(hdlp, id, PSVC_SENSOR_VALUE_ATTR, &temp);
-	if (status != PSVC_SUCCESS) {
-		if ((errno == ENOENT) || (errno == ENXIO))
-			return (PSVC_SUCCESS);
-		else
-			return (PSVC_FAILURE);
 	}
 
 	status = psvc_get_attr(hdlp, id, PSVC_FEATURES_ATTR, &features);
@@ -346,6 +445,26 @@ psvc_check_temperature_policy_0(psvc_opaque_t hdlp, char *id)
 	status = psvc_get_attr(hdlp, id, PSVC_LABEL_ATTR, label);
 	if (status != PSVC_SUCCESS)
 		return (status);
+
+	retry = 0;
+	do {
+		if (retry)
+			(void) sleep(retry_sleep_temp);
+		status = psvc_get_attr(hdlp, id, PSVC_SENSOR_VALUE_ATTR, &temp);
+		if (status != PSVC_SUCCESS) {
+			if ((errno == ENOENT) || (errno == ENXIO))
+				return (PSVC_SUCCESS);
+			else
+				return (PSVC_FAILURE);
+		}
+		temp_oor = 0;
+		if (((features & PSVC_LOW_SHUT) && temp <= lo_shut) ||
+		    ((features & PSVC_LOW_WARN) && temp <= lo_warn) ||
+		    ((features & PSVC_HIGH_SHUT) && temp >= hi_shut) ||
+		    ((features & PSVC_HIGH_WARN) && temp >= hi_warn))
+			temp_oor = 1;
+		retry++;
+	} while ((retry < n_retry_temp) && temp_oor);
 
 	if ((features & PSVC_LOW_SHUT) && temp <= lo_shut) {
 		strcpy(state, PSVC_ERROR);
@@ -428,14 +547,21 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 	devctl_hdl_t bus_handle, dev_handle;
 	devctl_ddef_t ddef_hdl;
 	char devpath[256];
+	int retry;
 
-	status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &presence);
-	if (status != PSVC_SUCCESS)
-		return (status);
 	status = psvc_get_attr(hdlp, id, PSVC_PREV_PRESENCE_ATTR,
 		&previous_presence);
 	if (status != PSVC_SUCCESS)
 		return (status);
+	retry = 0;
+	do {
+		if (retry)
+			(void) sleep(retry_sleep_hotplug);
+		status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &presence);
+		if (status != PSVC_SUCCESS)
+			return (status);
+		retry++;
+	} while ((retry < n_retry_hotplug) && (presence != previous_presence));
 
 	if (presence == previous_presence) {
 		/* No change */
@@ -688,6 +814,8 @@ check_cpu_temp_fault(psvc_opaque_t hdlp, char *cpu, int32_t cpu_count)
 	int32_t status = PSVC_SUCCESS;
 	int32_t i;
 	char fault[32];
+	int retry;
+	int8_t temp_oor;
 
 	psvc_get_attr(hdlp, cpu, PSVC_ASSOC_MATCHES_ATTR, &sensor_count,
 		PSVC_DEV_TEMP_SENSOR);
@@ -697,13 +825,23 @@ check_cpu_temp_fault(psvc_opaque_t hdlp, char *cpu, int32_t cpu_count)
 		if (status == PSVC_FAILURE)
 			return (status);
 
-		status = psvc_get_attr(hdlp, sensorid, PSVC_FAULTID_ATTR,
-			fault);
-		if (status == PSVC_FAILURE)
-			return (status);
+		retry = 0;
+		do {
+			if (retry)
+				(void) sleep(retry_sleep_temp_shutdown);
+			status = psvc_get_attr(hdlp, sensorid,
+			    PSVC_FAULTID_ATTR, fault);
+			if (status == PSVC_FAILURE)
+				return (status);
+			temp_oor = 0;
+			if ((strcmp(fault, PSVC_TEMP_HI_SHUT) == 0) ||
+			    (strcmp(fault, PSVC_TEMP_LO_SHUT) == 0)) {
+				temp_oor = 1;
+			}
+			retry++;
+		} while ((retry < n_retry_temp_shutdown) && temp_oor);
 
-		if ((strcmp(fault, PSVC_TEMP_HI_SHUT) == 0) ||
-			(strcmp(fault, PSVC_TEMP_LO_SHUT) == 0)) {
+		if (temp_oor) {
 			system(shutdown_string);
 		}
 	}

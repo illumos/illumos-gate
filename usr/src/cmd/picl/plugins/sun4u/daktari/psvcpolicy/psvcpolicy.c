@@ -49,6 +49,8 @@
 #include	<sys/daktari.h>
 #include	<sys/hpc3130_events.h>
 #include	<assert.h>
+#include	<limits.h>
+#include	<sys/systeminfo.h>
 
 /*LINTLIBRARY*/
 
@@ -149,6 +151,123 @@ static int32_t threshold_names[] = {
 	PSVC_HI_SHUT_ATTR,
 	PSVC_HW_HI_SHUT_ATTR
 };
+
+/*
+ * The I2C bus is noisy, and the state may be incorrectly reported as
+ * having changed.  When the state changes, we attempt to confirm by
+ * retrying.  If any retries indicate that the state has not changed, we
+ * assume the state change(s) were incorrect and the state has not changed.
+ * The following variables are used to store the tuneable values read in
+ * from the optional i2cparam.conf file for this shared object library.
+ */
+static int n_retry_pshp_status = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_pshp_status = 1;
+static int n_read_overcurrent = PSVC_THRESHOLD_COUNTER;
+static int n_retry_devicefail = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_devicefail = 1;
+static int n_read_fanfault = PSVC_THRESHOLD_COUNTER;
+static int n_retry_pshp = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_pshp = 1;
+static int n_retry_diskfault = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_diskfault = 1;
+static int n_retry_temp_shutdown = PSVC_NUM_OF_RETRIES;
+static int retry_sleep_temp_shutdown = 1;
+
+typedef struct {
+	int *pvar;
+	char *texttag;
+} i2c_noise_param_t;
+
+static i2c_noise_param_t i2cparams[] = {
+	&n_retry_pshp_status, "n_retry_pshp_status",
+	&retry_sleep_pshp_status, "retry_sleep_pshp_status",
+	&n_read_overcurrent, "n_read_overcurrent",
+	&n_retry_devicefail, "n_retry_devicefail",
+	&retry_sleep_devicefail, "retry_sleep_devicefail",
+	&n_read_fanfault, "n_read_fanfault",
+	&n_retry_pshp, "n_retry_pshp",
+	&retry_sleep_pshp, "retry_sleep_pshp",
+	&n_retry_diskfault, "n_retry_diskfault",
+	&retry_sleep_diskfault, "retry_sleep_diskfault",
+	&n_retry_temp_shutdown, "n_retry_temp_shutdown",
+	&retry_sleep_temp_shutdown, "retry_sleep_temp_shutdown",
+	NULL, NULL
+};
+
+#pragma init(i2cparams_load)
+
+static void
+i2cparams_debug(i2c_noise_param_t *pi2cparams, char *platform,
+	int usingDefaults)
+{
+	char s[128];
+	i2c_noise_param_t *p;
+
+	if (!usingDefaults) {
+		(void) snprintf(s, sizeof (s),
+		    "# Values from /usr/platform/%s/lib/i2cparam.conf\n",
+		    platform);
+		syslog(LOG_WARNING, "%s", s);
+	} else {
+		/* no file - we're using the defaults */
+		(void) snprintf(s, sizeof (s),
+"# No /usr/platform/%s/lib/i2cparam.conf file, using defaults\n",
+		    platform);
+	}
+	(void) fputs(s, stdout);
+	p = pi2cparams;
+	while (p->pvar != NULL) {
+		(void) snprintf(s, sizeof (s), "%s %d\n", p->texttag,
+		    *(p->pvar));
+		if (!usingDefaults)
+			syslog(LOG_WARNING, "%s", s);
+		(void) fputs(s, stdout);
+		p++;
+	}
+}
+
+static void
+i2cparams_load(void)
+{
+	FILE *fp;
+	char filename[PATH_MAX];
+	char platform[64];
+	char s[128];
+	char var[128];
+	int val;
+	i2c_noise_param_t *p;
+
+	if (sysinfo(SI_PLATFORM, platform, sizeof (platform)) == -1) {
+		syslog(LOG_ERR, "sysinfo error %s\n", strerror(errno));
+		return;
+	}
+	(void) snprintf(filename, sizeof (filename),
+	    "/usr/platform/%s/lib/i2cparam.conf", platform);
+	/* read thru the i2cparam.conf file and set variables */
+	if ((fp = fopen(filename, "r")) != NULL) {
+		while (fgets(s, sizeof (s), fp) != NULL) {
+			if (s[0] == '#') /* skip comment lines */
+				continue;
+			/* try to find a string match and get the value */
+			if (sscanf(s, "%127s %d", var, &val) != 2)
+				continue;
+			if (val < 1)
+				val = 1;  /* clamp min value */
+			p = &(i2cparams[0]);
+			while (p->pvar != NULL) {
+				if (strncmp(p->texttag, var, sizeof (var)) ==
+				    0) {
+					*(p->pvar) = val;
+					break;
+				}
+				p++;
+			}
+		}
+		(void) fclose(fp);
+	}
+	/* output the values of the parameters */
+	i2cparams_debug(&(i2cparams[0]), platform, ((fp == NULL)? 1 : 0));
+}
 
 int32_t
 psvc_MB_update_thresholds_0(psvc_opaque_t hdlp, char *id, int offset)
@@ -426,7 +545,7 @@ psvc_check_ps_hotplug_status_0(psvc_opaque_t hdlp, char *id)
 	char		led_state[32];
 	boolean_t	present;
 	static int8_t	hotplug_failed_count = 0;
-	int8_t		retry;
+	int	retry;
 
 	status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &present);
 	if (status == PSVC_FAILURE) {
@@ -445,7 +564,7 @@ psvc_check_ps_hotplug_status_0(psvc_opaque_t hdlp, char *id)
 	retry = 0;
 	do {
 		if (retry)
-			sleep(1);
+			(void) sleep(retry_sleep_pshp_status);
 		status = psvc_get_attr(hdlp, fail_valid_switch_id,
 		    PSVC_STATE_ATTR, valid_switch_state);
 		if (status == PSVC_FAILURE) {
@@ -499,7 +618,7 @@ psvc_check_ps_hotplug_status_0(psvc_opaque_t hdlp, char *id)
 		 *	PSVC_OFF	PSVC_HOTPLUGGED		no
 		 *	PSVC_ON		!PSVC_HOTPLUGGED	no
 		 */
-	} while ((retry < PSVC_NUM_OF_RETRIES) &&
+	} while ((retry < n_retry_pshp_status) &&
 	    change_of_state_str(valid_switch_state, PSVC_OFF,
 	    state, PSVC_HOTPLUGGED));
 
@@ -562,7 +681,7 @@ psvc_ps_overcurrent_check_policy_0(psvc_opaque_t hdlp, char *system)
 	static int32_t hi_warn[DAKTARI_MAX_PS][DAK_MAX_PS_I_SENSORS];
 	char state[32];
 	static int8_t overcurrent_failed_check = 0;
-	static int8_t threshold_counter = 0;
+	static int threshold_counter = 0;
 
 	if (power_supply_id[0] == NULL) {
 		for (i = 0; i < DAKTARI_MAX_PS; i++) {
@@ -664,10 +783,10 @@ psvc_ps_overcurrent_check_policy_0(psvc_opaque_t hdlp, char *system)
 		 * Because we observed an overcurrent
 		 * condition, we increment threshold_counter.
 		 * Once threshold_counter reaches the value
-		 * of PSVC_THRESHOLD_COUNTER we log the event.
+		 * of n_read_overcurrent we log the event.
 		 */
 		threshold_counter++;
-		if (threshold_counter == PSVC_THRESHOLD_COUNTER) {
+		if (threshold_counter == n_read_overcurrent) {
 			threshold_counter = 0;
 			if (ps_present == 1) {
 				syslog(LOG_ERR, PS_OVER_CURRENT_MSG);
@@ -698,7 +817,7 @@ psvc_ps_device_fail_notifier_policy_0(psvc_opaque_t hdlp, char *system)
 	boolean_t present;
 	int fail_state;
 	static int8_t device_fail_failed_check = 0;
-	int8_t retry, should_retry;
+	int retry, should_retry;
 
 	if (ps_id[0] == NULL) {
 		for (i = 0; i < DAKTARI_MAX_PS; i++) {
@@ -744,7 +863,7 @@ psvc_ps_device_fail_notifier_policy_0(psvc_opaque_t hdlp, char *system)
 		retry = 0;
 		do {
 			if (retry)
-				sleep(1);
+				(void) sleep(retry_sleep_devicefail);
 			fail_state = 0;
 			should_retry = 0;
 			for (j = 0; j < DAK_MAX_FAULT_SENSORS; ++j) {
@@ -825,7 +944,7 @@ psvc_ps_device_fail_notifier_policy_0(psvc_opaque_t hdlp, char *system)
 			    (strcmp(past_state, PSVC_ERROR) == 0)) {
 				should_retry = 1;
 			}
-		} while ((retry < PSVC_NUM_OF_RETRIES) && should_retry);
+		} while ((retry < n_retry_devicefail) && should_retry);
 
 		if (fail_state != 0) {
 			strcpy(state, PSVC_ERROR);
@@ -998,7 +1117,7 @@ psvc_fan_fault_check_policy_0(psvc_opaque_t hdlp, char *system)
 	int32_t speed;
 	int32_t status = PSVC_SUCCESS;
 	int r;
-	static int8_t threshold_counter = 0;
+	static int threshold_counter = 0;
 
 	if (fan_id[0] == NULL) {
 		for (r = 0; r < DAK_MAX_FANS; r++) {
@@ -1104,7 +1223,7 @@ psvc_fan_fault_check_policy_0(psvc_opaque_t hdlp, char *system)
 			if (speed == 0) {
 				threshold_counter++;
 				if (threshold_counter ==
-				    PSVC_THRESHOLD_COUNTER) {
+				    n_read_fanfault) {
 					int32_t i;
 					int32_t led_count;
 					char led_state[32];
@@ -1281,7 +1400,7 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 	devctl_hdl_t bus_handle, dev_handle;
 	devctl_ddef_t ddef_hdl;
 	char pcf8574_devpath[256], pcf8591_devpath[256], fru_devpath[256];
-	int8_t retry;
+	int retry;
 
 	status = psvc_get_attr(hdlp, id, PSVC_PREV_PRESENCE_ATTR,
 		&previous_presence);
@@ -1291,13 +1410,13 @@ psvc_ps_hotplug_policy_0(psvc_opaque_t hdlp, char *id)
 	retry = 0;
 	do {
 		if (retry)
-			sleep(1);
+			(void) sleep(retry_sleep_pshp);
 
 		status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &presence);
 		if (status != PSVC_SUCCESS)
 			return (status);
 		retry++;
-	} while ((retry < PSVC_NUM_OF_RETRIES) &&
+	} while ((retry < n_retry_pshp) &&
 	    (presence != previous_presence));
 
 	if (presence == previous_presence) {
@@ -1565,16 +1684,24 @@ psvc_shutdown_policy(psvc_opaque_t hdlp, char *id)
 	int32_t	status;
 	char	fault[32] = {0};
 	boolean_t	pr;
+	int	retry;
 
 	status = psvc_get_attr(hdlp, id, PSVC_PRESENCE_ATTR, &pr);
 	if ((status != PSVC_SUCCESS) || (pr != PSVC_PRESENT)) {
 		return (status);
 	}
 
-	status = psvc_get_attr(hdlp, id, PSVC_FAULTID_ATTR, fault);
-	if (status != PSVC_SUCCESS)
-		return (status);
-
+	retry = 0;
+	do {
+		if (retry)
+			(void) sleep(retry_sleep_temp_shutdown);
+		status = psvc_get_attr(hdlp, id, PSVC_FAULTID_ATTR, fault);
+		if (status != PSVC_SUCCESS)
+			return (status);
+		retry++;
+	} while (((strcmp(fault, PSVC_TEMP_LO_SHUT) == 0) ||
+	    (strcmp(fault, PSVC_TEMP_HI_SHUT) == 0)) &&
+		(retry < n_retry_temp_shutdown));
 	if ((strcmp(fault, PSVC_TEMP_LO_SHUT) == 0) ||
 	    (strcmp(fault, PSVC_TEMP_HI_SHUT) == 0)) {
 		shutdown_routine();
@@ -1594,7 +1721,7 @@ psvc_check_disk_fault_policy_0(psvc_opaque_t hdlp, char *id)
 	static char	*led_id[DAK_MAX_DISKS] = {NULL};
 	static char	*parent_id[DAK_MAX_DISKS] = {NULL};
 	boolean_t	present;
-	int8_t		retry;
+	int		retry;
 
 	/*
 	 * Check which disk faulted, now get the disks.
@@ -1651,7 +1778,7 @@ psvc_check_disk_fault_policy_0(psvc_opaque_t hdlp, char *id)
 		retry = 0;
 		do {
 			if (retry)
-				sleep(1);
+				(void) sleep(retry_sleep_diskfault);
 			status = psvc_get_attr(hdlp, led_id[i], PSVC_STATE_ATTR,
 			    led_state);
 			if (status != PSVC_SUCCESS)
@@ -1667,7 +1794,7 @@ psvc_check_disk_fault_policy_0(psvc_opaque_t hdlp, char *id)
 			 * PSVC_ERROR		PSVC_LED_OFF		no
 			 * PSVC_OK		PSVC_LED_ON		no
 			 */
-		} while ((retry < PSVC_NUM_OF_RETRIES) &&
+		} while ((retry < n_retry_diskfault) &&
 		    change_of_state_str(prev_state, PSVC_OK,
 		    led_state, PSVC_LED_ON));
 
