@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright 1983,1984,1985,1986,1987,1988,1989  AT&T.
@@ -229,8 +229,9 @@ struct hostname_cache {
 	time_t expire;
 };
 
-#define	DEF_HNC_SIZE	128
-#define	DEF_HNC_TTL	600	/* 10 minutes */
+#define	DEF_HNC_SIZE	2037
+#define	DEF_HNC_TTL	1200	/* 20 minutes */
+#define	MAX_BUCKETS	30
 
 /*
  * function prototypes
@@ -297,9 +298,12 @@ static void disable_errorlog(void);
 static void enable_errorlog(void);
 
 static void hnc_init(int);
-static host_list_t *hnc_lookup(struct netbuf *, struct netconfig *);
-static void hnc_register(struct netbuf *, struct netconfig *, host_list_t *);
+static host_list_t *hnc_lookup(struct netbuf *,
+		    struct netconfig *, int *);
+static void hnc_register(struct netbuf *,
+		    struct netconfig *, host_list_t *, int);
 static void hnc_unreg(struct hostname_cache **);
+static int addr_hash(struct netbuf *nbp);
 
 
 #ifdef	__cplusplus

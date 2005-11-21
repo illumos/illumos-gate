@@ -244,7 +244,7 @@ static struct t_uderr **Errp;
 static int turnoff = 0;
 static int shutting_down;
 
-static struct hostname_cache *hnc_cache, *hnc_active, *hnc_freeq;
+static struct hostname_cache **hnc_cache;
 static pthread_mutex_t hnc_mutex = PTHREAD_MUTEX_INITIALIZER;
 static size_t hnc_size = DEF_HNC_SIZE;
 static unsigned int hnc_ttl = DEF_HNC_TTL;
@@ -2187,6 +2187,7 @@ cvthname(struct netbuf *nbp, struct netconfig *ncp, char *failsafe_addr)
 	struct nd_hostservlist *hsp;
 	struct nd_hostserv *hspp;
 	pthread_t mythreadno;
+	int hindex;
 	char *uap;
 
 	if (Debug) {
@@ -2199,7 +2200,7 @@ cvthname(struct netbuf *nbp, struct netconfig *ncp, char *failsafe_addr)
 	DPRINT2(2, "cvthname(%u): looking up hostname for %s\n",
 			mythreadno, uap ? uap : "<unknown>");
 
-	if ((h = hnc_lookup(nbp, ncp)) != NULL) {
+	if ((h = hnc_lookup(nbp, ncp, &hindex)) != NULL) {
 		DPRINT4(2, "cvthname(%u): Cache found %p for %s (%s)\n",
 				mythreadno, h, uap ? uap : "<unknown>",
 				h->hl_hosts[0]);
@@ -2281,7 +2282,7 @@ out:			netdir_free((void *)hsp, ND_HOSTSERVLIST);
 		/* This host_list won't be shared by the cache. */
 		return (h);
 	}
-	hnc_register(nbp, ncp, h);
+	hnc_register(nbp, ncp, h, hindex);
 	DPRINT3(2, "cvthname(%u): returning %p for %s\n",
 			mythreadno, h, h->hl_hosts[0]);
 	return (h);
@@ -5230,28 +5231,21 @@ out:;
 
 /*
  * The following function implements simple hostname cache mechanism.
- * Host name cache consists of single linked list structure which contains
- * host_list_t and netbuf pair. All cache entries(hnc_size) are allocated
- * initially and linked to "hnc_freeq". If cache register request comes,
- * then one element will be pulled from freeq, and will be linked to
- * "hnc_active" with given netbuf, host_list_t and expiration time. All valid
- * cahces are linked from hnc_active. If the cache element has run
- * out, most unused element will be re-used for the new request.
+ * Host name cache is implemented through hash table bucket chaining method.
+ * Collisions are handled by bucket chaining.
  *
  * hnc_init():
  * 	allocate and initialize the cache. If reinit is set,
  *	invalidate all cache entries.
  * hnc_look():
- *	lookup the cache entries by following single linked list
- *	from hnc_active. If cached entry was found, it will be
- *	put in the head of the list, and return. While going through
+ *	It hashes the ipaddress gets the index and walks thru the
+ *	single linked list. if cached entry was found, it will
+ *	put in the head of the list, and return.While going through
  *	the entries, an entry which has already expired will be invalidated.
  * hnc_register():
- *	take one element from freeq, and put the new entry at the top
- *	of hnc_active.
+ *	Hashes the ipaddress finds the index and puts current entry to the list.
  * hnc_unreg():
- *	invalidate the cache. i.e unlink from hnc_active, and linked the
- *	element to freeq.
+ *	invalidate the cachep.
  */
 
 static void
@@ -5259,6 +5253,7 @@ hnc_init(int reinit)
 {
 	struct hostname_cache **hpp;
 	pthread_t mythreadno;
+	int i;
 
 	if (Debug) {
 		mythreadno = pthread_self();
@@ -5267,17 +5262,18 @@ hnc_init(int reinit)
 	if (reinit) {
 		pthread_mutex_lock(&hnc_mutex);
 
-		for (hpp = &hnc_active; *hpp != NULL; ) {
-			hnc_unreg(hpp);
+		for (i = 0; i < hnc_size; i++) {
+			for (hpp = &hnc_cache[i]; *hpp != NULL; ) {
+				hnc_unreg(hpp);
+			}
 		}
 
 		pthread_mutex_unlock(&hnc_mutex);
 		DPRINT1(2, "hnc_init(%u): hostname cache re-configured\n",
 			mythreadno);
 	} else {
-		int i;
 
-		hnc_cache = malloc(hnc_size * sizeof (struct hostname_cache));
+		hnc_cache = calloc(hnc_size, sizeof (struct hostname_cache *));
 
 		if (hnc_cache == NULL) {
 			MALLOC_FAIL("hostname cache");
@@ -5285,26 +5281,18 @@ hnc_init(int reinit)
 			return;
 		}
 
-		for (i = 0; i < hnc_size; i++) {
-			hnc_cache[i].h = NULL;
-			hnc_cache[i].next = hnc_cache + i + 1;
-		}
-
-		hnc_cache[hnc_size - 1].next = NULL;
-		hnc_freeq = hnc_cache;
-		hnc_active = NULL;
-
 		DPRINT3(1, "hnc_init(%u): hostname cache configured %d entry"
 			" ttl:%d\n", mythreadno, hnc_size, hnc_ttl);
 	}
 }
 
 static host_list_t *
-hnc_lookup(struct netbuf *nbp, struct netconfig *ncp)
+hnc_lookup(struct netbuf *nbp, struct netconfig *ncp, int *hindex)
 {
 	struct hostname_cache **hpp, *hp;
 	time_t now;
 	pthread_t mythreadno;
+	int index;
 
 	if (Debug) {
 		mythreadno = pthread_self();
@@ -5317,14 +5305,15 @@ hnc_lookup(struct netbuf *nbp, struct netconfig *ncp)
 	pthread_mutex_lock(&hnc_mutex);
 	now = time(0);
 
-	for (hpp = &hnc_active; (hp = *hpp) != NULL; ) {
+	*hindex = index = addr_hash(nbp);
+
+	for (hpp = &hnc_cache[index]; (hp = *hpp) != NULL; ) {
 		DPRINT4(10, "hnc_lookup(%u): check %p on %p for %s\n",
 			mythreadno, hp->h, hp, hp->h->hl_hosts[0]);
 
 		if (hp->expire < now) {
 			DPRINT2(9, "hnc_lookup(%u): purge %p\n",
 				mythreadno, hp);
-			/* Note: hnc_unreg changes *hpp */
 			hnc_unreg(hpp);
 			continue;
 		}
@@ -5335,12 +5324,12 @@ hnc_lookup(struct netbuf *nbp, struct netconfig *ncp)
 			 * Put the entry at the top.
 			 */
 
-			if (hp != hnc_active) {
+			if (hp != hnc_cache[index]) {
 				/* unlink from active list */
 				*hpp = (*hpp)->next;
 				/* push it onto the top */
-				hp->next = hnc_active;
-				hnc_active = hp;
+				hp->next = hnc_cache[index];
+				hnc_cache[index] = hp;
 			}
 
 			pthread_mutex_lock(&hp->h->hl_mutex);
@@ -5362,12 +5351,14 @@ hnc_lookup(struct netbuf *nbp, struct netconfig *ncp)
 }
 
 static void
-hnc_register(struct netbuf *nbp, struct netconfig *ncp, host_list_t *h)
+hnc_register(struct netbuf *nbp, struct netconfig *ncp,
+		    host_list_t *h, int hindex)
 {
-	struct hostname_cache **hpp, **tailp, *hp;
+	struct hostname_cache **hpp, **tailp, *hp, *entry;
 	void *addrbuf;
 	time_t now;
 	pthread_t mythreadno;
+	int i;
 
 	if (Debug) {
 		mythreadno = pthread_self();
@@ -5382,51 +5373,54 @@ hnc_register(struct netbuf *nbp, struct netconfig *ncp, host_list_t *h)
 		return;
 	}
 
+	if ((entry = malloc(sizeof (struct hostname_cache))) == NULL) {
+		MALLOC_FAIL("pushing hostname entry");
+		free(addrbuf);
+		return;
+	}
+
 	pthread_mutex_lock(&hnc_mutex);
 
-	if (hnc_freeq == NULL) {
-		DPRINT1(9, "hnc_register(%u): freeq empty\n", mythreadno);
-		now = time(NULL);
-		/*
-		 * first go through active list, and discard the
-		 * caches which has been invalid.
-		 */
-		for (hpp = &hnc_active; (hp = *hpp) != NULL; ) {
-			tailp = hpp;
+	i = 0;
 
-			if (hp->expire < now) {
-				DPRINT2(9, "hnc_register(%u): discard %p\n",
-					mythreadno, hp);
-				hnc_unreg(hpp);
-			} else {
-				hpp = &hp->next;
-			}
-		}
+	now = time(0);
+	/*
+	 * first go through active list, and discard the
+	 * caches which has been invalid. Count number of
+	 * non-expired buckets.
+	 */
 
-		if (hnc_freeq == NULL) {
-			DPRINT2(9, "hnc_register(%u): stealing %p\n",
-					mythreadno, *tailp);
-			/*
-			 * If still no inactive cache, then steal the least
-			 * active element.
-			 */
-			hnc_unreg(tailp);
+	for (hpp = &hnc_cache[hindex]; (hp = *hpp) != NULL; ) {
+		tailp = hpp;
+
+		if (hp->expire < now) {
+			DPRINT2(9, "hnc_register(%u): discard %p\n",
+				mythreadno, hp);
+			hnc_unreg(hpp);
+		} else {
+			i++;
+			hpp = &hp->next;
 		}
 	}
 
-	hp = hnc_freeq;
-	hnc_freeq = hnc_freeq->next;
-
-	/* push it on the top */
-	hp->next = hnc_active;
-	hnc_active = hp;
+	/*
+	 * If max limit of chained hash buckets has been used up
+	 * delete the least active element in the chain.
+	 */
+	if (i == MAX_BUCKETS) {
+		hnc_unreg(tailp);
+	}
 
 	(void) memcpy(addrbuf, nbp->buf, nbp->len);
-	hp->addr.len = nbp->len;
-	hp->addr.buf = addrbuf;
-	hp->ncp = ncp;
-	hp->h = h;
-	hp->expire = time(NULL) + hnc_ttl;
+	entry->addr.len = nbp->len;
+	entry->addr.buf = addrbuf;
+	entry->ncp = ncp;
+	entry->h = h;
+	entry->expire = time(NULL) + hnc_ttl;
+
+	/* insert it at the top */
+	entry->next = hnc_cache[hindex];
+	hnc_cache[hindex] = entry;
 
 	/*
 	 * As far as cache is valid, corresponding host_list must
@@ -5457,9 +5451,7 @@ hnc_unreg(struct hostname_cache **hpp)
 	/* unlink from active list */
 	*hpp = (*hpp)->next;
 
-	/* put in freeq */
-	hp->next = hnc_freeq;
-	hnc_freeq = hp;
+	free(hp);
 }
 
 /*
@@ -5498,4 +5490,39 @@ enable_errorlog()
 		(void) dataq_enqueue(&inputq, mp);
 	}
 	dataq_destroy(&tmpq);
+}
+
+/*
+ * Generate a hash value of the given address and derive
+ * an index into the hnc_cache hashtable.
+ * The hashing method is similar to what Java does for strings.
+ */
+static int
+addr_hash(struct netbuf *nbp)
+{
+	char *uap;
+	int i;
+	unsigned long hcode = 0;
+
+	uap = nbp->buf;
+
+	if (uap == NULL) {
+		return (0);
+	}
+
+	/*
+	 * Compute a hashcode of the address string
+	 */
+	for (i = 0; i < nbp->len; i++)
+		hcode = (31 * hcode) + uap[i];
+
+	/*
+	 * Scramble the hashcode for better distribution
+	 */
+	hcode += ~(hcode << 9);
+	hcode ^=  (hcode >> 14);
+	hcode +=  (hcode << 4);
+	hcode ^=  (hcode >> 10);
+
+	return ((int)(hcode % hnc_size));
 }
