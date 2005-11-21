@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * logadm/main.c -- main routines for logadm
@@ -93,6 +93,7 @@ static struct optinfo Opttable[] = {
 	{ "e", OPTTYPE_STRING,	NULL,			OPTF_CLI|OPTF_CONF },
 	{ "f", OPTTYPE_STRING,	NULL,			OPTF_CLI },
 	{ "h", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
+	{ "l", OPTTYPE_BOOLEAN, NULL,			OPTF_CLI },
 	{ "N", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI|OPTF_CONF },
 	{ "n", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
 	{ "r", OPTTYPE_BOOLEAN,	NULL,			OPTF_CLI },
@@ -125,7 +126,7 @@ static struct optinfo Opttable[] = {
  * in the first form.  In other words, it is not allowed to run logadm
  * with any of these options unless at least one logname is also provided.
  */
-#define	OPTIONS_NOT_FIRST_FORM	"eNrwpPsabcgmoRtzACEST"
+#define	OPTIONS_NOT_FIRST_FORM	"eNrwpPsabcglmoRtzACEST"
 
 /* text that we spew with the -h flag */
 #define	HELP1 \
@@ -158,6 +159,7 @@ static struct optinfo Opttable[] = {
 "        -b cmd          execute cmd before taking actions\n"\
 "        -c              copy & truncate logfile, don't rename\n"\
 "        -g group        new empty log file group\n"\
+"        -l              rotate log file with local time rather than UTC\n"\
 "        -m mode         new empty log file mode\n"\
 "        -M cmd          execute cmd to rotate the log file\n"\
 "        -o owner        new empty log file owner\n"\
@@ -668,9 +670,25 @@ rotatelog(struct fn *fnp, struct opts *opts)
 
 	if (Debug)
 		(void) fprintf(stderr, "rotatelog: conditions met\n");
+	if (opts_count(opts, "l")) {
+		/* Change the time zone to local time zone */
+		if (putenv("TZ="))
+			err(EF_SYS, "putenv TZ");
+		tzset();
+		Now = time(0);
 
-	/* rename the log file */
-	rotateto(fnp, opts, 0, recentlog, B_FALSE);
+		/* rename the log file */
+		rotateto(fnp, opts, 0, recentlog, B_FALSE);
+
+		/* Change the time zone to UTC */
+		if (putenv("TZ=UTC"))
+			err(EF_SYS, "putenv TZ");
+		tzset();
+		Now = time(0);
+	} else {
+		/* rename the log file */
+		rotateto(fnp, opts, 0, recentlog, B_FALSE);
+	}
 
 	/* determine owner, group, mode for empty log file */
 	if (opts_count(opts, "o"))

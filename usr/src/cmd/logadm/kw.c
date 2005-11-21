@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * logadm/kw.c -- manage keywords table
@@ -192,7 +192,7 @@ kw_expand(struct fn *src, struct fn *dst, int n, boolean_t gz)
 	boolean_t hasn = B_FALSE;
 	struct fn *kw = fn_new(NULL);
 	char *ptr;
-	struct tm *gmt_tm = gmtime(&Now);
+	struct tm *gmt_tm = localtime(&Now);
 
 	while ((c = fn_getc(src)) != '\0')
 		switch (c) {

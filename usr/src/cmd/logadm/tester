@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -91,6 +91,7 @@ umask 002;
 	"logadm16",
 	"logadm17",
 	"logadm18",
+	"logadm19",
 );
 
 use Getopt::Std;
@@ -607,6 +608,7 @@ EOF
 	$secondblob =~ s/%d/$percentd/mg;
 	$secondblob =~ s/%Y/$percentY/mg;
 	$secondblob =~ s/ISA/$isa/mg;
+	$utcenv = "TZ=UTC export TZ";
 	chomp $secondblob;
 	set_file('sed.out.expect', <<"EOF");
             basename syslog
@@ -638,6 +640,7 @@ EOF
 	set_file('runtest', <<"EOF");
 # test "kwtest1"
 $envsetup
+$utcenv
 exec $bindir/$kwtest >std.out 2>std.err
 EOF
 }
@@ -1882,6 +1885,7 @@ Options which control how a logfile is rotated:
         -b cmd          execute cmd before taking actions
         -c              copy & truncate logfile, don't rename
         -g group        new empty log file group
+        -l              rotate log file with local time rather than UTC
         -m mode         new empty log file mode
         -M cmd          execute cmd to rotate the log file
         -o owner        new empty log file owner
@@ -1985,5 +1989,31 @@ EOF
 # test "logadm18"
 $envsetup
 exec $bindir/logadm -f logadm.conf >std.out 2>std.err
+EOF
+}
+
+#############################################################################
+#
+#         logadm19 -- test of  -l
+#
+#############################################################################
+sub logadm19 {
+        set_file('logfile', 'initially logfile');
+
+        set_file('checktest', <<'EOF');
+[ -s std.err ] && exit 1
+[ -s std.out ] && exit 1
+[ -s logfile ] && exit 1
+TZ= export TZ
+d=`/bin/date +\%d\%H\%M`
+[ -f logfile.$d ] || exit 1
+[ "xinitially logfile" = "x`/bin/cat logfile.$d`" ] || exit 1
+exit 0
+EOF
+
+        set_file('runtest', <<"EOF");
+# test "logadm4"
+$envsetup
+exec $bindir/logadm -f /dev/null -l -p now logfile -t '\$file.\%d\%H\%M' >std.out 2>std.err
 EOF
 }
