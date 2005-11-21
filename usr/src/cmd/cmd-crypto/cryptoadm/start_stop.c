@@ -87,9 +87,13 @@ stop_fail:
 
 	if (err != 0)  {
 		cryptoerror(LOG_STDERR, gettext(
-		    "failed to stop cryptographic framework daemon - %s."),
+		    "no kcfd available to stop - %s."),
 		    strerror(err));
-		return (SMF_EXIT_MON_OFFLINE);
+		/*
+		 * We return with SMF_EXIT_OK because this was a request
+		 * to stop something that wasn't running.
+		 */
+		return (SMF_EXIT_OK);
 	}
 
 	return (SMF_EXIT_OK);
