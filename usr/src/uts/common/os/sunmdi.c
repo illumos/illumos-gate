@@ -122,6 +122,27 @@ static int mdi_vhcache_flush_delay = 10;
 static int mdi_vhcache_flush_daemon_idle_time = 60;
 
 /*
+ * MDI falls back to discovery of all paths when a bus_config_one fails.
+ * The following parameters can be used to tune this operation.
+ *
+ * mdi_path_discovery_boot
+ *	Number of times path discovery will be attempted during early boot.
+ *	Probably there is no reason to ever set this value to greater than one.
+ *
+ * mdi_path_discovery_postboot
+ *	Number of times path discovery will be attempted after early boot.
+ *	Set it to a minimum of two to allow for discovery of iscsi paths which
+ *	may happen very late during booting.
+ *
+ * mdi_path_discovery_interval
+ *	Minimum number of seconds MDI will wait between successive discovery
+ *	of all paths. Set it to -1 to disable discovery of all paths.
+ */
+static int mdi_path_discovery_boot = 1;
+static int mdi_path_discovery_postboot = 2;
+static int mdi_path_discovery_interval = 10;
+
+/*
  * number of seconds the asynchronous configuration thread will sleep idle
  * before exiting.
  */
@@ -265,6 +286,8 @@ static void		sort_vhcache_paths(mdi_vhcache_client_t *);
 static int		flush_vhcache(mdi_vhci_config_t *, int);
 static void		vhcache_dirty(mdi_vhci_config_t *);
 static void		free_async_client_config(mdi_async_client_config_t *);
+static void		single_threaded_vhconfig_enter(mdi_vhci_config_t *);
+static void		single_threaded_vhconfig_exit(mdi_vhci_config_t *);
 static nvlist_t		*read_on_disk_vhci_cache(char *);
 extern int		fread_nvlist(char *, nvlist_t **);
 extern int		fwrite_nvlist(char *, nvlist_t *);
@@ -6401,12 +6424,6 @@ static nvlist_t *vhcache_nvl[N_VHCI_CLASSES];
 #define	MDI_NVPNAME_PHCIS	"phcis"
 #define	MDI_NVPNAME_CTADDRMAP	"clientaddrmap"
 
-typedef enum {
-	VHCACHE_NOT_REBUILT,
-	VHCACHE_PARTIALLY_BUILT,
-	VHCACHE_FULLY_BUILT
-} vhcache_build_status_t;
-
 /*
  * Given vhci class name, return its on-disk vhci cache filename.
  * Memory for the returned filename which includes the full path is allocated
@@ -6500,6 +6517,9 @@ setup_vhci_cache(mdi_vhci_t *vh)
 
 	vhc->vhc_cbid = callb_add(stop_vhcache_flush_thread, vhc,
 	    CB_CL_UADMIN_PRE_VFS, "mdi_vhcache_flush");
+
+	vhc->vhc_path_discovery_boot = mdi_path_discovery_boot;
+	vhc->vhc_path_discovery_postboot = mdi_path_discovery_postboot;
 }
 
 /*
@@ -6642,7 +6662,6 @@ stop_vhcache_async_threads(mdi_vhci_config_t *vhc)
 	cv_broadcast(&vhc->vhc_cv);
 
 	while ((vhc->vhc_flags & MDI_VHC_VHCACHE_FLUSH_THREAD) ||
-	    (vhc->vhc_flags & MDI_VHC_BUILD_VHCI_CACHE_THREAD) ||
 	    vhc->vhc_acc_thrcount != 0) {
 		mutex_exit(&vhc->vhc_lock);
 		delay(1);
@@ -7146,7 +7165,17 @@ vhcache_phci_add(mdi_vhci_config_t *vhc, mdi_phci_t *ph)
 		enqueue_vhcache_phci(vhcache, cphci);
 		cache_updated = 1;
 	}
+
 	rw_exit(&vhcache->vhcache_lock);
+
+	/*
+	 * Since a new phci has been added, reset
+	 * vhc_path_discovery_cutoff_time to allow for discovery of paths
+	 * during next vhcache_discover_paths().
+	 */
+	mutex_enter(&vhc->vhc_lock);
+	vhc->vhc_path_discovery_cutoff_time = 0;
+	mutex_exit(&vhc->vhc_lock);
 
 	kmem_free(pathname, MAXPATHLEN);
 	if (cache_updated)
@@ -7574,6 +7603,20 @@ bus_config_all_phcis(mdi_vhci_cache_t *vhcache, uint_t flags,
 	mutex_destroy(&vhbc->vhbc_lock);
 	cv_destroy(&vhbc->vhbc_cv);
 	kmem_free(vhbc, sizeof (*vhbc));
+}
+
+/*
+ * Single threaded version of bus_config_all_phcis()
+ */
+static void
+st_bus_config_all_phcis(mdi_vhci_config_t *vhc, uint_t flags,
+    ddi_bus_config_op_t op, major_t maj)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+
+	single_threaded_vhconfig_enter(vhc);
+	bus_config_all_phcis(vhcache, flags, op, maj);
+	single_threaded_vhconfig_exit(vhc);
 }
 
 /*
@@ -8019,13 +8062,13 @@ single_threaded_vhconfig_exit(mdi_vhci_config_t *vhc)
  * drivers that have the root support.
  */
 static void
-attach_phci_drivers(mdi_vhci_config_t *vhc, int root_mounted)
+attach_phci_drivers(mdi_vhci_config_t *vhc)
 {
 	int  i;
 	major_t m;
 
 	for (i = 0; i < vhc->vhc_nphci_drivers; i++) {
-		if (root_mounted == 0 &&
+		if (modrootloaded == 0 &&
 		    vhc->vhc_phci_driver_list[i].phdriver_root_support == 0)
 			continue;
 
@@ -8044,124 +8087,99 @@ attach_phci_drivers(mdi_vhci_config_t *vhc, int root_mounted)
  * Attach phci driver instances and then drive BUS_CONFIG_ALL on
  * the phci driver instances. During this process the cache gets built.
  *
- * Cache is built fully if the root is mounted (i.e., root_mounted is nonzero).
- *
+ * Cache is built fully if the root is mounted.
  * If the root is not mounted, phci drivers that do not have root support
  * are not attached. As a result the cache is built partially. The entries
  * in the cache reflect only those phci drivers that have root support.
  */
-static vhcache_build_status_t
-build_vhci_cache(mdi_vhci_config_t *vhc, int root_mounted)
+static int
+build_vhci_cache(mdi_vhci_config_t *vhc)
 {
 	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+
+	single_threaded_vhconfig_enter(vhc);
 
 	rw_enter(&vhcache->vhcache_lock, RW_READER);
 	if (vhcache->vhcache_flags & MDI_VHCI_CACHE_SETUP_DONE) {
 		rw_exit(&vhcache->vhcache_lock);
-		return (VHCACHE_NOT_REBUILT);
+		single_threaded_vhconfig_exit(vhc);
+		return (0);
 	}
 	rw_exit(&vhcache->vhcache_lock);
 
-	attach_phci_drivers(vhc, root_mounted);
+	attach_phci_drivers(vhc);
 	bus_config_all_phcis(vhcache, NDI_DRV_CONF_REPROBE | NDI_NO_EVENT,
 	    BUS_CONFIG_ALL, (major_t)-1);
 
-	if (root_mounted) {
-		rw_enter(&vhcache->vhcache_lock, RW_WRITER);
-		vhcache->vhcache_flags |= MDI_VHCI_CACHE_SETUP_DONE;
-		rw_exit(&vhcache->vhcache_lock);
-		vhcache_dirty(vhc);
-		return (VHCACHE_FULLY_BUILT);
-	} else
-		return (VHCACHE_PARTIALLY_BUILT);
+	rw_enter(&vhcache->vhcache_lock, RW_WRITER);
+	vhcache->vhcache_flags |= MDI_VHCI_CACHE_SETUP_DONE;
+	rw_exit(&vhcache->vhcache_lock);
+
+	single_threaded_vhconfig_exit(vhc);
+	vhcache_dirty(vhc);
+	return (1);
 }
 
 /*
- * Wait until the root is mounted and then build the vhci cache.
- */
-static void
-build_vhci_cache_thread(void *arg)
-{
-	mdi_vhci_config_t *vhc = (mdi_vhci_config_t *)arg;
-
-	mutex_enter(&vhc->vhc_lock);
-	while (!modrootloaded && !(vhc->vhc_flags & MDI_VHC_EXIT)) {
-		(void) cv_timedwait(&vhc->vhc_cv, &vhc->vhc_lock,
-		    ddi_get_lbolt() + 10 * TICKS_PER_SECOND);
-	}
-	if (vhc->vhc_flags & MDI_VHC_EXIT)
-		goto out;
-
-	mutex_exit(&vhc->vhc_lock);
-
-	/*
-	 * Now that the root is mounted. So build_vhci_cache() will build
-	 * the full cache.
-	 */
-	(void) build_vhci_cache(vhc, 1);
-
-	mutex_enter(&vhc->vhc_lock);
-out:
-	vhc->vhc_flags &= ~MDI_VHC_BUILD_VHCI_CACHE_THREAD;
-	mutex_exit(&vhc->vhc_lock);
-}
-
-/*
- * Build vhci cache - a wrapper for build_vhci_cache().
- *
- * In a normal case on-disk vhci cache is read and setup during booting.
- * But if the on-disk vhci cache is not there or deleted or corrupted then
- * this function sets up the vhci cache.
- *
- * The cache is built fully if the root is mounted.
- *
- * If the root is not mounted, initially the cache is built reflecting only
- * those driver entries that have the root support. A separate thread is
- * created to handle the creation of full cache. This thread will wait
- * until the root is mounted and then rebuilds the cache.
+ * Determine if discovery of paths is needed.
  */
 static int
-e_build_vhci_cache(mdi_vhci_config_t *vhc)
+vhcache_do_discovery(mdi_vhci_config_t *vhc)
 {
-	vhcache_build_status_t rv;
+	int rv = 1;
+
+	mutex_enter(&vhc->vhc_lock);
+	if (i_ddi_io_initialized() == 0) {
+		if (vhc->vhc_path_discovery_boot > 0) {
+			vhc->vhc_path_discovery_boot--;
+			goto out;
+		}
+	} else {
+		if (vhc->vhc_path_discovery_postboot > 0) {
+			vhc->vhc_path_discovery_postboot--;
+			goto out;
+		}
+	}
+
+	/*
+	 * Do full path discovery at most once per mdi_path_discovery_interval.
+	 * This is to avoid a series of full path discoveries when opening
+	 * stale /dev/[r]dsk links.
+	 */
+	if (mdi_path_discovery_interval != -1 &&
+	    lbolt64 >= vhc->vhc_path_discovery_cutoff_time)
+		goto out;
+
+	rv = 0;
+out:
+	mutex_exit(&vhc->vhc_lock);
+	return (rv);
+}
+
+/*
+ * Discover all paths:
+ *
+ * Attach phci driver instances and then drive BUS_CONFIG_ALL on all the phci
+ * driver instances. During this process all paths will be discovered.
+ */
+static int
+vhcache_discover_paths(mdi_vhci_config_t *vhc)
+{
+	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
+	int rv = 0;
 
 	single_threaded_vhconfig_enter(vhc);
 
-	mutex_enter(&vhc->vhc_lock);
-	if (vhc->vhc_flags & MDI_VHC_BUILD_VHCI_CACHE_THREAD) {
-		if (modrootloaded) {
-			cv_broadcast(&vhc->vhc_cv);
-			/* wait until build vhci cache thread exits */
-			while (vhc->vhc_flags & MDI_VHC_BUILD_VHCI_CACHE_THREAD)
-				cv_wait(&vhc->vhc_cv, &vhc->vhc_lock);
-			rv = VHCACHE_FULLY_BUILT;
-		} else {
-			/*
-			 * The presense of MDI_VHC_BUILD_VHCI_CACHE_THREAD
-			 * flag indicates that the cache has already been
-			 * partially built.
-			 */
-			rv = VHCACHE_PARTIALLY_BUILT;
-		}
+	if (vhcache_do_discovery(vhc)) {
+		attach_phci_drivers(vhc);
+		bus_config_all_phcis(vhcache, NDI_DRV_CONF_REPROBE |
+		    NDI_NO_EVENT, BUS_CONFIG_ALL, (major_t)-1);
 
-		mutex_exit(&vhc->vhc_lock);
-		single_threaded_vhconfig_exit(vhc);
-		return (rv);
-	}
-	mutex_exit(&vhc->vhc_lock);
-
-	rv = build_vhci_cache(vhc, modrootloaded);
-
-	if (rv == VHCACHE_PARTIALLY_BUILT) {
-		/*
-		 * create a thread; this thread will wait until the root is
-		 * mounted and then fully rebuilds the cache.
-		 */
 		mutex_enter(&vhc->vhc_lock);
-		vhc->vhc_flags |= MDI_VHC_BUILD_VHCI_CACHE_THREAD;
+		vhc->vhc_path_discovery_cutoff_time = lbolt64 +
+		    mdi_path_discovery_interval * TICKS_PER_SECOND;
 		mutex_exit(&vhc->vhc_lock);
-		(void) thread_create(NULL, 0, build_vhci_cache_thread,
-		    vhc, 0, &p0, TS_RUN, minclsyspri);
+		rv = 1;
 	}
 
 	single_threaded_vhconfig_exit(vhc);
@@ -8200,7 +8218,8 @@ mdi_vhci_bus_config(dev_info_t *vdip, uint_t flags, ddi_bus_config_op_t op,
 	mdi_vhci_t *vh = i_devi_get_vhci(vdip);
 	mdi_vhci_config_t *vhc = vh->vh_config;
 	mdi_vhci_cache_t *vhcache = &vhc->vhc_vhcache;
-	vhcache_build_status_t rv = VHCACHE_NOT_REBUILT;
+	int rv = 0;
+	int params_valid = 0;
 	char *cp;
 
 	/*
@@ -8223,36 +8242,41 @@ mdi_vhci_bus_config(dev_info_t *vdip, uint_t flags, ddi_bus_config_op_t op,
 	rw_enter(&vhcache->vhcache_lock, RW_READER);
 	if (!(vhcache->vhcache_flags & MDI_VHCI_CACHE_SETUP_DONE)) {
 		rw_exit(&vhcache->vhcache_lock);
-		rv = e_build_vhci_cache(vhc);
+		rv = build_vhci_cache(vhc);
 		rw_enter(&vhcache->vhcache_lock, RW_READER);
 	}
 
 	switch (op) {
 	case BUS_CONFIG_ONE:
-		/* extract node name */
-		cp = (char *)arg;
-		while (*cp != '\0' && *cp != '@')
-			cp++;
-		if (*cp == '@') {
-			*cp = '\0';
-			config_client_paths(vhc, (char *)arg, ct_addr);
-			/* config_client_paths() releases the cache_lock */
-			*cp = '@';
-		} else
-			rw_exit(&vhcache->vhcache_lock);
+		if (arg != NULL && ct_addr != NULL) {
+			/* extract node name */
+			cp = (char *)arg;
+			while (*cp != '\0' && *cp != '@')
+				cp++;
+			if (*cp == '@') {
+				params_valid = 1;
+				*cp = '\0';
+				config_client_paths(vhc, (char *)arg, ct_addr);
+				/* config_client_paths() releases cache_lock */
+				*cp = '@';
+				break;
+			}
+		}
+
+		rw_exit(&vhcache->vhcache_lock);
 		break;
 
 	case BUS_CONFIG_DRIVER:
 		rw_exit(&vhcache->vhcache_lock);
-		if (rv == VHCACHE_NOT_REBUILT)
-			bus_config_all_phcis(vhcache, flags, op,
+		if (rv == 0)
+			st_bus_config_all_phcis(vhc, flags, op,
 			    (major_t)(uintptr_t)arg);
 		break;
 
 	case BUS_CONFIG_ALL:
 		rw_exit(&vhcache->vhcache_lock);
-		if (rv == VHCACHE_NOT_REBUILT)
-			bus_config_all_phcis(vhcache, flags, op, -1);
+		if (rv == 0)
+			st_bus_config_all_phcis(vhc, flags, op, -1);
 		break;
 
 	default:
@@ -8269,6 +8293,12 @@ default_bus_config:
 	if (ndi_busop_bus_config(vdip, flags, op, arg, child, 0) ==
 	    NDI_SUCCESS) {
 		return (MDI_SUCCESS);
+	} else if (op == BUS_CONFIG_ONE && rv == 0 && params_valid) {
+		/* discover all paths and try configuring again */
+		if (vhcache_discover_paths(vhc) &&
+		    ndi_busop_bus_config(vdip, flags, op, arg, child, 0) ==
+		    NDI_SUCCESS)
+			return (MDI_SUCCESS);
 	}
 
 	return (MDI_FAILURE);

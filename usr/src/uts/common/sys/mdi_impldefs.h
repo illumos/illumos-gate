@@ -966,6 +966,18 @@ typedef struct mdi_vhci_config {
 
 	/* callback id - for flushing the cache during system shutdown */
 	callb_id_t		vhc_cbid;
+
+	/*
+	 * vhc_path_discovery_boot -	number of times path discovery will be
+	 *				attempted during early boot.
+	 * vhc_path_discovery_postboot	number of times path discovery will be
+	 *				attempted during late boot.
+	 * vhc_path_discovery_cutoff_time - time at which paths were last
+	 *				discovered  + some timeout
+	 */
+	int			vhc_path_discovery_boot;
+	int			vhc_path_discovery_postboot;
+	int64_t			vhc_path_discovery_cutoff_time;
 } mdi_vhci_config_t;
 
 /* vhc_flags */
@@ -975,7 +987,6 @@ typedef struct mdi_vhci_config {
 #define	MDI_VHC_VHCACHE_FLUSH_THREAD	0x0008	/* cache flush thead running */
 #define	MDI_VHC_VHCACHE_FLUSH_ERROR	0x0010	/* failed to flush cache */
 #define	MDI_VHC_READONLY_FS		0x0020	/* filesys is readonly */
-#define	MDI_VHC_BUILD_VHCI_CACHE_THREAD	0x0040	/* cachebuild thread running */
 
 typedef struct mdi_phys_path {
 	char			*phys_path;
