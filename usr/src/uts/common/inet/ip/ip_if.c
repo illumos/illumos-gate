@@ -10215,6 +10215,7 @@ ip_sioctl_removeif(ipif_t *ipif, sin_t *sin, queue_t *q, mblk_t *mp,
 				mutex_exit(&ill->ill_lock);
 				mutex_exit(&connp->conn_lock);
 				ill_delete_tail(ill);
+				mi_free(ill);
 				return (0);
 			}
 			success = ipsq_pending_mp_add(connp, ipif,
@@ -10349,6 +10350,7 @@ ip_sioctl_removeif_restart(ipif_t *ipif, sin_t *dummy_sin, queue_t *q,
 		ASSERT((ipif->ipif_state_flags & IPIF_CONDEMNED) &&
 		    (ill->ill_state_flags & IPIF_CONDEMNED));
 		ill_delete_tail(ill);
+		mi_free(ill);
 		return (0);
 	}
 
