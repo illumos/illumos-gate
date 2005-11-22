@@ -22,7 +22,7 @@
 #
 # uts/intel/nfssrv/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -61,12 +61,6 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides.
 #
-VOLFH_debug32	= -DVOLATILE_FH_TEST
-VOLFH_debug64	= -DVOLATILE_FH_TEST
-VOLFH_obj32	=
-VOLFH_obj64	=
-
-CFLAGS		+= $(VOLFH_$(OBJS_DIR))
 LDFLAGS         += -dy -Nstrmod/rpcmod -Nfs/nfs -Nmisc/rpcsec
 LDFLAGS		+= -Nmisc/klmmod
 

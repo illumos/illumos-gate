@@ -990,7 +990,6 @@ reencode_attrs:
 			    FATTR4_FILEID_MASK)) {
 
 				if (ae & FATTR4_FILEHANDLE_MASK) {
-					bool_t fh_error;
 					struct {
 						uint_t len;
 						char *val;
@@ -1001,10 +1000,9 @@ reencode_attrs:
 					(void) makefh4((nfs_fh4 *)&fh, vp,
 					    (newexi ? newexi : cs->exi));
 
-					fh_error = xdr_inline_encode_nfs_fh4(
+					if (!xdr_inline_encode_nfs_fh4(
 					    &ptr, ptr_redzone,
-					    (nfs_fh4_fmt_t *)fh.val);
-					if (fh_error) {
+					    (nfs_fh4_fmt_t *)fh.val)) {
 						if (nents ||
 						    IS_MIN_ATTR_MASK(ar)) {
 							no_space = TRUE;

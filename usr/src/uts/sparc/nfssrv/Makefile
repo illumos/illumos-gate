@@ -21,7 +21,7 @@
 #
 #
 # uts/sparc/nfssrv/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -60,11 +60,8 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 #
 #	Overrides.
 #
-VOLFH_debug64	= -DVOLATILE_FH_TEST
-VOLFH_obj64	=
-
 CLEANFILES	+= nfs_auth_xdr.c
-CFLAGS		+= $(CCVERBOSE) $(VOLFH_$(OBJS_DIR))
+CFLAGS		+= $(CCVERBOSE)
 LDFLAGS         += -dy -Nstrmod/rpcmod -Nfs/nfs -Nmisc/rpcsec
 LDFLAGS         += -Nmisc/klmmod
 
