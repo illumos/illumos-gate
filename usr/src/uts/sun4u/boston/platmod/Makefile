@@ -75,7 +75,7 @@ check:
 LINT_LIB_DIR	= $(BOSTON_LINT_LIB_DIR)
 
 $(PLATLIB):	$(BINARY)
-	${LD} -o $(PLATLIB) -G $(BINARY)
+	$(BUILD.SO) $(BINARY)
 
 $(SYM_MOD):	$(UNIX_O) $(PLATLIB)
 	@echo "resolving symbols against unix.o"

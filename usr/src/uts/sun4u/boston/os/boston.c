@@ -384,7 +384,7 @@ cpu_sgn_update(ushort_t sig, uchar_t state, uchar_t sub_state, int cpuid)
 void *
 plat_lgrp_cpu_to_hand(processorid_t id)
 {
-	return ((void *) CPUID_TO_LGRP(id));
+	return ((void *)(uintptr_t)CPUID_TO_LGRP(id));
 }
 
 /*
