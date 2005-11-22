@@ -309,7 +309,7 @@ static void ppb_pwr_setup(ppb_devstate_t *ppb, dev_info_t *dip);
 static void ppb_pwr_teardown(ppb_devstate_t *ppb, dev_info_t *dip);
 static void ppb_init_hotplug(ppb_devstate_t *ppb);
 static void ppb_create_ranges_prop(dev_info_t *, ddi_acc_handle_t);
-extern uint64_t pci_debug_flags;
+uint64_t pci_debug_flags = 0;
 
 int
 _init(void)
