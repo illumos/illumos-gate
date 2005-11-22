@@ -224,6 +224,7 @@ DRV_KMODS	+= consms
 DRV_KMODS	+= cpuid
 DRV_KMODS	+= crypto
 DRV_KMODS	+= cryptoadm
+DRV_KMODS	+= dca
 DRV_KMODS	+= devinfo
 DRV_KMODS	+= dld
 DRV_KMODS	+= dump

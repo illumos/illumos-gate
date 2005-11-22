@@ -218,7 +218,7 @@ NOT_YET_KMODS	 = $(OLDPTY_OBJS) $(PTY_OBJS) $(MOD_OBJS)
 #	Common Drivers (usually pseudo drivers) (/kernel/drv):
 #
 DRV_KMODS	+= aggr arp bl bofi clone cn conskbd consms cpuid
-DRV_KMODS	+= crypto cryptoadm devinfo dump
+DRV_KMODS	+= crypto cryptoadm dca devinfo dump
 DRV_KMODS	+= dtrace fasttrap fbt lockstat profile sdt systrace
 DRV_KMODS	+= fssnap glm icmp icmp6 ip ip6 ipsecah
 DRV_KMODS	+= ipsecesp isp iwscn keysock kmdb kstat ksyms llc1 llc2

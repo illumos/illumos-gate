@@ -155,6 +155,8 @@ COMMON_SUBDIRS= \
 	SUNWcsl  \
 	SUNWcslr \
 	SUNWcstl \
+	SUNWdcaf \
+	SUNWdcar \
 	SUNWdfbh  \
 	SUNWdhcm  \
 	SUNWdhcsb  \
@@ -339,8 +341,6 @@ COMMON_XMODS= \
 	SUNWcry \
 	SUNWcryr \
 	SUNWcryptoint \
-	SUNWdcaf \
-	SUNWdcar \
 	SUNWintgige \
 	SUNWkdcr \
 	SUNWkdcu \
