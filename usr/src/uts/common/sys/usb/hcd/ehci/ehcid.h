@@ -90,7 +90,11 @@ typedef struct ehci_state {
 	ddi_dma_attr_t		ehci_dma_attr;		/* DMA attributes */
 
 	ddi_intr_handle_t	*ehci_htable;		/* intr handle */
+	int			ehci_intr_type;		/* intr type used */
+	int			ehci_intr_cnt;		/* # of intrs inuse */
 	uint_t			ehci_intr_pri;		/* intr priority */
+	int			ehci_intr_cap;		/* intr capabilities */
+	boolean_t		ehci_msi_enabled;	/* default to true */
 	kmutex_t		ehci_int_mutex;		/* Global EHCI mutex */
 
 	/* Periodic Frame List area */
@@ -1006,7 +1010,6 @@ typedef struct setup_pkt {
 #define	PRINT_MASK_DUMPING	0x00000100	/* Dump ehci info */
 #define	PRINT_MASK_ALL		0xFFFFFFFF
 
-
 /*
  * workaround for ALI chips
  */
@@ -1135,7 +1138,8 @@ void		ehci_handle_root_hub_pipe_stop_intr_polling(
 /*
  * EHCI Interrupt Handler entry point.
  */
-uint_t		ehci_intr(caddr_t			arg);
+uint_t		ehci_intr(caddr_t			arg1,
+				caddr_t			arg2);
 
 #ifdef __cplusplus
 }

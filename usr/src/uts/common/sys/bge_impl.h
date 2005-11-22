@@ -569,7 +569,7 @@ typedef struct {
 
 	uint64_t		hw_mac_addr;	/* from chip register	*/
 	bge_mac_addr_t		vendor_addr;	/* transform of same	*/
-	boolean_t		bge_msi_enabled;	/* default to false */
+	boolean_t		msi_enabled;	/* default to true */
 } chip_id_t;
 
 #define	CHIP_FLAG_SUPPORTED	0x80
@@ -730,8 +730,6 @@ typedef struct bge {
 	ddi_intr_handle_t 	*htable;	/* For array of interrupts */
 	int			intr_type;	/* What type of interrupt */
 	int			intr_cnt;	/* # of intrs count returned */
-	size_t			intr_size;	/* Size of intr array to */
-						/* allocate */
 	uint_t			intr_pri;	/* Interrupt priority	*/
 	int			intr_cap;	/* Interrupt capabilities */
 	uint32_t		progress;	/* attach tracking	*/
@@ -1134,7 +1132,7 @@ uint_t bge_chip_factotum(caddr_t arg);
 void bge_chip_cyclic(void *arg);
 enum ioc_reply bge_chip_ioctl(bge_t *bgep, queue_t *wq, mblk_t *mp,
 	struct iocblk *iocp);
-uint_t bge_intr(caddr_t arg);
+uint_t bge_intr(caddr_t arg1, caddr_t arg2);
 extern uint32_t bge_rx_ticks_norm;
 extern uint32_t bge_tx_ticks_norm;
 extern uint32_t bge_rx_count_norm;

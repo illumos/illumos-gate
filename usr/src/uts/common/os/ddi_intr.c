@@ -1129,7 +1129,8 @@ ddi_intr_hilevel(dev_info_t *dip, uint_t inumber)
 		hdl = existing_hdlp[0];	/* Use existing handle */
 	} else {
 		if ((ret = ddi_intr_alloc(dip, &hdl, DDI_INTR_TYPE_FIXED,
-		    inumber, 1, &actual, 0)) != DDI_SUCCESS) {
+		    inumber, 1, &actual,
+		    DDI_INTR_ALLOC_NORMAL)) != DDI_SUCCESS) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_intr_hilevel: "
 			    "ddi_intr_alloc failed, ret 0x%x\n", ret));
 			return (0);
@@ -1195,7 +1196,8 @@ ddi_get_iblock_cookie(dev_info_t *dip, uint_t inumber,
 		hdl = existing_hdlp[0];	/* Use existing handle */
 	} else {
 		if ((ret = ddi_intr_alloc(dip, &hdl, DDI_INTR_TYPE_FIXED,
-		    inumber, 1, &actual, 0)) != DDI_SUCCESS) {
+		    inumber, 1, &actual,
+		    DDI_INTR_ALLOC_NORMAL)) != DDI_SUCCESS) {
 			DDI_INTR_APIDBG((CE_CONT, "ddi_get_iblock_cookie: "
 			    "ddi_intr_alloc failed, ret 0x%x\n", ret));
 			return (DDI_INTR_NOTFOUND);
@@ -1236,7 +1238,7 @@ ddi_add_intr(dev_info_t *dip, uint_t inumber,
 	hdl_p = kmem_zalloc(sizeof (ddi_intr_handle_t), KM_SLEEP);
 
 	if ((ret = ddi_intr_alloc(dip, hdl_p, DDI_INTR_TYPE_FIXED,
-	    inumber, 1, &actual, 0)) != DDI_SUCCESS) {
+	    inumber, 1, &actual, DDI_INTR_ALLOC_NORMAL)) != DDI_SUCCESS) {
 		DDI_INTR_APIDBG((CE_CONT, "ddi_add_intr: "
 		    "ddi_intr_alloc failed, ret 0x%x\n", ret));
 		kmem_free(hdl_p, sizeof (ddi_intr_handle_t));

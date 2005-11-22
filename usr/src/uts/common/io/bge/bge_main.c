@@ -49,8 +49,7 @@ static char subven_propname[] = "subsystem-vendor-id";
 static char rxrings_propname[] = "bge-rx-rings";
 static char txrings_propname[] = "bge-tx-rings";
 
-static int bge_add_legacy_intrs(bge_t *);
-static int bge_add_msi_intrs(bge_t *);
+static int bge_add_intrs(bge_t *, int);
 static void bge_rem_intrs(bge_t *);
 
 /*
@@ -247,8 +246,8 @@ bge_reinit_rings(bge_t *bgep)
 static void
 bge_reset(bge_t *bgep)
 {
-	uint64_t ring;
-	int x;
+	uint64_t	ring;
+	int		i;
 
 	BGE_TRACE(("bge_reset($%p)", (void *)bgep));
 
@@ -274,8 +273,8 @@ bge_reset(bge_t *bgep)
 			(void) ddi_intr_block_disable(bgep->htable,
 			    bgep->intr_cnt);
 		} else {
-			for (x = 0; x < bgep->intr_cnt; x++) {
-				(void) ddi_intr_disable(bgep->htable[x]);
+			for (i = 0; i < bgep->intr_cnt; i++) {
+				(void) ddi_intr_disable(bgep->htable[i]);
 			}
 		}
 	}
@@ -318,7 +317,7 @@ bge_stop(bge_t *bgep)
 static void
 bge_start(bge_t *bgep, boolean_t reset_phys)
 {
-	int x;
+	int	i;
 
 	BGE_TRACE(("bge_start($%p, %d)", (void *)bgep, reset_phys));
 
@@ -340,8 +339,8 @@ bge_start(bge_t *bgep, boolean_t reset_phys)
 			    bgep->intr_cnt);
 		} else {
 			/* Call ddi_intr_enable for MSI non block enable */
-			for (x = 0; x < bgep->intr_cnt; x++) {
-				(void) ddi_intr_enable(bgep->htable[x]);
+			for (i = 0; i < bgep->intr_cnt; i++) {
+				(void) ddi_intr_enable(bgep->htable[i]);
 			}
 		}
 	}
@@ -1084,7 +1083,7 @@ bge_init_send_ring(bge_t *bgep, uint64_t ring)
 	srp->cons_index_p = SEND_INDEX_P(bsp, ring);
 	srp->chip_mbx_reg = SEND_RING_HOST_INDEX_REG(ring);
 	rw_init(srp->tx_lock, NULL, RW_DRIVER,
-	    (void *)(uintptr_t)bgep->intr_pri);
+	    DDI_INTR_PRI(bgep->intr_pri));
 	mutex_init(srp->tc_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(bgep->intr_pri));
 
@@ -1688,7 +1687,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	int err;
 	mac_info_t *mip;
 	int intr_types;
-	int x;
+	int i;
 
 	instance = ddi_get_instance(devinfo);
 
@@ -1848,28 +1847,30 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	bge_log(bgep, "ddi_intr_get_supported_types() returned: %x",
 	    intr_types);
 
-	if ((intr_types & DDI_INTR_TYPE_MSI) && bgep->chipid.bge_msi_enabled) {
-		if (bge_add_msi_intrs(bgep) != DDI_SUCCESS) {
+	if ((intr_types & DDI_INTR_TYPE_MSI) && bgep->chipid.msi_enabled) {
+		if (bge_add_intrs(bgep, DDI_INTR_TYPE_MSI) != DDI_SUCCESS) {
 			bge_error(bgep, "MSI registration failed, "
-			    "trying LEGACY interrupt type\n");
+			    "trying FIXED interrupt type\n");
 		} else {
+			bge_log(bgep, "Using MSI interrupt type\n");
+
 			bgep->intr_type = DDI_INTR_TYPE_MSI;
 			bgep->progress |= PROGRESS_INTR;
 		}
-		bge_log(bgep, "Using MSI interrupt type\n");
 	}
 
 	if (!(bgep->progress & PROGRESS_INTR) &&
 	    (intr_types & DDI_INTR_TYPE_FIXED)) {
-		if (bge_add_legacy_intrs(bgep) != DDI_SUCCESS) {
-			bge_error(bgep, "Legacy interrupt "
+		if (bge_add_intrs(bgep, DDI_INTR_TYPE_FIXED) != DDI_SUCCESS) {
+			bge_error(bgep, "FIXED interrupt "
 			    "registration failed\n");
 			goto attach_fail;
 		}
 
+		bge_log(bgep, "Using FIXED interrupt type\n");
+
 		bgep->intr_type = DDI_INTR_TYPE_FIXED;
 		bgep->progress |= PROGRESS_INTR;
-		bge_log(bgep, "Using Legacy interrupt type\n");
 	}
 
 	if (!(bgep->progress & PROGRESS_INTR)) {
@@ -1889,12 +1890,12 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Now that mutex locks are initialized, enable interrupts.
 	 */
 	if (bgep->intr_cap & DDI_INTR_FLAG_BLOCK) {
-		/* Call ddi_intr_block_enable() for MSI */
+		/* Call ddi_intr_block_enable() for MSI interrupts */
 		(void) ddi_intr_block_enable(bgep->htable, bgep->intr_cnt);
 	} else {
-		/* Call ddi_intr_enable() for Legacy/MSI non block enable */
-		for (x = 0; x < bgep->intr_cnt; x++) {
-			(void) ddi_intr_enable(bgep->htable[x]);
+		/* Call ddi_intr_enable for MSI or FIXED interrupts */
+		for (i = 0; i < bgep->intr_cnt; i++) {
+			(void) ddi_intr_enable(bgep->htable[i]);
 		}
 	}
 
@@ -2120,113 +2121,33 @@ _fini(void)
 
 
 /*
- * bge_add_legacy_intrs() handles INTx and legacy interrupts
+ * bge_add_intrs:
+ *
+ * Register FIXED or MSI interrupts.
  */
 static int
-bge_add_legacy_intrs(bge_t *bgep)
+bge_add_intrs(bge_t *bgep, int	intr_type)
 {
-	dev_info_t	*devinfo = bgep->devinfo;
-	int		actual, count = 0;
-	int 		x, y, rc, inum = 0;
+	dev_info_t	*dip = bgep->devinfo;
+	int		avail, actual, intr_size, count = 0;
+	int		i, flag, ret;
 
-	bge_log(bgep, "bge_add_legacy_intrs\n");
+	bge_log(bgep, "bge_add_intrs: interrupt type 0x%x\n", intr_type);
 
-	/* get number of interrupts */
-	rc = ddi_intr_get_nintrs(devinfo, DDI_INTR_TYPE_FIXED, &count);
-	if ((rc != DDI_SUCCESS) || (count == 0)) {
-		bge_error(bgep, "ddi_intr_get_nintrs() failure, "
-		    "rc: %d, count: %d", rc, count);
-
-		return (DDI_FAILURE);
-	}
-
-	/* Allocate an array of interrupt handles */
-	bgep->intr_size = count * sizeof (ddi_intr_handle_t);
-	bgep->htable = kmem_zalloc(bgep->intr_size, KM_SLEEP);
-
-	/* call ddi_intr_alloc() */
-	rc = ddi_intr_alloc(devinfo, bgep->htable, DDI_INTR_TYPE_FIXED, inum,
-	    count, &actual, DDI_INTR_ALLOC_STRICT);
-
-	if ((rc != DDI_SUCCESS) || (actual == 0)) {
-		bge_error(bgep, "ddi_intr_alloc() failed: %d\n", rc);
-		kmem_free(bgep->htable, bgep->intr_size);
+	/* Get number of interrupts */
+	ret = ddi_intr_get_nintrs(dip, intr_type, &count);
+	if ((ret != DDI_SUCCESS) || (count == 0)) {
+		bge_error(bgep, "ddi_intr_get_nintrs() failure, ret: %d, "
+		    "count: %d", ret, count);
 
 		return (DDI_FAILURE);
 	}
 
-	if (actual < count) {
-		bge_log(bgep, "Requested: %d, Received: %d\n",
-		    count, actual);
-
-		for (x = 0; x < actual; x++) {
-			(void) ddi_intr_free(bgep->htable[x]);
-		}
-
-		kmem_free(bgep->htable, bgep->intr_size);
-		return (DDI_FAILURE);
-	}
-
-	bgep->intr_cnt = actual;
-
-	/* Get intr priority */
-	if (ddi_intr_get_pri(bgep->htable[0], &bgep->intr_pri) !=
-	    DDI_SUCCESS) {
-		bge_error(bgep, "ddi_intr_get_pri() failed\n");
-
-		for (x = 0; x < actual; x++) {
-			(void) ddi_intr_free(bgep->htable[x]);
-		}
-
-		kmem_free(bgep->htable, bgep->intr_size);
-		return (DDI_FAILURE);
-	}
-
-	/* Call ddi_intr_add_handler() */
-	for (x = 0; x < actual; x++) {
-		if (ddi_intr_add_handler(bgep->htable[x],
-		    (ddi_intr_handler_t *)bge_intr,
-		    (caddr_t)bgep, NULL) != DDI_SUCCESS) {
-			bge_error(bgep, "ddi_add_intr() failed\n");
-
-			for (y = 0; y < actual; y++) {
-				(void) ddi_intr_free(bgep->htable[y]);
-			}
-
-			kmem_free(bgep->htable, bgep->intr_size);
-			return (DDI_FAILURE);
-		}
-	}
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * bge_add_msi_intrs() handles MSI interrupts
- */
-static int
-bge_add_msi_intrs(bge_t *bgep)
-{
-	dev_info_t	*devinfo = bgep->devinfo;
-	int		count, avail, actual;
-	int		x, y, rc, inum = 0;
-
-	bge_log(bgep, "bge_add_msi_intrs\n");
-
-	/* get number of interrupts */
-	rc = ddi_intr_get_nintrs(devinfo, DDI_INTR_TYPE_MSI, &count);
-	if ((rc != DDI_SUCCESS) || (count == 0)) {
-		cmn_err(CE_WARN, "ddi_intr_get_nintrs() failure, rc: %d, "
-		    "count: %d", rc, count);
-
-		return (DDI_FAILURE);
-	}
-
-	/* get number of available interrupts */
-	rc = ddi_intr_get_navail(devinfo, DDI_INTR_TYPE_MSI, &avail);
-	if ((rc != DDI_SUCCESS) || (avail == 0)) {
+	/* Get number of available interrupts */
+	ret = ddi_intr_get_navail(dip, intr_type, &avail);
+	if ((ret != DDI_SUCCESS) || (avail == 0)) {
 		bge_error(bgep, "ddi_intr_get_navail() failure, "
-		    "rc: %d, avail: %d\n", rc, avail);
+		    "ret: %d, avail: %d\n", ret, avail);
 
 		return (DDI_FAILURE);
 	}
@@ -2236,18 +2157,29 @@ bge_add_msi_intrs(bge_t *bgep)
 		    count, avail);
 	}
 
+	/*
+	 * BGE hardware generates only single MSI even though it claims
+	 * to support multiple MSIs. So, hard code MSI count value to 1.
+	 */
+	if (intr_type == DDI_INTR_TYPE_MSI) {
+		count = 1;
+		flag = DDI_INTR_ALLOC_STRICT;
+	} else {
+		flag = DDI_INTR_ALLOC_NORMAL;
+	}
+
 	/* Allocate an array of interrupt handles */
-	bgep->intr_size = count * sizeof (ddi_intr_handle_t);
-	bgep->htable = kmem_alloc(bgep->intr_size, KM_SLEEP);
+	intr_size = count * sizeof (ddi_intr_handle_t);
+	bgep->htable = kmem_alloc(intr_size, KM_SLEEP);
 
-	/* call ddi_intr_alloc() */
-	rc = ddi_intr_alloc(devinfo, bgep->htable, DDI_INTR_TYPE_MSI, inum,
-	    count, &actual, DDI_INTR_ALLOC_NORMAL);
+	/* Call ddi_intr_alloc() */
+	ret = ddi_intr_alloc(dip, bgep->htable, intr_type, 0,
+	    count, &actual, flag);
 
-	if ((rc != DDI_SUCCESS) || (actual == 0)) {
-		bge_error(bgep, "ddi_intr_alloc() failed: %d\n", rc);
+	if ((ret != DDI_SUCCESS) || (actual == 0)) {
+		bge_error(bgep, "ddi_intr_alloc() failed %d\n", ret);
 
-		kmem_free(bgep->htable, bgep->intr_size);
+		kmem_free(bgep->htable, intr_size);
 		return (DDI_FAILURE);
 	}
 
@@ -2260,46 +2192,61 @@ bge_add_msi_intrs(bge_t *bgep)
 	/*
 	 * Get priority for first msi, assume remaining are all the same
 	 */
-	if (ddi_intr_get_pri(bgep->htable[0], &bgep->intr_pri) !=
+	if ((ret = ddi_intr_get_pri(bgep->htable[0], &bgep->intr_pri)) !=
 	    DDI_SUCCESS) {
-		bge_error(bgep, "ddi_intr_get_pri() failed\n");
+		bge_error(bgep, "ddi_intr_get_pri() failed %d\n", ret);
 
 		/* Free already allocated intr */
-		for (y = 0; y < actual; y++) {
-			(void) ddi_intr_free(bgep->htable[y]);
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_free(bgep->htable[i]);
 		}
 
-		kmem_free(bgep->htable, bgep->intr_size);
-
+		kmem_free(bgep->htable, intr_size);
 		return (DDI_FAILURE);
 	}
 
 	/* Call ddi_intr_add_handler() */
-	for (x = 0; x < actual; x++) {
-		if (ddi_intr_add_handler(bgep->htable[x],
-		    (ddi_intr_handler_t *)bge_intr,
-		    (caddr_t)bgep, NULL) != DDI_SUCCESS) {
-			bge_error(bgep, "ddi_intr_add_handler() failed\n");
+	for (i = 0; i < actual; i++) {
+		if ((ret = ddi_intr_add_handler(bgep->htable[i], bge_intr,
+		    (caddr_t)bgep, (caddr_t)(uintptr_t)i)) != DDI_SUCCESS) {
+			bge_error(bgep, "ddi_intr_add_handler() "
+			    "failed %d\n", ret);
 
 			/* Free already allocated intr */
-			for (y = 0; y < actual; y++) {
-				(void) ddi_intr_free(bgep->htable[y]);
+			for (i = 0; i < actual; i++) {
+				(void) ddi_intr_free(bgep->htable[i]);
 			}
 
-			kmem_free(bgep->htable, bgep->intr_size);
+			kmem_free(bgep->htable, intr_size);
 			return (DDI_FAILURE);
 		}
 	}
 
-	(void) ddi_intr_get_cap(bgep->htable[0], &bgep->intr_cap);
+	if ((ret = ddi_intr_get_cap(bgep->htable[0], &bgep->intr_cap))
+		!= DDI_SUCCESS) {
+		bge_error(bgep, "ddi_intr_get_cap() failed %d\n", ret);
+
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_remove_handler(bgep->htable[i]);
+			(void) ddi_intr_free(bgep->htable[i]);
+		}
+
+		kmem_free(bgep->htable, intr_size);
+		return (DDI_FAILURE);
+	}
 
 	return (DDI_SUCCESS);
 }
 
+/*
+ * bge_rem_intrs:
+ *
+ * Unregister FIXED or MSI interrupts
+ */
 static void
 bge_rem_intrs(bge_t *bgep)
 {
-	int		x;
+	int	i;
 
 	bge_log(bgep, "bge_rem_intrs\n");
 
@@ -2308,16 +2255,16 @@ bge_rem_intrs(bge_t *bgep)
 		/* Call ddi_intr_block_disable() */
 		(void) ddi_intr_block_disable(bgep->htable, bgep->intr_cnt);
 	} else {
-		for (x = 0; x < bgep->intr_cnt; x++) {
-			(void) ddi_intr_disable(bgep->htable[x]);
+		for (i = 0; i < bgep->intr_cnt; i++) {
+			(void) ddi_intr_disable(bgep->htable[i]);
 		}
 	}
 
 	/* Call ddi_intr_remove_handler() */
-	for (x = 0; x < bgep->intr_cnt; x++) {
-		(void) ddi_intr_remove_handler(bgep->htable[x]);
-		(void) ddi_intr_free(bgep->htable[x]);
+	for (i = 0; i < bgep->intr_cnt; i++) {
+		(void) ddi_intr_remove_handler(bgep->htable[i]);
+		(void) ddi_intr_free(bgep->htable[i]);
 	}
 
-	kmem_free(bgep->htable, bgep->intr_size);
+	kmem_free(bgep->htable, bgep->intr_cnt * sizeof (ddi_intr_handle_t));
 }

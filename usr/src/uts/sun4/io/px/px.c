@@ -444,6 +444,8 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		ddi_remove_minor_node(dip, "devctl");
 		px_err_rem_intr(&px_p->px_fault);
 		px_pec_detach(px_p);
+		px_pwr_teardown(dip);
+		pwr_common_teardown(dip);
 		px_msi_detach(px_p);
 		px_msiq_detach(px_p);
 		px_mmu_detach(px_p);
@@ -457,8 +459,6 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 * resources it's using.
 		 */
 		px_free_props(px_p);
-		px_pwr_teardown(dip);
-		pwr_common_teardown(dip);
 		mutex_exit(&px_p->px_mutex);
 		mutex_destroy(&px_p->px_mutex);
 		ddi_soft_state_free(px_state_p, instance);
@@ -1295,9 +1295,6 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	/* Process DDI_INTROP_SUPPORTED_TYPES request here */
 	if (intr_op == DDI_INTROP_SUPPORTED_TYPES) {
-		px_t		*px_p = DIP_TO_STATE(dip);
-		px_msi_state_t	*msi_state_p = &px_p->px_ib_p->ib_msi_state;
-
 		*(int *)result = i_ddi_get_nintrs(rdip) ?
 		    DDI_INTR_TYPE_FIXED : 0;
 
@@ -1306,8 +1303,12 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			/*
 			 * Double check supported interrupt types vs.
 			 * what the host bridge supports.
+			 *
+			 * NOTE:
+			 * Currently MSI-X is disabled since px driver
+			 * don't fully support this feature.
 			 */
-			*(int *)result |= (intr_types & msi_state_p->msi_type);
+			*(int *)result |= (intr_types & DDI_INTR_TYPE_MSI);
 		}
 
 		return (ret);

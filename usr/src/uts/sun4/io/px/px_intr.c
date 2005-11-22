@@ -582,9 +582,6 @@ px_intx_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_NAVAIL:
 		*(int *)result = i_ddi_get_nintrs(rdip);
 		break;
-	case DDI_INTROP_SUPPORTED_TYPES:
-		*(int *)result = DDI_INTR_TYPE_FIXED;
-		break;
 	default:
 		ret = DDI_ENOTSUP;
 		break;
@@ -600,6 +597,9 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 {
 	px_t			*px_p = DIP_TO_STATE(dip);
 	px_msi_state_t		*msi_state_p = &px_p->px_ib_p->ib_msi_state;
+	msiq_rec_type_t		msiq_rec_type;
+	msi_type_t		msi_type;
+	uint64_t		msi_addr;
 	msinum_t		msi_num;
 	msiqid_t		msiq_id;
 	uint_t			nintrs;
@@ -607,6 +607,18 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 	DBG(DBG_INTROPS, dip, "px_msix_ops: dip=%x rdip=%x intr_op=%x "
 	    "handle=%p\n", dip, rdip, intr_op, hdlp);
+
+	/* Check for MSI64 support */
+	if (hdlp->ih_cap & DDI_INTR_FLAG_MSI64) {
+		msiq_rec_type = MSI64_REC;
+		msi_type = MSI64_TYPE;
+		msi_addr = msi_state_p->msi_addr64 ?
+		    msi_state_p->msi_addr64:msi_state_p->msi_addr32;
+	} else {
+		msiq_rec_type = MSI32_REC;
+		msi_type = MSI32_TYPE;
+		msi_addr = msi_state_p->msi_addr32;
+	}
 
 	switch (intr_op) {
 	case DDI_INTROP_GETCAP:
@@ -650,7 +662,7 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			return (ret);
 
 		if ((ret = px_add_msiq_intr(dip, rdip, hdlp,
-		    MSI32_REC, msi_num, &msiq_id)) != DDI_SUCCESS) {
+		    msiq_rec_type, msi_num, &msiq_id)) != DDI_SUCCESS) {
 			DBG(DBG_INTROPS, dip, "px_msix_ops: Add MSI handler "
 			    "failed, rdip 0x%p msi 0x%x\n", rdip, msi_num);
 			return (ret);
@@ -659,16 +671,16 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		DBG(DBG_INTROPS, dip, "px_msix_ops: msiq used 0x%x\n", msiq_id);
 
 		if ((ret = px_lib_msi_setmsiq(dip, msi_num,
-		    msiq_id, MSI32_TYPE)) != DDI_SUCCESS) {
+		    msiq_id, msi_type)) != DDI_SUCCESS) {
 			(void) px_rem_msiq_intr(dip, rdip,
-			    hdlp, MSI32_REC, msi_num, msiq_id);
+			    hdlp, msiq_rec_type, msi_num, msiq_id);
 			return (ret);
 		}
 
 		if ((ret = px_lib_msi_setstate(dip, msi_num,
 		    PCI_MSI_STATE_IDLE)) != DDI_SUCCESS) {
 			(void) px_rem_msiq_intr(dip, rdip,
-			    hdlp, MSI32_REC, msi_num, msiq_id);
+			    hdlp, msiq_rec_type, msi_num, msiq_id);
 			return (ret);
 		}
 
@@ -686,11 +698,11 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			return (ret);
 
 		if ((ret = px_lib_msi_setstate(dip, msi_num,
-		    PCI_MSI_STATE_DELIVERED)) != DDI_SUCCESS)
+		    PCI_MSI_STATE_IDLE)) != DDI_SUCCESS)
 			return (ret);
 
 		ret = px_rem_msiq_intr(dip, rdip,
-		    hdlp, MSI32_REC, msi_num, msiq_id);
+		    hdlp, msiq_rec_type, msi_num, msiq_id);
 
 		hdlp->ih_vector = 0;
 		break;
@@ -705,7 +717,7 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 			nintrs = i_ddi_intr_get_current_nintrs(hdlp->ih_dip);
 
 			if ((ret = pci_msi_configure(rdip, hdlp->ih_type,
-			    nintrs, hdlp->ih_inum, msi_state_p->msi_addr32,
+			    nintrs, hdlp->ih_inum, msi_addr,
 			    msi_num & ~(nintrs - 1))) != DDI_SUCCESS)
 				return (ret);
 
@@ -724,7 +736,7 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 		ret = px_ib_update_intr_state(px_p, rdip, hdlp->ih_inum,
 		    px_msiqid_to_devino(px_p, msiq_id), PX_INTR_STATE_ENABLE,
-		    MSI32_REC, msi_num);
+		    msiq_rec_type, msi_num);
 
 		break;
 	case DDI_INTROP_DISABLE:
@@ -744,7 +756,7 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 		ret = px_ib_update_intr_state(px_p, rdip,
 		    hdlp->ih_inum, px_msiqid_to_devino(px_p, msiq_id),
-		    PX_INTR_STATE_DISABLE, MSI32_REC, msi_num);
+		    PX_INTR_STATE_DISABLE, msiq_rec_type, msi_num);
 
 		break;
 	case DDI_INTROP_BLOCKENABLE:
@@ -752,7 +764,7 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		msi_num = hdlp->ih_vector;
 
 		if ((ret = pci_msi_configure(rdip, hdlp->ih_type,
-		    nintrs, hdlp->ih_inum, msi_state_p->msi_addr32,
+		    nintrs, hdlp->ih_inum, msi_addr,
 		    msi_num & ~(nintrs - 1))) != DDI_SUCCESS)
 			return (ret);
 
@@ -767,8 +779,8 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 			if ((ret = px_ib_update_intr_state(px_p, rdip,
 			    hdlp->ih_inum + i, px_msiqid_to_devino(px_p,
-			    msiq_id), PX_INTR_STATE_ENABLE, MSI32_REC, msi_num))
-			    != DDI_SUCCESS)
+			    msiq_id), PX_INTR_STATE_ENABLE, msiq_rec_type,
+			    msi_num)) != DDI_SUCCESS)
 				return (ret);
 		}
 
@@ -793,7 +805,7 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 
 			if ((ret = px_ib_update_intr_state(px_p, rdip,
 			    hdlp->ih_inum + i, px_msiqid_to_devino(px_p,
-			    msiq_id), PX_INTR_STATE_DISABLE, MSI32_REC,
+			    msiq_id), PX_INTR_STATE_DISABLE, msiq_rec_type,
 			    msi_num)) != DDI_SUCCESS)
 				return (ret);
 		}
@@ -815,9 +827,6 @@ px_msix_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	case DDI_INTROP_NAVAIL:
 		/* XXX - a new interface may be needed */
 		ret = pci_msi_get_nintrs(rdip, hdlp->ih_type, (int *)result);
-		break;
-	case DDI_INTROP_SUPPORTED_TYPES:
-		ret = pci_msi_get_supported_type(rdip, (int *)result);
 		break;
 	default:
 		ret = DDI_ENOTSUP;

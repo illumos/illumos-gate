@@ -155,13 +155,13 @@ typedef struct ddi_intr_msix {
 
 	/* MSI-X Table related information */
 	ddi_acc_handle_t	msix_tbl_hdl;		/* MSI-X table handle */
-	caddr_t			msix_tbl_addr;		/* MSI-X table addr */
-	offset_t		msix_tbl_offset;	/* MSI-X table offset */
+	uint32_t		*msix_tbl_addr;		/* MSI-X table addr */
+	uint32_t		msix_tbl_offset;	/* MSI-X table offset */
 
 	/* MSI-X PBA Table related information */
 	ddi_acc_handle_t	msix_pba_hdl;		/* MSI-X PBA handle */
-	caddr_t			msix_pba_addr;		/* MSI-X PBA addr */
-	offset_t		msix_pba_offset;	/* MSI-X PBA offset */
+	uint32_t		*msix_pba_addr;		/* MSI-X PBA addr */
+	uint32_t		msix_pba_offset;	/* MSI-X PBA offset */
 
 	ddi_device_acc_attr_t	msix_dev_attr;		/* MSI-X device attr */
 } ddi_intr_msix_t;

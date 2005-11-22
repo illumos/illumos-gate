@@ -43,7 +43,9 @@
  * Prototype Declarations for cb_ops and dev_ops
  */
 static	int uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
+static  int uhci_add_intrs(uhci_state_t *uhcip, int	intr_type);
 static	int uhci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
+static void uhci_rem_intrs(uhci_state_t	*uhcip);
 static	int uhci_open(dev_t *devp, int flags, int otyp, cred_t *credp);
 static	int uhci_close(dev_t dev, int flag, int otyp, cred_t *credp);
 static	int uhci_ioctl(dev_t dev, int cmd, intptr_t arg, int mode,
@@ -108,6 +110,13 @@ ushort_t	uhci_tree_bottom_nodes[NUM_FRAME_LST_ENTRIES];
 
 
 /*
+ * UHCI MSI tunable:
+ *
+ * By default MSI is enabled on all supported platforms.
+ */
+boolean_t uhci_enable_msi = B_TRUE;
+
+/*
  * tunable, delay during attach in seconds
  */
 int 		uhci_attach_wait = 1;
@@ -117,7 +126,7 @@ static void	uhci_handle_intr_td_errors(uhci_state_t *uhcip, uhci_td_t *td,
 			uhci_trans_wrapper_t *tw, uhci_pipe_private_t *pp);
 static void	uhci_handle_one_xfer_completion(uhci_state_t *uhcip,
 			usb_cr_t usb_err, uhci_td_t *td);
-static uint_t	uhci_intr(caddr_t arg);
+static uint_t	uhci_intr(caddr_t arg1, caddr_t arg2);
 static int	uhci_cleanup(uhci_state_t *uhcip);
 
 
@@ -203,8 +212,7 @@ static int
 uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	int				instance;
-	int				type, count, actual, ret;
-	uint_t				intr_pri;
+	int				i, intr_types;
 	uhci_state_t			*uhcip = NULL;
 	usba_hcdi_register_args_t	hcdi_args;
 
@@ -241,94 +249,59 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	uhcip->uhci_dip		= dip;
 	uhcip->uhci_instance	= instance;
 
+	/* Get supported interrupt types */
+	if (ddi_intr_get_supported_types(uhcip->uhci_dip,
+	    &intr_types) != DDI_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_attach: ddi_intr_get_supported_types failed");
+
+		usb_free_log_hdl(uhcip->uhci_log_hdl);
+		ddi_soft_state_free(uhci_statep, instance);
+
+		return (DDI_FAILURE);
+	}
+
+	USB_DPRINTF_L3(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+	    "uhci_attach: supported interrupt types 0x%x", intr_types);
+
+	if ((intr_types & DDI_INTR_TYPE_MSI) && uhci_enable_msi) {
+		if (uhci_add_intrs(uhcip, DDI_INTR_TYPE_MSI)
+		    != DDI_SUCCESS) {
+			USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+			    "uhci_attach: MSI registration failed, "
+			    "trying FIXED interrupt \n");
+		} else {
+			USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+			    "uhci_attach: Using MSI interrupt type\n");
+
+			uhcip->uhci_intr_type = DDI_INTR_TYPE_MSI;
+		}
+	}
+
+	if (!(uhcip->uhci_htable) && (intr_types & DDI_INTR_TYPE_FIXED)) {
+		if (uhci_add_intrs(uhcip, DDI_INTR_TYPE_FIXED)
+		    != DDI_SUCCESS) {
+			USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+			    "uhci_attach: FIXED interrupt registration "
+			    "failed\n");
+
+			usb_free_log_hdl(uhcip->uhci_log_hdl);
+			ddi_soft_state_free(uhci_statep, instance);
+
+			return (DDI_FAILURE);
+		}
+
+		USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_attach: Using FIXED interrupt type\n");
+
+		uhcip->uhci_intr_type = DDI_INTR_TYPE_FIXED;
+	}
+
 	/* Semaphore to serialize opens and closes */
 	sema_init(&uhcip->uhci_ocsem, 1, NULL, SEMA_DRIVER, NULL);
 
-	ret = ddi_intr_get_supported_types(dip, &type);
-	if ((ret != DDI_SUCCESS) || (!(type & DDI_INTR_TYPE_FIXED))) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-		    "Fixed type interrupts not supported");
-		usb_free_log_hdl(uhcip->uhci_log_hdl);
-		ddi_soft_state_free(uhci_statep, instance);
-
-		return (DDI_FAILURE);
-	}
-
-	ret = ddi_intr_get_nintrs(dip, DDI_INTR_TYPE_FIXED, &count);
-
-	/*
-	 * Fixed interrupts can only have one interrupt. Check to make
-	 * sure that number of supported interrupts and number of
-	 * available interrupts are both equal to 1.
-	 */
-	if ((ret != DDI_SUCCESS) || (count != 1)) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-		    "No Fixed interrupts found");
-		usb_free_log_hdl(uhcip->uhci_log_hdl);
-		ddi_soft_state_free(uhci_statep, instance);
-
-		return (DDI_FAILURE);
-	}
-
-	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-	    "Supported Intr types = 0x%x, #Intrs = 0x%x", type, count);
-	uhcip->uhci_htable = kmem_zalloc(count * sizeof (ddi_intr_handle_t),
-	    KM_SLEEP);
-
-	ret = ddi_intr_alloc(dip, uhcip->uhci_htable, DDI_INTR_TYPE_FIXED, 0,
-	    count,
-	    &actual, 0);
-	if ((ret != DDI_SUCCESS) || (actual != 1)) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-		    "ddi_intr_alloc failed 0x%x", ret);
-		kmem_free(uhcip->uhci_htable, sizeof (ddi_intr_handle_t));
-		usb_free_log_hdl(uhcip->uhci_log_hdl);
-		ddi_soft_state_free(uhci_statep, instance);
-
-		return (DDI_FAILURE);
-	}
-
-	ret = ddi_intr_get_pri(uhcip->uhci_htable[0], &intr_pri);
-	if (ret != DDI_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-		    "ddi_intr_get_pri failed 0x%x", ret);
-		(void) ddi_intr_free(uhcip->uhci_htable[0]);
-		kmem_free(uhcip->uhci_htable, sizeof (ddi_intr_handle_t));
-		usb_free_log_hdl(uhcip->uhci_log_hdl);
-		ddi_soft_state_free(uhci_statep, instance);
-
-		return (DDI_FAILURE);
-	}
-
-	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-	    "Supported Interrupt priority = 0x%x", intr_pri);
-
-	if (intr_pri >= ddi_intr_get_hilevel_pri()) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-		    "Hi level interrupt not supported");
-		(void) ddi_intr_free(uhcip->uhci_htable[0]);
-		kmem_free(uhcip->uhci_htable, sizeof (ddi_intr_handle_t));
-		usb_free_log_hdl(uhcip->uhci_log_hdl);
-		ddi_soft_state_free(uhci_statep, instance);
-
-		return (DDI_FAILURE);
-	}
-
-	/* Initialize the mutex */
-	mutex_init(&uhcip->uhci_int_mutex, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(intr_pri));
-
 	/* Create prototype condition variable */
 	cv_init(&uhcip->uhci_cv_SOF, NULL, CV_DRIVER, NULL);
-
-	ret = ddi_intr_add_handler(uhcip->uhci_htable[0],
-	    (ddi_intr_handler_t *)uhci_intr, (caddr_t)uhcip, NULL);
-	if (ret != DDI_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-		    "ddi_intr_add_handler failed 0x%x", ret);
-
-		goto fail;
-	}
 
 	/* Initialize the DMA attributes */
 	uhci_set_dma_attributes(uhcip);
@@ -351,14 +324,17 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Set the flag that uhci controller has not been initialized. */
 	uhcip->uhci_ctlr_init_flag = B_FALSE;
 
-	/* finally enable the interrupt */
-	ret = ddi_intr_enable(uhcip->uhci_htable[0]);
-	if (ret != DDI_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
-		    "ddi_intr_enable failed 0x%x", ret);
-
-		goto fail;
+	/* Enable all interrupts */
+	if (uhcip->uhci_intr_cap & DDI_INTR_FLAG_BLOCK) {
+		/* Call ddi_intr_block_enable() for MSI interrupts */
+		(void) ddi_intr_block_enable(uhcip->uhci_htable,
+		    uhcip->uhci_intr_cnt);
+	} else {
+		/* Call ddi_intr_enable for MSI or FIXED interrupts */
+		for (i = 0; i < uhcip->uhci_intr_cnt; i++)
+			(void) ddi_intr_enable(uhcip->uhci_htable[i]);
 	}
+
 
 	/* Initialize the controller */
 	if (uhci_init_ctlr(uhcip) != USB_SUCCESS) {
@@ -381,7 +357,7 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	hcdi_args.usba_hcdi_register_ops = uhcip->uhci_hcdi_ops;
 	hcdi_args.usba_hcdi_register_dma_attr = &uhcip->uhci_dma_attr;
 	hcdi_args.usba_hcdi_register_iblock_cookie =
-	    (ddi_iblock_cookie_t)(uintptr_t)intr_pri;
+	    (ddi_iblock_cookie_t)(uintptr_t)uhcip->uhci_intr_pri;
 
 	if (usba_hcdi_register(&hcdi_args, 0) != USB_SUCCESS) {
 
@@ -449,6 +425,155 @@ fail:
 
 
 /*
+ * uhci_add_intrs:
+ *
+ * Register FIXED or MSI interrupts.
+ */
+static int
+uhci_add_intrs(uhci_state_t	*uhcip,
+		int		intr_type)
+{
+	int	actual, avail, intr_size, count = 0;
+	int 	i, flag, ret;
+
+	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+	    "uhci_add_intrs: interrupt type 0x%x", intr_type);
+
+	/* Get number of interrupts */
+	ret = ddi_intr_get_nintrs(uhcip->uhci_dip, intr_type, &count);
+	if ((ret != DDI_SUCCESS) || (count == 0)) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_add_intrs: ddi_intr_get_nintrs() failure, "
+		    "ret: %d, count: %d", ret, count);
+
+		return (DDI_FAILURE);
+	}
+
+	/* Get number of available interrupts */
+	ret = ddi_intr_get_navail(uhcip->uhci_dip, intr_type, &avail);
+	if ((ret != DDI_SUCCESS) || (avail == 0)) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_add_intrs: ddi_intr_get_navail() failure, "
+		    "ret: %d, count: %d", ret, count);
+
+		return (DDI_FAILURE);
+	}
+
+	if (avail < count) {
+		USB_DPRINTF_L3(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_add_intrs: uhci_add_intrs: nintrs () "
+		    "returned %d, navail returned %d\n", count, avail);
+	}
+
+	/* Allocate an array of interrupt handles */
+	intr_size = count * sizeof (ddi_intr_handle_t);
+	uhcip->uhci_htable = kmem_zalloc(intr_size, KM_SLEEP);
+
+	flag = (intr_type == DDI_INTR_TYPE_MSI) ?
+	    DDI_INTR_ALLOC_STRICT:DDI_INTR_ALLOC_NORMAL;
+
+	/* call ddi_intr_alloc() */
+	ret = ddi_intr_alloc(uhcip->uhci_dip, uhcip->uhci_htable,
+	    intr_type, 0, count, &actual, flag);
+
+	if ((ret != DDI_SUCCESS) || (actual == 0)) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_add_intrs: ddi_intr_alloc() failed %d", ret);
+
+		kmem_free(uhcip->uhci_htable, intr_size);
+
+		return (DDI_FAILURE);
+	}
+
+	if (actual < count) {
+		USB_DPRINTF_L3(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_add_intrs: Requested: %d, Received: %d\n",
+		    count, actual);
+
+		for (i = 0; i < actual; i++)
+			(void) ddi_intr_free(uhcip->uhci_htable[i]);
+
+		kmem_free(uhcip->uhci_htable, intr_size);
+
+		return (DDI_FAILURE);
+	}
+
+	uhcip->uhci_intr_cnt = actual;
+
+	if ((ret = ddi_intr_get_pri(uhcip->uhci_htable[0],
+	    &uhcip->uhci_intr_pri)) != DDI_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_add_intrs: ddi_intr_get_pri() failed %d", ret);
+
+		for (i = 0; i < actual; i++)
+			(void) ddi_intr_free(uhcip->uhci_htable[i]);
+
+		kmem_free(uhcip->uhci_htable, intr_size);
+
+		return (DDI_FAILURE);
+	}
+
+	USB_DPRINTF_L3(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+	    "uhci_add_intrs: Supported Interrupt priority 0x%x",
+	    uhcip->uhci_intr_pri);
+
+	/* Test for high level mutex */
+	if (uhcip->uhci_intr_pri >= ddi_intr_get_hilevel_pri()) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_add_intrs: Hi level interrupt not supported");
+
+		for (i = 0; i < actual; i++)
+			(void) ddi_intr_free(uhcip->uhci_htable[i]);
+
+		kmem_free(uhcip->uhci_htable, intr_size);
+
+		return (DDI_FAILURE);
+	}
+
+	/* Initialize the mutex */
+	mutex_init(&uhcip->uhci_int_mutex, NULL, MUTEX_DRIVER,
+	    DDI_INTR_PRI(uhcip->uhci_intr_pri));
+
+	/* Call ddi_intr_add_handler() */
+	for (i = 0; i < actual; i++) {
+		if ((ret = ddi_intr_add_handler(uhcip->uhci_htable[i],
+		    uhci_intr, (caddr_t)uhcip,
+		    (caddr_t)(uintptr_t)i)) != DDI_SUCCESS) {
+			USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+			    "uhci_add_intrs: ddi_intr_add_handler() "
+			    "failed %d", ret);
+
+			for (i = 0; i < actual; i++)
+				(void) ddi_intr_free(uhcip->uhci_htable[i]);
+
+			mutex_destroy(&uhcip->uhci_int_mutex);
+			kmem_free(uhcip->uhci_htable, intr_size);
+
+			return (DDI_FAILURE);
+		}
+	}
+
+	if ((ret = ddi_intr_get_cap(uhcip->uhci_htable[0],
+	    &uhcip->uhci_intr_cap)) != DDI_SUCCESS) {
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		    "uhci_add_intrs: ddi_intr_get_cap() failed %d", ret);
+
+		for (i = 0; i < actual; i++) {
+			(void) ddi_intr_remove_handler(uhcip->uhci_htable[i]);
+			(void) ddi_intr_free(uhcip->uhci_htable[i]);
+		}
+
+		mutex_destroy(&uhcip->uhci_int_mutex);
+		kmem_free(uhcip->uhci_htable, intr_size);
+
+		return (DDI_FAILURE);
+	}
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
  * Function Name:	uhci_detach
  * Description:		Detach entry point - called by the Kernel.
  *			Deallocates all the memory
@@ -477,6 +602,40 @@ uhci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 		return (DDI_FAILURE);
 	}
+}
+
+
+/*
+ * uhci_rem_intrs:
+ *
+ * Unregister FIXED or MSI interrupts
+ */
+static void
+uhci_rem_intrs(uhci_state_t	*uhcip)
+{
+	int	i;
+
+	USB_DPRINTF_L4(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+	    "uhci_rem_intrs: interrupt type 0x%x", uhcip->uhci_intr_type);
+
+	/* Disable all interrupts */
+	if (uhcip->uhci_intr_cap & DDI_INTR_FLAG_BLOCK) {
+		(void) ddi_intr_block_disable(uhcip->uhci_htable,
+		    uhcip->uhci_intr_cnt);
+	} else {
+		for (i = 0; i < uhcip->uhci_intr_cnt; i++) {
+			(void) ddi_intr_disable(uhcip->uhci_htable[i]);
+		}
+	}
+
+	/* Call ddi_intr_remove_handler() */
+	for (i = 0; i < uhcip->uhci_intr_cnt; i++) {
+		(void) ddi_intr_remove_handler(uhcip->uhci_htable[i]);
+		(void) ddi_intr_free(uhcip->uhci_htable[i]);
+	}
+
+	kmem_free(uhcip->uhci_htable,
+	    uhcip->uhci_intr_cnt * sizeof (ddi_intr_handle_t));
 }
 
 
@@ -575,18 +734,8 @@ uhci_cleanup(uhci_state_t *uhcip)
 	mutex_exit(&uhcip->uhci_int_mutex);
 
 	/* do interrupt cleanup */
-	if (uhcip->uhci_htable[0]) {
-		/* disable interrupt */
-		(void) ddi_intr_disable(uhcip->uhci_htable[0]);
-
-		/* remove interrupt handler */
-		(void) ddi_intr_remove_handler(uhcip->uhci_htable[0]);
-
-		/* free interrupt handle */
-		(void) ddi_intr_free(uhcip->uhci_htable[0]);
-
-		/* free memory */
-		kmem_free(uhcip->uhci_htable, sizeof (ddi_intr_handle_t));
+	if (uhcip->uhci_htable) {
+		uhci_rem_intrs(uhcip);
 	}
 
 	mutex_enter(&uhcip->uhci_int_mutex);
@@ -620,10 +769,13 @@ uhci_cleanup(uhci_state_t *uhcip)
  *	uhci interrupt handling routine.
  */
 static uint_t
-uhci_intr(caddr_t arg)
+uhci_intr(caddr_t arg1, caddr_t arg2)
 {
 	ushort_t	intr_status, cmd_reg;
-	uhci_state_t	*uhcip = (uhci_state_t *)arg;
+	uhci_state_t	*uhcip = (uhci_state_t *)arg1;
+
+	USB_DPRINTF_L3(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
+	    "uhci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p", arg1, arg2);
 
 	mutex_enter(&uhcip->uhci_int_mutex);
 

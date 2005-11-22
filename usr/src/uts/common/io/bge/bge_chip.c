@@ -38,6 +38,16 @@
 #define	BGE_IND_IO32	0	/* indirect access code		*/
 #define	BGE_SEE_IO32	1	/* SEEPROM access code		*/
 #define	BGE_FLASH_IO32	1	/* FLASH access code		*/
+
+/*
+ * BGE MSI tunable:
+ *
+ * By default MSI is enabled on all supported platforms but it is disabled
+ * for some Broadcom chips due to known MSI hardware issues. Currently MSI
+ * is enabled only for 5714C A2, 5715C A2, 5721, and 5751 broadcom chips.
+ */
+boolean_t bge_enable_msi = B_TRUE;
+
 /*
  * Property names
  */
@@ -499,11 +509,15 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 	mhcr =	MHCR_ENABLE_INDIRECT_ACCESS |
 		MHCR_ENABLE_TAGGED_STATUS_MODE |
 		MHCR_MASK_INTERRUPT_MODE |
-		MHCR_MASK_PCI_INT_OUTPUT |
 		MHCR_CLEAR_INTERRUPT_INTA;
+
+	if (bgep->intr_type == DDI_INTR_TYPE_FIXED)
+		mhcr |= MHCR_MASK_PCI_INT_OUTPUT;
+
 #ifdef	_BIG_ENDIAN
 	mhcr |= MHCR_ENABLE_ENDIAN_WORD_SWAP | MHCR_ENABLE_ENDIAN_BYTE_SWAP;
 #endif	/* _BIG_ENDIAN */
+
 	pci_config_put32(handle, PCI_CONF_BGE_MHCR, mhcr);
 
 	/*
@@ -1857,7 +1871,9 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->rx_rings = BGE_RECV_RINGS_DEFAULT;
 	if (cidp->tx_rings == 0 || cidp->tx_rings > BGE_SEND_RINGS_MAX)
 		cidp->tx_rings = BGE_SEND_RINGS_DEFAULT;
-	cidp->bge_msi_enabled = B_FALSE;
+
+	cidp->msi_enabled = B_FALSE;
+
 	switch (cidp->device) {
 	case DEVICE_ID_5700:
 	case DEVICE_ID_5700x:
@@ -1953,6 +1969,9 @@ bge_chip_id_init(bge_t *bgep)
 		break;
 
 	case DEVICE_ID_5714C:
+		if (cidp->revision >= 0xa2)
+			cidp->msi_enabled = bge_enable_msi;
+		/* FALLTHRU */
 	case DEVICE_ID_5714S:
 		cidp->chip_label = 5714;
 		cidp->mbuf_base = bge_mbuf_pool_base_5721;
@@ -1972,6 +1991,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5714;
 		cidp->bge_mlcr_default = bge_mlcr_default_5714;
 		cidp->pci_type = BGE_PCI_E;
+		if (cidp->revision >= 0xa2)
+			cidp->msi_enabled = bge_enable_msi;
 		dev_ok = B_TRUE;
 		break;
 
@@ -1982,6 +2003,7 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
+		cidp->msi_enabled = bge_enable_msi;
 		dev_ok = B_TRUE;
 		break;
 
@@ -1993,6 +2015,7 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
 		cidp->pci_type = BGE_PCI_E;
+		cidp->msi_enabled = bge_enable_msi;
 		dev_ok = B_TRUE;
 		break;
 
@@ -3275,19 +3298,19 @@ bge_wake_factotum(bge_t *bgep)
 /*
  *	bge_intr() -- handle chip interrupts
  */
-uint_t bge_intr(caddr_t arg);
+uint_t bge_intr(caddr_t arg1, caddr_t arg2);
 #pragma	no_inline(bge_intr)
 
 uint_t
-bge_intr(caddr_t arg)
+bge_intr(caddr_t arg1, caddr_t arg2)
 {
-	bge_t *bgep = (bge_t *)arg;		/* private device info	*/
+	bge_t *bgep = (bge_t *)arg1;		/* private device info	*/
 	bge_status_t *bsp;
 	uint64_t flags;
 	uint32_t mlcr;
 	uint_t result;
 
-	BGE_TRACE(("bge_intr($%p)", arg));
+	BGE_TRACE(("bge_intr($%p) ($%p)", arg1, arg2));
 
 	/*
 	 * GLD v2 checks that s/w setup is complete before passing
@@ -3309,7 +3332,7 @@ bge_intr(caddr_t arg)
 	if (bgep->intr_type == DDI_INTR_TYPE_FIXED)
 		mlcr = bge_reg_get32(bgep, MISC_LOCAL_CONTROL_REG);
 
-	BGE_DEBUG(("bge_intr($%p) mlcr 0x%08x", arg, mlcr));
+	BGE_DEBUG(("bge_intr($%p) ($%p) mlcr 0x%08x", arg1, arg2, mlcr));
 
 	if ((mlcr & MLCR_INTA_STATE) == 0) {
 		/*

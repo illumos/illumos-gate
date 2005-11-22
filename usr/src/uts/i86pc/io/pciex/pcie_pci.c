@@ -917,7 +917,7 @@ pepb_intr_init(pepb_devstate_t *pepb_p, int intr_type)
 	pepb_p->soft_state |= PEPB_SOFT_STATE_INIT_HTABLE;
 
 	ret = ddi_intr_alloc(dip, pepb_p->htable, intr_type, 0, request,
-	    &count, 0);
+	    &count, DDI_INTR_ALLOC_NORMAL);
 	if ((ret != DDI_SUCCESS) || (count == 0)) {
 		PEPB_DEBUG((CE_NOTE, "ddi_intr_alloc() ret: %d ask: %d"
 		    " actual: %d\n", ret, request, count));

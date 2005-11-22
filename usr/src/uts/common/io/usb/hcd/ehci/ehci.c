@@ -275,14 +275,20 @@ ehci_attach(dev_info_t		*dip,
 		return (DDI_FAILURE);
 	}
 
+	/* Get the ehci chip vendor and device id */
+	ehcip->ehci_vendor_id = pci_config_get16(
+	    ehcip->ehci_config_handle, PCI_CONF_VENID);
+	ehcip->ehci_device_id = pci_config_get16(
+	    ehcip->ehci_config_handle, PCI_CONF_DEVID);
+	ehcip->ehci_rev_id = pci_config_get8(
+	    ehcip->ehci_config_handle, PCI_CONF_REVID);
+
 	/* Register interrupts */
 	if (ehci_register_intrs_and_init_mutex(ehcip) != DDI_SUCCESS) {
 		(void) ehci_cleanup(ehcip);
 
 		return (DDI_FAILURE);
 	}
-
-	ehcip->ehci_flags |= EHCI_INTR;
 
 	mutex_enter(&ehcip->ehci_int_mutex);
 
@@ -563,13 +569,13 @@ ehci_ioctl(dev_t	dev,
  * EHCI (EHCI) interrupt handling routine.
  */
 uint_t
-ehci_intr(caddr_t arg)
+ehci_intr(caddr_t arg1, caddr_t arg2)
 {
 	uint_t			intr;
-	ehci_state_t		*ehcip = (ehci_state_t *)arg;
+	ehci_state_t		*ehcip = (ehci_state_t *)arg1;
 
 	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
-	    "ehci_intr: Interrupt occurred");
+	    "ehci_intr: Interrupt occurred, arg1 0x%p arg2 0x%p", arg1, arg2);
 
 	/* Get the ehci global mutex */
 	mutex_enter(&ehcip->ehci_int_mutex);

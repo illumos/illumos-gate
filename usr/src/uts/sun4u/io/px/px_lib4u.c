@@ -1925,10 +1925,10 @@ px_err_rem_intr(px_fault_t *px_fault_p)
 	dev_info_t	*dip = px_fault_p->px_fh_dip;
 	px_t		*px_p = DIP_TO_STATE(dip);
 
-	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
-
 	px_ib_intr_disable(px_p->px_ib_p, px_fault_p->px_intr_ino,
 		IB_INTR_WAIT);
+
+	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
 }
 
 #ifdef FMA

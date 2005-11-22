@@ -138,7 +138,10 @@ typedef struct ohci_state {
 	ddi_dma_attr_t		ohci_dma_attr;		/* DMA attributes */
 
 	ddi_intr_handle_t	*ohci_htable;		/* intr handle */
+	int			ohci_intr_type;		/* intr type used */
+	int			ohci_intr_cnt;		/* # of intrs inuse */
 	uint_t			ohci_intr_pri;		/* intr priority */
+	int			ohci_intr_cap;		/* intr capabilities */
 	kmutex_t		ohci_int_mutex;		/* Mutex for struct */
 
 	/* HCCA area */

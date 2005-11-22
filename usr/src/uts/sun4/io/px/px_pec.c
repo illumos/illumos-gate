@@ -121,29 +121,10 @@ px_pec_attach(px_t *px_p)
 		*pfnlp = mmu_btop(rng_addr + rng_size);
 	}
 
-	/*
-	 * Register a function to disable pec error interrupts during a panic.
-	 * do in px_attach. bus_func_register(BF_TYPE_ERRDIS,
-	 * (busfunc_t)pec_disable_pci_errors, pec_p);
-	 */
-
 	mutex_init(&pec_p->pec_pokefault_mutex, NULL, MUTEX_DRIVER,
 	    (void *)px_p->px_fm_ibc);
 
 	return (DDI_SUCCESS);
-}
-
-uint_t
-pec_disable_px_errors(px_pec_t *pec_p)
-{
-	px_t *px_p = pec_p->pec_px_p;
-	px_ib_t *ib_p = px_p->px_ib_p;
-
-	/*
-	 * Disable error interrupts via the interrupt mapping register.
-	 */
-	px_ib_intr_disable(ib_p, px_p->px_inos[PX_INTR_PEC], IB_INTR_NOWAIT);
-	return (BF_NONE);
 }
 
 void
@@ -151,26 +132,12 @@ px_pec_detach(px_t *px_p)
 {
 	dev_info_t *dip = px_p->px_dip;
 	px_pec_t *pec_p = px_p->px_pec_p;
-	px_ib_t *ib_p = px_p->px_ib_p;
-	devino_t ino = px_p->px_inos[PX_INTR_PEC];
 
 	/*
 	 * Free the pokefault mutex.
 	 */
 	DBG(DBG_DETACH, dip, "px_pec_detach:\n");
 	mutex_destroy(&pec_p->pec_pokefault_mutex);
-
-	/*
-	 * Remove the pci error interrupt handler.
-	 */
-	px_ib_intr_disable(ib_p, ino, IB_INTR_WAIT);
-	ddi_remove_intr(dip, 0, NULL);
-
-	/*
-	 * Remove the error disable function.
-	 */
-	bus_func_unregister(BF_TYPE_ERRDIS,
-	    (busfunc_t)pec_disable_px_errors, pec_p);
 
 	/*
 	 * Remove interrupt handlers to process correctable/fatal/non fatal

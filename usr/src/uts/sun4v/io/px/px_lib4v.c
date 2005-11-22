@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <sys/sysmacros.h>
 #include <sys/ddi.h>
+#include <sys/async.h>
 #include <sys/sunddi.h>
 #include <sys/ddifm.h>
 #include <sys/fm/protocol.h>
@@ -233,9 +234,24 @@ px_lib_intr_settarget(dev_info_t *dip, sysino_t sysino, cpuid_t cpuid)
 int
 px_lib_intr_reset(dev_info_t *dip)
 {
+	px_t			*px_p = DIP_TO_STATE(dip);
+	px_ib_t			*ib_p = px_p->px_ib_p;
+	px_ib_ino_info_t	*ino_p;
+
 	DBG(DBG_LIB_INT, dip, "px_lib_intr_reset: dip 0x%p\n", dip);
 
-	return (DDI_SUCCESS);
+	mutex_enter(&ib_p->ib_ino_lst_mutex);
+
+	/* Reset all Interrupts */
+	for (ino_p = ib_p->ib_ino_lst; ino_p; ino_p = ino_p->ino_next) {
+		if (px_lib_intr_setstate(dip, ino_p->ino_sysino,
+		    INTR_IDLE_STATE) != DDI_SUCCESS)
+			return (BF_FATAL);
+	}
+
+	mutex_exit(&ib_p->ib_ino_lst_mutex);
+
+	return (BF_NONE);
 }
 
 /*ARGSUSED*/
@@ -1710,10 +1726,10 @@ px_err_rem_intr(px_fault_t *px_fault_p)
 {
 	px_t	*px_p = DIP_TO_STATE(px_fault_p->px_fh_dip);
 
-	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
-
 	px_ib_intr_disable(px_p->px_ib_p, px_fault_p->px_intr_ino,
 	    IB_INTR_WAIT);
+
+	rem_ivintr(px_fault_p->px_fh_sysino, NULL);
 }
 
 

@@ -50,6 +50,13 @@
 #include "px_pci.h"
 #include "px_debug.h"
 
+/*
+ * PXB MSI tunable:
+ *
+ * By default MSI is enabled on all supported platforms.
+ */
+boolean_t pxb_enable_msi = B_TRUE;
+
 static int pxb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 	off_t, off_t, caddr_t *);
 static int pxb_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
@@ -370,10 +377,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	/* Do not support FIXED interrupts at this time, only MSI */
-	intr_types &= ~DDI_INTR_TYPE_FIXED;
-
-	if (intr_types & DDI_INTR_TYPE_MSI) {
+	if ((intr_types & DDI_INTR_TYPE_MSI) && pxb_enable_msi) {
 		if (pxb_intr_init(pxb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
 			intr_types = DDI_INTR_TYPE_MSI;
 		else
@@ -935,7 +939,7 @@ pxb_intr_init(pxb_devstate_t *pxb, int intr_type) {
 	pxb->pxb_init_flags |= PXB_INIT_HTABLE;
 
 	ret = ddi_intr_alloc(dip, pxb->pxb_htable, intr_type,
-	    0, request, &count, 0);
+	    0, request, &count, DDI_INTR_ALLOC_NORMAL);
 	if ((ret != DDI_SUCCESS) || (count == 0)) {
 		DBG(DBG_ATTACH, dip,
 		    "ddi_intr_alloc() ret: %d ask: %d actual: %d\n",

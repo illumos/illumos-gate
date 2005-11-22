@@ -1810,8 +1810,10 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		DDI_INTR_ASSIGN_HDLR_N_ARGS(hdlp, intr_handler->funcp,
 		    intr_handler->arg1, intr_handler->arg2);
 
-		if (ret != DDI_SUCCESS)
-		    goto done;
+		if (ret != DDI_SUCCESS) {
+			mutex_exit(&softsp->intr_poll_list_lock);
+			goto done;
+		}
 
 		if ((slot >= EXT_SBUS_SLOTS) ||
 		    (softsp->intr_hndlr_cnt[slot] == 0)) {

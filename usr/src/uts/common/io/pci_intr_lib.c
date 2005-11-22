@@ -37,6 +37,14 @@
 #include <sys/bitmap.h>
 
 /*
+ * MSI-X BIR Index Table:
+ *
+ * BAR indicator register (BIR) to Base Address register.
+ */
+static	uchar_t pci_msix_bir_index[8] = {0x10, 0x14, 0x18, 0x1c,
+					0x20, 0x24, 0xff, 0xff};
+
+/*
  * Library utility functions
  */
 
@@ -98,13 +106,13 @@ static int
 pci_get_msi_ctrl(dev_info_t *dip, int type, ushort_t *msi_ctrl,
     ushort_t *caps_ptr, ddi_acc_handle_t *cfg_hdle)
 {
-	ushort_t	cap, cap_count;
+	ushort_t	cap;
 
 	*msi_ctrl = *caps_ptr = 0;
 
 	if (pci_config_setup(dip, cfg_hdle) != DDI_SUCCESS) {
 		DDI_INTR_NEXDBG((CE_CONT, "pci_get_msi_ctrl: "
-		    "%s%d can't get config handle",
+		    "%s%d can't get config handle\n",
 		    ddi_driver_name(dip), ddi_get_instance(dip)));
 
 		return (DDI_FAILURE);
@@ -120,9 +128,8 @@ pci_get_msi_ctrl(dev_info_t *dip, int type, ushort_t *msi_ctrl,
 	}
 
 	*caps_ptr = pci_config_get8(*cfg_hdle, PCI_CONF_CAP_PTR);
-	cap_count = PCI_CAP_MAX_PTR;
 
-	while ((cap_count--) && (*caps_ptr >= PCI_CAP_PTR_OFF)) {
+	while (*caps_ptr && (*caps_ptr >= PCI_CAP_PTR_OFF)) {
 		*caps_ptr &= PCI_CAP_PTR_MASK;
 		cap = pci_config_get8(*cfg_hdle, *caps_ptr);
 
@@ -213,8 +220,9 @@ pci_msi_configure(dev_info_t *rdip, int type, int count, int inum,
 	ushort_t		caps_ptr, msi_ctrl;
 	ddi_acc_handle_t	cfg_hdle;
 
-	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: rdip = 0x%p\n",
-	    (void *)rdip));
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: rdip = 0x%p type 0x%x "
+	    "count 0x%x inum 0x%x addr 0x%" PRIx64 " data 0x%" PRIx64 "\n",
+	    (void *)rdip, type, count, inum, addr, data));
 
 	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
 	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
@@ -226,36 +234,60 @@ pci_msi_configure(dev_info_t *rdip, int type, int count, int inum,
 		pci_config_put16(cfg_hdle,
 		    caps_ptr + PCI_MSI_CTRL, msi_ctrl);
 
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: msi_ctrl = %x\n",
+		    pci_config_get16(cfg_hdle, caps_ptr + PCI_MSI_CTRL)));
+
 		/* Set the "data" and "addr" bits */
 		pci_config_put32(cfg_hdle,
 		    caps_ptr + PCI_MSI_ADDR_OFFSET, addr);
 
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: msi_addr = %x\n",
+		    pci_config_get32(cfg_hdle, caps_ptr +
+		    PCI_MSI_ADDR_OFFSET)));
+
 		if (msi_ctrl &  PCI_MSI_64BIT_MASK) {
 			pci_config_put32(cfg_hdle,
-			    caps_ptr + PCI_MSI_ADDR_OFFSET + 4, 0);
+			    caps_ptr + PCI_MSI_ADDR_OFFSET + 4, addr >> 32);
+
+			DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: "
+			    "upper 32bit msi_addr = %x\n", pci_config_get32(
+			    cfg_hdle, caps_ptr + PCI_MSI_ADDR_OFFSET + 4)));
+
 			pci_config_put16(cfg_hdle,
 			    caps_ptr + PCI_MSI_64BIT_DATA, data);
+
+			DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: "
+			    "msi_data = %x\n", pci_config_get16(cfg_hdle,
+			    caps_ptr + PCI_MSI_64BIT_DATA)));
 		} else {
 			pci_config_put16(cfg_hdle,
 			    caps_ptr + PCI_MSI_32BIT_DATA, data);
+
+			DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: "
+			    "msi_data = %x\n", pci_config_get16(cfg_hdle,
+			    caps_ptr + PCI_MSI_32BIT_DATA)));
 		}
-
-		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: msi_ctrl = %x\n",
-		    pci_config_get16(cfg_hdle, caps_ptr + PCI_MSI_CTRL)));
-
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		uintptr_t	off;
 		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
 		off = (uintptr_t)msix_p->msix_tbl_addr +
-		    ((inum - 1) * PCI_MSIX_VECTOR_SIZE);
+		    (inum * PCI_MSIX_VECTOR_SIZE);
 
 		/* Set the "data" and "addr" bits */
 		ddi_put32(msix_p->msix_tbl_hdl,
-		    (uint32_t *)((uchar_t *)off + PCI_MSIX_DATA_OFFSET), data);
+		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), data);
 
-		ddi_put64(msix_p->msix_tbl_hdl, (uint64_t *)off, addr);
+		ddi_put64(msix_p->msix_tbl_hdl,
+		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET), addr);
+
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_configure: "
+		    "msix_addr 0x%" PRIx64 " msix_data 0x%x\n",
+		    ddi_get64(msix_p->msix_tbl_hdl,
+		    (uint64_t *)(off + PCI_MSIX_LOWER_ADDR_OFFSET)),
+		    ddi_get32(msix_p->msix_tbl_hdl,
+		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET))));
 	}
 
 	pci_config_teardown(&cfg_hdle);
@@ -309,11 +341,11 @@ pci_msi_unconfigure(dev_info_t *rdip, int type, int inum)
 
 		/* Offset into the "inum"th entry in the MSI-X table */
 		off = (uintptr_t)msix_p->msix_tbl_addr +
-		    ((inum - 1) * PCI_MSIX_VECTOR_SIZE);
+		    (inum * PCI_MSIX_VECTOR_SIZE);
 
 		/* Reset the "data" and "addr" bits */
 		ddi_put32(msix_p->msix_tbl_hdl,
-		    (uint32_t *)((uchar_t *)off + PCI_MSIX_DATA_OFFSET), 0);
+		    (uint32_t *)(off + PCI_MSIX_DATA_OFFSET), 0);
 
 		ddi_put64(msix_p->msix_tbl_hdl, (uint64_t *)off, 0);
 	}
@@ -364,7 +396,6 @@ int
 pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 {
 	ushort_t		caps_ptr, msi_ctrl;
-	uint16_t		cmd_reg;
 	ddi_acc_handle_t	cfg_hdle;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_enable_mode: rdip = 0x%p, "
@@ -373,17 +404,6 @@ pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 	if (pci_get_msi_ctrl(rdip, type, &msi_ctrl,
 	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
 		return (DDI_FAILURE);
-
-	/* Disable INTx simulation, if applicable */
-	cmd_reg = pci_config_get16(cfg_hdle, PCI_CONF_COMM);
-
-	/* This write succeeds only for devices > PCI2.3 */
-	pci_config_put16(cfg_hdle, PCI_CONF_COMM,
-	    cmd_reg | PCI_COMM_INTX_DISABLE);
-
-	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_enable_mode: "
-	    "Before CmdReg = 0x%x, After CmdReg = 0x%x\n",
-	    cmd_reg, pci_config_get16(cfg_hdle, PCI_CONF_COMM)));
 
 	if (type == DDI_INTR_TYPE_MSI) {
 		if (msi_ctrl & PCI_MSI_ENABLE_BIT)
@@ -395,7 +415,6 @@ pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 
 	} else if (type == DDI_INTR_TYPE_MSIX) {
 		uintptr_t	off;
-		uint32_t	mask_bits;
 		ddi_intr_msix_t	*msix_p;
 
 		if (msi_ctrl & PCI_MSIX_ENABLE_BIT)
@@ -408,17 +427,15 @@ pci_msi_enable_mode(dev_info_t *rdip, int type, int inum)
 		msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uintptr_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
 
 		/* Clear the Mask bit */
-		mask_bits = ddi_get32(msix_p->msix_tbl_hdl,
-		    (uint32_t *)((uchar_t *)off));
+		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0x0);
 
-		mask_bits &= ~0;
-
-		ddi_put32(msix_p->msix_tbl_hdl,
-		    (uint32_t *)((uchar_t *)off), mask_bits);
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msi_enable: "
+		    "msix_vector_mask 0x%x\n",
+		    ddi_get32(msix_p->msix_tbl_hdl, (uint32_t *)off)));
 	}
 
 finished:
@@ -466,12 +483,11 @@ pci_msi_disable_mode(dev_info_t *rdip, int type, int inum)
 		msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uintptr_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
 
 		/* Set the Mask bit */
-		ddi_put32(msix_p->msix_tbl_hdl,
-		    (uint32_t *)((uchar_t *)off), 0x1);
+		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0x1);
 	}
 
 finished:
@@ -496,7 +512,7 @@ pci_msi_set_mask(dev_info_t *rdip, int type, int inum)
 	int			ret = DDI_FAILURE;
 	ushort_t		caps_ptr, msi_ctrl;
 	ddi_acc_handle_t	cfg_hdle;
-	uint_t			mask_bits;
+	uint32_t		mask_bits;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_set_mask: rdip = 0x%p, "
 	    "type = 0x%x\n", (void *)rdip, type));
@@ -533,12 +549,11 @@ pci_msi_set_mask(dev_info_t *rdip, int type, int inum)
 		msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uintptr_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
 
 		/* Set the Mask bit */
-		ddi_put32(msix_p->msix_tbl_hdl,
-		    (uint32_t *)((uchar_t *)off), 0x1);
+		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0x1);
 	}
 
 	ret = DDI_SUCCESS;
@@ -561,7 +576,7 @@ pci_msi_clr_mask(dev_info_t *rdip, int type, int inum)
 	ddi_acc_handle_t	cfg_hdle;
 	int			offset;
 	int			ret = DDI_FAILURE;
-	uint_t			mask_bits;
+	uint32_t		mask_bits;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_msi_clr_mask: rdip = 0x%p, "
 	    "type = 0x%x\n", (void *)rdip, type));
@@ -596,17 +611,11 @@ pci_msi_clr_mask(dev_info_t *rdip, int type, int inum)
 		msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the "inum"th entry in the MSI-X table */
-		off = (uintptr_t)msix_p->msix_tbl_addr + ((inum - 1) *
+		off = (uintptr_t)msix_p->msix_tbl_addr + (inum *
 		    PCI_MSIX_VECTOR_SIZE) + PCI_MSIX_VECTOR_CTRL_OFFSET;
 
 		/* Clear the Mask bit */
-		mask_bits = ddi_get32(msix_p->msix_tbl_hdl,
-		    (uint32_t *)((uchar_t *)off));
-
-		mask_bits &= ~0;
-
-		ddi_put32(msix_p->msix_tbl_hdl,
-		    (uint32_t *)((uchar_t *)off), mask_bits);
+		ddi_put32(msix_p->msix_tbl_hdl, (uint32_t *)off, 0x0);
 	}
 
 	ret = DDI_SUCCESS;
@@ -660,11 +669,10 @@ pci_msi_get_pending(dev_info_t *rdip, int type, int inum, int *pendingp)
 		ddi_intr_msix_t	*msix_p = i_ddi_get_msix(rdip);
 
 		/* Offset into the PBA array which has entry for "inum" */
-		off = (uintptr_t)msix_p->msix_pba_addr + ((inum - 1) / 64);
+		off = (uintptr_t)msix_p->msix_pba_addr + (inum / 64);
 
 		/* Read the PBA array */
-		pending_bits = ddi_get64(msix_p->msix_pba_hdl,
-		    (uint64_t *)((uchar_t *)off));
+		pending_bits = ddi_get64(msix_p->msix_pba_hdl, (uint64_t *)off);
 
 		*pendingp = pending_bits & ~(1 >> inum);
 	}
@@ -794,16 +802,19 @@ pci_msi_get_supported_type(dev_info_t *rdip, int *typesp)
 ddi_intr_msix_t *
 pci_msix_init(dev_info_t *rdip)
 {
-	uint_t			rnumber;
+	uint_t			rnumber, breg, nregs;
 	size_t			msix_tbl_size;
 	size_t			pba_tbl_size;
-	ushort_t		caps_ptr, msi_ctrl;
+	ushort_t		caps_ptr, msix_ctrl;
 	ddi_intr_msix_t		*msix_p;
 	ddi_acc_handle_t	cfg_hdle;
+	pci_regspec_t		*rp;
+	int			reg_size, addr_space, offset, *regs_list;
+	int			i, ret;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: rdip = %p\n", (void *)rdip));
 
-	if (pci_get_msi_ctrl(rdip, DDI_INTR_TYPE_MSI, &msi_ctrl,
+	if (pci_get_msi_ctrl(rdip, DDI_INTR_TYPE_MSIX, &msix_ctrl,
 	    &caps_ptr, &cfg_hdle) != DDI_SUCCESS)
 		return (NULL);
 
@@ -817,60 +828,128 @@ pci_msix_init(dev_info_t *rdip)
 	    DDI_STRUCTURE_LE_ACC;
 	msix_p->msix_dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
-	/*
-	 * Map the entire MSI-X vector table
-	 */
+	/* Map the entire MSI-X vector table */
 	msix_p->msix_tbl_offset = pci_config_get32(cfg_hdle,
 	    caps_ptr + PCI_MSIX_TBL_OFFSET);
-	rnumber = msix_p->msix_tbl_offset & PCI_MSIX_TBL_BIR_MASK;
-	msix_p->msix_tbl_offset &= ~rnumber; /* Clear BIR from the offset */
 
-	msix_tbl_size = (msi_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1;
+	if ((breg = pci_msix_bir_index[msix_p->msix_tbl_offset &
+	    PCI_MSIX_TBL_BIR_MASK]) == 0xff)
+		goto fail1;
 
-	if (ddi_regs_map_setup(rdip,
-	    rnumber,
-	    &msix_p->msix_tbl_addr,
-	    msix_p->msix_tbl_offset,
-	    msix_tbl_size,
-	    &msix_p->msix_dev_attr,
-	    &msix_p->msix_tbl_hdl) !=
-	    DDI_SUCCESS) {
-		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_initialize: MSI-X Table "
-		    "ddi_regs_map_setup failed\n"));
-		kmem_free(msix_p, sizeof (ddi_intr_msix_t));
-		pci_config_teardown(&cfg_hdle);
-		return (NULL);
+	msix_p->msix_tbl_offset = msix_p->msix_tbl_offset &
+	    ~PCI_MSIX_TBL_BIR_MASK;
+	msix_tbl_size = ((msix_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1) *
+	    PCI_MSIX_VECTOR_SIZE;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: MSI-X table offset 0x%x "
+	    "breg 0x%x size 0x%lx\n", msix_p->msix_tbl_offset, breg,
+	    msix_tbl_size));
+
+	if ((ret = ddi_prop_lookup_int_array(DDI_DEV_T_ANY, rdip,
+	    DDI_PROP_DONTPASS, "reg", (int **)&regs_list, &nregs))
+	    != DDI_PROP_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: "
+		    "ddi_prop_lookup_int_array failed %d\n", ret));
+
+		goto fail1;
+	}
+
+	reg_size = sizeof (pci_regspec_t) / sizeof (int);
+
+	for (i = 1, rnumber = 0; i < nregs/reg_size; i++) {
+		rp = (pci_regspec_t *)&regs_list[i * reg_size];
+		addr_space = rp->pci_phys_hi & PCI_ADDR_MASK;
+		offset = PCI_REG_REG_G(rp->pci_phys_hi);
+
+		if ((offset == breg) && ((addr_space == PCI_ADDR_MEM32) ||
+		    (addr_space == PCI_ADDR_MEM64))) {
+			rnumber = i;
+			break;
+		}
+	}
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: MSI-X rnum = %d\n", rnumber));
+
+	if (rnumber == 0) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: "
+		    "no mtaching reg number for offset 0x%x\n", breg));
+
+		goto fail2;
+	}
+
+	if ((ret = ddi_regs_map_setup(rdip, rnumber,
+	    (caddr_t *)&msix_p->msix_tbl_addr, msix_p->msix_tbl_offset,
+	    msix_tbl_size, &msix_p->msix_dev_attr,
+	    &msix_p->msix_tbl_hdl)) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: MSI-X Table "
+		    "ddi_regs_map_setup failed %d\n", ret));
+
+		goto fail2;
 	}
 
 	/*
 	 * Map in the MSI-X Pending Bit Array
 	 */
-	if (msi_ctrl &  PCI_MSIX_TBL_SIZE_MASK)
-		pba_tbl_size = ((msi_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1)/64;
-
 	msix_p->msix_pba_offset = pci_config_get32(cfg_hdle,
 	    caps_ptr + PCI_MSIX_PBA_OFFSET);
-	rnumber = msix_p->msix_pba_offset & PCI_MSIX_PBA_BIR_MASK;
-	msix_p->msix_pba_offset &= ~rnumber; /* Clear offset from BIR */
 
-	if (ddi_regs_map_setup(rdip,
-	    rnumber,
-	    &msix_p->msix_pba_addr,
-	    msix_p->msix_pba_offset,
-	    pba_tbl_size,
-	    &msix_p->msix_dev_attr,
-	    &msix_p->msix_pba_hdl) != DDI_SUCCESS) {
-		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_initialize: PBA "
-		    "ddi_regs_map_setup failed\n"));
-		ddi_regs_map_free(&msix_p->msix_tbl_hdl);
-		kmem_free(msix_p, sizeof (ddi_intr_msix_t));
-		pci_config_teardown(&cfg_hdle);
-		return (NULL);
+	if ((breg = pci_msix_bir_index[msix_p->msix_pba_offset &
+	    PCI_MSIX_PBA_BIR_MASK]) == 0xff)
+		goto fail3;
+
+	msix_p->msix_pba_offset = msix_p->msix_pba_offset &
+	    ~PCI_MSIX_PBA_BIR_MASK;
+	pba_tbl_size = ((msix_ctrl & PCI_MSIX_TBL_SIZE_MASK) + 1)/8;
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: PBA table offset 0x%x "
+	    "breg 0x%x size 0x%lx\n", msix_p->msix_pba_offset, breg,
+	    pba_tbl_size));
+
+	for (i = 1, rnumber = 0; i < nregs/reg_size; i++) {
+		rp = (pci_regspec_t *)&regs_list[i * reg_size];
+		addr_space = rp->pci_phys_hi & PCI_ADDR_MASK;
+		offset = PCI_REG_REG_G(rp->pci_phys_hi);
+
+		if ((offset == breg) && ((addr_space == PCI_ADDR_MEM32) ||
+		    (addr_space == PCI_ADDR_MEM64))) {
+			ddi_prop_free(regs_list);
+			rnumber = i;
+			break;
+		}
+	}
+
+	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: PBA rnum = %d\n", rnumber));
+
+	if (rnumber == 0) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: "
+		    "no mtaching reg number for offset 0x%x\n", breg));
+
+		goto fail3;
+	}
+
+	if ((ret = ddi_regs_map_setup(rdip, rnumber,
+	    (caddr_t *)&msix_p->msix_pba_addr, msix_p->msix_pba_offset,
+	    pba_tbl_size, &msix_p->msix_dev_attr,
+	    &msix_p->msix_pba_hdl)) != DDI_SUCCESS) {
+		DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: PBA "
+		    "ddi_regs_map_setup failed %d\n", ret));
+
+		goto fail3;
 	}
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_msix_init: msix_p = 0x%p DONE!!\n",
 	    (void *)msix_p));
 
+	goto done;
+
+fail3:
+	ddi_regs_map_free(&msix_p->msix_tbl_hdl);
+fail2:
+	ddi_prop_free(regs_list);
+fail1:
+	kmem_free(msix_p, sizeof (ddi_intr_msix_t));
+	msix_p = NULL;
+done:
 	pci_config_teardown(&cfg_hdle);
 	return (msix_p);
 }

@@ -137,6 +137,10 @@ typedef struct uhci_state {
 	ddi_dma_attr_t		uhci_dma_attr;		/* DMA attributes */
 
 	ddi_intr_handle_t	*uhci_htable;		/* intr handle */
+	int			uhci_intr_type;		/* intr type used */
+	int			uhci_intr_cnt;		/* # of intrs inuse */
+	uint_t			uhci_intr_pri;		/* intr priority */
+	int			uhci_intr_cap;		/* intr capabilities */
 	kmutex_t		uhci_int_mutex;		/* Mutex for struct */
 
 	frame_lst_table_t	*uhci_frame_lst_tablep;	/* Virtual HCCA ptr */

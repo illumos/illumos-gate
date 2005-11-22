@@ -38,7 +38,6 @@ static int intr_px_walk_step(mdb_walk_state_t *);
 static void intr_pci_print_items(mdb_walk_state_t *);
 static void intr_px_print_items(mdb_walk_state_t *);
 static char *intr_get_intr_type(msiq_rec_type_t);
-static void intr_print_line(int);
 static void intr_print_banner(void);
 
 typedef struct intr_info {
@@ -108,6 +107,8 @@ intr_pci_walk_step(mdb_walk_state_t *wsp)
 	/* Figure out how many items are here */
 	start_addr = (uintptr_t)pci_per_p;
 
+	intr_print_banner();
+
 	while (mdb_vread(&pci_per_p, sizeof (uintptr_t),
 	    (uintptr_t)start_addr) != -1) {
 		/* Read until nothing is left */
@@ -142,6 +143,8 @@ intr_px_walk_step(mdb_walk_state_t *wsp)
 
 	/* Figure out how many items are here */
 	start_addr = (uintptr_t)px_state_p;
+
+	intr_print_banner();
 
 	while (mdb_vread(&px_state_p, sizeof (uintptr_t),
 	    (uintptr_t)start_addr) != -1) {
@@ -186,10 +189,6 @@ intr_pci_print_items(mdb_walk_state_t *wsp)
 		/* Nothing here to read from */
 		return;
 	}
-
-	intr_print_line(77);
-	intr_print_banner();
-	intr_print_line(77);
 
 	do {
 		if (mdb_vread(&ih, sizeof (ih_t),
@@ -246,8 +245,6 @@ intr_pci_print_items(mdb_walk_state_t *wsp)
 
 	} while (mdb_vread(&list, sizeof (ib_ino_info_t),
 	    (uintptr_t)list.ino_next) != -1);
-
-	intr_print_line(77);
 }
 
 static void
@@ -275,10 +272,6 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 		/* Nothing here to read from */
 		return;
 	}
-
-	intr_print_line(77);
-	intr_print_banner();
-	intr_print_line(77);
 
 	do {
 		if (mdb_vread(&px_ih, sizeof (px_ih_t),
@@ -335,8 +328,6 @@ intr_px_print_items(mdb_walk_state_t *wsp)
 
 	} while (mdb_vread(&px_list, sizeof (px_ib_ino_info_t),
 	    (uintptr_t)px_list.ino_next) != -1);
-
-	intr_print_line(77);
 }
 
 static char *
@@ -355,33 +346,19 @@ intr_get_intr_type(msiq_rec_type_t rec_type)
 }
 
 static void
-intr_print_line(int cnt)
-{
-	int	x;
-
-	if (!detailed) {
-		mdb_printf("+");
-		for (x = 0; x < cnt; x++) {
-			mdb_printf("-");
-		}
-		mdb_printf("+\n");
-	}
-}
-
-static void
 intr_print_banner(void)
 {
 	if (!detailed) {
-		mdb_printf("|    Device\t"
-		    "| Shard\t"
-		    "| Type\t"
-		    "| MSG #\t"
-		    "| State "
-		    "| INO\t"
-		    "| Mondo\t"
-		    "|  Pil\t"
-		    "| CPU "
-		    "|\n");
+		mdb_printf("\n%<u>\tDevice\t"
+		    " Shared\t"
+		    " Type\t"
+		    " MSG #\t"
+		    " State\t"
+		    " INO\t"
+		    " Mondo\t"
+		    "  Pil\t"
+		    " CPU   %</u>"
+		    "\n");
 	}
 }
 
@@ -389,25 +366,22 @@ static void
 intr_print_elements(intr_info_t info)
 {
 	if (!detailed) {
-		mdb_printf("| %11s#%d\t", info.driver_name, info.instance);
-		mdb_printf("| %s\t",
+		mdb_printf(" %11s#%d\t", info.driver_name, info.instance);
+		mdb_printf(" %5s\t",
 		    info.shared ? "yes" : "no");
-		mdb_printf("| %s\t", intr_get_intr_type(info.intr_type));
+		mdb_printf(" %s\t", intr_get_intr_type(info.intr_type));
 		if (strcmp("Fixed", intr_get_intr_type(info.intr_type)) == 0) {
-			mdb_printf("|  --- \t");
+			mdb_printf("  --- \t");
 		} else {
-			mdb_printf("| %4d\t", info.num);
+			mdb_printf(" %4d\t", info.num);
 		}
 
-		mdb_printf("| %2s\t",
+		mdb_printf(" %2s\t",
 		    info.intr_state ? "enbl" : "disbl");
-		mdb_printf("| 0x%x\t", info.ino_ino);
-		mdb_printf("| 0x%x", info.mondo);
-		if (!(info.mondo & 0xF000)) {  /* Don't overrun table width */
-			mdb_printf("\t");
-		}
-		mdb_printf("| %4d\t", info.pil);
-		mdb_printf("| %3d |\n", info.cpuid);
+		mdb_printf(" 0x%x\t", info.ino_ino);
+		mdb_printf(" 0x%x\t", info.mondo);
+		mdb_printf(" %4d\t", info.pil);
+		mdb_printf(" %3d \n", info.cpuid);
 	} else {
 		mdb_printf("\n-------------------------------------------\n");
 		mdb_printf("Device:\t\t%s\n", info.driver_name);

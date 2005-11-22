@@ -679,9 +679,9 @@ extern "C" {
  */
 #define	PCI_MSIX_CTRL		0x02	/* MSI-X control register, 2 bytes */
 #define	PCI_MSIX_TBL_OFFSET	0x04	/* MSI-X table offset, 4 bytes */
-#define	PCI_MSIX_TBL_BIR_MASK	0x0003	/* MSI-X table BIR mask */
-#define	PCI_MSIX_PBA_OFFSET	0x0C	/* MSI-X pending bit array, 4 bytes */
-#define	PCI_MSIX_PBA_BIR_MASK	0x0003	/* MSI-X PBA BIR mask */
+#define	PCI_MSIX_TBL_BIR_MASK	0x0007	/* MSI-X table BIR mask */
+#define	PCI_MSIX_PBA_OFFSET	0x08	/* MSI-X pending bit array, 4 bytes */
+#define	PCI_MSIX_PBA_BIR_MASK	0x0007	/* MSI-X PBA BIR mask */
 
 #define	PCI_MSIX_TBL_SIZE_MASK	0x07FF	/* table size mask in MSI-X ctrl reg */
 #define	PCI_MSIX_FUNCTION_MASK	0x4000	/* function mask in MSI-X ctrl reg */
