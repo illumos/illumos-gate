@@ -21,10 +21,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 #	  All Rights Reserved
@@ -166,6 +166,13 @@ if [ -n "$FFLAG" -a "$FSType" != "nfs"  -a -n "$RFLAG" ]; then		# 7
 fi
 
 ZONENAME=`zonename`
+
+# Check and if needed sync the boot archive before unmounting things.
+#
+if [ -z "${RFLAG}${NFLAG}${HFLAG}" -a "$ZONENAME" = "global" -a \
+    `uname -p` = "i386" ] ; then
+	/sbin/bootadm -a update_all
+fi
 
 #
 # Take advantage of parallel unmounting at this point if we have no
