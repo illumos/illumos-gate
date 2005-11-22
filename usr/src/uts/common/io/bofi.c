@@ -4127,9 +4127,11 @@ bofi_dvma_reserve(dev_info_t *rdip, ddi_dma_handle_t handle)
 			 * assume it.
 			 */
 			hp->allocaddr = ddi_umem_alloc(
-			    ((int)hp->addr & pagemask) + pagemask + 1,
+			    ((int)(uintptr_t)hp->addr & pagemask)
+				+ pagemask + 1,
 			    KM_SLEEP, &hp->umem_cookie);
-			hp->addr = hp->allocaddr + ((int)hp->addr & pagemask);
+			hp->addr = hp->allocaddr +
+			    ((int)(uintptr_t)hp->addr & pagemask);
 		}
 		/*
 		 * add to dhash and inuse lists.
