@@ -249,6 +249,7 @@ pgcnt_t kcage_lotsfree;
 pgcnt_t kcage_desfree;
 pgcnt_t kcage_minfree;
 pgcnt_t kcage_throttlefree;
+pgcnt_t	kcage_reserve;
 int kcage_maxwait = 10;	/* in seconds */
 
 /* when we use lp for kmem we start the cage at a higher initial value */
@@ -918,6 +919,7 @@ kcage_recalc_thresholds()
 	static pgcnt_t init_desfree;
 	static pgcnt_t init_minfree;
 	static pgcnt_t init_throttlefree;
+	static pgcnt_t init_reserve;
 
 	/* TODO: any reason to take more care than this with live editing? */
 	mutex_enter(&kcage_cageout_mutex);
@@ -929,11 +931,13 @@ kcage_recalc_thresholds()
 		init_desfree = kcage_desfree;
 		init_minfree = kcage_minfree;
 		init_throttlefree = kcage_throttlefree;
+		init_reserve = kcage_reserve;
 	} else {
 		kcage_lotsfree = init_lotsfree;
 		kcage_desfree = init_desfree;
 		kcage_minfree = init_minfree;
 		kcage_throttlefree = init_throttlefree;
+		kcage_reserve = init_reserve;
 	}
 
 	if (kcage_lotsfree == 0)
@@ -947,6 +951,9 @@ kcage_recalc_thresholds()
 
 	if (kcage_throttlefree == 0)
 		kcage_throttlefree = MAX(32, kcage_minfree / 2);
+
+	if (kcage_reserve == 0)
+		kcage_reserve = MIN(32, kcage_throttlefree / 2);
 
 	mutex_exit(&freemem_lock);
 	mutex_exit(&kcage_cageout_mutex);
@@ -1030,9 +1037,10 @@ kcage_create_throttle(pgcnt_t npages, int flags)
 	}
 
 	/*
-	 * Don't throttle real-time threads.
+	 * Don't throttle real-time threads if kcage_freemem > kcage_reserve.
 	 */
-	if (DISP_PRIO(curthread) > maxclsyspri) {
+	if (DISP_PRIO(curthread) > maxclsyspri &&
+	    kcage_freemem > kcage_reserve) {
 		KCAGE_STAT_INCR(kct_exempt);	/* unprotected incr. */
 		return (KCT_CRIT);
 	}
