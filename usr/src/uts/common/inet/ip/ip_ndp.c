@@ -1406,6 +1406,33 @@ ndp_input_solicit(ill_t *ill, mblk_t *mp)
 			}
 		}
 	}
+	/*
+	 * haddr can be NULL if no options are present,
+	 * or no Source link layer address is present in,
+	 * recvd NDP options of solicitation message.
+	 */
+	if (haddr == NULL) {
+		nce_t   *nnce;
+		mutex_enter(&ndp_g_lock);
+		nnce = nce_lookup_addr(ill, &src);
+		mutex_exit(&ndp_g_lock);
+
+		if (nnce == NULL) {
+			in6_addr_t dst = ipv6_solicited_node_mcast;
+
+			/* Form solicited node multicast address */
+			dst.s6_addr32[3] |= src.s6_addr32[3];
+			(void) nce_xmit(ill,
+				ND_NEIGHBOR_SOLICIT,
+				ill,
+				B_TRUE,
+				&target,
+				&dst,
+				flag);
+			bad_solicit = B_TRUE;
+			goto done;
+		}
+	}
 	/* Set override flag, it will be reset later if need be. */
 	flag |= NDP_ORIDE;
 	if (!IN6_IS_ADDR_MULTICAST(&ip6h->ip6_dst)) {
