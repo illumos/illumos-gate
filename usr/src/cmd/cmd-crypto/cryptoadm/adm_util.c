@@ -20,12 +20,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <ctype.h>
 #include <strings.h>
 #include "cryptoadm.h"
 
@@ -38,6 +39,7 @@ mechlist_t *
 create_mech(char *name)
 {
 	mechlist_t *pres = NULL;
+	char *first, *last;
 
 	if (name == NULL) {
 		return (NULL);
@@ -49,7 +51,16 @@ create_mech(char *name)
 		return (NULL);
 	}
 
-	(void) strlcpy(pres->name, name, sizeof (pres->name));
+	first = name;
+	while (isspace(*first)) /* nuke leading whitespace */
+	    first++;
+	(void) strlcpy(pres->name, first, sizeof (pres->name));
+
+	last = strrchr(pres->name, '\0');
+	last--;
+	while (isspace(*last))  /* nuke trailing whitespace */
+	    *last-- = '\0';
+
 	pres->next = NULL;
 
 	return (pres);

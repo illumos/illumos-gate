@@ -100,11 +100,6 @@ static crypto_mech_info_t aes_mech_info_tab[] = {
 	    AES_MIN_KEY_LEN, AES_MAX_KEY_LEN, CRYPTO_KEYSIZE_UNIT_IN_BYTES}
 };
 
-#define	AES_VALID_MECH(mech)					\
-	(((mech)->cm_type == AES_ECB_MECH_INFO_TYPE ||		\
-	(mech)->cm_type == AES_CBC_MECH_INFO_TYPE ||		\
-	(mech)->cm_type == AES_CTR_MECH_INFO_TYPE) ? 1 : 0)
-
 /* operations are in-place if the output buffer is NULL */
 #define	AES_ARG_INPLACE(input, output)				\
 	if ((output) == NULL)					\
@@ -259,6 +254,31 @@ _info(struct modinfo *modinfop)
 
 /* EXPORT DELETE START */
 
+static int
+aes_check_mech_param(crypto_mechanism_t *mechanism)
+{
+	int rv = CRYPTO_SUCCESS;
+
+	switch (mechanism->cm_type) {
+	case AES_ECB_MECH_INFO_TYPE:
+		/* no parameter */
+		break;
+	case AES_CBC_MECH_INFO_TYPE:
+		if (mechanism->cm_param == NULL ||
+		    mechanism->cm_param_len != AES_BLOCK_LEN)
+			rv = CRYPTO_MECHANISM_PARAM_INVALID;
+		break;
+	case AES_CTR_MECH_INFO_TYPE:
+		if (mechanism->cm_param == NULL ||
+		    mechanism->cm_param_len != sizeof (CK_AES_CTR_PARAMS))
+			rv = CRYPTO_MECHANISM_PARAM_INVALID;
+		break;
+	default:
+		rv = CRYPTO_MECHANISM_INVALID;
+	}
+	return (rv);
+}
+
 /*
  * Initialize key schedules for AES
  */
@@ -321,19 +341,8 @@ aes_common_init(crypto_ctx_t *ctx, crypto_mechanism_t *mechanism,
 		return (CRYPTO_KEY_TYPE_INCONSISTENT);
 	}
 
-	if (!AES_VALID_MECH(mechanism))
-		return (CRYPTO_MECHANISM_INVALID);
-
-	if (mechanism->cm_param != NULL) {
-		if (mechanism->cm_type == AES_CTR_MECH_INFO_TYPE) {
-			if (mechanism->cm_param_len !=
-			    sizeof (CK_AES_CTR_PARAMS))
-				return (CRYPTO_MECHANISM_PARAM_INVALID);
-		} else {
-			if (mechanism->cm_param_len != AES_BLOCK_LEN)
-				return (CRYPTO_MECHANISM_PARAM_INVALID);
-		}
-	}
+	if ((rv = aes_check_mech_param(mechanism)) != CRYPTO_SUCCESS)
+		return (rv);
 
 	/*
 	 * Allocate an AES context.
@@ -894,19 +903,8 @@ aes_encrypt_atomic(crypto_provider_handle_t provider,
 		return (CRYPTO_BUFFER_TOO_SMALL);
 	}
 
-	if (!AES_VALID_MECH(mechanism))
-		return (CRYPTO_MECHANISM_INVALID);
-
-	if (mechanism->cm_param != NULL) {
-		if (mechanism->cm_type == AES_CTR_MECH_INFO_TYPE) {
-			if (mechanism->cm_param_len !=
-			    sizeof (CK_AES_CTR_PARAMS))
-				return (CRYPTO_MECHANISM_PARAM_INVALID);
-		} else {
-			if (mechanism->cm_param_len != AES_BLOCK_LEN)
-				return (CRYPTO_MECHANISM_PARAM_INVALID);
-		}
-	}
+	if ((ret = aes_check_mech_param(mechanism)) != CRYPTO_SUCCESS)
+		return (ret);
 
 	bzero(&aes_ctx, sizeof (aes_ctx_t));
 
@@ -998,19 +996,8 @@ aes_decrypt_atomic(crypto_provider_handle_t provider,
 		return (CRYPTO_BUFFER_TOO_SMALL);
 	}
 
-	if (!AES_VALID_MECH(mechanism))
-		return (CRYPTO_MECHANISM_INVALID);
-
-	if (mechanism->cm_param != NULL) {
-		if (mechanism->cm_type == AES_CTR_MECH_INFO_TYPE) {
-			if (mechanism->cm_param_len !=
-			    sizeof (CK_AES_CTR_PARAMS))
-				return (CRYPTO_MECHANISM_PARAM_INVALID);
-		} else {
-			if (mechanism->cm_param_len != AES_BLOCK_LEN)
-				return (CRYPTO_MECHANISM_PARAM_INVALID);
-		}
-	}
+	if ((ret = aes_check_mech_param(mechanism)) != CRYPTO_SUCCESS)
+		return (ret);
 
 	bzero(&aes_ctx, sizeof (aes_ctx_t));
 
@@ -1088,7 +1075,9 @@ aes_create_ctx_template(crypto_provider_handle_t provider,
 	size_t size;
 	int rv;
 
-	if (!AES_VALID_MECH(mechanism))
+	if (mechanism->cm_type != AES_ECB_MECH_INFO_TYPE &&
+	    mechanism->cm_type != AES_CBC_MECH_INFO_TYPE &&
+	    mechanism->cm_type != AES_CTR_MECH_INFO_TYPE)
 		return (CRYPTO_MECHANISM_INVALID);
 
 	if ((keysched = aes_alloc_keysched(&size,

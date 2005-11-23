@@ -78,7 +78,7 @@ kernel_cleanup_object(kernel_object_t *objp)
 	/*
 	 * Free the storage allocated to a secret key object.
 	 */
-	if (OBJ_SEC(objp) != NULL) {
+	if (objp->class == CKO_SECRET_KEY) {
 		if (OBJ_SEC_VALUE(objp) != NULL) {
 			bzero(OBJ_SEC_VALUE(objp), OBJ_SEC_VALUE_LEN(objp));
 			free(OBJ_SEC_VALUE(objp));
