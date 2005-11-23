@@ -265,14 +265,6 @@ uint64_t	max_pages_retired_bps = MCE_BPT;
 int page_retire_messages = 0;
 
 /*
- * Control whether or not we retire dirty UE pages. By default we do
- * since we assume the data is corrupt and the process(es) using it will
- * be killed. This is platform tunable only, and should probably not be
- * changed, ever.
- */
-int page_retire_modified = 1;
-
-/*
  * Control whether or not we return scrubbed UE pages to service.
  * By default we do not since FMA wants to run its diagnostics first
  * and then ask us to unretire the page if it passes. Non-FMA platforms
@@ -300,9 +292,9 @@ struct page_retire_debug {
 	int prd_top;
 	int prd_locked;
 	int prd_reloc;
-	int prd_modce;
-	int prd_modue_fail;
-	int prd_modue_retire;
+	int prd_relocfail;
+	int prd_mod;
+	int prd_mod_late;
 	int prd_kern;
 	int prd_free;
 	int prd_noreclaim;
@@ -369,7 +361,7 @@ int pr_types[PRT_ALL+1];
 	int whichtype = 0;			\
 	if (pp->p_vnode)			\
 		whichtype |= PRT_NAMED;		\
-	if (pp->p_vnode == &kvp)		\
+	if (PP_ISKVP(pp))			\
 		whichtype |= PRT_KERNEL;	\
 	if (PP_ISFREE(pp))			\
 		whichtype |= PRT_FREE;		\
@@ -612,6 +604,8 @@ page_retire_dequeue(page_t *pp)
 static void
 page_retire_destroy(page_t *pp)
 {
+	u_offset_t off = (u_offset_t)((uintptr_t)pp);
+
 	ASSERT(PAGE_EXCL(pp));
 	ASSERT(!PP_ISFREE(pp));
 	ASSERT(pp->p_szc == 0);
@@ -623,7 +617,7 @@ page_retire_destroy(page_t *pp)
 
 	pp->p_next = NULL;
 	pp->p_prev = NULL;
-	if (page_hashin(pp, retired_pages, (u_offset_t)pp, NULL) == 0) {
+	if (page_hashin(pp, retired_pages, off, NULL) == 0) {
 		cmn_err(CE_PANIC, "retired page %p hashin failed", (void *)pp);
 	}
 
@@ -789,12 +783,6 @@ page_retire_transient_ue(page_t *pp)
 			page_clrtoxic(pp, PR_UE | PR_MCE | PR_MSG | PR_BUSY);
 			page_retire_dequeue(pp);
 
-			/*
-			 * Clear the free bit if it's set, since the
-			 * page free code will get cranky if we don't.
-			 */
-			PP_CLRFREE(pp);
-
 			/* LINTED: CONSTCOND */
 			VN_DISPOSE(pp, B_FREE, 1, kcred);
 			return (1);
@@ -894,7 +882,7 @@ static void
 page_retire_thread_cb(page_t *pp)
 {
 	PR_DEBUG(prd_tctop);
-	if (pp->p_vnode != &kvp && page_trylock(pp, SE_EXCL)) {
+	if (!PP_ISKVP(pp) && page_trylock(pp, SE_EXCL)) {
 		PR_DEBUG(prd_tclocked);
 		page_unlock(pp);
 	}
@@ -913,8 +901,9 @@ page_retire_mdboot_cb(page_t *pp)
 	 * Don't scrub the kernel, since we might still need it, unless
 	 * we have UEs on the page, in which case we have nothing to lose.
 	 */
-	if (pp->p_vnode != &kvp || PP_TOXIC(pp)) {
+	if (!PP_ISKVP(pp) || PP_TOXIC(pp)) {
 		pp->p_selock = -1;	/* pacify ASSERTs */
+		PP_CLRFREE(pp);
 		pagescrub(pp, 0, PAGESIZE);
 		pp->p_selock = 0;
 	}
@@ -930,7 +919,8 @@ page_retire_hunt(void (*callback)(page_t *))
 {
 	page_t *pp;
 	page_t *first;
-	int i, found;
+	uint64_t tbr, found;
+	int i;
 
 	PR_DEBUG(prd_hunt);
 
@@ -943,6 +933,8 @@ page_retire_hunt(void (*callback)(page_t *))
 	found = 0;
 	mutex_enter(&pr_q_mutex);
 
+	tbr = PR_KSTAT_PENDING;
+
 	for (i = 0; i < PR_PENDING_QMAX; i++) {
 		if ((pp = pr_pending_q[i]) != NULL) {
 			mutex_exit(&pr_q_mutex);
@@ -952,7 +944,7 @@ page_retire_hunt(void (*callback)(page_t *))
 		}
 	}
 
-	if (PR_KSTAT_EQFAIL == PR_KSTAT_DQFAIL && found == PR_KSTAT_PENDING) {
+	if (PR_KSTAT_EQFAIL == PR_KSTAT_DQFAIL && found == tbr) {
 		mutex_exit(&pr_q_mutex);
 		PR_DEBUG(prd_earlyhunt);
 		return;
@@ -969,7 +961,7 @@ page_retire_hunt(void (*callback)(page_t *))
 	do {
 		if (PP_PR_REQ(pp)) {
 			callback(pp);
-			if (++found == PR_KSTAT_PENDING) {
+			if (++found == tbr) {
 				break;	/* got 'em all */
 			}
 		}
@@ -1060,7 +1052,7 @@ page_retire_pp(page_t *pp)
 	}
 
 	if ((toxic & PR_UE) == 0 && pp->p_vnode && !PP_ISFREE(pp) &&
-	    !PP_ISNORELOC(pp) && MTBF(reloc_calls, reloc_mtbf)) {
+	    !PP_ISNORELOCKERNEL(pp) && MTBF(reloc_calls, reloc_mtbf)) {
 		page_t *newpp;
 		spgcnt_t count;
 
@@ -1070,15 +1062,24 @@ page_retire_pp(page_t *pp)
 		 * of whether the relocation succeeds, we are still
 		 * going to take `pp' around back and shoot it.
 		 */
-		PR_DEBUG(prd_reloc);
 		newpp = NULL;
 		if (page_relocate(&pp, &newpp, 0, 0, &count, NULL) == 0) {
+			PR_DEBUG(prd_reloc);
 			page_unlock(newpp);
 			ASSERT(hat_page_getattr(pp, P_MOD) == 0);
+		} else {
+			PR_DEBUG(prd_relocfail);
 		}
 	}
 
-	if (pp->p_vnode == &kvp) {
+	if (hat_ismod(pp)) {
+		PR_DEBUG(prd_mod);
+		PR_INCR_KSTAT(pr_failed);
+		page_unlock(pp);
+		return (page_retire_done(pp, PRD_FAILED));
+	}
+
+	if (PP_ISKVP(pp)) {
 		PR_DEBUG(prd_kern);
 		PR_INCR_KSTAT(pr_failed_kernel);
 		page_unlock(pp);
@@ -1086,14 +1087,10 @@ page_retire_pp(page_t *pp)
 	}
 
 	if (pp->p_lckcnt || pp->p_cowcnt) {
-		if (toxic & PR_UE) {
-			(void) page_clear_lck_cow(pp, 1);
-		} else {
-			PR_DEBUG(prd_locked);
-			PR_INCR_KSTAT(pr_failed);
-			page_unlock(pp);
-			return (page_retire_done(pp, PRD_FAILED));
-		}
+		PR_DEBUG(prd_locked);
+		PR_INCR_KSTAT(pr_failed);
+		page_unlock(pp);
+		return (page_retire_done(pp, PRD_FAILED));
 	}
 
 	(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
@@ -1101,27 +1098,16 @@ page_retire_pp(page_t *pp)
 	ASSERT(!hat_page_is_mapped(pp));
 
 	/*
-	 * If the page is modified, was not relocated, and not toxic,
-	 * we can't retire it without dropping data on the floor.
-	 *
-	 * RFE: we could change fsflush so that it (and only it) will
-	 * be allowed to lock this page and push it out.  Once it cleans
-	 * the page, we'd then be able to retire it on the free path.
-	 * In practice, this should be exceedingly rare.
+	 * If the page is modified, and was not relocated; we can't
+	 * retire it without dropping data on the floor. We have to
+	 * recheck after unloading since the dirty bit could have been
+	 * set since we last checked.
 	 */
 	if (hat_ismod(pp)) {
-		if ((toxic & PR_UE) == 0) {
-			PR_DEBUG(prd_modce);
-			PR_INCR_KSTAT(pr_failed);
-			page_unlock(pp);
-			return (page_retire_done(pp, PRD_FAILED));
-		} else if (page_retire_modified == 0) {
-			PR_DEBUG(prd_modue_fail);
-			PR_INCR_KSTAT(pr_failed);
-			page_unlock(pp);
-			return (page_retire_done(pp, PRD_FAILED));
-		}
-		PR_DEBUG(prd_modue_retire);
+		PR_DEBUG(prd_mod_late);
+		PR_INCR_KSTAT(pr_failed);
+		page_unlock(pp);
+		return (page_retire_done(pp, PRD_FAILED));
 	}
 
 	if (pp->p_vnode) {
@@ -1137,15 +1123,6 @@ page_retire_pp(page_t *pp)
 	 * Now we select our ammunition, take it around back, and shoot it.
 	 */
 	if (toxic & PR_UE) {
-		if (hat_ismod(pp)) {
-			/*
-			 * Let the user know we are dropping their data
-			 * on the floor.
-			 */
-			PR_MESSAGE(CE_WARN, 1, "Removing modified page "
-			    "0x%08x.%08x from service",
-			    mmu_ptob(pp->p_pagenum));
-		}
 		if (page_retire_transient_ue(pp)) {
 			PR_DEBUG(prd_uescrubbed);
 			return (page_retire_done(pp, PRD_UE_SCRUBBED));

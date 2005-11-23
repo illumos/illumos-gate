@@ -251,7 +251,7 @@ page_lock(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim)
  * [2] Retired pages may not be locked at any time, regardless of the
  *   dispostion of se, unless the es parameter has SE_RETIRED flag set.
  *
- * [3] If the page is slated for retirement the lock is denied.
+ * [3] If the page is slated for retirement by an agent, the lock is denied.
  *
  * Notes on values of "es":
  *
@@ -356,12 +356,10 @@ page_lock_es(page_t *pp, se_t se, kmutex_t *lock, reclaim_t reclaim, int es)
 		if (pp->p_selock >= 0) {
 			/*
 			 * Readers are not allowed when excl wanted or
-			 * a retire is pending. Since kvp pages can take
-			 * a long time to be retired, we make an exception
-			 * for them to avoid hanging threads unnecessarily.
+			 * an FMA retire is pending.
 			 */
 			if ((pp->p_selock & SE_EWANTED) == 0) {
-				if (!PP_PR_REQ(pp) || pp->p_vnode == &kvp) {
+				if (!PP_PR_NOSHARE(pp)) {
 					pp->p_selock += SE_READER;
 					retval = 1;
 				}
@@ -510,14 +508,10 @@ page_try_reclaim_lock(page_t *pp, se_t se, int es)
 			if (old >= 0) {
 				/*
 				 * Readers are not allowed when excl wanted
-				 * or a retire is pending. Since kvp pages can
-				 * take a long time to be retired, we make an
-				 * exception for them to avoid hanging threads
-				 * unnecessarily.
+				 * or a retire is pending.
 				 */
 				if ((old & SE_EWANTED) == 0) {
-					if (!PP_PR_REQ(pp) ||
-					    pp->p_vnode == &kvp) {
+					if (!PP_PR_NOSHARE(pp)) {
 						pp->p_selock = old + SE_READER;
 						mutex_exit(pse);
 						return (1);
@@ -567,7 +561,7 @@ page_trylock(page_t *pp, se_t se)
 
 	mutex_enter(pse);
 	if (pp->p_selock & SE_EWANTED || PP_RETIRED(pp) ||
-	    (se == SE_SHARED && PP_PR_REQ(pp) && pp->p_vnode != &kvp)) {
+	    (se == SE_SHARED && PP_PR_NOSHARE(pp))) {
 		/*
 		 * Fail if a thread wants exclusive access and page is
 		 * retired, if the page is slated for retirement, or a

@@ -1322,7 +1322,7 @@ reread:
 			    /* add a sector offset within the cluster */
 			    /* when the clustersize > PAGESIZE */
 			    (xferoffset - lbnoff) / fsp->pcfs_secsize;
-			bp->b_un.b_addr = (caddr_t)pgoff;
+			bp->b_un.b_addr = (caddr_t)(uintptr_t)pgoff;
 			bp->b_file = vp;
 			bp->b_offset = (offset_t)(off + pgoff);
 

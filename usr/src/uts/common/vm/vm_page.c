@@ -2998,7 +2998,7 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 
 	/* TODO: Do we need to test kcage_freemem if PG_NORELOC(pp)? */
 
-	if (freemem <= throttlefree && !page_create_throttle(1l, 0)) {
+	if (freemem <= throttlefree && !page_create_throttle(npgs, 0)) {
 		pcf_acquire_all();
 		goto page_reclaim_nomem;
 	}
@@ -3128,7 +3128,7 @@ page_reclaim_nomem:
 	 *
 	 * Set the reference bit to protect against immediate pageout.
 	 */
-	for (i = 0; i < npgs; i++, pp = page_next(pp)) {
+	for (i = 0; i < npgs; i++, pp++) {
 		PP_CLRFREE(pp);
 		PP_CLRAGED(pp);
 		page_set_props(pp, P_REF);
