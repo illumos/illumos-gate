@@ -166,8 +166,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp)
 		ASSERT(err == 0);
 	} else {
 		/* It's the meta-objset. */
+		/* XXX - turn off metadata compression temporarily */
 		osi->os_checksum = ZIO_CHECKSUM_FLETCHER_4;
-		osi->os_compress = ZIO_COMPRESS_LZJB;
+		osi->os_compress = ZIO_COMPRESS_OFF;
 	}
 
 	/*
@@ -184,7 +185,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp)
 	else
 		osi->os_md_checksum = ZIO_CHECKSUM_FLETCHER_4;
 
-	osi->os_md_compress = ZIO_COMPRESS_LZJB;
+	/* XXX - turn off metadata compression temporarily */
+	osi->os_md_compress = ZIO_COMPRESS_OFF;
 
 	for (i = 0; i < TXG_SIZE; i++) {
 		list_create(&osi->os_dirty_dnodes[i], sizeof (dnode_t),

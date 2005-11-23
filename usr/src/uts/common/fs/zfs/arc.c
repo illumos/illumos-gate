@@ -1891,18 +1891,24 @@ arc_tempreserve_space(uint64_t tempreserve)
 		return (ERESTART);
 	}
 #endif
+	if (tempreserve > arc.c/4 && !arc.no_grow)
+		arc.c = MIN(arc.c_max, tempreserve * 4);
+	if (tempreserve > arc.c)
+		return (ENOMEM);
+
 	/*
-	 * XXX This is kind of hacky.  The limit should be adjusted
-	 * dynamically to keep the time to sync a dataset fixed (around
-	 * 1-5 seconds?).
-	 * Maybe should have some sort of locking?  If two requests come
-	 * in concurrently, we might let them both succeed, when one of
-	 * them should fail.  Not a huge deal.
+	 * Throttle writes when the amount of dirty data in the cache
+	 * gets too large.  We try to keep the cache less than half full
+	 * of dirty blocks so that our sync times don't grow too large.
+	 * Note: if two requests come in concurrently, we might let them
+	 * both succeed, when one of them should fail.  Not a huge deal.
+	 *
+	 * XXX The limit should be adjusted dynamically to keep the time
+	 * to sync a dataset fixed (around 1-5 seconds?).
 	 */
 
-	ASSERT3U(tempreserve, <, arc.c/4); /* otherwise we'll loop forever */
-
-	if (arc_tempreserve + tempreserve + arc.anon->size > arc.c / 4) {
+	if (tempreserve + arc_tempreserve + arc.anon->size > arc.c / 2 &&
+	    arc_tempreserve + arc.anon->size > arc.c / 4) {
 		dprintf("failing, arc_tempreserve=%lluK anon=%lluK "
 		    "tempreserve=%lluK arc.c=%lluK\n",
 		    arc_tempreserve>>10, arc.anon->lsize>>10,
@@ -1932,9 +1938,9 @@ arc_init(void)
 	arc.c = MIN(arc.c, vmem_size(heap_arena, VMEM_ALLOC | VMEM_FREE) / 8);
 #endif
 
-	/* use at least 1/32 of all memory, or 32MB, whichever is more */
+	/* set min cache to 1/32 of all memory, or 64MB, whichever is more */
 	arc.c_min = MAX(arc.c / 4, 64<<20);
-	/* use at most 3/4 of all memory, or all but 1GB, whichever is more */
+	/* set max to 3/4 of all memory, or all but 1GB, whichever is more */
 	if (arc.c * 8 >= 1<<30)
 		arc.c_max = (arc.c * 8) - (1<<30);
 	else

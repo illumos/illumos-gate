@@ -1847,7 +1847,8 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 			 * that specializes in arrays of bps.
 			 */
 			checksum = ZIO_CHECKSUM_FLETCHER_4;
-			compress = ZIO_COMPRESS_LZJB;
+			/* XXX - disable compresssion for now */
+			compress = ZIO_COMPRESS_OFF;
 		} else {
 			/*
 			 * Allow dnode settings to override objset settings,
