@@ -2612,7 +2612,9 @@ help_func(int argc, char *argv[])
 		}
 	}
 	while (optind < argc) {
-		if ((cmd_num = cmd_match(argv[optind])) < 0) {
+		/* Private commands have NULL short_usage; omit them */
+		if ((cmd_num = cmd_match(argv[optind])) < 0 ||
+		    cmdtab[cmd_num].short_usage == NULL) {
 			sub_usage(SHELP_HELP, CMD_HELP);
 			return (Z_USAGE);
 		}
