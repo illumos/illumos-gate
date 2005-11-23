@@ -512,7 +512,8 @@ audio1575_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 		break;
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)audio_sup_devt_to_instance((dev_t)arg);
+		*result = (void *)(uintptr_t)
+		    audio_sup_devt_to_instance((dev_t)arg);
 		error = DDI_SUCCESS;
 		break;
 
@@ -2404,10 +2405,7 @@ audio1575_init_ac97(audio1575_state_t *statep, int restore)
 
 		/* 0eh - set mic input, mute, 0dB attenuation */
 		shadow[M1575_CODEC_REG(AC97_MIC_VOLUME_REGISTER)] =
-		    MICVR_MUTE| MICVR_20dB_BOOST;
-
-		statep->m1575_ad_info.ad_add_mode |=
-		    AM_ADD_MODE_MIC_BOOST;
+		    MICVR_MUTE | MICVR_0dB_GAIN;
 
 		/* 10h - set line input, mute, 0dB attenuation */
 		shadow[M1575_CODEC_REG(AC97_LINE_IN_VOLUME_REGISTER)] =
@@ -2459,7 +2457,7 @@ audio1575_init_ac97(audio1575_state_t *statep, int restore)
 
 		/* 76h - Misc. Control Bit  Register */
 		shadow[M1575_CODEC_REG(AC97_MISC_CONTROL_BIT_REGISTER)] =
-		    MIC_30dB_GAIN|C1MIC;
+		    MIC_20dB_GAIN | C1MIC;
 	}
 
 	/* Now we set the AC97 codec registers to the saved values */
