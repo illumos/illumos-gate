@@ -103,6 +103,7 @@ COMMON_SUBDIRS = \
 	cmd/devmgmt \
 	cmd/dfs.cmds \
 	cmd/diff3 \
+	cmd/dirname \
 	cmd/diskscan \
 	cmd/dispadmin \
 	cmd/dladm \

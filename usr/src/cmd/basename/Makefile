@@ -22,32 +22,29 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 PROG= basename
 XPG4PROG= basename
 
-SRCS= $(PROG:%=%.sh)
-
 include ../Makefile.cmd
 
-$(XPG4) := CFLAGS += $(CCVERBOSE)
+$(XPG4) := CFLAGS += -DXPG4 $(CCVERBOSE)
+lint_PROG_XPG4 := CPPFLAGS += -DXPG4
 
 .KEEP_STATE:
 
 all: $(PROG) $(XPG4)
 
-$(PROG): $(PROG).sh
-	$(RM) $@
-	cat $(PROG).sh > $@
-	chmod +x $@
-
 install: all $(ROOTPROG) $(ROOTXPG4PROG)
 
 clean:
 
-lint: lint_PROG
+lint: lint_PROG lint_PROG_XPG4
+
+lint_PROG_XPG4:	$(PROG).c
+	$(LINT.c) $(PROG).c $(LDLIBS)
 
 include ../Makefile.targ
