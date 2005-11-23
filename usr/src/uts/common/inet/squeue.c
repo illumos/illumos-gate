@@ -210,7 +210,7 @@
 #include <sys/squeue_impl.h>
 
 static void squeue_fire(void *);
-static void squeue_drain(squeue_t *, uint_t, clock_t);
+static void squeue_drain(squeue_t *, uint_t, hrtime_t);
 static void squeue_worker(squeue_t *sqp);
 
 #if SQUEUE_PROFILE
@@ -220,15 +220,17 @@ static int  squeue_kstat_update(kstat_t *, int);
 
 kmem_cache_t *squeue_cache;
 
+#define	SQUEUE_MSEC_TO_NSEC 1000000
+
 int squeue_intrdrain_ms = 20;
 int squeue_writerdrain_ms = 10;
 int squeue_workerdrain_ms = 10;
 int squeue_workerwait_ms = 10;
 
-/* The values above converted to ticks */
-static int squeue_intrdrain_tick = 0;
-static int squeue_writerdrain_tick = 0;
-static int squeue_workerdrain_tick = 0;
+/* The values above converted to ticks or nano seconds */
+static int squeue_intrdrain_ns = 0;
+static int squeue_writerdrain_ns = 0;
+static int squeue_workerdrain_ns = 0;
 static int squeue_workerwait_tick = 0;
 
 /*
@@ -434,9 +436,9 @@ squeue_init(void)
 	squeue_cache = kmem_cache_create("squeue_cache",
 	    sizeof (squeue_t), 64, NULL, NULL, NULL, NULL, NULL, 0);
 
-	squeue_intrdrain_tick = MSEC_TO_TICK_ROUNDUP(squeue_intrdrain_ms);
-	squeue_writerdrain_tick = MSEC_TO_TICK_ROUNDUP(squeue_writerdrain_ms);
-	squeue_workerdrain_tick = MSEC_TO_TICK_ROUNDUP(squeue_workerdrain_ms);
+	squeue_intrdrain_ns = squeue_intrdrain_ms * SQUEUE_MSEC_TO_NSEC;
+	squeue_writerdrain_ns = squeue_writerdrain_ms * SQUEUE_MSEC_TO_NSEC;
+	squeue_workerdrain_ns = squeue_workerdrain_ms * SQUEUE_MSEC_TO_NSEC;
 	squeue_workerwait_tick = MSEC_TO_TICK_ROUNDUP(squeue_workerwait_ms);
 }
 
@@ -453,7 +455,8 @@ squeue_create(char *name, processorid_t bind, clock_t wait, pri_t pri)
 	sqp->sq_bind = bind;
 	sqp->sq_wait = MSEC_TO_TICK(wait);
 	sqp->sq_avg_drain_time =
-	    drv_hztousec(squeue_intrdrain_tick)/squeue_intrdrain_tick;
+	    drv_hztousec(NSEC_TO_TICK_ROUNDUP(squeue_intrdrain_ns)) /
+	    NSEC_TO_TICK_ROUNDUP(squeue_intrdrain_ns);
 
 #if SQUEUE_PROFILE
 	if ((sqp->sq_kstat = kstat_create("ip", bind, name,
@@ -525,6 +528,7 @@ squeue_enter_chain(squeue_t *sqp, mblk_t *mp, mblk_t *tail,
 	int		interrupt = servicing_interrupt();
 	void 		*arg;
 	sqproc_t	proc;
+	hrtime_t	now;
 #if SQUEUE_PROFILE
 	hrtime_t 	start, delta;
 #endif
@@ -662,12 +666,13 @@ squeue_enter_chain(squeue_t *sqp, mblk_t *mp, mblk_t *tail,
 		sqp->sq_isintr = interrupt;
 #endif
 
+		now = gethrtime();
 		if (interrupt) {
-			squeue_drain(sqp, SQS_ENTER, lbolt +
-			    squeue_intrdrain_tick);
+			squeue_drain(sqp, SQS_ENTER, now +
+			    squeue_intrdrain_ns);
 		} else {
-			squeue_drain(sqp, SQS_USER, lbolt +
-			    squeue_writerdrain_tick);
+			squeue_drain(sqp, SQS_USER, now +
+			    squeue_writerdrain_ns);
 		}
 
 #if SQUEUE_PROFILE
@@ -724,6 +729,7 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, sqproc_t proc, void *arg,
     uint8_t tag)
 {
 	int	interrupt = servicing_interrupt();
+	hrtime_t now;
 #if SQUEUE_PROFILE
 	hrtime_t start, delta;
 #endif
@@ -852,12 +858,13 @@ squeue_enter(squeue_t *sqp, mblk_t *mp, sqproc_t proc, void *arg,
 		sqp->sq_isintr = interrupt;
 #endif
 
+		now = gethrtime();
 		if (interrupt) {
-			squeue_drain(sqp, SQS_ENTER, lbolt +
-			    squeue_intrdrain_tick);
+			squeue_drain(sqp, SQS_ENTER, now +
+			    squeue_intrdrain_ns);
 		} else {
-			squeue_drain(sqp, SQS_USER, lbolt +
-			    squeue_writerdrain_tick);
+			squeue_drain(sqp, SQS_USER, now +
+			    squeue_writerdrain_ns);
 		}
 
 #if SQUEUE_PROFILE
@@ -1170,7 +1177,7 @@ squeue_fire(void *arg)
 }
 
 static void
-squeue_drain(squeue_t *sqp, uint_t proc_type, clock_t expire)
+squeue_drain(squeue_t *sqp, uint_t proc_type, hrtime_t expire)
 {
 	mblk_t	*mp;
 	mblk_t 	*head;
@@ -1184,6 +1191,7 @@ squeue_drain(squeue_t *sqp, uint_t proc_type, clock_t expire)
 	ill_rx_ring_t	*sq_rx_ring = sqp->sq_rx_ring;
 	int	interrupt = servicing_interrupt();
 	boolean_t poll_on = B_FALSE;
+	hrtime_t now;
 
 	ASSERT(mutex_owned(&sqp->sq_lock));
 	ASSERT(!(sqp->sq_state & SQS_PROC));
@@ -1276,7 +1284,9 @@ again:
 	total_cnt += cnt;
 
 	if (sqp->sq_first != NULL) {
-		if (!expire || (lbolt < expire)) {
+
+		now = gethrtime();
+		if (!expire || (now < expire)) {
 			/* More arrived and time not expired */
 			head = sqp->sq_first;
 			sqp->sq_first = NULL;
@@ -1329,6 +1339,7 @@ squeue_worker(squeue_t *sqp)
 	kmutex_t *lock = &sqp->sq_lock;
 	kcondvar_t *async = &sqp->sq_async;
 	callb_cpr_t cprinfo;
+	hrtime_t now;
 #if SQUEUE_PROFILE
 	hrtime_t start;
 #endif
@@ -1353,9 +1364,10 @@ still_wait:
 		}
 #endif
 
-		ASSERT(squeue_workerdrain_tick != 0);
+		ASSERT(squeue_workerdrain_ns != 0);
+		now = gethrtime();
 		sqp->sq_run = curthread;
-		squeue_drain(sqp, SQS_WORKER, lbolt +  squeue_workerdrain_tick);
+		squeue_drain(sqp, SQS_WORKER, now +  squeue_workerdrain_ns);
 		sqp->sq_run = NULL;
 
 		if (sqp->sq_first != NULL) {
@@ -1363,7 +1375,7 @@ still_wait:
 			 * Doing too much processing by worker thread
 			 * in presense of interrupts can be sub optimal.
 			 * Instead, once a drain is done by worker thread
-			 * for squeue_writerdrain_ms (the reason we are
+			 * for squeue_writerdrain_ns (the reason we are
 			 * here), we force wait for squeue_workerwait_tick
 			 * before doing more processing even if sq_wait is
 			 * set to 0.
