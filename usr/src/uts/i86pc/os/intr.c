@@ -290,13 +290,10 @@ intr_thread_prolog(struct cpu *cpu, caddr_t stackptr, uint_t pil)
 	 * There should always be an interrupt thread, since we
 	 * allocate one for each level on each CPU.
 	 *
-	 * Note that the code in kcpc_overflow_intr -relies- on the
-	 * ordering of events here - in particular that t->t_lwp of
-	 * the interrupt thread is set to the pinned thread *before*
-	 * curthread is changed.
+	 * t_intr_start could be zero due to cpu_intr_swtch_enter.
 	 */
 	t = cpu->cpu_thread;
-	if (t->t_flag & T_INTR_THREAD) {
+	if ((t->t_flag & T_INTR_THREAD) && t->t_intr_start != 0) {
 		hrtime_t intrtime = tsc_read() - t->t_intr_start;
 		mcpu->intrstat[t->t_pil][0] += intrtime;
 		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
@@ -309,6 +306,11 @@ intr_thread_prolog(struct cpu *cpu, caddr_t stackptr, uint_t pil)
 
 	/*
 	 * unlink the interrupt thread off the cpu
+	 *
+	 * Note that the code in kcpc_overflow_intr -relies- on the
+	 * ordering of events here - in particular that t->t_lwp of
+	 * the interrupt thread is set to the pinned thread *before*
+	 * curthread is changed.
 	 */
 	it = cpu->cpu_intr_thread;
 	cpu->cpu_intr_thread = it->t_link;
@@ -504,18 +506,21 @@ top:
 	it = cpu->cpu_intr_thread;
 	cpu->cpu_intr_thread = it->t_link;
 
+	/* t_intr_start could be zero due to cpu_intr_swtch_enter. */
+	t = cpu->cpu_thread;
+	if ((t->t_flag & T_INTR_THREAD) && t->t_intr_start != 0) {
+		hrtime_t intrtime = tsc_read() - t->t_intr_start;
+		mcpu->intrstat[pil][0] += intrtime;
+		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
+		t->t_intr_start = 0;
+	}
+
 	/*
 	 * Note that the code in kcpc_overflow_intr -relies- on the
 	 * ordering of events here - in particular that t->t_lwp of
 	 * the interrupt thread is set to the pinned thread *before*
-	 * curthread is changed
+	 * curthread is changed.
 	 */
-	t = cpu->cpu_thread;
-	if (t->t_flag & T_INTR_THREAD) {
-		hrtime_t intrtime = tsc_read() - t->t_intr_start;
-		mcpu->intrstat[pil][0] += intrtime;
-		cpu->cpu_intracct[cpu->cpu_mstate] += intrtime;
-	}
 	it->t_lwp = t->t_lwp;
 	it->t_state = TS_ONPROC;
 

@@ -894,6 +894,16 @@ _interrupt_size:
 	/
 	testw	$T_INTR_THREAD, T_FLAGS(%edx)
 	jz	0f
+	/
+	/ We have interrupted an interrupt thread. Account for its time slice
+	/ only if its time stamp is non-zero. t_intr_start may be zero due to
+	/ cpu_intr_swtch_enter.
+	/
+	cmpl	$0, T_INTR_START+4(%edx)
+	jne	1f
+	cmpl	$0, T_INTR_START(%edx)
+	je	0f
+1:	
 	pushl	%ecx
 	pushl	%eax
 	movl	%edx, %esi
@@ -1327,6 +1337,16 @@ _fakesoftint_size:
 	/ If we are interrupting an interrupt thread, account for it.
 	testw	$T_INTR_THREAD, T_FLAGS(%ecx)
 	jz	0f
+	/
+	/ We have interrupted an interrupt thread. Account for its time slice
+	/ only if its time stamp is non-zero. t_intr_start may be zero due to
+	/ cpu_intr_swtch_enter.
+	/
+	cmpl	$0, T_INTR_START+4(%ecx)
+	jne	1f
+	cmpl	$0, T_INTR_START(%ecx)
+	je	0f
+1:
 	pushl	%eax
 	movl	%eax, %ebp
 _tsc_patch11:
