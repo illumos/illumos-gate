@@ -5446,6 +5446,14 @@ sd_uselabel(struct sd_lun *un, struct dk_label *labp, int path_flag)
 	vpartp		= labp->dkl_vtoc.v_part;
 	track_capacity	= labp->dkl_nhead * labp->dkl_nsect;
 
+	/* Prevent divide by zero */
+	if (track_capacity == 0) {
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		    "Corrupt label - zero nhead or nsect value\n");
+
+		return (SD_LABEL_IS_INVALID);
+	}
+
 	for (i = 0; i < NDKMAP; i++, vpartp++) {
 		un->un_map[i].dkl_cylno = vpartp->p_start / track_capacity;
 		un->un_map[i].dkl_nblk  = vpartp->p_size;
@@ -5462,9 +5470,6 @@ sd_uselabel(struct sd_lun *un, struct dk_label *labp, int path_flag)
 	bcopy(labp->dkl_asciilabel, un->un_asciilabel, LEN_DKL_ASCII);
 #endif
 
-	/* Mark the geometry as valid. */
-	un->un_f_geometry_is_valid = TRUE;
-
 	/* Now look for a valid capacity. */
 	track_capacity	= (un->un_g.dkg_nhead * un->un_g.dkg_nsect);
 	capacity	= (un->un_g.dkg_ncyl  * track_capacity);
@@ -5477,6 +5482,21 @@ sd_uselabel(struct sd_lun *un, struct dk_label *labp, int path_flag)
 		capacity += track_capacity;
 #endif
 	}
+
+	/*
+	 * Force check here to ensure the computed capacity is valid.
+	 * If capacity is zero, it indicates an invalid label and
+	 * we should abort updating the relevant data then.
+	 */
+	if (capacity == 0) {
+		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
+		    "Corrupt label - no valid capacity could be retrieved\n");
+
+		return (SD_LABEL_IS_INVALID);
+	}
+
+	/* Mark the geometry as valid. */
+	un->un_f_geometry_is_valid = TRUE;
 
 	/*
 	 * At this point, un->un_blockcount should contain valid data from
@@ -5719,6 +5739,7 @@ sd_build_default_label(struct sd_lun *un)
 		phys_spc = un->un_g.dkg_nhead * un->un_g.dkg_nsect;
 	}
 
+	ASSERT(phys_spc != 0);
 	un->un_g.dkg_pcyl = un->un_solaris_size / phys_spc;
 	un->un_g.dkg_acyl = DK_ACYL;
 	un->un_g.dkg_ncyl = un->un_g.dkg_pcyl - DK_ACYL;
@@ -21638,6 +21659,18 @@ skip_ready_valid:
 				dkgp->dkg_ncyl = un->un_pgeom.g_ncyl;
 				dkgp->dkg_acyl = un->un_pgeom.g_acyl;
 			} else {
+				/*
+				 * Invalid un_blockcount can generate invalid
+				 * dk_geom and may result in division by zero
+				 * system failure. Should make sure blockcount
+				 * is valid before using it here.
+				 */
+				if (un->un_f_blockcount_is_valid == FALSE) {
+					mutex_exit(SD_MUTEX(un));
+					err = EIO;
+
+					break;
+				}
 				sd_convert_geometry(un->un_blockcount, dkgp);
 				dkgp->dkg_acyl = 0;
 				dkgp->dkg_ncyl = un->un_blockcount /
