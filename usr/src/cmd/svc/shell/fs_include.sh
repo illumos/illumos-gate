@@ -124,7 +124,6 @@ checkfs() {
 	# /usr failed or the /usr filesystem is badly damanged.  In either
 	# case, there is not much to be done automatically.  Fail with
 	# a message to the user.
-
 	if [ ! -x /usr/sbin/fsck ]; then
 		cecho ""
 		cecho "WARNING - /usr/sbin/fsck not found.  Most likely the"
@@ -133,6 +132,10 @@ checkfs() {
 		cecho ""
 		return 1
 	fi
+
+	# If a filesystem-specific fsck binary is unavailable, then no
+	# fsck pass is required.
+	[ ! -x /usr/lib/fs/$2/fsck ] && [ ! -x /etc/fs/$2/fsck ] && return
 
 	/usr/sbin/fsck -F $2 -m $1 >/dev/null 2>&1
 
