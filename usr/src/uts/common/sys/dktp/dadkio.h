@@ -124,7 +124,10 @@ typedef struct dadk_ioc_string
 #define	DERR_UNIT_ATTN	19	/* Unit attention			*/
 #define	DERR_DATA_PROT	20	/* Data protection			*/
 #define	DERR_MISCOMP	21	/* Miscompare				*/
-#define	DERR_RESV	22	/* Reserved				*/
+#define	DERR_ICRC	22	/* Interface CRC error -- new driver	*/
+				/* error code in ATA-4 and newer	*/
+#define	DERR_RESV	23	/* Reserved				*/
+
 struct	dadkio_derr {
 	int	d_action;
 	int	d_severity;

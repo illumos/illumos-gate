@@ -186,7 +186,8 @@ static char *dadk_sense[] = {
 	"\023unit attention",		/* DERR_UNIT_ATTN	*/
 	"\024data protection",		/* DERR_DATA_PROT	*/
 	"\025miscompare",		/* DERR_MISCOMPARE	*/
-	"\026reserved",			/* DERR_RESV		*/
+	"\026ICRC error during UDMA",	/* DERR_ICRC		*/
+	"\027reserved",			/* DERR_RESV		*/
 	NULL
 };
 
@@ -1185,7 +1186,8 @@ static struct dadkio_derr dadk_errtab[] = {
 	{COMMAND_DONE, GDA_FATAL},		/* 19 DERR_UNIT_ATTN	*/
 	{COMMAND_DONE_ERROR, GDA_FATAL},	/* 20 DERR_DATA_PROT	*/
 	{COMMAND_DONE_ERROR, GDA_FATAL},	/* 21 DERR_MISCOMPARE	*/
-	{COMMAND_DONE_ERROR, GDA_FATAL},	/* 22 DERR_RESV		*/
+	{QUE_COMMAND, GDA_RETRYABLE},		/* 22 DERR_ICRC		*/
+	{COMMAND_DONE_ERROR, GDA_FATAL},	/* 23 DERR_RESV		*/
 };
 
 static int
@@ -1265,6 +1267,7 @@ dadk_recorderr(struct cmpkt *pktp, struct dadkio_rwcmd *rwcmdp)
 	case DERR_HARD:
 		rwcmdp->status.status = DADKIO_STAT_HARDWARE_ERROR;
 		break;
+	case DERR_ICRC:
 	default:
 		rwcmdp->status.status = DADKIO_STAT_NOT_SUPPORTED;
 	}
