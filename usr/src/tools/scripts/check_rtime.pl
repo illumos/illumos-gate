@@ -208,9 +208,10 @@ $UnusedNoise = qr{
 	libdl\.so\.1;\ unused\ dependency\ of\ .*libCrun\.so\.1 |
 	libfru\.so\.1;\ unused\ object=.*libdl\.so\.1 |
 	libfrupicl\.so\.1;\ unused\ object=.*libdl\.so\.1 |
-	libmapmalloc\.so\.1;\ unused
+	libmapmalloc\.so\.1;\ unused |
+	unused\ dependency\ of\ .*libstdc\+\+\.so\.6 |
+	unreferenced\ object=.*libstdc\+\+\.so\.6
 }x;
-
 
 # Define interpreters we should ignore.
 $SkipInterps = qr{
