@@ -1065,7 +1065,7 @@ zfs_perm_init(znode_t *zp, znode_t *parent, int flag,
 }
 
 /*
- * Can use be used for inheritance
+ * Should ACE be inherited?
  */
 static int
 zfs_ace_can_use(znode_t *zp, ace_t *acep)
@@ -1076,10 +1076,9 @@ zfs_ace_can_use(znode_t *zp, ace_t *acep)
 
 	if ((vtype == VDIR) && (iflags & ACE_DIRECTORY_INHERIT_ACE))
 		return (1);
-
 	else if (iflags & ACE_FILE_INHERIT_ACE)
-		return (1);
-
+		return (!((vtype == VDIR) &&
+		    (iflags & ACE_NO_PROPAGATE_INHERIT_ACE)));
 	return (0);
 }
 
