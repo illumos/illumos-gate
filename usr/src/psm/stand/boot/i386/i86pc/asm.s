@@ -243,17 +243,6 @@ donetable:
 / under extreme circumstances.
 
 	ENTRY(reset)
-	/ Try the PCI (soft) reset vector (should work on all modern systems)
-	/ When resetting via this method, 2 writes are required.  The first
-	/ targets bit 1 (0=hard reset without power cycle, 1=hard reset with power
-	/ cycle).
-	/ The reset occurs on the second write, during bit 2's transition from 0->1.
-	movw	$0xcf9, %dx
-	movb	$0x2, %al	/ Reset mode = hard, no power cycle
-	outb	(%dx)
-	movb	$0x6, %al
-	outb	(%dx)
-
 	/
 	/ Try the classic keyboard controller-triggered reset.
 	/
@@ -276,8 +265,23 @@ donetable:
 	orb	$1, %al		/ Set bit 0
 	outb	(%dx)		/ and reset the system
 1:
+
+	/ Try the PCI (soft) reset vector (should work on all modern systems,
+	/ but has been shown to cause problems on 450NX systems, and some newer
+	/ systems (e.g. ATI IXP400-equipped systems))
+	/ When resetting via this method, 2 writes are required.  The first
+	/ targets bit 1 (0=hard reset without power cycle, 1=hard reset with
+	/ power cycle).
+	/ The reset occurs on the second write, during bit 2's transition from
+	/ 0->1.
+	movw	$0xcf9, %dx
+	movb	$0x2, %al	/ Reset mode = hard, no power cycle
+	outb	(%dx)
+	movb	$0x6, %al
+	outb	(%dx)
+
 	/
-	/ port 0x92 failed also.  Last-ditch effort is to
+	/ port 0xcf9 failed also.  Last-ditch effort is to
 	/ triple-fault the CPU.
 	/
 	movw	$0, IDTlimit	/ generate faulty table
