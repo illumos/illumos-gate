@@ -31,23 +31,23 @@
 name:/frutree/chassis/MB
 NODE system-board fru
     NODE pci-slot location
-    	PROP Label string r 0 "PCI4"
+    	PROP Label string r 0 "PCIE2"
 	PROP SlotType string r 0 "pci-e"
     ENDNODE
     NODE pci-slot location
-    	PROP Label string r 0 "PCI3"
+    	PROP Label string r 0 "PCIE1"
 	PROP SlotType string r 0 "pci-e"
     ENDNODE
     NODE pci-slot location
-    	PROP Label string r 0 "PCI2"
+    	PROP Label string r 0 "PCIE0"
 	PROP SlotType string r 0 "pci-e"
     ENDNODE
     NODE pci-slot location
-    	PROP Label string r 0 "PCI1"
+    	PROP Label string r 0 "PCIX1"
 	PROP SlotType string r 0 "pci-x"
     ENDNODE
     NODE pci-slot location
-    	PROP Label string r 0 "PCI0"
+    	PROP Label string r 0 "PCIX0"
 	PROP SlotType string r 0 "pci-x"
     ENDNODE
     NODE cpu-slot location
@@ -115,7 +115,7 @@ REFNODE cpu-module fru WITH _class:/PLATFORM_CLASS/cpu?ID=1
  * Create DIMM fru modules
  */
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM0
-REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a0
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a6
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM1
 REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a2
@@ -124,16 +124,16 @@ name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM2
 REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a4
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM3
-REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a6
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a0
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM4
 REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,a8
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM5
-REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,aa
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,ac
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM6
-REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,ac
+REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,aa
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM7
 REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,ae
@@ -141,19 +141,19 @@ REFNODE mem-module fru WITH /platform/i2c@1f,520000/dimm-spd@0,ae
 /*
  * Populate PCI slots
  */
-name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI4
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIE2
 REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1f,700000/picl?DeviceID=0
 
-name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI3
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIE1
 REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl?DeviceID=0
 
-name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI2
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIE0
 REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl?DeviceID=0
 
-name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI1
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIX1
 REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pciex@0,2/picl?DeviceID=1
 
-name:/frutree/chassis/MB/system-board/pci-slot?Label=PCI0
+name:/frutree/chassis/MB/system-board/pci-slot?Label=PCIX0
 REFNODE pci-card fru WITH _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pciex@0,2/picl?DeviceID=2
 
 /*
@@ -168,7 +168,7 @@ REFPROP _seeprom_source /platform/i2c@1f,530000/motherboard-fru-prom@0,a2
  */
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM0/mem-module
 PROP FRUDataAvailable void r
-REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a0
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a6
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM1/mem-module
 PROP FRUDataAvailable void r
@@ -180,7 +180,7 @@ REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a4
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM3/mem-module
 PROP FRUDataAvailable void r
-REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a6
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a0
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM4/mem-module
 PROP FRUDataAvailable void r
@@ -188,11 +188,11 @@ REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,a8
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM5/mem-module
 PROP FRUDataAvailable void r
-REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,aa
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,ac
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM6/mem-module
 PROP FRUDataAvailable void r
-REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,ac
+REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,aa
 
 name:/frutree/chassis/MB/system-board/mem-slot?Label=DIMM7/mem-module
 PROP FRUDataAvailable void r
@@ -201,7 +201,7 @@ REFPROP _seeprom_source /platform/i2c@1f,520000/dimm-spd@0,ae
 /*
  * _fru_parent memory modules
  */
-name:/platform/memory-controller?portid=0/memory-module-group?ID=0/memory-module?ID=0
+name:/platform/memory-controller?portid=0/memory-module-group?ID=1/memory-module?ID=1
 REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM0/mem-module
 
 name:/platform/memory-controller?portid=0/memory-module-group?ID=0/memory-module?ID=1
@@ -210,16 +210,16 @@ REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM1/mem-mo
 name:/platform/memory-controller?portid=0/memory-module-group?ID=1/memory-module?ID=0
 REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM2/mem-module
 
-name:/platform/memory-controller?portid=0/memory-module-group?ID=1/memory-module?ID=1
+name:/platform/memory-controller?portid=0/memory-module-group?ID=0/memory-module?ID=0
 REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM3/mem-module
 
 name:/platform/memory-controller?portid=1/memory-module-group?ID=0/memory-module?ID=0
 REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM4/mem-module
 
-name:/platform/memory-controller?portid=1/memory-module-group?ID=0/memory-module?ID=1
+name:/platform/memory-controller?portid=1/memory-module-group?ID=1/memory-module?ID=0
 REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM5/mem-module
 
-name:/platform/memory-controller?portid=1/memory-module-group?ID=1/memory-module?ID=0
+name:/platform/memory-controller?portid=1/memory-module-group?ID=0/memory-module?ID=1
 REFPROP _fru_parent /frutree/chassis/MB/system-board/mem-slot?Label=DIMM6/mem-module
 
 name:/platform/memory-controller?portid=1/memory-module-group?ID=1/memory-module?ID=1
@@ -251,19 +251,19 @@ REFPROP _fru_parent /frutree/chassis/MB/system-board
  * _fru_parent PCI devices
  */
 _class:/PLATFORM_CLASS/pciex@1f,700000/picl?DeviceID=0
-REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI4/pci-card
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE2/pci-card
 
 _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@8/picl?DeviceID=0
-REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI3/pci-card
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE1/pci-card
 
 _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@3/picl?DeviceID=0
-REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI2/pci-card
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIE0/pci-card
 
 _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pciex@0,2/picl?DeviceID=1
-REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI1/pci-card
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX1/pci-card
 
 _class:/PLATFORM_CLASS/pciex@1e,600000/pciex@0/pciex@9/pciex@0,2/picl?DeviceID=2
-REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCI0/pci-card
+REFPROP _fru_parent /frutree/chassis/MB/system-board/pci-slot?Label=PCIX0/pci-card
 
 /*
  * _fru_parent for fans
