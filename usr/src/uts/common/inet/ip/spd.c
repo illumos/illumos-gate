@@ -1310,10 +1310,15 @@ ipsec_check_ipsecin_unique(ipsec_in_t *ii, mblk_t *mp,
     const char **reason, kstat_named_t **counter)
 {
 	uint64_t pkt_unique, ah_mask, esp_mask;
-	ipsa_t *ah_assoc = ii->ipsec_in_ah_sa;
-	ipsa_t *esp_assoc = ii->ipsec_in_esp_sa;
+	ipsa_t *ah_assoc;
+	ipsa_t *esp_assoc;
 	ipsec_selector_t sel;
 
+	ASSERT(ii->ipsec_in_secure);
+	ASSERT(!ii->ipsec_in_loopback);
+
+	ah_assoc = ii->ipsec_in_ah_sa;
+	esp_assoc = ii->ipsec_in_esp_sa;
 	ASSERT((ah_assoc != NULL) || (esp_assoc != NULL));
 
 	ah_mask = (ah_assoc != NULL) ? ah_assoc->ipsa_unique_mask : 0;
@@ -1539,22 +1544,31 @@ ipsec_check_ipsecin_latch(ipsec_in_t *ii, mblk_t *mp, ipsec_latch_t *ipl,
 {
 	ASSERT(ipl->ipl_ids_latched == B_TRUE);
 
-	if ((ii->ipsec_in_ah_sa != NULL) &&
-	    (!spd_match_inbound_ids(ipl, ii->ipsec_in_ah_sa))) {
-		*counter = &ipdrops_spd_ah_badid;
-		*reason = "AH identity mismatch";
-		return (B_FALSE);
-	}
+	if (!ii->ipsec_in_loopback) {
+		/*
+		 * Over loopback, there aren't real security associations,
+		 * so there are neither identities nor "unique" values
+		 * for us to check the packet against.
+		 */
+		if ((ii->ipsec_in_ah_sa != NULL) &&
+		    (!spd_match_inbound_ids(ipl, ii->ipsec_in_ah_sa))) {
+			*counter = &ipdrops_spd_ah_badid;
+			*reason = "AH identity mismatch";
+			return (B_FALSE);
+		}
 
-	if ((ii->ipsec_in_esp_sa != NULL) &&
-	    (!spd_match_inbound_ids(ipl, ii->ipsec_in_esp_sa))) {
-		*counter = &ipdrops_spd_esp_badid;
-		*reason = "ESP identity mismatch";
-		return (B_FALSE);
-	}
+		if ((ii->ipsec_in_esp_sa != NULL) &&
+		    (!spd_match_inbound_ids(ipl, ii->ipsec_in_esp_sa))) {
+			*counter = &ipdrops_spd_esp_badid;
+			*reason = "ESP identity mismatch";
+			return (B_FALSE);
+		}
 
-	if (!ipsec_check_ipsecin_unique(ii, mp, ipha, ip6h, reason, counter))
-		return (B_FALSE);
+		if (!ipsec_check_ipsecin_unique(ii, mp, ipha, ip6h, reason,
+		    counter)) {
+			return (B_FALSE);
+		}
+	}
 
 	return (ipsec_check_ipsecin_action(ii, mp, ipl->ipl_in_action,
 	    ipha, ip6h, reason, counter));
@@ -1590,8 +1604,9 @@ ipsec_check_ipsecin_policy(queue_t *q, mblk_t *first_mp, ipsec_policy_t *ipsp,
 
 	if (ii->ipsec_in_loopback)
 		return (ipsec_check_loopback_policy(q, first_mp, B_TRUE, ipsp));
-
 	ASSERT(ii->ipsec_in_type == IPSEC_IN);
+	ASSERT(ii->ipsec_in_secure);
+
 	if (ii->ipsec_in_action != NULL) {
 		/*
 		 * this can happen if we do a double policy-check on a packet
@@ -1841,6 +1856,7 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 	mblk_t *data_mp, *ipsec_mp;
 	boolean_t policy_present;
 	kstat_named_t *counter;
+	ipsec_in_t *ii = NULL;
 
 	data_mp = mctl_present ? first_mp->b_cont : first_mp;
 	ipsec_mp = mctl_present ? first_mp : NULL;
@@ -1868,8 +1884,8 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 
 	if (ipsec_mp != NULL) {
 		ASSERT(ipsec_mp->b_datap->db_type == M_CTL);
-		ASSERT(((ipsec_in_t *)ipsec_mp->b_rptr)->ipsec_in_type ==
-		    IPSEC_IN);
+		ii = (ipsec_in_t *)(ipsec_mp->b_rptr);
+		ASSERT(ii->ipsec_in_type == IPSEC_IN);
 	}
 
 	/*
@@ -1923,7 +1939,7 @@ ipsec_check_global_policy(mblk_t *first_mp, conn_t *connp,
 			goto fail;
 		}
 	}
-	if (ipsec_mp != NULL)
+	if ((ii != NULL) && (ii->ipsec_in_secure))
 		return (ipsec_check_ipsecin_policy(q, ipsec_mp, p, ipha, ip6h));
 	if (p->ipsp_act->ipa_allow_clear) {
 		BUMP_MIB(&ip_mib, ipsecInSucceeded);
@@ -2159,6 +2175,7 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 	ipl = connp->conn_latch;
 
 	if (ipsec_mp == NULL) {
+clear:
 		/*
 		 * This is the case where the incoming datagram is
 		 * cleartext and we need to see whether this client
@@ -2222,6 +2239,9 @@ ipsec_check_inbound_policy(mblk_t *first_mp, conn_t *connp,
 	ASSERT(ipsec_mp != NULL);
 	ASSERT(ipsec_mp->b_datap->db_type == M_CTL);
 	ii = (ipsec_in_t *)ipsec_mp->b_rptr;
+
+	if (!ii->ipsec_in_secure)
+		goto clear;
 
 	/*
 	 * mp->b_cont could be either a M_CTL message
