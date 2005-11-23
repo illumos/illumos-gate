@@ -392,7 +392,7 @@ usbprn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if ((ddi_create_minor_node(dip, "printer", S_IFCHR,
 	    instance << USBPRN_MINOR_INSTANCE_SHIFT,
 	    DDI_NT_PRINTER, 0)) != DDI_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, usbprnp->usbprn_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, usbprnp->usbprn_log_handle,
 		    "usbprn_attach: cannot create minor node");
 
 		goto fail;
@@ -417,7 +417,7 @@ usbprn_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Register for events */
 	if (usb_register_event_cbs(dip, &usbprn_events, 0) != USB_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, usbprnp->usbprn_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, usbprnp->usbprn_log_handle,
 		    "usbprn_attach: usb_register_event_cbs failed");
 
 		goto fail;
@@ -1010,7 +1010,7 @@ usbprn_open(dev_t *devp, int flag, int sflag, cred_t *credp)
 
 	if (usbprn_open_usb_pipes(usbprnp) != USB_SUCCESS) {
 
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, usbprnp->usbprn_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, usbprnp->usbprn_log_handle,
 		    "usbprn_open: pipe open failed");
 
 		usb_release_access(usbprnp->usbprn_ser_acc);
@@ -2545,7 +2545,7 @@ usbprn_restore_device_state(dev_info_t *dip, usbprn_state_t *usbprnp)
 
 	/* Check if we are talking to the same device */
 	if (usb_check_same_device(dip, usbprnp->usbprn_log_handle,
-	    USB_LOG_L2, PRINT_MASK_ALL,
+	    USB_LOG_L0, PRINT_MASK_ALL,
 	    USB_CHK_ALL, NULL) != USB_SUCCESS) {
 
 		/* change the device state from suspended to disconnected */

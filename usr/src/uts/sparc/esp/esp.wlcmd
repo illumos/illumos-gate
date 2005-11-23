@@ -42,6 +42,11 @@ add notify_entry::callback target warlock_dummy
 
 root esp_kmem_cache_constructor esp_kmem_cache_destructor
 
-add     scsi_hba_tran::tran_bus_config targets warlock_dummy
-add     scsi_hba_tran::tran_bus_unconfig targets warlock_dummy
+for ptr in `funcptrs | grep '^scsi_hba_tran::'`
+do
+        add $ptr target warlock_dummy
+done
+root    scsi_hba_bus_power
+ignore  delay
+
 

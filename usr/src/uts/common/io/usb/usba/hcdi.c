@@ -196,7 +196,7 @@ usba_hcdi_register(usba_hcdi_register_args_t *args, uint_t flags)
 			hcdi->hcdi_ugen_default_binding =
 			    USBA_UGEN_INTERFACE_BINDING;
 		} else {
-			USB_DPRINTF_L1(DPRINT_MASK_HCDI,
+			USB_DPRINTF_L2(DPRINT_MASK_HCDI,
 			    hcdi->hcdi_log_handle,
 			    "illegal value (%s) for "
 			    "ugen_default_binding property",

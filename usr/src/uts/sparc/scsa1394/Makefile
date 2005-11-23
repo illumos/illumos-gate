@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,6 +38,8 @@ MODULE		= scsa1394
 OBJECTS		= $(SCSA1394_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SCSA1394_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+WARLOCK_OUT     = $(SCSA1394_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
 
 #
 #	Include common rules.
@@ -76,11 +78,11 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean:		$(CLEAN_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS)
-
-lint:		$(LINT_DEPS)
+clobber:	$(CLOBBER_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 modlintlib:	$(MODLINTLIB_DEPS) lint32
 
@@ -107,14 +109,19 @@ TEST		= test
 #
 WARLOCK_OBJECTS	= $(SCSA1394_OBJS:%.o=%.ll)
 SBP2_FILES = $(SBP2_OBJS:%.o= -l ../sbp2/%.ll)
+SD_FILES   = $(SD_OBJS:%.o=../sd/%.ll)
+SCSI_FILES = $(SCSI_OBJS:%.o= -l ../scsi/%.ll)
 
 warlock: $(MODULE).ok
 
 %.wlcmd:
 	$(TEST) -f $@ || $(SCCS) get $@
 
-$(MODULE).ok: $(WARLOCK_OBJECTS) sbp2.files warlock_ddi.files scsa1394.wlcmd
-	$(WARLOCK) -c scsa1394.wlcmd $(WARLOCK_OBJECTS) $(SBP2_FILES) \
+$(MODULE).ok: $(WARLOCK_OBJECTS) sbp2.files warlock_ddi.files scsa1394.wlcmd \
+	sd.files scsi.files
+	$(WARLOCK) -c scsa1394.wlcmd $(WARLOCK_OBJECTS) $(SD_FILES) \
+		$(SCSI_FILES) \
+		$(SBP2_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@
 
@@ -126,3 +133,11 @@ sbp2.files:
 
 warlock_ddi.files:
 	@cd ../warlock; pwd; $(MAKE) warlock
+
+sd.files:
+	@cd ../sd; pwd; $(MAKE) warlock_alone
+
+scsi.files:
+	@cd ../scsi; pwd; $(MAKE) warlock
+
+

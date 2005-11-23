@@ -22,7 +22,7 @@
 #
 # uts/intel/hci1394/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -94,38 +94,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-SCCS		= sccs
-TEST		= test
-
-#
-#	Warlock targets
-#
-WARLOCK_OBJECTS	= $(HCI1394_OBJS:%.o=%.ll)
-S1394_FILES = $(S1394_OBJS:%.o= -l ../s1394/%.ll)
-
-warlock: $(MODULE).ok
-
-%.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
-
-$(MODULE).ok: $(WARLOCK_OBJECTS) s1394.files warlock_ddi.files hci1394.wlcmd
-	$(WARLOCK) -c hci1394.wlcmd $(WARLOCK_OBJECTS) $(S1394_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/1394/adapters/%.c
-	$(WLCC) $(CPPFLAGS) -DNPROBE -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock
-
-s1394.files:
-	@cd ../s1394; pwd; $(MAKE) warlock
-

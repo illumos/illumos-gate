@@ -11233,6 +11233,8 @@ sdawrite(dev_t dev, struct aio_req *aio, cred_t *cred_p)
 #define	SD_TASKQ_MAXALLOC	256
 
 static taskq_t	*sd_tq = NULL;
+_NOTE(SCHEME_PROTECTS_DATA("stable data", sd_tq))
+
 static int	sd_taskq_minalloc = SD_TASKQ_MINALLOC;
 static int	sd_taskq_maxalloc = SD_TASKQ_MAXALLOC;
 
@@ -11246,6 +11248,7 @@ static int	sd_taskq_maxalloc = SD_TASKQ_MAXALLOC;
  */
 #define	SD_WMR_TASKQ_NUMTHREADS	1
 static taskq_t	*sd_wmr_tq = NULL;
+_NOTE(SCHEME_PROTECTS_DATA("stable data", sd_wmr_tq))
 
 /*
  *    Function: sd_taskq_create

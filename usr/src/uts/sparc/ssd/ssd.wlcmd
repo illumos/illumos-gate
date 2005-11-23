@@ -1,6 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
 # CDDL HEADER START
 #
@@ -22,6 +19,10 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 one scsi_device
 root ssd_mhd_reset_notify_cb ssd_event_callback
@@ -42,3 +43,9 @@ done
 
 add scsi_watch_request::swr_callback targets ssd_media_watch_cb ssd_mhd_watch_cb
 add sd.c:ssd_start_cmds/funcp target ssd_initpkt_for_buf ssd_initpkt_for_uscsi
+
+root scsi_hba_bus_power
+
+add  sd_uscsi_info::ui_dkc.dkc_callback targets warlock_dummy
+add  dk_callback::dkc_callback targets warlock_dummy
+

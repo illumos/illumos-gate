@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2063,7 +2063,7 @@ usb_pipe_stop_intr_polling(usb_pipe_handle_t pipe_handle,
 
 	if ((ph_data->p_ep.bmAttributes &
 	    USB_EP_ATTR_MASK) != USB_EP_ATTR_INTR) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_pipe_stop_intr_polling: wrong pipe type");
 
 		usba_release_ph_data(ph_data->p_ph_impl);
@@ -2072,7 +2072,7 @@ usb_pipe_stop_intr_polling(usb_pipe_handle_t pipe_handle,
 	}
 
 	if ((ph_data->p_ep.bEndpointAddress & USB_EP_DIR_IN) == 0) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_pipe_stop_intr_polling: wrong pipe direction");
 
 		usba_release_ph_data(ph_data->p_ph_impl);
@@ -2081,7 +2081,7 @@ usb_pipe_stop_intr_polling(usb_pipe_handle_t pipe_handle,
 	}
 
 	if (servicing_interrupt() && (flags & USB_FLAGS_SLEEP)) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_pipe_stop_intr_polling: invalid context");
 
 		usba_release_ph_data(ph_data->p_ph_impl);
@@ -2553,7 +2553,7 @@ usb_pipe_stop_isoc_polling(usb_pipe_handle_t pipe_handle,
 
 	if ((ph_data->p_ep.bmAttributes & USB_EP_ATTR_MASK) !=
 	    USB_EP_ATTR_ISOCH) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_pipe_stop_isoc_polling: wrong pipe type");
 
 		usba_release_ph_data(ph_data->p_ph_impl);
@@ -2561,7 +2561,7 @@ usb_pipe_stop_isoc_polling(usb_pipe_handle_t pipe_handle,
 		return;
 	}
 	if ((ph_data->p_ep.bEndpointAddress & USB_EP_DIR_IN) == 0) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_pipe_stop_isoc_polling: wrong pipe direction");
 
 		usba_release_ph_data(ph_data->p_ph_impl);
@@ -2570,7 +2570,7 @@ usb_pipe_stop_isoc_polling(usb_pipe_handle_t pipe_handle,
 	}
 
 	if (servicing_interrupt() && (flags & USB_FLAGS_SLEEP)) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_pipe_stop_intr_polling: invalid context");
 
 		usba_release_ph_data(ph_data->p_ph_impl);

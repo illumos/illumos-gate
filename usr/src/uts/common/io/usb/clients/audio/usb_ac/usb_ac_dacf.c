@@ -217,7 +217,7 @@ usb_ac_mux_plumbing(dacf_infohdl_t info_hdl, dacf_arghdl_t arg_hdl, int flags)
 	/* usb_as and hid should be attached but double check */
 	if (usb_ac_online_siblings(uacp) != USB_SUCCESS) {
 		mutex_exit(&uacp->usb_ac_mutex);
-		USB_DPRINTF_L1(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "no audio streams driver plumbed");
 
 		return (DACF_FAILURE);
@@ -251,7 +251,7 @@ usb_ac_mux_plumbing(dacf_infohdl_t info_hdl, dacf_arghdl_t arg_hdl, int flags)
 		ldi_ident_release(li);
 	}
 	if (error) {
-		USB_DPRINTF_L1(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "open failed, error=%d", error);
 		usb_ac_rele_siblings(uacp);
 
@@ -279,7 +279,7 @@ usb_ac_mux_plumbing(dacf_infohdl_t info_hdl, dacf_arghdl_t arg_hdl, int flags)
 
 		(void) usb_ac_mux_unplumbing(info_hdl, arg_hdl, flags);
 
-		USB_DPRINTF_L1(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 		    "no audio streams driver plumbed");
 
 		usb_ac_rele_siblings(uacp);
@@ -545,7 +545,7 @@ usb_ac_mux_walk_siblings(usb_ac_state_t *uacp, ldi_handle_t mux_lh)
 
 		mutex_enter(&uacp->usb_ac_mutex);
 		if (error) {
-			USB_DPRINTF_L1(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+			USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 			    "ldi_open_by_dev failed on major = %d minor = %d, "
 			    "name = %s error=%d", drv_major, drv_instance,
 			    ddi_driver_name(child_dip), error);
@@ -564,7 +564,7 @@ usb_ac_mux_walk_siblings(usb_ac_state_t *uacp, ldi_handle_t mux_lh)
 			if (usb_ac_get_reg_data(uacp, drv_lh, count) !=
 			    USB_SUCCESS) {
 
-				USB_DPRINTF_L1(PRINT_MASK_ALL,
+				USB_DPRINTF_L2(PRINT_MASK_ALL,
 				    uacp->usb_ac_log_handle,
 				    "get_reg_data failed on major = %d "
 				    "minor = %d, name = %s", drv_major,
@@ -590,7 +590,7 @@ usb_ac_mux_walk_siblings(usb_ac_state_t *uacp, ldi_handle_t mux_lh)
 			mutex_enter(&uacp->usb_ac_mutex);
 
 			if (error) {
-				USB_DPRINTF_L1(PRINT_MASK_ALL,
+				USB_DPRINTF_L2(PRINT_MASK_ALL,
 				    uacp->usb_ac_log_handle,
 				    "ldi_ioctl failed for usb_ah, "
 				    "major:%d minor:%d name:%s",
@@ -608,7 +608,7 @@ usb_ac_mux_walk_siblings(usb_ac_state_t *uacp, ldi_handle_t mux_lh)
 			}
 		} else {
 			/* should not be here */
-			USB_DPRINTF_L1(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
+			USB_DPRINTF_L2(PRINT_MASK_ALL, uacp->usb_ac_log_handle,
 			    "usb_ac_mux_plumbing: unknown module");
 			count --;
 
@@ -640,7 +640,7 @@ usb_ac_mux_walk_siblings(usb_ac_state_t *uacp, ldi_handle_t mux_lh)
 		mutex_enter(&uacp->usb_ac_mutex);
 
 		if (error) {
-			USB_DPRINTF_L1(PRINT_MASK_ALL,
+			USB_DPRINTF_L2(PRINT_MASK_ALL,
 			    uacp->usb_ac_log_handle,
 			    "plink failed for major:%d minor:%d"
 			    "name:%s", drv_major, drv_instance,
@@ -726,7 +726,7 @@ usb_ac_mixer_registration(usb_ac_state_t *uacp, usb_ac_state_space_t *ssp)
 	/* Haven't found a streaming interface; fail mixer registration */
 	if (n > USB_AC_MAX_AS_PLUMBED) {
 		USB_DPRINTF_L1(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
-		    "usb_ac_mixer_registration: no streaming interface");
+		    "no streaming interface");
 
 		return (USB_FAILURE);
 	}
@@ -888,8 +888,8 @@ usb_ac_mixer_registration(usb_ac_state_t *uacp, usb_ac_state_space_t *ssp)
 
 	if (am_attach(uacp->usb_ac_audiohdl, DDI_ATTACH, info) ==
 	    AUDIO_FAILURE) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
-		    "am_attach failed");
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
+		    "am_attach: failed");
 
 		mutex_enter(&uacp->usb_ac_mutex);
 
@@ -954,7 +954,7 @@ usb_ac_get_reg_data(usb_ac_state_t *uacp, ldi_handle_t drv_lh, int index)
 
 	if ((error = ldi_ioctl(drv_lh, USB_AUDIO_MIXER_REGISTRATION,
 	    (intptr_t)streams_reg, FKIOCTL, kcred, &rval)) != USB_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ALL,
+		USB_DPRINTF_L2(PRINT_MASK_ALL,
 		    uacp->usb_ac_log_handle,
 		    "ldi_ioctl fails for mixer registration, error=%d", error);
 		mutex_enter(&uacp->usb_ac_mutex);
@@ -1021,7 +1021,7 @@ usb_ac_setup_plumbed(usb_ac_state_t *uacp, int plb_idx, int str_idx,
 			}
 		}
 		if (i == USB_AC_MAX_AS_PLUMBED) {
-			USB_DPRINTF_L1(PRINT_MASK_ALL,
+			USB_DPRINTF_L2(PRINT_MASK_ALL,
 			    uacp->usb_ac_log_handle,
 			    "no corresponding registration structure");
 
@@ -1118,7 +1118,7 @@ usb_ac_online_siblings(usb_ac_state_t *uacp)
 			mutex_exit(&uacp->usb_ac_mutex);
 			if (ndi_devi_online(child_dip, NDI_ONLINE_ATTACH) !=
 			    NDI_SUCCESS) {
-				USB_DPRINTF_L1(PRINT_MASK_ALL,
+				USB_DPRINTF_L2(PRINT_MASK_ALL,
 				    uacp->usb_ac_log_handle,
 				    "failure to online driver %s%d",
 				    ddi_driver_name(child_dip),

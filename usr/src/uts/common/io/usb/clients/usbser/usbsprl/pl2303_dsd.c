@@ -1091,7 +1091,7 @@ pl2303_restore_device_state(pl2303_state_t *plp)
 		return (state);
 	}
 
-	if (usb_check_same_device(plp->pl_dip, plp->pl_lh, USB_LOG_L2,
+	if (usb_check_same_device(plp->pl_dip, plp->pl_lh, USB_LOG_L0,
 	    DPRINT_MASK_ALL, USB_CHK_ALL, NULL) != USB_SUCCESS) {
 		mutex_enter(&plp->pl_mutex);
 		state = plp->pl_dev_state = USB_DEV_DISCONNECTED;
@@ -1204,7 +1204,7 @@ pl2303_destroy_pm_components(pl2303_state_t *plp)
 		if (pm->pm_wakeup_enabled) {
 			rval = pm_raise_power(dip, 0, USB_DEV_OS_FULL_PWR);
 			if (rval != DDI_SUCCESS) {
-				USB_DPRINTF_L1(DPRINT_PM, plp->pl_lh,
+				USB_DPRINTF_L2(DPRINT_PM, plp->pl_lh,
 				    "pl2303_destroy_pm_components:"
 				    "raising power failed, rval=%d", rval);
 			}
@@ -1265,7 +1265,7 @@ pl2303_pm_set_busy(pl2303_state_t *plp)
 
 	rval = pm_raise_power(dip, 0, USB_DEV_OS_FULL_PWR);
 	if (rval != DDI_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_PM, plp->pl_lh, "raising power failed");
+		USB_DPRINTF_L2(DPRINT_PM, plp->pl_lh, "raising power failed");
 	}
 
 	mutex_enter(&plp->pl_mutex);

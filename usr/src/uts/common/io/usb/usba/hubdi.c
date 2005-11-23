@@ -411,7 +411,7 @@ usba_hubdi_unbind_root_hub(dev_info_t *dip)
 	if (usba_hubdi_detach(dip, DDI_DETACH) != DDI_SUCCESS) {
 
 		if (DEVI_IS_ATTACHING(dip)) {
-			USB_DPRINTF_L1(DPRINT_MASK_ATTA, hubdi_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubdi_log_handle,
 			    "failure to unbind root hub after attach failure");
 		}
 
@@ -1828,7 +1828,7 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 */
 	rval = usba_hubdi_register(dip, 0);
 	if (rval != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_ATTA, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 		    "usba_hubdi_register failed");
 		goto fail;
 	}
@@ -1860,7 +1860,7 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* event registration */
 	if (hubd_register_events(hubd) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_ATTA, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 		    "hubd_register_events failed");
 
 		goto fail;
@@ -1871,7 +1871,7 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* initialize and create children */
 	if (hubd_check_ports(hubd) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_ATTA, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 		    "hubd_check_ports failed");
 		mutex_exit(HUBD_MUTEX(hubd));
 
@@ -1897,7 +1897,7 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 		if (ddi_create_minor_node(dip, ap_name, S_IFCHR, instance,
 		    DDI_NT_USB_ATTACHMENT_POINT, 0) != DDI_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_ATTA, hubd->h_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 			    "cannot create attachment point node (%d)",
 			    instance);
 			mutex_exit(HUBD_MUTEX(hubd));
@@ -1911,7 +1911,7 @@ usba_hubdi_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_create_minor_node(dip, "hubd", S_IFCHR,
 	    instance | minor, DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
 
-		USB_DPRINTF_L1(DPRINT_MASK_ATTA, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubd->h_log_handle,
 		    "cannot create devctl minor node (%d)", instance);
 
 		goto fail;
@@ -1954,7 +1954,7 @@ fail:
 	if (hubd) {
 		rval = hubd_cleanup(dip, hubd);
 		if (rval != USB_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_ATTA, hubdi_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_ATTA, hubdi_log_handle,
 			    "failure to complete cleanup after attach failure");
 		}
 	}
@@ -2612,7 +2612,7 @@ hubd_cleanup(dev_info_t *dip, hubd_t *hubd)
 
 		} else if (rval != NDI_SUCCESS) {
 
-			USB_DPRINTF_L1(DPRINT_MASK_ALL, hubd->h_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_ALL, hubd->h_log_handle,
 			    "hubd_cleanup: ndi_event_free_hdl failed");
 			ndi_devi_exit(dip, circ);
 
@@ -2933,7 +2933,7 @@ hubd_open_intr_pipe(hubd_t	*hubd)
 	if ((rval = usb_pipe_open(hubd->h_dip,
 	    &hubd->h_ep1_descr, &hubd->h_pipe_policy,
 	    0, &hubd->h_ep1_ph)) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_HUB, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HUB, hubd->h_log_handle,
 		    "open intr pipe failed (%d)", rval);
 
 		mutex_enter(HUBD_MUTEX(hubd));
@@ -3716,7 +3716,7 @@ hubd_handle_port_connect(hubd_t *hubd, usb_port_t port)
 		if ((rval = hubd_determine_port_status(hubd, port, &status,
 		    &change, 0)) != USB_SUCCESS) {
 
-			USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 			    "getting status failed (%d)", rval);
 
 			(void) hubd_disable_port(hubd, port);
@@ -3725,7 +3725,7 @@ hubd_handle_port_connect(hubd_t *hubd, usb_port_t port)
 		}
 
 		if (status & PORT_STATUS_POCI) {
-			USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+			USB_DPRINTF_L0(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 			    "port %d overcurrent", port);
 
 			(void) hubd_disable_port(hubd, port);
@@ -3831,7 +3831,7 @@ hubd_handle_port_connect(hubd_t *hubd, usb_port_t port)
 					hubd->h_total_hotplug_success++;
 
 					if (retry > 0) {
-						USB_DPRINTF_L1(
+						USB_DPRINTF_L2(
 						    DPRINT_MASK_HOTPLUG,
 						    hubd->h_log_handle,
 						    "device on port %d "
@@ -4042,7 +4042,7 @@ hubd_get_hub_status(hubd_t *hubd)
 			 * the port power is automatically disabled, so we
 			 * won't see disconnects.
 			 */
-			USB_DPRINTF_L1(DPRINT_MASK_PORT, hubd->h_log_handle,
+			USB_DPRINTF_L0(DPRINT_MASK_PORT, hubd->h_log_handle,
 			    "global over current condition, "
 			    "please disconnect hub");
 		}
@@ -4107,7 +4107,7 @@ hubd_reset_port(hubd_t *hubd, usb_port_t port)
 	    0,
 	    NULL, 0,
 	    &completion_reason, &cb_flags, 0)) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_PORT, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_PORT, hubd->h_log_handle,
 		    "reset port%d failed (%d 0x%x %d)",
 		    port, completion_reason, cb_flags, rval);
 
@@ -4174,7 +4174,7 @@ hubd_reset_port(hubd_t *hubd, usb_port_t port)
 		    GET_STATUS_LENGTH,
 		    &data, 0,
 		    &completion_reason, &cb_flags, 0)) != USB_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_PORT,
+			USB_DPRINTF_L2(DPRINT_MASK_PORT,
 			    hubd->h_log_handle,
 			    "get status port%d failed (%d 0x%x %d)",
 			    port, completion_reason, cb_flags, rval);
@@ -4470,8 +4470,8 @@ hubd_determine_port_status(hubd_t *hubd, usb_port_t port,
 	}
 
 	if (*status & PORT_STATUS_POCI) {
-		USB_DPRINTF_L1(DPRINT_MASK_PORT, hubd->h_log_handle,
-		    "port%d over current!", port);
+		USB_DPRINTF_L2(DPRINT_MASK_PORT, hubd->h_log_handle,
+		    "port%d overcurrent!", port);
 
 		hubd->h_port_state[port] |= (PORT_STATUS_POCI & ack_flag);
 	} else {
@@ -4769,7 +4769,7 @@ hubd_enable_all_port_power(hubd_t *hubd)
 		/* Print warning message if port has no power */
 		if (!(status & PORT_STATUS_PPS)) {
 
-			USB_DPRINTF_L1(DPRINT_MASK_PORT, hubd->h_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_PORT, hubd->h_log_handle,
 			    "hubd_enable_all_port_power: port %d power-on "
 			    "failed, port status 0x%x", port, status);
 		}
@@ -5021,7 +5021,7 @@ hubd_get_this_config_cloud(hubd_t *hubd, dev_info_t *dip,
 		if (size == USB_PARSE_ERROR) {
 
 			if (pdata->b_rptr[1] != USB_DESCR_TYPE_CFG) {
-				USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG,
+				USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG,
 				    hubd->h_log_handle,
 				    "device returned incorrect "
 				    "configuration descriptor type.");
@@ -5031,7 +5031,7 @@ hubd_get_this_config_cloud(hubd_t *hubd, dev_info_t *dip,
 		}
 
 		if (confdescr->wTotalLength < USB_CFG_DESCR_SIZE) {
-			USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG,
+			USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG,
 			    hubd->h_log_handle,
 			    "device returned incorrect "
 			    "configuration descriptor size.");
@@ -5059,7 +5059,7 @@ hubd_get_this_config_cloud(hubd_t *hubd, dev_info_t *dip,
 			if ((pdata->b_wptr - pdata->b_rptr) !=
 			    confdescr->wTotalLength) {
 
-				USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG,
+				USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG,
 				    hubd->h_log_handle,
 				    "device returned incorrect "
 				    "configuration descriptor.");
@@ -5334,7 +5334,7 @@ hubd_create_child(dev_info_t *dip,
 
 	if (rval != USB_SUCCESS) {
 
-		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "usb_create_child_devi failed (%d)", rval);
 
 		goto fail_cleanup;
@@ -5381,8 +5381,8 @@ hubd_create_child(dev_info_t *dip,
 	/* Open the default pipe */
 	if ((rval = usb_pipe_open(child_dip, NULL, NULL,
 	    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED, &ph)) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
-			"usb_pipe_open failed (%d)", rval);
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		    "usb_pipe_open failed (%d)", rval);
 
 		goto fail_cleanup;
 	}
@@ -5427,7 +5427,7 @@ hubd_create_child(dev_info_t *dip,
 		    &completion_reason, &cb_flags, 0);
 
 		if (rval != USB_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 			    "getting device descriptor failed (%s 0x%x %d)",
 			    usb_str_cr(completion_reason), cb_flags, rval);
 			goto fail_cleanup;
@@ -5451,14 +5451,14 @@ hubd_create_child(dev_info_t *dip,
 	freemsg(pdata);
 	pdata = NULL;
 	if (size < 8) {
-		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "get device descriptor returned %lu bytes", size);
 
 		goto fail_cleanup;
 	}
 
 	if (length < 8) {
-		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "fail enumeration: bLength=%d", length);
 
 		goto fail_cleanup;
@@ -5474,7 +5474,7 @@ hubd_create_child(dev_info_t *dip,
 	    NULL, 0,
 	    &completion_reason, &cb_flags, 0)) != USB_SUCCESS) {
 		char buffer[64];
-		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "setting address failed (cr=%s cb_flags=%s rval=%d)",
 		    usb_str_cr(completion_reason),
 		    usb_str_cb_flags(cb_flags, buffer, sizeof (buffer)),
@@ -5512,7 +5512,7 @@ hubd_create_child(dev_info_t *dip,
 	/* re-open the pipe for the device with the new address */
 	if ((rval = usb_pipe_open(child_dip, NULL, NULL,
 	    USB_FLAGS_SLEEP | USBA_FLAGS_PRIVILEGED, &ph)) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "usb_pipe_open failed (%d)", rval);
 
 		goto fail_cleanup;
@@ -5563,7 +5563,7 @@ hubd_create_child(dev_info_t *dip,
 					goto fail_cleanup;
 				}
 			} else if (rval != USB_SUCCESS) {
-				USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG,
+				USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG,
 				    hubd->h_log_handle,
 				    "getting device descriptor failed "
 				    "(%d 0x%x %d)",
@@ -5590,7 +5590,7 @@ hubd_create_child(dev_info_t *dip,
 		pdata = NULL;
 
 		if (size != USB_DEV_DESCR_SIZE) {
-			USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 			    "fail enumeration: descriptor size=%lu "
 			    "expected size=%u", size, USB_DEV_DESCR_SIZE);
 
@@ -5609,7 +5609,7 @@ hubd_create_child(dev_info_t *dip,
 	}
 
 	if (usb_dev_descr.bNumConfigurations == 0) {
-		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "device descriptor:\n\t"
 		    "l=0x%x type=0x%x USB=0x%x class=0x%x subclass=0x%x\n\t"
 		    "protocol=0x%x maxpktsize=0x%x "
@@ -5635,7 +5635,7 @@ hubd_create_child(dev_info_t *dip,
 	/* retrieve config cloud for all configurations */
 	rval = hubd_get_all_device_config_cloud(hubd, child_dip, child_ud);
 	if (rval != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "failed to get configuration descriptor(s)");
 
 		goto fail_cleanup;
@@ -5647,7 +5647,7 @@ hubd_create_child(dev_info_t *dip,
 
 	/* Check if the user selected configuration index is in range */
 	if (user_conf_index >= usb_dev_descr.bNumConfigurations) {
-		USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 		    "Configuration index for device idVendor=%d "
 		    "idProduct=%d is=%d, and is out of range[0..%d]",
 		    usb_dev_descr.idVendor, usb_dev_descr.idProduct,
@@ -5820,7 +5820,7 @@ fail_cleanup:
 		int rval = usba_destroy_child_devi(child_dip,
 		    NDI_DEVI_REMOVE);
 		if (rval != USB_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG, hubd->h_log_handle,
 			    "failure to remove child node");
 		}
 	}
@@ -6182,7 +6182,7 @@ hubd_post_event(hubd_t *hubd, usb_port_t port, usba_event_t type)
 
 		rval = usba_persistent_pipe_open(usba_device);
 		if (rval != USB_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_HOTPLUG,
+			USB_DPRINTF_L2(DPRINT_MASK_HOTPLUG,
 			    hubd->h_log_handle,
 			    "failed to reopen all pipes on reconnect");
 		}
@@ -7641,7 +7641,7 @@ hubd_toggle_port(hubd_t *hubd, usb_port_t port)
 	/* Print warning message if port has no power */
 	if (!(status & PORT_STATUS_PPS)) {
 
-		USB_DPRINTF_L1(DPRINT_MASK_PORT, hubd->h_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_PORT, hubd->h_log_handle,
 		    "hubd_toggle_port: port %d power-on failed, "
 		    "port status 0x%x", port, status);
 

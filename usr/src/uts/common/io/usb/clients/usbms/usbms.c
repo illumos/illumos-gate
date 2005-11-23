@@ -370,7 +370,7 @@ usbms_open(queue_t			*q,
 		}
 	} else {
 		USB_DPRINTF_L1(PRINT_MASK_ALL,
-			usbms_log_handle, "usbms: Invalid HID "
+			usbms_log_handle, "Invalid HID "
 			"Descriptor Tree. Set to default value(3 buttons).");
 		usbmsp->usbms_num_buttons = USB_MS_DEFAULT_BUTTON_NO;
 	}

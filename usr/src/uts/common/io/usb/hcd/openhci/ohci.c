@@ -2294,7 +2294,7 @@ ohci_cpr_resume(ohci_state_t	*ohcip)
 	/* Restart the controller */
 	if (ohci_init_ctlr(ohcip) != DDI_SUCCESS) {
 
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, ohcip->ohci_log_hdl,
 		    "ohci_cpr_resume: ohci host controller resume failed ");
 
 		mutex_exit(&ohcip->ohci_int_mutex);
@@ -3414,7 +3414,7 @@ ohci_adjust_polling_interval(
 	if ((interval < MIN_POLL_INTERVAL) ||
 	    (interval > MAX_POLL_INTERVAL)) {
 
-		USB_DPRINTF_L1(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_LISTS, ohcip->ohci_log_hdl,
 		    "ohci_adjust_polling_interval: "
 		    "Endpoint's poll interval must be between %d and %d ms",
 		    MIN_POLL_INTERVAL, MAX_POLL_INTERVAL);
@@ -3435,7 +3435,7 @@ ohci_adjust_polling_interval(
 	if ((port_status == USBA_LOW_SPEED_DEV) &&
 	    (interval < MIN_LOW_SPEED_POLL_INTERVAL)) {
 
-		USB_DPRINTF_L1(PRINT_MASK_BW, ohcip->ohci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_BW, ohcip->ohci_log_hdl,
 		    "ohci_adjust_polling_interval: "
 		    "Low speed endpoint's poll interval of %d ms "
 		    "is below threshold.  Rounding up to %d ms",
@@ -8247,7 +8247,7 @@ ohci_cleanup_data_underrun(
 	if (!(hced_head & HC_EPT_Halt)) {
 		uint_t hced_ctrl = Get_ED(pp->pp_ept->hced_ctrl);
 
-		USB_DPRINTF_L1(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_INTR, ohcip->ohci_log_hdl,
 		    "ohci_cleanup_data_underrun: Unable to clean up a short "
 		    "xfer error.  Client might send/receive irrelevant data."
 		    " Device address %d Endpoint number %d",

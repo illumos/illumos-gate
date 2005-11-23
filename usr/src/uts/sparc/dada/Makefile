@@ -22,7 +22,7 @@
 #
 # uts/sparc/dada/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -40,6 +40,8 @@ MODULE		= dada
 OBJECTS		= $(DADA_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(DADA_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
+WARLOCK_OUT     = $(DADA_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
 
 #
 #	Include common rules.
@@ -70,9 +72,11 @@ def:		$(DEF_DEPS)
 
 clean:		$(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS)
+clean:		$(CLEAN_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-lint:		$(LINT_DEPS)
+clobber:	$(CLOBBER_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 modlintlib:	$(MODLINTLIB_DEPS) lint64
 

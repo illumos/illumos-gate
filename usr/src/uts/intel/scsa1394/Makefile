@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,33 +80,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-SCCS		= sccs
-TEST		= test
-
-#
-#	Warlock targets
-#
-WARLOCK_OBJECTS	= $(SCSA1394_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok
-
-%.wlcmd:
-	$(TEST) -f $@ || $(SCCS) get $@
-
-$(MODULE).ok: $(WARLOCK_OBJECTS) warlock_ddi.files scsa1394.wlcmd
-	$(WARLOCK) -c scsa1394.wlcmd $(WARLOCK_OBJECTS) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/1394/targets/scsa1394/%.c
-	$(WLCC) $(CPPFLAGS) -DNPROBE -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock

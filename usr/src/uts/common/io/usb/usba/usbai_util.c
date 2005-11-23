@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2054,7 +2054,7 @@ usb_release_access(
 
 	if (impl_tokenp->s_flag & USB_INIT_SER_CHECK_SAME_THREAD) {
 		if (impl_tokenp->s_thread != curthread) {
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, usbai_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usbai_log_handle,
 			    "usb_release_access: release from wrong thread");
 		}
 		ASSERT(impl_tokenp->s_thread == curthread);

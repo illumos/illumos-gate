@@ -22,7 +22,7 @@
 #
 # uts/sparc/sd/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,6 +45,8 @@ OBJECTS		= $(SD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/scsi/targets
+WARLOCK_OUT     = $(SD_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
 
 #
 #	Include common rules.
@@ -72,9 +74,11 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean:		$(CLEAN_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS)
+clobber:	$(CLOBBER_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -107,13 +111,13 @@ TEST		= test
 # and warlock can only handle one extern function by a given name;
 # any loaded after the first are ignored.
 
-SD_FILES   = $(MODULE).ll
+SD_FILES = $(SD_OBJS:%.o=%.ll)
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 
 warlock: warlock_alone warlock_with_esp warlock_with_isp warlock_with_fas \
 	warlock_with_glm warlock_with_uata warlock_with_mpt
 
-warlock_alone: $(MODULE).ok
+warlock_alone: $(MODULE).ok $(SD_FILES)
 
 %.wlcmd:
 	$(TEST) -f $@  || $(SCCS) get $@
@@ -153,8 +157,8 @@ warlock_with_uata: sd_with_uata.wlcmd $(SD_FILES) scsi_files uata_files \
 warlock_with_mpt: sd_with_mpt.wlcmd $(SD_FILES) scsi_files mpt_files \
 	warlock_ddi.files
 	$(WARLOCK) -c ./sd_with_mpt.wlcmd \
-		$(SD_FILES) ../mpt/mpt $(SCSI_FILES)  \
-		 -l ../warlock/ddi_dki_impl.ll
+		$(SD_FILES) ../mpt/*.ll $(SCSI_FILES)  \
+		-l ../warlock/ddi_dki_impl.ll
 
 scsi_files:
 	@cd ../scsi; pwd; $(MAKE) warlock

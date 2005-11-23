@@ -1,6 +1,3 @@
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
 # CDDL HEADER START
 #
@@ -22,10 +19,16 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+# 
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 add scsi_watch_request::swr_callback targets \
 	sd.c:sd_mhd_watch_cb \
 	sd.c:sd_media_watch_cb
+
+add     __ddi_xbuf_attr::xa_strategy targets sd_xbuf_strategy
 
 add scsi_pkt::pkt_comp targets \
 	sd.c:sd_mhd_watch_cb \
@@ -46,21 +49,28 @@ add scsi_pkt::pkt_comp targets \
 	glm.c:glm_scsi_tgt_free \
 	glm.c:glm_scsi_sync_pkt
 
-one scsi_device
-one glm
-add notify_entry::callback target  sd_mhd_reset_notify_cb
-add sd.c:sd_start_cmds/funcp target sd_initpkt_for_buf sd_initpkt_for_uscsi
+one 	scsi_device
+one 	glm
+one     __ddi_xbuf_attr
+one     sd_lun
+one     sd_resv_reclaim_request
 
-root glm_kmem_cache_constructor glm_kmem_cache_destructor
+add 	notify_entry::callback target  sd_mhd_reset_notify_cb
+add 	sd.c:sd_start_cmds/funcp target sd_initpkt_for_buf sd_initpkt_for_uscsi
 
-root sd_handle_mchange sd_media_change_task sd_start_stop_unit_task
-root sd_wm_cache_constructor sd_wm_cache_destructor sd_read_modify_write_task
-root sd_xbuf_strategy 
-root sd_failfast_flushq_callback
+root 	glm_kmem_cache_constructor glm_kmem_cache_destructor
+
+root 	sd_handle_mchange sd_media_change_task sd_start_stop_unit_task
+root 	sd_wm_cache_constructor sd_wm_cache_destructor sd_read_modify_write_task
+root 	sd_failfast_flushq_callback
 
 assert order scsi_device::sd_mutex  glm::g_mutex
 
-
-add     scsi_hba_tran::tran_bus_config targets warlock_dummy
-add     scsi_hba_tran::tran_bus_unconfig targets warlock_dummy
-
+for ptr in `funcptrs | grep '^scsi_hba_tran::'`
+do
+        add $ptr target warlock_dummy
+done
+root    scsi_hba_bus_power
+ignore  delay
+add     sd_uscsi_info::ui_dkc.dkc_callback targets warlock_dummy
+add     dk_callback::dkc_callback targets warlock_dummy

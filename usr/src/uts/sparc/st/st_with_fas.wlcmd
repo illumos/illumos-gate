@@ -1,6 +1,3 @@
-
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
 # CDDL HEADER START
 #
@@ -22,7 +19,10 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 add scsi_watch_request::swr_callback targets \
 	st.c:st_media_watch_cb
@@ -44,6 +44,11 @@ add scsi_pkt::pkt_comp targets \
 
 add notify_entry::callback target warlock_dummy
 
+add st.c:st_known_tape_type/config_funct targets \
+        st_get_conf_from_st_dot_conf \
+        st_get_conf_from_st_conf_dot_c \
+        st_get_default_conf  
+
 one scsi_device
 one fas 
 
@@ -54,6 +59,10 @@ root fas.c:fas_scsi_dmafree fas.c:fas_scsi_sync_pkt
 #
 assert order scsi_device::sd_mutex  fas::f_mutex
 
-add     scsi_hba_tran::tran_bus_config targets warlock_dummy
-add     scsi_hba_tran::tran_bus_unconfig targets warlock_dummy
+for ptr in `funcptrs | grep '^scsi_hba_tran::'`
+do
+        add $ptr target warlock_dummy
+done
+root    scsi_hba_bus_power
+ignore  delay
 

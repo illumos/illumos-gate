@@ -19,10 +19,9 @@
 #
 # CDDL HEADER END
 #
-#
 # uts/sparc/st/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,6 +44,8 @@ OBJECTS		= $(ST_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(ST_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/scsi/targets
+WARLOCK_OUT     = $(ST_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
 
 #
 #	Include common rules.
@@ -72,9 +73,11 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean:		$(CLEAN_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS)
+clobber:	$(CLOBBER_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -105,8 +108,8 @@ TEST		= test
 # and warlock can only handle one extern function by a given name;
 # any loaded after the first are ignored.
 
-ST_FILES   = $(MODULE).ll
 SCSI_FILES = $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
+ST_FILES = $(ST_OBJS:%.o=%.ll)
 
 warlock: warlock_alone warlock_with_esp warlock_with_isp warlock_with_fas \
 	warlock_with_glm
@@ -157,7 +160,7 @@ isp_files:
 glm_files:
 	@cd ../glm; pwd; $(MAKE) warlock
 
-st.ok: st.wlcmd $(ST_FILES) scsi_files warlock_ddi.files
+st.ok: st.wlcmd st.ll st_conf.ll  scsi_files warlock_ddi.files
 	$(WARLOCK) -c ./st.wlcmd $(ST_FILES) $(SCSI_FILES) \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $@

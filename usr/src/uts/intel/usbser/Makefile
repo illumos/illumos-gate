@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/intel/usbser/Makefile
@@ -41,8 +41,6 @@ UTSBASE	= ../..
 MODULE		= usbser
 OBJECTS		= $(USBSER_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(USBSER_OBJS:%.o=$(LINTS_DIR)/%.ln)
-WARLOCK_OUT	= $(USBSER_OBJS:%.o=%.ll)
-WARLOCK_OK	= $(MODULE).ok
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -68,11 +66,9 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS); \
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 

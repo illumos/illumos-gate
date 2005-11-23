@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,7 +301,7 @@ uhci_handle_set_clear_port_feature(
 			break;
 
 		default:
-			USB_DPRINTF_L1(PRINT_MASK_ROOT_HUB, uhcip->uhci_log_hdl,
+			USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB, uhcip->uhci_log_hdl,
 			    "uhci_handle_set_clear_port_feature: "
 			    "Unsupported request 0x%x 0x%x", bRequest, wValue);
 			error = USB_FAILURE;
@@ -340,7 +340,7 @@ uhci_handle_set_clear_port_feature(
 
 			break;
 		default:
-			USB_DPRINTF_L1(PRINT_MASK_ROOT_HUB, uhcip->uhci_log_hdl,
+			USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB, uhcip->uhci_log_hdl,
 			    "uhci_handle_set_clear_port_feature: "
 			    "Unsupported request 0x%x 0x%x", bRequest, wValue);
 			error = USB_FAILURE;

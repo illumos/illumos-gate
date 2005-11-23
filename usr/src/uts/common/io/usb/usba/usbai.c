@@ -713,7 +713,7 @@ usb_is_pm_enabled(dev_info_t *dip)
 			rval = hcdi->hcdi_ops->
 				usba_hcdi_pm_support(root_hub_dip);
 			if (rval != USB_SUCCESS) {
-				USB_DPRINTF_L1(DPRINT_MASK_USBA,
+				USB_DPRINTF_L2(DPRINT_MASK_USBA,
 				    usbai_log_handle,
 				    "%s%d: no PM enabled for this device",
 				    ddi_driver_name(dip),

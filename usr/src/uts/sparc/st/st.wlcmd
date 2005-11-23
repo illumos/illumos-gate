@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,8 +19,11 @@
 #
 # CDDL HEADER END
 #
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 one scsi_device 
 root scsi_hba_post_event scsi_hba_remove_eventcall scsi_hba_add_eventcall scsi_hba_get_eventcookie
@@ -36,3 +36,12 @@ do
 done
 
 add scsi_watch_request::swr_callback targets st_media_watch_cb
+
+add st.c:st_known_tape_type/config_funct targets \
+        st_get_conf_from_st_dot_conf \
+        st_get_conf_from_st_conf_dot_c \
+        st_get_default_conf  
+
+root    scsi_hba_bus_power
+ignore  delay
+

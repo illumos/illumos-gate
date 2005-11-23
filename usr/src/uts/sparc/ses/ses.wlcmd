@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,6 +18,10 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -57,4 +58,6 @@ add ses_softc::ses_vec.init_enc    target ses_init_enc
 add ses_softc::ses_vec.set_encstat target ses_set_encstat
 add ses_softc::ses_vec.set_objstat target ses_set_objstat
 add ses_softc::ses_vec.softc_init  target ses_softc_init
+
+root scsi_hba_bus_power
 

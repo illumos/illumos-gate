@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,6 +18,9 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -158,7 +158,6 @@ root	ibc_pre_detach
 root	ibc_detach
 root	ibc_async_handler
 root	ibc_cq_handler
-root	ibc_fmr_flush_handler
 
 # IBTF Debug entry points
 root	ibtl_dprintf_intr
@@ -286,6 +285,5 @@ add	ibc_operations_s::ibc_deregister_fmr		targets warlock_dummy
 add	ibt_clnt_modinfo_s::mi_async_handler		targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_async_client_call/async_handler	targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_cq_handler_call/cq_handler	targets	warlock_dummy
-add	ibtl_handlers.c:ibtl_fmr_flush_handler_call/fmr_handler	targets	warlock_dummy
 add	ibtl_handlers.c:ibtl_sm_notice_task/sm_notice_handler	targets	warlock_dummy
 add	ibtl_mgr_s::mgr_async_handler			targets	warlock_dummy

@@ -214,6 +214,7 @@ typedef struct scsa1394_bus_buf {
 } scsa1394_bus_buf_t;
 
 _NOTE(SCHEME_PROTECTS_DATA("unique per task", scsa1394_bus_buf))
+_NOTE(SCHEME_PROTECTS_DATA("dev_info::devi_lock", dev_info::devi_state))
 
 /* various translation macros */
 #define	ADDR2TRAN(ap)	((ap)->a_hba_tran)

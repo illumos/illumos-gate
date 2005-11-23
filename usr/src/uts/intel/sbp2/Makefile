@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/intel/sbp2/Makefile
@@ -61,11 +61,9 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS); \
-                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clean:		$(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS); \
-		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
+clobber:	$(CLOBBER_DEPS)
 
 lint:		$(LINT_DEPS)
 
@@ -79,27 +77,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-
-#
-#	Warlock
-#
-
-SBP2_FILES	= $(SBP2_OBJS:%.o=%.ll)
-WARLOCK_CMD	= $(MODULE).wlcmd
-
-warlock: $(MODULE).ok 
-
-%.ok:	$(SBP2_FILES)
-	$(WARLOCK) -c $(WARLOCK_CMD) $(SBP2_FILES) \
-		-l ../warlock/ddi_dki_impl.ll
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/sbp2/%.c
-	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<

@@ -677,7 +677,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	altif_data = &dev_data->dev_curr_cfg->cfg_if[interface].if_alt[0];
 
 	if (altif_data->altif_n_ep == 0) {
-		USB_DPRINTF_L1(DPRINT_MASK_SCSA, log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_SCSA, log_handle,
 		    "invalid alt 0 for interface %d", interface);
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
 
@@ -687,7 +687,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* All CB/CBI, BO devices should have this value set */
 	if (altif_data->altif_descr.bInterfaceClass !=
 	    USB_CLASS_MASS_STORAGE) {
-		USB_DPRINTF_L1(DPRINT_MASK_SCSA, log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_SCSA, log_handle,
 		    "invalid interface class (0x%x)",
 		    altif_data->altif_descr.bInterfaceClass);
 	}
@@ -737,7 +737,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (scsa2usbp->scsa2usb_protocol_override) {
 			scsa2usbp->scsa2usb_cmd_protocol |=
 			    scsa2usbp->scsa2usb_protocol_override;
-			USB_DPRINTF_L1(DPRINT_MASK_SCSA, log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_SCSA, log_handle,
 			    "overriding protocol %x",
 			    scsa2usbp->scsa2usb_intfc_descr.bInterfaceProtocol);
 			break;
@@ -766,7 +766,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		if (scsa2usbp->scsa2usb_subclass_override) {
 			scsa2usbp->scsa2usb_cmd_protocol |=
 			    scsa2usbp->scsa2usb_subclass_override;
-			USB_DPRINTF_L1(DPRINT_MASK_SCSA, log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_SCSA, log_handle,
 			    "overriding subclass %x",
 			    scsa2usbp->scsa2usb_intfc_descr.bInterfaceSubClass);
 			break;
@@ -795,7 +795,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	if (ept_check == B_FALSE) {
-		USB_DPRINTF_L1(DPRINT_MASK_SCSA, log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_SCSA, log_handle,
 		    "scsa2usb%d doesn't support minimum required endpoints",
 		    instance);
 		mutex_exit(&scsa2usbp->scsa2usb_mutex);
@@ -918,7 +918,7 @@ scsa2usb_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* log the conf file override string if there is one */
 	if (scsa2usbp->scsa2usb_override_str) {
-		USB_DPRINTF_L1(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_SCSA, scsa2usbp->scsa2usb_log_handle,
 		    "scsa2usb.conf override: %s",
 		    scsa2usbp->scsa2usb_override_str);
 	}
@@ -1253,7 +1253,7 @@ scsa2usb_cleanup(dev_info_t *dip, scsa2usb_state_t *scsa2usbp)
 				if ((rval = usb_handle_remote_wakeup(dip,
 				    USB_REMOTE_WAKEUP_DISABLE)) !=
 				    USB_SUCCESS) {
-					USB_DPRINTF_L1(DPRINT_MASK_SCSA,
+					USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 					    scsa2usbp->scsa2usb_log_handle,
 					    "disable remote wakeup failed "
 					    "(%d)", rval);
@@ -3977,7 +3977,7 @@ scsa2usb_do_inquiry(scsa2usb_state_t *scsa2usbp, uint_t target, uint_t lun)
 	(void) scsi_transport(pkt);
 
 	if (pkt->pkt_reason) {
-		USB_DPRINTF_L0(DPRINT_MASK_SCSA,
+		USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 		    scsa2usbp->scsa2usb_log_handle,
 		    "INQUIRY failed, cannot determine device type, "
 		    "pkt_reason=0x%x", pkt->pkt_reason);

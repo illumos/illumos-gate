@@ -839,7 +839,7 @@ scsa2usb_bulk_only_get_max_lun(scsa2usb_state_t *scsa2usbp)
 		 * Otherwise we assume that device supports only one LUN.
 		 */
 		if ((data->b_wptr - data->b_rptr) != 1) {
-			USB_DPRINTF_L1(DPRINT_MASK_SCSA,
+			USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 			    scsa2usbp->scsa2usb_log_handle,
 			    "device reported incorrect luns (adjusting to 1)");
 		} else {
@@ -855,7 +855,7 @@ scsa2usb_bulk_only_get_max_lun(scsa2usb_state_t *scsa2usbp)
 			 * we assume 1.
 			 */
 			if ((luns >= SCSA2USB_MAX_LUNS) || (luns <= 0)) {
-				USB_DPRINTF_L1(DPRINT_MASK_SCSA,
+				USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 				    scsa2usbp->scsa2usb_log_handle,
 				    "device reported %d luns "
 				    "(adjusting to 1)", luns);

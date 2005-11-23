@@ -21,10 +21,10 @@
 #
 #
 # uts/intel/kbtrans/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This makefile drives the production of the kbtrans kernel module.
 #
@@ -79,24 +79,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-WARLOCK		= warlock
-
-#
-#	Warlock targets
-#
-WARLOCK_OBJECTS	= $(KBTRANS_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok $(WARLOCK_OBJECTS)
-
-%.ok: $(WARLOCK_OBJECTS)
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/usb/clients/usbkbm/%.c
-	$(WLCC) $(CFLAGS) $(CPPFLAGS) -DDEBUG -o $@ $<
-

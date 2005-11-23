@@ -454,7 +454,7 @@ usb_as_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if ((ddi_create_minor_node(dip, "usb_as", S_IFCHR,
 	    USB_AS_CONSTRUCT_MINOR(instance),
 	    NULL, 0)) != DDI_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
 		    "usb_as_attach: couldn't create minor node");
 
 		goto fail;
@@ -468,7 +468,7 @@ usb_as_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Register for events */
 	if (usb_register_event_cbs(dip, &usb_as_events, 0) != USB_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
 		    "usb_as_attach: couldn't register for events");
 
 		goto fail;
@@ -484,7 +484,7 @@ usb_as_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 fail:
 	if (uasp) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uasp->usb_as_log_handle,
 		    "attach failed");
 		usb_as_cleanup(dip, uasp);
 	}

@@ -321,7 +321,7 @@ keyspan_attach(ds_attach_info_t *aip)
 
 	/* get device specific parameters */
 	if (keyspan_attach_dev(ksp) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_ATTACH, ksp->ks_lh, "fail attach dev ");
+		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh, "fail attach dev ");
 
 		goto fail_attach_dev;
 	}
@@ -329,7 +329,7 @@ keyspan_attach(ds_attach_info_t *aip)
 	keyspan_attach_ports(ksp);
 
 	if (keyspan_init_pipes(ksp) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_ATTACH, ksp->ks_lh,
+		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_init_pipes: failed.");
 
 		goto fail_init_pipes;
@@ -340,7 +340,7 @@ keyspan_attach(ds_attach_info_t *aip)
 	keyspan_set_dev_state_online(ksp);
 
 	if (keyspan_create_pm_components(ksp) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_ATTACH, ksp->ks_lh,
+		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_create_pm_components: failed.");
 
 		goto fail_pm;
@@ -353,7 +353,7 @@ keyspan_attach(ds_attach_info_t *aip)
 
 	/* open the global pipes */
 	if (keyspan_attach_pipes(ksp) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_ATTACH, ksp->ks_lh,
+		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_attach_pipes: failed.");
 
 		goto fail_attach_pipes;
@@ -489,7 +489,7 @@ fail:
 		keyspan_close_port_pipes(kp);
 	}
 
-	USB_DPRINTF_L1(DPRINT_OPEN, kp->kp_lh,
+	USB_DPRINTF_L2(DPRINT_OPEN, kp->kp_lh,
 	    "keyspan_open_hw_port: failed. This port can't be used.");
 
 	return (rval);
@@ -865,7 +865,7 @@ keyspan_set_port_params(ds_hdl_t hdl, uint_t port_num, ds_port_params_t *tp)
 	mutex_exit(&kp->kp_mutex);
 
 	if (keyspan_send_cmd(kp) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_CTLOP, kp->kp_lh,
+		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
 		    "keyspan_send_cmd() FAILED");
 
 		return (USB_FAILURE);
@@ -1523,7 +1523,7 @@ keyspan_attach_dev(keyspan_state_t *ksp)
 #endif	/* If KEYSPAN_USA49WLC defined */
 	default:
 		mutex_exit(&ksp->ks_mutex);
-		USB_DPRINTF_L1(DPRINT_ATTACH, ksp->ks_lh,
+		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_attach_dev:"
 		    "the device's product id can't be recognized");
 
@@ -1731,7 +1731,7 @@ keyspan_restore_device_state(keyspan_state_t *ksp)
 		return (state);
 	}
 
-	if (usb_check_same_device(ksp->ks_dip, ksp->ks_lh, USB_LOG_L2,
+	if (usb_check_same_device(ksp->ks_dip, ksp->ks_lh, USB_LOG_L0,
 	    DPRINT_MASK_ALL, USB_CHK_ALL, NULL) != USB_SUCCESS) {
 		mutex_enter(&ksp->ks_mutex);
 		state = ksp->ks_dev_state = USB_DEV_DISCONNECTED;

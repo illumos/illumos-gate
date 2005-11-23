@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,6 +43,9 @@ OBJECTS		= $(IBMF_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(IBMF_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 LDFLAGS		+= -dy -Nmisc/ibtl
+WARLOCK_OUT     = $(IBMF_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
+
 #
 #	Include common rules.
 #
@@ -77,9 +80,11 @@ def:		$(DEF_DEPS)
 
 all:		$(ALL_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean:		$(CLEAN_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS)
+clobber:	$(CLOBBER_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 

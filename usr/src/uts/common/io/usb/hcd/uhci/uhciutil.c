@@ -518,7 +518,7 @@ uhci_init_ctlr(uhci_state_t *uhcip)
 
 	if (!(cmd_reg & (USBCMD_REG_HC_RUN | USBCMD_REG_MAXPKT_64 |
 	    USBCMD_REG_CONFIG_FLAG))) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 		    "uhci_init_ctlr: Controller initialization failed");
 
 		return (USB_FAILURE);
@@ -612,7 +612,7 @@ uhci_map_regs(uhci_state_t *uhcip)
 	if (ddi_regs_map_setup(dip, index, (caddr_t *)&uhcip->uhci_regsp,
 	    0, sizeof (hc_regs_t), &attr, &uhcip->uhci_regs_handle) !=
 	    DDI_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 		    "ddi_regs_map_setup: failed");
 
 		return (USB_FAILURE);
@@ -919,7 +919,7 @@ uhci_alloc_queue_head(uhci_state_t *uhcip)
 	    "uhci_alloc_queue_head: Allocated %d", index);
 
 	if (index == uhci_qh_pool_size) {
-		USB_DPRINTF_L1(PRINT_MASK_ALLOC,  uhcip->uhci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_ALLOC,  uhcip->uhci_log_hdl,
 		    "uhci_alloc_queue_head: All QH exhausted");
 
 		/* Free the dummy td allocated for this qh. */
@@ -1305,7 +1305,7 @@ uhci_bandwidth_adjust(
 	 */
 	if ((port_status == USBA_LOW_SPEED_DEV) &&
 	    (interval < MIN_LOW_SPEED_POLL_INTERVAL)) {
-		USB_DPRINTF_L1(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_LISTS, uhcip->uhci_log_hdl,
 		    "uhci_bandwidth_adjust: Low speed endpoint's poll interval "
 		    "must be >= %d ms, adjusted",
 		    MIN_LOW_SPEED_POLL_INTERVAL);

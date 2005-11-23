@@ -746,7 +746,7 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (ddi_create_minor_node(dip, "usb_mid", S_IFCHR,
 	    instance << USB_MID_MINOR_INSTANCE_SHIFT,
 	    DDI_NT_NEXUS, 0) != DDI_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_ATTA, usb_mid->mi_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, usb_mid->mi_log_handle,
 		    "cannot create devctl minor node");
 		goto fail;
 	}
@@ -796,7 +796,7 @@ usb_mid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 fail:
-	USB_DPRINTF_L1(DPRINT_MASK_ATTA, NULL, "usb_mid%d cannot attach",
+	USB_DPRINTF_L2(DPRINT_MASK_ATTA, NULL, "usb_mid%d cannot attach",
 	    instance);
 
 	if (usb_mid) {
@@ -872,7 +872,7 @@ usb_mid_cleanup(dev_info_t *dip, usb_mid_t *usb_mid)
 	if (usb_mid->mi_ndi_event_hdl &&
 	    (ndi_event_free_hdl(usb_mid->mi_ndi_event_hdl) != NDI_SUCCESS)) {
 
-		USB_DPRINTF_L1(DPRINT_MASK_ATTA, usb_mid->mi_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_ATTA, usb_mid->mi_log_handle,
 		    "usb_mid_cleanup: ndi_event_free_hdl failed");
 
 		return (DDI_FAILURE);

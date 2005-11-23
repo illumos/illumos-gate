@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # uts/sparc/scsa2usb/Makefile
@@ -29,7 +29,7 @@
 #	kernel module. sparc architecture dependent
 #
 
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -110,6 +110,8 @@ USBA_FILES = $(USBA_OBJS:%.o=../usba/%.ll)
 UHCI_FILES = $(UHCI_OBJS:%.o=../uhci/%.ll)
 OHCI_FILES = $(OHCI_OBJS:%.o=../ohci/%.ll)
 EHCI_FILES = $(EHCI_OBJS:%.o=../ehci/%.ll)
+SD_FILES   = $(SD_OBJS:%.o=../sd/%.ll)
+ST_FILES   = $(ST_OBJS:%.o=../st/%.ll)
 SCSI_FILES = $(SCSI_OBJS:%.o= -l ../scsi/%.ll)
 
 warlock: $(MODULE).ok $(WARLOCK_OBJECTS) warlock_with_usba
@@ -132,9 +134,12 @@ scsa2usb.ok: $(WARLOCK_OBJECTS) scsa2usb.wlcmd warlock_ddi.files \
 	$(WLCC)  $(CPPFLAGS) -DDEBUG -o $@ $<
 
 warlock_with_usba: scsa2usb.wlcmd  $(WARLOCK_OBJECTS) usba_files \
-	ohci_files ehci_files uhci_files warlock_ddi.files
+	ohci_files ehci_files uhci_files warlock_ddi.files sd.files st.files
 	$(WARLOCK) -c ./scsa2usb_with_usba.wlcmd \
 		$(USBA_FILES) $(OHCI_FILES) $(EHCI_FILES) $(UHCI_FILES) \
+		$(SD_FILES) \
+		$(ST_FILES) \
+		$(SCSI_FILES) \
 		$(WARLOCK_OBJECTS) \
 		-l ../warlock/ddi_dki_impl.ll
 
@@ -155,3 +160,9 @@ warlock_ddi.files:
 
 scsi.files:
 	@cd ../scsi; pwd; $(MAKE) warlock
+
+sd.files:
+	@cd ../sd; pwd; $(MAKE) warlock_alone
+
+st.files:
+	@cd ../sd; pwd; $(MAKE) warlock_alone

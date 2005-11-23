@@ -218,7 +218,7 @@ usb_client_attach(dev_info_t *dip, uint_t version, usb_flags_t flags)
 	}
 
 	if (version == USBA_MAKE_VER(USBA_LEG_MAJOR_VER, USBA_LEG_MINOR_VER)) {
-		USB_DPRINTF_L1(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_REGISTER, usbai_reg_log_handle,
 		    "Accepting legacy USB driver version %d.%d for %s%d",
 		    USBA_LEG_MAJOR_VER, USBA_LEG_MINOR_VER,
 		    ddi_driver_name(dip), ddi_get_instance(dip));

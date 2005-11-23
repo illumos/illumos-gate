@@ -45,8 +45,9 @@ OBJECTS		= $(SES_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SES_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/scsi/targets
-WARLOCK_TARGETS	= warlock.ok warlock_with_esp.ok warlock_with_fas.ok \
-		  warlock_with_isp.ok warlock_with_glm.ok
+
+WARLOCK_OUT     = $(SES_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
 
 #
 # Include common rules.
@@ -72,9 +73,11 @@ all:		$(ALL_DEPS)
 
 clean:		$(CLEAN_DEPS)
 
-clobber:	$(CLOBBER_DEPS)
+clean:		$(CLEAN_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-lint:		$(LINT_DEPS)
+clobber:	$(CLOBBER_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 modlintlib:	$(MODLINTLIB_DEPS) lint64
 
@@ -103,6 +106,8 @@ TEST		= test
 SES_FILES	= $(MODULE).ll
 SCSI_FILES	= $(SCSI_OBJS:%.o=-l ../scsi/%.ll)
 
+WARLOCK_TARGETS	= warlock.ok warlock_with_esp.ok warlock_with_fas.ok \
+		  warlock_with_isp.ok warlock_with_glm.ok
 
 warlock: $(WARLOCK_TARGETS)
 

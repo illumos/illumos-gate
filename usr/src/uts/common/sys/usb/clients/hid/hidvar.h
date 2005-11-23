@@ -236,6 +236,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_default_pipe))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_log_handle))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_if_descr))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_dev_data))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(hid_state_t::hid_dev_descr))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", hid_state_t::hid_rq_ptr))
 _NOTE(SCHEME_PROTECTS_DATA("stable data", hid_state_t::hid_wq_ptr))
 

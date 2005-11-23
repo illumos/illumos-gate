@@ -22,14 +22,14 @@
 #
 # uts/intel/amsrc2/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 #
 #	This makefile drives the production of the audio mixer
 #	sample rate conversion routine #1 (amsrc2).
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -73,7 +73,6 @@ all:		$(ALL_DEPS)
 clean:		$(CLEAN_DEPS)
 
 clobber:	$(CLOBBER_DEPS)
-	$(RM) $(MODULE).ok main.ll am_src1.ll
 
 lint:		$(LINT_DEPS)
 
@@ -87,33 +86,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WARLOCK		= warlock
-WLCC		= wlcc
-TOUCH		= touch
-SCCS		= sccs
-TEST		= test
-
-#
-#	Warlock rules
-#
-AMSRC2_FILES	= $(AMSRC2_OBJS:%.o=%.ll)
-
-warlock:	main.ll $(MODULE).ok
-	$(WARLOCK) $(AMSRC2_FILES) -l main.ll
-
-%.ll:	$(UTSBASE)/common/io/audio/sada/amsrc2/%.c
-	$(WLCC) $(CFLAGS) $(CPPFLAGS) -DDEBUG -o $@ $<
-
-main.ll:	main.c
-	$(WLCC) $(CFLAGS) $(CPPFLAGS) -DDEBUG -o $@ main.c
-
-$(MODULE).ok:	$(AMSRC2_FILES)
-	$(TOUCH) $@
-
-%.wlcmd main.c:
-	$(TEST) -f $@ || $(SCCS) get $@
-

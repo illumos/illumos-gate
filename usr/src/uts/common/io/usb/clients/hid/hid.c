@@ -640,7 +640,7 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if ((ddi_create_minor_node(dip, minor_name, S_IFCHR,
 	    HID_CONSTRUCT_EXTERNAL_MINOR(instance),
 	    DDI_PSEUDO, 0)) != DDI_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, hidp->hid_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, hidp->hid_log_handle,
 		    "hid_attach: Could not create minor node");
 
 		goto fail;
@@ -675,7 +675,7 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* register for all events */
 	if (usb_register_event_cbs(dip, &hid_events, 0) != USB_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, hidp->hid_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, hidp->hid_log_handle,
 		    "usb_register_event_cbs failed");
 
 		goto fail;
@@ -1758,7 +1758,7 @@ hid_handle_report_descriptor(hid_state_t	*hidp,
 	    &data,				/* data */
 	    &completion_reason, &cb_flags, 0) != USB_SUCCESS) {
 
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, hidp->hid_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, hidp->hid_log_handle,
 			"Failed to receive the Report Descriptor");
 		freemsg(data);
 

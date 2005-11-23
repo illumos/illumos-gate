@@ -2174,7 +2174,7 @@ usbser_rx_cb_put(usbser_port_t *pp, queue_t *rq, queue_t *wq, mblk_t *mp)
 		usbser_st_put_stopi++;
 
 		USB_DPRINTF_L1(DPRINT_RX_CB, pp->port_lh,
-		    "usbser_rx_cb: input overrun");
+		    "input overrun");
 	}
 }
 

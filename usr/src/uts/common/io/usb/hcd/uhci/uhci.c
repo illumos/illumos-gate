@@ -415,7 +415,7 @@ uhci_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 fail:
-	USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+	USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 	    "failed to attach");
 
 	(void) uhci_cleanup(uhcip);
@@ -594,7 +594,7 @@ uhci_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		return (uhci_cleanup(uhcip) == USB_SUCCESS ?
 					DDI_SUCCESS : DDI_FAILURE);
 	case DDI_SUSPEND:
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uhcip->uhci_log_hdl,
 		    "uhci_detach: Suspend not supported");
 
 		return (DDI_FAILURE);
@@ -821,7 +821,7 @@ uhci_intr(caddr_t arg1, caddr_t arg2)
 	 * We configured the hw incorrectly, disable future interrupts.
 	 */
 	if ((intr_status & USBSTS_REG_HOST_SYS_ERR)) {
-		USB_DPRINTF_L1(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
+		USB_DPRINTF_L2(PRINT_MASK_INTR, uhcip->uhci_log_hdl,
 		    "uhci_intr: Sys Err Disabling Interrupt");
 		Set_OpReg16(USBINTR, DISABLE_ALL_INTRS);
 		mutex_exit(&uhcip->uhci_int_mutex);

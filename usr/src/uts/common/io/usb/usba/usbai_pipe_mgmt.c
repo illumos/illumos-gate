@@ -326,7 +326,7 @@ usba_pipe_setup_func_call(
 
 	if (((usb_flags & USB_FLAGS_SLEEP) == 0) && (callback == NULL)) {
 		usba_release_ph_data(ph_impl);
-		USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_pipe_setup_func_call: async request with "
 		    "no callback");
 
@@ -966,7 +966,7 @@ usb_pipe_close(dev_info_t	*dip,
 			callback(pipe_handle, callback_arg,
 			    USB_INVALID_ARGS, callback_flags);
 		} else {
-			USB_DPRINTF_L1(DPRINT_MASK_USBAI,
+			USB_DPRINTF_L2(DPRINT_MASK_USBAI,
 			    usbai_log_handle,
 			    "usb_pipe_close: invalid arguments");
 		}
@@ -989,7 +989,7 @@ usb_pipe_close(dev_info_t	*dip,
 			callback(pipe_handle, callback_arg,
 			    USB_INVALID_CONTEXT, callback_flags);
 		} else {
-			USB_DPRINTF_L1(DPRINT_MASK_USBAI,
+			USB_DPRINTF_L2(DPRINT_MASK_USBAI,
 			    usbai_log_handle,
 			    "usb_pipe_close: invalid context");
 		}
@@ -1014,7 +1014,7 @@ usb_pipe_close(dev_info_t	*dip,
 
 	if (USBA_IS_DEFAULT_PIPE(ph_data) &&
 	    ((usb_flags & USBA_FLAGS_PRIVILEGED) == 0)) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usb_pipe_close: not allowed to close def pipe");
 		mutex_exit(&ph_data->p_mutex);
 
@@ -1024,7 +1024,7 @@ usb_pipe_close(dev_info_t	*dip,
 			callback(pipe_handle, callback_arg,
 			    USB_INVALID_PIPE, callback_flags);
 		} else {
-			USB_DPRINTF_L1(DPRINT_MASK_USBAI,
+			USB_DPRINTF_L2(DPRINT_MASK_USBAI,
 			    usbai_log_handle,
 			    "usb_pipe_close: invalid pipe");
 		}
@@ -1149,7 +1149,7 @@ done:
 
 	if (usba_device->usb_hcdi_ops->usba_hcdi_pipe_close(ph_data,
 	    usb_flags) != USB_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 		    "usba_pipe_sync_close: hcd close failed");
 		/* carry on regardless! */
 	}
@@ -1256,7 +1256,7 @@ usb_pipe_reset(dev_info_t		*dip,
 			callback(pipe_handle, callback_arg,
 			    USB_INVALID_ARGS, callback_flags);
 		} else {
-			USB_DPRINTF_L1(DPRINT_MASK_USBAI,
+			USB_DPRINTF_L2(DPRINT_MASK_USBAI,
 			    usbai_log_handle,
 			    "usb_pipe_reset: invalid arguments");
 		}
@@ -1270,7 +1270,7 @@ usb_pipe_reset(dev_info_t		*dip,
 			callback(pipe_handle, callback_arg,
 			    USB_INVALID_CONTEXT, callback_flags);
 		} else {
-			USB_DPRINTF_L1(DPRINT_MASK_USBAI,
+			USB_DPRINTF_L2(DPRINT_MASK_USBAI,
 			    usbai_log_handle,
 			    "usb_pipe_reset: invalid context");
 		}
@@ -1285,7 +1285,7 @@ usb_pipe_reset(dev_info_t		*dip,
 	/* is this the default pipe? */
 	if (USBA_IS_DEFAULT_PIPE(ph_data)) {
 		if ((usb_flags & USBA_FLAGS_PRIVILEGED) == 0) {
-			USB_DPRINTF_L1(DPRINT_MASK_USBAI, usbai_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBAI, usbai_log_handle,
 			    "usb_pipe_reset: not allowed to reset def pipe");
 			mutex_exit(&ph_data->p_mutex);
 
@@ -1293,7 +1293,7 @@ usb_pipe_reset(dev_info_t		*dip,
 				callback(pipe_handle, callback_arg,
 				    USB_INVALID_PIPE, callback_flags);
 			} else {
-				USB_DPRINTF_L1(DPRINT_MASK_USBAI,
+				USB_DPRINTF_L2(DPRINT_MASK_USBAI,
 				    usbai_log_handle,
 				    "usb_pipe_reset: invalid pipe");
 			}

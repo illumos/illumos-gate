@@ -650,7 +650,7 @@ usb_ac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	kmem_free(key, key_len);
 
 	if (uacp->usb_ac_audiohdl == NULL) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 		    "audio_sup_register failed");
 
 		goto fail;
@@ -683,7 +683,7 @@ usb_ac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	if ((ddi_create_minor_node(dip, "mux", S_IFCHR,
 	    minor, NULL, 0)) != DDI_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 		    "usb_ac_attach: couldn't create minor node mux");
 
 		goto fail;
@@ -709,7 +709,7 @@ usb_ac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 
 	/* Register for events */
 	if (usb_register_event_cbs(dip, &usb_ac_events, 0) != USB_SUCCESS) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 		    "usb_ac_attach: couldn't register for events");
 
 		goto fail;
@@ -724,7 +724,7 @@ usb_ac_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 fail:
 	if (uacp) {
-		USB_DPRINTF_L1(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
+		USB_DPRINTF_L2(PRINT_MASK_ATTA, uacp->usb_ac_log_handle,
 		    "attach failed");
 		(void) usb_ac_cleanup(dip, uacp);
 	}

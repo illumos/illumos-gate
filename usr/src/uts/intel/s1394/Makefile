@@ -22,7 +22,7 @@
 #
 # uts/intel/1394/s1394/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -92,26 +92,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/intel/Makefile.targ
-
-#
-#	Defines for local commands.
-#
-WLCC		= wlcc
-TOUCH		= touch
-
-#
-#	Warlock targets
-#
-WARLOCK_OBJECTS	= $(S1394_OBJS:%.o=%.ll)
-
-warlock: $(MODULE).ok
-
-$(MODULE).ok: $(WARLOCK_OBJECTS) warlock_ddi.files
-	$(TOUCH) $@
-
-%.ll: $(UTSBASE)/common/io/1394/%.c
-	$(WLCC) $(CPPFLAGS) -DNPROBE -DDEBUG -o $@ $<
-
-warlock_ddi.files:
-	@cd ../warlock; pwd; $(MAKE) warlock
-

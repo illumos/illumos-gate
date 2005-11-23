@@ -291,14 +291,14 @@ usba_bus_ctl(dev_info_t	*dip,
 		    DDI_PROP_DONTPASS |	DDI_PROP_CANSLEEP, "assigned-address",
 		    (caddr_t)&usb_addr,	&len) != DDI_SUCCESS) {
 
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, hubdi_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, hubdi_log_handle,
 			    "usba_bus_ctl:\n\t"
 			    "%s%d %s%d op=%d rdip = 0x%p dip = 0x%p",
 			    ddi_node_name(rdip), ddi_get_instance(rdip),
 			    ddi_node_name(dip), ddi_get_instance(dip), op,
 			    rdip, dip);
 
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, hubdi_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, hubdi_log_handle,
 			    "usba_bus_ctl: DDI_NOT_WELL_FORMED (%s (0x%p))",
 			    ddi_node_name(child_dip), (void *)child_dip);
 
@@ -309,7 +309,7 @@ usba_bus_ctl(dev_info_t	*dip,
 		    DDI_PROP_DONTPASS, "reg",
 		    &data, &n)) != DDI_SUCCESS) {
 
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, hubdi_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, hubdi_log_handle,
 			    "usba_bus_ctl: %d, DDI_NOT_WELL_FORMED", rval);
 
 			return (DDI_NOT_WELL_FORMED);
@@ -473,7 +473,7 @@ usba_set_usb_address(usba_device_t *usba_device)
 
 	usba_device->usb_addr = 0;
 
-	USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+	USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 	    "no usb address available");
 
 	mutex_exit(&hcdi->hcdi_mutex);
@@ -903,7 +903,7 @@ fail:
 		usba_unset_usb_address(usba_device);
 	}
 
-	USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+	USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 	    "usba_create_child_devi failed: rval=%d", rval);
 
 	return (rval);
@@ -1537,7 +1537,7 @@ usba_find_existing_node(dev_info_t *odip)
 	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY,
 	    odip, DDI_PROP_DONTPASS, "reg",
 	    &odata, &n_odata) != DDI_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_HCDI, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_HCDI, usba_log_handle,
 		    "usba_find_existing_node: "
 		    "%s: DDI_NOT_WELL_FORMED", ddi_driver_name(odip));
 
@@ -1563,7 +1563,7 @@ usba_find_existing_node(dev_info_t *odip)
 		    child, DDI_PROP_DONTPASS, "reg",
 		    &ndata, &n_ndata) != DDI_SUCCESS) {
 
-			USB_DPRINTF_L1(DPRINT_MASK_HCDI, usba_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_HCDI, usba_log_handle,
 			    "usba_find_existing_node: "
 			    "%s DDI_NOT_WELL_FORMED", ddi_driver_name(child));
 
@@ -1677,7 +1677,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 				USB_IF_DESCR_SIZE);
 
 		if (size != USB_IF_DESCR_SIZE) {
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "parsing interface: "
 			    "size (%lu) != USB_IF_DESCR_SIZE (%d)",
 			    size, USB_IF_DESCR_SIZE);
@@ -1703,7 +1703,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 		DDI_DEV_T_NONE, child_dip, "reg", reg, 1);
 
 	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: property update failed");
 
 		return (child_dip);
@@ -1970,7 +1970,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 
 		if (rval != DDI_PROP_SUCCESS) {
 
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "usba_ready_device_node: property update failed");
 
 			return (child_dip);
@@ -1981,7 +1981,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
 			"assigned-address", usba_device->usb_addr);
 	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: address update failed");
 	}
 
@@ -1990,7 +1990,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 			"assigned-address", usba_device->usb_addr);
 
 	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: address update failed");
 	}
 
@@ -1998,35 +1998,35 @@ usba_ready_device_node(dev_info_t *child_dip)
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
 	    "usb-vendor-id", usb_dev_descr->idVendor);
 	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: usb-vendor-id update failed");
 	}
 
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
 	    "usb-product-id", usb_dev_descr->idProduct);
 	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: usb-product-id update failed");
 	}
 
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
 	    "usb-revision-id", usb_dev_descr->bcdDevice);
 	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: usb-revision-id update failed");
 	}
 
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
 	    "usb-num-configs", usb_dev_descr->bNumConfigurations);
 	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: usb-num-configs update failed");
 	}
 
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
 	    "usb-release", usb_dev_descr->bcdUSB);
 	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_device_node: usb-release update failed");
 	}
 
@@ -2037,7 +2037,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 		rval = ndi_prop_update_string(DDI_DEV_T_NONE, child_dip,
 		    "usb-serialno", devprop_str);
 		if (rval != DDI_PROP_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "usba_ready_device_node: "
 			    "usb-serialno update failed");
 		}
@@ -2048,7 +2048,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 		rval = ndi_prop_update_string(DDI_DEV_T_NONE, child_dip,
 		    "usb-vendor-name", devprop_str);
 		if (rval != DDI_PROP_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "usba_ready_device_node: "
 			    "usb-vendor-name update failed");
 		}
@@ -2059,7 +2059,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 		rval = ndi_prop_update_string(DDI_DEV_T_NONE, child_dip,
 		    "usb-product-name", devprop_str);
 		if (rval != DDI_PROP_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "usba_ready_device_node: "
 			    "usb-product-name update failed");
 		}
@@ -2083,7 +2083,7 @@ usba_ready_device_node(dev_info_t *child_dip)
 		rval = ndi_prop_create_boolean(DDI_DEV_T_NONE, child_dip,
 			"low-speed");
 		if (rval != DDI_PROP_SUCCESS) {
-			USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 			    "usba_ready_device_node: "
 			    "low speed prop update failed");
 		}
@@ -2147,7 +2147,7 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 			USB_IF_DESCR_SIZE);
 
 	if (size != USB_IF_DESCR_SIZE) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "parsing interface: size (%lu) != USB_IF_DESCR_SIZE (%d)",
 		    size, USB_IF_DESCR_SIZE);
 		mutex_exit(&child_ud->usb_mutex);
@@ -2299,7 +2299,7 @@ usba_ready_interface_node(dev_info_t *dip, uint_t intf)
 	rval = ndi_prop_update_int(DDI_DEV_T_NONE, child_dip,
 			"assigned-address", child_ud->usb_addr);
 	if (rval != DDI_PROP_SUCCESS) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "usba_ready_interface_node: address update failed");
 	}
 
@@ -2679,7 +2679,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 		usba_ph_impl_t *ph_impl =
 		    &usba_device->usb_ph_list[i];
 		if (ph_impl->usba_ph_data) {
-			USB_DPRINTF_L1(DPRINT_MASK_USBA,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA,
 			    usba_log_handle,
 			    "%s%d: leaking pipehandle=0x%p (0x%p) ep_addr=0x%x",
 			    ddi_driver_name(ph_impl->usba_ph_data->p_dip),
@@ -2714,7 +2714,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 			mutex_exit(&entry->list_mutex);
 			leaks++;
 
-			USB_DPRINTF_L1(DPRINT_MASK_USBA,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA,
 			    usba_log_handle,
 			    "%s%d: leaking request 0x%p",
 			    ddi_driver_name(wrp->wr_dip),
@@ -2752,7 +2752,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 
 
 				if (i_ddi_node_state(dip) < DS_ATTACHED) {
-					USB_DPRINTF_L1(DPRINT_MASK_USBA,
+					USB_DPRINTF_L2(DPRINT_MASK_USBA,
 					    usba_log_handle,
 					    "%s%d: leaking dev_data 0x%p",
 					    ddi_driver_name(dip),
@@ -2774,7 +2774,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 			dev_info_t *dip = usba_device->
 				usb_client_attach_list[iface].dip;
 
-			USB_DPRINTF_L1(DPRINT_MASK_USBA,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA,
 			    usba_log_handle,
 			    "%s%d: did no usb_client_detach",
 			    ddi_driver_name(dip), ddi_get_instance(dip));
@@ -2800,7 +2800,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 			    usba_device->usb_client_ev_cb_list[iface].
 							ev_data;
 
-			USB_DPRINTF_L1(DPRINT_MASK_USBA,
+			USB_DPRINTF_L2(DPRINT_MASK_USBA,
 			    usba_log_handle,
 			    "%s%d: did no usb_unregister_event_cbs",
 			    ddi_driver_name(dip), ddi_get_instance(dip));
@@ -2821,7 +2821,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 	mutex_exit(&usba_device->usb_mutex);
 
 	if (leaks) {
-		USB_DPRINTF_L1(DPRINT_MASK_USBA, usba_log_handle,
+		USB_DPRINTF_L2(DPRINT_MASK_USBA, usba_log_handle,
 		    "all %d leaks fixed", leaks);
 	}
 }

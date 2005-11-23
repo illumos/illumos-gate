@@ -21,11 +21,10 @@
 #
 #
 # uts/sparc/ssd/Makefile
-
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-
 #ident	"%Z%%M%	%I%	%E% SMI"
 
 #
@@ -47,6 +46,9 @@ OBJECTS		= $(SSD_OBJS:%=$(OBJS_DIR)/%)
 LINTS		= $(SSD_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
 CONF_SRCDIR	= $(UTSBASE)/sun/io/scsi/targets
+
+WARLOCK_OUT     = $(SSD_OBJS:%.o=%.ll)
+WARLOCK_OK      = $(MODULE).ok
 
 #
 #	Include common rules.
@@ -76,9 +78,11 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS)
+clean:		$(CLEAN_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS)
+clobber:	$(CLOBBER_DEPS); \
+		$(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -129,7 +133,7 @@ ssd.ok: ssd.wlcmd $(SSD_FILES) scsi_files
 	$(TOUCH) $@
 
 ssd.ll: $(UTSBASE)/common/io/scsi/targets/sd.c
-	$(WLCC) $(CPPFLAGS) $(WLCCFLAGS) -o $@ $(UTSBASE)/common/io/scsi/targets/sd.c 
+	$(WLCC) $(CPPFLAGS) $(WLCCFLAGS) -DDEBUG -o $@ $(UTSBASE)/common/io/scsi/targets/sd.c 
 
 warlock_ddi.files:
 	@cd ../warlock; pwd; $(MAKE) warlock

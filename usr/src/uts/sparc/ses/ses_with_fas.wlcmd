@@ -1,6 +1,3 @@
-#ident	"%Z%%M%	%I%	%E% SMI"
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
 #
 # CDDL HEADER START
 #
@@ -22,6 +19,10 @@
 #
 # CDDL HEADER END
 #
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 one scsi_device
@@ -48,7 +49,6 @@ ignore fas_kmem_cache_constructor fas_kmem_cache_destructor
 
 root scsi_hba_reset_notify_setup
 
-
 root ses_runcmd
 
 add ses_softc::ses_vec.get_encstat target safte_get_encstat
@@ -72,6 +72,10 @@ add ses_softc::ses_vec.set_encstat target ses_set_encstat
 add ses_softc::ses_vec.set_objstat target ses_set_objstat
 add ses_softc::ses_vec.softc_init  target ses_softc_init
 
-add     scsi_hba_tran::tran_bus_config targets warlock_dummy
-add     scsi_hba_tran::tran_bus_unconfig targets warlock_dummy
 
+for ptr in `funcptrs | grep '^scsi_hba_tran::'`
+do
+        add $ptr target warlock_dummy
+done
+root    scsi_hba_bus_power
+ignore  delay

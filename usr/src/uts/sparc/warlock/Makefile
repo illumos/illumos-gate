@@ -19,12 +19,11 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+# ident	"%Z%%M%	%I%	%E% SMI"
+
 #	This makefile drives the production of the fas driver kernel module.
 #
 #	sparc architecture dependent
@@ -105,6 +104,7 @@ warlock.scsi:
 warlock.1394:
 	@cd ../s1394; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../hci1394; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../scsa1394; rm -f *.ll *.ok; $(MAKE) warlock
 
 warlock.ecpp:
 	@cd ../ecpp; rm -f *.ll *.ok; $(MAKE) warlock
