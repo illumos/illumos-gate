@@ -112,6 +112,7 @@ event ereport.io.fire.jbc.mb_pea@hostbridge{within(5s)};
 event ereport.io.fire.jbc.mb_per@hostbridge/pciexrc{within(5s)}; 
 event ereport.io.fire.jbc.mb_pew@hostbridge/pciexrc{within(5s)}; 
 event ereport.io.fire.jbc.ebus_to@hostbridge{within(5s)};
+event ereport.io.fire.jbc.ebus_to@hostbridge/pciexrc{within(5s)};
 
 
 /*
@@ -252,16 +253,15 @@ event fault.io.ebus@hostbridge/pciexrc,
  * A faulty ebus can cause ebus timeout ebus_to
  */
 prop fault.io.ebus@hostbridge/pciexrc (0)->
-    ereport.io.fire.jbc.ebus_to@hostbridge;
+    ereport.io.fire.jbc.ebus_to@hostbridge,
+    ereport.io.fire.jbc.ebus_to@hostbridge/pciexrc;
 
 
 /*
  * hostbus
  */
-fru hostbridge;
-asru hostbridge;
-event fault.io.hbus@hostbridge/pciexrc, 
-    FITrate=HBUS_FIT, FRU=hostbridge, ASRU=hostbridge; 
+event fault.io.fire.hbus@hostbridge/pciexrc, 
+    FITrate=HBUS_FIT, FRU=hostbridge/pciexrc, ASRU=hostbridge/pciexrc; 
  
 event error.io.fire.jbc.pio_dpe@hostbridge/pciexrc;
 
@@ -281,7 +281,7 @@ event ereport.io.fire.jbc.pio_cpe@hostbridge{within(5s)};
  *  - cpe:      jbus control parity error. 
  *  - pio_cpe:  jbus PIO control parity error. 
  */ 
-prop fault.io.hbus@hostbridge/pciexrc (0)-> 
+prop fault.io.fire.hbus@hostbridge/pciexrc (0)-> 
     ereport.io.fire.jbc.ape@hostbridge, 
     error.io.fire.jbc.pio_dpe@hostbridge/pciexrc, 
     ereport.io.fire.jbc.rd_dpe@hostbridge/pciexrc, 
