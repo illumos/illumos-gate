@@ -769,6 +769,39 @@ vfs_mountroot(void)
 }
 
 /*
+ * If remount failed and we're in a zone we need to check for the zone
+ * root path and strip it before the call to vfs_setpath().
+ *
+ * If strpath doesn't begin with the zone_rootpath the original
+ * strpath is returned unchanged.
+ */
+static const char *
+stripzonepath(const char *strpath)
+{
+	char *str1, *str2;
+	int i;
+	zone_t *zonep = curproc->p_zone;
+
+	if (zonep->zone_rootpath == NULL || strpath == NULL) {
+		return (NULL);
+	}
+
+	/*
+	 * we check for the end of the string at one past the
+	 * current position because the zone_rootpath always
+	 * ends with "/" but we don't want to strip that off.
+	 */
+	str1 = zonep->zone_rootpath;
+	str2 = (char *)strpath;
+	ASSERT(str1[0] != '\0');
+	for (i = 0; str1[i + 1] != '\0'; i++) {
+		if (str1[i] != str2[i])
+			return ((char *)strpath);
+	}
+	return (&str2[i]);
+}
+
+/*
  * Common mount code.  Called from the system call entry point, from autofs,
  * and from pxfs.
  *
@@ -1264,10 +1297,12 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		if (remount) {
 			/* put back pre-remount options */
 			vfs_swapopttbl(&mnt_mntopts, &vfsp->vfs_mntopts);
-			vfs_setmntpoint(vfsp, refstr_value(oldmntpt));
+			vfs_setmntpoint(vfsp, (stripzonepath(
+					refstr_value(oldmntpt))));
 			if (oldmntpt)
 				refstr_rele(oldmntpt);
-			vfs_setresource(vfsp, refstr_value(oldresource));
+			vfs_setresource(vfsp, (stripzonepath(
+					refstr_value(oldresource))));
 			if (oldresource)
 				refstr_rele(oldresource);
 			vfsp->vfs_flag = ovflags;
