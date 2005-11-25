@@ -54,6 +54,8 @@ HTMLENTS = \
 	RtNameServiceSecure.html \
 	RtNetMngmnt.html \
 	RtNetSecure.html \
+	RtNetWifiMngmnt.html \
+	RtNetWifiSecure.html \
 	RtObAccessMngmnt.html \
 	RtPrntAdmin.html \
 	RtProcManagement.html \

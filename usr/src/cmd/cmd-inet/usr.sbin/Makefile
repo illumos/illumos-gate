@@ -70,11 +70,11 @@ SRCS=		$(PROGSRCS) $(OTHERSRC)
 SUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed \
 		in.talkd inetadm inetconv ipqosconf kssl/kssladm \
 		kssl/ksslcfg  mipagentconfig mipagentstat ping snoop \
-		sppptun traceroute
+		sppptun traceroute wificonfig
 
 MSGSUBDIRS=	bootconfchk htable ifconfig in.ftpd in.routed in.talkd \
 		inetadm inetconv ipqosconf kssl/ksslcfg mipagentconfig \
-		mipagentstat sppptun snoop
+		mipagentstat sppptun snoop wificonfig
 
 # As programs get lint-clean, add them here and to the 'lint' target.
 # Eventually this hack should go away, and all in PROG should be
@@ -87,7 +87,7 @@ LINTCLEAN=	6to4relay arp ikeadm in.rlogind in.rshd in.telnetd in.tftpd \
 # with SUBDIRS.  Also (sigh) deal with the commented-out build lines
 # for the lint rule.
 LINTSUBDIRS=	bootconfchk in.routed in.talkd inetadm inetconv ipqosconf \
-		mipagentstat ping sppptun traceroute
+		mipagentstat ping sppptun traceroute wificonfig
 # And as programs are verified not to attempt to write into constants,
 # -xstrconst should be used to ensure they stay that way.
 CONSTCLEAN=	ikeadm

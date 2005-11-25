@@ -48,8 +48,10 @@ Mail Management:::Manage sendmail & queues:auths=solaris.smf.manage.sendmail;hel
 Maintenance and Repair:::Maintain and repair a system:auths=solaris.smf.manage.system-log;help=RtMaintAndRepair.html
 Media Backup:::Backup files and file systems:help=RtMediaBkup.html
 Media Restore:::Restore files and file systems from backups:help=RtMediaRestore.html
-Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind;help=RtNetMngmnt.html
-Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh;help=RtNetSecure.html
+Network Management:::Manage the host and network configuration:auths=solaris.smf.manage.name-service-cache,solaris.smf.manage.bind;profiles=Network Wifi Management;help=RtNetMngmnt.html
+Network Security:::Manage network and host security:auths=solaris.smf.manage.ssh;profiles=Network Wifi Security;help=RtNetSecure.html
+Network Wifi Management:::Manage wifi network configuration:auths=solaris.network.wifi.config;help=RtNetWifiMngmnt.html
+Network Wifi Security:::Manage wifi network security:auths=solaris.network.wifi.wep;help=RtNetWifiSecure.html
 Name Service Management:::Non-security name service scripts/commands:help=RtNameServiceAdmin.html
 Name Service Security:::Security related name service scripts/commands:help=RtNameServiceSecure.html
 Object Access Management:::Change ownership and permission on files:help=RtObAccessMngmnt.html

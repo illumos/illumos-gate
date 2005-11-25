@@ -42,6 +42,7 @@ static int node_slash_minor(di_minor_t minor, di_node_t node);
 static int driver_minor(di_minor_t minor, di_node_t node);
 static int node_name(di_minor_t minor, di_node_t node);
 static int minor_name(di_minor_t minor, di_node_t node);
+static int wifi_minor_name(di_minor_t minor, di_node_t node);
 static int conskbd(di_minor_t minor, di_node_t node);
 static int consms(di_minor_t minor, di_node_t node);
 static int power_button(di_minor_t minor, di_node_t node);
@@ -67,6 +68,9 @@ static devfsadm_create_t misc_cbt[] = {
 	},
 	{ "network", "ddi_network", NULL,
 	    TYPE_EXACT, ILEVEL_0, minor_name
+	},
+	{ "wifi", "ddi_network:wifi", NULL,
+	    TYPE_EXACT, ILEVEL_0, wifi_minor_name
 	},
 	{ "display", "ddi_display", NULL,
 	    TYPE_EXACT, ILEVEL_0, display
@@ -358,6 +362,20 @@ minor_name(di_minor_t minor, di_node_t node)
 	return (DEVFSADM_CONTINUE);
 }
 
+/*
+ * create links at /dev/wifi for wifi minor node
+ */
+static int
+wifi_minor_name(di_minor_t minor, di_node_t node)
+{
+	char buf[256];
+	char *mn = di_minor_name(minor);
+
+	(void) snprintf(buf, sizeof (buf), "%s%s", "wifi/", mn);
+	(void) devfsadm_mklink(buf, node, minor, 0);
+
+	return (DEVFSADM_CONTINUE);
+}
 
 static int
 conskbd(di_minor_t minor, di_node_t node)

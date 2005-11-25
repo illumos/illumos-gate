@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -79,7 +79,10 @@ HTMLENTS = \
 	SmfPowerStates.html \
 	SmfSendmailStates.html \
 	SmfSshStates.html \
-	SmfSyslogStates.html
+	SmfSyslogStates.html \
+	NetworkHeader.html \
+	WifiConfig.html \
+	WifiWep.html
 
 HELPDIR=$(ROOT)/usr/lib/help
 AUTHDIR=$(HELPDIR)/auths

@@ -319,6 +319,8 @@ COMMON_SUBDIRS= \
 	SUNWvolr  \
 	SUNWvolu  \
 	SUNWxcu4  \
+	SUNWwlanr  \
+	SUNWwlanu  \
 	SUNWxcu6  \
 	SUNWxwdv \
 	SUNWpmr \

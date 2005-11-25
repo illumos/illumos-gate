@@ -166,6 +166,8 @@ extern "C" {
 
 #define	DDI_NT_NET	"ddi_network"		/* DLPI network devices */
 
+#define	DDI_NT_NET_WIFI	"ddi_network:wifi"	/* wifi devices */
+
 #define	DDI_NT_MAC	"ddi_mac"		/* MAC devices */
 
 #define	DDI_NT_DISPLAY	"ddi_display"		/* display devices */

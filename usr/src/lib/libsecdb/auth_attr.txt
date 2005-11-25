@@ -57,6 +57,10 @@ solaris.login.remote:::Remote Login::help=LoginRemote.html
 solaris.mail.:::Mail::help=MailHeader.html
 solaris.mail.mailq:::Mail Queue::help=MailQueue.html
 #
+solaris.network.:::Network::help=NetworkHeader.html
+solaris.network.wifi.config:::Wifi Config::help=WifiConfig.html
+solaris.network.wifi.wep:::Wifi Wep::help=WifiWep.html
+#
 solaris.profmgr.:::Rights::help=ProfmgrHeader.html
 solaris.profmgr.assign:::Assign All Rights::help=AuthProfmgrAssign.html
 solaris.profmgr.delegate:::Assign Owned Rights::help=AuthProfmgrDelegate.html

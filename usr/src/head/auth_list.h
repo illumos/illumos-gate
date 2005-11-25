@@ -20,7 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc. All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  *
  * This is an internal header file. Not to be shipped.
  */
@@ -46,6 +47,8 @@ extern "C" {
 #define	DEVICE_REVOKE_AUTH	"solaris.device.revoke"
 #define	MAILQ_AUTH		"solaris.mail.mailq"
 #define	SET_DATE_AUTH		"solaris.system.date"
+#define	WIFI_CONFIG_AUTH	"solaris.network.wifi.config"
+#define	WIFI_WEP_AUTH		"solaris.network.wifi.wep"
 
 #ifdef	__cplusplus
 }
