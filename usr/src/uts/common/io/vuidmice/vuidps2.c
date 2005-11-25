@@ -113,6 +113,7 @@
  */
 #define	PS2_INIT_TMOUT_RESET	500000	/* 500ms for RESET command */
 #define	PS2_INIT_TMOUT_PER_CMD	200000	/* 200ms for each command-response */
+#define	PS2_INIT_TMOUT_PER_GROUP	500000 /* 500ms for group commands */
 
 #define	PS2_MAX_INIT_COUNT	5
 
@@ -136,7 +137,7 @@ static void VUID_INIT_TIMEOUT(void *q);
  * Set timeout for SET STREAM MODE and ENABLE.
  *
  * But for simplicity, sometimes we just apply the timeout
- * to a function (e.g. wheel-mouse detection).
+ * to a function with group commands (e.g. wheel-mouse detection).
  *
  */
 static void
@@ -224,10 +225,11 @@ VUID_OPEN(queue_t *const qp)
 	STATEP->nbuttons = 3;
 
 	STATEP->state = PS2_WAIT_RESET_ACK;
-	put1(WR(qp), MSERESET);
 
 	/* Set timeout for reset */
 	vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
+
+	put1(WR(qp), MSERESET);
 
 	while ((STATEP->state != PS2_START) &&
 	    !(STATEP->inited & PS2_FLAG_INIT_TIMEOUT)) {
@@ -285,10 +287,10 @@ VUID_INIT_TIMEOUT(void *q)
 
 	STATEP->state = PS2_WAIT_RESET_ACK;
 
+	vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
+
 	/* try again */
 	put1(WR(qp), MSERESET);
-
-	vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
 }
 
 void
@@ -393,9 +395,9 @@ restart:
 
 		case PS2_MAYBE_REATTACH:
 			if (code == MSE_00) {
-				put1(WR(qp), MSERESET);
 				STATEP->state = PS2_WAIT_RESET_ACK;
 				vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
+				put1(WR(qp), MSERESET);
 				break;
 			}
 			/*FALLTHROUGH*/
@@ -546,6 +548,19 @@ packet_complete:
 			if (code != MSE_ACK) {
 				break;
 			}
+
+			/*
+			 * On Dell latitude D800, we find that the MSE_ACK is
+			 * coming up even after timeout in VUID_OPEN during
+			 * early boot. So here (PS2_WAIT_RESET_ACK) we check
+			 * if timeout happened before, if true, we reset the
+			 * timeout to restart the initialization.
+			 */
+			if (STATEP->inited & PS2_FLAG_INIT_TIMEOUT) {
+				STATEP->inited &= ~PS2_FLAG_INIT_TIMEOUT;
+				vuid_set_timeout(qp, PS2_INIT_TMOUT_RESET);
+			}
+
 			STATEP->state = PS2_WAIT_RESET_AA;
 			break;
 
@@ -564,20 +579,20 @@ packet_complete:
 			/* Reset has been ok */
 			vuid_cancel_timeout(qp);
 
-			put1(WR(qp), MSESETRES);
 			STATEP->state = PS2_WAIT_SETRES0_ACK1;
 
 			/* Set timeout for set res */
-			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_CMD);
+			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_GROUP);
 
+			put1(WR(qp), MSESETRES);
 			break;
 
 		case PS2_WAIT_SETRES0_ACK1:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), 0);
 			STATEP->state = PS2_WAIT_SETRES0_ACK2;
+			put1(WR(qp), 0);
 			break;
 
 		case PS2_WAIT_SETRES0_ACK2:
@@ -586,8 +601,8 @@ packet_complete:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), MSESCALE1);
 			STATEP->state++;
+			put1(WR(qp), MSESCALE1);
 			break;
 
 		case PS2_WAIT_SCALE1_3_ACK:
@@ -598,11 +613,12 @@ packet_complete:
 			/* Set res and scale have been ok */
 			vuid_cancel_timeout(qp);
 
-			put1(WR(qp), MSESTATREQ);
 			STATEP->state = PS2_WAIT_STATREQ_ACK;
 
 			/* Set timeout for status request */
-			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_CMD);
+			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_GROUP);
+
+			put1(WR(qp), MSESTATREQ);
 
 			break;
 
@@ -660,6 +676,9 @@ packet_complete:
 			/* Status request has been ok */
 			vuid_cancel_timeout(qp);
 
+			/* Set timeout for set res or sample rate */
+			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_GROUP);
+
 			/*
 			 * Start the wheel-mouse detection code.  First, we look
 			 * for standard wheel mice.  If we set the sample rate
@@ -673,51 +692,48 @@ packet_complete:
 				STATEP->state = PS2_WAIT_SETRES3_ACK1;
 				put1(WR(qp), MSESETRES);
 			} else {
-				put1(WR(qp), MSECHGMOD);
 				STATEP->state = PS2_WAIT_WHEEL_SMPL1_CMD_ACK;
+				put1(WR(qp), MSECHGMOD);
 			}
-
-			/* Set timeout for set res or sample rate */
-			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_CMD);
 
 			break;
 		case PS2_WAIT_WHEEL_SMPL1_CMD_ACK:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), 200);
 			STATEP->state = PS2_WAIT_WHEEL_SMPL1_RATE_ACK;
+			put1(WR(qp), 200);
 			break;
 		case PS2_WAIT_WHEEL_SMPL1_RATE_ACK:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), MSECHGMOD);
 			STATEP->state = PS2_WAIT_WHEEL_SMPL2_CMD_ACK;
+			put1(WR(qp), MSECHGMOD);
 			break;
 
 		case PS2_WAIT_WHEEL_SMPL2_CMD_ACK:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), 100);
 			STATEP->state = PS2_WAIT_WHEEL_SMPL2_RATE_ACK;
+			put1(WR(qp), 100);
 			break;
 
 		case PS2_WAIT_WHEEL_SMPL2_RATE_ACK:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), MSECHGMOD);
 			STATEP->state = PS2_WAIT_WHEEL_SMPL3_CMD_ACK;
+			put1(WR(qp), MSECHGMOD);
 			break;
 
 		case PS2_WAIT_WHEEL_SMPL3_CMD_ACK:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), 80);
 			STATEP->state = PS2_WAIT_WHEEL_SMPL3_RATE_ACK;
+			put1(WR(qp), 80);
 			break;
 
 		case PS2_WAIT_WHEEL_SMPL3_RATE_ACK:
@@ -728,12 +744,12 @@ packet_complete:
 			/* Set sample rate has been ok */
 			vuid_cancel_timeout(qp);
 
-			put1(WR(qp), MSEGETDEV);
 			STATEP->state = PS2_WAIT_WHEEL_DEV_CMD;
 
 			/* Set timeout for get dev */
 			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_CMD);
 
+			put1(WR(qp), MSEGETDEV);
 			break;
 
 		case PS2_WAIT_WHEEL_DEV_CMD:
@@ -749,11 +765,12 @@ packet_complete:
 			vuid_cancel_timeout(qp);
 
 			if (code != 0x03) {
-				put1(WR(qp), MSESETRES);
 				STATEP->state = PS2_WAIT_SETRES3_ACK1;
 
 				/* Set timeout for set res */
 				vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_CMD);
+
+				put1(WR(qp), MSESETRES);
 
 				break;
 			}
@@ -765,12 +782,13 @@ packet_complete:
 			 */
 			STATEP->wheel_state_bf |= VUID_WHEEL_STATE_ENABLED;
 
-			/* We're on a roll - try for wheel+5 */
-			put1(WR(qp), MSECHGMOD);
 			STATEP->state = PS2_WAIT_WHEEL5_SMPL1_CMD_ACK;
 
 			/* Set timeout for set sample rate */
-			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_CMD);
+			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_GROUP);
+
+			/* We're on a roll - try for wheel+5 */
+			put1(WR(qp), MSECHGMOD);
 
 			break;
 
@@ -778,40 +796,40 @@ packet_complete:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), 200);
 			STATEP->state = PS2_WAIT_WHEEL5_SMPL1_RATE_ACK;
+			put1(WR(qp), 200);
 			break;
 
 		case PS2_WAIT_WHEEL5_SMPL1_RATE_ACK:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), MSECHGMOD);
 			STATEP->state = PS2_WAIT_WHEEL5_SMPL2_CMD_ACK;
+			put1(WR(qp), MSECHGMOD);
 			break;
 
 		case PS2_WAIT_WHEEL5_SMPL2_CMD_ACK:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), 200);
 			STATEP->state = PS2_WAIT_WHEEL5_SMPL2_RATE_ACK;
+			put1(WR(qp), 200);
 			break;
 
 		case PS2_WAIT_WHEEL5_SMPL2_RATE_ACK:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), MSECHGMOD);
 			STATEP->state = PS2_WAIT_WHEEL5_SMPL3_CMD_ACK;
+			put1(WR(qp), MSECHGMOD);
 			break;
 
 		case PS2_WAIT_WHEEL5_SMPL3_CMD_ACK:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), 80);
 			STATEP->state = PS2_WAIT_WHEEL5_SMPL3_RATE_ACK;
+			put1(WR(qp), 80);
 			break;
 
 		case PS2_WAIT_WHEEL5_SMPL3_RATE_ACK:
@@ -822,11 +840,12 @@ packet_complete:
 			/* Set sample rate has been ok */
 			vuid_cancel_timeout(qp);
 
-			put1(WR(qp), MSEGETDEV);
 			STATEP->state = PS2_WAIT_WHEEL5_DEV_CMD;
 
 			/* Set timeout for wheel5 get dev */
 			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_CMD);
+
+			put1(WR(qp), MSEGETDEV);
 
 			break;
 
@@ -856,11 +875,12 @@ packet_complete:
 			/* FALLTHROUGH */
 
 		case PS2_WAIT_SETRES3_CMD:
-			put1(WR(qp), MSESETRES);
 			STATEP->state = PS2_WAIT_SETRES3_ACK1;
 
 			/* Set timeout for set res */
 			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_CMD);
+
+			put1(WR(qp), MSESETRES);
 
 			break;
 
@@ -868,8 +888,8 @@ packet_complete:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), 3);
 			STATEP->state = PS2_WAIT_SETRES3_ACK2;
+			put1(WR(qp), 3);
 			break;
 
 		case PS2_WAIT_SETRES3_ACK2:
@@ -880,11 +900,12 @@ packet_complete:
 			/* Set res has been ok */
 			vuid_cancel_timeout(qp);
 
-			put1(WR(qp), MSESTREAM);
 			STATEP->state = PS2_WAIT_STREAM_ACK;
 
 			/* Set timeout for enable */
 			vuid_set_timeout(qp, PS2_INIT_TMOUT_PER_CMD);
+
+			put1(WR(qp), MSESTREAM);
 
 			break;
 
@@ -892,8 +913,8 @@ packet_complete:
 			if (code != MSE_ACK) {
 				break;
 			}
-			put1(WR(qp), MSEON);
 			STATEP->state = PS2_WAIT_ON_ACK;
+			put1(WR(qp), MSEON);
 			break;
 
 		case PS2_WAIT_ON_ACK:
