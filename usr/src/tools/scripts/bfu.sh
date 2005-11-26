@@ -2145,6 +2145,29 @@ bfucmd="
 	${GZIPBIN-$GATE/public/bin/$bfu_isa/gzip}
 "
 
+#
+# Scripts needed by BFU. These must be modified to use the interpreters in
+# /tmp/bfubin. The interpreters in /usr/bin may not be compatible with the
+# libraries in the archives being extracted.
+#
+bfuscr="
+	${ACR-${GATE}/public/bin/acr}
+"
+
+#
+# basename and dirname may be ELF executables, not shell scripts;
+# make sure they go into the right list.
+#
+if `file /usr/bin/basename | grep ELF >/dev/null`
+then	bfucmd="$bfucmd /usr/bin/basename"
+else	bfuscr="$bfuscr /usr/bin/basename"
+fi
+
+if `file /usr/bin/dirname | grep ELF >/dev/null`
+then	bfucmd="$bfucmd /usr/bin/dirname"
+else	bfuscr="$bfuscr /usr/bin/dirname"
+fi
+
 rm -rf /tmp/bfubin
 mkdir /tmp/bfubin
 set $bfucmd
@@ -2306,18 +2329,6 @@ cp /lib/ld.so.1 /tmp/bfulib/bf.1	# bfu's private runtime linker
 cp /lib/ld.so.1 /tmp/bl/bf.1
 
 ${BFULD-$GATE/public/bin/$bfu_isa/bfuld} /tmp/bfubin/* || fail "bfuld failed"
-
-#
-# Scripts needed by BFU. These must be modified to use the interpreters in
-# /tmp/bfubin. The interpreters in /usr/bin may not be compatible with the
-# libraries in the archives being extracted.
-#
-#
-bfuscr="
-	/usr/bin/basename
-	/usr/bin/dirname
-	${ACR-${GATE}/public/bin/acr}
-"
 
 for x in $bfuscr
 do
@@ -3803,7 +3814,7 @@ check_multi_to_dca_boot()
 			# files are relative to /boot.
 			for file in $saved_boot_files
 			do
-				dir="`/usr/bin/dirname $rootprefix/stubboot/$file`"
+				dir="`dirname $rootprefix/stubboot/$file`"
 				mkdir -p $dir
 				cp $rootprefix/boot/$file $dir
 			done
