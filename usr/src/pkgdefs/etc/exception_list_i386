@@ -736,6 +736,9 @@ lib/amd64/libc_i18n.a			i386
 #
 # ZFS internal tools and lint libraries
 #
+lib/llib-lzfs.ln			i386
+lib/llib-lzfs				i386
+lib/amd64/llib-lzfs.ln			i386
 usr/bin/ztest				i386
 usr/bin/i86/ztest			i386
 usr/bin/amd64/ztest			i386

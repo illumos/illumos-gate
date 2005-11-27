@@ -32,8 +32,8 @@
 # SUNWzfsu
 #
 d none usr/lib/amd64 755 root bin
-f none usr/lib/amd64/libzfs.so.1 755 root bin
-s none usr/lib/amd64/libzfs.so=libzfs.so.1
+s none usr/lib/amd64/libzfs.so.1=../../../lib/amd64/libzfs.so.1
+s none usr/lib/amd64/libzfs.so=../../../lib/amd64/libzfs.so.1
 f none usr/lib/amd64/libzfs_jni.so.1 755 root bin
 s none usr/lib/amd64/libzfs_jni.so=libzfs_jni.so.1
 f none usr/lib/amd64/libzpool.so.1 755 root bin

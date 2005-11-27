@@ -877,6 +877,8 @@ $(ROOT)/usr/lib/libw.so.1:=		REALPATH=../../lib/libw.so.1
 $(ROOT)/usr/lib/libw.so:=		REALPATH=../../lib/libw.so.1
 $(ROOT)/usr/lib/libxnet.so.1:=		REALPATH=../../lib/libxnet.so.1
 $(ROOT)/usr/lib/libxnet.so:=		REALPATH=../../lib/libxnet.so.1
+$(ROOT)/usr/lib/libzfs.so.1:=		REALPATH=../../lib/libzfs.so.1
+$(ROOT)/usr/lib/libzfs.so:=		REALPATH=../../lib/libzfs.so.1
 $(ROOT)/usr/lib/llib-ladm.ln:=		REALPATH=../../lib/llib-ladm.ln
 $(ROOT)/usr/lib/llib-ladm:=		REALPATH=../../lib/llib-ladm
 $(ROOT)/usr/lib/llib-laio.ln:=		REALPATH=../../lib/llib-laio.ln
@@ -971,6 +973,8 @@ $(ROOT)/usr/lib/llib-luuid.ln:=		REALPATH=../../lib/llib-luuid.ln
 $(ROOT)/usr/lib/llib-luuid:=		REALPATH=../../lib/llib-luuid
 $(ROOT)/usr/lib/llib-lxnet.ln:=		REALPATH=../../lib/llib-lxnet.ln
 $(ROOT)/usr/lib/llib-lxnet:=		REALPATH=../../lib/llib-lxnet
+$(ROOT)/usr/lib/llib-lzfs.ln:=		REALPATH=../../lib/llib-lzfs.ln
+$(ROOT)/usr/lib/llib-lzfs:=		REALPATH=../../lib/llib-lzfs
 $(ROOT)/usr/lib/nss_compat.so.1:=	REALPATH=../../lib/nss_compat.so.1
 $(ROOT)/usr/lib/nss_dns.so.1:=		REALPATH=../../lib/nss_dns.so.1
 $(ROOT)/usr/lib/nss_files.so.1:=	REALPATH=../../lib/nss_files.so.1
@@ -1192,6 +1196,10 @@ $(ROOT)/usr/lib/$(MACH64)/libxnet.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/libxnet.so.1
 $(ROOT)/usr/lib/$(MACH64)/libxnet.so:= \
 	REALPATH=../../../lib/$(MACH64)/libxnet.so.1
+$(ROOT)/usr/lib/$(MACH64)/libzfs.so:= \
+	REALPATH=../../../lib/$(MACH64)/libzfs.so.1
+$(ROOT)/usr/lib/$(MACH64)/libzfs.so.1:= \
+	REALPATH=../../../lib/$(MACH64)/libzfs.so.1
 $(ROOT)/usr/lib/$(MACH64)/llib-ladm.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-ladm.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-laio.ln:= \
@@ -1284,6 +1292,8 @@ $(ROOT)/usr/lib/$(MACH64)/llib-luuid.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-luuid.ln
 $(ROOT)/usr/lib/$(MACH64)/llib-lxnet.ln:= \
 	REALPATH=../../../lib/$(MACH64)/llib-lxnet.ln
+$(ROOT)/usr/lib/$(MACH64)/llib-lzfs.ln:= \
+	REALPATH=../../../lib/$(MACH64)/llib-lzfs.ln
 $(ROOT)/usr/lib/$(MACH64)/nss_compat.so.1:= \
 	REALPATH=../../../lib/$(MACH64)/nss_compat.so.1
 $(ROOT)/usr/lib/$(MACH64)/nss_dns.so.1:= \
@@ -1424,6 +1434,8 @@ SYM.USRLIB= \
 	/usr/lib/libw.so.1 \
 	/usr/lib/libxnet.so \
 	/usr/lib/libxnet.so.1 \
+	/usr/lib/libzfs.so \
+	/usr/lib/libzfs.so.1 \
 	/usr/lib/llib-ladm \
 	/usr/lib/llib-ladm.ln \
 	/usr/lib/llib-laio \
@@ -1518,6 +1530,8 @@ SYM.USRLIB= \
 	/usr/lib/llib-luuid.ln \
 	/usr/lib/llib-lxnet \
 	/usr/lib/llib-lxnet.ln \
+	/usr/lib/llib-lzfs \
+	/usr/lib/llib-lzfs.ln \
 	/usr/lib/nss_compat.so.1 \
 	/usr/lib/nss_dns.so.1 \
 	/usr/lib/nss_files.so.1 \
@@ -1643,6 +1657,8 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/libw.so.1 \
 	/usr/lib/$(MACH64)/libxnet.so \
 	/usr/lib/$(MACH64)/libxnet.so.1 \
+	/usr/lib/$(MACH64)/libzfs.so \
+	/usr/lib/$(MACH64)/libzfs.so.1 \
 	/usr/lib/$(MACH64)/llib-ladm.ln \
 	/usr/lib/$(MACH64)/llib-laio.ln \
 	/usr/lib/$(MACH64)/llib-lavl.ln \
@@ -1689,6 +1705,7 @@ SYM.USRLIB64= \
 	/usr/lib/$(MACH64)/llib-lumem.ln \
 	/usr/lib/$(MACH64)/llib-luuid.ln \
 	/usr/lib/$(MACH64)/llib-lxnet.ln \
+	/usr/lib/$(MACH64)/llib-lzfs.ln \
 	/usr/lib/$(MACH64)/nss_compat.so.1 \
 	/usr/lib/$(MACH64)/nss_dns.so.1 \
 	/usr/lib/$(MACH64)/nss_files.so.1 \

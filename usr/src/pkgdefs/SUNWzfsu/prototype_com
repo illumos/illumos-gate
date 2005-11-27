@@ -46,8 +46,8 @@ d none usr/lib/fs/zfs 755 root sys
 f none usr/lib/fs/zfs/fstyp 555 root bin
 s none usr/lib/fs/zfs/mount=../../../../sbin/zfs
 s none usr/lib/fs/zfs/umount=../../../../sbin/zfs
-f none usr/lib/libzfs.so.1 755 root bin
-s none usr/lib/libzfs.so=libzfs.so.1
+s none usr/lib/libzfs.so.1=../../lib/libzfs.so.1
+s none usr/lib/libzfs.so=../../lib/libzfs.so.1
 f none usr/lib/libzfs_jni.so.1 755 root bin
 s none usr/lib/libzfs_jni.so=libzfs_jni.so.1
 d none usr/lib/mdb 755 root sys

@@ -804,6 +804,9 @@ usr/platform/SUNW,Sun-Fire-T200/lib/llib-lpcp.ln	sparc
 #
 # ZFS internal tools and lint libraries
 #
+lib/llib-lzfs				sparc
+lib/llib-lzfs.ln			sparc
+lib/sparcv9/llib-lzfs.ln		sparc
 usr/bin/ztest				sparc
 usr/bin/sparcv9/ztest			sparc
 usr/lib/llib-lzfs			sparc
