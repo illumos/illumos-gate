@@ -110,7 +110,8 @@ i386_SUBDIRS= \
 	SUNWrmodr \
 	SUNWrmodu \
 	SUNWrtls \
-	SUNWvia823x
+	SUNWvia823x \
+	SUNWatheros
 
 i386_XMODS= \
 	SUNWadpu320 \

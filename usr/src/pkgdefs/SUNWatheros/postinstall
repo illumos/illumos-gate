@@ -1,0 +1,140 @@
+#! /usr/bin/sh
+#
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+# Driver info
+DRV=ath
+DRVALIAS='"pci168c,13" "pci168c,1014"'
+
+BASEDIR=${BASEDIR:-/}
+
+# Function: check_add_drv()
+#
+# This function will check if add_drv has been executed.
+# If not simply calls add_drv. Otherwise adds entries to
+# driver_aliases, driver_classes and minor_perm if necessary.
+# The syntax of this function is the same as add_drv. 
+
+check_add_drv()
+{
+	CMD=$*
+	shift
+
+	ALIAS=""
+	CLASS=""
+	MPERM=""
+	ALIASDIR=${BASEDIR}/etc/driver_aliases
+	CLASSDIR=${BASEDIR}/etc/driver_classes
+	MPERMDIR=${BASEDIR}/etc/minor_perm
+	while getopts i:c:m opt 2>/dev/null; do
+		case "$opt" in
+			i)	ALIAS=`echo ${OPTARG} | /usr/bin/sed -e "s/'//g"`
+				;;
+			c)	CLASS=${OPTARG}
+				;;
+			m)	MPERM=${OPTARG}
+				;;
+		esac
+	done
+	shift `/usr/bin/expr ${OPTIND} - 1`
+	DRIVER=$1
+
+	# Make sure add_drv has not been previously executed
+	# before attempting to add the driver
+	/usr/bin/egrep -s "^${DRIVER}[ 	]" $BASEDIR/etc/name_to_major
+
+	if [ $? -ne 0 ]; then
+		eval ${CMD}
+		if [ $? -ne 0 ]; then
+			echo "Failed add_drv ${DRIVER}!\n" >&2
+			exit 1
+		fi
+	else
+		# Add driver entry if necessary
+		if [ -n "${ALIAS}" ]; then
+			for i in ${ALIAS}; do
+				/usr/bin/egrep -s "^${DRIVER}[ 	]+$i" ${ALIASDIR}
+				if [ $? -ne 0 ]; then
+					echo "${DRIVER} $i" >> ${ALIASDIR}
+				fi
+			done
+		fi
+
+		if [ -n "${CLASS}" ]; then
+			/usr/bin/egrep -s "^${DRIVER}[ 	]+${CLASS}" ${CLASSDIR}
+			if [ $? -ne 0 ]; then
+				echo "${DRIVER}\t${CLASS}" >> ${CLASSDIR}
+			fi
+		fi
+
+		if [ -n "${MPERM}" ]; then
+			/usr/bin/egrep -s "^${DRIVER}:" ${MPERMDIR}
+			if [ $? -ne 0 ]; then
+				echo "${DRIVER}:${PERM}" >> ${MPERMDIR}
+			fi
+		fi
+	fi
+}
+
+# Is the hardware there?
+hw_exists=0
+CLEANALIAS=`echo ${DRVALIAS} | /usr/bin/sed -e 's/\"//g'`
+for i in ${CLEANALIAS}
+do
+	prtconf -v | /usr/bin/egrep -s $i
+	if [ $? -eq 0 ]
+	then
+		hw_exists=1
+	fi
+done
+
+# Only attempt to attach the driver on a running
+# system with the hardware present
+if [ "$BASEDIR" = "/" ]
+then
+	case ${hw_exists} in
+		# On a running system with no hardware
+		# modify the system files only
+		0)	ADD_DRV="add_drv -n"
+			;;
+		# On a running system with hardware
+		# modify the system files and attach the driver
+		1)	ADD_DRV="add_drv"
+			;;
+	esac
+else
+	# On a client
+	# modify the sytem files and touch /reconfigure
+	# for reconfigure reboot
+	ADD_DRV="add_drv -b ${BASEDIR}"
+fi
+
+ARCH=`uname -p`
+if [ ${ARCH} = "i386" ]; then
+	check_add_drv ${ADD_DRV} -i "'${DRVALIAS}'" ${DRV}
+fi

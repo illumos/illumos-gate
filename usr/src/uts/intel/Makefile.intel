@@ -297,6 +297,7 @@ DRV_KMODS	+= winlock
 DRV_KMODS	+= xge
 DRV_KMODS	+= chxge
 DRV_KMODS	+= zcons
+DRV_KMODS	+= ath
 
 #
 # Common code drivers

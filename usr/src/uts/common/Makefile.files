@@ -1294,6 +1294,9 @@ IGIGE_OBJS += e1000g_debug.o e1000_hw.o e1000g_main.o e1000g_alloc.o \
 		e1000g_tx.o e1000g_rx.o e1000g_stat.o
 RGE_OBJS += rge_main.o rge_chip.o rge_ndd.o rge_kstats.o rge_log.o rge_rxtx.o
 
+ATH_OBJS += ath_aux.o ath_ieee80211.o ath_main.o ath_osdep.o \
+		ath_rate.o ath_wificonfig.o
+
 #
 #	Build up defines and paths.
 #
