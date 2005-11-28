@@ -38,6 +38,18 @@
 #include <sys/ddi.h>
 #include <sys/epm.h>
 
+extern struct scsi_pkt *scsi_init_cache_pkt(struct scsi_address *,
+		    struct scsi_pkt *, struct buf *, int, int, int, int,
+		    int (*)(caddr_t), caddr_t);
+extern void scsi_free_cache_pkt(struct scsi_address *,
+		    struct scsi_pkt *);
+/*
+ * Round up all allocations so that we can guarantee
+ * long-long alignment.  This is the same alignment
+ * provided by kmem_alloc().
+ */
+#define	ROUNDUP(x)	(((x) + 0x07) & ~0x07)
+
 static kmutex_t	scsi_hba_mutex;
 
 kmutex_t scsi_log_mutex;
@@ -203,7 +215,73 @@ scsi_uninitialize_hba_interface()
 }
 #endif	/* NO_SCSI_FINI_YET */
 
+int
+scsi_hba_pkt_constructor(void *buf, void *arg, int kmflag)
+{
+	struct scsi_pkt		*pkt;
+	scsi_hba_tran_t		*tran = (scsi_hba_tran_t *)arg;
+	int			pkt_len;
+	char			*ptr;
 
+	pkt = &((struct scsi_pkt_cache_wrapper *)buf)->pcw_pkt;
+
+	/*
+	 * allocate a chunk of memory for the following:
+	 * scsi_pkt
+	 * pkt_ha_private
+	 * pkt_cdbp, if needed
+	 * (pkt_private always null)
+	 * pkt_scbp, if needed
+	 */
+	pkt_len = tran->tran_hba_len + sizeof (struct scsi_pkt_cache_wrapper);
+	if (tran->tran_hba_flags & SCSI_HBA_TRAN_CDB)
+		pkt_len += DEFAULT_CDBLEN;
+	if (tran->tran_hba_flags & SCSI_HBA_TRAN_SCB)
+		pkt_len += DEFAULT_SCBLEN;
+	bzero(buf, pkt_len);
+	ptr = buf;
+	ptr += sizeof (struct scsi_pkt_cache_wrapper);
+	pkt->pkt_ha_private = (opaque_t)ptr;
+	ptr += tran->tran_hba_len;
+	if (tran->tran_hba_flags & SCSI_HBA_TRAN_CDB) {
+		pkt->pkt_cdbp = (opaque_t)ptr;
+		ptr += DEFAULT_CDBLEN;
+	}
+	pkt->pkt_private = NULL;
+	if (tran->tran_hba_flags & SCSI_HBA_TRAN_SCB)
+		pkt->pkt_scbp = (opaque_t)ptr;
+	if (tran->tran_pkt_constructor)
+		return ((*tran->tran_pkt_constructor)(pkt, arg, kmflag));
+	else
+		return (0);
+}
+
+#define	P_TO_TRAN(pkt)	((pkt)->pkt_address.a_hba_tran)
+
+void
+scsi_hba_pkt_destructor(void *buf, void *arg)
+{
+	struct scsi_pkt		*pkt;
+	scsi_hba_tran_t		*tran = (scsi_hba_tran_t *)arg;
+
+	pkt = &((struct scsi_pkt_cache_wrapper *)buf)->pcw_pkt;
+	if (tran->tran_pkt_destructor)
+		(*tran->tran_pkt_destructor)(pkt, arg);
+
+	/* make sure nobody messed with our pointers */
+	ASSERT(pkt->pkt_ha_private == (opaque_t)((char *)pkt +
+		sizeof (struct scsi_pkt_cache_wrapper)));
+	ASSERT(((tran->tran_hba_flags & SCSI_HBA_TRAN_SCB) == 0) ||
+	    (pkt->pkt_scbp == (opaque_t)((char *)pkt +
+	    tran->tran_hba_len +
+	    (((tran->tran_hba_flags & SCSI_HBA_TRAN_CDB) == 0)
+		? 0 : DEFAULT_CDBLEN) +
+	    DEFAULT_PRIVLEN + sizeof (struct scsi_pkt_cache_wrapper))));
+	ASSERT(((tran->tran_hba_flags & SCSI_HBA_TRAN_CDB) == 0) ||
+	    (pkt->pkt_cdbp == (opaque_t)((char *)pkt +
+	    tran->tran_hba_len +
+	    sizeof (struct scsi_pkt_cache_wrapper))));
+}
 
 /*
  * Called by an HBA from _init()
@@ -324,6 +402,34 @@ scsi_hba_attach_setup(
 		(1<<(ddi_ffs(hba_dma_attr->dma_attr_burstsizes)-1));
 	hba_tran->tran_max_burst_size =
 		(1<<(ddi_fls(hba_dma_attr->dma_attr_burstsizes)-1));
+
+	/* create kmem_cache, if needed */
+	if (hba_tran->tran_pkt_constructor) {
+		char tmp[96];
+		int hbalen;
+		int cmdlen = 0;
+		int statuslen = 0;
+
+		ASSERT(hba_tran->tran_init_pkt == NULL);
+		ASSERT(hba_tran->tran_destroy_pkt == NULL);
+
+		hba_tran->tran_init_pkt = scsi_init_cache_pkt;
+		hba_tran->tran_destroy_pkt = scsi_free_cache_pkt;
+
+		hbalen = ROUNDUP(hba_tran->tran_hba_len);
+		if (flags & SCSI_HBA_TRAN_CDB)
+			cmdlen = ROUNDUP(DEFAULT_CDBLEN);
+		if (flags & SCSI_HBA_TRAN_SCB)
+			statuslen = ROUNDUP(DEFAULT_SCBLEN);
+
+		(void) snprintf(tmp, sizeof (tmp), "pkt_cache_%s_%d",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+		hba_tran->tran_pkt_cache_ptr = kmem_cache_create(tmp,
+		    sizeof (struct scsi_pkt_cache_wrapper) +
+		    hbalen + cmdlen + statuslen, 8,
+		    scsi_hba_pkt_constructor, scsi_hba_pkt_destructor,
+		    NULL, hba_tran, NULL, 0);
+	}
 
 	/*
 	 * Attach scsi configuration property parameters
@@ -473,6 +579,10 @@ scsi_hba_detach(dev_info_t *dip)
 	hba->tran_min_burst_size = (uchar_t)0;
 	hba->tran_max_burst_size = (uchar_t)0;
 
+	if (hba->tran_pkt_cache_ptr != NULL) {
+		kmem_cache_destroy(hba->tran_pkt_cache_ptr);
+		hba->tran_pkt_cache_ptr = NULL;
+	}
 	/*
 	 * Remove HBA instance from scsi_hba_list
 	 */
@@ -904,13 +1014,6 @@ struct scsi_pkt_wrapper {
 _NOTE(SCHEME_PROTECTS_DATA("unique per thread", scsi_pkt_wrapper))
 _NOTE(SCHEME_PROTECTS_DATA("Unshared Data", dev_ops))
 #endif
-
-/*
- * Round up all allocations so that we can guarantee
- * long-long alignment.  This is the same alignment
- * provided by kmem_alloc().
- */
-#define	ROUNDUP(x)	(((x) + 0x07) & ~0x07)
 
 /*
  * Called by an HBA to allocate a scsi_pkt

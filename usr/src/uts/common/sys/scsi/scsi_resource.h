@@ -77,6 +77,25 @@ void		scsi_sync_pkt(struct scsi_pkt *);
 void		scsi_resfree(struct scsi_pkt *);
 
 /*
+ * Private wrapper for scsi_pkt's allocated via scsi_init_cache_pkt()
+ */
+struct scsi_pkt_cache_wrapper {
+	struct scsi_pkt		pcw_pkt;
+	uint_t			pcw_kmflags;
+};
+
+#define	NEED_EXT_CDB	0x0001
+#define	NEED_EXT_TGT	0x0002
+#define	NEED_EXT_SCB	0x0004
+
+/*
+ * Private defines i.e. not part of the DDI.
+ */
+#define	DEFAULT_CDBLEN	16
+#define	DEFAULT_PRIVLEN	0
+#define	DEFAULT_SCBLEN	(sizeof (struct scsi_arq_status))
+
+/*
  * Preliminary version of the SCSA specification
  * mentioned a routine called scsi_pktfree, which
  * turned out to be semantically equivialent to

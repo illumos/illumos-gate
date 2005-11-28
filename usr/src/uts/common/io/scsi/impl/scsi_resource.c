@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -122,6 +122,163 @@ scsi_free_consistent_buf(struct buf *bp)
 	}
 	TRACE_0(TR_FAC_SCSI_RES, TR_SCSI_FREE_CONSISTENT_BUF_END,
 		"scsi_free_consistent_buf_end");
+}
+
+void scsi_free_cache_pkt(struct scsi_address *, struct scsi_pkt *);
+
+struct scsi_pkt *
+scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
+    struct buf *bp, int cmdlen, int statuslen, int pplen,
+    int flags, int (*callback)(caddr_t), caddr_t callback_arg)
+{
+	struct scsi_pkt_cache_wrapper *pktw;
+	scsi_hba_tran_t *tranp = ap->a_hba_tran;
+	int		(*func)(caddr_t);
+
+	func = (callback == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC;
+
+	if (in_pktp == NULL) {
+		int kf;
+
+		if (callback == SLEEP_FUNC)
+			kf = KM_SLEEP;
+		else
+			kf = KM_NOSLEEP;
+		pktw = kmem_cache_alloc(tranp->tran_pkt_cache_ptr,
+			    kf);
+		if (pktw == NULL)
+			goto fail1;
+
+		pktw->pcw_kmflags = 0;
+		in_pktp = &(pktw->pcw_pkt);
+		/*
+		 * target driver initializes pkt_comp, pkt_flags,
+		 * and pkt_time
+		 */
+		in_pktp->pkt_address = *ap;
+		in_pktp->pkt_resid = 0;
+		in_pktp->pkt_state = 0;
+		in_pktp->pkt_statistics = 0;
+		in_pktp->pkt_reason = 0;
+
+		in_pktp->pkt_cdblen = cmdlen;
+		if ((tranp->tran_hba_flags & SCSI_HBA_TRAN_CDB) &&
+		    (cmdlen > DEFAULT_CDBLEN)) {
+			pktw->pcw_kmflags |= NEED_EXT_CDB;
+			in_pktp->pkt_cdbp = kmem_zalloc(cmdlen, kf);
+			if (in_pktp->pkt_cdbp == NULL)
+				goto fail2;
+		}
+		in_pktp->pkt_tgtlen = pplen;
+		if (pplen > DEFAULT_PRIVLEN) {
+			pktw->pcw_kmflags |= NEED_EXT_TGT;
+			in_pktp->pkt_private = kmem_zalloc(pplen, kf);
+			if (in_pktp->pkt_private == NULL)
+				goto fail3;
+		}
+		in_pktp->pkt_scblen = statuslen;
+		if ((tranp->tran_hba_flags & SCSI_HBA_TRAN_SCB) &&
+		    (statuslen > DEFAULT_SCBLEN)) {
+			pktw->pcw_kmflags |= NEED_EXT_SCB;
+			in_pktp->pkt_scbp = kmem_zalloc(statuslen, kf);
+			if (in_pktp->pkt_scbp == NULL)
+				goto fail4;
+		}
+		if ((*tranp->tran_setup_pkt) (in_pktp,
+			func, NULL) == -1) {
+				goto fail5;
+		}
+	}
+	if (bp && bp->b_bcount) {
+		if ((*tranp->tran_setup_bp) (in_pktp, bp,
+		    flags, func, NULL) == -1) {
+			scsi_free_cache_pkt(ap, in_pktp);
+			in_pktp = NULL;
+		}
+	}
+	return (in_pktp);
+
+fail5:
+	if (pktw->pcw_kmflags & NEED_EXT_SCB) {
+		kmem_free(in_pktp->pkt_scbp, statuslen);
+		in_pktp->pkt_scbp = (opaque_t)((char *)in_pktp +
+		    tranp->tran_hba_len + DEFAULT_PRIVLEN +
+		    sizeof (struct scsi_pkt));
+		if ((A_TO_TRAN(ap))->tran_hba_flags & SCSI_HBA_TRAN_CDB)
+			in_pktp->pkt_scbp = (opaque_t)((in_pktp->pkt_scbp) +
+				DEFAULT_CDBLEN);
+		in_pktp->pkt_scblen = 0;
+	}
+fail4:
+	if (pktw->pcw_kmflags & NEED_EXT_TGT) {
+		kmem_free(in_pktp->pkt_private, pplen);
+		in_pktp->pkt_tgtlen = 0;
+		in_pktp->pkt_private = NULL;
+	}
+fail3:
+	if (pktw->pcw_kmflags & NEED_EXT_CDB) {
+		kmem_free(in_pktp->pkt_cdbp, cmdlen);
+		in_pktp->pkt_cdbp = (opaque_t)((char *)in_pktp +
+		    tranp->tran_hba_len +
+		    sizeof (struct scsi_pkt));
+		in_pktp->pkt_cdblen = 0;
+	}
+	pktw->pcw_kmflags &=
+	    ~(NEED_EXT_CDB|NEED_EXT_TGT|NEED_EXT_SCB);
+fail2:
+	kmem_cache_free(tranp->tran_pkt_cache_ptr, pktw);
+fail1:
+	if (callback != NULL_FUNC && callback != SLEEP_FUNC) {
+		ddi_set_callback(callback, callback_arg,
+			&scsi_callback_id);
+	}
+
+	return (NULL);
+}
+
+void
+scsi_free_cache_pkt(struct scsi_address *ap, struct scsi_pkt *pktp)
+{
+	struct scsi_pkt_cache_wrapper *pktw;
+
+	(*A_TO_TRAN(ap)->tran_teardown_pkt)(pktp);
+	pktw = (struct scsi_pkt_cache_wrapper *)pktp;
+
+	/*
+	 * if we allocated memory for anything that wouldn't fit, free
+	 * the memory and restore the pointers
+	 */
+	if (pktw->pcw_kmflags & NEED_EXT_SCB) {
+		kmem_free(pktp->pkt_scbp, pktp->pkt_scblen);
+		pktp->pkt_scbp = (opaque_t)((char *)pktp +
+		    (A_TO_TRAN(ap))->tran_hba_len +
+		    DEFAULT_PRIVLEN + sizeof (struct scsi_pkt_cache_wrapper));
+		if ((A_TO_TRAN(ap))->tran_hba_flags & SCSI_HBA_TRAN_CDB)
+			pktp->pkt_scbp = (opaque_t)((pktp->pkt_scbp) +
+				DEFAULT_CDBLEN);
+		pktp->pkt_scblen = 0;
+	}
+	if (pktw->pcw_kmflags & NEED_EXT_TGT) {
+		kmem_free(pktp->pkt_private, pktp->pkt_tgtlen);
+		pktp->pkt_tgtlen = 0;
+		pktp->pkt_private = NULL;
+	}
+	if (pktw->pcw_kmflags & NEED_EXT_CDB) {
+		kmem_free(pktp->pkt_cdbp, pktp->pkt_cdblen);
+		pktp->pkt_cdbp = (opaque_t)((char *)pktp +
+		    (A_TO_TRAN(ap))->tran_hba_len +
+		    sizeof (struct scsi_pkt_cache_wrapper));
+		pktp->pkt_cdblen = 0;
+	}
+	pktw->pcw_kmflags &=
+	    ~(NEED_EXT_CDB|NEED_EXT_TGT|NEED_EXT_SCB);
+	ASSERT(pktw->pcw_kmflags == 0);
+	kmem_cache_free(A_TO_TRAN(ap)->tran_pkt_cache_ptr, pktw);
+
+	if (scsi_callback_id != 0) {
+		ddi_run_callback(&scsi_callback_id);
+	}
+
 }
 
 struct scsi_pkt *

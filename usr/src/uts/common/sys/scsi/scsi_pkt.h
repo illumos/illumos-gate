@@ -61,6 +61,9 @@ struct scsi_pkt {
 	uint_t	pkt_state;		/* state of command */
 	uint_t	pkt_statistics;		/* statistics */
 	uchar_t	pkt_reason;		/* reason completion called */
+	uint_t	pkt_cdblen;
+	uint_t	pkt_tgtlen;
+	uint_t	pkt_scblen;
 };
 
 /*
@@ -115,7 +118,6 @@ struct scsi_pkt {
  * in pHCI. Return immediately with TRAN_BUSY.
  */
 #define	FLAG_NOQUEUE	0x80000000
-
 
 /*
  * Definitions for the pkt_reason field.

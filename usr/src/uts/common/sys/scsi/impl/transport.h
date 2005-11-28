@@ -259,6 +259,31 @@ struct scsi_hba_tran {
 	 * usr/src/uts/common/sys/scsi/impl/services.h
 	 */
 	int		tran_interconnect_type;
+	int		(*tran_pkt_constructor)(
+				struct scsi_pkt		*pkt,
+				scsi_hba_tran_t		*tran,
+				int			kmflag);
+	void		(*tran_pkt_destructor)(
+				struct scsi_pkt		*pkt,
+				scsi_hba_tran_t		*tran);
+	kmem_cache_t	*tran_pkt_cache_ptr;
+
+	uint_t		tran_hba_len;
+	int		(*tran_setup_pkt)(
+				struct scsi_pkt		*pkt,
+				int			(*callback)(
+								caddr_t	arg),
+				caddr_t			callback_arg);
+	int		(*tran_setup_bp)(
+				struct scsi_pkt		*pkt,
+				struct buf		*bp,
+				int			flags,
+				int			(*callback)(
+								caddr_t	arg),
+				caddr_t			callback_arg);
+	void		(*tran_teardown_pkt)(
+				struct scsi_pkt		*pkt);
+
 };
 
 #ifdef __lock_lint
@@ -379,6 +404,8 @@ extern void		scsi_hba_nodename_compatible_free(
 						/* structure per target */
 #define	SCSI_HBA_TRAN_ALLOC	0x02		/* set if scsi_hba_tran_alloc */
 						/* is called */
+#define	SCSI_HBA_TRAN_CDB	0x04		/* allocate cdb */
+#define	SCSI_HBA_TRAN_SCB	0x08		/* allocate sense */
 
 /*
  * Flags for scsi_hba allocation functions
