@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,7 @@ static struct chip {
 
 static void cpu_info(kstat_ctl_t *kc, kstat_t *ksp, int verbosity,
 	int phys_view, int visible);
+static void print_cpuid_list(processorid_t *ids, int count);
 
 static void
 usage(char *msg)
@@ -180,6 +181,13 @@ main(int argc, char *argv[])
 			    ksp->ks_instance > maxcpu)
 				maxcpu = ksp->ks_instance;
 
+		/*
+		 * N.B. We're assuming that instance number == cpuid.
+		 * A number of things break if this isn't true.  In
+		 * particular, print_cpuid_list() assumes that c->cores[]
+		 * is numerically sorted, which is true only because we
+		 * add each virtual processor in cpuid order here.
+		 */
 		for (cpu = 0; cpu <= maxcpu; cpu++)
 			if (ksp = kstat_lookup(kc, "cpu_info", cpu, NULL))
 				cpu_info(kc, ksp, verbosity, phys_view,
@@ -282,7 +290,6 @@ main(int argc, char *argv[])
 			 * Print a report on each chip.
 			 */
 			for (i = 0; i <= max_chip_id; i++) {
-				int j;
 				struct chip *c = &chips[i];
 
 				if (!c->visible)
@@ -294,11 +301,7 @@ main(int argc, char *argv[])
 				    c->core_count == 1 ?
 					gettext("processor") :
 					gettext("processors"));
-				for (j = 0; j < c->core_count; j++) {
-					if (j > 0)
-						(void) printf(", ");
-					(void) printf("%d", c->cores[j]);
-				}
+				print_cpuid_list(c->cores, c->core_count);
 				(void) printf(")\n");
 
 				(void) printf("  %s\n", c->impl);
@@ -439,4 +442,29 @@ cpu_info(kstat_ctl_t *kc, kstat_t *ksp, int verbosity, int phys_view,
 	else
 		(void) printf(gettext(",\n\tand has a %s floating point "
 		    "processor.\n"), GETSTR("fpu_type"));
+}
+
+
+
+static void
+print_cpuid_list(processorid_t *ids, int count)
+{
+	int i;
+	char *separator = "";
+
+	for (i = 0; i < count; ++i) {
+		/*
+		 * if we're not at the ends, and the two adjacent numbers
+		 * are sequential, then don't print this number.
+		 */
+		if (i > 0 && i < count-1 &&
+		    ids[i]-1 == ids[i-1] &&
+		    ids[i]+1 == ids[i+1]) {
+			separator = "-";
+			continue;
+		}
+
+		(void) printf("%s%d", separator, ids[i]);
+		separator = " ";
+	}
 }
