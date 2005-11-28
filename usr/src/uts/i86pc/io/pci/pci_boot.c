@@ -526,7 +526,7 @@ new_func_pci(uchar_t bus, uchar_t dev, uchar_t func, uchar_t header,
 	if (status & PCI_STAT_UDF)
 		(void) ndi_prop_create_boolean(DDI_DEV_T_NONE, dip,
 		    "udf-supported");
-	if (pciex & slot_num)
+	if (pciex && slot_num)
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 		    "physical-slot#", slot_num);
 
