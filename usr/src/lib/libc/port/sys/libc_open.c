@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +36,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <strings.h>
+#include <errno.h>
 #include <sys/stat.h>
 #include <sys/stropts.h>
 #include <sys/stream.h>
@@ -105,26 +107,25 @@ _open64(const char *fname, int oflag, ...)
 #endif	/* !_LP64 */
 
 /*
- * Checks if the file matches an entry in the /dev/pts directory
+ * Check if the file matches an entry in the /dev/pts directory.
+ * Be careful to preserve errno.
  */
 static int
 isptsfd(int fd)
 {
-	static char buf[TTYNAME_MAX];
+	char buf[TTYNAME_MAX];
 	struct stat64 fsb, stb;
+	int oerrno = errno;
+	int rval = 0;
 
-	if (fstat64(fd, &fsb) != 0 ||
-	    (fsb.st_mode & S_IFMT) != S_IFCHR)
-		return (0);
-
-	(void) strcpy(buf, "/dev/pts/");
-	itoa(minor(fsb.st_rdev), buf+strlen(buf));
-
-	if (stat64(buf, &stb) != 0 ||
-	    (fsb.st_mode & S_IFMT) != S_IFCHR)
-		return (0);
-
-	return (stb.st_rdev == fsb.st_rdev);
+	if (fstat64(fd, &fsb) == 0 && S_ISCHR(fsb.st_mode)) {
+		(void) strcpy(buf, "/dev/pts/");
+		itoa(minor(fsb.st_rdev), buf+strlen(buf));
+		if (stat64(buf, &stb) == 0)
+			rval = (stb.st_rdev == fsb.st_rdev);
+	}
+	errno = oerrno;
+	return (rval);
 }
 
 /*
@@ -157,6 +158,7 @@ static void
 push_module(int fd)
 {
 	struct strioctl istr;
+	int oerrno = errno;
 
 	istr.ic_cmd = PTSSTTY;
 	istr.ic_len = 0;
@@ -172,4 +174,5 @@ push_module(int fd)
 		istr.ic_dp = NULL;
 		(void) ioctl(fd, I_STR, &istr);
 	}
+	errno = oerrno;
 }
