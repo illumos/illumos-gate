@@ -60,7 +60,7 @@ static uint64_t mach_getcpufreq(void);
 static void mach_fixcpufreq(void);
 static int mach_clkinit(int, int *);
 static void mach_smpinit(void);
-static void mach_set_softintr(int ipl);
+static void mach_set_softintr(int ipl, struct av_softinfo *);
 static void mach_cpu_start(int cpun);
 static int mach_softlvl_to_vect(int ipl);
 static void mach_get_platform(int owner);
@@ -105,7 +105,8 @@ void (*send_dirintf)() 		= return_instr;
 void (*setspl)(int)		= return_instr;
 int (*addspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
 int (*delspl)(int, int, int, int) = (int (*)(int, int, int, int))return_instr;
-void (*setsoftint)(int)		= (void (*)(int))return_instr;
+void (*setsoftint)(int, struct av_softinfo *)=
+	(void (*)(int, struct av_softinfo *))return_instr;
 int (*slvltovect)(int)		= (int (*)(int))return_instr;
 int (*setlvl)(int, int *)	= (int (*)(int, int *))return_instr;
 void (*setlvlx)(int, int)	= (void (*)(int, int))return_instr;
@@ -932,6 +933,17 @@ mach_clkinit(int preferred_mode, int *set_mode)
 	}
 }
 
+/*ARGSUSED*/
+static void
+mach_psm_set_softintr(int ipl, struct av_softinfo *pending)
+{
+	register struct psm_ops  *pops;
+
+	/* invoke hardware interrupt					*/
+	pops = mach_set[0];
+	(*pops->psm_set_softintr)(ipl);
+}
+
 static int
 mach_softlvl_to_vect(register int ipl)
 {
@@ -942,19 +954,19 @@ mach_softlvl_to_vect(register int ipl)
 
 	/* check for null handler for set soft interrupt call		*/
 	if (pops->psm_set_softintr == NULL) {
-		setsoftint = set_pending;
+		setsoftint = av_set_softint_pending;
 		return (PSM_SV_SOFTWARE);
 	}
 
 	softvect = (*pops->psm_softlvl_to_irq)(ipl);
 	/* check for hardware scheme					*/
 	if (softvect > PSM_SV_SOFTWARE) {
-		setsoftint = pops->psm_set_softintr;
+		setsoftint = mach_psm_set_softintr;
 		return (softvect);
 	}
 
 	if (softvect == PSM_SV_SOFTWARE)
-		setsoftint = set_pending;
+		setsoftint = av_set_softint_pending;
 	else	/* hardware and software mixed scheme			*/
 		setsoftint = mach_set_softintr;
 
@@ -962,12 +974,12 @@ mach_softlvl_to_vect(register int ipl)
 }
 
 static void
-mach_set_softintr(register int ipl)
+mach_set_softintr(register int ipl, struct av_softinfo *pending)
 {
 	register struct psm_ops  *pops;
 
 	/* set software pending bits					*/
-	set_pending(ipl);
+	av_set_softint_pending(ipl, pending);
 
 	/*	check if dosoftint will be called at the end of intr	*/
 	if (CPU_ON_INTR(CPU) || (curthread->t_intr))

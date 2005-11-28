@@ -38,6 +38,7 @@
 #include <sys/clock.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_intr.h>
+#include <sys/avintr.h>
 
 static int cbe_vector;
 static int cbe_ticks = 0;
@@ -48,9 +49,9 @@ static void *cbe_xcall_farg;
 static cpuset_t cbe_enabled;
 
 static ddi_softint_hdl_impl_t cbe_low_hdl =
-	{0, NULL, NULL, 0, 0, NULL, NULL, NULL};
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL};
 static ddi_softint_hdl_impl_t cbe_clock_hdl =
-	{0, NULL, NULL, 0, 0, NULL, NULL, NULL};
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL};
 
 cyclic_id_t cbe_hres_cyclic;
 int cbe_psm_timer_mode = TIMER_ONESHOT;
@@ -112,12 +113,10 @@ cbe_softint(void *arg, cyc_level_t level)
 {
 	switch (level) {
 	case CY_LOW_LEVEL:
-		cbe_low_hdl.ih_pending = 1;
-		(*setsoftint)(CBE_LOW_PIL);
+		(*setsoftint)(CBE_LOW_PIL, cbe_low_hdl.ih_pending);
 		break;
 	case CY_LOCK_LEVEL:
-		cbe_clock_hdl.ih_pending = 1;
-		(*setsoftint)(CBE_LOCK_PIL);
+		(*setsoftint)(CBE_LOCK_PIL, cbe_clock_hdl.ih_pending);
 		break;
 	default:
 		panic("cbe_softint: unexpected soft level %d", level);

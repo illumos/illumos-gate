@@ -116,6 +116,8 @@ typedef struct ddi_intr_handle_impl {
 #define	DDI_INTR_SUP_TYPES	DDI_INTR_TYPE_FIXED|DDI_INTR_TYPE_MSI|\
 				DDI_INTR_TYPE_MSIX
 
+struct av_softinfo;
+
 /*
  * One such data structure is allocated per ddi_soft_intr_handle
  * This is the incore copy of the softint info.
@@ -124,7 +126,7 @@ typedef struct ddi_softint_hdl_impl {
 	dev_info_t	*ih_dip;		/* dip associated with handle */
 	uint_t		ih_pri;			/* priority - bus dependent */
 	krwlock_t	ih_rwlock;		/* read/write lock per handle */
-	uint_t		ih_pending;		/* whether softint is pending */
+	struct av_softinfo *ih_pending;		/* whether softint is pending */
 
 	uint_t		(*ih_cb_func)(caddr_t, caddr_t);
 						/* cb function for soft ints */

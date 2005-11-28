@@ -48,7 +48,11 @@
 #include <sys/stack.h>
 #include <sys/ddi_impldefs.h>
 
-static int insert_av(void *intr_id, struct av_head *vectp, avfunc f,
+typedef struct av_softinfo {
+	cpuset_t	av_pending;	/* pending bitmasks */
+} av_softinfo_t;
+
+static void insert_av(void *intr_id, struct av_head *vectp, avfunc f,
 	caddr_t arg1, caddr_t arg2, uint64_t *ticksp, int pri_level,
 	dev_info_t *dip);
 static void remove_av(void *intr_id, struct av_head *vectp, avfunc f,
@@ -78,11 +82,37 @@ struct av_head autovect[MAX_VECT];
 struct av_head softvect[LOCK_LEVEL + 1];
 kmutex_t av_lock;
 ddi_softint_hdl_impl_t softlevel1_hdl =
-	{0, NULL, NULL, 0, 0, NULL, NULL, NULL};
+	{0, NULL, NULL, NULL, 0, NULL, NULL, NULL};
 
+
+/*
+ * clear/check softint pending flag corresponding for
+ * the current CPU
+ */
 void
-set_pending(int pri)
+av_clear_softint_pending(av_softinfo_t *infop)
 {
+	CPUSET_ATOMIC_DEL(infop->av_pending, CPU->cpu_seqid);
+}
+
+boolean_t
+av_check_softint_pending(av_softinfo_t *infop, boolean_t check_all)
+{
+	if (check_all)
+		return (!CPUSET_ISNULL(infop->av_pending));
+	else
+		return (CPU_IN_SET(infop->av_pending, CPU->cpu_seqid) != 0);
+}
+
+/*
+ * It first sets our av softint pending bit for the current CPU,
+ * then it sets the CPU softint pending bit for pri.
+ */
+void
+av_set_softint_pending(int pri, av_softinfo_t *infop)
+{
+	CPUSET_ATOMIC_ADD(infop->av_pending, CPU->cpu_seqid);
+
 	atomic_or_32((uint32_t *)&CPU->cpu_softinfo.st_pending, 1 << pri);
 }
 
@@ -191,8 +221,7 @@ add_avintr(void *intr_id, int lvl, avfunc xxintr, char *name, int vect,
 			cmn_err(CE_NOTE, multilevel, vect);
 	}
 
-	if (!insert_av(intr_id, vecp, f, arg1, arg2, ticksp, lvl, dip))
-		return (0);
+	insert_av(intr_id, vecp, f, arg1, arg2, ticksp, lvl, dip);
 	s = splhi();
 	/*
 	 * do what ever machine specific things are necessary
@@ -233,6 +262,7 @@ add_avsoftintr(void *intr_id, int lvl, avfunc xxintr, char *name,
     caddr_t arg1, caddr_t arg2)
 {
 	int slvl;
+	ddi_softint_hdl_impl_t	*hdlp = (ddi_softint_hdl_impl_t *)intr_id;
 
 	if ((slvl = slvltovect(lvl)) != -1)
 		return (add_avintr(intr_id, lvl, xxintr,
@@ -254,15 +284,19 @@ add_avsoftintr(void *intr_id, int lvl, avfunc xxintr, char *name,
 		printf(badsoft, lvl, name);
 		return (0);
 	}
-	if (!insert_av(intr_id, &softvect[lvl], xxintr, arg1, arg2, NULL,
-	    lvl, NULL)) {
-		return (0);
+
+	if (hdlp->ih_pending == NULL) {
+		hdlp->ih_pending =
+			kmem_zalloc(sizeof (av_softinfo_t), KM_SLEEP);
 	}
+
+	insert_av(intr_id, &softvect[lvl], xxintr, arg1, arg2, NULL, lvl, NULL);
+
 	return (1);
 }
 
 /* insert an interrupt vector into chain */
-static int
+static void
 insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
     caddr_t arg2, uint64_t *ticksp, int pri_level, dev_info_t *dip)
 {
@@ -288,7 +322,7 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 		vectp->avh_hi_pri = vectp->avh_lo_pri = (ushort_t)pri_level;
 
 		mutex_exit(&av_lock);
-		return (1);
+		return;
 	}
 
 	/* find where it goes in list */
@@ -309,7 +343,7 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 			}
 			p->av_vector = f;
 			mutex_exit(&av_lock);
-			return (1);
+			return;
 		}
 	}
 	/* insert new intpt at beginning of chain */
@@ -322,18 +356,15 @@ insert_av(void *intr_id, struct av_head *vectp, avfunc f, caddr_t arg1,
 		vectp->avh_lo_pri = (ushort_t)pri_level;
 	}
 	mutex_exit(&av_lock);
-
-	return (1);
 }
 
-/*
- * Remove a driver from the autovector list.
- */
-int
-rem_avsoftintr(void *intr_id, int lvl, avfunc xxintr)
+static int
+av_rem_softintr(void *intr_id, int lvl, avfunc xxintr, boolean_t rem_softinfo)
 {
 	struct av_head *vecp = (struct av_head *)0;
 	int slvl;
+	ddi_softint_hdl_impl_t	*hdlp = (ddi_softint_hdl_impl_t *)intr_id;
+	av_softinfo_t *infop = (av_softinfo_t *)hdlp->ih_pending;
 
 	if (xxintr == NULL)
 		return (0);
@@ -349,7 +380,38 @@ rem_avsoftintr(void *intr_id, int lvl, avfunc xxintr)
 	vecp = &softvect[lvl];
 	remove_av(intr_id, vecp, xxintr, lvl, 0);
 
+	if (rem_softinfo) {
+		kmem_free(infop, sizeof (av_softinfo_t));
+		hdlp->ih_pending = NULL;
+	}
+
 	return (1);
+}
+
+int
+av_softint_movepri(void *intr_id, int old_lvl)
+{
+	int ret;
+	ddi_softint_hdl_impl_t	*hdlp = (ddi_softint_hdl_impl_t *)intr_id;
+
+	ret = add_avsoftintr(intr_id, hdlp->ih_pri, hdlp->ih_cb_func,
+	    DEVI(hdlp->ih_dip)->devi_name, hdlp->ih_cb_arg1, hdlp->ih_cb_arg2);
+
+	if (ret) {
+		(void) av_rem_softintr(intr_id, old_lvl, hdlp->ih_cb_func,
+		    B_FALSE);
+	}
+
+	return (ret);
+}
+
+/*
+ * Remove a driver from the autovector list.
+ */
+int
+rem_avsoftintr(void *intr_id, int lvl, avfunc xxintr)
+{
+	return (av_rem_softintr(intr_id, lvl, xxintr, B_TRUE));
 }
 
 void
@@ -480,8 +542,7 @@ remove_av(void *intr_id, struct av_head *vectp, avfunc f, int pri_level,
 void
 siron(void)
 {
-	softlevel1_hdl.ih_pending = 1;
-	(*setsoftint)(1);
+	(*setsoftint)(1, softlevel1_hdl.ih_pending);
 }
 
 /*
@@ -556,8 +617,14 @@ av_dispatch_softvect(uint_t pil)
 		hdlp = (ddi_softint_hdl_impl_t *)av->av_intr_id;
 		ASSERT(hdlp);
 
-		if (hdlp->ih_pending) {
-			hdlp->ih_pending = 0;
+		/*
+		 * Each cpu has its own pending bit in hdlp->ih_pending,
+		 * here av_check/clear_softint_pending is just checking
+		 * and clearing the pending bit for the current cpu, who
+		 * has just triggered a softint.
+		 */
+		if (av_check_softint_pending(hdlp->ih_pending, B_FALSE)) {
+			av_clear_softint_pending(hdlp->ih_pending);
 			(void) (*intr)(arg1, arg2);
 		}
 	}

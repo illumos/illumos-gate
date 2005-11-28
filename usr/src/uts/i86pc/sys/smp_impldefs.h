@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/sunddi.h>
 #include <sys/cpuvar.h>
+#include <sys/avintr.h>
 #include <sys/pic.h>
 #include <sys/xc_levels.h>
 
@@ -77,10 +78,12 @@ extern void (*setlvlx)(int, int); /* set intr pri to specified level	*/
 extern void (*setspl)(int);	/* mask intr below or equal given ipl	*/
 extern int (*addspl)(int, int, int, int); /* add intr mask of vector 	*/
 extern int (*delspl)(int, int, int, int); /* delete intr mask of vector */
-extern void (*setsoftint)(int);	/* trigger a software intr		*/
+
+/* trigger a software intr */
+extern void (*setsoftint)(int, struct av_softinfo *);
 
 extern uint_t xc_serv(caddr_t, caddr_t); /* cross call service routine	*/
-extern void set_pending();	/* set software interrupt pending	*/
+extern void av_set_softint_pending();	/* set software interrupt pending */
 extern void microfind(void);	/* initialize tenmicrosec		*/
 
 /* map physical address							*/

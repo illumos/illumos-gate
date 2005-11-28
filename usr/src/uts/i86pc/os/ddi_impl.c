@@ -850,23 +850,19 @@ i_ddi_remove_softint(ddi_softint_hdl_impl_t *hdlp)
 }
 
 
-extern void (*setsoftint)(int);
+extern void (*setsoftint)(int, struct av_softinfo *);
+extern boolean_t av_check_softint_pending(struct av_softinfo *, boolean_t);
 
 int
 i_ddi_trigger_softint(ddi_softint_hdl_impl_t *hdlp, void *arg2)
 {
-	int	ret = DDI_SUCCESS;
+	if (av_check_softint_pending(hdlp->ih_pending, B_FALSE))
+		return (DDI_EPENDING);
 
-	if (hdlp->ih_pending) {
-		ret = DDI_EPENDING;
-	} else {
-		update_avsoftintr_args((void *)hdlp,
-		    hdlp->ih_pri, arg2);
-		hdlp->ih_pending = 1;
-	}
+	update_avsoftintr_args((void *)hdlp, hdlp->ih_pri, arg2);
 
-	(*setsoftint)(hdlp->ih_pri);
-	return (ret);
+	(*setsoftint)(hdlp->ih_pri, hdlp->ih_pending);
+	return (DDI_SUCCESS);
 }
 
 /*
@@ -879,18 +875,16 @@ i_ddi_trigger_softint(ddi_softint_hdl_impl_t *hdlp, void *arg2)
 int
 i_ddi_set_softint_pri(ddi_softint_hdl_impl_t *hdlp, uint_t old_pri)
 {
+	int ret;
+
 	/*
 	 * If a softint is pending at the old priority then fail the request.
-	 * 	OR
-	 * If we failed to add a softint vector with the new priority; then
-	 * fail the request with a DDI_FAILURE
 	 */
-	if (hdlp->ih_pending || i_ddi_add_softint(hdlp) != DDI_SUCCESS)
+	if (av_check_softint_pending(hdlp->ih_pending, B_TRUE))
 		return (DDI_FAILURE);
 
-	/* Now, remove the softint at the old priority */
-	(void) rem_avsoftintr((void *)hdlp, old_pri, hdlp->ih_cb_func);
-	return (DDI_SUCCESS);
+	ret = av_softint_movepri((void *)hdlp, old_pri);
+	return (ret ? DDI_SUCCESS : DDI_FAILURE);
 }
 
 void
