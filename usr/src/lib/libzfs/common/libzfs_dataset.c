@@ -126,6 +126,11 @@ zfs_validate_name(const char *path, int type, char *buf, size_t buflen)
 	if (dataset_namecheck(path, &why, &what) != 0) {
 		if (buf != NULL) {
 			switch (why) {
+			case NAME_ERR_TOOLONG:
+				(void) strlcpy(buf, dgettext(TEXT_DOMAIN,
+				    "name is too long"), buflen);
+				break;
+
 			case NAME_ERR_LEADING_SLASH:
 				(void) strlcpy(buf, dgettext(TEXT_DOMAIN,
 				    "leading slash"), buflen);
@@ -252,17 +257,6 @@ zfs_handle_t *
 zfs_open(const char *path, int types)
 {
 	zfs_handle_t *zhp;
-
-	/*
-	 * If the path is longer than the maximum dataset length, treat it as
-	 * ENOENT because we know there can't be any dataset with that path.
-	 */
-	if (strlen(path) >= ZFS_MAXNAMELEN) {
-		zfs_error(dgettext(TEXT_DOMAIN,
-		    "cannot open '%s': no such %s"), path,
-		    path_to_str(path, types));
-		return (NULL);
-	}
 
 	/*
 	 * Validate the name before we even try to open it.  We don't care about
@@ -1749,14 +1743,6 @@ zfs_create(const char *path, zfs_type_t type,
 	    reason, sizeof (reason)) != 0) {
 		zfs_error(dgettext(TEXT_DOMAIN,
 		    "bad volume blocksize '%s': %s"), blocksizestr, reason);
-		return (-1);
-	}
-
-	/* make sure the name is not too long */
-	if (strlen(path) >= ZFS_MAXNAMELEN) {
-		zfs_error(dgettext(TEXT_DOMAIN,
-		    "cannot create '%s': %s name is too long"),
-		    path, zfs_type_to_name(type));
 		return (-1);
 	}
 

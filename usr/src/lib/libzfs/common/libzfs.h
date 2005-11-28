@@ -96,13 +96,13 @@ extern int zpool_vdev_detach(zpool_handle_t *, const char *);
 typedef enum {
 	/*
 	 * The following correspond to faults as defined in the (fault.fs.zfs.*)
-	 * event namespace.  Each is associated with a correponding message ID.
+	 * event namespace.  Each is associated with a corresponding message ID.
 	 */
 	ZPOOL_STATUS_CORRUPT_CACHE,	/* corrupt /kernel/drv/zpool.cache */
 	ZPOOL_STATUS_MISSING_DEV_R,	/* missing device with replicas */
 	ZPOOL_STATUS_MISSING_DEV_NR,	/* missing device with no replicas */
 	ZPOOL_STATUS_CORRUPT_LABEL_R,	/* bad device label with replicas */
-	ZPOOL_STATUS_CORRUPT_LABEL_NR,	/* bad device lable with no replicas */
+	ZPOOL_STATUS_CORRUPT_LABEL_NR,	/* bad device label with no replicas */
 	ZPOOL_STATUS_BAD_GUID_SUM,	/* sum of device guids didn't match */
 	ZPOOL_STATUS_CORRUPT_POOL,	/* pool metadata is corrupted */
 	ZPOOL_STATUS_CORRUPT_DATA,	/* data errors in user (meta)data */
@@ -111,7 +111,7 @@ typedef enum {
 
 	/*
 	 * The following are not faults per se, but still an error possibly
-	 * requiring adminsitrative attention.  There is no corresponding
+	 * requiring administrative attention.  There is no corresponding
 	 * message ID.
 	 */
 	ZPOOL_STATUS_RESILVERING,	/* device being resilvered */
@@ -164,7 +164,7 @@ typedef enum {
 
 /*
  * Property management functions.  Some functions are shared with the kernel,
- * and are found in fs/zfs.h.
+ * and are found in sys/fs/zfs.h.
  */
 const char *zfs_prop_to_name(zfs_prop_t);
 int zfs_prop_set(zfs_handle_t *, zfs_prop_t, const char *);

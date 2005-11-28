@@ -51,16 +51,14 @@ zpool_name_valid(const char *pool, char *buf, size_t buflen)
 	namecheck_err_t why;
 	char what;
 
-	if (strlen(pool) >= ZPOOL_MAXNAMELEN) {
-		if (buf)
-			(void) snprintf(buf, buflen,
-			    dgettext(TEXT_DOMAIN, "name is too long"));
-		return (FALSE);
-	}
-
 	if (pool_namecheck(pool, &why, &what) != 0) {
 		if (buf != NULL) {
 			switch (why) {
+			case NAME_ERR_TOOLONG:
+				(void) snprintf(buf, buflen,
+				    dgettext(TEXT_DOMAIN, "name is too long"));
+				break;
+
 			case NAME_ERR_INVALCHAR:
 				(void) snprintf(buf, buflen,
 				    dgettext(TEXT_DOMAIN, "invalid character "

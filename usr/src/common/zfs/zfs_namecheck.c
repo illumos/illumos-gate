@@ -44,6 +44,7 @@
 #include <string.h>
 #endif
 
+#include <sys/param.h>
 #include "zfs_namecheck.h"
 
 static int
@@ -70,6 +71,20 @@ dataset_namecheck(const char *path, namecheck_err_t *why, char *what)
 {
 	const char *loc, *end;
 	int found_snapshot;
+
+	/*
+	 * Make sure the name is not too long.
+	 *
+	 * ZFS_MAXNAMELEN is the maximum dataset length used in the userland
+	 * which is the same as MAXNAMELEN used in the kernel.
+	 * If ZFS_MAXNAMELEN value is changed, make sure to cleanup all
+	 * places using MAXNAMELEN.
+	 */
+	if (strlen(path) >= MAXNAMELEN) {
+		if (why)
+			*why = NAME_ERR_TOOLONG;
+		return (-1);
+	}
 
 	/* Explicitly check for a leading slash.  */
 	if (path[0] == '/') {
@@ -152,6 +167,20 @@ int
 pool_namecheck(const char *pool, namecheck_err_t *why, char *what)
 {
 	const char *c;
+
+	/*
+	 * Make sure the name is not too long.
+	 *
+	 * ZPOOL_MAXNAMELEN is the maximum pool length used in the userland
+	 * which is the same as MAXNAMELEN used in the kernel.
+	 * If ZPOOL_MAXNAMELEN value is changed, make sure to cleanup all
+	 * places using MAXNAMELEN.
+	 */
+	if (strlen(pool) >= MAXNAMELEN) {
+		if (why)
+			*why = NAME_ERR_TOOLONG;
+		return (-1);
+	}
 
 	c = pool;
 	while (*c != '\0') {

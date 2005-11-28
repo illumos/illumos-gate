@@ -775,10 +775,13 @@ retry:
 		return (error);
 	}
 
-	if (strlcat(zc->zc_name, "@", sizeof (zc->zc_name)) >=
-	    sizeof (zc->zc_name)) {
+	/*
+	 * A dataset name of maximum length cannot have any snapshots,
+	 * so exit immediately.
+	 */
+	if (strlcat(zc->zc_name, "@", sizeof (zc->zc_name)) >= MAXNAMELEN) {
 		dmu_objset_close(os);
-		return (ENAMETOOLONG);
+		return (ESRCH);
 	}
 
 	error = dmu_snapshot_list_next(os,

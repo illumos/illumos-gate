@@ -112,7 +112,7 @@ static zfs_command_t command_table[] = {
 	{ "clone",	zfs_do_clone,
 	    "\tclone <snapshot> <filesystem|volume>\n"			},
 	{ "rename",	zfs_do_rename,
-	    "\trename <filesystems|volume|snapshot> "
+	    "\trename <filesystem|volume|snapshot> "
 	    "<filesystem|volume|snapshot>\n"				},
 	{ NULL },
 	{ "list",	zfs_do_list,

@@ -42,6 +42,7 @@ typedef enum {
 	NAME_ERR_NOLETTER,		/* pool doesn't begin with a letter */
 	NAME_ERR_RESERVED,		/* entire name is reserved */
 	NAME_ERR_DISKLIKE,		/* reserved disk name (c[0-9].*) */
+	NAME_ERR_TOOLONG,		/* name is too long */
 } namecheck_err_t;
 
 int pool_namecheck(const char *, namecheck_err_t *, char *);
