@@ -89,6 +89,8 @@ static void	ehci_handle_get_hub_descriptor(
 				ehci_state_t		*ehcip);
 static void	ehci_handle_get_hub_status(
 				ehci_state_t		*ehcip);
+static void	ehci_handle_get_device_status(
+				ehci_state_t		*ehcip);
 static uint_t	ehci_get_root_hub_port_status(
 				ehci_state_t		*ehcip,
 				uint16_t		port);
@@ -550,14 +552,17 @@ ehci_handle_root_hub_request(
 	mutex_exit(&ehcip->ehci_int_mutex);
 
 	switch (bmRequestType) {
-	case HANDLE_PORT_FEATURE:
+	case HUB_GET_DEVICE_STATUS_TYPE:
+		ehci_handle_get_device_status(ehcip);
+		break;
+	case HUB_HANDLE_PORT_FEATURE_TYPE:
 		error = ehci_handle_set_clear_port_feature(ehcip,
 		    bRequest, wValue, port);
 		break;
-	case GET_PORT_STATUS:
+	case HUB_GET_PORT_STATUS_TYPE:
 		ehci_handle_get_port_status(ehcip, port);
 		break;
-	case HUB_CLASS_REQ:
+	case HUB_CLASS_REQ_TYPE:
 		switch (bRequest) {
 		case USB_REQ_GET_STATUS:
 			ehci_handle_get_hub_status(ehcip);
@@ -1351,6 +1356,47 @@ ehci_handle_get_hub_status(
 	*message->b_wptr++ = (uchar_t)(new_root_hub_status >> 8);
 	*message->b_wptr++ = (uchar_t)(new_root_hub_status >> 16);
 	*message->b_wptr++ = (uchar_t)(new_root_hub_status >> 24);
+
+	/* Save the data in control request */
+	ctrl_reqp->ctrl_data = message;
+
+	mutex_exit(&ehcip->ehci_int_mutex);
+}
+
+
+/*
+ * ehci_handle_get_device_status:
+ *
+ * Handle a get device status request.
+ */
+static void
+ehci_handle_get_device_status(
+	ehci_state_t		*ehcip)
+{
+	usb_ctrl_req_t		*ctrl_reqp;
+	mblk_t			*message;
+	uint16_t		dev_status;
+
+	mutex_enter(&ehcip->ehci_int_mutex);
+
+	ctrl_reqp = ehcip->ehci_root_hub.rh_curr_ctrl_reqp;
+
+	/*
+	 * For EHCI, there is no device status information.
+	 * Simply return what is desired for the request.
+	 */
+	dev_status = USB_DEV_SLF_PWRD_STATUS;
+
+	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ehcip->ehci_log_hdl,
+	    "ehci_handle_get_device_status: device status = 0x%x",
+	    dev_status);
+
+	message = ctrl_reqp->ctrl_data;
+
+	ASSERT(message != NULL);
+
+	*message->b_wptr++ = (uchar_t)dev_status;
+	*message->b_wptr++ = (uchar_t)(dev_status >> 8);
 
 	/* Save the data in control request */
 	ctrl_reqp->ctrl_data = message;

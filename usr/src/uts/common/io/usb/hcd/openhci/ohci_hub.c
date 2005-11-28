@@ -79,6 +79,8 @@ static void	ohci_handle_get_hub_descriptor(
 				ohci_state_t		*ohcip);
 static void	ohci_handle_get_hub_status(
 				ohci_state_t		*ohcip);
+static void	ohci_handle_get_device_status(
+				ohci_state_t		*ohcip);
 static int	ohci_root_hub_allocate_intr_pipe_resource(
 				ohci_state_t		*ohcip,
 				usb_flags_t		flags);
@@ -557,14 +559,17 @@ ohci_handle_root_hub_request(
 	mutex_exit(&ohcip->ohci_int_mutex);
 
 	switch (bmRequestType) {
-	case HANDLE_PORT_FEATURE:
+	case HUB_GET_DEVICE_STATUS_TYPE:
+		ohci_handle_get_device_status(ohcip);
+		break;
+	case HUB_HANDLE_PORT_FEATURE_TYPE:
 		error = ohci_handle_set_clear_port_feature(ohcip,
 		    bRequest, wValue, port);
 		break;
-	case GET_PORT_STATUS:
+	case HUB_GET_PORT_STATUS_TYPE:
 		ohci_handle_get_port_status(ohcip, port);
 		break;
-	case HUB_CLASS_REQ:
+	case HUB_CLASS_REQ_TYPE:
 		switch (bRequest) {
 		case USB_REQ_GET_STATUS:
 			ohci_handle_get_hub_status(ohcip);
@@ -1146,6 +1151,47 @@ ohci_handle_get_hub_status(
 	*message->b_wptr++ = (uchar_t)(new_root_hub_status >> 8);
 	*message->b_wptr++ = (uchar_t)(new_root_hub_status >> 16);
 	*message->b_wptr++ = (uchar_t)(new_root_hub_status >> 24);
+
+	/* Save the data in control request */
+	ctrl_reqp->ctrl_data = message;
+
+	mutex_exit(&ohcip->ohci_int_mutex);
+}
+
+
+/*
+ * ohci_handle_get_device_status:
+ *
+ * Handle a get device status request.
+ */
+static void
+ohci_handle_get_device_status(
+	ohci_state_t		*ohcip)
+{
+	usb_ctrl_req_t		*ctrl_reqp;
+	mblk_t			*message;
+	uint16_t		dev_status;
+
+	mutex_enter(&ohcip->ohci_int_mutex);
+
+	ctrl_reqp = ohcip->ohci_root_hub.rh_curr_ctrl_reqp;
+
+	/*
+	 * OHCI doesn't have device status information.
+	 * Simply return what is desired for the request.
+	 */
+	dev_status = USB_DEV_SLF_PWRD_STATUS;
+
+	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ohcip->ohci_log_hdl,
+	    "ohci_handle_get_device_status: device status = 0x%x",
+	    dev_status);
+
+	message = ctrl_reqp->ctrl_data;
+
+	ASSERT(message != NULL);
+
+	*message->b_wptr++ = (uchar_t)dev_status;
+	*message->b_wptr++ = (uchar_t)(dev_status >> 8);
 
 	/* Save the data in control request */
 	ctrl_reqp->ctrl_data = message;

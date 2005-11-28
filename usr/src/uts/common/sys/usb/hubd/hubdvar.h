@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -224,6 +224,22 @@ typedef struct hubd {
 	boolean_t		h_cleanup_enabled;
 	boolean_t		h_cleanup_needed;
 	boolean_t		h_cleanup_active;
+
+	/*
+	 * for power budget support
+	 * h_pwr_limit and h_pwr_left are expressed
+	 * in 2mA units
+	 */
+	boolean_t		h_local_pwr_capable;
+	boolean_t		h_local_pwr_on;
+	uint16_t		h_pwr_limit; /* per port pwr limit */
+	int16_t			h_pwr_left; /* limit on the whole hub */
+
+	/*
+	 * conf file override to power budget property
+	 * if 1, power budget is disabled
+	 */
+	boolean_t		h_ignore_pwr_budget;
 } hubd_t;
 
 _NOTE(MUTEX_PROTECTS_DATA(hubd::h_mutex, hubd))
@@ -238,6 +254,7 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(hubd::h_default_pipe
 		hubd::h_instance
 		hubd::h_hubpm
 		hubd::h_dip
+		hubd::h_ignore_pwr_budget
 ))
 
 _NOTE(SCHEME_PROTECTS_DATA("stable data", usb_ep_descr))
@@ -251,6 +268,7 @@ _NOTE(SCHEME_PROTECTS_DATA("stable data", usb_ep_descr))
 #define	HUBD_LOCKS_DONE		0x0001
 #define	HUBD_HUBDI_REGISTERED	0x0002
 #define	HUBD_MINOR_NODE_CREATED 0x0004
+#define	HUBD_CHILDREN_CREATED	0x0008
 #define	HUBD_EVENTS_REGISTERED	0x0020
 
 /*
@@ -343,6 +361,20 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared", hubd_offline_req))
 
 /* enumeration timeout */
 #define	HUBDI_ENUM_TIMEOUT	1	/* 1 second */
+
+/* power budget unit in mA */
+#define	USB_PWR_UNIT_LOAD	100
+
+/* power values in 100mA units */
+#define	USB_HIGH_PWR_VALUE	5
+#define	USB_LOW_PWR_VALUE	1
+
+/*
+ * According to section 9.6.3 of USB 2.0 spec,
+ * bMaxPower in the device configuration descriptor
+ * is expressed in 2mA units
+ */
+#define	USB_CFG_DESCR_PWR_UNIT	2
 
 #ifdef	__cplusplus
 }

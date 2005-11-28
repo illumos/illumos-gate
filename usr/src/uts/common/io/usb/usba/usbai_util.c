@@ -562,6 +562,7 @@ usba_sync_set_cfg(dev_info_t	*dip,
 	uint_t		cfg_index = (uint_t)((uintptr_t)(request->arg));
 	size_t		size;
 	usb_cfg_descr_t confdescr;
+	dev_info_t	*pdip;
 
 	usba_device = usba_get_usba_device(dip);
 
@@ -580,6 +581,40 @@ usba_sync_set_cfg(dev_info_t	*dip,
 		usba_release_ph_data(ph_impl);
 
 		return (USB_BUSY);
+	}
+
+	/*
+	 * check if the configuration meets the
+	 * power budget requirement
+	 */
+	if (usba_is_root_hub(dip)) {
+		/*
+		 * root hub should never be multi-configured.
+		 * the code is here just to ensure
+		 */
+		usba_release_ph_data(ph_impl);
+
+		return (USB_FAILURE);
+	}
+	pdip = ddi_get_parent(dip);
+
+	/*
+	 * increase the power budget value back to the unconfigured
+	 * state to eliminate the influence of the old configuration
+	 * before checking the new configuration; but remember to
+	 * make a decrement before leaving this routine to restore
+	 * the power consumption state of the device no matter it
+	 * is in the new or old configuration
+	 */
+	usba_hubdi_incr_power_budget(pdip, usba_device);
+
+	if ((usba_hubdi_check_power_budget(pdip, usba_device,
+	    cfg_index)) != USB_SUCCESS) {
+		usba_hubdi_decr_power_budget(pdip, usba_device);
+
+		usba_release_ph_data(ph_impl);
+
+		return (USB_FAILURE);
 	}
 
 	size = usb_parse_cfg_descr(usba_device->usb_cfg_array[cfg_index],
@@ -611,6 +646,14 @@ usba_sync_set_cfg(dev_info_t	*dip,
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 			"configuration#", usba_device->usb_cfg_value);
 	}
+
+	/*
+	 * usba_device->usb_cfg always stores current configuration
+	 * descriptor no matter SET_CFG request succeeded or not,
+	 * so usba_hubdi_decr_power_budget can be done regardless
+	 * of rval above
+	 */
+	usba_hubdi_decr_power_budget(pdip, usba_device);
 
 	USB_DPRINTF_L4(DPRINT_MASK_USBA, usbai_log_handle,
 	    "rval=%d, cb_flags=%d, cr=%d", rval, cb_flags, completion_reason);

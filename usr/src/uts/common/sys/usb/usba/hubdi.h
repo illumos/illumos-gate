@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,8 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
+#include <sys/usb/usba/usba_types.h>
 
 /* USBA calls these: */
 void	usba_hubdi_initialization();
@@ -59,6 +61,11 @@ int usba_hubdi_detach(dev_info_t *, ddi_detach_cmd_t);
 int usba_hubdi_bind_root_hub(dev_info_t *, uchar_t *, size_t,
 				usb_dev_descr_t *);
 int usba_hubdi_unbind_root_hub(dev_info_t *);
+
+/* power budget control routines */
+void usba_hubdi_incr_power_budget(dev_info_t *, usba_device_t *);
+void usba_hubdi_decr_power_budget(dev_info_t *, usba_device_t *);
+int usba_hubdi_check_power_budget(dev_info_t *, usba_device_t *, uint_t);
 
 #ifdef __cplusplus
 }

@@ -77,6 +77,9 @@ static	void	uhci_handle_get_hub_descriptor(
 static void	uhci_handle_get_hub_status(
 			uhci_state_t		*uhcip,
 			usb_ctrl_req_t		*req);
+static void	uhci_handle_get_device_status(
+			uhci_state_t		*uhcip,
+			usb_ctrl_req_t		*req);
 static uint_t	uhci_get_port_status(
 			uhci_state_t		*uhcip,
 			usb_port_t		port);
@@ -215,16 +218,20 @@ uhci_handle_root_hub_request(
 	ASSERT(mutex_owned(&uhcip->uhci_int_mutex));
 
 	switch (req->ctrl_bmRequestType) {
-	case HANDLE_PORT_FEATURE:
+	case HUB_GET_DEVICE_STATUS_TYPE:
+		uhci_handle_get_device_status(uhcip, req);
+
+		break;
+	case HUB_HANDLE_PORT_FEATURE_TYPE:
 		error = uhci_handle_set_clear_port_feature(uhcip,
 		    req->ctrl_bRequest, req->ctrl_wValue, port);
 
 		break;
-	case GET_PORT_STATUS:
+	case HUB_GET_PORT_STATUS_TYPE:
 		uhci_handle_get_port_status(uhcip, req, port);
 
 		break;
-	case HUB_CLASS_REQ:
+	case HUB_CLASS_REQ_TYPE:
 		switch (req->ctrl_bRequest) {
 		case USB_REQ_GET_DESCR:
 			uhci_handle_get_hub_descriptor(uhcip, req);
@@ -675,6 +682,34 @@ uhci_handle_get_hub_status(
 	 */
 	bzero(req->ctrl_data->b_wptr, req->ctrl_wLength);
 	req->ctrl_data->b_wptr += req->ctrl_wLength;
+}
+
+
+/*
+ * uhci_handle_get_device_status:
+ */
+static void
+uhci_handle_get_device_status(
+	uhci_state_t		*uhcip,
+	usb_ctrl_req_t		*req)
+{
+	uint16_t	dev_status;
+
+	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, uhcip->uhci_log_hdl,
+	    "uhci_handle_get_device_status: wLength = 0x%x",
+	    req->ctrl_wLength);
+
+	ASSERT(req->ctrl_wLength != 0);
+	ASSERT(req->ctrl_data != NULL);
+
+	/*
+	 * UHCI doesn't have device status information.
+	 * Simply return what is desired for the request.
+	 */
+	dev_status = USB_DEV_SLF_PWRD_STATUS;
+
+	*req->ctrl_data->b_wptr++ = (uchar_t)dev_status;
+	*req->ctrl_data->b_wptr++ = (uchar_t)(dev_status >> 8);
 }
 
 

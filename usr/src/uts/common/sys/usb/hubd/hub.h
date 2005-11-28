@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,16 +82,21 @@ typedef struct usb_hub_descr {
 #define	HUB_CHANGE_STATUS	0x01
 
 /* Class Specific bmRequestType values Table 11-10 */
-#define	HANDLE_PORT_FEATURE	(USB_DEV_REQ_HOST_TO_DEV \
-				|USB_DEV_REQ_TYPE_CLASS \
-				|USB_DEV_REQ_RCPT_OTHER)
+#define	HUB_HANDLE_PORT_FEATURE_TYPE	(USB_DEV_REQ_HOST_TO_DEV \
+					|USB_DEV_REQ_TYPE_CLASS \
+					|USB_DEV_REQ_RCPT_OTHER)
 
-#define	GET_PORT_STATUS		(USB_DEV_REQ_DEV_TO_HOST \
-				|USB_DEV_REQ_TYPE_CLASS \
-				|USB_DEV_REQ_RCPT_OTHER)
+#define	HUB_GET_PORT_STATUS_TYPE	(USB_DEV_REQ_DEV_TO_HOST \
+					|USB_DEV_REQ_TYPE_CLASS \
+					|USB_DEV_REQ_RCPT_OTHER)
 
-#define	HUB_CLASS_REQ		(USB_DEV_REQ_DEV_TO_HOST \
-				|USB_DEV_REQ_TYPE_CLASS)
+#define	HUB_CLASS_REQ_TYPE		(USB_DEV_REQ_DEV_TO_HOST \
+					|USB_DEV_REQ_TYPE_CLASS)
+
+/* bmRequestType for getting device status */
+#define	HUB_GET_DEVICE_STATUS_TYPE	(USB_DEV_REQ_DEV_TO_HOST \
+					|USB_DEV_REQ_TYPE_STANDARD \
+					|USB_DEV_REQ_RCPT_DEV)
 
 /* Port Status Field Bits - Table 11-15 */
 #define	PORT_STATUS_CCS		0x0001	/* port connection status */

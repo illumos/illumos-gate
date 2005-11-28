@@ -295,6 +295,12 @@ typedef struct usba_device {
 	uchar_t			usb_n_cfgs;
 	uchar_t			usb_n_ifs;
 
+	/*
+	 * power drawn from hub, if > 0, the power has been
+	 * subtracted from the parent hub's power budget
+	 */
+	uint16_t		usb_pwr_from_hub;
+
 	/* ref count, if > 0, this structure is in use */
 	int			usb_ref_count;
 
