@@ -892,7 +892,7 @@ todds1337_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		*result = (void *)softsp->dip;
 		return (DDI_SUCCESS);
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		return (DDI_SUCCESS);
 	default:
 		return (DDI_FAILURE);

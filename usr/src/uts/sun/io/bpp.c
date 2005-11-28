@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -294,8 +294,8 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * This must be done before expecting to receive any interrupts.
 	 */
 	if (ddi_add_intr(dip, 0, &bpp_p->bpp_block_cookie,
-		(ddi_idevice_cookie_t *)0, bpp_intr, (caddr_t)unit_no)
-		!= DDI_SUCCESS) {
+		(ddi_idevice_cookie_t *)0, bpp_intr,
+		(caddr_t)(uintptr_t)unit_no) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE,
 			"bpp_attach unit %d: cannot add interrupt!", unit_no);
 		ddi_soft_state_free(bpp_state_head, unit_no);
@@ -555,7 +555,7 @@ bpp_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 		}
 		break;
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)getminor((dev_t)arg);
+		*result = (void *)(uintptr_t)getminor((dev_t)arg);
 		error = DDI_SUCCESS;
 		break;
 	default:
@@ -1333,7 +1333,7 @@ bpp_strategy(register struct buf *bp)
 		"Setting timeout to call bpp_transfer_timeout in %d sec\n",
 			timeout_value));
 	bpp_p->bpp_transfer_timeout_ident =
-	    timeout(bpp_transfer_timeout, (void *)unit_no,
+	    timeout(bpp_transfer_timeout, (void *)(uintptr_t)unit_no,
 			drv_usectohz(timeout_value * 1000000));
 	bpp_p->timeouts |= TRANSFER_TIMEOUT;
 	BPP_PRINT(5, (CE_CONT, "In bpp_strategy, Timeout block is 0x%x.\n",
@@ -1537,7 +1537,7 @@ bpp_intr(caddr_t unit_no)
 	register struct bpp_error_status *bpp_errorstat_p; /* error stat */
 
 	BPP_PRINT(2, (CE_CONT, "Entering bpp_intr, unit number %d\n", unit_no));
-	bpp_unit_no = (uint_t)unit_no;
+	bpp_unit_no = (int)(uintptr_t)unit_no;
 
 	/*
 	 * Check that this unit is indeed interrupting.
@@ -1843,7 +1843,7 @@ bpp_transfer_failed(int unit_no)
 static void
 bpp_transfer_timeout(void *unit_no_arg)
 {
-	int unit_no = (int)unit_no_arg;
+	int unit_no = (int)(uintptr_t)unit_no_arg;
 	register struct	bpp_unit	*bpp_p;	/* will point to this */
 						/* unit's state struct */
 	register struct buf		*bp;

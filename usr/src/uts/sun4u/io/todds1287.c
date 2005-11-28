@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -203,7 +203,7 @@ _init(void)
 	}
 
 
-	ds1287_hi_iblock = (ddi_iblock_cookie_t)
+	ds1287_hi_iblock = (ddi_iblock_cookie_t)(uintptr_t)
 	    ipltospl(ds1287_interrupt_priority);
 	mutex_init(&ds1287_reg_mutex, NULL, MUTEX_DRIVER, ds1287_hi_iblock);
 
@@ -272,7 +272,7 @@ ds1287_getinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 		return (DDI_SUCCESS);
 
 	case DDI_INFO_DEVT2INSTANCE:
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		return (DDI_SUCCESS);
 
 	default:
@@ -318,7 +318,7 @@ ds1287_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	softsp = ddi_get_soft_state(ds1287_state, instance);
-	DPRINTF("ds1287_attach: instance=%d softsp=0x%x\n", instance, softsp);
+	DPRINTF("ds1287_attach: instance=%d softsp=0x%p\n", instance, softsp);
 
 	softsp->dip = dip;
 
@@ -331,7 +331,7 @@ ds1287_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	}
 
 	/* add the softint */
-	ds1287_lo_iblock = (ddi_iblock_cookie_t)
+	ds1287_lo_iblock = (ddi_iblock_cookie_t)(uintptr_t)
 	    ipltospl(ds1287_softint_priority);
 
 	if (ddi_add_softintr(dip, DDI_SOFTINT_FIXED, &ds1287_softintr_id,
