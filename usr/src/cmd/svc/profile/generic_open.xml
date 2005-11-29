@@ -123,6 +123,17 @@
   </service>
 
   <!--
+      Enable CDE services.
+  -->
+  <service name='application/cde-printinfo' version='1' type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+  <service name='application/graphical-login/cde-login' version='1'
+    type='service'>
+    <instance name='default' enabled='true' />
+  </service>
+
+  <!--
       Include inetd(1M) services profile.
   -->
   <xi:include href='file:/var/svc/profile/inetd_services.xml' />

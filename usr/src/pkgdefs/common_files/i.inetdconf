@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -295,27 +295,6 @@ inetd_remove fs <<EOF
 ^[# 	]*fs[ 	]*stream
 ^# Sun Font Server
 EOF
-
-# Not yet converted
-# Remove ToolTalk DB server
-#inetd_remove rpc.ttdbserverd <<EOF
-#^[# 	]*100083/1[ 	]*tli
-#^# Sun ToolTalk Database Server
-#EOF
-
-# Not yet converted
-# Remove rpc.cmsd
-#inetd_remove rpc.cmsd <<EOF
-#^[# 	]*100068/2-5[ 	]*dgram
-#^# rpc.cmsd
-#^#.*/var/spool/calendar
-#EOF
-
-# Not yet converted
-# Remove dtspcd
-#inetd_remove dtspcd <<EOF
-#^[# 	]*dtspc[ 	]*stream
-#EOF
 
 # Remove nfsmapid
 # Only appears in Solaris 10

@@ -86,4 +86,19 @@
 	<service name='network/security/ktkt_warn' version='1' type='service'>
 		<instance name='default' enabled='true'/>
 	</service>
+
+	<!--
+		Enable CDE services.
+	-->
+	<service name='network/cde-spc' version='1' type='service'>
+		<instance name='default' enabled='true' />
+	</service>
+	<service name='network/rpc/cde-ttdbserver' version='1' type='service'>
+		<instance name='tcp' enabled='true' />
+	</service>
+	<service name='network/rpc/cde-calendar-manager' version='1'
+	 	type='service'>
+		<instance name='udp' enabled='true' />
+	</service>
+
 </service_bundle>
