@@ -99,6 +99,7 @@ COMOBJS=			\
 
 GENOBJS=			\
 	_div64.o		\
+	_divdi3.o		\
 	_getsp.o		\
 	_mul64.o		\
 	abs.o			\
@@ -780,7 +781,6 @@ THREADSMACHOBJS=		\
 	machdep.o
 
 THREADSASMOBJS=			\
-	inlines.o		\
 	asm_subr.o
 
 UNWINDMACHOBJS=			\
@@ -932,11 +932,6 @@ ALTPICS= $(TRACEOBJS:%=pics/%)
 
 $(DYNLIB) := PICS += $(ROOTFS_LIBDIR)/libc_i18n.a
 $(DYNLIB) := BUILD.SO = $(LD) -o $@ -G $(DYNFLAGS) $(PICS) $(ALTPICS) $(LDLIBS)
-
-#
-# XX64 Don't know why ctf fails.  Remove when it is fixed.
-#
-$(__GNUC)$(DYNLIB) := CTFMERGE_POST =
 
 MAPDIR=		../spec/i386
 MAPFILE=	$(MAPDIR)/mapfile

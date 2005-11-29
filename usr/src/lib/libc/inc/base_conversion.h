@@ -19,10 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
+#ifndef	BASE_CONVERSION_H
+#define	BASE_CONVERSION_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -335,3 +339,7 @@ extern double __dabs(double *);
 #if defined(sparc) || defined(__sparc)
 extern enum fp_direction_type _QgetRD(void);
 #endif
+
+#include "base_inlines.h"
+
+#endif	/* BASE_CONVERSION_H */

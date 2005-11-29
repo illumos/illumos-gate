@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,9 +33,9 @@
 #pragma weak swapcontext = _swapcontext
 
 #include "synonyms.h"
+#include "thr_uberdata.h"
 #include <ucontext.h>
 #include <sys/types.h>
-#include "libc.h"
 
 int
 swapcontext(ucontext_t *oucp, const ucontext_t *nucp)

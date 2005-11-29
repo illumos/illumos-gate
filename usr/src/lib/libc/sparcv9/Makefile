@@ -103,6 +103,9 @@ FPASMOBJS=			\
 	fpsetrnd.o		\
 	fpsetsticky.o
 
+$(__GNUC)FPASMOBJS +=		\
+	__quad.o
+
 ATOMICOBJS=			\
 	atomic.o
 
@@ -1098,8 +1101,6 @@ $(QIL:%=pics/%): ../$(MACH)/fp/__quad.il
 
 # include common libc targets
 include ../Makefile.targ
-
-pics/getxby_door.o := CCMODE =
 
 # We need to strip out all CTF and DOF data from the static library
 $(LIB_PIC) := DIR = pics

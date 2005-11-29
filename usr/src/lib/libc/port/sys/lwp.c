@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +38,7 @@
 #endif	/* __i386 || __amd64 */
 
 #include "synonyms.h"
-#include "mtlib.h"
+#include "thr_uberdata.h"
 #include <sys/types.h>
 #include <sys/time.h>
 #include <errno.h>
@@ -47,7 +48,6 @@
 
 extern int ___lwp_mutex_timedlock(mutex_t *, timespec_t *);
 extern int ___lwp_sema_timedwait(lwp_sema_t *, timespec_t *, int);
-extern int set_lock_byte(volatile uint8_t *);
 
 int
 _lwp_mutex_lock(mutex_t *mp)
@@ -80,26 +80,18 @@ _lwp_sema_wait(lwp_sema_t *sp)
 	return (___lwp_sema_timedwait(sp, NULL, 0));
 }
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 int
 _lwp_private(int cmd, int which, void *sbase)
 {
 	extern int ___lwp_private(int, int, void *);
 	return (___lwp_private(cmd, which, sbase));
 }
-#endif	/* __i386 || __amd64 */
+#endif	/* __x86 */
 
 int
 _lwp_suspend(lwpid_t lwpid)
 {
 	extern int ___lwp_suspend(lwpid_t);
 	return (___lwp_suspend(lwpid));
-}
-
-void
-_halt(void)
-{
-	/*LINTED*/
-	while (1)
-		continue;
 }

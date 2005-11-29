@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,11 +104,10 @@ _nsc_trydoorcall(nsc_data_t **dptr, int *ndata, int *adata)
 try_again:
 
 	if (doorfd == -1) {
-
 		int		tbc[3];
 		int		i;
-		if ((doorfd = open64(NAME_SERVICE_DOOR, O_RDONLY, 0))
-		    == -1) {
+
+		if ((doorfd = open64(NAME_SERVICE_DOOR, O_RDONLY, 0)) == -1) {
 			lmutex_unlock(&_door_lock);
 			return (NOSERVER);
 		}
@@ -136,7 +136,9 @@ try_again:
 		 * mark this door descriptor as close on exec
 		 */
 		(void) fcntl(doorfd, F_SETFD, FD_CLOEXEC);
-		if (__door_info(doorfd, &real_door) == -1) {
+		if (__door_info(doorfd, &real_door) == -1 ||
+		    (real_door.di_attributes & DOOR_REVOKED) ||
+		    real_door.di_data != (uintptr_t)NAME_SERVICE_DOOR_COOKIE) {
 			/*
 			 * we should close doorfd because we just opened it
 			 */
@@ -145,27 +147,17 @@ try_again:
 			lmutex_unlock(&_door_lock);
 			return (NOSERVER);
 		}
-
-		if ((real_door.di_attributes & DOOR_REVOKED) ||
-		    (real_door.di_data !=
-		    (door_ptr_t)NAME_SERVICE_DOOR_COOKIE)) {
-			(void) close(doorfd);
-			doorfd = -1;
-			lmutex_unlock(&_door_lock);
-			return (NOSERVER);
-		}
 	} else {
-
-		if ((__door_info(doorfd, &my_door) == -1) ||
-		    (my_door.di_data != (door_ptr_t)NAME_SERVICE_DOOR_COOKIE) ||
-			(my_door.di_uniquifier != real_door.di_uniquifier)) {
-				/*
-				 * don't close it -
-				 * someone else has clobbered fd
-				 */
-				doorfd = -1;
-				goto try_again;
-			}
+		if (__door_info(doorfd, &my_door) == -1 ||
+		    my_door.di_data != (uintptr_t)NAME_SERVICE_DOOR_COOKIE ||
+		    my_door.di_uniquifier != real_door.di_uniquifier) {
+			/*
+			 * don't close it -
+			 * someone else has clobbered fd
+			 */
+			doorfd = -1;
+			goto try_again;
+		}
 
 		if (my_door.di_attributes & DOOR_REVOKED) {
 			(void) close(doorfd);	/* nscd exited .... */

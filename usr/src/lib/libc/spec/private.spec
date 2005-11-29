@@ -1321,12 +1321,6 @@ function	_gtty
 version		SUNWprivate_1.1
 end
 
-function	_halt
-#Declaration	/* Unknown. */
-arch		sparc sparcv9
-version		sparc=SUNWprivate_1.1 sparcv9=SUNWprivate_1.1
-end
-
 function	_hasmntopt # extends libc/spec/gen.spec hasmntopt
 weak		hasmntopt
 #Declaration	/* Unknown. */

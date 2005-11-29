@@ -740,7 +740,6 @@ THREADSMACHOBJS=		\
 	machdep.o
 
 THREADSASMOBJS=			\
-	inlines.o		\
 	asm_subr.o
 
 UNWINDMACHOBJS=			\

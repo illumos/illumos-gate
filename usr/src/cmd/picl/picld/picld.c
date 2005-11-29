@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -830,7 +831,7 @@ daemon_exists(void)
 	}
 
 	if ((dinfo.di_attributes & DOOR_REVOKED) ||
-	    (dinfo.di_data != (door_ptr_t)PICLD_DOOR_COOKIE)) {
+	    (dinfo.di_data != (uintptr_t)PICLD_DOOR_COOKIE)) {
 		(void) close(doorh);
 		return (0);
 	}

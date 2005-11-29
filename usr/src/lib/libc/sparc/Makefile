@@ -101,6 +101,9 @@ FPASMOBJS=			\
 	fpsetrnd.o		\
 	fpsetsticky.o
 
+$(__GNUC)FPASMOBJS +=		\
+	__quad.o
+
 ATOMICOBJS=			\
 	atomic.o
 
@@ -1063,6 +1066,9 @@ TIL=				\
 
 $(TIL:%=pics/%) := CFLAGS += $(LIBCBASE)/threads/sparc.il
 
+# special kludge for gcc inlines with 'cas':
+$(__GNUC)pics/synch.o pics/lwp.o := sparc_XARCH = -xarch=v8plus
+
 # Files in port/fp subdirectory that need base.il inline template
 IL=				\
 	__flt_decim.o		\
@@ -1154,8 +1160,6 @@ $(QIL:%=pics/%): ../$(MACH)/fp/__quad.il
 
 # include common libc targets
 include ../Makefile.targ
-
-pics/getxby_door.o := CCMODE =
 
 # We need to strip out all CTF and DOF data from the static library
 $(LIB_PIC) := DIR = pics

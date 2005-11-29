@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -98,7 +99,6 @@ extern int64_t __div64(int64_t, int64_t);
 extern int64_t __rem64(int64_t, int64_t);
 extern uint64_t __udiv64(uint64_t, uint64_t);
 extern uint64_t __urem64(uint64_t, uint64_t);
-extern uint64_t _umul32x32to64(uint32_t, uint32_t);
 extern int64_t __mul64(int64_t, int64_t);
 extern uint64_t __umul64(uint64_t, uint64_t);
 
@@ -324,11 +324,6 @@ extern size_t	_wcslen(const wchar_t *);
  * defined in wscpy.c
  */
 extern wchar_t	*_wcscpy(wchar_t *, const wchar_t *);
-
-#ifdef __sparc
-extern ulong_t caller(void);
-extern ulong_t getfp(void);
-#endif
 
 /*
  * misc synonyms

@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -106,7 +107,7 @@
 #define	WAITER		0x00000001
 #define	LOCKSET		0xff
 #define	LOCKCLEAR	0
-#elif defined(__i386) || defined(__amd64)
+#elif defined(__x86)
 /* lock.lock64.pad[x]	   7 6 5 4 */
 #define	LOCKMASK	0xff000000
 #define	WAITERMASK	0x00ff0000
@@ -114,7 +115,7 @@
 #define	LOCKSET		0x01
 #define	LOCKCLEAR	0
 #else
-#error "none of __sparc __i386 __amd64 is defined"
+#error "neither __sparc nor __x86 is defined"
 #endif
 
 /*
@@ -215,7 +216,7 @@ extern struct pcclass ts_class, rt_class;
 #define	MUTEX_TRY	0
 #define	MUTEX_LOCK	1
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 
 typedef struct {	/* structure returned by fnstenv */
 	int	fctrl;		/* control word */
@@ -242,14 +243,14 @@ typedef struct {
 } fpuenv32_t;
 #endif	/* _SYSCALL32 */
 
-#endif	/* __i386 || __amd64 */
+#endif	/* __x86 */
 
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 extern	void	ht_pause(void);		/* "pause" instruction */
 #define	SMT_PAUSE()	ht_pause()
 #else
 #define	SMT_PAUSE()
-#endif	/* __i386 || __amd64 */
+#endif	/* __x86 */
 
 /*
  * Cleanup handler related data.
@@ -827,7 +828,7 @@ typedef struct ulwp32 {
 	uint32_t	ul_dreturn;	/* dtrace: return %o0 */
 #endif
 	caddr32_t	ul_self;	/* pointer to self */
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 	uint8_t		ul_dinstr[40];	/* scratch space for dtrace */
 #endif
 	caddr32_t	ul_uberdata;	/* uber (super-global) data */
@@ -1041,123 +1042,6 @@ extern	greg_t		stkptr(void);
 #if !defined(__GNUC__)
 #define	__attribute__(string)
 #endif
-
-#if !defined(__lint) && defined(__GNUC__) && \
-	(defined(__i386) || defined(__amd64))
-
-/* inlines for gcc */
-
-extern __inline__ ulwp_t *_curthread(void)
-{
-	void *__value;
-	__asm__ __volatile__(
-#if defined(__amd64)
-		"movq %%fs:0,%0" : "=r" (__value));
-#else	/* __i386 */
-		"movl %%gs:0,%0" : "=r" (__value));
-#endif
-	return (__value);
-}
-
-extern __inline__ ulwp_t *__curthread(void)
-{
-	void *__value;
-	__asm__ __volatile__(
-#if defined(__amd64)
-		"xorq %0,%0;"
-		"mov %%fs,%0;"
-		"andq %0,%0;"
-		"je 1f;"
-		"movq %%fs:0,%0;"
-#else	/* __i386 */
-		"xorl %0,%0;"
-		"mov %%gs,%0;"
-		"andl %0,%0;"
-		"je 1f;"
-		"movl %%gs:0,%0;"
-#endif
-		"1:" : "=r" (__value));
-	return (__value);
-}
-
-extern __inline__ greg_t stkptr(void)
-{
-	greg_t __value;
-	__asm__ __volatile__(
-#if defined(__amd64)
-		"movq %%rsp, %0"
-#else	/* __i386 */
-		"movl %%esp, %0"
-#endif
-		: "=r" (__value));
-	return (__value);
-}
-
-extern __inline__ hrtime_t gethrtime(void)
-{
-	hrtime_t __value;
-#if defined(__amd64)
-	__asm__ __volatile__(
-		"movl $3,%%eax;"
-		"int $0xd2"	/* caller-saved registers are trashed */
-		: "=a" (__value)
-		: : "rcx", "rdx", "rsi", "rdi", "r8", "r9", "r10", "r11");
-#else	/* __i386 */
-	__asm__ __volatile__(
-		"movl $3,%%eax;"
-		"int $0xd2"
-		: "=A" (__value)
-		: : "ecx");
-#endif
-	return (__value);
-}
-
-extern __inline__ int set_lock_byte(volatile uint8_t *__lockp)
-{
-	int __value;
-	__asm__ __volatile__(
-		"movl $1,%0;"
-		"xchgb %%dl,%1" : "+d" (__value) : "m" (*__lockp));
-	return (__value);
-}
-
-extern __inline__ uint32_t
-swap32(volatile uint32_t *__memory, uint32_t __value)
-{
-	__asm__ __volatile__(
-		"xchgl %0,%1" : "+q" (__value) : "m" (*__memory));
-	return (__value);
-}
-
-extern __inline__ uint32_t
-cas32(volatile uint32_t *__memory, uint32_t __cmp, uint32_t __newvalue)
-{
-	uint32_t __oldvalue;
-	__asm__ __volatile__(
-		"lock; cmpxchgl %3, %0"
-		: "=m" (*__memory), "=a" (__oldvalue)
-		: "a" (__cmp), "r" (__newvalue));
-	return (__oldvalue);
-}
-
-extern __inline__ void incr32(volatile uint32_t *__memory)
-{
-	__asm__ __volatile__(
-		"lock; incl %0" : "=m" (*__memory) : "m" (*__memory));
-}
-
-extern __inline__ void decr32(volatile uint32_t *__memory)
-{
-	__asm__ __volatile__(
-		"lock; decl %0" : "=m" (*__memory) : "m" (*__memory));
-}
-
-extern __inline__ void ht_pause()
-{
-	__asm__ __volatile__("rep; nop");
-}
-
-#endif	/* !__lint && __GNUC__ && (__i386 || __amd64) */
 
 /*
  * Implementation functions.  Not visible outside of the library itself.
@@ -1456,9 +1340,9 @@ extern	int	__lwp_rwlock_unlock(rwlock_t *);
 extern	int	__lwp_park(timespec_t *, lwpid_t);
 extern	int	__lwp_unpark(lwpid_t);
 extern	int	__lwp_unpark_all(lwpid_t *, int);
-#if defined(__i386) || defined(__amd64)
+#if defined(__x86)
 extern	int	___lwp_private(int, int, void *);
-#endif	/* __i386 || __amd64 */
+#endif	/* __x86 */
 
 extern	int	_private_lwp_mutex_lock(mutex_t *);
 extern	int	_private_lwp_mutex_unlock(mutex_t *);
@@ -1471,5 +1355,11 @@ extern	uint32_t	swap32(volatile uint32_t *, uint32_t);
 extern	uint32_t	cas32(volatile uint32_t *, uint32_t, uint32_t);
 extern	void		incr32(volatile uint32_t *);
 extern	void		decr32(volatile uint32_t *);
+#if defined(__sparc)
+extern	ulong_t		caller(void);
+extern	ulong_t		getfp(void);
+#endif	/* __sparc */
+
+#include "thr_inlines.h"
 
 #endif	/* _THR_UBERDATA_H */

@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -29,44 +30,6 @@
 	.file	"%M%"
 
 #include <SYS.h>
-
-/*
- * Functions needed because gcc doesn't understand .il files.
- */
-	ENTRY(_curthread)
-	movl	%gs:0, %eax
-	ret
-	SET_SIZE(_curthread)
-
-	ENTRY(__curthread)
-	xorl	%eax, %eax
-	movw	%gs, %ax
-	andl	%eax, %eax
-	je	1f
-	movl	%gs:0, %eax
-1:
-	ret
-	SET_SIZE(__curthread)
-
-	ENTRY(set_lock_byte)
-	movl	$1, %eax
-	movl	4(%esp), %ecx
-	xchgb	%al, (%ecx)
-	ret
-	SET_SIZE(set_lock_byte)
-
-	ENTRY(swap32)
-	movl	4(%esp), %ecx
-	movl	8(%esp), %eax
-	xchgl	(%ecx), %eax
-	ret
-	SET_SIZE(swap32)
-
-	ENTRY(ht_pause)
-	rep		/* "rep nop" is equivalent to "pause" */
-	nop
-	ret
-	SET_SIZE(ht_pause)
 
 /*
  * C support for 64-bit modulo and division.
