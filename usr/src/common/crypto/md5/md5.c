@@ -45,6 +45,7 @@
 #include <sys/types.h>
 #include <sys/md5.h>
 #include <sys/md5_consts.h>	/* MD5_CONST() optimization */
+#include "md5_byteswap.h"
 #if	!defined(_KERNEL) || defined(_BOOT)
 #include <strings.h>
 #endif /* !_KERNEL || _BOOT */
@@ -84,7 +85,7 @@ static struct modlmisc modlmisc = {
 
 static struct modlcrypto modlcrypto = {
 	&mod_cryptoops,
-	"MD5 Kernel SW Provider %I%"
+	"MD5 Kernel SW Provider 1.23"
 };
 
 static struct modlinkage modlinkage = {
@@ -371,17 +372,6 @@ static uint8_t PADDING[64] = { 0x80, /* all zeros */ };
  * If we get another CISC ISA, we'll have to change the ifdef.
  */
 
-/*
- * Using the %asi register to achieve little endian loads - register
- * is set using a inline template.
- *
- * Saves a few arithmetic ops as can now use an immediate offset with the
- * lduwa instructions.
- */
-
-extern void set_little(uint32_t);
-extern uint32_t get_little();
-
 #if defined(__i386) || defined(__amd64)
 
 #define	MD5_CONST(x)		(MD5_CONST_ ## x)
@@ -630,107 +620,6 @@ md5_calc(unsigned char *output, unsigned char *input, unsigned int inlen)
 }
 
 #endif	/* !_KERNEL */
-
-/*
- * Little-endian optimization:  I don't need to do any weirdness.   On
- * some little-endian boxen, I'll have to do alignment checks, but I can do
- * that below.
- */
-
-#ifdef _LITTLE_ENDIAN
-
-#if !defined(__i386) && !defined(__amd64)
-/*
- * i386 and amd64 don't require aligned 4-byte loads.  The symbol
- * _MD5_CHECK_ALIGNMENT indicates below whether the MD5Transform function
- * requires alignment checking.
- */
-#define	_MD5_CHECK_ALIGNMENT
-#endif /* !__i386 && !__amd64 */
-
-#define	LOAD_LITTLE_32(addr)	(*(uint32_t *)(addr))
-
-/*
- * sparc v9/v8plus optimization:
- *
- * on the sparc v9/v8plus, we can load data little endian.  however, since
- * the compiler doesn't have direct support for little endian, we
- * link to an assembly-language routine `load_little_32' to do
- * the magic.  note that special care must be taken to ensure the
- * address is 32-bit aligned -- in the interest of speed, we don't
- * check to make sure, since careful programming can guarantee this
- * for us.
- */
-
-#elif	defined(sun4u)
-
-/* Define alignment check because we can 4-byte load as little endian. */
-#define	_MD5_CHECK_ALIGNMENT
-
-extern  uint32_t load_little_32(uint32_t *);
-#define	LOAD_LITTLE_32(addr)    load_little_32((uint32_t *)(addr))
-
-#ifdef sun4v
-
-/*
- * For N1 want to minimize number of arithmetic operations. This is best
- * achieved by using the %asi register to specify ASI for the lduwa operations.
- * Also, have a separate inline template for each word, so can utilize the
- * immediate offset in lduwa, without relying on the compiler to do the right
- * thing.
- *
- * Moving to 64-bit loads might also be beneficial.
- */
-
-extern	uint32_t load_little_32_0(uint32_t *);
-extern	uint32_t load_little_32_1(uint32_t *);
-extern	uint32_t load_little_32_2(uint32_t *);
-extern	uint32_t load_little_32_3(uint32_t *);
-extern	uint32_t load_little_32_4(uint32_t *);
-extern	uint32_t load_little_32_5(uint32_t *);
-extern	uint32_t load_little_32_6(uint32_t *);
-extern	uint32_t load_little_32_7(uint32_t *);
-extern	uint32_t load_little_32_8(uint32_t *);
-extern	uint32_t load_little_32_9(uint32_t *);
-extern	uint32_t load_little_32_a(uint32_t *);
-extern	uint32_t load_little_32_b(uint32_t *);
-extern	uint32_t load_little_32_c(uint32_t *);
-extern	uint32_t load_little_32_d(uint32_t *);
-extern	uint32_t load_little_32_e(uint32_t *);
-extern	uint32_t load_little_32_f(uint32_t *);
-#define	LOAD_LITTLE_32_0(addr)	load_little_32_0((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_1(addr)	load_little_32_1((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_2(addr)	load_little_32_2((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_3(addr)	load_little_32_3((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_4(addr)	load_little_32_4((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_5(addr)	load_little_32_5((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_6(addr)	load_little_32_6((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_7(addr)	load_little_32_7((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_8(addr)	load_little_32_8((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_9(addr)	load_little_32_9((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_a(addr)	load_little_32_a((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_b(addr)	load_little_32_b((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_c(addr)	load_little_32_c((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_d(addr)	load_little_32_d((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_e(addr)	load_little_32_e((uint32_t *)(addr))
-#define	LOAD_LITTLE_32_f(addr)	load_little_32_f((uint32_t *)(addr))
-#endif /* sun4v */
-
-/* Placate lint */
-#if	defined(__lint)
-uint32_t
-load_little_32(uint32_t *addr)
-{
-	return (*addr);
-}
-#endif
-
-#else	/* big endian -- will work on little endian, but slowly */
-
-/* Since we do byte operations, we don't have to check for alignment. */
-#define	LOAD_LITTLE_32(addr)	\
-	((addr)[0] | ((addr)[1] << 8) | ((addr)[2] << 16) | ((addr)[3] << 24))
-#endif
 
 /*
  * sparc register window optimization:

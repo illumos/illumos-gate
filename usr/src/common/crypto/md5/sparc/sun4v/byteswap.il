@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,23 +18,26 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 /*
  * byteswap.il -- definitions for .inline functions for little-endian loads.
- *
- * ident	"%Z%%M%	%I%	%E% SMI"
  *
  * right now, this file is only used on UltraSPARC architectures,
  * which have a special address space identifier for loading 32 and 16 bit
  * integers in little-endian byte order.
  *
  * note: apparently these files are not preprocessed, so we cannot
- *       use `#pragma ident' or `ASI_PL'.
+ *       use `ASI_PL'.
  *
+ * This file and common/crypto/md5/md5_byteswap.h implement the
+ * same thing and must be changed together.
  */
 
 	.inline load_little_32, 4
