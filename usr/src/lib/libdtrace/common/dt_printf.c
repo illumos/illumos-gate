@@ -79,6 +79,14 @@ pfcheck_stack(dt_pfargv_t *pfv, dt_pfargd_t *pfd, dt_node_t *dnp)
 
 /*ARGSUSED*/
 static int
+pfcheck_time(dt_pfargv_t *pfv, dt_pfargd_t *pfd, dt_node_t *dnp)
+{
+	return (dt_node_is_integer(dnp) &&
+	    dt_node_type_size(dnp) == sizeof (uint64_t));
+}
+
+/*ARGSUSED*/
+static int
 pfcheck_str(dt_pfargv_t *pfv, dt_pfargd_t *pfd, dt_node_t *dnp)
 {
 	ctf_file_t *ctfp;
@@ -613,13 +621,13 @@ static const dt_pfconv_t _dtrace_conversions[] = {
 { "p", "x", pfproto_addr, pfcheck_addr, pfprint_uint },
 { "s", "s", "char [] or string (or use stringof)", pfcheck_str, pfprint_cstr },
 { "S", "s", pfproto_cstr, pfcheck_str, pfprint_estr },
-{ "T", "s", "uint64_t", pfcheck_type, pfprint_time822 },
+{ "T", "s", "int64_t", pfcheck_time, pfprint_time822 },
 { "u", "u", pfproto_xint, pfcheck_xint, pfprint_uint },
 { "wc",	"wc", "int", pfcheck_type, pfprint_sint }, /* a.k.a. wchar_t */
 { "ws", "ws", pfproto_wstr, pfcheck_wstr, pfprint_wstr },
 { "x", "x", pfproto_xint, pfcheck_xint, pfprint_uint },
 { "X", "X", pfproto_xint, pfcheck_xint, pfprint_uint },
-{ "Y", "s", "uint64_t", pfcheck_type, pfprint_time },
+{ "Y", "s", "int64_t", pfcheck_time, pfprint_time },
 { "%", "%", "void", pfcheck_type, pfprint_pct },
 { NULL, NULL, NULL, NULL, NULL }
 };
@@ -1107,6 +1115,63 @@ dt_printf_validate(dt_pfargv_t *pfv, uint_t flags,
 	}
 }
 
+void
+dt_printa_validate(dt_node_t *lhs, dt_node_t *rhs)
+{
+	dt_ident_t *lid, *rid;
+	dt_node_t *lproto, *rproto;
+	int largc, rargc, argn;
+	char n1[DT_TYPE_NAMELEN];
+	char n2[DT_TYPE_NAMELEN];
+
+	assert(lhs->dn_kind == DT_NODE_AGG);
+	assert(rhs->dn_kind == DT_NODE_AGG);
+
+	lid = lhs->dn_ident;
+	rid = rhs->dn_ident;
+
+	lproto = ((dt_idsig_t *)lid->di_data)->dis_args;
+	rproto = ((dt_idsig_t *)rid->di_data)->dis_args;
+
+	/*
+	 * First, get an argument count on each side.  These must match.
+	 */
+	for (largc = 0; lproto != NULL; lproto = lproto->dn_list)
+		largc++;
+
+	for (rargc = 0; rproto != NULL; rproto = rproto->dn_list)
+		rargc++;
+
+	if (largc != rargc) {
+		xyerror(D_PRINTA_AGGKEY, "printa( ): @%s and @%s do not have "
+		    "matching key signatures: @%s has %d key%s, @%s has %d "
+		    "key%s", lid->di_name, rid->di_name,
+		    lid->di_name, largc, largc == 1 ? "" : "s",
+		    rid->di_name, rargc, rargc == 1 ? "" : "s");
+	}
+
+	/*
+	 * Now iterate over the keys to verify that each type matches.
+	 */
+	lproto = ((dt_idsig_t *)lid->di_data)->dis_args;
+	rproto = ((dt_idsig_t *)rid->di_data)->dis_args;
+
+	for (argn = 1; lproto != NULL; argn++, lproto = lproto->dn_list,
+	    rproto = rproto->dn_list) {
+		assert(rproto != NULL);
+
+		if (dt_node_is_argcompat(lproto, rproto))
+			continue;
+
+		xyerror(D_PRINTA_AGGPROTO, "printa( ): @%s[ ] key #%d is "
+		    "incompatible with @%s:\n%9s key #%d: %s\n"
+		    "%9s key #%d: %s\n",
+		    rid->di_name, argn, lid->di_name, lid->di_name, argn,
+		    dt_node_type_name(lproto, n1, sizeof (n1)), rid->di_name,
+		    argn, dt_node_type_name(rproto, n2, sizeof (n2)));
+	}
+}
+
 static int
 dt_printf_getint(dtrace_hdl_t *dtp, const dtrace_recdesc_t *recp,
     uint_t nrecs, const void *buf, size_t len, int *ip)
@@ -1177,27 +1242,36 @@ pfprint_lquantize(dtrace_hdl_t *dtp, FILE *fp, const char *format,
 static int
 dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
     const dtrace_recdesc_t *recs, uint_t nrecs, const void *buf,
-    size_t len, const dtrace_aggdata_t *adp)
+    size_t len, const dtrace_aggdata_t **aggsdata, int naggvars)
 {
 	dt_pfargd_t *pfd = pfv->pfv_argv;
 	const dtrace_recdesc_t *recp = recs;
-	const dtrace_recdesc_t *aggr = NULL;
-	uchar_t *lim = (uchar_t *)buf + len;
+	const dtrace_aggdata_t *aggdata;
+	dtrace_aggdesc_t *agg;
+	caddr_t lim = (caddr_t)buf + len, limit;
 	char format[64] = "%";
-	uint64_t normal = adp ? adp->dtada_normal : 1;
-	int i;
+	int i, aggrec, curagg = -1;
+	uint64_t normal;
 
 	/*
-	 * If we are formatting an aggregation, set 'aggr' to the final record
-	 * description (the aggregation result) so we can use this record with
-	 * any conversion where DT_PFCONV_AGG is set.  We then decrement nrecs
-	 * to prevent this record from being used with any other conversion.
+	 * If we are formatting an aggregation, set 'aggrec' to the index of
+	 * the final record description (the aggregation result) so we can use
+	 * this record index with any conversion where DT_PFCONV_AGG is set.
+	 * (The actual aggregation used will vary as we increment through the
+	 * aggregation variables that we have been passed.)  Finally, we
+	 * decrement nrecs to prevent this record from being used with any
+	 * other conversion.
 	 */
 	if (pfv->pfv_flags & DT_PRINTF_AGGREGATION) {
-		assert(adp != NULL);
+		assert(aggsdata != NULL);
+		assert(naggvars > 0);
+
 		if (nrecs == 0)
 			return (dt_set_errno(dtp, EDT_DMISMATCH));
-		aggr = recp + nrecs - 1;
+
+		curagg = naggvars > 1 ? 1 : 0;
+		aggdata = aggsdata[0];
+		aggrec = aggdata->dtada_desc->dtagd_nrecs - 1;
 		nrecs--;
 	}
 
@@ -1210,8 +1284,9 @@ dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
 		char *f = format + 1; /* skip initial '%' */
 		const dtrace_recdesc_t *rec;
 		dt_pfprint_f *func;
-		uchar_t *addr;
+		caddr_t addr;
 		size_t size;
+		uint32_t flags;
 
 		if (pfd->pfd_preflen != 0) {
 			char *tmp = alloca(pfd->pfd_preflen + 1);
@@ -1225,12 +1300,16 @@ dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
 			if (pfv->pfv_flags & DT_PRINTF_AGGREGATION) {
 				/*
 				 * For printa(), we flush the buffer after each
-				 * prefix, setting the record to NULL to
-				 * indicate that this does not correspond to
-				 * a particular tuple element, but is rather
-				 * part of the format string.
+				 * prefix, setting the flags to indicate that
+				 * this is part of the printa() format string.
 				 */
-				if (dt_buffered_flush(dtp, NULL, NULL, adp) < 0)
+				flags = DTRACE_BUFDATA_AGGFORMAT;
+
+				if (pfc == NULL && i == pfv->pfv_argc - 1)
+					flags |= DTRACE_BUFDATA_AGGLAST;
+
+				if (dt_buffered_flush(dtp, NULL, NULL,
+				    aggdata, flags) < 0)
 					return (-1);
 			}
 		}
@@ -1265,20 +1344,48 @@ dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
 			return (-1); /* errno is set for us */
 
 		if (pfd->pfd_flags & DT_PFCONV_AGG) {
-			if (aggr == NULL)
+			/*
+			 * This should be impossible -- the compiler shouldn't
+			 * create a DT_PFCONV_AGG conversion without an
+			 * aggregation present.  Still, we'd rather fail
+			 * gracefully than blow up...
+			 */
+			if (aggsdata == NULL)
 				return (dt_set_errno(dtp, EDT_DMISMATCH));
-			rec = aggr;
+
+			aggdata = aggsdata[curagg];
+			agg = aggdata->dtada_desc;
+
+			/*
+			 * We increment the current aggregation variable, but
+			 * not beyond the number of aggregation variables that
+			 * we're printing. This has the (desired) effect that
+			 * DT_PFCONV_AGG conversions beyond the number of
+			 * aggregation variables (re-)convert the aggregation
+			 * value of the last aggregation variable.
+			 */
+			if (curagg < naggvars - 1)
+				curagg++;
+
+			rec = &agg->dtagd_rec[aggrec];
+			addr = aggdata->dtada_data + rec->dtrd_offset;
+			limit = addr + aggdata->dtada_size;
+			normal = aggdata->dtada_normal;
+			flags = DTRACE_BUFDATA_AGGVAL;
 		} else {
 			if (nrecs == 0)
 				return (dt_set_errno(dtp, EDT_DMISMATCH));
 			rec = recp++;
 			nrecs--;
+			addr = (caddr_t)buf + rec->dtrd_offset;
+			limit = lim;
+			normal = 1;
+			flags = DTRACE_BUFDATA_AGGKEY;
 		}
 
-		addr = (uchar_t *)buf + rec->dtrd_offset;
 		size = rec->dtrd_size;
 
-		if (addr + size > lim) {
+		if (addr + size > limit) {
 			dt_dprintf("bad size: addr=%p size=0x%x lim=%p\n",
 			    (void *)addr, rec->dtrd_size, (void *)lim);
 			return (dt_set_errno(dtp, EDT_DOFFSET));
@@ -1343,16 +1450,20 @@ dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
 		(void) strcpy(f, pfd->pfd_fmt);
 		pfd->pfd_rec = rec;
 
-		if (func(dtp, fp, format, pfd, addr, size,
-		    rec == aggr ? normal : 1) < 0)
+		if (func(dtp, fp, format, pfd, addr, size, normal) < 0)
 			return (-1); /* errno is set for us */
 
 		if (pfv->pfv_flags & DT_PRINTF_AGGREGATION) {
 			/*
 			 * For printa(), we flush the buffer after each tuple
-			 * element.
+			 * element, inidicating that this is the last record
+			 * as appropriate.
 			 */
-			if (dt_buffered_flush(dtp, NULL, rec, adp) < 0)
+			if (i == pfv->pfv_argc - 1)
+				flags |= DTRACE_BUFDATA_AGGLAST;
+
+			if (dt_buffered_flush(dtp, NULL,
+			    rec, aggdata, flags) < 0)
 				return (-1);
 		}
 	}
@@ -1379,7 +1490,8 @@ dtrace_sprintf(dtrace_hdl_t *dtp, FILE *fp, void *fmtdata,
 
 	bzero(dtp->dt_sprintf_buf, size);
 	dtp->dt_sprintf_buflen = size;
-	rval = dt_printf_format(dtp, fp, fmtdata, recp, nrecs, buf, len, NULL);
+	rval = dt_printf_format(dtp, fp, fmtdata, recp, nrecs, buf, len,
+	    NULL, 0);
 	dtp->dt_sprintf_buflen = 0;
 
 	if (rval == -1)
@@ -1519,7 +1631,7 @@ dtrace_fprintf(dtrace_hdl_t *dtp, FILE *fp, void *fmtdata,
     uint_t nrecs, const void *buf, size_t len)
 {
 	return (dt_printf_format(dtp, fp, fmtdata,
-	    recp, nrecs, buf, len, NULL));
+	    recp, nrecs, buf, len, NULL, 0));
 }
 
 void *
@@ -1670,7 +1782,7 @@ dt_fprinta(const dtrace_aggdata_t *adp, void *arg)
 		return (0); /* no aggregation id or id does not match */
 
 	if (dt_printf_format(dtp, pfw->pfw_fp, pfw->pfw_argv,
-	    recp, nrecs, adp->dtada_data, adp->dtada_size, adp) == -1)
+	    recp, nrecs, adp->dtada_data, adp->dtada_size, &adp, 1) == -1)
 		return (pfw->pfw_err = dtp->dt_errno);
 
 	/*
@@ -1682,27 +1794,82 @@ dt_fprinta(const dtrace_aggdata_t *adp, void *arg)
 	return (0);
 }
 
+static int
+dt_fprintas(const dtrace_aggdata_t **aggsdata, int naggvars, void *arg)
+{
+	const dtrace_aggdata_t *aggdata = aggsdata[0];
+	const dtrace_aggdesc_t *agg = aggdata->dtada_desc;
+	const dtrace_recdesc_t *rec = &agg->dtagd_rec[1];
+	uint_t nrecs = agg->dtagd_nrecs - 1;
+	dt_pfwalk_t *pfw = arg;
+	dtrace_hdl_t *dtp = pfw->pfw_argv->pfv_dtp;
+	int i;
+
+	if (dt_printf_format(dtp, pfw->pfw_fp, pfw->pfw_argv,
+	    rec, nrecs, aggdata->dtada_data, aggdata->dtada_size,
+	    aggsdata, naggvars) == -1)
+		return (pfw->pfw_err = dtp->dt_errno);
+
+	/*
+	 * For each aggregation, indicate that it has been printed, casting
+	 * away the const as necessary.
+	 */
+	for (i = 1; i < naggvars; i++) {
+		agg = aggsdata[i]->dtada_desc;
+		((dtrace_aggdesc_t *)agg)->dtagd_flags |= DTRACE_AGD_PRINTED;
+	}
+
+	return (0);
+}
 /*ARGSUSED*/
 int
 dtrace_fprinta(dtrace_hdl_t *dtp, FILE *fp, void *fmtdata,
     const dtrace_probedata_t *data, const dtrace_recdesc_t *recs,
     uint_t nrecs, const void *buf, size_t len)
 {
-	const dtrace_recdesc_t *recp = recs;
 	dt_pfwalk_t pfw;
-	int id;
+	int i, naggvars = 0;
+	dtrace_aggvarid_t *aggvars;
 
-	if (dt_printf_getint(dtp, recp++, nrecs--, buf, len, &id) == -1)
-		return (-1); /* errno is set for us */
+	aggvars = alloca(nrecs * sizeof (dtrace_aggvarid_t));
+
+	/*
+	 * This might be a printa() with multiple aggregation variables.  We
+	 * need to scan forward through the records until we find a record from
+	 * a different statement.
+	 */
+	for (i = 0; i < nrecs; i++) {
+		const dtrace_recdesc_t *nrec = &recs[i];
+
+		if (nrec->dtrd_uarg != recs->dtrd_uarg)
+			break;
+
+		if (nrec->dtrd_action != recs->dtrd_action)
+			return (dt_set_errno(dtp, EDT_BADAGG));
+
+		aggvars[naggvars++] =
+		    /* LINTED - alignment */
+		    *((dtrace_aggvarid_t *)((caddr_t)buf + nrec->dtrd_offset));
+	}
+
+	if (naggvars == 0)
+		return (dt_set_errno(dtp, EDT_BADAGG));
 
 	pfw.pfw_argv = fmtdata;
-	pfw.pfw_aid = id;
 	pfw.pfw_fp = fp;
 	pfw.pfw_err = 0;
 
-	if (dtrace_aggregate_walk_valsorted(dtp, dt_fprinta, &pfw) == -1 ||
-	    pfw.pfw_err != 0)
-		return (-1); /* errno is set for us */
+	if (naggvars == 1) {
+		pfw.pfw_aid = aggvars[0];
 
-	return ((int)(recp - recs));
+		if (dtrace_aggregate_walk_sorted(dtp,
+		    dt_fprinta, &pfw) == -1 || pfw.pfw_err != 0)
+			return (-1); /* errno is set for us */
+	} else {
+		if (dtrace_aggregate_walk_joined(dtp, aggvars, naggvars,
+		    dt_fprintas, &pfw) == -1 || pfw.pfw_err != 0)
+			return (-1); /* errno is set for us */
+	}
+
+	return (i);
 }

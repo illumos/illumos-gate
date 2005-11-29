@@ -49,6 +49,7 @@ typedef struct dt_idsig {
 	int dis_optargs;	/* argument index of start of optargs (or -1) */
 	int dis_argc;		/* number of types in this signature */
 	struct dt_node *dis_args; /* array of nodes representing formal types */
+	uint64_t dis_auxinfo;	/* auxiliary signature information, if any */
 } dt_idsig_t;
 
 typedef struct dt_idnode {

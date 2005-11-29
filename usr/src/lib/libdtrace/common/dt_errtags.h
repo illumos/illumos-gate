@@ -183,6 +183,8 @@ typedef enum {
 	D_PRINTA_PROTO,			/* printa() prototype mismatch */
 	D_PRINTA_AGGARG,		/* aggregation arg type mismatch */
 	D_PRINTA_AGGBAD,		/* printa() aggregation not defined */
+	D_PRINTA_AGGKEY,		/* printa() aggregation key mismatch */
+	D_PRINTA_AGGPROTO,		/* printa() aggregation mismatch */
 	D_TRACE_VOID,			/* trace() argument has void type */
 	D_TRACE_DYN,			/* trace() argument has dynamic type */
 	D_TRACEMEM_ADDR,		/* tracemem() address bad type */
@@ -230,7 +232,10 @@ typedef enum {
 	D_PROV_PRDUP,			/* duplicate probe declaration */
 	D_PROV_PRARGLEN,		/* probe argument list too long */
 	D_PROV_PRXLATOR,		/* probe argument translator missing */
-	D_FREOPEN_INVALID		/* frename() filename is invalid */
+	D_FREOPEN_INVALID,		/* frename() filename is invalid */
+	D_LQUANT_MATCHBASE,		/* lquantize() mismatch on base */
+	D_LQUANT_MATCHLIM,		/* lquantize() mismatch on limit */
+	D_LQUANT_MATCHSTEP		/* lquantize() mismatch on step */
 } dt_errtag_t;
 
 extern const char *dt_errtag(dt_errtag_t);

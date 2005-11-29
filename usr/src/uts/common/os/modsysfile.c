@@ -1568,8 +1568,9 @@ struct val_list {
 	} val;
 };
 
-static void
-add_val(struct val_list **val_listp, int val_type, caddr_t val)
+static struct val_list *
+add_val(struct val_list **val_listp, struct val_list *tail,
+    int val_type, caddr_t val)
 {
 	struct val_list *new_val, *listp = *val_listp;
 
@@ -1583,14 +1584,17 @@ add_val(struct val_list **val_listp, int val_type, caddr_t val)
 		new_val->val.integer = (int)(uintptr_t)val;
 	}
 
-	if (listp) {
-		while (listp->val_next) {
-			listp = listp->val_next;
-		}
-		listp->val_next = new_val;
+	ASSERT((listp == NULL && tail == NULL) ||
+	    (listp != NULL && tail != NULL));
+
+	if (tail != NULL) {
+		ASSERT(tail->val_next == NULL);
+		tail->val_next = new_val;
 	} else {
 		*val_listp = new_val;
 	}
+
+	return (new_val);
 }
 
 /*
@@ -1750,7 +1754,7 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 	token_t token;
 	struct hwc_spec *hwcp;
 	struct dev_info *devi;
-	struct val_list *val_list;
+	struct val_list *val_list, *tail;
 	hwc_state_t state;
 	u_longlong_t ival;
 
@@ -1761,6 +1765,7 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 	token = NAME;
 	prop_name = NULL;
 	val_list = NULL;
+	tail = NULL;
 	string = NULL;
 	do {
 #ifdef DEBUG
@@ -1776,6 +1781,7 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 				    prop_name, val_list);
 				prop_name = NULL;
 				val_list = NULL;
+				tail = NULL;
 				/*FALLTHROUGH*/
 			case hwc_begin:
 				if (strcmp(tokbuf, "PARENT") == 0 ||
@@ -1855,7 +1861,7 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 				/*FALLTHROUGH*/
 			case prop_equals:
 			case prop_equals_string_comma:
-				add_val(&val_list, 0, string);
+				tail = add_val(&val_list, tail, 0, string);
 				string = NULL;
 				state = prop_equals_string;
 				break;
@@ -1869,7 +1875,8 @@ get_hwc_spec(struct _buf *file, char *tokbuf, size_t linesize)
 			case prop_equals:
 			case prop_equals_integer_comma:
 				(void) kobj_getvalue(tokbuf, &ival);
-				add_val(&val_list, 1, (caddr_t)(uintptr_t)ival);
+				tail = add_val(&val_list, tail,
+				    1, (caddr_t)(uintptr_t)ival);
 				state = prop_equals_integer;
 				break;
 			default:

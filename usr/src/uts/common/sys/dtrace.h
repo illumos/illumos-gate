@@ -61,6 +61,7 @@ extern "C" {
 #define	DTRACE_IDNONE		0	/* invalid probe identifier */
 #define	DTRACE_EPIDNONE		0	/* invalid enabled probe identifier */
 #define	DTRACE_AGGIDNONE	0	/* invalid aggregation identifier */
+#define	DTRACE_AGGVARIDNONE	0	/* invalid aggregation variable ID */
 #define	DTRACE_CACHEIDNONE	0	/* invalid predicate cache */
 #define	DTRACE_PROVNONE		0	/* invalid provider identifier */
 #define	DTRACE_METAPROVNONE	0	/* invalid meta-provider identifier */
@@ -77,6 +78,7 @@ extern "C" {
 typedef uint32_t dtrace_id_t;		/* probe identifier */
 typedef uint32_t dtrace_epid_t;		/* enabled probe identifier */
 typedef uint32_t dtrace_aggid_t;	/* aggregation identifier */
+typedef int64_t dtrace_aggvarid_t;	/* aggregation variable identifier */
 typedef uint16_t dtrace_actkind_t;	/* action kind */
 typedef int64_t dtrace_optval_t;	/* option value */
 typedef uint32_t dtrace_cacheid_t;	/* predicate cache identifier */
@@ -885,6 +887,7 @@ typedef struct dtrace_eprobedesc {
 
 typedef struct dtrace_aggdesc {
 	DTRACE_PTR(char, dtagd_name);		/* not filled in by kernel */
+	dtrace_aggvarid_t dtagd_varid;		/* not filled in by kernel */
 	int dtagd_flags;			/* not filled in by kernel */
 	dtrace_aggid_t dtagd_id;		/* aggregation ID */
 	dtrace_epid_t dtagd_epid;		/* enabled probe ID */
@@ -944,7 +947,11 @@ typedef struct dtrace_fmtdesc {
 #define	DTRACEOPT_RAWBYTES	20	/* always print bytes in raw form */
 #define	DTRACEOPT_JSTACKFRAMES	21	/* number of jstack() frames */
 #define	DTRACEOPT_JSTACKSTRSIZE	22	/* size of jstack() string table */
-#define	DTRACEOPT_MAX		23	/* number of options */
+#define	DTRACEOPT_AGGSORTKEY	23	/* sort aggregations by key */
+#define	DTRACEOPT_AGGSORTREV	24	/* reverse-sort aggregations */
+#define	DTRACEOPT_AGGSORTPOS	25	/* agg. position to sort on */
+#define	DTRACEOPT_AGGSORTKEYPOS	26	/* agg. key position to sort on */
+#define	DTRACEOPT_MAX		27	/* number of options */
 
 #define	DTRACEOPT_UNSET		(dtrace_optval_t)-2	/* unset option */
 

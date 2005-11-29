@@ -344,7 +344,7 @@ static const dt_ident_t _dtrace_globals[] = {
 	&dt_idops_type, "uint64_t" },
 { "walltimestamp", DT_IDENT_SCALAR, 0, DIF_VAR_WALLTIMESTAMP,
 	DT_ATTR_STABCMN, DT_VERS_1_0,
-	&dt_idops_type, "uint64_t" },
+	&dt_idops_type, "int64_t" },
 { "zonename", DT_IDENT_SCALAR, 0, DIF_VAR_ZONENAME,
 	DT_ATTR_STABCMN, DT_VERS_1_0, &dt_idops_type, "string" },
 { NULL, 0, 0, 0, { 0, 0, 0 }, 0, NULL, NULL }
@@ -758,6 +758,21 @@ dt_vopen(int version, int flags, int *errp,
 	if (version > DTRACE_VERSION)
 		return (set_open_errno(dtp, errp, EDT_VERSION));
 
+	if (version < DTRACE_VERSION) {
+		/*
+		 * Currently, increasing the library version number is used to
+		 * denote a binary incompatible change.  That is, a consumer
+		 * of the library cannot run on a version of the library with
+		 * a higher DTRACE_VERSION number than the consumer compiled
+		 * against.  Once the library API has been committed to,
+		 * backwards binary compatibility will be required; at that
+		 * time, this check should change to return EDT_OVERSION only
+		 * if the specified version number is less than the version
+		 * number at the time of interface commitment.
+		 */
+		return (set_open_errno(dtp, errp, EDT_OVERSION));
+	}
+
 	if (flags & ~DTRACE_O_MASK)
 		return (set_open_errno(dtp, errp, EINVAL));
 
@@ -948,7 +963,8 @@ alloc:
 		bcopy(_dtrace_ints_64, dtp->dt_ints, sizeof (_dtrace_ints_64));
 
 	dtp->dt_macros = dt_idhash_create("macro", NULL, 0, UINT_MAX);
-	dtp->dt_aggs = dt_idhash_create("aggregation", NULL, 0, UINT_MAX);
+	dtp->dt_aggs = dt_idhash_create("aggregation", NULL,
+	    DTRACE_AGGVARIDNONE + 1, UINT_MAX);
 
 	dtp->dt_globals = dt_idhash_create("global", _dtrace_globals,
 	    DIF_VAR_OTHER_UBASE, DIF_VAR_OTHER_MAX);

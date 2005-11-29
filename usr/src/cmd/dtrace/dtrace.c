@@ -65,7 +65,7 @@ typedef struct dtrace_cmd {
 #define	E_USAGE		2
 
 static const char DTRACE_OPTSTR[] =
-	"3:6:aAb:c:CD:ef:FGHi:I:lL:m:n:o:p:P:qs:SU:vVwx:X:Z";
+	"3:6:aAb:Bc:CD:ef:FGHi:I:lL:m:n:o:p:P:qs:SU:vVwx:X:Z";
 
 static char **g_argv;
 static int g_argc;
@@ -245,6 +245,9 @@ oprintf(const char *fmt, ...)
 {
 	va_list ap;
 	int n;
+
+	if (g_ofp == NULL)
+		return;
 
 	va_start(ap, fmt);
 	n = vfprintf(g_ofp, fmt, ap);
@@ -793,6 +796,128 @@ setopthandler(const dtrace_setoptdata_t *data, void *arg)
 	return (DTRACE_HANDLE_OK);
 }
 
+#define	BUFDUMPHDR(hdr) \
+	(void) printf("%s: %s%s\n", g_pname, hdr, strlen(hdr) > 0 ? ":" : "");
+
+#define	BUFDUMPSTR(ptr, field) \
+	(void) printf("%s: %20s => ", g_pname, #field);	\
+	if ((ptr)->field != NULL) {			\
+		const char *c = (ptr)->field;		\
+		(void) printf("\"");			\
+		do {					\
+			if (*c == '\n') {		\
+				(void) printf("\\n");	\
+				continue;		\
+			}				\
+							\
+			(void) printf("%c", *c);	\
+		} while (*c++ != '\0');			\
+		(void) printf("\"\n");			\
+	} else {					\
+		(void) printf("<NULL>\n");		\
+	}
+
+#define	BUFDUMPASSTR(ptr, field, str) \
+	(void) printf("%s: %20s => %s\n", g_pname, #field, str);
+
+#define	BUFDUMP(ptr, field) \
+	(void) printf("%s: %20s => %lld\n", g_pname, #field, \
+	    (long long)(ptr)->field);
+
+#define	BUFDUMPPTR(ptr, field) \
+	(void) printf("%s: %20s => %s\n", g_pname, #field, \
+	    (ptr)->field != NULL ? "<non-NULL>" : "<NULL>");
+
+/*ARGSUSED*/
+static int
+bufhandler(const dtrace_bufdata_t *bufdata, void *arg)
+{
+	const dtrace_aggdata_t *agg = bufdata->dtbda_aggdata;
+	const dtrace_recdesc_t *rec = bufdata->dtbda_recdesc;
+	const dtrace_probedesc_t *pd;
+	uint32_t flags = bufdata->dtbda_flags;
+	char buf[512], *c = buf, *end = c + sizeof (buf);
+	int i, printed;
+
+	struct {
+		const char *name;
+		uint32_t value;
+	} flagnames[] = {
+	    { "AGGVAL",		DTRACE_BUFDATA_AGGVAL },
+	    { "AGGKEY",		DTRACE_BUFDATA_AGGKEY },
+	    { "AGGFORMAT",	DTRACE_BUFDATA_AGGFORMAT },
+	    { "AGGLAST",	DTRACE_BUFDATA_AGGLAST },
+	    { "???",		UINT32_MAX },
+	    { NULL }
+	};
+
+	if (bufdata->dtbda_probe != NULL) {
+		pd = bufdata->dtbda_probe->dtpda_pdesc;
+	} else if (agg != NULL) {
+		pd = agg->dtada_pdesc;
+	} else {
+		pd = NULL;
+	}
+
+	BUFDUMPHDR(">>> Called buffer handler");
+	BUFDUMPHDR("");
+
+	BUFDUMPHDR("  dtrace_bufdata");
+	BUFDUMPSTR(bufdata, dtbda_buffered);
+	BUFDUMPPTR(bufdata, dtbda_probe);
+	BUFDUMPPTR(bufdata, dtbda_aggdata);
+	BUFDUMPPTR(bufdata, dtbda_recdesc);
+
+	(void) snprintf(c, end - c, "0x%x ", bufdata->dtbda_flags);
+	c += strlen(c);
+
+	for (i = 0, printed = 0; flagnames[i].name != NULL; i++) {
+		if (!(flags & flagnames[i].value))
+			continue;
+
+		(void) snprintf(c, end - c,
+		    "%s%s", printed++ ? " | " : "(", flagnames[i].name);
+		c += strlen(c);
+		flags &= ~flagnames[i].value;
+	}
+
+	if (printed)
+		(void) snprintf(c, end - c, ")");
+
+	BUFDUMPASSTR(bufdata, dtbda_flags, buf);
+	BUFDUMPHDR("");
+
+	if (pd != NULL) {
+		BUFDUMPHDR("  dtrace_probedesc");
+		BUFDUMPSTR(pd, dtpd_provider);
+		BUFDUMPSTR(pd, dtpd_mod);
+		BUFDUMPSTR(pd, dtpd_func);
+		BUFDUMPSTR(pd, dtpd_name);
+		BUFDUMPHDR("");
+	}
+
+	if (rec != NULL) {
+		BUFDUMPHDR("  dtrace_recdesc");
+		BUFDUMP(rec, dtrd_action);
+		BUFDUMP(rec, dtrd_size);
+		BUFDUMP(rec, dtrd_offset);
+		BUFDUMPHDR("");
+	}
+
+	if (agg != NULL) {
+		dtrace_aggdesc_t *desc = agg->dtada_desc;
+
+		BUFDUMPHDR("  dtrace_aggdesc");
+		BUFDUMPSTR(desc, dtagd_name);
+		BUFDUMP(desc, dtagd_varid);
+		BUFDUMP(desc, dtagd_id);
+		BUFDUMP(desc, dtagd_nrecs);
+		BUFDUMPHDR("");
+	}
+
+	return (DTRACE_HANDLE_OK);
+}
+
 /*ARGSUSED*/
 static int
 chewrec(const dtrace_probedata_t *data, const dtrace_recdesc_t *rec, void *arg)
@@ -1159,6 +1284,10 @@ main(int argc, char *argv[])
 					dfatal("failed to set -b %s", optarg);
 				break;
 
+			case 'B':
+				g_ofp = NULL;
+				break;
+
 			case 'C':
 				g_cflags |= DTRACE_C_CPP;
 				break;
@@ -1281,6 +1410,18 @@ main(int argc, char *argv[])
 		}
 	}
 
+	if (g_ofp == NULL && g_mode != DMODE_EXEC) {
+		(void) fprintf(stderr, "%s: -B not valid in combination"
+		    " with [-AGl] options\n", g_pname);
+		return (E_USAGE);
+	}
+
+	if (g_ofp == NULL && g_ofile != NULL) {
+		(void) fprintf(stderr, "%s: -B not valid in combination"
+		    " with -o option\n", g_pname);
+		return (E_USAGE);
+	}
+
 	/*
 	 * In our third pass we handle any command-line options related to
 	 * grabbing or creating victim processes.  The behavior of these calls
@@ -1337,6 +1478,10 @@ main(int argc, char *argv[])
 
 		if (dtrace_handle_setopt(g_dtp, &setopthandler, NULL) == -1)
 			dfatal("failed to establish setopt handler");
+
+		if (g_ofp == NULL &&
+		    dtrace_handle_buffered(g_dtp, &bufhandler, NULL) == -1)
+			dfatal("failed to establish buffered handler");
 	}
 
 	(void) dtrace_getopt(g_dtp, "flowindent", &opt);
@@ -1519,7 +1664,7 @@ main(int argc, char *argv[])
 				dfatal("processing aborted");
 		}
 
-		if (fflush(g_ofp) == EOF)
+		if (g_ofp != NULL && fflush(g_ofp) == EOF)
 			clearerr(g_ofp);
 	} while (!done);
 

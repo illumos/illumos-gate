@@ -656,7 +656,7 @@ dt_printf(dtrace_hdl_t *dtp, FILE *fp, const char *format, ...)
 
 int
 dt_buffered_flush(dtrace_hdl_t *dtp, dtrace_probedata_t *pdata,
-    const dtrace_recdesc_t *rec, const dtrace_aggdata_t *agg)
+    const dtrace_recdesc_t *rec, const dtrace_aggdata_t *agg, uint32_t flags)
 {
 	dtrace_bufdata_t data;
 
@@ -668,6 +668,7 @@ dt_buffered_flush(dtrace_hdl_t *dtp, dtrace_probedata_t *pdata,
 	data.dtbda_probe = pdata;
 	data.dtbda_recdesc = rec;
 	data.dtbda_aggdata = agg;
+	data.dtbda_flags = flags;
 
 	if ((*dtp->dt_bufhdlr)(&data, dtp->dt_bufarg) == DTRACE_HANDLE_ABORT)
 		return (dt_set_errno(dtp, EDT_DIRABORT));

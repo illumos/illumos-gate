@@ -844,12 +844,11 @@ dt_normalize_agg(const dtrace_aggdata_t *aggdata, void *arg)
 	dt_normal_t *normal = arg;
 	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
 	dtrace_aggvarid_t id = normal->dtnd_id;
-	uintptr_t data = (uintptr_t)aggdata->dtada_data;
 
 	if (agg->dtagd_nrecs == 0)
 		return (DTRACE_AGGWALK_NEXT);
 
-	if (id != *(dtrace_aggvarid_t *)(data + agg->dtagd_rec[0].dtrd_offset))
+	if (agg->dtagd_varid != id)
 		return (DTRACE_AGGWALK_NEXT);
 
 	((dtrace_aggdata_t *)aggdata)->dtada_normal = normal->dtnd_normal;
@@ -913,12 +912,11 @@ dt_denormalize_agg(const dtrace_aggdata_t *aggdata, void *arg)
 {
 	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
 	dtrace_aggvarid_t id = *((dtrace_aggvarid_t *)arg);
-	uintptr_t data = (uintptr_t)aggdata->dtada_data;
 
 	if (agg->dtagd_nrecs == 0)
 		return (DTRACE_AGGWALK_NEXT);
 
-	if (id != *(dtrace_aggvarid_t *)(data + agg->dtagd_rec[0].dtrd_offset))
+	if (agg->dtagd_varid != id)
 		return (DTRACE_AGGWALK_NEXT);
 
 	return (DTRACE_AGGWALK_DENORMALIZE);
@@ -929,12 +927,11 @@ dt_clear_agg(const dtrace_aggdata_t *aggdata, void *arg)
 {
 	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
 	dtrace_aggvarid_t id = *((dtrace_aggvarid_t *)arg);
-	uintptr_t data = (uintptr_t)aggdata->dtada_data;
 
 	if (agg->dtagd_nrecs == 0)
 		return (DTRACE_AGGWALK_NEXT);
 
-	if (id != *(dtrace_aggvarid_t *)(data + agg->dtagd_rec[0].dtrd_offset))
+	if (agg->dtagd_varid != id)
 		return (DTRACE_AGGWALK_NEXT);
 
 	return (DTRACE_AGGWALK_CLEAR);
@@ -951,12 +948,11 @@ dt_trunc_agg(const dtrace_aggdata_t *aggdata, void *arg)
 	dt_trunc_t *trunc = arg;
 	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
 	dtrace_aggvarid_t id = trunc->dttd_id;
-	uintptr_t data = (uintptr_t)aggdata->dtada_data;
 
 	if (agg->dtagd_nrecs == 0)
 		return (DTRACE_AGGWALK_NEXT);
 
-	if (id != *(dtrace_aggvarid_t *)(data + agg->dtagd_rec[0].dtrd_offset))
+	if (agg->dtagd_varid != id)
 		return (DTRACE_AGGWALK_NEXT);
 
 	if (trunc->dttd_remaining == 0)
@@ -1031,16 +1027,156 @@ dt_trunc(dtrace_hdl_t *dtp, caddr_t base, dtrace_recdesc_t *rec)
 	return (0);
 }
 
-int
-dt_print_agg(const dtrace_aggdata_t *aggdata, void *arg)
+static int
+dt_print_datum(dtrace_hdl_t *dtp, FILE *fp, dtrace_recdesc_t *rec,
+    caddr_t addr, size_t size, uint64_t normal)
 {
-	int i, err = 0;
+	int err;
+	dtrace_actkind_t act = rec->dtrd_action;
+
+	switch (act) {
+	case DTRACEACT_STACK:
+		return (dt_print_stack(dtp, fp, NULL, addr,
+		    rec->dtrd_arg, rec->dtrd_size / rec->dtrd_arg));
+
+	case DTRACEACT_USTACK:
+	case DTRACEACT_JSTACK:
+		return (dt_print_ustack(dtp, fp, NULL, addr, rec->dtrd_arg));
+
+	case DTRACEACT_USYM:
+	case DTRACEACT_UADDR:
+		return (dt_print_usym(dtp, fp, addr, act));
+
+	case DTRACEACT_UMOD:
+		return (dt_print_umod(dtp, fp, NULL, addr));
+
+	case DTRACEACT_SYM:
+		return (dt_print_sym(dtp, fp, NULL, addr));
+
+	case DTRACEACT_MOD:
+		return (dt_print_mod(dtp, fp, NULL, addr));
+
+	case DTRACEAGG_QUANTIZE:
+		return (dt_print_quantize(dtp, fp, addr, size, normal));
+
+	case DTRACEAGG_LQUANTIZE:
+		return (dt_print_lquantize(dtp, fp, addr, size, normal));
+
+	case DTRACEAGG_AVG:
+		return (dt_print_average(dtp, fp, addr, size, normal));
+
+	default:
+		break;
+	}
+
+	switch (size) {
+	case sizeof (uint64_t):
+		err = dt_printf(dtp, fp, " %16lld",
+		    /* LINTED - alignment */
+		    (long long)*((uint64_t *)addr) / normal);
+		break;
+	case sizeof (uint32_t):
+		/* LINTED - alignment */
+		err = dt_printf(dtp, fp, " %8d", *((uint32_t *)addr) /
+		    (uint32_t)normal);
+		break;
+	case sizeof (uint16_t):
+		/* LINTED - alignment */
+		err = dt_printf(dtp, fp, " %5d", *((uint16_t *)addr) /
+		    (uint32_t)normal);
+		break;
+	case sizeof (uint8_t):
+		err = dt_printf(dtp, fp, " %3d", *((uint8_t *)addr) /
+		    (uint32_t)normal);
+		break;
+	default:
+		err = dt_print_bytes(dtp, fp, addr, size, 50, 0);
+		break;
+	}
+
+	return (err);
+}
+
+int
+dt_print_aggs(const dtrace_aggdata_t **aggsdata, int naggvars, void *arg)
+{
+	int i, aggact = 0;
 	dt_print_aggdata_t *pd = arg;
+	const dtrace_aggdata_t *aggdata = aggsdata[0];
 	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
 	FILE *fp = pd->dtpa_fp;
 	dtrace_hdl_t *dtp = pd->dtpa_dtp;
+	dtrace_recdesc_t *rec;
+	dtrace_actkind_t act;
+	caddr_t addr;
+	size_t size;
+
+	/*
+	 * Iterate over each record description in the key, printing the traced
+	 * data, skipping the first datum (the tuple member created by the
+	 * compiler).
+	 */
+	for (i = 1; i < agg->dtagd_nrecs; i++) {
+		rec = &agg->dtagd_rec[i];
+		act = rec->dtrd_action;
+		addr = aggdata->dtada_data + rec->dtrd_offset;
+		size = rec->dtrd_size;
+
+		if (DTRACEACT_ISAGG(act)) {
+			aggact = i;
+			break;
+		}
+
+		if (dt_print_datum(dtp, fp, rec, addr, size, 1) < 0)
+			return (-1);
+
+		if (dt_buffered_flush(dtp, NULL, rec, aggdata,
+		    DTRACE_BUFDATA_AGGKEY) < 0)
+			return (-1);
+	}
+
+	assert(aggact != 0);
+
+	for (i = (naggvars == 1 ? 0 : 1); i < naggvars; i++) {
+		uint64_t normal;
+
+		aggdata = aggsdata[i];
+		agg = aggdata->dtada_desc;
+		rec = &agg->dtagd_rec[aggact];
+		act = rec->dtrd_action;
+		addr = aggdata->dtada_data + rec->dtrd_offset;
+		size = rec->dtrd_size;
+
+		assert(DTRACEACT_ISAGG(act));
+		normal = aggdata->dtada_normal;
+
+		if (dt_print_datum(dtp, fp, rec, addr, size, normal) < 0)
+			return (-1);
+
+		if (dt_buffered_flush(dtp, NULL, rec, aggdata,
+		    DTRACE_BUFDATA_AGGVAL) < 0)
+			return (-1);
+
+		if (!pd->dtpa_allunprint)
+			agg->dtagd_flags |= DTRACE_AGD_PRINTED;
+	}
+
+	if (dt_printf(dtp, fp, "\n") < 0)
+		return (-1);
+
+	if (dt_buffered_flush(dtp, NULL, NULL, aggdata,
+	    DTRACE_BUFDATA_AGGFORMAT | DTRACE_BUFDATA_AGGLAST) < 0)
+		return (-1);
+
+	return (0);
+}
+
+int
+dt_print_agg(const dtrace_aggdata_t *aggdata, void *arg)
+{
+	dt_print_aggdata_t *pd = arg;
+	dtrace_aggdesc_t *agg = aggdata->dtada_desc;
 	dtrace_aggvarid_t aggvarid = pd->dtpa_id;
-	uintptr_t data = (uintptr_t)aggdata->dtada_data;
 
 	if (pd->dtpa_allunprint) {
 		if (agg->dtagd_flags & DTRACE_AGD_PRINTED)
@@ -1055,113 +1191,12 @@ dt_print_agg(const dtrace_aggdata_t *aggdata, void *arg)
 		if (agg->dtagd_nrecs == 0)
 			return (0);
 
-		if (aggvarid != *(dtrace_aggvarid_t *)(data +
-		    agg->dtagd_rec[0].dtrd_offset))
+		if (aggvarid != agg->dtagd_varid)
 			return (0);
 	}
 
-	/*
-	 * Iterate over each record description, printing the traced data,
-	 * skipping the first datum (the tuple member created by the compiler).
-	 */
-	for (i = 1; err >= 0 && i < agg->dtagd_nrecs; i++) {
-		dtrace_recdesc_t *rec = &agg->dtagd_rec[i];
-		dtrace_actkind_t act = rec->dtrd_action;
-		caddr_t addr = aggdata->dtada_data + rec->dtrd_offset;
-		size_t size = rec->dtrd_size;
-		uint64_t normal;
-
-		normal = DTRACEACT_ISAGG(act) ? aggdata->dtada_normal : 1;
-
-		if (act == DTRACEACT_STACK) {
-			err = dt_print_stack(dtp, fp, NULL, addr,
-			    rec->dtrd_arg, rec->dtrd_size / rec->dtrd_arg);
-			goto nextrec;
-		}
-
-		if (act == DTRACEACT_USTACK || act == DTRACEACT_JSTACK) {
-			err = dt_print_ustack(dtp, fp, NULL, addr,
-			    rec->dtrd_arg);
-			goto nextrec;
-		}
-
-		if (act == DTRACEACT_USYM || act == DTRACEACT_UADDR) {
-			err = dt_print_usym(dtp, fp, addr, act);
-			goto nextrec;
-		}
-
-		if (act == DTRACEACT_UMOD) {
-			err = dt_print_umod(dtp, fp, NULL, addr);
-			goto nextrec;
-		}
-
-		if (act == DTRACEACT_SYM) {
-			err = dt_print_sym(dtp, fp, NULL, addr);
-			goto nextrec;
-		}
-
-		if (act == DTRACEACT_MOD) {
-			err = dt_print_mod(dtp, fp, NULL, addr);
-			goto nextrec;
-		}
-
-		if (act == DTRACEAGG_QUANTIZE) {
-			err = dt_print_quantize(dtp, fp, addr, size, normal);
-			goto nextrec;
-		}
-
-		if (act == DTRACEAGG_LQUANTIZE) {
-			err = dt_print_lquantize(dtp, fp, addr, size, normal);
-			goto nextrec;
-		}
-
-		if (act == DTRACEAGG_AVG) {
-			err = dt_print_average(dtp, fp, addr, size, normal);
-			goto nextrec;
-		}
-
-		switch (size) {
-		case sizeof (uint64_t):
-			err = dt_printf(dtp, fp, " %16lld",
-			    /* LINTED - alignment */
-			    (long long)*((uint64_t *)addr) / normal);
-			break;
-		case sizeof (uint32_t):
-			/* LINTED - alignment */
-			err = dt_printf(dtp, fp, " %8d", *((uint32_t *)addr) /
-			    (uint32_t)normal);
-			break;
-		case sizeof (uint16_t):
-			/* LINTED - alignment */
-			err = dt_printf(dtp, fp, " %5d", *((uint16_t *)addr) /
-			    (uint32_t)normal);
-			break;
-		case sizeof (uint8_t):
-			err = dt_printf(dtp, fp, " %3d", *((uint8_t *)addr) /
-			    (uint32_t)normal);
-			break;
-		default:
-			err = dt_print_bytes(dtp, fp, addr, size, 50, 0);
-			break;
-		}
-
-nextrec:
-		if (dt_buffered_flush(dtp, NULL, rec, aggdata) < 0)
-			return (-1);
-	}
-
-	if (err >= 0)
-		err = dt_printf(dtp, fp, "\n");
-
-	if (dt_buffered_flush(dtp, NULL, NULL, aggdata) < 0)
-		return (-1);
-
-	if (!pd->dtpa_allunprint)
-		agg->dtagd_flags |= DTRACE_AGD_PRINTED;
-
-	return (err < 0 ? -1 : 0);
+	return (dt_print_aggs(&aggdata, 1, arg));
 }
-
 
 int
 dt_setopt(dtrace_hdl_t *dtp, const dtrace_probedata_t *data,
@@ -1472,18 +1507,68 @@ again:
 nofmt:
 			if (act == DTRACEACT_PRINTA) {
 				dt_print_aggdata_t pd;
+				dtrace_aggvarid_t *aggvars;
+				int j, naggvars = 0;
+				size_t size = ((epd->dtepd_nrecs - i) *
+				    sizeof (dtrace_aggvarid_t));
 
+				if ((aggvars = dt_alloc(dtp, size)) == NULL)
+					return (-1);
+
+				/*
+				 * This might be a printa() with multiple
+				 * aggregation variables.  We need to scan
+				 * forward through the records until we find
+				 * a record from a different statement.
+				 */
+				for (j = i; j < epd->dtepd_nrecs; j++) {
+					dtrace_recdesc_t *nrec;
+					caddr_t naddr;
+
+					nrec = &epd->dtepd_rec[j];
+
+					if (nrec->dtrd_uarg != rec->dtrd_uarg)
+						break;
+
+					if (nrec->dtrd_action != act) {
+						return (dt_set_errno(dtp,
+						    EDT_BADAGG));
+					}
+
+					naddr = buf->dtbd_data + offs +
+					    nrec->dtrd_offset;
+
+					aggvars[naggvars++] =
+					    /* LINTED - alignment */
+					    *((dtrace_aggvarid_t *)naddr);
+				}
+
+				i = j - 1;
 				bzero(&pd, sizeof (pd));
 				pd.dtpa_dtp = dtp;
 				pd.dtpa_fp = fp;
-				/* LINTED - alignment */
-				pd.dtpa_id = *((dtrace_aggvarid_t *)addr);
+
+				assert(naggvars >= 1);
+
+				if (naggvars == 1) {
+					pd.dtpa_id = aggvars[0];
+					dt_free(dtp, aggvars);
+
+					if (dt_printf(dtp, fp, "\n") < 0 ||
+					    dtrace_aggregate_walk_sorted(dtp,
+					    dt_print_agg, &pd) < 0)
+						return (-1);
+					goto nextrec;
+				}
 
 				if (dt_printf(dtp, fp, "\n") < 0 ||
-				    dtrace_aggregate_walk_valsorted(dtp,
-				    dt_print_agg, &pd) < 0)
+				    dtrace_aggregate_walk_joined(dtp, aggvars,
+				    naggvars, dt_print_aggs, &pd) < 0) {
+					dt_free(dtp, aggvars);
 					return (-1);
+				}
 
+				dt_free(dtp, aggvars);
 				goto nextrec;
 			}
 
@@ -1518,7 +1603,7 @@ nofmt:
 				return (-1); /* errno is set for us */
 
 nextrec:
-			if (dt_buffered_flush(dtp, &data, rec, NULL) < 0)
+			if (dt_buffered_flush(dtp, &data, rec, NULL, 0) < 0)
 				return (-1); /* errno is set for us */
 		}
 

@@ -104,6 +104,10 @@ static const struct {
 	{ EDT_ELFVERSION, "libelf is out-of-date with respect to libdtrace" },
 	{ EDT_NOBUFFERED, "Attempt to buffer output without handler" },
 	{ EDT_UNSTABLE, "Description matched an unstable set of probes" },
+	{ EDT_BADSETOPT, "Invalid setopt() library action" },
+	{ EDT_BADSTACKPC, "Invalid stack program counter size" },
+	{ EDT_BADAGGVAR, "Invalid aggregation variable identifier" },
+	{ EDT_OVERSION,	"Client requested deprecated version of library" }
 };
 
 static const int _dt_nerr = sizeof (_dt_errlist) / sizeof (_dt_errlist[0]);

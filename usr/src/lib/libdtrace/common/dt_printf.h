@@ -119,6 +119,8 @@ extern void dt_printf_destroy(dt_pfargv_t *);
 extern void dt_printf_validate(dt_pfargv_t *, uint_t,
     struct dt_ident *, int, dtrace_actkind_t, struct dt_node *);
 
+extern void dt_printa_validate(struct dt_node *, struct dt_node *);
+
 extern int dt_print_stack(dtrace_hdl_t *, FILE *,
     const char *, caddr_t, int, int);
 extern int dt_print_ustack(dtrace_hdl_t *, FILE *,

@@ -910,6 +910,10 @@ static const dt_option_t _dtrace_rtoptions[] = {
  */
 static const dt_option_t _dtrace_drtoptions[] = {
 	{ "aggrate", dt_opt_rate, DTRACEOPT_AGGRATE },
+	{ "aggsortkey", dt_opt_runtime, DTRACEOPT_AGGSORTKEY },
+	{ "aggsortkeypos", dt_opt_runtime, DTRACEOPT_AGGSORTKEYPOS },
+	{ "aggsortpos", dt_opt_runtime, DTRACEOPT_AGGSORTPOS },
+	{ "aggsortrev", dt_opt_runtime, DTRACEOPT_AGGSORTREV },
 	{ "flowindent", dt_opt_runtime, DTRACEOPT_FLOWINDENT },
 	{ "quiet", dt_opt_runtime, DTRACEOPT_QUIET },
 	{ "rawbytes", dt_opt_runtime, DTRACEOPT_RAWBYTES },

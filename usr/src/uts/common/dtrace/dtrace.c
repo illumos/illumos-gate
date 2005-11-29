@@ -407,6 +407,10 @@ dtrace_load##bits(uintptr_t addr)					\
 	((flags) & CPU_DTRACE_NOSCRATCH) ?  DTRACEFLT_NOSCRATCH :	\
 	DTRACEFLT_UNKNOWN)
 
+#define	DTRACEACT_ISSTRING(act)						\
+	((act)->dta_kind == DTRACEACT_DIFEXPR &&			\
+	(act)->dta_difo->dtdo_rtype.dtdt_kind == DIF_TYPE_STRING)
+
 static dtrace_probe_t *dtrace_probe_lookup_id(dtrace_id_t id);
 static void dtrace_enabling_provide(dtrace_provider_t *);
 static int dtrace_enabling_match(dtrace_enabling_t *, int *);
@@ -1490,9 +1494,10 @@ dtrace_aggregate(dtrace_aggregation_t *agg, dtrace_buffer_t *dbuf,
 	uint32_t align = sizeof (uint64_t) - 1;
 	dtrace_aggbuffer_t *agb;
 	dtrace_aggkey_t *key;
-	uint32_t hashval = 0;
+	uint32_t hashval = 0, limit, isstr;
 	caddr_t tomax, data, kdata;
 	dtrace_actkind_t action;
+	dtrace_action_t *act;
 	uintptr_t offs;
 
 	if (buf == NULL)
@@ -1563,6 +1568,9 @@ dtrace_aggregate(dtrace_aggregation_t *agg, dtrace_buffer_t *dbuf,
 			agb->dtagb_hash[i] = NULL;
 	}
 
+	ASSERT(agg->dtag_first != NULL);
+	ASSERT(agg->dtag_first->dta_intuple);
+
 	/*
 	 * Calculate the hash value based on the key.  Note that we _don't_
 	 * include the aggid in the hashing (but we will store it as part of
@@ -1572,10 +1580,20 @@ dtrace_aggregate(dtrace_aggregation_t *agg, dtrace_buffer_t *dbuf,
 	 * algorithm (and a comparison with other algorithms) may be found by
 	 * running the ::dtrace_aggstat MDB dcmd.
 	 */
-	for (i = sizeof (dtrace_aggid_t); i < size; i++) {
-		hashval += data[i];
-		hashval += (hashval << 10);
-		hashval ^= (hashval >> 6);
+	for (act = agg->dtag_first; act->dta_intuple; act = act->dta_next) {
+		i = act->dta_rec.dtrd_offset - agg->dtag_base;
+		limit = i + act->dta_rec.dtrd_size;
+		ASSERT(limit <= size);
+		isstr = DTRACEACT_ISSTRING(act);
+
+		for (; i < limit; i++) {
+			hashval += data[i];
+			hashval += (hashval << 10);
+			hashval ^= (hashval >> 6);
+
+			if (isstr && data[i] == '\0')
+				break;
+		}
 	}
 
 	hashval += (hashval << 3);
@@ -1583,8 +1601,9 @@ dtrace_aggregate(dtrace_aggregation_t *agg, dtrace_buffer_t *dbuf,
 	hashval += (hashval << 15);
 
 	/*
-	 * Yes, the divide here is expensive.  If the cycle count here becomes
-	 * prohibitive, we can do tricks to eliminate it.
+	 * Yes, the divide here is expensive -- but it's generally the least
+	 * of the performance issues given the amount of data that we iterate
+	 * over to compute hash values, compare data, etc.
 	 */
 	ndx = hashval % agb->dtagb_hashsize;
 
@@ -1598,9 +1617,20 @@ dtrace_aggregate(dtrace_aggregation_t *agg, dtrace_buffer_t *dbuf,
 		kdata = key->dtak_data;
 		ASSERT(kdata >= tomax && kdata < tomax + buf->dtb_size);
 
-		for (i = sizeof (dtrace_aggid_t); i < size; i++) {
-			if (kdata[i] != data[i])
-				goto next;
+		for (act = agg->dtag_first; act->dta_intuple;
+		    act = act->dta_next) {
+			i = act->dta_rec.dtrd_offset - agg->dtag_base;
+			limit = i + act->dta_rec.dtrd_size;
+			ASSERT(limit <= size);
+			isstr = DTRACEACT_ISSTRING(act);
+
+			for (; i < limit; i++) {
+				if (kdata[i] != data[i])
+					goto next;
+
+				if (isstr && data[i] == '\0')
+					break;
+			}
 		}
 
 		if (action != key->dtak_action) {
@@ -1660,6 +1690,34 @@ next:
 
 	for (i = sizeof (dtrace_aggid_t); i < size; i++)
 		kdata[i] = data[i];
+
+	/*
+	 * Because strings are not zeroed out by default, we need to iterate
+	 * looking for actions that store strings, and we need to explicitly
+	 * pad these strings out with zeroes.
+	 */
+	for (act = agg->dtag_first; act->dta_intuple; act = act->dta_next) {
+		int nul;
+
+		if (!DTRACEACT_ISSTRING(act))
+			continue;
+
+		i = act->dta_rec.dtrd_offset - agg->dtag_base;
+		limit = i + act->dta_rec.dtrd_size;
+		ASSERT(limit <= size);
+
+		for (nul = 0; i < limit; i++) {
+			if (nul) {
+				kdata[i] = '\0';
+				continue;
+			}
+
+			if (data[i] != '\0')
+				continue;
+
+			nul = 1;
+		}
+	}
 
 	for (i = size; i < fsize; i++)
 		kdata[i] = 0;
@@ -4988,6 +5046,7 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 				if (dp->dtdo_rtype.dtdt_kind ==
 				    DIF_TYPE_STRING) {
 					char c = '\0' + 1;
+					int intuple = act->dta_intuple;
 					size_t s;
 
 					for (s = 0; s < size; s++) {
@@ -4996,6 +5055,9 @@ dtrace_probe(dtrace_id_t id, uintptr_t arg0, uintptr_t arg1,
 
 						DTRACE_STORE(uint8_t, tomax,
 						    valoffs++, c);
+
+						if (c == '\0' && intuple)
+							break;
 					}
 
 					continue;
@@ -8591,16 +8653,7 @@ dtrace_ecb_action_add(dtrace_ecb_t *ecb, dtrace_actdesc_t *desc)
 
 	rec->dtrd_action = action->dta_kind;
 	rec->dtrd_arg = arg;
-
-	if (ecb->dte_state == dtrace_anon.dta_state) {
-		/*
-		 * If this is an anonymous enabling, explicitly clear the uarg.
-		 */
-		rec->dtrd_uarg = 0;
-	} else {
-		rec->dtrd_uarg = desc->dtad_uarg;
-	}
-
+	rec->dtrd_uarg = desc->dtad_uarg;
 	rec->dtrd_alignment = (uint16_t)align;
 	rec->dtrd_format = format;
 
@@ -11245,6 +11298,15 @@ dtrace_state_go(dtrace_state_t *state, processorid_t *cpu)
 
 		state->dts_anon = dtrace_anon_grab();
 		ASSERT(state->dts_anon != NULL);
+		state = state->dts_anon;
+
+		/*
+		 * We want "grabanon" to be set in the grabbed state, so we'll
+		 * copy that option value from the grabbing state into the
+		 * grabbed state.
+		 */
+		state->dts_options[DTRACEOPT_GRABANON] =
+		    opt[DTRACEOPT_GRABANON];
 
 		*cpu = dtrace_anon.dta_beganon;
 
@@ -11254,8 +11316,6 @@ dtrace_state_go(dtrace_state_t *state, processorid_t *cpu)
 		 * we don't allow any further option processing -- but we
 		 * don't return failure.
 		 */
-		state = state->dts_anon;
-
 		if (state->dts_activity != DTRACE_ACTIVITY_INACTIVE)
 			goto out;
 	}
@@ -13378,6 +13438,20 @@ dtrace_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 		for (act = agg->dtag_first; ; act = act->dta_next) {
 			ASSERT(act->dta_intuple ||
 			    DTRACEACT_ISAGG(act->dta_kind));
+
+			/*
+			 * If this action has a record size of zero, it
+			 * denotes an argument to the aggregating action.
+			 * Because the presence of this record doesn't (or
+			 * shouldn't) affect the way the data is interpreted,
+			 * we don't copy it out to save user-level the
+			 * confusion of dealing with a zero-length record.
+			 */
+			if (act->dta_rec.dtrd_size == 0) {
+				ASSERT(agg->dtag_hasarg);
+				continue;
+			}
+
 			aggdesc.dtagd_nrecs++;
 
 			if (act == &agg->dtag_action)
@@ -13401,6 +13475,15 @@ dtrace_ioctl(dev_t dev, int cmd, intptr_t arg, int md, cred_t *cr, int *rv)
 
 		for (act = agg->dtag_first; ; act = act->dta_next) {
 			dtrace_recdesc_t rec = act->dta_rec;
+
+			/*
+			 * See the comment in the above loop for why we pass
+			 * over zero-length records.
+			 */
+			if (rec.dtrd_size == 0) {
+				ASSERT(agg->dtag_hasarg);
+				continue;
+			}
 
 			if (nrecs-- == 0)
 				break;

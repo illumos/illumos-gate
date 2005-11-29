@@ -484,7 +484,9 @@ enum {
 	EDT_NOBUFFERED,		/* attempt to buffer output without handler */
 	EDT_UNSTABLE,		/* description matched unstable set of probes */
 	EDT_BADSETOPT,		/* invalid setopt library action */
-	EDT_BADSTACKPC		/* invalid stack program counter size */
+	EDT_BADSTACKPC,		/* invalid stack program counter size */
+	EDT_BADAGGVAR,		/* invalid aggregation variable identifier */
+	EDT_OVERSION		/* client is requesting deprecated version */
 };
 
 /*
@@ -550,7 +552,7 @@ extern ulong_t dt_popcb(const ulong_t *, ulong_t);
 
 extern int dt_buffered_enable(dtrace_hdl_t *);
 extern int dt_buffered_flush(dtrace_hdl_t *, dtrace_probedata_t *,
-    const dtrace_recdesc_t *, const dtrace_aggdata_t *);
+    const dtrace_recdesc_t *, const dtrace_aggdata_t *, uint32_t flags);
 extern void dt_buffered_disable(dtrace_hdl_t *);
 extern void dt_buffered_destroy(dtrace_hdl_t *);
 

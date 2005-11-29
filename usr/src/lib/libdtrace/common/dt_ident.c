@@ -53,10 +53,12 @@ dt_idcook_sign(dt_node_t *dnp, dt_ident_t *idp,
     int argc, dt_node_t *args, const char *prefix, const char *suffix)
 {
 	dt_idsig_t *isp = idp->di_data;
-	int i, compat, mismatch, arglimit;
+	int i, compat, mismatch, arglimit, iskey;
 
 	char n1[DT_TYPE_NAMELEN];
 	char n2[DT_TYPE_NAMELEN];
+
+	iskey = idp->di_kind == DT_IDENT_ARRAY || idp->di_kind == DT_IDENT_AGG;
 
 	if (isp->dis_varargs >= 0) {
 		mismatch = argc < isp->dis_varargs;
@@ -70,9 +72,9 @@ dt_idcook_sign(dt_node_t *dnp, dt_ident_t *idp,
 	}
 
 	if (mismatch) {
-		xyerror(D_PROTO_LEN, "%s%s%s prototype mismatch: %d arg%s"
+		xyerror(D_PROTO_LEN, "%s%s%s prototype mismatch: %d %s%s"
 		    "passed, %s%d expected\n", prefix, idp->di_name, suffix,
-		    argc, argc == 1 ? " " : "s ",
+		    argc, iskey ? "key" : "arg", argc == 1 ? " " : "s ",
 		    isp->dis_optargs >= 0 ? "at least " : "",
 		    isp->dis_optargs >= 0 ? isp->dis_optargs : arglimit);
 	}
@@ -85,11 +87,13 @@ dt_idcook_sign(dt_node_t *dnp, dt_ident_t *idp,
 
 		if (!compat) {
 			xyerror(D_PROTO_ARG,
-			    "%s%s%s argument #%d is incompatible with "
-			    "prototype:\n\tprototype: %s\n\t argument: %s\n",
-			    prefix, idp->di_name, suffix, i + 1,
+			    "%s%s%s %s #%d is incompatible with "
+			    "prototype:\n\tprototype: %s\n\t%9s: %s\n",
+			    prefix, idp->di_name, suffix,
+			    iskey ? "key" : "argument", i + 1,
 			    dt_node_type_name(&isp->dis_args[i], n1,
 			    sizeof (n1)),
+			    iskey ? "key" : "argument",
 			    dt_node_type_name(args, n2, sizeof (n2)));
 		}
 	}
@@ -117,6 +121,7 @@ dt_idcook_assc(dt_node_t *dnp, dt_ident_t *idp, int argc, dt_node_t *args)
 		isp->dis_optargs = -1;
 		isp->dis_argc = argc;
 		isp->dis_args = NULL;
+		isp->dis_auxinfo = 0;
 
 		if (argc != 0 && (isp->dis_args = calloc(argc,
 		    sizeof (dt_node_t))) == NULL) {
@@ -212,6 +217,7 @@ dt_idcook_func(dt_node_t *dnp, dt_ident_t *idp, int argc, dt_node_t *args)
 		isp->dis_optargs = -1;
 		isp->dis_argc = i;
 		isp->dis_args = NULL;
+		isp->dis_auxinfo = 0;
 
 		if (i != 0 && (isp->dis_args = calloc(i,
 		    sizeof (dt_node_t))) == NULL) {

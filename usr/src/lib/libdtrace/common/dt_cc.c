@@ -490,7 +490,7 @@ dt_action_printa(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 	dt_ident_t *aid, *fid;
 	dtrace_actdesc_t *ap;
 	const char *format;
-	dt_node_t *anp;
+	dt_node_t *anp, *proto = NULL;
 
 	char n[DT_TYPE_NAMELEN];
 	int argc = 0, argr = 0;
@@ -515,39 +515,59 @@ dt_action_printa(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 		argr = 1;
 	}
 
-	if (argc != argr) {
+	if (argc < argr) {
 		dnerror(dnp, D_PRINTA_PROTO,
 		    "%s( ) prototype mismatch: %d args passed, %d expected\n",
 		    dnp->dn_ident->di_name, argc, argr);
 	}
 
-	if (anp->dn_kind != DT_NODE_AGG) {
-		dnerror(dnp, D_PRINTA_AGGARG,
-		    "%s( ) argument #%d is incompatible with prototype:\n"
-		    "\tprototype: aggregation\n\t argument: %s\n",
-		    dnp->dn_ident->di_name, argr,
-		    dt_node_type_name(anp, n, sizeof (n)));
+	assert(anp != NULL);
+
+	while (anp != NULL) {
+		if (anp->dn_kind != DT_NODE_AGG) {
+			dnerror(dnp, D_PRINTA_AGGARG,
+			    "%s( ) argument #%d is incompatible with "
+			    "prototype:\n\tprototype: aggregation\n"
+			    "\t argument: %s\n", dnp->dn_ident->di_name, argr,
+			    dt_node_type_name(anp, n, sizeof (n)));
+		}
+
+		aid = anp->dn_ident;
+		fid = aid->di_iarg;
+
+		if (aid->di_gen == dtp->dt_gen &&
+		    !(aid->di_flags & DT_IDFLG_MOD)) {
+			dnerror(dnp, D_PRINTA_AGGBAD,
+			    "undefined aggregation: @%s\n", aid->di_name);
+		}
+
+		/*
+		 * If we have multiple aggregations, we must be sure that
+		 * their key signatures match.
+		 */
+		if (proto != NULL) {
+			dt_printa_validate(proto, anp);
+		} else {
+			proto = anp;
+		}
+
+		if (format != NULL) {
+			yylineno = dnp->dn_line;
+
+			sdp->dtsd_fmtdata =
+			    dt_printf_create(yypcb->pcb_hdl, format);
+			dt_printf_validate(sdp->dtsd_fmtdata,
+			    DT_PRINTF_AGGREGATION, dnp->dn_ident, 1,
+			    fid->di_id, ((dt_idsig_t *)aid->di_data)->dis_args);
+			format = NULL;
+		}
+
+		ap = dt_stmt_action(dtp, sdp);
+		dt_action_difconst(ap, anp->dn_ident->di_id, DTRACEACT_PRINTA);
+
+		anp = anp->dn_list;
+		argr++;
 	}
-
-	aid = anp->dn_ident;
-	fid = aid->di_iarg;
-
-	if (aid->di_gen == dtp->dt_gen && !(aid->di_flags & DT_IDFLG_MOD)) {
-		dnerror(dnp, D_PRINTA_AGGBAD,
-		    "undefined aggregation: @%s\n", aid->di_name);
-	}
-
-	if (format != NULL) {
-		yylineno = dnp->dn_line;
-
-		sdp->dtsd_fmtdata = dt_printf_create(yypcb->pcb_hdl, format);
-		dt_printf_validate(sdp->dtsd_fmtdata,
-		    DT_PRINTF_AGGREGATION, dnp->dn_ident, 1,
-		    fid->di_id, ((dt_idsig_t *)aid->di_data)->dis_args);
-	}
-
-	ap = dt_stmt_action(dtp, sdp);
-	dt_action_difconst(ap, anp->dn_ident->di_id, DTRACEACT_PRINTA);
 }
 
 static void
@@ -1148,7 +1168,8 @@ dt_compile_agg(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 		dt_node_t *arg1 = dnp->dn_aggfun->dn_args->dn_list;
 		dt_node_t *arg2 = arg1->dn_list;
 		dt_node_t *arg3 = arg2->dn_list;
-		uint64_t nlevels, step = 1;
+		dt_idsig_t *isp;
+		uint64_t nlevels, step = 1, oarg;
 		int64_t baseval, limitval;
 
 		if (arg1->dn_kind != DT_NODE_INT) {
@@ -1212,6 +1233,58 @@ dt_compile_agg(dtrace_hdl_t *dtp, dt_node_t *dnp, dtrace_stmtdesc_t *sdp)
 		    (nlevels << DTRACE_LQUANTIZE_LEVELSHIFT) |
 		    ((baseval << DTRACE_LQUANTIZE_BASESHIFT) &
 		    DTRACE_LQUANTIZE_BASEMASK);
+
+		assert(arg != 0);
+
+		isp = (dt_idsig_t *)aid->di_data;
+
+		if (isp->dis_auxinfo == 0) {
+			/*
+			 * This is the first time we've seen an lquantize()
+			 * for this aggregation; we'll store our argument
+			 * as the auxiliary signature information.
+			 */
+			isp->dis_auxinfo = arg;
+		} else if ((oarg = isp->dis_auxinfo) != arg) {
+			/*
+			 * If we have seen this lquantize() before and the
+			 * argument doesn't match the original argument, pick
+			 * the original argument apart to concisely report the
+			 * mismatch.
+			 */
+			int obaseval = DTRACE_LQUANTIZE_BASE(oarg);
+			int onlevels = DTRACE_LQUANTIZE_LEVELS(oarg);
+			int ostep = DTRACE_LQUANTIZE_STEP(oarg);
+
+			if (obaseval != baseval) {
+				dnerror(dnp, D_LQUANT_MATCHBASE, "lquantize( ) "
+				    "base (argument #1) doesn't match previous "
+				    "declaration: expected %d, found %d\n",
+				    obaseval, (int)baseval);
+			}
+
+			if (onlevels * ostep != nlevels * step) {
+				dnerror(dnp, D_LQUANT_MATCHLIM, "lquantize( ) "
+				    "limit (argument #2) doesn't match previous"
+				    " declaration: expected %d, found %d\n",
+				    obaseval + onlevels * ostep,
+				    (int)baseval + (int)nlevels * (int)step);
+			}
+
+			if (ostep != step) {
+				dnerror(dnp, D_LQUANT_MATCHSTEP, "lquantize( ) "
+				    "step (argument #3) doesn't match previous "
+				    "declaration: expected %d, found %d\n",
+				    ostep, (int)step);
+			}
+
+			/*
+			 * We shouldn't be able to get here -- one of the
+			 * parameters must be mismatched if the arguments
+			 * didn't match.
+			 */
+			assert(0);
+		}
 
 		incr = arg3 != NULL ? arg3->dn_list : NULL;
 		argmax = 5;

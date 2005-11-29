@@ -49,14 +49,13 @@ extern "C" {
  * Please refer to the "Solaris Dynamic Tracing Guide" for more information.
  */
 
-#define	DTRACE_VERSION	1		/* library ABI interface version */
+#define	DTRACE_VERSION	2		/* library ABI interface version */
 
 struct ps_prochandle;
 typedef struct dtrace_hdl dtrace_hdl_t;
 typedef struct dtrace_prog dtrace_prog_t;
 typedef struct dtrace_vector dtrace_vector_t;
 typedef struct dtrace_aggdata dtrace_aggdata_t;
-typedef int64_t dtrace_aggvarid_t;
 
 #define	DTRACE_O_NODEV		0x01	/* do not open dtrace(7D) device */
 #define	DTRACE_O_NOSYS		0x02	/* do not load /system/object modules */
@@ -298,12 +297,18 @@ extern int dtrace_handle_drop(dtrace_hdl_t *, dtrace_handle_drop_f *, void *);
 typedef void dtrace_handle_proc_f(struct ps_prochandle *, void *);
 extern int dtrace_handle_proc(dtrace_hdl_t *, dtrace_handle_proc_f *, void *);
 
+#define	DTRACE_BUFDATA_AGGKEY		0x0001	/* aggregation key */
+#define	DTRACE_BUFDATA_AGGVAL		0x0002	/* aggregation value */
+#define	DTRACE_BUFDATA_AGGFORMAT	0x0004	/* aggregation format data */
+#define	DTRACE_BUFDATA_AGGLAST		0x0008	/* last for this key/val */
+
 typedef struct dtrace_bufdata {
 	dtrace_hdl_t *dtbda_handle;		/* handle to DTrace library */
 	const char *dtbda_buffered;		/* buffered output */
 	dtrace_probedata_t *dtbda_probe;	/* probe data */
 	const dtrace_recdesc_t *dtbda_recdesc;	/* record description */
 	const dtrace_aggdata_t *dtbda_aggdata;	/* aggregation data, if agg. */
+	uint32_t dtbda_flags;			/* flags; see above */
 } dtrace_bufdata_t;
 
 typedef int dtrace_handle_buffered_f(const dtrace_bufdata_t *, void *);
@@ -354,6 +359,8 @@ struct dtrace_aggdata {
 typedef int dtrace_aggregate_f(const dtrace_aggdata_t *, void *);
 typedef int dtrace_aggregate_walk_f(dtrace_hdl_t *,
     dtrace_aggregate_f *, void *);
+typedef int dtrace_aggregate_walk_joined_f(const dtrace_aggdata_t **,
+    const int, void *);
 
 extern void dtrace_aggregate_clear(dtrace_hdl_t *);
 extern int dtrace_aggregate_snap(dtrace_hdl_t *);
@@ -361,6 +368,12 @@ extern int dtrace_aggregate_print(dtrace_hdl_t *, FILE *,
     dtrace_aggregate_walk_f *);
 
 extern int dtrace_aggregate_walk(dtrace_hdl_t *, dtrace_aggregate_f *, void *);
+
+extern int dtrace_aggregate_walk_joined(dtrace_hdl_t *,
+    dtrace_aggvarid_t *, int, dtrace_aggregate_walk_joined_f *, void *);
+
+extern int dtrace_aggregate_walk_sorted(dtrace_hdl_t *,
+    dtrace_aggregate_f *, void *);
 
 extern int dtrace_aggregate_walk_keysorted(dtrace_hdl_t *,
     dtrace_aggregate_f *, void *);

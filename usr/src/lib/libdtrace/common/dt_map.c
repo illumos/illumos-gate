@@ -351,7 +351,15 @@ dt_aggid_add(dtrace_hdl_t *dtp, dtrace_aggid_t id)
 			}
 		}
 
-		if (agg->dtagd_rec[0].dtrd_uarg) {
+		/*
+		 * If we have a uarg, it's a pointer to the compiler-generated
+		 * statement; we'll use this value to get the name and
+		 * compiler-generated variable ID for the aggregation.  If
+		 * we're grabbing an anonymous enabling, this pointer value
+		 * is obviously meaningless -- and in this case, we can't
+		 * provide the compiler-generated aggregation information.
+		 */
+		if (dtp->dt_options[DTRACEOPT_GRABANON] == DTRACEOPT_UNSET) {
 			dtrace_stmtdesc_t *sdp;
 			dt_ident_t *aid;
 
@@ -359,6 +367,9 @@ dt_aggid_add(dtrace_hdl_t *dtp, dtrace_aggid_t id)
 			    agg->dtagd_rec[0].dtrd_uarg;
 			aid = sdp->dtsd_aggdata;
 			agg->dtagd_name = aid->di_name;
+			agg->dtagd_varid = aid->di_id;
+		} else {
+			agg->dtagd_varid = DTRACE_AGGVARIDNONE;
 		}
 
 		if ((epid = agg->dtagd_epid) >= dtp->dt_maxprobe ||
