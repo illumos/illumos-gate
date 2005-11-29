@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,11 +33,13 @@
 # We can't run cryptoadm(1m) here because it might not be available.
 
 kcfconf=$BASEDIR/etc/crypto/kcf.conf
+ipsecalgs=$BASEDIR/etc/inet/ipsecalgs
 if [ ! -r $kcfconf ]; then
 	echo "/etc/crypto/kcf.conf not found, this may be an attempt to \c"	
 	echo "install this package on an incorrect release of Solaris"
 	exit 2
 fi
+# No release that has kcf.conf does NOT have ipsecalgs, so no need to check.
 
 cp $kcfconf ${kcfconf}.tmp
 
@@ -47,8 +49,17 @@ sed -e 's/^aes256:/aes:/' -e 's/^blowfish448:/blowfish:/' -e \
 
 mv -f ${kcfconf}.tmp $kcfconf
 
+cp $ipsecalgs ${ipsecalgs}.tmp
+
+sed -e 's/_CBC|128\/32-448,8/_CBC|128\/32-128,8/' \
+	-e 's/AES_CBC|128\/128-256,64|/AES_CBC|128|/' \
+	$ipsecalgs > ${ipsecalgs}.tmp
+
+mv -f ${ipsecalgs}.tmp $ipsecalgs
+
 if [ -z "$BASEDIR" ]; then
 	[ -x /usr/sbin/cryptoadm ] && /usr/sbin/cryptoadm refresh
+	[ -x /usr/sbin/ipsecalgs ] && /usr/sbin/ipsecalgs -s
 fi
 
 exit 0

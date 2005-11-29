@@ -2795,6 +2795,7 @@ enable_crypto_unlimited()
 
 	print "Simulating SUNWcry* installation...\c"
 	kcfconf=$rootprefix/etc/crypto/kcf.conf
+	ipsecalgs=$rootprefix/etc/inet/ipsecalgs
 
 	cp $kcfconf ${kcfconf}.tmp
 
@@ -2803,6 +2804,14 @@ enable_crypto_unlimited()
         	$kcfconf > ${kcfconf}.tmp
 
 	mv -f ${kcfconf}.tmp $kcfconf
+
+	cp $ipsecalgs ${ipsecalgs}.tmp
+
+	sed -e 's/_CBC|128\/32-128,8/_CBC|128\/32-448,8/' \
+	    -e 's/AES_CBC|128|/AES_CBC|128\/128-256,64|/' \
+	    $ipsecalgs > ${ipsecalgs}.tmp
+
+	mv -f ${ipsecalgs}.tmp $ipsecalgs
 
 	# Since we do that for the kernel we do it for userland as well.
 

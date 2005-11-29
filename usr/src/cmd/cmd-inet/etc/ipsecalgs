@@ -43,6 +43,6 @@ ALG|2|3|hmac-sha1,sha,sha1,sha-1,hmac-sha,hmac-sha-1|CKM_SHA_1_HMAC_GENERAL|160|
 ALG|3|0|any|-|0|0
 ALG|3|2|des-cbc,des|CKM_DES_CBC|64|8
 ALG|3|3|3des-cbc,3des|CKM_DES3_CBC|192|8
-ALG|3|7|blowfish-cbc,blowfish|CKM_BLOWFISH_CBC|128/32-448,8|8
+ALG|3|7|blowfish-cbc,blowfish|CKM_BLOWFISH_CBC|128/32-128,8|8
 ALG|3|11|null|-|0|0
-ALG|3|12|aes-cbc,aes|CKM_AES_CBC|128/128-256,64|16
+ALG|3|12|aes-cbc,aes|CKM_AES_CBC|128|16
