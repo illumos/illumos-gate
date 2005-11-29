@@ -232,6 +232,7 @@ ps(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 #define	PG_NEWEST	0x0001
 #define	PG_OLDEST	0x0002
 #define	PG_PIPE_OUT	0x0004
+#define	PG_EXACT_MATCH	0x0008
 
 typedef struct pgrep_data {
 	uint_t pg_flags;
@@ -256,13 +257,19 @@ pgrep_cb(uintptr_t addr, const void *pdata, void *data)
 
 	/*
 	 * kmdb doesn't have access to the reg* functions, so we fall back
-	 * to strstr.
+	 * to strstr/strcmp.
 	 */
 #ifdef _KMDB
-	if (strstr(prp->p_user.u_comm, pgp->pg_pat) == NULL)
+	if ((pgp->pg_flags & PG_EXACT_MATCH) ?
+	    (strcmp(prp->p_user.u_comm, pgp->pg_pat) != 0) :
+	    (strstr(prp->p_user.u_comm, pgp->pg_pat) == NULL))
 		return (WALK_NEXT);
 #else
 	if (regexec(&pgp->pg_reg, prp->p_user.u_comm, 1, &pmatch, 0) != 0)
+		return (WALK_NEXT);
+
+	if ((pgp->pg_flags & PG_EXACT_MATCH) &&
+	    (pmatch.rm_so != 0 || prp->p_user.u_comm[pmatch.rm_eo] != '\0'))
 		return (WALK_NEXT);
 #endif
 
@@ -317,6 +324,7 @@ pgrep(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	i = mdb_getopts(argc, argv,
 	    'n', MDB_OPT_SETBITS, PG_NEWEST, &pg.pg_flags,
 	    'o', MDB_OPT_SETBITS, PG_OLDEST, &pg.pg_flags,
+	    'x', MDB_OPT_SETBITS, PG_EXACT_MATCH, &pg.pg_flags,
 	    NULL);
 
 	argc -= i;
@@ -3221,8 +3229,8 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "pmap", ":[-q]", "print process memory map", pmap },
 	{ "project", NULL, "display kernel project(s)", project },
 	{ "ps", "[-fltzTP]", "list processes (and associated thr,lwp)", ps },
-	{ "pgrep", "[-n | -o] pattern", "pattern match against all processes",
-		pgrep },
+	{ "pgrep", "[-x] [-n | -o] pattern",
+		"pattern match against all processes", pgrep },
 	{ "ptree", NULL, "print process tree", ptree },
 	{ "seg", ":", "print address space segment", seg },
 	{ "sysevent", "?[-sv]", "print sysevent pending or sent queue",
