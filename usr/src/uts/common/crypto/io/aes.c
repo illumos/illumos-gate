@@ -252,8 +252,6 @@ _info(struct modinfo *modinfop)
 }
 
 
-/* EXPORT DELETE START */
-
 static int
 aes_check_mech_param(crypto_mechanism_t *mechanism)
 {
@@ -264,12 +262,12 @@ aes_check_mech_param(crypto_mechanism_t *mechanism)
 		/* no parameter */
 		break;
 	case AES_CBC_MECH_INFO_TYPE:
-		if (mechanism->cm_param == NULL ||
+		if (mechanism->cm_param != NULL &&
 		    mechanism->cm_param_len != AES_BLOCK_LEN)
 			rv = CRYPTO_MECHANISM_PARAM_INVALID;
 		break;
 	case AES_CTR_MECH_INFO_TYPE:
-		if (mechanism->cm_param == NULL ||
+		if (mechanism->cm_param != NULL &&
 		    mechanism->cm_param_len != sizeof (CK_AES_CTR_PARAMS))
 			rv = CRYPTO_MECHANISM_PARAM_INVALID;
 		break;
@@ -278,6 +276,8 @@ aes_check_mech_param(crypto_mechanism_t *mechanism)
 	}
 	return (rv);
 }
+
+/* EXPORT DELETE START */
 
 /*
  * Initialize key schedules for AES
