@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +38,7 @@
 #include <AudioDebug.h>
 #include <AudioDevice.h>
 
-#define	irint(d)	((int)d)
+#define	irint(d)	((int)(d))
 
 // class AudioDevice methods
 

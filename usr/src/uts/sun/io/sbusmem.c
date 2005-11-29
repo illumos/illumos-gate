@@ -306,7 +306,7 @@ sbmem_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 
 	case DDI_INFO_DEVT2INSTANCE:
 		instance = getminor((dev_t)arg);
-		*result = (void *)instance;
+		*result = (void *)(uintptr_t)instance;
 		error = DDI_SUCCESS;
 		break;
 

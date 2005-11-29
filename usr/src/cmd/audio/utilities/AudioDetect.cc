@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -339,7 +339,7 @@ Analyze(
 	list = oldpts;
 	if ((list != NULL) && (from > 0.)) {
 		cnt = 0;
-		while ((list->type != AUDIO_EOF) && (from > list->pos)) {
+		while ((list->type != DETECT_EOF) && (from > list->pos)) {
 			cnt++;
 			list++;
 		}
@@ -353,7 +353,7 @@ Analyze(
 
 	// If time is a subset of an existing list, copy out the last entries
 	if ((list != NULL) && (!Undefined(to))) {
-		while (list->type != AUDIO_EOF) {
+		while (list->type != DETECT_EOF) {
 			if (list->pos >= to) {
 				ap->appendpts(list, 1);
 				list++;

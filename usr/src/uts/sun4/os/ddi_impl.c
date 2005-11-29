@@ -944,7 +944,8 @@ i_ddi_trigger_softint(ddi_softint_hdl_impl_t *hdlp, void *arg2)
 	ASSERT(hdlp != NULL);
 	ASSERT(hdlp->ih_private != NULL);
 
-	intr_id = (uint_t)hdlp->ih_private;
+	/* use uintptr_t to suppress the gcc warning */
+	intr_id = (uint_t)(uintptr_t)hdlp->ih_private;
 
 	/* update the vector table for the 2nd arg */
 	ret = update_softint_arg2(intr_id, arg2);
@@ -964,7 +965,8 @@ i_ddi_set_softint_pri(ddi_softint_hdl_impl_t *hdlp, uint_t old_pri)
 	ASSERT(hdlp != NULL);
 	ASSERT(hdlp->ih_private != NULL);
 
-	intr_id = (uint_t)hdlp->ih_private;
+	/* use uintptr_t to suppress the gcc warning */
+	intr_id = (uint_t)(uintptr_t)hdlp->ih_private;
 
 	/* update the vector table for the new priority */
 	ret = update_softint_pri(intr_id, hdlp->ih_pri);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +32,7 @@
 #include <math.h>
 #include <AudioHdr.h>
 
-#define	irint(d)	((int)d)
+#define	irint(d)	((int)(d))
 
 // Convert a string to lowercase and return an allocated copy of it.
 // XXX - There really should be a string-insensitive 8-bit compare routine.

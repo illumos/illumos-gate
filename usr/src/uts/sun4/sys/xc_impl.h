@@ -195,7 +195,8 @@ extern uint_t sendmondo_in_recover;
 			}						\
 			panic("WAIT_MBOX_DONE() timeout, "		\
 				"recv_cpuset 0x%lx, xc cpuset 0x%lx ",	\
-				recv_cpuset, xc_cpuset);		\
+				*(ulong_t *)&recv_cpuset,		\
+				*(ulong_t *)&xc_cpuset);		\
 		}							\
 	}								\
 }

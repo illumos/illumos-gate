@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -546,7 +546,7 @@ polled_read(cell_t *cif)
 	/*
 	 * Get the address of where to copy the characters into.
 	 */
-	buffer = (uchar_t *)p1275_cell2uint(cif[CIF_MIN_SIZE+0]);
+	buffer = (uchar_t *)(uintptr_t)p1275_cell2uint(cif[CIF_MIN_SIZE+0]);
 
 	/*
 	 * Get the length of the buffer that we can copy characters into.
@@ -788,7 +788,7 @@ polled_write(cell_t *cif)
 	/*
 	 * Get the address of where to copy the characters into.
 	 */
-	buffer = (uchar_t *)p1275_cell2uint(cif[CIF_MIN_SIZE+0]);
+	buffer = (uchar_t *)(uintptr_t)p1275_cell2uint(cif[CIF_MIN_SIZE+0]);
 
 	/*
 	 * Get the length of the buffer that we can copy characters into.

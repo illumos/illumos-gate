@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1993, 1996, by Sun Microsystems Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_PROM_DEBUG_H
@@ -43,11 +43,8 @@ extern int	prom_debug;
 	prom_printf("%s:%d: HERE\n", __FILE__, __LINE__)
 
 #define	PRM_DEBUG(q)	if (prom_debug) {				\
-	prom_printf("%s:%d: '%s' is ", __FILE__, __LINE__, #q);		\
-	if (sizeof (q) <= sizeof (int))					\
-		prom_printf("0x%x\n", (int)q);				\
-	else								\
-		prom_printf("0x%llx\n",	q);				\
+	prom_printf("%s:%d: '%s' is 0x%lx\n", __FILE__, __LINE__, #q,	\
+	    (long)q);							\
 }
 
 #define	PRM_INFO(l)	if (prom_debug)					\
