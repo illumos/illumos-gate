@@ -1,4 +1,24 @@
 /*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+/*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -65,17 +85,17 @@ typedef struct mpapi_list_header {
 }mpapi_list_header_t;
 
 /*
- * Structure to maintain mp api initiator data.
+ * Structure to maintain mpapi initiator data.
  */
 typedef struct mpapi_initiator_data {
-	void			*resp; /* phci */
+	void			*resp; /* initiator-port prop */
 	mpapi_list_header_t	*path_list;
 	int			valid;
 	mp_init_port_prop_t	prop;
 } mpapi_initiator_data_t;
 
 /*
- * Structure to maintain mp api lu data.
+ * Structure to maintain mpapi lu data.
  */
 typedef struct mpapi_lu_data {
 	void			*resp; /* vlun */
@@ -86,7 +106,7 @@ typedef struct mpapi_lu_data {
 } mpapi_lu_data_t;
 
 /*
- * Structure to maintain mp api path data.
+ * Structure to maintain mpapi path data.
  */
 typedef struct mpapi_path_data {
 	void			*resp; /* pip */
@@ -96,10 +116,10 @@ typedef struct mpapi_path_data {
 } mpapi_path_data_t;
 
 /*
- * Structure to maintain mp api tpg data.
+ * Structure to maintain mpapi tpg data.
  */
 typedef struct mpapi_tpg_data {
-	void			*resp; /* target port prop, but non-unique */
+	void			*resp;
 	mpapi_list_header_t	*tport_list;
 	mpapi_list_header_t	*lu_list; /* mpath lu or lun list */
 	int			valid;
@@ -107,7 +127,7 @@ typedef struct mpapi_tpg_data {
 } mpapi_tpg_data_t;
 
 /*
- * Structure to maintain mp api tport data.
+ * Structure to maintain mpapi tport data.
  */
 typedef struct mpapi_tport_data {
 	void			*resp; /* target port prop */
@@ -122,23 +142,19 @@ typedef struct mpapi_tport_data {
 typedef struct mpapi_priv {
 
 	/*
-	 * Will be initialized with the lbolt value(lower
-	 * 32 bits) at the time of initialization. This will
-	 * enable detection of stale OIDs used by the
-	 * upper layers.
+	 * Will be initialized with tod(time of day)
+	 * This will enable detection of stale OIDs used by the upper layers.
 	 */
 	uint32_t		tstamp;
 	/*
-	 * The Seq number space is unique within an Object
-	 * type - that is there can be a seq# 2 in Object type
-	 * 'initiator Port' and also a seq#2 in object type
-	 * 'Path LU'. Even though the seq space collides,
-	 * the unique type field(Object type) will make them
-	 * distinct.
-	 * The following field will indicate what the next
-	 * sequence number that can be used for a particular
-	 * type of Object type - Object type will be used to
-	 * index into the array element.
+	 * The Sequence number space is unique within an Object Type -
+	 * that is there can be a seq# 2 in Object Type "initiator port"
+	 * and also a seq#2 in object type 'Path LU'.
+	 * Even though the Seq# space collides, the Object type field
+	 * will make the OIDs unique.
+	 * The following field will indicate what the next sequence number
+	 * that can be used for a particular type of Object type -
+	 * Object type will be used to index into the array element.
 	 */
 	uint32_t		oid_seq[MP_MAX_OBJECT_TYPE];
 
@@ -146,11 +162,6 @@ typedef struct mpapi_priv {
 	 * One list for each type of object.
 	 */
 	mpapi_list_header_t	*obj_hdr_list[MP_MAX_OBJECT_TYPE];
-
-	/*
-	 * Still to do..   LBA
-	 */
-
 
 } mpapi_priv_t;
 
