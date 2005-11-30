@@ -605,6 +605,7 @@ typedef struct tcp_squeue_priv_s {
 	tcp_t		*tcp_time_wait_head;
 	tcp_t		*tcp_time_wait_tail;
 	tcp_t		*tcp_free_list;
+	uint_t		tcp_free_list_cnt;
 } tcp_squeue_priv_t;
 
 /*
@@ -613,6 +614,11 @@ typedef struct tcp_squeue_priv_s {
  */
 #define	TCP_TIME_WAIT_DELAY drv_usectohz(5000000)
 
+/*
+ * To prevent memory hog, limit the number of entries in tcp_free_list
+ * to 1% of available memory / number of cpus
+ */
+uint_t tcp_free_list_max_cnt = 0;
 
 #define	TCP_XMIT_LOWATER	4096
 #define	TCP_XMIT_HIWATER	49152
@@ -1769,6 +1775,7 @@ tcp_time_wait_collector(void *arg)
 			tcp_time_wait->tcp_free_list = tcp->tcp_time_wait_next;
 			CONN_DEC_REF(tcp->tcp_connp);
 		}
+		tcp_time_wait->tcp_free_list_cnt = 0;
 	}
 
 	/*
@@ -1827,15 +1834,29 @@ tcp_time_wait_collector(void *arg)
 				 * thread will wait till the ire is blown away
 				 */
 				connp->conn_state_flags |= CONN_CONDEMNED;
-				mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
 				mutex_exit(lock);
 				mutex_exit(&connp->conn_lock);
-				tcp_cleanup(tcp);
-				mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
-				tcp->tcp_time_wait_next =
-				    tcp_time_wait->tcp_free_list;
-				tcp_time_wait->tcp_free_list = tcp;
-				continue;
+				if (tcp_time_wait->tcp_free_list_cnt <
+				    tcp_free_list_max_cnt) {
+					/* Add to head of tcp_free_list */
+					mutex_exit(
+					    &tcp_time_wait->tcp_time_wait_lock);
+					tcp_cleanup(tcp);
+					mutex_enter(
+					    &tcp_time_wait->tcp_time_wait_lock);
+					tcp->tcp_time_wait_next =
+					    tcp_time_wait->tcp_free_list;
+					tcp_time_wait->tcp_free_list = tcp;
+					tcp_time_wait->tcp_free_list_cnt++;
+					continue;
+				} else {
+					/* Do not add to tcp_free_list */
+					mutex_exit(
+					    &tcp_time_wait->tcp_time_wait_lock);
+					tcp_bind_hash_remove(tcp);
+					conn_delete_ire(tcp->tcp_connp, NULL);
+					CONN_DEC_REF(tcp->tcp_connp);
+				}
 			} else {
 				CONN_INC_REF_LOCKED(connp);
 				mutex_exit(lock);
@@ -5015,8 +5036,10 @@ tcp_get_conn(void *arg)
 
 	mutex_enter(&tcp_time_wait->tcp_time_wait_lock);
 	tcp = tcp_time_wait->tcp_free_list;
+	ASSERT((tcp != NULL) ^ (tcp_time_wait->tcp_free_list_cnt == 0));
 	if (tcp != NULL) {
 		tcp_time_wait->tcp_free_list = tcp->tcp_time_wait_next;
+		tcp_time_wait->tcp_free_list_cnt--;
 		mutex_exit(&tcp_time_wait->tcp_time_wait_lock);
 		tcp->tcp_time_wait_next = NULL;
 		connp = tcp->tcp_connp;
@@ -24786,4 +24809,15 @@ tcp_squeue_add(squeue_t *sqp)
 	*squeue_getprivate(sqp, SQPRIVATE_TCP) = (intptr_t)tcp_time_wait;
 	tcp_time_wait->tcp_time_wait_tid = timeout(tcp_time_wait_collector,
 	    sqp, TCP_TIME_WAIT_DELAY);
+	if (tcp_free_list_max_cnt == 0) {
+		int tcp_ncpus = ((boot_max_ncpus == -1) ?
+			max_ncpus : boot_max_ncpus);
+
+		/*
+		 * Limit number of entries to 1% of availble memory / tcp_ncpus
+		 */
+		tcp_free_list_max_cnt = (freemem * PAGESIZE) /
+			(tcp_ncpus * sizeof (tcp_t) * 100);
+	}
+	tcp_time_wait->tcp_free_list_cnt = 0;
 }
