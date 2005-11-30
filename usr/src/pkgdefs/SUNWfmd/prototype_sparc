@@ -115,6 +115,10 @@ d none usr/lib/fm/topo/SUNW,Sun-Fire-T200 755 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Fire-T200/platform.topo 444 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Fire-T200/pciexdev.topo 444 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Fire-T200/pcidev.topo 444 root bin
+d none usr/lib/fm/topo/SUNW,A70 755 root bin
+f none usr/lib/fm/topo/SUNW,A70/platform.topo 444 root bin
+l none usr/lib/fm/topo/SUNW,A70/pciexdev.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-T200/pciexdev.topo
+l none usr/lib/fm/topo/SUNW,A70/pcidev.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-T200/pcidev.topo
 f none usr/lib/locale/C/LC_MESSAGES/SUN4.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4U.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4V.mo 444 root bin
