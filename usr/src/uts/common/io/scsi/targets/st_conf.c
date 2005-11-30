@@ -2861,6 +2861,43 @@ const struct st_drivetype st_drivetypes[] =
   },
 
   /*
+   * [1] The IBM 3592 Cartridge has only one density at this time,
+   *     Compression is controlled via the Device Configuration mode page.
+   * [2] The IBM 3592 Cartridge has only one speed (if the driver ever cares).
+   */
+  {                           /* Structure member Description                 */
+                              /* ---------------- -----------                 */
+    "IBM 3592 Cartridge",     /* .name            Display ("pretty") name     */
+    13,                       /* .length          Length of next item...      */
+    "IBM     03592",          /* .vid             Vendor-product ID string    */
+    MT_LTO,                   /* .type            Numeric type (cf. mtio.h)   */
+    0,                        /* .bsize           Block size (0 = variable)   */
+                              /* .options         Drive option flags:         */
+    ST_VARIABLE         |     /*    00001           Supports variable length  */
+    ST_BSF              |     /*    00008           Supports SPACE block fwd  */
+    ST_BSR              |     /*    00010           Supports SPACE block rev  */
+    ST_AUTODEN_OVERRIDE |     /*    00040           Autodensity override flag */
+    ST_KNOWS_EOD        |     /*    00200           Recognizes end-of-data    */
+    ST_UNLOADABLE       |     /*    00400           Driver can be unloaded    */
+    ST_NO_RECSIZE_LIMIT |     /*    08000           Supports blocks > 64KB    */
+    ST_MODE_SEL_COMP,         /*    10000           [Note 1]                  */
+                              /*    -----                                     */
+                              /*    18659                                     */
+    -1,                       /* .max_rretries    Not used any more.          */
+    -1,                       /* .max_wretries    Not used any more.          */
+    {0x51, 0x51, 0x51, 0x51}, /* .densities       Density codes [Note 1]      */
+    MT_DENSITY4,              /* .default_density (.densities[x])             */
+    {0, 0, 0, 0},             /* .speeds          Speed codes [Note 2]        */
+    MINUTES(1),               /* .non_motion_time                             */
+    MINUTES(18),              /* .io_time                                     */
+    MINUTES(8),               /* .rewind_time                                 */
+    MINUTES(14),              /* .space_time      worst case directory invalid*/
+    MINUTES(12),              /* .load_time                                   */
+    MINUTES(12),              /* .unload_time                                 */
+    MINUTES(235)              /* .erase_time                                  */
+  },
+
+  /*
    * Seagate Hornet NS20 USB Travan
    *
    *     NOTES
