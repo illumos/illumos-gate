@@ -1,5 +1,5 @@
 /*
- * Copyright 1996, 1998, 2001, 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -243,7 +243,23 @@ nodeupdates(name, ino, type)
 		key |= INOFND;
 		for (ep = ip->e_links; ep != NIL; ep = ep->e_links) {
 			if (ep == np) {
-				ip = ep;
+				/*
+				 * Need to set the NEW flag on the hard link
+				 * so it gets created because we extract the
+				 * "parent".  If the NAMEFND key is set, remove
+				 * the leaf.
+				 */
+				if (ip->e_flags & EXTRACT) {
+					if (key & NAMEFND) {
+						removeleaf(np);
+						freeentry(np);
+						np = NIL;
+						key &= ~NAMEFND;
+					}
+					ep->e_flags |= NEW;
+				} else {
+					ip = ep;
+				}
 				break;
 			}
 		}
