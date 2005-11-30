@@ -1968,7 +1968,7 @@ cpu_unconfigure(int cpuid)
  * it is called by the kmem allocator init code).  In any case, there
  * are quite a few extra entries for future users.
  */
-#define	NCPU_SETUPS	10
+#define	NCPU_SETUPS	20
 
 struct cpu_setup {
 	cpu_setup_func_t *func;
