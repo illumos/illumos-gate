@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -572,12 +571,10 @@ hs_mountfs(
 	 * Look for a Standard File Structure Volume Descriptor,
 	 * of which there must be at least one.
 	 * If found, check for volume size consistency.
-	 *
-	 * XXX - va_size may someday not be large enough to do this correctly.
 	 */
-	error = hs_findhsvol(fsp, devvp, &fsp->hsfs_vol);
-	if (error == EINVAL) /* not in hs format, try iso 9660 format */
-		error = hs_findisovol(fsp, devvp, &fsp->hsfs_vol);
+	error = hs_findisovol(fsp, devvp, &fsp->hsfs_vol);
+	if (error == EINVAL) /* no iso 9660 - try high sierra ... */
+		error = hs_findhsvol(fsp, devvp, &fsp->hsfs_vol);
 
 	if (error)
 		goto cleanup;
@@ -635,6 +632,10 @@ hs_mountfs(
 		if (hs_remakenode(fsp->hsfs_vol.root_dir.ext_lbn,
 			    (uint_t)0, vfsp, &fsp->hsfs_rootvp)) {
 			error = EINVAL;
+			hs_mounttab = hs_mounttab->hsfs_next;
+			mutex_destroy(&fsp->hsfs_free_lock);
+			rw_destroy(&fsp->hsfs_hash_lock);
+			kmem_free(fsp->hsfs_fsmnt, strlen(path) + 1);
 			mutex_exit(&hs_mounttab_lock);
 			goto cleanup;
 		}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -66,7 +65,7 @@
 /* static declarations */
 static void free_cont_area(uchar_t *);
 static int get_cont_area(struct hsfs *, uchar_t **, cont_info_t *);
-static int parse_signatures(sig_args_t *, uint_t, uchar_t *, int);
+static int parse_signatures(sig_args_t *, int, uchar_t *, int);
 
 /*
  * parse_sua()
@@ -104,6 +103,14 @@ parse_sua(
 
 	if (SUA_len == 0)
 		return (0);
+
+	/*
+	 * Underflow on the length field means there's a mismatch
+	 * between sizes of SUA and ISO directory entry. This entry
+	 * is corrupted, return an appropriate error.
+	 */
+	if (SUA_len < 0)
+		return (SUA_EINVAL);
 
 	/*
 	 * Make sure that the continuation lenth is zero, as that is
@@ -197,7 +204,7 @@ clean_up:
 static int
 parse_signatures(
 	sig_args_t	*sig_args_p,
-	uint_t		SUA_len,
+	int		SUA_len,
 	uchar_t		*search_sig,	/* possible signature to search for */
 	int		search_num)	/* n^th occurance of search_sig to */
 					/*   search for */
@@ -206,12 +213,15 @@ parse_signatures(
 	extension_name_t	*extnp;
 	ext_signature_t		*ext_sigp;
 	int			impl_bit_num = 0;
-	uint_t			SUA_rem = SUA_len; /* SUA length */
+	int			SUA_rem = SUA_len; /* SUA length */
 					/* remaining to be parsed */
 
 	/* This should never happen ... just so we don't panic, literally */
 	if (sig_string == (uchar_t *)NULL)
 		return (SUA_NULL_POINTER);
+
+	if (SUA_len < 0)
+		return (SUA_EINVAL);
 
 	/*
 	 * Until the end of SUA, search for the signatures
@@ -249,6 +259,8 @@ parse_signatures(
 					    SUF_SIG_LEN) == 0) {
 
 					SUA_rem -= SUF_LEN(sig_string);
+					if (SUA_rem < 0)
+						return (END_OF_SUA);
 
 					/*
 					 * The SUA_len parameter specifies the
@@ -386,10 +398,13 @@ hs_check_root_dirent(struct vnode *vp, struct hs_direntry *hdp)
 	 * Then we run through the hs_parsedir() function to catch all
 	 * the other possibilities of SUSP fields and continuations.
 	 *
-	 * If there is not SUA area, just return, and assume ISO.
+	 * If there is no SUA area, just return, and assume ISO.
+	 *
+	 * If the SUA area length is invalid (negative, due to a mismatch
+	 * between dirent size and SUA size), return and hope for the best.
 	 */
 
-	if (IDE_SUA_LEN(root_ptr) == 0)
+	if (IDE_SUA_LEN(root_ptr) <= 0)
 		goto end;
 
 	if (strncmp(SUSP_SP, (char *)IDE_sys_use_area(root_ptr),

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -51,7 +50,6 @@
 #include <sys/mode.h>
 #include <sys/mkdev.h>
 #include <sys/ddi.h>
-#include <sys/sunddi.h>
 
 #include <vm/page.h>
 
@@ -240,22 +238,29 @@ name_parse(
 	}
 
 	/*
-	 * Since SUA_string isn't NULL terminated, we use strlcat()
-	 * to add the trailing NULL byte. Defensive programming, don't
-	 * ever overwrite beyond the end of the destination buffer,
-	 * and neither attempt to read beyond the end of SUA_string.
-	 * We assume the caller properly validates SUA_string_len as
-	 * we have no way of doing so.
-	 * Note for corrupted filesystems, SUA_string may contain
-	 * NULL bytes. If that happens, the destination string length
-	 * returned will be larger than the "actual" length, since
-	 * strlcat() terminates when encountering the NULL byte.
-	 * This causes no harm (apart from filenames not being reported
-	 * 'correctly', but then what is correct on a corrupted fs ?)
-	 * so we don't bother assigning strlen(dst) to *dst_lenp.
+	 * strlcat() has two nice properties:
+	 * - the size of the output buffer includes the trailing '\0'
+	 * - we pass "total size" not "remaining size"
+	 * It'd be the ideal candidate for this codeblock - make it:
+	 *
+	 *	strlcat(dst, SUA_string,
+	 *	    MIN(dstsize, strlen(dst) + SUA_string_len + 1));
+	 *
+	 * Unfortunately, strlcat() cannot deal with input strings
+	 * that are not NULL-terminated - like SUA_string can be in
+	 * our case here. So we can't use it :(
+	 * We therefore have to emulate its behaviour using strncat(),
+	 * which will never access more bytes from the input string
+	 * than specified. Since strncat() doesn't necessarily NULL-
+	 * terminate the result, make sure we've got space for the
+	 * Nullbyte at the end.
 	 */
-	*dst_lenp = MIN(dst_size, strlen((char *)dst) + SUA_string_len + 1);
-	(void) strlcat((char *)dst, (char *)SUA_string, (*dst_lenp)--);
+	dst_size--;	/* trailing '\0' */
+
+	(void) strncat((char *)dst, (char *)SUA_string,
+	    MIN(dst_size - strlen((char *)dst), SUA_string_len));
+	dst[dst_size] = '\0';
+	*dst_lenp = strlen((char *)dst);
 
 	if (IS_NAME_BIT_SET(rrip_flags, RRIP_NAME_CONTINUE))
 		SET_NAME_BIT(*(name_flags_p), RRIP_NAME_CONTINUE);
