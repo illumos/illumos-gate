@@ -714,8 +714,6 @@ pm_decode_direction(int direction)
 	default:
 		return ("INVALID DIRECTION");
 	}
-	_NOTE(NOTREACHED);
-	ASSERT(0);
 }
 
 char *
@@ -737,8 +735,6 @@ pm_decode_op(pm_bus_power_op_t op)
 	default:
 		return ("UNKNOWN OP");
 	}
-	_NOTE(NOTREACHED);
-	ASSERT(0);
 }
 
 /*

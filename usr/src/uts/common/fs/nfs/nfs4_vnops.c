@@ -509,8 +509,6 @@ nfs4args_verify(nfs_argop4 *argop, vattr_t *vap, enum nfs_opnum4 op,
 		break;
 	default:
 		return (EINVAL);
-		/*NOTREACHED*/
-		break;
 	}
 	if (!error)
 		error = vattr_to_fattr4(vap, NULL, attr, 0, op, supp);

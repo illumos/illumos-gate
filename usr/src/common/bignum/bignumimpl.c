@@ -2439,7 +2439,7 @@ big_nextprime_pos(BIGNUM *result, BIGNUM *n)
 	if ((err = big_copy(result, n)) != BIG_OK)
 		return (err);
 	result->value[0] |= 1;
-	/* LINTED */
+	/* CONSTCOND */
 	while (1) {
 		for (i = 0; i < SIEVESIZE; i++) sieve[i] = 0;
 		for (i = 0;
@@ -2471,7 +2471,7 @@ big_nextprime_pos(BIGNUM *result, BIGNUM *n)
 				return (err);
 		}
 	}
-	return (BIG_OK);
+	/* NOTREACHED */
 }
 
 

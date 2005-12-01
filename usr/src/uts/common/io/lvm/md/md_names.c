@@ -497,7 +497,8 @@ alloc_entry(
 		if (create_record(recid, nh, shared, 0L) < 0)
 			return ((caddr_t)0);
 	} /* go check the new record */
-	return ((caddr_t)0); /* if we come here..we have an error */
+	/* can't get here, but lint seems to think so */
+	/* NOTREACHED */
 }
 
 static void *

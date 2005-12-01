@@ -47,6 +47,11 @@ DEBUG_DEFS	+= $(DEBUG_FLGS)
 #
 CFLAGS += $(CCVERBOSE) -DPWRDMN -DACPI_USE_LOCAL_CACHE
 
+#
+# 3rd party code is not lint clean
+#
+CERRWARN += -erroff=E_STATEMENT_NOT_REACHED
+
 LINTFLAGS += -errchk=%none
 LINTFLAGS += -errhdr=%none
 LINTFLAGS += -erroff=%all

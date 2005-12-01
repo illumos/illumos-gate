@@ -240,8 +240,6 @@ ippr_rpcb_in(fin, aps, nat)
 	{
 	case -1:
 		return(APR_ERR(1));
-		/*NOTREACHED*/
-		break;
 	case 0:
 		break;
 	case 1:
@@ -317,8 +315,6 @@ ippr_rpcb_out(fin, aps, nat)
                         MUTEX_EXIT(&rs->rs_rxlock);
                 }
 		return(APR_ERR(1));
-		/*NOTREACHED*/
-		break;
 	case  0: /* Negative reply / request rejected */
 		break;
 	case  1: /* Positive reply */
@@ -957,8 +953,6 @@ ippr_rpcb_decoderep(fin, nat, rs, rm, rxp)
 		{
 		case 0:
 			return(0);
-			/*NOTREACHED*/
-			break;
 		case 1:
 			break;
 		default:

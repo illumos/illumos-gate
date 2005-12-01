@@ -241,6 +241,9 @@ $(__GNUC)i386_C99MODE	= $(C99_ENABLE)
 sparc_C99MODE		= $(C99_DISABLE)
 C99MODE			= $($(MACH)_C99MODE)
 
+# Override the default, the kernel is squeaky clean
+CERRWARN = -errtags=yes -errwarn=%all
+
 CFLAGS_uts		=
 CFLAGS_uts		+= $(STAND_FLAGS_$(CLASS))
 CFLAGS_uts		+= $(CCVERBOSE)
