@@ -151,7 +151,9 @@ MODEL		= $(MODEL_$(CLASS))
 #
 LHEAD =	( $(ECHO) "\n$@";
 
-LGREP.2 =	egrep -v ' (_init|_fini|_info|_depends_on) '
+# Note: egrep returns "failure" if there are no matches, which is
+# exactly the opposite of what we need.
+LGREP.2 =	if egrep -v ' (_init|_fini|_info|_depends_on) '; then false; else true; fi
 
 LTAIL =	)
 
@@ -162,8 +164,6 @@ LINTTAGS_32	+= -erroff=E_BAD_PTR_CAST_ALIGN
 LINTTAGS_32	+= -erroff=E_SUPPRESSION_DIRECTIVE_UNUSED
 LINTTAGS_32	+= -erroff=E_SUSPICIOUS_COMPARISON
 LINTTAGS_32	+= -erroff=E_INVALID_ANNOTATION_NAME
-LINTTAGS_32	+= -erroff=E_OLD_STYLE_DECL_OR_BAD_TYPE
-LINTTAGS_32	+= -erroff=E_NO_EXPLICIT_TYPE_GIVEN
 LINTTAGS_32	+= -erroff=E_STATIC_UNUSED
 LINTTAGS_32	+= -erroff=E_PTRDIFF_OVERFLOW
 LINTTAGS_32	+= -erroff=E_ASSIGN_NARROW_CONV
