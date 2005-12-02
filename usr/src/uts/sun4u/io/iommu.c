@@ -173,7 +173,8 @@ iommu_init(struct sbus_soft_state *softsp, caddr_t address)
 	/*
 	 * Initialize the DVMA vmem arena.
 	 */
-	softsp->dvma_arena = vmem_create(name, (void *)softsp->iommu_dvma_base,
+	softsp->dvma_arena = vmem_create(name,
+	    (void *)(uintptr_t)softsp->iommu_dvma_base,
 	    softsp->iommu_dvma_size, PAGESIZE, NULL, NULL, NULL,
 	    DVMA_MAX_CACHE, VM_SLEEP);
 
@@ -314,16 +315,16 @@ iommu_tlb_flush(struct sbus_soft_state *softsp, ioaddr_t addr, pgcnt_t npages)
 		ioaddr = (ioaddr_t)((tmpreg & IOMMU_TLBTAG_VA_MASK) <<
 		    IOMMU_TLBTAG_VA_SHIFT);
 
-		DPRINTF(IOMMU_TLB, ("Vaddr reg 0x%x, "
-		    "TLB vaddr reg %llx, IO addr 0x%x "
+		DPRINTF(IOMMU_TLB, ("Vaddr reg 0x%p, "
+		    "TLB vaddr reg %lx, IO addr 0x%x "
 		    "Base addr 0x%x, Hi addr 0x%x\n",
 		    vaddr_reg, tmpreg, ioaddr, addr, hiaddr));
 
 		if (ioaddr >= addr && ioaddr <= hiaddr) {
 			tmpreg = *valid_bit_reg;
 
-			DPRINTF(IOMMU_TLB, ("Valid reg addr 0x%x, "
-			    "TLB valid reg %llx\n",
+			DPRINTF(IOMMU_TLB, ("Valid reg addr 0x%p, "
+			    "TLB valid reg %lx\n",
 			    valid_bit_reg, tmpreg));
 
 			if (tmpreg & IOMMU_TLB_VALID) {
@@ -511,14 +512,14 @@ iommu_create_vaddr_mappings(ddi_dma_impl_t *mp, uintptr_t addr)
 				iotte_flag |= IOTTE_INTRA;
 
 				DPRINTF(IOMMU_INTER_INTRA_XFER, (
-				    "Intra xfer pfnum %x TTE %llx\n",
+				    "Intra xfer pfnum %lx TTE %lx\n",
 				    pfn, iotte_flag));
 			} else {
 				if (pf_is_dmacapable(pfn) == 1) {
 					/*EMPTY*/
 					DPRINTF(IOMMU_INTER_INTRA_XFER,
 					    ("Inter xfer pfnum %lx "
-					    "tte hi %llx\n",
+					    "tte hi %lx\n",
 					    pfn, iotte_flag));
 				} else {
 					rval = DDI_DMA_NOMAPPING;
@@ -530,8 +531,8 @@ iommu_create_vaddr_mappings(ddi_dma_impl_t *mp, uintptr_t addr)
 		}
 		addr += IOMMU_PAGESIZE;
 
-		DPRINTF(IOMMU_TTE, ("vaddr mapping: tte index %x pfn %lx "
-		    "tte flag %llx addr %p ioaddr %x\n",
+		DPRINTF(IOMMU_TTE, ("vaddr mapping: tte index %p pfn %lx "
+		    "tte flag %lx addr %lx ioaddr %x\n",
 		    iotte_ptr, pfn, iotte_flag, addr, ioaddr));
 
 		/* Flush the IOMMU TLB before loading a new mapping */
@@ -641,8 +642,8 @@ iommu_create_pp_mappings(ddi_dma_impl_t *mp, page_t *pp, page_t **pplist)
 			pplist++;
 		}
 
-		DPRINTF(IOMMU_TTE, ("pp mapping TTE index %x pfn %lx "
-		    "tte flag %llx ioaddr %x\n", iotte_ptr,
+		DPRINTF(IOMMU_TTE, ("pp mapping TTE index %p pfn %lx "
+		    "tte flag %lx ioaddr %x\n", iotte_ptr,
 		    pfn, iotte_flag, ioaddr));
 
 		/* Flush the IOMMU TLB before loading a new mapping */
@@ -781,7 +782,7 @@ iommu_dma_allochdl(dev_info_t *dip, dev_info_t *rdip,
 	}
 	mp = (ddi_dma_impl_t *)mppriv;
 
-	DPRINTF(IOMMU_DMA_ALLOCHDL_DEBUG, ("dma_allochdl: (%s) handle %x "
+	DPRINTF(IOMMU_DMA_ALLOCHDL_DEBUG, ("dma_allochdl: (%s) handle %p "
 	    "hi %x lo %x min %x burst %x\n",
 	    ddi_get_name(dip), mp, addrhigh, addrlow,
 	    dma_attr->dma_attr_minxfer, dma_attr->dma_attr_burstsizes));
@@ -894,7 +895,7 @@ iommu_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 		pplist = dmareq->dmar_object.dmao_obj.virt_obj.v_priv;
 		npages = iommu_btopr(OBJSIZE + offset);
 
-		DPRINTF(IOMMU_DMAMAP_DEBUG, ("dma_map vaddr: %x pages "
+		DPRINTF(IOMMU_DMAMAP_DEBUG, ("dma_map vaddr: %lx pages "
 		    "req addr %lx off %x OBJSIZE %x\n",
 		    npages, addr, offset, OBJSIZE));
 
@@ -945,7 +946,7 @@ iommu_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 			npages = MIN_DVMA_WIN_SIZE + iommu_btopr(offset);
 			size = iommu_ptob(MIN_DVMA_WIN_SIZE);
 			DPRINTF(IOMMU_DMA_SETUP_DEBUG, ("dma_setup: SZ %x pg "
-			    "%x sz %lx\n", OBJSIZE, npages, size));
+			    "%lx sz %x\n", OBJSIZE, npages, size));
 			if (pplist != NULL) {
 				mp->dmai_minfo = (void *)pplist;
 				mp->dmai_rflags |= DMP_SHADOW;
@@ -969,7 +970,7 @@ iommu_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 	mp->dmai_ndvmapages = npages;
 
 	if (mp->dmai_rflags & DMP_NOLIMIT) {
-		ioaddr = (ioaddr_t)vmem_alloc(softsp->dvma_arena,
+		ioaddr = (ioaddr_t)(uintptr_t)vmem_alloc(softsp->dvma_arena,
 		    iommu_ptob(npages),
 		    dmareq->dmar_fp == DDI_DMA_SLEEP ? VM_SLEEP : VM_NOSLEEP);
 		if (ioaddr == 0) {
@@ -1022,8 +1023,8 @@ iommu_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 				*ccountp = 1;
 			}
 
-			DPRINTF(IOMMU_TTE, ("speed loading: TTE index %x "
-			    "pfn %lx tte flag %llx addr %lx ioaddr %x\n",
+			DPRINTF(IOMMU_TTE, ("speed loading: TTE index %p "
+			    "pfn %lx tte flag %lx addr %lx ioaddr %x\n",
 			    iotte_ptr, pfn, iotte_flag, addr, ioaddr));
 
 #if defined(DEBUG) && defined(IO_MEMUSAGE)
@@ -1045,12 +1046,13 @@ iommu_dma_bindhdl(dev_info_t *dip, dev_info_t *rdip,
 			return (DDI_DMA_MAPPED);
 		}
 	} else {
-		ioaddr = (ioaddr_t)vmem_xalloc(softsp->dvma_arena,
+		ioaddr = (ioaddr_t)(uintptr_t)vmem_xalloc(softsp->dvma_arena,
 		    iommu_ptob(npages),
 		    MAX((uint_t)dma_attr->dma_attr_align, IOMMU_PAGESIZE), 0,
 		    (uint_t)dma_attr->dma_attr_seg + 1,
-		    (void *)(ioaddr_t)dma_attr->dma_attr_addr_lo,
-		    (void *)((ioaddr_t)dma_attr->dma_attr_addr_hi + 1),
+		    (void *)(uintptr_t)(ioaddr_t)dma_attr->dma_attr_addr_lo,
+		    (void *)(uintptr_t)
+			((ioaddr_t)dma_attr->dma_attr_addr_hi + 1),
 		    dmareq->dmar_fp == DDI_DMA_SLEEP ? VM_SLEEP : VM_NOSLEEP);
 	}
 
@@ -1102,10 +1104,10 @@ bad_nomap:
 	 * Could not create mmu mappings.
 	 */
 	if (mp->dmai_rflags & DMP_NOLIMIT) {
-		vmem_free(softsp->dvma_arena, (void *)ioaddr,
+		vmem_free(softsp->dvma_arena, (void *)(uintptr_t)ioaddr,
 		    iommu_ptob(npages));
 	} else {
-		vmem_xfree(softsp->dvma_arena, (void *)ioaddr,
+		vmem_xfree(softsp->dvma_arena, (void *)(uintptr_t)ioaddr,
 		    iommu_ptob(npages));
 	}
 
@@ -1155,9 +1157,9 @@ iommu_dma_unbindhdl(dev_info_t *dip, dev_info_t *rdip,
 
 	ASSERT(npages > (uint_t)0);
 	if (mp->dmai_rflags & DMP_NOLIMIT)
-		vmem_free(softsp->dvma_arena, (void *)addr, size);
+		vmem_free(softsp->dvma_arena, (void *)(uintptr_t)addr, size);
 	else
-		vmem_xfree(softsp->dvma_arena, (void *)addr, size);
+		vmem_xfree(softsp->dvma_arena, (void *)(uintptr_t)addr, size);
 
 	mp->dmai_ndvmapages = 0;
 	mp->dmai_inuse = 0;
@@ -1427,9 +1429,11 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 
 		ASSERT(npages > (uint_t)0);
 		if (mp->dmai_rflags & DMP_NOLIMIT)
-			vmem_free(softsp->dvma_arena, (void *)addr, size);
+			vmem_free(softsp->dvma_arena,
+			    (void *)(uintptr_t)addr, size);
 		else
-			vmem_xfree(softsp->dvma_arena, (void *)addr, size);
+			vmem_xfree(softsp->dvma_arena,
+			    (void *)(uintptr_t)addr, size);
 
 		kmem_free(mppriv, sizeof (*mppriv));
 
@@ -1450,7 +1454,7 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 
 	case DDI_DMA_HTOC:
 		DPRINTF(IOMMU_DMAMCTL_HTOC_DEBUG, ("htoc off %lx mapping %lx "
-		    "size %lx\n", *offp, mp->dmai_mapping,
+		    "size %x\n", *offp, mp->dmai_mapping,
 		    mp->dmai_size));
 
 		if ((uint_t)(*offp) >= mp->dmai_size)
@@ -1558,7 +1562,7 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 		offset = (uint_t)(mp->dmai_mapping & IOMMU_PAGEOFFSET);
 		winsize = iommu_ptob(mp->dmai_ndvmapages - iommu_btopr(offset));
 
-		DPRINTF(IOMMU_DMAMCTL_MOVWIN_DEBUG, ("movwin off %lx len %x "
+		DPRINTF(IOMMU_DMAMCTL_MOVWIN_DEBUG, ("movwin off %lx len %lx "
 		    "winsize %x\n", *offp, *lenp, winsize));
 
 		if ((mp->dmai_rflags & DDI_DMA_PARTIAL) == 0)
@@ -1618,7 +1622,7 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 
 		*lenp = (uint_t)iommu_ptob(addr);
 
-		DPRINTF(IOMMU_DMAMCTL_REPWIN_DEBUG, ("repwin off %x len %x\n",
+		DPRINTF(IOMMU_DMAMCTL_REPWIN_DEBUG, ("repwin off %lx len %x\n",
 		    mp->dmai_offset, mp->dmai_size));
 
 		break;
@@ -1639,7 +1643,7 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 
 		*objp = (caddr_t)(addr - mp->dmai_mapping);
 
-		DPRINTF(IOMMU_DMAMCTL_COFF_DEBUG, ("coff off %lx mapping %x "
+		DPRINTF(IOMMU_DMAMCTL_COFF_DEBUG, ("coff off %lx mapping %lx "
 		    "size %x\n", (ulong_t)*objp, mp->dmai_mapping,
 		    mp->dmai_size));
 
@@ -1688,9 +1692,10 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 		mp->dmai_minxfer = dma_lim->dlim_minxfer;
 		mp->dmai_burstsizes = dma_lim->dlim_burstsizes;
 
-		ioaddr = (ioaddr_t)vmem_xalloc(softsp->dvma_arena,
+		ioaddr = (ioaddr_t)(uintptr_t)vmem_xalloc(softsp->dvma_arena,
 		    iommu_ptob(np), IOMMU_PAGESIZE, 0,
-		    dma_lim->dlim_cntr_max + 1, (void *)ALO, (void *)(AHI + 1),
+		    dma_lim->dlim_cntr_max + 1,
+		    (void *)(uintptr_t)ALO, (void *)(uintptr_t)(AHI + 1),
 		    dmareq->dmar_fp == DDI_DMA_SLEEP ? VM_SLEEP : VM_NOSLEEP);
 
 		if (ioaddr == 0) {
@@ -1773,11 +1778,11 @@ iommu_dma_mctl(dev_info_t *dip, dev_info_t *rdip,
 		mutex_exit(&softsp->dma_pool_lock);
 
 		if (mp->dmai_rflags & DMP_NOLIMIT)
-			vmem_free(softsp->dvma_arena, (void *)ioaddr,
-			    iommu_ptob(np));
+			vmem_free(softsp->dvma_arena,
+			    (void *)(uintptr_t)ioaddr, iommu_ptob(np));
 		else
-			vmem_xfree(softsp->dvma_arena, (void *)ioaddr,
-			    iommu_ptob(np));
+			vmem_xfree(softsp->dvma_arena,
+			    (void *)(uintptr_t)ioaddr, iommu_ptob(np));
 
 		kmem_free(mp, sizeof (*mp));
 		kmem_free(iommu_fast_dvma->pagecnt, np * sizeof (uint_t));
@@ -1866,7 +1871,7 @@ iommu_dvma_kaddr_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 		iotte_flag |= IOTTE_STREAM;
 
 	DPRINTF(IOMMU_FASTDMA_LOAD, ("kaddr_load: ioaddr %x "
-	    "size %x offset %x index %x kaddr %p\n",
+	    "size %x offset %x index %x kaddr %lx\n",
 	    ioaddr, len, offset, index, addr));
 	ASSERT(npages > 0);
 	do {
@@ -1942,7 +1947,7 @@ iommu_dvma_unload(ddi_dma_handle_t h, uint_t index, uint_t view)
 #endif /* DEBUG && IO_MEMUSAGE */
 
 	DPRINTF(IOMMU_FASTDMA_SYNC, ("kaddr_unload: handle %p sync flag "
-	    "addr %p sync flag pfn %x index %x page count %x\n", mp,
+	    "addr %p sync flag pfn %llx index %x page count %lx\n", mp,
 	    &iommu_fast_dvma->sync_flag[index],
 	    iommu_fast_dvma->phys_sync_flag[index],
 	    index, npages));
@@ -1974,7 +1979,7 @@ iommu_dvma_sync(ddi_dma_handle_t h, uint_t index, uint_t view)
 	npages = iommu_fast_dvma->pagecnt[index];
 
 	DPRINTF(IOMMU_FASTDMA_SYNC, ("kaddr_sync: handle %p, "
-	    "sync flag addr %p, sync flag pfn %x\n", mp,
+	    "sync flag addr %p, sync flag pfn %llx\n", mp,
 	    &iommu_fast_dvma->sync_flag[index],
 	    iommu_fast_dvma->phys_sync_flag[index]));
 

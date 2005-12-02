@@ -536,7 +536,7 @@ sbus_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (DDI_FAILURE);
 	}
 
-	DPRINTF(SBUS_ATTACH_DEBUG, ("sbus: devi=0x%x, softsp=0x%x\n",
+	DPRINTF(SBUS_ATTACH_DEBUG, ("sbus: devi=0x%p, softsp=0x%p\n",
 	    devi, softsp));
 
 #ifdef	notdef
@@ -734,8 +734,8 @@ sbus_init(struct sbus_soft_state *softsp, caddr_t address)
 
 #undef	REG_ADDR
 
-	DPRINTF(SBUS_REGISTERS_DEBUG, ("SYSIO Control reg: 0x%x\n"
-	    "SBUS Control reg: 0x%x", softsp->sysio_ctrl_reg,
+	DPRINTF(SBUS_REGISTERS_DEBUG, ("SYSIO Control reg: 0x%p\n"
+	    "SBUS Control reg: 0x%p", softsp->sysio_ctrl_reg,
 	    softsp->sbus_ctrl_reg));
 
 #ifdef _STARFIRE
@@ -875,7 +875,7 @@ sbus_resume_init(struct sbus_soft_state *softsp, int resume)
 			tmpreg = *softsp->sbus_ctrl_reg;
 
 			DPRINTF(SBUS_REGISTERS_DEBUG, ("Sbus slot 0x%x slot "
-			    "configuration reg: 0x%x", (i > 3) ? i + 9 : i,
+			    "configuration reg: 0x%p", (i > 3) ? i + 9 : i,
 			    config));
 		}
 	} else {
@@ -1435,7 +1435,7 @@ sbus_ctlops(dev_info_t *dip, dev_info_t *rdip,
 		 * available and say that that is our minimum value (modulo
 		 * what mincycle is).
 		 */
-		if ((int)arg)
+		if ((int)(uintptr_t)arg)
 			val = maxbit(val,
 			    (1 << (ddi_fls(softsp->sbus_burst_sizes) - 1)));
 		else
@@ -1744,7 +1744,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	intr_handler->inum = hdlp->ih_inum;
 
 	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: xlated interrupt 0x%x "
-	    "intr_handler 0x%x\n", hdlp->ih_vector, intr_handler));
+	    "intr_handler 0x%p\n", hdlp->ih_vector, intr_handler));
 
 	/*
 	 * Grab this lock here. So it will protect the poll list.
@@ -1764,7 +1764,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 #endif
 
 		DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr:sbus_arg exists "
-		    "0x%x\n", sbus_arg));
+		    "0x%p\n", sbus_arg));
 		/*
 		 * Two bits per ino in the diagnostic register
 		 * indicate the status of its interrupt.
@@ -1786,7 +1786,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 		sbus_arg->clear_reg = (softsp->clr_intr_reg +
 		    ino_table[ino]->clear_reg);
 		DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr:Ino 0x%x Interrupt "
-		    "clear reg: 0x%x\n", ino, sbus_arg->clear_reg));
+		    "clear reg: 0x%p\n", ino, sbus_arg->clear_reg));
 		sbus_arg->softsp = softsp;
 		sbus_arg->handler_list = intr_handler;
 
@@ -1827,7 +1827,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 			tmp_mondo_vec =
 			    cpu_id << IMR_TID_SHIFT;
 			DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: initial "
-			    "mapping reg 0x%llx\n", tmp_mondo_vec));
+			    "mapping reg 0x%lx\n", tmp_mondo_vec));
 #endif	/* _STARFIRE */
 		} else {
 			/*
@@ -1840,13 +1840,13 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 			tmp_mondo_vec &= ~INTERRUPT_VALID;
 			*mondo_vec_reg = tmp_mondo_vec;
 			DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: existing "
-			    "mapping reg 0x%llx\n", tmp_mondo_vec));
+			    "mapping reg 0x%lx\n", tmp_mondo_vec));
 		}
 
 		sbus_arg->pil = hdlp->ih_pri;
 
 		DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr:Alloc sbus_arg "
-		    "0x%x\n", sbus_arg));
+		    "0x%p\n", sbus_arg));
 	}
 
 	softsp->intr_hndlr_cnt[slot]++;
@@ -1862,7 +1862,7 @@ sbus_add_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 
 	tmp_mondo_vec |= INTERRUPT_VALID;
 
-	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: Ino 0x%x mapping reg: 0x%x "
+	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Add intr: Ino 0x%x mapping reg: 0x%p "
 	    "Intr cntr %d\n", ino, mondo_vec_reg,
 	    softsp->intr_hndlr_cnt[slot]));
 
@@ -1976,8 +1976,8 @@ sbus_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	/* Decrement the intr handler count on this slot */
 	softsp->intr_hndlr_cnt[slot]--;
 
-	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Rem intr: Softsp 0x%x, Mondo 0x%x, "
-	    "ino 0x%x, sbus_arg 0x%x intr cntr %d\n", softsp,
+	DPRINTF(SBUS_INTERRUPT_DEBUG, ("Rem intr: Softsp 0x%p, Mondo 0x%x, "
+	    "ino 0x%x, sbus_arg 0x%p intr cntr %d\n", softsp,
 	    hdlp->ih_vector, ino, sbus_arg, softsp->intr_hndlr_cnt[slot]));
 
 	ASSERT(sbus_arg != NULL);
@@ -2011,7 +2011,7 @@ sbus_remove_intr_impl(dev_info_t *dip, dev_info_t *rdip,
 	/* Free up the memory used for the sbus interrupt handler */
 	if (sbus_arg->handler_list == NULL) {
 		DPRINTF(SBUS_INTERRUPT_DEBUG, ("Rem intr: Freeing sbus arg "
-		    "0x%x\n", sbus_arg));
+		    "0x%p\n", sbus_arg));
 		kmem_free(sbus_arg, sizeof (struct sbus_wrapper_arg));
 		softsp->intr_list[ino] = NULL;
 	}

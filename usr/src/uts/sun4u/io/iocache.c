@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1995-1998, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,8 +95,8 @@ stream_buf_init(struct sbus_soft_state *softsp, caddr_t address)
 
 #undef	REG_ADDR
 
-	DPRINTF(IOCACHE_REGISTERS_DEBUG, ("Streaming buffer control reg: 0x%x, "
-	    "Streaming buffer flush reg: 0x%x, Streaming buffer sync reg: 0x%x",
+	DPRINTF(IOCACHE_REGISTERS_DEBUG, ("Streaming buffer control reg: 0x%p, "
+	    "Streaming buffer flush reg: 0x%p, Streaming buffer sync reg: 0x%p",
 	    softsp->str_buf_ctrl_reg, softsp->str_buf_flush_reg,
 	    softsp->str_buf_sync_reg));
 
@@ -173,7 +173,7 @@ sync_stream_buf(struct sbus_soft_state *softsp, ioaddr_t addr, uint_t npages,
 		return;
 
 	DPRINTF(IOCACHE_SYNC_DEBUG, ("sync_stream_buf: ioaddr 0x%x, page cnt "
-	    "0x%x, sync flag 0x%x, sync flag pf 0x%xll\n", addr, npages,
+	    "0x%x, sync flag 0x%p, sync flag pf 0x%lx\n", addr, npages,
 	    sync_flag, phys_sync_flag));
 
 	ASSERT(npages > (uint_t)0);
@@ -203,7 +203,7 @@ sync_stream_buf(struct sbus_soft_state *softsp, ioaddr_t addr, uint_t npages,
 				lo = (uint_t)(reg & 0xffffffff);
 				DPRINTF(IOCACHE_DIAG_REG_DEBUG,
 				    ("IO cache line diag "
-				    "reg addr 0x%x, hi0x%x lo0x%x\n",
+				    "reg addr 0x%p, hi0x%x lo0x%x\n",
 				    reg_addr, hi, lo));
 			}
 #endif /* DEBUG */
