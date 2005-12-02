@@ -523,7 +523,7 @@ setgwins32(klwp_t *lwp, gwindows32_t *gwins)
 	ASSERT(wbcnt >= 0 && wbcnt <= SPARC_MAXREGWINDOW);
 	mpcb->mpcb_wbcnt = 0;
 	for (i = 0; i < wbcnt; i++) {
-		sp = (caddr_t)gwins->spbuf[i];
+		sp = (caddr_t)(uintptr_t)gwins->spbuf[i];
 		mpcb->mpcb_spbuf[i] = sp;
 		rwp = (struct rwindow *)
 			(mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
@@ -597,7 +597,7 @@ getgwins32(klwp_t *lwp, gwindows32_t *gwp)
 		sp = mpcb->mpcb_spbuf[i];
 		rwp = (struct rwindow *)
 			(mpcb->mpcb_wbuf + (i * wbuf_rwindow_size));
-		gwp->spbuf[i] = (caddr32_t)sp;
+		gwp->spbuf[i] = (caddr32_t)(uintptr_t)sp;
 		if (is64 && IS_V9STACK(sp))
 			rwindow_nto32(rwp, &gwp->wbuf[i]);
 		else
@@ -643,7 +643,18 @@ flush_user_windows_to_stack(caddr_t *psp)
 			stack_align = STACK_ALIGN64;
 			rwindow_size = WINDOWSIZE64;
 		} else {
-			sp = (caddr_t)(uint32_t)sp;
+			/*
+			 * Reduce sp to a 32 bit value.  This was originally
+			 * done by casting down to uint32_t and back up to
+			 * caddr_t, but one compiler didn't like that, so the
+			 * uintptr_t casts were added.  The temporary 32 bit
+			 * variable was introduced to avoid depending on all
+			 * compilers to generate the desired assembly code for a
+			 * quadruple cast in a single expression.
+			 */
+			caddr32_t sp32 = (uint32_t)(uintptr_t)sp;
+			sp = (caddr_t)(uintptr_t)sp32;
+
 			stack_align = STACK_ALIGN32;
 			rwindow_size = WINDOWSIZE32;
 		}
@@ -710,7 +721,18 @@ copy_return_window32(int dotwo)
 
 	(void) flush_user_windows_to_stack(NULL);
 	if (mpcb->mpcb_rsp[0] == NULL) {
-		sp1 = (caddr_t)(uint32_t)lwptoregs(lwp)->r_sp;
+		/*
+		 * Reduce r_sp to a 32 bit value before storing it in sp1.  This
+		 * was originally done by casting down to uint32_t and back up
+		 * to caddr_t, but that generated complaints under one compiler.
+		 * The uintptr_t cast was added to address that, and the
+		 * temporary 32 bit variable was introduced to avoid depending
+		 * on all compilers to generate the desired assembly code for a
+		 * triple cast in a single expression.
+		 */
+		caddr32_t sp1_32 = (uint32_t)lwptoregs(lwp)->r_sp;
+		sp1 = (caddr_t)(uintptr_t)sp1_32;
+
 		if ((copyin_nowatch(sp1, &rwindow32,
 		    sizeof (struct rwindow32))) == 0)
 			mpcb->mpcb_rsp[0] = sp1;
@@ -1211,6 +1233,7 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	volatile int watched = 0;
 	volatile int watched2 = 0;
 	caddr_t tos;
+	caddr32_t tos32;
 
 	/*
 	 * Make sure the current last user window has been flushed to
@@ -1272,7 +1295,17 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	newstack = (sigismember(&u.u_sigonstack, sig) &&
 	    !(lwp->lwp_sigaltstack.ss_flags & (SS_ONSTACK|SS_DISABLE)));
 
-	tos = (void *)(uint32_t)rp->r_sp;
+	/*
+	 * Reduce r_sp to a 32 bit value before storing it in tos.  This was
+	 * originally done by casting down to uint32_t and back up to void *,
+	 * but that generated complaints under one compiler.  The uintptr_t cast
+	 * was added to address that, and the temporary 32 bit variable was
+	 * introduced to avoid depending on all compilers to generate the
+	 * desired assembly code for a triple cast in a single expression.
+	 */
+	tos32 = (uint32_t)rp->r_sp;
+	tos = (void *)(uintptr_t)tos32;
+
 	if (newstack != 0) {
 		fp = (struct sigframe32 *)
 		    (SA32((uintptr_t)lwp->lwp_sigaltstack.ss_sp) +
@@ -1328,7 +1361,7 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	 * save extra register state if it exists
 	 */
 	if (xregs_size != 0) {
-		xregs_setptr32(lwp, tuc, (caddr32_t)sp);
+		xregs_setptr32(lwp, tuc, (caddr32_t)(uintptr_t)sp);
 		xregs = kmem_alloc(xregs_size, KM_SLEEP);
 		xregs_get(lwp, xregs);
 		copyout_noerr(xregs, sp, xregs_size);
@@ -1388,7 +1421,8 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 	if (gwin_size != 0) {
 		gwp = kmem_alloc(gwin_size, KM_SLEEP);
 		getgwins32(lwp, gwp);
-		suword32_noerr(&fp->uc.uc_mcontext.gwins, (uint32_t)sp);
+		suword32_noerr(&fp->uc.uc_mcontext.gwins,
+		    (uint32_t)(uintptr_t)sp);
 		copyout_noerr(gwp, sp, gwin_size);
 		kmem_free(gwp, gwin_size);
 		gwp = NULL;
@@ -1404,7 +1438,8 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 		 * where we then copyout the fq32 to.
 		 */
 		struct fq32 *fqp = (struct fq32 *)sp;
-		suword32_noerr(&fp->uc.uc_mcontext.fpregs.fpu_q, (uint32_t)fqp);
+		suword32_noerr(&fp->uc.uc_mcontext.fpregs.fpu_q,
+		    (uint32_t)(uintptr_t)fqp);
 		copyout_noerr(dfq, fqp, fpq_size);
 
 		/*
@@ -1449,7 +1484,8 @@ sendsig32(int sig, k_siginfo_t *sip, void (*hdlr)())
 		if (lwp->lwp_ustack) {
 			stack32_t stk32;
 
-			stk32.ss_sp = (caddr32_t)lwp->lwp_sigaltstack.ss_sp;
+			stk32.ss_sp =
+			    (caddr32_t)(uintptr_t)lwp->lwp_sigaltstack.ss_sp;
 			stk32.ss_size = (size32_t)lwp->lwp_sigaltstack.ss_size;
 			stk32.ss_flags = (int32_t)lwp->lwp_sigaltstack.ss_flags;
 
@@ -1641,7 +1677,7 @@ fpuregset_nto32(const fpregset_t *src, fpregset32_t *dest, struct fq32 *dfq)
 		struct fq *sfq = src->fpu_q;
 		for (i = 0; i < src->fpu_qcnt; i++, dfq++, sfq++) {
 			dfq->FQu.fpq.fpq_addr =
-			    (caddr32_t)sfq->FQu.fpq.fpq_addr;
+			    (caddr32_t)(uintptr_t)sfq->FQu.fpq.fpq_addr;
 			dfq->FQu.fpq.fpq_instr = sfq->FQu.fpq.fpq_instr;
 		}
 	}
@@ -1674,7 +1710,7 @@ fpuregset_32ton(const fpregset32_t *src, fpregset_t *dest,
 	if ((src->fpu_qcnt) && (sfq) && (dfq)) {
 		for (i = 0; i < src->fpu_qcnt; i++, dfq++, sfq++) {
 			dfq->FQu.fpq.fpq_addr =
-			    (unsigned int *)sfq->FQu.fpq.fpq_addr;
+			    (unsigned int *)(uintptr_t)sfq->FQu.fpq.fpq_addr;
 			dfq->FQu.fpq.fpq_instr = sfq->FQu.fpq.fpq_instr;
 		}
 	}
@@ -1689,13 +1725,13 @@ ucontext_32ton(const ucontext32_t *src, ucontext_t *dest,
 	bzero(dest, sizeof (*dest));
 
 	dest->uc_flags = src->uc_flags;
-	dest->uc_link = (ucontext_t *)src->uc_link;
+	dest->uc_link = (ucontext_t *)(uintptr_t)src->uc_link;
 
 	for (i = 0; i < 4; i++) {
 		dest->uc_sigmask.__sigbits[i] = src->uc_sigmask.__sigbits[i];
 	}
 
-	dest->uc_stack.ss_sp = (void *)src->uc_stack.ss_sp;
+	dest->uc_stack.ss_sp = (void *)(uintptr_t)src->uc_stack.ss_sp;
 	dest->uc_stack.ss_size = (size_t)src->uc_stack.ss_size;
 	dest->uc_stack.ss_flags = src->uc_stack.ss_flags;
 
@@ -1717,7 +1753,8 @@ ucontext_32ton(const ucontext32_t *src, ucontext_t *dest,
 	} else {
 		dest->uc_mcontext.gregs[REG_FPRS] = 0;
 	}
-	dest->uc_mcontext.gwins = (gwindows_t *)src->uc_mcontext.gwins;
+	dest->uc_mcontext.gwins =
+	    (gwindows_t *)(uintptr_t)src->uc_mcontext.gwins;
 	if (src->uc_flags & UC_FPU) {
 		fpuregset_32ton(&src->uc_mcontext.fpregs,
 		    &dest->uc_mcontext.fpregs, sfq, dfq);

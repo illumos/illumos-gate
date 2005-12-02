@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,8 +49,17 @@ _fp_read_inst(
 	if (((uintptr_t)address & 0x3) != 0)
 		return (ftt_alignment);	/* Must be word-aligned. */
 
-	if (get_udatamodel() == DATAMODEL_ILP32)
-		address = (uint32_t *)(caddr32_t)address;
+	if (get_udatamodel() == DATAMODEL_ILP32) {
+		/*
+		 * If this is a 32-bit program, chop the address accordingly.
+		 * The intermediate uintptr_t casts prevent warnings under a
+		 * certain compiler, and the temporary 32 bit storage is
+		 * intended to force proper code generation and break up what
+		 * would otherwise be a quadruple cast.
+		 */
+		caddr32_t address32 = (caddr32_t)(uintptr_t)address;
+		address = (uint32_t *)(uintptr_t)address32;
+	}
 
 	if (fuword32(address, pvalue) == -1) {
 		pfpsd->fp_trapaddr = (caddr_t)address;
@@ -69,8 +78,17 @@ _fp_read_extword(
 	if (((uintptr_t)address & 0x7) != 0)
 		return (ftt_alignment);	/* Must be extword-aligned. */
 
-	if (get_udatamodel() == DATAMODEL_ILP32)
-		address = (uint64_t *)(caddr32_t)address;
+	if (get_udatamodel() == DATAMODEL_ILP32) {
+		/*
+		 * If this is a 32-bit program, chop the address accordingly.
+		 * The intermediate uintptr_t casts prevent warnings under a
+		 * certain compiler, and the temporary 32 bit storage is
+		 * intended to force proper code generation and break up what
+		 * would otherwise be a quadruple cast.
+		 */
+		caddr32_t address32 = (caddr32_t)(uintptr_t)address;
+		address = (uint64_t *)(uintptr_t)address32;
+	}
 
 	if (fuword64(address, pvalue) == -1) {
 		pfpsd->fp_trapaddr = (caddr_t)address;
@@ -89,8 +107,17 @@ _fp_read_word(
 	if (((uintptr_t)address & 0x3) != 0)
 		return (ftt_alignment);	/* Must be word-aligned. */
 
-	if (get_udatamodel() == DATAMODEL_ILP32)
-		address = (uint32_t *)(caddr32_t)address;
+	if (get_udatamodel() == DATAMODEL_ILP32) {
+		/*
+		 * If this is a 32-bit program, chop the address accordingly.
+		 * The intermediate uintptr_t casts prevent warnings under a
+		 * certain compiler, and the temporary 32 bit storage is
+		 * intended to force proper code generation and break up what
+		 * would otherwise be a quadruple cast.
+		 */
+		caddr32_t address32 = (caddr32_t)(uintptr_t)address;
+		address = (uint32_t *)(uintptr_t)address32;
+	}
 
 	if (fuword32(address, pvalue) == -1) {
 		pfpsd->fp_trapaddr = (caddr_t)address;
@@ -109,8 +136,17 @@ _fp_write_extword(
 	if (((uintptr_t)address & 0x7) != 0)
 		return (ftt_alignment);	/* Must be extword-aligned. */
 
-	if (get_udatamodel() == DATAMODEL_ILP32)
-		address = (uint64_t *)(caddr32_t)address;
+	if (get_udatamodel() == DATAMODEL_ILP32) {
+		/*
+		 * If this is a 32-bit program, chop the address accordingly.
+		 * The intermediate uintptr_t casts prevent warnings under a
+		 * certain compiler, and the temporary 32 bit storage is
+		 * intended to force proper code generation and break up what
+		 * would otherwise be a quadruple cast.
+		 */
+		caddr32_t address32 = (caddr32_t)(uintptr_t)address;
+		address = (uint64_t *)(uintptr_t)address32;
+	}
 
 	if (suword64(address, value) == -1) {
 		pfpsd->fp_trapaddr = (caddr_t)address;
@@ -129,8 +165,17 @@ _fp_write_word(
 	if (((uintptr_t)address & 0x3) != 0)
 		return (ftt_alignment);	/* Must be word-aligned. */
 
-	if (get_udatamodel() == DATAMODEL_ILP32)
-		address = (uint32_t *)(caddr32_t)address;
+	if (get_udatamodel() == DATAMODEL_ILP32) {
+		/*
+		 * If this is a 32-bit program, chop the address accordingly.
+		 * The intermediate uintptr_t casts prevent warnings under a
+		 * certain compiler, and the temporary 32 bit storage is
+		 * intended to force proper code generation and break up what
+		 * would otherwise be a quadruple cast.
+		 */
+		caddr32_t address32 = (caddr32_t)(uintptr_t)address;
+		address = (uint32_t *)(uintptr_t)address32;
+	}
 
 	if (suword32(address, value) == -1) {
 		pfpsd->fp_trapaddr = (caddr_t)address;
@@ -165,8 +210,19 @@ read_iureg(
 	} else if (USERMODE(pregs->r_tstate)) { /* locals and ins */
 		if (lwp_getdatamodel(curthread->t_lwp) == DATAMODEL_ILP32) {
 			uint32_t res, *addr, *rw;
+			caddr32_t rw32;
 
-			rw = (uint32_t *)(caddr32_t)prw;
+			/*
+			 * If this is a 32-bit program, chop the address
+			 * accordingly.  The intermediate uintptr_t casts
+			 * prevent warnings under a certain compiler, and the
+			 * temporary 32 bit storage is intended to force proper
+			 * code generation and break up what would otherwise be
+			 * a quadruple cast.
+			 */
+			rw32 = (caddr32_t)(uintptr_t)prw;
+			rw = (uint32_t *)(uintptr_t)rw32;
+
 			addr = (uint32_t *)&rw[n - 16];
 			ftt = _fp_read_word(addr, &res, pfpsd);
 			*pvalue = (uint64_t)res;
@@ -214,8 +270,19 @@ write_iureg(
 	} else if (USERMODE(pregs->r_tstate)) { /* locals and ins */
 		if (lwp_getdatamodel(curthread->t_lwp) == DATAMODEL_ILP32) {
 			uint32_t res, *addr, *rw;
+			caddr32_t rw32;
 
-			rw = (uint32_t *)(caddr32_t)prw;
+			/*
+			 * If this is a 32-bit program, chop the address
+			 * accordingly.  The intermediate uintptr_t casts
+			 * prevent warnings under a certain compiler, and the
+			 * temporary 32 bit storage is intended to force proper
+			 * code generation and break up what would otherwise be
+			 * a quadruple cast.
+			 */
+			rw32 = (caddr32_t)(uintptr_t)prw;
+			rw = (uint32_t *)(uintptr_t)rw32;
+
 			addr = &rw[n - 16];
 			res = (uint_t)*pvalue;
 			ftt = _fp_write_word(addr, res, pfpsd);

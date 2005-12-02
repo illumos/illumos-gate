@@ -42,6 +42,7 @@ install_utrap(utrap_entry_t type, utrap_handler_t new_handler,
 {
 	struct proc *p = curthread->t_procp;
 	utrap_handler_t *ov, *nv, *pv, *sv, *tmp;
+	caddr32_t nv32;
 	int idx;
 
 	/*
@@ -75,9 +76,13 @@ install_utrap(utrap_entry_t type, utrap_handler_t new_handler,
 	}
 
 	/*
-	 * Be sure handler address is word aligned.
+	 * Be sure handler address is word aligned.  The uintptr_t casts are
+	 * there to prevent warnings when using a certain compiler, and the
+	 * temporary 32 bit variable is intended to ensure proper code
+	 * generation and avoid a messy quadruple cast.
 	 */
-	nv = (utrap_handler_t *)(caddr32_t)new_handler;
+	nv32 = (caddr32_t)(uintptr_t)new_handler;
+	nv = (utrap_handler_t *)(uintptr_t)nv32;
 	if (nv != UTRAP_UTH_NOCHANGE) {
 		if (((uintptr_t)nv) & 0x3)
 			return ((int)set_errno(EINVAL));
@@ -111,7 +116,7 @@ install_utrap(utrap_entry_t type, utrap_handler_t new_handler,
 		}
 	}
 	if (old_handlerp != NULL) {
-		if (suword32(old_handlerp, (uint32_t)ov) == -1)
+		if (suword32(old_handlerp, (uint32_t)(uintptr_t)ov) == -1)
 			return ((int)set_errno(EINVAL));
 	}
 	return (0);

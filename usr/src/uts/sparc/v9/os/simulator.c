@@ -238,10 +238,16 @@ do_unaligned(struct regs *rp, caddr_t *badaddr)
 	}
 
 	/*
-	 * If this is a 32-bit program, chop the address accordingly.
+	 * If this is a 32-bit program, chop the address accordingly.  The
+	 * intermediate uintptr_t casts prevent warnings under a certain
+	 * compiler, and the temporary 32 bit storage is intended to force
+	 * proper code generation and break up what would otherwise be a
+	 * quadruple cast.
 	 */
-	if (curproc->p_model == DATAMODEL_ILP32)
-		addr = (caddr_t)(caddr32_t)addr;
+	if (curproc->p_model == DATAMODEL_ILP32) {
+		caddr32_t addr32 = (caddr32_t)(uintptr_t)addr;
+		addr = (caddr_t)(uintptr_t)addr32;
+	}
 
 	if (aligndebug)
 		printf("addr 2 = %p\n", (void *)addr);
@@ -649,10 +655,16 @@ simulate_lddstd(struct regs *rp, caddr_t *badaddr)
 	}
 
 	/*
-	 * If this is a 32-bit program, chop the address accordingly.
+	 * If this is a 32-bit program, chop the address accordingly.  The
+	 * intermediate uintptr_t casts prevent warnings under a certain
+	 * compiler, and the temporary 32 bit storage is intended to force
+	 * proper code generation and break up what would otherwise be a
+	 * quadruple cast.
 	 */
-	if (curproc->p_model == DATAMODEL_ILP32 && usermode)
-		addr = (caddr_t)(caddr32_t)addr;
+	if (curproc->p_model == DATAMODEL_ILP32 && usermode) {
+		caddr32_t addr32 = (caddr32_t)(uintptr_t)addr;
+		addr = (caddr_t)(uintptr_t)addr32;
+	}
 
 	if ((inst >> 21) & 1) {			/* store */
 		if (getreg(rp, rd, &reven, badaddr))
@@ -1060,7 +1072,8 @@ getreg(struct regs *rp, uint_t reg, uint64_t *val, caddr_t *badaddr)
 		}
 		*val = res;
 	} else {
-		uint32_t *rw = (uint32_t *)(caddr32_t)sp;
+		caddr32_t sp32 = (caddr32_t)(uintptr_t)sp;
+		uint32_t *rw = (uint32_t *)(uintptr_t)sp32;
 		uint32_t *addr = (uint32_t *)&rw[reg - 16];
 		uint32_t res;
 
@@ -1121,7 +1134,8 @@ putreg(uint64_t	*data, struct regs *rp, uint_t reg, caddr_t *badaddr)
 			*addr = res;
 		}
 	} else {
-		uint32_t *rw = (uint32_t *)(caddr32_t)sp;
+		caddr32_t sp32 = (caddr32_t)(uintptr_t)sp;
+		uint32_t *rw = (uint32_t *)(uintptr_t)sp32;
 		uint32_t *addr = (uint32_t *)&rw[reg - 16];
 		uint32_t res;
 
@@ -1239,11 +1253,16 @@ calc_memaddr(struct regs *rp, caddr_t *badaddr)
 	}
 
 	/*
-	 * If this is a 32-bit program, chop the address accordingly.
+	 * If this is a 32-bit program, chop the address accordingly.  The
+	 * intermediate uintptr_t casts prevent warnings under a certain
+	 * compiler, and the temporary 32 bit storage is intended to force
+	 * proper code generation and break up what would otherwise be a
+	 * quadruple cast.
 	 */
-	if (curproc->p_model == DATAMODEL_ILP32 &&
-	    USERMODE(rp->r_tstate))
-		addr = (caddr_t)(caddr32_t)addr;
+	if (curproc->p_model == DATAMODEL_ILP32 && USERMODE(rp->r_tstate)) {
+		caddr32_t addr32 = (caddr32_t)(uintptr_t)addr;
+		addr = (caddr_t)(uintptr_t)addr32;
+	}
 
 	*badaddr = addr;
 	return ((uintptr_t)addr & (sz - 1) ? SIMU_UNALIGN : SIMU_SUCCESS);
@@ -1382,10 +1401,16 @@ instr_size(struct regs *rp, caddr_t *addrp, enum seg_rw rdwr)
 	}
 
 	/*
-	 * If this is a 32-bit program, chop the address accordingly.
+	 * If this is a 32-bit program, chop the address accordingly.  The
+	 * intermediate uintptr_t casts prevent warnings under a certain
+	 * compiler, and the temporary 32 bit storage is intended to force
+	 * proper code generation and break up what would otherwise be a
+	 * quadruple cast.
 	 */
-	if (curproc->p_model == DATAMODEL_ILP32)
-		addr = (caddr_t)(caddr32_t)addr;
+	if (curproc->p_model == DATAMODEL_ILP32) {
+		caddr32_t addr32 = (caddr32_t)(uintptr_t)addr;
+		addr = (caddr_t)(uintptr_t)addr32;
+	}
 
 	*addrp = addr;
 	ASSERT(sz != 0);
@@ -1403,10 +1428,16 @@ fetch_user_instr(caddr_t vaddr)
 	int32_t instr;
 
 	/*
-	 * If this is a 32-bit program, chop the address accordingly.
+	 * If this is a 32-bit program, chop the address accordingly.  The
+	 * intermediate uintptr_t casts prevent warnings under a certain
+	 * compiler, and the temporary 32 bit storage is intended to force
+	 * proper code generation and break up what would otherwise be a
+	 * quadruple cast.
 	 */
-	if (p->p_model == DATAMODEL_ILP32)
-		vaddr = (caddr_t)(caddr32_t)vaddr;
+	if (p->p_model == DATAMODEL_ILP32) {
+		caddr32_t vaddr32 = (caddr32_t)(uintptr_t)vaddr;
+		vaddr = (caddr_t)(uintptr_t)vaddr32;
+	}
 
 	if (fuword32_nowatch(vaddr, (uint32_t *)&instr) == -1)
 		instr = -1;
