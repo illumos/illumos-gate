@@ -253,11 +253,13 @@ C_Finalize(CK_VOID_PTR pReserved)
 	(void) pthread_mutex_lock(&globalmutex);
 
 	if (!kernel_initialized) {
+		(void) pthread_mutex_unlock(&globalmutex);
 		return (CKR_CRYPTOKI_NOT_INITIALIZED);
 	}
 
 	/* Check to see if pReseved is NULL */
 	if (pReserved != NULL) {
+		(void) pthread_mutex_unlock(&globalmutex);
 		return (CKR_ARGUMENTS_BAD);
 	}
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -227,7 +227,7 @@ dsa_sign(soft_object_t *key, CK_BYTE_PTR in, CK_ULONG inlen, CK_BYTE_PTR out)
 		goto clean1;
 	}
 
-	if (20 != xlen) {
+	if (20 < xlen) {
 		rv = CKR_KEY_SIZE_RANGE;
 		goto clean1;
 	}
