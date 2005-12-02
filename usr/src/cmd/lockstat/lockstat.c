@@ -738,6 +738,13 @@ dprog_addevent(int event)
 		dprog_add("\ttrace(%s);\n", caller);
 		dprog_add(stack);
 	} else {
+		/*
+		 * The ordering here is important:  when we process the
+		 * aggregate, we count on the fact that @avg appears before
+		 * @hist in program order to assure that @avg is assigned the
+		 * first aggregation variable ID and @hist assigned the
+		 * second; see the comment in process_aggregate() for details.
+		 */
 		dprog_add("\t@avg[%dULL, %s, %s%s] = avg(%s);\n",
 		    event, arg0, caller, stack, arg1);
 
@@ -898,19 +905,24 @@ process_aggregate(const dtrace_aggdata_t *agg, void *arg)
 
 	assert(lsdata->lsd_count < g_nrecs);
 
-	rec = &aggdesc->dtagd_rec[0];
-
-	if (rec->dtrd_size != sizeof (uint64_t))
-		fail(0, "bad variable size in zeroth record");
-
-	/* LINTED - alignment */
-	if (*((uint64_t *)(data + rec->dtrd_offset))) {
+	/*
+	 * Aggregation variable IDs are guaranteed to be generated in program
+	 * order, and they are guaranteed to start from DTRACE_AGGVARIDNONE
+	 * plus one.  As "avg" appears before "hist" in program order, we know
+	 * that "avg" will be allocated the first aggregation variable ID, and
+	 * "hist" will be allocated the second aggregation variable ID -- and
+	 * we therefore use the aggregation variable ID to differentiate the
+	 * cases.
+	 */
+	if (aggdesc->dtagd_varid > DTRACE_AGGVARIDNONE + 1) {
 		/*
-		 * If the variable is non-zero, this is the histogram entry.
-		 * We'll copy the quantized data into lc_hist, and jump over
-		 * the rest.
+		 * If this is the histogram entry.  We'll copy the quantized
+		 * data into lc_hist, and jump over the rest.
 		 */
 		rec = &aggdesc->dtagd_rec[aggdesc->dtagd_nrecs - 1];
+
+		if (aggdesc->dtagd_varid != DTRACE_AGGVARIDNONE + 2)
+			fail(0, "bad variable ID in aggregation record");
 
 		if (rec->dtrd_size !=
 		    DTRACE_QUANTIZE_NBUCKETS * sizeof (uint64_t))

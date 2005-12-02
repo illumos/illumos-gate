@@ -900,7 +900,32 @@ bufhandler(const dtrace_bufdata_t *bufdata, void *arg)
 		BUFDUMPHDR("  dtrace_recdesc");
 		BUFDUMP(rec, dtrd_action);
 		BUFDUMP(rec, dtrd_size);
-		BUFDUMP(rec, dtrd_offset);
+
+		if (agg != NULL) {
+			uint8_t *data;
+			int lim = rec->dtrd_size;
+
+			(void) sprintf(buf, "%d (data: ", rec->dtrd_offset);
+			c = buf + strlen(buf);
+
+			if (lim > sizeof (uint64_t))
+				lim = sizeof (uint64_t);
+
+			data = (uint8_t *)agg->dtada_data + rec->dtrd_offset;
+
+			for (i = 0; i < lim; i++) {
+				(void) snprintf(c, end - c, "%s%02x",
+				    i == 0 ? "" : " ", *data++);
+				c += strlen(c);
+			}
+
+			(void) snprintf(c, end - c,
+			    "%s)", lim < rec->dtrd_size ? " ..." : "");
+			BUFDUMPASSTR(rec, dtrd_offset, buf);
+		} else {
+			BUFDUMP(rec, dtrd_offset);
+		}
+
 		BUFDUMPHDR("");
 	}
 

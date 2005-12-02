@@ -1375,12 +1375,25 @@ dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
 		} else {
 			if (nrecs == 0)
 				return (dt_set_errno(dtp, EDT_DMISMATCH));
+
+			if (pfv->pfv_flags & DT_PRINTF_AGGREGATION) {
+				/*
+				 * When printing aggregation keys, we always
+				 * set the aggdata to be the representative
+				 * (zeroth) aggregation.  The aggdata isn't
+				 * actually used here in this case, but it is
+				 * passed to the buffer handler and must
+				 * therefore still be correct.
+				 */
+				aggdata = aggsdata[0];
+				flags = DTRACE_BUFDATA_AGGKEY;
+			}
+
 			rec = recp++;
 			nrecs--;
 			addr = (caddr_t)buf + rec->dtrd_offset;
 			limit = lim;
 			normal = 1;
-			flags = DTRACE_BUFDATA_AGGKEY;
 		}
 
 		size = rec->dtrd_size;
