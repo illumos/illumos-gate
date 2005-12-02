@@ -8339,7 +8339,7 @@ noticmpv6:
 		case ICMP6_DST_UNREACH_NOPORT:
 			if (((tcp->tcp_state == TCPS_SYN_SENT) ||
 			    (tcp->tcp_state == TCPS_SYN_RCVD)) &&
-			    (tcpha->tha_seq == tcp->tcp_iss)) {
+			    (seg_seq == tcp->tcp_iss)) {
 				(void) tcp_clean_death(tcp,
 				    ECONNREFUSED, 8);
 			}
@@ -8353,7 +8353,7 @@ noticmpv6:
 			tcp->tcp_client_errno = EHOSTUNREACH;
 			if (((tcp->tcp_state == TCPS_SYN_SENT) ||
 			    (tcp->tcp_state == TCPS_SYN_RCVD)) &&
-			    (tcpha->tha_seq == tcp->tcp_iss)) {
+			    (seg_seq == tcp->tcp_iss)) {
 				if (tcp->tcp_listener != NULL &&
 				    tcp->tcp_listener->tcp_syn_defense) {
 					/*
