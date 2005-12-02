@@ -73,9 +73,9 @@ static struct av_head	avec_tbl[APIC_MAX_VECTOR+1];
 static char *
 get_interrupt_type(short index)
 {
-	if (index == RESERVE_INDEX) {
+	if (index == RESERVE_INDEX)
 		return ("IPI");
-	} else if (index == ACPI_INDEX)
+	else if (index == ACPI_INDEX)
 		return ("Fixed");
 	else if (index == MSI_INDEX)
 		return ("MSI");
@@ -98,8 +98,10 @@ interrupt_display_info(apic_irq_t irqp, int i)
 	int		share_cnt;
 	char		*intr_type;
 	char		ioapic_iline[10];
+	char		ipl[3];
 	char		driver_name[MODMAXNAMELEN + 1];
-	uchar_t		cpu_assigned;
+	char		cpu_assigned[4];
+	uchar_t		assigned_cpu;
 	uintptr_t	dip_addr;
 	struct dev_info	dev_info;
 	struct autovec	avhp;
@@ -113,13 +115,15 @@ interrupt_display_info(apic_irq_t irqp, int i)
 
 	/* Figure out IOAPIC number and ILINE number */
 	if (APIC_IS_MSI_OR_MSIX_INDEX(irqp.airq_mps_intr_index))
-		(void) mdb_snprintf(ioapic_iline, 10, "n/a  ");
+		(void) mdb_snprintf(ioapic_iline, 10, "-    ");
 	else {
 		if (!irqp.airq_ioapicindex && !irqp.airq_intin_no) {
 			if (strcmp(intr_type, "Fixed") == 0)
 				(void) mdb_snprintf(ioapic_iline, 10,
 				    "0x%x/0x%x", irqp.airq_ioapicindex,
 				    irqp.airq_intin_no);
+			else if (irqp.airq_mps_intr_index == RESERVE_INDEX)
+				(void) mdb_snprintf(ioapic_iline, 10, "-    ");
 			else
 				(void) mdb_snprintf(ioapic_iline, 10, " ");
 		} else
@@ -127,14 +131,22 @@ interrupt_display_info(apic_irq_t irqp, int i)
 			    irqp.airq_ioapicindex, irqp.airq_intin_no);
 	}
 
-	cpu_assigned = irqp.airq_temp_cpu;
-	if (cpu_assigned == IRQ_UNINIT || cpu_assigned == IRQ_UNBOUND)
-		cpu_assigned = irqp.airq_cpu;
+	assigned_cpu = irqp.airq_temp_cpu;
+	if (assigned_cpu == IRQ_UNINIT || assigned_cpu == IRQ_UNBOUND)
+		assigned_cpu = irqp.airq_cpu;
 	bus_type = irqp.airq_iflag.bustype;
 
+	if (irqp.airq_mps_intr_index == RESERVE_INDEX) {
+		(void) mdb_snprintf(cpu_assigned, 4, "ALL");
+		(void) mdb_snprintf(ipl, 3, "%d", avec_tbl[i].avh_hi_pri);
+	} else {
+		(void) mdb_snprintf(cpu_assigned, 4, "0x%x", assigned_cpu);
+		(void) mdb_snprintf(ipl, 3, "%d", irqp.airq_ipl);
+	}
+
 	/* Print each interrupt entry */
-	mdb_printf("%4d  0x%x     %-5s  %-6s%2d   %2d    %-9s     ",
-	    i, irqp.airq_vector, (bus_type ? businfo_array[bus_type] : " "),
+	mdb_printf("%3d  0x%x   %-3s %-5s %-6s%-4s %2d   %-9s ", i,
+	    irqp.airq_vector, ipl, (bus_type ? businfo_array[bus_type] : " "),
 	    intr_type, cpu_assigned, irqp.airq_share, ioapic_iline);
 
 	/* If valid dip found; print driver name */
@@ -168,7 +180,10 @@ interrupt_display_info(apic_irq_t irqp, int i)
 		mdb_printf("\n");
 
 	} else {
-		if (mdb_vread(&avhp, sizeof (struct autovec),
+		if (irqp.airq_mps_intr_index == RESERVE_INDEX &&
+		    !irqp.airq_share)
+			mdb_printf("poke_cpu\n");
+		else if (mdb_vread(&avhp, sizeof (struct autovec),
 		    (uintptr_t)avec_tbl[i].avh_link) == -1)
 			mdb_printf("\n");
 		else
@@ -195,12 +210,13 @@ interrupt_dump(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	}
 
 	if (mdb_readvar(&avec_tbl, "autovect") == -1) {
-		mdb_warn("failed to read apic_irq_table");
+		mdb_warn("failed to read autovect");
 		return (DCMD_ERR);
 	}
 
-	mdb_printf("IRQ#  Vector#  Bus    Type  CPU Shared IOAPIC/INTIN  "
-	    "Driver Name(s)/ISR(s)\n");
+	/* Print the header first */
+	mdb_printf("%<u>IRQ  Vector IPL Bus   Type  CPU Share APIC/INT# "
+	    "Driver Name(s)/ISR(s) %</u>\n");
 
 	/* Walk all the entries */
 	for (i = 0; i < APIC_MAX_VECTOR + 1; i++) {

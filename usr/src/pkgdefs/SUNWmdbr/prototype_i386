@@ -86,6 +86,8 @@ d none platform/i86pc/kernel 755 root sys
 d none platform/i86pc/kernel/kmdb 755 root sys
 f none platform/i86pc/kernel/kmdb/pcplusmp 555 root sys
 f none platform/i86pc/kernel/kmdb/unix 555 root sys
+f none platform/i86pc/kernel/kmdb/uppc 555 root sys
 d none platform/i86pc/kernel/kmdb/amd64 755 root sys
 f none platform/i86pc/kernel/kmdb/amd64/pcplusmp 555 root sys
 f none platform/i86pc/kernel/kmdb/amd64/unix 555 root sys
+f none platform/i86pc/kernel/kmdb/amd64/uppc 555 root sys

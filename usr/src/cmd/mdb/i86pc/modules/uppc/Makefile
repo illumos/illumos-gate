@@ -25,5 +25,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = pcplusmp unix uppc
-include ../../Makefile.subdirs
+include $(SRC)/Makefile.master
+SUBDIRS =		ia32
+$(BUILD64)SUBDIRS += 	$(MACH64)
+include ../../../Makefile.subdirs

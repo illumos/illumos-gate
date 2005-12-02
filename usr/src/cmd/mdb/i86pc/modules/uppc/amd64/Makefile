@@ -25,5 +25,18 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = pcplusmp unix uppc
-include ../../Makefile.subdirs
+MODULE = uppc.so
+MDBTGT = kvm
+
+MODSRCS = uppc.c
+
+include ../../../../../Makefile.cmd
+include ../../../../../Makefile.cmd.64
+include ../../../../intel/Makefile.amd64
+include ../../../Makefile.i86pc
+include ../../../../Makefile.module
+
+CPPFLAGS += -DMP -D_MACHDEP
+CPPFLAGS += -I../../../../common
+CPPFLAGS += -I$(SRC)/uts/intel
+CPPFLAGS += -I$(SRC)/uts/i86pc
