@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -29,12 +28,12 @@
 # cmd/loadkeys/type_6/Makefile
 
 KEYTABLES = \
-        us denmark finnish france germany italy japan korea \
+        us belgium denmark finnish france germany italy japan korea \
         netherlands norway portugal reset spain sweden \
         swiss_french swiss_german taiwan uk \
         slovakia slovenia serbiaandmontenegro \
         iceland croatia bulgaria belarus maltaus \
-        maltauk albania
+        maltauk albania turkeyq turkeyf 
 
 include ../../Makefile.cmd
 
@@ -45,11 +44,12 @@ ROOTKEYTABLES= $(KEYTABLES:%=$(ROOTKEYDIR)/%)
 # there is an install target for each ROOT layout link
 #
 LAYOUTS= \
-        layout_00 layout_06 layout_07 layout_08 layout_09 layout_0e \
+        layout_00 layout_02 layout_06 layout_07 layout_08 layout_09 layout_0e \
         layout_0f layout_10 layout_12 layout_13 layout_16 layout_19 \
         layout_1a layout_1b layout_1c layout_1e layout_20 layout_21 \
         layout_100 layout_18 layout_101 layout_102 layout_103 layout_104 \
-        layout_105 layout_106 layout_107 layout_108 layout_10f
+        layout_105 layout_106 layout_107 layout_108 layout_10f layout_1f \
+	layout_23
 
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
@@ -77,6 +77,9 @@ $(ROOTKEYDIR): $(ROOTKEYTABLESDIR)
 #
 $(ROOTKEYDIR)/layout_00: $(ROOTKEYDIR)/us
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/us $@
+
+$(ROOTKEYDIR)/layout_02: $(ROOTKEYDIR)/belgium
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/belgium $@
 
 $(ROOTKEYDIR)/layout_06: $(ROOTKEYDIR)/denmark
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/denmark $@
@@ -160,6 +163,13 @@ $(ROOTKEYDIR)/layout_108: $(ROOTKEYDIR)/albania
 	$(RM) $@; $(LN) $(ROOTKEYDIR)/albania  $@
 
 $(ROOTKEYDIR)/layout_10f: $(ROOTKEYDIR)/japan
-	$(RM) $@; $(LN) $(ROOTKEYDIR)/japan $@ 
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/japan $@
+
+$(ROOTKEYDIR)/layout_1f: $(ROOTKEYDIR)/turkeyq
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/turkeyq  $@
+
+$(ROOTKEYDIR)/layout_23: $(ROOTKEYDIR)/turkeyf
+	$(RM) $@; $(LN) $(ROOTKEYDIR)/turkeyf  $@
+
 
 include ../../Makefile.targ

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -105,6 +104,7 @@ l none usr/share/lib/keytables/type_101/layout_3b=../../../../../usr/share/lib/k
 l none usr/share/lib/keytables/type_101/layout_3e9=../../../../../usr/share/lib/keytables/type_101/us
 
 d none usr/share/lib/keytables/type_6 755 root bin
+f none usr/share/lib/keytables/type_6/belgium 444 root bin
 f none usr/share/lib/keytables/type_6/denmark  444 root bin
 f none usr/share/lib/keytables/type_6/finnish 444 root bin
 f none usr/share/lib/keytables/type_6/france 444 root bin
@@ -133,8 +133,11 @@ f none usr/share/lib/keytables/type_6/belarus 444 root bin
 f none usr/share/lib/keytables/type_6/maltaus 444 root bin
 f none usr/share/lib/keytables/type_6/maltauk 444 root bin
 f none usr/share/lib/keytables/type_6/albania 444 root bin
+f none usr/share/lib/keytables/type_6/turkeyq 444 root bin
+f none usr/share/lib/keytables/type_6/turkeyf 444 root bin
 
 l none usr/share/lib/keytables/type_6/layout_00=../../../../../usr/share/lib/keytables/type_6/us
+l none usr/share/lib/keytables/type_6/layout_02=../../../../../usr/share/lib/keytables/type_6/belgium
 l none usr/share/lib/keytables/type_6/layout_06=../../../../../usr/share/lib/keytables/type_6/denmark
 l none usr/share/lib/keytables/type_6/layout_07=../../../../../usr/share/lib/keytables/type_6/finnish
 l none usr/share/lib/keytables/type_6/layout_08=../../../../../usr/share/lib/keytables/type_6/france
@@ -150,6 +153,8 @@ l none usr/share/lib/keytables/type_6/layout_1a=../../../../../usr/share/lib/key
 l none usr/share/lib/keytables/type_6/layout_1b=../../../../../usr/share/lib/keytables/type_6/swiss_french
 l none usr/share/lib/keytables/type_6/layout_1c=../../../../../usr/share/lib/keytables/type_6/swiss_german
 l none usr/share/lib/keytables/type_6/layout_1e=../../../../../usr/share/lib/keytables/type_6/taiwan
+l none usr/share/lib/keytables/type_6/layout_23=../../../../../usr/share/lib/keytables/type_6/turkeyf
+l none usr/share/lib/keytables/type_6/layout_1f=../../../../../usr/share/lib/keytables/type_6/turkeyq
 l none usr/share/lib/keytables/type_6/layout_20=../../../../../usr/share/lib/keytables/type_6/uk
 l none usr/share/lib/keytables/type_6/layout_21=../../../../../usr/share/lib/keytables/type_6/us
 l none usr/share/lib/keytables/type_6/layout_18=../../../../../usr/share/lib/keytables/type_6/slovakia
