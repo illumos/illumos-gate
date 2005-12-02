@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +39,7 @@
 int
 getcwd(char *buf, size_t buflen)
 {
-	int ret;
+	int err;
 	char *kbuf;
 	size_t kbuflen;
 
@@ -54,18 +54,19 @@ getcwd(char *buf, size_t buflen)
 	for (;;) {
 		kbuf = kmem_alloc(kbuflen, KM_SLEEP);
 
-		if ((ret = dogetcwd(kbuf, kbuflen)) == 0)
-			ret = copyout(kbuf, buf, strlen(kbuf) + 1);
+		if (((err = dogetcwd(kbuf, kbuflen)) == 0) &&
+		    (copyout(kbuf, buf, strlen(kbuf) + 1) != 0))
+			err = EFAULT;
 
 		kmem_free(kbuf, kbuflen);
 
-		if (ret == ENAMETOOLONG) {
+		if (err == ENAMETOOLONG) {
 			/*
 			 * If the user's buffer really was too small, give up.
 			 * For some reason, getcwd() uses ERANGE for this case.
 			 */
 			if (kbuflen == buflen) {
-				ret = ERANGE;
+				err = ERANGE;
 				break;
 			}
 			kbuflen = MIN(kbuflen * 2, buflen);
@@ -74,8 +75,5 @@ getcwd(char *buf, size_t buflen)
 		}
 	}
 
-	if (ret)
-		return (set_errno(ret));
-
-	return (ret);
+	return ((err != 0) ? set_errno(err) : 0);
 }
