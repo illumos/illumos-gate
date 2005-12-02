@@ -211,7 +211,7 @@ typedef struct vdev_phys {
 typedef struct vdev_label {
 	char			vl_pad[VDEV_SKIP_SIZE];		/*   8K	*/
 	vdev_boot_header_t	vl_boot_header;			/*   8K	*/
-	vdev_phys_t		vl_vdev_phys;			/* 120K	*/
+	vdev_phys_t		vl_vdev_phys;			/* 112K	*/
 	uberblock_phys_t	vl_uberblock[VDEV_UBERBLOCKS];	/* 128K	*/
 } vdev_label_t;							/* 256K total */
 
