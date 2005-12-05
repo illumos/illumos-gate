@@ -55,6 +55,9 @@ void		add_ck804_isa_bridge_props(dev_info_t *, uchar_t, uchar_t,
 #define	NVIDIA_CK804_ISA_SYSCTRL_BAR_OFF	0x64	/* System Control BAR */
 #define	NVIDIA_CK804_ISA_ANALOG_BAR_OFF		0x68	/* Analog BAR */
 
+#define	NVIDIA_CK804_INTR_BCR_OFF		0x3C	/* NV_XVR_INTR_BCR */
+#define	NVIDIA_CK804_INTR_BCR_SERR_ENABLE	0x02	/* SERR_ENABLE bit */
+
 /* NV_XVR_VEND_CYA1 related defines */
 #define	NVIDIA_CK804_VEND_CYA1_OFF		0xf40	/* NV_XVR_VEND_CYA1 */
 #define	NVIDIA_CK804_VEND_CYA1_ERPT_VAL		0x2000	/* enable CYA1 ERPT */

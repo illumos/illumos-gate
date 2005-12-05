@@ -140,9 +140,10 @@ pcie_error_init(dev_info_t *cdip)
 	uint8_t			header_type;
 	uint8_t			bcr;
 	uint16_t		command_reg, status_reg;
-	uint16_t		cap_ptr, aer_ptr;
+	uint16_t		cap_ptr = 0;
+	uint16_t		aer_ptr = 0;
 	uint16_t		device_ctl;
-	uint16_t		dev_type;
+	uint16_t		dev_type = 0;
 	uint32_t		aer_reg;
 
 	/*
@@ -291,6 +292,14 @@ pcie_ck804_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
 {
 	uint16_t	rc_ctl;
 
+	/* Program SERR_FORWARD bit in NV_XVR_INTR_BCR */
+	rc_ctl = pci_config_get16(cfg_hdl, NVIDIA_CK804_INTR_BCR_OFF + 0x2);
+	pci_config_put16(cfg_hdl, NVIDIA_CK804_INTR_BCR_OFF + 0x2,
+	    rc_ctl | NVIDIA_CK804_INTR_BCR_SERR_ENABLE);
+	PCIE_ERROR_DBG("%s: PCIe NV_XVR_INTR_BCR=0x%x->0x%x\n",
+	    ddi_driver_name(child), rc_ctl,
+	    pci_config_get16(cfg_hdl, NVIDIA_CK804_INTR_BCR_OFF + 0x2));
+
 	if (!pcie_serr_disable_flag) {
 		rc_ctl = pci_config_get16(cfg_hdl, cap_ptr + PCIE_ROOTCTL);
 		pci_config_put16(cfg_hdl, cap_ptr + PCIE_ROOTCTL,
@@ -301,13 +310,14 @@ pcie_ck804_error_init(dev_info_t *child, ddi_acc_handle_t cfg_hdl,
 	}
 
 	/* Root Error Command Register */
-	rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD);
-	if (!pcie_aer_disable_flag)
+	if (aer_ptr && !pcie_aer_disable_flag) {
+		rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD);
 		pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD,
 		    rc_ctl | pcie_root_error_cmd_default);
-	PCIE_ERROR_DBG("%s: PCIe AER RootError Command Register=0x%x->0x%x\n",
-	    ddi_driver_name(child), rc_ctl,
-	    pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD));
+		PCIE_ERROR_DBG("%s: PCIe AER Root Error Command "
+		    "Register=0x%x->0x%x\n", ddi_driver_name(child), rc_ctl,
+		    pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD));
+	}
 }
 
 
@@ -361,10 +371,8 @@ pcie_error_fini(dev_info_t *cdip)
 	}
 
 	cap_ptr = pcie_error_find_cap_reg(cfg_hdl, PCI_CAP_ID_PCI_E);
-	if (cap_ptr == PCI_CAP_NEXT_PTR_NULL) {
-		pci_config_teardown(&cfg_hdl);
-		return;
-	}
+	if (cap_ptr == PCI_CAP_NEXT_PTR_NULL)
+		goto error_fini_exit;
 
 	/* Disable PCI-Express Baseline Error Handling */
 	pci_config_put16(cfg_hdl, cap_ptr + PCIE_DEVCTL, 0x0);
@@ -380,37 +388,30 @@ pcie_error_fini(dev_info_t *cdip)
 	    NVIDIA_CK804_DEVICE_ID))
 		pcie_ck804_error_fini(cfg_hdl, cap_ptr, aer_ptr);
 
-	if (aer_ptr == PCIE_EXT_CAP_NEXT_PTR_NULL) {
-		pci_config_teardown(&cfg_hdl);
-		return;
-	}
+	if (aer_ptr == PCIE_EXT_CAP_NEXT_PTR_NULL)
+		goto error_fini_exit;
 
 	/* Disable AER bits */
-	if (!pcie_aer_disable_flag)
-		dev_type = pci_config_get16(cfg_hdl, cap_ptr + PCIE_PCIECAP) &
-		    PCIE_PCIECAP_DEV_TYPE_MASK;
-
-	/* Disable Uncorrectable errors */
-	if (!pcie_aer_disable_flag)
+	if (!pcie_aer_disable_flag) {
+		/* Disable Uncorrectable errors */
 		pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_UCE_MASK,
 		    PCIE_AER_UCE_BITS);
 
-	/* Disable Correctable errors */
-	if (!pcie_aer_disable_flag)
+		/* Disable Correctable errors */
 		pci_config_put32(cfg_hdl,
 		    aer_ptr + PCIE_AER_CE_MASK, PCIE_AER_CE_BITS);
 
-	/* Disable Secondary Uncorrectable errors if this is a bridge */
-	if (!pcie_aer_disable_flag) {
-		if (!(dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)) {
-			pci_config_teardown(&cfg_hdl);
-				return;
-		}
+		/* Disable Secondary Uncorrectable errors if this is a bridge */
+		dev_type = pci_config_get16(cfg_hdl, cap_ptr + PCIE_PCIECAP) &
+		    PCIE_PCIECAP_DEV_TYPE_MASK;
+		if (!(dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI))
+			goto error_fini_exit;
 
-		/* Disable secondary bus errors */
 		pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_SUCE_MASK,
 		    PCIE_AER_SUCE_BITS);
 	}
+
+error_fini_exit:
 	pci_config_teardown(&cfg_hdl);
 }
 
@@ -428,10 +429,11 @@ pcie_ck804_error_fini(ddi_acc_handle_t cfg_hdl, uint16_t cap_ptr,
 	}
 
 	/* Root Error Command Register */
-	rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD);
-	rc_ctl &= ~pcie_root_error_cmd_default;
-	if (!pcie_aer_disable_flag)
+	if (aer_ptr && !pcie_aer_disable_flag) {
+		rc_ctl = pci_config_get16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD);
+		rc_ctl &= ~pcie_root_error_cmd_default;
 		pci_config_put16(cfg_hdl, aer_ptr + PCIE_AER_RE_CMD, rc_ctl);
+	}
 }
 
 /*
@@ -444,18 +446,19 @@ pcie_error_clear_errors(ddi_acc_handle_t cfg_hdl, uint16_t cap_ptr,
 	uint16_t	device_sts;
 
 	/* 1. clear the Advanced PCIe Errors */
-	if (aer_ptr != PCIE_EXT_CAP_NEXT_PTR_NULL) {
+	if (cap_ptr && aer_ptr) {
 		pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_CE_STS, -1);
 		pci_config_put32(cfg_hdl, aer_ptr + PCIE_AER_UCE_STS, -1);
-		if (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI) {
+		if (dev_type == PCIE_PCIECAP_DEV_TYPE_PCIE2PCI)
 			pci_config_put32(cfg_hdl,
 			    aer_ptr + PCIE_AER_SUCE_STS, -1);
-		}
 	}
 
 	/* 2. clear the PCIe Errors */
-	device_sts = pci_config_get16(cfg_hdl, cap_ptr + PCIE_DEVSTS);
-	pci_config_put16(cfg_hdl, cap_ptr + PCIE_DEVSTS, device_sts);
+	if (cap_ptr) {
+		device_sts = pci_config_get16(cfg_hdl, cap_ptr + PCIE_DEVSTS);
+		pci_config_put16(cfg_hdl, cap_ptr + PCIE_DEVSTS, device_sts);
+	}
 
 	/* 3. clear the Legacy PCI Errors */
 	device_sts = pci_config_get16(cfg_hdl, PCI_CONF_STAT);
@@ -486,10 +489,8 @@ pcie_error_find_cap_reg(ddi_acc_handle_t cfg_hdl, uint8_t cap_id)
 		return (PCI_CAP_NEXT_PTR_NULL);
 
 	caps_ptr = P2ALIGN(pci_config_get8(cfg_hdl, PCI_CONF_CAP_PTR), 4);
-	while (caps_ptr != PCI_CAP_NEXT_PTR_NULL) {
-		if (caps_ptr < PCI_CAP_PTR_OFF)
-			return (PCI_CAP_NEXT_PTR_NULL);
-
+	while (caps_ptr && caps_ptr >= PCI_CAP_PTR_OFF) {
+		caps_ptr &= PCI_CAP_PTR_MASK;
 		cap = pci_config_get8(cfg_hdl, caps_ptr);
 		if (cap == cap_id) {
 			break;
