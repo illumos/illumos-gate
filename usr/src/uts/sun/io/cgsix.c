@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -718,37 +718,6 @@ cg6_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	    (void) cg6_detach(devi, DDI_DETACH);
 	    return (DDI_FAILURE);
 	}
-#if 0
-	if (ddi_map_regs(devi, 0, &softc->rom, softc->addr_rom,
-		    (off_t)CG6_ROM_SZ) != 0) {
-	    (void) cg6_detach(devi, DDI_DETACH);
-	    return (DDI_FAILURE);
-	}
-	if (ddi_map_regs(devi, 0, &softc->dhc, CG6_ADDR_DHC,
-		    (off_t)CG6_DHC_SZ) != 0) {
-	    (void) cg6_detach(devi, DDI_DETACH);
-	    return (DDI_FAILURE);
-	}
-	if (ddi_map_regs(devi, 0, &softc->alt, CG6_ADDR_ALT,
-		    (off_t)CG6_ALT_SZ) != 0) {
-	    (void) cg6_detach(devi, DDI_DETACH);
-	    return (DDI_FAILURE);
-	}
-	/* TODO: uart (future) */
-
-	/* map frame buffer if necessary */
-	if (bytes) {
-	    if (ddi_map_regs(devi, 0, (caddr_t *)&softc->_fb, CG6_ADDR_COLOR,
-		    (off_t)ddi_ptob(devi, ddi_btopr(devi, w * h))) == -1) {
-		(void) cg6_detach(devi, DDI_DETACH);
-		return (DDI_FAILURE);
-	    }
-	    softc->mapped_by_driver =
-		(off_t)ddi_ptob(devi, ddi_btopr(devi, w * h));
-	}
-
-	softc->fbpfnum = hat_getkpfnum((caddr_t)softc->_fb);
-#endif
 
 	softc->chiprev =
 	    *S_FHC(softc) >> FHC_CONFIG_REV_SHIFT & FHC_CONFIG_REV_MASK;
@@ -924,18 +893,6 @@ cg6_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	if (softc->fhcthc)
 	    ddi_unmap_regs(devi, 0,
 		&softc->fhcthc, CG6_ADDR_FHC, CG6_FHCTHC_SZ);
-#if 0
-	if (softc->rom)
-	    ddi_unmap_regs(devi, 0, &softc->rom, softc->addr_rom, CG6_ROM_SZ);
-	if (softc->dhc)
-	    ddi_unmap_regs(devi, 0, &softc->dhc, CG6_ADDR_DHC, CG6_DHC_SZ);
-	if (softc->alt)
-	    ddi_unmap_regs(devi, 0, &softc->alt, CG6_ADDR_ALT, CG6_ALT_SZ);
-	/* TODO: uart (future) */
-	if (softc->_fb && softc->mapped_by_driver)
-	    ddi_unmap_regs(devi, 0, (caddr_t *)&softc->_fb, CG6_ADDR_COLOR,
-		    softc->mapped_by_driver);
-#endif
 	if (softc->intrstats) {
 		kstat_delete(softc->intrstats);
 	}
@@ -961,6 +918,14 @@ static int
 cg6_power(dev_info_t *dip, int cmpt, int level)
 {
 	struct cg6_softc *softc;
+
+	/*
+	 * Framebuffer is represented by cmpt 0.  In cg6, no power
+	 * management is done on the framebuffer itself.  Only the
+	 * monitor (cmpt 1) is being power managed.
+	 */
+	if (cmpt == 0)
+		return (DDI_SUCCESS);
 
 	if (cmpt != 1 || 0 > level || level > 1 ||
 	    (softc = ddi_get_driver_private(dip)) == NULL)
@@ -2363,19 +2328,6 @@ curctx = %x, context = %x\n",
 			return (err);
 		}
 	}
-
-#if 0
-	for (pvts = p->context->pvt; pvts != NULL; pvts = pvts->next) {
-		DEBUGF(7, (CE_CONT, "cg6map_contextmgt: pvts = %x, dhp = %x, \
-cur_ctx = %x, ctx = %x\n",
-			pvts, pvts->dhp, softc->curctx, pvts->context));
-		if ((err = devmap_load(pvts->dhp, pvts->offset,
-				pvts->len, type, rw)) != 0) {
-			mutex_exit(&softc->mutex);
-			return (err);
-		}
-	}
-#endif
 
 	mutex_exit(&softc->mutex);
 
