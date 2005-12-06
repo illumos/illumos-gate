@@ -26,7 +26,7 @@
  * All Rights Reserved
  *
  * Portions of this source code were derived from Berkeley
- * 4.3 BSD under license from the Regents of the University of 
+ * 4.3 BSD under license from the Regents of the University of
  * California.
  */
 
@@ -81,7 +81,7 @@ getgssd_handle()
 	if (first_time == TRUE) {
 		if (uname(&u) == -1)
 			return ((CLIENT *) NULL);
-		if ((hostname = strdup(u.nodename)) == (char *) NULL)
+		if ((hostname = strdup(u.nodename)) == (char *)NULL)
 			return ((CLIENT *) NULL);
 		first_time = FALSE;
 	}
@@ -108,7 +108,7 @@ getgssd_handle()
 		if (clnt) {
 			dprt("got COTS\n");
 		}
-#endif DEBUG
+#endif /* DEBUG */
 	}
 	endnetconfig(localhandle);
 

@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/dnsglue.c
@@ -303,8 +308,6 @@ krb5int_dns_nextans(struct krb5int_dns_state *ds,
 	SAFE_GETUINT16(ds->ansp, ds->anslen, p, 2, rdlen, out);
 
 	if (!INCR_OK(ds->ansp, ds->anslen, p, rdlen))
-	    return -1;
-	if (rdlen > INT_MAX)
 	    return -1;
 	if (nclass == ds->nclass && ntype == ds->ntype) {
 	    *pp = p;

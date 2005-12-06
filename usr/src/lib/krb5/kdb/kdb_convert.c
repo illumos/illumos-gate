@@ -609,12 +609,10 @@ ulog_conv_2logentry(krb5_context context, krb5_db_entry *entries,
 /* END CSTYLED */
 
 			case AT_LEN:
-				if (ent->len >= 0) {
-					ULOG_ENTRY_TYPE(upd, ++final).av_type =
-						AT_LEN;
-					ULOG_ENTRY(upd, final).av_len =
-						(int16_t)ent->len;
-				}
+				ULOG_ENTRY_TYPE(upd, ++final).av_type =
+					AT_LEN;
+				ULOG_ENTRY(upd, final).av_len =
+					(int16_t)ent->len;
 				break;
 
 			default:

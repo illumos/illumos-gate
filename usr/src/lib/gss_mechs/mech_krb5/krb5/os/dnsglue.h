@@ -1,3 +1,8 @@
+/*
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*
  * lib/krb5/os/dnsglue.h
@@ -131,9 +136,9 @@
 #define SAFE_GETUINT16(base, max, ptr, incr, s, label)	\
     do {						\
 	if (!INCR_OK(base, max, ptr, incr)) goto label;	\
-	(s) = (unsigned short)(p)[0] << 8		\
-	    | (unsigned short)(p)[1];			\
-	(p) += (incr);					\
+	(s) = (unsigned short)(ptr)[0] << 8		\
+	    | (unsigned short)(ptr)[1];			\
+	(ptr) += (incr);					\
     } while (0)
 
 struct krb5int_dns_state;

@@ -442,9 +442,9 @@ krb5_fcc_read(krb5_context context, krb5_ccache id, krb5_pointer buf, unsigned i
  * KRB5_CC_NOMEM
  */
 
-#define ALLOC(NUM,TYPE) \
-    (((NUM) <= (((size_t)0-1)/ sizeof(TYPE)))		\
-     ? (TYPE *) calloc((NUM), sizeof(TYPE))		\
+#define ALLOC(NUM,TYPE)	\
+    (((NUM) <= (((size_t)0-1)/ sizeof(TYPE)))         \
+     ? (TYPE *) calloc((NUM), sizeof(TYPE))	      \
      : (errno = ENOMEM,(TYPE *) 0))
 
 static krb5_error_code
@@ -457,7 +457,7 @@ krb5_fcc_read_principal(krb5_context context, krb5_ccache id, krb5_principal *pr
     int i;
 
     k5_assert_locked(&((krb5_fcc_data *) id->data)->lock);
-
+    
     if (data->version == KRB5_FCC_FVNO_1) {
 	type = KRB5_NT_UNKNOWN;
     } else {
@@ -598,7 +598,7 @@ krb5_fcc_read_keyblock(krb5_context context, krb5_ccache id, krb5_keyblock *keyb
 	 return KRB5_CC_NOMEM;
      if ( keyblock->length == 0 )
 	 return KRB5_OK;
-     keyblock->contents = ALLOC (keyblock->length, krb5_octet);
+     keyblock->contents = calloc(keyblock->length, sizeof(krb5_octet));
      if (keyblock->contents == NULL)
 	 return KRB5_CC_NOMEM;
      
