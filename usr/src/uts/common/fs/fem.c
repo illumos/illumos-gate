@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -3009,7 +3009,7 @@ static int
 fem_remove_node(struct fem_head *fh, void **baseops, void *opset, void *datap)
 {
 	struct fem_list *sp;
-	int		error;
+	int		error = 0;
 	int		retry;
 
 	if (fh == NULL) {
@@ -3067,7 +3067,13 @@ fem_remove_node(struct fem_head *fh, void **baseops, void *opset, void *datap)
 				fem_release(nsp);
 				retry = 1;
 			}
-			fem_release(sp);
+			/*
+			 * If error is set, then we tried to remove a node
+			 * from the list, but failed.  This means that we
+			 * will still be using this list so don't release it.
+			 */
+			if (error == 0)
+				fem_release(sp);
 			fem_unlock(fh);
 		}
 	} while (retry);
