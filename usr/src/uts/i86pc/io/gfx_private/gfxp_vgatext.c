@@ -257,7 +257,7 @@ gfxp_vgatext_attach(dev_info_t *devi, ddi_attach_cmd_t cmd,
 				MYNAME ": can't find reg entry for memory");
 			goto fail;
 		}
-	} else if (STREQ(parent_type, "pci")) {
+	} else if (STREQ(parent_type, "pci") || STREQ(parent_type, "pciex")) {
 		reg_rnumber = vgatext_get_pci_reg_index(devi,
 			PCI_REG_ADDR_M|PCI_REG_REL_M,
 			PCI_ADDR_IO|PCI_RELOCAT_B, VGA_REG_ADDR,
