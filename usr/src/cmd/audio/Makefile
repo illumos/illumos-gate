@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,15 +30,12 @@
 
 include ../Makefile.cmd
 
-AUDIOCONVERT= audioconvert
-# XX64 audioconvert requires C++
-$(__GNUC)AUDIOCONVERT=
 SUBDIRS =			\
 		mixerctl	\
 		utilities .WAIT \
 		audioplay	\
 		audiorecord	\
-		$(AUDIOCONVERT)	\
+		audioconvert	\
 		samples
 
 AUDIODIR= $(ROOT)/usr/share/audio
