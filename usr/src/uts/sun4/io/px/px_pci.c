@@ -277,11 +277,17 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			ddi_get_soft_state(pxb_state, instance);
 		(void) pcie_pwr_resume(devi);
 
+		mutex_enter(&DEVI(devi)->devi_lock);
 		DEVI_SET_ATTACHING(devi);
+		mutex_exit(&DEVI(devi)->devi_lock);
+
 		if (pxb_fm_init(pxb) != DDI_SUCCESS)
 			cmn_err(CE_WARN, "px_pci: dip0x%p failed pxb_fm_init "
 			    "at resume\n", (void *) devi);
+
+		mutex_enter(&DEVI(devi)->devi_lock);
 		DEVI_CLR_ATTACHING(devi);
+		mutex_exit(&DEVI(devi)->devi_lock);
 
 		return (DDI_SUCCESS);
 
@@ -471,9 +477,15 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		pxb = (pxb_devstate_t *)
 			ddi_get_soft_state(pxb_state, ddi_get_instance(devi));
 
+		mutex_enter(&DEVI(devi)->devi_lock);
 		DEVI_SET_DETACHING(devi);
+		mutex_exit(&DEVI(devi)->devi_lock);
+
 		pxb_fm_fini(pxb);
+
+		mutex_enter(&DEVI(devi)->devi_lock);
 		DEVI_CLR_DETACHING(devi);
+		mutex_exit(&DEVI(devi)->devi_lock);
 
 		error = pcie_pwr_suspend(devi);
 

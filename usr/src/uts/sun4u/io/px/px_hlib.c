@@ -2494,7 +2494,7 @@ static void
 msiq_resume(devhandle_t dev_hdl, pxu_t *pxu_p)
 {
 	size_t	bufsz;
-	uint64_t *cur_p;
+	uint64_t *cur_p, state;
 	int i;
 
 	bufsz = MSIQ_STATE_SIZE + MSIQ_MAPPING_SIZE + MSIQ_OTHER_SIZE;
@@ -2507,11 +2507,10 @@ msiq_resume(devhandle_t dev_hdl, pxu_t *pxu_p)
 
 	/* Restore EQ states */
 	for (i = 0; i < EVENT_QUEUE_STATE_ENTRIES; i++, cur_p++) {
-		if (((*cur_p) & EVENT_QUEUE_STATE_ENTRIES_STATE_MASK) ==
-		    EQ_ACTIVE_STATE) {
+		state = (*cur_p) & EVENT_QUEUE_STATE_ENTRIES_STATE_MASK;
+		if ((state == EQ_ACTIVE_STATE) || (state == EQ_ERROR_STATE))
 			CSRA_BS((caddr_t)dev_hdl, EVENT_QUEUE_CONTROL_SET,
 			    i, ENTRIES_EN);
-		}
 	}
 
 	/* Restore MSI mapping */
