@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -202,6 +201,25 @@ exec_common(const char *fname, const char **argp, const char **envp)
 		pn_free(&pn);
 		goto out;
 	}
+
+	/*
+	 * We do not allow executing files in attribute directories.
+	 * We test this by determining whether the resolved path
+	 * contains a "/" when we're in an attribute directory;
+	 * only if the pathname does not contain a "/" the resolved path
+	 * points to a file in the current working (attribute) directory.
+	 */
+	if ((p->p_user.u_cdir->v_flag & V_XATTRDIR) != 0 &&
+	    strchr(resolvepn.pn_path, '/') == NULL) {
+		if (dir != NULL)
+			VN_RELE(dir);
+		error = EACCES;
+		pn_free(&resolvepn);
+		pn_free(&pn);
+		VN_RELE(vp);
+		goto out;
+	}
+
 	bzero(exec_file, MAXCOMLEN+1);
 	(void) strncpy(exec_file, pn.pn_path, MAXCOMLEN);
 	bzero(&args, sizeof (args));
