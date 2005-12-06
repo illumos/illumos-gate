@@ -48,12 +48,3 @@ fi
 if [ -f /etc/rctladm.conf ] && [ -x /usr/sbin/rctladm ]; then
 	/usr/sbin/rctladm -u
 fi
-
-#
-# Run pooladm to configure system pools.  See pooladm(1m) for more information.
-#
-if [ -f /etc/pooladm.conf ] && [ -x /usr/sbin/pooladm ] && \
-    [ "$_INIT_ZONENAME" = "global" ]; then
-	/usr/sbin/pooladm -e
-	/usr/sbin/pooladm -c
-fi

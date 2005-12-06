@@ -53,6 +53,7 @@
 
 #define	POOLD_DEF_CLASSPATH	"/usr/lib/pool/JPool.jar"
 #define	POOLD_DEF_LIBPATH	"/usr/lib/pool"
+#define	SMF_SVC_INSTANCE	"svc:/system/pools/dynamic:default"
 
 #if defined(sparc)
 #define	PLAT	"sparc"
@@ -63,8 +64,6 @@
 #error Unrecognized platform.
 #endif
 #endif
-
-#define	PID_PROPERTY_NAME	"system.poold.pid"
 
 #define	CLASS_FIELD_DESC(class_desc)	"L" class_desc ";"
 
@@ -190,58 +189,6 @@ pu_die(const char *fmt, ...)
 }
 
 /*
- * Update the "system.poold.pid" to reflect this instance of poold only
- * if the property hasn't been set already to reflect an existing
- * process, and mode is not set to PGAS_GET_ONLY.  Returns the
- * property's pre-existing value, or -1 otherwise.
- */
-static pid_t
-poold_get_and_set_pid(pgas_mode_t mode)
-{
-	pool_conf_t *conf;
-	pool_elem_t *pe;
-	pool_value_t *val;
-	int64_t ival;
-
-	if (!(conf = pool_conf_alloc()))
-		return ((pid_t)-1);
-
-	if (pool_conf_open(conf, pool_dynamic_location(), PO_RDWR) != 0) {
-		(void) pool_conf_free(conf);
-		return ((pid_t)-1);
-	}
-
-	pe = pool_conf_to_elem(conf);
-	if (!(val = pool_value_alloc())) {
-		(void) pool_conf_close(conf);
-		return ((pid_t)-1);
-	}
-
-	if (pool_get_property(conf, pe, PID_PROPERTY_NAME, val) == POC_INT) {
-		if (pool_value_get_int64(val, &ival) != 0) {
-			(void) pool_value_free(val);
-			(void) pool_conf_close(conf);
-			return ((pid_t)-1);
-		}
-	} else {
-		ival = (pid_t)-1;
-	}
-
-	if (mode == PGAS_GET_AND_SET) {
-		ival = getpid();
-		pool_value_set_int64(val, ival);
-		(void) pool_put_property(conf, pe, PID_PROPERTY_NAME, val);
-		(void) pool_conf_commit(conf, 0);
-	}
-
-	(void) pool_value_free(val);
-	(void) pool_conf_close(conf);
-	pool_conf_free(conf);
-
-	return ((pid_t)ival);
-}
-
-/*
  * Reconfigure the JVM by simply updating a dummy property on the
  * system element to force pool_conf_update() to detect a change.
  */
@@ -328,8 +275,20 @@ handle_sig(void *arg)
 		char buf[SIG2STR_MAX];
 		int detach_required = 0;
 
-		if ((sig = sigwait(&hdl_set)) < 0)
+retry:
+		if ((sig = sigwait(&hdl_set)) < 0) {
+			/*
+			 * We used forkall() previously to ensure that
+			 * all threads started by the JVM are
+			 * duplicated in the child. Since forkall()
+			 * can cause blocking system calls to be
+			 * interrupted, check to see if the errno is
+			 * EINTR and if it is wait again.
+			 */
+			if (errno == EINTR)
+				goto retry;
 			pu_die("unexpected error: %d\n", errno);
+		}
 		(void) sig2str(sig, buf);
 		switch (sig) {
 		case SIGHUP:
@@ -410,7 +369,6 @@ main(int argc, char *argv[])
 {
 	char c;
 	char log_severity[16] = "";
-	pid_t pid;
 	JavaVMInitArgs vm_args;
 	JavaVMOption vm_opts[5];
 	int nopts = 0;
@@ -429,6 +387,7 @@ main(int argc, char *argv[])
 	int explain_ex = 1;
 	JavaVM *jvm_tmp;
 	pthread_t hdl_thread;
+	FILE *p;
 
 	pname = pu_getpname(argv[0]);
 	openlog(pname, 0, LOG_DAEMON);
@@ -456,20 +415,59 @@ main(int argc, char *argv[])
 	}
 
 	/*
-	 * Verify no other poold is running.  This condition is checked
-	 * again later, but should be checked now since it is more
-	 * serious (i.e.  should be reported before) than a lack of
-	 * privileges.
-	 */
-	if (((pid = poold_get_and_set_pid(PGAS_GET_ONLY)) != (pid_t)-1) &&
-	    pid != getpid() && kill(pid, 0) == 0)
-		pu_die(gettext("poold is already active (process %ld)\n"), pid);
-
-	/*
 	 * Check permission
 	 */
 	if (!priv_ineffect(PRIV_SYS_RES_CONFIG))
 		pu_die(gettext(ERR_PRIVILEGE), PRIV_SYS_RES_CONFIG);
+
+	/*
+	 * In order to avoid problems with arbitrary thread selection
+	 * when handling asynchronous signals, dedicate a thread to
+	 * look after these signals.
+	 */
+	if (sigemptyset(&hdl_set) < 0 ||
+	    sigaddset(&hdl_set, SIGHUP) < 0 ||
+	    sigaddset(&hdl_set, SIGTERM) < 0 ||
+	    sigaddset(&hdl_set, SIGINT) < 0 ||
+	    pthread_sigmask(SIG_BLOCK, &hdl_set, NULL) ||
+	    pthread_create(&hdl_thread, NULL, handle_sig, NULL))
+		pu_die(gettext("can't install signal handler"));
+
+	/*
+	 * If the -l flag is supplied, terminate the SMF service and
+	 * run interactively from the command line.
+	 */
+	if (lflag) {
+		char *cmd = "/usr/sbin/svcadm disable -st " SMF_SVC_INSTANCE;
+
+		if (getenv("SMF_FMRI") != NULL)
+			pu_die("-l option illegal: %s\n", SMF_SVC_INSTANCE);
+		/*
+		 * Since disabling a service isn't synchronous, use the
+		 * synchronous option from svcadm to achieve synchronous
+		 * behaviour.
+		 * This is not very satisfactory, but since this is only
+		 * for use in debugging scenarios, it will do until there
+		 * is a C API to synchronously shutdown a service in SMF.
+		 */
+		if ((p = popen(cmd, "w")) == NULL || pclose(p) != 0)
+			pu_die("could not temporarily disable service: %s\n",
+			    SMF_SVC_INSTANCE);
+	} else {
+		/*
+		 * Check if we are running as a SMF service. If we
+		 * aren't, terminate this process after enabling the
+		 * service.
+		 */
+		if (getenv("SMF_FMRI") == NULL) {
+			char *cmd = "/usr/sbin/svcadm enable -s " \
+			    SMF_SVC_INSTANCE;
+			if ((p = popen(cmd, "w")) == NULL || pclose(p) != 0)
+				pu_die("could not enable "
+				    "service: %s\n", SMF_SVC_INSTANCE);
+			return (E_PO_SUCCESS);
+		}
+	}
 
 	/*
 	 * Establish the classpath and LD_LIBRARY_PATH for native
@@ -512,43 +510,6 @@ main(int argc, char *argv[])
 	vm_args.nOptions = nopts;
 	vm_args.ignoreUnrecognized = JNI_FALSE;
 	vm_args.version = 0x00010002;
-
-	/*
-	 * XXX - Forking after the VM is created is desirable to
-	 * guarantee reporting of errors, but cannot be done (see
-	 * 4919246).
-	 *
-	 * If invoked by libpool(3LIB), it's set the system.poold.pid
-	 * property and forked already.  If invoked directly and -l is
-	 * specified, forking is not desired.
-	 */
-	if (!lflag && pid != getpid())
-		switch (fork()) {
-		case 0:
-			(void) setsid();
-			(void) fclose(stdin);
-			(void) fclose(stdout);
-			(void) fclose(stderr);
-			break;
-		case -1:
-			pu_die(gettext("cannot fork"));
-			/*NOTREACHED*/
-		default:
-			return (E_PO_SUCCESS);
-		}
-
-	/*
-	 * In order to avoid problems with arbitrary thread selection
-	 * when handling asynchronous signals, dedicate a thread to
-	 * look after these signals.
-	 */
-	if (sigemptyset(&hdl_set) < 0 ||
-	    sigaddset(&hdl_set, SIGHUP) < 0 ||
-	    sigaddset(&hdl_set, SIGTERM) < 0 ||
-	    sigaddset(&hdl_set, SIGINT) < 0 ||
-	    pthread_sigmask(SIG_BLOCK, &hdl_set, NULL) ||
-	    pthread_create(&hdl_thread, NULL, handle_sig, NULL))
-		pu_die(gettext("can't install signal handler"));
 
 	/*
 	 * Use jvm_tmp when creating the jvm to prevent race
@@ -648,20 +609,23 @@ main(int argc, char *argv[])
 	log_dest = LD_JAVA;
 
 	/*
-	 * Now we're ready to start poold.  Store our pid in the pools
-	 * configuration to mark that an instance of poold is active,
-	 * then invoke Poold.run(), which does not normally return.
-	 *
-	 * Note that the ignoreUpdates variable in Poold is used to
-	 * allow Poold to ignore the pools configuration update that
-	 * this change triggers. If this code is ever modified to
-	 * remove or modify this logic, then the Poold class must also
-	 * be modified to keep the actions synchronized.
+	 * If invoked directly and -l is specified, forking is not
+	 * desired.
 	 */
-
-	if (((pid = poold_get_and_set_pid(PGAS_GET_AND_SET)) != (pid_t)-1) &&
-	    pid != getpid() && kill(pid, 0) == 0)
-		pu_die(gettext("poold is already active (process %ld)\n"), pid);
+	if (!lflag)
+		switch (forkall()) {
+		case 0:
+			(void) setsid();
+			(void) fclose(stdin);
+			(void) fclose(stdout);
+			(void) fclose(stderr);
+			break;
+		case -1:
+			pu_die(gettext("cannot fork"));
+			/*NOTREACHED*/
+		default:
+			return (E_PO_SUCCESS);
+		}
 
 	(void) pthread_mutex_lock(&instance_running_lock);
 	instance_running = 1;

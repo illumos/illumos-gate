@@ -117,8 +117,7 @@ public class Pool extends Element {
 
 		if ((resources = PoolInternal.pool_query_pool_resources(
 			 _conf.getConf(), getPool(), values)) == null) {
-			if (PoolInternal.pool_error() == 0 ||
-			    PoolInternal.pool_error() ==
+			if (PoolInternal.pool_error() ==
 			    PoolInternal.POE_INVALID_SEARCH)
 				return new ArrayList();
 			else

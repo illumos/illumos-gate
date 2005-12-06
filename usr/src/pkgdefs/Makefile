@@ -251,6 +251,7 @@ COMMON_SUBDIRS= \
 	SUNWpl5u \
 	SUNWpl5v \
 	SUNWpool \
+	SUNWpoold \
 	SUNWpoolr \
 	SUNWppm \
 	SUNWpppd \

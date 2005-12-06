@@ -131,8 +131,7 @@ public class Resource extends Element
 
 		if ((components = PoolInternal.pool_query_resource_components(
 		    _conf.getConf(), getResource(), values)) == null) {
-			if (PoolInternal.pool_error() == 0 ||
-			    PoolInternal.pool_error() ==
+			if (PoolInternal.pool_error() ==
 			    PoolInternal.POE_INVALID_SEARCH)
 				return new ArrayList();
 			else

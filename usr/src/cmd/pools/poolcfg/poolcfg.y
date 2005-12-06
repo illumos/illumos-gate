@@ -20,7 +20,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -328,6 +328,11 @@ create_command: PCC_CREATE entity name
 		switch ($2) {
 		case PCE_SYSTEM:
 			$$->cmd = &parser_conf_create;
+			/*
+			 * When creating a new system element, ensure
+			 * pre-existing errors are ignored.
+			 */
+			conf_list_error = conf_edit_error = POE_OK;
 			break;
 		case PCE_POOL:
 			$$->cmd = &parser_pool_create;

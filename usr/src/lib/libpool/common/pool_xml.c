@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2141,7 +2141,6 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 				if (pool_build_xpath_buf(prov, src, PEC_SYSTEM,
 				    props, cb, PO_TRUE) == PO_FAIL) {
 					free_char_buf(cb);
-					pool_seterror(POE_INVALID_SEARCH);
 					return (NULL);
 				}
 			}
@@ -2149,7 +2148,6 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 				if (pool_build_xpath_buf(prov, src, PEC_POOL,
 				    props, cb, PO_TRUE) == PO_FAIL) {
 					free_char_buf(cb);
-					pool_seterror(POE_INVALID_SEARCH);
 					return (NULL);
 				}
 			}
@@ -2158,7 +2156,6 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 				    PEC_RES_COMP, props, cb, PO_TRUE)
 				    == PO_FAIL) {
 					free_char_buf(cb);
-					pool_seterror(POE_INVALID_SEARCH);
 					return (NULL);
 				}
 			} else if ((classes & PEC_QRY_RES_AGG) != 0) {
@@ -2166,7 +2163,6 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 				    PEC_RES_AGG, props, cb, PO_TRUE)
 				    == PO_FAIL) {
 					free_char_buf(cb);
-					pool_seterror(POE_INVALID_SEARCH);
 					return (NULL);
 				}
 			}
@@ -2186,7 +2182,6 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 			if (pool_build_xpath_buf(prov, src, PEC_SYSTEM, props,
 			    cb, PO_FALSE) == PO_FAIL) {
 				free_char_buf(cb);
-				pool_seterror(POE_INVALID_SEARCH);
 				return (NULL);
 			}
 		}
@@ -2194,7 +2189,6 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 			if (pool_build_xpath_buf(prov, src, PEC_POOL, props,
 			    cb, PO_FALSE) == PO_FAIL) {
 				free_char_buf(cb);
-				pool_seterror(POE_INVALID_SEARCH);
 				return (NULL);
 			}
 		}
@@ -2202,7 +2196,6 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 			if (pool_build_xpath_buf(prov, src, PEC_RES_COMP, props,
 			    cb, PO_FALSE) == PO_FAIL) {
 				free_char_buf(cb);
-				pool_seterror(POE_INVALID_SEARCH);
 				return (NULL);
 			}
 		}
@@ -2210,7 +2203,6 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 			if (pool_build_xpath_buf(prov, src, PEC_RES_AGG, props,
 			    cb, PO_FALSE) == PO_FAIL) {
 				free_char_buf(cb);
-				pool_seterror(POE_INVALID_SEARCH);
 				return (NULL);
 			}
 		}
@@ -2218,7 +2210,6 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 			if (pool_build_xpath_buf(prov, src, PEC_COMP, props,
 			    cb, PO_FALSE) == PO_FAIL) {
 				free_char_buf(cb);
-				pool_seterror(POE_INVALID_SEARCH);
 				return (NULL);
 			}
 		}
@@ -2255,6 +2246,8 @@ pool_xml_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 	/*
 	 * Generate the result set and wrap the results as pool_elem_t
 	 */
+	if (rs->pxr_path->nodesetval->nodeNr == 0)
+		pool_seterror(POE_INVALID_SEARCH);
 	return ((pool_result_set_t *)rs);
 }
 
@@ -2392,6 +2385,7 @@ pool_build_xpath_buf(pool_xml_connection_t *prov, const pool_elem_t *src,
 			break;
 		default:
 			free(type_prefix);
+			pool_seterror(POE_INVALID_SEARCH);
 			return (PO_FAIL);
 		}
 		if (last_prop_name != NULL) {

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -316,11 +316,6 @@ final class Poold
 	 * output the "starting" message on the first.
 	 */
 	private AtomicBoolean firstInitialization = new AtomicBoolean(true);
-
-	/**
-	 * Ignore configuration updates for the next interval?
-	 */
-	private boolean ignoreUpdates = true;
 
 	/**
 	 * Flags whether poold should run or exit.
@@ -807,16 +802,6 @@ final class Poold
 		while (shouldRun.get()) {
 			try {
 				changed = conf.update();
-				/*
-				 * poold modifies the configuration
-				 * during startup (updating the PID of
-				 * poold) so we have to ignore our
-				 * first ever configuration update.
-				 */
-				if (ignoreUpdates) {
-					ignoreUpdates = false;
-					changed = 0;
-				}
 				assert(!confRequired || confRequired &&
 				    changed != 0);
 				if (changed != 0) {

@@ -20,17 +20,22 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/pools/Makefile
 #
 
+MANIFEST=	pools.xml
+SVCMETHOD=	svc-pools
+
 include ../Makefile.cmd
 
 SUBDIRS=	pooladm poolbind poolcfg poolstat poold
+
+ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
 
 all :=		TARGET = all
 install :=	TARGET = install
@@ -39,9 +44,15 @@ clobber :=	TARGET = clobber
 lint :=		TARGET = lint
 _msg :=		TARGET = _msg
 
+$(ROOTMANIFEST):= 	FILEMODE= 444
+
 .KEEP_STATE:
 
-all install lint clean clobber _msg: $(SUBDIRS)
+all lint clean clobber _msg: $(SUBDIRS)
+
+install: $(SUBDIRS) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
+
+check:	$(CHKMANIFEST)
 
 $(SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)

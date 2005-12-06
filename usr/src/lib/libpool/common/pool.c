@@ -97,6 +97,7 @@
 #define	XFER_SUCCESS	PO_SUCCESS
 #define	XFER_CONTINUE	1
 
+#define	SMF_SVC_INSTANCE	"svc:/system/pools:default"
 #define	E_ERROR		1		/* Exit status for error */
 
 #ifndef	TEXT_DOMAIN
@@ -145,7 +146,6 @@ static int pool_conf_check(const pool_conf_t *);
 static void free_value_list(int, pool_value_t **);
 static int setup_transfer(pool_conf_t *, pool_resource_t *, pool_resource_t *,
     uint64_t, uint64_t *, uint64_t *);
-static int pool_start_poold(void);
 
 /*
  * Return the "static" location string for libpool.
@@ -709,70 +709,9 @@ pool_get_status(int *state)
 }
 
 int
-pool_start_poold()
-{
-	pool_value_t val = POOL_VALUE_INITIALIZER;
-	pool_conf_t *conf;
-	pool_elem_t *pe;
-	pid_t pid;
-
-	switch (pid = fork()) {
-	case 0:
-		/*
-		 * Become a child of init.
-		 */
-		switch (fork()) {
-		case 0:
-			break;
-		case -1:
-			dprintf("poold fork failed %d\n", errno);
-			pool_seterror(POE_SYSTEM);
-			return (PO_FAIL);
-		default:
-			exit(0);
-			break;
-		}
-
-		/*
-		 * Store the pid as a property
-		 */
-		conf = pool_conf_alloc();
-		(void) pool_conf_open(conf,
-		    pool_dynamic_location(), PO_RDWR);
-		pe = pool_conf_to_elem(conf);
-		pool_value_set_int64(&val, getpid());
-		(void) pool_put_property(conf, pe,
-		    "system.poold.pid", &val);
-		(void) pool_conf_commit(conf, 0);
-		(void) pool_conf_close(conf);
-		pool_conf_free(conf);
-		(void) setsid();
-		(void) fclose(stdin);
-		(void) fclose(stdout);
-		(void) fclose(stderr);
-		if (execl("/usr/lib/pool/poold", "usr/lib/pool/poold", NULL) <
-		    0) {
-			dprintf("poold exec() failed (errno %d)\n", errno);
-			pool_seterror(POE_SYSTEM);
-			exit(E_ERROR);
-		}
-		break;
-	case -1:
-		dprintf("poold fork failed %d\n", errno);
-		pool_seterror(POE_SYSTEM);
-		return (PO_FAIL);
-	default:
-		(void) waitpid(pid, NULL, 0);
-		break;
-	}
-	return (PO_SUCCESS);
-}
-
-int
 pool_set_status(int state)
 {
 	int old_state;
-	int64_t pid;
 
 	if (pool_get_status(&old_state) != PO_SUCCESS) {
 		pool_seterror(POE_SYSTEM);
@@ -783,24 +722,32 @@ pool_set_status(int state)
 		int fd;
 		pool_status_t status;
 
-		if (state == 0) {
-			pool_value_t val = POOL_VALUE_INITIALIZER;
-			pool_conf_t *conf;
-			pool_elem_t *pe;
-
-			conf = pool_conf_alloc();
-			(void) pool_conf_open(conf, pool_dynamic_location(),
-			    PO_RDWR);
-			pe = pool_conf_to_elem(conf);
-			if (pool_get_property(conf, pe, "system.poold.pid",
-				&val) != POC_INVAL && pool_value_get_int64(&val,
-				    &pid) == PO_SUCCESS) {
-				(void) kill((pid_t)pid, SIGTERM);
-				(void) pool_rm_property(conf, pe,
-				    "system.poold.pid");
+		/*
+		 * Changing the status of pools is performed by enabling
+		 * or disabling the pools service instance. If this
+		 * function has not been invoked by startd then we simply
+		 * enable/disable the service and return success.
+		 *
+		 * There is no way to specify that state changes must be
+		 * synchronous using the library API as yet, so we use
+		 * the -s option provided by svcadm.
+		 */
+		if (getenv("SMF_FMRI") == NULL) {
+			FILE *p;
+			if (state) {
+				char *cmd = "/usr/sbin/svcadm enable -st " \
+				    SMF_SVC_INSTANCE;
+				if ((p = popen(cmd, "w")) == NULL ||
+				    pclose(p) != 0)
+					return (PO_FAIL);
+			} else {
+				char *cmd = "/usr/sbin/svcadm disable -st " \
+				    SMF_SVC_INSTANCE;
+				if ((p = popen(cmd, "w")) == NULL ||
+				    pclose(p) != 0)
+					return (PO_FAIL);
 			}
-			(void) pool_conf_close(conf);
-			pool_conf_free(conf);
+			return (PO_SUCCESS);
 		}
 
 		if ((fd = open(pool_dynamic_location(), O_RDWR | O_EXCL)) < 0) {
@@ -818,38 +765,6 @@ pool_set_status(int state)
 
 		(void) close(fd);
 
-		/*
-		 * Start/Stop poold.
-		 */
-		if (state) {
-			return (pool_start_poold());
-		}
-	} else {
-		if (state) {
-			pool_value_t val = POOL_VALUE_INITIALIZER;
-			pool_conf_t *conf;
-			pool_elem_t *pe;
-			int ret = PO_SUCCESS;
-
-			conf = pool_conf_alloc();
-			(void) pool_conf_open(conf, pool_dynamic_location(),
-			    PO_RDWR);
-			pe = pool_conf_to_elem(conf);
-			if (pool_get_property(conf, pe, "system.poold.pid",
-				&val) != POC_INVAL && pool_value_get_int64(&val,
-				    &pid) == PO_SUCCESS)
-				if (kill((pid_t)pid, SIGHUP) < 0) {
-					(void) pool_rm_property(conf, pe,
-					    "system.poold.pid");
-					(void) pool_conf_close(conf);
-					pool_conf_free(conf);
-					ret = pool_start_poold();
-				} else {
-					(void) pool_conf_close(conf);
-					pool_conf_free(conf);
-				}
-			return (ret);
-		}
 	}
 	return (PO_SUCCESS);
 }
@@ -1801,7 +1716,6 @@ pool_get_pool(const pool_conf_t *conf, const char *name)
 	}
 	rs = pool_query_pools(conf, &size, props);
 	if (rs == NULL) { /* Can't find a pool to match the name */
-		pool_seterror(POE_BADPARAM);
 		return (NULL);
 	}
 	if (size != 1) {
@@ -1834,12 +1748,10 @@ pool_query_pools(const pool_conf_t *conf, uint_t *size, pool_value_t **props)
 	}
 	rs = pool_exec_query(conf, NULL, NULL, PEC_QRY_POOL, props);
 	if (rs == NULL) {
-		pool_seterror(POE_BADPARAM);
 		return (NULL);
 	}
 	if ((*size = pool_rs_count(rs)) == 0) {
 		(void) pool_rs_close(rs);
-		pool_seterror(POE_INVALID_SEARCH);
 		return (NULL);
 	}
 	if ((result = malloc(sizeof (pool_t *) * (*size + 1))) == NULL) {
@@ -1912,7 +1824,6 @@ pool_get_resource(const pool_conf_t *conf, const char *sz_type,
 	free_char_buf(cb);
 	rs = pool_query_resources(conf, &size, props);
 	if (rs == NULL) {
-		pool_seterror(POE_BADPARAM);
 		return (NULL);
 	}
 	if (size != 1) {
@@ -1949,12 +1860,10 @@ pool_query_resources(const pool_conf_t *conf, uint_t *size,
 
 	rs = pool_exec_query(conf, NULL, NULL, PEC_QRY_RES, props);
 	if (rs == NULL) {
-		pool_seterror(POE_BADPARAM);
 		return (NULL);
 	}
 	if ((*size = pool_rs_count(rs)) == 0) {
 		(void) pool_rs_close(rs);
-		pool_seterror(POE_INVALID_SEARCH);
 		return (NULL);
 	}
 	if ((result = malloc(sizeof (pool_resource_t *) * (*size + 1)))
@@ -2617,12 +2526,10 @@ pool_query_pool_resources(const pool_conf_t *conf, const pool_t *pp,
 
 	rs = pool_exec_query(conf, pe, "res", PEC_QRY_RES, props);
 	if (rs == NULL) {
-		pool_seterror(POE_BADPARAM);
 		return (NULL);
 	}
 	if ((*size = pool_rs_count(rs)) == 0) {
 		(void) pool_rs_close(rs);
-		pool_seterror(POE_INVALID_SEARCH);
 		return (NULL);
 	}
 	if ((result = malloc(sizeof (pool_resource_t *) * (*size + 1)))
@@ -2694,12 +2601,10 @@ pool_query_resource_components(const pool_conf_t *conf,
 
 	rs = pool_exec_query(conf, pe, NULL, PEC_QRY_COMP, props);
 	if (rs == NULL) {
-		pool_seterror(POE_BADPARAM);
 		return (NULL);
 	}
 	if ((*size = pool_rs_count(rs)) == 0) {
 		(void) pool_rs_close(rs);
-		pool_seterror(POE_INVALID_SEARCH);
 		return (NULL);
 	}
 	if ((result = malloc(sizeof (pool_component_t *) * (*size + 1)))

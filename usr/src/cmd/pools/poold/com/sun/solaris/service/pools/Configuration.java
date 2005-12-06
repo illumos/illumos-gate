@@ -338,8 +338,7 @@ public class Configuration extends Element
 
 		if ((pools = PoolInternal.pool_query_pools(getConf(), values))
 		    == null) {
-			if (PoolInternal.pool_error() == 0 ||
-			    PoolInternal.pool_error() ==
+			if (PoolInternal.pool_error() ==
 			    PoolInternal.POE_INVALID_SEARCH)
 				return new ArrayList();
 			else
@@ -447,8 +446,7 @@ public class Configuration extends Element
 
 		if ((resources = PoolInternal.pool_query_resources(getConf(),
 		    values)) == null) {
-			if (PoolInternal.pool_error() == 0 ||
-			    PoolInternal.pool_error() ==
+			if (PoolInternal.pool_error() ==
 			    PoolInternal.POE_INVALID_SEARCH)
 				return new ArrayList();
 			else
@@ -525,8 +523,7 @@ public class Configuration extends Element
 		
 		if ((components = PoolInternal.pool_query_components(getConf(),
 		    values)) == null) {
-			if (PoolInternal.pool_error() == 0 ||
-			    PoolInternal.pool_error() ==
+			if (PoolInternal.pool_error() ==
 			    PoolInternal.POE_INVALID_SEARCH)
 				return new ArrayList();
 			else
@@ -586,8 +583,7 @@ public class Configuration extends Element
 
 		if ((components = PoolInternal.pool_query_components(getConf(),
 		    values)) == null) {
-			if (PoolInternal.pool_error() == 0 ||
-			    PoolInternal.pool_error() ==
+			if (PoolInternal.pool_error() ==
 			    PoolInternal.POE_INVALID_SEARCH)
 				return new ArrayList();
 			else

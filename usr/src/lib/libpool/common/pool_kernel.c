@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1357,6 +1357,8 @@ pool_knl_exec_query(const pool_conf_t *conf, const pool_elem_t *src,
 	} else
 		dict_map(prov->pkc_elements, build_result_set, &qo);
 
+	if (rs->pkr_count == 0)
+		pool_seterror(POE_INVALID_SEARCH);
 	return ((pool_result_set_t *)rs);
 }
 

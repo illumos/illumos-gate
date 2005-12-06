@@ -20,10 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -62,18 +62,6 @@ d none usr/sbin 755 root bin
 f none usr/sbin/pooladm 555 root bin
 f none usr/sbin/poolcfg 555 root bin
 f none usr/sbin/poolbind 555 root bin
-d none usr/lib/pool 755 root bin
-f none usr/lib/pool/poold 555 root bin
-f none usr/lib/pool/libjkstat.so.1 755 root bin
-s none usr/lib/pool/libjkstat.so=./libjkstat.so.1
-f none usr/lib/pool/libjlgrp.so.1 755 root bin
-s none usr/lib/pool/libjlgrp.so=./libjlgrp.so.1
-f none usr/lib/pool/libjpool.so.1 755 root bin
-s none usr/lib/pool/libjpool.so=./libjpool.so.1
-f none usr/lib/pool/libjsyslog.so.1 755 root bin
-s none usr/lib/pool/libjsyslog.so=./libjsyslog.so.1
-f none usr/lib/pool/JPool.jar 444 root bin
-f none usr/lib/pool/poold.properties 444 root bin
 d none usr/share 755 root sys
 d none usr/share/lib 755 root sys
 d none usr/share/lib/xml 755 root sys

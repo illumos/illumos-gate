@@ -20,17 +20,19 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/pools/poold/Makefile
 
-
 PROG =		poold
 OBJS =		poold.o
 SRCS =		$(OBJS:%.o=%.c)
+
+MANIFEST=	poold.xml
+SVCMETHOD=	svc-poold
 
 include $(SRC)/cmd/Makefile.cmd
 
@@ -47,6 +49,8 @@ SUBDIRS =	libjkstat \
 		libjpool \
 		libjsyslog
 
+ROOTMANIFESTDIR=	$(ROOTSVCSYSTEM)
+
 all :=		TARGET = all
 install :=	TARGET = install
 clean :=	TARGET = clean
@@ -54,6 +58,7 @@ clobber :=	TARGET = clobber
 lint :=		TARGET = lint
 msg :=		TARGET = msg
 
+$(ROOTMANIFEST):=	FILEMODE= 444
 JARFILE =	JPool.jar
 
 # JAVA_SUBDIRS and PACKAGEDOCS must be synchronized to ensure 
@@ -108,7 +113,10 @@ lint: $(SUBDIRS)
 msg: $(POFILES)
 
 install: $(ROOTCMD) $(JAVA_SUBDIRS) $(JARFILE) \
-		    .WAIT $(SUBDIRS) $(ROOTJAVA)
+		    .WAIT $(SUBDIRS) $(ROOTJAVA) $(ROOTMANIFEST) \
+		    $(ROOTSVCMETHOD)
+
+check:	$(CHKMANIFEST)
 
 $(JAVA_SUBDIRS): FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
