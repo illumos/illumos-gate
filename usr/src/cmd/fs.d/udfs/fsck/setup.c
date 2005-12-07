@@ -1,5 +1,5 @@
 /*
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -81,8 +81,7 @@ char *res_vdbuf;		/* buffer for reserved volume sequence */
 int serialnum = -1;		/* set from primary volume descriptor */
 
 char *
-setup(dev)
-	char *dev;
+setup(char *dev)
 {
 	dev_t rootdev;
 	struct stat statb;
@@ -256,35 +255,35 @@ badsb:
 	return (0);
 }
 
-static
+static int
 check_pri_vol_desc(struct tag *tp)
 {
 	pvolp = (struct pri_vol_desc *)tp;
 	return (0);
 }
 
-static
+static int
 check_avdp(struct tag *tp)
 {
 	avdp = (struct anch_vol_desc_ptr *)tp;
 	return (0);
 }
 
-static
+static int
 check_vdp(struct tag *tp)
 {
 	volp = (struct vdp_desc *)tp;
 	return (0);
 }
 
-static
+static int
 check_iuvd(struct tag *tp)
 {
 	iudp = (struct iuvd_desc *)tp;
 	return (0);
 }
 
-static
+static int
 check_part_desc(struct tag *tp)
 {
 	partp = (struct part_desc *)tp;
@@ -298,14 +297,14 @@ check_part_desc(struct tag *tp)
 	return (0);
 }
 
-static
+static int
 check_log_desc(struct tag *tp)
 {
 	logvp = (struct log_vol_desc *)tp;
 	return (0);
 }
 
-static
+static int
 check_unall_desc(struct tag *tp)
 {
 	unallp = (struct unall_desc *)tp;
@@ -313,13 +312,13 @@ check_unall_desc(struct tag *tp)
 }
 
 /* ARGSUSED */
-static
+static int
 check_term_desc(struct tag *tp)
 {
 	return (0);
 }
 
-static
+static int
 check_lvint(struct tag *tp)
 {
 	/* LINTED */
@@ -346,7 +345,7 @@ dump16(char *cp, char *nl)
  * Read in the super block and its summary info.
  */
 /* ARGSUSED */
-static
+static int
 readvolseq(int32_t listerr)
 {
 	struct tag *tp;

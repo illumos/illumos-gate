@@ -1,5 +1,5 @@
 /*
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <fcntl.h>
 #include <string.h>
 #include <strings.h>
@@ -64,7 +65,7 @@ void	flush(int32_t, struct bufarea *);
 int32_t	bread(int32_t, char *, daddr_t, long);
 void	bwrite(int, char *, daddr_t, long);
 static int32_t	getline(FILE *, char *, int32_t);
-
+void errexit(char *, ...) __NORETURN;
 static long	diskreads, totalreads;	/* Disk cache statistics */
 offset_t	llseek();
 extern unsigned int largefile_count;
@@ -75,20 +76,22 @@ extern unsigned int largefile_count;
  */
 /* VARARGS1 */
 void
-pfatal(s, a1, a2, a3)
-	char *s;
+pfatal(char *fmt, ...)
 {
-
+	va_list args;
+	va_start(args, fmt);
 	if (preen) {
 		(void) printf("%s: ", devname);
-		(void) printf(s, a1, a2, a3);
+		(void) vprintf(fmt, args);
 		(void) printf("\n");
 		(void) printf(
 		    gettext("%s: UNEXPECTED INCONSISTENCY; RUN fsck "
 			"MANUALLY.\n"), devname);
+		va_end(args);
 		exit(36);
 	}
-	(void) printf(s, a1, a2, a3);
+	(void) vprintf(fmt, args);
+	va_end(args);
 }
 
 /*
@@ -97,22 +100,25 @@ pfatal(s, a1, a2, a3)
  */
 /* VARARGS1 */
 void
-pwarn(s, a1, a2, a3, a4, a5, a6)
-	char *s;
+pwarn(char *fmt, ...)
 {
-
+	va_list args;
+	va_start(args, fmt);
 	if (preen)
 		(void) printf("%s: ", devname);
-	(void) printf(s, a1, a2, a3, a4, a5, a6);
+	(void) vprintf(fmt, args);
+	va_end(args);
 }
 
 
 /* VARARGS1 */
 void
-errexit(s1, s2, s3, s4)
-	char *s1;
+errexit(char *fmt, ...)
 {
-	(void) printf(s1, s2, s3, s4);
+	va_list args;
+	va_start(args, fmt);
+	(void) vprintf(fmt, args);
+	va_end(args);
 	exit(39);
 }
 
@@ -228,7 +234,7 @@ reply(char *question)
 int32_t
 getline(FILE *fp, char *loc, int32_t maxlen)
 {
-	register n;
+	int n;
 	register char *p, *lastloc;
 
 	p = loc;
@@ -452,7 +458,7 @@ catch()
 void
 catchquit()
 {
-	extern returntosingle;
+	extern int returntosingle;
 
 	(void) printf(gettext("returning to single-user after filesystem "
 		"check\n"));
@@ -502,6 +508,7 @@ dofix(struct inodesc *idesc, char *msg)
  * Since we do not believe /etc/mnttab, we stat the mount point
  * to see if it is really looks mounted.
  */
+int
 mounted(char *name)
 {
 	int found = 0;
@@ -545,6 +552,7 @@ mounted(char *name)
  * Check to see if name corresponds to an entry in vfstab, and that the entry
  * does not have option ro.
  */
+int
 writable(char *name)
 {
 	int rw = 1;

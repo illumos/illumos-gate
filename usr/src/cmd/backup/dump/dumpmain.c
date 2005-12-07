@@ -60,9 +60,8 @@ static void nextstate();
 extern	jmp_buf checkpoint_buf;	/* context for return from checkpoint */
 #define	FUDGE_FACTOR	0x2000000
 
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	char		*arg;
 	int		bflag = 0, i, error = 0, saverr;
@@ -1126,14 +1125,13 @@ restart:
 	if (! doingactive)
 		putitime();
 	Exit(X_FINOK);
-#ifdef lint
+
+	/*NOTREACHED*/
 	return (0);
-#endif
 }
 
 void
-sigAbort(sig)
-	int	sig;
+sigAbort(int sig)
 {
 	char	*sigtype;
 
@@ -1186,8 +1184,7 @@ sigAbort(sig)
 
 /* Note that returned value is malloc'd if != cp && != NULL */
 char *
-rawname(cp)
-	char *cp;
+rawname(char *cp)
 {
 	struct stat64 st;
 	char *dp;
@@ -1213,8 +1210,7 @@ rawname(cp)
 }
 
 static char *
-mb(blks)
-	u_offset_t blks;
+mb(u_offset_t blks)
 {
 	static char buf[16];
 
@@ -1227,9 +1223,7 @@ mb(blks)
 }
 
 #ifdef signal
-void (*nsignal(sig, act))(int)
-	int	sig;
-	void	(*act)(int);
+void (*nsignal(int sig, void (*act)(int)))(int)
 {
 	struct sigaction sa, osa;
 
@@ -1243,8 +1237,7 @@ void (*nsignal(sig, act))(int)
 #endif
 
 static void
-nextstate(state)
-	int	state;
+nextstate(int state)
 {
 	/* LINTED assigned value never used - kept for documentary purposes */
 	dumpstate = state;
@@ -1266,8 +1259,7 @@ nextstate(state)
  * a state of -1 resets everything.
  */
 time32_t
-timeclock(state)
-	time32_t state;
+timeclock(time32_t state)
 {
 	static int *currentState = NULL;
 	static struct timeval *clockstart;

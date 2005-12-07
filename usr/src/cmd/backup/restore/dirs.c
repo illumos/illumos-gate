@@ -113,8 +113,7 @@ static struct inotab *inotablookup();
  *	directories on the tape.
  */
 void
-extractdirs(genmode)
-	int genmode;
+extractdirs(int genmode)
 {
 	int ts;
 	struct dinode *ip;
@@ -224,10 +223,7 @@ skipdirs()
  *	pname and pass them off to be processed.
  */
 void
-treescan(pname, ino, todo)
-	char *pname;
-	ino_t ino;
-	long (*todo)();
+treescan(char *pname, ino_t ino, long (*todo)())
 {
 	struct inotab *itp;
 	struct direct *dp;
@@ -304,9 +300,7 @@ treescan(pname, ino, todo)
  * be extracted.
  */
 void
-attrscan(always, todo)
-	int always;
-	long (*todo)();
+attrscan(int always, long (*todo)())
 {
 	struct inotab *itp;
 	struct entry *ep, *parent;
@@ -354,8 +348,7 @@ attrscan(always, todo)
  * condition it was given to us in.
  */
 ino_t
-psearch(n)
-	char	*n;
+psearch(char *n)
 {
 	char *cp, *cp1;
 	ino_t ino;
@@ -388,9 +381,7 @@ next:
  * looking for entry cp
  */
 static ino_t
-search(inum, cp)
-	ino_t	inum;
-	char	*cp;
+search(ino_t inum, char *cp)
 {
 	struct direct *dp;
 	struct inotab *itp;
@@ -413,9 +404,7 @@ search(inum, cp)
  * Put the directory entries in the directory file
  */
 static void
-putdir(buf, size)
-	char *buf;
-	size_t size;
+putdir(char *buf, size_t size)
 {
 	struct direct cvtbuf;
 	struct odirect *odp;
@@ -462,8 +451,7 @@ static int32_t prev = 0;
  * add a new directory entry to a file.
  */
 static void
-putent(dp)
-	struct direct *dp;
+putent(struct direct *dp)
 {
 	/* LINTED DIRSIZ will always fit in a ushort_t */
 	dp->d_reclen = (ushort_t)DIRSIZ(dp);
@@ -504,9 +492,7 @@ flushent()
 }
 
 static void
-dcvt(odp, ndp)
-	struct odirect *odp;
-	struct direct *ndp;
+dcvt(struct odirect *odp, struct direct *ndp)
 {
 
 	(void) bzero((char *)ndp, sizeof (*ndp));
@@ -529,8 +515,7 @@ dcvt(odp, ndp)
  * Initialize the directory file
  */
 static RST_DIR *
-rst_initdirfile(name)
-	char *name;
+rst_initdirfile(char *name)
 {
 	RST_DIR *dp;
 	int fd;
@@ -551,8 +536,7 @@ rst_initdirfile(name)
  * Simulate the opening of a directory
  */
 RST_DIR *
-rst_opendir(name)
-	char *name;
+rst_opendir(char *name)
 {
 	struct inotab *itp;
 	ino_t ino;
@@ -571,8 +555,7 @@ rst_opendir(name)
  * Specifically, the dirp it provided to the caller is malloc'd.
  */
 void
-rst_closedir(cdirp)
-	RST_DIR *cdirp;
+rst_closedir(RST_DIR *cdirp)
 {
 	if ((cdirp != NULL) && (--(cdirp->dd_refcnt) < 1))
 		free(cdirp);
@@ -582,8 +565,7 @@ rst_closedir(cdirp)
  * return a pointer into a directory
  */
 static offset_t
-rst_telldir(tdirp)
-	RST_DIR *tdirp;
+rst_telldir(RST_DIR *tdirp)
 {
 	offset_t pos = llseek(tdirp->dd_fd, (offset_t)0, SEEK_CUR);
 
@@ -603,9 +585,7 @@ rst_telldir(tdirp)
  * the desired seek offset into it.
  */
 static void
-rst_seekdir(sdirp, loc, base)
-	RST_DIR *sdirp;
-	offset_t loc, base;
+rst_seekdir(RST_DIR *sdirp, offset_t loc, offset_t base)
 {
 
 	if (loc == rst_telldir(sdirp))
@@ -624,8 +604,7 @@ rst_seekdir(sdirp, loc, base)
  * get next entry in a directory.
  */
 struct direct *
-rst_readdir(rdirp)
-	RST_DIR *rdirp;
+rst_readdir(RST_DIR *rdirp)
 {
 	struct direct *dp;
 
@@ -797,9 +776,7 @@ setdirmodes()
 }
 
 void
-skipmetadata(f, size)
-	FILE *f;
-	size_t size;
+skipmetadata(FILE *f, size_t size)
 {
 	/* XXX should we bail if this doesn't work? */
 	/* LINTED unsigned -> signed conversion ok here */
@@ -809,9 +786,8 @@ skipmetadata(f, size)
 /*
  * Generate a literal copy of a directory.
  */
-genliteraldir(name, ino)
-	char *name;
-	ino_t ino;
+int
+genliteraldir(char *name, ino_t ino)
 {
 	struct inotab *itp;
 	int ofile, dp;
@@ -867,8 +843,8 @@ genliteraldir(name, ino)
 /*
  * Determine the type of an inode
  */
-inodetype(ino)
-	ino_t ino;
+int
+inodetype(ino_t ino)
 {
 	struct inotab *itp;
 
@@ -883,10 +859,7 @@ inodetype(ino)
  * If requested, save its pertinent mode, owner, and time info.
  */
 static struct inotab *
-allocinotab(ino, dip, seekpt)
-	ino_t ino;
-	struct dinode *dip;
-	off64_t seekpt;
+allocinotab(ino_t ino, struct dinode *dip, off64_t seekpt)
 {
 	struct inotab	*itp;
 
@@ -939,8 +912,7 @@ nodeflush()
  * Look up an inode in the table of directories
  */
 static struct inotab *
-inotablookup(ino)
-	ino_t	ino;
+inotablookup(ino_t ino)
 {
 	struct inotab *itp;
 
@@ -954,8 +926,7 @@ inotablookup(ino)
  * Clean up and exit
  */
 void
-done(exitcode)
-	int exitcode;
+done(int exitcode)
 {
 	closemt(ALLOW_OFFLINE);		/* don't force offline on exit */
 	if (modefile[0] != '#')

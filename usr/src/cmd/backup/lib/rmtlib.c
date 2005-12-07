@@ -1,7 +1,7 @@
 /*LINTLIBRARY*/
 /*PROTOLIB1*/
 /*
- * Copyright 1998, 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -93,18 +93,15 @@ rmtinit(
 	void (*errexit)(int))			/* exit routine */
 #else
 void
-rmtinit(errmsg, errexit)
-	void (*errmsg)();			/* print routine */
-	void (*errexit)();			/* exit routine */
+rmtinit(void (*errmsg)(), void (*errexit)())
 #endif
 {
 	print = errmsg;
 	Exit = errexit;
 }
 
-rmthost(host, blocksize)
-	char	*host;
-	uint_t	blocksize;			/* in Kbytes per tape block */
+int
+rmthost(char *host, uint_t blocksize)
 {
 	struct sigvec sv;
 
@@ -142,8 +139,7 @@ rmthost(host, blocksize)
 
 /*ARGSUSED*/
 static void
-rmtconnaborted(sig)
-	int	sig;
+rmtconnaborted(int sig)
 {
 	print(dgettext(domainname, "Lost connection to remote host.\n"));
 	Exit(1);
@@ -215,8 +211,7 @@ rmtgetconn()
 }
 
 static int
-okname(cp0)
-	char *cp0;
+okname(char *cp0)
 {
 	char *cp;
 	uchar_t c;
@@ -232,9 +227,8 @@ okname(cp0)
 	return (1);
 }
 
-rmtopen(tape, mode)
-	char *tape;
-	int mode;
+int
+rmtopen(char *tape, int mode)
 {
 	struct mtget mt;
 	char buf[256];
@@ -277,8 +271,8 @@ rmtclose()
 	rmtstate = TS_CLOSED;
 }
 
-rmtstatus(mt)
-	struct mtget *mt;
+int
+rmtstatus(struct mtget *mt)
 {
 	char *buf = (char *)mt;
 	int n, i, cc;
@@ -309,8 +303,7 @@ rmtstatus(mt)
 }
 
 static int
-rmtstatus_extended(mt)
-	struct mtget *mt;
+rmtstatus_extended(struct mtget *mt)
 {
 	if ((mt->mt_type = rmtcall("status", "sT")) == -1)
 		return (-1);
@@ -324,9 +317,8 @@ rmtstatus_extended(mt)
 	return (0);
 }
 
-rmtread(buf, count)
-	char *buf;
-	uint_t count;
+int
+rmtread(char *buf, uint_t count)
 {
 	char line[30];
 	int n, i, cc;
@@ -354,9 +346,8 @@ rmtread(buf, count)
 	return (n);
 }
 
-rmtwrite(buf, count)
-	char *buf;
-	uint_t count;
+int
+rmtwrite(char *buf, uint_t count)
 {
 	int retval;
 	char line[64];		/* numbers can get big */
@@ -374,9 +365,7 @@ rmtwrite(buf, count)
 }
 
 int
-rmtpush(buf, count)
-	char *buf;
-	uint_t count;
+rmtpush(char *buf, uint_t count)
 {
 	int retval;
 
@@ -390,8 +379,7 @@ rmtpush(buf, count)
 }
 
 int
-rmtseek(offset, pos)
-	int offset, pos;
+rmtseek(int offset, int pos)
 {
 	char line[80];
 
@@ -400,9 +388,7 @@ rmtseek(offset, pos)
 }
 
 int
-rmtioctl(cmd, count)
-	int cmd;
-	long count;
+rmtioctl(int cmd, long count)
 {
 	char buf[256];
 	int xcmd;
@@ -422,8 +408,7 @@ rmtioctl(cmd, count)
  * if possible.
  */
 static int
-map_extended_ioctl(cmd)
-	int cmd;
+map_extended_ioctl(int cmd)
 {
 	int xcmd;
 
@@ -451,9 +436,7 @@ map_extended_ioctl(cmd)
 }
 
 static int
-rmtioctl_extended(cmd, count)
-	int cmd;
-	long count;
+rmtioctl_extended(int cmd, long count)
 {
 	char buf[256];
 
@@ -462,8 +445,7 @@ rmtioctl_extended(cmd, count)
 }
 
 static int
-rmtcall(cmd, buf)
-	char *cmd, *buf;
+rmtcall(char *cmd, char *buf)
 {
 	if (rmtpush(buf, strlen(buf)) != strlen(buf))
 		rmtconnaborted(0);
@@ -471,8 +453,7 @@ rmtcall(cmd, buf)
 }
 
 static int
-rmtreply(cmd)
-	char *cmd;
+rmtreply(char *cmd)
 {
 	char code[30], emsg[BUFSIZ];
 
@@ -505,9 +486,7 @@ rmtreply(cmd)
 }
 
 static void
-rmtgets(cp, len)
-	char *cp;
-	int len;
+rmtgets(char *cp, int len)
 {
 	int i, n;
 
@@ -549,8 +528,7 @@ rmtmsg(const char *fmt, ...)
 
 /* VARARGS */
 static void
-rmtmsg(va_alist)
-	va_dcl
+rmtmsg(va_dcl)
 {
 	va_list	args;
 	char	*fmt;

@@ -75,7 +75,7 @@ static void readtape(char *);
 static int checkvol(struct s_spcl *, int);
 static void accthdr(struct s_spcl *);
 static int ishead(struct s_spcl *);
-static checktype(struct s_spcl *, int);
+static int checktype(struct s_spcl *, int);
 static void metaset(char *name);
 #else
 static int autoload_tape();
@@ -101,9 +101,7 @@ static void metaset();
  * Set up an input source
  */
 void
-setinput(source, archive)
-	char *source;
-	char *archive;
+setinput(char *source, char *archive)
 {
 
 	flsht();
@@ -179,8 +177,7 @@ setinput(source, archive)
 }
 
 void
-newtapebuf(size)
-	size_t size;
+newtapebuf(size_t size)
 {
 	size_t nsize;
 
@@ -456,8 +453,7 @@ setupR()
 #define	FT_STATE_3	3
 
 void
-getvol(nextvol)
-	int nextvol;
+getvol(int nextvol)
 {
 	int newvol;
 	long savecnt, savetapea, wantnext;
@@ -778,8 +774,8 @@ printdumpinfo()
 	}
 }
 
-extractfile(name)
-	char *name;
+int
+extractfile(char *name)
 {
 	static int complained_chown = 0;
 	static int complained_lchown = 0;
@@ -900,8 +896,7 @@ extractfile(name)
 			full_dev = (unsigned)(curfile.dip->di_ordev);
 		}
 
-		if (mknod(rname, mode, full_dev) < 0)
-		{
+		if (mknod(rname, mode, full_dev) < 0) {
 			struct stat64 s[1];
 
 			saverr = errno;
@@ -1075,8 +1070,7 @@ skipfile()
  * with the blocks
  */
 void
-getfile(f1, f2)
-	void	(*f2)(), (*f1)();
+getfile(void (*f1)(), void (*f2)())
 {
 	int i;
 	size_t curblk = 0;
@@ -1182,9 +1176,7 @@ loop:
  * put the data into the right form and place.
  */
 static void
-xtrfile(buf, size)
-	char	*buf;
-	size_t	size;
+xtrfile(char *buf, size_t size)
 {
 	if (write(ofile, buf, (size_t)size) == -1) {
 		int saverr = errno;
@@ -1204,9 +1196,7 @@ xtrfile(buf, size)
 
 /*ARGSUSED*/
 static void
-xtrskip(buf, size)
-	char *buf;
-	size_t size;
+xtrskip(char *buf, size_t size)
 {
 	if (lseek64(ofile, (offset_t)size, 1) == -1) {
 		int saverr = errno;
@@ -1224,8 +1214,7 @@ static char *metadata = NULL;
 static size_t metasize = 0;
 
 static void
-metacheck(head)
-	struct s_spcl *head;
+metacheck(struct s_spcl *head)
 {
 	if (! (head->c_flags & DR_HASMETA))
 		return;
@@ -1239,9 +1228,7 @@ metacheck(head)
 }
 
 static void
-xtrmeta(buf, size)
-	char *buf;
-	size_t size;
+xtrmeta(char *buf, size_t size)
 {
 	if ((metadata == NULL) && ((spcl.c_dinode.di_mode & IFMT) != IFSHAD))
 		return;
@@ -1256,9 +1243,7 @@ xtrmeta(buf, size)
 
 /* ARGSUSED */
 static void
-metaskip(buf, size)
-	char *buf;
-	size_t size;
+metaskip(char *buf, size_t size)
 {
 	if (metadata == NULL)
 		return;
@@ -1272,8 +1257,7 @@ metaskip(buf, size)
 }
 
 static void
-metaset(name)
-	char *name;
+metaset(char *name)
 {
 	if (metadata == NULL)
 		return;
@@ -1376,9 +1360,7 @@ static struct fsdtypes {
 };
 
 void
-metaproc(name, mdata, msize)
-	char *name, *mdata;
-	size_t msize;
+metaproc(char *name, char *mdata, size_t msize)
 {
 	struct fsdtypes *fsdtype;
 	ufs_fsd_t *fsd;
@@ -1415,9 +1397,7 @@ metaproc(name, mdata, msize)
 }
 
 static void
-xtrlnkfile(buf, size)
-	char	*buf;
-	size_t	size;
+xtrlnkfile(char *buf, size_t size)
 {
 	/* LINTED: signed/unsigned mix ok */
 	pathlen += size;
@@ -1435,9 +1415,7 @@ xtrlnkfile(buf, size)
 
 /*ARGSUSED*/
 static void
-xtrlnkskip(buf, size)
-	char *buf;
-	size_t size;
+xtrlnkskip(char *buf, size_t size)
 {
 	(void) fprintf(stderr,
 	    gettext("unallocated block in symbolic link %s\n"),
@@ -1446,9 +1424,7 @@ xtrlnkskip(buf, size)
 }
 
 static void
-xtrmap(buf, size)
-	char	*buf;
-	size_t	size;
+xtrmap(char *buf, size_t size)
 {
 	if ((map+size) > endmap) {
 		int64_t mapsize, increment;
@@ -1497,9 +1473,7 @@ xtrmap(buf, size)
 
 /*ARGSUSED*/
 static void
-xtrmapskip(buf, size)
-	char *buf;
-	size_t size;
+xtrmapskip(char *buf, size_t size)
 {
 	(void) fprintf(stderr, gettext("hole in map\n"));
 	done(1);
@@ -1507,9 +1481,7 @@ xtrmapskip(buf, size)
 
 /*ARGSUSED*/
 void
-null(buf, size)
-	char *buf;
-	size_t size;
+null(char *buf, size_t size)
 {
 }
 
@@ -1518,8 +1490,7 @@ null(buf, size)
  * etc..
  */
 static void
-readtape(b)
-	char *b;
+readtape(char *b)
 {
 	int i;
 	int rd, newvol;
@@ -1692,8 +1663,7 @@ void
 #ifdef __STDC__
 findtapeblksize(int arfile)
 #else
-findtapeblksize(arfile)
-int arfile;
+findtapeblksize(int arfile)
 #endif
 {
 	int	i;
@@ -1750,8 +1720,7 @@ void
 #ifdef __STDC__
 closemt(int mode)
 #else
-closemt(mode)
-	int mode;
+closemt(int mode)
 #endif
 {
 	/*
@@ -1792,9 +1761,7 @@ closemt(mode)
 }
 
 static int
-checkvol(b, t)
-	struct s_spcl *b;
-	int t;
+checkvol(struct s_spcl *b, int t)
 {
 
 	if (b->c_volume != t)
@@ -1802,8 +1769,8 @@ checkvol(b, t)
 	return (GOOD);
 }
 
-readhdr(b)
-	struct s_spcl *b;
+int
+readhdr(struct s_spcl *b)
 {
 
 	if (gethead(b) == FAIL) {
@@ -1818,8 +1785,8 @@ readhdr(b)
  * read the tape into buf, then return whether or
  * or not it is a header block.
  */
-gethead(buf)
-	struct s_spcl *buf;
+int
+gethead(struct s_spcl *buf)
 {
 	int i;
 	union u_ospcl {
@@ -1964,8 +1931,7 @@ gethead(buf)
  * Check that a header is where it belongs and predict the next header
  */
 static void
-accthdr(header)
-	struct s_spcl *header;
+accthdr(struct s_spcl *header)
 {
 	static ino_t previno = (ino_t)(unsigned)-1;
 	static int prevtype;
@@ -2026,8 +1992,8 @@ newcalc:
 /*
  * Try to determine which volume a file resides on.
  */
-volnumber(inum)
-	ino_t inum;
+int
+volnumber(ino_t inum)
 {
 	int i;
 
@@ -2045,8 +2011,7 @@ volnumber(inum)
  * pointers into it.
  */
 void
-findinode(header)
-	struct s_spcl *header;
+findinode(struct s_spcl *header)
 {
 	long skipcnt = 0;
 	int i;
@@ -2112,8 +2077,7 @@ findinode(header)
  * return whether or not the buffer contains a header block
  */
 static int
-ishead(buf)
-	struct s_spcl *buf;
+ishead(struct s_spcl *buf)
 {
 	if (buf->c_magic !=
 	    ((tp_bsize == TP_BSIZE_MIN) ? NFS_MAGIC : MTB_MAGIC))
@@ -2121,10 +2085,8 @@ ishead(buf)
 	return (GOOD);
 }
 
-static
-checktype(b, t)
-	struct s_spcl *b;
-	int	t;
+static int
+checktype(struct s_spcl *b, int t)
 {
 	if (b->c_type != t)
 		return (FAIL);

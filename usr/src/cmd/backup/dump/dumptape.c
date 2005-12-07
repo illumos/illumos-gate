@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -399,11 +398,7 @@ bufclear()
  * systems don't cause dump to consume large amounts of memory.
  */
 static pid_t
-#ifdef __STDC__
 setuparchive(void)
-#else
-setuparchive()
-#endif
 {
 	struct slaves *slavep;
 	int cmd[2];
@@ -543,6 +538,7 @@ setuparchive()
 	}
 	Exit(X_FINOK);
 	/* NOTREACHED */
+	return (0);
 }
 
 /*
@@ -550,11 +546,7 @@ setuparchive()
  * to the output device.
  */
 static pid_t
-#ifdef __STDC__
 setupwriter(void)
-#else
-setupwriter()
-#endif
 {
 	struct slaves *slavep;
 	int cmd[2];
@@ -612,6 +604,7 @@ setupwriter()
 	(void) close(cmd[0]);
 	Exit(X_FINOK);
 	/* NOTREACHED */
+	return (0);
 }
 
 void
@@ -681,10 +674,7 @@ spclrec()
  * Fill appropriate buffer
  */
 void
-taprec(dp, flags, size)
-	uchar_t *dp;
-	int flags;
-	int size;
+taprec(uchar_t *dp, int flags, int size)
 {
 	if (size > tp_bsize) {
 		msg(gettext(
@@ -713,10 +703,7 @@ taprec(dp, flags, size)
 }
 
 void
-dmpblk(blkno, size, offset)
-	daddr32_t blkno;
-	size_t size;
-	off_t offset;
+dmpblk(daddr32_t blkno, size_t size, off_t offset)
 {
 	diskaddr_t dblkno;
 
@@ -734,8 +721,7 @@ dmpblk(blkno, size, offset)
 
 /*ARGSUSED*/
 static void
-tperror(sig)
-	int	sig;
+tperror(int sig)
 {
 	char buf[3000];
 
@@ -783,9 +769,7 @@ tperror(sig)
  * info when it completes a volume.
  */
 void
-toslave(fn, inumber)
-	void	(*fn)();
-	ino_t	inumber;
+toslave(void (*fn)(), ino_t inumber)
 {
 	int	wasactive;
 
@@ -825,8 +809,7 @@ toslave(fn, inumber)
 }
 
 void
-dospcl(inumber)
-	ino_t	inumber;
+dospcl(ino_t inumber)
 {
 	/* LINTED for now, max inode # is 2**31 (ufs max size is 1TB) */
 	spcl.c_inumber = (ino32_t)inumber;
@@ -913,8 +896,7 @@ jmp_buf	checkpoint_buf;
  */
 /*ARGSUSED*/
 static void
-rollforward(sig)
-	int	sig;
+rollforward(int sig)
 {
 	int status;
 	(void) sighold(SIGUSR1);
@@ -1022,8 +1004,7 @@ rollforward(sig)
 }
 
 static void
-nap(ms)
-	int ms;
+nap(int ms)
 {
 	struct timeval tv;
 
@@ -1036,8 +1017,7 @@ static jmp_buf alrm_buf;
 
 /*ARGSUSED*/
 static void
-alrm(sig)
-	int	sig;
+alrm(int sig)
 {
 	longjmp(alrm_buf, 1);
 	/*NOTREACHED*/
@@ -1103,8 +1083,7 @@ nextdevice()
  * make an educated guess.
  */
 int
-isrewind(f)
-	int	f;	/* fd, if local device */
+isrewind(int f)
 {
 	struct stat64 sbuf;
 	char    *c;
@@ -1393,8 +1372,7 @@ changevol()
  */
 
 void
-otape(top)
-	int top;
+otape(int top)
 {
 	static struct mtget mt;
 	char buf[3000];
@@ -1789,16 +1767,14 @@ killall()
 
 /*ARGSUSED*/
 static void
-proceed(sig)
-	int	sig;
+proceed(int sig)
 {
 	caught++;
 }
 
 /*ARGSUSED*/
 static void
-die(sig)
-	int	sig;
+die(int sig)
 {
 	Exit(X_FINOK);
 }
@@ -1972,10 +1948,7 @@ wait_our_turn()
 }
 
 static void
-dumpoffline(cmd, next, mynum)
-	int cmd;
-	pid_t next;
-	int mynum;
+dumpoffline(int cmd, pid_t next, int mynum)
 {
 	struct req *p = slaves[mynum].sl_req;
 	ulong_t i;
@@ -2029,8 +2002,7 @@ static int count;		/* tape blocks written since last spclrec */
 
 /*ARGSUSED*/
 static void
-onxfsz(sig)
-	int	sig;
+onxfsz(int sig)
 {
 	msg(gettext("File size limit exceeded writing output volume %d\n"),
 	    tapeno);
@@ -2044,8 +2016,7 @@ static long	lastnonaddrm;		/* and the mode thereof */
  * dowrite -- the main body of the output writer process
  */
 static void
-dowrite(cmd)
-	int	cmd;
+dowrite(int cmd)
 {
 	struct bdesc *last =
 	    &bufp[(NBUF*ntrec)-1];		/* last buffer in pool */
@@ -2268,9 +2239,7 @@ dowrite(cmd)
  * special record map.
  */
 static void
-checkpoint(bp, cmd)
-	struct bdesc *bp;
-	int	cmd;
+checkpoint(struct bdesc *bp, int cmd)
 {
 	int	state, type;
 	ino_t	ino;
@@ -2396,9 +2365,7 @@ checkpoint(bp, cmd)
  * loop until the count is satisfied (or error).
  */
 static ssize_t
-atomic(func, fd, buf, count)
-	int (*func)(), fd, count;
-	char *buf;
+atomic(int (*func)(), int fd, char *buf, int count)
 {
 	ssize_t got = 0, need = count;
 
@@ -2421,8 +2388,7 @@ void
 #ifdef __STDC__
 positiontape(char *msgbuf)
 #else
-positiontape(msgbuf)
-	char *msgbuf;
+positiontape(char *msgbuf)
 #endif
 {
 	/* Static as never change, no need to waste stack space */

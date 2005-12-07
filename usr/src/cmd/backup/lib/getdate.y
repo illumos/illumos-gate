@@ -1,7 +1,7 @@
 %{
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -509,6 +509,7 @@ ToSeconds(Hours, Minutes, Seconds, Meridian)
 	    return (720L + Minutes) * 60L + Seconds;
     }
     /* NOTREACHED */
+    return (-1);
 }
 
 

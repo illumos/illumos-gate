@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +29,7 @@
  * input arguments, so a double NULL needs to be added to each name.
  */
 void
-pathcheck(name)
-	char *name;
+pathcheck(char *name)
 {
 	char *cp, save;
 	struct entry *ep;
@@ -61,8 +60,7 @@ pathcheck(name)
  * Change a name to a unique temporary name.
  */
 void
-mktempname(ep)
-	struct entry *ep;
+mktempname(struct entry *ep)
 {
 	char *newname;
 
@@ -82,8 +80,7 @@ mktempname(ep)
  * Generate a temporary name for an entry.
  */
 char *
-gentempname(ep)
-	struct entry *ep;
+gentempname(struct entry *ep)
 {
 	static char name[MAXPATHLEN];
 	struct entry *np;
@@ -101,9 +98,7 @@ gentempname(ep)
  * Rename a file or directory.
  */
 void
-renameit(fp, tp)
-	char *fp;
-	char *tp;
+renameit(char *fp, char *tp)
 {
 	int fromfd, tofd;
 	char *from, *to;
@@ -149,8 +144,7 @@ renameit(fp, tp)
  * operating in attribute space.
  */
 void
-newnode(np)
-	struct entry *np;
+newnode(struct entry *np)
 {
 	char *cp;
 	int dfd;
@@ -190,8 +184,7 @@ newnode(np)
  * for explanation of fchdir() use below.
  */
 void
-removenode(ep)
-	struct entry *ep;
+removenode(struct entry *ep)
 {
 	char *cp;
 	int dfd;
@@ -234,8 +227,7 @@ removenode(ep)
  * Remove a leaf.
  */
 void
-removeleaf(ep)
-	struct entry *ep;
+removeleaf(struct entry *ep)
 {
 	char *cp;
 	int dfd;
@@ -265,9 +257,8 @@ removeleaf(ep)
  *	for the link file to be created (i.e., we have "fchdir-ed"
  *	into attribute space already if this is an attribute link).
  */
-lf_linkit(existing, new, type)
-	char *existing, *new;
-	int type;
+int
+lf_linkit(char *existing, char *new, int type)
 {
 	char linkbuf[MAXPATHLEN];
 	struct stat64 s1[1], s2[1];
@@ -349,8 +340,7 @@ out:
  * Caller knows that a return value of maxino means there's nothing left.
  */
 ino_t
-lowerbnd(start)
-	ino_t start;
+lowerbnd(ino_t start)
 {
 	struct entry *ep;
 
@@ -368,8 +358,7 @@ lowerbnd(start)
  * Find highest-numbered inode (below "start") that needs to be extracted.
  */
 ino_t
-upperbnd(start)
-	ino_t start;
+upperbnd(ino_t start)
 {
 	struct entry *ep;
 
@@ -387,9 +376,7 @@ upperbnd(start)
  * report on a badly formed entry
  */
 void
-badentry(ep, msg)
-	struct entry *ep;
-	char *msg;
+badentry(struct entry *ep, char *msg)
 {
 
 	(void) fprintf(stderr, gettext("bad entry: %s\n"), msg);
@@ -422,8 +409,7 @@ badentry(ep, msg)
  * Construct a string indicating the active flag bits of an entry.
  */
 char *
-flagvalues(ep)
-	struct entry *ep;
+flagvalues(struct entry *ep)
 {
 	static char flagbuf[BUFSIZ];
 
@@ -453,8 +439,7 @@ flagvalues(ep)
  * Check to see if a name is on a dump tape.
  */
 ino_t
-dirlookup(name)
-	char *name;
+dirlookup(char *name)
 {
 	ino_t ino;
 
@@ -467,8 +452,8 @@ dirlookup(name)
 /*
  * Elicit a reply.
  */
-reply(question)
-	char *question;
+int
+reply(char *question)
 {
 	char *yesorno = gettext("yn"); /* must be two characters, "yes" first */
 	int c;
@@ -524,8 +509,7 @@ panic(const char *msg, ...)
 
 /* VARARGS1 */
 void
-panic(va_alist)
-	va_dcl
+panic(va_dcl)
 {
 	va_list	args;
 	char	*msg;
@@ -545,8 +529,7 @@ panic(va_alist)
  * Locale-specific version of ctime
  */
 char *
-lctime(tp)
-	time_t	*tp;
+lctime(time_t *tp)
 {
 	static char buf[256];
 	struct tm *tm;
@@ -805,10 +788,7 @@ safe_fopen(const char *filename, const char *smode, int perms)
  * Read the contents of a directory.
  */
 int
-mkentry(name, ino, ap)
-	char *name;
-	ino_t ino;
-	struct arglist *ap;
+mkentry(char *name, ino_t ino, struct arglist *ap)
 {
 	struct afile *fp;
 
@@ -870,10 +850,7 @@ static int addg();
  * Our caller guarantees that "as" is at least the string ".".
  */
 int
-expand(as, rflg, ap)
-	char *as;
-	int rflg;
-	struct arglist *ap;
+expand(char *as, int rflg, struct arglist *ap)
 {
 	int		count, size;
 	char		dir = 0;
@@ -987,9 +964,7 @@ expand(as, rflg, ap)
  * Check for a name match
  */
 static int
-gmatch(s, p)
-	wchar_t	*s;	/* string to test */
-	wchar_t	*p;	/* pattern to match against */
+gmatch(wchar_t *s, wchar_t *p)
 {
 	long	scc;	/* source character to text */
 	wchar_t	c;	/* pattern character to match */
@@ -1060,11 +1035,7 @@ gmatch(s, p)
  * Construct a matched name.
  */
 static int
-addg(dp, as1, as3, ap)
-	struct direct	*dp;	/* The directory containing the name */
-	char		*as1;	/* The current directory */
-	char		*as3;	/* The file name in dp */
-	struct arglist	*ap;	/* Where to append the new name */
+addg(struct direct *dp, char *as1, char *as3, struct arglist *ap)
 {
 	char	*s1, *s2, *limit;
 	int	c;
@@ -1125,10 +1096,7 @@ addg(dp, as1, as3, ap)
  * paths.
  */
 void
-resolve(path, fd, rpath)
-	char	*path;
-	int	*fd;
-	char	**rpath;
+resolve(char *path, int *fd, char **rpath)
 {
 	int	tfd;
 
@@ -1160,10 +1128,7 @@ resolve(path, fd, rpath)
  * up to (but not including) the final NULL.
  */
 int
-complexcpy(s1, s2, max)
-	char	*s1;
-	char	*s2;
-	int	max;
+complexcpy(char *s1, char *s2, int max)
 {
 	int	nullseen = 0;
 	int	len = 0;

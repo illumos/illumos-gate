@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,8 +139,7 @@ static void checkbuf();
 #endif
 
 static void
-catch(sig)
-	int sig;
+catch(int sig)
 {
 	switch (sig) {
 	default:    return;
@@ -153,9 +151,8 @@ catch(sig)
 	longjmp(sjbuf, 1);
 }
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	struct sigaction sa;
 	pid_t parent = getpid(), next = parent;
@@ -461,16 +458,11 @@ main(argc, argv)
 		(void) sigsuspend(&cmdmask);
 	}
 	(void) kill(next, RECV);
-	exit(0);
-#ifdef lint
 	return (0);
-#endif
 }
 
 static void
-respond(rval, Errno)
-	offset_t rval;
-	int Errno;
+respond(offset_t rval, int Errno)
 {
 	char resp[SSIZE];
 	char *errstr = strerror(Errno);
@@ -487,9 +479,7 @@ respond(rval, Errno)
 }
 
 static void
-getstring(cp, size)
-	char *cp;
-	size_t size;
+getstring(char *cp, size_t size)
 {
 	char *limit = cp + size - 1;
 
@@ -503,8 +493,7 @@ getstring(cp, size)
 }
 
 static void
-checkbuf(size)
-	size_t size;
+checkbuf(size_t size)
 {
 	if (size <= maxrecsize)
 		return;

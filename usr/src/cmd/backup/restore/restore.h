@@ -397,6 +397,7 @@ extern int complexcopy();
 #define	TAPE_FILE	0
 #define	ARCHIVE_FILE	1
 
+#undef	setjmp
 #define	setjmp(b)		sigsetjmp((b), 1)
 #define	longjmp			siglongjmp
 #define	jmp_buf			sigjmp_buf

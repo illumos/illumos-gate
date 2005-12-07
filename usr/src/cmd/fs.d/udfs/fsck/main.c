@@ -1,5 +1,5 @@
 /*
- * Copyright 1999 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,10 +87,8 @@ static char *subopts [] = {
 
 uint32_t ecma_version = 2;
 
-void
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	int	c;
 	char	*suboptions,	*value;
@@ -200,12 +198,12 @@ main(argc, argv)
 		}
 		exit(exitstat);
 	}
+	return (0);
 }
 
 
 static void
-checkfilesys(filesys)
-	char *filesys;
+checkfilesys(char *filesys)
 {
 	char *devstr;
 
@@ -285,8 +283,7 @@ checkfilesys(filesys)
  */
 
 static void
-check_sanity(filename)
-char	*filename;
+check_sanity(char *filename)
 {
 	struct stat stbd, stbr;
 	struct ustat usb;
@@ -370,8 +367,7 @@ char	*filename;
 }
 
 char *
-unrawname(name)
-	char *name;
+unrawname(char *name)
 {
 	char *dp;
 
@@ -382,8 +378,7 @@ unrawname(name)
 }
 
 char *
-rawname(name)
-	char *name;
+rawname(char *name)
 {
 	char *dp;
 
@@ -393,9 +388,7 @@ rawname(name)
 }
 
 char *
-hasvfsopt(vfs, opt)
-	register struct vfstab *vfs;
-	register char *opt;
+hasvfsopt(struct vfstab *vfs, char *opt)
 {
 	char *f, *opts;
 	static char *tmpopts;

@@ -73,9 +73,8 @@ struct byteorder_ctx *byteorder;
 
 static void set_tmpdir(void);
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	static struct arglist alist = { 0, 0, 0, 0, 0 };
 	int  count;
@@ -516,9 +515,7 @@ If set, the envar TMPDIR selects where temporary files are kept\n"),
 		done(0);
 		/* NOTREACHED */
 	}
-#ifdef lint
 	return (0);
-#endif
 }
 
 /*
