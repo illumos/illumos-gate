@@ -19,10 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	defined(_KERNEL)
@@ -139,7 +141,7 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 				8, 0, 0},
 /* R_SPARC_PLT64 */	{0x0, FLG_RE_PLTREL | FLG_RE_VERIFY |
 				FLG_RE_ADDRELATIVE, 8, 0, 0},
-/* R_SPARC_HIX22 */	{0xffffffffffffffff, FLG_RE_NOTREL | FLG_RE_VERIFY,
+/* R_SPARC_HIX22 */	{(Xword)(-1LL), FLG_RE_NOTREL | FLG_RE_VERIFY,
 				4, 10, 22},	/* V9 - HaL */
 /* R_SPARC_LOX10 */	{0x3ff, FLG_RE_NOTREL | FLG_RE_SIGN,
 				4, 0, 13},	/* V9 - HaL */
@@ -179,7 +181,7 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 /* R_SPARC_TLS_IE_LD */	    {0x0, FLG_RE_TLSINS | FLG_RE_TLSIE, 0, 0, 0},
 /* R_SPARC_TLS_IE_LDX */    {0x0, FLG_RE_TLSINS | FLG_RE_TLSIE, 0, 0, 0},
 /* R_SPARC_TLS_IE_ADD */    {0x0, FLG_RE_TLSINS | FLG_RE_TLSIE, 0, 0, 0},
-/* R_SPARC_TLS_LE_HIX22 */  {(unsigned long)((long)-1), FLG_RE_VERIFY |
+/* R_SPARC_TLS_LE_HIX22 */  {(Xword)(-1LL), FLG_RE_VERIFY |
 				FLG_RE_TLSINS | FLG_RE_NOTREL | FLG_RE_TLSLE,
 				4, 10, 22},
 /* R_SPARC_TLS_LE_LOX10 */  {0x3ff, FLG_RE_TLSINS | FLG_RE_SIGN |
@@ -406,10 +408,10 @@ do_reloc(unsigned char rtype, unsigned char *off, Xword *value,
 		for (i = field_size - 1; i >= 0; i--)
 			dest[i] = off[i];
 	} else {
-		if (((field_size == 2) && ((long long)off & 0x1)) ||
-		    ((field_size == 4) && ((long long)off & 0x3)) ||
-		    ((field_size == 8) && ((long long)off & 0x7))) {
-			REL_ERR_NONALIGN(file, sym, rtype, off);
+		if (((field_size == 2) && ((uintptr_t)off & 0x1)) ||
+		    ((field_size == 4) && ((uintptr_t)off & 0x3)) ||
+		    ((field_size == 8) && ((uintptr_t)off & 0x7))) {
+			REL_ERR_NONALIGN(file, sym, rtype, (uintptr_t)off);
 			return (0);
 		}
 		switch (field_size) {

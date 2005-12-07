@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -152,7 +153,7 @@ xregrestore(klwp_t *lwp, int shared)
 			is64 = 1;
 		} else {
 			rwinsize = sizeof (struct rwindow32);
-			sp = (caddr_t)(caddr32_t)sp;
+			sp = (caddr_t)(uintptr_t)(caddr32_t)(uintptr_t)sp;
 			rwp = sp;
 			is64 = 0;
 		}
@@ -307,8 +308,8 @@ save_syscall_args()
 			lwp->lwp_arg[3] = (uint32_t)rp->r_o4;
 			lwp->lwp_arg[4] = (uint32_t)rp->r_o5;
 			if (nargs > 5) {
-				ua = (caddr_t)(caddr32_t)(rp->r_sp +
-				    MINFRAME32);
+				ua = (caddr_t)(uintptr_t)(caddr32_t)(uintptr_t)
+				    (rp->r_sp + MINFRAME32);
 				for (i = 5; i < nargs; i++) {
 					uint32_t a;
 					if (fuword32(ua, &a) != 0)
@@ -325,8 +326,8 @@ save_syscall_args()
 			lwp->lwp_arg[4] = (uint32_t)rp->r_o4;
 			lwp->lwp_arg[5] = (uint32_t)rp->r_o5;
 			if (nargs > 6) {
-				ua = (caddr_t)(caddr32_t)(rp->r_sp +
-				    MINFRAME32);
+				ua = (caddr_t)(uintptr_t)(caddr32_t)(uintptr_t)
+				    (rp->r_sp + MINFRAME32);
 				for (i = 6; i < nargs; i++) {
 					uint32_t a;
 					if (fuword32(ua, &a) != 0)
@@ -911,8 +912,9 @@ sig_check:
 			if (copyin((stack32_t *)lwp->lwp_ustack, &stk32,
 			    sizeof (stack32_t)) == 0 &&
 			    (stk32.ss_size == lwp->lwp_old_stk_ctl ||
-				stk32.ss_size == 0) &&
-			    stk32.ss_sp == (caddr32_t)(top - stk32.ss_size)) {
+			    stk32.ss_size == 0) &&
+			    stk32.ss_sp ==
+			    (caddr32_t)(uintptr_t)(top - stk32.ss_size)) {
 				stk32.ss_sp += stk32.ss_size - new_size;
 				stk32.ss_size = new_size;
 

@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -746,8 +747,8 @@ prdostep(void)
 		return;
 
 	if (p->p_model == DATAMODEL_ILP32) {
-		pc = (caddr_t)(caddr32_t)r->r_pc;
-		npc = (caddr_t)(caddr32_t)r->r_npc;
+		pc = (caddr_t)(uintptr_t)(caddr32_t)r->r_pc;
+		npc = (caddr_t)(uintptr_t)(caddr32_t)r->r_npc;
 	} else {
 		pc = (caddr_t)r->r_pc;
 		npc = (caddr_t)r->r_npc;
@@ -834,8 +835,8 @@ prundostep(void)
 		ASSERT(r != NULL);
 
 		if (p->p_model == DATAMODEL_ILP32) {
-			pc = (caddr_t)(caddr32_t)r->r_pc;
-			npc = (caddr_t)(caddr32_t)r->r_npc;
+			pc = (caddr_t)(uintptr_t)(caddr32_t)r->r_pc;
+			npc = (caddr_t)(uintptr_t)(caddr32_t)r->r_npc;
 		} else {
 			pc = (caddr_t)r->r_pc;
 			npc = (caddr_t)r->r_npc;
@@ -903,7 +904,7 @@ prstop(int why, int what)
 
 		if (mpcb->mpcb_wstate == WSTATE_USER32) {
 			rw_size = sizeof (struct rwindow32);
-			sp = (caddr_t)(caddr32_t)r->r_sp;
+			sp = (caddr_t)(uintptr_t)(caddr32_t)r->r_sp;
 			rwp = sp;
 			is64 = 0;
 		} else {
@@ -954,7 +955,7 @@ prstop(int why, int what)
 	fp_prsave(pfp);
 
 	if (p->p_model == DATAMODEL_ILP32)
-		pc = (caddr_t)(caddr32_t)r->r_pc;
+		pc = (caddr_t)(uintptr_t)(caddr32_t)r->r_pc;
 	else
 		pc = (caddr_t)r->r_pc;
 

@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1387,7 +1388,8 @@ fasttrap_getreg(struct regs *rp, uint_t reg)
 		if (fasttrap_fulword(&fr->fr_local[reg - 16], &value) != 0)
 			goto err;
 	} else {
-		struct frame32 *fr = (struct frame32 *)(caddr32_t)rp->r_sp;
+		struct frame32 *fr =
+		    (struct frame32 *)(uintptr_t)(caddr32_t)rp->r_sp;
 		uint32_t *v32 = (uint32_t *)&value;
 
 		if (mpcb->mpcb_wbcnt > 0) {
@@ -1494,7 +1496,8 @@ fasttrap_putreg(struct regs *rp, uint_t reg, ulong_t value)
 			return;
 		}
 	} else {
-		struct frame32 *fr = (struct frame32 *)(caddr32_t)rp->r_sp;
+		struct frame32 *fr =
+		    (struct frame32 *)(uintptr_t)(caddr32_t)rp->r_sp;
 		struct rwindow32 *rwin = (struct rwindow32 *)mpcb->mpcb_wbuf;
 		uint32_t v32 = (uint32_t)value;
 

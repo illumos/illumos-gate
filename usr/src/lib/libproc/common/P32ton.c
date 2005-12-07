@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -205,7 +206,7 @@ gwindows_32_to_n(const gwindows32_t *src, gwindows_t *dst)
 	for (i = 0; i < src->wbcnt; i++) {
 		if (src->spbuf[i] != 0) {
 			rwindow_32_to_n(&src->wbuf[i], &dst->wbuf[i]);
-			dst->spbuf[i] = (greg_t *)src->spbuf[i];
+			dst->spbuf[i] = (greg_t *)(uintptr_t)src->spbuf[i];
 		}
 	}
 }

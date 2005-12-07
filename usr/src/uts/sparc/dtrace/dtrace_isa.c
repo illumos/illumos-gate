@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -141,7 +142,7 @@ dtrace_getpcstack(pc_t *pcstack, int pcstack_limit, int aframes, uint32_t *pc)
 		int delay = 0, branches = 0, taken = 0;
 
 		if (depth < pcstack_limit)
-			pcstack[depth++] = (pc_t)pc;
+			pcstack[depth++] = (pc_t)(uintptr_t)pc;
 
 		/*
 		 * Our heuristic is exactly that -- a heuristic -- and there
@@ -780,7 +781,7 @@ dtrace_getreg(struct regs *rp, uint_t reg)
 		value = dtrace_fulword(&fr->fr_local[reg - 16]);
 		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 	} else {
-		struct frame32 *fr = (void *)(caddr32_t)rp->r_sp;
+		struct frame32 *fr = (void *)(uintptr_t)(caddr32_t)rp->r_sp;
 
 		if (mpcb->mpcb_wbcnt > 0) {
 			struct rwindow32 *rwin = (void *)mpcb->mpcb_wbuf;
@@ -842,7 +843,7 @@ fake_restore:
 		if (cpu_core[CPU->cpu_id].cpuc_dtrace_flags & CPU_DTRACE_FAULT)
 			return (0);
 	} else {
-		struct frame32 *fr = (void *)(caddr32_t)rp->r_sp;
+		struct frame32 *fr = (void *)(uintptr_t)(caddr32_t)rp->r_sp;
 
 		if (mpcb->mpcb_wbcnt > 0) {
 			struct rwindow32 *rwin = (void *)mpcb->mpcb_wbuf;
@@ -881,7 +882,7 @@ got_fp:
 		value = dtrace_fulword(&fr->fr_local[reg - 16]);
 		DTRACE_CPUFLAG_CLEAR(CPU_DTRACE_NOFAULT);
 	} else {
-		struct frame32 *fr = (void *)(caddr32_t)fp;
+		struct frame32 *fr = (void *)(uintptr_t)(caddr32_t)fp;
 
 		if (mpcb->mpcb_wbcnt > 0) {
 			struct rwindow32 *rwin = (void *)mpcb->mpcb_wbuf;

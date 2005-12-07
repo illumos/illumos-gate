@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,14 +136,14 @@ _kobj_boot(
 		}
 	}
 
-	sh = (uint_t)bootaux[BA_LDSHDR].ba_ptr;
+	sh = (uint_t)(uintptr_t)bootaux[BA_LDSHDR].ba_ptr;
 	sh_num = ((Ehdr *)bootaux[BA_LDELF].ba_ptr)->e_shnum;
 	sh_size = ((Ehdr *)bootaux[BA_LDELF].ba_ptr)->e_shentsize;
 	/*
 	 * Build cache table for section addresses.
 	 */
 	for (i = 0; i < sh_num; i++) {
-		section[i] = (Shdr *)sh;
+		section[i] = (Shdr *)(uintptr_t)sh;
 		sh += sh_size;
 	}
 	/*
@@ -354,7 +355,7 @@ _kobj_boot(
 			}
 			if (rtype != R_SPARC_UA32 && (off & 3) != 0)
 				return;
-			offptr = (unsigned int *)off;
+			offptr = (unsigned int *)(uintptr_t)off;
 			/*
 			 * insert value calculated at reference point
 			 * 3 cases - normal byte order aligned, normal byte
@@ -453,10 +454,10 @@ _kobj_boot(
 
 				symval.l = value + addend;
 
-				((char *)off)[0] = symval.c[0];
-				((char *)off)[1] = symval.c[1];
-				((char *)off)[2] = symval.c[2];
-				((char *)off)[3] = symval.c[3];
+				((char *)(uintptr_t)off)[0] = symval.c[0];
+				((char *)(uintptr_t)off)[1] = symval.c[1];
+				((char *)(uintptr_t)off)[2] = symval.c[2];
+				((char *)(uintptr_t)off)[3] = symval.c[3];
 				break;
 			}
 			case R_SPARC_10:

@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -122,7 +123,7 @@ kobj_tmp_verify(void)
 		size_t resid = KOBJ_TMP_SMALL_PAGE_SIZE - 8;
 		size_t sz, asz;
 
-		if (*(uint32_t *)pg != (uint32_t)lpg) {
+		if (*(uint32_t *)pg != (uint32_t)(uintptr_t)lpg) {
 			_kobj_printf(ops, "krtld temp mem corrupt: ");
 			_kobj_printf(ops, "page %p ", pg);
 			_kobj_printf(ops, "prev pointer %8x ", *(uint32_t *)pg);
@@ -198,7 +199,8 @@ kobj_tmp_verify(void)
 		}
 
 		lpg = pg;
-		pg = (caddr_t)*(uint32_t *)(pg + KOBJ_TMP_SMALL_PAGE_SIZE - 4);
+		pg = (caddr_t)(uintptr_t)
+		    *(uint32_t *)(pg + KOBJ_TMP_SMALL_PAGE_SIZE - 4);
 	}
 }
 
@@ -248,7 +250,8 @@ kobj_tmp_bigalloc(size_t sz)
 		}
 	}
 
-	kobj_tmp.tmp_bigmap[kobj_tmp.tmp_bigmapidx].bm_addr = (uint32_t)buf;
+	kobj_tmp.tmp_bigmap[kobj_tmp.tmp_bigmapidx].bm_addr =
+	    (uint32_t)(uintptr_t)buf;
 	kobj_tmp.tmp_bigmap[kobj_tmp.tmp_bigmapidx].bm_size = sz;
 
 	return (buf);
@@ -295,11 +298,12 @@ kobj_tmp_alloc(size_t sz)
 		bzero(new, KOBJ_TMP_SMALL_PAGE_SIZE);
 		kobj_tmp.tmp_used += KOBJ_TMP_SMALL_PAGE_SIZE;
 
-		*(uint32_t *)new = (uint32_t)kobj_tmp.tmp_page;
+		*(uint32_t *)new = (uint32_t)(uintptr_t)kobj_tmp.tmp_page;
 
 		if (kobj_tmp.tmp_page != NULL) {
 			*(uint32_t *)(kobj_tmp.tmp_page +
-			    KOBJ_TMP_SMALL_PAGE_SIZE - 4) = (uint32_t)new;
+			    KOBJ_TMP_SMALL_PAGE_SIZE - 4) =
+			    (uint32_t)(uintptr_t)new;
 		}
 
 		kobj_tmp.tmp_page = new;
@@ -353,12 +357,13 @@ kobj_tmp_free(void)
 		if (bm->bm_addr == NULL)
 			break;
 
-		bzero((caddr_t)bm->bm_addr, bm->bm_size);
-		BOP_FREE(ops, (caddr_t)bm->bm_addr, bm->bm_size);
+		bzero((caddr_t)(uintptr_t)bm->bm_addr, bm->bm_size);
+		BOP_FREE(ops, (caddr_t)(uintptr_t)bm->bm_addr, bm->bm_size);
 	}
 
 	for (pg = kobj_tmp.tmp_base; pg != NULL; pg = npg) {
-		npg = (caddr_t)*(uint32_t *)(pg + KOBJ_TMP_SMALL_PAGE_SIZE - 4);
+		npg = (caddr_t)(uintptr_t)
+		    *(uint32_t *)(pg + KOBJ_TMP_SMALL_PAGE_SIZE - 4);
 
 		bzero(pg, KOBJ_TMP_SMALL_PAGE_SIZE);
 		BOP_FREE(ops, pg, KOBJ_TMP_SMALL_PAGE_SIZE);

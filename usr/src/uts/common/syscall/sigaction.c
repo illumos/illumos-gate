@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,7 +163,7 @@ sigaction32(int sig, struct sigaction32 *actp, struct sigaction32 *oactp)
 		/*
 		 * Check alignment of handler
 		 */
-		handler = (void (*)())act32.sa_handler;
+		handler = (void (*)())(uintptr_t)act32.sa_handler;
 		if (handler != SIG_IGN && handler != SIG_DFL &&
 		    ((uintptr_t)handler & 0x3) != 0)
 			return (set_errno(EINVAL));

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -394,13 +395,13 @@ savecontext32(ucontext32_t *ucp, k_sigset_t mask, struct fq32 *dfq)
 
 		if (lwp->lwp_sigaltstack.ss_flags == SS_ONSTACK) {
 			ucp->uc_stack.ss_sp =
-			    (caddr32_t)lwp->lwp_sigaltstack.ss_sp;
+			    (caddr32_t)(uintptr_t)lwp->lwp_sigaltstack.ss_sp;
 			ucp->uc_stack.ss_size =
 			    (size32_t)lwp->lwp_sigaltstack.ss_size;
 			ucp->uc_stack.ss_flags = SS_ONSTACK;
 		} else {
 			ucp->uc_stack.ss_sp =
-			    (caddr32_t)p->p_usrstack - p->p_stksize;
+			    (caddr32_t)(uintptr_t)p->p_usrstack - p->p_stksize;
 			ucp->uc_stack.ss_size =
 			    (size32_t)p->p_stksize;
 			ucp->uc_stack.ss_flags = 0;
@@ -509,7 +510,7 @@ getsetcontext32(int flag, void *arg)
 				    fpp->fpu_q_entrysize <= 0 ||
 				    fpp->fpu_q_entrysize > sizeof (struct fq32))
 					return (set_errno(EINVAL));
-				if (copyin((void *)fpp->fpu_q, fpu_q,
+				if (copyin((void *)(uintptr_t)fpp->fpu_q, fpu_q,
 				    fpp->fpu_qcnt * fpp->fpu_q_entrysize))
 					return (set_errno(EFAULT));
 			} else {
@@ -531,7 +532,7 @@ getsetcontext32(int flag, void *arg)
 			 */
 			gwin = kmem_zalloc(sizeof (gwindows32_t),
 							KM_SLEEP);
-			if (copyin((void *)uc.uc_mcontext.gwins,
+			if (copyin((void *)(uintptr_t)uc.uc_mcontext.gwins,
 			    &gwin->wbcnt, sizeof (gwin->wbcnt))) {
 				kmem_free(gwin, sizeof (gwindows32_t));
 				return (set_errno(EFAULT));
@@ -544,7 +545,7 @@ getsetcontext32(int flag, void *arg)
 			    SPARC_MAXREGWINDOW * sizeof (caddr32_t) +
 			    sizeof (int32_t);
 			if (gwin_size > sizeof (gwindows32_t) ||
-			    copyin((void *)uc.uc_mcontext.gwins,
+			    copyin((void *)(uintptr_t)uc.uc_mcontext.gwins,
 			    gwin, gwin_size)) {
 				kmem_free(gwin, sizeof (gwindows32_t));
 				return (set_errno(EFAULT));
@@ -561,8 +562,7 @@ getsetcontext32(int flag, void *arg)
 		if (xregs_hasptr32(lwp, &uc) &&
 		    ((xregs_size = xregs_getsize(curproc)) > 0)) {
 			xregs = kmem_zalloc(xregs_size, KM_SLEEP);
-			if (copyin((void *)
-			    xregs_getptr32(lwp, &uc),
+			if (copyin((void *)(uintptr_t)xregs_getptr32(lwp, &uc),
 			    xregs, xregs_size)) {
 				kmem_free(xregs, xregs_size);
 				if (gwin)

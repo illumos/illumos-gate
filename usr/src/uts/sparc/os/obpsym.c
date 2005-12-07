@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,7 +132,7 @@ value_to_name(uintptr_t value, char *symbol)
 	ulong_t offset;
 	char *name;
 
-	DPRINTF1("value_to_name: Looking for %p\n", value);
+	DPRINTF1("value_to_name: Looking for %p\n", (void *)value);
 
 	do {
 		if (modp->mod_mp &&
