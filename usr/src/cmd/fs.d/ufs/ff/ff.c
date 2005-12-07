@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -172,9 +171,7 @@ char *subopts [] = {
 	};
 
 int
-main(argc, argv)
-	int argc;
-	char *argv[];
+main(int argc, char *argv[])
 {
 	long n;
 	int	opt;
@@ -299,7 +296,7 @@ main(argc, argv)
 void
 check(char *file)
 {
-	register int i, j, c;
+	int i, j, c;
 
 	fi = open64(file, 0);
 	if (fi < 0) {
@@ -456,7 +453,7 @@ pass1(struct dinode *ip)
 void
 pass2(struct dinode *ip)
 {
-	register struct direct *dp;
+	struct direct *dp;
 	struct dirstuff dirp;
 	struct htab *hp;
 
@@ -494,7 +491,7 @@ pass2(struct dinode *ip)
 void
 pass3(struct dinode *ip)
 {
-	register struct direct *dp;
+	struct direct *dp;
 	struct dirstuff dirp;
 	struct dinode   *dip;
 	int k;
@@ -561,7 +558,7 @@ pass3(struct dinode *ip)
 struct direct *
 dreaddir(struct dirstuff *dirp)
 {
-	register struct direct *dp;
+	struct direct *dp;
 	diskaddr_t lbn, d;
 
 	for (;;) {
@@ -598,7 +595,7 @@ dotname(struct direct *dp)
 void
 pname(FILE *stream, ino_t i, int lev)
 {
-	register struct htab *hp;
+	struct htab *hp;
 
 	if (i == UFSROOTINO)
 		return;
@@ -622,7 +619,7 @@ pname(FILE *stream, ino_t i, int lev)
 struct htab *
 lookup(ino_t i, int ef)
 {
-	register struct htab *hp;
+	struct htab *hp;
 
 	for (hp = &htab[(int)i%hsize]; hp->h_ino; ) {
 		if (hp->h_ino == i)
@@ -644,7 +641,7 @@ lookup(ino_t i, int ef)
 void
 bread(diskaddr_t bno, char *buf, int cnt)
 {
-	register i;
+	int i;
 	int got;
 	offset_t offset;
 

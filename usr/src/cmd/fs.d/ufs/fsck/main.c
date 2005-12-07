@@ -175,7 +175,7 @@ char *magic_fs[] = {
 	NULL			/* MAGIC_LIMIT */
 };
 
-void
+int
 main(int argc, char *argv[])
 {
 	int c;

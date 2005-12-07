@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -121,7 +120,7 @@ int	nhent;
 int	nerror;
 
 long	atol();
-daddr_t	bmap();
+daddr_t	bmap(daddr_t);
 void	bread(diskaddr_t bno, char *buf, int cnt);
 void	check(char *file);
 int	dotname(struct direct *dp);
@@ -148,9 +147,8 @@ char *subopts [] = {
 	NULL
 	};
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	long n;
 	int	opt;
@@ -235,10 +233,9 @@ main(argc, argv)
 }
 
 void
-check(file)
-	char *file;
+check(char *file)
 {
-	register int i, j, c;
+	int i, j, c;
 
 	fi = open64(file, 0);
 	if (fi < 0) {
@@ -380,8 +377,7 @@ check(file)
 }
 
 void
-pass1(ip)
-	register struct dinode *ip;
+pass1(struct dinode *ip)
 {
 	int i;
 
@@ -412,10 +408,9 @@ pass1(ip)
 }
 
 void
-pass2(ip)
-	register struct dinode *ip;
+pass2(struct dinode *ip)
 {
-	register struct direct *dp;
+	struct direct *dp;
 	struct dirstuff dirp;
 	struct htab *hp;
 
@@ -454,10 +449,9 @@ pass2(ip)
 }
 
 void
-pass3(ip)
-	register struct dinode *ip;
+pass3(struct dinode *ip)
 {
-	register struct direct *dp;
+	struct direct *dp;
 	struct dirstuff dirp;
 	int k;
 
@@ -496,10 +490,9 @@ pass3(ip)
  * get next entry in a directory.
  */
 struct direct *
-dreaddir(dirp)
-	register struct dirstuff *dirp;
+dreaddir(struct dirstuff *dirp)
 {
-	register struct direct *dp;
+	struct direct *dp;
 	daddr_t lbn, d;
 
 	for (;;) {
@@ -528,8 +521,8 @@ dreaddir(dirp)
 	}
 }
 
-dotname(dp)
-	register struct direct *dp;
+int
+dotname(struct direct *dp)
 {
 
 	if (dp->d_name[0] == '.') {
@@ -541,11 +534,9 @@ dotname(dp)
 }
 
 void
-pname(i, lev)
-	ino_t i;
-	int lev;
+pname(ino_t i, int lev)
 {
-	register struct htab *hp;
+	struct htab *hp;
 
 	if (i == UFSROOTINO)
 		return;
@@ -564,11 +555,9 @@ pname(i, lev)
 }
 
 struct htab *
-lookup(i, ef)
-	ino_t i;
-	int ef;
+lookup(ino_t i, int ef)
 {
-	register struct htab *hp;
+	struct htab *hp;
 
 	for (hp = &htab[(int)i%hsize]; hp->h_ino; ) {
 		if (hp->h_ino == i)
@@ -589,12 +578,9 @@ lookup(i, ef)
 }
 
 void
-bread(bno, buf, cnt)
-	diskaddr_t bno;
-	char *buf;
-	int cnt;
+bread(diskaddr_t bno, char *buf, int cnt)
 {
-	register i;
+	int i;
 	int got;
 
 	if (llseek(fi, (offset_t)bno * DEV_BSIZE, 0) == -1) {
@@ -621,8 +607,7 @@ bread(bno, buf, cnt)
 }
 
 daddr_t
-bmap(i)
-	daddr_t i;
+bmap(daddr_t i)
 {
 	daddr_t ibuf[MAXNINDIR];
 
@@ -676,8 +661,7 @@ extend_ilist()
  * Return non-zero for success.
  */
 int
-extend_strngtab(size)
-	unsigned int size;
+extend_strngtab(unsigned int size)
 {
 	strngtab_size += size;
 	strngtab = (char *)realloc(strngtab, strngtab_size);
@@ -691,10 +675,7 @@ extend_strngtab(size)
  * Return null on failure.
  */
 uchar_t *
-extend_tbl(tbl, current_size, new_size)
-	uchar_t *tbl;
-	unsigned int *current_size;	/* current size */
-	unsigned int new_size;		/* bytes required */
+extend_tbl(uchar_t *tbl, unsigned int *current_size, unsigned int new_size)
 {
 	/*
 	 * if we've already allocated tbl,

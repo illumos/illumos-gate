@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -72,21 +71,24 @@ extern off_t	lseek();
 extern char 	*getfullblkname();
 
 static  void		usage(), pheader();
-static  char		*mpath(), *zap_chroot();
-static  char		*pathsuffix();
-static  char		*xmalloc();
-static  int		chroot_stat();
-static  int		bread();
-static  int		abspath(), subpath();
+static  char		*mpath(char *);
+static  char		*zap_chroot(char *);
+static  char		*pathsuffix(char *, char *);
+static  char		*xmalloc(unsigned int);
+static  int		chroot_stat(char *, int (*)(), char *, char **);
+static  int		bread(char *, int, daddr_t, char *, int);
+static  int		subpath(char *, char *);
+static	int		abspath(char *, char *, char *);
 static  void		show_inode_usage();
-static  void		dfreedev();
-static  void		dfreemnt();
+static  void		dfreedev(char *);
+static  void		dfreemnt(char *, struct mnttab *);
 static  void		print_totals();
 static  void		print_itotals();
-static  void		print_statvfs();
+static  void		print_statvfs(struct statvfs64 *);
+static  int 		mdev(char *, struct mnttab **);
 static struct mntlist	*mkmntlist();
-static struct mnttab	*mntdup(), *mdev(char *);
-static struct mntlist	*findmntent();
+static struct mnttab	*mntdup(struct mnttab *mnt);
+static struct mntlist	*findmntent(char *, struct stat64 *, struct mntlist *);
 
 #define	bcopy(f, t, n)	memcpy(t, f, n)
 #define	bzero(s, n)	memset(s, 0, n)
@@ -146,10 +148,8 @@ char *subopts [] = {
 	NULL
 };
 
-void
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	struct mnttab 		mnt;
 	int			opt;
@@ -257,7 +257,7 @@ main(argc, argv)
 		 * 	/usr/lib/fs/ufs/df -o i
 		 *	/usr/lib/fs/ufs/df
 		 */
-		register FILE *mtabp;
+		FILE *mtabp;
 
 		if ((mtabp = fopen(MNTTAB, "r")) == NULL) {
 			(void) fprintf(stderr, "df: ");
@@ -344,7 +344,7 @@ main(argc, argv)
 		 * Iterate through the argument list, reporting on each one.
 		 */
 		for (i = 0; i < argc; i++) {
-			register struct mntlist *mlp;
+			struct mntlist *mlp;
 			int isblk;
 
 			/*
@@ -363,7 +363,9 @@ main(argc, argv)
 			if ((isblk = (argstat[i].st_mode&S_IFMT) == S_IFBLK) ||
 			    (argstat[i].st_mode & S_IFMT) == S_IFCHR) {
 				if (isblk && strcmp(mpath(cp), "") != 0) {
-					struct mnttab *mp = mdev(cp);
+					struct mnttab *mp;
+					if (mdev(cp, &mp))
+						return (1);
 					dfreemnt(mp->mnt_mountp, mp);
 				} else {
 					dfreedev(cp);
@@ -393,8 +395,7 @@ main(argc, argv)
 		free(devnames);
 		free(argstat);
 	}
-	exit(0);
-	/*NOTREACHED*/
+	return (0);
 }
 
 void
@@ -463,8 +464,7 @@ pheader()
  * mounted.  N.B. checks for a valid UFS superblock.
  */
 void
-dfreedev(file)
-	char *file;
+dfreedev(char *file)
 {
 	fsblkcnt64_t totalblks, availblks, avail, free, used;
 	int fi;
@@ -553,9 +553,7 @@ dfreedev(file)
 }
 
 void
-dfreemnt(file, mnt)
-	char *file;
-	struct mnttab *mnt;
+dfreemnt(char *file, struct mnttab *mnt)
 {
 	struct statvfs64 fs;
 
@@ -658,8 +656,7 @@ show_inode_usage(fsfilcnt64_t total, fsfilcnt64_t free)
  * value isn't obtainable or if it's not a prefix of path, return NULL.
  */
 static char *
-zap_chroot(path)
-	char	*path;
+zap_chroot(char *path)
 {
 	return (pathsuffix(path, chrootpath));
 }
@@ -670,11 +667,7 @@ zap_chroot(path)
  * activated NSE environment.
  */
 static int
-chroot_stat(dir, statfunc, statp, dirp)
-	char *dir;
-	int (*statfunc)();
-	char *statp;
-	char **dirp;
+chroot_stat(char *dir, int (*statfunc)(), char *statp, char **dirp)
 {
 	if ((dir = zap_chroot(dir)) == NULL)
 		return (-1);
@@ -721,10 +714,11 @@ mpath(char *file)
 
 /*
  * Given a special device, return mnttab entry
+ * Returns 0 on success
  */
 
-struct mnttab *
-mdev(char *spec)
+int
+mdev(char *spec, struct mnttab **mntbp)
 {
 	FILE *mntp;
 	struct mnttab mnt;
@@ -732,18 +726,19 @@ mdev(char *spec)
 	if ((mntp = fopen(MNTTAB, "r")) == 0) {
 		(void) fprintf(stderr, "df: ");
 		perror(MNTTAB);
-		exit(1);
+		return (1);
 	}
 
 	while (getmntent(mntp, &mnt) == 0) {
 		if (strcmp(spec, mnt.mnt_special) == 0) {
 			(void) fclose(mntp);
-			return (mntdup(&mnt));
+			*mntbp =  mntdup(&mnt);
+			return (0);
 		}
 	}
 	(void) fclose(mntp);
 	(void) fprintf(stderr, "df : couldn't find mnttab entry for %s", spec);
-	exit(1);
+	return (1);
 }
 
 /*
@@ -768,15 +763,12 @@ mdev(char *spec)
  * those resources are necessary for accessing path.
  */
 static struct mntlist *
-findmntent(path, pstat, mlist)
-	char		*path;
-	struct stat64	*pstat;
-	struct mntlist	*mlist;
+findmntent(char *path, struct stat64 *pstat, struct mntlist *mlist)
 {
 	static char		cwd[MAXPATHLEN];
 	char			canon[MAXPATHLEN];
 	char			scratch[MAXPATHLEN];
-	register struct mntlist *mlp;
+	struct mntlist *mlp;
 
 	/*
 	 * If path is relative and we haven't already determined the current
@@ -857,10 +849,7 @@ again:
  * Return 0 on success, -1 on failure.
  */
 static int
-abspath(wd, raw, canon)
-	char		*wd;
-	register char	*raw;
-	char		*canon;
+abspath(char *wd, char *raw, char *canon)
 {
 	char		absbuf[MAXPATHLEN];
 
@@ -875,8 +864,8 @@ abspath(wd, raw, canon)
 	 * using wd if it's been supplied.
 	 */
 	if (raw[0] != '/') {
-		register char	*limit = absbuf + sizeof (absbuf);
-		register char	*d;
+		char	*limit = absbuf + sizeof (absbuf);
+		char	*d;
 
 		/* Fill in working directory. */
 		if (strlcpy(absbuf, wd, sizeof (absbuf)) >= sizeof (absbuf))
@@ -907,11 +896,9 @@ abspath(wd, raw, canon)
  * component boundary.
  */
 static char *
-pathsuffix(full, pref)
-	register char *full;
-	register char *pref;
+pathsuffix(char *full, char *pref)
 {
-	register int preflen;
+	int preflen;
 
 	if (full == NULL || pref == NULL)
 		return (NULL);
@@ -941,9 +928,7 @@ pathsuffix(full, pref)
  * Treat null paths as matching nothing.
  */
 static int
-subpath(full, sub)
-	register char *full;
-	register char *sub;
+subpath(char *full, char *sub)
 {
 	return (pathsuffix(full, sub) == NULL);
 }
@@ -951,14 +936,9 @@ subpath(full, sub)
 offset_t llseek();
 
 int
-bread(file, fi, bno, buf, cnt)
-	char *file;
-	int fi;
-	daddr_t bno;
-	char *buf;
-	int cnt;
+bread(char *file, int fi, daddr_t bno, char *buf, int cnt)
 {
-	register int n;
+	int n;
 
 	(void) llseek(fi, (offset_t)bno * DEV_BSIZE, 0);
 	if ((n = read(fi, buf, cnt)) < 0) {
@@ -979,10 +959,9 @@ bread(file, fi, bno, buf, cnt)
 }
 
 char *
-xmalloc(size)
-	unsigned int size;
+xmalloc(unsigned int size)
 {
-	register char *ret;
+	char *ret;
 	char *malloc();
 
 	if ((ret = (char *)malloc(size)) == NULL) {
@@ -993,10 +972,9 @@ xmalloc(size)
 }
 
 struct mnttab *
-mntdup(mnt)
-	register struct mnttab *mnt;
+mntdup(struct mnttab *mnt)
 {
-	register struct mnttab *new;
+	struct mnttab *new;
 
 	new = (struct mnttab *)xmalloc(sizeof (*new));
 
@@ -1064,8 +1042,7 @@ mkmntlist()
 }
 
 void
-print_statvfs(fs)
-	struct statvfs64	*fs;
+print_statvfs(struct statvfs64 *fs)
 {
 	int	i;
 

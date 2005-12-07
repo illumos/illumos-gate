@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -65,7 +64,7 @@
 #include <sys/fs/ufs_fs.h>
 
 static void usage();
-static void label();
+static void label(char *, char *, char *);
 
 static union sbtag {
 	char		dummy[SBSIZE];
@@ -78,10 +77,8 @@ static union sbtag {
 extern int	optind;
 extern char	*optarg;
 
-void
-main(argc, argv)
-	int	argc;
-	char	*argv[];
+int
+main(int argc, char *argv[])
 {
 	int		opt;
 	char		*special = NULL;
@@ -123,7 +120,7 @@ main(argc, argv)
 		}
 	}
 	label(special, fsname, volume);
-	exit(0);
+	return	(0);
 }
 
 void
@@ -136,10 +133,7 @@ usage()
 }
 
 void
-label(special, fsname, volume)
-	char		*special;
-	char		*fsname;
-	char		*volume;
+label(char *special, char *fsname, char *volume)
 {
 	int	f;
 	int	blk;

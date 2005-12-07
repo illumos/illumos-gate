@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,7 +115,7 @@ char **listbuf;
 struct dqblk zerodqbuf;
 struct fileusage zerofileusage;
 
-void
+int
 main(int argc, char **argv)
 {
 	struct mnttab mntp;
@@ -257,22 +256,20 @@ main(int argc, char **argv)
 	}
 	if (errs > 0)
 		errs += 31;
-	exit(errs);
+	return (errs);
 }
 
-static struct active {
+struct active {
 	char *rdev;
 	pid_t pid;
 	struct active *nxt;
 };
 
 int
-preen(listcnt, listp)
-	int listcnt;
-	char **listp;
+preen(int listcnt, char **listp)
 {
-	register int i, rc, errs;
-	register char **lp, *rdev, *bdev;
+	int i, rc, errs;
+	char **lp, *rdev, *bdev;
 	extern char *getfullrawname(), *getfullblkname();
 	struct mnttab mntp, mpref;
 	struct active *alist, *ap;
@@ -389,12 +386,11 @@ preen(listcnt, listp)
 }
 
 int
-waiter(alp)
-	struct active **alp;
+waiter(struct active **alp)
 {
 	pid_t curpid;
 	int status;
-	register struct active *ap, *lap;
+	struct active *ap, *lap;
 
 	curpid = wait(&status);
 	if (curpid == -1) {
@@ -424,12 +420,9 @@ waiter(alp)
 }
 
 int
-chkquota(fsdev, fsfile, qffile)
-	char *fsdev;
-	char *fsfile;
-	char *qffile;
+chkquota(char *fsdev, char *fsfile, char *qffile)
 {
-	register struct fileusage *fup;
+	struct fileusage *fup;
 	dev_t quotadev;
 	FILE *qf;
 	uid_t uid;
@@ -597,10 +590,9 @@ chkquota(fsdev, fsfile, qffile)
 }
 
 void
-acct(ip)
-	register struct dinode *ip;
+acct(struct dinode *ip)
 {
-	register struct fileusage *fup;
+	struct fileusage *fup;
 
 	if (ip == NULL)
 		return;
@@ -618,10 +610,7 @@ acct(ip)
 }
 
 int
-oneof(target, olistp, on)
-	char *target;
-	register char **olistp;
-	register int on;
+oneof(char *target, char **olistp, int on)
 {
 	char **listp = olistp;
 	int n = on;
@@ -672,7 +661,7 @@ bread(diskaddr_t bno, char *buf, int cnt)
 struct fileusage *
 lookup(uid_t uid)
 {
-	register struct fileusage *fup;
+	struct fileusage *fup;
 
 	for (fup = fuhead[uid % FUHASH]; fup != 0; fup = fup->fu_next)
 		if (fup->fu_uid == uid)
@@ -710,11 +699,7 @@ usage()
 }
 
 int
-quotactl(cmd, mountp, uid, addr)
-	int		cmd;
-	char		*mountp;
-	uid_t		uid;
-	caddr_t		addr;
+quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 {
 	int 		fd;
 	int 		status;
@@ -783,9 +768,7 @@ quotactl(cmd, mountp, uid, addr)
 }
 
 char *
-hasvfsopt(vfs, opt)
-	register struct vfstab *vfs;
-	register char *opt;
+hasvfsopt(struct vfstab *vfs, char *opt)
 {
 	char *f, *opts;
 	static char *tmpopts;

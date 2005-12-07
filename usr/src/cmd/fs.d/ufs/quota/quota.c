@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,10 +72,15 @@ extern char	*optarg;
 #endif
 
 static int getnfsquota(char *, char *, uid_t, struct dqblk *);
+static void showuid(uid_t);
+static void showquotas(uid_t, char *);
+static void warn(struct mnttab *, struct dqblk *);
+static void heading(uid_t, char *);
+static void prquota(struct mnttab *, struct dqblk *);
+static void fmttime(char *, long);
 
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	int	opt;
 	int	i;
@@ -126,11 +130,11 @@ main(argc, argv)
 		} else
 			status |= showname(argv[i]);
 	}
-	exit(status);
+	return (status);
 }
 
-showuid(uid)
-	uid_t uid;
+static void
+showuid(uid_t uid)
 {
 	struct passwd *pwd = getpwuid(uid);
 
@@ -146,8 +150,7 @@ showuid(uid)
 }
 
 int
-showname(name)
-	char *name;
+showname(char *name)
 {
 	struct passwd *pwd = getpwnam(name);
 
@@ -166,9 +169,8 @@ showname(name)
 
 #include "../../nfs/lib/replica.h"
 
-showquotas(uid, name)
-	uid_t uid;
-	char *name;
+static void
+showquotas(uid_t uid, char *name)
 {
 	struct mnttab mnt;
 	FILE *mtab;
@@ -277,9 +279,8 @@ showquotas(uid, name)
 	fclose(mtab);
 }
 
-warn(mntp, dqp)
-	struct mnttab *mntp;
-	struct dqblk *dqp;
+static void
+warn(struct mnttab *mntp, struct dqblk *dqp)
 {
 	struct timeval tv;
 
@@ -341,9 +342,8 @@ warn(mntp, dqp)
 	}
 }
 
-heading(uid, name)
-	uid_t uid;
-	char *name;
+static void
+heading(uid_t uid, char *name)
 {
 	printf("Disk quotas for %s (uid %ld):\n", name, (long)uid);
 	printf("%-12s %7s%7s%7s%12s%7s%7s%7s%12s\n",
@@ -358,9 +358,8 @@ heading(uid, name)
 		"timeleft");
 }
 
-prquota(mntp, dqp)
-	register struct mnttab *mntp;
-	register struct dqblk *dqp;
+static void
+prquota(struct mnttab *mntp, struct dqblk *dqp)
 {
 	struct timeval tv;
 	char ftimeleft[80], btimeleft[80];
@@ -408,9 +407,8 @@ prquota(mntp, dqp)
 	    ftimeleft);
 }
 
-fmttime(buf, time)
-	char *buf;
-	register long time;
+static void
+fmttime(char *buf, long time)
 {
 	int i;
 	static struct {
@@ -436,10 +434,10 @@ fmttime(buf, time)
 	sprintf(buf, "%.1f %s", (double)time/cunits[i].c_secs, cunits[i].c_str);
 }
 
-alldigits(s)
-	register char *s;
+int
+alldigits(char *s)
 {
-	register c;
+	int c;
 
 	c = *s++;
 	do {
@@ -450,10 +448,7 @@ alldigits(s)
 }
 
 int
-getdiskquota(mntp, uid, dqp)
-	struct mnttab *mntp;
-	uid_t uid;
-	struct dqblk *dqp;
+getdiskquota(struct mnttab *mntp, uid_t uid, struct dqblk *dqp)
 {
 	int fd;
 	dev_t fsdev;
@@ -491,11 +486,8 @@ getdiskquota(mntp, uid, dqp)
 	return (1);
 }
 
-quotactl(cmd, mountp, uid, addr)
-	int		cmd;
-	char		*mountp;
-	uid_t		uid;
-	caddr_t		addr;
+int
+quotactl(int cmd, char *mountp, uid_t uid, caddr_t addr)
 {
 	int		fd;
 	int		status;
@@ -565,8 +557,7 @@ quotactl(cmd, mountp, uid, addr)
  * Return 1 if opt appears in optlist
  */
 int
-hasopt(opt, optlist)
-	char *opt, *optlist;
+hasopt(char *opt, char *optlist)
 {
 	char *value;
 	char *opts[2];
@@ -646,10 +637,9 @@ getnfsquota(char *hostp, char *path, uid_t uid, struct dqblk *dqp)
 	return (0);
 }
 
-callaurpc(host, prognum, versnum, procnum, inproc, in, outproc, out)
-	char *host;
-	xdrproc_t inproc, outproc;
-	char *in, *out;
+int
+callaurpc(char *host, int prognum, int versnum, int procnum,
+		xdrproc_t inproc, char *in, xdrproc_t outproc, char *out)
 {
 	static enum clnt_stat clnt_stat;
 	struct timeval tottimeout;

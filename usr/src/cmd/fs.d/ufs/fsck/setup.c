@@ -887,9 +887,9 @@ create_and_init_maps(void)
 		goto finish;
 	}
 	if (debug) {
-		if (listmax > USI_MAX)
+		if (listmax > ULONG_MAX)
 			errexit("create_and_init_maps: listmax overflowed\n");
-		if (numdirs > USI_MAX)
+		if (numdirs > ULONG_MAX)
 			errexit("create_and_init_maps: numdirs overflowed\n");
 	}
 
@@ -906,9 +906,9 @@ create_and_init_maps(void)
 		goto finish;
 	}
 	if (debug) {
-		if (aclmax > USI_MAX)
+		if (aclmax > ULONG_MAX)
 			errexit("create_and_init_maps: aclmax overflowed\n");
-		if (numacls > USI_MAX)
+		if (numacls > ULONG_MAX)
 			errexit("create_and_init_maps: numacls overflowed\n");
 	}
 	aclplast = 0L;

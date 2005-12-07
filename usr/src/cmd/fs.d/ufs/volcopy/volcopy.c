@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -145,10 +144,23 @@ FILE	*Devtty;
 static void 	getinfs(),
 		getoutfs();
 
-static char 	*getfslabel();
-static char 	*getvolabel();
-static void	prompt(int verify, const char *fmt, ...);
-static void	perr(int severity, const char *fmt, ...);
+static char 	*getfslabel(struct fs *);
+static char 	*getvolabel(struct fs *);
+static void	prompt(int, const char *, ...);
+static void	perr(int, const char *, ...);
+static void 	mklabel(void);
+static void	get_mach_type(void);
+static void 	mem_setup(void);
+static void	rprt(void);
+static void 	chgreel(struct file_info *, int);
+static void	parent_copy(void);
+static void 	copy(void);
+static void 	flush_bufs(int);
+static void 	cleanup(void);
+
+#ifdef LOG
+static int 	fslog(void);
+#endif	/* LOG */
 
 /*
  * g_init(), g_read(), g_write() originally came from libgenIO,
@@ -288,13 +300,12 @@ g_write(int devtype, int fdes, void *buf, size_t nbytes)
  * volcopy u5 /dev/rmt/0m -  /dev/rdsk/1s5 -
  */
 
-main(argc, argv)
-int argc;
-char **argv;
+int
+main(int argc, char *argv[])
 {
-	register char c;
-	register int lfdes, altflg = 0, result, verify;
-	register long dist;
+	char c;
+	int lfdes, altflg = 0, result, verify;
+	long dist;
 	char *align();
 	void sigalrm(), sigint();
 	struct stat stbuf;
@@ -610,8 +621,8 @@ fsname /devfrom volfrom /devto volto\n");
 	fslog();
 #endif
 	if (Blocks)
-		exit(0);
-	exit(31+1);		/* failed.. 0 blocks */
+		return (0);
+	return (31+1);		/* failed.. 0 blocks */
 }
 
 /*
@@ -646,7 +657,7 @@ sigint()
 {
 	void (*signal())();
 	extern char **environ;
-	register int tmpflg, i = 0, ps1 = -1, ps2 = -1;
+	int tmpflg, i = 0, ps1 = -1, ps2 = -1;
 
 	tmpflg = Yesflg; /* override yesflag for duration of interrupt */
 	Yesflg = 0;
@@ -698,8 +709,8 @@ actual_blocks()
  * get_mach_type: Determine what machine this is executing on.
  */
 
-int
-get_mach_type()
+static void
+get_mach_type(void)
 {
 	struct utsname utsinfo;
 
@@ -718,11 +729,11 @@ get_mach_type()
  * get normal memory and only use one process.
  */
 
-int
-mem_setup()
+static void
+mem_setup(void)
 {
 	void (*signal())();
-	register int cnt, num, size;
+	int cnt, num, size;
 	char *align();
 
 	union semun {
@@ -834,8 +845,8 @@ prompt(int verify, const char *fmt, ...)
  * ask: Ask the user a question and get the answer.
  */
 
-ask(s)
-char *s;
+int
+ask(char *s)
 {
 	char ans[12];
 
@@ -872,10 +883,9 @@ char *s;
  */
 
 char *
-align(size)
-register int size;
+align(int size)
 {
-	register int pad;
+	int pad;
 
 	if ((pad = ((int)malloc(0) & (PAGESIZE-1))) > 0) {
 		pad = PAGESIZE - pad;
@@ -893,8 +903,8 @@ register int size;
 int
 child_copy()
 {
-	register int rv, cur_buf, left, have, tpcnt;
-	register char *c_p;
+	int rv, cur_buf, left, have, tpcnt;
+	char *c_p;
 
 	(void) signal(SIGINT, SIG_IGN);
 	Sem_buf.sem_op = -1;
@@ -947,11 +957,11 @@ child_copy()
  * source file system and writes to shared memory.
  */
 
-int
-parent_copy()
+static void
+parent_copy(void)
 {
-	register int rv, left, have, tpcnt, cur_buf;
-	register char *c_p;
+	int rv, left, have, tpcnt, cur_buf;
+	char *c_p;
 	int eom = 0, xfer_cnt = Fs * BLKSIZ;
 
 	Sem_buf.sem_num = 0;
@@ -1033,11 +1043,11 @@ parent_copy()
  * filesystem and writes to the destination filesystem.
  */
 
-int
-copy()
+static void
+copy(void)
 {
-	register int rv, left, have, tpcnt = 1, xfer_cnt = Fs * BLKSIZ;
-	register char *c_p;
+	int rv, left, have, tpcnt = 1, xfer_cnt = Fs * BLKSIZ;
+	char *c_p;
 
 	if ((Itape || Otape) && !Eomflg)
 		tpcnt = actual_blocks() * BLKSIZ;
@@ -1115,9 +1125,8 @@ copy()
  * buffer before prompting user for end-of-media.
  */
 
-int
-flush_bufs(buffer)
-register int buffer;
+static void
+flush_bufs(int buffer)
 {
 
 	Blocks += *Cnts[buffer];
@@ -1131,10 +1140,10 @@ register int buffer;
  * cleanup:  Clean up shared memory and semaphore resources.
  */
 
-int
-cleanup()
+static void
+cleanup(void)
 {
-	register int cnt;
+	int cnt;
 
 	if (Ipc) {
 		for (cnt = 0; cnt < BUFCNT; cnt++) {
@@ -1151,10 +1160,9 @@ cleanup()
  */
 
 int
-find_lcm(sz1, sz2)
-register int sz1, sz2;
+find_lcm(int sz1, int sz2)
 {
-	register int inc, lcm, small;
+	int inc, lcm, small;
 
 	if (sz1 < sz2) {
 		lcm = inc = sz2;
@@ -1172,8 +1180,8 @@ register int sz1, sz2;
  * Determine bpi information from drive names.
  */
 
-getbpi(inp)
-register char *inp;
+int
+getbpi(char *inp)
 {
 
 /*
@@ -1202,10 +1210,9 @@ register char *inp;
  */
 
 int
-blks_per_ft(disc)
-register double disc;
+blks_per_ft(double disc)
 {
-	register double dcnt = Blk_cnt, dBpi = Bpi, dsiz = BLKSIZ, dgap = 0.3;
+	double dcnt = Blk_cnt, dBpi = Bpi, dsiz = BLKSIZ, dgap = 0.3;
 
 	return ((int)(dcnt / (((dcnt * dsiz / dBpi) + dgap) / 12.0) * disc));
 }
@@ -1217,11 +1224,10 @@ register double disc;
  * block sizes and 88% for large block sizes.
  */
 
-tapeck(f_p, dir)
-register struct file_info *f_p;
-register int dir;
+int
+tapeck(struct file_info *f_p, int dir)
 {
-	register int again = 1, verify, old_style, new_style;
+	int again = 1, verify, old_style, new_style;
 	char resp[16];
 
 	errno = 0;
@@ -1391,11 +1397,10 @@ register int dir;
  * hdrck:  Look for and validate a volcopy style tape label.
  */
 
-hdrck(dev, fd, tvol)
-register int dev, fd;
-register char *tvol;
+int
+hdrck(int dev, int fd, char *tvol)
 {
-	register int verify;
+	int verify;
 	struct volcopy_label tlabl;
 
 	alarm(15); /* don't scan whole tape for label */
@@ -1430,7 +1435,8 @@ register char *tvol;
  * mklabel:  Zero out and initialize a volcopy label.
  */
 
-mklabel()
+static void
+mklabel(void)
 {
 
 	(void) memcpy(&V_labl, Empty, sizeof (V_labl));
@@ -1444,7 +1450,8 @@ mklabel()
  * rprt:  Report activity to user.
  */
 
-rprt()
+static void
+rprt(void)
 {
 
 	if (Itape)
@@ -1465,7 +1472,8 @@ rprt()
  * fslog: Log current activity.
  */
 
-fslog()
+static int
+fslog(void)
 {
 	FILE *fp = NULL;
 
@@ -1478,7 +1486,7 @@ fslog()
 		In.f_dev_p, ';', Ifname, ';', Ifpack, Out.f_dev_p,
 		';', Ofname, ';', Ofpack, ctime(&Tvec));
 	fclose(fp);
-	exit(0);
+	return (0);
 }
 #endif	/* LOG */
 
@@ -1486,10 +1494,10 @@ fslog()
  * getname:  Get device name.
  */
 
-getname(nam_p)
-register char *nam_p;
+void
+getname(char *nam_p)
 {
-	register int lastchar;
+	int lastchar;
 	char nam_buf[21];
 
 	nam_buf[0] = '\0';
@@ -1508,11 +1516,10 @@ register char *nam_p;
  * chgreel:  Change reel on end-of-media.
  */
 
-chgreel(f_p, dir)
-register struct file_info *f_p;
-register int dir;
+static void
+chgreel(struct file_info *f_p, int dir)
 {
-	register int again = 1, lastchar, temp;
+	int again = 1, lastchar, temp;
 	char vol_tmp[11];
 
 	R_cur++;
@@ -1628,10 +1635,7 @@ perr(int severity, const char *fmt, ...)
 
 
 static void
-getinfs(dev, fd, buf)
-	int 	dev;
-	int 	fd;
-	char 	*buf;
+getinfs(int dev, int fd, char *buf)
 {
 	int cnt;
 	int i;
@@ -1649,11 +1653,7 @@ getinfs(dev, fd, buf)
 }
 
 static void
-getoutfs(dev, fd, buf, verify)
-	int 	dev;
-	int 	fd;
-	char 	*buf;
-	int	verify;
+getoutfs(int dev, int fd, char *buf, int verify)
 {
 	int cnt;
 	int i;
@@ -1672,8 +1672,7 @@ getoutfs(dev, fd, buf, verify)
 }
 
 static char *
-getfslabel(sb)
-	struct fs *sb;
+getfslabel(struct fs *sb)
 {
 	int i;
 	int blk;
@@ -1698,8 +1697,7 @@ getfslabel(sb)
 }
 
 static char *
-getvolabel(sb)
-	struct fs *sb;
+getvolabel(struct fs *sb)
 {
 	char *p;
 	int i;

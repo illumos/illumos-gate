@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,18 +76,16 @@ char	*whoami;
 
 static void fixmntent();
 static void mnterror();
-static void usage();
+static void usage(char *);
 static int oneof();
 static int quotaonoff();
-static int quotactl();
+static int quotactl(int, char *, uid_t, caddr_t);
 
 extern int	optind;
 extern char	*optarg;
 
-void
-main(argc, argv)
-	int argc;
-	char **argv;
+int
+main(int argc, char **argv)
 {
 	struct mnttab mntp;
 	struct vfstab vfsbuf;
@@ -244,13 +241,11 @@ main(argc, argv)
 	}
 	if (errs > 0)
 		errs += 31;
-	exit(errs);
+	return (errs);
 }
 
 int
-quotaonoff(mntp, offmode)
-	register struct mnttab *mntp;
-	int offmode;
+quotaonoff(struct mnttab *mntp, int offmode)
 {
 
 	if (offmode) {
@@ -273,10 +268,7 @@ bad:
 }
 
 int
-oneof(target, olistp, on)
-	char *target;
-	register char **olistp;
-	register int on;
+oneof(char *target, char **olistp, int on)
 {
 	int n = on;
 	char **listp = olistp;
@@ -292,8 +284,7 @@ oneof(target, olistp, on)
 }
 
 void
-usage(whoami)
-	char	*whoami;
+usage(char *whoami)
 {
 
 	fprintf(stderr, "ufs usage:\n");
@@ -304,11 +295,7 @@ usage(whoami)
 
 
 int
-quotactl(cmd, mountpt, uid, addr)
-	int		cmd;
-	char		*mountpt;
-	uid_t		uid;
-	caddr_t		addr;
+quotactl(int cmd, char *mountpt, uid_t uid, caddr_t addr)
 {
 	int		fd;
 	int		status;
@@ -339,9 +326,7 @@ quotactl(cmd, mountpt, uid, addr)
 }
 
 char *
-hasvfsopt(vfs, opt)
-	register struct vfstab *vfs;
-	register char *opt;
+hasvfsopt(struct vfstab *vfs, char *opt)
 {
 	char *f, *opts;
 	static char *tmpopts;
@@ -362,8 +347,7 @@ hasvfsopt(vfs, opt)
 }
 
 void
-mnterror(flag)
-	int	flag;
+mnterror(int flag)
 {
 	switch (flag) {
 	case MNT_TOOLONG:

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -86,11 +85,11 @@ extern int	optind;
 extern char	*optarg;
 
 static void usage();
-static void getsb();
-static void bwrite();
+static void getsb(struct fs *, char *);
+static void bwrite(diskaddr_t, char *, int);
 static void fatal();
-static int bread();
-static int isnumber();
+static int bread(diskaddr_t, char *, int);
+static int isnumber(char *);
 
 extern char *getfullrawname(), *getfullblkname();
 
@@ -146,10 +145,8 @@ searchmnttab(char **specialp, char **mountpointp)
 	fclose(mnttab);
 }
 
-void
-main(argc, argv)
-	int argc;
-	char *argv[];
+int
+main(int argc, char *argv[])
 {
 	char *special, *name, *mountpoint = NULL;
 	struct stat64 st;
@@ -348,7 +345,7 @@ main(argc, argv)
 	}
 
 	close(fi);
-	exit(0);
+	return (0);
 }
 
 void
@@ -365,9 +362,7 @@ usage()
 }
 
 void
-getsb(fs, file)
-	struct fs *fs;
-	char *file;
+getsb(struct fs *fs, char *file)
 {
 
 	fi = open64(file, O_RDWR);
@@ -402,10 +397,7 @@ getsb(fs, file)
 }
 
 void
-bwrite(blk, buf, size)
-	char *buf;
-	diskaddr_t blk;
-	int size;
+bwrite(diskaddr_t blk, char *buf, int size)
 {
 	if (llseek(fi, (offset_t)blk * DEV_BSIZE, 0) < 0) {
 		perror("FS SEEK");
@@ -418,9 +410,7 @@ bwrite(blk, buf, size)
 }
 
 int
-bread(bno, buf, cnt)
-	diskaddr_t bno;
-	char *buf;
+bread(diskaddr_t bno, char *buf, int cnt)
 {
 	int	i;
 
@@ -440,8 +430,7 @@ bread(bno, buf, cnt)
 
 /* VARARGS1 */
 void
-fatal(fmt, arg1, arg2)
-	char *fmt, *arg1, *arg2;
+fatal(char *fmt, char *arg1, char *arg2)
 {
 	fprintf(stderr, "tunefs: ");
 	fprintf(stderr, fmt, arg1, arg2);
@@ -451,10 +440,9 @@ fatal(fmt, arg1, arg2)
 
 
 int
-isnumber(s)
-	char *s;
+isnumber(char *s)
 {
-	register c;
+	int c;
 
 	while (c = *s++)
 		if (c < '0' || c > '9')

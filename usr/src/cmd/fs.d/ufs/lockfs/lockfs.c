@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,12 +52,12 @@ extern int	opterr;
 extern void exit();
 
 static void exitusage();
-static void printstatusline();
-static void printstatus();
-static void flushfs();
-static void lockfs();
+static void printstatusline(char *, char *, char *);
+static void printstatus(char *);
+static void flushfs(char *);
+static void lockfs(char *);
 static void getmntnames();
-static void getcmdnames();
+static void getcmdnames(int, char **, int);
 
 /*
  * -a = all
@@ -90,14 +89,14 @@ struct filename	*fnanchor	= 0;
  * -wnduhfe changes them
  */
 int request	= _FIOLFSS;
-u_short	lock	= LOCKFS_ULOCK;
+ushort_t	lock	= LOCKFS_ULOCK;
 
 /*
  * default comment is null
  *	-c changes it
  */
 caddr_t comment	= 0;
-u_long	comlen	= 0;
+ulong_t	comlen	= 0;
 
 /*
  * for prettyprint
@@ -124,10 +123,8 @@ int no_unlocks_printed	= 0;
  */
 char	*malloc();
 
-void
-main(argc, argv)
-	int		argc;
-	char		**argv;
+int
+main(int argc, char *argv[])
 {
 	int		c;
 	struct filename	*fnp;
@@ -223,7 +220,7 @@ main(argc, argv)
 	/*
 	 * all done
 	 */
-	exit(exitstatus);
+	return (exitstatus);
 }
 /*
  * exitusage
@@ -240,10 +237,7 @@ exitusage()
  * 	prettyprint the status line
  */
 void
-printstatusline(fn, locktype, comment)
-	char	*fn;
-	char	*locktype;
-	char	*comment;
+printstatusline(char *fn, char *locktype, char *comment)
 {
 	if (firsttime++ == 0)
 		printf("%-20s %-10s %s\n", "Filesystem", "Locktype", "Comment");
@@ -254,8 +248,7 @@ printstatusline(fn, locktype, comment)
  *	get and prettyprint file system lock status
  */
 void
-printstatus(fn)
-	char		*fn;
+printstatus(char *fn)
 {
 	int		fd;
 	int		fsmod	= 0;
@@ -350,8 +343,7 @@ out:
  *	push and invalidate at least the data that is *currently* dirty
  */
 void
-flushfs(fn)
-	char		*fn;
+flushfs(char *fn)
 {
 	int		fd;
 
@@ -375,8 +367,7 @@ flushfs(fn)
  *	lock the file system
  */
 void
-lockfs(fn)
-	char	*fn;
+lockfs(char *fn)
 {
 	int		fd;
 	struct lockfs	lf;
@@ -446,7 +437,7 @@ getmntnames()
 			continue;
 		fnlen = strlen(mntp->mnt_mountp) + 1;
 		fnp = (struct filename *)malloc(sizeof (struct filename));
-		fnp->fn_name = malloc((u_int)fnlen);
+		fnp->fn_name = malloc((uint_t)fnlen);
 		strcpy(fnp->fn_name, mntp->mnt_mountp);
 		fnp->fn_next = NULL;
 		if (fnpc)
@@ -462,10 +453,7 @@ getmntnames()
  *	file names from command line
  */
 void
-getcmdnames(argc, argv, i)
-	int	argc;
-	char	**argv;
-	int	i;
+getcmdnames(int argc, char **argv, int i)
 {
 	struct filename	*fnp;
 	struct filename	*fnpc;

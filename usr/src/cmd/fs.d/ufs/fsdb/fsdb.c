@@ -291,32 +291,32 @@ extern char	*malloc(), *calloc();
 static char		getachar();
 static char		*getblk(), *fmtentry();
 
-static offset_t		get();
+static offset_t		get(short);
 static long		bmap();
 static long		expr();
 static long		term();
 static long		getnumb();
 static u_offset_t	getdirslot();
-static unsigned long	*print_check();
+static unsigned long	*print_check(unsigned long *, long *, short, int);
 
-static void		usage();
-static void		ungetachar();
+static void		usage(char *);
+static void		ungetachar(char);
 static void		getnextinput();
 static void		eat_spaces();
-static void		restore_inode();
+static void		restore_inode(ino_t);
 static void		find();
-static void		ls();
-static void		formatf();
+static void		ls(struct filenames *, struct filenames *, short);
+static void		formatf(struct filenames *, struct filenames *);
 static void		parse();
-static void		follow_path();
+static void		follow_path(long, long);
 static void		getname();
-static void		freemem();
-static void		print_path();
+static void		freemem(struct filenames *, int);
+static void		print_path(char **, int);
 static void		fill();
-static void		put();
-static void		insert();
+static void		put(u_offset_t, short);
+static void		insert(struct lbuf *);
 static void		puta();
-static void		fprnt();
+static void		fprnt(char, char);
 static void		index();
 #ifdef _LARGEFILE64_SOURCE
 static void		printll
@@ -326,26 +326,28 @@ static void		printll
 #else /* !_LARGEFILE64_SOURCE */
 static void		print(long value, int fieldsz, int digits, int lead);
 #endif /* _LARGEFILE64_SOURCE */
-static void		printsb();
-static void		printcg();
-static void		pbits();
-static void		old_fsdb();	/* Support for old fsdb functionality */
+static void		printsb(struct fs *);
+static void		printcg(struct cg *);
+static void		pbits(unsigned char *, int);
+static void		old_fsdb(int, char *);	/* For old fsdb functionality */
 
-static int		isnumber();
-static int		icheck();
-static int		cgrp_check();
+static int		isnumber(char *);
+static int		icheck(u_offset_t);
+static int		cgrp_check(long);
 static int		valid_addr();
-static int		match();
-static int		devcheck();
+static int		match(char *, int);
+static int		devcheck(short);
 static int		bcomp();
-static int		compare();
-static int		check_addr();
+static int		compare(char *, char *, short);
+static int		check_addr(short, short *, short *, short);
 static int		fcmp();
 static int		ffcmp();
 
-static int		getshadowslot();
-static void		getshadowdata();
-static void		syncshadowscan();
+static int		getshadowslot(long);
+static void		getshadowdata(long *, int);
+static void		syncshadowscan(int);
+static void		log_display_header(void);
+static void		log_show(enum log_enum);
 
 #ifdef sun
 static void		err();
@@ -375,19 +377,17 @@ static char *subopt_v[] = {
  *	and fsdb could not share stdin.
  */
 
-void
-main(argc, argv)
-	int			argc;
-	char			*argv[];
+int
+main(int argc, char *argv[])
 {
 
-	register char		c, *cptr;
-	register short		i;
-	register struct direct	*dirp;
-	register struct lbuf	*bp;
-	char			*progname;
-	short			colon, mode;
-	long			temp;
+	char		c, *cptr;
+	short		i;
+	struct direct	*dirp;
+	struct lbuf	*bp;
+	char		*progname;
+	short		colon, mode;
+	long		temp;
 
 	/* Options/Suboptions processing */
 	int	opt;
@@ -1166,8 +1166,8 @@ OTX:
 			if (match("at", 2)) { 		/* access time */
 				acting_on_inode = 2;
 				should_print = 1;
-				addr = (long)
-					&((struct dinode *)cur_ino)->di_atime;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_atime;
 				value = get(LONG);
 				type = NULL;
 				continue;
@@ -1199,8 +1199,8 @@ OTX:
 				should_print = 1;
 				if (icheck(cur_ino) == 0)
 					continue;
-				addr = (long)
-					&((struct dinode *)cur_ino)->di_blocks;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_blocks;
 				value = get(LONG);
 				type = NULL;
 				continue;
@@ -1309,8 +1309,8 @@ showbase:
 			if (match("ct", 2)) {		/* creation time */
 				acting_on_inode = 2;
 				should_print = 1;
-				addr = (long)
-					&((struct dinode *)cur_ino)->di_ctime;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_ctime;
 				value = get(LONG);
 				type = NULL;
 				continue;
@@ -1346,7 +1346,7 @@ showbase:
 				if (!icheck(addr))
 					continue;
 				addr = (long)
-					&((struct dinode *)cur_ino)->
+					&((struct dinode *)(uintptr_t)cur_ino)->
 								di_db[value];
 				bod_addr = addr;
 				cur_bytes = (value) * BLKSIZE;
@@ -1443,8 +1443,8 @@ showbase:
 			if (match("gid", 1)) {		/* group id */
 				acting_on_inode = 1;
 				should_print = 1;
-				addr = (long)
-					&((struct dinode *)cur_ino)->di_gid;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_gid;
 				value = get(SHORT);
 				type = NULL;
 				continue;
@@ -1489,8 +1489,8 @@ showbase:
 					error++;
 					continue;
 				}
-				addr = (long)&((struct dinode *)cur_ino)->
-								di_ib[value];
+				addr = (long)&((struct dinode *)(uintptr_t)
+						cur_ino)->di_ib[value];
 				cur_bytes = (NDADDR - 1) * BLKSIZE;
 				temp = 1;
 				for (i = 0; i < value; i++) {
@@ -1600,8 +1600,8 @@ showbase:
 			if (match("ln", 2)) {		/* link count */
 				acting_on_inode = 1;
 				should_print = 1;
-				addr = (long)
-					&((struct dinode *)cur_ino)->di_nlink;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_nlink;
 				value = get(SHORT);
 				type = NULL;
 				continue;
@@ -1619,8 +1619,8 @@ showbase:
 			if (match("mt", 2)) { 		/* modification time */
 				acting_on_inode = 2;
 				should_print = 1;
-				addr = (long)
-					&((struct dinode *)cur_ino)->di_mtime;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_mtime;
 				value = get(LONG);
 				type = NULL;
 				continue;
@@ -1628,8 +1628,8 @@ showbase:
 			if (match("md", 2)) {		/* mode */
 				acting_on_inode = 1;
 				should_print = 1;
-				addr = (long)
-					&((struct dinode *)cur_ino)->di_mode;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_mode;
 				value = get(SHORT);
 				type = NULL;
 				continue;
@@ -1639,8 +1639,8 @@ showbase:
 				should_print = 1;
 				if (devcheck(mode))
 					continue;
-				addr = (uintptr_t)
-					&((struct dinode *)cur_ino)->di_ordev;
+				addr = (uintptr_t)&((struct dinode *)(uintptr_t)
+							cur_ino)->di_ordev;
 				{
 					long	dvalue;
 					dvalue = get(LONG);
@@ -1654,8 +1654,8 @@ showbase:
 				should_print = 1;
 				if (devcheck(mode))
 					continue;
-				addr = (uintptr_t)
-					&((struct dinode *)cur_ino)->di_ordev;
+				addr = (uintptr_t)&((struct dinode *)(uintptr_t)
+							cur_ino)->di_ordev;
 				{
 					long	dvalue;
 					dvalue = (long)get(LONG);
@@ -1682,8 +1682,8 @@ showbase:
 				stringsize = (long)dirp->d_reclen -
 						((long)&dirp->d_name[0] -
 							(long)&dirp->d_ino);
-				addr = (long)
-					&((struct direct *)addr)->d_name[0];
+				addr = (long)&((struct direct *)
+						(uintptr_t)addr)->d_name[0];
 				type = NULL;
 				continue;
 			}
@@ -1791,8 +1791,8 @@ showbase:
 			if (match("si", 2)) {   /* shadow inode field */
 				acting_on_inode = 1;
 				should_print = 1;
-				addr = (long)
-				    &((struct dinode *)cur_ino)->di_shadow;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_shadow;
 				value = get(LONG);
 				type = NULL;
 				continue;
@@ -1801,8 +1801,8 @@ showbase:
 			if (match("sz", 2)) {		/* file size */
 				acting_on_inode = 1;
 				should_print = 1;
-				addr = (long)
-					&((struct dinode *)cur_ino)->di_size;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_size;
 				value = get(U_OFFSET_T);
 				type = NULL;
 				objsz = U_OFFSET_T;
@@ -1820,8 +1820,8 @@ showbase:
 			if (match("uid", 1)) {		/* user id */
 				acting_on_inode = 1;
 				should_print = 1;
-				addr = (long)
-					&((struct dinode *)cur_ino)->di_uid;
+				addr = (long)&((struct dinode *)
+						(uintptr_t)cur_ino)->di_uid;
 				value = get(SHORT);
 				type = NULL;
 				continue;
@@ -1857,8 +1857,7 @@ bad_syntax:
  * usage - print usage and exit
  */
 static void
-usage(progname)
-	char *progname;
+usage(char *progname)
 {
 	printf("usage:   %s [options] special\n", progname);
 	printf("options:\n");
@@ -1884,8 +1883,7 @@ getachar()
  * ungetachar - return character to input buffer.
  */
 static void
-ungetachar(c)
-	register char	c;
+ungetachar(char c)
 {
 	if (input_pointer == 0) {
 		printf("internal problem maintaining input buffer\n");
@@ -1903,10 +1901,10 @@ ungetachar(c)
 static void
 getnextinput()
 {
-	register int	i;
-	register char	c;
-	register short	pid, rpid;
-	int		retcode;
+	int	i;
+	char	c;
+	short	pid, rpid;
+	int	retcode;
 
 newline:
 	i = 0;
@@ -1946,7 +1944,7 @@ ignore_eol:
 static void
 eat_spaces()
 {
-	register char	c;
+	char	c;
 
 	while ((c = getachar()) == ' ')
 		;
@@ -1958,8 +1956,7 @@ eat_spaces()
  *	the current inode.
  */
 static void
-restore_inode(inum)
-	ino_t		inum;
+restore_inode(ino_t inum)
 {
 	errinum = cur_inum = inum;
 	addr = errino = cur_ino = itob(inum);
@@ -1970,13 +1967,11 @@ restore_inode(inum)
  *	upto letters.   Then proceed to chew up extraneous letters.
  */
 static int
-match(string, upto)
-	register char	*string;
-	register int	upto;
+match(char *string, int upto)
 {
-	register int	i, length = strlen(string) - 1;
-	register char	c;
-	int		save_upto = upto;
+	int	i, length = strlen(string) - 1;
+	char	c;
+	int	save_upto = upto;
 
 	while (--upto) {
 		string++;
@@ -2007,8 +2002,8 @@ match(string, upto)
 static long
 expr()
 {
-	register long	numb = 0, temp;
-	register char	c;
+	long	numb = 0, temp;
+	char	c;
 
 	numb = term();
 	for (;;) {
@@ -2060,7 +2055,7 @@ expr()
 static long
 term()
 {
-	register char	c;
+	char	c;
 
 	switch (c = getachar()) {
 
@@ -2090,7 +2085,7 @@ static long
 getnumb()
 {
 
-	register char	c, savec;
+	char		c, savec;
 	long		number = 0, tbase, num;
 	extern short	error;
 
@@ -2148,10 +2143,10 @@ getnumb()
 static void
 find()
 {
-	register struct filenames	*fn;
-	register char			c;
-	long				temp;
-	short				mode;
+	struct filenames	*fn;
+	char			c;
+	long			temp;
+	short			mode;
 
 	eat_spaces();
 	temp = cur_inum;
@@ -2235,11 +2230,9 @@ find()
  *	Only -R and -l is supported and -l gives different results.
  */
 static void
-ls(fn0, fnlast, level)
-	struct filenames		*fn0, *fnlast;
-	short				level;
+ls(struct filenames *fn0, struct filenames *fnlast, short level)
 {
-	register struct filenames	*fn, *fnn;
+	struct filenames	*fn, *fnn;
 
 	fn = fn0;
 	for (;;) {
@@ -2282,13 +2275,12 @@ ls(fn0, fnlast, level)
  * formatf - code lifted from ls.
  */
 static void
-formatf(fn0, fnlast)
-	register struct filenames	*fn0, *fnlast;
+formatf(struct filenames *fn0, struct filenames *fnlast)
 {
-	register struct filenames	*fn;
-	int				width = 0, w, nentry = fnlast - fn0 + 1;
-	int				i, j, columns, lines;
-	char				*cp;
+	struct filenames	*fn;
+	int			width = 0, w, nentry = fnlast - fn0 + 1;
+	int			i, j, columns, lines;
+	char			*cp;
 
 	if (long_list) {
 		columns = 1;
@@ -2334,12 +2326,11 @@ formatf(fn0, fnlast)
  * fmtentry - code lifted from ls.
  */
 static char *
-fmtentry(fn)
-	register struct filenames	*fn;
+fmtentry(struct filenames *fn)
 {
-	static char			fmtres[BUFSIZ];
-	register struct dinode		*ip;
-	register char			*cptr, *cp, *dp;
+	static char	fmtres[BUFSIZ];
+	struct dinode	*ip;
+	char		*cptr, *cp, *dp;
 
 	dp = &fmtres[0];
 	for (cp = fn->fname[cmp_level]; *cp; cp++) {
@@ -2391,10 +2382,9 @@ fmtentry(fn)
  *	cmp_level to tell what component of the path name we are comparing.
  */
 static int
-fcmp(f1, f2)
-	register struct filenames	*f1, *f2;
+fcmp(struct filenames *f1, struct filenames *f2)
 {
-	int 				value;
+	int value;
 
 	if ((value = strcmp(f1->fname[cmp_level], f2->fname[cmp_level])))
 		return (value);
@@ -2405,8 +2395,7 @@ fcmp(f1, f2)
  * ffcmp - routine used by qsort.  Sort only by pathname length.
  */
 static int
-ffcmp(f1, f2)
-	register struct filenames	*f1, *f2;
+ffcmp(struct filenames *f1, struct filenames *f2)
 {
 	return (f1->len - f2->len);
 }
@@ -2417,8 +2406,8 @@ ffcmp(f1, f2)
 static void
 parse()
 {
-	register int	i;
-	char		c;
+	int	i;
+	char	c;
 
 	stack_pathp = input_pathp = -1;
 	if ((c = getachar()) == '/') {
@@ -2459,12 +2448,11 @@ parse()
  *	stack_path holds the name at the current depth.
  */
 static void
-follow_path(level, inum)
-	long			level, inum;
+follow_path(long level, long inum)
 {
-	register struct direct	*dirp;
-	register char		**ccptr, *cptr;
-	register int		i;
+	struct direct		*dirp;
+	char			**ccptr, *cptr;
+	int			i;
 	struct filenames	*tos, *bos, *fn, *fnn, *fnnn;
 	long			block;
 	short			mode;
@@ -2676,8 +2664,8 @@ duplicate:
 static void
 getname()
 {
-	register int	i;
-	char		c;
+	int	i;
+	char	c;
 
 	if ((c = getachar()) == '\n') {
 	    ungetachar(c);
@@ -2727,11 +2715,9 @@ clear:
  *	Handles '*', '?', and '[]'.
  */
 static int
-compare(s1, s2, at_start)
-	char		*s1, *s2;
-	short		at_start;
+compare(char *s1, char *s2, short at_start)
 {
-	register char	c, *s;
+	char	c, *s;
 
 	s = s2;
 	while ((c = *s1) != NULL) {
@@ -2795,11 +2781,9 @@ compare_chars:
  * freemem - free the memory allocated to the filenames structure.
  */
 static void
-freemem(p, numb)
-	struct filenames	*p;
-	int			numb;
+freemem(struct filenames *p, int numb)
 {
-	register int		i, j;
+	int	i, j;
 
 	if (numb == 0)
 		return;
@@ -2814,11 +2798,9 @@ freemem(p, numb)
  * print_path - print the pathname held in p.
  */
 static void
-print_path(p, pntr)
-	char		*p[];
-	int		pntr;
+print_path(char *p[], int pntr)
 {
-	register int	i;
+	int	i;
 
 	printf("/");
 	if (pntr >= 0) {
@@ -2835,8 +2817,8 @@ print_path(p, pntr)
 static void
 fill()
 {
-	register char	*cptr;
-	register int	i;
+	char		*cptr;
+	int		i;
 	short		eof_flag, end = 0, eof = 0;
 	long		temp, tcount;
 	u_offset_t	taddr;
@@ -2903,11 +2885,10 @@ fill()
  *	and the appropriate data is extracted and returned.
  */
 static offset_t
-get(lngth)
-	short		lngth;
+get(short lngth)
 {
 
-	register char	*bptr;
+	char		*bptr;
 	u_offset_t	temp = addr;
 
 	objsz = lngth;
@@ -2942,8 +2923,7 @@ get(lngth)
  *	beyond the total number of cylinder groups or before the start.
  */
 static int
-cgrp_check(cgrp)
-	long		cgrp;
+cgrp_check(long cgrp)
 {
 	if (cgrp < 0) {
 		if (objsz == CGRP)
@@ -2972,11 +2952,11 @@ cgrp_check(cgrp)
  *	and determine the filesize (0 if inode not allocated).  Return
  *	0 if error otherwise return the mode.
  */
-icheck(address)
-	u_offset_t		address;
+int
+icheck(u_offset_t address)
 {
-	register char		*cptr;
-	register struct dinode	*ip;
+	char		*cptr;
+	struct dinode	*ip;
 
 	if ((cptr = getblk(address)) == 0)
 		return (0);
@@ -3002,14 +2982,13 @@ icheck(address)
  * getdirslot - get the address of the directory slot desired.
  */
 static u_offset_t
-getdirslot(slot)
-	long			slot;
+getdirslot(long slot)
 {
-	register char		*cptr;
-	register struct direct	*dirp;
-	register short		i;
-	char			*string = &scratch[0];
-	short			bod = 0, mode, temp;
+	char		*cptr;
+	struct direct	*dirp;
+	short		i;
+	char		*string = &scratch[0];
+	short		bod = 0, mode, temp;
 
 	if (slot < 0) {
 		slot = 0;
@@ -3123,8 +3102,7 @@ getdirslot(slot)
  * getshadowslot - get the address of the shadow data desired
  */
 static int
-getshadowslot(shadow)
-	long		shadow;
+getshadowslot(long shadow)
 {
 	struct ufs_fsd		fsd;
 	short			bod = 0, mode;
@@ -3184,9 +3162,7 @@ getshadowslot(shadow)
 }
 
 static void
-getshadowdata(buf, len)
-	long	*buf;
-	int	len;
+getshadowdata(long *buf, int len)
 {
 	long	tfsd;
 
@@ -3200,8 +3176,7 @@ getshadowdata(buf, len)
 }
 
 static void
-syncshadowscan(force)
-	int	force;
+syncshadowscan(int force)
 {
 	long	curblkoff;
 	if (type == SHADOW_DATA && (force ||
@@ -3225,8 +3200,7 @@ syncshadowscan(force)
  *	recognized are printed as \?.
  */
 static void
-putf(c)
-	register	char  c;
+putf(char c)
 {
 
 	if (c <= 037 || c >= 0177 || c == '\\') {
@@ -3260,14 +3234,12 @@ putf(c)
  *	the entire block is written back to the file system.
  */
 static void
-put(item, lngth)
-	u_offset_t	item;
-	short		lngth;
+put(u_offset_t item, short lngth)
 {
 
-	register char	*bptr, *sbptr;
-	long		s_err, nbytes;
-	long		olditem;
+	char	*bptr, *sbptr;
+	long	s_err, nbytes;
+	long	olditem;
 
 	if (wrtflag == O_RDONLY) {
 		printf("not opened for write '-w'\n");
@@ -3345,13 +3317,12 @@ put(item, lngth)
  *	Finally, a pointer to the buffer is returned.
  */
 static char *
-getblk(address)
-	u_offset_t		address;
+getblk(u_offset_t address)
 {
 
-	register struct lbuf	*bp;
-	long			s_err, nbytes;
-	unsigned long		block;
+	struct lbuf	*bp;
+	long		s_err, nbytes;
+	unsigned long	block;
 
 	read_requests++;
 	block = lblkno(fs, address);
@@ -3391,8 +3362,7 @@ xit:	bp->back->fwd = bp->fwd;
  *	at the head of the linked list of buffers.
  */
 static void
-insert(bp)
-	register struct lbuf	*bp;
+insert(struct lbuf *bp)
 {
 
 	bp->back = &bhdr;
@@ -3410,8 +3380,7 @@ insert(bp)
 #ifdef sun
 /*ARGSUSED*/
 static void
-err(sig)
-	int	sig;
+err(int sig)
 #else
 err()
 #endif /* sun */
@@ -3436,8 +3405,7 @@ err()
  *	character and block devices.
  */
 static int
-devcheck(md)
-	register	short md;
+devcheck(short md)
 {
 	if (override)
 		return (0);
@@ -3458,8 +3426,7 @@ devcheck(md)
  *	for a large file or as a data block for a small file.
  */
 static int
-nullblk(bn)
-	long		bn;
+nullblk(long bn)
 {
 	if (bn != 0)
 		return (0);
@@ -3477,13 +3444,13 @@ nullblk(bn)
 static void
 puta()
 {
-	register char		*cptr, c;
-	register int		i;
-	char			*sbptr;
-	short			terror = 0;
-	long			maxchars, s_err, nbytes, temp;
-	u_offset_t		taddr = addr;
-	long			tcount = 0, item, olditem = 0;
+	char		*cptr, c;
+	int		i;
+	char		*sbptr;
+	short		terror = 0;
+	long		maxchars, s_err, nbytes, temp;
+	u_offset_t	taddr = addr;
+	long		tcount = 0, item, olditem = 0;
 
 	if (wrtflag == O_RDONLY) {
 		printf("not opened for write '-w'\n");
@@ -3639,22 +3606,21 @@ puta()
  *				S   - print as shadow data
  */
 static void
-fprnt(style, po)
-	register char		style, po;
+fprnt(char style, char po)
 {
-	register int		i;
-	register struct fs	*sb;
-	register struct cg	*cg;
-	register struct direct	*dirp;
-	register struct dinode	*ip;
-	int			tbase;
-	char			c, *cptr, *p;
-	long			tinode, tcount, temp;
-	u_offset_t		taddr;
-	short			offset, mode, end = 0, eof = 0, eof_flag;
-	unsigned short		*sptr;
-	unsigned long		*lptr;
-	offset_t		curoff, curioff;
+	int		i;
+	struct fs	*sb;
+	struct cg	*cg;
+	struct direct	*dirp;
+	struct dinode	*ip;
+	int		tbase;
+	char		c, *cptr, *p;
+	long		tinode, tcount, temp;
+	u_offset_t	taddr;
+	short		offset, mode, end = 0, eof = 0, eof_flag;
+	unsigned short	*sptr;
+	unsigned long	*lptr;
+	offset_t	curoff, curioff;
 
 	laststyle = style;
 	lastpo = po;
@@ -4365,8 +4331,7 @@ valid_addr()
  *	end of file.  Return the proper count.
  */
 static int
-check_addr(eof_flag, end, eof, keep_on)
-	short	eof_flag, *end, *eof, keep_on;
+check_addr(short eof_flag, short *end, short *eof, short keep_on)
 {
 	long	temp, tcount = count, tcur_bytes = cur_bytes;
 	u_offset_t	taddr = addr;
@@ -4444,13 +4409,9 @@ check_addr(eof_flag, end, eof, keep_on)
  *	rows of zeros from the output.
  */
 unsigned long *
-print_check(lptr, tcount, tbase, i)
-	unsigned long	*lptr;
-	long		*tcount;
-	short		tbase;
-	register int	i;
+print_check(unsigned long *lptr, long *tcount, short tbase, int i)
 {
-	register int	j, k, temp = BYTESPERLINE / objsz;
+	int		j, k, temp = BYTESPERLINE / objsz;
 	short		first_time = 0;
 	unsigned long	*tlptr;
 	unsigned short	*tsptr, *sptr;
@@ -4511,8 +4472,7 @@ print_check(lptr, tcount, tbase, i)
  *	with leading zeros.
  */
 static void
-index(b)
-	int	b;
+index(int b)
 {
 	int	tbase = base;
 
@@ -4533,9 +4493,9 @@ printll(u_offset_t value, int fieldsz, int digits, int lead)
 print(long value, int fieldsz, int digits, int lead)
 #endif /* _LARGEFILE64_SOURCE */
 {
-	register int	i, left = 0;
-	char		mode = BASE[base - OCTAL];
-	char		*string = &scratch[0];
+	int	i, left = 0;
+	char	mode = BASE[base - OCTAL];
+	char	*string = &scratch[0];
 
 	if (digits < 0) {
 		left = 1;
@@ -4582,8 +4542,7 @@ print(long value, int fieldsz, int digits, int lead)
  * Print out the contents of a superblock.
  */
 static void
-printsb(fs)
-	struct fs *fs;
+printsb(struct fs *fs)
 {
 	int c, i, j, k, size;
 	caddr_t sip;
@@ -4722,8 +4681,7 @@ printsb(fs)
  * Print out the contents of a cylinder group.
  */
 static void
-printcg(cg)
-	struct cg *cg;
+printcg(struct cg *cg)
 {
 	int i, j;
 	time_t t;
@@ -4789,11 +4747,9 @@ printcg(cg)
  * Print out the contents of a bit array.
  */
 static void
-pbits(cp, max)
-	register unsigned char *cp;
-	int max;
+pbits(unsigned char *cp, int max)
 {
-	register int i;
+	int i;
 	int count = 0, j;
 
 	for (i = 0; i < max; i++)
@@ -4834,14 +4790,13 @@ bcomp(addr)
  *	system.
  */
 static long
-bmap(bn)
-	long			bn;
+bmap(long bn)
 {
-	register int		j;
-	register struct dinode	*ip;
-	int			sh;
-	long			nb;
-	register char		*cptr;
+	int		j;
+	struct dinode	*ip;
+	int		sh;
+	long		nb;
+	char		*cptr;
 
 	if ((cptr = getblk(cur_ino)) == 0)
 		return (0);
@@ -4903,9 +4858,7 @@ static union {
 #define	sblock sb_un.sblk
 
 static void
-old_fsdb(inum, special)
-	int	inum;
-	char *special;
+old_fsdb(int inum, char *special)
 {
 	int		f;	/* File descriptor for "special" */
 	int		j;
@@ -4967,8 +4920,7 @@ old_fsdb(inum, special)
 }
 
 static int
-isnumber(s)
-	char *s;
+isnumber(char *s)
 {
 	register int	c;
 
@@ -5097,6 +5049,7 @@ log_get_header_info(void)
 	return (1);
 }
 
+static void
 log_display_header(void)
 {
 	int x;
@@ -5146,6 +5099,7 @@ log_display_header(void)
 /*
  * log_lodb -- logical log offset to disk block number
  */
+int
 log_lodb(u_offset_t off, diskaddr_t *pblk)
 {
 	uint32_t	lblk = (uint32_t)btodb(off);
@@ -5176,6 +5130,7 @@ char *dt_str[] = {
 /*
  * log_read_log -- transfer information from the log and adjust offset
  */
+int
 log_read_log(u_offset_t *addr, caddr_t va, int nb, uint32_t *chk)
 {
 	int		xfer;
@@ -5263,6 +5218,7 @@ log_nbcommit(u_offset_t a)
  *		LOG_CHECKSCAN then run through the log checking the st_ident
  *		for valid data.
  */
+static void
 log_show(enum log_enum l)
 {
 	struct delta	d;
