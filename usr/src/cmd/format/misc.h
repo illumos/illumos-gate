@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,7 +147,7 @@ int	check(char *question);
 void	cmdabort(int sig);
 void	onsusp(int sig);
 void	onalarm(int sig);
-void	fullabort(void);
+void	fullabort(void) __NORETURN;
 void	enter_critical(void);
 void	exit_critical(void);
 void	echo_off(void);
