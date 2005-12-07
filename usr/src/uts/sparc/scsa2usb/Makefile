@@ -165,4 +165,4 @@ sd.files:
 	@cd ../sd; pwd; $(MAKE) warlock_alone
 
 st.files:
-	@cd ../sd; pwd; $(MAKE) warlock_alone
+	@cd ../st; pwd; $(MAKE) warlock_alone
