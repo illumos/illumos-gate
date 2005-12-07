@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ struct fmd_log {
 	char *log_osrelease;		/* uname -r at log creation time */
 	char *log_osversion;		/* uname -v at log creation time */
 	char *log_platform;		/* uname -i at log creation time */
+	char *log_uuid;			/* log file uuid string */
 	int log_abi;			/* abi version of library client */
 	int log_errno;			/* err from last library call */
 	int log_fd;			/* file descriptor for log */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -202,6 +202,7 @@ extern "C" {
 #define	EXD_FMA_MINOR		0x004009
 #define	EXD_FMA_INODE		0x00400A
 #define	EXD_FMA_OFFSET		0x00400B
+#define	EXD_FMA_UUID		0x00400C
 
 #ifdef	__cplusplus
 }

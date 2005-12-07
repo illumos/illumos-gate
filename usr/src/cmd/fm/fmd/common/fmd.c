@@ -62,7 +62,7 @@
 
 extern const nv_alloc_ops_t fmd_nv_alloc_ops;	/* see fmd_nv.c */
 
-const char _fmd_version[] = "1.0";		/* daemon version string */
+const char _fmd_version[] = "1.1";		/* daemon version string */
 static char _fmd_plat[MAXNAMELEN];		/* native platform string */
 static char _fmd_isa[MAXNAMELEN];		/* native instruction set */
 static struct utsname _fmd_uts;			/* native uname(2) info */

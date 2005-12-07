@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,14 +44,17 @@
  * the fmd code below.  Our exacct file management uses the following grammar:
  *
  * file := hdr toc event*
- * hdr := EXD_FMA_LABEL EXD_FMA_VERSION EXD_FMA_OSREL EXD_FMA_OSVER EXD_FMA_PLAT
+ * hdr := EXD_FMA_LABEL EXD_FMA_VERSION EXD_FMA_OSREL EXD_FMA_OSVER
+ * EXD_FMA_PLAT EXD_FMA_UUID
  * toc := EXD_FMA_OFFSET
- * event := EXD_FMA_TODSEC EXD_FMA_TODNSEC EXD_FMA_NVLIST evref*
- * evref := EXD_FMA_MAJOR EXD_FMA_MINOR EXD_FMA_INODE EXD_FMA_OFFSET
+ * event := EXD_FMA_TODSEC EXD_FMA_TODNSEC EXD_FMA_NVLIST evref* or legacy evref
+ * evref := EXD_FMA_UUID EXD_FMA_OFFSET
+ * legacy evref := EXD_FMA_MAJOR EXD_FMA_MINOR EXD_FMA_INODE EXD_FMA_OFFSET
  *
  * Any event can be uniquely identified by the tuple (file, offset) where file
- * is encoded as (major, minor, inode) when we are cross-linking files.  Note
- * that we break out of the file's dev_t into its two 32-bit components to
+ * is encoded as (uuid) when we are cross-linking files.  For legacy file
+ * formats we still support encoding the reference as (major, minor, inode).
+ * Note that we break out of the file's dev_t into its two 32-bit components to
  * permit development of either 32-bit or 64-bit log readers and writers; the
  * LFS APIs do not yet export a 64-bit dev_t to fstat64(), so there is no way
  * for a 32-bit application to retrieve and store a 64-bit dev_t.
@@ -69,6 +72,7 @@
 #include <sys/statvfs.h>
 #include <sys/fm/protocol.h>
 #include <sys/exacct_impl.h>
+#include <uuid/uuid.h>
 
 #include <unistd.h>
 #include <limits.h>
@@ -94,6 +98,7 @@
 #define	CAT_FMA_OSREL	(EXT_STRING | EXC_DEFAULT | EXD_FMA_OSREL)
 #define	CAT_FMA_OSVER	(EXT_STRING | EXC_DEFAULT | EXD_FMA_OSVER)
 #define	CAT_FMA_PLAT	(EXT_STRING | EXC_DEFAULT | EXD_FMA_PLAT)
+#define	CAT_FMA_UUID	(EXT_STRING | EXC_DEFAULT | EXD_FMA_UUID)
 #define	CAT_FMA_TODSEC	(EXT_UINT64 | EXC_DEFAULT | EXD_FMA_TODSEC)
 #define	CAT_FMA_TODNSEC	(EXT_UINT64 | EXC_DEFAULT | EXD_FMA_TODNSEC)
 #define	CAT_FMA_NVLIST	(EXT_RAW | EXC_DEFAULT | EXD_FMA_NVLIST)
@@ -127,14 +132,20 @@ fmd_log_write(fmd_log_t *lp, const void *buf, size_t n)
 static int
 fmd_log_write_hdr(fmd_log_t *lp, const char *tag)
 {
-	ea_object_t hdr, toc, i0, i1, i2, i3, i4, i5;
+	ea_object_t hdr, toc, i0, i1, i2, i3, i4, i5, i6;
 	const char *osrel, *osver, *plat;
 	off64_t off = 0;
 	int err = 0;
+	uuid_t uuid;
 
 	(void) fmd_conf_getprop(fmd.d_conf, "osrelease", &osrel);
 	(void) fmd_conf_getprop(fmd.d_conf, "osversion", &osver);
 	(void) fmd_conf_getprop(fmd.d_conf, "platform", &plat);
+	(void) fmd_conf_getprop(fmd.d_conf, "uuidlen", &lp->log_uuidlen);
+
+	lp->log_uuid = fmd_zalloc(lp->log_uuidlen + 1, FMD_SLEEP);
+	uuid_generate(uuid);
+	uuid_unparse(uuid, lp->log_uuid);
 
 	err |= ea_set_group(&hdr, CAT_FMA_GROUP);
 	err |= ea_set_group(&toc, CAT_FMA_GROUP);
@@ -144,14 +155,16 @@ fmd_log_write_hdr(fmd_log_t *lp, const char *tag)
 	err |= ea_set_item(&i2, CAT_FMA_OSREL, osrel, 0);
 	err |= ea_set_item(&i3, CAT_FMA_OSVER, osver, 0);
 	err |= ea_set_item(&i4, CAT_FMA_PLAT, plat, 0);
-	err |= ea_set_item(&i5, CAT_FMA_OFFSET, &off, 0);
+	err |= ea_set_item(&i5, CAT_FMA_UUID, lp->log_uuid, 0);
+	err |= ea_set_item(&i6, CAT_FMA_OFFSET, &off, 0);
 
 	(void) ea_attach_to_group(&hdr, &i0);
 	(void) ea_attach_to_group(&hdr, &i1);
 	(void) ea_attach_to_group(&hdr, &i2);
 	(void) ea_attach_to_group(&hdr, &i3);
 	(void) ea_attach_to_group(&hdr, &i4);
-	(void) ea_attach_to_group(&toc, &i5);
+	(void) ea_attach_to_group(&hdr, &i5);
+	(void) ea_attach_to_group(&toc, &i6);
 
 	if (err == 0) {
 		size_t hdr_size = ea_pack_object(&hdr, NULL, 0);
@@ -186,6 +199,7 @@ fmd_log_write_hdr(fmd_log_t *lp, const char *tag)
 	(void) ea_free_item(&i3, EUP_ALLOC);
 	(void) ea_free_item(&i4, EUP_ALLOC);
 	(void) ea_free_item(&i5, EUP_ALLOC);
+	(void) ea_free_item(&i6, EUP_ALLOC);
 
 	return (err ? fmd_set_errno(err) : 0);
 }
@@ -269,6 +283,11 @@ fmd_log_check_hdr(fmd_log_t *lp, const char *tag)
 				return (fmd_set_errno(EFMD_LOG_INVAL));
 			}
 			got_label++;
+			break;
+		case CAT_FMA_UUID:
+			lp->log_uuid = fmd_strdup(obj->eo_item.ei_string,
+			    FMD_SLEEP);
+			lp->log_uuidlen = strlen(lp->log_uuid);
 			break;
 		}
 	}
@@ -439,6 +458,8 @@ fmd_log_close(fmd_log_t *lp)
 
 	fmd_strfree(lp->log_name);
 	fmd_strfree(lp->log_tag);
+	if (lp->log_uuid != NULL)
+		fmd_free(lp->log_uuid, lp->log_uuidlen + 1);
 
 	fmd_free(lp, sizeof (fmd_log_t));
 }
@@ -488,7 +509,8 @@ fmd_log_append(fmd_log_t *lp, fmd_event_t *e, fmd_case_t *cp)
 	int err = 0;
 
 	ea_object_t grp0, grp1, i0, i1, i2, *items;
-	size_t nvsize, easize, itsize;
+	ea_object_t **fe = NULL;
+	size_t nvsize, easize, itsize, frsize;
 	char *nvbuf, *eabuf;
 	statvfs64_t stv;
 
@@ -525,15 +547,14 @@ fmd_log_append(fmd_log_t *lp, fmd_event_t *e, fmd_case_t *cp)
 	 * then allocate a block of ea_object_t's and fill in a group for
 	 * each event saved in the case's item list.  For each such group,
 	 * we attach it to grp1, which in turn will be attached to grp0.
-	 * This section of code cannot fail as we only manipulate integer
-	 * objects, which require no underlying libexacct memory allocation.
 	 */
 	if (cp != NULL) {
-		ea_object_t *egrp, *ip;
+		ea_object_t *egrp, *ip, **fp;
 		fmd_event_impl_t *eip;
 		fmd_case_item_t *cit;
 
 		(void) ea_set_group(&grp1, CAT_FMA_GROUP);
+		frsize = sizeof (ea_object_t *) * cip->ci_nitems;
 		itsize = sizeof (ea_object_t) * cip->ci_nitems * 5;
 		items = ip = fmd_alloc(itsize, FMD_SLEEP);
 
@@ -552,22 +573,35 @@ fmd_log_append(fmd_log_t *lp, fmd_event_t *e, fmd_case_t *cp)
 			(void) ea_set_group(ip, CAT_FMA_GROUP);
 			egrp = ip++; /* first obj is group */
 
-			(void) ea_set_item(ip, CAT_FMA_MAJOR, &maj, 0);
-			(void) ea_attach_to_group(egrp, ip++);
-
-			(void) ea_set_item(ip, CAT_FMA_MINOR, &min, 0);
-			(void) ea_attach_to_group(egrp, ip++);
-
-			(void) ea_set_item(ip, CAT_FMA_INODE,
-			    &eip->ev_log->log_stat.st_ino, 0);
-			(void) ea_attach_to_group(egrp, ip++);
-
+			/*
+			 * If the event log file is in legacy format,
+			 * then write the xref to the file in the legacy
+			 * maj/min/inode method else write it using the
+			 * file uuid.
+			 */
+			if (eip->ev_log->log_uuid == NULL) {
+				(void) ea_set_item(ip, CAT_FMA_MAJOR, &maj, 0);
+				(void) ea_attach_to_group(egrp, ip++);
+				(void) ea_set_item(ip, CAT_FMA_MINOR, &min, 0);
+				(void) ea_attach_to_group(egrp, ip++);
+				(void) ea_set_item(ip, CAT_FMA_INODE,
+				    &eip->ev_log->log_stat.st_ino, 0);
+				(void) ea_attach_to_group(egrp, ip++);
+			} else {
+				if (ea_set_item(ip, CAT_FMA_UUID,
+				    eip->ev_log->log_uuid, 0) == -1) {
+					err = EFMD_LOG_EXACCT;
+					goto exerrcp;
+				}
+				if (fe == NULL)
+					fe = fp = fmd_zalloc(frsize, FMD_SLEEP);
+				*fp++ = ip;
+				(void) ea_attach_to_group(egrp, ip++);
+			}
 			(void) ea_set_item(ip, CAT_FMA_OFFSET, &eip->ev_off, 0);
 			(void) ea_attach_to_group(egrp, ip++);
-
 			(void) ea_attach_to_group(&grp1, egrp);
 		}
-
 		(void) ea_attach_to_group(&grp0, &grp1);
 	}
 
@@ -624,10 +658,22 @@ fmd_log_append(fmd_log_t *lp, fmd_event_t *e, fmd_case_t *cp)
 	(void) pthread_mutex_unlock(&lp->log_lock);
 	(void) pthread_mutex_unlock(&ep->ev_lock);
 
-	if (cp != NULL)
-		fmd_free(items, itsize);
-
 	fmd_free(eabuf, easize);
+
+exerrcp:
+	if (cp != NULL) {
+		if (fe != NULL) {
+			ea_object_t **fp = fe;
+			int i = 0;
+
+			for (; *fp != NULL && i < cip->ci_nitems; i++)
+				(void) ea_free_item(*fp++, EUP_ALLOC);
+			fmd_free(fe, frsize);
+		}
+
+		fmd_free(items, itsize);
+	}
+
 exerr:
 	fmd_free(nvbuf, nvsize);
 

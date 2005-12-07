@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +46,7 @@ extern "C" {
  * purpose until they are publicly documented for use outside of Sun.
  */
 
-#define	FMD_LOG_VERSION	1		/* library ABI interface version */
+#define	FMD_LOG_VERSION	2		/* library ABI interface version */
 
 typedef struct fmd_log fmd_log_t;
 
@@ -65,6 +65,7 @@ typedef struct fmd_log_header {
 	const char *log_osrelease;	/* uname(1) -r value at creation time */
 	const char *log_osversion;	/* uname(1) -v value at creation time */
 	const char *log_platform;	/* uname(1) -i value at creation time */
+	const char *log_uuid;		/* fmd(1M) log file uuid */
 } fmd_log_header_t;
 
 extern void fmd_log_header(fmd_log_t *, fmd_log_header_t *);

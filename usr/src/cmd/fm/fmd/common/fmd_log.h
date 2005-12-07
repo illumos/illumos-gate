@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,8 @@ typedef struct fmd_log {
 	off64_t log_off;		/* offset at which to append */
 	off64_t log_skip;		/* offset to skip to for replay */
 	uint64_t log_minfree;		/* minimum free bytes for filesystem */
+	char *log_uuid;			/* uuid string for this log file */
+	uint_t log_uuidlen;		/* length of log_uuid (not incl. \0) */
 } fmd_log_t;
 
 #define	FMD_LF_EAOPEN	0x1		/* log_ea is open and valid */

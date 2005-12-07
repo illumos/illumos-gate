@@ -501,6 +501,7 @@ main(int argc, char *argv[])
 		(void) printf("EXD_FMA_OSREL = %s\n", log.log_osrelease);
 		(void) printf("EXD_FMA_OSVER = %s\n", log.log_osversion);
 		(void) printf("EXD_FMA_PLAT = %s\n", log.log_platform);
+		(void) printf("EXD_FMA_UUID = %s\n", log.log_uuid);
 
 		return (FMDUMP_EXIT_SUCCESS);
 	}

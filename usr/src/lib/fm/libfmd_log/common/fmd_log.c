@@ -50,6 +50,7 @@
 #define	CAT_FMA_OSREL	(EXT_STRING | EXC_DEFAULT | EXD_FMA_OSREL)
 #define	CAT_FMA_OSVER	(EXT_STRING | EXC_DEFAULT | EXD_FMA_OSVER)
 #define	CAT_FMA_PLAT	(EXT_STRING | EXC_DEFAULT | EXD_FMA_PLAT)
+#define	CAT_FMA_UUID	(EXT_STRING | EXC_DEFAULT | EXD_FMA_UUID)
 #define	CAT_FMA_TODSEC	(EXT_UINT64 | EXC_DEFAULT | EXD_FMA_TODSEC)
 #define	CAT_FMA_TODNSEC	(EXT_UINT64 | EXC_DEFAULT | EXD_FMA_TODNSEC)
 #define	CAT_FMA_NVLIST	(EXT_RAW | EXC_DEFAULT | EXD_FMA_NVLIST)
@@ -206,6 +207,7 @@ fmd_log_load_xref(fmd_log_t *lp, uint_t iflags,
 	major_t maj = (major_t)-1L;
 	minor_t min = (minor_t)-1L;
 	ino64_t ino = (ino64_t)-1L;
+	char *uuid = NULL;
 
 	for (obj = grp->eo_group.eg_objs; obj != NULL; obj = obj->eo_next) {
 		switch (obj->eo_catalog) {
@@ -221,30 +223,43 @@ fmd_log_load_xref(fmd_log_t *lp, uint_t iflags,
 		case CAT_FMA_OFFSET:
 			off = obj->eo_item.ei_uint64;
 			break;
+		case CAT_FMA_UUID:
+			uuid = obj->eo_item.ei_string;
+			break;
 		}
 	}
 
-	if (off == (off64_t)-1L || ino == (ino64_t)-1L ||
-	    maj == (major_t)-1L || min == (minor_t)-1L)
+	if (off == (off64_t)-1L || (uuid == NULL && (ino == (ino64_t)-1L ||
+	    maj == (major_t)-1L || min == (minor_t)-1L)))
 		return (fmd_log_set_errno(lp, EFDL_BADREF));
 
-	if ((dev = makedev(maj, min)) == NODEV)
+	if (uuid == NULL && (dev = makedev(maj, min)) == NODEV)
 		return (fmd_log_set_errno(lp, EFDL_BADDEV));
 
 	/*
-	 * Search our xref list for matching (dev_t, ino64_t).  If we can't
-	 * find one, return silently without doing anything.  We expect log
-	 * xrefs to be broken whenever log files are trimmed or removed; their
-	 * only purpose is to help us debug diagnosis engine algorithms.
+	 * Search our xref list for matching (dev_t, ino64_t) or (uuid).
+	 * If we can't find one, return silently without
+	 * doing anything.  We expect log xrefs to be broken whenever log
+	 * files are trimmed or removed; their only purpose is to help us
+	 * debug diagnosis engine algorithms.
 	 */
 	for (xlp = lp->log_xrefs; xlp != NULL; xlp = xlp->log_xnext) {
-		if (xlp->log_stat.st_ino == ino && xlp->log_stat.st_dev == dev)
+		if (uuid == NULL) {
+			if (xlp->log_stat.st_ino == ino &&
+			    xlp->log_stat.st_dev == dev)
+				break;
+		} else if (xlp->log_uuid != NULL &&
+		    strcmp(xlp->log_uuid, uuid) == 0)
 			break;
 	}
 
 	if (xlp == NULL) {
-		fmd_log_dprintf(lp, "broken xref dev=%lx ino=%llx\n",
-		    (ulong_t)dev, (u_longlong_t)ino);
+		if (uuid == NULL)
+			fmd_log_dprintf(lp, "broken xref dev=%lx ino=%llx\n",
+			    (ulong_t)dev, (u_longlong_t)ino);
+		else
+			fmd_log_dprintf(lp, "broken xref uuid=%s\n", uuid);
+
 		return (0);
 	}
 
@@ -366,7 +381,7 @@ fmd_log_open(int abi, const char *name, int *errp)
 	fmd_log_t *lp;
 	int fd;
 
-	if (abi != FMD_LOG_VERSION)
+	if (abi > FMD_LOG_VERSION)
 		return (fmd_log_open_err(NULL, errp, EFDL_VERSION));
 
 	if ((lp = malloc(sizeof (fmd_log_t))) == NULL)
@@ -443,6 +458,13 @@ fmd_log_open(int abi, const char *name, int *errp)
 				return (fmd_log_open_err(lp, errp, EFDL_NOMEM));
 			}
 			break;
+		case CAT_FMA_UUID:
+			lp->log_uuid = strdup(obj->eo_item.ei_string);
+			if (lp->log_uuid == NULL) {
+				ea_free_object(grp, EUP_ALLOC);
+				return (fmd_log_open_err(lp, errp, EFDL_NOMEM));
+			}
+			break;
 		}
 	}
 
@@ -498,6 +520,7 @@ fmd_log_close(fmd_log_t *lp)
 	free(lp->log_osrelease);
 	free(lp->log_osversion);
 	free(lp->log_platform);
+	free(lp->log_uuid);
 
 	free(lp);
 }
@@ -521,6 +544,8 @@ fmd_log_header(fmd_log_t *lp, fmd_log_header_t *hp)
 	hp->log_osrelease = lp->log_osrelease ? lp->log_osrelease : "";
 	hp->log_osversion = lp->log_osversion ? lp->log_osversion : "";
 	hp->log_platform = lp->log_platform ? lp->log_platform : "";
+	if (lp->log_abi > 1)
+		hp->log_uuid = lp->log_uuid ? lp->log_uuid : "";
 }
 
 /*
