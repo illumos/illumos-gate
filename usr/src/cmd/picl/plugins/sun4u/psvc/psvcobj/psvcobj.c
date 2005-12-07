@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4741,7 +4741,6 @@ i_psvc_constructor_11_3(
 	char buf[BUFSZ];
 	EPhysDev_t *dp;
 	char path[1024];
-	static int32_t fp = -1;
 
 	status = i_psvc_load_generic(hdlp, id, objpp, buf, sizeof (EPhysDev_t));
 	if (status != PSVC_SUCCESS)
@@ -4760,9 +4759,14 @@ i_psvc_constructor_11_3(
 		return (status);
 	}
 
-	if (fp != -1) close(fp);
-	fp = open(path, O_RDWR);
-	if (fp == -1) {
+	/*
+	 * We deliberately do not close our file handle, to prevent
+	 * any device instances from being detached.  If an instance
+	 * is detached, the "readable states in the device unitp"
+	 * will be unloaded, causing loss of control of the device
+	 * and incorrect error(s) to be displayed.
+	 */
+	if (open(path, O_RDWR) == -1) {
 		return (PSVC_FAILURE);
 	}
 	/* Load class specific info */
