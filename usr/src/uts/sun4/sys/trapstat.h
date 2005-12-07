@@ -107,11 +107,24 @@ typedef struct tstat_data {
 #define	TSTAT_PROBE_SIZE	(TSTAT_PROBE_NPAGES * MMU_PAGESIZE)
 #define	TSTAT_PROBE_NLAPS	10
 
+#ifdef sun4v
+#define	TSTAT_TLBENT_NINSTR	32
+#define	TSTAT_ENT_IMMUMISS	0x09
+#define	TSTAT_ENT_DMMUMISS	0x31
+#endif
+
 #ifndef _ASM
 
 typedef struct tstat_tlbretent {
 	uint32_t	ttlbrent_instr[TSTAT_TLBRET_NINSTR];
 } tstat_tlbretent_t;
+
+#ifdef sun4v
+typedef struct tstat_tlbent {
+	uint32_t	ttlbent_instr[TSTAT_TLBENT_NINSTR];
+} tstat_tlbent_t;
+#endif /* sun4v */
+
 
 typedef struct tstat_tlbret {
 	tstat_tlbretent_t	ttlbr_ktlb;
@@ -124,6 +137,10 @@ typedef struct tstat_instr {
 	uint32_t	tinst_traptab[TSTAT_TOTAL_NENT * TSTAT_ENT_NINSTR];
 	tstat_tlbret_t	tinst_itlbret;
 	tstat_tlbret_t	tinst_dtlbret;
+#ifdef sun4v
+	tstat_tlbent_t	tinst_immumiss;
+	tstat_tlbent_t	tinst_dmmumiss;
+#endif
 } tstat_instr_t;
 
 typedef struct tstat_tsbmiss_patch_entry {

@@ -202,3 +202,40 @@ ni_getver:
 #endif	/* lint */
 
 #endif /* NIAGARA_CHK_VERSION */
+
+#if defined(lint)
+/*ARGSUSED*/
+uint64_t
+hv_niagara_mmustat_conf(uint64_t buf, uint64_t *prev_buf)
+{ return (0); }
+
+/*ARGSUSED*/
+uint64_t
+hv_niagara_mmustat_info(uint64_t *buf)
+{ return (0); }
+
+#else   /* lint */
+
+	/*
+	 * hv_niagara_mmustat_conf(uint64_t buf, uint64_t *prev_buf)
+	 */
+	ENTRY(hv_niagara_mmustat_conf)
+	mov	%o1, %o4			! save prev_buf
+	mov	HV_NIAGARA_MMUSTAT_CONF, %o5
+	ta	FAST_TRAP
+	retl
+	stx	%o1, [%o4]
+	SET_SIZE(hv_niagara_mmustat_conf)
+
+	/*
+	 * hv_niagara_mmustat_info(uint64_t *buf)
+	 */
+	ENTRY(hv_niagara_mmustat_info)
+	mov	%o0, %o4			! save buf
+	mov	HV_NIAGARA_MMUSTAT_INFO, %o5
+	ta	FAST_TRAP
+	retl
+	stx	%o1, [%o4]
+	SET_SIZE(hv_niagara_mmustat_info)
+
+#endif /* !lint */

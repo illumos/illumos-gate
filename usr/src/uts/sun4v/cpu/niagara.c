@@ -55,6 +55,8 @@
 #include <sys/dtrace.h>
 #include <sys/simulate.h>
 #include <sys/fault.h>
+#include <sys/niagararegs.h>
+#include <sys/trapstat.h>
 
 #define	S_VAC_SIZE	MMU_PAGESIZE /* XXXQ? */
 
@@ -64,6 +66,8 @@
 #define	MAX_NCTXS	(1 << 13)
 
 uint_t root_phys_addr_lo_mask = 0xffffffffU;
+static niagara_mmustat_t *cpu_tstat_va;		/* VA of mmustat buffer */
+static uint64_t cpu_tstat_pa;			/* PA of mmustat buffer */
 
 #ifdef NIAGARA_CHK_VERSION
 static uint64_t	cpu_ver;			/* Niagara CPU version reg */
@@ -362,4 +366,92 @@ vis1_partial_support(struct regs *rp, k_siginfo_t *siginfo, uint_t *fault)
 		break;
 	}
 	return (0);
+}
+
+/*
+ * Trapstat support for Niagara processor
+ */
+int
+cpu_trapstat_conf(int cmd)
+{
+	size_t len;
+	uint64_t mmustat_pa, hvret;
+	int status = 0;
+
+	switch (cmd) {
+	case CPU_TSTATCONF_INIT:
+		ASSERT(cpu_tstat_va == NULL);
+		len = (NCPU+1) * sizeof (niagara_mmustat_t);
+		cpu_tstat_va = contig_mem_alloc_align(len,
+		    sizeof (niagara_mmustat_t));
+		if (cpu_tstat_va == NULL)
+			status = EAGAIN;
+		else {
+			bzero(cpu_tstat_va, len);
+			cpu_tstat_pa = va_to_pa(cpu_tstat_va);
+		}
+		break;
+
+	case CPU_TSTATCONF_FINI:
+		if (cpu_tstat_va) {
+			len = (NCPU+1) * sizeof (niagara_mmustat_t);
+			contig_mem_free(cpu_tstat_va, len);
+			cpu_tstat_va = NULL;
+			cpu_tstat_pa = 0;
+		}
+		break;
+
+	case CPU_TSTATCONF_ENABLE:
+		hvret = hv_niagara_mmustat_conf((cpu_tstat_pa +
+		    (CPU->cpu_id+1) * sizeof (niagara_mmustat_t)),
+		    (uint64_t *)&mmustat_pa);
+		if (hvret != H_EOK)
+			status = EINVAL;
+		break;
+
+	case CPU_TSTATCONF_DISABLE:
+		hvret = hv_niagara_mmustat_conf(0, (uint64_t *)&mmustat_pa);
+		if (hvret != H_EOK)
+			status = EINVAL;
+		break;
+
+	default:
+		status = EINVAL;
+		break;
+	}
+	return (status);
+}
+
+void
+cpu_trapstat_data(void *buf, uint_t tstat_pgszs)
+{
+	niagara_mmustat_t	*mmustatp;
+	tstat_pgszdata_t	*tstatp = (tstat_pgszdata_t *)buf;
+	int	i, pgcnt;
+
+	if (cpu_tstat_va == NULL)
+		return;
+
+	mmustatp = &((niagara_mmustat_t *)cpu_tstat_va)[CPU->cpu_id+1];
+	if (tstat_pgszs > NIAGARA_MMUSTAT_PGSZS)
+		tstat_pgszs = NIAGARA_MMUSTAT_PGSZS;
+
+	for (i = 0; i < tstat_pgszs; i++, tstatp++) {
+		tstatp->tpgsz_kernel.tmode_itlb.ttlb_tlb.tmiss_count =
+		    mmustatp->kitsb[i].tsbhit_count;
+		tstatp->tpgsz_kernel.tmode_itlb.ttlb_tlb.tmiss_time =
+		    mmustatp->kitsb[i].tsbhit_time;
+		tstatp->tpgsz_user.tmode_itlb.ttlb_tlb.tmiss_count =
+		    mmustatp->uitsb[i].tsbhit_count;
+		tstatp->tpgsz_user.tmode_itlb.ttlb_tlb.tmiss_time =
+		    mmustatp->uitsb[i].tsbhit_time;
+		tstatp->tpgsz_kernel.tmode_dtlb.ttlb_tlb.tmiss_count =
+		    mmustatp->kdtsb[i].tsbhit_count;
+		tstatp->tpgsz_kernel.tmode_dtlb.ttlb_tlb.tmiss_time =
+		    mmustatp->kdtsb[i].tsbhit_time;
+		tstatp->tpgsz_user.tmode_dtlb.ttlb_tlb.tmiss_count =
+		    mmustatp->udtsb[i].tsbhit_count;
+		tstatp->tpgsz_user.tmode_dtlb.ttlb_tlb.tmiss_time =
+		    mmustatp->udtsb[i].tsbhit_time;
+	}
 }

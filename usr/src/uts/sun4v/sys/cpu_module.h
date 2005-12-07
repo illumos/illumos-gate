@@ -143,6 +143,17 @@ extern int kzero(void *addr, size_t count);
 extern void uzero(void *addr, size_t count);
 extern void bzero(void *addr, size_t count);
 
+/*
+ * trapstat interface and cpu_trapstat_conf commands
+ */
+#define	CPU_TSTATCONF_INIT	1
+#define	CPU_TSTATCONF_FINI	2
+#define	CPU_TSTATCONF_ENABLE	3
+#define	CPU_TSTATCONF_DISABLE	4
+
+int	cpu_trapstat_conf(int cmd);
+void	cpu_trapstat_data(void *buf, uint_t pgszs);
+
 #endif /* _KERNEL */
 
 #ifdef	__cplusplus

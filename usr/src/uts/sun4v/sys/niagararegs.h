@@ -87,6 +87,11 @@ extern "C" {
 #define	HV_NIAGARA_GETPERF	0x100
 #define	HV_NIAGARA_SETPERF	0x101
 
+/*
+ * Hypervisor FAST_TRAP API function numbers for Niagara MMU statistics
+ */
+#define	HV_NIAGARA_MMUSTAT_CONF	0x102
+#define	HV_NIAGARA_MMUSTAT_INFO	0x103
 
 /*
  * DRAM/JBUS performance counter register numbers for HV_NIAGARA_GETPERF
@@ -103,14 +108,37 @@ extern "C" {
 #define	HV_NIAGARA_DRAM_CTL3		0x8
 #define	HV_NIAGARA_DRAM_COUNT3		0x9
 
+#ifndef _ASM
+
+/*
+ * Niagara MMU statistics data structure
+ */
+
+#define	NIAGARA_MMUSTAT_PGSZS	8
+
+typedef struct niagara_tsbinfo {
+	uint64_t	tsbhit_count;
+	uint64_t	tsbhit_time;
+} niagara_tsbinfo_t;
+
+typedef struct niagara_mmustat {
+	niagara_tsbinfo_t	kitsb[NIAGARA_MMUSTAT_PGSZS];
+	niagara_tsbinfo_t	uitsb[NIAGARA_MMUSTAT_PGSZS];
+	niagara_tsbinfo_t	kdtsb[NIAGARA_MMUSTAT_PGSZS];
+	niagara_tsbinfo_t	udtsb[NIAGARA_MMUSTAT_PGSZS];
+} niagara_mmustat_t;
+
+
 /*
  * prototypes for hypervisor interface to get/set DRAM and JBUS
  * performance counters
  */
-#ifndef _ASM
 extern uint64_t hv_niagara_setperf(uint64_t regnum, uint64_t val);
 extern uint64_t hv_niagara_getperf(uint64_t regnum, uint64_t *val);
-#endif
+extern uint64_t hv_niagara_mmustat_conf(uint64_t buf, uint64_t *prev_buf);
+extern uint64_t hv_niagara_mmustat_info(uint64_t *buf);
+
+#endif /* _ASM */
 
 /*
  * Bits defined in L2 Error Status Register

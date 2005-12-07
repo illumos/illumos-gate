@@ -447,10 +447,17 @@
  *
  * Note that on sun4v platforms, TLB misses are normally handled by the
  * hypervisor or the hardware TSB walker. Thus no fast MMU miss information
- * is reported for normal operation. However, when trapstat is invoked with
- * -t or -T option to collect detailed TLB statistics, kernel takes
+ * is reported for normal operation. However, when trapstat is invoked
+ * with -t or -T option to collect detailed TLB statistics, kernel takes
  * over TLB miss handling. This results in significantly more overhead
  * and TLB statistics may not be as accurate as on sun4u platforms.
+ * On some processors, hypervisor or hardware may provide a low overhead
+ * interface to collect TSB hit statistics. This support is exposed via
+ * a well defined CPU module interface (cpu_trapstat_conf to enable this
+ * interface and cpu_trapstat_data to get detailed TSB hit statistics).
+ * In this scenario, TSB miss statistics is collected by intercepting the
+ * IMMU_miss and DMMU_miss traps using above mentioned trap interposition
+ * approach.
  *
  * Locking
  *
@@ -502,6 +509,7 @@ static size_t		tstat_total_size;  /* tstat data size + instr size */
 #ifdef sun4v
 static caddr_t		tstat_va;	/* VA of memory reserved for TBA */
 static pfn_t		tstat_pfn;	/* PFN of memory reserved for TBA */
+static boolean_t	tstat_fast_tlbstat = B_FALSE;
 #endif
 
 /*
@@ -814,34 +822,29 @@ trapstat_enable()
 		(void) set_tba(tcpu->tcpu_ibase);
 	tcpu->tcpu_flags |= TSTAT_CPU_ENABLED;
 #ifdef sun4v
-	if (tstat_options & (TSTAT_OPT_TLBDATA | TSTAT_OPT_NOGO)) {
-		/*
-		 * On sun4v platforms, TLB misses are normally handled by the
-		 * hypervisor or the hardware -- provided one or more TSBs
-		 * have been setup and communicated via hv_set_ctx0 and
-		 * hv_set_nonctx0 API.  However, as part of collecting TLB
-		 * statistics, we disabled this miss processing by telling the
-		 * hypervisor that there was not a TSB; we now need to
-		 * communicate the proper kernel/user TSB information to
-		 * resume efficient operation.
-		 *
-		 * While we restore kernel TSB information immediately, to
-		 * avoid any locking dependency, we don't restore user TSB
-		 * information right away.  Rather, we simply clear the
-		 * TSTAT_TLB_STATS flag so that the user TSB information is
-		 * automatically restored on the next context switch.
-		 *
-		 * Note that the call to restore kernel TSB information is not
-		 * expected to fail.  Even in the event of failure, the system
-		 * will still continue to function properly, if in a state of
-		 * reduced performance due to the guest kernel handling all
-		 * TLB misses.
-		 */
-		cpu_t *cp = CPU;
+	if ((tstat_options & TSTAT_OPT_TLBDATA) &&
+	    !(tstat_options & TSTAT_OPT_NOGO)) {
+		if (tstat_fast_tlbstat) {
+			/*
+			 * Invoke processor specific interface to enable
+			 * collection of TSB hit statistics.
+			 */
+			cpu_trapstat_conf(CPU_TSTATCONF_ENABLE);
+		} else {
+			/*
+			 * Collect TLB miss statistics by taking over
+			 * TLB miss handling from the hypervisor. This
+			 * is done by telling the hypervisor that there
+			 * is no TSB configured. Also set TSTAT_TLB_STATS
+			 * flag so that no user TSB is configured during
+			 * context switch time.
+			 */
+			cpu_t *cp = CPU;
 
-		cp->cpu_m.cpu_tstat_flags |= TSTAT_TLB_STATS;
-		(void) hv_set_ctx0(NULL, NULL);
-		(void) hv_set_ctxnon0(NULL, NULL);
+			cp->cpu_m.cpu_tstat_flags |= TSTAT_TLB_STATS;
+			(void) hv_set_ctx0(NULL, NULL);
+			(void) hv_set_ctxnon0(NULL, NULL);
+		}
 	}
 #endif
 }
@@ -867,35 +870,44 @@ trapstat_disable()
 	tcpu->tcpu_flags &= ~TSTAT_CPU_ENABLED;
 
 #ifdef sun4v
-	if (tstat_options & (TSTAT_OPT_TLBDATA | TSTAT_OPT_NOGO)) {
-		/*
-		 * On sun4v platforms, TlB misses are normally handled by
-		 * the hypervisor or the hardware provided one or more TSBs
-		 * have been setup and communicated via hv_set_ctx0 and
-		 * hv_set_nonctx0 API. However, as part of collecting TLB
-		 * statistics, we disabled that by faking NO TSB and we
-		 * need to communicate proper kernel/user TSB information
-		 * so that TLB misses can be handled by the hypervisor or
-		 * the hardware more efficiently.
-		 *
-		 * We restore kernel TSB information right away. However,
-		 * to minimize any locking dependency, we don't restore
-		 * user TSB information right away. Instead, we simply
-		 * clear the TSTAT_TLB_STATS flag so that the user TSB
-		 * information is automatically restored on next context
-		 * switch.
-		 *
-		 * Note that the call to restore kernel TSB information
-		 * will normally not fail, unless wrong information is
-		 * passed here. In that scenario, system will still
-		 * continue to function properly with the exception of
-		 * kernel handling all the TLB misses.
-		 */
-		struct hv_tsb_block *hvbp = &ksfmmup->sfmmu_hvblock;
-		cpu_t *cp = CPU;
+	if ((tstat_options & TSTAT_OPT_TLBDATA) &&
+	    !(tstat_options & TSTAT_OPT_NOGO)) {
+		if (tstat_fast_tlbstat) {
+			/*
+			 * Invoke processor specific interface to disable
+			 * collection of TSB hit statistics on each processor.
+			 */
+			cpu_trapstat_conf(CPU_TSTATCONF_DISABLE);
+		} else {
+			/*
+			 * As part of collecting TLB miss statistics, we took
+			 * over TLB miss handling from the hypervisor by
+			 * telling the hypervisor that NO TSB is configured.
+			 * We need to restore that by communicating proper
+			 * kernel/user TSB information so that TLB misses
+			 * can be handled by the hypervisor or the hardware
+			 * more efficiently.
+			 *
+			 * We restore kernel TSB information right away.
+			 * However, to minimize any locking dependency, we
+			 * don't restore user TSB information right away.
+			 * Instead, we simply clear the TSTAT_TLB_STATS flag
+			 * so that the user TSB information is automatically
+			 * restored on next context switch.
+			 *
+			 * Note that the call to restore kernel TSB information
+			 * will normally not fail, unless wrong information is
+			 * passed here. In that scenario, system will still
+			 * continue to function properly with the exception of
+			 * kernel handling all the TLB misses.
+			 */
+			struct hv_tsb_block *hvbp = &ksfmmup->sfmmu_hvblock;
+			cpu_t *cp = CPU;
 
-		cp->cpu_m.cpu_tstat_flags &= ~TSTAT_TLB_STATS;
-		(void) hv_set_ctx0(hvbp->hv_tsb_info_cnt, hvbp->hv_tsb_info_pa);
+			cp->cpu_m.cpu_tstat_flags &= ~TSTAT_TLB_STATS;
+			(void) hv_set_ctx0(hvbp->hv_tsb_info_cnt,
+			    hvbp->hv_tsb_info_pa);
+		}
 	}
 #endif
 }
@@ -920,6 +932,15 @@ trapstat_snapshot()
 	data->tdata_snapts = gethrtime();
 	data->tdata_snaptick = rdtick();
 	bcopy(data, tstat_buffer, tstat_data_t_size);
+#ifdef sun4v
+	/*
+	 * Invoke processor specific interface to collect TSB hit
+	 * statistics on each processor.
+	 */
+	if ((tstat_options & TSTAT_OPT_TLBDATA) && tstat_fast_tlbstat)
+		cpu_trapstat_data((void *) tstat_buffer->tdata_pgsz,
+		    tstat_pgszs);
+#endif
 }
 
 /*
@@ -929,7 +950,7 @@ trapstat_snapshot()
  * will likely require changes to these constants.
  */
 
-#ifndef	sun4v
+#ifndef sun4v
 #define	TSTAT_RETENT_STATHI	1
 #define	TSTAT_RETENT_STATLO	2
 #define	TSTAT_RETENT_SHIFT	11
@@ -1090,7 +1111,11 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 {
 	uint32_t *ent;
 	uintptr_t orig, va, baoffs;
+#ifndef sun4v
 	int itlb = entno == TSTAT_ENT_ITLBMISS;
+#else
+	int itlb = (entno == TSTAT_ENT_IMMUMISS || entno == TSTAT_ENT_ITLBMISS);
+#endif
 	int entoffs = entno << TSTAT_ENT_SHIFT;
 	uintptr_t tmptick, stat, tpc, utpc;
 	tstat_pgszdata_t *data = &tcpu->tcpu_data->tdata_pgsz[0];
@@ -1189,7 +1214,12 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	};
 
 	ASSERT(MUTEX_HELD(&tstat_lock));
+#ifndef sun4v
 	ASSERT(entno == TSTAT_ENT_ITLBMISS || entno == TSTAT_ENT_DTLBMISS);
+#else
+	ASSERT(entno == TSTAT_ENT_ITLBMISS || entno == TSTAT_ENT_DTLBMISS ||
+	    entno == TSTAT_ENT_IMMUMISS || entno == TSTAT_ENT_DMMUMISS);
+#endif
 
 	stat = TSTAT_DATA_OFFS(tcpu, tdata_traps) + entoffs;
 	tmptick = TSTAT_DATA_OFFS(tcpu, tdata_tmptick);
@@ -1215,6 +1245,36 @@ trapstat_tlbent(tstat_percpu_t *tcpu, int entno)
 	orig = KERNELBASE + entoffs;
 	va = (uintptr_t)tcpu->tcpu_ibase + entoffs;
 	baoffs = TSTAT_TLBENT_BA * sizeof (uint32_t);
+
+#ifdef sun4v
+	if (entno == TSTAT_ENT_IMMUMISS || entno == TSTAT_ENT_DMMUMISS) {
+		/*
+		 * Because of lack of space, interposing tlbent trap
+		 * handler for IMMU_miss and DMMU_miss traps cannot be
+		 * placed in-line. Instead, we copy it to the space set
+		 * aside for these traps in per CPU trapstat area and
+		 * invoke it by placing a branch in the trap table itself.
+		 */
+		static const uint32_t mmumiss[TSTAT_ENT_NINSTR] = {
+		    0x30800000,			/* ba,a addr */
+		    NOP, NOP, NOP, NOP, NOP, NOP, NOP
+		};
+		uint32_t *tent = ent;		/* trap vector entry */
+		uintptr_t tentva = va;		/* trap vector entry va */
+
+		if (itlb) {
+			ent = (uint32_t *)((uintptr_t)
+				&tcpu->tcpu_instr->tinst_immumiss);
+			va = TSTAT_INSTR_OFFS(tcpu, tinst_immumiss);
+		} else {
+			ent = (uint32_t *)((uintptr_t)
+				&tcpu->tcpu_instr->tinst_dmmumiss);
+			va = TSTAT_INSTR_OFFS(tcpu, tinst_dmmumiss);
+		}
+		bcopy(mmumiss, tent, sizeof (mmumiss));
+		tent[0] |= DISP22(tentva, va);
+	}
+#endif /* sun4v */
 
 	bcopy(tlbent, ent, sizeof (tlbent));
 
@@ -1418,8 +1478,18 @@ trapstat_setup(processorid_t cpu)
 		 * TLB Statistics have been specified; set up the I- and D-TLB
 		 * entries and corresponding TLB return entries.
 		 */
+#ifndef sun4v
 		trapstat_tlbent(tcpu, TSTAT_ENT_ITLBMISS);
 		trapstat_tlbent(tcpu, TSTAT_ENT_DTLBMISS);
+#else
+		if (tstat_fast_tlbstat) {
+			trapstat_tlbent(tcpu, TSTAT_ENT_IMMUMISS);
+			trapstat_tlbent(tcpu, TSTAT_ENT_DMMUMISS);
+		} else {
+			trapstat_tlbent(tcpu, TSTAT_ENT_ITLBMISS);
+			trapstat_tlbent(tcpu, TSTAT_ENT_DTLBMISS);
+		}
+#endif
 	}
 
 	tcpu->tcpu_flags |= TSTAT_CPU_ALLOCATED;
@@ -1482,13 +1552,29 @@ trapstat_go()
 
 #ifdef sun4v
 	/*
-	 * Allocate large page to hold interposing tables
+	 * Allocate large page to hold interposing tables.
 	 */
 	tstat_va = contig_mem_alloc(MMU_PAGESIZE4M);
 	tstat_pfn = va_to_pfn(tstat_va);
-	if (tstat_pfn == PFN_INVALID) {
-		contig_mem_free(tstat_va, MMU_PAGESIZE4M);
+	if (tstat_pfn == PFN_INVALID)
 		return (EAGAIN);
+
+	/*
+	 * For detailed TLB statistics, invoke CPU specific interface
+	 * to see if it supports a low overhead interface to collect
+	 * TSB hit statistics. If so, make set tstat_fast_tlbstat flag
+	 * to reflect that.
+	 */
+	if (tstat_options & TSTAT_OPT_TLBDATA) {
+		int error;
+
+		error = cpu_trapstat_conf(CPU_TSTATCONF_INIT);
+		if (error == 0)
+			tstat_fast_tlbstat = B_TRUE;
+		else if (error != ENOTSUP) {
+			contig_mem_free(tstat_va, MMU_PAGESIZE4M);
+			return (error);
+		}
 	}
 #endif
 
@@ -1549,6 +1635,8 @@ trapstat_stop()
 	}
 
 #ifdef sun4v
+	if (tstat_options & TSTAT_OPT_TLBDATA)
+		cpu_trapstat_conf(CPU_TSTATCONF_FINI);
 	contig_mem_free(tstat_va, MMU_PAGESIZE4M);
 #endif
 	trapstat_hotpatch();

@@ -244,3 +244,32 @@ cpu_inv_tsb(caddr_t tsb_base, uint_t tsb_bytes)
 		tsbaddr->tte_tag.tag_inthi = TSBTAG_INVALID;
 	}
 }
+
+/*
+ * Trapstat support for generic sun4v processor
+ */
+int
+cpu_trapstat_conf(int cmd)
+{
+	int status;
+
+	switch (cmd) {
+	case CPU_TSTATCONF_INIT:
+	case CPU_TSTATCONF_FINI:
+	case CPU_TSTATCONF_ENABLE:
+	case CPU_TSTATCONF_DISABLE:
+		status = ENOTSUP;
+		break;
+
+	default:
+		status = EINVAL;
+		break;
+	}
+	return (status);
+}
+
+/*ARGSUSED*/
+void
+cpu_trapstat_data(void *buf, uint_t tstat_pgszs)
+{
+}
