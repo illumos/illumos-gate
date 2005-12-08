@@ -211,157 +211,51 @@ do_geometry_sanity_check()
 }
 
 /*
- * expand the internal 32-bit SMI VTOC into the 64-bit EFI version
- * for writing it out to the disk
+ * create a clear EFI partition table when format is used
+ * to convert a SMI label to an EFI lable
  */
 int
 SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc, struct vtoc *old_vtoc)
 {
-	int i, j;
-	int vtoc_part_count = 0;
-	int highest_assigned_part = 0;
-	int last_par = 0;
-	int compact = 0;
-	struct dk_gpt	*vtoc;
-	struct vtoc	old_vtoc_copy;
-	diskaddr_t	start, size;
+	int i;
+	struct dk_gpt	*efi;
 
 	if (efi_alloc_and_init(fd, EFI_NUMPAR, new_vtoc) != 0) {
 	    err_print("SMI vtoc to EFI failed\n");
 	    return (-1);
 	}
-	vtoc = *new_vtoc;
-	old_vtoc_copy = *old_vtoc;
+	efi = *new_vtoc;
 
 	/*
-	 * Prepare old VTOC table for transfer by ensuring the
-	 * tags are set correctly.  Also collect information
-	 * about the old VTOC table including the number of
-	 * valid VTOC partitions and the highest VTOC partition
-	 * in use.  An EFI label provides fewer partitions, so
-	 * it is possible that the VTOC partitions cannot all be
-	 * transferred.
+	 * create a clear EFI partition table:
+	 * s0 takes the whole disk except the primary EFI lable,
+	 * backup EFI labels, and the reserved partition.
+	 * s1-s6 are unassigned slices.
 	 */
-	for (i = 0; i < V_NUMPAR; i++) {
-		/*
-		 * we may be carrying around old tags from the
-		 * default partition table.  If the partition
-		 * is really unassigned, set the tag correctly
-		 */
-		if ((old_vtoc->v_part[i].p_start == 0) &&
-		    (old_vtoc->v_part[i].p_size == 0))
-			old_vtoc->v_part[i].p_tag = V_UNASSIGNED;
-		/*
-		 * Likewise, if the partition is not empty, don't
-		 * write it out as "unassigned."
-		 */
-		if ((old_vtoc->v_part[i].p_size != 0) &&
-		    (old_vtoc->v_part[i].p_tag == V_UNASSIGNED))
-			old_vtoc->v_part[i].p_tag = V_ROOT;
-		if (old_vtoc->v_part[i].p_tag != V_BACKUP &&
-		    old_vtoc->v_part[i].p_tag != V_UNASSIGNED &&
-		    old_vtoc->v_part[i].p_start < vtoc->efi_first_u_lba) {
-			old_vtoc->v_part[i].p_start = vtoc->efi_first_u_lba;
-			old_vtoc->v_part[i].p_size -= vtoc->efi_first_u_lba;
-		}
+	efi->efi_parts[0].p_tag = V_USR;
+	efi->efi_parts[0].p_start = efi->efi_first_u_lba;
+	efi->efi_parts[0].p_size = efi->efi_last_u_lba - efi->efi_first_u_lba
+		- EFI_MIN_RESV_SIZE;
 
-		if (old_vtoc->v_part[i].p_tag == V_BACKUP ||
-		    old_vtoc->v_part[i].p_tag == V_BOOT) {
-		    old_vtoc->v_part[i].p_tag = V_UNASSIGNED;
-		    old_vtoc->v_part[i].p_start =
-			old_vtoc->v_part[i].p_size = 0;
-		    last_par = i;
-		}
-		if ((i == WD_NODE) && (old_vtoc->v_part[i].p_tag !=
-		    V_UNASSIGNED)) {
-			old_vtoc->v_part[i].p_tag = V_UNASSIGNED;
-			old_vtoc->v_part[i].p_start = 0;
-			old_vtoc->v_part[i].p_size = 0;
-		}
-
-		if (old_vtoc->v_part[i].p_tag != V_UNASSIGNED) {
-			/* Update count of valid VTOC partitions */
-			vtoc_part_count++;
-
-			/* Note the highest valid VTOC slice */
-			highest_assigned_part = i;
-		}
-	}
-	if (vtoc_part_count > vtoc->efi_nparts - 1) {
-		/* Too many partitions to convert the VTOC label */
-		err_print("There are %d defined VTOC ", vtoc_part_count);
-		err_print("partitions and an EFI label\n");
-		err_print("can only accept %d.\n", vtoc->efi_nparts - 1);
-		if (check("Continue anyway") != 0) {
-			/* If no, restore VTOC and return an error */
-			*old_vtoc = old_vtoc_copy;
-			efi_free(vtoc);
-			return (-1);
-		}
-	}
-
-	if (highest_assigned_part > vtoc->efi_nparts - 2) {
-		/*
-		 * Partition indexes cannot be transferred directly since
-		 * the highest valid VTOC index is higher than the highest
-		 * available EFI partition.  Ask the user if it is OK to
-		 * move the partitions to available slots
-		 */
-		err_print("VTOC partition %d is defined ",
-		    highest_assigned_part);
-		err_print("and the highest available EFI\n");
-		err_print("partition is %d.  The partitions\n",
-		    vtoc->efi_nparts - 2);
-		err_print("will fit if they are re-numbered\n");
-		if (check("OK to renumber") != 0) {
-			/* If no, restore VTOC and return an error */
-			*old_vtoc = old_vtoc_copy;
-			efi_free(vtoc);
-			return (-1);
-		} else {
-			compact = 1;
-		}
+	/*
+	 * s1-s6 are unassigned slices
+	 */
+	for (i = 1; i < efi->efi_nparts - 2; i++) {
+		efi->efi_parts[i].p_tag = V_UNASSIGNED;
+		efi->efi_parts[i].p_start = 0;
+		efi->efi_parts[i].p_size = 0;
 	}
 
 	/*
-	 * Now copy the VTOC partitions, remapping the indices if
-	 * necessary.
+	 * the reserved slice
 	 */
-	j = 0;
-	for (i = 0; i < V_NUMPAR; i++) {
-		if (old_vtoc->v_part[i].p_tag != V_UNASSIGNED) {
-			/* Copy partition info */
-			vtoc->efi_parts[j].p_tag = old_vtoc->v_part[i].p_tag;
-			vtoc->efi_parts[j].p_flag = old_vtoc->v_part[i].p_flag;
-			vtoc->efi_parts[j].p_start =
-			    old_vtoc->v_part[i].p_start;
-			vtoc->efi_parts[j].p_size =
-			    old_vtoc->v_part[i].p_size;
-			if (vtoc->efi_parts[j].p_size != 0)
-				last_par = j;
-			j++; /* Increment EFI index */
-		} else {
-			if (!compact) {
-				j++; /* Increment EFI index */
-			}
-		}
-	}
-
-	start = vtoc->efi_parts[last_par].p_start;
-	size = vtoc->efi_parts[last_par].p_size;
-	if ((start + size) > (vtoc->efi_last_u_lba - EFI_MIN_RESV_SIZE)) {
-		size = (start + size) - (vtoc->efi_last_u_lba -
-			    EFI_MIN_RESV_SIZE);
-		vtoc->efi_parts[last_par].p_size -= size;
-	}
-	vtoc->efi_parts[vtoc->efi_nparts - 1].p_tag = V_RESERVED;
-	vtoc->efi_parts[vtoc->efi_nparts - 1].p_start =
-	    vtoc->efi_last_u_lba - EFI_MIN_RESV_SIZE;
-	vtoc->efi_parts[vtoc->efi_nparts - 1].p_size = EFI_MIN_RESV_SIZE;
+	efi->efi_parts[efi->efi_nparts - 1].p_tag = V_RESERVED;
+	efi->efi_parts[efi->efi_nparts - 1].p_start =
+		efi->efi_last_u_lba - EFI_MIN_RESV_SIZE;
+	efi->efi_parts[efi->efi_nparts - 1].p_size = EFI_MIN_RESV_SIZE;
 
 	return (0);
 }
-
 
 /*
  * This routine constructs and writes a label on the disk.  It writes both
