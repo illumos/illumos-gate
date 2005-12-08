@@ -7843,7 +7843,7 @@ tcp_header_init_ipv6(tcp_t *tcp)
 }
 
 /* At minimum we need 4 bytes in the TCP header for the lookup */
-#define	ICMP_MIN_TCP_HDR	4
+#define	ICMP_MIN_TCP_HDR	12
 
 /*
  * tcp_icmp_error is called by tcp_rput_other to process ICMP error messages
