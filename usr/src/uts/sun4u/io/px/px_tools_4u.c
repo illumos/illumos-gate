@@ -44,12 +44,29 @@
  * surface.  The larger the number of bridges and switches, the larger the
  * number needed here.
  *
+ * The way it works is as follows:
+ *
+ * An access is done which causes an error.  Fire errors are handled with
+ * ontrap protection and usually come in first.  Fabric errors can come in
+ * later.
+ *
+ * px_phys_peek_4u() disables interrupts.  Interrupts are reenabled at the end
+ * of that function if no errors have been caught by the trap handler, or by
+ * peek_fault() which executes when a fire error occurs.
+ *
+ * Fabric error messages get put on an event queue but are not processed until
+ * interrupts are reenabled.
+ *
+ * The delay gives time for the fabric errors to be processed by FMA before
+ * changing the fm error flag back to DDI_FM_ERR_UNEXPECTED.  If this isn't
+ * done, then the fabric error which should be safe can panic the system.
+ *
  * Note: this is a workaround until a better solution is found.  While this
  * number is high, given enough bridges and switches in the device path, this
  * workaround can break.  Also, other PIL 15 interrupts besides the ones we are
  * enveloping could delay processing of the interrupt we are trying to protect.
  */
-int pxtool_delay_usec = 500;
+int pxtool_delay_ticks = 1;
 
 /* Number of inos per root complex. */
 int pxtool_num_inos = INTERRUPT_MAPPING_ENTRIES;
@@ -99,14 +116,15 @@ pxtool_safe_phys_peek(px_t *px_p, boolean_t type, size_t size, uint64_t paddr,
 	} else
 		err = DDI_FAILURE;
 
+	no_trap();
+
 	/*
 	 * Workaround: delay taking down safe access env.
-	 * For more info, see comments where pxtool_delay_usec is declared.
+	 * For more info, see comments where pxtool_delay_ticks is declared.
 	 */
-	if (pxtool_delay_usec > 0)
-		drv_usecwait(pxtool_delay_usec);
+	if (pxtool_delay_ticks > 0)
+		delay(pxtool_delay_ticks);
 
-	no_trap();
 	pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
 	mutex_exit(&pec_p->pec_pokefault_mutex);
 
@@ -185,14 +203,6 @@ pxtool_safe_phys_poke(px_t *px_p, boolean_t type, size_t size, uint64_t paddr,
 	} else
 		err = DDI_FAILURE;
 
-	/*
-	 * Workaround: delay taking down safe access env.
-	 * For more info, see comments where pxtool_delay_usec is declared.
-	 */
-	if (pxtool_delay_usec > 0)
-		drv_usecwait(pxtool_delay_usec);
-
-
 	px_lib_clr_errs(px_p);
 
 	if (otd.ot_trap & OT_DATA_ACCESS)
@@ -200,8 +210,15 @@ pxtool_safe_phys_poke(px_t *px_p, boolean_t type, size_t size, uint64_t paddr,
 
 	/* Take down protected environment. */
 	no_trap();
-
 	pec_p->pec_ontrap_data = NULL;
+
+	/*
+	 * Workaround: delay taking down safe access env.
+	 * For more info, see comments where pxtool_delay_ticks is declared.
+	 */
+	if (pxtool_delay_ticks > 0)
+		delay(pxtool_delay_ticks);
+
 	pec_p->pec_safeacc_type = DDI_FM_ERR_UNEXPECTED;
 	mutex_exit(&pec_p->pec_pokefault_mutex);
 
@@ -216,20 +233,19 @@ pxtool_safe_phys_poke(px_t *px_p, boolean_t type, size_t size, uint64_t paddr,
  *
  * Dip is of the nexus,
  * phys_addr is the address to write in physical space.
- * max_addr is the upper bound on the physical space used for bounds checking,
  * pcitool_status returns more detailed status in addition to a more generic
  * errno-style function return value.
  * other args are self-explanatory.
  *
- * This function assumes that offset, bdf, acc_attr, max_addr are current in
+ * This function assumes that offset, bdf, and acc_attr are current in
  * prg_p.  It also assumes that prg_p->phys_addr is the final phys addr,
  * including offset.
  * This function modifies prg_p status and data.
  */
 /*ARGSUSED*/
 static int
-pxtool_access(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
-    uint64_t *data_p, boolean_t is_write)
+pxtool_access(px_t *px_p, pcitool_reg_t *prg_p, uint64_t *data_p,
+    boolean_t is_write)
 {
 	dev_info_t *dip = px_p->px_dip;
 	uint64_t phys_addr = prg_p->phys_addr;
@@ -237,17 +253,8 @@ pxtool_access(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
 	size_t size = PCITOOL_ACC_ATTR_SIZE(prg_p->acc_attr);
 	int rval = SUCCESS;
 
-	/* Upper bounds checking. */
-	if (phys_addr > max_addr) {
-		DBG(DBG_TOOLS, dip,
-		    "Phys addr 0x%" PRIx64 " out of range "
-		    "(max 0x%" PRIx64 ").\n", phys_addr, max_addr);
-		prg_p->status = PCITOOL_INVALID_ADDRESS;
-
-		rval = EINVAL;
-
 	/* Alignment checking.  Assumes base address is 8-byte aligned. */
-	} else if (!IS_P2ALIGNED(phys_addr, size)) {
+	if (!IS_P2ALIGNED(phys_addr, size)) {
 		DBG(DBG_TOOLS, dip, "not aligned.\n");
 		prg_p->status = PCITOOL_NOT_ALIGNED;
 
@@ -293,16 +300,16 @@ pxtool_access(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
 
 int
 pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
-    uint64_t max_addr, uint64_t *data_p, boolean_t is_write)
+    uint64_t *data_p, boolean_t is_write)
 {
-	return (pxtool_access(px_p, prg_p, max_addr, data_p, is_write));
+	return (pxtool_access(px_p, prg_p, data_p, is_write));
 }
 
 int
-pxtool_pciiomem_access(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
+pxtool_pciiomem_access(px_t *px_p, pcitool_reg_t *prg_p,
     uint64_t *data_p, boolean_t is_write)
 {
-	return (pxtool_access(px_p, prg_p, max_addr, data_p, is_write));
+	return (pxtool_access(px_p, prg_p, data_p, is_write));
 }
 
 int
@@ -332,7 +339,6 @@ pxtool_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 {
 	pcitool_reg_t		prg;
 	uint64_t		base_addr;
-	uint64_t		max_addr;
 	uint32_t		reglen;
 	px_t			*px_p = DIP_TO_STATE(dip);
 	px_nexus_regspec_t	*px_rp = NULL;
@@ -374,15 +380,21 @@ pxtool_bus_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 	}
 
 	base_addr = px_rp[prg.barnum].phys_addr;
-	max_addr = base_addr + px_rp[prg.barnum].size;
 	prg.phys_addr = base_addr + prg.offset;
 
 	DBG(DBG_TOOLS, dip, "pxtool_bus_reg_ops: nexus: base:0x%" PRIx64 ", "
-	    "offset:0x%" PRIx64 ", addr:0x%" PRIx64 ", max_addr:"
-	    "0x%" PRIx64 "\n", base_addr, prg.offset, prg.phys_addr, max_addr);
+	    "offset:0x%" PRIx64 ", addr:0x%" PRIx64 ", max_offset:"
+	    "0x%" PRIx64 "\n",
+	    base_addr, prg.offset, prg.phys_addr, px_rp[prg.barnum].size);
+
+	if (prg.offset >= px_rp[prg.barnum].size) {
+		prg.status = PCITOOL_OUT_OF_RANGE;
+		rval = EINVAL;
+		goto done;
+	}
 
 	/* Access device.  prg.status is modified. */
-	rval = pxtool_access(px_p, &prg, max_addr, &prg.data, write_flag);
+	rval = pxtool_access(px_p, &prg, &prg.data, write_flag);
 
 done:
 	if (px_rp != NULL)

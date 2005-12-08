@@ -346,11 +346,60 @@ pxtool_validate_barnum_bdf(pcitool_reg_t *prg)
 	return (rval);
 }
 
+
+/*
+ * px_p defines which leaf, space defines which space in that leaf, offset
+ * defines the offset within the specified space.
+ *
+ * This returns the physical address of the corresponding location.
+ */
+static uintptr_t
+pxtool_get_phys_addr(px_t *px_p, int space, uint64_t offset)
+{
+	px_ranges_t	*rp;
+	uint64_t range_base;
+	int rval;
+	dev_info_t *dip = px_p->px_dip;
+	uint32_t base_offset = 0;
+
+	/*
+	 * Assume that requested entity is small enough to be on the same page.
+	 * (Same starting and ending value "offset" passed to px_search_ranges.)
+	 * PCItool checks alignment so that this will be true for single
+	 * accesses.
+	 *
+	 * Base_offset is the offset from the specified address, where the
+	 * current range begins.  This is nonzero when a PCI space is split and
+	 * the address is inside the second or subsequent range.
+	 *
+	 * NOTE: offset is a uint64_t but px_search_ranges takes a uint32_t.
+	 * px_search_ranges should also take a uint64_t for base_offset.
+	 * RFE is to have px_search_ranges handle a uint64_t offset.
+	 */
+	rval = px_search_ranges(px_p, space, offset, offset, &rp,
+	    (uint32_t *)&base_offset);
+	DBG(DBG_TOOLS, dip,
+	    "space:0x%d, offset:0x%" PRIx64 ", base_offset:0x%" PRIx64 "\n",
+	    space, offset, base_offset);
+
+	if (rval != DDI_SUCCESS)
+		return (NULL);
+	else {
+		range_base =
+		    (((uint64_t)(rp->parent_high & 0x7ff)) << 32) +
+		    rp->parent_low;
+		DBG(DBG_TOOLS, dip, "range base:0x%" PRIx64 "\n", range_base);
+		return (base_offset + range_base);
+	}
+}
+
+
 static int
-pxtool_get_bar(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
-    uint64_t *bar_p, uint32_t *space_p)
+pxtool_get_bar(px_t *px_p, pcitool_reg_t *prg_p, uint64_t *bar_p,
+    uint32_t *space_p)
 {
 	int rval;
+	uint64_t off_in_space;
 	pcitool_reg_t cfg_prg = *prg_p;	/* Make local copy. */
 	dev_info_t *dip = px_p->px_dip;
 
@@ -361,20 +410,29 @@ pxtool_get_bar(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
 	 * Translate BAR number into offset of the BAR in
 	 * the device's config space.
 	 */
-	cfg_prg.offset = PCI_BAR_OFFSET((*prg_p));
-	cfg_prg.phys_addr = prg_p->phys_addr + cfg_prg.offset;
 	cfg_prg.acc_attr =
 	    PCITOOL_ACC_ATTR_SIZE_4 | PCITOOL_ACC_ATTR_ENDN_LTL;
 
-	DBG(DBG_TOOLS, dip, "barnum:%d, phys_addr:0x%" PRIx64 "\n",
-	    cfg_prg.barnum, cfg_prg.phys_addr);
+	/*
+	 * Note: sun4u acc function uses phys_addr which includes offset.
+	 * sun4v acc function doesn't use phys_addr but uses cfg_prg.offset.
+	 */
+	cfg_prg.offset = PCI_BAR_OFFSET((*prg_p));
+	off_in_space = (PX_GET_BDF(prg_p) << PX_PCI_BDF_OFFSET_DELTA) +
+	    cfg_prg.offset;
+	cfg_prg.phys_addr = pxtool_get_phys_addr(px_p, PCI_CONFIG_SPACE,
+	    off_in_space);
+
+	DBG(DBG_TOOLS, dip,
+	    "off_in_space:0x%" PRIx64 ", phys_addr:0x%" PRIx64 ", barnum:%d\n",
+	    off_in_space, cfg_prg.phys_addr, cfg_prg.barnum);
 
 	/*
 	 * Get Bus Address Register (BAR) from config space.
 	 * cfg_prg.offset is the offset into config space of the
 	 * BAR desired.  prg_p->status is modified on error.
 	 */
-	rval = pxtool_pcicfg_access(px_p, &cfg_prg, max_addr, bar_p, PX_ISREAD);
+	rval = pxtool_pcicfg_access(px_p, &cfg_prg, bar_p, PX_ISREAD);
 
 	if (rval != SUCCESS) {
 		prg_p->status = cfg_prg.status;
@@ -416,8 +474,7 @@ pxtool_get_bar(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
 		cfg_prg.phys_addr += sizeof (uint32_t);
 		cfg_prg.offset += sizeof (uint32_t);
 
-		rval = pxtool_pcicfg_access(px_p, &cfg_prg, max_addr, bar_p,
-		    PX_ISREAD);
+		rval = pxtool_pcicfg_access(px_p, &cfg_prg, bar_p, PX_ISREAD);
 		if (rval != SUCCESS) {
 			prg_p->status = cfg_prg.status;
 			return (rval);
@@ -463,15 +520,11 @@ int
 pxtool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 {
 	pcitool_reg_t	prg;
-	uint64_t	base_addr;
-	uint64_t	range_base;
-	uint64_t	range_base_size;
-	uint64_t	max_addr;
 	uint64_t	bar;
 	uint32_t	space;
+	uint64_t	off_in_space;
 	boolean_t	write_flag = B_FALSE;
 	px_t		*px_p = DIP_TO_STATE(dip);
-	px_ranges_t	*rp = px_p->px_ranges_p;
 	int		rval = 0;
 
 	if (cmd == PCITOOL_DEVICE_SET_REG)
@@ -496,58 +549,54 @@ pxtool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 	if ((rval = pxtool_validate_barnum_bdf(&prg)) != SUCCESS)
 		goto done_reg;
 
-	range_base = PX_GET_RANGE_PROP(rp, PCI_CONFIG_SPACE);
-	range_base_size = PX_GET_RANGE_PROP_SIZE(rp, PCI_CONFIG_SPACE);
-
-	base_addr = range_base + (PX_GET_BDF(&prg) << PX_PCI_BDF_OFFSET_DELTA);
-	max_addr = base_addr + DEV_CFG_SPACE_SIZE - 1;
-
-	prg.phys_addr = base_addr;
-
 	if (prg.barnum == 0) {	/* Proper config space desired. */
 
-		/* Access config space and we're done. */
-		prg.phys_addr = base_addr + prg.offset;
+		/* Enforce offset limits. */
+		if (prg.offset >= DEV_CFG_SPACE_SIZE) {
+			DBG(DBG_TOOLS, dip,
+			    "Config space offset 0x%" PRIx64 " out of range\n",
+			    prg.offset);
+			prg.status = PCITOOL_OUT_OF_RANGE;
+			rval = EINVAL;
+			goto done_reg;
+		}
+
+		off_in_space = (PX_GET_BDF(&prg) << PX_PCI_BDF_OFFSET_DELTA) +
+		    (uint32_t)prg.offset;
+
+		/*
+		 * For sun4v, config space base won't be known.
+		 * pxtool_get_phys_addr will return zero.
+		 * Note that for sun4v, phys_addr isn't
+		 * used for making config space accesses.
+		 *
+		 * For sun4u, assume that phys_addr will come back valid.
+		 */
+
+		/* Accessed entity is assumed small enough to be on one page. */
+		prg.phys_addr = pxtool_get_phys_addr(px_p, PCI_CONFIG_SPACE,
+		    off_in_space);
 
 		DBG(DBG_TOOLS, dip,
-		    "config access: base:0x%" PRIx64 ", offset:0x%" PRIx64 ", "
-		    "phys_addr:0x%" PRIx64 ", end:%s\n",
-		    base_addr, prg.offset, prg.phys_addr,
+		    "off_in_space:0x%" PRIx64 ", phys_addr:0x%" PRIx64 ", "
+		    "end:%s\n", off_in_space, prg.phys_addr,
 		    PCITOOL_ACC_IS_BIG_ENDIAN(prg.acc_attr) ? "big":"ltl");
 
 		/*
 		 * Access device.  pr.status is modified.
 		 * BDF is assumed valid at this point.
 		 */
-		rval = pxtool_pcicfg_access(px_p, &prg, max_addr, &prg.data,
-		    write_flag);
+		rval = pxtool_pcicfg_access(px_p, &prg, &prg.data, write_flag);
 		goto done_reg;
 	}
 
 	/* IO/ MEM/ MEM64 space. */
 
-	if ((rval = pxtool_get_bar(px_p, &prg, max_addr, &bar, &space)) !=
-	    SUCCESS)
+	if ((rval = pxtool_get_bar(px_p, &prg, &bar, &space)) != SUCCESS)
 		goto done_reg;
 
-	if (space == PCI_IO_SPACE) {	/* IO space. */
-
-		DBG(DBG_TOOLS, dip, "IO space\n");
-
-		/* Focus on IO space. */
-		range_base = PX_GET_RANGE_PROP(rp, PCI_IO_SPACE);
-		range_base_size = PX_GET_RANGE_PROP_SIZE(rp, PCI_IO_SPACE);
-
-	} else if (space == PCI_MEM64_SPACE) {	/* 64 bit memory space. */
-
-		DBG(DBG_TOOLS, dip,
-		    "64 bit mem space.  64-bit bar is 0x%" PRIx64 "\n", bar);
-
-		/* Set focus to MEM64 range space. */
-		range_base = PX_GET_RANGE_PROP(rp, PCI_MEM64_SPACE);
-		range_base_size = PX_GET_RANGE_PROP_SIZE(rp, PCI_MEM64_SPACE);
-
-	} else {	/* Mem32 space, including ROM */
+	switch (space) {
+	case PCI_MEM32_SPACE:
 
 		DBG(DBG_TOOLS, dip, "32 bit mem space\n");
 
@@ -557,30 +606,38 @@ pxtool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 			rval = EIO;
 			goto done_reg;
 		}
+		break;
 
-		range_base = PX_GET_RANGE_PROP(rp, PCI_MEM32_SPACE);
-		range_base_size = PX_GET_RANGE_PROP_SIZE(rp, PCI_MEM32_SPACE);
+	case PCI_IO_SPACE:
+		DBG(DBG_TOOLS, dip, "IO space\n");
+		break;
+
+	case PCI_MEM64_SPACE:
+		DBG(DBG_TOOLS, dip,
+		    "64 bit mem space.  64-bit bar is 0x%" PRIx64 "\n", bar);
+		break;
+
+	default:
+		DBG(DBG_TOOLS, dip, "Unknown space!\n");
+		prg.status = PCITOOL_IO_ERROR;
+		rval = EIO;
+		goto done_reg;
 	}
 
-	/* Common code for all IO/MEM range spaces. */
-	max_addr = range_base + range_base_size;
-	DBG(DBG_TOOLS, dip, "Range from 0x%" PRIx64 " to 0x%" PRIx64 "\n",
-	    range_base, range_base + range_base_size);
-
-	base_addr = range_base + bar;
-
-	DBG(DBG_TOOLS, dip,
-	    "addr portion of bar is 0x%" PRIx64 ", base=0x%" PRIx64 ", "
-	    "offset:0x%" PRIx64 "\n", bar, base_addr, prg.offset);
-
 	/*
+	 * Common code for all IO/MEM range spaces.
+	 *
 	 * Use offset provided by caller to index into desired space.
 	 * Note that prg.status is modified on error.
 	 */
-	prg.phys_addr = base_addr + prg.offset;
+	off_in_space = bar + prg.offset;
+	prg.phys_addr = pxtool_get_phys_addr(px_p, space, off_in_space);
 
-	rval = pxtool_pciiomem_access(px_p, &prg, max_addr, &prg.data,
-	    write_flag);
+	DBG(DBG_TOOLS, dip,
+	    "addr in bar:0x%" PRIx64 ", offset:0x%" PRIx64 ", "
+	    "phys_addr:0x%" PRIx64 "\n", bar, prg.offset, prg.phys_addr);
+
+	rval = pxtool_pciiomem_access(px_p, &prg, &prg.data, write_flag);
 
 done_reg:
 	if (ddi_copyout(&prg, arg, sizeof (pcitool_reg_t),

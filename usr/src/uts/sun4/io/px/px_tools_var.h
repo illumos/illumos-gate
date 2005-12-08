@@ -53,20 +53,6 @@ extern "C" {
  */
 #define	PX_PCI_BDF_OFFSET_DELTA	4
 
-/*
- * Extract 64 bit parent or size values from 32 bit cells of
- * px_ranges_t property.
- *
- * Only bits 42-32 are relevant in parent_high.
- */
-#define	PX_GET_RANGE_PROP(ranges, bank) \
-	((((uint64_t)(ranges[bank].parent_high & 0x7ff)) << 32) | \
-	ranges[bank].parent_low)
-
-#define	PX_GET_RANGE_PROP_SIZE(ranges, bank) \
-	((((uint64_t)(ranges[bank].size_high)) << 32) | \
-	ranges[bank].size_low)
-
 #define	PCI_BAR_OFFSET(x)	(pci_bars[x.barnum])
 
 #define	PX_ISWRITE		B_TRUE
@@ -83,9 +69,9 @@ extern int pci_num_bars;
 
 extern int pxtool_num_inos;
 
-int pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
+int pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
     uint64_t *data_p, boolean_t is_write);
-int pxtool_pciiomem_access(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
+int pxtool_pciiomem_access(px_t *px_p, pcitool_reg_t *prg_p,
     uint64_t *data_p, boolean_t is_write);
 int pxtool_dev_reg_ops_platchk(dev_info_t *dip, pcitool_reg_t *prg_p);
 

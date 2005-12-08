@@ -33,10 +33,7 @@
 extern "C" {
 #endif
 
-extern int px_phys_peek_4v(size_t size, uint64_t paddr, uint64_t *value,
-    int type);
-extern int px_phys_poke_4v(size_t size, uint64_t paddr, uint64_t *value,
-    int type);
+extern int px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr);
 
 #ifdef	__cplusplus
 }

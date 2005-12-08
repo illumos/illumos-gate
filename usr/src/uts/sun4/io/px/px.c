@@ -461,7 +461,6 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		px_free_props(px_p);
 		mutex_exit(&px_p->px_mutex);
 		mutex_destroy(&px_p->px_mutex);
-		ddi_soft_state_free(px_state_p, instance);
 
 		/* Free the interrupt-priorities prop if we created it. */ {
 			int len;
@@ -474,6 +473,7 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		}
 
 		px_p->px_dev_hdl = NULL;
+		ddi_soft_state_free(px_state_p, instance);
 
 		return (DDI_SUCCESS);
 

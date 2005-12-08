@@ -45,69 +45,38 @@
 
 /*ARGSUSED*/
 int
-px_phys_peek_4v(uint64_t dummy, uint64_t paddr, uint64_t *value, int type)
-{ return (0); }
-
-/*ARGSUSED*/
-int
-px_phys_poke_4v(uint64_t dummy, uint64_t paddr, uint64_t *value, int type)
+px_phys_acc_4v(uint64_t dummy, uint64_t from_addr, uint64_t to_addr)
 { return (0); }
 
 #else /* lint */
 
 #define	SHIFT_REGS	mov %o1,%o0; mov %o2,%o1; mov %o3,%o2; mov %o4,%o3
 
-! px_phys_peek_4v: Do physical address read.
+! px_phys_acc_4v: Do physical address read.
 !
 ! After SHIFT_REGS:
-! %o0 is address to read
-! %o1 is address to save value into
-! %o2 is 0 for little endian, non-zero for big endian
+! %o0 is "from" address
+! %o1 is "to" address
 !
 ! Assumes 8 byte data and that alignment is correct.
 !
 ! Always returns success (0) in %o0
 
-	ENTRY(px_phys_peek_4v)
+	! px_phys_acc_4v must not be split across pages.
+	!
+	! ATTN: Be sure that the alignment value is larger than the size of
+	! the px_phys_acc_4v function.
+	!
+	.align	0x40
+
+	ENTRY(px_phys_acc_4v)
 
 	SHIFT_REGS
-	tst	%o2			! Set up %asi with modifier for
-	movz	%xcc, ASI_IOL, %g1	! Big/little endian physical space
-	movnz	%xcc, ASI_IO, %g1
-	mov	%g1, %asi
-
-	ldxa	[%o0]%asi, %g1
+	ldx	[%o0], %g1
 	stx	%g1, [%o1]
 	membar	#Sync			! Make sure the loads take
 	mov     %g0, %o0
 	done
-	SET_SIZE(px_phys_peek_4v)
-
-
-! px_phys_poke_4v: Do physical address write.
-!
-! After SHIFT_REGS:
-! %o0 is address to write to
-! %o1 is address to read from
-! %o2 is 0 for little endian, non-zero for big endian
-!
-! Assumes 8 byte data and that alignment is correct.
-!
-! Always returns success (0) in %o0
-
-	ENTRY(px_phys_poke_4v)
-
-	SHIFT_REGS
-	tst	%o2
-	movz	%xcc, ASI_IOL, %g1	! Big/little endian physical space
-	movnz	%xcc, ASI_IO, %g1
-	mov	%g1, %asi
-
-	ldx	[%o1], %g1
-	stxa	%g1, [%o0]%asi
-	membar	#Sync
-	mov	%g0, %o0
-	done
-	SET_SIZE(px_phys_poke_4v)
+	SET_SIZE(px_phys_acc_4v)
 
 #endif

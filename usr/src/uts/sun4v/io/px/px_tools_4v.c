@@ -57,62 +57,6 @@ int pxtool_iomem_delay_usec = 25000;
 /* Number of inos per root complex. */
 int pxtool_num_inos = INTERRUPT_MAPPING_ENTRIES;
 
-static int
-pxtool_phys_access(px_t *px_p, uintptr_t dev_addr,
-    uint64_t *data_p, boolean_t is_big_endian, boolean_t is_write)
-{
-	void *func;
-	uint64_t rfunc;
-	uint64_t pfunc;
-	uint64_t rdata_addr;
-	uint64_t pdata_addr;
-	int rval;
-	dev_info_t *dip = px_p->px_dip;
-
-	DBG(DBG_TOOLS, dip,
-	    "pxtool_phys_access: dev_addr:0x%" PRIx64 "\n", dev_addr);
-	DBG(DBG_TOOLS, dip, "    data_addr:0x%" PRIx64 ", is_write:%s\n",
-	    data_p, (is_write ? "yes" : "no"));
-
-	/*LINTED*/
-	func = (is_write) ? (void *)px_phys_poke_4v : (void *)px_phys_peek_4v;
-
-	if ((rfunc = va_to_pa(func))  == (uint64_t)-1) {
-		DBG(DBG_TOOLS, dip, "Error getting real addr for function\n");
-		return (EIO);
-	}
-
-	if ((pfunc = hv_ra2pa(rfunc)) == -1) {
-		DBG(DBG_TOOLS, dip, "Error getting phys addr for function\n");
-		return (EIO);
-	}
-
-	if ((rdata_addr = va_to_pa((void *)data_p))  == (uint64_t)-1) {
-		DBG(DBG_TOOLS, dip, "Error getting real addr for data_p\n");
-		return (EIO);
-	}
-
-	if ((pdata_addr = hv_ra2pa(rdata_addr)) == -1) {
-		DBG(DBG_TOOLS, dip, "Error getting phys addr for data ptr\n");
-		return (EIO);
-	}
-
-	rval = hv_hpriv((void *)pfunc, dev_addr, pdata_addr, is_big_endian);
-	switch (rval) {
-	case H_ENOACCESS:	/* Returned by non-debug hypervisor. */
-		rval = ENOTSUP;
-		break;
-	case H_EOK:
-		rval = SUCCESS;
-		break;
-	default:
-		rval = EIO;
-		break;
-	}
-
-	return (rval);
-}
-
 /* Swap endianness. */
 static uint64_t
 pxtool_swap_endian(uint64_t data, int size)
@@ -136,17 +80,92 @@ pxtool_swap_endian(uint64_t data, int size)
 	return (returned_data.data64);
 }
 
+static int
+pxtool_phys_access(px_t *px_p, uintptr_t dev_addr,
+    uint64_t *data_p, boolean_t is_big_endian, boolean_t is_write)
+{
+	uint64_t rfunc, pfunc;
+	uint64_t rdata_addr, pdata_addr;
+	uint64_t to_addr, from_addr;
+	uint64_t local_data;
+	int rval;
+	dev_info_t *dip = px_p->px_dip;
+
+	DBG(DBG_TOOLS, dip,
+	    "pxtool_phys_access: dev_addr:0x%" PRIx64 "\n", dev_addr);
+	DBG(DBG_TOOLS, dip, "    data_addr:0x%" PRIx64 ", is_write:%s\n",
+	    data_p, (is_write ? "yes" : "no"));
+
+	if ((rfunc = va_to_pa((void *)px_phys_acc_4v))  == (uint64_t)-1) {
+		DBG(DBG_TOOLS, dip, "Error getting real addr for function\n");
+		return (EIO);
+	}
+
+	if ((pfunc = hv_ra2pa(rfunc)) == -1) {
+		DBG(DBG_TOOLS, dip, "Error getting phys addr for function\n");
+		return (EIO);
+	}
+
+	if ((rdata_addr = va_to_pa((void *)&local_data))  == (uint64_t)-1) {
+		DBG(DBG_TOOLS, dip, "Error getting real addr for data_p\n");
+		return (EIO);
+	}
+
+	if ((pdata_addr = hv_ra2pa(rdata_addr)) == -1) {
+		DBG(DBG_TOOLS, dip, "Error getting phys addr for data ptr\n");
+		return (EIO);
+	}
+
+	if (is_write) {
+		to_addr = dev_addr;
+		from_addr = pdata_addr;
+
+		if (is_big_endian)
+			local_data = *data_p;
+		else
+			local_data =
+			    pxtool_swap_endian(*data_p, sizeof (uint64_t));
+	} else {
+		to_addr = pdata_addr;
+		from_addr = dev_addr;
+	}
+
+	rval = hv_hpriv((void *)pfunc, from_addr, to_addr, NULL);
+	switch (rval) {
+	case H_ENOACCESS:	/* Returned by non-debug hypervisor. */
+		rval = ENOTSUP;
+		break;
+	case H_EOK:
+		rval = SUCCESS;
+		break;
+	default:
+		rval = EIO;
+		break;
+	}
+
+	if ((rval == SUCCESS) && (!is_write)) {
+		if (is_big_endian)
+			*data_p = local_data;
+		else
+			*data_p =
+			    pxtool_swap_endian(local_data, sizeof (uint64_t));
+	}
+
+	return (rval);
+}
+
 /*
  * This function is for PCI config space access.
  * It assumes that offset, bdf, acc_attr are valid in prg_p.
- * It assumes that prg_p->phys_addr is the final phys addr (including offset).
  * This function modifies prg_p status and data.
+ *
+ * prg_p->phys_addr isn't used.
  */
 
 /*ARGSUSED*/
 int
 pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
-    uint64_t max_addr, uint64_t *data_p, boolean_t is_write)
+    uint64_t *data_p, boolean_t is_write)
 {
 	pci_cfg_data_t data;
 	on_trap_data_t otd;
@@ -271,7 +290,7 @@ pxtool_pcicfg_access(px_t *px_p, pcitool_reg_t *prg_p,
  * This function modifies prg_p status and data.
  */
 int
-pxtool_pciiomem_access(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
+pxtool_pciiomem_access(px_t *px_p, pcitool_reg_t *prg_p,
     uint64_t *data_p, boolean_t is_write)
 {
 	on_trap_data_t otd;
@@ -285,14 +304,6 @@ pxtool_pciiomem_access(px_t *px_p, pcitool_reg_t *prg_p, uint64_t max_addr,
 	if (!IS_P2ALIGNED(prg_p->offset, size)) {
 		DBG(DBG_TOOLS, dip, "not aligned.\n");
 		prg_p->status = PCITOOL_NOT_ALIGNED;
-		return (EINVAL);
-	}
-
-	/* Upper bounds checking. */
-	if (prg_p->phys_addr > max_addr) {
-		DBG(DBG_TOOLS, dip, "Phys addr 0x%" PRIx64 " out of "
-		    "range (max 0x%" PRIx64 ").\n", prg_p->phys_addr, max_addr);
-		prg_p->status = PCITOOL_INVALID_ADDRESS;
 		return (EINVAL);
 	}
 
