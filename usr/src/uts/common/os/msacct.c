@@ -150,6 +150,18 @@ term_cpu_mstate(struct cpu *cpu)
 	cpu->cpu_mstate_start = 0;
 }
 
+/* NEW_CPU_MSTATE comments inline in new_cpu_mstate below. */
+
+#define	NEW_CPU_MSTATE(state)						\
+	gen = cpu->cpu_mstate_gen;					\
+	cpu->cpu_mstate_gen = 0;					\
+	/* Need membar_producer() here if stores not ordered / TSO */	\
+	cpu->cpu_acct[cpu->cpu_mstate] += curtime - cpu->cpu_mstate_start; \
+	cpu->cpu_mstate = state;					\
+	cpu->cpu_mstate_start = curtime;				\
+	/* Need membar_producer() here if stores not ordered / TSO */	\
+	cpu->cpu_mstate_gen = (++gen == 0) ? 1 : gen;
+
 void
 new_cpu_mstate(int cmstate, hrtime_t curtime)
 {
@@ -196,18 +208,32 @@ new_cpu_mstate(int cmstate, hrtime_t curtime)
 	 * counter both before and after reading all state. The
 	 * important point is that the reader is not a
 	 * performance-critical path, but this function is.
+	 *
+	 * The ordering of writes is critical. cpu_mstate_gen must
+	 * be visibly zero on all CPUs before we change cpu_mstate
+	 * and cpu_mstate_start. Additionally, cpu_mstate_gen must
+	 * not be restored to oldgen+1 until after all of the other
+	 * writes have become visible.
+	 *
+	 * Normally one puts membar_producer() calls to accomplish
+	 * this. Unfortunately this routine is extremely performance
+	 * critical (esp. in syscall_mstate below) and we cannot
+	 * afford the additional time, particularly on some x86
+	 * architectures with extremely slow sfence calls. On a
+	 * CPU which guarantees write ordering (including sparc, x86,
+	 * and amd64) this is not a problem. The compiler could still
+	 * reorder the writes, so we make the four cpu fields
+	 * volatile to prevent this.
+	 *
+	 * TSO warning: should we port to a non-TSO (or equivalent)
+	 * CPU, this will break.
+	 *
+	 * The reader stills needs the membar_consumer() calls because,
+	 * although the volatiles prevent the compiler from reordering
+	 * loads, the CPU can still do so.
 	 */
 
-	gen = cpu->cpu_mstate_gen;
-	cpu->cpu_mstate_gen = 0;
-
-	membar_producer();
-	cpu->cpu_acct[cpu->cpu_mstate] += curtime - cpu->cpu_mstate_start;
-	cpu->cpu_mstate = cmstate;
-	cpu->cpu_mstate_start = curtime;
-	membar_producer();
-
-	cpu->cpu_mstate_gen = (++gen == 0) ? 1 : gen;
+	NEW_CPU_MSTATE(cmstate);
 }
 
 /*
@@ -254,6 +280,7 @@ mstate_aggr_state(proc_t *p, int a_state)
 	return (aggr_time);
 }
 
+
 void
 syscall_mstate(int fromms, int toms)
 {
@@ -263,6 +290,8 @@ syscall_mstate(int fromms, int toms)
 	hrtime_t curtime;
 	klwp_t *lwp;
 	hrtime_t newtime;
+	cpu_t *cpu;
+	uint16_t gen;
 
 	if ((lwp = ttolwp(t)) == NULL)
 		return;
@@ -283,13 +312,17 @@ syscall_mstate(int fromms, int toms)
 	ms->ms_state_start = curtime;
 	ms->ms_prev = fromms;
 	kpreempt_disable(); /* don't change CPU while changing CPU's state */
-	ASSERT(CPU == t->t_cpu);
-	if ((toms != LMS_USER) && (t->t_cpu->cpu_mstate != CMS_SYSTEM))
-		new_cpu_mstate(CMS_SYSTEM, curtime);
-	else if ((toms == LMS_USER) && (t->t_cpu->cpu_mstate != CMS_USER))
-		new_cpu_mstate(CMS_USER, curtime);
+	cpu = CPU;
+	ASSERT(cpu == t->t_cpu);
+	if ((toms != LMS_USER) && (cpu->cpu_mstate != CMS_SYSTEM)) {
+		NEW_CPU_MSTATE(CMS_SYSTEM);
+	} else if ((toms == LMS_USER) && (cpu->cpu_mstate != CMS_USER)) {
+		NEW_CPU_MSTATE(CMS_USER);
+	}
 	kpreempt_enable();
 }
+
+#undef NEW_CPU_MSTATE
 
 /*
  * The following is for computing the percentage of cpu time used recently
