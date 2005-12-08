@@ -96,7 +96,8 @@ LINTSEC	=	$(LPLIB)/secure/llib-llpsec.ln
 LINTSYS	=	$(LPLIB)/systems/llib-llpsys.ln
 LINTUSR	=	$(LPLIB)/users/llib-llpusr.ln
 
-$(__GNUC)CFLAGS += -_gcc=-Wno-sequence-points
+$(__GNUC)CFLAGS += -_gcc=-fwritable-strings -_gcc=-Wno-sequence-points
+$(__GNUC)CFLAGS64 += -_gcc=-fwritable-strings -_gcc=-Wno-sequence-points
 
 all:=           TARGET= all
 install:=       TARGET= install

@@ -31,8 +31,6 @@
 include		../../Makefile.lp
 
 CPPFLAGS =	-D_REENTRANT -I. -I$(LPINC) $(CPPFLAGS.master)
-CFLAGS +=	-_gcc=-fwritable-strings
-CFLAGS64 +=	-_gcc=-fwritable-strings
 
 SRCS=		chkopts.c	\
 		default.c	\
