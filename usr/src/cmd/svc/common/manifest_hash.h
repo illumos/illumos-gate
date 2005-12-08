@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -37,7 +36,8 @@
 extern "C" {
 #endif
 
-#define	MHASH_SIZE	MD5_DIGEST_LENGTH
+#define	MHASH_SIZE	(MD5_DIGEST_LENGTH * 2)
+#define	MHASH_SIZE_OLD	MD5_DIGEST_LENGTH
 #define	MHASH_SVC	"smf/manifest"
 #define	MHASH_PG_TYPE	"framework"
 #define	MHASH_PG_FLAGS	0

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -32,6 +31,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <libintl.h>
 #include <libscf.h>
 #include <libuutil.h>
@@ -42,6 +42,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
 
 #include <manifest_hash.h>
 
@@ -156,7 +157,14 @@ mhash_retrieve_entry(scf_handle_t *hndl, const char *name, uchar_t *hash)
 		goto out;
 	}
 
-	if (szret != MHASH_SIZE) {
+	/*
+	 * Make sure that the old hash is returned with
+	 * remainder of the bytes zeroed.
+	 */
+	if (szret == MHASH_SIZE_OLD) {
+		(void) memset(hash + MHASH_SIZE_OLD, 0,
+		    MHASH_SIZE - MHASH_SIZE_OLD);
+	} else if (szret != MHASH_SIZE) {
 		scf_value_destroy(val);
 		result = -1;
 		goto out;
@@ -390,6 +398,43 @@ out:
 }
 
 /*
+ * Generate the md5 hash of a file; manifest files are smallish
+ * so we can read them in one gulp.
+ */
+static int
+md5_hash_file(const char *file, off64_t sz, uchar_t *hash)
+{
+	char *buf;
+	int fd;
+	ssize_t res;
+	int ret;
+
+	fd = open(file, O_RDONLY);
+	if (fd < 0)
+		return (-1);
+
+	buf = malloc(sz);
+	if (buf == NULL) {
+		(void) close(fd);
+		return (-1);
+	}
+
+	res = read(fd, buf, (size_t)sz);
+
+	(void) close(fd);
+
+	if (res == sz) {
+		ret = 0;
+		md5_calc(hash, (uchar_t *)buf, (unsigned int) sz);
+	} else {
+		ret = -1;
+	}
+
+	free(buf);
+	return (ret);
+}
+
+/*
  * int mhash_test_file(scf_handle_t *, const char *, uint_t, char **, uchar_t *)
  *   Test the given filename against the hashed metadata in the repository.
  *   The behaviours for import and apply are slightly different.  For imports,
@@ -424,9 +469,25 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 	 * the effective "v2" hash, such that updates result in the more
 	 * portable hash being used.
 	 *
-	 * If neither calculated digest matches the stored value, we consider
-	 * the test to have failed, implying that some aspect of the manifest
-	 * has changed.
+	 * An unwanted side effect of a hash based solely on the file
+	 * meta data is the fact that we pay no attention to the contents
+	 * which may remain the same despite meta data changes.  This happens
+	 * with (live) upgrades.  We extend the V2 hash with an additional
+	 * digest of the file contents and the code retrieving the hash
+	 * from the repository zero fills the remainder so we can detect
+	 * it is missing.
+	 *
+	 * If the the V2 digest matches, we check for the presence of
+	 * the contents digest and compute and store it if missing.
+	 *
+	 * If the V2 digest doesn't match but we also have a non-zero
+	 * file hash, we match the file content digest.  If it matches,
+	 * we compute and store the new complete hash so that later
+	 * checks will find the meta data digest correct.
+	 *
+	 * If the above matches fail and the V1 hash doesn't match either,
+	 * we consider the test to have failed, implying that some aspect
+	 * of the manifest has changed.
 	 */
 
 	cp = getenv("SVCCFG_CHECKHASH");
@@ -449,6 +510,7 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 		return (-1);
 	}
 
+	(void) memset(hash, 0, MHASH_SIZE);
 	md5_calc(hash, (uchar_t *)data, strlen(data));
 
 	uu_free(data);
@@ -461,29 +523,73 @@ mhash_test_file(scf_handle_t *hndl, const char *file, uint_t is_profile,
 		uchar_t hash_v1[MHASH_SIZE];
 
 		if (is_profile) {
+			uu_free(pname);
 			return (1);
 		}
 
 		/*
 		 * Manifest import.
 		 */
-		if (memcmp(hash, stored_hash, MHASH_SIZE) == 0)
+		if (memcmp(hash, stored_hash, MD5_DIGEST_LENGTH) == 0) {
+			int i;
+
+			/*
+			 * If there's no recorded file hash, record it.
+			 */
+			for (i = 0; i < MD5_DIGEST_LENGTH; i++) {
+				if (stored_hash[MD5_DIGEST_LENGTH+i] != 0)
+					break;
+			}
+			if (i == MD5_DIGEST_LENGTH) {
+				if (md5_hash_file(file, st.st_size,
+				    &hash[MHASH_SIZE_OLD]) == 0) {
+				    (void) mhash_store_entry(hndl, pname, hash,
+					NULL);
+				}
+			} else {
+				/* Always return hash with MD5 content hash */
+				(void) memcpy(hash, stored_hash, MHASH_SIZE);
+			}
+			uu_free(pname);
 			return (1);
+		}
+
+		/*
+		 * The remainder of our hash is all 0; if the returned hash
+		 * is not, it's a V2 hash + file checksum; so we're going
+		 * to hash the file and then compare the checksum again.
+		 */
+		if (memcmp(&hash[MHASH_SIZE_OLD], &stored_hash[MHASH_SIZE_OLD],
+			MD5_DIGEST_LENGTH) != 0 &&
+		    md5_hash_file(file, st.st_size,
+			&hash[MHASH_SIZE_OLD]) == 0 &&
+		    memcmp(&hash[MHASH_SIZE_OLD], &stored_hash[MHASH_SIZE_OLD],
+			MD5_DIGEST_LENGTH) == 0) {
+
+			/* Be kind and update the entry */
+			(void) mhash_store_entry(hndl, pname, hash, NULL);
+			uu_free(pname);
+			return (1);
+		}
 
 		/*
 		 * No match on V2 hash; compare V1 hash.
 		 */
 		data = uu_msprintf(MHASH_FORMAT_V1, st.st_ino, st.st_uid,
 		    st.st_size, st.st_mtime);
-		if (data == NULL)
+		if (data == NULL) {
+			uu_free(pname);
 			return (-1);
+		}
 
 		md5_calc(hash_v1, (uchar_t *)data, strlen(data));
 
 		uu_free(data);
 
-		if (memcmp(hash_v1, stored_hash, MHASH_SIZE) == 0)
+		if (memcmp(hash_v1, stored_hash, MD5_DIGEST_LENGTH) == 0) {
+			uu_free(pname);
 			return (1);
+		}
 	}
 
 	*pnamep = pname;
