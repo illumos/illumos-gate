@@ -257,70 +257,67 @@ px_lib_intr_reset(dev_info_t *dip)
 /*ARGSUSED*/
 int
 px_lib_iommu_map(dev_info_t *dip, tsbid_t tsbid, pages_t pages,
-    io_attributes_t io_attributes, void *addr, size_t pfn_index,
+    io_attributes_t io_attr, void *addr, size_t pfn_index,
     int flag)
 {
-	pages_t		pgs_mapped = 0, pgs_cnt = 0;
-	pages_t		pgs = pages;
 	tsbnum_t	tsb_num = PCI_TSBID_TO_TSBNUM(tsbid);
-	tsbindex_t	tsbindex = PCI_TSBID_TO_TSBINDEX(tsbid);
-	io_page_list_t	*io_page_list_p, *ptr;
+	tsbindex_t	tsb_index = PCI_TSBID_TO_TSBINDEX(tsbid);
+	io_page_list_t	*pfns, *pfn_p;
+	pages_t		ttes_mapped = 0;
 	int		i, err = DDI_SUCCESS;
-	uint64_t	ret;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_map: dip 0x%p tsbid 0x%llx "
 	    "pages 0x%x atrr 0x%x addr 0x%p pfn_index 0x%llx, flag 0x%x\n",
-	    dip, tsbid, pages, io_attributes, addr, pfn_index, flag);
+	    dip, tsbid, pages, io_attr, addr, pfn_index, flag);
 
-	if ((ptr = kmem_zalloc((pages * sizeof (io_page_list_t)),
+	if ((pfns = pfn_p = kmem_zalloc((pages * sizeof (io_page_list_t)),
 	    KM_NOSLEEP)) == NULL) {
 		DBG(DBG_LIB_DMA, dip, "px_lib_iommu_map: kmem_zalloc failed\n");
 		return (DDI_FAILURE);
 	}
 
-	io_page_list_p = (io_page_list_t *)ptr;
+	for (i = 0; i < pages; i++)
+		pfns[i] = MMU_PTOB(PX_ADDR2PFN(addr, pfn_index, flag, i));
 
-	if (flag == MMU_MAP_MP) {
-		ddi_dma_impl_t	*mp = (ddi_dma_impl_t *)addr;
+	while ((ttes_mapped = pfn_p - pfns) < pages) {
+		uintptr_t	ra = va_to_pa(pfn_p);
+		pages_t		ttes2map;
+		uint64_t	ret;
 
-		for (i = 0; i < pages; i++, pfn_index++) {
-			px_iopfn_t pfn = PX_GET_MP_PFN(mp, pfn_index);
-			io_page_list_p[i] = MMU_PTOB(pfn);
-		}
-	} else {
-		caddr_t	a = (caddr_t)addr;
+		ttes2map = (MMU_PAGE_SIZE - P2PHASE(ra, MMU_PAGE_SIZE)) >> 3;
+		ra = MMU_PTOB(MMU_BTOP(ra));
 
-		for (i = 0; i < pages; i++, a += MMU_PAGE_SIZE) {
-			px_iopfn_t pfn = hat_getpfnum(kas.a_hat, a);
-			io_page_list_p[i] = MMU_PTOB(pfn);
+		for (ttes2map = MIN(ttes2map, pages - ttes_mapped); ttes2map;
+		    ttes2map -= ttes_mapped, pfn_p += ttes_mapped) {
+
+			ttes_mapped = 0;
+			if ((ret = hvio_iommu_map(DIP_TO_HANDLE(dip),
+			    PCI_TSBID(tsb_num, tsb_index + (pfn_p - pfns)),
+			    ttes2map, io_attr, (io_page_list_t *)(ra |
+			    ((uintptr_t)pfn_p & MMU_PAGE_OFFSET)),
+			    &ttes_mapped)) != H_EOK) {
+				DBG(DBG_LIB_DMA, dip, "hvio_iommu_map failed "
+				    "ret 0x%lx\n", ret);
+
+				ttes_mapped = pfn_p - pfns;
+				err = DDI_FAILURE;
+				goto cleanup;
+			}
+
+			DBG(DBG_LIB_DMA, dip, "px_lib_iommu_map: tsb_num 0x%x "
+			    "tsb_index 0x%lx ttes_to_map 0x%lx attr 0x%x "
+			    "ra 0x%p ttes_mapped 0x%x\n", tsb_num,
+			    tsb_index + (pfn_p - pfns), ttes2map, io_attr,
+			    ra | ((uintptr_t)pfn_p & MMU_PAGE_OFFSET),
+			    ttes_mapped);
 		}
 	}
 
-	io_page_list_p = (io_page_list_t *)va_to_pa(ptr);
-	pgs_mapped = 0;
+cleanup:
+	if ((err == DDI_FAILURE) && ttes_mapped)
+		(void) px_lib_iommu_demap(dip, tsbid, ttes_mapped);
 
-	while (pgs) {
-		if ((ret = hvio_iommu_map(DIP_TO_HANDLE(dip),
-		    PCI_TSBID(tsb_num, tsbindex), pgs, io_attributes,
-		    io_page_list_p, &pgs_cnt)) != H_EOK) {
-			DBG(DBG_LIB_DMA, dip,
-			    "hvio_iommu_map failed, ret 0x%lx\n", ret);
-			err = DDI_FAILURE;
-			break;
-		}
-
-		pgs_mapped += pgs_cnt;
-		pgs -= pgs_cnt;
-		tsbindex += pgs_cnt;
-		io_page_list_p += pgs_cnt;
-		pgs_cnt = 0;
-	}
-
-	if ((err == DDI_FAILURE) && (pgs_mapped))
-		(void) px_lib_iommu_demap(dip, tsbid, pgs_mapped);
-
-	kmem_free(ptr, (pages * sizeof (io_page_list_t)));
-
+	kmem_free(pfns, pages * sizeof (io_page_list_t));
 	return (err);
 }
 
@@ -329,25 +326,27 @@ int
 px_lib_iommu_demap(dev_info_t *dip, tsbid_t tsbid, pages_t pages)
 {
 	tsbnum_t	tsb_num = PCI_TSBID_TO_TSBNUM(tsbid);
-	tsbindex_t	tsbindex = PCI_TSBID_TO_TSBINDEX(tsbid);
-	pages_t		pgs_cnt = 0;
+	tsbindex_t	tsb_index = PCI_TSBID_TO_TSBINDEX(tsbid);
+	pages_t		ttes2demap, ttes_demapped = 0;
 	uint64_t	ret;
 
 	DBG(DBG_LIB_DMA, dip, "px_lib_iommu_demap: dip 0x%p tsbid 0x%llx "
 	    "pages 0x%x\n", dip, tsbid, pages);
 
-	while (pages) {
+	for (ttes2demap = pages; ttes2demap;
+	    ttes2demap -= ttes_demapped, tsb_index += ttes_demapped) {
 		if ((ret = hvio_iommu_demap(DIP_TO_HANDLE(dip),
-		    PCI_TSBID(tsb_num, tsbindex), pages,
-		    &pgs_cnt)) != H_EOK) {
-			DBG(DBG_LIB_DMA, dip,
-			    "hvio_iommu_demap failed, ret 0x%lx\n", ret);
+		    PCI_TSBID(tsb_num, tsb_index), ttes2demap,
+		    &ttes_demapped)) != H_EOK) {
+			DBG(DBG_LIB_DMA, dip, "hvio_iommu_demap failed, "
+			    "ret 0x%lx\n", ret);
+
 			return (DDI_FAILURE);
 		}
 
-		pages -= pgs_cnt;
-		tsbindex += pgs_cnt;
-		pgs_cnt = 0;
+		DBG(DBG_LIB_DMA, dip, "px_lib_iommu_demap: tsb_num 0x%x "
+		    "tsb_index 0x%lx ttes_to_demap 0x%lx ttes_demapped 0x%x\n",
+		    tsb_num, tsb_index, ttes2demap, ttes_demapped);
 	}
 
 	return (DDI_SUCCESS);

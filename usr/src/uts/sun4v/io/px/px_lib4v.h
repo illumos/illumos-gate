@@ -48,6 +48,11 @@ extern "C" {
 /* PX BDF Shift in a Phyiscal Address - used FMA Fabric only */
 #define	PX_RA_BDF_SHIFT			8
 
+#define	PX_ADDR2PFN(addr, index, flag, i) \
+	((flag == MMU_MAP_MP) ? \
+	PX_GET_MP_PFN((ddi_dma_impl_t *)(addr), (index + i)) : \
+	hat_getpfnum(kas.a_hat, ((caddr_t)addr + (MMU_PAGE_SIZE * i))))
+
 extern uint64_t hvio_config_get(devhandle_t dev_hdl, pci_device_t bdf,
     pci_config_offset_t off, pci_config_size_t size, pci_cfg_data_t *data_p);
 extern uint64_t hvio_config_put(devhandle_t dev_hdl, pci_device_t bdf,
