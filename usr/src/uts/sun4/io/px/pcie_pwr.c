@@ -262,7 +262,7 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 	int new_level;
 	int old_level;
 	int rv = DDI_SUCCESS;
-	int level_allowed;
+	int level_allowed, comp;
 
 	switch (op) {
 	case BUS_POWER_PRE_NOTIFICATION:
@@ -271,6 +271,7 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		cdip = bpc->bpc_dip;
 		new_level = bpc->bpc_nlevel;
 		old_level = bpc->bpc_olevel;
+		comp = bpc->bpc_comp;
 		break;
 
 	case BUS_POWER_HAS_CHANGED:
@@ -278,6 +279,7 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		cdip = bphc->bphc_dip;
 		new_level = bphc->bphc_nlevel;
 		old_level = bphc->bphc_olevel;
+		comp = bphc->bphc_comp;
 		break;
 
 	default:
@@ -306,7 +308,7 @@ pcie_bus_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 				    "busy to disable pm \n");
 				(void) pm_busy_component(cdip, 0);
 			}
-			if (new_level < PM_LEVEL_D0) {
+			if (new_level < PM_LEVEL_D0 && !comp) {
 				DBG(DBG_PWR, dip, "bus_power: rejecting "
 				    "child's attempt to go to %d\n", new_level);
 				rv = DDI_FAILURE;
