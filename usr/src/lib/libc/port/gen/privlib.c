@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -229,14 +228,16 @@ __priv_free_info(priv_data_t *d)
 }
 
 /*
- * Return with the pd_lock held and data loaded
+ * Return with the pd_lock held and data loaded or indicate failure.
  */
-void
+int
 lock_data(void)
 {
-	if (privdata == NULL)
-		(void) __priv_getdata();
+	if (privdata == NULL && __priv_getdata() == NULL)
+		return (-1);
+
 	lmutex_lock(&pd_lock);
+	return (0);
 }
 
 boolean_t
@@ -717,10 +718,17 @@ __priv_relinquish(void)
 int
 __priv_getbyname(const priv_data_t *d, const char *name)
 {
-	char *const *list = d->pd_privnames;
-	const int *order = d->pd_setsort;
+	char *const *list;
+	const int *order;
 	int lo = 0;
-	int hi = d->pd_nprivs - 1;
+	int hi;
+
+	if (d == NULL)
+		return (-1);
+
+	list = d->pd_privnames;
+	order = d->pd_setsort;
+	hi = d->pd_nprivs - 1;
 
 	if (strncasecmp(name, "priv_", 5) == 0)
 		name += 5;
@@ -785,6 +793,8 @@ priv_bynum(int i, int n, char **list)
 const char *
 __priv_getbynum(const priv_data_t *d, int num)
 {
+	if (d == NULL)
+		return (NULL);
 	return (priv_bynum(num, d->pd_nprivs, d->pd_privnames));
 }
 
@@ -797,6 +807,8 @@ priv_getbynum(int num)
 const char *
 __priv_getsetbynum(const priv_data_t *d, int num)
 {
+	if (d == NULL)
+		return (NULL);
 	return (priv_bynum(num, d->pd_nsets, d->pd_setnames));
 }
 
@@ -817,6 +829,9 @@ priv_getsetbynum(int num)
 static priv_set_t *
 __priv_allocset(priv_data_t *d)
 {
+	if (d == NULL)
+		return (NULL);
+
 	return (libc_malloc(d->pd_setsize));
 }
 

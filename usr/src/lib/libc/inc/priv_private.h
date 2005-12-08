@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,13 +43,15 @@ extern "C" {
 #define	LOADPRIVDATA(d)		if ((d = privdata) == NULL) d = __priv_getdata()
 #define	GETPRIVDATA()		(privdata == NULL ? __priv_getdata() : privdata)
 #define	LOCKPRIVDATA()		{ \
-					lock_data(); \
+					/* Data already allocated */ \
+					(void) lock_data(); \
 					(void) refresh_data(); \
 				}
 #define	UNLOCKPRIVDATA()	unlock_data()
 #define	WITHPRIVLOCKED(t, b, x)	{ \
 					t __result; \
-					lock_data(); \
+					if (lock_data() != 0) \
+						return (b); \
 					__result = (x); \
 					if (__result == (b) && refresh_data()) \
 						__result = (x); \
@@ -99,7 +100,7 @@ extern priv_data_t *__priv_parse_info(priv_impl_info_t *);
 extern void __priv_free_info(priv_data_t *);
 extern priv_data_t *privdata;
 
-extern void lock_data(void);
+extern int lock_data(void);
 extern boolean_t refresh_data(void);
 extern void unlock_data(void);
 
