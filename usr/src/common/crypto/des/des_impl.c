@@ -741,10 +741,10 @@ des3_keycheck(uint8_t *key, uint8_t *corrected_key)
 
 	/*
 	 * Perform key equivalence checks, now that parity is properly set.
-	 * All three keys must be unique.
+	 * 1st and 2nd keys must be unique, the 3rd key can be the same as
+	 * the 1st key for the 2 key varient of 3DES.
 	 */
-	if (currentkey[0] == currentkey[1] || currentkey[1] == currentkey[2] ||
-	    currentkey[2] == currentkey[0])
+	if (currentkey[0] == currentkey[1] || currentkey[1] == currentkey[2])
 		return (B_FALSE);
 
 	if (corrected_key != NULL) {
