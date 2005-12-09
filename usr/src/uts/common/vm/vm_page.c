@@ -2968,7 +2968,8 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 	uint_t		pcf_index;
 	struct cpu	*cpup;
 	uint_t		i;
-	pgcnt_t		npgs, need, collected;
+	pgcnt_t		npgs, need;
+	pgcnt_t		collected = 0;
 
 	ASSERT(lock != NULL ? MUTEX_HELD(lock) : 1);
 	ASSERT(PAGE_EXCL(pp) && PP_ISFREE(pp));
@@ -3003,7 +3004,6 @@ page_reclaim(page_t *pp, kmutex_t *lock)
 		goto page_reclaim_nomem;
 	}
 
-	collected = 0;
 	pcf_index = PCF_INDEX();
 	p = &pcf[pcf_index];
 	p->pcf_touch = 1;
