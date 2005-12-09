@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -704,8 +703,8 @@ static uint32_t	random_max_ncpus = 0;
 /*
  * Boot-time tunables, for experimentation.
  */
-size_t	rndmag_threshold = 64;
-size_t	rndbuf_len = 1280;
+size_t	rndmag_threshold = 2560;
+size_t	rndbuf_len = 5120;
 size_t	rndmag_size = 1280;
 
 
