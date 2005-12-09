@@ -3061,6 +3061,7 @@ nfs_free_mi(mntinfo_t *mi)
 		kmem_free(mi->mi_klmconfig, sizeof (struct knetconfig));
 	}
 	mutex_destroy(&mi->mi_lock);
+	mutex_destroy(&mi->mi_remap_lock);
 	mutex_destroy(&mi->mi_async_lock);
 	cv_destroy(&mi->mi_failover_cv);
 	cv_destroy(&mi->mi_async_work_cv);

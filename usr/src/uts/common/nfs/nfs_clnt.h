@@ -387,6 +387,12 @@ typedef struct mntinfo {
 	 */
 	struct zone	*mi_zone;	/* Zone mounted in */
 	list_node_t	mi_zone_node;	/* Linkage into per-zone mi list */
+	/*
+	 * Serializes threads in failover_remap.
+	 * Need to acquire this lock first in failover_remap() function
+	 * before acquiring any other rnode lock.
+	 */
+	kmutex_t	mi_remap_lock;
 } mntinfo_t;
 
 /*

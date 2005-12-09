@@ -4487,6 +4487,19 @@ failover_remap(failinfo_t *fi)
 		 * copied to the original vnode/rnode.
 		 */
 		nrp = VTOR(nvp);
+		mutex_enter(&mi->mi_remap_lock);
+		/*
+		 * Some other thread could have raced in here and could
+		 * have done the remap for this particular rnode before
+		 * this thread here. Check for rp->r_server and
+		 * mi->mi_curr_serv and return if they are same.
+		 */
+		if (VALID_FH(fi)) {
+			mutex_exit(&mi->mi_remap_lock);
+			VN_RELE(nvp);
+			return (0);
+		}
+
 		if (nrp->r_flags & RHASHED)
 			rp_rmhash(nrp);
 
@@ -4496,6 +4509,7 @@ failover_remap(failinfo_t *fi)
 		 * that we remember from the old version.
 		 */
 		if (rp->r_size != nrp->r_size || vp->v_type != nvp->v_type) {
+			mutex_exit(&mi->mi_remap_lock);
 			zcmn_err(mi->mi_zone->zone_id, CE_WARN,
 			    "NFS replicas %s and %s: file %s not same.",
 			    rp->r_server->sv_hostname,
@@ -4513,8 +4527,7 @@ failover_remap(failinfo_t *fi)
 			rp_rmhash(rp);
 		rp->r_server = mi->mi_curr_serv;
 		rp->r_fh = nrp->r_fh;
-		index = rtablehash(&rp->r_fh);
-		rp->r_hashq = &rtable[index];
+		rp->r_hashq = nrp->r_hashq;
 		/*
 		 * Copy the attributes from the new rnode to the old
 		 * rnode.  This will help to reduce unnecessary page
@@ -4528,6 +4541,7 @@ failover_remap(failinfo_t *fi)
 		rw_enter(&rp->r_hashq->r_lock, RW_WRITER);
 		rp_addhash(rp);
 		rw_exit(&rp->r_hashq->r_lock);
+		mutex_exit(&mi->mi_remap_lock);
 		VN_RELE(nvp);
 	}
 

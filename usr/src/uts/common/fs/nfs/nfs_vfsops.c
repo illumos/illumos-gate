@@ -864,6 +864,7 @@ nfsrootvp(vnode_t **rtvpp, vfs_t *vfsp, struct servinfo *svp,
 	 */
 	mi = kmem_zalloc(sizeof (*mi), KM_SLEEP);
 	mutex_init(&mi->mi_lock, NULL, MUTEX_DEFAULT, NULL);
+	mutex_init(&mi->mi_remap_lock, NULL, MUTEX_DEFAULT, NULL);
 	mi->mi_flags = MI_ACL | MI_EXTATTR;
 	if (!(flags & NFSMNT_SOFT))
 		mi->mi_flags |= MI_HARD;
