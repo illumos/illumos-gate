@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1991-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,8 +44,7 @@ int	read_label(int fd, struct dk_label *label);
 int	read_efi_label(int fd, struct efi_info *label);
 int	get_disk_info(int fd, struct efi_info *label);
 int	label_to_vtoc(struct vtoc *vtoc, struct dk_label *label);
-int	SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc,
-			struct vtoc *old_vtoc);
+int	SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc);
 void	err_check(struct dk_gpt *vtoc);
 extern int	is_efi_type(int fd);
 

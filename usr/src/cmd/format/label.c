@@ -215,7 +215,7 @@ do_geometry_sanity_check()
  * to convert a SMI label to an EFI lable
  */
 int
-SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc, struct vtoc *old_vtoc)
+SMI_vtoc_to_EFI(int fd, struct dk_gpt **new_vtoc)
 {
 	int i;
 	struct dk_gpt	*efi;

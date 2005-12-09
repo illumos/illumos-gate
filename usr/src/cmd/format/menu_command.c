@@ -1529,7 +1529,7 @@ c_label()
 		if (label_to_vtoc(&vtoc, &label) == -1) {
 		    return (-1);
 		}
-		if (SMI_vtoc_to_EFI(cur_file, &vtoc64, &vtoc) == -1) {
+		if (SMI_vtoc_to_EFI(cur_file, &vtoc64) == -1) {
 		    return (-1);
 		}
 		if (efi_write(cur_file, vtoc64) != 0) {
