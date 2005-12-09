@@ -315,6 +315,8 @@ superfluous_local_zone_files="
 	etc/zones
 	kernel
 	lib/svc/method/svc-intrd
+	lib/svc/method/svc-poold
+	lib/svc/method/svc-pools
 	lib/svc/method/svc-scheduler
 	var/adm/pool
 	var/fm
@@ -332,6 +334,8 @@ superfluous_local_zone_files="
 	var/svc/manifest/system/mdmonitor.xml
 	var/svc/manifest/system/metainit.xml
 	var/svc/manifest/system/picl.xml
+	var/svc/manifest/system/poold.xml
+	var/svc/manifest/system/pools.xml
 	var/svc/manifest/system/power.xml
 	var/svc/manifest/system/scheduler.xml
 	var/svc/manifest/system/sysevent.xml
