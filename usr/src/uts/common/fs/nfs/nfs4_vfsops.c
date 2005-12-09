@@ -1465,6 +1465,8 @@ nfs4_remap_root(mntinfo4_t *mi, nfs4_error_t *ep, int flags)
 	int orig_sv_pathlen, num_retry;
 
 	mutex_enter(&mi->mi_lock);
+
+remap_retry:
 	svp = mi->mi_curr_serv;
 	getfh_flags =
 		(flags & NFS4_REMAP_NEEDSOP) ? NFS4_GETFH_NEEDSOP : 0;
@@ -1518,7 +1520,6 @@ nfs4_remap_root(mntinfo4_t *mi, nfs4_error_t *ep, int flags)
 			kmem_free(svp->sv_path, svp->sv_pathlen);
 			svp->sv_path = kmem_alloc(orig_sv_pathlen, KM_SLEEP);
 			svp->sv_pathlen = orig_sv_pathlen;
-
 		}
 		bcopy(orig_sv_path, svp->sv_path, orig_sv_pathlen);
 		nfs_rw_exit(&svp->sv_lock);
@@ -1544,15 +1545,17 @@ nfs4_remap_root(mntinfo4_t *mi, nfs4_error_t *ep, int flags)
 	nfs_rw_exit(&svp->sv_lock);
 	sfh4_update(mi->mi_rootfh, &rootfh);
 
-#ifdef DEBUG
 	/*
-	 * There shouldn't have been any other recovery activity on the
-	 * filesystem.
+	 * It's possible that recovery took place on the filesystem
+	 * and the server has been updated between the time we did
+	 * the nfs4getfh_otw and now. Re-drive the otw operation
+	 * to make sure we have a good fh.
 	 */
 	mutex_enter(&mi->mi_lock);
-	ASSERT(mi->mi_curr_serv == svp);
+	if (mi->mi_curr_serv != svp)
+		goto remap_retry;
+
 	mutex_exit(&mi->mi_lock);
-#endif
 }
 
 static int
