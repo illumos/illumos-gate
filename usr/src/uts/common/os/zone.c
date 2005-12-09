@@ -1896,11 +1896,13 @@ zthread_exit(void)
 	/*
 	 * Reparent to p0
 	 */
+	kpreempt_disable();
 	mutex_enter(&pp->p_lock);
 	t->t_proc_flag &= ~TP_ZTHREAD;
 	t->t_procp = &p0;
 	hat_thread_exit(t);
 	mutex_exit(&pp->p_lock);
+	kpreempt_enable();
 
 	if (t->t_back == t) {
 		ASSERT(t->t_forw == t);
