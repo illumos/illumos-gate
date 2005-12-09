@@ -173,7 +173,21 @@ JNIEXPORT jobject JNICALL
 Java_com_sun_zfs_common_model_SystemDataModel_getPool(JNIEnv *env,
     jobject obj, jstring poolUTF)
 {
-	return (zjni_get_Dataset(env, poolUTF, ZFS_TYPE_FILESYSTEM));
+	jobject pool = zjni_get_Dataset(env, poolUTF, ZFS_TYPE_FILESYSTEM);
+
+	/* Verify that object is Pool, not some other Dataset */
+	if (pool != NULL) {
+	    jclass class = (*env)->FindClass(
+		env, ZFSJNI_PACKAGE_DATA "Pool");
+
+	    jboolean is_pool = (*env)->IsInstanceOf(env, pool, class);
+
+	    if (is_pool != JNI_TRUE) {
+		pool = NULL;
+	    }
+	}
+
+	return (pool);
 }
 
 /*
@@ -187,6 +201,11 @@ JNIEXPORT jobjectArray JNICALL
 Java_com_sun_zfs_common_model_SystemDataModel_getFileSystems(JNIEnv *env,
     jobject obj, jstring containerUTF)
 {
+	if (containerUTF == NULL) {
+		return (Java_com_sun_zfs_common_model_SystemDataModel_getPools(
+		    env, obj));
+	}
+
 	return (zjni_get_Datasets_below(env, containerUTF,
 	    ZFS_TYPE_FILESYSTEM, ZFS_TYPE_FILESYSTEM,
 	    ZFSJNI_PACKAGE_DATA "FileSystem"));
@@ -283,8 +302,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getDatasets(JNIEnv *env,
 	}
 
 	return (zjni_get_Datasets_below(env, containerUTF,
-	    ZFS_TYPE_FILESYSTEM, ZFS_TYPE_ANY,
-	    ZFSJNI_PACKAGE_DATA "Dataset"));
+	    ZFS_TYPE_FILESYSTEM, ZFS_TYPE_ANY, ZFSJNI_PACKAGE_DATA "Dataset"));
 }
 
 /*

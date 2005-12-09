@@ -45,6 +45,7 @@ INCS += -I$(JAVA_ROOT)/include \
 
 LDLIBS +=	-lc -lnvpair -ldiskmgt -lzfs
 CPPFLAGS +=	$(INCS)
+$(NOT_RELEASE_BUILD) CPPFLAGS += -DDEBUG
 
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 

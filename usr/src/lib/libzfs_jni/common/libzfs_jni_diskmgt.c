@@ -33,12 +33,6 @@
 #include <sys/mnttab.h>
 
 /*
- * Constants
- */
-
-#define	DISK_IN_USE	12345
-
-/*
  * Function prototypes
  */
 
@@ -102,9 +96,6 @@ get_device_name(dm_descriptor_t device, int *error)
  *  1. Success: error is set to 0 and a dmgt_disk_t is returned
  *
  *  2. Failure: error is set to -1 and NULL is returned
- *
- *  3. In use: error is set to DISK_IN_USE and NULL is returned if all
- *     of the slices have an existing use that precludes use in ZFS
  */
 static dmgt_disk_t *
 get_disk(dm_descriptor_t disk, int *error)
@@ -148,14 +139,6 @@ get_disk(dm_descriptor_t disk, int *error)
 							media[0], dp->name,
 							dp->blocksize,
 							&(dp->in_use), error);
-
-						/*
-						 * If this disk has no usable
-						 * slices...
-						 */
-						if (dp->in_use) {
-							*error = DISK_IN_USE;
-						}
 					}
 					dm_free_descriptors(media);
 				}
@@ -164,10 +147,8 @@ get_disk(dm_descriptor_t disk, int *error)
 	}
 
 	if (*error) {
-		if (*error != DISK_IN_USE) {
-			/* Normalize error */
-			*error = -1;
-		}
+		/* Normalize error */
+		*error = -1;
 
 		if (dp != NULL) {
 			dmgt_free_disk(dp);
@@ -408,10 +389,11 @@ get_disk_usable_slices(dm_descriptor_t media, const char *name,
 						    j);
 					}
 				}
-			} else
+			} else {
 				if (slice_too_small(slice)) {
 					remove_slice_from_list(slices, i);
 				}
+			}
 		}
 	}
 
@@ -690,16 +672,29 @@ dmgt_avail_disk_iter(dmgt_disk_iter_f func, void *data)
 			int online = get_disk_online(disk, &error);
 			if (!error && online) {
 				dmgt_disk_t *dp = get_disk(disk, &error);
-				if (error == DISK_IN_USE) {
-					error = 0;
-				} else
-					if (!error) {
+				if (!error) {
+					/*
+					 * If this disk or any of its
+					 * slices is usable...
+					 */
+					if (!dp->in_use ||
+					    zjni_count_elements(
+					    (void **)dp->slices) != 0) {
+
 						/* Run the given function */
 						if (func(dp, data)) {
 							error = -1;
 						}
 						dmgt_free_disk(dp);
+#ifdef DEBUG
+					} else {
+						(void) fprintf(stderr, "disk "
+						    "has no available slices: "
+						    "%s\n", dp->name);
+#endif
 					}
+
+				}
 			}
 		}
 		dm_free_descriptors(disks);

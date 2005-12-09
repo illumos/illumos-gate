@@ -56,6 +56,8 @@ create_DiskDeviceBean(JNIEnv *env, dmgt_disk_t *dp)
 		if (slices != NULL) {
 			jstring nameUTF = (*env)->NewStringUTF(env, dp->name);
 
+			jboolean in_use = dp->in_use ? JNI_TRUE : JNI_FALSE;
+
 			jclass class_DiskDeviceBean = (*env)->FindClass(
 			    env, ZFSJNI_PACKAGE_DATA "DiskDeviceBean");
 
@@ -63,10 +65,11 @@ create_DiskDeviceBean(JNIEnv *env, dmgt_disk_t *dp)
 			    (*env)->GetMethodID(env, class_DiskDeviceBean,
 				"<init>",
 				"(JLjava/lang/String;[Ljava/lang/String;[L"
-				ZFSJNI_PACKAGE_DATA "SliceDeviceBean;)V");
+				ZFSJNI_PACKAGE_DATA "SliceDeviceBean;Z)V");
 
 			disk = (*env)->NewObject(env, class_DiskDeviceBean,
-			    constructor, dp->size, nameUTF, aliases, slices);
+			    constructor, dp->size, nameUTF, aliases, slices,
+			    in_use);
 		}
 	}
 

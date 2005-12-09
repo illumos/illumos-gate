@@ -66,6 +66,9 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 	(void) snprintf(tmp, sizeof (tmp), "%llu", dp->size);
 	xmlSetProp(disk, (xmlChar *)ATTR_DISK_SIZE, (xmlChar *)tmp);
 
+	xmlSetProp(disk, (xmlChar *)ATTR_DISK_INUSE, (xmlChar *)
+	    (dp->in_use ? VAL_ATTR_TRUE : VAL_ATTR_FALSE));
+
 	if (dp->aliases != NULL) {
 		for (i = 0; dp->aliases[i] != NULL; i++) {
 			xmlNodePtr alias = xmlNewChild(
