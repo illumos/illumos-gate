@@ -590,7 +590,7 @@ cmlb_validate(cmlb_handle_t cmlbhandle)
 		return (ENXIO);
 	}
 
-	rval = cmlb_validate_geometry((struct cmlb_lun *)cmlbhandle, 0);
+	rval = cmlb_validate_geometry((struct cmlb_lun *)cmlbhandle, 1);
 
 	if (rval == ENOTSUP) {
 		if (un->un_f_geometry_is_valid == TRUE) {
@@ -1186,6 +1186,12 @@ cmlb_validate_geometry(struct cmlb_lun *un, int forcerevalid)
 		 * cmlb_use_efi
 		 */
 		return (ENOTSUP);
+	} else {
+		if ((label_error != ESRCH) && (label_error != EINVAL)) {
+			cmlb_dbg(CMLB_ERROR,  un, "cmlb_use_efi failed %d\n",
+			    label_error);
+			return (label_error);
+		}
 	}
 
 	/* NO EFI label found */
@@ -1808,6 +1814,7 @@ cmlb_use_efi(struct cmlb_lun *un, diskaddr_t capacity)
 	diskaddr_t	cap;
 	uint_t		nparts;
 	diskaddr_t	gpe_lba;
+	int		iofailed = 0;
 
 	ASSERT(mutex_owned(CMLB_MUTEX(un)));
 
@@ -1818,6 +1825,7 @@ cmlb_use_efi(struct cmlb_lun *un, diskaddr_t capacity)
 
 	rval = DK_TG_READ(un, buf, 0, lbasize);
 	if (rval) {
+		iofailed = 1;
 		goto done_err;
 	}
 	if (((struct dk_label *)buf)->dkl_magic == DKL_MAGIC) {
@@ -1828,6 +1836,7 @@ cmlb_use_efi(struct cmlb_lun *un, diskaddr_t capacity)
 
 	rval = DK_TG_READ(un, buf, 1, lbasize);
 	if (rval) {
+		iofailed = 1;
 		goto done_err;
 	}
 	cmlb_swap_efi_gpt((efi_gpt_t *)buf);
@@ -1841,9 +1850,11 @@ cmlb_use_efi(struct cmlb_lun *un, diskaddr_t capacity)
 		rval = DK_TG_GETCAP(un, &cap);
 
 		if (rval) {
+			iofailed = 1;
 			goto done_err;
 		}
 		if ((rval = DK_TG_READ(un, buf, cap - 1, lbasize)) != 0) {
+			iofailed = 1;
 			goto done_err;
 		}
 		cmlb_swap_efi_gpt((efi_gpt_t *)buf);
@@ -1858,6 +1869,7 @@ cmlb_use_efi(struct cmlb_lun *un, diskaddr_t capacity)
 
 	rval = DK_TG_READ(un, buf, gpe_lba, EFI_MIN_ARRAY_SIZE);
 	if (rval) {
+		iofailed = 1;
 		goto done_err;
 	}
 	partitions = (efi_gpe_t *)buf;
@@ -1908,7 +1920,7 @@ done_err:
 	 * valid because cmlb_prop_op will now fail, which in turn
 	 * causes things like opens and stats on the partition to fail.
 	 */
-	if ((capacity > DK_MAX_BLOCKS) && (rval != ESRCH)) {
+	if ((capacity > DK_MAX_BLOCKS) && (rval != ESRCH) && !iofailed) {
 		un->un_f_geometry_is_valid = FALSE;
 	}
 	return (rval);

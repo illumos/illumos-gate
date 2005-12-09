@@ -743,15 +743,13 @@ cmdkioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *credp, int *rvalp)
 		if (rval = dadk_check_media(DKTP_DATA, &state))
 			return (rval);
 
-		cmlb_invalidate(dkp->dk_cmlbhandle);
 		if (state == DKIO_INSERTED) {
-			if (cmlb_partinfo(
-			    dkp->dk_cmlbhandle,
-			    CMDKPART(dev),
-			    &p_lblkcnt,
-			    &p_lblksrt,
-			    NULL,
-			    NULL))
+
+			if (cmlb_validate(dkp->dk_cmlbhandle) != 0)
+				return (ENXIO);
+
+			if (cmlb_partinfo(dkp->dk_cmlbhandle, CMDKPART(dev),
+			    &p_lblkcnt, &p_lblksrt, NULL, NULL))
 				return (ENXIO);
 
 			if (p_lblkcnt <= 0)
@@ -866,6 +864,8 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp)
 	ulong_t		partbit;
 	int 		instance;
 	struct cmdk	*dkp;
+	int		lastclose = 1;
+	int		i;
 
 	instance = CMDKUNIT(dev);
 	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)) ||
@@ -891,7 +891,24 @@ cmdkclose(dev_t dev, int flag, int otyp, cred_t *credp)
 		dkp->dk_open_reg[otyp] &= ~partbit;
 	dkp->dk_open_exl &= ~partbit;
 
+	for (i = 0; i < CMDK_MAXPART; i++)
+		if (dkp->dk_open_lyr[i] != 0) {
+			lastclose = 0;
+			break;
+		}
+
+	if (lastclose)
+		for (i = 0; i < OTYPCNT; i++)
+			if (dkp->dk_open_reg[i] != 0) {
+				lastclose = 0;
+				break;
+			}
+
 	mutex_exit(&dkp->dk_mutex);
+
+	if (lastclose)
+		cmlb_invalidate(dkp->dk_cmlbhandle);
+
 	return (DDI_SUCCESS);
 }
 
@@ -907,6 +924,7 @@ cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp)
 	diskaddr_t	p_lblksrt;
 	diskaddr_t	p_lblkcnt;
 	int		i;
+	int		nodelay;
 
 	instance = CMDKUNIT(dev);
 	if (!(dkp = ddi_get_soft_state(cmdk_state, instance)))
@@ -917,30 +935,32 @@ cmdkopen(dev_t *dev_p, int flag, int otyp, cred_t *credp)
 
 	part = CMDKPART(dev);
 	partbit = 1 << part;
+	nodelay = (flag & (FNDELAY | FNONBLOCK));
 
 	mutex_enter(&dkp->dk_mutex);
 
-	/* re-do the target open */
-	cmlb_invalidate(dkp->dk_cmlbhandle);
-	if (!cmlb_partinfo(
-	    dkp->dk_cmlbhandle,
-	    part,
-	    &p_lblkcnt,
-	    &p_lblksrt,
-	    NULL,
-	    NULL)) {
-		if (p_lblkcnt <= 0 &&
-		    ((flag & (FNDELAY|FNONBLOCK)) == 0 || otyp != OTYP_CHR)) {
+	if (cmlb_validate(dkp->dk_cmlbhandle) != 0) {
+
+		/* fail if not doing non block open */
+		if (!nodelay) {
+			mutex_exit(&dkp->dk_mutex);
+			return (ENXIO);
+		}
+	} else if (cmlb_partinfo(dkp->dk_cmlbhandle, part, &p_lblkcnt,
+	    &p_lblksrt, NULL, NULL) == 0) {
+
+		if (p_lblkcnt <= 0 && (!nodelay || otyp != OTYP_CHR)) {
 			mutex_exit(&dkp->dk_mutex);
 			return (ENXIO);
 		}
 	} else {
 		/* fail if not doing non block open */
-		if ((flag & (FNONBLOCK|FNDELAY)) == 0) {
+		if (!nodelay) {
 			mutex_exit(&dkp->dk_mutex);
 			return (ENXIO);
 		}
 	}
+
 	if ((DKTP_EXT->tg_rdonly) && (flag & FWRITE)) {
 		mutex_exit(&dkp->dk_mutex);
 		return (EROFS);
@@ -1219,7 +1239,7 @@ cmdk_lb_rdwr(
 	count = (count + NBPSCTR - 1) & -NBPSCTR;
 	handle = dadk_iob_alloc(DKTP_DATA, start, count, KM_SLEEP);
 	if (!handle)
-		return (DDI_FAILURE);
+		return (ENOMEM);
 
 	if (cmd == TG_READ) {
 		bufa = dadk_iob_xfer(DKTP_DATA, handle, B_READ);
