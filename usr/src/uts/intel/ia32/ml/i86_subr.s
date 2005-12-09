@@ -1428,13 +1428,45 @@ pc_reset(void)
 
 #else	/* __lint */
 
+	ENTRY(wait_500ms)
+	movl	$50000, %ecx
+1:
+	call	tenmicrosec
+	loop	1b
+	ret	
+	SET_SIZE(wait_500ms)
+
+#define	RESET_METHOD_KBC	1
+#define	RESET_METHOD_PORT92	2
+#define RESET_METHOD_PCI	4
+
+	DGDEF3(pc_reset_methods, 4, 8)
+	.long RESET_METHOD_KBC|RESET_METHOD_PORT92|RESET_METHOD_PCI;
+
 	ENTRY(pc_reset)
+
+	testl	$RESET_METHOD_KBC, pc_reset_methods
+	jz	1f
+
 	/
 	/ Try the classic keyboard controller-triggered reset.
 	/
 	movw	$0x64, %dx
 	movb	$0xfe, %al
 	outb	(%dx)
+
+	/ Wait up to 500 milliseconds here for the keyboard controller
+	/ to pull the reset line.  On some systems where the keyboard
+	/ controller is slow to pull the reset line, the next reset method
+	/ may be executed (which may be bad if those systems hang when the
+	/ next reset method is used, e.g. Ferrari 3400 (doesn't like port 92),
+	/ and Ferrari 4000 (doesn't like the cf9 reset method))
+
+	call	wait_500ms
+
+1:
+	testl	$RESET_METHOD_PORT92, pc_reset_methods
+	jz	3f
 
 	/
 	/ Try port 0x92 fast reset
@@ -1452,6 +1484,12 @@ pc_reset(void)
 	outb	(%dx)		/ and reset the system
 1:
 
+	call	wait_500ms
+
+3:
+	testl	$RESET_METHOD_PCI, pc_reset_methods
+	jz	4f
+
 	/ Try the PCI (soft) reset vector (should work on all modern systems,
 	/ but has been shown to cause problems on 450NX systems, and some newer
 	/ systems (e.g. ATI IXP400-equipped systems))
@@ -1466,6 +1504,9 @@ pc_reset(void)
 	movb	$0x6, %al
 	outb	(%dx)
 
+	call	wait_500ms
+
+4:
 	/
 	/ port 0xcf9 failed also.  Last-ditch effort is to
 	/ triple-fault the CPU.
@@ -1480,7 +1521,9 @@ pc_reset(void)
 	lidt	(%esp)
 #endif
 	int	$0x0		/ Trigger interrupt, generate triple-fault
-	hlt
+
+	cli
+	hlt			/ Wait forever
 	/*NOTREACHED*/
 	SET_SIZE(pc_reset)
 

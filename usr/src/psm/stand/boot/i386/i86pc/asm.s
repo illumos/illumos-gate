@@ -250,6 +250,11 @@ donetable:
 	movb	$0xfe, %al
 	outb	(%dx)
 
+	/ Wait up to 500 ms for the keyboard controller to pull the reset line
+	pushl	$500
+	call	mdelay
+	addl	$4, %esp
+
 	/
 	/ Try port 0x92 fast reset
 	/
@@ -266,6 +271,11 @@ donetable:
 	outb	(%dx)		/ and reset the system
 1:
 
+	/ Wait up to 500 ms for the port 92 reset method to reset the CPU
+	pushl	$500
+	call	mdelay
+	addl	$4, %esp
+
 	/ Try the PCI (soft) reset vector (should work on all modern systems,
 	/ but has been shown to cause problems on 450NX systems, and some newer
 	/ systems (e.g. ATI IXP400-equipped systems))
@@ -280,6 +290,11 @@ donetable:
 	movb	$0x6, %al
 	outb	(%dx)
 
+	/ Wait up to 500 ms for the port cf9 reset method to reset the CPU
+	pushl	$500
+	call	mdelay
+	addl	$4, %esp
+
 	/
 	/ port 0xcf9 failed also.  Last-ditch effort is to
 	/ triple-fault the CPU.
@@ -287,7 +302,9 @@ donetable:
 	movw	$0, IDTlimit	/ generate faulty table
 	lidt	IDTptr		/ load faulty table
 	int	$10		/ trigger an interrupt
- 	hlt
+
+	cli
+ 	hlt			/ Wait forever
  	/*NOTREACHED*/
 	SET_SIZE(reset)
 
