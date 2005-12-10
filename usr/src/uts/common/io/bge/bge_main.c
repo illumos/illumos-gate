@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "BCM579x driver v0.46";
+static char bge_ident[] = "BCM579x driver v0.47";
 
 /*
  * Property names
@@ -265,20 +265,6 @@ bge_reset(bge_t *bgep)
 	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring)
 		mutex_enter(bgep->send[ring].tc_lock);
 
-	if ((bgep->progress & PROGRESS_INTR) &&
-	    (bgep->intr_type == DDI_INTR_TYPE_MSI)) {
-		/* Disable all interrupts */
-		if (bgep->intr_cap & DDI_INTR_FLAG_BLOCK) {
-			/* Call ddi_intr_block_disable() */
-			(void) ddi_intr_block_disable(bgep->htable,
-			    bgep->intr_cnt);
-		} else {
-			for (i = 0; i < bgep->intr_cnt; i++) {
-				(void) ddi_intr_disable(bgep->htable[i]);
-			}
-		}
-	}
-
 	bge_chip_reset(bgep, B_TRUE);
 	bge_reinit_rings(bgep);
 
@@ -322,28 +308,6 @@ bge_start(bge_t *bgep, boolean_t reset_phys)
 	BGE_TRACE(("bge_start($%p, %d)", (void *)bgep, reset_phys));
 
 	ASSERT(mutex_owned(bgep->genlock));
-
-	if ((bgep->progress & PROGRESS_INTR) &&
-	    (bgep->intr_type == DDI_INTR_TYPE_MSI)) {
-		/*
-		 * If the device driver resets the device for any reason
-		 * then the device might end up resetting its configuration
-		 * space modifications, so we will need to re-enable all
-		 * interrupts.
-		 */
-
-		/* Enable all interrupts */
-		if (bgep->intr_cap & DDI_INTR_FLAG_BLOCK) {
-			/* Call ddi_intr_block_enable() for MSI */
-			(void) ddi_intr_block_enable(bgep->htable,
-			    bgep->intr_cnt);
-		} else {
-			/* Call ddi_intr_enable for MSI non block enable */
-			for (i = 0; i < bgep->intr_cnt; i++) {
-				(void) ddi_intr_enable(bgep->htable[i]);
-			}
-		}
-	}
 
 	/*
 	 * Start chip processing, including enabling interrupts

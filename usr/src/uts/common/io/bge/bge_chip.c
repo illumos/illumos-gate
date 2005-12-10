@@ -44,9 +44,13 @@
  *
  * By default MSI is enabled on all supported platforms but it is disabled
  * for some Broadcom chips due to known MSI hardware issues. Currently MSI
- * is enabled only for 5714C A2, 5715C A2, 5721, and 5751 broadcom chips.
+ * is enabled only for 5714C A2 and 5715C A2 broadcom chips.
  */
+#if defined(__sparc)
 boolean_t bge_enable_msi = B_TRUE;
+#else
+boolean_t bge_enable_msi = B_FALSE;
+#endif
 
 /*
  * Property names
@@ -2003,7 +2007,6 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
-		cidp->msi_enabled = bge_enable_msi;
 		dev_ok = B_TRUE;
 		break;
 
@@ -2015,7 +2018,6 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
 		cidp->pci_type = BGE_PCI_E;
-		cidp->msi_enabled = bge_enable_msi;
 		dev_ok = B_TRUE;
 		break;
 
@@ -3307,7 +3309,7 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 	bge_t *bgep = (bge_t *)arg1;		/* private device info	*/
 	bge_status_t *bsp;
 	uint64_t flags;
-	uint32_t mlcr;
+	uint32_t mlcr = 0;
 	uint_t result;
 
 	BGE_TRACE(("bge_intr($%p) ($%p)", arg1, arg2));
