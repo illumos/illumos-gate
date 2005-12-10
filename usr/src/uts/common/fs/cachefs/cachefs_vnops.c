@@ -9264,6 +9264,14 @@ cachefs_cacheacl(cnode_t *cp, vsecattr_t *vsecp)
 			printf("cachefs_cacheacl: setsecattr: error %d\n",
 			    error);
 #endif /* CFSDEBUG */
+		/*
+		 * If there was an error, we don't want to call
+		 * cachefs_nocache(); so, set error to 0.
+		 * We will call cachefs_purgeacl(), in order to
+		 * clean such things as adjunct ACL directories.
+		 */
+		cachefs_purgeacl(cp);
+		error = 0;
 		goto out;
 	}
 	if (vp == cp->c_frontvp)
