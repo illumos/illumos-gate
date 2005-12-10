@@ -132,29 +132,34 @@ t0:
 	.skip	THREAD_SIZE		! thread 0
 	.size	t0, THREAD_SIZE
 
-#ifdef	TRAPTRACE
 	.global	trap_trace_ctl
+	.global	htrap_tr0
+	.global htrap_trace_bufsize
+
+	.align	64
+trap_trace_ctl:
+	.skip	NCPU * TRAPTR_SIZE	! NCPU control headers
+htrap_tr0:
+	.skip	HTRAP_TSIZE		! one buffer for the boot cpu
+	.align	4
+htrap_trace_bufsize:
+	.word	HTRAP_TSIZE		! default hv trap buffer size
+
+#ifdef	TRAPTRACE
 	.global	trap_tr0
 	.global trap_trace_bufsize
-	.global htrap_trace_bufsize
 	.global	trap_freeze
 	.global	trap_freeze_pc
 
 	.align	4
 trap_trace_bufsize:
 	.word	TRAP_TSIZE		! default trap buffer size
-htrap_trace_bufsize:
-	.word	HTRAP_TSIZE		! default hv trap buffer size
 trap_freeze:
 	.word	0
 
-	.align	64
-trap_trace_ctl:
-	.skip	NCPU * TRAPTR_SIZE	! NCPU control headers
-
 	.align	16
 trap_tr0:
-	.skip	TRAP_TBUF_SIZE		! one buffer for the boot cpu
+	.skip	TRAP_TSIZE		! one buffer for the boot cpu
 
 /*
  * When an assertion in TRACE_PTR was failed, %pc is saved in trap_freeze_pc to

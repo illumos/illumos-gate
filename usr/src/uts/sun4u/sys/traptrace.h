@@ -81,7 +81,7 @@ struct trap_trace_record {
 
 #endif
 
-#define	TRAP_TBUF_SIZE	TRAP_TSIZE
+#define	HTRAP_TSIZE	0
 
 /*
  * Trap tracing buffer header.
@@ -115,8 +115,10 @@ extern int		trap_freeze;		/* freeze the trap trace */
 extern caddr_t		ttrace_buf;		/* buffer bop alloced */
 extern int		ttrace_index;		/* index used */
 extern caddr_t		trap_trace_alloc(caddr_t);
-extern void htrap_trace_setup(caddr_t, int);
-extern void htrap_trace_register(int);
+extern void mach_htraptrace_setup(int);
+extern void mach_htraptrace_configure(int);
+extern void mach_htraptrace_init(void);
+extern void mach_htraptrace_cleanup(int);
 
 #endif
 

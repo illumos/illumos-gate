@@ -59,9 +59,7 @@
 #include <sys/clock.h>
 #include <sys/fpras_impl.h>
 #include <sys/prom_debug.h>
-#ifdef TRAPTRACE
 #include <sys/traptrace.h>
-#endif /* TRAPTRACE */
 #include <sys/memnode.h>
 #include <sys/mem_cage.h>
 
@@ -205,21 +203,33 @@ cpu_intrq_register(struct cpu *cp)
 	/* Interrupt/error queues not applicable to sun4u */
 }
 
-#ifdef TRAPTRACE
 /*ARGSUSED*/
 void
-htrap_trace_setup(caddr_t buf, int cpuid)
+mach_htraptrace_setup(int cpuid)
 {
 	/* Setup hypervisor traptrace buffer, not applicable to sun4u */
 }
 
 /*ARGSUSED*/
 void
-htrap_trace_register(int cpuid)
+mach_htraptrace_configure(int cpuid)
 {
-	/* Register hypervisor traptrace buffer, not applicable to sun4u */
+	/* enable/ disable hypervisor traptracing, not applicable to sun4u */
 }
-#endif /* TRAPTRACE */
+
+/*ARGSUSED*/
+void
+mach_htraptrace_init(void)
+{
+	/* allocate hypervisor traptrace buffer, not applicable to sun4u */
+}
+
+/*ARGSUSED*/
+void
+mach_htraptrace_cleanup(int cpuid)
+{
+	/* cleanup hypervisor traptrace buffer, not applicable to sun4u */
+}
 
 void
 mach_descrip_init(void)

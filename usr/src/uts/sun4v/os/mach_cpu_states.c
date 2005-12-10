@@ -43,6 +43,7 @@
 #include <sys/intreg.h>
 #include <sys/consdev.h>
 #include <sys/kdi_impl.h>
+#include <sys/traptrace.h>
 #include <sys/hypervisor_api.h>
 #include <sys/vmsystm.h>
 #include <sys/dtrace.h>
@@ -59,14 +60,9 @@ caddr_t hvdump_buf_va;
 uint64_t hvdump_buf_sz = HVDUMP_SIZE_DEFAULT;
 static uint64_t hvdump_buf_pa;
 
-
-#ifdef	TRAPTRACE
-#include <sys/traptrace.h>
-#include <sys/hypervisor_api.h>
 u_longlong_t panic_tick;
-#endif /* TRAPTRACE */
 
-extern u_longlong_t	gettick();
+extern u_longlong_t gettick();
 static void reboot_machine(char *);
 static void update_hvdump_buffer(void);
 
@@ -279,18 +275,19 @@ panic_stopcpus(cpu_t *cp, kthread_t *t, int spl)
 void
 panic_enter_hw(int spl)
 {
-#ifdef TRAPTRACE
 	if (!panic_tick) {
-		uint64_t prev_freeze;
-
 		panic_tick = gettick();
-		/*  there are no possible error codes for this hcall */
-		(void) hv_ttrace_freeze((uint64_t)TRAP_TFREEZE_ALL,
-			&prev_freeze);
-		TRAPTRACE_FREEZE;
-	}
-#endif
+		if (mach_htraptrace_enable) {
+			uint64_t prev_freeze;
 
+			/*  there are no possible error codes for this hcall */
+			(void) hv_ttrace_freeze((uint64_t)TRAP_TFREEZE_ALL,
+			    &prev_freeze);
+		}
+#ifdef TRAPTRACE
+		TRAPTRACE_FREEZE;
+#endif
+	}
 	if (spl == ipltospl(PIL_14)) {
 		uint_t opstate = disable_vec_intr();
 
@@ -324,17 +321,22 @@ panic_quiesce_hw(panic_data_t *pdp)
 	extern uint_t getpstate(void);
 	extern void setpstate(uint_t);
 
-#ifdef TRAPTRACE
-	uint64_t prev_freeze;
 	/*
 	 * Turn off TRAPTRACE and save the current %tick value in panic_tick.
 	 */
-	if (!panic_tick)
+	if (!panic_tick) {
 		panic_tick = gettick();
-	/*  there are no possible error codes for this hcall */
-	(void) hv_ttrace_freeze((uint64_t)TRAP_TFREEZE_ALL, &prev_freeze);
-	TRAPTRACE_FREEZE;
+		if (mach_htraptrace_enable) {
+			uint64_t prev_freeze;
+
+			/*  there are no possible error codes for this hcall */
+			(void) hv_ttrace_freeze((uint64_t)TRAP_TFREEZE_ALL,
+			    &prev_freeze);
+		}
+#ifdef TRAPTRACE
+		TRAPTRACE_FREEZE;
 #endif
+	}
 	/*
 	 * For Platforms that use CPU signatures, we
 	 * need to set the signature block to OS, the state to

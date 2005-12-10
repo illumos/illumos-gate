@@ -66,11 +66,7 @@
 
 #include <sys/sunddi.h>
 #include <sys/lgrp.h>
-
-#ifdef TRAPTRACE
 #include <sys/traptrace.h>
-#endif /* TRAPTRACE */
-
 /*
  * External Routines:
  */
@@ -240,12 +236,12 @@ mlsetup(struct regs *rp, void *cif, kfpu_t *fp)
 	ctlp->d.offset = ctlp->d.last_offset = 0;
 	ctlp->d.limit = TRAP_TSIZE;		/* XXX dynamic someday */
 	ctlp->d.paddr_base = va_to_pa(trap_tr0);
+#endif /* TRAPTRACE */
 	/*
 	 * initialize HV trap trace buffer for the boot cpu
 	 */
-	htrap_trace_setup((trap_tr0 + TRAP_TSIZE), CPU->cpu_id);
-	htrap_trace_register(CPU->cpu_id);
-#endif /* TRAPTRACE */
+	mach_htraptrace_setup(CPU->cpu_id);
+	mach_htraptrace_configure(CPU->cpu_id);
 
 	/*
 	 * lgroup framework initialization. This must be done prior

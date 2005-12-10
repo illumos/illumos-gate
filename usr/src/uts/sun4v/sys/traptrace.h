@@ -124,12 +124,9 @@ struct trap_trace_record {
 #else
 
 #define	TRAP_TSIZE	((TRAP_TBUF / TRAP_ENT_SIZE) * TRAP_ENT_SIZE)
-/* Rounding not needed, done for consistency */
 #define	HTRAP_TSIZE	((TRAP_TBUF / HTRAP_ENT_SIZE) * HTRAP_ENT_SIZE)
 
 #endif
-
-#define	TRAP_TBUF_SIZE	(TRAP_TSIZE + HTRAP_TSIZE)
 
 /*
  * Trap tracing buffer header.
@@ -168,8 +165,11 @@ extern int		ttrace_index;		/* index used */
 extern caddr_t trap_trace_alloc(caddr_t);
 
 extern int		htrap_trace_bufsize;	/* default hv buffer size */
-extern void htrap_trace_setup(caddr_t, int);
-extern void htrap_trace_register(int);
+extern int		mach_htraptrace_enable;
+extern void mach_htraptrace_setup(int);
+extern void mach_htraptrace_configure(int);
+extern void mach_htraptrace_init(void);
+extern void mach_htraptrace_cleanup(int);
 
 #endif
 

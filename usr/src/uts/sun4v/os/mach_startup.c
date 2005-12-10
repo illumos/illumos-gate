@@ -36,10 +36,16 @@
 #include <sys/cpupart.h>
 #include <sys/disp.h>
 #include <sys/hypervisor_api.h>
-#ifdef TRAPTRACE
 #include <sys/traptrace.h>
-#include <sys/hypervisor_api.h>
-#endif /* TRAPTRACE */
+
+#ifdef TRAPTRACE
+int mach_htraptrace_enable = 1;
+#else
+int mach_htraptrace_enable = 0;
+#endif
+int htrap_tr0_inuse = 0;
+caddr_t httrace_buf;	/* hv traptrace buffer for all cpus except 0 */
+extern char htrap_tr0[];	/* prealloc buf for boot cpu */
 
 caddr_t	mmu_fault_status_area;
 
@@ -282,26 +288,31 @@ mach_hw_copy_limit(void)
 	/* HW copy limits set by individual CPU module */
 }
 
-#ifdef TRAPTRACE
 /*
  * This function sets up hypervisor traptrace buffer
+ * This routine is called by the boot cpu only
  */
 void
-htrap_trace_setup(caddr_t buf, int cpuid)
+mach_htraptrace_setup(int cpuid)
 {
 	TRAP_TRACE_CTL	*ctlp;
+	int bootcpuid = getprocessorid(); /* invoked on boot cpu only */
 
-	ctlp = &trap_trace_ctl[cpuid];
-	ctlp->d.hvaddr_base = buf;
-	ctlp->d.hlimit = HTRAP_TSIZE;
-	ctlp->d.hpaddr_base = va_to_pa(buf);
+	if (mach_htraptrace_enable && ((cpuid != bootcpuid) ||
+	    !htrap_tr0_inuse)) {
+		ctlp = &trap_trace_ctl[cpuid];
+		ctlp->d.hvaddr_base = (cpuid == bootcpuid) ? htrap_tr0 :
+		    httrace_buf + (cpuid * HTRAP_TSIZE);
+		ctlp->d.hlimit = HTRAP_TSIZE;
+		ctlp->d.hpaddr_base = va_to_pa(ctlp->d.hvaddr_base);
+	}
 }
 
 /*
- * This function configures and enables the hypervisor traptrace buffer
+ * This function enables or disables the hypervisor traptracing
  */
 void
-htrap_trace_register(int cpuid)
+mach_htraptrace_configure(int cpuid)
 {
 	uint64_t ret;
 	uint64_t prev_buf, prev_bufsize;
@@ -309,36 +320,106 @@ htrap_trace_register(int cpuid)
 	uint64_t size;
 	TRAP_TRACE_CTL	*ctlp;
 
-	ret = hv_ttrace_buf_info(&prev_buf, &prev_bufsize);
-	if ((ret == H_EOK) && (prev_bufsize != 0)) {
-		cmn_err(CE_CONT,
-		    "!cpu%d: previous HV traptrace buffer of size 0x%lx "
-		    "at address 0x%lx", cpuid, prev_bufsize, prev_buf);
-	}
-
 	ctlp = &trap_trace_ctl[cpuid];
-	ret = hv_ttrace_buf_conf(ctlp->d.hpaddr_base, HTRAP_TSIZE /
-		(sizeof (struct htrap_trace_record)), &size);
-	if (ret == H_EOK) {
-		ret = hv_ttrace_enable((uint64_t)TRAP_TENABLE_ALL,
-			&prev_enable);
-		if (ret != H_EOK) {
-			cmn_err(CE_WARN,
-			    "!cpu%d: HV traptracing not enabled, "
-			    "ta: 0x%x returned error: %ld",
-			    cpuid, TTRACE_ENABLE, ret);
+	if (mach_htraptrace_enable) {
+		if ((ctlp->d.hvaddr_base != htrap_tr0) || (!htrap_tr0_inuse)) {
+			ret = hv_ttrace_buf_info(&prev_buf, &prev_bufsize);
+			if ((ret == H_EOK) && (prev_bufsize != 0)) {
+				cmn_err(CE_CONT,
+				    "!cpu%d: previous HV traptrace buffer of "
+				    "size 0x%lx at address 0x%lx", cpuid,
+				    prev_bufsize, prev_buf);
+			}
+
+			ret = hv_ttrace_buf_conf(ctlp->d.hpaddr_base,
+			    HTRAP_TSIZE / (sizeof (struct htrap_trace_record)),
+			    &size);
+			if (ret == H_EOK) {
+				ret = hv_ttrace_enable(\
+				    (uint64_t)TRAP_TENABLE_ALL, &prev_enable);
+				if (ret != H_EOK) {
+					cmn_err(CE_WARN,
+					    "!cpu%d: HV traptracing not "
+					    "enabled, ta: 0x%x returned error: "
+					    "%ld", cpuid, TTRACE_ENABLE, ret);
+				} else {
+					if (ctlp->d.hvaddr_base == htrap_tr0)
+						htrap_tr0_inuse = 1;
+				}
+			} else {
+				cmn_err(CE_WARN,
+				    "!cpu%d: HV traptrace buffer not "
+				    "configured, ta: 0x%x returned error: %ld",
+				    cpuid, TTRACE_BUF_CONF, ret);
+			}
+			/*
+			 * set hvaddr_base to NULL when traptrace buffer
+			 * registration fails
+			 */
+			if (ret != H_EOK) {
+				ctlp->d.hvaddr_base = NULL;
+				ctlp->d.hlimit = 0;
+				ctlp->d.hpaddr_base = NULL;
+			}
 		}
 	} else {
-		cmn_err(CE_WARN,
-		    "!cpu%d: HV traptrace buffer not configured, "
-		    "ta: 0x%x returned error: %ld",
-		    cpuid, TTRACE_BUF_CONF, ret);
+		ret = hv_ttrace_buf_info(&prev_buf, &prev_bufsize);
+		if ((ret == H_EOK) && (prev_bufsize != 0)) {
+			ret = hv_ttrace_enable((uint64_t)TRAP_TDISABLE_ALL,
+			    &prev_enable);
+			if (ret == H_EOK) {
+				if (ctlp->d.hvaddr_base == htrap_tr0)
+					htrap_tr0_inuse = 0;
+				ctlp->d.hvaddr_base = NULL;
+				ctlp->d.hlimit = 0;
+				ctlp->d.hpaddr_base = NULL;
+			} else
+				cmn_err(CE_WARN,
+				    "!cpu%d: HV traptracing is not disabled, "
+				    "ta: 0x%x returned error: %ld",
+				    cpuid, TTRACE_ENABLE, ret);
+		}
 	}
-	/* set hvaddr_base to NULL when traptrace buffer registration fails */
-	if (ret != H_EOK) {
+}
+
+/*
+ * This function allocates hypervisor traptrace buffer
+ */
+void
+mach_htraptrace_init(void)
+{
+	if (mach_htraptrace_enable && (max_ncpus > 1))
+		httrace_buf = contig_mem_alloc_align((HTRAP_TSIZE *
+		    max_ncpus), HTRAP_TSIZE);
+	else
+		httrace_buf = NULL;
+}
+
+/*
+ * This function cleans up the hypervisor traptrace buffer
+ */
+void
+mach_htraptrace_cleanup(int cpuid)
+{
+	int i;
+	TRAP_TRACE_CTL  *ctlp;
+	caddr_t newbuf;
+
+	if (mach_htraptrace_enable) {
+		ctlp = &trap_trace_ctl[cpuid];
+		newbuf = ctlp->d.hvaddr_base;
+		i = (newbuf - httrace_buf) / HTRAP_TSIZE;
+		if (((newbuf - httrace_buf) % HTRAP_TSIZE == 0) &&
+		    ((i >= 0) && (i < max_ncpus))) {
+			bzero(newbuf, HTRAP_TSIZE);
+		} else if (newbuf == htrap_tr0) {
+			bzero(htrap_tr0, (HTRAP_TSIZE));
+		} else {
+			cmn_err(CE_WARN, "failed to free trap trace buffer "
+			    "from cpu%d", cpuid);
+		}
 		ctlp->d.hvaddr_base = NULL;
 		ctlp->d.hlimit = 0;
 		ctlp->d.hpaddr_base = NULL;
 	}
 }
-#endif /* TRAPTRACE */

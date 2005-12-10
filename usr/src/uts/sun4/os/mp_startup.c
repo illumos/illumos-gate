@@ -39,12 +39,10 @@
 #include <sys/dtrace.h>
 #include <sys/reboot.h>
 #include <sys/kdi.h>
-
-#ifdef TRAPTRACE
 #include <sys/traptrace.h>
+#ifdef TRAPTRACE
 #include <sys/bootconf.h>
 #endif /* TRAPTRACE */
-
 #include <sys/cpu_sgnblk_defs.h>
 
 extern void cpu_intrq_setup(struct cpu *);
@@ -111,13 +109,13 @@ trap_trace_alloc(caddr_t base)
 		return (base);
 	}
 
-	if ((vaddr = (caddr_t)BOP_ALLOC(bootops, base, (TRAP_TBUF_SIZE *
-		(max_ncpus - 1)), TRAP_TBUF_SIZE)) == NULL) {
+	if ((vaddr = (caddr_t)BOP_ALLOC(bootops, base, (TRAP_TSIZE *
+		(max_ncpus - 1)), TRAP_TSIZE)) == NULL) {
 		panic("traptrace_alloc: can't bop alloc");
 	}
 	ttrace_buf = vaddr;
 	PRM_DEBUG(ttrace_buf);
-	return (vaddr + (TRAP_TBUF_SIZE * (max_ncpus - 1)));
+	return (vaddr + (TRAP_TSIZE * (max_ncpus - 1)));
 }
 #endif	/* TRAPTRACE */
 
@@ -329,18 +327,18 @@ setup_cpu_common(int cpuid)
 			    break;
 		ASSERT(tt_index < max_ncpus - 1);
 		trap_trace_inuse[tt_index] = 1;
-		newbuf = (caddr_t)(ttrace_buf + (tt_index * TRAP_TBUF_SIZE));
+		newbuf = (caddr_t)(ttrace_buf + (tt_index * TRAP_TSIZE));
 	}
 	ctlp->d.vaddr_base = newbuf;
 	ctlp->d.offset = ctlp->d.last_offset = 0;
 	ctlp->d.limit = trap_trace_bufsize;
 	ctlp->d.paddr_base = va_to_pa(newbuf);
 	ASSERT(ctlp->d.paddr_base != (uint64_t)-1);
-	/*
-	 * initialize HV trap trace buffer for other cpus
-	 */
-	htrap_trace_setup((newbuf + TRAP_TSIZE), cpuid);
 #endif /* TRAPTRACE */
+	/*
+	 * initialize hv traptrace buffer for this CPU
+	 */
+	mach_htraptrace_setup(cpuid);
 
 	/*
 	 * Obtain pointer to the appropriate cpu structure.
@@ -480,24 +478,28 @@ cleanup_cpu_common(int cpuid)
 	 */
 	segkp_release(segkp, cp->cpu_intr_stack);
 
+	/*
+	 * Free hv traptrace buffer for this CPU.
+	 */
+	mach_htraptrace_cleanup(cpuid);
 #ifdef TRAPTRACE
 	/*
 	 * Free the traptrace buffer for this CPU.
 	 */
 	ctlp = &trap_trace_ctl[cpuid];
 	newbuf = ctlp->d.vaddr_base;
-	i = (newbuf - ttrace_buf) / (TRAP_TBUF_SIZE);
-	if (((newbuf - ttrace_buf) % (TRAP_TBUF_SIZE) == 0) &&
+	i = (newbuf - ttrace_buf) / (TRAP_TSIZE);
+	if (((newbuf - ttrace_buf) % (TRAP_TSIZE) == 0) &&
 	    ((i >= 0) && (i < (max_ncpus-1)))) {
 		/*
 		 * This CPU got it's trap trace buffer from the
 		 * boot-alloc'd bunch of them.
 		 */
 		trap_trace_inuse[i] = 0;
-		bzero(newbuf, (TRAP_TBUF_SIZE));
+		bzero(newbuf, (TRAP_TSIZE));
 	} else if (newbuf == trap_tr0) {
 		trap_tr0_inuse = 0;
-		bzero(trap_tr0, (TRAP_TBUF_SIZE));
+		bzero(trap_tr0, (TRAP_TSIZE));
 	} else {
 		cmn_err(CE_WARN, "failed to free trap trace buffer from cpu%d",
 		    cpuid);
@@ -587,9 +589,7 @@ slave_startup(void)
 	struct cpu	*cp = CPU;
 	ushort_t	original_flags = cp->cpu_flags;
 
-#ifdef TRAPTRACE
-	htrap_trace_register(cp->cpu_id);
-#endif
+	mach_htraptrace_configure(cp->cpu_id);
 	cpu_intrq_register(CPU);
 	cp->cpu_m.mutex_ready = 1;
 	cp->cpu_m.poke_cpu_outstanding = B_FALSE;

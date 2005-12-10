@@ -61,14 +61,9 @@
 #include <sys/cmn_err.h>
 #include <sys/promif.h>
 #include <sys/prom_debug.h>
-
-#ifdef TRAPTRACE
 #include <sys/traptrace.h>
-#endif /* TRAPTRACE */
-
 #include <sys/memnode.h>
 #include <sys/mem_cage.h>
-
 
 extern void setup_trap_table(void);
 extern void cpu_intrq_setup(struct cpu *);
@@ -2122,6 +2117,9 @@ startup_end(void)
 	mach_descrip_init();
 	cpu_intrq_setup(CPU);
 	cpu_intrq_register(CPU);
+	mach_htraptrace_init();
+	mach_htraptrace_setup(CPU->cpu_id);
+	mach_htraptrace_configure(CPU->cpu_id);
 	mach_dump_buffer_init();
 
 	/*
