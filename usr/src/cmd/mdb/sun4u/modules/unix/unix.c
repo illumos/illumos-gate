@@ -514,7 +514,7 @@ int
 ttctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	TRAP_TRACE_CTL *ctls, *ctl;
-	int i;
+	int i, traptrace_buf_inuse = 0;
 
 	if (argc != 0)
 		return (DCMD_USAGE);
@@ -533,6 +533,7 @@ ttctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (ctl->d.vaddr_base == 0)
 			continue;
 
+		traptrace_buf_inuse = 1;
 		mdb_printf("trap_trace_ctl[%d] = {\n", i);
 		mdb_printf("  vaddr_base = 0x%lx\n", (long)ctl->d.vaddr_base);
 		mdb_printf("  last_offset = 0x%x\n", ctl->d.last_offset);
@@ -540,6 +541,10 @@ ttctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("  limit = 0x%x\n", ctl->d.limit);
 		mdb_printf("  paddr_base = 0x%llx\n", ctl->d.paddr_base);
 		mdb_printf("  asi = 0x%02x\n}\n", ctl->d.asi);
+	}
+	if (!traptrace_buf_inuse) {
+		mdb_warn("traptrace not configured");
+		return (DCMD_ERR);
 	}
 
 	return (DCMD_OK);
@@ -667,7 +672,7 @@ int
 ttrace_walk_init(mdb_walk_state_t *wsp)
 {
 	TRAP_TRACE_CTL *ctls, *ctl;
-	int i;
+	int i, traptrace_buf_inuse = 0;
 	ttrace_walk_data_t *tw;
 	ttrace_cpu_data_t *tc;
 	struct trap_trace_record *buf;
@@ -698,6 +703,7 @@ ttrace_walk_init(mdb_walk_state_t *wsp)
 		if (ctl->d.vaddr_base == 0)
 			continue;
 
+		traptrace_buf_inuse = 1;
 		tc = &(tw->tw_cpus[i]);
 		tc->tc_bufsiz = ctl->d.limit -
 		    sizeof (struct trap_trace_record);
@@ -715,6 +721,11 @@ ttrace_walk_init(mdb_walk_state_t *wsp)
 			tc->tc_stop = (struct trap_trace_record *)
 			    ((uintptr_t)buf + (uintptr_t)ctl->d.offset);
 		}
+	}
+	if (!traptrace_buf_inuse) {
+		mdb_warn("traptrace not configured");
+		mdb_free(ctls, sizeof (TRAP_TRACE_CTL) * ncpu);
+		return (DCMD_ERR);
 	}
 
 	mdb_free(ctls, sizeof (TRAP_TRACE_CTL) * ncpu);
@@ -849,7 +860,7 @@ int
 httctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	TRAP_TRACE_CTL *ctls, *ctl;
-	int i;
+	int i, htraptrace_buf_inuse = 0;
 	htrap_trace_hdr_t hdr;
 
 	if (argc != 0)
@@ -869,6 +880,7 @@ httctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		if (ctl->d.hvaddr_base == 0)
 			continue;
 
+		htraptrace_buf_inuse = 1;
 		mdb_vread(&hdr, sizeof (htrap_trace_hdr_t),
 			(uintptr_t)ctl->d.hvaddr_base);
 		mdb_printf("htrap_trace_ctl[%d] = {\n", i);
@@ -877,6 +889,10 @@ httctl(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		mdb_printf("  offset = 0x%lx\n", hdr.offset);
 		mdb_printf("  limit = 0x%x\n", ctl->d.hlimit);
 		mdb_printf("  paddr_base = 0x%llx\n}\n", ctl->d.hpaddr_base);
+	}
+	if (!htraptrace_buf_inuse) {
+		mdb_warn("hv traptrace not configured");
+		return (DCMD_ERR);
 	}
 
 	return (DCMD_OK);
@@ -944,7 +960,7 @@ int
 httrace_walk_init(mdb_walk_state_t *wsp)
 {
 	TRAP_TRACE_CTL *ctls, *ctl;
-	int i;
+	int i, htraptrace_buf_inuse = 0;
 	httrace_walk_data_t *tw;
 	httrace_cpu_data_t *tc;
 	struct htrap_trace_record *buf;
@@ -976,6 +992,7 @@ httrace_walk_init(mdb_walk_state_t *wsp)
 		if (ctl->d.hvaddr_base == 0)
 			continue;
 
+		htraptrace_buf_inuse = 1;
 		tc = &(tw->tw_cpus[i]);
 		tc->tc_bufsiz = ctl->d.hlimit -
 			sizeof (struct htrap_trace_record);
@@ -995,6 +1012,11 @@ httrace_walk_init(mdb_walk_state_t *wsp)
 			tc->tc_stop = (struct htrap_trace_record *)
 				((uintptr_t)buf + (uintptr_t)hdr.offset);
 		}
+	}
+	if (!htraptrace_buf_inuse) {
+		mdb_warn("hv traptrace not configured");
+		mdb_free(ctls, sizeof (TRAP_TRACE_CTL) * ncpu);
+		return (DCMD_ERR);
 	}
 
 	mdb_free(ctls, sizeof (TRAP_TRACE_CTL) * ncpu);
