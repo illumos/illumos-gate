@@ -103,6 +103,11 @@ static char 	hasEPIC = B_FALSE;
 #define	ABORT_INCREMENT_DELAY	10
 
 /*
+ * FWARC 2005/687: power device compatible property
+ */
+#define	POWER_DEVICE_TYPE "power-device-type"
+
+/*
  * Driver global variables
  */
 static void *power_state;
@@ -1178,31 +1183,53 @@ power_setup_mbc_regs(dev_info_t *dip, struct power_soft_state *softsp)
 
 /*
  * Setup register map for the power button
- * NOTE:- we only map registers for platforms
- * binding with the ali1535d+-power compatible
- * property or mbc-power or epic property.
+ * NOTE:- we only map registers for platforms if
+ * the OBP power device has any of the following
+ * properties:
+ *
+ * a) Boston:  power-device-type set to "SUNW,mbc"
+ * b) Seattle: power-device-type set to "SUNW,pic18lf65j10"
+ * c) Chalupa: compatible set to "ali1535d+-power"
+ *
+ * Cases (a) and (b) are defined in FWARC 2005/687.
+ * If none of the above conditions are true, then we
+ * do not need to map in any registers, and this
+ * function can simply return DDI_SUCCESS.
  */
 static int
 power_setup_regs(struct power_soft_state *softsp)
 {
 	char	*binding_name;
+	char	*power_type = NULL;
+	int	retval = DDI_SUCCESS;
 
 	softsp->power_regs_mapped = B_FALSE;
 	softsp->power_btn_ioctl = B_FALSE;
 	binding_name = ddi_binding_name(softsp->dip);
-	if (strcmp(binding_name, "mbc-power") == 0)
-		return (power_setup_mbc_regs(softsp->dip, softsp));
-	else if (strcmp(binding_name, "SUNW,ebus-pic18lf65j10-power") == 0)
-		return (power_setup_epic_regs(softsp->dip, softsp));
-	else if (strcmp(binding_name, "ali1535d+-power") == 0)
-		return (power_setup_m1535_regs(softsp->dip, softsp));
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, softsp->dip,
+	    DDI_PROP_DONTPASS, POWER_DEVICE_TYPE,
+	    &power_type) == DDI_PROP_SUCCESS) {
+		if (strcmp(power_type, "SUNW,mbc") == 0) {
+			retval = power_setup_mbc_regs(softsp->dip, softsp);
+		} else if (strcmp(power_type, "SUNW,pic18lf65j10") == 0) {
+			retval = power_setup_epic_regs(softsp->dip, softsp);
+		} else {
+			cmn_err(CE_WARN, "unexpected power-device-type: %s\n",
+			    power_type);
+			retval = DDI_FAILURE;
+		}
+		ddi_prop_free(power_type);
+	} else if (strcmp(binding_name, "ali1535d+-power") == 0) {
+		retval = power_setup_m1535_regs(softsp->dip, softsp);
+	}
 
 	/*
-	 * If the binding name is not one of these, that means there is no
-	 * additional HW and hence no extra processing is necessary. Just
-	 * return SUCCESS.
+	 * If power-device-type does not exist AND the binding name is not
+	 * "ali1535d+-power", that means there is no additional HW and hence
+	 * no extra processing is necessary. In that case, retval should still
+	 * be set to its initial value of DDI_SUCCESS.
 	 */
-	return (DDI_SUCCESS);
+	return (retval);
 }
 
 static void

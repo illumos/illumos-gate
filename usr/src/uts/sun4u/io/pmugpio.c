@@ -51,6 +51,11 @@ typedef enum {
 } pmugpio_access_type_t;
 
 /*
+ * FWARC 2005/686: gpio device compatible property
+ */
+#define	PMUGPIO_DEVICE_TYPE "gpio-device-type"
+
+/*
  * CPLD GPIO Register defines.
  */
 #define	CPLD_RESET_SC		0x01	/* Reset SC */
@@ -368,22 +373,37 @@ static int
 pmugpio_map_regs(dev_info_t *dip, pmugpio_state_t *pmugpio_ptr)
 {
 	ddi_device_acc_attr_t attr;
-	char *binding_name;
+	char *pmugpio_type;
 
 	/* The host controller will be little endian */
 	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 	attr.devacc_attr_endian_flags  = DDI_STRUCTURE_LE_ACC;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
 
-	binding_name = ddi_binding_name(dip);
-
 	/*
-	 * Determine access type.
+	 * Determine access type per FWARC 2005/686.
+	 * For Boston and Seattle, the OBP gpio device contains a property
+	 * named "gpio-device-type".
+	 *
+	 * Boston:  gpio-device-type = SUNW,mbc
+	 * Seattle: gpio-device-type = SUNW,cpld
+	 *
+	 * If this property does not exist, we are a legacy Chalupa.
 	 */
-	if (strcmp(binding_name, "mbcgpio") == 0)
-		pmugpio_ptr->access_type = PMUGPIO_MBC;
-	else if (strcmp(binding_name, "cpldgpio") == 0)
-		pmugpio_ptr->access_type = PMUGPIO_CPLD;
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    PMUGPIO_DEVICE_TYPE, &pmugpio_type) == DDI_PROP_SUCCESS) {
+		if (strcmp(pmugpio_type, "SUNW,mbc") == 0)
+			pmugpio_ptr->access_type = PMUGPIO_MBC;
+		else if (strcmp(pmugpio_type, "SUNW,cpld") == 0)
+			pmugpio_ptr->access_type = PMUGPIO_CPLD;
+		else {
+			cmn_err(CE_WARN, "unexpected gpio-device-type: %s\n",
+			    pmugpio_type);
+			ddi_prop_free(pmugpio_type);
+			return (DDI_FAILURE);
+		}
+		ddi_prop_free(pmugpio_type);
+	}
 	else
 		pmugpio_ptr->access_type = PMUGPIO_OTHER;
 
