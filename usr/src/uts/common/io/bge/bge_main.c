@@ -247,7 +247,6 @@ static void
 bge_reset(bge_t *bgep)
 {
 	uint64_t	ring;
-	int		i;
 
 	BGE_TRACE(("bge_reset($%p)", (void *)bgep));
 
@@ -303,8 +302,6 @@ bge_stop(bge_t *bgep)
 static void
 bge_start(bge_t *bgep, boolean_t reset_phys)
 {
-	int	i;
-
 	BGE_TRACE(("bge_start($%p, %d)", (void *)bgep, reset_phys));
 
 	ASSERT(mutex_owned(bgep->genlock));
