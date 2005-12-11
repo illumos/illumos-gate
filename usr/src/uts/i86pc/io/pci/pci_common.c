@@ -51,6 +51,8 @@
 #include <io/pci/pci_var.h>
 #include <io/pci/pci_tools_ext.h>
 #include <io/pci/pci_common.h>
+#include <sys/pci_cfgspace.h>
+#include <sys/pci_impl.h>
 
 /*
  * Function prototypes
@@ -817,4 +819,308 @@ pci_common_ioctl(dev_info_t *dip, dev_t dev, int cmd, intptr_t arg,
 	}
 
 	return (rv);
+}
+
+
+/*
+ * These are the get and put functions to be shared with drivers. The
+ * mutex locking is done inside the functions referenced, rather than
+ * here, and is thus shared across PCI child drivers and any other
+ * consumers of PCI config space (such as the ACPI subsystem).
+ *
+ * The configuration space addresses come in as pointers.  This is fine on
+ * a 32-bit system, where the VM space and configuration space are the same
+ * size.  It's not such a good idea on a 64-bit system, where memory
+ * addresses are twice as large as configuration space addresses.  At some
+ * point in the call tree we need to take a stand and say "you are 32-bit
+ * from this time forth", and this seems like a nice self-contained place.
+ */
+
+uint8_t
+pci_config_rd8(ddi_acc_impl_t *hdlp, uint8_t *addr)
+{
+	pci_acc_cfblk_t *cfp;
+	uint8_t	rval;
+	int reg;
+
+	ASSERT64(((uintptr_t)addr >> 32) == 0);
+
+	reg = (int)(uintptr_t)addr;
+
+	cfp = (pci_acc_cfblk_t *)&hdlp->ahi_common.ah_bus_private;
+
+	rval = (*pci_getb_func)(cfp->c_busnum, cfp->c_devnum, cfp->c_funcnum,
+	    reg);
+
+	return (rval);
+}
+
+void
+pci_config_rep_rd8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
+	uint8_t *dev_addr, size_t repcount, uint_t flags)
+{
+	uint8_t *h, *d;
+
+	h = host_addr;
+	d = dev_addr;
+
+	if (flags == DDI_DEV_AUTOINCR)
+		for (; repcount; repcount--)
+			*h++ = pci_config_rd8(hdlp, d++);
+	else
+		for (; repcount; repcount--)
+			*h++ = pci_config_rd8(hdlp, d);
+}
+
+uint16_t
+pci_config_rd16(ddi_acc_impl_t *hdlp, uint16_t *addr)
+{
+	pci_acc_cfblk_t *cfp;
+	uint16_t rval;
+	int reg;
+
+	ASSERT64(((uintptr_t)addr >> 32) == 0);
+
+	reg = (int)(uintptr_t)addr;
+
+	cfp = (pci_acc_cfblk_t *)&hdlp->ahi_common.ah_bus_private;
+
+	rval = (*pci_getw_func)(cfp->c_busnum, cfp->c_devnum, cfp->c_funcnum,
+	    reg);
+
+	return (rval);
+}
+
+void
+pci_config_rep_rd16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
+	uint16_t *dev_addr, size_t repcount, uint_t flags)
+{
+	uint16_t *h, *d;
+
+	h = host_addr;
+	d = dev_addr;
+
+	if (flags == DDI_DEV_AUTOINCR)
+		for (; repcount; repcount--)
+			*h++ = pci_config_rd16(hdlp, d++);
+	else
+		for (; repcount; repcount--)
+			*h++ = pci_config_rd16(hdlp, d);
+}
+
+uint32_t
+pci_config_rd32(ddi_acc_impl_t *hdlp, uint32_t *addr)
+{
+	pci_acc_cfblk_t *cfp;
+	uint32_t rval;
+	int reg;
+
+	ASSERT64(((uintptr_t)addr >> 32) == 0);
+
+	reg = (int)(uintptr_t)addr;
+
+	cfp = (pci_acc_cfblk_t *)&hdlp->ahi_common.ah_bus_private;
+
+	rval = (*pci_getl_func)(cfp->c_busnum, cfp->c_devnum,
+	    cfp->c_funcnum, reg);
+
+	return (rval);
+}
+
+void
+pci_config_rep_rd32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
+	uint32_t *dev_addr, size_t repcount, uint_t flags)
+{
+	uint32_t *h, *d;
+
+	h = host_addr;
+	d = dev_addr;
+
+	if (flags == DDI_DEV_AUTOINCR)
+		for (; repcount; repcount--)
+			*h++ = pci_config_rd32(hdlp, d++);
+	else
+		for (; repcount; repcount--)
+			*h++ = pci_config_rd32(hdlp, d);
+}
+
+
+void
+pci_config_wr8(ddi_acc_impl_t *hdlp, uint8_t *addr, uint8_t value)
+{
+	pci_acc_cfblk_t *cfp;
+	int reg;
+
+	ASSERT64(((uintptr_t)addr >> 32) == 0);
+
+	reg = (int)(uintptr_t)addr;
+
+	cfp = (pci_acc_cfblk_t *)&hdlp->ahi_common.ah_bus_private;
+
+	(*pci_putb_func)(cfp->c_busnum, cfp->c_devnum,
+	    cfp->c_funcnum, reg, value);
+}
+
+void
+pci_config_rep_wr8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
+	uint8_t *dev_addr, size_t repcount, uint_t flags)
+{
+	uint8_t *h, *d;
+
+	h = host_addr;
+	d = dev_addr;
+
+	if (flags == DDI_DEV_AUTOINCR)
+		for (; repcount; repcount--)
+			pci_config_wr8(hdlp, d++, *h++);
+	else
+		for (; repcount; repcount--)
+			pci_config_wr8(hdlp, d, *h++);
+}
+
+void
+pci_config_wr16(ddi_acc_impl_t *hdlp, uint16_t *addr, uint16_t value)
+{
+	pci_acc_cfblk_t *cfp;
+	int reg;
+
+	ASSERT64(((uintptr_t)addr >> 32) == 0);
+
+	reg = (int)(uintptr_t)addr;
+
+	cfp = (pci_acc_cfblk_t *)&hdlp->ahi_common.ah_bus_private;
+
+	(*pci_putw_func)(cfp->c_busnum, cfp->c_devnum,
+	    cfp->c_funcnum, reg, value);
+}
+
+void
+pci_config_rep_wr16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
+	uint16_t *dev_addr, size_t repcount, uint_t flags)
+{
+	uint16_t *h, *d;
+
+	h = host_addr;
+	d = dev_addr;
+
+	if (flags == DDI_DEV_AUTOINCR)
+		for (; repcount; repcount--)
+			pci_config_wr16(hdlp, d++, *h++);
+	else
+		for (; repcount; repcount--)
+			pci_config_wr16(hdlp, d, *h++);
+}
+
+void
+pci_config_wr32(ddi_acc_impl_t *hdlp, uint32_t *addr, uint32_t value)
+{
+	pci_acc_cfblk_t *cfp;
+	int reg;
+
+	ASSERT64(((uintptr_t)addr >> 32) == 0);
+
+	reg = (int)(uintptr_t)addr;
+
+	cfp = (pci_acc_cfblk_t *)&hdlp->ahi_common.ah_bus_private;
+
+	(*pci_putl_func)(cfp->c_busnum, cfp->c_devnum,
+	    cfp->c_funcnum, reg, value);
+}
+
+void
+pci_config_rep_wr32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
+	uint32_t *dev_addr, size_t repcount, uint_t flags)
+{
+	uint32_t *h, *d;
+
+	h = host_addr;
+	d = dev_addr;
+
+	if (flags == DDI_DEV_AUTOINCR)
+		for (; repcount; repcount--)
+			pci_config_wr32(hdlp, d++, *h++);
+	else
+		for (; repcount; repcount--)
+			pci_config_wr32(hdlp, d, *h++);
+}
+
+uint64_t
+pci_config_rd64(ddi_acc_impl_t *hdlp, uint64_t *addr)
+{
+	uint32_t lw_val;
+	uint32_t hi_val;
+	uint32_t *dp;
+	uint64_t val;
+
+	dp = (uint32_t *)addr;
+	lw_val = pci_config_rd32(hdlp, dp);
+	dp++;
+	hi_val = pci_config_rd32(hdlp, dp);
+	val = ((uint64_t)hi_val << 32) | lw_val;
+	return (val);
+}
+
+void
+pci_config_wr64(ddi_acc_impl_t *hdlp, uint64_t *addr, uint64_t value)
+{
+	uint32_t lw_val;
+	uint32_t hi_val;
+	uint32_t *dp;
+
+	dp = (uint32_t *)addr;
+	lw_val = (uint32_t)(value & 0xffffffff);
+	hi_val = (uint32_t)(value >> 32);
+	pci_config_wr32(hdlp, dp, lw_val);
+	dp++;
+	pci_config_wr32(hdlp, dp, hi_val);
+}
+
+void
+pci_config_rep_rd64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
+	uint64_t *dev_addr, size_t repcount, uint_t flags)
+{
+	if (flags == DDI_DEV_AUTOINCR) {
+		for (; repcount; repcount--)
+			*host_addr++ = pci_config_rd64(hdlp, dev_addr++);
+	} else {
+		for (; repcount; repcount--)
+			*host_addr++ = pci_config_rd64(hdlp, dev_addr);
+	}
+}
+
+void
+pci_config_rep_wr64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
+	uint64_t *dev_addr, size_t repcount, uint_t flags)
+{
+	if (flags == DDI_DEV_AUTOINCR) {
+		for (; repcount; repcount--)
+			pci_config_wr64(hdlp, host_addr++, *dev_addr++);
+	} else {
+		for (; repcount; repcount--)
+			pci_config_wr64(hdlp, host_addr++, *dev_addr);
+	}
+}
+
+
+/*
+ * Enable Legacy PCI config space access for the following four north bridges
+ *	Host bridge: AMD HyperTransport Technology Configuration
+ *	Host bridge: AMD Address Map
+ *	Host bridge: AMD DRAM Controller
+ *	Host bridge: AMD Miscellaneous Control
+ */
+int
+is_amd_northbridge(dev_info_t *dip)
+{
+	int vendor_id, device_id;
+
+	vendor_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+			"vendor-id", -1);
+	device_id = ddi_prop_get_int(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+			"device-id", -1);
+
+	if (IS_AMD_NTBRIDGE(vendor_id, device_id))
+		return (0);
+
+	return (1);
 }

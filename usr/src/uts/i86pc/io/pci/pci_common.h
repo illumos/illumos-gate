@@ -34,15 +34,74 @@
 extern "C" {
 #endif
 
+/*
+ *	Common header file with definitions shared between
+ *	pci(7d) and npe(7d)
+ */
+
 /* State structure. */
 typedef struct pci_state {
 	dev_info_t *pci_dip;
 } pci_state_t;
 
+/* AMD's northbridges vendor-id and device-ids */
+#define	AMD_NTBRDIGE_VID		0x1022	/* AMD vendor-id */
+#define	AMD_HT_NTBRIDGE_DID		0x1100	/* HT Configuration */
+#define	AMD_AM_NTBRIDGE_DID		0x1101	/* Address Map */
+#define	AMD_DC_NTBRIDGE_DID		0x1102	/* DRAM Controller */
+#define	AMD_MC_NTBRIDGE_DID		0x1103	/* Misc Controller */
+
 /*
- *	Common header file with definitions shared between
- *	pci(7d) and npe(7d)
+ * Check if the given device is an AMD northbridge
  */
+#define	IS_AMD_NTBRIDGE(vid, did) \
+	    (((vid) == AMD_NTBRDIGE_VID) && \
+	    (((did) == AMD_HT_NTBRIDGE_DID) || \
+	    ((did) == AMD_AM_NTBRIDGE_DID) || \
+	    ((did) == AMD_DC_NTBRIDGE_DID) || \
+	    ((did) == AMD_MC_NTBRIDGE_DID)))
+
+/*
+ * Check if the give device is a PCI northbridge
+ */
+int		is_amd_northbridge(dev_info_t *dip);
+
+/*
+ * These are the access routines.
+ * The pci_bus_map sets the handle to point to these in pci(7d).
+ * The npe_bus_map sets the handle to point to these in npe(7d).
+ */
+uint8_t		pci_config_rd8(ddi_acc_impl_t *hdlp, uint8_t *addr);
+uint16_t	pci_config_rd16(ddi_acc_impl_t *hdlp, uint16_t *addr);
+uint32_t	pci_config_rd32(ddi_acc_impl_t *hdlp, uint32_t *addr);
+uint64_t	pci_config_rd64(ddi_acc_impl_t *hdlp, uint64_t *addr);
+
+void		pci_config_wr8(ddi_acc_impl_t *hdlp, uint8_t *addr,
+		    uint8_t value);
+void		pci_config_wr16(ddi_acc_impl_t *hdlp, uint16_t *addr,
+		    uint16_t value);
+void		pci_config_wr32(ddi_acc_impl_t *hdlp, uint32_t *addr,
+		    uint32_t value);
+void		pci_config_wr64(ddi_acc_impl_t *hdlp, uint64_t *addr,
+		    uint64_t value);
+
+void		pci_config_rep_rd8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
+		    uint8_t *dev_addr, size_t repcount, uint_t flags);
+void		pci_config_rep_rd16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
+		    uint16_t *dev_addr, size_t repcount, uint_t flags);
+void		pci_config_rep_rd32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
+		    uint32_t *dev_addr, size_t repcount, uint_t flags);
+void		pci_config_rep_rd64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
+		    uint64_t *dev_addr, size_t repcount, uint_t flags);
+
+void		pci_config_rep_wr8(ddi_acc_impl_t *hdlp, uint8_t *host_addr,
+		    uint8_t *dev_addr, size_t repcount, uint_t flags);
+void		pci_config_rep_wr16(ddi_acc_impl_t *hdlp, uint16_t *host_addr,
+		    uint16_t *dev_addr, size_t repcount, uint_t flags);
+void		pci_config_rep_wr32(ddi_acc_impl_t *hdlp, uint32_t *host_addr,
+		    uint32_t *dev_addr, size_t repcount, uint_t flags);
+void		pci_config_rep_wr64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
+		    uint64_t *dev_addr, size_t repcount, uint_t flags);
 
 /*
  * PCI tool related declarations

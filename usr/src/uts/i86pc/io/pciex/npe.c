@@ -48,6 +48,7 @@
  */
 static int	npe_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 		    off_t, off_t, caddr_t *);
+static int	npe_map_legacy_pci(off_t, off_t, caddr_t *, ddi_acc_hdl_t *);
 static int	npe_ctlops(dev_info_t *, dev_info_t *, ddi_ctl_enum_t,
 		    void *, void *);
 static int	npe_intr_ops(dev_info_t *, dev_info_t *, ddi_intr_op_t,
@@ -370,7 +371,11 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			break;
 
 		case PCI_ADDR_CONFIG:
-			/* Just fall through */
+			/* Check for AMD's northbridges */
+			if (is_amd_northbridge(rdip) == 0)
+				return (DDI_SUCCESS);
+
+			/* FALLTHROUGH */
 		case PCI_ADDR_MEM64:
 			/*
 			 * MEM64 requires special treatment on map, to check
@@ -407,14 +412,18 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 		if (hp == NULL)
 			return (DDI_FAILURE);
 
-		pci_rp->pci_phys_low = ddi_prop_get_int64(DDI_DEV_T_ANY,
-		    rdip, 0, "ecfga-base-address", 0);
-
 		/* record the device address for future reference */
 		cfp = (pci_acc_cfblk_t *)&hp->ah_bus_private;
 		cfp->c_busnum = PCI_REG_BUS_G(pci_rp->pci_phys_hi);
 		cfp->c_devnum = PCI_REG_DEV_G(pci_rp->pci_phys_hi);
 		cfp->c_funcnum = PCI_REG_FUNC_G(pci_rp->pci_phys_hi);
+
+		/* Check for AMD's northbridges */
+		if (is_amd_northbridge(rdip) == 0)
+			return (npe_map_legacy_pci(offset, len, vaddrp, hp));
+
+		pci_rp->pci_phys_low = ddi_prop_get_int64(DDI_DEV_T_ANY,
+		    rdip, 0, "ecfga-base-address", 0);
 
 		pci_rp->pci_phys_low += ((cfp->c_busnum << 20) |
 		    (cfp->c_devnum) << 15 | (cfp->c_funcnum << 12));
@@ -470,6 +479,61 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 	mp->map_obj.rp = &reg;
 	return (ddi_map(dip, mp, (off_t)0, (off_t)0, vaddrp));
+}
+
+
+static int
+npe_map_legacy_pci(off_t offset, off_t len, caddr_t *vaddrp, ddi_acc_hdl_t *hp)
+{
+	ddi_acc_impl_t	*ap;
+
+	/*
+	 * check for config space
+	 * On x86, CONFIG is not mapped via MMU and there is
+	 * no endian-ness issues. Set the attr field in the handle to
+	 * indicate that the common routines to call the nexus driver.
+	 */
+
+	ap = (ddi_acc_impl_t *)hp->ah_platform_private;
+
+	/* endian-ness check */
+	if (hp->ah_acc.devacc_attr_endian_flags == DDI_STRUCTURE_BE_ACC)
+		return (DDI_FAILURE);
+
+	/*
+	 * range check
+	 */
+	if ((offset >= PCI_CONF_HDR_SIZE) ||
+	    (len > PCI_CONF_HDR_SIZE) ||
+	    (offset + len > PCI_CONF_HDR_SIZE))
+		return (DDI_FAILURE);
+	*vaddrp = (caddr_t)offset;
+
+	ap->ahi_acc_attr |= DDI_ACCATTR_CONFIG_SPACE;
+	ap->ahi_put8 = pci_config_wr8;
+	ap->ahi_get8 = pci_config_rd8;
+	ap->ahi_put64 = pci_config_wr64;
+	ap->ahi_get64 = pci_config_rd64;
+	ap->ahi_rep_put8 = pci_config_rep_wr8;
+	ap->ahi_rep_get8 = pci_config_rep_rd8;
+	ap->ahi_rep_put64 = pci_config_rep_wr64;
+	ap->ahi_rep_get64 = pci_config_rep_rd64;
+	ap->ahi_get16 = pci_config_rd16;
+	ap->ahi_get32 = pci_config_rd32;
+	ap->ahi_put16 = pci_config_wr16;
+	ap->ahi_put32 = pci_config_wr32;
+	ap->ahi_rep_get16 = pci_config_rep_rd16;
+	ap->ahi_rep_get32 = pci_config_rep_rd32;
+	ap->ahi_rep_put16 = pci_config_rep_wr16;
+	ap->ahi_rep_put32 = pci_config_rep_wr32;
+
+	/* Initialize to default check/notify functions */
+	ap->ahi_fault_check = i_ddi_acc_fault_check;
+	ap->ahi_fault_notify = i_ddi_acc_fault_notify;
+	ap->ahi_fault = 0;
+	impl_acc_err_init(hp);
+
+	return (DDI_SUCCESS);
 }
 
 

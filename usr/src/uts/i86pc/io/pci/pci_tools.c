@@ -39,10 +39,11 @@
 #include <sys/hotplug/pci/pcihp.h>
 #include <sys/pci_cfgspace.h>
 #include <sys/pci_tools.h>
-#include "pci_tools_ext.h"
+#include <io/pci/pci_tools_ext.h>
 #include <io/pcplusmp/apic.h>
 #include <io/pci/pci_var.h>
 #include <sys/promif.h>
+#include <sys/x86_archext.h>
 
 #define	PCIEX_BDF_OFFSET_DELTA	4
 #define	PCIEX_REG_FUNC_SHIFT	(PCI_REG_FUNC_SHIFT + PCIEX_BDF_OFFSET_DELTA)
@@ -865,8 +866,19 @@ pcitool_dev_reg_ops(dev_info_t *dip, void *arg, int cmd, int mode)
 				goto done_reg;
 			}
 
-			/* Access device.  prg is modified. */
-			if (max_cfg_size == PCIE_CONF_HDR_SIZE)
+			/*
+			 * Access device.  prg is modified.
+			 * First, check for AMD northbridges for I/O access
+			 * (This fix will move in future to pcitool user-land)
+			 * Next, check for PCIe devices and do
+			 * memory-mapped access
+			 * Lastly, check for PCI devices and do I/O access
+			 */
+			if (prg.bus_no == 0 && prg.dev_no == 0x18) {
+				if (cpuid_getvendor(CPU) == X86_VENDOR_AMD)
+					rval = pcitool_cfg_access(dip, &prg,
+					    write_flag);
+			} else if (max_cfg_size == PCIE_CONF_HDR_SIZE)
 				rval = pcitool_pciex_cfg_access(dip, &prg,
 				    write_flag);
 			else
