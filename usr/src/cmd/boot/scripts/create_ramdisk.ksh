@@ -96,7 +96,7 @@ function getsize {
 	total_size=0
 	for file in $filelist
 	do
-		if [ -e $file ] ; then
+		if [ -e ${ALT_ROOT}/${file} ] ; then
 			du -sk ${ALT_ROOT}/${file} | read size name
 			(( total_size += size ))
 		fi
