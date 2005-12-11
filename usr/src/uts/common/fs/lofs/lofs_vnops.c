@@ -338,8 +338,10 @@ lo_lookup(
 	/*
 	 * Do the normal lookup
 	 */
-	if (error = VOP_LOOKUP(realdvp, nm, &vp, pnp, flags, rdir, cr))
+	if (error = VOP_LOOKUP(realdvp, nm, &vp, pnp, flags, rdir, cr)) {
+		vp = NULL;
 		goto out;
+	}
 
 	/*
 	 * We do this check here to avoid returning a stale file handle to the

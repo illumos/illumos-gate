@@ -720,7 +720,10 @@ gfs_dir_lookup(vnode_t *dvp, const char *nm, vnode_t **vpp)
 out:
 	gfs_dir_unlock(dp);
 
-	*vpp = vp;
+	if (ret == 0)
+		*vpp = vp;
+	else
+		*vpp = NULL;
 
 	return (ret);
 }
