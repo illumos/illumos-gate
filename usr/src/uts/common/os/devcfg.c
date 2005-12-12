@@ -174,6 +174,7 @@ static int devi_unconfig_common(dev_info_t *, dev_info_t **, int, major_t,
 static int
 ndi_devi_config_obp_args(dev_info_t *parent, char *devnm,
     dev_info_t **childp, int flags);
+static void i_link_vhci_node(dev_info_t *);
 
 /*
  * dev_info cache and node management
@@ -557,6 +558,8 @@ link_node(dev_info_t *dip)
 	 * may be depending on them.  This workaround embodies the knowledge
 	 * that system PM and CPR both traverse the tree left-to-right during
 	 * SUSPEND and right-to-left during RESUME.
+	 * Extending the workaround to IB Nexus/VHCI
+	 * driver also.
 	 */
 	if (strcmp(devi->devi_name, "scsi_vhci") == 0) {
 		/* Add scsi_vhci to beginning of list */
@@ -564,6 +567,8 @@ link_node(dev_info_t *dip)
 		/* scsi_vhci under rootnex */
 		devi->devi_sibling = parent->devi_child;
 		parent->devi_child = devi;
+	} else if (strcmp(devi->devi_name, "ib") == 0) {
+		i_link_vhci_node(dip);
 	} else {
 		/* Add to end of list */
 		*dipp = dip;
@@ -2902,6 +2907,13 @@ i_ddi_forceattach_drivers()
 	(void) ddi_hold_installed_driver(ddi_name_to_major("ehci"));
 	(void) ddi_hold_installed_driver(ddi_name_to_major("uhci"));
 	(void) ddi_hold_installed_driver(ddi_name_to_major("ohci"));
+
+	/*
+	 * Attach IB VHCI driver before the force-attach thread attaches the
+	 * IB HCA driver. IB HCA driver will fail if IB Nexus has not yet
+	 * been attached.
+	 */
+	(void) ddi_hold_installed_driver(ddi_name_to_major("ib"));
 
 	(void) thread_create(NULL, 0, (void (*)())attach_drivers, NULL, 0, &p0,
 	    TS_RUN, minclsyspri);
@@ -6552,10 +6564,11 @@ i_init_vhci_node(dev_info_t *dip)
 static void
 i_link_vhci_node(dev_info_t *dip)
 {
+	ASSERT(MUTEX_HELD(&global_vhci_lock));
+
 	/*
 	 * scsi_vhci should be kept left most of the device tree.
 	 */
-	mutex_enter(&global_vhci_lock);
 	if (scsi_vhci_dip) {
 		DEVI(dip)->devi_sibling = DEVI(scsi_vhci_dip)->devi_sibling;
 		DEVI(scsi_vhci_dip)->devi_sibling = DEVI(dip);
@@ -6563,7 +6576,6 @@ i_link_vhci_node(dev_info_t *dip)
 		DEVI(dip)->devi_sibling = DEVI(top_devinfo)->devi_child;
 		DEVI(top_devinfo)->devi_child = DEVI(dip);
 	}
-	mutex_exit(&global_vhci_lock);
 }
 
 
@@ -6635,7 +6647,9 @@ ndi_devi_config_vhci(char *drvname, int flags)
 	DEVI_CLR_ATTACHING(dip);
 	mutex_exit(&(DEVI(dip)->devi_lock));
 
+	mutex_enter(&global_vhci_lock);
 	i_link_vhci_node(dip);
+	mutex_exit(&global_vhci_lock);
 	i_ddi_set_node_state(dip, DS_READY);
 
 	LOCK_DEV_OPS(&dnp->dn_lock);

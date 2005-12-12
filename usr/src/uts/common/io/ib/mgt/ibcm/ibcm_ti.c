@@ -151,7 +151,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 
 	/* cm handler should always be specified */
 	if (chan_args->oc_cm_handler == NULL) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "CM handler is not be specified", channel);
 		return (IBT_INVALID_PARAM);
 	}
@@ -159,31 +159,31 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	if (mode == IBT_NONBLOCKING) {
 		if (ret_args != NULL) {
 			IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
-			    "ret_args should be NULL when called in "
+			    " ret_args should be NULL when called in "
 			    "non-blocking mode", channel);
 			return (IBT_INVALID_PARAM);
 		}
 	} else if (mode == IBT_BLOCKING) {
 		if (ret_args == NULL) {
 			IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
-			    "ret_args should be Non-NULL when called in "
+			    " ret_args should be Non-NULL when called in "
 			    "blocking mode", channel);
 			return (IBT_INVALID_PARAM);
 		}
 		if (ret_args->rc_priv_data_len > IBT_REP_PRIV_DATA_SZ) {
 			IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
-			    "private data length is too large", channel);
+			    " private data length is too large", channel);
 			return (IBT_INVALID_PARAM);
 		}
 		if ((ret_args->rc_priv_data_len > 0) &&
 		    (ret_args->rc_priv_data == NULL)) {
 			IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
-			    "rc_priv_data_len > 0, but rc_priv_data NULL",
+			    " rc_priv_data_len > 0, but rc_priv_data NULL",
 			    channel);
 			return (IBT_INVALID_PARAM);
 		}
 	} else { /* any other mode is not valid for ibt_open_rc_channel */
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "invalid mode %x specified", channel, mode);
 		return (IBT_INVALID_PARAM);
 	}
@@ -192,14 +192,14 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	 * XXX: no support yet for ibt_chan_open_flags_t - IBT_OCHAN_DUP
 	 */
 	if (flags & IBT_OCHAN_DUP) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Unsupported Flags specified: 0x%X", channel, flags);
 		return (IBT_INVALID_PARAM);
 	}
 
 	if ((flags & IBT_OCHAN_REDIRECTED) &&
 	    (flags & IBT_OCHAN_PORT_REDIRECTED)) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Illegal to specify IBT_OCHAN_REDIRECTED and "
 		    "IBT_OCHAN_PORT_REDIRECTED flags together", channel);
 		return (IBT_INVALID_PARAM);
@@ -209,7 +209,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	    (chan_args->oc_cm_redirect_info == NULL)) ||
 	    ((flags & IBT_OCHAN_PORT_REDIRECTED) &&
 	    (chan_args->oc_cm_cep_path == NULL))) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Redirect flag specified, but respective arg is NULL",
 		    channel);
 		return (IBT_INVALID_PARAM);
@@ -218,7 +218,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	if ((flags & IBT_OCHAN_REDIRECTED) &&
 	    (chan_args->oc_cm_redirect_info->rdi_dlid == 0) &&
 	    (chan_args->oc_cm_redirect_info->rdi_gid.gid_guid == 0)) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Either rdi_dlid or rdi_gid must be specified for"
 		    " IBT_OCHAN_REDIRECTED", channel);
 		return (IBT_INVALID_PARAM);
@@ -228,21 +228,21 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	port_no = IBCM_PRIM_CEP_PATH(chan_args).cep_hca_port_num;
 
 	if ((IBCM_PRIM_ADDS_VECT(chan_args).av_dlid == 0) && (port_no == 0)) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Primary Path's information is not valid", channel);
 		return (IBT_INVALID_PARAM);
 	}
 
 	/* validate SID */
 	if (chan_args->oc_path->pi_sid == 0) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "ERROR: Service ID in path information is 0", channel);
 		return (IBT_INVALID_PARAM);
 	}
 
 	/* validate rnr_retry_cnt (enum has more than 3 bits) */
 	if ((uint_t)chan_args->oc_path_rnr_retry_cnt > IBT_RNR_INFINITE_RETRY) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "ERROR: oc_path_rnr_retry_cnt(%d) is out of range",
 		    channel, chan_args->oc_path_rnr_retry_cnt);
 		return (IBT_INVALID_PARAM);
@@ -255,7 +255,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	IBCM_GET_CHAN_PRIVATE(channel, statep);
 	if (statep != NULL) {
 		IBCM_RELEASE_CHAN_PRIVATE(channel);
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Channel being re-used on active side", channel);
 		return (IBT_CHAN_IN_USE);
 	}
@@ -265,7 +265,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 
 	/* validate QP's hca guid with that from primary path  */
 	if (hca_guid != chan_args->oc_path->pi_hca_guid) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "GUID from Channel and primary path don't match", channel);
 		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Channel GUID %llX primary path GUID %llX", channel,
@@ -276,12 +276,9 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
 	    "Local HCA GUID %llX", channel, hca_guid);
 
-	ibcm_rc_flow_control_enter();	/* limit how many run simultaneously */
-
 	status = ibt_query_qp(channel, &qp_query_attr);
 	if (status != IBT_SUCCESS) {
-		ibcm_rc_flow_control_exit();
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "ibt_query_qp failed %d", channel, status);
 		return (status);
 	}
@@ -289,8 +286,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	/* If client specified "no port change on QP" */
 	if ((qp_query_attr.qp_info.qp_transport.rc.rc_path.cep_hca_port_num !=
 	    port_no) && (flags & IBT_OCHAN_PORT_FIXED)) {
-		ibcm_rc_flow_control_exit();
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "chan port %d and path port %d does not match", channel,
 		    qp_query_attr.qp_info.qp_transport.rc.rc_path. \
 		    cep_hca_port_num, port_no);
@@ -298,8 +294,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	}
 
 	if (qp_query_attr.qp_info.qp_trans != IBT_RC_SRV) {
-		ibcm_rc_flow_control_exit();
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Invalid Channel type: Applicable only to RC Channel",
 		    channel);
 		return (IBT_CHAN_SRV_TYPE_INVALID);
@@ -307,8 +302,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 
 	/* Check if QP is in INIT state or not */
 	if (qp_query_attr.qp_info.qp_state != IBT_STATE_INIT) {
-		ibcm_rc_flow_control_exit();
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "QP is not in INIT state %x", channel,
 		    qp_query_attr.qp_info.qp_state);
 		return (IBT_CHAN_STATE_INVALID);
@@ -330,9 +324,8 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 
 		status = ibt_query_eec(channel, &eec_query_attr);
 		if (status != IBT_SUCCESS) {
-			ibcm_rc_flow_control_exit();
 			IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
-			    "ibt_query_eec failed %d", channel, status);
+			    " ibt_query_eec failed %d", channel, status);
 			return (status);
 		}
 		local_eecn = eec_query_attr.eec_eecn;
@@ -342,7 +335,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 
 	/* If no HCA found return failure */
 	if ((hcap = ibcm_find_hca_entry(hca_guid)) == NULL) {
-		ibcm_rc_flow_control_exit();
 		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "hcap is NULL. Probably hca is not in active state",
 		    channel);
@@ -354,19 +346,17 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 
 	if ((rdma_in > hcap->hca_max_rdma_in_qp) ||
 	    (rdma_out > hcap->hca_max_rdma_out_qp)) {
-		ibcm_rc_flow_control_exit();
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "rdma in %d/out %d values exceed hca limits", channel,
 		    rdma_in, rdma_out);
 		ibcm_dec_hca_acc_cnt(hcap);
 		return (IBT_INVALID_PARAM);
 	}
 
-	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p"
+	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
 	    "rdma_in %d rdma_out %d", channel, rdma_in, rdma_out);
 
 	if (chan_args->oc_path->pi_prim_pkt_lt > ibcm_max_ib_pkt_lt) {
-		ibcm_rc_flow_control_exit();
 		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Huge Primary Pkt lt %d", channel,
 		    chan_args->oc_path->pi_prim_pkt_lt);
@@ -377,8 +367,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	status = ibt_get_port_state_byguid(hcap->hca_guid, port_no,
 	    NULL, &base_lid);
 	if (status != IBT_SUCCESS) {
-		ibcm_rc_flow_control_exit();
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "primary port_num %d not active", channel, port_no);
 		ibcm_dec_hca_acc_cnt(hcap);
 		return (status);
@@ -388,7 +377,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	status = ibt_index2pkey_byguid(hcap->hca_guid, port_no,
 	    IBCM_PRIM_CEP_PATH(chan_args).cep_pkey_ix, &prim_pkey);
 	if (status != IBT_SUCCESS) {
-		ibcm_rc_flow_control_exit();
 		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "Invalid Primary PKeyIx %x", channel,
 		    IBCM_PRIM_CEP_PATH(chan_args).cep_pkey_ix);
@@ -396,15 +384,14 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		return (status);
 	}
 
-	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p"
+	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
 	    "primary_port_num %d primary_pkey 0x%x", channel, port_no,
 	    prim_pkey);
 
 	if ((hcap->hca_port_info[port_no - 1].port_ibmf_hdl == NULL) &&
 	    ((status = ibcm_hca_reinit_port(hcap, port_no - 1))
 	    != IBT_SUCCESS)) {
-		ibcm_rc_flow_control_exit();
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "ibmf reg or callback setup failed during re-initialize",
 		    channel);
 		ibcm_dec_hca_acc_cnt(hcap);
@@ -428,7 +415,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		alt_port_no = IBCM_ALT_CEP_PATH(chan_args).cep_hca_port_num;
 
 		if (chan_args->oc_path->pi_alt_pkt_lt > ibcm_max_ib_pkt_lt) {
-			ibcm_rc_flow_control_exit();
 			IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 			    "Huge Alt Pkt lt %d", channel,
 			    chan_args->oc_path->pi_alt_pkt_lt);
@@ -442,7 +428,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 			    alt_port_no, NULL, &base_lid);
 			if (status != IBT_SUCCESS) {
 
-				ibcm_rc_flow_control_exit();
 				IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: "
 				    "chan 0x%p alt_port_num %d inactive %d",
 				    channel, alt_port_no, status);
@@ -454,7 +439,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		alternate_slid =
 		    base_lid + IBCM_ALT_ADDS_VECT(chan_args).av_src_path;
 
-		IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan %0xp"
+		IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan %0xp "
 		    "alternate SLID = %x", channel, alternate_slid);
 	}
 
@@ -469,8 +454,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	if ((status = ibcm_init_reply_addr(hcap, &cm_reply_addr, chan_args,
 	    flags, &cm_pkt_lt, primary_slid)) != IBT_SUCCESS) {
 
-		ibcm_rc_flow_control_exit();
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "ibcm_init_reply_addr failed status %d ", channel, status);
 		ibcm_dec_hca_acc_cnt(hcap);
 		return (status);
@@ -488,8 +472,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	/* Retrieve an ibmf qp for sending CM MADs */
 	if ((cm_qp_entry = ibcm_find_qp(hcap, port_no,
 	    cm_reply_addr.rcvd_addr.ia_p_key)) == NULL) {
-		ibcm_rc_flow_control_exit();
-		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p "
 		    "unable to allocate ibmf qp for CM MADs", channel);
 		ibcm_dec_hca_acc_cnt(hcap);
 		return (IBT_INSUFF_RESOURCE);
@@ -497,7 +480,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 
 
 	if (ibcm_alloc_comid(hcap, &local_comid) != IBCM_SUCCESS) {
-		ibcm_rc_flow_control_exit();
 		ibcm_release_qp(cm_qp_entry);
 		ibcm_dec_hca_acc_cnt(hcap);
 		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: chan 0x%p"
@@ -508,7 +490,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	/* allocate an IBMF mad buffer */
 	if ((status = ibcm_alloc_out_msg(ibmf_hdl, &ibmf_msg,
 	    MAD_METHOD_SEND)) != IBT_SUCCESS) {
-		ibcm_rc_flow_control_exit();
 		IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: "
 		    "chan 0x%p ibcm_alloc_out_msg failed", channel);
 		ibcm_release_qp(cm_qp_entry);
@@ -544,7 +525,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		status = ibt_modify_qp(channel, cep_flags, &qp_info, NULL);
 
 		if (status != IBT_SUCCESS) {
-			ibcm_rc_flow_control_exit();
 			IBTF_DPRINTF_L2(cmlog, "ibt_open_rc_channel: "
 			    "chan 0x%p ibt_modify_qp() = %d", channel, status);
 			ibcm_release_qp(cm_qp_entry);
@@ -572,7 +552,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 
 	/* Once a resource created on hca, no need to hold the acc cnt */
 	ibcm_dec_hca_acc_cnt(hcap);
-
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(*statep))
 
@@ -678,7 +657,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	    chan_args->oc_path_rnr_retry_cnt;
 
 	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p CM retry cnt %d"
-	    "staring PSN %x", channel, cm_retries, starting_psn);
+	    " staring PSN %x", channel, cm_retries, starting_psn);
 
 
 #ifdef	NO_EEC_SUPPORT_YET
@@ -699,6 +678,9 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	req_msgp->req_primary_r_port_gid.gid_guid =
 	    h2b64(IBCM_PRIM_ADDS_VECT(chan_args).av_dgid.gid_guid);
 	primary_grh = IBCM_PRIM_ADDS_VECT(chan_args).av_send_grh;
+
+	statep->remote_hca_guid = /* not correct, but helpful for debugging */
+	    IBCM_PRIM_ADDS_VECT(chan_args).av_dgid.gid_guid;
 
 	/* Bytes 88-91 - primary_flowlbl, and primary_srate */
 	req_msgp->req_primary_flow_label_plus =
@@ -731,11 +713,8 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	    channel, IBCM_PRIM_ADDS_VECT(chan_args).av_dlid);
 
 	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
-	    "prim gid prefix %llX", channel,
-	    IBCM_PRIM_ADDS_VECT(chan_args).av_dgid.gid_prefix);
-
-	IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
-	    "prim gid guid %llX ", channel,
+	    "prim GID %llX:%llX", channel,
+	    IBCM_PRIM_ADDS_VECT(chan_args).av_dgid.gid_prefix,
 	    IBCM_PRIM_ADDS_VECT(chan_args).av_dgid.gid_guid);
 
 	/* Initialize the "alternate" port stuff - optional */
@@ -786,11 +765,8 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		    IBCM_ALT_ADDS_VECT(chan_args).av_dlid);
 
 		IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
-		    "alt gid prefix %llX", channel,
-		    IBCM_ALT_ADDS_VECT(chan_args).av_dgid.gid_prefix);
-
-		IBTF_DPRINTF_L5(cmlog, "ibt_open_rc_channel: chan 0x%p "
-		    "alt gid guid %llX ", channel,
+		    "alt GID %llX:%llX", channel,
+		    IBCM_ALT_ADDS_VECT(chan_args).av_dgid.gid_prefix,
 		    IBCM_ALT_ADDS_VECT(chan_args).av_dgid.gid_guid);
 	}
 
@@ -815,7 +791,8 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	statep->pkt_life_time =
 	    ibt_ib2usec(chan_args->oc_path->pi_prim_pkt_lt);
 
-	statep->timer_value = 2 * ibt_ib2usec(cm_pkt_lt) + remote_cm_resp_time;
+	statep->timer_value = ibt_ib2usec(ibt_usec2ib(
+	    2 * ibt_ib2usec(cm_pkt_lt) + remote_cm_resp_time));
 
 	/* Initialize statep->stored_reply_addr */
 	statep->stored_reply_addr.ibmf_hdl = ibmf_hdl;
@@ -837,9 +814,11 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 	statep->prim_src_path_bits = IBCM_PRIM_ADDS_VECT(chan_args).av_src_path;
 	statep->alt_src_path_bits = IBCM_ALT_ADDS_VECT(chan_args).av_src_path;
 
+	statep->open_flow = 1;
 	statep->open_done = B_FALSE;
 	statep->state = statep->timer_stored_state = IBCM_STATE_REQ_SENT;
-	IBCM_REF_CNT_INCR(statep);	/* For non-blocking REQ post */
+	IBCM_REF_CNT_INCR(statep);	/* Decremented before return */
+	IBCM_REF_CNT_INCR(statep);	/* Decremented after REQ is posted */
 	statep->send_mad_flags |= IBCM_REQ_POST_BUSY;
 
 	IBCM_OUT_HDRP(statep->stored_msg)->AttributeID =
@@ -851,11 +830,7 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 
 	_NOTE(NOW_VISIBLE_TO_OTHER_THREADS(*statep))
 
-	ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_REQ);
-
-	/* Send REQ */
-	ibcm_post_rc_mad(statep, statep->stored_msg, ibcm_post_req_complete,
-	    statep);
+	ibcm_open_enqueue(statep);
 
 	mutex_enter(&statep->state_mutex);
 
@@ -877,7 +852,6 @@ ibt_open_rc_channel(ibt_channel_hdl_t channel, ibt_chan_open_flags_t flags,
 		    "ret status %d cm status %d", channel, status,
 		    statep->open_return_data->rc_status);
 	}
-
 
 	/* decrement the ref-count before leaving here */
 	IBCM_REF_CNT_DECR(statep);
@@ -959,7 +933,6 @@ ibcm_init_reply_addr(ibcm_hca_info_t *hcap, ibcm_mad_addr_t *reply_addr,
 
 	} else if (flags & IBT_OCHAN_REDIRECTED) {
 		ibt_redirect_info_t	*redirect_info;
-
 		ibt_hca_portinfo_t	*port_infop;
 		uint_t			psize, nports;
 
@@ -968,25 +941,25 @@ ibcm_init_reply_addr(ibcm_hca_info_t *hcap, ibcm_mad_addr_t *reply_addr,
 
 		redirect_info = chan_args->oc_cm_redirect_info;
 
+		if ((redirect_info->rdi_gid.gid_prefix == 0) ||
+		    (redirect_info->rdi_gid.gid_guid == 0)) {
+			IBTF_DPRINTF_L2(cmlog, "ibcm_init_reply_addr: "
+			    "ERROR: Re-direct GID value NOT Provided.");
+			return (IBT_INVALID_PARAM);
+		}
+
 		/* As per spec definition 1.1, it's always IB_GSI_QKEY */
 		reply_addr->rcvd_addr.ia_q_key = redirect_info->rdi_qkey;
 		reply_addr->rcvd_addr.ia_remote_qno = redirect_info->rdi_qpn;
 		reply_addr->rcvd_addr.ia_p_key = redirect_info->rdi_pkey;
 
 		/*
-		 * if LID is non-zero in classportinfo and DGID is in the same
-		 * subnet as SGID, use classportinfo fields to form
-		 * CM MAD destination address.
+		 * if LID is non-zero in classportinfo then use classportinfo
+		 * fields to form CM MAD destination address.
 		 */
-
-		if ((redirect_info->rdi_dlid != 0) &&
-		    ((redirect_info->rdi_gid.gid_guid == 0) ||
-		    (redirect_info->rdi_gid.gid_guid ==
-		    reply_addr->grh_hdr.ig_sender_gid.gid_guid))) {
-
+		if (redirect_info->rdi_dlid != 0) {
 			status = ibtl_cm_query_hca_ports_byguid(hcap->hca_guid,
 			    reply_addr->port_num, &port_infop, &nports, &psize);
-
 			if ((status != IBT_SUCCESS) || (nports == 0)) {
 				IBTF_DPRINTF_L2(cmlog, "ibcm_init_reply_addr: "
 				    "Query Ports Failed: %d", status);
@@ -1016,33 +989,27 @@ ibcm_init_reply_addr(ibcm_hca_info_t *hcap, ibcm_mad_addr_t *reply_addr,
 			    redirect_info->rdi_dlid;
 			reply_addr->rcvd_addr.ia_service_level =
 			    redirect_info->rdi_sl;
+			reply_addr->grh_exists = B_TRUE;
+			reply_addr->grh_hdr.ig_recver_gid =
+			    redirect_info->rdi_gid;
+			reply_addr->grh_hdr.ig_tclass =
+			    redirect_info->rdi_tclass;
+			reply_addr->grh_hdr.ig_flow_label =
+			    redirect_info->rdi_flow;
 
-			/* If GID is specified, copy GRH fields */
-			if (redirect_info->rdi_gid.gid_guid != 0) {
-				reply_addr->grh_exists = B_TRUE;
-				reply_addr->grh_hdr.ig_recver_gid =
-				    redirect_info->rdi_gid;
-				reply_addr->grh_hdr.ig_tclass =
-				    redirect_info->rdi_tclass;
-				reply_addr->grh_hdr.ig_flow_label =
-				    redirect_info->rdi_flow;
-
-				/* Classportinfo doesn't have hoplimit field */
-				reply_addr->grh_hdr.ig_hop_limit = 0xff;
-			}
+			/* Classportinfo doesn't have hoplimit field */
+			reply_addr->grh_hdr.ig_hop_limit = 0xff;
 			return (IBT_SUCCESS);
 
-		} else {	/* redirect GID on a different subnet */
+		} else {
 			ibt_path_attr_t	path_attr;
 			ib_gid_t	path_dgid[1];
 
 			/*
 			 * If GID is specified, and LID is zero in classportinfo
-			 * do a path lookup using specified GID, Pkey, FL, TC
+			 * do a path lookup using specified GID, Pkey,
 			 * in classportinfo
 			 */
-
-			ASSERT(redirect_info->rdi_gid.gid_guid != 0);
 
 			bzero(&path_attr, sizeof (path_attr));
 
@@ -1055,14 +1022,11 @@ ibcm_init_reply_addr(ibcm_hca_info_t *hcap, ibcm_mad_addr_t *reply_addr,
 			 * for originating end point for CM MADs above
 			 */
 			path_attr.pa_sgid = reply_addr->grh_hdr.ig_sender_gid;
-
 			path_attr.pa_num_dgids = 1;
-			path_attr.pa_flow = redirect_info->rdi_flow;
-			path_attr.pa_tclass = redirect_info->rdi_tclass;
 			path_attr.pa_pkey = redirect_info->rdi_pkey;
 
 			if ((status = ibt_get_paths(ibcm_ibt_handle,
-			    IBT_PATH_NO_FLAGS, &path_attr, 1, &path, NULL)) !=
+			    IBT_PATH_PKEY, &path_attr, 1, &path, NULL)) !=
 			    IBT_SUCCESS)
 				return (status);
 
@@ -1084,7 +1048,6 @@ ibcm_init_reply_addr(ibcm_hca_info_t *hcap, ibcm_mad_addr_t *reply_addr,
 
 	reply_addr->rcvd_addr.ia_remote_lid =
 	    cm_adds->av_dlid;
-
 	reply_addr->grh_hdr.ig_recver_gid =
 	    cm_adds->av_dgid;
 	reply_addr->grh_hdr.ig_flow_label =
@@ -1126,13 +1089,13 @@ ibt_prime_close_rc_channel(ibt_channel_hdl_t channel)
 
 	/* validate channel, first */
 	if (IBCM_INVALID_CHANNEL(channel)) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_prime_close_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_prime_close_rc_channel: chan 0x%p "
 		    "invalid channel", channel);
 		return (IBT_CHAN_HDL_INVALID);
 	}
 
 	if (ibtl_cm_get_chan_type(channel) != IBT_RC_SRV) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_prime_close_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_prime_close_rc_channel: chan 0x%p "
 		    "Invalid Channel type: Applicable only to RC Channel",
 		    channel);
 		return (IBT_CHAN_SRV_TYPE_INVALID);
@@ -1147,7 +1110,7 @@ ibt_prime_close_rc_channel(ibt_channel_hdl_t channel)
 	 */
 
 	if (statep == NULL) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_prime_close_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_prime_close_rc_channel: chan 0x%p "
 		    "statep NULL", channel);
 		return (IBT_SUCCESS);
 	}
@@ -1160,7 +1123,7 @@ ibt_prime_close_rc_channel(ibt_channel_hdl_t channel)
 	}
 	IBCM_REF_CNT_INCR(statep);
 	IBTF_DPRINTF_L4(cmlog, "ibt_prime_close_rc_channel: chan 0x%p statep %p"
-	    "state %x", channel, statep, statep->state);
+	    " state %x", channel, statep, statep->state);
 	mutex_exit(&statep->state_mutex);
 
 	/* clients could pre-allocate dreq mad, even before connection est */
@@ -1213,7 +1176,7 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 	}
 
 	if (ibtl_cm_get_chan_type(channel) != IBT_RC_SRV) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: chan 0x%p "
 		    "Invalid Channel type: Applicable only to RC Channel",
 		    channel);
 		return (IBT_CHAN_SRV_TYPE_INVALID);
@@ -1224,12 +1187,12 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 		if ((ret_priv_data_len_p != NULL) &&
 		    (*ret_priv_data_len_p > IBT_DREP_PRIV_DATA_SZ)) {
 			IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: chan 0x%p"
-			    "private data len %d is too large", channel,
+			    " private data len %d is too large", channel,
 			    *ret_priv_data_len_p);
 			return (IBT_INVALID_PARAM);
 		}
 	} else if ((mode != IBT_NONBLOCKING) && (mode != IBT_NOCALLBACKS)) {
-		IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: chan 0x%p"
+		IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: chan 0x%p "
 		    "invalid mode %x specified", channel, mode);
 		return (IBT_INVALID_PARAM);
 	}
@@ -1291,6 +1254,7 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 
 	/* If state is in pre-established states, abort the connection est */
 	if (statep->state != IBCM_STATE_ESTABLISHED) {
+		statep->cm_retries++;	/* ensure connection trace is dumped */
 
 		/* No DREP private data possible */
 		if (ret_priv_data_len_p != NULL)
@@ -1496,11 +1460,12 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 		IBTF_DPRINTF_L4(cmlog, "ibt_close_rc_channel: "
 		    "NOCALLBACKS on in statep = %p", statep);
 	}
+	mutex_exit(&statep->state_mutex);
 
-	statep->state = IBCM_STATE_TRANSIENT_DREQ_SENT;
-	statep->timerid = 0;
-	statep->close_done = B_FALSE;
-	statep->close_flow = 1;
+	mutex_enter(&statep->state_mutex);
+	if (statep->state != IBCM_STATE_ESTABLISHED) {
+		goto lost_race;
+	}
 
 	/*
 	 * Cancel/wait for any pending ibt_set_alt_path, and
@@ -1508,7 +1473,20 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 	 */
 	ibcm_sync_lapr_idle(statep);
 
-	ibcm_close_flow_control_enter();
+	ibcm_close_enter();
+
+	mutex_enter(&statep->state_mutex);
+	if (statep->state != IBCM_STATE_ESTABLISHED) {
+		ibcm_close_exit();
+		goto lost_race;
+	}
+
+	statep->state = IBCM_STATE_TRANSIENT_DREQ_SENT;
+	statep->timerid = 0;
+	statep->close_done = B_FALSE;
+	statep->close_flow = 1;
+	mutex_exit(&statep->state_mutex);
+
 	if (statep->dreq_msg == NULL) {
 		if ((status = ibcm_alloc_out_msg(
 		    statep->stored_reply_addr.ibmf_hdl, &statep->dreq_msg,
@@ -1517,16 +1495,16 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 			IBTF_DPRINTF_L2(cmlog, "ibt_close_rc_channel: "
 			    "chan 0x%p ibcm_alloc_out_msg failed ", channel);
 			mutex_enter(&statep->state_mutex);
+			ibcm_close_exit();
 			statep->state = IBCM_STATE_ESTABLISHED;
 			IBCM_REF_CNT_DECR(statep);
 			cv_broadcast(&statep->block_mad_cv);
 			statep->close_flow = 0;
-			ibcm_close_flow_control_exit();
 			mutex_exit(&statep->state_mutex);
 			return (status);
 		}
 	} else
-		IBTF_DPRINTF_L3(cmlog, "ibt_close_rc_channel:"
+		IBTF_DPRINTF_L3(cmlog, "ibt_close_rc_channel: "
 		    "DREQ MAD already allocated in statep %p", statep);
 
 	if ((ret_priv_data == NULL) || (ret_priv_data_len_p == NULL)) {
@@ -1543,25 +1521,11 @@ ibt_close_rc_channel(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 		    IBCM_OUT_MSGP(statep->dreq_msg))->dreq_private_data,
 		    priv_data_len);
 
-	/* statep mutex not held while posting the MAD */
-	if (mode == IBT_NONBLOCKING) {
-		if (taskq_dispatch(ibcm_taskq, ibcm_post_dreq_mad, statep,
-		    TQ_NOSLEEP) == 0) {
-			mutex_enter(&statep->state_mutex);
-			statep->state = IBCM_STATE_ESTABLISHED;
-			IBCM_REF_CNT_DECR(statep);
-			cv_broadcast(&statep->block_mad_cv);
-			statep->close_flow = 0;
-			ibcm_close_flow_control_exit();
-			mutex_exit(&statep->state_mutex);
-			return (IBT_INSUFF_KERNEL_RESOURCE);
-		}
-	} else {
-		ibcm_post_dreq_mad(statep);
-	}
+	ibcm_post_dreq_mad(statep);
 
 	mutex_enter(&statep->state_mutex);
 
+lost_race:
 	if (mode == IBT_BLOCKING) {
 
 		/* wait for DREP */
@@ -2278,7 +2242,7 @@ ibt_cm_delay(ibt_cmdelay_flags_t flags, void *cm_session_id,
 	ibcm_state_data_t	*statep;
 	ibt_status_t		status;
 
-	IBTF_DPRINTF_L2(cmlog, "ibt_cm_delay(0x%x, %p, 0x%x)",
+	IBTF_DPRINTF_L3(cmlog, "ibt_cm_delay(0x%x, %p, 0x%x)",
 	    flags, cm_session_id, service_time);
 
 	/*
@@ -2342,14 +2306,14 @@ ibt_cm_delay(ibt_cmdelay_flags_t flags, void *cm_session_id,
 		} else if (statep->ap_state == IBCM_AP_STATE_LAP_RCVD) {
 			statep->ap_state = IBCM_AP_STATE_MRA_LAP_RCVD;
 		} else {
-			IBTF_DPRINTF_L2(cmlog, "ibt_cm_delay: invalid state"
+			IBTF_DPRINTF_L2(cmlog, "ibt_cm_delay: invalid state "
 			    "/ap_state/mode %x, %x, %x", statep->state,
 			    statep->ap_state, statep->mode);
 			mutex_exit(&statep->state_mutex);
 			return (IBT_CHAN_STATE_INVALID);
 		}
 	} else {
-		IBTF_DPRINTF_L2(cmlog, "ibt_cm_delay: invalid state"
+		IBTF_DPRINTF_L2(cmlog, "ibt_cm_delay: invalid state "
 		    "/ap_state/mode %x, %x, %x", statep->state,
 		    statep->ap_state, statep->mode);
 		mutex_exit(&statep->state_mutex);
@@ -2371,9 +2335,9 @@ ibt_cm_delay(ibt_cmdelay_flags_t flags, void *cm_session_id,
 	/* post the MRA mad in blocking mode, as no timers involved */
 	ibcm_post_rc_mad(statep, statep->mra_msg, ibcm_post_mra_complete,
 	    statep);
-
+	ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_MRA);
 	/* If this message isn't seen then ibt_cm_delay failed */
-	IBTF_DPRINTF_L2(cmlog, "ibt_cm_delay: done !!");
+	IBTF_DPRINTF_L3(cmlog, "ibt_cm_delay: done !!");
 
 	return (IBT_SUCCESS);
 }
@@ -2844,7 +2808,7 @@ ibt_bind_service(ibt_srv_hdl_t srv_hdl, ib_gid_t gid, ibt_srv_bind_t *srv_bind,
 	ibcm_dec_hca_acc_cnt(hcap);
 
 	/* If this message isn't seen then ibt_bind_service failed */
-	IBTF_DPRINTF_L2(cmlog, "ibt_bind_service: DONE (%p, %llX:%llx)",
+	IBTF_DPRINTF_L2(cmlog, "ibt_bind_service: DONE (%p, %llX:%llX)",
 	    srv_hdl, gid.gid_prefix, gid.gid_guid);
 
 	if (sb_hdl_p != NULL)
@@ -3555,9 +3519,6 @@ ibt_query_ar(ib_gid_t *sgid, ibt_ar_t *queryp, ibt_ar_t *resultp)
 	/* Validate the returned number of records. */
 	if ((results_p != NULL) && (num_rec > 0)) {
 		uint8_t		*b;
-
-		IBTF_DPRINTF_L3(cmlog, "ibt_query_ar: "
-		    "Found %d Service Record(s).", num_rec);
 
 		/* Just return info from the first service record. */
 		svcrec_resp = (sa_service_record_t *)results_p;
@@ -4286,13 +4247,13 @@ ibt_set_alt_path(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 	IBTF_DPRINTF_L4(cmlog, "ibt_set_alt_path: alternate SLID = %x",
 	    h2b16(alternate_slid));
 
-	ibcm_rc_flow_control_enter();	/* limit how many run simultaneously */
+	ibcm_lapr_enter();	/* limit how many run simultaneously */
 
 	/* Allocate MAD for LAP */
 	if (statep->lapr_msg == NULL)
 		if ((status = ibcm_alloc_out_msg(ibmf_hdl, &statep->lapr_msg,
 		    MAD_METHOD_SEND)) != IBT_SUCCESS) {
-			ibcm_rc_flow_control_exit();
+			ibcm_lapr_exit();
 			IBTF_DPRINTF_L2(cmlog, "ibt_set_alt_path: "
 			    "chan 0x%p ibcm_alloc_out_msg failed", channel);
 			mutex_enter(&statep->state_mutex);
@@ -4312,7 +4273,7 @@ ibt_set_alt_path(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 		IBCM_REF_CNT_DECR(statep);
 		mutex_exit(&statep->state_mutex);
 		(void) ibcm_free_out_msg(ibmf_hdl, &statep->lapr_msg);
-		ibcm_rc_flow_control_exit();
+		ibcm_lapr_exit();
 		return (IBT_CHAN_STATE_INVALID);
 	} else {
 		/* Set to LAP Sent state */
@@ -4435,6 +4396,8 @@ ibt_set_alt_path(ibt_channel_hdl_t channel, ibt_execution_mode_t mode,
 	IBCM_REF_CNT_DECR(statep);
 
 	mutex_exit(&statep->state_mutex);
+
+	ibcm_lapr_exit();
 
 	/* If this message isn't seen then ibt_set_alt_path failed */
 	IBTF_DPRINTF_L4(cmlog, "ibt_set_alt_path: done");

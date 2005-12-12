@@ -80,7 +80,8 @@ static ibnex_rval_t	ibnex_commsvc_fininode(dev_info_t *);
 static ibnex_rval_t	ibnex_pseudo_fininode(dev_info_t *);
 
 extern uint64_t		ibnex_str2hex(char *, int, int *);
-extern int		ibnex_ioc_initnode(ibdm_ioc_info_t *, int);
+extern int		ibnex_ioc_initnode(ibdm_ioc_info_t *, int,
+			    dev_info_t *);
 extern dev_info_t	*ibnex_commsvc_initnode(dev_info_t *,
 			    ibdm_port_attr_t *, int, int, ib_pkey_t, int *,
 			    int);
@@ -88,7 +89,8 @@ extern int		ibnex_get_dip_from_guid(ib_guid_t, int,
 			    ib_pkey_t, dev_info_t **);
 extern void		ibnex_reprobe_ioc_dev(void *arg);
 extern void		ibnex_reprobe_ioc_all();
-extern int		ibnex_pseudo_create_pi(ibnex_node_data_t *);
+extern int		ibnex_pseudo_create_pi(ibnex_node_data_t *,
+			    dev_info_t *);
 extern void		ibnex_pseudo_initnodes(void);
 
 extern ibnex_t	ibnex;
@@ -1038,7 +1040,12 @@ ibnex_get_num_devices(void)
 
 	/* Last: figure out how many Pseudo nodes are present. */
 	for (nodep = ibnex.ibnex_pseudo_node_head; nodep;
-	    nodep = nodep->node_next, ++num_nodes);
+	    nodep = nodep->node_next) {
+		if (nodep->node_data.pseudo_node.pseudo_merge_node == 1)
+			continue;
+
+		num_nodes++;
+	}
 	return (num_nodes);
 }
 
@@ -1246,6 +1253,8 @@ ibnex_get_snapshot(char **buf, size_t *sz, int allow_probe)
 	/* lastly; pseudo nodes */
 	for (nodep = ibnex.ibnex_pseudo_node_head; nodep;
 	    nodep = nodep->node_next) {
+		if (nodep->node_data.pseudo_node.pseudo_merge_node == 1)
+			continue;
 		if (ibnex_fill_nodeinfo(&nvl, nodep, NULL) != 0) {
 			IBTF_DPRINTF_L2("ibnex", "ibnex_get_snapshot: "
 			    "filling NVL data for Pseudo %p failed", nodep);
@@ -1792,6 +1801,9 @@ ibnex_get_dip_from_apid(char *apid, dev_info_t **ret_dip,
 		/* pseudo ap_id */
 		for (nodep = ibnex.ibnex_pseudo_node_head; nodep;
 		    nodep = nodep->node_next) {
+			if (nodep->node_data.pseudo_node.pseudo_merge_node
+			    == 1)
+				continue;
 			node_addr = nodep->node_data.pseudo_node.
 			    pseudo_node_addr;
 			if (strncmp(dyn, node_addr, strlen(node_addr)) == 0) {
@@ -1855,6 +1867,8 @@ ibnex_handle_pseudo_configure(char *apid)
 	/* find the matching entry and configure it */
 	for (nodep = ibnex.ibnex_pseudo_node_head; nodep != NULL;
 	    nodep = nodep->node_next) {
+		if (nodep->node_data.pseudo_node.pseudo_merge_node == 1)
+			continue;
 		node_addr = nodep->node_data.pseudo_node.pseudo_node_addr;
 		if (strncmp(node_addr, last, strlen(last)))
 			continue;
@@ -1883,7 +1897,7 @@ ibnex_handle_pseudo_configure(char *apid)
 		nodep->node_data.pseudo_node.pseudo_new_node = 0;
 
 		mutex_exit(&ibnex.ibnex_mutex);
-		retval = ibnex_pseudo_create_pi(nodep);
+		retval = ibnex_pseudo_create_pi(nodep, NULL);
 		mutex_enter(&ibnex.ibnex_mutex);
 		if (retval == NDI_SUCCESS) {
 			nodep->node_state = IBNEX_CFGADM_CONFIGURED;
@@ -1942,7 +1956,7 @@ ibnex_handle_ioc_configure(char *apid)
 		return (retval);
 	}
 
-	retval = ibnex_ioc_initnode(ioc_info, IBNEX_CFGADM_ENUMERATE);
+	retval = ibnex_ioc_initnode(ioc_info, IBNEX_CFGADM_ENUMERATE, NULL);
 	ibdm_ibnex_free_ioc_list(ioc_info);
 
 	IBTF_DPRINTF_L4("ibnex", "\tibnex_handle_ioc_configure: "

@@ -76,6 +76,7 @@ typedef struct ibnex_pseudo_node_s {
 	int			pseudo_unit_addr_len;	/* unit addr len */
 	char			*pseudo_devi_name;	/* name of driver */
 	int			pseudo_new_node;	/* new node */
+	int			pseudo_merge_node;	/* merge node */
 } ibnex_pseudo_node_t;
 
 /*
@@ -248,6 +249,11 @@ typedef struct ibnex_s {
 typedef enum {
 		IB_EVENT_TAG_PROP_UPDATE = 0
 } ib_ddi_event_tag_t;
+
+/* Definations for IB HW in device tree status */
+#define	IBNEX_DEVTREE_NOT_CHECKED	-1
+#define	IBNEX_HW_NOT_IN_DEVTREE		0
+#define	IBNEX_HW_IN_DEVTREE		1
 
 #ifdef __cplusplus
 }

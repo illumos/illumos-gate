@@ -295,7 +295,7 @@ ibtl_cm_get_cnt(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 	ibt_hca_portinfo_t	*pinfop;
 	ib_guid_t		hca_guid, tmp_hca_guid = 0;
 	ib_gid_t		gid;
-	uint_t			pcount = 0;
+	uint_t			pcount = 0, tmp_pcount = 0;
 	uint_t			cnt = *count;
 	ibt_status_t		retval = IBT_SUCCESS;
 	uint_t			i, j;
@@ -393,15 +393,16 @@ ibtl_cm_get_cnt(ibt_path_attr_t *attr, ibt_path_flags_t flags,
 			} else if (pcount == 1) {
 				if (hdevp->hd_hca_dev_link) {
 					tmp_hca_guid = hca_guid;
+					tmp_pcount = pcount;
 					pcount = 0;
 				} else if (tmp_hca_guid) {
 					attr->pa_hca_guid = tmp_hca_guid;
 				} else {
 					attr->pa_hca_guid = hca_guid;
 				}
-			} else if ((pcount == 0) && (tmp_hca_guid) &&
-			    (hdevp->hd_hca_dev_link != NULL)) {
+			} else if ((pcount == 0) && (tmp_hca_guid)) {
 				attr->pa_hca_guid = tmp_hca_guid;
+				pcount = tmp_pcount;
 			}
 		}
 		hdevp = hdevp->hd_hca_dev_link;

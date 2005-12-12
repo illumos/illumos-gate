@@ -1951,29 +1951,9 @@ ibmf_i_alloc_msg(ibmf_client_t *clientp, ibmf_msg_impl_t **msgp, int km_flags)
 	msgimplp = (ibmf_msg_impl_t *)kmem_zalloc(sizeof (ibmf_msg_impl_t),
 	    km_flags);
 	if (msgimplp != NULL) {
-
-		ibmf_ud_dest_t	*ibmf_ud_dest;
-
 		if (km_flags == KM_SLEEP) {
 			ibmf_i_pop_ud_dest_thread(clientp->ic_myci);
 		}
-
-		/* get a UD dest structure from the pool */
-		ibmf_ud_dest = ibmf_i_get_ud_dest(clientp->ic_myci);
-		if (ibmf_ud_dest == NULL) {
-			kmem_free(msgimplp, sizeof (ibmf_msg_impl_t));
-			IBMF_TRACE_1(IBMF_TNF_NODEBUG, DPRINT_L1,
-			    ibmf_i_alloc_msg_err, IBMF_TNF_ERROR, "",
-			    "ibmf_i_alloc_msg(): %s\n",
-			    tnf_string, msg, "No ud_dest available");
-			IBMF_TRACE_0(IBMF_TNF_DEBUG, DPRINT_L4,
-			    ibmf_i_alloc_msg_end, IBMF_TNF_TRACE, "",
-			    "ibmf_i_alloc_msg() exit\n");
-			return (IBMF_NO_RESOURCES);
-		}
-		msgimplp->im_ibmf_ud_dest = ibmf_ud_dest;
-		msgimplp->im_ud_dest = &ibmf_ud_dest->ud_dest;
-
 	} else {
 		IBMF_TRACE_1(IBMF_TNF_NODEBUG, DPRINT_L1,
 		    ibmf_i_alloc_msg_err, IBMF_TNF_ERROR, "",

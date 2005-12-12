@@ -123,13 +123,19 @@ typedef enum ibcm_state_rc_trace_qualifier_e {
 	/* special event related */
 	IBCM_TRACE_STALE_DETECT,
 
+	IBCM_TRACE_OUT_REQ_RETRY,
+	IBCM_TRACE_OUT_REP_RETRY,
+	IBCM_TRACE_OUT_LAP_RETRY,
+	IBCM_TRACE_OUT_MRA_RETRY,
+	IBCM_TRACE_OUT_DREQ_RETRY,
+
 	/* End Marker */
 	IBCM_TRACE_END_MARKER
 
 } ibcm_state_rc_trace_qualifier_t;
 
 /* Number of traces per connection chunk */
-#define		IBCM_MAX_CONN_TRCNT		32
+#define		IBCM_MAX_CONN_TRCNT		40
 #define		IBCM_DEBUG_BUF_SIZE		4096
 
 /* If the trace time diff type is changed in the future, modify below */

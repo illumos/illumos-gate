@@ -87,7 +87,7 @@ ibcm_lookup_msg(ibcm_event_type_t event_type, ib_com_id_t comid,
 	avl_index_t		where;
 	ibcm_state_data_t	*sp;
 
-	IBTF_DPRINTF_L4(cmlog, "ibcm_lookup_msg: event = 0x%x, comid = 0x%lx",
+	IBTF_DPRINTF_L4(cmlog, "ibcm_lookup_msg: event = 0x%x, comid = 0x%x",
 	    event_type, comid);
 	IBTF_DPRINTF_L4(cmlog, "ibcm_lookup_msg: rem_qpn = 0x%lX, "
 	    "rem_hca_guid = 0x%llX", remote_qpn, remote_hca_guid);
@@ -160,7 +160,8 @@ ibcm_lookup_msg(ibcm_event_type_t event_type, ib_com_id_t comid,
 	    (event_type == IBCM_INCOMING_REP_STALE) ||
 	    (event_type == IBCM_OUTGOING_REQ))) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_lookup_msg: failed for "
-		    "event type %x", event_type);
+		    "event type %x remote_comid = 0x%x",
+		    event_type, comid);
 
 		return (IBCM_LOOKUP_FAIL);
 	}
@@ -424,6 +425,7 @@ void
 ibcm_dealloc_state_data(ibcm_state_data_t *statep)
 {
 	timeout_id_t timer_val;
+	int dump_trace;
 	IBTF_DPRINTF_L4(cmlog, "ibcm_dealloc_state_data: statep 0x%p", statep);
 
 	if (statep == NULL) {
@@ -474,6 +476,7 @@ ibcm_dealloc_state_data(ibcm_state_data_t *statep)
 
 	/* Ensure the thread doing ref cnt decr releases the mutex */
 	mutex_enter(&statep->state_mutex);
+	dump_trace = statep->cm_retries > 0;
 	mutex_exit(&statep->state_mutex);
 
 	/*
@@ -491,7 +494,7 @@ ibcm_dealloc_state_data(ibcm_state_data_t *statep)
 	ibcm_dec_hca_res_cnt(statep->hcap);
 
 	/* dump the trace data into ibtf_debug_buf */
-	if (ibcm_enable_trace & 4)
+	if ((ibcm_enable_trace & 4) || dump_trace)
 		ibcm_dump_conn_trace(statep);
 
 	ibcm_fini_conn_trace(statep);
@@ -639,7 +642,7 @@ ibcm_add_sidr_entry(ibcm_sidr_srch_t *srch_param, ibcm_hca_info_t *hcap)
 	ibcm_ud_state_data_t	*ud_statep;
 
 	IBTF_DPRINTF_L5(cmlog, "ibcm_add_sidr_entry: lid=%x, guid=%llX, "
-	    "grh = %x req_id = %lx", srch_param->srch_lid,
+	    "grh = %x req_id = %x", srch_param->srch_lid,
 	    srch_param->srch_gid.gid_guid, srch_param->srch_grh_exists,
 	    srch_param->srch_req_id);
 
@@ -1121,7 +1124,7 @@ ibcm_decode_tranid(uint64_t tran_id, uint32_t *cm_tran_priv)
 	id = tran_id & 0xFFFFFFFF;
 	event = (tran_id >> 32) & 0xF;
 
-	IBTF_DPRINTF_L5(cmlog, "ibcm_decode_tranid: id = 0x%lx, event = %x",
+	IBTF_DPRINTF_L5(cmlog, "ibcm_decode_tranid: id = 0x%x, event = %x",
 	    id, event);
 
 	if (cm_tran_priv) {
@@ -1566,6 +1569,15 @@ ibcm_fini_conn_trace(ibcm_state_data_t *statep)
 	}
 }
 
+/* mostly used to profile connection establishment times with dtrace */
+void
+ibcm_established(hrtime_t time_diff)
+{
+	if (time_diff > 1000000000LL)	/* 1 second */
+		IBTF_DPRINTF_L2(cmlog, "slow connection time (%d seconds)",
+		    (uint_t)(time_diff >> 30));
+}
+
 void
 ibcm_insert_trace(void *statep, ibcm_state_rc_trace_qualifier_t event_qualifier)
 {
@@ -1600,7 +1612,10 @@ ibcm_insert_trace(void *statep, ibcm_state_rc_trace_qualifier_t event_qualifier)
 
 	if ((ibcm_enable_trace & 1) == 0) {
 		hrt = gethrtime();
-		time_diff = (hrt - conn_trace->conn_base_tm) >> 10;
+		time_diff = hrt - conn_trace->conn_base_tm;
+		if (event_qualifier == IBCM_TRACE_CALLED_CONN_EST_EVENT)
+			ibcm_established(time_diff);
+		time_diff >>= 10;
 		if (time_diff >= TM_DIFF_MAX) {
 			/* RESET, future times are relative to new base time. */
 			conn_trace->conn_base_tm = hrt;
@@ -1726,7 +1741,7 @@ ibcm_query_qp(ibmf_handle_t ibmf_hdl, ibmf_qp_handle_t ibmf_qp)
 
 	ASSERT(ibmf_status == IBMF_SUCCESS);
 
-	IBTF_DPRINTF_L5(cmlog, "ibcm_query_qp: qpn %lx qkey %x pkey %x port %d",
+	IBTF_DPRINTF_L5(cmlog, "ibcm_query_qp: qpn %x qkey %x pkey %x port %d",
 	    qp_num, qp_qkey, qp_pkey, qp_port_num);
 }
 

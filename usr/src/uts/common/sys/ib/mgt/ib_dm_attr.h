@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,7 +103,8 @@ typedef struct ib_dm_io_unitinfo_s {
 #define	IB_DM_IOU_DEVICEID_MASK		0x2
 
 #define	IB_DM_IOC_ID_STRING_LEN		64	/* see ioc_id_string later */
-#define	IB_DM_VENDORID_MASK		0xFFFFFF
+#define	IB_DM_VENDORID_MASK		0xFFFFFF00
+#define	IB_DM_VENDORID_SHIFT		8
 
 typedef struct ib_dm_ioc_ctrl_profile_s {
 	ib_guid_t	ioc_guid;		/* GUID of the IOC */

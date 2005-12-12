@@ -138,7 +138,8 @@ static void ibdm_saa_handle_new_gid(void *);
 static void ibdm_reset_all_dgids(ibmf_saa_handle_t);
 static void ibdm_reset_gidinfo(ibdm_dp_gidinfo_t *);
 static void ibdm_delete_gidinfo(ibdm_dp_gidinfo_t *);
-
+static void ibdm_fill_srv_attr_mod(ib_mad_hdr_t *, ibdm_timeout_cb_args_t *);
+static void ibdm_bump_transactionID(ibdm_dp_gidinfo_t *);
 
 int	ibdm_dft_timeout	= IBDM_DFT_TIMEOUT;
 int	ibdm_dft_retry_cnt	= IBDM_DFT_NRETRIES;
@@ -1684,14 +1685,18 @@ ibdm_get_reachable_ports(ibdm_port_attr_t *portinfo, ibdm_hca_list_t *hca)
 		gid_info->gl_ibmf_hdl		= portinfo->pa_ibmf_hdl;
 		gid_info->gl_slid		= precp->SLID;
 		gid_info->gl_dlid		= precp->DLID;
-		gid_info->gl_transactionID	= ++ibdm.ibdm_transactionID;
+		gid_info->gl_transactionID	= (++ibdm.ibdm_transactionID)
+		    << IBDM_GID_TRANSACTIONID_SHIFT;
+		gid_info->gl_min_transactionID  = gid_info->gl_transactionID;
+		gid_info->gl_max_transactionID  = (ibdm.ibdm_transactionID +1)
+		    << IBDM_GID_TRANSACTIONID_SHIFT;
 		ibdm_addto_glhcalist(gid_info,  hca);
 
 		ibdm_dump_path_info(precp);
 
 		gid_info->gl_qp_hdl = NULL;
-		if (portinfo->pa_pkey_tbl == NULL)
-			break;
+		ASSERT(portinfo->pa_pkey_tbl != NULL &&
+		    portinfo->pa_npkeys != 0);
 
 		for (jj = 0; jj < portinfo->pa_npkeys; jj++) {
 			pkey_tbl = &portinfo->pa_pkey_tbl[jj];
@@ -1702,9 +1707,15 @@ ibdm_get_reachable_ports(ibdm_port_attr_t *portinfo, ibdm_hca_list_t *hca)
 			}
 		}
 
+		/*
+		 * QP handle for GID not initialized. No matching Pkey
+		 * was found!! ibdm should *not* hit this case. Flag an
+		 * error and drop the GID if ibdm does encounter this.
+		 */
 		if (gid_info->gl_qp_hdl == NULL) {
-			gid_info->gl_state = IBDM_GID_PROBING_FAILED;
-			ibdm_delete_glhca_list(gid_info);
+			IBTF_DPRINTF_L2(ibdm_string,
+			    "\tget_reachable_ports: No matching Pkey");
+			ibdm_delete_gidinfo(gid_info);
 			continue;
 		}
 		if (ibdm.ibdm_dp_gidlist_head == NULL) {
@@ -1867,6 +1878,7 @@ ibdm_handle_classportinfo(ibmf_handle_t ibmf_hdl,
 	 * If created/ active,  cancel the timeout  handler
 	 */
 	mutex_enter(&gid_info->gl_mutex);
+	ibdm_bump_transactionID(gid_info);
 	if (gid_info->gl_state != IBDM_GET_CLASSPORTINFO) {
 		IBTF_DPRINTF_L2("ibdm", "\thandle_classportinfo:DUP resp");
 		*flag |= IBDM_IBMF_PKT_DUP_RESP;
@@ -1987,6 +1999,11 @@ ibdm_send_iounitinfo(ibdm_dp_gidinfo_t *gid_info)
 		IBTF_DPRINTF_L4("ibdm", "\tsend_iounitinfo: pkt alloc fail");
 		return (IBDM_FAILURE);
 	}
+
+	mutex_enter(&gid_info->gl_mutex);
+	ibdm_bump_transactionID(gid_info);
+	mutex_exit(&gid_info->gl_mutex);
+
 
 	ibdm_alloc_send_buffers(msg);
 	msg->im_local_addr.ia_local_lid		= gid_info->gl_slid;
@@ -2179,6 +2196,10 @@ ibdm_handle_iounitinfo(ibmf_handle_t ibmf_hdl,
 			continue;
 		}
 
+		mutex_enter(&gid_info->gl_mutex);
+		ibdm_bump_transactionID(gid_info);
+		mutex_exit(&gid_info->gl_mutex);
+
 		/*
 		 * Re use the already allocated packet (for IOUnitinfo) to
 		 * send the first IOC controller attribute. Allocate new
@@ -2352,11 +2373,13 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 	if (reprobe == 0) {
 		gioc->ioc_guid			= b2h64(ioc->ioc_guid);
 		gioc->ioc_vendorid		=
-		    (b2h32(ioc->ioc_vendorid) & IB_DM_VENDORID_MASK);
+		    ((b2h32(ioc->ioc_vendorid) & IB_DM_VENDORID_MASK)
+		    >> IB_DM_VENDORID_SHIFT);
 		gioc->ioc_deviceid		= b2h32(ioc->ioc_deviceid);
 		gioc->ioc_device_ver		= b2h16(ioc->ioc_device_ver);
 		gioc->ioc_subsys_vendorid	=
-		    (b2h32(ioc->ioc_subsys_vendorid) & IB_DM_VENDORID_MASK);
+		    ((b2h32(ioc->ioc_subsys_vendorid) & IB_DM_VENDORID_MASK)
+		    >> IB_DM_VENDORID_SHIFT);
 		gioc->ioc_subsys_id		= b2h32(ioc->ioc_subsys_id);
 		gioc->ioc_io_class		= b2h16(ioc->ioc_io_class);
 		gioc->ioc_io_subclass		= b2h16(ioc->ioc_io_subclass);
@@ -2408,6 +2431,10 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 	nserv_entries = ioc->ioc_service_entries;
 	ii = 0;
 	while (nserv_entries) {
+		mutex_enter(&gid_info->gl_mutex);
+		ibdm_bump_transactionID(gid_info);
+		mutex_exit(&gid_info->gl_mutex);
+
 		if (first != B_TRUE) {
 			if (ibmf_alloc_msg(ibmf_hdl, IBMF_ALLOC_SLEEP,
 			    &msg) != IBMF_SUCCESS) {
@@ -2453,19 +2480,15 @@ ibdm_handle_ioc_profile(ibmf_handle_t ibmf_hdl,
 		cb_args->cb_ioc_num	= ioc_no - 1;
 
 		if (nserv_entries >= IBDM_MAX_SERV_ENTRIES_PER_REQ) {
-			hdr->AttributeModifier = h2b32(((ioc_no << 16) |
-			    (srv_start << 8) | (srv_start + 3)));
 			nserv_entries -= IBDM_MAX_SERV_ENTRIES_PER_REQ;
 			cb_args->cb_srvents_end = (cb_args->cb_srvents_start +
 			    IBDM_MAX_SERV_ENTRIES_PER_REQ - 1);
 		} else {
-			hdr->AttributeModifier = h2b32(((ioc_no << 16) |
-			    (srv_start << 8) | (srv_start +
-			    (nserv_entries -1))));
 			cb_args->cb_srvents_end =
 			    (cb_args->cb_srvents_start + nserv_entries - 1);
 			nserv_entries = 0;
 		}
+		ibdm_fill_srv_attr_mod(hdr, cb_args);
 
 		ioc_info->ioc_serv[srv_start].se_timeout_id = timeout(
 		    ibdm_pkt_timeout_hdlr, cb_args,
@@ -2516,8 +2539,8 @@ ibdm_handle_srventry_mad(ibmf_msg_t *msg,
 	 */
 	attrmod = IBDM_IN_IBMFMSG_ATTRMOD(msg);
 	ioc_no	= ((attrmod >> 16) & IBDM_16_BIT_MASK);
-	start	= ((attrmod >> 8) & IBDM_8_BIT_MASK);
-	end	= (attrmod & IBDM_8_BIT_MASK);
+	end	= ((attrmod >> 8) & IBDM_8_BIT_MASK);
+	start	= (attrmod & IBDM_8_BIT_MASK);
 
 	/* Make sure that IOC index is with the valid range */
 	if ((ioc_no < 1) |
@@ -2569,7 +2592,7 @@ ibdm_handle_srventry_mad(ibmf_msg_t *msg,
 	gsrv_ents->se_state = IBDM_SE_VALID;
 	mutex_exit(&gid_info->gl_mutex);
 	for (ii = start; ii <= end; ii++, srv_ents++, gsrv_ents++) {
-		gsrv_ents->se_attr.srv_id = srv_ents->srv_id;
+		gsrv_ents->se_attr.srv_id = b2h64(srv_ents->srv_id);
 		bcopy(srv_ents->srv_name,
 		    gsrv_ents->se_attr.srv_name, IB_DM_MAX_SVC_NAME_LEN);
 		ibdm_dump_service_entries(&gsrv_ents->se_attr);
@@ -2601,6 +2624,10 @@ ibdm_get_diagcode(ibdm_dp_gidinfo_t *gid_info, int attr)
 	}
 
 	ibdm_alloc_send_buffers(msg);
+
+	mutex_enter(&gid_info->gl_mutex);
+	ibdm_bump_transactionID(gid_info);
+	mutex_exit(&gid_info->gl_mutex);
 
 	msg->im_local_addr.ia_local_lid	= gid_info->gl_slid;
 	msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
@@ -2914,7 +2941,9 @@ ibdm_process_incoming_mad(ibmf_handle_t ibmf_hdl, ibmf_msg_t *msg, void *arg)
 	mutex_enter(&ibdm.ibdm_mutex);
 	gid_info = ibdm.ibdm_dp_gidlist_head;
 	while (gid_info) {
-		if (gid_info->gl_transactionID == transaction_id)
+		if ((gid_info->gl_transactionID  &
+		    IBDM_GID_TRANSACTIONID_MASK) ==
+		    (transaction_id & IBDM_GID_TRANSACTIONID_MASK))
 			break;
 		gid_info = gid_info->gl_next;
 	}
@@ -3137,7 +3166,7 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 				mutex_exit(&gid_info->gl_mutex);
 				return (IBDM_FAILURE);
 			}
-			start 	= ((attrmod >> 8) & IBDM_8_BIT_MASK);
+			start 	= (attrmod & IBDM_8_BIT_MASK);
 			ioc	= IBDM_GIDINFO2IOCINFO(gid_info, (ioc_no -1));
 			if (start > ioc->ioc_profile.ioc_service_entries) {
 				IBTF_DPRINTF_L2("ibdm", "\thandle_redirction:"
@@ -3198,6 +3227,7 @@ ibdm_handle_redirection(ibmf_msg_t *msg,
 		msg->im_local_addr.ia_remote_lid =
 				gid_info->gl_redirect_dlid;
 	}
+	ibdm_bump_transactionID(gid_info);
 	mutex_exit(&gid_info->gl_mutex);
 
 	ibdm_alloc_send_buffers(msg);
@@ -3413,6 +3443,8 @@ ibdm_retry_command(ibdm_timeout_cb_args_t *cb_args)
 
 	ibdm_alloc_send_buffers(msg);
 
+	ibdm_bump_transactionID(gid_info);
+
 	msg->im_local_addr.ia_local_lid	= gid_info->gl_slid;
 	msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
 	if (gid_info->gl_redirected == B_TRUE) {
@@ -3455,10 +3487,7 @@ ibdm_retry_command(ibdm_timeout_cb_args_t *cb_args)
 		break;
 	case IBDM_REQ_TYPE_SRVENTS:
 		hdr->AttributeID = h2b16(IB_DM_ATTR_SERVICE_ENTRIES);
-		hdr->AttributeModifier =
-		    h2b32((((cb_args->cb_ioc_num+1) << 16) |
-		    ((cb_args->cb_srvents_start << 8) |
-		    (cb_args->cb_srvents_end))));
+		ibdm_fill_srv_attr_mod(hdr, cb_args);
 		ioc = IBDM_GIDINFO2IOCINFO(gid_info, cb_args->cb_ioc_num);
 		timeout_id =
 		    &ioc->ioc_serv[cb_args->cb_srvents_start].se_timeout_id;
@@ -3651,6 +3680,7 @@ ibdm_probe_ioc(ib_guid_t nodeguid, ib_guid_t ioc_guid, int reprobe_flag)
 				}
 				if (node_gid == NULL) {
 					node_gid = new_gid;
+					ibdm_add_to_gl_gid(node_gid, node_gid);
 				} else {
 					IBTF_DPRINTF_L4("ibdm",
 					    "\tprobe_ioc: new gid");
@@ -3835,7 +3865,11 @@ ibdm_create_gid_info(ibdm_port_attr_t *port, ib_gid_t sgid, ib_gid_t dgid)
 		gid_info->gl_ibmf_hdl		= port->pa_ibmf_hdl;
 		gid_info->gl_slid		= path->SLID;
 		gid_info->gl_dlid		= path->DLID;
-		gid_info->gl_transactionID	= ++ibdm.ibdm_transactionID;
+		gid_info->gl_transactionID	= (++ibdm.ibdm_transactionID)
+		    << IBDM_GID_TRANSACTIONID_SHIFT;
+		gid_info->gl_min_transactionID  = gid_info->gl_transactionID;
+		gid_info->gl_max_transactionID  = (ibdm.ibdm_transactionID +1)
+		    << IBDM_GID_TRANSACTIONID_SHIFT;
 
 		gid_info->gl_qp_hdl = IBMF_QP_HANDLE_DEFAULT;
 		for (ii = 0; ii < port->pa_npkeys; ii++) {
@@ -3850,6 +3884,19 @@ ibdm_create_gid_info(ibdm_port_attr_t *port, ib_gid_t sgid, ib_gid_t dgid)
 			}
 		}
 		kmem_free(path, len);
+
+		/*
+		 * QP handle for GID not initialized. No matching Pkey
+		 * was found!! ibdm should *not* hit this case. Flag an
+		 * error and drop the GID if ibdm does encounter this.
+		 */
+		if (gid_info->gl_qp_hdl == NULL) {
+			IBTF_DPRINTF_L2(ibdm_string,
+			    "\tcreate_gid_info: No matching Pkey");
+			ibdm_delete_gidinfo(gid_info);
+			return (NULL);
+		}
+
 		ibdm.ibdm_ngids++;
 		if (ibdm.ibdm_dp_gidlist_head == NULL) {
 			ibdm.ibdm_dp_gidlist_head = gid_info;
@@ -4717,6 +4764,10 @@ ibdm_send_ioc_profile(ibdm_dp_gidinfo_t *gid_info, uint8_t ioc_no)
 	}
 
 	ibdm_alloc_send_buffers(msg);
+
+	mutex_enter(&gid_info->gl_mutex);
+	ibdm_bump_transactionID(gid_info);
+	mutex_exit(&gid_info->gl_mutex);
 
 	msg->im_local_addr.ia_local_lid	= gid_info->gl_slid;
 	msg->im_local_addr.ia_remote_lid	= gid_info->gl_dlid;
@@ -6081,6 +6132,30 @@ ibdm_delete_gidinfo(ibdm_dp_gidinfo_t *gidinfo)
 	}
 }
 
+
+static void
+ibdm_fill_srv_attr_mod(ib_mad_hdr_t *hdr, ibdm_timeout_cb_args_t *cb_args)
+{
+	uint32_t	attr_mod;
+
+	attr_mod = (cb_args->cb_ioc_num + 1) << 16;
+	attr_mod |= cb_args->cb_srvents_start;
+	attr_mod |= (cb_args->cb_srvents_end) << 8;
+	hdr->AttributeModifier = h2b32(attr_mod);
+}
+
+static void
+ibdm_bump_transactionID(ibdm_dp_gidinfo_t *gid_info)
+{
+	ASSERT(MUTEX_HELD(&gid_info->gl_mutex));
+	gid_info->gl_transactionID++;
+	if (gid_info->gl_transactionID == gid_info->gl_max_transactionID) {
+		IBTF_DPRINTF_L4(ibdm_string,
+		    "\tbump_transactionID(%p), wrapup", gid_info);
+		gid_info->gl_transactionID = gid_info->gl_min_transactionID;
+	}
+}
+
 /* For debugging purpose only */
 #ifdef	DEBUG
 void
@@ -6115,7 +6190,7 @@ ibdm_dump_ibmf_msg(ibmf_msg_t *ibmf_msg, int flag)
 	    "\tTransaction ID     : 0x%llx",
 	    mad_hdr->Status, mad_hdr->TransactionID);
 	IBTF_DPRINTF_L4("ibdm", "\t Attribute ID  : 0x%x"
-	    "\tAttribute Modified : 0x%x",
+	    "\tAttribute Modified : 0x%lx",
 	    mad_hdr->AttributeID, mad_hdr->AttributeModifier);
 }
 

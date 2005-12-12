@@ -566,11 +566,12 @@ ibc_attach(ibc_clnt_hdl_t *ibc_hdl_p, ibc_hca_info_t *info_p)
 	/*
 	 * Install IB nexus driver (if not installed already)
 	 */
+	ibtl_set_ibhw_status();
 	if (ndi_devi_config_vhci("ib", 0) == NULL) {
 		IBTF_DPRINTF_L2(ibtf, "ibc_attach: IB nexus attach failed");
+		ibtl_clear_ibhw_status();
 		return (IBC_FAILURE);
 	}
-	ibtl_set_ibhw_status();
 
 	ibtl_thread_init2();
 

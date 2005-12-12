@@ -396,7 +396,6 @@
  *		delete statep
  */
 
-
 /* Function prototypes */
 static void		ibcm_set_primary_adds_vect(ibcm_state_data_t *,
 			    ibt_adds_vect_t *, ibcm_req_msg_t *);
@@ -2167,6 +2166,8 @@ ibcm_process_rej_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 		return;
 	}
 
+	IBTF_DPRINTF_L2(cmlog, "ibcm_process_rej_msg: statep 0x%p",
+	    statep);
 	ibcm_insert_trace(statep, IBCM_TRACE_INCOMING_REJ);
 	if (ibcm_enable_trace & 2)
 		ibcm_dump_conn_trace(statep);
@@ -2364,7 +2365,8 @@ ibcm_process_dreq_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 	 * If another thread is processing a copy of this same DREQ,
 	 * bail out here.
 	 */
-	if (statep->drep_in_progress) {
+	if (statep->state == IBCM_STATE_TRANSIENT_DREQ_SENT ||
+	    statep->drep_in_progress) {
 		IBCM_REF_CNT_DECR(statep);
 		mutex_exit(&statep->state_mutex);
 		return;
@@ -2372,7 +2374,6 @@ ibcm_process_dreq_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 	switch (statep->state) {
 	case IBCM_STATE_ESTABLISHED:
 	case IBCM_STATE_DREQ_SENT:
-	case IBCM_STATE_TRANSIENT_DREQ_SENT:
 	case IBCM_STATE_TIMEWAIT:
 		break;
 	default:
@@ -2402,9 +2403,13 @@ ibcm_process_dreq_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 		mutex_enter(&statep->state_mutex);
 	}
 
+	if (statep->state == IBCM_STATE_TRANSIENT_DREQ_SENT) {
+		IBCM_REF_CNT_DECR(statep);
+		statep->drep_in_progress = 0;
+		mutex_exit(&statep->state_mutex);
+		return;
+	}
 
-	while (statep->state == IBCM_STATE_TRANSIENT_DREQ_SENT)
-		cv_wait(&statep->block_mad_cv, &statep->state_mutex);
 	/*
 	 * Need to generate drep, as time wait can be reached either by an
 	 * outgoing dreq or an incoming dreq
@@ -2416,6 +2421,7 @@ ibcm_process_dreq_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 		if (statep->state == IBCM_STATE_DREQ_SENT) {
 			statep->state = IBCM_STATE_DREQ_RCVD;
 			statep->timerid = 0;
+			ibcm_close_done(statep, 0);
 			mutex_exit(&statep->state_mutex);
 
 			close_event_type = IBT_CM_CLOSED_DUP;
@@ -2800,9 +2806,7 @@ ibcm_process_drep_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 		/* Set the timer wait state timer */
 		statep->state = statep->timer_stored_state =
 		    IBCM_STATE_TIMEWAIT;
-		if (statep->close_flow == 1)
-			ibcm_close_flow_control_exit();
-		statep->close_flow = 0;
+		ibcm_close_done(statep, 0);
 
 		statep->remaining_retry_cnt = 0;
 		/*
@@ -2900,7 +2904,7 @@ ibcm_resend_rep_mad(ibcm_state_data_t *statep)
 			IBCM_REF_CNT_INCR(statep);
 			mutex_exit(&statep->state_mutex);
 
-			ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_REP);
+			ibcm_insert_trace(statep, IBCM_TRACE_OUT_REP_RETRY);
 
 			ibcm_post_rc_mad(statep, statep->stored_msg,
 			    ibcm_resend_post_rep_complete, statep);
@@ -2926,6 +2930,7 @@ ibcm_resend_mra_mad(ibcm_state_data_t *statep)
 
 	statep->send_mad_flags |= IBCM_MRA_POST_BUSY;
 
+	statep->mra_time = gethrtime();
 	IBCM_REF_CNT_INCR(statep); 	/* for non-blocking MRA post */
 	/* Exit the statep mutex, before sending the MAD */
 	mutex_exit(&statep->state_mutex);
@@ -3338,8 +3343,9 @@ ibcm_process_abort(ibcm_state_data_t *statep)
 			ibcm_insert_trace(statep,
 			    IBCM_TRACE_RET_CONN_CLOSE_EVENT);
 
-			if (statep->mode == IBCM_ACTIVE_MODE)
-				ibcm_rc_flow_control_exit();
+			mutex_enter(&statep->state_mutex);
+			ibcm_open_done(statep);
+			mutex_exit(&statep->state_mutex);
 		}
 	}
 
@@ -3349,6 +3355,7 @@ ibcm_process_abort(ibcm_state_data_t *statep)
 	 */
 	mutex_enter(&statep->state_mutex);
 
+	statep->cm_retries++; /* cause connection trace to be printed */
 	statep->open_done = B_TRUE;
 	statep->close_done = B_TRUE;
 	statep->close_nocb_state = IBCM_FAIL; /* sanity sake */
@@ -3362,6 +3369,8 @@ ibcm_process_abort(ibcm_state_data_t *statep)
 
 	cv_broadcast(&statep->block_client_cv);
 	mutex_exit(&statep->state_mutex);
+	if (ibcm_enable_trace != 0)
+		ibcm_dump_conn_trace(statep);
 }
 
 /*
@@ -3489,43 +3498,54 @@ ibcm_timeout_cb(void *arg)
 
 		/* Post REQ MAD in non-blocking mode */
 		if (stored_state == IBCM_STATE_REQ_SENT) {
-			ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_REQ);
-			ibcm_rc_flow_control_stall();	/* stall the flow */
+			ibcm_insert_trace(statep, IBCM_TRACE_OUT_REQ_RETRY);
 			ibcm_post_rc_mad(statep, statep->stored_msg,
 			    ibcm_post_req_complete, statep);
 		/* Post REQ MAD in non-blocking mode */
 		} else if (stored_state == IBCM_STATE_REP_WAIT) {
-			ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_REQ);
-			ibcm_rc_flow_control_stall();	/* stall the flow */
+			ibcm_insert_trace(statep, IBCM_TRACE_OUT_REQ_RETRY);
 			ibcm_post_rc_mad(statep, statep->stored_msg,
 			    ibcm_post_rep_wait_complete, statep);
 		/* Post REP MAD in non-blocking mode */
 		} else if (stored_state == IBCM_STATE_REP_SENT) {
-			ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_REP);
-			ibcm_rc_flow_control_stall();	/* stall the flow */
+			ibcm_insert_trace(statep, IBCM_TRACE_OUT_REP_RETRY);
 			ibcm_post_rc_mad(statep, statep->stored_msg,
 			    ibcm_post_rep_complete, statep);
 		/* Post REP MAD in non-blocking mode */
 		} else if (stored_state == IBCM_STATE_MRA_REP_RCVD) {
-			ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_REP);
-			ibcm_rc_flow_control_stall();	/* stall the flow */
+			ibcm_insert_trace(statep, IBCM_TRACE_OUT_REP_RETRY);
+			mutex_enter(&statep->state_mutex);
+			statep->mra_time = gethrtime();
+			mutex_exit(&statep->state_mutex);
 			ibcm_post_rc_mad(statep, statep->stored_msg,
 			    ibcm_post_mra_rep_complete, statep);
 		/* Post DREQ MAD in non-blocking mode */
 		} else if (stored_state == IBCM_STATE_DREQ_SENT) {
-			ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_DREQ);
+			mutex_enter(&statep->state_mutex);
+			if (statep->remaining_retry_cnt ==
+			    statep->max_cm_retries)
+				ibcm_insert_trace(statep,
+				    IBCM_TRACE_OUTGOING_DREQ);
+			else {
+				ibcm_insert_trace(statep,
+				    IBCM_TRACE_OUT_DREQ_RETRY);
+				statep->cm_retries++;
+				ibcm_close_done(statep, 0);
+			}
+			mutex_exit(&statep->state_mutex);
 			ibcm_post_rc_mad(statep, statep->dreq_msg,
 			    ibcm_post_dreq_complete, statep);
 		/* post LAP MAD in non-blocking mode */
 		} else if (stored_ap_state == IBCM_AP_STATE_LAP_SENT) {
-			ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_LAP);
-			ibcm_rc_flow_control_stall();	/* stall the flow */
+			ibcm_insert_trace(statep, IBCM_TRACE_OUT_LAP_RETRY);
 			ibcm_post_rc_mad(statep, statep->lapr_msg,
 			    ibcm_post_lap_complete, statep);
 		/* post LAP MAD in non-blocking mode */
 		} else if (stored_ap_state == IBCM_AP_STATE_MRA_LAP_RCVD) {
-			ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_LAP);
-			ibcm_rc_flow_control_stall();	/* stall the flow */
+			ibcm_insert_trace(statep, IBCM_TRACE_OUT_LAP_RETRY);
+			mutex_enter(&statep->state_mutex);
+			statep->mra_time = gethrtime();
+			mutex_exit(&statep->state_mutex);
 			ibcm_post_rc_mad(statep, statep->lapr_msg,
 			    ibcm_post_mra_lap_complete, statep);
 		}
@@ -3545,7 +3565,7 @@ ibcm_timeout_cb(void *arg)
 
 		IBTF_DPRINTF_L3(cmlog, "ibcm_timeout_cb: "
 		    "max retries done for statep 0x%p", statep);
-
+		statep->cm_retries++; /* cause conn trace to print */
 		mutex_exit(&statep->state_mutex);
 
 		if ((statep->timedout_state == IBCM_STATE_REP_SENT) ||
@@ -3605,6 +3625,7 @@ ibcm_timeout_cb(void *arg)
 		 * as in this state
 		 */
 		statep->ap_state = IBCM_AP_STATE_TIMED_OUT;
+		ibcm_open_done(statep);
 
 		if (statep->cm_handler != NULL) {
 			/* Attach statep to timeout list - thread handling */
@@ -3677,9 +3698,10 @@ ibcm_post_req_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_req_complete statep %p ", statep);
 
+	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "REQ");
 	ibcm_insert_trace(statep, IBCM_TRACE_REQ_POST_COMPLETE);
 
-	mutex_enter(&statep->state_mutex);
 	statep->send_mad_flags &= ~IBCM_REQ_POST_BUSY;
 
 	/* signal any waiting threads for REQ MAD to become available */
@@ -3701,8 +3723,9 @@ ibcm_post_rep_wait_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_rep_wait_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_REQ_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "REQ_RETRY");
+	ibcm_insert_trace(statep, IBCM_TRACE_REQ_POST_COMPLETE);
 	if (statep->state == IBCM_STATE_REP_WAIT)
 		statep->timerid = IBCM_TIMEOUT(statep, statep->timer_value);
 	IBCM_REF_CNT_DECR(statep);
@@ -3717,8 +3740,9 @@ ibcm_post_rep_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_rep_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_REP_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "REP");
+	ibcm_insert_trace(statep, IBCM_TRACE_REP_POST_COMPLETE);
 	statep->send_mad_flags &= ~IBCM_REP_POST_BUSY;
 	if (statep->state == IBCM_STATE_REP_SENT)
 		statep->timerid = IBCM_TIMEOUT(statep, statep->timer_value);
@@ -3735,8 +3759,9 @@ ibcm_resend_post_rep_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_resend_post_rep_complete(%p)", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_REP_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "REP_RETRY");
+	ibcm_insert_trace(statep, IBCM_TRACE_REP_POST_COMPLETE);
 	statep->send_mad_flags &= ~IBCM_REP_POST_BUSY;
 
 	/* No new timeout is set for resending a REP MAD for an incoming REQ */
@@ -3753,8 +3778,9 @@ ibcm_post_mra_rep_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_mra_rep_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_REP_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->mra_time, "MRA_REP");
+	ibcm_insert_trace(statep, IBCM_TRACE_REP_POST_COMPLETE);
 	if (statep->state == IBCM_STATE_MRA_REP_RCVD)
 		statep->timerid = IBCM_TIMEOUT(statep, statep->timer_value);
 	IBCM_REF_CNT_DECR(statep);
@@ -3771,8 +3797,9 @@ ibcm_post_mra_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_mra_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_MRA_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->mra_time, "MRA");
+	ibcm_insert_trace(statep, IBCM_TRACE_MRA_POST_COMPLETE);
 
 	if (statep->delete_mra_msg == B_TRUE) {
 		ibmf_msg_t	*mra_msg;
@@ -3797,13 +3824,12 @@ ibcm_post_dreq_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_dreq_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_DREQ_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "DREQ");
+	ibcm_insert_trace(statep, IBCM_TRACE_DREQ_POST_COMPLETE);
 	if (statep->state == IBCM_STATE_DREQ_SENT)
 		statep->timerid = IBCM_TIMEOUT(statep, statep->timer_value);
-	if (statep->close_flow == 1)
-		ibcm_close_flow_control_exit();
-	statep->close_flow = 0;
+	ibcm_close_done(statep, 1);
 	IBCM_REF_CNT_DECR(statep);
 	mutex_exit(&statep->state_mutex);
 }
@@ -3816,8 +3842,9 @@ ibcm_post_lap_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp, void *args)
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_lap_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_LAP_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "LAP");
+	ibcm_insert_trace(statep, IBCM_TRACE_LAP_POST_COMPLETE);
 	if (statep->ap_state == IBCM_AP_STATE_LAP_SENT)
 		statep->timerid = IBCM_TIMEOUT(statep, statep->timer_value);
 	IBCM_REF_CNT_DECR(statep);
@@ -3833,8 +3860,9 @@ ibcm_post_mra_lap_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_mra_lap_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_LAP_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->mra_time, "MRA_LAP");
+	ibcm_insert_trace(statep, IBCM_TRACE_LAP_POST_COMPLETE);
 	if (statep->ap_state == IBCM_AP_STATE_MRA_LAP_RCVD)
 		statep->timerid = IBCM_TIMEOUT(statep, statep->timer_value);
 	IBCM_REF_CNT_DECR(statep);
@@ -3850,8 +3878,9 @@ ibcm_post_rej_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_rej_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_REJ_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "REJ");
+	ibcm_insert_trace(statep, IBCM_TRACE_REJ_POST_COMPLETE);
 	statep->send_mad_flags &= ~IBCM_REJ_POST_BUSY;
 	if (statep->state == IBCM_STATE_REJ_SENT) {
 		statep->remaining_retry_cnt = 0;
@@ -3874,10 +3903,12 @@ ibcm_post_rtu_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_rtu_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_RTU_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "RTU");
+	ibcm_insert_trace(statep, IBCM_TRACE_RTU_POST_COMPLETE);
 	statep->send_mad_flags &= ~IBCM_RTU_POST_BUSY;
 	IBCM_REF_CNT_DECR(statep);
+	ibcm_open_done(statep);
 	mutex_exit(&statep->state_mutex);
 }
 
@@ -3890,9 +3921,10 @@ ibcm_post_apr_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_apr_complete statep %p", statep);
 
+	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "APR");
 	ibcm_insert_trace(statep, IBCM_TRACE_APR_POST_COMPLETE);
 	/* As long as one APR mad in transit, no retransmits are allowed */
-	mutex_enter(&statep->state_mutex);
 	statep->ap_state = IBCM_AP_STATE_IDLE;
 
 	/* unblock any DREQ threads and close channels */
@@ -3911,6 +3943,7 @@ ibcm_post_stored_apr_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_stored_apr_complete args %p", args);
 
+	ibcm_flow_dec(0, "APR_RESEND");
 	(void) ibcm_free_out_msg(ibmf_handle, &ibmf_apr_msg);
 }
 
@@ -3923,15 +3956,14 @@ ibcm_post_drep_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_drep_complete statep %p", statep);
 
-	ibcm_insert_trace(statep, IBCM_TRACE_DREP_POST_COMPLETE);
 	mutex_enter(&statep->state_mutex);
+	ibcm_flow_dec(statep->post_time, "DREP");
+	ibcm_insert_trace(statep, IBCM_TRACE_DREP_POST_COMPLETE);
 	statep->send_mad_flags &= ~IBCM_REJ_POST_BUSY;
 
 	if (statep->state == IBCM_STATE_DREQ_RCVD) {
 
-		if (statep->close_flow == 1)
-			ibcm_close_flow_control_exit();
-		statep->close_flow = 0;
+		ibcm_close_done(statep, 1);
 		statep->state = IBCM_STATE_TIMEWAIT;
 
 		/*
@@ -3960,6 +3992,7 @@ ibcm_post_sidr_rep_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_sidr_rep_complete ud_statep %p",
 	    ud_statep);
 
+	ibcm_flow_dec(0, "SIDR_REP");
 	mutex_enter(&ud_statep->ud_state_mutex);
 	ud_statep->ud_send_mad_flags &= ~IBCM_SREP_POST_BUSY;
 	ud_statep->ud_remaining_retry_cnt = 0;
@@ -3981,6 +4014,7 @@ ibcm_post_sidr_req_complete(ibmf_handle_t ibmf_handle, ibmf_msg_t *msgp,
 	IBTF_DPRINTF_L4(cmlog, "ibcm_post_sidr_req_complete ud_statep %p",
 	    ud_statep);
 
+	ibcm_flow_dec(0, "SIDR_REQ");
 	mutex_enter(&ud_statep->ud_state_mutex);
 	if (ud_statep->ud_state == IBCM_STATE_SIDR_REQ_SENT)
 		ud_statep->ud_timerid = IBCM_UD_TIMEOUT(ud_statep,
@@ -4007,9 +4041,7 @@ ibcm_process_dreq_timeout(ibcm_state_data_t *statep)
 	/* Max retries reached, move to the time wait state */
 	statep->state = statep->timer_stored_state =
 	    IBCM_STATE_TIMEWAIT;
-	if (statep->close_flow == 1)
-		ibcm_close_flow_control_exit();
-	statep->close_flow = 0;
+	ibcm_close_done(statep, 0);
 
 	/* Set the TIME_WAIT state timer value */
 	statep->timer_value = statep->remote_ack_delay;
@@ -4066,6 +4098,13 @@ ibcm_add_tlist(ibcm_state_data_t *statep)
 	    "attached state = %p to timeout list", statep);
 }
 
+void
+ibcm_run_tlist_thread(void)
+{
+	mutex_enter(&ibcm_timeout_list_lock);
+	cv_signal(&ibcm_timeout_list_cv);
+	mutex_exit(&ibcm_timeout_list_lock);
+}
 
 /*
  * ibcm_add_ud_tlist:
@@ -4127,6 +4166,9 @@ ibcm_process_tlist()
 			cv_signal(&ibcm_timeout_thread_done_cv);
 			break;
 		}
+		mutex_exit(&ibcm_timeout_list_lock);
+		ibcm_check_for_opens();
+		mutex_enter(&ibcm_timeout_list_lock);
 
 		/* First, handle pending RC statep's, followed by UD's */
 		if (ibcm_timeout_list_hdr != NULL) {
@@ -4668,7 +4710,7 @@ ibcm_process_sidr_rep_msg(ibcm_hca_info_t *hcap, uint8_t *input_madp,
 	bcopy(&tmp_svc_id, sidr_repp->sidr_rep_service_id, sizeof (tmp_svc_id));
 	if (ud_statep->ud_svc_id != b2h64(tmp_svc_id)) {
 		IBTF_DPRINTF_L2(cmlog, "ibcm_process_sidr_rep_msg: "
-		    "ud_statep -0x%p svcids do not match %lx %lx",
+		    "ud_statep -0x%p svcids do not match %llx %llx",
 		    ud_statep, ud_statep->ud_svc_id, b2h64(tmp_svc_id));
 
 		IBCM_UD_REF_CNT_DECR(ud_statep);
@@ -5006,6 +5048,9 @@ ibcm_post_rc_mad(ibcm_state_data_t *statep, ibmf_msg_t *msgp,
 {
 	ibt_status_t	status;
 
+	mutex_enter(&statep->state_mutex);
+	statep->post_time = gethrtime();
+	mutex_exit(&statep->state_mutex);
 	status = ibcm_post_mad(msgp, &statep->stored_reply_addr, post_cb,
 	    args);
 	if ((status != IBT_SUCCESS) && (post_cb != NULL))
@@ -5074,14 +5119,14 @@ ibcm_post_mad(ibmf_msg_t *msgp, ibcm_mad_addr_t *cm_mad_addr,
 	if (cm_mad_addr->grh_exists == B_TRUE)
 		msgp->im_global_addr = cm_mad_addr->grh_hdr;
 
+	if (post_cb)
+		ibcm_flow_inc();
 	post_status = ibmf_msg_transport(
 	    cm_mad_addr->ibmf_hdl, cm_mad_addr->cm_qp_entry->qp_cm, msgp,
 	    NULL, post_cb, args, 0);
-
-	IBTF_DPRINTF_L4(cmlog, "ibcm_post_mad: ibmf_msg_transport returned %d",
-	    post_status);
-
 	if (post_status != IBMF_SUCCESS) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_post_mad: ibmf_msg_transport "
+		    "failed: status %d, cb = %p", post_status, post_cb);
 		/* Analyze the reason for failure */
 		return (ibcm_ibmf_analyze_error(post_status));
 	}
@@ -5206,8 +5251,9 @@ ibcm_handler_conn_fail(ibcm_state_data_t *statep, uint8_t cf_code,
 	}
 	if (ibcm_enable_trace != 0)
 		ibcm_dump_conn_trace(statep);
-	if (statep->mode == IBCM_ACTIVE_MODE)
-		ibcm_rc_flow_control_exit();
+	mutex_enter(&statep->state_mutex);
+	ibcm_open_done(statep);
+	mutex_exit(&statep->state_mutex);
 }
 
 /*
@@ -6842,7 +6888,6 @@ ibcm_cep_send_rtu(ibcm_state_data_t *statep)
 	}
 	if (ibcm_enable_trace & 4)
 		ibcm_dump_conn_trace(statep);
-	ibcm_rc_flow_control_exit();
 
 	/* unblock any pending DREQ threads */
 	mutex_enter(&statep->state_mutex);
@@ -6976,8 +7021,9 @@ ibcm_cep_state_rej(ibcm_state_data_t *statep, ibcm_rej_msg_t *rej_msgp,
 		    sizeof (ibt_arej_info_t));
 	if (ibcm_enable_trace != 0)
 		ibcm_dump_conn_trace(statep);
-	if (statep->mode == IBCM_ACTIVE_MODE)
-		ibcm_rc_flow_control_exit();
+	mutex_enter(&statep->state_mutex);
+	ibcm_open_done(statep);
+	mutex_exit(&statep->state_mutex);
 }
 
 /* Used to initialize client args with addl rej information from REJ MAD */
@@ -7825,8 +7871,8 @@ ibcm_process_cep_lap_cm_hdlr(ibcm_state_data_t *statep,
 
 	qp_attrs.qp_info.qp_trans = IBT_RC_SRV;
 	if (IBCM_QP_RC(qp_attrs).rc_mig_state == IBT_STATE_MIGRATED) {
-		IBTF_DPRINTF_L3(cmlog, "ibcm_cep_state_lap_cm_hdlr: statep %p: "
-		    "rearming APM", statep);
+		IBTF_DPRINTF_L3(cmlog, "ibcm_process_cep_lap_cm_hdlr: statep %p"
+		    ": rearming APM", statep);
 		cep_flags |= IBT_CEP_SET_MIG;
 		IBCM_QP_RC(qp_attrs).rc_mig_state = IBT_STATE_REARMED;
 	}
@@ -8137,7 +8183,9 @@ ibcm_cep_state_apr(ibcm_state_data_t *statep, ibcm_lap_msg_t *lap_msg,
 		statep->cm_handler(statep->state_cm_private, &event,
 		    NULL, apr_msg->apr_private_data, IBT_APR_PRIV_DATA_SZ);
 	}
-	ibcm_rc_flow_control_exit();
+	mutex_enter(&statep->state_mutex);
+	ibcm_open_done(statep);
+	mutex_exit(&statep->state_mutex);
 }
 
 /*

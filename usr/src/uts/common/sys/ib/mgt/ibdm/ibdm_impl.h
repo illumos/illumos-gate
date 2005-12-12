@@ -195,11 +195,25 @@ typedef struct ibdm_dp_gidinfo_s {
 	int			gl_num_iocs;
 	ibdm_hca_list_t		*gl_hca_list;
 	int			gl_disconnected;
+	uint64_t		gl_min_transactionID;
+	uint64_t		gl_max_transactionID;
 } ibdm_dp_gidinfo_t;
 _NOTE(MUTEX_PROTECTS_DATA(ibdm_dp_gidinfo_s::gl_mutex,
 	ibdm_dp_gidinfo_s::{gl_state gl_timeout_id gl_pending_cmds}))
 _NOTE(SCHEME_PROTECTS_DATA("Serialized access by cv", ibdm_dp_gidinfo_s))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(ibdm_dp_gidinfo_s::{gl_ibmf_hdl gl_sa_hdl}))
+
+/*
+ * The transaction ID for the GID contains of two parts :
+ *	1. Upper 32 bits which is unique for each GID.
+ *	2. Lower 32 bits which is unique for each MAD.
+ * The assumptions are :
+ *	1. At most 2 power 32 DM capable GIDs on the IB fabric
+ *	2. IBDM sends maximum of 2 power 32 MADs to the same DM GID
+ * The limits are sufficient for practical configurations.
+ */
+#define	IBDM_GID_TRANSACTIONID_SHIFT	((ulong_t)32)
+#define	IBDM_GID_TRANSACTIONID_MASK	0xFFFFFFFF00000000
 
 typedef struct ibdm_s {
 	/* Protects IBDM's critical data */
@@ -216,7 +230,7 @@ typedef struct ibdm_s {
 	kcondvar_t		ibdm_probe_cv;
 	kcondvar_t		ibdm_busy_cv;
 	uint32_t		ibdm_ngid_probes_in_progress;
-	uint32_t		ibdm_transactionID;
+	uint64_t		ibdm_transactionID;
 	uint32_t		ibdm_ngids;
 	uint32_t		ibdm_busy;
 	int			ibdm_state;

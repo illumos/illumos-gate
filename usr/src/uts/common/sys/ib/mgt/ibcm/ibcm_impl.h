@@ -397,11 +397,14 @@ typedef struct ibcm_state_data_s {
 	clock_t			rc_alt_pkt_lt;
 
 	hrtime_t		stale_clock;
+	hrtime_t		post_time;
+	hrtime_t		mra_time;
 
 	ibcm_conn_state_t	timer_stored_state;
 	ibcm_ap_state_t		timer_stored_ap_state;
 	uint8_t			remaining_retry_cnt;
 	uint8_t			max_cm_retries;
+	uint8_t			cm_retries;
 
 	uint8_t			drep_in_progress;
 
@@ -426,6 +429,7 @@ typedef struct ibcm_state_data_s {
 
 	uint8_t			send_mad_flags;
 	uint8_t			close_flow;
+	uint8_t			open_flow;
 	ibcm_abort_flag_t	abort_flag;
 
 	struct ibcm_state_data_s	*timeout_next;
@@ -454,6 +458,9 @@ typedef struct ibcm_state_data_s {
 	uint8_t			*close_priv_data;
 	ibt_priv_data_len_t	*close_priv_data_len;
 	uint8_t			*close_ret_status;
+
+	/* for queuing of open_rc_channel requests */
+	struct ibcm_state_data_s	*open_link;
 
 	struct ibcm_conn_trace_s	*conn_trace;
 
@@ -539,6 +546,16 @@ _NOTE(DATA_READABLE_WITHOUT_LOCK(ibcm_state_data_s::{timedout_state
 						drv_usectohz(arg2))
 #define	IBCM_UD_TIMEOUT(arg1, arg2)	timeout(ibcm_sidr_timeout_cb, arg1,\
 						drv_usectohz(arg2))
+
+extern void ibcm_open_enqueue(ibcm_state_data_t *statep);
+extern void ibcm_open_done(ibcm_state_data_t *statep);
+extern void ibcm_close_done(ibcm_state_data_t *statep, int send_done);
+extern void ibcm_close_enter(void);
+extern void ibcm_close_exit(void);
+extern void ibcm_lapr_enter(void);
+extern void ibcm_lapr_exit(void);
+extern void ibcm_check_for_opens(void);
+extern void ibcm_run_tlist_thread(void);
 
 /*
  * Structures & defines for SIDR
@@ -1948,11 +1965,8 @@ void ibcm_dec_hca_svc_cnt(ibcm_hca_info_t *hca);
 ibmf_saa_handle_t ibcm_get_saa_handle(ibcm_hca_info_t *hcap, uint8_t port);
 
 /* Allow some flow control of RC connection initiations */
-void ibcm_rc_flow_control_enter(void);
-void ibcm_rc_flow_control_exit(void);
-void ibcm_rc_flow_control_stall(void);
-void ibcm_close_flow_control_enter(void);
-void ibcm_close_flow_control_exit(void);
+void ibcm_flow_inc(void);
+void ibcm_flow_dec(hrtime_t delta, char *mad_type);
 
 /* Allow some flow control of SA requests */
 void ibcm_sa_access_enter(void);
@@ -2059,10 +2073,10 @@ _NOTE(READ_ONLY_DATA(ibcm_local_processing_time ibcm_remote_response_time
 /*
  * miscellaneous defines for retries, times etc.
  */
-#define	IBCM_MAX_RETRIES		7	/* Max CM retries for a msg */
-#define	IBCM_LOCAL_RESPONSE_TIME	250000	/* Local CM processing time */
+#define	IBCM_MAX_RETRIES		11	/* Max CM retries for a msg */
+#define	IBCM_LOCAL_RESPONSE_TIME	300000	/* Local CM processing time */
 						/* in usecs */
-#define	IBCM_REMOTE_RESPONSE_TIME	250000	/* Remote CM response time  */
+#define	IBCM_REMOTE_RESPONSE_TIME	300000	/* Remote CM response time  */
 						/* in usecs */
 #define	IBCM_MAX_SIDR_PROCESS_TIME	16	/* Time to process SIDR REP */
 #define	IBCM_MAX_SIDR_PKT_LIFE_TIME	9	/* Approx pkt lt for UD srver */

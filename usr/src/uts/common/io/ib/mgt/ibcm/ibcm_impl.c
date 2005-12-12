@@ -95,7 +95,8 @@ kmutex_t		ibcm_trace_mutex;	/* Trace mutex */
 kmutex_t		ibcm_trace_print_mutex;	/* Trace print mutex */
 int			ibcm_conn_max_trcnt = IBCM_MAX_CONN_TRCNT;
 
-int			ibcm_enable_trace = 4;	/* Trace level 4 by default */
+int			ibcm_enable_trace = 2;	/* Trace level 4 by default */
+int			ibcm_dtrace = 0; /* conditionally enable more dtrace */
 
 _NOTE(MUTEX_PROTECTS_DATA(ibcm_svc_info_lock, ibcm_svc_info_s::{svc_bind_list
     svc_ref_cnt svc_to_delete}))
@@ -168,6 +169,57 @@ _NOTE(MUTEX_PROTECTS_DATA(ibcm_timeout_list_lock,
 
 _NOTE(MUTEX_PROTECTS_DATA(ibcm_timeout_list_lock,
     ibcm_ud_state_data_s::ud_timeout_next))
+
+/*
+ * Flow control logic for open_rc_channel uses the following.
+ */
+
+struct ibcm_open_s {
+	kmutex_t		mutex;
+	kcondvar_t		cv;
+	uint8_t			task_running;
+	uint_t			queued;
+	uint_t			exit_deferred;
+	uint_t			in_progress;
+	uint_t			in_progress_max;
+	uint_t			sends;
+	uint_t			sends_max;
+	uint_t			sends_lowat;
+	uint_t			sends_hiwat;
+	ibcm_state_data_t	*tail;
+	ibcm_state_data_t	head;
+} ibcm_open;
+
+static void ibcm_open_task(void *);
+
+/*
+ * Flow control logic for SA access and close_rc_channel calls follows.
+ */
+
+int ibcm_close_simul_max	= 12;
+int ibcm_lapr_simul_max		= 12;
+int ibcm_saa_simul_max		= 8;
+
+typedef struct ibcm_flow1_s {
+	struct ibcm_flow1_s	*link;
+	kcondvar_t		cv;
+	uint8_t			waiters;	/* 1 to IBCM_FLOW_SIMUL_MAX */
+} ibcm_flow1_t;
+
+typedef struct ibcm_flow_s {
+	ibcm_flow1_t		*list;
+	uint_t			simul;	/* #requests currently outstanding */
+	uint_t			simul_max;
+	uint_t			waiters_per_chunk;
+	uint_t			lowat;
+	uint_t			lowat_default;
+	/* statistics */
+	uint_t			total;
+} ibcm_flow_t;
+
+ibcm_flow_t ibcm_saa_flow;
+ibcm_flow_t ibcm_close_flow;
+ibcm_flow_t ibcm_lapr_flow;
 
 static ibt_clnt_modinfo_t ibcm_ibt_modinfo = {	/* Client's modinfop */
 	IBTI_V2,
@@ -293,6 +345,11 @@ char	*event_str[] = {
 	"SET_ALT                    ",
 	"SET_ALT_FAIL               ",
 	"STALE_DETECT               ",
+	"OUTGOING_REQ_RETRY         ",
+	"OUTGOING_REP_RETRY         ",
+	"OUTGOING_LAP_RETRY         ",
+	"OUTGOING_MRA_RETRY         ",
+	"OUTGOING_DREQ_RETRY        ",
 	"NEVER SEE THIS             "
 };
 
@@ -925,7 +982,7 @@ ibcm_hca_detach(ibcm_hca_info_t *hcap)
 	 * All these stateps must be short lived ones, waiting to be cleaned
 	 * up after some timeout value, based on the current state.
 	 */
-	IBTF_DPRINTF_L5(cmlog, "hca_guid = 0x%llX res_cnt = %d",
+	IBTF_DPRINTF_L5(cmlog, "ibcm_hca_detach:hca_guid = 0x%llX res_cnt = %d",
 	    hcap->hca_guid, hcap->hca_res_cnt);
 
 	/* wait on response CV to 500mS */
@@ -1056,7 +1113,7 @@ ibcm_check_avl_clean(ibcm_hca_info_t *hcap)
 		if ((sp->state != IBCM_STATE_TIMEWAIT) &&
 		    (sp->state != IBCM_STATE_REJ_SENT) &&
 		    (sp->state != IBCM_STATE_DELETE)) {
-			IBTF_DPRINTF_L3(cmlog, "ibcm_check_avl_clean:"
+			IBTF_DPRINTF_L3(cmlog, "ibcm_check_avl_clean: "
 			    "sp = %p not in transient state = %d", sp,
 			    sp->state);
 			mutex_exit(&sp->state_mutex);
@@ -1099,8 +1156,8 @@ ibcm_add_hca_entry(ib_guid_t hcaguid, uint_t nports)
 		if (hcap->hca_guid == hcaguid) {
 			/* already exists */
 			IBTF_DPRINTF_L2(cmlog, "ibcm_add_hca_entry: "
-			"hcap %p guid 0x%llX, entry already exists !!",
-			hcap, hcap->hca_guid);
+			    "hcap %p guid 0x%llX, entry already exists !!",
+			    hcap, hcap->hca_guid);
 			return (NULL);
 		}
 		hcap = hcap->hca_next;
@@ -1128,7 +1185,6 @@ ibcm_add_hca_entry(ib_guid_t hcaguid, uint_t nports)
 void
 ibcm_delete_hca_entry(ibcm_hca_info_t *hcap)
 {
-
 	ibcm_hca_info_t	*headp, *prevp = NULL;
 
 	/* ibcm_hca_global_lock is held */
@@ -1283,7 +1339,7 @@ ibcm_dec_hca_acc_cnt(ibcm_hca_info_t *hcap)
 	mutex_enter(&ibcm_global_hca_lock);
 	ASSERT(hcap->hca_acc_cnt > 0);
 	--(hcap->hca_acc_cnt);
-	IBTF_DPRINTF_L5(cmlog, "ibcm_dec_hca_acc_cnt: hcap = 0x%p"
+	IBTF_DPRINTF_L5(cmlog, "ibcm_dec_hca_acc_cnt: hcap = 0x%p "
 	    "acc_cnt = %d", hcap, hcap->hca_acc_cnt);
 	if ((hcap->hca_state == IBCM_HCA_NOT_ACTIVE) &&
 	    (hcap->hca_acc_cnt == 0)) {
@@ -1301,7 +1357,7 @@ ibcm_inc_hca_res_cnt(ibcm_hca_info_t *hcap)
 {
 	mutex_enter(&ibcm_global_hca_lock);
 	++(hcap->hca_res_cnt);
-	IBTF_DPRINTF_L5(cmlog, "ibcm_inc_hca_res_cnt: hcap = 0x%p"
+	IBTF_DPRINTF_L5(cmlog, "ibcm_inc_hca_res_cnt: hcap = 0x%p "
 	    "ref_cnt = %d", hcap, hcap->hca_res_cnt);
 	mutex_exit(&ibcm_global_hca_lock);
 }
@@ -1313,7 +1369,7 @@ ibcm_dec_hca_res_cnt(ibcm_hca_info_t *hcap)
 	mutex_enter(&ibcm_global_hca_lock);
 	ASSERT(hcap->hca_res_cnt > 0);
 	--(hcap->hca_res_cnt);
-	IBTF_DPRINTF_L5(cmlog, "ibcm_dec_hca_res_cnt: hcap = 0x%p"
+	IBTF_DPRINTF_L5(cmlog, "ibcm_dec_hca_res_cnt: hcap = 0x%p "
 	    "ref_cnt = %d", hcap, hcap->hca_res_cnt);
 	if ((hcap->hca_state == IBCM_HCA_NOT_ACTIVE) &&
 	    (hcap->hca_res_cnt == 0)) {
@@ -1331,7 +1387,7 @@ ibcm_inc_hca_svc_cnt(ibcm_hca_info_t *hcap)
 {
 	mutex_enter(&ibcm_global_hca_lock);
 	++(hcap->hca_svc_cnt);
-	IBTF_DPRINTF_L5(cmlog, "ibcm_inc_hca_svc_cnt: hcap = 0x%p"
+	IBTF_DPRINTF_L5(cmlog, "ibcm_inc_hca_svc_cnt: hcap = 0x%p "
 	    "svc_cnt = %d", hcap, hcap->hca_svc_cnt);
 	mutex_exit(&ibcm_global_hca_lock);
 }
@@ -1343,77 +1399,182 @@ ibcm_dec_hca_svc_cnt(ibcm_hca_info_t *hcap)
 	mutex_enter(&ibcm_global_hca_lock);
 	ASSERT(hcap->hca_svc_cnt > 0);
 	--(hcap->hca_svc_cnt);
-	IBTF_DPRINTF_L5(cmlog, "ibcm_dec_hca_svc_cnt: hcap = 0x%p"
+	IBTF_DPRINTF_L5(cmlog, "ibcm_dec_hca_svc_cnt: hcap = 0x%p "
 	    "svc_cnt = %d", hcap, hcap->hca_svc_cnt);
 	mutex_exit(&ibcm_global_hca_lock);
 }
 
 /*
- * Flow control logic for open_rc_channel and close_rc_channel follows.
- * We use one instance of the same data structure to control each of
- * "open" and "close".  We allow up to IBCM_FLOW_SIMUL_MAX requests to be
- * initiated at one time.  We initiate the next group any time there are
- * less than IBCM_FLOW_LOW_WATER.
+ * The following code manages three classes of requests that CM makes to
+ * the fabric.  Those three classes are SA_ACCESS, REQ/REP/RTU, and DREQ/DREP.
+ * The main issue is that the fabric can become very busy, and the CM
+ * protocols rely on responses being made based on a predefined timeout
+ * value.  By managing how many simultaneous sessions are allowed, there
+ * is observed extremely high reliability of CM protocol succeeding when
+ * it should.
+ *
+ * SA_ACCESS and DREQ/DREP are managed at the thread level, whereby the
+ * thread blocks until there are less than some number of threads doing
+ * similar requests.
+ *
+ * REQ/REP/RTU requests beyond a given limit are added to a list,
+ * allowing the thread to return immediately to its caller in the
+ * case where the "mode" is IBT_NONBLOCKING.  This is the mode used
+ * by uDAPL and seems to be an important feature/behavior.
  */
 
-/* These variables are for both open_rc_channel and close_rc_channel */
-#define	IBCM_FLOW_SIMUL_MAX	32
-int ibcm_flow_simul_max = IBCM_FLOW_SIMUL_MAX;
-#define	IBCM_SAA_SIMUL_MAX	8
-int ibcm_saa_simul_max = IBCM_SAA_SIMUL_MAX;
+static int
+ibcm_ok_to_start(struct ibcm_open_s *openp)
+{
+	return (openp->sends < openp->sends_hiwat &&
+	    openp->in_progress < openp->in_progress_max);
+}
 
-typedef struct ibcm_flow1_s {
-	struct ibcm_flow1_s	*link;
-	kcondvar_t		cv;
-	uint8_t			waiters;	/* 1 to IBCM_FLOW_SIMUL_MAX */
-} ibcm_flow1_t;
+void
+ibcm_open_done(ibcm_state_data_t *statep)
+{
+	int run;
 
-typedef struct ibcm_flow_s {
-	ibcm_flow1_t	*list;
-	uint_t		simul;		/* #requests currently outstanding */
-	uint_t		simul_max;
-	uint_t		waiters_per_chunk;
-	uint_t		lowat;
-	uint_t		lowat_default;
-	/* statistics */
-	uint_t		total;
-	uint_t		enable_queuing;
-} ibcm_flow_t;
+	ASSERT(MUTEX_HELD(&statep->state_mutex));
+	if (statep->open_flow == 1) {
+		statep->open_flow = 0;
+		mutex_enter(&ibcm_open.mutex);
+		ibcm_open.in_progress--;
+		run = ibcm_ok_to_start(&ibcm_open);
+		mutex_exit(&ibcm_open.mutex);
+		if (run)
+			ibcm_run_tlist_thread();
+	}
+}
 
-kmutex_t ibcm_rc_flow_mutex;
-ibcm_flow_t ibcm_open_flow;
-ibcm_flow_t ibcm_close_flow;
-ibcm_flow_t ibcm_saa_flow;
+/* dtrace */
+void
+ibcm_open_wait(hrtime_t delta)
+{
+	if (delta > 1000000)
+		IBTF_DPRINTF_L2(cmlog, "ibcm_open_wait: flow more %lld", delta);
+}
+
+void
+ibcm_open_start(ibcm_state_data_t *statep)
+{
+	ibcm_insert_trace(statep, IBCM_TRACE_OUTGOING_REQ);
+
+	mutex_enter(&statep->state_mutex);
+	ibcm_open_wait(gethrtime() - statep->post_time);
+	mutex_exit(&statep->state_mutex);
+
+	ibcm_post_rc_mad(statep, statep->stored_msg, ibcm_post_req_complete,
+	    statep);
+
+	mutex_enter(&statep->state_mutex);
+	IBCM_REF_CNT_DECR(statep);
+	mutex_exit(&statep->state_mutex);
+}
+
+void
+ibcm_open_enqueue(ibcm_state_data_t *statep)
+{
+	int run;
+
+	mutex_enter(&statep->state_mutex);
+	statep->post_time = gethrtime();
+	mutex_exit(&statep->state_mutex);
+	mutex_enter(&ibcm_open.mutex);
+	if (ibcm_open.queued == 0 && ibcm_ok_to_start(&ibcm_open)) {
+		ibcm_open.in_progress++;
+		mutex_exit(&ibcm_open.mutex);
+		ibcm_open_start(statep);
+	} else {
+		ibcm_open.queued++;
+		statep->open_link = NULL;
+		ibcm_open.tail->open_link = statep;
+		ibcm_open.tail = statep;
+		run = ibcm_ok_to_start(&ibcm_open);
+		mutex_exit(&ibcm_open.mutex);
+		if (run)
+			ibcm_run_tlist_thread();
+	}
+}
+
+ibcm_state_data_t *
+ibcm_open_dequeue(void)
+{
+	ibcm_state_data_t *statep;
+
+	ASSERT(MUTEX_HELD(&ibcm_open.mutex));
+	ibcm_open.queued--;
+	ibcm_open.in_progress++;
+	statep = ibcm_open.head.open_link;
+	ibcm_open.head.open_link = statep->open_link;
+	statep->open_link = NULL;
+	if (ibcm_open.tail == statep)
+		ibcm_open.tail = &ibcm_open.head;
+	return (statep);
+}
+
+void
+ibcm_check_for_opens(void)
+{
+	ibcm_state_data_t 	*statep;
+
+	mutex_enter(&ibcm_open.mutex);
+
+	while (ibcm_open.queued > 0) {
+		if (ibcm_ok_to_start(&ibcm_open)) {
+			statep = ibcm_open_dequeue();
+			mutex_exit(&ibcm_open.mutex);
+
+			ibcm_open_start(statep);
+
+			mutex_enter(&ibcm_open.mutex);
+		} else {
+			break;
+		}
+	}
+	mutex_exit(&ibcm_open.mutex);
+}
+
 
 static void
 ibcm_flow_init(ibcm_flow_t *flow, uint_t simul_max)
 {
-	flow->list = NULL;
-	flow->simul = 0;
-	flow->waiters_per_chunk = 4;
-	flow->simul_max = simul_max;
-	flow->lowat = flow->simul_max - flow->waiters_per_chunk;
-	flow->lowat_default = flow->lowat;
+	flow->list			= NULL;
+	flow->simul			= 0;
+	flow->waiters_per_chunk		= 4;
+	flow->simul_max			= simul_max;
+	flow->lowat			= simul_max - flow->waiters_per_chunk;
+	flow->lowat_default		= flow->lowat;
 	/* stats */
-	flow->total = 0;
-	flow->enable_queuing = 0;
+	flow->total			= 0;
 }
 
 static void
 ibcm_rc_flow_control_init(void)
 {
-	mutex_init(&ibcm_rc_flow_mutex, NULL, MUTEX_DEFAULT, NULL);
-	mutex_enter(&ibcm_rc_flow_mutex);
-	ibcm_flow_init(&ibcm_open_flow, ibcm_flow_simul_max);
-	ibcm_flow_init(&ibcm_close_flow, ibcm_flow_simul_max);
+	mutex_init(&ibcm_open.mutex, NULL, MUTEX_DEFAULT, NULL);
+	mutex_enter(&ibcm_open.mutex);
+	ibcm_flow_init(&ibcm_close_flow, ibcm_close_simul_max);
+	ibcm_flow_init(&ibcm_lapr_flow, ibcm_lapr_simul_max);
 	ibcm_flow_init(&ibcm_saa_flow, ibcm_saa_simul_max);
-	mutex_exit(&ibcm_rc_flow_mutex);
+
+	ibcm_open.queued 		= 0;
+	ibcm_open.exit_deferred 	= 0;
+	ibcm_open.in_progress 		= 0;
+	ibcm_open.in_progress_max 	= 16;
+	ibcm_open.sends 		= 0;
+	ibcm_open.sends_max 		= 0;
+	ibcm_open.sends_lowat 		= 8;
+	ibcm_open.sends_hiwat 		= 16;
+	ibcm_open.tail 			= &ibcm_open.head;
+	ibcm_open.head.open_link 	= NULL;
+	mutex_exit(&ibcm_open.mutex);
 }
 
 static void
 ibcm_rc_flow_control_fini(void)
 {
-	mutex_destroy(&ibcm_rc_flow_mutex);
+	mutex_destroy(&ibcm_open.mutex);
 }
 
 static ibcm_flow1_t *
@@ -1431,9 +1592,9 @@ ibcm_flow_find(ibcm_flow_t *flow)
 	}
 
 	/* There was no flow1 list element ready for another waiter */
-	mutex_exit(&ibcm_rc_flow_mutex);
+	mutex_exit(&ibcm_open.mutex);
 	flow1 = kmem_alloc(sizeof (*flow1), KM_SLEEP);
-	mutex_enter(&ibcm_rc_flow_mutex);
+	mutex_enter(&ibcm_open.mutex);
 
 	f = flow->list;
 	if (f) {
@@ -1456,32 +1617,33 @@ ibcm_flow_find(ibcm_flow_t *flow)
 static void
 ibcm_flow_enter(ibcm_flow_t *flow)
 {
-	mutex_enter(&ibcm_rc_flow_mutex);
+	mutex_enter(&ibcm_open.mutex);
 	if (flow->list == NULL && flow->simul < flow->simul_max) {
 		flow->simul++;
 		flow->total++;
+		mutex_exit(&ibcm_open.mutex);
 	} else {
 		ibcm_flow1_t *flow1;
 
 		flow1 = ibcm_flow_find(flow);
 		flow1->waiters++;
-		cv_wait(&flow1->cv, &ibcm_rc_flow_mutex);
+		cv_wait(&flow1->cv, &ibcm_open.mutex);
 		if (--flow1->waiters == 0) {
 			cv_destroy(&flow1->cv);
+			mutex_exit(&ibcm_open.mutex);
 			kmem_free(flow1, sizeof (*flow1));
-		}
+		} else
+			mutex_exit(&ibcm_open.mutex);
 	}
-	mutex_exit(&ibcm_rc_flow_mutex);
 }
 
 static void
 ibcm_flow_exit(ibcm_flow_t *flow)
 {
-	mutex_enter(&ibcm_rc_flow_mutex);
+	mutex_enter(&ibcm_open.mutex);
 	if (--flow->simul < flow->lowat) {
-		flow->lowat += flow->waiters_per_chunk;
-		if (flow->lowat > flow->lowat_default)
-			flow->lowat = flow->lowat_default;
+		if (flow->lowat < flow->lowat_default)
+			flow->lowat++;
 		if (flow->list) {
 			ibcm_flow1_t *flow1;
 
@@ -1493,48 +1655,123 @@ ibcm_flow_exit(ibcm_flow_t *flow)
 			cv_broadcast(&flow1->cv);
 		}
 	}
-	mutex_exit(&ibcm_rc_flow_mutex);
+	mutex_exit(&ibcm_open.mutex);
+}
+
+void
+ibcm_flow_inc(void)
+{
+	mutex_enter(&ibcm_open.mutex);
+	if (++ibcm_open.sends > ibcm_open.sends_max) {
+		ibcm_open.sends_max = ibcm_open.sends;
+		IBTF_DPRINTF_L2(cmlog, "ibcm_flow_inc: sends max = %d",
+		    ibcm_open.sends_max);
+	}
+	mutex_exit(&ibcm_open.mutex);
 }
 
 static void
-ibcm_flow_stall(ibcm_flow_t *flow)
+ibcm_check_send_cmpltn_time(hrtime_t delta, char *event_msg)
 {
-	mutex_enter(&ibcm_rc_flow_mutex);
-	if (flow->lowat > 1) {
-		flow->lowat >>= 1;
-		IBTF_DPRINTF_L2(cmlog, "stall - lowat = %d", flow->lowat);
+	if (delta > 4000000LL) {
+		IBTF_DPRINTF_L2(cmlog, "ibcm_check_send_cmpltn_time: "
+		    "%s: %lldns", event_msg, delta);
 	}
-	mutex_exit(&ibcm_rc_flow_mutex);
 }
 
 void
-ibcm_rc_flow_control_enter(void)
+ibcm_flow_dec(hrtime_t time, char *mad_type)
 {
-	ibcm_flow_enter(&ibcm_open_flow);
+	int flow_exit = 0;
+	int run = 0;
+
+	if (ibcm_dtrace)
+		ibcm_check_send_cmpltn_time(gethrtime() - time, mad_type);
+	mutex_enter(&ibcm_open.mutex);
+	ibcm_open.sends--;
+	if (ibcm_open.sends < ibcm_open.sends_lowat) {
+		run = ibcm_ok_to_start(&ibcm_open);
+		if (ibcm_open.exit_deferred) {
+			ibcm_open.exit_deferred--;
+			flow_exit = 1;
+		}
+	}
+	mutex_exit(&ibcm_open.mutex);
+	if (flow_exit)
+		ibcm_flow_exit(&ibcm_close_flow);
+	if (run)
+		ibcm_run_tlist_thread();
 }
 
 void
-ibcm_rc_flow_control_exit(void)
-{
-	ibcm_flow_exit(&ibcm_open_flow);
-}
-
-void
-ibcm_close_flow_control_enter()
+ibcm_close_enter(void)
 {
 	ibcm_flow_enter(&ibcm_close_flow);
 }
 
 void
-ibcm_close_flow_control_exit()
+ibcm_close_exit(void)
 {
-	ibcm_flow_exit(&ibcm_close_flow);
+	int flow_exit;
+
+	mutex_enter(&ibcm_open.mutex);
+	if (ibcm_open.sends < ibcm_open.sends_lowat ||
+	    ibcm_open.exit_deferred >= 4)
+		flow_exit = 1;
+	else {
+		flow_exit = 0;
+		ibcm_open.exit_deferred++;
+	}
+	mutex_exit(&ibcm_open.mutex);
+	if (flow_exit)
+		ibcm_flow_exit(&ibcm_close_flow);
+}
+
+/*
+ * This function needs to be called twice to finish our flow
+ * control accounting when closing down a connection.  One
+ * call has send_done set to 1, while the other has it set to 0.
+ * Because of retries, this could get called more than once
+ * with either 0 or 1, but additional calls have no effect.
+ */
+void
+ibcm_close_done(ibcm_state_data_t *statep, int send_done)
+{
+	int flow_exit;
+
+	ASSERT(MUTEX_HELD(&statep->state_mutex));
+	if (statep->close_flow == 1) {
+		if (send_done)
+			statep->close_flow = 3;
+		else
+			statep->close_flow = 2;
+	} else if ((send_done && statep->close_flow == 2) ||
+	    (!send_done && statep->close_flow == 3)) {
+		statep->close_flow = 0;
+		mutex_enter(&ibcm_open.mutex);
+		if (ibcm_open.sends < ibcm_open.sends_lowat ||
+		    ibcm_open.exit_deferred >= 4)
+			flow_exit = 1;
+		else {
+			flow_exit = 0;
+			ibcm_open.exit_deferred++;
+		}
+		mutex_exit(&ibcm_open.mutex);
+		if (flow_exit)
+			ibcm_flow_exit(&ibcm_close_flow);
+	}
 }
 
 void
-ibcm_rc_flow_control_stall()
+ibcm_lapr_enter(void)
 {
-	ibcm_flow_stall(&ibcm_open_flow);
+	ibcm_flow_enter(&ibcm_lapr_flow);
+}
+
+void
+ibcm_lapr_exit(void)
+{
+	ibcm_flow_exit(&ibcm_lapr_flow);
 }
 
 void
@@ -1702,11 +1939,11 @@ ibcm_init_saa(void *arg)
 
 	if ((status = ibmf_sa_session_open(port_guid, 0, &event_args,
 	    IBMF_VERSION, 0, &portp->port_ibmf_saa_hdl)) != IBMF_SUCCESS) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_init_saa "
+		IBTF_DPRINTF_L2(cmlog, "ibcm_init_saa: "
 		    "ibmf_sa_session_open failed for port guid %llX "
 		    "status = %d", port_guid, status);
 	} else {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_init_saa "
+		IBTF_DPRINTF_L2(cmlog, "ibcm_init_saa: "
 		    "registered sa_hdl 0x%p for port guid %llX",
 		    portp->port_ibmf_saa_hdl, port_guid);
 	}
@@ -1753,7 +1990,7 @@ ibcm_init_saa_handle(ibcm_hca_info_t *hcap, uint8_t port)
 	ibt_status = ibt_get_port_state_byguid(portp->port_hcap->hca_guid,
 	    portp->port_num, &portp->port_sgid0, NULL);
 	if (ibt_status != IBT_SUCCESS) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_init_saa_handle "
+		IBTF_DPRINTF_L2(cmlog, "ibcm_init_saa_handle: "
 		    "ibt_get_port_state_byguid failed for guid %llX "
 		    "with status %d", portp->port_hcap->hca_guid, ibt_status);
 		mutex_enter(&ibcm_sa_open_lock);
@@ -1795,7 +2032,7 @@ ibcm_get_saa_handle(ibcm_hca_info_t *hcap, uint8_t port)
 	ibt_status = ibt_get_port_state_byguid(portp->port_hcap->hca_guid,
 	    portp->port_num, &portp->port_sgid0, NULL);
 	if (ibt_status != IBT_SUCCESS) {
-		IBTF_DPRINTF_L2(cmlog, "ibcm_get_saa_handle "
+		IBTF_DPRINTF_L2(cmlog, "ibcm_get_saa_handle: "
 		    "ibt_get_port_state_byguid failed for guid %llX "
 		    "with status %d", portp->port_hcap->hca_guid, ibt_status);
 		mutex_enter(&ibcm_sa_open_lock);
@@ -1943,7 +2180,7 @@ ibcm_hca_fini_port(ibcm_hca_info_t *hcap, uint8_t port_index)
 		ibmf_status = ibmf_sa_session_close(
 		    &hcap->hca_port_info[port_index].port_ibmf_saa_hdl, 0);
 		if (ibmf_status != IBMF_SUCCESS) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_fini_port "
+			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_fini_port: "
 			    "ibmf_sa_session_close of port %d returned %x",
 			    port_index + 1, ibmf_status);
 			return (IBCM_FAILURE);
@@ -1960,7 +2197,7 @@ ibcm_hca_fini_port(ibcm_hca_info_t *hcap, uint8_t port_index)
 
 		if (ibcm_status != IBCM_SUCCESS) {
 
-			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_fini_port "
+			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_fini_port: "
 			    "ibcm_free_allqps failed for port_num %d",
 			    port_index + 1);
 			return (IBCM_FAILURE);
@@ -1972,7 +2209,7 @@ ibcm_hca_fini_port(ibcm_hca_info_t *hcap, uint8_t port_index)
 		    IBMF_QP_HANDLE_DEFAULT, 0);
 
 		if (ibmf_status != IBMF_SUCCESS) {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_fini_port "
+			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_fini_port: "
 			    "ibmf_tear_down_async_cb failed %d port_num %d",
 			    ibmf_status, port_index + 1);
 			return (IBCM_FAILURE);
@@ -1989,7 +2226,7 @@ ibcm_hca_fini_port(ibcm_hca_info_t *hcap, uint8_t port_index)
 			hcap->hca_port_info[port_index].port_ibmf_hdl =
 								NULL;
 		else {
-			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_fini_port "
+			IBTF_DPRINTF_L2(cmlog, "ibcm_hca_fini_port: "
 			    "ibmf_unregister failed %d port_num %d",
 			    ibmf_status, port_index + 1);
 			return (IBCM_FAILURE);
