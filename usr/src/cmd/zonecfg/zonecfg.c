@@ -1896,10 +1896,7 @@ fill_in_fstab(cmd_t *cmd, struct zone_fstab *fstab, bool fill_in_only)
 	if ((err = initialize(TRUE)) != Z_OK)
 		return (err);
 
-	fstab->zone_fs_dir[0] = '\0';
-	fstab->zone_fs_special[0] = '\0';
-	fstab->zone_fs_type[0] = '\0';
-	fstab->zone_fs_options = NULL;
+	bzero(fstab, sizeof (*fstab));
 	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
@@ -1944,7 +1941,7 @@ fill_in_ipdtab(cmd_t *cmd, struct zone_fstab *ipdtab, bool fill_in_only)
 	if ((err = initialize(TRUE)) != Z_OK)
 		return (err);
 
-	ipdtab->zone_fs_dir[0] = '\0';
+	bzero(ipdtab, sizeof (*ipdtab));
 	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
@@ -1977,8 +1974,7 @@ fill_in_nwiftab(cmd_t *cmd, struct zone_nwiftab *nwiftab, bool fill_in_only)
 	if ((err = initialize(TRUE)) != Z_OK)
 		return (err);
 
-	nwiftab->zone_nwif_address[0] = '\0';
-	nwiftab->zone_nwif_physical[0] = '\0';
+	bzero(nwiftab, sizeof (*nwiftab));
 	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
@@ -2017,7 +2013,7 @@ fill_in_devtab(cmd_t *cmd, struct zone_devtab *devtab, bool fill_in_only)
 	if ((err = initialize(TRUE)) != Z_OK)
 		return (err);
 
-	devtab->zone_dev_match[0] = '\0';
+	bzero(devtab, sizeof (*devtab));
 	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
@@ -2051,7 +2047,7 @@ fill_in_rctltab(cmd_t *cmd, struct zone_rctltab *rctltab, bool fill_in_only)
 	if ((err = initialize(TRUE)) != Z_OK)
 		return (err);
 
-	rctltab->zone_rctl_name[0] = '\0';
+	bzero(rctltab, sizeof (*rctltab));
 	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
@@ -2085,9 +2081,7 @@ fill_in_attrtab(cmd_t *cmd, struct zone_attrtab *attrtab, bool fill_in_only)
 	if ((err = initialize(TRUE)) != Z_OK)
 		return (err);
 
-	attrtab->zone_attr_name[0] = '\0';
-	attrtab->zone_attr_type[0] = '\0';
-	attrtab->zone_attr_value[0] = '\0';
+	bzero(attrtab, sizeof (*attrtab));
 	for (i = 0; i < cmd->cmd_prop_nv_pairs; i++) {
 		pp = cmd->cmd_property_ptr[i];
 		if (pp->pv_type != PROP_VAL_SIMPLE || pp->pv_simple == NULL) {
