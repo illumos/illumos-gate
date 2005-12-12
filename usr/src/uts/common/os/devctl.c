@@ -1312,6 +1312,7 @@ e_devid_cache_to_devt_list(ddi_devid_t devid, char *minor_name,
 	char		*path, **paths;
 	int		i, j, n;
 	dev_t		*devts, *udevts;
+	dev_t		tdevt;
 	int		ndevts, undevts, ndevts_alloced;
 	dev_info_t	*devi, **devis;
 	int		ndevis, npaths, nalloced;
@@ -1437,9 +1438,9 @@ restart:
 	for (i = 0; i < (ndevts - 1); i++) {
 		for (j = 0; j < ((ndevts - 1) - i); j++) {
 			if (devts[j + 1] < devts[j]) {
-				n = devts[j];
+				tdevt = devts[j];
 				devts[j] = devts[j + 1];
-				devts[j + 1] = n;
+				devts[j + 1] = tdevt;
 			}
 		}
 	}
