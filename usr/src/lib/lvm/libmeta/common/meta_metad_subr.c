@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -219,6 +218,24 @@ get_db_rec(
 )
 {
 	mddb_userreq_t	*reqp = Zalloc(sizeof (*reqp));
+	mdsetname_t	*sp;
+	md_set_desc	*sd;
+	int		ureq;
+
+	if ((sp = metasetnosetname(setno, ep)) == NULL) {
+		Free(reqp);
+		return (NULL);
+	}
+
+	if (metaislocalset(sp)) {
+		ureq = MD_DB_USERREQ;
+	} else {
+		if ((sd = metaget_setdesc(sp, ep)) == NULL) {
+			Free(reqp);
+			return (NULL);
+		}
+		ureq = MD_MNSET_DESC(sd) ? MD_MN_DB_USERREQ : MD_DB_USERREQ;
+	}
 
 	reqp->ur_setno = setno;
 	reqp->ur_type = type;
@@ -228,7 +245,7 @@ get_db_rec(
 	    case MD_UR_GET_NEXT:
 		    reqp->ur_cmd = MD_DB_GETNEXTREC;
 		    reqp->ur_recid = *idp;
-		    if (metaioctl(MD_DB_USERREQ, reqp, &reqp->ur_mde, NULL)
+		    if (metaioctl(ureq, reqp, &reqp->ur_mde, NULL)
 			!= 0) {
 			    (void) mdstealerror(ep, &reqp->ur_mde);
 			    Free(reqp);
@@ -247,7 +264,7 @@ get_db_rec(
 	}
 
 	reqp->ur_cmd = MD_DB_GETSIZE;
-	if (metaioctl(MD_DB_USERREQ, reqp, &reqp->ur_mde, NULL) != 0) {
+	if (metaioctl(ureq, reqp, &reqp->ur_mde, NULL) != 0) {
 		(void) mdstealerror(ep, &reqp->ur_mde);
 		Free(reqp);
 
@@ -257,7 +274,7 @@ get_db_rec(
 
 	reqp->ur_cmd = MD_DB_GETDATA;
 	reqp->ur_data = (uintptr_t)Zalloc(reqp->ur_size);
-	if (metaioctl(MD_DB_USERREQ, reqp, &reqp->ur_mde, NULL) != 0) {
+	if (metaioctl(ureq, reqp, &reqp->ur_mde, NULL) != 0) {
 		(void) mdstealerror(ep, &reqp->ur_mde);
 		Free((void *)(uintptr_t)reqp->ur_data);
 		Free(reqp);
