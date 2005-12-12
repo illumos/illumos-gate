@@ -4427,7 +4427,6 @@ failover_remap(failinfo_t *fi)
 	rnode_t *rp, *nrp;
 	mntinfo_t *mi;
 	int error;
-	int index;
 #ifdef DEBUG
 	struct nfs_clnt *nfscl;
 
