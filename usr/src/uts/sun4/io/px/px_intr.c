@@ -880,21 +880,33 @@ px_ks_update(kstat_t *ksp, int rw)
 	    "%s%d", ddi_driver_name(ih_p->ih_dip),
 	    ddi_get_instance(ih_p->ih_dip));
 
-	(void) strcpy(pxintr_ks_template.pxintr_ks_type.value.c,
-	    (ih_p->ih_rec_type == 0) ? "fixed" : "msi");
-	pxintr_ks_template.pxintr_ks_cpu.value.ui64 = ih_p->ih_ino_p->ino_cpuid;
-	pxintr_ks_template.pxintr_ks_pil.value.ui64 = ih_p->ih_ino_p->ino_pil;
-	pxintr_ks_template.pxintr_ks_time.value.ui64 =
-	    ih_p->ih_nsec + (uint64_t)
-	    tick2ns((hrtime_t)ih_p->ih_ticks, ih_p->ih_ino_p->ino_cpuid);
-	pxintr_ks_template.pxintr_ks_ino.value.ui64 = ino;
-	pxintr_ks_template.pxintr_ks_cookie.value.ui64 = sysino;
-
 	(void) ddi_pathname(ih_p->ih_dip, ih_devpath);
 	(void) ddi_pathname(px_p->px_dip, ih_buspath);
 	kstat_named_setstr(&pxintr_ks_template.pxintr_ks_devpath, ih_devpath);
 	kstat_named_setstr(&pxintr_ks_template.pxintr_ks_buspath, ih_buspath);
 
+	if (ih_p->ih_intr_state == PX_INTR_STATE_ENABLE) {
+
+		(void) strcpy(pxintr_ks_template.pxintr_ks_type.value.c,
+		    (ih_p->ih_rec_type == 0) ? "fixed" : "msi");
+		pxintr_ks_template.pxintr_ks_cpu.value.ui64 =
+		    ih_p->ih_ino_p->ino_cpuid;
+		pxintr_ks_template.pxintr_ks_pil.value.ui64 =
+		    ih_p->ih_ino_p->ino_pil;
+		pxintr_ks_template.pxintr_ks_time.value.ui64 = ih_p->ih_nsec +
+		    (uint64_t)tick2ns((hrtime_t)ih_p->ih_ticks,
+			ih_p->ih_ino_p->ino_cpuid);
+		pxintr_ks_template.pxintr_ks_ino.value.ui64 = ino;
+		pxintr_ks_template.pxintr_ks_cookie.value.ui64 = sysino;
+	} else {
+		(void) strcpy(pxintr_ks_template.pxintr_ks_type.value.c,
+		    "disabled");
+		pxintr_ks_template.pxintr_ks_cpu.value.ui64 = 0;
+		pxintr_ks_template.pxintr_ks_pil.value.ui64 = 0;
+		pxintr_ks_template.pxintr_ks_time.value.ui64 = 0;
+		pxintr_ks_template.pxintr_ks_ino.value.ui64 = 0;
+		pxintr_ks_template.pxintr_ks_cookie.value.ui64 = 0;
+	}
 	return (0);
 }
 

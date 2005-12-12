@@ -84,16 +84,14 @@ pci_ih_ks_update(kstat_t *ksp, int rw)
 
 	(void) snprintf(pci_ks_template.ihks_name.value.c, maxlen, "%s%d",
 	    ddi_driver_name(dip), ddi_get_instance(dip));
-	(void) strcpy(pci_ks_template.ihks_type.value.c,
-	    DDI_INTR_IS_MSI_OR_MSIX(ih_p->ih_type) ? "msi" : "fixed");
-	pci_ks_template.ihks_pil.value.ui64 = ih_p->ih_pri;
-	pci_ks_template.ihks_time.value.ui64 =
-	    ((ihdl_plat_t *)ih_p->ih_private)->ip_ticks;
-	tsc_scalehrtime((hrtime_t *)&pci_ks_template.ihks_time.value.ui64);
-	pci_ks_template.ihks_cookie.value.ui64 = ih_p->ih_vector;
+	(void) ddi_pathname(dip, ih_devpath);
+	(void) ddi_pathname(rootnex_dip, ih_buspath);
+	kstat_named_setstr(&pci_ks_template.ihks_devpath, ih_devpath);
+	kstat_named_setstr(&pci_ks_template.ihks_buspath, ih_buspath);
 
 	/*
-	 * Return a vector since that's what PCItool will require intrd to use.
+	 * ih_p->ih_vector really has an IRQ.  Ask pci_get_intr_from_vecirq to
+	 * return a vector since that's what PCItool will require intrd to use.
 	 *
 	 * PCItool will change the CPU routing of the IRQ that vector maps to.
 	 *
@@ -101,24 +99,52 @@ pci_ih_ks_update(kstat_t *ksp, int rw)
 	 * vector returned below will always be the same for a given IRQ
 	 * specified, and so all kstats for a given IRQ will report the same
 	 * value for the ino field.
+	 *
+	 * ---
+	 *
+	 * Check for the enabled state, since kstats are set up when the ISR is
+	 * added, not enabled.  There may be a period where interrupts are not
+	 * enabled even though they may have been added.
+	 *
+	 * It is also possible that the vector is for a dummy interrupt.
+	 * pci_get_intr_from_vecirq will return failure in this case.
 	 */
+	intrinfo.avgi_cpu_id = 0; /* In case pci_get_intr_from_vecirq fails */
 	intrinfo.avgi_req_flags = PSMGI_REQ_CPUID | PSMGI_REQ_VECTOR;
-	if (pci_get_intr_from_vecirq(&intrinfo,  ih_p->ih_vector, IS_IRQ) !=
-	    DDI_SUCCESS) {
-		/* again, shouldn't happen */
+	if ((ih_p->ih_state != DDI_IHDL_STATE_ENABLE) ||
+	    (pci_get_intr_from_vecirq(&intrinfo,  ih_p->ih_vector, IS_IRQ) !=
+		DDI_SUCCESS) ||
+	    (intrinfo.avgi_cpu_id & PSMGI_CPU_FLAGS)) {
+
+		(void) strcpy(pci_ks_template.ihks_type.value.c, "disabled");
+		pci_ks_template.ihks_pil.value.ui64 = 0;
+		pci_ks_template.ihks_time.value.ui64 = 0;
+		pci_ks_template.ihks_cookie.value.ui64 = 0;
 		pci_ks_template.ihks_cpu.value.ui64 = 0;
-		/* XXX Setting this value seems to be harmless. */
-		pci_ks_template.ihks_cookie.value.ui64 = ih_p->ih_vector;
-	} else {
-		pci_ks_template.ihks_cpu.value.ui64 =
-		    intrinfo.avgi_cpu_id & ~PSMGI_CPU_FLAGS;
-		pci_ks_template.ihks_ino.value.ui64 = intrinfo.avgi_vector;
+		pci_ks_template.ihks_ino.value.ui64 = 0;
+
+		/* Interrupt is user-bound.  Remove kstat. */
+		if (intrinfo.avgi_cpu_id & PSMGI_CPU_FLAGS)
+			(void) taskq_dispatch(system_taskq,
+			    (void (*)(void *))pci_kstat_delete, ksp, TQ_SLEEP);
+
+		return (0);
 	}
 
-	(void) ddi_pathname(dip, ih_devpath);
-	(void) ddi_pathname(rootnex_dip, ih_buspath);
-	kstat_named_setstr(&pci_ks_template.ihks_devpath, ih_devpath);
-	kstat_named_setstr(&pci_ks_template.ihks_buspath, ih_buspath);
+	/*
+	 * Interrupt is valid (not a dummy), not user-bound to a specific cpu,
+	 * and enabled.  Update kstat fields.
+	 */
+	(void) strcpy(pci_ks_template.ihks_type.value.c,
+	    DDI_INTR_IS_MSI_OR_MSIX(ih_p->ih_type) ? "msi" : "fixed");
+	pci_ks_template.ihks_pil.value.ui64 = ih_p->ih_pri;
+	pci_ks_template.ihks_time.value.ui64 =
+	    ((ihdl_plat_t *)ih_p->ih_private)->ip_ticks;
+	tsc_scalehrtime((hrtime_t *)&pci_ks_template.ihks_time.value.ui64);
+	pci_ks_template.ihks_cookie.value.ui64 = ih_p->ih_vector;
+	/* CPU won't be user bound at this point. */
+	pci_ks_template.ihks_cpu.value.ui64 = intrinfo.avgi_cpu_id;
+	pci_ks_template.ihks_ino.value.ui64 = intrinfo.avgi_vector;
 
 	return (0);
 }
@@ -149,13 +175,23 @@ void pci_kstat_create(kstat_t **kspp, dev_info_t *rootnex_dip,
 	}
 }
 
+
+/*
+ * This function is invoked in two ways:
+ * - Thru taskq thread via pci_ih_ks_update to remove kstats for user-bound
+ *   interrupts.
+ * - From the REMISR introp when an interrupt is being removed.
+ */
 void
 pci_kstat_delete(kstat_t *ksp)
 {
-	pci_kstat_private_t *kstat_private;
+	pci_kstat_private_t	*kstat_private;
+	ddi_intr_handle_impl_t	*hdlp;
 
 	if (ksp) {
 		kstat_private = ksp->ks_private;
+		hdlp = kstat_private->hdlp;
+		((ihdl_plat_t *)hdlp->ih_private)->ip_ksp = NULL;
 
 		/*
 		 * Delete the kstat before removing the private pointer, to
@@ -163,7 +199,6 @@ pci_kstat_delete(kstat_t *ksp)
 		 */
 		kstat_delete(ksp);
 
-		if (kstat_private)
-			kmem_free(kstat_private, sizeof (pci_kstat_private_t));
+		kmem_free(kstat_private, sizeof (pci_kstat_private_t));
 	}
 }

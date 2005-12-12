@@ -530,22 +530,34 @@ pci_ks_update(kstat_t *ksp, int rw)
 	(void) snprintf(pciintr_ks_template.pciintr_ks_name.value.c, maxlen,
 	    "%s%d", ddi_driver_name(ih_p->ih_dip),
 	    ddi_get_instance(ih_p->ih_dip));
-	(void) strcpy(pciintr_ks_template.pciintr_ks_type.value.c, "fixed");
-	pciintr_ks_template.pciintr_ks_cpu.value.ui64 =
-	    ih_p->ih_ino_p->ino_cpuid;
-	pciintr_ks_template.pciintr_ks_pil.value.ui64 =
-	    ih_p->ih_ino_p->ino_pil;
-	pciintr_ks_template.pciintr_ks_time.value.ui64 =
-	    ih_p->ih_nsec + (uint64_t)
-	    tick2ns((hrtime_t)ih_p->ih_ticks, ih_p->ih_ino_p->ino_cpuid);
-	pciintr_ks_template.pciintr_ks_ino.value.ui64 = ino;
-	pciintr_ks_template.pciintr_ks_cookie.value.ui64 =
-		IB_INO_TO_MONDO(ib_p, ino);
 
 	(void) ddi_pathname(ih_p->ih_dip, ih_devpath);
 	(void) ddi_pathname(pci_p->pci_dip, ih_buspath);
 	kstat_named_setstr(&pciintr_ks_template.pciintr_ks_devpath, ih_devpath);
 	kstat_named_setstr(&pciintr_ks_template.pciintr_ks_buspath, ih_buspath);
+
+	if (ih_p->ih_intr_state == PCI_INTR_STATE_ENABLE) {
+		(void) strcpy(pciintr_ks_template.pciintr_ks_type.value.c,
+		    "fixed");
+		pciintr_ks_template.pciintr_ks_cpu.value.ui64 =
+		    ih_p->ih_ino_p->ino_cpuid;
+		pciintr_ks_template.pciintr_ks_pil.value.ui64 =
+		    ih_p->ih_ino_p->ino_pil;
+		pciintr_ks_template.pciintr_ks_time.value.ui64 = ih_p->ih_nsec +
+		    (uint64_t)tick2ns((hrtime_t)ih_p->ih_ticks,
+			ih_p->ih_ino_p->ino_cpuid);
+		pciintr_ks_template.pciintr_ks_ino.value.ui64 = ino;
+		pciintr_ks_template.pciintr_ks_cookie.value.ui64 =
+			IB_INO_TO_MONDO(ib_p, ino);
+	} else {
+		(void) strcpy(pciintr_ks_template.pciintr_ks_type.value.c,
+		    "disabled");
+		pciintr_ks_template.pciintr_ks_cpu.value.ui64 = 0;
+		pciintr_ks_template.pciintr_ks_pil.value.ui64 = 0;
+		pciintr_ks_template.pciintr_ks_time.value.ui64 = 0;
+		pciintr_ks_template.pciintr_ks_ino.value.ui64 = 0;
+		pciintr_ks_template.pciintr_ks_cookie.value.ui64 = 0;
+	}
 
 	return (0);
 }

@@ -217,6 +217,7 @@ sub getstat($)
 		my $cpu = $intrcfg->{cpu};
 
 		next unless exists $stat{$cpu};
+		next if ($intrcfg->{type} =~ /^disabled\0/);
 
 		if ($intrcfg->{snaptime} < $minsnap) {
 			$minsnap = $intrcfg->{snaptime};

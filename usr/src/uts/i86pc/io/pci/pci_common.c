@@ -230,6 +230,7 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	struct intrspec		*ispec;
 	ddi_intr_handle_impl_t	tmp_hdl;
 	ddi_intr_msix_t		*msix_p;
+	ihdl_plat_t		*ihdl_plat_datap;
 
 	DDI_INTR_NEXDBG((CE_CONT,
 	    "pci_common_intr_ops: pdip 0x%p, rdip 0x%p, op %x handle 0x%p\n",
@@ -373,15 +374,22 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		/* update ispec */
 		isp = pci_intx_get_ispec(pdip, rdip, (int)hdlp->ih_inum);
 		ispec = (struct intrspec *)isp;
-		if (ispec)
+		if (ispec) {
 			ispec->intrspec_func = hdlp->ih_cb_func;
+			ihdl_plat_datap = (ihdl_plat_t *)hdlp->ih_private;
+			pci_kstat_create(&ihdl_plat_datap->ip_ksp, pdip, hdlp);
+		}
 		break;
 	case DDI_INTROP_REMISR:
 		/* Get the interrupt structure pointer */
 		isp = pci_intx_get_ispec(pdip, rdip, (int)hdlp->ih_inum);
 		ispec = (struct intrspec *)isp;
-		if (ispec)
+		if (ispec) {
 			ispec->intrspec_func = (uint_t (*)()) 0;
+			ihdl_plat_datap = (ihdl_plat_t *)hdlp->ih_private;
+			if (ihdl_plat_datap->ip_ksp != NULL)
+				pci_kstat_delete(ihdl_plat_datap->ip_ksp);
+		}
 		break;
 	case DDI_INTROP_GETCAP:
 		/*
@@ -639,7 +647,6 @@ pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
 {
 	struct intrspec	*ispec;
 	int		irq;
-	int		cpu_id;
 	ihdl_plat_t	*ihdl_plat_datap = (ihdl_plat_t *)hdlp->ih_private;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_enable_intr: hdlp %p inum %x\n",
@@ -665,11 +672,6 @@ pci_enable_intr(dev_info_t *pdip, dev_info_t *rdip,
 	/* Note this really is an irq. */
 	hdlp->ih_vector = (ushort_t)irq;
 
-	/* Don't create kstats for unmoveable interrupts */
-	if (((cpu_id = pci_get_cpu_from_vecirq(irq, IS_IRQ)) != -1) &&
-	    (!(cpu_id & PSMGI_CPU_USER_BOUND)))
-		pci_kstat_create(&ihdl_plat_datap->ip_ksp, pdip, hdlp);
-
 	return (DDI_SUCCESS);
 }
 
@@ -683,10 +685,6 @@ pci_disable_intr(dev_info_t *pdip, dev_info_t *rdip,
 	ihdl_plat_t	*ihdl_plat_datap = (ihdl_plat_t *)hdlp->ih_private;
 
 	DDI_INTR_NEXDBG((CE_CONT, "pci_disable_intr: \n"));
-	if (ihdl_plat_datap->ip_ksp != NULL) {
-		pci_kstat_delete(ihdl_plat_datap->ip_ksp);
-		ihdl_plat_datap->ip_ksp = NULL;
-	}
 	ispec = (struct intrspec *)pci_intx_get_ispec(pdip, rdip, (int)inum);
 	if (DDI_INTR_IS_MSI_OR_MSIX(hdlp->ih_type) && ispec)
 		ispec->intrspec_vec = inum;

@@ -498,8 +498,9 @@ int
 apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 {
 	struct autovec *av_dev;
-	uchar_t irq;
+	uchar_t irqno;
 	int i;
+	apic_irq_t *irq_p;
 
 	/* Sanity check the vector/irq argument. */
 	ASSERT((vecirq >= 0) || (vecirq <= APIC_MAX_VECTOR));
@@ -512,14 +513,23 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 	 */
 	if ((intr_params_p->avgi_req_flags & PSMGI_INTRBY_FLAGS) ==
 	    PSMGI_INTRBY_VEC)
-		irq = apic_vector_to_irq[vecirq];
+		irqno = apic_vector_to_irq[vecirq];
 	else
-		irq = vecirq;
+		irqno = vecirq;
+
+	irq_p = apic_irq_table[irqno];
+
+	if ((irq_p == NULL) ||
+	    (irq_p->airq_temp_cpu == IRQ_UNBOUND) ||
+	    (irq_p->airq_temp_cpu == IRQ_UNINIT)) {
+		mutex_exit(&airq_mutex);
+		return (PSM_FAILURE);
+	}
 
 	if (intr_params_p->avgi_req_flags & PSMGI_REQ_CPUID) {
 
 		/* Get the (temp) cpu from apic_irq table, indexed by irq. */
-		intr_params_p->avgi_cpu_id = apic_irq_table[irq]->airq_temp_cpu;
+		intr_params_p->avgi_cpu_id = irq_p->airq_temp_cpu;
 
 		/* Return user bound info for intrd. */
 		if (intr_params_p->avgi_cpu_id & IRQ_USER_BOUND) {
@@ -529,13 +539,13 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 	}
 
 	if (intr_params_p->avgi_req_flags & PSMGI_REQ_VECTOR) {
-		intr_params_p->avgi_vector = apic_irq_table[irq]->airq_vector;
+		intr_params_p->avgi_vector = irq_p->airq_vector;
 	}
 
 	if (intr_params_p->avgi_req_flags &
 	    (PSMGI_REQ_NUM_DEVS | PSMGI_REQ_GET_DEVS)) {
 		/* Get number of devices from apic_irq table shared field. */
-		intr_params_p->avgi_num_devs = apic_irq_table[irq]->airq_share;
+		intr_params_p->avgi_num_devs = irq_p->airq_share;
 	}
 
 	if (intr_params_p->avgi_req_flags &  PSMGI_REQ_GET_DEVS) {
@@ -544,7 +554,7 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 
 		/* Some devices have NULL dip.  Don't count these. */
 		if (intr_params_p->avgi_num_devs > 0) {
-			for (i = 0, av_dev = autovect[irq].avh_link;
+			for (i = 0, av_dev = autovect[irqno].avh_link;
 			    av_dev; av_dev = av_dev->av_link)
 				if (av_dev->av_vector && av_dev->av_dip)
 					i++;
@@ -572,7 +582,7 @@ apic_get_vector_intr_info(int vecirq, apic_get_intr_t *intr_params_p)
 			 * entries which contain NULL dips.  These will be
 			 * ignored.
 			 */
-			for (i = 0, av_dev = autovect[irq].avh_link;
+			for (i = 0, av_dev = autovect[irqno].avh_link;
 			    av_dev; av_dev = av_dev->av_link)
 				if (av_dev->av_vector && av_dev->av_dip)
 					intr_params_p->avgi_dip_list[i++] =
