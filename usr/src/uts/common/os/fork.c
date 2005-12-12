@@ -165,15 +165,6 @@ cfork(int isvfork, int isfork1)
 		goto forkerr;
 	}
 
-	/*
-	 * If this is vfork(), cancel any suspend request we might
-	 * have gotten from some other thread via lwp_suspend().
-	 * Otherwise we could end up with a deadlock on return
-	 * from the vfork() in both the parent and the child.
-	 */
-	if (isvfork)
-		curthread->t_proc_flag &= ~TP_HOLDLWP;
-
 #if defined(__sparc)
 	/*
 	 * Ensure that the user stack is fully constructed
@@ -182,10 +173,18 @@ cfork(int isvfork, int isfork1)
 	(void) flush_user_windows_to_stack(NULL);
 #endif
 
+	mutex_enter(&p->p_lock);
+	/*
+	 * If this is vfork(), cancel any suspend request we might
+	 * have gotten from some other thread via lwp_suspend().
+	 * Otherwise we could end up with a deadlock on return
+	 * from the vfork() in both the parent and the child.
+	 */
+	if (isvfork)
+		curthread->t_proc_flag &= ~TP_HOLDLWP;
 	/*
 	 * Prevent our resource set associations from being changed during fork.
 	 */
-	mutex_enter(&p->p_lock);
 	pool_barrier_enter();
 	mutex_exit(&p->p_lock);
 
