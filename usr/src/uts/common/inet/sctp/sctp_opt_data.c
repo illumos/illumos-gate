@@ -44,6 +44,7 @@
 #include <netinet/ip6.h>
 #include <inet/ip.h>
 #include <inet/ip_ire.h>
+#include <inet/ip_if.h>
 #include <inet/ipclassifier.h>
 #include <inet/ipsec_impl.h>
 
@@ -796,6 +797,7 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 	int	*i1 = (int *)ptr;
 	int	retval = 0;
 	int	buflen = *optlen;
+	conn_t		*connp = sctp->sctp_connp;
 	ip6_pkt_t	*ipp = &sctp->sctp_sticky_ipp;
 	/* In most cases, the return buffer is just an int */
 	*optlen = sizeof (int32_t);
@@ -1040,6 +1042,14 @@ sctp_get_opt(sctp_t *sctp, int level, int name, void *ptr, socklen_t *optlen)
 			break;
 		case IP_TTL:
 			*i1 = (int)sctp->sctp_ipha->ipha_ttl;
+			break;
+		case IP_NEXTHOP:
+			if (connp->conn_nexthop_set) {
+				*(ipaddr_t *)ptr = connp->conn_nexthop_v4;
+				*optlen = sizeof (ipaddr_t);
+			} else {
+				*optlen = 0;
+			}
 			break;
 		default:
 			retval = EINVAL;
@@ -1487,6 +1497,37 @@ sctp_set_opt(sctp_t *sctp, int level, int name, const void *invalp,
 		case IP_UNSPEC_SRC:
 			connp->conn_unspec_src = onoff;
 			break;
+		case IP_NEXTHOP: {
+			ipaddr_t addr = *i1;
+			ipif_t *ipif = NULL;
+			ill_t *ill;
+
+			if (secpolicy_net(CRED(), OP_CONFIG, B_TRUE) == 0) {
+				ipif =
+				    ipif_lookup_onlink_addr(addr,
+				    connp->conn_zoneid);
+				if (ipif == NULL) {
+					retval = EHOSTUNREACH;
+					break;
+				}
+				ill = ipif->ipif_ill;
+				mutex_enter(&ill->ill_lock);
+				if ((ill->ill_state_flags & ILL_CONDEMNED) ||
+				    (ipif->ipif_state_flags & IPIF_CONDEMNED)) {
+					mutex_exit(&ill->ill_lock);
+					ipif_refrele(ipif);
+					retval =  EHOSTUNREACH;
+					break;
+				}
+				mutex_exit(&ill->ill_lock);
+				ipif_refrele(ipif);
+				mutex_enter(&connp->conn_lock);
+				connp->conn_nexthop_v4 = addr;
+				connp->conn_nexthop_set = B_TRUE;
+				mutex_exit(&connp->conn_lock);
+			}
+			break;
+		}
 		default:
 			retval = EINVAL;
 			break;

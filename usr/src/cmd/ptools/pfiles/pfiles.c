@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,12 +38,14 @@
 #include <limits.h>
 #include <door.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <sys/mkdev.h>
 #include <sys/un.h>
 #include <netdb.h>
 #include <libproc.h>
+#include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 
@@ -524,13 +526,16 @@ show_socktype(uint_t type)
 		(void) printf("\tunknown socket type %u\n", type);
 }
 
+#define	BUFSIZE	200
 static void
 show_sockopts(struct ps_prochandle *Pr, int fd)
 {
 	int val, vlen;
-	char buf[64];
+	char buf[BUFSIZE];
 	char buf1[32];
+	char ipaddr[INET_ADDRSTRLEN];
 	int i;
+	in_addr_t nexthop_val;
 	struct boolopt {
 		int		opt;
 		const char	*name;
@@ -572,6 +577,15 @@ show_sockopts(struct ps_prochandle *Pr, int fd)
 	vlen = sizeof (val);
 	if (pr_getsockopt(Pr, fd, SOL_SOCKET, SO_RCVBUF, &val, &vlen) == 0) {
 		(void) snprintf(buf1, sizeof (buf1), "SO_RCVBUF(%d),", val);
+		(void) strlcat(buf, buf1, sizeof (buf));
+	}
+	vlen = sizeof (nexthop_val);
+	if (pr_getsockopt(Pr, fd, IPPROTO_IP, IP_NEXTHOP, &nexthop_val,
+	    &vlen) == 0) {
+		(void) inet_ntop(AF_INET, (void *) &nexthop_val, ipaddr,
+		    sizeof (ipaddr));
+		(void) snprintf(buf1, sizeof (buf1), "IP_NEXTHOP(%s),",
+		    ipaddr);
 		(void) strlcat(buf, buf1, sizeof (buf));
 	}
 

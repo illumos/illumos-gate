@@ -219,7 +219,8 @@ typedef struct ipsec_out_s {
 		 * messages are to be trusted by all receivers.
 		 */
 		ipsec_out_icmp_loopback: 1,
-		ipsec_out_pad_bits : 12;
+		ipsec_out_ip_nexthop : 1,	/* IP_NEXTHOP option is set */
+		ipsec_out_pad_bits : 11;
 	cred_t	*ipsec_out_cred;
 	uint32_t ipsec_out_capab_ill_index;
 
@@ -235,6 +236,8 @@ typedef struct ipsec_out_s {
 	crypto_data_t ipsec_out_crypto_mac;	/* to store the MAC */
 
 	zoneid_t ipsec_out_zoneid;	/* source zone for the datagram */
+	in6_addr_t ipsec_out_nexthop_v6;	/* nexthop IP address */
+#define	ipsec_out_nexthop_addr V4_PART_OF_V6(ipsec_out_nexthop_v6)
 } ipsec_out_t;
 
 /*

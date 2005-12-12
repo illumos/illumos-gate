@@ -2989,6 +2989,9 @@ udp_opt_get(queue_t *q, t_scalar_t level, t_scalar_t name, uchar_t *ptr)
 		case IP_TTL:
 			*i1 = (int)udp->udp_ttl;
 			break;	/* goto sizeof (int) option return */
+		case IP_NEXTHOP:
+			/* Handled at IP level */
+			return (-EINVAL);
 		case IP_MULTICAST_IF:
 			/* 0 address if not set */
 			*(ipaddr_t *)ptr = udp->udp_multicast_if_addr;
@@ -3418,6 +3421,7 @@ udp_opt_set(queue_t *q, uint_t optset_context, int level,
 		case MCAST_JOIN_SOURCE_GROUP:
 		case MCAST_LEAVE_SOURCE_GROUP:
 		case IP_SEC_OPT:
+		case IP_NEXTHOP:
 			/*
 			 * "soft" error (negative)
 			 * option not handled at this level
@@ -6054,6 +6058,7 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 	    (ire->ire_flags & RTF_MULTIRT) || ire->ire_stq == NULL ||
 	    ire->ire_max_frag < ntohs(ipha->ipha_length) ||
 	    (ire_fp_mp = ire->ire_fp_mp) == NULL ||
+	    (connp->conn_nexthop_set) ||
 	    (ire_fp_mp_len = MBLKL(ire_fp_mp)) > MBLKHEAD(mp)) {
 		if (ipif != NULL)
 			ipif_refrele(ipif);

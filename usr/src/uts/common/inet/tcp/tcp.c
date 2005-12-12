@@ -27,7 +27,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-const char tcp_version[] = "%Z%%M%	%I%	%E% SMI";
+const char tcp_version[] = "@(#)tcp.c	1.490	05/11/29 SMI";
 
 #include <sys/types.h>
 #include <sys/stream.h>
@@ -2468,7 +2468,7 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 	tcp_hsp_t	*hsp;
 	ire_t		*ire;
 	ire_t		*sire = NULL;
-	iulp_t		*ire_uinfo;
+	iulp_t		*ire_uinfo = NULL;
 	uint32_t	mss_max;
 	uint32_t	mss;
 	boolean_t	tcp_detached = TCP_IS_DETACHED(tcp);
@@ -2486,32 +2486,58 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 			BUMP_MIB(&ip_mib, ipInDiscards);
 			return (0);
 		}
-
-		ire = ire_cache_lookup(tcp->tcp_connp->conn_rem, zoneid);
-		if (ire != NULL) {
-			ire_cacheable = B_TRUE;
-			ire_uinfo = (ire_mp != NULL) ?
-			    &((ire_t *)ire_mp->b_rptr)->ire_uinfo:
-			    &ire->ire_uinfo;
-
-		} else {
-			if (ire_mp == NULL) {
+		/*
+		 * If IP_NEXTHOP is set, then look for an IRE_CACHE
+		 * for the destination with the nexthop as gateway.
+		 * ire_ctable_lookup() is used because this particular
+		 * ire, if it exists, will be marked private.
+		 * If that is not available, use the interface ire
+		 * for the nexthop.
+		 */
+		if (tcp->tcp_connp->conn_nexthop_set) {
+			ire = ire_ctable_lookup(tcp->tcp_connp->conn_rem,
+			    tcp->tcp_connp->conn_nexthop_v4, 0, NULL, zoneid,
+			    MATCH_IRE_MARK_PRIVATE_ADDR | MATCH_IRE_GW);
+			if (ire == NULL) {
 				ire = ire_ftable_lookup(
-				    tcp->tcp_connp->conn_rem,
-				    0, 0, 0, NULL, &sire, zoneid, 0,
-				    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT));
+				    tcp->tcp_connp->conn_nexthop_v4,
+				    0, 0, IRE_INTERFACE, NULL, NULL, zoneid, 0,
+				    MATCH_IRE_TYPE);
 				if (ire == NULL)
 					return (0);
-				ire_uinfo = (sire != NULL) ? &sire->ire_uinfo :
-				    &ire->ire_uinfo;
 			} else {
-				ire = (ire_t *)ire_mp->b_rptr;
-				ire_uinfo =
-				    &((ire_t *)ire_mp->b_rptr)->ire_uinfo;
+				ire_uinfo = &ire->ire_uinfo;
+			}
+		} else {
+			ire = ire_cache_lookup(tcp->tcp_connp->conn_rem,
+			    zoneid);
+			if (ire != NULL) {
+				ire_cacheable = B_TRUE;
+				ire_uinfo = (ire_mp != NULL) ?
+				    &((ire_t *)ire_mp->b_rptr)->ire_uinfo:
+				    &ire->ire_uinfo;
+
+			} else {
+				if (ire_mp == NULL) {
+					ire = ire_ftable_lookup(
+					    tcp->tcp_connp->conn_rem,
+					    0, 0, 0, NULL, &sire, zoneid, 0,
+					    (MATCH_IRE_RECURSIVE |
+					    MATCH_IRE_DEFAULT));
+					if (ire == NULL)
+						return (0);
+					ire_uinfo = (sire != NULL) ?
+					    &sire->ire_uinfo :
+					    &ire->ire_uinfo;
+				} else {
+					ire = (ire_t *)ire_mp->b_rptr;
+					ire_uinfo =
+					    &((ire_t *)
+					    ire_mp->b_rptr)->ire_uinfo;
+				}
 			}
 		}
 		ASSERT(ire != NULL);
-		ASSERT(ire_uinfo != NULL);
 
 		if ((ire->ire_src_addr == INADDR_ANY) ||
 		    (ire->ire_type & IRE_BROADCAST)) {
@@ -2550,7 +2576,19 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 			tcp->tcp_ipha->ipha_fragment_offset_and_flags =
 			    htons(IPH_DF);
 		}
-		tcp->tcp_localnet = (ire->ire_gateway_addr == 0);
+		/*
+		 * If ire_uinfo is NULL, this is the IRE_INTERFACE case
+		 * for IP_NEXTHOP. No cache ire has been found for the
+		 * destination and we are working with the nexthop's
+		 * interface ire. Since we need to forward all packets
+		 * to the nexthop first, we "blindly" set tcp_localnet
+		 * to false, eventhough the destination may also be
+		 * onlink.
+		 */
+		if (ire_uinfo == NULL)
+			tcp->tcp_localnet = 0;
+		else
+			tcp->tcp_localnet = (ire->ire_gateway_addr == 0);
 	} else {
 		/*
 		 * For incoming connection ire_mp = NULL
@@ -2662,93 +2700,99 @@ tcp_adapt_ire(tcp_t *tcp, mblk_t *ire_mp)
 	 * Make use of the cached rtt and rtt_sd values to calculate the
 	 * initial RTO.  Note that they are already initialized in
 	 * tcp_init_values().
+	 * If ire_uinfo is NULL, i.e., we do not have a cache ire for
+	 * IP_NEXTHOP, but instead are using the interface ire for the
+	 * nexthop, then we do not use the ire_uinfo from that ire to
+	 * do any initializations.
 	 */
-	if (ire_uinfo->iulp_rtt != 0) {
-		clock_t	rto;
+	if (ire_uinfo != NULL) {
+		if (ire_uinfo->iulp_rtt != 0) {
+			clock_t	rto;
 
-		tcp->tcp_rtt_sa = ire_uinfo->iulp_rtt;
-		tcp->tcp_rtt_sd = ire_uinfo->iulp_rtt_sd;
-		rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
-		    tcp_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5);
+			tcp->tcp_rtt_sa = ire_uinfo->iulp_rtt;
+			tcp->tcp_rtt_sd = ire_uinfo->iulp_rtt_sd;
+			rto = (tcp->tcp_rtt_sa >> 3) + tcp->tcp_rtt_sd +
+			    tcp_rexmit_interval_extra + (tcp->tcp_rtt_sa >> 5);
 
-		if (rto > tcp_rexmit_interval_max) {
-			tcp->tcp_rto = tcp_rexmit_interval_max;
-		} else if (rto < tcp_rexmit_interval_min) {
-			tcp->tcp_rto = tcp_rexmit_interval_min;
+			if (rto > tcp_rexmit_interval_max) {
+				tcp->tcp_rto = tcp_rexmit_interval_max;
+			} else if (rto < tcp_rexmit_interval_min) {
+				tcp->tcp_rto = tcp_rexmit_interval_min;
+			} else {
+				tcp->tcp_rto = rto;
+			}
+		}
+		if (ire_uinfo->iulp_ssthresh != 0)
+			tcp->tcp_cwnd_ssthresh = ire_uinfo->iulp_ssthresh;
+		else
+			tcp->tcp_cwnd_ssthresh = TCP_MAX_LARGEWIN;
+		if (ire_uinfo->iulp_spipe > 0) {
+			tcp->tcp_xmit_hiwater = MIN(ire_uinfo->iulp_spipe,
+			    tcp_max_buf);
+			if (tcp_snd_lowat_fraction != 0)
+				tcp->tcp_xmit_lowater = tcp->tcp_xmit_hiwater /
+				    tcp_snd_lowat_fraction;
+			(void) tcp_maxpsz_set(tcp, B_TRUE);
+		}
+		/*
+		 * Note that up till now, acceptor always inherits receive
+		 * window from the listener.  But if there is a metrics
+		 * associated with a host, we should use that instead of
+		 * inheriting it from listener. Thus we need to pass this
+		 * info back to the caller.
+		 */
+		if (ire_uinfo->iulp_rpipe > 0) {
+			tcp->tcp_rwnd = MIN(ire_uinfo->iulp_rpipe, tcp_max_buf);
+		}
+
+		if (ire_uinfo->iulp_rtomax > 0) {
+			tcp->tcp_second_timer_threshold =
+			    ire_uinfo->iulp_rtomax;
+		}
+
+		/*
+		 * Use the metric option settings, iulp_tstamp_ok and
+		 * iulp_wscale_ok, only for active open. What this means
+		 * is that if the other side uses timestamp or window
+		 * scale option, TCP will also use those options. That
+		 * is for passive open.  If the application sets a
+		 * large window, window scale is enabled regardless of
+		 * the value in iulp_wscale_ok.  This is the behavior
+		 * since 2.6.  So we keep it.
+		 * The only case left in passive open processing is the
+		 * check for SACK.
+		 * For ECN, it should probably be like SACK.  But the
+		 * current value is binary, so we treat it like the other
+		 * cases.  The metric only controls active open.For passive
+		 * open, the ndd param, tcp_ecn_permitted, controls the
+		 * behavior.
+		 */
+		if (!tcp_detached) {
+			/*
+			 * The if check means that the following can only
+			 * be turned on by the metrics only IRE, but not off.
+			 */
+			if (ire_uinfo->iulp_tstamp_ok)
+				tcp->tcp_snd_ts_ok = B_TRUE;
+			if (ire_uinfo->iulp_wscale_ok)
+				tcp->tcp_snd_ws_ok = B_TRUE;
+			if (ire_uinfo->iulp_sack == 2)
+				tcp->tcp_snd_sack_ok = B_TRUE;
+			if (ire_uinfo->iulp_ecn_ok)
+				tcp->tcp_ecn_ok = B_TRUE;
 		} else {
-			tcp->tcp_rto = rto;
+			/*
+			 * Passive open.
+			 *
+			 * As above, the if check means that SACK can only be
+			 * turned on by the metric only IRE.
+			 */
+			if (ire_uinfo->iulp_sack > 0) {
+				tcp->tcp_snd_sack_ok = B_TRUE;
+			}
 		}
-	}
-	if (ire_uinfo->iulp_ssthresh != 0)
-		tcp->tcp_cwnd_ssthresh = ire_uinfo->iulp_ssthresh;
-	else
-		tcp->tcp_cwnd_ssthresh = TCP_MAX_LARGEWIN;
-	if (ire_uinfo->iulp_spipe > 0) {
-		tcp->tcp_xmit_hiwater = MIN(ire_uinfo->iulp_spipe,
-		    tcp_max_buf);
-		if (tcp_snd_lowat_fraction != 0)
-			tcp->tcp_xmit_lowater = tcp->tcp_xmit_hiwater /
-			    tcp_snd_lowat_fraction;
-		(void) tcp_maxpsz_set(tcp, B_TRUE);
-	}
-	/*
-	 * Note that up till now, acceptor always inherits receive
-	 * window from the listener.  But if there is a metrics associated
-	 * with a host, we should use that instead of inheriting it from
-	 * listener.  Thus we need to pass this info back to the caller.
-	 */
-	if (ire_uinfo->iulp_rpipe > 0) {
-		tcp->tcp_rwnd = MIN(ire_uinfo->iulp_rpipe, tcp_max_buf);
-	} else {
-		/*
-		 * For passive open, set tcp_rwnd to 0 so that the caller
-		 * knows that there is no rpipe metric for this connection.
-		 */
-		if (tcp_detached)
-			tcp->tcp_rwnd = 0;
-	}
-	if (ire_uinfo->iulp_rtomax > 0) {
-		tcp->tcp_second_timer_threshold = ire_uinfo->iulp_rtomax;
 	}
 
-	/*
-	 * Use the metric option settings, iulp_tstamp_ok and iulp_wscale_ok,
-	 * only for active open.  What this means is that if the other side
-	 * uses timestamp or window scale option, TCP will also use those
-	 * options.  That is for passive open.  If the application sets a
-	 * large window, window scale is enabled regardless of the value in
-	 * iulp_wscale_ok.  This is the behavior since 2.6.  So we keep it.
-	 * The only case left in passive open processing is the check for SACK.
-	 *
-	 * For ECN, it should probably be like SACK.  But the current
-	 * value is binary, so we treat it like the other cases.  The
-	 * metric only controls active open.  For passive open, the ndd
-	 * param, tcp_ecn_permitted, controls the behavior.
-	 */
-	if (!tcp_detached) {
-		/*
-		 * The if check means that the following can only be turned
-		 * on by the metrics only IRE, but not off.
-		 */
-		if (ire_uinfo->iulp_tstamp_ok)
-			tcp->tcp_snd_ts_ok = B_TRUE;
-		if (ire_uinfo->iulp_wscale_ok)
-			tcp->tcp_snd_ws_ok = B_TRUE;
-		if (ire_uinfo->iulp_sack == 2)
-			tcp->tcp_snd_sack_ok = B_TRUE;
-		if (ire_uinfo->iulp_ecn_ok)
-			tcp->tcp_ecn_ok = B_TRUE;
-	} else {
-		/*
-		 * Passive open.
-		 *
-		 * As above, the if check means that SACK can only be
-		 * turned on by the metric only IRE.
-		 */
-		if (ire_uinfo->iulp_sack > 0) {
-			tcp->tcp_snd_sack_ok = B_TRUE;
-		}
-	}
 
 	/*
 	 * XXX: Note that currently, ire_max_frag can be as small as 68
@@ -5308,10 +5352,23 @@ tcp_conn_request(void *arg, mblk_t *mp, void *arg2)
 	    tcp->tcp_second_ctimer_threshold;
 
 	/*
+	 * tcp_adapt_ire() may change tcp_rwnd according to the ire metrics.
+	 * If it does not, the eager's receive window will be set to the
+	 * listener's receive window later in this function.
+	 */
+	eager->tcp_rwnd = 0;
+
+	/*
 	 * Zones: tcp_adapt_ire() and tcp_send_data() both need the
 	 * zone id before the accept is completed in tcp_wput_accept().
 	 */
 	econnp->conn_zoneid = connp->conn_zoneid;
+
+	/* Copy nexthop information from listener to eager */
+	if (connp->conn_nexthop_set) {
+		econnp->conn_nexthop_set = connp->conn_nexthop_set;
+		econnp->conn_nexthop_v4 = connp->conn_nexthop_v4;
+	}
 
 	eager->tcp_hard_binding = B_TRUE;
 
@@ -7662,6 +7719,7 @@ tcp_init_values(tcp_t *tcp)
 	tcp->tcp_ms_we_have_waited = 0;
 	tcp->tcp_last_recv_time = lbolt;
 	tcp->tcp_cwnd_max = tcp_cwnd_max_;
+	tcp->tcp_cwnd_ssthresh = TCP_MAX_LARGEWIN;
 	tcp->tcp_snd_burst = TCP_CWND_INFINITE;
 
 	tcp->tcp_maxpsz = tcp_maxpsz_multiplier;
@@ -9362,6 +9420,9 @@ tcp_opt_get(queue_t *q, int level, int	name, uchar_t *ptr)
 		case IP_TTL:
 			*i1 = (int)tcp->tcp_ipha->ipha_ttl;
 			break;
+		case IP_NEXTHOP:
+			/* Handled at IP level */
+			return (-EINVAL);
 		default:
 			return (-1);
 		}
@@ -9912,6 +9973,7 @@ tcp_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 			}
 			break;
 		case IP_BOUND_IF:
+		case IP_NEXTHOP:
 			/* Handled at the IP level */
 			return (-EINVAL);
 		case IP_SEC_OPT:
@@ -17725,6 +17787,7 @@ tcp_zcopy_check(tcp_t *tcp)
 	    IPCL_IS_CONNECTED(connp) &&
 	    (connp->conn_flags & IPCL_CHECK_POLICY) == 0 &&
 	    connp->conn_dontroute == 0 &&
+	    !connp->conn_nexthop_set &&
 	    connp->conn_xmit_if_ill == NULL &&
 	    connp->conn_nofailover_ill == NULL &&
 	    do_tcpzcopy == 1) {
@@ -17895,6 +17958,7 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	    !IPCL_IS_CONNECTED(connp) ||
 	    (connp->conn_flags & IPCL_CHECK_POLICY) != 0 ||
 	    connp->conn_dontroute ||
+	    connp->conn_nexthop_set ||
 	    connp->conn_xmit_if_ill != NULL ||
 	    connp->conn_nofailover_ill != NULL ||
 	    ipha->ipha_ident == IP_HDR_INCLUDED ||

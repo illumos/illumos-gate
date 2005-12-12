@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -126,6 +126,8 @@ extern "C" {
 #define	MATCH_IRE_ZONEONLY	0x4000	/* Match IREs in specified zone, ie */
 					/* don't match IRE_LOCALs from other */
 					/* zones or shared IREs */
+#define	MATCH_IRE_MARK_PRIVATE_ADDR	0x8000	/* Match IRE ire_marks with */
+						/* IRE_MARK_PRIVATE_ADDR. */
 
 /* Structure for ire_cache_count() */
 typedef struct {

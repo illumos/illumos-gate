@@ -807,7 +807,8 @@ struct sockaddr_in6 {
 #define	IP_BLOCK_SOURCE		0x15	/* block   mcast pkts from source  */
 #define	IP_UNBLOCK_SOURCE	0x16	/* unblock mcast pkts from source  */
 #define	IP_ADD_SOURCE_MEMBERSHIP  0x17	/* add  mcast group/source pair	   */
-#define	IP_DROP_SOURCE_MEMBERSHIP 0x18	/* drop mcast gruop/source pair	   */
+#define	IP_DROP_SOURCE_MEMBERSHIP 0x18	/* drop mcast group/source pair	   */
+#define	IP_NEXTHOP		0x19	/* send directly to next hop	   */
 
 #if !defined(_XPG4_2) || defined(__EXTENSIONS__)
 /*

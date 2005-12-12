@@ -174,7 +174,8 @@ struct conn_s {
 		conn_recvif : 1,		/* IP_RECVIF option */
 		conn_recvslla : 1,		/* IP_RECVSLLA option */
 		conn_mdt_ok : 1,		/* MDT is permitted */
-		pad_to_bit_31 : 2;
+		conn_nexthop_set : 1,
+		pad_to_bit_31 : 1;
 
 	tcp_t		*conn_tcp;		/* Pointer to the tcp struct */
 	udp_t		*conn_udp;		/* Pointer to the udp struct */
@@ -257,6 +258,8 @@ struct conn_s {
 	/* mtuinfo from IPV6_PACKET_TOO_BIG conditional on conn_pathmtu_valid */
 	struct ip6_mtuinfo mtuinfo;
 	zoneid_t	conn_zoneid;		/* zone connection is in */
+	in6_addr_t	conn_nexthop_v6;	/* nexthop IP address */
+#define	conn_nexthop_v4	V4_PART_OF_V6(conn_nexthop_v6)
 #ifdef CONN_DEBUG
 #define	CONN_TRACE_MAX	10
 	int		conn_trace_last;	/* ndx of last used tracebuf */

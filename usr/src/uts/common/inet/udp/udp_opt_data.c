@@ -137,6 +137,9 @@ opdes_t	udp_opt_arr[] = {
 { IP_UNSPEC_SRC, IPPROTO_IP, OA_R, OA_RW, OP_RAW, OP_PASSNEXT,
 	sizeof (int), 0 },
 
+{ IP_NEXTHOP, IPPROTO_IP, OA_RW, OA_RW, OP_CONFIG, OP_PASSNEXT,
+	sizeof (in_addr_t),	-1 /* not initialized  */ },
+
 { MCAST_JOIN_GROUP, IPPROTO_IP, OA_X, OA_X, OP_NP,
 	(OP_PASSNEXT|OP_NODEFAULT), sizeof (struct group_req),
 	-1 /* not initialized */ },

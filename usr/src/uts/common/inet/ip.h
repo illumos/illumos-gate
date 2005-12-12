@@ -618,6 +618,15 @@ typedef struct ip_m_s {
  */
 #define	IRE_MARK_USESRC_CHECK	0x0020
 
+/*
+ * IRE_MARK_PRIVATE_ADDR is used for IP_NEXTHOP. When IP_NEXTHOP is set, the
+ * routing table lookup for the destination is bypassed and the packet is
+ * sent directly to the specified nexthop. The associated IRE_CACHE entries
+ * should be marked with IRE_MARK_PRIVATE_ADDR flag so that they don't show up
+ * in regular ire cache lookups.
+ */
+#define	IRE_MARK_PRIVATE_ADDR	0x0040
+
 /* Flags with ire_expire routine */
 #define	FLUSH_ARP_TIME		0x0001	/* ARP info potentially stale timer */
 #define	FLUSH_REDIRECT_TIME	0x0002	/* Redirects potentially stale */

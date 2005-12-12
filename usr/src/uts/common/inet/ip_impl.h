@@ -363,6 +363,7 @@ typedef struct ip_mdt_info_s {
  */
 #define	CONN_IS_MD_FASTPATH(connp)	\
 	((connp)->conn_dontroute == 0 &&	/* SO_DONTROUTE */	\
+	!((connp)->conn_nexthop_set) &&		/* IP_NEXTHOP */	\
 	(connp)->conn_nofailover_ill == NULL &&	/* IPIF_NOFAILOVER */	\
 	(connp)->conn_xmit_if_ill == NULL &&	/* IP_XMIT_IF */	\
 	(connp)->conn_outgoing_pill == NULL &&	/* IP{V6}_BOUND_PIF */	\

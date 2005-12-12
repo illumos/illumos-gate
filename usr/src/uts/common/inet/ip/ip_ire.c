@@ -4393,6 +4393,18 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	    (ire->ire_marks & IRE_MARK_HIDDEN))
 		return (B_FALSE);
 
+	/*
+	 * MATCH_IRE_MARK_PRIVATE_ADDR is set when IP_NEXTHOP option
+	 * is used. In that case the routing table is bypassed and the
+	 * packets are sent directly to the specified nexthop. The
+	 * IRE_CACHE entry representing this route should be marked
+	 * with IRE_MARK_PRIVATE_ADDR.
+	 */
+
+	if (!(match_flags & MATCH_IRE_MARK_PRIVATE_ADDR) &&
+	    (ire->ire_marks & IRE_MARK_PRIVATE_ADDR))
+		return (B_FALSE);
+
 	if (zoneid != ALL_ZONES && zoneid != ire->ire_zoneid) {
 		/*
 		 * If MATCH_IRE_ZONEONLY has been set and the supplied zoneid is
@@ -4498,6 +4510,9 @@ ire_match_args(ire_t *ire, ipaddr_t addr, ipaddr_t mask, ipaddr_t gateway,
 	    ((!(match_flags & MATCH_IRE_MARK_HIDDEN)) ||
 		(ire->ire_type != IRE_CACHE ||
 		ire->ire_marks & IRE_MARK_HIDDEN)) &&
+	    ((!(match_flags & MATCH_IRE_MARK_PRIVATE_ADDR)) ||
+		(ire->ire_type != IRE_CACHE ||
+		ire->ire_marks & IRE_MARK_PRIVATE_ADDR)) &&
 	    ((!(match_flags & MATCH_IRE_ILL)) ||
 		(ire_ill == ipif_ill)) &&
 	    ((!(match_flags & MATCH_IRE_IHANDLE)) ||
@@ -5005,8 +5020,10 @@ ire_cache_lookup(ipaddr_t addr, zoneid_t zoneid)
 	irb_ptr = &ip_cache_table[IRE_ADDR_HASH(addr, ip_cache_table_size)];
 	rw_enter(&irb_ptr->irb_lock, RW_READER);
 	for (ire = irb_ptr->irb_ire; ire != NULL; ire = ire->ire_next) {
-		if (ire->ire_marks & (IRE_MARK_CONDEMNED | IRE_MARK_HIDDEN))
+		if (ire->ire_marks & (IRE_MARK_CONDEMNED |
+		    IRE_MARK_HIDDEN | IRE_MARK_PRIVATE_ADDR)) {
 			continue;
+		}
 		if (ire->ire_addr == addr) {
 			if (zoneid == ALL_ZONES || ire->ire_zoneid == zoneid ||
 			    ire->ire_type == IRE_LOCAL) {

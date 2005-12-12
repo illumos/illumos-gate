@@ -4113,23 +4113,30 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 		    MATCH_IRE_RJ_BHOLE));
 	} else {
 		/*
-		 * If conn_dontroute is set, and onlink ipif is not found
-		 * set ENETUNREACH error
+		 * If conn_dontroute is set or if conn_nexthop_set is set,
+		 * and onlink ipif is not found set ENETUNREACH error.
 		 */
-		if (connp->conn_dontroute) {
+		if (connp->conn_dontroute || connp->conn_nexthop_set) {
 			ipif_t *ipif;
 
-			ipif = ipif_lookup_onlink_addr(dst_addr, zoneid);
+			ipif = ipif_lookup_onlink_addr(connp->conn_dontroute ?
+			    dst_addr : connp->conn_nexthop_v4, zoneid);
 			if (ipif == NULL) {
 				error = ENETUNREACH;
 				goto bad_addr;
 			}
 			ipif_refrele(ipif);
 		}
-		dst_ire = ire_route_lookup(dst_addr, 0, 0, 0, NULL, &sire,
-		    zoneid,
-		    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
-		    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE));
+
+		if (connp->conn_nexthop_set) {
+			dst_ire = ire_route_lookup(connp->conn_nexthop_v4, 0,
+			    0, 0, NULL, NULL, zoneid, 0);
+		} else {
+			dst_ire = ire_route_lookup(dst_addr, 0, 0, 0, NULL,
+			    &sire, zoneid,
+			    (MATCH_IRE_RECURSIVE | MATCH_IRE_DEFAULT |
+			    MATCH_IRE_PARENT | MATCH_IRE_RJ_BHOLE));
+		}
 	}
 	/*
 	 * dst_ire can't be a broadcast when not ire_requested.
@@ -6691,6 +6698,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 	ire_t	*ire = NULL;
 	mblk_t	*res_mp;
 	ipaddr_t *addrp;
+	ipaddr_t nexthop_addr;
 	ipif_t  *src_ipif = NULL;
 	ill_t	*dst_ill = NULL;
 	ipha_t  *ipha;
@@ -6712,6 +6720,7 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 	boolean_t multirt_is_resolvable;
 	boolean_t multirt_resolve_next;
 	boolean_t do_attach_ill = B_FALSE;
+	boolean_t ip_nexthop = B_FALSE;
 	zoneid_t zoneid;
 
 	if (ip_debug > 2) {
@@ -6760,6 +6769,10 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 		if (ill_is_probeonly(attach_ill))
 			ire_marks = IRE_MARK_HIDDEN;
 	}
+	if (mctl_present && io->ipsec_out_ip_nexthop) {
+		ip_nexthop = B_TRUE;
+		nexthop_addr = io->ipsec_out_nexthop_addr;
+	}
 	/*
 	 * If this IRE is created for forwarding or it is not for
 	 * traffic for congestion controlled protocols, mark it as temporary.
@@ -6788,6 +6801,28 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 	if (in_ill != NULL) {
 		ire = ire_srcif_table_lookup(dst, IRE_IF_RESOLVER, NULL,
 		    in_ill, MATCH_IRE_TYPE);
+	} else if (ip_nexthop) {
+		/*
+		 * The first time we come here, we look for an IRE_INTERFACE
+		 * entry for the specified nexthop, set the dst to be the
+		 * nexthop address and create an IRE_CACHE entry for the
+		 * nexthop. The next time around, we are able to find an
+		 * IRE_CACHE entry for the nexthop, set the gateway to be the
+		 * nexthop address and create an IRE_CACHE entry for the
+		 * destination address via the specified nexthop.
+		 */
+		ire = ire_cache_lookup(nexthop_addr, zoneid);
+		if (ire != NULL) {
+			gw = nexthop_addr;
+			ire_marks |= IRE_MARK_PRIVATE_ADDR;
+		} else {
+			ire = ire_ftable_lookup(nexthop_addr, 0, 0,
+			    IRE_INTERFACE, NULL, NULL, zoneid, 0,
+			    MATCH_IRE_TYPE);
+			if (ire != NULL) {
+				dst = nexthop_addr;
+			}
+		}
 	} else if (attach_ill == NULL) {
 		ire = ire_ftable_lookup(dst, 0, 0, 0,
 		    NULL, &sire, zoneid, 0,
@@ -7211,7 +7246,6 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			ire_t	*ipif_ire;
 			mblk_t	*ire_fp_mp;
 
-			ASSERT(sire != NULL);
 			if (gw == 0)
 				gw = ire->ire_gateway_addr;
 			/*
@@ -7219,7 +7253,8 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			 * off-link destination from the cache ire of the
 			 * gateway.
 			 *
-			 *	1. The prefix ire 'sire'
+			 *	1. The prefix ire 'sire' (Note that this does
+			 *	   not apply to the conn_nexthop_set case)
 			 *	2. The cache ire of the gateway 'ire'
 			 *	3. The interface ire 'ipif_ire'
 			 *
@@ -7227,9 +7262,14 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			 *
 			 * If there is no interface route to the gateway,
 			 * it is a race condition, where we found the cache
-			 * but the inteface route has been deleted.
+			 * but the interface route has been deleted.
 			 */
-			ipif_ire = ire_ihandle_lookup_offlink(ire, sire);
+			if (ip_nexthop) {
+				ipif_ire = ire_ihandle_lookup_onlink(ire);
+			} else {
+				ipif_ire =
+				    ire_ihandle_lookup_offlink(ire, sire);
+			}
 			if (ipif_ire == NULL) {
 				ip1dbg(("ip_newroute: "
 				    "ire_ihandle_lookup_offlink failed\n"));
@@ -7268,19 +7308,21 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			    save_ire->ire_dlureq_mp,
 			    src_ipif,
 			    in_ill,			/* incoming ill */
-			    sire->ire_mask,		/* Parent mask */
-			    sire->ire_phandle,		/* Parent handle */
+			    (sire != NULL) ?
+				sire->ire_mask : 0, 	/* Parent mask */
+			    (sire != NULL) ?
+				sire->ire_phandle : 0,  /* Parent handle */
 			    ipif_ire->ire_ihandle,	/* Interface handle */
-			    sire->ire_flags &
-				(RTF_SETSRC | RTF_MULTIRT), /* flags if any */
-			    &(sire->ire_uinfo));
+			    (sire != NULL) ? (sire->ire_flags &
+				(RTF_SETSRC | RTF_MULTIRT)) : 0, /* flags */
+			    (sire != NULL) ?
+				&(sire->ire_uinfo) : &(save_ire->ire_uinfo));
 
 			if (ire == NULL) {
 				ire_refrele(ipif_ire);
 				ire_refrele(save_ire);
 				break;
 			}
-
 			ire->ire_marks |= ire_marks;
 
 			/*
@@ -7288,20 +7330,23 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			 * The newly created ire is tied to both of them via
 			 * the phandle and ihandle respectively.
 			 */
-			IRB_REFHOLD(sire->ire_bucket);
-			/* Has it been removed already ? */
-			if (sire->ire_marks & IRE_MARK_CONDEMNED) {
-				IRB_REFRELE(sire->ire_bucket);
-				ire_refrele(ipif_ire);
-				ire_refrele(save_ire);
-				break;
+			if (sire != NULL) {
+				IRB_REFHOLD(sire->ire_bucket);
+				/* Has it been removed already ? */
+				if (sire->ire_marks & IRE_MARK_CONDEMNED) {
+					IRB_REFRELE(sire->ire_bucket);
+					ire_refrele(ipif_ire);
+					ire_refrele(save_ire);
+					break;
+				}
 			}
 
 			IRB_REFHOLD(ipif_ire->ire_bucket);
 			/* Has it been removed already ? */
 			if (ipif_ire->ire_marks & IRE_MARK_CONDEMNED) {
 				IRB_REFRELE(ipif_ire->ire_bucket);
-				IRB_REFRELE(sire->ire_bucket);
+				if (sire != NULL)
+					IRB_REFRELE(sire->ire_bucket);
 				ire_refrele(ipif_ire);
 				ire_refrele(save_ire);
 				break;
@@ -7325,8 +7370,10 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			ire_refrele(save_ire);
 
 			/* Assert that sire is not deleted yet. */
-			ASSERT(sire->ire_ptpn != NULL);
-			IRB_REFRELE(sire->ire_bucket);
+			if (sire != NULL) {
+				ASSERT(sire->ire_ptpn != NULL);
+				IRB_REFRELE(sire->ire_bucket);
+			}
 
 			/* Assert that ipif_ire is not deleted yet. */
 			ASSERT(ipif_ire->ire_ptpn != NULL);
@@ -7349,8 +7396,8 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 				multirt_resolve_next = B_TRUE;
 				continue;
 			}
-
-			ire_refrele(sire);
+			if (sire != NULL)
+				ire_refrele(sire);
 			ipif_refrele(src_ipif);
 			ill_refrele(dst_ill);
 			return;
@@ -9086,12 +9133,19 @@ ip_opt_set_ipif(conn_t *connp, ipaddr_t addr, boolean_t checkonly, int option,
 
 	if (addr != INADDR_ANY || checkonly) {
 		ASSERT(connp != NULL);
-		ipif = ipif_lookup_addr(addr, NULL, connp->conn_zoneid,
-		    CONNP_TO_WQ(connp), first_mp, ip_restart_optmgmt, &error);
+		if (option == IP_NEXTHOP) {
+			ipif =
+			    ipif_lookup_onlink_addr(addr, connp->conn_zoneid);
+		} else {
+			ipif = ipif_lookup_addr(addr, NULL, connp->conn_zoneid,
+			    CONNP_TO_WQ(connp), first_mp, ip_restart_optmgmt,
+			    &error);
+		}
 		if (ipif == NULL) {
 			if (error == EINPROGRESS)
 				return (error);
-			else if (option == IP_MULTICAST_IF)
+			else if ((option == IP_MULTICAST_IF) ||
+			    (option == IP_NEXTHOP))
 				return (EHOSTUNREACH);
 			else
 				return (EINVAL);
@@ -9155,6 +9209,10 @@ ip_opt_set_ipif(conn_t *connp, ipaddr_t addr, boolean_t checkonly, int option,
 
 	case IP_MULTICAST_IF:
 		connp->conn_multicast_ipif = ipif;
+		break;
+	case IP_NEXTHOP:
+		connp->conn_nexthop_v4 = addr;
+		connp->conn_nexthop_set = B_TRUE;
 		break;
 	}
 
@@ -9472,6 +9530,7 @@ ip_opt_set(queue_t *q, uint_t optset_context, int level, int name,
 		break;
 	case IPPROTO_IP:
 		switch (name) {
+		case IP_NEXTHOP:
 		case IP_MULTICAST_IF:
 		case IP_DONTFAILOVER_IF: {
 			ipaddr_t addr = *i1;
@@ -10268,6 +10327,12 @@ ip_opt_get(queue_t *q, int level, int name, uchar_t *ptr)
 			return (sizeof (int));
 		case IP_SEC_OPT:
 			return (ipsec_req_from_conn(connp, req, IPSEC_AF_V4));
+		case IP_NEXTHOP:
+			if (connp->conn_nexthop_set) {
+				*(ipaddr_t *)ptr = connp->conn_nexthop_v4;
+				return (sizeof (ipaddr_t));
+			} else
+				return (0);
 		default:
 			break;
 		}
@@ -17748,6 +17813,9 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 	zoneid_t	zoneid;
 	boolean_t	need_decref = B_FALSE;
 	boolean_t	ignore_dontroute = B_FALSE;
+	boolean_t	ignore_nexthop = B_FALSE;
+	boolean_t	ip_nexthop = B_FALSE;
+	ipaddr_t	nexthop_addr;
 
 #ifdef	_BIG_ENDIAN
 #define	V_HLEN	(v_hlen_tos_len >> 24)
@@ -17850,20 +17918,21 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 	if (CLASSD(dst))
 		goto multicast;
 
-	if ((connp->conn_dontroute) || (connp->conn_xmit_if_ill != NULL)) {
+	if ((connp->conn_dontroute) || (connp->conn_xmit_if_ill != NULL) ||
+	    (connp->conn_nexthop_set)) {
 		/*
 		 * If the destination is a broadcast or a loopback
-		 * address, both SO_DONTROUTE and IP_XMIT_IF go
+		 * address, SO_DONTROUTE, IP_XMIT_IF and IP_NEXTHOP go
 		 * through the standard path. But in the case of local
-		 * destination only SO_DONTROUTE goes through the
-		 * standard path not IP_XMIT_IF.
+		 * destination only SO_DONTROUTE and IP_NEXTHOP go through
+		 * the standard path not IP_XMIT_IF.
 		 */
 		ire = ire_cache_lookup(dst, zoneid);
 		if ((ire == NULL) || ((ire->ire_type != IRE_BROADCAST) &&
 		    (ire->ire_type != IRE_LOOPBACK))) {
-
-			if ((connp->conn_dontroute) && (ire != NULL) &&
-				(ire->ire_type == IRE_LOCAL))
+			if ((connp->conn_dontroute ||
+			    connp->conn_nexthop_set) && (ire != NULL) &&
+			    (ire->ire_type == IRE_LOCAL))
 				goto standard_path;
 
 			if (ire != NULL) {
@@ -17875,8 +17944,13 @@ ip_output(void *arg, mblk_t *mp, void *arg2, int caller)
 			 * bypass routing checks and go directly to
 			 * interface.
 			 */
-			if (connp->conn_dontroute)
+			if (connp->conn_dontroute) {
 				goto dontroute;
+			} else if (connp->conn_nexthop_set) {
+				ip_nexthop = B_TRUE;
+				nexthop_addr = connp->conn_nexthop_v4;
+				goto send_from_ill;
+			}
 
 			/*
 			 * If IP_XMIT_IF socket option is set,
@@ -18227,52 +18301,69 @@ qnext:
 
 		io = (ipsec_out_t *)first_mp->b_rptr;
 		if (io->ipsec_out_attach_if ||
-		    io->ipsec_out_xmit_if) {
+		    io->ipsec_out_xmit_if ||
+		    io->ipsec_out_ip_nexthop) {
 			ill_t	*ill;
 
-			ASSERT(io->ipsec_out_ill_index != 0);
-			ifindex = io->ipsec_out_ill_index;
-			ill = ill_lookup_on_ifindex(ifindex, B_FALSE,
-			    NULL, NULL, NULL, NULL);
 			/*
-			 * ipsec_out_xmit_if bit is used to tell
-			 * ip_wput to use the ill to send outgoing data
-			 * as we have no conn when data comes from ICMP
-			 * error msg routines. Currently this feature is
-			 * only used by ip_mrtun_forward routine.
+			 * We may have lost the conn context if we are
+			 * coming here from ip_newroute(). Copy the
+			 * nexthop information.
 			 */
-			if (io->ipsec_out_xmit_if) {
-				xmit_ill = ill;
-				if (xmit_ill == NULL) {
-					ip1dbg(("ip_wput: bad ifindex for"
-					    "xmit_ill %d\n", ifindex));
+			if (io->ipsec_out_ip_nexthop) {
+				ip_nexthop = B_TRUE;
+				nexthop_addr = io->ipsec_out_nexthop_addr;
+
+				ipha = (ipha_t *)mp->b_rptr;
+				dst = ipha->ipha_dst;
+				goto send_from_ill;
+			} else {
+				ASSERT(io->ipsec_out_ill_index != 0);
+				ifindex = io->ipsec_out_ill_index;
+				ill = ill_lookup_on_ifindex(ifindex, B_FALSE,
+				    NULL, NULL, NULL, NULL);
+				/*
+				 * ipsec_out_xmit_if bit is used to tell
+				 * ip_wput to use the ill to send outgoing data
+				 * as we have no conn when data comes from ICMP
+				 * error msg routines. Currently this feature is
+				 * only used by ip_mrtun_forward routine.
+				 */
+				if (io->ipsec_out_xmit_if) {
+					xmit_ill = ill;
+					if (xmit_ill == NULL) {
+						ip1dbg(("ip_output:bad ifindex "
+						    "for xmit_ill %d\n",
+						    ifindex));
+						freemsg(first_mp);
+						BUMP_MIB(&ip_mib,
+						    ipOutDiscards);
+						ASSERT(!need_decref);
+						return;
+					}
+					/* Free up the ipsec_out_t mblk */
+					ASSERT(first_mp->b_cont == mp);
+					first_mp->b_cont = NULL;
+					freeb(first_mp);
+					/* Just send the IP header+ICMP+data */
+					first_mp = mp;
+					ipha = (ipha_t *)mp->b_rptr;
+					dst = ipha->ipha_dst;
+					goto send_from_ill;
+				} else {
+					attach_ill = ill;
+				}
+
+				if (attach_ill == NULL) {
+					ASSERT(xmit_ill == NULL);
+					ip1dbg(("ip_output: bad ifindex for "
+					    "(BIND TO IPIF_NOFAILOVER) %d\n",
+					    ifindex));
 					freemsg(first_mp);
 					BUMP_MIB(&ip_mib, ipOutDiscards);
 					ASSERT(!need_decref);
 					return;
 				}
-				/* Free up the ipsec_out_t mblk */
-				ASSERT(first_mp->b_cont == mp);
-				first_mp->b_cont = NULL;
-				freeb(first_mp);
-				/* Just send the IP header+ICMP+data */
-				first_mp = mp;
-				ipha = (ipha_t *)mp->b_rptr;
-				dst = ipha->ipha_dst;
-				goto send_from_ill;
-
-			} else {
-				attach_ill = ill;
-			}
-
-			if (attach_ill == NULL) {
-				ASSERT(xmit_ill == NULL);
-				ip1dbg(("ip_wput : bad ifindex for "
-				    "(BIND TO IPIF_NOFAILOVER) %d\n", ifindex));
-				freemsg(first_mp);
-				BUMP_MIB(&ip_mib, ipOutDiscards);
-				ASSERT(!need_decref);
-				return;
 			}
 		}
 	}
@@ -18711,6 +18802,7 @@ qnext:
 		if ((ire != NULL) && (ire->ire_type &
 		    (IRE_BROADCAST | IRE_LOCAL | IRE_LOOPBACK))) {
 			ignore_dontroute = B_TRUE;
+			ignore_nexthop = B_TRUE;
 		}
 		if (ire != NULL) {
 			ire_refrele(ire);
@@ -18853,6 +18945,16 @@ send_from_ill:
 			if (need_decref)
 				CONN_DEC_REF(connp);
 			return;
+		} else if (ip_nexthop || (connp != NULL &&
+		    (connp->conn_nexthop_set)) && !ignore_nexthop) {
+			if (!ip_nexthop) {
+				ip_nexthop = B_TRUE;
+				nexthop_addr = connp->conn_nexthop_v4;
+			}
+			match_flags = MATCH_IRE_MARK_PRIVATE_ADDR |
+			    MATCH_IRE_GW;
+			ire = ire_ctable_lookup(dst, nexthop_addr, 0,
+			    NULL, zoneid, match_flags);
 		} else {
 			ire = ire_cache_lookup(dst, zoneid);
 		}
@@ -18861,7 +18963,8 @@ send_from_ill:
 			 * Make sure we don't load spread if this
 			 * is IPIF_NOFAILOVER case.
 			 */
-			if (attach_ill != NULL) {
+			if ((attach_ill != NULL) ||
+			    (ip_nexthop && !ignore_nexthop)) {
 				if (mctl_present) {
 					io = (ipsec_out_t *)first_mp->b_rptr;
 					ASSERT(first_mp->b_datap->db_type ==
@@ -18890,9 +18993,15 @@ send_from_ill:
 					first_mp->b_cont = mp;
 					mctl_present = B_TRUE;
 				}
-				io->ipsec_out_ill_index = attach_ill->
-				    ill_phyint->phyint_ifindex;
-				io->ipsec_out_attach_if = B_TRUE;
+				if (attach_ill != NULL) {
+					io->ipsec_out_ill_index = attach_ill->
+					    ill_phyint->phyint_ifindex;
+					io->ipsec_out_attach_if = B_TRUE;
+				} else {
+					io->ipsec_out_ip_nexthop = ip_nexthop;
+					io->ipsec_out_nexthop_addr =
+					    nexthop_addr;
+				}
 			}
 noirefound:
 			/*
