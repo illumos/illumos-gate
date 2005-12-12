@@ -280,6 +280,11 @@ sotpi_create(vnode_t *accessvp, int domain, int type, int protocol, int version,
 		flags |= SO_SOCKSTR;
 	}
 
+	/* Initialize the kernel SSL proxy fields */
+	so->so_kssl_type = KSSL_NO_PROXY;
+	so->so_kssl_ent = NULL;
+	so->so_kssl_ctx = NULL;
+
 	if (error = socktpi_open(&vp, flags, CRED())) {
 		VN_RELE(vp);
 		*errorp = error;
@@ -297,11 +302,6 @@ sotpi_create(vnode_t *accessvp, int domain, int type, int protocol, int version,
 		version = so_default_version;
 
 	so->so_version = (short)version;
-
-	/* Initialize the kernel SSL proxy fields */
-	so->so_kssl_type = KSSL_NO_PROXY;
-	so->so_kssl_ent = NULL;
-	so->so_kssl_ctx = NULL;
 
 	return (so);
 }
