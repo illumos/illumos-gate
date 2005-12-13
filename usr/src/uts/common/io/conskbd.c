@@ -550,7 +550,7 @@ conskbdopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 	conskbd_consqueue = q;
 
 	/*
-	 * initialzie kbtrans module for conskbd
+	 * initialize kbtrans module for conskbd
 	 */
 	err = kbtrans_streams_init(q, sflag, crp, (struct kbtrans_hardware *)
 	    &conskbd, &conskbd_callbacks, &conskbd.conskbd_kbtrans, 0, 0);
@@ -2017,6 +2017,33 @@ conskbd_polled_keycheck(struct kbtrans_hardware *hw,
 
 		/* Get a char from lower queue(hardware) ? */
 		if (ret == B_TRUE) {
+
+			/* A legacy keyboard ? */
+			if (conskbd.conskbd_bypassed == B_TRUE)
+				break;
+
+			/*
+			 * This is the PS2 scancode 0x2B -> USB(49) /
+			 * USB(50) keycode mapping workaround, for
+			 * polled mode.
+			 *
+			 * There are two possible USB keycode mappings
+			 * for PS2 scancode 0x2B and this workaround
+			 * makes sure that we use the USB keycode that
+			 * does not end up being mapped to a HOLE key
+			 * using the current keyboard translation
+			 * tables.
+			 *
+			 * See conskbdlrput() for a detailed
+			 * explanation of the problem.
+			 */
+			if (*keycode == 49 || *keycode == 50) {
+				if (conskbd_keyindex->k_normal[50] == HOLE)
+					*keycode = 49;
+				else
+					*keycode = 50;
+			}
+
 			break;
 		}
 	}
