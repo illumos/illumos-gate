@@ -95,6 +95,14 @@ extern "C" {
 #define	MS_ADDONICS_CARD_READER_VID 0x7cc /* addonics */
 #define	MS_ADDONICS_CARD_READER_PID 0x320
 
+#define	MS_NEWMAN_FLASH_VID	0x1043	/* Newman flash device */
+#define	MS_NEWMAN_FLASH_PID	0x8006
+
+#define	MS_ACOMDATA_VID		0xc0b	/* VendorId of DMI (Acomdata) */
+#define	MS_ACOMDATA_PID1	0x5fab	/* PID for 80GB USB/1394 disk */
+
+#define	MS_OTI_VID		0xea0	/* VendorID of OTI */
+#define	MS_OTI_DEVICE_6828	0x6828	/* PID for 6828 flash disk */
 
 /*
  * List the attributes that need special case in the driver
@@ -113,6 +121,9 @@ extern "C" {
  *		timeout with SCMD_START_STOP cmd
  * SCSA2USB_ATTRS_RMB: Pay attention to the device's RMB setting,
  *		instead of automatically treating it as removable
+ * SCSA2USB_ATTRS_USE_CSW_RESIDUE: Some devices report false residue in
+ *		the CSW of bulk-only transfer status stage though data
+ *		was successfully transfered, so need to ignore residue.
  *
  * NOTE: If a device simply STALLs the GET_MAX_LUN BO class-specific command
  * and recovers then it will not be added to the scsa2usb_blacklist[] table
@@ -130,9 +141,11 @@ extern "C" {
 #define	SCSA2USB_ATTRS_RMB		0x100	/* Pay attention to RMB */
 #define	SCSA2USB_ATTRS_MODE_SENSE	0x200	/* SCMD_MODE_SENSE */
 #define	SCSA2USB_ATTRS_INQUIRY		0x400	/* SCMD_INQUIRY */
+#define	SCSA2USB_ATTRS_USE_CSW_RESIDUE	0x800	/* for residue checking */
 #define	SCSA2USB_ATTRS_REDUCED_CMD	\
 	(SCSA2USB_ATTRS_DOORLOCK|SCSA2USB_ATTRS_MODE_SENSE| \
-	SCSA2USB_ATTRS_START_STOP|SCSA2USB_ATTRS_INQUIRY)
+	SCSA2USB_ATTRS_START_STOP|SCSA2USB_ATTRS_INQUIRY| \
+	SCSA2USB_ATTRS_USE_CSW_RESIDUE)
 
 #define	SCSA2USB_ALL_ATTRS		0xFFFF	/* All of the above */
 

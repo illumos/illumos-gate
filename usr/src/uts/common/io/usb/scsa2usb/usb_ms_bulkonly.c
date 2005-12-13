@@ -700,15 +700,19 @@ scsa2usb_handle_csw_result(scsa2usb_state_t *scsa2usbp, mblk_t *data)
 		 * of valid bytes transferred during the last transfer
 		 * which we now subtract from the total_xfercount
 		 */
-		if ((residue < 0) ||
+		if ((!(scsa2usbp->scsa2usb_attrs &
+		    SCSA2USB_ATTRS_USE_CSW_RESIDUE)) ||
+		    (residue < 0) ||
 		    (residue > cmd->cmd_total_xfercount)) {
-			/* some device have a negative resid, ignore */
-			residue = cmd->cmd_resid_xfercount;
+			/* some devices lie about the resid, ignore */
+			cmd->cmd_total_xfercount -=
+			    cmd->cmd_xfercount - cmd->cmd_resid_xfercount;
+		} else {
+			cmd->cmd_total_xfercount -=
+			    cmd->cmd_xfercount -
+			    max(min(residue, cmd->cmd_xfercount),
+			    cmd->cmd_resid_xfercount);
 		}
-		cmd->cmd_total_xfercount -=
-		    cmd->cmd_xfercount -
-		    max(min(residue, cmd->cmd_xfercount),
-		    cmd->cmd_resid_xfercount);
 
 		pkt->pkt_resid = cmd->cmd_total_xfercount;
 	}
