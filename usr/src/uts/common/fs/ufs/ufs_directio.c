@@ -102,15 +102,24 @@ int	ufs_directio_enabled = 1;	/* feature is enabled */
  * for kstats reader
  */
 struct ufs_directio_kstats {
-	uint_t	logical_reads;
-	uint_t	phys_reads;
-	uint_t	hole_reads;
-	uint_t	nread;
-	uint_t	logical_writes;
-	uint_t	phys_writes;
-	uint_t	nwritten;
-	uint_t	nflushes;
-} ufs_directio_kstats;
+	kstat_named_t	logical_reads;
+	kstat_named_t	phys_reads;
+	kstat_named_t	hole_reads;
+	kstat_named_t	nread;
+	kstat_named_t	logical_writes;
+	kstat_named_t	phys_writes;
+	kstat_named_t	nwritten;
+	kstat_named_t	nflushes;
+} ufs_directio_kstats = {
+	{ "logical_reads",	KSTAT_DATA_UINT64 },
+	{ "phys_reads",		KSTAT_DATA_UINT64 },
+	{ "hole_reads",		KSTAT_DATA_UINT64 },
+	{ "nread",		KSTAT_DATA_UINT64 },
+	{ "logical_writes",	KSTAT_DATA_UINT64 },
+	{ "phys_writes",	KSTAT_DATA_UINT64 },
+	{ "nwritten",		KSTAT_DATA_UINT64 },
+	{ "nflushes",		KSTAT_DATA_UINT64 },
+};
 
 kstat_t	*ufs_directio_kstatsp;
 
@@ -159,10 +168,10 @@ ufs_directio_init(void)
 	/*
 	 * kstats
 	 */
-	ufs_directio_kstatsp = kstat_create("ufs directio", 0,
-			"UFS DirectIO Stats", "ufs directio",
-			KSTAT_TYPE_RAW, sizeof (ufs_directio_kstats),
-			KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_WRITABLE);
+	ufs_directio_kstatsp = kstat_create("ufs", 0,
+	    "directio", "ufs", KSTAT_TYPE_NAMED,
+	    sizeof (ufs_directio_kstats) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL | KSTAT_FLAG_WRITABLE);
 	if (ufs_directio_kstatsp) {
 		ufs_directio_kstatsp->ks_data = (void *)&ufs_directio_kstats;
 		kstat_install(ufs_directio_kstatsp);
@@ -294,12 +303,12 @@ directio_start(struct ufsvfs *ufsvfsp, dev_t dev, size_t nbytes,
 	 */
 	if (rw == S_WRITE) {
 		bp->b_flags = B_BUSY | B_PHYS | B_READ;
-		ufs_directio_kstats.phys_reads++;
-		ufs_directio_kstats.nread += nbytes;
+		ufs_directio_kstats.phys_reads.value.ui64++;
+		ufs_directio_kstats.nread.value.ui64 += nbytes;
 	} else {
 		bp->b_flags = B_BUSY | B_PHYS | B_WRITE;
-		ufs_directio_kstats.phys_writes++;
-		ufs_directio_kstats.nwritten += nbytes;
+		ufs_directio_kstats.phys_writes.value.ui64++;
+		ufs_directio_kstats.nwritten.value.ui64 += nbytes;
 	}
 	bp->b_shadow = pplist;
 	if (pplist != NULL)
@@ -598,7 +607,7 @@ skip_alloc:
 			goto errout;
 		if (!exclusive)
 			rw_downgrade(&ip->i_contents);
-		ufs_directio_kstats.nflushes++;
+		ufs_directio_kstats.nflushes.value.ui64++;
 	}
 
 	/*
@@ -627,7 +636,7 @@ skip_alloc:
 	newerror = 0;
 	resid = uio->uio_resid;
 	bytes_written = 0;
-	ufs_directio_kstats.logical_writes++;
+	ufs_directio_kstats.logical_writes.value.ui64++;
 	while (error == 0 && newerror == 0 && resid && uio->uio_iovcnt) {
 		size_t pglck_len, pglck_size;
 		caddr_t pglck_base;
@@ -731,7 +740,7 @@ skip_alloc:
 			rw_enter(&ip->i_contents, RW_WRITER);
 			(void) VOP_PUTPAGE(vp, (offset_t)0, (size_t)0,
 				B_INVAL, cr);
-			ufs_directio_kstats.nflushes++;
+			ufs_directio_kstats.nflushes.value.ui64++;
 			rw_downgrade(&ip->i_contents);
 		}
 	}
@@ -783,8 +792,8 @@ directio_hole(struct uio *uio, size_t nbytes)
 	uio_t		phys_uio;
 	iovec_t		phys_iov;
 
-	ufs_directio_kstats.hole_reads++;
-	ufs_directio_kstats.nread += nbytes;
+	ufs_directio_kstats.hole_reads.value.ui64++;
+	ufs_directio_kstats.nread.value.ui64 += nbytes;
 
 	phys_iov.iov_base = uio->uio_iov->iov_base;
 	phys_iov.iov_len = nbytes;
@@ -909,7 +918,7 @@ ufs_directio_read(struct inode *ip, uio_t *uio, cred_t *cr, int *statusp)
 		if (vn_has_cached_data(vp))
 			return (0);
 		rw_downgrade(&ip->i_contents);
-		ufs_directio_kstats.nflushes++;
+		ufs_directio_kstats.nflushes.value.ui64++;
 	}
 	/*
 	 * Direct Reads
@@ -930,7 +939,7 @@ ufs_directio_read(struct inode *ip, uio_t *uio, cred_t *cr, int *statusp)
 	error = 0;
 	newerror = 0;
 	bytes_read = 0;
-	ufs_directio_kstats.logical_reads++;
+	ufs_directio_kstats.logical_reads.value.ui64++;
 	while (error == 0 && newerror == 0 && resid && uio->uio_iovcnt) {
 		size_t pglck_len, pglck_size;
 		caddr_t pglck_base;
