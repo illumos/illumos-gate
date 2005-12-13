@@ -35,6 +35,8 @@ extern "C" {
 
 #include <libnvpair.h>
 
+
+
 /*
  * Holds all the data regarding the device.
  * Private to libdiskmgt. Must use dm_xxx functions to set/get data.
@@ -224,6 +226,8 @@ typedef enum {
 #define	DM_CTYPE		"ctype"
 #define	DM_LUN			"lun"
 #define	DM_TARGET		"target"
+
+#define	NOINUSE_SET	getenv("NOINUSE_CHECK") != NULL
 
 void			dm_free_descriptors(dm_descriptor_t *desc_list);
 void			dm_free_descriptor(dm_descriptor_t desc);

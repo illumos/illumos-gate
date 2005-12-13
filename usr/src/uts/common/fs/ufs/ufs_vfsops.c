@@ -552,7 +552,7 @@ remountfs(struct vfs *vfsp, dev_t dev, void *raw_argsp, int args_len)
 
 	/* cannot remount to RDONLY */
 	if (vfsp->vfs_flag & VFS_RDONLY)
-		return (EINVAL);
+		return (ENOTSUP);
 
 	/* whoops, wrong dev */
 	if (vfsp->vfs_dev != dev)
@@ -752,7 +752,7 @@ int ufs_maxmaxphys = (1024 * 1024);
 #include <sys/ddi.h>		/* for delay(9f) */
 
 int ufs_mount_error_delay = 20;	/* default to 20ms */
-int ufs_mount_timeout = 60;	/* default to 1 minute */
+int ufs_mount_timeout = 60000;	/* default to 1 minute */
 
 static int
 mountfs(struct vfs *vfsp, enum whymountroot why, struct vnode *devvp,

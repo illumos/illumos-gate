@@ -443,7 +443,7 @@ dm_get_stats(dm_descriptor_t desc, int stat_type, int *errp)
 			 * the in use checking if the user has set stat_type
 			 * DM_SLICE_STAT_USE
 			 */
-			if (getenv("NOINUSE_CHECK") != NULL) {
+			if (NOINUSE_SET) {
 				stats = NULL;
 				break;
 			}
@@ -571,8 +571,16 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 	int	found = 0;
 	char	*dname = NULL;
 
+
 	*errp = 0;
 	*msg = NULL;
+
+	/*
+	 * If the user doesn't want to do in use checking, return.
+	 */
+
+	if (NOINUSE_SET)
+		return (0);
 
 	dname = getfullblkname(dev_name);
 	/*

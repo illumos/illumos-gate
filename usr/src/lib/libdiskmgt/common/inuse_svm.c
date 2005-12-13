@@ -34,11 +34,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <libintl.h>
 #include <synch.h>
 #include <thread.h>
 #include <dlfcn.h>
 #include <link.h>
 #include <libsysevent.h>
+#include <syslog.h>
 #include <sys/types.h>
 #include <sys/sysevent/eventdefs.h>
 
@@ -156,6 +158,22 @@ inuse_svm(char *slice, nvlist_t *attrs, int *errp)
 						}
 					} else {
 						*errp = errno;
+					}
+					if (*errp) {
+						/*
+						 * If the sysevent thread fails,
+						 * log the error but continue
+						 * on. This failing to start
+						 * is not catastrophic in
+						 * particular for short lived
+						 * consumers of libdiskmgt.
+						 */
+						syslog(LOG_WARNING,
+						    dgettext(TEXT_DOMAIN,
+						    "libdiskmgt: sysevent "
+						    "thread for SVM failed "
+						    "to start\n"));
+						*errp = 0;
 					}
 				}
 			}

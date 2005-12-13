@@ -284,6 +284,16 @@ checkdevinuse(char *cur_disk_path, diskaddr_t start, diskaddr_t end, int print,
 	char		*name;
 
 	/*
+	 * If the user does not want to do in use checking, return immediately.
+	 * Normally, this is handled in libdiskmgt. For format, there is more
+	 * processing required, so we want to bypass the in use checking
+	 * here.
+	 */
+
+	if (NOINUSE_SET)
+		return (0);
+
+	/*
 	 * For format, we get basic 'in use' details from libdiskmgt. After
 	 * that we must do the appropriate checking to see if the 'in use'
 	 * details require a bit of additional work.

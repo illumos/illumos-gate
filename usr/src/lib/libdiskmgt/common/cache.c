@@ -31,10 +31,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <libintl.h>
 #include <synch.h>
 #include <sys/sunddi.h>
 #include <sys/types.h>
 #include <libgen.h>
+#include <syslog.h>
 
 #include "libdiskmgt.h"
 #include "disks_private.h"
@@ -632,10 +634,9 @@ static int
 initialize()
 {
 	struct search_args	args;
-	int			status;
 
 	if (cache_loaded) {
-	    return (0);
+		return (0);
 	}
 
 	libdiskmgt_init_debug();
@@ -643,7 +644,7 @@ initialize()
 	findevs(&args);
 
 	if (args.dev_walk_status != 0) {
-	    return (args.dev_walk_status);
+		return (args.dev_walk_status);
 	}
 
 	disk_listp = args.disk_listp;
@@ -656,11 +657,16 @@ initialize()
 	 * Only start the event thread if we are not doing an install
 	 */
 	if (getenv("_LIBDISKMGT_INSTALL") == NULL) {
-		if ((status = events_start_event_watcher()) != 0) {
-			return (status);
+		if (events_start_event_watcher() != 0) {
+			/*
+			 * Log a message about the failure to start
+			 * sysevents and continue on.
+			 */
+			syslog(LOG_WARNING, dgettext(TEXT_DOMAIN,
+			    "libdiskmgt: sysevent thread for cache "
+			    "events failed to start\n"));
 		}
 	}
-
 	return (0);
 }
 

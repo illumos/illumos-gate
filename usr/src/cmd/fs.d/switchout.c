@@ -46,6 +46,7 @@
 
 
 static int match(char **opts, char *s);
+static int has_Nflag(char *opts);
 
 #define	FSTYPE_MAX	8
 #define	ARGV_MAX	1024
