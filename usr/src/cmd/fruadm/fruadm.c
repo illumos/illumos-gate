@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -500,11 +500,13 @@ create_segment(fru_nodehdl_t nodehdl)
 	fru_segdef_t	def;
 	int	cnt;
 
+	(void) memset(&seg_desc, 0, sizeof (seg_desc));
 	seg_desc.field.field_perm = 0x6;
 	seg_desc.field.operations_perm = 0x6;
 	seg_desc.field.engineering_perm = 0x6;
 	seg_desc.field.repair_perm = 0x6;
 
+	(void) memset(&def, 0, sizeof (def));
 	def.address = 0;
 	def.desc.raw_data = seg_desc.raw_data;
 	def.hw_desc.all_bits = 0;

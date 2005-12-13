@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -107,6 +107,7 @@ extern "C" {
 #define	PICL_CLASS_PORT			"port"
 #define	PICL_CLASS_WATCHDOG_CONTROLLER	"watchdog-controller"
 #define	PICL_CLASS_WATCHDOG_TIMER	"watchdog-timer"
+#define	PICL_CLASS_CHASSIS_SERIAL_NUM	"chassis-serial-number"
 
 /*
  * Solaris driver property names
@@ -197,6 +198,7 @@ extern "C" {
 #define	PICL_PROP_GEO_ADDR			"GeoAddr"
 #define	PICL_PROP_ADMIN_LOCK			"AdminLock"
 #define	PICL_PROP_PORT_TYPE			"PortType"
+#define	PICL_PROP_SERIAL_NUMBER			"SerialNumber"
 
 #define	PICL_UNITADDR_LEN_MAX		256
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,9 +18,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,12 +37,14 @@
 
 #define	DEFAULT_NAME		"system"
 
-typedef struct {
-	int		(*locator_func)(picl_nodehdl_t, char *);
-	int		found;
-	int		err;
-	char		*name;
-	char		*str;
+typedef struct locator_info {
+	int		(*locator_func)(picl_nodehdl_t, struct locator_info *);
+	int		found; 		/* Nonzero if found during walk */
+	int		err;   		/* Last error from picl */
+	char		*name; 		/* Name/LocatorName of locator node */
+	int		new_state;	/* 0 = logical off, 1 = logical on */
+	char		*on;		/* Logical on value for State */
+	char		*off;		/* Logical off value for State */
 } locator_info_t;
 
 static void
@@ -53,11 +55,12 @@ usage(char *prog_name)
 }
 
 static int
-change_locator_state(picl_nodehdl_t locator_node, char *new_state)
+change_locator_state(picl_nodehdl_t locator_node, locator_info_t *locator_info)
 {
 	picl_prophdl_t	state_prop;
 	char		state[PICL_PROPNAMELEN_MAX];
 	int		err;
+	char		*new_state;
 
 	err = picl_get_prop_by_name(locator_node, "State", &state_prop);
 	if (err != PICL_SUCCESS) {
@@ -74,6 +77,9 @@ change_locator_state(picl_nodehdl_t locator_node, char *new_state)
 			picl_strerror(err));
 		return (err);
 	}
+
+	new_state = (locator_info->new_state) ? locator_info->on :
+	    locator_info->off;
 
 	if (strcmp(state, new_state) != 0) {
 		picl_propinfo_t prop_info;
@@ -96,9 +102,11 @@ change_locator_state(picl_nodehdl_t locator_node, char *new_state)
 }
 
 static int
-display_locator_state(picl_nodehdl_t locator_node, char *locator_name)
+display_locator_state(picl_nodehdl_t locator_node,
+    locator_info_t *locator_info)
 {
 	char		state[PICL_PROPNAMELEN_MAX];
+	char		*display_state;
 	int		err;
 
 	err = picl_get_propval_by_name(locator_node, "State",
@@ -110,8 +118,15 @@ display_locator_state(picl_nodehdl_t locator_node, char *locator_name)
 		return (err);
 	}
 
+	if (strcmp(state, locator_info->on) == 0)
+		display_state = gettext("on");
+	else if (strcmp(state, locator_info->off) == 0)
+		display_state = gettext("off");
+	else
+		display_state = state;
+
 	(void) printf(gettext("The '%s' locator is %s.\n"),
-		locator_name, state);
+		locator_info->name, display_state);
 	return (err);
 }
 
@@ -122,9 +137,12 @@ locator_walker_func(picl_nodehdl_t nodeh, void *arg)
 	int		err;
 	char		is_locator[PICL_PROPNAMELEN_MAX];
 	char		name[PICL_PROPNAMELEN_MAX];
+	char		locator_on[PICL_PROPNAMELEN_MAX];
+	char		locator_off[PICL_PROPNAMELEN_MAX];
 
 	err = picl_get_propval_by_name(nodeh, "IsLocator", is_locator,
 		sizeof (is_locator));
+
 	if (err != PICL_SUCCESS)
 		return (PICL_WALK_CONTINUE);
 
@@ -133,19 +151,43 @@ locator_walker_func(picl_nodehdl_t nodeh, void *arg)
 
 	err = picl_get_propval_by_name(nodeh, "LocatorName", name,
 		sizeof (name));
+
 	if (err == PICL_PROPNOTFOUND)
 		err = picl_get_propval_by_name(nodeh, PICL_PROP_NAME, name,
 			sizeof (name));
+
 	if (err != PICL_SUCCESS)
 		return (err);
 
 	if (strcmp(name, locator_info->name) != 0)
 		return (PICL_WALK_CONTINUE);
 
-	locator_info->err =
-		(locator_info->locator_func)(nodeh, locator_info->str);
+	err = picl_get_propval_by_name(nodeh, "LocatorOn", locator_on,
+		sizeof (locator_on));
 
+	if (err == PICL_SUCCESS) {
+		locator_info->on = locator_on;
+	} else if (err == PICL_PROPNOTFOUND) {
+		locator_info->on = "on";
+	} else {
+		return (err);
+	}
+
+	err = picl_get_propval_by_name(nodeh, "LocatorOff", locator_off,
+		sizeof (locator_off));
+
+	if (err == PICL_SUCCESS) {
+		locator_info->off = locator_off;
+	} else if (err == PICL_PROPNOTFOUND) {
+		locator_info->off = "off";
+	} else {
+		return (err);
+	}
+
+	locator_info->err = (locator_info->locator_func)(nodeh,
+		locator_info);
 	locator_info->found = 1;
+
 	return (PICL_WALK_TERMINATE);
 }
 
@@ -207,13 +249,12 @@ main(int argc, char **argv)
 
 	if (on_flag) {
 		locator_info.locator_func = change_locator_state;
-		locator_info.str = "ON";
+		locator_info.new_state = 1;
 	} else if (off_flag) {
 		locator_info.locator_func = change_locator_state;
-		locator_info.str = "OFF";
+		locator_info.new_state = 0;
 	} else {
 		locator_info.locator_func = display_locator_state;
-		locator_info.str = locator_name;
 	}
 
 	locator_info.name = locator_name;

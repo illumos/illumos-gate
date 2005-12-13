@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,13 @@ extern "C" {
 #define	ENVMON_FAN_IND		7
 #define	ENVMON_LED_IND		8
 #define	ENVMON_KEY_SWITCH	9
-#define	ENVMONTYPES		10
+#define	ENVMON_CHASSIS		10
+
+/*
+ * ENVMONTYPES is the total of all the environmental monitor types. Needs
+ * to be incrementee everytime a new type is added.
+ */
+#define	ENVMONTYPES		11
 
 /*
  * number of key-switches supported
@@ -86,7 +92,8 @@ extern "C" {
 #define	LED_OK2RM	"OK2RM"
 #define	LED_LOCATE	"LOCATE"
 
-#define	KEYSWITCH_NAME	"keyswitch"
+#define	KEYSWITCH_NAME		"keyswitch"
+#define	CHASSIS_SERIAL_NUMBER	"chassis_serial_number"
 
 /*
  * Config file name

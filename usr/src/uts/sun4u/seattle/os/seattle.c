@@ -1,4 +1,25 @@
 /*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -81,6 +102,14 @@ load_platform_drivers(void)
 	if (i_ddi_attach_hw_nodes("mc-us3i") != DDI_SUCCESS)
 		cmn_err(CE_WARN, "mc-us3i driver failed to install");
 	(void) ddi_hold_driver(ddi_name_to_major("mc-us3i"));
+
+	/*
+	 * load the power button driver
+	 */
+	if (i_ddi_attach_hw_nodes("power") != DDI_SUCCESS)
+		cmn_err(CE_WARN, "power button driver failed to install");
+	else
+		(void) ddi_hold_driver(ddi_name_to_major("power"));
 
 	/*
 	 * load the GPIO driver for the ALOM reset and watchdog lines
@@ -200,6 +229,32 @@ plat_get_mem_unum(int synd_code, uint64_t flt_addr, int flt_bus_id,
 		    buf, buflen, lenp));
 	else
 		return (ENOTSUP);
+}
+
+/*
+ * This platform hook gets called from mc_add_mem_unum_label() in the mc-us3i
+ * driver giving each platform the opportunity to add platform
+ * specific label information to the unum for ECC error logging purposes.
+ */
+/*ARGSUSED*/
+void
+plat_add_mem_unum_label(char *unum, int mcid, int bank, int dimm)
+{
+	char old_unum[UNUM_NAMLEN];
+	int printed;
+	int buflen = UNUM_NAMLEN;
+	strcpy(old_unum, unum);
+	printed = snprintf(unum, buflen, "MB/P%d/B%d", mcid, bank);
+	buflen -= printed;
+	unum += printed;
+
+	if (dimm != -1) {
+		printed = snprintf(unum, buflen, "/D%d", dimm);
+		buflen -= printed;
+		unum += printed;
+	}
+
+	snprintf(unum, buflen, ": %s", old_unum);
 }
 
 /*ARGSUSED*/

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,6 +119,8 @@ static void	setup_strings();
 static void	free_vol_prop(picl_prophdl_t proph);
 static void	envmon_evhandler(const char *ename, const void *earg,
     size_t size, void *cookie);
+static int	get_serial_num(int envmon_fd, envmon_handle_t *id, int cmd,
+    envmon_chassis_t *chassis);
 
 #pragma	init(piclenvmon_register)
 
@@ -132,6 +134,8 @@ static picld_plugin_reg_t  my_reg_info = {
 
 static	const char str_On[] = "on";
 static	const char str_Off[] = "off";
+static  const char str_Blinking[] = "blinking";
+static  const char str_Flashing[] = "flashing";
 static	const char str_SC[] = "SC";
 static	char *envmon_device_name = NULL;
 static	envmon_sysinfo_t	env_limits;
@@ -175,7 +179,8 @@ int	fru_to_cmd[] = {
 	ENVMONIOCFAN,
 	ENVMONIOCFANIND,
 	ENVMONIOCGETLED,
-	ENVMONIOCGETKEYSW
+	ENVMONIOCGETKEYSW,
+	ENVMONIOCCHASSISSERIALNUM
 };
 
 /*
@@ -191,7 +196,8 @@ const char *fru_to_class[] = {
 	PICL_CLASS_FAN,
 	PICL_CLASS_FAN,
 	PICL_CLASS_LED,
-	PICL_CLASS_KEYSWITCH
+	PICL_CLASS_KEYSWITCH,
+	PICL_CLASS_CHASSIS_SERIAL_NUM
 };
 
 /*
@@ -207,7 +213,8 @@ const char *fru_to_prop[] = {
 	PICL_PROP_FAN_SPEED,
 	PICL_PROP_FAN_SPEED_UNIT,
 	PICL_PROP_STATE,
-	PICL_PROP_STATE
+	PICL_PROP_STATE,
+	PICL_PROP_SERIAL_NUMBER
 };
 
 /*
@@ -221,6 +228,7 @@ int	fru_to_ptype[] = {
 	PICL_PTYPE_INT,
 	PICL_PTYPE_CHARSTRING,
 	PICL_PTYPE_UNSIGNED_INT,
+	PICL_PTYPE_CHARSTRING,
 	PICL_PTYPE_CHARSTRING,
 	PICL_PTYPE_CHARSTRING,
 	PICL_PTYPE_CHARSTRING
@@ -237,7 +245,7 @@ static char *cond_failed;
  * the -1's are replaced by the max size of a condition string
  */
 int	fru_to_size[] = {
-	4, -1, 4, -1, 2, -1, 2, -1, -1, -1
+	4, -1, 4, -1, 2, -1, 2, -1, -1, -1, -1
 };
 
 static node_el_t *
@@ -747,6 +755,34 @@ get_keyswitch_data(int envmon_fd, envmon_handle_t *id, int cmd,
 }
 
 /*
+ * Function to read the chassis serial number
+ * Returns PICL_INVALIDHANDLE if ioctl not supported (or fails)
+ */
+static int
+get_serial_num(int envmon_fd, envmon_handle_t *id, int cmd,
+    envmon_chassis_t *chassis)
+{
+	int			res;
+
+	if (id->name[0] == '\0') {
+		(void) strlcpy(id->name, CHASSIS_SERIAL_NUMBER,
+		    sizeof (id->name));
+		return (PICL_INVALIDHANDLE);
+	} else if (strncmp(id->name, CHASSIS_SERIAL_NUMBER, sizeof (id->name))
+	    != 0) {
+		id->name[0] = '\0';
+		return (PICL_INVALIDHANDLE);
+	} else {
+		res = ioctl(envmon_fd, cmd, chassis);
+		id->name[0] = '\0';
+
+		if (res < 0)
+			return (PICL_INVALIDHANDLE);
+		return (PICL_SUCCESS);
+	}
+}
+
+/*
  * change to lower case and convert any spaces into hyphens,
  * and any dots or colons symbols into underscores
  */
@@ -879,6 +915,7 @@ read_vol_data(ptree_rarg_t *r_arg, void *buf)
 	int16_t			sensor_data;
 	int8_t			led_state;
 	envmon_keysw_pos_t	key_posn;
+	envmon_chassis_t	chassis;
 	float			float_data;
 	int			cmd;
 	int			err;
@@ -926,6 +963,9 @@ read_vol_data(ptree_rarg_t *r_arg, void *buf)
 		break;
 	case ENVMON_KEY_SWITCH:
 		err = get_keyswitch_data(envmon_fd, &id, cmd, &key_posn);
+		break;
+	case ENVMON_CHASSIS:
+		err = get_serial_num(envmon_fd, &id, cmd, &chassis);
 		break;
 	default:
 		err = PICL_FAILURE;
@@ -984,6 +1024,10 @@ read_vol_data(ptree_rarg_t *r_arg, void *buf)
 			return (err);
 		(void) strlcpy(buf, cptr, fru_to_size[fru_type]);
 		break;
+	case ENVMON_CHASSIS:
+		(void) memcpy(buf, chassis.serial_number,
+		    sizeof (chassis.serial_number));
+		break;
 
 	default:
 		return (PICL_FAILURE);
@@ -1017,6 +1061,10 @@ write_led_data(ptree_warg_t *w_arg, const void *buf)
 		led_ctl.led_state = ENVMON_LED_OFF;
 	else if (strcasecmp(str_On, buf) == 0)
 		led_ctl.led_state = ENVMON_LED_ON;
+	else if (strcasecmp(str_Blinking, buf) == 0)
+		led_ctl.led_state = ENVMON_LED_BLINKING;
+	else if (strcasecmp(str_Flashing, buf) == 0)
+		led_ctl.led_state = ENVMON_LED_FLASHING;
 	else
 		return (PICL_INVALIDARG);
 
@@ -1079,6 +1127,7 @@ add_env_nodes(int envmon_fd, uint8_t fru_type, picl_nodehdl_t envmonh)
 	int8_t			led_state;
 	int8_t			colour;
 	envmon_keysw_pos_t	key_state;
+	envmon_chassis_t	chassis_num;
 	int			cmd;
 	int			err;
 	int			index = handle_arr.num;
@@ -1135,6 +1184,10 @@ add_env_nodes(int envmon_fd, uint8_t fru_type, picl_nodehdl_t envmonh)
 			err = get_keyswitch_data(envmon_fd, &id, cmd,
 			    &key_state);
 			break;
+		case ENVMON_CHASSIS:
+			err = get_serial_num(envmon_fd, &id, cmd,
+			    &chassis_num);
+			break;
 		default:
 			return (PICL_FAILURE);
 		}
@@ -1181,6 +1234,7 @@ add_env_nodes(int envmon_fd, uint8_t fru_type, picl_nodehdl_t envmonh)
 		if (err != PICL_SUCCESS) {
 			break;
 		}
+
 		/*
 		 * if any thresholds are defined add a property
 		 */
@@ -1258,11 +1312,13 @@ add_env_nodes(int envmon_fd, uint8_t fru_type, picl_nodehdl_t envmonh)
 			}
 		}
 		/*
-		 * add a label property unless it's a keyswitch
-		 * (keyswitch is labelled from a config file because the
+		 * add a label property unless it's a keyswitch or the
+		 * chassis serial number. keyswitch and chassis serial
+		 * number are labelled from a config file because the
 		 * ALOM interface doesn't supply a name for it)
 		 */
-		if (fru_type != ENVMON_KEY_SWITCH) {
+		if ((fru_type != ENVMON_KEY_SWITCH) &&
+		    (fru_type != ENVMON_CHASSIS)) {
 			err = add_regular_prop(node_hdl, PICL_PROP_LABEL,
 			    PICL_PTYPE_CHARSTRING, PICL_READ,
 			    1 + strlen(label_name), label_name, NULL);
@@ -1399,6 +1455,11 @@ setup_strings()
 	fixkeyposn(ENVMON_KEYSW_POS_LOCKED, gettext("LOCKED"), &string_size);
 	fixkeyposn(ENVMON_KEYSW_POS_OFF, gettext("STBY"), &string_size);
 	fru_to_size[ENVMON_KEY_SWITCH] = string_size;
+
+	/*
+	 * initialise chassis serial number string
+	 */
+	fru_to_size[ENVMON_CHASSIS] = ENVMON_MAXNAMELEN;
 }
 
 /*

@@ -1,4 +1,25 @@
 /*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
@@ -213,6 +234,11 @@ typedef struct dp_get_tod_clock_r {
 
 #define	DP_GET_EVENT_LOG	0x7D
 
+/*
+ * NOTE: changing this or the dp_event_log_entry structure will almost
+ * certainly require changing the code that parses these structures
+ * in scadm.  See src/cmd/scadm/sparcv9/mpxu/common/eventlog.c.
+ */
 #define	DP_GET_EVENT_LOG_R	0x5D
 typedef struct dp_get_event_log_r {
 	rsci32	entry_count;
@@ -926,6 +952,57 @@ typedef struct dp_event_notification {
 typedef struct dp_event_notification_r {
 	rsci32		event_seqno; 	/* event sequence number */
 } dp_event_notification_r_t;
+
+#define	DP_GET_CHASSIS_SERIALNUM	0x2E
+#define	DP_GET_CHASSIS_SERIALNUM_R	0x2F
+typedef struct dp_get_serialnum_r {
+	rsci8		chassis_serial_number[32];
+} dp_get_serialnum_r_t;
+
+#define	DP_GET_CONSOLE_LOG	0x1A
+typedef struct dp_get_console_log {
+	rsci64		start_seq; 	/* sequence number of first log byte */
+	rsci16		length;		/* expected size of retrieved data */
+} dp_get_console_log_t;
+
+#define	DP_GET_CONSOLE_LOG_R	0x1B
+typedef struct dp_get_console_log_r {
+	rsci64		next_seq;	/* sequence number of next log byte */
+	rsci64		remaining_log_bytes;	/* bytes left to retrieve */
+	rsci16		length;		/* size of retrieved data */
+	char		buffer[DP_MAX_MSGLEN - (sizeof (rsci64) * 2 +
+			    sizeof (rsci16))];
+} dp_get_console_log_r_t;
+
+#define	DP_GET_CONFIG_LOG	0x1C
+typedef struct dp_get_config_log {
+	rsci64		start_seq;	/* sequence number of first log byte */
+	rsci16		length;		/* size of retrieved data */
+} dp_get_config_log_t;
+
+#define	DP_GET_CONFIG_LOG_R	0x1D
+typedef struct dp_get_config_log_r {
+	rsci64		next_seq;	/* sequence number of next log byte */
+	rsci64		remaining_log_bytes;	/* bytes left to retrieve */
+	rsci16		length;		/* size of retrieved data */
+	char		buffer[DP_MAX_MSGLEN - (sizeof (rsci64) * 2 +
+			    sizeof (rsci16))];
+} dp_get_config_log_r_t;
+
+#define	DP_GET_EVENT_LOG2	0x1E
+typedef struct dp_get_event_log2 {
+	rsci64		start_seq;	/* sequence number of first log event */
+	rsci16		length;		/* size of retrieved data */
+} dp_get_event_log2_t;
+
+#define	DP_GET_EVENT_LOG2_R	0x1F
+typedef struct dp_get_event_log2_r {
+	rsci64		next_seq;	/* sequence number of next log event */
+	rsci64		remaining_log_events;	/* events left to retrieve */
+	rsci16		num_events;		/* size of retrieved data */
+	char		buffer[DP_MAX_MSGLEN - (sizeof (rsci64) * 2 +
+			    sizeof (rsci16))];
+} dp_get_event_log2_r_t;
 
 #ifdef	__cplusplus
 }

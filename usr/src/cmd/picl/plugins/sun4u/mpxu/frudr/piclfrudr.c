@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -52,6 +52,7 @@
 #include "picldefs.h"
 #include <sys/raidioctl.h>
 #include <sys/param.h>
+#include <sys/epic.h>
 
 /*
  * Plugin registration entry points
@@ -59,6 +60,11 @@
 static void	piclfrudr_register(void);
 static void	piclfrudr_init(void);
 static void	piclfrudr_fini(void);
+static void	rmc_state_event(void);
+static void	seattle_setleds(void);
+static void	boston_set_frontleds(const char *, int);
+static void	boston_set_rearleds(const char *, int);
+
 #pragma	init(piclfrudr_register)
 
 static picld_plugin_reg_t  my_reg_info = {
@@ -99,6 +105,14 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	FRUTREE_PATH		"/frutree"
 #define	CHASSIS_LOC_PATH	"/frutree/chassis/%s"
 #define	SYS_BOARD_PATH		"/frutree/chassis/MB/system-board/%s"
+#define	SEATTLE1U_HDDBP_PATH	\
+	"/frutree/chassis/MB/system-board/HDDBP/disk-backplane-1/%s"
+#define	SEATTLE2U_HDDBP_PATH	\
+	"/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3/%s"
+#define	BOSTON_HDDBP_PATH	\
+	"/frutree/chassis/MB/system-board/HDDCNTRL/disk-controller/HDDBP" \
+	"/disk-backplane-8/%s"
+
 #define	CONFFILE_PREFIX		"fru_"
 #define	CONFFILE_SUFFIX		".conf"
 #define	CONFFILE_FRUTREE	"piclfrutree.conf"
@@ -124,6 +138,15 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	ENTS_ACT_LED		0x10
 #define	V440_SRVC_LED		0x2
 #define	V440_ACT_LED		0x1
+#define	BOSTON_FRONT_SRVC_LED	0x2
+#define	BOSTON_FRONT_ACT_LED	0x4
+#define	BOSTON_FRONT_CLEAR_DIR	0x0
+#define	BOSTON_FRONT_CLEAR_POL	0x0
+#define	BOSTON_FRONT_LED_MASK	0xffffffff
+#define	BOSTON_REAR_SRVC_LED	0x2000
+#define	BOSTON_REAR_ACT_LED	0x8000
+#define	BOSTON_REAR_CLEAR_POL	0x0000
+#define	BOSTON_REAR_LED_MASK	0xe000
 
 /*
  * PSU defines
@@ -151,6 +174,30 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	PS_DEVICE_NAME "power-supply-fru-prom"
 
 /*
+ * Seattle/Boston PSU defines
+ */
+#define	SEATTLE_PSU_I2C_BUS_DEV "/devices/i2c@1f,530000:devctl"
+#define	SEATTLE_PSU_DEV	\
+	"/devices/i2c@1f,530000/power-supply-fru-prom@0,%x"
+#define	SEATTLE_PSU_PLATFORM	"/platform/i2c@1f,530000"
+#define	SEATTLE_PS0_ADDR	0x6c
+#define	SEATTLE_PS1_ADDR	0x6e
+#define	SEATTLE_PS0_UNITADDR	"0,6c"
+#define	SEATTLE_PS1_UNITADDR	"0,6e"
+#define	BOSTON_PSU_I2C_BUS_DEV	"/devices/i2c@1f,520000:devctl"
+#define	BOSTON_PSU_DEV	\
+	"/devices/i2c@1f,520000/power-supply-fru-prom@0,%x"
+#define	BOSTON_PSU_PLATFORM	"/platform/i2c@1f,520000"
+#define	BOSTON_PS0_ADDR		0x24
+#define	BOSTON_PS1_ADDR		0x32
+#define	BOSTON_PS2_ADDR		0x52
+#define	BOSTON_PS3_ADDR		0x72
+#define	BOSTON_PS0_UNITADDR	"0,24"
+#define	BOSTON_PS1_UNITADDR	"0,32"
+#define	BOSTON_PS2_UNITADDR	"0,52"
+#define	BOSTON_PS3_UNITADDR	"0,72"
+
+/*
  * disk defines
  */
 #define	REMOK_LED "OK2RM"
@@ -166,6 +213,17 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	V440_DISK_DEVCTL "/devices/pci@1f,700000/scsi@2:devctl"
 
 /*
+ * Seattle/Boston disk defines
+ */
+#define	N_SEATTLE1U_DISKS	2
+#define	N_SEATTLE2U_DISKS	4
+#define	N_BOSTON_DISKS		8
+#define	SEATTLE_DISK_DEVCTL \
+	"/devices/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1:devctl"
+#define	BOSTON_DISK_DEVCTL \
+	"/devices/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1:devctl"
+
+/*
  * led defines
  */
 #define	ENXS_LED_DIR	"/devices/pci@1e,600000/isa@7/i2c@0,320/"
@@ -177,6 +235,20 @@ static picld_plugin_reg_t  my_reg_info = {
 
 #define	V440_LED_DIR	"/devices/pci@1e,600000/isa@7/i2c@0,320/"
 #define	V440_LED_PATH	V440_LED_DIR "gpio@0,48:port_0"
+
+/*
+ * Seattle/Boston led defines
+ */
+#define	SEATTLE_LED_DEV	"/devices/ebus@1f,464000/env-monitor@3,0:env-monitor0"
+#define	BOSTON_LED_DIR	"/devices/i2c@1f,520000/"
+#define	BOSTON_FRONT_LED_PATH	BOSTON_LED_DIR "gpio@0,3a:port_0"
+#define	BOSTON_REAR_LED_PATH	BOSTON_LED_DIR "hardware-monitor@0,5c:adm1026"
+
+/*
+ * Seattle/Boston USB defines
+ */
+#define	MAX_USB_PORTS		4
+#define	USB_CONF_FILE_NAME	"usb-a-"
 
 typedef struct id_props {
 	envmon_handle_t	envhandle;
@@ -287,6 +359,9 @@ static void add_op_status(envmon_hpu_t *hpu, int *index);
 #define	PLAT_EN19	3
 #define	PLAT_CHALUPA19	4
 #define	PLAT_SALSA19	5
+#define	PLAT_SEATTLE1U	6
+#define	PLAT_SEATTLE2U	7
+#define	PLAT_BOSTON	8
 
 static int sys_platform;
 
@@ -309,6 +384,12 @@ get_platform()
 		sys_platform = PLAT_SALSA19;
 	else if (strcmp(platform, "SUNW,Netra-440") == 0)
 		sys_platform = PLAT_CHALUPA19;
+	else if (strcmp(platform, "SUNW,Sun-Fire-V215") == 0)
+		sys_platform = PLAT_SEATTLE1U;
+	else if (strcmp(platform, "SUNW,Sun-Fire-V245") == 0)
+		sys_platform = PLAT_SEATTLE2U;
+	else if (strcmp(platform, "SUNW,Sun-Fire-V445") == 0)
+		sys_platform = PLAT_BOSTON;
 	else
 		sys_platform = PLAT_UNKNOWN;
 }
@@ -534,6 +615,99 @@ solaris_setleds(const char *led_path, int leds)
 	(void) close(fd);
 }
 
+/*
+ * Function for explicitly turning on system leds
+ * for a failed/degraded RMC (SC) on Seattle
+ */
+static void
+seattle_setleds(void)
+{
+	int fd;
+
+	fd = open(SEATTLE_LED_DEV, O_RDWR);
+
+	if (fd < 0)
+		return;
+
+	ioctl(fd, EPIC_SET_POWER_LED, (char *)0);
+	ioctl(fd, EPIC_SET_ALERT_LED, (char *)0);
+	(void) close(fd);
+}
+
+/*
+ * Function for explicitly turning on the front system leds
+ * for a failed/degraded RMC (SC) on Boston
+ */
+static void
+boston_set_frontleds(const char *led_path, int leds)
+{
+	i2c_gpio_t	gpio;
+	int		fd = open(led_path, O_RDWR);
+
+	if (fd < 0) {
+		return;
+	}
+
+	/* first clear the polarity */
+	gpio.reg_val  = BOSTON_FRONT_CLEAR_POL;
+	gpio.reg_mask = BOSTON_FRONT_LED_MASK;
+	if (ioctl(fd, GPIO_SET_POLARITY, &gpio) < 0)	{
+		(void) close(fd);
+		return;
+	}
+
+	/* now clear the direction */
+	gpio.reg_val  = BOSTON_FRONT_CLEAR_DIR;
+	gpio.reg_mask = BOSTON_FRONT_LED_MASK;
+	if (ioctl(fd, GPIO_SET_CONFIG, &gpio) < 0)	{
+		(void) close(fd);
+		return;
+	}
+
+	/* and light the leds */
+	gpio.reg_val = leds;
+	gpio.reg_mask = BOSTON_FRONT_LED_MASK;
+	ioctl(fd, GPIO_SET_OUTPUT, &gpio);
+	(void) close(fd);
+}
+
+/*
+ * Function for explicitly turning on the rear system leds
+ * for a failed/degraded RMC (SC) on Boston
+ */
+static void
+boston_set_rearleds(const char *led_path, int leds)
+{
+	i2c_gpio_t	gpio;
+	int		fd = open(led_path, O_RDWR);
+
+	if (fd < 0) {
+		return;
+	}
+
+	/* first clear the polarity */
+	gpio.reg_val  = BOSTON_REAR_CLEAR_POL;
+	gpio.reg_mask = BOSTON_REAR_LED_MASK;
+	if (ioctl(fd, GPIO_SET_POLARITY, &gpio) < 0)	{
+		(void) close(fd);
+		return;
+	}
+
+	/* now set the direction */
+	gpio.reg_val  = BOSTON_REAR_LED_MASK;
+	gpio.reg_mask = BOSTON_REAR_LED_MASK;
+	if (ioctl(fd, GPIO_SET_CONFIG, &gpio) < 0)	{
+		(void) close(fd);
+		return;
+	}
+
+	/* and light the leds */
+	gpio.reg_val = leds;
+	gpio.reg_mask = BOSTON_REAR_LED_MASK;
+	ioctl(fd, GPIO_SET_OUTPUT, &gpio);
+	(void) close(fd);
+}
+
 static void
 rmc_state_event(void)
 {
@@ -595,6 +769,18 @@ rmc_state_event(void)
 		case PLAT_CHALUPA19:
 			solaris_setleds(V440_LED_PATH,
 			    V440_SRVC_LED | V440_ACT_LED);
+			break;
+		case PLAT_BOSTON:
+			/* set front leds */
+			boston_set_frontleds(BOSTON_FRONT_LED_PATH,
+			    BOSTON_FRONT_SRVC_LED | BOSTON_FRONT_ACT_LED);
+			/* and then the rear leds */
+			boston_set_rearleds(BOSTON_REAR_LED_PATH,
+			    BOSTON_REAR_SRVC_LED | BOSTON_REAR_ACT_LED);
+			break;
+		case PLAT_SEATTLE1U:
+		case PLAT_SEATTLE2U:
+			seattle_setleds();
 			break;
 		default:
 			break;
@@ -1042,7 +1228,20 @@ add_ps_to_platform(char *unit)
 	int			res;
 	char			unit_addr[PICL_UNITADDR_LEN_MAX];
 
-	if (ptree_get_node_by_path(PSU_PLATFORM, &parent_hdl) != PICL_SUCCESS)
+	switch (sys_platform) {
+	case PLAT_SEATTLE1U:
+	case PLAT_SEATTLE2U:
+		res = ptree_get_node_by_path(SEATTLE_PSU_PLATFORM, &parent_hdl);
+		break;
+	case PLAT_BOSTON:
+		res = ptree_get_node_by_path(BOSTON_PSU_PLATFORM, &parent_hdl);
+		break;
+	default:
+		res = ptree_get_node_by_path(PSU_PLATFORM, &parent_hdl);
+		break;
+	}
+
+	if (res != PICL_SUCCESS)
 		return;
 	/*
 	 * seeprom nodes sit below this node,
@@ -1153,9 +1352,25 @@ frudr_evhandler(const char *ename, const void *earg, size_t size, void *cookie)
 			(strncmp(ap_id, PS_NAME, PS_NAME_LEN) == 0)) {
 			sprintf_buf2(path, CHASSIS_LOC_PATH,
 				ps_apid_to_nodename(ap_id));
-		}
-		else
+		} else	if (strncmp(ap_id, DISK_NAME, DISK_NAME_LEN) == 0) {
+			switch (sys_platform)	{
+			case PLAT_SEATTLE1U:
+				sprintf_buf2(path, SEATTLE1U_HDDBP_PATH, ap_id);
+				break;
+			case PLAT_SEATTLE2U:
+				sprintf_buf2(path, SEATTLE2U_HDDBP_PATH, ap_id);
+				break;
+			case PLAT_BOSTON:
+				sprintf_buf2(path, BOSTON_HDDBP_PATH, ap_id);
+				break;
+			default:
+				sprintf_buf2(path, CHASSIS_LOC_PATH, ap_id);
+				break;
+			}
+		} else	{
 			sprintf_buf2(path, CHASSIS_LOC_PATH, ap_id);
+
+		}
 	}
 
 	if (ptree_get_node_by_path(path, &locnodeh) != PICL_SUCCESS) {
@@ -1335,6 +1550,7 @@ frutree_evhandler(const char *ename, const void *earg, size_t size,
 	char			*ptr;
 	char			*ptr2;
 	int			done = B_FALSE;
+	int			i;
 
 	if (strcmp(ename, PICLEVENT_SYSEVENT_DEVICE_ADDED) != 0)
 		return;
@@ -1373,50 +1589,67 @@ frutree_evhandler(const char *ename, const void *earg, size_t size,
 	 *	"/pci@1e,600000/usb@a/device@2/mouse@0"
 	 * reduce it to "usb-a-2"
 	 */
-	ptr = fru_name;
-	if (*ptr == '/') {
-		ptr++;
-		ptr = strchr(ptr, '/');
-		if (ptr != NULL) {
+	if ((sys_platform == PLAT_SEATTLE1U) ||
+	    (sys_platform == PLAT_SEATTLE2U) ||
+	    (sys_platform == PLAT_BOSTON)) {
+		for (i = 0; i < MAX_USB_PORTS; i++) {
+			sprintf(fru_name, "%s%d", USB_CONF_FILE_NAME, i+1);
+			if (get_config_file(path, fru_name) == 0) {
+				if ((ptree_get_root(&rooth) != PICL_SUCCESS) ||
+				    (picld_pluginutil_parse_config_file(rooth,
+				    path) != PICL_SUCCESS)) {
+					syslog(LOG_ERR, PARSE_CONF_FAIL, path);
+				}
+			}
+		}
+	} else {
+		ptr = fru_name;
+		if (*ptr == '/') {
 			ptr++;
-			(void) memmove(fru_name, ptr, strlen(ptr) + 1);
-			ptr = strchr(fru_name, '@');
+			ptr = strchr(ptr, '/');
 			if (ptr != NULL) {
-				*ptr = '-';
 				ptr++;
-				ptr = strchr(ptr, '/');
+				(void) memmove(fru_name, ptr, strlen(ptr) + 1);
+				ptr = strchr(fru_name, '@');
 				if (ptr != NULL) {
 					*ptr = '-';
 					ptr++;
-					ptr2 = ptr;
-					ptr = strchr(ptr, '@');
+					ptr = strchr(ptr, '/');
 					if (ptr != NULL) {
+						*ptr = '-';
 						ptr++;
-						(void) memmove(ptr2, ptr,
-						    strlen(ptr) + 1);
-						ptr2 = strchr(ptr2, '/');
-						if (ptr2 != NULL) {
-							*ptr2 = '\0';
+						ptr2 = ptr;
+						ptr = strchr(ptr, '@');
+						if (ptr != NULL) {
+							ptr++;
+							(void) memmove(ptr2,
+							    ptr, strlen(ptr)+1);
+							ptr2 = strchr(ptr2,
+							    '/');
+							if (ptr2 != NULL) {
+								*ptr2 = '\0';
+							}
+							done = B_TRUE;
 						}
-						done = B_TRUE;
 					}
 				}
 			}
 		}
-	}
-	if (done == B_FALSE) {
-		free(fru_name);
-		return;
-	}
+		if (done == B_FALSE) {
+			free(fru_name);
+			return;
+		}
 
-	/*
-	 * see if there's a .conf file for this fru
-	 */
-	if (get_config_file(path, fru_name) == 0) {
-		if ((ptree_get_root(&rooth) != PICL_SUCCESS) ||
-		    (picld_pluginutil_parse_config_file(rooth, path) !=
-		    PICL_SUCCESS)) {
-			syslog(LOG_ERR, PARSE_CONF_FAIL, path);
+		/*
+		 * see if there's a .conf file for this fru
+		 */
+
+		if (get_config_file(path, fru_name) == 0) {
+			if ((ptree_get_root(&rooth) != PICL_SUCCESS) ||
+			    (picld_pluginutil_parse_config_file(rooth, path) !=
+			    PICL_SUCCESS)) {
+				syslog(LOG_ERR, PARSE_CONF_FAIL, path);
+			}
 		}
 	}
 
@@ -1439,9 +1672,28 @@ set_led(char *name, char *ptr, char *value)
 	char			class[PICL_PROPNAMELEN_MAX];
 
 	/* find the location node */
-	sprintf_buf2(path, CHASSIS_LOC_PATH, name);
-	if (ptree_get_node_by_path(path, &locnodeh) != PICL_SUCCESS)
+	switch (sys_platform)	{
+	case PLAT_CHALUPA:
+	case PLAT_CHALUPA19:
+		sprintf_buf2(path, CHASSIS_LOC_PATH, name);
+		break;
+	case PLAT_SEATTLE1U:
+		sprintf_buf2(path, SEATTLE1U_HDDBP_PATH, name);
+		break;
+	case PLAT_SEATTLE2U:
+		sprintf_buf2(path, SEATTLE2U_HDDBP_PATH, name);
+		break;
+	case PLAT_BOSTON:
+		sprintf_buf2(path, BOSTON_HDDBP_PATH, name);
+		break;
+	default:
+		sprintf_buf2(path, CHASSIS_LOC_PATH, name);
+		break;
+	}
+
+	if (ptree_get_node_by_path(path, &locnodeh) != PICL_SUCCESS)	{
 		return (PICL_FAILURE);
+	}
 
 	/*
 	 * if no fru node, then turn led off
@@ -1759,7 +2011,6 @@ opst_init(void)
 		    (hpu.next_id.name[0] != '\0')) {
 			hpu.id = hpu.next_id;
 			res = ioctl(fd, ENVMONIOCHPU, &hpu);
-
 			if ((res == 0) &&
 			    ((hpu.sensor_status & ENVMON_NOT_PRESENT) == 0)) {
 				add_op_status(&hpu, &index);
@@ -1874,7 +2125,25 @@ update_disk_node(char *fruname, char *devpath)
 	int err;
 	char path[MAXPATHLEN];
 
-	sprintf_buf2(path, CHASSIS_LOC_PATH, fruname);
+	switch (sys_platform)	{
+	case PLAT_CHALUPA:
+	case PLAT_CHALUPA19:
+		sprintf_buf2(path, CHASSIS_LOC_PATH, fruname);
+		break;
+	case PLAT_SEATTLE1U:
+		sprintf_buf2(path, SEATTLE1U_HDDBP_PATH, fruname);
+		break;
+	case PLAT_SEATTLE2U:
+		sprintf_buf2(path, SEATTLE2U_HDDBP_PATH, fruname);
+		break;
+	case PLAT_BOSTON:
+		sprintf_buf2(path, BOSTON_HDDBP_PATH, fruname);
+		break;
+	default:
+		sprintf_buf2(path, CHASSIS_LOC_PATH, fruname);
+		break;
+	}
+
 	if (ptree_get_node_by_path(path, &slotndh) != PICL_SUCCESS) {
 		return;
 	}
@@ -1918,15 +2187,75 @@ update_disk_node(char *fruname, char *devpath)
 	}
 }
 
+/*
+ * We will light the OK2REMOVE LED for disks configured
+ * into a raid if (and only if) the driver reports
+ * that the disk has failed.
+ */
 static int
-get_raid_config(raid_config_t *config)
+raid_ok2rem_policy(raid_config_t config, int target)
 {
+	int i;
+
+	for (i = 0; i < config.ndisks; i++) {
+		int d = config.disk[i];
+		int dstatus = config.diskstatus[i];
+
+		if (d  == target)	{
+			switch (dstatus) {
+			case RAID_DISKSTATUS_MISSING:
+				/* If LED is on, turn it off */
+				if (disk_ready[d] == B_FALSE) {
+					if (set_led(disk_name[d], REMOK_LED,
+					    PICL_PROPVAL_OFF) == PICL_SUCCESS) {
+						disk_ready[d] = B_TRUE;
+					}
+				}
+			break;
+			case RAID_DISKSTATUS_GOOD:
+				if (disk_ready[d] != B_TRUE) {
+					if (set_led(disk_name[d], REMOK_LED,
+					    PICL_PROPVAL_OFF) == PICL_SUCCESS) {
+						disk_ready[d] = B_TRUE;
+					}
+				}
+			break;
+			case RAID_DISKSTATUS_FAILED:
+				if (disk_ready[d] != B_FALSE) {
+					if (set_led(disk_name[d], REMOK_LED,
+					PICL_PROPVAL_ON) == PICL_SUCCESS) {
+						disk_ready[d] = B_FALSE;
+					}
+				}
+			break;
+			default:
+			break;
+			}
+			return (1);
+		}
+	}
+	return (0);
+}
+
+static int
+check_raid(int target)
+{
+	raid_config_t	config;
 	int	fd;
+	int	numvols;
+	int	i, j;
 
 	switch (sys_platform) {
 	case PLAT_CHALUPA:
 	case PLAT_CHALUPA19:
 		fd = open(V440_DISK_DEVCTL, O_RDONLY);
+		break;
+	case PLAT_SEATTLE1U:
+	case PLAT_SEATTLE2U:
+		fd = open(SEATTLE_DISK_DEVCTL, O_RDONLY);
+		break;
+	case PLAT_BOSTON:
+		fd = open(BOSTON_DISK_DEVCTL, O_RDONLY);
 		break;
 	default:
 		fd = -1;
@@ -1934,88 +2263,28 @@ get_raid_config(raid_config_t *config)
 	}
 
 	if (fd == -1) {
-		syslog(LOG_ERR, "%s", strerror(errno));
-		return (1);
+		return (0);
 	}
 
-	/*
-	 * We are running on chalupa, so we know just a single
-	 * RAID volume is supported. We can go ahead and
-	 * explicitly request the unitid 0 RAID volume.
-	 */
-	config->unitid = 0;
-	if (ioctl(fd, RAID_GETCONFIG, config)) {
-		syslog(LOG_ERR, "%s", strerror(errno));
+	if (ioctl(fd, RAID_NUMVOLUMES, &numvols)) {
 		(void) close(fd);
-		return (1);
+		return (0);
+	}
+
+	for (i = 0; i < numvols; i++)	{
+		config.unitid = i;
+		if (ioctl(fd, RAID_GETCONFIG, &config)) {
+			(void) close(fd);
+			return (0);
+		}
+		if (raid_ok2rem_policy(config, target))	{
+			(void) close(fd);
+			return (1);
+		}
 	}
 
 	(void) close(fd);
 	return (0);
-}
-
-/*
- * We will light the OK2REMOVE LED for disks configured
- * into a raid if (and only if) the driver reports
- * that the disk has failed.
- */
-static void
-raid_ok2rem_policy(raid_config_t config)
-{
-	int i;
-	for (i = 0; i < config.ndisks; i++) {
-		int d = config.disk[i];
-		int dstatus = config.diskstatus[i];
-
-		switch (dstatus) {
-		case RAID_DISKSTATUS_MISSING:
-			/* If LED is on, turn it off */
-			if (disk_ready[d] == B_FALSE) {
-				if (set_led(disk_name[d], REMOK_LED,
-				    PICL_PROPVAL_OFF) == PICL_SUCCESS) {
-					disk_ready[d] = B_TRUE;
-				}
-			}
-		break;
-		case RAID_DISKSTATUS_GOOD:
-			if (disk_ready[d] != B_TRUE) {
-				if (set_led(disk_name[d], REMOK_LED,
-				    PICL_PROPVAL_OFF) == PICL_SUCCESS) {
-					disk_ready[d] = B_TRUE;
-				}
-			}
-		break;
-		case RAID_DISKSTATUS_FAILED:
-			if (disk_ready[d] != B_FALSE) {
-				if (set_led(disk_name[d], REMOK_LED,
-					PICL_PROPVAL_ON) == PICL_SUCCESS) {
-					disk_ready[d] = B_FALSE;
-				}
-			}
-		break;
-		default:
-		break;
-		}
-	}
-}
-
-static void
-check_raid(int *d0, int *d1)
-{
-	raid_config_t	raid_config;
-	int	raid_exists = 0;
-
-	if (!get_raid_config(&raid_config)) {
-		raid_exists = raid_config.ndisks;
-	} else {
-		return;
-	}
-
-	if (raid_exists) {
-		*d0 = raid_config.disk[0];
-		*d1 = raid_config.disk[1];
-		raid_ok2rem_policy(raid_config);
-	}
 }
 
 /*ARGSUSED*/
@@ -2063,6 +2332,24 @@ disk_leds_thread(void *args)
 		"/pci@1c,600000/LSILogic,sas@1/sd@1,0"
 	};
 
+	static char *seattle_devs[] = {
+		"/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@0,0",
+		"/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@1,0",
+		"/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@2,0",
+		"/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@3,0"
+	};
+
+	static char *boston_devs[] = {
+		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@0,0",
+		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@1,0",
+		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@2,0",
+		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@3,0",
+		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@4,0",
+		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@5,0",
+		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@6,0",
+		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@7,0"
+	};
+
 	char	*ddev[N_DISKS];		/* "/devices"  */
 	char	*pdev[N_DISKS];		/* "/platform" */
 
@@ -2083,6 +2370,20 @@ disk_leds_thread(void *args)
 	case PLAT_SALSA19:
 		disk_dev = n210_devs;
 		n_disks = N_EN19_DISKS;
+		break;
+
+	case PLAT_SEATTLE1U:
+	case PLAT_SEATTLE2U:
+		do_raid = 1;
+		disk_dev = seattle_devs;
+		n_disks = (sys_platform == PLAT_SEATTLE1U) ?
+			N_SEATTLE1U_DISKS : N_SEATTLE2U_DISKS;
+		break;
+
+	case PLAT_BOSTON:
+		do_raid = 1;
+		disk_dev = boston_devs;
+		n_disks = N_BOSTON_DISKS;
 		break;
 
 	default: /* PLAT_ENXS/PLAT_EN19 */
@@ -2106,22 +2407,14 @@ disk_leds_thread(void *args)
 	disk_leds_thread_running = B_TRUE;
 
 	for (;;) {
-		int rdsk0 = -1;
-		int rdsk1 = -1;
-
-		if (do_raid)
-			check_raid(&rdsk0, &rdsk1);
-
 		for (i = 0; i < n_disks; i++) {
 			/*
-			 * If it's one of the raid disks, we have already
+			 * If it's one of the RAID disks, we have already
 			 * applied the ok2remove policy.
-			 * If there was no raid, rdskN will be -1 and
-			 * so the check will fail and the default
-			 * okay2remove policy will be applied.
 			 */
-			if (i == rdsk0 || i == rdsk1)
+			if (do_raid && check_raid(i))	{
 				continue;
+			}
 
 			dhdl = devctl_device_acquire(ddev[i], 0);
 			devctl_device_getstate(dhdl, &statep);
@@ -2182,17 +2475,54 @@ ps_name_to_addr(char *name)
 {
 	int ps_addr = 0;
 	if ((strcmp(name, PS0_NAME) == 0) ||
-		(strcmp(name, PSU0_NAME) == 0))
-		ps_addr = PS0_ADDR;
-	else if ((strcmp(name, PS1_NAME) == 0) ||
-		(strcmp(name, PSU1_NAME) == 0))
-		ps_addr = PS1_ADDR;
-	else if ((strcmp(name, PS2_NAME) == 0) ||
-		(strcmp(name, PSU2_NAME) == 0))
-		ps_addr = PS2_ADDR;
-	else if ((strcmp(name, PS3_NAME) == 0) ||
-		(strcmp(name, PSU3_NAME) == 0))
-		ps_addr = PS3_ADDR;
+		(strcmp(name, PSU0_NAME) == 0))	{
+		switch (sys_platform) {
+		case PLAT_SEATTLE1U:
+		case PLAT_SEATTLE2U:
+			ps_addr = SEATTLE_PS0_ADDR;
+			break;
+		case PLAT_BOSTON:
+			ps_addr = BOSTON_PS0_ADDR;
+			break;
+		default:
+			ps_addr = PS0_ADDR;
+			break;
+		}
+	} else if ((strcmp(name, PS1_NAME) == 0) ||
+		(strcmp(name, PSU1_NAME) == 0))	{
+		switch (sys_platform) {
+		case PLAT_SEATTLE1U:
+		case PLAT_SEATTLE2U:
+			ps_addr = SEATTLE_PS1_ADDR;
+			break;
+		case PLAT_BOSTON:
+			ps_addr = BOSTON_PS1_ADDR;
+			break;
+		default:
+			ps_addr = PS1_ADDR;
+			break;
+		}
+	} else if ((strcmp(name, PS2_NAME) == 0) ||
+		(strcmp(name, PSU2_NAME) == 0))	{
+		switch (sys_platform) {
+		case PLAT_BOSTON:
+			ps_addr = BOSTON_PS2_ADDR;
+			break;
+		default:
+			ps_addr = PS2_ADDR;
+			break;
+		}
+	} else if ((strcmp(name, PS3_NAME) == 0) ||
+		(strcmp(name, PSU3_NAME) == 0))	{
+		switch (sys_platform) {
+		case PLAT_BOSTON:
+			ps_addr = BOSTON_PS3_ADDR;
+			break;
+		default:
+			ps_addr = PS3_ADDR;
+			break;
+		}
+	}
 
 	return (ps_addr);
 }
@@ -2205,14 +2535,51 @@ ps_name_to_unitaddr(char *name)
 {
 	char *unitaddr;
 
-	if (strcmp(name, PS0_NAME) == 0)
-		unitaddr = PS0_UNITADDR;
-	else if (strcmp(name, PS1_NAME) == 0)
-		unitaddr = PS1_UNITADDR;
-	else if (strcmp(name, PS2_NAME) == 0)
-		unitaddr = PS2_UNITADDR;
-	else if (strcmp(name, PS3_NAME) == 0)
-		unitaddr = PS3_UNITADDR;
+	if (strcmp(name, PS0_NAME) == 0)	{
+		switch (sys_platform) {
+		case PLAT_SEATTLE1U:
+		case PLAT_SEATTLE2U:
+			unitaddr = SEATTLE_PS0_UNITADDR;
+			break;
+		case PLAT_BOSTON:
+			unitaddr = BOSTON_PS0_UNITADDR;
+			break;
+		default:
+			unitaddr = PS0_UNITADDR;
+			break;
+		}
+	} else if (strcmp(name, PS1_NAME) == 0)	{
+		switch (sys_platform) {
+		case PLAT_SEATTLE1U:
+		case PLAT_SEATTLE2U:
+			unitaddr = SEATTLE_PS1_UNITADDR;
+			break;
+		case PLAT_BOSTON:
+			unitaddr = BOSTON_PS1_UNITADDR;
+			break;
+		default:
+			unitaddr = PS1_UNITADDR;
+			break;
+		}
+	} else if (strcmp(name, PS2_NAME) == 0)	{
+		switch (sys_platform) {
+		case PLAT_BOSTON:
+			unitaddr = BOSTON_PS2_UNITADDR;
+			break;
+		default:
+			unitaddr = PS2_UNITADDR;
+			break;
+		}
+	} else if (strcmp(name, PS3_NAME) == 0)	{
+		switch (sys_platform) {
+		case PLAT_BOSTON:
+			unitaddr = BOSTON_PS3_UNITADDR;
+			break;
+		default:
+			unitaddr = PS3_UNITADDR;
+			break;
+		}
+	}
 	else
 		unitaddr = NULL;
 
@@ -2262,7 +2629,19 @@ create_i2c_node(char *ap_id)
 	nd_reg[0] = 0;
 	nd_reg[1] = ps_name_to_addr(ap_id);
 
-	bus_hdl = devctl_bus_acquire(PSU_I2C_BUS_DEV, 0);
+	switch (sys_platform) {
+	case PLAT_SEATTLE1U:
+	case PLAT_SEATTLE2U:
+		bus_hdl = devctl_bus_acquire(SEATTLE_PSU_I2C_BUS_DEV, 0);
+		break;
+	case PLAT_BOSTON:
+		bus_hdl = devctl_bus_acquire(BOSTON_PSU_I2C_BUS_DEV, 0);
+		break;
+	default:
+		bus_hdl = devctl_bus_acquire(PSU_I2C_BUS_DEV, 0);
+		break;
+	}
+
 	if (bus_hdl == NULL)
 		return (DDI_FAILURE);
 
@@ -2294,7 +2673,19 @@ delete_i2c_node(char *ap_id)
 	devctl_hdl_t	dev_hdl;
 	char	buf[MAXPATHLEN];
 
-	sprintf_buf2(buf, PSU_DEV, ps_name_to_addr(ap_id));
+	switch (sys_platform) {
+	case PLAT_SEATTLE1U:
+	case PLAT_SEATTLE2U:
+		sprintf_buf2(buf, SEATTLE_PSU_DEV, ps_name_to_addr(ap_id));
+		break;
+	case PLAT_BOSTON:
+		sprintf_buf2(buf, BOSTON_PSU_DEV, ps_name_to_addr(ap_id));
+		break;
+	default:
+		sprintf_buf2(buf, PSU_DEV, ps_name_to_addr(ap_id));
+		break;
+	}
+
 	dev_hdl = devctl_device_acquire(buf, 0);
 	if (dev_hdl == NULL) {
 		return;
@@ -2325,7 +2716,7 @@ add_op_status(envmon_hpu_t *hpu, int *index)
 		PS_NAME_LEN) == 0);
 	disk_flag = (strncmp(hpu->id.name, DISK_NAME,
 		DISK_NAME_LEN) == 0);
-	if (rmc_flag || ps_flag || disk_flag) {
+	if (rmc_flag || ps_flag) {
 		idprop->idp[*index].envhandle = hpu->id;
 		flag = rmc_flag && ((sys_platform != PLAT_CHALUPA) &&
 			(sys_platform != PLAT_CHALUPA19));
@@ -2333,7 +2724,32 @@ add_op_status(envmon_hpu_t *hpu, int *index)
 			flag ? SYS_BOARD_PATH : CHASSIS_LOC_PATH, ps_flag ?
 			ps_apid_to_nodename(hpu->id.name) : hpu->id.name);
 
-	add_op_status_by_name(node_name, disk_flag ? DISK_FRU_NAME :
-		ps_flag ? PS_FRU_NAME : NULL, &idprop->idp[(*index)++].volprop);
+		add_op_status_by_name(node_name, ps_flag ? PS_FRU_NAME : NULL,
+			&idprop->idp[(*index)++].volprop);
+	} else if (disk_flag)	{
+		idprop->idp[*index].envhandle = hpu->id;
+		switch (sys_platform)	{
+		case PLAT_CHALUPA:
+		case PLAT_CHALUPA19:
+			sprintf_buf2(node_name, CHASSIS_LOC_PATH, hpu->id.name);
+			break;
+		case PLAT_SEATTLE1U:
+			sprintf_buf2(node_name, SEATTLE1U_HDDBP_PATH, \
+				hpu->id.name);
+			break;
+		case PLAT_SEATTLE2U:
+			sprintf_buf2(node_name, SEATTLE2U_HDDBP_PATH, \
+				hpu->id.name);
+			break;
+		case PLAT_BOSTON:
+			sprintf_buf2(node_name, BOSTON_HDDBP_PATH, \
+				hpu->id.name);
+			break;
+		default:
+			sprintf_buf2(node_name, SYS_BOARD_PATH, hpu->id.name);
+			break;
+		}
+		add_op_status_by_name(node_name, DISK_FRU_NAME,
+			&idprop->idp[(*index)++].volprop);
 	}
 }

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -304,6 +304,25 @@ f none usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_usb-b-1.conf 644 roo
 f none usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/fru_usb-b-2.conf 644 root sys
 s none usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/libpiclfrudr.so.1=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1 
 s none usr/platform/SUNW,Sun-Fire-V250/lib/picl/plugins/libpiclfrudr.so=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so
+d none usr/platform/SUNW,Sun-Fire-V215/lib/picl 755 root sys
+d none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins 755 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/picldevtree.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/picl_asr.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/piclfrutree.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/piclenvmon.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_SC.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_PS0.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_PS1.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_HDD0.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_HDD1.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_HDD2.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_HDD3.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-1.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-2.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-3.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/fru_usb-a-4.conf 644 root sys
+s none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/libpiclfrudr.so.1=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1 
+s none usr/platform/SUNW,Sun-Fire-V215/lib/picl/plugins/libpiclfrudr.so=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so
 d none usr/platform/SUNW,Sun-Fire-V440/lib/picl 755 root sys
 d none usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins 755 root sys
 f none usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/picldevtree.conf 644 root sys
@@ -322,6 +341,31 @@ f none usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_HDD2.conf 644 root s
 f none usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/fru_HDD3.conf 644 root sys
 s none usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/libpiclfrudr.so.1=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
 s none usr/platform/SUNW,Sun-Fire-V440/lib/picl/plugins/libpiclfrudr.so=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
+d none usr/platform/SUNW,Sun-Fire-V445/lib/picl 755 root sys
+d none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins 755 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/picldevtree.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/picl_asr.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/piclfrutree.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/piclenvmon.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_SC.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PSU0.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PSU1.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PSU2.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_PSU3.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD0.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD1.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD2.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD3.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD4.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD5.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD6.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_HDD7.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-1.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-2.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-3.conf 644 root sys
+f none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/fru_usb-a-4.conf 644 root sys
+s none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/libpiclfrudr.so.1=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so.1
+s none usr/platform/SUNW,Sun-Fire-V445/lib/picl/plugins/libpiclfrudr.so=../../../../SUNW,Sun-Fire-V240/lib/picl/plugins/libpiclfrudr.so
 d none usr/lib/sparcv9 755 root bin
 f none usr/lib/sparcv9/libpicl.so.1 755 root bin
 s none usr/lib/sparcv9/libpicl.so=./libpicl.so.1 755 root bin
