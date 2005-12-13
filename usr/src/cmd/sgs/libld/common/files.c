@@ -19,10 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
- *
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -704,18 +704,19 @@ process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
 	dp = elf_getdata(scn, NULL);
 
 	for (dyn = (Dyn *)dp->d_buf; dyn->d_tag != DT_NULL; dyn++) {
-		Ifl_desc *	_ifl;
+		Ifl_desc	*difl;
 
 		switch (dyn->d_tag) {
 		case DT_NEEDED:
 		case DT_USED:
-			if ((_ifl = libld_calloc(1, sizeof (Ifl_desc))) == 0)
+			if (((difl =
+			    libld_calloc(1, sizeof (Ifl_desc))) == 0) ||
+			    (list_appendc(&ofl->ofl_sos, difl) == 0))
 				return (S_ERROR);
-			_ifl->ifl_name = MSG_ORIG(MSG_STR_DYNAMIC);
-			_ifl->ifl_soname = str + (size_t)dyn->d_un.d_val;
-			_ifl->ifl_flags = FLG_IF_NEEDSTR;
-			if (list_appendc(&ofl->ofl_sos, _ifl) == 0)
-				return (S_ERROR);
+
+			difl->ifl_name = MSG_ORIG(MSG_STR_DYNAMIC);
+			difl->ifl_soname = str + (size_t)dyn->d_un.d_val;
+			difl->ifl_flags = FLG_IF_NEEDSTR;
 			break;
 		case DT_RPATH:
 		case DT_RUNPATH:
@@ -734,7 +735,7 @@ process_rel_dynamic(const char *name, Ifl_desc *ifl, Shdr *shdr, Elf_Scn *scn,
  * $ORIGIN, $PLATFORM, $OSREL and $OSNAME tokens, either from their needed name,
  * or via a runpath.  In addition runpaths may also specify the $ISALIST token.
  *
- * Probably the most common reference to explict dependencies (via -L) will be
+ * Probably the most common reference to explicit dependencies (via -L) will be
  * sufficient to find any associated implicit dependencies, but just in case we
  * expand any occurrence of these known tokens here.
  *
@@ -776,7 +777,7 @@ expand(const char *parent, const char *name, char **next)
 			/*
 			 * For $ORIGIN, expansion is really just a concatenation
 			 * of the parents directory name.  For example, an
-			 * explict dependency foo/bar/lib1.so with a dependency
+			 * explicit dependency foo/bar/lib1.so with a dependency
 			 * on $ORIGIN/lib2.so would be expanded to
 			 * foo/bar/lib2.so.
 			 */
@@ -1610,7 +1611,7 @@ process_elf(Ifl_desc *ifl, Elf *elf, Ofl_desc *ofl)
 	}
 
 	/*
-	 * If this is an explict shared object determine if the user has
+	 * If this is an explicit shared object determine if the user has
 	 * specified a control definition.  This descriptor may specify which
 	 * version definitions can be used from this object (it may also update
 	 * the dependency to USED and supply an alternative SONAME).
@@ -2093,9 +2094,9 @@ finish_libs(Ofl_desc *ofl)
 		/*
 		 * See if this file has already been processed.  At the time
 		 * this implicit dependency was determined there may still have
-		 * been more explict dependencies to process.  (Note, if we ever
+		 * been more explicit dependencies to process.  Note, if we ever
 		 * do parse the command line three times we would be able to
-		 * do all this checking when processing the dynamic section).
+		 * do all this checking when processing the dynamic section.
 		 */
 		if (sdf->sdf_file)
 			continue;

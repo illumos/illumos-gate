@@ -19,13 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -1181,7 +1181,6 @@ static uintptr_t
 parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 {
 	int	c;
-	static char *com_line;
 
 	while ((c = getopt(argc, argv, MSG_ORIG(MSG_STR_OPTIONS))) != -1) {
 		Ifl_desc	*ifl;
@@ -1225,18 +1224,16 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					    MSG_ORIG(MSG_ARG_CN));
 					ofl->ofl_flags |= FLG_OF_FATAL;
 				}
-				if ((ifl = libld_calloc(1,
-				    sizeof (Ifl_desc))) == (Ifl_desc *)S_ERROR)
+				if (((ifl =
+				    libld_calloc(1, sizeof (Ifl_desc))) == 0) ||
+				    (list_appendc(&ofl->ofl_sos, ifl) == 0))
 					return (S_ERROR);
-				if (com_line == NULL)
-					com_line = (char *)
-						MSG_INTL(MSG_STR_COMMAND);
-				ifl->ifl_name = com_line;
+
+				ifl->ifl_name = MSG_INTL(MSG_STR_COMMAND);
 				ifl->ifl_soname = optarg;
-				ifl->ifl_flags = FLG_IF_NEEDSTR |
-					FLG_IF_FILEREF | FLG_IF_DEPREQD;
-				if (list_appendc(&ofl->ofl_sos, ifl) == 0)
-					return (S_ERROR);
+				ifl->ifl_flags = (FLG_IF_NEEDSTR |
+				    FLG_IF_FILEREF | FLG_IF_DEPREQD);
+
 				break;
 			case 'D':
 				dbg_mask = dbg_setup(optarg);
@@ -1274,8 +1271,8 @@ parseopt_pass2(Ofl_desc *ofl, int argc, char **argv)
 					ofl->ofl_flags1 |= FLG_OF1_NDIRECT;
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_IGNORE)) == 0) {
-					ofl->ofl_flags1 |= FLG_OF1_IGNORE |
-						FLG_OF1_IGNPRC;
+					ofl->ofl_flags1 |=
+					    (FLG_OF1_IGNORE | FLG_OF1_IGNPRC);
 				} else if (strcmp(optarg,
 				    MSG_ORIG(MSG_ARG_RECORD)) == 0) {
 					ofl->ofl_flags1 &= ~FLG_OF1_IGNORE;

@@ -65,9 +65,8 @@ $(PICS64) :=	sparc_CFLAGS += -xregs=no%appl -K pic
 $(PICS64) :=	sparcv9_CFLAGS += -xregs=no%appl -K pic
 $(PICS64) :=	CPPFLAGS += -DPIC -D_REENTRANT
 
-LDZIGNORE=	-zignore
-LDFLAGS +=	$(LDZIGNORE)
-DYNFLAGS +=	$(LDZIGNORE)
+LDFLAGS +=	$(ZIGNORE)
+DYNFLAGS +=	$(ZIGNORE)
 
 # Establish the local tools, proto and package area.
 

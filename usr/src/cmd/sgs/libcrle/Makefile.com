@@ -19,8 +19,9 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,7 +49,7 @@ MAPOPTS=	$(MAPFILES:%=-M%)
 DLLIB =		$(VAR_DL_LIB)
 package	:=	DLLIB = $(VAR_PKG_DL_LIB)
 
-LDZIGNORE=
+ZIGNORE =
 LDLIBS +=	-lmapmalloc $(DLLIB) -lc
 
 LINTFLAGS +=	-u

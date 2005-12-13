@@ -19,10 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
- *
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -3156,14 +3156,14 @@ unused(Lm_list *lml)
 				(void) printf(MSG_INTL(MSG_LDD_UNCYC_FMT),
 				    NAME(lmp), CYCGROUP(lmp));
 			else
-				DBG_CALL(Dbg_unused_file(NAME(lmp),
+				DBG_CALL(Dbg_unused_file(NAME(lmp), 0,
 				    CYCGROUP(lmp)));
 		} else {
 			if (tracing)
 				(void) printf(MSG_INTL(MSG_LDD_UNUSED_FMT),
 				    NAME(lmp));
 			else
-				DBG_CALL(Dbg_unused_file(NAME(lmp), 0));
+				DBG_CALL(Dbg_unused_file(NAME(lmp), 0, 0));
 		}
 	}
 
@@ -3203,6 +3203,7 @@ fmap_setup()
 #else
 	if (fmap->fm_maddr)
 		(void) munmap((caddr_t)fmap->fm_maddr, fmap->fm_msize);
+
 	fmap->fm_maddr = 0;
 	fmap->fm_mflags = MAP_PRIVATE;
 #endif

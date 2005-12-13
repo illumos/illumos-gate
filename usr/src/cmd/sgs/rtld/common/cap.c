@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -44,7 +45,7 @@
  * qsort(3c) comparison function.
  */
 static int
-compare(const void * fdesc1, const void * fdesc2)
+compare(const void *fdesc1, const void *fdesc2)
 {
 	ulong_t	hwcap1 = ((Fdesc *)fdesc1)->fd_fmap.fm_hwptr;
 	ulong_t	hwcap2 = ((Fdesc *)fdesc2)->fd_fmap.fm_hwptr;
@@ -108,7 +109,7 @@ hwcap_check(Rej_desc *rej, Ehdr *ehdr)
 }
 
 static void
-remove_fdesc(Fdesc * fdp)
+remove_fdesc(Fdesc *fdp)
 {
 #if	defined(MAP_ALIGN)
 	if (fdp->fd_fmap.fm_maddr &&
@@ -117,6 +118,7 @@ remove_fdesc(Fdesc * fdp)
 	if (fdp->fd_fmap.fm_maddr) {
 #endif
 		(void) munmap(fdp->fd_fmap.fm_maddr, fdp->fd_fmap.fm_msize);
+
 		/*
 		 * Note, this file descriptor might be duplicating information
 		 * from the global fmap descriptor.  If so, clean up the global
@@ -138,7 +140,7 @@ remove_fdesc(Fdesc * fdp)
  * and analyze all the files it contains.
  */
 int
-hwcap_dir(Alist ** fdalpp, Lm_list * lml, const char *name, Rt_map * clmp,
+hwcap_dir(Alist **fdalpp, Lm_list *lml, const char *name, Rt_map *clmp,
     uint_t flags, Rej_desc *rej)
 {
 	char		path[PATH_MAX], *dst;
@@ -261,7 +263,7 @@ hwcap_dir(Alist ** fdalpp, Lm_list * lml, const char *name, Rt_map * clmp,
 }
 
 static Pnode *
-_hwcap_filtees(Pnode ** pnpp, Aliste nlmco, Rt_map * flmp, const char *ref,
+_hwcap_filtees(Pnode **pnpp, Aliste nlmco, Rt_map *flmp, const char *ref,
     const char *dir, int mode, uint_t flags)
 {
 	Alist		*fdalp = 0;
@@ -283,8 +285,9 @@ _hwcap_filtees(Pnode ** pnpp, Aliste nlmco, Rt_map * flmp, const char *ref,
 	 */
 	for (ALIST_TRAVERSE(fdalp, off, fdp)) {
 		Rt_map	*nlmp;
-		Grp_hdl	*ghp;
+		Grp_hdl	*ghp = 0;
 		Pnode	*pnp;
+		int	audit = 0;
 
 		if (unused) {
 			/*
@@ -306,68 +309,29 @@ _hwcap_filtees(Pnode ** pnpp, Aliste nlmco, Rt_map * flmp, const char *ref,
 		    (flags | FLG_RT_HANDLE), &ghp, fdp, &rej);
 		remove_fdesc(fdp);
 
-		if (nlmp == 0)
-			continue;
-
-		/*
-		 * Audit the filter/filtee established.  A return of 0
-		 * indicates the auditor wishes to ignore this filtee.
-		 */
-		if ((lml->lm_tflags | FLAGS1(flmp)) &
-		    LML_TFLG_AUD_OBJFILTER) {
-			if (audit_objfilter(flmp, ref, nlmp, 0) == 0) {
-				DBG_CALL(Dbg_file_filtee(0, NAME(nlmp), 1));
-				(void) dlclose_core(ghp, flmp);
-				continue;
-			}
-		}
-
-		ghp->gh_flags |= GPH_FILTEE;
-
-		/*
-		 * Finish processing the objects associated with this request.
-		 */
-		if ((analyze_lmc(lml, nlmco, nlmp) == 0) ||
-		    (relocate_lmc(lml, nlmco, nlmp) == 0)) {
-			(void) dlclose_core(ghp, flmp);
-			continue;
-		}
-
 		/*
 		 * Create a new Pnode to represent this filtee, and substitute
 		 * the calling Pnode (which was used to represent the hardware
 		 * capability directory).
 		 */
 		if ((pnp = calloc(1, sizeof (Pnode))) == 0) {
-			(void) dlclose_core(ghp, flmp);
-			continue;
+			if (ghp)
+				(void) dlclose_core(ghp, flmp);
+			return (0);
 		}
 		if ((pnp->p_name = strdup(NAME(nlmp))) == 0) {
-			(void) dlclose_core(ghp, flmp);
+			if (ghp)
+				(void) dlclose_core(ghp, flmp);
 			free(pnp);
-			continue;
+			return (0);
 		}
 		pnp->p_len = strlen(NAME(nlmp));
 		pnp->p_info = (void *)ghp;
 		pnp->p_next = npnp;
 
-		/*
-		 * Finally, if the filtee is part of a link-map control list
-		 * that is equivalent, or less, than the filter control list,
-		 * create an association between the filter and filtee.  This
-		 * association provides sufficient information to tear down the
-		 * filter and filtee if necessary.
-		 */
-		if ((CNTL(nlmp) <= CNTL(flmp)) &&
-		    (hdl_add(ghp, flmp, GPD_FILTER) == 0)) {
-			(void) dlclose_core(ghp, flmp);
-			free((void *)pnp->p_name);
-			free(pnp);
-			continue;
-		}
-
 		if (fpnp == 0) {
 			Pnode	*opnp = (*pnpp);
+
 			/*
 			 * If this is the first pnode, reuse the original after
 			 * freeing any of its pathnames.
@@ -378,17 +342,68 @@ _hwcap_filtees(Pnode ** pnpp, Aliste nlmco, Rt_map * flmp, const char *ref,
 				free((void *)opnp->p_oname);
 			*opnp = *pnp;
 			free((void *)pnp);
-			fpnp = lpnp = opnp;
+			fpnp = lpnp = pnp = opnp;
 		} else {
 			lpnp->p_next = pnp;
 			lpnp = pnp;
 		}
 
 		/*
+		 * Establish the filter handle to prevent any recursion.
+		 */
+		if (nlmp && ghp) {
+			ghp->gh_flags |= GPH_FILTEE;
+			pnp->p_info = (void *)ghp;
+		}
+
+		/*
+		 * Audit the filter/filtee established.  A return of 0
+		 * indicates the auditor wishes to ignore this filtee.
+		 */
+		if (nlmp && (lml->lm_tflags | FLAGS1(flmp)) &
+		    LML_TFLG_AUD_OBJFILTER) {
+			if (audit_objfilter(flmp, ref, nlmp, 0) == 0) {
+				audit = 1;
+				nlmp = 0;
+			}
+		}
+
+		/*
+		 * Finish processing the objects associated with this request.
+		 */
+		if (nlmp && ghp && ((analyze_lmc(lml, nlmco, nlmp) == 0) ||
+		    (relocate_lmc(lml, nlmco, nlmp) == 0)))
+			nlmp = 0;
+
+		/*
+		 * Finally, if the filtee is part of a link-map control list
+		 * that is equivalent, or less, than the filter control list,
+		 * create an association between the filter and filtee.  This
+		 * association provides sufficient information to tear down the
+		 * filter and filtee if necessary.
+		 */
+		if (nlmp && ghp && (CNTL(nlmp) <= CNTL(flmp)) &&
+		    (hdl_add(ghp, flmp, GPD_FILTER) == 0))
+			nlmp = 0;
+
+		/*
 		 * If this object is marked an end-filtee, we're done.
 		 */
-		if (FLAGS1(nlmp) & FL1_RT_ENDFILTE)
+		if (nlmp && ghp && (FLAGS1(nlmp) & FL1_RT_ENDFILTE))
 			unused = 1;
+
+		/*
+		 * Generate a diagnostic if the filtee couldn't be loaded, null
+		 * out the pnode entry, and continue the search.
+		 */
+		if (nlmp == 0) {
+			pnp->p_info = 0;
+			DBG_CALL(Dbg_file_filtee(0, pnp->p_name, audit));
+			if (ghp)
+				(void) dlclose_core(ghp, flmp);
+
+			pnp->p_len = 0;
+		}
 	}
 
 	free(fdalp);
@@ -396,7 +411,7 @@ _hwcap_filtees(Pnode ** pnpp, Aliste nlmco, Rt_map * flmp, const char *ref,
 }
 
 Pnode *
-hwcap_filtees(Pnode ** pnpp, Aliste nlmco, Dyninfo * dip, Rt_map * flmp,
+hwcap_filtees(Pnode **pnpp, Aliste nlmco, Dyninfo *dip, Rt_map *flmp,
     const char *ref, int mode, uint_t flags)
 {
 	Pnode		*pnp = *pnpp;
@@ -427,8 +442,8 @@ hwcap_filtees(Pnode ** pnpp, Aliste nlmco, Dyninfo * dip, Rt_map * flmp,
  * Load an individual hardware capabilities object.
  */
 Rt_map *
-load_hwcap(Lm_list * lml, Aliste lmco, const char *dir, Rt_map * clmp,
-    uint_t mode, uint_t flags, Grp_hdl ** hdl, Rej_desc *rej)
+load_hwcap(Lm_list *lml, Aliste lmco, const char *dir, Rt_map *clmp,
+    uint_t mode, uint_t flags, Grp_hdl **hdl, Rej_desc *rej)
 {
 	Alist		*fdalp = 0;
 	Aliste		off;

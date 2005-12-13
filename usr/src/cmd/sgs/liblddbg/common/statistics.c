@@ -83,7 +83,7 @@ Dbg_statistics_ar(Ofl_desc *ofl)
 		uint_t	count = 0, used = 0;
 
 		if ((adp->ad_flags & FLG_ARD_EXTRACT) == 0) {
-			Dbg_unused_file(adp->ad_name, 0);
+			Dbg_unused_file(adp->ad_name, 0, 0);
 			continue;
 		}
 

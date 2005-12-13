@@ -19,10 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
- *
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1481,7 +1481,7 @@ find_file(Lm_list *lml, const char *oname, Rt_map *clmp, uint_t flags,
  * process the various names by which it can be referenced.
  */
 static Rt_map *
-load_file(Lm_list *lml, Aliste lmco, Fdesc * fdesc)
+load_file(Lm_list *lml, Aliste lmco, Fdesc *fdesc)
 {
 	const char	*oname = fdesc->fd_oname;
 	const char	*nname = fdesc->fd_nname;
@@ -1616,14 +1616,13 @@ load_file(Lm_list *lml, Aliste lmco, Fdesc * fdesc)
  */
 static Rt_map *
 load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
-    uint_t flags, Fdesc *fdp, Rej_desc *rej)
+    uint_t flags, Fdesc *nfdp, Rej_desc *rej)
 {
 	char		*name;
 	uint_t		slash = 0;
 	size_t		olen;
-	Fdesc		fdesc, _fdesc = { 0 };
+	Fdesc		fdesc = { 0 };
 	Pnode		*dir;
-	Rt_map		*nlmp;
 
 	/*
 	 * If the file is the run time linker then it's already loaded.
@@ -1672,76 +1671,55 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 	 * keeping so that we can fall through into common code.
 	 */
 	if (flags & FLG_RT_HWCAP) {
-		fdesc = *fdp;
+		/*
+		 * If this object is already loaded, we're done.
+		 */
+		if (nfdp->fd_lmp)
+			return (nfdp->fd_lmp);
 
 		/*
-		 * Restablish the Fmap structure to reflect this objects
-		 * original initial page mapping.  Make sure any present Fmap
-		 * mapping is removed before overwriting the structure.
+		 * Obtain the avl index for this object.
 		 */
-		if (fdesc.fd_lmp == 0) {
-#if	defined(MAP_ALIGN)
-			if (fmap->fm_maddr &&
-			    ((fmap->fm_mflags & MAP_ALIGN) == 0))
-#else
-			if (fmap->fm_maddr)
-#endif
-				(void) munmap(fmap->fm_maddr, fmap->fm_msize);
-			*fmap = fdesc.fd_fmap;
+		(void) fpavl_loaded(lml, nfdp->fd_nname, &(nfdp->fd_avlwhere));
 
-			/*
-			 * Obtain the avl index for this object.
-			 */
-			(void) fpavl_loaded(lml, fdesc.fd_nname,
-			    &(fdesc.fd_avlwhere));
+		/*
+		 * If the name and resolved pathname differ, duplicate the path
+		 * name once more to provide for genric cleanup by the caller.
+		 */
+		if (nfdp->fd_pname && (nfdp->fd_nname != nfdp->fd_pname)) {
+			char	*pname;
 
-			/*
-			 * If the name and resolved pathname differ, duplicate
-			 * the pathname once more to provide for genric cleanup
-			 * by the caller.
-			 */
-			if (fdesc.fd_pname &&
-			    (fdesc.fd_nname != fdesc.fd_pname)) {
-				char	*pname;
-
-				if ((pname = strdup(fdesc.fd_pname)) == 0) {
-					(void) close(fdesc.fd_fd);
-					return (0);
-				}
-				fdesc.fd_pname = pname;
-			}
-		} else {
-			/*
-			 * If this object is already loaded, we're done.
-			 */
-			return (fdesc.fd_lmp);
+			if ((pname = strdup(nfdp->fd_pname)) == 0)
+				return (0);
+			nfdp->fd_pname = pname;
 		}
-
 	} else if (slash) {
 		Rej_desc	_rej = { 0 };
 
-		fdesc = _fdesc;
-		fdesc.fd_flags = FLG_FD_SLASH;
+		*nfdp = fdesc;
+		nfdp->fd_flags = FLG_FD_SLASH;
 
-		if (find_path(lml, oname, clmp, flags, &fdesc, &_rej) == 0) {
-			rejection_inherit(rej, &_rej, &fdesc);
+		if (find_path(lml, oname, clmp, flags, nfdp, &_rej) == 0) {
+			rejection_inherit(rej, &_rej, nfdp);
 			return (0);
 		}
 
 		/*
 		 * If this object is already loaded, we're done.
 		 */
-		if (fdesc.fd_lmp)
-			return (fdesc.fd_lmp);
+		if (nfdp->fd_lmp)
+			return (nfdp->fd_lmp);
 
 	} else {
 		/*
 		 * No '/' - for each directory on list, make a pathname using
 		 * that directory and filename and try to open that file.
 		 */
-		Pnode *		dirlist = (Pnode *)0;
+		Pnode		*dirlist = (Pnode *)0;
 		Word		strhash = 0;
-
+#if	!defined(ISSOLOAD_BASENAME_DISABLED)
+		Rt_map		*nlmp;
+#endif
 		DBG_CALL(Dbg_libs_find(oname));
 
 #if	!defined(ISSOLOAD_BASENAME_DISABLED)
@@ -1753,31 +1731,31 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		 * following directory search doesn't provide any directories
 		 * (odd, but this can be forced with a -znodefaultlib test).
 		 */
-		fdesc = _fdesc;
+		*nfdp = fdesc;
 		for (dir = get_next_dir(&dirlist, clmp, flags); dir;
 		    dir = get_next_dir(&dirlist, clmp, flags)) {
 			Rej_desc	_rej = { 0 };
 
-			fdesc = _fdesc;
+			*nfdp = fdesc;
 
 			/*
 			 * Try and locate this file.  Make sure to clean up
 			 * any rejection information should the file have
 			 * been found, but not appropriate.
 			 */
-			if (find_file(lml, oname, clmp, flags, &fdesc, &_rej,
+			if (find_file(lml, oname, clmp, flags, nfdp, &_rej,
 			    dir, &strhash, olen) == 0) {
-				rejection_inherit(rej, &_rej, &fdesc);
+				rejection_inherit(rej, &_rej, nfdp);
 				continue;
 			}
 
 			/*
 			 * If this object is already loaded, we're done.
 			 */
-			if (fdesc.fd_lmp)
-				return (fdesc.fd_lmp);
+			if (nfdp->fd_lmp)
+				return (nfdp->fd_lmp);
 
-			fdesc.fd_odir = dir->p_name;
+			nfdp->fd_odir = dir->p_name;
 			break;
 		}
 
@@ -1789,7 +1767,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 		 * (i.e., a file might have a dependency on foo.so.1 which has
 		 * already been opened using its full pathname).
 		 */
-		if (fdesc.fd_nname == 0)
+		if (nfdp->fd_nname == 0)
 			return (is_so_loaded(lml, oname, 1));
 	}
 
@@ -1799,14 +1777,13 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 	 * they get duplicated once more to insure consistent cleanup in the
 	 * event of an error condition.
 	 */
-	if ((name = strdup(fdesc.fd_nname)) == 0) {
-		(void) close(fdesc.fd_fd);
+	if ((name = strdup(nfdp->fd_nname)) == 0)
 		return (0);
-	}
-	if (fdesc.fd_nname == fdesc.fd_pname)
-		fdesc.fd_nname = fdesc.fd_pname = name;
+
+	if (nfdp->fd_nname == nfdp->fd_pname)
+		nfdp->fd_nname = nfdp->fd_pname = name;
 	else
-		fdesc.fd_nname = name;
+		nfdp->fd_nname = name;
 
 	/*
 	 * Finish mapping the file and return the link-map descriptor.  Note,
@@ -1816,15 +1793,7 @@ load_so(Lm_list *lml, Aliste lmco, const char *oname, Rt_map *clmp,
 	 * this mapping needs to be reset to insure it doesn't mistakenly get
 	 * unmapped as part of HWCAP cleanup.
 	 */
-	nlmp = load_file(lml, lmco, &fdesc);
-
-	if (flags & FLG_RT_HWCAP) {
-		fdp->fd_fmap.fm_maddr = fmap->fm_maddr;
-		fdp->fd_fmap.fm_mflags = fmap->fm_mflags;
-		fdp->fd_fd = fdesc.fd_fd;
-	}
-
-	return (nlmp);
+	return (load_file(lml, lmco, nfdp));
 }
 
 /*
@@ -1877,8 +1846,8 @@ load_trace(Lm_list *lml, const char *name, Rt_map *clmp)
  * object to existing handles if required.
  */
 static int
-load_finish(Lm_list *lml, const char *name, Rt_map * clmp, int nmode,
-    uint_t flags, Grp_hdl ** hdl, Rt_map * nlmp)
+load_finish(Lm_list *lml, const char *name, Rt_map *clmp, int nmode,
+    uint_t flags, Grp_hdl **hdl, Rt_map *nlmp)
 {
 	Aliste		off;
 	Grp_hdl		*ghp, **ghpp;
@@ -2092,9 +2061,9 @@ load_finish(Lm_list *lml, const char *name, Rt_map * clmp, int nmode,
  * The central routine for loading shared objects.  Insures ldd() diagnostics,
  * handles and any other related additions are all done in one place.
  */
-Rt_map *
-load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
-    int nmode, uint_t flags, Grp_hdl ** hdl, Fdesc *fdp, Rej_desc *rej)
+static Rt_map *
+_load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
+    int nmode, uint_t flags, Grp_hdl ** hdl, Fdesc *nfdp, Rej_desc *rej)
 {
 	Rt_map	*nlmp;
 
@@ -2106,7 +2075,7 @@ load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 			return (0);
 
 		if ((nlmp = load_so(lml, lmco, name, clmp, flags,
-		    fdp, rej)) == 0)
+		    nfdp, rej)) == 0)
 			return (0);
 
 		/*
@@ -2124,7 +2093,7 @@ load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 			_rej.rej_type = SGS_REJ_STR;
 			_rej.rej_str = MSG_INTL(MSG_GEN_NOOPEN);
 			DBG_CALL(Dbg_file_rejected(&_rej));
-			rejection_inherit(rej, &_rej, fdp);
+			rejection_inherit(rej, &_rej, nfdp);
 			remove_so(lml, nlmp);
 			return (0);
 		}
@@ -2157,7 +2126,7 @@ load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 			_rej.rej_type = SGS_REJ_STR;
 			_rej.rej_str = strerror(ENOENT);
 			DBG_CALL(Dbg_file_rejected(&_rej));
-			rejection_inherit(rej, &_rej, 0);
+			rejection_inherit(rej, &_rej, nfdp);
 			return (0);
 		}
 	}
@@ -2197,6 +2166,57 @@ load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
 		}
 	}
 	return (nlmp);
+}
+
+Rt_map *
+load_path(Lm_list *lml, Aliste lmco, const char *name, Rt_map *clmp,
+    int nmode, uint_t flags, Grp_hdl **hdl, Fdesc *cfdp, Rej_desc *rej)
+{
+	Rt_map	*lmp;
+	Fdesc	nfdp = { 0 };
+
+	/*
+	 * If this path resulted from a $HWCAP specification, then the best
+	 * hardware capability object has already been establish, and is
+	 * available in the calling file descriptor.
+	 */
+	if (flags & FLG_RT_HWCAP) {
+		if (cfdp->fd_lmp == 0) {
+			/*
+			 * If this object hasn't yet been mapped, re-establish
+			 * the file descriptor structure to reflect this objects
+			 * original initial page mapping.  Make sure any present
+			 * file descriptor mapping is removed before overwriting
+			 * the structure.
+			 */
+#if	defined(MAP_ALIGN)
+			if (fmap->fm_maddr &&
+			    ((fmap->fm_mflags & MAP_ALIGN) == 0))
+#else
+			if (fmap->fm_maddr)
+#endif
+				(void) munmap(fmap->fm_maddr, fmap->fm_msize);
+		}
+		nfdp = *cfdp;
+		*fmap = cfdp->fd_fmap;
+	}
+
+	lmp = _load_path(lml, lmco, name, clmp, nmode, flags, hdl, &nfdp, rej);
+
+	/*
+	 * If this path originated from a $HWCAP specification, re-establish the
+	 * fdesc information.  For single paged objects, such as filters, the
+	 * original mapping may have been sufficient to capture the file, thus
+	 * this mapping needs to be reset to insure it doesn't mistakenly get
+	 * unmapped as part of HWCAP cleanup.
+	 */
+	if (flags & FLG_RT_HWCAP) {
+		cfdp->fd_fmap.fm_maddr = fmap->fm_maddr;
+		cfdp->fd_fmap.fm_mflags = fmap->fm_mflags;
+		cfdp->fd_fd = nfdp.fd_fd;
+	}
+
+	return (lmp);
 }
 
 /*

@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -455,7 +456,7 @@ extern	void		Dbg_statistics_ld(Ofl_desc *);
 extern	void		Dbg_syminfo_entry(int, Syminfo *, Sym *,
 			    const char *, Dyn *);
 extern	void		Dbg_syminfo_title(void);
-extern	void		Dbg_unused_file(const char *, int);
+extern	void		Dbg_unused_file(const char *, int, int);
 extern	void		Dbg_unused_rtldinfo(const char *, const char *);
 extern	void		Dbg_unused_sec(Is_desc *);
 extern	void		Dbg_unused_unref(const char *, const char *);

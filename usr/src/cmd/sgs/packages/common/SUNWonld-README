@@ -1071,3 +1071,5 @@ All the above changes are incorporated in the following patches:
 6307274 crle bug with LD_LIBRARY_PATH
 6317969 elfheader limited to 65535 segments (link-editor components only)
 6350027 ld.so.1 aborts with assertion failed on amd64
+6362044 ld(1) inconsistencies with LD_DEBUG=-Dunused and -zignore
+6362047 ld.so.1 dumps core when combining HWCAP and LD_PROFILE

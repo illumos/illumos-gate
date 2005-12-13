@@ -281,7 +281,7 @@ void Dbg_syminfo_title64(void);
 void Dbg_support_action(const char *, const char *, Support_ndx, const char *);
 void Dbg_support_load(const char *, const char *);
 void Dbg_support_req(const char *, int);
-void Dbg_unused_file(const char *, int);
+void Dbg_unused_file(const char *, int, int);
 void Dbg_unused_rtldinfo(const char *, const char *);
 void Dbg_unused_sec(Is_desc *);
 void Dbg_unused_sec64(Is_desc *);

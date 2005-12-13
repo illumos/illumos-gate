@@ -19,10 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
- *
  *
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -66,45 +66,50 @@ ignore_section_processing(Ofl_desc *ofl)
 	Rel_cache	*rcp;
 
 	for (LIST_TRAVERSE(&ofl->ofl_objs, lnp, ifl)) {
-		uint_t		num, discard;
+		uint_t	num, discard;
 
 		/*
 		 * Diagnose (-D unused) a completely unreferenced file.
 		 */
 		if ((ifl->ifl_flags & FLG_IF_FILEREF) == 0)
-			DBG_CALL(Dbg_unused_file(ifl->ifl_name, 0));
-		if ((ifl->ifl_flags & FLG_IF_IGNORE) == 0)
+			DBG_CALL(Dbg_unused_file(ifl->ifl_name, 0, 0));
+		if (((ofl->ofl_flags1 & FLG_OF1_IGNPRC) == 0) ||
+		    ((ifl->ifl_flags & FLG_IF_IGNORE) == 0))
 			continue;
 
 		/*
-		 * Before scanning the whole symbol table to determine
-		 * if we have symbols to discard - let's do a (relatively)
-		 * quick scan of the sections and determine if we've discarded
-		 * any sections.
+		 * Before scanning the whole symbol table to determine if
+		 * symbols should be discard - quickly (relatively) scan the
+		 * sections to determine if any are to be discarded.
 		 */
-		for (discard = 0, num = 1; num < ifl->ifl_shnum; num++) {
-			Is_desc	*isp;
-			Os_desc *osp;
+		discard = 0;
+		if (ifl->ifl_flags & FLG_IF_FILEREF) {
+			for (num = 1; num < ifl->ifl_shnum; num++) {
+				Is_desc	*isp;
+				Os_desc *osp;
+				Sg_desc	*sgp;
 
-			if (((isp = ifl->ifl_isdesc[num]) != 0) &&
-			    ((isp->is_flags & FLG_IS_SECTREF) == 0) &&
-			    ((osp = isp->is_osdesc) != 0) &&
-			    (osp->os_sgdesc->sg_phdr.p_type == PT_LOAD)) {
-				discard++;
-				break;
+				if (((isp = ifl->ifl_isdesc[num]) != 0) &&
+				    ((isp->is_flags & FLG_IS_SECTREF) == 0) &&
+				    ((osp = isp->is_osdesc) != 0) &&
+				    ((sgp = osp->os_sgdesc) != 0) &&
+				    (sgp->sg_phdr.p_type == PT_LOAD)) {
+					discard++;
+					break;
+				}
 			}
 		}
+
 		/*
 		 * No sections are to be 'ignored'
 		 */
-		if ((!discard) || ((ifl->ifl_flags & FLG_IF_FILEREF) == 0))
+		if ((discard == 0) && (ifl->ifl_flags & FLG_IF_FILEREF))
 			continue;
 
 		/*
-		 * We know that we have discarded sections - now we
-		 * scan the symtable for the file in question to determine
-		 * if we need to discard associated with the 'ignored'
-		 * sections.
+		 * We know that we have discarded sections.  Scan the symbol
+		 * table for this file to determine if symbols need to be
+		 * discarded that are associated with the 'ignored' sections.
 		 */
 		for (num = 1; num < ifl->ifl_symscnt; num++) {
 			Sym_desc	*sdp;
@@ -115,6 +120,27 @@ ignore_section_processing(Ofl_desc *ofl)
 
 			sdp = ifl->ifl_oldndx[num];
 			symp = sdp->sd_sym;
+
+			/*
+			 * If the whole file is being eliminated, remove the
+			 * local file symbol, and any COMMON symbols (which
+			 * aren't associated with a section) provided they
+			 * haven't been referenced by a relocation.
+			 */
+			if ((ofl->ofl_flags1 & FLG_OF1_IGNORE) &&
+			    ((ifl->ifl_flags & FLG_IF_FILEREF) == 0) &&
+			    ((ELF_ST_TYPE(symp->st_info) == STT_FILE) ||
+			    ((symp->st_shndx == SHN_COMMON) &&
+			    ((sdp->sd_flags & FLG_SY_UPREQD) == 0)))) {
+				if ((ofl->ofl_flags1 & FLG_OF1_REDLSYM) == 0) {
+					ofl->ofl_locscnt--;
+					err = st_delstring(ofl->ofl_strtab,
+					    sdp->sd_name);
+					assert(err != -1);
+				}
+				sdp->sd_flags |= FLG_SY_ISDISC;
+				continue;
+			}
 
 			/*
 			 * Skip any undefined, reserved section symbols, already
@@ -140,38 +166,53 @@ ignore_section_processing(Ofl_desc *ofl)
 			    (osp->os_sgdesc->sg_phdr.p_type != PT_LOAD))))
 				continue;
 
+			/*
+			 * Finish processing any local symbols.
+			 */
 			if (ELF_ST_BIND(symp->st_info) == STB_LOCAL) {
-				if (!(ofl->ofl_flags1 & FLG_OF1_REDLSYM)) {
-					ofl->ofl_locscnt--;
+				if (ofl->ofl_flags1 & FLG_OF1_IGNORE) {
+					if ((ofl->ofl_flags1 &
+					    FLG_OF1_REDLSYM) == 0) {
+						ofl->ofl_locscnt--;
 
-					err = st_delstring(ofl->ofl_strtab,
-					    sdp->sd_name);
-					assert(err != -1);
+						err = st_delstring(
+						    ofl->ofl_strtab,
+						    sdp->sd_name);
+						assert(err != -1);
+					}
+					sdp->sd_flags |= FLG_SY_ISDISC;
 				}
-				sdp->sd_flags |= FLG_SY_ISDISC;
 				DBG_CALL(Dbg_syms_discarded(sdp, sdp->sd_isc));
 				continue;
 			}
 
+			/*
+			 * Global symbols can only be eliminated when an objects
+			 * interfaces (versioning/scoping) is defined.
+			 */
 			if (sdp->sd_flags1 & FLG_SY1_LOCL) {
-				ofl->ofl_scopecnt--;
-				ofl->ofl_elimcnt++;
+				if (ofl->ofl_flags1 & FLG_OF1_IGNORE) {
+					ofl->ofl_scopecnt--;
+					ofl->ofl_elimcnt++;
 
-				err = st_delstring(ofl->ofl_strtab,
-				    sdp->sd_name);
-				assert(err != -1);
+					err = st_delstring(ofl->ofl_strtab,
+					    sdp->sd_name);
+					assert(err != -1);
 
-				sdp->sd_flags1 |= FLG_SY1_ELIM;
+					sdp->sd_flags1 |= FLG_SY1_ELIM;
+				}
 				DBG_CALL(Dbg_syms_discarded(sdp, sdp->sd_isc));
 				continue;
 			}
 		}
 	}
 
+	if ((ofl->ofl_flags1 & FLG_OF1_IGNPRC) == 0)
+		return (1);
+
 	/*
-	 * Scan all output relocations - searching for relocations
-	 * against discarded/ignored sections.  If we find one - subtract it
-	 * from out total outrel count.
+	 * Scan all output relocations searching for those against discarded or
+	 * ignored sections.  If one is found, decrement the total outrel count.
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_outrels, lnp, rcp)) {
 		Rel_desc	*orsp;
@@ -180,10 +221,10 @@ ignore_section_processing(Ofl_desc *ofl)
 		/* LINTED */
 		for (orsp = (Rel_desc *)(rcp + 1);
 		    orsp < rcp->rc_free; orsp++) {
-			Is_desc	*	_isdesc = orsp->rel_isdesc;
+			Is_desc		*_isdesc = orsp->rel_isdesc;
 			uint_t		flags, entsize;
-			Shdr *		shdr;
-			Ifl_desc *	ifl;
+			Shdr		*shdr;
+			Ifl_desc	*ifl;
 
 			if ((_isdesc == 0) ||
 			    ((_isdesc->is_flags & (FLG_IS_SECTREF))) ||
@@ -206,7 +247,6 @@ ignore_section_processing(Ofl_desc *ofl)
 			else
 				entsize = sizeof (Rel);
 
-
 			assert(relosp->os_szoutrels > 0);
 			relosp->os_szoutrels -= entsize;
 
@@ -217,10 +257,8 @@ ignore_section_processing(Ofl_desc *ofl)
 				ofl->ofl_relocrelcnt--;
 		}
 	}
-
 	return (1);
 }
-
 
 /*
  * Build a .bss section for allocation of tentative definitions.  Any `static'
@@ -540,7 +578,7 @@ make_dynamic(Ofl_desc *ofl)
 			continue;
 
 		/*
-		 * If this dependency didn't satisfy any symbol references
+		 * If this dependency didn't satisfy any symbol references,
 		 * generate a debugging diagnostic (ld(1) -Dunused can be used
 		 * to display these).  If this is a standard needed dependency,
 		 * and -z ignore is in effect, drop the dependency.  Explicitly
@@ -548,10 +586,12 @@ make_dynamic(Ofl_desc *ofl)
 		 * are flagged as being required to simplify update_odynamic()
 		 * processing.
 		 */
-		if (!(ifl->ifl_flags & FLG_IF_DEPREQD)) {
+		if ((ifl->ifl_flags & FLG_IF_NEEDSTR) ||
+		    ((ifl->ifl_flags & FLG_IF_DEPREQD) == 0)) {
 			if (unused++ == 0)
 				DBG_CALL(Dbg_util_nl());
-			DBG_CALL(Dbg_unused_file(ifl->ifl_soname, 0));
+			DBG_CALL(Dbg_unused_file(ifl->ifl_soname,
+			    (ifl->ifl_flags & FLG_IF_NEEDSTR), 0));
 
 			if (ifl->ifl_flags & FLG_IF_NEEDSTR)
 				ifl->ifl_flags |= FLG_IF_DEPREQD;
@@ -2133,7 +2173,12 @@ make_sections(Ofl_desc *ofl)
 		if (make_plt(ofl) == S_ERROR)
 			return (S_ERROR);
 
-	if (ofl->ofl_flags1 & FLG_OF1_IGNPRC) {
+	/*
+	 * Determine whether any sections or files are not referenced.  Under
+	 * -Dunused a diagnostic for any unused components is generated, under
+	 * -zignore the component is removed from the final output.
+	 */
+	if (dbg_mask || (ofl->ofl_flags1 & FLG_OF1_IGNPRC)) {
 		if (ignore_section_processing(ofl) == S_ERROR)
 			return (S_ERROR);
 	}

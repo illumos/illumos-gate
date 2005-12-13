@@ -485,6 +485,7 @@
 			 unused: does not satisfy any references%s"
 @ MSG_USD_SECDISCARD	"; discarded"
 @ MSG_USD_FILE		"file=%s  unused: does not satisfy any references"
+@ MSG_USD_NEEDSTR	"file=%s  unused: unable to determine use" 
 @ MSG_USD_UNREF		"file=%s  unreferenced: unused dependency of %s"
 @ MSG_USD_FILECYCLIC	"file=%s  unused: cyclic group [%d] member: \
 			 unreferenced outside of group"

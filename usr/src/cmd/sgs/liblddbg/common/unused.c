@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
- *	Use is subject to license terms.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -64,12 +65,14 @@ Dbg_unused_sec(Is_desc *isp)
 #if	!defined(_ELF64)
 
 void
-Dbg_unused_file(const char *name, int cycle)
+Dbg_unused_file(const char *name, int needstr, int cycle)
 {
 	if (DBG_NOTCLASS(DBG_UNUSED))
 		return;
 
-	if (cycle)
+	if (needstr)
+		dbg_print(MSG_INTL(MSG_USD_NEEDSTR), name);
+	else if (cycle)
 		dbg_print(MSG_INTL(MSG_USD_FILECYCLIC), name, cycle);
 	else
 		dbg_print(MSG_INTL(MSG_USD_FILE), name);
