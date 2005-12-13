@@ -43,97 +43,113 @@
 #include <sys/cred.h>
 #include <sys/t_lock.h>
 #include <sys/model.h>
-#include <sys/strft.h>
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 /*
- * Both the queue and the data block structures have embedded
- * mutexes: q_lock and db_lock.  In general, these mutexes protect
- * the consistency of the data structure.  In addition, q_lock
- * is used, with the stream head condition variable, to implement
- * a monitor at the stream head for blocking reads and writes.
- * Neither of these locks should be acquired by module or driver code.
+ * Data queue.
  *
- * In particular, q_lock protects the following fields:
- *	q_first
- *	q_last
- *	q_link
- *	q_count
- *	q_bandp
- *	q_nband
+ * NOTE: The *only* public fields are documented in queue(9S).
+ *       Everything else is implementation-private.
  *
- * q_next is protected by stream head locking; this links the
- * stream together, and should be thought of as part of the stream
- * data structure, not the queue.
+ * The locking rules for the queue_t structure are extremely subtle and vary
+ * widely depending on the field in question.  As such, each field is
+ * annotated according to the following legend:
  *
- * The remaining fields are either modified only by the allocator,
- * which has exclusive access to them at that time, or are not to
- * be touched by anything but the MT synchronization primitives
- * (i.e. q_wait).
+ *   Q9S: The field is documented in queue(9S) and may be accessed without
+ *        locks by a STREAMS module when inside an entry point (e.g., put(9E)).
+ *        However, no fields can be directly modified unless q_lock is held
+ *        (which is not possible in a DDI compliant STREAMS module), with the
+ *        following exceptions:
  *
- * q_sqnext and q_sqprev are special - they are protected by
- * SQLOCK(q->syncq).
+ *	   - q_ptr: can be modified as per the rules of the STREAMS module.
+ *		    The STREAMS framework ignores q_ptr and thus imposes *no*
+ *		    locking rules on it.
+ *         - q_qinfo: can be modified before qprocson().
+ *
+ *	   - q_minpsz, q_maxpsz, q_hiwat, q_lowat: can be modified as per the
+ *		    rules of the STREAMS module.  The STREAMS framework never
+ *		    modifies these fields, and is tolerant of temporarily
+ *		    stale field values.
+ *
+ *	  In general, the STREAMS framework employs one of the following
+ *	  techniques to ensure STREAMS modules can safely access Q9S fields:
+ *
+ *	   - The field is only modified by the framework when the stream is
+ *	     locked with strlock() (q_next).
+ *
+ *	   - The field is modified by the framework, but the modifies are
+ *	     atomic, and temporarily stale values are harmless (q_count,
+ *	     q_first, q_last).
+ *
+ *	   - The field is modified by the framework, but the field's visible
+ *	     values are either constant or directly under the control
+ *	     of the STREAMS module itself (q_flag).
+ *
+ *   QLK: The field must be accessed or modified under q_lock, except when
+ *        the stream has been locked with strlock().  If multiple q_locks must
+ *        be acquired, q_locks at higher addresses must be taken first.
+ *
+ *   STR: The field can be accessed without a lock, but must be modified under
+ *	  strlock().
+ *
+ *   SQLK: The field must be accessed or modified under SQLOCK().
+ *
+ *   NOLK: The field can be accessed without a lock, but can only be modified
+ *	   when the queue_t is not known to any other threads.
+ *
+ *   SVLK: The field must be accessed or modified under the service_queue lock.
+ *         Note that service_lock must be taken after any needed q_locks,
+ *	   and that no other lock should be taken while service_lock is held.
+ *
+ * In addition, it is always acceptable to modify a field that is not yet
+ * known to any other threads -- and other special case exceptions exist in
+ * the code.  Also, q_lock is used with q_wait to implement a stream head
+ * monitor for reads and writes.
  */
+typedef struct queue {
+	struct qinit	*q_qinfo;	/* Q9S: Q processing procedure  */
+	struct msgb	*q_first;	/* Q9S: first message in Q	*/
+	struct msgb	*q_last;	/* Q9S: last message in Q	*/
+	struct queue	*q_next;	/* Q9S: next Q in stream	*/
+	struct queue	*q_link;	/* SVLK: next Q for scheduling	*/
+	void		*q_ptr;		/* Q9S: module-specific data	*/
+	size_t		q_count;	/* Q9S: number of bytes on Q	*/
+	uint_t		q_flag;		/* Q9S: Q state			*/
+	ssize_t		q_minpsz;	/* Q9S: smallest packet OK on Q */
+	ssize_t		q_maxpsz;	/* Q9S: largest packet OK on Q	*/
+	size_t		q_hiwat;	/* Q9S: Q high water mark	*/
+	size_t		q_lowat;	/* Q9S: Q low water mark	*/
+	struct qband	*q_bandp;	/* QLK: band flow information	*/
+	kmutex_t	q_lock;		/* NOLK: structure lock		*/
+	struct stdata 	*q_stream;	/* NOLK: stream backpointer	*/
+	struct syncq	*q_syncq;	/* NOLK: associated syncq 	*/
+	unsigned char	q_nband;	/* QLK: number of bands		*/
+	kcondvar_t	q_wait;		/* NOLK: read/write sleep CV	*/
+	struct queue	*q_nfsrv;	/* STR: next Q with svc routine */
+	ushort_t	q_draining;	/* QLK: Q is draining		*/
+	short		q_struiot;	/* QLK: sync streams Q UIO mode	*/
+	clock_t		q_qtstamp;	/* QLK: when Q was enabled	*/
+	size_t		q_mblkcnt;	/* QLK: mblk count		*/
+	uint_t		q_syncqmsgs;	/* QLK: syncq message count	*/
+	size_t		q_rwcnt;	/* QLK: # threads in rwnext()	*/
+	pri_t		q_spri;		/* QLK: Q scheduling priority	*/
 
-/*
- * Data queue
- */
-typedef struct	queue {
-	struct	qinit	*q_qinfo;	/* procs and limits for queue	*/
-	struct	msgb	*q_first;	/* first data block		*/
-	struct	msgb	*q_last;	/* last data block		*/
-	struct	queue	*q_next;	/* Q of next stream		*/
-	struct	queue	*q_link;	/* to next Q for scheduling	*/
-	void		*q_ptr;		/* to private data structure	*/
-	size_t		q_count;	/* number of bytes on Q		*/
-	uint_t		q_flag;		/* queue state			*/
-	ssize_t		q_minpsz;	/* min packet size accepted by	*/
-					/* this module			*/
-	ssize_t		q_maxpsz;	/* max packet size accepted by	*/
-					/* this module			*/
-	size_t		q_hiwat;	/* queue high water mark	*/
-	size_t		q_lowat;	/* queue low water mark		*/
-	struct qband	*q_bandp;	/* separate flow information */
-	kmutex_t	q_lock;		/* protect data queue		*/
-	struct stdata 	*q_stream;	/* for head locks		*/
-	struct	syncq	*q_syncq;	/* sync queue object		*/
-	unsigned char	q_nband;	/* number of priority bands > 0	*/
-	kcondvar_t	q_wait;		/* read/write sleeps		*/
-	struct	queue	*q_nfsrv;	/* next q fwd with service routine */
-	ushort_t	q_draining;	/* protected by QLOCK - drain_syncq */
-	short		q_struiot;	/* stream uio type for struio()	*/
-	uint_t		q_syncqmsgs;	/* messages in syncq for this queue */
-	size_t		q_mblkcnt;	/* mblk counter for runaway msgs */
 	/*
-	 * Syncq scheduling.
-	 * These fields are initially protected by the SQLOCK,
-	 * but they will eventually be protected by the QLOCK.
-	 * The lock ordering is QLOCK then SQLOCK.
-	 * Note that  q_syncqmsgs can either disappear, or be an additional
-	 * count of messages instead of bytes (need bytes for QFULL).
+	 * Syncq scheduling
 	 */
-	struct msgb	*q_sqhead;	/* first syncq message		*/
-	struct msgb	*q_sqtail;	/* last syncq message		*/
-	uint_t		q_sqflags;	/* Queue flags, protected by SQLOCK */
-	size_t		q_rwcnt;	/* Number of threads synchronously */
-					/* entering Q */
+	struct msgb	*q_sqhead;	/* QLK: first syncq message	*/
+	struct msgb	*q_sqtail;	/* QLK: last syncq message 	*/
+	struct queue	*q_sqnext;	/* SQLK: next Q on syncq list	*/
+	struct queue	*q_sqprev;	/* SQLK: prev Q on syncq list 	*/
+	uint_t		q_sqflags;	/* SQLK: syncq flags		*/
+	clock_t		q_sqtstamp;	/* SQLK: when Q was scheduled for sq */
 
 	/*
-	 * These fields need to be protected by the SQLOCK since
-	 * the corresponding syncq fields are (sq_head/sq_tail).
-	 */
-	struct queue	*q_sqnext;	/* Next Q on syncq list		*/
-	struct queue	*q_sqprev;	/* Previous Q on syncq list	*/
-	clock_t		q_sqtstamp;	/* Time when Q was scheduled for sq */
-	clock_t		q_qtstamp;	/* Time when Q was enabled	*/
-	pri_t		q_spri;		/* Scheduling priority		*/
-
-	/*
-	 * Reference to the queue's module's implementation structure. This
-	 * will be NULL for queues associated with drivers.
+	 * NOLK: Reference to the queue's module's implementation
+	 * structure. This will be NULL for queues associated with drivers.
 	 */
 	struct fmodsw_impl	*q_fp;
 } queue_t;
@@ -176,7 +192,7 @@ typedef struct	queue {
 
 /* queue sqflags (protected by SQLOCK). */
 #define	Q_SQQUEUED	0x01		/* Queue is in the syncq list */
-#define	Q_SQDRAINING	0x02		/* Servicing suncq msgs.	*/
+#define	Q_SQDRAINING	0x02		/* Servicing syncq msgs.	*/
 					/* This is also noted by the	*/
 					/* q_draining field, but this one is */
 					/* protected by SQLOCK */
@@ -327,7 +343,7 @@ typedef struct datab {
 		 * Union used for future extensions (pointer to data ?).
 		 */
 	} db_struioun;
-	fthdr_t		*db_fthdr;
+	struct fthdr	*db_fthdr;
 	cred_t		*db_credp;	/* credential */
 } dblk_t;
 
@@ -361,7 +377,6 @@ typedef struct	msgb {
 /*
  * bcache descriptor
  */
-
 typedef	struct	bcache {
 	kmutex_t		mutex;
 	struct kmem_cache	*buffer_cache;

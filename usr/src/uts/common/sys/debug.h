@@ -95,7 +95,6 @@ extern void assfail3(const char *, uintmax_t, const char *, uintmax_t,
 			__FILE__, __LINE__); \
 _NOTE(CONSTCOND) } while (0)
 
-
 #define	VERIFY3S(x, y, z)	VERIFY3_IMPL(x, y, z, int64_t)
 #define	VERIFY3U(x, y, z)	VERIFY3_IMPL(x, y, z, uint64_t)
 #define	VERIFY3P(x, y, z)	VERIFY3_IMPL(x, y, z, uintptr_t)
@@ -115,12 +114,6 @@ extern void abort_sequence_enter(char *);
 extern void debug_enter(char *);
 
 #endif	/* _KERNEL */
-
-#ifdef MONITOR
-#define	MONITOR(id, w1, w2, w3, w4) monitor(id, w1, w2, w3, w4)
-#else
-#define	MONITOR(id, w1, w2, w3, w4)
-#endif
 
 #if defined(DEBUG) && !defined(__sun)
 /* CSTYLED */

@@ -50,6 +50,7 @@
 #include <sys/multidata.h>
 #include <sys/multidata_impl.h>
 #include <sys/sdt.h>
+#include <sys/strft.h>
 
 #ifdef DEBUG
 #include <sys/kmem_impl.h>

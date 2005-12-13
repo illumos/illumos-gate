@@ -64,12 +64,6 @@
 #define	NET_SUSPEND	4
 #define	NET_RESUME	5
 
-/*
- * PSARC decided that DLPI providers are not allowed to end in a digit.
- * If this ever changes we could add a delimiter with this macro.
- */
-#define	NET_DELIMITER	""
-
 typedef struct net_cache
 {
 	char			*resource;
@@ -84,7 +78,6 @@ typedef struct net_cache
 static net_cache_t	cache_head;
 static net_cache_t	cache_tail;
 static mutex_t		cache_lock;
-static int		events_registered = 0;
 
 /* module interface routines */
 static int net_register(rcm_handle_t *);
@@ -101,8 +94,6 @@ static int net_online(rcm_handle_t *, char *, id_t, uint_t, char **,
     rcm_info_t **);
 static int net_remove(rcm_handle_t *, char *, id_t, uint_t, char **,
     rcm_info_t **);
-static int net_notify_event(rcm_handle_t *, char *, id_t, uint_t,
-    char **, nvlist_t *, rcm_info_t **);
 
 /* module private routines */
 static void free_cache(void);
@@ -126,10 +117,7 @@ static struct rcm_mod_ops net_ops = {
 	net_resume,
 	net_offline,
 	net_online,
-	net_remove,
-	NULL,		/* request_capacity_change */
-	NULL,		/* notify_capacity_change */
-	net_notify_event
+	net_remove
 };
 
 /*
@@ -191,10 +179,6 @@ rcm_mod_fini(void)
 static int
 net_register(rcm_handle_t *hd)
 {
-	if (events_registered == 0) {
-		(void) rcm_register_event(hd, "SUNW_resource/new", 0, NULL);
-		events_registered++;
-	}
 	update_cache(hd);
 	return (RCM_SUCCESS);
 }
@@ -224,10 +208,6 @@ net_unregister(rcm_handle_t *hd)
 		probe = cache_head.next;
 	}
 	(void) mutex_unlock(&cache_lock);
-	if (events_registered > 0) {
-		(void) rcm_unregister_event(hd, "SUNW_resource/new", 0);
-		events_registered--;
-	}
 	return (RCM_SUCCESS);
 }
 
@@ -351,7 +331,7 @@ net_offline(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flags,
 /*
  * net_online()
  *
- *	Remount the previously offlined filesystem, and online its dependents.
+ *	Online the previously offlined resource, and online its dependents.
  */
 static int
 net_online(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag, char **reason,
@@ -516,143 +496,6 @@ net_remove(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag, char **info,
 }
 
 /*
- * net_notify_event()
- *
- *	Receive new resource events.  If the resource is a network
- *	device, then pass up a notify for it too.  No need to cache
- *	it, though, since we'll do that in our register() routine the
- *	next time we're called.
- */
-/*ARGSUSED*/
-static int
-net_notify_event(rcm_handle_t *hd, char *rsrc, id_t id, uint_t flag,
-    char **errstr, nvlist_t *nvl, rcm_info_t **result)
-{
-	char		*devname = NULL, *nodetype, *driver, *kpath;
-	char		ifname[MAXPATHLEN];
-	di_node_t	node;
-	di_minor_t	minor;
-	nvlist_t	*nvlist;
-	nvpair_t	*nvp = NULL;
-	int		rv;
-
-	assert(hd != NULL);
-	assert(rsrc != NULL);
-	assert(id == (id_t)0);
-	assert(nvl != NULL);
-	assert(result != NULL);
-
-	rcm_log_message(RCM_TRACE1, "NET: notify_event(%s)\n", rsrc);
-
-	if (strcmp(rsrc, "SUNW_resource/new") != 0) {
-		/* how did we get this?  we didn't ask for it! */
-		rcm_log_message(RCM_WARNING,
-		    _("NET: unrecognized event for %s\n"), rsrc);
-		return (RCM_FAILURE);
-	}
-
-	/* is it a /devices resource? */
-	/*
-	 * note: we'd like to use nvlist_lookup_string, but a bug in
-	 * libnvpair breaks lookups, so we have to walk it ourself.
-	 */
-#ifdef NVLIST_LOOKUP_NOTBROKEN
-	if (nvlist_lookup_string(nvl, RCM_RSRCNAME, &devname) != 0) {
-		/* resource not found */
-		rcm_log_message(RCM_WARNING,
-		    _("NET: event without resource name\n"));
-		return (RCM_FAILURE);
-	}
-#else
-	while ((nvp = nvlist_next_nvpair(nvl, nvp)) != NULL) {
-		if (strcmp(nvpair_name(nvp), RCM_RSRCNAME) == 0) {
-			if (nvpair_value_string(nvp, &devname) != 0) {
-				rcm_log_message(RCM_WARNING,
-				    _("NET: cannot get event "
-					"resource value\n"));
-				return (RCM_FAILURE);
-			}
-			break;
-		}
-	}
-	if (devname == NULL) {
-		rcm_log_message(RCM_WARNING,
-		    _("NET: event without resource name\n"));
-		return (RCM_FAILURE);
-	}
-#endif
-	rcm_log_message(RCM_TRACE1, "NET: new rsrc(%s)\n", devname);
-	if (strncmp(devname, "/devices/", strlen("/devices/")) != 0) {
-		/* not a /devices resource, we ignore it */
-		rcm_log_message(RCM_TRACE1, "NET: %s not for us\n", devname);
-		return (RCM_SUCCESS);
-	}
-	kpath = devname + strlen("/devices");
-	if (strncmp(kpath, "/pseudo/", strlen("/pseudo/")) == 0) {
-		/* pseudo device , not for us */
-		rcm_log_message(RCM_TRACE1, "NET: ignoring pseudo %s\n",
-		    devname);
-		return (RCM_SUCCESS);
-	}
-
-	/* just snapshot the specific tree we need */
-	if ((node = di_init(kpath, DINFOMINOR)) == NULL) {
-		rcm_log_message(RCM_ERROR,
-		    _("NET: cannot initialize device tree\n"));
-		return (RCM_FAILURE);
-	}
-
-	/* network devices usually only have a single minor node */
-	if ((minor = di_minor_next(node, DI_MINOR_NIL)) == DI_MINOR_NIL) {
-		rcm_log_message(RCM_WARNING,
-		    _("NET: cannot find minor for %s\n"),
-		    devname);
-		di_fini(node);
-		return (RCM_FAILURE);
-	}
-
-	nodetype = di_minor_nodetype(minor);
-	if ((nodetype == NULL) || (strcmp(nodetype, DDI_NT_NET) != 0)) {
-		/* doesn't look like a network device */
-		rcm_log_message(RCM_TRACE1, "NET: %s not a NIC\n", devname);
-		goto done;
-	}
-	if ((driver = di_driver_name(node)) == NULL) {
-		rcm_log_message(RCM_TRACE1, "NET: no driver (%s)\n", devname);
-		goto done;
-	}
-	(void) snprintf(ifname, sizeof (ifname), "SUNW_network/%s%s%d", driver,
-	    NET_DELIMITER, di_instance(node));
-
-	rcm_log_message(RCM_TRACE1, "NET: notifying arrival of %s\n", ifname);
-	/* build up our nvlist -- these shouldn't ever fail */
-	if ((rv = nvlist_alloc(&nvlist, NV_UNIQUE_NAME, 0)) != 0) {
-		rcm_log_message(RCM_TRACE1,
-		    "NET: nvlist alloc failed %d, errno %d\n", rv, errno);
-	}
-
-	if ((rv = nvlist_add_string(nvlist, RCM_RSRCNAME, ifname)) != 0) {
-		rcm_log_message(RCM_TRACE1,
-		    "NET: nvlist_add_string failed %d, errno %d\n", rv, errno);
-	}
-	/* now we need to do our own notification */
-	rv = rcm_notify_event(hd, "SUNW_resource/new", 0, nvlist, result);
-	if (rv != RCM_SUCCESS) {
-		rcm_log_message(RCM_TRACE1,
-		    "NET: notify_event failed: %s\n", strerror(errno));
-	} else {
-		rcm_log_message(RCM_TRACE1, "NET: notify_event succeeded\n");
-	}
-
-	/* and clean up our nvlist */
-	nvlist_free(nvlist);
-
-done:
-	di_fini(node);
-	return (RCM_SUCCESS);
-}
-
-/*
  * Cache management routines.  Note that the cache is implemented as a
  * trivial linked list, and is only required because RCM doesn't
  * provide enough state about our own registrations back to us.  This
@@ -757,8 +600,8 @@ devfs_entry(di_node_t node, di_minor_t minor, void *arg)
 
 	instance = di_instance(node);
 
-	(void) snprintf(ifname, sizeof (ifname), "SUNW_network/%s%s%d",
-	    name, NET_DELIMITER, instance);
+	(void) snprintf(ifname, sizeof (ifname), "SUNW_network/%s%d",
+	    name, instance);
 
 	devfspath = di_devfs_path(node);
 	if (!devfspath) {

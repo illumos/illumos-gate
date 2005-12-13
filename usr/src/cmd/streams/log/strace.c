@@ -24,8 +24,8 @@
 
 
 /*
- * Copyright (c) 1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,7 +74,7 @@ static char *
 getarg(void)
 {
 	static char argbuf[40];
-	static eofflg = 0;
+	static int eofflg = 0;
 	char *ap;
 	int c;
 
@@ -116,7 +116,7 @@ getarg(void)
 static int
 getid(int ac, char **av, struct trace_ids *tp)
 {
-	static index = 1;
+	static int index = 1;
 
 	/*
 	 * if inside of standard input scan take arguments from there.
