@@ -56,6 +56,8 @@ typedef struct FileSystemBean {
 
 typedef struct PoolBean {
 	FileSystemBean_t super;
+
+	jmethodID method_setSize;
 } PoolBean_t;
 
 typedef struct VolumeBean {
@@ -162,6 +164,9 @@ new_PoolBean(JNIEnv *env, PoolBean_t *bean)
 		object->object =
 		    (*env)->NewObject(env, object->class, object->constructor);
 	}
+
+	bean->method_setSize = (*env)->GetMethodID(
+	    env, object->class, "setSize", "(J)V");
 
 	new_FileSystemBean(env, (FileSystemBean_t *)bean);
 }
@@ -335,6 +340,19 @@ populate_DatasetBean(JNIEnv *env, zfs_handle_t *zhp, DatasetBean_t *bean)
 static int
 populate_PoolBean(JNIEnv *env, zfs_handle_t *zhp, PoolBean_t *bean)
 {
+	zjni_Object_t *object = (zjni_Object_t *)bean;
+	const char *name = zfs_get_name(zhp);
+	zpool_handle_t *zphp = zpool_open_canfail(name);
+
+	if (zphp == NULL) {
+	    return (-1);
+	}
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setSize, zpool_get_space_total(zphp));
+
+	zpool_close(zphp);
+
 	return (populate_FileSystemBean(env, zhp, (FileSystemBean_t *)bean));
 }
 
