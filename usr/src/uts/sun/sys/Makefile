@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -41,7 +41,7 @@ bw2reg.h		bw2var.h \
 cg3var.h		\
 cg6fbc.h		cg6reg.h		cg6tec.h \
 cg6thc.h		cg6var.h \
-cms.h 			cursor_impl.h		dbriio.h \
+cms.h 			cursor_impl.h \
 dkmpio.h		dmaga.h	\
 eri.h			eri_common.h		eri_mac.h \
 eri_msg.h		eri_phy.h \
@@ -51,7 +51,6 @@ hme_phy.h		i82586.h \
 isdnio.h \
 mace.h \
 memfb.h			memreg.h		memvar.h \
-mmcodecreg.h \
 obpdefs.h		pixrect.h  \
 pr_impl_util.h		pr_planegroups.h \
 promif.h		promimpl.h \

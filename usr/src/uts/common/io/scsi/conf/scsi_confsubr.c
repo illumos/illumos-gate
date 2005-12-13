@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -137,11 +137,65 @@ int	scsi_probe_debug = 0;
 int	scsi_test_busy_timeout = SCSI_POLL_TIMEOUT;	/* in seconds */
 int	scsi_test_busy_delay = 10000;			/* 10msec in usec */
 
+/*
+ * architecture dependent allocation restrictions. For x86, we'll set
+ * dma_attr_addr_hi to scsi_max_phys_addr and dma_attr_sgllen to
+ * scsi_sgl_size during _init().
+ */
+#if defined(__sparc)
+ddi_dma_attr_t scsi_alloc_attr = {
+	DMA_ATTR_V0,	/* version number */
+	0x0,		/* lowest usable address */
+	0xFFFFFFFFull,	/* high DMA address range */
+	0xFFFFFFFFull,	/* DMA counter register */
+	1,		/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xFFFFFFFFull,	/* max DMA xfer size */
+	0xFFFFFFFFull,	/* segment boundary */
+	1,		/* s/g list length */
+	512,		/* granularity of device */
+	0		/* DMA transfer flags */
+};
+#elif defined(__x86)
+ddi_dma_attr_t scsi_alloc_attr = {
+	DMA_ATTR_V0,	/* version number */
+	0x0,		/* lowest usable address */
+	0x0,		/* high DMA address range [set in _init()] */
+	0xFFFFull,	/* DMA counter register */
+	1,		/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xFFFFFFFFull,	/* max DMA xfer size */
+	0xFFFFFFFFull,  /* segment boundary */
+	0,		/* s/g list length */
+	512,		/* granularity of device [set in _init()] */
+	0		/* DMA transfer flags */
+};
+uint64_t scsi_max_phys_addr = 0xFFFFFFFFull;
+int scsi_sgl_size = 0xFF;
+#endif
+
+
 int
 _init()
 {
 	scsi_initialize_hba_interface();
 	scsi_watch_init();
+
+#if defined(__x86)
+	/* set the max physical address for iob allocs on x86 */
+	scsi_alloc_attr.dma_attr_addr_hi = scsi_max_phys_addr;
+
+	/*
+	 * set the sgllen for iob allocs on x86. If this is set less than
+	 * the number of pages the buffer will take (taking into account
+	 * alignment), it would force the allocator to try and allocate
+	 * contiguous pages.
+	 */
+	scsi_alloc_attr.dma_attr_sgllen = scsi_sgl_size;
+#endif
+
 	return (mod_install(&modlinkage));
 }
 

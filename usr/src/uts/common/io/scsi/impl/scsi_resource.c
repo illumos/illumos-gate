@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -39,7 +39,7 @@
  */
 uintptr_t scsi_callback_id = 0;
 
-
+extern ddi_dma_attr_t scsi_alloc_attr;
 
 struct buf *
 scsi_alloc_consistent_buf(struct scsi_address *ap,
@@ -49,6 +49,7 @@ scsi_alloc_consistent_buf(struct scsi_address *ap,
 	dev_info_t	*pdip;
 	struct		buf *bp;
 	int		kmflag;
+	size_t		rlen;
 
 	TRACE_0(TR_FAC_SCSI_RES, TR_SCSI_ALLOC_CONSISTENT_BUF_START,
 		"scsi_alloc_consistent_buf_start");
@@ -76,8 +77,15 @@ scsi_alloc_consistent_buf(struct scsi_address *ap,
 	if (datalen) {
 		pdip = (A_TO_TRAN(ap))->tran_hba_dip;
 
-		while (ddi_iopb_alloc(pdip, (ddi_dma_lim_t *)0, datalen,
-		    &bp->b_un.b_addr)) {
+		/*
+		 * use i_ddi_mem_alloc() for now until we have an interface to
+		 * allocate memory for DMA which doesn't require a DMA handle.
+		 * ddi_iopb_alloc() is obsolete and we want more flexibility in
+		 * controlling the DMA address constraints.
+		 */
+		while (i_ddi_mem_alloc(pdip, &scsi_alloc_attr, datalen,
+		    ((callback == SLEEP_FUNC) ? 1 : 0), 0, NULL,
+		    &bp->b_un.b_addr, &rlen, NULL) != DDI_SUCCESS) {
 			if (callback == SLEEP_FUNC) {
 				delay(drv_usectohz(10000));
 			} else {
@@ -115,7 +123,7 @@ scsi_free_consistent_buf(struct buf *bp)
 	if (!bp)
 		return;
 	if (bp->b_un.b_addr)
-		ddi_iopb_free((caddr_t)bp->b_un.b_addr);
+		i_ddi_mem_free((caddr_t)bp->b_un.b_addr, 0);
 	freerbuf(bp);
 	if (scsi_callback_id != 0) {
 		ddi_run_callback(&scsi_callback_id);

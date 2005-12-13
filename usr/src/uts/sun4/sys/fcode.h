@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -634,8 +633,13 @@ extern int fc_priv_error(fc_ci_t *, char *);
  * optimize these functions by not necessarily calling through the
  * attachment point driver.
  */
-int fc_ddi_dma_htoc(dev_info_t *, ddi_dma_handle_t, off_t, ddi_dma_cookie_t *);
-int fc_ddi_dma_free(dev_info_t *ap, ddi_dma_handle_t h);
+int fc_ddi_dma_alloc_handle(dev_info_t *dip, ddi_dma_attr_t *attr,
+    int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep);
+int fc_ddi_dma_buf_bind_handle(ddi_dma_handle_t handle, struct buf *bp,
+    uint_t flags, int (*waitfp)(caddr_t), caddr_t arg,
+    ddi_dma_cookie_t *cookiep, uint_t *ccountp);
+int fc_ddi_dma_unbind_handle(ddi_dma_handle_t handle);
+void fc_ddi_dma_free_handle(ddi_dma_handle_t *handlep);
 int fc_ddi_dma_sync(ddi_dma_handle_t h, off_t o, size_t l, uint_t whom);
 
 /*

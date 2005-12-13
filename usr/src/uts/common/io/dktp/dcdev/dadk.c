@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -77,6 +77,46 @@ struct tgcom_objops dadk_com_ops = {
 	dadk_transport,
 	0, 0
 };
+
+/*
+ * architecture dependent allocation restrictions for dadk_iob_alloc(). For
+ * x86, we'll set dma_attr_addr_hi to dadk_max_phys_addr and dma_attr_sgllen
+ * to dadk_sgl_size during _init().
+ */
+#if defined(__sparc)
+static ddi_dma_attr_t dadk_alloc_attr = {
+	DMA_ATTR_V0,	/* version number */
+	0x0,		/* lowest usable address */
+	0xFFFFFFFFull,	/* high DMA address range */
+	0xFFFFFFFFull,	/* DMA counter register */
+	1,		/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xFFFFFFFFull,	/* max DMA xfer size */
+	0xFFFFFFFFull,	/* segment boundary */
+	1,		/* s/g list length */
+	512,		/* granularity of device */
+	0,		/* DMA transfer flags */
+};
+#elif defined(__x86)
+static ddi_dma_attr_t dadk_alloc_attr = {
+	DMA_ATTR_V0,	/* version number */
+	0x0,		/* lowest usable address */
+	0x0,		/* high DMA address range [set in _init()] */
+	0xFFFFull,	/* DMA counter register */
+	512,		/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xFFFFFFFFull,	/* max DMA xfer size */
+	0xFFFFFFFFull,	/* segment boundary */
+	0,		/* s/g list length [set in _init()] */
+	512,		/* granularity of device */
+	0,		/* DMA transfer flags */
+};
+
+uint64_t dadk_max_phys_addr = 0xFFFFFFFFull;
+int dadk_sgl_size = 0xFF;
+#endif
 
 static int dadk_rmb_ioctl(struct dadk *dadkp, int cmd, intptr_t arg, int flags,
     int silent);
@@ -216,6 +256,20 @@ _init(void)
 	if (dadk_debug & DENT)
 		PRF("dadk_init: call\n");
 #endif
+
+#if defined(__x86)
+	/* set the max physical address for iob allocs on x86 */
+	dadk_alloc_attr.dma_attr_addr_hi = dadk_max_phys_addr;
+
+	/*
+	 * set the sgllen for iob allocs on x86. If this is set less than
+	 * the number of pages the buffer will take (taking into account
+	 * alignment), it would force the allocator to try and allocate
+	 * contiguous pages.
+	 */
+	dadk_alloc_attr.dma_attr_sgllen = dadk_sgl_size;
+#endif
+
 	return (mod_install(&modlinkage));
 }
 
@@ -862,6 +916,7 @@ dadk_iob_alloc(opaque_t objp, daddr_t blkno, ssize_t xfer, int kmsflg)
 	struct dadk *dadkp = (struct dadk *)objp;
 	struct buf *bp;
 	struct tgdk_iob *iobp;
+	size_t rlen;
 
 	iobp = kmem_zalloc(sizeof (*iobp), kmsflg);
 	if (iobp == NULL)
@@ -877,8 +932,15 @@ dadk_iob_alloc(opaque_t objp, daddr_t blkno, ssize_t xfer, int kmsflg)
 				>> dadkp->dad_secshf) << dadkp->dad_secshf;
 
 	bp->b_un.b_addr = 0;
-	if (ddi_iopb_alloc((dadkp->dad_sd)->sd_dev, (ddi_dma_lim_t *)0,
-	    (uint_t)iobp->b_pbytecnt, &bp->b_un.b_addr)) {
+	/*
+	 * use i_ddi_mem_alloc() for now until we have an interface to allocate
+	 * memory for DMA which doesn't require a DMA handle. ddi_iopb_alloc()
+	 * is obsolete and we want more flexibility in controlling the DMA
+	 * address constraints..
+	 */
+	if (i_ddi_mem_alloc((dadkp->dad_sd)->sd_dev, &dadk_alloc_attr,
+	    (size_t)iobp->b_pbytecnt, ((kmsflg == KM_SLEEP) ? 1 : 0), 0, NULL,
+	    &bp->b_un.b_addr, &rlen, NULL) != DDI_SUCCESS) {
 		freerbuf(bp);
 		kmem_free(iobp, sizeof (*iobp));
 		return (NULL);
@@ -902,7 +964,7 @@ dadk_iob_free(opaque_t objp, struct tgdk_iob *iobp)
 		if (iobp->b_bp && (iobp->b_flag & IOB_BPALLOC)) {
 			bp = iobp->b_bp;
 			if (bp->b_un.b_addr && (iobp->b_flag & IOB_BPBUFALLOC))
-				ddi_iopb_free((caddr_t)bp->b_un.b_addr);
+				i_ddi_mem_free((caddr_t)bp->b_un.b_addr, 0);
 			freerbuf(bp);
 		}
 		kmem_free(iobp, sizeof (*iobp));

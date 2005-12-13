@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -89,16 +89,28 @@ static	int	sbus_cycle	= 0;	/* sbus clock prop period in nsec */
 static	void *bpp_state_head;		/* opaque handle top of state structs */
 
 
-static	ddi_dma_lim_t	bpp_limits = {
-	0x00000000,		/* lower range limit */
-	(ulong_t)0xffffffff,	/* upper range limit */
+static ddi_dma_attr_t	bpp_dma_attr = {
+	DMA_ATTR_V0,		/* version */
+	0x00000000ull,		/* dlim_addr_lo */
+	0xffffffffull,		/* dlim_addr_hi */
 	((1<<24)-1),		/* inclusive upper bound of */
 				/* bpp dma address counter  */
 				/* lower 24 bits are a counter, */
 				/* upper 8 bits are registered */
-	DEFAULT_BURSTSIZE,	/* encoded burstsizes 	*/
-	(uint_t)1,		/* minimum dma transfer */
-	0			/* dma speed - don't care */
+	1,			/* DMA address alignment */
+	DEFAULT_BURSTSIZE,	/* encoded burstsizes */
+	0x1,			/* min effective DMA size */
+	0x7fffffff,		/* max DMA xfer size */
+	0x00ffffff,		/* segment boundary */
+	1,			/* s/g list length */
+	1,			/* granularity of device */
+	0			/* DMA flags */
+};
+
+static ddi_device_acc_attr_t bpp_acc_attr = {
+	DDI_DEVICE_ATTR_V0,
+	DDI_STRUCTURE_BE_ACC,
+	DDI_STRICTORDER_ACC
 };
 
 #define	KIOIP	KSTAT_INTR_PTR(bpp_p->intrstats)
@@ -367,7 +379,6 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		bpp_p->sbus_clock_cycle));
 
 
-
 	/*
 	 * Map in any device registers. The zebra parallel section
 	 * has only one register area.
@@ -375,10 +386,12 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/*
 	 * Map the structure into kernel virtual space.
 	 */
-	if (ddi_map_regs(dip, 0, (caddr_t *)&(bpp_p->bpp_regs_p),
-			0, sizeof (struct bpp_regs)) != DDI_SUCCESS) {
+	if (ddi_regs_map_setup(dip, 0, (caddr_t *)&(bpp_p->bpp_regs_p),
+	    0, sizeof (struct bpp_regs),
+	    &bpp_acc_attr, &bpp_p->bpp_acc_handle) != DDI_SUCCESS) {
 		cmn_err(CE_NOTE,
-			"bpp_attach unit %d: ddi_map_regs failed!", unit_no);
+			"bpp_attach unit %d: regs_map_setup failed!", unit_no);
+		cv_destroy(&bpp_p->wr_cv);
 		mutex_destroy(&bpp_p->bpp_mutex);
 		ddi_remove_intr(bpp_p->dip, 0, bpp_p->bpp_block_cookie);
 		ddi_soft_state_free(bpp_state_head, unit_no);
@@ -389,13 +402,27 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	if (check_bpp_registers(unit_no)) {	/* registers don't seem right */
 		cmn_err(CE_NOTE,
 			"bpp_attach unit %d: register check failed!", unit_no);
-		ddi_unmap_regs(dip, 0, (caddr_t *)&bpp_p->bpp_regs_p,
-			0, sizeof (struct bpp_regs));
+		ddi_regs_map_free(&bpp_p->bpp_acc_handle);
+		cv_destroy(&bpp_p->wr_cv);
 		mutex_destroy(&bpp_p->bpp_mutex);
 		ddi_remove_intr(bpp_p->dip, 0, bpp_p->bpp_block_cookie);
 		ddi_soft_state_free(bpp_state_head, unit_no);
 		return (DDI_FAILURE);
 	}
+
+	if (ddi_dma_alloc_handle(dip, &bpp_dma_attr, DDI_DMA_DONTWAIT, NULL,
+	    &bpp_p->bpp_dma_handle) != DDI_SUCCESS) {
+		cmn_err(CE_NOTE,
+			"bpp_attach unit %d: dma_alloc_handle failed!",
+			unit_no);
+		ddi_regs_map_free(&bpp_p->bpp_acc_handle);
+		cv_destroy(&bpp_p->wr_cv);
+		mutex_destroy(&bpp_p->bpp_mutex);
+		ddi_remove_intr(bpp_p->dip, 0, bpp_p->bpp_block_cookie);
+		ddi_soft_state_free(bpp_state_head, unit_no);
+		return (DDI_FAILURE);
+	}
+
 	/* The driver is now commited - all sanity checks done */
 
 	(void) sprintf(name, "bpp%d", unit_no);
@@ -404,8 +431,9 @@ bpp_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		ddi_remove_minor_node(dip, NULL);
 		cmn_err(CE_NOTE, "ddi_create_minor_node failed for unit %d",
 			unit_no);
-		ddi_unmap_regs(dip, 0, (caddr_t *)&bpp_p->bpp_regs_p,
-			0, sizeof (struct bpp_regs));
+		ddi_dma_free_handle(&bpp_p->bpp_dma_handle);
+		ddi_regs_map_free(&bpp_p->bpp_acc_handle);
+		cv_destroy(&bpp_p->wr_cv);
 		mutex_destroy(&bpp_p->bpp_mutex);
 		ddi_remove_intr(bpp_p->dip, 0, bpp_p->bpp_block_cookie);
 		ddi_soft_state_free(bpp_state_head, unit_no);
@@ -691,12 +719,14 @@ bpp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/* Remove the minor node created in attach */
 	ddi_remove_minor_node(dip, NULL);
 
+	/* Free DMA handle */
+	ddi_dma_free_handle(&bpp_p->bpp_dma_handle);
+
 	/*
 	 * Unmap register area from kernel memory.
 	 */
 	dip = bpp_p->dip;
-	ddi_unmap_regs(dip, 0, (caddr_t *)&bpp_p->bpp_regs_p,
-		0, sizeof (struct bpp_regs));
+	ddi_regs_map_free(&bpp_p->bpp_acc_handle);
 
 	/*
 	 * Remove interrupt registry
@@ -709,7 +739,8 @@ bpp_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	}
 	bpp_p->intrstats = NULL;
 
-	/* Destroy the per-unit mutex. */
+	/* Destroy the per-unit cv and mutex. */
+	cv_destroy(&bpp_p->wr_cv);
 	mutex_destroy(&bpp_p->bpp_mutex);
 
 	/* Free the memory allocated for this unit's state struct */
@@ -1208,8 +1239,9 @@ bpp_strategy(register struct buf *bp)
 	size_t	size;			/* size of DVMA transfer */
 	register struct	bpp_transfer_parms	*bpp_transfer_parms_p;
 	register volatile struct bpp_regs	*bpp_regs_p;
-	int	flags;			/* flags to pass to ddi_dma_buf_setup */
+	int	flags;			/* flags to use for DMA mapping */
 	ddi_dma_cookie_t	dma_cookie;
+	uint_t			dma_cookie_cnt;
 
 
 	unit_no = BPP_UNIT(&(bp->b_edev));
@@ -1242,37 +1274,31 @@ bpp_strategy(register struct buf *bp)
 		flags = DDI_DMA_WRITE;
 
 	BPP_PRINT(5, (CE_CONT,
-		"Before dma_buf_setup, b_addr = 0x%p, b_bcount = 0x%x\n",
+		"Before dma_buf_bind, b_addr = 0x%p, b_bcount = 0x%x\n",
 		(void *)bp->b_un.b_addr, bp->b_bcount));
 	/*
 	 * Get dvma bus resource, sleeping if necessary.
 	 */
-	if ((ddi_dma_buf_setup(bpp_p->dip, bp, flags, DDI_DMA_SLEEP,
-			(caddr_t)0, &bpp_limits,
-			&bpp_p->bpp_dma_handle)) != 0) {
+	if (ddi_dma_buf_bind_handle(bpp_p->bpp_dma_handle, bp,
+	    flags | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, 0,
+	    &dma_cookie, &dma_cookie_cnt) != DDI_DMA_MAPPED) {
 		cmn_err(CE_NOTE,
-			"ERROR: bpp%d: ddi_dma_buf_setup failed mapping",
+			"ERROR: bpp%d: dma_buf_bind failed mapping",
 				unit_no);
+		bioerror(bp, ENOMEM);
+		bp->b_resid = bp->b_bcount;
+		biodone(bp);
+		return (0);
 	}
+	ASSERT(dma_cookie_cnt == 1);
 
 	BPP_PRINT(5, (CE_CONT,
-		"After dma_buf_setup, b_addr = 0x%p, b_bcount = 0x%x\n",
+		"After dma_buf_bind, b_addr = 0x%p, b_bcount = 0x%x\n",
 		(void *)bp->b_un.b_addr, bp->b_bcount));
 
-
-	/*
-	 * Convert the dma_handle into an actual virtual
-	 * DVMA address which can be put into the DMA engine.
-	 */
-	if (ddi_dma_htoc(bpp_p->bpp_dma_handle, (off_t)0,
-			&dma_cookie) != 0) {
-		cmn_err(CE_NOTE,
-		    "ERROR: bpp%d: ddi_dma_htoc failed to fill in DMA cookie!",
-							unit_no);
-	}
 	start_address = dma_cookie.dmac_address;
 	BPP_PRINT(5, (CE_CONT,
-		"After dma_htoc, start_address = 0x%x\n", start_address));
+		"start_address = 0x%x\n", start_address));
 
 	size = bp->b_bcount;
 
@@ -1734,7 +1760,7 @@ bpp_intr(caddr_t unit_no)
 		 * Release the dvma bus resource.
 		 */
 
-		(void) ddi_dma_free(bpp_p->bpp_dma_handle);
+		(void) ddi_dma_unbind_handle(bpp_p->bpp_dma_handle);
 
 		BPP_PRINT(5, (CE_CONT,
 			"bpp_intr, unit %d, Calling biodone.\n", unit_no));
@@ -1923,7 +1949,7 @@ bpp_transfer_timeout(void *unit_no_arg)
 	/*
 	 * Release the dvma bus resource.
 	 */
-	(void) ddi_dma_free(bpp_p->bpp_dma_handle);
+	(void) ddi_dma_unbind_handle(bpp_p->bpp_dma_handle);
 
 	BPP_PRINT(5, (CE_CONT,
 		"bpp_transfer_timeout, unit %d, Calling biodone.\n", unit_no));

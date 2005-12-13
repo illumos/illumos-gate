@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -307,6 +307,46 @@ static struct cln_bit_position {
 };
 
 /*
+ * architecture dependent allocation restrictions. For x86, we'll set
+ * dma_attr_addr_hi to st_max_phys_addr and dma_attr_sgllen to
+ * st_sgl_size during _init().
+ */
+#if defined(__sparc)
+static ddi_dma_attr_t st_alloc_attr = {
+	DMA_ATTR_V0,	/* version number */
+	0x0,		/* lowest usable address */
+	0xFFFFFFFFull,	/* high DMA address range */
+	0xFFFFFFFFull,	/* DMA counter register */
+	1,		/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xFFFFFFFFull,	/* max DMA xfer size */
+	0xFFFFFFFFull,	/* segment boundary */
+	1,		/* s/g list length */
+	512,		/* granularity of device */
+	0		/* DMA transfer flags */
+};
+#elif defined(__x86)
+static ddi_dma_attr_t st_alloc_attr = {
+	DMA_ATTR_V0,	/* version number */
+	0x0,		/* lowest usable address */
+	0x0,		/* high DMA address range [set in _init()] */
+	0xFFFFull,	/* DMA counter register */
+	512,		/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xFFFFFFFFull,	/* max DMA xfer size */
+	0xFFFFFFFFull,  /* segment boundary */
+	0,		/* s/g list length */
+	512,		/* granularity of device [set in _init()] */
+	0		/* DMA transfer flags */
+};
+uint64_t st_max_phys_addr = 0xFFFFFFFFull;
+int st_sgl_size = 0xF;
+
+#endif
+
+/*
  * Configuration Data:
  *
  * Device driver ops vector
@@ -536,6 +576,19 @@ _init(void)
 	if ((e = mod_install(&modlinkage)) != 0) {
 		ddi_soft_state_fini(&st_state);
 	}
+
+#if defined(__x86)
+	/* set the max physical address for iob allocs on x86 */
+	st_alloc_attr.dma_attr_addr_hi = st_max_phys_addr;
+
+	/*
+	 * set the sgllen for iob allocs on x86. If this is set less than
+	 * the number of pages the buffer will take (taking into account
+	 * alignment), it would force the allocator to try and allocate
+	 * contiguous pages.
+	 */
+	st_alloc_attr.dma_attr_sgllen = st_sgl_size;
+#endif
 
 	return (e);
 }
@@ -788,7 +841,7 @@ st_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 				kmem_free(un->un_uscsi_rqs_buf, SENSE_LENGTH);
 			}
 			if (un->un_mspl) {
-				ddi_iopb_free((caddr_t)un->un_mspl);
+				i_ddi_mem_free((caddr_t)un->un_mspl, 0);
 			}
 			scsi_destroy_pkt(un->un_rqs);
 			scsi_free_consistent_buf(un->un_rqs_bp);
@@ -1047,7 +1100,7 @@ st_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			kmem_free(un->un_uscsi_rqs_buf, SENSE_LENGTH);
 		}
 		if (un->un_mspl) {
-			ddi_iopb_free((caddr_t)un->un_mspl);
+			i_ddi_mem_free((caddr_t)un->un_mspl, 0);
 		}
 		if (un->un_rqs) {
 			scsi_destroy_pkt(un->un_rqs);
@@ -1265,6 +1318,7 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 	int km_flags = (canwait != NULL_FUNC) ? KM_SLEEP : KM_NOSLEEP;
 	int instance;
 	struct buf *bp;
+	size_t rlen;
 
 	/*
 	 * Call the routine scsi_probe to do some of the dirty work.
@@ -1333,12 +1387,19 @@ st_doattach(struct scsi_device *devp, int (*canwait)())
 
 	un->un_uscsi_rqs_buf = kmem_alloc(SENSE_LENGTH, KM_SLEEP);
 
-	(void) ddi_iopb_alloc(devp->sd_dev, (ddi_dma_lim_t *)0,
-		sizeof (struct seq_mode), (caddr_t *)&un->un_mspl);
+	/*
+	 * use i_ddi_mem_alloc() for now until we have an interface to allocate
+	 * memory for DMA which doesn't require a DMA handle. ddi_iopb_alloc()
+	 * is obsolete and we want more flexibility in controlling the DMA
+	 * address constraints.
+	 */
+	(void) i_ddi_mem_alloc(devp->sd_dev, &st_alloc_attr,
+	    sizeof (struct seq_mode), ((km_flags == KM_SLEEP) ? 1 : 0), 0,
+	    NULL, (caddr_t *)&un->un_mspl, &rlen, NULL);
 
 	if (!un->un_sbufp || !un->un_mspl) {
 		if (un->un_mspl) {
-			ddi_iopb_free((caddr_t)un->un_mspl);
+			i_ddi_mem_free((caddr_t)un->un_mspl, 0);
 		}
 		ST_DEBUG6(devp->sd_dev, st_label, SCSI_DEBUG,
 		    "probe partial failure: no space\n");
@@ -1418,7 +1479,7 @@ error:
 	ddi_remove_minor_node(devp->sd_dev, NULL);
 	if (un) {
 		if (un->un_mspl) {
-			ddi_iopb_free((caddr_t)un->un_mspl);
+			i_ddi_mem_free((caddr_t)un->un_mspl, 0);
 		}
 		if (un->un_sbufp) {
 			freerbuf(un->un_sbufp);

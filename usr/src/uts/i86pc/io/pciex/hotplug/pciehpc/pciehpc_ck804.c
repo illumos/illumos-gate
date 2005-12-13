@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -838,7 +837,7 @@ ck804_reg_get16(pciehpc_t *ctrl_p, uint_t off)
 
 	ASSERT(ck804_p != NULL);
 
-	return (ddi_mem_get16(ck804_p->analog_bar_hdl,
+	return (ddi_get16(ck804_p->analog_bar_hdl,
 			(uint16_t *)(ck804_p->analog_bar_base + off)));
 }
 
@@ -849,6 +848,6 @@ ck804_reg_put16(pciehpc_t *ctrl_p, uint_t off, uint16_t val)
 
 	ASSERT(ck804_p != NULL);
 
-	ddi_mem_put16(ck804_p->analog_bar_hdl,
+	ddi_put16(ck804_p->analog_bar_hdl,
 	    (uint16_t *)(ck804_p->analog_bar_base + off), val);
 }

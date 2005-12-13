@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,21 @@
  */
 uintptr_t	dcd_callback_id = 0L;
 
+/* For i_ddi_mem_alloc() in dcd_alloc_consistent_buf() */
+static ddi_dma_attr_t standard_dma_attr = {
+	DMA_ATTR_V0,	/* version number */
+	0x0,		/* lowest usable address */
+	0xFFFFFFFFull,	/* high DMA address range */
+	0xFFFFFFFFull,	/* DMA counter register */
+	1,		/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xFFFFFFFFull,	/* max DMA xfer size */
+	0xFFFFFFFFull,	/* segment boundary */
+	1,		/* s/g list length */
+	512,		/* granularity of device */
+	0,		/* DMA transfer flags */
+};
 
 struct buf *
 dcd_alloc_consistent_buf(struct dcd_address *ap,
@@ -48,6 +63,7 @@ dcd_alloc_consistent_buf(struct dcd_address *ap,
 	dev_info_t	*pdip;
 	struct	buf 	*bp;
 	int		kmflag;
+	size_t		rlen;
 
 
 	if (!in_bp) {
@@ -61,9 +77,8 @@ dcd_alloc_consistent_buf(struct dcd_address *ap,
 	bp->b_un.b_addr = 0;
 	if (datalen) {
 		pdip = (A_TO_TRAN(ap))->tran_hba_dip;
-
-		if (ddi_iopb_alloc(pdip, (ddi_dma_lim_t *)0, datalen,
-			&bp->b_un.b_addr)) {
+		if (i_ddi_mem_alloc(pdip, &standard_dma_attr, datalen, 0,
+		    0, NULL, &bp->b_un.b_addr, &rlen, NULL) != DDI_SUCCESS) {
 			if (!in_bp)
 				freerbuf(bp);
 			goto no_resource;
@@ -92,7 +107,7 @@ dcd_free_consistent_buf(struct buf *bp)
 		return;
 
 	if (bp->b_un.b_addr)
-		ddi_iopb_free((caddr_t)bp->b_un.b_addr);
+		i_ddi_mem_free((caddr_t)bp->b_un.b_addr, 0);
 	freerbuf(bp);
 	if (dcd_callback_id != 0L) {
 		ddi_run_callback(&dcd_callback_id);

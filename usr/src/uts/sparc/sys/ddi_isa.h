@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,108 +50,6 @@ extern "C" {
 /*
  * DDI interfaces defined as functions
  */
-
-#ifdef	__STDC__
-
-uint8_t
-ddi_mem_get8(ddi_acc_handle_t handle, uint8_t *host_addr);
-
-uint16_t
-ddi_mem_get16(ddi_acc_handle_t handle, uint16_t *host_addr);
-
-uint32_t
-ddi_mem_get32(ddi_acc_handle_t handle, uint32_t *host_addr);
-
-uint64_t
-ddi_mem_get64(ddi_acc_handle_t handle, uint64_t *host_addr);
-
-void
-ddi_mem_rep_get8(ddi_acc_handle_t handle, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags);
-
-void
-ddi_mem_rep_get16(ddi_acc_handle_t handle, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags);
-
-void
-ddi_mem_rep_get32(ddi_acc_handle_t handle, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags);
-
-void
-ddi_mem_rep_get64(ddi_acc_handle_t handle, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags);
-
-void
-ddi_mem_put8(ddi_acc_handle_t handle, uint8_t *dev_addr, uint8_t value);
-
-void
-ddi_mem_put16(ddi_acc_handle_t handle, uint16_t *dev_addr, uint16_t value);
-
-void
-ddi_mem_put32(ddi_acc_handle_t handle, uint32_t *dev_addr, uint32_t value);
-
-void
-ddi_mem_put64(ddi_acc_handle_t handle, uint64_t *dev_addr, uint64_t value);
-
-void
-ddi_mem_rep_put8(ddi_acc_handle_t handle, uint8_t *host_addr,
-	uint8_t *dev_addr, size_t repcount, uint_t flags);
-
-void
-ddi_mem_rep_put16(ddi_acc_handle_t handle, uint16_t *host_addr,
-	uint16_t *dev_addr, size_t repcount, uint_t flags);
-
-void
-ddi_mem_rep_put32(ddi_acc_handle_t handle, uint32_t *host_addr,
-	uint32_t *dev_addr, size_t repcount, uint_t flags);
-
-void
-ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
-	uint64_t *dev_addr, size_t repcount, uint_t flags);
-
-uint8_t
-ddi_io_get8(ddi_acc_handle_t handle, uint8_t *dev_addr);
-
-uint16_t
-ddi_io_get16(ddi_acc_handle_t handle, uint16_t *dev_addr);
-
-uint32_t
-ddi_io_get32(ddi_acc_handle_t handle, uint32_t *dev_addr);
-
-void
-ddi_io_rep_get8(ddi_acc_handle_t handle,
-	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount);
-
-void
-ddi_io_rep_get16(ddi_acc_handle_t handle,
-	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount);
-
-void
-ddi_io_rep_get32(ddi_acc_handle_t handle,
-	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount);
-
-void
-ddi_io_put8(ddi_acc_handle_t handle, uint8_t *dev_addr, uint8_t value);
-
-void
-ddi_io_put16(ddi_acc_handle_t handle, uint16_t *dev_addr, uint16_t value);
-
-void
-ddi_io_put32(ddi_acc_handle_t handle, uint32_t *dev_addr, uint32_t value);
-
-void
-ddi_io_rep_put8(ddi_acc_handle_t handle,
-	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount);
-
-void
-ddi_io_rep_put16(ddi_acc_handle_t handle,
-	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount);
-
-void
-ddi_io_rep_put32(ddi_acc_handle_t handle,
-	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount);
-
-#endif	/* __STDC__ */
 
 /*
  * The implementation specific ddi access handle is the same for

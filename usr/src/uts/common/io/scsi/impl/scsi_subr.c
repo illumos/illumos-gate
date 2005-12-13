@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@ static char scsi_log_buffer[MAXPATHLEN + 1];
 #define	CSEC		10000			/* usecs */
 #define	SEC_TO_CSEC	(1000000/CSEC)
 
+extern ddi_dma_attr_t scsi_alloc_attr;
 
 /*PRINTFLIKE4*/
 static void impl_scsi_log(dev_info_t *dev, char *label, uint_t level,
@@ -274,13 +275,22 @@ get_pktiopb(struct scsi_address *ap, caddr_t *datap, int cdblen, int statuslen,
 	dev_info_t	*pdip = tran->tran_hba_dip;
 	struct scsi_pkt	*pkt = NULL;
 	struct buf	local;
+	size_t		rlen;
 
 	if (!datap)
 		return (pkt);
 	*datap = (caddr_t)0;
 	bzero((caddr_t)&local, sizeof (struct buf));
-	if (ddi_iopb_alloc(pdip, (ddi_dma_lim_t *)0,
-	    (uint_t)datalen, &local.b_un.b_addr)) {
+
+	/*
+	 * use i_ddi_mem_alloc() for now until we have an interface to allocate
+	 * memory for DMA which doesn't require a DMA handle. ddi_iopb_alloc()
+	 * is obsolete and we want more flexibility in controlling the DMA
+	 * address constraints.
+	 */
+	if (i_ddi_mem_alloc(pdip, &scsi_alloc_attr, datalen,
+	    ((func == SLEEP_FUNC) ? 1 : 0), 0, NULL, &local.b_un.b_addr, &rlen,
+	    NULL) != DDI_SUCCESS) {
 		return (pkt);
 	}
 	if (readflag)
@@ -291,7 +301,7 @@ get_pktiopb(struct scsi_address *ap, caddr_t *datap, int cdblen, int statuslen,
 		(func == SLEEP_FUNC) ? SLEEP_FUNC : NULL_FUNC,
 		NULL);
 	if (!pkt) {
-		ddi_iopb_free(local.b_un.b_addr);
+		i_ddi_mem_free(local.b_un.b_addr, 0);
 		if (func != NULL_FUNC) {
 			ddi_set_callback(func, NULL, &scsi_callback_id);
 		}
@@ -313,7 +323,7 @@ free_pktiopb(struct scsi_pkt *pkt, caddr_t datap, int datalen)
 
 	(*tran->tran_destroy_pkt)(ap, pkt);
 	if (datap && datalen) {
-		ddi_iopb_free(datap);
+		i_ddi_mem_free(datap, 0);
 	}
 	if (scsi_callback_id != 0) {
 		ddi_run_callback(&scsi_callback_id);

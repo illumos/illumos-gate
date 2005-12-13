@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -405,97 +405,130 @@ ddi_poke(dev_info_t *devi, size_t size, void *addr, void *value_p)
 	return (i_ddi_peekpoke(devi, DDI_CTLOPS_POKE, size, addr, value_p));
 }
 
-#ifdef _LP64
 int
 ddi_peek8(dev_info_t *dip, int8_t *addr, int8_t *val_p)
-#else /* _ILP32 */
-int
-ddi_peekc(dev_info_t *dip, int8_t *addr, int8_t *val_p)
-#endif
 {
 	return (i_ddi_peekpoke(dip, DDI_CTLOPS_PEEK, sizeof (*val_p), addr,
 	    val_p));
 }
 
-#ifdef _LP64
 int
 ddi_peek16(dev_info_t *dip, int16_t *addr, int16_t *val_p)
-#else /* _ILP32 */
-int
-ddi_peeks(dev_info_t *dip, int16_t *addr, int16_t *val_p)
-#endif
 {
 	return (i_ddi_peekpoke(dip, DDI_CTLOPS_PEEK, sizeof (*val_p), addr,
 	    val_p));
 }
 
-#ifdef _LP64
 int
 ddi_peek32(dev_info_t *dip, int32_t *addr, int32_t *val_p)
-#else /* _ILP32 */
-int
-ddi_peekl(dev_info_t *dip, int32_t *addr, int32_t *val_p)
-#endif
 {
 	return (i_ddi_peekpoke(dip, DDI_CTLOPS_PEEK, sizeof (*val_p), addr,
 	    val_p));
 }
 
-#ifdef _LP64
 int
 ddi_peek64(dev_info_t *dip, int64_t *addr, int64_t *val_p)
-#else /* _ILP32 */
-int
-ddi_peekd(dev_info_t *dip, int64_t *addr, int64_t *val_p)
-#endif
 {
 	return (i_ddi_peekpoke(dip, DDI_CTLOPS_PEEK, sizeof (*val_p), addr,
 	    val_p));
 }
 
-#ifdef _LP64
+
+/*
+ * We need to separate the old interfaces from the new ones and leave them
+ * in here for a while. Previous versions of the OS defined the new interfaces
+ * to the old interfaces. This way we can fix things up so that we can
+ * eventually remove these interfaces.
+ * e.g. A 3rd party module/driver using ddi_peek8 and built against S10
+ * or earlier will actually have a reference to ddi_peekc in the binary.
+ */
+#ifdef _ILP32
+int
+ddi_peekc(dev_info_t *dip, int8_t *addr, int8_t *val_p)
+{
+	return (i_ddi_peekpoke(dip, DDI_CTLOPS_PEEK, sizeof (*val_p), addr,
+	    val_p));
+}
+
+int
+ddi_peeks(dev_info_t *dip, int16_t *addr, int16_t *val_p)
+{
+	return (i_ddi_peekpoke(dip, DDI_CTLOPS_PEEK, sizeof (*val_p), addr,
+	    val_p));
+}
+
+int
+ddi_peekl(dev_info_t *dip, int32_t *addr, int32_t *val_p)
+{
+	return (i_ddi_peekpoke(dip, DDI_CTLOPS_PEEK, sizeof (*val_p), addr,
+	    val_p));
+}
+
+int
+ddi_peekd(dev_info_t *dip, int64_t *addr, int64_t *val_p)
+{
+	return (i_ddi_peekpoke(dip, DDI_CTLOPS_PEEK, sizeof (*val_p), addr,
+	    val_p));
+}
+#endif /* _ILP32 */
+
 int
 ddi_poke8(dev_info_t *dip, int8_t *addr, int8_t val)
-#else /* _ILP32 */
-int
-ddi_pokec(dev_info_t *dip, int8_t *addr, int8_t val)
-#endif
 {
 	return (i_ddi_peekpoke(dip, DDI_CTLOPS_POKE, sizeof (val), addr, &val));
 }
 
-#ifdef _LP64
 int
 ddi_poke16(dev_info_t *dip, int16_t *addr, int16_t val)
-#else /* _ILP32 */
-int
-ddi_pokes(dev_info_t *dip, int16_t *addr, int16_t val)
-#endif
 {
 	return (i_ddi_peekpoke(dip, DDI_CTLOPS_POKE, sizeof (val), addr, &val));
 }
 
-#ifdef _LP64
 int
 ddi_poke32(dev_info_t *dip, int32_t *addr, int32_t val)
-#else /* _ILP32 */
-int
-ddi_pokel(dev_info_t *dip, int32_t *addr, int32_t val)
-#endif
 {
 	return (i_ddi_peekpoke(dip, DDI_CTLOPS_POKE, sizeof (val), addr, &val));
 }
 
-#ifdef _LP64
 int
 ddi_poke64(dev_info_t *dip, int64_t *addr, int64_t val)
-#else /* _ILP32 */
-int
-ddi_poked(dev_info_t *dip, int64_t *addr, int64_t val)
-#endif
 {
 	return (i_ddi_peekpoke(dip, DDI_CTLOPS_POKE, sizeof (val), addr, &val));
 }
+
+/*
+ * We need to separate the old interfaces from the new ones and leave them
+ * in here for a while. Previous versions of the OS defined the new interfaces
+ * to the old interfaces. This way we can fix things up so that we can
+ * eventually remove these interfaces.
+ * e.g. A 3rd party module/driver using ddi_poke8 and built against S10
+ * or earlier will actually have a reference to ddi_pokec in the binary.
+ */
+#ifdef _ILP32
+int
+ddi_pokec(dev_info_t *dip, int8_t *addr, int8_t val)
+{
+	return (i_ddi_peekpoke(dip, DDI_CTLOPS_POKE, sizeof (val), addr, &val));
+}
+
+int
+ddi_pokes(dev_info_t *dip, int16_t *addr, int16_t val)
+{
+	return (i_ddi_peekpoke(dip, DDI_CTLOPS_POKE, sizeof (val), addr, &val));
+}
+
+int
+ddi_pokel(dev_info_t *dip, int32_t *addr, int32_t val)
+{
+	return (i_ddi_peekpoke(dip, DDI_CTLOPS_POKE, sizeof (val), addr, &val));
+}
+
+int
+ddi_poked(dev_info_t *dip, int64_t *addr, int64_t val)
+{
+	return (i_ddi_peekpoke(dip, DDI_CTLOPS_POKE, sizeof (val), addr, &val));
+}
+#endif /* _ILP32 */
 
 /*
  * ddi_peekpokeio() is used primarily by the mem drivers for moving

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -512,9 +512,9 @@ dnethack(dev_info_t *devinfo)
 	/*
 	 * Reset the chip
 	 */
-	ddi_io_put32(io_handle, REG32(io_reg, BUS_MODE_REG), SW_RESET);
+	ddi_put32(io_handle, REG32(io_reg, BUS_MODE_REG), SW_RESET);
 	drv_usecwait(3);
-	ddi_io_put32(io_handle, REG32(io_reg, BUS_MODE_REG), 0);
+	ddi_put32(io_handle, REG32(io_reg, BUS_MODE_REG), 0);
 	drv_usecwait(8);
 
 	secondary = dnet_read_srom(devinfo, deviceid, io_handle,
@@ -967,16 +967,16 @@ dnet_reset_board(gld_mac_info_t *macinfo)
 	 */
 	/* XXX function return value ignored */
 	/* (void) dnet_stop_board(macinfo); */
-	val = ddi_io_get32(dnetp->io_handle,
+	val = ddi_get32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, OPN_MODE_REG));
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
 		    val & ~(START_TRANSMIT | START_RECEIVE));
 
 	/*
 	 * Reset the chip
 	 */
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, INT_MASK_REG), 0);
-	ddi_io_put32(dnetp->io_handle,
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, INT_MASK_REG), 0);
+	ddi_put32(dnetp->io_handle,
 		REG32(dnetp->io_reg, BUS_MODE_REG), SW_RESET);
 	drv_usecwait(5);
 }
@@ -1006,7 +1006,7 @@ dnet_chip_init(gld_mac_info_t *macinfo)
 	struct dnetinstance	*dnetp = (struct dnetinstance *)
 					(macinfo->gldm_private);
 
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, BUS_MODE_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, BUS_MODE_REG),
 		    CACHE_ALIGN | BURST_SIZE);		/* CSR0 */
 
 	/*
@@ -1017,13 +1017,13 @@ dnet_chip_init(gld_mac_info_t *macinfo)
 	/*
 	 * Set the base address of the Rx descriptor list in CSR3
 	 */
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, RX_BASE_ADDR_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, RX_BASE_ADDR_REG),
 	    (uint32_t)(dnetp->rx_desc_paddr));
 
 	/*
 	 * Set the base address of the Tx descrptor list in CSR4
 	 */
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, TX_BASE_ADDR_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, TX_BASE_ADDR_REG),
 		    (uint32_t)(dnetp->tx_desc_paddr));
 
 	dnetp->tx_current_desc = dnetp->rx_current_desc = 0;
@@ -1052,14 +1052,14 @@ dnet_start(gld_mac_info_t *macinfo)
 	/*
 	 * start the board and enable receiving
 	 */
-	val = ddi_io_get32(dnetp->io_handle,
+	val = ddi_get32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, OPN_MODE_REG));
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
 		    val | START_TRANSMIT);
 	(void) dnet_set_addr(macinfo, dnetp->curr_macaddr);
-	val = ddi_io_get32(dnetp->io_handle,
+	val = ddi_get32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, OPN_MODE_REG));
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
 		    val | START_RECEIVE);
 	enable_interrupts(dnetp, 1);
 	return (0);
@@ -1106,9 +1106,9 @@ dnet_stop_board(gld_mac_info_t *macinfo)
 	 * stop the board and disable transmit/receive
 	 */
 	mutex_enter(&dnetp->intrlock);
-	val = ddi_io_get32(dnetp->io_handle,
+	val = ddi_get32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, OPN_MODE_REG));
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG),
 		    val & ~(START_TRANSMIT | START_RECEIVE));
 	mutex_exit(&dnetp->intrlock);
 	return (0);
@@ -1135,7 +1135,7 @@ dnet_set_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 		cmn_err(CE_NOTE, "dnet_set_addr(0x%p)", (void *) macinfo);
 #endif
 	bcopy(macaddr, dnetp->curr_macaddr, ETHERADDRL);
-	val = ddi_io_get32(dnetp->io_handle,
+	val = ddi_get32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, OPN_MODE_REG));
 	if (!(val & START_TRANSMIT))
 		return (0);
@@ -1194,7 +1194,7 @@ dnet_set_addr(gld_mac_info_t *macinfo, uchar_t *macaddr)
 	hashp[ index / 16 ] |= 1 << (index % 16);
 
 	desc->desc0.own = 1;
-	ddi_io_put8(dnetp->io_handle, REG8(dnetp->io_reg, TX_POLL_REG),
+	ddi_put8(dnetp->io_handle, REG8(dnetp->io_reg, TX_POLL_REG),
 		    TX_POLL_DEMAND);
 	return (0);
 }
@@ -1323,14 +1323,14 @@ dnet_set_promiscuous(gld_mac_info_t *macinfo, int on)
 	}
 	dnetp->promisc = on;
 
-	val = ddi_io_get32(dnetp->io_handle,
+	val = ddi_get32(dnetp->io_handle,
 			REG32(dnetp->io_reg, OPN_MODE_REG));
 	if (on != GLD_MAC_PROMISC_NONE)
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			REG32(dnetp->io_reg, OPN_MODE_REG),
 			val | PROM_MODE);
 	else
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			REG32(dnetp->io_reg, OPN_MODE_REG),
 			val & (~PROM_MODE));
 	mutex_exit(&dnetp->intrlock);
@@ -1590,7 +1590,7 @@ dnet_send(gld_mac_info_t *macinfo, mblk_t *mp)
 	/*
 	 * Kick the transmitter
 	 */
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, TX_POLL_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, TX_POLL_REG),
 	    TX_POLL_DEMAND);
 	mutex_exit(&dnetp->intrlock);
 	return (GLD_TX_OK);		/* successful transmit attempt */
@@ -1615,7 +1615,7 @@ dnetintr(gld_mac_info_t *macinfo)
 	if (dnetdebug & DNETINT)
 		cmn_err(CE_NOTE, "dnetintr(0x%p)", (void *)macinfo);
 #endif
-	int_status = ddi_io_get32(dnetp->io_handle, REG32(dnetp->io_reg,
+	int_status = ddi_get32(dnetp->io_handle, REG32(dnetp->io_reg,
 			STATUS_REG));
 
 	/*
@@ -1629,7 +1629,7 @@ dnetintr(gld_mac_info_t *macinfo)
 	dnetp->stat_intr++;
 
 	if (int_status & GPTIMER_INTR) {
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, STATUS_REG), GPTIMER_INTR);
 		if (dnetp->timer.cb)
 			dnetp->timer.cb(dnetp);
@@ -1638,7 +1638,7 @@ dnetintr(gld_mac_info_t *macinfo)
 	}
 
 	if (int_status & TX_INTR) {
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, STATUS_REG), TX_INTR);
 		mutex_enter(&dnetp->txlock);
 		if (dnetp->need_gld_sched) {
@@ -1658,7 +1658,7 @@ dnetintr(gld_mac_info_t *macinfo)
 	 * Check if receive interrupt bit is set
 	 */
 	if (int_status & RX_INTR) {
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, STATUS_REG), RX_INTR);
 		dnet_getp(macinfo);
 	}
@@ -1739,7 +1739,7 @@ dnet_getp(gld_mac_info_t *macinfo)
 		 * If the workaround is not in place, we must still update
 		 * the missed frame statistic from the on-chip counter.
 		 */
-		misses = ddi_io_get32(dnetp->io_handle,
+		misses = ddi_get32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, MISSED_FRAME_REG));
 		dnetp->stat_missed += (misses & MISSED_FRAME_MASK);
 	}
@@ -1765,7 +1765,7 @@ dnet_getp(gld_mac_info_t *macinfo)
 			} while (!(dnetp->rx_desc[marker].desc0.own) &&
 			    marker != index);
 
-			misses = ddi_io_get32(dnetp->io_handle,
+			misses = ddi_get32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, MISSED_FRAME_REG));
 			dnetp->stat_missed +=
 			    (misses & MISSED_FRAME_MASK);
@@ -1774,15 +1774,15 @@ dnet_getp(gld_mac_info_t *macinfo)
 				 * Overflow(s) have occurred : stop receiver,
 				 * and wait until in stopped state
 				 */
-				opn = ddi_io_get32(dnetp->io_handle,
+				opn = ddi_get32(dnetp->io_handle,
 				    REG32(dnetp->io_reg, OPN_MODE_REG));
-				ddi_io_put32(dnetp->io_handle,
+				ddi_put32(dnetp->io_handle,
 				    REG32(dnetp->io_reg, OPN_MODE_REG),
 				    opn & ~(START_RECEIVE));
 
 				do {
 					drv_usecwait(10);
-				} while ((ddi_io_get32(dnetp->io_handle,
+				} while ((ddi_get32(dnetp->io_handle,
 				    REG32(dnetp->io_reg, STATUS_REG)) &
 				    RECEIVE_PROCESS_STATE) != 0);
 #ifdef DNETDEBUG
@@ -1797,9 +1797,9 @@ dnet_getp(gld_mac_info_t *macinfo)
 				}
 
 				/* restart the receiver */
-				opn = ddi_io_get32(dnetp->io_handle,
+				opn = ddi_get32(dnetp->io_handle,
 				    REG32(dnetp->io_reg, OPN_MODE_REG));
-				ddi_io_put32(dnetp->io_handle,
+				ddi_put32(dnetp->io_handle,
 				    REG32(dnetp->io_reg, OPN_MODE_REG),
 				    opn | START_RECEIVE);
 				marker = dnetp->rx_current_desc = index;
@@ -1912,7 +1912,7 @@ dnet_getp(gld_mac_info_t *macinfo)
 			    (dnetp->rx_current_desc+1) % dnetp->max_rx_desc;
 
 			/* Demand receive polling by the chip */
-			ddi_io_put32(dnetp->io_handle,
+			ddi_put32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, RX_POLL_REG), RX_POLL_DEMAND);
 
 			continue;
@@ -1953,7 +1953,7 @@ dnet_getp(gld_mac_info_t *macinfo)
 			(dnetp->rx_current_desc+1) % dnetp->max_rx_desc;
 
 		/* Demand polling by chip */
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			    REG32(dnetp->io_reg, RX_POLL_REG), RX_POLL_DEMAND);
 
 		/* send the packet upstream */
@@ -2087,7 +2087,7 @@ write_gpr(struct dnetinstance *dnetp, uint32_t val)
 			val |= CWE_21143, val &= ~GPR_CONTROL_WRITE;
 		/* Write to upper half of CSR15 */
 		dnetp->gprsia = (dnetp->gprsia & 0xffff) | (val << 16);
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			REG32(dnetp->io_reg, SIA_GENERAL_REG),
 			dnetp->gprsia);
 		break;
@@ -2095,7 +2095,7 @@ write_gpr(struct dnetinstance *dnetp, uint32_t val)
 		/* Set the correct bit for a control write */
 		if (val & GPR_CONTROL_WRITE)
 			val |= CWE_21140, val &= ~GPR_CONTROL_WRITE;
-		ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, GP_REG),
+		ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, GP_REG),
 			val);
 		break;
 	}
@@ -2107,10 +2107,10 @@ read_gpr(struct dnetinstance *dnetp)
 	switch (dnetp->board_type) {
 	case DEVICE_ID_21143:
 		/* Read upper half of CSR15 */
-		return (ddi_io_get32(dnetp->io_handle,
+		return (ddi_get32(dnetp->io_handle,
 			REG32(dnetp->io_reg, SIA_GENERAL_REG)) >> 16);
 	default:
-		return (ddi_io_get32(dnetp->io_handle,
+		return (ddi_get32(dnetp->io_handle,
 				REG32(dnetp->io_reg, GP_REG)));
 	}
 }
@@ -2194,10 +2194,10 @@ set_opr(gld_mac_info_t *macinfo)
 	}
 
 	if (opnmode_len) {
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			REG32(dnetp->io_reg, OPN_MODE_REG), val);
 		dnet_reset_board(macinfo);
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			REG32(dnetp->io_reg, OPN_MODE_REG), val);
 		return;
 	}
@@ -2237,9 +2237,9 @@ set_opr(gld_mac_info_t *macinfo)
 	if (dnetdebug & DNETREGCFG)
 		cmn_err(CE_NOTE, "OPN: %x", val);
 #endif
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG), val);
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG), val);
 	dnet_reset_board(macinfo);
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG), val);
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, OPN_MODE_REG), val);
 }
 
 static void
@@ -2263,10 +2263,10 @@ set_sia(gld_mac_info_t *macinfo)
 		sia_delay = ddi_getprop(DDI_DEV_T_ANY, dnetp->devinfo,
 		    DDI_PROP_DONTPASS, "sia-delay", 10000);
 
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			REG32(dnetp->io_reg, SIA_CONNECT_REG), 0);
 
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 			REG32(dnetp->io_reg, SIA_TXRX_REG),
 		    block->un.sia.csr14);
 
@@ -2275,20 +2275,20 @@ set_sia(gld_mac_info_t *macinfo)
 		 * to keep the GP half intact
 		 */
 		dnetp->gprsia = (dnetp->gprsia&0xffff0000)|block->un.sia.csr15;
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, SIA_GENERAL_REG),
 		    dnetp->gprsia);
 
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, SIA_CONNECT_REG),
 		    block->un.sia.csr13);
 
 		drv_usecwait(sia_delay);
 
 	} else if (dnetp->board_type != DEVICE_ID_21140) {
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, SIA_CONNECT_REG), 0);
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, SIA_TXRX_REG), 0);
 	}
 }
@@ -3029,10 +3029,10 @@ dnet_read21040addr(dev_info_t *dip, ddi_acc_handle_t io_handle, int io_reg,
 	    DDI_PROP_DONTPASS, macoffset_propname, 0) + ETHERADDRL;
 
 	/* Reset ROM pointer */
-	ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG), 0);
+	ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG), 0);
 	for (i = 0; i < *len; i++) {
 		do {
-			val = ddi_io_get32(io_handle,
+			val = ddi_get32(io_handle,
 				REG32(io_reg, ETHER_ROM_REG));
 		} while (val & 0x80000000);
 		addr[i] = val & 0xFF;
@@ -3057,55 +3057,55 @@ dnet_read21140srom(ddi_acc_handle_t io_handle, int io_reg, uchar_t *addr,
 
 	rom_addr = 0;
 	for (i = 0; i <	maxlen; i += 2) {
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM);
 		drv_nsecwait(30);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP);
 		drv_nsecwait(50);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | SEL_CLK);
 		drv_nsecwait(250);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP);
 		drv_nsecwait(100);
 
 		/* command */
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN);
 		drv_nsecwait(150);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN | SEL_CLK);
 		drv_nsecwait(250);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN);
 		drv_nsecwait(250);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN | SEL_CLK);
 		drv_nsecwait(250);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | DATA_IN);
 		drv_nsecwait(100);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP);
 		drv_nsecwait(150);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | SEL_CLK);
 		drv_nsecwait(250);
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP);
 		drv_nsecwait(100);
 
 		/* Address */
 		for (j = HIGH_ADDRESS_BIT; j >= 1; j >>= 1) {
 			bit = (rom_addr & j) ? DATA_IN : 0;
-			ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+			ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | bit);
 			drv_nsecwait(150);
-			ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+			ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | bit | SEL_CLK);
 			drv_nsecwait(250);
-			ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+			ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM | SEL_CHIP | bit);
 			drv_nsecwait(100);
 		}
@@ -3114,15 +3114,15 @@ dnet_read21140srom(ddi_acc_handle_t io_handle, int io_reg, uchar_t *addr,
 		/* Data */
 		word = 0;
 		for (j = 0x8000; j >= 1; j >>= 1) {
-			ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+			ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 				    READ_OP | SEL_ROM | SEL_CHIP | SEL_CLK);
 			drv_nsecwait(100);
-			dout = ddi_io_get32(io_handle,
+			dout = ddi_get32(io_handle,
 					    REG32(io_reg, ETHER_ROM_REG));
 			drv_nsecwait(150);
 			if (dout & DATA_OUT)
 				word |= j;
-			ddi_io_put32(io_handle,
+			ddi_put32(io_handle,
 				    REG32(io_reg, ETHER_ROM_REG),
 				    READ_OP | SEL_ROM | SEL_CHIP);
 			drv_nsecwait(250);
@@ -3130,7 +3130,7 @@ dnet_read21140srom(ddi_acc_handle_t io_handle, int io_reg, uchar_t *addr,
 		addr[i] = (word & 0x0000FF);
 		addr[i + 1] = (word >> 8);
 		rom_addr++;
-		ddi_io_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
+		ddi_put32(io_handle, REG32(io_reg, ETHER_ROM_REG),
 			    READ_OP | SEL_ROM);
 		drv_nsecwait(100);
 	}
@@ -3656,7 +3656,7 @@ send_test_packet(gld_mac_info_t *macinfo)
 	desc[bufindex].desc1.int_on_comp = 1;
 	desc[bufindex].desc0.own = 1;
 
-	ddi_io_put8(dnetp->io_handle, REG8(dnetp->io_reg, TX_POLL_REG),
+	ddi_put8(dnetp->io_handle, REG8(dnetp->io_reg, TX_POLL_REG),
 		    TX_POLL_DEMAND);
 
 	/*
@@ -3698,7 +3698,7 @@ enable_interrupts(struct dnetinstance *dnetp, int enable_xmit)
 	/* Don't enable interrupts if they have been forced off */
 	if (dnetp->interrupts_disabled)
 		return;
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, INT_MASK_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, INT_MASK_REG),
 	    NORMAL_INTR_MASK | ABNORMAL_INTR_MASK | TX_UNDERFLOW_MASK |
 	    (enable_xmit ? TX_INTERRUPT_MASK : 0) |
 	    (dnetp->timer.cb ? GPTIMER_INTR : 0) |
@@ -3938,7 +3938,7 @@ dnet_detach_hacked_interrupt(dev_info_t *devinfo)
 			struct dnetinstance *altdnetp =
 				(struct dnetinstance *)mac->gldm_private;
 			altdnetp->interrupts_disabled = 1;
-			ddi_io_put32(altdnetp->io_handle,
+			ddi_put32(altdnetp->io_handle,
 				REG32(altdnetp->io_reg, INT_MASK_REG), 0);
 		}
 	}
@@ -4051,20 +4051,20 @@ dnet_mii_read(dev_info_t *dip, int phy_addr, int reg_num)
 	mii_tristate(dnetp);
 
 	/* Check that the PHY generated a zero bit the 2nd clock */
-	tmp = ddi_io_get32(dnetp->io_handle,
+	tmp = ddi_get32(dnetp->io_handle,
 		REG32(dnetp->io_reg, ETHER_ROM_REG));
 
 	turned_around = (tmp & MII_DATA_IN) ? 0 : 1;
 
 	/* read data WORD */
 	for (i = 0; i < bits_in_ushort; i++) {
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, ETHER_ROM_REG), MII_READ);
 		drv_usecwait(MII_DELAY);
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, ETHER_ROM_REG), MII_READ | MII_CLOCK);
 		drv_usecwait(MII_DELAY);
-		tmp = ddi_io_get32(dnetp->io_handle,
+		tmp = ddi_get32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, ETHER_ROM_REG));
 		drv_usecwait(MII_DELAY);
 		data = (data << 1) | (tmp >> MII_DATA_IN_POSITION) & 0x0001;
@@ -4110,11 +4110,11 @@ write_mii(struct dnetinstance *dnetp, uint32_t mii_data, int data_size)
 	for (i = data_size; i > 0; i--) {
 		dbit = ((mii_data >>
 		    (31 - MII_WRITE_DATA_POSITION)) & MII_WRITE_DATA);
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, ETHER_ROM_REG),
 		    MII_WRITE | dbit);
 		drv_usecwait(MII_DELAY);
-		ddi_io_put32(dnetp->io_handle,
+		ddi_put32(dnetp->io_handle,
 		    REG32(dnetp->io_reg, ETHER_ROM_REG),
 		    MII_WRITE | MII_CLOCK | dbit);
 		drv_usecwait(MII_DELAY);
@@ -4130,10 +4130,10 @@ static void
 mii_tristate(struct dnetinstance *dnetp)
 {
 	ASSERT(MUTEX_HELD(&dnetp->intrlock));
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, ETHER_ROM_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, ETHER_ROM_REG),
 	    MII_WRITE_TS);
 	drv_usecwait(MII_DELAY);
-	ddi_io_put32(dnetp->io_handle, REG32(dnetp->io_reg, ETHER_ROM_REG),
+	ddi_put32(dnetp->io_handle, REG32(dnetp->io_reg, ETHER_ROM_REG),
 	    MII_WRITE_TS | MII_CLOCK);
 	drv_usecwait(MII_DELAY);
 }

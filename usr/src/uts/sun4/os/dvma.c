@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,6 +121,8 @@ dvma_kaddr_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 	register ddi_dma_impl_t *mp = (ddi_dma_impl_t *)h;
 	struct fast_dvma *nexus_private;
 	struct dvma_ops *nexus_funcptr;
+	ddi_dma_attr_t dma_attr;
+	uint_t ccnt;
 
 	if (mp->dmai_rflags & DMP_BYPASSNEXUS) {
 		nexus_private = (struct fast_dvma *)mp->dmai_nexus_private;
@@ -131,10 +133,23 @@ dvma_kaddr_load(ddi_dma_handle_t h, caddr_t a, uint_t len, uint_t index,
 		ddi_dma_lim_t *limp;
 
 		limp = (ddi_dma_lim_t *)mp->dmai_mapping;
-		(void) ddi_dma_addr_setup(HD, NULL, a, len, DDI_DMA_RDWR,
-					DDI_DMA_SLEEP, NULL, limp, &handle);
+		dma_attr.dma_attr_version = DMA_ATTR_V0;
+		dma_attr.dma_attr_addr_lo = limp->dlim_addr_lo;
+		dma_attr.dma_attr_addr_hi = limp->dlim_addr_hi;
+		dma_attr.dma_attr_count_max = limp->dlim_cntr_max;
+		dma_attr.dma_attr_align = 1;
+		dma_attr.dma_attr_burstsizes = limp->dlim_burstsizes;
+		dma_attr.dma_attr_minxfer = limp->dlim_minxfer;
+		dma_attr.dma_attr_maxxfer = 0xFFFFFFFFull;
+		dma_attr.dma_attr_seg = 0xFFFFFFFFull;
+		dma_attr.dma_attr_sgllen = 1;
+		dma_attr.dma_attr_granular = 1;
+		dma_attr.dma_attr_flags = 0;
+		(void) ddi_dma_alloc_handle(HD, &dma_attr, DDI_DMA_SLEEP, NULL,
+		    &handle);
+		(void) ddi_dma_addr_bind_handle(handle, NULL, a, len,
+		    DDI_DMA_RDWR, DDI_DMA_SLEEP, NULL, cp, &ccnt);
 		((ddi_dma_handle_t *)mp->dmai_minfo)[index] = handle;
-		(void) ddi_dma_htoc(handle, 0, cp);
 	}
 }
 
@@ -154,7 +169,8 @@ dvma_unload(ddi_dma_handle_t h, uint_t objindex, uint_t type)
 		ddi_dma_handle_t handle;
 
 		handle = ((ddi_dma_handle_t *)mp->dmai_minfo)[objindex];
-		(void) ddi_dma_free(handle);
+		(void) ddi_dma_unbind_handle(handle);
+		(void) ddi_dma_free_handle(&handle);
 	}
 }
 

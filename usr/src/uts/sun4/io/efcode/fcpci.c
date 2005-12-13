@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -43,6 +43,7 @@
 #include <sys/fcode.h>
 #include <sys/promif.h>
 #include <sys/promimpl.h>
+#include <sys/ddi_implfuncs.h>
 
 #define	PCI_NPT_bits	(PCI_RELOCAT_B | PCI_PREFETCH_B | PCI_ALIAS_B)
 #define	PCICFG_CONF_INDIRECT_MAP	1
@@ -76,7 +77,6 @@ int pci_alloc_io_chunk(dev_info_t *,  uint64_t,  uint64_t *, uint64_t *);
 static int fcpci_indirect_map(dev_info_t *);
 
 int fcpci_unloadable;
-int no_advisory_dma;
 
 #ifndef	lint
 static char _depends_on[] = "misc/fcodem misc/busra";
@@ -288,6 +288,8 @@ pfc_dma_map_in(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	struct fc_resource *ip;
 	ddi_dma_cookie_t c;
 	struct buf *bp;
+	ddi_dma_attr_t attr;
+	uint_t ccnt;
 
 	if (fc_cell2int(cp->nargs) != 3)
 		return (fc_syntax_error(cp, "nargs must be 3"));
@@ -317,48 +319,30 @@ pfc_dma_map_in(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 		return (fc_priv_error(cp, "fc_physio_setup failed"));
 	}
 
-	if (no_advisory_dma == 0) {
-		/*
-		 * First try the advisory call to see if it's legal ..
-		 * for advisory dma, don't pass in a ptr to a dma handle.
-		 */
-		FC_DEBUG0(9, CE_CONT, "pfc_dma_map_in: advisory dma_map_in\n");
-		error = ddi_dma_buf_setup(ap, bp, flags, DDI_DMA_SLEEP,
-		    NULL, NULL, NULL);
-
-		if (error)  {
-			FC_DEBUG3(9, CE_CONT, "pfc_dma_map_in: advisory "
-			    "dma-map-in failed error: %d  virt: %p  len %d\n",
-			    error, virt, len);
-			return (fc_priv_error(cp, "advisory dma-map-in "
-			    "failed"));
-		}
-	}
-
 	FC_DEBUG1(9, CE_CONT, "pfc_dma_map_in: dma_map_in; bp = %p\n", bp);
-	error = ddi_dma_buf_setup(ap, bp, flags, DDI_DMA_SLEEP,
-	    NULL, NULL, &h);
-
-	if (error)  {
+	error = fc_ddi_dma_alloc_handle(ap, &attr, DDI_DMA_SLEEP, NULL, &h);
+	if (error != DDI_SUCCESS)  {
 		FC_DEBUG3(1, CE_CONT, "pfc_dma_map_in: real dma-map-in failed "
 		    "error: %d  virt: %p  len %d\n", error, virt, len);
 		return (fc_priv_error(cp, "real dma-map-in failed"));
 	}
 
-	/*
-	 * Now that the resource is mapped in, we need the dma cookie
-	 * so we can return it to the driver.
-	 */
-
-	error = fc_ddi_dma_htoc(ap, h, 0, &c);
-	if (error)  {
-		(void) fc_ddi_dma_free(ap, h);
-		return (fc_priv_error(cp, "ddi_dma_htoc failed"));
+	error = fc_ddi_dma_buf_bind_handle(h, bp, flags, DDI_DMA_SLEEP, NULL,
+	    &c, &ccnt);
+	if ((error != DDI_DMA_MAPPED) || (ccnt != 1)) {
+		fc_ddi_dma_free_handle(&h);
+		FC_DEBUG3(1, CE_CONT, "pfc_dma_map_in: real dma-map-in failed "
+		    "error: %d  virt: %p  len %d\n", error, virt, len);
+		return (fc_priv_error(cp, "real dma-map-in failed"));
 	}
 
 	if (c.dmac_size < len)  {
-		(void) fc_ddi_dma_free(ap, h);
-		return (fc_priv_error(cp, "ddi_dma_htoc size < len"));
+		error = fc_ddi_dma_unbind_handle(h);
+		if (error != DDI_SUCCESS) {
+			return (fc_priv_error(cp, "ddi_dma_unbind error"));
+		}
+		fc_ddi_dma_free_handle(&h);
+		return (fc_priv_error(cp, "ddi_dma_buf_bind size < len"));
 	}
 
 	FC_DEBUG1(9, CE_CONT, "pfc_dma_map_in: returning devaddr %x\n",
@@ -443,6 +427,7 @@ pfc_dma_map_out(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	size_t len;
 	uint32_t devaddr;
 	struct fc_resource *ip;
+	int e;
 
 	if (fc_cell2int(cp->nargs) != 3)
 		return (fc_syntax_error(cp, "nargs must be 3"));
@@ -472,10 +457,13 @@ pfc_dma_map_out(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 		    "known dma mapping"));
 
 	/*
-	 * ddi_dma_free does an implied sync ...
+	 * ddi_dma_unbind_handle does an implied sync ...
 	 */
-	if (fc_ddi_dma_free(ap, ip->fc_dma_handle))
-		cmn_err(CE_CONT, "pfc_dma_map_out: ddi_dma_free failed!\n");
+	e = fc_ddi_dma_unbind_handle(ip->fc_dma_handle);
+	if (e != DDI_SUCCESS) {
+		cmn_err(CE_CONT, "pfc_dma_map_out: ddi_dma_unbind failed!\n");
+	}
+	fc_ddi_dma_free_handle(&ip->fc_dma_handle);
 
 	/*
 	 * Tear down the physio mappings
@@ -510,6 +498,7 @@ static int
 pfc_dma_cleanup(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 {
 	struct fc_resource *ip;
+	int e;
 
 	while ((ip = next_dma_resource(rp)) != NULL) {
 
@@ -519,9 +508,12 @@ pfc_dma_cleanup(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 		/*
 		 * Free the dma handle
 		 */
-		if (fc_ddi_dma_free(ap, ip->fc_dma_handle))
+		e = fc_ddi_dma_unbind_handle(ip->fc_dma_handle);
+		if (e != DDI_SUCCESS) {
 			cmn_err(CE_CONT, "pfc_dma_cleanup: "
-			    "ddi_dma_free failed!\n");
+			    "ddi_dma_unbind failed!\n");
+		}
+		fc_ddi_dma_free_handle(&ip->fc_dma_handle);
 
 		/*
 		 * Tear down the userland mapping and free the buf header

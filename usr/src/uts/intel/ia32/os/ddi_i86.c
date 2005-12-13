@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -704,45 +704,27 @@ i_ddi_io_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr, uint64_t value)
 	/*NOTREACHED*/
 }
 
-#ifdef _LP64
 void
 ddi_io_rep_get8(ddi_acc_handle_t handle,
 	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
-#else /* _ILP32 */
-void
-ddi_io_rep_getb(ddi_acc_handle_t handle,
-	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
-#endif
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_get8)
 		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
 		repcount, DDI_DEV_NO_AUTOINCR);
 }
 
-#ifdef _LP64
 void
 ddi_io_rep_get16(ddi_acc_handle_t handle,
 	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
-#else /* _ILP32 */
-void
-ddi_io_rep_getw(ddi_acc_handle_t handle,
-	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
-#endif
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_get16)
 		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
 		repcount, DDI_DEV_NO_AUTOINCR);
 }
 
-#ifdef _LP64
 void
 ddi_io_rep_get32(ddi_acc_handle_t handle,
 	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
-#else /* _ILP32 */
-void
-ddi_io_rep_getl(ddi_acc_handle_t handle,
-	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
-#endif
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_get32)
 		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
@@ -757,45 +739,27 @@ i_ddi_io_rep_get64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 	cmn_err(CE_PANIC, "ddi_rep_get64 from i/o space");
 }
 
-#ifdef _LP64
 void
 ddi_io_rep_put8(ddi_acc_handle_t handle,
 	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
-#else /* _ILP32 */
-void
-ddi_io_rep_putb(ddi_acc_handle_t handle,
-	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
-#endif
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_put8)
 		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
 		repcount, DDI_DEV_NO_AUTOINCR);
 }
 
-#ifdef _LP64
 void
 ddi_io_rep_put16(ddi_acc_handle_t handle,
 	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
-#else /* _ILP32 */
-void
-ddi_io_rep_putw(ddi_acc_handle_t handle,
-	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
-#endif
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_put16)
 		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
 		repcount, DDI_DEV_NO_AUTOINCR);
 }
 
-#ifdef _LP64
 void
 ddi_io_rep_put32(ddi_acc_handle_t handle,
 	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
-#else /* _ILP32 */
-void
-ddi_io_rep_putl(ddi_acc_handle_t handle,
-	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
-#endif
 {
 	(((ddi_acc_impl_t *)handle)->ahi_rep_put32)
 		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
@@ -809,6 +773,70 @@ i_ddi_io_rep_put64(ddi_acc_impl_t *hdlp, uint64_t *host_addr,
 {
 	cmn_err(CE_PANIC, "ddi_rep_put64 to i/o space");
 }
+
+/*
+ * We need to separate the old interfaces from the new ones and leave them
+ * in here for a while. Previous versions of the OS defined the new interfaces
+ * to the old interfaces. This way we can fix things up so that we can
+ * eventually remove these interfaces.
+ * e.g. A 3rd party module/driver using ddi_io_rep_get8 and built against S10
+ * or earlier will actually have a reference to ddi_io_rep_getb in the binary.
+ */
+#ifdef _ILP32
+void
+ddi_io_rep_getb(ddi_acc_handle_t handle,
+	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
+{
+	(((ddi_acc_impl_t *)handle)->ahi_rep_get8)
+		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
+		repcount, DDI_DEV_NO_AUTOINCR);
+}
+
+void
+ddi_io_rep_getw(ddi_acc_handle_t handle,
+	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
+{
+	(((ddi_acc_impl_t *)handle)->ahi_rep_get16)
+		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
+		repcount, DDI_DEV_NO_AUTOINCR);
+}
+
+void
+ddi_io_rep_getl(ddi_acc_handle_t handle,
+	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
+{
+	(((ddi_acc_impl_t *)handle)->ahi_rep_get32)
+		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
+		repcount, DDI_DEV_NO_AUTOINCR);
+}
+
+void
+ddi_io_rep_putb(ddi_acc_handle_t handle,
+	uint8_t *host_addr, uint8_t *dev_addr, size_t repcount)
+{
+	(((ddi_acc_impl_t *)handle)->ahi_rep_put8)
+		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
+		repcount, DDI_DEV_NO_AUTOINCR);
+}
+
+void
+ddi_io_rep_putw(ddi_acc_handle_t handle,
+	uint16_t *host_addr, uint16_t *dev_addr, size_t repcount)
+{
+	(((ddi_acc_impl_t *)handle)->ahi_rep_put16)
+		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
+		repcount, DDI_DEV_NO_AUTOINCR);
+}
+
+void
+ddi_io_rep_putl(ddi_acc_handle_t handle,
+	uint32_t *host_addr, uint32_t *dev_addr, size_t repcount)
+{
+	(((ddi_acc_impl_t *)handle)->ahi_rep_put32)
+		((ddi_acc_impl_t *)handle, host_addr, dev_addr,
+		repcount, DDI_DEV_NO_AUTOINCR);
+}
+#endif /* _ILP32 */
 
 /*
  * These next two functions could be translated into assembler someday

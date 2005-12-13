@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -520,10 +520,6 @@ int tone[] = {
  * a series of small packets is heard as
  * clicks, whereas a series of NFS packets
  * in an 8k read sounds like a "WHAAAARP".
- *
- * Note: add 4 constant bytes to sound segments
- * to avoid an artifact of DBRI/MMCODEC that
- * results in a screech due to underrun (bug 114552).
  */
 void
 click(len)
@@ -534,7 +530,6 @@ click(len)
 
 	if (audio) {
 		write(audio, tone, len);
-		write(audio, "\377\377\377\377", 4);
 	}
 }
 

@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -92,7 +93,6 @@ f none usr/include/sys/isdnio.h 644 root bin
 f none usr/include/sys/mace.h 644 root bin
 f none usr/include/sys/memfb.h 644 root bin
 f none usr/include/sys/memreg.h 644 root bin
-f none usr/include/sys/mmcodecreg.h 644 root bin
 f none usr/include/sys/obpdefs.h 644 root bin
 f none usr/include/sys/ramdac.h 644 root bin
 f none usr/include/sys/scsi/adapters/espcmd.h 644 root bin

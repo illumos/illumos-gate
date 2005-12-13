@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1999, 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,26 +39,101 @@
 
 /*
  * We want to call the attachment point's dma ctl op, not his parent's
- * dma ctl op, so we have to code this ourselves. (the dma setup functions
- * already implement this functionality for us.)
+ * dma ctl op, so we have to code this ourselves.
  */
-int
-fc_ddi_dma_htoc(dev_info_t *ap, ddi_dma_handle_t h, off_t o,
-	ddi_dma_cookie_t *c)
-{
-	int (*fp)();
 
-	fp = DEVI(ap)->devi_ops->devo_bus_ops->bus_dma_ctl;
-	return ((*fp) (ap, ap, h, DDI_DMA_HTOC, &o, 0, (caddr_t *)c, 0));
+int
+fc_ddi_dma_alloc_handle(dev_info_t *dip, ddi_dma_attr_t *attr,
+    int (*waitfp)(caddr_t), caddr_t arg, ddi_dma_handle_t *handlep)
+{
+	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_attr_t *,
+	    int (*)(caddr_t), caddr_t, ddi_dma_handle_t *);
+
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_allochdl;
+	return ((*funcp)(dip, dip, attr, waitfp, arg, handlep));
 }
 
 int
-fc_ddi_dma_free(dev_info_t *ap, ddi_dma_handle_t h)
+fc_ddi_dma_buf_bind_handle(ddi_dma_handle_t handle, struct buf *bp,
+    uint_t flags, int (*waitfp)(caddr_t), caddr_t arg,
+    ddi_dma_cookie_t *cookiep, uint_t *ccountp)
 {
-	int (*fp)();
+	struct ddi_dma_req dmareq;
+	ddi_dma_impl_t *hp;
+	dev_info_t *dip;
+	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t,
+	    struct ddi_dma_req *, ddi_dma_cookie_t *, uint_t *);
 
-	fp = DEVI(ap)->devi_ops->devo_bus_ops->bus_dma_ctl;
-	return ((*fp) (ap, ap, h, DDI_DMA_FREE, 0, 0, 0, 0));
+	hp = (ddi_dma_impl_t *)handle;
+	dip = hp->dmai_rdip;
+
+	dmareq.dmar_flags = flags;
+	dmareq.dmar_fp = waitfp;
+	dmareq.dmar_arg = arg;
+	dmareq.dmar_object.dmao_size = (uint_t)bp->b_bcount;
+
+	if ((bp->b_flags & (B_PAGEIO|B_REMAPPED)) == B_PAGEIO) {
+		dmareq.dmar_object.dmao_type = DMA_OTYP_PAGES;
+		dmareq.dmar_object.dmao_obj.pp_obj.pp_pp = bp->b_pages;
+		dmareq.dmar_object.dmao_obj.pp_obj.pp_offset =
+		    (uint_t)(((uintptr_t)bp->b_un.b_addr) & MMU_PAGEOFFSET);
+	} else {
+		dmareq.dmar_object.dmao_obj.virt_obj.v_addr = bp->b_un.b_addr;
+		if ((bp->b_flags & (B_SHADOW|B_REMAPPED)) == B_SHADOW) {
+			dmareq.dmar_object.dmao_obj.virt_obj.v_priv =
+							bp->b_shadow;
+			dmareq.dmar_object.dmao_type = DMA_OTYP_BUFVADDR;
+		} else {
+			dmareq.dmar_object.dmao_type =
+				(bp->b_flags & (B_PHYS | B_REMAPPED))?
+				DMA_OTYP_BUFVADDR : DMA_OTYP_VADDR;
+			dmareq.dmar_object.dmao_obj.virt_obj.v_priv = NULL;
+		}
+
+		/*
+		 * If the buffer has no proc pointer, or the proc
+		 * struct has the kernel address space, or the buffer has
+		 * been marked B_REMAPPED (meaning that it is now
+		 * mapped into the kernel's address space), then
+		 * the address space is kas (kernel address space).
+		 */
+		if (bp->b_proc == NULL || bp->b_proc->p_as == &kas ||
+		    (bp->b_flags & B_REMAPPED) != 0) {
+			dmareq.dmar_object.dmao_obj.virt_obj.v_as = 0;
+		} else {
+			dmareq.dmar_object.dmao_obj.virt_obj.v_as =
+			    bp->b_proc->p_as;
+		}
+	}
+
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_bindhdl;
+	return ((*funcp)(dip, dip, handle, &dmareq, cookiep, ccountp));
+}
+
+int
+fc_ddi_dma_unbind_handle(ddi_dma_handle_t handle)
+{
+	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t);
+	ddi_dma_impl_t *hp;
+	dev_info_t *dip;
+
+	hp = (ddi_dma_impl_t *)handle;
+	dip = hp->dmai_rdip;
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_unbindhdl;
+	return ((*funcp)(dip, dip, handle));
+}
+
+void
+fc_ddi_dma_free_handle(ddi_dma_handle_t *handlep)
+{
+	int (*funcp)(dev_info_t *, dev_info_t *, ddi_dma_handle_t);
+	ddi_dma_impl_t *hp;
+	dev_info_t *dip;
+
+	hp = (ddi_dma_impl_t *)*handlep;
+	dip = hp->dmai_rdip;
+	funcp = DEVI(dip)->devi_ops->devo_bus_ops->bus_dma_freehdl;
+	(void) (*funcp)(dip, dip, *handlep);
 }
 
 int

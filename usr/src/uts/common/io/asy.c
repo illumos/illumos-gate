@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.	*/
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989, 1990 AT&T	*/
 /*	  All Rights Reserved					*/
@@ -636,7 +636,7 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * the system to hang if there was input available.
 	 */
 
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0x00);
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0x00);
 
 	/* establish default usage */
 	asy->asy_mcr |= RTS|DTR;		/* do use RTS/DTR after open */
@@ -744,17 +744,17 @@ asyattach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/* disable all interrupts */
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
 	/* select baud rate generator */
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR, DLAB);
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR, DLAB);
 	/* Set the baud rate to 9600 */
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + (DAT+DLL),
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + (DAT+DLL),
 		asyspdtab[asy->asy_bidx] & 0xff);
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + (DAT+DLH),
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + (DAT+DLH),
 		(asyspdtab[asy->asy_bidx] >> 8) & 0xff);
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 		asy->asy_lcr);
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR, mcr);
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR, mcr);
 
 	mutex_exit(&asy->asy_excl_hi);
 	mutex_exit(&asy->asy_excl);
@@ -991,11 +991,11 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 		/* Check scratch register works. */
 
 		/* write to scratch register */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + SCR, SCRTEST);
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + SCR, SCRTEST);
 		/* make sure that pattern doesn't just linger on the bus */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + FIFOR, 0x00);
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + FIFOR, 0x00);
 		/* read data back from scratch register */
-		ret = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + SCR);
+		ret = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + SCR);
 		if (ret != SCRTEST) {
 			/*
 			 * Scratch register not working.
@@ -1013,22 +1013,22 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 	 * Use 16550 fifo reset sequence specified in NS application
 	 * note. Disable fifos until chip is initialized.
 	 */
-	ddi_io_put8(asy->asy_iohandle,
+	ddi_put8(asy->asy_iohandle,
 	    asy->asy_ioaddr + FIFOR, 0x00);	/* clear */
-	ddi_io_put8(asy->asy_iohandle,
+	ddi_put8(asy->asy_iohandle,
 	    asy->asy_ioaddr + FIFOR, FIFO_ON);	/* enable */
-	ddi_io_put8(asy->asy_iohandle,
+	ddi_put8(asy->asy_iohandle,
 	    asy->asy_ioaddr + FIFOR, FIFO_ON | FIFORXFLSH);
 						/* reset */
 	if (asymaxchip >= ASY16650 && asy_scr_test) {
 		/*
 		 * Reset 16650 enhanced regs also, in case we have one of these
 		 */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 		    EFRACCESS);
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + EFR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + EFR,
 		    0);
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 		    STOP1|BITS8);
 	}
 
@@ -1047,8 +1047,8 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 
 	asy_reset_fifo(asy, FIFOTXFLSH | FIFORXFLSH);
 
-	mcr = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + MCR);
-	ret = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + ISR);
+	mcr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + MCR);
+	ret = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + ISR);
 	DEBUGCONT4(ASY_DEBUG_CHIP,
 	    "asy%d: probe fifo FIFOR=0x%02x ISR=0x%02x MCR=0x%02x\n",
 	    asy->asy_unit, asy->asy_fifor | FIFOTXFLSH | FIFORXFLSH,
@@ -1117,22 +1117,22 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 	if (asy->asy_hwtype == ASY16550A && asymaxchip >= ASY16650 &&
 	    asy_scr_test) {
 		/* Enable enhanced mode register access */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 		    EFRACCESS);
 		/* zero scratch register (not scratch register if enhanced) */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + SCR, 0);
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + SCR, 0);
 		/* Disable enhanced mode register access */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 		    STOP1|BITS8);
 		/* read back scratch register */
-		ret = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + SCR);
+		ret = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + SCR);
 		if (ret == SCRTEST) {
 			/* looks like we have an ST16650 -- enable it */
-			ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+			ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 			    EFRACCESS);
-			ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + EFR,
+			ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + EFR,
 			    ENHENABLE);
-			ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+			ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 			    STOP1|BITS8);
 			asy->asy_hwtype = ASY16650;
 			asy->asy_fifo_buf = 32;
@@ -1153,22 +1153,22 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 		int i;
 
 		/* Set baud rate to 57600 (fairly arbitrary choice) */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 		    DLAB);
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT,
 		    asyspdtab[B57600] & 0xff);
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR,
 		    (asyspdtab[B57600] >> 8) & 0xff);
 		/* Set 8 bits, 1 stop bit */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 		    STOP1|BITS8);
 		/* Set loopback mode */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR,
 		    DTR | RTS | ASY_LOOP | OUT1 | OUT2);
 
 		/* Overfill fifo */
 		for (i = 0; i < asy->asy_fifo_buf * 2; i++) {
-			ddi_io_put8(asy->asy_iohandle,
+			ddi_put8(asy->asy_iohandle,
 			    asy->asy_ioaddr + DAT, i);
 		}
 		/*
@@ -1198,11 +1198,11 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 
 		/* Now see how many characters we can read back */
 		for (i = 0; i < asy->asy_fifo_buf * 3; i++) {
-			ret = ddi_io_get8(asy->asy_iohandle,
+			ret = ddi_get8(asy->asy_iohandle,
 			    asy->asy_ioaddr + LSR);
 			if (!(ret & RCA))
 				break;	/* FIFO emptied */
-			(void) ddi_io_get8(asy->asy_iohandle,
+			(void) ddi_get8(asy->asy_iohandle,
 			    asy->asy_ioaddr + DAT); /* lose another */
 		}
 
@@ -1244,18 +1244,18 @@ asy_identify_chip(dev_info_t *devi, struct asycom *asy)
 		 */
 		if (asy->asy_hwtype >= ASY16650 && hwtype < ASY16650) {
 			/* Disable 16650 enhanced mode */
-			ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+			ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 			    EFRACCESS);
-			ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + EFR,
+			ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + EFR,
 			    0);
-			ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+			ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 			    STOP1|BITS8);
 		}
 		asy_reset_fifo(asy, FIFOTXFLSH | FIFORXFLSH);
 		asy->asy_hwtype = hwtype;
 
 		/* Clear loopback mode and restore DTR/RTS */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR, mcr);
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR, mcr);
 	}
 
 	DEBUGNOTE3(ASY_DEBUG_CHIP, "asy%d %s @ %p",
@@ -1378,8 +1378,8 @@ again:
 		mutex_enter(&asy->asy_excl_hi);
 	}
 
-	mcr = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + MCR);
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR,
+	mcr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + MCR);
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR,
 		mcr|(asy->asy_mcr&DTR));
 
 	DEBUGCONT3(ASY_DEBUG_INIT,
@@ -1399,7 +1399,7 @@ again:
 	/*
 	 * Check carrier.
 	 */
-	asy->asy_msr = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + MSR);
+	asy->asy_msr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + MSR);
 	DEBUGCONT3(ASY_DEBUG_INIT, "asy%dopen: TS_SOFTCAR is %s, "
 		"MSR & DCD is %s\n",
 		unit,
@@ -1557,8 +1557,8 @@ asyclose(queue_t *q, int flag, cred_t *credp)
 			async->async_utbrktid = 0;
 		}
 		mutex_enter(&asy->asy_excl_hi);
-		lcr = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + LCR);
-		ddi_io_put8(asy->asy_iohandle,
+		lcr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LCR);
+		ddi_put8(asy->asy_iohandle,
 		    asy->asy_ioaddr + LCR, (lcr & ~SETBREAK));
 		mutex_exit(&asy->asy_excl_hi);
 		async->async_flags &= ~ASYNC_OUT_SUSPEND;
@@ -1644,12 +1644,12 @@ nodrain:
 				instance,
 				asy->asy_flags & ASY_IGNORE_CD,
 				asy->asy_flags & ASY_RTS_DTR_OFF);
-			ddi_io_put8(asy->asy_iohandle,
+			ddi_put8(asy->asy_iohandle,
 				asy->asy_ioaddr + MCR, asy->asy_mcr|OUT2);
 		} else {
 			DEBUGCONT1(ASY_DEBUG_MODEM,
 			    "asy%dclose: Dropping DTR and RTS\n", instance);
-			ddi_io_put8(asy->asy_iohandle,
+			ddi_put8(asy->asy_iohandle,
 				asy->asy_ioaddr + MCR, OUT2);
 		}
 		async->async_dtrtid =
@@ -1660,9 +1660,9 @@ nodrain:
 	 * If nobody's using it now, turn off receiver interrupts.
 	 */
 	if ((async->async_flags & (ASYNC_WOPEN|ASYNC_ISOPEN)) == 0) {
-		icr = ddi_io_get8(asy->asy_iohandle,
+		icr = ddi_get8(asy->asy_iohandle,
 			asy->asy_ioaddr + ICR);
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR,
 			(icr & ~RIEN));
 	}
 	mutex_exit(&asy->asy_excl_hi);
@@ -1704,7 +1704,7 @@ asy_isbusy(struct asycom *asy)
 	ASSERT(mutex_owned(&asy->asy_excl));
 	ASSERT(mutex_owned(&asy->asy_excl_hi));
 	return ((async->async_ocnt > 0) ||
-		((ddi_io_get8(asy->asy_iohandle,
+		((ddi_get8(asy->asy_iohandle,
 		    asy->asy_ioaddr + LSR) & (XSRE|XHRE)) == 0));
 }
 
@@ -1737,18 +1737,18 @@ asy_reset_fifo(struct asycom *asy, uchar_t flush)
 	/* On a 16750, we have to set DLAB in order to set FIFOEXTRA. */
 
 	if (asy->asy_hwtype >= ASY16750) {
-		lcr = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + LCR);
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+		lcr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LCR);
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 		    lcr | DLAB);
 	}
 
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + FIFOR,
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + FIFOR,
 	    asy->asy_fifor | flush);
 
 	/* Clear DLAB */
 
 	if (asy->asy_hwtype >= ASY16750) {
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR, lcr);
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR, lcr);
 	}
 }
 
@@ -1800,14 +1800,14 @@ asy_program(struct asycom *asy, int mode)
 		(CLOCAL|CREAD|CSTOPB|CSIZE|PARENB|PARODD|CBAUD|CBAUDEXT);
 
 	/* disable interrupts */
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, 0);
 
 	ocflags = asy->asy_ocflag;
 
 	/* flush/reset the status registers */
-	(void) ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + ISR);
-	(void) ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR);
-	asy->asy_msr = flush_reg = ddi_io_get8(asy->asy_iohandle,
+	(void) ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + ISR);
+	(void) ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR);
+	asy->asy_msr = flush_reg = ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + MSR);
 	/*
 	 * The device is programmed in the open sequence, if we
@@ -1844,17 +1844,17 @@ asy_program(struct asycom *asy, int mode)
 	if (mode == ASY_INIT)
 		if (asy->asy_use_fifo == FIFO_ON) {
 			for (flush_reg = asy->asy_fifo_buf; flush_reg-- > 0; ) {
-				(void) ddi_io_get8(asy->asy_iohandle,
+				(void) ddi_get8(asy->asy_iohandle,
 						asy->asy_ioaddr + DAT);
 			}
 		} else {
-			flush_reg = ddi_io_get8(asy->asy_iohandle,
+			flush_reg = ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + DAT);
 		}
 
 	if (ocflags != (c_flag & ~CLOCAL) || mode == ASY_INIT) {
 		/* Set line control */
-		lcr = ddi_io_get8(asy->asy_iohandle,
+		lcr = ddi_get8(asy->asy_iohandle,
 			asy->asy_ioaddr + LCR);
 		lcr &= ~(WLS0|WLS1|STB|PEN|EPS);
 
@@ -1883,16 +1883,16 @@ asy_program(struct asycom *asy, int mode)
 		}
 
 		/* set the baud rate, unless it is "0" */
-		ddi_io_put8(asy->asy_iohandle,
+		ddi_put8(asy->asy_iohandle,
 			asy->asy_ioaddr + LCR, DLAB);
 		if (baudrate != 0) {
-			ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT,
+			ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT,
 				asyspdtab[baudrate] & 0xff);
-			ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR,
+			ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR,
 				(asyspdtab[baudrate] >> 8) & 0xff);
 		}
 		/* set the line control modes */
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR, lcr);
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR, lcr);
 
 		/*
 		 * If we have a FIFO buffer, enable/flush
@@ -1909,10 +1909,10 @@ asy_program(struct asycom *asy, int mode)
 	}
 
 	if (baudrate == 0)
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR,
 			(asy->asy_mcr & RTS) | OUT2);
 	else
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR,
 			asy->asy_mcr | OUT2);
 
 	/*
@@ -1940,7 +1940,7 @@ asy_program(struct asycom *asy, int mode)
 	if (c_flag & CREAD)
 		icr |= RIEN;
 
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, icr);
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + ICR, icr);
 	DEBUGCONT1(ASY_DEBUG_PROCS, "asy%d_program: done\n", instance);
 }
 
@@ -1978,7 +1978,7 @@ asyintr(caddr_t argasy)
 	int			ret_status = DDI_INTR_UNCLAIMED;
 	uchar_t			interrupt_id, lsr;
 
-	interrupt_id = ddi_io_get8(asy->asy_iohandle,
+	interrupt_id = ddi_get8(asy->asy_iohandle,
 				asy->asy_ioaddr + ISR) & 0x0F;
 	async = asy->asy_priv;
 	if ((async == NULL) || asy_addedsoft == 0 ||
@@ -1992,11 +1992,11 @@ asyintr(caddr_t argasy)
 			 *	reading any data from data status register
 			 *	reading modem status
 			 */
-			(void) ddi_io_get8(asy->asy_iohandle,
+			(void) ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + LSR);
-			(void) ddi_io_get8(asy->asy_iohandle,
+			(void) ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + DAT);
-			asy->asy_msr = ddi_io_get8(asy->asy_iohandle,
+			asy->asy_msr = ddi_get8(asy->asy_iohandle,
 						asy->asy_ioaddr + MSR);
 			return (DDI_INTR_CLAIMED);
 		}
@@ -2007,7 +2007,7 @@ asyintr(caddr_t argasy)
 	 * interrupt is edge triggered.
 	 */
 	/* CSTYLED */
-	for (;; interrupt_id = (ddi_io_get8(asy->asy_iohandle,
+	for (;; interrupt_id = (ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + ISR) & 0x0F)) {
 		if (interrupt_id & NOINTERRUPT)
 			break;
@@ -2015,7 +2015,7 @@ asyintr(caddr_t argasy)
 
 		DEBUGCONT1(ASY_DEBUG_INTR,
 			"asyintr: interrupt_id = 0x%d\n", interrupt_id);
-		lsr = ddi_io_get8(asy->asy_iohandle,
+		lsr = ddi_get8(asy->asy_iohandle,
 			asy->asy_ioaddr + LSR);
 		switch (interrupt_id) {
 		case RxRDY:
@@ -2075,7 +2075,7 @@ async_txint(struct asycom *asy)
 	    !(async->async_flags &
 	    (ASYNC_HW_OUT_FLW|ASYNC_SW_OUT_FLW|ASYNC_STOPPED))) {
 		while (fifo_len-- > 0 && async->async_ocnt-- > 0) {
-			ddi_io_put8(asy->asy_iohandle,
+			ddi_put8(asy->asy_iohandle,
 			    asy->asy_ioaddr + DAT, *async->async_optr++);
 		}
 		async->async_flags |= ASYNC_PROGRESS;
@@ -2170,9 +2170,9 @@ async_rxint(struct asycom *asy, uchar_t lsr)
 	tp = &async->async_ttycommon;
 	if (!(tp->t_cflag & CREAD)) {
 		while (lsr & (RCA|PARERR|FRMERR|BRKDET|OVRRUN)) {
-			(void) (ddi_io_get8(asy->asy_iohandle,
+			(void) (ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + DAT) & 0xff);
-			lsr = ddi_io_get8(asy->asy_iohandle,
+			lsr = ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + LSR);
 			if (looplim-- < 0)		/* limit loop */
 				break;
@@ -2184,7 +2184,7 @@ async_rxint(struct asycom *asy, uchar_t lsr)
 		c = 0;
 		s = 0;				/* reset error status */
 		if (lsr & RCA) {
-			c = ddi_io_get8(asy->asy_iohandle,
+			c = ddi_get8(asy->asy_iohandle,
 				asy->asy_ioaddr + DAT) & 0xff;
 
 			/*
@@ -2272,7 +2272,7 @@ async_rxint(struct asycom *asy, uchar_t lsr)
 				else
 					async->async_sw_overrun = 1;
 check_looplim:
-		lsr = ddi_io_get8(asy->asy_iohandle,
+		lsr = ddi_get8(asy->asy_iohandle,
 			asy->asy_ioaddr + LSR);
 		if (looplim-- < 0)		/* limit loop */
 			break;
@@ -2306,7 +2306,7 @@ async_msint(struct asycom *asy)
 
 async_msint_retry:
 	/* this resets the interrupt */
-	msr = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + MSR);
+	msr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + MSR);
 	DEBUGCONT10(ASY_DEBUG_STATE,
 		"async%d_msint call #%d:\n"
 		"   transition: %3s %3s %3s %3s\n"
@@ -2347,7 +2347,7 @@ async_msint_retry:
 	 * status, we would miss a change of modem status event that occured
 	 * after we initiated a read MSR operation.
 	 */
-	msr = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + MSR);
+	msr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + MSR);
 	if (STATES(msr) != STATES(asy->asy_msr))
 		goto	async_msint_retry;
 }
@@ -2480,9 +2480,9 @@ begin:
 				 * not stopped, and send a hangup
 				 * notification upstream.
 				 */
-				val = ddi_io_get8(asy->asy_iohandle,
+				val = ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + MCR);
-				ddi_io_put8(asy->asy_iohandle,
+				ddi_put8(asy->asy_iohandle,
 				    asy->asy_ioaddr + MCR, (val & ~DTR));
 				if (async->async_flags & ASYNC_BUSY) {
 				    DEBUGCONT0(ASY_DEBUG_BUSY,
@@ -2728,9 +2728,9 @@ async_restart(void *arg)
 	if ((async->async_flags & ASYNC_BREAK) &&
 	    !(async->async_flags & ASYNC_OUT_SUSPEND)) {
 		mutex_enter(&asy->asy_excl_hi);
-		lcr = ddi_io_get8(asy->asy_iohandle,
+		lcr = ddi_get8(asy->asy_iohandle,
 			asy->asy_ioaddr + LCR);
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 			(lcr & ~SETBREAK));
 		mutex_exit(&asy->asy_excl_hi);
 	}
@@ -2834,9 +2834,9 @@ async_nstart(struct asyncline *async, int mode)
 			 * the next message.
 			 */
 			mutex_enter(&asy->asy_excl_hi);
-			val = ddi_io_get8(asy->asy_iohandle,
+			val = ddi_get8(asy->asy_iohandle,
 				asy->asy_ioaddr + LCR);
-			ddi_io_put8(asy->asy_iohandle,
+			ddi_put8(asy->asy_iohandle,
 				asy->asy_ioaddr + LCR, (val | SETBREAK));
 			mutex_exit(&asy->asy_excl_hi);
 			async->async_flags |= ASYNC_BREAK;
@@ -2917,10 +2917,10 @@ async_nstart(struct asyncline *async, int mode)
 	 */
 	didsome = B_FALSE;
 	while (--fifo_len >= 0 && cc > 0) {
-		if (!(ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR) &
+		if (!(ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR) &
 		    XHRE))
 			break;
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT,
 		    *xmit_addr++);
 		cc--;
 		didsome = B_TRUE;
@@ -2954,13 +2954,13 @@ async_resume(struct asyncline *async)
 	DEBUGCONT1(ASY_DEBUG_PROCS, "async%d_resume\n", instance);
 #endif
 
-	if (ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR) & XHRE) {
+	if (ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR) & XHRE) {
 		if (async_flowcontrol_sw_input(asy, FLOW_CHECK, IN_FLOW_NULL))
 			return;
 		if (async->async_ocnt > 0 &&
 		    !(async->async_flags &
 		    (ASYNC_HW_OUT_FLW|ASYNC_SW_OUT_FLW|ASYNC_OUT_SUSPEND))) {
-			ddi_io_put8(asy->asy_iohandle,
+			ddi_put8(asy->asy_iohandle,
 			    asy->asy_ioaddr + DAT, *async->async_optr++);
 			async->async_ocnt--;
 			async->async_flags |= ASYNC_PROGRESS;
@@ -3008,8 +3008,8 @@ async_resume_utbrk(struct asyncline *async)
 	 * really clean the HW break.
 	 */
 	if (!(async->async_flags & ASYNC_BREAK)) {
-		val = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + LCR);
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
+		val = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LCR);
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + LCR,
 		    (val & ~SETBREAK));
 	}
 	async->async_flags &= ~ASYNC_OUT_SUSPEND;
@@ -3285,7 +3285,7 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp)
 				index = BAUDINDEX(
 					async->async_ttycommon.t_cflag);
 				async->async_flags |= ASYNC_BREAK;
-				while ((ddi_io_get8(asy->asy_iohandle,
+				while ((ddi_get8(asy->asy_iohandle,
 				    asy->asy_ioaddr + LSR) & XSRE) == 0) {
 					mutex_exit(&asy->asy_excl_hi);
 					mutex_exit(&asy->asy_excl);
@@ -3300,9 +3300,9 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp)
 				 * it will turn the break bit off, and call
 				 * "async_start" to grab the next message.
 				 */
-				val = ddi_io_get8(asy->asy_iohandle,
+				val = ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + LCR);
-				ddi_io_put8(asy->asy_iohandle,
+				ddi_put8(asy->asy_iohandle,
 					asy->asy_ioaddr + LCR,
 					(val | SETBREAK));
 				mutex_exit(&asy->asy_excl_hi);
@@ -3328,7 +3328,7 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp)
 				async->async_flags |= ASYNC_HOLD_UTBRK;
 				index = BAUDINDEX(
 				    async->async_ttycommon.t_cflag);
-				while ((ddi_io_get8(asy->asy_iohandle,
+				while ((ddi_get8(asy->asy_iohandle,
 				    asy->asy_ioaddr + LSR) & XSRE) == 0) {
 					mutex_exit(&asy->asy_excl_hi);
 					mutex_exit(&asy->asy_excl);
@@ -3337,9 +3337,9 @@ async_ioctl(struct asyncline *async, queue_t *wq, mblk_t *mp)
 					mutex_enter(&asy->asy_excl);
 					mutex_enter(&asy->asy_excl_hi);
 				}
-				val = ddi_io_get8(asy->asy_iohandle,
+				val = ddi_get8(asy->asy_iohandle,
 				    asy->asy_ioaddr + LCR);
-				ddi_io_put8(asy->asy_iohandle,
+				ddi_put8(asy->asy_iohandle,
 				    asy->asy_ioaddr + LCR, (val | SETBREAK));
 				mutex_exit(&asy->asy_excl_hi);
 				/* wait for 100ms to hold BREAK */
@@ -3861,14 +3861,14 @@ asyputchar(struct cons_polledio_arg *arg, uchar_t c)
 	if (c == '\n')
 		asyputchar(arg, '\r');
 
-	while ((ddi_io_get8(asy->asy_iohandle,
+	while ((ddi_get8(asy->asy_iohandle,
 	    asy->asy_ioaddr + LSR) & XHRE) == 0) {
 		/* wait for xmit to finish */
 		drv_usecwait(10);
 	}
 
 	/* put the character out */
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT, c);
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT, c);
 }
 
 /*
@@ -3880,7 +3880,7 @@ asyischar(struct cons_polledio_arg *arg)
 {
 	struct asycom *asy = (struct asycom *)arg;
 
-	return ((ddi_io_get8(asy->asy_iohandle,
+	return ((ddi_get8(asy->asy_iohandle,
 		asy->asy_ioaddr + LSR) & RCA) != 0);
 }
 
@@ -3894,7 +3894,7 @@ asygetchar(struct cons_polledio_arg *arg)
 
 	while (!asyischar(arg))
 		drv_usecwait(10);
-	return (ddi_io_get8(asy->asy_iohandle,
+	return (ddi_get8(asy->asy_iohandle,
 		asy->asy_ioaddr + DAT));
 }
 
@@ -3911,7 +3911,7 @@ asymctl(struct asycom *asy, int bits, int how)
 	ASSERT(mutex_owned(&asy->asy_excl));
 
 	/* Read Modem Control Registers */
-	mcr_r = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + MCR);
+	mcr_r = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + MCR);
 
 	switch (how) {
 
@@ -3939,14 +3939,14 @@ asymctl(struct asycom *asy, int bits, int how)
 		 * If modem interrupts are enabled, we return the
 		 * saved value of msr. We read MSR only in async_msint()
 		 */
-		if (ddi_io_get8(asy->asy_iohandle,
+		if (ddi_get8(asy->asy_iohandle,
 		    asy->asy_ioaddr + ICR) & MIEN) {
 			msr_r = asy->asy_msr;
 			DEBUGCONT2(ASY_DEBUG_MODEM,
 				"asy%dmctl: TIOCMGET, read msr_r = %x\n",
 				instance, msr_r);
 		} else {
-			msr_r = ddi_io_get8(asy->asy_iohandle,
+			msr_r = ddi_get8(asy->asy_iohandle,
 					asy->asy_ioaddr + MSR);
 			DEBUGCONT2(ASY_DEBUG_MODEM,
 				"asy%dmctl: TIOCMGET, read MSR = %x\n",
@@ -3957,7 +3957,7 @@ asymctl(struct asycom *asy, int bits, int how)
 		return (asytodm(mcr_r, msr_r));
 	}
 
-	ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR, mcr_r);
+	ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + MCR, mcr_r);
 
 	return (mcr_r);
 }
@@ -4300,14 +4300,14 @@ async_flowcontrol_sw_input(struct asycom *asy, async_flowc_action onoff,
 
 	if (((async->async_flags & (ASYNC_SW_IN_NEEDED | ASYNC_BREAK |
 	    ASYNC_OUT_SUSPEND)) == ASYNC_SW_IN_NEEDED) &&
-	    (ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR) & XHRE)) {
+	    (ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + LSR) & XHRE)) {
 		/*
 		 * If we get this far, then we know we need to send out
 		 * XON or XOFF char.
 		 */
 		async->async_flags = (async->async_flags &
 		    ~ASYNC_SW_IN_NEEDED) | ASYNC_BUSY;
-		ddi_io_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT,
+		ddi_put8(asy->asy_iohandle, asy->asy_ioaddr + DAT,
 		    async->async_flags & ASYNC_SW_IN_FLOW ?
 		    async->async_stopc : async->async_startc);
 		rval = B_TRUE;
@@ -4404,11 +4404,11 @@ async_flowcontrol_hw_input(struct asycom *asy, async_flowc_action onoff,
 	default:
 		break;
 	}
-	mcr = ddi_io_get8(asy->asy_iohandle, asy->asy_ioaddr + MCR);
+	mcr = ddi_get8(asy->asy_iohandle, asy->asy_ioaddr + MCR);
 	flag = (async->async_flags & ASYNC_HW_IN_FLOW) ? 0 : RTS;
 
 	if (((mcr ^ flag) & RTS) != 0) {
-		ddi_io_put8(asy->asy_iohandle,
+		ddi_put8(asy->asy_iohandle,
 		    asy->asy_ioaddr + MCR, (mcr ^ RTS));
 	}
 }

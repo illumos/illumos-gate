@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -263,9 +263,7 @@ decode_devtype()
  */
 	if (ioctl(getfd(), AUDIO_GETDEV, &adev) >= 0) {
 #ifdef MAX_AUDIO_DEV_LEN
-		if (strcmp(adev.name, "SUNW,dbri") == 0)
-			devtype = AudioDeviceDBRI;
-		else if (strcmp(adev.name, "SUNW,CS4231") == 0)
+		if (strcmp(adev.name, "SUNW,CS4231") == 0)
 			devtype = AudioDeviceCODEC;
 		else if (strcmp(adev.name, "SUNW,audiots") == 0)
 			devtype = AudioDeviceCODEC;
@@ -283,10 +281,6 @@ decode_devtype()
 			devtype = AudioDeviceUnknown;
 #else /* 4.1.3 */
 	switch (adev) {
-	case AUDIO_DEV_SPEAKERBOX:
-	case AUDIO_DEV_CODEC:
-		devtype = AudioDeviceDBRI;
-		break;
 	case AUDIO_DEV_AMD:
 		devtype = AudioDeviceAMD;
 		break;
@@ -335,7 +329,6 @@ CanSetHeader(
 		h.sample_rate = 8000;
 		break;
 
-	case AudioDeviceDBRI:
 	case AudioDeviceCODEC:
 		if (h.channels > 2)
 			return (FALSE);

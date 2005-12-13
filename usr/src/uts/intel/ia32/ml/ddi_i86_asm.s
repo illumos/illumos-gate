@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -36,8 +36,6 @@
 #endif
 
 #if defined(lint) || defined(__lint)
-
-#ifdef _LP64
 
 /*ARGSUSED*/
 uint8_t
@@ -267,253 +265,13 @@ ddi_mem_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr,
     uint64_t *dev_addr, size_t repcount, uint_t flags)
 {}
 
-#else	/* _ILP32 */
-
-uint8_t
-ddi_io_getb(ddi_acc_handle_t handle, uint8_t *addr)
-{
-	return ((((ddi_acc_impl_t *)handle)->ahi_get8)
-		((ddi_acc_impl_t *)handle, addr));
-}
-
-uint16_t
-ddi_getw(ddi_acc_handle_t handle, uint16_t *addr)
-{
-	return ((((ddi_acc_impl_t *)handle)->ahi_get16)
-		((ddi_acc_impl_t *)handle, addr));
-}
-
-uint16_t
-ddi_mem_getw(ddi_acc_handle_t handle, uint16_t *addr)
-{
-	return ((((ddi_acc_impl_t *)handle)->ahi_get16)
-		((ddi_acc_impl_t *)handle, addr));
-}
-
-uint16_t
-ddi_io_getw(ddi_acc_handle_t handle, uint16_t *addr)
-{
-	return ((((ddi_acc_impl_t *)handle)->ahi_get16)
-		((ddi_acc_impl_t *)handle, addr));
-}
-
-uint32_t
-ddi_getl(ddi_acc_handle_t handle, uint32_t *addr)
-{
-	return ((((ddi_acc_impl_t *)handle)->ahi_get32)
-		((ddi_acc_impl_t *)handle, addr));
-}
-
-uint32_t
-ddi_mem_getl(ddi_acc_handle_t handle, uint32_t *addr)
-{
-	return ((((ddi_acc_impl_t *)handle)->ahi_get32)
-		((ddi_acc_impl_t *)handle, addr));
-}
-
-uint32_t
-ddi_io_getl(ddi_acc_handle_t handle, uint32_t *addr)
-{
-	return ((((ddi_acc_impl_t *)handle)->ahi_get32)
-		((ddi_acc_impl_t *)handle, addr));
-}
-
-uint64_t
-ddi_getll(ddi_acc_handle_t handle, uint64_t *addr)
-{
-	return ((((ddi_acc_impl_t *)handle)->ahi_get64)
-		((ddi_acc_impl_t *)handle, addr));
-}
-
-uint64_t
-ddi_mem_getll(ddi_acc_handle_t handle, uint64_t *addr)
-{
-	return ((((ddi_acc_impl_t *)handle)->ahi_get64)
-		((ddi_acc_impl_t *)handle, addr));
-}
-
-void
-ddi_putb(ddi_acc_handle_t handle, uint8_t *addr, uint8_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put8)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_mem_putb(ddi_acc_handle_t handle, uint8_t *addr, uint8_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put8)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_io_putb(ddi_acc_handle_t handle, uint8_t *addr, uint8_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put8)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_put16(ddi_acc_handle_t handle, uint16_t *addr, uint16_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put16)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_mem_putw(ddi_acc_handle_t handle, uint16_t *addr, uint16_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put16)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_io_putw(ddi_acc_handle_t handle, uint16_t *addr, uint16_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put16)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_putl(ddi_acc_handle_t handle, uint32_t *addr, uint32_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put32)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_mem_putl(ddi_acc_handle_t handle, uint32_t *addr, uint32_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put32)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_io_putl(ddi_acc_handle_t handle, uint32_t *addr, uint32_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put32)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_putll(ddi_acc_handle_t handle, uint64_t *addr, uint64_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put64)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-void
-ddi_mem_putll(ddi_acc_handle_t handle, uint64_t *addr, uint64_t value)
-{
-	(((ddi_acc_impl_t *)handle)->ahi_put64)
-		((ddi_acc_impl_t *)handle, addr, value);
-}
-
-/*ARGSUSED*/
-void
-ddi_rep_getb(ddi_acc_handle_t handle, uint8_t *host_addr, uint8_t *dev_addr,
-    size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_rep_getw(ddi_acc_handle_t handle, uint16_t *host_addr, uint16_t *dev_addr,
-    size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_rep_getl(ddi_acc_handle_t handle, uint32_t *host_addr, uint32_t *dev_addr,
-    size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_rep_getll(ddi_acc_handle_t handle, uint64_t *host_addr, uint64_t *dev_addr,
-    size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_rep_putb(ddi_acc_handle_t handle, uint8_t *host_addr, uint8_t *dev_addr,
-    size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_rep_putw(ddi_acc_handle_t handle, uint16_t *host_addr, uint16_t *dev_addr,
-    size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_rep_putl(ddi_acc_handle_t handle, uint32_t *host_addr, uint32_t *dev_addr,
-    size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr, uint64_t *dev_addr,
-    size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_mem_rep_getb(ddi_acc_handle_t handle, uint8_t *host_addr,
-    uint8_t *dev_addr, size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_mem_rep_getw(ddi_acc_handle_t handle, uint16_t *host_addr,
-    uint16_t *dev_addr, size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_mem_rep_getl(ddi_acc_handle_t handle, uint32_t *host_addr,
-    uint32_t *dev_addr, size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_mem_rep_getll(ddi_acc_handle_t handle, uint64_t *host_addr,
-    uint64_t *dev_addr, size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_mem_rep_putb(ddi_acc_handle_t handle, uint8_t *host_addr,
-    uint8_t *dev_addr, size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_mem_rep_putw(ddi_acc_handle_t handle, uint16_t *host_addr,
-    uint16_t *dev_addr, size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_mem_rep_putl(ddi_acc_handle_t handle, uint32_t *host_addr,
-    uint32_t *dev_addr, size_t repcount, uint_t flags)
-{}
-
-/*ARGSUSED*/
-void
-ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
-    uint64_t *dev_addr, size_t repcount, uint_t flags)
-{}
-
-#endif /* _LP64 */
-
 #else	/* lint */
 
 	
 #if defined(__amd64)
 
-	ENTRY(ddi_getb)
-	ALTENTRY(ddi_get8)
+	ENTRY(ddi_get8)
+	ALTENTRY(ddi_getb)
 	ALTENTRY(ddi_mem_getb)
 	ALTENTRY(ddi_mem_get8)
 	ALTENTRY(ddi_io_getb)
@@ -532,8 +290,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 2:
 	jmp	*ACC_GETB(%rdi)
-	SET_SIZE(ddi_getb)
 	SET_SIZE(ddi_get8)
+	SET_SIZE(ddi_getb)
 	SET_SIZE(ddi_mem_getb)
 	SET_SIZE(ddi_mem_get8)
 	SET_SIZE(ddi_io_getb)
@@ -541,8 +299,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #elif defined(__i386)
 
-	ENTRY(ddi_getb)
-	ALTENTRY(ddi_get8)
+	ENTRY(ddi_get8)
+	ALTENTRY(ddi_getb)
 	ALTENTRY(ddi_mem_getb)
 	ALTENTRY(ddi_mem_get8)
 	ALTENTRY(ddi_io_getb)
@@ -563,8 +321,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 2:
 	jmp	*ACC_GETB(%eax)
-	SET_SIZE(ddi_getb)
 	SET_SIZE(ddi_get8)
+	SET_SIZE(ddi_getb)
 	SET_SIZE(ddi_mem_getb)
 	SET_SIZE(ddi_mem_get8)
 	SET_SIZE(ddi_io_getb)
@@ -574,8 +332,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_getw)
-	ALTENTRY(ddi_get16)
+	ENTRY(ddi_get16)
+	ALTENTRY(ddi_getw)
 	ALTENTRY(ddi_mem_getw)
 	ALTENTRY(ddi_mem_get16)
 	ALTENTRY(ddi_io_getw)
@@ -594,8 +352,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 4:
 	jmp	*ACC_GETW(%rdi)
-	SET_SIZE(ddi_getw)
 	SET_SIZE(ddi_get16)
+	SET_SIZE(ddi_getw)
 	SET_SIZE(ddi_mem_getw)
 	SET_SIZE(ddi_mem_get16)
 	SET_SIZE(ddi_io_getw)
@@ -603,8 +361,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #elif defined(__i386)
 
-	ENTRY(ddi_getw)
-	ALTENTRY(ddi_get16)
+	ENTRY(ddi_get16)
+	ALTENTRY(ddi_getw)
 	ALTENTRY(ddi_mem_getw)
 	ALTENTRY(ddi_mem_get16)
 	ALTENTRY(ddi_io_getw)
@@ -625,8 +383,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 4:
 	jmp	*ACC_GETW(%eax)
-	SET_SIZE(ddi_getw)
 	SET_SIZE(ddi_get16)
+	SET_SIZE(ddi_getw)
 	SET_SIZE(ddi_mem_getw)
 	SET_SIZE(ddi_mem_get16)
 	SET_SIZE(ddi_io_getw)
@@ -636,8 +394,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_getl)
-	ALTENTRY(ddi_get32)
+	ENTRY(ddi_get32)
+	ALTENTRY(ddi_getl)
 	ALTENTRY(ddi_mem_getl)
 	ALTENTRY(ddi_mem_get32)
 	ALTENTRY(ddi_io_getl)
@@ -655,8 +413,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 6:
 	jmp	*ACC_GETL(%rdi)
-	SET_SIZE(ddi_getl)
 	SET_SIZE(ddi_get32)
+	SET_SIZE(ddi_getl)
 	SET_SIZE(ddi_mem_getl)
 	SET_SIZE(ddi_mem_get32)
 	SET_SIZE(ddi_io_getl)
@@ -664,8 +422,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #elif defined(__i386)
 
-	ENTRY(ddi_getl)
-	ALTENTRY(ddi_get32)
+	ENTRY(ddi_get32)
+	ALTENTRY(ddi_getl)
 	ALTENTRY(ddi_mem_getl)
 	ALTENTRY(ddi_mem_get32)
 	ALTENTRY(ddi_io_getl)
@@ -685,8 +443,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 6:
 	jmp	*ACC_GETL(%eax)
-	SET_SIZE(ddi_getl)
 	SET_SIZE(ddi_get32)
+	SET_SIZE(ddi_getl)
 	SET_SIZE(ddi_mem_getl)
 	SET_SIZE(ddi_mem_get32)
 	SET_SIZE(ddi_io_getl)
@@ -696,26 +454,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_getll)
-	ALTENTRY(ddi_get64)
+	ENTRY(ddi_get64)
+	ALTENTRY(ddi_getll)
 	ALTENTRY(ddi_mem_getll)
 	ALTENTRY(ddi_mem_get64)
 	jmp	*ACC_GETLL(%rdi)
-	SET_SIZE(ddi_getll)
 	SET_SIZE(ddi_get64)
+	SET_SIZE(ddi_getll)
 	SET_SIZE(ddi_mem_getll)
 	SET_SIZE(ddi_mem_get64)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_getll)
-	ALTENTRY(ddi_get64)
+	ENTRY(ddi_get64)
+	ALTENTRY(ddi_getll)
 	ALTENTRY(ddi_mem_getll)
 	ALTENTRY(ddi_mem_get64)
 	movl	4(%esp), %eax
 	jmp	*ACC_GETLL(%eax)
-	SET_SIZE(ddi_getll)
 	SET_SIZE(ddi_get64)
+	SET_SIZE(ddi_getll)
 	SET_SIZE(ddi_mem_getll)
 	SET_SIZE(ddi_mem_get64)
 
@@ -723,8 +481,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_putb)
-	ALTENTRY(ddi_put8)
+	ENTRY(ddi_put8)
+	ALTENTRY(ddi_putb)
 	ALTENTRY(ddi_mem_putb)
 	ALTENTRY(ddi_mem_put8)
 	ALTENTRY(ddi_io_putb)
@@ -743,8 +501,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 8:
 	jmp	*ACC_PUTB(%rdi)
-	SET_SIZE(ddi_putb)
 	SET_SIZE(ddi_put8)
+	SET_SIZE(ddi_putb)
 	SET_SIZE(ddi_mem_putb)
 	SET_SIZE(ddi_mem_put8)
 	SET_SIZE(ddi_io_putb)
@@ -752,8 +510,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #elif defined(__i386)
 
-	ENTRY(ddi_putb)
-	ALTENTRY(ddi_put8)
+	ENTRY(ddi_put8)
+	ALTENTRY(ddi_putb)
 	ALTENTRY(ddi_mem_putb)
 	ALTENTRY(ddi_mem_put8)
 	ALTENTRY(ddi_io_putb)
@@ -775,8 +533,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 8:
 	jmp	*ACC_PUTB(%eax)
-	SET_SIZE(ddi_putb)
 	SET_SIZE(ddi_put8)
+	SET_SIZE(ddi_putb)
 	SET_SIZE(ddi_mem_putb)
 	SET_SIZE(ddi_mem_put8)
 	SET_SIZE(ddi_io_putb)
@@ -786,8 +544,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_putw)
-	ALTENTRY(ddi_put16)
+	ENTRY(ddi_put16)
+	ALTENTRY(ddi_putw)
 	ALTENTRY(ddi_mem_putw)
 	ALTENTRY(ddi_mem_put16)
 	ALTENTRY(ddi_io_putw)
@@ -806,8 +564,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 9:
 	jmp	*ACC_PUTW(%rdi)
-	SET_SIZE(ddi_putw)
 	SET_SIZE(ddi_put16)
+	SET_SIZE(ddi_putw)
 	SET_SIZE(ddi_mem_putw)
 	SET_SIZE(ddi_mem_put16)
 	SET_SIZE(ddi_io_putw)
@@ -815,8 +573,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #elif defined(__i386)
 
-	ENTRY(ddi_putw)
-	ALTENTRY(ddi_put16)
+	ENTRY(ddi_put16)
+	ALTENTRY(ddi_putw)
 	ALTENTRY(ddi_mem_putw)
 	ALTENTRY(ddi_mem_put16)
 	ALTENTRY(ddi_io_putw)
@@ -838,8 +596,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 9:
 	jmp	*ACC_PUTW(%eax)
-	SET_SIZE(ddi_putw)
 	SET_SIZE(ddi_put16)
+	SET_SIZE(ddi_putw)
 	SET_SIZE(ddi_mem_putw)
 	SET_SIZE(ddi_mem_put16)
 	SET_SIZE(ddi_io_putw)
@@ -849,8 +607,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_putl)
-	ALTENTRY(ddi_put32)
+	ENTRY(ddi_put32)
+	ALTENTRY(ddi_putl)
 	ALTENTRY(ddi_mem_putl)
 	ALTENTRY(ddi_mem_put32)
 	ALTENTRY(ddi_io_putl)
@@ -869,8 +627,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 9:
 	jmp	*ACC_PUTL(%rdi)
-	SET_SIZE(ddi_putl)
 	SET_SIZE(ddi_put32)
+	SET_SIZE(ddi_putl)
 	SET_SIZE(ddi_mem_putl)
 	SET_SIZE(ddi_mem_put32)
 	SET_SIZE(ddi_io_putl)
@@ -878,8 +636,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #elif defined(__i386)
 
-	ENTRY(ddi_putl)
-	ALTENTRY(ddi_put32)
+	ENTRY(ddi_put32)
+	ALTENTRY(ddi_putl)
 	ALTENTRY(ddi_mem_putl)
 	ALTENTRY(ddi_mem_put32)
 	ALTENTRY(ddi_io_putl)
@@ -901,8 +659,8 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 	ret
 9:
 	jmp	*ACC_PUTL(%eax)
-	SET_SIZE(ddi_putl)
 	SET_SIZE(ddi_put32)
+	SET_SIZE(ddi_putl)
 	SET_SIZE(ddi_mem_putl)
 	SET_SIZE(ddi_mem_put32)
 	SET_SIZE(ddi_io_putl)
@@ -912,26 +670,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_putll)
-	ALTENTRY(ddi_put64)
+	ENTRY(ddi_put64)
+	ALTENTRY(ddi_putll)
 	ALTENTRY(ddi_mem_putll)
 	ALTENTRY(ddi_mem_put64)
 	jmp	*ACC_PUTLL(%rdi)
-	SET_SIZE(ddi_putll)
 	SET_SIZE(ddi_put64)
+	SET_SIZE(ddi_putll)
 	SET_SIZE(ddi_mem_putll)
 	SET_SIZE(ddi_mem_put64)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_putll)
-	ALTENTRY(ddi_put64)
+	ENTRY(ddi_put64)
+	ALTENTRY(ddi_putll)
 	ALTENTRY(ddi_mem_putll)
 	ALTENTRY(ddi_mem_put64)
 	movl	4(%esp), %eax
 	jmp	*ACC_PUTLL(%eax)
-	SET_SIZE(ddi_putll)
 	SET_SIZE(ddi_put64)
+	SET_SIZE(ddi_putll)
 	SET_SIZE(ddi_mem_putll)
 	SET_SIZE(ddi_mem_put64)
 
@@ -939,26 +697,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_rep_getb)
-	ALTENTRY(ddi_rep_get8)
+	ENTRY(ddi_rep_get8)
+	ALTENTRY(ddi_rep_getb)
 	ALTENTRY(ddi_mem_rep_getb)
 	ALTENTRY(ddi_mem_rep_get8)
 	jmp	*ACC_REP_GETB(%rdi)
-	SET_SIZE(ddi_rep_getb)
 	SET_SIZE(ddi_rep_get8)
+	SET_SIZE(ddi_rep_getb)
 	SET_SIZE(ddi_mem_rep_getb)
 	SET_SIZE(ddi_mem_rep_get8)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_rep_getb)
-	ALTENTRY(ddi_rep_get8)
+	ENTRY(ddi_rep_get8)
+	ALTENTRY(ddi_rep_getb)
 	ALTENTRY(ddi_mem_rep_getb)
 	ALTENTRY(ddi_mem_rep_get8)
 	movl	4(%esp), %eax
 	jmp	*ACC_REP_GETB(%eax)
-	SET_SIZE(ddi_rep_getb)
 	SET_SIZE(ddi_rep_get8)
+	SET_SIZE(ddi_rep_getb)
 	SET_SIZE(ddi_mem_rep_getb)
 	SET_SIZE(ddi_mem_rep_get8)
 
@@ -966,26 +724,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_rep_getw)
-	ALTENTRY(ddi_rep_get16)
+	ENTRY(ddi_rep_get16)
+	ALTENTRY(ddi_rep_getw)
 	ALTENTRY(ddi_mem_rep_getw)
 	ALTENTRY(ddi_mem_rep_get16)
 	jmp	*ACC_REP_GETW(%rdi)
-	SET_SIZE(ddi_rep_getw)
 	SET_SIZE(ddi_rep_get16)
+	SET_SIZE(ddi_rep_getw)
 	SET_SIZE(ddi_mem_rep_getw)
 	SET_SIZE(ddi_mem_rep_get16)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_rep_getw)
-	ALTENTRY(ddi_rep_get16)
+	ENTRY(ddi_rep_get16)
+	ALTENTRY(ddi_rep_getw)
 	ALTENTRY(ddi_mem_rep_getw)
 	ALTENTRY(ddi_mem_rep_get16)
 	movl	4(%esp), %eax
 	jmp	*ACC_REP_GETW(%eax)
-	SET_SIZE(ddi_rep_getw)
 	SET_SIZE(ddi_rep_get16)
+	SET_SIZE(ddi_rep_getw)
 	SET_SIZE(ddi_mem_rep_getw)
 	SET_SIZE(ddi_mem_rep_get16)
 
@@ -993,26 +751,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_rep_getl)
-	ALTENTRY(ddi_rep_get32)
+	ENTRY(ddi_rep_get32)
+	ALTENTRY(ddi_rep_getl)
 	ALTENTRY(ddi_mem_rep_getl)
 	ALTENTRY(ddi_mem_rep_get32)
 	jmp	*ACC_REP_GETL(%rdi)
-	SET_SIZE(ddi_rep_getl)
 	SET_SIZE(ddi_rep_get32)
+	SET_SIZE(ddi_rep_getl)
 	SET_SIZE(ddi_mem_rep_getl)
 	SET_SIZE(ddi_mem_rep_get32)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_rep_getl)
-	ALTENTRY(ddi_rep_get32)
+	ENTRY(ddi_rep_get32)
+	ALTENTRY(ddi_rep_getl)
 	ALTENTRY(ddi_mem_rep_getl)
 	ALTENTRY(ddi_mem_rep_get32)
 	movl	4(%esp), %eax
 	jmp	*ACC_REP_GETL(%eax)
-	SET_SIZE(ddi_rep_getl)
 	SET_SIZE(ddi_rep_get32)
+	SET_SIZE(ddi_rep_getl)
 	SET_SIZE(ddi_mem_rep_getl)
 	SET_SIZE(ddi_mem_rep_get32)
 
@@ -1020,26 +778,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_rep_getll)
-	ALTENTRY(ddi_rep_get64)
+	ENTRY(ddi_rep_get64)
+	ALTENTRY(ddi_rep_getll)
 	ALTENTRY(ddi_mem_rep_getll)
 	ALTENTRY(ddi_mem_rep_get64)
 	jmp	*ACC_REP_GETLL(%rdi)
-	SET_SIZE(ddi_rep_getll)
 	SET_SIZE(ddi_rep_get64)
+	SET_SIZE(ddi_rep_getll)
 	SET_SIZE(ddi_mem_rep_getll)
 	SET_SIZE(ddi_mem_rep_get64)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_rep_getll)
-	ALTENTRY(ddi_rep_get64)
+	ENTRY(ddi_rep_get64)
+	ALTENTRY(ddi_rep_getll)
 	ALTENTRY(ddi_mem_rep_getll)
 	ALTENTRY(ddi_mem_rep_get64)
 	movl	4(%esp), %eax
 	jmp	*ACC_REP_GETLL(%eax)
-	SET_SIZE(ddi_rep_getll)
 	SET_SIZE(ddi_rep_get64)
+	SET_SIZE(ddi_rep_getll)
 	SET_SIZE(ddi_mem_rep_getll)
 	SET_SIZE(ddi_mem_rep_get64)
 
@@ -1047,26 +805,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_rep_putb)
-	ALTENTRY(ddi_rep_put8)
+	ENTRY(ddi_rep_put8)
+	ALTENTRY(ddi_rep_putb)
 	ALTENTRY(ddi_mem_rep_putb)
 	ALTENTRY(ddi_mem_rep_put8)
 	jmp	*ACC_REP_PUTB(%rdi)
-	SET_SIZE(ddi_rep_putb)
 	SET_SIZE(ddi_rep_put8)
+	SET_SIZE(ddi_rep_putb)
 	SET_SIZE(ddi_mem_rep_putb)
 	SET_SIZE(ddi_mem_rep_put8)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_rep_putb)
-	ALTENTRY(ddi_rep_put8)
+	ENTRY(ddi_rep_put8)
+	ALTENTRY(ddi_rep_putb)
 	ALTENTRY(ddi_mem_rep_putb)
 	ALTENTRY(ddi_mem_rep_put8)
 	movl	4(%esp), %eax
 	jmp	*ACC_REP_PUTB(%eax)
-	SET_SIZE(ddi_rep_putb)
 	SET_SIZE(ddi_rep_put8)
+	SET_SIZE(ddi_rep_putb)
 	SET_SIZE(ddi_mem_rep_putb)
 	SET_SIZE(ddi_mem_rep_put8)
 
@@ -1074,26 +832,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_rep_putw)
-	ALTENTRY(ddi_rep_put16)
+	ENTRY(ddi_rep_put16)
+	ALTENTRY(ddi_rep_putw)
 	ALTENTRY(ddi_mem_rep_putw)
 	ALTENTRY(ddi_mem_rep_put16)
 	jmp	*ACC_REP_PUTW(%rdi)
-	SET_SIZE(ddi_rep_putw)
 	SET_SIZE(ddi_rep_put16)
+	SET_SIZE(ddi_rep_putw)
 	SET_SIZE(ddi_mem_rep_putw)
 	SET_SIZE(ddi_mem_rep_put16)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_rep_putw)
-	ALTENTRY(ddi_rep_put16)
+	ENTRY(ddi_rep_put16)
+	ALTENTRY(ddi_rep_putw)
 	ALTENTRY(ddi_mem_rep_putw)
 	ALTENTRY(ddi_mem_rep_put16)
 	movl	4(%esp), %eax
 	jmp	*ACC_REP_PUTW(%eax)
-	SET_SIZE(ddi_rep_putw)
 	SET_SIZE(ddi_rep_put16)
+	SET_SIZE(ddi_rep_putw)
 	SET_SIZE(ddi_mem_rep_putw)
 	SET_SIZE(ddi_mem_rep_put16)
 
@@ -1101,26 +859,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_rep_putl)
-	ALTENTRY(ddi_rep_put32)
+	ENTRY(ddi_rep_put32)
+	ALTENTRY(ddi_rep_putl)
 	ALTENTRY(ddi_mem_rep_putl)
 	ALTENTRY(ddi_mem_rep_put32)
 	jmp	*ACC_REP_PUTL(%rdi)
-	SET_SIZE(ddi_rep_putl)
 	SET_SIZE(ddi_rep_put32)
+	SET_SIZE(ddi_rep_putl)
 	SET_SIZE(ddi_mem_rep_putl)
 	SET_SIZE(ddi_mem_rep_put32)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_rep_putl)
-	ALTENTRY(ddi_rep_put32)
+	ENTRY(ddi_rep_put32)
+	ALTENTRY(ddi_rep_putl)
 	ALTENTRY(ddi_mem_rep_putl)
 	ALTENTRY(ddi_mem_rep_put32)
 	movl	4(%esp), %eax
 	jmp	*ACC_REP_PUTL(%eax)
-	SET_SIZE(ddi_rep_putl)
 	SET_SIZE(ddi_rep_put32)
+	SET_SIZE(ddi_rep_putl)
 	SET_SIZE(ddi_mem_rep_putl)
 	SET_SIZE(ddi_mem_rep_put32)
 
@@ -1128,26 +886,26 @@ ddi_mem_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr,
 
 #if defined(__amd64)
 
-	ENTRY(ddi_rep_putll)
-	ALTENTRY(ddi_rep_put64)
+	ENTRY(ddi_rep_put64)
+	ALTENTRY(ddi_rep_putll)
 	ALTENTRY(ddi_mem_rep_putll)
 	ALTENTRY(ddi_mem_rep_put64)
 	jmp	*ACC_REP_PUTLL(%rdi)
-	SET_SIZE(ddi_rep_putll)
 	SET_SIZE(ddi_rep_put64)
+	SET_SIZE(ddi_rep_putll)
 	SET_SIZE(ddi_mem_rep_putll)
 	SET_SIZE(ddi_mem_rep_put64)
 
 #elif defined(__i386)
 
-	ENTRY(ddi_rep_putll)
-	ALTENTRY(ddi_rep_put64)
+	ENTRY(ddi_rep_put64)
+	ALTENTRY(ddi_rep_putll)
 	ALTENTRY(ddi_mem_rep_putll)
 	ALTENTRY(ddi_mem_rep_put64)
 	movl	4(%esp), %eax
 	jmp	*ACC_REP_PUTLL(%eax)
-	SET_SIZE(ddi_rep_putll)
 	SET_SIZE(ddi_rep_put64)
+	SET_SIZE(ddi_rep_putll)
 	SET_SIZE(ddi_mem_rep_putll)
 	SET_SIZE(ddi_mem_rep_put64)
 

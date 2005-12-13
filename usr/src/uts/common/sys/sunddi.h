@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -55,6 +54,9 @@
 #include <sys/stream.h>
 #if defined(__GNUC__) && defined(_ASM_INLINES) && defined(_KERNEL)
 #include <asm/sunddi.h>
+#endif
+#ifdef _KERNEL
+#include <sys/ddi_obsolete.h>
 #endif
 
 #ifdef	__cplusplus
@@ -489,8 +491,6 @@ int
 nullbusmap(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp, off_t offset,
 	off_t len, caddr_t *vaddrp);
 
-#ifdef _LP64
-
 int ddi_peek8(dev_info_t *dip, int8_t *addr, int8_t *val_p);
 int ddi_peek16(dev_info_t *dip, int16_t *addr, int16_t *val_p);
 int ddi_peek32(dev_info_t *dip, int32_t *addr, int32_t *val_p);
@@ -500,34 +500,6 @@ int ddi_poke8(dev_info_t *dip, int8_t *addr, int8_t val);
 int ddi_poke16(dev_info_t *dip, int16_t *addr, int16_t val);
 int ddi_poke32(dev_info_t *dip, int32_t *addr, int32_t val);
 int ddi_poke64(dev_info_t *dip, int64_t *addr, int64_t val);
-
-#else /* _ILP32 */
-
-int ddi_peekc(dev_info_t *dip, int8_t *addr, int8_t *val_p);
-#define	ddi_peek8	ddi_peekc
-
-int ddi_peeks(dev_info_t *dip, int16_t *addr, int16_t *val_p);
-#define	ddi_peek16	ddi_peeks
-
-int ddi_peekl(dev_info_t *dip, int32_t *addr, int32_t *val_p);
-#define	ddi_peek32	ddi_peekl
-
-int ddi_peekd(dev_info_t *dip, int64_t *addr, int64_t *val_p);
-#define	ddi_peek64	ddi_peekd
-
-int ddi_pokec(dev_info_t *dip, int8_t *addr, int8_t val);
-#define	ddi_poke8	ddi_pokec
-
-int ddi_pokes(dev_info_t *dip, int16_t *addr, int16_t val);
-#define	ddi_poke16	ddi_pokes
-
-int ddi_pokel(dev_info_t *dip, int32_t *addr, int32_t val);
-#define	ddi_poke32	ddi_pokel
-
-int ddi_poked(dev_info_t *dip, int64_t *addr, int64_t val);
-#define	ddi_poke64	ddi_poked
-
-#endif /* _LP64 */
 
 /*
  * Peek and poke to and from a uio structure in xfersize pieces,
@@ -1130,287 +1102,6 @@ dev_info_t *
 ddi_find_devinfo(char *name, int instance, int attached);
 
 /*
- * DMA Mapping Setup
- *
- * The basic interface function is ddi_dma_setup(). This function
- * is to designed to allow a DMA mapping to be established to a
- * memory object. This function returns DDI_DMA_MAPPED if the
- * request was successfully filled. If this occurs, then the
- * argument handlep is filled in. This value is the DMA handle
- * for the mapping, and is used in a variety of other functions.
- * The handle is an opaque handle on the mapping, and no further
- * information may be inferred from it by the caller.
- *
- * Specifics of arguments to ddi_dma_setup:
- *
- * dip - devinfo pointer, which identifies the base device that wishes
- * to establish a dma mapping. The device may either be a leaf device,
- * or a device which is both a leaf and a nexus (e.g., a device which
- * has a dma engine but no children devices).
- *
- * dmareqp - pointer to a dma request structure. This structure contains
- * all the info necessary to establish the mapping (see <sys/ddidmareq.h>).
- * This structure may be impermanent, as its information is copied and
- * saved, if necessary, by implementation specific functions. The caller
- * is responsible for filling in the dmar_flags, dmar_length, dmar_type,
- * dmar_addr_un, dmar_fp and dmar_arg fields. Any other elements of the
- * ddi_dma_req structure should neither be examined or modified by the
- * caller.
- *
- * handlep - this is a pointer to a ddi_dma_handle_t. It is the callers
- * responsibility to hang on to this handle, because it becomes the token
- * used in all other DDI dma functions. If the handle pointer is NULL,
- * then no mapping is made, and the call is being used by the caller
- * to simply determine whether such a mapping *could* be made.
- *
- * Discussion of DMA resource callback functions:
- *
- * If a request could not be filled, it was because either there were
- * not enough mapping resources available to satisfy the request, and the
- * dmar_fp field was not set to DDI_DMA_SLEEP, or the mapping could not
- * be established at all (DDI_DMA_NOMAPPING) due to a basic inability of
- * available hardware to map the object. Callers should be prepared to deal
- * with all possible returns. It is suggested that the appropriate system
- * error number for the DDI_DMA_NOMAPPING returns is EFAULT.
- *
- * If the caller does not care whether a DMA mapping can be set up now,
- * the caller should set the field dmar_fp to DDI_DMA_DONTWAIT. This
- * implies that the caller will appropriately deal with resource
- * exhaustion.
- *
- * If the caller either cannot or does not wish to sleep awaiting mapping
- * resources, the caller may specify, via the field dmar_fp, a function to
- * call with the argument specified in dmar_arg, when resources might have
- * become available. The callback function will be called from interrupt
- * context, but in such a fashion to guarantee that spl blocking (in systems
- * that use this method of data protection) by the caller will not be
- * bypassed.
- *
- *
- * When function specified via dmar_fp is called, it may attempt to try and get
- * the mapping again. If it succeeds in getting the mapping, or does not need
- * to get the mapping any more, it must return 1. If it tries to get the
- * mapping but fails to do so, and it wants to be called back later, it
- * must return 0.
- *
- * Failure to observe this protocol will have unpredictable results.
- *
- * The callback function must provide its own data structure integrity
- * when it is invoked.
- */
-
-int
-ddi_dma_setup(dev_info_t *dip, struct ddi_dma_req *dmareqp,
-	ddi_dma_handle_t *handlep);
-
-/*
- * The following three functions are convenience wrappers for ddi_dma_setup().
- */
-
-int
-ddi_dma_addr_setup(dev_info_t *dip, struct as *as, caddr_t addr, size_t len,
-	uint_t flags, int (*waitfp)(), caddr_t arg,
-	ddi_dma_lim_t *limits, ddi_dma_handle_t *handlep);
-
-int
-ddi_dma_buf_setup(dev_info_t *dip, struct buf *bp, uint_t flags,
-	int (*waitfp)(), caddr_t arg, ddi_dma_lim_t *limits,
-	ddi_dma_handle_t *handlep);
-
-/*
- * Kernel addressability of the DMA object
- *
- * It might often be very useful to be able to get an IU mapping
- * to the object which has DMA active to/from it. In fact, it might
- * even really be a requirement.
- *
- * The cacheability of the object with respect to I/O and I/U caches
- * is affected by this function as follows:
- *
- *	If a kernel virtual mapping to the object owned by the handle
- *	existed already, and is IU cacheable, then the extant mapping
- *	is locked and returned in kaddrp. By inference, kaddrp will
- *	be an IU cacheable reference.
- *
- *	If a kernel virtual mapping to the object owned by the handle
- *	existed already, and is not IU cacheable, then the extant mapping
- *	is locked and returned in kaddrp. By inference, kaddrp will
- *	*not* be an IU cacheable reference.
- *
- *	If a kernel virtual mapping to the object owned by the handle
- *	does not exist already, a mapping will be created that will
- *	*not* be an IU cacheable reference.
- *
- *	The IO cacheability of the object owned by the handle is ignored
- *	and unaffected.
- *
- * This function returns the mapping values as describe above.
- *
- * When the DMA object owned by handle is freed (by ddi_dma_free()- see
- * below), any mappings created by ddi_dma_kvaddrp() cease to be valid.
- * This will be the convention that drivers must follow, as it will be
- * impossible to enforce this programmatically.
- */
-
-int
-ddi_dma_kvaddrp(ddi_dma_handle_t, off_t, size_t, caddr_t *);
-
-
-/*
- * Device addressability of the DMA object
- *
- * The handle that identifies an object mapped for DMA is an opaque entity.
- * When a device driver wishes to load its dma engine with the appropriate
- * values for transferring data to the mapped object, it has to get the
- * value. Since the exact shape and form of this address is device specific,
- * the value returned is a 'cookie' that each device may then interpret
- * as it needs to. See <sys/dditypes.h> for the form of what the DMA cookie
- * looks like.
- *
- * Returns DDI_SUCCESS for successful cookie generation,
- * or DDI_FAILURE if it cannot generate the DMA cookie.
- */
-
-int
-ddi_dma_htoc(ddi_dma_handle_t handle, off_t off, ddi_dma_cookie_t *cookiep);
-
-/*
- * Given a DMA cookie, return its offset within the object referred to
- * by the DMA handle. This is so at the end of a dma transfer, the device
- * may take its specific ending address and find out how far into the
- * memory object described by the handle the device got.
- */
-
-int
-ddi_dma_coff(ddi_dma_handle_t handle, ddi_dma_cookie_t *cookiep, off_t *offp);
-
-/*
- * DMA mapping manipulation
- *
- * It may be desirable or convenient for some devices to allow partial
- * mapping of an object for dma. This allows the mapping for DMA of
- * arbitrarily large objects since only a portion of the object may
- * be mapped for DMA at any point in time.
- *
- * In order to support this as well as other operations, the paradigm
- * of a 'mapping window' is defined here. The object to be mapped has
- * attributes of location and length. A window can be established upon
- * this object. The window has attributes of offset (from the base mapping
- * of the object) and length. It is assumed that length and offset are
- * positive with respect to the base of the mapped object.
- *
- * In order to get support for such a window, the flag DDI_DMA_PARTIAL
- * must be set in the request flags when the object is mapped for DMA.
- * Each implementation may elect whether or not to support such an
- * operation. Each implementation may also choose to ignore the request
- * for a PARTIAL mapping and either reject the mapping of the object
- * for being too big (DDI_DMA_TOOBIG) or may map the entire object.
- * The caller who asks the object to be mapped for DMA will know
- * whether a partial mapping has been made by receiving the qualified
- * return value of DDI_DMA_PARTIAL_MAP instead of DDI_DMA_MAPPED.
- * All dma window functions will return DDI_FAILURE if the object
- * is not mapped partially.
- *
- * All other DDI dma functions (except ddi_dma_Free) operate *only* on
- * the mapped portion of the object. That is, functions such as ddi_dma_sync,
- * ddi_dma_segtocookie, and so on, only operate on the currently mapped
- * window.
- */
-
-#if defined(__sparc)
-
-/*
- * ddi_dma_movwin - Move window from current offset/length to new
- * offset/length. Returns DDI_SUCCESS if able to do so, else returns
- * DDI_FAILURE if unable to do so, or the new window would be out of bounds
- * or the object isn't set up for windows. If length is (off_t) -1, the
- * If the optional cp argument is specified, an implicit ddi_dma_htoc
- * is done to fill that in. The new offset and length will be returned
- * in the arguments *offp and *lenp (resp).
- *
- * In this implementation, only fixed width windows are used. It is
- * recommended that the windowsize should be retrieved via the function
- * ddi_dma_curwin (below) and that used to specify new offsets and lengths
- * since the window will be fixed at that size and will only move modulo
- * winsize.
- *
- * The caller must guarantee that their device's dma engine is quiescent
- * with respect to the current DMA window.
- *
- * The implementation will try to be rapid with respect to moving a window,
- * but since an appropriate ddi_dma_sync() is likely to be done, there
- * will be no guaranteed latency. In practice this should not be too
- * horrible, but don't depend upon any particular latency.
- */
-
-int
-ddi_dma_movwin(ddi_dma_handle_t, off_t *offp, size_t *lenp, ddi_dma_cookie_t *);
-
-#endif
-
-/*
- * ddi_dma_curwin - report the current offset/length of the window.
- *
- * Returns DDI_SUCCESS if offset and length
- * successfully established, else DDI_FAILURE.
- */
-
-int
-ddi_dma_curwin(ddi_dma_handle_t handle, off_t *offp, size_t *lenp);
-
-/*
- * Get next dma window
- *
- * ddi_dma_nextwin takes a handle and a window, and fills in a pointer to
- * the next window within the object. If win is "NULL", a pointer to the
- * first window within the object is filled in.
- *
- * Returns	DDI_SUCCESS if successfully filled in the window pointer,
- *		DDI_DMA_STALE if win does not refer to the currently active
- *				 window,
- *		DDI_DMA_DONE else there is no next window.
- */
-
-int
-ddi_dma_nextwin(ddi_dma_handle_t, ddi_dma_win_t, ddi_dma_win_t *);
-
-/*
- * Get next segment
- *
- * ddi_dma_nextseg takes a window and a segment and fills in a pointer to
- * the next segment within the window. If seg is "NULL", a pointer to the
- * first segment within the window is filled in.
- *
- * Returns	DDI_SUCCESS if successfully filled in the segment pointer,
- *		DDI_DMA_STALE if win does not refer to the currently active
- *				 window.
- *		DDI_DMA_DONE else there is no next segment.
- */
-
-int
-ddi_dma_nextseg(ddi_dma_win_t, ddi_dma_seg_t, ddi_dma_seg_t *);
-
-/*
- * Segment to cookie
- *
- * ddi_dma_segtocookie takes a segment and fills in the cookie pointed
- * to by cookiep with the appropriate address, length and bus type to be
- * used to program the DMA engine. ddi_dma_segtocookie also fills in the
- * range within the object (specified by <off, len>) this particular
- * segment is mapping. <off, len> are filled in to give some control
- * where in the object the current dma transfer is active.
- *
- * Returns	DDI_SUCCESS if successfully filled in all values,
- * else		DDI_FAILURE
- *
- * This function is documented as Obsolete and is replaced by
- * ddi_dma_nextcookie(9F)
- */
-
-int
-ddi_dma_segtocookie(ddi_dma_seg_t, off_t *, off_t *, ddi_dma_cookie_t *);
-
-/*
  * Synchronization of I/O with respect to various
  * caches and system write buffers.
  *
@@ -1486,97 +1177,6 @@ int
 ddi_dma_sync(ddi_dma_handle_t handle, off_t offset, size_t len, uint_t flags);
 
 /*
- * DMA mapping de-allocation
- *
- * When an I/O transfer completes, the resources required to map the
- * object for DMA should be completely released. As a side effect,
- * various cache synchronization might need to occur (see above).
- *
- * Returns DDI_SUCCESS if the all underlying caches are successfully
- * flushed, else DDI_FAILURE.
- *
- */
-
-int
-ddi_dma_free(ddi_dma_handle_t handle);
-
-/*
- * Device constraint cognizant kernel memory allocation- consistent access.
- *
- * IOPB allocation and de-allocation
- *
- * An IOPB allocation allocates some primary memory such that both
- * the kernel and the specified DMA device might be able to access it in a
- * non-cacheable (otherwise known as byte-consistent or non-streaming mode)
- * fashion. The allocation will obey the beginning alignment and padding
- * constraints as specified in the initial limits argument and as subsequently
- * modified by intervening parents. The limits argument may be NULL, in
- * which case the system picks a reasonable beginning limits.
- *
- * A kernel virtual address to the allocated primary memory is returned,
- * but no DMA mapping to the object is established (drivers must use the
- * ddi_dma_map() routines for that).
- *
- * If no iopb space can be allocated, DDI_FAILURE is returned.
- */
-
-int
-ddi_iopb_alloc(dev_info_t *dip, ddi_dma_lim_t *limits, uint_t length,
-	caddr_t *iopbp);
-
-/*
- * Deallocate an IOPB kernel virtual mapping.
- */
-
-void
-ddi_iopb_free(caddr_t iopb);
-
-/*
- * Device constraint cognizant kernel memory allocation- streaming access.
- *
- * Similar to ddi_iopb_alloc, but for primary memory that is intended
- * to be accessed in a streaming fashion. The allocation will obey the
- * beginning alignment and padding constraints as specified in the initial
- * limits argument and as subsequently modified by intervening parents.
- * The limits argument may be NULL, in which case the system picks a
- * reasonable beginning limits.
- *
- * A flags value of 0x1 indicates whether the caller can wait for
- * memory to become available. Other bits in the flags argument
- * are reserved for future use and must be zero.
- *
- * Upon return from a successful call, the new real length of
- * the allocation is returned (for use in mapping the memory
- * later).
- */
-
-int
-ddi_mem_alloc(dev_info_t *dip, ddi_dma_lim_t *limits, uint_t length,
-	uint_t flags, caddr_t *kaddrp, uint_t *real_length);
-
-/*
- * Free the memory allocated via ddi_mem_alloc().
- *
- * Note that passing an address not allocated via ddi_mem_alloc()
- * will panic the system.
- */
-
-void
-ddi_mem_free(caddr_t kaddr);
-
-/*
- * Dma alignment, minimum transfers sizes, and burst sizes allowed.
- * Some with tears, some without.
- */
-
-/*
- * Return a copy of the DMA attributes for the given handle.
- */
-
-int
-ddi_dma_get_attr(ddi_dma_handle_t handle, ddi_dma_attr_t *attrp);
-
-/*
  * Return the allowable DMA burst size for the object mapped by handle.
  * The burst sizes will returned in an integer that encodes power
  * of two burst sizes that are allowed in bit encoded format. For
@@ -1587,47 +1187,6 @@ ddi_dma_get_attr(ddi_dma_handle_t handle, ddi_dma_attr_t *attrp);
 
 int
 ddi_dma_burstsizes(ddi_dma_handle_t handle);
-
-/*
- * Return the required beginning alignment for a transfer and
- * the minimum sized effect a transfer would have. The beginning
- * alignment will be some power of two. The minimum sized effect
- * indicates, for writes, how much of the mapped object will be
- * affected by the minimum access and for reads how much of the
- * mapped object will accessed.
- */
-
-int
-ddi_dma_devalign(ddi_dma_handle_t handle, uint_t *alignment, uint_t *mineffect);
-
-/*
- * Like ddi_dma_devalign, but without having to map the object.
- * The object is assumed to be primary memory, and it is assumed
- * a minimum effective transfer is also the appropriate alignment
- * to be using. The streaming flag, if non-zero, indicates that the
- * returned value should be modified to account for streaming mode
- * accesses (e.g., with I/O caches enabled). The initial value
- * is passed by the requester if it has a dma engine that has
- * a minimum cycle constraint (or, for streaming mode, the most
- * efficient size).
- */
-
-int
-ddi_iomin(dev_info_t *dip, int initial, int streaming);
-
-/*
- * Given two DMA limit structures, apply the limitations
- * of one to the other, following the rules of limits
- * and the wishes of the caller.
- *
- * The rules of dma limit structures are that you cannot
- * make things *less* restrictive as you apply one set
- * of limits to another.
- *
- */
-
-void
-ddi_dmalim_merge(ddi_dma_lim_t *limit, ddi_dma_lim_t *modifier);
 
 /*
  * Merge DMA attributes
@@ -2119,15 +1678,9 @@ extern int proc_signal(void *pref, int sig);
 extern uint8_t inb(int port);
 extern uint16_t inw(int port);
 extern uint32_t inl(int port);
-extern void repinsb(int port, uint8_t *addr, int count);
-extern void repinsw(int port, uint16_t *addr, int count);
-extern void repinsd(int port, uint32_t *addr, int count);
 extern void outb(int port, uint8_t value);
 extern void outw(int port, uint16_t value);
 extern void outl(int port, uint32_t value);
-extern void repoutsb(int port, uint8_t *addr, int count);
-extern void repoutsw(int port, uint16_t *addr, int count);
-extern void repoutsd(int port, uint32_t *addr, int count);
 
 /*
  * Console bell routines
@@ -2177,8 +1730,6 @@ ddi_regs_map_free(ddi_acc_handle_t *handle);
 /*
  * these are the prototypes for the common portable data access functions
  */
-
-#ifdef _LP64
 
 uint8_t
 ddi_get8(ddi_acc_handle_t handle, uint8_t *addr);
@@ -2234,82 +1785,6 @@ void
 ddi_rep_put64(ddi_acc_handle_t handle, uint64_t *host_addr, uint64_t *dev_addr,
 	size_t repcount, uint_t flags);
 
-#else /* _ILP32 */
-
-uint8_t
-ddi_getb(ddi_acc_handle_t handle, uint8_t *addr);
-#define	ddi_get8	ddi_getb
-
-uint16_t
-ddi_getw(ddi_acc_handle_t handle, uint16_t *addr);
-#define	ddi_get16	ddi_getw
-
-uint32_t
-ddi_getl(ddi_acc_handle_t handle, uint32_t *addr);
-#define	ddi_get32	ddi_getl
-
-uint64_t
-ddi_getll(ddi_acc_handle_t handle, uint64_t *addr);
-#define	ddi_get64	ddi_getll
-
-void
-ddi_rep_getb(ddi_acc_handle_t handle, uint8_t *host_addr, uint8_t *dev_addr,
-	size_t repcount, uint_t flags);
-#define	ddi_rep_get8	ddi_rep_getb
-
-void
-ddi_rep_getw(ddi_acc_handle_t handle, uint16_t *host_addr, uint16_t *dev_addr,
-	size_t repcount, uint_t flags);
-#define	ddi_rep_get16	ddi_rep_getw
-
-void
-ddi_rep_getl(ddi_acc_handle_t handle, uint32_t *host_addr, uint32_t *dev_addr,
-	size_t repcount, uint_t flags);
-#define	ddi_rep_get32	ddi_rep_getl
-
-void
-ddi_rep_getll(ddi_acc_handle_t handle, uint64_t *host_addr, uint64_t *dev_addr,
-	size_t repcount, uint_t flags);
-#define	ddi_rep_get64	ddi_rep_getll
-
-void
-ddi_putb(ddi_acc_handle_t handle, uint8_t *addr, uint8_t value);
-#define	ddi_put8	ddi_putb
-
-void
-ddi_putw(ddi_acc_handle_t handle, uint16_t *addr, uint16_t value);
-#define	ddi_put16	ddi_putw
-
-void
-ddi_putl(ddi_acc_handle_t handle, uint32_t *addr, uint32_t value);
-#define	ddi_put32	ddi_putl
-
-void
-ddi_putll(ddi_acc_handle_t handle, uint64_t *addr, uint64_t value);
-#define	ddi_put64	ddi_putll
-
-void
-ddi_rep_putb(ddi_acc_handle_t handle, uint8_t *host_addr, uint8_t *dev_addr,
-	size_t repcount, uint_t flags);
-#define	ddi_rep_put8	ddi_rep_putb
-
-void
-ddi_rep_putw(ddi_acc_handle_t handle, uint16_t *host_addr, uint16_t *dev_addr,
-	size_t repcount, uint_t flags);
-#define	ddi_rep_put16	ddi_rep_putw
-
-void
-ddi_rep_putl(ddi_acc_handle_t handle, uint32_t *host_addr, uint32_t *dev_addr,
-	size_t repcount, uint_t flags);
-#define	ddi_rep_put32	ddi_rep_putl
-
-void
-ddi_rep_putll(ddi_acc_handle_t handle, uint64_t *host_addr, uint64_t *dev_addr,
-	size_t repcount, uint_t flags);
-#define	ddi_rep_put64	ddi_rep_putll
-
-#endif /* _LP64 */
-
 /*
  * these are special device handling functions
  */
@@ -2352,8 +1827,6 @@ pci_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle);
 void
 pci_config_teardown(ddi_acc_handle_t *handle);
 
-#ifdef _LP64
-
 uint8_t
 pci_config_get8(ddi_acc_handle_t handle, off_t offset);
 
@@ -2377,42 +1850,6 @@ pci_config_put32(ddi_acc_handle_t handle, off_t offset, uint32_t value);
 
 void
 pci_config_put64(ddi_acc_handle_t handle, off_t offset, uint64_t value);
-
-#else /* _ILP32 */
-
-uint8_t
-pci_config_getb(ddi_acc_handle_t handle, off_t offset);
-#define	pci_config_get8		pci_config_getb
-
-uint16_t
-pci_config_getw(ddi_acc_handle_t handle, off_t offset);
-#define	pci_config_get16	pci_config_getw
-
-uint32_t
-pci_config_getl(ddi_acc_handle_t handle, off_t offset);
-#define	pci_config_get32	pci_config_getl
-
-uint64_t
-pci_config_getll(ddi_acc_handle_t handle, off_t offset);
-#define	pci_config_get64	pci_config_getll
-
-void
-pci_config_putb(ddi_acc_handle_t handle, off_t offset, uint8_t value);
-#define	pci_config_put8		pci_config_putb
-
-void
-pci_config_putw(ddi_acc_handle_t handle, off_t offset, uint16_t value);
-#define	pci_config_put16	pci_config_putw
-
-void
-pci_config_putl(ddi_acc_handle_t handle, off_t offset, uint32_t value);
-#define	pci_config_put32	pci_config_putl
-
-void
-pci_config_putll(ddi_acc_handle_t handle, off_t offset, uint64_t value);
-#define	pci_config_put64	pci_config_putll
-
-#endif /* _LP64 */
 
 int
 pci_report_pmcap(dev_info_t *dip, int cap, void *arg);

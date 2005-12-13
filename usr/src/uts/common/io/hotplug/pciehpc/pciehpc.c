@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1612,7 +1611,7 @@ pciehpc_reg_get8(pciehpc_t *ctrl_p, uint_t off)
 	    return ((uint8_t)ctrl_p->regops.get(ctrl_p->regops.cookie,
 			(off_t)off));
 	else
-	    return (ddi_mem_get8(ctrl_p->cfghdl,
+	    return (ddi_get8(ctrl_p->cfghdl,
 			(uint8_t *)(ctrl_p->regs_base + off)));
 }
 
@@ -1625,7 +1624,7 @@ pciehpc_reg_get16(pciehpc_t *ctrl_p, uint_t off)
 	    return ((uint16_t)ctrl_p->regops.get(ctrl_p->regops.cookie,
 			(off_t)off));
 	else
-	    return (ddi_mem_get16(ctrl_p->cfghdl,
+	    return (ddi_get16(ctrl_p->cfghdl,
 			(uint16_t *)(ctrl_p->regs_base + off)));
 }
 
@@ -1638,7 +1637,7 @@ pciehpc_reg_get32(pciehpc_t *ctrl_p, uint_t off)
 	    return ((uint32_t)ctrl_p->regops.get(ctrl_p->regops.cookie,
 			(off_t)off));
 	else
-	    return (ddi_mem_get32(ctrl_p->cfghdl,
+	    return (ddi_get32(ctrl_p->cfghdl,
 			(uint32_t *)(ctrl_p->regs_base + off)));
 }
 
@@ -1651,7 +1650,7 @@ pciehpc_reg_put8(pciehpc_t *ctrl_p, uint_t off, uint8_t val)
 	if (ctrl_p->regops.put != NULL)
 	    ctrl_p->regops.put(ctrl_p->regops.cookie, (off_t)off, (uint_t)val);
 	else
-	    ddi_mem_put8(ctrl_p->cfghdl,
+	    ddi_put8(ctrl_p->cfghdl,
 			(uint8_t *)(ctrl_p->regs_base + off), val);
 }
 
@@ -1664,7 +1663,7 @@ pciehpc_reg_put16(pciehpc_t *ctrl_p, uint_t off, uint16_t val)
 	if (ctrl_p->regops.put != NULL)
 	    ctrl_p->regops.put(ctrl_p->regops.cookie, (off_t)off, (uint_t)val);
 	else
-	    ddi_mem_put16(ctrl_p->cfghdl,
+	    ddi_put16(ctrl_p->cfghdl,
 			(uint16_t *)(ctrl_p->regs_base + off), val);
 }
 
@@ -1677,7 +1676,7 @@ pciehpc_reg_put32(pciehpc_t *ctrl_p, uint_t off, uint32_t val)
 	if (ctrl_p->regops.put != NULL)
 	    ctrl_p->regops.put(ctrl_p->regops.cookie, (off_t)off, (uint_t)val);
 	else
-	    ddi_mem_put32(ctrl_p->cfghdl,
+	    ddi_put32(ctrl_p->cfghdl,
 			(uint32_t *)(ctrl_p->regs_base + off), val);
 }
 

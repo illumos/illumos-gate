@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -4864,7 +4863,6 @@ mondo_loop() {
 		$root/kernel/drv/conskbd \
 		$root/kernel/drv/consms \
 		$root/kernel/drv/dad \
-		$root/kernel/drv/dbri \
 		$root/kernel/drv/devinfo \
 		$root/kernel/drv/ecpp \
 		$root/kernel/drv/ehci \
@@ -5492,6 +5490,20 @@ mondo_loop() {
 	rm -f $usr/lib/adb/hat.nxt
 	rm -f $usr/lib/adb/hwpp.nxt
 	
+	#
+	# Remove drivers for EOF of chs as per PSARC/2005/581
+	#
+	rm -f $root/kernel/drv/chs
+	rm -f $root/kernel/drv/chs.conf
+	rm -f $root/boot/solaris/drivers/notisa.020/chs.bef
+
+	#
+	# Remove drivers & header files for EOF of dbri as per PSARC 2005/582
+	#
+	rm -f $root/kernel/drv/sparcv9/dbri
+	rm -f $root/usr/include/sys/dbriio.h
+	rm -f $root/usr/include/sys/mmcodecreg.h
+
 	#
 	# Remove drivers for EOF of pcscsi as per PSARC/2005/003
 	#

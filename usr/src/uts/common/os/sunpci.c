@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -460,13 +460,8 @@ pci_bdg_check_status(dev_info_t *dip, ddi_fm_error_t *derr,
 	    (unknown ? DDI_FM_UNKNOWN : DDI_FM_OK)));
 }
 
-#ifdef _LP64
 uint8_t
 pci_config_get8(ddi_acc_handle_t handle, off_t offset)
-#else /* _ILP32 */
-uint8_t
-pci_config_getb(ddi_acc_handle_t handle, off_t offset)
-#endif
 {
 	caddr_t	cfgaddr;
 	ddi_acc_hdl_t *hp;
@@ -476,13 +471,8 @@ pci_config_getb(ddi_acc_handle_t handle, off_t offset)
 	return (ddi_get8(handle, (uint8_t *)cfgaddr));
 }
 
-#ifdef _LP64
 uint16_t
 pci_config_get16(ddi_acc_handle_t handle, off_t offset)
-#else /* _ILP32 */
-uint16_t
-pci_config_getw(ddi_acc_handle_t handle, off_t offset)
-#endif
 {
 	caddr_t	cfgaddr;
 	ddi_acc_hdl_t *hp;
@@ -492,13 +482,8 @@ pci_config_getw(ddi_acc_handle_t handle, off_t offset)
 	return (ddi_get16(handle, (uint16_t *)cfgaddr));
 }
 
-#ifdef _LP64
 uint32_t
 pci_config_get32(ddi_acc_handle_t handle, off_t offset)
-#else /* _ILP32 */
-uint32_t
-pci_config_getl(ddi_acc_handle_t handle, off_t offset)
-#endif
 {
 	caddr_t	cfgaddr;
 	ddi_acc_hdl_t *hp;
@@ -508,13 +493,8 @@ pci_config_getl(ddi_acc_handle_t handle, off_t offset)
 	return (ddi_get32(handle, (uint32_t *)cfgaddr));
 }
 
-#ifdef _LP64
 uint64_t
 pci_config_get64(ddi_acc_handle_t handle, off_t offset)
-#else /* _ILP32 */
-uint64_t
-pci_config_getll(ddi_acc_handle_t handle, off_t offset)
-#endif
 {
 	caddr_t	cfgaddr;
 	ddi_acc_hdl_t *hp;
@@ -524,13 +504,8 @@ pci_config_getll(ddi_acc_handle_t handle, off_t offset)
 	return (ddi_get64(handle, (uint64_t *)cfgaddr));
 }
 
-#ifdef _LP64
 void
 pci_config_put8(ddi_acc_handle_t handle, off_t offset, uint8_t value)
-#else /* _ILP32 */
-void
-pci_config_putb(ddi_acc_handle_t handle, off_t offset, uint8_t value)
-#endif
 {
 	caddr_t	cfgaddr;
 	ddi_acc_hdl_t *hp;
@@ -540,13 +515,8 @@ pci_config_putb(ddi_acc_handle_t handle, off_t offset, uint8_t value)
 	ddi_put8(handle, (uint8_t *)cfgaddr, value);
 }
 
-#ifdef _LP64
 void
 pci_config_put16(ddi_acc_handle_t handle, off_t offset, uint16_t value)
-#else /* _ILP32 */
-void
-pci_config_putw(ddi_acc_handle_t handle, off_t offset, uint16_t value)
-#endif
 {
 	caddr_t	cfgaddr;
 	ddi_acc_hdl_t *hp;
@@ -556,13 +526,8 @@ pci_config_putw(ddi_acc_handle_t handle, off_t offset, uint16_t value)
 	ddi_put16(handle, (uint16_t *)cfgaddr, value);
 }
 
-#ifdef _LP64
 void
 pci_config_put32(ddi_acc_handle_t handle, off_t offset, uint32_t value)
-#else /* _ILP32 */
-void
-pci_config_putl(ddi_acc_handle_t handle, off_t offset, uint32_t value)
-#endif
 {
 	caddr_t	cfgaddr;
 	ddi_acc_hdl_t *hp;
@@ -572,13 +537,8 @@ pci_config_putl(ddi_acc_handle_t handle, off_t offset, uint32_t value)
 	ddi_put32(handle, (uint32_t *)cfgaddr, value);
 }
 
-#ifdef _LP64
 void
 pci_config_put64(ddi_acc_handle_t handle, off_t offset, uint64_t value)
-#else /* _ILP32 */
-void
-pci_config_putll(ddi_acc_handle_t handle, off_t offset, uint64_t value)
-#endif
 {
 	caddr_t	cfgaddr;
 	ddi_acc_hdl_t *hp;
@@ -587,6 +547,104 @@ pci_config_putll(ddi_acc_handle_t handle, off_t offset, uint64_t value)
 	cfgaddr = hp->ah_addr + offset;
 	ddi_put64(handle, (uint64_t *)cfgaddr, value);
 }
+
+/*
+ * We need to separate the old interfaces from the new ones and leave them
+ * in here for a while. Previous versions of the OS defined the new interfaces
+ * to the old interfaces. This way we can fix things up so that we can
+ * eventually remove these interfaces.
+ * e.g. A 3rd party module/driver using pci_config_get8 and built against S10
+ * or earlier will actually have a reference to pci_config_getb in the binary.
+ */
+#ifdef _ILP32
+uint8_t
+pci_config_getb(ddi_acc_handle_t handle, off_t offset)
+{
+	caddr_t	cfgaddr;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get(handle);
+	cfgaddr = hp->ah_addr + offset;
+	return (ddi_get8(handle, (uint8_t *)cfgaddr));
+}
+
+uint16_t
+pci_config_getw(ddi_acc_handle_t handle, off_t offset)
+{
+	caddr_t	cfgaddr;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get(handle);
+	cfgaddr = hp->ah_addr + offset;
+	return (ddi_get16(handle, (uint16_t *)cfgaddr));
+}
+
+uint32_t
+pci_config_getl(ddi_acc_handle_t handle, off_t offset)
+{
+	caddr_t	cfgaddr;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get(handle);
+	cfgaddr = hp->ah_addr + offset;
+	return (ddi_get32(handle, (uint32_t *)cfgaddr));
+}
+
+uint64_t
+pci_config_getll(ddi_acc_handle_t handle, off_t offset)
+{
+	caddr_t	cfgaddr;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get(handle);
+	cfgaddr = hp->ah_addr + offset;
+	return (ddi_get64(handle, (uint64_t *)cfgaddr));
+}
+
+void
+pci_config_putb(ddi_acc_handle_t handle, off_t offset, uint8_t value)
+{
+	caddr_t	cfgaddr;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get(handle);
+	cfgaddr = hp->ah_addr + offset;
+	ddi_put8(handle, (uint8_t *)cfgaddr, value);
+}
+
+void
+pci_config_putw(ddi_acc_handle_t handle, off_t offset, uint16_t value)
+{
+	caddr_t	cfgaddr;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get(handle);
+	cfgaddr = hp->ah_addr + offset;
+	ddi_put16(handle, (uint16_t *)cfgaddr, value);
+}
+
+void
+pci_config_putl(ddi_acc_handle_t handle, off_t offset, uint32_t value)
+{
+	caddr_t	cfgaddr;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get(handle);
+	cfgaddr = hp->ah_addr + offset;
+	ddi_put32(handle, (uint32_t *)cfgaddr, value);
+}
+
+void
+pci_config_putll(ddi_acc_handle_t handle, off_t offset, uint64_t value)
+{
+	caddr_t	cfgaddr;
+	ddi_acc_hdl_t *hp;
+
+	hp = impl_acc_hdl_get(handle);
+	cfgaddr = hp->ah_addr + offset;
+	ddi_put64(handle, (uint64_t *)cfgaddr, value);
+}
+#endif /* _ILP32 */
 
 /*ARGSUSED*/
 int
