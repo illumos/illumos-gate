@@ -171,6 +171,38 @@ static const bge_ksindex_t bge_statistics[] = {
 	{ KS_STATS_SIZE, NULL }
 };
 
+static const bge_ksindex_t bge_stat_val[] = {
+	KS_NAME(ifHCOutOctets),
+	KS_NAME(etherStatsCollisions),
+	KS_NAME(outXonSent),
+	KS_NAME(outXoffSent),
+	KS_NAME(dot3StatsInternalMacTransmitErrors),
+	KS_NAME(dot3StatsSingleCollisionFrames),
+	KS_NAME(dot3StatsMultipleCollisionFrames),
+	KS_NAME(dot3StatsDeferredTransmissions),
+	KS_NAME(dot3StatsExcessiveCollisions),
+	KS_NAME(dot3StatsLateCollisions),
+	KS_NAME(ifHCOutUcastPkts),
+	KS_NAME(ifHCOutMulticastPkts),
+	KS_NAME(ifHCOutBroadcastPkts),
+	KS_NAME(ifHCInOctets),
+	KS_NAME(etherStatsFragments),
+	KS_NAME(ifHCInUcastPkts),
+	KS_NAME(ifHCInMulticastPkts),
+	KS_NAME(ifHCInBroadcastPkts),
+	KS_NAME(dot3StatsFCSErrors),
+	KS_NAME(dot3StatsAlignmentErrors),
+	KS_NAME(xonPauseFramesReceived),
+	KS_NAME(xoffPauseFramesReceived),
+	KS_NAME(macControlFramesReceived),
+	KS_NAME(xoffStateEntered),
+	KS_NAME(dot3StatsFrameTooLongs),
+	KS_NAME(etherStatsJabbers),
+	KS_NAME(etherStatsUndersizePkts),
+
+	{ KS_STAT_REG_SIZE, NULL }
+};
+
 static int
 bge_statistics_update(kstat_t *ksp, int flag)
 {
@@ -183,7 +215,9 @@ bge_statistics_update(kstat_t *ksp, int flag)
 		return (EACCES);
 
 	bgep = ksp->ks_private;
-	bstp = DMA_VPTR(bgep->statistics);
+	if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+		bstp = DMA_VPTR(bgep->statistics);
+
 	knp = ksp->ks_data;
 
 	/*
@@ -194,8 +228,69 @@ bge_statistics_update(kstat_t *ksp, int flag)
 	 * statistics, 'cos it doesn't really matter if they're a few
 	 * microsends out of date or less than 100% consistent ...
 	 */
-	for (ksip = bge_statistics; ksip->name != NULL; ++knp, ++ksip)
-		knp->value.ui64 = bstp->a[ksip->index];
+	if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+		for (ksip = bge_statistics; ksip->name != NULL; ++knp, ++ksip)
+			knp->value.ui64 = bstp->a[ksip->index];
+	else {
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.ifHCOutOctets);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.etherStatsCollisions);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.outXonSent);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.outXoffSent);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->
+				stat_val.dot3StatsInternalMacTransmitErrors);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->
+				stat_val.dot3StatsSingleCollisionFrames);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->
+				stat_val.dot3StatsMultipleCollisionFrames);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->
+				stat_val.dot3StatsDeferredTransmissions);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.dot3StatsExcessiveCollisions);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.dot3StatsLateCollisions);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.ifHCOutUcastPkts);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.ifHCOutMulticastPkts);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.ifHCOutBroadcastPkts);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.ifHCInOctets);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.etherStatsFragments);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.ifHCInUcastPkts);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.ifHCInMulticastPkts);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.ifHCInBroadcastPkts);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.dot3StatsFCSErrors);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.dot3StatsAlignmentErrors);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.xonPauseFramesReceived);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.xoffPauseFramesReceived);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.macControlFramesReceived);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.xoffStateEntered);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.dot3StatsFrameTooLongs);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.etherStatsJabbers);
+		(knp++)->value.ui64 =
+			(uint64_t)(bgep->stat_val.etherStatsUndersizePkts);
+	}
 
 	return (0);
 }
@@ -707,18 +802,25 @@ bge_init_kstats(bge_t *bgep, int instance)
 
 	BGE_TRACE(("bge_init_kstats($%p, %d)", (void *)bgep, instance));
 
-	DMA_ZERO(bgep->statistics);
-	bgep->bge_kstats[BGE_KSTAT_RAW] = ksp = kstat_create(BGE_DRIVER_NAME,
-		instance, "raw_statistics", "net", KSTAT_TYPE_RAW,
-		sizeof (bge_statistics_t), KSTAT_FLAG_VIRTUAL);
-	if (ksp != NULL) {
-		ksp->ks_data = DMA_VPTR(bgep->statistics);
-		kstat_install(ksp);
-	}
+	if (bgep->chipid.statistic_type == BGE_STAT_BLK) {
+		DMA_ZERO(bgep->statistics);
+		bgep->bge_kstats[BGE_KSTAT_RAW] = ksp =
+			kstat_create(BGE_DRIVER_NAME, instance,
+				"raw_statistics", "net", KSTAT_TYPE_RAW,
+				sizeof (bge_statistics_t), KSTAT_FLAG_VIRTUAL);
+		if (ksp != NULL) {
+			ksp->ks_data = DMA_VPTR(bgep->statistics);
+			kstat_install(ksp);
+		}
 
-	bgep->bge_kstats[BGE_KSTAT_STATS] = bge_setup_named_kstat(bgep,
-		instance, "statistics", bge_statistics,
-		sizeof (bge_statistics), bge_statistics_update);
+		bgep->bge_kstats[BGE_KSTAT_STATS] = bge_setup_named_kstat(bgep,
+			instance, "statistics", bge_statistics,
+			sizeof (bge_statistics), bge_statistics_update);
+	} else {
+		bgep->bge_kstats[BGE_KSTAT_STATS] = bge_setup_named_kstat(bgep,
+			instance, "statistics", bge_stat_val,
+			sizeof (bge_stat_val), bge_statistics_update);
+	}
 
 	bgep->bge_kstats[BGE_KSTAT_CHIPID] = bge_setup_named_kstat(bgep,
 		instance, "chipid", bge_chipid,
@@ -761,8 +863,68 @@ uint64_t
 bge_m_stat(void *arg, enum mac_stat stat)
 {
 	bge_t *bgep = arg;
-	bge_statistics_t *bstp = DMA_VPTR(bgep->statistics);
+	bge_statistics_t *bstp;
 	uint64_t val;
+
+	if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+		bstp = DMA_VPTR(bgep->statistics);
+	else {
+
+		bgep->stat_val.ifHCOutOctets +=
+			bge_reg_get32(bgep, STAT_IFHCOUT_OCTETS_REG);
+		bgep->stat_val.etherStatsCollisions +=
+			bge_reg_get32(bgep, STAT_ETHER_COLLIS_REG);
+		bgep->stat_val.outXonSent +=
+			bge_reg_get32(bgep, STAT_OUTXON_SENT_REG);
+		bgep->stat_val.outXoffSent +=
+			bge_reg_get32(bgep, STAT_OUTXOFF_SENT_REG);
+		bgep->stat_val.dot3StatsInternalMacTransmitErrors +=
+			bge_reg_get32(bgep, STAT_DOT3_INTMACTX_ERR_REG);
+		bgep->stat_val.dot3StatsSingleCollisionFrames +=
+			bge_reg_get32(bgep, STAT_DOT3_SCOLLI_FRAME_REG);
+		bgep->stat_val.dot3StatsMultipleCollisionFrames +=
+			bge_reg_get32(bgep, STAT_DOT3_MCOLLI_FRAME_REG);
+		bgep->stat_val.dot3StatsDeferredTransmissions +=
+			bge_reg_get32(bgep, STAT_DOT3_DEFERED_TX_REG);
+		bgep->stat_val.dot3StatsExcessiveCollisions +=
+			bge_reg_get32(bgep, STAT_DOT3_EXCE_COLLI_REG);
+		bgep->stat_val.dot3StatsLateCollisions +=
+			bge_reg_get32(bgep, STAT_DOT3_LATE_COLLI_REG);
+		bgep->stat_val.ifHCOutUcastPkts +=
+			bge_reg_get32(bgep, STAT_IFHCOUT_UPKGS_REG);
+		bgep->stat_val.ifHCOutMulticastPkts +=
+			bge_reg_get32(bgep, STAT_IFHCOUT_MPKGS_REG);
+		bgep->stat_val.ifHCOutBroadcastPkts +=
+			bge_reg_get32(bgep, STAT_IFHCOUT_BPKGS_REG);
+		bgep->stat_val.ifHCInOctets +=
+			bge_reg_get32(bgep, STAT_IFHCIN_OCTETS_REG);
+		bgep->stat_val.etherStatsFragments +=
+			bge_reg_get32(bgep, STAT_ETHER_FRAGMENT_REG);
+		bgep->stat_val.ifHCInUcastPkts +=
+			bge_reg_get32(bgep, STAT_IFHCIN_UPKGS_REG);
+		bgep->stat_val.ifHCInMulticastPkts +=
+			bge_reg_get32(bgep, STAT_IFHCIN_MPKGS_REG);
+		bgep->stat_val.ifHCInBroadcastPkts +=
+			bge_reg_get32(bgep, STAT_IFHCIN_BPKGS_REG);
+		bgep->stat_val.dot3StatsFCSErrors +=
+			bge_reg_get32(bgep, STAT_DOT3_FCS_ERR_REG);
+		bgep->stat_val.dot3StatsAlignmentErrors +=
+			bge_reg_get32(bgep, STAT_DOT3_ALIGN_ERR_REG);
+		bgep->stat_val.xonPauseFramesReceived +=
+			bge_reg_get32(bgep, STAT_XON_PAUSE_RX_REG);
+		bgep->stat_val.xoffPauseFramesReceived +=
+			bge_reg_get32(bgep, STAT_XOFF_PAUSE_RX_REG);
+		bgep->stat_val.macControlFramesReceived +=
+			bge_reg_get32(bgep, STAT_MAC_CTRL_RX_REG);
+		bgep->stat_val.xoffStateEntered +=
+			bge_reg_get32(bgep, STAT_XOFF_STATE_ENTER_REG);
+		bgep->stat_val.dot3StatsFrameTooLongs +=
+			bge_reg_get32(bgep, STAT_DOT3_FRAME_TOOLONG_REG);
+		bgep->stat_val.etherStatsJabbers +=
+			bge_reg_get32(bgep, STAT_ETHER_JABBERS_REG);
+		bgep->stat_val.etherStatsUndersizePkts +=
+			bge_reg_get32(bgep, STAT_ETHER_UNDERSIZE_REG);
+		}
 
 	switch (stat) {
 	case MAC_STAT_IFSPEED:
@@ -770,99 +932,172 @@ bge_m_stat(void *arg, enum mac_stat stat)
 		break;
 
 	case MAC_STAT_MULTIRCV:
-		val = bstp->s.ifHCInMulticastPkts;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifHCInMulticastPkts;
+		else
+			val = bgep->stat_val.ifHCInMulticastPkts;
 		break;
 
 	case MAC_STAT_BRDCSTRCV:
-		val = bstp->s.ifHCInBroadcastPkts;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifHCInBroadcastPkts;
+		else
+			val = bgep->stat_val.ifHCInBroadcastPkts;
 		break;
 
 	case MAC_STAT_MULTIXMT:
-		val = bstp->s.ifHCOutMulticastPkts;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifHCOutMulticastPkts;
+		else
+			val = bgep->stat_val.ifHCOutMulticastPkts;
 		break;
 
 	case MAC_STAT_BRDCSTXMT:
-		val = bstp->s.ifHCOutBroadcastPkts;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifHCOutBroadcastPkts;
+		else
+			val = bgep->stat_val.ifHCOutBroadcastPkts;
 		break;
 
 	case MAC_STAT_NORCVBUF:
-		val = bstp->s.ifInDiscards;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifInDiscards;
+		else
+			val = 0;
 		break;
 
 	case MAC_STAT_IERRORS:
-		val = bstp->s.ifInErrors;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifInErrors;
+		else
+			val = 0;
 		break;
 
 	case MAC_STAT_NOXMTBUF:
-		val = bstp->s.ifOutDiscards;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifOutDiscards;
+		else
+			val = 0;
 		break;
 
 	case MAC_STAT_OERRORS:
-		val = bstp->s.ifOutErrors;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifOutDiscards;
+		else
+			val = 0;
 		break;
 
 	case MAC_STAT_COLLISIONS:
-		val = bstp->s.etherStatsCollisions;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.etherStatsCollisions;
+		else
+			val = bgep->stat_val.etherStatsCollisions;
 		break;
 
 	case MAC_STAT_RBYTES:
-		val = bstp->s.ifHCInOctets;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifHCInOctets;
+		else
+			val = bgep->stat_val.ifHCInOctets;
 		break;
 
 	case MAC_STAT_IPACKETS:
-		val = bstp->s.ifHCInUcastPkts +
-		    bstp->s.ifHCInMulticastPkts +
-		    bstp->s.ifHCInBroadcastPkts;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifHCInUcastPkts +
+				bstp->s.ifHCInMulticastPkts +
+				bstp->s.ifHCInBroadcastPkts;
+		else
+			val = bgep->stat_val.ifHCInUcastPkts +
+				bgep->stat_val.ifHCInMulticastPkts +
+				bgep->stat_val.ifHCInBroadcastPkts;
 		break;
 
 	case MAC_STAT_OBYTES:
-		val = bstp->s.ifHCOutOctets;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifHCOutOctets;
+		else
+			val = bgep->stat_val.ifHCOutOctets;
 		break;
 
 	case MAC_STAT_OPACKETS:
-		val = bstp->s.ifHCOutUcastPkts +
-		    bstp->s.ifHCOutMulticastPkts +
-		    bstp->s.ifHCOutBroadcastPkts;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.ifHCOutUcastPkts +
+				bstp->s.ifHCOutMulticastPkts +
+				bstp->s.ifHCOutBroadcastPkts;
+		else
+			val = bgep->stat_val.ifHCOutUcastPkts +
+				bgep->stat_val.ifHCOutMulticastPkts +
+				bgep->stat_val.ifHCOutBroadcastPkts;
 		break;
 
 	case MAC_STAT_ALIGN_ERRORS:
-		val = bstp->s.dot3StatsAlignmentErrors;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsAlignmentErrors;
+		else
+			val = bgep->stat_val.dot3StatsAlignmentErrors;
 		break;
 
 	case MAC_STAT_FCS_ERRORS:
-		val = bstp->s.dot3StatsFCSErrors;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsFCSErrors;
+		else
+			val = bgep->stat_val.dot3StatsFCSErrors;
 		break;
 
 	case MAC_STAT_FIRST_COLLISIONS:
-		val = bstp->s.dot3StatsSingleCollisionFrames;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsSingleCollisionFrames;
+		else
+			val = bgep->stat_val.dot3StatsSingleCollisionFrames;
 		break;
 
 	case MAC_STAT_MULTI_COLLISIONS:
-		val = bstp->s.dot3StatsMultipleCollisionFrames;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsMultipleCollisionFrames;
+		else
+			val = bgep->stat_val.dot3StatsMultipleCollisionFrames;
 		break;
 
 	case MAC_STAT_DEFER_XMTS:
-		val = bstp->s.dot3StatsDeferredTransmissions;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsDeferredTransmissions;
+		else
+			val = bgep->stat_val.dot3StatsDeferredTransmissions;
 		break;
 
 	case MAC_STAT_TX_LATE_COLLISIONS:
-		val = bstp->s.dot3StatsLateCollisions;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsLateCollisions;
+		else
+			val = bgep->stat_val.dot3StatsLateCollisions;
 		break;
 
 	case MAC_STAT_EX_COLLISIONS:
-		val = bstp->s.dot3StatsExcessiveCollisions;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsExcessiveCollisions;
+		else
+			val = bgep->stat_val.dot3StatsExcessiveCollisions;
 		break;
 
 	case MAC_STAT_MACXMT_ERRORS:
-		val = bstp->s.dot3StatsInternalMacTransmitErrors;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsInternalMacTransmitErrors;
+		else
+			val = bgep->stat_val.dot3StatsInternalMacTransmitErrors;
 		break;
 
 	case MAC_STAT_CARRIER_ERRORS:
-		val = bstp->s.dot3StatsCarrierSenseErrors;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsCarrierSenseErrors;
+		else
+			val = 0;
 		break;
 
 	case MAC_STAT_TOOLONG_ERRORS:
-		val = bstp->s.dot3StatsFrameTooLongs;
+		if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+			val = bstp->s.dot3StatsFrameTooLongs;
+		else
+			val = bgep->stat_val.dot3StatsFrameTooLongs;
 		break;
 
 	case MAC_STAT_XCVR_ADDR:

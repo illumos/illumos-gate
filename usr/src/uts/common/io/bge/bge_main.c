@@ -48,6 +48,7 @@ static char subdev_propname[] = "subsystem-id";
 static char subven_propname[] = "subsystem-vendor-id";
 static char rxrings_propname[] = "bge-rx-rings";
 static char txrings_propname[] = "bge-tx-rings";
+static char default_mtu[] = "default-mtu";
 
 static int bge_add_intrs(bge_t *, int);
 static void bge_rem_intrs(bge_t *);
@@ -1043,7 +1044,7 @@ bge_init_send_ring(bge_t *bgep, uint64_t ring)
 	bsp = DMA_VPTR(bgep->status_block);
 	srp->cons_index_p = SEND_INDEX_P(bsp, ring);
 	srp->chip_mbx_reg = SEND_RING_HOST_INDEX_REG(ring);
-	rw_init(srp->tx_lock, NULL, RW_DRIVER,
+	mutex_init(srp->tx_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(bgep->intr_pri));
 	mutex_init(srp->tc_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(bgep->intr_pri));
@@ -1087,7 +1088,7 @@ bge_fini_send_ring(bge_t *bgep, uint64_t ring)
 	ssbdp = srp->sw_sbds;
 	kmem_free(ssbdp, srp->desc.nslots*sizeof (*ssbdp));
 
-	rw_destroy(srp->tx_lock);
+	mutex_destroy(srp->tx_lock);
 	mutex_destroy(srp->tc_lock);
 }
 
@@ -1345,7 +1346,7 @@ bge_alloc_bufs(bge_t *bgep)
 		bge_slice_chunk(&bgep->buff[BGE_MINI_BUFF_RING].buf[split],
 			&area, BGE_MINI_SLOTS_USED/BGE_SPLIT,
 			BGE_MINI_BUFF_SIZE);
-		ASSERT(area.alength == 0);
+		ASSERT(area.alength >= 0);
 	}
 
 	for (split = 0; split < BGE_SPLIT; ++split) {
@@ -1358,7 +1359,7 @@ bge_alloc_bufs(bge_t *bgep)
 			bge_slice_chunk(&bgep->send[ring].buf[split],
 				&area, 0/BGE_SPLIT,
 				bgep->chipid.snd_buff_size);
-		ASSERT(area.alength == 0);
+		ASSERT(area.alength >= 0);
 	}
 
 	for (ring = 0; ring < rx_rings; ++ring)
@@ -1738,6 +1739,14 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	cidp->tx_rings = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
 		DDI_PROP_DONTPASS, txrings_propname, cidp->tx_rings);
 
+	if (bge_jumbo_enable == B_TRUE) {
+		cidp->default_mtu = ddi_prop_get_int(DDI_DEV_T_ANY, devinfo,
+			DDI_PROP_DONTPASS, default_mtu, BGE_DEFAULT_MTU);
+		if ((cidp->default_mtu < BGE_DEFAULT_MTU)||
+			(cidp->default_mtu > BGE_MAXIMUM_MTU)) {
+			cidp->default_mtu = BGE_DEFAULT_MTU;
+		}
+	}
 	/*
 	 * Map operating registers
 	 */

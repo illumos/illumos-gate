@@ -225,10 +225,10 @@ bge_send_claim(bge_t *bgep, send_ring_t *srp)
 {
 	uint64_t slot;
 
-	rw_enter(srp->tx_lock, RW_READER);
+	mutex_enter(srp->tx_lock);
 	atomic_add_64(&srp->tx_flow, 1);
 	slot = bge_atomic_claim(&srp->tx_next, srp->desc.nslots);
-	rw_exit(srp->tx_lock);
+	mutex_exit(srp->tx_lock);
 
 	/*
 	 * Bump the watchdog counter, thus guaranteeing that it's
@@ -427,12 +427,12 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	 * transit through this code, we only want to prod the
 	 * hardware once the last one is departing ...
 	 */
-	rw_enter(srp->tx_lock, RW_WRITER);
+	mutex_enter(srp->tx_lock);
 	if (--srp->tx_flow == 0) {
 		DMA_SYNC(srp->desc, DDI_DMA_SYNC_FORDEV);
 		bge_mbx_put(bgep, srp->chip_mbx_reg, srp->tx_next);
 	}
-	rw_exit(srp->tx_lock);
+	mutex_exit(srp->tx_lock);
 
 	if (status == SEND_FREE)
 		freemsg(mp);

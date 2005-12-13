@@ -112,6 +112,45 @@ extern "C" {
 #define	REVISION_ID_5751_A1		0x01
 
 #define	REVISION_ID_5714_A0		0x00
+#define	REVISION_ID_5714_A1		0x01
+#define	REVISION_ID_5714_A2		0xA2
+
+#define	REVISION_ID_5715_A0		0x00
+#define	REVISION_ID_5715_A1		0x01
+#define	REVISION_ID_5715_A2		0xA2
+
+#define	DEVICE_5704_SERIES_CHIPSETS(bgep)\
+		((bgep->chipid.device == DEVICE_ID_5700) ||\
+		(bgep->chipid.device == DEVICE_ID_5701) ||\
+		(bgep->chipid.device == DEVICE_ID_5702) ||\
+		(bgep->chipid.device == DEVICE_ID_5702fe)||\
+		(bgep->chipid.device == DEVICE_ID_5703C) ||\
+		(bgep->chipid.device == DEVICE_ID_5703S) ||\
+		(bgep->chipid.device == DEVICE_ID_5703) ||\
+		(bgep->chipid.device == DEVICE_ID_5704C) ||\
+		(bgep->chipid.device == DEVICE_ID_5704S) ||\
+		(bgep->chipid.device == DEVICE_ID_5704))
+
+#define	DEVICE_5702_SERIES_CHIPSETS(bgep) \
+		((bgep->chipid.device == DEVICE_ID_5702) ||\
+		(bgep->chipid.device == DEVICE_ID_5702fe))
+
+#define	DEVICE_5705_SERIES_CHIPSETS(bgep) \
+		((bgep->chipid.device == DEVICE_ID_5705C) ||\
+		(bgep->chipid.device == DEVICE_ID_5705M) ||\
+		(bgep->chipid.device == DEVICE_ID_5705MA3) ||\
+		(bgep->chipid.device == DEVICE_ID_5782) ||\
+		(bgep->chipid.device == DEVICE_ID_5788))
+
+#define	DEVICE_5721_SERIES_CHIPSETS(bgep) \
+		((bgep->chipid.device == DEVICE_ID_5721) ||\
+		(bgep->chipid.device == DEVICE_ID_5751) ||\
+		(bgep->chipid.device == DEVICE_ID_5751M))
+
+#define	DEVICE_5714_SERIES_CHIPSETS(bgep) \
+		((bgep->chipid.device == DEVICE_ID_5714C) ||\
+		(bgep->chipid.device == DEVICE_ID_5714S) ||\
+		(bgep->chipid.device == DEVICE_ID_5715C))
 
 /*
  * Second section:
@@ -148,14 +187,19 @@ extern "C" {
 #define	MHCR_CHIP_REV_5700_C2		0x72020000
 
 #define	MHCR_CHIP_REV_5701_A0		0x00000000
-#define	MHCR_CHIP_REV_5701_A2		0x01020000
-#define	MHCR_CHIP_REV_5701_A3		0x01050000
+#define	MHCR_CHIP_REV_5701_A2		0x00020000
+#define	MHCR_CHIP_REV_5701_A3		0x00030000
+#define	MHCR_CHIP_REV_5701_A5		0x01050000
 
-#define	MHCR_CHIP_REV_5702_A0		0x10020000	/* duplicate!	*/
+#define	MHCR_CHIP_REV_5702_A0		0x10000000
+#define	MHCR_CHIP_REV_5702_A1		0x10010000
+#define	MHCR_CHIP_REV_5702_A2		0x10020000
 
 #define	MHCR_CHIP_REV_5703_A0		0x10000000
 #define	MHCR_CHIP_REV_5703_A1		0x10010000
 #define	MHCR_CHIP_REV_5703_A2		0x10020000
+#define	MHCR_CHIP_REV_5703_B0		0x11000000
+#define	MHCR_CHIP_REV_5703_B1		0x11010000
 
 #define	MHCR_CHIP_REV_5704_A0		0x20000000
 #define	MHCR_CHIP_REV_5704_A1		0x20010000
@@ -165,9 +209,14 @@ extern "C" {
 
 #define	MHCR_CHIP_REV_5705_A0		0x30000000
 #define	MHCR_CHIP_REV_5705_A1		0x30010000
+#define	MHCR_CHIP_REV_5705_A2		0x30020000
+#define	MHCR_CHIP_REV_5705_A3		0x30030000
+#define	MHCR_CHIP_REV_5705_A5		0x30050000
 
 #define	MHCR_CHIP_REV_5782_A0		0x30030000
 #define	MHCR_CHIP_REV_5782_A1		0x30030088
+
+#define	MHCR_CHIP_REV_5788_A1		0x30050000
 
 #define	MHCR_CHIP_REV_5751_A0		0x40000000
 #define	MHCR_CHIP_REV_5751_A1		0x40010000
@@ -176,6 +225,10 @@ extern "C" {
 #define	MHCR_CHIP_REV_5721_A1		0x41010000
 
 #define	MHCR_CHIP_REV_5714_A0		0x50000000
+#define	MHCR_CHIP_REV_5714_A1		0x90010000
+
+#define	MHCR_CHIP_REV_5715_A0		0x50000000
+#define	MHCR_CHIP_REV_5715_A1		0x90010000
 
 #define	MHCR_CHIP_ASIC_REV(ChipRevId)	((ChipRevId) & 0xf0000000)
 #define	MHCR_CHIP_ASIC_REV_5700		(0x7 << 28)
@@ -225,7 +278,8 @@ extern "C" {
 
 #define	PDRWCR_VAR_DEFAULT		0x761b0000
 #define	PDRWCR_VAR_5721			0x76180000
-#define	PDRWCR_VAR_5714			0x76144000	/* OR of above	*/
+#define	PDRWCR_VAR_5714			0x76148000	/* OR of above	*/
+#define	PDRWCR_VAR_5715			0x76144000	/* OR of above	*/
 
 /*
  * PCI State Register, in PCI config space
@@ -781,6 +835,39 @@ extern "C" {
 #define	SERDES_STATUS_RXSTAT		0x000000ff
 
 /*
+ * Statistic Registers (5705/5788/5721/5751/5752/5714/5715 only)
+ */
+#define	STAT_IFHCOUT_OCTETS_REG		0x0800
+#define	STAT_ETHER_COLLIS_REG		0x0808
+#define	STAT_OUTXON_SENT_REG		0x080c
+#define	STAT_OUTXOFF_SENT_REG		0x0810
+#define	STAT_DOT3_INTMACTX_ERR_REG		0x0818
+#define	STAT_DOT3_SCOLLI_FRAME_REG		0x081c
+#define	STAT_DOT3_MCOLLI_FRAME_REG		0x0820
+#define	STAT_DOT3_DEFERED_TX_REG		0x0824
+#define	STAT_DOT3_EXCE_COLLI_REG		0x082c
+#define	STAT_DOT3_LATE_COLLI_REG		0x0830
+#define	STAT_IFHCOUT_UPKGS_REG		0x086c
+#define	STAT_IFHCOUT_MPKGS_REG		0x0870
+#define	STAT_IFHCOUT_BPKGS_REG		0x0874
+
+#define	STAT_IFHCIN_OCTETS_REG		0x0880
+#define	STAT_ETHER_FRAGMENT_REG		0x0888
+#define	STAT_IFHCIN_UPKGS_REG		0x088c
+#define	STAT_IFHCIN_MPKGS_REG		0x0890
+#define	STAT_IFHCIN_BPKGS_REG		0x0894
+
+#define	STAT_DOT3_FCS_ERR_REG		0x0898
+#define	STAT_DOT3_ALIGN_ERR_REG		0x089c
+#define	STAT_XON_PAUSE_RX_REG		0x08a0
+#define	STAT_XOFF_PAUSE_RX_REG		0x08a4
+#define	STAT_MAC_CTRL_RX_REG		0x08a8
+#define	STAT_XOFF_STATE_ENTER_REG		0x08ac
+#define	STAT_DOT3_FRAME_TOOLONG_REG		0x08b0
+#define	STAT_ETHER_JABBERS_REG		0x08b4
+#define	STAT_ETHER_UNDERSIZE_REG		0x08b8
+#define	SIZE_OF_STATISTIC_REG		0x1B
+/*
  * Send Data Initiator Registers
  */
 #define	SEND_INIT_STATS_CONTROL_REG	0x0c08
@@ -882,7 +969,7 @@ extern "C" {
 #define	MBUF_POOL_BASE_REG		0x4408
 #define	MBUF_POOL_BASE_DEFAULT		0x00008000
 #define	MBUF_POOL_BASE_5721		0x00010000
-#define	MBUF_POOL_BASE_5704		0x00008000
+#define	MBUF_POOL_BASE_5704		0x00010000
 #define	MBUF_POOL_BASE_5705		0x00010000
 #define	MBUF_POOL_LENGTH_REG		0x440c
 #define	MBUF_POOL_LENGTH_DEFAULT	0x00018000
@@ -936,6 +1023,10 @@ extern "C" {
 
 #define	FTQ_RESET_REG			0x5c00
 
+#define	MSI_MODE_REG			0x6000
+#define	MSI_PRI_HIGHEST			0xc0000000
+#define	MSI_MSI_ENABLE			0x00000002
+
 #define	MODE_CONTROL_REG		0x6800
 #define	MODE_ROUTE_MCAST_TO_RX_RISC	0x40000000
 #define	MODE_4X_NIC_SEND_RINGS		0x20000000
@@ -983,6 +1074,7 @@ extern "C" {
 #define	CORE_CLOCK_MHZ			66
 #define	MISC_CONFIG_REG			0x6804
 #define	MISC_CONFIG_GRC_RESET_DISABLE   0x20000000
+#define	MISC_CONFIG_GPHY_POWERDOWN_OVERRIDE 0x04000000
 #define	MISC_CONFIG_POWERDOWN		0x00100000
 #define	MISC_CONFIG_POWER_STATE		0x00060000
 #define	MISC_CONFIG_PRESCALE_MASK	0x000000fe
@@ -1100,6 +1192,15 @@ extern "C" {
 #define	NVM_SET_REQ2			0X00000004
 #define	NVM_SET_REQ1			0X00000002
 #define	NVM_SET_REQ0			0X00000001
+
+/*
+ * NVM access register
+ * Applicable to BCM5721,BCM5751,BCM5752,BCM5714
+ * and BCM5715 only.
+ */
+#define	NVM_ACCESS_REG			0X7024
+#define	NVM_WRITE_ENABLE		0X00000002
+#define	NVM_ACCESS_ENABLE		0X00000001
 
 /*
  * TLP Control Register
@@ -1443,7 +1544,12 @@ typedef struct {
 #define	RBD_ERROR_GIANT_PKT_RCVD	0x01000000
 
 /*
- * Hardware-defined Status Block
+ * Hardware-defined Status Block,Size of status block
+ * is actually 0x50 bytes.Use 0x80 bytes for cache line
+ * alignment.For BCM5705/5788/5721/5751/5752/5714
+ * and 5715,there is only 1 recv and send ring index,but
+ * driver defined 16 indexs here,please pay attention only
+ * one ring is enabled in these chipsets.
  */
 typedef struct {
 	uint64_t	flags_n_tag;
@@ -1731,6 +1837,38 @@ typedef union {
 	} s;
 } bge_statistics_t;
 
+#define	KS_STAT_REG_SIZE	(0x1B)
+#define	KS_STAT_REG_BASE	(0x800)
+
+typedef struct {
+	uint32_t	ifHCOutOctets;
+	uint32_t	etherStatsCollisions;
+	uint32_t	outXonSent;
+	uint32_t	outXoffSent;
+	uint32_t	dot3StatsInternalMacTransmitErrors;
+	uint32_t	dot3StatsSingleCollisionFrames;
+	uint32_t	dot3StatsMultipleCollisionFrames;
+	uint32_t	dot3StatsDeferredTransmissions;
+	uint32_t	dot3StatsExcessiveCollisions;
+	uint32_t	dot3StatsLateCollisions;
+	uint32_t	ifHCOutUcastPkts;
+	uint32_t	ifHCOutMulticastPkts;
+	uint32_t	ifHCOutBroadcastPkts;
+	uint32_t	ifHCInOctets;
+	uint32_t	etherStatsFragments;
+	uint32_t	ifHCInUcastPkts;
+	uint32_t	ifHCInMulticastPkts;
+	uint32_t	ifHCInBroadcastPkts;
+	uint32_t	dot3StatsFCSErrors;
+	uint32_t	dot3StatsAlignmentErrors;
+	uint32_t	xonPauseFramesReceived;
+	uint32_t	xoffPauseFramesReceived;
+	uint32_t	macControlFramesReceived;
+	uint32_t	xoffStateEntered;
+	uint32_t	dot3StatsFrameTooLongs;
+	uint32_t	etherStatsJabbers;
+	uint32_t	etherStatsUndersizePkts;
+} bge_statistics_reg_t;
 
 #ifdef __cplusplus
 }

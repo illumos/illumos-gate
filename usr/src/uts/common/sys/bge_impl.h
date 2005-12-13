@@ -241,6 +241,20 @@ extern int drv_priv(cred_t *);
 #define	BGE_PCI_X	2
 
 /*
+ * Statistic type. There are two type of statistic:statistic block and
+ * staristic registers
+ */
+#define	BGE_STAT_BLK	1
+#define	BGE_STAT_REG	2
+
+/*
+ * MTU.for all chipsets ,the default is 1500 ,and some chipsets
+ * support 9k jumbo frames size
+ */
+#define	BGE_DEFAULT_MTU		1500
+#define	BGE_MAXIMUM_MTU		9000
+
+/*
  * Pad the h/w defined status block (which can be up to 80 bytes long)
  * to a power-of-two boundary
  */
@@ -464,7 +478,7 @@ typedef struct send_ring {
 
 	bge_regno_t		chip_mbx_reg;	/* (const) h/w producer	*/
 						/* index mailbox offset	*/
-	krwlock_t		tx_lock[1];	/* serialize h/w update	*/
+	kmutex_t		tx_lock[1];	/* serialize h/w update	*/
 						/* ("producer index")	*/
 	uint64_t		tx_next;	/* next slot to use	*/
 	uint64_t		tx_flow;	/* # concurrent sends	*/
@@ -551,6 +565,7 @@ typedef struct {
 	uint32_t		mbuf_base;	/* Mbuf pool parameters */
 	uint32_t		mbuf_length;	/* depend on chiptype	*/
 	uint32_t		pci_type;
+	uint32_t		statistic_type;
 	uint32_t		bge_dma_rwctrl;
 	uint32_t		bge_mlcr_default;
 	uint32_t		recv_slots;	/* receive ring size    */
@@ -566,6 +581,7 @@ typedef struct {
 
 	uint64_t		rx_rings;	/* from bge.conf	*/
 	uint64_t		tx_rings;	/* from bge.conf	*/
+	uint64_t		default_mtu;	/* from bge.conf	*/
 
 	uint64_t		hw_mac_addr;	/* from chip register	*/
 	bge_mac_addr_t		vendor_addr;	/* transform of same	*/
@@ -759,6 +775,13 @@ typedef struct bge {
 						/* statistics area	*/
 	dma_area_t		status_block;	/* describes hardware	*/
 						/* status block		*/
+	/*
+	 * For the BCM5705/5788/5721/5751/5752/5714 and 5715,
+	 * the statistic block is not available,the statistic counter must
+	 * be get from statistic registers.And bge_statistics_reg_t record
+	 * the statistic registers value
+	 */
+	bge_statistics_reg_t	stat_val;
 
 	/*
 	 * Runtime read-write data starts here ...
@@ -1137,6 +1160,7 @@ extern uint32_t bge_rx_ticks_norm;
 extern uint32_t bge_tx_ticks_norm;
 extern uint32_t bge_rx_count_norm;
 extern uint32_t bge_tx_count_norm;
+extern boolean_t bge_jumbo_enable;
 void   bge_chip_msi_trig(bge_t *bgep);
 
 /* bge_kstats.c */

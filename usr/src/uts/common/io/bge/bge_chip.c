@@ -95,6 +95,7 @@ static uint32_t bge_dma_wrprio = 0;
 static uint32_t bge_dma_rwctrl = PDRWCR_VAR_DEFAULT;
 static uint32_t bge_dma_rwctrl_5721 = PDRWCR_VAR_5721;
 static uint32_t bge_dma_rwctrl_5714 = PDRWCR_VAR_5714;
+static uint32_t bge_dma_rwctrl_5715 = PDRWCR_VAR_5715;
 
 uint32_t bge_rx_ticks_norm = 128;
 uint32_t bge_tx_ticks_norm = 2048;		/* 8 for FJ2+ !?!?	*/
@@ -151,8 +152,8 @@ static uint16_t bge_dma_miss_limit	= 20;
 
 static uint32_t bge_stop_start_on_sync	= 0;
 
-static uint32_t bge_jumbo_enable	= 0;
-static uint32_t bge_jumbo_size		= BGE_JUMBO_BUFF_SIZE;
+boolean_t bge_jumbo_enable		= B_TRUE;
+static uint32_t bge_default_jumbo_size	= BGE_JUMBO_BUFF_SIZE;
 
 /*
  * ========== Low-level chip & ring buffer manipulation ==========
@@ -1621,15 +1622,36 @@ bge_nvmem_rw32(bge_t *bgep, uint32_t cmd, bge_regno_t addr, uint32_t *dp)
 			break;
 
 		case BGE_FLASH_READ:
+			if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
+			    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+				bge_reg_set32(bgep, NVM_ACCESS_REG,
+				    NVM_ACCESS_ENABLE);
+			}
 			err = bge_flash_access(bgep,
 			    NVM_FLASH_CMD_RD, addr, dp);
+			if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
+			    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+				bge_reg_clr32(bgep, NVM_ACCESS_REG,
+				    NVM_ACCESS_ENABLE);
+			}
 			break;
 
 		case BGE_FLASH_WRITE:
+			if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
+			    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+				bge_reg_set32(bgep, NVM_ACCESS_REG,
+				    NVM_WRITE_ENABLE|NVM_ACCESS_ENABLE);
+			}
 			bge_nvmem_protect(bgep, B_FALSE);
 			err = bge_flash_access(bgep,
 			    NVM_FLASH_CMD_WR, addr, dp);
 			bge_nvmem_protect(bgep, B_TRUE);
+			if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
+			    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+				bge_reg_clr32(bgep, NVM_ACCESS_REG,
+				    NVM_WRITE_ENABLE|NVM_ACCESS_ENABLE);
+			}
+
 			break;
 
 		default:
@@ -1870,6 +1892,7 @@ bge_chip_id_init(bge_t *bgep)
 	cidp->recv_slots = BGE_RECV_SLOTS_USED;
 	cidp->bge_dma_rwctrl = bge_dma_rwctrl;
 	cidp->pci_type = BGE_PCI_X;
+	cidp->statistic_type = BGE_STAT_BLK;
 
 	if (cidp->rx_rings == 0 || cidp->rx_rings > BGE_RECV_RINGS_MAX)
 		cidp->rx_rings = BGE_RECV_RINGS_DEFAULT;
@@ -1936,6 +1959,7 @@ bge_chip_id_init(bge_t *bgep)
 		if (cidp->tx_rings > BGE_SEND_RINGS_MAX_5705)
 			cidp->tx_rings = BGE_SEND_RINGS_DEFAULT;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
 		break;
 
@@ -1958,6 +1982,7 @@ bge_chip_id_init(bge_t *bgep)
 		if (cidp->tx_rings > BGE_SEND_RINGS_MAX_5705)
 			cidp->tx_rings = BGE_SEND_RINGS_DEFAULT;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
+		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
 		break;
 
@@ -1969,11 +1994,13 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
 		cidp->recv_slots = BGE_RECV_SLOTS_5705;
+		cidp->statistic_type = BGE_STAT_REG;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		dev_ok = B_TRUE;
 		break;
 
 	case DEVICE_ID_5714C:
-		if (cidp->revision >= 0xa2)
+		if (cidp->revision >= REVISION_ID_5714_A2)
 			cidp->msi_enabled = bge_enable_msi;
 		/* FALLTHRU */
 	case DEVICE_ID_5714S:
@@ -1984,6 +2011,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5714;
 		cidp->bge_mlcr_default = bge_mlcr_default_5714;
 		cidp->pci_type = BGE_PCI_E;
+		cidp->statistic_type = BGE_STAT_REG;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		dev_ok = B_TRUE;
 		break;
 
@@ -1992,11 +2021,11 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_base = bge_mbuf_pool_base_5721;
 		cidp->mbuf_length = bge_mbuf_pool_len_5721;
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
-		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5714;
+		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5715;
 		cidp->bge_mlcr_default = bge_mlcr_default_5714;
 		cidp->pci_type = BGE_PCI_E;
-		if (cidp->revision >= 0xa2)
-			cidp->msi_enabled = bge_enable_msi;
+		cidp->statistic_type = BGE_STAT_REG;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		dev_ok = B_TRUE;
 		break;
 
@@ -2005,8 +2034,10 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_base = bge_mbuf_pool_base_5721;
 		cidp->mbuf_length = bge_mbuf_pool_len_5721;
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
-		cidp->pci_type = BGE_PCI_E;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
+		cidp->pci_type = BGE_PCI_E;
+		cidp->statistic_type = BGE_STAT_REG;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		dev_ok = B_TRUE;
 		break;
 
@@ -2018,6 +2049,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
 		cidp->pci_type = BGE_PCI_E;
+		cidp->statistic_type = BGE_STAT_REG;
+		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		dev_ok = B_TRUE;
 		break;
 
@@ -2037,15 +2070,17 @@ bge_chip_id_init(bge_t *bgep)
 	 * setup below jumbo specific parameters.
 	 */
 	if (bge_jumbo_enable &&
-	    !(cidp->flags & CHIP_FLAG_NO_JUMBO)) {
+	    !(cidp->flags & CHIP_FLAG_NO_JUMBO) &&
+	    (cidp->default_mtu > BGE_DEFAULT_MTU) &&
+	    (cidp->default_mtu <= BGE_MAXIMUM_MTU)) {
 		cidp->mbuf_lo_water_rdma = RDMA_MBUF_LOWAT_JUMBO;
 		cidp->mbuf_lo_water_rmac = MAC_RX_MBUF_LOWAT_JUMBO;
 		cidp->mbuf_hi_water = MBUF_HIWAT_JUMBO;
 		cidp->recv_jumbo_size = BGE_JUMBO_BUFF_SIZE;
 		cidp->snd_buff_size = BGE_SEND_BUFF_SIZE_JUMBO;
 		cidp->jumbo_slots = BGE_JUMBO_SLOTS_USED;
-		cidp->ethmax_size = bge_jumbo_size - ETHERFCSL;
-		cidp->ethmax_size -= VLAN_TAGSZ;
+		cidp->ethmax_size = cidp->default_mtu +
+		    sizeof (struct ether_header);
 	}
 
 	/*
@@ -2123,10 +2158,12 @@ bge_chip_id_init(bge_t *bgep)
 			"Device 'pci%04x,%04x' (%d) revision %d not supported",
 			cidp->vendor, cidp->device, cidp->chip_label,
 			cidp->revision);
+#if	BGE_DEBUGGING
 	else if (!sys_ok)
 		bge_problem(bgep,
 			"%d-based subsystem 'pci%04x,%04x' not validated",
 			cidp->chip_label, cidp->subven, cidp->subdev);
+#endif
 	else
 		cidp->flags |= CHIP_FLAG_SUPPORTED;
 }
@@ -2228,23 +2265,33 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 		 * while the reset bit is written.
 		 * See:P500 of 57xx-PG102-RDS.pdf.
 		 */
-		if (bgep->chipid.pci_type == BGE_PCI_E) {
-			if (bgep->chipid.asic_rev == MHCR_CHIP_REV_5751_A0 ||
-			    bgep->chipid.asic_rev == MHCR_CHIP_REV_5721_A0) {
-				val32 = bge_reg_get32(bgep, PHY_TEST_CTRL_REG);
-				if (val32 == (PHY_PCIE_SCRAM_MODE |
-				    PHY_PCIE_LTASS_MODE))
-					bge_reg_put32(bgep, PHY_TEST_CTRL_REG,
-						PHY_PCIE_SCRAM_MODE);
-				val32 = pci_config_get32(bgep->cfg_handle,
-					PCI_CONF_BGE_CLKCTL);
-				val32 |= CLKCTL_PCIE_A0_FIX;
-				pci_config_put32(bgep->cfg_handle,
-					PCI_CONF_BGE_CLKCTL, val32);
+		if (DEVICE_5705_SERIES_CHIPSETS(bgep)||
+		    DEVICE_5721_SERIES_CHIPSETS(bgep)||
+		    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
+			regval |= MISC_CONFIG_GPHY_POWERDOWN_OVERRIDE;
+			if (bgep->chipid.pci_type == BGE_PCI_E) {
+				if (bgep->chipid.asic_rev ==
+				    MHCR_CHIP_REV_5751_A0 ||
+				    bgep->chipid.asic_rev ==
+				    MHCR_CHIP_REV_5721_A0) {
+					val32 = bge_reg_get32(bgep,
+					    PHY_TEST_CTRL_REG);
+					if (val32 == (PHY_PCIE_SCRAM_MODE |
+					    PHY_PCIE_LTASS_MODE))
+						bge_reg_put32(bgep,
+						    PHY_TEST_CTRL_REG,
+						    PHY_PCIE_SCRAM_MODE);
+					val32 = pci_config_get32
+					    (bgep->cfg_handle,
+					    PCI_CONF_BGE_CLKCTL);
+					val32 |= CLKCTL_PCIE_A0_FIX;
+					pci_config_put32(bgep->cfg_handle,
+					    PCI_CONF_BGE_CLKCTL, val32);
+				}
+				bge_reg_set32(bgep, regno,
+					MISC_CONFIG_GRC_RESET_DISABLE);
+				regval |= MISC_CONFIG_GRC_RESET_DISABLE;
 			}
-			bge_reg_set32(bgep, regno,
-				MISC_CONFIG_GRC_RESET_DISABLE);
-			regval |= MISC_CONFIG_GRC_RESET_DISABLE;
 		}
 
 		/*
@@ -2550,7 +2597,7 @@ static bge_regno_t shutdown_engine_regs[] = {
 	RECEIVE_MAC_MODE_REG,
 	RCV_BD_INITIATOR_MODE_REG,
 	RCV_LIST_PLACEMENT_MODE_REG,
-	RCV_LIST_SELECTOR_MODE_REG,
+	RCV_LIST_SELECTOR_MODE_REG,		/* BCM5704 series only	*/
 	RCV_DATA_BD_INITIATOR_MODE_REG,
 	RCV_DATA_COMPLETION_MODE_REG,
 	RCV_BD_COMPLETION_MODE_REG,
@@ -2560,17 +2607,17 @@ static bge_regno_t shutdown_engine_regs[] = {
 	SEND_DATA_INITIATOR_MODE_REG,
 	READ_DMA_MODE_REG,
 	SEND_DATA_COMPLETION_MODE_REG,
-	DMA_COMPLETION_MODE_REG,
+	DMA_COMPLETION_MODE_REG,		/* BCM5704 series only	*/
 	SEND_BD_COMPLETION_MODE_REG,
 	TRANSMIT_MAC_MODE_REG,
 
 	HOST_COALESCE_MODE_REG,
 	WRITE_DMA_MODE_REG,
-	MBUF_CLUSTER_FREE_MODE_REG,
-	FTQ_RESET_REG,				/* special - see code	*/
-	BUFFER_MANAGER_MODE_REG,
-	MEMORY_ARBITER_MODE_REG,
-	BGE_REGNO_NONE				/* terminator		*/
+	MBUF_CLUSTER_FREE_MODE_REG,		/* BCM5704 series only	*/
+	FTQ_RESET_REG,		/* special - see code	*/
+	BUFFER_MANAGER_MODE_REG,		/* BCM5704 series only	*/
+	MEMORY_ARBITER_MODE_REG,		/* BCM5704 series only	*/
+	BGE_REGNO_NONE		/* terminator		*/
 };
 
 /*
@@ -2596,8 +2643,22 @@ bge_chip_stop(bge_t *bgep, boolean_t fault)
 	ASSERT(mutex_owned(bgep->genlock));
 
 	rbp = shutdown_engine_regs;
-	for (ok = B_TRUE; (regno = *rbp) != BGE_REGNO_NONE; ++rbp)
-		ok &= bge_chip_disable_engine(bgep, regno, 0);
+	/*
+	 * When driver try to shutdown the BCM5705/5788/5721/5751/
+	 * 5752/5714 and 5715 chipsets,the buffer manager and the mem
+	 * -ory arbiter should not be disabled.
+	 */
+	for (ok = B_TRUE; (regno = *rbp) != BGE_REGNO_NONE; ++rbp) {
+			if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+			    ok &= bge_chip_disable_engine(bgep, regno, 0);
+			else if ((regno != RCV_LIST_SELECTOR_MODE_REG) &&
+				    (regno != DMA_COMPLETION_MODE_REG) &&
+				    (regno != MBUF_CLUSTER_FREE_MODE_REG)&&
+				    (regno != BUFFER_MANAGER_MODE_REG) &&
+				    (regno != MEMORY_ARBITER_MODE_REG))
+					ok &= bge_chip_disable_engine(bgep,
+					    regno, 0);
+	}
 
 	/*
 	 * Finally, disable (all) MAC events & clear the MAC status
@@ -2691,6 +2752,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	chip_id_t chipid;
 	uint64_t mac;
 	uint32_t modeflags;
+	uint32_t mhcr;
 	uint32_t sx0;
 	uint32_t i;
 
@@ -2727,9 +2789,24 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	 * Adapted from Broadcom document 570X-PG102-R, pp 102-116.
 	 * Updated to reflect Broadcom document 570X-PG104-R, pp 146-159.
 	 *
+	 * Before reset Core clock,it is
+	 * also required to initialize the Memory Arbiter as specified in step9
+	 * and Misc Host Control Register as specified in step-13
 	 * Step 4-5: reset Core clock & wait for completion
 	 * Steps 6-8: are done by bge_chip_cfg_init()
 	 */
+	(void) bge_chip_enable_engine(bgep, MEMORY_ARBITER_MODE_REG, 0);
+
+	mhcr = MHCR_ENABLE_INDIRECT_ACCESS |
+	    MHCR_ENABLE_TAGGED_STATUS_MODE |
+	    MHCR_MASK_INTERRUPT_MODE |
+	    MHCR_MASK_PCI_INT_OUTPUT |
+	    MHCR_CLEAR_INTERRUPT_INTA;
+#ifdef  _BIG_ENDIAN
+	mhcr |= MHCR_ENABLE_ENDIAN_WORD_SWAP | MHCR_ENABLE_ENDIAN_BYTE_SWAP;
+#endif  /* _BIG_ENDIAN */
+	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, mhcr);
+
 	(void) bge_chip_reset_engine(bgep, MISC_CONFIG_REG);
 	bge_chip_cfg_init(bgep, &chipid, enable_dma);
 
@@ -2742,7 +2819,8 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 
 
 	/*
-	 * Step 9: enable MAC memory arbiter
+	 * Step 9: enable MAC memory arbiter,bit30 and bit31 of 5714/5715 should
+	 * not be changed.
 	 */
 	(void) bge_chip_enable_engine(bgep, MEMORY_ARBITER_MODE_REG, 0);
 
@@ -2822,7 +2900,8 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 
 	/* Enable MSI code */
 	if (bgep->intr_type == DDI_INTR_TYPE_MSI)
-		bge_reg_set32(bgep, 0x6000, 0xc0000002);
+		bge_reg_set32(bgep, MSI_MODE_REG,
+		    MSI_PRI_HIGHEST|MSI_MSI_ENABLE);
 
 	/*
 	 * On the first time through, save the factory-set MAC address
@@ -2885,7 +2964,9 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 22: clear the MAC statistics block
 	 * (0x0300-0x0aff in NIC-local memory)
 	 */
-	bge_nic_zero(bgep, NIC_MEM_STATISTICS, NIC_MEM_STATISTICS_SIZE);
+	if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+		bge_nic_zero(bgep, NIC_MEM_STATISTICS,
+		    NIC_MEM_STATISTICS_SIZE);
 
 	/*
 	 * Step 23: clear the status block (in host memory)
@@ -2926,16 +3007,19 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 *
 	 * If the mbuf_length is specified as 0, we just leave these at
 	 * their hardware defaults, rather than explicitly setting them.
+	 * As the Broadcom HRM,driver better not change the parameters
+	 * when the chipsets is 5705/5788/5721/5751/5714 and 5715.
 	 */
-	if (bgep->chipid.mbuf_length != 0) {
-		bge_reg_put32(bgep, MBUF_POOL_BASE_REG,
-			bgep->chipid.mbuf_base);
-		bge_reg_put32(bgep, MBUF_POOL_LENGTH_REG,
-			bgep->chipid.mbuf_length);
-		bge_reg_put32(bgep, DMAD_POOL_BASE_REG,
-			DMAD_POOL_BASE_DEFAULT);
-		bge_reg_put32(bgep, DMAD_POOL_LENGTH_REG,
-			DMAD_POOL_LENGTH_DEFAULT);
+	if ((bgep->chipid.mbuf_length != 0) &&
+		(DEVICE_5704_SERIES_CHIPSETS(bgep))) {
+			bge_reg_put32(bgep, MBUF_POOL_BASE_REG,
+				bgep->chipid.mbuf_base);
+			bge_reg_put32(bgep, MBUF_POOL_LENGTH_REG,
+				bgep->chipid.mbuf_length);
+			bge_reg_put32(bgep, DMAD_POOL_BASE_REG,
+				DMAD_POOL_BASE_DEFAULT);
+			bge_reg_put32(bgep, DMAD_POOL_LENGTH_REG,
+				DMAD_POOL_LENGTH_DEFAULT);
 	}
 
 	/*
@@ -2951,8 +3035,12 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	/*
 	 * Step 33: configure DMA resource watermarks
 	 */
-	bge_reg_put32(bgep, DMAD_POOL_LOWAT_REG, bge_dmad_lo_water);
-	bge_reg_put32(bgep, DMAD_POOL_HIWAT_REG, bge_dmad_hi_water);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep)) {
+		bge_reg_put32(bgep, DMAD_POOL_LOWAT_REG,
+		    bge_dmad_lo_water);
+		bge_reg_put32(bgep, DMAD_POOL_HIWAT_REG,
+		    bge_dmad_hi_water);
+	}
 	bge_reg_put32(bgep, LOWAT_MAX_RECV_FRAMES_REG, bge_lowat_recv_frames);
 
 	/*
@@ -2976,8 +3064,12 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 40: set Receive Buffer Descriptor Ring replenish thresholds
 	 */
 	bge_reg_put32(bgep, STD_RCV_BD_REPLENISH_REG, bge_replenish_std);
-	bge_reg_put32(bgep, JUMBO_RCV_BD_REPLENISH_REG, bge_replenish_jumbo);
-	bge_reg_put32(bgep, MINI_RCV_BD_REPLENISH_REG, bge_replenish_mini);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		bge_reg_put32(bgep, JUMBO_RCV_BD_REPLENISH_REG,
+		    bge_replenish_jumbo);
+	if (bgep->chipid.device == DEVICE_ID_5700)
+		bge_reg_put32(bgep, MINI_RCV_BD_REPLENISH_REG,
+		    bge_replenish_mini);
 
 	/*
 	 * Steps 41-43: clear Send Ring Producer Indices and initialise
@@ -3002,8 +3094,10 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 46: initialise Receive Buffer (Producer) Ring indexes
 	 */
 	bge_mbx_put(bgep, RECV_STD_PROD_INDEX_REG, 0);
-	bge_mbx_put(bgep, RECV_JUMBO_PROD_INDEX_REG, 0);
-	bge_mbx_put(bgep, RECV_MINI_PROD_INDEX_REG, 0);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		bge_mbx_put(bgep, RECV_JUMBO_PROD_INDEX_REG, 0);
+	if (bgep->chipid.device == DEVICE_ID_5700)
+		bge_mbx_put(bgep, RECV_MINI_PROD_INDEX_REG, 0);
 
 	/*
 	 * Step 47: configure the MAC unicast address
@@ -3035,7 +3129,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	bge_reg_put32(bgep, RCV_LP_CONFIG_REG,
 		RCV_LP_CONFIG(bgep->chipid.rx_rings));
 	bge_reg_put32(bgep, RCV_LP_STATS_ENABLE_MASK_REG, ~0);
-	bge_reg_put32(bgep, RCV_LP_STATS_CONTROL_REG, RCV_LP_STATS_ENABLE);
+	bge_reg_set32(bgep, RCV_LP_STATS_CONTROL_REG, RCV_LP_STATS_ENABLE);
 
 	if (bgep->chipid.rx_rings > 1)
 		bge_init_recv_rule(bgep);
@@ -3044,9 +3138,13 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Steps 55-56: enable Send Data Initiator Statistics
 	 */
 	bge_reg_put32(bgep, SEND_INIT_STATS_ENABLE_MASK_REG, ~0);
-	bge_reg_put32(bgep, SEND_INIT_STATS_CONTROL_REG,
-		SEND_INIT_STATS_ENABLE | SEND_INIT_STATS_FASTER);
-
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep)) {
+		bge_reg_put32(bgep, SEND_INIT_STATS_CONTROL_REG,
+		    SEND_INIT_STATS_ENABLE | SEND_INIT_STATS_FASTER);
+	} else {
+		bge_reg_put32(bgep, SEND_INIT_STATS_CONTROL_REG,
+		    SEND_INIT_STATS_ENABLE);
+	}
 	/*
 	 * Steps 57-58: stop (?) the Host Coalescing Engine
 	 */
@@ -3055,41 +3153,50 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	/*
 	 * Steps 59-62: initialise Host Coalescing parameters
 	 */
-	bge_reg_put32(bgep, SEND_COALESCE_MAX_BD_REG,	 bge_tx_count_norm);
-	bge_reg_put32(bgep, SEND_COALESCE_INT_BD_REG,	 bge_tx_count_intr);
-	bge_reg_put32(bgep, SEND_COALESCE_TICKS_REG,	 bge_tx_ticks_norm);
-	bge_reg_put32(bgep, SEND_COALESCE_INT_TICKS_REG, bge_tx_ticks_intr);
-
-	bge_reg_put32(bgep, RCV_COALESCE_MAX_BD_REG,	 bge_rx_count_norm);
-	bge_reg_put32(bgep, RCV_COALESCE_INT_BD_REG,	 bge_rx_count_intr);
-	bge_reg_put32(bgep, RCV_COALESCE_TICKS_REG,	 bge_rx_ticks_norm);
-	bge_reg_put32(bgep, RCV_COALESCE_INT_TICKS_REG,	 bge_rx_ticks_intr);
+	bge_reg_put32(bgep, SEND_COALESCE_MAX_BD_REG, bge_tx_count_norm);
+	bge_reg_put32(bgep, SEND_COALESCE_TICKS_REG, bge_tx_ticks_norm);
+	bge_reg_put32(bgep, RCV_COALESCE_MAX_BD_REG, bge_rx_count_norm);
+	bge_reg_put32(bgep, RCV_COALESCE_TICKS_REG, bge_rx_ticks_norm);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep)) {
+		bge_reg_put32(bgep, SEND_COALESCE_INT_BD_REG,
+		    bge_tx_count_intr);
+		bge_reg_put32(bgep, SEND_COALESCE_INT_TICKS_REG,
+		    bge_tx_ticks_intr);
+		bge_reg_put32(bgep, RCV_COALESCE_INT_BD_REG,
+		    bge_rx_count_intr);
+		bge_reg_put32(bgep, RCV_COALESCE_INT_TICKS_REG,
+		    bge_rx_ticks_intr);
+	}
 
 	/*
 	 * Steps 63-64: initialise status block & statistics
 	 * host memory addresses
+	 * The statistic block does not exist in some chipsets
+	 * Step 65: initialise Statistics Coalescing Tick Counter
 	 */
 	bge_reg_put64(bgep, STATUS_BLOCK_HOST_ADDR_REG,
 		bgep->status_block.cookie.dmac_laddress);
-	bge_reg_put64(bgep, STATISTICS_HOST_ADDR_REG,
-		bgep->statistics.cookie.dmac_laddress);
-
-	/*
-	 * Step 65: initialise Statistics Coalescing Tick Counter
-	 */
-	bge_reg_put32(bgep, STATISTICS_TICKS_REG, STATISTICS_TICKS_DEFAULT);
 
 	/*
 	 * Steps 66-67: initialise status block & statistics
 	 * NIC-local memory addresses
 	 */
-	bge_reg_put32(bgep, STATUS_BLOCK_BASE_ADDR_REG, NIC_MEM_STATUS_BLOCK);
-	bge_reg_put32(bgep, STATISTICS_BASE_ADDR_REG, NIC_MEM_STATISTICS);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep)) {
+		bge_reg_put64(bgep, STATISTICS_HOST_ADDR_REG,
+		    bgep->statistics.cookie.dmac_laddress);
+		bge_reg_put32(bgep, STATISTICS_TICKS_REG,
+		    STATISTICS_TICKS_DEFAULT);
+		bge_reg_put32(bgep, STATUS_BLOCK_BASE_ADDR_REG,
+		    NIC_MEM_STATUS_BLOCK);
+		bge_reg_put32(bgep, STATISTICS_BASE_ADDR_REG,
+		    NIC_MEM_STATISTICS);
+	}
 
 	/*
 	 * Steps 68-71: start the Host Coalescing Engine, the Receive BD
 	 * Completion Engine, the Receive List Placement Engine, and the
-	 * Receive List selector.
+	 * Receive List selector.Pay attention:0x3400 is not exist in BCM5714
+	 * and BCM5715.
 	 */
 	if (bgep->chipid.tx_rings <= COALESCE_64_BYTE_RINGS &&
 	    bgep->chipid.rx_rings <= COALESCE_64_BYTE_RINGS)
@@ -3098,10 +3205,12 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 		coalmode = 0;
 	(void) bge_chip_enable_engine(bgep, HOST_COALESCE_MODE_REG, coalmode);
 	(void) bge_chip_enable_engine(bgep, RCV_BD_COMPLETION_MODE_REG,
-		STATE_MACHINE_ATTN_ENABLE_BIT);
+	    STATE_MACHINE_ATTN_ENABLE_BIT);
 	(void) bge_chip_enable_engine(bgep, RCV_LIST_PLACEMENT_MODE_REG, 0);
-	(void) bge_chip_enable_engine(bgep, RCV_LIST_SELECTOR_MODE_REG,
-		STATE_MACHINE_ATTN_ENABLE_BIT);
+
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		(void) bge_chip_enable_engine(bgep, RCV_LIST_SELECTOR_MODE_REG,
+		    STATE_MACHINE_ATTN_ENABLE_BIT);
 
 	/*
 	 * Step 72: Enable MAC DMA engines
@@ -3138,14 +3247,17 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 *
 	 * Beware exhaust fumes?
 	 */
-	(void) bge_chip_enable_engine(bgep, DMA_COMPLETION_MODE_REG, 0);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		(void) bge_chip_enable_engine(bgep, DMA_COMPLETION_MODE_REG, 0);
 	(void) bge_chip_enable_engine(bgep, WRITE_DMA_MODE_REG,
 		(bge_dma_wrprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS);
 	(void) bge_chip_enable_engine(bgep, READ_DMA_MODE_REG,
 		(bge_dma_rdprio << DMA_PRIORITY_SHIFT) | ALL_DMA_ATTN_BITS);
 	(void) bge_chip_enable_engine(bgep, RCV_DATA_COMPLETION_MODE_REG,
 		STATE_MACHINE_ATTN_ENABLE_BIT);
-	(void) bge_chip_enable_engine(bgep, MBUF_CLUSTER_FREE_MODE_REG, 0);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		(void) bge_chip_enable_engine(bgep,
+		    MBUF_CLUSTER_FREE_MODE_REG, 0);
 	(void) bge_chip_enable_engine(bgep, SEND_DATA_COMPLETION_MODE_REG, 0);
 	(void) bge_chip_enable_engine(bgep, SEND_BD_COMPLETION_MODE_REG,
 		STATE_MACHINE_ATTN_ENABLE_BIT);
@@ -3464,7 +3576,7 @@ bge_factotum_error_handler(bge_t *bgep)
 	uint32_t tmac;
 	uint32_t rmac;
 	uint32_t rxrs;
-	uint32_t txrs;
+	uint32_t txrs = 0;
 
 	ASSERT(mutex_owned(bgep->genlock));
 
@@ -3478,7 +3590,8 @@ bge_factotum_error_handler(bge_t *bgep)
 	tmac = bge_reg_get32(bgep, TRANSMIT_MAC_STATUS_REG);
 	rmac = bge_reg_get32(bgep, RECEIVE_MAC_STATUS_REG);
 	rxrs = bge_reg_get32(bgep, RX_RISC_STATE_REG);
-	txrs = bge_reg_get32(bgep, TX_RISC_STATE_REG);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		txrs = bge_reg_get32(bgep, TX_RISC_STATE_REG);
 
 	BGE_DEBUG(("factotum($%p) flow 0x%x rdma 0x%x wdma 0x%x",
 		(void *)bgep, flow, rdma, wdma));
@@ -3488,7 +3601,8 @@ bge_factotum_error_handler(bge_t *bgep)
 	/*
 	 * For now, just clear all the errors ...
 	 */
-	bge_reg_put32(bgep, TX_RISC_STATE_REG, ~0);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		bge_reg_put32(bgep, TX_RISC_STATE_REG, ~0);
 	bge_reg_put32(bgep, RX_RISC_STATE_REG, ~0);
 	bge_reg_put32(bgep, RECEIVE_MAC_STATUS_REG, ~0);
 	bge_reg_put32(bgep, WRITE_DMA_STATUS_REG, ~0);
@@ -4319,7 +4433,8 @@ bge_pp_ioctl(bge_t *bgep, int cmd, mblk_t *mp, struct iocblk *iocp)
 			areap = &bgep->status_block;
 			break;
 		case BGE_PP_SPACE_STATISTICS:
-			areap = &bgep->statistics;
+			if (bgep->chipid.statistic_type == BGE_STAT_BLK)
+				areap = &bgep->statistics;
 			break;
 		}
 
