@@ -77,8 +77,9 @@ kctl_ddi_prop_read(kmdb_auxv_nv_t *nv, char *pname, void *arg)
 static int
 cons_type(void)
 {
+#define	CONS_STR_BUFLEN 10
 	static int cons_type = -1;
-	char cons_str[10];
+	char cons_str[CONS_STR_BUFLEN];
 	int len;
 	struct bootops *ops = kctl.kctl_boot_ops;
 
@@ -87,7 +88,7 @@ cons_type(void)
 	cons_type = 0;	/* default to screen */
 
 	len = BOP_GETPROPLEN(ops, "console");
-	if (len > 0 || len <= 10) {
+	if (len > 0 && len <= CONS_STR_BUFLEN) {
 		(void) BOP_GETPROP(ops, "console", (void *)cons_str);
 		if (strncmp(cons_str, "ttya", 4) == 0)
 			cons_type = 1;
