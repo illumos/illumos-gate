@@ -129,6 +129,7 @@ static int ctrl_nums = 0;
 /* ID's for supported chips */
 #define	LSI_1030	0x30
 #define	LSI_1064	0x50
+#define	LSI_1068	0x54
 #define	LSI_1064E	0x56
 #define	LSI_1068E	0x58
 
@@ -927,8 +928,8 @@ do_create(char **d, int rlevel, int force)
 		goto fail;
 	}
 
-	if ((devid == LSI_1064) || (devid == LSI_1064E) || (devid ==
-	    LSI_1068E)) {
+	if ((devid == LSI_1064) || (devid == LSI_1064E) ||
+	    (devid == LSI_1068) || (devid == LSI_1068E)) {
 		/*
 		 * no secondary channel, just check to make
 		 * sure we can fit a new volume
@@ -952,7 +953,7 @@ do_create(char **d, int rlevel, int force)
 
 		/*
 		 * we have the capacity to add a volume, now confirm the
-		 * creation. the 1064 uses a much larger metadata region
+		 * creation. the 1064/1068 uses a much larger metadata region
 		 * than the 1030 (64MB, as opposed to 16KB).  this larger
 		 * reservation is enough to alter the disk label. therefore,
 		 * once the volume is created, it must be relabeled.
