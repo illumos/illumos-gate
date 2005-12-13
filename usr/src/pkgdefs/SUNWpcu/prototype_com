@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,9 +49,14 @@ f none usr/bin/cancel 4511 root lp
 s none usr/bin/disable=../sbin/accept
 s none usr/bin/enable=../sbin/accept
 f none usr/bin/lp 4511 root lp
+f none usr/bin/lpc 555 root lp
 f none usr/bin/lpget 0511 root lp
+s none usr/bin/lpq=lpstat
+s none usr/bin/lpr=lp
+s none usr/bin/lprm=cancel
 f none usr/bin/lpset 4511 root lp
 f none usr/bin/lpstat 4511 root lp
+f none usr/bin/lptest 555 root lp
 d none usr/lib 0755 root bin
 s none usr/lib/accept=../sbin/accept
 f none usr/lib/libprint.so.2 0755 root bin

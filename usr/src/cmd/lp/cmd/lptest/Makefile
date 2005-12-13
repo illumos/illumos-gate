@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 1990-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
@@ -34,6 +34,9 @@
 include 	../../Makefile.lp
 
 PROG=		lptest
+
+ROOTUSRUCBSYMLINK=	$(ROOTUSRUCB)/$(PROG)
+ROOTUSRBINPROG=		$(PROG:%=$(ROOTBIN)/%)
 
 SRCS= 		lptest.c
 
@@ -48,8 +51,10 @@ POFILE=		lp_cmd_lptest.po
 
 all:		$(PROG)
 
-install:	all .WAIT $(ROOTUSRUCBPROG)
+install:	all .WAIT $(ROOTUSRBINPROG) $(ROOTUSRUCBSYMLINK)
 
+$(ROOTUSRUCBSYMLINK):	
+		$(RM) $@; $(SYMLINK) ../bin/$(PROG) $@
 
 clean:
 		$(RM) $(OBJS)

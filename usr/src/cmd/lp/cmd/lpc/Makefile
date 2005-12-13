@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 1989-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/lp/cmd/lpc/Makefile
@@ -31,6 +31,9 @@
 include 	../../Makefile.lp
 
 PROG=		lpc
+
+ROOTUSRUCBSYMLINK=	$(ROOTUSRUCB)/$(PROG)
+ROOTUSRBINPROG=		$(PROG:%=$(ROOTBIN)/%)
 
 SRCS= 		cmds.c cmdtab.c lpc.c process.c topq.c fatalmsg.c sndrcv.c \
 		global.c
@@ -54,7 +57,10 @@ $(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-install:	all .WAIT $(ROOTUSRUCBPROG)
+install:	all .WAIT $(ROOTUSRBINPROG) $(ROOTUSRUCBSYMLINK)
+
+$(ROOTUSRUCBSYMLINK):
+		$(RM) $@; $(SYMLINK) ../bin/$(PROG) $@
 
 clean:
 		$(RM) $(OBJS)

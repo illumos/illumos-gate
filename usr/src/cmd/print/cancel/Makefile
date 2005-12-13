@@ -22,8 +22,8 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1994 by Sun Microsystems, Inc.
-# All Rights Reserved
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # cmd/lp/client/cancel/Makefile
 #
@@ -37,7 +37,8 @@ SRCS= 		cancel.c cancel_list.c
 OBJS=		$(SRCS:.c=.o)
 
 ROOTBINPROG=	$(PROG:%=$(ROOTBIN)/%)
-ROOTUSRBINSYMLINK=	$(ROOTUSRUCB)/lprm
+ROOTUSRBINSYMLINK=	$(ROOTBIN)/lprm
+ROOTUSRUCBSYMLINK=	$(ROOTUSRUCB)/lprm
 
 FILEMODE=	04511
 OWNER=		root
@@ -53,13 +54,17 @@ $(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-install:	all $(ROOTBIN) $(ROOTBINPROG) $(ROOTUSRBINSYMLINK)
+install:	all $(ROOTBIN) $(ROOTBINPROG) $(ROOTUSRBINSYMLINK) \
+		$(ROOTUSRUCBSYMLINK)
 
 $(ROOTBIN):
 	$(INS.dir)
 
 $(ROOTUSRBINSYMLINK):
-	$(RM) $@; $(SYMLINK) ../bin/$(PROG) $@
+	$(RM) $@; $(SYMLINK) $(PROG) $@
+
+$(ROOTUSRUCBSYMLINK):
+	$(RM) $@; $(SYMLINK) ../bin/lprm $@
 
 strip:
 	$(STRIP) $(PROG)

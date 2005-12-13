@@ -20,8 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1990-1993,1998 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -46,8 +46,8 @@ i depend
 #
 d none usr 755 root sys
 d none usr/ucb 755 root bin
-f none usr/ucb/lpc 555 root lp
-s none usr/ucb/lpq=../bin/lpstat
-s none usr/ucb/lpr=../bin/lp
-s none usr/ucb/lprm=../bin/cancel
-f none usr/ucb/lptest 555 root lp
+s none usr/ucb/lpc=../bin/lpc
+s none usr/ucb/lpq=../bin/lpq
+s none usr/ucb/lpr=../bin/lpr
+s none usr/ucb/lprm=../bin/lprm
+s none usr/ucb/lptest=../bin/lptest

@@ -20,8 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1994, 1995, 1996 by Sun Microsystems, Inc.
-# All Rights Reserved
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -37,7 +37,8 @@ SRCS= 		lpstat.c sysv-functions.c bsd-functions.c parse_bsd.c
 OBJS=		$(SRCS:.c=.o)
 
 ROOTBINPROG=	$(PROG:%=$(ROOTBIN)/%)
-ROOTUSRBINSYMLINK=	$(ROOTUSRUCB)/lpq
+ROOTUSRBINSYMLINK=	$(ROOTBIN)/lpq
+ROOTUSRUCBSYMLINK=	$(ROOTUSRUCB)/lpq
 
 FILEMODE=	04511
 OWNER=		root
@@ -53,13 +54,17 @@ $(PROG):	$(OBJS)
 		$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
 		$(POST_PROCESS)
 
-install:	all $(ROOTBIN) $(ROOTBINPROG) $(ROOTUSRBINSYMLINK)
+install:	all $(ROOTBIN) $(ROOTBINPROG) $(ROOTUSRBINSYMLINK) \
+		$(ROOTUSRUCBSYMLINK)
 
 $(ROOTBIN):
 	$(INS.dir)
 
 $(ROOTUSRBINSYMLINK):
-	$(RM) $@; $(SYMLINK) ../bin/$(PROG) $@
+	$(RM) $@; $(SYMLINK) $(PROG) $@
+
+$(ROOTUSRUCBSYMLINK):
+	$(RM) $@; $(SYMLINK) ../bin/lpq $@
 
 strip:
 	$(STRIP) $(PROG)

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,7 +43,8 @@ $(ROOTMANIFEST)		:= FILEMODE= 444
 OBJS=		$(SRCS:.c=.o)
 
 ROOTBINPROG=	$(PROG:%=$(ROOTBIN)/%)
-ROOTUSRBINSYMLINK=	$(ROOTUSRUCB)/lpr
+ROOTUSRBINSYMLINK=	$(ROOTBIN)/lpr
+ROOTUSRUCBSYMLINK=	$(ROOTUSRUCB)/lpr
 PRINTSYMLINK=	$(ROOTLIB)/print/printd
 $(ROOTLIB)/print	:=	OWNER=root
 $(ROOTLIB)/print	:=	GROUP=lp
@@ -60,8 +61,8 @@ LDLIBS +=	$(LIBNPRT)
 all:		$(PROG)
 
 install:	all $(ROOTBIN) $(ROOTLIB)/print $(ROOTBINPROG) \
-		$(ROOTUSRBINSYMLINK) $(PRINTSYMLINK) $(ROOTMANIFEST) \
-		$(ROOTMETHOD)
+		$(ROOTUSRBINSYMLINK) $(ROOTUSRUCBSYMLINK) $(PRINTSYMLINK) \
+		$(ROOTMANIFEST) $(ROOTMETHOD)
 
 check:	$(CHKMANIFEST)
 
@@ -69,7 +70,10 @@ $(ROOTBIN) $(ROOTLIB)/print:
 	$(INS.dir)
 
 $(ROOTUSRBINSYMLINK):
-	$(RM) $@; $(SYMLINK) ../bin/$(PROG) $@
+	$(RM) $@; $(SYMLINK) $(PROG) $@
+
+$(ROOTUSRUCBSYMLINK):
+	$(RM) $@; $(SYMLINK) ../bin/lpr $@
 
 $(PRINTSYMLINK):
 	$(RM) $@; $(SYMLINK) ../../bin/$(PROG) $@
