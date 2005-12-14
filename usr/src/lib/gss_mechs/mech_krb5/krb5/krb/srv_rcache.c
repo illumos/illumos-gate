@@ -45,7 +45,7 @@ krb5_get_server_rcache(krb5_context context, const krb5_data *piece,
 {
     krb5_rcache rcache = 0;
     char *cachename = 0, *def_env = 0, *cachetype;
-    char tmp[4];
+    char tmp[4], *full_name;
     krb5_error_code retval;
     int p, i;
     unsigned int len;
@@ -58,20 +58,34 @@ krb5_get_server_rcache(krb5_context context, const krb5_data *piece,
     if (piece == NULL)
 	return ENOMEM;
 
-/*
- * Check to see if something other than the default replay cache
- * name will be used.  If so then skip over the construction of
- * said name.
- */
+    cachetype = krb5_rc_default_type(context);
+
+    /*
+     * Solaris: Check to see if something other than the default replay cache
+     * name will be used.  If so then skip over the construction of
+     * said name.
+     */
     if ((def_env = krb5_rc_default_name(context)) != 0) {
 	cachename = strdup(def_env);
-	if (!cachename) {
+	if (cachename == NULL)
 		return (ENOMEM);
+	/*
+	 * We expect to have the fully qualified rcache name (<type>:<name>),
+	 * so we populate the default type here if the type is missing.
+	 */
+	if (strchr(cachename, ':') == NULL) {
+		full_name = malloc(strlen(cachetype) + 1 +
+				   strlen(cachename) + 1);
+		if (full_name == NULL) {
+			free(cachename);
+			return(ENOMEM);
+		}
+		(void) sprintf(full_name, "%s:%s", cachetype, cachename);
+		free(cachename);
+		cachename = full_name;
 	}
 	goto skip_create;
     }
-    
-    cachetype = krb5_rc_default_type(context);
 
     len = piece->length + 3 + 1;
     for (i = 0; i < piece->length; i++) {

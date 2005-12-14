@@ -110,15 +110,12 @@ char * krb5_rc_get_type(krb5_context context, krb5_rcache id)
 
 char * krb5_rc_default_type(krb5_context context) 
 {
-	char *s;
-	if ((s = getenv("KRB5RCACHETYPE")))
-		return s;
-	else
-		/*
-		 * Solaris Kerberos/SUNW14resync
-		 * MIT's is "dfl" but we now have FILE and MEMORY instead.
-		 */
-		return "FILE";
+	/*
+	 * Solaris Kerberos/SUNW14resync
+	 * MIT's is "dfl" but we now have FILE and MEMORY instead.
+	 * And we only support the KRB5RCNAME env var.
+	 */
+	return ("FILE");
 }
 
 /*ARGSUSED*/
@@ -139,8 +136,13 @@ krb5_rc_default(krb5_context context, krb5_rcache *id)
     if (!(*id = (krb5_rcache )malloc(sizeof(**id))))
 	return KRB5_RC_MALLOC;
 
-    retval = krb5_rc_resolve(context, *id, 
-				 krb5_rc_default_name(context));
+    retval = krb5_rc_resolve_type(context, id, krb5_rc_default_type(context));
+    if (retval != 0) {
+	k5_mutex_destroy(&(*id)->lock);
+	FREE_RC(*id);
+	return (retval);
+    }
+    retval = krb5_rc_resolve(context, *id, krb5_rc_default_name(context));
     if (retval) {
         k5_mutex_destroy(&(*id)->lock);
 	FREE_RC(*id);
@@ -187,4 +189,3 @@ krb5_error_code krb5_rc_resolve_full(krb5_context context, krb5_rcache *id, char
     (*id)->magic = KV5M_RCACHE;
     return retval;
 }
-

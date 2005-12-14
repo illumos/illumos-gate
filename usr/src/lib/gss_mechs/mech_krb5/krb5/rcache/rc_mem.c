@@ -248,16 +248,24 @@ krb5_rc_mem_store(krb5_context context, krb5_rcache id, krb5_donot_replay *rep)
 {
 	krb5_error_code ret;
 
+	ret = k5_mutex_lock(&id->lock);
+	if (ret)
+		return (ret);
+
 	switch (rc_store(context, id, rep)) {
 		case CMP_MALLOC:
+			k5_mutex_unlock(&id->lock);
 			return (KRB5_RC_MALLOC);
 		case CMP_REPLAY:
+			k5_mutex_unlock(&id->lock);
 			return (KRB5KRB_AP_ERR_REPEAT);
 		case CMP_EXPIRED:
+			k5_mutex_unlock(&id->lock);
 			return (KRB5KRB_AP_ERR_SKEW);
 		case CMP_HOHUM:
 			break;
 	}
 
+	k5_mutex_unlock(&id->lock);
 	return (0);
 }
