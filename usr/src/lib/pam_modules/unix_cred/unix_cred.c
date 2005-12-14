@@ -229,7 +229,8 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		goto adt_done;
 	}
 
-	if (auid == AU_NOAUDITID) {
+	if ((auid == AU_NOAUDITID) &&
+	    (flags & PAM_ESTABLISH_CRED)) {
 		struct passwd	rpwd;
 		char	rpwbuf[NSS_BUFLEN_PASSWD];
 
@@ -302,7 +303,8 @@ pam_sm_setcred(pam_handle_t *pamh, int flags, int argc, const char **argv)
 			    "pam_unix_cred: new audit set for %d",
 			    pwd.pw_uid);
 		}
-	} else if (flags & PAM_REINITIALIZE_CRED) {
+	} else if ((auid != AU_NOAUDITID) &&
+	    (flags & PAM_REINITIALIZE_CRED)) {
 		if (adt_set_user(ah, pwd.pw_uid, pwd.pw_gid, pwd.pw_uid,
 		    pwd.pw_gid, NULL, ADT_UPDATE) != 0) {
 			syslog(LOG_AUTH | LOG_ERR,
