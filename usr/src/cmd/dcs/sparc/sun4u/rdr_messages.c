@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1189,6 +1189,20 @@ rdr_cleanup_params(rdr_msg_opcode_t message_opcode, cfga_params_t *param)
 	}
 
 	return (RDR_OK);
+}
+
+/*
+ * rdr_setsockopt:
+ *
+ * Wrapper of the setsockopt(3SOCKET) library function.
+ */
+int
+rdr_setsockopt(int fd, int level, int optname, const void *optval, int optlen)
+{
+	if (setsockopt(fd, level, optname, optval, optlen) == -1)
+		return (RDR_NET_ERR);
+	else
+		return (RDR_OK);
 }
 
 

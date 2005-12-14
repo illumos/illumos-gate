@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,6 +38,8 @@ PROG=		dcs
 CLASS=		32
 
 PLATFORM=	sun4u
+
+SVCMETHOD=	svc-$(PROG)
 
 #
 # Set CONCURR_MODE to one of the following:
@@ -78,6 +80,7 @@ GROUP=		bin
 
 ROOTMANIFESTDIR=	$(ROOTSVCPLATFORMSUN4U)
 $(ROOTMANIFEST)		:= FILEMODE= 444
+$(ROOTSVCMETHOD)	:= FILEMODE= 555
 
 #
 # FLAGS:
@@ -118,7 +121,7 @@ $(PROG): $(OBJS) $(HDRS)
 	$(CC) -o $@ $(OBJS) $(LDFLAGS) $(LDLIBS)
 	$(POST_PROCESS)
 
-install: all .WAIT $(ROOTLIBPROG) $(ROOTMANIFEST)
+install: all .WAIT $(ROOTLIBPROG) $(ROOTMANIFEST) $(ROOTSVCMETHOD)
 
 check:	$(CHKMANIFEST)
 

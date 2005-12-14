@@ -23,15 +23,14 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
 IPSECINIT="$BASEDIR/etc/inet/ipsecinit.conf"
-IPSECINITSAMPLE="$BASEDIR/etc/inet/ipsecinit.sample"
 
 #
 # Update IPsec policy configuration file only if installed
@@ -45,27 +44,18 @@ fi
 
 issue_warning=0
 
-# Make sure ipsecinit.conf exists
-if [ ! -f $IPSECINIT -a -f $IPSECINITSAMPLE ]
-then
-	cp $IPSECINITSAMPLE $IPSECINIT
-else
-	touch $IPSECINIT > /dev/null 2>&1
-fi
-
 #
 # Function to update ipsecinit.conf if necessary.
 #
 # Usage:
-#	add_ipsecinit_entry  sport|dport  service  apply|permit \
+#	remove_ipsecinit_entry  sport|dport  service  apply|permit \
 #		auth_algs  [sa_state]
 #
 # Note: If an entry exists that uses the same (sport|dport)/service
-# combination, the default entry is not added. This is to prevent
-# the default policies from overriding any custom policies that might
-# have been established.
+# combination that entry is not removed. This is to prevent
+# the removal of any custom policies that might have been established.
 #
-add_ipsecinit_entry()
+remove_ipsecinit_entry()
 {
 	# Build default entries
 	if [ $3 = "permit" ]; then
@@ -74,47 +64,48 @@ add_ipsecinit_entry()
 		default="{ $1 $2 ulp tcp } $3 { auth_algs $4 sa $5 }"
 	fi
 
-	# Check for a default entry
+	# Check for a default entry, and remove it
 	grep "$default" $IPSECINIT > /dev/null 2>&1
 	if [ $? -eq 0 ]; then
+		sed "/$default/d" $IPSECINIT > /tmp/ipsec.$$ && \
+		    cat /tmp/ipsec.$$ > $IPSECINIT
+		rm -f /tmp/ipsec.$$
 		return
 	fi
 
 	#
-	# Check the file for an entry that has
-	# a matching (sport|dport)/service pair
+	# Check the file for an entry that
+	# has a matching (sport|dport)/port pair
 	#
 	nawk "	BEGIN		{ RS=\"}\" }
 		/$1.*$2/	{ exit 1 }
 	" $IPSECINIT > /dev/null 2>&1
 
-	# Add an entry if necessary
+	# Found a modified entry, just issue a warning
 	if [ $? -eq 1 ]; then
 		echo "Found a policy for $1 $2 that does not match the" \
 		     "default policy"
 		issue_warning=1
-	else
-		echo $default >> $IPSECINIT
 	fi
 }
 
 
 #
-# Add all of our default policies
+# Remove all of our default policies
 #
-add_ipsecinit_entry dport sun-dr permit md5
-add_ipsecinit_entry sport sun-dr apply md5 unique
-add_ipsecinit_entry dport cvc_hostd permit md5
-add_ipsecinit_entry sport cvc_hostd apply md5 unique
+remove_ipsecinit_entry dport sun-dr permit md5
+remove_ipsecinit_entry sport sun-dr apply md5 unique
+remove_ipsecinit_entry dport cvc_hostd permit md5
+remove_ipsecinit_entry sport cvc_hostd apply md5 unique
 
 
 if [ $issue_warning -eq 1 ]; then
 	echo
 	echo "NOTICE: One or more of the default IPsec policies for the"
-	echo "Sun Fire 15000 services has been modified. As a result, the "
-	echo "default policy for those services was not added. Please verify" 
-	echo "that the /etc/inet/ipsecinit.conf file is correct.  For"
-	echo "more information, refer to sckmd(1M) and ipsecconf(1M)."
+	echo "Sun Fire 15000 services has been modified. As a result, the"
+	echo "modified policy for those services was not removed. Please"
+	echo "verify that the /etc/inet/ipsecinit.conf file is correct."
+	echo "For more information, refer to sckmd(1M) and ipsecconf(1M)."
 	echo
 fi
 

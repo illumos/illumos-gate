@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef _RDR_MESSAGES_H
@@ -76,6 +76,8 @@ extern "C" {
 #include "rdr_param_types.h"
 #include "rsrc_info.h"
 
+int rdr_setsockopt(int fd, int level, int optname, const void *optval,
+    int optlen);
 #endif /* SMSLIB_TARGET */
 
 

@@ -1763,6 +1763,24 @@ EOF
 
 	touch $rootprefix/var/svc/profile/.upgrade_prophist
 
+	cat >> $rootprefix/var/svc/profile/upgrade <<EOF
+	# We are deleting and reimporting dcs's manifest, because we
+	# need to change the restarter.
+	dcsfmri="svc:/platform/sun4u/dcs:default"
+	dcsmani="/var/svc/manifest/platform/sun4u/dcs.xml"
+	restarter=\`svcprop -c -p general/restarter \$dcsfmri 2>&1\`
+	case \$restarter in
+		*network/inetd:default)
+			en=\`svcprop -c -p general/enabled \$dcsfmri\`
+			svccfg delete -f \$dcsfmri
+			svccfg import \$dcsmani
+			if [ \$en = "true" ]; then
+				svcadm enable \$dcsfmri
+			fi
+			;;
+	esac
+EOF
+
 }
 
 EXTRACT_LOG=/tmp/bfu-extract-log.$$

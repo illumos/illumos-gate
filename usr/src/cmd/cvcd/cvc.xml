@@ -70,6 +70,13 @@
 	    exec=':kill -9'
 	    timeout_seconds='60' />
 
+	<!-- these are passed to cvcd in the method script -->
+	<property_group name='cvc' type='application'>
+		<propval name='ah_auth' type='astring' value='md5' />
+		<propval name='esp_encr' type='astring' value='none' />
+		<propval name='esp_auth' type='astring' value='none' />
+	</property_group>
+
 	<stability value='Unstable' />
 
 	<template>

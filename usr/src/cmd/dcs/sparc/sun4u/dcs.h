@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_DCS_H
@@ -55,6 +55,52 @@ extern "C" {
 #define	DCS_MAX_SESSIONS	128
 
 /*
+ * Header files for per-socket IPsec
+ */
+#include <netinet/in.h>
+#include <net/pfkeyv2.h>
+
+
+/*
+ * The IPsec socket option struct, from ipsec(7P):
+ *
+ *     typedef struct ipsec_req {
+ *         uint_t      ipsr_ah_req;            AH request
+ *         uint_t      ipsr_esp_req;           ESP request
+ *         uint_t      ipsr_self_encap_req;    Self-Encap request
+ *         uint8_t     ipsr_auth_alg;          Auth algs for AH
+ *         uint8_t     ipsr_esp_alg;           Encr algs for ESP
+ *         uint8_t     ipsr_esp_auth_alg;      Auth algs for ESP
+ *     } ipsec_req_t;
+ *
+ * The -a option sets the ipsr_auth_alg field. Allowable arguments
+ * are "none", "md5", or "sha1". The -e option sets the ipsr_esp_alg
+ * field. Allowable arguments are "none", "des", or "3des". "none"
+ * is the default for both options. The -u option sets the ipsr_esp_auth_alg
+ * field. Allowable arguments are the same as -a.
+ *
+ * The arguments ("md5", "des", etc.) are named so that they match
+ * kmd(1m)'s accepted arguments which are listed on the SC in
+ * /etc/opt/SUNWSMS/SMS/config/kmd_policy.cf.
+ */
+#define	AH_REQ		(IPSEC_PREF_REQUIRED | IPSEC_PREF_UNIQUE)
+#define	ESP_REQ		(IPSEC_PREF_REQUIRED | IPSEC_PREF_UNIQUE)
+#define	SELF_ENCAP_REQ	0x0
+
+/*
+ * A type to hold the command line argument string used to select a
+ * particular authentication header (AH) or encapsulating security
+ * payload (ESP) algorithm and the ID used for that algorithm when
+ * filling the ipsec_req_t structure which is passed to
+ * setsockopt(3SOCKET).
+ */
+typedef struct dcs_alg {
+	char		*arg_name;
+	uint8_t		alg_id;
+} dcs_alg_t;
+
+
+/*
  * Debugging
  */
 #define	DBG_NONE	0x00000000
@@ -72,8 +118,11 @@ extern "C" {
  * -d  control the amount of debugging
  * -S  control standalone mode
  * -s  control maximum active sessions
+ * -a  control the IPsec AH algorithm ("none", "md5", or "sha1")
+ * -e  control the IPsec ESP encr algorithm ("none", "des", or "3des")
+ * -u  control the IPsec ESP auth algorithm ("none", "md5", or "sha1")
  */
-#define	OPT_STR		"d:Ss:"
+#define	OPT_STR		"d:Ss:a:e:u:"
 
 #else /* DCS_DEBUG */
 
@@ -81,8 +130,11 @@ extern "C" {
  * supported options for non-debug version:
  *
  * -s  control maximum active sessions
+ * -a  control the IPsec AH algorithm ("none", "md5", or "sha1")
+ * -e  control the IPsec ESP encr algorithm ("none", "des", or "3des")
+ * -u  control the IPsec ESP auth algorithm ("none", "md5", or "sha1")
  */
-#define	OPT_STR		"s:"
+#define	OPT_STR		"s:a:e:u:"
 
 #endif /* DCS_DEBUG */
 
@@ -140,6 +192,7 @@ typedef enum {
 	DCS_CFGA_UNKNOWN,   /* configuration administration unknown error  */
 	DCS_CFGA_ERR,	    /* %s: %s					   */
 	DCS_RSRC_ERR,	    /* resource info init error (%d)		   */
+	DCS_NO_ERR,	    /* no error					   */
 	DCS_MSG_COUNT	    /* NULL					   */
 
 } dcs_err_code;

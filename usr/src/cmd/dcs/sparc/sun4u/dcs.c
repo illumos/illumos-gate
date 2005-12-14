@@ -20,8 +20,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 2000-2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +55,7 @@
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <strings.h>
 
 #include "dcs.h"
 #include "remote_cfg.h"
@@ -70,7 +71,8 @@ typedef struct {
 
 
 /* initialization functions */
-static int init_server(struct pollfd *pfd);
+static int init_server(struct pollfd *pfd, uint8_t ah_auth_alg,
+    uint8_t esp_encr_alg, uint8_t esp_auth_alg);
 static void init_signals(void);
 
 /* message processing functions */
@@ -101,6 +103,9 @@ static rdr_list_t *generate_sort_order(cfga_list_data_t *listp, int nlist);
 static int ldata_compare(const void *ap1, const void *ap2);
 static int invalid_msg(rdr_msg_hdr_t *hdr);
 static char *basename(char *path);
+static boolean_t is_socket(int fd);
+static uint8_t dcs_get_alg(dcs_alg_t *algs, char *arg, dcs_err_code *error);
+static void dcs_log_bad_alg(char optopt, char *optarg);
 
 
 /*
@@ -152,8 +157,24 @@ dcs_ver_t ver_supp[] = {
 char	*cmdname = NULL;		 /* the name of the executable	    */
 ulong_t	dcs_debug = 0;			 /* control the amount of debugging */
 int	standalone = 0;			 /* control standalone mode	    */
+boolean_t inetd = B_FALSE;		 /* control daemon mode		    */
 ulong_t	max_sessions = DCS_MAX_SESSIONS; /* control maximum active sessions */
 int	dcsfd = STDIN_FILENO;		 /* fd for the DCS reserved port    */
+
+/*
+ * Array of acceptable -a, -e and -u arguments.
+ */
+static dcs_alg_t auth_algs_array[] = {
+	{ "none",	SADB_AALG_NONE },	/* -a none or -u none */
+	{ "md5",	SADB_AALG_MD5HMAC },	/* -a md5  or -u md5 */
+	{ "sha1",	SADB_AALG_SHA1HMAC },	/* -a sha1 or -u sha1 */
+	{ NULL,		0x0 }
+}, esp_algs_array[] = {
+	{ "none",	SADB_EALG_NONE },	/* -e none */
+	{ "des",	SADB_EALG_DESCBC },	/* -e des  */
+	{ "3des",	SADB_EALG_3DESCBC },	/* -e 3des */
+	{ NULL,		0x0 }
+};
 
 
 /*
@@ -170,6 +191,10 @@ main(int argc, char **argv)
 	struct timeval	tv;
 	struct pollfd	dcs_rcv;
 	int		newfd;
+	uint8_t		ah_auth_alg	= SADB_AALG_NONE;
+	uint8_t		esp_encr_alg	= SADB_EALG_NONE;
+	uint8_t		esp_auth_alg	= SADB_AALG_NONE;
+	dcs_err_code	alg_ec		= DCS_NO_ERR;
 
 
 	/* initialize globals */
@@ -233,14 +258,66 @@ main(int argc, char **argv)
 			break;
 		}
 
+		case 'a':
+		case 'u':
+			if (opt == 'a')
+				ah_auth_alg = dcs_get_alg(auth_algs_array,
+				    optarg, &alg_ec);
+			else /* opt == 'u' */
+				esp_auth_alg = dcs_get_alg(auth_algs_array,
+				    optarg, &alg_ec);
+
+			if (alg_ec == DCS_BAD_OPT_ARG) {
+				dcs_log_bad_alg(optopt, optarg);
+				(void) rdr_reject(dcsfd);
+				exit(1);
+			}
+
+			break;
+
+		case 'e':
+			esp_encr_alg = dcs_get_alg(esp_algs_array, optarg,
+			    &alg_ec);
+
+			if (alg_ec == DCS_BAD_OPT_ARG) {
+				dcs_log_bad_alg(optopt, optarg);
+				(void) rdr_reject(dcsfd);
+				exit(1);
+			}
+
+			break;
+
 		default:
-			dcs_log_msg(LOG_ERR, DCS_BAD_OPT, optopt);
+			if (optopt == 'a' || optopt == 'e' || optopt == 'u')
+				dcs_log_bad_alg(optopt, optarg);
+			else
+				dcs_log_msg(LOG_ERR, DCS_BAD_OPT, optopt);
 			(void) rdr_reject(dcsfd);
 			exit(1);
 
 			/* NOTREACHED */
 			break;
 		}
+	}
+
+	/*
+	 * In the future if inetd supports per-socket IPsec dcs can be run
+	 * under inetd.
+	 * Daemonize if we were not started by inetd unless running standalone.
+	 */
+	inetd = is_socket(STDIN_FILENO);
+	if (inetd == B_FALSE && standalone == 0) {
+		closefrom(0);
+		(void) chdir("/");
+		(void) umask(0);
+
+		if (fork() != 0)
+			exit(0);
+
+		(void) setsid();
+
+		/* open log again after all files were closed */
+		openlog(cmdname, LOG_CONS | LOG_NDELAY, LOG_DAEMON);
 	}
 
 	DCS_DBG(DBG_ALL, "initializing %s...", cmdname);
@@ -262,7 +339,8 @@ main(int argc, char **argv)
 	srand48(tv.tv_usec);
 
 	/* initialize our transport endpoint */
-	if (init_server(&dcs_rcv) == -1) {
+	if (init_server(&dcs_rcv, ah_auth_alg, esp_encr_alg, esp_auth_alg) ==
+	    -1) {
 		dcs_log_msg(LOG_ERR, DCS_INIT_ERR);
 		(void) rdr_reject(dcsfd);
 		exit(1);
@@ -309,6 +387,57 @@ main(int argc, char **argv)
 
 
 /*
+ * dcs_get_alg:
+ *
+ * Returns the ID of the first algorithm found in the 'algs' array
+ * with a name matching 'arg'. If there is no matching algorithm,
+ * 'error' is set to DCS_BAD_OPT_ARG, otherwise it is set to DCS_NO_ERR.
+ * The 'algs' array must be terminated by an entry containing a NULL
+ * 'arg_name' field. The 'error' argument must be a valid pointer.
+ */
+static uint8_t
+dcs_get_alg(dcs_alg_t *algs, char *arg, dcs_err_code *error)
+{
+	dcs_alg_t *alg;
+
+	*error = DCS_NO_ERR;
+
+	for (alg = algs; alg->arg_name != NULL && arg != NULL; alg++) {
+		if (strncmp(alg->arg_name, arg, strlen(alg->arg_name) + 1)
+		    == 0) {
+			return (alg->alg_id);
+		}
+	}
+
+	*error = DCS_BAD_OPT_ARG;
+
+	return (0);
+}
+
+
+/*
+ * dcs_log_bad_alg:
+ *
+ * Logs an appropriate message when an invalid command line argument
+ * was provided.  'optarg' is the invalid argument string for the
+ * command line option 'optopt', where 'optopt' = 'a' for the '-a'
+ * option. A NULL 'optarg' indicates the required option was not
+ * provided.
+ */
+static void
+dcs_log_bad_alg(char optopt, char *optarg)
+{
+	if (optarg == NULL) {
+		dcs_log_msg(LOG_ERR, DCS_BAD_OPT_ARG, optopt,
+		    "empty string", "an argument is required, exiting");
+	} else {
+		dcs_log_msg(LOG_ERR, DCS_BAD_OPT_ARG, optopt,
+		    optarg, "exiting");
+	}
+}
+
+
+/*
  * init_server:
  *
  * Perform all the operations that are required to initialize the
@@ -317,12 +446,14 @@ main(int argc, char **argv)
  * port.
  */
 static int
-init_server(struct pollfd *pfd)
+init_server(struct pollfd *pfd, uint8_t ah_auth_alg, uint8_t esp_encr_alg,
+	uint8_t esp_auth_alg)
 {
 	struct servent		*se;
 	struct sockaddr_storage	ss;
 	struct sockaddr_in	*sin;
 	struct sockaddr_in6	*sin6;
+	ipsec_req_t		ipsec_req;
 	int			req_port;
 	int			act_port;
 	int			init_status;
@@ -331,6 +462,10 @@ init_server(struct pollfd *pfd)
 
 
 	assert(pfd);
+	pfd->fd = dcsfd;
+	pfd->events = POLLIN | POLLPRI;
+	pfd->revents = 0;
+
 
 	/*
 	 * In standalone mode, we have to initialize the transport
@@ -339,16 +474,48 @@ init_server(struct pollfd *pfd)
 	 * our reserved port.
 	 */
 
-	if (standalone) {
+	if (inetd == B_FALSE || standalone) {
 		/* in standalone mode, init fd for reserved port */
 		if ((dcsfd = rdr_open(AF_INET6)) == -1) {
 			DCS_DBG(DBG_ALL, "rdr_open failed");
+			return (-1);
+		}
+		pfd->fd = dcsfd;
+
+		/*
+		 * Enable per-socket IPsec if the user specified an
+		 * AH or ESP algorithm to use.
+		 */
+		if (ah_auth_alg != SADB_AALG_NONE ||
+		    esp_encr_alg != SADB_EALG_NONE ||
+		    esp_auth_alg != SADB_AALG_NONE) {
+			int err;
+
+			bzero(&ipsec_req, sizeof (ipsec_req));
+
+			/* Hardcoded values */
+			ipsec_req.ipsr_self_encap_req	= SELF_ENCAP_REQ;
+			/* User defined */
+			ipsec_req.ipsr_auth_alg		= ah_auth_alg;
+			ipsec_req.ipsr_esp_alg		= esp_encr_alg;
+			if (ah_auth_alg != SADB_AALG_NONE)
+				ipsec_req.ipsr_ah_req = AH_REQ;
+			if (esp_encr_alg != SADB_EALG_NONE ||
+			    esp_auth_alg != SADB_AALG_NONE) {
+				ipsec_req.ipsr_esp_req		= ESP_REQ;
+				ipsec_req.ipsr_esp_auth_alg	= esp_auth_alg;
+			}
+
+			err = rdr_setsockopt(pfd->fd, IPPROTO_IPV6,
+			    IPV6_SEC_OPT, (void *)&ipsec_req,
+			    sizeof (ipsec_req));
+
+			if (err != RDR_OK) {
+				DCS_DBG(DBG_ALL, "rdr_setsockopt failed");
+				return (-1);
+			}
 		}
 	}
-
-	pfd->fd = dcsfd;
-	pfd->events = POLLIN | POLLPRI;
-	pfd->revents = 0;
 
 	/*
 	 * Look up our service to get the reserved port number
@@ -2031,4 +2198,19 @@ basename(char *cp)
 	}
 
 	return (cp);
+}
+
+/*
+ * is_socket:
+ *
+ * determine if fd represents a socket file type.
+ */
+static boolean_t
+is_socket(int fd)
+{
+	struct stat statb;
+	if (fstat(fd, &statb) < 0) {
+		return (B_FALSE);
+	}
+	return (S_ISSOCK(statb.st_mode));
 }

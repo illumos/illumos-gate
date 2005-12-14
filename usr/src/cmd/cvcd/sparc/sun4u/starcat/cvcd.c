@@ -31,9 +31,9 @@
  * It accepts one TCP connection at a time on a well-known port.  Once a
  * connection is accepted, the console redirection driver (cvcdredir(7D)) is
  * opened, and console I/O is routed back and forth between the two file
- * descriptors (network and redirection driver).  No security is provided or
- * enforced within the daemon, as the Starcat platform uses a network security
- * solution that is transparent to domain-side daemons.
+ * descriptors (network and redirection driver).  Per-socket IPsec is used to
+ * secure the connection if it is enabled with the "-a", "-u" and or "-e"
+ * command line options.
  */
 
 #include <stdio.h>
@@ -66,6 +66,50 @@
 
 
 /*
+ * Header files for per-socket IPsec
+ */
+#include <netinet/in.h>
+#include <net/pfkeyv2.h>
+
+/*
+ * The IPsec socket option struct, from ipsec(7P):
+ *
+ *     typedef struct ipsec_req {
+ *         uint_t      ipsr_ah_req;            AH request
+ *         uint_t      ipsr_esp_req;           ESP request
+ *         uint_t      ipsr_self_encap_req;    Self-Encap request
+ *         uint8_t     ipsr_auth_alg;          Auth algs for AH
+ *         uint8_t     ipsr_esp_alg;           Encr algs for ESP
+ *         uint8_t     ipsr_esp_auth_alg;      Auth algs for ESP
+ *     } ipsec_req_t;
+ *
+ * The -a option sets the ipsr_auth_alg field. Allowable arguments
+ * are "none", "md5", or "sha1". The -e option sets the ipsr_esp_alg
+ * field. Allowable arguments are "none", "des", or "3des". "none"
+ * is the default for both options. The -u option sets ipsr_esp_auth_alg.
+ * Allowable arguments are the same as -a.
+ *
+ * The arguments ("md5", "des", etc.) are named so that they match
+ * kmd(1m)'s accepted arguments which are listed on the SC in
+ * /etc/opt/SUNWSMS/SMS/config/kmd_policy.cf.
+ */
+#define	AH_REQ		(IPSEC_PREF_REQUIRED | IPSEC_PREF_UNIQUE)
+#define	ESP_REQ		(IPSEC_PREF_REQUIRED | IPSEC_PREF_UNIQUE)
+#define	SELF_ENCAP_REQ	0x0
+
+/*
+ * A type to hold the command line argument string used to select a
+ * particular authentication header (AH) or encapsulating security
+ * payload (ESP) algorithm and the ID used for that algorithm when
+ * filling the ipsec_req_t structure which is passed to
+ * setsockopt(3SOCKET).
+ */
+typedef struct cvcd_alg {
+	char		*arg_name;
+	uint8_t		alg_id;
+} cvcd_alg_t;
+
+/*
  *  Misc. defines.
  */
 #define	NODENAME	"/etc/nodename"
@@ -78,10 +122,12 @@
  * Function prototypes
  */
 static void cvcd_set_priority(void);
-static int  cvcd_init_host_socket(int port);
+static int  cvcd_init_host_socket(int port, uint8_t ah_auth_alg,
+    uint8_t esp_encr_alg, uint8_t esp_auth_alg);
 static void cvcd_do_network_console(void);
 static void cvcd_err(int code, char *format, ...);
 static void cvcd_usage(void);
+static uint8_t cvcd_get_alg(cvcd_alg_t *algs, char *arg);
 
 /*
  *  Globals
@@ -89,6 +135,22 @@ static void cvcd_usage(void);
 static struct pollfd	pfds[NUM_PFDS];
 static char		progname[MAXPATHLEN];
 static int		debug = 0;
+
+/*
+ * Array of acceptable -a, -u and -e arguments.
+ */
+static cvcd_alg_t auth_algs_array[] = {
+	{ "none",	SADB_AALG_NONE },	/* -a none or -u none */
+	{ "md5",	SADB_AALG_MD5HMAC },	/* -a md5  or -u md5 */
+	{ "sha1",	SADB_AALG_SHA1HMAC },	/* -a sha1 or -u sha1 */
+	{ NULL,		0x0 }
+}, esp_algs_array[] = {
+	{ "none",	SADB_EALG_NONE },	/* -e none */
+	{ "des",	SADB_EALG_DESCBC },	/* -e des  */
+	{ "3des",	SADB_EALG_3DESCBC },	/* -e 3des */
+	{ NULL,		0x0 }
+};
+
 
 int
 main(int argc, char **argv)
@@ -102,16 +164,32 @@ main(int argc, char **argv)
 	int			i;
 	struct servent		*se;
 	char 			prefix[256];
+	uint8_t			ah_auth_alg 	= SADB_AALG_NONE;
+	uint8_t			esp_encr_alg  	= SADB_EALG_NONE;
+	uint8_t			esp_auth_alg  	= SADB_AALG_NONE;
 
 	(void) setlocale(LC_ALL, "");
 	(void) strcpy(progname, argv[0]);
 
 #ifdef DEBUG
-	while ((opt = getopt(argc, argv, "dp:")) != EOF) {
+	while ((opt = getopt(argc, argv, "a:e:u:dp:")) != EOF) {
 #else
-	while ((opt = getopt(argc, argv, "")) != EOF) {
+	while ((opt = getopt(argc, argv, "a:e:u:")) != EOF) {
 #endif
 		switch (opt) {
+			case 'a' :
+			case 'u' :
+					if (opt == 'a')
+						ah_auth_alg = cvcd_get_alg(
+						    auth_algs_array, optarg);
+					else
+						esp_auth_alg = cvcd_get_alg(
+						    auth_algs_array, optarg);
+					break;
+
+			case 'e' :	esp_encr_alg = cvcd_get_alg(
+					    esp_algs_array, optarg);
+					break;
 #ifdef DEBUG
 			case 'd' :	debug = 1;
 					break;
@@ -172,13 +250,7 @@ main(int argc, char **argv)
 	 * Daemonize...
 	 */
 	if (debug == 0) {
-		for (i = 0; i < OPEN_MAX; i++) {
-			if (debug && (i == STDERR_FILENO)) {
-				/* Don't close stderr in debug mode! */
-				continue;
-			}
-			(void) close(i);
-		}
+		closefrom(0);
 		(void) chdir("/");
 		(void) umask(0);
 		if (fork() != 0) {
@@ -230,7 +302,8 @@ main(int argc, char **argv)
 	 * connections.  No need to check the return value, as the call will
 	 * exit if it fails.
 	 */
-	pfds[LISTEN_PFD].fd = cvcd_init_host_socket(tport);
+	pfds[LISTEN_PFD].fd = cvcd_init_host_socket(tport, ah_auth_alg,
+	    esp_encr_alg, esp_auth_alg);
 
 	/*
 	 * Now that we're all set up, we loop forever waiting for connections
@@ -309,6 +382,31 @@ main(int argc, char **argv)
 	return (1);
 }
 
+/*
+ * cvcd_get_alg
+ *
+ * Returns the ID of the first algorithm found in
+ * the 'algs' array with a name matching 'arg'. If
+ * there is no matching algorithm, the function does
+ * not return. The 'algs' array must be terminated
+ * by an entry containing a NULL 'arg_name' field.
+ */
+static uint8_t
+cvcd_get_alg(cvcd_alg_t *algs, char *arg)
+{
+	cvcd_alg_t *alg;
+
+	for (alg = algs; alg->arg_name != NULL && arg != NULL; alg++) {
+		if (strncmp(alg->arg_name, arg, strlen(alg->arg_name) + 1)
+		    == 0) {
+			return (alg->alg_id);
+		}
+	}
+
+	cvcd_usage();
+	exit(1);
+	/* NOTREACHED */
+}
 
 /*
  * cvcd_set_priority
@@ -386,13 +484,15 @@ cvcd_set_priority(void)
  * accepting incoming connections to that port.
  */
 static int
-cvcd_init_host_socket(int port)
+cvcd_init_host_socket(int port, uint8_t ah_auth_alg, uint8_t esp_encr_alg,
+	uint8_t esp_auth_alg)
 {
 	int			err;
 	int			fd;
 	int			optval;
 	int 			optlen = sizeof (optval);
-	struct sockaddr_in6	sin6;
+	ipsec_req_t		ipsec_req;	/* For per-socket IPsec */
+	struct sockaddr_in6	sin6;		/* IPv6 listen socket   */
 
 	/*
 	 * Start by creating the socket, which needs to support IPv6.
@@ -417,6 +517,37 @@ cvcd_init_host_socket(int port)
 	if (err == -1) {
 		cvcd_err(LOG_ERR, "ioctl: %s", strerror(errno));
 		exit(1);
+	}
+
+	/*
+	 * Enable per-socket IPsec if the user specified an AH or ESP
+	 * algorithm to use.
+	 */
+	if (ah_auth_alg != SADB_AALG_NONE || esp_encr_alg != SADB_EALG_NONE ||
+	    esp_auth_alg != SADB_AALG_NONE) {
+		bzero(&ipsec_req, sizeof (ipsec_req));
+
+		/* Hardcoded values */
+		ipsec_req.ipsr_self_encap_req	= SELF_ENCAP_REQ;
+		/* User defined */
+		ipsec_req.ipsr_auth_alg		= ah_auth_alg;
+		ipsec_req.ipsr_esp_alg		= esp_encr_alg;
+		if (ah_auth_alg != SADB_AALG_NONE)
+			ipsec_req.ipsr_ah_req		= AH_REQ;
+		if (esp_encr_alg != SADB_EALG_NONE ||
+		    esp_auth_alg != SADB_AALG_NONE) {
+			ipsec_req.ipsr_esp_req		= ESP_REQ;
+			ipsec_req.ipsr_esp_auth_alg	= esp_auth_alg;
+		}
+
+		err = setsockopt(fd, IPPROTO_IPV6, IPV6_SEC_OPT,
+		    (void *)&ipsec_req, sizeof (ipsec_req));
+
+		if (err == -1) {
+			cvcd_err(LOG_ERR, "failed to enable per-socket IPsec");
+			cvcd_err(LOG_ERR, "setsockopt: %s", strerror(errno));
+			exit(1);
+		}
 	}
 
 	/*
@@ -652,9 +783,12 @@ static void
 cvcd_usage()
 {
 #if defined(DEBUG)
-	(void) printf("%s [-d] [-p port]\n", progname);
+	(void) printf("%s [-d] [-p port] "
+	    "[-a none|md5|sha1] [-e none|des|3des] [-u none|md5|sha1]\n",
+	    progname);
 #else
-	(void) printf("%s\n", progname);
+	(void) printf("%s [-a none|md5|sha1] [-e none|des|3des] "
+	    "[-u none|md5|sha1]\n", progname);
 #endif  /* DEBUG */
 }
 

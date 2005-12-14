@@ -42,52 +42,41 @@
 
 	<create_default_instance enabled='false' />
 
-	<restarter>
-		<service_fmri value='svc:/network/inetd:default' />
-	</restarter>
+	<dependency
+		name='network'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+			<service_fmri value='svc:/network/loopback' />
+	</dependency>
+
+	<dependency
+		name='nodename'
+		grouping='require_all'
+		restart_on='none'
+		type='service'>
+			 <service_fmri value='svc:/system/identity:node' />
+	</dependency>
 
 	<exec_method
 	    type='method'
-	    name='inetd_start'
-	    exec='/usr/lib/dcs'
-	    timeout_seconds='0'>
-	    <method_context>
-		<method_credential user='root' group='root' />
-	    </method_context>
+	    name='start'
+	    exec='/lib/svc/method/svc-dcs'
+	    timeout_seconds='60'>
 	</exec_method>
 
 	<exec_method
 		type='method'
-		name='inetd_offline'
-		exec=':kill_process'
-		timeout_seconds='0'>
+		name='stop'
+		exec=':kill -9'
+		timeout_seconds='60'>
 	</exec_method>
 
-	<exec_method
-	    type='method'
-	    name='inetd_disable'
-	    exec=':kill -KILL'
-	    timeout_seconds='0'>
-	</exec_method>
-
-	<!--
-	    The proto entry listing both tcp and tcp6only is required to prevent
-	    other services from inadvertently attempting to use the reserved
-	    dcs port and thereby running afoul of the IPsec policies which
-	    are applied to that port.
-	-->
-	<property_group name='inetd' type='framework'>
-		<stability value='Evolving' />
-		<propval name='name' type='astring' value='sun-dr' />
-		<propval name='endpoint_type' type='astring' value='stream' />
-		<propval name='wait' type='boolean' value='true' />
-		<propval name='isrpc' type='boolean' value='false' />
-		<property name='proto' type='astring'>
-			<astring_list>
-				<value_node value='tcp'/>
-				<value_node value='tcp6only'/>
-			</astring_list>
-		</property>
+	<!-- these are passed to dcs in the method script -->
+	<property_group name='dcs' type='application'>
+		<propval name='ah_auth' type='astring' value='md5' />
+		<propval name='esp_encr' type='astring' value='none' />
+		<propval name='esp_auth' type='astring' value='none' />
 	</property_group>
 
 	<stability value='Unstable' />
