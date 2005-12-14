@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1357,9 +1358,14 @@ libc_init(void)
 		/*
 		 * Retrieve all pointers to uberdata allocated
 		 * while running on previous link maps.
-		 * This is a giant structure assignment.
+		 * We would like to do a structure assignment here, but
+		 * gcc turns structure assignments into calls to memcpy(),
+		 * a function exported from libc.  We can't call any such
+		 * external functions until we establish curthread, below,
+		 * so we just call our private version of memcpy().
 		 */
-		*udp = *oldself->ul_uberdata;
+		(void) _private_memcpy(udp,
+		    oldself->ul_uberdata, sizeof (*udp));
 		/*
 		 * These items point to global data on the primary link map.
 		 */

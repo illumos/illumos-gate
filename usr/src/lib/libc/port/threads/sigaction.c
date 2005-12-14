@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -100,11 +101,11 @@ call_user_handler(int sig, siginfo_t *sip, ucontext_t *ucp)
 	    ((sig == SIGPROF && sip->si_code == PROF_SIG) ||
 	    (sig == SIGEMT && sip->si_code == EMT_CPCOVF)))) {
 		/* we wish this assignment could be atomic */
-		uact = *sap;
+		(void) _private_memcpy(&uact, (void *)sap, sizeof (uact));
 	} else {
 		mutex_t *mp = &udp->siguaction[sig].sig_lock;
 		lmutex_lock(mp);
-		uact = *sap;
+		(void) _private_memcpy(&uact, (void *)sap, sizeof (uact));
 		if (sig == SIGCANCEL && (sap->sa_flags & SA_RESETHAND))
 			sap->sa_sigaction = SIG_DFL;
 		lmutex_unlock(mp);
@@ -227,7 +228,8 @@ take_deferred_signal(int sig)
 	if (self->ul_siginfo.si_signo == 0)
 		sip = NULL;
 	else {
-		siginfo = self->ul_siginfo;
+		(void) _private_memcpy(&siginfo,
+		    &self->ul_siginfo, sizeof (siginfo));
 		sip = &siginfo;
 	}
 	uc.uc_sigmask = self->ul_sigmask;
@@ -264,7 +266,8 @@ sigacthandler(int sig, siginfo_t *sip, void *uvp)
 	ASSERT(self->ul_cursig == 0);
 	self->ul_cursig = (char)sig;
 	if (sip != NULL)
-		self->ul_siginfo = *sip;
+		(void) _private_memcpy(&self->ul_siginfo,
+		    sip, sizeof (siginfo_t));
 	else
 		self->ul_siginfo.si_signo = 0;
 
@@ -436,7 +439,7 @@ _private_setcontext(const ucontext_t *ucp)
 	 */
 	if (ucp == NULL)
 		_thr_exit(NULL);
-	uc = *ucp;
+	(void) _private_memcpy(&uc, ucp, sizeof (uc));
 
 	/*
 	 * Restore previous signal mask and context link.

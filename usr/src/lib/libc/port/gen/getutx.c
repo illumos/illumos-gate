@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -637,7 +638,7 @@ pututxline(const struct utmpx *entry)
 	if (entry == NULL)
 		return (NULL);
 
-	tmpxbuf = *entry;
+	(void) memcpy(&tmpxbuf, entry, sizeof (tmpxbuf));
 	utmpx_api2frec(entry, &ftmpxbuf);
 
 	if (fd < 0) {
@@ -693,7 +694,7 @@ pututxline(const struct utmpx *entry)
 		 * it will be up to date in the future.
 		 */
 		(void) fflush(fp);
-		fubuf = ftmpxbuf;
+		(void) memcpy(&fubuf, &ftmpxbuf, sizeof (fubuf));
 		utmpx_frec2api(&fubuf, &ubuf);
 		answer = &ubuf;
 	}
@@ -937,7 +938,7 @@ modutx(const struct utmpx *utp)
 	/*
 	 * copy the supplied utmpx structure someplace safe
 	 */
-	utmp = *utp;
+	(void) memcpy(&utmp, utp, sizeof (utmp));
 	setutxent();
 	while (fup = getutxent_frec()) {
 		if (idcmp(ucp->ut_id, fup->ut_id))

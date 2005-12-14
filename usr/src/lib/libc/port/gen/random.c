@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +43,7 @@
 #include "synonyms.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <limits.h>
 
@@ -194,7 +196,7 @@ _randomjunk(void)
 		rp = (struct _randomjunk *)malloc(sizeof (*rp));
 		if (rp == NULL)
 			return (NULL);
-		*rp = _randominit;
+		(void) memcpy(rp, &_randominit, sizeof (*rp));
 		__randomjunk = rp;
 	}
 	return (rp);

@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -336,7 +337,8 @@ _forkall(void)
 	if (!self->ul_vfork) {						\
 		if (sigmask) {						\
 			block_all_signals(self);			\
-			self->ul_tmpmask = *sigmask;			\
+			self->ul_tmpmask.__sigbits[0] = sigmask->__sigbits[0]; \
+			self->ul_tmpmask.__sigbits[1] = sigmask->__sigbits[1]; \
 			delete_reserved_signals(&self->ul_tmpmask);	\
 			self->ul_sigsuspend = 1;			\
 		}							\
@@ -842,7 +844,7 @@ __sigtimedwait(const sigset_t *set, siginfo_t *infop,
 	}
 	EPILOGUE
 	if (sig != -1 && infop)
-		*infop = info;
+		(void) _private_memcpy(infop, &info, sizeof (*infop));
 	return (sig);
 }
 

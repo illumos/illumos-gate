@@ -106,7 +106,8 @@ __tls_static_mods(TLS_modinfo **tlslist, unsigned long statictlssize)
 	 */
 	tlsm = &__uberdata.tls_metadata;
 	if (oldself != NULL) {
-		*tlsm = oldself->ul_uberdata->tls_metadata;
+		(void) _private_memcpy(tlsm,
+		    &oldself->ul_uberdata->tls_metadata, sizeof (*tlsm));
 		ASSERT(tlsm->static_tls.tls_data == NULL);
 	}
 
@@ -144,14 +145,16 @@ __tls_static_mods(TLS_modinfo **tlslist, unsigned long statictlssize)
 	 */
 	modinfo = tls_modinfo_alloc(tlsm, max_modid);
 	for (tlspp = tlslist; (tlsp = *tlspp) != NULL; tlspp++)
-		modinfo[tlsp->tm_modid] = *tlsp;
+		(void) _private_memcpy(&modinfo[tlsp->tm_modid],
+		    tlsp, sizeof (*tlsp));
 
 	/*
 	 * Copy the new tls_metadata back to the old, if any,
 	 * since it will be copied up again in libc_init().
 	 */
 	if (oldself != NULL)
-		oldself->ul_uberdata->tls_metadata = *tlsm;
+		(void) _private_memcpy(&oldself->ul_uberdata->tls_metadata,
+		    tlsm, sizeof (*tlsm));
 }
 
 /*
@@ -170,7 +173,7 @@ __tls_mod_add(TLS_modinfo *tlsp)
 	ASSERT(!(tlsp->tm_flags & TM_FLG_STATICTLS));
 	ASSERT(tlsp->tm_filesz <= tlsp->tm_memsz);
 	modinfo = tls_modinfo_alloc(tlsm, moduleid);
-	modinfo[moduleid] = *tlsp;
+	(void) _private_memcpy(&modinfo[moduleid], tlsp, sizeof (*tlsp));
 	lmutex_unlock(&tlsm->tls_lock);
 }
 

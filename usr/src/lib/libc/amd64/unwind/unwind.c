@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -146,6 +147,7 @@
 #include "synonyms.h"
 #endif
 
+#include <string.h>
 #include "stack_unwind.h"
 #include "reg_num.h"
 #include "unwind_context.h"
@@ -162,7 +164,7 @@ static void
 copy_ctx(struct _Unwind_Context *ctx1, struct _Unwind_Context *ctx2)
 {
 	if (ctx1 != ctx2) {
-		*ctx2 = *ctx1;
+		(void) memcpy(ctx2, ctx1, sizeof (*ctx2));
 	}
 }
 
