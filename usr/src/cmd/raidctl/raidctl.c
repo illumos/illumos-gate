@@ -292,19 +292,19 @@ get_devctl(char *disk, char *b)
 	return (0);
 }
 
-static int
+raidlist_t *
 already_there(int controller)
 {
 	raidlist_t	*curr = raids;
 
 	while (curr != NULL) {
 		if (curr->controller == controller)
-			return (1);
+			return (curr);
 
 		curr = curr->next;
 	}
 
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -422,26 +422,35 @@ add_raid_to_raidlist(char *ctrl_name, int controller)
 			info_ctrl[i][INFO_STATUS] = RAID_FOUND;
 
 		/*
-		 * if raids has not been initialized, do it.
-		 * otherwise, see if this controller is in
-		 * raids.
+		 * if raids has not been initialized, then do so.
+		 * otherwise, see if this controller is in raids.
+		 * if it is not, add it.  then, add this volume to
+		 * the raidlist
 		 */
 		if (raids == NULL) {
 			raids = (raidlist_t *)malloc(sizeof (raidlist_t));
 			curr = raids;
 		} else {
-			curr = raids;
-			if (already_there(controller))
+			if ((curr = already_there(controller)) != NULL)
 				goto already_there;
+
+			curr = raids;
 
 			/* add this controller to raids */
 			while (curr->next != NULL)
 				curr = curr->next;
+
 			curr->next = (raidlist_t *)malloc(sizeof (raidlist_t));
 			curr = curr->next;
 		}
 
 already_there:
+		/*
+		 * curr is now pointing to this controller. since we are
+		 * adding controllers one at a time from do_search(), set
+		 * curr->next to NULL so that we know where the end of our
+		 * currently added controllers lies.
+		 */
 		curr->next = NULL;
 		curr->controller = controller;
 		(void) strlcpy(curr->devctl, buf1, sizeof (curr->devctl));
@@ -583,6 +592,11 @@ do_search()
 			gettext("Cannot open /dev/cfg: %s\n"), strerror(errno));
 		return;
 	}
+	/*
+	 * iterate over the controllers and add any
+	 * controllers with RAID volumes to the raids
+	 * list, one at a time
+	 */
 	while ((dp = readdir(dir)) != NULL) {
 		if (strcmp(dp->d_name, ".") == 0 ||
 		    strcmp(dp->d_name, "..") == 0)
