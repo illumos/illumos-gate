@@ -132,7 +132,7 @@ ses_to_be_freed_list_t ses_delay_freed;
 /* protects softtoken_initialized and access to C_Initialize/C_Finalize */
 pthread_mutex_t soft_giant_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-static CK_RV finalize_common(CK_VOID_PTR pReserved);
+static CK_RV finalize_common(boolean_t force, CK_VOID_PTR pReserved);
 static void softtoken_fini();
 
 CK_RV
@@ -165,7 +165,7 @@ C_Initialize(CK_VOID_PTR pInitArgs)
 			 * out any state from the parent, and then
 			 * continue on.
 			 */
-			(void) finalize_common(NULL);
+			(void) finalize_common(B_TRUE, NULL);
 		}
 	}
 
@@ -288,7 +288,7 @@ C_Finalize(CK_VOID_PTR pReserved)
 
 	(void) pthread_mutex_lock(&soft_giant_mutex);
 
-	rv = finalize_common(pReserved);
+	rv = finalize_common(B_FALSE, pReserved);
 
 	(void) pthread_mutex_unlock(&soft_giant_mutex);
 
@@ -301,7 +301,7 @@ C_Finalize(CK_VOID_PTR pReserved)
  * must be held before calling this function.
  */
 static CK_RV
-finalize_common(CK_VOID_PTR pReserved) {
+finalize_common(boolean_t force, CK_VOID_PTR pReserved) {
 
 	CK_RV rv = CKR_OK;
 	struct object *delay_free_obj, *tmpo;
@@ -325,7 +325,7 @@ finalize_common(CK_VOID_PTR pReserved) {
 	(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
 
 	/* Delete all the sessions and release the allocated resources */
-	rv = soft_delete_all_sessions();
+	rv = soft_delete_all_sessions(force);
 
 	(void) pthread_mutex_lock(&soft_sessionlist_mutex);
 	/* Reset all_sessions_closing flag. */
@@ -395,7 +395,7 @@ softtoken_fini()
 		return;
 	}
 
-	(void) finalize_common(NULL_PTR);
+	(void) finalize_common(B_TRUE, NULL_PTR);
 
 	(void) pthread_mutex_unlock(&soft_giant_mutex);
 }

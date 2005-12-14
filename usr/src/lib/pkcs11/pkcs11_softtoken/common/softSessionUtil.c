@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ CK_ULONG soft_session_rw_cnt = 0;	/* the number of opened R/W sessions */
  * caller.
  */
 CK_RV
-soft_delete_all_sessions()
+soft_delete_all_sessions(boolean_t force)
 {
 
 	CK_RV rv = CKR_OK;
@@ -74,8 +74,9 @@ soft_delete_all_sessions()
 		 * with a session pointer and a boolean arguments.
 		 * Boolean value TRUE is used to indicate that the
 		 * caller holds the lock on the global session list.
+		 *
 		 */
-		rv1 = soft_delete_session(session_p, B_TRUE);
+		rv1 = soft_delete_session(session_p, force, B_TRUE);
 
 		/* Record the very first error code */
 		if (rv == CKR_OK) {
@@ -238,7 +239,8 @@ session_delay_free(soft_session_t *sp)
  * and also release that lock before returning to caller.
  */
 CK_RV
-soft_delete_session(soft_session_t *session_p, boolean_t lock_held)
+soft_delete_session(soft_session_t *session_p,
+    boolean_t force, boolean_t lock_held)
 {
 
 	/*
@@ -310,7 +312,14 @@ soft_delete_session(soft_session_t *session_p, boolean_t lock_held)
 	 * the session closing thread must wait for the non-closing
 	 * operation to be completed before it can proceed the close
 	 * operation.
+	 *
+	 * Unless we are being forced to shut everything down, this only
+	 * happens if the libraries _fini() is running not of someone
+	 * explicitly called C_Finalize().
 	 */
+	if (force)
+		session_p->ses_refcnt = 0;
+
 	while (session_p->ses_refcnt != 0) {
 		/*
 		 * We set the SESSION_REFCNT_WAITING flag before we put

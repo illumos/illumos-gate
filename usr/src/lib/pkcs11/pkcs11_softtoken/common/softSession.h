@@ -179,14 +179,15 @@ extern CK_ULONG soft_session_rw_cnt;	/* the number of opened R/W sessions */
  */
 CK_RV handle2session(CK_SESSION_HANDLE hSession, soft_session_t **session_p);
 
-CK_RV soft_delete_all_sessions(void);
+CK_RV soft_delete_all_sessions(boolean_t force);
 
 void soft_delete_all_objects_in_session(soft_session_t *sp);
 
 CK_RV soft_add_session(CK_FLAGS flags, CK_VOID_PTR pApplication,
     CK_NOTIFY notify, CK_ULONG *phSession);
 
-CK_RV soft_delete_session(soft_session_t *sp, boolean_t lock_held);
+CK_RV soft_delete_session(soft_session_t *sp,
+    boolean_t force, boolean_t lock_held);
 
 CK_RV soft_get_operationstate(soft_session_t *, CK_BYTE_PTR, CK_ULONG_PTR);
 CK_RV soft_set_operationstate(soft_session_t *, CK_BYTE_PTR, CK_ULONG,

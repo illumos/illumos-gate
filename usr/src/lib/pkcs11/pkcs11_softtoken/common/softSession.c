@@ -113,12 +113,13 @@ C_CloseSession(CK_SESSION_HANDLE hSession)
 	 * Delete a session by calling soft_delete_session() with
 	 * a session pointer and a boolean arguments. Boolean
 	 * value FALSE is used to indicate that the caller does not
-	 * hold the lock on the global session list.
+	 * hold the lock on the global session list and also that
+	 * this is not a forced session close but an explicit request.
 	 *
 	 * soft_delete_session() will reset SESSION_IS_CLOSING
 	 * flag after it is done.
 	 */
-	rv = soft_delete_session(session_p, B_FALSE);
+	rv = soft_delete_session(session_p, B_FALSE, B_FALSE);
 
 	if (soft_session_cnt == 0) {
 		/* Clean up private token objects from the token object list */
@@ -160,7 +161,7 @@ C_CloseAllSessions(CK_SLOT_ID slotID)
 	(void) pthread_mutex_unlock(&soft_sessionlist_mutex);
 
 	/* Delete all the sessions and release the allocated resources */
-	rv = soft_delete_all_sessions();
+	rv = soft_delete_all_sessions(B_FALSE);
 
 	/* Clean up private token objects from the token object list */
 	soft_delete_all_in_core_token_objects(PRIVATE_TOKEN);
