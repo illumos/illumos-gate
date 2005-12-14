@@ -21,18 +21,39 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.	 All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
+target=${PKG_INSTALL_ROOT:-/}
+kcfconf=$target/etc/crypto/kcf.conf
+ 
+if [ ! -f $kcfconf ]; then
+	# If there's no kcf.conf, then there's no ipsecalgs either.
+	ipsecalgs_reduce=0
+else
+	grep aes256 $kcfconf >/dev/null
+	if [ $? -eq 0 ]; then
+		ipsecalgs_reduce=0
+	else
+		ipsecalgs_reduce=1
+	fi
+fi
+ 
 while read src dest
 do
-        if [ ! -f $dest ] ; then
-                cp $src $dest
+	if [ ! -f $dest ] ; then
+		cp $src $dest
 	else
 		sed -e 's/CKM_BF_CBC/CKM_BLOWFISH_CBC/' $dest > $dest.$$
 		mv $dest.$$ $dest
-        fi
+		if [ $ipsecalgs_reduce -eq 1 ]; then
+			sed -e 's/_CBC|128\/32-448,8/_CBC|128\/32-128,8/' \
+			    -e 's/AES_CBC|128\/128-256,64|/AES_CBC|128|/' \
+			    $dest > $dest.$$
+			mv $dest.$$ $dest
+		fi
+       fi
 done
 exit 0
