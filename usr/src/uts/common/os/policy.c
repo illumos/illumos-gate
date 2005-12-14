@@ -898,6 +898,18 @@ secpolicy_vnode_owner(const cred_t *cr, uid_t owner)
 	return (PRIV_POLICY(cr, PRIV_FILE_OWNER, allzone, EPERM, NULL));
 }
 
+void
+secpolicy_setid_clear(vattr_t *vap, cred_t *cr)
+{
+	if ((vap->va_mode & (S_ISUID | S_ISGID)) != 0 &&
+	    secpolicy_vnode_setid_retain(cr,
+	    (vap->va_mode & S_ISUID) != 0 &&
+	    (vap->va_mask & AT_UID) != 0 && vap->va_uid == 0) != 0) {
+		vap->va_mask |= AT_MODE;
+		vap->va_mode &= ~(S_ISUID|S_ISGID);
+	}
+}
+
 /*
  * This function checks the policy decisions surrounding the
  * vop setattr call.
@@ -1033,14 +1045,7 @@ secpolicy_vnode_setattr(cred_t *cr, struct vnode *vp, struct vattr *vap,
 		 * If the file has either the set UID or set GID bits
 		 * set and the caller can set the bits, then leave them.
 		 */
-		if ((vap->va_mode & (S_ISUID | S_ISGID)) != 0 &&
-		    secpolicy_vnode_setid_retain(cr,
-			    (vap->va_mode & S_ISUID) != 0 &&
-			    (mask & AT_UID) != 0 && vap->va_uid == 0) != 0) {
-			/* Copied from ovap above if AT_MODE not specified */
-			vap->va_mask |= AT_MODE;
-			vap->va_mode &= ~(S_ISUID|S_ISGID);
-		}
+		secpolicy_setid_clear(vap, cr);
 	}
 	if (mask & (AT_ATIME|AT_MTIME)) {
 		/*
