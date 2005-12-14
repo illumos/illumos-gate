@@ -155,6 +155,7 @@ main(int argc, char **argv)
 	int		n;
 
 
+	disk_efi = NULL;
 	dfile = NULL;
 	vname = NULL;
 #if defined(sparc)
@@ -254,7 +255,7 @@ main(int argc, char **argv)
 		if (vread(fd, &disk_vtoc, argv[optind]) == 1)
 			eflag++;
 	}
-	if (eflag && (dfile == NULL)) {
+	if (eflag && ((dfile == NULL) || qflag)) {
 		vread64(fd, &disk_efi, argv[optind]);
 	}
 

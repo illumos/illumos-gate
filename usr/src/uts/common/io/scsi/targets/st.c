@@ -6280,6 +6280,7 @@ st_runout(caddr_t arg)
 			 */
 			un->un_quel = bp->b_actf;
 		}
+		mutex_exit(ST_MUTEX);
 		bp->b_actf = NULL;
 
 		ASSERT((bp->b_flags & B_DONE) == 0);
@@ -6294,9 +6295,8 @@ st_runout(caddr_t arg)
 		 * Try Again
 		 */
 		st_start(un);
+		mutex_exit(ST_MUTEX);
 	}
-
-	mutex_exit(ST_MUTEX);
 
 	/*
 	 * Comments courtesy of sd.c
