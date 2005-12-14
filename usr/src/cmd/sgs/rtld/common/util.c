@@ -2168,7 +2168,7 @@ ld_str_env(const char *s1, Word *lmflags, Word *lmtflags, uint_t env_flags,
     int aout)
 {
 	const char	*s2;
-	size_t		loc = 0;
+	static	size_t	loc = 0;
 
 	if (*s1++ != 'L')
 		return;

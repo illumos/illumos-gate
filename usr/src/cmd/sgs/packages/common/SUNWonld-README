@@ -1058,7 +1058,6 @@ All the above changes are incorporated in the following patches:
 6329796 Memory leak with iconv_open/iconv_close with patch 109147-33
 6332983 s9 linker patches 112963-24/113986-20 causing cluster machines not
 	to boot
-6340814 ld.so.1 core dump with HWCAP relocatable object + updated statistics
 --------------------------------------------------------------------------------
 All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.10_sparc	patch T117461-08
@@ -1068,8 +1067,10 @@ All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.8_sparc	patch T109147-40
     Solaris/SunOS 5.8_x86	patch T109148-40
 --------------------------------------------------------------------------------
+6340814 ld.so.1 core dump with HWCAP relocatable object + updated statistics
 6307274 crle bug with LD_LIBRARY_PATH
 6317969 elfheader limited to 65535 segments (link-editor components only)
 6350027 ld.so.1 aborts with assertion failed on amd64
 6362044 ld(1) inconsistencies with LD_DEBUG=-Dunused and -zignore
 6362047 ld.so.1 dumps core when combining HWCAP and LD_PROFILE
+6304206 runtime linker may respect LANG and LC_MESSAGE more than LC_ALL
