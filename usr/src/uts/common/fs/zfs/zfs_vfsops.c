@@ -661,7 +661,7 @@ zfs_statvfs(vfs_t *vfsp, struct statvfs64 *statp)
 	 */
 	(void) strcpy(statp->f_basetype, vfssw[vfsp->vfs_fstype].vsw_name);
 
-	statp->f_flag = 0;
+	statp->f_flag = vf_to_stf(vfsp->vfs_flag);
 
 	statp->f_namemax = ZFS_MAXNAMELEN;
 
