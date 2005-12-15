@@ -741,7 +741,7 @@ get_hostinfo(char *host, int family, struct addrinfo **aipp)
 
 	(void) memset(&hints, 0, sizeof (hints));
 	hints.ai_family = family;
-	hints.ai_flags = AI_ADDRCONFIG;
+	hints.ai_flags = AI_ADDRCONFIG | AI_CANONNAME;
 	rc = getaddrinfo(host, NULL, &hints, &ai);
 	if (rc != 0) {
 		if (rc != EAI_NONAME)
@@ -878,10 +878,17 @@ set_src_addr(struct pr_set *pr, struct ifaddrlist **alp)
 		}
 
 		source = aip->ai_canonname;
-		ap = (union any_in_addr *)
-		    /* LINTED E_BAD_PTR_CAST_ALIGN */
-		    &((struct sockaddr_in6 *)
-		    aip->ai_addr)->sin6_addr;
+
+		if (pr->family == AF_INET)
+			ap = (union any_in_addr *)
+			    /* LINTED E_BAD_PTR_CAST_ALIGN */
+			    &((struct sockaddr_in *)
+				aip->ai_addr)->sin_addr;
+		else
+			ap = (union any_in_addr *)
+			    /* LINTED E_BAD_PTR_CAST_ALIGN */
+			    &((struct sockaddr_in6 *)
+				aip->ai_addr)->sin6_addr;
 
 		/*
 		 * LBNL bug fixed: used to accept any src address
@@ -890,8 +897,8 @@ set_src_addr(struct pr_set *pr, struct ifaddrlist **alp)
 
 		if (tmp2_al == NULL) {
 			Fprintf(stderr,
-			    "%s: %s is an invalid %s source address\n", prog,
-			    inet_ntop(pr->family, (const void *)ap,
+			    "%s: %s is not a local %s address\n",
+			    prog, inet_ntop(pr->family, ap,
 				temp_buf, sizeof (temp_buf)),
 			    pr->name);
 
