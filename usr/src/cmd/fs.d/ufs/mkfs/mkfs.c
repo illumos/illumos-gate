@@ -2310,10 +2310,12 @@ grow50:
 		/* we're just cleaning up, so keep going */
 	}
 	fsi = fso = -1;
-	return (0);
+
 #ifndef STANDALONE
 	lockexit(0);
 #endif
+
+	return (0);
 }
 
 /*
