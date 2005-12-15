@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,13 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 add scsi_watch_request::swr_callback targets \
 	sd.c:sd_mhd_watch_cb \
@@ -101,7 +103,7 @@ add cmd_ctl::ccc_ccbfree target warlock_dummy
 ### Ignore the following functions as they are never used
 
 ignore L1_remove ata_disk_init_reset ghd_doneq_put ghd_gcmd_alloc
-ignore ghd_gcmd_free ghd_timer_stop ghd_tran_init_pkt ghd_tran_sync_pkt
+ignore ghd_gcmd_free ghd_timer_stop ghd_tran_sync_pkt
 ignore scsi_htos_3byte scsi_htos_long scsi_htos_short scsi_stoh_3byte
 ignore scsi_stoh_long scsi_stoh_short sd_mhd_reset_notify_cb
 
@@ -121,3 +123,4 @@ ignore  delay
 add     sd_uscsi_info::ui_dkc.dkc_callback targets warlock_dummy
 add     dk_callback::dkc_callback targets warlock_dummy
 
+root ghd_pktfree ghd_pktalloc

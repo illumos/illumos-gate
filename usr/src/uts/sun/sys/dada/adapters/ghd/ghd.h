@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -135,6 +136,9 @@ typedef struct tmr_conf {
 	int		t_refs;		/* reference count */
 	struct cmd_ctl	*t_ccc_listp;	/* control struct list, one per HBA */
 } tmr_t;
+_NOTE(MUTEX_PROTECTS_DATA(tmr_t::t_mutex, tmr_t::t_ccc_listp))
+_NOTE(MUTEX_PROTECTS_DATA(tmr_t::t_mutex, tmr_t::t_timeout_id))
+_NOTE(MUTEX_PROTECTS_DATA(tmr_t::t_mutex, tmr_t::t_refs))
 
 
 
@@ -176,6 +180,12 @@ typedef struct cmd_ctl {
 	int	(*ccc_timeout_func)(void *handle, gcmd_t *cmdp, gtgt_t *gtgtp,
 				    gact_t action, int calltype);
 } ccc_t;
+_NOTE(MUTEX_PROTECTS_DATA(cmd_ctl::ccc_activel_mutex, cmd_ctl::ccc_activel))
+_NOTE(MUTEX_PROTECTS_DATA(cmd_ctl::ccc_hba_mutex, cmd_ctl::ccc_hba_dip))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(cmd_ctl::ccc_hba_dip))
+_NOTE(MUTEX_PROTECTS_DATA(cmd_ctl::ccc_waitq_mutex, cmd_ctl::ccc_waitq))
+_NOTE(MUTEX_PROTECTS_DATA(cmd_ctl::ccc_doneq_mutex, cmd_ctl::ccc_doneq))
+
 
 #define	GHBA_QHEAD(cccp)	((cccp)->ccc_waitq.Q_qhead)
 #define	GHBA_MAXACTIVE(cccp)	((cccp)->ccc_waitq.Q_maxactive)
