@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,6 +109,13 @@ static void *ds_lib = NULL;
 static int ds_lib_ref_cnt = 0;
 static char *ds_lib_name = NULL;
 
+#define	FRU_NORESPONSE_RETRY 500
+
+#define RETRY(expr) 						\
+	{ for (int loop = 0; loop < FRU_NORESPONSE_RETRY &&	\
+		(expr) == FRU_NORESPONSE; loop++) ;		\
+	}	
+
 /* ========================================================================= */
 static const char *fru_errmsg[] =
 {
@@ -135,6 +142,7 @@ static const char *fru_errmsg[] =
 	"Data Corrupt",
 	"General LIBFRU FAILURE",
 	"Walk terminated",
+	"FRU No response",
 	"Unknown error"
 };
 
@@ -420,14 +428,17 @@ fru_close_data_source(void)
 int
 segment_is_encrypted(fru_nodehdl_t container, const char *seg_name)
 {
-	fru_errno_t tmp;
+	fru_errno_t err = FRU_SUCCESS;
 	fru_segdef_t segdef;
 
 	if (data_source == NULL) {
 		return (0);
 	}
-	if (data_source->get_seg_def(NODEHDL_TO_TREEHDL(container),
-					seg_name, &segdef) != FRU_SUCCESS) {
+
+	RETRY(err = data_source->get_seg_def(NODEHDL_TO_TREEHDL(container),
+							seg_name, &segdef))
+
+	if (err != FRU_SUCCESS) {
 		return (0);
 	}
 
@@ -445,8 +456,10 @@ get_seg_list_from_ds(fru_nodehdl_t node, fru_strlist_t *list)
 	}
 
 	/* get a list of all segments */
-	if ((err = data_source->get_seg_list(NODEHDL_TO_TREEHDL(node),
-			&raw_list)) != FRU_SUCCESS) {
+	RETRY(err = data_source->get_seg_list(NODEHDL_TO_TREEHDL(node),
+								&raw_list))
+
+	if (err != FRU_SUCCESS) {
 		return (err);
 	}
 
@@ -497,7 +510,7 @@ fru_get_root(fru_nodehdl_t *handle)
 		return (FRU_FAILURE);
 	}
 
-	err = data_source->get_root(&tr_root);
+	RETRY(err = data_source->get_root(&tr_root))
 	if (err == FRU_SUCCESS) {
 		*handle = TREEHDL_TO_NODEHDL(tr_root);
 	}
@@ -511,16 +524,19 @@ fru_get_child(fru_nodehdl_t handle, fru_nodehdl_t *child)
 	fru_errno_t err = FRU_SUCCESS;
 	fru_treehdl_t tr_child;
 	fru_node_t type;
-
 	if (data_source == NULL) {
 		return (FRU_FAILURE);
 	}
-	if ((err = data_source->get_child(NODEHDL_TO_TREEHDL(handle),
-				&tr_child)) != FRU_SUCCESS) {
+
+	RETRY(err = data_source->get_child(NODEHDL_TO_TREEHDL(handle),
+								&tr_child))
+	if (err != FRU_SUCCESS) {
 		return (err);
 	}
-	if ((err = data_source->get_node_type(tr_child, &type))
-		!= FRU_SUCCESS) {
+
+	RETRY(err = data_source->get_node_type(tr_child, &type))
+
+	if (err != FRU_SUCCESS) {
 		return (err);
 	}
 	if ((type == FRU_NODE_LOCATION) ||
@@ -535,12 +551,13 @@ fru_get_child(fru_nodehdl_t handle, fru_nodehdl_t *child)
  * valid
  */
 	do {
-		if ((err = data_source->get_peer(tr_child,
-					&tr_child)) != FRU_SUCCESS) {
+		RETRY(err = data_source->get_peer(tr_child, &tr_child))
+		if (err != FRU_SUCCESS) {
 			return (err);
 		}
-		if ((err = data_source->get_node_type(tr_child, &type))
-			!= FRU_SUCCESS) {
+		
+		RETRY(err = data_source->get_node_type(tr_child, &type))
+		if (err != FRU_SUCCESS) {
 			return (err);
 		}
 		if ((type == FRU_NODE_LOCATION) ||
@@ -565,12 +582,14 @@ fru_get_peer(fru_nodehdl_t handle, fru_nodehdl_t *peer)
 	}
 
 	do {
-		if ((err = data_source->get_peer(tr_peer, &tr_peer))
-			!= FRU_SUCCESS) {
+		RETRY(err = data_source->get_peer(tr_peer, &tr_peer))
+
+		if (err != FRU_SUCCESS) {
 			return (err);
 		}
-		if ((err = data_source->get_node_type(tr_peer, &type))
-			!= FRU_SUCCESS) {
+
+		RETRY(err = data_source->get_node_type(tr_peer, &type))
+		if (err != FRU_SUCCESS) {
 			return (err);
 		}
 		if ((type == FRU_NODE_LOCATION) ||
@@ -590,7 +609,9 @@ fru_get_parent(fru_nodehdl_t handle, fru_nodehdl_t *parent)
 	if (data_source == NULL) {
 		return (FRU_FAILURE);
 	}
-	err = data_source->get_parent(NODEHDL_TO_TREEHDL(handle), &tr_parent);
+
+	RETRY(err = data_source->get_parent(NODEHDL_TO_TREEHDL(handle),
+								&tr_parent))
 	if (err == FRU_SUCCESS) {
 		*parent = TREEHDL_TO_NODEHDL(tr_parent);
 	}
@@ -602,11 +623,15 @@ fru_get_parent(fru_nodehdl_t handle, fru_nodehdl_t *parent)
 fru_errno_t
 fru_get_name_from_hdl(fru_nodehdl_t handle, char **name)
 {
+	fru_errno_t	err = FRU_SUCCESS;
+
 	if (data_source == NULL) {
 		return (FRU_FAILURE);
 	}
-	return (data_source->get_name_from_hdl(NODEHDL_TO_TREEHDL(handle),
-		name));
+
+	RETRY(err = data_source->get_name_from_hdl(NODEHDL_TO_TREEHDL(handle),
+									name))
+	return (err);
 }
 
 /* ========================================================================= */
@@ -717,12 +742,13 @@ fru_get_node_type(fru_nodehdl_t handle, fru_node_t *type)
 	if (data_source == NULL) {
 		return (FRU_FAILURE);
 	}
-	if ((err = data_source->get_node_type(NODEHDL_TO_TREEHDL(handle),
-			&tmp)) != FRU_SUCCESS) {
-		return (err);
+	
+	RETRY(err = data_source->get_node_type(NODEHDL_TO_TREEHDL(handle),
+								&tmp))
+	if (err == FRU_SUCCESS) {
+		*type = tmp;
 	}
-	*type = tmp;
-	return (FRU_SUCCESS);
+	return (err);
 }
 
 /* ========================================================================= */
@@ -844,8 +870,9 @@ fru_create_segment(fru_nodehdl_t container, fru_segdef_t *def)
 
 	/* get a list of all segments */
 	/* here we do not want to leave out the encrypted segments. */
-	if ((err = data_source->get_seg_list(NODEHDL_TO_TREEHDL(container),
-			&seg_list)) != FRU_SUCCESS) {
+	RETRY(err = data_source->get_seg_list(NODEHDL_TO_TREEHDL(container),
+								&seg_list))
+	if (err != FRU_SUCCESS) {
 		CHK_UNLOCK_CONTAINER(container);
 		return (err);
 	}
@@ -860,7 +887,8 @@ fru_create_segment(fru_nodehdl_t container, fru_segdef_t *def)
 	}
 	fru_destroy_strlist(&seg_list);
 
-	err = data_source->add_seg(NODEHDL_TO_TREEHDL(container), def);
+	RETRY(err = data_source->add_seg(NODEHDL_TO_TREEHDL(container), def))
+
 	CHK_UNLOCK_CONTAINER(container);
 	return (err);
 }
@@ -892,8 +920,9 @@ fru_remove_segment(fru_nodehdl_t container, const char *seg_name)
 		(fru_encryption_supported() == FRU_NOTSUP)) {
 		err = FRU_INVALSEG;
 	} else {
-		err = data_source->delete_seg(NODEHDL_TO_TREEHDL(container),
-						seg_name);
+		RETRY(err =
+			data_source->delete_seg(NODEHDL_TO_TREEHDL(container),
+								seg_name))
 	}
 
 	CHK_UNLOCK_CONTAINER(container);
@@ -925,8 +954,11 @@ fru_get_segment_def(fru_nodehdl_t container, const char *seg_name,
 	// NOTE: not passing "definition" to this function such that I may
 	// check for encryption before allowing the user to get the data.
 	fru_segdef_t segdef;
-	if ((err = data_source->get_seg_def(NODEHDL_TO_TREEHDL(container),
-					seg_name, &segdef)) != FRU_SUCCESS) {
+
+	RETRY(err = data_source->get_seg_def(NODEHDL_TO_TREEHDL(container),
+							seg_name, &segdef))
+
+	if (err != FRU_SUCCESS) {
 		CHK_UNLOCK_CONTAINER(container);
 		return (err);
 	}
@@ -982,9 +1014,9 @@ fru_list_elems_in(fru_nodehdl_t container, const char *seg_name,
 		return (FRU_INVALSEG);
 	}
 
-	if ((err = data_source->get_tag_list(NODEHDL_TO_TREEHDL(container),
-					seg_name, &tags, &num_tags))
-		!= FRU_SUCCESS) {
+	RETRY(err = data_source->get_tag_list(NODEHDL_TO_TREEHDL(container),
+						seg_name, &tags, &num_tags))
+	if (err != FRU_SUCCESS) {
 		CHK_UNLOCK_CONTAINER(container);
 		return (err);
 	}
@@ -1052,10 +1084,9 @@ fru_for_each_segment(fru_nodehdl_t container,
 	if (lock_container(READ_LOCK, container) != FRU_SUCCESS) {
 		return (FRU_FAILURE);
 	}
-
-	status = data_source->for_each_segment(NODEHDL_TO_TREEHDL(container),
-						function, args);
-
+	RETRY(status =
+		data_source->for_each_segment(NODEHDL_TO_TREEHDL(container),
+							function, args))
 	CHK_UNLOCK_CONTAINER(container);
 	return (status);
 }
@@ -1071,9 +1102,13 @@ fru_for_each_segment(fru_nodehdl_t container,
 fru_errno_t
 fru_get_segment_name(fru_seghdl_t segment, char **name)
 {
+	fru_errno_t	err = FRU_SUCCESS;
+
 	assert(data_source != NULL);
-	return (data_source->get_segment_name(NODEHDL_TO_TREEHDL(segment),
-		name));
+
+	RETRY(err = data_source->get_segment_name(NODEHDL_TO_TREEHDL(segment),
+									name))
+	return (err);
 }
 
 /* ========================================================================= */
@@ -1090,9 +1125,13 @@ fru_for_each_packet(fru_seghdl_t segment,
 					size_t length, void *args),
 			void *args)
 {
+	fru_errno_t	err = FRU_SUCCESS;
+
 	assert(data_source != NULL);
-	return (data_source->for_each_packet(NODEHDL_TO_TREEHDL(segment),
-						function, args));
+
+	RETRY(err = data_source->for_each_packet(NODEHDL_TO_TREEHDL(segment),
+							function, args))
+	return (err);
 }
 
 
@@ -1391,9 +1430,9 @@ static fru_errno_t get_payload(fru_nodehdl_t container,
 	if (data_source == NULL) {
 		return (FRU_FAILURE);
 	}
-	if ((err = data_source->get_tag_list(NODEHDL_TO_TREEHDL(container),
-					seg_name, &tags, &num_tags))
-			!= FRU_SUCCESS) {
+	RETRY(err = data_source->get_tag_list(NODEHDL_TO_TREEHDL(container),
+						seg_name, &tags, &num_tags))
+	if (err != FRU_SUCCESS) {
 		return (err);
 	}
 
@@ -1416,10 +1455,10 @@ static fru_errno_t get_payload(fru_nodehdl_t container,
 			free(tags);
 			return (err);
 		}
-
-		err = data_source->get_tag_data(NODEHDL_TO_TREEHDL(container),
-					seg_name, tagToRead, unknown_inst,
-					payload, payloadLen);
+		RETRY(err =
+			data_source->get_tag_data(NODEHDL_TO_TREEHDL(container),
+				seg_name, tagToRead, unknown_inst, payload,
+								payloadLen))
 		free(tags);
 		return (err);
 	}
@@ -1472,20 +1511,15 @@ static fru_errno_t get_payload(fru_nodehdl_t container,
 
 	// if we get here this means the instance number within the payload.
 	*instLeft = instance;
-
-	if ((err = data_source->get_tag_data(NODEHDL_TO_TREEHDL(container),
-					seg_name, (*correct)->getTag(),
-					(*tagInstance),
-					payload, payloadLen))
-			!= FRU_SUCCESS) {
-		free(tags);
+	RETRY(err = data_source->get_tag_data(NODEHDL_TO_TREEHDL(container),
+		seg_name, (*correct)->getTag(), (*tagInstance), payload,
+								payloadLen))
+	free(tags);
+	if (err != FRU_SUCCESS) {
 		delete *ancestors; // linked list
 		delete *pathDef;
-		return (err);
 	}
-
-	free(tags);
-	return (FRU_SUCCESS);
+	return (err);
 }
 
 /* ========================================================================= */
@@ -1735,11 +1769,9 @@ fru_update_field(fru_nodehdl_t container,
 		}
 	}
 
-	err = data_source->set_tag_data(NODEHDL_TO_TREEHDL(container),
-					seg_name,
-					correctAnt->getTag(), tagInstance,
-					payload, payloadLen);
-
+	RETRY(err = data_source->set_tag_data(NODEHDL_TO_TREEHDL(container),
+					seg_name, correctAnt->getTag(),
+					tagInstance, payload, payloadLen))
 	CHK_UNLOCK_CONTAINER(container);
 	delete ancestors; // linked list.
 	free(payload);
@@ -1914,11 +1946,9 @@ fru_add_element(fru_nodehdl_t container,
 			return (err);
 		}
 	}
-
-	err = data_source->add_tag_to_seg(NODEHDL_TO_TREEHDL(container),
-						seg_name, tag,
-						data, def->payloadLen);
-
+	
+	RETRY(err = data_source->add_tag_to_seg(NODEHDL_TO_TREEHDL(container),
+					seg_name, tag, data, def->payloadLen))
 	CHK_UNLOCK_CONTAINER(container);
 	delete[] data;
 	return (err);
@@ -1964,10 +1994,11 @@ fru_delete_element(fru_nodehdl_t container,
 		fru_tag_t *tags = NULL;
 		int num_tags = 0;
 
-		if ((err = data_source->get_tag_list(
-					NODEHDL_TO_TREEHDL(container),
-					seg_name, &tags, &num_tags))
-				!= FRU_SUCCESS) {
+		RETRY(err =
+			data_source->get_tag_list(NODEHDL_TO_TREEHDL(container),
+						seg_name, &tags, &num_tags))
+							
+		if (err != FRU_SUCCESS) {
 			CHK_UNLOCK_CONTAINER(container);
 			return (err);
 		}
@@ -1991,9 +2022,9 @@ fru_delete_element(fru_nodehdl_t container,
 		}
 		mk_tag(def->tagType, def->tagDense, def->payloadLen, &tag);
 	}
-
-	err = data_source->delete_tag(NODEHDL_TO_TREEHDL(container), seg_name,
-					tag, instance);
+	
+	RETRY(err = data_source->delete_tag(NODEHDL_TO_TREEHDL(container),
+						seg_name, tag, instance))
 	CHK_UNLOCK_CONTAINER(container);
 	return (err);
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,12 @@ map_plugin_err(int picl_err)
 			return (FRU_DUPSEG);
 		case PICL_NOSPACE:
 			return (FRU_NOSPACE);
+		case PICL_NORESPONSE:
+			return (FRU_NORESPONSE);
+		case PICL_PROPNOTFOUND:
+			return (FRU_NODENOTFOUND);
+		case PICL_ENDOFLIST:
+			return (FRU_DATANOTFOUND);
 	}
 	return (FRU_IOERROR);
 }
@@ -134,7 +140,7 @@ fpt_get_name_from_hdl(fru_treehdl_t node, char **name)
 	/* get the name */
 	if ((picl_err = get_strprop_by_name(handle, PICL_PROP_NAME,
 		&tmp_name)) != PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	/* get the label, if any */
@@ -142,7 +148,7 @@ fpt_get_name_from_hdl(fru_treehdl_t node, char **name)
 		&label)) != PICL_SUCCESS) {
 		if (picl_err != PICL_PROPNOTFOUND) {
 			free(tmp_name);
-			return (FRU_IOERROR);
+			return (map_plugin_err(picl_err));
 		}
 		/* else PICL_PROPNOTFOUND is OK because not all nodes */
 		/* will have a label. */
@@ -226,7 +232,7 @@ fpt_get_root(fru_treehdl_t *node)
 	if ((picl_err = picl_get_propval_by_name(picl_node, PICL_PROP_CHILD,
 		(void *)&picl_node, sizeof (picl_node)))
 		!= PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	while (cmp_node_name(picl_node, PICL_NODE_FRUTREE)
@@ -237,7 +243,7 @@ fpt_get_root(fru_treehdl_t *node)
 			sizeof (picl_node))) == PICL_PROPNOTFOUND) {
 			return (FRU_NODENOTFOUND);
 		} else if (picl_err != PICL_SUCCESS) {
-			return (FRU_IOERROR);
+			return (map_plugin_err(picl_err));
 		}
 	}
 
@@ -257,10 +263,7 @@ fpt_get_peer(fru_treehdl_t sibling, fru_treehdl_t *peer)
 	rc = picl_get_propval_by_name(handle, PICL_PROP_PEER,
 		(void *)&picl_peer, sizeof (picl_peer));
 	if (rc != PICL_SUCCESS) {
-		if (rc == PICL_PROPNOTFOUND)
-			return (FRU_NODENOTFOUND);
-		else
-			return (FRU_IOERROR);
+		return (map_plugin_err(rc));
 	}
 
 	*peer = PICLHDL_TO_TREEHDL(picl_peer);
@@ -275,10 +278,7 @@ fpt_get_child(fru_treehdl_t handle, fru_treehdl_t *child)
 	int rc = picl_get_propval_by_name(TREEHDL_TO_PICLHDL(handle),
 		PICL_PROP_CHILD, (void *)&p_child, sizeof (p_child));
 	if (rc != PICL_SUCCESS) {
-		if (rc == PICL_PROPNOTFOUND)
-			return (FRU_NODENOTFOUND);
-		else
-			return (FRU_IOERROR);
+		return (map_plugin_err(rc));
 	}
 
 	*child = PICLHDL_TO_TREEHDL(p_child);
@@ -300,10 +300,7 @@ fpt_get_parent(fru_treehdl_t handle, fru_treehdl_t *parent)
 	rc = picl_get_propval_by_name(TREEHDL_TO_PICLHDL(handle),
 		PICL_PROP_PARENT, (void *)&p_parent, sizeof (p_parent));
 	if (rc != PICL_SUCCESS) {
-		if (rc == PICL_PROPNOTFOUND)
-			return (FRU_NODENOTFOUND);
-		else
-			return (FRU_IOERROR);
+		return (map_plugin_err(rc));
 	}
 
 	*parent = PICLHDL_TO_TREEHDL(p_parent);
@@ -314,12 +311,13 @@ fpt_get_parent(fru_treehdl_t handle, fru_treehdl_t *parent)
 static fru_errno_t
 fpt_get_node_type(fru_treehdl_t node, fru_node_t *type)
 {
+	int	rc = PICL_SUCCESS;
 	char picl_class[PICL_PROPNAMELEN_MAX];
 	picl_nodehdl_t handle = TREEHDL_TO_PICLHDL(node);
 
-	if (picl_get_propval_by_name(handle, PICL_PROP_CLASSNAME,
-		picl_class, sizeof (picl_class)) != PICL_SUCCESS) {
-		return (FRU_IOERROR);
+	if ((rc = picl_get_propval_by_name(handle, PICL_PROP_CLASSNAME,
+		picl_class, sizeof (picl_class))) != PICL_SUCCESS) {
+		return (map_plugin_err(rc));
 	}
 
 	if (strcmp(picl_class, PICL_CLASS_LOCATION) == 0)  {
@@ -449,11 +447,12 @@ get_segment_node(picl_nodehdl_t handle, const char *segment,
 					return (FRU_SEGCORRUPT);
 				}
 				/* get the HW protections of this section. */
-				if (picl_get_propval_by_name(sect_node,
+				if ((rc = picl_get_propval_by_name(sect_node,
 					PICL_PROP_PROTECTED,
 					(void *)&protection,
-					sizeof (protection)) != PICL_SUCCESS) {
-					return (FRU_IOERROR);
+					sizeof (protection)))
+							!= PICL_SUCCESS) {
+					return (map_plugin_err(rc));
 				}
 				hw_desc->all_bits = 0;
 				hw_desc->field.read_only = protection;
@@ -467,7 +466,7 @@ get_segment_node(picl_nodehdl_t handle, const char *segment,
 
 		/* Peer property not found is ok */
 		if (rc != PICL_PROPNOTFOUND) {
-			return (FRU_IOERROR);
+			return (map_plugin_err(rc));
 		}
 
 		err = find_next_section(sect_node, &sect_node);
@@ -534,7 +533,7 @@ add_segs_for_section(picl_nodehdl_t section, fru_strlist_t *list)
 
 		/* Peer property not found is ok */
 		if (rc != PICL_PROPNOTFOUND) {
-			return (FRU_IOERROR);
+			return (map_plugin_err(rc));
 		}
 
 	}
@@ -598,19 +597,19 @@ fpt_get_seg_def(fru_treehdl_t handle, const char *seg_name, fru_segdef_t *def)
 	if ((picl_err = picl_get_propval_by_name(seg_node,
 		PICL_PROP_DESCRIPTOR,
 		&desc, sizeof (desc))) != PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	if ((picl_err = picl_get_propval_by_name(seg_node,
 		PICL_PROP_LENGTH,
 		&size, sizeof (size))) != PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	if ((picl_err = picl_get_propval_by_name(seg_node,
 		PICL_PROP_OFFSET,
 		&address, sizeof (address))) != PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	def->version = LIBFRU_VERSION;
@@ -698,11 +697,11 @@ fpt_add_tag_to_seg(fru_treehdl_t handle, const char *seg_name,
 	if ((picl_err = picl_get_prop_by_name(segHdl,
 		PICL_PROP_ADD_PACKET,
 		&add_prop)) != PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 	if ((picl_err = picl_get_propinfo(add_prop, &add_prop_info))
 			!= PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	buf_size = add_prop_info.size;
@@ -750,7 +749,7 @@ fpt_get_tag_list(fru_treehdl_t handle, const char *seg_name,
 		PICL_PROP_NUM_TAGS,
 		(void *)&total_tags,
 		sizeof (total_tags))) != PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	if (total_tags == 0) {
@@ -769,7 +768,7 @@ fpt_get_tag_list(fru_treehdl_t handle, const char *seg_name,
 		PICL_PROP_PACKET_TABLE,
 		&tagTable, sizeof (tagTable))) != PICL_SUCCESS) {
 		free(rc_tags);
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 	picl_err = picl_get_next_by_col(tagTable, &tagTable);
 	while (picl_err == PICL_SUCCESS) {
@@ -783,7 +782,7 @@ fpt_get_tag_list(fru_treehdl_t handle, const char *seg_name,
 			(void *)&(rc_tags[rc_num++]),
 			sizeof (fru_tag_t))) != PICL_SUCCESS) {
 			free(rc_tags);
-			return (FRU_IOERROR);
+			return (map_plugin_err(picl_err));
 		}
 		/* get the next tag */
 		picl_err = picl_get_next_by_col(tagTable, &tagTable);
@@ -794,7 +793,7 @@ fpt_get_tag_list(fru_treehdl_t handle, const char *seg_name,
 		*number = rc_num;
 		return (FRU_SUCCESS);
 	}
-	return (FRU_IOERROR);
+	return (map_plugin_err(picl_err));
 }
 
 /* ========================================================================= */
@@ -826,7 +825,7 @@ get_tag_handle(picl_nodehdl_t handle, const char *segment,
 	if ((picl_err = picl_get_propval_by_name(tmp_seg,
 		PICL_PROP_PACKET_TABLE,
 		&tagTable, sizeof (tagTable))) != PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	picl_err = picl_get_next_by_col(tagTable, &tagTable);
@@ -834,7 +833,7 @@ get_tag_handle(picl_nodehdl_t handle, const char *segment,
 		(picl_err == PICL_SUCCESS)) {
 		if ((picl_err = picl_get_propval(tagTable, (void *)&foundTag,
 			sizeof (foundTag))) != PICL_SUCCESS) {
-			return (FRU_IOERROR);
+			return (map_plugin_err(picl_err));
 		}
 		if ((tags_equal(tag, foundTag) == 1) && (instance-- == 0)) {
 			*segHdl = tmp_seg;
@@ -844,10 +843,7 @@ get_tag_handle(picl_nodehdl_t handle, const char *segment,
 		picl_err = picl_get_next_by_col(tagTable, &tagTable);
 	}
 
-	if (picl_err == PICL_ENDOFLIST)
-		return (FRU_DATANOTFOUND);
-
-	return (FRU_IOERROR);
+	return (map_plugin_err(picl_err));
 }
 
 /* ========================================================================= */
@@ -871,7 +867,7 @@ fpt_get_tag_data(fru_treehdl_t handle, const char *seg_name,
 
 	if ((picl_err = picl_get_next_by_row(tagHdl, &tagHdl))
 		!= PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	buf_len = get_payload_length(&tag);
@@ -910,7 +906,7 @@ fpt_set_tag_data(fru_treehdl_t handle, const char *seg_name,
 
 	if ((picl_err = picl_get_next_by_row(tagHdl, &tagHdl))
 		!= PICL_SUCCESS) {
-		return (FRU_IOERROR);
+		return (map_plugin_err(picl_err));
 	}
 
 	if ((picl_err = picl_set_propval(tagHdl, data, data_len))
@@ -1031,10 +1027,10 @@ fpt_get_segment_name(fru_treeseghdl_t segment, char **name)
 	picl_propinfo_t	propinfo;
 
 
-	if (picl_get_propinfo_by_name(TREESEGHDL_TO_PICLHDL(segment),
-		PICL_PROP_NAME, &propinfo, &proph)
+	if ((status = picl_get_propinfo_by_name(TREESEGHDL_TO_PICLHDL(segment),
+		PICL_PROP_NAME, &propinfo, &proph))
 	    != PICL_SUCCESS)
-		return (FRU_IOERROR);
+		return (map_plugin_err(status));
 
 	if (propinfo.size == 0)
 		return (FRU_INVALDATASIZE);
