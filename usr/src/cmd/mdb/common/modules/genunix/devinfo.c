@@ -415,8 +415,7 @@ devinfo2driver(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
-
-	if (!DDI_CF2(&devi)) {
+	if (devi.devi_node_state < DS_ATTACHED) {
 		/* No driver attached to this devinfo - nothing to do. */
 		mdb_warn("%p: No driver attached to this devinfo node\n", addr);
 		return (DCMD_ERR);
@@ -952,19 +951,6 @@ typedef struct devinfo_cb_data {
 	uint_t		di_flags;
 } devinfo_cb_data_t;
 
-/*
- * Yet to be added:
- *
- * struct devnames *devnamesp;
- *   <sys/autoconf.h>:26		- type definition
- *   uts/common/os/modctl.c:106		- devnamesp definition
- *
- * int devcnt;
- *   uts/common/io/conf.c:62		- devcnt definition
- *
- * "devnamesp" is an array of "devcnt" "devnames" structures,
- *   indexed by major number.  This gets us "prtconf -D".
- */
 static int
 devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)
 {
@@ -972,6 +958,7 @@ devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)
 	 * We know the walker passes us extra data after the dev_info.
 	 */
 	char		binding_name[128];
+	char		dname[MODMAXNAMELEN + 1];
 	devinfo_node_t	*din = (devinfo_node_t *)dev;
 	ddi_prop_t	*global_props = NULL;
 
@@ -1002,8 +989,14 @@ devinfo_print(uintptr_t addr, struct dev_info *dev, devinfo_cb_data_t *data)
 		mdb_printf("%</b>");
 	if (dev->devi_instance >= 0)
 		mdb_printf(", instance #%d", dev->devi_instance);
-	if (dev->devi_ops == NULL)
+
+	if (dev->devi_node_state < DS_ATTACHED)
 		mdb_printf(" (driver not attached)");
+	else if (mdb_devinfo2driver(addr, dname, sizeof (dname)) != 0)
+		mdb_printf(" (could not determine driver name)");
+	else
+		mdb_printf(" (driver name: %s)", dname);
+
 	mdb_printf("\n");
 	if (data->di_flags & DEVINFO_VERBOSE) {
 		mdb_inc_indent(DEVINFO_PROPLIST_INDENT);

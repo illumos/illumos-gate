@@ -1367,6 +1367,11 @@ pt_gcore(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_ERR);
 	}
 
+	if (t->t_pshandle == NULL) {
+		mdb_warn("no process active\n");
+		return (DCMD_ERR);
+	}
+
 	pid = Pstatus(t->t_pshandle)->pr_pid;
 	size = 1 + mdb_snprintf(NULL, 0, "%s.%d", prefix, (int)pid);
 	fname = mdb_alloc(size, UM_SLEEP | UM_GC);
@@ -1838,6 +1843,11 @@ pt_getenv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc == 1 && argv->a_type != MDB_TYPE_STRING)
 		return (DCMD_USAGE);
 
+	if (opt_t && t->t_pshandle == NULL) {
+		mdb_warn("no process active\n");
+		return (DCMD_ERR);
+	}
+
 	if (opt_t && (Pstate(t->t_pshandle) == PS_IDLE ||
 	    Pstate(t->t_pshandle) == PS_UNDEAD)) {
 		mdb_warn("-t option requires target to be running\n");
@@ -1957,6 +1967,11 @@ pt_setenv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	    (argc > 1 && argv[1].a_type != MDB_TYPE_STRING))
 		return (DCMD_USAGE);
 
+	if (t->t_pshandle == NULL) {
+		mdb_warn("no process active\n");
+		return (DCMD_ERR);
+	}
+
 	/*
 	 * If the process is in some sort of running state, warn the user that
 	 * changes won't immediately take effect.
@@ -2006,6 +2021,11 @@ pt_unsetenv(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 
 	if (argc == 1 && argv->a_type != MDB_TYPE_STRING)
 		return (DCMD_USAGE);
+
+	if (t->t_pshandle == NULL) {
+		mdb_warn("no process active\n");
+		return (DCMD_ERR);
+	}
 
 	/*
 	 * If the process is in some sort of running state, warn the user that
