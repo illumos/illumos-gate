@@ -21,14 +21,19 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1991, 1998-1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
 # All rights reserved.
 #
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
+
+# Set noinuse checking during boot. We want to disable device in use checking
+# so that normal swap use, such as specified in /etc/vfstab, will not cause
+# swap devices to fail to be configured during boot.
+NOINUSE_CHECK=1; export NOINUSE_CHECK
 
 PATH=/usr/sbin:/usr/bin; export PATH
 USAGE="Usage: swapadd [-12] [file_system_table]"
