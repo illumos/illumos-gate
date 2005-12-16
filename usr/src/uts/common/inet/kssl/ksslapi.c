@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -532,7 +531,7 @@ kssl_handle_record(kssl_ctx_t ctx, mblk_t **mpp, mblk_t **outmp)
 {
 	uchar_t *recend, *rec_sz_p;
 	uchar_t *real_recend;
-	mblk_t *prevmp = NULL, *nextmp, *mp = *mpp, *copybp;
+	mblk_t *prevmp = NULL, *nextmp, *firstmp, *mp, *copybp;
 	int mac_sz;
 	uchar_t version[2];
 	uint16_t rec_sz;
@@ -549,6 +548,7 @@ kssl_handle_record(kssl_ctx_t ctx, mblk_t **mpp, mblk_t **outmp)
 
 	ssl = (ssl_t *)(ctx);
 
+	mp = firstmp = *mpp;
 	*outmp = NULL;
 
 more:
@@ -565,7 +565,7 @@ more:
 				return (NULL);
 
 			copybp->b_cont = mp->b_cont;
-			if (mp == *mpp) {
+			if (mp == firstmp) {
 				*mpp = copybp;
 			} else {
 				prevmp->b_cont = copybp;
@@ -620,6 +620,24 @@ more:
 		spec = &ssl->spec[KSSL_READ];
 		mac_sz = spec->mac_hashsz;
 		if (spec->cipher_ctx != 0) {
+
+			/*
+			 * The record length must be a multiple of the
+			 * block size for block ciphers.
+			 * The cipher_bsize is always a power of 2.
+			 */
+			if ((spec->cipher_type == type_block) &&
+			    ((rec_sz & (spec->cipher_bsize - 1)) != 0)) {
+#ifdef	DEBUG
+				cmn_err(CE_WARN, "kssl_handle_record: "
+				    "bad record size");
+#endif	/* DEBUG */
+				KSSL_COUNTER(record_decrypt_failure, 1);
+				mp->b_rptr = recend;
+				desc = decrypt_error;
+				goto makealert;
+			}
+
 			cipher_data.cd_format = CRYPTO_DATA_RAW;
 			cipher_data.cd_offset = 0;
 			cipher_data.cd_length = rec_sz;
@@ -802,6 +820,22 @@ kssl_handle_any_record(kssl_ctx_t ctx, mblk_t *mp, mblk_t **decrmp,
 	spec = &ssl->spec[KSSL_READ];
 	mac_sz = spec->mac_hashsz;
 	if (spec->cipher_ctx != 0) {
+		/*
+		 * The record length must be a multiple of the
+		 * block size for block ciphers.
+		 */
+		if ((spec->cipher_type == type_block) &&
+		    ((rec_sz & (spec->cipher_bsize - 1)) != 0)) {
+#ifdef	DEBUG
+			cmn_err(CE_WARN, "kssl_handle_any_record: "
+			    "bad record size");
+#endif	/* DEBUG */
+			KSSL_COUNTER(record_decrypt_failure, 1);
+			mp->b_rptr = recend;
+			desc = decrypt_error;
+			goto sendalert;
+		}
+
 		spec->cipher_data.cd_length = rec_sz;
 		spec->cipher_data.cd_raw.iov_base = (char *)mp->b_rptr;
 		spec->cipher_data.cd_raw.iov_len = rec_sz;
