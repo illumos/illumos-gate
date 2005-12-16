@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,9 +37,6 @@
 #include	<string.h>
 #include	<sys/types.h>
 #include	<sys/stat.h>
-#include	<thread.h>
-#include	<pthread.h>
-#include	<synch.h>
 #include	<sys/smedia.h>
 #include	"smserver.h"
 
@@ -50,13 +47,9 @@ fatal(const char *fmt, ...)
 {
 	va_list		ap;
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
-
 	va_start(ap, fmt);
 	(void) vsyslog(LOG_DAEMON|LOG_CRIT, fmt, ap);
 	va_end(ap);
-
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 
 	exit(-1);
 }
@@ -66,13 +59,9 @@ quit(const char *fmt, ...)
 {
 	va_list		ap;
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
-
 	va_start(ap, fmt);
 	(void) vsyslog(LOG_DAEMON|LOG_ERR, fmt, ap);
 	va_end(ap);
-
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 
 	exit(0);
 }
@@ -83,13 +72,9 @@ noise(const char *fmt, ...)
 {
 	va_list		ap;
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
-
 	va_start(ap, fmt);
 	(void) vsyslog(LOG_DAEMON|LOG_WARNING, fmt, ap);
 	va_end(ap);
-
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 }
 
 void
@@ -97,14 +82,9 @@ warning(const char *fmt, ...)
 {
 	va_list		ap;
 
-
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
-
 	va_start(ap, fmt);
 	(void) vsyslog(LOG_DAEMON|LOG_WARNING, fmt, ap);
 	va_end(ap);
-
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 }
 
 
@@ -114,18 +94,13 @@ info(const char *fmt, ...)
 	extern int	verbose;
 	va_list		ap;
 
-
 	if (verbose == 0) {
 		return;
 	}
 
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
-
 	va_start(ap, fmt);
 	(void) vsyslog(LOG_DAEMON|LOG_INFO, fmt, ap);
 	va_end(ap);
-
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 }
 
 /*PRINTFLIKE2*/
@@ -136,18 +111,12 @@ debug(uint_t level, const char *fmt, ...)
 	va_list		ap;
 	char		dbgmsg[BUFSIZ];
 
-
-
 	if (level > debug_level) {
 		return;
 	}
-
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
 
 	(void) snprintf(dbgmsg, sizeof (dbgmsg), DEBUGMSG, level, fmt);
 	va_start(ap, fmt);
 	(void) vsyslog(LOG_DAEMON|LOG_DEBUG, dbgmsg, ap);
 	va_end(ap);
-
-	(void) pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 }

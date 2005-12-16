@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,8 +123,8 @@ typedef struct door_data {
 	cond_t		dd_cv;		/* client_door_descriptor cv */
 	cond_t		dd_cv_bind;	/* client door descriptor bind cv */
 	int32_t		dd_id;		/* for future use. To store unique id */
-	door_desc_t	dd_desc[2];	/* contains the client door and */
-					/* and death door decriptor */
+	door_desc_t	dd_desc[2];	/* [0] : Client Door descriptor */
+					/* [1] : Death Door decriptor */
 	thread_t	dd_thread;	/* thread bound to the client door */
 	door_cred_t	dd_cred;	/* credentials of client */
 	int32_t		dd_fd;		/* device file descriptor */
@@ -154,6 +154,12 @@ typedef struct door_data {
 	char		audit_text[128];
 	char		audit_text1[128];
 } door_data_t;
+
+/* Symbols to simplify access of door_data_t */
+#define	dd_cdoor	dd_desc[0]	/* Client Door descriptor */
+#define	dd_ddoor	dd_desc[1]	/* Death Door descriptor */
+#define	dd_cdoor_descriptor	dd_cdoor.d_data.d_desc.d_descriptor
+#define	dd_ddoor_descriptor	dd_ddoor.d_data.d_desc.d_descriptor
 
 typedef enum {
 	SMEDIA_CNUM_OPEN_FD = 0x1,

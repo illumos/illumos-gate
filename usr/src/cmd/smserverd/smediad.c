@@ -104,7 +104,7 @@
  * 	This is a predefined descriptor used by client to establish a
  * connection with the server. This descriptor is available to the client
  * as /var/adm/smedia_svc
- * The client uses the main door_descriptor to obtain a dedicated
+ * The client uses the main_door_descriptor to obtain a dedicated
  * client_door_descriptor for itself. The smedia_get_handle call communicates
  * to the server using the main_door_descriptor and obtains the
  * client_door_descriptor which is stored in the handle structure.
@@ -119,11 +119,14 @@
  *
  * death_door_descriptor:
  * ----------------------
- * 	The sole function of this door descriptor is to inform the server of
- * the untimely death of the client. This helps the server to do the necessary
- * cleanups.
+ * 	The sole function of this descriptor HAD been to inform the server of
+ * the untimely death of the client. This descriptor is no longer used, though
+ * it is still created, as libsmedia expects to use it.  This descriptor's
+ * service procedure had used pthread cancellation(5) to terminate the thread of
+ * the associated client_door_descriptor.  The client_door_descriptor now
+ * handles the scenarios where a door_call/client are aborted/terminated.
  *
- * main_server()
+ * main_servproc()
  * -------------
  *	This is the routine associated with the main_door_descriptor.
  * This is the routine that handles the smedia_get_handle() call
@@ -135,10 +138,9 @@
  * than the client process that obtained it.
  * In addition to the client_door_descriptor a death_door_descriptor is also
  * created by the main server and passed on to the client. The client does not
- * use the death_door_descriptor at all. It is there to inform the server in
- * case the client program were to exit without calling smedia_free_handle().
+ * use the death_door_descriptor.
  *
- * client_server()
+ * client_servproc()
  * ---------------
  *	This is the routine that handles the libsmedia calls of the
  * client. In the current implementation the server takes control of the
@@ -146,16 +148,16 @@
  * door descriptor as DOOR_PRIVATE.
  * The server runs only one thread per handle. This makes the implementation
  * simple as we do not have to use mutex to make the code MT safe.
- * The client_server thread has a data structure door_data_t associated with it.
+ * The server thread has a data structure door_data_t associated with it.
  *
  * door_data_t
  * -----------
- * This is the data structure that is created by the main_server when it
+ * This is the data structure that is created by the main_servproc when it
  * creates the client_door_descriptor. The door mechanism has a way to associate
  * a cookie with the door descriptor. door_data_t is the cookie for the
- * client-door_descriptor. This cookie is passed to the server function that
- * handles the clinet_door_descriptor calls. In our case it is the client_server
- * routine.
+ * client_door_descriptor. This cookie is passed to the server function that
+ * handles the client_door_descriptor calls. In our case it is the
+ * client_servproc routine.
  * The key elements of the door_data_t are the following:
  *
  *	dd_fd		file descriptor for the device.
@@ -172,7 +174,7 @@
  * cleanup()
  * ---------
  *	This routine frees up all the resources allocated for the client.
- * Resources inlcude the file descriptor, shared memory, threads.
+ * Resources include the file descriptor, shared memory, threads.
  *
  * shared memory
  * -------------
@@ -247,13 +249,13 @@ static int	server_door, server_fd;
 
 static int32_t do_uscsi_cmd(int32_t file, struct uscsi_cmd *uscsi_cmd,
 		int32_t flag);
-static void client_server(void *cookie, char *argp, size_t arg_size,
+static void client_servproc(void *cookie, char *argp, size_t arg_size,
 		door_desc_t *dp, uint_t ndesc);
 static void cleanup(door_data_t *);
 static void *init_server(void *);
 static int32_t scsi_reassign_block(int32_t fd, diskaddr_t);
 static int32_t get_mode_page(int32_t fd, uchar_t pc, uchar_t page_code,
-				uchar_t *md_data, uchar_t data_len);
+	uchar_t *md_data, uchar_t data_len);
 static int32_t get_device_type(char *v_name);
 static int32_t get_device_type_scsi(int32_t fd, struct scsi_inquiry *inq);
 
@@ -271,8 +273,8 @@ static int32_t get_media_capacity(int32_t fd, uint32_t *capacity,
 static int32_t scsi_ls120_format(uint_t fd, uint_t flavor, uint32_t capacity,
 			uint32_t blocksize);
 
-static void * my_server_thread(void *arg);
-static void my_create(door_info_t *dip);
+static void *sm_server_thread(void *arg);
+static void sm_door_server_create(door_info_t *dip);
 static void term_handler(int sig, siginfo_t *siginfo, void *sigctx);
 static void hup_handler(int sig, siginfo_t *siginfo, void *sigctx);
 static void sig_handler(int sig, siginfo_t *siginfo, void *sigctx);
@@ -423,7 +425,6 @@ xlate_cnum(smedia_callnumber_t cnum)
 smserver_info *
 smserverproc_get_serverinfo_1(void *argp, CLIENT *clnt)
 {
-
 	(void) mutex_lock(&svcstate_lock);
 	svcstate = _SERVED;
 	(void) mutex_unlock(&svcstate_lock);
@@ -436,8 +437,8 @@ smserverproc_get_serverinfo_1(void *argp, CLIENT *clnt)
 		(void) init_server(NULL);
 	}
 	if (server_data.sd_init_state != INIT_DONE) {
-		debug(1,
-"init_server did not do the job. init_state=%d\n", server_data.sd_init_state);
+		debug(1, "init_server did not do the job. "
+		    "init_state=%d\n", server_data.sd_init_state);
 		server_data.sd_init_state = INIT_NOT_DONE;
 		(void) mutex_unlock(&server_data.sd_init_lock);
 		server_info.status = -1;
@@ -529,8 +530,8 @@ get_device_type_scsi(int32_t fd, struct scsi_inquiry *inq)
 	ucmd.uscsi_rqbuf = rq_data;
 	ret_val = do_uscsi_cmd(fd, &ucmd, USCSI_READ|USCSI_RQENABLE);
 	if (ret_val || ucmd.uscsi_status) {
-		debug(5, "inquiry failed: %d - %d errno = %d\n",
-			ret_val, ucmd.uscsi_status, errno);
+		debug(5, "INQUIRY failed: rv = %d  uscsi_status = "
+		    "%d  errno = %d\n", ret_val, ucmd.uscsi_status, errno);
 		return (-1);
 	}
 
@@ -971,14 +972,13 @@ scsi_format(int32_t fd, uint_t flavor, uint_t mode)
 	return (0);
 }
 
-
 static int32_t
 scsi_media_status(int32_t fd)
 {
 	struct mode_header modeh;
 	struct uscsi_cmd ucmd;
 	union scsi_cdb  cdb;
-	int32_t	ret_val;
+	int32_t ret_val;
 	int32_t cur_status;
 	char rq_data[RQ_LEN];
 
@@ -1041,9 +1041,9 @@ scsi_zip_media_status(int32_t fd)
 	ucmd.uscsi_rqbuf = rq_data;
 	status = do_uscsi_cmd(fd, &ucmd, USCSI_READ|USCSI_RQENABLE);
 	if (status || ucmd.uscsi_status) {
-		debug(5,
-		"Catridge protect operation failed: %d - %d errno = %d\n",
-			status, ucmd.uscsi_status, errno);
+		debug(5, "Cartridge protect operation failed: "
+		    "rv = %d  uscsi_status = %d  errno = %d\n",
+		    status, ucmd.uscsi_status, errno);
 		return (-1);
 	}
 
@@ -1053,9 +1053,8 @@ scsi_zip_media_status(int32_t fd)
 	}
 	mode = data[PROTECT_MODE_OFFSET + NON_SENSE_HDR_LEN] & 0xF;
 
-	debug(5, "MODE %x\n", mode);
+	debug(5, "MODE 0x%x / %d.\n", mode, mode);
 
-	debug(5, "Mode = %d\n", mode);
 	switch (mode) {
 		case UNLOCK_MODE:
 			status = SM_WRITE_PROTECT_DISABLE;
@@ -1081,7 +1080,7 @@ scsi_zip_media_status(int32_t fd)
 	return (status);
 }
 
-int32_t
+static int32_t
 scsi_reassign_block(int32_t fd, diskaddr_t block)
 {
 	uchar_t data[8];
@@ -1119,16 +1118,16 @@ scsi_reassign_block(int32_t fd, diskaddr_t block)
 	return (0);
 }
 
-int32_t
+static int32_t
 get_mode_page(int32_t fd, uchar_t pc, uchar_t page_code,
-				uchar_t *md_data, uchar_t data_len)
+    uchar_t *md_data, uchar_t data_len)
 {
 	struct uscsi_cmd ucmd;
 	uchar_t cdb[12];
 	int32_t	ret_val;
 	char rq_data[RQ_LEN];
 
-	debug(10, "GET MODE PAGE CALLED \n");
+	debug(10, "MODE SENSE(6) - page_code = 0x%x\n", page_code);
 
 	(void) memset((void *) md_data, 0, sizeof (data_len));
 	(void) memset((void *) &ucmd, 0, sizeof (ucmd));
@@ -1136,7 +1135,6 @@ get_mode_page(int32_t fd, uchar_t pc, uchar_t page_code,
 	cdb[0] = SCMD_MODE_SENSE;
 	cdb[2] = (pc << 6) | page_code;
 	cdb[4] = data_len;
-
 
 	ucmd.uscsi_cdb = (caddr_t)&cdb;
 	ucmd.uscsi_cdblen = CDB_GROUP0;
@@ -1265,14 +1263,14 @@ scsi_zip_write_protect(int32_t fd, smwp_state_t *wp)
 		free(tmp_passwd);
 	}
 	if (status || ucmd.uscsi_status) {
-		debug(5,
-	"Catridge protect operation failed: status = %d - %d errno = %d\n",
-			status, ucmd.uscsi_status, errno);
-		    if ((rq_data[2] & 0xF) == KEY_ILLEGAL_REQUEST) {
+		debug(5, "Cartridge-protect operation failed: rv "
+		    "= %d  uscsi_status = %d  errno = %d\n", status,
+		    ucmd.uscsi_status, errno);
+		if ((rq_data[2] & 0xF) == KEY_ILLEGAL_REQUEST) {
 			if (rq_data[12] == 0x26) {
 				/* Wrong passwd */
-				debug(5,
-"Protection Request with wrong passwd. errno is being set to EACCES.\n");
+				debug(5, "Protection Request with wrong "
+				    "passwd. errno is being set to EACCES.\n");
 				errno = EACCES;
 			}
 		}
@@ -1290,26 +1288,58 @@ scsi_write_protect(int32_t fd, smwp_state_t *wp)
 	return (-1);
 }
 
+/*
+ * This thread becomes the server-side thread used in
+ * the implementation of a door_call between a client
+ * and the Client Door.
+ *
+ * This thread is customized both by the door_server_create(3c)
+ * function sm_door_server_create, as well as by itself.
+ *
+ * This thread needs to synchronize with the
+ * main_servproc[SMEDIA_CNUM_OPEN_FD] door_call in terms of
+ * both successful and failure scenarios.  main_servproc
+ * locks dd_lock before calling door_create.  This thread
+ * then attempts to lock, but will block until main_servproc
+ * has either created all doors it requires, or until a
+ * door_create has failed (door_create's return and the
+ * creation of an associated thread are asynchronous).
+ *
+ * If door_create failed, this thread will be able to obtain
+ * dd_lock and call pthread_exit.  If all door_create's succeed,
+ * this thread will obtain dd_lock and commence with
+ * customizing the thread's attributes.  door_bind is called to
+ * bind this thread to the per-door private thread pool, and
+ * main_servproc is cond_signal'd to avail it of this fact.
+ *
+ * Finally, this thread calls door_return, which causes it to
+ * commence its lifetime as a server-side thread in implementation
+ * of a Client Door door_call.
+ */
 static void *
-my_server_thread(void *arg)
+sm_server_thread(void *arg)
 {
 	door_data_t	*door_dp;
-	struct	sigaction act;
-	int	i, oldtype;
+	struct		sigaction act;
+	int		i;
+	int		err;
 
 	door_dp = (door_data_t *)arg;
 
 	if (door_dp == NULL) {
-		fatal("my_server_thread[%d]: argument is NULL!!\n",
-			pthread_self());
+		fatal("sm_server_thread[%d]: argument is NULL!!\n",
+		    pthread_self());
 		exit(-1);
 	}
-	/* Wait for door to be created */
 
+	/* Wait for Client Door to be created */
 	(void) mutex_lock(&door_dp->dd_lock);
-
-	if (door_dp->dd_desc[0].d_data.d_desc.d_descriptor == -1)
-		(void) cond_wait(&door_dp->dd_cv, &door_dp->dd_lock);
+	if (door_dp->dd_cdoor_descriptor < 0) {
+		debug(5, "sm_server_thread[%d]: door_create() failed",
+		    pthread_self());
+		(void) mutex_unlock(&door_dp->dd_lock);
+		pthread_exit((void *)-2);
+	}
 	(void) mutex_unlock(&door_dp->dd_lock);
 
 	for (i = 0; i < N_BADSIGS; i++) {
@@ -1318,134 +1348,203 @@ my_server_thread(void *arg)
 		act.sa_flags = SA_SIGINFO;
 		if (sigaction(badsigs[i], &act, NULL) == -1)
 			warning(gettext(SIGACT_FAILED), strsignal(badsigs[i]),
-				strerror(errno));
+			    strerror(errno));
 	}
 	if (sigemptyset(&door_dp->dd_newset) != 0)
 		warning(gettext("sigemptyset failed. errno = %d\n"),
-			errno);
-	if (pthread_sigmask(SIG_BLOCK, &door_dp->dd_newset, NULL) != 0)
-		warning(gettext("pthread_sigmask failed. errno = %d\n"),
-			errno);
+		    errno);
+	if ((err = pthread_sigmask(SIG_BLOCK, &door_dp->dd_newset, NULL)) != 0)
+		warning(gettext("pthread_sigmask failed = %d\n"), err);
 
-	/* Bind thread with pool associated with this door */
+	/* Bind thread with pool associated with Client Door */
 
-	if (door_bind(door_dp->dd_desc[0].d_data.d_desc.d_descriptor) < 0) {
+	if (door_bind(door_dp->dd_cdoor_descriptor) < 0) {
 		fatal("door_bind");
 		exit(-1);
 	}
-	debug(5, "thread 0x%x bound to the door %d.\n", pthread_self(),
-		door_dp->dd_desc[0].d_data.d_desc.d_descriptor);
+	debug(5, "thr[%d] bound to Client Door[%d]", pthread_self(),
+	    door_dp->dd_cdoor_descriptor);
+
 	/*
-	 * We ENABLE thread cancellation as default.
-	 * We will disable it whenever it is unsafe for thread to be cancelled.
-	 * For example if we are going to be holding locks, we will disable
-	 * thread cancellation.
+	 * Set these two cancellation(5) attributes.  Ensure that the
+	 * pthread we create has cancellation(5) DISABLED and DEFERRED,
+	 * as our implementation is based on this.  DEFERRED is the
+	 * default, but set it anyways, in case the defaults change in
+	 * the future.
 	 */
-	if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-		warning(gettext("pthread_setcancelstate failed. errno = %d\n"),
-			errno);
-	/*
-	 * Receipt of pthread_cancel should cause  immediate cancellation.
-	 */
-	if (pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &oldtype) != 0)
-		warning(gettext("pthread_setcanceltype failed. errno = %d\n"),
-			errno);
-	/*
-	 * Inform the main thread that bind is complete.
-	 */
+	if ((err = pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL)) != 0)
+		warning(gettext("pthread_setcancelstate(PTHREAD_CANCEL_DISABLE)"
+		    " failed = %d\n"), err);
+	if ((err = pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED,
+	    NULL)) != 0)
+		warning(gettext("pthread_setcanceltype(DEFERRED) "
+		    "failed = %d\n"), err);
+
+	/* Inform main_servproc that door_bind() is complete. */
 	(void) cond_signal(&door_dp->dd_cv_bind);
+
+	/*
+	 * Per doors protocol, transfer control to the doors-runtime in
+	 * order to make this thread available to answer future door_call()'s.
+	 */
 	(void) door_return(NULL, 0, NULL, 0);
-	warning(gettext("Exiting my_server_thread[%d]\n"), pthread_self());
 	return (NULL);
 }
 
+/*
+ * This function cleans up all per-connection resources.
+ *
+ * This function is called when the Client Door's service procedure
+ * (client_servproc) is called w/ DOOR_UNREF_DATA, which is the
+ * doors protocol convention stating that the number of file
+ * descriptors referring to this door has dropped to one.
+ * client_servproc is passed DOOR_UNREF_DATA because the Client Door
+ * was door_create'd with the DOOR_UNREF bitflag.
+ */
 static void
-cleanup(door_data_t	*door_dp)
+cleanup(door_data_t *door_dp)
 {
+	/* do door_revoke() of Death Door */
+	if (door_dp->dd_ddoor_descriptor >= 0) {
+		debug(1, "cleanup[%d]: door_revoke() Death Door[%d]",
+		    pthread_self(), door_dp->dd_ddoor_descriptor);
 
-	debug(5, "cleanup running for thread %d\n", door_dp->dd_thread);
-	if (door_dp->dd_desc[1].d_data.d_desc.d_descriptor >= 0)
-	    if (close(door_dp->dd_desc[1].d_data.d_desc.d_descriptor) < 0) {
-		warning(gettext(
-		"cleanup:close death door : door id = 0x%x, errno =%d"),
-			door_dp->dd_desc[1].d_data.d_desc.d_descriptor,
-			errno);
+		if (door_revoke(door_dp->dd_ddoor_descriptor) < 0) {
+			warning(gettext("cleanup[%d]: door_revoke() of Death "
+			    "Door(%d) failed = %d"), pthread_self(),
+			    door_dp->dd_ddoor_descriptor, errno);
+		} else {
+			door_dp->dd_ddoor_descriptor = -1;
+		}
 	}
-	if (door_dp->dd_buffd != -1) {
+
+	/* release memory that is shared between client and (our) server */
+	if (door_dp->dd_buffd >= 0) {
+		debug(1, "cleanup[%d]: release shared memory", pthread_self());
 		(void) munmap(door_dp->dd_buf, door_dp->dd_buf_len);
 		(void) close(door_dp->dd_buffd);
+
+		door_dp->dd_buffd = -1;
 		door_dp->dd_buf = NULL;
 		door_dp->dd_buf_len = 0;
 	}
 
-	/* close the device */
-	if (door_dp->dd_fd >= 0)
-	    if (close(door_dp->dd_fd) < 0) {
-		warning(gettext("cleanup:close fd failed. errno = %d\n"),
-			errno);
+	/* close the (target) device that the Client is operating on */
+	if (door_dp->dd_fd >= 0) {
+		debug(1, "cleanup[%d]: close(%d) target device", pthread_self(),
+		    door_dp->dd_fd);
+		if (close(door_dp->dd_fd) < 0) {
+			warning(gettext("cleanup[%d]: close() of target device"
+			    "failed = %d\n"), pthread_self(), errno);
+		}
 	}
-	if (door_dp->dd_thread != 0)
-	    if (pthread_cancel(door_dp->dd_thread) != 0)
-		warning(gettext("pthread_cancel failed. errno = %d\n"),
-			errno);
+
+	/*
+	 * Unbind the current thread from the Client Door's private
+	 * thread pool.
+	 */
+	debug(1, "cleanup[%d]: door_unbind() of Client Door[%d]",
+	    pthread_self(), door_dp->dd_cdoor_descriptor);
+	if (door_unbind() < 0)
+		warning("door_unbind() of Client Door[%d] failed = "
+		    "%d", door_dp->dd_cdoor_descriptor, errno);
+
+	/* Disallow any future requests to the Client Door */
+	if (door_dp->dd_cdoor_descriptor >= 0) {
+		debug(1, "cleanup[%d]: door_revoke() Client Door[%d]",
+		    pthread_self(), door_dp->dd_cdoor_descriptor);
+
+		if (door_revoke(door_dp->dd_cdoor_descriptor) < 0) {
+			warning(gettext("cleanup[%d]: door_revoke() of "
+			    "Client Door[%d] failed = %d"), pthread_self(),
+			    door_dp->dd_cdoor_descriptor, errno);
+		}
+	}
+
 	free(door_dp);
-	debug(5, "Exiting cleanup\n");
+	debug(5, "cleanup[%d] ...exiting\n", pthread_self());
 }
 
+/*
+ * This is the door_server_create(3c) function used to customize
+ * creation of the threads used in the handling of our daemon's
+ * door_call(3c)'s.
+ *
+ * This function is called synchronously as part of door_create(3c).
+ * Note that door_create(), however, is not synchronous; it can return
+ * with the created door file descriptor before any associated
+ * thread has been created.  As a result, synchronization is needed
+ * between door_create() caller and the created pthread.  This is
+ * needed both when each activity succeeds or when either activity
+ * fails.
+ *
+ * Specifically, this function ensures that each "connection"
+ * with the client creates only one thread in the per-door,
+ * private thread pool.  This function locks dd_threadlock and
+ * then calls pthread_create().  If that succeeds, dd_thread
+ * is assigned the thread id, and dd_threadlock is unlocked.
+ * Any per-connection door_create that causes control to flow
+ * to this function will eventually find that dd_thread is
+ * non-zero, and control will exit this function.
+ *
+ * In the current implementation, the door_create for the Client Door
+ * is called first, and the Death Door is door_create'd second.
+ * As a result, the following function can safely make the static
+ * assumption that the first door (within a connection) is the
+ * Client Door.  A connection's Client Door and Death Door share
+ * the same thread as well as the same door_data_t instance.
+ */
 static void
-my_create(door_info_t *dip)
+sm_door_server_create(door_info_t *dip)
 {
 	door_data_t	*door_dp;
 	pthread_t	tid;
 	pthread_attr_t	attr;
 	int		ret_val;
+	int		err;
 
 	if (dip == NULL) {
 		return;
 	}
 	door_dp = (door_data_t *)(uintptr_t)dip->di_data;
 
-	debug(10, "entering my_create\n");
+	debug(10, "sm_door_server_create[%d]: entering...\n", pthread_self());
 
 	/* create one thread for this door */
 
 	(void) mutex_lock(&door_dp->dd_threadlock);
 
 	if (door_dp->dd_thread != 0) {
-		debug(8, "Exiting my_create without creating thread.\n");
+		debug(8, "sm_door_server_create[%d]: Exiting without creating "
+		    "thread.\n", pthread_self());
 		(void) mutex_unlock(&door_dp->dd_threadlock);
 		return;
 	}
 
 	(void) pthread_attr_init(&attr);
-	if (pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM) != 0)
-		warning(gettext(
-		"pthread_attr_setscope failed. errno = %d\n"),
-			errno);
-	if (pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED) != 0)
-		warning(gettext(
-		"pthread_attr_setdetachstate failed. errno = %d\n"),
-			errno);
-	ret_val = pthread_create(&tid, &attr, my_server_thread,
-		(void *)(uintptr_t)(dip->di_data));
 
+	if ((err = pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM)) != 0)
+		warning(gettext("pthread_attr_setscope failed = %d\n"), err);
+	if ((err = pthread_attr_setdetachstate(&attr,
+	    PTHREAD_CREATE_DETACHED)) != 0)
+		warning(gettext("pthread_attr_setdetachstate failed = %d\n"),
+		    err);
+
+	ret_val = pthread_create(&tid, &attr, sm_server_thread,
+	    (void *)(uintptr_t)(dip->di_data));
 	if (ret_val != 0) {
-		warning(gettext(
-			"my_create[%d]:pthread_create failed. errno = %d\n"),
-				pthread_self(), errno);
+		warning(gettext("sm_door_server_create[%d]: pthread_create "
+		    "failed = %d\n"), pthread_self(), ret_val);
 		(void) mutex_unlock(&door_dp->dd_threadlock);
 		(void) pthread_attr_destroy(&attr);
 		return;
 	}
 	(void) pthread_attr_destroy(&attr);
 	door_dp->dd_thread = tid;
-	debug(5, "my_server_thread[%d] created.\n", tid);
 
 	(void) mutex_unlock(&door_dp->dd_threadlock);
-	debug(5,
-		"Exiting my_create[%d] after creating a thread.\n",
-		pthread_self());
-
+	debug(5, "Exiting sm_door_server_create[%d] after creating thr[%d].\n",
+	    pthread_self(), tid);
 }
 
 static void
@@ -1681,33 +1780,34 @@ set_protection_status(door_data_t *door_dp, smedia_services_t *req)
 }
 
 static int32_t
-set_shfd(door_data_t	*door_dp, int32_t fd, smedia_services_t *req)
+set_shfd(door_data_t *door_dp, int32_t fd, smedia_services_t *req)
 {
 	void	*fbuf;
-	int32_t	ret_val;
+	int32_t ret_val = 0;
 
-	if ((door_dp->dd_buffd != -1) &&
-		(door_dp->dd_buf != NULL)) {
-			ret_val = munmap(door_dp->dd_buf,
-				door_dp->dd_buf_len);
-			if (ret_val == -1)
-				warning(gettext(
-					"munmap failed. errno=%d\n"),
-						errno);
-			(void) close(door_dp->dd_buffd);
-			door_dp->dd_buffd = -1;
-			door_dp->dd_buf = 0;
-			door_dp->dd_buf_len = 0;
+	if ((door_dp->dd_buffd != -1) && (door_dp->dd_buf != NULL)) {
+		ret_val = munmap(door_dp->dd_buf, door_dp->dd_buf_len);
+		if (ret_val == -1)
+			warning(gettext("munmap failed. errno=%d\n"),
+			    errno);
+		(void) close(door_dp->dd_buffd);
+
+		door_dp->dd_buffd = -1;
+		door_dp->dd_buf = 0;
+		door_dp->dd_buf_len = 0;
 	}
+
 	fbuf = mmap(0, req->reqset_shfd.fdbuf_len,
-		PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-	if (fbuf == (char *)-1) {
+	    PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (fbuf == MAP_FAILED) {
+		ret_val = errno;
 		debug(5, "mmap failed. errno=%d\n", errno);
-		return (-1);
+		return (ret_val);
 	}
 	door_dp->dd_buffd = fd;
 	door_dp->dd_buf = fbuf;
 	door_dp->dd_buf_len = req->reqset_shfd.fdbuf_len;
+
 	return (0);
 }
 
@@ -1722,10 +1822,10 @@ reassign_block(door_data_t *door_dp, smedia_services_t *req)
 	uchar_t			mode_data[MD_LEN];
 
 	if (get_mode_page(door_dp->dd_fd, 0, 1,
-		mode_data, MD_LEN) < 0) {
+	    mode_data, MD_LEN) < 0) {
 		debug(5, "Mode sense failed\n");
 		ret_val =  scsi_reassign_block(door_dp->dd_fd,
-			req->reqreassign_block.blockno);
+		    req->reqreassign_block.blockno);
 		if (ret_val != 0)
 			return (-1);
 		return (0);
@@ -1821,8 +1921,33 @@ close_door_descs(door_desc_t *dp, uint_t ndesc)
 	}
 }
 
+/*
+ * This is a Death Door's service procedure.
+ *
+ * This procedure is a NOP because the Death Door functionality
+ * is no longer used and will be removed in the future.
+ */
+/*ARGSUSED*/
 static void
-client_server(void *cookie, char *argp, size_t arg_size,
+death_servproc(void *cookie, char *argp, size_t arg_size,
+    door_desc_t *dp, uint_t ndesc)
+{
+	debug(1, "death_servproc[%d]: argp = 0x%p  "
+	    "Death Door[%d]\n", pthread_self(), (void *)argp,
+	    ((door_data_t *)cookie)->dd_ddoor_descriptor);
+
+	(void) door_return(NULL, 0, NULL, 0);
+}
+
+/*
+ * This is a Client Door's service procedure.
+ *
+ * This procedure is specified in the door_create() of a Client Door,
+ * and its functionality represents the bulk of services that the
+ * rpc.smserverd daemon offers.
+ */
+static void
+client_servproc(void *cookie, char *argp, size_t arg_size,
     door_desc_t *dp, uint_t ndesc)
 {
 	smedia_services_t	*req;
@@ -1841,82 +1966,73 @@ client_server(void *cookie, char *argp, size_t arg_size,
 	union scsi_cdb		cdb;
 	int32_t			ret_val, err;
 	char			rq_data[RQ_LEN];
-	uint_t			expected_descs;
+	uint_t			nexpected_desc;
 	struct vtoc		vtoc;
 
 	door_dp = (door_data_t *)cookie;
 	req = (smedia_services_t *)((void *)argp);
 
-	debug(10, "Entering client server...\n");
+	debug(10, "client_servproc[%d]...\n", pthread_self());
 
 	if (argp == DOOR_UNREF_DATA) {
-		debug(5, "client_server[%d]...DOOR_UNREF_DATA\n",
-			pthread_self());
+		debug(5, "client_servproc[%d]: req = DOOR_UNREF_DATA\n",
+		    pthread_self());
 		debug(5, "Client has exited. Cleaning up resources\n");
+
 		(void) mutex_lock(&svcstate_lock);
 		svccount--;
 		(void) mutex_unlock(&svcstate_lock);
+
 		cleanup(door_dp);
-		(void) door_return(NULL, 0, NULL, 0);
+		return;
 	}
-	/*
-	 * we disable thread cancellation while holding locks.
-	 */
-	if (pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL) != 0)
-		warning(gettext("pthread_setcancelstate failed. errno = %d\n"),
-			errno);
+
 	(void) mutex_lock(&svcstate_lock);
 	svcstate = _SERVED;
 	(void) mutex_unlock(&svcstate_lock);
-	if (pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL) != 0)
-		warning(gettext("pthread_setcancelstate failed. errno = %d\n"),
-			errno);
 
 	rmsvc.in.cnum = req->in.cnum;
-	debug(5, "client_server[%d]...req = %s\n", pthread_self(),
-		xlate_cnum(req->in.cnum));
+	debug(5, "client_servproc[%d]: req = %s\n", pthread_self(),
+	    xlate_cnum(req->in.cnum));
 
 	/*
 	 * Our caller may have passed more descriptors than we expected.
 	 * If so, we silently close (and ignore) them.
 	 */
-	if (req->in.cnum == SMEDIA_CNUM_SET_SHFD)
-		expected_descs = 1;
-	else
-		expected_descs = 0;
-
-	if (ndesc > expected_descs)
-		close_door_descs(dp + expected_descs, ndesc - expected_descs);
+	nexpected_desc = (req->in.cnum == SMEDIA_CNUM_SET_SHFD) ? 1 : 0;
+	if (ndesc > nexpected_desc) {
+		close_door_descs(dp + nexpected_desc, ndesc - nexpected_desc);
+	}
 
 	switch (req->in.cnum) {
-
 	default:
-		debug(5, "unknown command %d\n", req->in.cnum);
+		debug(5, "client_servproc: unknown command %d\n", req->in.cnum);
 		door_ret_err(&reterror, ENOTSUP);
 		break;
 
-	case	SMEDIA_CNUM_SET_SHFD:
+	case SMEDIA_CNUM_SET_SHFD:
 		if (ndesc == 0)
 			door_ret_err(&reterror, EINVAL);
 		/*
-		 * If an 0ld mapping exists destroy it before creaing
-		 * a new map.
+		 * Allocate shared memory for this connection.
+		 * If this connection already has shared memory,
+		 * deallocate before doing the allocation.
 		 */
-		ret_val =
-			set_shfd(door_dp, dp->d_data.d_desc.d_descriptor, req);
+		ret_val = set_shfd(door_dp, dp->d_data.d_desc.d_descriptor,
+		    req);
 		if (ret_val == 0) {
 			reterror.cnum = SMEDIA_CNUM_SET_SHFD;
 			reterror.errnum = 0;
+
 			my_door_return((char *)&reterror,
 				sizeof (smedia_reterror_t), 0, 0);
 		} else {
 			(void) close(dp->d_data.d_desc.d_descriptor);
-			door_ret_err(&reterror, errno);
+			door_ret_err(&reterror, ret_val);
 		}
-
 		break;
 
-	case	SMEDIA_CNUM_RAW_READ:
+	case SMEDIA_CNUM_RAW_READ:
 		debug(10, " arg size = %d blk num=0x%x nbytes = 0x%x \n",
 			(int)arg_size,
 			(uint32_t)req->reqraw_read.blockno,
@@ -1948,15 +2064,13 @@ client_server(void *cookie, char *argp, size_t arg_size,
 		ucmd.uscsi_timeout = req->requscsi_cmd.uscsi_timeout;
 		ucmd.uscsi_rqlen = req->requscsi_cmd.uscsi_rqlen;
 		ucmd.uscsi_rqbuf = (caddr_t)&rmsvc.retuscsi_cmd.uscsi_rqbuf;
-		debug(5,
-		"USCSI CMD 0x%x requested.\n",
+		debug(5, "USCSI CMD 0x%x requested.\n",
 		    req->requscsi_cmd.uscsi_cdb[0]);
 		/*
 		 * Check the device type and invalid flags specified.
 		 * We permit operations only on CDROM devices types.
 		 */
-		errno = invalid_uscsi_operation(door_dp,
-				&ucmd);
+		errno = invalid_uscsi_operation(door_dp, &ucmd);
 		if (errno) {
 			door_ret_err(&reterror, errno);
 		}
@@ -1964,11 +2078,11 @@ client_server(void *cookie, char *argp, size_t arg_size,
 		if ((req->requscsi_cmd.uscsi_buflen) &&
 		    ((req->requscsi_cmd.uscsi_buflen > door_dp->dd_buf_len) ||
 		    (door_dp->dd_buf == NULL))) {
-			debug(5,
-	"uscsi_cmd failed: uscsi_buflen=0x%x dd_buf_len=0x%x dd_buf=0x%p\n",
-				req->requscsi_cmd.uscsi_buflen,
-				door_dp->dd_buf_len,
-				door_dp->dd_buf);
+			debug(5, "uscsi_cmd failed: uscsi_buflen=0x%x "
+			    "dd_buf_len=0x%x dd_buf=0x%p\n",
+			    req->requscsi_cmd.uscsi_buflen,
+			    door_dp->dd_buf_len,
+			    door_dp->dd_buf);
 			errno = EINVAL;
 			door_ret_err(&reterror, errno);
 		}
@@ -2043,15 +2157,15 @@ client_server(void *cookie, char *argp, size_t arg_size,
 
 		rmsvc.retget_device_info.sm_interface_type = IF_SCSI;
 
-		debug(5,
-	"Vendor name = %s\n", rmsvc.retget_device_info.sm_vendor_name);
-		debug(5,
-	"product name = %s\n", rmsvc.retget_device_info.sm_product_name);
-		debug(5,
-"Firmware revision = %s\n", rmsvc.retget_device_info.sm_firmware_version);
+		debug(5, "Vendor name = %s\n",
+		    rmsvc.retget_device_info.sm_vendor_name);
+		debug(5, "product name = %s\n",
+		    rmsvc.retget_device_info.sm_product_name);
+		debug(5, "Firmware revision = %s\n",
+		    rmsvc.retget_device_info.sm_firmware_version);
+
 		my_door_return((char *)&rmsvc.retget_device_info,
 			sizeof (smedia_retget_device_info_t), 0, 0);
-
 		break;
 
 	case	SMEDIA_CNUM_GET_MEDIUM_PROPERTY:
@@ -2070,9 +2184,8 @@ client_server(void *cookie, char *argp, size_t arg_size,
 			 * information from the SCMD_READ_FORMAT_CAP command.
 			 */
 
-			debug(5, "DKIOCGMEDIAINFO failed");
-
-			debug(5, "using SCMD_READ_FORMAT_CAP");
+			debug(5, "DKIOCGMEDIAINFO failed; using "
+			    "SCMD_READ_FORMAT_CAP");
 			ret_val = get_media_capacity(door_dp->dd_fd,
 			    &capacity, &blocksize);
 
@@ -2083,7 +2196,6 @@ client_server(void *cookie, char *argp, size_t arg_size,
 				debug(5, "SCMD_READ_FORMAT_CAP failed");
 				door_ret_err(&reterror, errno);
 			}
-
 		}
 		rmsvc.retget_medium_property.smprop.sm_blocksize =
 		    media_info.dki_lbsize;
@@ -2283,14 +2395,16 @@ client_server(void *cookie, char *argp, size_t arg_size,
 	}	/* end of switch */
 
 	debug(10, "Exiting client server...\n");
-
-
 	my_door_return((char *)&reterror, sizeof (smedia_reterror_t), 0, 0);
 }
 
+/*
+ * This is the service procedure for the door that is associated with
+ * the (doorfs) filesystem Door that is created at 'smedia_service'.
+ */
 /*ARGSUSED*/
 static void
-main_server(void *server_data, char *argp, size_t arg_size,
+main_servproc(void *server_data, char *argp, size_t arg_size,
     door_desc_t *dp, uint_t ndesc)
 {
 	smedia_services_t	*req;
@@ -2302,9 +2416,9 @@ main_server(void *server_data, char *argp, size_t arg_size,
 	struct	stat	stat;
 	door_desc_t	*didpp;
 	struct dk_cinfo dkinfo;
-	uint_t		expected_descs;
+	uint_t		nexpected_desc;
 
-	debug(10, "Entering main server[%d].\n", pthread_self());
+	debug(10, "Entering main_servproc[%d].\n", pthread_self());
 
 	didpp = dp;
 	(void) mutex_lock(&svcstate_lock);
@@ -2313,6 +2427,7 @@ main_server(void *server_data, char *argp, size_t arg_size,
 
 	reterror.cnum = SMEDIA_CNUM_ERROR;
 	reterror.errnum = SMEDIA_FAILURE;
+
 	if (argp == NULL) {
 		debug(5, "argp is NULL\n");
 		if (ndesc > 0)
@@ -2322,95 +2437,85 @@ main_server(void *server_data, char *argp, size_t arg_size,
 	}
 
 	req = (smedia_services_t *)((void *)argp);
+
 	retok.cnum = req->in.cnum;
 	retok.errnum = 0;
 
 	debug(5, "req = %s arg_size = 0x%x \n",
-		xlate_cnum(req->reqopen.cnum), arg_size);
+	    xlate_cnum(req->reqopen.cnum), arg_size);
 
 	/*
 	 * Our caller may have passed more descriptors than we expected.
 	 * If so, we silently close (and ignore) them.
 	 */
-	if (req->in.cnum == SMEDIA_CNUM_OPEN_FD)
-		expected_descs = 1;
-	else
-		expected_descs = 0;
-
-	if (ndesc > expected_descs)
-		close_door_descs(dp + expected_descs, ndesc - expected_descs);
+	nexpected_desc = (req->in.cnum == SMEDIA_CNUM_OPEN_FD) ? 1 : 0;
+	if (ndesc > nexpected_desc) {
+		close_door_descs(dp + nexpected_desc, ndesc - nexpected_desc);
+	}
 
 	switch (req->in.cnum) {
-
 	default:
-		debug(5, "unkmown command 0x%x\n", req->reqopen.cnum);
+		debug(5, "main_servproc: unknown command 0x%x\n",
+		    req->reqopen.cnum);
 		break;
 
-	case	SMEDIA_CNUM_PING:
+	case SMEDIA_CNUM_PING:
 		/*
 		 * This service is to indicate that server is up and
 		 * running. It is usually called from another instance of
 		 * server that is started.
 		 */
-
 		reterror.cnum = SMEDIA_CNUM_PING;
 		reterror.errnum = 0;
 		my_door_return((char *)&reterror,
-			sizeof (smedia_reterror_t), 0, 0);
+		    sizeof (smedia_reterror_t), 0, 0);
 		break;
 
 
-	case	SMEDIA_CNUM_OPEN_FD:
+	case SMEDIA_CNUM_OPEN_FD:
 
 		debug(5, "ndesc = %d\n", ndesc);
 		if (ndesc == 0) {
 			my_door_return((char *)&reterror,
-				sizeof (smedia_reterror_t), 0, 0);
+			    sizeof (smedia_reterror_t), 0, 0);
 		}
-		debug(5, "Checking descriptor 1\n");
+		debug(5, "Checking file descriptor of target device\n");
 		if (fstat(didpp->d_data.d_desc.d_descriptor, &stat) < 0) {
-			warning(gettext(
-			"main_server:fstat failed. errno = %d\n"),
-				errno);
+			warning(gettext("main_servproc:fstat failed. "
+			    "errno = %d\n"), errno);
 			(void) close(didpp->d_data.d_desc.d_descriptor);
 			my_door_return((char *)&reterror,
-				sizeof (smedia_reterror_t), 0, 0);
+			    sizeof (smedia_reterror_t), 0, 0);
 		}
 		debug(5, "descriptor = %d st_mode = 0x%lx\n",
-			didpp->d_data.d_desc.d_descriptor,
-			stat.st_mode);
+		    didpp->d_data.d_desc.d_descriptor,
+		    stat.st_mode);
 
 		/* Obtain the credentials of the user */
 		ret_val = door_cred(&door_credentials);
 		if (ret_val < 0) {
-			warning(gettext(
-			"main_server:door_cred failed. errno = %d\n"),
-				errno);
+			warning(gettext("main_servproc:door_cred "
+			    "failed. errno = %d\n"), errno);
 			(void) close(didpp->d_data.d_desc.d_descriptor);
 			my_door_return((char *)&reterror,
-				sizeof (smedia_reterror_t), 0, 0);
+			    sizeof (smedia_reterror_t), 0, 0);
 		}
 		if (ioctl(didpp->d_data.d_desc.d_descriptor, DKIOCINFO,
 			&dkinfo) == -1) {
-			warning(gettext(
-			"main_server:DKIOCINFO failed. errno = %d\n"),
-				errno);
+			warning(gettext("main_servproc:DKIOCINFO failed. "
+			    "errno = %d\n"), errno);
 			(void) close(didpp->d_data.d_desc.d_descriptor);
 			my_door_return((char *)&reterror,
-				sizeof (smedia_reterror_t), 0, 0);
+			    sizeof (smedia_reterror_t), 0, 0);
 		}
 
-		/*
-		 * create a separate thread to handle IO calls to this device.
-		 */
 		ddata = (door_data_t *)calloc(1, sizeof (door_data_t));
 		if (ddata == NULL) {
-			warning(gettext(
-			"main_server:calloc failed. errno = %d\n"),
-				errno);
+			warning(gettext("main_servproc:calloc failed. "
+			    "errno = %d\n"), errno);
 			(void) close(didpp->d_data.d_desc.d_descriptor);
 			my_door_return((char *)&reterror,
-				sizeof (smedia_reterror_t), 0, 0);
+			    sizeof (smedia_reterror_t), 0, 0);
 		}
 		ddata->dd_stat = stat;
 		ddata->dd_cred = door_credentials;
@@ -2420,57 +2525,82 @@ main_server(void *server_data, char *argp, size_t arg_size,
 		ddata->dd_buffd = -1;
 		ddata->dd_sector_size = 0;
 		ddata->dd_dkinfo = dkinfo;
-		debug(5, "ddata = %p \n", (void *)ddata);
+		debug(5, "ddata = 0x%p \n", (void *)ddata);
 
-		(void) door_server_create(my_create);
+		/* specify a function that'll customize our door threads */
+		(void) door_server_create(sm_door_server_create);
 		debug(5, "door_server_create called.\n");
 
 		(void) mutex_lock(&ddata->dd_lock);
 
-		ddata->dd_desc[0].d_data.d_desc.d_descriptor = door_create(
-		    client_server, (void *)ddata, DOOR_PRIVATE);
-		if (ddata->dd_desc[0].d_data.d_desc.d_descriptor < 0) {
-			warning(gettext(
-			"main_server:client door_create failed. errno = %d\n"),
-				errno);
+		/* create Client Door */
+		ddata->dd_cdoor_descriptor =
+		    door_create(client_servproc,
+		    (void *)ddata, DOOR_PRIVATE | DOOR_NO_CANCEL | DOOR_UNREF);
+
+		if (ddata->dd_cdoor_descriptor < 0) {
+			/* then door_create() failed */
+			int err = errno;
+
+			(void) mutex_unlock(&ddata->dd_lock);
+
+			warning(gettext("main_servproc: door_create of Client "
+			    "Door failed = %d\n"), err);
 			free(ddata);
+
+			/* close target device */
 			(void) close(didpp->d_data.d_desc.d_descriptor);
+			my_door_return((char *)&reterror,
+			    sizeof (smedia_reterror_t), 0, 0);
 		}
-		ddata->dd_desc[1].d_data.d_desc.d_descriptor =
-		    door_create(client_server, (void *)ddata, DOOR_UNREF);
-		if (ddata->dd_desc[1].d_data.d_desc.d_descriptor < 0) {
-			warning(gettext(
-			"main_server:death door_create failed. errno = %d\n"),
-				errno);
-			(void) close(
-				ddata->dd_desc[0].d_data.d_desc.d_descriptor);
-			free(ddata);
-			(void) close(didpp->d_data.d_desc.d_descriptor);
+
+		/* create Death Door */
+		ddata->dd_ddoor_descriptor =
+		    door_create(death_servproc, (void *)ddata,
+		    DOOR_REFUSE_DESC | DOOR_NO_CANCEL);
+		if (ddata->dd_ddoor_descriptor < 0) {
+			warning(gettext("main_servproc: door_create of Death "
+			    "Door failed = %d\n"), errno);
+		} else {
+			(void) door_setparam(ddata->dd_ddoor_descriptor,
+			    DOOR_PARAM_DATA_MAX, 0);
 		}
-		debug(5,
-		"Client door server 0x%0x and death door 0x%x created.\n",
-			ddata->dd_desc[0].d_data.d_desc.d_descriptor,
-			ddata->dd_desc[1].d_data.d_desc.d_descriptor);
-		ddata->dd_desc[0].d_attributes = (DOOR_DESCRIPTOR|DOOR_RELEASE);
-		ddata->dd_desc[1].d_attributes = (DOOR_DESCRIPTOR);
+
+		debug(5, "main_servproc[%d]: Client Door = %d, "
+		    "Death Door = %d", pthread_self(),
+		    ddata->dd_cdoor_descriptor, ddata->dd_ddoor_descriptor);
 
 		audit_init(ddata);
 
-		(void) cond_signal(&ddata->dd_cv);
+		/* wait until sm_server_thread does door_bind() */
 		(void) cond_wait(&ddata->dd_cv_bind, &ddata->dd_lock);
+
 		(void) mutex_unlock(&ddata->dd_lock);
-		debug(5, "retok.cnum = 0x%x\n", retok.cnum);
 
 		(void) mutex_lock(&svcstate_lock);
 		svccount++;
 		(void) mutex_unlock(&svcstate_lock);
-		my_door_return((char *)&retok, sizeof (smedia_reterror_t),
-			&ddata->dd_desc[0], 2);
 
+		if (ddata->dd_ddoor_descriptor < 0) {
+			/* Return only the Client Door to the client. */
+			ddata->dd_cdoor.d_attributes = (DOOR_DESCRIPTOR);
+			my_door_return((char *)&reterror,
+			    sizeof (smedia_reterror_t), &ddata->dd_desc[0], 1);
+		} else {
+			/*
+			 * Return the Client Door and Death Door
+			 * to the client.
+			 */
+			debug(5, "retok.cnum = 0x%x\n", retok.cnum);
+			ddata->dd_cdoor.d_attributes = (DOOR_DESCRIPTOR);
+			ddata->dd_ddoor.d_attributes = (DOOR_DESCRIPTOR);
+			my_door_return((char *)&retok,
+			    sizeof (smedia_reterror_t), &ddata->dd_desc[0], 2);
+		}
 		break;
 	}
 
-	debug(10, "exiting main server. \n");
+	debug(10, "exiting main_servproc. \n");
 	my_door_return((char *)&reterror, sizeof (smedia_reterror_t), 0, 0);
 }
 
@@ -2479,8 +2609,8 @@ static void
 term_handler(int sig, siginfo_t *siginfo, void *sigctx)
 {
 	warning(gettext("thread[%d]: Received signal %d. Ignoring it.\n"),
-		pthread_self(),
-		sig);
+	    pthread_self(),
+	    sig);
 }
 
 /* ARGSUSED */
@@ -2488,8 +2618,8 @@ static void
 hup_handler(int sig, siginfo_t *siginfo, void *sigctx)
 {
 	warning(gettext("thread[%d]: Received signal %d. Ignoring it.\n"),
-		pthread_self(),
-		sig);
+	    pthread_self(),
+	    sig);
 }
 
 /*ARGSUSED*/
@@ -2497,22 +2627,21 @@ static void
 sig_handler(int sig, siginfo_t *siginfo, void *sigctx)
 {
 	warning(gettext("thread[%d]: Received signal %d. Ignoring it.\n"),
-		pthread_self(),
-		sig);
+	    pthread_self(),
+	    sig);
 }
 
 /*ARGSUSED*/
 static void
 badsig_handler(int sig, siginfo_t *siginfo, void *sigctx)
 {
-
 	fatal(BADSIG_MSG, pthread_self(), sig, siginfo->si_addr,
-		siginfo->si_trapno,
-		siginfo->si_pc);
+	    siginfo->si_trapno,
+	    siginfo->si_pc);
 }
 
 /*ARGSUSED*/
-void *
+static void *
 init_server(void *argp)
 {
 	int	i, fd;
@@ -2567,7 +2696,7 @@ init_server(void *argp)
 		warning(gettext("setrlimit for fd's failed; %m\n"));
 	}
 
-	server_door = door_create(main_server, (void *)&server_data, 0);
+	server_door = door_create(main_servproc, (void *)&server_data, 0);
 	if (server_door == -1) {
 		debug(1, "main door_create");
 		exit(1);
@@ -2642,7 +2771,6 @@ server_exists()
 		(void) close(doorh);
 		return (0);
 	}
-
 	if (dinfo.di_attributes & DOOR_REVOKED) {
 		(void) close(doorh);
 		return (0);
@@ -2729,7 +2857,6 @@ closedown(void *arg)
 #else
 			return (NULL);
 #endif
-
 		if (svcstate == _IDLE && svccount == 0) {
 			int size;
 			int i, openfd = 0;
@@ -2941,7 +3068,7 @@ get_floppy_geom(int32_t fd, uint32_t capacity, struct dk_geom *dkgeom)
 
 }
 /* ARGSUSED */
-int32_t
+static int32_t
 scsi_floppy_format(int32_t fd, uint_t flavor, uint_t mode)
 {
 	struct uscsi_cmd ucmd;
@@ -3085,7 +3212,7 @@ scsi_floppy_format(int32_t fd, uint_t flavor, uint_t mode)
 
 
 /* ARGSUSED */
-int32_t
+static int32_t
 scsi_floppy_media_status(int32_t fd)
 {
 	struct mode_header_g1 modeh;
