@@ -153,6 +153,7 @@ single:
 	if (nofile)
 		goto single;
 	oflush();
+	fclose(stdout);
 	return (errs);
 }
 
