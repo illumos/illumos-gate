@@ -743,13 +743,13 @@ zfs_prop_set(zfs_handle_t *zhp, zfs_prop_t prop, const char *propval)
 		if (zfs_prop_get_int(zhp, ZFS_PROP_ZONED)) {
 			if (getzoneid() == GLOBAL_ZONEID) {
 				zfs_error(dgettext(TEXT_DOMAIN,
-				    "cannot set %s for '%s', "
+				    "cannot set %s for '%s': "
 				    "dataset is used in a non-global zone"),
 				    propname, zhp->zfs_name);
 				return (-1);
 			} else if (prop == ZFS_PROP_SHARENFS) {
 				zfs_error(dgettext(TEXT_DOMAIN,
-				    "cannot set %s for '%s', filesystems "
+				    "cannot set %s for '%s': filesystems "
 				    "cannot be shared in a non-global zone"),
 				    propname, zhp->zfs_name);
 				return (-1);
@@ -760,7 +760,7 @@ zfs_prop_set(zfs_handle_t *zhp, zfs_prop_t prop, const char *propval)
 			 * a globle zone. If not, something is wrong.
 			 */
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot set %s for '%s', dataset is "
+			    "cannot set %s for '%s': dataset is "
 			    "used in a non-global zone, but 'zoned' "
 			    "property is not set"),
 			    propname, zhp->zfs_name);
@@ -1781,9 +1781,37 @@ zfs_create(const char *path, zfs_type_t type,
 		zc.zc_objset_type = DMU_OST_ZFS;
 
 	if (type == ZFS_TYPE_VOLUME) {
+		/*
+		 * If we are creating a volume, the size and block size must
+		 * satisfy a few restraints.  First, the blocksize must be a
+		 * valid block size between SPA_{MIN,MAX}BLOCKSIZE.  Second, the
+		 * volsize must be a multiple of the block size, and cannot be
+		 * zero.
+		 */
 		if (size == 0) {
 			zfs_error(dgettext(TEXT_DOMAIN,
 			    "bad volume size '%s': cannot be zero"), sizestr);
+			return (-1);
+		}
+
+		if (blocksize < SPA_MINBLOCKSIZE ||
+		    blocksize > SPA_MAXBLOCKSIZE || !ISP2(blocksize)) {
+			zfs_error(dgettext(TEXT_DOMAIN,
+			    "bad volume block size '%s': "
+			    "must be power of 2 from %u to %uk"),
+			    blocksizestr,
+			    (uint_t)SPA_MINBLOCKSIZE,
+			    (uint_t)SPA_MAXBLOCKSIZE >> 10);
+			return (-1);
+		}
+
+		if (size % blocksize != 0) {
+			char buf[64];
+			zfs_nicenum(blocksize, buf, sizeof (buf));
+			zfs_error(dgettext(TEXT_DOMAIN,
+			    "bad volume size '%s': "
+			    "must be multiple of volume block size (%s)"),
+			    sizestr, buf);
 			return (-1);
 		}
 
@@ -1792,7 +1820,6 @@ zfs_create(const char *path, zfs_type_t type,
 	}
 
 	/* create the dataset */
-
 	ret = ioctl(zfs_fd, ZFS_IOC_CREATE, &zc);
 
 	if (ret == 0 && type == ZFS_TYPE_VOLUME)

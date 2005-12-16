@@ -59,17 +59,12 @@ typedef struct raidz_map {
 	uint64_t	rm_bigcols;
 	uint64_t	rm_asize;
 	int		rm_missing_child;
-	int		rm_type;
 	int		rm_firstdatacol;
 	raidz_col_t	rm_col[1];
 } raidz_map_t;
 
-#define	RAIDZ_SINGLE	0
-#define	RAIDZ_PARITY	1
-
 static raidz_map_t *
-vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
-	int raid_type)
+vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols)
 {
 	raidz_map_t *rm;
 	uint64_t b = zio->io_offset >> unit_shift;
@@ -79,20 +74,10 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 	uint64_t q, r, c, bc, col, acols, coff;
 	int firstdatacol;
 
-	switch (raid_type) {
-	case RAIDZ_SINGLE:
-		q = s / dcols;
-		r = s - q * dcols;
-		bc = r;
-		firstdatacol = 0;
-		break;
-	case RAIDZ_PARITY:
-		q = s / (dcols - 1);
-		r = s - q * (dcols - 1);
-		bc = r + !!r;
-		firstdatacol = 1;
-		break;
-	}
+	q = s / (dcols - 1);
+	r = s - q * (dcols - 1);
+	bc = r + !!r;
+	firstdatacol = 1;
 
 	acols = (q == 0 ? bc : dcols);
 
@@ -102,7 +87,6 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 	rm->rm_bigcols = bc;
 	rm->rm_asize = 0;
 	rm->rm_missing_child = -1;
-	rm->rm_type = raid_type;
 	rm->rm_firstdatacol = firstdatacol;
 
 	for (c = 0; c < acols; c++) {
@@ -133,22 +117,20 @@ vdev_raidz_map_alloc(zio_t *zio, uint64_t unit_shift, uint64_t dcols,
 		rm->rm_col[c].rc_data = (char *)rm->rm_col[c - 1].rc_data +
 		    rm->rm_col[c - 1].rc_size;
 
-	if (raid_type == RAIDZ_PARITY) {
-		/*
-		 * To prevent hot parity disks, switch the parity and data
-		 * columns every 1MB.
-		 */
-		ASSERT(rm->rm_cols >= 2);
-		ASSERT(rm->rm_col[0].rc_size == rm->rm_col[1].rc_size);
+	/*
+	 * To prevent hot parity disks, switch the parity and data
+	 * columns every 1MB.
+	 */
+	ASSERT(rm->rm_cols >= 2);
+	ASSERT(rm->rm_col[0].rc_size == rm->rm_col[1].rc_size);
 
-		if (zio->io_offset & (1ULL << 20)) {
-			col = rm->rm_col[0].rc_col;
-			o = rm->rm_col[0].rc_offset;
-			rm->rm_col[0].rc_col = rm->rm_col[1].rc_col;
-			rm->rm_col[0].rc_offset = rm->rm_col[1].rc_offset;
-			rm->rm_col[1].rc_col = col;
-			rm->rm_col[1].rc_offset = o;
-		}
+	if (zio->io_offset & (1ULL << 20)) {
+		col = rm->rm_col[0].rc_col;
+		o = rm->rm_col[0].rc_offset;
+		rm->rm_col[0].rc_col = rm->rm_col[1].rc_col;
+		rm->rm_col[0].rc_offset = rm->rm_col[1].rc_offset;
+		rm->rm_col[1].rc_col = col;
+		rm->rm_col[1].rc_offset = o;
 	}
 
 	zio->io_vsd = rm;
@@ -252,9 +234,6 @@ vdev_raidz_asize(vdev_t *vd, uint64_t psize)
 	uint64_t asize;
 	uint64_t cols = vd->vdev_children;
 
-	/*
-	 * These calculations assume RAIDZ_PARITY.
-	 */
 	asize = psize >> vd->vdev_ashift;
 	asize += (asize + cols - 2) / (cols - 1);
 	asize = P2ROUNDUP(asize, VDEV_RAIDZ_ALIGN) << vd->vdev_ashift;
@@ -288,8 +267,7 @@ vdev_raidz_io_start(zio_t *zio)
 	raidz_col_t *rc;
 	int c;
 
-	rm = vdev_raidz_map_alloc(zio, vd->vdev_ashift, vd->vdev_children,
-	    RAIDZ_PARITY);
+	rm = vdev_raidz_map_alloc(zio, vd->vdev_ashift, vd->vdev_children);
 
 	if (DVA_GET_GANG(ZIO_GET_DVA(zio))) {
 		ASSERT3U(rm->rm_asize, ==,

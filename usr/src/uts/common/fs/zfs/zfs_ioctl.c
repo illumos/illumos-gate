@@ -918,9 +918,12 @@ zfs_ioc_create(zfs_cmd_t *zc)
 		 * We're creating a new dataset.
 		 */
 		if (type == DMU_OST_ZVOL) {
-			if ((error = zvol_check_volsize(zc)) != 0)
-				return (error);
+
 			if ((error = zvol_check_volblocksize(zc)) != 0)
+				return (error);
+
+			if ((error = zvol_check_volsize(zc,
+			    zc->zc_volblocksize)) != 0)
 				return (error);
 		}
 		error = dmu_objset_create(zc->zc_name, type, NULL, cbfunc, zc);

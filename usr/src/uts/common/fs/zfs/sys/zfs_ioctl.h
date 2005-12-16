@@ -157,7 +157,7 @@ extern dev_info_t *zfs_dip;
 extern int zfs_secpolicy_write(const char *dataset, const char *, cred_t *cr);
 extern int zfs_busy(void);
 
-extern int zvol_check_volsize(zfs_cmd_t *zc);
+extern int zvol_check_volsize(zfs_cmd_t *zc, uint64_t blocksize);
 extern int zvol_check_volblocksize(zfs_cmd_t *zc);
 extern int zvol_get_stats(zfs_cmd_t *zc, objset_t *os);
 extern void zvol_create_cb(objset_t *os, void *arg, dmu_tx_t *tx);

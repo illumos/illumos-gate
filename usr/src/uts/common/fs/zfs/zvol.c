@@ -112,12 +112,14 @@ zvol_size_changed(zvol_state_t *zv, dev_t dev)
 }
 
 int
-zvol_check_volsize(zfs_cmd_t *zc)
+zvol_check_volsize(zfs_cmd_t *zc, uint64_t blocksize)
 {
 	if (zc->zc_volsize == 0)
 		return (EINVAL);
 
-	zc->zc_volsize = P2ROUNDUP(zc->zc_volsize, SPA_MAXBLOCKSIZE);
+	if (zc->zc_volsize % blocksize != 0)
+		return (EINVAL);
+
 #ifdef _ILP32
 	if (zc->zc_volsize - 1 > SPEC_MAXOFFSET_T)
 		return (EOVERFLOW);
@@ -408,15 +410,19 @@ zvol_set_volsize(zfs_cmd_t *zc)
 	dev_t dev = zc->zc_dev;
 	dmu_tx_t *tx;
 	int error;
-
-	if ((error = zvol_check_volsize(zc)) != 0)
-		return (error);
+	dmu_object_info_t doi;
 
 	mutex_enter(&zvol_state_lock);
 
 	if ((zv = zvol_minor_lookup(zc->zc_name)) == NULL) {
 		mutex_exit(&zvol_state_lock);
 		return (ENXIO);
+	}
+
+	if ((error = dmu_object_info(zv->zv_objset, ZVOL_OBJ, &doi)) != 0 ||
+	    (error = zvol_check_volsize(zc, doi.doi_data_block_size)) != 0) {
+		mutex_exit(&zvol_state_lock);
+		return (error);
 	}
 
 	if (zv->zv_readonly || (zv->zv_mode & DS_MODE_READONLY)) {
@@ -738,7 +744,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		efi.dki_length = sizeof (gpt) + sizeof (gpe);
 
 		gpt.efi_gpt_Signature = LE_64(EFI_SIGNATURE);
-		gpt.efi_gpt_Revision = LE_32(EFI_VERSION102);
+		gpt.efi_gpt_Revision = LE_32(EFI_VERSION_CURRENT);
 		gpt.efi_gpt_HeaderSize = LE_32(sizeof (gpt));
 		gpt.efi_gpt_FirstUsableLBA = LE_64(0ULL);
 		gpt.efi_gpt_LastUsableLBA =

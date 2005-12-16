@@ -1551,36 +1551,54 @@ set_callback(zfs_handle_t *zhp, void *data)
 	}
 
 	/*
-	 * If we're changing the volsize, and the volsize and reservation are
-	 * the same, then change the reservation as well.
+	 * If we're changing the volsize, make sure the value is appropriate,
+	 * and set the reservation if this is a non-sparse volume.
 	 */
 	if (cbp->cb_prop == ZFS_PROP_VOLSIZE &&
-	    zfs_get_type(zhp) == ZFS_TYPE_VOLUME &&
-	    zfs_prop_get_int(zhp, ZFS_PROP_VOLSIZE) ==
-	    zfs_prop_get_int(zhp, ZFS_PROP_RESERVATION)) {
+	    zfs_get_type(zhp) == ZFS_TYPE_VOLUME) {
 		uint64_t volsize = zfs_prop_get_int(zhp, ZFS_PROP_VOLSIZE);
 		uint64_t avail = zfs_prop_get_int(zhp, ZFS_PROP_AVAILABLE);
+		uint64_t reservation = zfs_prop_get_int(zhp,
+		    ZFS_PROP_RESERVATION);
+		uint64_t blocksize = zfs_prop_get_int(zhp,
+		    ZFS_PROP_VOLBLOCKSIZE);
 		uint64_t value;
 
 		verify(zfs_nicestrtonum(cbp->cb_value, &value) == 0);
 
-		/*
-		 * Warn about raising the volume size greater than the amount of
-		 * available space.
-		 */
-		if (value > volsize && (value - volsize) > avail) {
-			(void) fprintf(stderr, gettext("cannot set "
-			    "%s property for '%s': volume size exceeds "
-			    "amount of available space\n"),
-			    cbp->cb_propname, zfs_get_name(zhp));
+		if (value % blocksize != 0) {
+			char buf[64];
+
+			zfs_nicenum(blocksize, buf, sizeof (buf));
+			(void) fprintf(stderr, gettext("cannot set %s for "
+			    "'%s': must be a multiple of volume block size "
+			    "(%s)\n"), cbp->cb_propname, zfs_get_name(zhp),
+			    buf);
 			return (1);
 		}
 
-		if (zfs_prop_set(zhp, ZFS_PROP_RESERVATION,
-		    cbp->cb_value) != 0) {
-			(void) fprintf(stderr, gettext("volsize and "
-			    "reservation must remain equal\n"));
+		if (value == 0) {
+			(void) fprintf(stderr, gettext("cannot set %s for "
+			    "'%s': cannot be zero\n"), cbp->cb_propname,
+			    zfs_get_name(zhp));
 			return (1);
+		}
+
+		if (volsize == reservation) {
+			if (value > volsize && (value - volsize) > avail) {
+				(void) fprintf(stderr, gettext("cannot set "
+				    "%s property for '%s': volume size exceeds "
+				    "amount of available space\n"),
+				    cbp->cb_propname, zfs_get_name(zhp));
+				return (1);
+			}
+
+			if (zfs_prop_set(zhp, ZFS_PROP_RESERVATION,
+			    cbp->cb_value) != 0) {
+				(void) fprintf(stderr, gettext("volsize and "
+				    "reservation must remain equal\n"));
+				return (1);
+			}
 		}
 	}
 
