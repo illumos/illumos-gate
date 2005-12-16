@@ -1,11 +1,10 @@
-#!/bin/sh -- # This comment tells perl not to loop!
+#!/usr/bin/perl -w
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,114 +19,49 @@
 #
 # CDDL HEADER END
 #
+
 #
-eval 'exec perl -S $0 "$@"'
-if 0;
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright (c) 1991-1997 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # jstyle - check for some common stylistic errors.
 #
-#	jstyle is a sort of "lint" for Java coding style.
-#
-#	There's a lot this can't check for, like proper
-#	indentation of continuation lines.  There's also
-#	a lot more this could check for.
-#
-#	A note to the non perl literate:
-#
-#		perl regular expressions are pretty much like egrep
-#		regular expressions, with the following special symbols
-#
-#		\s	any space character
-#		\S	any non-space character
-#		\w	any "word" character [a-zA-Z0-9_]
-#		\W	any non-word character
-#		\d	a digit [0-9]
-#		\D	a non-digit
-#		\b	word boundary (between \w and \W)
-#		\B	non-word boundary
-#
-#require "getopts.pl";
-# XXX - because some versions of perl can not find the lib directory,
-# we just include this here.
-;# getopts.pl - a better getopt.pl
 
-;# Usage:
-;#      do Getopts("a:bc");  # -a takes arg. -b & -c not. Sets opt_* as a
-;#                           #  side effect.
+require 5.006;
+use Getopt::Std;
+use strict;
 
-sub Getopts {
-    local($argumentative) = @_;
-    local(@args,$_,$first,$rest);
-    local($[) = 0;
-    local($errs) = 0;
-
-    @args = split( / */, $argumentative );
-    while(($_ = $ARGV[0]) =~ /^-(.)(.*)/) {
-	($first,$rest) = ($1,$2);
-	$pos = index($argumentative,$first);
-	if($pos >= $[) {
-	    if($args[$pos+1] eq ":") {
-		shift(@ARGV);
-		if($rest eq "") {
-		    $rest = shift(@ARGV);
-		}
-		eval "\$opt_$first = \$rest;";
-	    }
-	    else {
-		eval "\$opt_$first = 1";
-		if($rest eq "") {
-		    shift(@ARGV);
-		}
-		else {
-		    $ARGV[0] = "-$rest";
-		}
-	    }
-	}
-	else {
-	    print STDERR "Unknown option: $first\n";
-	    ++$errs;
-	    if($rest ne "") {
-		$ARGV[0] = "-$rest";
-	    }
-	    else {
-		shift(@ARGV);
-	    }
-	}
-    }
-    $errs == 0;
-}
-
-1;
-# end of getopts.pl
-
-$usage =
-"usage: jstyle [-c] [-h] [-p] [-s] [-t] [-v] [-C] file ...
+my $usage =
+"usage: jstyle [-c] [-h] [-p] [-t] [-v] [-C] file ...
 	-c	check continuation line indenting
 	-h	perform heuristic checks that are sometimes wrong
 	-p	perform some of the more picky checks
-	-s	check for spaces vs. tabs
 	-t	insist on indenting by tabs
 	-v	verbose
 	-C	don't check anything in header block comments
 ";
 
-if (!&Getopts("chpstvC")) {
+my %opts;
+
+# Keep -s, as it's been around for a while.  It just doesn't do anything
+# anymore.
+if (!getopts("chpstvC", \%opts)) {
 	print $usage;
 	exit 1;
 }
 
-$check_continuation = $opt_c;
-$heuristic = $opt_h;
-$picky = $opt_p;
-$spaces = $opt_s;
-$tabs = $opt_t;
-$verbose = $opt_v;
-$ignore_hdr_comment = $opt_C;
+my $check_continuation = $opts{'c'};
+my $heuristic = $opts{'h'};
+my $picky = $opts{'p'};
+my $tabs = $opts{'t'};
+my $verbose = $opts{'v'};
+my $ignore_hdr_comment = $opts{'C'};
+
+my ($filename, $line, $prev);
+
+my $fmt;
 
 if ($verbose) {
 	$fmt = "%s: %d: %s\n%s\n";
@@ -136,36 +70,50 @@ if ($verbose) {
 }
 
 # Note, following must be in single quotes so that \s and \w work right.
-$typename = '(int|char|boolean|byte|short|long|float|double)';
+my $typename = '(int|char|boolean|byte|short|long|float|double)';
+my $keywords = '(for|if|while|switch|return|catch|synchronized|throw|assert)';
+# See perlre(1) for the meaning of (??{ ... })
+my $annotations = ""; $annotations = qr/@\w+\((?:(?>[^()]+)|(??{ $annotations }))*\)/;
+my $generics = ""; $generics = qr/<(([\s\w,.?[\]]| & )+|(??{ $generics }))*>/;
+my $relationalops = qr/>=|<=|<|>|!=|==/;
+my $shiftops = qr/<<<|>>>|<<|>>/;
+my $shiftassignmentops = qr/[<>]{2,3}=/;
+my $assignmentops = qr/[-+\/*|&^%]?=/;
+# These need to be in decreasing order of length
+my $allops = qr/$shiftassignmentops|$shiftops|$relationalops|$assignmentops/;
 
 if ($#ARGV >= 0) {
-	foreach $arg (@ARGV) {
+	foreach my $arg (@ARGV) {
 		if (!open(STDIN, $arg)) {
 			printf "%s: can not open\n", $arg;
 		} else {
 			&jstyle($arg);
+			close STDIN;
 		}
 	}
 } else {
 	&jstyle("<stdin>");
 }
 
-sub err {
+sub err($) {
 	printf $fmt, $filename, $., $_[0], $line;
 }
 
-sub jstyle {
+sub jstyle($) {
 
-$in_comment = 0;
-$in_header_comment = 0;
-$in_continuation = 0;
-$in_class = 0;
-$in_declaration = 0;
-$note_level = 0;
-$nextok = 0;
-$nocheck = 0;
-$expect_continuation = 0;
-$prev = '';
+my $in_comment = 0;
+my $in_header_comment = 0;
+my $in_continuation = 0;
+my $in_class = 0;
+my $in_declaration = 0;
+my $nextok = 0;
+my $nocheck = 0;
+my $expect_continuation = 0;
+my $continuation_indent;
+my $okmsg;
+my $comment_prefix;
+my $comment_done;
+my $cpp_comment;
 
 $filename = $_[0];
 
@@ -191,7 +139,7 @@ line: while (<STDIN>) {
 	# a /*JSTYLED*/ comment indicates that the next line is ok.
 	if ($nextok) {
 		if ($okmsg) {
-			do err($okmsg);
+			err($okmsg);
 		}
 		$nextok = 0;
 		$okmsg = 0;
@@ -220,7 +168,7 @@ line: while (<STDIN>) {
 		# fit on the line.
 		if (!/^$continuation_indent    \S/ &&
 		    !/^$continuation_indent\t\S/ && !/^\s*"/) {
-			do err("continuation line improperly indented");
+			err("continuation line improperly indented");
 		}
 		$expect_continuation = 0;
 	}
@@ -255,46 +203,41 @@ line: while (<STDIN>) {
 		next line;
 	}
 
-	if (!$spaces) {
-		# strip trailing spaces
-		s/\s*$//;
+	if ($comment_done) {
+		$in_comment = 0;
+		$in_header_comment = 0;
+		$comment_done = 0;
 	}
-
 	# does this looks like the start of a block comment?
-	if (/^\s*\/\*(\*|)$/) {
-		if (!/^(\t|    )*\/\*(\*|)$/) {
-			do err("block comment not indented properly");
+	if (/^\s*\/\*/ && !/^\s*\/\*.*\*\//) {
+		if (/^\s*\/\*./ && !/^\s*\/\*\*$/) {
+			err("improper first line of block comment");
+		}
+		if (!/^(\t|    )*\/\*/) {
+			err("block comment not indented properly");
 		}
 		$in_comment = 1;
-		s/\/\*(\*|)/ /;
-		$comment_prefix = $_;
-		if ($comment_prefix eq " ") {
-			$in_header_comment = 1;
-		}
-		$prev = $line;
-		next line;
-	}
-	if (/^\s*\/\*./ && !/^\s*\/\*\*$/ && !/^\s*\/\*.*\*\//) {
-		do err("improper first line of block comment");
-		# it's a bad one, but it still is one.
-		# avoid ripple effect of not recognizing this.
-		if (!/^(\t|    )*\/\*(\*|)/) {
-			do err("block comment not indented properly");
-		}
-		$in_comment = 1;
-		s/\/\*.*/ /;
-		$comment_prefix = $_;
-		if ($comment_prefix eq " ") {
+		/^(\s*)\//;
+		$comment_prefix = $1;
+		if ($comment_prefix eq "") {
 			$in_header_comment = 1;
 		}
 		$prev = $line;
 		next line;
 	}
 	# are we still in the block comment?
-	if ($in_comment && !/^$comment_prefix\*/) {
-		# assume out of comment
-		$in_comment = 0;
-		$in_header_comment = 0;
+	if ($in_comment) {
+		if (/^$comment_prefix \*\/$/) {
+			$comment_done = 1;
+		} elsif (/\*\//) {
+			$comment_done = 1;
+			err("improper block comment close")
+			    unless ($ignore_hdr_comment && $in_header_comment);
+		} elsif (!/^$comment_prefix \*[ \t]/ &&
+		    !/^$comment_prefix \*$/) {
+			err("improper block comment")
+			    unless ($ignore_hdr_comment && $in_header_comment);
+		}
 	}
 
 	if ($in_header_comment && $ignore_hdr_comment) {
@@ -309,55 +252,45 @@ line: while (<STDIN>) {
 	if ($line =~ tr/\t/\t/ * 7 + length($line) > 80) {
 		# yes, there is a chance.
 		# replace tabs with spaces and check again.
-		$eline = $line;
+		my $eline = $line;
 		1 while $eline =~
 		    s/\t+/' ' x (length($&) * 8 - length($`) % 8)/e;
 		if (length($eline) > 80) {
-			do err("line > 80 characters");
+			err("line > 80 characters");
 		}
 	}
-#	this is the fastest way to check line length,
-#	but it doesnt work with perl 3.0.
-#	if ($line =~ tr/\t/\t/ * 7 + length($line) > 80) {
-#		$pos = $oldp = $p = 0;
-#		while (($p = index($line, "\t", $p)) >= 0) {
-#			$pos = ($pos + $p - $oldp + 8) & ~7;
-#			$oldp = ++$p;
-#		}
-#		$pos += length($line) - $oldp;
-#		if ($pos > 80) {
-#			do err("line > 80 characters");
-#		}
-#	}
 
 	# allow spaces to be used to draw pictures in header comments.
-	if ($spaces && /[^ ]     / && !/".*     .*"/ && !$in_header_comment) {
-		do err("spaces instead of tabs");
+	if (/[^ ]     / && !/".*     .*"/ && !$in_header_comment) {
+		err("spaces instead of tabs");
 	}
 	if ($tabs && /^ / && !/^ \*[ \t\/]/ && !/^ \*$/ &&
 	    (!/^    \w/ || $in_class != 0)) {
-		do err("indent by spaces instead of tabs");
+		err("indent by spaces instead of tabs");
 	}
 	if (!$in_comment && (/^(\t    )* {1,3}\S/ || /^(\t    )* {5,7}\S/) &&
 	    !(/^\s*[-+|&\/?:=]/ || ($prev =~ /,\s*$/))) {
-		do err("indent not a multiple of 4");
+		err("indent not a multiple of 4");
 	}
-	if ($spaces && /\s$/) {
-		do err("space or tab at end of line");
+	if (/\s$/) {
+		err("space or tab at end of line");
 	}
 if (0) {
 	if (/^[\t]+ [^ \t\*]/ || /^[\t]+  \S/ || /^[\t]+   \S/) {
-		do err("continuation line not indented by 4 spaces");
+		err("continuation line not indented by 4 spaces");
 	}
 }
-	if (/[^ \t(]\/\*/ && !/\w\(\/\*.*\*\/\);/) {
-		do err("comment preceded by non-blank");
+	if (/\/\//) {
+		$cpp_comment = 1;
 	}
-	if ($spaces && /\t[ ]+\t/) {
-		do err("spaces between tabs");
+	if (!$cpp_comment && /[^ \t(\/]\/\*/ && !/\w\(\/\*.*\*\/\);/) {
+		err("comment preceded by non-blank");
 	}
-	if ($spaces && / [\t]+ /) {
-		do err("tabs between spaces");
+	if (/\t +\t/) {
+		err("spaces between tabs");
+	}
+	if (/ \t+ /) {
+		err("tabs between spaces");
 	}
 
 	if ($in_comment) {	# still in comment
@@ -365,27 +298,33 @@ if (0) {
 		next line;
 	}
 
-	if ((/\/\*\S/ && !/\/\*\*/) || /\/\*\*\S/) {
-		do err("missing blank after open comment");
+	if (!$cpp_comment && ((/\/\*\S/ && !/\/\*\*/) || /\/\*\*\S/)) {
+		err("missing blank after open comment");
 	}
-	if (/\S\*\//) {
-		do err("missing blank before close comment");
-	}
-	# allow // at beginnging of line, often used to comment out code
-	if (/.\/\/\S/) {		# C++ comments
-		do err("missing blank after start comment");
+	if (!$cpp_comment && /\S\*\//) {
+		err("missing blank before close comment");
 	}
 	# check for unterminated single line comments.
 	if (/\S.*\/\*/ && !/\S.*\/\*.*\*\//) {
-		do err("unterminated single line comment");
+		err("unterminated single line comment");
 	}
 
-	# delete any comments and check everything else.
-	s/\/\*.*\*\///g;
+	# delete any comments and check everything else.  Be sure to leave
+	# //-style comments intact, and if there are multiple comments on a
+	# line, preserve whatever's in between.
+	s/(?<!\/)\/\*.*?\*\///g;
+	# Check for //-style comments only outside of block comments
+	if (m{(//(?!$))} && substr($_, $+[0], 1) !~ /[ \t]/) {
+		err("missing blank after start comment");
+	}
 	s/\/\/.*$//;		# C++ comments
+	$cpp_comment = 0;
 
 	# delete any trailing whitespace; we have already checked for that.
 	s/\s*$//;
+
+	# We don't style (yet) what's inside annotations, so just delete them.
+	s/$annotations//;
 
 	# following checks do not apply to text in comments.
 
@@ -406,95 +345,112 @@ if (0) {
 			$continuation_indent = $1;
 		}
 	}
-	if (/[^<>\s][!<>=]=/ || /[^<>][!<>=]=\S/ ||
-	    (/[^->]>[^=>\s]/ && !/[^->]>$/) || (/[^<]<[^=<\s]/ && !/[^<]<$/) ||
-	    /[^<\s]<[^<]/ || /[^->\s]>[^>]/) {
-		do err("missing space around relational operator");
-	}
-	if (/\S>>=/ || /\S<<=/ || />>=\S/ || /<<=\S/ || /\S[-+*\/&|^%]=/ ||
-	    (/[^-+*\/&|^%!<>=\s]=[^=]/ && !/[^-+*\/&|^%!<>=\s]=$/) ||
-	    (/[^!<>=]=[^=\s]/ && !/[^!<>=]=$/)) {
-		do err("missing space around assignment operator");
+	while (/($allops)/g) {
+		my $z = substr($_, $-[1] - 1);
+		if ($z !~ /\s\Q$1\E(?:\s|$)/) {
+			my $m = $1;
+			my $shift;
+			# @+ is available only in the currently active
+			# dynamic scope.  Assign it to a new variable
+			# to pass it into the if block.
+			if ($z =~ /($generics)/ &&
+			    ($shift = $+[1])) {
+				pos $_ += $shift;
+				next;
+			}
+
+			# These need to be in decreasing order of length
+			# (violable as long as there's no ambiguity)
+			my $nospace = "missing space around";
+			if ($m =~ $shiftassignmentops) {
+				err("$nospace assignment operator");
+			} elsif ($m =~ $shiftops) {
+				err("$nospace shift operator");
+			} elsif ($m =~ $relationalops) {
+				err("$nospace relational operator");
+			} elsif ($m =~ $assignmentops) {
+				err("$nospace assignment operator");
+			}
+		}
 	}
 	if (/[,;]\S/ && !/\bfor \(;;\)/) {
-		do err("comma or semicolon followed by non-blank");
+		err("comma or semicolon followed by non-blank");
 	}
 	# allow "for" statements to have empty "while" clauses
 	if (/\s[,;]/ && !/^[\t]+;$/ && !/^\s*for \([^;]*; ;[^;]*\)/) {
-		do err("comma or semicolon preceded by blank");
+		err("comma or semicolon preceded by blank");
 	}
 if (0) {
 	if (/^\s*(&&|\|\|)/) {
-		do err("improper boolean continuation");
+		err("improper boolean continuation");
 	}
 }
 	if ($picky && /\S   *(&&|\|\|)/ || /(&&|\|\|)   *\S/) {
-		do err("more than one space around boolean operator");
+		err("more than one space around boolean operator");
 	}
-	if (/\b(for|if|while|switch|return|case|catch|synchronized)\(/) {
-		do err("missing space between keyword and paren");
+	if (/\b$keywords\(/) {
+		err("missing space between keyword and paren");
 	}
-	if (/(\b(for|if|while|switch|return|catch|synchronized)\b.*){2,}/) {
-		# multiple "case" allowed
-		do err("more than one keyword on line");
+	if (/(\b$keywords\b.*){2,}/ && !/\bcase\b.*/) { # "case" excepted
+		err("more than one keyword on line");
 	}
-	if (/\b(for|if|while|switch|return|case|catch|synchronized)\s\s+\(/ &&
+	if (/\b$keywords\s\s+\(/ &&
 	    !/^#if\s+\(/) {
-		do err("extra space between keyword and paren");
+		err("extra space between keyword and paren");
 	}
 	# try to detect "func (x)" but not "if (x)" or
 	# "int (*func)();"
 	if (/\w\s\(/) {
-		$s = $_;
+		my $save = $_;
 		# strip off all keywords on the line
-		s/\b(for|if|while|switch|return|case|catch|synchronized)\s\(/XXX(/g;
+		s/\b$keywords\s\(/XXX(/g;
 		#s/\b($typename|void)\s+\(+/XXX(/og;
 		if (/\w\s\(/) {
-			do err("extra space between function name and left paren");
+			err("extra space between function name and left paren");
 		}
-		$_ = $s;
+		$_ = $save;
 	}
 	if (/\(\s/) {
-		do err("whitespace after left paren");
+		err("whitespace after left paren");
 	}
 	# allow "for" statements to have empty "continue" clauses
 	if (/\s\)/ && !/^\s*for \([^;]*;[^;]*; \)/) {
-		do err("whitespace before right paren");
+		err("whitespace before right paren");
 	}
 	if (/^\s*\(void\)[^ ]/) {
-		do err("missing space after (void) cast");
+		err("missing space after (void) cast");
 	}
 	if (/\S{/ && !/{{/) {
-		do err("missing space before left brace");
+		err("missing space before left brace");
 	}
 	if ($in_class && /^\s+{/ && ($prev =~ /\)\s*$/)) {
-		do err("left brace starting a line");
+		err("left brace starting a line");
 	}
 	if (/}(else|while)/) {
-		do err("missing space after right brace");
+		err("missing space after right brace");
 	}
 	if (/}\s\s+(else|while)/) {
-		do err("extra space after right brace");
+		err("extra space after right brace");
 	}
 	if (/\b$typename\*/o) {
-		do err("missing space between type name and *");
+		err("missing space between type name and *");
 	}
 	if ($heuristic) {
 		# cannot check this everywhere due to "struct {\n...\n} foo;"
 		if ($in_class && !$in_declaration &&
 		    /}./ && !/}\s+=/ && !/{.*}[;,]$/ && !/}(\s|)*$/ &&
 		    !/} (else|while)/ && !/}}/) {
-			do err("possible bad text following right brace");
+			err("possible bad text following right brace");
 		}
 		# cannot check this because sub-blocks in
 		# the middle of code are ok
 		if ($in_class && /^\s+{/) {
-			do err("possible left brace starting a line");
+			err("possible left brace starting a line");
 		}
 	}
 	if (/^\s*else\W/) {
 		if ($prev =~ /^\s*}$/) {
-			$str = "else and right brace should be on same line";
+			my $str = "else and right brace should be on same line";
 			printf $fmt, $filename, $., $str, $prev;
 			if ($verbose) {
 				printf "%s\n", $line;
@@ -505,7 +461,7 @@ if (0) {
 }
 
 if ($picky && $prev eq "") {
-	do err("last line in file is blank");
+	err("last line in file is blank");
 }
 
 }
