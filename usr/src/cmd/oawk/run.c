@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1095,39 +1095,53 @@ print(NODE **a, int n)
 	NODE *x;
 	CELL *y;
 	wchar_t s[RECSIZE];
-	wchar_t *ss, *bp, *ep;
+	wchar_t *ss, *bp, *ep, *os;
+	size_t	blen, newlen, sslen, orslen, ofslen, oslen;
 
 	s[0] = '\0';
 	bp = s;
 	ep = s + RECSIZE;
-	for (x=a[0]; x!=NULL; x=x->nnext) {
+
+	blen = 0;
+	orslen = wcslen(*ORS);
+	ofslen = wcslen(*OFS);
+
+	for (x = a[0]; x != NULL; x = x->nnext) {
 		y = execute(x);
 		ss = getsval(y);
-		/* allocate larger buffer if needed */
-		if (ep < bp + wslen(bp) + wslen(ss)) {
-			int newlen;
-			wchar_t *oldbp;
 
-			newlen = wslen(bp) + wslen(ss) + 1 + 1;
-			oldbp = bp;
-			bp = malloc(newlen * sizeof(wchar_t));
+		/* total new length will be */
+		sslen = wcslen(ss);
+		if (x->nnext == NULL) {
+			os = *ORS;
+			oslen = orslen;
+		} else {
+			os = *OFS;
+			oslen = ofslen;
+		}
+		newlen = blen + sslen + oslen;
+
+		/* allocate larger buffer if needed */
+		if (ep < (bp + newlen + 1)) {
+			wchar_t	*oldbp = bp;
+
+			if (oldbp == s)
+				bp = NULL;
+			bp = realloc(bp, sizeof (wchar_t) * (newlen + 1));
 			if (bp == NULL)
 				error(FATAL, "out of space in print");
-			ep = bp + newlen;
-			wscpy(bp, oldbp);
-			if (oldbp != s)
-				free(oldbp);
+			ep = bp + newlen + 1;
+			if (oldbp == s)
+				(void) wmemcpy(bp, oldbp, blen);
 		}
-		if (ss)
-			wscat(bp, ss);
+		(void) wmemcpy(bp + blen, ss, sslen);
+		(void) wmemcpy(bp + blen + sslen, os, oslen);
 		tempfree(y);
-		if (x->nnext == NULL)
-			wscat(bp, *ORS);
-		else
-			wscat(bp, *OFS);
+		blen = newlen;
+		bp[blen] = '\0';
 	}
-	if (a[1] == 0) {
-		printf("%ws", bp);
+	if (a[1] == NULL) {
+		(void) printf("%ws", bp);
 		if (bp != s)
 			free(bp);
 		return (true);
