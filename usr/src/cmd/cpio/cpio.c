@@ -67,6 +67,9 @@
 #include <dirent.h>
 #include <limits.h>
 #include <aclutils.h>
+#ifdef SOLARIS_PRIVS
+#include <priv.h>
+#endif	/* SOLARIS_PRIVS */
 
 /*
  * Special kludge for off_t being a signed quantity.
@@ -433,7 +436,8 @@ int	Append = 0,	/* Flag set while searching to end of archive */
 	Dflag = 0,
 	Atflag = 0,	/* Archive/restore extended attributes */
 	Compressed,	/* Flag to indicate if the bar archive is compressed */
-	Bar_vol_num = 0; /* Volume number count for bar archive */
+	Bar_vol_num = 0, /* Volume number count for bar archive */
+	privileged = 0;	/* Flag set if running with higher privileges */
 
 
 static
@@ -466,8 +470,6 @@ FILE	*Ef_p,			/* File pointer of pattern input file */
 
 static
 ushort_t	Ftype = S_IFMT;	/* File type mask */
-static
-uid_t	Euid;		/* Effective uid of invoker */
 
 /* ACL support */
 static struct sec_attr {
@@ -605,10 +607,13 @@ static void	write_ancillary(char *, int);
  * cpio has been changed so that it doesn't carry a second implementation of
  * the kernel's policy with respect to privileges.  Instead of attempting
  * to restore uid and gid from an archive only if cpio is run as uid 0,
- * cpio now *always* tries to restore the uid and gid from the archive.
- * If the restoration of the uid and gid are unsuccessful, then an error
- * message will only be received if cpio is being run with root privileges,
- * i.e., effective uid (euid) is 0, or if -R was specified.
+ * cpio now *always* tries to restore the uid and gid from the archive
+ * except when the -R option is specified.  When the -R is specified,
+ * the uid and gid of the restored file will be changed to those of the
+ * login id specified.  In addition, chown(), set_tym(), and chmod() should
+ * only be executed once during archive extraction, and to ensure
+ * setuid/setgid bits are restored properly, chown() should always be
+ * executed before chmod().
  *
  * Note regarding debugging mechanism for cpio:
  *
@@ -977,8 +982,8 @@ chgreel(int dir)
 	if ((statb.st_mode & S_IFMT) != S_IFCHR) {
 		if (dir == INPUT) {
 			msg(EXT, "%s%s\n",
-				"Can't read input:  end of file encountered ",
-				"prior to expected end of archive.");
+			    "Can't read input:  end of file encountered ",
+			    "prior to expected end of archive.");
 		}
 	}
 	msg(EPOST, "\007End of medium on \"%s\".", dir ? "output" : "input");
@@ -1138,6 +1143,10 @@ ckopts(long mask)
 	int oflag;
 	char *t_p;
 	long errmsk;
+	uid_t	Euid = geteuid();	/* Effective uid of invoker */
+#ifdef SOLARIS_PRIVS
+	priv_set_t *privset;
+#endif	/* SOLARIS_PRIVS */
 
 	if (mask & OCi) {
 		errmsk = mask & INV_MSK4i;
@@ -1156,7 +1165,7 @@ ckopts(long mask)
 	}
 
 	if ((mask & OCa) && (mask & OCm) && ((mask & OCi) ||
-		(mask & OCo))) {
+	    (mask & OCo))) {
 		msg(ERR, "-a and -m are mutually exclusive.");
 	}
 
@@ -1279,9 +1288,27 @@ ckopts(long mask)
 		}
 	}
 
+#ifdef SOLARIS_PRIVS
+	if ((privset = priv_allocset()) == NULL) {
+		msg(ERR, "Unable to allocate privilege set");
+	} else if (getppriv(PRIV_EFFECTIVE, privset) != 0) {
+		msg(ERR, "Unable to obtain privilege set");
+	} else {
+		privileged = (priv_isfullset(privset) == B_TRUE);
+	}
+	if (privset != NULL) {
+		priv_freeset(privset);
+	}
+#else
+	privileged = (Euid == 0);
+#endif	/* SOLARIS_PRIVS */
+
 	if (mask & OCR) {
 		if ((Rpw_p = getpwnam(Own_p)) == (struct passwd *)NULL) {
 			msg(ERR, "\"%s\" is not a valid user id", Own_p);
+		} else if ((Euid != Rpw_p->pw_uid) && !privileged) {
+			msg(ERR, "R option only valid for super-user or "
+			    "id matches login id of user executing cpio");
 		}
 	}
 
@@ -1580,45 +1607,38 @@ creat_lnk(int dirfd, char *name1_p, char *name2_p)
 			}
 			cnt = 0;
 			break;
-		} else if (errno == EEXIST) {
-			if (cnt == 0) {
-				struct stat lsb1;
-				struct stat lsb2;
+		} else if ((errno == EEXIST) && (cnt == 0)) {
+			struct stat lsb1;
+			struct stat lsb2;
 
-				/*
-				 * Check to see if we are trying to link this
-				 * file to itself.  If so, count the effort as
-				 * successful.  If the two files are different,
-				 * or if either lstat is unsuccessful, proceed
-				 * as we would have otherwise; the appropriate
-				 * error will be reported subsequently.
-				 */
+			/*
+			 * Check to see if we are trying to link this
+			 * file to itself.  If so, count the effort as
+			 * successful.  If the two files are different,
+			 * or if either lstat is unsuccessful, proceed
+			 * as we would have otherwise; the appropriate
+			 * error will be reported subsequently.
+			 */
 
-				if (lstat(name1_p, &lsb1) != 0) {
-					msg(ERR, "Cannot lstat source file %s",
-					    name1_p);
+			if (lstat(name1_p, &lsb1) != 0) {
+				msg(ERR, "Cannot lstat source file %s",
+				    name1_p);
+			} else {
+				if (lstat(name2_p, &lsb2) != 0) {
+					msg(ERR, "Cannot lstat "
+					    "destination file %s", name2_p);
 				} else {
-					if (lstat(name2_p, &lsb2) != 0) {
-						msg(ERR, "Cannot lstat "
-						    "destination file %s",
+					if (lsb1.st_dev == lsb2.st_dev &&
+					    lsb1.st_ino == lsb2.st_ino) {
+						VERBOSE((Args & (OCv | OCV)),
 						    name2_p);
-					} else {
-						if (lsb1.st_dev ==
-						    lsb2.st_dev &&
-						    lsb1.st_ino ==
-						    lsb2.st_ino) {
-							VERBOSE((Args &
-							    (OCv | OCV)),
-							    name2_p);
-							return (0);
-						}
+						return (0);
 					}
 				}
 			}
 
 			if (!(Args & OCu) && G_p->g_mtime <= DesSt.st_mtime)
-				msg(ERR,
-				    "Existing \"%s\" same age or newer",
+				msg(ERR, "Existing \"%s\" same age or newer",
 				    name2_p);
 			else if (unlinkat(dirfd, get_component(name2_p), 0) < 0)
 				msg(ERRN, "Error cannot unlink \"%s\"",
@@ -1694,7 +1714,15 @@ creat_spec(int dirfd)
 	 */
 
 	if (Hiddendir) {
-		if (fchownat(dirfd, ".", G_p->g_uid, G_p->g_gid, 0) != 0) {
+		if (Args & OCR) {
+			if (fchownat(dirfd, ".", Rpw_p->pw_uid,
+			    Rpw_p->pw_gid, 0) != 0) {
+				msg(ERRN,
+				    "Cannot chown() \"attribute directory of "
+				    "file %s\"", G_p->g_attrfnam_p);
+			}
+		} else if ((fchownat(dirfd, ".", G_p->g_uid,
+		    G_p->g_gid, 0) != 0) && privileged) {
 			msg(ERRN,
 			    "Cannot chown() \"attribute directory of "
 			    "file %s\"", G_p->g_attrfnam_p);
@@ -1901,11 +1929,6 @@ creat_tmp(char *nam_p)
 
 	if (G_p->g_mtime <= DesSt.st_mtime && !(Args & OCu)) {
 		msg(ERR, "Existing \"%s\" same age or newer", nam_p);
-		return (-1);
-	}
-
-	if (Euid && Aspec) {
-		msg(ERR, "Cannot overwrite \"%s\"", nam_p);
 		return (-1);
 	}
 
@@ -2253,7 +2276,7 @@ data_out(void)
 		VERBOSE((Args & (OCv | OCV)), nam_p);
 		return;
 	} else if ((G_p->g_mode & Ftype) == S_IFLNK &&
-		    (Hdr_type == USTAR || Hdr_type == TAR)) {
+	    (Hdr_type == USTAR || Hdr_type == TAR)) {
 		int size;
 
 		/*
@@ -2364,7 +2387,7 @@ data_out(void)
 		} else if (amount_read > amt_to_read) {
 			/* the file has grown */
 			real_filesz = G_p->g_filesz +
-				(amount_read - amt_to_read);
+			    (amount_read - amt_to_read);
 			amount_read = amt_to_read;
 		} else if (amount_read == amt_to_read) {
 			/* the file is the same size */
@@ -2653,18 +2676,18 @@ file_in(void)
 		typeflag = Thdr_p->tbuf.t_typeflag;
 		if (G_p->g_nlink == 1) {		/* hard link */
 			if (proc_file != F_SKIP) {
-			    int i;
-			    char lname[NAMSIZ+1];
-			    (void) memset(lname, '\0', sizeof (lname));
+				int i;
+				char lname[NAMSIZ+1];
+				(void) memset(lname, '\0', sizeof (lname));
 
-			    (void) strncpy(lname, Thdr_p->tbuf.t_linkname,
-				NAMSIZ);
-			    for (i = 0; i <= NAMSIZ && lname[i] != 0; i++)
-				;
+				(void) strncpy(lname, Thdr_p->tbuf.t_linkname,
+				    NAMSIZ);
+				for (i = 0; i <= NAMSIZ && lname[i] != 0; i++)
+					;
 
-			    lname[i] = 0;
-			    (void) creat_lnk(G_p->g_dirfd,
-				&lname[0], G_p->g_nam_p);
+				lname[i] = 0;
+				(void) creat_lnk(G_p->g_dirfd,
+				    &lname[0], G_p->g_nam_p);
 			}
 			close_dirfd();
 			return;
@@ -2679,7 +2702,7 @@ file_in(void)
 			return;
 		} else if (Adir || Aspec) {
 			if ((proc_file == F_SKIP) ||
-					(Ofile = openout(G_p->g_dirfd)) < 0) {
+			    (Ofile = openout(G_p->g_dirfd)) < 0) {
 				data_in(P_SKIP);
 			} else {
 				data_in(P_PROC);
@@ -2706,7 +2729,7 @@ file_in(void)
 				VERBOSE((Args & (OCv | OCV)), G_p->g_nam_p);
 		} else {
 			if ((proc_file == F_SKIP) ||
-					(Ofile = openout(G_p->g_dirfd)) < 0) {
+			    (Ofile = openout(G_p->g_dirfd)) < 0) {
 				data_in(P_SKIP);
 			} else {
 				data_in(P_PROC);
@@ -2735,7 +2758,7 @@ file_in(void)
 						VERBOSE((Args & (OCv | OCV)),
 						    G_p->g_nam_p);
 				} else if ((Ofile =
-						openout(G_p->g_dirfd)) < 0) {
+				    openout(G_p->g_dirfd)) < 0) {
 					data_in(P_SKIP);
 					close_dirfd();
 					reclaim(l_p);
@@ -3080,16 +3103,27 @@ file_pass(void)
 		if (symlink(Symlnk_p, Fullnam_p) < 0) {
 			if (errno == EEXIST) {
 				if (openout(G_p->g_passdirfd) < 0) {
+					if (errno != EEXIST) {
+						msg(ERRN,
+						    "Cannot create \"%s\"",
+						    Fullnam_p);
+					}
 					return (FILE_PASS_ERR);
 				}
 			} else {
 				msg(ERRN, "Cannot create \"%s\"", Fullnam_p);
 				return (FILE_PASS_ERR);
 			}
-		}
-
-		if (lchown(Fullnam_p, (int)G_p->g_uid, (int)G_p->g_gid) < 0) {
-			if ((Euid == 0) || (Args & OCR)) {
+		} else {
+			if (Args & OCR) {
+				if (lchown(Fullnam_p, (int)Rpw_p->pw_uid,
+				    (int)Rpw_p->pw_gid) < 0) {
+					msg(ERRN,
+					    "Error during chown() of \"%s\"",
+					    Fullnam_p);
+				}
+			} else if ((lchown(Fullnam_p, (int)G_p->g_uid,
+			    (int)G_p->g_gid) < 0) && privileged) {
 				msg(ERRN,
 				    "Error during chown() of \"%s\"",
 				    Fullnam_p);
@@ -3824,7 +3858,7 @@ getname(void)
 					Gen.g_dirfd = open(dir, O_RDONLY);
 					if (Gen.g_dirfd == -1) {
 						msg(ERRN, "Cannot open "
-							"directory %s", dir);
+						    "directory %s", dir);
 						continue;
 					}
 					Gen.g_dirpath = dir;
@@ -4357,31 +4391,30 @@ openout(int dirfd)
 		if ((Args & OCi) && (Hdr_type == USTAR)) {
 			setpasswd(nam_p);
 		}
-
 		if ((G_p->g_mode & Ftype) == S_IFLNK ||
 		    (Hdr_type == BAR && bar_linkflag == SYMTYPE)) {
-			if (fchownat(dirfd, get_component(nam_p),
-			    (int)G_p->g_uid, (int)G_p->g_gid,
-			    AT_SYMLINK_NOFOLLOW) < 0) {
-				if ((Euid == 0) || (Args & OCR)) {
+			if (Args & OCR) {
+				if (fchownat(dirfd,
+				    get_component(nam_p),
+				    (int)Rpw_p->pw_uid,
+				    (int)Rpw_p->pw_gid,
+				    AT_SYMLINK_NOFOLLOW) < 0) {
 					msg(ERRN,
 					    "Error during chown() of "
 					    "\"%s%s%s\"",
-					    (G_p->g_attrnam_p == (char *)NULL) ?
+					    (G_p->g_attrnam_p ==
+					    (char *)NULL) ?
 					    nam_p : G_p->g_attrfnam_p,
-					    (G_p->g_attrnam_p == (char *)NULL) ?
+					    (G_p->g_attrnam_p ==
+					    (char *)NULL) ?
 					    "" : gettext(" Attribute "),
-					    (G_p->g_attrnam_p == (char *)NULL) ?
+					    (G_p->g_attrnam_p ==
+					    (char *)NULL) ?
 					    "" : nam_p);
 				}
-			}
-
-			break;
-		}
-
-		if (fchownat(dirfd, get_component(nam_p),
-		    (int)G_p->g_uid, (int)G_p->g_gid, 0) < 0) {
-			if ((Euid == 0) || (Args & OCR)) {
+			} else if ((fchownat(dirfd, get_component(nam_p),
+			    (int)G_p->g_uid, (int)G_p->g_gid,
+			    AT_SYMLINK_NOFOLLOW) < 0) && privileged) {
 				msg(ERRN,
 				    "Error during chown() of \"%s%s%s\"",
 				    (G_p->g_attrnam_p == (char *)NULL) ?
@@ -4392,7 +4425,6 @@ openout(int dirfd)
 				    "" : nam_p);
 			}
 		}
-
 		break;
 
 	case 1:
@@ -4865,84 +4897,80 @@ rstfiles(int over, int dirfd)
 		}
 
 	/*
-	 * change the modes back to the ones originally created in the
-	 * archive
+	 * Change the owner, time, and mode to those of the file
+	 * originally created in the archive.  Note: time and
+	 * mode do not need to be restored for a symbolic link
+	 * since rstfiles() is not called when the archived file
+	 * is a symlink.
 	 */
-	if (Args & OCi) {
-		mode_t orig_mask, new_mask;
-		struct stat sbuf;
-
-		if (!(Pflag && acl_is_set)) {
-			/* Acl was not set, so we must chmod */
-			if (LSTAT(dirfd, G_p->g_nam_p, &sbuf) == 0) {
-				if ((sbuf.st_mode & Ftype) != S_IFLNK) {
-					orig_mask = umask(0);
-					new_mask = G_p->g_mode & ~orig_mask;
-
-					/*
-					 * use fchmod for attributes, since
-					 * we known they are always regular
-					 * files, whereas when it isn't an
-					 * attribute it could be for a fifo
-					 * or something other that we don't
-					 * open and don't have a valid Ofile
-					 * for.
-					 */
-					if (G_p->g_attrnam_p != (char *)NULL) {
-						error = fchmod(Ofile, new_mask);
-					} else {
-						error = chmod(G_p->g_nam_p,
-							new_mask);
-					}
-					if (error < 0) {
-						msg(ERRN,
-						    "Cannot chmod() \"%s%s%s\"",
-						    (G_p->g_attrnam_p ==
-						    (char *)NULL) ?
-						    G_p->g_nam_p :
-						    G_p->g_attrfnam_p,
-						    (G_p->g_attrnam_p ==
-						    (char *)NULL) ?
-						    "" : gettext(
-						    " Attribute "),
-						    (G_p->g_attrnam_p ==
-						    (char *)NULL) ?
-						    "" : G_p->g_attrnam_p);
-					}
-					(void) umask(orig_mask);
-				}
-			}
-		}
-	}
-
 	if (!(Args & OCo)) {
-		if (Args & OCm) {
-			set_tym(dirfd, get_component(onam_p),
-			    G_p->g_mtime, G_p->g_mtime);
-		}
-		if (!acl_is_set) {
-			if (G_p->g_attrnam_p != (char *)NULL) {
-				error = fchmod(Ofile, (int)G_p->g_mode);
-			} else {
-				error = chmod(onam_p, (int)G_p->g_mode);
+		if (Args & OCR) {
+			if (fchownat(dirfd, get_component(onam_p),
+			    Rpw_p->pw_uid, Rpw_p->pw_gid,
+			    AT_SYMLINK_NOFOLLOW) < 0) {
+				msg(ERRN, "Cannot chown() \"%s%s%s\"",
+				    onam_p,
+				    (G_p->g_attrnam_p == (char *)NULL) ?
+				    "" : gettext(" Attribute "),
+				    (G_p->g_attrnam_p == (char *)NULL) ?
+				    "" : onam_p);
 			}
-			if ((error < 0) && ((Euid == 0) || (Args & OCR))) {
-				msg(ERRN, "Cannot chmod() \"%s%s%s\"", onam_p,
+		} else {
+			if ((fchownat(dirfd, get_component(onam_p),
+			    G_p->g_uid, G_p->g_gid,
+			    AT_SYMLINK_NOFOLLOW) < 0) && privileged) {
+				msg(ERRN, "Cannot chown() \"%s%s%s\"",
+				    onam_p,
 				    (G_p->g_attrnam_p == (char *)NULL) ?
 				    "" : gettext(" Attribute "),
 				    (G_p->g_attrnam_p == (char *)NULL) ?
 				    "" : onam_p);
 			}
 		}
-		if ((Args & OCR) &&
-		    (fchownat(dirfd, get_component(onam_p), Rpw_p->pw_uid,
-			Rpw_p->pw_gid, 0) < 0)) {
-			msg(ERRN, "Cannot chown() \"%s%s%s\"",
-			    onam_p,
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : gettext(" Attribute "),
-			    (G_p->g_attrnam_p == (char *)NULL) ?
-			    "" : onam_p);
+
+		if (Args & OCm) {
+			set_tym(dirfd, get_component(onam_p),
+			    G_p->g_mtime, G_p->g_mtime);
+		}
+
+		/* Acl was not set, so we must chmod */
+		if (!acl_is_set) {
+			mode_t orig_mask, new_mask;
+
+			/*
+			 * use fchmod for attributes, since
+			 * we known they are always regular
+			 * files, whereas when it isn't an
+			 * attribute it could be for a fifo
+			 * or something other that we don't
+			 * open and don't have a valid Ofile
+			 * for.
+			 */
+			if (privileged) {
+				new_mask = G_p->g_mode;
+			} else {
+				orig_mask = umask(0);
+				new_mask = G_p->g_mode & ~orig_mask;
+			}
+
+			if (G_p->g_attrnam_p != (char *)NULL) {
+				error = fchmod(Ofile, new_mask);
+			} else {
+				error = chmod(onam_p, new_mask);
+			}
+			if (error < 0) {
+				msg(ERRN,
+				    "Cannot chmod() \"%s%s%s\"",
+				    (G_p->g_attrnam_p == (char *)NULL) ?
+				    onam_p : G_p->g_attrfnam_p,
+				    (G_p->g_attrnam_p == (char *)NULL) ?
+				    "" : gettext(" Attribute "),
+				    (G_p->g_attrnam_p == (char *)NULL) ?
+				    "" : onam_p);
+			}
+			if (!privileged) {
+				(void) umask(orig_mask);
+			}
 		}
 	}
 
@@ -4953,36 +4981,6 @@ rstfiles(int over, int dirfd)
 		 */
 		set_tym(G_p->g_dirfd, get_component(inam_p),
 		    (ulong_t)SrcSt.st_atime, (ulong_t)SrcSt.st_mtime);
-	}
-
-	if ((Args & OCp) && !(Args & OCR)) {
-		if (fchownat(dirfd, get_component(onam_p),
-		    G_p->g_uid, G_p->g_gid, 0) < 0) {
-			if (Euid == 0) {
-				msg(ERRN, "Cannot chown() \"%s%s%s\"",
-				    onam_p,
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : gettext(" Attribute "),
-				    (G_p->g_attrnam_p == (char *)NULL) ?
-				    "" : onam_p);
-			}
-		}
-	} else {
-		/* OCi only uses onam_p, OCo only uses inam_p */
-		if (!(Args & OCR)) {
-			if ((Args & OCi) && (fchownat(dirfd,
-			    get_component(inam_p), G_p->g_uid,
-			    G_p->g_gid, 0) < 0)) {
-				if (Euid == 0) {
-					msg(ERRN, "Cannot chown() \"%s%s%s\"",
-					    onam_p,
-					    (G_p->g_attrnam_p == (char *)NULL) ?
-					    "" : gettext(" Attribute "),
-					    (G_p->g_attrnam_p == (char *)NULL) ?
-					    "" : onam_p);
-				}
-			}
-		}
 	}
 }
 
@@ -5066,7 +5064,6 @@ setup(int largc, char **largv)
 		PageSize = 8192;
 	}
 
-	Euid = geteuid();
 	Hdr_type = BIN;
 	Max_offset = (off_t)(BIN_OFFSET_MAX);
 	Efil_p = Hdr_p = Own_p = IOfil_p = NULL;
@@ -5503,20 +5500,20 @@ usage(void)
 	(void) fflush(stdout);
 #if defined(O_XATTR)
 	(void) fprintf(stderr, gettext("USAGE:\n"
-				"\tcpio -i[bcdfkmrstuv@BSV6] [-C size] "
-				"[-E file] [-H hdr] [-I file [-M msg]] "
-				"[-R id] [patterns]\n"
-				"\tcpio -o[acv@ABLV] [-C size] "
-				"[-H hdr] [-O file [-M msg]]\n"
-				"\tcpio -p[adlmuv@LV] [-R id] directory\n"));
+	    "\tcpio -i[bcdfkmrstuv@BSV6] [-C size] "
+	    "[-E file] [-H hdr] [-I file [-M msg]] "
+	    "[-R id] [patterns]\n"
+	    "\tcpio -o[acv@ABLV] [-C size] "
+	    "[-H hdr] [-O file [-M msg]]\n"
+	    "\tcpio -p[adlmuv@LV] [-R id] directory\n"));
 #else
 	(void) fprintf(stderr, gettext("USAGE:\n"
-				"\tcpio -i[bcdfkmrstuvBSV6] [-C size] "
-				"[-E file] [-H hdr] [-I file [-M msg]] "
-				"[-R id] [patterns]\n"
-				"\tcpio -o[acvABLV] [-C size] "
-				"[-H hdr] [-O file [-M msg]]\n"
-				"\tcpio -p[adlmuvLV] [-R id] directory\n"));
+	    "\tcpio -i[bcdfkmrstuvBSV6] [-C size] "
+	    "[-E file] [-H hdr] [-I file [-M msg]] "
+	    "[-R id] [patterns]\n"
+	    "\tcpio -o[acvABLV] [-C size] "
+	    "[-H hdr] [-O file [-M msg]]\n"
+	    "\tcpio -p[adlmuvLV] [-R id] directory\n"));
 #endif
 	(void) fflush(stderr);
 	exit(EXIT_CODE);
@@ -5878,11 +5875,11 @@ write_hdr(int secflag, off_t len)
 		(void) sprintf(Buffr.b_in_p,
 		    "%.6lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%.8lx%."
 		    "8lx%.8lx%.8lx%.8lx%s",
-			G_p->g_magic, G_p->g_ino, mode, G_p->g_uid,
-			G_p->g_gid, G_p->g_nlink, G_p->g_mtime, (ulong_t)len,
-			major(G_p->g_dev), minor(G_p->g_dev),
-			major(G_p->g_rdev), minor(G_p->g_rdev),
-			G_p->g_namesz, G_p->g_cksum, G_p->g_nam_p);
+		    G_p->g_magic, G_p->g_ino, mode, G_p->g_uid,
+		    G_p->g_gid, G_p->g_nlink, G_p->g_mtime, (ulong_t)len,
+		    major(G_p->g_dev), minor(G_p->g_dev),
+		    major(G_p->g_rdev), minor(G_p->g_rdev),
+		    G_p->g_namesz, G_p->g_cksum, G_p->g_nam_p);
 		break;
 	case USTAR:
 		Thdr_p = (union tblock *)Buffr.b_in_p;
@@ -7404,7 +7401,7 @@ write_xattr_hdr()
 		tl_p = Lnk_hd.L_nxt_p;
 		while (tl_p != &Lnk_hd) {
 			if (tl_p->L_gen.g_ino == G_p->g_ino &&
-				tl_p->L_gen.g_dev == G_p->g_dev) {
+			    tl_p->L_gen.g_dev == G_p->g_dev) {
 					linkinfo = tl_p;
 					break; /* found */
 			}
@@ -7723,9 +7720,9 @@ sl_numlinks(dev_t device, ino_t inode)
 	sl_info_t *p = sl_search(device, inode);
 
 	if (p) {
-	    return (p->sl_count);
+		return (p->sl_count);
 	} else {
-	    return (1);
+		return (1);
 	}
 }
 

@@ -19,12 +19,10 @@
 #
 # CDDL HEADER END
 #
-#
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Copyright 1989-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
+#ident	"%Z%%M%	%I%	%E% SMI"
 
 PROG= cpio
 
@@ -32,7 +30,7 @@ OBJS= cpio.o cpiostat.o
 SRCS= $(OBJS:%.o=%.c)
 
 include ../Makefile.cmd
-CPPFLAGS += -D_FILE_OFFSET_BITS=64
+CPPFLAGS += -D_FILE_OFFSET_BITS=64 -DSOLARIS_PRIVS
 
 LDLIBS += -lsec
 XGETFLAGS += -a -x cpio.xcl
