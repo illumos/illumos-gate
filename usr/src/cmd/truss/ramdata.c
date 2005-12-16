@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,5 +133,8 @@ lwpid_t	primary_lwp;		/* representative lwp on process grab */
 sysset_t syshang;		/* sys calls to make process hang */
 sigset_t sighang;		/* signals to make process hang */
 fltset_t flthang;		/* faults to make process hang */
+
+sigset_t emptyset;		/* no signals, for thr_sigsetmask() */
+sigset_t fillset;		/* all signals, for thr_sigsetmask() */
 
 int	leave_hung;		/* if TRUE, leave the process hung */

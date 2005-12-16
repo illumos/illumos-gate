@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -168,44 +169,39 @@ insert_lwpid(lwpid_t lwpid)
 }
 
 /*
- * This is called from the main thread while holding truss_lock.
+ * This is called from the first worker thread to encounter one of
+ * (leave_hung || interrupt || sigusr1).  It must notify all other
+ * worker threads of the same condition.  truss_lock is held.
  */
 void
-delete_lwpid(lwpid_t lwpid)
+broadcast_signals(void)
 {
 	static int int_notified = FALSE;
 	static int usr1_notified = FALSE;
 	static int usr2_notified = FALSE;
+	lwpid_t my_id = thr_self();
+	lwpid_t lwpid;
 	int i;
 
-	if (--truss_nlwp <= 1)	/* notify controller of the exec()ing LWP */
-		(void) cond_broadcast(&truss_cv);
-
-	for (i = 0; i < truss_maxlwp; i++) {
-		if (truss_lwpid[i] == lwpid) {
-			truss_lwpid[i] = 0;
-			break;
-		}
-	}
 	if (interrupt && !int_notified) {
 		int_notified = TRUE;
 		for (i = 0; i < truss_maxlwp; i++) {
-			if (truss_lwpid[i] != 0)
-				(void) thr_kill(truss_lwpid[i], interrupt);
+			if ((lwpid = truss_lwpid[i]) != 0 && lwpid != my_id)
+				(void) thr_kill(lwpid, interrupt);
 		}
 	}
 	if (sigusr1 && !usr1_notified) {
 		usr1_notified = TRUE;
 		for (i = 0; i < truss_maxlwp; i++) {
-			if (truss_lwpid[i] != 0)
-				(void) thr_kill(truss_lwpid[i], SIGUSR1);
+			if ((lwpid = truss_lwpid[i]) != 0 && lwpid != my_id)
+				(void) thr_kill(lwpid, SIGUSR1);
 		}
 	}
 	if (leave_hung && !usr2_notified) {
 		usr2_notified = TRUE;
 		for (i = 0; i < truss_maxlwp; i++) {
-			if (truss_lwpid[i] != 0)
-				(void) thr_kill(truss_lwpid[i], SIGUSR2);
+			if ((lwpid = truss_lwpid[i]) != 0 && lwpid != my_id)
+				(void) thr_kill(lwpid, SIGUSR2);
 		}
 	}
 }
@@ -322,6 +318,9 @@ main(int argc, char *argv[])
 	premptyset(&syshang);	/* default: hang on no system calls */
 	premptyset(&sighang);	/* default: hang on no signals */
 	premptyset(&flthang);	/* default: hang on no faults */
+
+	(void) sigemptyset(&emptyset);	/* for unblocking all signals */
+	(void) sigfillset(&fillset);	/* for blocking all signals */
 
 #define	OPTIONS	"FpfcaeildDEht:T:v:x:s:S:m:M:u:U:r:w:o:"
 	while ((opt = getopt(argc, argv, OPTIONS)) != EOF) {
@@ -795,14 +794,17 @@ void
 main_thread(int first)
 {
 	private_t *pri = get_private();
-	sigset_t mask;
 	struct tms tms;
-	lwpid_t lwpid;
-	void *status;
 	int flags;
 	int retc;
 	int i;
 	int count;
+
+	/*
+	 * Block all signals in the main thread.
+	 * Some worker thread will receive signals.
+	 */
+	(void) thr_sigsetmask(SIG_SETMASK, &fillset, NULL);
 
 	/*
 	 * If we are dealing with a previously hung process,
@@ -813,10 +815,7 @@ main_thread(int first)
 
 	/*
 	 * Create worker threads to match the lwps in the target process.
-	 * Clear our signal mask so that worker threads are unblocked.
 	 */
-	(void) sigemptyset(&mask);
-	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
 	truss_nlwp = 0;
 	truss_maxlwp = 1;
 	truss_lwpid = my_realloc(truss_lwpid, sizeof (lwpid_t), NULL);
@@ -831,13 +830,6 @@ main_thread(int first)
 	}
 
 	/*
-	 * Block all signals in the main thread.
-	 * Some worker thread will receive signals.
-	 */
-	(void) sigfillset(&mask);
-	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
-
-	/*
 	 * Set all of the truss worker threads running now.
 	 */
 	(void) mutex_lock(&truss_lock);
@@ -848,22 +840,15 @@ main_thread(int first)
 	(void) mutex_unlock(&truss_lock);
 
 	/*
-	 * Wait until all lwps terminate.
+	 * Wait until all worker threads terminate.
 	 */
-	while (thr_join(0, &lwpid, &status) == 0) {
-		(void) mutex_lock(&truss_lock);
-		if (status != NULL)
-			leave_hung = TRUE;
-		delete_lwpid(lwpid);
-		(void) mutex_unlock(&truss_lock);
-	}
+	while (thr_join(0, NULL, NULL) == 0)
+		continue;
 
 	(void) Punsetflags(Proc, PR_ASYNC);
 	Psync(Proc);
 	if (sigusr1)
 		letgo(pri);
-	report_htable_stats();
-	clear_breakpoints();
 	flags = PRELEASE_CLEAR;
 	if (leave_hung)
 		flags |= PRELEASE_HANG;
@@ -897,7 +882,7 @@ worker_thread(void *arg)
 	int first = (who == primary_lwp);
 	private_t *pri = get_private();
 	int req_flag = 0;
-	intptr_t leave_it_hung = FALSE;
+	int leave_it_hung = FALSE;
 	int reset_traps = FALSE;
 	int gcode;
 	int what;
@@ -909,9 +894,6 @@ worker_thread(void *arg)
 	sysset_t running_set;
 	int dotrace = lwptrace(Psp->pr_pid, Lsp->pr_lwpid);
 
-	static int nstopped = 0;
-	static int go = 0;
-
 	pri->Lwp = Lwp;
 	pri->lwpstat = Lsp;
 	pri->syslast = Lsp->pr_stime;
@@ -920,8 +902,12 @@ worker_thread(void *arg)
 
 	prfillset(&full_set);
 
+	/* we were created with all signals blocked; unblock them */
+	(void) thr_sigsetmask(SIG_SETMASK, &emptyset, NULL);
+
 	/*
-	 * Run this loop until the victim lwp terminates.
+	 * Run this loop until the victim lwp terminates or we receive
+	 * a termination condition (leave_hung | interrupt | sigusr1).
 	 */
 	for (;;) {
 		if (interrupt | sigusr1) {
@@ -1210,7 +1196,7 @@ worker_thread(void *arg)
 							    pri->sys_string);
 							Flush();
 						}
-						sigusr1 = 1;
+						sigusr1 = TRUE;
 						(void) mutex_unlock(
 							&truss_lock);
 						goto out;
@@ -1247,6 +1233,8 @@ worker_thread(void *arg)
 				lwpid_t lwpid;
 
 				if ((new_Lwp = grab_lwp(pri->Rval1)) != NULL) {
+					(void) thr_sigsetmask(SIG_SETMASK,
+					    &fillset, NULL);
 					if (thr_create(NULL, 0, worker_thread,
 					    new_Lwp, THR_BOUND | THR_SUSPENDED,
 					    &lwpid) != 0)
@@ -1254,6 +1242,8 @@ worker_thread(void *arg)
 						    "to follow child lwp");
 					insert_lwpid(lwpid);
 					(void) thr_continue(lwpid);
+					(void) thr_sigsetmask(SIG_SETMASK,
+					    &emptyset, NULL);
 				}
 			}
 			pri->sys_nargs = 0;
@@ -1403,57 +1393,19 @@ worker_thread(void *arg)
 	}
 
 out:
-	if (Lstate(Lwp) != PS_UNDEAD) {
+	/* block all signals in preparation for exiting */
+	(void) thr_sigsetmask(SIG_SETMASK, &fillset, NULL);
+
+	if (Lstate(Lwp) == PS_UNDEAD || Lstate(Lwp) == PS_LOST)
+		(void) mutex_lock(&truss_lock);
+	else {
 		(void) Lstop(Lwp, MILLISEC);
 		(void) mutex_lock(&truss_lock);
 		if (Lstate(Lwp) == PS_STOP &&
 		    Lsp->pr_why == PR_FAULTED &&
 		    Lsp->pr_what == FLTBPT)
 			(void) function_trace(pri, 0, 1, dotrace);
-	} else {
-		(void) mutex_lock(&truss_lock);
 	}
-
-	/*
-	 * The first thread through needs to instruct all other
-	 * threads to stop -- they're not going to stop on their own.
-	 */
-	if (nstopped == 0)
-		(void) Pdstop(Proc);
-
-	/*
-	 * Once the last thread has reached this point, then and only then is
-	 * it safe to remove breakpoints and other instrumentation. Since
-	 * breakpoints are executed without truss_lock held, a monitor thread
-	 * can't exit until all breakpoints have been removed, and we can't
-	 * be sure the procedure to execute a breakpoint won't temporarily
-	 * reinstall a breakpont. Accordingly, we need to wait until all
-	 * threads are in a known state.
-	 */
-	if (++nstopped == truss_nlwp) {
-		/*
-		 * All threads should already be sufficiently stopped, but
-		 * just to be safe...
-		 */
-		(void) Pstop(Proc, MILLISEC);
-		clear_breakpoints();
-		(void) Psysexit(Proc, SYS_forkall, FALSE);
-		(void) Psysexit(Proc, SYS_vfork, FALSE);
-		(void) Psysexit(Proc, SYS_fork1, FALSE);
-		(void) Punsetflags(Proc, PR_FORK);
-		Psync(Proc);
-		fflag = 0;
-		go = 1;
-		(void) cond_broadcast(&truss_cv);
-	} else {
-		while (!go)
-			(void) cond_wait(&truss_cv, &truss_lock);
-	}
-
-	if (!leave_it_hung && Lstate(Lwp) == PS_STOP)
-		(void) Lsetrun(Lwp, 0, 0);
-
-	(void) mutex_unlock(&truss_lock);
 
 	if (dotrace && ow_in_effect) {
 		if (cflag) {
@@ -1481,11 +1433,103 @@ out:
 		Psetsysentry(Proc, &running_set);
 	}
 
-	(void) mutex_lock(&truss_lock);	/* fork1() protection */
+	if (Lstate(Lwp) == PS_UNDEAD || Lstate(Lwp) == PS_LOST) {
+		/*
+		 * The victim thread has exited or we lost control of
+		 * the process.  Remove ourself from the list of all
+		 * truss threads and notify everyone waiting for this.
+		 */
+		lwpid_t my_id = thr_self();
+		int i;
+
+		for (i = 0; i < truss_maxlwp; i++) {
+			if (truss_lwpid[i] == my_id) {
+				truss_lwpid[i] = 0;
+				break;
+			}
+		}
+		if (--truss_nlwp != 0) {
+			(void) cond_broadcast(&truss_cv);
+		} else {
+			/*
+			 * The last truss worker thread is terminating.
+			 * The address space is gone (UNDEAD) or is
+			 * inaccessible (LOST) so we cannot clear the
+			 * breakpoints.  Just report the htable stats.
+			 */
+			report_htable_stats();
+		}
+	} else {
+		/*
+		 * The victim thread is not a zombie thread, and we have not
+		 * lost control of the process.  We must have gotten here due
+		 * to (leave_hung || leave_it_hung || interrupt || sigusr1).
+		 * In these cases, we must carefully uninstrument the process
+		 * and either set it running or leave it stopped and abandoned.
+		 */
+		static int nstopped = 0;
+		static int cleared = 0;
+
+		if (leave_it_hung)
+			leave_hung = TRUE;
+		if ((leave_hung | interrupt | sigusr1) == 0)
+			abend("(leave_hung | interrupt | sigusr1) == 0", NULL);
+
+		/*
+		 * The first truss thread through here needs to instruct all
+		 * application threads to stop -- they're not necessarily
+		 * going to stop on their own.
+		 */
+		if (nstopped++ == 0)
+			(void) Pdstop(Proc);
+
+		/*
+		 * Notify all other worker threads about the reason
+		 * for being here (leave_hung || interrupt || sigusr1).
+		 */
+		broadcast_signals();
+
+		/*
+		 * Once the last thread has reached this point, then and
+		 * only then is it safe to remove breakpoints and other
+		 * instrumentation.  Since breakpoints are executed without
+		 * truss_lock held, a monitor thread can't exit until all
+		 * breakpoints have been removed, and we can't be sure the
+		 * procedure to execute a breakpoint won't temporarily
+		 * reinstall a breakpont.  Accordingly, we need to wait
+		 * until all threads are in a known state.
+		 */
+		while (nstopped != truss_nlwp)
+			(void) cond_wait(&truss_cv, &truss_lock);
+
+		/*
+		 * All truss threads have reached this point.
+		 * One of them clears the breakpoints and
+		 * wakes up everybody else to finish up.
+		 */
+		if (cleared++ == 0) {
+			/*
+			 * All threads should already be stopped,
+			 * but just to be safe...
+			 */
+			(void) Pstop(Proc, MILLISEC);
+			clear_breakpoints();
+			(void) Psysexit(Proc, SYS_forkall, FALSE);
+			(void) Psysexit(Proc, SYS_vfork, FALSE);
+			(void) Psysexit(Proc, SYS_fork1, FALSE);
+			(void) Punsetflags(Proc, PR_FORK);
+			Psync(Proc);
+			fflag = 0;
+			(void) cond_broadcast(&truss_cv);
+		}
+
+		if (!leave_hung && Lstate(Lwp) == PS_STOP)
+			(void) Lsetrun(Lwp, 0, 0);
+	}
+
 	(void) Lfree(Lwp);
 	(void) mutex_unlock(&truss_lock);
-
-	return ((void *)leave_it_hung);
+	return (NULL);
 }
 
 /*
@@ -2530,10 +2574,7 @@ errmsg(const char *s, const char *q)
 void
 abend(const char *s, const char *q)
 {
-	sigset_t mask;
-
-	(void) sigfillset(&mask);
-	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
+	(void) thr_sigsetmask(SIG_SETMASK, &fillset, NULL);
 	if (Proc) {
 		Flush();
 		errmsg(s, q);
