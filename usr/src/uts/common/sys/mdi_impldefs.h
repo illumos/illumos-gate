@@ -476,8 +476,10 @@ typedef struct mdi_client {
 	int			ct_power_cnt;	/* Hold count on parent power */
 	kcondvar_t		ct_powerchange_cv;
 					/* Paths in power transient state */
-	int			ct_powercnt_held;
-					/* ct_power_cnt held in pre_unconfig */
+	short			ct_powercnt_config;
+					/* held in pre/post config */
+	short			ct_powercnt_unconfig;
+					/* held in pre/post unconfig */
 	int			ct_powercnt_reset;
 					/* ct_power_cnt was resetted */
 	void			*ct_vprivate;	/* vHCI driver private	*/

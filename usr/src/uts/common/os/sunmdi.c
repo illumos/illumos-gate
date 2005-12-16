@@ -517,6 +517,7 @@ mdi_vhci_unregister(dev_info_t *vdip, int flags)
 	kmem_free(vh->vh_class, strlen(vh->vh_class)+1);
 	kmem_free(vh->vh_client_table,
 	    mdi_client_table_size * sizeof (struct client_hash));
+
 	kmem_free(vh, sizeof (mdi_vhci_t));
 	return (MDI_SUCCESS);
 }
@@ -5644,8 +5645,9 @@ i_mdi_pm_reset_client(mdi_client_t *ct)
 	    "ct_power_cnt = %d\n", ct->ct_power_cnt));
 	ct->ct_power_cnt = 0;
 	i_mdi_rele_all_phci(ct);
+	ct->ct_powercnt_config = 0;
+	ct->ct_powercnt_unconfig = 0;
 	ct->ct_powercnt_reset = 1;
-	ct->ct_powercnt_held = 0;
 }
 
 static void
@@ -5899,7 +5901,7 @@ i_mdi_pm_pre_config_one(dev_info_t *child)
 		return (MDI_SUCCESS);
 	}
 
-	if (ct->ct_powercnt_held) {
+	if (ct->ct_powercnt_config) {
 		MDI_CLIENT_UNLOCK(ct);
 		MDI_DEBUG(4, (CE_NOTE, child,
 		    "i_mdi_pm_pre_config_one ALREADY held\n"));
@@ -5912,7 +5914,7 @@ i_mdi_pm_pre_config_one(dev_info_t *child)
 	MDI_DEBUG(4, (CE_NOTE, child,
 	    "i_mdi_pm_pre_config_one i_mdi_pm_hold_client\n"));
 	i_mdi_pm_hold_client(ct, ct->ct_path_count);
-	ct->ct_powercnt_held = 1;
+	ct->ct_powercnt_config = 1;
 	ct->ct_powercnt_reset = 0;
 	MDI_CLIENT_UNLOCK(ct);
 	return (ret);
@@ -5976,7 +5978,7 @@ i_mdi_pm_pre_unconfig_one(dev_info_t *child, int *held, int flags)
 		return (MDI_FAILURE);
 	}
 
-	if (ct->ct_powercnt_held) {
+	if (ct->ct_powercnt_unconfig) {
 		MDI_DEBUG(4, (CE_NOTE, child,
 		    "i_mdi_pm_pre_unconfig ct_powercnt_held\n"));
 		MDI_CLIENT_UNLOCK(ct);
@@ -5990,7 +5992,7 @@ i_mdi_pm_pre_unconfig_one(dev_info_t *child, int *held, int flags)
 	MDI_DEBUG(4, (CE_NOTE, child,
 	    "i_mdi_pm_pre_unconfig i_mdi_pm_hold_client\n"));
 	i_mdi_pm_hold_client(ct, ct->ct_path_count);
-	ct->ct_powercnt_held = 1;
+	ct->ct_powercnt_unconfig = 1;
 	ct->ct_powercnt_reset = 0;
 	MDI_CLIENT_UNLOCK(ct);
 	if (ret == MDI_SUCCESS)
@@ -6044,9 +6046,9 @@ i_mdi_pm_post_config_one(dev_info_t *child)
 	while (MDI_CLIENT_IS_POWER_TRANSITION(ct))
 		cv_wait(&ct->ct_powerchange_cv, &ct->ct_mutex);
 
-	if (ct->ct_powercnt_reset || !ct->ct_powercnt_held) {
+	if (ct->ct_powercnt_reset || !ct->ct_powercnt_config) {
 		MDI_DEBUG(4, (CE_NOTE, child,
-		    "i_mdi_pm_post_config_one NOT held\n"));
+		    "i_mdi_pm_post_config_one NOT configured\n"));
 		MDI_CLIENT_UNLOCK(ct);
 		return;
 	}
@@ -6068,7 +6070,7 @@ i_mdi_pm_post_config_one(dev_info_t *child)
 		    "i_mdi_pm_post_config i_mdi_pm_reset_client\n"));
 		i_mdi_pm_reset_client(ct);
 	} else {
-		mdi_pathinfo_t	*pip, *next;
+		mdi_pathinfo_t  *pip, *next;
 		int	valid_path_count = 0;
 
 		MDI_DEBUG(4, (CE_NOTE, child,
@@ -6077,17 +6079,14 @@ i_mdi_pm_post_config_one(dev_info_t *child)
 		while (pip != NULL) {
 			MDI_PI_LOCK(pip);
 			next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link;
-			if ((MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK)
-				== MDI_PATHINFO_STATE_ONLINE ||
-			    (MDI_PI(pip)->pi_state & MDI_PATHINFO_STATE_MASK)
-				== MDI_PATHINFO_STATE_STANDBY)
+			if (MDI_PI_IS_ONLINE(pip) || MDI_PI_IS_STANDBY(pip))
 				valid_path_count ++;
 			MDI_PI_UNLOCK(pip);
 			pip = next;
 		}
 		i_mdi_pm_rele_client(ct, valid_path_count);
 	}
-	ct->ct_powercnt_held = 0;
+	ct->ct_powercnt_config = 0;
 	MDI_CLIENT_UNLOCK(ct);
 }
 
@@ -6129,7 +6128,7 @@ i_mdi_pm_post_unconfig_one(dev_info_t *child)
 	while (MDI_CLIENT_IS_POWER_TRANSITION(ct))
 		cv_wait(&ct->ct_powerchange_cv, &ct->ct_mutex);
 
-	if (!ct->ct_powercnt_held) {
+	if (!ct->ct_powercnt_unconfig || ct->ct_powercnt_reset) {
 		MDI_DEBUG(4, (CE_NOTE, child,
 		    "i_mdi_pm_post_unconfig NOT held\n"));
 		MDI_CLIENT_UNLOCK(ct);
@@ -6144,10 +6143,25 @@ i_mdi_pm_post_unconfig_one(dev_info_t *child)
 		MDI_DEBUG(4, (CE_NOTE, child,
 		    "i_mdi_pm_post_unconfig i_mdi_pm_reset_client\n"));
 		i_mdi_pm_reset_client(ct);
+	} else {
+		mdi_pathinfo_t  *pip, *next;
+		int	valid_path_count = 0;
+
+		MDI_DEBUG(4, (CE_NOTE, child,
+		    "i_mdi_pm_post_unconfig i_mdi_pm_rele_client\n"));
+		pip = ct->ct_path_head;
+		while (pip != NULL) {
+			MDI_PI_LOCK(pip);
+			next = (mdi_pathinfo_t *)MDI_PI(pip)->pi_client_link;
+			if (MDI_PI_IS_ONLINE(pip) || MDI_PI_IS_STANDBY(pip))
+				valid_path_count ++;
+			MDI_PI_UNLOCK(pip);
+			pip = next;
+		}
+		i_mdi_pm_rele_client(ct, valid_path_count);
+		ct->ct_powercnt_unconfig = 0;
 	}
 
-	MDI_DEBUG(4, (CE_NOTE, child,
-	    "i_mdi_pm_post_unconfig not changed\n"));
 	MDI_CLIENT_UNLOCK(ct);
 }
 
