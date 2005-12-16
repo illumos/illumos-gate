@@ -363,7 +363,12 @@ typedef struct {
 
 static const __usa_rules_t	__usa_rules[] = {
 	{
-		1987, 2037,
+		2007, 2037,
+		{ MON_WEEK_DOW, Sun, _2nd_week, Mar, _2AM },
+		{ MON_WEEK_DOW, Sun, _1st_week, Nov, _2AM },
+	},
+	{
+		1987, 2006,
 		{ MON_WEEK_DOW, Sun, _1st_week,  Apr, _2AM },
 		{ MON_WEEK_DOW, Sun, _Last_week, Oct, _2AM },
 	},

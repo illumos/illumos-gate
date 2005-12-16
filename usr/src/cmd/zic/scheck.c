@@ -1,6 +1,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-/* static char	elsieid[] = "@(#)scheck.c	8.15"; */
+/* static char	elsieid[] = "@(#)scheck.c	8.16"; */
 
 /*LINTLIBRARY*/
 
@@ -9,20 +9,20 @@
 char *
 scheck(string, format)
 const char * const	string;
-const char * const	format;
+char * const		format;
 {
-	register char *		fbuf;
-	register const char *	fp;
-	register char *		tp;
+	register char		*fbuf;
+	register const char	*fp;
+	register char		*tp;
 	register int		c;
-	register char *		result;
+	register char		*result;
 	char			dummy;
 	static char		nada;
 
 	result = &nada;
 	if (string == NULL || format == NULL)
 		return (result);
-	fbuf = imalloc((int) (2 * strlen(format) + 4));
+	fbuf = imalloc((int)(2 * strlen(format) + 4));
 	if (fbuf == NULL)
 		return (result);
 	fp = format;
@@ -51,7 +51,7 @@ const char * const	format;
 	*tp++ = 'c';
 	*tp = '\0';
 	if (sscanf(string, fbuf, &dummy) != 1)
-		result = (char *) format;
+		result = (char *)format;
 	ifree(fbuf);
 	return (result);
 }

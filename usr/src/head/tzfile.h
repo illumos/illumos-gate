@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1988-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,8 @@
  * Do NOT copy it to any system include directory.
  * Thank you!
  */
+
+/* static char	tzfilehid[] = "@(#)tzfile.h	7.17"; */
 
 /*
  * Note: Despite warnings from the authors of this code, Solaris has
@@ -204,11 +206,6 @@ struct tzhead {
 #define	EPOCH_YEAR	1970
 #define	EPOCH_WDAY	TM_THURSDAY
 
-/*
- * Accurate only for the past couple of centuries;
- * that will probably do.
- */
-
 #define	isleap(y) (((y) % 4) == 0 && (((y) % 100) != 0 || ((y) % 400) == 0))
 
 #ifndef USG
@@ -232,6 +229,20 @@ struct tzhead {
 #define	MONS_PER_YEAR	MONSPERYEAR
 
 #endif /* !defined USG */
+
+/*
+ * Since everything in isleap is modulo 400 (or a factor of 400), we know that
+ *	isleap(y) == isleap(y % 400)
+ * and so
+ *	isleap(a + b) == isleap((a + b) % 400)
+ * or
+ *	isleap(a + b) == isleap(a % 400 + b % 400)
+ * This is true even if % means modulo rather than Fortran remainder
+ * (which is allowed by C89 but not C99).
+ * We use this to avoid addition overflow problems.
+ */
+
+#define	isleap_sum(a, b)	isleap((a) % 400 + (b) % 400)
 
 #ifdef	__cplusplus
 }

@@ -1017,7 +1017,7 @@ f none usr/share/lib/zoneinfo/Africa/Nouakchott 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Ouagadougou 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Porto-Novo 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Sao_Tome 644 root bin
-f none usr/share/lib/zoneinfo/Africa/Timbuktu 644 root bin
+l none usr/share/lib/zoneinfo/Africa/Timbuktu=../../../../../usr/share/lib/zoneinfo/Africa/Bamako
 f none usr/share/lib/zoneinfo/Africa/Tripoli 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Tunis 644 root bin
 f none usr/share/lib/zoneinfo/Africa/Windhoek 644 root bin
@@ -1030,7 +1030,7 @@ f none usr/share/lib/zoneinfo/America/Araguaina 644 root bin
 d none usr/share/lib/zoneinfo/America/Argentina 755 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/Buenos_Aires 644 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/Catamarca 644 root bin
-f none usr/share/lib/zoneinfo/America/Argentina/ComodRivadavia 644 root bin
+l none usr/share/lib/zoneinfo/America/Argentina/ComodRivadavia=../../../../../../usr/share/lib/zoneinfo/America/Argentina/Catamarca
 f none usr/share/lib/zoneinfo/America/Argentina/Cordoba 644 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/Jujuy 644 root bin
 f none usr/share/lib/zoneinfo/America/Argentina/La_Rioja 644 root bin
@@ -1059,6 +1059,7 @@ f none usr/share/lib/zoneinfo/America/Cayenne 644 root bin
 f none usr/share/lib/zoneinfo/America/Cayman 644 root bin
 f none usr/share/lib/zoneinfo/America/Chicago 644 root bin
 f none usr/share/lib/zoneinfo/America/Chihuahua 644 root bin
+f none usr/share/lib/zoneinfo/America/Coral_Harbour 644 root bin
 l none usr/share/lib/zoneinfo/America/Cordoba=../../../../../usr/share/lib/zoneinfo/America/Argentina/Cordoba
 f none usr/share/lib/zoneinfo/America/Costa_Rica 644 root bin
 f none usr/share/lib/zoneinfo/America/Cuiaba 644 root bin
@@ -1073,7 +1074,7 @@ f none usr/share/lib/zoneinfo/America/Edmonton 644 root bin
 f none usr/share/lib/zoneinfo/America/Eirunepe 644 root bin
 f none usr/share/lib/zoneinfo/America/El_Salvador 644 root bin
 l none usr/share/lib/zoneinfo/America/Ensenada=../../../../../usr/share/lib/zoneinfo/America/Tijuana
-l none usr/share/lib/zoneinfo/America/Fort_Wayne=../../../../../usr/share/lib/zoneinfo/America/Indianapolis
+l none usr/share/lib/zoneinfo/America/Fort_Wayne=../../../../../usr/share/lib/zoneinfo/America/Indiana/Indianapolis
 f none usr/share/lib/zoneinfo/America/Fortaleza 644 root bin
 f none usr/share/lib/zoneinfo/America/Glace_Bay 644 root bin
 f none usr/share/lib/zoneinfo/America/Godthab 644 root bin
@@ -1088,24 +1089,24 @@ f none usr/share/lib/zoneinfo/America/Halifax 644 root bin
 f none usr/share/lib/zoneinfo/America/Havana 644 root bin
 f none usr/share/lib/zoneinfo/America/Hermosillo 644 root bin
 d none usr/share/lib/zoneinfo/America/Indiana 755 root bin
-l none usr/share/lib/zoneinfo/America/Indiana/Indianapolis=../../../../../../usr/share/lib/zoneinfo/America/Indianapolis
+f none usr/share/lib/zoneinfo/America/Indiana/Indianapolis 644 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Knox 644 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Marengo 644 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Vevay 644 root bin
-f none usr/share/lib/zoneinfo/America/Indianapolis 644 root bin
+l none usr/share/lib/zoneinfo/America/Indianapolis=../../../../../usr/share/lib/zoneinfo/America/Indiana/Indianapolis
 f none usr/share/lib/zoneinfo/America/Inuvik 644 root bin
 f none usr/share/lib/zoneinfo/America/Iqaluit 644 root bin
 f none usr/share/lib/zoneinfo/America/Jamaica 644 root bin
 l none usr/share/lib/zoneinfo/America/Jujuy=../../../../../usr/share/lib/zoneinfo/America/Argentina/Jujuy
 f none usr/share/lib/zoneinfo/America/Juneau 644 root bin
 d none usr/share/lib/zoneinfo/America/Kentucky 755 root bin
-l none usr/share/lib/zoneinfo/America/Kentucky/Louisville=../../../../../../usr/share/lib/zoneinfo/America/Louisville
+f none usr/share/lib/zoneinfo/America/Kentucky/Louisville 644 root bin
 f none usr/share/lib/zoneinfo/America/Kentucky/Monticello 644 root bin
 l none usr/share/lib/zoneinfo/America/Knox_IN=../../../../../usr/share/lib/zoneinfo/America/Indiana/Knox
 f none usr/share/lib/zoneinfo/America/La_Paz 644 root bin
 f none usr/share/lib/zoneinfo/America/Lima 644 root bin
 f none usr/share/lib/zoneinfo/America/Los_Angeles 644 root bin
-f none usr/share/lib/zoneinfo/America/Louisville 644 root bin
+l none usr/share/lib/zoneinfo/America/Louisville=../../../../../usr/share/lib/zoneinfo/America/Kentucky/Louisville
 f none usr/share/lib/zoneinfo/America/Maceio 644 root bin
 f none usr/share/lib/zoneinfo/America/Managua 644 root bin
 f none usr/share/lib/zoneinfo/America/Manaus 644 root bin
@@ -1284,6 +1285,7 @@ f none usr/share/lib/zoneinfo/Australia/Adelaide 644 root bin
 f none usr/share/lib/zoneinfo/Australia/Brisbane 644 root bin
 f none usr/share/lib/zoneinfo/Australia/Broken_Hill 644 root bin
 l none usr/share/lib/zoneinfo/Australia/Canberra=../../../../../usr/share/lib/zoneinfo/Australia/Sydney
+f none usr/share/lib/zoneinfo/Australia/Currie 644 root bin
 f none usr/share/lib/zoneinfo/Australia/Darwin 644 root bin
 f none usr/share/lib/zoneinfo/Australia/Hobart 644 root bin
 l none usr/share/lib/zoneinfo/Australia/LHI=../../../../../usr/share/lib/zoneinfo/Australia/Lord_Howe
@@ -1322,7 +1324,7 @@ l none usr/share/lib/zoneinfo/Chile/Continental=../../../../../usr/share/lib/zon
 l none usr/share/lib/zoneinfo/Chile/EasterIsland=../../../../../usr/share/lib/zoneinfo/Pacific/Easter
 l none usr/share/lib/zoneinfo/Cuba=../../../../usr/share/lib/zoneinfo/America/Havana
 f none usr/share/lib/zoneinfo/EET 644 root bin
-l none usr/share/lib/zoneinfo/EST=../../../../usr/share/lib/zoneinfo/America/Indianapolis
+l none usr/share/lib/zoneinfo/EST=../../../../usr/share/lib/zoneinfo/America/Panama
 l none usr/share/lib/zoneinfo/EST5EDT=../../../../usr/share/lib/zoneinfo/America/New_York
 l none usr/share/lib/zoneinfo/Egypt=../../../../usr/share/lib/zoneinfo/Africa/Cairo
 l none usr/share/lib/zoneinfo/Eire=../../../../usr/share/lib/zoneinfo/Europe/Dublin
@@ -1366,7 +1368,7 @@ d none usr/share/lib/zoneinfo/Europe 755 root bin
 f none usr/share/lib/zoneinfo/Europe/Amsterdam 644 root bin
 f none usr/share/lib/zoneinfo/Europe/Andorra 644 root bin
 f none usr/share/lib/zoneinfo/Europe/Athens 644 root bin
-f none usr/share/lib/zoneinfo/Europe/Belfast 644 root bin
+l none usr/share/lib/zoneinfo/Europe/Belfast=../../../../../usr/share/lib/zoneinfo/Europe/London
 f none usr/share/lib/zoneinfo/Europe/Belgrade 644 root bin
 f none usr/share/lib/zoneinfo/Europe/Berlin 644 root bin
 l none usr/share/lib/zoneinfo/Europe/Bratislava=../../../../../usr/share/lib/zoneinfo/Europe/Prague
@@ -1501,7 +1503,7 @@ f none usr/share/lib/zoneinfo/Pacific/Tongatapu 644 root bin
 f none usr/share/lib/zoneinfo/Pacific/Truk 644 root bin
 f none usr/share/lib/zoneinfo/Pacific/Wake 644 root bin
 f none usr/share/lib/zoneinfo/Pacific/Wallis 644 root bin
-f none usr/share/lib/zoneinfo/Pacific/Yap 644 root bin
+l none usr/share/lib/zoneinfo/Pacific/Yap=../../../../../usr/share/lib/zoneinfo/Pacific/Truk
 l none usr/share/lib/zoneinfo/Poland=../../../../usr/share/lib/zoneinfo/Europe/Warsaw
 l none usr/share/lib/zoneinfo/Portugal=../../../../usr/share/lib/zoneinfo/Europe/Lisbon
 l none usr/share/lib/zoneinfo/ROK=../../../../usr/share/lib/zoneinfo/Asia/Seoul
@@ -1513,7 +1515,7 @@ l none usr/share/lib/zoneinfo/US/Alaska=../../../../../usr/share/lib/zoneinfo/Am
 l none usr/share/lib/zoneinfo/US/Aleutian=../../../../../usr/share/lib/zoneinfo/America/Adak
 l none usr/share/lib/zoneinfo/US/Arizona=../../../../../usr/share/lib/zoneinfo/America/Phoenix
 l none usr/share/lib/zoneinfo/US/Central=../../../../../usr/share/lib/zoneinfo/America/Chicago
-l none usr/share/lib/zoneinfo/US/East-Indiana=../../../../../usr/share/lib/zoneinfo/America/Indianapolis
+l none usr/share/lib/zoneinfo/US/East-Indiana=../../../../../usr/share/lib/zoneinfo/America/Indiana/Indianapolis
 l none usr/share/lib/zoneinfo/US/Eastern=../../../../../usr/share/lib/zoneinfo/America/New_York
 l none usr/share/lib/zoneinfo/US/Hawaii=../../../../../usr/share/lib/zoneinfo/Pacific/Honolulu
 l none usr/share/lib/zoneinfo/US/Indiana-Starke=../../../../../usr/share/lib/zoneinfo/America/Indiana/Knox

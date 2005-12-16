@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1994-1999, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_PRIVATE_H
@@ -37,8 +37,11 @@ extern "C" {
 #include <stdlib.h>
 #include <libintl.h>	/* for F_OK and R_OK */
 #include <unistd.h>
+#include <sys/wait.h>
 
-/* static char	privatehid[] = "@(#)private.h	7.48"; */
+/* static char	privatehid[] = "@(#)private.h	7.55"; */
+
+#define	GRANDPARENTED	"Local time zone must be set--see zic manual page"
 
 /* Unlike <ctype.h>'s isdigit, this also works if c < 0 | c > UCHAR_MAX.  */
 #define	is_digit(c)		((unsigned)(c) - '0' <= 9)
@@ -46,12 +49,12 @@ extern "C" {
 /*
  * Private function declarations.
  */
-char 	*icatalloc(char * old, const char * new);
-char 	*icpyalloc(const char * string);
+char 	*icatalloc(char *old, const char *new);
+char 	*icpyalloc(const char *string);
 char 	*imalloc(int n);
-void 	*irealloc(void * pointer, int size);
-void	ifree(char * pointer);
-char	*scheck(const char *string, const char *format);
+void 	*irealloc(void *pointer, int size);
+void	ifree(char *pointer);
+char	*scheck(const char *string, char *format);
 
 /*
  * Finally, some convenience items.
