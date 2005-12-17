@@ -91,7 +91,8 @@ struct zilog {
 	uint8_t		zl_log_error;	/* boolean: log write error */
 	list_t		zl_itx_list;	/* in-memory itx list */
 	uint64_t	zl_itx_list_sz;	/* total size of records on list */
-	uint64_t	zl_prev_blk_sz;	/* previous log block size */
+	uint64_t	zl_cur_used;	/* current commit log size used */
+	uint64_t	zl_prev_used;	/* previous commit log size used */
 	list_t		zl_lwb_list;	/* in-flight log write list */
 	list_t		zl_vdev_list;	/* list of [vdev, seq] pairs */
 	taskq_t		*zl_clean_taskq; /* runs lwb and itx clean tasks */

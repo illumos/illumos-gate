@@ -68,6 +68,7 @@
 #include <sys/fs/zfs.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/mkdev.h>
+#include <sys/zil.h>
 
 #include "zfs_namecheck.h"
 
@@ -98,6 +99,8 @@ typedef struct zvol_state {
 	uint32_t	zv_mode;	/* DS_MODE_* flags at open time */
 	uint32_t	zv_open_count[OTYPCNT];	/* open counts */
 	uint32_t	zv_total_opens;	/* total open count */
+	zilog_t		*zv_zilog;	/* ZIL handle */
+	uint64_t	zv_txg_assign;	/* txg to assign during ZIL replay */
 } zvol_state_t;
 
 static void
@@ -218,6 +221,68 @@ zvol_create_cb(objset_t *os, void *arg, dmu_tx_t *tx)
 	error = zap_update(os, ZVOL_ZAP_OBJ, "size", 8, 1, &zc->zc_volsize, tx);
 	ASSERT(error == 0);
 }
+
+/*
+ * Replay a TX_WRITE ZIL transaction that didn't get committed
+ * after a system failure
+ */
+static int
+zvol_replay_write(zvol_state_t *zv, lr_write_t *lr, boolean_t byteswap)
+{
+	objset_t *os = zv->zv_objset;
+	char *data = (char *)(lr + 1);	/* data follows lr_write_t */
+	uint64_t off = lr->lr_offset;
+	uint64_t len = lr->lr_length;
+	dmu_tx_t *tx;
+	int error;
+
+	if (byteswap)
+		byteswap_uint64_array(lr, sizeof (*lr));
+
+restart:
+	tx = dmu_tx_create(os);
+	dmu_tx_hold_write(tx, ZVOL_OBJ, off, len);
+	error = dmu_tx_assign(tx, zv->zv_txg_assign);
+	if (error) {
+		dmu_tx_abort(tx);
+		if (error == ERESTART && zv->zv_txg_assign == TXG_NOWAIT) {
+			txg_wait_open(dmu_objset_pool(os), 0);
+			goto restart;
+		}
+	} else {
+		dmu_write(os, ZVOL_OBJ, off, len, data, tx);
+		dmu_tx_commit(tx);
+	}
+
+	return (error);
+}
+
+/* ARGSUSED */
+static int
+zvol_replay_err(zvol_state_t *zv, lr_t *lr, boolean_t byteswap)
+{
+	return (ENOTSUP);
+}
+
+/*
+ * Callback vectors for replaying records.
+ * Only TX_WRITE is needed for zvol.
+ */
+zil_replay_func_t *zvol_replay_vector[TX_MAX_TYPE] = {
+	zvol_replay_err,	/* 0 no such transaction type */
+	zvol_replay_err,	/* TX_CREATE */
+	zvol_replay_err,	/* TX_MKDIR */
+	zvol_replay_err,	/* TX_MKXATTR */
+	zvol_replay_err,	/* TX_SYMLINK */
+	zvol_replay_err,	/* TX_REMOVE */
+	zvol_replay_err,	/* TX_RMDIR */
+	zvol_replay_err,	/* TX_LINK */
+	zvol_replay_err,	/* TX_RENAME */
+	zvol_replay_write,	/* TX_WRITE */
+	zvol_replay_err,	/* TX_TRUNCATE */
+	zvol_replay_err,	/* TX_SETATTR */
+	zvol_replay_err,	/* TX_ACL */
+};
 
 /*
  * Create a minor node for the specified volume.
@@ -347,6 +412,9 @@ zvol_create_minor(zfs_cmd_t *zc)
 	zv->zv_volsize = volsize;
 	zv->zv_objset = os;
 	zv->zv_mode = ds_mode;
+	zv->zv_zilog = zil_open(os, NULL);
+
+	zil_replay(os, zv, &zv->zv_txg_assign, zvol_replay_vector, NULL);
 
 	zvol_size_changed(zv, dev);
 
@@ -390,8 +458,9 @@ zvol_remove_minor(zfs_cmd_t *zc)
 	VERIFY(dsl_prop_unregister(dmu_objset_ds(zv->zv_objset),
 	    "readonly", zvol_readonly_changed_cb, zv) == 0);
 
+	zil_close(zv->zv_zilog);
+	zv->zv_zilog = NULL;
 	dmu_objset_close(zv->zv_objset);
-
 	zv->zv_objset = NULL;
 
 	ddi_soft_state_free(zvol_state, zv->zv_minor);
@@ -576,6 +645,57 @@ zvol_close(dev_t dev, int flag, int otyp, cred_t *cr)
 	return (0);
 }
 
+/*
+ * zvol_log_write() handles synchronous page writes using
+ * TX_WRITE ZIL transactions.
+ *
+ * We store data in the log buffers if it's small enough.
+ * Otherwise we flush the data out via dmu_sync().
+ */
+ssize_t zvol_immediate_write_sz = 65536;
+
+int
+zvol_log_write(zvol_state_t *zv, dmu_tx_t *tx, offset_t off, ssize_t len,
+    char *addr)
+{
+	itx_t *itx;
+	lr_write_t *lr;
+	objset_t *os = zv->zv_objset;
+	int dlen;
+	int error;
+
+	dlen = (len <= zvol_immediate_write_sz ? len : 0);
+	itx = zil_itx_create(TX_WRITE, sizeof (*lr) + dlen);
+	lr = (lr_write_t *)&itx->itx_lr;
+	lr->lr_foid = ZVOL_OBJ;
+	lr->lr_offset = off;
+	lr->lr_length = len;
+	lr->lr_blkoff = 0;
+	BP_ZERO(&lr->lr_blkptr);
+
+	/*
+	 * Get the data as we know we'll be writing it immediately
+	 */
+	if (dlen) { /* immediate write */
+		bcopy(addr, (char *)itx + offsetof(itx_t, itx_lr) +
+		    sizeof (*lr), len);
+	} else {
+		txg_suspend(dmu_objset_pool(os));
+		error = dmu_sync(os, ZVOL_OBJ, off, &lr->lr_blkoff,
+		    &lr->lr_blkptr, dmu_tx_get_txg(tx));
+		txg_resume(dmu_objset_pool(os));
+		if (error) {
+			kmem_free(itx, offsetof(itx_t, itx_lr));
+			return (error);
+		}
+	}
+	itx->itx_data_copied = 1;
+
+	(void) zil_itx_assign(zv->zv_zilog, itx, tx);
+
+	return (0);
+}
+
 int
 zvol_strategy(buf_t *bp)
 {
@@ -583,7 +703,9 @@ zvol_strategy(buf_t *bp)
 	uint64_t off, volsize;
 	size_t size, resid;
 	char *addr;
+	objset_t *os;
 	int error = 0;
+	int sync;
 
 	if (zv == NULL) {
 		bioerror(bp, ENXIO);
@@ -606,7 +728,9 @@ zvol_strategy(buf_t *bp)
 	off = ldbtob(bp->b_blkno);
 	volsize = zv->zv_volsize;
 
-	ASSERT(zv->zv_objset != NULL);
+	os = zv->zv_objset;
+	ASSERT(os != NULL);
+	sync = !(bp->b_flags & B_ASYNC) && !(zil_disable);
 
 	bp_mapin(bp);
 	addr = bp->b_un.b_addr;
@@ -620,17 +744,26 @@ zvol_strategy(buf_t *bp)
 			size = volsize - off;
 
 		if (bp->b_flags & B_READ) {
-			error = dmu_read_canfail(zv->zv_objset, ZVOL_OBJ,
+			error = dmu_read_canfail(os, ZVOL_OBJ,
 			    off, size, addr);
 		} else {
-			dmu_tx_t *tx = dmu_tx_create(zv->zv_objset);
+			dmu_tx_t *tx = dmu_tx_create(os);
 			dmu_tx_hold_write(tx, ZVOL_OBJ, off, size);
 			error = dmu_tx_assign(tx, TXG_WAIT);
 			if (error) {
 				dmu_tx_abort(tx);
 			} else {
-				dmu_write(zv->zv_objset, ZVOL_OBJ,
-				    off, size, addr, tx);
+				dmu_write(os, ZVOL_OBJ, off, size, addr, tx);
+				if (sync) {
+					/* use the ZIL to commit this write */
+					error = zvol_log_write(zv, tx, off,
+					    size, addr);
+					if (error) {
+						txg_wait_synced(
+						    dmu_objset_pool(os), 0);
+						sync = B_FALSE;
+					}
+				}
 				dmu_tx_commit(tx);
 			}
 		}
@@ -645,6 +778,10 @@ zvol_strategy(buf_t *bp)
 		bioerror(bp, off > volsize ? EINVAL : error);
 
 	biodone(bp);
+
+	if (sync)
+		zil_commit(zv->zv_zilog, UINT64_MAX, FDSYNC);
+
 	return (0);
 }
 

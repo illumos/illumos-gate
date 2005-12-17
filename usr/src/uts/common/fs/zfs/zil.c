@@ -38,7 +38,6 @@
 #include <sys/dsl_dataset.h>
 #include <sys/vdev.h>
 
-
 /*
  * The zfs intent log (ZIL) saves transaction records of system calls
  * that change the file system in memory with enough information
@@ -414,7 +413,6 @@ zil_add_vdev(zilog_t *zilog, uint64_t vdev, uint64_t seq)
 	list_insert_tail(&zilog->zl_vdev_list, zv);
 }
 
-
 void
 zil_flush_vdevs(zilog_t *zilog, uint64_t seq)
 {
@@ -467,8 +465,11 @@ zil_flush_vdevs(zilog_t *zilog, uint64_t seq)
 	 * Wait for all the flushes to complete.  Not all devices actually
 	 * support the DKIOCFLUSHWRITECACHE ioctl, so it's OK if it fails.
 	 */
-	if (zio != NULL)
+	if (zio != NULL) {
+		mutex_exit(&zilog->zl_lock);
 		(void) zio_wait(zio);
+		mutex_enter(&zilog->zl_lock);
+	}
 }
 
 /*
@@ -554,19 +555,15 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	txg_rele_to_quiesce(&lwb->lwb_txgh);
 
 	/*
-	 * Pick a ZIL blocksize based upon the size of the outstanding
-	 * in-memory transactions, or if none the same size as the
-	 * last block.
+	 * Pick a ZIL blocksize. We request a size that is the
+	 * maximum of the previous used size, the current used size and
+	 * the amount waiting in the queue.
 	 */
-	if (zilog->zl_itx_list_sz) {
-		zil_blksz = zilog->zl_itx_list_sz + sizeof (*ztp);
-		zil_blksz = P2ROUNDUP(zil_blksz, ZIL_MIN_BLKSZ);
-		if (zil_blksz > ZIL_MAX_BLKSZ)
-			zil_blksz = ZIL_MAX_BLKSZ;
-		zilog->zl_prev_blk_sz = zil_blksz;
-	} else {
-		zil_blksz = zilog->zl_prev_blk_sz;
-	}
+	zil_blksz = MAX(zilog->zl_cur_used, zilog->zl_prev_used);
+	zil_blksz = MAX(zil_blksz, zilog->zl_itx_list_sz + sizeof (*ztp));
+	zil_blksz = P2ROUNDUP(zil_blksz, ZIL_MIN_BLKSZ);
+	if (zil_blksz > ZIL_MAX_BLKSZ)
+		zil_blksz = ZIL_MAX_BLKSZ;
 
 	error = zio_alloc_blk(zilog->zl_spa, ZIO_CHECKSUM_ZILOG,
 	    zil_blksz, &ztp->zit_next_blk, txg);
@@ -656,6 +653,8 @@ zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 			return (lwb);
 		}
 	}
+
+	zilog->zl_cur_used += reclen;
 
 	/*
 	 * If this record won't fit in the current log block, start a new one.
@@ -847,11 +846,10 @@ zil_commit(zilog_t *zilog, uint64_t seq, int ioflag)
 	if (lwb != NULL && lwb->lwb_nused != 0)
 		lwb = zil_lwb_write_start(zilog, lwb);
 
-	/* wake up others waiting to start a write */
-	mutex_enter(&zilog->zl_lock);
-	zilog->zl_writer = B_FALSE;
-	cv_signal(&zilog->zl_cv_write);
+	zilog->zl_prev_used = zilog->zl_cur_used;
+	zilog->zl_cur_used = 0;
 
+	mutex_enter(&zilog->zl_lock);
 	if (max_seq > zilog->zl_ss_seq) {
 		zilog->zl_ss_seq = max_seq;
 		cv_broadcast(&zilog->zl_cv_seq);
@@ -864,6 +862,7 @@ zil_commit(zilog_t *zilog, uint64_t seq, int ioflag)
 			cv_wait(&zilog->zl_cv_seq, &zilog->zl_lock);
 		zil_flush_vdevs(zilog, seq);
 	}
+
 	if (zilog->zl_log_error || lwb == NULL) {
 		zilog->zl_log_error = 0;
 		max_seq = zilog->zl_itx_seq;
@@ -873,7 +872,10 @@ zil_commit(zilog_t *zilog, uint64_t seq, int ioflag)
 		zilog->zl_ss_seq = MAX(max_seq, zilog->zl_ss_seq);
 		cv_broadcast(&zilog->zl_cv_seq);
 	}
+	/* wake up others waiting to start a write */
+	zilog->zl_writer = B_FALSE;
 	mutex_exit(&zilog->zl_lock);
+	cv_signal(&zilog->zl_cv_write);
 }
 
 /*
@@ -937,7 +939,6 @@ zil_alloc(objset_t *os, zil_header_t *zh_phys)
 	zilog->zl_os = os;
 	zilog->zl_spa = dmu_objset_spa(os);
 	zilog->zl_dmu_pool = dmu_objset_pool(os);
-	zilog->zl_prev_blk_sz = ZIL_MIN_BLKSZ;
 
 	list_create(&zilog->zl_itx_list, sizeof (itx_t),
 	    offsetof(itx_t, itx_node));

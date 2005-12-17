@@ -2793,7 +2793,7 @@ top:
 	if (lenp)
 		*lenp = len;
 
-	zil_commit(zilog, seq, 0);
+	zil_commit(zilog, seq, (flags & B_ASYNC) ? 0 : FDSYNC);
 out:
 	return (err);
 }
