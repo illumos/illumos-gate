@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+/* Portions Copyright 2005 Richard Lowe */
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -186,7 +187,7 @@ static int cryptoreadfile(char *filename, CK_BYTE_PTR *pdata,
 	CK_ULONG_PTR pdatalen);
 static int get_random_data(CK_BYTE_PTR pivbuf, int ivlen);
 static int crypt_multipart(struct CommandInfo *cmd, CK_SESSION_HANDLE hSession,
-	int infd, int outfd, struct stat in);
+	int infd, int outfd, off_t insize);
 
 int
 main(int argc, char **argv)
@@ -275,11 +276,11 @@ usage(struct CommandInfo *cmd)
 {
 	if (cmd->type == CKA_ENCRYPT) {
 		cryptoerror(LOG_STDERR, gettext("usage: encrypt -l | -a "
-		    "<algorithm> [-k <keyfile>] [-i <infile>]"
+		    "<algorithm> [-v] [-k <keyfile>] [-i <infile>]"
 		    "\n\t\t\t[-o <outfile>]"));
 	} else {
 		cryptoerror(LOG_STDERR, gettext("usage: decrypt -l | -a "
-		    "<algorithm> [-k <keyfile>] [-i <infile>]"
+		    "<algorithm> [-v] [-k <keyfile>] [-i <infile>]"
 		    "\n\t\t\t[-o <outfile>]"));
 	}
 }
@@ -859,7 +860,7 @@ execute_cmd(struct CommandInfo *cmd, char *algo_str)
 		}
 	}
 
-	if (crypt_multipart(cmd, hSession, infd, outfd, insbuf) == -1) {
+	if (crypt_multipart(cmd, hSession, infd, outfd, insbuf.st_size) == -1) {
 		goto cleanup;
 	}
 
@@ -888,9 +889,9 @@ cleanup:
 		free(pivbuf);
 
 	/* close all the files */
-	if (infd != -1)
+	if (iflag && (infd != -1))
 		(void) close(infd);
-	if (outfd != -1)
+	if (oflag && (outfd != -1))
 		(void) close(outfd);
 
 	/* rename tmp output to input file */
@@ -962,7 +963,7 @@ print_status(int pos_to_advance)
 
 static int
 crypt_multipart(struct CommandInfo *cmd, CK_SESSION_HANDLE hSession,
-	int infd, int outfd, struct stat in)
+	int infd, int outfd, off_t insize)
 {
 	CK_RV		rv;
 	CK_ULONG	resultlen;
@@ -984,7 +985,7 @@ crypt_multipart(struct CommandInfo *cmd, CK_SESSION_HANDLE hSession,
 
 	/* Divide into 79 increments for progress bar element spacing */
 	if (vflag && iflag)
-		status_incr = (in.st_size / 79.0);
+		status_incr = (insize / 79.0);
 
 	while ((nread = read(infd, databuf, datalen)) > 0) {
 
@@ -1060,7 +1061,7 @@ crypt_multipart(struct CommandInfo *cmd, CK_SESSION_HANDLE hSession,
 			}
 
 			/* Calculate the number of elements need to be print */
-			if (in.st_size <= BUFFERSIZE)
+			if (insize <= BUFFERSIZE)
 				pos = 78;
 			else
 				pos = (int)((status_index - status_last) /
