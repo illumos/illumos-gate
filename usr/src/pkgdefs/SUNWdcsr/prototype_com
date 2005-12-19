@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -41,6 +41,7 @@ i copyright
 i depend
 i i.manifest
 i r.manifest
+i postinstall
 #
 # source locations relative to the prototype file
 #
@@ -52,3 +53,7 @@ d none var/svc/manifest 0755 root sys
 d none var/svc/manifest/platform 0755 root sys
 d none var/svc/manifest/platform/sun4u 0755 root sys
 f manifest var/svc/manifest/platform/sun4u/dcs.xml 0444 root sys
+d none lib 755 root bin
+d none lib/svc 0755 root bin
+d none lib/svc/method 0755 root bin
+f none lib/svc/method/svc-dcs 0555 root bin

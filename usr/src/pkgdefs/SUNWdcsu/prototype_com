@@ -39,16 +39,11 @@
 i pkginfo
 i copyright
 i depend
-i postinstall
 #
 # source locations relative to the prototype file
 #
 # SUNWdcsu
 #
-d none lib 755 root bin
-d none lib/svc 0755 root bin
-d none lib/svc/method 0755 root bin
-f none lib/svc/method/svc-dcs 0555 root bin
 d none usr 755 root sys
 d none usr/lib 755 root bin
 f none usr/lib/dcs 755 root bin
