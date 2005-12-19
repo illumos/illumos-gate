@@ -1434,6 +1434,7 @@ static void sd_free_rqs(struct sd_lun *un);
 
 static void sd_dump_memory(struct sd_lun *un, uint_t comp, char *title,
 	uchar_t *data, int len, int fmt);
+static void sd_panic_for_res_conflict(struct sd_lun *un);
 
 /*
  * Disk Ioctl Function Prototypes
@@ -8744,9 +8745,6 @@ sd_unit_detach(dev_info_t *devi)
 	struct sd_lun		*un;
 	int			i;
 	dev_t			dev;
-#if !(defined(__i386) || defined(__amd64)) && !defined(__fibre)
-	int			reset_retval;
-#endif
 	int			instance = ddi_get_instance(devi);
 
 	mutex_enter(&sd_detach_mutex);
@@ -8926,58 +8924,6 @@ sd_unit_detach(dev_info_t *devi)
 	 */
 	(void) scsi_reset_notify(SD_ADDRESS(un), SCSI_RESET_CANCEL,
 	    sd_mhd_reset_notify_cb, (caddr_t)un);
-
-
-
-#if defined(__i386) || defined(__amd64)
-	/*
-	 * Gratuitous bus resets sometimes cause an otherwise
-	 * okay ATA/ATAPI bus to hang. This is due the lack of
-	 * a clear spec of how resets should be implemented by ATA
-	 * disk drives.
-	 */
-#elif !defined(__fibre)		/* "#else if" does NOT work! */
-	/*
-	 * Reset target/bus.
-	 *
-	 * Note: This is a legacy workaround for Elite III dual-port drives that
-	 * will not come online after an aborted detach and subsequent re-attach
-	 * It should be removed when the Elite III FW is fixed, or the drives
-	 * are no longer supported.
-	 */
-	if (un->un_f_cfg_is_atapi == FALSE) {
-		reset_retval = 0;
-
-		/* If the device is in low power mode don't reset it */
-
-		mutex_enter(&un->un_pm_mutex);
-		if (!SD_DEVICE_IS_IN_LOW_POWER(un)) {
-			/*
-			 * First try a LUN reset if we can, then move on to a
-			 * target reset if needed; swat the bus as a last
-			 * resort.
-			 */
-			mutex_exit(&un->un_pm_mutex);
-			if (un->un_f_allow_bus_device_reset == TRUE) {
-				if (un->un_f_lun_reset_enabled == TRUE) {
-					reset_retval =
-					    scsi_reset(SD_ADDRESS(un),
-					    RESET_LUN);
-				}
-				if (reset_retval == 0) {
-					reset_retval =
-					    scsi_reset(SD_ADDRESS(un),
-					    RESET_TARGET);
-				}
-			}
-			if (reset_retval == 0) {
-				(void) scsi_reset(SD_ADDRESS(un), RESET_ALL);
-			}
-		} else {
-			mutex_exit(&un->un_pm_mutex);
-		}
-	}
-#endif
 
 	/*
 	 * protect the timeout pointers from getting nulled by
@@ -18513,12 +18459,12 @@ sd_pkt_status_check_condition(struct sd_lun *un, struct buf *bp,
 		 * The SD_RETRY_DELAY value need to be adjusted here
 		 * when SD_RETRY_DELAY change in sddef.h
 		 */
-		sd_retry_command(un, bp, SD_RETRIES_STANDARD, NULL, NULL, 0,
+		sd_retry_command(un, bp, SD_RETRIES_STANDARD, NULL, NULL, EIO,
 			un->un_f_is_fibre?drv_usectohz(100000):(clock_t)0,
 			NULL);
 #else
 		sd_retry_command(un, bp, SD_RETRIES_STANDARD, NULL, NULL,
-		    0, SD_RETRY_DELAY, NULL);
+		    EIO, SD_RETRY_DELAY, NULL);
 #endif
 	}
 
@@ -18657,7 +18603,7 @@ sd_pkt_status_reservation_conflict(struct sd_lun *un, struct buf *bp,
 	if ((un->un_resvd_status & SD_FAILFAST) != 0) {
 		if (sd_failfast_enable != 0) {
 			/* By definition, we must panic here.... */
-			panic("Reservation Conflict");
+			sd_panic_for_res_conflict(un);
 			/*NOTREACHED*/
 		}
 		SD_ERROR(SD_LOG_IO, un,
@@ -25075,7 +25021,7 @@ sd_mhd_watch_cb(caddr_t arg, struct scsi_watch_result *resultp)
 			mutex_enter(SD_MUTEX(un));
 			if ((un->un_resvd_status & SD_FAILFAST) &&
 			    (sd_failfast_enable)) {
-				panic("Reservation Conflict");
+				sd_panic_for_res_conflict(un);
 				/*NOTREACHED*/
 			}
 			SD_INFO(SD_LOG_IOCTL_MHD, un,
@@ -29949,6 +29895,32 @@ sd_setup_next_xfer(struct sd_lun *un, struct buf *bp,
 	return (0);
 }
 #endif
+
+/*
+ *    Function: sd_panic_for_res_conflict
+ *
+ * Description: Call panic with a string formated with "Reservation Conflict"
+ *		and a human readable identifier indicating the SD instance
+ *		that experienced the reservation conflict.
+ *
+ *   Arguments: un - pointer to the soft state struct for the instance.
+ *
+ *     Context: may execute in interrupt context.
+ */
+
+#define	SD_RESV_CONFLICT_FMT_LEN 40
+void
+sd_panic_for_res_conflict(struct sd_lun *un)
+{
+	char panic_str[SD_RESV_CONFLICT_FMT_LEN+MAXPATHLEN];
+	char path_str[MAXPATHLEN];
+
+	(void) snprintf(panic_str, sizeof (panic_str),
+	    "Reservation Conflict\nDisk: %s",
+	    ddi_pathname(SD_DEVINFO(un), path_str));
+
+	panic(panic_str);
+}
 
 /*
  * Note: The following sd_faultinjection_ioctl( ) routines implement

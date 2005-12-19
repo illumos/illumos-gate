@@ -258,6 +258,13 @@ typedef struct emul64_tgt {
 	avl_tree_t		emul64_tgt_data;	/* Tree of data blks */
 	kmutex_t		emul64_tgt_blk_lock;	/* Protect data blks */
 	krwlock_t		emul64_tgt_nw_lock;	/* Guard tgt_nowrite */
+	/* Fields for error injection */
+	ushort_t		emul64_einj_state;
+	ushort_t		emul64_einj_sense_length;
+	uint_t			emul64_einj_pkt_state;
+	uint_t			emul64_einj_pkt_reason;
+	struct scsi_status	emul64_einj_scsi_status;
+	uint8_t			*emul64_einj_sense_data;
 } emul64_tgt_t;
 
 /*

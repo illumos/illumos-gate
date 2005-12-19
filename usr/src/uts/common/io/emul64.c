@@ -1087,6 +1087,135 @@ emul64_check_cond(struct scsi_pkt *pkt, uchar_t key, uchar_t asc, uchar_t ascq)
 	arq->sts_sensedata.es_qual_code = ascq;
 }
 
+ushort_t
+emul64_error_inject(struct scsi_pkt *pkt)
+{
+	struct emul64_cmd	*sp	= PKT2CMD(pkt);
+	emul64_tgt_t		*tgt;
+	struct scsi_arq_status *arq =
+			(struct scsi_arq_status *)pkt->pkt_scbp;
+	uint_t			max_sense_len;
+
+	EMUL64_MUTEX_ENTER(sp->cmd_emul64);
+	tgt = find_tgt(sp->cmd_emul64,
+		pkt->pkt_address.a_target, pkt->pkt_address.a_lun);
+	EMUL64_MUTEX_EXIT(sp->cmd_emul64);
+
+	/*
+	 * If there is no target, skip the error injection and
+	 * let the packet be handled normally.  This would normally
+	 * never happen since a_target and a_lun are setup in
+	 * emul64_scsi_init_pkt.
+	 */
+	if (tgt == NULL) {
+		return (ERR_INJ_DISABLE);
+	}
+
+	if (tgt->emul64_einj_state != ERR_INJ_DISABLE) {
+		arq->sts_status = tgt->emul64_einj_scsi_status;
+		pkt->pkt_state = tgt->emul64_einj_pkt_state;
+		pkt->pkt_reason = tgt->emul64_einj_pkt_reason;
+
+		/*
+		 * Calculate available sense buffer length.  We could just
+		 * assume sizeof(struct scsi_extended_sense) but hopefully
+		 * that limitation will go away soon.
+		 */
+		max_sense_len = sp->cmd_scblen  -
+		    (sizeof (struct scsi_arq_status) -
+			sizeof (struct scsi_extended_sense));
+		if (max_sense_len > tgt->emul64_einj_sense_length) {
+			max_sense_len = tgt->emul64_einj_sense_length;
+		}
+
+		/* for ARQ */
+		arq->sts_rqpkt_reason = CMD_CMPLT;
+		arq->sts_rqpkt_resid = 0;
+		arq->sts_rqpkt_state = STATE_GOT_BUS | STATE_GOT_TARGET |
+		    STATE_SENT_CMD | STATE_XFERRED_DATA | STATE_GOT_STATUS;
+
+		/* Copy sense data */
+		if (tgt->emul64_einj_sense_data != 0) {
+			bcopy(tgt->emul64_einj_sense_data,
+			    (uint8_t *)&arq->sts_sensedata,
+			    max_sense_len);
+		}
+	}
+
+	/* Return current error injection state */
+	return (tgt->emul64_einj_state);
+}
+
+int
+emul64_error_inject_req(struct emul64 *emul64, intptr_t arg)
+{
+	emul64_tgt_t		*tgt;
+	struct emul64_error_inj_data error_inj_req;
+
+	/* Check args */
+	if (arg == NULL) {
+		return (EINVAL);
+	}
+
+	if (ddi_copyin((void *)arg, &error_inj_req,
+	    sizeof (error_inj_req), 0) != 0) {
+		cmn_err(CE_WARN, "emul64: ioctl - inj copyin failed\n");
+		return (EFAULT);
+	}
+
+	EMUL64_MUTEX_ENTER(emul64);
+	tgt = find_tgt(emul64, error_inj_req.eccd_target,
+	    error_inj_req.eccd_lun);
+	EMUL64_MUTEX_EXIT(emul64);
+
+	/* Make sure device exists */
+	if (tgt == NULL) {
+		return (ENODEV);
+	}
+
+	/* Free old sense buffer if we have one */
+	if (tgt->emul64_einj_sense_data != NULL) {
+		ASSERT(tgt->emul64_einj_sense_length != 0);
+		kmem_free(tgt->emul64_einj_sense_data,
+		    tgt->emul64_einj_sense_length);
+		tgt->emul64_einj_sense_data = NULL;
+		tgt->emul64_einj_sense_length = 0;
+	}
+
+	/*
+	 * Now handle error injection request.  If error injection
+	 * is requested we will return the sense data provided for
+	 * any I/O to this target until told to stop.
+	 */
+	tgt->emul64_einj_state = error_inj_req.eccd_inj_state;
+	tgt->emul64_einj_sense_length = error_inj_req.eccd_sns_dlen;
+	tgt->emul64_einj_pkt_state = error_inj_req.eccd_pkt_state;
+	tgt->emul64_einj_pkt_reason = error_inj_req.eccd_pkt_reason;
+	tgt->emul64_einj_scsi_status = error_inj_req.eccd_scsi_status;
+	switch (error_inj_req.eccd_inj_state) {
+	case ERR_INJ_ENABLE:
+	case ERR_INJ_ENABLE_NODATA:
+		if (error_inj_req.eccd_sns_dlen) {
+			tgt->emul64_einj_sense_data =
+			    kmem_alloc(error_inj_req.eccd_sns_dlen, KM_SLEEP);
+			/* Copy sense data */
+			if (ddi_copyin((void *)(arg + sizeof (error_inj_req)),
+				tgt->emul64_einj_sense_data,
+				error_inj_req.eccd_sns_dlen, 0) != 0) {
+				cmn_err(CE_WARN,
+				    "emul64: sense data copy in failed\n");
+				return (EFAULT);
+			}
+		}
+		break;
+	case ERR_INJ_DISABLE:
+	default:
+		break;
+	}
+
+	return (0);
+}
+
 int bsd_scsi_start_stop_unit(struct scsi_pkt *);
 int bsd_scsi_test_unit_ready(struct scsi_pkt *);
 int bsd_scsi_request_sense(struct scsi_pkt *);
@@ -1108,6 +1237,20 @@ int bsd_freeblkrange(emul64_tgt_t *, emul64_range_t *);
 static void
 emul64_handle_cmd(struct scsi_pkt *pkt)
 {
+	if (emul64_error_inject(pkt) == ERR_INJ_ENABLE_NODATA) {
+		/*
+		 * If error injection is configured to return with
+		 * no data return now without handling the command.
+		 * This is how normal check conditions work.
+		 *
+		 * If the error injection state is ERR_INJ_ENABLE
+		 * (or if error injection is disabled) continue and
+		 * handle the command.  This would be used for
+		 * KEY_RECOVERABLE_ERROR type conditions.
+		 */
+		return;
+	}
+
 	switch (pkt->pkt_cdbp[0]) {
 	case SCMD_START_STOP:
 		(void) bsd_scsi_start_stop_unit(pkt);
@@ -1290,6 +1433,9 @@ emul64_ioctl(dev_t dev,
 			rv = bsd_freeblkrange(tgt, &tgtr.emul64_blkrange);
 			mutex_exit(&tgt->emul64_tgt_blk_lock);
 		}
+		break;
+	case EMUL64_ERROR_INJECT:
+		rv = emul64_error_inject_req(emul64, arg);
 		break;
 	default:
 		rv  = scsi_hba_ioctl(dev, cmd, arg, mode, credp, rvalp);

@@ -51,6 +51,7 @@ extern "C" {
 
 #include <sys/inttypes.h>
 #include <sys/types.h>
+#include <sys/scsi/scsi.h>
 
 /*
  * emul64 ioctl commands:
@@ -61,6 +62,7 @@ extern "C" {
 #define	EMUL64_WRITE_OFF	(EMUL64IOC|37)
 #define	EMUL64_WRITE_ON		(EMUL64IOC|38)
 #define	EMUL64_ZERO_RANGE	(EMUL64IOC|39)
+#define	EMUL64_ERROR_INJECT	(EMUL64IOC|40)
 
 struct emul64_range {
 	diskaddr_t	emul64_sb;	/* starting block # of range */
@@ -80,6 +82,23 @@ struct emul64_tgt_range {
 };
 
 typedef struct emul64_tgt_range emul64_tgt_range_t;
+
+/*
+ * Structure to use for specifying error injection sense data
+ */
+#define	ERR_INJ_DISABLE		0
+#define	ERR_INJ_ENABLE		1
+#define	ERR_INJ_ENABLE_NODATA	2
+
+struct emul64_error_inj_data {
+	ushort_t	eccd_target;
+	ushort_t	eccd_lun;
+	ushort_t	eccd_inj_state; /* ERR_INJ_DISABLE, ... */
+	ushort_t	eccd_sns_dlen; /* Number of bytes of sense data */
+	struct scsi_status eccd_scsi_status;
+	uchar_t		eccd_pkt_reason;
+	uint_t		eccd_pkt_state;
+};
 
 #ifdef __cplusplus
 }
