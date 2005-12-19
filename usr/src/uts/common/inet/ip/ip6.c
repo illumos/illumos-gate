@@ -10123,10 +10123,40 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 	mblk_t		*mp = first_mp, *first_mp1;
 	boolean_t	mctl_present;
 	uint8_t		nexthdr;
-	uint16_t	hdr_length = IPV6_HDR_LEN;
+	uint16_t	hdr_length;
 	ipsec_out_t	*io;
 	mib2_ipv6IfStatsEntry_t	*mibptr;
 	ilm_t		*ilm;
+	uint_t	nexthdr_offset;
+
+	nexthdr = ip6h->ip6_nxt;
+	mibptr = ill->ill_ip6_mib;
+
+	/* Fastpath */
+	switch (nexthdr) {
+	case IPPROTO_TCP:
+	case IPPROTO_UDP:
+	case IPPROTO_ICMPV6:
+	case IPPROTO_SCTP:
+		hdr_length = IPV6_HDR_LEN;
+		nexthdr_offset = (uint_t)((uchar_t *)&ip6h->ip6_nxt -
+		    (uchar_t *)ip6h);
+		break;
+	default: {
+		uint8_t	*nexthdrp;
+
+		if (!ip_hdr_length_nexthdr_v6(mp, ip6h,
+		    &hdr_length, &nexthdrp)) {
+			/* Malformed packet */
+			BUMP_MIB(mibptr, ipv6OutDiscards);
+			freemsg(first_mp);
+			return;
+		}
+		nexthdr = *nexthdrp;
+		nexthdr_offset = nexthdrp - (uint8_t *)ip6h;
+		break;
+	}
+	}
 
 	if (DB_TYPE(mp) == M_CTL) {
 		io = (ipsec_out_t *)mp->b_rptr;
@@ -10143,9 +10173,6 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 	} else {
 		mctl_present = B_FALSE;
 	}
-
-	nexthdr = ip6h->ip6_nxt;
-	mibptr = ill->ill_ip6_mib;
 
 	UPDATE_OB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;
@@ -10278,20 +10305,7 @@ ip_wput_local_v6(queue_t *q, ill_t *ill, ip6_t *ip6h, mblk_t *first_mp,
 			/*
 			 * Handle protocols with which IPv6 is less intimate.
 			 */
-			uint8_t	*nexthdrp;
-			uint_t	nexthdr_offset;
-
 			fanout_flags |= IP_FF_RAWIP|IP_FF_IP6INFO;
-
-			if (!ip_hdr_length_nexthdr_v6(mp, ip6h,
-			    &hdr_length, &nexthdrp)) {
-				/* Malformed packet */
-				BUMP_MIB(mibptr, ipv6OutDiscards);
-				freemsg(first_mp);
-				return;
-			}
-			nexthdr = *nexthdrp;
-			nexthdr_offset = nexthdrp - (uint8_t *)ip6h;
 
 			/*
 			 * Enable sending ICMP for "Unknown" nexthdr
@@ -10527,29 +10541,6 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 		}
 	}
 
-	/* Fastpath */
-	switch (nexthdr) {
-	case IPPROTO_TCP:
-	case IPPROTO_UDP:
-	case IPPROTO_ICMPV6:
-	case IPPROTO_SCTP:
-		hdr_length = IPV6_HDR_LEN;
-		break;
-	default: {
-		uint8_t	*nexthdrp;
-
-		if (!ip_hdr_length_nexthdr_v6(mp, ip6h,
-		    &hdr_length, &nexthdrp)) {
-			/* Malformed packet */
-			BUMP_MIB(mibptr, ipv6OutDiscards);
-			freemsg(first_mp);
-			return;
-		}
-		nexthdr = *nexthdrp;
-		break;
-	}
-	}
-
 	if (ire->ire_stq != NULL) {
 		uint32_t	sum;
 		uint_t		ill_index =  ((ill_t *)ire->ire_stq->q_ptr)->
@@ -10609,6 +10600,29 @@ ip_wput_ire_v6(queue_t *q, mblk_t *mp, ire_t *ire, int unspec_src,
 			if (mctl_present)
 				io->ipsec_out_reachable = B_TRUE;
 		}
+		/* Fastpath */
+		switch (nexthdr) {
+		case IPPROTO_TCP:
+		case IPPROTO_UDP:
+		case IPPROTO_ICMPV6:
+		case IPPROTO_SCTP:
+			hdr_length = IPV6_HDR_LEN;
+			break;
+		default: {
+			uint8_t	*nexthdrp;
+
+			if (!ip_hdr_length_nexthdr_v6(mp, ip6h,
+			    &hdr_length, &nexthdrp)) {
+				/* Malformed packet */
+				BUMP_MIB(mibptr, ipv6OutDiscards);
+				freemsg(first_mp);
+				return;
+			}
+			nexthdr = *nexthdrp;
+			break;
+		}
+		}
+
 		if (cksum_request != -1 && nexthdr != IPPROTO_ICMPV6) {
 			uint16_t	*up;
 			uint16_t	*insp;
