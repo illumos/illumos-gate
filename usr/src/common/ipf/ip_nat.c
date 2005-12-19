@@ -191,7 +191,7 @@ static	void	nat_delrdr __P((struct ipnat *));
 static	void	nat_delnat __P((struct ipnat *));
 static	int	fr_natgetent __P((caddr_t));
 static	int	fr_natgetsz __P((caddr_t));
-static	int	fr_natputent __P((caddr_t));
+static	int	fr_natputent __P((caddr_t, int));
 static	void	nat_tabmove __P((nat_t *));
 static	int	nat_match __P((fr_info_t *, ipnat_t *));
 static	INLINE	int nat_newmap __P((fr_info_t *, nat_t *, natinfo_t *));
@@ -813,16 +813,11 @@ int mode;
 		error = fr_lock(data, &fr_nat_lock);
 		break;
 	case SIOCSTPUT :
-		if (fr_nat_lock) {
-			if (getlock) {
-				WRITE_ENTER(&ipf_nat);
-			}
-			error = fr_natputent(data);
-			if (getlock) {
-				RWLOCK_EXIT(&ipf_nat);
-			}
-		} else
+		if ((mode & FWRITE) != 0) {
+			error = fr_natputent(data, getlock);
+		} else {
 			error = EACCES;
+		}
 		break;
 	case SIOCSTGSZ :
 		if (fr_nat_lock) {
@@ -1266,8 +1261,9 @@ caddr_t data;
 /* Loads a NAT table entry from user space, including a NAT rule, proxy and */
 /* firewall rule data structures, if pointers to them indicate so.          */
 /* ------------------------------------------------------------------------ */
-static int fr_natputent(data)
+static int fr_natputent(data, getlock)
 caddr_t data;
+int getlock;
 {
 	nat_save_t ipn, *ipnn;
 	ap_session_t *aps;
@@ -1351,8 +1347,15 @@ caddr_t data;
 		fin.fin_data[0] = ntohs(nat->nat_oport);
 		fin.fin_data[1] = ntohs(nat->nat_outport);
 		fin.fin_ifp = nat->nat_ifps[1];
-		if (nat_inlookup(&fin, 0, fin.fin_p, nat->nat_oip,
-				  nat->nat_inip) != NULL) {
+		if (getlock) {
+			READ_ENTER(&ipf_nat);
+		}
+		n = nat_inlookup(&fin, 0, fin.fin_p, nat->nat_oip,
+				nat->nat_inip);
+		if (getlock) {
+			RWLOCK_EXIT(&ipf_nat);
+		}
+		if (n != NULL) {
 			error = EEXIST;
 			goto junkput;
 		}
@@ -1360,8 +1363,15 @@ caddr_t data;
 		fin.fin_data[0] = ntohs(nat->nat_outport);
 		fin.fin_data[1] = ntohs(nat->nat_oport);
 		fin.fin_ifp = nat->nat_ifps[0];
-		if (nat_outlookup(&fin, 0, fin.fin_p, nat->nat_outip,
-				 nat->nat_oip) != NULL) {
+		if (getlock) {
+			READ_ENTER(&ipf_nat);
+		}
+		n = nat_outlookup(&fin, 0, fin.fin_p, nat->nat_outip,
+			nat->nat_oip);
+		if (getlock) {
+			RWLOCK_EXIT(&ipf_nat);
+		}
+		if (n != NULL) {
 			error = EEXIST;
 			goto junkput;
 		}
@@ -1418,9 +1428,20 @@ caddr_t data;
 			ipn.ipn_nat.nat_fr = fr;
 			(void) fr_outobj(&ipn, data, IPFOBJ_NATSAVE);
 		} else {
+			if (getlock) {
+				READ_ENTER(&ipf_nat);
+			}
 			for (n = nat_instances; n; n = n->nat_next)
 				if (n->nat_fr == fr)
 					break;
+			if (n != NULL) {
+				MUTEX_ENTER(&fr->fr_lock);
+				fr->fr_ref++;
+				MUTEX_EXIT(&fr->fr_lock);
+			}
+			if (getlock) {
+				RWLOCK_EXIT(&ipf_nat);
+			}
 			if (!n) {
 				error = ESRCH;
 				goto junkput;
@@ -1428,7 +1449,13 @@ caddr_t data;
 		}
 	}
 
+	if (getlock) {
+		WRITE_ENTER(&ipf_nat);
+	}
 	error = nat_insert(nat);
+	if (getlock) {
+		RWLOCK_EXIT(&ipf_nat);
+	}
 	if (error == 0) {
 		if (ipnn != NULL) {
 			KFREES(ipnn, sizeof (ipn) + ipn.ipn_dsize);
