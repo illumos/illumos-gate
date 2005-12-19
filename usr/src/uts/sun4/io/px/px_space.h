@@ -150,14 +150,17 @@ extern uint64_t px_lpug_log_mask;
 extern uint64_t px_lpug_count_mask;
 
 /* timeout length in micro seconds */
-#define	PX_PME_TO_ACK_TIMEOUT	1000000
-#define	PX_LINKUP_TIMEOUT	100000
+#define	PX_MSEC_TO_USEC	1000
+#define	PX_PME_TO_ACK_TIMEOUT	(1000 * PX_MSEC_TO_USEC)
+#define	PX_LUP_POLL_INTERVAL	(10 * PX_MSEC_TO_USEC)
+#define	PX_LUP_POLL_TO		(10 * PX_LUP_POLL_INTERVAL)
 
 #define	PX_PWR_PIL		1
 #define	PX_MAX_L1_TRIES		5
 
 extern uint64_t px_pme_to_ack_timeout;
-extern uint64_t px_linkup_timeout;
+extern uint64_t px_lup_poll_to;
+extern uint64_t px_lup_poll_interval;
 extern uint32_t	px_pwr_pil;
 extern uint32_t px_max_l1_tries;
 

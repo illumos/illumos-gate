@@ -291,8 +291,8 @@ px_err_bit_desc_t px_err_tlu_oe_tbl[] = {
 	{ TLU_OE_BIT_DESC(EHP,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(LIN,		non_fatal,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(LRS,		non_fatal,	pciex_oe) },
-	{ TLU_OE_BIT_DESC(LDN,		non_fatal,	pciex_ldn) },
-	{ TLU_OE_BIT_DESC(LUP,		tlu_lup,	pciex_lup) },
+	{ TLU_OE_BIT_DESC(LDN,		tlu_ldn,	pciex_oe) },
+	{ TLU_OE_BIT_DESC(LUP,		tlu_lup,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(ERU,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(ERO,		fatal_gos,	pciex_oe) },
 	{ TLU_OE_BIT_DESC(EMP,		fatal_gos,	pciex_oe) },
@@ -820,6 +820,7 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 	int			(*erpt_handler)();
 	int			reg_id, key;
 	int			err = PX_OK;
+	int			biterr;
 
 	ASSERT(MUTEX_HELD(&cb_p->xbc_fm_mutex));
 
@@ -862,16 +863,19 @@ px_err_erpt_and_clr(px_t *px_p, ddi_fm_error_t *derr, px_err_ss_t *ss)
 
 				/* Error Handle for this bit */
 				err_handler = err_bit_desc->err_handler;
-				if (err_handler)
-					err |= err_handler(rpdip,
+				if (err_handler) {
+					biterr = err_handler(rpdip,
 					    csr_base,
 					    derr,
 					    err_reg_tbl,
 					    err_bit_desc);
+					err |= biterr;
+				}
 
 				/* Send the ereport if it's an UNEXPECTED err */
 				erpt_handler = err_bit_desc->erpt_handler;
-				if (derr->fme_flag == DDI_FM_ERR_UNEXPECTED) {
+				if ((derr->fme_flag == DDI_FM_ERR_UNEXPECTED) &&
+				    (biterr != PX_OK)) {
 					if (erpt_handler)
 						(void) erpt_handler(rpdip,
 						    csr_base,
@@ -1627,7 +1631,8 @@ px_err_mmu_tblwlk_handle(dev_info_t *rpdip, caddr_t csr_base,
 }
 
 /*
- * TLU LUP event - power management code is interested in this event.
+ * TLU LUP event - if caused by power management activity, then it is expected.
+ * In all other cases, it is an error.
  */
 /* ARGSUSED */
 int
@@ -1638,22 +1643,27 @@ px_err_tlu_lup_handle(dev_info_t *rpdip, caddr_t csr_base,
 	px_t	*px_p = DIP_TO_STATE(rpdip);
 
 	/*
-	 * Existense of pm info indicates the power management
-	 * is interested in this event.
+	 * power management code is currently the only segment that sets
+	 * px_lup_pending to indicate its expectation for a healthy LUP
+	 * event.  For all other occasions, LUP event should be flaged as
+	 * error condition.
 	 */
-	if (!PCIE_PMINFO(rpdip) || !PCIE_NEXUS_PMINFO(rpdip))
-		return (PX_OK);
+	return ((atomic_cas_32(&px_p->px_lup_pending, 1, 0) == 0) ?
+	    PX_NONFATAL : PX_OK);
+}
 
-	mutex_enter(&px_p->px_lup_lock);
-	px_p->px_lupsoft_pending++;
-	mutex_exit(&px_p->px_lup_lock);
-
-	/*
-	 * Post a soft interrupt to wake up threads waiting for this.
-	 */
-	ddi_trigger_softintr(px_p->px_lupsoft_id);
-
-	return (PX_OK);
+/*
+ * TLU LDN event - if caused by power management activity, then it is expected.
+ * In all other cases, it is an error.
+ */
+/* ARGSUSED */
+int
+px_err_tlu_ldn_handle(dev_info_t *rpdip, caddr_t csr_base,
+	ddi_fm_error_t *derr, px_err_reg_desc_t *err_reg_descr,
+	px_err_bit_desc_t *err_bit_descr)
+{
+	px_t    *px_p = DIP_TO_STATE(rpdip);
+	return ((px_p->px_pm_flags & PX_LDN_EXPECTED) ? PX_OK : PX_NONFATAL);
 }
 
 /* PEC ILU none - see io erpt doc, section 3.1 */
@@ -1917,40 +1927,4 @@ PX_ERPT_SEND_DEC(pciex_oe)
 	    NULL);
 
 	return (PX_OK);
-}
-
-/* TLU Other Event - Link Down see io erpt doc, section 3.9 */
-PX_ERPT_SEND_DEC(pciex_ldn)
-{
-	px_t			*px_p = DIP_TO_STATE(rpdip);
-
-	/*
-	 * Don't post ereport, if ldn event is due to
-	 * power management.
-	 */
-	if (px_p->px_pm_flags & PX_LDN_EXPECTED) {
-		px_p->px_pm_flags &= ~PX_LDN_EXPECTED;
-		return (PX_OK);
-	}
-	return (PX_ERPT_SEND(pciex_oe)(rpdip, csr_base, ss_reg, derr,
-	    bit, class_name));
-
-}
-
-/* TLU Other Event - Link Up see io erpt doc, section 3.9 */
-PX_ERPT_SEND_DEC(pciex_lup)
-{
-	px_t			*px_p = DIP_TO_STATE(rpdip);
-
-	/*
-	 * Don't post ereport, if lup event is due to
-	 * power management.
-	 */
-	if (px_p->px_pm_flags & PX_LUP_EXPECTED) {
-		px_p->px_pm_flags &= ~PX_LUP_EXPECTED;
-		return (PX_OK);
-	}
-
-	return (PX_ERPT_SEND(pciex_oe)(rpdip, csr_base, ss_reg, derr,
-	    bit, class_name));
 }

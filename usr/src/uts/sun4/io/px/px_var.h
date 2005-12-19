@@ -138,18 +138,11 @@ struct px {
 	/* Power Management fields */
 	kmutex_t	px_l23ready_lock; /* used in PME_To_ACK interrupt */
 	kcondvar_t	px_l23ready_cv;	/* used in PME_TO_ACK timeout */
-
-	/* Fields below deal with link up interrupt */
-	kmutex_t	px_lup_lock;
-	kcondvar_t	px_lup_cv;	/* used in LUP event timeout */
-	kmutex_t	px_lupsoft_lock;
-	ddi_softintr_t	px_lupsoft_id;
-	int		px_lupsoft_pending;
+	volatile uint32_t	px_lup_pending;
 	int		px_pm_flags;
 	msiqid_t	px_pm_msiq_id;	/* EQ id for PCIE_PME_ACK_MSG Message */
 	uint32_t	px_pmetoack_ignored; /* count of PME_To_ACKs ignored */
 	uint32_t	px_pme_ignored; /* count of PME ignored */
-	uint32_t	px_lup_ignored; /* count of link up events ignored */
 
 	/* CPR callback id */
 	callb_id_t	px_cprcb_id;
@@ -164,10 +157,7 @@ struct px {
 /* px_pm_flags definitions used with interrupts and FMA code */
 #define	PX_PMETOACK_RECVD		0x01 /* With PME_To_ACK interrupt */
 #define	PX_PME_TURNOFF_PENDING		0x02 /* With PME_To_ACK interrupt */
-#define	PX_LINKUP_RECVD			0x04 /* With link up soft interrupt */
-#define	PX_LINKUP_PENDING		0x08 /* With link up soft interrupt */
-#define	PX_LUP_EXPECTED			0x10 /* With FMA code */
-#define	PX_LDN_EXPECTED			0x20 /* With FMA code */
+#define	PX_LDN_EXPECTED			0x04 /* With FMA code */
 
 #define	DIP_TO_INST(dip)	ddi_get_instance(dip)
 #define	INST_TO_STATE(inst)	ddi_get_soft_state(px_state_p, inst)

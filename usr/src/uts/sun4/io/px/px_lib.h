@@ -175,7 +175,6 @@ extern int px_lib_pmctl(int cmd, px_t *px_p);
  */
 extern uint64_t px_lib_get_cb(dev_info_t *dip);
 extern void px_lib_set_cb(dev_info_t *dip, uint64_t val);
-extern uint_t px_lup_softintr(caddr_t arg);
 extern uint_t px_pmeq_intr(caddr_t arg);
 
 /*

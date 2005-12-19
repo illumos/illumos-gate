@@ -1600,8 +1600,6 @@ px_lib_pmctl(int cmd, px_t *px_p)
 	}
 }
 
-#define	MSEC_TO_USEC	1000
-
 /*
  * sends PME_Turn_Off message to put the link in L2/L3 ready state.
  * called by px_ioctl.
@@ -1674,7 +1672,7 @@ px_goto_l23ready(px_t *px_p)
 		 * consequetive requests.
 		 */
 		mutex_exit(&px_p->px_l23ready_lock);
-		delay(drv_usectohz(50 * MSEC_TO_USEC));
+		delay(drv_usectohz(50 * PX_MSEC_TO_USEC));
 		mutex_held = 0;
 		if (!(px_p->px_pm_flags & PX_PMETOACK_RECVD)) {
 			ret = DDI_FAILURE;
@@ -1706,7 +1704,7 @@ l23ready_done:
 			 * here just to make sure that we wait till link
 			 * is transitioned to L23Ready state.
 			 */
-			delay(drv_usectohz(100 * MSEC_TO_USEC));
+			delay(drv_usectohz(100 * PX_MSEC_TO_USEC));
 		}
 		pwr_p->pwr_link_lvl = PM_LEVEL_L3;
 
@@ -1766,8 +1764,7 @@ px_goto_l0(px_t *px_p)
 	pxu_t		*pxu_p = (pxu_t *)px_p->px_plat_p;
 	caddr_t csr_base = (caddr_t)pxu_p->px_address[PX_REG_CSR];
 	int		ret = DDI_SUCCESS;
-	clock_t		end, timeleft;
-	int		mutex_held = 1;
+	uint64_t	time_spent = 0;
 
 	/* If no PM info, return failure */
 	if (!PCIE_PMINFO(px_p->px_dip) ||
@@ -1775,102 +1772,31 @@ px_goto_l0(px_t *px_p)
 		return (DDI_FAILURE);
 
 	mutex_enter(&pwr_p->pwr_lock);
-	mutex_enter(&px_p->px_lupsoft_lock);
-	/* Clear the LINKUP_RECVD receieved flag */
-	px_p->px_pm_flags &= ~PX_LINKUP_RECVD;
 	/*
-	 * Set flags LUP_EXPECTED to inform FMA code that LUP is
-	 * expected as part of link training and no ereports should
-	 * be posted for this event. FMA code will clear this flag
-	 * after one instance of this event. In case of P25, there
-	 * will not be a LDN event. So clear the flag set at PRE_PWRON
-	 * time.
+	 * The following link retrain activity will cause LDN and LUP event.
+	 * Receiving LDN prior to receiving LUP is expected, not an error in
+	 * this case.  Receiving LUP indicates link is fully up to support
+	 * powering up down stream device, and of course any further LDN and
+	 * LUP outside this context will be error.
 	 */
-	px_p->px_pm_flags |=  PX_LUP_EXPECTED;
-	px_p->px_pm_flags &= ~PX_LDN_EXPECTED;
+	px_p->px_lup_pending = 1;
 	if (px_link_retrain(csr_base) != DDI_SUCCESS) {
 		ret = DDI_FAILURE;
 		goto l0_done;
 	}
-	px_p->px_pm_flags |= PX_LINKUP_PENDING;
 
-	end = ddi_get_lbolt() + drv_usectohz(px_linkup_timeout);
-	while (!(px_p->px_pm_flags & PX_LINKUP_RECVD)) {
-		timeleft = cv_timedwait(&px_p->px_lup_cv,
-		    &px_p->px_lupsoft_lock, end);
-		/*
-		 * if cv_timedwait returns -1, it is either
-		 * 1) timed out or
-		 * 2) there was a pre-mature wakeup but by the time
-		 * cv_timedwait is called again end < lbolt i.e.
-		 * end is in the past.
-		 * 3) By the time we make first cv_timedwait call,
-		 * end < lbolt is true.
-		 */
-		if (timeleft == -1)
-			break;
-	}
-	if (!(px_p->px_pm_flags & PX_LINKUP_RECVD)) {
-		/*
-		 * Either timedout or interrupt didn't get a
-		 * chance to grab the mutex and set the flag.
-		 * release the mutex and delay for sometime.
-		 * This will 1) give a chance for interrupt to
-		 * set the flag 2) creates a delay between two
-		 * consequetive requests.
-		 */
-		mutex_exit(&px_p->px_lupsoft_lock);
-		mutex_held = 0;
-		delay(drv_usectohz(50 * MSEC_TO_USEC));
-		if (!(px_p->px_pm_flags & PX_LINKUP_RECVD)) {
-			ret = DDI_FAILURE;
-			DBG(DBG_PWR, px_p->px_dip, " Timed out while waiting"
-			    " for link up\n");
-		}
-	}
-	px_p->px_pm_flags &=
-	    ~(PX_LINKUP_PENDING | PX_LINKUP_RECVD | PX_LUP_EXPECTED);
-
+	/* LUP event takes the order of 15ms amount of time to occur */
+	for (; px_p->px_lup_pending && (time_spent < px_lup_poll_to);
+	    time_spent += px_lup_poll_interval)
+		drv_usecwait(px_lup_poll_interval);
+	if (px_p->px_lup_pending)
+		ret = DDI_FAILURE;
 l0_done:
-	if (mutex_held)
-		mutex_exit(&px_p->px_lupsoft_lock);
 	px_enable_detect_quiet(csr_base);
 	if (ret == DDI_SUCCESS)
 		pwr_p->pwr_link_lvl = PM_LEVEL_L0;
 	mutex_exit(&pwr_p->pwr_lock);
 	return (ret);
-}
-
-uint_t
-px_lup_softintr(caddr_t arg)
-{
-	px_t *px_p = (px_t *)arg;
-
-	DBG(DBG_PWR, px_p->px_dip, " Link up soft interrupt received \n");
-	mutex_enter(&px_p->px_lup_lock);
-	if (!(px_p->px_lupsoft_pending > 0)) {
-		/* Spurious */
-		mutex_exit(&px_p->px_lup_lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-	px_p->px_lupsoft_pending--;
-	if (px_p->px_lupsoft_pending > 0) {
-		/* More than one lup soft intr posted - unlikely */
-		mutex_exit(&px_p->px_lup_lock);
-		return (DDI_INTR_UNCLAIMED);
-	}
-	mutex_exit(&px_p->px_lup_lock);
-
-	mutex_enter(&px_p->px_lupsoft_lock);
-	cv_broadcast(&px_p->px_lup_cv);
-	if (px_p->px_pm_flags & PX_LINKUP_PENDING) {
-		px_p->px_pm_flags |= PX_LINKUP_RECVD;
-	} else {
-		/* Nobody waiting for this! */
-		px_p->px_lup_ignored++;
-	}
-	mutex_exit(&px_p->px_lupsoft_lock);
-	return (DDI_INTR_CLAIMED);
 }
 
 /*

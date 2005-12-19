@@ -2380,8 +2380,11 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 #endif
 	ppm_dc_t *dc;
 	i2c_gpio_t i2c_req;
-	int	ret;
+	int	ret, pio_save;
 	clock_t delay = 0;
+	ppm_dev_t *pdev;
+	extern int do_polled_io;
+	extern uint_t cfb_inuse;
 
 	for (dc = domp->dc; dc; dc = dc->next)
 		if (dc->cmd == key)
@@ -2406,8 +2409,22 @@ ppm_gpioset(ppm_domain_t *domp, int key)
 	case PPMDC_I2CKIO:
 		i2c_req.reg_mask = dc->m_un.i2c.mask;
 		i2c_req.reg_val = dc->m_un.i2c.val;
+
+		pio_save = do_polled_io;
+		if (cfb_inuse) {
+			for (pdev = domp->devlist; pdev; pdev = pdev->next) {
+				if (pm_is_cfb(pdev->dip)) {
+					do_polled_io = 1;
+					PPMD(D_GPIO, ("%s: cfb is in use, "
+					    "i2c transaction is done in "
+					    "poll-mode.\n", str))
+					break;
+				}
+			}
+		}
 		ret = ldi_ioctl(dc->lh, dc->m_un.i2c.iowr,
 		    (intptr_t)&i2c_req, FWRITE | FKIOCTL, kcred, NULL);
+		do_polled_io = pio_save;
 
 		PPMD(D_GPIO, ("%s: %s domain(%s) from %s by writing %x "
 		    "to gpio\n",

@@ -216,7 +216,8 @@ uint64_t px_lpug_count_mask	= PX_ERR_EN_ALL;
 uint64_t px_pme_to_ack_timeout	= PX_PME_TO_ACK_TIMEOUT;
 
 /* timeout in micro seconds for receiving link up interrupt */
-uint64_t px_linkup_timeout = PX_LINKUP_TIMEOUT;
+uint64_t px_lup_poll_to = PX_LUP_POLL_TO;
+uint64_t px_lup_poll_interval = PX_LUP_POLL_INTERVAL;
 
 /* PIL at which PME_To_ACK message interrupt is handled */
 uint32_t px_pwr_pil		= PX_PWR_PIL;

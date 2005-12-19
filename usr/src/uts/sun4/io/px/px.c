@@ -506,7 +506,6 @@ px_pwr_setup(dev_info_t *dip)
 	int instance = ddi_get_instance(dip);
 	px_t *px_p = INST_TO_STATE(instance);
 	ddi_intr_handle_impl_t hdl;
-	ddi_iblock_cookie_t iblk_cookie;
 
 	ASSERT(PCIE_PMINFO(dip));
 	pwr_p = PCIE_NEXUS_PMINFO(dip);
@@ -531,25 +530,6 @@ px_pwr_setup(dev_info_t *dip)
 	    DDI_INTR_PRI(px_pwr_pil));
 	cv_init(&px_p->px_l23ready_cv, NULL, CV_DRIVER, NULL);
 
-	mutex_init(&px_p->px_lup_lock, NULL, MUTEX_DRIVER,
-	    DDI_INTR_PRI(PX_ERR_PIL));
-	cv_init(&px_p->px_lup_cv, NULL, CV_DRIVER, NULL);
-
-	if (ddi_get_soft_iblock_cookie(dip, DDI_SOFTINT_HIGH,
-	    &iblk_cookie) != DDI_SUCCESS) {
-		DBG(DBG_PWR, dip, "px_pwr_setup: couldn't get iblock cookie\n");
-		goto pwr_setup_err1;
-	}
-
-	mutex_init(&px_p->px_lupsoft_lock, NULL, MUTEX_DRIVER,
-	    (void *)iblk_cookie);
-
-	if (ddi_add_softintr(dip, DDI_SOFTINT_HIGH, &px_p->px_lupsoft_id,
-	    NULL, NULL, px_lup_softintr, (caddr_t)px_p) != DDI_SUCCESS) {
-		DBG(DBG_PWR, dip, "px_pwr_setup: couldn't add soft intr \n");
-		goto pwr_setup_err2;
-	}
-
 	/* Initilize handle */
 	hdl.ih_cb_arg1 = px_p;
 	hdl.ih_cb_arg2 = NULL;
@@ -565,7 +545,7 @@ px_pwr_setup(dev_info_t *dip)
 	    (msgcode_t)PCIE_PME_ACK_MSG, &px_p->px_pm_msiq_id) != DDI_SUCCESS) {
 		DBG(DBG_PWR, dip, "px_pwr_setup: couldn't add "
 		    " PME_TO_ACK intr\n");
-		goto px_pwrsetup_err;
+		goto pwr_setup_err1;
 	}
 	px_lib_msg_setmsiq(dip, PCIE_PME_ACK_MSG, px_p->px_pm_msiq_id);
 	px_lib_msg_setvalid(dip, PCIE_PME_ACK_MSG, PCIE_MSG_VALID);
@@ -584,13 +564,7 @@ px_pwrsetup_err_state:
 	px_lib_msg_setvalid(dip, PCIE_PME_ACK_MSG, PCIE_MSG_INVALID);
 	(void) px_rem_msiq_intr(dip, dip, &hdl, MSG_REC, PCIE_PME_ACK_MSG,
 	    px_p->px_pm_msiq_id);
-px_pwrsetup_err:
-	ddi_remove_softintr(px_p->px_lupsoft_id);
-pwr_setup_err2:
-	mutex_destroy(&px_p->px_lupsoft_lock);
 pwr_setup_err1:
-	mutex_destroy(&px_p->px_lup_lock);
-	cv_destroy(&px_p->px_lup_cv);
 	mutex_destroy(&px_p->px_l23ready_lock);
 	cv_destroy(&px_p->px_l23ready_cv);
 
@@ -627,9 +601,6 @@ px_pwr_teardown(dev_info_t *dip)
 	px_p->px_pm_msiq_id = -1;
 
 	cv_destroy(&px_p->px_l23ready_cv);
-	ddi_remove_softintr(px_p->px_lupsoft_id);
-	mutex_destroy(&px_p->px_lupsoft_lock);
-	mutex_destroy(&px_p->px_lup_lock);
 	mutex_destroy(&px_p->px_l23ready_lock);
 }
 
