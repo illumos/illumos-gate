@@ -4621,6 +4621,11 @@ sotpi_getsockname(struct sonode *so)
 		error = 0;
 		goto done;
 	}
+	if (!(so->so_state & SS_ISBOUND)) {
+		/* If not bound, then nothing to return. */
+		error = 0;
+		goto done;
+	}
 	/* Allocate local buffer to use with ioctl */
 	addrlen = (t_uscalar_t)so->so_laddr_maxlen;
 	mutex_exit(&so->so_lock);
