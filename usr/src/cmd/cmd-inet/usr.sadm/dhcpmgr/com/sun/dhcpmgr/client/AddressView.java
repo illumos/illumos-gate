@@ -22,7 +22,7 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 package com.sun.dhcpmgr.client;
@@ -68,12 +68,12 @@ public class AddressView implements View {
     private int sortModelIndex = -1;
     private static final String NO_NETWORKS =
 	ResourceStrings.getString("no_networks");
-    
+
     // Model class for the network list
     class NetworkListModel extends AbstractListModel {
 	private Object currentValue;
 	private Network data[] = null;
-    
+
 	public void load() {
 	    try {
 		MainFrame.setStatusText(
@@ -86,28 +86,28 @@ public class AddressView implements View {
 		if (data != null) {
 		    len = data.length;
 		}
-	        MainFrame.setStatusText(
+		MainFrame.setStatusText(
 		    MessageFormat.format(
 		    ResourceStrings.getString("networks_loaded"), len));
 	    }
 	}
-	
+
 	public void reload() {
 	    load();
 	    fireContentsChanged(this, -1, -1);
 	}
-	    
+
 	public int getSize() {
 	    if (data == null) {
 		load();
 	    }
-	    if (data == null) { 
+	    if (data == null) {
 		return 0;
 	    } else {
 		return data.length;
 	    }
 	}
-	
+
 	public Object getElementAt(int index) {
 	    if (data == null) {
 		load();
@@ -118,30 +118,30 @@ public class AddressView implements View {
 		return data[index].toString();
 	    }
 	}
-	
+
 	public Network getNetworkAt(int index) {
 	    if (data == null || index >= data.length) {
-	    	return null;
+		return null;
 	    } else {
-	    	return data[index];
+		return data[index];
 	    }
 	}
     }
-    
+
     // Container class for the address data
     class AddressTableModel extends AbstractTableModel {
 	private DhcpClientRecord [] data;
 	private String network;
 	private boolean showAddresses;
 	private boolean firstLoad;
-	
+
 	public AddressTableModel() {
 	    data = null;
 	    network = "";
 	    showAddresses = false;
 	    firstLoad = true;
 	}
-	
+
 	public void load(String network) {
 	    data = null;
 	    fireTableDataChanged();
@@ -150,8 +150,8 @@ public class AddressView implements View {
 		return;
 	    }
 	    this.network = network;
-	    
-	    // Update the status line	
+
+	    // Update the status line
 	    Object [] objs = {network};
 	    String s = MessageFormat.format(
 		ResourceStrings.getString("loading_addresses"), objs);
@@ -159,9 +159,9 @@ public class AddressView implements View {
 
 	    // Kick off background loading of addresses
 	    AddressLoader loader = new AddressLoader();
-	    
+
 	}
-	
+
 	// Loading is done, re-sort and tell the view to repaint
 	protected void doneLoading() {
 	    sortedTableModel.reallocateIndexes();
@@ -171,21 +171,21 @@ public class AddressView implements View {
 	    }
 	    fireTableDataChanged();
 	}
-	
+
 	protected String getNetwork() {
 	    return network;
 	}
-	
+
 	protected void setData(DhcpClientRecord [] newdata) {
 	    data = newdata;
 	}
-	
+
 	public void setShowAddresses(boolean state) {
 	    showAddresses = state;
 	    fireTableStructureChanged();
 	    sortedTableModel.sortByColumn(sortModelIndex);
 	}
-	
+
 	public int getRowCount() {
 	    if (data == null) {
 		return 0;
@@ -193,12 +193,12 @@ public class AddressView implements View {
 		return data.length;
 	    }
 	}
-	
+
 	public int getColumnCount() {
 	    return 7;
 	}
-	
-	public Object getValueAt(int row, int column) {	
+
+	public Object getValueAt(int row, int column) {
 	    switch (column) {
 	    case 0:
 		if (showAddresses) {
@@ -236,7 +236,7 @@ public class AddressView implements View {
 		return null;
 	    }
 	}
-	
+
 	public Class getColumnClass(int column) {
 	    switch (column) {
 	    case 0:
@@ -257,7 +257,7 @@ public class AddressView implements View {
 		return super.getColumnClass(column);
 	    }
 	}
-	
+
 	public String getColumnName(int column) {
 	    switch (column) {
 	    case 0:
@@ -282,34 +282,34 @@ public class AddressView implements View {
 		return super.getColumnName(column);
 	    }
 	}
-	
+
 	protected DhcpClientRecord getClientAt(int row) {
 	    return data[row];
 	}
     }
-    
+
     // Background loader for addresses.
-    class AddressLoader extends SwingWorker {
+    class AddressLoader extends com.sun.dhcpmgr.ui.SwingWorker {
 	public Object construct() {
 	    try {
 		String net = addressTableModel.getNetwork();
 		return DataManager.get().getClients(net, true);
 	    } catch (final BridgeException e) {
-	    	// Since we're in a background thread, ask Swing to run ASAP.
-	    	SwingUtilities.invokeLater(new Runnable() {
+		// Since we're in a background thread, ask Swing to run ASAP.
+		SwingUtilities.invokeLater(new Runnable() {
 		    Object [] args = new Object[] { e.getMessage() };
-	    	    public void run() {
-		    	MessageFormat form = new MessageFormat(
-		            ResourceStrings.getString("error_loading_addrs"));
-		    	JOptionPane.showMessageDialog(null, form.format(args),
-		            ResourceStrings.getString("server_error_title"),
+		    public void run() {
+			MessageFormat form = new MessageFormat(
+			    ResourceStrings.getString("error_loading_addrs"));
+			JOptionPane.showMessageDialog(null, form.format(args),
+			    ResourceStrings.getString("server_error_title"),
 			    JOptionPane.ERROR_MESSAGE);
 		    }
-	    	});
+		});
 	    }
 	    return null;
 	}
-	
+
 	public void finished() {
 	    addressTableModel.setData((DhcpClientRecord [])get());
 	    addressTableModel.doneLoading();
@@ -320,7 +320,7 @@ public class AddressView implements View {
 	    addressTable.clearSelection();
 	}
     }
-    
+
     // Renderer class used to make unusable addresses bold in the display
     class AddressTableCellRenderer extends ExtendedCellRenderer {
 	public Component getTableCellRendererComponent(JTable table,
@@ -348,7 +348,7 @@ public class AddressView implements View {
 	    }
 	}
     }
-    
+
     public AddressView() {
 	displayPanel = new JPanel(new BorderLayout());
 
@@ -366,12 +366,10 @@ public class AddressView implements View {
 		int index = networkList.getSelectedIndex();
 		if (index != -1) {
 		    net = (String)networkListModel.getElementAt(
-		    	networkList.getSelectedIndex());
+			networkList.getSelectedIndex());
 		}
 		if (net.length() == 0) {
-		    /*
-		     * No networks are selected; disable menu items
-		     */
+		    // No networks are selected; disable menu items
 		    deleteNets.setEnabled(false);
 		    addAddrs.setEnabled(false);
 		    showAddresses.setEnabled(false);
@@ -401,7 +399,7 @@ public class AddressView implements View {
 
 	networkPanel.add(networkPane, BorderLayout.CENTER);
 	displayPanel.add(networkPanel, BorderLayout.WEST);
-	
+
 	// Create table to display in data area
 	addressTableModel = new AddressTableModel();
 	sortedTableModel = new TableSorter(addressTableModel);
@@ -413,9 +411,9 @@ public class AddressView implements View {
 	    ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
 
 	sortedTableModel.addActionListener(new ActionListener() {
-    	    private SortedHeaderRenderer sortedRenderer =
-	        new SortedHeaderRenderer(addressTable);
-    	    private TableCellRenderer savedRenderer;
+	    private SortedHeaderRenderer sortedRenderer =
+		new SortedHeaderRenderer(addressTable);
+	    private TableCellRenderer savedRenderer;
 	    public void actionPerformed(ActionEvent e) {
 		// Clear the selection when sorting is changed
 		addressTable.clearSelection();
@@ -428,7 +426,7 @@ public class AddressView implements View {
 		    addressTable.convertColumnIndexToView(modelIndex);
 		if (sortModelIndex != -1) {
 		    int sortViewIndex =
-		        addressTable.convertColumnIndexToView(sortModelIndex);
+			addressTable.convertColumnIndexToView(sortModelIndex);
 		    addressTable.getColumnModel().getColumn(
 			sortViewIndex).setHeaderRenderer(savedRenderer);
 		}
@@ -460,12 +458,12 @@ public class AddressView implements View {
 	addressTable.setDefaultRenderer(String.class, renderer);
 	addressTable.setDefaultRenderer(IPAddress.class, renderer);
 	addressTable.setDefaultRenderer(Date.class, renderer);
-	
+
 	// Wrap it in a scroll pane
 	addressPane = new JScrollPane(addressTable);
-	
+
 	displayPanel.add(addressPane, BorderLayout.CENTER);
-	
+
 	// Create menu items
 	Mnemonic mnShowAddrs =
             new Mnemonic(ResourceStrings.getString("show_addresses"));
@@ -489,7 +487,7 @@ public class AddressView implements View {
 	    }
 	});
 
-  	Mnemonic mnAddNet =         
+  	Mnemonic mnAddNet =
             new Mnemonic(ResourceStrings.getString("add_network"));
 	addNet = new JMenuItem(mnAddNet.getString());
 	addNet.setMnemonic(mnAddNet.getMnemonic());
@@ -529,7 +527,7 @@ public class AddressView implements View {
 	    }
 	});
 
-	Mnemonic mnAddAddr = 
+	Mnemonic mnAddAddr =
 	    new Mnemonic(ResourceStrings.getString("add_addresses"));
 	addAddrs = new JMenuItem(mnAddAddr.getString());
 	addAddrs.setMnemonic(mnAddAddr.getMnemonic());
@@ -580,7 +578,7 @@ public class AddressView implements View {
 		DhcpmgrApplet.showHelp("addresses_reference");
 	    }
 	});
-	
+
 	/*
 	 * Construct the menu lists
 	 */
@@ -595,7 +593,7 @@ public class AddressView implements View {
 	menuItems[MainFrame.EDIT_MENU].addElement(addNet);
 	menuItems[MainFrame.EDIT_MENU].addElement(deleteNets);
 	menuItems[MainFrame.HELP_MENU].addElement(addressHelp);
-	
+
 	// Listen for selections events, manipulate menu item state as needed
 	addressTable.getSelectionModel().addListSelectionListener(
 		new ListSelectionListener() {
@@ -612,25 +610,25 @@ public class AddressView implements View {
 	    }
 	});
     }
-    
+
     public String getName() {
 	return ResourceStrings.getString("address_view_name");
     }
-    
+
     // Return custom menus for this view, which is nothing at this time
     public Enumeration menus() {
 	return null;
     }
-    
+
     // Return custom menu items for each menu as requested.
     public Enumeration menuItems(int menu) {
 	return menuItems[menu].elements();
     }
-    
+
     public Component getDisplay() {
 	return displayPanel;
     }
-    
+
     public void setActive(boolean state) {
 	if (state) {
 	    if (firstActivation) {
@@ -647,15 +645,15 @@ public class AddressView implements View {
 	    }
 	}
     }
-    
+
     // Handle a find
     public void find(String s) {
 	int startRow = addressTable.getSelectedRow() + 1;
 	for (int i = startRow; i < sortedTableModel.getRowCount(); ++i) {
 	    DhcpClientRecord rec =
-	        addressTableModel.getClientAt(sortedTableModel.mapRowAt(i));
+		addressTableModel.getClientAt(sortedTableModel.mapRowAt(i));
 	    if (rec.getClientName().indexOf(s) != -1 ||
-	            rec.toString().indexOf(s) != -1) {
+		    rec.toString().indexOf(s) != -1) {
 		addressTable.setRowSelectionInterval(i, i);
 		addressTable.scrollRectToVisible(
 		    addressTable.getCellRect(i, 0, false));
@@ -665,17 +663,17 @@ public class AddressView implements View {
 	// Got to the end, wrap around
 	for (int i = 0; i < startRow; ++i) {
 	    DhcpClientRecord rec =
-	        addressTableModel.getClientAt(sortedTableModel.mapRowAt(i));
+		addressTableModel.getClientAt(sortedTableModel.mapRowAt(i));
 	    if (rec.getClientName().indexOf(s) != -1 ||
-	    	    rec.toString().indexOf(s) != -1) {
+		    rec.toString().indexOf(s) != -1) {
 		addressTable.setRowSelectionInterval(i, i);
 		addressTable.scrollRectToVisible(
 		    addressTable.getCellRect(i, 0, false));
 		return;
 	    }
-	}   
+	}
     }
-    
+
     public void handleCreate() {
 	if (networkList.getSelectedIndex() == -1) {
 	    // Tell user to use Network Wizard
@@ -692,7 +690,7 @@ public class AddressView implements View {
 	    d.setVisible(true);
 	}
     }
-    
+
     public void handleDelete() {
 	int [] rows = addressTable.getSelectedRows();
 	if (rows.length == 0) {
@@ -710,7 +708,7 @@ public class AddressView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleDuplicate() {
 	int row = addressTable.getSelectedRow();
 	if (row == -1) {
@@ -728,7 +726,7 @@ public class AddressView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleProperties() {
 	int [] rows = addressTable.getSelectedRows();
 	if (rows.length == 0) {
@@ -762,7 +760,7 @@ public class AddressView implements View {
     public void handleUpdate() {
 	reload();
     }
-    
+
     protected void reload() {
 	Object value = networkList.getSelectedValue();
 	networkListModel.reload();
@@ -774,15 +772,15 @@ public class AddressView implements View {
 	    networkList.setSelectedIndex(0);
 	}
     }
-    
+
     public void addSelectionListener(SelectionListener listener) {
 	selectionListeners.addElement(listener);
     }
-    
+
     public void removeSelectionListener(SelectionListener listener) {
 	selectionListeners.removeElement(listener);
     }
-    
+
     private void notifySelectionListeners() {
 	Enumeration en = selectionListeners.elements();
 	while (en.hasMoreElements()) {
@@ -790,15 +788,15 @@ public class AddressView implements View {
 	    l.valueChanged();
 	}
     }
-    
+
     public boolean isSelectionEmpty() {
 	return addressTable.getSelectionModel().isSelectionEmpty();
     }
-    
+
     public boolean isSelectionMultiple() {
 	return (addressTable.getSelectedRowCount() > 1);
     }
-    
+
     public void startAddressWizard() {
 	addAddrs.doClick();
     }

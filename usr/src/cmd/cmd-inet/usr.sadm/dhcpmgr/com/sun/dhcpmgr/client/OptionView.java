@@ -22,7 +22,7 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 package com.sun.dhcpmgr.client;
@@ -49,11 +49,11 @@ public class OptionView implements View {
     class OptionTableModel extends AbstractTableModel {
 	private Option [] data = null;
 	private boolean firstLoad;
-    
+
 	public OptionTableModel() {
 	    firstLoad = true;
 	}
-	
+
 	public void load() {
 	    data = null;
 	    // Update status line
@@ -64,7 +64,7 @@ public class OptionView implements View {
 	    // Kick off background loading
 	    OptionLoader loader = new OptionLoader();
 	}
-	
+
 	protected void doneLoading() {
 	    sortedTableModel.reallocateIndexes();
 	    if (firstLoad) {
@@ -74,12 +74,12 @@ public class OptionView implements View {
 	    // Check for any ill-defined options, tell user about them
 	    Vector errs = new Vector();
 	    for (int i = 0; i < data.length; ++i) {
-	    	if (!data[i].isValid()) {
+		if (!data[i].isValid()) {
 		    errs.addElement(data[i].getKey());
 		}
 	    }
 	    if (errs.size() != 0) {
-	        Object [] objs = new Object[2];
+		Object [] objs = new Object[2];
 		objs[0] =
 		    ResourceStrings.getString("option_validation_warning");
 		JList optionList = new JList(errs);
@@ -92,11 +92,11 @@ public class OptionView implements View {
 	    }
 	    fireTableDataChanged();
 	}
-	
+
 	protected void setData(Option [] newdata) {
 	    data = newdata;
 	}
-	
+
 	public int getRowCount() {
 	    if (data == null) {
 		return 0;
@@ -104,12 +104,12 @@ public class OptionView implements View {
 		return data.length;
 	    }
 	}
-	
+
 	public int getColumnCount() {
 	    return 6;
 	}
-	
-	public Object getValueAt(int row, int column) {	
+
+	public Object getValueAt(int row, int column) {
 	    switch (column) {
 	    case 0:
 		return data[row].getKey();
@@ -127,7 +127,7 @@ public class OptionView implements View {
 		return null;
 	    }
 	}
-	
+
 	public Class getColumnClass(int column) {
 	    switch (column) {
 	    case 0:
@@ -143,7 +143,7 @@ public class OptionView implements View {
 	    }
 	    return null;
 	}
-	
+
 	public String getColumnName(int column) {
 	    switch (column) {
 	    case 0:
@@ -163,33 +163,33 @@ public class OptionView implements View {
 	    }
 	    return null;
 	}
-	
+
 	public Option getOptionAt(int row) {
 	    return data[row];
 	}
     }
-    
+
     // Background loader for options.
-    class OptionLoader extends SwingWorker {
+    class OptionLoader extends com.sun.dhcpmgr.ui.SwingWorker {
 	public Object construct() {
 	    try {
 		return DataManager.get().getOptions(true);
 	    } catch (final BridgeException e) {
-	    	// Since we're in a background thread, ask Swing to run ASAP.
-	    	SwingUtilities.invokeLater(new Runnable() {
+		// Since we're in a background thread, ask Swing to run ASAP.
+		SwingUtilities.invokeLater(new Runnable() {
 		    Object [] args = new Object[] { e.getMessage() };
-	    	    public void run() {
-		    	MessageFormat form = new MessageFormat(
-		            ResourceStrings.getString("error_loading_options"));
-		    	JOptionPane.showMessageDialog(null, form.format(args),
-		            ResourceStrings.getString("server_error_title"),
+		    public void run() {
+			MessageFormat form = new MessageFormat(
+			    ResourceStrings.getString("error_loading_options"));
+			JOptionPane.showMessageDialog(null, form.format(args),
+			    ResourceStrings.getString("server_error_title"),
 			    JOptionPane.ERROR_MESSAGE);
 		    }
-	    	});
-	    	return null;
+		});
+		return null;
 	    }
 	}
-	
+
 	public void finished() {
 	    Option [] options = (Option [])get();
 	    if (options == null) {
@@ -211,7 +211,7 @@ public class OptionView implements View {
     class DialogListener implements ActionListener {
 	public void actionPerformed(ActionEvent e) {
 	    if (!e.getActionCommand().equals(DialogActions.CANCEL)) {
-	        reload();
+		reload();
 	    }
 	}
     }
@@ -226,7 +226,7 @@ public class OptionView implements View {
     private static boolean firstview = true;
     private Vector selectionListeners = new Vector();
     private TableSorter sortedTableModel;
-    
+
     public OptionView() {
 	// Create table to display in data area
 	optionTableModel = new OptionTableModel();
@@ -237,15 +237,15 @@ public class OptionView implements View {
 	sortedTableModel.addMouseListenerToHeaderInTable(optionTable);
 	optionTable.getTableHeader().setReorderingAllowed(true);
 	optionTable.getTableHeader().setResizingAllowed(true);
-	optionTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);	
+	optionTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
 	// Allow clicks in header to adjust sorting column
 	sortedTableModel.addActionListener(new ActionListener() {
-    	    private int sortModelIndex = -1;
-    	    private TableCellRenderer savedRenderer;
-    	    private SortedHeaderRenderer sortedRenderer =
-	        new SortedHeaderRenderer(optionTable);
-	    
+	    private int sortModelIndex = -1;
+	    private TableCellRenderer savedRenderer;
+	    private SortedHeaderRenderer sortedRenderer =
+		new SortedHeaderRenderer(optionTable);
+
 	    public void actionPerformed(ActionEvent e) {
 		// Clear the selection if sorting is changed
 		optionTable.clearSelection();
@@ -256,7 +256,7 @@ public class OptionView implements View {
 		    optionTable.convertColumnIndexToView(modelIndex);
 		if (sortModelIndex != -1) {
 		    int sortViewIndex =
-		        optionTable.convertColumnIndexToView(sortModelIndex);
+			optionTable.convertColumnIndexToView(sortModelIndex);
 		    optionTable.getColumnModel().getColumn(sortViewIndex).
 			setHeaderRenderer(savedRenderer);
 		}
@@ -270,10 +270,10 @@ public class OptionView implements View {
 		    optionTable.getColumnModel().getColumn(viewIndex);
 		savedRenderer = c.getHeaderRenderer();
 		c.setHeaderRenderer(sortedRenderer);
-		sortModelIndex = modelIndex;	
+		sortModelIndex = modelIndex;
 	    }
 	});
-	
+
 	// Make it scrollable
 	optionPane = new JScrollPane(optionTable);
 
@@ -307,9 +307,9 @@ public class OptionView implements View {
 		DhcpmgrApplet.showHelp("options_reference");
 	    }
 	});
-	
+
 	/*
-	 * Build the sets of menu items which we'll return to 
+	 * Build the sets of menu items which we'll return to
 	 * MainFrame when it asks for them.
 	 */
 	menuItems = new Vector[MainFrame.MENU_COUNT];
@@ -328,25 +328,25 @@ public class OptionView implements View {
 	    }
 	});
     }
-    
+
     public String getName() {
 	return ResourceStrings.getString("option_view_name");
     }
-    
+
     // Return custom menus we want added, in our case none.
     public Enumeration menus() {
 	return null;
     }
-    
+
     // Return menu items for each menu as requested by MainFrame
     public Enumeration menuItems(int menu) {
 	return menuItems[menu].elements();
     }
-    
+
     public Component getDisplay() {
 	return optionPane;
     }
-    
+
     public void setActive(boolean state) {
 	if (state) {
 	    // Things we do only the first time we're displayed
@@ -362,7 +362,7 @@ public class OptionView implements View {
 	    }
 	}
     }
-    
+
     public void find(String s) {
 	int startRow = optionTable.getSelectedRow() + 1;
 	for (int i = startRow; i < sortedTableModel.getRowCount(); ++i) {
@@ -383,9 +383,9 @@ public class OptionView implements View {
 		    false));
 		return;
 	    }
-	}   
+	}
     }
-    
+
     public void handleCreate() {
 	CreateOptionDialog d = new CreateOptionDialog(myFrame,
 	    CreateOptionDialog.CREATE);
@@ -393,7 +393,7 @@ public class OptionView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleDelete() {
 	int selectedRow = optionTable.getSelectedRow();
 	if (selectedRow == -1) {
@@ -406,7 +406,7 @@ public class OptionView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleDuplicate() {
 	int selectedRow = optionTable.getSelectedRow();
 	if (selectedRow == -1) {
@@ -420,7 +420,7 @@ public class OptionView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleProperties() {
 	int selectedRow = optionTable.getSelectedRow();
 	if (selectedRow == -1) {
@@ -434,11 +434,11 @@ public class OptionView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleUpdate() {
 	reload();
     }
-    
+
     private void reload() {
 	optionTableModel.load();
     }
@@ -446,11 +446,11 @@ public class OptionView implements View {
     public void addSelectionListener(SelectionListener listener) {
 	selectionListeners.addElement(listener);
     }
-    
+
     public void removeSelectionListener(SelectionListener listener) {
 	selectionListeners.removeElement(listener);
     }
-    
+
     private void notifySelectionListeners() {
 	Enumeration en = selectionListeners.elements();
 	while (en.hasMoreElements()) {
@@ -458,11 +458,11 @@ public class OptionView implements View {
 	    l.valueChanged();
 	}
     }
-    
+
     public boolean isSelectionEmpty() {
 	return optionTable.getSelectionModel().isSelectionEmpty();
     }
-    
+
     public boolean isSelectionMultiple() {
 	return false; // Multiple selection is not allowed.
     }

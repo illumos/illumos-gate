@@ -22,7 +22,7 @@
 /*
  * ident	"%Z%%M%	%I%	%E% SMI"
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 package com.sun.dhcpmgr.client;
@@ -42,7 +42,7 @@ import com.sun.dhcpmgr.data.*;
 import com.sun.dhcpmgr.bridge.BridgeException;
 
 // Background thread for doing retrieval while keeping GUI live
-class MacroLoader extends SwingWorker {
+class MacroLoader extends com.sun.dhcpmgr.ui.SwingWorker {
     public Object construct() {
 	try {
 	    return DataManager.get().getMacros(true);
@@ -50,18 +50,18 @@ class MacroLoader extends SwingWorker {
 	    // Since we're in a background thread, ask Swing to run ASAP.
 	    SwingUtilities.invokeLater(new Runnable() {
 		Object [] args = new Object[] { e.getMessage() };
-	    	public void run() {
+		public void run() {
 		    MessageFormat form = new MessageFormat(
-		        ResourceStrings.getString("error_loading_macros"));
+			ResourceStrings.getString("error_loading_macros"));
 		    JOptionPane.showMessageDialog(null, form.format(args),
-		        ResourceStrings.getString("server_error_title"),
+			ResourceStrings.getString("server_error_title"),
 			JOptionPane.ERROR_MESSAGE);
 		}
 	    });
 	}
 	return null;
     }
-    
+
     public void finished() {
 	Macro [] macros = (Macro [])get();
 	if (macros == null) {
@@ -81,16 +81,16 @@ public class MacroView implements View {
     class MacroTreeNode extends DefaultMutableTreeNode {
 	private boolean scannedIncludes = false;
 	private boolean isScanning = false;
-	
+
 	public MacroTreeNode(Object o) {
 	    super(o);
 	}
-	
+
 	public String toString() {
 	    Macro m = (Macro)getUserObject();
 	    return m.getKey();
 	}
-    
+
 	public int getChildCount() {
 	    /*
 	     * scannedIncludes is used so that we only build the tree once;
@@ -117,27 +117,27 @@ public class MacroView implements View {
 	    }
 	    return super.getChildCount();
 	}
-	
+
 	public Macro getMacro() {
 	    return (Macro)getUserObject();
 	}
     }
-    
+
     /*
      * Special class for the root node; this handles retrieving the data from
      * the server
      */
     class MacroTreeRootNode extends MacroTreeNode {
 	private Macro [] macros = null;
-	
+
 	public MacroTreeRootNode() {
 	    super(new Macro());
 	}
-	
+
 	public MacroTreeRootNode(Object o) {
 	    super(o);
 	}
-	
+
 	protected void setMacros(Macro [] newmacros) {
 	    macros = newmacros;
 	    if (newmacros != null) {
@@ -148,18 +148,18 @@ public class MacroView implements View {
 	    macroTreeModel.reload();
 	    reloadCompleted();
 	}
-	
+
 	public String toString() {
 	    return ResourceStrings.getString("macros");
 	}
-	
+
 	public int getChildCount() {
 	    if (macros == null) {
 		return 0;
 	    }
 	    return super.getChildCount();
 	}
-	
+
 	public void load() {
 	    // Display starting message and clear tree
 	    MainFrame.setStatusText(
@@ -169,11 +169,11 @@ public class MacroView implements View {
 	    // Kick off background loader
 	    MacroLoader loader = new MacroLoader();
 	}
-	
+
 	public Macro getMacro() {
 	    return null;
 	}
-	
+
 	// Find a particular macro by name
 	public Macro getMacro(String name) {
 	    if (macros != null) {
@@ -186,39 +186,39 @@ public class MacroView implements View {
 	    return null;
 	}
     }
-    
+
     // Model for data contained in macro tree
     class MacroTreeModel extends DefaultTreeModel {
 	public MacroTreeModel(MacroTreeRootNode n) {
 	    super(n);
 	}
-	
+
 	public void load() {
 	    getRootNode().load();
 	}
-	
+
 	public Macro getMacro(String name) {
 	    return getRootNode().getMacro(name);
 	}
-	
+
 	public MacroTreeRootNode getRootNode() {
 	    return (MacroTreeRootNode)super.getRoot();
 	}
     }
-    
+
     // Model for table displaying contents of a macro
     class MacroTableModel extends AbstractTableModel {
 	private Macro macro = null;
-    
+
 	public MacroTableModel() {
 	    super();
 	}
-	
+
 	public void display(Macro m) {
 	    macro = m;
 	    fireTableDataChanged();
 	}
-	
+
 	public int getRowCount() {
 	    if (macro == null) {
 		return 0;
@@ -226,12 +226,12 @@ public class MacroView implements View {
 		return macro.optionCount();
 	    }
 	}
-	
+
 	public int getColumnCount() {
 	    return 2;
 	}
-	
-	public Object getValueAt(int row, int column) {	
+
+	public Object getValueAt(int row, int column) {
 	    if (macro == null) {
 		return null;
 	    }
@@ -244,7 +244,7 @@ public class MacroView implements View {
 		return null;
 	    }
 	}
-	
+
 	public Class getColumnClass(int column) {
 	    switch (column) {
 	    case 0:
@@ -255,7 +255,7 @@ public class MacroView implements View {
 	    }
 	    return null;
 	}
-	
+
 	public String getColumnName(int column) {
 	    switch (column) {
 	    case 0:
@@ -268,12 +268,12 @@ public class MacroView implements View {
 	    return null;
 	}
     }
-    
+
     // Recipient of update messages sent when the macro editing dialogs exit
     class DialogListener implements ActionListener {
 	public void actionPerformed(ActionEvent e) {
 	    if (!e.getActionCommand().equals(DialogActions.CANCEL)) {
-	        reload();
+		reload();
 	    }
 	}
     }
@@ -292,8 +292,8 @@ public class MacroView implements View {
     private Frame myFrame;
     private boolean firstview = true;
     private Vector selectionListeners = new Vector();
-    
-    public MacroView() {	
+
+    public MacroView() {
 	// Create tree for macro display
 	macroTreeModel = new MacroTreeModel(new MacroTreeRootNode());
 	macroTree = new JTree(macroTreeModel);
@@ -336,25 +336,25 @@ public class MacroView implements View {
 		}
 	    }
 	});
-	
+
 	// Create table to display in data area
 	macroTableModel = new MacroTableModel();
 	macroTable = new AutosizingTable(macroTableModel);
-	
+
 	// Can't mess with the column order, or select any data
 	macroTable.getTableHeader().setReorderingAllowed(false);
 	macroTable.setRowSelectionAllowed(false);
 	macroTable.setColumnSelectionAllowed(false);
-	
+
 	// Now wrap it with scrollbars
 	macroTablePane = new JScrollPane(macroTable);
 
 	// Create split pane containing the tree & table, side-by-side
 	splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, treePane,
 	    macroTablePane);
-	
+
 	// Create menu items
-        Mnemonic mnShowGrid =        
+        Mnemonic mnShowGrid =
             new Mnemonic(ResourceStrings.getString("show_grid"));
         showGrid = new JCheckBoxMenuItem(mnShowGrid.getString(),
             true);
@@ -374,7 +374,7 @@ public class MacroView implements View {
 		DhcpmgrApplet.showHelp("macros_reference");
 	    }
 	});
-	
+
 
 	/*
 	 * Construct lists of menu items custom to this view.
@@ -386,29 +386,29 @@ public class MacroView implements View {
 	menuItems[MainFrame.VIEW_MENU].addElement(showGrid);
 	menuItems[MainFrame.HELP_MENU].addElement(macroHelp);
     }
-    
+
     public String getName() {
 	return ResourceStrings.getString("macro_view_name");
     }
-    
+
     // Return menus that we wish to add to MainFrame, in our case none
     public Enumeration menus() {
 	return null;
     }
-    
+
     // Return menu items for each menu as requested by MainFrame
     public Enumeration menuItems(int menu) {
 	return menuItems[menu].elements();
     }
-    
+
     public Component getDisplay() {
 	return splitPane;
     }
-    
+
     private void reload() {
 	macroTreeModel.load();
     }
-    
+
     // Callback from model when loading completed to update display
     private void reloadCompleted() {
 	// Doesn't display correctly without this
@@ -426,9 +426,9 @@ public class MacroView implements View {
 	Vector errs = new Vector();
 	for (int i = 0; i < rootNode.macros.length; ++i) {
 	    try {
-	    	rootNode.macros[i].validate();
+		rootNode.macros[i].validate();
 	    } catch (ValidationException e) {
-	    	errs.addElement(rootNode.macros[i].getKey());
+		errs.addElement(rootNode.macros[i].getKey());
 	    }
 	}
 	if (errs.size() != 0) {
@@ -440,7 +440,7 @@ public class MacroView implements View {
 	    macroList.setVisibleRowCount(4);
 	    objs[1] = scrollPane;
 	    JOptionPane.showMessageDialog(macroTable, objs,
-	        ResourceStrings.getString("warning"),
+		ResourceStrings.getString("warning"),
 		JOptionPane.WARNING_MESSAGE);
 	}
 	macroTree.setSelectionRow(1);
@@ -457,7 +457,7 @@ public class MacroView implements View {
 	    }
 	}
     }
-    
+
     /*
      * Handle a find operation.
      * Algorithm used here searches nodes in the order they appear in the
@@ -515,7 +515,7 @@ public class MacroView implements View {
 	args[0] = s;
 	MainFrame.setStatusText(form.format(args));
     }
-	    	
+
     // Search a particular level of a tree in the order a user would expect
     private MacroTreeNode searchNodeLevel(MacroTreeNode n,
 	    MacroTreeNode startNode, String s) {
@@ -549,23 +549,23 @@ public class MacroView implements View {
 	}
 	return null;
     }
-    
+
     // Search a node and all its children for a particular string
     private MacroTreeNode searchNode(MacroTreeNode n, String s) {
 	if (n.getMacro().getKey().indexOf(s) != -1
-	        || n.getMacro().getValue().indexOf(s) != -1) {
+	    || n.getMacro().getValue().indexOf(s) != -1) {
 	    return n;
 	}
 	return searchUnderNode(n, s);
     }
-    
+
     // Search all children, recursively, of a node for a particular string
     private MacroTreeNode searchUnderNode(MacroTreeNode n, String s) {
 	Enumeration e = n.children();
 	while (e.hasMoreElements()) {
 	    MacroTreeNode cn = (MacroTreeNode)e.nextElement();
 	    if (cn.getMacro().getKey().indexOf(s) != -1
-	    	    || cn.getMacro().getValue().indexOf(s) != -1) {
+		|| cn.getMacro().getValue().indexOf(s) != -1) {
 		return cn;
 	    }
 	    MacroTreeNode result = searchUnderNode(cn, s);
@@ -583,7 +583,7 @@ public class MacroView implements View {
 	macroTree.addSelectionPath(selPath);
 	macroTree.scrollPathToVisible(selPath);
     }
-    
+
     // Return the macro currently selected
     private Macro getSelectedMacro() {
 	TreePath selPath = macroTree.getSelectionPath();
@@ -595,7 +595,7 @@ public class MacroView implements View {
 	}
 	return null;
     }
-     
+
     public void handleCreate() {
 	CreateMacroDialog d = new CreateMacroDialog(myFrame,
 	    CreateMacroDialog.CREATE);
@@ -603,7 +603,7 @@ public class MacroView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleDelete() {
 	Macro m = getSelectedMacro();
 	if (m == null) {
@@ -614,7 +614,7 @@ public class MacroView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleDuplicate() {
 	Macro m = getSelectedMacro();
 	if (m == null) {
@@ -627,7 +627,7 @@ public class MacroView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleProperties() {
 	Macro m = getSelectedMacro();
 	if (m == null) {
@@ -640,7 +640,7 @@ public class MacroView implements View {
 	d.pack();
 	d.setVisible(true);
     }
-    
+
     public void handleUpdate() {
 	reload();
     }
@@ -648,11 +648,11 @@ public class MacroView implements View {
     public void addSelectionListener(SelectionListener listener) {
 	selectionListeners.addElement(listener);
     }
-    
+
     public void removeSelectionListener(SelectionListener listener) {
 	selectionListeners.removeElement(listener);
     }
-    
+
     private void notifySelectionListeners() {
 	Enumeration en = selectionListeners.elements();
 	while (en.hasMoreElements()) {
@@ -660,13 +660,13 @@ public class MacroView implements View {
 	    l.valueChanged();
 	}
     }
-    
+
     public boolean isSelectionEmpty() {
 	TreePath path = macroTree.getSelectionPath();
 	// If empty or the root of the tree is selected, then we call it empty
 	return ((path == null) || (path.getPathCount() == 1));
     }
-    
+
     public boolean isSelectionMultiple() {
 	return false; // We don't allow multiple selection
     }
