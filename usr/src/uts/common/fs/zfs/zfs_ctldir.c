@@ -397,9 +397,9 @@ zfsctl_snapshot_zname(vnode_t *vp, const char *name, int len, char *zname)
 	objset_t *os = ((zfsvfs_t *)((vp)->v_vfsp->vfs_data))->z_os;
 
 	dmu_objset_name(os, zname);
-	(void) strcat(zname, "@");
-	if (strlen(zname) + strlen(name) >= len)
+	if (strlen(zname) + 1 + strlen(name) >= len)
 		return (ENAMETOOLONG);
+	(void) strcat(zname, "@");
 	(void) strcat(zname, name);
 	return (0);
 }
@@ -438,7 +438,7 @@ zfsctl_unmount_snap(vnode_t *dvp, const char *name, int force, cred_t *cr)
 }
 
 
-static int
+static void
 zfsctl_rename_snap(zfsctl_snapdir_t *sdp, zfs_snapentry_t *sep, const char *nm)
 {
 	avl_index_t where;
@@ -447,7 +447,6 @@ zfsctl_rename_snap(zfsctl_snapdir_t *sdp, zfs_snapentry_t *sep, const char *nm)
 	char newpath[MAXNAMELEN];
 	const char *oldpath;
 	char *tail;
-	int err;
 
 	ASSERT(MUTEX_HELD(&sdp->sd_lock));
 	ASSERT(sep != NULL);
@@ -455,8 +454,7 @@ zfsctl_rename_snap(zfsctl_snapdir_t *sdp, zfs_snapentry_t *sep, const char *nm)
 	vfsp = vn_mountedvfs(sep->se_root);
 	ASSERT(vfsp != NULL);
 
-	if (err = vfs_lock(vfsp))
-		return (err);
+	vfs_lock_wait(vfsp);
 
 	/*
 	 * Change the name in the AVL tree.
@@ -492,7 +490,6 @@ zfsctl_rename_snap(zfsctl_snapdir_t *sdp, zfs_snapentry_t *sep, const char *nm)
 	vfs_setresource(vfsp, newpath);
 
 	vfs_unlock(vfsp);
-	return (0);
 }
 
 static int
@@ -505,7 +502,9 @@ zfsctl_snapdir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	char from[MAXNAMELEN], to[MAXNAMELEN];
 	int err;
 
-	VERIFY(zfsctl_snapshot_zname(sdvp, snm, MAXNAMELEN, from) == 0);
+	err = zfsctl_snapshot_zname(sdvp, snm, MAXNAMELEN, from);
+	if (err)
+		return (err);
 	err = zfs_secpolicy_write(from, NULL, cr);
 	if (err)
 		return (err);
@@ -519,20 +518,21 @@ zfsctl_snapdir_rename(vnode_t *sdvp, char *snm, vnode_t *tdvp, char *tnm,
 	if (strcmp(snm, tnm) == 0)
 		return (0);
 
+	err = zfsctl_snapshot_zname(tdvp, tnm, MAXNAMELEN, to);
+	if (err)
+		return (err);
+
 	mutex_enter(&sdp->sd_lock);
 
 	search.se_name = (char *)snm;
-	if ((sep = avl_find(&sdp->sd_snaps, &search, &where)) != NULL) {
-		err = zfsctl_rename_snap(sdp, sep, tnm);
-		if (err) {
-			mutex_exit(&sdp->sd_lock);
-			return (err);
-		}
+	if ((sep = avl_find(&sdp->sd_snaps, &search, &where)) == NULL) {
+		mutex_exit(&sdp->sd_lock);
+		return (ENOENT);
 	}
 
-
-	VERIFY(zfsctl_snapshot_zname(tdvp, tnm, MAXNAMELEN, to) == 0);
 	err = dmu_objset_rename(from, to);
+	if (err == 0)
+		zfsctl_rename_snap(sdp, sep, tnm);
 
 	mutex_exit(&sdp->sd_lock);
 
@@ -547,7 +547,9 @@ zfsctl_snapdir_remove(vnode_t *dvp, char *name, vnode_t *cwd, cred_t *cr)
 	char snapname[MAXNAMELEN];
 	int err;
 
-	VERIFY(zfsctl_snapshot_zname(dvp, name, MAXNAMELEN, snapname) == 0);
+	err = zfsctl_snapshot_zname(dvp, name, MAXNAMELEN, snapname);
+	if (err)
+		return (err);
 	err = zfs_secpolicy_write(snapname, NULL, cr);
 	if (err)
 		return (err);
@@ -624,7 +626,12 @@ zfsctl_snapdir_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, pathname_t *pnp,
 	/*
 	 * The requested snapshot is not currently mounted, look it up.
 	 */
-	VERIFY(zfsctl_snapshot_zname(dvp, nm, MAXNAMELEN, snapname) == 0);
+	err = zfsctl_snapshot_zname(dvp, nm, MAXNAMELEN, snapname);
+	if (err) {
+		mutex_exit(&sdp->sd_lock);
+		ZFS_EXIT(zfsvfs);
+		return (err);
+	}
 	if (dmu_objset_open(snapname, DMU_OST_ZFS,
 	    DS_MODE_STANDARD | DS_MODE_READONLY, &snap) != 0) {
 		mutex_exit(&sdp->sd_lock);
