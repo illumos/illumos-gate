@@ -202,9 +202,9 @@ static int pl2303_speedtab[] = {
 
 
 /* debug support */
-static uint_t   pl2303_errlevel = USB_LOG_L4;
-static uint_t   pl2303_errmask = DPRINT_MASK_ALL;
-static uint_t   pl2303_instance_debug = (uint_t)-1;
+static uint_t	pl2303_errlevel = USB_LOG_L4;
+static uint_t	pl2303_errmask = DPRINT_MASK_ALL;
+static uint_t	pl2303_instance_debug = (uint_t)-1;
 
 
 /*
@@ -235,6 +235,14 @@ pl2303_attach(ds_attach_info_t *aip)
 
 		return (USB_FAILURE);
 	}
+
+	mutex_init(&plp->pl_mutex, NULL, MUTEX_DRIVER,
+			plp->pl_dev_data->dev_iblock_cookie);
+
+	cv_init(&plp->pl_tx_cv, NULL, CV_DRIVER, NULL);
+
+	plp->pl_lh = usb_alloc_log_hdl(plp->pl_dip, "pl2303",
+	    &pl2303_errlevel, &pl2303_errmask, &pl2303_instance_debug, 0);
 
 	/*
 	 * check the chip type: pl2303_H, pl2303_X (or pl2303_HX)
@@ -268,16 +276,7 @@ pl2303_attach(ds_attach_info_t *aip)
 			"Chip Type: Unknown");
 	}
 
-	plp->pl_lh = usb_alloc_log_hdl(plp->pl_dip, "pl2303",
-	    &pl2303_errlevel, &pl2303_errmask, &pl2303_instance_debug, 0);
-
 	plp->pl_def_ph = plp->pl_dev_data->dev_default_ph;
-
-	mutex_init(&plp->pl_mutex, NULL, MUTEX_DRIVER,
-			plp->pl_dev_data->dev_iblock_cookie);
-
-	cv_init(&plp->pl_tx_cv, NULL, CV_DRIVER, NULL);
-	cv_init(&plp->pl_rx_cv, NULL, CV_DRIVER, NULL);
 
 	mutex_enter(&plp->pl_mutex);
 	plp->pl_dev_state = USB_DEV_ONLINE;
@@ -285,21 +284,21 @@ pl2303_attach(ds_attach_info_t *aip)
 	mutex_exit(&plp->pl_mutex);
 
 	if (pl2303_create_pm_components(plp) != USB_SUCCESS) {
-		pl2303_cleanup(plp, 2);
+		pl2303_cleanup(plp, 3);
 
 		return (USB_FAILURE);
 	}
 
 	if (usb_register_event_cbs(plp->pl_dip, plp->pl_usb_events, 0)
 	    != USB_SUCCESS) {
-		pl2303_cleanup(plp, 3);
+		pl2303_cleanup(plp, 4);
 
 		return (USB_FAILURE);
 	}
 
 	if (usb_pipe_get_max_bulk_transfer_size(plp->pl_dip,
 	    &plp->pl_xfer_sz) != USB_SUCCESS) {
-		pl2303_cleanup(plp, 4);
+		pl2303_cleanup(plp, 5);
 
 		return (USB_FAILURE);
 	}
@@ -309,7 +308,7 @@ pl2303_attach(ds_attach_info_t *aip)
 	}
 
 	if (pl2303_dev_attach(plp) != USB_SUCCESS) {
-		pl2303_cleanup(plp, 4);
+		pl2303_cleanup(plp, 5);
 
 		return (USB_FAILURE);
 	}
@@ -390,10 +389,14 @@ pl2303_open_port(ds_hdl_t hdl, uint_t port_num)
 
 	if (rval == USB_SUCCESS) {
 		mutex_enter(&plp->pl_mutex);
-		plp->pl_port_state = PL2303_PORT_OPEN;
 
 		/* start to receive data */
-		(void) pl2303_rx_start(plp);
+		if (pl2303_rx_start(plp) != USB_SUCCESS) {
+			mutex_exit(&plp->pl_mutex);
+
+			return (USB_FAILURE);
+		}
+		plp->pl_port_state = PL2303_PORT_OPEN;
 		mutex_exit(&plp->pl_mutex);
 	} else {
 		pl2303_pm_set_idle(plp);
@@ -716,7 +719,7 @@ pl2303_set_port_params(ds_hdl_t hdl, uint_t port_num, ds_port_params_t *tp)
 					xonxoff_symbol = (xoff_char << 8)
 							| xon_char;
 
-					rval =  pl2303_cmd_vendor_write0(
+					rval =	pl2303_cmd_vendor_write0(
 						plp, SET_XONXOFF,
 						xonxoff_symbol);
 
@@ -1032,14 +1035,15 @@ pl2303_cleanup(pl2303_state_t *plp, int level)
 	default:
 		pl2303_close_pipes(plp);
 		/* FALLTHRU */
-	case 4:
+	case 5:
 		usb_unregister_event_cbs(plp->pl_dip, plp->pl_usb_events);
 		/* FALLTHRU */
-	case 3:
+	case 4:
 		pl2303_destroy_pm_components(plp);
+		/* FALLTHRU */
+	case 3:
 		mutex_destroy(&plp->pl_mutex);
 		cv_destroy(&plp->pl_tx_cv);
-		cv_destroy(&plp->pl_rx_cv);
 
 		usb_free_log_hdl(plp->pl_lh);
 		plp->pl_lh = NULL;
@@ -1259,7 +1263,7 @@ pl2303_pm_set_busy(pl2303_state_t *plp)
 		return (USB_SUCCESS);
 	}
 
-	/* need to raise power  */
+	/* need to raise power	*/
 	pm->pm_raise_power = B_TRUE;
 	mutex_exit(&plp->pl_mutex);
 
@@ -1462,18 +1466,14 @@ pl2303_open_pipes(pl2303_state_t *plp)
 static void
 pl2303_close_pipes(pl2303_state_t *plp)
 {
-	mutex_enter(&plp->pl_mutex);
-	if (plp->pl_dev_state == USB_DEV_ONLINE) {
-		USB_DPRINTF_L4(DPRINT_IN_PIPE, plp->pl_lh,
-		    "pl2303_close_pipes: waiting for idle bulkin\n");
-		while (plp->pl_bulkin_state != PL2303_PIPE_IDLE) {
-			cv_wait(&plp->pl_rx_cv, &plp->pl_mutex);
-		}
+	if (plp->pl_bulkin_ph) {
+		usb_pipe_close(plp->pl_dip, plp->pl_bulkin_ph,
+		    USB_FLAGS_SLEEP, 0, 0);
 	}
-	mutex_exit(&plp->pl_mutex);
-
-	usb_pipe_close(plp->pl_dip, plp->pl_bulkin_ph, USB_FLAGS_SLEEP, 0, 0);
-	usb_pipe_close(plp->pl_dip, plp->pl_bulkout_ph, USB_FLAGS_SLEEP, 0, 0);
+	if (plp->pl_bulkout_ph) {
+		usb_pipe_close(plp->pl_dip, plp->pl_bulkout_ph,
+		    USB_FLAGS_SLEEP, 0, 0);
+	}
 
 	mutex_enter(&plp->pl_mutex);
 	plp->pl_bulkin_state = PL2303_PIPE_CLOSED;
@@ -1540,11 +1540,12 @@ pl2303_bulkin_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	/* receive more */
 	mutex_enter(&plp->pl_mutex);
 	plp->pl_bulkin_state = PL2303_PIPE_IDLE;
-	if (plp->pl_port_state == PL2303_PORT_OPEN) {
-		(void) pl2303_rx_start(plp);
-	} else {
-		plp->pl_bulkin_state = PL2303_PIPE_IDLE;
-		cv_broadcast(&plp->pl_rx_cv);
+	if ((plp->pl_port_state == PL2303_PORT_OPEN) &&
+	    (plp->pl_dev_state == USB_DEV_ONLINE)) {
+		if (pl2303_rx_start(plp) != USB_SUCCESS) {
+			USB_DPRINTF_L2(DPRINT_IN_PIPE, plp->pl_lh,
+			    "pl2303_bulkin_cb: restart rx fail");
+		}
 	}
 	mutex_exit(&plp->pl_mutex);
 }

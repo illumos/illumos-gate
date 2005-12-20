@@ -96,7 +96,6 @@ typedef struct pl2303_state {
 	mblk_t			*pl_rx_mp;		/* rx data */
 	mblk_t			*pl_tx_mp;		/* tx data */
 	kcondvar_t		pl_tx_cv;		/* tx completion */
-	kcondvar_t		pl_rx_cv;		/* rx completion */
 	/*
 	 * other
 	 */
@@ -147,7 +146,7 @@ enum {
 	PL2303_BULKOUT_TIMEOUT		= 15,	/* bulkout timeout */
 	PL2303_BULKIN_TIMEOUT		= 15,	/* bulkin timeout */
 	PL2303_XFER_SZ_MAX		= 64,	/* max xfer size */
-	PL2303_CLEANUP_LEVEL_MAX	= 5	/* cleanup level */
+	PL2303_CLEANUP_LEVEL_MAX	= 6	/* cleanup level */
 };
 
 

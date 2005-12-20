@@ -1774,9 +1774,8 @@ usbser_thr_cancel(usbser_thread_t *thr)
 
 	/* wait until the thread actually exits */
 	do {
-		if (cv_wait_sig(&thr->thr_cv, &pp->port_mutex) == 0) {
-			break;
-		}
+		cv_wait(&thr->thr_cv, &pp->port_mutex);
+
 	} while ((thr->thr_flags & USBSER_THR_EXITED) == 0);
 }
 

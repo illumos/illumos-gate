@@ -534,6 +534,10 @@ usb_as_cleanup(dev_info_t *dip, usb_as_state_t *uasp)
 	USB_DPRINTF_L4(PRINT_MASK_ALL, uasp->usb_as_log_handle,
 	    "usb_as_cleanup: uaspm=0x%p", uaspm);
 
+	if (uasp->usb_as_isoc_ph) {
+		usb_pipe_close(dip, uasp->usb_as_isoc_ph,
+		    USB_FLAGS_SLEEP, NULL, NULL);
+	}
 	/*
 	 * Disable the event callbacks first, after this point, event
 	 * callbacks will never get called. Note we shouldn't hold

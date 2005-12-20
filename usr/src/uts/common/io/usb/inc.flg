@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -75,6 +75,8 @@ find_files "s.*"	\
 	usr/src/uts/sparc/ugen \
 	usr/src/uts/sparc/usbser \
 	usr/src/uts/sparc/usbser_edge \
+	usr/src/uts/sparc/usbsksp \
+	usr/src/uts/sparc/usbsprl \
 	usr/src/uts/sparc/usbskel \
 	usr/src/uts/sparc/warlock \
 	usr/src/uts/intel/hid	\
@@ -95,6 +97,8 @@ find_files "s.*"	\
 	usr/src/uts/intel/usb_ah \
 	usr/src/uts/intel/usbser \
 	usr/src/uts/intel/usbser_edge \
+	usr/src/uts/intel/usbsksp \
+	usr/src/uts/intel/usbsprl \
 	usr/src/uts/intel/ia32 \
 	usr/src/uts/intel/amd64 \
 	usr/src/uts/intel/asm 
@@ -131,6 +135,13 @@ echo_file  usr/src/uts/intel/Makefile.files
 echo_file  usr/src/uts/intel/Makefile.rules
 echo_file  usr/src/uts/intel/Makefile.intel
 echo_file  usr/src/uts/intel/Makefile.targ
+echo_file  usr/src/uts/sparc/v9/Makefile.files
+echo_file  usr/src/uts/sparc/v9/Makefile.rules
+echo_file  usr/src/uts/sun4u/Makefile.rules
+echo_file  usr/src/uts/sun4/Makefile.rules
+echo_file  usr/src/uts/common/sys/Makefile
+echo_file  usr/src/uts/common/os/privs.awk
+echo_file  usr/src/uts/common/os/priv_defs
 
 # these files are needed for forthdebug
 echo_file  usr/src/uts/sun4u/forthdebug/Makefile
