@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1012,13 +1012,11 @@ mount:
 			mutex_exit(&mfnp->fn_lock);
 		}
 
-		(void) vn_vfswlock_wait(mvp);
+		(void) vn_vfsrlock_wait(mvp);
 		mvfsp = vn_mountedvfs(mvp);
 		if (mvfsp != NULL) {
-			vfs_lock_wait(mvfsp);
-			vn_vfsunlock(mvp);
 			error = VFS_ROOT(mvfsp, &newvp);
-			vfs_unlock(mvfsp);
+			vn_vfsunlock(mvp);
 			if (error) {
 				/*
 				 * We've dropped the locks, so let's get
@@ -1442,7 +1440,7 @@ auto_getmntpnt(
 
 	AUTOFS_DPRINT((4, "auto_getmntpnt: path=%s\n", path));
 
-	if (error = vn_vfswlock_wait(dvp))
+	if (error = vn_vfsrlock_wait(dvp))
 		return (error);
 
 	/*
@@ -1462,10 +1460,8 @@ auto_getmntpnt(
 	 * it is important that we do the filesystem jump here to
 	 * avoid lookuppn() calling auto_lookup on dvp and deadlock.
 	 */
-	vfs_lock_wait(vfsp);
-	vn_vfsunlock(dvp);
 	error = VFS_ROOT(vfsp, &newvp);
-	vfs_unlock(vfsp);
+	vn_vfsunlock(dvp);
 	if (error)
 		goto done;
 
@@ -2125,13 +2121,11 @@ top:
 			 * to a call to auto_root().
 			 */
 			AUTOFS_DPRINT((10, "\t\tAUTOFS mounted here\n"));
-			vfs_lock_wait(vfsp);
 			if (VFS_ROOT(vfsp, &newvp)) {
 				cmn_err(CE_PANIC,
 				    "unmount_tree: VFS_ROOT(vfs=%p) failed",
 				    (void *)vfsp);
 			}
-			vfs_unlock(vfsp);
 			nfnp = vntofn(newvp);
 			if (DEEPER(nfnp)) {
 				vn_vfsunlock(vp);

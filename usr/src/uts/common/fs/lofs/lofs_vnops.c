@@ -359,7 +359,7 @@ lo_lookup(
 		if ((vtol(dvp))->lo_looping & LO_LOOPING) {
 			vfs_t *vfsp;
 
-			error = vn_vfswlock_wait(realdvp);
+			error = vn_vfsrlock_wait(realdvp);
 			if (error)
 				goto out;
 			vfsp = vn_mountedvfs(realdvp);
@@ -388,14 +388,12 @@ lo_lookup(
 			 * root vnode would turn *vfsp into garbage
 			 * which would be fatal.
 			 */
-			vfs_lock_wait(vfsp);
+			error = VFS_ROOT(vfsp, &tvp);
 			vn_vfsunlock(realdvp);
 
-			error = VFS_ROOT(vfsp, &tvp);
-
-			vfs_unlock(vfsp);
 			if (error)
 				goto out;
+
 			if ((tvp == li->li_rootvp) && (vp == realvp(tvp))) {
 				/*
 				 * we're back at the real vnode

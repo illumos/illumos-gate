@@ -162,7 +162,7 @@ auto_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cred)
 	if (vn_vfswlock_held(vp))
 		goto defattr;
 
-	if (error = vn_vfswlock_wait(vp))
+	if (error = vn_vfsrlock_wait(vp))
 		return (error);
 
 	vfsp = vn_mountedvfs(vp);
@@ -170,10 +170,8 @@ auto_getattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cred)
 		/*
 		 * Node is mounted on.
 		 */
-		vfs_lock_wait(vfsp);
-		vn_vfsunlock(vp);
 		error = VFS_ROOT(vfsp, &newvp);
-		vfs_unlock(vfsp);
+		vn_vfsunlock(vp);
 		if (error)
 			return (error);
 		mutex_enter(&fnp->fn_lock);
@@ -361,7 +359,7 @@ auto_lookup(
 		if (pdfnp == pdfnp->fn_globals->fng_rootfnnodep) {
 			vnode_t *vp;
 
-			vfs_lock_wait(dvp->v_vfsp);
+			vfs_rlock_wait(dvp->v_vfsp);
 			if (dvp->v_vfsp->vfs_flag & VFS_UNMOUNTED) {
 				vfs_unlock(dvp->v_vfsp);
 				return (EIO);
@@ -407,15 +405,13 @@ top:
 		mutex_exit(&dfnp->fn_lock);
 
 
-	error = vn_vfswlock_wait(dvp);
+	error = vn_vfsrlock_wait(dvp);
 	if (error)
 		return (error);
 	vfsp = vn_mountedvfs(dvp);
 	if (vfsp != NULL) {
-		vfs_lock_wait(vfsp);
-		vn_vfsunlock(dvp);
 		error = VFS_ROOT(vfsp, &newvp);
-		vfs_unlock(vfsp);
+		vn_vfsunlock(dvp);
 		if (!error) {
 			error = VOP_LOOKUP(newvp, nm, vpp, pnp,
 			    flags, rdir, cred);
@@ -1344,10 +1340,8 @@ retry:
 	vfsp = vn_mountedvfs(vp);
 	if (vfsp != NULL) {
 		mutex_exit(&fnp->fn_lock);
-		vfs_lock_wait(vfsp);
-		vn_vfsunlock(vp);
 		error = VFS_ROOT(vfsp, newvp);
-		vfs_unlock(vfsp);
+		vn_vfsunlock(vp);
 		goto done;
 	} else {
 		vn_vfsunlock(vp);
@@ -1406,15 +1400,13 @@ retry:
 			goto done;
 		}
 		if (error == 0) {
-			if (error = vn_vfswlock_wait(vp))
+			if (error = vn_vfsrlock_wait(vp))
 				goto done;
 			/* Reacquire after dropping locks */
 			vfsp = vn_mountedvfs(vp);
 			if (vfsp != NULL) {
-				vfs_lock_wait(vfsp);
-				vn_vfsunlock(vp);
 				error = VFS_ROOT(vfsp, newvp);
-				vfs_unlock(vfsp);
+				vn_vfsunlock(vp);
 			} else {
 				vn_vfsunlock(vp);
 				goto retry;
