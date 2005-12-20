@@ -590,7 +590,7 @@ const char *_dtrace_defcpp = "/usr/ccs/lib/cpp"; /* default cpp(1) to invoke */
 const char *_dtrace_defld = "/usr/ccs/bin/ld";   /* default ld(1) to invoke */
 
 const char *_dtrace_libdir = "/usr/lib/dtrace"; /* default library directory */
-const char *_dtrace_moddir = "dtrace";		/* kernel module directory */
+const char *_dtrace_provdir = "/dev/dtrace/provider"; /* provider directory */
 
 int _dtrace_strbuckets = 211;	/* default number of hash buckets (prime) */
 int _dtrace_intbuckets = 256;	/* default number of integer buckets (Pof2) */
@@ -634,8 +634,7 @@ set_open_errno(dtrace_hdl_t *dtp, int *errp, int err)
 }
 
 static void
-dt_provmod_open(dt_provmod_t **provmod, dt_fdlist_t *dfp, const char *dirname,
-    const char *subdir, const char *isadir)
+dt_provmod_open(dt_provmod_t **provmod, dt_fdlist_t *dfp)
 {
 	dt_provmod_t *prov;
 	char path[PATH_MAX];
@@ -643,15 +642,7 @@ dt_provmod_open(dt_provmod_t **provmod, dt_fdlist_t *dfp, const char *dirname,
 	DIR *dirp;
 	int fd;
 
-	if (isadir) {
-		(void) snprintf(path, sizeof (path), "%s/%s/%s",
-		    dirname, subdir, isadir);
-	} else {
-		(void) snprintf(path, sizeof (path), "%s/%s",
-		    dirname, subdir);
-	}
-
-	if ((dirp = opendir(path)) == NULL)
+	if ((dirp = opendir(_dtrace_provdir)) == NULL)
 		return; /* failed to open directory; just skip it */
 
 	ep = alloca(sizeof (struct dirent) + PATH_MAX + 1);
@@ -672,8 +663,8 @@ dt_provmod_open(dt_provmod_t **provmod, dt_fdlist_t *dfp, const char *dirname,
 			dfp->df_size = size;
 		}
 
-		(void) snprintf(path, sizeof (path),
-		    "/devices/pseudo/%s@0:%s", dp->d_name, dp->d_name);
+		(void) snprintf(path, sizeof (path), "%s/%s",
+		    _dtrace_provdir, dp->d_name);
 
 		if ((fd = open(path, O_RDONLY)) == -1)
 			continue; /* failed to open driver; just skip it */
@@ -745,9 +736,7 @@ dt_vopen(int version, int flags, int *errp,
 	ctf_arinfo_t ctr;
 
 	dt_fdlist_t df = { NULL, 0, 0 };
-	char *p, *q, *path = NULL;
-	const char *isadir = NULL;
-	int pathlen;
+	char *p;
 
 	char isadef[32], utsdef[32];
 	char s1[64], s2[64];
@@ -789,45 +778,24 @@ dt_vopen(int version, int flags, int *errp,
 		goto alloc; /* do not attempt to open dtrace device */
 
 	/*
-	 * For each directory in the kernel's module path, build the name of
-	 * the corresponding dtrace provider subdirectory and attempt to open a
-	 * pseudo-driver whose name matches the name of each provider therein.
-	 * We hold them open in the df.df_fds list until we open the DTrace
-	 * driver itself, allowing us to see all of the probes provided on this
-	 * system.  Once we have the DTrace driver open, we can safely close
-	 * all the providers now that they have registered with the framework.
+	 * Get the device path of each of the providers.  We hold them open
+	 * in the df.df_fds list until we open the DTrace driver itself,
+	 * allowing us to see all of the probes provided on this system.  Once
+	 * we have the DTrace driver open, we can safely close all the providers
+	 * now that they have registered with the framework.
 	 */
-	if (sysinfo(SI_ISALIST, isadef, sizeof (isadef)) > 0) {
-		if (strstr(isadef, "sparcv9") != NULL)
-			isadir = "sparcv9";
-		else if (strstr(isadef, "amd64") != NULL)
-			isadir = "amd64";
-	}
+	dt_provmod_open(&provmod, &df);
 
-	if (modctl(MODGETPATHLEN, NULL, &pathlen) == 0 &&
-	    (path = malloc(pathlen + 1)) != NULL &&
-	    modctl(MODGETPATH, NULL, path) == 0) {
-		for (p = path; *p != '\0'; p = q) {
-			if ((q = strchr(p, ' ')) != NULL)
-				*q++ = '\0';
-			else
-				q = p + strlen(p);
-			dt_provmod_open(&provmod, &df, p,
-			    _dtrace_moddir, isadir);
-		}
-	}
-
-	dtfd = open("/devices/pseudo/dtrace@0:dtrace", O_RDWR);
+	dtfd = open("/dev/dtrace/dtrace", O_RDWR);
 	err = errno; /* save errno from opening dtfd */
 
-	ftfd = open("/devices/pseudo/fasttrap@0:fasttrap", O_RDWR);
+	ftfd = open("/dev/dtrace/provider/fasttrap", O_RDWR);
 	fterr = ftfd == -1 ? errno : 0; /* save errno from open ftfd */
 
 	while (df.df_ents-- != 0)
 		(void) close(df.df_fds[df.df_ents]);
 
 	free(df.df_fds);
-	free(path);
 
 	/*
 	 * If we failed to open the dtrace device, fail dtrace_open().

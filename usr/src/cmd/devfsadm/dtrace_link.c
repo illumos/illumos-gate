@@ -28,14 +28,27 @@
 
 #include <devfsadm.h>
 #include <strings.h>
+#include <stdio.h>
 #include <sys/dtrace.h>
 
 static int dtrace(di_minor_t minor, di_node_t node);
+static int dtrace_provider(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t dtrace_create_cbt[] = {
 	{ "pseudo", "ddi_pseudo", "dtrace",
-	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace
-	}
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace },
+	{ "pseudo", "ddi_pseudo", "fasttrap",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace_provider },
+	{ "pseudo", "ddi_pseudo", "fbt",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace_provider },
+	{ "pseudo", "ddi_pseudo", "lockstat",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace_provider },
+	{ "pseudo", "ddi_pseudo", "profile",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace_provider },
+	{ "pseudo", "ddi_pseudo", "sdt",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace_provider },
+	{ "pseudo", "ddi_pseudo", "systrace",
+	    TYPE_EXACT | DRV_EXACT, ILEVEL_0, dtrace_provider },
 };
 
 DEVFSADM_CREATE_INIT_V0(dtrace_create_cbt);
@@ -44,11 +57,22 @@ static int
 dtrace(di_minor_t minor, di_node_t node)
 {
 	char *mname = di_minor_name(minor);
+	char path[MAXPATHLEN];
 
-	if (strcmp(DTRACEMNR_HELPER, mname) == 0) {
-		(void) devfsadm_mklink("dtrace/" DTRACEMNR_HELPER,
-		    node, minor, 0);
-	}
+	(void) snprintf(path, sizeof (path), "dtrace/%s", mname);
+	(void) devfsadm_mklink(path, node, minor, 0);
+
+	return (DEVFSADM_CONTINUE);
+}
+
+static int
+dtrace_provider(di_minor_t minor, di_node_t node)
+{
+	char *mname = di_minor_name(minor);
+	char path[MAXPATHLEN];
+
+	(void) snprintf(path, sizeof (path), "dtrace/provider/%s", mname);
+	(void) devfsadm_mklink(path, node, minor, 0);
 
 	return (DEVFSADM_CONTINUE);
 }
