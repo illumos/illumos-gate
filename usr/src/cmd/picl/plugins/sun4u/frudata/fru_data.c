@@ -720,12 +720,12 @@ frudata_delete_segment(ptree_warg_t *warg, const void *buf)
 	for (count = 0; count < num_of_segment; count++) {
 		desc	= (fru_segdesc_t *)&seg_buffer[count].descriptor;
 		if (!(desc->field.field_perm & SEGMENT_READ)) {
-		        seg_hash = seg_hash->u.seg_node->next; 
+			seg_hash = seg_hash->u.seg_node->next;
 			continue;
 		}
 
 		if (desc->field.opaque) {
-		        seg_hash = seg_hash->u.seg_node->next; 
+			seg_hash = seg_hash->u.seg_node->next;
 			continue;
 		}
 
@@ -737,7 +737,7 @@ frudata_delete_segment(ptree_warg_t *warg, const void *buf)
 			fru_get_num_packets(seg_buffer[count].handle,
 						&warg->cred);
 		if (num_of_pkt <= 0) {
-		        seg_hash = seg_hash->u.seg_node->next; 
+			seg_hash = seg_hash->u.seg_node->next;
 			continue;
 		}
 
@@ -750,13 +750,13 @@ frudata_delete_segment(ptree_warg_t *warg, const void *buf)
 		retval = fru_get_packets(seg_buffer[count].handle, pkt_buf,
 						num_of_pkt, &warg->cred);
 		if (retval == -1) {
-		        seg_hash = seg_hash->u.seg_node->next; 
+			seg_hash = seg_hash->u.seg_node->next;
 			continue;
 		}
 
 		pkt_hash = seg_hash->u.seg_node->packet_list;
 		if (pkt_hash == NULL) {
-		        seg_hash = seg_hash->u.seg_node->next; 
+			seg_hash = seg_hash->u.seg_node->next;
 			continue;
 		}
 
