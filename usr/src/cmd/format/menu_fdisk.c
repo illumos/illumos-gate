@@ -404,6 +404,7 @@ get_solaris_part(int fd, struct ipart *ipart)
 	struct ipart	ip;
 	int		status;
 	char		*bootptr;
+	struct dk_label	update_label;
 
 	(void) lseek(fd, 0, 0);
 	status = read(fd, (caddr_t)&boot_sec, NBPSCTR);
@@ -476,6 +477,38 @@ get_solaris_part(int fd, struct ipart *ipart)
 			err_print("Cannot read vtoc information.\n");
 			return (-1);
 		}
+
+		status = read_label(fd, &update_label);
+		if (status == -1) {
+			err_print("Cannot read label information.\n");
+			return (-1);
+		}
+
+#if defined(_SUNOS_VTOC_16)
+		/*
+		 * this is to update the slice table on x86
+		 * we don't care about VTOC8 here
+		 */
+		for (i = 0; i < NDKMAP; i ++) {
+			cur_parts->pinfo_map[i].dkl_cylno =
+			    update_label.dkl_vtoc.v_part[i].p_start /
+			    ((int)(update_label.dkl_nhead *
+			    update_label.dkl_nsect));
+			cur_parts->pinfo_map[i].dkl_nblk =
+			    update_label.dkl_vtoc.v_part[i].p_size;
+		}
+#endif /* defined(_SUNOS_VTOC_16) */
+
+		cur_dtype->dtype_ncyl = update_label.dkl_ncyl;
+		cur_dtype->dtype_pcyl = update_label.dkl_pcyl;
+		cur_dtype->dtype_acyl = update_label.dkl_acyl;
+		cur_dtype->dtype_nhead = update_label.dkl_nhead;
+		cur_dtype->dtype_nsect = update_label.dkl_nsect;
+		ncyl = cur_dtype->dtype_ncyl;
+		acyl = cur_dtype->dtype_acyl;
+		pcyl = cur_dtype->dtype_pcyl;
+		nsect = cur_dtype->dtype_nsect;
+		nhead = cur_dtype->dtype_nhead;
 	}
 	return (0);
 }
