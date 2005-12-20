@@ -736,7 +736,6 @@ dt_vopen(int version, int flags, int *errp,
 	ctf_arinfo_t ctr;
 
 	dt_fdlist_t df = { NULL, 0, 0 };
-	char *p;
 
 	char isadef[32], utsdef[32];
 	char s1[64], s2[64];
@@ -913,13 +912,13 @@ alloc:
 	 * compiles and __amd64 is defined for 64-bit compiles.  Unlike SPARC,
 	 * they are defined exclusive of one another (see PSARC 2004/619).
 	 */
-	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64)
-		p = dt_cpp_add_arg(dtp, "-D__amd64");
-	else
-		p = dt_cpp_add_arg(dtp, "-D__i386");
-
-	if (p == NULL)
-		return (set_open_errno(dtp, errp, EDT_NOMEM));
+	if (dtp->dt_conf.dtc_ctfmodel == CTF_MODEL_LP64) {
+		if (dt_cpp_add_arg(dtp, "-D__amd64") == NULL)
+			return (set_open_errno(dtp, errp, EDT_NOMEM));
+	} else {
+		if (dt_cpp_add_arg(dtp, "-D__i386") == NULL)
+			return (set_open_errno(dtp, errp, EDT_NOMEM));
+	}
 #endif
 
 	if (dtp->dt_conf.dtc_difversion < DIF_VERSION)
