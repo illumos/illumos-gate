@@ -139,7 +139,7 @@ cvrt_dim_data(const char *spd_data, size_t spd_data_len, uchar_t **sp_seg_ptr,
 	 * construct Sun compressed encoding for JEDEC code
 	 */
 	for (c = 0; c < sizeof (spd->jedec) - 1; c++) {
-		if (spd->jedec[c] != 0xfe)
+		if (spd->jedec[c] != 0x7F) 
 			break;
 	}
 
