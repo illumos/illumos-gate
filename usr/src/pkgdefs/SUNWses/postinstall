@@ -63,7 +63,7 @@ rem_devlink()
 	rm -f $TMP.devlink
 }
 
-dev_aliases='scsiclass,0d scsiclass,00.vSUN.pUniversal_Xport'
+dev_aliases='"scsiclass,0d" "scsiclass,00.vSUN.pUniversal_Xport"'
 
 rem_devlink 'type=ddi_pseudo;name=ses' 'es/ses\\N0'
 
