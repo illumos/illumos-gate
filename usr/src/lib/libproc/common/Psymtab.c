@@ -2247,6 +2247,8 @@ Pbuild_file_symtab(struct ps_prochandle *P, file_info_t *fptr)
 	fptr->file_class = ehdr.e_ident[EI_CLASS];
 	fptr->file_etype = ehdr.e_type;
 	fptr->file_elf = elf;
+	fptr->file_shstrs = shdata->d_buf;
+	fptr->file_shstrsz = shdata->d_size;
 
 	/*
 	 * Iterate through each section, caching its section header, data
@@ -3041,6 +3043,7 @@ Psymbol_iter_com(struct ps_prochandle *P, Lmid_t lmid, const char *object_name,
     int which, int mask, pr_order_t order, proc_xsym_f *func, void *cd)
 {
 	GElf_Sym sym;
+	GElf_Shdr shdr;
 	map_info_t *mptr;
 	file_info_t *fptr;
 	sym_tbl_t *symtab;
@@ -3136,8 +3139,21 @@ Psymbol_iter_com(struct ps_prochandle *P, Lmid_t lmid, const char *object_name,
 				sym.st_value += fptr->file_dyn_base;
 
 			si.prs_name = strs + sym.st_name;
+
+			/*
+			 * If symbol's type is STT_SECTION, then try to lookup
+			 * the name of the corresponding section.
+			 */
+			if (GELF_ST_TYPE(sym.st_info) == STT_SECTION &&
+			    fptr->file_shstrs != NULL &&
+			    gelf_getshdr(elf_getscn(fptr->file_elf,
+			    sym.st_shndx), &shdr) != NULL &&
+			    shdr.sh_name != 0 &&
+			    shdr.sh_name < fptr->file_shstrsz)
+				si.prs_name = fptr->file_shstrs + shdr.sh_name;
+
 			si.prs_id = ndx;
-			if ((rv = func(cd, &sym, strs + sym.st_name, &si)) != 0)
+			if ((rv = func(cd, &sym, si.prs_name, &si)) != 0)
 				break;
 		}
 	}
