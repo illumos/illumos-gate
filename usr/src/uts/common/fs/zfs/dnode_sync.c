@@ -208,7 +208,7 @@ free_children(dmu_buf_impl_t *db, uint64_t blkid, uint64_t nblks, int trunc,
 	dmu_buf_impl_t *subdb;
 	uint64_t start, end, dbstart, dbend, i;
 	int epbs, shift, err;
-	int txg_index = tx->tx_txg&TXG_MASK;
+	int txgoff = tx->tx_txg & TXG_MASK;
 	int all = TRUE;
 
 	dbuf_read(db);
@@ -236,7 +236,7 @@ free_children(dmu_buf_impl_t *db, uint64_t blkid, uint64_t nblks, int trunc,
 	if (db->db_level == 1) {
 		FREE_VERIFY(db, start, end, tx);
 		free_blocks(dn, bp, end-start+1, tx);
-		ASSERT(all || list_link_active(&db->db_dirty_node[txg_index]));
+		ASSERT(all || list_link_active(&db->db_dirty_node[txgoff]));
 		return (all);
 	}
 
@@ -251,6 +251,8 @@ free_children(dmu_buf_impl_t *db, uint64_t blkid, uint64_t nblks, int trunc,
 		if (free_children(subdb, blkid, nblks, trunc, tx)) {
 			ASSERT3P(subdb->db_blkptr, ==, bp);
 			free_blocks(dn, bp, 1, tx);
+		} else {
+			all = FALSE;
 		}
 		dbuf_remove_ref(subdb, FTAG);
 	}
@@ -264,7 +266,7 @@ free_children(dmu_buf_impl_t *db, uint64_t blkid, uint64_t nblks, int trunc,
 		ASSERT3U(bp->blk_birth, ==, 0);
 	}
 #endif
-	ASSERT(all || list_link_active(&db->db_dirty_node[txg_index]));
+	ASSERT(all || list_link_active(&db->db_dirty_node[txgoff]));
 	return (all);
 }
 
@@ -478,8 +480,8 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 
 	/* process all the "freed" ranges in the file */
 	if (dn->dn_free_txg == 0 || dn->dn_free_txg > tx->tx_txg) {
-		for (rp = avl_first(&dn->dn_ranges[txgoff]); rp != NULL;
-		    rp = AVL_NEXT(&dn->dn_ranges[txgoff], rp))
+		for (rp = avl_last(&dn->dn_ranges[txgoff]); rp != NULL;
+		    rp = AVL_PREV(&dn->dn_ranges[txgoff], rp))
 			dnode_sync_free_range(dn,
 			    rp->fr_blkid, rp->fr_nblks, tx);
 	}
@@ -523,9 +525,10 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 		 * so only bother if there are multiple blocks and thus
 		 * it can't be changing.
 		 */
-		ASSERT(off < dn->dn_phys->dn_maxblkid ||
+		if (!(off < dn->dn_phys->dn_maxblkid ||
 		    dn->dn_phys->dn_maxblkid == 0 ||
-		    dnode_next_offset(dn, FALSE, &off, 1, 1) == ESRCH);
+		    dnode_next_offset(dn, FALSE, &off, 1, 1) == ESRCH))
+			panic("data after EOF: off=%lld\n", off);
 
 		dn->dn_dirtyblksz[txgoff] = 0;
 

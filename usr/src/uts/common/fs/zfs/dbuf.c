@@ -1611,6 +1611,7 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 	uint64_t txg = tx->tx_txg;
 	dnode_t *dn = db->db_dnode;
 	objset_impl_t *os = dn->dn_objset;
+	int epbs = dn->dn_phys->dn_indblkshift - SPA_BLKPTRSHIFT;
 	int blksz;
 
 	ASSERT(dmu_tx_is_syncing(tx));
@@ -1751,7 +1752,6 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 		mutex_exit(&db->db_mtx);
 	} else if (db->db_blkptr == NULL) {
 		dmu_buf_impl_t *parent = db->db_parent;
-		int epbs = dn->dn_phys->dn_indblkshift - SPA_BLKPTRSHIFT;
 
 		mutex_exit(&db->db_mtx);
 		ASSERT(dn->dn_phys->dn_nlevels > 1);
@@ -1771,9 +1771,42 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 
 	ASSERT(IS_DNODE_DNODE(dn->dn_object) || db->db_parent != NULL);
 
+	if (db->db_level > 0 &&
+	    db->db_blkid > dn->dn_phys->dn_maxblkid >> (db->db_level * epbs)) {
+		/*
+		 * Don't write indirect blocks past EOF.
+		 * We get these when we truncate a file *after* dirtying
+		 * blocks in the truncate range (we undirty the level 0
+		 * blocks in dbuf_free_range(), but not the indirects).
+		 */
+#ifdef ZFS_DEBUG
+		/*
+		 * Verify that this indirect block is empty.
+		 */
+		blkptr_t *bplist;
+		int i;
+
+		mutex_enter(&db->db_mtx);
+		bplist = db->db.db_data;
+		for (i = 0; i < (1 << epbs); i++) {
+			if (!BP_IS_HOLE(&bplist[i])) {
+				panic("data past EOF: "
+				    "db=%p level=%d id=%lld i=%d\n",
+				    db, db->db_level, db->db_blkid, i);
+			}
+		}
+		mutex_exit(&db->db_mtx);
+#endif
+		ASSERT(db->db_blkptr == NULL || BP_IS_HOLE(db->db_blkptr));
+		mutex_enter(&db->db_mtx);
+		db->db_dirtycnt -= 1;
+		mutex_exit(&db->db_mtx);
+		dbuf_remove_ref(db, (void *)(uintptr_t)txg);
+		return;
+	}
+
 	if (db->db_parent != dn->dn_dbuf) {
 		dmu_buf_impl_t *parent = db->db_parent;
-		int epbs = dn->dn_phys->dn_indblkshift - SPA_BLKPTRSHIFT;
 
 		mutex_enter(&db->db_mtx);
 		ASSERT(db->db_level == parent->db_level-1);
@@ -1967,9 +2000,13 @@ dbuf_write_done(zio_t *zio, arc_buf_t *buf, void *vdb)
 		blkptr_t *bp = db->db.db_data;
 		ASSERT3U(db->db.db_size, ==, 1<<dn->dn_phys->dn_indblkshift);
 		if (!BP_IS_HOLE(db->db_blkptr)) {
+			int epbs =
+			    dn->dn_phys->dn_indblkshift - SPA_BLKPTRSHIFT;
 			ASSERT3U(BP_GET_LSIZE(zio->io_bp), ==, db->db.db_size);
 			ASSERT3U(BP_GET_LSIZE(db->db_blkptr), ==,
 			    db->db.db_size);
+			ASSERT3U(dn->dn_phys->dn_maxblkid
+			    >> (db->db_level * epbs), >=, db->db_blkid);
 		}
 		for (i = db->db.db_size >> SPA_BLKPTRSHIFT; i > 0; i--, bp++) {
 			if (BP_IS_HOLE(bp))
