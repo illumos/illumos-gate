@@ -40,6 +40,7 @@
 #include <sys/pci.h>
 #include <sys/pcie_impl.h>
 #include "pcie_pwr.h"
+#include "px_pci.h"
 #include "px_debug.h"
 
 /*
@@ -92,6 +93,7 @@ static void pcie_add_comps(dev_info_t *dip, dev_info_t *cdip,
 static void pcie_remove_comps(dev_info_t *dip, dev_info_t *cdip,
     pcie_pwr_t *pwr_p);
 static void pcie_pm_subrelease(dev_info_t *dip, pcie_pwr_t *pwr_p);
+static boolean_t pcie_is_pcie(ddi_acc_handle_t config_handle);
 #ifdef DEBUG
 static char *pcie_decode_pwr_op(pm_bus_power_op_t op);
 #else
@@ -801,6 +803,22 @@ pcie_pm_remove_child(dev_info_t *dip, dev_info_t *cdip)
 	return (DDI_SUCCESS);
 }
 
+boolean_t
+pcie_is_pcie(ddi_acc_handle_t config_handle)
+{
+	uint8_t cap_ptr, cap_id;
+
+	cap_ptr = pci_config_get8(config_handle, PCI_BCNF_CAP_PTR);
+	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
+		cap_id = pci_config_get8(config_handle, cap_ptr + PCI_CAP_ID);
+		if (cap_id == PCI_CAP_ID_PCI_E)
+			return (B_TRUE);
+		cap_ptr = pci_config_get8(config_handle,
+		    cap_ptr + PCI_CAP_NEXT_PTR);
+	}
+	return (B_FALSE);
+}
+
 /*
  * Called by px_attach or pxb_attach:: DDI_RESUME
  */
@@ -832,6 +850,7 @@ pcie_pwr_resume(dev_info_t *dip)
 	 */
 	for (cdip = ddi_get_child(dip); cdip != NULL;
 	    cdip = ddi_get_next_sibling(cdip)) {
+		boolean_t	is_pcie;
 
 		/*
 		 * Not interested in children who are not already
@@ -848,26 +867,36 @@ pcie_pwr_resume(dev_info_t *dip)
 		 * Only restore config registers if saved by nexus.
 		 */
 		if (ddi_prop_exists(DDI_DEV_T_ANY, cdip, DDI_PROP_DONTPASS,
-		    "nexus-saved-config-regs") == 1) {
-			DBG(DBG_PWR, dip,
-			    "DDI_RESUME: nexus restoring %s%d config regs\n",
+		    "nexus-saved-config-regs") != 1)
+			continue;
+
+		DBG(DBG_PWR, dip,
+		    "DDI_RESUME: nexus restoring %s%d config regs\n",
+		    ddi_driver_name(cdip), ddi_get_instance(cdip));
+
+		if (pci_config_setup(cdip, &config_handle) == DDI_FAILURE) {
+			DBG(DBG_PWR, dip, "DDI_RESUME: "
+			    "pci_config_setup for %s%d failed\n",
 			    ddi_driver_name(cdip), ddi_get_instance(cdip));
+			continue;
+		}
 
-			if (pci_config_setup(cdip, &config_handle) ==
-			    DDI_SUCCESS) {
-				pcie_clear_errors(cdip, config_handle);
-				pci_config_teardown(&config_handle);
-			}
+		/* clear errors left by OBP scrubbing */
+		pcie_clear_errors(cdip, config_handle);
 
-			(void) pci_restore_config_regs(cdip);
+		/* PCIe workaround: disable errors during 4K config resore */
+		if (is_pcie = pcie_is_pcie(config_handle))
+			pcie_disable_errors(cdip, config_handle);
+		(void) pci_restore_config_regs(cdip);
+		if (is_pcie)
+			pcie_enable_errors(cdip, config_handle);
+		pci_config_teardown(&config_handle);
 
-			if (ndi_prop_remove(DDI_DEV_T_NONE, cdip,
-			    "nexus-saved-config-regs") != DDI_PROP_SUCCESS) {
-				DBG(DBG_PWR, dip, "%s%d can't remove prop %s",
-				    ddi_driver_name(cdip),
-				    ddi_get_instance(cdip),
-				    "nexus-saved-config-regs");
-			}
+		if (ndi_prop_remove(DDI_DEV_T_NONE, cdip,
+		    "nexus-saved-config-regs") != DDI_PROP_SUCCESS) {
+			DBG(DBG_PWR, dip, "%s%d can't remove prop %s",
+			    ddi_driver_name(cdip), ddi_get_instance(cdip),
+			    "nexus-saved-config-regs");
 		}
 	}
 	return (DDI_SUCCESS);
@@ -880,6 +909,7 @@ int
 pcie_pwr_suspend(dev_info_t *dip)
 {
 	dev_info_t *cdip;
+	ddi_acc_handle_t	config_handle;
 	int i, *counters; /* per nexus counters */
 	int *child_counters = NULL; /* per child dip counters */
 	pcie_pwr_t *pwr_p = NULL;
@@ -927,6 +957,7 @@ pcie_pwr_suspend(dev_info_t *dip)
 	 */
 	for (cdip = ddi_get_child(dip); cdip != NULL;
 	    cdip = ddi_get_next_sibling(cdip)) {
+		boolean_t	is_pcie;
 
 		/*
 		 * Not interested in children who are not already
@@ -975,7 +1006,21 @@ pcie_pwr_suspend(dev_info_t *dip)
 		}
 		DBG(DBG_PWR, dip, "DDI_SUSPEND: saving config space for"
 		    " %s%d\n", ddi_driver_name(cdip), ddi_get_instance(cdip));
+
+		/* PCIe workaround: disable errors during 4K config save */
+		if (pci_config_setup(cdip, &config_handle) == DDI_FAILURE) {
+			DBG(DBG_PWR, dip, "DDI_SUSPEND: pci_config_setup "
+			    "for %s%d failed\n",
+			    ddi_driver_name(cdip), ddi_get_instance(cdip));
+			continue;
+		}
+
+		if (is_pcie = pcie_is_pcie(config_handle))
+			pcie_disable_errors(cdip, config_handle);
 		(void) pci_save_config_regs(cdip);
+		if (is_pcie)
+			pcie_enable_errors(cdip, config_handle);
+		pci_config_teardown(&config_handle);
 	}
 	return (DDI_SUCCESS);
 }

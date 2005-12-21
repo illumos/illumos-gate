@@ -39,10 +39,6 @@
 #include <sys/pcie.h>
 #include <sys/pcie_impl.h>
 
-static void pcie_enable_errors(dev_info_t *dip,
-    ddi_acc_handle_t config_handle);
-static void 	pcie_disable_errors(dev_info_t *dip,
-    ddi_acc_handle_t config_handle);
 static uint16_t pcie_find_cap_reg(ddi_acc_handle_t config_handle,
     uint8_t cap_id);
 static uint16_t pcie_find_ext_cap_reg(ddi_acc_handle_t config_handle,
@@ -257,7 +253,7 @@ pcie_clear_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	}
 }
 
-static void
+void
 pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
 	uint16_t		cap_ptr, aer_ptr;
@@ -334,7 +330,7 @@ pcie_enable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 }
 
 /* ARGSUSED */
-static void
+void
 pcie_disable_errors(dev_info_t *dip, ddi_acc_handle_t config_handle)
 {
 	uint16_t		cap_ptr, aer_ptr;
