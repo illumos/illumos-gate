@@ -1301,14 +1301,14 @@ lookup_floppy(struct fd_char *fdchar, bpb_t *wbpb)
  *
  *	Compute an acceptable sectors/cluster value.
  *
- *	Values taken from a table found on p. 407 of "Windows 98
- *	Professional Reference", by Bruce A. Hallberg & Joe
- *	Casad. (ISBN 0-56205-786-3) I believe they've taken their
- *	table directly from the MSDN docs.
+ * 	Based on values from the Hardware White Paper
+ *	from Microsoft.
+ *	"Microsoft Extensible Firmware Initiative
+ *	 FAT32 File System Specification
+ *	 FAT: General Overview of On-Disk Format"
  *
- *	FAT32 information taken from "Partition Magic 6.0", User Guide, p67.
- *	It uses strange values as 8.01, 16.02 and 32.04; the windows support
- *	site uses 8G and 16G.
+ *	Version 1.03, December 6, 2000
+ *
  */
 static
 void
@@ -1318,52 +1318,94 @@ compute_cluster_size(bpb_t *wbpb)
 	ulong_t spc;
 	ulong_t rds, tmpval1, tmpval2;
 	ulong_t fatsz;
+	ulong_t bps = wbpb->bpb.bytes_sector;
+	int newfat = 16;
+
+#define	FAT12_MAX_CLUSTERS	0x0FF4
+#define	FAT16_MAX_CLUSTERS	0xFFF4
+#define	FAT32_MAX_CLUSTERS	0x0FFFFFF0
+#define	FAT32_SUGGESTED_NCLUST	0x400000
+
+	/* compute volume size in sectors. */
 	volsize = wbpb->bpb.sectors_in_volume ? wbpb->bpb.sectors_in_volume :
 		wbpb->bpb.sectors_in_logical_volume;
 	volsize -= wbpb->bpb.resv_sectors;
 
 	if (GetSPC) {
-		if (MakeFAT32) {
-			if (volsize < 0x10428) {
-				spc = 0; /* too small, trigger an error */
-			} else if (volsize <= 0x82000) {	/* 260MB */
-				spc = 1;
-			} else if (volsize <= 0x1000000) {	/* 8G */
-				spc = 8;
-			} else if (volsize <= 0x2000000) {	/* 16G */
-				spc = 16;
-			} else if (volsize <= 0x4000000) {	/* 32G */
-				spc = 32;
-			} else {
-				spc = 64;
+		/*
+		 * User indicated what sort of FAT to create,
+		 * make sure it is valid with the given size
+		 * and compute an SPC value.
+		 */
+		if (!MakeFAT32) { /* FAT16 */
+			/* volsize is in sectors */
+			if (volsize < FAT12_MAX_CLUSTERS) {
+				(void) fprintf(stderr,
+					gettext("Requested size is too "
+						"small for FAT16.\n"));
+				exit(4);
 			}
-		} else {
-			/* FAT16 Table */
-			if (volsize <= 0x20D0) {		/* 4.1M */
-				spc = 0; /* too small, trigger an error */
-			} else if (volsize <= 0x7FA8) {		/* 16M */
-				spc = 2;
-			} else if (volsize <= 0x40000) {	/* 128M */
-				spc = 4;
-			} else if (volsize <= 0x80000) {	/* 256M */
-				spc = 8;
-			} else if (volsize <= 0x100000) {	/* 512M */
-				spc = 16;
-			/* Entries beyond here are only if FAT16 is forced */
-			} else if (volsize <= 0x200000) {	/* 1G */
-				spc = 32;
-			} else if (volsize <= 0x400000) {	/* 2G */
-				spc = 64;
-			} else if (volsize <= 0x800000) {	/* 4G */
-				spc = 128;
-			} else {
-				(void) fprintf(stderr, gettext(
-				    "Partition too large for a FAT!\n"));
+			/* SPC must be a power of 2 */
+			for (spc = 1; spc <= 64; spc = spc * 2) {
+				if (volsize < spc * FAT16_MAX_CLUSTERS)
+					break;
+			}
+			if (volsize > (spc * FAT16_MAX_CLUSTERS)) {
+				(void) fprintf(stderr,
+					gettext("Requested size is too "
+						"large for FAT16.\n"));
+				exit(4);
+			}
+		} else { /* FAT32 */
+			/* volsize is in sectors */
+			if (volsize < FAT16_MAX_CLUSTERS) {
+				(void) fprintf(stderr,
+					gettext("Requested size is too "
+						"small for FAT32.\n"));
+				exit(4);
+			}
+			/* SPC must be a power of 2 */
+			for (spc = 1; spc <= 64; spc = spc * 2) {
+				if (volsize < (spc * FAT32_SUGGESTED_NCLUST))
+					break;
+			}
+			if (volsize > (spc * FAT32_MAX_CLUSTERS)) {
+				(void) fprintf(stderr,
+					gettext("Requested size is too "
+						"large for FAT32.\n"));
 				exit(4);
 			}
 		}
 	} else {
+		/*
+		 * User gave the SPC as an explicit option,
+		 * make sure it will work with the requested
+		 * volume size.
+		 */
+		int nclust;
+
 		spc = SecPerClust;
+		nclust = volsize / spc;
+
+		if (nclust <= FAT16_MAX_CLUSTERS && MakeFAT32) {
+			(void) fprintf(stderr,
+				gettext("Requested size is too "
+					"small for FAT32.\n"));
+			exit(4);
+		}
+		if (!MakeFAT32) {
+			/* Determine if FAT12 or FAT16 */
+			if (nclust < FAT12_MAX_CLUSTERS)
+				newfat = 12;
+			else if (nclust < FAT16_MAX_CLUSTERS)
+				newfat = 16;
+			else {
+				(void) fprintf(stderr,
+					gettext("Requested size is too "
+						"small for FAT32.\n"));
+				exit(4);
+			}
+		}
 	}
 
 	/*
@@ -1378,20 +1420,17 @@ compute_cluster_size(bpb_t *wbpb)
 		if (MakeFAT32)
 			Fatentsize = 32;
 		else
-			Fatentsize = 16;
+			Fatentsize = newfat;
 	} else {
 		Fatentsize = BitsPerFAT;
 
 		if (Fatentsize == 12 &&
 			(volsize - rds) >= DOS_F12MAXC * spc) {
 			/*
-			 * 4228473 No way to non-interactively make a
-			 *	   pcfs filesystem
-			 *
-			 *	If we don't have an input TTY, or we aren't
-			 *	really doing anything, then don't ask
-			 *	questions.  Assume a yes answer to any
-			 *	questions we would ask.
+			 * If we don't have an input TTY, or we aren't
+			 * really doing anything, then don't ask
+			 * questions.  Assume a yes answer to any
+			 * questions we would ask.
 			 */
 			if (Notreally || !isatty(fileno(stdin))) {
 			    (void) printf(
