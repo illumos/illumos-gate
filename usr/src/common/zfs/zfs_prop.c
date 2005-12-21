@@ -165,6 +165,34 @@ zfs_prop_get_type(zfs_prop_t prop)
 	return (zfs_prop_table[prop].pd_proptype);
 }
 
+static int
+propname_match(const char *p, int prop, size_t len)
+{
+	const char *propname = zfs_prop_table[prop].pd_name;
+#ifndef _KERNEL
+	const char *colname = zfs_prop_table[prop].pd_colname;
+	int c;
+#endif
+
+	if (len == strlen(propname) &&
+	    strncmp(p, propname, len) == 0)
+		return (1);
+
+#ifndef _KERNEL
+	if (colname == NULL || len != strlen(colname))
+		return (0);
+
+	for (c = 0; c < len; c++)
+		if (p[c] != tolower(colname[c]))
+			break;
+
+	return (colname[c] == '\0');
+#else
+	return (0);
+#endif
+}
+
+
 /*
  * Given a property name, returns the corresponding property ID.
  */
@@ -174,13 +202,8 @@ zfs_name_to_prop(const char *propname)
 	int i;
 
 	for (i = 0; i < ZFS_NPROP_ALL; i++) {
-		if (strcmp(zfs_prop_table[i].pd_name, propname) == 0)
+		if (propname_match(propname, i, strlen(propname)))
 			return (i);
-#ifndef _KERNEL
-		if (zfs_prop_table[i].pd_colname != NULL &&
-		    strcasecmp(zfs_prop_table[i].pd_colname, propname) == 0)
-			return (i);
-#endif
 	}
 
 	return (ZFS_PROP_INVAL);
@@ -336,28 +359,8 @@ zfs_get_proplist(char *fields, zfs_prop_t *props, int max,
 		 * Check all regular property names.
 		 */
 		for (i = 0; i < ZFS_NPROP_ALL; i++) {
-			if (zfs_prop_table[i].pd_colname == NULL)
-				continue;
-
-			if (len == strlen(zfs_prop_table[i].pd_name) &&
-			    strncmp(s, zfs_prop_table[i].pd_name, len) == 0)
+			if (propname_match(s, i, len))
 				break;
-		}
-
-		/*
-		 * Check all abbreviated column names.
-		 */
-		if (i == ZFS_NPROP_ALL) {
-			for (i = 0; i < ZFS_NPROP_ALL; i++) {
-				if (zfs_prop_table[i].pd_colname == NULL)
-					continue;
-
-				if (len ==
-				    strlen(zfs_prop_table[i].pd_colname) &&
-				    strncasecmp(s, zfs_prop_table[i].pd_colname,
-				    len) == 0)
-					break;
-			}
 		}
 
 		/*

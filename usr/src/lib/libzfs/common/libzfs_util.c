@@ -185,20 +185,36 @@ zfs_nicenum(uint64_t num, char *buf, size_t buflen)
 	char u;
 
 	while (n >= 1024) {
-		n = (n + (1024 / 2)) / 1024; /* Round up or down */
+		n /= 1024;
 		index++;
 	}
 
 	u = " KMGTPE"[index];
 
-	if (index == 0)
+	if (index == 0) {
 		(void) snprintf(buf, buflen, "%llu", n);
-	else if (n < 10 && (num & (num - 1)) != 0)
-		(void) snprintf(buf, buflen, "%.2f%c",
-		    (double)num / (1ULL << 10 * index), u);
-	else if (n < 100 && (num & (num - 1)) != 0)
-		(void) snprintf(buf, buflen, "%.1f%c",
-		    (double)num / (1ULL << 10 * index), u);
-	else
+	} else if ((num & ((1ULL << 10 * index) - 1)) == 0) {
+		/*
+		 * If this is an even multiple of the base, always display
+		 * without any decimal precision.
+		 */
 		(void) snprintf(buf, buflen, "%llu%c", n, u);
+	} else {
+		/*
+		 * We want to choose a precision that reflects the best choice
+		 * for fitting in 5 characters.  This can get rather tricky when
+		 * we have numbers that are very close to an order of magnitude.
+		 * For example, when displaying 10239 (which is really 9.999K),
+		 * we want only a single place of precision for 10.0K.  We could
+		 * develop some complex heuristics for this, but it's much
+		 * easier just to try each combination in turn.
+		 */
+		int i;
+		for (i = 2; i >= 0; i--) {
+			(void) snprintf(buf, buflen, "%.*f%c", i,
+			    (double)num / (1ULL << 10 * index), u);
+			if (strlen(buf) <= 5)
+				break;
+		}
+	}
 }
