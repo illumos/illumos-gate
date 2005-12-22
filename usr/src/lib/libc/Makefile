@@ -100,7 +100,22 @@ $(ROOTVARIANTDIR)/$(VAR2_DYNLIB)	:= FILEMODE= 755
 
 .KEEP_STATE:
 
-all:	spec .WAIT lib32 $(BUILD64) .WAIT lib64 .WAIT etc
+all:	check_i18n .WAIT spec .WAIT lib32 $(BUILD64) .WAIT lib64 .WAIT etc
+
+check_i18n:
+	@if [ ! -f $(ROOTFS_LIBDIR)/libc_i18n.a -a \
+	    ! -f $(ROOTFS_LIBDIR64)/libc_i18n.a ]; then \
+		if [ "$$CLOSED_IS_PRESENT" = no ]; then \
+			$(ECHO) "Warning: closed binaries not" \
+			    "properly unpacked." >&2;\
+			$(ECHO) "Missing libc_i18n.a" >&2; \
+			exit 1; \
+		else \
+			$(ECHO) "Warning: libc_i18n.a must be built" \
+			    "before libc can be built." >&2; \
+			exit 1; \
+		fi \
+	fi
 
 etc:	$($(MACH)_ETC)
 

@@ -31,21 +31,28 @@
 #
 include ../../../Makefile.master
 
-HDRS=	export.h	lm.h		lm_impl.h	lm_nlm.h	\
-	lm_server.h	\
+HDRS=	export.h	lm.h						\
 	mount.h		nfs.h		nfssys.h	nfs_acl.h	\
 	nfs_clnt.h	nfs_log.h 	nfs_sec.h	nfs4.h		\
 	nfs4_attr.h	nfs4_clnt.h	rnode.h		rnode4.h	\
 	nfs4_kprot.h	nfs4_db_impl.h	nfs4_idmap_impl.h \
 	nfsid_map.h
 
+$(CLOSED_BUILD)CLOSEDHDRS=	lm_impl.h	lm_nlm.h	lm_server.h
+
+ALLHDRS= $(HDRS) $(CLOSEDHDRS)
+
 ROOTDIRS= $(ROOT)/usr/include/nfs
 
-ROOTHDRS= $(HDRS:%=$(ROOTDIRS)/%)
+ROOTHDRS= $(ALLHDRS:%=$(ROOTDIRS)/%)
 
-CHECKHDRS= $(HDRS:%.h=%.check)
+CHECKHDRS= $(HDRS:%.h=%.check) \
+	$(CLOSEDHDRS:%.h=$(CLOSED)/uts/common/nfs/%.check)
 
 $(ROOTDIRS)/%: %
+	$(INS.file)
+
+$(ROOTDIRS)/%: $(CLOSED)/uts/common/nfs/%
 	$(INS.file)
 
 .KEEP_STATE:

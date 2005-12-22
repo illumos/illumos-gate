@@ -72,10 +72,12 @@ PROTO=${WS}/proto/root_${MACH}
 
 rm -f $PLIST
 
-PKGDEFS=${SRC}/pkgdefs
+PKGDEFS_FLG="-d ${SRC}/pkgdefs"
+[ -d ${SRC}/../closed ] && \
+	PKGDEFS_FLG="$PKGDEFS_FLG -d ${SRC}/../closed/pkgdefs"
 EXCEPTION=${PKGDEFS}/etc/exception_list_${MACH}
 
 protolist ${PROTO} > $PLIST
-protocmp ${GUFLAG} -e ${EXCEPTION} -d ${PKGDEFS} ${PLIST}
+protocmp ${GUFLAG} -e ${EXCEPTION} ${PKGDEFS_FLG} ${PLIST}
 
 rm -f $PLIST

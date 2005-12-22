@@ -65,7 +65,6 @@ COMMON_MODULES_KVM = \
 	md \
 	mpxio \
 	nca \
-	nfs \
 	ptm \
 	random \
 	s1394 \
@@ -76,3 +75,8 @@ COMMON_MODULES_KVM = \
 	ufs_log \
 	usba \
 	zfs
+
+CLOSED_COMMON_MODULES_KVM = \
+	nfs
+
+include $(SRC)/Makefile.master

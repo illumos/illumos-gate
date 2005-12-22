@@ -21,7 +21,7 @@
 #
 #
 # uts/sun4u/cherrystone/Makefile
-# Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,6 +49,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -57,7 +59,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean.lint clean clobber: $(CHERRYSTONE_KMODS)
+def all clean.lint clean clobber modlist: $(CHERRYSTONE_KMODS)
 
 modlintlib:	$(CHERRYSTONE_KMODS)
 
@@ -97,6 +99,7 @@ lint:		modlintlib
 LINT_LIBS	 = $(LINT_LIB) \
 		   -L$(CHERRYSTONE_LINT_LIB_DIR) \
 		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+		       $(CLOSED_LINT_KMODS:%=-l%) \
 		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:   modlintlib
@@ -104,7 +107,7 @@ lint.platmod:   modlintlib
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 $(CHERRYSTONE_KMODS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 # EXPORT DELETE START
 

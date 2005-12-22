@@ -51,6 +51,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -59,7 +61,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clobber clean.lint:	$(ONTARIO_KMODS)
+def all clean clobber clean.lint modlist:	$(ONTARIO_KMODS)
 
 lintlib:      unix
 
@@ -76,7 +78,7 @@ install:	$(ROOT_ONTARIO_DIR) $(USR_ONTARIO_DIR) \
 		.WAIT $(ONTARIO_KMODS)
 
 $(ONTARIO_KMODS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 install_h check:	FRC
 
@@ -85,6 +87,7 @@ lint:	modlintlib .WAIT $(LINT_DEPS)
 LINT_LIBS	= $(LINT_LIB) \
 			-L$(ONTARIO_LINT_LIB_DIR) \
 			-L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+			    $(CLOSED_LINT_KMODS:%=-l%) \
 			-L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:   modlintlib

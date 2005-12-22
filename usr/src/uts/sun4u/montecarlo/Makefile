@@ -21,8 +21,8 @@
 #
 #
 # uts/sun4u/montecarlo/Makefile
-# Copyright (c) 1999-2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -51,6 +51,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 #lintlib	:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -59,15 +61,16 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean.lint clean clobber: $(MONTECARLO_KMODS)
+def all clean.lint clean clobber modlist: $(MONTECARLO_KMODS) \
+	$(CLOSED_MONTECARLO_KMODS)
 
-modlintlib:	$(MONTECARLO_KMODS)
+modlintlib:	$(MONTECARLO_KMODS) $(CLOSED_MONTECARLO_KMODS)
 
 install:        $(ROOT_MONTECARLO_DIR) $(USR_MONTECARLO_DIR) \
                 $(USR_MONTECARLO_INC_DIR) \
                 $(USR_MONTECARLO_SBIN_DIR) \
                 $(USR_MONTECARLO_LIB_DIR) \
-                .WAIT $(MONTECARLO_KMODS) \
+                .WAIT $(MONTECARLO_KMODS) $(CLOSED_MONTECARLO_KMODS) \
 		pcicfg se.conf ttymux.conf
 
 pcicfg:		$(ROOT_MONTECARLO_MISC_DIR_64)
@@ -104,6 +107,7 @@ lint:		modlintlib
 LINT_LIBS	 = $(LINT_LIB) \
 		   -L$(MONTECARLO_LINT_LIB_DIR) \
 		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+		       $(CLOSED_LINT_KMODS:%=-l%) \
 		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:   modlintlib
@@ -111,7 +115,11 @@ lint.platmod:   modlintlib
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 $(MONTECARLO_KMODS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(CLOSED_MONTECARLO_KMODS): FRC
+	cd $(CLOSED)/uts/sun4u/montecarlo/$@; pwd; \
+	    $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

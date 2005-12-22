@@ -27,9 +27,9 @@
 #
 # uts/sun/Makefile.files
 #
-#	This Makefile defines all file modules and build rules for the
-# directory uts/sun and it's children. These are the source files which
-# are common to all sun implementations.
+# This Makefile defines file modules and build rules for the directory
+# uts/sun and its children. These are the source files which are
+# common to all sun implementations.
 #
 
 #
@@ -62,13 +62,7 @@ FAS_OBJS +=	fas.o fas_callbacks.o
 
 FD_OBJS += fd.o
 
-IFP_OBJS +=	ifp.o ifp_fw.o
-
-ISP_OBJS +=	isp.o isp_sbus_fw.o isp_1040_fw.o isp_cmds.o
-
 MS_OBJS +=	ms.o
-
-SF_OBJS +=	sf.o
 
 HME_OBJS +=	hme.o
 
@@ -80,19 +74,11 @@ SD_OBJS +=	sd.o sd_xbuf.o
 
 CMLB_OBJS +=	cmlb.o
 
-DAD_OBJS +=	dad.o
-
 DADA_OBJS +=	dcd_hba.o       dcd_transport.o \
 		dcd_control.o   dcd_resource.o  dcd_confsubr.o dcd_subr.o \
 		dcd_confdata.o
 
-ATA_OBJS +=	ata_common.o atapi.o ata_disk.o ghd.o ghd_scsi.o \
-		ghd_debug.o ghd_scsa.o ghd_gcmd.o ghd_queue.o ghd_timer.o \
-		ghd_waitq.o cmd.o acersb.o sil.o
-
 SSD_OBJS +=	sd.o sd_xbuf.o
-
-SOCAL_OBJS +=	socal.o	socal_ucode.o
 
 STP4020_OBJS +=	stp4020.o
 

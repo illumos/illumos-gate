@@ -45,12 +45,13 @@ SUN_SOLARIS = Sun/Solaris
 PERL_DYNAMIC_EXT = \
     $(SUN_SOLARIS)/Utils \
     $(SUN_SOLARIS)/Intrs \
-    $(SUN_SOLARIS)/Kstat \
     $(SUN_SOLARIS)/Project \
     $(SUN_SOLARIS)/Task \
     $(SUN_SOLARIS)/Exacct \
     $(SUN_SOLARIS)/Privilege \
     $(SUN_SOLARIS)/Ucred
+
+CLOSED_PERL_EXT += $(SUN_SOLARIS)/Kstat
 
 # Add any pure-perl extensions here.
 PERL_NONXS_EXT = \
@@ -60,9 +61,15 @@ PERL_NONXS_EXT = \
 PERL_EXT = $(PERL_DYNAMIC_EXT) $(PERL_NONXS_EXT)
 PERL_EXT_MAKEFILES = $(PERL_EXT:%=%/Makefile)
 
-all: copy_contrib $(PERL_EXT_MAKEFILES) $(PERL_EXT)
+ALL_EXT = $(PERL_EXT)
+ALL_EXT_MAKEFILES = $(PERL_EXT_MAKEFILES)
 
-.PARALLEL: $(PERL_EXT_MAKEFILES) $(PERL_EXT)
+$(CLOSED_BUILD)ALL_EXT += $(CLOSED_PERL_EXT)
+$(CLOSED_BUILD)ALL_EXT_MAKEFILES += $(CLOSED_PERL_EXT:%=%/Makefile)
+
+all: copy_contrib $(ALL_EXT_MAKEFILES) $(ALL_EXT)
+
+.PARALLEL: $(ALL_EXT_MAKEFILES) $(ALL_EXT)
 
 #
 # Note: this is a dummy install target; during 'make all' this Makefile
@@ -77,10 +84,15 @@ install: all
 #
 copy_contrib:   ../../contrib/copy_contrib
 	@ ../../contrib/copy_contrib ../../contrib . $(PERL_EXT)
+	@ if [ -d $(CLOSED)/cmd/perl/contrib -a \
+	    -n "$(CLOSED_PERL_EXT)" ]; then \
+		../../contrib/copy_contrib $(CLOSED)/cmd/perl/contrib \
+		    . $(CLOSED_PERL_EXT); \
+	fi
 
 clean:
 	-@ $(PERL_MM_ENV); \
-	for ext in $(PERL_EXT); do \
+	for ext in $(ALL_EXT); do \
 		if [ -d $$ext ]; then \
 			( \
 			cd $$ext; pwd; \
@@ -93,7 +105,7 @@ clean:
 
 clobber:
 	-@ $(PERL_MM_ENV); \
-	for ext in $(PERL_EXT); do \
+	for ext in $(ALL_EXT); do \
 		if [ -d $$ext ]; then \
 			( \
 			cd $$ext; pwd; \
@@ -107,7 +119,7 @@ clobber:
 
 test: all
 	@ $(PERL_MM_ENV); $(PERL_LD_ENV); \
-	for ext in $(PERL_EXT); do \
+	for ext in $(ALL_EXT); do \
 		( \
 		cd $$ext; pwd; \
 		[ -f Makefile.old ] && mf=Makefile.old; \

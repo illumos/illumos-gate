@@ -1018,6 +1018,37 @@ if [ "$BRINGOVER_FILES" = "" ]; then
 	BRINGOVER_FILES="usr"
 fi
 
+if [ -z "$CLOSED_IS_PRESENT" ]; then
+	#
+	# See if the closed tree is present.  If the current workspace
+	# is empty, check the bringover workspace.  (This is for
+	# builds that start out with nothing but the environment
+	# file.)
+	#
+	if [ -d $SRC/../closed ]; then
+		CLOSED_IS_PRESENT="yes"
+	elif [ -d $SRC ]; then
+		CLOSED_IS_PRESENT="no"
+	elif [ -d $CLONE_WS/usr/closed ]; then
+		CLOSED_IS_PRESENT="yes"
+	else
+		CLOSED_IS_PRESENT="no"
+	fi
+	export CLOSED_IS_PRESENT
+fi
+
+#
+# If the closed sources are not present, the closed binaries must be
+# present for the build to succeed.  If there's no pointer to the
+# closed binaries, flag that now, rather than forcing the user to wait
+# a couple hours (or more) to find out.
+#
+if [[ "$CLOSED_IS_PRESENT" = no && ! -d "$ON_CLOSED_BINS" ]]; then
+	echo "If the closed sources are not present, ON_CLOSED_BINS"
+	echo "must point to the closed binaries tree."
+	exit 1
+fi
+
 #
 # Note: changes to the option letters here should also be applied to the
 #	bldenv script.
@@ -1147,7 +1178,9 @@ export PATH
 
 # roots of source trees, both relative to $SRC and absolute.
 relsrcdirs="."
-[ -d $SRC/../closed ] && relsrcdirs="$relsrcdirs ../closed"
+if [[ -d $SRC/../closed && "$CLOSED_IS_PRESENT" != no ]]; then
+	relsrcdirs="$relsrcdirs ../closed"
+fi
 abssrcdirs=""
 for d in $relsrcdirs; do
 	abssrcdirs="$abssrcdirs $SRC/$d"
@@ -2215,10 +2248,10 @@ if [ "$M_FLAG" != "y" -a "$build_ok" = y ]; then
 	# Get pkginfo files from usr/src/pkgdefs
 	#
 	pmodes -qvdP \
-	`for d in $SRC/pkgdefs $SRC/../closed/pkgdefs; do
-		if [ -d "$d" ]
+	`for d in $abssrcdirs; do
+		if [ -d "$d/pkgdefs" ]
 		then
-			find $d -name pkginfo.tmpl -print -o -name .del\* -prune
+			find $d/pkgdefs -name pkginfo.tmpl -print -o -name .del\* -prune
 		fi
 	 done | sed -e 's:/pkginfo.tmpl$::' | sort -u ` >> $mail_msg_file
 fi

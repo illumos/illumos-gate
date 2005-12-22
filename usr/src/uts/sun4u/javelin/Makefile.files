@@ -21,8 +21,8 @@
 #
 #
 # uts/sun4u/javelin/Makefile.files
-# Copyright (c) 1994, 1995, 1996 - 1998 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -36,7 +36,6 @@
 #
 # Javelin specific driver relate modules
 #
-ENVCTRLTWO_OBJS	= envctrltwo.o
 
 #
 # Miscellaneous

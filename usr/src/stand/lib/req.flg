@@ -34,3 +34,4 @@ echo_file usr/src/psm/Makefile.psm.64
 find_files "s.*.h" usr/src/psm/stand/sys
 find_files "s.*.h" usr/src/stand
 find_files "s.*.h" usr/src/uts
+find_files "s.*.h" usr/closed/uts

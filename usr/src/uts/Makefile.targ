@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -262,32 +261,35 @@ clean $(CLEAN_DEPS)		:= TARGET = clean
 clobber $(CLOBBER_DEPS)		:= TARGET = clobber
 lint $(LINT_DEPS)		:= TARGET = lint
 modlintlib $(MODLINTLIB_DEPS)	:= TARGET = modlintlib
+modlist	$(MODLIST_DEPS)		:= TARGET = modlist
+modlist	$(MODLIST_DEPS)		:= NO_STATE= -K $$MODSTATE$$$$
 clean.lint $(CLEAN_LINT_DEPS)	:= TARGET = clean.lint
 install $(INSTALL_DEPS)		:= TARGET = install
 symcheck $(SYM_DEPS)		:= TARGET = symcheck
 
 
-ALL_TARGS	= def all clean clobber lint modlintlib clean.lint lintlib install symcheck
+ALL_TARGS	= def all clean clobber lint modlintlib \
+		  clean.lint lintlib install symcheck
 
 ALL_OBJ32	= $(ALL_TARGS:%=%.obj32)
 
 $(ALL_OBJ32):	FRC
-	@BUILD_TYPE=OBJ32 VERSION='$(VERSION)' $(MAKE) $(TARGET).targ
+	@BUILD_TYPE=OBJ32 VERSION='$(VERSION)' $(MAKE) $(NO_STATE) $(TARGET).targ
 
 ALL_DEBUG32	= $(ALL_TARGS:%=%.debug32)
 
 $(ALL_DEBUG32):	FRC
-	@BUILD_TYPE=DBG32 VERSION='$(VERSION)' $(MAKE) $(TARGET).targ
+	@BUILD_TYPE=DBG32 VERSION='$(VERSION)' $(MAKE) $(NO_STATE) $(TARGET).targ
 
 ALL_OBJ64	= $(ALL_TARGS:%=%.obj64)
 
 $(ALL_OBJ64):	FRC
-	@BUILD_TYPE=OBJ64 VERSION='$(VERSION)' $(MAKE) $(TARGET).targ
+	@BUILD_TYPE=OBJ64 VERSION='$(VERSION)' $(MAKE) $(NO_STATE) $(TARGET).targ
 
 ALL_DEBUG64	= $(ALL_TARGS:%=%.debug64)
 
 $(ALL_DEBUG64):	FRC
-	@BUILD_TYPE=DBG64 VERSION='$(VERSION)' $(MAKE) $(TARGET).targ
+	@BUILD_TYPE=DBG64 VERSION='$(VERSION)' $(MAKE) $(NO_STATE) $(TARGET).targ
 
 
 $(OBJS_DIR):
@@ -302,6 +304,87 @@ lint.targ:		$(OBJS_DIR) $(LINT_TARGET)
 modlintlib.targ:	$(OBJS_DIR) $(MOD_LINT_LIB)
 
 install.targ:		$(OBJS_DIR) $(INSTALL_TARGET)
+
+#
+# Support for Install.sh.
+#
+
+modlist:	$(MODLIST_DEPS)
+
+# paths relative to $(ROOT).
+RELMODULE = $(ROOTMODULE:$(ROOT)/%=%)
+RELCONF = $(ROOT_CONFFILE:$(ROOT)/%=%)
+RELLINK = $(ROOTLINK:$(ROOT)/%=%)
+RELUNIX = $(UNIX32_LINK:$(ROOT)/%=%)
+RELSOFTLINKS = $(ROOTSOFTLINKS:$(ROOT)/%=%)
+
+MODSRC:sh=		pwd
+
+#
+# Changes to this target may require corresponding changes to
+# Install.sh.
+# Don't issue a MOD entry if it's not in the install list.
+#
+$(MODLIST_DEPS): FRC
+	@case $@ in \
+	*32) \
+		class=32; \
+		relmodule=`dirname $(RELMODULE)`; \
+		rellink=`dirname $(RELLINK)`;; \
+	*64) \
+		class=64; \
+		relmodule=`dirname $(RELMODULE)`/$(SUBDIR64); \
+		rellink=`dirname $(RELLINK)`/$(SUBDIR64);; \
+	esac; \
+	if [ -z "$(THISIMPL)" ]; then \
+		impl=all; \
+	else \
+		impl=$(THISIMPL); \
+	fi; \
+	if [ -n "$(ROOTMODULE)" -a -n "$(INSTALL_TARGET)" ]; then \
+		if [ -z "$(MODULE)" ]; then \
+			module=`basename $(ROOTMODULE)`; \
+		else \
+			module=$(MODULE); \
+		fi; \
+		tinstall="$(INSTALL_TARGET)"; \
+		for t in $$tinstall; do \
+			if [ "$(ROOTMODULE)" = $$t ]; then \
+				echo MOD $$module $$relmodule \
+				    $$class $$impl $(MODSRC); \
+				break; \
+			fi \
+		done \
+	fi; \
+	if [ -n "$(CONF_SRCDIR)" ]; then \
+		tinstall="$(INSTALL_TARGET)"; \
+		for t in $$tinstall; do \
+			if [ $(ROOT_CONFFILE) = $$t ]; then \
+				echo CONF $(RELCONF) \
+				    $(MODSRC)/$(CONF_SRCDIR) $$impl $$module; \
+				break; \
+			fi \
+		done \
+	fi; \
+	if [ -n "$(ROOTLINK)" ]; then \
+		echo LINK $$relmodule $$module \
+		    $$rellink `basename $(RELLINK)` $$impl; \
+	fi; \
+	if [ -n "$(UNIX32_LINK)" ]; then \
+		echo SYMLINK $(SUBDIR64)/$(UNIX) \
+		    `dirname $(RELUNIX)` unix $$impl $$module; \
+	fi; \
+	trelsoftlinks="$(RELSOFTLINKS)"; \
+	for t in $$trelsoftlinks; do \
+		if [ $$class = 32 ]; then \
+			linkdir=`dirname $$t`; \
+		else \
+			linkdir=`dirname $$t`/$(SUBDIR64); \
+		fi; \
+		linkname=`basename $$t`; \
+		echo SYMLINK $(MODULE) $$linkdir $$linkname \
+		    $$impl $$module; \
+	done
 
 #
 #	Cleanliness is next to ...

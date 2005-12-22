@@ -48,6 +48,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 
 .KEEP_STATE:
 
@@ -61,14 +63,14 @@ clean clobber: $($(MACH)_ARCHITECTURES)
 		$(RM) $(PMTMO_FILE) ; \
 	fi
 
-clean.lint: $($(MACH)_ARCHITECTURES)
+clean.lint modlist: $($(MACH)_ARCHITECTURES)
 
 install_dirs:
 	@cd ..; pwd; $(MAKE) rootdirs
 	@pwd
 
 $($(MACH)_ARCHITECTURES): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(PMTMO_FILE) pmtmo_file: $(PATCH_MAKEUP_TABLE)
 	@if [ -z "$(PATCH_MAKEUP_TABLE)" ] ; then \
@@ -94,6 +96,10 @@ COMMON_HDRDIRS= common/des common/fs common/gssapi common/inet common/net \
 	common/netinet common/nfs common/rpc common/sys common/vm \
 	common/c2 common/pcmcia/sys common/rpcsvc common/inet/kssl \
 	common/inet/nca common/ipp
+
+# These aren't the only headers in closed.  But the other directories
+# are simple enough that they can be driven from the src tree.
+$(CLOSED_BUILD)COMMON_HDRDIRS += $(CLOSED)/uts/common/sys
 
 sparc_HDRDIRS= sun/sys
 i386_HDRDIRS= i86pc/vm
@@ -130,7 +136,12 @@ ONC_PLUS:	$(ONC_FILES:%=%_onc_plus)
 # the user will be interested in), it's historically been set to
 # mirror the $(XRDIRS) list, and that works kinda sorta okay.
 #
-XRDIRS = $(sparc_ARCHITECTURES) $(i386_ARCHITECTURES) sun4 sfmmu sun common
+SHARED_XRDIRS = $(sparc_ARCHITECTURES) $(i386_ARCHITECTURES) sun4 sfmmu	\
+	sun common
+CLOSED_XRDIRS = $(SHARED_XRDIRS:%=% ../../closed/uts/%)
+XRDIRS = $(SHARED_XRDIRS)
+$(CLOSED_BUILD)XRDIRS = $(CLOSED_XRDIRS:../../closed/uts/sfmmu=)
+
 XRINCDIRS = $(XRDIRS)
 
 cscope.out tags: FRC

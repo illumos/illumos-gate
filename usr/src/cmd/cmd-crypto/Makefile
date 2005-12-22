@@ -20,25 +20,30 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+include ../Makefile.cmd
+
 SUBDIRS1 = \
 	cryptoadm \
 	decrypt \
 	digest \
-	elfsign \
-	kcfd \
 	pktool
+
+$(CLOSED_BUILD)SUBDIRS1 += \
+	$(CLOSED)/cmd/cmd-crypto/elfsign \
+	$(CLOSED)/cmd/cmd-crypto/kcfd
 
 SUBDIRS2 = \
 	etc \
 	scripts
 
-include ../Makefile.cmd
+$(CLOSED_BUILD)SUBDIRS2 += \
+	$(CLOSED)/cmd/cmd-crypto/etc
 
 all:=           TARGET= all
 install:=       TARGET= install

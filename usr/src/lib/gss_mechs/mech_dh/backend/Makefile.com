@@ -45,7 +45,8 @@ OBJECTS= $(MECH) $(CRYPTO) $(DERIVED_OBJS)
 # include library definitions
 include ../../../../Makefile.lib
 
-$(EXPORT_RELEASE_BUILD)include ../Makefile.export
+MAKEFILE_EXPORT = $(CLOSED)/lib/gss_mechs/mech_dh/backend/Makefile.export
+$(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)
 
 
 CPPFLAGS += -I../mech -I../crypto -I$(SRC)/uts/common/gssapi/include
@@ -60,7 +61,7 @@ LIBNAME = $(LIBRARY:%.a=%)
 
 MAPFILE = ../mapfile-vers
 
-$(EXPORT_RELEASE_BUILD)MAPFILE = ../mapfile-vers-export
+$(EXPORT_RELEASE_BUILD)MAPFILE = $(CLOSED)/lib/gss_mechs/mech_dh/backend/mapfile-vers-export
 
 DYNFLAGS += -M$(MAPFILE)
 

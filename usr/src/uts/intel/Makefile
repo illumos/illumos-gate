@@ -35,15 +35,16 @@ UTSBASE = ..
 include Makefile.intel
 
 LINT_LIBS	= $(LINT_LIB) $(GEN_LINT_LIB) \
-		  $(LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) 
+		  $(LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
+		  $(CLOSED_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) 
 
 # EXPORT DELETE START
 LINT_LIBS	+= $(SVVS_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln)
-LINT_XMODLIBS3	 = $(XMODS:lsimega=)
-LINT_XMODLIBS2	 = $(LINT_XMODLIBS3:adpu320=)
-LINT_XMODLIBS1	 = $(LINT_XMODLIBS2:e1000g=)
-LINT_XMODLIBS	 = $(LINT_XMODLIBS1:nge=)
-LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD3	 = $(CLOSED_XMODS:lsimega=)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD2	 = $(LINT_CLOSED_XMOD3:adpu320=)
+$(CLOSED_BUILD)LINT_CLOSED_XMOD1	 = $(LINT_CLOSED_XMOD2:e1000g=)
+$(CLOSED_BUILD)LINT_XMODLIBS	= $(LINT_CLOSED_XMOD1:nge=)
+$(CLOSED_BUILD)LINT_LIBS	+= $(LINT_XMODLIBS:%=$(LINT_LIB_DIR)/llib-l%.ln)
 
 #
 # dprov is delivered in the SUNWcrtptoint package.
@@ -56,9 +57,12 @@ DRV_KMODS	+= dprov
 # causing the 2nd pass of lint on the kernel to complain. CRYPTO_EK_KMODS
 # should not be listed in the lint target.
 #
-CRYPTO_EK_KMODS	+= aes256
-CRYPTO_EK_KMODS	+= arcfour2048
-CRYPTO_EK_KMODS	+= blowfish448
+# Don't build these for OpenSolaris, since they will be replaced by
+# binaries that are signed by Sun RE.
+#
+$(CLOSED_BUILD)CRYPTO_EK_KMODS	+= aes256
+$(CLOSED_BUILD)CRYPTO_EK_KMODS	+= arcfour2048
+$(CLOSED_BUILD)CRYPTO_EK_KMODS	+= blowfish448
 
 # EXPORT DELETE END
 
@@ -71,24 +75,40 @@ clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 install_h	:=	TARGET= install_h
 
 .KEEP_STATE:
 
-.PARALLEL:	$(KMODS) $(SVVS) $(XMODS) config $(LINT_DEPS)
+.PARALLEL:	$(KMODS) $(CLOSED_KMODS) $(SVVS) $(XMODS) $(CLOSED_XMODS) \
+		config $(LINT_DEPS)
 
-def all install clean clobber: $(KMODS) $(SVVS) $(XMODS) config
+def all install clean clobber modlist: $(KMODS) $(CLOSED_KMODS) \
+		$(SVVS) $(XMODS) $(CLOSED_XMODS) config
 
-modlintlib clean.lint: $(LINT_KMODS) $(SVVS) $(XMODS)
+modlintlib clean.lint: $(LINT_KMODS) $(CLOSED_LINT_KMODS) $(SVVS) \
+	$(XMODS) $(CLOSED_XMODS)
 
 $(KMODS) $(SUBDIRS) config:	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
-$(SVVS) $(XMODS):	FRC
+$(CLOSED_KMODS):	FRC
+	cd $(CLOSED)/uts/intel/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
+		cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET); \
+	else \
+		true; \
+	fi
+
+$(SVVS) $(CLOSED_XMODS):	FRC
+	@if [ -f $(CLOSED)/uts/intel/$@/Makefile  ]; then \
+		cd $(CLOSED)/uts/intel/$@; pwd; \
+		    $(MAKE) $(NO_STATE) $(TARGET); \
 	else \
 		true; \
 	fi

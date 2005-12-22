@@ -47,14 +47,12 @@ $(SUBDIRS): FRC
 #
 # Cross-reference customization: include all boot-related source files.
 #
-UTSDIR=		../../../../uts
 STANDLIBDIR=	../../../../stand/lib
 STANDSYSDIR=	../../../../stand/sys
 PROMDIRS=	../../../promif/ieee1275
 NAMESDIRS=	../../lib/names/sparcv9 ../../lib/names/sparc/common
 XRDIRS +=	../common ../sparc/common $(NAMESDIRS) $(PROMDIRS) \
-		$(STANDSYSDIR) $(STANDLIBDIR)/sparcv9 $(STANDLIBDIR)/common \
-		$(STANDLIBDIR)/fs
+		$(STANDSYSDIR) $(STANDLIBDIR)
 
 cscope.out tags: FRC
 	$(XREF) -x $@

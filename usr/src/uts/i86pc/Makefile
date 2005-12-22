@@ -45,6 +45,7 @@ INTEL_LINTS	 = genunix
 
 LINT_LIBS	 = $(LINT_LIB) \
 		   $(KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
+		   $(CLOSED_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(INTEL_LINTS:%=$(INTEL_LIB_DIR)/llib-l%.ln)
 
 #
@@ -58,27 +59,52 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 machmodlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist	modlist.intel :=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 .KEEP_STATE:
 
-.PARALLEL:	$(KMODS) $(XMODS)
+.PARALLEL:	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \
+		modlist modlist.intel
 
-def all clean clobber clean.lint: genassym unix .WAIT $(KMODS) $(XMODS)
+def all clean clobber clean.lint: genassym unix .WAIT \
+	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
 
-install: install_platforms genassym unix .WAIT $(KMODS) $(XMODS)
+install: install_platforms genassym unix .WAIT $(KMODS) $(CLOSED_KMODS) \
+	$(XMODS) $(CLOSED_XMODS)
+
+# list the modules under i86pc.
+modlist: unix $(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
+
+# list the modules for Install -k i86pc.
+modlist.karch: modlist modlist.intel
+
+modlist.intel:
+	@cd $(SRC)/uts/intel; pwd; $(MAKE) $(NO_STATE) modlist
 
 lintlib:	unix
 
-modlintlib:	$(KMODS)
+modlintlib:	$(KMODS) $(CLOSED_KMODS)
 
 genassym unix $(KMODS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
+		cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET); \
+	else \
+		true; \
+	fi
+
+$(CLOSED_KMODS):	FRC
+	cd $(CLOSED)/uts/i86pc/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(CLOSED_XMODS):	FRC
+	@if [ -f $(CLOSED)/uts/i86pc/$@/Makefile  ]; then \
+		cd $(CLOSED)/uts/i86pc/$@; pwd; \
+		    $(MAKE) $(NO_STATE) $(TARGET); \
 	else \
 		true; \
 	fi
@@ -144,7 +170,9 @@ include ../Makefile.targ
 # Cross-reference customization: build a cross-reference over all of the
 # i86pc-related directories.
 #
-XRDIRS	= ../i86pc ../intel ../common
+SHARED_XRDIRS	= ../i86pc ../intel ../common
+XRDIRS		= $(SHARED_XRDIRS)
+$(CLOSED_BUILD)XRDIRS	= $(SHARED_XRDIRS:../%=../% ../../../closed/uts/%)
 XRPRUNE	= sun4u sun4
 
 cscope.out tags: FRC

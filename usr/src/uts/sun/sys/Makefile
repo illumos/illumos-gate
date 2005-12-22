@@ -55,11 +55,13 @@ obpdefs.h		pixrect.h  \
 pr_impl_util.h		pr_planegroups.h \
 promif.h		promimpl.h \
 ramdac.h 		ser_async.h		ser_zscc.h \
-socalvar.h		socalreg.h		socalmap.h \
-socalio.h 		socal_cq_defs.h \
+socalio.h		socalreg.h \
 stp4020_reg.h		stp4020_var.h \
 ttymux.h		ttymuxuser.h \
 zsdev.h
+
+CLOSED_HDRS= \
+socal_cq_defs.h		socalmap.h		socalvar.h
 
 AUDIOHDRS= \
 audio_4231.h \
@@ -67,9 +69,14 @@ audio1575.h
 
 SCSIADHDRS= \
 espcmd.h	espreg.h	espvar.h	fascmd.h	fasdma.h \
-fasreg.h	fasvar.h	sfvar.h	\
-ifpcmd.h	ifpvar.h	ifpio.h		ifpmail.h	ifpreg.h \
-ispcmd.h	ispmail.h	ispreg.h	ispvar.h
+fasreg.h	fasvar.h	ifpio.h
+
+CLOSED_SCSIAD = $(CLOSED)/uts/sun/sys/scsi/adapters
+
+CLOSED_SCSIADHDRS= \
+ifpcmd.h	ifpmail.h	ifpreg.h	ifpvar.h \
+ispcmd.h	ispmail.h	ispreg.h	ispvar.h \
+sfvar.h
 
 SCSITARGHDRS= \
 
@@ -80,9 +87,12 @@ ROOTDIRS=	$(ROOTDIR) \
 		$(ROOTDIR)/scsi/targets
 
 ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%)
+$(CLOSED_BUILD)ROOTHDRS += $(CLOSED_HDRS:%=$(ROOTDIR)/%)
 ROOTAUDHDRS= $(AUDIOHDRS:%=$(ROOTDIR)/audio/%)
 ROOTFCHDRS= $(FCHDRS:%=$(ROOTDIR)/fc4/%)
 ROOTSCSIADHDRS= $(SCSIADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
+$(CLOSED_BUILD)ROOTSCSIADHDRS += \
+	$(CLOSED_SCSIADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
 ROOTSCSITARGHDRS= $(SCSITARGHDRS:%=$(ROOTDIR)/scsi/targets/%)
 
 
@@ -90,10 +100,16 @@ ROOTSCSITARGHDRS= $(SCSITARGHDRS:%=$(ROOTDIR)/scsi/targets/%)
 $(ROOTDIR)/%: %
 	$(INS.file)
 
+$(ROOTDIR)/%: $(CLOSED)/uts/sun/sys/%
+	$(INS.file)
+
 $(ROOTDIR)/audio/%: audio/%
 	$(INS.file)
 
 $(ROOTDIR)/scsi/adapters/%: scsi/adapters/%
+	$(INS.file)
+
+$(ROOTDIR)/scsi/adapters/%: $(CLOSED_SCSIAD)/%
 	$(INS.file)
 
 $(ROOTDIR)/scsi/targets/%: scsi/targets/%
@@ -117,6 +133,9 @@ CHECKHDRS= \
 	$(SCSIADHDRS:%.h=scsi/adapters/%.check) \
 	$(SCSITARGHDRS:%.h=scsi/targets/%.check)
 
+$(CLOSED_BUILD)CHECKHDRS += \
+	$(CLOSED_HDRS:%.h=$(CLOSED)/uts/sun/sys/%.check) \
+	$(CLOSED_SCSIADHDRS:%.h=$(CLOSED_SCSIAD)/%.check)
 
 # headers which won't quite meet the standards...
 #

@@ -25,8 +25,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This Makefile defines all file modules in the directory uts/i86pc
-#	and it's children. These are the source files which i86pc
+#	This Makefile defines file modules in the directory uts/i86pc
+#	and its children. These are the source files which are i86pc
 #	"implementation architecture" dependent.
 #
 
@@ -112,33 +112,20 @@ PCINEXUS_OBJS += pci.o pci_common.o pci_kstats.o pci_tools.o
 
 TCIC_OBJS +=	tcic.o
 
-ATA_OBJS +=	$(GHD_OBJS) ata_blacklist.o ata_common.o ata_disk.o \
-		ata_dma.o atapi.o atapi_fsm.o ata_debug.o \
-		sil3xxx.o
-
-NCRS_OBJS	+= glm.o
-ELXL_OBJS	+= elxl.o elxl_cmn.o mii.o
-
 FD_OBJS		+= fd.o
 
 PCN_OBJS	+= mii.o
-SBPRO_OBJS	+= sbpro.o
 
 DNET_OBJS	+= dnet.o mii.o
-IPRB_OBJS	+= iprb.o mii.o
-BMC_OBJS	+= bmc_fe.o bmc_kcs.o
 LOGI_OBJS	+= logi.o
 MSCSI_OBJS	+= mscsi.o
 MSMOUSE_OBJS	+= msm.o
 PCPLUSMP_OBJS	+= apic.o psm_common.o apic_introp.o
 RTLS_OBJS	+= rtls.o
-SPWR_OBJS	+= spwr.o 9432.o lm9432.o lm9432cf.o
 AGPGART_OBJS	+=	agpgart.o \
 			agp_kstat.o
 AGPTARGET_OBJS	+=	agptarget.o
 AMD64GART_OBJS	+=	amd64_gart.o
-BSCV_OBJS	+= bscv.o
-BSCBUS_OBJS	+= bscbus.o
 
 #
 #	PCI-Express driver modules

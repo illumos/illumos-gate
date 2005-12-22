@@ -21,7 +21,7 @@
 #
 #
 # uts/sun4u/mpxu/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -53,6 +53,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -61,11 +63,11 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clean.lint clobber: $(MPXU_KMODS)
+def all clean clean.lint clobber modlist: $(MPXU_KMODS) $(CLOSED_MPXU_KMODS)
 
 lintlib:	unix
 
-modlintlib:	$(MPXU_KMODS)
+modlintlib:	$(MPXU_KMODS) $(CLOSED_MPXU_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-V240
 
@@ -92,10 +94,14 @@ install:	$(ROOT_MPXU_DIR) $(USR_MPXU_DIR) \
 		$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%) \
 		$(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%) \
 		$(MPXU_CRYPTO_LINKS) \
+		$(CLOSED_MPXU_KMODS) \
 		.WAIT $(MPXU_KMODS)
 
 $(MPXU_KMODS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(CLOSED_MPXU_KMODS): FRC
+	cd $(CLOSED)/uts/sun4u/mpxu/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(MPXU_CRYPTO_LINKS): $(ROOT_MPXU_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_MPXU_CRYPTO_DIR_64)/$@;
@@ -110,6 +116,7 @@ lint:		modlintlib
 LINT_LIBS	 = $(LINT_LIB) \
 		   -L$(MPXU_LINT_LIB_DIR) \
 		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+		       $(CLOSED_LINT_KMODS:%=-l%) \
 		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:	modlintlib

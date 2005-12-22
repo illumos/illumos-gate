@@ -43,7 +43,8 @@ OBJECTS= $(DH192)
 # include library definitions
 include ../../../../Makefile.lib
 
-$(EXPORT_RELEASE_BUILD)include ../Makefile.export
+MAKEFILE_EXPORT = $(CLOSED)/lib/gss_mechs/mech_dh/dh192/Makefile.export
+$(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)
 
 CPPFLAGS += -I../../backend/mech -I../../backend/crypto
 CPPFLAGS += -I$(SRC)/lib/libnsl/include
@@ -59,7 +60,7 @@ LIBNAME = $(LIBRARY:%.a=%)
 
 MAPFILE = ../mapfile-vers
 
-$(EXPORT_RELEASE_BUILD)MAPFILE = ../mapfile-vers-export
+$(EXPORT_RELEASE_BUILD)MAPFILE = $(CLOSED)/lib/gss_mechs/mech_dh/dh192/mapfile-vers-export
 
 DYNFLAGS += -M$(MAPFILE)
 

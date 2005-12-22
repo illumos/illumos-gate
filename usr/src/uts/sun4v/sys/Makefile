@@ -56,7 +56,6 @@ SUN4_HDRS=			\
 	ivintr.h		\
 	memlist_plat.h	 	\
 	memnode.h		\
-	memtestio.h		\
 	nexusdebug.h		\
 	prom_debug.h		\
 	scb.h			\
@@ -69,6 +68,9 @@ SUN4_HDRS=			\
 	xc_impl.h		\
 	zsmach.h
 
+CLOSED_SUN4_HDRS=			\
+	memtestio.h
+
 HDRS=	\
 	hypervisor_api.h	\
 	machasi.h		\
@@ -79,8 +81,6 @@ HDRS=	\
 	machparam.h		\
 	machsystm.h		\
 	machthread.h		\
-	memtestio_ni.h		\
-	memtestio_v.h		\
 	mmu.h			\
 	niagaraasi.h		\
 	niagararegs.h		\
@@ -89,8 +89,15 @@ HDRS=	\
 	qcn.h			\
 	traptrace.h
 
+CLOSED_HDRS=	\
+	memtestio_ni.h		\
+	memtestio_v.h
+
 ROOTHDRS=		$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
+$(CLOSED_BUILD)ROOTHDRS += $(CLOSED_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
+
 SUN4_ROOTHDRS=		$(SUN4_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
+$(CLOSED_BUILD)SUN4_ROOTHDRS += $(CLOSED_SUN4_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 
 ROOTDIR=		$(ROOT)/usr/share/src
 ROOTDIRS=		$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
@@ -100,6 +107,9 @@ LINKDEST=		../../../../platform/$(PLATFORM)/include/sys
 
 CHECKHDRS=		$(HDRS:%.h=%.check) \
 			$(SUN4_HDRS:%.h=%.cmncheck)
+$(CLOSED_BUILD)CHECKHDRS +=			\
+	$(CLOSED_HDRS:%.h=%.check)		\
+	$(CLOSED_SUN4_HDRS:%.h=%.cmncheck)
 
 .KEEP_STATE:
 
@@ -120,6 +130,12 @@ $(USR_PSM_ISYS_DIR)/%:	../../sfmmu/sys/% $(USR_PSM_ISYS_DIR)
 $(USR_PSM_ISYS_DIR)/%:	../../sun4/sys/% $(USR_PSM_ISYS_DIR)
 	$(INS.file)
 
+$(USR_PSM_ISYS_DIR)/%:	$(CLOSED)/uts/sun4/sys/% $(USR_PSM_ISYS_DIR)
+	$(INS.file)
+
+$(USR_PSM_ISYS_DIR)/%:	$(CLOSED)/uts/sun4v/sys/% $(USR_PSM_ISYS_DIR)
+	$(INS.file)
+
 $(ROOTDIRS):
 	$(INS.dir.root.bin)
 
@@ -132,7 +148,11 @@ mon/%.check:	mon/%.h
 
 %.check:	../../sfmmu/sys/%.h
 	$(DOT_H_CHECK)
+%.check:	$(CLOSED)/uts/sun4v/sys/%.h
+	$(DOT_H_CHECK)
 %.cmncheck:	../../sun4/sys/%.h
+	$(DOT_H_CHECK)
+%.cmncheck:	$(CLOSED)/uts/sun4/sys/%.h
 	$(DOT_H_CHECK)
 
 FRC:

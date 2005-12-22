@@ -20,8 +20,7 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/blade/options/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -84,4 +83,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sparc/Makefile.targ
+include $(UTSBASE)/sun4u/blade/Makefile.targ

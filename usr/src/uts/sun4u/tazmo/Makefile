@@ -21,7 +21,8 @@
 #
 #
 # uts/sun4u/tazmo/Makefile
-# Copyright (c) 1997 by Sun Microsystems, Inc.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -50,6 +51,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -58,15 +61,15 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clean.lint clobber: $(TAZMO_KMODS)
-  
-modlintlib:	$(TAZMO_KMODS)
- 
+def all clean clean.lint clobber modlist: $(TAZMO_KMODS) $(CLOSED_TAZMO_KMODS)
+
+modlintlib:	$(TAZMO_KMODS) $(CLOSED_TAZMO_KMODS)
+
 install:	$(ROOT_TAZMO_DIR) $(USR_TAZMO_DIR) \
 		$(USR_TAZMO_INC_DIR) \
 		$(USR_TAZMO_SBIN_DIR) \
 		$(USR_TAZMO_LIB_DIR) \
-		$(TAZMO_KMODS)
+		$(TAZMO_KMODS) $(CLOSED_TAZMO_KMODS)
 
 check install_h:
 
@@ -81,6 +84,7 @@ lint:		modlintlib
 LINT_LIBS	 = $(LINT_LIB) \
 		   -L$(TAZMO_LINT_LIB_DIR) \
 		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+		       $(CLOSED_LINT_KMODS:%=-l%) \
 		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:	modlintlib
@@ -88,7 +92,10 @@ lint.platmod:	modlintlib
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 $(TAZMO_KMODS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(CLOSED_TAZMO_KMODS): FRC
+	cd $(CLOSED)/uts/sun4u/tazmo/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

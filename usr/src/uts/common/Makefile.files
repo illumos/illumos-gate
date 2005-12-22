@@ -25,7 +25,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This Makefile defines all file modules for the directory uts/common
+# This Makefile defines all file modules for the directory uts/common
 # and its children. These are the source files which may be considered
 # common to all SunOS systems.
 
@@ -363,15 +363,11 @@ AUDIOVIA823X_OBJS += audiovia823x.o
 
 AUDIO810_OBJS += audio810.o
 
-AUDIOENS_OBJS += audioens.o
-
 AUDIOTS_OBJS +=	audiots.o
 
 CONSKBD_OBJS += conskbd.o
 
 CONSMS_OBJS +=	consms.o
-
-DAPLT_OBJS +=	daplt.o
 
 DIAUDIO_OBJS += audio.o
 
@@ -507,11 +503,6 @@ MAC_OBJS +=     mac.o mac_mod.o mac_stat.o
 AGGR_OBJS +=	aggr_dev.o aggr_ctl.o aggr_grp.o aggr_port.o \
 		aggr_send.o aggr_recv.o aggr_lacp.o
 
-TAVOR_OBJS +=	tavor.o tavor_agents.o tavor_cfg.o tavor_ci.o tavor_cmd.o \
-		tavor_cq.o tavor_event.o tavor_ioctl.o tavor_misc.o \
-		tavor_mr.o tavor_qp.o tavor_qpmod.o tavor_rsrc.o \
-		tavor_srq.o tavor_stats.o tavor_umap.o tavor_wr.o
-
 IB_OBJS +=	ibnex.o ibnex_ioctl.o
 
 IBCM_OBJS +=	ibcm_impl.o ibcm_sm.o ibcm_ti.o ibcm_utils.o ibcm_path.o
@@ -583,10 +574,6 @@ UGEN_OBJS += ugen.o
 
 USBSER_OBJS += usbser.o usbser_rseq.o
 
-USBSER_EDGE_OBJS += usbser_edge.o edge_dsd.o edge_dsd_sp.o edge_dsd_ti.o \
-		edge_pipe.o edge_subr.o	\
-		edge_fw_down.o edge_fw_down_g2.o edge_fw_down_ti.o
-
 USBSER_KEYSPAN_OBJS += usbser_keyspan.o keyspan_dsd.o keyspan_pipe.o
 
 USBSPRL_OBJS += usbser_pl2303.o pl2303_dsd.o
@@ -634,8 +621,6 @@ SCSA1394_OBJS += hba.o sbp2_driver.o sbp2_bus.o
 SBP2_OBJS += cfgrom.o sbp2.o
 
 PMODEM_OBJS += pmodem.o pmodem_cis.o cis.o cis_callout.o cis_handlers.o cis_params.o
-
-SGEN_OBJS +=	sgen.o
 
 ST_OBJS +=	st.o	st_conf.o
 
@@ -713,15 +698,7 @@ EMUL64_OBJS += emul64.o emul64_bsd.o
 
 ZCONS_OBJS += zcons.o
 
-#
-# The GHD files are currently shared source and not yet a driver module
-#
-GHD_OBJS +=	ghd.o ghd_debug.o ghd_dma.o ghd_queue.o ghd_scsa.o \
-		ghd_scsi.o ghd_timer.o ghd_waitq.o ghd_gcmd.o
-
 PCIIDE_OBJS += pci-ide.o
-
-PCN_OBJS += pcn.o
 
 PCEPP_OBJS += pcepp.o
 
@@ -957,10 +934,6 @@ RPCMOD_OBJS +=	rpcmod.o	clnt_cots.o	clnt_clts.o \
 		rpcsys.o	xdr_sizeof.o	clnt_rdma.o	svc_rdma.o \
 		xdr_rdma.o	rdma_subr.o	xdrrdma_sizeof.o	
 
-KLMMOD_OBJS +=	klmmod.o	lm_subr.o	lm_xdr.o	lm_server.o
-
-KLMOPS_OBJS +=	klmops.o	lm_client.o	lm_nlm_server.o lm_nlm4_server.o
-
 TLIMOD_OBJS +=	tlimod.o	t_kalloc.o	t_kbind.o	t_kclose.o \
 		t_kconnect.o	t_kfree.o	t_kgtstate.o	t_kopen.o \
 		t_krcvudat.o	t_ksndudat.o	t_kspoll.o	t_kunbind.o \
@@ -1002,25 +975,6 @@ IPCSEM_OBJS +=	sem.o
 IPCSHM_OBJS +=	shm.o
 
 #
-#			SVVS Modules
-#
-LO_OBJS +=	lo.o
-
-TIDG_OBJS +=	tidg.o
-
-TIVC_OBJS +=	tivc.o
-
-TMUX_OBJS +=	tmux.o
-
-LMODB_OBJS +=	lmodb.o
-
-LMODE_OBJS +=	lmode.o
-
-LMODR_OBJS +=	lmodr.o
-
-LMODT_OBJS +=	lmodt.o
-
-#
 #			kernel cryptographic framework
 #
 KCF_OBJS +=	kcf.o kcf_callprov.o kcf_cbufcall.o kcf_cipher.o kcf_crypto.o \
@@ -1058,7 +1012,6 @@ KSSL_OBJS +=	kssl.o ksslioctl.o ksslapi.o ksslrec.o
 #
 #			misc. modules
 #
-AMSRC1_OBJS +=	am_src1.o
 
 AMSRC2_OBJS +=	am_src2.o
 
@@ -1172,8 +1125,6 @@ DES_OBJS +=	des_crypt.o des_cbc_crypt.o des_impl.o des_ks.o des_soft.o
 
 DLBOOT_OBJS +=	bootparam_xdr.o nfs_dlinet.o scan.o
 
-GLM_OBJS +=	glm.o
-
 KRTLD_OBJS +=	\
 	kobj_bootflags.o \
 	getoptstr.o \
@@ -1183,17 +1134,6 @@ KRTLD_OBJS +=	\
 	kobj_subr.o
 
 MOD_OBJS +=	modctl.o modsubr.o modsysfile.o modconf.o modhash.o
-
-MPT_OBJS +=	mpt.o mpt_fw.o mpt_impl.o mpt_init.o mpt_raid.o
-
-SCSI_VHCI_OBJS +=	scsi_vhci.o		\
-			sun_asymmetric_fops.o	\
-			symmetric_fops.o	\
-			lsi_asymmetric_fops.o	\
-			std_asymmetric_fops.o	\
-			emc_asymmetric_fops.o	\
-			mpapi_impl.o		\
-			proprietary_vhci_util.o
 
 STRPLUMB_OBJS += strplumb.o octet.o
 
@@ -1205,8 +1145,6 @@ PROF_OBJS +=	prf.o
 
 SE_OBJS += se_driver.o
 
-LLC2_OBJS += SAM.o dlpi.o errlog.o ild.o llc2.o
-
 SYSACCT_OBJS +=	acct.o
 
 ACCTCTL_OBJS +=	acctctl.o
@@ -1215,19 +1153,13 @@ EXACCTSYS_OBJS += exacctsys.o
 
 KAIO_OBJS += aio.o
 
-PCIC_OBJS +=	pcic.o
-
 PCMCIA_OBJS += pcmcia.o cs.o cis.o cis_callout.o cis_handlers.o cis_params.o
-
-PEM_OBJS += pem.o
 
 BUSRA_OBJS += busra.o
 
 PCS_OBJS += pcs.o
 
 PCATA_OBJS += pcide.o pcdisk.o pclabel.o pcata.o
-
-PCELX_OBJS += pcelx.o pcgld.o
 
 PCMEM_OBJS += pcmem.o
 
@@ -1287,11 +1219,6 @@ BGE_OBJS += bge_main.o bge_chip.o bge_kstats.o bge_log.o bge_ndd.o \
 IXGB_OBJS += ixgb.o ixgb_atomic.o ixgb_chip.o ixgb_gld.o ixgb_kstats.o \
 		ixgb_log.o ixgb_ndd.o ixgb_rx.o ixgb_tx.o ixgb_xmii.o
 
-NGE_OBJS += nge_main.o nge_atomic.o nge_chip.o nge_ndd.o nge_kstats.o \
-                nge_log.o nge_rx.o nge_tx.o nge_xmii.o
-
-IGIGE_OBJS += e1000g_debug.o e1000_hw.o e1000g_main.o e1000g_alloc.o \
-		e1000g_tx.o e1000g_rx.o e1000g_stat.o
 RGE_OBJS += rge_main.o rge_chip.o rge_ndd.o rge_kstats.o rge_log.o rge_rxtx.o
 
 ATH_OBJS += ath_aux.o ath_ieee80211.o ath_main.o ath_osdep.o \
@@ -1313,17 +1240,8 @@ AS_INC_PATH	+= $(INC_PATH) -I$(UTSBASE)/common
 INCLUDE_PATH    += $(INC_PATH) $(CCYFLAG)$(UTSBASE)/common
 
 #
-#	Xframe 10G NIC driver module
-#
-XGE_OBJS = xge.o xgell.o
-
 PCIE_OBJS += pcie.o
 
-XGE_HAL_OBJS =  xgehal-channel.o xgehal-fifo.o xgehal-ring.o  xgehal-config.o \
-		xgehal-driver.o  xgehal-mm.o xgehal-stats.o  xgehal-device.o \
-		xge-queue.o  xgehal-mgmt.o xgehal-mgmtaux.o
-
-#
 #	Chelsio N110 10G NIC driver module
 #
 CH_OBJS = ch.o glue.o pe.o sge.o

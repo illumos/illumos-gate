@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,5 +30,5 @@ find_files "s.*" usr/src/common/crypto
 find_files "s.*" usr/src/common/bignum
 find_files "s.*" usr/src/lib/libldap5/sources/ldap/ber
 find_files "s.*" usr/src/lib/libldap5/include/ldap
-echo_file usr/src/cmd/cmd-crypto/etc/keys/SUNWosnet
-echo_file usr/src/cmd/cmd-crypto/etc/certs/SUNWosnet
+echo_file usr/closed/cmd/cmd-crypto/etc/keys/SUNWosnet
+echo_file usr/closed/cmd/cmd-crypto/etc/certs/SUNWosnet

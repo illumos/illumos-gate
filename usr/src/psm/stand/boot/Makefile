@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,14 +53,23 @@ $(SUBDIRS): FRC
 # Cross-reference customization: include all boot-related source files.
 #
 UTSDIR =	../../../uts
+UTSCLOSED =	../../../../closed/uts
 STANDLIBDIR =	../../../stand/lib
-STANDSYSDIRS =	../../../stand/sys ../../../stand/i386/sys
+STANDSYSDIRS =	../../../stand/sys
 PROMDIRS =	../../promif $(UTSDIR)/intel/promif
 NAMESDIRS =	../lib/names
 XRDIRS += 	$(STANDLIBDIR) $(STANDSYSDIRS) $(PROMDIRS) $(NAMESDIRS)
-XRINCDIRS =	$(UTSDIR)/sun4u $(UTSDIR)/sfmmu $(UTSDIR)/sparc/v7 \
-	    	$(UTSDIR)/sparc/v9 $(UTSDIR)/sparc $(UTSDIR)/sun \
-		$(UTSDIR)/common $(UTSDIR)/intel $(UTSDIR)/i86pc
+
+#
+# Components beginning with B! are in the open and closed trees; those
+# beginning with O! are just in the open tree.
+#
+XRINCCOMP = B!sun4u O!sfmmu O!sparc/v7 O!sparc/v9 B!sparc B!sun \
+	B!common B!intel B!i86pc
+XRINC_TMP = $(XRINCCOMP:B!%=$(UTSDIR)/%)
+XRINCDIRS = $(XRINC_TMP:O!%=$(UTSDIR)/%)
+$(CLOSED_BUILD)XRINC_TMP = $(XRINCCOMP:B!%=$(UTSDIR)/% $(UTSCLOSED)/%)
+$(CLOSED_BUILD)XRINCDIRS = $(XRINC_TMP:O!%=$(UTSDIR)/%)
 
 cscope.out tags: FRC
 	$(XREF) -x $@

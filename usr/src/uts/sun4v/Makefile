@@ -49,6 +49,7 @@ SPARC_LINTS	 =
 #
 LINT_LIBS	 = $(LINT_LIB) \
 		   $(LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
+		   $(CLOSED_LINT_KMODS:%=$(LINT_LIB_DIR)/llib-l%.ln) \
 		   $(SPARC_LINTS:%=$(SPARC_LIB_DIR)/llib-l%.ln)
 
 # EXPORT DELETE START
@@ -58,7 +59,10 @@ LINT_LIBS	 = $(LINT_LIB) \
 # causing the 2nd pass of lint on the kernel to complain. CRYPTO_EK_KMODS
 # should not be listed in the lint target.
 #
-CRYPTO_EK_KMODS	+= arcfour2048
+# Don't build this for OpenSolaris, since it will be replaced by
+# a binary that is signed by Sun RE.
+#
+$(CLOSED_BUILD)CRYPTO_EK_KMODS	+= arcfour2048
 # EXPORT DELETE END
 
 def		:=	TARGET= def
@@ -70,36 +74,63 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist	modlist.sparc :=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 .KEEP_STATE:
 
-.PARALLEL:	$(KMODS) $(XMODS)
+.PARALLEL:	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \
+		modlist modlist.sparc
 
 # Override for CPU_KMODS... they cannot be built
 # in parallel
 .NO_PARALLEL:	$(CPU_KMODS)
 
-def all clean clobber clean.lint: genassym unix .WAIT $(KMODS) $(XMODS) \
+def all clean clobber clean.lint: genassym unix .WAIT \
+	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) $(IMPLEMENTATIONS)
+
+# list the modules under sun4v.
+modlist: unix $(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \
 	$(IMPLEMENTATIONS)
 
-install: install_platforms genassym unix .WAIT $(KMODS) $(XMODS) \
-	$(IMPLEMENTATIONS)
+# list the modules for Install -k sun4v.
+modlist.karch: modlist modlist.sparc
+
+modlist.sparc:
+	@cd $(SRC)/uts/sparc; pwd; $(MAKE) $(NO_STATE) modlist
+
+install: install_platforms genassym unix .WAIT $(KMODS) $(CLOSED_KMODS) \
+	$(XMODS) $(CLOSED_XMODS) $(IMPLEMENTATIONS)
 
 lintlib:	unix
 
-modlintlib:	$(LINT_KMODS)
+modlintlib:	$(LINT_KMODS) $(CLOSED_LINT_KMODS)
 
-genassym unix $(KMODS) $(IMPLEMENTATIONS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+genassym unix $(KMODS):	FRC
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(IMPLEMENTATIONS):	FRC
+	@cd $@; pwd; THISIMPL=$@ $(MAKE) $(NO_STATE) $(TARGET)
 
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \
-		cd $@; pwd; $(MAKE) $(TARGET); \
+		cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET); \
 	else \
 		true; \
 	fi
+
+$(CLOSED_XMODS):	FRC
+	@if [ -f $(CLOSED)/uts/sun4v/$@/Makefile  ]; then \
+		cd $(CLOSED)/uts/sun4v/$@; pwd; \
+		    $(MAKE) $(NO_STATE) $(TARGET); \
+	else \
+		true; \
+	fi
+
+$(CLOSED_KMODS):	FRC
+	cd $(CLOSED)/uts/sun4v/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 install_h check:	install_platforms $(IMPLEMENTATIONS) FRC
 	@cd sys; pwd; $(MAKE) $(TARGET)
@@ -193,7 +224,11 @@ include ../Makefile.targ
 # Cross-reference customization: build a cross-reference over all of the
 # sun4v-related directories.
 #
-XRDIRS	= ../sun4v ../sun4 ../sfmmu ../sparc ../sun ../common
+SHARED_XRDIRS	= ../sun4v ../sun4 ../sfmmu ../sparc ../sun ../common
+CLOSED_XRDIRS	= $(SHARED_XRDIRS:../%=../% ../../../closed/uts/%)
+XRDIRS		= $(SHARED_XRDIRS)
+$(CLOSED_BUILD)XRDIRS	= $(CLOSED_XRDIRS:../../../closed/uts/sfmmu=)
+
 XRPRUNE = i86pc
 
 cscope.out tags: FRC

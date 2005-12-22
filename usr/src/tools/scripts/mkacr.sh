@@ -385,6 +385,10 @@ bfu_incompatible_classes="
 
 process_pkgdefs_directory $workspace/pkgdefs std
 
+if [[ -d $workspace/../closed/pkgdefs && "$CLOSED_IS_PRESENT" != no ]]; then
+	process_pkgdefs_directory $workspace/../closed/pkgdefs std-closed
+fi
+
 #
 # set up the list of corepkgs and bfs-incompatible classes for the
 # processing of the usr/src/realmode/pkgdefs directory

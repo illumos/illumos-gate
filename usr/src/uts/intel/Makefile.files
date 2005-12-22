@@ -28,7 +28,7 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 #	This Makefile defines all file modules and build rules for the
-# directory uts/intel and it's children. These are the source files which
+# directory uts/intel and its children. These are the source files which
 # are specific to x86 processor architectures.
 #
 
@@ -146,14 +146,6 @@ FBT_OBJS += fbt.o
 SDT_OBJS += sdt.o
 
 #
-#	adpu320 module
-#
-ADPU320_OBJS  = adpu320.o hwminit.o hwmhrst.o hwmtask.o \
-                hwmutil.o hwmptcl.o hwmintr.o hwmdlvr.o \
-                hwmse2.o hwmdiag.o rsminit.o rsmtask.o \
-                rsmutil.o xlminit.o xlmtask.o xlmutil.o
-
-#
 #	Pentium Performance Counter BackEnd module
 #
 P123_PCBE_OBJS = p123_pcbe.o
@@ -177,11 +169,6 @@ AAC_OBJS = aac.o
 #	AMR module
 #
 AMR_OBJS = amr.o
-
-#
-#	LSIMEGA module
-#
-LSIMEGA_OBJS = lsimega.o
 
 #
 #	special files

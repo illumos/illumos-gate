@@ -21,8 +21,8 @@
 #
 #
 # uts/sun4u/montecarlo/Makefile.files
-# Copyright (c) 1999-2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -40,11 +40,7 @@
 #     XXX_OBJS = xxx.o [yyy.o ...]
 #
 
-PCF8591_NCT_OBJS    = pcf8591_nct.o
-PCF8574_NCT_OBJS    = pcf8574_nct.o
-SCSB_OBJS	= scsb.o hsc.o
 TTYMUX_DACF_OBJS	= ttymux_dacf.o ttymux_dacf_util.o
-ACEBUS_OBJS	= acebus.o
 
 #
 # Miscellaneous

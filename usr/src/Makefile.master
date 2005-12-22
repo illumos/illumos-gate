@@ -52,7 +52,13 @@ ROOT=		/proto
 #
 # EXPORT_RELEASE_BUILD controls whether binaries are built in a form that
 # can be released for export under a binary license.  It is orthogonal to
-# the other *RELEASE_BUILD settings.
+# the other *RELEASE_BUILD settings.  ("#" means do an export release
+# build, "" means do a normal build.)
+#
+# CLOSED_BUILD controls whether we try to build files under
+# usr/closed.  ("" means to build closed code, "#" means don't try to
+# build it.)  Skipping the closed code implies doing an export release
+# build.
 #
 # STRIP_COMMENTS toggles comment section striping. Generally the same setting
 # as INTERNAL_RELEASE_BUILD.
@@ -73,10 +79,16 @@ CH=					$(POUND_SIGN)
 NOT_RELEASE_BUILD=
 INTERNAL_RELEASE_BUILD=			$(POUND_SIGN)
 RELEASE_BUILD=				$(POUND_SIGN)
-EXPORT_RELEASE_BUILD=
 $(RELEASE_BUILD)NOT_RELEASE_BUILD=	$(POUND_SIGN)
 $(RELEASE_BUILD)INTERNAL_RELEASE_BUILD=
 PATCH_BUILD=				$(POUND_SIGN)
+
+# If CLOSED_IS_PRESENT is not set, assume the closed tree is present.
+CLOSED_BUILD_1=	$(CLOSED_IS_PRESENT:yes=)
+CLOSED_BUILD=	$(CLOSED_BUILD_1:no=$(POUND_SIGN))
+
+EXPORT_RELEASE_BUILD=			$(POUND_SIGN)
+$(CLOSED_BUILD)EXPORT_RELEASE_BUILD=
 
 # SPARC_BLD is '#' for an Intel build.
 # INTEL_BLD is '#' for a Sparc build.
@@ -95,6 +107,10 @@ __GNUC=		$(POUND_SIGN)
 # The default is to use the Sun Studio 10 compiler by using the __GNUC
 # setting.
 __GNUC64=	$(__GNUC)
+
+# CLOSED is the root of the tree that contains source which isn't released
+# as open source
+CLOSED=		$(SRC)/../closed
 
 # BUILD_TOOLS is the root of all tools including compilers.
 # ONBLD_TOOLS is the root of all the tools that are part of SUNWonbld.
@@ -702,22 +718,21 @@ CTFCONVERT_O		= $(CTFCONVERT) $(CTFCVTFLAGS) $@
 ELFSIGN_O=	$(TRUE)
 ELFSIGN_CRYPTO=	$(ELFSIGN_O)
 ELFSIGN_OBJECT=	$(ELFSIGN_O)
-# EXPORT DELETE START
-# Note: The setting of ELFSIGN_O, etc. to $(TRUE) above must stay outside
-# of the export src markers.  The real setting for non source product builds
-# is inside the markers.
-# This is needed to reduce the amount of changes to Makefiles elsewhere
-# in the source tree (particularly in uts/{sparc,intel})
-ELFSIGN_O =	$(ELFSIGN)
-ELFSIGN_KEY =	$(SRC)/cmd/cmd-crypto/etc/keys/SUNWosnet
-ELFSIGN_CERT=	$(SRC)/cmd/cmd-crypto/etc/certs/SUNWosnet
-ELFSIGN_SEKEY =	$(SRC)/cmd/cmd-crypto/etc/keys/SUNWosnetSolaris
-ELFSIGN_SECERT=	$(SRC)/cmd/cmd-crypto/etc/certs/SUNWosnetSolaris
-ELFSIGN_CRYPTO=	$(ELFSIGN_O) sign $(ELFSIGN_FORMAT_OPTION) \
+$(EXPORT_RELEASE_BUILD)ELFSIGN_O =	$(ELFSIGN)
+$(EXPORT_RELEASE_BUILD)ELFSIGN_KEY =	\
+			$(CLOSED)/cmd/cmd-crypto/etc/keys/SUNWosnet
+$(EXPORT_RELEASE_BUILD)ELFSIGN_CERT=	\
+			$(CLOSED)/cmd/cmd-crypto/etc/certs/SUNWosnet
+$(EXPORT_RELEASE_BUILD)ELFSIGN_SEKEY =	\
+			$(CLOSED)/cmd/cmd-crypto/etc/keys/SUNWosnetSolaris
+$(EXPORT_RELEASE_BUILD)ELFSIGN_SECERT=	\
+			$(CLOSED)/cmd/cmd-crypto/etc/certs/SUNWosnetSolaris
+$(EXPORT_RELEASE_BUILD)ELFSIGN_CRYPTO=	$(ELFSIGN_O) sign \
+			$(ELFSIGN_FORMAT_OPTION) \
 			-k $(ELFSIGN_KEY) -c $(ELFSIGN_CERT) -e $@
-ELFSIGN_OBJECT=	$(ELFSIGN_O) sign $(ELFSIGN_FORMAT_OPTION) \
+$(EXPORT_RELEASE_BUILD)ELFSIGN_OBJECT=	$(ELFSIGN_O) sign \
+			$(ELFSIGN_FORMAT_OPTION) \
 			-k $(ELFSIGN_SEKEY) -c $(ELFSIGN_SECERT) -e $@
-# EXPORT DELETE END
 
 # Rules (normally from make.rules) and macros which are used for post
 # processing files. Normally, these do stripping of the comment section

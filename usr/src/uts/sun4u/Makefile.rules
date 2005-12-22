@@ -47,6 +47,12 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cpu/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/cpu/%.s
 	$(COMPILE.s) -o $@ $<
 
+#
+# This rule for io/ppm/%.c needs to come before the io/%.c rule so that
+# the sun4u/ppm driver pulls in io/ppm/ppm.c instead of io/ppm.c.
+# Making an explicit rule to build ppm.o doesn't work because it breaks
+# the build of excalibur/xcalppm
+#
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/ppm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -66,20 +72,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/i2c/misc/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/i2c/nexus/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/memtest/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4/io/memtest/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/memtest/%.s
-	$(COMPILE.s) -o $@ $<
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4/io/memtest/%.s
-	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/pci/%.c
 	$(COMPILE.c) -o $@ $<
@@ -103,10 +95,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/wrsm/%.s
 	$(COMPILE.s) -o $@ $<
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/dmfe/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/io/ctsmc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -214,18 +202,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/i2c/misc/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/i2c/nexus/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/memtest/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4/io/memtest/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/memtest/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4/io/memtest/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/pci/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -245,9 +221,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/wrsm/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/dmfe/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/io/ctsmc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/ml/%.s

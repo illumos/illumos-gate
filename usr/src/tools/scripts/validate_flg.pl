@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -132,7 +132,7 @@ sub wanted {
 $f_flg = $ARGV[0] eq "-f";
 shift @ARGV if $f_flg;
 
-$basedir = "usr/src";
+$basedir = "usr";
 if ($#ARGV == 0) {
     $basedir = shift @ARGV;
 } elsif ($#ARGV > 0) {

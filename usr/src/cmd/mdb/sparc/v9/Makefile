@@ -31,10 +31,14 @@ MODULES = \
 	$(COMMON_MODULES_PROC) \
 	$(COMMON_MODULES_KVM) \
 	intr \
-	isp \
 	sd \
-	sparcdis \
 	ssd
+
+$(CLOSED_BUILD)MODULES += \
+	$(CLOSED_COMMON_MODULES_KVM:%=$(CLOSED)/cmd/mdb/sparc/v9/%)
+$(CLOSED_BUILD)MODULES += \
+	$(CLOSED)/cmd/mdb/sparc/v9/isp \
+	$(CLOSED)/cmd/mdb/sparc/v9/sparcdis
 
 #
 # a "$(MODULES): kmdb" rule would seem to do the trick but, for some reason,

@@ -21,7 +21,7 @@
 #
 #
 # uts/sun4u/serengeti/Makefile.files
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,13 +32,6 @@
 #
 # Define objects.
 #
-SERENGETI_OBJS	= serengeti.o serengeti_asm.o plat_ecc_unum.o sg_unum.o
-SGCN_OBJS	= sgcn.o
-SGHSC_OBJS	= sghsc.o
-SGSBBC_OBJS	= sgsbbc.o sgsbbc_iosram.o sgsbbc_mailbox.o
-SBDP_OBJS	= sbdp.o sbdp_quiesce.o sbdp_cpu.o sbdp_mem.o sbdp_asm.o \
-			sbdp_dr.o sbdp_mbox.o sbdp_error.o
-SSM_OBJS	= ssm.o
 
 #
 #	serengeti-specific header file path

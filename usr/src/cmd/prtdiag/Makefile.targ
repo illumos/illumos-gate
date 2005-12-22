@@ -42,5 +42,8 @@ $(POFILE):	$(POFILES)
 	$(RM)	$@
 	cat	$(POFILES) >	$@
 
+$(LIBPRTDIAG):
+	cd $(LIBPRTDIAG); pwd; $(MAKE) install
+
 include $(SRCDIR)/../Makefile.targ
 include $(SRCDIR)/../../Makefile.psm.targ

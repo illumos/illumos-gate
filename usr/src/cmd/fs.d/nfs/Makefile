@@ -22,7 +22,7 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/fs.d/nfs/Makefile
@@ -31,12 +31,15 @@
 #  whose executable reside in $(INSDIR1) and $(INSDIR2).
 #
 
+include $(SRC)/Makefile.master
+
 SUBDIR1=	exportfs nfsd rquotad unshare \
 		statd nfsstat mountd dfshares \
 		nfsfind nfs4cbd
-SUBDIR2=	clear_locks lockd umount showmount \
+SUBDIR2=	clear_locks umount showmount \
 		share mount dfmounts nfslog nfsmapid \
 		sysidnfs4
+
 SUBDIR3=	etc svc
 SUBDIRS=	$(SUBDIR1) $(SUBDIR2) $(SUBDIR3)
 
@@ -44,6 +47,11 @@ SUBDIRS=	$(SUBDIR1) $(SUBDIR2) $(SUBDIR3)
 #
 POFILES=        $(SUBDIR2:%=%/%.po)
 POFILE=         nfs.po
+
+LOCKD=		$(CLOSED)/cmd/fs.d/nfs/lockd
+$(CLOSED_BUILD)CLOSED_SUBDIR2=	$(LOCKD)
+$(CLOSED_BUILD)POFILES +=	$(LOCKD)/lockd.po
+$(CLOSED_BUILD)SUBDIRS +=	$(CLOSED_SUBDIR2)
 
 all:=		TARGET= all
 install:=	TARGET= install
@@ -58,7 +66,7 @@ catalog:=       TARGET= catalog
 
 all install clean clobber lint: $(SUBDIRS)
 
-catalog: $(SUBDIR2)
+catalog: $(SUBDIR2) $(CLOSED_SUBDIR2)
 	$(RM) $(POFILE)
 	cat $(POFILES) > $(POFILE)
 

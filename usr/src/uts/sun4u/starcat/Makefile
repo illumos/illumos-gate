@@ -22,7 +22,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2000-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the sun4u starcat platform
@@ -50,6 +50,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -59,11 +61,14 @@ check		:=	TARGET= check
 .KEEP_STATE:
 
 def all clean clobber clean.lint: genassym unix .WAIT \
-		$(STARCAT_CPU_KMODS) $(STARCAT_KMODS)
+		$(STARCAT_CPU_KMODS) $(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS)
+
+modlist:	unix \
+		$(STARCAT_CPU_KMODS) $(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS)
 
 lintlib:	unix
 
-modlintlib:	$(STARCAT_KMODS)
+modlintlib:	$(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS)
 
 IMPLEMENTED_PLATFORM	= SUNW,Sun-Fire-15000
 
@@ -80,15 +85,20 @@ install: $(ROOT_STARCAT_DIR) $(USR_STARCAT_DIR) \
 	$(USR_STARCAT_SBIN_DIR) \
 	$(USR_STARCAT_LIB_DIR) \
 	$(STARCAT_CRYPTO_LINKS) \
-	genassym unix .WAIT $(STARCAT_CPU_KMODS) $(STARCAT_KMODS) pcicfg
+	genassym unix .WAIT $(STARCAT_CPU_KMODS) \
+	$(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS) pcicfg
 
-pcicfg:		$(ROOT_PSM_MISC_DIR_64)/pcicfg.e
+pcicfg:		$(ROOT_PSM_MISC_DIR_64)/pcicfg.e $(ROOT_STARCAT_MISC_DIR_64)
 		-@$(RM) $(ROOT_STARCAT_MISC_DIR_64)/$@
 		$(SYMLINK) ../../../../sun4u/kernel/misc/sparcv9/pcicfg.e \
 		$(ROOT_STARCAT_MISC_DIR_64)/$@
 
 genassym unix $(STARCAT_KMODS) $(STARCAT_CPU_KMODS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(CLOSED_STARCAT_KMODS): FRC
+	cd $(CLOSED)/uts/sun4u/starcat/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
 
 $(STARCAT_CRYPTO_LINKS): $(ROOT_STARCAT_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_STARCAT_CRYPTO_DIR_64)/$@;
@@ -101,7 +111,7 @@ lint:	modlintlib
 
 
 #
-# The 'lint.platmod' target lints the montecarlo platform module against
+# The 'lint.platmod' target lints the starcat platform module against
 # the sun4u kernel.  This ends up doing all the kernel cross-checks,
 # so it takes a couple of minutes.
 # Due to the low ROI, it's not run by default, but it's a good
@@ -111,6 +121,7 @@ lint:	modlintlib
 LINT_LIBS	= $(LINT_LIB) \
 		  -L$(STARCAT_LINT_LIB_DIR) \
 		  -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+		      $(CLOSED_LINT_KMODS:%=-l%) \
 		  -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:   modlintlib

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,35 +36,12 @@
 # Starcat specific driver related modules
 #
 
-DMAN_OBJS +=	dman.o dman_domain.o
-CVC_OBJS +=	cvc.o
-IOSRAM_OBJS +=	iosram.o
-MBOXSC_OBJS +=	mboxsc.o
-SCHPC_OBJS +=	schpc.o
-AXQ_OBJS +=	axq.o
-SCOSMB_OBJS +=	scosmb.o
-SCKMDRV_OBJS += sckmdrv.o
 
 CVCREDIR_OBJS +=	cvcredir.o
 SC_PCICFG_OBJS +=	sc_pcicfg.o
-GPTWO_PCI_OBJS +=	gptwo_pci.o
-GPTWO_WCI_OBJS +=	gptwo_wci.o
-SC_GPTWO_OBJS +=	sc_gptwocfg.o
-FCGP2_OBJS +=		fcgp2.o
-
-DRMACH_OBJS +=	drmach.o drmach_asm.o dr_util.o drmach_err.o
 
 #
 # Miscellaneous
 #
 INC_PATH	+= -I$(UTSBASE)/sun4u/starcat
 INC_PATH	+= -I$(UTSBASE)/sun4u/starcat/sys
-
-#
-# Since assym.h is a derived file, the dependency must be explicit for
-# all files including this file. (This is only actually required in the
-# instance when the .nse_depinfo file does not exist.) It may seem that
-# the lint targets should also have a similar dependency, but they don't
-# since only C headers are included when #defined(lint) is true.
-#
-ASSYM_DEPS	+= drmach_asm.o

@@ -22,7 +22,7 @@
 #
 # uts/sparc/mixer/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the audio mixer (mixer)
@@ -122,7 +122,7 @@ $(WARLOCK_OK):	$(WARLOCK_OBJECTS) warlock_ddi.files \
 	warlock_amsrc2.files \
 	warlock_standalone mixer_with_audiosup.wlcmd 
 	$(WARLOCK) -c mixer_with_audiosup.wlcmd $(WARLOCK_OBJECTS) \
-	../audiosup/audio_support.ll ../amsrc1/am_src1.ll \
+	../audiosup/audio_support.ll $(CLOSED)/uts/sparc/amsrc1/am_src1.ll \
 	-l ../warlock/ddi_dki_impl.ll
 	$(WARLOCK) -c mixer_with_audiosup.wlcmd $(WARLOCK_OBJECTS) \
 	../audiosup/audio_support.ll ../amsrc2/am_src2.ll \
@@ -144,7 +144,7 @@ warlock_audiosup.files:
 	@cd ../audiosup; pwd; $(MAKE) warlock
 
 warlock_amsrc1.files:
-	@cd ../amsrc1; pwd; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/amsrc1; pwd; $(MAKE) warlock
 
 warlock_amsrc2.files:
 	@cd ../amsrc2; pwd; $(MAKE) warlock

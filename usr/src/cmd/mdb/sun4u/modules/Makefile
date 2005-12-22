@@ -20,10 +20,18 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1998-2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = unix lw8 serengeti wrsm wrsmd
+include $(SRC)/Makefile.master
+
+CLOSED_SUN4UMOD = $(CLOSED)/cmd/mdb/sun4u/modules
+
+SUBDIRS = unix wrsm 
+
+$(CLOSED_BUILD)SUBDIRS += $(CLOSED_SUN4UMOD)/lw8 $(CLOSED_SUN4UMOD)/serengeti \
+	$(CLOSED_SUN4UMOD)/wrsmd
+
 include ../../Makefile.subdirs

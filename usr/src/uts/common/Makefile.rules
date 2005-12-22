@@ -420,23 +420,11 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/legacy/diaudio/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/sada/amsrc1/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/sada/amsrc2/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/sada/drv/audiovia823x/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/sada/drv/audio810/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/audio/sada/drv/audioens/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -496,10 +484,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/i2o/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ib/adapters/tavor/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ib/clients/ibd/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -524,10 +508,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ib/ibtl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ib/clients/daplt/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/kb8042/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -537,10 +517,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/kbtrans/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/aggr/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/llc2/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -592,10 +568,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pcmcia/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/pcn/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ppp/sppp/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -633,10 +605,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/targets/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/scsi/adapters/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/se/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -684,10 +652,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/usbser/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/usbser/usbser_edge/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/usb/clients/usbser/usbser_keyspan/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -732,14 +696,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/vuidmice/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/xge/drv/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/xge/hal/xgehal/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/chxge/com/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -749,14 +705,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/chxge/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/ixgb/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/nge/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/e1000g/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -781,10 +729,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/ipp/dscpmk/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/ipp/meters/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/klm/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -833,10 +777,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/pcmcia/nexus/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/pcmcia/pcs/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/pcmcia/pem/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -1198,9 +1138,6 @@ $(LINTS_DIR)/%.ln:              $(UTSBASE)/common/io/ath/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/legacy/diaudio/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/sada/amsrc1/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/sada/amsrc2/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1210,13 +1147,7 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/sada/mixer/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/sada/framework/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/sada/drv/audiovia823x/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/sada/drv/audio810/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/sada/drv/audioens/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/audio/sada/drv/audiots/%.c
@@ -1255,9 +1186,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/hotplug/pcihp/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/i2o/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ib/adapters/tavor/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ib/clients/ibd/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1276,9 +1204,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ib/ibnex/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ib/ibtl/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ib/clients/daplt/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/kb8042/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1286,9 +1211,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/kbtrans/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/aggr/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/llc2/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/lp/%.c
@@ -1327,9 +1249,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/pci-ide/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/pcmcia/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/pcn/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ppp/sppp/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1346,9 +1265,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/rsm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/rge/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/se/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/scsi/adapters/%.c
@@ -1396,9 +1312,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/printer/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbser/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbser/usbser_edge/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/clients/usbser/usbser_keyspan/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1432,12 +1345,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/usb/usba10/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/vuidmice/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/xge/drv/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/xge/hal/xgehal/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/chxge/com/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -1445,9 +1352,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/chxge/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/ixgb/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:	$(UTSBASE)/common/io/nge/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/ipp/%.c
@@ -1466,9 +1370,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/ipp/dscpmk/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/ipp/meters/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/klm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/kmdb/%.c
@@ -1508,9 +1409,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/pcmcia/nexus/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/pcmcia/pcs/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/pcmcia/pem/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/rpc/%.c

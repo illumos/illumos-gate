@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -136,13 +135,13 @@ warlock_with_fas: st_with_fas.wlcmd $(ST_FILES) scsi_files fas_files \
 warlock_with_isp: st_with_isp.wlcmd $(ST_FILES) scsi_files isp_files \
 	warlock_ddi.files
 	$(WARLOCK) -c ./st_with_isp.wlcmd \
-		$(ST_FILES) ../isp/isp $(SCSI_FILES)  \
+		$(ST_FILES) $(CLOSED)/uts/sparc/isp/isp $(SCSI_FILES)  \
 		-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_glm: st_with_glm.wlcmd $(ST_FILES) scsi_files glm_files \
 	warlock_ddi.files
 	$(WARLOCK) -c ./st_with_glm.wlcmd \
-		$(ST_FILES) ../glm/glm $(SCSI_FILES) \
+		$(ST_FILES) $(CLOSED)/uts/sparc/glm/glm $(SCSI_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
 scsi_files:
@@ -155,10 +154,10 @@ fas_files:
 	@cd ../fas; pwd; $(MAKE) warlock
 
 isp_files:
-	@cd ../isp; pwd; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/isp; pwd; $(MAKE) warlock
 
 glm_files:
-	@cd ../glm; pwd; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/glm; pwd; $(MAKE) warlock
 
 st.ok: st.wlcmd st.ll st_conf.ll  scsi_files warlock_ddi.files
 	$(WARLOCK) -c ./st.wlcmd $(ST_FILES) $(SCSI_FILES) \

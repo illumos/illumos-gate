@@ -27,7 +27,9 @@
 #
 # lib/cfgadm_plugins/Makefile.com
 
-include ../../../../Makefile.psm
+# This is used by open and closed components, so it uses an absolute
+# path.
+include $(SRC)/Makefile.psm
 
 MODULE =	cfgadm
 

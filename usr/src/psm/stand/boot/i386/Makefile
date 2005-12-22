@@ -47,8 +47,7 @@ $(SUBDIRS): FRC
 #
 # Cross-reference customization: include all boot-related source files.
 #
-UTSDIR=		../../../../uts
-XRDIRS +=	../amd64 ../intel ../common
+XRDIRS +=	../amd64 ../common
 
 cscope.out tags: FRC
 	$(XREF) -x $@

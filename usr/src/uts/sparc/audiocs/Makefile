@@ -22,7 +22,7 @@
 #
 # uts/sparc/audiocs/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -115,19 +115,19 @@ WARLOCK 	= warlock
 	$(TEST) -f $@ || $(SCCS) get $@
 
 warlock:	$(WARLOCK_OK)
-	
+
 $(WARLOCK_OK):	$(WARLOCK_OBJECTS) warlock_ddi.files \
 	warlock_audiosup.files warlock_mixer.files warlock_amsrc1.files \
 	warlock_standalone audiocs_with_sada.wlcmd
 	$(WARLOCK) -c audiocs_with_sada.wlcmd $(WARLOCK_OBJECTS) \
-	../audiosup/audio_support.ll ../amsrc1/am_src1.ll \
+	../audiosup/audio_support.ll $(CLOSED)/uts/sparc/amsrc1/am_src1.ll \
 	../mixer/am_main.ll ../mixer/am_ad.ll ../mixer/am_ioctl.ll \
 	-l ../warlock/ddi_dki_impl.ll
 	$(TOUCH) $(WARLOCK_OK)
 
 %.ll: $(UTSBASE)/sun/io/audio/sada/drv/audiocs/%.c
 	$(WLCC) $(CPPFLAGS) -DDEBUG -o $@ $<
-	
+
 warlock_standalone: $(WARLOCK_OBJECTS) warlock_ddi.files audiocs.wlcmd
 	$(WARLOCK) -c audiocs.wlcmd $(WARLOCK_OBJECTS) \
 	-l ../warlock/ddi_dki_impl.ll
@@ -139,7 +139,7 @@ warlock_audiosup.files:
 	@cd ../audiosup; pwd; $(MAKE) warlock
 
 warlock_amsrc1.files:
-	@cd ../amsrc1; pwd; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/amsrc1; pwd; $(MAKE) warlock
 
 warlock_mixer.files:
 	@cd ../mixer; pwd; $(MAKE) warlock

@@ -227,7 +227,7 @@ CPPFLAGS += -I$(REL_PATH)/libgss -I../include  \
 
 CPPFLAGS += $(KRB5_DEFS)
 
-$(EXPORT_RELEASE_BUILD)include ../Makefile.export
+$(EXPORT_RELEASE_BUILD)include $(CLOSED)/lib/gss_mechs/mech_krb5/Makefile.export
 
 #CPPFLAGS += 	-D_REENTRANT
 $(PICS) := 	CFLAGS += $(XFFLAG)

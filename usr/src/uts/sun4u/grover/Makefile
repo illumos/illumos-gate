@@ -21,8 +21,8 @@
 #
 #
 # uts/sun4u/grover/Makefile
-# Copyright (c) 2000 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -51,6 +51,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -59,16 +61,18 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clean.lint clobber: $(GROVER_KMODS)
+def all clean clean.lint clobber modlist: $(GROVER_KMODS) \
+	$(CLOSED_GROVER_KMODS)
 
-modlintlib:	$(GROVER_KMODS)
+modlintlib:	$(GROVER_KMODS) $(CLOSED_GROVER_KMODS)
 
 install:	$(ROOT_GROVER_DIR) \
 		$(USR_GROVER_DIR) \
 		$(USR_GROVER_INC_DIR) \
 		$(USR_GROVER_SBIN_DIR) \
 		$(USR_GROVER_LIB_DIR) \
-		$(GROVER_KMODS)
+		$(GROVER_KMODS) \
+		$(CLOSED_GROVER_KMODS)
 
 check install_h:
 
@@ -83,6 +87,7 @@ lint:		modlintlib
 LINT_LIBS	 = $(LINT_LIB) \
 		   -L$(GROVER_LINT_LIB_DIR) \
 		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+		       $(CLOSED_LINT_KMODS:%=-l%) \
 		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:	modlintlib
@@ -90,7 +95,10 @@ lint.platmod:	modlintlib
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 $(GROVER_KMODS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(CLOSED_GROVER_KMODS): FRC
+	cd $(CLOSED)/uts/sun4u/grover/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

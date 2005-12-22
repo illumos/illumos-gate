@@ -59,6 +59,11 @@ PARENT_WS="/ws/onnv-gate";			export PARENT_WS
 # clone instead of the gate (see the gate's README).
 CLONE_WS="/ws/onnv-clone";			export CLONE_WS
 
+# This flag controls whether to build the closed source.  If
+# undefined, nightly(1) and bldenv(1) will set it according to whether
+# the closed tree is present.
+# CLOSED_IS_PRESENT="yes";		export CLOSED_IS_PRESENT
+
 # The bringover, if any, is done as STAFFER.
 # Set STAFFER to your own login as gatekeeper or developer
 # The point is to use group "staff" and avoid referencing the parent
@@ -208,6 +213,6 @@ UT_NO_USAGE_TRACKING="1"; export UT_NO_USAGE_TRACKING
 #VERIFY_ELFSIGN=n
 
 # BRINGOVER_FILES is the list of files nightly passes to bringover.
-# If not set the default is "usr/src", but it can be used for bringing
+# If not set the default is "usr", but it can be used for bringing
 # over deleted_files or other nifty directories.
-#BRINGOVER_FILES="usr/src deleted_files"
+#BRINGOVER_FILES="usr deleted_files"

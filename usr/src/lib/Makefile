@@ -45,13 +45,24 @@ include ../Makefile.master
 #
 .PARALLEL:
 
+#
+# The $(CLOSED_BUILD) additions to SUBDIRS & MSGSUBDIRS are unfortunate,
+# but required due to the "dependencies" of using .WAIT to barrier the
+# parallel dmake builds.  once 4631488 has been fixed, they can be
+# consolidated into one $(CLOSED_BUILD)SUBDIRS += (all closed libs) as
+# shown in HDRSUBDIRS
+#
 SUBDIRS= \
 	common			.WAIT	\
 	abi/apptrace		.WAIT	\
 	../cmd/abi/spectrans	.WAIT	\
 	../cmd/sgs/libconv		\
-	../cmd/sgs/libdl	.WAIT	\
-	libc_i18n		\
+	../cmd/sgs/libdl	.WAIT
+
+$(CLOSED_BUILD)SUBDIRS += \
+	$(CLOSED)/lib/libc_i18n
+
+SUBDIRS += \
 	libc			.WAIT	\
 	libmapmalloc		.WAIT	\
 	../cmd/sgs/libelf	.WAIT	\
@@ -125,8 +136,10 @@ SUBDIRS= \
 	nametoaddr	\
 	ncad_addr	\
 	gss_mechs/mech_krb5	.WAIT	\
-	krb5	.WAIT	\
-	smartcard	\
+	krb5	.WAIT
+$(CLOSED_BUILD)SUBDIRS += \
+	$(CLOSED)/lib/smartcard
+SUBDIRS += \
 	passwdutil	\
 	pam_modules	\
 	crypt_modules	\
@@ -144,16 +157,20 @@ SUBDIRS= \
 	libdhcpagent	\
 	libdhcpdu	\
 	libdhcputil	\
-	libipsecutil	\
-	libike		\
+	libipsecutil
+$(CLOSED_BUILD)SUBDIRS += \
+	$(CLOSED)/lib/libike
+SUBDIRS += \
 	nsswitch	\
 	print		\
 	libuutil	\
 	libscf		\
 	libinetsvc	\
 	librestart	\
-	libsched	\
-	libelfsign	\
+	libsched
+$(CLOSED_BUILD)SUBDIRS += \
+	$(CLOSED)/lib/libelfsign
+SUBDIRS += \
 	pkcs11		.WAIT	\
 	libpctx		.WAIT	\
 	libcpc		\
@@ -198,10 +215,12 @@ SUBDIRS= \
 sparc_SUBDIRS= .WAIT	\
 	efcode		\
 	libc_psr	.WAIT	\
-	libmd5_psr	.WAIT	\
-	libprtdiag	.WAIT	\
-	libprtdiag_psr	\
-	librsc		\
+	libmd5_psr	.WAIT
+$(CLOSED_BUILD)sparc_SUBDIRS += \
+	$(CLOSED)/lib/libprtdiag	.WAIT	\
+	$(CLOSED)/lib/libprtdiag_psr	\
+	$(CLOSED)/lib/librsc
+sparc_SUBDIRS += \
 	libfruutils	.WAIT	\
 	libfru		\
 	libwrsmconf	\
@@ -256,19 +275,22 @@ MSGSUBDIRS=		\
 	madv		\
 	mpss		\
 	pam_modules	\
-	rpcsec_gss	\
-	smartcard	\
+	rpcsec_gss
+$(CLOSED_BUILD)MSGSUBDIRS += \
+	$(CLOSED)/lib/smartcard
+MSGSUBDIRS += \
 	$($(MACH)_MSGSUBDIRS)
 
-sparc_MSGSUBDIRS=	\
-	libprtdiag	\
-	libprtdiag_psr
+sparc_MSGSUBDIRS=
+
+$(CLOSED_BUILD)sparc_MSGSUBDIRS +=	\
+	$(CLOSED)/lib/libprtdiag	\
+	$(CLOSED)/lib/libprtdiag_psr
 
 HDRSUBDIRS= libaio	\
 	auditd_plugins	\
 	libbsm		\
 	libc		\
-	libc_i18n	\
 	libcmdutils	\
 	libcontract	\
 	libcpc		\
@@ -290,7 +312,6 @@ HDRSUBDIRS= libaio	\
 	libwanboot	\
 	libwanbootutil	\
 	libipsecutil	\
-	libike		\
 	libinetcfg	\
 	libinetsvc	\
 	libinetutil	\
@@ -336,12 +357,16 @@ HDRSUBDIRS= libaio	\
 	lvm		\
 	openssl		\
 	pkcs11		\
-	smartcard	\
 	passwdutil	\
 	../cmd/sendmail/libmilter	\
 	fm		\
 	udapl		\
 	$($(MACH)_HDRSUBDIRS)
+
+$(CLOSED_BUILD)HDRSUBDIRS += \
+	$(CLOSED)/lib/libc_i18n	\
+	$(CLOSED)/lib/libike	\
+	$(CLOSED)/lib/smartcard
 
 sparc_HDRSUBDIRS=	\
 	libwrsmconf
@@ -387,13 +412,16 @@ _msg:			$(MSGSUBDIRS:%=%-nodepend) .WAIT _dc
 
 _dc:			$(DCSUBDIRS:%=%-nodepend)
 
+# dependencies for pam_modules (see below)
+$(CLOSED_BUILD)SMARTCARD=	$(CLOSED)/lib/smartcard
+
 #
 # Library interdependencies are called out explicitly here
 #
 auditd_plugins: libbsm libnsl libsecdb
 gss_mechs/mech_krb5:	libgss libnsl libsocket libresolv pkcs11
 libadt_jni:	libbsm
-libc:		libc_i18n
+$(CLOSED_BUILD)libc:		$(CLOSED)/lib/libc_i18n
 libcmdutils:	libavl
 libcontract:	libnvpair
 libdevid:	libdevinfo
@@ -404,7 +432,8 @@ libdhcputil:	libinetutil
 libdladm:	libdlpi libdevinfo
 libdtrace:	libproc libgen libctf
 libefi:		libuuid
-libelfsign:	libike libcryptoutil pkcs11
+$(CLOSED_BUILD)$(CLOSED)/lib/libelfsign: \
+			$(CLOSED)/lib/libike libcryptoutil pkcs11
 libinetcfg:	libnsl libsocket libdevinfo
 libnsl:		libmd5 libscf
 libmacadm:	libdevinfo
@@ -424,7 +453,7 @@ libwrap:	libnsl libsocket
 libwanboot:	libnvpair libresolv libnsl libsocket libdevinfo libinetutil \
 		libdhcputil openssl
 libwanbootutil:	libnsl
-pam_modules:	libproject smartcard
+pam_modules:	libproject passwdutil $(SMARTCARD)
 libscf:		libuutil
 libinetsvc:	libscf
 librestart:	libuutil libscf
@@ -440,7 +469,8 @@ libzpool:	libavl libumem libnvpair
 #
 # The reason this rule checks for the existence of the
 # Makefile is that some of the directories do not exist
-# in our exportable source builds.
+# in certain situations (e.g., exportable source builds,
+# OpenSolaris).
 #
 $(SUBDIRS) abi: FRC
 	@if [ -f $@/Makefile  ]; then \

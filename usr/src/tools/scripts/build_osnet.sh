@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -283,7 +283,7 @@ export VERSION
 echo "\n==== Disk space used (Source) ====\n"
 
 cd ${BUILDAREA}
-/usr/bin/du -s -k usr/src
+/usr/bin/du -s -k usr
 
 mkdir -p ${ROOT}
 mkdir -p ${PKGARCHIVE}
@@ -330,7 +330,7 @@ egrep "${MAKE}|ERROR|WARNING" $SRC/pkgdefs/install.out | \
 echo "\n==== Disk space used (Source/Build/Packages) ====\n"
 
 cd ${BUILDAREA}
-/usr/bin/du -s -k usr/src proto packages
+/usr/bin/du -s -k usr proto packages
 
 #
 # Copy packages into /pkgs location 

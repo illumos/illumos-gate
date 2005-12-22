@@ -72,7 +72,6 @@ COMMON_SUBDIRS = \
 	cmd/cmd-inet/usr.bin \
 	cmd/cmd-inet/usr.lib/dsvclockd \
 	cmd/cmd-inet/usr.lib/in.dhcpd \
-	cmd/cmd-inet/usr.lib/in.iked \
 	cmd/cmd-inet/usr.lib/in.mpathd \
 	cmd/cmd-inet/usr.lib/inetd \
 	cmd/cmd-inet/usr.lib/mipagent \
@@ -194,7 +193,6 @@ COMMON_SUBDIRS = \
 	cmd/pagesize \
 	cmd/passwd \
 	cmd/pathchk \
-	cmd/pax \
 	cmd/pbind \
 	cmd/pcidr \
 	cmd/pfexec \
@@ -233,9 +231,7 @@ COMMON_SUBDIRS = \
 	cmd/rpcgen \
 	cmd/rpcsvc/rpc.bootparamd \
 	cmd/runat \
-	cmd/sed_xpg4 \
 	cmd/setpgrp \
-	cmd/smartcard \
 	cmd/smbios \
 	cmd/smserverd \
 	cmd/sort \
@@ -253,12 +249,10 @@ COMMON_SUBDIRS = \
 	cmd/syseventadm \
 	cmd/syseventd \
 	cmd/tabs \
-	cmd/tail \
 	cmd/tee \
 	cmd/th_tools \
 	cmd/tip \
 	cmd/touch \
-	cmd/tr \
 	cmd/truss \
 	cmd/tty \
 	cmd/uadmin \
@@ -296,7 +290,6 @@ COMMON_SUBDIRS = \
 	lib/libbsm \
 	lib/libc \
 	lib/libc_db \
-	lib/libc_i18n \
 	lib/libcfgadm \
 	lib/libcmdutils \
 	lib/libcontract \
@@ -315,7 +308,6 @@ COMMON_SUBDIRS = \
 	lib/libdoor \
 	lib/libdtrace \
 	lib/libefi \
-	lib/libelfsign \
 	lib/libexacct \
 	lib/libgen \
 	lib/libgss \
@@ -371,7 +363,6 @@ COMMON_SUBDIRS = \
 	lib/pam_modules \
 	lib/passwdutil \
 	lib/pkcs11 \
-	lib/smartcard \
 	lib/fm \
 	lib/udapl \
 	psm \
@@ -386,6 +377,17 @@ COMMON_SUBDIRS = \
 	ucbcmd/users \
 	ucbcmd/whoami
 
+$(CLOSED_BUILD)COMMON_SUBDIRS += \
+	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
+	$(CLOSED)/cmd/pax \
+	$(CLOSED)/cmd/sed_xpg4 \
+	$(CLOSED)/cmd/smartcard \
+	$(CLOSED)/cmd/tail \
+	$(CLOSED)/cmd/tr \
+	$(CLOSED)/lib/libc_i18n \
+	$(CLOSED)/lib/libelfsign \
+	$(CLOSED)/lib/smartcard
+
 i386_SUBDIRS= \
 	cmd/biosdev \
 	cmd/rtc \
@@ -395,7 +397,6 @@ sparc_SUBDIRS= \
 	cmd/datadm \
 	cmd/dcs \
 	cmd/fruadm \
-	cmd/mtst \
 	cmd/prtfru \
 	cmd/sckmd \
 	cmd/wrsmconf \
@@ -403,6 +404,8 @@ sparc_SUBDIRS= \
 	lib/libwrsmconf \
 	lib/wrsm \
 	stand
+
+$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED)/cmd/mtst
 
 LINTSUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 

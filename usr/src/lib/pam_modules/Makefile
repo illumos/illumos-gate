@@ -28,6 +28,8 @@
 # lib/pam_modules/Makefile
 #
 
+include $(SRC)/Makefile.master
+
 SUBDIRS = \
 	allow	\
 	authtok_get	\
@@ -44,11 +46,13 @@ SUBDIRS = \
 	rhosts_auth	\
 	roles		\
 	sample		\
-	smartcard	\
 	unix_auth	\
 	unix_account	\
 	unix_cred	\
 	unix_session
+
+$(CLOSED_BUILD)SUBDIRS += \
+	$(CLOSED)/lib/pam_modules/smartcard
 
 all :=		TARGET= all
 catalog :=	TARGET= _msg

@@ -73,7 +73,6 @@ HDRS	=			\
 	pte.h			\
 	reg.h			\
 	regset.h		\
-	sbpro.h			\
 	segment.h		\
 	segments.h		\
 	spl.h			\
@@ -89,6 +88,9 @@ HDRS	=			\
 	utrap.h			\
 	vmparam.h		\
 	x86_archext.h
+
+CLOSEDHDRS = \
+	sbpro.h
 
 SUBHDRS	=			\
 	dktp/cdtypes.h		\
@@ -113,15 +115,23 @@ ROOTFSDIR=	$(ROOTDIR)/fs
 ROOTDIRS=	$(ROOTDIR) $(ROOTFSDIR)
 
 ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%) $(SUBHDRS:%=$(ROOTDIR)/%)
+$(CLOSED_BUILD)ROOTHDRS += $(CLOSEDHDRS:%=$(ROOTDIR)/%)
+
 ROOTFSHDRS= $(FSHDRS:%=$(ROOTDIR)/fs/%)
 
 CHECKHDRS= 			\
 	$(HDRS:%.h=%.check)	\
 	$(SUBHDRS:%.h=%.check)	\
+	$(CLOSEDHDRS:%.h=$(CLOSED)/uts/intel/sys/%.check) \
 	$(FSHDRS:%.h=fs/%.check)
+
+$(CLOSED_BUILD)CHECKHDRS += $(CLOSEDHDRS:%.h=$(CLOSED)/uts/intel/sys/%.check)
 
 # install rules
 $(ROOTDIR)/%: %
+	$(INS.file)
+
+$(ROOTDIR)/%:	$(CLOSED)/uts/intel/sys/%
 	$(INS.file)
 
 .KEEP_STATE:

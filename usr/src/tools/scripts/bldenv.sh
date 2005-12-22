@@ -138,6 +138,15 @@ shift
 
 #MACH=`uname -p`
 
+if [ -z "$CLOSED_IS_PRESENT" ]; then
+	if [ -d $SRC/../closed ]; then
+		CLOSED_IS_PRESENT="yes"
+	else
+		CLOSED_IS_PRESENT="no"
+	fi
+	export CLOSED_IS_PRESENT
+fi
+
 # must match the getopts in nightly.sh
 OPTIND=1
 while getopts ABDFMNPTCGIRafinlmoptuUxdrtzWS:X FLAG $NIGHTLY_OPTIONS

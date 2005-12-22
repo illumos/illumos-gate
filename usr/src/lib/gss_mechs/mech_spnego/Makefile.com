@@ -49,7 +49,8 @@ SPECMAPFILE =	$(MAPDIR)/mapfile
 
 CPPFLAGS += -I$(SRC)/uts/common/gssapi/include -I$(ROOT)/usr/include/gssapi $(DEBUG)
 
-$(EXPORT_RELEASE_BUILD)include ../Makefile.export
+MAKEFILE_EXPORT = $(CLOSED)/lib/gss_mechs/mech_spnego/Makefile.export
+$(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)
 
 .KEEP_STATE:
 

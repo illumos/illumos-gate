@@ -22,13 +22,14 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1998 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 ENVFILES= \
 	developer \
-	gatekeeper
+	gatekeeper \
+	opensolaris
 
 include ../Makefile.tools
 

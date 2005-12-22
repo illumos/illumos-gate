@@ -1,4 +1,3 @@
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -19,75 +18,12 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 1999-2001,2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	Common targets for sun4u MonteCarlo implementation specific modules.
-#
-#
-# Platform targets
-#
-$(ROOT_MONTECARLO_DIR): $(ROOT_PLAT_DIR)
-	-$(INS.dir.root.sys)
 
-.KEEP_STATE:
+UTSTREE=$(UTSBASE)
 
-#
-# Rules for implementation subdirectories.
-#
-$(ROOT_MONTECARLO_MOD_DIR): $(ROOT_MONTECARLO_DIR)
-	-$(INS.dir.root.sys)
-
-$(ROOT_MONTECARLO_DACF_DIR_32): $(ROOT_MONTECARLO_MOD_DIR)
-	-$(INS.dir.root.sys)
-
-$(ROOT_MONTECARLO_DACF_DIR_64): $(ROOT_MONTECARLO_DACF_DIR_32)
-	-$(INS.dir.root.sys)
-
-$(ROOT_MONTECARLO_DRV_DIR_32): $(ROOT_MONTECARLO_MOD_DIR)
-	-$(INS.dir.root.sys)
-
-$(ROOT_MONTECARLO_DRV_DIR_64): $(ROOT_MONTECARLO_DRV_DIR_32)
-	-$(INS.dir.root.sys)
-
-$(ROOT_MONTECARLO_MISC_DIR_32): $(ROOT_MONTECARLO_MOD_DIR)
-	-$(INS.dir.root.sys)
-
-$(ROOT_MONTECARLO_MISC_DIR_64): $(ROOT_MONTECARLO_MISC_DIR_32)
-	-$(INS.dir.root.sys)
-
-$(USR_MONTECARLO_DIR): $(USR_PLAT_DIR)
-	-$(INS.dir.root.sys)
-
-$(USR_MONTECARLO_INC_DIR): $(USR_MONTECARLO_DIR)
-	-$(INS.slink4)
-
-$(USR_MONTECARLO_SBIN_DIR): $(USR_MONTECARLO_DIR)
-	-$(INS.slink5)
-
-$(USR_MONTECARLO_LIB_DIR): $(USR_MONTECARLO_DIR)
-	-$(INS.dir.root.bin)
-
-$(USR_MONTECARLO_ISYS_DIR): $(USR_MONTECARLO_INC_DIR)
-	-$(INS.dir.root.bin)
-
-$(ROOT_MONTECARLO_MOD_DIR)/%: $(OBJS_DIR)/% $(ROOT_MONTECARLO_MOD_DIR) FRC
-	$(INS.file)
-
-$(ROOT_MONTECARLO_MISC_DIR)/%: $(OBJS_DIR)/% $(ROOT_MONTECARLO_MISC_DIR) FRC
-	$(INS.file)
-
-$(ROOT_MONTECARLO_DACF_DIR)/%: $(OBJS_DIR)/% $(ROOT_MONTECARLO_DACF_DIR)
-	$(INS.file)
-
-$(ROOT_MONTECARLO_DRV_DIR)/%: $(OBJS_DIR)/% $(ROOT_MONTECARLO_DRV_DIR) FRC
-	$(INS.file)
-
-#
-#	Include common targets.
-#
-include $(UTSBASE)/sun4u/montecarlo/Makefile.rules
-include $(UTSBASE)/sun4u/Makefile.targ
+include $(UTSBASE)/sun4u/montecarlo/Makefile.targ.shared

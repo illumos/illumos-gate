@@ -1,4 +1,3 @@
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -19,58 +18,12 @@
 #
 # CDDL HEADER END
 #
-#
-# uts/sun4u/grover/Makefile.grover
-# Copyright 2000-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	Global definitions for sun4u implementation specific modules.
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-#
-#	Define directories.
-#
-ROOT_GROVER_DIR		= $(ROOT_PLAT_DIR)/SUNW,Sun-Blade-100
-ROOT_GROVER_MOD_DIR	= $(ROOT_GROVER_DIR)/kernel
+UTSTREE=$(UTSBASE)
 
-ROOT_GROVER_MISC_DIR_32	= $(ROOT_GROVER_MOD_DIR)/misc
-ROOT_GROVER_MISC_DIR_64	= $(ROOT_GROVER_MISC_DIR_32)/$(SUBDIR64)
-ROOT_GROVER_DRV_DIR_32	= $(ROOT_GROVER_MOD_DIR)/drv
-ROOT_GROVER_DRV_DIR_64	= $(ROOT_GROVER_DRV_DIR_32)/$(SUBDIR64)
-
-ROOT_GROVER_MISC_DIR	= $(ROOT_GROVER_MISC_DIR_$(CLASS))
-ROOT_GROVER_DRV_DIR	= $(ROOT_GROVER_DRV_DIR_$(CLASS))
-
-ROOT_PLAT_MOD_DIRS	+= $(ROOT_GROVER_MOD_DIR)
-ROOT_PLAT_MISC_DIRS	+= $(ROOT_GROVER_MISC_DIR)
-
-USR_GROVER_DIR		= $(USR_PLAT_DIR)/SUNW,Sun-Blade-100
-USR_GROVER_LINKED_DIR	= $(USR_PLAT_DIR)/$(LINKED_PLATFORM)
-USR_GROVER_INC_DIR	= $(USR_GROVER_DIR)/include
-USR_GROVER_ISYS_DIR	= $(USR_GROVER_INC_DIR)/sys
-USR_GROVER_SBIN_DIR	= $(USR_GROVER_DIR)/sbin
-USR_GROVER_LIB_DIR	= $(USR_GROVER_DIR)/lib
-
-
-GROVER_LINT_LIB_DIR= $(UTSBASE)/$(PLATFORM)/grover/lint-libs/$(OBJS_DIR)
-
-#
-# Define objects.
-#
-GROVER_OBJS	= grover.o
-
-#
-#	Define modules.
-#
-GROVER_KMODS	= platmod
-GROVER_KMODS	+= grfans
-GROVER_KMODS	+= grppm
-
-include $(UTSBASE)/sun4u/grover/Makefile.files
-
-#
-#	Include common rules.
-#
-include $(UTSBASE)/sun4u/Makefile.sun4u
+include $(UTSBASE)/sun4u/grover/Makefile.grover.shared

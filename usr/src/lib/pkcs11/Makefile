@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,12 +37,18 @@ ROOTHDRDIR =	$(ROOT)/usr/include/security
 CHECKHDRS =	$(HDRDIR)/cryptoki.h
 
 SUBDIRS = \
-	libpkcs11 	\
-	pkcs11_kernel	\
-	pkcs11_softtoken
+	libpkcs11
+
+#
+# Don't build these for OpenSolaris, since they will be replaced by
+# binaries that are signed by Sun RE.
+#
+$(CLOSED_BUILD)SUBDIRS += \
+			pkcs11_kernel	\
+			pkcs11_softtoken
 
 # EXPORT DELETE START
-SUBDIRS	+= pkcs11_softtoken_extra
+$(CLOSED_BUILD)SUBDIRS	+= pkcs11_softtoken_extra
 # EXPORT DELETE END
 
 all 	:=	TARGET= all

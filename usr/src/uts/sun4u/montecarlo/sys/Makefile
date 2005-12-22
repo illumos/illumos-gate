@@ -22,8 +22,8 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1997-2000, by Sun Microsystems, Inc.
-# All Rights Reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 UTSBASE	= ../../..
 
@@ -38,9 +38,11 @@ include ../Makefile.montecarlo
 FILEMODE	 = 644
 GROUP = bin
 
-HDRS=	scsb_led.h
+HDRS=	
+CLOSEDHDRS=scsb_led.h
 
 ROOTHDRS=	$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
+$(CLOSED_BUILD)ROOTHDRS += $(CLOSEDHDRS:%=$(USR_PSM_ISYS_DIR)/%)
 
 ROOTDIR=	$(ROOT)/usr/share/src
 ROOTDIRS=	$(ROOTDIR)/uts $(ROOTDIR)/uts/$(PLATFORM)
@@ -49,6 +51,8 @@ ROOTLINK=	$(ROOTDIR)/uts/$(PLATFORM)/sys
 LINKDEST=	../../../../platform/$(PLATFORM)/include/sys
 
 CHECKHDRS=		$(HDRS:%.h=%.check)
+$(CLOSED_BUILD)CHECKHDRS += \
+	$(CLOSEDHDRS:%.h=$(CLOSED)/uts/sun4u/montecarlo/sys/%.check)
 
 .KEEP_STATE:
 
@@ -61,7 +65,10 @@ check:	$(CHECKHDRS)
 #
 # install rules
 #
-$(USR_MONTECARLO_ISYS_DIR)/%:	% $(USR_MONTECARLO_ISYS_DIR)
+$(USR_PSM_ISYS_DIR)/%: % $(USR_PSM_ISYS_DIR)
+	$(INS.file)
+
+$(USR_PSM_ISYS_DIR)/%: $(CLOSED)/uts/sun4u/montecarlo/sys/%
 	$(INS.file)
 
 $(ROOTDIRS):

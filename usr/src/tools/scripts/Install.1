@@ -24,7 +24,7 @@
 .\"
 .\" ident	"%Z%%M%	%I%	%E% SMI"
 .\"
-.TH Install 1 "5 Nov 2004"
+.TH Install 1 "20 Oct 2005"
 .SH NAME
 Install \- install a kernel from an ON workspace
 .SH SYNOPSIS
@@ -65,7 +65,6 @@ Install \- install a kernel from an ON workspace
 .IR "library dir" " ]"
 .RB [ " \-G "
 .IB glomname " ]"
-.RB [ " \-x|X " ]
 .RI [ " module ... " ]
 .LP
 or
@@ -199,7 +198,8 @@ rather than rebuild the tarfile from scratch.
 specifies where
 .B Install
 should create its temp files [default: /tmp/Install.username].  This is
-useful if you have limited space in /tmp (\fBInstall\fR needs about 4MB).
+useful if you have limited space in /tmp (\fBInstall\fR can take as
+much as 100MB).
 The suffix "Install.username" is always appended.
 .TP
 .B "-L"
@@ -232,19 +232,6 @@ specifies the library directory [default: $HOME/LibInstall].
 gloms /kernel and /usr/kernel together into a single /kernel directory.
 Useful for development work, e.g. use "Install -G good [...]" to create a
 "/kernel.good".
-.TP
-.B "-x"
-includes various auxiliary files along with the kernel.  Currently,
-these include /etc/minor_perm, /etc/driver_aliases, /etc/name_to_sysnum,
-and /etc/name_to_major.
-.B "-x"
-is the default.
-.TP
-.B "-X"
-opposite of
-.BR "-x" :
-.I do not
-include auxiliary files.
 .TP
 .B "-P"
 update /etc/path_to_inst -- generally not advisable.
@@ -368,10 +355,6 @@ $HOME/.Installrc, $HOME/.Install.state
 .SH "SEE ALSO"
 .BR tar "(1), " rsh "(1), " rcp "(1)"
 .SH "BUGS"
-.B Install
-may break periodically as the kernel Makefile structure changes.
-I will provide frequent updates to compensate.
-.LP
 .BR tar "(1) and " rsh "(1)"
 do not have particularly useful exit codes.  To compensate,
 .B Install

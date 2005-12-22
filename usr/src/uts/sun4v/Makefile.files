@@ -110,8 +110,6 @@ QCN_OBJS	= qcn.o
 VNEX_OBJS	= vnex.o
 GLVC_OBJS	= glvc.o
 MDESC_OBJS	= mdesc.o
-NCP_OBJS	= ncp.o ncp_kcf.o ncp_debug.o ncp_kstat.o ncp_rsa.o \
-		  ncp_dsa.o bignumimpl.o
 
 #
 #			Misc modules

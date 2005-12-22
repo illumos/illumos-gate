@@ -57,7 +57,6 @@ SUN4_HDRS=			\
 	ivintr.h		\
 	memlist_plat.h  	\
 	memnode.h		\
-	memtestio.h		\
 	nexusdebug.h		\
 	prom_debug.h		\
 	scb.h			\
@@ -70,14 +69,13 @@ SUN4_HDRS=			\
 	xc_impl.h		\
 	zsmach.h
 
+$(CLOSED_BUILD)CLOSED_SUN4_HDRS=	\
+	memtestio.h
+
 HDRS=	\
 	cheetahregs.h		\
 	cpr_impl.h		\
 	ecc_kstat.h		\
-	envctrl.h		\
-	envctrl_gen.h		\
-	envctrl_ue250.h		\
-	envctrl_ue450.h		\
 	gpio_87317.h		\
 	fc_plat.h		\
 	iocache.h		\
@@ -88,14 +86,6 @@ HDRS=	\
 	machparam.h		\
 	machsystm.h		\
 	machthread.h		\
-	memtestio_u.h		\
-	memtestio_ch.h		\
-	memtestio_chp.h		\
-	memtestio_ja.h		\
-	memtestio_jg.h		\
-	memtestio_pn.h		\
-	memtestio_sf.h		\
-	memtestio_sr.h		\
 	mmu.h			\
 	prom_plat.h		\
 	pte.h			\
@@ -118,15 +108,32 @@ HDRS=	\
 	wrsm_common.h		\
 	wrsm_types.h
 
+$(CLOSED_BUILD)CLOSED_HDRS=	\
+	envctrl.h		\
+	envctrl_gen.h		\
+	envctrl_ue250.h		\
+	envctrl_ue450.h		\
+	memtestio_ch.h		\
+	memtestio_chp.h		\
+	memtestio_ja.h		\
+	memtestio_jg.h		\
+	memtestio_pn.h		\
+	memtestio_sf.h		\
+	memtestio_sr.h		\
+	memtestio_u.h
+
 DMFEHDRS =	dmfe.h dmfe_impl.h miiregs.h
 
 ROOTDMFEDIR = $(ROOT)/usr/include/sys
 
 ROOTDMFEHDRS = $(DMFEHDRS:%=$(ROOTDMFEDIR)/%)
 
+$(CLOSED_BUILD)CLOSED_I2CHDRS =	clients/scmi2c.h
+
 I2CHDRS =	clients/max1617.h misc/i2c_svc.h clients/i2c_client.h	\
-		clients/scmi2c.h clients/hpc3130.h clients/lm75.h	\
-		clients/pcf8591.h clients/ssc050.h
+		clients/hpc3130.h clients/lm75.h	\
+		clients/pcf8591.h clients/ssc050.h $(CLOSED_I2CHDRS)
+
 I2C_DIRS=	clients misc
 USR_PSM_ISYS_I2C_ROOT=	$(USR_PSM_ISYS_DIR)/i2c
 USR_PSM_ISYS_I2C_DIRS=	$(USR_PSM_ISYS_I2C_ROOT) \
@@ -134,14 +141,16 @@ USR_PSM_ISYS_I2C_DIRS=	$(USR_PSM_ISYS_I2C_ROOT) \
 
 ROOTI2CHDRS=		$(I2CHDRS:%=$(USR_PSM_ISYS_I2C_ROOT)/%)
 
-
 MONHDRS=
 #MONHDRS=	eeprom.h    idprom.h    keyboard.h  password.h
 
 USR_PSM_MON_DIR=	$(USR_PSM_ISYS_DIR)/mon
 
 ROOTHDRS=		$(HDRS:%=$(USR_PSM_ISYS_DIR)/%)
+$(CLOSED_BUILD)ROOTHDRS += $(CLOSED_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
+
 SUN4_ROOTHDRS=		$(SUN4_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
+$(CLOSED_BUILD)SUN4_ROOTHDRS += $(CLOSED_SUN4_HDRS:%=$(USR_PSM_ISYS_DIR)/%)
 
 ROOTMONHDRS=		$(MONHDRS:%=$(USR_PSM_MON_DIR)/%)
 
@@ -154,6 +163,10 @@ LINKDEST=		../../../../platform/$(PLATFORM)/include/sys
 CHECKHDRS=		$(HDRS:%.h=%.check) \
 			$(MONHDRS:%.h=mon/%.check) \
 			$(SUN4_HDRS:%.h=%.cmncheck)
+
+$(CLOSED_BUILD)CHECKHDRS += $(CLOSED_HDRS:%.h=$(CLOSED)/uts/sun4u/sys/%.check)
+$(CLOSED_BUILD)CHECKHDRS += \
+		$(CLOSED_I2CHDRS:%.h=$(CLOSED)/uts/sun4u/sys/i2c/%.check)
 
 .KEEP_STATE:
 
@@ -174,6 +187,12 @@ $(USR_PSM_MON_DIR):	$(USR_PSM_ISYS_DIR)
 
 $(USR_PSM_ISYS_I2C_DIRS):
 	$(INS.dir.root.bin)
+
+$(USR_PSM_ISYS_DIR)/%:	$(CLOSED)/uts/sun4u/sys/% $(USR_PSM_ISYS_DIR)
+	$(INS.file)
+
+$(USR_PSM_ISYS_DIR)/%:	$(CLOSED)/uts/sun4/sys/% $(USR_PSM_ISYS_DIR)
+	$(INS.file)
 
 $(USR_PSM_ISYS_DIR)/%:	../../sfmmu/sys/% $(USR_PSM_ISYS_DIR)
 	$(INS.file)

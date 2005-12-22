@@ -32,6 +32,6 @@ VERS	=	.1
 
 EXPORT = clean.o
 
-$(EXPORT_RELEASE_BUILD)EXPORT = export.o
+$(EXPORT_RELEASE_BUILD)EXPORT = ../../../../../closed/lib/gss_mechs/mech_spnego/spec/export.o
 
 OBJECTS	=	spnego.o $(EXPORT)

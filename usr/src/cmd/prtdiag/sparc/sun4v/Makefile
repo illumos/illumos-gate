@@ -46,9 +46,6 @@ LINTFLAGS	+= -u
 
 .KEEP_STATE:
 
-all:	libprtdiag $(PROG)
-
-libprtdiag:
-	cd $(SRCDIR)/../../lib/libprtdiag ; $(MAKE) install
+all:	$(LIBPRTDIAG) $(PROG)
 
 include $(SRCDIR)/Makefile.targ

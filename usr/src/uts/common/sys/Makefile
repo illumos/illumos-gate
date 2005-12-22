@@ -47,7 +47,6 @@ i386_HDRS=			\
 	agpgart.h		\
 	asy.h			\
 	audio/audio810.h	\
-	audio/audiovia823x.h	\
 	fd_debug.h		\
 	fdc.h			\
 	fdmedia.h		\
@@ -283,7 +282,6 @@ CHKHDRS=			\
 	list.h			\
 	list_impl.h		\
 	llc1.h			\
-	llc2.h			\
 	loadavg.h		\
 	lock.h			\
 	lockfs.h		\
@@ -354,9 +352,7 @@ CHKHDRS=			\
 	pci_impl.h		\
 	pcmcia.h		\
 	pctypes.h		\
-	pem.h			\
 	pfmod.h			\
-	phx.h			\
 	pm.h			\
 	policy.h		\
 	poll.h			\
@@ -566,16 +562,12 @@ AUDIOHDRS=			\
 	audio_src.h		\
 	audio_support.h		\
 	audio_trace.h		\
-	audioens.h		\
 	g711.h
 
 BSCHDRS=			\
-	bscbus.h		\
-	bscv_impl.h		\
 	lom_ebuscodes.h		\
 	lom_io.h		\
-	lom_priv.h		\
-	lombus.h
+	lom_priv.h
 
 MDESCHDRS=			\
 	mdesc.h			\
@@ -629,9 +621,6 @@ IBMGTHDRS=		\
 
 IBDHDRS=		\
 	ibd.h
-
-TAVORHDRS=		\
-	tavor_ioctl.h
 
 ISOHDRS=			\
 	signal_iso.h
@@ -728,7 +717,6 @@ FSHDRS=				\
 
 PCMCIAHDRS=		\
 	pcata.h		\
-	pcelx.h		\
 	pcgld.h		\
 	pcramio.h	\
 	pcramvar.h	\
@@ -778,14 +766,9 @@ SCSITARGETSHDRS=	\
 	ses.h		\
 	sesio.h		\
 	stdef.h		\
-	sddef.h		\
-	sgendef.h
+	sddef.h
 
-SCSICADHDRS=		\
-	glmreg.h	\
-	glmvar.h	\
-	mptreg.h	\
-	mptvar.h
+SCSICADHDRS=
 
 SCSIVHCIHDRS=		\
 	scsi_vhci.h	\
@@ -897,8 +880,6 @@ PCHDRS=			\
 	avintr.h	\
 	dma_engine.h	\
 	i8272A.h	\
-	pcic_reg.h	\
-	pcic_var.h	\
 	pic.h		\
 	pit.h		\
 	rtc.h
@@ -912,115 +893,9 @@ I2OHDRS=		\
 	i2omstr.h	\
 	i2outil.h
 
-# SVVS headers and other excluded headers
-XHDRS=		\
-	lo.h	\
-	tidg.h	\
-	tivc.h	\
-	tmux.h
-
-# check files really don't exist
-
-audio/%.check:	audio/%.h
-	$(DOT_H_CHECK)
-
-av/%.check:	av/%.h
-	$(DOT_H_CHECK)
+include Makefile.syshdrs
 
 dcam/%.check:	dcam/%.h
-	$(DOT_H_CHECK)
-
-fm/%.check:     fm/%.h
-	$(DOT_H_CHECK)
-
-fm/cpu/%.check:     fm/cpu/%.h
-	$(DOT_H_CHECK)
-
-fm/io/%.check:     fm/io/%.h
-	$(DOT_H_CHECK)
-
-fs/%.check:	fs/%.h
-	$(DOT_H_CHECK)
-
-ib/%.check:		ib/%.h
-	$(DOT_H_CHECK)
-
-ib/clients/ibd/%.check:	ib/clients/ibd/%.h
-	$(DOT_H_CHECK)
-
-ib/ibtl/%.check:	ib/ibtl/%.h
-	$(DOT_H_CHECK)
-
-ib/ibtl/impl/%.check:	ib/ibtl/impl/%.h
-	$(DOT_H_CHECK)
-
-ib/ibnex/%.check:	ib/ibnex/%.h
-	$(DOT_H_CHECK)
-
-ib/mgt/%.check:	ib/mgt/%.h
-	$(DOT_H_CHECK)
-
-ib/mgt/ibmf/%.check:	ib/mgt/ibmf/%.h
-	$(DOT_H_CHECK)
-
-ib/adapters/tavor/%.check:	ib/adapters/tavor/%.h
-	$(DOT_H_CHECK)
-
-lvm/%.check:	lvm/%.h
-	$(DOT_H_CHECK)
-
-pcmcia/%.check:	pcmcia/%.h
-	$(DOT_H_CHECK)
-
-scsi/%.check:		scsi/%.h
-	$(DOT_H_CHECK)
-
-scsi/conf/%.check:	scsi/conf/%.h
-	$(DOT_H_CHECK)
-
-scsi/generic/%.check:	scsi/generic/%.h
-	$(DOT_H_CHECK)
-
-scsi/impl/%.check:	scsi/impl/%.h
-	$(DOT_H_CHECK)
-
-scsi/targets/%.check:	scsi/targets/%.h
-	$(DOT_H_CHECK)
-
-scsi/adapters/%.check:	scsi/adapters/%.h
-	$(DOT_H_CHECK)
-
-sysevent/%.check:     sysevent/%.h
-	$(DOT_H_CHECK)
-
-contract/%.check:     contract/%.h
-	$(DOT_H_CHECK)
-
-usb/%.check:		usb/%.h
-	$(DOT_H_CHECK)
-
-usb/clients/audio/%.check:  usb/clients/audio/%.h
-	$(DOT_H_CHECK)
-
-usb/hubd/%.check:	usb/hubd/%.h
-	$(DOT_H_CHECK)
-
-usb/clients/hid/%.check:	usb/clients/hid/%.h
-	$(DOT_H_CHECK)
-
-usb/clients/mass_storage/%.check:	usb/clients/mass_storage/%.h
-	$(DOT_H_CHECK)
-
-usb/clients/hid/%.check:	usb/clients/hid/%.h
-	$(DOT_H_CHECK)
-
-usb/clients/printer/%.check:  usb/clients/printer/%.h
-	$(DOT_H_CHECK)
-
-1394/%.check:         1394/%.h
-	$(DOT_H_CHECK)
-
-rsm/%.check:	rsm/%.h
 	$(DOT_H_CHECK)
 
 CHECKHDRS=						\
@@ -1044,7 +919,6 @@ CHECKHDRS=						\
 	$(FMIOHDRS:%.h=fm/io/%.check)			\
 	$(FSHDRS:%.h=fs/%.check)			\
 	$(LVMHDRS:%.h=lvm/%.check)			\
-	$(XHDRS:%.h=%.check)				\
 	$(PCMCIAHDRS:%.h=pcmcia/%.check)		\
 	$(SCSIHDRS:%.h=scsi/%.check)			\
 	$(SCSICONHDRS:%.h=scsi/conf/%.check)		\
@@ -1064,232 +938,6 @@ CHECKHDRS=						\
 	$(I1394HDRS:%.h=1394/%.check)			\
 	$(RSMHDRS:%.h=rsm/%.check)
 
-
-ROOTDIR=	$(ROOT)/usr/include/sys
-
-ROOTDKTPDIR=	$(ROOTDIR)/dktp
-
-sparc_ROOTDIRS=	$(ROOTDKTPDIR) $(ROOTDIR)/scsi/adapters \
-		$(ROOTDIR)/scsi/targets \
-		$(ROOTDIR)/av
-
-i386_ROOTDIRS=	$(ROOTDKTPDIR) $(ROOTDIR)/scsi/adapters $(ROOTDIR)/scsi/targets \
-		$(ROOTDIR)/i2o $(ROOTDIR)/agp
-
-ROOTDIRS=			\
-	$(ROOTDIR)		\
-	$(ROOTDIR)/audio	\
-	$(ROOTDIR)/hotplug	\
-	$(ROOTDIR)/hotplug/pci	\
-	$(ROOTDIR)/crypto	\
-	$(ROOTDIR)/dcam		\
-	$(ROOTDIR)/iso		\
-	$(ROOTDIR)/fm		\
-	$(ROOTDIR)/fm/cpu	\
-	$(ROOTDIR)/fm/io	\
-	$(ROOTDIR)/fs		\
-	$(ROOTDIR)/ib		\
-	$(ROOTDIR)/ib/adapters/tavor	\
-	$(ROOTDIR)/ib/ibtl	\
-	$(ROOTDIR)/ib/ibtl/impl	\
-	$(ROOTDIR)/ib/mgt	\
-	$(ROOTDIR)/ib/mgt/ibmf	\
-	$(ROOTDIR)/ib/ibnex	\
-	$(ROOTDIR)/ib/clients/ibd \
-	$(ROOTDIR)/lvm		\
-	$(ROOTDIR)/pcmcia	\
-	$(ROOTDIR)/scsi		\
-	$(ROOTDIR)/scsi/conf	\
-	$(ROOTDIR)/scsi/generic	\
-	$(ROOTDIR)/scsi/impl	\
-	$(ROOTDIR)/fc4		\
-	$(ROOTDIR)/sysevent     \
-	$(ROOTDIR)/contract     \
-	$(ROOTDIR)/usb		\
-	$(ROOTDIR)/usb/hubd	\
-	$(ROOTDIR)/usb/clients	\
-	$(ROOTDIR)/usb/clients/audio  \
-	$(ROOTDIR)/usb/clients/hid \
-	$(ROOTDIR)/usb/clients/mass_storage	\
-	$(ROOTDIR)/usb/clients/printer  \
-	$(ROOTDIR)/usb/clients/ugen  \
-	$(ROOTDIR)/1394         \
-	$(ROOTDIR)/rsm		\
-	$($(MACH)_ROOTDIRS)
-
-
-ROOTHDRS=				\
-	$($(MACH)_HDRS:%=$(ROOTDIR)/%)	\
-	$(HDRS:%=$(ROOTDIR)/%)
-
-ROOTAUDHDRS= $(AUDIOHDRS:%=$(ROOTDIR)/audio/%)
-
-ROOTAVHDRS= $(AVHDRS:%=$(ROOTDIR)/av/%)
-
-ROOTCRYPTOHDRS= $(CRYPTOHDRS:%=$(ROOTDIR)/crypto/%)
-
-ROOTDCAMHDRS= $(DCAMHDRS:%=$(ROOTDIR)/dcam/%)
-
-ROOTIBHDRS= $(IBHDRS:%=$(ROOTDIR)/ib/%)
-ROOTIBDHDRS= $(IBDHDRS:%=$(ROOTDIR)/ib/clients/ibd/%)
-ROOTIBTLHDRS= $(IBTLHDRS:%=$(ROOTDIR)/ib/ibtl/%)
-ROOTIBTLIMPLHDRS= $(IBTLIMPLHDRS:%=$(ROOTDIR)/ib/ibtl/impl/%)
-ROOTIBNEXHDRS= $(IBNEXHDRS:%=$(ROOTDIR)/ib/ibnex/%)
-ROOTIBMGTHDRS= $(IBMGTHDRS:%=$(ROOTDIR)/ib/mgt/%)
-ROOTIBMFHDRS= $(IBMFHDRS:%=$(ROOTDIR)/ib/mgt/ibmf/%)
-ROOTTAVORHDRS= $(TAVORHDRS:%=$(ROOTDIR)/ib/adapters/tavor/%)
-
-ROOTISOHDRS= $(ISOHDRS:%=$(ROOTDIR)/iso/%)
-
-ROOTFMHDRS= $(FMHDRS:%=$(ROOTDIR)/fm/%)
-ROOTFMCPUHDRS= $(FMCPUHDRS:%=$(ROOTDIR)/fm/cpu/%)
-ROOTFMIOHDRS= $(FMIOHDRS:%=$(ROOTDIR)/fm/io/%)
-
-ROOTFSHDRS= $(FSHDRS:%=$(ROOTDIR)/fs/%)
-
-ROOTLVMHDRS= $(ALL_LVMHDRS:%=$(ROOTDIR)/lvm/%)
-
-ROOTPCMCIAHDRS= $(PCMCIAHDRS:%=$(ROOTDIR)/pcmcia/%)
-
-ROOTSCSIHDRS= $(SCSIHDRS:%=$(ROOTDIR)/scsi/%)
-ROOTSCSICONFHDRS= $(SCSICONFHDRS:%=$(ROOTDIR)/scsi/conf/%)
-ROOTSCSIGENHDRS= $(SCSIGENHDRS:%=$(ROOTDIR)/scsi/generic/%)
-ROOTSCSIIMPLHDRS= $(SCSIIMPLHDRS:%=$(ROOTDIR)/scsi/impl/%)
-ROOTSCSITARGETSHDRS= $(SCSITARGETSHDRS:%=$(ROOTDIR)/scsi/targets/%)
-ROOTSCSICADHDRS= $(SCSICADHDRS:%=$(ROOTDIR)/scsi/adapters/%)
-ROOTSCSIVHCIHDRS= $(SCSIVHCIHDRS:%=$(ROOTDIR)/scsi/adapters/%)
-
-ROOTFCHDRS= $(FCHDRS:%=$(ROOTDIR)/fc4/%)
-
-ROOTSYSEVENTHDRS= $(SYSEVENTHDRS:%=$(ROOTDIR)/sysevent/%)
-ROOTCONTRACTHDRS= $(CONTRACTHDRS:%=$(ROOTDIR)/contract/%)
-
-ROOTXHDRS= $(XHDRS:%=$(ROOTDIR)/%)
-
-ROOTUSBHDRS= $(USBHDRS:%=$(ROOTDIR)/usb/%)
-ROOTUSBAUDHDRS= $(USBAUDHDRS:%=$(ROOTDIR)/usb/clients/audio/%)
-ROOTUSBHUBDHDRS= $(USBHUBDHDRS:%=$(ROOTDIR)/usb/hubd/%)
-ROOTUSBHIDHDRS = $(USBHIDHDRS:%=$(ROOTDIR)/usb/clients/hid/%)
-ROOTUSBMSHDRS= $(USBMSHDRS:%=$(ROOTDIR)/usb/clients/mass_storage/%)
-ROOTUSBPRNHDRS= $(USBPRNHDRS:%=$(ROOTDIR)/usb/clients/printer/%)
-ROOTUGENHDRS= $(UGENHDRS:%=$(ROOTDIR)/usb/clients/ugen/%)
-
-ROOT1394HDRS= $(I1394HDRS:%=$(ROOTDIR)/1394/%)
-
-ROOTRSMHDRS= $(RSMHDRS:%=$(ROOTDIR)/rsm/%)
-
-ROOTSDKTPHDRS= $(SDKTPHDRS:%=$(ROOTDIR)/dktp/%)
-ROOTDKTPHDRS= $(DKTPHDRS:%=$(ROOTDIR)/dktp/%)
-ROOTPCHDRS= $(PCHDRS:%=$(ROOTDIR)/%)
-ROOTI2OHDRS= $(I2OHDRS:%=$(ROOTDIR)/i2o/%)
-ROOTHOTPLUGHDRS= $(HOTPLUGHDRS:%=$(ROOTDIR)/hotplug/%)
-ROOTHOTPLUGPCIHDRS= $(HOTPLUGPCIHDRS:%=$(ROOTDIR)/hotplug/pci/%)
-
-
-sparc_ROOTHDRS=	$(ROOTSDKTPHDRS) $(ROOTSCSICADHDRS) $(ROOTSCSITARGETSHDRS) \
-		$(ROOTFCHDRS) $(ROOTUSBHDRS) $(ROOTUSBHUBDHDRS) $(ROOTPCMCIAHDRS) \
-		$(ROOTUSBAUDHDRS) \
-		$(ROOTUSBHIDHDRS) $(ROOTUSBMSHDRS) $(ROOTUSBPRNHDRS) \
-		$(ROOTUGENHDRS)
-
-i386_ROOTHDRS=	$(ROOTDKTPHDRS) $(ROOTPCHDRS) $(ROOTSCSITARGETSHDRS)	\
-		$(ROOTSCSIVHCIHDRS) $(ROOTFCHDRS)	\
-		$(ROOTI2OHDRS) $(ROOTPCMCIAHDRS) $(ROOTHOTPLUGHDRS) \
-		$(ROOTHOTPLUGPCIHDRS)
-
-# install rules
-$(ROOTDIR)/%: %
-	$(INS.file)
-
-$(ROOTDIR)/crypto/%: crypto/%
-	$(INS.file)
-
-$(ROOTDIR)/fm/%:                fm/%
-	$(INS.file)
-
-$(ROOTDIR)/fm/cpu/%:                fm/cpu/%
-	$(INS.file)
-
-$(ROOTDIR)/fm/io/%:                fm/io/%
-	$(INS.file)
-
-$(ROOTDIR)/fs/%: fs/%
-	$(INS.file)
-
-$(ROOTDIR)/ib/%:		ib/%
-	$(INS.file)
-
-$(ROOTDIR)/ib/clients/ibd/%:	ib/clients/ibd/%
-	$(INS.file)
-
-$(ROOTDIR)/ib/ibtl/%:		ib/ibtl/%
-	$(INS.file)
-
-$(ROOTDIR)/ib/ibtl/impl/%:	ib/ibtl/impl/%
-	$(INS.file)
-
-$(ROOTDIR)/ib/ibnex/%:		ib/ibnex/%
-	$(INS.file)
-
-$(ROOTDIR)/ib/mgt/%:		ib/mgt/%
-	$(INS.file)
-
-$(ROOTDIR)/ib/mgt/ibmf/%:	ib/mgt/ibmf/%
-	$(INS.file)
-
-$(ROOTDIR)/ib/adapters/tavor/%:	ib/adapters/tavor/%
-	$(INS.file)
-
-$(ROOTDIR)/lvm/%: lvm/%
-	$(INS.file)
-
-$(ROOTDIR)/pcmcia/%:		pcmcia/%
-	$(INS.file)
-
-$(ROOTDIR)/scsi/%:		scsi/%
-	$(INS.file)
-
-$(ROOTDIR)/scsi/conf/%:		scsi/conf/%
-	$(INS.file)
-
-$(ROOTDIR)/scsi/generic/%:	scsi/generic/%
-	$(INS.file)
-
-$(ROOTDIR)/scsi/impl/%:		scsi/impl/%
-	$(INS.file)
-
-$(ROOTDIR)/scsi/targets/%:	scsi/targets/%
-	$(INS.file)
-
-$(ROOTDIR)/fc4/%:		fc4/%
-	$(INS.file)
-
-$(ROOTDIR)/sysevent/%:		sysevent/%
-	$(INS.file)
-
-$(ROOTDIR)/contract/%:		contract/%
-	$(INS.file)
-
-$(ROOTDIR)/usb/%:		usb/%
-	$(INS.file)
-
-$(ROOTDIR)/usb/hubd/%:		usb/hubd/%
-	$(INS.file)
-
-$(ROOTDIR)/usb/clients/hid/%:	usb/clients/hid/%
-	$(INS.file)
-
-$(ROOTDIR)/usb/clients/mass_storage/%:	usb/clients/mass_storage/%
-	$(INS.file)
-
-$(ROOTDIR)/dktp/%: dktp/%
-	$(INS.file)
-
-$(ROOTDIR)/1394/%:                    1394/%
-	$(INS.file)
-
-$(ROOTDIR)/rsm/%:	rsm/%
-	$(INS.file)
 
 .KEEP_STATE:
 
@@ -1378,15 +1026,7 @@ install_h:			\
 	$(ROOTHOTPLUGHDRS)	\
 	$(ROOTHOTPLUGPCIHDRS)	\
 	$(ROOTRSMHDRS)		\
-	$($(MACH)_ROOTHDRS)	\
-	svvs_h
-
-svvs_h: FRC
-	@if [ -f lo.h  ]; then \
-		$(MAKE) install_X_h; \
-	else \
-		true; \
-	fi
+	$($(MACH)_ROOTHDRS)
 
 all_h: $(GENHDRS)
 
@@ -1395,11 +1035,6 @@ priv_const.h: $(PRIVS_AWK) $(PRIVS_DEF)
 
 priv_names.h: $(PRIVS_AWK) $(PRIVS_DEF)
 	$(NAWK) -f $(PRIVS_AWK) < $(PRIVS_DEF) -v pubhfile=$@
-
-install_X_h: $(ROOTXHDRS)
-
-$(ROOTDIRS):
-	$(INS.dir)
 
 LVMDERIVED_H:
 	cd $(SRC)/uts/common/sys/lvm; pwd; $(MAKE)

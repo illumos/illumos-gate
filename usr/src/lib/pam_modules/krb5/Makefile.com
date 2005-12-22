@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # usr/src/lib/pam_modules/krb5/Makefile.com
@@ -65,15 +65,6 @@ CPPFLAGS +=	-I../../../gss_mechs/mech_krb5/include \
 # module needs to be unloadable because the key destructor might be
 # called after dlclose()
 DYNFLAGS +=	$(ZNODELETE)
-
-# EXPORT DELETE START
-# CRYPT DELETE START
-INTLMAP =
-INTLMAP += -Dxencrypt=_C0095A0F
-INTLMAP += -Dxdecrypt=_C0095A10
-CPPFLAGS += $(INTLMAP)
-# CRYPT DELETE END
-# EXPORT DELETE END
 
 CLOBBERFILES += $(LINTLIB) $(LINTOUT) $(JOBJ) $(POFILE)
 

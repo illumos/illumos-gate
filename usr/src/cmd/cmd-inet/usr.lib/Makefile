@@ -20,18 +20,23 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-SUBDIRS=	dhcp dsvclockd ike-certutils in.chargend in.daytimed \
-		in.discardd in.echod in.dhcpd in.iked in.mpathd in.ndpd \
+SUBDIRS=	dhcp dsvclockd in.chargend in.daytimed \
+		in.discardd in.echod in.dhcpd in.mpathd in.ndpd \
 		in.ripngd in.timed inetd mipagent ncaconfd pppoe slpd wanboot
+
 MSGSUBDIRS=	dsvclockd in.dhcpd inetd ncaconfd wanboot
 
 include ../../Makefile.cmd
+
+$(CLOSED_BUILD)SUBDIRS += \
+	$(CLOSED)/cmd/cmd-inet/usr.lib/ike-certutils \
+	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
 
 POFILES=	dsvclockd/dsvclockd.po in.dhcpd/in.dhcpd.po \
 		inetd/inetd.po ncaconfd/ncaconfd.po \
@@ -54,7 +59,7 @@ _msg: $(MSGSUBDIRS)
 #
 # The reason this rule checks for the existence of the
 # Makefile is that some of the directories do not exist
-# in our exportable source builds.
+# in our exportable source builds or in OpenSolaris.
 #
 $(SUBDIRS): FRC
 	@if [ -f $@/Makefile  ]; then \

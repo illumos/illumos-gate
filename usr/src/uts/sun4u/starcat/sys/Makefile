@@ -22,8 +22,8 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 2000-2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 UTSBASE	= ../../..
 
@@ -42,10 +42,14 @@ GROUP = bin
 HDRS=
 
 
-CHKHDRS=	drmach.h dman.h \
-		axq.h domaind.h iosramreg.h iosramio.h \
-		iosramvar.h dman.h sc_cvcio.h sc_cvc.h \
+CHKHDRS=	drmach.h \
+		domaind.h   \
+		sc_cvcio.h \
 		sckm_msg.h sckm_io.h
+
+CLOSED_CHKHDRS=	axq.h dman.h iosramio.h iosramreg.h iosramvar.h sc_cvc.h
+
+$(CLOSED_BUILD)CHKHDRS += $(CLOSED_CHKHDRS:%=$(CLOSED)/uts/sun4u/starcat/sys/%)
 
 STARHDRS=	$(UTSBASE)/sun4u/ngdr/sys/dr.h \
 		$(UTSBASE)/sun4u/ngdr/sys/dr_util.h

@@ -94,6 +94,12 @@ echo "Making ${archivetype}archives from $ROOT in $CPIODIR."
 if [ "$o_FLAG" != "y" -a -n "$MACH" -a -n "$SRC" -a -d "$SRC/pkgdefs" ]; then
 	pkg=$SRC/pkgdefs
 	bpkg=$SRC/realmode/pkgdefs
+	if [[ -d $SRC/../closed/pkgdefs && \
+	    "$CLOSED_IS_PRESENT" != no ]]; then
+		cpkg=$SRC/../closed/pkgdefs
+	else
+		cpkg=""
+	fi
 	exc=etc/exception_list_$MACH
 	if [ "$X_FLAG" = "y" ]; then
 		ipkg=$IA32_IHV_WS/usr/src/pkgdefs
@@ -106,7 +112,7 @@ if [ "$o_FLAG" != "y" -a -n "$MACH" -a -n "$SRC" -a -d "$SRC/pkgdefs" ]; then
 # packaging.
 # usr/lib/fs/ufs/mboot and a few friends are in $SRC/realmode/pkgdefs,
 # so the regular build also needs this packaging data.
-	mkbfu	-f "cpiotranslate -e $pkg/$exc $bpkgargs $pkg" \
+	mkbfu	-f "cpiotranslate -e $pkg/$exc $bpkgargs $pkg $cpkg" \
 		$zflag $ROOT $CPIODIR
 else
 	mkbfu $zflag $ROOT $CPIODIR

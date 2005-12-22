@@ -22,16 +22,16 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989,1998,2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 
 include		../../../Makefile.cmd
 
 BINPROG =	nsgmls instant
 
-SGMLUTILDOCBOOKDIR = docbook
-SGMLUTILSOLBOOKV1DIR = solbookv1
+SGMLUTILDOCBOOKDIR = $(CLOSED)/cmd/man/src/util/docbook
+SGMLUTILSOLBOOKV1DIR = $(CLOSED)/cmd/man/src/util/solbookv1
 SGMLUTILSOLBOOKV2DIR = solbookv2
 
 LIBSHELL =	sgml2roff
@@ -100,8 +100,8 @@ TPTDIR =	$(ROOTSHLIB)/sgml/locale/C/transpec
 ROOTPROG =	$(BINPROG:%=$(PROGDIR)/%)
 ROOTLIBSHELL =	$(LIBSHELL:%=$(PROGDIR)/%)
 ROOTENTS =	$(SGMLENTS:%=$(SGMLENTSDIR)/%)
-ROOTDOCBOOK = $(DOCBOOKDTD:%=$(DOCBOOKDIR)/%)
-ROOTSOLBOOKV1 = $(SOLBOOKV1:%=$(SOLBOOKV1DIR)/%)
+$(CLOSED_BUILD)ROOTDOCBOOK =	$(DOCBOOKDTD:%=$(DOCBOOKDIR)/%)
+$(CLOSED_BUILD)ROOTSOLBOOKV1 =	$(SOLBOOKV1:%=$(SOLBOOKV1DIR)/%)
 ROOTSOLBOOKV2 = $(SOLBOOKV2:%=$(SOLBOOKV2DIR)/%)
 ROOTCATALOG =	$(CATALOG:%=$(SGMLDTDDIR)/%)
 ROOTTPT =	$(TPTFILES:%=$(TPTDIR)/%)

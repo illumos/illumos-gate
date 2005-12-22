@@ -28,4 +28,4 @@
 
 find_files "s.*" usr/src/common/atomic
 find_files "s.*" usr/src/common/util
-find_files "s.*" usr/src/lib/libc_i18n
+find_files "s.*" usr/closed/lib/libc_i18n

@@ -49,18 +49,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/dktp/hba/ncrs/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/iprb/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/bmc/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/pci/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -87,14 +75,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/psm/%.c
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/psm/%.s
 	$(COMPILE.s) -o $@ $<
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/rtls/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/spwr/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/ml/%.s
 	$(COMPILE.s) -o $@ $<
 
@@ -107,18 +87,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/vm/%.c
 	$(CTFCONVERT_O)
 
 $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/dktp/controller/ata/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/dktp/hba/ghd/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/elxl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -214,15 +182,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/conf/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/dktp/hba/ncrs/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/iprb/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/bmc/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pci/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
@@ -244,12 +203,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/psm/%.c
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/psm/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/rtls/%.c
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/spwr/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/ml/%.s
 	@($(LHEAD) $(LINT.s) $< $(LTAIL))
 
@@ -260,15 +213,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/vm/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/dktp/controller/ata/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/dktp/hba/ghd/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/common/io/elxl/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/common/os/%.c

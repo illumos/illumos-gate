@@ -21,7 +21,7 @@
 #
 #
 # uts/sun4u/mpxu/Makefile.files
-# Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,9 +34,7 @@
 #
 # Define objects.
 #
-MPXU_PLATMOD_OBJS	= mpxu.o
 MPXU_TSALARM_OBJS	= tsalarm.o
-NTWDT_OBJS		= ntwdt.o
 
 #
 #	include mpxu header files

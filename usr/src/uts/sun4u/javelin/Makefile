@@ -21,8 +21,8 @@
 #
 #
 # uts/sun4u/javelin/Makefile
-# Copyright (c) 1994-1998 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -49,6 +49,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -57,15 +59,16 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean.lint clean clobber: $(JAVELIN_KMODS)
+def all clean.lint clean clobber modlist: $(JAVELIN_KMODS) \
+		$(CLOSED_JAVELIN_KMODS)
 
-modlintlib:	$(JAVELIN_KMODS)
+modlintlib:	$(JAVELIN_KMODS) $(CLOSED_JAVELIN_KMODS)
 
 install: 	$(ROOT_JAVELIN_DIR) $(USR_JAVELIN_DIR) \
 		$(USR_JAVELIN_INC_DIR) \
 		$(USR_JAVELIN_SBIN_DIR) \
 		$(USR_JAVELIN_LIB_DIR) \
-		.WAIT $(JAVELIN_KMODS)
+		.WAIT $(JAVELIN_KMODS) $(CLOSED_JAVELIN_KMODS)
 
 install_h check:
 
@@ -80,6 +83,7 @@ lint:		modlintlib
 LINT_LIBS	 = $(LINT_LIB) \
 		   -L$(JAVELIN_LINT_LIB_DIR) \
 		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+		       $(CLOSED_LINT_KMODS:%=-l%) \
 		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:   modlintlib
@@ -87,7 +91,10 @@ lint.platmod:   modlintlib
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 $(JAVELIN_KMODS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(CLOSED_JAVELIN_KMODS):	FRC
+	cd $(CLOSED)/uts/sun4u/javelin/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 #
 #	Include common targets.

@@ -130,7 +130,6 @@ COMMON_SUBDIRS=		\
 	dispadmin	\
 	dladm		\
 	dmesg		\
-	dodatadm	\
 	dtrace		\
 	du		\
 	dumpadm		\
@@ -187,7 +186,6 @@ COMMON_SUBDIRS=		\
 	head		\
 	hostid		\
 	hostname	\
-	iconv		\
 	id		\
 	infocmp		\
 	init		\
@@ -206,7 +204,6 @@ COMMON_SUBDIRS=		\
 	keyserv		\
 	killall		\
 	krb5		\
-	ksh		\
 	kstat		\
 	last		\
 	lastcomm	\
@@ -215,10 +212,8 @@ COMMON_SUBDIRS=		\
 	line		\
 	link		\
 	listen		\
-	llc2		\
 	loadkeys	\
 	locale		\
-	localedef	\
 	lockstat	\
 	locator		\
 	lofiadm		\
@@ -246,7 +241,6 @@ COMMON_SUBDIRS=		\
 	mktemp		\
 	modload		\
 	more		\
-	more_xpg4	\
 	msgfmt		\
 	msgid		\
 	mt		\
@@ -267,19 +261,15 @@ COMMON_SUBDIRS=		\
 	nscd		\
 	oamuser		\
 	oawk		\
-	od		\
 	openssl		\
 	pack		\
 	pagesize	\
 	passmgmt	\
 	passwd		\
 	paste		\
-	patch		\
 	pathchk		\
-	pax		\
 	pbind		\
 	pcidr		\
-	pcitool		\
 	pcmciad		\
 	pfexec		\
 	pgrep		\
@@ -293,7 +283,6 @@ COMMON_SUBDIRS=		\
 	pr		\
 	prctl		\
 	print		\
-	printf		\
 	priocntl	\
 	profiles	\
 	projadd		\
@@ -336,8 +325,6 @@ COMMON_SUBDIRS=		\
 	savecore	\
 	script		\
 	sdiff		\
-	sed		\
-	sed_xpg4	\
 	sendmail	\
 	setfacl		\
 	setmnt		\
@@ -346,7 +333,6 @@ COMMON_SUBDIRS=		\
 	sgs		\
 	sh		\
 	sleep		\
-	smartcard	\
 	smbios		\
 	smserverd	\
 	soelim		\
@@ -370,7 +356,6 @@ COMMON_SUBDIRS=		\
 	syseventadm	\
 	syslogd		\
 	tabs		\
-	tail		\
 	tar		\
 	tbl		\
 	tcopy		\
@@ -385,8 +370,6 @@ COMMON_SUBDIRS=		\
 	touch		\
 	tplot		\
 	tput		\
-	tr		\
-	tr_xpg4		\
 	trapstat	\
 	troff		\
 	true		\
@@ -434,6 +417,25 @@ COMMON_SUBDIRS=		\
 	zpool		\
 	ztest
 
+$(CLOSED_BUILD)COMMON_SUBDIRS += \
+	$(CLOSED)/cmd/dodatadm	\
+	$(CLOSED)/cmd/iconv	\
+	$(CLOSED)/cmd/ksh	\
+	$(CLOSED)/cmd/llc2	\
+	$(CLOSED)/cmd/localedef	\
+	$(CLOSED)/cmd/more_xpg4	\
+	$(CLOSED)/cmd/od	\
+	$(CLOSED)/cmd/patch	\
+	$(CLOSED)/cmd/pax	\
+	$(CLOSED)/cmd/pcitool	\
+	$(CLOSED)/cmd/printf	\
+	$(CLOSED)/cmd/sed	\
+	$(CLOSED)/cmd/sed_xpg4	\
+	$(CLOSED)/cmd/smartcard	\
+	$(CLOSED)/cmd/tail	\
+	$(CLOSED)/cmd/tr	\
+	$(CLOSED)/cmd/tr_xpg4
+
 i386_SUBDIRS=		\
 	addbadsec	\
 	biosdev		\
@@ -445,9 +447,9 @@ sparc_SUBDIRS=		\
 	cvcd		\
 	dcs		\
 	fruadm		\
-	mtst		\
+	$(CLOSED)/cmd/mtst	\
 	prtfru		\
-	scadm		\
+	$(CLOSED)/cmd/scadm	\
 	sckmd		\
 	sf880drd	\
 	stmsboot	\
@@ -545,19 +547,15 @@ MSGSUBDIRS=		\
 	halt		\
 	head		\
 	hostname	\
-	iconv		\
 	id		\
 	isaexec		\
 	join		\
 	krb5		\
-	ksh		\
 	kstat		\
 	last		\
 	ldap		\
 	ldapcachemgr	\
-	llc2		\
 	locale		\
-	localedef	\
 	lofiadm		\
 	logadm		\
 	logger		\
@@ -571,7 +569,6 @@ MSGSUBDIRS=		\
 	mkpwdict	\
 	mktemp		\
 	more		\
-	more_xpg4	\
 	msgfmt		\
 	mv		\
 	newgrp		\
@@ -580,14 +577,11 @@ MSGSUBDIRS=		\
 	nispasswd	\
 	nohup		\
 	oawk		\
-	od		\
 	pack		\
 	passwd		\
 	passmgmt	\
 	paste		\
-	patch		\
 	pathchk		\
-	pax		\
 	pfexec		\
 	pg		\
 	pgrep		\
@@ -597,7 +591,6 @@ MSGSUBDIRS=		\
 	pr		\
 	praudit		\
 	print		\
-	printf		\
 	profiles	\
 	projadd		\
 	projects	\
@@ -618,11 +611,8 @@ MSGSUBDIRS=		\
 	rm		\
 	rmdir		\
 	rmformat	\
-	scadm		\
 	script		\
 	sdiff		\
-	sed		\
-	sed_xpg4	\
 	sgs		\
 	sh		\
 	sleep		\
@@ -637,7 +627,6 @@ MSGSUBDIRS=		\
 	syseventadm	\
 	syseventd	\
 	tabs		\
-	tail		\
 	tar		\
 	tbl		\
 	tee		\
@@ -645,8 +634,6 @@ MSGSUBDIRS=		\
 	tnf		\
 	touch		\
 	tput		\
-	tr		\
-	tr_xpg4		\
 	troff		\
 	tty		\
 	ttymon		\
@@ -679,6 +666,23 @@ MSGSUBDIRS=		\
 	zonename	\
 	zpool
 
+$(CLOSED_BUILD)MSGSUBDIRS += \
+	$(CLOSED)/cmd/iconv	\
+	$(CLOSED)/cmd/ksh	\
+	$(CLOSED)/cmd/llc2	\
+	$(CLOSED)/cmd/localedef	\
+	$(CLOSED)/cmd/more_xpg4	\
+	$(CLOSED)/cmd/od	\
+	$(CLOSED)/cmd/patch	\
+	$(CLOSED)/cmd/pax	\
+	$(CLOSED)/cmd/printf	\
+	$(CLOSED)/cmd/scadm	\
+	$(CLOSED)/cmd/sed	\
+	$(CLOSED)/cmd/sed_xpg4	\
+	$(CLOSED)/cmd/tail	\
+	$(CLOSED)/cmd/tr	\
+	$(CLOSED)/cmd/tr_xpg4
+
 sparc_MSGSUBDIRS=	\
 	fruadm		\
 	prtfru		\
@@ -694,13 +698,15 @@ DCSUBDIRS=		\
 	cfgadm		\
 	diff		\
 	ls		\
-	pax		\
 	pr		\
 	tar		\
 	w		\
 	who		\
 	whodo		\
 	write
+
+$(CLOSED_BUILD)DCSUBDIRS += \
+	$(CLOSED)/cmd/pax
 
 #
 # commands that belong only to the basic security module

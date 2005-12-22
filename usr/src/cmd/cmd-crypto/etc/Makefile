@@ -38,22 +38,12 @@ ETCCERTSFILES = \
 	$(RELEASECERTS) \
 	SUNWSolarisCA
 
-# EXPORT DELETE START
-# CRYPT DELETE START
-
-ETCCRYPTOFILES +=	certs/SUNWosnet
-ETCCERTSFILES +=	SUNWosnetSolaris
-
-# CRYPT DELETE END
-# EXPORT DELETE END
-
 include ../../Makefile.cmd
 
 .KEEP_STATE:
 
 ROOTCRYPTODIR=		$(ROOT)/etc/crypto
 ROOTCRYPTOCERTSDIR=	$(ROOTCRYPTODIR)/certs
-ROOTCRYPTOCRLSDIR=	$(ROOTCRYPTODIR)/crls
 
 ROOTETCCERTSDIR=	$(ROOT)/etc/certs
 
@@ -73,7 +63,7 @@ $(RELEASECERTS:%=$(ROOTCRYPTODIR)/certs/%): \
 			$(INS) -s -m $(FILEMODE) -f $(@D) \
 				certs/$(@F:SUNW_SunOS_5.%=SUNWCryptographic%)
 			$(MV) $(@D)/$(@F:SUNW_SunOS_5.%=SUNWCryptographic%) $@
-			
+
 $(ROOTETCCERTSDIR)/%:	certs/%
 			$(INS.file)
 $(RELEASECERTS:%=$(ROOTETCCERTSDIR)/%): \
@@ -91,14 +81,3 @@ $(IETCCERTSFILES):=	OWNER= root
 $(IETCCERTSFILES):=	GROUP= sys
 
 install:	$(IETCCRYPTOFILES) $(IETCCERTSFILES)
-
-# EXPORT DELETE START
-
-EXPORT_SRC:
-	$(RM) Makefile+
-	$(SED) -e "/^# EXPORT DELETE START/,/^# EXPORT DELETE END/d" \
-		< Makefile > Makefile+
-	$(MV) -f Makefile+ Makefile
-	$(CHMOD) 444 Makefile
-
-# EXPORT DELETE END

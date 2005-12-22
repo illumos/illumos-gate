@@ -52,6 +52,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -60,7 +62,7 @@ check		:=	TARGET= check
 #
 .KEEP_STATE:
 
-def all clean clean.lint clobber: $(SEATTLE_KMODS)
+def all clean clean.lint clobber modlist: $(SEATTLE_KMODS)
 
 modlintlib:	$(SEATTLE_KMODS)
 
@@ -100,6 +102,7 @@ lint:		modlintlib
 LINT_LIBS	 = $(LINT_LIB) \
 		   -L$(SEATTLE_LINT_LIB_DIR) \
 		   -L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+			$(CLOSED_LINT_KMODS:%=-l%) \
 		   -L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:	modlintlib
@@ -107,7 +110,7 @@ lint.platmod:	modlintlib
 	@-$(LINT) $(LINTFLAGS) $(LINT_LIBS) 2>&1 | $(LGREP.2)
 
 $(SEATTLE_KMODS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(SEATTLE_CRYPTO_LINKS): $(ROOT_SEATTLE_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_SEATTLE_CRYPTO_DIR_64)/$@;

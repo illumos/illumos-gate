@@ -55,7 +55,6 @@ SUBDIRS-common= libconv		\
 		pvs		\
 		crle		\
 		ar		\
-		dis		\
 		dump		\
 		elfdump		\
 		error		\
@@ -75,6 +74,8 @@ SUBDIRS-common= libconv		\
 		tsort		\
 		unifdef		\
 		yacc
+
+$(CLOSED_BUILD)SUBDIRS-common += $(CLOSED)/cmd/sgs/dis
 
 SUBDIRS-i386=
 SUBDIRS-sparc=	rtld.4.x

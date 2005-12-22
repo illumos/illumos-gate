@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,25 +42,9 @@ IL_CPP=$(CPP) -P -DINLINE -D_ASM $(AS_INC_PATH) \
 
 DRMACH_IL=$(OBJS_DIR)/drmach.il
 
-$(OBJS_DIR)/drmach.o	:= CC_XARCH_32 = -xarch=v8plusa
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/starcat/io/%.c $(DRMACH_IL)
 	$(COMPILE.c) $(DRMACH_IL) -o $@ $<
 	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/starcat/os/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/starcat/ml/%.s
-	$(COMPILE.s) -o $@ $<
-
-STARCAT_IO=$(UTSBASE)/sun4u/starcat/io
-
-CLEANFILES += $(STARCAT_IO)/drmach_err.c
-
-$(STARCAT_IO)/drmach_err.c: $(SBDGENERR) $(SBD_IOCTL)
-	$(RM) $@
-	$(SBDGENERR) ESTC <$(SBD_IOCTL) >$@
 
 # inline stuff
 
@@ -73,13 +57,5 @@ $(DRMACH_IL):		$(UTSBASE)/sun4u/starcat/ml/drmach.il.cpp
 #	Section 1b: Lint object build rules
 #
 
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/starcat/os/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/drmach.ln		:= LINTFLAGS += -I../sys
-$(LINTS_DIR)/sc_gptwoctfg.ln	:= LINTFLAGS += -I../sys
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/starcat/io/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/starcat/ml/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,13 +28,17 @@
 # lib/cfgadm_plugins/Makefile
 #
 
-COMMON_SUBDIRS= scsi pci usb ib
-sparc_SUBDIRS=	ac sysctrl sbd
+include $(SRC)/Makefile.master
 
-# currently pci library is built only for i386; it should be moved
-# to COMMON_SUBDIRS when it is to be built for SPARC also.
+CLOSED_PLUGIN = $(CLOSED)/lib/cfgadm_plugins/
+
+COMMON_SUBDIRS= scsi pci usb ib
+sparc_SUBDIRS=	sbd
 
 i386_SUBDIRS=
+
+$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/ac
+$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/sysctrl
 
 SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 

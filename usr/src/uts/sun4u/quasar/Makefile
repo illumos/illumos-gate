@@ -21,7 +21,8 @@
 #
 #
 # uts/sun4u/quasar/Makefile
-# Copyright (c) 1999 by Sun Microsystems, Inc.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -50,15 +51,22 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
 #
 #	Default build targets.
 #
+# Note that quasar doesn't currently have any modules of its own to
+# build.
+#
 .KEEP_STATE:
 
 def all install_h clean lint lintlib modlintlib clean.lint clobber check:
+
+modlist:
 
 install:	install_darwin $(INSTALL_DEPS) $(USR_QUASAR_DIR)
 

@@ -73,6 +73,7 @@ echo_file usr/src/head/rtld_db.h
 echo_file usr/src/head/apptrace.h
 echo_file usr/src/head/apptrace_impl.h
 echo_file usr/src/uts/common/sys/Makefile
+echo_file usr/closed/uts/common/sys/Makefile
 echo_file usr/src/uts/Makefile.uts
 echo_file usr/src/uts/common/krtld/reloc.h
 echo_file usr/src/uts/common/sys/auxv.h

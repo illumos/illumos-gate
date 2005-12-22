@@ -60,14 +60,6 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/ttymux/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/dada/adapters/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/dada/adapters/ghd/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/dada/conf/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -76,15 +68,9 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/dada/impl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/dada/targets/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
 $(OBJS_DIR)/esp.o	:=	CFLAGS += -dalign
 $(OBJS_DIR)/fas.o	:=	CFLAGS += -dalign
 $(OBJS_DIR)/fas_callbacks.o :=	CFLAGS += -dalign
-$(OBJS_DIR)/ifp.o	:=	CFLAGS += -dalign
-$(OBJS_DIR)/isp.o	:=	CFLAGS += -dalign
 $(OBJS_DIR)/sf.o	:=	CFLAGS += -dalign
 $(OBJS_DIR)/%.o:		$(UTSBASE)/sun/io/scsi/adapters/%.c
 	$(COMPILE.c) -o $@ $<
@@ -115,15 +101,6 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/scsi/adapters/%.c
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/scsi/targets/%.c
 	@($(LHEAD) $(LINT.c) -I. $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/targets/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/adapters/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/adapters/ghd/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/sun/io/dada/impl/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))

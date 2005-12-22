@@ -1,4 +1,3 @@
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -19,28 +18,12 @@
 #
 # CDDL HEADER END
 #
-#
-# uts/i86pc/Makefile.targ
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
-#	This Makefile defines the set of all required, target containing
-# included Makefiles for the i86pc "implementation architecture".
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-#
-#	Targets for all implementations:
-#
-include $(UTSBASE)/Makefile.targ
+UTSTREE=$(UTSBASE)
 
-#
-#	Target set for i86pc (order is not important, as it is with the
-# isomorphic Makefile.files set).
-#
-include $(UTSBASE)/i86pc/Makefile.rules
-include $(UTSBASE)/intel/Makefile.rules
-include $(UTSBASE)/common/Makefile.rules
-
+include $(UTSBASE)/i86pc/Makefile.targ.shared

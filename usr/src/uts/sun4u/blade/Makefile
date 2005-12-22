@@ -22,7 +22,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2002-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This makefile drives the production of the sun4u JBOS - blade platform
@@ -51,6 +51,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -64,23 +66,26 @@ BLADE_PLAT_LINK1 =	$(BLADE_LINK_1:%=$(ROOT_PLAT_DIR)/%)
 #
 .KEEP_STATE:
 
-.PARALLEL:	$(BLADE_KMODS)
+.PARALLEL:	$(BLADE_KMODS) $(CLOSED_BLADE_KMODS)
 
-def all clean clobber clean.lint:	$(BLADE_KMODS)
+def all clean clobber clean.lint modlist: $(BLADE_KMODS) $(CLOSED_BLADE_KMODS)
 
 install:	$(ROOT_BLADE_DIR) \
 		$(USR_BLADE_DIR) \
 		$(USR_BLADE_INC_DIR) \
 		$(USR_BLADE_SBIN_DIR) \
 		$(USR_BLADE_LIB_DIR) \
-		.WAIT $(BLADE_KMODS) \
+		.WAIT $(BLADE_KMODS) $(CLOSED_BLADE_KMODS) \
 		$(BLADE_OPTION) \
 		$(BLADE_PLAT_LINK_1)
 
-modlintlib:	$(BLADE_KMODS)
+modlintlib:	$(BLADE_KMODS) $(CLOSED_BLADE_KMODS)
 
 $(BLADE_KMODS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+$(CLOSED_BLADE_KMODS):	FRC
+	cd $(CLOSED)/uts/sun4u/blade/$@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 $(BLADE_OPTION):	FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -88,10 +93,11 @@ $(BLADE_OPTION):	FRC
 install_h check:
 
 lint:	modlintlib .WAIT $(LINT_DEPS)
- 
+
 LINT_LIBS	= $(LINT_LIB) \
 			-L$(BLADE_LINT_LIB_DIR) \
 			-L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+			    $(CLOSED_LINT_KMODS:%=-l%) \
 			-L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:   modlintlib

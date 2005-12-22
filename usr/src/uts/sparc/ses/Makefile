@@ -143,8 +143,9 @@ warlock_with_fas.ok: ses_with_fas.wlcmd $(SES_FILES)
 warlock_with_isp.ok: ses_with_isp.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
-	@cd ../isp; $(MAKE) warlock;
-	$(WARLOCK) -c ./ses_with_isp.wlcmd $(SES_FILES) ../isp/isp \
+	@cd $(CLOSED)/uts/sparc/isp; $(MAKE) warlock;
+	$(WARLOCK) -c ./ses_with_isp.wlcmd $(SES_FILES) \
+		$(CLOSED)/uts/sparc/isp/isp \
 	        ../warlock/scsi.ll \
 	        -l ../warlock/ddi_dki_impl.ll \
 	        $(SCSI_FILES)
@@ -153,8 +154,9 @@ warlock_with_isp.ok: ses_with_isp.wlcmd $(SES_FILES)
 warlock_with_glm.ok: ses_with_glm.wlcmd $(SES_FILES)
 	@cd ../warlock; $(MAKE) warlock
 	@cd ../scsi; $(MAKE) warlock
-	@cd ../glm; $(MAKE) warlock;
-	$(WARLOCK) -c ./ses_with_glm.wlcmd $(SES_FILES) ../glm/glm \
+	@cd $(CLOSED)/uts/sparc/glm; $(MAKE) warlock;
+	$(WARLOCK) -c ./ses_with_glm.wlcmd $(SES_FILES) \
+		$(CLOSED)/uts/sparc/glm/glm \
 	        ../warlock/scsi.ll \
 	        -l ../warlock/ddi_dki_impl.ll \
 	        $(SCSI_FILES)

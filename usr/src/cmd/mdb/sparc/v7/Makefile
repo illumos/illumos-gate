@@ -29,8 +29,9 @@ include ../../Makefile.common
 
 MODULES = \
 	$(COMMON_MODULES_PROC) \
-	$(COMMON_MODULES_PROC_32BIT) \
-	sparcdis
+	$(COMMON_MODULES_PROC_32BIT)
+
+$(CLOSED_BUILD)MODULES += $(CLOSED)/cmd/mdb/sparc/v7/sparcdis
 
 SUBDIRS = mdb $(MODULES)
 

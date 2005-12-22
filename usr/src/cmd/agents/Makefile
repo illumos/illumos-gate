@@ -20,8 +20,8 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1998, 2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -65,14 +65,27 @@ TARG_SYS:sh =                           \
 ROOTDIR	: sh=echo ${ROOTDIR:-"`pwd`"}
 PKGLOC	: sh=echo ${PKGLOC:-'${ROOTDIR}/PACKAGES.`uname -p`'}
 
+$(CLOSED_BUILD)DMI= $(CLOSED)/cmd/agents/dmi2.0
+$(CLOSED_BUILD)AGENTS= $(CLOSED)/cmd/agents/agents
+
+all	:=		TARGET = all
+clean	:=		TARGET = clean
+install	:=		TARGET = install
+lint	:=		TARGET = lint
+realclobber :=		TARGET = realclobber
+
+SUBDIRS = snmp $(DMI) $(AGENTS)
+
 #
 # all
 #
 
-all:
-	cd snmp; $(MAKE) all
-	cd dmi2.0; $(MAKE) all
-	cd agents; $(MAKE) all
+all: $(SUBDIRS)
+
+$(SUBDIRS): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+FRC:
 
 DIRMODE=	0755
 OWNER=		root
@@ -101,34 +114,21 @@ $(ROOTDIRS):
 # Need a "make install" target for integrating into Solaris 2.6.
 #
 
-install: $(ROOTDIRS)
-	cd snmp; $(MAKE) install
-	cd dmi2.0; $(MAKE) install
-	cd agents; $(MAKE) install
-	
+install: $(ROOTDIRS) $(SUBDIRS)
 
 #
 # clean
 #
 
-clean:
-	cd snmp; $(MAKE) clean
-	cd dmi2.0; $(MAKE) clean
-	cd agents; $(MAKE) clean
+clean: $(SUBDIRS)
 
 # Need a lint target for Solaris2.6 integration.
 
-lint:
-	cd snmp; $(MAKE) lint
-	cd dmi2.0; $(MAKE) lint
-	cd agents; $(MAKE) lint
+lint:  $(SUBDIRS)
 
 # We need a real make clobber with sccs clean.
 
-realclobber:
-	cd snmp; $(MAKE) realclobber
-	cd dmi2.0; $(MAKE) realclobber
-	cd agents; $(MAKE) realclobber
+realclobber: $(SUBDIRS)
 
 package:
 	cd ../../pkgdefs; pwd; $(MAKE) awk_pkginfo

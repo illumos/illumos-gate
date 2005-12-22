@@ -105,14 +105,12 @@ LINTFLAGS64 = $(LINTFLAGS) -Xarch=v9
 #
 # Cross-reference customization: include all boot-related source files.
 #
-UTSDIR=		../../../../../uts
 STANDLIBDIR=	../../../../../stand/lib
 STANDSYSDIR=	../../../../../stand/sys
 PROMDIRS=	../../../../promif
 NAMESDIRS=	../../../lib/names/sparcv9 ../../../lib/names/sparc/common
 XRDIRS +=	../../sparc/common ../../common $(STANDLIBDIR) \
 		$(STANDSYSDIR) $(PROMDIRS) $(NAMESDIRS)
-XRDEL =		sun4x_srt0* sun4x_memlist*
 XRPRUNE =	i86pc i386
 
 cscope.out tags: FRC

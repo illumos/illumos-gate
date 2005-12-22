@@ -38,7 +38,8 @@ include $(SRC)/lib/Makefile.lib
 CPPFLAGS +=	-I../../libgss -I$(SRC)/uts/common/gssapi/include \
 	    	-I$(ROOT)/usr/include/gssapi
 
-$(EXPORT_RELEASE_BUILD)include ../Makefile.export
+MAKEFILE_EXPORT = $(CLOSED)/lib/gss_mechs/mech_dummy/Makefile.export
+$(EXPORT_RELEASE_BUILD)include $(MAKEFILE_EXPORT)
 
 SRCDIR =	../mech
 LIBS =		$(DYNLIB)

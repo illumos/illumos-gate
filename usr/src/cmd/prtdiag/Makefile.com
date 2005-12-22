@@ -42,6 +42,8 @@ LINTFILES	= $(OBJS:%.o=%.ln)
 POFILE		= prtdiag_$(PLATFORM).po
 POFILES		= $(OBJS:%.o=%.po)
 
+$(CLOSED_BUILD)LIBPRTDIAG = $(CLOSED)/lib/libprtdiag
+
 .PARALLEL: $(OBJS) $(LINTFILES)
 
 %.o: %.c

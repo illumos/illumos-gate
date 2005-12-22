@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -139,25 +138,25 @@ warlock_with_fas: sd_with_fas.wlcmd $(SD_FILES) scsi_files fas_files \
 warlock_with_isp: sd_with_isp.wlcmd $(SD_FILES) scsi_files isp_files \
 	warlock_ddi.files
 	$(WARLOCK) -c ./sd_with_isp.wlcmd \
-		$(SD_FILES) ../isp/isp $(SCSI_FILES) \
+		$(SD_FILES) $(CLOSED)/uts/sparc/isp/isp $(SCSI_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_glm: sd_with_glm.wlcmd $(SD_FILES) scsi_files glm_files \
 	warlock_ddi.files
 	$(WARLOCK) -c ./sd_with_glm.wlcmd \
-		$(SD_FILES) ../glm/glm $(SCSI_FILES)  \
+		$(SD_FILES) $(CLOSED)/uts/sparc/glm/glm $(SCSI_FILES)  \
 		-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_uata: sd_with_uata.wlcmd $(SD_FILES) scsi_files uata_files \
 	warlock_ddi.files
 	$(WARLOCK) -c ./sd_with_uata.wlcmd \
-		$(SD_FILES) ../uata/*.ll $(SCSI_FILES) \
+		$(SD_FILES) $(CLOSED)/uts/sparc/uata/*.ll $(SCSI_FILES) \
 		-l ../warlock/ddi_dki_impl.ll
 
 warlock_with_mpt: sd_with_mpt.wlcmd $(SD_FILES) scsi_files mpt_files \
 	warlock_ddi.files
 	$(WARLOCK) -c ./sd_with_mpt.wlcmd \
-		$(SD_FILES) ../mpt/*.ll $(SCSI_FILES)  \
+		$(SD_FILES) $(CLOSED)/uts/sparc/mpt/*.ll $(SCSI_FILES)  \
 		-l ../warlock/ddi_dki_impl.ll
 
 scsi_files:
@@ -170,16 +169,16 @@ fas_files:
 	@cd ../fas; pwd; $(MAKE) warlock
 
 isp_files:
-	@cd ../isp; pwd; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/isp; pwd; $(MAKE) warlock
 
 glm_files:
-	@cd ../glm; pwd; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/glm; pwd; $(MAKE) warlock
 
 uata_files:
-	@cd ../uata; pwd; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/uata; pwd; $(MAKE) warlock
 
 mpt_files:
-	@cd ../mpt; pwd; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/mpt; pwd; $(MAKE) warlock
 
 warlock_ddi.files:
 	@cd ../warlock; pwd; $(MAKE) warlock

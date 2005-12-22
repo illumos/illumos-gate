@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -84,8 +83,8 @@ _msg :=			TARGET= _msg
 #	build create 'packages' also.  To build packages
 #	cd pkgdefs and do a 'make install'
 #
-all: sgs .WAIT $(SUBDIRS) pkg_all
-install: sgs .WAIT $(SUBDIRS) pkg_all .WAIT _msg
+all: closedbins sgs .WAIT $(SUBDIRS) pkg_all
+install: closedbins sgs .WAIT $(SUBDIRS) pkg_all .WAIT _msg
 	@cd pkgdefs/SUNW0on; pwd; $(MAKE) _msg
 	@rm -rf "$(ROOT)/catalog"
 
@@ -116,6 +115,18 @@ ucblibs:
 #
 rootlibs: sgs
 	@cd lib; pwd; $(MAKE) install
+
+closedbins: FRC $(ROOTDIRS)
+	@if [ "$$CLOSED_IS_PRESENT" = no ]; then \
+		if [ ! -d "$$ON_CLOSED_BINS/root_$(MACH)" ]; then \
+			$(ECHO) "Error: if closed sources are not present," \
+			    "ON_CLOSED_BINS must point to closed binaries."; \
+			exit 1; \
+		fi; \
+		$(ECHO) "Copying closed binaries from $$ON_CLOSED_BINS"; \
+		(cd $$ON_CLOSED_BINS/root_$(MACH); tar cf - .) | \
+		    (cd $(ROOT); tar xBf -); \
+	fi
 
 $(SUBDIRS) head ucbhead pkgdefs: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
@@ -186,8 +197,10 @@ check:	$(CHKHDRSUBDIRS) $(CHKMFSTSUBDIRS)
 # Cross-reference customization: skip all of the subdirectories that
 # don't contain actual source code.
 #
+$(CLOSED_BUILD)XRDIRS += ../closed
 XRPRUNE = spec pkgdefs prototypes xmod
 XRINCDIRS = uts/common head ucbhead
+$(CLOSED_BUILD)XRINCDIRS = uts/common ../closed/uts/common head ucbhead
 
 cscope.out tags: FRC
 	$(XREF) -f -x $@
@@ -199,10 +212,11 @@ FRC:
 XMOD_DELETE_FILES:sh = cat xmod/xmod_files
 
 EXPORT_SRC:
-	@cd cmd/cmd-inet/usr.lib/in.iked;  pwd; $(MAKE) EXPORT_SRC
-	@cd cmd/cmd-inet/usr.lib/ike-certutils;  pwd; $(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/in.iked;  pwd; $(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/ike-certutils;  pwd; \
+	    $(MAKE) EXPORT_SRC
 	@cd cmd/cmd-inet/usr.sbin; pwd; $(MAKE) EXPORT_SRC
-	@cd cmd/cmd-crypto/etc; pwd; $(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/cmd/cmd-crypto/etc; pwd; $(MAKE) EXPORT_SRC
 	@cd cmd/crypt;	  pwd; $(MAKE) EXPORT_SRC
 	@cd cmd/gss/gssd;         pwd; $(MAKE) EXPORT_SRC
 	@cd cmd/krb5/kadmin;  pwd; $(MAKE) EXPORT_SRC
@@ -219,9 +233,9 @@ EXPORT_SRC:
 	@cd lib/gss_mechs/mech_krb5;		pwd; $(MAKE) EXPORT_SRC
 	@cd lib/gss_mechs/mech_spnego;		pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libcrypt; pwd; $(MAKE) EXPORT_SRC
-	@cd lib/libelfsign;   pwd; $(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/lib/libelfsign;   pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libgss;   pwd; $(MAKE) EXPORT_SRC
-	@cd lib/libike;   pwd; $(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/lib/libike;   pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libnsl;	  pwd; $(MAKE) EXPORT_SRC
 	@cd lib/openssl; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/pkcs11/pkcs11_softtoken/common;  pwd; $(MAKE) EXPORT_SRC
@@ -230,11 +244,11 @@ EXPORT_SRC:
 	@cd lib/libsldap; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libsasl; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/sasl_plugins; pwd; $(MAKE) EXPORT_SRC
-	@cd lib/smartcard;	  pwd; $(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/lib/smartcard;	  pwd; $(MAKE) EXPORT_SRC
 	@cd lib/pam_modules/krb5;   pwd; $(MAKE) EXPORT_SRC
 	@cd lib/udapl; pwd; $(MAKE) EXPORT_SRC
 	@cd lib/libresolv2; pwd; $(MAKE) EXPORT_SRC
-	@cd tools/elfsign; pwd; $(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/tools/elfsign; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/crypto/io; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/des; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common/rpc; pwd; $(MAKE) EXPORT_SRC
@@ -245,26 +259,26 @@ EXPORT_SRC:
 	@cd uts/common/gssapi/mechs/krb5;	pwd; $(MAKE) EXPORT_SRC
 	@cd uts/common; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/sparc; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/sun4u/forthdebug; pwd; $(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/uts/sun4u/forthdebug; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/intel; pwd; $(MAKE) EXPORT_SRC
 	@cd uts/sun4u; pwd; $(MAKE) EXPORT_SRC
-	@cd uts/sun4u/chalupa;	pwd;	$(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/uts/sun4u/chalupa;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/cherrystone;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/daktari;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/enchilada;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/ents;	pwd;	$(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/uts/sun4u/ents;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/excalibur;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/chicago;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/boston;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/seattle;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/littleneck;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/lw2plus;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4u/lw8;	pwd;	$(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/uts/sun4u/lw2plus;	pwd;	$(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/uts/sun4u/lw8;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/mpxu;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/serengeti;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/starcat;	pwd;	$(MAKE) EXPORT_SRC
 	@cd uts/sun4u/taco;	pwd;	$(MAKE) EXPORT_SRC
-	@cd uts/sun4v/io/ncp;	pwd;	$(MAKE) EXPORT_SRC
+	@cd $(CLOSED)/uts/sun4v/io/ncp;	pwd;	$(MAKE) EXPORT_SRC
 	@cd pkgdefs;	pwd; $(MAKE) EXPORT_SRC
 	$(RM) -r $(XMOD_DELETE_FILES)
 	$(RM) Targetdirs+
@@ -284,21 +298,22 @@ EXPORT_SRC:
 	$(CHMOD) 444 Makefile.master
 
 CRYPT_SRC:
-	@cd cmd/cmd-inet/usr.lib/in.iked;  pwd; $(MAKE) CRYPT_SRC
-	@cd cmd/cmd-inet/usr.lib/ike-certutils;  pwd; $(MAKE) CRYPT_SRC
+	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/in.iked;  pwd; $(MAKE) CRYPT_SRC
+	@cd $(CLOSED)/cmd/cmd-inet/usr.lib/ike-certutils;  pwd; \
+	    $(MAKE) CRYPT_SRC
 	@cd lib/crypt_modules/bsdbf; pwd ; $(MAKE) CRYPT_SRC
 	@cd lib/gss_mechs/mech_dummy;   pwd; $(MAKE) CRYPT_SRC
 	@cd lib/gss_mechs/mech_dh/backend; pwd; $(MAKE) CRYPT_SRC
 	@cd lib/gss_mechs/mech_krb5; pwd; $(MAKE) CRYPT_SRC
 	@cd lib/gss_mechs/mech_spnego; pwd; $(MAKE) CRYPT_SRC
-	@cd lib/libelfsign;   pwd; $(MAKE) CRYPT_SRC
-	@cd lib/libike;   pwd; $(MAKE) CRYPT_SRC
+	@cd $(CLOSED)/lib/libelfsign;   pwd; $(MAKE) CRYPT_SRC
+	@cd $(CLOSED)/lib/libike;   pwd; $(MAKE) CRYPT_SRC
 	@cd lib/libnsl;	 pwd; $(MAKE) CRYPT_SRC
 	@cd lib/libsasl;	 pwd; $(MAKE) CRYPT_SRC
 	@cd lib/libresolv2;	 pwd; $(MAKE) CRYPT_SRC
 	@cd lib/sasl_plugins; pwd; $(MAKE) CRYPT_SRC
 	@cd lib/pam_modules/krb5;   pwd; $(MAKE) CRYPT_SRC
-	@cd tools/elfsign; pwd; $(MAKE) CRYPT_SRC
+	@cd $(CLOSED)/tools/elfsign; pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi;    pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi/include;    pwd; $(MAKE) CRYPT_SRC
 	@cd uts/common/gssapi/mechs/dummy;        pwd; $(MAKE) CRYPT_SRC

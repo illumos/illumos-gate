@@ -22,7 +22,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	This Makefile defines all file modules for the directory
@@ -34,11 +34,7 @@
 # Object lists
 #
 
-BSCBUS_OBJS	= bscbus.o
-BSCV_OBJS	= bscv.o
-
 #
 # Miscellaneous
 #
 INC_PATH	+= -I$(UTSBASE)/sun4u/blade
-

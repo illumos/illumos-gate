@@ -94,7 +94,7 @@ SPECMAPFILE=	$(MAPDIR)/mapfile
 CPPFLAGS += 	-I$(GSSCRED_DIR) -I$(SRC)/uts/common/gssapi/include \
 		-DHAVE_STDLIB_H
 
-$(EXPORT_RELEASE_BUILD)include ../Makefile.export
+$(EXPORT_RELEASE_BUILD)include $(CLOSED)/lib/libgss/Makefile.export
 
 .KEEP_STATE:
 

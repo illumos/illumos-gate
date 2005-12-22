@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,37 +39,7 @@
 #
 #	Section 1a: C object build rules
 #
-SBDP_IL=$(OBJS_DIR)/sbdp.il
-
-$(OBJS_DIR)/sbdp_mem.o := CC_XARCH_32 = -xarch=v8plusa
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/io/%.c $(SBDP_IL)
-	$(COMPILE.c) $(SBDP_IL) -o $@ $<
-	$(CTFCONVERT_O)
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/ml/%.s
-	$(COMPILE.s) -o $@ $<
-
-$(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/serengeti/os/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-# inline stuff
-
-IL_CPP=$(CPP) -P -DINLINE -D_ASM $(AS_INC_PATH) \
-	$(CPP_DEFS) $(ALWAYS_DEFS) $(ALL_DEFS) $(CONFIG_DEFS)
-CLEANFILES += $(SBDP_IL)
-
-$(SBDP_IL):		$(UTSBASE)/sun4u/serengeti/ml/sbdp.il.cpp
-	$(IL_CPP) $(UTSBASE)/sun4u/serengeti/ml/sbdp.il.cpp >$@
 
 #
 #	Section 1b: Lint `object' build rules
 #
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/serengeti/io/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/serengeti/ml/%.s
-	@($(LHEAD) $(LINT.s) $< $(LTAIL))
-
-$(LINTS_DIR)/%.ln:		$(UTSBASE)/sun4u/serengeti/os/%.c
-	@($(LHEAD) $(LINT.c) $< $(LTAIL))

@@ -82,24 +82,24 @@ warlock.usb:
 	@cd ../usb_mid; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usbprn; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usbser; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../usbser_edge; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/usbser_edge; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usbsksp; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usbsprl; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usbskel; rm -f *.ll *.ok; $(MAKE) warlock
 
 warlock.scsi:
-	@cd ../dad; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/dad; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../dada; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../esp; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../fas; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../glm; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../ifp; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../isp; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/glm; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/ifp; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/isp; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../sd; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../ses; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../st; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../ssd; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../uata; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/uata; rm -f *.ll *.ok; $(MAKE) warlock
 
 warlock.1394:
 	@cd ../s1394; rm -f *.ll *.ok; $(MAKE) warlock
@@ -112,24 +112,24 @@ warlock.ecpp:
 warlock.audio:
 	@cd ../audiosup; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../mixer; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../amsrc1; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/amsrc1; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../amsrc2; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audio1575; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audio810; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../audiovia823x; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/audiovia823x; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audiocs; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../audioens; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/audioens; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../audiots; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usb_ac; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usb_as; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../usb_ah; rm -f *.ll *.ok; $(MAKE) warlock
 
 warlock.smartcard:
-	@cd ../../sun4u/scmi2c; rm -f *.ll *.ok; make warlock
+	@cd $(CLOSED)/uts/sun4u/scmi2c; rm -f *.ll *.ok; $(MAKE) warlock
 
 warlock.ib:
 	@cd ../ibmf; rm -f *.ll *.ok; $(MAKE) warlock
-	@cd ../tavor; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/tavor; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../ib; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../ibtl; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../ibcm; rm -f *.ll *.ok; $(MAKE) warlock

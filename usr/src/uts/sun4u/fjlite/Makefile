@@ -21,7 +21,7 @@
 #
 #
 # uts/sun4u/fjlite/Makefile
-# Copyright 2001-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,6 +52,8 @@ clobber		:=	TARGET= clobber
 lint		:=	TARGET= lint
 lintlib		:=	TARGET= lintlib
 modlintlib	:=	TARGET= modlintlib
+modlist		:=	TARGET= modlist
+modlist		:=	NO_STATE= -K $$MODSTATE$$$$
 clean.lint	:=	TARGET= clean.lint
 check		:=	TARGET= check
 
@@ -64,7 +66,7 @@ IMPLEMENTED_PLATFORM	= SUNW,UltraAX-i2
 
 .PARALLEL:	$(FJLITE_KMODS)
 
-def all clean clobber clean.lint:	$(FJLITE_KMODS)
+def all clean clobber clean.lint modlist:	$(FJLITE_KMODS)
 
 install:	$(ROOT_FJLITE_DIR) $(USR_FJLITE_DIR) \
 		.WAIT $(FJLITE_KMODS)
@@ -72,15 +74,16 @@ install:	$(ROOT_FJLITE_DIR) $(USR_FJLITE_DIR) \
 modlintlib:	$(FJLITE_KMODS)
 
 $(FJLITE_KMODS):	FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
 
 install_h check:
 
 lint:	modlintlib .WAIT $(LINT_DEPS)
- 
+
 LINT_LIBS	= $(LINT_LIB) \
 			-L$(FJLITE_LINT_LIB_DIR) \
 			-L$(LINT_LIB_DIR) $(LINT_KMODS:%=-l%) \
+			    $(CLOSED_LINT_KMODS:%=-l%) \
 			-L$(SPARC_LIB_DIR) $(SPARC_LINTS:%=-l%)
 
 lint.platmod:   modlintlib
