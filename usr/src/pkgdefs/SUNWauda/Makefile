@@ -20,19 +20,17 @@
 # CDDL HEADER END
 #
 #
-# Copyright (c) 1999-2000 Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 include ../Makefile.com
 
 .KEEP_STATE:
 
-DATAFILES += depend
-
-all: $(FILES)
+all: $(FILES) depend
 install: all pkg
 
 include ../Makefile.targ
