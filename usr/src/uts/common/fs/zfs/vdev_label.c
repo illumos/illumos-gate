@@ -206,6 +206,10 @@ vdev_config_generate(vdev_t *vd, int getstats)
 		VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_DEVID,
 		    vd->vdev_devid) == 0);
 
+	if (vd->vdev_wholedisk != -1ULL)
+		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
+		    vd->vdev_wholedisk) == 0);
+
 	if (vd == vd->vdev_top) {
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_METASLAB_ARRAY,
 		    vd->vdev_ms_array) == 0);

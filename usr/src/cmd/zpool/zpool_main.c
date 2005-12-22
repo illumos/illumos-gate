@@ -265,6 +265,7 @@ print_vdev_tree(const char *name, nvlist_t *nv, int indent)
 {
 	nvlist_t **child;
 	uint_t c, children;
+	char *vname;
 
 	if (name != NULL)
 		(void) printf("\t%*s%s\n", indent, "", name);
@@ -273,8 +274,11 @@ print_vdev_tree(const char *name, nvlist_t *nv, int indent)
 	    &child, &children) != 0)
 		return;
 
-	for (c = 0; c < children; c++)
-		print_vdev_tree(vdev_get_name(child[c]), child[c], indent + 2);
+	for (c = 0; c < children; c++) {
+		vname = vdev_get_name(child[c]);
+		print_vdev_tree(vname, child[c], indent + 2);
+		free(vname);
+	}
 }
 
 /*
@@ -689,13 +693,15 @@ zpool_do_export(int argc, char **argv)
 static int
 max_width(nvlist_t *nv, int depth, int max)
 {
-	const char *name = vdev_get_name(nv);
+	char *name = vdev_get_name(nv);
 	nvlist_t **child;
 	uint_t c, children;
 	int ret;
 
 	if (strlen(name) + depth > max)
 		max = strlen(name) + depth;
+
+	free(name);
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) != 0)
@@ -719,7 +725,7 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 	nvlist_t **child;
 	uint_t c, children;
 	vdev_stat_t *vs;
-	char *type;
+	char *type, *vname;
 
 	verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &type) == 0);
 	if (strcmp(type, VDEV_TYPE_MISSING) == 0)
@@ -759,9 +765,12 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 	    &child, &children) != 0)
 		return;
 
-	for (c = 0; c < children; c++)
-		print_import_config(vdev_get_name(child[c]), child[c],
+	for (c = 0; c < children; c++) {
+		vname = vdev_get_name(child[c]);
+		print_import_config(vname, child[c],
 		    namewidth, depth + 2);
+		free(vname);
+	}
 }
 
 /*
@@ -1192,6 +1201,7 @@ print_vdev_stats(const char *name, nvlist_t *oldnv, nvlist_t *newnv,
 	vdev_stat_t zerovs = { 0 };
 	uint64_t tdelta;
 	double scale;
+	char *vname;
 
 	if (oldnv != NULL) {
 		verify(nvlist_lookup_uint64_array(oldnv, ZPOOL_CONFIG_STATS,
@@ -1249,9 +1259,12 @@ print_vdev_stats(const char *name, nvlist_t *oldnv, nvlist_t *newnv,
 	    &oldchild, &c) != 0)
 		return;
 
-	for (c = 0; c < children; c++)
-		print_vdev_stats(vdev_get_name(newchild[c]),
-		    oldnv ? oldchild[c] : NULL, newchild[c], cb, depth + 2);
+	for (c = 0; c < children; c++) {
+		vname = vdev_get_name(newchild[c]);
+		print_vdev_stats(vname, oldnv ? oldchild[c] : NULL,
+		    newchild[c], cb, depth + 2);
+		free(vname);
+	}
 }
 
 static int
@@ -2151,6 +2164,7 @@ print_status_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 	uint_t c, children;
 	vdev_stat_t *vs;
 	char rbuf[6], wbuf[6], cbuf[6], repaired[6];
+	char *vname;
 
 	verify(nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_STATS,
 	    (uint64_t **)&vs, &c) == 0);
@@ -2199,9 +2213,12 @@ print_status_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 
 	(void) printf("\n");
 
-	for (c = 0; c < children; c++)
-		print_status_config(vdev_get_name(child[c]), child[c],
+	for (c = 0; c < children; c++) {
+		vname = vdev_get_name(child[c]);
+		print_status_config(vname, child[c],
 		    namewidth, depth + 2);
+		free(vname);
+	}
 }
 
 /*

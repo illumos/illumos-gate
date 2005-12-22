@@ -162,6 +162,7 @@ struct vdev {
 	uint64_t	vdev_psize;	/* physical device capacity	*/
 	space_map_obj_t	vdev_dtl;	/* dirty time log on-disk state	*/
 	txg_node_t	vdev_dtl_node;	/* per-txg dirty DTL linkage	*/
+	uint64_t	vdev_wholedisk;	/* true if this is a whole disk */
 	char		*vdev_path;	/* vdev path (if any)		*/
 	char		*vdev_devid;	/* vdev devid (if any)		*/
 	uint64_t	vdev_fault_arg; /* fault injection paramater	*/

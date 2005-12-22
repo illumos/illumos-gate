@@ -733,6 +733,9 @@ make_leaf_vdev(const char *arg)
 	verify(nvlist_alloc(&vdev, NV_UNIQUE_NAME, 0) == 0);
 	verify(nvlist_add_string(vdev, ZPOOL_CONFIG_PATH, path) == 0);
 	verify(nvlist_add_string(vdev, ZPOOL_CONFIG_TYPE, type) == 0);
+	if (strcmp(type, VDEV_TYPE_DISK) == 0)
+		verify(nvlist_add_uint64(vdev, ZPOOL_CONFIG_WHOLE_DISK,
+		    (uint64_t)wholedisk) == 0);
 
 	/*
 	 * For a whole disk, defer getting its devid until after labeling it.
@@ -1133,7 +1136,7 @@ make_disks(nvlist_t *nv)
 	uint_t c, children;
 	char *type, *path, *diskname;
 	char buf[MAXPATHLEN];
-	struct stat64 statbuf;
+	uint64_t wholedisk;
 	int fd;
 	int ret;
 	ddi_devid_t devid;
@@ -1154,7 +1157,8 @@ make_disks(nvlist_t *nv)
 		 */
 		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
 
-		if (!is_whole_disk(path, &statbuf))
+		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
+		    &wholedisk) != 0 || !wholedisk)
 			return (0);
 
 		diskname = strrchr(path, '/');
@@ -1187,6 +1191,14 @@ make_disks(nvlist_t *nv)
 				devid_str_free(minor);
 			devid_free(devid);
 		}
+
+		/*
+		 * Update the path to refer to the 's0' slice.  The presence of
+		 * the 'whole_disk' field indicates to the CLI that we should
+		 * chop off the slice number when displaying the device in
+		 * future output.
+		 */
+		verify(nvlist_add_string(nv, ZPOOL_CONFIG_PATH, buf) == 0);
 
 		(void) close(fd);
 

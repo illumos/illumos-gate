@@ -32,7 +32,7 @@
 #include <sys/vdev_impl.h>
 #include <sys/fs/zfs.h>
 #include <sys/zio.h>
-#include <sys/sunddi.h>
+#include <sys/sunldi.h>
 
 /*
  * Virtual device vector for disks.
@@ -68,10 +68,8 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 	 * also want to be able to survive disks being removed/recabled.
 	 * Therefore the sequence of opening devices is:
 	 *
-	 * 1. Try opening the device by path.
-	 *
-	 * 	a. First append "s0" to see if this is a whole disk
-	 * 	b. Fall back to path otherwise
+	 * 1. Try opening the device by path.  For legacy pools without the
+	 *    'whole_disk' property, attempt to fix the path by appending 's0'.
 	 *
 	 * 2. If the devid of the device matches the stored value, return
 	 *    success.
@@ -91,21 +89,28 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 	error = EINVAL;		/* presume failure */
 
 	if (vd->vdev_path != NULL) {
-		size_t len = strlen(vd->vdev_path) + 3;
-		char *buf = kmem_alloc(len, KM_SLEEP);
 		ddi_devid_t devid;
 
-		(void) snprintf(buf, len, "%ss0", vd->vdev_path);
+		if (vd->vdev_wholedisk == -1ULL) {
+			size_t len = strlen(vd->vdev_path) + 3;
+			char *buf = kmem_alloc(len, KM_SLEEP);
+			ldi_handle_t lh;
 
-		/*
-		 * Try whole disk first, then slice name.
-		 */
-		if ((error = ldi_open_by_name(buf, spa_mode, kcred,
-		    &dvd->vd_lh, zfs_li)) != 0)
-			error = ldi_open_by_name(vd->vdev_path,
-			    spa_mode, kcred, &dvd->vd_lh, zfs_li);
+			(void) snprintf(buf, len, "%ss0", vd->vdev_path);
 
-		kmem_free(buf, len);
+			if (ldi_open_by_name(buf, spa_mode, kcred,
+			    &lh, zfs_li) == 0) {
+				spa_strfree(vd->vdev_path);
+				vd->vdev_path = buf;
+				vd->vdev_wholedisk = 1ULL;
+				(void) ldi_close(lh, spa_mode, kcred);
+			} else {
+				kmem_free(buf, len);
+			}
+		}
+
+		error = ldi_open_by_name(vd->vdev_path, spa_mode, kcred,
+		    &dvd->vd_lh, zfs_li);
 
 		/*
 		 * Compare the devid to the stored value.
@@ -119,6 +124,13 @@ vdev_disk_open(vdev_t *vd, uint64_t *psize, uint64_t *ashift)
 			}
 			ddi_devid_free(devid);
 		}
+
+		/*
+		 * If we succeeded in opening the device, but 'vdev_wholedisk'
+		 * is not yet set, then this must be a slice.
+		 */
+		if (error == 0 && vd->vdev_wholedisk == -1ULL)
+			vd->vdev_wholedisk = 0;
 	}
 
 	/*

@@ -129,6 +129,7 @@ uint64_t zfs_prop_default_numeric(zfs_prop_t);
 #define	ZPOOL_CONFIG_ASIZE		"asize"
 #define	ZPOOL_CONFIG_DTL		"DTL"
 #define	ZPOOL_CONFIG_STATS		"stats"
+#define	ZPOOL_CONFIG_WHOLE_DISK		"whole_disk"
 
 #define	VDEV_TYPE_ROOT			"root"
 #define	VDEV_TYPE_MIRROR		"mirror"

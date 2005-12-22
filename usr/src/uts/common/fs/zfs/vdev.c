@@ -347,6 +347,14 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 		vd->vdev_devid = spa_strdup(vd->vdev_devid);
 
 	/*
+	 * Set the whole_disk property.  If it's not specified, leave the value
+	 * as -1.
+	 */
+	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
+	    &vd->vdev_wholedisk) != 0)
+		vd->vdev_wholedisk = -1ULL;
+
+	/*
 	 * If we're a top-level vdev, try to load the allocation parameters.
 	 */
 	if (parent && !parent->vdev_parent && alloctype == VDEV_ALLOC_LOAD) {

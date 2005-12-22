@@ -43,7 +43,7 @@ void *safe_malloc(size_t);
 char *safe_strdup(const char *);
 void no_memory(void);
 
-const char *vdev_get_name(nvlist_t *nv);
+char *vdev_get_name(nvlist_t *nv);
 
 /*
  * Virtual device functions
