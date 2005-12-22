@@ -664,6 +664,36 @@ declaration	int zonecfg_construct_rctlblk(const struct zone_rctlvaltab *, rctlbl
 version		SUNWprivate_1.1
 end
 
+function	zonecfg_notify_bind
+include		<libzonecfg.h>
+declaration 	void * zonecfg_notify_bind(int(*)(const char *, zoneid_t zid, const char *, const char *, void *), void *)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_notify_unbind		
+include		<libzonecfg.h>
+delcaration	void zonecfg_notify_unbind(void *)
+version		SUNWprivate_1.1
+end
+
+function	 zonecfg_notify_critical_enter
+include		<libzonecfg.h>
+declaration	void zonecfg_notify_critical_enter(void *);
+version		SUNWprivate_1.1
+end
+
+function 	zonecfg_notify_critical_abort
+include		<libzonecfg.h>
+declaration	void zonecfg_notify_critical_abort(void *);
+version		SUNWprivate_1.1
+end
+
+function 	zonecfg_notify_critical_exit
+include		<libzonecfg.h>
+declaration	int zonecfg_notify_critical_exit(void *);
+version		SUNWprivate_1.1
+end
+
 function	zonecfg_open_scratch
 include		<libzonecfg.h>
 declaration	FILE *zonecfg_open_scratch(const char *, boolean_t)

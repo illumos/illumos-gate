@@ -26,6 +26,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <libsysevent.h>
+#include <pthread.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <fnmatch.h>
 #include <strings.h>
@@ -39,6 +42,7 @@
 #include <sys/mntio.h>
 #include <sys/mnttab.h>
 #include <sys/types.h>
+#include <sys/nvpair.h>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -54,7 +58,11 @@
 #include <libzonecfg.h>
 #include "zonecfg_impl.h"
 
+
 #define	_PATH_TMPFILE	"/zonecfg.XXXXXX"
+#define	ZONE_CB_RETRY_COUNT		10
+#define	ZONE_EVENT_PING_SUBCLASS	"ping"
+#define	ZONE_EVENT_PING_PUBLISHER	"solaris"
 
 /* Hard-code the DTD element/attribute/entity names just once, here. */
 #define	DTD_ELEM_ATTR		(const xmlChar *) "attr"
@@ -105,6 +113,21 @@ struct zone_dochandle {
 	boolean_t	zone_dh_newzone;
 	boolean_t	zone_dh_snapshot;
 	char		zone_dh_delete_name[ZONENAME_MAX];
+};
+
+struct znotify {
+	void * zn_private;
+	evchan_t *zn_eventchan;
+	int (*zn_callback)(const  char *zonename, zoneid_t zid,
+	    const char *newstate, const char *oldstate, hrtime_t when, void *p);
+	pthread_mutex_t zn_mutex;
+	pthread_cond_t zn_cond;
+	pthread_mutex_t zn_bigmutex;
+	volatile enum {ZN_UNLOCKED, ZN_LOCKED, ZN_PING_INFLIGHT,
+	    ZN_PING_RECEIVED} zn_state;
+	char zn_subscriber_id[MAX_SUBID_LEN];
+	volatile boolean_t zn_failed;
+	int zn_failure_count;
 };
 
 char *zonecfg_root = "";
@@ -3519,6 +3542,320 @@ zonecfg_valid_rctl(const char *name, const rctlblk_t *rctlblk)
 		return (B_FALSE);
 
 	return (B_TRUE);
+}
+
+/*
+ * There is always a race condition between reading the initial copy of
+ * a zones state and its state changing.  We address this by providing
+ * zonecfg_notify_critical_enter and zonecfg_noticy_critical_exit functions.
+ * When zonecfg_critical_enter is called, sets the state field to LOCKED
+ * and aquires biglock. Biglock protects against other threads executing
+ * critical_enter and the state field protects against state changes during
+ * the critical period.
+ *
+ * If any state changes occur, zn_cb will set the failed field of the znotify
+ * structure.  This will cause the critical_exit function to re-lock the
+ * channel and return an error. Since evsnts may be delayed, the critical_exit
+ * function "flushes" the queue by putting an event on the queue and waiting for
+ * zn_cb to notify critical_exit that it received the ping event.
+ */
+static const char *
+string_get_tok(const char *in, char delim, int num)
+{
+	int i = 0;
+
+	for (; i < num; in++) {
+		if (*in == delim)
+			i++;
+		if (*in == 0)
+			return (NULL);
+	}
+	return (in);
+}
+
+static boolean_t
+is_ping(sysevent_t *ev)
+{
+	if (strcmp(sysevent_get_subclass_name(ev),
+		ZONE_EVENT_PING_SUBCLASS) == 0) {
+		return (B_TRUE);
+	} else {
+		return (B_FALSE);
+	}
+}
+
+static boolean_t
+is_my_ping(sysevent_t *ev)
+{
+	const char *sender;
+	char mypid[sizeof (pid_t) * 3 + 1];
+
+	(void) snprintf(mypid, sizeof (mypid), "%i", getpid());
+	sender = string_get_tok(sysevent_get_pub(ev), ':', 3);
+	if (sender == NULL)
+		return (B_FALSE);
+	if (strcmp(sender, mypid) != 0)
+		return (B_FALSE);
+	return (B_TRUE);
+}
+
+static int
+do_callback(struct znotify *zevtchan, sysevent_t *ev)
+{
+	nvlist_t *l;
+	int zid;
+	char *zonename;
+	char *newstate;
+	char *oldstate;
+	int ret;
+	hrtime_t when;
+
+	if (strcmp(sysevent_get_subclass_name(ev),
+	    ZONE_EVENT_STATUS_SUBCLASS) == 0) {
+
+		if (sysevent_get_attr_list(ev, &l) != 0) {
+			if (errno == ENOMEM) {
+				zevtchan->zn_failure_count++;
+				return (EAGAIN);
+			}
+			return (0);
+		}
+		ret = 0;
+
+		if ((nvlist_lookup_string(l, ZONE_CB_NAME, &zonename) == 0) &&
+		    (nvlist_lookup_string(l, ZONE_CB_NEWSTATE, &newstate)
+			== 0) &&
+		    (nvlist_lookup_string(l, ZONE_CB_OLDSTATE, &oldstate)
+			== 0) &&
+		    (nvlist_lookup_uint64(l, ZONE_CB_TIMESTAMP,
+			    (uint64_t *)&when) == 0) &&
+		    (nvlist_lookup_int32(l, ZONE_CB_ZONEID, &zid) == 0)) {
+			ret = zevtchan->zn_callback(zonename, zid, newstate,
+			    oldstate, when, zevtchan->zn_private);
+		}
+
+		zevtchan->zn_failure_count = 0;
+		nvlist_free(l);
+		return (ret);
+	} else {
+		/*
+		 * We have received an event in an unknown subclass. Ignore.
+		 */
+		zevtchan->zn_failure_count = 0;
+		return (0);
+	}
+}
+
+static int
+zn_cb(sysevent_t *ev, void *p)
+{
+	struct znotify *zevtchan = p;
+	int error;
+
+	(void) pthread_mutex_lock(&(zevtchan->zn_mutex));
+
+	if (is_ping(ev) && !is_my_ping(ev)) {
+		(void) pthread_mutex_unlock((&zevtchan->zn_mutex));
+		return (0);
+	}
+
+	if (zevtchan->zn_state == ZN_LOCKED) {
+		assert(!is_ping(ev));
+		zevtchan->zn_failed = B_TRUE;
+		(void) pthread_mutex_unlock(&(zevtchan->zn_mutex));
+		return (0);
+	}
+
+	if (zevtchan->zn_state == ZN_PING_INFLIGHT) {
+		if (is_ping(ev)) {
+			zevtchan->zn_state = ZN_PING_RECEIVED;
+			(void) pthread_cond_signal(&(zevtchan->zn_cond));
+			(void) pthread_mutex_unlock(&(zevtchan->zn_mutex));
+			return (0);
+		} else {
+			zevtchan->zn_failed = B_TRUE;
+			(void) pthread_mutex_unlock(&(zevtchan->zn_mutex));
+			return (0);
+		}
+	}
+
+	if (zevtchan->zn_state == ZN_UNLOCKED) {
+
+		error = do_callback(zevtchan, ev);
+		(void) pthread_mutex_unlock(&(zevtchan->zn_mutex));
+		/*
+		 * Every ENOMEM failure causes do_callback to increment
+		 * zn_failure_count and every success causes it to
+		 * set zn_failure_count to zero.  If we got EAGAIN,
+		 * we will sleep for zn_failure_count seconds and return
+		 * EAGAIN to gpec to try again.
+		 *
+		 * After 55 seconds, or 10 try's we give up and drop the
+		 * event.
+		 */
+		if (error == EAGAIN) {
+			if (zevtchan->zn_failure_count > ZONE_CB_RETRY_COUNT) {
+				return (0);
+			}
+			(void) sleep(zevtchan->zn_failure_count);
+		}
+		return (error);
+	}
+
+	if (zevtchan->zn_state == ZN_PING_RECEIVED) {
+		(void) pthread_mutex_unlock(&(zevtchan->zn_mutex));
+		return (0);
+	}
+
+	abort();
+	return (0);
+}
+
+void
+zonecfg_notify_critical_enter(void *h)
+{
+	struct znotify *zevtchan = h;
+
+	(void) pthread_mutex_lock(&(zevtchan->zn_bigmutex));
+	zevtchan->zn_state = ZN_LOCKED;
+}
+
+int
+zonecfg_notify_critical_exit(void * h)
+{
+
+	struct znotify *zevtchan = h;
+
+	if (zevtchan->zn_state == ZN_UNLOCKED)
+		return (0);
+
+	(void) pthread_mutex_lock(&(zevtchan->zn_mutex));
+	zevtchan->zn_state = ZN_PING_INFLIGHT;
+
+	sysevent_evc_publish(zevtchan->zn_eventchan, ZONE_EVENT_STATUS_CLASS,
+	    ZONE_EVENT_PING_SUBCLASS, ZONE_EVENT_PING_PUBLISHER,
+	    zevtchan->zn_subscriber_id, NULL, EVCH_SLEEP);
+
+	while (zevtchan->zn_state != ZN_PING_RECEIVED) {
+		(void) pthread_cond_wait(&(zevtchan->zn_cond),
+		    &(zevtchan->zn_mutex));
+	}
+
+	if (zevtchan->zn_failed == B_TRUE) {
+		zevtchan->zn_state = ZN_LOCKED;
+		zevtchan->zn_failed = B_FALSE;
+		(void) pthread_mutex_unlock(&(zevtchan->zn_mutex));
+		return (1);
+	}
+
+	zevtchan->zn_state = ZN_UNLOCKED;
+	(void) pthread_mutex_unlock(&(zevtchan->zn_mutex));
+	(void) pthread_mutex_unlock(&(zevtchan->zn_bigmutex));
+	return (0);
+}
+
+void
+zonecfg_notify_critical_abort(void *h)
+{
+	struct znotify *zevtchan = h;
+
+	zevtchan->zn_state = ZN_UNLOCKED;
+	zevtchan->zn_failed = B_FALSE;
+	/*
+	 * Don't do anything about zn_lock. If it is held, it could only be
+	 * held by zn_cb and it will be unlocked soon.
+	 */
+	(void) pthread_mutex_unlock(&(zevtchan->zn_bigmutex));
+}
+
+void *
+zonecfg_notify_bind(int(*func)(const char *zonename, zoneid_t zid,
+    const char *newstate, const char *oldstate, hrtime_t when, void *p),
+    void *p)
+{
+	struct znotify *zevtchan;
+	int i = 1;
+	int r;
+
+	zevtchan = malloc(sizeof (struct znotify));
+
+	if (zevtchan == NULL)
+		return (NULL);
+
+	zevtchan->zn_private = p;
+	zevtchan->zn_callback = func;
+	zevtchan->zn_state = ZN_UNLOCKED;
+	zevtchan->zn_failed = B_FALSE;
+
+	if (pthread_mutex_init(&(zevtchan->zn_mutex), NULL))
+		goto out2;
+	if (pthread_cond_init(&(zevtchan->zn_cond), NULL)) {
+		(void) pthread_mutex_destroy(&(zevtchan->zn_mutex));
+		goto out2;
+	}
+	if (pthread_mutex_init(&(zevtchan->zn_bigmutex), NULL)) {
+		(void) pthread_mutex_destroy(&(zevtchan->zn_mutex));
+		(void) pthread_cond_destroy(&(zevtchan->zn_cond));
+		goto out2;
+	}
+
+	if (sysevent_evc_bind(ZONE_EVENT_CHANNEL, &(zevtchan->zn_eventchan),
+		0) != 0)
+		goto out2;
+
+	do {
+		/*
+		 * At 4 digits the subscriber ID gets too long and we have
+		 * no chance of successfully registering.
+		 */
+		if (i > 999)
+			goto out;
+
+		(void) sprintf(zevtchan->zn_subscriber_id, "zone_%li_%i",
+		    getpid() % 999999l, i);
+
+		r = sysevent_evc_subscribe(zevtchan->zn_eventchan,
+		    zevtchan->zn_subscriber_id, ZONE_EVENT_STATUS_CLASS, zn_cb,
+		    zevtchan, 0);
+
+		i++;
+
+	} while (r);
+
+	return (zevtchan);
+out:
+	sysevent_evc_unbind(zevtchan->zn_eventchan);
+	(void) pthread_mutex_destroy(&zevtchan->zn_mutex);
+	(void) pthread_cond_destroy(&zevtchan->zn_cond);
+	(void) pthread_mutex_destroy(&(zevtchan->zn_bigmutex));
+out2:
+	free(zevtchan);
+
+	return (NULL);
+}
+
+void
+zonecfg_notify_unbind(void *handle)
+{
+
+	int ret;
+
+	sysevent_evc_unbind(((struct znotify *)handle)->zn_eventchan);
+	/*
+	 * Check that all evc threads have gone away. This should be
+	 * enforced by sysevent_evc_unbind.
+	 */
+	ret = pthread_mutex_trylock(&((struct znotify *)handle)->zn_mutex);
+
+	if (ret)
+		abort();
+
+	(void) pthread_mutex_unlock(&((struct znotify *)handle)->zn_mutex);
+	(void) pthread_mutex_destroy(&((struct znotify *)handle)->zn_mutex);
+	(void) pthread_cond_destroy(&((struct znotify *)handle)->zn_cond);
+	(void) pthread_mutex_destroy(&((struct znotify *)handle)->zn_bigmutex);
+
+	free(handle);
 }
 
 static int

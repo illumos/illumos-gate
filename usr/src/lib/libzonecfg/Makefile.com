@@ -34,7 +34,7 @@ include ../../Makefile.lib
 
 LIBS =		$(DYNLIB) $(LINTLIB)
 LDLIBS +=	-lc -lsocket -lnsl -luuid
-$(DYNLIB) :=	LDLIBS += -lxml2
+$(DYNLIB) :=	LDLIBS += -lxml2 -lnvpair -lsysevent
 CPPFLAGS +=	-I/usr/include/libxml2 -I$(SRCDIR) -D_REENTRANT
 $(LINTLIB) := SRCS=	$(SRCDIR)/$(LINTSRC)
 

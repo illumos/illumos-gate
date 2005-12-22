@@ -194,6 +194,7 @@
 #include <sys/pathname.h>
 #include <sys/proc.h>
 #include <sys/project.h>
+#include <sys/sysevent.h>
 #include <sys/task.h>
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -286,6 +287,27 @@ static kmutex_t zone_deathrow_lock;
 
 /* number of zones is limited by virtual interface limit in IP */
 uint_t maxzones = 8192;
+
+/* Event channel to sent zone state change notifications */
+evchan_t *zone_event_chan;
+
+/*
+ * This table holds the mapping from kernel zone states to
+ * states visible in the state notification API.
+ * The idea is that we only expose "obvious" states and
+ * do not expose states which are just implementation details.
+ */
+const char  *zone_status_table[] = {
+	ZONE_EVENT_UNINITIALIZED,	/* uninitialized */
+	ZONE_EVENT_READY,		/* ready */
+	ZONE_EVENT_READY,		/* booting */
+	ZONE_EVENT_RUNNING,		/* running */
+	ZONE_EVENT_SHUTTING_DOWN,	/* shutting_down */
+	ZONE_EVENT_SHUTTING_DOWN,	/* empty */
+	ZONE_EVENT_SHUTTING_DOWN,	/* down */
+	ZONE_EVENT_SHUTTING_DOWN,	/* dying */
+	ZONE_EVENT_UNINITIALIZED,	/* dead */
+};
 
 /*
  * This isn't static so lint doesn't complain.
@@ -986,6 +1008,7 @@ zone_init(void)
 	rctl_set_t *set;
 	rctl_alloc_gp_t *gp;
 	rctl_entity_p_t e;
+	int res;
 
 	ASSERT(curproc == &p0);
 
@@ -1064,6 +1087,15 @@ zone_init(void)
 	 * will be set when the root filesystem is mounted).
 	 */
 	global_zone = &zone0;
+
+	/*
+	 * Setup an event channel to send zone status change notifications on
+	 */
+	res = sysevent_evc_bind(ZONE_EVENT_CHANNEL, &zone_event_chan,
+	    EVCH_CREAT);
+
+	if (res)
+		panic("Sysevent_evc_bind failed during zone setup.\n");
 }
 
 static void
@@ -1120,10 +1152,32 @@ zone_free(zone_t *zone)
 static void
 zone_status_set(zone_t *zone, zone_status_t status)
 {
+
+	nvlist_t *nvl = NULL;
 	ASSERT(MUTEX_HELD(&zone_status_lock));
 	ASSERT(status > ZONE_MIN_STATE && status <= ZONE_MAX_STATE &&
 	    status >= zone_status_get(zone));
+
+	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, KM_SLEEP) ||
+	    nvlist_add_string(nvl, ZONE_CB_NAME, zone->zone_name) ||
+	    nvlist_add_string(nvl, ZONE_CB_NEWSTATE,
+		zone_status_table[status]) ||
+	    nvlist_add_string(nvl, ZONE_CB_OLDSTATE,
+		zone_status_table[zone->zone_status]) ||
+	    nvlist_add_int32(nvl, ZONE_CB_ZONEID, zone->zone_id) ||
+	    nvlist_add_uint64(nvl, ZONE_CB_TIMESTAMP, (uint64_t)gethrtime()) ||
+	    sysevent_evc_publish(zone_event_chan, ZONE_EVENT_STATUS_CLASS,
+		ZONE_EVENT_STATUS_SUBCLASS,
+		"sun.com", "kernel", nvl, EVCH_SLEEP)) {
+#ifdef DEBUG
+		(void) printf(
+		    "Failed to allocate and send zone state change event.\n");
+#endif
+	}
+	nvlist_free(nvl);
+
 	zone->zone_status = status;
+
 	cv_broadcast(&zone->zone_cv);
 }
 

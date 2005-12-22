@@ -77,6 +77,21 @@ extern "C" {
 #define	ZONE_ATTR_POOLID	6
 #define	ZONE_ATTR_INITPID	7
 
+#define	ZONE_EVENT_CHANNEL	"com.sun:zones:status"
+#define	ZONE_EVENT_STATUS_CLASS	"status"
+#define	ZONE_EVENT_STATUS_SUBCLASS	"change"
+
+#define	ZONE_EVENT_UNINITIALIZED	"uninitialized"
+#define	ZONE_EVENT_READY		"ready"
+#define	ZONE_EVENT_RUNNING		"running"
+#define	ZONE_EVENT_SHUTTING_DOWN	"shutting_down"
+
+#define	ZONE_CB_NAME		"zonename"
+#define	ZONE_CB_NEWSTATE	"newstate"
+#define	ZONE_CB_OLDSTATE	"oldstate"
+#define	ZONE_CB_TIMESTAMP	"when"
+#define	ZONE_CB_ZONEID		"zoneid"
+
 #ifdef _SYSCALL32
 typedef struct {
 	caddr32_t zone_name;
