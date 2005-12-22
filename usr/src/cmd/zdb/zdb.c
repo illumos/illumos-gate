@@ -1135,7 +1135,7 @@ dump_label(const char *dev)
 	uint64_t psize;
 	int l;
 
-	if ((fd = open(dev, O_RDONLY)) < 0) {
+	if ((fd = open64(dev, O_RDONLY)) < 0) {
 		(void) printf("cannot open '%s': %s\n", dev, strerror(errno));
 		exit(1);
 	}
@@ -1157,7 +1157,7 @@ dump_label(const char *dev)
 		(void) printf("LABEL %d\n", l);
 		(void) printf("--------------------------------------------\n");
 
-		if (pread(fd, &label, sizeof (label),
+		if (pread64(fd, &label, sizeof (label),
 		    vdev_label_offset(psize, l, 0)) != sizeof (label)) {
 			(void) printf("failed to read label %d\n", l);
 			continue;
