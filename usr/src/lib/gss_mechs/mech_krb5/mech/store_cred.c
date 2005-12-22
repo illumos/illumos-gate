@@ -123,7 +123,7 @@ OM_uint32 default_cred;
 gss_OID_set *elements_stored;
 gss_cred_usage_t *cred_usage_stored;
 {
-	OM_uint32 maj, min;
+	OM_uint32 maj, maj2, min;
 	krb5_context ctx = (krb5_context)ct;
 	krb5_gss_cred_id_t cred = (krb5_gss_cred_id_t)input_cred;
 	krb5_gss_cred_id_t cur_cred = (krb5_gss_cred_id_t)GSS_C_NO_CREDENTIAL;
@@ -132,7 +132,6 @@ gss_cred_usage_t *cred_usage_stored;
 	OM_uint32 cur_time_rec;			/* lifetime of current cred */
 	gss_cred_usage_t in_usage;		/* usage of input cred */
 	gss_name_t in_name = GSS_C_NO_NAME;	/* name of input cred */
-	gss_name_t cur_name = GSS_C_NO_NAME;	/* name of current cred */
 
 	if (input_cred == GSS_C_NO_CREDENTIAL)
 		return (GSS_S_CALL_INACCESSIBLE_READ);
@@ -200,24 +199,18 @@ gss_cred_usage_t *cred_usage_stored;
 		if (GSS_ERROR(maj))
 			goto cleanup;
 	}
-	maj = krb5_gss_acquire_cred_no_lock(ctx, &min,
-			(default_cred) ?  GSS_C_NO_NAME : in_name,
-			0, desired_mechs, cred_usage,
-			(gss_cred_id_t *)&cur_cred, NULL, &cur_time_rec);
-	if (maj == GSS_S_COMPLETE) {
-		maj = krb5_gss_inquire_cred_no_lock(ctx, minor_status,
-				(gss_cred_id_t)cur_cred, &cur_name,
-				NULL, NULL, NULL);
-		if (GSS_ERROR(maj))
-			goto cleanup;
-	}
 
 	/*
 	 * Handle overwrite_cred option.  If overwrite_cred == FALSE
 	 * then we must be careful not to overwrite an existing
-	 * credential for the same name.
+	 * unexpired credential.
 	 */
-	if (cur_cred == (krb5_gss_cred_id_t)GSS_C_NO_CREDENTIAL)
+	maj2 = krb5_gss_acquire_cred_no_lock(ctx, &min,
+			(default_cred) ?  GSS_C_NO_NAME : in_name,
+			0, desired_mechs, cred_usage,
+			(gss_cred_id_t *)&cur_cred, NULL, &cur_time_rec);
+
+	if (GSS_ERROR(maj2))
 		overwrite_cred = 1; /* nothing to overwrite */
 
 	if (cur_time_rec > 0 && !overwrite_cred) {
@@ -256,8 +249,6 @@ cleanup:
 				    (gss_cred_id_t *)&cur_cred);
 	if (in_name != GSS_C_NO_NAME)
 		(void) krb5_gss_release_name_no_lock(ctx, &min, &in_name);
-	if (cur_name != GSS_C_NO_NAME)
-		(void) krb5_gss_release_name_no_lock(ctx, &min, &cur_name);
 
 	return (maj);
 }
