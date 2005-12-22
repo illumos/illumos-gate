@@ -1044,9 +1044,14 @@ fi
 # a couple hours (or more) to find out.
 #
 if [[ "$CLOSED_IS_PRESENT" = no && ! -d "$ON_CLOSED_BINS" ]]; then
-	echo "If the closed sources are not present, ON_CLOSED_BINS"
-	echo "must point to the closed binaries tree."
-	exit 1
+	#
+	# If it's an old (pre-split) tree, don't complain.
+	#
+	if grep CLOSED_BUILD $SRC/Makefile.master > /dev/null; then
+		echo "If the closed sources are not present, ON_CLOSED_BINS"
+		echo "must point to the closed binaries tree."
+		exit 1
+	fi
 fi
 
 #
