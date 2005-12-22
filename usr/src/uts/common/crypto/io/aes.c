@@ -1194,19 +1194,29 @@ aes_common_init_ctx(aes_ctx_t *aes_ctx, crypto_spi_ctx_template_t *template,
 			uint8_t *iv8;
 			uint8_t *p8;
 
-			pp = (CK_AES_CTR_PARAMS *)mechanism->cm_param;
-			iv8 = (uint8_t *)&aes_ctx->ac_iv;
-			p8 = (uint8_t *)&pp->cb[0];
-
 			/* XXX what to do about miscdata */
+			pp = (CK_AES_CTR_PARAMS *)mechanism->cm_param;
 			count = pp->ulCounterBits;
 			if (count == 0 || count > 64) {
 				return (CRYPTO_MECHANISM_PARAM_INVALID);
 			}
 			while (count-- > 0)
 				mask |= (1ULL << count);
-
+#ifdef _LITTLE_ENDIAN
+			p8 = (uint8_t *)&mask;
+			mask = (((uint64_t)p8[0] << 56) |
+			    ((uint64_t)p8[1] << 48) |
+			    ((uint64_t)p8[2] << 40) |
+			    ((uint64_t)p8[3] << 32) |
+			    ((uint64_t)p8[4] << 24) |
+			    ((uint64_t)p8[5] << 16) |
+			    ((uint64_t)p8[6] << 8) |
+			    (uint64_t)p8[7]);
+#endif
 			aes_ctx->ac_counter_mask = mask;
+
+			iv8 = (uint8_t *)&aes_ctx->ac_iv;
+			p8 = (uint8_t *)&pp->cb[0];
 
 			iv8[0] = p8[0];
 			iv8[1] = p8[1];

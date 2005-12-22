@@ -608,6 +608,9 @@ aes_ctr_mode_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 	uint8_t *out_data_2;
 	size_t out_data_1_len;
 	uint64_t counter;
+#ifdef _LITTLE_ENDIAN
+	uint8_t *p;
+#endif
 
 	if (length + ctx->ac_remainder_len < AES_BLOCK_LEN) {
 		/* accumulate bytes here and return */
@@ -670,7 +673,28 @@ aes_ctr_mode_contiguous_blocks(aes_ctx_t *ctx, char *data, size_t length,
 		 * to the bottom 64 bits of the counter block.
 		 */
 		counter = ctx->ac_cb[1] & ctx->ac_counter_mask;
+#ifdef _LITTLE_ENDIAN
+		p = (uint8_t *)&counter;
+		counter = (((uint64_t)p[0] << 56) |
+		    ((uint64_t)p[1] << 48) |
+		    ((uint64_t)p[2] << 40) |
+		    ((uint64_t)p[3] << 32) |
+		    ((uint64_t)p[4] << 24) |
+		    ((uint64_t)p[5] << 16) |
+		    ((uint64_t)p[6] << 8) |
+		    (uint64_t)p[7]);
+#endif
 		counter++;
+#ifdef _LITTLE_ENDIAN
+		counter = (((uint64_t)p[0] << 56) |
+		    ((uint64_t)p[1] << 48) |
+		    ((uint64_t)p[2] << 40) |
+		    ((uint64_t)p[3] << 32) |
+		    ((uint64_t)p[4] << 24) |
+		    ((uint64_t)p[5] << 16) |
+		    ((uint64_t)p[6] << 8) |
+		    (uint64_t)p[7]);
+#endif
 		counter &= ctx->ac_counter_mask;
 		ctx->ac_cb[1] =
 		    (ctx->ac_cb[1] & ~(ctx->ac_counter_mask)) | counter;
