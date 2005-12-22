@@ -19,56 +19,61 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1996-1997,1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	"reloc.h"
 
-
-#ifdef	KOBJ_DEBUG
-static const char	*rels[] = {
-	"R_386_NONE",
-	"R_386_32",
-	"R_386_PC32",
-	"R_386_GOT32",
-	"R_386_PLT32",
-	"R_386_COPY",
-	"R_386_GLOB_DAT",
-	"R_386_JMP_SLOT",
-	"R_386_RELATIVE",
-	"R_386_GOTOFF",
-	"R_386_GOTPC",
-	"R_386_32PLT",
+static const char	*rels[R_386_NUM] = {
+	"R_386_NONE",			"R_386_32",
+	"R_386_PC32",			"R_386_GOT32",
+	"R_386_PLT32",			"R_386_COPY",
+	"R_386_GLOB_DAT",		"R_386_JMP_SLOT",
+	"R_386_RELATIVE",		"R_386_GOTOFF",
+	"R_386_GOTPC",			"R_386_32PLT",
+	"R_386_TLS_GD_PLT",		"R_386_TLS_LDM_PLT",
+	"R_386_TLS_TPOFF",		"R_386_TLS_IE",
+	"R_386_TLS_GOTIE",		"R_386_TLS_LE",
+	"R_386_TLS_GD",			"R_386_TLS_LDM",
+	"R_386_16",			"R_386_PC16",
+	"R_386_8",			"R_386_PC8",
+	"R_386_UNKNOWN24",		"R_386_UNKNOWN25",
+	"R_386_UNKNOWN26",		"R_386_UNKNOWN27",
+	"R_386_UNKNOWN28",		"R_386_UNKNOWN29",
+	"R_386_UNKNOWN30",		"R_386_UNKNOWN31",
+	"R_386_TLS_LDO_32",		"R_386_UNKNOWN33",
+	"R_386_UNKNOWN34",		"R_386_TLS_DTPMOD32",
+	"R_386_TLS_DTPOFF32",		"R_386_UNKNOWN37"
 };
-#endif
 
+#if	(R_386_NUM != (R_386_UNKNOWN37 + 1))
+#error	"R_386_NUM has grown"
+#endif
 
 /*
- * This is a 'stub' of the orignal version defined in liblddbg.so
- * This stub just returns the 'int string' of the relocation in question
- * instead of converting it to it's full syntax.
+ * This is a 'stub' of the orignal version defined in liblddbg.so.  This stub
+ * returns the 'int string' of the relocation in question instead of converting
+ * the relocation to it's full syntax.
  */
 const char *
-conv_reloc_386_type_str(Word rtype)
+conv_reloc_386_type_str(uint_t type)
 {
-#ifdef	KOBJ_DEBUG
-	if (rtype < R_386_NUM)
-		return (rels[rtype]);
-	else {
-#endif
-		static char 	strbuf[32];
-		int		ndx = 31;
-		strbuf[ndx--] = '\0';
-		do {
-			strbuf[ndx--] = '0' + (rtype % 10);
-			rtype = rtype / 10;
-		} while ((ndx >= (int)0) && (rtype > (Word)0));
-		return (&strbuf[ndx + 1]);
-#ifdef	KOBJ_DEBUG
-	}
-#endif
+	static char 	strbuf[32];
+	int		ndx = 31;
+
+	if (type < R_386_NUM)
+		return (rels[type]);
+
+	strbuf[ndx--] = '\0';
+	do {
+		strbuf[ndx--] = '0' + (type % 10);
+		type = type / 10;
+	} while ((ndx >= (int)0) && (type > (Word)0));
+
+	return (&strbuf[ndx + 1]);
 }

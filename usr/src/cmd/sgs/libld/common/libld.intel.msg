@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,14 +19,18 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 @ _START_
 
 # Message file for cmd/sgs/libld - intel specific.
 
-@ MSG_REL_UNSUPSZ	"relocation error: %s: file %s: symbol %s: \
-			 offset size (%d bytes) is not supported"
 @ MSG_REL_NOREG		"relocation error: REGISTER relocation not supported \
 			 on i386 architecture"
 @ MSG_REL_BADTLSINS	"relocation error: %s: file %s: symbol %s: section %s: \

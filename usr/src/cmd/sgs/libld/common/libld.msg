@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,7 +19,13 @@
 #
 # CDDL HEADER END
 #
+
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 @ _START_
 
@@ -237,6 +240,8 @@
 @ MSG_REL_UNKNWSYM	"relocation error: %s: file %s: section %s: \
 			 attempt to relocate with respect to unknown \
 			 symbol %s: offset 0x%llx, symbol index %d"
+@ MSG_REL_UNSUPSZ	"relocation error: %s: file %s: symbol %s: \
+			 offset size (%d bytes) is not supported"
 @ MSG_REL_INVALOFFSET	"relocation error: %s: file: %s section %s: \
 			 invalid offset symbol `%s': offset 0x%llx"
 @ MSG_REL_INVALRELT	"relocation error: file %s: section %s: \

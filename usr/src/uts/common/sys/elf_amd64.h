@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -60,7 +61,12 @@ extern "C" {
 #define	R_AMD64_PC64		24
 #define	R_AMD64_GOTOFF64	25
 #define	R_AMD64_GOTPC32		26
-#define	R_AMD64_NUM		27
+#define	R_AMD64_GOT64		27	/* reserved for future expansion */
+#define	R_AMD64_GOTPCREL64	28	/* reserved for future expansion */
+#define	R_AMD64_GOTPC64		29	/* reserved for future expansion */
+#define	R_AMD64_GOTPLT64	30	/* reserved for future expansion */
+#define	R_AMD64_PLTOFF64	31	/* reserved for future expansion */
+#define	R_AMD64_NUM		32
 
 
 /*
@@ -94,6 +100,11 @@ extern "C" {
 #define	R_X86_64_PC64		R_AMD64_PC64
 #define	R_X86_64_GOTPC32	R_AMD64_GOTPC32
 #define	R_X86_64_GOTOFF64	R_AMD64_GOTOFF64
+#define	R_X86_64_GOT64		R_AMD64_GOT64
+#define	R_X86_64_GOTPCREL64	R_AMD64_GOTPCREL64
+#define	R_X86_64_GOTPC64	R_AMD64_GOTPC64
+#define	R_X86_64_GOTPLT64	R_AMD64_GOTPLT64
+#define	R_X86_64_PLTOFF64	R_AMD64_PLTOFF64
 #define	R_X86_64_NUM		R_AMD64_NUM
 
 

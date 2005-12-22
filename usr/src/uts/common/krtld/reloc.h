@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -36,6 +37,7 @@
 #include <sys/kobj_impl.h>
 #else
 #include <machdep.h>
+#include <conv.h>
 #endif /* _KERNEL */
 
 #include <relmach.h>
@@ -66,24 +68,17 @@ extern "C" {
 #define	FLG_RE_EXTOFFSET	0x00000800	/* extra offset required */
 #define	FLG_RE_REGISTER		0x00001000	/* relocation initializes */
 						/*    a REGISTER by OLO10 */
-#define	FLG_RE_MSB		0x00002000	/* merced MSB data field */
-#define	FLG_RE_LSB		0x00004000	/* merced LSB data field */
-#define	FLG_RE_ADDFIELD		0x00008000	/* add contents of field at */
-						/*    r_offset to value */
 #define	FLG_RE_NOTSUP		0x00010000	/* relocation not supported */
-#define	FLG_RE_FRMOFF		0x00020000	/* offset contains islot */
-						/*    value (IA64) */
-#define	FLG_RE_SEGREL		0x00040000	/* Segment relative */
 
-#define	FLG_RE_SECREL		0x00080000	/* Section relative */
+#define	FLG_RE_SEGREL		0x00040000	/* segment relative */
+#define	FLG_RE_SECREL		0x00080000	/* section relative */
 #define	FLG_RE_TLSINS		0x00100000	/* TLS instructino rel */
 #define	FLG_RE_TLSGD		0x00200000	/* TLS GD relocation */
 #define	FLG_RE_TLSLD		0x00400000	/* TLS LD relocation */
 #define	FLG_RE_TLSIE		0x00800000	/* TLS IE relocation */
 #define	FLG_RE_TLSLE		0x01000000	/* TLS LE relocation */
-
 #define	FLG_RE_LOCLBND		0x02000000	/* relocation must bind */
-						/*  locally */
+						/*    locally */
 
 /*
  * Macros for testing relocation table flags
@@ -139,122 +134,98 @@ extern	const Rel_entry		reloc_table[];
 /*
  * Functions.
  */
-#if defined(__i386) || defined(__amd64)
-extern	int	do_reloc(unsigned char, unsigned char *, Xword *,
-			const char *, const char *);
-#elif defined(__sparc)
-extern	int	do_reloc(unsigned char, unsigned char *, Xword *,
-			const char *, const char *);
-#endif
-
+extern	int	do_reloc(uchar_t, uchar_t *, Xword *, const char *,
+		    const char *);
 
 /*
- * NOTE - this CONVRELOC macro is only used
- * in the REL_ERR_NOFIT() macro below.  For Intel
- * this macro is only referenced from the amd64 side - it's
- * not relevant for i386.  So - we just define AMD64 for i386
- * and sparc is sparc.
+ * Provide a macro to select the appropriate convension routine for this
+ * architecture.
  */
-#if defined(__amd64) || defined(__i386)
-#define	CONVRELOC conv_reloc_amd64_type_str
+#if defined(__amd64)
+#define	CONV_RELOC_TYPE		conv_reloc_amd64_type_str
+#elif defined(__i386)
+#define	CONV_RELOC_TYPE		conv_reloc_386_type_str
 #elif defined(__sparc)
-#define	CONVRELOC   conv_reloc_SPARC_type_str
+#define	CONV_RELOC_TYPE		conv_reloc_SPARC_type_str
 #else
 #error platform not defined!
 #endif
 
+
 #if defined(_KERNEL)
 /*
- * These are macro's that are only needed for krtld.  Many of these
- * are already defined in the sgs/include files referenced by
- * ld and rtld
+ * These are macro's that are only needed for krtld.  Many of these are already
+ * defined in the sgs/include files referenced by ld and rtld
  */
-
 #define	S_MASK(n)	((1l << (n)) - 1l)
 #define	S_INRANGE(v, n)	(((-(1l << (n)) - 1l) < (v)) && ((v) < (1l << (n))))
 
 /*
- * This converts the sgs eprintf() routine into the _printf()
- * as used by krtld.
+ * Message strings used by doreloc().
  */
-#define	eprintf		_kobj_printf
-#define	ERR_FATAL	ops
-
-/*
- * Message strings used by doreloc()
- */
-#define	MSG_ORIG(x)		x
-#define	MSG_INTL(x)		x
-
 #define	MSG_STR_UNKNOWN		"(unknown)"
-#define	MSG_REL_UNSUPSZ		"relocation error: %s: file %s: symbol %s: " \
-				"offset size (%d bytes) is not supported"
-#define	MSG_REL_ERR_STR		"relocation error: %s:"
-#define	MSG_REL_ERR_WITH_FILE	"relocation error: file %s: "
-#define	MSG_REL_ERR_FILE	" file %s: "
-#define	MSG_REL_ERR_SYM		" symbol %s: "
-#define	MSG_REL_ERR_VALUE	" value 0x%llx"
-#define	MSG_REL_ERR_OFF		" offset 0x%llx\n"
-#define	MSG_REL_UNIMPL		" unimplemented relocation type: %d"
-#define	MSG_REL_NONALIGN	" offset 0x%llx is non-aligned\n"
-#define	MSG_REL_UNNOBITS	" unsupported number of bits: %d"
-#define	MSG_REL_NOFIT		" value 0x%llx does not fit\n"
-#define	MSG_REL_LOSEBITS	" loses %d bits at"
 
-extern const char *conv_reloc_SPARC_type_str(Word rtype);
-extern const char *conv_reloc_386_type_str(Word rtype);
-extern const char *conv_reloc_amd64_type_str(Word rtype);
+#define	MSG_REL_PREGEN		"relocation error: %s: "
+#define	MSG_REL_PREFIL		"relocation error: file %s: "
+#define	MSG_REL_FILE		"file %s: "
+#define	MSG_REL_SYM		"symbol %s: "
+#define	MSG_REL_VALUE		"value 0x%llx "
+#define	MSG_REL_LOSEBITS	"loses %d bits at "
+
+#define	MSG_REL_UNIMPL		"unimplemented relocation type: %d"
+#define	MSG_REL_UNSUPSZ		"offset size (%d bytes) is not supported"
+#define	MSG_REL_NONALIGN	"offset 0x%llx is non-aligned"
+#define	MSG_REL_UNNOBITS	"unsupported number of bits: %d"
+#define	MSG_REL_OFFSET		"offset 0x%llx"
+#define	MSG_REL_NOFIT		"value 0x%llx does not fit"
+
+extern const char	 *conv_reloc_386_type_str(uint_t);
+extern const char	 *conv_reloc_amd64_type_str(uint_t);
+extern const char	 *conv_reloc_SPARC_type_str(uint_t);
 
 /*
- * Note:  Related to bug 4128755, dlerror() only keeps track
- * of a single error string, and therefore must have errors
- * reported through a single eprintf() call.  The kernel's
- * printf is somewhat more limited, and must receive messages
- * with only one arguement to the format string.  The following
- * macros are to straighted all this out because krtld and
- * rtld share do_reloc().
+ * Note:  Related to bug 4128755, dlerror() only keeps track of a single error
+ * string, and therefore must have errors reported through a single eprintf()
+ * call.  The kernel's _kobj_printf is somewhat more limited, and must receive
+ * messages with only one arguement to the format string.  The following macros
+ * are to straighted all this out because krtld and rtld share do_reloc().
  */
 #define	REL_ERR_UNIMPL(file, sym, rtype) \
-	eprintf(ERR_FATAL, MSG_REL_ERR_WITH_FILE, (file)); \
-	eprintf(ERR_FATAL, MSG_REL_ERR_SYM, \
-	    ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
-	eprintf(ERR_FATAL,  MSG_REL_UNIMPL, \
-	    (int)(rtype))
+	_kobj_printf(ops, MSG_REL_PREFIL, (file)); \
+	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
+	_kobj_printf(ops, MSG_REL_UNIMPL, (int)(rtype))
+
+#define	REL_ERR_UNSUPSZ(file, sym, rtype, size) \
+	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
+	_kobj_printf(ops, MSG_REL_FILE, (file)); \
+	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
+	_kobj_printf(ops, MSG_REL_UNSUPSZ, (int)(size))
 
 #define	REL_ERR_NONALIGN(file, sym, rtype, off) \
-	eprintf(ERR_FATAL, MSG_REL_ERR_STR, \
-	    conv_reloc_SPARC_type_str((rtype))); \
-	eprintf(ERR_FATAL, MSG_REL_ERR_FILE, (file)); \
-	eprintf(ERR_FATAL, MSG_REL_ERR_SYM, \
-	    ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
-	eprintf(ERR_FATAL, MSG_REL_NONALIGN, \
-	    EC_OFF((off)))
+	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
+	_kobj_printf(ops, MSG_REL_FILE, (file)); \
+	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
+	_kobj_printf(ops, MSG_REL_NONALIGN, EC_OFF((off)))
 
 #define	REL_ERR_UNNOBITS(file, sym, rtype, nbits) \
-	eprintf(ERR_FATAL, MSG_REL_ERR_STR, \
-	    conv_reloc_SPARC_type_str((rtype))); \
-	eprintf(ERR_FATAL, MSG_REL_ERR_FILE, (file)); \
-	eprintf(ERR_FATAL, MSG_REL_ERR_SYM, \
-	    ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
-	eprintf(ERR_FATAL, MSG_REL_UNNOBITS, (nbits))
+	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
+	_kobj_printf(ops, MSG_REL_FILE, (file)); \
+	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
+	_kobj_printf(ops, MSG_REL_UNNOBITS, (nbits))
 
 #define	REL_ERR_LOSEBITS(file, sym, rtype, uvalue, nbits, off) \
-	eprintf(ERR_FATAL,  MSG_REL_ERR_STR, \
-	    conv_reloc_SPARC_type_str((rtype))); \
-	eprintf(ERR_FATAL,  MSG_REL_ERR_FILE, (file)); \
-	eprintf(ERR_FATAL,  MSG_REL_ERR_SYM, \
-	    ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
-	eprintf(ERR_FATAL,  MSG_REL_ERR_VALUE, EC_XWORD((uvalue))); \
-	eprintf(ERR_FATAL,  MSG_REL_LOSEBITS, (nbits)); \
-	eprintf(ERR_FATAL,  MSG_REL_ERR_OFF, EC_ADDR((off)))
+	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
+	_kobj_printf(ops, MSG_REL_FILE, (file)); \
+	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
+	_kobj_printf(ops, MSG_REL_VALUE, EC_XWORD((uvalue))); \
+	_kobj_printf(ops, MSG_REL_LOSEBITS, (int)(nbits)); \
+	_kobj_printf(ops, MSG_REL_OFFSET, EC_ADDR((off)))
 
 #define	REL_ERR_NOFIT(file, sym, rtype, uvalue) \
-	eprintf(ERR_FATAL, MSG_REL_ERR_STR, \
-	    CONVRELOC((rtype))); \
-	eprintf(ERR_FATAL, MSG_REL_ERR_FILE, (file)); \
-	eprintf(ERR_FATAL, MSG_REL_ERR_SYM, \
-	    ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
-	eprintf(ERR_FATAL, MSG_REL_NOFIT, EC_XWORD((uvalue)))
+	_kobj_printf(ops, MSG_REL_PREGEN, CONV_RELOC_TYPE((rtype))); \
+	_kobj_printf(ops, MSG_REL_FILE, (file)); \
+	_kobj_printf(ops, MSG_REL_SYM, ((sym) ? (sym) : MSG_STR_UNKNOWN)); \
+	_kobj_printf(ops, MSG_REL_NOFIT, EC_XWORD((uvalue)))
 
 
 #else	/* !_KERNEL */
@@ -262,30 +233,33 @@ extern const char *conv_reloc_amd64_type_str(Word rtype);
 extern	const char *demangle(const char *);
 
 #define	REL_ERR_UNIMPL(file, sym, rtype) \
-	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNIMPL), \
-	    (file), ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
-	    (int)(rtype)))
+	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNIMPL), (file), \
+	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), (int)(rtype)))
+
+#define	REL_ERR_UNSUPSZ(file, sym, rtype, size) \
+	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSZ), \
+	    CONV_RELOC_TYPE((rtype)), (file), \
+	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), (int)(size)))
 
 #define	REL_ERR_NONALIGN(file, sym, rtype, off) \
 	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_NONALIGN), \
-	    conv_reloc_SPARC_type_str(rtype), (file), \
-	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
-	    EC_OFF((off))))
+	    CONV_RELOC_TYPE((rtype)), (file), \
+	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), EC_OFF((off))))
 
 #define	REL_ERR_UNNOBITS(file, sym, rtype, nbits) \
 	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNNOBITS), \
-	    conv_reloc_SPARC_type_str(rtype), (file), \
+	    CONV_RELOC_TYPE((rtype)), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), (nbits)))
 
 #define	REL_ERR_LOSEBITS(file, sym, rtype, uvalue, nbits, off) \
 	(eprintf(ERR_FATAL,  MSG_INTL(MSG_REL_LOSEBITS), \
-	    conv_reloc_SPARC_type_str((rtype)), (file), \
+	    CONV_RELOC_TYPE((rtype)), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
 	    EC_XWORD((uvalue)), (nbits), EC_ADDR((off))))
 
 #define	REL_ERR_NOFIT(file, sym, rtype, uvalue) \
 	(eprintf(ERR_FATAL, MSG_INTL(MSG_REL_NOFIT), \
-	    CONVRELOC((rtype)), (file), \
+	    CONV_RELOC_TYPE((rtype)), (file), \
 	    ((sym) ? demangle(sym) : MSG_INTL(MSG_STR_UNKNOWN)), \
 	    EC_XWORD((uvalue))))
 

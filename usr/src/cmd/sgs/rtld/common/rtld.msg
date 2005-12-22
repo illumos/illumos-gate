@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,7 +19,13 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 @ _START_
 
@@ -96,6 +99,8 @@
 @ MSG_REL_PLTREF	"relocation error: %s: unidentifiable procedure \
 			 reference: link-map 0x%llx, offset 0x%llx, \
 			 called from 0x%llx"
+@ MSG_REL_UNSUPSZ	"relocation error: %s: file %s: symbol %s: \
+			 offset size (%d bytes) is not supported"
 
 
 # System call messages.

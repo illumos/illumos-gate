@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,56 +35,37 @@
 #include	"relocate_amd64_msg.h"
 
 /*
- * Intel386 specific relocations.
+ * AMD64 specific relocations.
  */
-static const Msg rels[] = {
-	MSG_R_AMD64_NONE,
-	MSG_R_AMD64_64,
-	MSG_R_AMD64_PC32,
-	MSG_R_AMD64_GOT32,
-	MSG_R_AMD64_PLT32,
-	MSG_R_AMD64_COPY,
-	MSG_R_AMD64_GLOB_DATA,
-	MSG_R_AMD64_JUMP_SLOT,
-	MSG_R_AMD64_RELATIVE,
-	MSG_R_AMD64_GOTPCREL,
-	MSG_R_AMD64_32,
-	MSG_R_AMD64_32S,
-	MSG_R_AMD64_16,
-	MSG_R_AMD64_PC16,
-	MSG_R_AMD64_8,
-	MSG_R_AMD64_PC8,
-	MSG_R_AMD64_DTPMOD64,
-	MSG_R_AMD64_DTPOFF64,
-	MSG_R_AMD64_TPOFF64,
-	MSG_R_AMD64_TLSGD,
-	MSG_R_AMD64_TLSLD,
-	MSG_R_AMD64_DTPOFF32,
-	MSG_R_AMD64_GOTTPOFF,
-	MSG_R_AMD64_TPOFF32,
-	MSG_R_AMD64_PC64,
-	MSG_R_AMD64_GOTOFF64,
-	MSG_R_AMD64_GOTPC32
+static const Msg rels[R_AMD64_NUM] = {
+	MSG_R_AMD64_NONE,		MSG_R_AMD64_64,
+	MSG_R_AMD64_PC32,		MSG_R_AMD64_GOT32,
+	MSG_R_AMD64_PLT32,		MSG_R_AMD64_COPY,
+	MSG_R_AMD64_GLOB_DATA,		MSG_R_AMD64_JUMP_SLOT,
+	MSG_R_AMD64_RELATIVE,		MSG_R_AMD64_GOTPCREL,
+	MSG_R_AMD64_32,			MSG_R_AMD64_32S,
+	MSG_R_AMD64_16,			MSG_R_AMD64_PC16,
+	MSG_R_AMD64_8,			MSG_R_AMD64_PC8,
+	MSG_R_AMD64_DTPMOD64,		MSG_R_AMD64_DTPOFF64,
+	MSG_R_AMD64_TPOFF64,		MSG_R_AMD64_TLSGD,
+	MSG_R_AMD64_TLSLD,		MSG_R_AMD64_DTPOFF32,
+	MSG_R_AMD64_GOTTPOFF,		MSG_R_AMD64_TPOFF32,
+	MSG_R_AMD64_PC64,		MSG_R_AMD64_GOTOFF64,
+	MSG_R_AMD64_GOTPC32,		MSG_R_AMD64_GOT64,
+	MSG_R_AMD64_GOTPCREL64,		MSG_R_AMD64_GOTPC64,
+	MSG_R_AMD64_GOTPLT64,		MSG_R_AMD64_PLTOFF64
 };
 
-const char *
-conv_reloc_amd64_type_str(uint_t rel)
-{
-	static char	string[STRSIZE] = { '\0' };
-
-	/*
-	 * In order to assure that all values included in
-	 * sys/elf_x86_64.h::R_AMD64_* are included in libconv/elfdump for
-	 * decoding - we have the below #define trap.  Each time the rels[]
-	 * table is updated, make sure the following entry is updated.
-	 */
-
-#if	(R_AMD64_NUM != (R_AMD64_GOTPC32 + 1))
+#if	(R_AMD64_NUM != (R_AMD64_PLTOFF64 + 1))
 #error	"R_AMD64_NUM has grown"
 #endif
 
-	if (rel >= R_AMD64_NUM)
-		return (conv_invalid_str(string, STRSIZE, (Lword)rel, 0));
-	else
-		return (MSG_ORIG(rels[rel]));
+const char *
+conv_reloc_amd64_type_str(uint_t type)
+{
+	static char	string[STRSIZE] = { '\0' };
+
+	if (type >= R_AMD64_NUM)
+		return (conv_invalid_str(string, STRSIZE, type, 0));
+	return (MSG_ORIG(rels[type]));
 }

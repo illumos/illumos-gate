@@ -20,11 +20,12 @@
 #
 # CDDL HEADER END
 #
-#
-# ident	"%Z%%M%	%I%	%E% SMI" 
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI" 
 #
 
 find_files "s.*" \
@@ -76,6 +77,7 @@ echo_file usr/src/uts/common/sys/Makefile
 echo_file usr/closed/uts/common/sys/Makefile
 echo_file usr/src/uts/Makefile.uts
 echo_file usr/src/uts/common/krtld/reloc.h
+echo_file usr/src/uts/common/sys/Makefile.syshdrs
 echo_file usr/src/uts/common/sys/auxv.h
 echo_file usr/src/uts/common/sys/auxv_386.h
 echo_file usr/src/uts/common/sys/auxv_SPARC.h

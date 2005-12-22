@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,14 +19,13 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-@ _START_
-
-# Message file for cmd/sgs/rtld (ld.so.1) - intel specific.
-
-@ MSG_REL_UNSUPSZ	"relocation error: %s: file %s: symbol %s: \
-			 offset size (%d bytes) is not supported"
+#
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 @ _END_
 

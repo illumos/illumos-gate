@@ -40,17 +40,16 @@
 #include	"msg.h"
 #endif
 
-
 /*
  * This table represents the current relocations that do_reloc() is able to
  * process.  The relocations below that are marked SPECIAL are relocations that
  * take special processing and shouldn't actually ever be passed to do_reloc().
  */
 const Rel_entry	reloc_table[R_SPARC_NUM] = {
-/* R_SPARC_NONE */	{0x0, 0, 0, 0, 0},
-/* R_SPARC_8 */		{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY, 1, 0, 0},
-/* R_SPARC_16 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY, 2, 0, 0},
-/* R_SPARC_32 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY, 4, 0, 0},
+/* R_SPARC_NONE */	{0x0, FLG_RE_NOTREL, 0, 0, 0},
+/* R_SPARC_8 */		{0x0, FLG_RE_VERIFY, 1, 0, 0},
+/* R_SPARC_16 */	{0x0, FLG_RE_VERIFY, 2, 0, 0},
+/* R_SPARC_32 */	{0x0, FLG_RE_VERIFY, 4, 0, 0},
 /* R_SPARC_DISP8 */	{0x0, FLG_RE_PCREL | FLG_RE_VERIFY | FLG_RE_SIGN,
 				1, 0, 0},
 /* R_SPARC_DISP16 */	{0x0, FLG_RE_PCREL | FLG_RE_VERIFY | FLG_RE_SIGN,
@@ -62,14 +61,13 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 /* R_SPARC_WDISP22 */	{0x0, FLG_RE_PCREL | FLG_RE_VERIFY | FLG_RE_SIGN,
 				4, 2, 22},
 #if	defined(_ELF64)
-/* R_SPARC_HI22 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY, 4, 10, 22},
+/* R_SPARC_HI22 */	{0x0, FLG_RE_VERIFY, 4, 10, 22},
 #else
 /* R_SPARC_HI22 */	{0x0, FLG_RE_NOTREL, 4, 10, 22},
 #endif
-/* R_SPARC_22 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY, 4, 0, 22},
-/* R_SPARC_13 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY | FLG_RE_SIGN,
-				4, 0, 13},
-/* R_SPARC_LO10 */	{0x3ff, FLG_RE_NOTREL | FLG_RE_SIGN, 4, 0, 13},
+/* R_SPARC_22 */	{0x0, FLG_RE_VERIFY, 4, 0, 22},
+/* R_SPARC_13 */	{0x0, FLG_RE_VERIFY | FLG_RE_SIGN, 4, 0, 13},
+/* R_SPARC_LO10 */	{0x3ff, FLG_RE_SIGN, 4, 0, 13},
 /* R_SPARC_GOT10 */	{0x3ff, FLG_RE_GOTADD | FLG_RE_SIGN, 4, 0, 13},
 /* R_SPARC_GOT13 */	{0x0, FLG_RE_GOTADD | FLG_RE_VERIFY | FLG_RE_SIGN,
 				4, 0, 13},
@@ -94,39 +92,31 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 #else
 /* R_SPARC_RELATIVE */	{0x0, FLG_RE_NOTREL, 4, 0, 0},
 #endif
-/* R_SPARC_UA32 */	{0x0, FLG_RE_NOTREL | FLG_RE_UNALIGN, 4, 0, 0},
+/* R_SPARC_UA32 */	{0x0, FLG_RE_UNALIGN, 4, 0, 0},
 /* R_SPARC_PLT32 */	{0x0, FLG_RE_PLTREL | FLG_RE_VERIFY |
 				FLG_RE_ADDRELATIVE, 4, 0, 0},
 /* R_SPARC_HIPLT22 */	{0x0, FLG_RE_PLTREL, 4, 10, 22},
 /* R_SPARC_LOPLT10 */	{0x3ff, FLG_RE_PLTREL, 4, 0, 13},
 /* R_SPARC_PCPLT32 */	{0x0, FLG_RE_PLTREL | FLG_RE_PCREL | FLG_RE_VERIFY,
 				4, 0, 0},
-/* R_SPARC_PCPLT22 */	{0x0, FLG_RE_PLTREL | FLG_RE_PCREL |
-				FLG_RE_VERIFY,
+/* R_SPARC_PCPLT22 */	{0x0, FLG_RE_PLTREL | FLG_RE_PCREL | FLG_RE_VERIFY,
 				4, 10, 22},
-/* R_SPARC_PCPLT10 */	{0x3ff, FLG_RE_PLTREL | FLG_RE_PCREL |
-				FLG_RE_VERIFY,
+/* R_SPARC_PCPLT10 */	{0x3ff, FLG_RE_PLTREL | FLG_RE_PCREL | FLG_RE_VERIFY,
 				4, 0, 13},
-/* R_SPARC_10 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY | FLG_RE_SIGN,
-				4, 0, 10},
-/* R_SPARC_11 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY | FLG_RE_SIGN,
-				4, 0, 11},
-/* R_SPARC_64 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY,
-				8, 0, 0},	/* V9 */
-/* R_SPARC_OLO10 */	{0x3ff, FLG_RE_NOTREL | FLG_RE_EXTOFFSET |
-				FLG_RE_SIGN, 4, 0, 13},	/* V9 */
-/* R_SPARC_HH22 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY,
-				4, 42, 22}, /* V9 */
-/* R_SPARC_HM10 */	{0x3ff, FLG_RE_NOTREL | FLG_RE_SIGN,
-				4, 32, 13},	/* V9 */
-/* R_SPARC_LM22 */	{0x0, FLG_RE_NOTREL,
-				4, 10, 22},	/* V9 */
-/* R_SPARC_PC_HH22 */	{0x0, FLG_RE_PCREL | FLG_RE_VERIFY |
-				FLG_RE_GOTPC, 4, 42, 22},	/* V9 */
-/* R_SPARC_PC_HM10 */	{0x3ff, FLG_RE_PCREL | FLG_RE_SIGN |
-				FLG_RE_GOTPC, 4, 32, 13},	/* V9 */
+/* R_SPARC_10 */	{0x0, FLG_RE_VERIFY | FLG_RE_SIGN, 4, 0, 10},
+/* R_SPARC_11 */	{0x0, FLG_RE_VERIFY | FLG_RE_SIGN, 4, 0, 11},
+/* R_SPARC_64 */	{0x0, FLG_RE_VERIFY, 8, 0, 0},		/* V9 */
+/* R_SPARC_OLO10 */	{0x3ff, FLG_RE_EXTOFFSET | FLG_RE_SIGN,
+				4, 0, 13},			/* V9 */
+/* R_SPARC_HH22 */	{0x0, FLG_RE_VERIFY, 4, 42, 22},	/* V9 */
+/* R_SPARC_HM10 */	{0x3ff, FLG_RE_SIGN, 4, 32, 13},	/* V9 */
+/* R_SPARC_LM22 */	{0x0, FLG_RE_NOTREL, 4, 10, 22},	/* V9 */
+/* R_SPARC_PC_HH22 */	{0x0, FLG_RE_PCREL | FLG_RE_VERIFY | FLG_RE_GOTPC,
+				4, 42, 22},			/* V9 */
+/* R_SPARC_PC_HM10 */	{0x3ff, FLG_RE_PCREL | FLG_RE_SIGN | FLG_RE_GOTPC,
+				4, 32, 13},			/* V9 */
 /* R_SPARC_PC_LM22 */	{0x0, FLG_RE_PCREL | FLG_RE_GOTPC,
-				4, 10, 22},	/* V9 */
+				4, 10, 22},			/* V9 */
 /* R_SPARC_WDISP16 */	{0x0, FLG_RE_PCREL | FLG_RE_WDISP16 |
 				FLG_RE_VERIFY | FLG_RE_SIGN,
 				4, 2, 16},
@@ -143,17 +133,14 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 				FLG_RE_ADDRELATIVE, 8, 0, 0},
 /* R_SPARC_HIX22 */	{(Xword)(-1LL), FLG_RE_NOTREL | FLG_RE_VERIFY,
 				4, 10, 22},	/* V9 - HaL */
-/* R_SPARC_LOX10 */	{0x3ff, FLG_RE_NOTREL | FLG_RE_SIGN,
-				4, 0, 13},	/* V9 - HaL */
-/* R_SPARC_H44 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY, 4,
-				22, 22}, /* V9 */
+/* R_SPARC_LOX10 */	{0x3ff, FLG_RE_SIGN, 4, 0, 13},		/* V9 - HaL */
+/* R_SPARC_H44 */	{0x0, FLG_RE_VERIFY, 4, 22, 22},	/* V9 */
 /* R_SPARC_M44 */	{0x3ff, FLG_RE_NOTREL, 4, 12, 10},	/* V9 */
 /* R_SPARC_L44 */	{0xfff, FLG_RE_NOTREL, 4, 0, 13},	/* V9 */
-/* R_SPARC_REGISTER */	{0x0, FLG_RE_REGISTER,
-				0, 0, 0},	/* V9 - special */
-/* R_SPARC_UA64 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY | FLG_RE_UNALIGN,
-				8, 0, 0},	/* V9 */
-/* R_SPARC_UA16 */	{0x0, FLG_RE_NOTREL | FLG_RE_VERIFY | FLG_RE_UNALIGN,
+/* R_SPARC_REGISTER */	{0x0, FLG_RE_REGISTER, 0, 0, 0},	/* SPECIAL */
+/* R_SPARC_UA64 */	{0x0, FLG_RE_VERIFY | FLG_RE_UNALIGN,
+				8, 0, 0},			/* V9 */
+/* R_SPARC_UA16 */	{0x0, FLG_RE_VERIFY | FLG_RE_UNALIGN,
 				2, 0, 0},
 /* R_SPARC_TLS_GD_HI22 */   {0x0, FLG_RE_GOTADD | FLG_RE_TLSINS | FLG_RE_TLSGD,
 				4, 10, 22},
@@ -167,11 +154,9 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 				FLG_RE_TLSLD | FLG_RE_SIGN, 4, 0, 13},
 /* R_SPARC_TLS_LDM_ADD */   {0x0, FLG_RE_TLSINS | FLG_RE_TLSLD, 0, 0, 0},
 /* R_SPARC_TLS_LDM_CALL */  {0x0, FLG_RE_TLSINS | FLG_RE_TLSLD, 0, 0, 0},
-/* R_SPARC_TLS_LDO_HIX22 */ {0x0, FLG_RE_VERIFY |
-				FLG_RE_TLSINS | FLG_RE_NOTREL | FLG_RE_TLSLD,
+/* R_SPARC_TLS_LDO_HIX22 */ {0x0, FLG_RE_VERIFY | FLG_RE_TLSINS | FLG_RE_TLSLD,
 				4, 10, 22},
-/* R_SPARC_TLS_LDO_LOX10 */ {0x3ff, FLG_RE_TLSINS | FLG_RE_SIGN |
-				FLG_RE_TLSLD |FLG_RE_NOTREL,
+/* R_SPARC_TLS_LDO_LOX10 */ {0x3ff, FLG_RE_TLSINS | FLG_RE_SIGN | FLG_RE_TLSLD,
 				4, 0, 13},
 /* R_SPARC_TLS_LDO_ADD */   {0x0, FLG_RE_TLSINS | FLG_RE_TLSLD, 0, 0, 0},
 /* R_SPARC_TLS_IE_HI22 */   {0x0, FLG_RE_TLSINS | FLG_RE_GOTADD | FLG_RE_TLSIE,
@@ -181,11 +166,10 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 /* R_SPARC_TLS_IE_LD */	    {0x0, FLG_RE_TLSINS | FLG_RE_TLSIE, 0, 0, 0},
 /* R_SPARC_TLS_IE_LDX */    {0x0, FLG_RE_TLSINS | FLG_RE_TLSIE, 0, 0, 0},
 /* R_SPARC_TLS_IE_ADD */    {0x0, FLG_RE_TLSINS | FLG_RE_TLSIE, 0, 0, 0},
-/* R_SPARC_TLS_LE_HIX22 */  {(Xword)(-1LL), FLG_RE_VERIFY |
-				FLG_RE_TLSINS | FLG_RE_NOTREL | FLG_RE_TLSLE,
+/* R_SPARC_TLS_LE_HIX22 */  {(Xword)(-1LL),
+				FLG_RE_VERIFY | FLG_RE_TLSINS | FLG_RE_TLSLE,
 				4, 10, 22},
-/* R_SPARC_TLS_LE_LOX10 */  {0x3ff, FLG_RE_TLSINS | FLG_RE_SIGN |
-				FLG_RE_TLSLE |FLG_RE_NOTREL,
+/* R_SPARC_TLS_LE_LOX10 */  {0x3ff, FLG_RE_TLSINS | FLG_RE_SIGN | FLG_RE_TLSLE,
 				4, 0, 13},
 /* R_SPARC_TLS_DTPMOD32 */  {0x0, FLG_RE_NOTREL, 4, 0, 0},
 /* R_SPARC_TLS_DTPMOD64 */  {0x0, FLG_RE_NOTREL, 8, 0, 0},
@@ -208,98 +192,101 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 /*
  * Write a single relocated value to its reference location.
  * We assume we wish to add the relocation amount, value, to the
- * the value of the address already present in the instruction.
+ * value of the address already present in the instruction.
  *
- * NAME			VALUE	FIELD		CALCULATION
+ * NAME			 VALUE	FIELD		CALCULATION
  *
- * R_SPARC_NONE		0	none		none
- * R_SPARC_8		1	V-byte8		S + A
- * R_SPARC_16		2	V-half16	S + A
- * R_SPARC_32		3	V-word32	S + A
- * R_SPARC_DISP8	4	V-byte8		S + A - P
- * R_SPARC_DISP16	5	V-half16	S + A - P
- * R_SPARC_DISP32	6	V-word32	S + A - P
- * R_SPARC_WDISP30	7	V-disp30	(S + A - P) >> 2
- * R_SPARC_WDISP22	8	V-disp22	(S + A - P) >> 2
- * R_SPARC_HI22		9	T-imm22		(S + A) >> 10
- * R_SPARC_22		10	V-imm22		S + A
- * R_SPARC_13		11	V-simm13	S + A
- * R_SPARC_LO10		12	T-simm13	(S + A) & 0x3ff
- * R_SPARC_GOT10	13	T-simm13	G & 0x3ff
- * R_SPARC_GOT13	14	V-simm13	G
- * R_SPARC_GOT22	15	T-imm22		G >> 10
- * R_SPARC_PC10		16	T-simm13	(S + A - P) & 0x3ff
- * R_SPARC_PC22		17	V-disp22	(S + A - P) >> 10
- * R_SPARC_WPLT30	18	V-disp30	(L + A - P) >> 2
- * R_SPARC_COPY		19	none		none
- * R_SPARC_GLOB_DAT	20	V-word32	S + A
- * R_SPARC_JMP_SLOT	21	V-plt22		S + A
- * R_SPARC_RELATIVE	22	V-word32	S + A
- * R_SPARC_UA32		23	V-word32	S + A
- * R_SPARC_PLT32	24	V-word32        L + A
- * R_SPARC_HIPLT22	25	T-imm22         (L + A) >> 10
- * R_SPARC_LOPLT10	26	T-simm13        (L + A) & 0x3ff
- * R_SPARC_PCPLT32	27	V-word32        L + A - P
- * R_SPARC_PCPLT22	28	V-disp22        (L + A - P) >> 10
- * R_SPARC_PCPLT10	29	V-simm13        (L + A - P) & 0x3ff
- * R_SPARC_10		30	V-simm10	S + A
- * R_SPARC_11		31	V-simm11	S + A
- * R_SPARC_64		32	V-xword64	S + A
- * R_SPARC_OLO10	33	V-simm13	((S + A) & 0x3ff) + O
- * R_SPARC_HH22		34	V-imm22		(S + A) >> 42
- * R_SPARC_HM10		35	T-simm13	((S + A) >>32) & 0x3ff
- * R_SPARC_LM22		36	T-imm22		(S + A) >> 10
- * R_SPARC_PC_HH22	37	V-imm22		(S + A - P) >> 42
- * R_SPARC_PC_HM10	38	T-simm13	((S + A - P) >> 32) & 0x3ff
- * R_SPARC_PC_LM22	39	T-imm22		(S + A - P) >> 10
- * R_SPARC_WDISP16	40	V-d2/disp14	(S + A - P) >> 2
- * R_SPARC_WDISP19	41	V-disp19	(S + A - P) >> 2
- * R_SPARC_GLOB_JMP	42	V-xword64	S + A
- * R_SPARC_7		43	V-imm7		S + A
- * R_SPARC_5		44	V-imm5		S + A
- * R_SPARC_6		45	V-imm6		S + A
- * R_SPARC_DISP64	46	V-xword64	S + A - P
- * R_SPARC_PLT64	47	V-xword64	L + A
- * R_SPARC_HIX22	48	V-imm22	((S + A)^0xffffffffffffffff) >> 10
- * R_SPARC_LOX10	49	T-simm13	((S + A) & 0x3ff) | 0x1c00
- * R_SPARC_H44		50	V-imm22		(S + A) >> 22
- * R_SPARC_M44		51	T-imm10		((S + A) >> 12) & 0x3ff
- * R_SPARC_L44		52	T-imm13		(S + A) & 0xfff
- * R_SPARC_REGISTER	53	V-xword64	S + A
- * R_SPARC_UA64		54	V-xword64	S + A
- * R_SPARC_UA16		55	V-half16	S + A
- * R_SPARC_TLS_GD_HI22	56	T-simm22	@dtlndx(S+A) >> 10
- * R_SPARC_TLS_GD_LO10	57	T-simm13	@dtlndx(S+A) & 0x3ff
- * R_SPARC_TLS_GD_ADD	58	none		special
- * R_SPARC_TLS_GD_CALL	59	V-disp30	special
- * R_SPARC_TLS_LDM_HI22	60	T-simm22	@tmndx(S+A) >> 10
- * R_SPARC_TLS_LDM_LO10	61	T-simm13	@tmndx(S+A) & 0x3ff
- * R_SPARC_TLS_LDM_ADD	62	none		special
- * R_SPARC_TLS_LDM_CALL	63	V-disp30	special
- * R_SPARC_TLS_LDO_HIX22 64	V-simm22	@dtpoff(S+A) >> 10
- * R_SPARC_TLS_LDO_LOX10 65	T-simm13	@dtpoff(S+A) & 0x3ff
- * R_SPARC_TLS_LDO_ADD	66	none		special
- * R_SPARC_TLS_IE_HI22	67	T-simm22	@got(@tpoff(S+A)) >> 10
- * R_SPARC_TLS_IE_LO10	68	T-simm13	@got(@tpoff(S+A)) & 0x3ff
- * R_SPARC_TLS_IE_LD	69	none		special
- * R_SPARC_TLS_IE_LDX	70	none		special
- * R_SPARC_TLS_IE_ADD	71	none		special
- * R_SPARC_TLS_LE_HIX22	72	V-simm22	(@tpoff(S+A)^0xffffffff) >> 10
- * R_SPARC_TLS_LE_LOX10	73	T-simm13	(@tpoff(S+A) & 0x3ff) | 0x1c00
- * R_SPARC_TLS_DTPMOD32	74	V-word32	@dtmod(S+A)
- * R_SPARC_TLS_DTPMOD64	75	V-word64	@dtmod(S+A)
- * R_SPARC_TLS_DTPOFF32	76	V-word32	@dtpoff(S+A)
- * R_SPARC_TLS_DTPOFF64	77	V-word64	@dtpoff(S+A)
- * R_SPARC_TLS_TPOFF32	78	V-word32	@tpoff(S+A)
- * R_SPARC_TLS_TPOFF64	79	V-word64	@tpoff(S+A)
- * R_SPARC_GOTDATA_HIX22 80	T-imm22		((S + A - G) >> 10) ^
- *						  ((S + A- G) >> 42)
- * R_SPARC_GOTDATA_LOX10 81	T-simm13	((S + A - G) & 0x3ff) |
- *						  (((S + A - G) >> 31) & 0x1c00)
- * R_SPARC_GOTDATA_OP_HIX22 82	T-imm22		(G >> 10) & (G >> 42)
- * R_SPARC_GOTDATA_OP_LOX10	T-simm13	(G & 0x3ff) |
- *						  ((0x1c00^~((G>>50)&0x1c00)))
- * R_SPARC_H34			V-imm22		(S + A) >> 12
+ * R_SPARC_NONE		     0	none		none
+ * R_SPARC_8		     1	V-byte8		S + A
+ * R_SPARC_16		     2	V-half16	S + A
+ * R_SPARC_32		     3	V-word32	S + A
+ * R_SPARC_DISP8	     4	V-byte8		S + A - P
+ * R_SPARC_DISP16	     5	V-half16	S + A - P
+ * R_SPARC_DISP32	     6	V-word32	S + A - P
+ * R_SPARC_WDISP30	     7	V-disp30	(S + A - P) >> 2
+ * R_SPARC_WDISP22	     8	V-disp22	(S + A - P) >> 2
+ * R_SPARC_HI22		     9	T-imm22		(S + A) >> 10
+ * R_SPARC_22		    10	V-imm22		S + A
+ * R_SPARC_13		    11	V-simm13	S + A
+ * R_SPARC_LO10		    12	T-simm13	(S + A) & 0x3ff
+ * R_SPARC_GOT10	    13	T-simm13	G & 0x3ff
+ * R_SPARC_GOT13	    14	V-simm13	G
+ * R_SPARC_GOT22	    15	T-imm22		G >> 10
+ * R_SPARC_PC10		    16	T-simm13	(S + A - P) & 0x3ff
+ * R_SPARC_PC22		    17	V-disp22	(S + A - P) >> 10
+ * R_SPARC_WPLT30	    18	V-disp30	(L + A - P) >> 2
+ * R_SPARC_COPY		    19	none		none
+ * R_SPARC_GLOB_DAT	    20	V-word32	S + A
+ * R_SPARC_JMP_SLOT	    21	V-plt22		S + A
+ * R_SPARC_RELATIVE	    22	V-word32	S + A
+ * R_SPARC_UA32		    23	V-word32	S + A
+ * R_SPARC_PLT32	    24	V-word32        L + A
+ * R_SPARC_HIPLT22	    25	T-imm22         (L + A) >> 10
+ * R_SPARC_LOPLT10	    26	T-simm13        (L + A) & 0x3ff
+ * R_SPARC_PCPLT32	    27	V-word32        L + A - P
+ * R_SPARC_PCPLT22	    28	V-disp22        (L + A - P) >> 10
+ * R_SPARC_PCPLT10	    29	V-simm13        (L + A - P) & 0x3ff
+ * R_SPARC_10		    30	V-simm10	S + A
+ * R_SPARC_11		    31	V-simm11	S + A
+ * R_SPARC_64		    32	V-xword64	S + A
+ * R_SPARC_OLO10	    33	V-simm13	((S + A) & 0x3ff) + O
+ * R_SPARC_HH22		    34	V-imm22		(S + A) >> 42
+ * R_SPARC_HM10		    35	T-simm13	((S + A) >> 32) & 0x3ff
+ * R_SPARC_LM22		    36	T-imm22		(S + A) >> 10
+ * R_SPARC_PC_HH22	    37	V-imm22		(S + A - P) >> 42
+ * R_SPARC_PC_HM10	    38	T-simm13	((S + A - P) >> 32) & 0x3ff
+ * R_SPARC_PC_LM22	    39	T-imm22		(S + A - P) >> 10
+ * R_SPARC_WDISP16	    40	V-d2/disp14	(S + A - P) >> 2
+ * R_SPARC_WDISP19	    41	V-disp19	(S + A - P) >> 2
+ * R_SPARC_GLOB_JMP	    42	V-xword64	S + A
+ * R_SPARC_7		    43	V-imm7		S + A
+ * R_SPARC_5		    44	V-imm5		S + A
+ * R_SPARC_6		    45	V-imm6		S + A
+ * R_SPARC_DISP64	    46	V-xword64	S + A - P
+ * R_SPARC_PLT64	    47	V-xword64	L + A
+ * R_SPARC_HIX22	    48	V-imm22		((S + A) ^
+ *						    0xffffffffffffffff) >> 10
+ * R_SPARC_LOX10	    49	T-simm13	((S + A) & 0x3ff) | 0x1c00
+ * R_SPARC_H44		    50	V-imm22		(S + A) >> 22
+ * R_SPARC_M44		    51	T-imm10		((S + A) >> 12) & 0x3ff
+ * R_SPARC_L44		    52	T-imm13		(S + A) & 0xfff
+ * R_SPARC_REGISTER	    53	V-xword64	S + A
+ * R_SPARC_UA64		    54	V-xword64	S + A
+ * R_SPARC_UA16		    55	V-half16	S + A
+ * R_SPARC_TLS_GD_HI22	    56	T-simm22	@dtlndx(S + A) >> 10
+ * R_SPARC_TLS_GD_LO10	    57	T-simm13	@dtlndx(S + A) & 0x3ff
+ * R_SPARC_TLS_GD_ADD	    58	none		SPECIAL
+ * R_SPARC_TLS_GD_CALL	    59	V-disp30	SPECIAL
+ * R_SPARC_TLS_LDM_HI22	    60	T-simm22	@tmndx(S + A) >> 10
+ * R_SPARC_TLS_LDM_LO10	    61	T-simm13	@tmndx(S + A) & 0x3ff
+ * R_SPARC_TLS_LDM_ADD	    62	none		SPECIAL
+ * R_SPARC_TLS_LDM_CALL	    63	V-disp30	SPECIAL
+ * R_SPARC_TLS_LDO_HIX22    64	V-simm22	@dtpoff(S + A) >> 10
+ * R_SPARC_TLS_LDO_LOX10    65	T-simm13	@dtpoff(S + A) & 0x3ff
+ * R_SPARC_TLS_LDO_ADD	    66	none		SPECIAL
+ * R_SPARC_TLS_IE_HI22	    67	T-simm22	@got(@tpoff(S + A)) >> 10
+ * R_SPARC_TLS_IE_LO10	    68	T-simm13	@got(@tpoff(S + A)) & 0x3ff
+ * R_SPARC_TLS_IE_LD	    69	none		SPECIAL
+ * R_SPARC_TLS_IE_LDX	    70	none		SPECIAL
+ * R_SPARC_TLS_IE_ADD	    71	none		SPECIAL
+ * R_SPARC_TLS_LE_HIX22	    72	V-simm22	(@tpoff(S + A) ^
+ *						    0xffffffff) >> 10
+ * R_SPARC_TLS_LE_LOX10	    73	T-simm13	(@tpoff(S + A) & 0x3ff) | 0x1c00
+ * R_SPARC_TLS_DTPMOD32	    74	V-word32	@dtmod(S + A)
+ * R_SPARC_TLS_DTPMOD64	    75	V-word64	@dtmod(S + A)
+ * R_SPARC_TLS_DTPOFF32	    76	V-word32	@dtpoff(S + A)
+ * R_SPARC_TLS_DTPOFF64	    77	V-word64	@dtpoff(S + A)
+ * R_SPARC_TLS_TPOFF32	    78	V-word32	@tpoff(S + A)
+ * R_SPARC_TLS_TPOFF64	    79	V-word64	@tpoff(S + A)
+ * R_SPARC_GOTDATA_HIX22    80	T-imm22		((S + A - GOT) >> 10) ^
+ *						  ((S + A - GOT) >> 31)
+ * R_SPARC_GOTDATA_LOX10    81	T-simm13	((S + A - GOT) & 0x3ff) |
+ *						  (((S + A - GOT) >> 31) &
+ *						  0x1c00)
+ * R_SPARC_GOTDATA_OP_HIX22 82	T-imm22		(G >> 10) & (G >> 31)
+ * R_SPARC_GOTDATA_OP_LOX10 83	T-simm13	(G & 0x3ff) |
+ *						  ((G >> 31) & 0x1c00)
+ * R_SPARC_H34		    84	V-imm22		(S + A) >> 12
  *
  *	This is Figure 4-20: Relocation Types from the Draft Copy of
  * the ABI, Printed on 11/29/88.
@@ -361,13 +348,13 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
  */
 /* ARGSUSED3 */
 int
-do_reloc(unsigned char rtype, unsigned char *off, Xword *value,
-	const char *sym, const char *file)
+do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
+    const char *file)
 {
 	Xword			uvalue = 0;
 	Xword			basevalue, sigbit_mask, sigfit_mask;
 	Xword			corevalue = *value;
-	unsigned char		bshift;
+	uchar_t			bshift;
 	int			field_size, re_flags;
 	const Rel_entry *	rep;
 
@@ -393,8 +380,8 @@ do_reloc(unsigned char rtype, unsigned char *off, Xword *value,
 	}
 
 	if (re_flags & FLG_RE_UNALIGN) {
-		int		i;
-		unsigned char *dest = (unsigned char *)&basevalue;
+		int	i;
+		uchar_t	*dest = (uchar_t *)&basevalue;
 
 		/*
 		 * Adjust the offset.
@@ -416,7 +403,7 @@ do_reloc(unsigned char rtype, unsigned char *off, Xword *value,
 		}
 		switch (field_size) {
 		case 1:
-			basevalue = (Xword)*((unsigned char *)off);
+			basevalue = (Xword)*((uchar_t *)off);
 			break;
 		case 2:
 			/* LINTED */
@@ -537,8 +524,8 @@ do_reloc(unsigned char rtype, unsigned char *off, Xword *value,
 	*value = corevalue;
 
 	if (re_flags & FLG_RE_UNALIGN) {
-		int		i;
-		unsigned char *src = (unsigned char *)&uvalue;
+		int	i;
+		uchar_t	*src = (uchar_t *)&uvalue;
 
 		/*
 		 * Adjust the offset.
@@ -553,7 +540,8 @@ do_reloc(unsigned char rtype, unsigned char *off, Xword *value,
 	} else {
 		switch (rep->re_fsize) {
 		case 1:
-			*((unsigned char *)off) = (unsigned char)uvalue;
+			/* LINTED */
+			*((uchar_t *)off) = (uchar_t)uvalue;
 			break;
 		case 2:
 			/* LINTED */
@@ -567,6 +555,12 @@ do_reloc(unsigned char rtype, unsigned char *off, Xword *value,
 			/* LINTED */
 			*((Xword *)off) = uvalue;
 			break;
+		default:
+			/*
+			 * To keep chkmsg() happy: MSG_INTL(MSG_REL_UNSUPSZ)
+			 */
+			REL_ERR_UNSUPSZ(file, sym, rtype, rep->re_fsize);
+			return (0);
 		}
 	}
 	return (1);

@@ -19,10 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #if	defined(_KERNEL)
@@ -39,20 +41,19 @@
 #endif
 
 /*
- * This table represents the current relocations that do_reloc()
- * is able to process.  The relocations below that are marked
- * 'SPECIAL' in the comments are relocations that take special
- * processing and shouldn't actually ever be passed to do_reloc().
+ * This table represents the current relocations that do_reloc() is able to
+ * process.  The relocations below that are marked SPECIAL are relocations that
+ * take special processing and shouldn't actually ever be passed to do_reloc().
  */
 const Rel_entry	reloc_table[R_386_NUM] = {
-/* R_386_NONE */	{0, 0},
+/* R_386_NONE */	{FLG_RE_NOTREL, 0},
 /* R_386_32 */		{FLG_RE_NOTREL, 4},
 /* R_386_PC32 */	{FLG_RE_PCREL, 4},
 /* R_386_GOT32 */	{FLG_RE_GOTADD, 4},
 /* R_386_PLT32 */	{FLG_RE_PLTREL | FLG_RE_PCREL, 4},
-/* R_386_COPY */	{0, 0},					/* SPECIAL */
+/* R_386_COPY */	{FLG_RE_NOTREL, 0},			/* SPECIAL */
 /* R_386_GLOB_DAT */	{FLG_RE_NOTREL, 4},
-/* R_386_JMP_SLOT */	{FLG_RE_NOTREL, 4},
+/* R_386_JMP_SLOT */	{FLG_RE_NOTREL, 4},			/* SPECIAL */
 /* R_386_RELATIVE */	{FLG_RE_NOTREL, 4},
 /* R_386_GOTOFF */	{FLG_RE_GOTREL, 4},
 /* R_386_GOTPC */	{FLG_RE_PCREL | FLG_RE_GOTPC | FLG_RE_LOCLBND, 4},
@@ -64,13 +65,13 @@ const Rel_entry	reloc_table[R_386_NUM] = {
 /* R_386_TLS_TPOFF */	{FLG_RE_NOTREL, 4},
 /* R_386_TLS_IE */	{FLG_RE_GOTADD | FLG_RE_TLSINS | FLG_RE_TLSIE, 4},
 /* R_386_TLS_GOTIE */	{FLG_RE_GOTADD | FLG_RE_TLSINS | FLG_RE_TLSIE, 4},
-/* R_386_TLS_LE */	{FLG_RE_TLSINS | FLG_RE_NOTREL | FLG_RE_TLSLE, 4},
+/* R_386_TLS_LE */	{FLG_RE_TLSINS | FLG_RE_TLSLE, 4},
 /* R_386_TLS_GD */	{FLG_RE_GOTADD | FLG_RE_TLSINS | FLG_RE_TLSGD, 4},
 /* R_386_TLS_LDM */	{FLG_RE_GOTADD | FLG_RE_TLSLD | FLG_RE_TLSINS, 4},
-/* R_386_16 */		{FLG_RE_NOTSUP, 0},
-/* R_386_PC16 */	{FLG_RE_NOTSUP, 0},
-/* R_386_8 */		{FLG_RE_NOTSUP, 0},
-/* R_386_PC8 */		{FLG_RE_NOTSUP, 0},
+/* R_386_16 */		{FLG_RE_NOTREL, 2},
+/* R_386_PC16 */	{FLG_RE_PCREL, 2},
+/* R_386_8 */		{FLG_RE_NOTREL, 1},
+/* R_386_PC8 */		{FLG_RE_PCREL, 1},
 /* R_386_UNKNOWN24 */	{FLG_RE_NOTSUP, 0},
 /* R_386_UNKNOWN25 */	{FLG_RE_NOTSUP, 0},
 /* R_386_UNKNOWN26 */	{FLG_RE_NOTSUP, 0},
@@ -79,7 +80,7 @@ const Rel_entry	reloc_table[R_386_NUM] = {
 /* R_386_UNKNOWN29 */	{FLG_RE_NOTSUP, 0},
 /* R_386_UNKNOWN30 */	{FLG_RE_NOTSUP, 0},
 /* R_386_UNKNOWN31 */	{FLG_RE_NOTSUP, 0},
-/* R_386_TLS_LDO_32 */	{FLG_RE_TLSINS | FLG_RE_TLSLD | FLG_RE_NOTREL, 4},
+/* R_386_TLS_LDO_32 */	{FLG_RE_TLSINS | FLG_RE_TLSLD, 4},
 /* R_386_UNKNOWN33 */	{FLG_RE_NOTSUP, 0},
 /* R_386_UNKNOWN34 */	{FLG_RE_NOTSUP, 0},
 /* R_386_TLS_DTPMOD32 */ {FLG_RE_NOTREL, 4},
@@ -87,10 +88,9 @@ const Rel_entry	reloc_table[R_386_NUM] = {
 /* R_386_UNKONWN37 */	{FLG_RE_NOTSUP, 0}
 };
 
-
 /*
  * Write a single relocated value to its reference location.
- * We assume we wish to add the relocatoin amount, value, to the
+ * We assume we wish to add the relocation amount, value, to the
  * value of the address already present at the offset.
  *
  * NAME			VALUE	FIELD		CALCULATION
@@ -113,11 +113,15 @@ const Rel_entry	reloc_table[R_386_NUM] = {
  * R_386_TLS_IE		15	word32		@indntpoff(S)
  * R_386_TLS_GD		18	word32		@tlsgd(S)
  * R_386_TLS_LDM	19	word32		@tlsldm(S)
+ * R_386_16		20	word16		S + A
+ * R_386_PC16		21	word16		S + A - P
+ * R_386_8		22	word8		S + A
+ * R_386_PC8		23	word8		S + A - P
  * R_386_TLS_LDO_32	32	word32		@dtpoff(S)
  * R_386_TLS_DTPMOD32	35	word32		@dtpmod(S)
  * R_386_TLS_DTPOFF32	36	word32		@dtpoff(S)
  *
- * Relocatoins 0-10 are from Figure 4-4: Relocations Types from the
+ * Relocations 0-10 are from Figure 4-4: Relocation Types from the
  * intel ABI.  Relocation 11 (R_386_32PLT) is from the C++ intel abi
  * and is in the process of being registered with intel ABI (1/13/94).
  *
@@ -158,23 +162,32 @@ const Rel_entry	reloc_table[R_386_NUM] = {
  * the addresses in the instructions.
  */
 int
-do_reloc(unsigned char rtype, unsigned char *off, Xword *value,
-	const char *sym, const char *file)
+do_reloc(uchar_t rtype, uchar_t *off, Xword *value, const char *sym,
+    const char *file)
 {
-	const Rel_entry *rep;
+	const Rel_entry	*rep;
 
 	rep = &reloc_table[rtype];
-	/*
-	 * Currenty 386 *only* relocates against full words
-	 */
-	if (rep->re_fsize != 4) {
-		eprintf(ERR_FATAL, MSG_INTL(MSG_REL_UNSUPSZ),
-		    conv_reloc_386_type_str(rtype), file,
-		    (sym ? sym : MSG_INTL(MSG_STR_UNKNOWN)),
-		    EC_WORD(rep->re_fsize));
+
+	switch (rep->re_fsize) {
+	case 1:
+		/* LINTED */
+		*((uchar_t *)off) += (uchar_t)(*value);
+		break;
+	case 2:
+		/* LINTED */
+		*((Half *)off) += (Half)(*value);
+		break;
+	case 4:
+		/* LINTED */
+		*((Xword *)off) += *value;
+		break;
+	default:
+		/*
+		 * To keep chkmsg() happy: MSG_INTL(MSG_REL_UNSUPSZ)
+		 */
+		REL_ERR_UNSUPSZ(file, sym, rtype, rep->re_fsize);
 		return (0);
 	}
-	/* LINTED */
-	*((Xword *)off) += *value;
 	return (1);
 }

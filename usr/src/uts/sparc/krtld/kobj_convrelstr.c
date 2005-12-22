@@ -19,89 +19,85 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1996-1997 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include	<sys/types.h>
 #include	"reloc.h"
 
-
-#ifdef	KOBJ_DEBUG
-static const char	*rels[] = {
-	"R_SPARC_NONE    ",
-	"R_SPARC_8       ",
-	"R_SPARC_16      ",
-	"R_SPARC_32      ",
-	"R_SPARC_DISP8   ",
-	"R_SPARC_DISP16  ",
-	"R_SPARC_DISP32  ",
-	"R_SPARC_WDISP30 ",
-	"R_SPARC_WDISP22 ",
-	"R_SPARC_HI22    ",
-	"R_SPARC_22      ",
-	"R_SPARC_13      ",
-	"R_SPARC_LO10    ",
-	"R_SPARC_GOT10   ",
-	"R_SPARC_GOT13   ",
-	"R_SPARC_GOT22   ",
-	"R_SPARC_PC10    ",
-	"R_SPARC_PC22    ",
-	"R_SPARC_WPLT30  ",
-	"R_SPARC_COPY    ",
-	"R_SPARC_GLOB_DAT",
-	"R_SPARC_JMP_SLOT",
-	"R_SPARC_RELATIVE",
-	"R_SPARC_UA32    ",
-	"R_SPARC_PLT32   ",
-	"R_SPARC_HIPLT22 ",
-	"R_SPARC_LOPLT10 ",
-	"R_SPARC_PCPLT32 ",
-	"R_SPARC_PCPLT22 ",
-	"R_SPARC_PCPLT10 ",
-	"R_SPARC_10      ",
-	"R_SPARC_11      ",
-	"R_SPARC_64      ",
-	"R_SPARC_OLO10   ",
-	"R_SPARC_HH22    ",
-	"R_SPARC_HM10    ",
-	"R_SPARC_LM22    ",
-	"R_SPARC_PC_HH22 ",
-	"R_SPARC_PC_HM10 ",
-	"R_SPARC_PC_LM22 ",
-	"R_SPARC_WDISP16 ",
-	"R_SPARC_WDISP19 ",
-	"R_SPARC_GLOB_JMP",
-	"R_SPARC_7       ",
-	"R_SPARC_5       ",
-	"R_SPARC_6       "
+static const char	*rels[R_SPARC_NUM] = {
+	"R_SPARC_NONE",			"R_SPARC_8",
+	"R_SPARC_16",			"R_SPARC_32",
+	"R_SPARC_DISP8",		"R_SPARC_DISP16",
+	"R_SPARC_DISP32",		"R_SPARC_WDISP30",
+	"R_SPARC_WDISP22",		"R_SPARC_HI22",
+	"R_SPARC_22",			"R_SPARC_13",
+	"R_SPARC_LO10",			"R_SPARC_GOT10",
+	"R_SPARC_GOT13",		"R_SPARC_GOT22",
+	"R_SPARC_PC10",			"R_SPARC_PC22",
+	"R_SPARC_WPLT30",		"R_SPARC_COPY",
+	"R_SPARC_GLOB_DAT",		"R_SPARC_JMP_SLOT",
+	"R_SPARC_RELATIVE",		"R_SPARC_UA32",
+	"R_SPARC_PLT32",		"R_SPARC_HIPLT22",
+	"R_SPARC_LOPLT10",		"R_SPARC_PCPLT32",
+	"R_SPARC_PCPLT22",		"R_SPARC_PCPLT10",
+	"R_SPARC_10",			"R_SPARC_11",
+	"R_SPARC_64",			"R_SPARC_OLO10",
+	"R_SPARC_HH22",			"R_SPARC_HM10",
+	"R_SPARC_LM22",			"R_SPARC_PC_HH22",
+	"R_SPARC_PC_HM10",		"R_SPARC_PC_LM22",
+	"R_SPARC_WDISP16",		"R_SPARC_WDISP19",
+	"R_SPARC_GLOB_JMP",		"R_SPARC_7",
+	"R_SPARC_5",			"R_SPARC_6",
+	"R_SPARC_DISP64",		"R_SPARC_PLT64",
+	"R_SPARC_HIX22",		"R_SPARC_LOX10",
+	"R_SPARC_H44",			"R_SPARC_M44",
+	"R_SPARC_L44",			"R_SPARC_REGISTER",
+	"R_SPARC_UA64",			"R_SPARC_UA16",
+	"R_SPARC_TLS_GD_HI22",		"R_SPARC_TLS_GD_LO10",
+	"R_SPARC_TLS_GD_ADD",		"R_SPARC_TLS_GD_CALL",
+	"R_SPARC_TLS_LDM_HI22",		"R_SPARC_TLS_LDM_LO10",
+	"R_SPARC_TLS_LDM_ADD",		"R_SPARC_TLS_LDM_CALL",
+	"R_SPARC_TLS_LDO_HIX22",	"R_SPARC_TLS_LDO_LOX10",
+	"R_SPARC_TLS_LDO_ADD",		"R_SPARC_TLS_IE_HI22",
+	"R_SPARC_TLS_IE_LO10",		"R_SPARC_TLS_IE_LD",
+	"R_SPARC_TLS_IE_LDX",		"R_SPARC_TLS_IE_ADD",
+	"R_SPARC_TLS_LE_HIX22",		"R_SPARC_TLS_LE_LOX10",
+	"R_SPARC_TLS_DTPMOD32",		"R_SPARC_TLS_DTPMOD64",
+	"R_SPARC_TLS_DTPOFF32",		"R_SPARC_TLS_DTPOFF64",
+	"R_SPARC_TLS_TPOFF32",		"R_SPARC_TLS_TPOFF64",
+	"R_SPARC_GOTDATA_HIX22",	"R_SPARC_GOTDATA_LOX10",
+	"R_SPARC_GOTDATA_OP_HIX22",	"R_SPARC_GOTDATA_OP_LOX10",
+	"R_SPARC_GOTDATA_OP",		"R_SPARC_H34"
 };
+
+#if	(R_SPARC_NUM != (R_SPARC_H34 + 1))
+#error	"R_SPARC_NUM has grown"
 #endif
 
 /*
- * This is a 'stub' of the orignal version defined in liblddbg.so
- * This stub just returns the 'int string' of the relocation in question
- * instead of converting it to it's full syntax.
+ * This is a 'stub' of the orignal version defined in liblddbg.so.  This stub
+ * returns the 'int string' of the relocation in question instead of converting
+ * the relocation to it's full syntax.
  */
 const char *
-conv_reloc_SPARC_type_str(Word rtype)
+conv_reloc_SPARC_type_str(uint_t type)
 {
-#ifdef	KOBJ_DEBUG
-	if (rtype < R_SPARC_NUM)
-		return (rels[rtype]);
-	else {
-#endif
-		static char 	strbuf[32];
-		int		ndx = 31;
-		strbuf[ndx--] = '\0';
-		do {
-			strbuf[ndx--] = '0' + (rtype % 10);
-			rtype = rtype / 10;
-		} while ((ndx >= (int)0) && (rtype > (Word)0));
-		return (&strbuf[ndx + 1]);
-#ifdef	KOBJ_DEBUG
-	}
-#endif
+	static char 	strbuf[32];
+	int		ndx = 31;
+
+	if (type < R_SPARC_NUM)
+		return (rels[type]);
+
+	strbuf[ndx--] = '\0';
+	do {
+		strbuf[ndx--] = '0' + (type % 10);
+		type = type / 10;
+	} while ((ndx >= (int)0) && (type > (Word)0));
+
+	return (&strbuf[ndx + 1]);
 }

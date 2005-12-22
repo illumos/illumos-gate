@@ -927,9 +927,9 @@ All the above changes are incorporated in the following patches:
 6217285 ctfmerge crashed during full onnv build
 --------------------------------------------------------------------------------
 
---------------
-Solaris Nevada
---------------
+-------------------------------------
+Solaris 10 106 (1st Q-update - s10u1)
+-------------------------------------
 Bugid   Risk Synopsis
 ================================================================================
 6209350 Do not include signature section from dynamic dependency library into
@@ -1067,6 +1067,12 @@ All the above changes are incorporated in the following patches:
     Solaris/SunOS 5.8_sparc	patch T109147-40
     Solaris/SunOS 5.8_x86	patch T109148-40
 --------------------------------------------------------------------------------
+
+--------------
+Solaris Nevada
+--------------
+Bugid   Risk Synopsis
+================================================================================
 6340814 ld.so.1 core dump with HWCAP relocatable object + updated statistics
 6307274 crle bug with LD_LIBRARY_PATH
 6317969 elfheader limited to 65535 segments (link-editor components only)
@@ -1074,3 +1080,4 @@ All the above changes are incorporated in the following patches:
 6362044 ld(1) inconsistencies with LD_DEBUG=-Dunused and -zignore
 6362047 ld.so.1 dumps core when combining HWCAP and LD_PROFILE
 6304206 runtime linker may respect LANG and LC_MESSAGE more than LC_ALL
+6363495	Catchup required with Intel relocations
