@@ -28,7 +28,8 @@ typedef struct agp_target_softstate {
 	dev_info_t		*tsoft_dip;
 	ddi_acc_handle_t	tsoft_pcihdl;
 	uint32_t		tsoft_devid;
-	off_t			tsoft_acaptr;	/* offset of ACAPID register */
+	/* The offset of the ACAPID register */
+	off_t			tsoft_acaptr;
 	kmutex_t		tsoft_lock;
 }agp_target_softstate_t;
 
@@ -38,7 +39,7 @@ static void *agptarget_glob_soft_handle;
     ddi_get_soft_state(agptarget_glob_soft_handle, instance));
 
 /*
- * AMD8151 bridge is the only 64 bit hardware supported
+ * The AMD8151 bridge is the only supported 64 bit hardware
  */
 static int
 is_64bit_aper(agp_target_softstate_t *softstate)
@@ -50,10 +51,10 @@ is_64bit_aper(agp_target_softstate_t *softstate)
  * agp_target_cap_find()
  *
  * Description:
- * 	This function seach the linked capability list to find the
- * 	offset of AGP capability register. When not found, return 0.
+ * 	This function searches the linked capability list to find the offset
+ * 	of the AGP capability register. When it was not found, return 0.
  * 	This works for standard AGP chipsets, but not for some Intel chipsets,
- * 	like I830M/I830MP/I852PM/I852GME/I855GME. It will return 0 for
+ * 	like the I830M/I830MP/I852PM/I852GME/I855GME. It will return 0 for
  * 	these chipsets even if AGP is supported. So the offset of acapid
  * 	should be set manually in thoses cases.
  *
@@ -62,7 +63,7 @@ is_64bit_aper(agp_target_softstate_t *softstate)
  *
  * Returns:
  * 	0			No capability pointer register found
- * 	nexcap			AGP capability pointer register offset
+ * 	nexcap			The AGP capability pointer register offset
  */
 static off_t
 agp_target_cap_find(ddi_acc_handle_t pci_handle)
@@ -71,7 +72,7 @@ agp_target_cap_find(ddi_acc_handle_t pci_handle)
 	uint32_t	ncapid = 0;
 	uint8_t		value = 0;
 
-	/* Check if this device supports capibility pointer */
+	/* Check if this device supports the capability pointer */
 	value = (uint8_t)(pci_config_get16(pci_handle, PCI_CONF_STAT)
 	    & PCI_CONF_CAP_MASK);
 
@@ -80,15 +81,15 @@ agp_target_cap_find(ddi_acc_handle_t pci_handle)
 	/* Get the offset of the first capability pointer from CAPPTR */
 	nextcap = (off_t)(pci_config_get8(pci_handle, AGP_CONF_CAPPTR));
 
-	/* Check AGP capability from the first capability pointer */
+	/* Check the AGP capability from the first capability pointer */
 	while (nextcap) {
 		ncapid = pci_config_get32(pci_handle, nextcap);
 		/*
-		 * AGP3.0 rev1.0 127  capid assigned by PCI SIG,
+		 * AGP3.0 rev1.0 127  the capid was assigned by the PCI SIG,
 		 * 845 data sheet page 69
 		 */
 		if ((ncapid & PCI_CONF_CAPID_MASK) ==
-		    AGP_CAP_ID) /* AGP cap found */
+		    AGP_CAP_ID) /* The AGP cap was found */
 			break;
 
 		nextcap = (off_t)((ncapid & PCI_CONF_NCAPID_MASK) >> 8);
@@ -102,8 +103,8 @@ agp_target_cap_find(ddi_acc_handle_t pci_handle)
  * agp_target_get_aperbase()
  *
  * Description:
- * 	This function get the AGP aperture base address from agp target
- *	register, the AGP aperture base register programmed by BIOS.
+ * 	This function gets the AGP aperture base address from the AGP target
+ *	register, the AGP aperture base register was programmed by the BIOS.
  *
  * Arguments:
  * 	softstate		driver soft state pointer
@@ -112,8 +113,8 @@ agp_target_cap_find(ddi_acc_handle_t pci_handle)
  * 	aper_base 		AGP aperture base address
  *
  * Notes:
- * 	If 64bit bridge deice available, the agp aperture base address
- * 	can be 64 bit
+ * 	If a 64bit bridge device is available, the AGP aperture base address
+ * 	can be 64 bit.
  */
 static uint64_t
 agp_target_get_apbase(agp_target_softstate_t *softstate)
@@ -139,14 +140,14 @@ agp_target_get_apbase(agp_target_softstate_t *softstate)
  * agp_target_get_apsize()
  *
  * Description:
- * 	This function get the agp aperture size by read the agp aperture
+ * 	This function gets the AGP aperture size by reading the AGP aperture
  * 	size register.
  * Arguments:
  * 	softstate		driver soft state pointer
  *
  * Return:
- * 	size		agp aperture size in megabytes
- * 	0		unexpected error
+ * 	size		The AGP aperture size in megabytes
+ * 	0		an unexpected error
  */
 static size_t
 agp_target_get_apsize(agp_target_softstate_t *softstate)
@@ -159,7 +160,7 @@ agp_target_get_apsize(agp_target_softstate_t *softstate)
 	cap = softstate->tsoft_acaptr;
 
 	if ((softstate->tsoft_devid & VENDOR_ID_MASK) == INTEL_VENDOR_ID) {
-		/* extend this value to 16 bit for later test */
+		/* extend this value to 16 bit for later tests */
 		value = (uint16_t)pci_config_get8(softstate->tsoft_pcihdl,
 		    cap + AGP_CONF_APERSIZE) | AGP_APER_SIZE_MASK;
 	} else {
@@ -213,8 +214,8 @@ agp_target_get_apsize(agp_target_softstate_t *softstate)
 	}
 	/*
 	 * In some cases, there is no APSIZE register, so the size value
-	 * of 256M could be wrong. Check the value by reading
-	 * the size of the first register set in PCI configuration space.
+	 * of 256M could be wrong. Check the value by reading the size of
+	 * the first register which was set in the PCI configuration space.
 	 */
 	if (size == 256) {
 		if (ddi_dev_regsize(softstate->tsoft_dip,
@@ -238,7 +239,7 @@ agp_target_set_gartaddr(agp_target_softstate_t *softstate, uint32_t gartaddr)
 {
 	ASSERT(softstate->tsoft_acaptr);
 
-	/* Disable GTLB for Intel chipsets */
+	/* Disable the GTLB for Intel chipsets */
 	pci_config_put16(softstate->tsoft_pcihdl,
 	    softstate->tsoft_acaptr + AGP_CONF_CONTROL, 0x0000);
 
@@ -267,7 +268,7 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 			kbytes = 1024; /* 1024K preallocated memory */
 			break;
 		default:
-			kbytes = 0; /* unexpected case */
+			kbytes = 0; /* an unexpected case */
 		}
 		break;
 	case INTEL_BR_830M:
@@ -284,7 +285,7 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 			kbytes = 8 * 1024; /* 8M preallocated memory */
 			break;
 		default:
-			kbytes = 0; /* unexpected case */
+			kbytes = 0; /* an unexpected case */
 		}
 		break;
 	case INTEL_BR_855GM:
@@ -306,7 +307,7 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 			kbytes = 32 * 1024; /* 32M preallocated memory */
 			break;
 		default:
-			kbytes = 0; /* unexpected case */
+			kbytes = 0; /* an unexpected case */
 		}
 		break;
 	case INTEL_BR_865:
@@ -322,7 +323,7 @@ i8xx_biosmem_detect(agp_target_softstate_t *softstate)
 			kbytes = 16 * 1024; /* 16M preallocated memory */
 			break;
 		default:
-			kbytes = 0; /* unexpected case */
+			kbytes = 0; /* an unexpected case */
 		}
 		break;
 	default:
@@ -395,7 +396,7 @@ agp_target_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	    PCI_CONF_VENID);
 	softstate->tsoft_acaptr = agp_target_cap_find(softstate->tsoft_pcihdl);
 	if (softstate->tsoft_acaptr == 0) {
-		/* Make correction for some Intel chipsets */
+		/* Make a correction for some Intel chipsets */
 		if ((softstate->tsoft_devid & VENDOR_ID_MASK) ==
 		    INTEL_VENDOR_ID)
 			softstate->tsoft_acaptr = AGP_CAP_OFF_DEF;
@@ -524,11 +525,11 @@ agp_target_ioctl(dev_t dev, int cmd, intptr_t data, int mode,
 
 	}
 	/*
-	 * This ioctl is only for intel agp chipsets.
-	 * It is not nessary for AMD8151 AGP bridge, because
-	 * this register in AMD8151 does not control any hadware.
-	 * It is  only provided for compatible with intel agp bridge
-	 * Please refer to <<AMD8151 data sheet>> page 24,
+	 * This ioctl is only for Intel AGP chipsets.
+	 * It is not necessary for the AMD8151 AGP bridge, because
+	 * this register in the AMD8151 does not control any hardware.
+	 * It is only provided for compatibility with an Intel AGP bridge.
+	 * Please refer to the <<AMD8151 data sheet>> page 24,
 	 * AGP device GART pointer.
 	 */
 	case AGP_TARGET_SET_GATTADDR:
