@@ -1,4 +1,7 @@
 #
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -19,30 +22,10 @@
 #
 # CDDL HEADER END
 #
-#
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
+# vers file for usr/src/lib/libc_psr/sun4u_hwcap1/sparcv9
 #
-# usr/src/lib/libc_psr/spec/Makefile
-
-SUBDIRS=	sun4u sun4u_hwcap1 sun4u_hwcap2 sun4v_hwcap1
-
-all		:=	TARGET= all
-install		:=	TARGET= install
-clean		:=	TARGET= clean
-clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
-
-.KEEP_STATE:
-
-all install clean clobber lint: $(SUBDIRS)
-
-# spec files do not have msgs or catalogs
-_msg catalog:
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+sparcv9 {
+	SUNWprivate_1.1;
+}

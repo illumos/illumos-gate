@@ -23,11 +23,12 @@
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#pragam ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Platform specific Makefile for libc_psr.
+# Platform specific Makefile for libc_psr_hwcap1.
 #
 PLATFORM	= sun4u-us3
+ALT_PLAT	= sun4u_hwcap1
 COMPAT_PLAT	= sun4u
 CLASS		= 32
 
@@ -35,8 +36,9 @@ OBJECTS		= memcpy.o memset.o memcmp.o
 
 include ../Makefile.com
 
-MAPDIR=		../../spec/$(PLATFORM)/$(MACH)
+MAPDIR=		../../spec/$(ALT_PLAT)/$(MACH)
 MAPFILE=	$(MAPDIR)/mapfile-$(MACH)
+
 MAPFILES=	$(MAPFILE) $(MAPFILE-FLTR)
 MAPOPTS=	$(MAPFILES:%=-M %)
 DYNFLAGS +=	$(MAPOPTS)
@@ -55,19 +57,19 @@ $(MAPFILE):
 
 .KEEP_STATE:
 
-MODULE		= libc_psr.so.1
-LIBC_PSR_DIRS	= $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib)
-LIBC_PSR_LINKS	= $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MODULE))
-INS.slink6	= $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
+MODULE		= libc_psr_hwcap1.so.1
+LIBC_PSR_DIR	= $(ROOT_PSM_LIB_DIR)/libc_psr
+LIBC_PSR_LIB	= $(LIBC_PSR_DIR)/$(MODULE)
+INS.libc	= $(RM) -r $@; $(INS) -s -f $(@D) $(MODULE)
 
-$(LIBC_PSR_DIRS):
+$(LIBC_PSR_DIR):
 	-$(INS.dir.root.bin)
 
-$(LIBC_PSR_LINKS): $(LIBC_PSR_DIRS)
-	-$(INS.slink6)
+$(LIBC_PSR_LIB): $(LIBC_PSR_DIR) $(MODULE)
+	-$(INS.libc)
 
 all:		$(LIBS)
 
-install:	all $(LIBC_PSR_LINKS) $(ROOT_PSM_LIBS)
+install:	all $(LIBC_PSR_LIB)
 
 include ../../Makefile.targ

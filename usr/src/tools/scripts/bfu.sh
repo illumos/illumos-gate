@@ -3524,6 +3524,20 @@ then
 		umount /platform/sun4v/lib/sparcv9/libc_psr.so.1
 	fi
 
+	# umount /platform/sun4u-us3/lib/libc_psr.so.1 if necessary
+	if [ -n "`mount | grep '^/platform/sun4u-us3/lib/libc_psr.so.1'`" ]
+	then
+		print "Unmounting /platform/sun4u-us3/lib/libc_psr.so.1 ..."
+		umount /platform/sun4u-us3/lib/libc_psr.so.1
+	fi
+
+	# umount /platform/sun4u-us3/lib/sparcv9/libc_psr.so.1 if necessary
+	if [ -n "`mount | grep '^/platform/sun4u-us3/lib/sparcv9/libc_psr.so.1'`" ]
+	then
+		print "Unmounting /platform/sun4u-us3/lib/sparcv9/libc_psr.so.1 ..."
+		umount /platform/sun4u-us3/lib/sparcv9/libc_psr.so.1
+	fi
+
 	if [ -x /usr/sbin/zoneadm ]; then
 		#
 		# Stop any running zones: the init script will print a

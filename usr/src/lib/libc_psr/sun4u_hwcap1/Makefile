@@ -20,32 +20,43 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc_psr/spec/sun4u-us3/sparc/Makefile
+# usr/src/lib/libc_psr/sun4u_hwcap1/Makefile
+#
+
+include ../../Makefile.lib
+
+PLATFORM=	sun4u-us3
+ALT_PLAT=	sun4u_hwcap1
+
+SUBDIRS=	$(MACH)
+SUBDIRS64=	$(MACH64)
+
+all		:=	TARGET= all
+install		:=	TARGET= install
+clean		:=	TARGET= clean
+clobber		:=	TARGET= clobber
 
 .KEEP_STATE:
 
-LIBRARY	=	libc_psr.a
-VERS	=	.1
+all install clean clobber : lib32 \
+				$(BUILD64) lib64
 
-PLATFORM=	sun4u-us3
-CLASS	=	32
+lint:
+	@ $(ECHO) "Nothing to lint here: skipping"
 
-OBJECTS	=	c_psr-$(MACH).o
+lib32: spec .WAIT $(SUBDIRS)
 
-SPECVERS =	-$(MACH)
+lib64: $(SUBDIRS64)
 
-include	$(SRC)/lib/Makefile.lib
-include $(SRC)/lib/libc_psr/spec/$(PLATFORM)/Makefile.links
+$(SUBDIRS) $(SUBDIRS64): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
-# Uncomment the following if the linker complains
-#sparc_C_PICFLAGS  = -K PIC
+spec: FRC
+	@cd ../spec/$(ALT_PLAT); pwd; $(MAKE) $(TARGET)
 
-include	$(SRC)/lib/Makefile.spec
-include	$(SRC)/lib/Makefile.spec.psm
-
-install:
+FRC:

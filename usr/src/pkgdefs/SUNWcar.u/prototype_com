@@ -44,6 +44,12 @@ i i.preserve
 #
 # SUNWcar.u
 #
+d none etc 755 root sys
+d none etc/flash 755 root sys
+d none etc/flash/precreation 700 root sys
+d none etc/flash/preexit 700 root sys
+d none etc/flash/postcreation 700 root sys
+f none etc/flash/precreation/caplib 500 root sys
 d none platform 755 root sys
 d none platform/sun4u-us3 755 root sys
 d none platform/SUNW,Netra-T12 755 root sys
@@ -122,8 +128,11 @@ d none platform/SUNW,UltraSPARC-IIi-Netract/lib/sparcv9 755 root bin
 d none platform/SUNW,Netra-CP2300/lib/sparcv9 755 root bin
 d none platform/SUNW,Netra-CP3010/lib/sparcv9 755 root bin
 d none platform/sun4u-us3/lib/sparcv9 755 root bin
+d none platform/sun4u-us3/lib/sparcv9/libc_psr 755 root bin
 f none platform/sun4u/lib/sparcv9/libc_psr.so.1 755 root bin
-f none platform/sun4u-us3/lib/sparcv9/libc_psr.so.1 755 root bin
+v none platform/sun4u-us3/lib/sparcv9/libc_psr.so.1 644 root bin
+f none platform/sun4u-us3/lib/sparcv9/libc_psr/libc_psr_hwcap1.so.1 755 root bin
+f none platform/sun4u-us3/lib/sparcv9/libc_psr/libc_psr_hwcap2.so.1 755 root bin
 s none platform/SUNW,Netra-T12/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
 s none platform/SUNW,Netra-T4/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
 s none platform/SUNW,Serverblade1/lib/sparcv9/libc_psr.so.1=../../../sun4u/lib/sparcv9/libc_psr.so.1
@@ -230,7 +239,10 @@ d none platform/SUNW,Netra-CP2300/lib 755 root bin
 d none platform/SUNW,Netra-CP3010/lib 755 root bin
 f none platform/sun4u/lib/libc_psr.so.1 755 root bin
 d none platform/sun4u-us3/lib 755 root sys
-f none platform/sun4u-us3/lib/libc_psr.so.1 755 root bin
+v none platform/sun4u-us3/lib/libc_psr.so.1 644 root bin
+d none platform/sun4u-us3/lib/libc_psr 755 root sys
+f none platform/sun4u-us3/lib/libc_psr/libc_psr_hwcap1.so.1 755 root bin
+f none platform/sun4u-us3/lib/libc_psr/libc_psr_hwcap2.so.1 755 root bin
 s none platform/SUNW,Ultra-2/lib/libc_psr.so.1=../../sun4u/lib/libc_psr.so.1
 s none platform/SUNW,Ultra-250/lib/libc_psr.so.1=../../sun4u/lib/libc_psr.so.1
 s none platform/SUNW,Ultra-30/lib/libc_psr.so.1=../../sun4u/lib/libc_psr.so.1

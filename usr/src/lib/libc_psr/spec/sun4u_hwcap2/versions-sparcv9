@@ -1,4 +1,7 @@
 #
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -19,34 +22,10 @@
 #
 # CDDL HEADER END
 #
-#
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc_psr/spec/sun4u-us3/sparcv9/Makefile
-
-.KEEP_STATE:
-
-LIBRARY	=	libc_psr.a
-VERS	=	.1
-
-PLATFORM=	sun4u-us3
-CLASS	=	64
-
-OBJECTS	=	c_psr-$(MACH64).o
-
-SPECVERS=	-$(MACH64)
-
-include	$(SRC)/lib/Makefile.lib
-include	$(SRC)/lib/Makefile.lib.64
-include $(SRC)/lib/libc_psr/spec/$(PLATFORM)/Makefile.links
-
-# Uncomment the following if the linker complains
-#sparcv9_C_PICFLAGS  = -K PIC
-
-include	$(SRC)/lib/Makefile.spec
-include	$(SRC)/lib/Makefile.spec.psm
-
-install:
+# vers file for usr/src/lib/libc_psr/sun4u_hwcap2/sparcv9
+#
+sparcv9 {
+	SUNWprivate_1.1;
+}

@@ -47,20 +47,83 @@ libc_mount() {
 	fi
 }
 
-libc_psr_mount() {
+# This mount function is sun4v only. It may be melded with the sun4u-us3
+# version later.
+sun4v_libc_psr_mount() {
 	LIBC_MOE_32=`/usr/bin/moe -32 '/platform/sun4v/lib/libc_psr/$HWCAP'`
 	if [ -n "$LIBC_MOE_32" ]; then
-		/usr/sbin/mount | egrep -s "^/platform/sun4v/lib/libc_psr.so.1 on "
+		/usr/sbin/mount |
+		    egrep -s "^/platform/sun4v/lib/libc_psr.so.1 on "
 		if [ $? -ne 0 ]; then
-			/usr/sbin/mount -O -F lofs $LIBC_MOE_32 /platform/sun4v/lib/libc_psr.so.1
+			/usr/sbin/mount -O -F lofs $LIBC_MOE_32 \
+			    /platform/sun4v/lib/libc_psr.so.1
 		fi
 	fi
 
-	LIBC_MOE_64=`/usr/bin/moe -64 '/platform/sun4v/lib/sparcv9/libc_psr/$HWCAP'`
+	LIBC_MOE_64=`/usr/bin/moe -64 \
+	    '/platform/sun4v/lib/sparcv9/libc_psr/$HWCAP'`
 	if [ -n "$LIBC_MOE_64" ]; then
-		/usr/sbin/mount | egrep -s "^/platform/sun4v/lib/sparcv9/libc_psr.so.1 on "
+		/usr/sbin/mount |
+		    egrep -s "^/platform/sun4v/lib/sparcv9/libc_psr.so.1 on "
 		if [ $? -ne 0 ]; then
-			/usr/sbin/mount -O -F lofs $LIBC_MOE_64 /platform/sun4v/lib/sparcv9/libc_psr.so.1
+			/usr/sbin/mount -O -F lofs $LIBC_MOE_64 \
+			    /platform/sun4v/lib/sparcv9/libc_psr.so.1
+		fi
+	fi
+}
+
+# This is specific to sun4u[-us3].
+# try to intelligently handle the various ways that a hwcap library can
+# be present for libc_psr for sun4u.
+sun4u_libc_psr_mount() {
+	# first look for $PLAT specific
+	# the string $HWCAP is not an env var but part of the argument to moe
+	LIBC_MOE_32=`/usr/bin/moe -32 /platform/$PLAT/lib/libc_psr/'$HWCAP'`
+	if [ -n "$LIBC_MOE_32" ]; then
+		/usr/sbin/mount |
+		    egrep -s "^/platform/$PLAT/lib/libc_psr.so.1 on "
+		if [ $? -ne 0 ]; then
+			/usr/sbin/mount -O -F lofs $LIBC_MOE_32 \
+			    /platform/$PLAT/lib/libc_psr.so.1
+		fi
+	else
+		# try the 'generic' one under $ARCH
+		LIBC_MOE_32=`/usr/bin/moe -32 \
+		    /platform/$ARCH/lib/libc_psr/'$HWCAP'`
+		if [ -n "$LIBC_MOE_32" ]; then
+			/usr/sbin/mount |
+			    egrep -s "^/platform/$ARCH/lib/libc_psr.so.1 on "
+			if [ $? -ne 0 ]; then
+				/usr/sbin/mount -O -F lofs $LIBC_MOE_32 \
+				    /platform/$ARCH/lib/libc_psr.so.1
+			fi
+		fi
+
+	fi
+
+	# now repeat for 64 bit.
+
+	LIBC_MOE_64=`/usr/bin/moe -64 \
+	    /platform/$PLAT/lib/sparcv9/libc_psr/'$HWCAP'`
+	if [ -n "$LIBC_MOE_64" ]; then
+		/usr/sbin/mount |
+		    egrep -s "^/platform/$PLAT/lib/sparcv9/libc_psr.so.1 on "
+		if [ $? -ne 0 ]; then
+			/usr/sbin/mount -O -F lofs $LIBC_MOE_64 \
+			    /platform/$PLAT/lib/sparcv9/libc_psr.so.1
+		fi
+	else
+		# now try $ARCH version
+		LIBC_MOE_64=`/usr/bin/moe -64 \
+		    /platform/$ARCH/lib/sparcv9/libc_psr/'$HWCAP'`
+		if [ -n "$LIBC_MOE_64" ]; then
+			/usr/sbin/mount |
+			    egrep -s \
+			    "^/platform/$ARCH/lib/sparcv9/libc_psr.so.1 on "
+			if [ $? -ne 0 ]; then
+				/usr/sbin/mount -O -F lofs $LIBC_MOE_64 \
+				    /platform/$ARCH/lib/sparcv9/libc_psr.so.1
+			fi
 		fi
 	fi
 }
@@ -176,6 +239,22 @@ fi
 
 libc_mount
 
-libc_psr_mount
+# 
+# Discover architecture and find and mount optimal libc_psr 
+#  
+PLAT=`/usr/bin/uname -i` 
+ARCH=`/usr/bin/uname -m` 
+if [ "$ARCH" = "sun4v" ]; then 
+	sun4v_libc_psr_mount 
+elif [ "$ARCH" = "sun4u" ]; then 
+	if [ -h /platform/$PLAT/lib/libc_psr.so.1 ]; then 
+		LINKSTO=`/usr/bin/ls -l /platform/$PLAT/lib/libc_psr.so.1 | 
+			/usr/bin/awk '{print $NF}'` 
+		if [ "$LINKSTO" = "../../sun4u-us3/lib/libc_psr.so.1" ]; then 
+			ARCH=sun4u-us3 
+		fi
+	fi
+	sun4u_libc_psr_mount 
+fi
 
 exit 0

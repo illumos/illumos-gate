@@ -30,7 +30,7 @@
 
 include ../Makefile.lib
 
-SUBDIRS=	sun4u sun4u-us3 sun4v sun4v_hwcap1
+SUBDIRS=	sun4u sun4u-us3 sun4u_hwcap1 sun4u_hwcap2 sun4v sun4v_hwcap1 etc
 
 all :=		TARGET= all
 install :=	TARGET= install

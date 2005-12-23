@@ -24,7 +24,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc_psr/spec/sun4u-us3/c_psr-sparc.spec
+# usr/src/lib/libc_psr/spec/sun4u_hwcap1/c_psr-sparc.spec
 
 function	memcmp extends libc/spec/gen.spec
 arch		sparc

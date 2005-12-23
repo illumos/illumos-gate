@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,10 +19,44 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# vers file for libc_psr/sun4u-us3/sparcv9
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-sparcv9 {
-	SUNWprivate_1.1;
-}
+#pragam ident	"%Z%%M%	%I%	%E% SMI"
+#
+# usr/src/lib/libc_psr/sun4u_hwcap2/Makefile
+#
+
+include ../../Makefile.lib
+
+PLATFORM=	sun4u-us3
+ALT_PLAT=	sun4u_hwcap2
+
+SUBDIRS=	$(MACH)
+SUBDIRS64=	$(MACH64)
+
+all		:=	TARGET= all
+install		:=	TARGET= install
+clean		:=	TARGET= clean
+clobber		:=	TARGET= clobber
+
+.KEEP_STATE:
+
+all install clean clobber : lib32 \
+				$(BUILD64) lib64
+
+lint:
+	@ $(ECHO) "Nothing to lint here: skipping"
+
+lib32: spec .WAIT $(SUBDIRS)
+
+lib64: $(SUBDIRS64)
+
+$(SUBDIRS) $(SUBDIRS64): FRC
+	@cd $@; pwd; $(MAKE) $(TARGET)
+
+spec: FRC
+	@cd ../spec/$(ALT_PLAT); pwd; $(MAKE) $(TARGET)
+
+FRC:

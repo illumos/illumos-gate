@@ -20,29 +20,33 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/lib/libc_psr/spec/Makefile
-
-SUBDIRS=	sun4u sun4u_hwcap1 sun4u_hwcap2 sun4v_hwcap1
-
-all		:=	TARGET= all
-install		:=	TARGET= install
-clean		:=	TARGET= clean
-clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# usr/src/lib/libc_psr/spec/sun4u_hwcap2/sparc/Makefile
 
 .KEEP_STATE:
 
-all install clean clobber lint: $(SUBDIRS)
+LIBRARY	=	libc_psr_hwcap2.a
+VERS	=	.1
 
-# spec files do not have msgs or catalogs
-_msg catalog:
+PLATFORM=	sun4u-us3
+ALT_PLAT=	sun4u_hwcap2
+CLASS	=	32
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+OBJECTS	=	c_psr-$(MACH).o
 
-FRC:
+SPECVERS =	-$(MACH)
+
+include	$(SRC)/lib/Makefile.lib
+include $(SRC)/lib/libc_psr/spec/$(ALT_PLAT)/Makefile.links
+
+# Uncomment the following if the linker complains
+#sparc_C_PICFLAGS  = -K PIC
+
+include	$(SRC)/lib/Makefile.spec
+include	$(SRC)/lib/Makefile.spec.psm
+
+install:

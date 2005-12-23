@@ -20,41 +20,87 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc_psr/sun4u-us3/Makefile
+# usr/src/lib/libc_psr/sun4u-us3/Makefile
 #
 
-include ../../Makefile.lib
+include $(SRC)/lib/Makefile.lib
+include $(SRC)/Makefile.psm
 
-PLATFORM=	sun4u-us3
-SUBDIRS=	$(MACH)
-SUBDIRS64=	$(MACH64)
+PLATFORM	=	sun4u-us3
 
 all		:=	TARGET= all
 install		:=	TARGET= install
 clean		:=	TARGET= clean
 clobber		:=	TARGET= clobber
 
-.KEEP_STATE:
+TOUCH		= /usr/bin/touch
 
-all install clean clobber : lib32 \
-				$(BUILD64) lib64
+MODULE		= libc_psr.so.1
+LIBC_PSR_DIRS   = $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib)
+LIBC_PSR_LINKS  = $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MODULE))
+INS.slink6      = $(RM) -r $@; $(SYMLINK) ../../$(PLATFORM)/lib/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
+LIBC_PSR64_DIRS	= $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MACH64))
+LIBC_PSR64_LINKS = $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MACH64)/$(MODULE))
+INS.slink7	= $(RM) -r $@; $(SYMLINK) ../../../$(PLATFORM)/lib/$(MACH64)/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
 
-lint:
-	@ $(ECHO) "Nothing to lint here: skipping"
+#
+# Used when building links in /platform/$(PLATFORM)/lib
+#
+LINKED_PLATFORMS	= SUNW,Sun-Blade-1000
+LINKED_PLATFORMS	+= SUNW,Sun-Blade-1500
+LINKED_PLATFORMS	+= SUNW,Sun-Blade-2500
+LINKED_PLATFORMS	+= SUNW,A70
+LINKED_PLATFORMS	+= SUNW,Sun-Fire
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-V240
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-V250
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-V440
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-280R
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-15000
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-880
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-480R
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-V890
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-V490
+LINKED_PLATFORMS	+= SUNW,Netra-T12
+LINKED_PLATFORMS	+= SUNW,Netra-T4
+LINKED_PLATFORMS	+= SUNW,Netra-CP3010
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-V215
+LINKED_PLATFORMS	+= SUNW,Sun-Fire-V445
 
-lib32: spec .WAIT $(SUBDIRS)
+$(ROOT_PSM_LIB_DIR):
+	-$(INS.dir.root.bin)
 
-lib64: $(SUBDIRS64)
+$(ROOT_PSM_LIB_DIR)/$(MODULE):	$(ROOT_PSM_LIB_DIR) $(MODULE)
+	$(RM) -r $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(MODULE)
 
-$(SUBDIRS) $(SUBDIRS64): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(ROOT_PSM_LIB64_DIR):
+	-$(INS.dir.root.bin)
 
-spec: FRC
-	@cd ../spec/$(PLATFORM); pwd; $(MAKE) $(TARGET)
+$(ROOT_PSM_LIB64_DIR)/$(MODULE):	$(ROOT_PSM_LIB64_DIR) $(MODULE)
+	$(RM) -r $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(MODULE)
+
+$(LIBC_PSR_DIRS):
+	-$(INS.dir.root.bin)
+
+$(LIBC_PSR_LINKS): $(LIBC_PSR_DIRS)
+	-$(INS.slink6)
+
+$(LIBC_PSR64_DIRS):
+	-$(INS.dir.root.bin)
+
+$(LIBC_PSR64_LINKS): $(LIBC_PSR64_DIRS)
+	-$(INS.slink7)
+
+all:	FRC
+	@$(TOUCH) $(MODULE)
+
+install:	all $(ROOT_PSM_LIB_DIR)/$(MODULE) $(ROOT_PSM_LIB64_DIR)/$(MODULE) $(LIBC_PSR_LINKS) $(LIBC_PSR64_LINKS)
+
+clean clobber : FRC
+	$(RM) $(MODULE)
 
 FRC:

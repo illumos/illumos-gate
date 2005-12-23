@@ -20,14 +20,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Platform specific Makefile for libc_psr.
+# Platform specific Makefile for libc_psr_hwcap2.
 #
 PLATFORM	= sun4u-us3
+ALT_PLAT	= sun4u_hwcap2
 COMPAT_PLAT	= sun4u
 CLASS		= 64
 
@@ -35,9 +36,11 @@ OBJECTS		= memcpy.o memset.o memcmp.o
 
 include ../Makefile.com
 
-MAPDIR=		../../spec/$(PLATFORM)/$(MACH64)
+MAPDIR=		../../spec/$(ALT_PLAT)/$(MACH64)
 MAPFILE=	$(MAPDIR)/mapfile-$(MACH64)
-MAPFILES=	$(MAPFILE) $(MAPFILE-FLTR)
+HWCAPMAPFILE=	../mapfile
+
+MAPFILES=	$(MAPFILE) $(HWCAPMAPFILE) $(MAPFILE-FLTR)
 MAPOPTS=	$(MAPFILES:%=-M %)
 DYNFLAGS +=	$(MAPOPTS)
 CLOBBERFILES +=	$(MAPFILE)
@@ -59,19 +62,19 @@ $(MAPFILE):
 
 .KEEP_STATE:
 
-MODULE		= libc_psr.so.1
-LIBC_PSR64_DIRS = $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MACH64))
-LIBC_PSR64_LINKS = $(LINKED_PLATFORMS:%=$(ROOT_PLAT_DIR)/%/lib/$(MACH64)/$(MODULE))
-INS.slink7	= $(RM) -r $@; $(SYMLINK) ../../../$(PLATFORM)/lib/$(MACH64)/$(MODULE) $@ $(CHOWNLINK) $(CHGRPLINK)
+MODULE		= libc_psr_hwcap2.so.1
+LIBC_PSR64_DIR	= $(ROOT_PSM_LIB_DIR)/$(MACH64)/libc_psr
+LIBC_PSR64_LIB	= $(LIBC_PSR64_DIR)/$(MODULE)
+INS.libc.64	= $(RM) -r $@; $(INS) -f $(@D) $(MODULE)
 
-$(LIBC_PSR64_DIRS):
+$(LIBC_PSR64_DIR):
 	-$(INS.dir.root.bin)
 
-$(LIBC_PSR64_LINKS): $(LIBC_PSR64_DIRS)
-	-$(INS.slink7)
+$(LIBC_PSR64_LIB): $(LIBC_PSR64_DIR) $(MODULE)
+	-$(INS.libc.64)
 
 all:		$(LIBS)
 
-install:	all $(LIBC_PSR64_LINKS) $(ROOT_PSM_LIB64_DIR)/$(LIBS)
+install:	all $(LIBC_PSR64_LIB)
 
 include ../../Makefile.targ

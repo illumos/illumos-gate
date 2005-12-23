@@ -24,44 +24,4 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/libc_psr/spec/sun4u-us3/c_psr-sparcv9.spec
-
-function	memcmp extends libc/spec/gen.spec
-arch		sparcv9
-version		SUNWprivate_1.1
-end		
-
-function	_memcmp extends libc/spec/private.spec
-arch		sparcv9
-version		SUNWprivate_1.1
-end		
-
-function	memcpy extends libc/spec/gen.spec
-arch		sparcv9
-version		SUNWprivate_1.1
-end		
-
-function	_memcpy extends libc/spec/private.spec
-arch		sparcv9
-version		SUNWprivate_1.1
-end		
-
-function	memmove extends libc/spec/gen.spec
-arch		sparcv9
-version		SUNWprivate_1.1
-end		
-
-function	_memmove extends libc/spec/private.spec
-arch		sparcv9
-version		SUNWprivate_1.1
-end		
-
-function	memset extends libc/spec/gen.spec
-arch		sparcv9
-version		SUNWprivate_1.1
-end		
-
-function	_memset extends libc/spec/private.spec
-arch		sparcv9
-version		SUNWprivate_1.1
-end		
+hwcap_1 = popc;

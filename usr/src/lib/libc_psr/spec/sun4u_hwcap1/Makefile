@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -22,10 +19,13 @@
 #
 # CDDL HEADER END
 #
+#
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# vers file for libc_psr/sun4u-us3/sparc
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-sparc {
-	SUNWprivate_1.1;
-}
+# usr/src/lib/libc_psr/spec/sun4u_hwcap1/Makefile
+
+include	$(SRC)/lib/Makefile.spec.arch
+

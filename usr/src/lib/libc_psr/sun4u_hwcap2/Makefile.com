@@ -20,29 +20,46 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/lib/libc_psr/spec/Makefile
+#pragam ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-SUBDIRS=	sun4u sun4u_hwcap1 sun4u_hwcap2 sun4v_hwcap1
+#
+#	Create default so empty rules don't
+#	confuse make
+#
 
-all		:=	TARGET= all
-install		:=	TARGET= install
-clean		:=	TARGET= clean
-clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
+LIBRARY		= libc_psr_hwcap2.a
+VERS		= .1
 
-.KEEP_STATE:
+include $(SRC)/lib/Makefile.lib
+include $(SRC)/Makefile.psm
 
-all install clean clobber lint: $(SUBDIRS)
+#
+# Since libc_psr is strictly assembly, deactivate the CTF build logic.
+#
+CTFCONVERT_POST	= :
+CTFMERGE_LIB	= :
 
-# spec files do not have msgs or catalogs
-_msg catalog:
+LIBS		= $(DYNLIB)
+IFLAGS		= -I$(SRC)/lib/libc/inc -I$(SRC)/uts/sun4u \
+		  -I$(ROOT)/usr/platform/sun4u/include
+# See note in memcpy.s for use of bst threshold.
+CPPFLAGS	= -DBSTORE_SIZE=65536 \
+		  -D_REENTRANT -D$(MACH) $(IFLAGS) $(CPPFLAGS.master)
+ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)
+ASFLAGS		= -P $(ASDEFS)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+#
+# build rules
+#
+pics/%.o: ../../$(PLATFORM)/common/%.s
+	$(AS) $(ASFLAGS) $< -o $@
+	$(POST_PROCESS_O)
 
-FRC:
+pics/%.o: ../../$(COMPAT_PLAT)/common/%.s
+	$(AS) $(ASFLAGS) $< -o $@
+	$(POST_PROCESS_O)
+

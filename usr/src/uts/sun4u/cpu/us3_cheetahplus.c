@@ -157,6 +157,8 @@ cpu_fix_allpanther(void)
 	ecache_setsize = PN_L3_SET_SIZE;
 	ASSERT(ecache_setsize >= (ecache_size / ecache_associativity));
 	/* vac same as Ch+ */
+	/* fix hwcaps for USIV+-only domains */
+	cpu_hwcap_flags |= AV_SPARC_POPC;
 }
 
 void

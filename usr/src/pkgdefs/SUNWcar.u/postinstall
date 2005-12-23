@@ -1,3 +1,4 @@
+#!/sbin/sh
 #
 # CDDL HEADER START
 #
@@ -20,29 +21,33 @@
 # CDDL HEADER END
 #
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# usr/src/lib/libc_psr/spec/Makefile
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#
+# SUNWcar.u postinstall script
+#
 
-SUBDIRS=	sun4u sun4u_hwcap1 sun4u_hwcap2 sun4v_hwcap1
+PATH="/usr/bin:/usr/sbin:${PATH}"
+export PATH
 
-all		:=	TARGET= all
-install		:=	TARGET= install
-clean		:=	TARGET= clean
-clobber		:=	TARGET= clobber
-lint		:=	TARGET= lint
+EXIT=0
 
-.KEEP_STATE:
+LIBC_MOE_32=`moe -32 '/platform/sun4u-us3/lib/libc_psr/$HWCAP'`
+if [ -n "$LIBC_MOE_32" ]; then
+	mount | egrep -s "^/platform/sun4u-us3/lib/libc_psr.so.1 on "
+	if [ $? -ne 0 ]; then
+		mount -O -F lofs $LIBC_MOE_32 /platform/sun4u-us3/lib/libc_psr.so.1
+	fi
+fi
 
-all install clean clobber lint: $(SUBDIRS)
+LIBC_MOE_64=`moe -64 '/platform/sun4u-us3/lib/sparcv9/libc_psr/$HWCAP'`
+if [ -n "$LIBC_MOE_64" ]; then
+	mount | egrep -s "^/platform/sun4u-us3/lib/sparcv9/libc_psr.so.1 on "
+	if [ $? -ne 0 ]; then
+		mount -O -F lofs $LIBC_MOE_64 /platform/sun4u-us3/lib/sparcv9/libc_psr.so.1
+	fi
+fi
 
-# spec files do not have msgs or catalogs
-_msg catalog:
-
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+exit $EXIT
