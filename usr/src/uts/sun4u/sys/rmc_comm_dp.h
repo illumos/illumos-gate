@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,7 +126,7 @@ typedef struct dp_req_resp {
 #define	MSG_SENT_BP	0x40
 #define	MSG_RXED_BP	0x80
 
-	uint8_t		error_status;   /* error code */
+	int		error_status;   /* error code */
 
 	uint8_t		retries_left;   /* number of retries left */
 

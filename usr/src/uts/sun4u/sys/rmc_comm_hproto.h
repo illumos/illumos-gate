@@ -216,6 +216,15 @@ typedef struct dp_get_temp_r {
 	rsci32	current_temp;
 } dp_get_temp_r_t;
 
+/*
+ * Implementations using this level of protocol or above,
+ * will generate a response to any supplied command code.
+ * This doesn't mean they will support a given command.
+ * It only means that they will generate a response to that
+ * command.
+ */
+#define	SDP_RESPONDS_TO_ALL_CMDS	3
+
 #define	DP_GET_SDP_VERSION	0x7B
 
 #define	DP_GET_SDP_VERSION_R	0x5B
@@ -1003,6 +1012,17 @@ typedef struct dp_get_event_log2_r {
 	char		buffer[DP_MAX_MSGLEN - (sizeof (rsci64) * 2 +
 			    sizeof (rsci16))];
 } dp_get_event_log2_r_t;
+
+/*
+ * This is ALOM's response to command codes it does not know.  It will
+ * return the unknown command code in inv_type.  Note that this is
+ * available starting with protocol version 3.  ALOM will not respond
+ * to unknown commands in older versions of the protocol.
+ */
+#define	DP_INVCMD	0x7F
+typedef struct dp_invcmd {
+	uint8_t inv_type;
+} dp_invcmd_t;
 
 #ifdef	__cplusplus
 }
