@@ -228,6 +228,7 @@ typedef struct vdev_stat {
 	uint64_t	vs_aux;			/* see vdev_aux_t	*/
 	uint64_t	vs_alloc;		/* space allocated	*/
 	uint64_t	vs_space;		/* total capacity	*/
+	uint64_t	vs_rsize;		/* replaceable dev size */
 	uint64_t	vs_ops[ZIO_TYPES];	/* operation count	*/
 	uint64_t	vs_bytes[ZIO_TYPES];	/* bytes read/written	*/
 	uint64_t	vs_read_errors;		/* read errors		*/

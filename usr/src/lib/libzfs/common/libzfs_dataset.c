@@ -883,6 +883,12 @@ zfs_prop_set(zfs_handle_t *zhp, zfs_prop_t prop, const char *propval)
 			}
 			break;
 
+		case EROFS:
+			zfs_error(dgettext(TEXT_DOMAIN, "cannot set %s for "
+			    "'%s': read only %s"), propname, zhp->zfs_name,
+			    zfs_type_to_name(zhp->zfs_type));
+			break;
+
 		case EOVERFLOW:
 			/*
 			 * This platform can't address a volume this big.

@@ -910,7 +910,11 @@ spa_vdev_attach(spa_t *spa, const char *path, nvlist_t *nvroot, int replacing)
 	if ((error = vdev_create(newrootvd, txg)) != 0)
 		return (spa_vdev_exit(spa, newrootvd, txg, error));
 
-	if (newvd->vdev_psize < oldvd->vdev_psize)
+	/*
+	 * Compare the new device size with the replaceable/attachable
+	 * device size.
+	 */
+	if (newvd->vdev_psize < vdev_get_rsize(oldvd))
 		return (spa_vdev_exit(spa, newrootvd, txg, EOVERFLOW));
 
 	if (newvd->vdev_ashift != oldvd->vdev_ashift && oldvd->vdev_ashift != 0)

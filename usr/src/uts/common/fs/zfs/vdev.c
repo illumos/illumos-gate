@@ -89,6 +89,43 @@ vdev_default_asize(vdev_t *vd, uint64_t psize)
 	return (asize);
 }
 
+/*
+ * Get the replaceable or attachable device size.
+ * If the parent is a mirror or raidz, the replaceable size is the minimum
+ * psize of all its children. For the rest, just return our own psize.
+ *
+ * e.g.
+ *			psize	rsize
+ * root			-	-
+ *	mirror/raidz	-	-
+ *	    disk1	20g	20g
+ *	    disk2 	40g	20g
+ *	disk3 		80g	80g
+ */
+uint64_t
+vdev_get_rsize(vdev_t *vd)
+{
+	vdev_t *pvd, *cvd;
+	uint64_t c, rsize;
+
+	pvd = vd->vdev_parent;
+
+	/*
+	 * If our parent is NULL or the root, just return our own psize.
+	 */
+	if (pvd == NULL || pvd->vdev_parent == NULL)
+		return (vd->vdev_psize);
+
+	rsize = 0;
+
+	for (c = 0; c < pvd->vdev_children; c++) {
+		cvd = pvd->vdev_child[c];
+		rsize = MIN(rsize - 1, cvd->vdev_psize - 1) + 1;
+	}
+
+	return (rsize);
+}
+
 vdev_t *
 vdev_lookup_top(spa_t *spa, uint64_t vdev)
 {
@@ -1442,6 +1479,7 @@ vdev_get_stats(vdev_t *vd, vdev_stat_t *vs)
 	bcopy(&vd->vdev_stat, vs, sizeof (*vs));
 	vs->vs_timestamp = gethrtime() - vs->vs_timestamp;
 	vs->vs_state = vd->vdev_state;
+	vs->vs_rsize = vdev_get_rsize(vd);
 	mutex_exit(&vd->vdev_stat_lock);
 
 	/*

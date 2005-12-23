@@ -277,9 +277,10 @@ extern vdev_ops_t vdev_file_ops;
 extern vdev_ops_t vdev_missing_ops;
 
 /*
- * Common asize function
+ * Common size functions
  */
 extern uint64_t vdev_default_asize(vdev_t *vd, uint64_t psize);
+extern uint64_t vdev_get_rsize(vdev_t *vd);
 
 #ifdef	__cplusplus
 }
