@@ -39,6 +39,9 @@
 i pkginfo
 i copyright
 i i.preserve
+i postinstall
+i preinstall
+i preremove
 #
 # source locations relative to the prototype file
 #
