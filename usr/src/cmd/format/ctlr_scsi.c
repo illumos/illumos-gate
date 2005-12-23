@@ -2554,12 +2554,6 @@ uscsi_read_capacity(fd, capacity)
 
 		status = uscsi_cmd(fd, &ucmd,
 			(option_msg && diag_msg) ? F_NORMAL : F_SILENT);
-
-		capacity->sc_capacity = BE_64(capacity->sc_capacity);
-		capacity->sc_lbasize = BE_32(capacity->sc_lbasize);
-	} else {
-		capacity->sc_capacity = (uint64_t)BE_32(cap_old.capacity);
-		capacity->sc_lbasize = BE_32(cap_old.lbasize);
 	}
 
 	if (status) {
@@ -2577,9 +2571,23 @@ uscsi_read_capacity(fd, capacity)
 		/*
 		 * Dump the capacity data if anyone's interested
 		 */
-		dump("Capacity: ", (caddr_t)capacity,
-			sizeof (struct scsi_capacity_16), HEX_ONLY);
+		if (cap_old.capacity == UINT_MAX32) {
+			dump("Capacity: ", (caddr_t)capacity,
+				sizeof (struct scsi_capacity_16), HEX_ONLY);
+		} else {
+			dump("Capacity: ", (caddr_t)&cap_old,
+				sizeof (struct scsi_capacity), HEX_ONLY);
+		}
 	}
+
+	if (cap_old.capacity == UINT_MAX32) {
+		capacity->sc_capacity = BE_64(capacity->sc_capacity);
+		capacity->sc_lbasize = BE_32(capacity->sc_lbasize);
+	} else {
+		capacity->sc_capacity = (uint64_t)BE_32(cap_old.capacity);
+		capacity->sc_lbasize = BE_32(cap_old.lbasize);
+	}
+
 	return (status);
 }
 
