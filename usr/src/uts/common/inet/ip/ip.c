@@ -4275,8 +4275,29 @@ ip_bind_connected(conn_t *connp, mblk_t *mp, ipaddr_t *src_addrp,
 			    (dst_ire->ire_ipif->ipif_flags &
 			    IPIF_DEPRECATED) ||
 			    (dst_ill->ill_usesrc_ifindex != 0))) {
+				/*
+				 * If the destination is reachable via a
+				 * given gateway, the selected source address
+				 * should be in the same subnet as the gateway.
+				 * Otherwise, the destination is not reachable.
+				 *
+				 * If there are no interfaces on the same subnet
+				 * as the destination, ipif_select_source gives
+				 * first non-deprecated interface which might be
+				 * on a different subnet than the gateway.
+				 * This is not desirable. Hence pass the dst_ire
+				 * source address to ipif_select_source.
+				 * It is sure that the destination is reachable
+				 * with the dst_ire source address subnet.
+				 * So passing dst_ire source address to
+				 * ipif_select_source will make sure that the
+				 * selected source will be on the same subnet
+				 * as dst_ire source address.
+				 */
+				ipaddr_t saddr =
+				    dst_ire->ire_ipif->ipif_src_addr;
 				src_ipif = ipif_select_source(dst_ill,
-				    dst_addr, zoneid);
+				    saddr, zoneid);
 				if (src_ipif != NULL) {
 					if (IS_VNI(src_ipif->ipif_ill)) {
 						/*
@@ -7130,7 +7151,27 @@ ip_newroute(queue_t *q, mblk_t *mp, ipaddr_t dst, ill_t *in_ill, conn_t *connp)
 			    (ire->ire_ipif->ipif_flags & IPIF_DEPRECATED) ||
 			    (connp != NULL && ire->ire_zoneid != zoneid) ||
 			    (dst_ill->ill_usesrc_ifindex != 0)) {
-				src_ipif = ipif_select_source(dst_ill, dst,
+				/*
+				 * If the destination is reachable via a
+				 * given gateway, the selected source address
+				 * should be in the same subnet as the gateway.
+				 * Otherwise, the destination is not reachable.
+				 *
+				 * If there are no interfaces on the same subnet
+				 * as the destination, ipif_select_source gives
+				 * first non-deprecated interface which might be
+				 * on a different subnet than the gateway.
+				 * This is not desirable. Hence pass the dst_ire
+				 * source address to ipif_select_source.
+				 * It is sure that the destination is reachable
+				 * with the dst_ire source address subnet.
+				 * So passing dst_ire source address to
+				 * ipif_select_source will make sure that the
+				 * selected source will be on the same subnet
+				 * as dst_ire source address.
+				 */
+				ipaddr_t saddr = ire->ire_ipif->ipif_src_addr;
+				src_ipif = ipif_select_source(dst_ill, saddr,
 				    zoneid);
 				if (src_ipif == NULL) {
 					if (ip_debug > 2) {
