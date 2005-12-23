@@ -2044,6 +2044,30 @@ __s_api_contain_passwd_control_oid(char **oids)
 
 	return (0);
 }
+
+/*
+ * Determine if the input OID list contains LDAP V3 password less
+ * account management control OID, which is:
+ * NS_LDAP_ACCOUNT_USABLE_CONTROL:1.3.6.1.4.1.42.2.27.9.5.8
+ * If yes, return 1, if no, 0.
+ */
+int
+__s_api_contain_account_usable_control_oid(char **oids)
+{
+	char **oid;
+
+	if (oids == NULL)
+		return (0);
+
+	for (oid = oids; *oid; oid++) {
+		if (strcmp(*oid, NS_LDAP_ACCOUNT_USABLE_CONTROL) == 0) {
+			return (1);
+		}
+	}
+
+	return (0);
+}
+
 /*
  * For some databases in name switch, the name and aliases are saved
  * as "cn". When the "cn" valuse are retrieved, there is no distinction

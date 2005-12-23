@@ -551,3 +551,13 @@ declaration	char * __s_api_get_canonical_name( \
 version		SUNWprivate_1.1
 exception	$return == NULL
 end
+
+function	__ns_ldap_getAcctMgmt
+include		"../../common/ns_sldap.h"
+include		"../../common/ns_internal.h"
+declaration	int __ns_ldap_getAcctMgmt( \
+			const char *user, \
+			AcctUsableResponse_t *acctResp);
+version		SUNWprivate_1.1
+exception	$return == -1
+end

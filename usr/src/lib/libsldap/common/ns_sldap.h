@@ -286,6 +286,10 @@ typedef enum {
 
 /*
  * Password management information structure
+ *
+ * This structure is different from AcctUsableResponse_t structure in
+ * that this structure holds result of users account mgmt information when
+ * an ldap bind is done with user name and user password.
  */
 typedef struct ns_ldap_passwd_mgmt {
 	ns_ldap_passwd_status_t
@@ -295,6 +299,53 @@ typedef struct ns_ldap_passwd_mgmt {
 					/* NS_PASSWD_ABOUT_TO_EXPIRE */
 } ns_ldap_passwd_mgmt_t;
 
+/*
+ * LDAP V3 control flag for account management - Used for account management
+ * when no password is provided
+ */
+#define	NS_LDAP_ACCOUNT_USABLE_CONTROL	"1.3.6.1.4.1.42.2.27.9.5.8"
+
+/*
+ * Structure for holding the response returned by server for
+ * NS_LDAP_ACCOUNT_USABLE_CONTROL control when account is not available.
+ */
+typedef struct AcctUsableMoreInfo {
+	int inactive;
+	int reset;
+	int expired;
+	int rem_grace;
+	int sec_b4_unlock;
+} AcctUsableMoreInfo_t;
+
+/*
+ * Structure used to hold the response from the server for
+ * NS_LDAP_ACCOUNT_USABLE_CONTROL control. The ASN1 notation is as below:
+ *
+ * ACCOUNT_USABLE_RESPONSE::= CHOICE {
+ * is_available		[0] INTEGER, seconds before expiration
+ * is_not_available	[1] More_info
+ * }
+ *
+ * More_info::= SEQUENCE {
+ * inactive		[0] BOOLEAN DEFAULT FALSE,
+ * reset		[1] BOOLEAN DEFAULT FALSE,
+ * expired		[2] BOOLEAN DEFAULT FALSE,
+ * remaining_grace	[3] INTEGER OPTIONAL,
+ * seconds_before_unlock[4] INTEGER OPTIONAL
+ * }
+ *
+ * This structure is different from ns_ldap_passwd_mgmt_t structure in
+ * that this structure holds result of users account mgmt information when
+ * pam_ldap doesn't have the users password and proxy agent is used for
+ * obtaining the account management information.
+ */
+typedef struct AcctUsableResponse {
+	int choice;
+	union {
+		int seconds_before_expiry;
+		AcctUsableMoreInfo_t more_info;
+	} AcctUsableResp;
+} AcctUsableResponse_t;
 
 /*
  * Simplified LDAP Naming API result structure
@@ -610,6 +661,10 @@ char **__ns_ldap_getOrigObjectClass(
 int __ns_ldap_getParamType(
 	const char *value,
 	ParamIndexType *type);
+
+int __ns_ldap_getAcctMgmt(
+	const char *user,
+	AcctUsableResponse_t *acctResp);
 #ifdef __cplusplus
 }
 #endif

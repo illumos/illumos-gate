@@ -1020,6 +1020,8 @@ delete_search_cookie(ns_ldap_cookie_t *cookie)
 	if (cookie->ctrlCookie)
 		ber_bvfree(cookie->ctrlCookie);
 	_freeControlList(&cookie->p_serverctrls);
+	if (cookie->resultctrl)
+		ldap_controls_free(cookie->resultctrl);
 	free(cookie);
 }
 
@@ -1549,7 +1551,8 @@ get_current_session(ns_ldap_cookie_t *cookie)
 
 	rc = __s_api_getConnection(NULL, cookie->i_flags,
 		cookie->i_auth, &connectionId, &conp,
-		&cookie->errorp, fail_if_new_pwd_reqd);
+		&cookie->errorp, fail_if_new_pwd_reqd,
+		cookie->nopasswd_acct_mgmt);
 
 	/*
 	 * If password control attached in *cookie->errorp,
@@ -1588,7 +1591,8 @@ get_next_session(ns_ldap_cookie_t *cookie)
 
 	rc = __s_api_getConnection(NULL, cookie->i_flags,
 		cookie->i_auth, &connectionId, &conp,
-		&cookie->errorp, fail_if_new_pwd_reqd);
+		&cookie->errorp, fail_if_new_pwd_reqd,
+		cookie->nopasswd_acct_mgmt);
 
 	/*
 	 * If password control attached in *cookie->errorp,
@@ -1625,8 +1629,9 @@ get_referral_session(ns_ldap_cookie_t *cookie)
 		DropConnection(cookie->connectionId, cookie->i_flags);
 
 	rc = __s_api_getConnection(cookie->refpos->refHost, 0,
-			cookie->i_auth, &connectionId, &conp,
-			&cookie->errorp, fail_if_new_pwd_reqd);
+		cookie->i_auth, &connectionId, &conp,
+		&cookie->errorp, fail_if_new_pwd_reqd,
+		cookie->nopasswd_acct_mgmt);
 
 	/*
 	 * If password control attached in *cookie->errorp,
@@ -2028,6 +2033,13 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 
 	for (;;) {
 		switch (cookie->state) {
+		case GET_ACCT_MGMT_INFO:
+			/*
+			 * Set the flag to get ldap account management controls.
+			 */
+			cookie->nopasswd_acct_mgmt = 1;
+			cookie->new_state = INIT;
+			break;
 		case EXIT:
 			/* state engine/connection cleaned up in delete */
 			if (cookie->attribute) {
@@ -2261,6 +2273,17 @@ search_state_machine(ns_ldap_cookie_t *cookie, ns_state_t state, int cycle)
 				break;
 			}
 			/* else LDAP_RES_SEARCH_ENTRY */
+			/* get account management response control */
+			if (cookie->nopasswd_acct_mgmt == 1) {
+				rc = ldap_get_entry_controls(cookie->conn->ld,
+					cookie->resultMsg,
+					&(cookie->resultctrl));
+				if (rc != LDAP_SUCCESS) {
+					cookie->new_state = LDAP_ERROR;
+					cookie->err_rc = rc;
+					break;
+				}
+			}
 			rc = __s_api_getEntry(cookie);
 			(void) ldap_msgfree(cookie->resultMsg);
 			cookie->resultMsg = NULL;
@@ -2976,6 +2999,7 @@ __ns_ldap_auth(const ns_cred_t *auth,
 	Connection	*conp;
 	int		rc = 0;
 	int		do_not_fail_if_new_pwd_reqd = 0;
+	int		nopasswd_acct_mgmt = 0;
 
 
 #ifdef DEBUG
@@ -2988,7 +3012,7 @@ __ns_ldap_auth(const ns_cred_t *auth,
 
 	rc = __s_api_getConnection(NULL, flags,
 			auth, &connectionId, &conp, errorp,
-			do_not_fail_if_new_pwd_reqd);
+			do_not_fail_if_new_pwd_reqd, nopasswd_acct_mgmt);
 	if (rc == NS_LDAP_OP_FAILED && *errorp)
 		(void) __ns_ldap_freeError(errorp);
 
@@ -4092,4 +4116,299 @@ validate_filter(ns_ldap_cookie_t *cookie)
 	/* end of filter checking */
 
 	return (NS_LDAP_SUCCESS);
+}
+
+/*
+ * Set the account management request control that needs to be sent to server.
+ * This control is required to get the account management information of
+ * a user to do local account checking.
+ */
+static int
+setup_acctmgmt_params(ns_ldap_cookie_t *cookie)
+{
+	LDAPControl	*req = NULL, **requestctrls;
+
+	req = (LDAPControl *)malloc(sizeof (LDAPControl));
+
+	if (req == NULL)
+		return (NS_LDAP_MEMORY);
+
+	/* fill in the fields of this new control */
+	req->ldctl_iscritical = 1;
+	req->ldctl_oid = strdup(NS_LDAP_ACCOUNT_USABLE_CONTROL);
+	if (req->ldctl_oid == NULL) {
+		free(req);
+		return (NS_LDAP_MEMORY);
+	}
+	req->ldctl_value.bv_len = 0;
+	req->ldctl_value.bv_val = NULL;
+
+	requestctrls = (LDAPControl **)calloc(2, sizeof (LDAPControl *));
+	if (requestctrls == NULL) {
+		ldap_control_free(req);
+		return (NS_LDAP_MEMORY);
+	}
+
+	requestctrls[0] = req;
+
+	cookie->p_serverctrls = requestctrls;
+
+	return (NS_LDAP_SUCCESS);
+}
+
+/*
+ * **** This function needs to be moved to libldap library ****
+ * parse_acct_cont_resp_msg() parses the message received by server according to
+ * following format:
+ * BER encoding:
+ * * account is usable *ti*
+ * 	+t: tag is 0
+ * 	+i: contains the num of seconds before expiration. -1 means no expiry.
+ * * account is not usable *t{bbbtiti}*
+ *	+t: tag is 1
+ *	+b: TRUE if inactive due to account inactivation
+ * 	+b: TRUE if password has been reset
+ * 	+b: TRUE if password is expired
+ *	+t: tag is 2
+ *	+i: contains num of remaining grace, 0 means no grace
+ *	+t: tag is 3
+ *	+i: contains num of seconds before auto-unlock. -1 means acct is locked
+ *		forever (i.e. until reset)
+ */
+static int
+parse_acct_cont_resp_msg(LDAPControl **ectrls, AcctUsableResponse_t *acctResp)
+{
+	BerElement	*ber;
+	int 		tag;
+	ber_len_t	len;
+	int		seconds_before_expiry, i;
+	int		inactive, reset, expired, rem_grace, sec_b4_unlock;
+
+	if (ectrls == NULL)
+		return (NS_LDAP_INVALID_PARAM);
+
+	for (i = 0; ectrls[i] != NULL; i++) {
+		if (strcmp(ectrls[i]->ldctl_oid, NS_LDAP_ACCOUNT_USABLE_CONTROL)
+			== 0)
+			goto found;
+		/* We have found some other control, ignore & continue */
+	}
+	/* Ldap control is not found */
+	return (NS_LDAP_NOTFOUND);
+
+found:
+	if ((ber = ber_init(&ectrls[i]->ldctl_value)) == NULL)
+		return (NS_LDAP_MEMORY);
+
+	if ((tag = ber_peek_tag(ber, &len)) == LBER_ERROR) {
+		/* Ldap decoding error */
+		ber_free(ber, 1);
+		return (NS_LDAP_INTERNAL);
+	}
+
+	switch (tag) {
+		case 0: acctResp->choice = 0;
+			if (ber_scanf(ber, "i", &seconds_before_expiry)
+				== LBER_ERROR) {
+				/* Ldap decoding error */
+				ber_free(ber, 1);
+				return (NS_LDAP_INTERNAL);
+			}
+			(acctResp->AcctUsableResp).seconds_before_expiry =
+				seconds_before_expiry;
+			ber_free(ber, 1);
+			return (NS_LDAP_SUCCESS);
+		case 1: acctResp->choice = 1;
+			if (ber_scanf(ber, "{bbb", &inactive, &reset, &expired)
+				== LBER_ERROR) {
+				/* Ldap decoding error */
+				ber_free(ber, 1);
+				return (NS_LDAP_INTERNAL);
+			}
+			(acctResp->AcctUsableResp).more_info.inactive =
+				inactive;
+			(acctResp->AcctUsableResp).more_info.reset =
+				reset;
+			(acctResp->AcctUsableResp).more_info.expired =
+				expired;
+			break;
+		default: /* Ldap decoding error */
+			ber_free(ber, 1);
+			return (NS_LDAP_INTERNAL);
+	}
+
+	if ((tag = ber_peek_tag(ber, &len)) == LBER_ERROR) {
+		ber_free(ber, 1);
+		return (NS_LDAP_SUCCESS);
+	}
+
+	switch (tag) {
+		case 2: if (ber_scanf(ber, "i", &rem_grace) == LBER_ERROR) {
+				ber_free(ber, 1);
+				return (NS_LDAP_INTERNAL);
+			}
+			(acctResp->AcctUsableResp).more_info.rem_grace =
+				rem_grace;
+			if ((tag = ber_peek_tag(ber, &len)) == LBER_ERROR) {
+				ber_free(ber, 1);
+				return (NS_LDAP_SUCCESS);
+			}
+			if (tag == 3)
+				goto timeb4unlock;
+			goto unknowntag;
+		case 3:
+timeb4unlock:
+			if (ber_scanf(ber, "i", &sec_b4_unlock) == LBER_ERROR) {
+				ber_free(ber, 1);
+				return (NS_LDAP_INTERNAL);
+			}
+			(acctResp->AcctUsableResp).more_info.sec_b4_unlock =
+				sec_b4_unlock;
+			break;
+		default:
+unknowntag:
+			ber_free(ber, 1);
+			return (NS_LDAP_INTERNAL);
+	}
+
+	ber_free(ber, 1);
+	return (NS_LDAP_SUCCESS);
+}
+
+/*
+ * __ns_ldap_getAcctMgmt() is called from pam account management stack
+ * for retrieving accounting information of users with no user password -
+ * eg. rlogin, rsh, etc. This function uses the account management control
+ * request to do a search on the server for the user in question. The
+ * response control returned from the server is got from the cookie.
+ * Input params: username of whose account mgmt information is to be got
+ *		 pointer to hold the parsed account management information
+ * Return values: NS_LDAP_SUCCESS on success or appropriate error
+ *		code on failure
+ */
+int
+__ns_ldap_getAcctMgmt(const char *user, AcctUsableResponse_t *acctResp)
+{
+	int		scope, rc;
+	char		ldapfilter[1024];
+	ns_ldap_cookie_t	*cookie;
+	ns_ldap_search_desc_t	**sdlist = NULL;
+	ns_ldap_search_desc_t	*dptr;
+	ns_ldap_error_t		*error = NULL;
+	char			**dns = NULL;
+	char		service[] = "shadow";
+
+	if (user == NULL || acctResp == NULL)
+		return (NS_LDAP_INVALID_PARAM);
+
+	/* Initialize State machine cookie */
+	cookie = init_search_state_machine();
+	if (cookie == NULL)
+		return (NS_LDAP_MEMORY);
+
+	/* see if need to follow referrals */
+	rc = __s_api_toFollowReferrals(0,
+		&cookie->followRef, &error);
+	if (rc != NS_LDAP_SUCCESS) {
+		(void) __ns_ldap_freeError(&error);
+		goto out;
+	}
+
+	/* get the service descriptor - or create a default one */
+	rc = __s_api_get_SSD_from_SSDtoUse_service(service,
+		&sdlist, &error);
+	if (rc != NS_LDAP_SUCCESS) {
+		(void) __ns_ldap_freeError(&error);
+		goto out;
+	}
+
+	if (sdlist == NULL) {
+		/* Create default service Desc */
+		sdlist = (ns_ldap_search_desc_t **)calloc(2,
+				sizeof (ns_ldap_search_desc_t *));
+		if (sdlist == NULL) {
+			rc = NS_LDAP_MEMORY;
+			goto out;
+		}
+		dptr = (ns_ldap_search_desc_t *)
+				calloc(1, sizeof (ns_ldap_search_desc_t));
+		if (dptr == NULL) {
+			free(sdlist);
+			rc = NS_LDAP_MEMORY;
+			goto out;
+		}
+		sdlist[0] = dptr;
+
+		/* default base */
+		rc = __s_api_getDNs(&dns, service, &cookie->errorp);
+		if (rc != NS_LDAP_SUCCESS) {
+			if (dns) {
+				__s_api_free2dArray(dns);
+				dns = NULL;
+			}
+			(void) __ns_ldap_freeError(&(cookie->errorp));
+			cookie->errorp = NULL;
+			goto out;
+		}
+		dptr->basedn = strdup(dns[0]);
+		if (dptr->basedn == NULL) {
+			free(sdlist);
+			free(dptr);
+			if (dns) {
+				__s_api_free2dArray(dns);
+				dns = NULL;
+			}
+			rc = NS_LDAP_MEMORY;
+			goto out;
+		}
+		__s_api_free2dArray(dns);
+		dns = NULL;
+
+		/* default scope */
+		scope = 0;
+		rc = __s_api_getSearchScope(&scope, &cookie->errorp);
+		dptr->scope = scope;
+	}
+
+	cookie->sdlist = sdlist;
+
+	cookie->service = strdup(service);
+	if (cookie->service == NULL) {
+		rc = NS_LDAP_MEMORY;
+		goto out;
+	}
+
+	/* search for entries for this particular uid */
+	(void) snprintf(ldapfilter, sizeof (ldapfilter), "(uid=%s)", user);
+	cookie->i_filter = strdup(ldapfilter);
+	if (cookie->i_filter == NULL) {
+		rc = NS_LDAP_MEMORY;
+		goto out;
+	}
+
+	/* create the control request */
+	if ((rc = setup_acctmgmt_params(cookie)) != NS_LDAP_SUCCESS)
+		goto out;
+
+	/* Process search */
+	rc = search_state_machine(cookie, GET_ACCT_MGMT_INFO, 0);
+
+	/* Copy results back to user */
+	rc = cookie->err_rc;
+	if (rc != NS_LDAP_SUCCESS)
+			(void) __ns_ldap_freeError(&(cookie->errorp));
+
+	if (cookie->result == NULL)
+			goto out;
+
+	if ((rc = parse_acct_cont_resp_msg(cookie->resultctrl, acctResp))
+		!= NS_LDAP_SUCCESS)
+		goto out;
+
+	rc = NS_LDAP_SUCCESS;
+
+out:
+	delete_search_cookie(cookie);
+
+	return (rc);
 }

@@ -602,7 +602,8 @@ freeConnection(Connection *con)
 static int
 makeConnection(Connection **conp, const char *serverAddr,
 	const ns_cred_t *auth, ConnectionID *cID, int timeoutSec,
-	ns_ldap_error_t **errorp, int fail_if_new_pwd_reqd)
+	ns_ldap_error_t **errorp, int fail_if_new_pwd_reqd,
+	int nopasswd_acct_mgmt)
 {
 	Connection *con = NULL;
 	ConnectionID id;
@@ -693,6 +694,19 @@ makeConnection(Connection **conp, const char *serverAddr,
 		/* check if server supports password management */
 		passwd_mgmt = __s_api_contain_passwd_control_oid(
 			sinfo.controls);
+		/* check if server supports password less account mgmt */
+		if (nopasswd_acct_mgmt &&
+			!__s_api_contain_account_usable_control_oid(
+			sinfo.controls)) {
+			syslog(LOG_WARNING, "libsldap: server %s does not "
+				"provide account information without password",
+				host);
+			free(host);
+			free(sinfo.server);
+			__s_api_free2dArray(sinfo.saslMechanisms);
+			__s_api_free2dArray(sinfo.controls);
+			return (NS_LDAP_OP_FAILED);
+		}
 		/* make the connection */
 		rc = openConnection(&ld, host, auth, timeoutSec, errorp,
 				fail_if_new_pwd_reqd, passwd_mgmt);
@@ -1744,6 +1758,10 @@ __s_api_getDefaultAuth(
  * fail_if_new_pwd_reqd
  *		a flag indicating this function should fail if the passwd
  *		in auth needs to change immediately
+ * nopasswd_acct_mgmt
+ *		a flag indicating that makeConnection should check before
+ *		binding if server supports LDAP V3 password less
+ *		account management
  *
  * OUTPUT:
  *
@@ -1758,7 +1776,8 @@ __s_api_getConnection(
 	ConnectionID *sessionId,
 	Connection **session,
 	ns_ldap_error_t **errorp,
-	int fail_if_new_pwd_reqd)
+	int fail_if_new_pwd_reqd,
+	int nopasswd_acct_mgmt)
 {
 	char		errmsg[MAXERROR];
 	ns_auth_t	**aMethod = NULL;
@@ -1866,7 +1885,7 @@ __s_api_getConnection(
 			/* using specified auth method */
 			rc = makeConnection(&con, server, cred,
 				sessionId, timeoutSec, errorp,
-				fail_if_new_pwd_reqd);
+				fail_if_new_pwd_reqd, nopasswd_acct_mgmt);
 			if (rc == NS_LDAP_SUCCESS ||
 				rc == NS_LDAP_SUCCESS_WITH_INFO) {
 				*session = con;
@@ -1879,7 +1898,8 @@ __s_api_getConnection(
 					/* make connection anonymously */
 					rc = makeConnection(&con, server, &anon,
 						sessionId, timeoutSec, errorp,
-						fail_if_new_pwd_reqd);
+						fail_if_new_pwd_reqd,
+						nopasswd_acct_mgmt);
 					if (rc == NS_LDAP_SUCCESS ||
 						rc ==
 						NS_LDAP_SUCCESS_WITH_INFO) {
@@ -1900,7 +1920,8 @@ __s_api_getConnection(
 					}
 					rc = makeConnection(&con, server, authp,
 						sessionId, timeoutSec, errorp,
-						fail_if_new_pwd_reqd);
+						fail_if_new_pwd_reqd,
+						nopasswd_acct_mgmt);
 					(void) __ns_ldap_freeCred(&authp);
 					if (rc == NS_LDAP_SUCCESS ||
 						rc ==

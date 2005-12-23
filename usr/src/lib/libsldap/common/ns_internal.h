@@ -514,7 +514,8 @@ typedef enum {
 	NEXT_REFERRAL		= 17,
 	GET_REFERRAL_SESSION	= 18,
 	ERROR			= 19,
-	LDAP_ERROR		= 20
+	LDAP_ERROR		= 20,
+	GET_ACCT_MGMT_INFO	= 21
 } ns_state_t;
 
 /*
@@ -646,6 +647,10 @@ typedef struct ns_ldap_cookie {
 	ns_referral_info_t  	*refpos;
 	/* search timeout value */
 	struct timeval		search_timeout;
+	/* response control to hold account management information */
+	LDAPControl		**resultctrl;
+	/* Flag to indicate password less account management is required */
+	int			nopasswd_acct_mgmt;
 } ns_ldap_cookie_t;
 
 /*
@@ -694,7 +699,7 @@ int	__s_api_get_search_DNs_v1(char ***, const char *,
 	ns_ldap_error_t **);
 int	__s_api_getConnection(const char *, const int,
 	const ns_cred_t *, int *,
-	Connection **, ns_ldap_error_t **, int);
+	Connection **, ns_ldap_error_t **, int, int);
 char	**__s_api_cp2dArray(char **);
 void	__s_api_free2dArray(char **);
 
@@ -791,6 +796,9 @@ int		__s_api_ishost(char *addr);
 ns_ldap_passwd_status_t
 		__s_api_set_passwd_status(int errnum, char *errmsg);
 int		__s_api_contain_passwd_control_oid(char **oids);
+
+/* password less account management routine */
+int		__s_api_contain_account_usable_control_oid(char **oids);
 
 /* RFC 2307 section 5.6. Get a canonical name from entry */
 char		*__s_api_get_canonical_name(ns_ldap_entry_t *entry,

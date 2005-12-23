@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,154 @@ warn_user_passwd_will_expire(
 	(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1, messages, NULL);
 }
 
+/*
+ * display_acct_unlock_time - Display the time left for the account to
+ * get auto unlocked after the maximum login failures has reached.
+ */
+static void
+display_acct_unlock_time(pam_handle_t *pamh, int sec_b4_unlock)
+{
+	char	messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
+	int	days = 0, hours = 0;
+	int	seconds_d = 0, seconds_h = 0;
+
+	/* Account is locked forever */
+	if (sec_b4_unlock == -1) {
+		(void) snprintf(messages[0], sizeof (messages[0]),
+		dgettext(TEXT_DOMAIN,
+		"Your account is locked, please contact administrator."));
+		(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1,
+			messages, NULL);
+		return;
+	}
+
+	days = sec_b4_unlock / 86400;
+	seconds_d = sec_b4_unlock % 86400;
+	hours = (days * 24) + seconds_d / 3600;
+	seconds_h = seconds_d % 3600;
+
+	if (sec_b4_unlock <= (86400 * 2)) {
+		if (seconds_d <= 3600 && days == 0)
+			(void) snprintf(messages[0], sizeof (messages[0]),
+				dgettext(TEXT_DOMAIN,
+				"Your account is locked and will be unlocked"
+				" within one hour."));
+		else
+			(void) snprintf(messages[0], sizeof (messages[0]),
+				dgettext(TEXT_DOMAIN,
+				"Your account is locked and will be unlocked"
+				" in %d hours."),
+				(seconds_h == 0) ? hours : hours + 1);
+	} else {
+		(void) snprintf(messages[0], sizeof (messages[0]),
+			dgettext(TEXT_DOMAIN,
+			"Your account is locked and will be unlocked"
+			" in %d days."),
+			(seconds_d == 0) ? days : days + 1);
+	}
+
+	(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1, messages, NULL);
+}
+
+/*
+ * warn_user_passwd_expired - warn the user that the password has expired
+ */
+static void
+warn_user_passwd_expired(pam_handle_t *pamh, int grace)
+{
+	char	messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
+
+	if (grace)
+		(void) snprintf(messages[0], sizeof (messages[0]),
+			dgettext(TEXT_DOMAIN,
+			"Your password has expired. "
+			"Number of grace logins allowed are %d."),
+			grace);
+	else
+		(void) snprintf(messages[0], sizeof (messages[0]),
+			dgettext(TEXT_DOMAIN,
+			"Your password has expired."));
+
+	(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1, messages, NULL);
+}
+
+/*
+ * display_passwd_reset_msg - tell user that password has been reset by
+ * administrator
+ */
+static void
+display_passwd_reset_msg(pam_handle_t *pamh)
+{
+	char	messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
+
+	(void) snprintf(messages[0], sizeof (messages[0]),
+			dgettext(TEXT_DOMAIN,
+			"Your password has been reset by administrator."));
+
+	(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1, messages, NULL);
+}
+
+/*
+ * Retreives account management related attributes for the user using
+ * default binding and does local account checks .
+ *
+ * Return Value: PAM_SUCCESS - If account is valid, seconds param will have
+ *				seconds left for password to expire
+ *		 PAM_ACCT_EXPIRED - If account is inactive
+ *		 PAM_NEW_AUTHTOK_REQD - Password is reset by admin
+ *		 PAM_AUTHTOK_EXPIRED - User password has expired, grace
+ *				param will have no. of grace logins allowed
+ *		 PAM_MAXTRIES - If maximum failure of wrong password has reached
+ *				seconds param will have no. of seconds for the
+ *				account to get unlocked
+ *		 PAM_AUTH_ERR - Failure return code
+ */
+static int
+get_account_mgmt(char *user, int *seconds, int *grace)
+{
+	int rc	= PAM_AUTH_ERR;
+	AcctUsableResponse_t	acctResp;
+
+	(void *)memset((void*)&acctResp, 0, sizeof (acctResp));
+	/* get the values for local account checking */
+	if ((rc = __ns_ldap_getAcctMgmt(user, &acctResp))
+		!= NS_LDAP_SUCCESS) {
+		syslog(LOG_DEBUG,
+			"__ns_ldap_getAcctMgmt() failed for %s with error %d",
+				user, rc);
+		return (PAM_AUTH_ERR);
+	}
+
+	if (acctResp.choice == 0) {
+		/* should be able to login */
+		*seconds =
+			acctResp.AcctUsableResp.seconds_before_expiry;
+		return (PAM_SUCCESS);
+	} else if (acctResp.choice == 1) {
+		/* cannot login */
+		if (acctResp.AcctUsableResp.more_info.inactive)
+			/* entry inactive */
+			return (PAM_ACCT_EXPIRED);
+		if (acctResp.AcctUsableResp.more_info.reset)
+			/* password reset by administrator */
+			return (PAM_NEW_AUTHTOK_REQD);
+		if (acctResp.AcctUsableResp.more_info.expired) {
+			/*
+			 * password expired, check for grace logins.
+			 */
+			*grace =
+				acctResp.AcctUsableResp.more_info.rem_grace;
+			return (PAM_AUTHTOK_EXPIRED);
+		}
+		if (acctResp.AcctUsableResp.more_info.sec_b4_unlock) {
+			/* max failures reached, seconds before unlock */
+			*seconds =
+				acctResp.AcctUsableResp.more_info.sec_b4_unlock;
+			return (PAM_MAXTRIES);
+		}
+	}
+	return (PAM_AUTH_ERR);
+}
 
 /*
  * pam_sm_acct_mgmt	main account managment routine.
@@ -107,7 +255,7 @@ pam_sm_acct_mgmt(
 	char			*password = NULL;
 	ns_cred_t		*credp = NULL;
 	int			nowarn = 0;
-	int			sec_until_expired = 0;
+	int			seconds = 0, grace = 0;
 	ldap_authtok_data	*status;
 
 	for (i = 0; i < argc; i++) {
@@ -142,14 +290,17 @@ pam_sm_acct_mgmt(
 	/* retrieve the password from the PAM handle */
 	result = pam_get_item(pamh, PAM_AUTHTOK, (void **) &password);
 	if (password == NULL) {
-		if (result == PAM_SUCCESS)
-			result = PAM_AUTH_ERR;
-		goto out;
+		if (debug)
+			syslog(LOG_DEBUG, "ldap pam_sm_acct_mgmt: "
+			    "no password for user %s", user);
+		/* Do local account checking */
+		result = get_account_mgmt(user, &seconds, &grace);
+	} else {
+		/* Try to authenticate to get password management info */
+		result = authenticate(&credp, user,
+				password, &seconds);
 	}
 
-	/* Try to authenticate to get password management info */
-	result = authenticate(&credp, user,
-			password, &sec_until_expired);
 	/*
 	 * process the password management info.
 	 * If user needs to change the password immediately,
@@ -157,21 +308,36 @@ pam_sm_acct_mgmt(
 	 * Otherwise, reset rc to the appropriate PAM error or
 	 * warn the user about password expiration.
 	 */
-	if (result == PAM_MAXTRIES)
-		/* exceed retry limit: denied access to account */
+	if (result == PAM_MAXTRIES) {
+		/* exceed retry limit, denied access to account */
+		if (!(flags & PAM_SILENT))
+			display_acct_unlock_time(pamh, seconds);
 		result = PAM_PERM_DENIED;
-	else if (result == PAM_AUTHTOK_EXPIRED)
-		/* password expired so account expired */
+	} else if (result == PAM_ACCT_EXPIRED)
+		/* account is inactivated */
 		result = PAM_ACCT_EXPIRED;
-	else if (result == PAM_SUCCESS) {
+	else if (result == PAM_AUTHTOK_EXPIRED) {
+		if (!(flags & PAM_SILENT))
+			warn_user_passwd_expired(pamh, grace);
+		/* password expired, check for grace logins */
+		if (grace > 0)
+			result = PAM_SUCCESS;
+		else
+			result = PAM_AUTHTOK_EXPIRED;
+	} else if (result == PAM_NEW_AUTHTOK_REQD) {
+		/* password has been reset by administrator */
+		if (!(flags & PAM_SILENT))
+			display_passwd_reset_msg(pamh);
+		result = PAM_NEW_AUTHTOK_REQD;
+	} else if (result == PAM_SUCCESS) {
 		/*
 		 * warn the user if the password
 		 * is about to expire.
 		 */
 		if (!(flags & PAM_SILENT) &&
-			sec_until_expired > 0)
+			seconds > 0)
 			warn_user_passwd_will_expire(pamh,
-				sec_until_expired);
+				seconds);
 
 	}
 

@@ -684,6 +684,7 @@ write_state_machine(
 	int		passwd_mgmt = 0;
 	int		i = 0;
 	int		ldap_error;
+	int		nopasswd_acct_mgmt = 0;
 
 	while (always) {
 		switch (state) {
@@ -726,7 +727,8 @@ write_state_machine(
 				&connectionId,
 				&conp,
 				errorp,
-				do_not_fail_if_new_pwd_reqd);
+				do_not_fail_if_new_pwd_reqd,
+				nopasswd_acct_mgmt);
 
 			/*
 			 * If password control attached
@@ -916,7 +918,8 @@ write_state_machine(
 				&connectionId,
 				&conp,
 				errorp,
-				do_not_fail_if_new_pwd_reqd);
+				do_not_fail_if_new_pwd_reqd,
+				nopasswd_acct_mgmt);
 
 			/*
 			 * If password control attached
