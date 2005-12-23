@@ -305,7 +305,7 @@ again:
 	}
 
 	if (dvp->dv_ref++ == 0)
-		dls_stat_create(dvp);
+		dls_mac_stat_create(dvp);
 
 	*dvpp = dvp;
 done:
@@ -334,7 +334,7 @@ dls_vlan_rele(dls_vlan_t *dvp)
 	mac_stop(dlp->dl_mh);
 	dls_mac_rele(dlp);
 	if (--dvp->dv_ref == 0) {
-		dls_stat_destroy(dvp);
+		dls_mac_stat_destroy(dvp);
 		/*
 		 * Tagged vlans get destroyed when dv_ref drops
 		 * to 0. We need to copy dv_name here because

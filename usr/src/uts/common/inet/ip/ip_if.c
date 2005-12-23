@@ -235,9 +235,10 @@ static void ill_capability_zerocopy_ack(ill_t *, mblk_t *,
     dl_capability_sub_t *);
 static void ill_capability_zerocopy_reset(ill_t *, mblk_t **);
 
-static void ill_capability_poll_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
+static void ill_capability_dls_ack(ill_t *, mblk_t *, dl_capability_sub_t *);
 static mac_resource_handle_t ill_ring_add(void *, mac_resource_t *);
-static void ill_capability_poll_reset(ill_t *, mblk_t **);
+static void ill_capability_dls_reset(ill_t *, mblk_t **);
+static void ill_capability_dls_disable(ill_t *);
 
 static void	illgrp_cache_delete(ire_t *, char *);
 static void	illgrp_delete(ill_t *ill);
@@ -560,6 +561,16 @@ static phyint_list_t phyint_g_list;	/* start of phyint list */
  */
 static boolean_t ipmp_enable_failback = B_TRUE;
 
+/*
+ * Enable soft rings if ip_squeue_soft_ring or ip_squeue_fanout
+ * is set and ip_soft_rings_cnt > 0. ip_squeue_soft_ring is
+ * set through platform specific code (Niagara/Ontario).
+ */
+#define	SOFT_RINGS_ENABLED()	(ip_soft_rings_cnt ? \
+		(ip_squeue_soft_ring || ip_squeue_fanout) : B_FALSE)
+
+#define	ILL_CAPAB_DLS	(ILL_CAPAB_SOFT_RING | ILL_CAPAB_POLL)
+
 static uint_t
 ipif_rand(void)
 {
@@ -770,7 +781,7 @@ ill_delete_tail(ill_t *ill)
 	 * to this ill.
 	 */
 	mutex_enter(&ill->ill_lock);
-	if (ill->ill_capabilities & ILL_CAPAB_POLL) {
+	if (ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING)) {
 		while (!(ill->ill_state_flags & ILL_DL_UNBIND_DONE))
 			cv_wait(&ill->ill_cv, &ill->ill_lock);
 	}
@@ -820,18 +831,18 @@ ill_delete_tail(ill_t *ill)
 	}
 
 	/*
-	 * Clean up polling capabilities
+	 * Clean up polling and soft ring capabilities
 	 */
-	if (ill->ill_capabilities & ILL_CAPAB_POLL)
-		ipsq_clean_all(ill);
+	if (ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING))
+		ill_capability_dls_disable(ill);
 
-	if (ill->ill_poll_capab != NULL) {
-		CONN_DEC_REF(ill->ill_poll_capab->ill_unbind_conn);
-		ill->ill_poll_capab->ill_unbind_conn = NULL;
-		kmem_free(ill->ill_poll_capab,
-		    sizeof (ill_poll_capab_t) +
+	if (ill->ill_dls_capab != NULL) {
+		CONN_DEC_REF(ill->ill_dls_capab->ill_unbind_conn);
+		ill->ill_dls_capab->ill_unbind_conn = NULL;
+		kmem_free(ill->ill_dls_capab,
+		    sizeof (ill_dls_capab_t) +
 		    (sizeof (ill_rx_ring_t) * ILL_MAX_RINGS));
-		ill->ill_poll_capab = NULL;
+		ill->ill_dls_capab = NULL;
 	}
 
 	ASSERT(!(ill->ill_capabilities & ILL_CAPAB_POLL));
@@ -1801,7 +1812,7 @@ ill_capability_reset(ill_t *ill)
 	ill_capability_hcksum_reset(ill, &sc_mp);
 	ill_capability_zerocopy_reset(ill, &sc_mp);
 	ill_capability_ipsec_reset(ill, &sc_mp);
-	ill_capability_poll_reset(ill, &sc_mp);
+	ill_capability_dls_reset(ill, &sc_mp);
 
 	/* Nothing to send down in order to disable the capabilities? */
 	if (sc_mp == NULL)
@@ -2627,7 +2638,12 @@ ill_capability_dispatch(ill_t *ill, mblk_t *mp, dl_capability_sub_t *subp,
 		ill_capability_zerocopy_ack(ill, mp, subp);
 		break;
 	case DL_CAPAB_POLL:
-		ill_capability_poll_ack(ill, mp, subp);
+		if (!SOFT_RINGS_ENABLED())
+			ill_capability_dls_ack(ill, mp, subp);
+		break;
+	case DL_CAPAB_SOFT_RING:
+		if (SOFT_RINGS_ENABLED())
+			ill_capability_dls_ack(ill, mp, subp);
 		break;
 	default:
 		ip1dbg(("ill_capability_dispatch: unknown capab type %d\n",
@@ -2672,16 +2688,16 @@ ill_ring_add(void *arg, mac_resource_t *mrp)
 	ill_rx_ring_t		*rx_ring;
 	int			ip_rx_index;
 
+	ASSERT(mrp != NULL);
 	if (mrp->mr_type != MAC_RX_FIFO) {
 		return (NULL);
 	}
 	ASSERT(ill != NULL);
-	ASSERT(ill->ill_poll_capab != NULL);
-	ASSERT(mrp != NULL);
+	ASSERT(ill->ill_dls_capab != NULL);
 
 	mutex_enter(&ill->ill_lock);
 	for (ip_rx_index = 0; ip_rx_index < ILL_MAX_RINGS; ip_rx_index++) {
-		rx_ring = &ill->ill_poll_capab->ill_ring_tbl[ip_rx_index];
+		rx_ring = &ill->ill_dls_capab->ill_ring_tbl[ip_rx_index];
 		ASSERT(rx_ring != NULL);
 
 		if (rx_ring->rr_ring_state == ILL_RING_FREE) {
@@ -2732,107 +2748,129 @@ ill_ring_add(void *arg, mac_resource_t *mrp)
 }
 
 static boolean_t
-ill_capability_poll_init(ill_t *ill)
+ill_capability_dls_init(ill_t *ill)
 {
-	ill_poll_capab_t	*ill_poll = ill->ill_poll_capab;
+	ill_dls_capab_t	*ill_dls = ill->ill_dls_capab;
 	conn_t 			*connp;
 	size_t			sz;
 
-	if (ill->ill_capabilities & ILL_CAPAB_POLL) {
-		if (ill_poll == NULL) {
-			cmn_err(CE_PANIC, "ill_capability_poll_init: "
-			    "polling enabled for ill=%s (%p) but data "
+	if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING) {
+		if (ill_dls == NULL) {
+			cmn_err(CE_PANIC, "ill_capability_dls_init: "
+			    "soft_ring enabled for ill=%s (%p) but data "
 			    "structs uninitialized\n", ill->ill_name,
 			    (void *)ill);
 		}
 		return (B_TRUE);
+	} else if (ill->ill_capabilities & ILL_CAPAB_POLL) {
+		if (ill_dls == NULL) {
+			cmn_err(CE_PANIC, "ill_capability_dls_init: "
+			    "polling enabled for ill=%s (%p) but data "
+			    "structs uninitialized\n", ill->ill_name,
+			(void *)ill);
+		}
+		return (B_TRUE);
 	}
 
-	if (ill_poll != NULL) {
-		ill_rx_ring_t 	*rx_ring = ill_poll->ill_ring_tbl;
-		/* Polling is being re-enabled */
+	if (ill_dls != NULL) {
+		ill_rx_ring_t 	*rx_ring = ill_dls->ill_ring_tbl;
+		/* Soft_Ring or polling is being re-enabled */
 
-		connp = ill_poll->ill_unbind_conn;
+		connp = ill_dls->ill_unbind_conn;
 		ASSERT(rx_ring != NULL);
-		bzero((void *)ill_poll, sizeof (ill_poll_capab_t));
+		bzero((void *)ill_dls, sizeof (ill_dls_capab_t));
 		bzero((void *)rx_ring,
 		    sizeof (ill_rx_ring_t) * ILL_MAX_RINGS);
-		ill_poll->ill_ring_tbl = rx_ring;
-		ill_poll->ill_unbind_conn = connp;
+		ill_dls->ill_ring_tbl = rx_ring;
+		ill_dls->ill_unbind_conn = connp;
 		return (B_TRUE);
 	}
 
 	if ((connp = ipcl_conn_create(IPCL_TCPCONN, KM_NOSLEEP)) == NULL)
 		return (B_FALSE);
 
-	sz = sizeof (ill_poll_capab_t);
+	sz = sizeof (ill_dls_capab_t);
 	sz += sizeof (ill_rx_ring_t) * ILL_MAX_RINGS;
 
-	ill_poll = kmem_zalloc(sz, KM_NOSLEEP);
-	if (ill_poll == NULL) {
-		cmn_err(CE_WARN, "ill_capability_poll_init: could not "
-		    "allocate poll_capab for %s (%p)\n", ill->ill_name,
+	ill_dls = kmem_zalloc(sz, KM_NOSLEEP);
+	if (ill_dls == NULL) {
+		cmn_err(CE_WARN, "ill_capability_dls_init: could not "
+		    "allocate dls_capab for %s (%p)\n", ill->ill_name,
 		    (void *)ill);
 		CONN_DEC_REF(connp);
 		return (B_FALSE);
 	}
 
 	/* Allocate space to hold ring table */
-	ill_poll->ill_ring_tbl = (ill_rx_ring_t *)&ill_poll[1];
-	ill->ill_poll_capab = ill_poll;
-	ill_poll->ill_unbind_conn = connp;
+	ill_dls->ill_ring_tbl = (ill_rx_ring_t *)&ill_dls[1];
+	ill->ill_dls_capab = ill_dls;
+	ill_dls->ill_unbind_conn = connp;
 	return (B_TRUE);
 }
 
 /*
- * ill_capability_poll_disable: disable polling capability. Since
- * any of the rings might already be in use, need to call ipsq_clean_all()
- * which gets behind the squeue to disable direct calls if necessary.
- * Clean up the direct tx function pointers as well.
+ * ill_capability_dls_disable: disable soft_ring and/or polling
+ * capability. Since any of the rings might already be in use, need
+ * to call ipsq_clean_all() which gets behind the squeue to disable
+ * direct calls if necessary.
  */
 static void
-ill_capability_poll_disable(ill_t *ill)
+ill_capability_dls_disable(ill_t *ill)
 {
-	ill_poll_capab_t	*ill_poll = ill->ill_poll_capab;
+	ill_dls_capab_t	*ill_dls = ill->ill_dls_capab;
 
-	if (ill->ill_capabilities & ILL_CAPAB_POLL) {
+	if (ill->ill_capabilities & ILL_CAPAB_DLS) {
 		ipsq_clean_all(ill);
-		ill_poll->ill_tx = NULL;
-		ill_poll->ill_tx_handle = NULL;
+		ill_dls->ill_tx = NULL;
+		ill_dls->ill_tx_handle = NULL;
+		ill_dls->ill_dls_change_status = NULL;
+		ill_dls->ill_dls_bind = NULL;
+		ill_dls->ill_dls_unbind = NULL;
 	}
 
-	ASSERT(!(ill->ill_capabilities & ILL_CAPAB_POLL));
+	ASSERT(!(ill->ill_capabilities & ILL_CAPAB_DLS));
 }
 
 static void
-ill_capability_poll_capable(ill_t *ill, dl_capab_poll_t *ipoll,
+ill_capability_dls_capable(ill_t *ill, dl_capab_dls_t *idls,
     dl_capability_sub_t *isub)
 {
 	uint_t			size;
 	uchar_t			*rptr;
-	dl_capab_poll_t		poll, *opoll;
-	ill_poll_capab_t	*ill_poll;
+	dl_capab_dls_t	dls, *odls;
+	ill_dls_capab_t	*ill_dls;
 	mblk_t			*nmp = NULL;
 	dl_capability_req_t	*ocap;
+	uint_t			sub_dl_cap = isub->dl_cap;
 
-	if (!ill_capability_poll_init(ill))
+	if (!ill_capability_dls_init(ill))
 		return;
-	ill_poll = ill->ill_poll_capab;
+	ill_dls = ill->ill_dls_capab;
 
 	/* Copy locally to get the members aligned */
-	bcopy((void *)ipoll, (void *)&poll, sizeof (dl_capab_poll_t));
+	bcopy((void *)idls, (void *)&dls,
+	    sizeof (dl_capab_dls_t));
 
 	/* Get the tx function and handle from dld */
-	ill_poll->ill_tx = (ip_dld_tx_t)poll.poll_tx;
-	ill_poll->ill_tx_handle = (void *)poll.poll_tx_handle;
+	ill_dls->ill_tx = (ip_dld_tx_t)dls.dls_tx;
+	ill_dls->ill_tx_handle = (void *)dls.dls_tx_handle;
+
+	if (sub_dl_cap == DL_CAPAB_SOFT_RING) {
+		ill_dls->ill_dls_change_status =
+		    (ip_dls_chg_soft_ring_t)dls.dls_ring_change_status;
+		ill_dls->ill_dls_bind = (ip_dls_bind_t)dls.dls_ring_bind;
+		ill_dls->ill_dls_unbind =
+		    (ip_dls_unbind_t)dls.dls_ring_unbind;
+		ill_dls->ill_dls_soft_ring_cnt = ip_soft_rings_cnt;
+	}
 
 	size = sizeof (dl_capability_req_t) + sizeof (dl_capability_sub_t) +
 	    isub->dl_length;
 
 	if ((nmp = ip_dlpi_alloc(size, DL_CAPABILITY_REQ)) == NULL) {
-		cmn_err(CE_WARN, "ill_capability_poll_ack: could not allocate "
-		    "memory for CAPAB_REQ for %s (%p)\n", ill->ill_name,
-		    (void *)ill);
+		cmn_err(CE_WARN, "ill_capability_dls_capable: could "
+		    "not allocate memory for CAPAB_REQ for %s (%p)\n",
+		    ill->ill_name, (void *)ill);
 		return;
 	}
 
@@ -2847,46 +2885,93 @@ ill_capability_poll_capable(ill_t *ill, dl_capab_poll_t *ipoll,
 	bcopy(isub, rptr, sizeof (*isub));
 	rptr += sizeof (*isub);
 
-	opoll = (dl_capab_poll_t *)rptr;
-	rptr += sizeof (dl_capab_poll_t);
+	odls = (dl_capab_dls_t *)rptr;
+	rptr += sizeof (dl_capab_dls_t);
 
-	/* initialize dl_capab_poll_t to be sent down */
-	poll.poll_rx_handle = (uintptr_t)ill;
-	poll.poll_rx = (uintptr_t)ip_input;
-	poll.poll_ring_add = (uintptr_t)ill_ring_add;
-	poll.poll_flags = POLL_ENABLE;
-	bcopy((void *)&poll, (void *)opoll, sizeof (dl_capab_poll_t));
+	/* initialize dl_capab_dls_t to be sent down */
+	dls.dls_rx_handle = (uintptr_t)ill;
+	dls.dls_rx = (uintptr_t)ip_input;
+	dls.dls_ring_add = (uintptr_t)ill_ring_add;
+
+	if (sub_dl_cap == DL_CAPAB_SOFT_RING) {
+		dls.dls_ring_cnt = ip_soft_rings_cnt;
+		dls.dls_ring_assign = (uintptr_t)ip_soft_ring_assignment;
+		dls.dls_flags = SOFT_RING_ENABLE;
+	} else {
+		dls.dls_flags = POLL_ENABLE;
+		ip1dbg(("ill_capability_dls_capable: asking interface %s "
+		    "to enable polling\n", ill->ill_name));
+	}
+	bcopy((void *)&dls, (void *)odls,
+	    sizeof (dl_capab_dls_t));
 	ASSERT(nmp->b_wptr == (nmp->b_rptr + size));
-
-	ip1dbg(("ill_capability_poll_capable: asking interface %s "
-	    "to enable polling\n", ill->ill_name));
-
-	/* nmp points to a DL_CAPABILITY_REQ message to enable polling */
+	/*
+	 * nmp points to a DL_CAPABILITY_REQ message to
+	 * enable either soft_ring or polling
+	 */
 	ill_dlpi_send(ill, nmp);
 }
 
+static void
+ill_capability_dls_reset(ill_t *ill, mblk_t **sc_mp)
+{
+	mblk_t *mp;
+	dl_capab_dls_t *idls;
+	dl_capability_sub_t *dl_subcap;
+	int size;
+
+	if (!(ill->ill_capabilities & ILL_CAPAB_DLS))
+		return;
+
+	ASSERT(ill->ill_dls_capab != NULL);
+
+	size = sizeof (*dl_subcap) + sizeof (*idls);
+
+	mp = allocb(size, BPRI_HI);
+	if (mp == NULL) {
+		ip1dbg(("ill_capability_dls_reset: unable to allocate "
+		    "request to disable soft_ring\n"));
+		return;
+	}
+
+	mp->b_wptr = mp->b_rptr + size;
+
+	dl_subcap = (dl_capability_sub_t *)mp->b_rptr;
+	dl_subcap->dl_length = sizeof (*idls);
+	if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING)
+		dl_subcap->dl_cap = DL_CAPAB_SOFT_RING;
+	else
+		dl_subcap->dl_cap = DL_CAPAB_POLL;
+
+	idls = (dl_capab_dls_t *)(dl_subcap + 1);
+	if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING)
+		idls->dls_flags = SOFT_RING_DISABLE;
+	else
+		idls->dls_flags = POLL_DISABLE;
+
+	if (*sc_mp != NULL)
+		linkb(*sc_mp, mp);
+	else
+		*sc_mp = mp;
+}
 
 /*
- * Process a polling capability negotiation ack received
- * from a DLS Provider.isub must point to the sub-capability (DL_CAPAB_POLL)
- * of a DL_CAPABILITY_ACK message.
+ * Process a soft_ring/poll capability negotiation ack received
+ * from a DLS Provider.isub must point to the sub-capability
+ * (DL_CAPAB_SOFT_RING/DL_CAPAB_POLL) of a DL_CAPABILITY_ACK message.
  */
 static void
-ill_capability_poll_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
+ill_capability_dls_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 {
-	dl_capab_poll_t		*ipoll;
+	dl_capab_dls_t		*idls;
 	uint_t			sub_dl_cap = isub->dl_cap;
 	uint8_t			*capend;
 
+	ASSERT(sub_dl_cap == DL_CAPAB_SOFT_RING ||
+	    sub_dl_cap == DL_CAPAB_POLL);
 
-	ASSERT(sub_dl_cap == DL_CAPAB_POLL);
-
-	/*
-	 * Don't enable polling for ipv6 ill's
-	 */
-	if (ill->ill_isv6) {
+	if (ill->ill_isv6)
 		return;
-	}
 
 	/*
 	 * Note: range checks here are not absolutely sufficient to
@@ -2897,7 +2982,7 @@ ill_capability_poll_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 	 */
 	capend = (uint8_t *)(isub + 1) + isub->dl_length;
 	if (capend > mp->b_wptr) {
-		cmn_err(CE_WARN, "ill_capability_poll_ack: "
+		cmn_err(CE_WARN, "ill_capability_dls_ack: "
 		    "malformed sub-capability too long for mblk");
 		return;
 	}
@@ -2905,17 +2990,17 @@ ill_capability_poll_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 	/*
 	 * There are two types of acks we process here:
 	 * 1. acks in reply to a (first form) generic capability req
-	 *    (poll_flag will be set to POLL_CAPABLE)
-	 * 2. acks in reply to a POLL_ENABLE capability req.
-	 *    (POLL_ENABLE flag set)
+	 *    (dls_flag will be set to SOFT_RING_CAPABLE or POLL_CAPABLE)
+	 * 2. acks in reply to a SOFT_RING_ENABLE or POLL_ENABLE
+	 *    capability req.
 	 */
-	ipoll = (dl_capab_poll_t *)(isub + 1);
+	idls = (dl_capab_dls_t *)(isub + 1);
 
-	if (!dlcapabcheckqid(&ipoll->poll_mid, ill->ill_lmod_rq)) {
-		ip1dbg(("ill_capability_poll_ack: mid token for polling "
+	if (!dlcapabcheckqid(&idls->dls_mid, ill->ill_lmod_rq)) {
+		ip1dbg(("ill_capability_dls_ack: mid token for dls "
 		    "capability isn't as expected; pass-thru "
 		    "module(s) detected, discarding capability\n"));
-		if (ill->ill_capabilities & ILL_CAPAB_POLL) {
+		if (ill->ill_capabilities & ILL_CAPAB_DLS) {
 			/*
 			 * This is a capability renegotitation case.
 			 * The interface better be unusable at this
@@ -2923,79 +3008,47 @@ ill_capability_poll_ack(ill_t *ill, mblk_t *mp, dl_capability_sub_t *isub)
 			 * if we disable direct calls on a running
 			 * and up interface.
 			 */
-			ill_capability_poll_disable(ill);
+			ill_capability_dls_disable(ill);
 		}
 		return;
 	}
 
-	switch (ipoll->poll_flags) {
+	switch (idls->dls_flags) {
 	default:
 		/* Disable if unknown flag */
+	case SOFT_RING_DISABLE:
 	case POLL_DISABLE:
-		ill_capability_poll_disable(ill);
+		ill_capability_dls_disable(ill);
 		break;
+	case SOFT_RING_CAPABLE:
 	case POLL_CAPABLE:
 		/*
 		 * If the capability was already enabled, its safe
 		 * to disable it first to get rid of stale information
 		 * and then start enabling it again.
 		 */
-		ill_capability_poll_disable(ill);
-		ill_capability_poll_capable(ill, ipoll, isub);
+		ill_capability_dls_disable(ill);
+		ill_capability_dls_capable(ill, idls, isub);
 		break;
+	case SOFT_RING_ENABLE:
 	case POLL_ENABLE:
-		if (!(ill->ill_capabilities & ILL_CAPAB_POLL)) {
-			ASSERT(ill->ill_poll_capab != NULL);
-			ill->ill_capabilities |= ILL_CAPAB_POLL;
+		mutex_enter(&ill->ill_lock);
+		if (sub_dl_cap == DL_CAPAB_SOFT_RING &&
+		    !(ill->ill_capabilities & ILL_CAPAB_SOFT_RING)) {
+			ASSERT(ill->ill_dls_capab != NULL);
+			ill->ill_capabilities |= ILL_CAPAB_SOFT_RING;
 		}
-		ip1dbg(("ill_capability_poll_ack: interface %s "
-		    "has enabled polling\n", ill->ill_name));
+		if (sub_dl_cap == DL_CAPAB_POLL &&
+		    !(ill->ill_capabilities & ILL_CAPAB_POLL)) {
+			ASSERT(ill->ill_dls_capab != NULL);
+			ill->ill_capabilities |= ILL_CAPAB_POLL;
+			ip1dbg(("ill_capability_dls_ack: interface %s "
+			    "has enabled polling\n", ill->ill_name));
+		}
+		mutex_exit(&ill->ill_lock);
 		break;
 	}
 }
-
-static void
-ill_capability_poll_reset(ill_t *ill, mblk_t **sc_mp)
-{
-	mblk_t *mp;
-	dl_capab_poll_t *ipoll;
-	dl_capability_sub_t *dl_subcap;
-	int size;
-
-	if (!(ill->ill_capabilities & ILL_CAPAB_POLL))
-		return;
-
-	ASSERT(ill->ill_poll_capab != NULL);
-
-	/*
-	 * Disable polling capability
-	 */
-	ill_capability_poll_disable(ill);
-
-	size = sizeof (*dl_subcap) + sizeof (*ipoll);
-
-	mp = allocb(size, BPRI_HI);
-	if (mp == NULL) {
-		ip1dbg(("ill_capability_poll_reset: unable to allocate "
-		    "request to disable polling\n"));
-		return;
-	}
-
-	mp->b_wptr = mp->b_rptr + size;
-
-	dl_subcap = (dl_capability_sub_t *)mp->b_rptr;
-	dl_subcap->dl_cap = DL_CAPAB_POLL;
-	dl_subcap->dl_length = sizeof (*ipoll);
-
-	ipoll = (dl_capab_poll_t *)(dl_subcap + 1);
-	ipoll->poll_flags = POLL_DISABLE;
-
-	if (*sc_mp != NULL)
-		linkb(*sc_mp, mp);
-	else
-		*sc_mp = mp;
-}
-
 
 /*
  * Process a hardware checksum offload capability negotiation ack received
@@ -7340,6 +7393,12 @@ ipsq_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring)
 
 	/* Just clean one squeue */
 	mutex_enter(&ill->ill_lock);
+	/*
+	 * Reset the ILL_SOFT_RING_ASSIGN bit so that
+	 * ip_squeue_soft_ring_affinty() will not go
+	 * ahead with assigning rings.
+	 */
+	ill->ill_state_flags &= ~ILL_SOFT_RING_ASSIGN;
 	while (rx_ring->rr_ring_state == ILL_RING_INPROC)
 		/* Some operations pending on the ring. Wait */
 		cv_wait(&ill->ill_cv, &ill->ill_lock);
@@ -7376,7 +7435,7 @@ ipsq_clean_ring(ill_t *ill, ill_rx_ring_t *rx_ring)
 	/*
 	 * Use the preallocated ill_unbind_conn for this purpose
 	 */
-	connp = ill->ill_poll_capab->ill_unbind_conn;
+	connp = ill->ill_dls_capab->ill_unbind_conn;
 	mp = &connp->conn_tcp->tcp_closemp;
 	CONN_INC_REF(connp);
 	squeue_enter(sqp, mp, ip_squeue_clean, connp, NULL);
@@ -7396,15 +7455,15 @@ ipsq_clean_all(ill_t *ill)
 	/*
 	 * No need to clean if poll_capab isn't set for this ill
 	 */
-	if (!(ill->ill_capabilities & ILL_CAPAB_POLL))
+	if (!(ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING)))
 		return;
 
-	ill->ill_capabilities &= ~ILL_CAPAB_POLL;
-
 	for (idx = 0; idx < ILL_MAX_RINGS; idx++) {
-		ill_rx_ring_t *ipr = &ill->ill_poll_capab->ill_ring_tbl[idx];
+		ill_rx_ring_t *ipr = &ill->ill_dls_capab->ill_ring_tbl[idx];
 		ipsq_clean_ring(ill, ipr);
 	}
+
+	ill->ill_capabilities &= ~(ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING);
 }
 
 /* ARGSUSED */

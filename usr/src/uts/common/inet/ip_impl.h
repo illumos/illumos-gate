@@ -466,20 +466,21 @@ typedef struct ip_pdescinfo_s PDESCINFO_STRUCT(2)	ip_pdescinfo_t;
 		putnext((connp)->conn_rq, mp);				\
 }
 
-#define	ILL_POLL_CAPABLE(ill)	\
-	(((ill)->ill_capabilities & ILL_CAPAB_POLL) != 0)
+#define	ILL_DLS_CAPABLE(ill)	\
+	(((ill)->ill_capabilities &		\
+	(ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING)) != 0)
 
 /*
  * Macro that hands off one or more messages directly to DLD
  * when the interface is marked with ILL_CAPAB_POLL.
  */
-#define	IP_POLL_ILL_TX(ill, mp) {					\
-	ill_poll_capab_t *ill_poll = ill->ill_poll_capab;		\
-	ASSERT(ILL_POLL_CAPABLE(ill));					\
-	ASSERT(ill_poll != NULL);					\
-	ASSERT(ill_poll->ill_tx != NULL);				\
-	ASSERT(ill_poll->ill_tx_handle != NULL);			\
-	ill_poll->ill_tx(ill_poll->ill_tx_handle, mp);			\
+#define	IP_DLS_ILL_TX(ill, mp) {					\
+	ill_dls_capab_t *ill_dls = ill->ill_dls_capab;		\
+	ASSERT(ILL_DLS_CAPABLE(ill));					\
+	ASSERT(ill_dls != NULL);					\
+	ASSERT(ill_dls->ill_tx != NULL);				\
+	ASSERT(ill_dls->ill_tx_handle != NULL);			\
+	ill_dls->ill_tx(ill_dls->ill_tx_handle, mp);			\
 }
 
 extern int	ip_wput_frag_mdt_min;

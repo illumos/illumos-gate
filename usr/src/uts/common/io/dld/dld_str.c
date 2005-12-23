@@ -259,6 +259,8 @@ dld_close(queue_t *rq)
 {
 	dld_str_t	*dsp = rq->q_ptr;
 
+	ASSERT(dsp->ds_task_id == NULL);
+
 	/*
 	 * Disable the queue srv(9e) routine.
 	 */
@@ -859,6 +861,7 @@ dld_str_detach(dld_str_t *dsp)
 	 * Clear the polling and promisc flags.
 	 */
 	dsp->ds_polling = B_FALSE;
+	dsp->ds_soft_ring = B_FALSE;
 	dsp->ds_promisc = 0;
 
 	/*
@@ -1494,7 +1497,7 @@ ioc_raw(dld_str_t *dsp, mblk_t *mp)
 	queue_t *q = dsp->ds_wq;
 
 	rw_enter(&dsp->ds_lock, RW_WRITER);
-	if (dsp->ds_polling) {
+	if (dsp->ds_polling || dsp->ds_soft_ring) {
 		rw_exit(&dsp->ds_lock);
 		miocnak(q, mp, 0, EPROTO);
 		return;
@@ -1604,7 +1607,7 @@ ioc_fast(dld_str_t *dsp, mblk_t *mp)
 		/*
 		 * Set the receive callback (unless polling is enabled).
 		 */
-		if (!dsp->ds_polling)
+		if (!dsp->ds_polling && !dsp->ds_soft_ring)
 			dls_rx_set(dc, dld_str_rx_fastpath, (void *)dsp);
 
 		/*

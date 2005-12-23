@@ -1593,6 +1593,7 @@ extern ill_g_head_t	ill_g_heads[];	/* ILL List Head */
 #define	ILL_CAPAB_HCKSUM	0x08		/* Hardware checksumming */
 #define	ILL_CAPAB_ZEROCOPY	0x10		/* Zero-copy */
 #define	ILL_CAPAB_POLL		0x20		/* Polling Toggle */
+#define	ILL_CAPAB_SOFT_RING	0x40		/* Soft_Ring capability */
 
 /*
  * Per-ill Multidata Transmit capabilities.
@@ -1615,9 +1616,9 @@ typedef struct ill_hcksum_capab_s ill_hcksum_capab_t;
 typedef struct ill_zerocopy_capab_s ill_zerocopy_capab_t;
 
 /*
- * Per-ill Polling capbilities.
+ * Per-ill Polling/soft ring capbilities.
  */
-typedef struct ill_poll_capab_s ill_poll_capab_t;
+typedef struct ill_dls_capab_s ill_dls_capab_t;
 
 /*
  * Per-ill polling resource map.
@@ -1629,6 +1630,7 @@ typedef struct ill_rx_ring ill_rx_ring_t;
 #define	ILL_CONDEMNED		0x02	/* No more new ref's to the ILL */
 #define	ILL_CHANGING		0x04	/* ILL not globally visible */
 #define	ILL_DL_UNBIND_DONE	0x08	/* UNBIND_REQ has been Acked */
+#define	ILL_SOFT_RING_ASSIGN	0x10	/* Makeing soft ring assigment */
 
 /* Is this an ILL whose source address is used by other ILL's ? */
 #define	IS_USESRC_ILL(ill)			\
@@ -1775,7 +1777,7 @@ typedef struct ill_s {
 	ill_ipsec_capab_t *ill_ipsec_capab_esp;	/* IPsec ESP capabilities */
 	ill_hcksum_capab_t *ill_hcksum_capab; /* H/W cksumming capabilities */
 	ill_zerocopy_capab_t *ill_zerocopy_capab; /* Zero-copy capabilities */
-	ill_poll_capab_t *ill_poll_capab; /* Polling capabilities */
+	ill_dls_capab_t *ill_dls_capab; /* Polling, soft ring capabilities */
 
 	/*
 	 * New fields for IPv6
@@ -2962,11 +2964,16 @@ struct ill_zerocopy_capab_s {
 #define	ILL_POLLING		0x01	/* Polling in use */
 
 /*
- * This function pointer type is exported by the mac layer.
- * we need to duplicate the definition here because we cannot
- * include mac.h in this file.
+ * These functions pointer types are exported by the mac/dls layer.
+ * we need to duplicate the definitions here because we cannot
+ * include mac/dls header files here.
  */
 typedef void	(*ip_mac_blank_t)(void *, time_t, uint_t);
+typedef void	(*ip_dld_tx_t)(void *, mblk_t *);
+
+typedef void	(*ip_dls_chg_soft_ring_t)(void *, int);
+typedef void	(*ip_dls_bind_t)(void *, processorid_t);
+typedef void	(*ip_dls_unbind_t)(void *);
 
 struct ill_rx_ring {
 	ip_mac_blank_t		rr_blank; /* Driver interrupt blanking func */
@@ -2984,15 +2991,15 @@ struct ill_rx_ring {
 	uint32_t		rr_ring_state; /* State of this ring */
 };
 
-/*
- * This is exported by dld and is meant to be invoked from a ULP.
- */
-typedef void	(*ip_dld_tx_t)(void *, mblk_t *);
-
-struct ill_poll_capab_s {
-	ip_dld_tx_t		ill_tx;		/* dld-supplied tx routine */
-	void			*ill_tx_handle;	/* dld-supplied tx handle */
+struct ill_dls_capab_s {
+	ip_dld_tx_t		ill_tx;		/* Driver Tx routine */
+	void			*ill_tx_handle;	/* Driver Tx handle */
+	ip_dls_chg_soft_ring_t	ill_dls_change_status;
+						/* change soft ring fanout */
+	ip_dls_bind_t		ill_dls_bind;	/* to add CPU affinity */
+	ip_dls_unbind_t		ill_dls_unbind;	/* remove CPU affinity */
 	ill_rx_ring_t		*ill_ring_tbl; /* Ring to Sqp mapping table */
+	uint_t			ill_dls_soft_ring_cnt; /* Number of soft ring */
 	conn_t			*ill_unbind_conn; /* Conn used during unplumb */
 };
 
@@ -3002,6 +3009,10 @@ struct ill_poll_capab_s {
 extern int 		ip_squeue_profile;
 extern int 		ip_squeue_bind;
 extern boolean_t 	ip_squeue_fanout;
+extern boolean_t	ip_squeue_soft_ring;
+extern uint_t		ip_threads_per_cpu;
+extern uint_t		ip_squeues_per_cpu;
+extern uint_t		ip_soft_rings_cnt;
 
 typedef struct squeue_set_s {
 	kmutex_t	sqs_lock;
@@ -3012,10 +3023,8 @@ typedef struct squeue_set_s {
 } squeue_set_t;
 
 #define	IP_SQUEUE_GET(hint) 						\
-	(!ip_squeue_fanout ?						\
-	(CPU->cpu_squeue_set->sqs_list[hint %				\
-					CPU->cpu_squeue_set->sqs_size]) : \
-	ip_squeue_random(hint))
+	((!ip_squeue_fanout) ?	(CPU->cpu_squeue_set->sqs_list[0]) :	\
+		ip_squeue_random(hint))
 
 typedef void (*squeue_func_t)(squeue_t *, mblk_t *, sqproc_t, void *, uint8_t);
 
@@ -3027,6 +3036,8 @@ extern int ip_squeue_bind_set(queue_t *, mblk_t *, char *, caddr_t, cred_t *);
 extern int ip_squeue_bind_get(queue_t *, mblk_t *, caddr_t, cred_t *);
 extern void ip_squeue_clean(void *, mblk_t *, void *);
 extern void ip_resume_tcp_bind(void *, mblk_t *, void *);
+extern void	ip_soft_ring_assignment(ill_t *, ill_rx_ring_t *,
+    mblk_t *, size_t);
 
 extern void tcp_wput(queue_t *, mblk_t *);
 

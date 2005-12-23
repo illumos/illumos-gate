@@ -494,7 +494,7 @@ CN_OBJS +=	cons.o
 
 DLD_OBJS +=	dld_drv.o dld_proto.o dld_str.o
 		
-DLS_OBJS +=	dls.o dls_link.o dls_mod.o dls_stat.o dls_vlan.o
+DLS_OBJS +=	dls.o dls_link.o dls_mod.o dls_stat.o dls_vlan.o dls_soft_ring.o
 
 GLD_OBJS +=     gld.o gldutil.o
 

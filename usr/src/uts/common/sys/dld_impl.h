@@ -163,6 +163,7 @@ struct dld_str {
 	 * IP polling is operational if this flag is set.
 	 */
 	boolean_t		ds_polling;
+	boolean_t		ds_soft_ring;
 
 	/*
 	 * State of DLPI user: may be active (regular network layer),
@@ -194,7 +195,9 @@ struct dld_str {
 	 */
 	kmutex_t		ds_thr_lock;
 	uint_t			ds_thr;
+	taskqid_t		ds_task_id;
 	mblk_t			*ds_detach_req;
+	mblk_t			*ds_unbind_req;
 } dld_str;
 
 /*

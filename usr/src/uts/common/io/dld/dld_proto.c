@@ -37,6 +37,7 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/strsun.h>
+#include <sys/cpuvar.h>
 #include <sys/dlpi.h>
 #include <netinet/in.h>
 #include <sys/sdt.h>
@@ -46,6 +47,7 @@
 #include <sys/dls.h>
 #include <sys/dld.h>
 #include <sys/dld_impl.h>
+#include <sys/dls_soft_ring.h>
 
 typedef boolean_t proto_reqfunc_t(dld_str_t *, union DL_primitives *, mblk_t *);
 
@@ -56,8 +58,14 @@ static proto_reqfunc_t proto_info_req, proto_attach_req, proto_detach_req,
     proto_notify_req, proto_unitdata_req, proto_passive_req;
 
 static void proto_poll_disable(dld_str_t *);
-static boolean_t proto_poll_enable(dld_str_t *, dl_capab_poll_t *);
+static boolean_t proto_poll_enable(dld_str_t *, dl_capab_dls_t *);
 static boolean_t proto_capability_advertise(dld_str_t *, mblk_t *);
+
+static void proto_soft_ring_disable(dld_str_t *);
+static boolean_t proto_soft_ring_enable(dld_str_t *, dl_capab_dls_t *);
+static boolean_t proto_capability_advertise(dld_str_t *, mblk_t *);
+static void proto_change_soft_ring_fanout(dld_str_t *, int);
+static void proto_stop_soft_ring_threads(void *);
 
 #define	DL_ACK_PENDING(state) \
 	((state) == DL_ATTACH_PENDING || \
@@ -606,6 +614,22 @@ proto_unbind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	 */
 	dsp->ds_mode = DLD_UNITDATA;
 
+	/*
+	 * If soft rings were enabled, the workers
+	 * should be quiesced. Start a task that will
+	 * get this in motion. We cannot check for
+	 * ds_soft_ring flag because
+	 * proto_soft_ring_disable() called from
+	 * proto_capability_req() would have reset it.
+	 */
+	if (dls_soft_ring_workers(dsp->ds_dc)) {
+		dsp->ds_unbind_req = mp;
+		dsp->ds_task_id = taskq_dispatch(system_taskq,
+		    proto_stop_soft_ring_threads, (void *)dsp, TQ_SLEEP);
+		rw_exit(&dsp->ds_lock);
+		return (B_TRUE);
+	}
+
 	dsp->ds_dlstate = DL_UNBOUND;
 	rw_exit(&dsp->ds_lock);
 
@@ -1055,6 +1079,20 @@ failed:
 	return (B_FALSE);
 }
 
+static boolean_t
+check_ip_above(queue_t *q)
+{
+	queue_t		*next_q;
+	boolean_t	ret = B_TRUE;
+
+	claimstr(q);
+	next_q = q->q_next;
+	if (strcmp(next_q->q_qinfo->qi_minfo->mi_idname, "ip") != 0)
+		ret = B_FALSE;
+	releasestr(q);
+	return (ret);
+}
+
 /*
  * DL_CAPABILITY_REQ
  */
@@ -1141,14 +1179,14 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		 * IP polling interface.
 		 */
 		case DL_CAPAB_POLL: {
-			dl_capab_poll_t *pollp;
-			dl_capab_poll_t	poll;
+			dl_capab_dls_t *pollp;
+			dl_capab_dls_t	poll;
 
-			pollp = (dl_capab_poll_t *)&sp[1];
+			pollp = (dl_capab_dls_t *)&sp[1];
 			/*
 			 * Copy for alignment.
 			 */
-			bcopy(pollp, &poll, sizeof (dl_capab_poll_t));
+			bcopy(pollp, &poll, sizeof (dl_capab_dls_t));
 
 			/*
 			 * We need to become writer before enabling and/or
@@ -1168,7 +1206,7 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 			}
 			upgraded = B_TRUE;
 
-			switch (poll.poll_flags) {
+			switch (poll.dls_flags) {
 			default:
 				/*FALLTHRU*/
 			case POLL_DISABLE:
@@ -1186,16 +1224,81 @@ proto_capability_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 				/*
 				 * Now attempt enable it.
 				 */
-				if (!proto_poll_enable(dsp, &poll))
-					break;
-
-				bzero(&poll, sizeof (dl_capab_poll_t));
-				poll.poll_flags = POLL_ENABLE;
+				if (check_ip_above(dsp->ds_rq) &&
+				    proto_poll_enable(dsp, &poll)) {
+					bzero(&poll, sizeof (dl_capab_dls_t));
+					poll.dls_flags = POLL_ENABLE;
+				}
 				break;
 			}
 
-			dlcapabsetqid(&(poll.poll_mid), dsp->ds_rq);
-			bcopy(&poll, pollp, sizeof (dl_capab_poll_t));
+			dlcapabsetqid(&(poll.dls_mid), dsp->ds_rq);
+			bcopy(&poll, pollp, sizeof (dl_capab_dls_t));
+			break;
+		}
+		case DL_CAPAB_SOFT_RING: {
+			dl_capab_dls_t *soft_ringp;
+			dl_capab_dls_t soft_ring;
+
+			soft_ringp = (dl_capab_dls_t *)&sp[1];
+			/*
+			 * Copy for alignment.
+			 */
+			bcopy(soft_ringp, &soft_ring,
+			    sizeof (dl_capab_dls_t));
+
+			/*
+			 * We need to become writer before enabling and/or
+			 * disabling the soft_ring interface.  If we couldn'
+			 * upgrade, check state again after re-acquiring the
+			 * lock to make sure we can proceed.
+			 */
+			if (!upgraded && !rw_tryupgrade(&dsp->ds_lock)) {
+				rw_exit(&dsp->ds_lock);
+				rw_enter(&dsp->ds_lock, RW_WRITER);
+
+				if (dsp->ds_dlstate == DL_UNATTACHED ||
+				    DL_ACK_PENDING(dsp->ds_dlstate)) {
+					dl_err = DL_OUTSTATE;
+					goto failed;
+				}
+			}
+			upgraded = B_TRUE;
+
+			switch (soft_ring.dls_flags) {
+			default:
+				/*FALLTHRU*/
+			case SOFT_RING_DISABLE:
+				proto_soft_ring_disable(dsp);
+				break;
+
+			case SOFT_RING_ENABLE:
+				/*
+				 * Make sure soft_ring is disabled.
+				 */
+				proto_soft_ring_disable(dsp);
+
+				/*
+				 * Now attempt enable it.
+				 */
+				if (check_ip_above(dsp->ds_rq) &&
+				    proto_soft_ring_enable(dsp, &soft_ring)) {
+					bzero(&soft_ring,
+					    sizeof (dl_capab_dls_t));
+					soft_ring.dls_flags =
+					    SOFT_RING_ENABLE;
+				} else {
+					bzero(&soft_ring,
+					    sizeof (dl_capab_dls_t));
+					soft_ring.dls_flags =
+					    SOFT_RING_DISABLE;
+				}
+				break;
+			}
+
+			dlcapabsetqid(&(soft_ring.dls_mid), dsp->ds_rq);
+			bcopy(&soft_ring, soft_ringp,
+			    sizeof (dl_capab_dls_t));
 			break;
 		}
 		default:
@@ -1440,6 +1543,7 @@ proto_poll_disable(dld_str_t *dsp)
 	 */
 	mh = dls_mac(dsp->ds_dc);
 	mac_resource_set(mh, NULL, NULL);
+	mac_resources(mh);
 
 	/*
 	 * Set receive function back to default.
@@ -1454,7 +1558,7 @@ proto_poll_disable(dld_str_t *dsp)
 }
 
 static boolean_t
-proto_poll_enable(dld_str_t *dsp, dl_capab_poll_t *pollp)
+proto_poll_enable(dld_str_t *dsp, dl_capab_dls_t *pollp)
 {
 	mac_handle_t	mh;
 
@@ -1473,15 +1577,15 @@ proto_poll_enable(dld_str_t *dsp, dl_capab_poll_t *pollp)
 	/*
 	 * Register resources.
 	 */
-	mac_resource_set(mh, (mac_resource_add_t)pollp->poll_ring_add,
-	    (void *)pollp->poll_rx_handle);
+	mac_resource_set(mh, (mac_resource_add_t)pollp->dls_ring_add,
+	    (void *)pollp->dls_rx_handle);
 	mac_resources(mh);
 
 	/*
 	 * Set the receive function.
 	 */
-	dls_rx_set(dsp->ds_dc, (dls_rx_t)pollp->poll_rx,
-	    (void *)pollp->poll_rx_handle);
+	dls_rx_set(dsp->ds_dc, (dls_rx_t)pollp->dls_rx,
+	    (void *)pollp->dls_rx_handle);
 
 	/*
 	 * Note that polling is enabled. This prevents further DLIOCHDRINFO
@@ -1489,6 +1593,74 @@ proto_poll_enable(dld_str_t *dsp, dl_capab_poll_t *pollp)
 	 */
 	dsp->ds_polling = B_TRUE;
 	return (B_TRUE);
+}
+
+static void
+proto_soft_ring_disable(dld_str_t *dsp)
+{
+	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
+
+	if (!dsp->ds_soft_ring)
+		return;
+
+	/*
+	 * It should be impossible to enable raw mode if soft_ring is turned on.
+	 */
+	ASSERT(dsp->ds_mode != DLD_RAW);
+	proto_change_soft_ring_fanout(dsp, SOFT_RING_NONE);
+	/*
+	 * Note that fanout is disabled.
+	 */
+	dsp->ds_soft_ring = B_FALSE;
+}
+
+static boolean_t
+proto_soft_ring_enable(dld_str_t *dsp, dl_capab_dls_t *soft_ringp)
+{
+	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
+	ASSERT(!dsp->ds_soft_ring);
+
+	/*
+	 * We cannot enable soft_ring if raw mode
+	 * has been enabled.
+	 */
+	if (dsp->ds_mode == DLD_RAW)
+		return (B_FALSE);
+
+	if (dls_soft_ring_enable(dsp->ds_dc, soft_ringp) == B_FALSE)
+		return (B_FALSE);
+
+	dsp->ds_soft_ring = B_TRUE;
+	return (B_TRUE);
+}
+
+static void
+proto_change_soft_ring_fanout(dld_str_t *dsp, int type)
+{
+	dls_rx_t	rx;
+
+	if (type == SOFT_RING_NONE) {
+		rx = (dsp->ds_mode == DLD_FASTPATH) ?
+			    dld_str_rx_fastpath : dld_str_rx_unitdata;
+	} else {
+		rx = (dls_rx_t)dls_ether_soft_ring_fanout;
+	}
+	dls_soft_ring_rx_set(dsp->ds_dc, rx, dsp, type);
+}
+
+static void
+proto_stop_soft_ring_threads(void *arg)
+{
+	dld_str_t	*dsp = (dld_str_t *)arg;
+
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+	dls_soft_ring_disable(dsp->ds_dc);
+	dsp->ds_dlstate = DL_UNBOUND;
+	rw_exit(&dsp->ds_lock);
+	dlokack(dsp->ds_wq, dsp->ds_unbind_req, DL_UNBIND_REQ);
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+	dsp->ds_task_id = NULL;
+	rw_exit(&dsp->ds_lock);
 }
 
 /*
@@ -1500,7 +1672,8 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	dl_capability_ack_t	*dlap;
 	dl_capability_sub_t	*dlsp;
 	size_t			subsize;
-	dl_capab_poll_t		poll;
+	dl_capab_dls_t		poll;
+	dl_capab_dls_t	soft_ring;
 	dl_capab_hcksum_t	hcksum;
 	dl_capab_zerocopy_t	zcopy;
 	uint8_t			*ptr;
@@ -1516,6 +1689,9 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	 */
 	subsize = 0;
 
+	/* Always advertize soft ring capability for GLDv3 drivers */
+	subsize += sizeof (dl_capability_sub_t) + sizeof (dl_capab_dls_t);
+
 	/*
 	 * Check if polling can be enabled on this interface.
 	 * If advertising DL_CAPAB_POLL has not been explicitly disabled
@@ -1525,7 +1701,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	    !(dld_opt & DLD_OPT_NO_POLL) && (dsp->ds_vid == VLAN_ID_NONE));
 	if (poll_cap) {
 		subsize += sizeof (dl_capability_sub_t) +
-		    sizeof (dl_capab_poll_t);
+		    sizeof (dl_capab_dls_t);
 	}
 
 	/*
@@ -1550,7 +1726,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	 * If there are no capabilities to advertise or if we
 	 * can't allocate a response, send a DL_ERROR_ACK.
 	 */
-	if (subsize == 0 || (mp1 = reallocb(mp,
+	if ((mp1 = reallocb(mp,
 	    sizeof (dl_capability_ack_t) + subsize, 0)) == NULL) {
 		rw_exit(&dsp->ds_lock);
 		dlerrorack(q, mp, DL_CAPABILITY_REQ, DL_NOTSUPPORTED, 0);
@@ -1594,7 +1770,7 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 			rw_downgrade(&dsp->ds_lock);
 
 			poll_capab_size = sizeof (dl_capability_sub_t) +
-			    sizeof (dl_capab_poll_t);
+			    sizeof (dl_capab_dls_t);
 
 			mp->b_wptr -= poll_capab_size;
 			subsize -= poll_capab_size;
@@ -1607,22 +1783,42 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 			dlsp = (dl_capability_sub_t *)ptr;
 
 			dlsp->dl_cap = DL_CAPAB_POLL;
-			dlsp->dl_length = sizeof (dl_capab_poll_t);
+			dlsp->dl_length = sizeof (dl_capab_dls_t);
 			ptr += sizeof (dl_capability_sub_t);
 
-			bzero(&poll, sizeof (dl_capab_poll_t));
-			poll.poll_version = POLL_VERSION_1;
-			poll.poll_flags = POLL_CAPABLE;
-			poll.poll_tx_handle = (uintptr_t)dsp;
-			poll.poll_tx = (uintptr_t)str_mdata_fastpath_put;
+			bzero(&poll, sizeof (dl_capab_dls_t));
+			poll.dls_version = POLL_VERSION_1;
+			poll.dls_flags = POLL_CAPABLE;
+			poll.dls_tx_handle = (uintptr_t)dsp;
+			poll.dls_tx = (uintptr_t)str_mdata_fastpath_put;
 
-			dlcapabsetqid(&(poll.poll_mid), dsp->ds_rq);
-			bcopy(&poll, ptr, sizeof (dl_capab_poll_t));
-			ptr += sizeof (dl_capab_poll_t);
+			dlcapabsetqid(&(poll.dls_mid), dsp->ds_rq);
+			bcopy(&poll, ptr, sizeof (dl_capab_dls_t));
+			ptr += sizeof (dl_capab_dls_t);
 		}
 	}
 
 	ASSERT(RW_READ_HELD(&dsp->ds_lock));
+
+	dlsp = (dl_capability_sub_t *)ptr;
+
+	dlsp->dl_cap = DL_CAPAB_SOFT_RING;
+	dlsp->dl_length = sizeof (dl_capab_dls_t);
+	ptr += sizeof (dl_capability_sub_t);
+
+	bzero(&soft_ring, sizeof (dl_capab_dls_t));
+	soft_ring.dls_version = SOFT_RING_VERSION_1;
+	soft_ring.dls_flags = SOFT_RING_CAPABLE;
+	soft_ring.dls_tx_handle = (uintptr_t)dsp;
+	soft_ring.dls_tx = (uintptr_t)str_mdata_fastpath_put;
+	soft_ring.dls_ring_change_status =
+	    (uintptr_t)proto_change_soft_ring_fanout;
+	soft_ring.dls_ring_bind = (uintptr_t)soft_ring_bind;
+	soft_ring.dls_ring_unbind = (uintptr_t)soft_ring_unbind;
+
+	dlcapabsetqid(&(soft_ring.dls_mid), dsp->ds_rq);
+	bcopy(&soft_ring, ptr, sizeof (dl_capab_dls_t));
+	ptr += sizeof (dl_capab_dls_t);
 
 	/*
 	 * TCP/IP checksum offload.

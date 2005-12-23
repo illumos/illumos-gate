@@ -577,7 +577,9 @@ union	DL_qos_types {
 #define	DL_CAPAB_ZEROCOPY	0x05	/* Zero-copy capability */
 					/* dl_data is dl_capab_zerocopy_t */
 #define	DL_CAPAB_POLL		0x06	/* Polling capability */
-					/* dl_data is dl_capab_poll_t */
+					/* dl_data is dl_capab_dls_t */
+#define	DL_CAPAB_SOFT_RING   	0x07	/* Soft ring capable */
+					/* dl_data is dl_capab_dls_t */
 
 typedef struct {
 	t_uscalar_t	dl_cap;		/* capability type */
@@ -696,37 +698,57 @@ typedef struct {
 #ifdef _KERNEL
 
 /*
- * This defines the DL_CAPAB_POLL capability. Currently it provides a
- * mechanism for IP to exchange function pointers with a gldv3-based driver
- * to enable streams-bypassing data-paths and interrupt blanking. True polling
- * support will be added in the future.
+ * This structure is used by DL_CAPAB_POLL and DL_CAPAB_SOFT_RING
+ * capabilities. It provides a mechanism for IP to exchange function
+ * pointers with a gldv3-based driver to enable it to bypass streams-
+ * data-paths. DL_CAPAB_POLL mechanism provides a way to blank
+ * interrupts. Note: True polling support will be added in the future.
+ * DL_CAPAB_SOFT_RING provides a mechanism to create soft ring at the
+ * dls layer.
  */
-typedef struct dl_capab_poll_s {
-	t_uscalar_t		poll_version;
-	t_uscalar_t		poll_flags;
+typedef struct dl_capab_dls_s {
+	t_uscalar_t		dls_version;
+	t_uscalar_t		dls_flags;
 
 	/* DLD provided information */
-	uintptr_t		poll_tx_handle;
-	uintptr_t		poll_tx;
+	uintptr_t		dls_tx_handle;
+	uintptr_t		dls_tx;
+	uintptr_t		dls_ring_change_status;
+	uintptr_t		dls_ring_bind;
+	uintptr_t		dls_ring_unbind;
 
 	/* IP provided information */
-	uintptr_t		poll_rx_handle;
-	uintptr_t		poll_rx;
-	uintptr_t		poll_ring_add;
+	uintptr_t		dls_rx_handle;
+	uintptr_t		dls_ring_assign;
+	uintptr_t		dls_rx;
+	uintptr_t		dls_ring_add;
+	t_uscalar_t		dls_ring_cnt;
 
-	dl_mid_t		poll_mid;		/* module ID */
-} dl_capab_poll_t;
+	dl_mid_t		dls_mid;		/* module ID */
+} dl_capab_dls_t;
 
 #define	POLL_CURRENT_VERSION	0x01
 #define	POLL_VERSION_1		0x01
 
-/*
- * Values for poll_flags
- */
+#define	SOFT_RING_VERSION_1		0x01
+
+/* Values for poll_flags */
 #define	POLL_ENABLE		0x01	/* Set to enable polling */
 					/* capability */
 #define	POLL_CAPABLE		0x02	/* Polling ability exists */
-#define	POLL_DISABLE		0x04	/* Disable Polling */
+#define	POLL_DISABLE		0x03	/* Disable Polling */
+
+/* Values for soft_ring_flags */
+#define	SOFT_RING_ENABLE		0x04	/* Set to enable soft_ring */
+						/* capability */
+#define	SOFT_RING_CAPABLE		0x05	/* Soft_Ring ability exists */
+#define	SOFT_RING_DISABLE		0x06	/* Disable Soft_Ring */
+
+/* Soft_Ring fanout types (used by soft_ring_change_status) */
+#define	SOFT_RING_NONE			0x00
+#define	SOFT_RING_RANDOM		0x01
+#define	SOFT_RING_SRC_HASH		0x02
+#define	SOFT_RING_RND_ROBIN		0x03
 
 #endif /* _KERNEL */
 

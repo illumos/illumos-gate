@@ -43,9 +43,17 @@
 
 #include	<sys/dls.h>
 #include	<sys/dls_impl.h>
+#include	<sys/dls_soft_ring.h>
 
 static kmem_cache_t	*i_dls_impl_cachep;
 static uint32_t		i_dls_impl_count;
+
+static kstat_t	*dls_ksp = (kstat_t *)NULL;
+struct dls_kstats dls_kstat =
+{
+	{ "soft_ring_pkt_drop", KSTAT_DATA_UINT32 },
+};
+
 
 /*
  * Private functions.
@@ -257,6 +265,27 @@ vlan:
 	dhip->dhi_vid = VLAN_ID(tci);
 }
 
+static void
+dls_stat_init()
+{
+	if ((dls_ksp = kstat_create("dls", 0, "dls_stat",
+	    "net", KSTAT_TYPE_NAMED,
+	    sizeof (dls_kstat) / sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL)) == NULL) {
+		cmn_err(CE_WARN,
+		"DLS: failed to create kstat structure for dls stats");
+		return;
+	}
+	dls_ksp->ks_data = (void *)&dls_kstat;
+	kstat_install(dls_ksp);
+}
+
+static void
+dls_stat_destroy()
+{
+	kstat_delete(dls_ksp);
+}
+
 /*
  * Module initialization functions.
  */
@@ -271,6 +300,8 @@ dls_init(void)
 	    sizeof (dls_impl_t), 0, i_dls_constructor, i_dls_destructor, NULL,
 	    NULL, NULL, 0);
 	ASSERT(i_dls_impl_cachep != NULL);
+	soft_ring_init();
+	dls_stat_init();
 }
 
 int
@@ -286,6 +317,7 @@ dls_fini(void)
 	 * Destroy the kmem_cache.
 	 */
 	kmem_cache_destroy(i_dls_impl_cachep);
+	dls_stat_destroy();
 	return (0);
 }
 
@@ -423,6 +455,14 @@ dls_close(dls_channel_t dc)
 	 */
 	dip->di_dvp = NULL;
 	dip->di_txinfo = NULL;
+
+	if (dip->di_soft_ring_list != NULL) {
+		soft_ring_set_destroy(dip->di_soft_ring_list,
+		    dip->di_soft_ring_size);
+		dip->di_soft_ring_list = NULL;
+	}
+	dip->di_soft_ring_size = 0;
+
 	kmem_cache_free(i_dls_impl_cachep, dip);
 
 	/*

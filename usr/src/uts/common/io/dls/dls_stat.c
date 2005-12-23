@@ -121,7 +121,7 @@ i_dls_stat_update(kstat_t *ksp, int rw)
  */
 
 void
-dls_stat_create(dls_vlan_t *dvp)
+dls_mac_stat_create(dls_vlan_t *dvp)
 {
 	dls_link_t		*dlp = dvp->dv_dlp;
 	char			module[IFNAMSIZ];
@@ -172,7 +172,7 @@ done:
 }
 
 void
-dls_stat_destroy(dls_vlan_t *dvp)
+dls_mac_stat_destroy(dls_vlan_t *dvp)
 {
 	kstat_delete(dvp->dv_ksp);
 	dvp->dv_ksp = NULL;

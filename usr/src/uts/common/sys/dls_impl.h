@@ -35,6 +35,8 @@
 #include <sys/modhash.h>
 #include <sys/kstat.h>
 #include <net/if.h>
+#include <sys/dlpi.h>
+#include <sys/dls_soft_ring.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -99,6 +101,7 @@ struct dls_impl_s {
 	dls_multicst_addr_t		*di_dmap;
 	dls_rx_t			di_rx;
 	void				*di_rx_arg;
+	mac_resource_add_t		di_ring_add;
 	const mac_txinfo_t		*di_txinfo;
 	boolean_t			di_bound;
 	boolean_t			di_removing;
@@ -106,6 +109,9 @@ struct dls_impl_s {
 	uint8_t				di_unicst_addr[MAXADDRLEN];
 	dls_priv_header_t		di_header;
 	dls_priv_header_info_t		di_header_info;
+	soft_ring_t			**di_soft_ring_list;
+	uint_t				di_soft_ring_size;
+	int				di_soft_ring_fanout_type;
 };
 
 struct dls_head_s {
@@ -123,8 +129,8 @@ extern void		dls_link_remove(dls_link_t *, dls_impl_t *);
 extern int		dls_mac_hold(dls_link_t *);
 extern void		dls_mac_rele(dls_link_t *);
 
-extern void		dls_stat_create(dls_vlan_t *);
-extern void		dls_stat_destroy(dls_vlan_t *);
+extern void		dls_mac_stat_create(dls_vlan_t *);
+extern void		dls_mac_stat_destroy(dls_vlan_t *);
 
 extern void		dls_vlan_init(void);
 extern int		dls_vlan_fini(void);

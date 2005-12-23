@@ -289,6 +289,21 @@ mach_hw_copy_limit(void)
 }
 
 /*
+ * We need to enable soft ring functionality on Niagara platform since
+ * one strand can't handle interrupts for a 1Gb NIC. Set the tunable
+ * ip_squeue_soft_ring by default on this platform. We can also set
+ * ip_threads_per_cpu to track number of threads per core. The variables
+ * themselves are defined in space.c and used by IP module
+ */
+extern uint_t ip_threads_per_cpu;
+extern boolean_t ip_squeue_soft_ring;
+void
+startup_platform(void)
+{
+	ip_squeue_soft_ring = B_TRUE;
+}
+
+/*
  * This function sets up hypervisor traptrace buffer
  * This routine is called by the boot cpu only
  */

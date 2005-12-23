@@ -6168,13 +6168,13 @@ udp_send_data(udp_t *udp, queue_t *q, mblk_t *mp, ipha_t *ipha)
 	UPDATE_OB_PKT_COUNT(ire);
 	ire->ire_last_used_time = lbolt;
 
-	if (ILL_POLL_CAPABLE(ill)) {
+	if (ILL_DLS_CAPABLE(ill)) {
 		/*
 		 * Send the packet directly to DLD, where it may be queued
 		 * depending on the availability of transmit resources at
 		 * the media layer.
 		 */
-		IP_POLL_ILL_TX(ill, mp);
+		IP_DLS_ILL_TX(ill, mp);
 	} else {
 		putnext(ire->ire_stq, mp);
 	}

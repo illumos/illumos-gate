@@ -125,13 +125,16 @@
  * We allow multiple NICs to bind to the same CPU but want to preserve 1 <-> 1
  * mapping between squeue and NIC (or Rx ring) for performance reasons so
  * each squeue can uniquely own a NIC or a Rx ring and do polling
- * (PSARC 2004/630). So we allow up to  MAX_THREAD_PER_CPU squeues per CPU.
- * We start by creating MIN_THREAD_PER_CPU squeues per CPU but more squeues
+ * (PSARC 2004/630). So we allow up to  MAX_SQUEUES_PER_CPU squeues per CPU.
+ * We start by creating MIN_SQUEUES_PER_CPU squeues per CPU but more squeues
  * can be created dynamically as needed.
  */
-#define	MAX_THREAD_PER_CPU	32
-#define	MIN_THREAD_PER_CPU	1
-uint_t	ip_threads_per_cpu = MIN_THREAD_PER_CPU;
+#define	MAX_SQUEUES_PER_CPU	32
+#define	MIN_SQUEUES_PER_CPU	1
+uint_t	ip_squeues_per_cpu = MIN_SQUEUES_PER_CPU;
+
+#define	IP_NUM_SOFT_RINGS	2
+uint_t ip_soft_rings_cnt = IP_NUM_SOFT_RINGS;
 
 /*
  * List of all created squeue sets. The size is protected by cpu_lock
@@ -155,11 +158,12 @@ static int ip_squeue_cpu_setup(cpu_setup_t, int, void *);
 
 static void ip_squeue_set_bind(squeue_set_t *);
 static void ip_squeue_set_unbind(squeue_set_t *);
+static squeue_t *ip_find_unused_squeue(squeue_set_t *, cpu_t *, boolean_t);
 
 #define	CPU_ISON(c) (c != NULL && CPU_ACTIVE(c) && (c->cpu_flags & CPU_EXISTS))
 
 /*
- * Create squeue set containing ip_threads_per_cpu number of squeues
+ * Create squeue set containing ip_squeues_per_cpu number of squeues
  * for this CPU and bind them all to the CPU.
  */
 static squeue_set_t *
@@ -186,13 +190,13 @@ ip_squeue_set_create(cpu_t *cp, boolean_t reuse)
 	}
 
 	sqs = kmem_zalloc(sizeof (squeue_set_t) +
-	    (sizeof (squeue_t *) * MAX_THREAD_PER_CPU), KM_SLEEP);
+	    (sizeof (squeue_t *) * MAX_SQUEUES_PER_CPU), KM_SLEEP);
 	mutex_init(&sqs->sqs_lock, NULL, MUTEX_DEFAULT, NULL);
 	sqs->sqs_list = (squeue_t **)&sqs[1];
-	sqs->sqs_max_size = MAX_THREAD_PER_CPU;
+	sqs->sqs_max_size = MAX_SQUEUES_PER_CPU;
 	sqs->sqs_bind = id;
 
-	for (i = 0; i < ip_threads_per_cpu; i++) {
+	for (i = 0; i < ip_squeues_per_cpu; i++) {
 		bzero(sqname, sizeof (sqname));
 
 		(void) snprintf(sqname, sizeof (sqname),
@@ -201,6 +205,12 @@ ip_squeue_set_create(cpu_t *cp, boolean_t reuse)
 
 		sqp = squeue_create(sqname, id, ip_squeue_worker_wait,
 		    minclsyspri);
+
+		/*
+		 * The first squeue in each squeue_set is the DEFAULT
+		 * squeue.
+		 */
+		sqp->sq_state |= SQS_DEFAULT;
 
 		ASSERT(sqp != NULL);
 
@@ -229,10 +239,10 @@ ip_squeue_init(void (*callback)(squeue_t *))
 
 	ASSERT(sqset_global_list == NULL);
 
-	if (ip_threads_per_cpu < MIN_THREAD_PER_CPU)
-		ip_threads_per_cpu = MIN_THREAD_PER_CPU;
-	else if (ip_threads_per_cpu > MAX_THREAD_PER_CPU)
-		ip_threads_per_cpu = MAX_THREAD_PER_CPU;
+	if (ip_squeues_per_cpu < MIN_SQUEUES_PER_CPU)
+		ip_squeues_per_cpu = MIN_SQUEUES_PER_CPU;
+	else if (ip_squeues_per_cpu > MAX_SQUEUES_PER_CPU)
+		ip_squeues_per_cpu = MAX_SQUEUES_PER_CPU;
 
 	ip_squeue_create_callback = callback;
 	squeue_init();
@@ -293,6 +303,10 @@ ip_squeue_clean(void *arg1, mblk_t *mp, void *arg2)
 	mutex_exit(&sqp->sq_lock);
 
 	ill = ring->rr_ill;
+	if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING) {
+		ASSERT(ring->rr_handle != NULL);
+		ill->ill_dls_capab->ill_dls_unbind(ring->rr_handle);
+	}
 
 	/*
 	 * Cleanup the ring
@@ -338,14 +352,19 @@ ip_squeue_extend(void *arg)
 	ill_t		*ill = sq_arg->ip_taskq_ill;
 	ill_rx_ring_t	*ill_rx_ring = sq_arg->ip_taskq_ill_rx_ring;
 	cpu_t		*intr_cpu = sq_arg->ip_taskq_cpu;
-	squeue_set_t *sqs;
+	squeue_set_t 	*sqs;
 	squeue_t 	*sqp = NULL;
-	char		sqname[64];
-	int		i;
 
 	ASSERT(ill != NULL);
 	ASSERT(ill_rx_ring != NULL);
 	kmem_free(arg, sizeof (ip_taskq_arg_t));
+
+	/*
+	 * Make sure the CPU that originally took the interrupt still
+	 * exists.
+	 */
+	if (!CPU_ISON(intr_cpu))
+		intr_cpu = CPU;
 
 	sqs = intr_cpu->cpu_squeue_set;
 
@@ -356,10 +375,337 @@ ip_squeue_extend(void *arg)
 	 * is sequential, we need to hold the ill_lock.
 	 */
 	mutex_enter(&ill->ill_lock);
+	sqp = ip_find_unused_squeue(sqs, intr_cpu, B_FALSE);
+	if (sqp == NULL) {
+		/*
+		 * We hit the max limit of squeues allowed per CPU.
+		 * Assign this rx_ring to DEFAULT squeue of the
+		 * interrupted CPU but the squeue will not manage
+		 * the ring. Also print a warning.
+		 */
+		cmn_err(CE_NOTE, "ip_squeue_extend: CPU/sqset = %d/%p already "
+		    "has max number of squeues. System performance might "
+		    "become suboptimal\n", sqs->sqs_bind, (void *)sqs);
+
+		/* the first squeue in the list is the default squeue */
+		sqp = sqs->sqs_list[0];
+		ASSERT(sqp != NULL);
+		ill_rx_ring->rr_sqp = sqp;
+		ill_rx_ring->rr_ring_state = ILL_RING_INUSE;
+
+		mutex_exit(&ill->ill_lock);
+		ill_waiter_dcr(ill);
+		return;
+	}
+
+	ASSERT(MUTEX_HELD(&sqp->sq_lock));
+	sqp->sq_rx_ring = ill_rx_ring;
+	ill_rx_ring->rr_sqp = sqp;
+	ill_rx_ring->rr_ring_state = ILL_RING_INUSE;
+
+	sqp->sq_state |= (SQS_ILL_BOUND|SQS_POLL_CAPAB);
+	mutex_exit(&sqp->sq_lock);
+
+	mutex_exit(&ill->ill_lock);
+
+	/* ill_waiter_dcr will also signal any waiters on ill_ring_state */
+	ill_waiter_dcr(ill);
+}
+
+/*
+ * Do a Rx ring to squeue binding. Find a unique squeue that is not
+ * managing a receive ring. If no such squeue exists, dynamically
+ * create a new one in the squeue set.
+ *
+ * The function runs via the system taskq. The ill passed as an
+ * argument can't go away since we hold a ref. The lock order is
+ * ill_lock -> sqs_lock -> sq_lock.
+ *
+ * If we are binding a Rx ring to a squeue attached to the offline CPU,
+ * no need to check that because squeues are never destroyed once
+ * created.
+ */
+/* ARGSUSED */
+static void
+ip_squeue_soft_ring_affinity(void *arg)
+{
+	ip_taskq_arg_t		*sq_arg = (ip_taskq_arg_t *)arg;
+	ill_t			*ill = sq_arg->ip_taskq_ill;
+	ill_dls_capab_t	*ill_soft_ring = ill->ill_dls_capab;
+	ill_rx_ring_t		*ill_rx_ring = sq_arg->ip_taskq_ill_rx_ring;
+	cpu_t			*intr_cpu = sq_arg->ip_taskq_cpu;
+	cpu_t			*bind_cpu;
+	int			cpu_id = intr_cpu->cpu_id;
+	int			min_cpu_id, max_cpu_id;
+	boolean_t		enough_uniq_cpus = B_FALSE;
+	boolean_t		enough_cpus = B_FALSE;
+	squeue_set_t 		*sqs, *last_sqs;
+	squeue_t 		*sqp = NULL;
+	int			i, j;
+
+	ASSERT(ill != NULL);
+	kmem_free(arg, sizeof (ip_taskq_arg_t));
+
+	/*
+	 * Make sure the CPU that originally took the interrupt still
+	 * exists.
+	 */
+	if (!CPU_ISON(intr_cpu)) {
+		intr_cpu = CPU;
+		cpu_id = intr_cpu->cpu_id;
+	}
+
+	/*
+	 * If this ill represents link aggregation, then there might be
+	 * multiple NICs trying to register them selves at the same time
+	 * and in order to ensure that test and assignment of free rings
+	 * is sequential, we need to hold the ill_lock.
+	 */
+	mutex_enter(&ill->ill_lock);
+
+	if (!(ill->ill_state_flags & ILL_SOFT_RING_ASSIGN)) {
+		mutex_exit(&ill->ill_lock);
+		return;
+	}
+	/*
+	 * We need to fanout the interrupts from the NIC. We do that by
+	 * telling the driver underneath to create soft rings and use
+	 * worker threads (if the driver advertized SOFT_RING capability)
+	 * Its still a big performance win to if we can fanout to the
+	 * threads on the same core that is taking interrupts.
+	 *
+	 * Since we don't know the interrupt to CPU binding, we don't
+	 * assign any squeues or affinity to worker threads in the NIC.
+	 * At the time of the first interrupt, we know which CPU is
+	 * taking interrupts and try to find other threads on the same
+	 * core. Assuming, ip_threads_per_cpu is correct and cpus are
+	 * numbered sequentially for each core (XXX need something better
+	 * than this in future), find the lowest number and highest
+	 * number thread for that core.
+	 *
+	 * If we have one more thread per core than number of soft rings,
+	 * then don't assign any worker threads to the H/W thread (cpu)
+	 * taking interrupts (capability negotiation tries to ensure this)
+	 *
+	 * If the number of threads per core are same as the number of
+	 * soft rings, then assign the worker affinity and squeue to
+	 * the same cpu.
+	 *
+	 * Otherwise, just fanout to higher number CPUs starting from
+	 * the interrupted CPU.
+	 */
+
+	min_cpu_id = (cpu_id / ip_threads_per_cpu) * ip_threads_per_cpu;
+	max_cpu_id = min_cpu_id + ip_threads_per_cpu;
+
+	cmn_err(CE_CONT, "soft_ring_affinity: min/max/intr = %d/%d/%d\n",
+	    min_cpu_id, max_cpu_id, (int)intr_cpu->cpu_id);
+
+	/*
+	 * Quickly check if there are enough CPUs present for fanout
+	 * and also max_cpu_id is less than the id of the active CPU.
+	 * We use the cpu_id stored in the last squeue_set to get
+	 * an idea. The scheme is by no means perfect since it doesn't
+	 * take into account CPU DR operations and the fact that
+	 * interrupts themselves might change. An ideal scenario
+	 * would be to ensure that interrupts run cpus by themselves
+	 * and worker threads never have affinity to those CPUs. If
+	 * the interrupts move to CPU which had a worker thread, it
+	 * should be changed. Probably callbacks similar to CPU offline
+	 * are needed to make it work perfectly.
+	 */
+	last_sqs = sqset_global_list[sqset_global_size - 1];
+	if (ip_threads_per_cpu <= ncpus && max_cpu_id <= last_sqs->sqs_bind) {
+		if ((max_cpu_id - min_cpu_id) >
+		    ill_soft_ring->ill_dls_soft_ring_cnt)
+			enough_uniq_cpus = B_TRUE;
+		else if ((max_cpu_id - min_cpu_id) >=
+		    ill_soft_ring->ill_dls_soft_ring_cnt)
+			enough_cpus = B_TRUE;
+	}
+
+	j = 0;
+	for (i = 0; i < (ill_soft_ring->ill_dls_soft_ring_cnt + j); i++) {
+		if (enough_uniq_cpus) {
+			if ((min_cpu_id + i) == cpu_id) {
+				j++;
+				continue;
+			}
+			bind_cpu = cpu[min_cpu_id + i];
+		} else if (enough_cpus) {
+			bind_cpu = cpu[min_cpu_id + i];
+		} else {
+			/* bind_cpu = cpu[(cpu_id + i) % last_sqs->sqs_bind]; */
+			bind_cpu = cpu[(cpu_id + i) % ncpus];
+		}
+
+		/*
+		 * Check if the CPU actually exist and active. If not,
+		 * use the interrupted CPU. ip_find_unused_squeue() will
+		 * find the right CPU to fanout anyway.
+		 */
+		if (!CPU_ISON(bind_cpu))
+			bind_cpu = intr_cpu;
+
+		sqs = bind_cpu->cpu_squeue_set;
+		ASSERT(sqs != NULL);
+		ill_rx_ring = &ill_soft_ring->ill_ring_tbl[i - j];
+
+		sqp = ip_find_unused_squeue(sqs, bind_cpu, B_TRUE);
+		if (sqp == NULL) {
+			/*
+			 * We hit the max limit of squeues allowed per CPU.
+			 * Assign this rx_ring to DEFAULT squeue of the
+			 * interrupted CPU but thesqueue will not manage
+			 * the ring. Also print a warning.
+			 */
+			cmn_err(CE_NOTE, "ip_squeue_soft_ring: CPU/sqset = "
+			    "%d/%p already has max number of squeues. System "
+			    "performance might become suboptimal\n",
+			    sqs->sqs_bind, (void *)sqs);
+
+			/* the first squeue in the list is the default squeue */
+			sqp = intr_cpu->cpu_squeue_set->sqs_list[0];
+			ASSERT(sqp != NULL);
+
+			ill_rx_ring->rr_sqp = sqp;
+			ill_rx_ring->rr_ring_state = ILL_RING_INUSE;
+			continue;
+
+		}
+		ASSERT(MUTEX_HELD(&sqp->sq_lock));
+		ill_rx_ring->rr_sqp = sqp;
+		sqp->sq_rx_ring = ill_rx_ring;
+		ill_rx_ring->rr_ring_state = ILL_RING_INUSE;
+		sqp->sq_state |= SQS_ILL_BOUND;
+
+		/* assign affinity to soft ring */
+		if (ip_squeue_bind && (sqp->sq_state & SQS_BOUND)) {
+			ill_soft_ring->ill_dls_bind(ill_rx_ring->rr_handle,
+			    sqp->sq_bind);
+		}
+		mutex_exit(&sqp->sq_lock);
+
+		cmn_err(CE_CONT, "soft_ring_affinity: ring = %d, bind = %d\n",
+		    i - j, sqp->sq_bind);
+	}
+	mutex_exit(&ill->ill_lock);
+
+	ill_soft_ring->ill_dls_change_status(ill_soft_ring->ill_tx_handle,
+	    SOFT_RING_SRC_HASH);
+
+	/* ill_waiter_dcr will also signal any waiters on ill_ring_state */
+	ill_waiter_dcr(ill);
+}
+
+void
+ip_soft_ring_assignment(ill_t *ill, ill_rx_ring_t *ip_ring,
+mblk_t *mp_chain, size_t hdrlen)
+{
+	ip_taskq_arg_t	*taskq_arg;
+	boolean_t	refheld;
+
+	ASSERT(servicing_interrupt());
+	ASSERT(ip_ring == NULL);
+
+	mutex_enter(&ill->ill_lock);
+	if (!(ill->ill_state_flags & ILL_SOFT_RING_ASSIGN)) {
+		taskq_arg = (ip_taskq_arg_t *)
+		    kmem_zalloc(sizeof (ip_taskq_arg_t), KM_NOSLEEP);
+
+		if (taskq_arg == NULL)
+			goto out;
+
+		taskq_arg->ip_taskq_ill = ill;
+		taskq_arg->ip_taskq_ill_rx_ring = ip_ring;
+		taskq_arg->ip_taskq_cpu = CPU;
+
+		/*
+		 * Set ILL_SOFT_RING_ASSIGN flag. We don't want
+		 * the next interrupt to schedule a task for calling
+		 * ip_squeue_soft_ring_affinity();
+		 */
+		ill->ill_state_flags |= ILL_SOFT_RING_ASSIGN;
+	} else {
+		mutex_exit(&ill->ill_lock);
+		goto out;
+	}
+	mutex_exit(&ill->ill_lock);
+	refheld = ill_waiter_inc(ill);
+	if (refheld) {
+		if (taskq_dispatch(system_taskq,
+		    ip_squeue_soft_ring_affinity, taskq_arg, TQ_NOSLEEP))
+			goto out;
+
+		/* release ref on ill if taskq dispatch fails */
+		ill_waiter_dcr(ill);
+	}
+	/*
+	 * Turn on CAPAB_SOFT_RING so that affinity assignment
+	 * can be tried again later.
+	 */
+	mutex_enter(&ill->ill_lock);
+	ill->ill_state_flags &= ~ILL_SOFT_RING_ASSIGN;
+	mutex_exit(&ill->ill_lock);
+	kmem_free(taskq_arg, sizeof (ip_taskq_arg_t));
+
+out:
+	ip_input(ill, ip_ring, mp_chain, hdrlen);
+}
+
+static squeue_t *
+ip_find_unused_squeue(squeue_set_t *sqs, cpu_t *bind_cpu, boolean_t fanout)
+{
+	int 		i;
+	squeue_set_t	*best_sqs = NULL;
+	squeue_set_t	*curr_sqs = NULL;
+	int		min_sq = 0;
+	squeue_t 	*sqp = NULL;
+	char		sqname[64];
+
+	/*
+	 * If fanout is set and the passed squeue_set already has some
+	 * squeues which are managing the NICs, try to find squeues on
+	 * unused CPU.
+	 */
+	if (sqs->sqs_size > 1 && fanout) {
+		/*
+		 * First check to see if any squeue on the CPU passed
+		 * is managing a NIC.
+		 */
+		for (i = 0; i < sqs->sqs_size; i++) {
+			mutex_enter(&sqs->sqs_list[i]->sq_lock);
+			if ((sqs->sqs_list[i]->sq_state & SQS_ILL_BOUND) &&
+			    !(sqs->sqs_list[i]->sq_state & SQS_DEFAULT)) {
+				mutex_exit(&sqs->sqs_list[i]->sq_lock);
+				break;
+			}
+			mutex_exit(&sqs->sqs_list[i]->sq_lock);
+		}
+		if (i != sqs->sqs_size) {
+			best_sqs = sqset_global_list[sqset_global_size - 1];
+			min_sq = best_sqs->sqs_size;
+
+			for (i = sqset_global_size - 2; i >= 0; i--) {
+				curr_sqs = sqset_global_list[i];
+				if (curr_sqs->sqs_size < min_sq) {
+					best_sqs = curr_sqs;
+					min_sq = curr_sqs->sqs_size;
+				}
+			}
+
+			ASSERT(best_sqs != NULL);
+			sqs = best_sqs;
+			bind_cpu = cpu[sqs->sqs_bind];
+		}
+	}
+
 	mutex_enter(&sqs->sqs_lock);
+
 	for (i = 0; i < sqs->sqs_size; i++) {
 		mutex_enter(&sqs->sqs_list[i]->sq_lock);
-		if ((sqs->sqs_list[i]->sq_state & SQS_ILL_BOUND) == 0) {
+		if ((sqs->sqs_list[i]->sq_state &
+		    (SQS_DEFAULT|SQS_ILL_BOUND)) == 0) {
 			sqp = sqs->sqs_list[i];
 			break;
 		}
@@ -371,29 +717,19 @@ ip_squeue_extend(void *arg)
 		if (sqs->sqs_size == sqs->sqs_max_size) {
 			/*
 			 * Reached the max limit for squeue
-			 * we can allocate on this CPU. Leave
-			 * ill_ring_state set to ILL_RING_INPROC
-			 * so that ip_squeue_direct will just
-			 * assign the default squeue for this
-			 * ring for future connections.
+			 * we can allocate on this CPU.
 			 */
-#ifdef DEBUG
-			cmn_err(CE_NOTE, "ip_squeue_add: Reached max "
-			    " threads per CPU for sqp = %p\n", (void *)sqp);
-#endif
 			mutex_exit(&sqs->sqs_lock);
-			mutex_exit(&ill->ill_lock);
-			ill_waiter_dcr(ill);
-			return;
+			return (NULL);
 		}
 
 		bzero(sqname, sizeof (sqname));
 		(void) snprintf(sqname, sizeof (sqname),
-		    "ip_squeue_cpu_%d/%d/%d", CPU->cpu_seqid,
-		    CPU->cpu_id, sqs->sqs_size);
+		    "ip_squeue_cpu_%d/%d/%d", bind_cpu->cpu_seqid,
+		    bind_cpu->cpu_id, sqs->sqs_size);
 
-		sqp = squeue_create(sqname, CPU->cpu_id, ip_squeue_worker_wait,
-		    minclsyspri);
+		sqp = squeue_create(sqname, bind_cpu->cpu_id,
+		    ip_squeue_worker_wait, minclsyspri);
 
 		ASSERT(sqp != NULL);
 
@@ -403,26 +739,18 @@ ip_squeue_extend(void *arg)
 		if (ip_squeue_create_callback != NULL)
 			ip_squeue_create_callback(sqp);
 
-		if (ip_squeue_bind) {
+		mutex_enter(&cpu_lock);
+		if (ip_squeue_bind && cpu_is_online(bind_cpu)) {
 			squeue_bind(sqp, -1);
 		}
+		mutex_exit(&cpu_lock);
+
 		mutex_enter(&sqp->sq_lock);
 	}
 
-	ASSERT(sqp != NULL);
-
-	sqp->sq_rx_ring = ill_rx_ring;
-	ill_rx_ring->rr_sqp = sqp;
-	ill_rx_ring->rr_ring_state = ILL_RING_INUSE;
-
-	sqp->sq_state |= (SQS_ILL_BOUND|SQS_POLL_CAPAB);
-	mutex_exit(&sqp->sq_lock);
 	mutex_exit(&sqs->sqs_lock);
-
-	mutex_exit(&ill->ill_lock);
-
-	/* ill_waiter_dcr will also signal any waiters on ill_ring_state */
-	ill_waiter_dcr(ill);
+	ASSERT(sqp != NULL);
+	return (sqp);
 }
 
 /*
@@ -657,6 +985,21 @@ ip_squeue_set_unbind(squeue_set_t *sqs)
 	mutex_enter(&sqs->sqs_lock);
 	for (i = 0; i < sqs->sqs_size; i++) {
 		sqp = sqs->sqs_list[i];
+
+		/*
+		 * CPU is going offline. Remove the thread affinity
+		 * for any soft ring threads the squeue is managing.
+		 */
+		if (sqp->sq_state & SQS_ILL_BOUND) {
+			ill_rx_ring_t	*ring = sqp->sq_rx_ring;
+			ill_t		*ill = ring->rr_ill;
+
+			if (ill->ill_capabilities & ILL_CAPAB_SOFT_RING) {
+				ASSERT(ring->rr_handle != NULL);
+				ill->ill_dls_capab->ill_dls_unbind(
+					ring->rr_handle);
+			}
+		}
 		if (!(sqp->sq_state & SQS_BOUND))
 			continue;
 		squeue_unbind(sqp);

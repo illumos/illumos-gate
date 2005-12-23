@@ -743,7 +743,7 @@ extern int	ip_squeue_profile_set(queue_t *, mblk_t *, char *, caddr_t,
     cred_t *);
 static int	ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
     caddr_t cp, cred_t *cr);
-static int	ip_fanout_set(queue_t *, mblk_t *, char *, caddr_t,
+static int	ip_int_set(queue_t *, mblk_t *, char *, caddr_t,
     cred_t *);
 static squeue_func_t ip_squeue_switch(int);
 
@@ -941,10 +941,12 @@ static ipndp_t	lcl_ndp_arr[] = {
 	    (caddr_t)&ip_squeue_bind, "ip_squeue_bind" },
 	{ ip_param_generic_get, ip_input_proc_set,
 	    (caddr_t)&ip_squeue_enter, "ip_squeue_enter" },
-	{ ip_param_generic_get, ip_fanout_set,
+	{ ip_param_generic_get, ip_int_set,
 	    (caddr_t)&ip_squeue_fanout, "ip_squeue_fanout" },
 	{  ip_cgtp_filter_get,	ip_cgtp_filter_set, (caddr_t)&ip_cgtp_filter,
-	    "ip_cgtp_filter" }
+	    "ip_cgtp_filter" },
+	{ ip_param_generic_get, ip_int_set,
+	    (caddr_t)&ip_soft_rings_cnt, "ip_soft_rings_cnt" }
 };
 
 /*
@@ -25996,7 +25998,7 @@ ip_input_proc_set(queue_t *q, mblk_t *mp, char *value,
 
 /* ARGSUSED */
 static int
-ip_fanout_set(queue_t *q, mblk_t *mp, char *value,
+ip_int_set(queue_t *q, mblk_t *mp, char *value,
     caddr_t addr, cred_t *cr)
 {
 	int *v = (int *)addr;
@@ -26008,7 +26010,6 @@ ip_fanout_set(queue_t *q, mblk_t *mp, char *value,
 	*v = new_value;
 	return (0);
 }
-
 
 static void
 ip_kstat_init(void)

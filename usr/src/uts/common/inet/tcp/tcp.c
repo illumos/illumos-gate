@@ -18126,13 +18126,13 @@ tcp_send_data(tcp_t *tcp, queue_t *q, mblk_t *mp)
 	ire->ire_last_used_time = lbolt;
 	BUMP_MIB(&ip_mib, ipOutRequests);
 
-	if (ILL_POLL_CAPABLE(ill)) {
+	if (ILL_DLS_CAPABLE(ill)) {
 		/*
 		 * Send the packet directly to DLD, where it may be queued
 		 * depending on the availability of transmit resources at
 		 * the media layer.
 		 */
-		IP_POLL_ILL_TX(ill, mp);
+		IP_DLS_ILL_TX(ill, mp);
 	} else {
 		putnext(ire->ire_stq, mp);
 	}

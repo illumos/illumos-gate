@@ -1297,7 +1297,10 @@ mac_resource_add(mac_t *mp, mac_resource_t *mrp)
 	add = mip->mi_resource_add;
 	arg = mip->mi_resource_add_arg;
 
-	mrh = add(arg, mrp);
+	if (add != NULL)
+		mrh = add(arg, mrp);
+	else
+		mrh = NULL;
 	rw_exit(&mip->mi_resource_lock);
 
 	return (mrh);
