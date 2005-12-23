@@ -1429,10 +1429,13 @@ pc_reset(void)
 #else	/* __lint */
 
 	ENTRY(wait_500ms)
-	movl	$50000, %ecx
+	push	%ebx
+	movl	$50000, %ebx
 1:
 	call	tenmicrosec
-	loop	1b
+	decl	%ebx
+	jnz	1b
+	pop	%ebx
 	ret	
 	SET_SIZE(wait_500ms)
 
@@ -1445,7 +1448,11 @@ pc_reset(void)
 
 	ENTRY(pc_reset)
 
+#if defined(__i386)
 	testl	$RESET_METHOD_KBC, pc_reset_methods
+#elif defined(__amd64)
+	testl	$RESET_METHOD_KBC, pc_reset_methods(%rip)
+#endif
 	jz	1f
 
 	/
@@ -1465,7 +1472,11 @@ pc_reset(void)
 	call	wait_500ms
 
 1:
+#if defined(__i386)
 	testl	$RESET_METHOD_PORT92, pc_reset_methods
+#elif defined(__amd64)
+	testl	$RESET_METHOD_PORT92, pc_reset_methods(%rip)
+#endif
 	jz	3f
 
 	/
@@ -1487,7 +1498,11 @@ pc_reset(void)
 	call	wait_500ms
 
 3:
+#if defined(__i386)
 	testl	$RESET_METHOD_PCI, pc_reset_methods
+#elif defined(__amd64)
+	testl	$RESET_METHOD_PCI, pc_reset_methods(%rip)
+#endif
 	jz	4f
 
 	/ Try the PCI (soft) reset vector (should work on all modern systems,
