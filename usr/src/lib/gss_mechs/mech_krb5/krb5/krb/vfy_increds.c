@@ -83,39 +83,11 @@ krb5_verify_init_creds(krb5_context context,
    authcon = NULL;
    ap_req.data = NULL;
 
-   if (server_arg) {
+   if (server_arg)
       server = server_arg;
-   } else {
-      if ((ret = krb5_sname_to_principal(context, NULL, NULL, 
-					KRB5_NT_SRV_HST, &server))) {
-	goto cleanup;
-      } else {
-	/*
-	 * Solaris Kerberos:
-	 * We check first up to see whether 'verify_ap_req_fail' is
-	 * set to false, because if FALSE there is no point in
-	 * proceeding any further with the strict TGT verification check
-	 * for the 'host/fqdn' service principal in the local keytab.
-	 */
-	int nofail;
-        if (krb5_libdefault_boolean(context,
-				&creds->client->realm,
-				"verify_ap_req_nofail",
-				&nofail) == 0) {
-		/*
-		 * Solaris Kerberos:
-		 * If the administrator has configured the system such
-		 * that its OK to fail this strict TGT verification check
-		 * (i.e. verify_ap_req_nofail = false), set the
-		 * 'ret' code to 0 and cleanup.
-		 */
-		if (!nofail) {
-			ret = 0;
-			goto cleanup;
-		}
-	}
-      }
-   }
+   else if (ret = krb5_sname_to_principal(context, NULL, NULL, 
+					KRB5_NT_SRV_HST, &server))
+      goto cleanup;
       
    /* first, check if the server is in the keytab.  If not, there's
       no reason to continue.  rd_req does all this, but there's
@@ -125,18 +97,38 @@ krb5_verify_init_creds(krb5_context context,
    if (keytab_arg) {
       keytab = keytab_arg;
    } else {
-      if ((ret = krb5_kt_default(context, &keytab)))
-	 goto cleanup;
+       /* Solaris Kerberos: ignore errors here, deal with below */
+      ret = krb5_kt_default(context, &keytab);
    }
 
-   if ((ret = krb5_kt_get_entry(context, keytab, server, 0, 0, &kte)) != NULL) {
+   /* Warning: be very, very careful when modifying the logic here */
+   if (keytab == NULL ||
+       (ret = krb5_kt_get_entry(context, keytab, server, 0, 0, &kte))) {
        /* this means there is no keying material.  This is ok, as long as
 	  it is not prohibited by the configuration */
+
+       int nofail = 1;  /* Solaris Kerberos: default return error if keytab problems */
+
        if (options &&
 	   (options->flags & KRB5_VERIFY_INIT_CREDS_OPT_AP_REQ_NOFAIL)) {
-	   if (options->ap_req_nofail)
-	       goto cleanup;
+	   /* first, if options are set then use the option value to set nofail */
+	    nofail = options->ap_req_nofail;
+       } else {
+	   /* 
+	    * Check verify_ap_req_nofail if set in config file.  Note this logic
+	    * assumes that krb5_libdefault_boolean will not set nofail to a
+	    * default value if verify_ap_req_nofail is not explictly set in
+	    * config file.  Don't care about the return code.
+	    */
+	   (void) krb5_libdefault_boolean(context, &creds->client->realm,
+					  "verify_ap_req_nofail",
+					  &nofail);
        }
+       /* Solaris Kerberos: exit without an error ONLY if nofail is false */
+       if (!nofail)
+	   ret = 0; 
+
+       goto cleanup;
    }
 
    krb5_kt_free_entry(context, &kte);
