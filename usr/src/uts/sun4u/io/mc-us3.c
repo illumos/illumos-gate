@@ -52,6 +52,7 @@
 #include <sys/mc.h>
 #include <sys/mc-us3.h>
 #include <sys/cpu_module.h>
+#include <sys/platform_module.h>
 
 /*
  * Function prototypes
@@ -119,6 +120,12 @@ static kmutex_t	mcmutex;
 static kmutex_t	mcdatamutex;
 static int mc_is_open = 0;
 
+static krwlock_t mcdimmsids_rw;
+
+/* pointer to cache of DIMM serial ids */
+static dimm_sid_cache_t	*mc_dimm_sids;
+static int		max_entries;
+
 extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
@@ -138,19 +145,34 @@ static int mc_get_mem_unum(int synd_code, uint64_t paddr, char *buf,
 static int mc_get_mem_info(int synd_code, uint64_t paddr,
     uint64_t *mem_sizep, uint64_t *seg_sizep, uint64_t *bank_sizep,
     int *segsp, int *banksp, int *mcidp);
+static int mc_get_mem_sid(int mcid, int dimm, char *buf, int buflen, int *lenp);
+static int mc_get_mem_offset(uint64_t paddr, uint64_t *offp);
+static int mc_get_mem_addr(int mcid, char *sid, uint64_t off, uint64_t *paddr);
+static int mc_init_sid_cache(void);
 static int mc_get_mcregs(struct mc_soft_state *);
 static void mc_construct(int mc_id, void *dimminfop);
 static int mlayout_add(int mc_id, int bank_no, uint64_t reg, void *dimminfop);
-static void mlayout_del(int mc_id);
+static void mlayout_del(int mc_id, int delete);
 static struct seg_info *seg_match_base(u_longlong_t base);
 static void mc_node_add(mc_dlist_t *node, mc_dlist_t **head, mc_dlist_t **tail);
 static void mc_node_del(mc_dlist_t *node, mc_dlist_t **head, mc_dlist_t **tail);
 static mc_dlist_t *mc_node_get(int id, mc_dlist_t *head);
 static void mc_add_mem_unum_label(char *buf, int mcid, int bank, int dimm);
+static int mc_populate_sid_cache(void);
+static int mc_get_sid_cache_index(int mcid);
 
 #pragma weak p2get_mem_unum
 #pragma weak p2get_mem_info
+#pragma weak p2get_mem_sid
+#pragma weak p2get_mem_offset
+#pragma	weak p2get_mem_addr
+#pragma weak p2init_sid_cache
 #pragma weak plat_add_mem_unum_label
+#pragma weak plat_alloc_sid_cache
+#pragma weak plat_populate_sid_cache
+
+#define	QWORD_SIZE		144
+#define	QWORD_SIZE_BYTES	(QWORD_SIZE / 8)
 
 /*
  * These are the module initialization routines.
@@ -169,6 +191,7 @@ _init(void)
 	if (error == 0) {
 		mutex_init(&mcmutex, NULL, MUTEX_DRIVER, NULL);
 		mutex_init(&mcdatamutex, NULL, MUTEX_DRIVER, NULL);
+		rw_init(&mcdimmsids_rw, NULL, RW_DRIVER, NULL);
 	}
 
 	return (error);
@@ -185,6 +208,11 @@ _fini(void)
 	ddi_soft_state_fini(&mcp);
 	mutex_destroy(&mcmutex);
 	mutex_destroy(&mcdatamutex);
+	rw_destroy(&mcdimmsids_rw);
+
+	if (mc_dimm_sids)
+		kmem_free(mc_dimm_sids, sizeof (dimm_sid_cache_t) *
+		    max_entries);
 
 	return (0);
 }
@@ -227,7 +255,7 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			(void) ddi_prop_remove(DDI_DEV_T_NONE, softsp->dip,
 			    MEM_CFG_PROP_NAME);
 		}
-		mlayout_del(softsp->portid);
+		mlayout_del(softsp->portid, 0);
 		if (mc_get_mcregs(softsp) == -1) {
 			cmn_err(CE_WARN, "mc_attach: mc%d DDI_RESUME failure\n",
 			    instance);
@@ -306,8 +334,27 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 			p2get_mem_unum = mc_get_mem_unum;
 		if (&p2get_mem_info)
 			p2get_mem_info = mc_get_mem_info;
+		if (&p2get_mem_sid)
+			p2get_mem_sid = mc_get_mem_sid;
+		if (&p2get_mem_offset)
+			p2get_mem_offset = mc_get_mem_offset;
+		if (&p2get_mem_addr)
+			p2get_mem_addr = mc_get_mem_addr;
+		if (&p2init_sid_cache)
+			p2init_sid_cache = mc_init_sid_cache;
 	}
+
 	mutex_exit(&mcmutex);
+
+	/*
+	 * Update DIMM serial id information if the DIMM serial id
+	 * cache has already been initialized.
+	 */
+	if (mc_dimm_sids) {
+		rw_enter(&mcdimmsids_rw, RW_WRITER);
+		(void) mc_populate_sid_cache();
+		rw_exit(&mcdimmsids_rw);
+	}
 
 	if (ddi_create_minor_node(devi, "mc-us3", S_IFCHR, instance,
 	    "ddi_mem_ctrl", 0) != DDI_SUCCESS) {
@@ -321,7 +368,7 @@ mc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 
 bad1:
 	/* release all allocated data struture for this MC */
-	mlayout_del(softsp->portid);
+	mlayout_del(softsp->portid, 0);
 	if (softsp->memlayoutp != NULL)
 		kmem_free(softsp->memlayoutp, softsp->size);
 
@@ -378,7 +425,7 @@ mc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 	}
 
 	/* release all allocated data struture for this MC */
-	mlayout_del(softsp->portid);
+	mlayout_del(softsp->portid, 1);
 	if (softsp->memlayoutp != NULL)
 		kmem_free(softsp->memlayoutp, softsp->size);
 
@@ -391,7 +438,16 @@ mc_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 			p2get_mem_unum = NULL;
 		if (&p2get_mem_info)
 			p2get_mem_info = NULL;
+		if (&p2get_mem_sid)
+			p2get_mem_sid = NULL;
+		if (&p2get_mem_offset)
+			p2get_mem_offset = NULL;
+		if (&p2get_mem_addr)
+			p2get_mem_addr = NULL;
+		if (&p2init_sid_cache)
+			p2init_sid_cache = NULL;
 	}
+
 	mutex_exit(&mcmutex);
 
 	ddi_remove_minor_node(devi, NULL);
@@ -890,6 +946,132 @@ exit:
 }
 
 /*
+ * Translate a <DIMM, offset> pair to a physical address.
+ */
+static int
+mc_offset_to_addr(struct seg_info *seg,
+    struct bank_info *bank, uint64_t off, uint64_t *addr)
+{
+	uint64_t base, size, line, remainder;
+	uint32_t ifactor;
+
+	/*
+	 * Compute the half-dimm size in bytes.
+	 * Note that bank->size represents the number of data bytes,
+	 * and does not include the additional bits used for ecc, mtag,
+	 * and mtag ecc information in each 144-bit checkword.
+	 * For calculating the offset to a checkword we need the size
+	 * including the additional 8 bytes for each 64 data bytes of
+	 * a cache line.
+	 */
+	size = ((bank->size / 4) / 64) * 72;
+
+	/*
+	 * Check if the offset is within this bank. This depends on the position
+	 * of the bank, i.e., whether it is the front bank or the back bank.
+	 */
+	base = size * bank->pos;
+
+	if ((off < base) || (off >= (base + size)))
+		return (-1);
+
+	/*
+	 * Compute the offset within the half-dimm.
+	 */
+	off -= base;
+
+	/*
+	 * Compute the line within the half-dimm. This is the same as the line
+	 * within the bank since each DIMM in a bank contributes uniformly
+	 * 144 bits (18 bytes) to a cache line.
+	 */
+	line = off / QWORD_SIZE_BYTES;
+
+	remainder = off % QWORD_SIZE_BYTES;
+
+	/*
+	 * Compute the line within the segment.
+	 * The bank->lm field indicates the order in which cache lines are
+	 * distributed across the banks of a segment (See the Cheetah PRM).
+	 * The interleave factor the bank is programmed with is used instead
+	 * of the segment interleave factor since a segment can be composed
+	 * of banks with different interleave factors if the banks are not
+	 * uniform in size.
+	 */
+	ifactor = (bank->lk ^ 0xF) + 1;
+	line = (line * ifactor) + bank->lm;
+
+	/*
+	 * Compute the physical address assuming that there are 64 data bytes
+	 * in a cache line.
+	 */
+	*addr = (line << 6) + seg->base;
+	*addr += remainder * 16;
+
+	return (0);
+}
+
+/*
+ * Translate a physical address to a <DIMM, offset> pair.
+ */
+static void
+mc_addr_to_offset(struct seg_info *seg,
+    struct bank_info *bank, uint64_t addr, uint64_t *off)
+{
+	uint64_t base, size, line, remainder;
+	uint32_t ifactor;
+
+	/*
+	 * Compute the line within the segment assuming that there are 64 data
+	 * bytes in a cache line.
+	 */
+	line = (addr - seg->base) / 64;
+
+	/*
+	 * The lm (lower match) field from the Memory Address Decoding Register
+	 * for this bank determines which lines within a memory segment this
+	 * bank should respond to.  These are the actual address bits the
+	 * interleave is done over (See the Cheetah PRM).
+	 * In other words, the lm field indicates the order in which the cache
+	 * lines are distributed across the banks of a segment, and thusly it
+	 * can be used to compute the line within this bank. This is the same as
+	 * the line within the half-dimm. This is because each DIMM in a bank
+	 * contributes uniformly to every cache line.
+	 */
+	ifactor = (bank->lk ^ 0xF) + 1;
+	line = (line - bank->lm)/ifactor;
+
+	/*
+	 * Compute the offset within the half-dimm. This depends on whether
+	 * or not the bank is a front logical bank or a back logical bank.
+	 */
+	*off = line * QWORD_SIZE_BYTES;
+
+	/*
+	 * Compute the half-dimm size in bytes.
+	 * Note that bank->size represents the number of data bytes,
+	 * and does not include the additional bits used for ecc, mtag,
+	 * and mtag ecc information in each 144-bit quadword.
+	 * For calculating the offset to a checkword we need the size
+	 * including the additional 8 bytes for each 64 data bytes of
+	 * a cache line.
+	 */
+	size = ((bank->size / 4) / 64) * 72;
+
+	/*
+	 * Compute the offset within the dimm to the nearest line. This depends
+	 * on whether or not the bank is a front logical bank or a back logical
+	 * bank.
+	 */
+	base = size * bank->pos;
+	*off += base;
+
+	remainder = (addr - seg->base) % 64;
+	remainder /= 16;
+	*off += remainder;
+}
+
+/*
  * A cache line is composed of four quadwords with the associated ECC, the
  * MTag along with its associated ECC. This is depicted below:
  *
@@ -930,7 +1112,6 @@ static uint8_t qwordmap[] =
 7,    8,   9,  10,  11,  12,  13,  14,  15,   4,   5,   6,   0,   1,   2,   3,
 };
 
-#define	QWORD_SIZE	144
 
 /* ARGSUSED */
 static int
@@ -962,7 +1143,7 @@ mc_get_mem_unum(int synd_code, uint64_t paddr, char *buf, int buflen, int *lenp)
 	/*
 	 * Scan all logical banks to get one responding to the physical
 	 * address. Then compute the index to look up dimm and pin tables
-	 * to generate the unmuber.
+	 * to generate the unum.
 	 */
 	mutex_enter(&mcdatamutex);
 	bank = (struct bank_info *)bank_head;
@@ -975,8 +1156,8 @@ mc_get_mem_unum(int synd_code, uint64_t paddr, char *buf, int buflen, int *lenp)
 
 		/*
 		 * The Address Decoding logic decodes the different fields
-		 * in the Memory Address Drcoding register to determine
-		 * whether a particular logic bank should respond to a
+		 * in the Memory Address Decoding register to determine
+		 * whether a particular logical bank should respond to a
 		 * physical address.
 		 */
 		if ((!bank->valid) || ((~(~(upper_pa ^ bank->um) |
@@ -1003,15 +1184,15 @@ mc_get_mem_unum(int synd_code, uint64_t paddr, char *buf, int buflen, int *lenp)
 
 			quadword = (paddr & 0x3f) / 16;
 			/* or quadword = (paddr >> 4) % 4; */
-			pos_cacheline = ((3 - quadword) * 144) +
+			pos_cacheline = ((3 - quadword) * QWORD_SIZE) +
 			    qwordmap[qwlayout];
 			position = 575 - pos_cacheline;
 			index = position * 2 / 8;
 			offset = position % 4;
 
 			/*
-			 * Trade-off: We cound't add pin number to
-			 * unumber string because statistic number
+			 * Trade-off: We couldn't add pin number to
+			 * unum string because statistic number
 			 * pumps up at the corresponding dimm not pin.
 			 * (void) sprintf(unum, "Pin %1u ", (uint_t)
 			 * pinp->pintable[pos_cacheline]);
@@ -1062,10 +1243,183 @@ mc_get_mem_unum(int synd_code, uint64_t paddr, char *buf, int buflen, int *lenp)
 			*lenp = strlen(buf);
 			return (0);
 		}
-	}	/* end of while loop for logic bank list */
+	}	/* end of while loop for logical bank list */
 
 	mutex_exit(&mcdatamutex);
 	return (ENXIO);
+}
+
+/* ARGSUSED */
+static int
+mc_get_mem_offset(uint64_t paddr, uint64_t *offp)
+{
+	int upper_pa, lower_pa;
+	struct bank_info *bank;
+	struct seg_info *seg;
+
+	upper_pa = (paddr & MADR_UPA_MASK) >> MADR_UPA_SHIFT;
+	lower_pa = (paddr & MADR_LPA_MASK) >> MADR_LPA_SHIFT;
+
+	/*
+	 * Scan all logical banks to get one responding to the physical
+	 * address.
+	 */
+	mutex_enter(&mcdatamutex);
+	bank = (struct bank_info *)bank_head;
+	while (bank != NULL) {
+		/*
+		 * The Address Decoding logic decodes the different fields
+		 * in the Memory Address Decoding register to determine
+		 * whether a particular logical bank should respond to a
+		 * physical address.
+		 */
+		if ((!bank->valid) || ((~(~(upper_pa ^ bank->um) |
+		    bank->uk)) || (~(~(lower_pa ^ bank->lm) | bank->lk)))) {
+			bank = (struct bank_info *)bank->bank_node.next;
+			continue;
+		}
+
+		seg = (struct seg_info *)mc_node_get(bank->seg_id, seg_head);
+		ASSERT(seg != NULL);
+		ASSERT(paddr >= seg->base);
+
+		mc_addr_to_offset(seg, bank, paddr, offp);
+
+		mutex_exit(&mcdatamutex);
+		return (0);
+	}
+
+	mutex_exit(&mcdatamutex);
+	return (ENXIO);
+}
+
+/*
+ * Translate a DIMM <id, offset> pair to a physical address.
+ */
+static int
+mc_get_mem_addr(int mcid, char *sid, uint64_t off, uint64_t *paddr)
+{
+	struct seg_info *seg;
+	struct bank_info *bank;
+	int first_seg_id;
+	int i, found;
+
+	ASSERT(sid != NULL);
+
+	mutex_enter(&mcdatamutex);
+
+	rw_enter(&mcdimmsids_rw, RW_READER);
+
+	/*
+	 * If DIMM serial ids have not been cached yet, tell the
+	 * caller to try again.
+	 */
+	if (mc_dimm_sids == NULL) {
+		rw_exit(&mcdimmsids_rw);
+		return (EAGAIN);
+	}
+
+	for (i = 0; i < max_entries; i++) {
+		if (mc_dimm_sids[i].mcid == mcid)
+			break;
+	}
+
+	if (i == max_entries) {
+		rw_exit(&mcdimmsids_rw);
+		mutex_exit(&mcdatamutex);
+		return (ENODEV);
+	}
+
+	first_seg_id = mc_dimm_sids[i].seg_id;
+
+	seg = (struct seg_info *)mc_node_get(first_seg_id, seg_head);
+
+	rw_exit(&mcdimmsids_rw);
+
+	if (seg == NULL) {
+		mutex_exit(&mcdatamutex);
+		return (ENODEV);
+	}
+
+	found = 0;
+
+	for (bank = seg->hb_inseg; bank; bank = bank->n_inseg) {
+		ASSERT(bank->valid);
+
+		for (i = 0; i < NDIMMS; i++) {
+			if (strncmp((char *)bank->dimmsidp[i], sid,
+			    DIMM_SERIAL_ID_LEN)  == 0)
+				break;
+		}
+
+		if (i == NDIMMS)
+			continue;
+
+		if (mc_offset_to_addr(seg, bank, off, paddr) == -1)
+			continue;
+		found = 1;
+		break;
+	}
+
+	if (found) {
+		mutex_exit(&mcdatamutex);
+		return (0);
+	}
+
+	/*
+	 * If a bank wasn't found, it may be in another segment.
+	 * This can happen if the different logical banks of an MC
+	 * have different interleave factors.  To deal with this
+	 * possibility, we'll do a brute-force search for banks
+	 * for this MC with a different seg id then above.
+	 */
+	bank = (struct bank_info *)bank_head;
+	while (bank != NULL) {
+
+		if (!bank->valid) {
+			bank = (struct bank_info *)bank->bank_node.next;
+			continue;
+		}
+
+		if (bank->bank_node.id / NBANKS != mcid) {
+			bank = (struct bank_info *)bank->bank_node.next;
+			continue;
+		}
+
+		/* Ignore banks in the segment we looked in above. */
+		if (bank->seg_id == mc_dimm_sids[i].seg_id) {
+			bank = (struct bank_info *)bank->bank_node.next;
+			continue;
+		}
+
+		for (i = 0; i < NDIMMS; i++) {
+			if (strncmp((char *)bank->dimmsidp[i], sid,
+			    DIMM_SERIAL_ID_LEN)  == 0)
+				break;
+		}
+
+		if (i == NDIMMS) {
+			bank = (struct bank_info *)bank->bank_node.next;
+			continue;
+		}
+
+		seg = (struct seg_info *)mc_node_get(bank->seg_id, seg_head);
+
+		if (mc_offset_to_addr(seg, bank, off, paddr) == -1) {
+			bank = (struct bank_info *)bank->bank_node.next;
+			continue;
+		}
+
+		found = 1;
+		break;
+	}
+
+	mutex_exit(&mcdatamutex);
+
+	if (found)
+		return (0);
+	else
+		return (ENOENT);
 }
 
 static int
@@ -1098,7 +1452,7 @@ mc_get_mem_info(int synd_code, uint64_t paddr,
 		/*
 		 * The Address Decoding logic decodes the different fields
 		 * in the Memory Address Decoding register to determine
-		 * whether a particular logic bank should respond to a
+		 * whether a particular logical bank should respond to a
 		 * physical address.
 		 */
 		if ((!bankp->valid) || ((~(~(upper_pa ^ bankp->um) |
@@ -1127,7 +1481,7 @@ mc_get_mem_info(int synd_code, uint64_t paddr,
 
 		return (0);
 
-	}	/* end of while loop for logic bank list */
+	}	/* end of while loop for logical bank list */
 
 	mutex_exit(&mcdatamutex);
 	return (ENXIO);
@@ -1305,6 +1659,16 @@ mlayout_add(int mc_id, int bank_no, uint64_t reg, void *dimminfop)
 	bank_curr->lm = mcreg._s.lm;
 	bank_curr->size = size;
 
+	/*
+	 * The bank's position depends on which halves of the DIMMs it consists
+	 * of. The front-side halves of the 4 DIMMs constitute the front bank
+	 * and the back-side halves constitute the back bank. Bank numbers
+	 * 0 and 1 are front-side banks and bank numbers 2 and 3 are back side
+	 * banks.
+	 */
+	bank_curr->pos = bank_no >> 1;
+	ASSERT((bank_curr->pos == 0) || (bank_curr->pos == 1));
+
 	DPRINTF(MC_CNSTRC_DEBUG, ("mlayout_add 3: logical bank num %d, "
 	"lk 0x%x uk 0x%x um 0x%x ifactor 0x%x size 0x%lx base 0x%lx\n",
 	    idx, mcreg._s.lk, mcreg._s.uk, mcreg._s.um, ifactor, size, base));
@@ -1399,9 +1763,14 @@ exit:
  * Delete nodes related to the given MC on mc, device group, device,
  * and bank lists. Moreover, delete corresponding segment if its connected
  * banks are all removed.
+ *
+ * The "delete" argument is 1 if this is called as a result of DDI_DETACH. In
+ * this case, the DIMM data structures need to be deleted. The argument is
+ * 0 if this called as a result of DDI_SUSPEND/DDI_RESUME. In this case,
+ * the DIMM data structures are left alone.
  */
 static void
-mlayout_del(int mc_id)
+mlayout_del(int mc_id, int delete)
 {
 	int i, j, dgrpid, devid, bankid, ndevgrps;
 	struct seg_info *seg;
@@ -1511,6 +1880,20 @@ mlayout_del(int mc_id)
 		mc_node_del((mc_dlist_t *)bank_curr, &bank_head, &bank_tail);
 		kmem_free(bank_curr, sizeof (struct bank_info));
 	}	/* end of for loop for four banks */
+
+	if (mc_dimm_sids && delete) {
+		rw_enter(&mcdimmsids_rw, RW_WRITER);
+		i = mc_get_sid_cache_index(mc_id);
+		if (i >= 0) {
+			mc_dimm_sids[i].state = MC_DIMM_SIDS_INVALID;
+			if (mc_dimm_sids[i].sids) {
+				kmem_free(mc_dimm_sids[i].sids,
+				    sizeof (dimm_sid_t) * (NDGRPS * NDIMMS));
+				mc_dimm_sids[i].sids = NULL;
+			}
+		}
+		rw_exit(&mcdimmsids_rw);
+	}
 
 	mutex_exit(&mcdatamutex);
 }
@@ -1623,4 +2006,143 @@ mc_add_mem_unum_label(char *buf, int mcid, int bank, int dimm)
 {
 	if (&plat_add_mem_unum_label)
 		plat_add_mem_unum_label(buf, mcid, bank, dimm);
+}
+
+static int
+mc_get_sid_cache_index(int mcid)
+{
+	int	i;
+
+	for (i = 0; i < max_entries; i++) {
+		if (mcid == mc_dimm_sids[i].mcid)
+			return (i);
+	}
+
+	return (-1);
+}
+
+static int
+mc_populate_sid_cache(void)
+{
+	struct bank_info	*bank;
+
+	if (&plat_populate_sid_cache == 0)
+		return (ENOTSUP);
+
+	ASSERT(RW_WRITE_HELD(&mcdimmsids_rw));
+
+	/*
+	 * Mark which MCs are present and which segment
+	 * the DIMMs belong to.  Allocate space to
+	 * store DIMM serial ids which are later provided
+	 * by the platform layer, and update each bank_info
+	 * structure with pointers to its serial ids.
+	 */
+	bank = (struct bank_info *)bank_head;
+	while (bank != NULL) {
+		int i, j;
+		int bankid, mcid, dgrp_no;
+
+		if (!bank->valid) {
+			bank = (struct bank_info *)bank->bank_node.next;
+			continue;
+		}
+
+		bankid = bank->bank_node.id;
+		mcid = bankid / NBANKS;
+		i = mc_get_sid_cache_index(mcid);
+		if (mc_dimm_sids[i].state == MC_DIMM_SIDS_AVAILABLE) {
+			bank = (struct bank_info *)bank->bank_node.next;
+			continue;
+		} else if (mc_dimm_sids[i].state != MC_DIMM_SIDS_REQUESTED) {
+			mc_dimm_sids[i].state = MC_DIMM_SIDS_REQUESTED;
+			mc_dimm_sids[i].seg_id = bank->seg_id;
+		}
+
+		if (mc_dimm_sids[i].sids == NULL) {
+			mc_dimm_sids[i].sids = (dimm_sid_t *)kmem_zalloc(
+			    sizeof (dimm_sid_t) * (NDGRPS * NDIMMS), KM_SLEEP);
+		}
+
+		dgrp_no = bank->devgrp_id % NDGRPS;
+
+		for (j = 0; j < NDIMMS; j++)
+			bank->dimmsidp[j] =
+			    &mc_dimm_sids[i].sids[j + (NDIMMS * dgrp_no)];
+
+		bank = (struct bank_info *)bank->bank_node.next;
+	}
+
+
+	/*
+	 * Call to the platform layer to populate the cache
+	 * with DIMM serial ids.
+	 */
+	return (plat_populate_sid_cache(mc_dimm_sids, max_entries));
+}
+
+static void
+mc_init_sid_cache_thr(void)
+{
+	ASSERT(mc_dimm_sids == NULL);
+
+	mutex_enter(&mcdatamutex);
+	rw_enter(&mcdimmsids_rw, RW_WRITER);
+
+	mc_dimm_sids = plat_alloc_sid_cache(&max_entries);
+	(void) mc_populate_sid_cache();
+
+	rw_exit(&mcdimmsids_rw);
+	mutex_exit(&mcdatamutex);
+}
+
+static int
+mc_init_sid_cache(void)
+{
+	if (&plat_alloc_sid_cache) {
+		(void) thread_create(NULL, 0, mc_init_sid_cache_thr, NULL, 0,
+		    &p0, TS_RUN, minclsyspri);
+		return (0);
+	} else
+		return (ENOTSUP);
+}
+
+static int
+mc_get_mem_sid(int mcid, int dimm, char *buf, int buflen, int *lenp)
+{
+	int	i;
+
+	if (buflen < DIMM_SERIAL_ID_LEN)
+		return (ENOSPC);
+
+	/*
+	 * If DIMM serial ids have not been cached yet, tell the
+	 * caller to try again.
+	 */
+	if (!rw_tryenter(&mcdimmsids_rw, RW_READER))
+		return (EAGAIN);
+
+	if (mc_dimm_sids == NULL) {
+		rw_exit(&mcdimmsids_rw);
+		return (EAGAIN);
+	}
+
+	/*
+	 * Find dimm serial id using mcid and dimm #
+	 */
+	for (i = 0; i < max_entries; i++) {
+		if (mc_dimm_sids[i].mcid == mcid)
+			break;
+	}
+	if ((i == max_entries) || (!mc_dimm_sids[i].sids)) {
+		rw_exit(&mcdimmsids_rw);
+		return (ENOENT);
+	}
+
+	(void) strlcpy(buf, mc_dimm_sids[i].sids[dimm],
+	    DIMM_SERIAL_ID_LEN);
+	*lenp = strlen(buf);
+
+	rw_exit(&mcdimmsids_rw);
+	return (0);
 }

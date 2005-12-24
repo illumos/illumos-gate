@@ -1878,6 +1878,27 @@ synd_to_synd_code(int synd_status, ushort_t synd)
 		return (ecc_syndrome_tab[synd]);
 }
 
+/* ARGSUSED */
+int
+cpu_get_mem_sid(char *unum, char *buf, int buflen, int *lenp)
+{
+	return (ENOTSUP);
+}
+
+/* ARGSUSED */
+int
+cpu_get_mem_offset(uint64_t flt_addr, uint64_t *offp)
+{
+	return (ENOTSUP);
+}
+
+/* ARGSUSED */
+int
+cpu_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *addrp)
+{
+	return (ENOTSUP);
+}
+
 /*
  * Routine to return a string identifying the physical name
  * associated with a memory/cache error.

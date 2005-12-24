@@ -38,7 +38,7 @@ SRCS = \
 	mem_util.c
 
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc
+LDLIBS += -L$(ROOTLIB)/fm -lmdesc -lrt
 LDFLAGS += -R/usr/lib/fm
 
 include ../Makefile.targ

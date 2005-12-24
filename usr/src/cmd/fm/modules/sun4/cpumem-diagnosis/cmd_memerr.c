@@ -35,6 +35,10 @@
 #include <cmd_bank.h>
 #include <cmd_page.h>
 #include <cmd_cpu.h>
+#ifdef sun4u
+#include <cmd_dp.h>
+#include <cmd_dp_page.h>
+#endif
 #include <cmd.h>
 
 #include <strings.h>
@@ -181,6 +185,13 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	    fmd_case_solved(hdl, page->page_case))
 		return (CMD_EVD_REDUND);
 
+#ifdef sun4u
+	if (cmd_dp_error(hdl) || cmd_dp_fault(hdl, afar)) {
+		CMD_STAT_BUMP(dp_ignored_ce);
+		return (CMD_EVD_UNUSED);
+	}
+#endif /* sun4u */
+
 	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
 		CMD_STAT_BUMP(bad_mem_asru);
 		return (NULL);
@@ -276,13 +287,13 @@ cmd_ce_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 	dimm->dimm_retstat.fmds_value.ui64++;
 	cmd_dimm_dirty(hdl, dimm);
 
-	cmd_page_fault(hdl, dimm->dimm_asru_nvl, cmd_dimm_fru(dimm), ep, afar);
+	cmd_page_fault(hdl, asru, cmd_dimm_fru(dimm), ep, afar);
 	ce_thresh_check(hdl, dimm);
 
 	return (CMD_EVD_OK);
 }
 
-static void
+void
 cmd_bank_fault(fmd_hdl_t *hdl, cmd_bank_t *bank)
 {
 	fmd_case_t *cp;
@@ -372,6 +383,17 @@ cmd_ue_common(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl,
 		bank->bank_case.cc_cp = cmd_case_create(hdl, &bank->bank_header,
 		    CMD_PTR_BANK_CASE, &uuid);
 	}
+
+#ifdef sun4u
+	if (cmd_dp_error(hdl)) {
+		CMD_STAT_BUMP(dp_deferred_ue);
+		cmd_dp_page_defer(hdl, asru, ep, afar);
+		return (CMD_EVD_OK);
+	} else if (cmd_dp_fault(hdl, afar)) {
+		CMD_STAT_BUMP(dp_ignored_ue);
+		return (CMD_EVD_UNUSED);
+	}
+#endif /* sun4u */
 
 	fmd_case_add_ereport(hdl, bank->bank_case.cc_cp, ep);
 

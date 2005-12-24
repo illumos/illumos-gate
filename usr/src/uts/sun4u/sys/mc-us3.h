@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,10 +52,12 @@ struct mc_soft_state {
 };
 
 struct dimm_info {
-	char	label[NDGRPS * NDIMMS][MAX_DEVLEN];	/* dimm lable */
+	char	label[NDGRPS * NDIMMS][MAX_DEVLEN];	/* dimm label */
 	char	sym_flag;	/* 1: symmetric 0: asymmetric */
 	char	data[1];
 };
+
+typedef char dimm_sid_t[DIMM_SERIAL_ID_LEN];
 
 struct pin_info {
 	uchar_t	dimmtable[144];
@@ -91,10 +93,12 @@ struct bank_info {
 	uint_t um;		/* Upper Match field to match PA[42:26] */
 	uchar_t lk;		/* Lower Mask field to mask match 4 PA[9:6] */
 	uchar_t lm;		/* Lower Match field to match PA[9:6] */
+	uchar_t pos;		/* front=0, back=1 */
 	uint64_t size;		/* memory size per logical bank */
 	struct bank_info *n_inseg; /* next bank at the same segment */
 	struct bank_info *p_inseg; /* previous bank at the same segment */
 	struct dimm_info *dimminfop;
+	dimm_sid_t *dimmsidp[NDIMMS];
 };
 
 /* id = mc_id * ndevgrps + devgrp_no */
@@ -119,10 +123,28 @@ struct mctrl_info {
 	int devgrpids[NDGRPS];
 };
 
+typedef struct dimm_sid_cache {
+	int	mcid;	/* mc portid */
+	int	seg_id;	/* segment these DIMMs are in */
+	int	state;	/* state of cache for this mc */
+	dimm_sid_t	*sids;  /* ptr to array of serial ids */
+} dimm_sid_cache_t;
+
+/* values for the state field of a dimm_sid_cache_t */
+#define	MC_DIMM_SIDS_INVALID	0
+#define	MC_DIMM_SIDS_REQUESTED	1
+#define	MC_DIMM_SIDS_AVAILABLE	2
+
 extern int (*p2get_mem_unum)(int, uint64_t, char *, int, int *);
 extern int (*p2get_mem_info)(int, uint64_t, uint64_t *, uint64_t *,
     uint64_t *, int *, int *, int *);
-extern int plat_add_mem_unum_label(char *, int, int, int);
+extern int (*p2get_mem_offset)(uint64_t, uint64_t *);
+extern int (*p2get_mem_addr)(int, char *, uint64_t, uint64_t *);
+extern int (*p2get_mem_sid)(int, int, char *, int, int *);
+extern int (*p2init_sid_cache)(void);
+extern void plat_add_mem_unum_label(char *, int, int, int);
+extern dimm_sid_cache_t *plat_alloc_sid_cache(int *);
+extern int plat_populate_sid_cache(dimm_sid_cache_t *, int);
 
 uint64_t get_mcr(int);
 

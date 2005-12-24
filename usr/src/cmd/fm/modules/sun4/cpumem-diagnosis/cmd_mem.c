@@ -34,6 +34,9 @@
 #include <cmd_dimm.h>
 #include <cmd_bank.h>
 #include <cmd.h>
+#ifdef sun4u
+#include <cmd_dp.h>
+#endif
 
 #include <errno.h>
 #include <strings.h>
@@ -55,7 +58,7 @@ cmd_fmri_get_unum(nvlist_t *fmri)
 	    FM_VERSION, DATA_TYPE_UINT8, &vers,
 	    FM_FMRI_SCHEME, DATA_TYPE_STRING, &scheme,
 	    FM_FMRI_MEM_UNUM, DATA_TYPE_STRING, &unum,
-	    NULL) != 0 || vers != FM_EREPORT_VERSION ||
+	    NULL) != 0 || vers > FM_MEM_SCHEME_VERSION ||
 	    strcmp(scheme, FM_FMRI_SCHEME_MEM) != 0)
 		return (NULL);
 
@@ -124,8 +127,8 @@ cmd_mem_thresh_check(fmd_hdl_t *hdl, uint_t nret)
 	return (nret > wrnpgs);
 }
 
-static nvlist_t *
-mem_fmri_create(const char *unum)
+nvlist_t *
+cmd_mem_fmri_create(const char *unum)
 {
 	nvlist_t *fmri;
 
@@ -177,7 +180,7 @@ cmd_mem_fmri_derive(fmd_hdl_t *hdl, uint64_t afar, uint64_t afsr, uint16_t synd)
 
 	(void) close(fd);
 
-	fmri = mem_fmri_create(mn.m_name);
+	fmri = cmd_mem_fmri_create(mn.m_name);
 	fmd_hdl_free(hdl, mn.m_name, mn.m_namelen);
 
 	return (fmri);
@@ -189,7 +192,7 @@ cmd_iorxefrx_queue(fmd_hdl_t *hdl, cmd_iorxefrx_t *rf)
 
 	fmd_hdl_debug(hdl, "queueing IOxE/RxE/FRx for matching\n");
 
-	rf->rf_expid = fmd_timer_install(hdl, CMD_TIMERTYPE_MEM, NULL,
+	rf->rf_expid = fmd_timer_install(hdl, (void *)CMD_TIMERTYPE_MEM, NULL,
 	    cmd.cmd_iorxefrx_window);
 	cmd_list_append(&cmd.cmd_iorxefrx, rf);
 }

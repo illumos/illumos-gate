@@ -66,13 +66,16 @@
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/debug.h>
+#include <sys/fm/protocol.h>
 
 #ifdef __sparc
 extern int cpu_get_mem_name(uint64_t, uint64_t *, uint64_t, char *, int, int *);
 extern int cpu_get_mem_info(uint64_t, uint64_t, uint64_t *, uint64_t *,
     uint64_t *, int *, int *, int *);
 extern size_t cpu_get_name_bufsize(void);
-#endif
+extern int cpu_get_mem_sid(char *, char *, int, int *);
+extern int cpu_get_mem_addr(char *, char *, uint64_t, uint64_t *);
+#endif	/* __sparc */
 
 /*
  * Turn a byte length into a pagecount.  The DDI btop takes a
@@ -90,6 +93,11 @@ static int mm_kmem_io_access;
 
 static int mm_kstat_update(kstat_t *ksp, int rw);
 static int mm_kstat_snapshot(kstat_t *ksp, void *buf, int rw);
+
+static int mm_read_mem_name(intptr_t data, mem_name_t *mem_name);
+static int mm_read_mem_page(intptr_t data, mem_page_t *mpage);
+static int mm_get_mem_fmri(mem_page_t *mpage, nvlist_t **nvl);
+static int mm_get_paddr(nvlist_t *nvl, uint64_t *paddr);
 
 /*ARGSUSED1*/
 static int
@@ -507,6 +515,42 @@ mmioctl_page_retire(int cmd, intptr_t data)
 	return (EINVAL);
 }
 
+/*
+ * Given a mem-scheme FMRI for a page, execute the given page retire
+ * command on it.
+ */
+static int
+mmioctl_page_fmri_retire(int cmd, intptr_t data)
+{
+	mem_page_t mpage;
+	uint64_t pa;
+	nvlist_t *nvl;
+	int err;
+
+	if ((err = mm_read_mem_page(data, &mpage)) < 0)
+		return (err);
+
+	if ((err = mm_get_mem_fmri(&mpage, &nvl)) < 0)
+		return (err);
+
+	if ((err = mm_get_paddr(nvl, &pa)) < 0) {
+		nvlist_free(nvl);
+		return (err);
+	}
+
+	nvlist_free(nvl);
+
+	switch (cmd) {
+	case MEM_PAGE_FMRI_ISRETIRED:
+		return (page_retire_check(pa, NULL));
+
+	case MEM_PAGE_FMRI_RETIRE:
+		return (page_retire(pa, PR_FMA));
+	}
+
+	return (EINVAL);
+}
+
 #ifdef __sparc
 /*
  * Given a syndrome, syndrome type, and address return the
@@ -516,9 +560,6 @@ static int
 mmioctl_get_mem_name(intptr_t data)
 {
 	mem_name_t mem_name;
-#ifdef	_SYSCALL32
-	mem_name32_t mem_name32;
-#endif
 	void *buf;
 	size_t bufsize;
 	int len, err;
@@ -526,22 +567,8 @@ mmioctl_get_mem_name(intptr_t data)
 	if ((bufsize = cpu_get_name_bufsize()) == 0)
 		return (ENOTSUP);
 
-	if (get_udatamodel() == DATAMODEL_NATIVE) {
-		if (copyin((void *)data, &mem_name, sizeof (mem_name_t)))
-			return (EFAULT);
-	}
-#ifdef	_SYSCALL32
-	else {
-		if (copyin((void *)data, &mem_name32, sizeof (mem_name32_t)))
-			return (EFAULT);
-		mem_name.m_addr = mem_name32.m_addr;
-		mem_name.m_synd = mem_name32.m_synd;
-		mem_name.m_type[0] = mem_name32.m_type[0];
-		mem_name.m_type[1] = mem_name32.m_type[1];
-		mem_name.m_name = (caddr_t)(uintptr_t)mem_name32.m_name;
-		mem_name.m_namelen = (size_t)mem_name32.m_namelen;
-	}
-#endif	/* _SYSCALL32 */
+	if ((err = mm_read_mem_name(data, &mem_name)) < 0)
+		return (err);
 
 	buf = kmem_alloc(bufsize, KM_SLEEP);
 
@@ -591,6 +618,66 @@ mmioctl_get_mem_info(intptr_t data)
 
 	return (0);
 }
+
+/*
+ * Given a memory name, return its associated serial id
+ */
+static int
+mmioctl_get_mem_sid(intptr_t data)
+{
+	mem_name_t mem_name;
+	void *buf;
+	void *name;
+	size_t	name_len;
+	size_t bufsize;
+	int len, err;
+
+	if ((bufsize = cpu_get_name_bufsize()) == 0)
+		return (ENOTSUP);
+
+	if ((err = mm_read_mem_name(data, &mem_name)) < 0)
+		return (err);
+
+	buf = kmem_alloc(bufsize, KM_SLEEP);
+
+	if (mem_name.m_namelen > 1024)
+		mem_name.m_namelen = 1024; /* cap at 1024 bytes */
+
+	name = kmem_alloc(mem_name.m_namelen, KM_SLEEP);
+
+	if ((err = copyinstr((char *)mem_name.m_name, (char *)name,
+	    mem_name.m_namelen, &name_len)) != 0) {
+		kmem_free(buf, bufsize);
+		kmem_free(name, mem_name.m_namelen);
+		return (err);
+	}
+
+	/*
+	 * Call into cpu specific code to do the lookup.
+	 */
+	if ((err = cpu_get_mem_sid(name, buf, bufsize, &len)) != 0) {
+		kmem_free(buf, bufsize);
+		kmem_free(name, mem_name.m_namelen);
+		return (err);
+	}
+
+	if (len > mem_name.m_sidlen) {
+		kmem_free(buf, bufsize);
+		kmem_free(name, mem_name.m_namelen);
+		return (ENAMETOOLONG);
+	}
+
+	if (copyoutstr(buf, (char *)mem_name.m_sid,
+	    mem_name.m_sidlen, NULL) != 0) {
+		kmem_free(buf, bufsize);
+		kmem_free(name, mem_name.m_namelen);
+		return (EFAULT);
+	}
+
+	kmem_free(buf, bufsize);
+	kmem_free(name, mem_name.m_namelen);
+	return (0);
+}
 #endif	/* __sparc */
 
 /*
@@ -602,10 +689,13 @@ mmioctl_get_mem_info(intptr_t data)
 static int
 mmioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cred, int *rvalp)
 {
+	if (cmd == MEM_VTOP && (getminor(dev) != M_KMEM))
+		return (ENXIO);
+	else if (getminor(dev) != M_MEM)
+		return (ENXIO);
+
 	switch (cmd) {
 	case MEM_VTOP:
-		if (getminor(dev) != M_KMEM)
-			return (ENXIO);
 		return (mmioctl_vtop(data));
 
 	case MEM_PAGE_RETIRE:
@@ -615,27 +705,27 @@ mmioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cred, int *rvalp)
 	case MEM_PAGE_RETIRE_UE:
 	case MEM_PAGE_GETERRORS:
 	case MEM_PAGE_RETIRE_TEST:
-		if (getminor(dev) != M_MEM)
-			return (ENXIO);
 		return (mmioctl_page_retire(cmd, data));
 
-	case MEM_NAME:
-		if (getminor(dev) != M_MEM)
-			return (ENXIO);
+	case MEM_PAGE_FMRI_RETIRE:
+	case MEM_PAGE_FMRI_ISRETIRED:
+		return (mmioctl_page_fmri_retire(cmd, data));
+
 #ifdef __sparc
+	case MEM_NAME:
 		return (mmioctl_get_mem_name(data));
-#else
-		return (ENOTSUP);
-#endif
 
 	case MEM_INFO:
-		if (getminor(dev) != M_MEM)
-			return (ENXIO);
-#ifdef __sparc
 		return (mmioctl_get_mem_info(data));
+
+	case MEM_SID:
+		return (mmioctl_get_mem_sid(data));
 #else
+	case MEM_NAME:
+	case MEM_INFO:
+	case MEM_SID:
 		return (ENOTSUP);
-#endif
+#endif	/* __sparc */
 	}
 	return (ENXIO);
 }
@@ -915,5 +1005,133 @@ mm_kstat_snapshot(kstat_t *ksp, void *buf, int rw)
 	}
 	memlist_read_unlock();
 
+	return (0);
+}
+
+/*
+ * Read a mem_name_t from user-space and store it in the mem_name_t
+ * pointed to by the mem_name argument.
+ */
+static int
+mm_read_mem_name(intptr_t data, mem_name_t *mem_name)
+{
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (copyin((void *)data, mem_name, sizeof (mem_name_t)))
+			return (EFAULT);
+	}
+#ifdef	_SYSCALL32
+	else {
+		mem_name32_t mem_name32;
+
+		if (copyin((void *)data, &mem_name32, sizeof (mem_name32_t)))
+			return (EFAULT);
+		mem_name->m_addr = mem_name32.m_addr;
+		mem_name->m_synd = mem_name32.m_synd;
+		mem_name->m_type[0] = mem_name32.m_type[0];
+		mem_name->m_type[1] = mem_name32.m_type[1];
+		mem_name->m_name = (caddr_t)mem_name32.m_name;
+		mem_name->m_namelen = (size_t)mem_name32.m_namelen;
+		mem_name->m_sid = (caddr_t)mem_name32.m_sid;
+		mem_name->m_sidlen = (size_t)mem_name32.m_sidlen;
+	}
+#endif	/* _SYSCALL32 */
+
+	return (0);
+}
+
+/*
+ * Read a mem_page_t from user-space and store it in the mem_page_t
+ * pointed to by the mpage argument.
+ */
+static int
+mm_read_mem_page(intptr_t data, mem_page_t *mpage)
+{
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (copyin((void *)data, mpage, sizeof (mem_page_t)) != 0)
+			return (EFAULT);
+	}
+#ifdef _SYSCALL32
+	else {
+		mem_page32_t	mpage32;
+
+		if (copyin((void *)data, &mpage32, sizeof (mem_page32_t)) != 0)
+			return (EFAULT);
+
+		mpage->m_fmri = (caddr_t)(uintptr_t)mpage32.m_fmri;
+		mpage->m_fmrisz = mpage32.m_fmrisz;
+	}
+#endif	/* _SYSCALL32 */
+
+	return (0);
+}
+
+/*
+ * Expand an FMRI from a mem_page_t.
+ */
+static int
+mm_get_mem_fmri(mem_page_t *mpage, nvlist_t **nvl)
+{
+	char *buf;
+	int err;
+
+	if (mpage->m_fmri == NULL || mpage->m_fmrisz > MEM_FMRI_MAX_BUFSIZE)
+		return (EINVAL);
+
+	buf = kmem_alloc(mpage->m_fmrisz, KM_SLEEP);
+	if (copyin(mpage->m_fmri, buf, mpage->m_fmrisz) != 0) {
+		kmem_free(buf, mpage->m_fmrisz);
+		return (EFAULT);
+	}
+
+	err = nvlist_unpack(buf, mpage->m_fmrisz, nvl, KM_SLEEP);
+	kmem_free(buf, mpage->m_fmrisz);
+
+	return (err);
+}
+
+static int
+mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
+{
+	uint8_t version;
+	uint64_t offset, pa;
+	char *scheme;
+	char *unum;
+	char **serids;
+	uint_t nserids;
+	int err;
+
+	/* Verify FMRI scheme name and version number */
+	if ((nvlist_lookup_string(nvl, FM_FMRI_SCHEME, &scheme) != 0) ||
+	    (strcmp(scheme, FM_FMRI_SCHEME_MEM) != 0) ||
+	    (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0) ||
+	    version > FM_MEM_SCHEME_VERSION) {
+		return (EINVAL);
+	}
+
+	/*
+	 * There are two ways a physical address can be  obtained from a mem
+	 * scheme FMRI.  One way is to use the "offset" and  "serial"
+	 * members, if they are present, together with the "unum" member to
+	 * calculate a physical address.  This is the preferred way since
+	 * it is independent of possible changes to the programming of
+	 * underlying hardware registers that may change the physical address.
+	 * If the "offset" member is not present, then the address is
+	 * retrieved from the "physaddr" member.
+	 */
+	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &offset) != 0) {
+		if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &pa) !=
+		    0) {
+			return (EINVAL);
+		}
+	} else if (nvlist_lookup_string(nvl, FM_FMRI_MEM_UNUM, &unum) != 0 ||
+	    nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, &serids,
+	    &nserids) != 0) {
+		return (EINVAL);
+	} else {
+		if ((err = cpu_get_mem_addr(unum, serids[0], offset, &pa)) != 0)
+			return (err);
+	}
+
+	*paddr = pa;
 	return (0);
 }

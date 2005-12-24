@@ -41,6 +41,9 @@
 #include <cmd_mem.h>
 #include <cmd_page.h>
 #include <cmd_dimm.h>
+#ifdef sun4u
+#include <cmd_dp.h>
+#endif
 #include <cmd_bank.h>
 #include <cmd.h>
 
@@ -122,6 +125,11 @@ static cmd_subscriber_t cmd_subscribers[] = {
 	{ "ereport.io.*.ecc.s-dwce",	cmd_ioxe_sec },
 	{ "ereport.io.*.ecc.s-drue",	cmd_ioxe_sec },
 	{ "ereport.io.*.ecc.s-dwue",	cmd_ioxe_sec },
+	{ "ereport.asic.*.cds.cds-dp", 	cmd_dp_cds },
+	{ "ereport.asic.*.dx.dx-dp",	cmd_dp_dx },
+	{ "ereport.asic.*.sdi.sdi-dp", 	cmd_dp_ex },
+	{ "ereport.asic.*.cp.cp-dp", 	cmd_dp_cp },
+	{ "ereport.asic.*.rp.rp-dp", 	cmd_dp_cp },
 #else /* i.e. sun4v */
 	{ "ereport.cpu.*.irc",		cmd_irc },
 	{ "ereport.cpu.*.iru", 		cmd_iru },
@@ -181,10 +189,28 @@ cmd_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 static void
 cmd_timeout(fmd_hdl_t *hdl, id_t id, void *arg)
 {
-	if (CMD_TIMERTYPE_ISCPU(arg))
-		cmd_cpu_timeout(hdl, id, arg);
-	else
-		cmd_mem_timeout(hdl, id);
+	uintptr_t	timertype = (uintptr_t)arg;
+
+	switch (timertype) {
+		case CMD_TIMERTYPE_MEM:
+			cmd_mem_timeout(hdl, id);
+			break;
+
+#ifdef sun4u
+		case CMD_TIMERTYPE_DP:
+
+			cmd_dp_timeout(hdl, id);
+			break;
+#endif
+
+		case CMD_TIMERTYPE_CPU_UEC_FLUSH:
+		case CMD_TIMERTYPE_CPU_XR_WAITER:
+			cmd_cpu_timeout(hdl, id, (void *)timertype);
+			break;
+
+		default:
+			break;
+	}
 }
 
 static void
@@ -239,7 +265,15 @@ static const cmd_stat_t cmd_stats = {
 	{ "xxu_retr_flt", FMD_TYPE_UINT64, "xxUs obviated by faults" },
 	{ "cpu_migrat", FMD_TYPE_UINT64, "CPUs migrated to new version" },
 	{ "dimm_migrat", FMD_TYPE_UINT64, "DIMMs migrated to new version" },
-	{ "bank_migrat", FMD_TYPE_UINT64, "banks migrated to new version" }
+	{ "bank_migrat", FMD_TYPE_UINT64, "banks migrated to new version" },
+#ifdef sun4u
+	{ "dp_ignored_ce", FMD_TYPE_UINT64,
+	    "memory CEs ignored due to DP error or fault" },
+	{ "dp_ignored_ue", FMD_TYPE_UINT64,
+	    "memory UEs ignored due to DP fault" },
+	{ "dp_deferred_ue", FMD_TYPE_UINT64,
+	    "memory UEs deferred due to DP error" },
+#endif
 };
 
 static const fmd_prop_t fmd_props[] = {
@@ -312,6 +346,9 @@ _fmd_fini(fmd_hdl_t *hdl)
 	cmd_cpu_fini(hdl);
 	cmd_mem_fini(hdl);
 	cmd_page_fini(hdl);
+#ifdef sun4u
+	cmd_dp_fini(hdl);
+#endif
 
 	fmd_hdl_free(hdl, cmd.cmd_xxcu_trw,
 	    sizeof (cmd_xxcu_trw_t) * cmd.cmd_xxcu_ntrw);
@@ -372,6 +409,17 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_hdl_subscribe(hdl, "ereport.io.xmits.ecc.s-dwce");
 	fmd_hdl_subscribe(hdl, "ereport.io.xmits.ecc.s-drue");
 	fmd_hdl_subscribe(hdl, "ereport.io.xmits.ecc.s-dwue");
+
+#ifdef sun4u
+	/*
+	 * Subscribe to datapath events
+	 */
+	fmd_hdl_subscribe(hdl, "ereport.asic.*.cds.cds-dp");
+	fmd_hdl_subscribe(hdl, "ereport.asic.*.dx.dx-dp");
+	fmd_hdl_subscribe(hdl, "ereport.asic.*.sdi.sdi-dp");
+	fmd_hdl_subscribe(hdl, "ereport.asic.*.cp.cp-dp");
+	fmd_hdl_subscribe(hdl, "ereport.asic.*.rp.rp-dp");
+#endif
 
 	bzero(&cmd, sizeof (cmd_t));
 

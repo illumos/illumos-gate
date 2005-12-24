@@ -71,7 +71,8 @@ typedef enum cmd_nodetype {
 	CMD_NT_CPU = 1,
 	CMD_NT_DIMM,
 	CMD_NT_BANK,
-	CMD_NT_PAGE
+	CMD_NT_PAGE,
+	CMD_NT_DP
 } cmd_nodetype_t;
 
 /*
@@ -99,7 +100,9 @@ typedef enum cmd_ptrsubtype {
 	CMD_PTR_CPU_IREG,
 	CMD_PTR_CPU_FREG,
 	CMD_PTR_CPU_MAU,
-	CMD_PTR_CPU_L2CTL
+	CMD_PTR_CPU_L2CTL,
+	CMD_PTR_DP_CASE,
+	CMD_PTR_DP_PAGE_DEFER
 } cmd_ptrsubtype_t;
 
 /*
@@ -121,11 +124,13 @@ typedef enum cmd_BUG_ptrsubtype {
 	BUG_PTR_PAGE_CASE = 8
 } cmd_BUG_ptrsubtype_t;
 
-#define	CMD_TIMERTYPE_CPU_UEC_FLUSH	(void *)1
-#define	CMD_TIMERTYPE_CPU_XR_WAITER	(void *)2
-#define	CMD_TIMERTYPE_MEM		(void *)3
+#define	CMD_TIMERTYPE_CPU_UEC_FLUSH	1
+#define	CMD_TIMERTYPE_CPU_XR_WAITER	2
+#define	CMD_TIMERTYPE_MEM		3
+#define	CMD_TIMERTYPE_DP		4
 
-#define	CMD_TIMERTYPE_ISCPU(timer)	((void *)timer != CMD_TIMERTYPE_MEM)
+#define	CMD_TIMERTYPE_ISCPU(timer)	((timer) != CMD_TIMERTYPE_MEM && \
+					(timer) != CMD_TIMERTYPE_DP)
 
 /*
  * There are three types of general-purpose buffers, used to track CPUs, DIMMs,

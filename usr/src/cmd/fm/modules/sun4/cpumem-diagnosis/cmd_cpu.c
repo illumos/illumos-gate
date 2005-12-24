@@ -217,8 +217,8 @@ cpu_uec_flush(fmd_hdl_t *hdl, cmd_cpu_t *cpu)
 	if (cpu->cpu_uec_flush != 0)
 		fmd_timer_remove(hdl, cpu->cpu_uec_flush);
 
-	cpu->cpu_uec_flush = fmd_timer_install(hdl, CMD_TIMERTYPE_CPU_UEC_FLUSH,
-	    NULL, NANOSEC);
+	cpu->cpu_uec_flush = fmd_timer_install(hdl,
+	    (void *)CMD_TIMERTYPE_CPU_UEC_FLUSH, NULL, NANOSEC);
 	cpu_buf_write(hdl, cpu);
 }
 
@@ -382,7 +382,7 @@ cmd_xr_reschedule(fmd_hdl_t *hdl, cmd_xr_t *xr, uint_t hdlrid)
 
 	xr->xr_hdlrid = hdlrid;
 	xr->xr_hdlr = cmd_xr_id2hdlr(hdl, hdlrid);
-	xr->xr_id = fmd_timer_install(hdl, CMD_TIMERTYPE_CPU_XR_WAITER,
+	xr->xr_id = fmd_timer_install(hdl, (void *)CMD_TIMERTYPE_CPU_XR_WAITER,
 	    NULL, cmd.cmd_xxcu_trdelay);
 
 	if (xr->xr_ref++ == 0)
@@ -452,7 +452,7 @@ cmd_xr_restore(fmd_hdl_t *hdl, cmd_cpu_t *cpu, fmd_case_t *cp)
 	 * which *should* be long enough.  It's pretty bad, but there's no
 	 * real way to keep the other side-effects from taking out the CPU.
 	 */
-	xr->xr_id = fmd_timer_install(hdl, CMD_TIMERTYPE_CPU_XR_WAITER,
+	xr->xr_id = fmd_timer_install(hdl, (void *)CMD_TIMERTYPE_CPU_XR_WAITER,
 	    NULL, fmd_prop_get_int64(hdl, "xxcu_restart_delay"));
 
 	cmd_list_append(&cmd.cmd_xxcu_redelivs, xr);

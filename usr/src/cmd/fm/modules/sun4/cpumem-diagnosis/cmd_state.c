@@ -35,6 +35,10 @@
 #include <cmd_mem.h>
 #include <cmd_page.h>
 #include <cmd_dimm.h>
+#ifdef sun4u
+#include <cmd_dp.h>
+#include <cmd_dp_page.h>
+#endif
 #include <cmd_bank.h>
 #include <cmd.h>
 
@@ -63,7 +67,13 @@ static cmd_case_closer_f *const cmd_case_closers[] = {
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_IREG */
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_FREG */
 	cmd_cpuerr_close,	/* CMD_PTR_CPU_MAU */
-	cmd_cpuerr_close	/* CMD_PTR_CPU_L2CTL */
+	cmd_cpuerr_close,	/* CMD_PTR_CPU_L2CTL */
+#ifdef sun4u
+	cmd_dp_close,		/* CMD_PTR_DP_CASE */
+#else
+	NULL,			/* CMD_PTR_DP_CASE */
+#endif
+	NULL			/* CMD_PTR_DP_PAGE_DEFER */
 };
 
 fmd_case_t *
@@ -132,7 +142,10 @@ static cmd_case_restorer_f *const cmd_case_restorers[] = {
 	cmd_cpu_restore,	/* CMD_NT_CPU */
 	cmd_dimm_restore,	/* CMD_NT_DIMM */
 	cmd_bank_restore,	/* CMD_NT_BANK */
-	cmd_page_restore	/* CMD_NT_PAGE */
+	cmd_page_restore,	/* CMD_NT_PAGE */
+#ifdef sun4u
+	cmd_dp_restore		/* CMD_NT_DP */
+#endif
 };
 
 int
@@ -175,7 +188,16 @@ cmd_state_restore(fmd_hdl_t *hdl)
 	cmd_cpu_validate(hdl);
 	cmd_bank_validate(hdl);
 	cmd_dimm_validate(hdl);
+#ifdef sun4u
+	/*
+	 * cmd_dp_page_validate() must be done before cmd_dp_validate()
+	 * and cmd_page_validate()
+	 */
+	cmd_dp_page_validate(hdl);
+	cmd_dp_validate(hdl);
+#endif
 	cmd_page_validate(hdl);
+
 	return (0);
 }
 

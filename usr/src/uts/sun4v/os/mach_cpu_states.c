@@ -909,6 +909,20 @@ cpu_get_mem_name(uint64_t synd, uint64_t *afsr, uint64_t afar,
 	return (ENOTSUP);
 }
 
+/* ARGSUSED */
+int
+cpu_get_mem_sid(char *unum, char *buf, int buflen, int *lenp)
+{
+	return (ENOTSUP);
+}
+
+/* ARGSUSED */
+int
+cpu_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *addrp)
+{
+	return (ENOTSUP);
+}
+
 /*
  * xt_sync - wait for previous x-traps to finish
  */

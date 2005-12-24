@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <sys/mem.h>
 #include <fm/fmd_fmri.h>
 
 void
@@ -45,15 +46,37 @@ mem_strarray_free(char **arr, size_t dim)
 }
 
 int
-mem_page_cmd(int cmd, uint64_t addr)
+mem_page_cmd(int cmd, nvlist_t *nvl)
 {
+	mem_page_t mpage;
+	char *fmribuf;
+	size_t fmrisz;
 	int fd, rc, err;
 
 	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
 		return (-1); /* errno is set for us */
 
-	if ((rc = ioctl(fd, cmd, &addr)) < 0)
+	if ((errno = nvlist_size(nvl, &fmrisz, NV_ENCODE_NATIVE)) != 0 ||
+	    fmrisz > MEM_FMRI_MAX_BUFSIZE ||
+	    (fmribuf = fmd_fmri_alloc(fmrisz)) == NULL) {
+		(void) close(fd);
+		return (-1); /* errno is set for us */
+	}
+
+	if ((errno = nvlist_pack(nvl, &fmribuf, &fmrisz,
+	    NV_ENCODE_NATIVE, 0)) != 0) {
+		fmd_fmri_free(fmribuf, fmrisz);
+		(void) close(fd);
+		return (-1); /* errno is set for us */
+	}
+
+	mpage.m_fmri = fmribuf;
+	mpage.m_fmrisz = fmrisz;
+
+	if ((rc = ioctl(fd, cmd, &mpage)) < 0)
 		err = errno;
+
+	fmd_fmri_free(fmribuf, fmrisz);
 
 	(void) close(fd);
 

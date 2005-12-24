@@ -138,6 +138,11 @@ typedef struct cmd_stat {
 	fmd_stat_t cpu_migrat;		/* # of CPUs migrated to new version */
 	fmd_stat_t dimm_migrat;		/* # of DIMMs migrated to new version */
 	fmd_stat_t bank_migrat;		/* # of banks migrated to new version */
+#ifdef sun4u
+	fmd_stat_t dp_ignored_ce;	/* # of CEs ignored due to DP flt/err */
+	fmd_stat_t dp_ignored_ue;	/* # of UEs ignored due to DP fault */
+	fmd_stat_t dp_deferred_ue;	/* # of UEs deferred due to DP error */
+#endif
 } cmd_stat_t;
 
 typedef struct cmd_serd {
@@ -152,6 +157,10 @@ typedef struct cmd {
 	cmd_list_t cmd_banks;		/* List of bank state structures */
 	cmd_list_t cmd_pages;		/* List of page state structures */
 	cmd_list_t cmd_iorxefrx;	/* List of IOxE/RxE/FRx correlation */
+#ifdef sun4u
+	cmd_list_t cmd_datapaths;	/* List of datapath state structures */
+	cmd_list_t cmd_deferred_pages;	/* Pages deferred due to a DP error */
+#endif
 	hrtime_t cmd_iorxefrx_window;	/* Max int between IOxE/RxE/FRx pairs */
 	cmd_stat_t *cmd_stats;		/* Module statistics */
 	size_t cmd_pagesize;		/* Page size, in bytes */
@@ -166,6 +175,9 @@ typedef struct cmd {
 	uint64_t cmd_thresh_tpct_sysmem; /* Pg ret warning thresh (% of mem) */
 	uint64_t cmd_thresh_abs_sysmem;	/* Pg ret warning thresh (# of pages) */
 	uint64_t cmd_thresh_abs_badrw;	/* Bad r/w retire thresh (# of pages) */
+#ifdef sun4u
+	uint16_t cmd_dp_flag;		/* datapath error in progress if set */
+#endif
 } cmd_t;
 
 extern cmd_t cmd;

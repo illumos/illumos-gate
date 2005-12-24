@@ -31,6 +31,7 @@
 
 #include <sys/types.h>
 #include <sys/mdesc.h>
+#include <sys/nvpair.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -102,7 +103,8 @@ extern "C" {
  *     that there is no relationship.
  */
 
-#define	MEM_SERID_MAXLEN	9	/* 8+nul for SPD, 6+nul for SEEPROM */
+/* 8+nul for SPD, 6+nul for SEEPROM, 15+nul max for Serengeti, Starcat, LW8 */
+#define	MEM_SERID_MAXLEN	16
 #define	MDESC_PATH		"%s/devices/pseudo/mdesc@0:mdesc"
 #define	MDESC_MAXPATHLEN	128
 
@@ -131,7 +133,7 @@ extern int mem_unum_burst(const char *, char ***, size_t *);
 extern int mem_unum_contains(const char *, const char *);
 
 extern void mem_strarray_free(char **, size_t);
-extern int mem_page_cmd(int, uint64_t);
+extern int mem_page_cmd(int, nvlist_t *);
 
 extern mem_t mem;
 

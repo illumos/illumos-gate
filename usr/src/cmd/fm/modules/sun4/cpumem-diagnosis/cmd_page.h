@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +35,7 @@
  */
 
 #include <cmd_state.h>
-#include <cmd_mem.h>
+#include <cmd_fmri.h>
 
 #include <fm/fmd_api.h>
 #include <sys/types.h>

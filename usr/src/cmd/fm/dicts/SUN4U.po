@@ -3608,3 +3608,83 @@ msgid "SUN4U-8007-03.impact"
 msgstr "Performance of this system may be affected."
 msgid "SUN4U-8007-03.action"
 msgstr "Schedule a repair procedure to replace the affected CPU.  Use fmdump -v -u <EVENT_ID> to identify the CPU."
+#
+# code: SUN4U-8007-1Y
+# keys: fault.asic.cds.dp
+#
+msgid "SUN4U-8007-1Y.type"
+msgstr "Fault"
+msgid "SUN4U-8007-1Y.severity"
+msgstr "Critical"
+msgid "SUN4U-8007-1Y.description"
+msgstr "A hardware problem was detected on the datapath interconnect.  Refer to %s for more information."
+msgid "SUN4U-8007-1Y.response"
+msgstr "One or more CPUs may be offlined. Additionally, page retires for memory in the impacted region may be disabled."
+msgid "SUN4U-8007-1Y.impact"
+msgstr "System performace may be affected."
+msgid "SUN4U-8007-1Y.action"
+msgstr "Schedule a repair procedure to replace the affected component(s). The System Controller (SC) diagnostic messages have the authoritative information on the affected component(s). fmdump -v -u <EVENT_ID> can also be used, but the SC is authoritative."
+#
+# code: SUN4U-8007-2D
+# keys: fault.asic.dx.dp
+#
+msgid "SUN4U-8007-2D.type"
+msgstr "Fault"
+msgid "SUN4U-8007-2D.severity"
+msgstr "Critical"
+msgid "SUN4U-8007-2D.description"
+msgstr "A hardware problem was detected on the datapath interconnect.  Refer to %s for more information."
+msgid "SUN4U-8007-2D.response"
+msgstr "One or more CPUs may be offlined. Additionally, page retires for memory in the impacted region may be disabled."
+msgid "SUN4U-8007-2D.impact"
+msgstr "System performace may be affected."
+msgid "SUN4U-8007-2D.action"
+msgstr "Schedule a repair procedure to replace the affected component(s). The System Controller (SC) diagnostic messages have the authoritative information on the affected component(s). fmdump -v -u <EVENT_ID> can also be used, but the SC is authoritative."
+#
+# code: SUN4U-8007-3H
+# keys: fault.asic.sdi.dp
+#
+msgid "SUN4U-8007-3H.type"
+msgstr "Fault"
+msgid "SUN4U-8007-3H.severity"
+msgstr "Critical"
+msgid "SUN4U-8007-3H.description"
+msgstr "A hardware problem was detected on the datapath interconnect.  Refer to %s for more information."
+msgid "SUN4U-8007-3H.response"
+msgstr "One or more CPUs may be offlined. Additionally, page retires for memory in the impacted region may be disabled."
+msgid "SUN4U-8007-3H.impact"
+msgstr "System performace may be affected."
+msgid "SUN4U-8007-3H.action"
+msgstr "Schedule a repair procedure to replace the affected component(s). The System Controller (SC) diagnostic messages have the authoritative information on the affected component(s). fmdump -v -u <EVENT_ID> can also be used, but the SC is authoritative."
+#
+# code: SUN4U-8007-4A
+# keys: fault.asic.cp.dp
+#
+msgid "SUN4U-8007-4A.type"
+msgstr "Fault"
+msgid "SUN4U-8007-4A.severity"
+msgstr "Critical"
+msgid "SUN4U-8007-4A.description"
+msgstr "A hardware problem was detected on the datapath interconnect.  Refer to %s for more information."
+msgid "SUN4U-8007-4A.response"
+msgstr "One or more CPUs may be offlined. Additionally, page retires for memory in the impacted region may be disabled."
+msgid "SUN4U-8007-4A.impact"
+msgstr "System performace may be affected."
+msgid "SUN4U-8007-4A.action"
+msgstr "Schedule a repair procedure to replace the affected component(s). The System Controller (SC) diagnostic messages have the authoritative information on the affected component(s). fmdump -v -u <EVENT_ID> can also be used, but the SC is authoritative."
+#
+# code: SUN4U-8007-5P
+# keys: fault.asic.rp.dp
+#
+msgid "SUN4U-8007-5P.type"
+msgstr "Fault"
+msgid "SUN4U-8007-5P.severity"
+msgstr "Critical"
+msgid "SUN4U-8007-5P.description"
+msgstr "A hardware problem was detected on the datapath interconnect.  Refer to %s for more information."
+msgid "SUN4U-8007-5P.response"
+msgstr "One or more CPUs may be offlined. Additionally, page retires for memory in the impacted region may be disabled."
+msgid "SUN4U-8007-5P.impact"
+msgstr "System performace may be affected."
+msgid "SUN4U-8007-5P.action"
+msgstr "Schedule a repair procedure to replace the affected component(s). The System Controller (SC) diagnostic messages have the authoritative information on the affected component(s). fmdump -v -u <EVENT_ID> can also be used, but the SC is authoritative."

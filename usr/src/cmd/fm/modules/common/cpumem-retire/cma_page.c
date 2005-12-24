@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,15 +60,37 @@
 #include <sys/mem.h>
 
 static int
-cma_page_cmd(int cmd, uint64_t addr)
+cma_page_cmd(fmd_hdl_t *hdl, int cmd, nvlist_t *nvl)
 {
+	mem_page_t mpage;
+	char *fmribuf;
+	size_t fmrisz;
 	int fd, rc, err;
 
 	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
 		return (-1); /* errno is set for us */
 
-	if ((rc = ioctl(fd, cmd, &addr)) < 0)
+	if ((errno = nvlist_size(nvl, &fmrisz, NV_ENCODE_NATIVE)) != 0 ||
+	    fmrisz > MEM_FMRI_MAX_BUFSIZE ||
+	    (fmribuf = fmd_hdl_alloc(hdl, fmrisz, FMD_SLEEP)) == NULL) {
+		(void) close(fd);
+		return (-1); /* errno is set for us */
+	}
+
+	if ((errno = nvlist_pack(nvl, &fmribuf, &fmrisz,
+	    NV_ENCODE_NATIVE, 0)) != 0) {
+		fmd_hdl_free(hdl, fmribuf, fmrisz);
+		(void) close(fd);
+		return (-1); /* errno is set for us */
+	}
+
+	mpage.m_fmri = fmribuf;
+	mpage.m_fmrisz = fmrisz;
+
+	if ((rc = ioctl(fd, cmd, &mpage)) < 0)
 		err = errno;
+
+	fmd_hdl_free(hdl, fmribuf, fmrisz);
 
 	(void) close(fd);
 
@@ -124,7 +146,7 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 		return;
 	}
 
-	if (cma_page_cmd(MEM_PAGE_RETIRE, pageaddr) == 0) {
+	if (cma_page_cmd(hdl, MEM_PAGE_FMRI_RETIRE, asru) == 0) {
 		fmd_hdl_debug(hdl, "retired page 0x%llx\n",
 		    (u_longlong_t)pageaddr);
 		cma_stats.page_flts.fmds_value.ui64++;
@@ -170,7 +192,7 @@ page_retry(fmd_hdl_t *hdl, cma_page_t *page)
 		return (1); /* no longer a page to retire */
 	}
 
-	if (cma_page_cmd(MEM_PAGE_ISRETIRED, page->pg_addr) == 0) {
+	if (cma_page_cmd(hdl, MEM_PAGE_FMRI_ISRETIRED, page->pg_fmri) == 0) {
 		fmd_hdl_debug(hdl, "retired page 0x%llx on retry %u\n",
 		    page->pg_addr, page->pg_nretries);
 		cma_stats.page_flts.fmds_value.ui64++;

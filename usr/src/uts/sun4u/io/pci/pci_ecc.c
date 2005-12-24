@@ -47,6 +47,8 @@
 #include <sys/pci/pci_obj.h>	/* ld/st physio */
 #include <sys/cpuvar.h>
 #include <sys/errclassify.h>
+#include <sys/cpu_module.h>
+#include <sys/async.h>
 
 /*LINTLIBRARY*/
 
@@ -695,11 +697,24 @@ ecc_ereport_post(dev_info_t *dip, ecc_errstate_t *ecc_err)
 	fm_fmri_dev_set(detector, FM_DEV_SCHEME_VERSION, NULL, dev_path, NULL);
 
 	if (ecc_err->ecc_pri) {
-		if ((ecc_err->ecc_fmri = fm_nvlist_create(nva)) != NULL)
+		if ((ecc_err->ecc_fmri = fm_nvlist_create(nva)) != NULL) {
+			char sid[DIMM_SERIAL_ID_LEN] = "";
+			uint64_t offset = (uint64_t)-1;
+			int len;
+			int ret;
+
+			ret = cpu_get_mem_sid(ecc_err->ecc_unum, sid,
+			    DIMM_SERIAL_ID_LEN, &len);
+
+			if (ret == 0) {
+				(void) cpu_get_mem_offset(
+				    ecc_err->ecc_aflt.flt_addr, &offset);
+			}
+
 			fm_fmri_mem_set(ecc_err->ecc_fmri,
 			    FM_MEM_SCHEME_VERSION, NULL, ecc_err->ecc_unum,
-			    NULL);
-
+			    (ret == 0) ? sid : NULL, offset);
+		}
 		fm_ereport_set(ereport, FM_EREPORT_VERSION, buf,
 		    ecc_err->ecc_ena, detector,
 		    PCI_ECC_AFSR, DATA_TYPE_UINT64, ecc_err->ecc_afsr,

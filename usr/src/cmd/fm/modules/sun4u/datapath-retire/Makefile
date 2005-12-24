@@ -25,13 +25,17 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+MODULE = datapath-retire
+CLASS = arch
 ARCH = sun4u
+SRCS = \
+	cda_cpu.c \
+	cda_main.c
 
-sun4u_SRCS = cmd_ecache.c \
-		cmd_dp.c \
-		cmd_dperr.c \
-		cmd_dp_page.c
+include ../../Makefile.plugin
 
-INCDIRS = $(SRC)/uts/sun4u
+CDA_VERSION = "1.0"
 
-include ../../sun4/cpumem-diagnosis/Makefile.cpumem
+INCDIRS = .
+
+CPPFLAGS += $(INCDIRS:%=-I%) -DCDA_VERSION='$(CDA_VERSION)'

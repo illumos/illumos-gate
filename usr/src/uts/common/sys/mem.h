@@ -71,6 +71,10 @@ typedef struct mem_vtop {
 #define	MEM_PAGE_RETIRE_UE	(('M' << 8) | 0x09)
 #define	MEM_PAGE_RETIRE_TEST	(('M' << 8) | 0x0A)
 
+#define	MEM_SID			(('M' << 8) | 0x0B)
+#define	MEM_PAGE_FMRI_RETIRE	(('M' << 8) | 0x0C)
+#define	MEM_PAGE_FMRI_ISRETIRED	(('M' << 8) | 0x0D)
+
 /*
  * Bits returned from MEM_PAGE_GETERRORS ioctl for use by fmd(1M).
  */
@@ -79,12 +83,28 @@ typedef struct mem_vtop {
 #define	MEM_PAGE_ERR_UE		0x2
 #define	MEM_PAGE_ERR_FMA_REQ	0x8
 
+#define	MEM_FMRI_MAX_BUFSIZE	8192	/* maximum allowed packed FMRI size */
+
+typedef struct mem_page {
+	caddr_t		m_fmri;		/* buffer containing packed FMRI */
+	size_t		m_fmrisz;	/* size of packed FMRI */
+} mem_page_t;
+
+#if	defined(_SYSCALL32)
+typedef struct mem_page32 {
+	caddr32_t	m_fmri;
+	size32_t	m_fmrisz;
+} mem_page32_t;
+#endif	/* _SYSCALL32 */
+
 typedef struct mem_name {
 	uint64_t	m_addr;		/* memory address */
 	uint64_t	m_synd;		/* architecture-specific syndrome */
 	uint64_t	m_type[2];	/* architecture-specific type */
 	caddr_t		m_name;		/* memory name buffer */
 	size_t		m_namelen;	/* memory name buffer length */
+	caddr_t		m_sid;		/* memory serial id buffer */
+	size_t		m_sidlen;	/* memory serial id buffer length */
 } mem_name_t;
 
 #if	defined(_SYSCALL32)
@@ -94,6 +114,8 @@ typedef struct mem_name32 {
 	uint64_t	m_type[2];
 	caddr32_t	m_name;
 	size32_t	m_namelen;
+	caddr32_t	m_sid;
+	size32_t	m_sidlen;
 } mem_name32_t;
 #endif	/* _SYSCALL32 */
 

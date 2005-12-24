@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,9 @@
 
 #include <cmd_page.h>
 #include <cmd.h>
+#ifdef sun4u
+#include <cmd_dp_page.h>
+#endif
 
 #include <errno.h>
 #include <string.h>
@@ -156,6 +159,13 @@ cmd_page_restore(fmd_hdl_t *hdl, fmd_case_t *cp, cmd_case_ptr_t *ptr)
 	case CMD_PTR_PAGE_CASE:
 		page->page_case = cp;
 		break;
+
+#ifdef sun4u
+	case CMD_PTR_DP_PAGE_DEFER:
+		page->page_case = cp;
+		cmd_dp_page_restore(hdl, page);
+		break;
+#endif
 	default:
 		fmd_hdl_abort(hdl, "invalid %s subtype %d\n",
 		    ptr->ptr_name, ptr->ptr_subtype);

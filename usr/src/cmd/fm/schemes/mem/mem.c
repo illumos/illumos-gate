@@ -29,8 +29,11 @@
 #include <mem.h>
 #include <fm/fmd_fmri.h>
 
+#include <fcntl.h>
+#include <unistd.h>
 #include <string.h>
 #include <strings.h>
+#include <time.h>
 #include <sys/mem.h>
 
 /*
@@ -38,6 +41,16 @@
  */
 
 mem_t mem;
+
+/*
+ * Retry values for handling the case where the kernel is not yet ready
+ * to provide DIMM serial ids.  Some platforms acquire DIMM serial id
+ * information from their System Controller via a mailbox interface.
+ * The values chosen are for 10 retries 3 seconds apart to approximate the
+ * possible 30 second timeout length of a mailbox message request.
+ */
+#define	MAX_MEM_SID_RETRIES	10
+#define	MEM_SID_RETRY_WAIT	3
 
 static mem_dimm_map_t *
 dm_lookup(const char *name)
@@ -55,10 +68,111 @@ dm_lookup(const char *name)
 /*
  * Returns 0 with serial numbers if found, -1 (with errno set) for errors.  If
  * the unum (or a component of same) wasn't found, -1 is returned with errno
+ * set to ENOENT.  If the kernel doesn't have support for serial numbers,
+ * -1 is returned with errno set to ENOTSUP.
+ */
+static int
+mem_get_serids_from_kernel(const char *unum, char ***seridsp, size_t *nseridsp)
+{
+	char **dimms, **serids;
+	size_t ndimms, nserids;
+	int i, rc = 0;
+	int fd;
+	int retries = MAX_MEM_SID_RETRIES;
+	mem_name_t mn;
+	struct timespec rqt;
+
+	if ((fd = open("/dev/mem", O_RDONLY)) < 0)
+		return (-1);
+
+	if (mem_unum_burst(unum, &dimms, &ndimms) < 0) {
+		(void) close(fd);
+		return (-1); /* errno is set for us */
+	}
+
+	serids = fmd_fmri_zalloc(sizeof (char *) * ndimms);
+	nserids = ndimms;
+
+	bzero(&mn, sizeof (mn));
+
+	for (i = 0; i < ndimms; i++) {
+		mn.m_namelen = strlen(dimms[i]) + 1;
+		mn.m_sidlen = MEM_SERID_MAXLEN;
+
+		mn.m_name = fmd_fmri_alloc(mn.m_namelen);
+		mn.m_sid = fmd_fmri_alloc(mn.m_sidlen);
+
+		(void) strcpy(mn.m_name, dimms[i]);
+
+		do {
+			rc = ioctl(fd, MEM_SID, &mn);
+
+			if (rc >= 0 || errno != EAGAIN)
+				break;
+
+			if (retries == 0) {
+				errno = ETIMEDOUT;
+				break;
+			}
+
+			/*
+			 * EAGAIN indicates the kernel is
+			 * not ready to provide DIMM serial
+			 * ids.  Sleep MEM_SID_RETRY_WAIT seconds
+			 * and try again.
+			 * nanosleep() is used instead of sleep()
+			 * to avoid interfering with fmd timers.
+			 */
+			rqt.tv_sec = MEM_SID_RETRY_WAIT;
+			rqt.tv_nsec = 0;
+			(void) nanosleep(&rqt, NULL);
+
+		} while (retries--);
+
+		if (rc < 0) {
+			/*
+			 * ENXIO can happen if the kernel memory driver
+			 * doesn't have the MEM_SID ioctl (e.g. if the
+			 * kernel hasn't been patched to provide the
+			 * support).
+			 *
+			 * If the MEM_SID ioctl is available but the
+			 * particular platform doesn't support providing
+			 * serial ids, ENOTSUP will be returned by the ioctl.
+			 */
+			if (errno == ENXIO)
+				errno = ENOTSUP;
+			fmd_fmri_free(mn.m_name, mn.m_namelen);
+			fmd_fmri_free(mn.m_sid, mn.m_sidlen);
+			mem_strarray_free(serids, nserids);
+			mem_strarray_free(dimms, ndimms);
+			(void) close(fd);
+			return (-1);
+		}
+
+		serids[i] = fmd_fmri_strdup(mn.m_sid);
+
+		fmd_fmri_free(mn.m_name, mn.m_namelen);
+		fmd_fmri_free(mn.m_sid, mn.m_sidlen);
+	}
+
+	mem_strarray_free(dimms, ndimms);
+
+	(void) close(fd);
+
+	*seridsp = serids;
+	*nseridsp = nserids;
+
+	return (0);
+}
+
+/*
+ * Returns 0 with serial numbers if found, -1 (with errno set) for errors.  If
+ * the unum (or a component of same) wasn't found, -1 is returned with errno
  * set to ENOENT.
  */
 static int
-mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
+mem_get_serids_from_cache(const char *unum, char ***seridsp, size_t *nseridsp)
 {
 	uint64_t drgen = fmd_fmri_get_drgen();
 	char **dimms, **serids;
@@ -97,7 +211,7 @@ mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
 
 	mem_strarray_free(dimms, ndimms);
 
-	if (i == ndimms) {
+	if (rc == 0) {
 		*seridsp = serids;
 		*nseridsp = nserids;
 	} else {
@@ -105,6 +219,20 @@ mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
 	}
 
 	return (rc);
+}
+
+static int
+mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
+{
+	/*
+	 * Some platforms do not support the caching of serial ids by the
+	 * mem scheme plugin but instead support making serial ids available
+	 * via the kernel.
+	 */
+	if (mem.mem_dm == NULL)
+		return (mem_get_serids_from_kernel(unum, seridsp, nseridsp));
+	else
+		return (mem_get_serids_from_cache(unum, seridsp, nseridsp));
 }
 
 static int
@@ -171,9 +299,6 @@ fmd_fmri_expand(nvlist_t *nvl)
 	uint_t nserids;
 	int rc;
 
-	if (mem.mem_dm == NULL)
-		return (0); /* nothing to add - no s/n support here */
-
 	if (mem_fmri_get_unum(nvl, &unum) < 0)
 		return (fmd_fmri_set_errno(EINVAL));
 
@@ -183,8 +308,13 @@ fmd_fmri_expand(nvlist_t *nvl)
 	else if (rc != ENOENT)
 		return (fmd_fmri_set_errno(EINVAL));
 
-	if (mem_get_serids_by_unum(unum, &serids, &nserids) < 0)
-		return (-1); /* errno is set for us */
+	if (mem_get_serids_by_unum(unum, &serids, &nserids) < 0) {
+		/* errno is set for us */
+		if (errno == ENOTSUP)
+			return (0); /* nothing to add - no s/n support */
+		else
+			return (-1);
+	}
 
 	rc = nvlist_add_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, serids,
 	    nserids);
@@ -221,15 +351,22 @@ fmd_fmri_present(nvlist_t *nvl)
 	uint64_t memconfig;
 	int rc;
 
-	if (mem.mem_dm == NULL)
-		return (1); /* assume it's there - no s/n support here */
-
 	if (mem_fmri_get_unum(nvl, &unum) < 0)
 		return (-1); /* errno is set for us */
 
 	if (nvlist_lookup_string_array(nvl, FM_FMRI_MEM_SERIAL_ID, &nvlserids,
-	    &nnvlserids) != 0)
-		return (fmd_fmri_set_errno(EINVAL));
+	    &nnvlserids) != 0) {
+		/*
+		 * Some mem scheme FMRIs don't have serial ids because
+		 * either the platform does not support them, or because
+		 * the FMRI was created before support for serial ids was
+		 * introduced.  If this is the case, assume it is there.
+		 */
+		if (mem.mem_dm == NULL)
+			return (1);
+		else
+			return (fmd_fmri_set_errno(EINVAL));
+	}
 
 	/*
 	 * Hypervisor will change the memconfig value when the mapping of
@@ -243,6 +380,8 @@ fmd_fmri_present(nvlist_t *nvl)
 		return (0);
 
 	if (mem_get_serids_by_unum(unum, &serids, &nserids) < 0) {
+		if (errno == ENOTSUP)
+			return (1); /* assume it's there, no s/n support here */
 		if (errno != ENOENT) {
 			/*
 			 * Errors are only signalled to the caller if they're
@@ -308,7 +447,7 @@ fmd_fmri_unusable(nvlist_t *nvl)
 	else if (err != 0)
 		return (fmd_fmri_set_errno(EINVAL));
 
-	if ((rc = mem_page_cmd(MEM_PAGE_ISRETIRED, pageaddr)) < 0 &&
+	if ((rc = mem_page_cmd(MEM_PAGE_FMRI_ISRETIRED, nvl)) < 0 &&
 	    errno == EIO) {
 		return (0); /* the page wonders, "why all the fuss?" */
 	} else if (rc == 0 || errno == EAGAIN || errno == EINVAL) {

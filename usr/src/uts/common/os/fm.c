@@ -981,14 +981,21 @@ fm_fmri_cpu_set(nvlist_t *fmri_cpu, int version, const nvlist_t *auth,
  *	version			uint8_t		0
  *	auth			nvlist_t	<auth>		[optional]
  *	unum			string		<unum>
- *	serial			string		<serial>	[optional]
+ *	serial			string		<serial>	[optional*]
+ *	offset			uint64_t	<offset>	[optional]
  *
+ *	* serial is required if offset is present
  */
 void
 fm_fmri_mem_set(nvlist_t *fmri, int version, const nvlist_t *auth,
-    const char *unum, const char *serial)
+    const char *unum, const char *serial, uint64_t offset)
 {
 	if (version != MEM_SCHEME_VERSION0) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		return;
+	}
+
+	if (!serial && (offset != (uint64_t)-1)) {
 		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
 		return;
 	}
@@ -1020,6 +1027,13 @@ fm_fmri_mem_set(nvlist_t *fmri, int version, const nvlist_t *auth,
 		    (char **)&serial, 1) != 0) {
 			atomic_add_64(
 			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		}
+		if (offset != (uint64_t)-1) {
+			if (nvlist_add_uint64(fmri, FM_FMRI_MEM_OFFSET,
+			    offset) != 0) {
+				atomic_add_64(&erpt_kstat_data.
+				    fmri_set_failed.value.ui64, 1);
+			}
 		}
 	}
 }

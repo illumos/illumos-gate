@@ -77,6 +77,15 @@ extern int plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *len);
 extern int plat_get_mem_unum(int synd_code, uint64_t flt_addr, int flt_bus_id,
     int flt_in_memory, ushort_t flt_status, char *buf, int buflen, int *len);
 
+#pragma	weak	plat_get_mem_sid
+#pragma	weak	plat_get_mem_offset
+#pragma	weak	plat_get_mem_addr
+
+extern int plat_get_mem_sid(char *unum, char *buf, int buflen, int *len);
+extern int plat_get_mem_offset(uint64_t paddr, uint64_t *offp);
+extern int plat_get_mem_addr(char *unum, char *sid, uint64_t offset,
+    uint64_t *paddr);
+
 #pragma weak	plat_log_fruid_error
 
 extern void plat_log_fruid_error(int synd_code, struct async_flt *ecc,

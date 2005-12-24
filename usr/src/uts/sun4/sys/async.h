@@ -228,6 +228,11 @@ extern errorq_t *ue_queue;
  */
 #define	UNUM_NAMLEN	60
 
+/*
+ * Maximum length of a DIMM serial id string + null
+ */
+#define	DIMM_SERIAL_ID_LEN	16
+
 #ifdef	__cplusplus
 }
 #endif

@@ -227,6 +227,7 @@ extern "C" {
 #define	FM_FMRI_MEM_SERIAL_ID		"serial"
 #define	FM_FMRI_MEM_PHYSADDR		"physaddr"
 #define	FM_FMRI_MEM_MEMCONFIG		"memconfig"
+#define	FM_FMRI_MEM_OFFSET		"offset"
 
 /* mod scheme member names */
 #define	FM_FMRI_MOD_PKG			"mod-pkg"
@@ -255,7 +256,7 @@ extern void fm_fmri_de_set(nvlist_t *, int, const nvlist_t *, const char *);
 extern void fm_fmri_cpu_set(nvlist_t *, int, const nvlist_t *, uint32_t,
     uint8_t, uint64_t);
 extern void fm_fmri_mem_set(nvlist_t *, int, const nvlist_t *, const char *,
-    const char *);
+    const char *, uint64_t);
 extern void fm_authority_set(nvlist_t *, int, const char *, const char *,
     const char *, const char *);
 

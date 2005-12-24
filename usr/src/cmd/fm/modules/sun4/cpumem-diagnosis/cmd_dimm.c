@@ -149,6 +149,7 @@ cmd_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 {
 	cmd_dimm_t *dimm;
 	const char *unum;
+	nvlist_t *fmri;
 
 	if (!fmd_nvl_fmri_present(hdl, asru)) {
 		fmd_hdl_debug(hdl, "dimm_lookup: discarding old ereport\n");
@@ -157,6 +158,13 @@ cmd_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 
 	if ((unum = cmd_fmri_get_unum(asru)) == NULL) {
 		CMD_STAT_BUMP(bad_mem_asru);
+		return (NULL);
+	}
+
+	fmri = cmd_mem_fmri_create(unum);
+	if (fmd_nvl_fmri_expand(hdl, fmri) < 0) {
+		CMD_STAT_BUMP(bad_mem_asru);
+		nvlist_free(fmri);
 		return (NULL);
 	}
 
@@ -169,7 +177,9 @@ cmd_dimm_create(fmd_hdl_t *hdl, nvlist_t *asru)
 
 	cmd_bufname(dimm->dimm_bufname, sizeof (dimm->dimm_bufname), "dimm_%s",
 	    unum);
-	cmd_fmri_init(hdl, &dimm->dimm_asru, asru, "dimm_asru_%s", unum);
+	cmd_fmri_init(hdl, &dimm->dimm_asru, fmri, "dimm_asru_%s", unum);
+
+	nvlist_free(fmri);
 
 	(void) nvlist_lookup_string(dimm->dimm_asru_nvl, FM_FMRI_MEM_UNUM,
 	    (char **)&dimm->dimm_unum);

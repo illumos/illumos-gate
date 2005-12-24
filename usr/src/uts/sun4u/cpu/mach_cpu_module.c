@@ -115,6 +115,22 @@ cpu_check_allcpus(struct async_flt *aflt)
 
 /*ARGSUSED*/
 int
+cpu_get_mem_sid(char *unum, char *buf, int buflen, int *lenp)
+{ return (ENOTSUP); }
+
+/*ARGSUSED*/
+int
+cpu_get_mem_offset(uint64_t flt_addr, uint64_t *offp)
+{ return (ENOTSUP); }
+
+/*ARGSUSED*/
+int
+cpu_get_mem_addr(char *unum, char *sid, uint64_t offset,
+    uint64_t *addrp)
+{ return (ENOTSUP); }
+
+/*ARGSUSED*/
+int
 cpu_get_mem_unum(int synd_stat, ushort_t synd, uint64_t afsr, uint64_t afar,
     int cpuid, int flt_in_memory, ushort_t flt_status, char *buf,
     int buflen, int *lenp)

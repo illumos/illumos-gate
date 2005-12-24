@@ -90,16 +90,76 @@ static const bank_dimm_t bank_dimm[] = {
 };
 
 /*
+ * Burst Serengeti and Starcat-style unums.
+ * A DIMM unum string is expected to be in this form:
+ * "[/N0/]SB12/P0/B0/D2 [J13500]"
+ * A bank unum string is expected to be in this form:
+ * "[/N0/]SB12/P0/B0 [J13500, ...]"
+ */
+static int
+mem_unum_burst_sgsc(const char *pat, char ***dimmsp, size_t *ndimmsp)
+{
+	char buf[64];
+	char **dimms;
+	char *base;
+	const char *c;
+	char *copy;
+	size_t copysz;
+	int i;
+
+	/*
+	 * No expansion is required for a DIMM unum
+	 */
+	if (strchr(pat, 'D') != NULL) {
+		dimms = fmd_fmri_alloc(sizeof (char *));
+		dimms[0] = fmd_fmri_strdup(pat);
+		*dimmsp = dimms;
+		*ndimmsp = 1;
+		return (0);
+	}
+
+	/*
+	 * strtok is destructive so we need to work with
+	 * a copy and keep track of the size allocated.
+	 */
+	copysz = strlen(pat) + 1;
+	copy = fmd_fmri_alloc(copysz);
+	(void) strcpy(copy, pat);
+
+	base = strtok(copy, " ");
+
+	/* There are four DIMMs in a bank */
+	dimms = fmd_fmri_alloc(sizeof (char *) * 4);
+
+	for (i = 0; i < 4; i++) {
+		(void) snprintf(buf, sizeof (buf), "%s/D%d", base, i);
+
+		if ((c = strtok(NULL, " ")) != NULL)
+			(void) snprintf(buf, sizeof (buf), "%s %s", buf, c);
+
+		dimms[i] = fmd_fmri_strdup(buf);
+	}
+
+	fmd_fmri_free(copy, copysz);
+
+	*dimmsp = dimms;
+	*ndimmsp = 4;
+	return (0);
+}
+
+
+/*
  * Returns 0 (with dimmsp and ndimmsp set) if the unum could be bursted, -1
  * otherwise.
  */
-int
-mem_unum_burst(const char *pat, char ***dimmsp, size_t *ndimmsp)
+static int
+mem_unum_burst_pattern(const char *pat, char ***dimmsp, size_t *ndimmsp)
 {
 	const bank_dimm_t *bd;
 	char **dimms = NULL, **newdimms;
 	size_t ndimms = 0;
 	const char *c;
+
 
 	for (bd = bank_dimm; bd->bd_pat != NULL; bd++) {
 		int replace, start, matched;
@@ -161,7 +221,26 @@ mem_unum_burst(const char *pat, char ***dimmsp, size_t *ndimmsp)
 	}
 
 	mem_strarray_free(dimms, ndimms);
+
 	return (fmd_fmri_set_errno(EINVAL));
+}
+
+int
+mem_unum_burst(const char *pat, char ***dimmsp, size_t *ndimmsp)
+{
+	const char *platform = fmd_fmri_get_platform();
+
+	/*
+	 * Call mem_unum_burst_sgsc() for Starcat, Serengeti, and
+	 * Lightweight 8 platforms.  Call mem_unum_burst_pattern()
+	 * for all other platforms.
+	 */
+	if (strcmp(platform, "SUNW,Sun-Fire-15000") == 0 ||
+	    strcmp(platform, "SUNW,Sun-Fire") == 0 ||
+	    strcmp(platform, "SUNW,Netra-T12") == 0)
+		return (mem_unum_burst_sgsc(pat, dimmsp, ndimmsp));
+	else
+		return (mem_unum_burst_pattern(pat, dimmsp, ndimmsp));
 }
 
 /*

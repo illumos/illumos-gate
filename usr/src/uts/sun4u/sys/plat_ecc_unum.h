@@ -46,7 +46,6 @@ extern "C" {
 #include <sys/cmn_err.h>
 #include <sys/sysmacros.h>
 
-
 /*
  * This file contains the common definitions used by the platform
  * unum ecc logging.
@@ -57,7 +56,8 @@ typedef enum {
 	PLAT_ECC_INDICTMENT_MESSAGE,
 	PLAT_ECC_ERROR2_MESSAGE,
 	PLAT_ECC_INDICTMENT2_MESSAGE,
-	PLAT_ECC_CAPABILITY_MESSAGE
+	PLAT_ECC_CAPABILITY_MESSAGE,
+	PLAT_ECC_DIMM_SID_MESSAGE
 } plat_ecc_message_type_t;
 
 /* Platform-specific function for sending mailbox message */
@@ -77,6 +77,12 @@ extern void plat_ecc_capability_sc_set(uint32_t cap);
 
 /* For sending a capability message to the SC */
 extern int plat_ecc_capability_send(void);
+
+/* For determining the maximum cpumem boards possible */
+extern int plat_max_cpumem_boards(void);
+
+/* For parsing the values from a memory unum */
+extern int parse_unum_memory(char *, int *, int *, int *, int *, int *);
 
 /*
  * The following variables enable and disable the fruid message logging on SC.
@@ -441,15 +447,18 @@ typedef struct plat_capability_data {
 #define	PLAT_ECC_CAP_VERSION_MAJOR	1
 #define	PLAT_ECC_CAP_VERSION_MINOR	1
 
-#define	PLAT_ECC_CAPABILITY_ERROR		0x01
-#define	PLAT_ECC_CAPABILITY_INDICT		0x02
-#define	PLAT_ECC_CAPABILITY_ERROR2		0x04
-#define	PLAT_ECC_CAPABILITY_INDICT2		0x08
-#define	PLAT_ECC_CAPABILITY_FMA			0x10
-#define	PLAT_ECC_CAPABILITY_EREPORTS		0x20
+#define	PLAT_ECC_CAPABILITY_ERROR		0x001
+#define	PLAT_ECC_CAPABILITY_INDICT		0x002
+#define	PLAT_ECC_CAPABILITY_ERROR2		0x004
+#define	PLAT_ECC_CAPABILITY_INDICT2		0x008
+#define	PLAT_ECC_CAPABILITY_FMA			0x010
+#define	PLAT_ECC_CAPABILITY_EREPORTS		0x020	/* unused */
+#define	PLAT_ECC_CAPABILITY_DIMM_SID		0x040
+#define	PLAT_ECC_CAPABILITY_DP_ERROR		0x080
+#define	PLAT_ECC_CAPABILITY_DP_FAULT		0x100
 
-#define	PLAT_ECC_CAPABILITY_DOMAIN_DEFAULT	0x1f
-#define	PLAT_ECC_CAPABILITY_SC_DEFAULT		0x03
+#define	PLAT_ECC_CAPABILITY_DOMAIN_DEFAULT	0x1df
+#define	PLAT_ECC_CAPABILITY_SC_DEFAULT		0x003
 
 extern uint32_t plat_ecc_capability_map_domain;
 extern uint32_t plat_ecc_capability_map_sc;

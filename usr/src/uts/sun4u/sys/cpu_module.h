@@ -141,17 +141,34 @@ int	cpu_aflt_size(void);
 void	cpu_async_panic_callb(void);
 void	cpu_check_allcpus(struct async_flt *aflt);
 int	cpu_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp);
-int	cpu_get_mem_unum(int synd_status, ushort_t synd, uint64_t afsr,
-	    uint64_t afar, int cpuid, int flt_in_memory,
-	    ushort_t flt_status, char *buf, int buflen, int *lenp);
-int	cpu_get_mem_unum_aflt(int synd_status, struct async_flt *aflt,
-	    char *buf, int buflen, int *lenp);
+
+/* Interfaces for getting memory-related information */
 int	cpu_get_mem_name(uint64_t synd, uint64_t *afsr, uint64_t afar,
 	    char *buf, int buflen, int *lenp);
 int	cpu_get_mem_info(uint64_t synd, uint64_t afar,
 	    uint64_t *mem_sizep, uint64_t *seg_sizep, uint64_t *bank_sizep,
 	    int *segsp, int *banksp, int *mcidp);
 size_t	cpu_get_name_bufsize();
+extern int cpu_get_mem_addr(char *unum, char *sid, uint64_t offset,
+	    uint64_t *addrp);
+
+/*
+ * FMA Event Memory Routines
+ *
+ * The following routines are used by FMA Event generators to retrieve data
+ * to store in memory ereports.  These routines may call through to platform-
+ * specific code and/or drivers, and can be called from passive context, low-
+ * level interrupt context, or panic context.  They may grab adaptive locks,
+ * but should not be allocating new data structures or calling cv_wait().
+ */
+int	cpu_get_mem_unum(int synd_status, ushort_t synd, uint64_t afsr,
+	    uint64_t afar, int cpuid, int flt_in_memory,
+	    ushort_t flt_status, char *buf, int buflen, int *lenp);
+int	cpu_get_mem_unum_aflt(int synd_status, struct async_flt *aflt,
+	    char *buf, int buflen, int *lenp);
+extern int cpu_get_mem_sid(char *unum, char *buf, int buflen, int *lenp);
+extern int cpu_get_mem_offset(uint64_t flt_addr, uint64_t *offp);
+
 void	read_ecc_data(struct async_flt *ecc, short verbose, short ce_err);
 /* add clr_datapath to aviod lint warning for ac_test.c temporarily */
 void	clr_datapath(void);

@@ -179,13 +179,15 @@ struct ecc_errstate {
 	uint64_t ecc_ctrl;
 	int ecc_pri;
 	ecc_region_t ecc_region;
-	char ecc_unum[UNUM_NAMLEN];
 	uint64_t ecc_ena;
 	uint64_t ecc_err_addr;
 	char *ecc_err_type;
 	int ecc_pg_ret;
-	nvlist_t *ecc_fmri;
 	int ecc_caller;
+	nvlist_t *ecc_fmri;
+	uint64_t ecc_dimm_offset;
+	char ecc_unum[UNUM_NAMLEN];
+	char ecc_dimm_sid[DIMM_SERIAL_ID_LEN];
 };
 
 /*

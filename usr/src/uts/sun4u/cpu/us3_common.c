@@ -3366,6 +3366,33 @@ synd_to_synd_code(int synd_status, ushort_t synd, uint64_t afsr_bit)
 	}
 }
 
+int
+cpu_get_mem_sid(char *unum, char *buf, int buflen, int *lenp)
+{
+	if (&plat_get_mem_sid)
+		return (plat_get_mem_sid(unum, buf, buflen, lenp));
+	else
+		return (ENOTSUP);
+}
+
+int
+cpu_get_mem_offset(uint64_t flt_addr, uint64_t *offp)
+{
+	if (&plat_get_mem_offset)
+		return (plat_get_mem_offset(flt_addr, offp));
+	else
+		return (ENOTSUP);
+}
+
+int
+cpu_get_mem_addr(char *unum, char *sid, uint64_t offset, uint64_t *addrp)
+{
+	if (&plat_get_mem_addr)
+		return (plat_get_mem_addr(unum, sid, offset, addrp));
+	else
+		return (ENOTSUP);
+}
+
 /*
  * Routine to return a string identifying the physical name
  * associated with a memory/cache error.
@@ -4463,13 +4490,25 @@ cpu_payload_add_aflt(struct async_flt *aflt, nvlist_t *payload,
 	 */
 	if ((aflt->flt_payload & FM_EREPORT_PAYLOAD_FLAG_RESOURCE) &&
 	    (*afar_status == AFLT_STAT_VALID)) {
-		char unum[UNUM_NAMLEN];
+		char unum[UNUM_NAMLEN] = "";
+		char sid[DIMM_SERIAL_ID_LEN] = "";
 		int len;
 
 		if (cpu_get_mem_unum_aflt(*synd_status, aflt, unum,
 		    UNUM_NAMLEN, &len) == 0) {
+			uint64_t offset = (uint64_t)-1;
+			int ret;
+
+			ret = cpu_get_mem_sid(unum, sid, DIMM_SERIAL_ID_LEN,
+			    &len);
+
+			if (ret == 0) {
+				(void) cpu_get_mem_offset(aflt->flt_addr,
+				    &offset);
+			}
+
 			fm_fmri_mem_set(resource, FM_MEM_SCHEME_VERSION,
-			    NULL, unum, NULL);
+			    NULL, unum, (ret == 0) ? sid : NULL, offset);
 			fm_payload_set(payload,
 			    FM_EREPORT_PAYLOAD_NAME_RESOURCE,
 			    DATA_TYPE_NVLIST, resource, NULL);
