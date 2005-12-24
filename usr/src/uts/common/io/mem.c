@@ -1118,6 +1118,7 @@ mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
 	 * If the "offset" member is not present, then the address is
 	 * retrieved from the "physaddr" member.
 	 */
+#ifdef __sparc
 	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &offset) != 0) {
 		if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &pa) !=
 		    0) {
@@ -1131,6 +1132,10 @@ mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
 		if ((err = cpu_get_mem_addr(unum, serids[0], offset, &pa)) != 0)
 			return (err);
 	}
+#else /* __i386, __amd64 */
+	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &pa) != 0)
+		return (EINVAL);
+#endif /* __sparc */
 
 	*paddr = pa;
 	return (0);
