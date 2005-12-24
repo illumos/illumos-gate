@@ -241,7 +241,7 @@ plat_add_mem_unum_label(char *unum, int mcid, int bank, int dimm)
 	int buflen = UNUM_NAMLEN;
 
 	strcpy(old_unum, unum);
-	printed = snprintf(unum, buflen, "C%d/P0/B%d", mcid, bank);
+	printed = snprintf(unum, buflen, "MB/C%d/P0/B%d", mcid, bank);
 	buflen -= printed;
 	unum += printed;
 
