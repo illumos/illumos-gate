@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,7 +155,7 @@ struct mctrl_info {
 extern int (*p2get_mem_unum)(int, uint64_t, char *, int, int *);
 extern int (*p2get_mem_info)(int, uint64_t, uint64_t *, uint64_t *,
     uint64_t *, int *, int *, int *);
-extern int plat_add_mem_unum_label(char *, int, int, int);
+extern void plat_add_mem_unum_label(char *, int, int, int);
 
 uint64_t get_mcr(int);
 
