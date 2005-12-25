@@ -1093,12 +1093,15 @@ static int
 mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
 {
 	uint8_t version;
-	uint64_t offset, pa;
+	uint64_t pa;
 	char *scheme;
+#ifdef __sparc
+	uint64_t offset;
 	char *unum;
 	char **serids;
 	uint_t nserids;
 	int err;
+#endif
 
 	/* Verify FMRI scheme name and version number */
 	if ((nvlist_lookup_string(nvl, FM_FMRI_SCHEME, &scheme) != 0) ||
