@@ -353,8 +353,8 @@ hidparser_get_packet_size_report_des(entity_item_t *parser_handle,
 				} else if (attribute->entity_attribute_tag ==
 				    R_ITEM_REPORT_SIZE) {
 					foundsize = 1;
-					temp = temp * attribute->
-						entity_attribute_value[0];
+					temp *= hidparser_find_unsigned_val(
+						attribute);
 					if (foundcount == 1) {
 						if (report_id &&
 						    right_report_id) {
@@ -364,8 +364,8 @@ hidparser_get_packet_size_report_des(entity_item_t *parser_handle,
 				} else if (attribute->entity_attribute_tag ==
 				    R_ITEM_REPORT_COUNT) {
 					foundcount = 1;
-					temp = temp * attribute->
-						entity_attribute_value[0];
+					temp *= hidparser_find_unsigned_val(
+						attribute);
 					if (foundsize == 1) {
 						if (report_id &&
 						    right_report_id) {
