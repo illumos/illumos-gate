@@ -248,6 +248,7 @@ findopt(int argc, char **argv)
 	int	argv_ind;
 	int	end_opt;
 	int	i;
+	int	isarg = 0;
 
 	fixtty();
 
@@ -279,10 +280,20 @@ findopt(int argc, char **argv)
 				end_opt++;
 				break;
 			}
+
+			if (argv[optnum][1] == 'h' || argv[optnum][1] == 'l' ||
+			    argv[optnum][1] == 'o' || argv[optnum][1] == 'w')
+				isarg = 1;
+			else
+				isarg = 0;
+
 			break;
 
 		default:
-			end_opt++;
+			if (isarg == 0)
+				end_opt++;
+			else
+				isarg = 0;
 			break;
 		}
 	}
