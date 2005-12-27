@@ -30,6 +30,11 @@
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
+if [ "${BASEDIR:=/}" != "/" ] 
+then
+	BASEDIR_OPT="-b $BASEDIR" 
+fi
+
 # In addition to the list of aliases in USBSER_EDGE_ALIASES, a
 # new alias is needed for the latest edgeport f/w revision. To
 # ensure that upgrades work we use update_drv(1M) to add this
@@ -91,7 +96,7 @@ if installed usbser_edge ; then
 		    ${BASEDIR}/etc/driver_aliases 2>/dev/null \
 			|| EXIT 1
 else
-	add_drv -b ${BASEDIR} -m '* 0666 root sys' \
+	add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
 	    -i "${USBSER_EDGE_ALIASES} \"${NEW_ALIAS}\"" -n usbser_edge || \
 	    EXIT=1
 fi

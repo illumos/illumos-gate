@@ -31,6 +31,11 @@
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
+if [ "${BASEDIR:=/}" != "/" ] 
+then
+	BASEDIR_OPT="-b $BASEDIR" 
+fi
+
 not_installed() {
 	driver=$1
 	grep "^${driver} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
@@ -45,7 +50,7 @@ USBSKSP_ALIASES="\
 	\"usb6cd,121\" \
 	"
 
-not_installed usbsksp || add_drv -b ${BASEDIR} -m '* 0666 root sys' \
+not_installed usbsksp || add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
 	-i "${USBSKSP_ALIASES}" -n usbsksp || EXIT=1
 
 exit $EXIT

@@ -30,6 +30,11 @@
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
+if [ "${BASEDIR:=/}" != "/" ] 
+then
+	BASEDIR_OPT="-b $BASEDIR" 
+fi
+
 installed() {
 	driver=$1
 	grep "^${driver} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
@@ -45,7 +50,7 @@ if installed usbsprl ; then
 	echo "usbsprl already installed" || EXIT 1
 
 else
-	add_drv -b ${BASEDIR} -m '* 0666 root sys' \
+	add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
 	    -i "${USBSPRL_ALIASES}" -n usbsprl || \
 	    EXIT=1
 fi

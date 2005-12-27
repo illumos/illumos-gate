@@ -28,6 +28,11 @@
 PATH="/usr/bin:/usr/sbin:${PATH}"
 export PATH
 
+if [ "${BASEDIR:=/}" != "/" ] 
+then
+	BASEDIR_OPT="-b $BASEDIR" 
+fi
+
 LOGIN_ENTRY_RE="/dev/console    0600    /dev/usb/[0-9a-f]+[.][0-9a-f]+/[0-9]+/* driver=scsa2usb,usb_mid,usbprn # libusb/ugen devices"
 LOGIN_ENTRY_NON_RE="/dev/usb/\[0-9a-f\]\+\[.\]\[0-9a-f\]\+/\[0-9\]\+/\*"
 
@@ -49,7 +54,7 @@ no_logindevperm() {
 
 EXIT=0
 
-not_installed ugen || add_drv -b ${BASEDIR} -m '* 0644 root sys' \
+not_installed ugen || add_drv ${BASEDIR_OPT} -m '* 0644 root sys' \
 	ugen || EXIT=1
 
 no_logindevperm || echo "$LOGIN_ENTRY_RE" >> $BASEDIR/etc/logindevperm
