@@ -25,6 +25,16 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
+SUNW_1.4 {
+    global:
+	freeaddrinfo =		FUNCTION FILTER libsocket.so.1;
+	gai_strerror =		FUNCTION FILTER libsocket.so.1;
+	getaddrinfo =		FUNCTION FILTER libsocket.so.1;
+	getnameinfo =		FUNCTION FILTER libsocket.so.1;
+	inet_ntop =		FUNCTION FILTER libnsl.so.1;
+	inet_pton =		FUNCTION FILTER libnsl.so.1;
+} SUNW_1.3;
+
 SUNW_1.3 {
     global:
 	if_freenameindex =	FUNCTION FILTER libsocket.so.1;
