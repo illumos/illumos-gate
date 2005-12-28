@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -113,9 +114,6 @@ cda_recv_list(fmd_hdl_t *hdl, nvlist_t *nvl)
 
 		if ((subr = cda_get_subr(hdl, nvl, &asru)) == NULL)
 			continue;
-
-		if (uuid != NULL)
-			fmd_case_uuconvict(hdl, uuid, nvl);
 
 		if (subr->subr_func != NULL)
 			subr->subr_func(hdl, nvl, asru, uuid);

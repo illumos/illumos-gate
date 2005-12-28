@@ -116,4 +116,5 @@ const fmd_modops_t fmd_rtld_ops = {
 	rtld_init,
 	rtld_fini,
 	fmd_module_dispatch,
+	fmd_module_transport,
 };

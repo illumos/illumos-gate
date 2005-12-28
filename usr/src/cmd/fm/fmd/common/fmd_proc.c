@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,4 +56,5 @@ const fmd_modops_t fmd_proc_ops = {
 	proc_init,
 	proc_fini,
 	fmd_module_dispatch,
+	fmd_module_transport,
 };

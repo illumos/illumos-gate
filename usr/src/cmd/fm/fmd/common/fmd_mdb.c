@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +39,7 @@
 #include <fmd_asru.h>
 #include <fmd_ckpt.h>
 #include <fmd_timerq.h>
+#include <fmd_xprt.h>
 
 #include <fmd.h>
 
@@ -214,7 +216,7 @@ trprint_msg(uintptr_t addr, const fmd_tracerec_t *trp, uintptr_t tid)
 		return (WALK_NEXT);
 
 	mdb_printf("%016llx %04x %-5u %s\n",
-	    trp->tr_time, trp->tr_tag, trp->tr_errno, trp->tr_msg);
+	    trp->tr_time, 1 << trp->tr_tag, trp->tr_errno, trp->tr_msg);
 
 	return (WALK_NEXT);
 }
@@ -234,7 +236,7 @@ trprint_cpp(uintptr_t addr, const fmd_tracerec_t *trp, uintptr_t tid)
 		(void) strcpy(file, "???");
 
 	mdb_printf("%016llx %04x %s: %u\n",
-	    trp->tr_time, trp->tr_tag, file, trp->tr_line);
+	    trp->tr_time, 1 << trp->tr_tag, file, trp->tr_line);
 
 	return (WALK_NEXT);
 }
@@ -511,6 +513,9 @@ fmd_event(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	case FMD_EVT_STATS:
 		(void) strcpy(type, "STAT");
 		break;
+	case FMD_EVT_PUBLISH:
+		(void) strcpy(type, "PUBL");
+		break;
 	default:
 		(void) mdb_snprintf(type, sizeof (type), "%u", ev.ev_type);
 	}
@@ -750,8 +755,14 @@ fmd_case(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	case FMD_CASE_SOLVED:
 		(void) strcpy(name, "SOLVE");
 		break;
+	case FMD_CASE_CLOSE_WAIT:
+		(void) strcpy(name, "CWAIT");
+		break;
 	case FMD_CASE_CLOSED:
 		(void) strcpy(name, "CLOSE");
+		break;
+	case FMD_CASE_REPAIRED:
+		(void) strcpy(name, "RPAIR");
 		break;
 	default:
 		(void) mdb_snprintf(name, sizeof (name), "%u", ci.ci_state);
@@ -1227,6 +1238,137 @@ fmd_timer(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static int
+xprt_walk_init(mdb_walk_state_t *wsp)
+{
+	fmd_module_t m;
+
+	if (wsp->walk_addr == NULL) {
+		mdb_warn("transport walker requires fmd_module_t address\n");
+		return (WALK_ERR);
+	}
+
+	if (mdb_vread(&m, sizeof (m), wsp->walk_addr) != sizeof (m)) {
+		mdb_warn("failed to read module at %p", wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)m.mod_transports.l_next;
+	return (WALK_NEXT);
+}
+
+static int
+xprt_walk_step(mdb_walk_state_t *wsp)
+{
+	uintptr_t addr = wsp->walk_addr;
+	fmd_xprt_impl_t xi;
+
+	if (addr == NULL)
+		return (WALK_DONE);
+
+	if (mdb_vread(&xi, sizeof (xi), addr) != sizeof (xi)) {
+		mdb_warn("failed to read fmd_xprt at %p", addr);
+		return (WALK_ERR);
+	}
+
+	wsp->walk_addr = (uintptr_t)xi.xi_list.l_next;
+	return (wsp->walk_callback(addr, &xi, wsp->walk_cbdata));
+}
+
+static int
+xpc_walk_init(mdb_walk_state_t *wsp)
+{
+	fmd_xprt_class_hash_t xch;
+
+	if (mdb_vread(&xch, sizeof (xch), wsp->walk_addr) != sizeof (xch)) {
+		mdb_warn("failed to read fmd_xprt_class_hash at %p",
+		    wsp->walk_addr);
+		return (WALK_ERR);
+	}
+
+	return (hash_walk_init(wsp, (uintptr_t)xch.xch_hash, xch.xch_hashlen,
+	    "fmd_xprt_class", sizeof (fmd_xprt_class_t),
+	    OFFSETOF(fmd_xprt_class_t, xc_next)));
+}
+
+/*ARGSUSED*/
+static int
+fmd_xprt_class(uintptr_t addr, const void *data, void *arg)
+{
+	const fmd_xprt_class_t *xcp = data;
+	char name[1024];
+
+	if (mdb_readstr(name, sizeof (name), (uintptr_t)xcp->xc_class) <= 0)
+		(void) mdb_snprintf(name, sizeof (name), "<%p>", xcp->xc_class);
+
+	mdb_printf("%-8p %-4u %s\n", addr, xcp->xc_refs, name);
+	return (WALK_NEXT);
+}
+
+static int
+fmd_xprt(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint_t opt_s = FALSE, opt_l = FALSE, opt_r = FALSE, opt_u = FALSE;
+	fmd_xprt_impl_t xi;
+
+	if (mdb_getopts(argc, argv,
+	    'l', MDB_OPT_SETBITS, TRUE, &opt_l,
+	    'r', MDB_OPT_SETBITS, TRUE, &opt_r,
+	    's', MDB_OPT_SETBITS, TRUE, &opt_s,
+	    'u', MDB_OPT_SETBITS, TRUE, &opt_u, NULL) != argc)
+		return (DCMD_USAGE);
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_walk_dcmd("fmd_xprt", "fmd_xprt", argc, argv) != 0) {
+			mdb_warn("failed to walk fmd_xprt");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (mdb_vread(&xi, sizeof (xi), addr) != sizeof (xi)) {
+		mdb_warn("failed to read fmd_xprt at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (DCMD_HDRSPEC(flags)) {
+		mdb_printf("%<u>%-8s %-4s %-4s %-5s %s%</u>\n",
+		    "ADDR", "ID", "VERS", "FLAGS", "STATE");
+	}
+
+	mdb_printf("%-8p %-4d %-4u %-5x %a\n",
+	    addr, xi.xi_id, xi.xi_version, xi.xi_flags, xi.xi_state);
+
+	if (opt_l | opt_s) {
+		(void) mdb_inc_indent(4);
+		mdb_printf("Local subscriptions requested by peer:\n");
+		mdb_printf("%<u>%-8s %-4s %s%</u>\n", "ADDR", "REFS", "CLASS");
+		(void) mdb_pwalk("fmd_xprt_class", fmd_xprt_class, &xi,
+		    addr + OFFSETOF(fmd_xprt_impl_t, xi_lsub));
+		(void) mdb_dec_indent(4);
+	}
+
+	if (opt_r | opt_s) {
+		(void) mdb_inc_indent(4);
+		mdb_printf("Remote subscriptions requested of peer:\n");
+		mdb_printf("%<u>%-8s %-4s %s%</u>\n", "ADDR", "REFS", "CLASS");
+		(void) mdb_pwalk("fmd_xprt_class", fmd_xprt_class, &xi,
+		    addr + OFFSETOF(fmd_xprt_impl_t, xi_rsub));
+		(void) mdb_dec_indent(4);
+	}
+
+	if (opt_u | opt_s) {
+		(void) mdb_inc_indent(4);
+		mdb_printf("Pending unsubscription acknowledgements:\n");
+		mdb_printf("%<u>%-8s %-4s %s%</u>\n", "ADDR", "REFS", "CLASS");
+		(void) mdb_pwalk("fmd_xprt_class", fmd_xprt_class, &xi,
+		    addr + OFFSETOF(fmd_xprt_impl_t, xi_usub));
+		(void) mdb_dec_indent(4);
+	}
+
+	return (DCMD_OK);
+}
+
 static const mdb_dcmd_t dcmds[] = {
 	{ "fcf_case", "?", "print a FCF case", fcf_case },
 	{ "fcf_event", "?", "print a FCF event", fcf_event },
@@ -1244,6 +1386,7 @@ static const mdb_dcmd_t dcmds[] = {
 	{ "fmd_serd", ":", "display serd engine structure", fmd_serd },
 	{ "fmd_asru", "?", "display asru resource structure", fmd_asru },
 	{ "fmd_timer", "?", "display pending timer(s)", fmd_timer },
+	{ "fmd_xprt", "?[-lrsu]", "display event transport(s)", fmd_xprt },
 	{ NULL }
 };
 
@@ -1268,6 +1411,10 @@ static const mdb_walker_t walkers[] = {
 		asru_walk_init, hash_walk_step, hash_walk_fini },
 	{ "fmd_timerq", "walk timer queue",
 		tmq_walk_init, tmq_walk_step, NULL },
+	{ "fmd_xprt", "walk per-module list of transports",
+		xprt_walk_init, xprt_walk_step, NULL },
+	{ "fmd_xprt_class", "walk hash table of subscription classes",
+		xpc_walk_init, hash_walk_step, hash_walk_fini },
 	{ NULL, NULL, NULL, NULL, NULL }
 };
 

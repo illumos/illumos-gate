@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,8 +31,17 @@ unset ENV TMPDIR
 umask 022
 cwd=$PWD
 
+isa=$(uname -p)
+if [[ $isa = sparc ]]; then
+	isa64=sparcv9
+elif [[ $isa = i386 ]]; then
+	isa64=amd64
+else
+	isa64=unknown
+fi
+
 if [[ -n "$CODEMGR_WS" ]]; then
-	sysroot=$CODEMGR_WS/proto/root_`uname -p`
+	sysroot=$CODEMGR_WS/proto/root_$isa
 elif [[ -n "$ROOT" ]]; then
 	sysroot=$ROOT
 else
@@ -57,6 +66,7 @@ fmd_args=
 opt_h=false
 opt_i=false
 opt_s=false
+opt_w=false
 opt_x=false
 
 function cp_so
@@ -89,14 +99,24 @@ function wait_status
 	fi
 }
 
+function wait_prompt
+{
+	echo "fmsim: [ Press return to $* ] \c"
+	mode=$(stty -g)
+	stty -echo -isig min 1 time 0
+	read s; echo
+	stty $mode
+}
+
 function die
 {
 	echo "fmsim: $*" >& 2
+	$opt_w && wait_prompt exit
 	[[ -n "$simpid" ]] && exit 1 || exit 2
 }
 
 while [[ $# -gt 0 ]]; do
-	OPTIND=1; while getopts ':d:D:ehio:st:vVx' c; do
+	OPTIND=1; while getopts ':d:D:ehio:st:vVwx' c; do
 		case "$c" in
 		d)
 			simroot=$OPTARG
@@ -109,7 +129,7 @@ while [[ $# -gt 0 ]]; do
 		e|v|V)
 			dump_args="$dump_args -$c"
 			;;
-		h|i|s|x)
+		h|i|s|w|x)
 			eval opt_$c'='true
 			;;
 		o)
@@ -144,9 +164,10 @@ for file in $files; do
 done
 
 if $opt_h || [[ -z "$files" && $opt_i = false ]]; then
-	echo "Usage: fmsim [-ehiksvV] [-d dir] [-D a.d] [-o opt=val]" \
+	echo "Usage: fmsim [-ehisvVwx] [-d dir] [-D a.d] [-o opt=val]" \
 	    "[-t args] [file ...]"
 
+	echo "\t-d  set the simulation root directory to the given location"
 	echo "\t-D  start fmd(1M) using dtrace(1M) and specified D script"
 	echo "\t-e  display error log content instead of fault log content"
 	echo "\t-h  display usage information for fmsim and exit"
@@ -156,6 +177,7 @@ if $opt_h || [[ -z "$files" && $opt_i = false ]]; then
 	echo "\t-t  start fmd(1M) using truss(1) and specified arguments"
 	echo "\t-v  set verbose mode: display additional event detail"
 	echo "\t-V  set very verbose mode: display complete event contents"
+	echo "\t-w  wait for a keypress after simulation completes"
 	echo "\t-x  delete simulation world if simulation is successful"
 
 	exit 0
@@ -170,6 +192,7 @@ echo "fmsim: populating /var ... \c"
 mkdir -p -m 0755 var/fm/fmd
 mkdir -p -m 0700 var/fm/fmd/ckpt
 mkdir -p -m 0700 var/fm/fmd/rsrc
+mkdir -p -m 0700 var/fm/fmd/xprt
 echo "done."
 
 echo "fmsim: populating /usr/lib/fm from $sysroot ... \c"
@@ -217,7 +240,7 @@ echo "fmsim: generating script ... \c"
 cat >$simscript <<EOS
 #!/bin/ksh -p
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -226,12 +249,16 @@ cat >$simscript <<EOS
 # fmsim(1M) script generated for $simroot $(date)
 #
 
-export LD_LIBRARY_PATH=$simroot/usr/lib
-export LD_LIBRARY_PATH_64=$simroot/usr/lib/64
+export LD_LIBRARY_PATH=$simroot/usr/lib:$simroot/usr/lib/fm
+export LD_LIBRARY_PATH_64=$simroot/usr/lib/64:$simroot/usr/lib/fm/$isa64
+
+export _THREAD_ERROR_DETECTION=2
 
 exec $truss_cmd $truss_args $quote./usr/lib/fm/fmd/fmd -R $simroot $eol
-    -o fg=true -o rpc.adm.path=$simroot/rpc -o xprt.device=/dev/null $eol
-    -o errchan=$simchan -o clock=simulated $fmd_args$quote
+    -o fg=true -o clock=simulated $eol
+    -o rpc.adm.prog=0 -o rpc.adm.path=$simroot/rpc $eol
+    -o sysevent-transport:device=/dev/null $eol
+    -o sysevent-transport:channel=$simchan $fmd_args$quote
 
 EOS
 
@@ -243,8 +270,8 @@ if $opt_s; then
 	exit 0
 fi
 
-export LD_LIBRARY_PATH=$simroot/usr/lib
-export LD_LIBRARY_PATH_64=$simroot/usr/lib/64
+export LD_LIBRARY_PATH=$simroot/usr/lib:$simroot/usr/lib/fm
+export LD_LIBRARY_PATH_64=$simroot/usr/lib/64:$simroot/usr/lib/fm/$isa64
 
 echo "fmsim: simulation $$ running fmd(1M)\c"
 ./usr/lib/fm/fmd/fmd -V | cut -d: -f2
@@ -294,5 +321,7 @@ if [[ -f $simroot/var/fm/fmd/errlog ]]; then
 fi
 
 wait_status $status
+$opt_w && wait_prompt exit
 $opt_x && rm -rf $simroot
+
 exit 0

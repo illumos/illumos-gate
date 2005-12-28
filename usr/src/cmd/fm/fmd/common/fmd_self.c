@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,7 +122,6 @@ self_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 
 		fmd_case_add_suspect(hdl, cp, flt);
 		fmd_case_solve(hdl, cp);
-		fmd_case_convict(hdl, cp, flt);
 
 		return;
 	}
@@ -140,11 +140,16 @@ self_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 	 * errors, which we ignore.  Otherwise we keep one case per class and
 	 * use it to produce a message indicating that something is awry.
 	 */
-	if (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0)
+	if (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_ISOLATED_CLASS) == 0 ||
+	    strcmp(class, FM_LIST_REPAIRED_CLASS) == 0)
 		return; /* if no agents are present just drop list.suspect */
 
-	if (strncmp(class, FMD_ERR_CLASS, strlen(FMD_ERR_CLASS)) == 0)
+	if (strncmp(class, FMD_ERR_CLASS, FMD_ERR_CLASS_LEN) == 0)
 		return; /* if fmd itself produced the error just drop it */
+
+	if (strncmp(class, FMD_RSRC_CLASS, FMD_RSRC_CLASS_LEN) == 0)
+		return; /* if fmd itself produced the event just drop it */
 
 	if (self_case_lookup(hdl, SC_CLASS, class) != NULL)
 		return; /* case is already open against this class */

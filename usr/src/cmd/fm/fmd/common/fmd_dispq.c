@@ -20,21 +20,25 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/fm/protocol.h>
+#include <sys/bitmap.h>
+
 #include <strings.h>
+#include <limits.h>
 #include <alloca.h>
 
 #include <fmd_alloc.h>
 #include <fmd_string.h>
+#include <fmd_module.h>
 #include <fmd_dispq.h>
-#include <fmd_eventq.h>
 #include <fmd_subr.h>
+
 #include <fmd.h>
 
 static fmd_dispqelem_t *
@@ -61,7 +65,6 @@ fmd_dispqelem_destroy(fmd_dispqelem_t *dep)
 
 	for (dlp = dep->dq_list; dlp != NULL; dlp = nlp) {
 		nlp = dlp->dq_next;
-		fmd_module_rele(dlp->dq_mod);
 		fmd_free(dlp, sizeof (fmd_dispqlist_t));
 	}
 
@@ -98,6 +101,8 @@ fmd_dispq_create(void)
 
 	(void) pthread_rwlock_init(&dqp->dq_lock, NULL);
 	dqp->dq_root = fmd_dispqelem_create(NULL);
+	dqp->dq_gids = fmd_idspace_create("dispq_gids", 1, INT_MAX);
+	dqp->dq_gmax = 0;
 
 	return (dqp);
 }
@@ -106,6 +111,7 @@ void
 fmd_dispq_destroy(fmd_dispq_t *dqp)
 {
 	fmd_dispqelem_destroy(dqp->dq_root);
+	fmd_idspace_destroy(dqp->dq_gids);
 	fmd_free(dqp, sizeof (fmd_dispq_t));
 }
 
@@ -134,15 +140,13 @@ fmd_dispq_insert_one(fmd_dispqelem_t *dep, const char *name)
 }
 
 void
-fmd_dispq_insert(fmd_dispq_t *dqp, fmd_module_t *mp, const char *pattern)
+fmd_dispq_insert(fmd_dispq_t *dqp, fmd_eventq_t *eqp, const char *pattern)
 {
 	char *p, *q, *s = fmd_strdup(pattern, FMD_SLEEP);
 	size_t len = strlen(s);
 
 	fmd_dispqlist_t *dlp = fmd_alloc(sizeof (fmd_dispqlist_t), FMD_SLEEP);
 	fmd_dispqelem_t *dep;
-
-	fmd_module_hold(mp);
 
 	(void) pthread_rwlock_wrlock(&dqp->dq_lock);
 	dep = dqp->dq_root;
@@ -151,7 +155,7 @@ fmd_dispq_insert(fmd_dispq_t *dqp, fmd_module_t *mp, const char *pattern)
 		dep = fmd_dispq_insert_one(dep, p);
 
 	dlp->dq_next = dep->dq_list;
-	dlp->dq_mod = mp;
+	dlp->dq_eventq = eqp;
 
 	dep->dq_list = dlp;
 	dep->dq_refs++;
@@ -163,7 +167,7 @@ fmd_dispq_insert(fmd_dispq_t *dqp, fmd_module_t *mp, const char *pattern)
 
 static void
 fmd_dispq_delete_one(fmd_dispqelem_t *dep,
-    fmd_module_t *mp, int patc, char *patv[])
+    fmd_eventq_t *eqp, int patc, char *patv[])
 {
 	fmd_dispqlist_t *lp, **lpp;
 	fmd_dispqelem_t *ep, **epp;
@@ -182,23 +186,21 @@ fmd_dispq_delete_one(fmd_dispqelem_t *dep,
 	lpp = &ep->dq_list;
 
 	if (patc > 1) {
-		fmd_dispq_delete_one(ep, mp, patc - 1, patv + 1);
+		fmd_dispq_delete_one(ep, eqp, patc - 1, patv + 1);
 	} else {
 		for (lp = *lpp; lp != NULL; lp = lp->dq_next) {
-			if (lp->dq_mod != mp)
+			if (lp->dq_eventq != eqp)
 				lpp = &lp->dq_next;
 			else
 				break;
 		}
 
-		ASSERT(lp != NULL);
-		*lpp = lp->dq_next;
-
-		fmd_module_rele(lp->dq_mod);
-		fmd_free(lp, sizeof (fmd_dispqlist_t));
-
-		ASSERT(ep->dq_refs != 0);
-		ep->dq_refs--;
+		if (lp != NULL) {
+			*lpp = lp->dq_next;
+			fmd_free(lp, sizeof (fmd_dispqlist_t));
+			ASSERT(ep->dq_refs != 0);
+			ep->dq_refs--;
+		}
 	}
 
 	if (ep->dq_refs == 0) {
@@ -210,7 +212,7 @@ fmd_dispq_delete_one(fmd_dispqelem_t *dep,
 }
 
 void
-fmd_dispq_delete(fmd_dispq_t *dqp, fmd_module_t *mp, const char *pattern)
+fmd_dispq_delete(fmd_dispq_t *dqp, fmd_eventq_t *eqp, const char *pattern)
 {
 	char *p, *q, *s = fmd_strdup(pattern, FMD_SLEEP);
 	size_t len = strlen(s);
@@ -223,7 +225,7 @@ fmd_dispq_delete(fmd_dispq_t *dqp, fmd_module_t *mp, const char *pattern)
 
 	if (patc != 0) {
 		(void) pthread_rwlock_wrlock(&dqp->dq_lock);
-		fmd_dispq_delete_one(dqp->dq_root, mp, patc, patv);
+		fmd_dispq_delete_one(dqp->dq_root, eqp, patc, patv);
 		(void) pthread_rwlock_unlock(&dqp->dq_lock);
 	}
 
@@ -232,16 +234,23 @@ fmd_dispq_delete(fmd_dispq_t *dqp, fmd_module_t *mp, const char *pattern)
 }
 
 static uint_t
-fmd_dispq_dispatch_one(fmd_dispqelem_t *dep, fmd_event_t *ep, const char *class)
+fmd_dispq_dispatch_one(fmd_dispqelem_t *dep, ulong_t *gids,
+    fmd_event_t *ep, const char *class)
 {
 	fmd_dispqlist_t *dlp;
 	uint_t n = 0;
 
 	for (dlp = dep->dq_list; dlp != NULL; dlp = dlp->dq_next, n++) {
-		TRACE((FMD_DBG_DISP, "queue %p (%s) for %s",
-		    (void *)ep, class, dlp->dq_mod->mod_name));
+		id_t gid = dlp->dq_eventq->eq_sgid;
 
-		fmd_eventq_insert_at_time(dlp->dq_mod->mod_queue, ep);
+		if (BT_TEST(gids, gid) != 0)
+			continue; /* event already queued for this group ID */
+
+		TRACE((FMD_DBG_DISP, "queue %p (%s) for %s (%d)", (void *)ep,
+		    class, dlp->dq_eventq->eq_mod->mod_name, (int)gid));
+
+		fmd_eventq_insert_at_time(dlp->dq_eventq, ep);
+		BT_SET(gids, gid);
 	}
 
 	return (n);
@@ -258,77 +267,153 @@ fmd_dispq_dispatch_one(fmd_dispqelem_t *dep, fmd_event_t *ep, const char *class)
  * allowing a subscription to "a.*" to match "a.b", "a.b.c", and so on.
  */
 static uint_t
-fmd_dispq_dispatchv(fmd_dispqelem_t *root,
+fmd_dispq_dispatchv(fmd_dispqelem_t *root, ulong_t *gids,
     fmd_event_t *ep, const char *class, uint_t cc, char *cv[])
 {
 	fmd_dispqelem_t *dep;
 	uint_t n = 0;
 
 	if (cc == 0)
-		return (fmd_dispq_dispatch_one(root, ep, class));
+		return (fmd_dispq_dispatch_one(root, gids, ep, class));
 
 	if ((dep = fmd_dispqelem_lookup(root, cv[0])) != NULL)
-		n += fmd_dispq_dispatchv(dep, ep, class, cc - 1, cv + 1);
+		n += fmd_dispq_dispatchv(dep, gids, ep, class, cc - 1, cv + 1);
 
 	if ((dep = fmd_dispqelem_lookup(root, "*")) != NULL)
-		n += fmd_dispq_dispatchv(dep, ep, class, cc - 1, cv + 1);
+		n += fmd_dispq_dispatchv(dep, gids, ep, class, cc - 1, cv + 1);
 
 	if (dep != NULL && cc > 1)
-		n += fmd_dispq_dispatch_one(dep, ep, class);
+		n += fmd_dispq_dispatch_one(dep, gids, ep, class);
 
 	return (n);
 }
 
-void
-fmd_dispq_dispatch(fmd_dispq_t *dqp, fmd_event_t *ep, const char *class)
+static uint_t
+fmd_dispq_tokenize(const char *class,
+    char *buf, size_t buflen, char **cv, uint_t cvlen)
 {
-	fmd_event_impl_t *eip = (fmd_event_impl_t *)ep;
-	char *p, *q, *s, **cv;
-	uint_t n, len, cc;
+	uint_t cc = 0;
+	char *p, *q;
 
-	nvlist_t **nvp;
-	uint_t nvc = 0;
+	(void) strlcpy(buf, class, buflen);
+
+	for (p = strtok_r(buf, ".", &q); p != NULL; p = strtok_r(NULL, ".", &q))
+		cv[cc++] = p;
+
+	if (cc > cvlen)
+		fmd_panic("fmd_dispq_tokenize() cc=%u > cv[%u]\n", cc, cvlen);
+
+	return (cc);
+}
+
+void
+fmd_dispq_dispatch_gid(fmd_dispq_t *dqp,
+    fmd_event_t *ep, const char *class, id_t gid)
+{
+	size_t cvbuflen = strlen(class);
+	uint_t cc, cvlen, n = 0;
+	char *c, *cvbuf, **cv;
+
+	ulong_t *gids;
+	uint_t glen, i;
+
+	nvlist_t **nva;
+	uint_t nvi, nvc = 0;
 
 	fmd_event_hold(ep);
 
 	/*
 	 * If the event is a protocol list.suspect event with one or more
-	 * events contained inside of it, we call fmd_dispq_dispatch()
-	 * recursively using the class string of the embedded event.
+	 * events contained inside of it, determine the maximum length of all
+	 * class strings that will be used in this dispatch operation.
 	 */
-	if (eip->ev_type == FMD_EVT_PROTOCOL && strcmp(class,
+	if (FMD_EVENT_TYPE(ep) == FMD_EVT_PROTOCOL && strcmp(class,
 	    FM_LIST_SUSPECT_CLASS) == 0 && nvlist_lookup_nvlist_array(
-	    eip->ev_nvl, FM_SUSPECT_FAULT_LIST, &nvp, &nvc) == 0 && nvc != 0) {
-		while (nvc-- != 0) {
-			if (nvlist_lookup_string(*nvp++, FM_CLASS, &p) == 0)
-				fmd_dispq_dispatch(dqp, ep, p);
+	    FMD_EVENT_NVL(ep), FM_SUSPECT_FAULT_LIST, &nva, &nvc) == 0) {
+		for (nvi = 0; nvi < nvc; nvi++) {
+			if (nvlist_lookup_string(nva[nvi], FM_CLASS, &c) == 0) {
+				size_t len = strlen(c);
+				cvbuflen = MAX(cvbuflen, len);
+			}
 		}
 	}
 
+	cvbuf = alloca(cvbuflen + 1);
+	cvlen = cvbuflen / 2 + 1;
+	cv = alloca(sizeof (char *) * cvlen);
+
 	/*
-	 * Once we've handled any recursive invocations, grab the dispatch
-	 * queue lock and walk down the dispatch queue hashes posting the event
-	 * for each subscriber.  If the total subscribers (n) is zero, send
-	 * the event by default to the self-diagnosis module for handling.
+	 * With dq_lock held as reader, allocate a bitmap on the stack for
+	 * group IDs for this dispatch, zero it, and then do the dispatch.
 	 */
-	len = strlen(class);
-	s = alloca(len + 1);
-	(void) strcpy(s, class);
-
-	cv = alloca(sizeof (char *) * (len / 2 + 1));
-	cc = 0;
-
-	for (p = strtok_r(s, ".", &q); p != NULL; p = strtok_r(NULL, ".", &q))
-		cv[cc++] = p;
-
 	(void) pthread_rwlock_rdlock(&dqp->dq_lock);
-	n = fmd_dispq_dispatchv(dqp->dq_root, ep, class, cc, cv);
+
+	glen = BT_BITOUL(dqp->dq_gmax);
+	gids = alloca(sizeof (ulong_t) * glen);
+	bzero(gids, sizeof (ulong_t) * glen);
+
+	/*
+	 * If we are dispatching to only a single gid, set all bits in the
+	 * group IDs mask and then clear only the bit for the specified gid.
+	 */
+	if (gid >= 0) {
+		for (i = 0; i < glen; i++)
+			gids[i] = BT_ULMAXMASK;
+		BT_CLEAR(gids, gid);
+	}
+
+	for (nvi = 0; nvi < nvc; nvi++) {
+		if (nvlist_lookup_string(nva[nvi], FM_CLASS, &c) == 0) {
+			cc = fmd_dispq_tokenize(c, cvbuf, cvbuflen, cv, cvlen);
+			n += fmd_dispq_dispatchv(dqp->dq_root,
+			    gids, ep, c, cc, cv);
+		}
+	}
+
+	cc = fmd_dispq_tokenize(class, cvbuf, cvbuflen, cv, cvlen);
+	n += fmd_dispq_dispatchv(dqp->dq_root, gids, ep, class, cc, cv);
+
 	(void) pthread_rwlock_unlock(&dqp->dq_lock);
+	fmd_dprintf(FMD_DBG_DISP, "%s dispatched to %u queues\n", class, n);
 
-	fmd_dprintf(FMD_DBG_DISP, "%s dispatched to %u modules\n", class, n);
-
-	if (n == 0 && fmd.d_self != NULL)
+	/*
+	 * If the total subscriptions matched (n) was zero and we're not being
+	 * called for a single gid, send the event to the self-diagnosis module.
+	 */
+	if (n == 0 && gid < 0 && fmd.d_self != NULL)
 		fmd_eventq_insert_at_time(fmd.d_self->mod_queue, ep);
 
 	fmd_event_rele(ep);
+}
+
+void
+fmd_dispq_dispatch(fmd_dispq_t *dqp, fmd_event_t *ep, const char *class)
+{
+	fmd_dispq_dispatch_gid(dqp, ep, class, -1);
+}
+
+id_t
+fmd_dispq_getgid(fmd_dispq_t *dqp, void *cookie)
+{
+	id_t gid;
+
+	(void) pthread_rwlock_wrlock(&dqp->dq_lock);
+
+	gid = fmd_idspace_alloc_min(dqp->dq_gids, cookie);
+	dqp->dq_gmax = MAX(dqp->dq_gmax, gid);
+
+	(void) pthread_rwlock_unlock(&dqp->dq_lock);
+
+	return (gid);
+}
+
+void
+fmd_dispq_delgid(fmd_dispq_t *dqp, id_t gid)
+{
+	(void) pthread_rwlock_wrlock(&dqp->dq_lock);
+
+	ASSERT(fmd_idspace_contains(dqp->dq_gids, gid));
+	(void) fmd_idspace_free(dqp->dq_gids, gid);
+
+	(void) pthread_rwlock_unlock(&dqp->dq_lock);
 }

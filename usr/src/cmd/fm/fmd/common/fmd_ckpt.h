@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +178,7 @@ typedef struct fcf_case {
 
 #define	FCF_CASE_UNSOLVED	0
 #define	FCF_CASE_SOLVED		1
-#define	FCF_CASE_CLOSED		2
+#define	FCF_CASE_CLOSE_WAIT	2
 
 typedef struct fcf_buf {
 	fcf_stridx_t fcfb_name;	/* buffer name */

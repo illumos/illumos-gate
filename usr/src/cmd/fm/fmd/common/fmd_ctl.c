@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,7 +35,7 @@
  * and used to control the behavior of the fault manager itself.  At present
  * this feature is used for the implementation of simulation controls such as
  * advancing the simulated clock using events sent by the fminject utility.
- * Control events are assigned a class of the form "resource.sunos.fmd.*" and
+ * Control events are assigned a class of the form "resource.fm.fmd.*" and
  * are assigned a callback function defined in the _fmd_ctls[] table below.
  * As control events are received by the event transport, they are assigned a
  * special event type (ev_type = FMD_EVT_CTL) and the ev_data member is used
@@ -79,7 +80,7 @@ fmd_ctl_addhrt(nvlist_t *nvl)
 {
 	int64_t delta = 0;
 
-	(void) nvlist_lookup_int64(nvl, FMD_RSRC_ADDHRT_DELTA, &delta);
+	(void) nvlist_lookup_int64(nvl, FMD_CTL_ADDHRT_DELTA, &delta);
 	fmd_time_addhrtime(delta);
 
 	/*
@@ -99,8 +100,15 @@ fmd_ctl_inval(nvlist_t *nvl)
 	fmd_error(EFMD_CTL_INVAL, "ignoring invalid control event %s\n", class);
 }
 
+/*ARGSUSED*/
+static void
+fmd_ctl_pause(nvlist_t *nvl)
+{
+	fmd_dprintf(FMD_DBG_DISP, "unpausing modules from ctl barrier\n");
+}
+
 static const fmd_ctl_desc_t _fmd_ctls[] = {
-	{ FMD_RSRC_ADDHRT, FMD_RSRC_ADDHRT_VERS1, fmd_ctl_addhrt },
+	{ FMD_CTL_ADDHRT, FMD_CTL_ADDHRT_VERS1, fmd_ctl_addhrt },
 	{ NULL, UINT_MAX, fmd_ctl_inval }
 };
 
@@ -116,6 +124,14 @@ fmd_ctl_init(nvlist_t *nvl)
 	(void) pthread_mutex_init(&cp->ctl_lock, NULL);
 	(void) pthread_cond_init(&cp->ctl_cv, NULL);
 
+	cp->ctl_nvl = nvl;
+	cp->ctl_refs = 0;
+
+	if (nvl == NULL) {
+		cp->ctl_func = fmd_ctl_pause;
+		return (cp);
+	}
+
 	if (nvlist_lookup_string(nvl, FM_CLASS, &class) != 0 ||
 	    nvlist_lookup_uint8(nvl, FM_VERSION, &vers) != 0)
 		fmd_panic("ctl_init called with bad nvlist %p", (void *)nvl);
@@ -126,9 +142,6 @@ fmd_ctl_init(nvlist_t *nvl)
 	}
 
 	cp->ctl_func = vers > dp->cde_vers ? &fmd_ctl_inval : dp->cde_func;
-	cp->ctl_nvl = nvl;
-	cp->ctl_refs = 0;
-
 	return (cp);
 }
 

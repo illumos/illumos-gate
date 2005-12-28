@@ -36,7 +36,6 @@
 	fmd_case_add_suspect = FUNCTION extern;
 	fmd_case_close = FUNCTION extern;
 	fmd_case_closed = FUNCTION extern;
-	fmd_case_convict = FUNCTION extern;
 	fmd_case_getprincipal = FUNCTION extern;
 	fmd_case_getspecific = FUNCTION extern;
 	fmd_case_next = FUNCTION extern;
@@ -49,9 +48,10 @@
 	fmd_case_solved = FUNCTION extern;
 	fmd_case_uuclose = FUNCTION extern;
 	fmd_case_uuclosed = FUNCTION extern;
-	fmd_case_uuconvict = FUNCTION extern;
 	fmd_case_uuid = FUNCTION extern;
 	fmd_case_uulookup = FUNCTION extern;
+
+	fmd_event_local = FUNCTION extern;
 
 	fmd_hdl_abort = FUNCTION extern;
 	fmd_hdl_alloc = FUNCTION extern;
@@ -78,6 +78,7 @@
 	fmd_nvl_fmri_present = FUNCTION extern;
 	fmd_nvl_fmri_unusable = FUNCTION extern;
 	fmd_nvl_fmri_contains = FUNCTION extern;
+	fmd_nvl_fmri_translate = FUNCTION extern;
 
 	fmd_prop_free_string = FUNCTION extern;
 	fmd_prop_get_int32 = FUNCTION extern;
@@ -102,4 +103,14 @@
 
 	fmd_timer_install = FUNCTION extern;
 	fmd_timer_remove = FUNCTION extern;
+
+	fmd_xprt_close = FUNCTION extern;
+	fmd_xprt_error = FUNCTION extern;
+	fmd_xprt_getspecific = FUNCTION extern;
+	fmd_xprt_open = FUNCTION extern;
+	fmd_xprt_post = FUNCTION extern;
+	fmd_xprt_resume = FUNCTION extern;
+	fmd_xprt_setspecific = FUNCTION extern;
+	fmd_xprt_suspend = FUNCTION extern;
+	fmd_xprt_translate = FUNCTION extern;
 };

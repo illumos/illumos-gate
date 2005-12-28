@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,6 +100,14 @@ fmd_scheme_fmd_unusable(nvlist_t *nvl)
 	return (rv);
 }
 
+/*ARGSUSED*/
+static nvlist_t *
+fmd_scheme_notranslate(nvlist_t *fmri, nvlist_t *auth)
+{
+	(void) nvlist_xdup(fmri, &fmri, &fmd.d_nva);
+	return (fmri);
+}
+
 static long
 fmd_scheme_notsup(void)
 {
@@ -122,7 +131,8 @@ static const fmd_scheme_ops_t _fmd_scheme_default_ops = {
 	(int (*)())fmd_scheme_nop,		/* sop_expand */
 	(int (*)())fmd_scheme_notsup,		/* sop_present */
 	(int (*)())fmd_scheme_notsup,		/* sop_unusable */
-	(int (*)())fmd_scheme_notsup		/* sop_contains */
+	(int (*)())fmd_scheme_notsup,		/* sop_contains */
+	fmd_scheme_notranslate			/* sop_translate */
 };
 
 static const fmd_scheme_ops_t _fmd_scheme_builtin_ops = {
@@ -132,7 +142,8 @@ static const fmd_scheme_ops_t _fmd_scheme_builtin_ops = {
 	(int (*)())fmd_scheme_nop,		/* sop_expand */
 	fmd_scheme_fmd_present,			/* sop_present */
 	fmd_scheme_fmd_unusable,		/* sop_unusable */
-	(int (*)())fmd_scheme_notsup		/* sop_contains */
+	(int (*)())fmd_scheme_notsup,		/* sop_contains */
+	fmd_scheme_notranslate			/* sop_translate */
 };
 
 /*
@@ -147,6 +158,7 @@ static const fmd_scheme_opd_t _fmd_scheme_ops[] = {
 	{ "fmd_fmri_present", offsetof(fmd_scheme_ops_t, sop_present) },
 	{ "fmd_fmri_unusable", offsetof(fmd_scheme_ops_t, sop_unusable) },
 	{ "fmd_fmri_contains", offsetof(fmd_scheme_ops_t, sop_contains) },
+	{ "fmd_fmri_translate", offsetof(fmd_scheme_ops_t, sop_translate) },
 	{ NULL, 0 }
 };
 
@@ -351,8 +363,9 @@ fmd_scheme_hash_lookup(fmd_scheme_hash_t *shp, const char *name)
 		sp->sch_loaded = FMD_B_TRUE; /* set regardless of success */
 		sp->sch_refs++;
 		ASSERT(sp->sch_refs != 0);
-		(void) pthread_mutex_unlock(&sp->sch_lock);
+
 		(void) pthread_cond_broadcast(&sp->sch_cv);
+		(void) pthread_mutex_unlock(&sp->sch_lock);
 
 	} else {
 		while (!sp->sch_loaded)

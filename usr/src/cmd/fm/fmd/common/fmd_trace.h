@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,10 +55,11 @@ typedef struct fmd_tracebuf {
 	uint_t tb_frames;	/* maximum captured frames */
 	uint_t tb_recs;		/* number of trace records */
 	uint_t tb_size;		/* size of each record */
+	uint_t tb_depth;	/* recursion depth of trace function */
 } fmd_tracebuf_t;
 
 typedef fmd_tracerec_t *fmd_tracebuf_f(fmd_tracebuf_t *,
-    uint8_t, const char *, va_list);
+    uint_t, const char *, va_list);
 
 extern fmd_tracebuf_t *fmd_trace_create(void);
 extern void fmd_trace_destroy(fmd_tracebuf_t *);

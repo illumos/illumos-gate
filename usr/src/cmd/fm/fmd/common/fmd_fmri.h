@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +69,7 @@ extern void fmd_fmri_free(void *, size_t);
 extern int fmd_fmri_set_errno(int);
 extern void fmd_fmri_warn(const char *, ...);
 
+extern char *fmd_fmri_auth2str(nvlist_t *);
 extern char *fmd_fmri_strescape(const char *);
 extern char *fmd_fmri_strdup(const char *);
 extern void fmd_fmri_strfree(char *);
@@ -87,6 +89,7 @@ extern int fmd_fmri_expand(nvlist_t *);
 extern int fmd_fmri_present(nvlist_t *);
 extern int fmd_fmri_unusable(nvlist_t *);
 extern int fmd_fmri_contains(nvlist_t *, nvlist_t *);
+extern nvlist_t *fmd_fmri_translate(nvlist_t *, nvlist_t *);
 
 #ifdef	__cplusplus
 }

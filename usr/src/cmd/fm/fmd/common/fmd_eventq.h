@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,19 @@ extern "C" {
 #include <fmd_event.h>
 #include <fmd_list.h>
 
+typedef struct fmd_eventqstat {
+	fmd_stat_t eqs_dispatched;	/* total events dispatched to queue */
+	fmd_stat_t eqs_dequeued;	/* total events dequeued by consumer */
+	fmd_stat_t eqs_prdequeued;	/* total protocol events dequeued */
+	fmd_stat_t eqs_dropped;		/* total events dropped by queue */
+	fmd_stat_t eqs_wcnt;		/* count of events waiting on queue */
+	fmd_stat_t eqs_wtime;		/* total wait time (pre-dispatch) */
+	fmd_stat_t eqs_wlentime;	/* total wait length * time product */
+	fmd_stat_t eqs_wlastupdate;	/* hrtime of last wait queue update */
+	fmd_stat_t eqs_dtime;		/* total dispatch time */
+	fmd_stat_t eqs_dlastupdate;	/* hrtime of last dispatch */
+} fmd_eventqstat_t;
+
 typedef struct fmd_eventqelem {
 	fmd_list_t eqe_list;		/* linked-list prev/next pointers */
 	fmd_event_t *eqe_event;		/* pointer to event */
@@ -50,17 +63,27 @@ typedef struct fmd_eventq {
 	pthread_cond_t eq_cv;		/* condition variable for waiters */
 	fmd_list_t eq_list;		/* list head/tail pointers for queue */
 	struct fmd_module *eq_mod;	/* module associated with this queue */
+	pthread_mutex_t *eq_stats_lock;	/* lock that protects eq_stats */
+	fmd_eventqstat_t *eq_stats;	/* statistics associated with queue */
 	uint_t eq_limit;		/* limit on number of queue elements */
 	uint_t eq_size;			/* number of elements on queue */
-	uint_t eq_abort;		/* flag for fmd_eventq_abort() */
+	uint_t eq_flags;		/* flags for abort and suspend */
+	id_t eq_sgid;			/* subscription group id for dispq */
 } fmd_eventq_t;
 
-extern fmd_eventq_t *fmd_eventq_create(struct fmd_module *, uint_t);
+#define	FMD_EVENTQ_ABORT	0x1	/* return NULL from fmd_eventq_delete */
+#define	FMD_EVENTQ_SUSPEND	0x2	/* suspend in fmd_eventq_delete */
+
+extern fmd_eventq_t *fmd_eventq_create(struct fmd_module *,
+    fmd_eventqstat_t *, pthread_mutex_t *, uint_t);
 extern void fmd_eventq_destroy(fmd_eventq_t *);
 extern void fmd_eventq_insert_at_head(fmd_eventq_t *, fmd_event_t *);
 extern void fmd_eventq_insert_at_time(fmd_eventq_t *, fmd_event_t *);
 extern fmd_event_t *fmd_eventq_delete(fmd_eventq_t *);
+extern void fmd_eventq_done(fmd_eventq_t *);
 extern void fmd_eventq_cancel(fmd_eventq_t *, uint_t, void *);
+extern void fmd_eventq_suspend(fmd_eventq_t *);
+extern void fmd_eventq_resume(fmd_eventq_t *);
 extern void fmd_eventq_abort(fmd_eventq_t *);
 
 #ifdef	__cplusplus

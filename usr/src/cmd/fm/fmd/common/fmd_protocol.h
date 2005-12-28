@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,19 +38,27 @@
 extern "C" {
 #endif
 
-#define	FMD_RSRC_CLASS		"resource.sunos.fmd."
+#define	FMD_RSRC_CLASS		FM_RSRC_CLASS ".fm."
+#define	FMD_CTL_CLASS		FMD_RSRC_CLASS "fmd."
+
 #define	FMD_RSRC_CLASS_LEN	(sizeof (FMD_RSRC_CLASS) - 1)
-#define	FMD_RSRC_ADDHRT		FMD_RSRC_CLASS "clock.addhrtime"
+#define	FMD_CTL_CLASS_LEN	(sizeof (FMD_CTL_CLASS) - 1)
 
-#define	FMD_RSRC_ADDHRT_VERS1	1
-#define	FMD_RSRC_ADDHRT_DELTA	"delta"
+#define	FMD_CTL_ADDHRT		FMD_CTL_CLASS "clock.addhrtime"
+#define	FMD_CTL_ADDHRT_VERS1	1
+#define	FMD_CTL_ADDHRT_DELTA	"delta"
 
-#define	FMD_FLT_NOSUB	"defect.sunos.fmd.nosub"
-#define	FMD_FLT_NODC	"defect.sunos.fmd.nodiagcode"
-#define	FMD_FLT_MOD	"defect.sunos.fmd.module"
-#define	FMD_FLT_CONF	"defect.sunos.fmd.config"
+/*
+ * The FMD_FLT_* events still use defect.sunos.* for now: a future registry
+ * putback should define all fmd events and convert these to defect.fm.fmd.*
+ */
+#define	FMD_FLT_NOSUB		"defect.sunos.fmd.nosub"
+#define	FMD_FLT_NODC		"defect.sunos.fmd.nodiagcode"
+#define	FMD_FLT_MOD		"defect.sunos.fmd.module"
+#define	FMD_FLT_CONF		"defect.sunos.fmd.config"
 
-#define	FMD_ERR_CLASS	"ereport.sunos.fmd."
+#define	FMD_ERR_CLASS		"ereport.fm.fmd."
+#define	FMD_ERR_CLASS_LEN	(sizeof (FMD_ERR_CLASS) - 1)
 
 #define	FMD_ERR_MOD_MSG		"msg"
 #define	FMD_ERR_MOD_ERRNO	"errno"
@@ -61,12 +70,18 @@ extern nvlist_t *fmd_protocol_authority(void);
 extern nvlist_t *fmd_protocol_fmri_module(struct fmd_module *);
 extern nvlist_t *fmd_protocol_fault(const char *,
     uint8_t, nvlist_t *, nvlist_t *, nvlist_t *);
-extern nvlist_t *fmd_protocol_suspects(nvlist_t *,
-    const char *, const char *, uint_t, nvlist_t **, int);
-extern nvlist_t *fmd_protocol_resource(const char *,
-    nvlist_t *, const char *, boolean_t, boolean_t, boolean_t, nvlist_t *);
+extern nvlist_t *fmd_protocol_list(const char *, nvlist_t *,
+    const char *, const char *, uint_t, nvlist_t **, uint8_t *, int);
+extern nvlist_t *fmd_protocol_rsrc_asru(const char *, nvlist_t *,
+    const char *, const char *, boolean_t, boolean_t, boolean_t, nvlist_t *);
 extern nvlist_t *fmd_protocol_fmderror(int, const char *, va_list);
 extern nvlist_t *fmd_protocol_moderror(struct fmd_module *, int, const char *);
+extern nvlist_t *fmd_protocol_xprt_ctl(struct fmd_module *,
+    const char *, uint8_t);
+extern nvlist_t *fmd_protocol_xprt_sub(struct fmd_module *,
+    const char *, uint8_t, const char *);
+extern nvlist_t *fmd_protocol_xprt_uuclose(struct fmd_module *,
+    const char *, uint8_t, const char *);
 
 #ifdef	__cplusplus
 }

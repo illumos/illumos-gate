@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -37,6 +38,7 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <door.h>
 
 #include <fmd_conf.h>
 #include <fmd_dispq.h>
@@ -47,7 +49,6 @@
 #include <fmd_thread.h>
 #include <fmd_alloc.h>
 #include <fmd_string.h>
-#include <fmd_transport.h>
 #include <fmd_builtin.h>
 #include <fmd_ustat.h>
 #include <fmd_protocol.h>
@@ -55,8 +56,11 @@
 #include <fmd_asru.h>
 #include <fmd_case.h>
 #include <fmd_log.h>
+#include <fmd_idspace.h>
 #include <fmd_rpc.h>
 #include <fmd_dr.h>
+#include <fmd_xprt.h>
+#include <fmd_ctl.h>
 
 #include <fmd.h>
 
@@ -119,6 +123,7 @@ static const fmd_conf_mode_t _fmd_debug_modes[] = {
 	{ "case", "debug case subsystem routines", FMD_DBG_CASE },
 	{ "ckpt", "debug checkpoint routines", FMD_DBG_CKPT },
 	{ "rpc", "debug rpc service routines", FMD_DBG_RPC },
+	{ "trace", "display matching trace calls", FMD_DBG_TRACE },
 	{ "all", "enable all available debug modes", FMD_DBG_ALL },
 	{ NULL, NULL, 0 }
 };
@@ -234,6 +239,9 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "client.thrlim", &fmd_conf_uint32, "8" },	/* client aux thread limit */
 { "client.thrsig", &fmd_conf_signal, "SIGUSR1" }, /* fmd_thr_signal() value */
 { "client.tmrlim", &fmd_conf_uint32, "1024" },	/* client pending timer limit */
+{ "client.xprtlim", &fmd_conf_uint32, "256" },	/* client transport limit */
+{ "client.xprtlog", &fmd_conf_bool, NULL },	/* client transport logging? */
+{ "client.xprtqlim", &fmd_conf_uint32, "256" }, /* client transport queue lim */
 { "clock", &fmd_clkmode_ops, "native" },	/* clock operation mode */
 { "conf_path", &fmd_conf_path, _fmd_conf_path }, /* root config file path */
 { "conf_file", &fmd_conf_string, "fmd.conf" },	/* root config file name */
@@ -242,19 +250,19 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "debug", &fmd_debug_ops, NULL },		/* daemon debugging flags */
 { "dictdir", &fmd_conf_string, "usr/lib/fm/dict" }, /* default diagcode dir */
 { "domain", &fmd_conf_string, NULL },		/* domain id for de auth */
-{ "errchan", &fmd_conf_string, FM_ERROR_CHAN }, /* error event channel name */
 { "fg", &fmd_conf_bool, "false" },		/* run daemon in foreground */
 { "gc_interval", &fmd_conf_time, "1d" },	/* garbage collection intvl */
 { "ids.avg", &fmd_conf_uint32, "4" },		/* desired idspace chain len */
 { "ids.max", &fmd_conf_uint32, "1024" },	/* maximum idspace buckets */
 { "isaname", &fmd_conf_string, _fmd_isa },	/* instruction set (uname -p) */
-{ "log.rsrc", &fmd_conf_string, "var/fm/fmd/rsrc" }, /* asru log dir path */
 { "log.creator", &fmd_conf_string, "fmd" },	/* exacct log creator string */
 { "log.error", &fmd_conf_string, "var/fm/fmd/errlog" }, /* error log path */
 { "log.fault", &fmd_conf_string, "var/fm/fmd/fltlog" }, /* fault log path */
 { "log.minfree", &fmd_conf_size, "2m" },	/* min log fsys free space */
+{ "log.rsrc", &fmd_conf_string, "var/fm/fmd/rsrc" }, /* asru log dir path */
 { "log.tryrotate", &fmd_conf_uint32, "10" },	/* max log rotation attempts */
 { "log.waitrotate", &fmd_conf_time, "200ms" },	/* log rotation retry delay */
+{ "log.xprt", &fmd_conf_string, "var/fm/fmd/xprt" }, /* transport log dir */
 { "machine", &fmd_conf_string, _fmd_uts.machine }, /* machine name (uname -m) */
 { "nodiagcode", &fmd_conf_string, "-" },	/* diagcode to use if error */
 { "osrelease", &fmd_conf_string, _fmd_uts.release }, /* release (uname -r) */
@@ -284,9 +292,7 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "trace.recs", &fmd_conf_uint32, "128" },	/* trace records per thread */
 { "trace.frames", &fmd_conf_uint32, "16" },	/* max trace rec stack frames */
 { "uuidlen", &fmd_conf_uint32, "36" },		/* UUID ASCII string length */
-{ "xprt.class", &fmd_conf_string, NULL },	/* transport event class */
-{ "xprt.device", &fmd_conf_string, NULL },	/* transport replay device */
-{ "xprt.sid", &fmd_conf_string, "fmd" },	/* transport subscriber id */
+{ "xprt.ttl", &fmd_conf_uint8, "1" },		/* default event time-to-live */
 };
 
 /*
@@ -295,11 +301,6 @@ static const fmd_conf_formal_t _fmd_conf[] = {
  * required in the future, the FMD_ADM_MODGSTAT service routine must change.
  */
 static fmd_statistics_t _fmd_stats = {
-{ "transport.received", FMD_TYPE_UINT64, "events received by transport" },
-{ "transport.discarded", FMD_TYPE_UINT64, "bad events discarded by transport" },
-{ "transport.retried", FMD_TYPE_UINT64, "retries requested of transport" },
-{ "transport.replayed", FMD_TYPE_UINT64, "events replayed by transport" },
-{ "transport.lost", FMD_TYPE_UINT64, "events lost by transport" },
 { "errlog.replayed", FMD_TYPE_UINT64, "total events replayed from errlog" },
 { "errlog.partials", FMD_TYPE_UINT64, "events partially committed in errlog" },
 { "errlog.enospc", FMD_TYPE_UINT64, "events not appended to errlog (ENOSPC)" },
@@ -331,9 +332,6 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 		fmd_error(EFMD_EXIT, "failed to create pthread key");
 
 	(void) pthread_mutex_init(&dp->d_xprt_lock, NULL);
-	(void) pthread_cond_init(&dp->d_xprt_cv, NULL);
-	dp->d_xprt_wait++; /* pause transport threads */
-
 	(void) pthread_mutex_init(&dp->d_err_lock, NULL);
 	(void) pthread_mutex_init(&dp->d_thr_lock, NULL);
 	(void) pthread_mutex_init(&dp->d_mod_lock, NULL);
@@ -357,8 +355,8 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	dp->d_machine = _fmd_uts.machine;
 	dp->d_isaname = _fmd_isa;
 
-	dp->d_conf = fmd_conf_open(conf,
-	    sizeof (_fmd_conf) / sizeof (_fmd_conf[0]), _fmd_conf);
+	dp->d_conf = fmd_conf_open(conf, sizeof (_fmd_conf) /
+	    sizeof (_fmd_conf[0]), _fmd_conf, FMD_CONF_DEFER);
 
 	if (dp->d_conf == NULL) {
 		fmd_error(EFMD_EXIT,
@@ -399,8 +397,10 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	/*
 	 * Update the value of fmd.d_fg based on "fg".  We cache this property
 	 * because it must be accessed deep within fmd at fmd_verror() time.
+	 * Update any other properties that must be cached for performance.
 	 */
 	(void) fmd_conf_getprop(fmd.d_conf, "fg", &fmd.d_fg);
+	(void) fmd_conf_getprop(fmd.d_conf, "xprt.ttl", &fmd.d_xprt_ttl);
 
 	/*
 	 * Initialize our custom libnvpair allocator and create an nvlist for
@@ -415,12 +415,17 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	 */
 	dp->d_rmod = fmd_zalloc(sizeof (fmd_module_t), FMD_SLEEP);
 	dp->d_rmod->mod_name = fmd_strdup(dp->d_pname, FMD_SLEEP);
+	dp->d_rmod->mod_fmri = fmd_protocol_fmri_module(dp->d_rmod);
+
 	fmd_list_append(&dp->d_mod_list, dp->d_rmod);
+	fmd_module_hold(dp->d_rmod);
 
 	(void) pthread_mutex_init(&dp->d_rmod->mod_lock, NULL);
 	(void) pthread_cond_init(&dp->d_rmod->mod_cv, NULL);
+	(void) pthread_mutex_init(&dp->d_rmod->mod_stats_lock, NULL);
 
 	dp->d_rmod->mod_thread = fmd_thread_xcreate(dp->d_rmod, pthread_self());
+	dp->d_rmod->mod_stats = fmd_zalloc(sizeof (fmd_modstat_t), FMD_SLEEP);
 	dp->d_rmod->mod_ustat = fmd_ustat_create();
 
 	if (pthread_setspecific(dp->d_key, dp->d_rmod->mod_thread) != 0)
@@ -430,6 +435,10 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	    dp->d_rmod->mod_ustat, FMD_USTAT_NOALLOC, sizeof (_fmd_stats) /
 	    sizeof (fmd_stat_t), (fmd_stat_t *)&_fmd_stats, NULL)) == NULL)
 		fmd_error(EFMD_EXIT, "failed to initialize statistics");
+
+	(void) pthread_mutex_lock(&dp->d_rmod->mod_lock);
+	dp->d_rmod->mod_flags |= FMD_MOD_INIT;
+	(void) pthread_mutex_unlock(&dp->d_rmod->mod_lock);
 
 	/*
 	 * In addition to inserting the _fmd_stats collection of program-wide
@@ -453,13 +462,14 @@ void
 fmd_destroy(fmd_t *dp)
 {
 	fmd_module_t *mp;
+	fmd_case_t *cp;
 	int core;
 
 	(void) fmd_conf_getprop(fmd.d_conf, "core", &core);
 
 	fmd_rpc_fini();
-	fmd_transport_fini();
 	fmd_dr_fini();
+	fmd_xprt_suspend_all();
 
 	/*
 	 * Unload the self-diagnosis module first.  This ensures that it does
@@ -503,6 +513,15 @@ fmd_destroy(fmd_t *dp)
 	}
 
 	/*
+	 * Now destroy the resource cache: each ASRU contains a case reference,
+	 * which may in turn contain a pointer to a referenced owning module.
+	 */
+	if (dp->d_asrus != NULL) {
+		fmd_asru_hash_destroy(dp->d_asrus);
+		dp->d_asrus = NULL;
+	}
+
+	/*
 	 * Now that all data structures that refer to modules are torn down,
 	 * no modules should be remaining on the module list except for d_rmod.
 	 * If we trip one of these assertions, we're missing a rele somewhere.
@@ -515,19 +534,36 @@ fmd_destroy(fmd_t *dp)
 	 * calls to fmd_trace() inside of the module code will be ignored.
 	 */
 	(void) pthread_setspecific(dp->d_key, NULL);
-	(void) pthread_mutex_lock(&dp->d_rmod->mod_lock);
-	fmd_module_destroy(dp->d_rmod);
+	fmd_module_lock(dp->d_rmod);
 
-	if (dp->d_timers != NULL)
-		fmd_timerq_destroy(dp->d_timers);
-	if (dp->d_disp != NULL)
-		fmd_dispq_destroy(dp->d_disp);
-	if (dp->d_asrus != NULL)
-		fmd_asru_hash_destroy(dp->d_asrus);
-	if (dp->d_schemes != NULL)
-		fmd_scheme_hash_destroy(dp->d_schemes);
+	while ((cp = fmd_list_next(&dp->d_rmod->mod_cases)) != NULL)
+		fmd_case_discard(cp);
+
+	fmd_module_unlock(dp->d_rmod);
+	fmd_free(dp->d_rmod->mod_stats, sizeof (fmd_modstat_t));
+	dp->d_rmod->mod_stats = NULL;
+
+	(void) pthread_mutex_lock(&dp->d_rmod->mod_lock);
+	dp->d_rmod->mod_flags |= FMD_MOD_FINI;
+	(void) pthread_mutex_unlock(&dp->d_rmod->mod_lock);
+
+	fmd_module_rele(dp->d_rmod);
+	ASSERT(fmd_list_next(&dp->d_mod_list) == NULL);
+
+	/*
+	 * Now destroy the remaining global data structures.  If 'core' was
+	 * set to true, force a core dump so we can check for memory leaks.
+	 */
 	if (dp->d_cases != NULL)
 		fmd_case_hash_destroy(dp->d_cases);
+	if (dp->d_disp != NULL)
+		fmd_dispq_destroy(dp->d_disp);
+	if (dp->d_timers != NULL)
+		fmd_timerq_destroy(dp->d_timers);
+	if (dp->d_schemes != NULL)
+		fmd_scheme_hash_destroy(dp->d_schemes);
+	if (dp->d_xprt_ids != NULL)
+		fmd_idspace_destroy(dp->d_xprt_ids);
 
 	if (dp->d_errstats != NULL) {
 		fmd_free(dp->d_errstats,
@@ -606,14 +642,32 @@ fmd_err_replay(fmd_log_t *lp, fmd_event_t *ep, fmd_t *dp)
 		fmd_module_rele(mp);
 		sp = &dp->d_stats->ds_log_partials;
 	} else {
-		fmd_dispq_dispatch(dp->d_disp, ep,
-		    ((fmd_event_impl_t *)ep)->ev_data);
+		fmd_dispq_dispatch(dp->d_disp, ep, FMD_EVENT_DATA(ep));
 		sp = &dp->d_stats->ds_log_replayed;
 	}
 
 	(void) pthread_mutex_lock(&dp->d_stats_lock);
 	sp->fmds_value.ui64++;
 	(void) pthread_mutex_unlock(&dp->d_stats_lock);
+}
+
+void
+fmd_door_server(void *dip)
+{
+	fmd_dprintf(FMD_DBG_XPRT, "door server starting for %p\n", dip);
+	(void) pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+	(void) door_return(NULL, 0, NULL, 0);
+}
+
+/*
+ * Custom door server create callback.  Any fmd services that use doors will
+ * require those threads to have their fmd-specific TSD initialized, etc.
+ */
+static void
+fmd_door(door_info_t *dip)
+{
+	if (fmd_thread_create(fmd.d_rmod, fmd_door_server, dip) == NULL)
+		fmd_panic("failed to create server for door %p", (void *)dip);
 }
 
 /*
@@ -637,6 +691,7 @@ fmd_run(fmd_t *dp, int pfd)
 	int status = FMD_EXIT_SUCCESS;
 	const char *name;
 	fmd_conf_path_t *pap;
+	fmd_event_t *e;
 	int dbout;
 
 	/*
@@ -661,22 +716,29 @@ fmd_run(fmd_t *dp, int pfd)
 		dp->d_hdl_dbout = dbout;
 
 	/*
-	 * Initialize remaining major program data structures such as the event
-	 * transport, dispatch queues, log files, module hash collections, etc.
+	 * Initialize remaining major program data structures such as the
+	 * clock, dispatch queues, log files, module hash collections, etc.
 	 * This work is done here rather than in fmd_create() to permit the -o
 	 * command-line option to modify properties after fmd_create() is done.
-	 * Note that our event transport will remain blocked until we broadcast
-	 * to threads blocked on d_xprt_cv at the end of this function.
 	 */
 	dp->d_clockptr = dp->d_clockops->fto_init();
-	fmd_transport_init();
-	fmd_rpc_init();
+	dp->d_xprt_ids = fmd_idspace_create("xprt_ids", 1, INT_MAX);
+	fmd_xprt_suspend_all();
+
+	(void) door_server_create(fmd_door);
 	fmd_dr_init();
 
 	dp->d_rmod->mod_timerids = fmd_idspace_create(dp->d_pname, 1, 16);
 	dp->d_timers = fmd_timerq_create();
 	dp->d_disp = fmd_dispq_create();
 	dp->d_cases = fmd_case_hash_create();
+
+	/*
+	 * The root module's mod_queue is created with limit zero, making it
+	 * act like /dev/null; anything inserted here is simply ignored.
+	 */
+	dp->d_rmod->mod_queue = fmd_eventq_create(dp->d_rmod,
+	    &dp->d_rmod->mod_stats->ms_evqstat, &dp->d_rmod->mod_stats_lock, 0);
 
 	/*
 	 * Once our subsystems that use signals have been set up, install the
@@ -716,27 +778,58 @@ fmd_run(fmd_t *dp, int pfd)
 	if (dp->d_asrus == NULL || dp->d_errlog == NULL || dp->d_fltlog == NULL)
 		fmd_error(EFMD_EXIT, "failed to initialize log files\n");
 
+	/*
+	 * Before loading modules, create an empty control event which will act
+	 * as a global barrier for module event processing.  Each module we
+	 * load successfully will insert it at their head of their event queue,
+	 * and then pause inside of fmd_ctl_rele() after dequeuing the event.
+	 * This module barrier is required for two reasons:
+	 *
+	 * (a) During module loading, the restoration of case checkpoints may
+	 *    result in a list.* event being recreated for which the intended
+	 *    subscriber has not yet loaded depending on the load order. Such
+	 *    events could then result in spurious "no subscriber" errors.
+	 *
+	 * (b) During errlog replay, a sequence of errors from a long time ago
+	 *    may be replayed, and the module may attempt to install relative
+	 *    timers associated with one or more of these events.  If errlog
+	 *    replay were "racing" with active module threads, an event E1
+	 *    that resulted in a relative timer T at time E1 + N nsec could
+	 *    fire prior to an event E2 being enqueued, even if the relative
+	 *    time ordering was E1 < E2 < E1 + N, causing mis-diagnosis.
+	 */
+	dp->d_mod_event = e = fmd_event_create(FMD_EVT_CTL,
+	    FMD_HRT_NOW, NULL, fmd_ctl_init(NULL));
+
+	fmd_event_hold(e);
+
+	/*
+	 * Once all data structures are initialized, we load all of our modules
+	 * in order according to class in order to load up any subscriptions.
+	 * Once built-in modules are loaded, we detach from our waiting parent.
+	 */
 	dp->d_mod_hash = fmd_modhash_create();
+
+	if (fmd_builtin_loadall(dp->d_mod_hash) != 0 && !dp->d_fg)
+		fmd_error(EFMD_EXIT, "failed to initialize fault manager\n");
+
+	(void) fmd_conf_getprop(dp->d_conf, "self.name", &name);
+	dp->d_self = fmd_modhash_lookup(dp->d_mod_hash, name);
+
+	if (dp->d_self != NULL && fmd_module_dc_key2code(dp->d_self,
+	    nodc_key, nodc_str, sizeof (nodc_str)) == 0)
+		(void) fmd_conf_setprop(dp->d_conf, "nodiagcode", nodc_str);
+
+	fmd_rpc_init();
 	dp->d_running = 1; /* we are now officially an active fmd */
 
 	/*
 	 * Now that we're running, if a pipe fd was specified, write an exit
 	 * status to it to indicate that our parent process can safely detach.
+	 * Then proceed to loading the remaining non-built-in modules.
 	 */
 	if (pfd >= 0)
 		(void) write(pfd, &status, sizeof (status));
-
-	/*
-	 * Once all data structures are initialized, we load all of our modules
-	 * in order according to class in order to load up any subscriptions.
-	 */
-	fmd_builtin_loadall(dp->d_mod_hash);
-	(void) fmd_conf_getprop(dp->d_conf, "self.name", &name);
-	dp->d_self = fmd_modhash_lookup(dp->d_mod_hash, name);
-
-	if (fmd_module_dc_key2code(dp->d_self,
-	    nodc_key, nodc_str, sizeof (nodc_str)) == 0)
-		(void) fmd_conf_setprop(dp->d_conf, "nodiagcode", nodc_str);
 
 	(void) fmd_conf_getprop(dp->d_conf, "plugin.path", &pap);
 	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_rtld_ops);
@@ -745,33 +838,29 @@ fmd_run(fmd_t *dp, int pfd)
 	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_proc_ops);
 
 	/*
-	 * Before activating the inbound event transport, we first replay any
-	 * fault events from the ASRU cache, any case events from the case hash
-	 * associated with restored case checkpoints, and any error events from
-	 * the errlog that did not finish processing the last time we ran. Then
-	 * we replay any pending events from the event transport itself.
+	 * With all modules loaded, replay fault events from the ASRU cache for
+	 * any ASRUs that must be retired, replay error events from the errlog
+	 * that did not finish processing the last time ran, and then release
+	 * the global module barrier by executing a final rele on d_mod_event.
 	 */
 	fmd_asru_hash_refresh(dp->d_asrus);
-	fmd_case_hash_refresh(dp->d_cases);
 
 	(void) pthread_rwlock_rdlock(&dp->d_log_lock);
 	fmd_log_replay(dp->d_errlog, (fmd_log_f *)fmd_err_replay, dp);
 	fmd_log_update(dp->d_errlog);
 	(void) pthread_rwlock_unlock(&dp->d_log_lock);
 
-	fmd_transport_replay();
+	dp->d_mod_event = NULL;
+	fmd_event_rele(e);
 
 	/*
 	 * Finally, awaken any threads associated with receiving events from
-	 * our main ereport event transport that are sleeping on d_xprt_wait.
+	 * open transports and tell them to proceed with fmd_xprt_recv().
 	 */
-	(void) pthread_mutex_lock(&dp->d_xprt_lock);
-	ASSERT(dp->d_xprt_wait != 0);
-	dp->d_xprt_wait--;
-	(void) pthread_mutex_unlock(&dp->d_xprt_lock);
-	(void) pthread_cond_broadcast(&dp->d_xprt_cv);
-
+	fmd_xprt_resume_all();
 	fmd_gc(dp, 0, 0);
+
+	dp->d_booted = 1;
 }
 
 void

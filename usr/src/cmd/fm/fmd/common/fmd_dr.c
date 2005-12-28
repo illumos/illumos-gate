@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@
 #include <sys/sysevent/eventdefs.h>
 
 #include <stdio.h>
+#include <unistd.h>
 #include <libsysevent.h>
 
 #undef MUTEX_HELD
@@ -70,18 +71,13 @@ fmd_dr_event(sysevent_t *sep)
 	TRACE((FMD_DBG_XPRT, "dr event %p, gen=%llu", (void *)sep, gen));
 }
 
-/*
- * Initialize DR event subscription.  Note: sysevent_bind_handle() calls
- * door_create() internally.  Door servers in fmd must be setup as fmd threads,
- * and fmd_transport_init() already calls door_server_create() for us.  We
- * therefore rely on fmd_transport_init() being called before fmd_dr_init().
- */
 void
 fmd_dr_init(void)
 {
 	const char *subclass = ESC_DR_AP_STATE_CHANGE;
 
-	ASSERT(fmd.d_xprt_chan != NULL); /* fmd_transport_init() has happened */
+	if (geteuid() != 0)
+		return; /* legacy sysevent mechanism is still root-only */
 
 	if ((fmd.d_dr_hdl = sysevent_bind_handle(fmd_dr_event)) == NULL)
 		fmd_error(EFMD_EXIT, "failed to bind handle for DR sysevent");

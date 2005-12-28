@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +85,7 @@ extern fmd_stat_t *fmd_ustat_insert(fmd_ustat_t *,
     uint_t, uint_t, fmd_stat_t *, fmd_stat_t **);
 
 extern void fmd_ustat_delete(fmd_ustat_t *, uint_t, fmd_stat_t *);
+extern void fmd_ustat_delete_references(fmd_ustat_t *);
 
 #ifdef	__cplusplus
 }

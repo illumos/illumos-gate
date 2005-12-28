@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,7 +47,9 @@ enum fmd_adm_error {
 	FMD_ADM_ERR_ROTFAIL,
 	FMD_ADM_ERR_ROTBUSY,
 	FMD_ADM_ERR_CASESRCH,
-	FMD_ADM_ERR_CASEOPEN
+	FMD_ADM_ERR_CASEOPEN,
+	FMD_ADM_ERR_XPRTSRCH,
+	FMD_ADM_ERR_CASEXPRT
 };
 
 struct fmd_rpc_modstat {
@@ -102,6 +105,12 @@ struct fmd_rpc_serdlist {
 	uint32_t rsl_len;
 };
 
+struct fmd_rpc_xprtlist {
+	int32_t rxl_buf<>;
+	uint32_t rxl_len;
+	enum fmd_adm_error rxl_err;
+};
+
 program FMD_ADM {
 	version FMD_ADM_VERSION_1 {
 		struct fmd_rpc_modlist FMD_ADM_MODINFO(void) = 1;
@@ -120,6 +129,8 @@ program FMD_ADM {
 		int FMD_ADM_SERDRESET(string, string) = 14;
 		int FMD_ADM_LOGROTATE(string) = 15;
 		int FMD_ADM_CASEREPAIR(string) = 16;
+		struct fmd_rpc_xprtlist FMD_ADM_XPRTLIST(void) = 17;
+		struct fmd_rpc_modstat FMD_ADM_XPRTSTAT(int32_t) = 18;
 	} = 1;
 } = 100169;
 

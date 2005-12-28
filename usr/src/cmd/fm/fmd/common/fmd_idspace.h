@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,8 +45,10 @@ typedef struct fmd_idelem {
 typedef struct fmd_idspace {
 	char ids_name[32];		/* string name of idspace for debug */
 	pthread_mutex_t ids_lock;	/* lock protecting idspace contents */
+	pthread_cond_t ids_cv;		/* condition variable for waiters */
 	fmd_idelem_t **ids_hash;	/* hash bucket array of fmd_idelems */
 	uint_t ids_hashlen;		/* size of hash bucket array */
+	uint_t ids_refs;		/* reference count for idspace_hold */
 	id_t ids_nextid;		/* next identifier guess for alloc */
 	id_t ids_minid;			/* minimum identifier value */
 	id_t ids_maxid;			/* maximum identifier value */
@@ -55,7 +57,8 @@ typedef struct fmd_idspace {
 
 extern fmd_idspace_t *fmd_idspace_create(const char *, id_t, id_t);
 extern void fmd_idspace_destroy(fmd_idspace_t *);
-extern void fmd_idspace_apply(fmd_idspace_t *, void (*)(void *, id_t), void *);
+extern void fmd_idspace_apply(fmd_idspace_t *,
+    void (*)(fmd_idspace_t *, id_t, void *), void *);
 
 extern void *fmd_idspace_getspecific(fmd_idspace_t *, id_t);
 extern void fmd_idspace_setspecific(fmd_idspace_t *, id_t, void *);
@@ -64,7 +67,11 @@ extern int fmd_idspace_valid(fmd_idspace_t *, id_t);
 
 extern id_t fmd_idspace_xalloc(fmd_idspace_t *, id_t, void *);
 extern id_t fmd_idspace_alloc(fmd_idspace_t *, void *);
+extern id_t fmd_idspace_alloc_min(fmd_idspace_t *, void *);
 extern void *fmd_idspace_free(fmd_idspace_t *, id_t);
+
+extern void *fmd_idspace_hold(fmd_idspace_t *, id_t);
+extern void fmd_idspace_rele(fmd_idspace_t *, id_t);
 
 #ifdef	__cplusplus
 }

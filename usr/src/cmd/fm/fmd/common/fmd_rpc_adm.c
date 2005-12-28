@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,8 @@
 #include <fmd_ckpt.h>
 #include <fmd_case.h>
 #include <fmd_fmri.h>
+#include <fmd_idspace.h>
+#include <fmd_xprt.h>
 
 #include <fmd.h>
 
@@ -425,6 +427,7 @@ fmd_adm_rsrcinfo_1_svc(char *fmri,
     struct fmd_rpc_rsrcinfo *rvp, struct svc_req *req)
 {
 	fmd_asru_t *ap;
+	fmd_case_impl_t *cip;
 	int state;
 
 	bzero(rvp, sizeof (struct fmd_rpc_rsrcinfo));
@@ -441,10 +444,11 @@ fmd_adm_rsrcinfo_1_svc(char *fmri,
 
 	state = fmd_asru_getstate(ap);
 	(void) pthread_mutex_lock(&ap->asru_lock);
+	cip = (fmd_case_impl_t *)ap->asru_case;
 
 	rvp->rri_fmri = strdup(ap->asru_name);
 	rvp->rri_uuid = strdup(ap->asru_uuid);
-	rvp->rri_case = ap->asru_case ? strdup(ap->asru_case) : NULL;
+	rvp->rri_case = cip ? strdup(cip->ci_uuid) : NULL;
 	rvp->rri_faulty = (state & FMD_ASRU_FAULTY) != 0;
 	rvp->rri_unusable = (state & FMD_ASRU_UNUSABLE) != 0;
 	rvp->rri_invisible = (ap->asru_flags & FMD_ASRU_INVISIBLE) != 0;
@@ -471,34 +475,12 @@ fmd_adm_rsrcflush_1_svc(char *name, int *rvp, struct svc_req *req)
 	return (TRUE);
 }
 
-static int
-fmd_adm_repair(fmd_asru_t *ap)
-{
-	fmd_case_t *cp;
-	uint_t cidlen;
-	char *cid;
-
-	if (!fmd_asru_clrflags(ap, FMD_ASRU_FAULTY, NULL, NULL))
-		return (FMD_ADM_ERR_RSRCNOTF);
-
-	(void) fmd_conf_getprop(fmd.d_conf, "uuidlen", &cidlen);
-	cid = alloca(cidlen + 1);
-	(void) fmd_asru_getcase(ap, cid, cidlen + 1);
-
-	if ((cp = fmd_case_hash_lookup(fmd.d_cases, cid)) != NULL) {
-		fmd_case_update(cp);
-		fmd_case_rele(cp);
-	}
-
-	return (0);
-}
-
 static void
 fmd_adm_repair_containee(fmd_asru_t *ee, void *er)
 {
 	if ((ee->asru_flags & FMD_ASRU_FAULTY) &&
 	    fmd_fmri_contains(er, ee->asru_fmri) > 0)
-		(void) fmd_adm_repair(ee);
+		(void) fmd_asru_clrflags(ee, FMD_ASRU_FAULTY, NULL, NULL);
 }
 
 bool_t
@@ -511,7 +493,9 @@ fmd_adm_rsrcrepair_1_svc(char *name, int *rvp, struct svc_req *req)
 		err = FMD_ADM_ERR_PERM;
 	else if ((ap = fmd_asru_hash_lookup_name(fmd.d_asrus, name)) == NULL)
 		err = FMD_ADM_ERR_RSRCSRCH;
-	else if ((err = fmd_adm_repair(ap)) == 0) {
+	else if (!fmd_asru_clrflags(ap, FMD_ASRU_FAULTY, NULL, NULL))
+		err = FMD_ADM_ERR_RSRCNOTF;
+	else {
 		/*
 		 * We've located the requested ASRU, and have repaired it.  Now
 		 * traverse the ASRU cache, looking for any faulty entries that
@@ -683,35 +667,18 @@ fmd_adm_logrotate_1_svc(char *name, int *rvp, struct svc_req *req)
 	return (TRUE);
 }
 
-struct fmd_adm_repair {
-	const char *rep_uuid;	/* case uuid that we are using to match */
-	char *rep_buf;		/* buffer in which to store case ids */
-	uint_t rep_buflen;	/* length of rep_buf buffer minus one */
-	uint_t rep_cnt;		/* number of matching asrus found */
-};
-
+/*
+ * If the case associated with this ASRU matches our input case, close all
+ * ASRUs contained by 'ap' and trigger appropriate case close events.
+ */
 static void
-fmd_adm_caserepair_asru(fmd_asru_t *ap, void *arg)
+fmd_adm_caserepair_asru(fmd_asru_t *ap, void *cp)
 {
-	struct fmd_adm_repair *rp = arg;
-
-	if (fmd_asru_getcase(ap, rp->rep_buf, rp->rep_buflen + 1) == NULL ||
-	    strcmp(rp->rep_buf, rp->rep_uuid) != 0)
-		return;
-
-	/*
-	 * If the UUID of the case associated with this ASRU matches, close all
-	 * ASRUs contained by 'ap' and trigger appropriate case close events.
-	 */
-	fmd_asru_hash_apply(fmd.d_asrus,
-	    fmd_adm_repair_containee, ap->asru_fmri);
-
-	/*
-	 * We can call fmd_asru_clrflags() here rather than fmd_adm_repair()
-	 * because if the case was still open, fmd_case_repair() closed it.
-	 */
-	(void) fmd_asru_clrflags(ap, FMD_ASRU_FAULTY, NULL, NULL);
-	rp->rep_cnt++;
+	if (ap->asru_case == cp) {
+		fmd_asru_hash_apply(fmd.d_asrus,
+		    fmd_adm_repair_containee, ap->asru_fmri);
+		(void) fmd_asru_clrflags(ap, FMD_ASRU_FAULTY, NULL, NULL);
+	}
 }
 
 bool_t
@@ -724,34 +691,113 @@ fmd_adm_caserepair_1_svc(char *uuid, int *rvp, struct svc_req *req)
 		err = FMD_ADM_ERR_PERM;
 	else if ((cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) == NULL)
 		err = FMD_ADM_ERR_CASESRCH;
-	else if (fmd_case_repair(cp) != 0)
-		err = FMD_ADM_ERR_CASEOPEN;
-
-	/*
-	 * If the case is not found, it could be already closed (i.e. the ASRU
-	 * was successfully offlined).  Check all ASRUs for a matching UUID and
-	 * try to repair them.  If any are found, set err to indicate success.
-	 * If the case is found, we also check all ASRUs so that any ASRUs
-	 * contained by those that have been repaired are repaired recursively.
-	 */
-	if (err == FMD_ADM_ERR_CASESRCH || err == 0) {
-		struct fmd_adm_repair r;
-
-		r.rep_uuid = uuid;
-		(void) fmd_conf_getprop(fmd.d_conf, "uuidlen", &r.rep_buflen);
-		r.rep_buf = alloca(r.rep_buflen + 1);
-		r.rep_cnt = 0;
-
-		fmd_asru_hash_apply(fmd.d_asrus, fmd_adm_caserepair_asru, &r);
-
-		if (err == FMD_ADM_ERR_CASESRCH && r.rep_cnt != 0)
-			err = 0; /* one or more ASRUs had matching case IDs */
+	else if (fmd_case_repair(cp) == 0)
+		fmd_asru_hash_apply(fmd.d_asrus, fmd_adm_caserepair_asru, cp);
+	else {
+		err = errno == EFMD_CASE_OWNER ?
+		    FMD_ADM_ERR_CASEXPRT : FMD_ADM_ERR_CASEOPEN;
 	}
 
 	if (cp != NULL)
 		fmd_case_rele(cp);
 
 	*rvp = err;
+	return (TRUE);
+}
+
+/*ARGSUSED*/
+static void
+fmd_adm_xprtlist_one(fmd_idspace_t *ids, id_t id, void *arg)
+{
+	struct fmd_rpc_xprtlist *rvp = arg;
+
+	if (rvp->rxl_len < rvp->rxl_buf.rxl_buf_len)
+		rvp->rxl_buf.rxl_buf_val[rvp->rxl_len++] = id;
+}
+
+bool_t
+fmd_adm_xprtlist_1_svc(struct fmd_rpc_xprtlist *rvp, struct svc_req *req)
+{
+	if (fmd_rpc_deny(req)) {
+		rvp->rxl_buf.rxl_buf_len = 0;
+		rvp->rxl_buf.rxl_buf_val = NULL;
+		rvp->rxl_len = 0;
+		rvp->rxl_err = FMD_ADM_ERR_PERM;
+		return (TRUE);
+	}
+
+	/*
+	 * Since we're taking a snapshot of the transports, and these could
+	 * change after we return our result, there's no need to hold any kind
+	 * of lock between retrieving ids_count and taking the snapshot.  We'll
+	 * just capture up to a maximum of whatever ids_count value we sampled.
+	 */
+	rvp->rxl_buf.rxl_buf_len = fmd.d_xprt_ids->ids_count;
+	rvp->rxl_buf.rxl_buf_val = malloc(sizeof (int32_t) *
+	    rvp->rxl_buf.rxl_buf_len);
+	rvp->rxl_len = 0;
+	rvp->rxl_err = 0;
+
+	if (rvp->rxl_buf.rxl_buf_val == NULL) {
+		rvp->rxl_err = FMD_ADM_ERR_NOMEM;
+		return (TRUE);
+	}
+
+	fmd_idspace_apply(fmd.d_xprt_ids, fmd_adm_xprtlist_one, rvp);
+	return (TRUE);
+}
+
+bool_t
+fmd_adm_xprtstat_1_svc(int32_t id,
+    struct fmd_rpc_modstat *rms, struct svc_req *req)
+{
+	fmd_xprt_impl_t *xip;
+	fmd_stat_t *sp, *ep, *cp;
+
+	if (fmd_rpc_deny(req)) {
+		rms->rms_buf.rms_buf_val = NULL;
+		rms->rms_buf.rms_buf_len = 0;
+		rms->rms_err = FMD_ADM_ERR_PERM;
+		return (TRUE);
+	}
+
+	rms->rms_buf.rms_buf_val = malloc(sizeof (fmd_xprt_stat_t));
+	rms->rms_buf.rms_buf_len = sizeof (fmd_xprt_stat_t) /
+	    sizeof (fmd_stat_t);
+	rms->rms_err = 0;
+
+	if (rms->rms_buf.rms_buf_val == NULL) {
+		rms->rms_err = FMD_ADM_ERR_NOMEM;
+		rms->rms_buf.rms_buf_len = 0;
+		return (TRUE);
+	}
+
+	if ((xip = fmd_idspace_hold(fmd.d_xprt_ids, id)) == NULL) {
+		rms->rms_err = FMD_ADM_ERR_XPRTSRCH;
+		return (TRUE);
+	}
+
+	/*
+	 * Grab the stats lock and bcopy the entire transport stats array in
+	 * one shot. Then go back through and duplicate any string values.
+	 */
+	(void) pthread_mutex_lock(&xip->xi_stats_lock);
+
+	sp = (fmd_stat_t *)xip->xi_stats;
+	ep = sp + rms->rms_buf.rms_buf_len;
+	cp = rms->rms_buf.rms_buf_val;
+
+	bcopy(sp, cp, sizeof (fmd_xprt_stat_t));
+
+	for (; sp < ep; sp++, cp++) {
+		if (sp->fmds_type == FMD_TYPE_STRING &&
+		    sp->fmds_value.str != NULL)
+			cp->fmds_value.str = strdup(sp->fmds_value.str);
+	}
+
+	(void) pthread_mutex_unlock(&xip->xi_stats_lock);
+	fmd_idspace_rele(fmd.d_xprt_ids, id);
+
 	return (TRUE);
 }
 

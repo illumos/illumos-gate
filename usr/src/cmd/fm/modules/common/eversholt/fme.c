@@ -56,7 +56,6 @@
 #include "platform.h"
 
 /* imported from eft.c... */
-extern int Autoconvict;
 extern char *Autoclose;
 extern hrtime_t Hesitate;
 extern nv_alloc_t Eft_nv_hdl;
@@ -1698,17 +1697,6 @@ publish_suspects(struct fme *fmep)
 	fmd_case_solve(fmep->hdl, fmep->fmcase);
 	out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
 	    fmd_case_uuid(fmep->hdl, fmep->fmcase));
-
-	if (Autoconvict) {
-		for (rp = srl; rp <= erl; rp++) {
-			if (rp->suspect == NULL)
-				continue;
-			fmd_case_convict(fmep->hdl,
-			    fmep->fmcase, rp->suspect->fault);
-		}
-		out(O_ALTFP, "[convicting FME%d, case %s]", fmep->id,
-		    fmd_case_uuid(fmep->hdl, fmep->fmcase));
-	}
 
 	/*
 	 * revert to the original suspect list

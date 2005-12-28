@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,12 +34,45 @@
 #include <fmd_subr.h>
 #include <fmd_event.h>
 #include <fmd_string.h>
+#include <fmd_module.h>
 #include <fmd_case.h>
 #include <fmd_log.h>
 #include <fmd_time.h>
 #include <fmd_ctl.h>
 
 #include <fmd.h>
+
+static void
+fmd_event_nvwrap(fmd_event_impl_t *ep)
+{
+	(void) nvlist_remove_all(ep->ev_nvl, FMD_EVN_TTL);
+	(void) nvlist_remove_all(ep->ev_nvl, FMD_EVN_TOD);
+
+	(void) nvlist_add_uint8(ep->ev_nvl,
+	    FMD_EVN_TTL, ep->ev_ttl);
+	(void) nvlist_add_uint64_array(ep->ev_nvl,
+	    FMD_EVN_TOD, (uint64_t *)&ep->ev_time, 2);
+}
+
+static void
+fmd_event_nvunwrap(fmd_event_impl_t *ep, const fmd_timeval_t *tp)
+{
+	uint64_t *tod;
+	uint_t n;
+
+	if (nvlist_lookup_uint8(ep->ev_nvl, FMD_EVN_TTL, &ep->ev_ttl) != 0) {
+		ep->ev_flags |= FMD_EVF_LOCAL;
+		ep->ev_ttl = (uint8_t)fmd.d_xprt_ttl;
+	}
+
+	if (tp != NULL)
+		ep->ev_time = *tp;
+	else if (nvlist_lookup_uint64_array(ep->ev_nvl,
+	    FMD_EVN_TOD, &tod, &n) == 0 && n >= 2)
+		ep->ev_time = *(const fmd_timeval_t *)tod;
+	else
+		fmd_time_sync(&ep->ev_time, &ep->ev_hrt, 1);
+}
 
 fmd_event_t *
 fmd_event_recreate(uint_t type, const fmd_timeval_t *tp,
@@ -52,15 +86,16 @@ fmd_event_recreate(uint_t type, const fmd_timeval_t *tp,
 	(void) pthread_mutex_init(&ep->ev_lock, NULL);
 	ep->ev_refs = 0;
 	ASSERT(type < FMD_EVT_NTYPES);
-	ep->ev_type = (uint16_t)type;
+	ep->ev_type = (uint8_t)type;
 	ep->ev_state = FMD_EVS_RECEIVED;
 	ep->ev_flags = FMD_EVF_REPLAY;
 	ep->ev_nvl = nvl;
 	ep->ev_data = data;
-	ep->ev_time = *tp;
 	ep->ev_log = lp;
 	ep->ev_off = off;
 	ep->ev_len = len;
+
+	fmd_event_nvunwrap(ep, tp);
 
 	/*
 	 * If we're not restoring from a log, the event is marked volatile.  If
@@ -79,11 +114,12 @@ fmd_event_recreate(uint_t type, const fmd_timeval_t *tp,
 
 	/*
 	 * Sample a (TOD, hrtime) pair from the current system clocks and then
-	 * compute ev_hrt by taking the delta between TOD and the input 'tp'.
+	 * compute ev_hrt by taking the delta between this TOD and ev_time.
 	 */
 	fmd_time_sync(&tod, &hr0, 1);
-	fmd_time_tod2hrt(hr0, &tod, tp, &ep->ev_hrt);
+	fmd_time_tod2hrt(hr0, &tod, &ep->ev_time, &ep->ev_hrt);
 
+	fmd_event_nvwrap(ep);
 	return ((fmd_event_t *)ep);
 }
 
@@ -100,9 +136,10 @@ fmd_event_create(uint_t type, hrtime_t hrt, nvlist_t *nvl, void *data)
 	(void) pthread_mutex_init(&ep->ev_lock, NULL);
 	ep->ev_refs = 0;
 	ASSERT(type < FMD_EVT_NTYPES);
-	ep->ev_type = (uint16_t)type;
+	ep->ev_type = (uint8_t)type;
 	ep->ev_state = FMD_EVS_RECEIVED;
-	ep->ev_flags = FMD_EVF_VOLATILE | FMD_EVF_REPLAY;
+	ep->ev_flags = FMD_EVF_VOLATILE | FMD_EVF_REPLAY | FMD_EVF_LOCAL;
+	ep->ev_ttl = (uint8_t)fmd.d_xprt_ttl;
 	ep->ev_nvl = nvl;
 	ep->ev_data = data;
 	ep->ev_log = NULL;
@@ -132,6 +169,7 @@ fmd_event_create(uint_t type, hrtime_t hrt, nvlist_t *nvl, void *data)
 	fmd_time_hrt2tod(hr0, &tod, hrt, &ep->ev_time);
 	ep->ev_hrt = hrt;
 
+	fmd_event_nvwrap(ep);
 	return ((fmd_event_t *)ep);
 }
 
@@ -169,7 +207,11 @@ fmd_event_destroy(fmd_event_t *e)
 	 * the name-value pair list and underlying event data structure.
 	 */
 	switch (ep->ev_type) {
+	case FMD_EVT_TIMEOUT:
+		fmd_free(ep->ev_data, sizeof (fmd_modtimer_t));
+		break;
 	case FMD_EVT_CLOSE:
+	case FMD_EVT_PUBLISH:
 		fmd_case_rele(ep->ev_data);
 		break;
 	case FMD_EVT_CTL:
@@ -296,7 +338,7 @@ fmd_event_hrtime(fmd_event_t *ep)
 }
 
 int
-fmd_event_match(fmd_event_t *e, uint_t type, void *data)
+fmd_event_match(fmd_event_t *e, uint_t type, const void *data)
 {
 	fmd_event_impl_t *ep = (fmd_event_impl_t *)e;
 

@@ -70,6 +70,7 @@ typedef void fmd_log_f(fmd_log_t *, fmd_event_t *, void *);
 #define	FMD_LOG_ERROR	"error"		/* tag for error log files */
 #define	FMD_LOG_FAULT	"fault"		/* tag for fault log files */
 #define	FMD_LOG_ASRU	"asru"		/* tag for asru log files */
+#define	FMD_LOG_XPRT	"xprt"		/* tag for transport log files */
 
 extern fmd_log_t *fmd_log_tryopen(const char *, const char *, const char *);
 extern fmd_log_t *fmd_log_open(const char *, const char *, const char *);

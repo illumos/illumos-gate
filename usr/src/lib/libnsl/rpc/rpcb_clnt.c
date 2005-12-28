@@ -955,6 +955,8 @@ regular_rpcbind:
 		/* A CLTS type of client - destroy it */
 		CLNT_DESTROY(client);
 		client = NULL;
+		free(parms.r_addr);
+		parms.r_addr = NULL;
 	}
 
 	if (client == NULL) {
@@ -987,6 +989,9 @@ regular_rpcbind:
 				    (char *)&ua, *tp);
 		if (clnt_st == RPC_SUCCESS) {
 			if ((ua == NULL) || (ua[0] == NULL)) {
+				if (ua != NULL)
+					xdr_free(xdr_wrapstring, (char *)&ua);
+
 				/* address unknown */
 				rpc_createerr.cf_stat = RPC_PROGNOTREGISTERED;
 				goto error;

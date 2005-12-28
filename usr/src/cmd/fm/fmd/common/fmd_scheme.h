@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,6 +50,7 @@ typedef struct fmd_scheme_ops {
 	int (*sop_present)(nvlist_t *);
 	int (*sop_unusable)(nvlist_t *);
 	int (*sop_contains)(nvlist_t *, nvlist_t *);
+	nvlist_t *(*sop_translate)(nvlist_t *, nvlist_t *);
 } fmd_scheme_ops_t;
 
 typedef struct fmd_scheme_opd {

@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -35,6 +36,7 @@
 
 static const struct fmd_builtin _fmd_builtins[] = {
 	{ "fmd-self-diagnosis", self_init, self_fini },
+	{ "sysevent-transport", sysev_init, sysev_fini },
 	{ NULL, NULL, NULL }
 };
 
@@ -97,13 +99,20 @@ const fmd_modops_t fmd_bltin_ops = {
 	bltin_init,
 	bltin_fini,
 	fmd_module_dispatch,
+	fmd_module_transport,
 };
 
-void
+int
 fmd_builtin_loadall(fmd_modhash_t *mhp)
 {
 	const fmd_builtin_t *bp;
+	int err = 0;
 
-	for (bp = _fmd_builtins; bp->bltin_name != NULL; bp++)
-		(void) fmd_modhash_load(mhp, bp->bltin_name, &fmd_bltin_ops);
+	for (bp = _fmd_builtins; bp->bltin_name != NULL; bp++) {
+		if (fmd_modhash_load(mhp, bp->bltin_name,
+		    &fmd_bltin_ops) == NULL)
+			err = -1;
+	}
+
+	return (err);
 }

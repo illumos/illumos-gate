@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -99,9 +99,11 @@ fmd_idspace_create(const char *name, id_t min, id_t max)
 
 	(void) strlcpy(ids->ids_name, name, sizeof (ids->ids_name));
 	(void) pthread_mutex_init(&ids->ids_lock, NULL);
+	(void) pthread_cond_init(&ids->ids_cv, NULL);
 
 	ids->ids_hash = fmd_zalloc(sizeof (void *) * hashlen, FMD_SLEEP);
 	ids->ids_hashlen = hashlen;
+	ids->ids_refs = 0;
 	ids->ids_nextid = min - 1;
 	ids->ids_minid = min;
 	ids->ids_maxid = max;
@@ -118,6 +120,9 @@ fmd_idspace_destroy(fmd_idspace_t *ids)
 
 	(void) pthread_mutex_lock(&ids->ids_lock);
 
+	while (ids->ids_refs != 0)
+		(void) pthread_cond_wait(&ids->ids_cv, &ids->ids_lock);
+
 	for (i = 0; i < ids->ids_hashlen; i++) {
 		for (ide = ids->ids_hash[i]; ide != NULL; ide = nde) {
 			nde = ide->ide_next;
@@ -130,7 +135,8 @@ fmd_idspace_destroy(fmd_idspace_t *ids)
 }
 
 void
-fmd_idspace_apply(fmd_idspace_t *ids, void (*func)(void *, id_t), void *arg)
+fmd_idspace_apply(fmd_idspace_t *ids,
+    void (*func)(fmd_idspace_t *, id_t, void *), void *arg)
 {
 	fmd_idelem_t *ide;
 	id_t *ida, *idp;
@@ -149,7 +155,7 @@ fmd_idspace_apply(fmd_idspace_t *ids, void (*func)(void *, id_t), void *arg)
 	(void) pthread_mutex_unlock(&ids->ids_lock);
 
 	for (i = 0; i < count; i++)
-		func(arg, ida[i]);
+		func(ids, ida[i], arg);
 
 	fmd_free(ida, sizeof (id_t) * count);
 }
@@ -190,6 +196,9 @@ fmd_idspace_setspecific(fmd_idspace_t *ids, id_t id, void *data)
 	fmd_idelem_t *ide;
 
 	(void) pthread_mutex_lock(&ids->ids_lock);
+
+	while (ids->ids_refs != 0)
+		(void) pthread_cond_wait(&ids->ids_cv, &ids->ids_lock);
 
 	if ((ide = fmd_idspace_lookup(ids, id)) == NULL) {
 		fmd_panic("idspace %p (%s) does not contain id %ld",
@@ -255,17 +264,15 @@ fmd_idspace_xalloc(fmd_idspace_t *ids, id_t id, void *data)
 	return (id);
 }
 
-id_t
-fmd_idspace_alloc(fmd_idspace_t *ids, void *data)
+static id_t
+fmd_idspace_alloc_locked(fmd_idspace_t *ids, void *data)
 {
 	id_t id;
 
-	(void) pthread_mutex_lock(&ids->ids_lock);
+	ASSERT(MUTEX_HELD(&ids->ids_lock));
 
-	if (ids->ids_count == ids->ids_maxid - ids->ids_minid + 1) {
-		(void) pthread_mutex_unlock(&ids->ids_lock);
+	if (ids->ids_count == ids->ids_maxid - ids->ids_minid + 1)
 		return (fmd_set_errno(ENOSPC));
-	}
 
 	do {
 		if (++ids->ids_nextid > ids->ids_maxid)
@@ -273,7 +280,36 @@ fmd_idspace_alloc(fmd_idspace_t *ids, void *data)
 		id = ids->ids_nextid;
 	} while (fmd_idspace_xalloc_locked(ids, id, data) != id);
 
+	return (id);
+}
+
+id_t
+fmd_idspace_alloc(fmd_idspace_t *ids, void *data)
+{
+	id_t id;
+
+	(void) pthread_mutex_lock(&ids->ids_lock);
+	id = fmd_idspace_alloc_locked(ids, data);
 	(void) pthread_mutex_unlock(&ids->ids_lock);
+
+	return (id);
+}
+
+/*
+ * For the moment, we use a simple but slow implementation: reset ids_nextid to
+ * the minimum id and search in order from there.  If this becomes performance
+ * sensitive we can maintain a freelist of the unallocated identifiers, etc.
+ */
+id_t
+fmd_idspace_alloc_min(fmd_idspace_t *ids, void *data)
+{
+	id_t id;
+
+	(void) pthread_mutex_lock(&ids->ids_lock);
+	ids->ids_nextid = ids->ids_minid - 1;
+	id = fmd_idspace_alloc_locked(ids, data);
+	(void) pthread_mutex_unlock(&ids->ids_lock);
+
 	return (id);
 }
 
@@ -307,4 +343,44 @@ fmd_idspace_free(fmd_idspace_t *ids, id_t id)
 
 	(void) pthread_mutex_unlock(&ids->ids_lock);
 	return (data);
+}
+
+/*
+ * Retrieve the id-specific data for the specified id and place a hold on the
+ * id so that it cannot be or deleted until fmd_idspace_rele(ids, id) is
+ * called.  For simplicity, we now use a single global reference count for all
+ * holds.  If this feature needs to be used in a place where there is high
+ * contention between holders and deleters, the implementation can be modified
+ * to use either a per-hash-bucket or a per-id-element condition variable.
+ */
+void *
+fmd_idspace_hold(fmd_idspace_t *ids, id_t id)
+{
+	fmd_idelem_t *ide;
+	void *data = NULL;
+
+	(void) pthread_mutex_lock(&ids->ids_lock);
+
+	if ((ide = fmd_idspace_lookup(ids, id)) != NULL) {
+		ids->ids_refs++;
+		ASSERT(ids->ids_refs != 0);
+		data = ide->ide_data;
+		ASSERT(data != NULL);
+	}
+
+	(void) pthread_mutex_unlock(&ids->ids_lock);
+	return (data);
+}
+
+void
+fmd_idspace_rele(fmd_idspace_t *ids, id_t id)
+{
+	(void) pthread_mutex_lock(&ids->ids_lock);
+
+	ASSERT(fmd_idspace_lookup(ids, id) != NULL);
+	ASSERT(ids->ids_refs != 0);
+	ids->ids_refs--;
+
+	(void) pthread_cond_broadcast(&ids->ids_cv);
+	(void) pthread_mutex_unlock(&ids->ids_lock);
 }

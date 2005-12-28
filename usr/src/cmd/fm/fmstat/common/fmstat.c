@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,8 +42,16 @@
 #define	FMSTAT_EXIT_USAGE	2
 
 static const struct stats {
+	fmd_stat_t module;
+	fmd_stat_t authority;
+	fmd_stat_t state;
 	fmd_stat_t loadtime;
 	fmd_stat_t snaptime;
+	fmd_stat_t received;
+	fmd_stat_t discarded;
+	fmd_stat_t retried;
+	fmd_stat_t replayed;
+	fmd_stat_t lost;
 	fmd_stat_t dispatched;
 	fmd_stat_t dequeued;
 	fmd_stat_t prdequeued;
@@ -58,22 +67,30 @@ static const struct stats {
 	fmd_stat_t dtime;
 	fmd_stat_t dlastupdate;
 } stats_template = {
-	{ "fmd.loadtime", FMD_TYPE_TIME },
-	{ "fmd.snaptime", FMD_TYPE_TIME },
-	{ "fmd.dispatched", FMD_TYPE_UINT64 },
-	{ "fmd.dequeued", FMD_TYPE_UINT64 },
-	{ "fmd.prdequeued", FMD_TYPE_UINT64 },
-	{ "fmd.accepted", FMD_TYPE_UINT64 },
-	{ "fmd.memtotal", FMD_TYPE_SIZE },
-	{ "fmd.buftotal", FMD_TYPE_SIZE },
-	{ "fmd.caseopen", FMD_TYPE_UINT64 },
-	{ "fmd.casesolved", FMD_TYPE_UINT64 },
-	{ "fmd.wcnt", FMD_TYPE_UINT32 },
-	{ "fmd.wtime", FMD_TYPE_TIME },
-	{ "fmd.wlentime", FMD_TYPE_TIME },
-	{ "fmd.wlastupdate", FMD_TYPE_TIME },
-	{ "fmd.dtime", FMD_TYPE_TIME },
-	{ "fmd.dlastupdate", FMD_TYPE_TIME },
+	{ "module", FMD_TYPE_STRING },
+	{ "authority", FMD_TYPE_STRING },
+	{ "state", FMD_TYPE_STRING },
+	{ "loadtime", FMD_TYPE_TIME },
+	{ "snaptime", FMD_TYPE_TIME },
+	{ "received", FMD_TYPE_UINT64 },
+	{ "discarded", FMD_TYPE_UINT64 },
+	{ "retried", FMD_TYPE_UINT64 },
+	{ "replayed", FMD_TYPE_UINT64 },
+	{ "lost", FMD_TYPE_UINT64 },
+	{ "dispatched", FMD_TYPE_UINT64 },
+	{ "dequeued", FMD_TYPE_UINT64 },
+	{ "prdequeued", FMD_TYPE_UINT64 },
+	{ "accepted", FMD_TYPE_UINT64 },
+	{ "memtotal", FMD_TYPE_SIZE },
+	{ "buftotal", FMD_TYPE_SIZE },
+	{ "caseopen", FMD_TYPE_UINT64 },
+	{ "casesolved", FMD_TYPE_UINT64 },
+	{ "wcnt", FMD_TYPE_UINT32 },
+	{ "wtime", FMD_TYPE_TIME },
+	{ "wlentime", FMD_TYPE_TIME },
+	{ "wlastupdate", FMD_TYPE_TIME },
+	{ "dtime", FMD_TYPE_TIME },
+	{ "dlastupdate", FMD_TYPE_TIME },
 };
 
 static const char *g_pname;
@@ -84,6 +101,13 @@ static struct modstats {
 	struct modstats *m_next;
 	struct stats m_stbuf[2];
 	int m_stidx;
+	int m_id;
+	struct stats *m_old;
+	struct stats *m_new;
+	double m_wait;
+	double m_svc;
+	double m_pct_b;
+	double m_pct_w;
 } *g_mods;
 
 static void
@@ -192,70 +216,72 @@ u64delta(uint64_t old, uint64_t new)
 	return (new >= old ? (new - old) : ((UINT64_MAX - old) + new + 1));
 }
 
-/*ARGSUSED*/
-static int
-stat_one_fmd(const fmd_adm_modinfo_t *ami, void *ignored)
+static struct modstats *
+modstat_create(const char *name, id_t id)
+{
+	struct modstats *mp = malloc(sizeof (struct modstats));
+
+	if (mp == NULL)
+		return (NULL);
+
+	bzero(mp, sizeof (struct modstats));
+
+	if (name != NULL && (mp->m_name = strdup(name)) == NULL) {
+		free(mp);
+		return (NULL);
+	}
+
+	mp->m_id = id;
+	mp->m_next = g_mods;
+	g_mods = mp;
+	return (mp);
+}
+
+/*
+ * Given a statistics buffer containing event queue statistics, compute the
+ * common queue statistics for the given module and store the results in 'mp'.
+ * We set m_new and m_old for the caller, and store the compute values of
+ * m_svc, m_wait, m_pct_w, and m_pct_b there as well.  The caller must not free
+ * 'ams' until after using the results as m_new may contain pointers to it.
+ */
+static void
+modstat_compute(struct modstats *mp, fmd_adm_stats_t *ams)
 {
 	static fmd_stat_t *t_beg = (fmd_stat_t *)(&stats_template + 0);
 	static fmd_stat_t *t_end = (fmd_stat_t *)(&stats_template + 1);
 
-	fmd_stat_t *tsp, *nsp, *sp;
 	struct stats *old, *new;
-	char memsz[8], bufsz[8];
-	double elapsed, wait, avg_w, avg_d, svc, pct_b, pct_w;
+	fmd_stat_t *tsp, *nsp, *sp;
+	double elapsed, avg_w, avg_d;
 	uint64_t delta;
 
-	fmd_adm_stats_t ams;
-	struct modstats *mp;
-	char *name;
-
-	/*
-	 * Take a snapshot of the statistics for this module and then set up
-	 * 'old' and 'new' to point to the rotating persistent m_stbuf structs.
-	 * If no matching module is found on our g_mods list, add a new module.
-	 */
-	if (fmd_adm_module_stats(g_adm, ami->ami_name, &ams) != 0) {
-		warn("failed to retrieve statistics for %s", ami->ami_name);
-		return (0); /* continue on to the next module */
-	}
-
-	for (mp = g_mods; mp != NULL; mp = mp->m_next) {
-		if (strcmp(mp->m_name, ami->ami_name) == 0)
-			break;
-	}
-
-	if (mp == NULL) {
-		if ((mp = malloc(sizeof (struct modstats))) == NULL ||
-		    (name = strdup(ami->ami_name)) == NULL) {
-			warn("failed to allocate memory for %s", ami->ami_name);
-			(void) fmd_adm_stats_free(g_adm, &ams);
-			free(mp);
-			return (0);
-		}
-
-		bzero(mp, sizeof (struct modstats));
-		mp->m_name = name;
-		mp->m_next = g_mods;
-		g_mods = mp;
-	}
-
-	old = &mp->m_stbuf[mp->m_stidx];
+	old = mp->m_old = &mp->m_stbuf[mp->m_stidx];
 	mp->m_stidx = 1 - mp->m_stidx;
-	new = &mp->m_stbuf[mp->m_stidx];
+	new = mp->m_new = &mp->m_stbuf[mp->m_stidx];
 
 	/*
 	 * The statistics can come in any order; we compare each one to the
 	 * template of statistics of interest, find the matching ones, and copy
 	 * their values into the appropriate slot of the 'new' stats.
 	 */
-	for (nsp = ams.ams_buf; nsp < ams.ams_buf + ams.ams_len; nsp++) {
+	for (nsp = ams->ams_buf; nsp < ams->ams_buf + ams->ams_len; nsp++) {
 		for (tsp = t_beg; tsp < t_end; tsp++) {
-			if (strcmp(tsp->fmds_name, nsp->fmds_name) != 0)
-				continue; /* continue until we match the name */
+			const char *p = strrchr(nsp->fmds_name, '.');
+
+			/*
+			 * The fmd queue stats can either be named fmd.<name>
+			 * or fmd.xprt.%u.<name> depending on whether we're
+			 * looking at the module queue or the transport queue.
+			 * So we match using the patterns fmd.* and *.<name>
+			 * and store only the value of <name> in stats_template.
+			 */
+			if (p == NULL || strcmp(p + 1, tsp->fmds_name) != 0 ||
+			    strncmp(nsp->fmds_name, "fmd.", 4) != 0)
+				continue; /* continue until we match the stat */
 
 			if (tsp->fmds_type != nsp->fmds_type) {
 				warn("%s has unexpected type (%u != %u)\n",
-				    tsp->fmds_name, tsp->fmds_type,
+				    nsp->fmds_name, tsp->fmds_type,
 				    nsp->fmds_type);
 			} else {
 				sp = (fmd_stat_t *)new + (tsp - t_beg);
@@ -283,9 +309,9 @@ stat_one_fmd(const fmd_adm_modinfo_t *ami, void *ignored)
 	    new->wlentime.fmds_value.ui64);
 
 	if (delta != 0)
-		wait = (double)delta / elapsed;
+		mp->m_wait = (double)delta / elapsed;
 	else
-		wait = 0.0;
+		mp->m_wait = 0.0;
 
 	/*
 	 * Compute average wait time by taking the delta in the wait queue time
@@ -317,7 +343,7 @@ stat_one_fmd(const fmd_adm_modinfo_t *ami, void *ignored)
 	 * Finally compute the average overall service time by adding together
 	 * the average wait and dispatch times and converting to milliseconds.
 	 */
-	svc = ((avg_w + avg_d) * (double)MILLISEC) / (double)NANOSEC;
+	mp->m_svc = ((avg_w + avg_d) * (double)MILLISEC) / (double)NANOSEC;
 
 	/*
 	 * Compute the %wait and %busy times by taking the delta in wait and
@@ -327,33 +353,160 @@ stat_one_fmd(const fmd_adm_modinfo_t *ami, void *ignored)
 	    new->wtime.fmds_value.ui64);
 
 	if (delta != 0)
-		pct_w = ((double)delta / elapsed) * 100.0;
+		mp->m_pct_w = ((double)delta / elapsed) * 100.0;
 	else
-		pct_w = 0.0;
+		mp->m_pct_w = 0.0;
 
 	delta = u64delta(old->dtime.fmds_value.ui64,
 	    new->dtime.fmds_value.ui64);
 
 	if (delta != 0)
-		pct_b = ((double)delta / elapsed) * 100.0;
+		mp->m_pct_b = ((double)delta / elapsed) * 100.0;
 	else
-		pct_b = 0.0;
+		mp->m_pct_b = 0.0;
+}
 
-	/*
-	 * Print the formatted line of statistics for this module based on
-	 * our calculations, and then free the statistics we sampled.
-	 */
+/*ARGSUSED*/
+static int
+stat_one_xprt(id_t id, void *ignored)
+{
+	fmd_adm_stats_t ams;
+	struct modstats *mp;
+
+	if (fmd_adm_xprt_stats(g_adm, id, &ams) != 0) {
+		warn("failed to retrieve statistics for transport %d", (int)id);
+		return (0); /* continue on to the next transport */
+	}
+
+	for (mp = g_mods; mp != NULL; mp = mp->m_next) {
+		if (mp->m_id == id)
+			break;
+	}
+
+	if (mp == NULL && (mp = modstat_create(NULL, id)) == NULL) {
+		warn("failed to allocate memory for transport %d", (int)id);
+		(void) fmd_adm_stats_free(g_adm, &ams);
+		return (0);
+	}
+
+	modstat_compute(mp, &ams);
+
+	(void) printf("%3d %5s %7llu %7llu %7llu %7llu "
+	    "%4.1f %6.1f %3.0f %3.0f %s\n", (int)id,
+	    mp->m_new->state.fmds_value.str,
+	    u64delta(mp->m_old->prdequeued.fmds_value.ui64,
+	    mp->m_new->prdequeued.fmds_value.ui64),
+	    u64delta(mp->m_old->received.fmds_value.ui64,
+	    mp->m_new->received.fmds_value.ui64),
+	    u64delta(mp->m_old->discarded.fmds_value.ui64,
+	    mp->m_new->discarded.fmds_value.ui64),
+	    u64delta(mp->m_old->lost.fmds_value.ui64,
+	    mp->m_new->lost.fmds_value.ui64),
+	    mp->m_wait, mp->m_svc, mp->m_pct_w, mp->m_pct_b,
+	    mp->m_new->module.fmds_value.str);
+
+	(void) fmd_adm_stats_free(g_adm, &ams);
+	return (0);
+}
+
+static void
+stat_xprt(void)
+{
+	(void) printf("%3s %5s %7s %7s %7s %7s %4s %6s %3s %3s %s\n",
+	    "id", "state", "ev_send", "ev_recv", "ev_drop", "ev_lost",
+	    "wait", "svc_t", "%w", "%b", "module");
+
+	if (fmd_adm_xprt_iter(g_adm, stat_one_xprt, NULL) != 0)
+		die("failed to retrieve list of transports");
+}
+
+static int
+stat_one_xprt_auth(id_t id, void *arg)
+{
+	const char *module = arg;
+	fmd_adm_stats_t ams;
+	struct modstats *mp;
+
+	if (fmd_adm_xprt_stats(g_adm, id, &ams) != 0) {
+		warn("failed to retrieve statistics for transport %d", (int)id);
+		return (0); /* continue on to the next transport */
+	}
+
+	for (mp = g_mods; mp != NULL; mp = mp->m_next) {
+		if (mp->m_id == id)
+			break;
+	}
+
+	if (mp == NULL && (mp = modstat_create(NULL, id)) == NULL) {
+		warn("failed to allocate memory for transport %d", (int)id);
+		(void) fmd_adm_stats_free(g_adm, &ams);
+		return (0);
+	}
+
+	modstat_compute(mp, &ams);
+
+	if (module == NULL ||
+	    strcmp(module, mp->m_new->module.fmds_value.str) == 0) {
+		(void) printf("%3d %5s %-18s  %s\n", (int)id,
+		    mp->m_new->state.fmds_value.str,
+		    mp->m_new->module.fmds_value.str,
+		    mp->m_new->authority.fmds_value.str ?
+		    mp->m_new->authority.fmds_value.str : "-");
+	}
+
+	(void) fmd_adm_stats_free(g_adm, &ams);
+	return (0);
+}
+
+static void
+stat_xprt_auth(const char *module)
+{
+	(void) printf("%3s %5s %-18s  %s\n",
+	    "id", "state", "module", "authority");
+
+	if (fmd_adm_xprt_iter(g_adm, stat_one_xprt_auth, (void *)module) != 0)
+		die("failed to retrieve list of transports");
+}
+
+/*ARGSUSED*/
+static int
+stat_one_fmd(const fmd_adm_modinfo_t *ami, void *ignored)
+{
+	char memsz[8], bufsz[8];
+	fmd_adm_stats_t ams;
+	struct modstats *mp;
+
+	if (fmd_adm_module_stats(g_adm, ami->ami_name, &ams) != 0) {
+		warn("failed to retrieve statistics for %s", ami->ami_name);
+		return (0); /* continue on to the next module */
+	}
+
+	for (mp = g_mods; mp != NULL; mp = mp->m_next) {
+		if (strcmp(mp->m_name, ami->ami_name) == 0)
+			break;
+	}
+
+	if (mp == NULL && (mp = modstat_create(ami->ami_name, 0)) == NULL) {
+		warn("failed to allocate memory for %s", ami->ami_name);
+		(void) fmd_adm_stats_free(g_adm, &ams);
+		return (0);
+	}
+
+	modstat_compute(mp, &ams);
+
 	(void) printf("%-18s %7llu %7llu %4.1f %6.1f %3.0f %3.0f "
 	    "%5llu %5llu %6s %6s\n", ami->ami_name,
-	    u64delta(old->prdequeued.fmds_value.ui64,
-	    new->prdequeued.fmds_value.ui64),
-	    u64delta(old->accepted.fmds_value.ui64,
-	    new->accepted.fmds_value.ui64),
-	    wait, svc, pct_w, pct_b,
-	    new->caseopen.fmds_value.ui64,
-	    new->casesolved.fmds_value.ui64,
-	    size2str(memsz, sizeof (memsz), new->memtotal.fmds_value.ui64),
-	    size2str(bufsz, sizeof (bufsz), new->buftotal.fmds_value.ui64));
+	    u64delta(mp->m_old->prdequeued.fmds_value.ui64,
+	    mp->m_new->prdequeued.fmds_value.ui64),
+	    u64delta(mp->m_old->accepted.fmds_value.ui64,
+	    mp->m_new->accepted.fmds_value.ui64),
+	    mp->m_wait, mp->m_svc, mp->m_pct_w, mp->m_pct_b,
+	    mp->m_new->caseopen.fmds_value.ui64,
+	    mp->m_new->casesolved.fmds_value.ui64,
+	    size2str(memsz, sizeof (memsz),
+	    mp->m_new->memtotal.fmds_value.ui64),
+	    size2str(bufsz, sizeof (bufsz),
+	    mp->m_new->buftotal.fmds_value.ui64));
 
 	(void) fmd_adm_stats_free(g_adm, &ams);
 	return (0);
@@ -518,7 +671,7 @@ getu32(const char *name, const char *s)
 static int
 usage(FILE *fp)
 {
-	(void) fprintf(fp, "Usage: %s [-asz] [-m module] "
+	(void) fprintf(fp, "Usage: %s [-astTz] [-m module] "
 	    "[-P prog] [interval [count]]\n\n", g_pname);
 
 	(void) fprintf(fp,
@@ -526,6 +679,8 @@ usage(FILE *fp)
 	    "\t-m show module-specific statistics\n"
 	    "\t-P connect to alternate fmd program\n"
 	    "\t-s show module-specific serd engines\n"
+	    "\t-t show transport-specific statistics\n"
+	    "\t-T show transport modules and authorities\n"
 	    "\t-z suppress zero-valued statistics\n");
 
 	return (FMSTAT_EXIT_USAGE);
@@ -534,7 +689,7 @@ usage(FILE *fp)
 int
 main(int argc, char *argv[])
 {
-	int opt_a = 0, opt_s = 0, opt_z = 0;
+	int opt_a = 0, opt_s = 0, opt_t = 0, opt_T = 0, opt_z = 0;
 	const char *opt_m = NULL;
 	int msec = 0, iter = 1;
 
@@ -552,7 +707,7 @@ main(int argc, char *argv[])
 	else
 		program = FMD_ADM_PROGRAM;
 
-	while ((c = getopt(argc, argv, "am:P:sz")) != EOF) {
+	while ((c = getopt(argc, argv, "am:P:stTz")) != EOF) {
 		switch (c) {
 		case 'a':
 			opt_a++;
@@ -565,6 +720,12 @@ main(int argc, char *argv[])
 			break;
 		case 's':
 			opt_s++;
+			break;
+		case 't':
+			opt_t++;
+			break;
+		case 'T':
+			opt_T++;
 			break;
 		case 'z':
 			opt_z++;
@@ -585,6 +746,18 @@ main(int argc, char *argv[])
 	if (optind < argc)
 		return (usage(stderr));
 
+	if (opt_t != 0 && (opt_m != NULL || opt_s != 0)) {
+		(void) fprintf(stderr,
+		    "%s: -t cannot be used with -m or -s\n", g_pname);
+		return (FMSTAT_EXIT_USAGE);
+	}
+
+	if (opt_t != 0 && opt_T != 0) {
+		(void) fprintf(stderr,
+		    "%s: -t and -T are mutually exclusive options\n", g_pname);
+		return (FMSTAT_EXIT_USAGE);
+	}
+
 	if (opt_m == NULL && opt_s != 0) {
 		(void) fprintf(stderr,
 		    "%s: -s requires -m <module>\n", g_pname);
@@ -597,8 +770,12 @@ main(int argc, char *argv[])
 	while (iter < 0 || iter-- > 0) {
 		if (opt_s)
 			stat_mod_serd(opt_m);
+		else if (opt_T)
+			stat_xprt_auth(opt_m);
 		else if (opt_a || opt_m)
 			stat_mod(opt_m, opt_a, opt_z);
+		else if (opt_t)
+			stat_xprt();
 		else
 			stat_fmd();
 

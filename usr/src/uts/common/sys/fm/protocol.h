@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -51,7 +52,11 @@ extern "C" {
 #define	FM_FAULT_CLASS			"fault"
 #define	FM_RSRC_CLASS			"resource"
 #define	FM_LIST_EVENT			"list"
+
+/* FM list.* event class values */
 #define	FM_LIST_SUSPECT_CLASS		FM_LIST_EVENT ".suspect"
+#define	FM_LIST_ISOLATED_CLASS		FM_LIST_EVENT ".isolated"
+#define	FM_LIST_REPAIRED_CLASS		FM_LIST_EVENT ".repaired"
 
 /* ereport class subcategory values */
 #define	FM_ERROR_CPU			"cpu"
@@ -65,16 +70,17 @@ extern "C" {
 #define	FM_EREPORT_DETECTOR		"detector"
 #define	FM_EREPORT_ENA			"ena"
 
-/* list event payload member names */
+/* list.* event payload member names */
 #define	FM_LIST_EVENT_SIZE		"list-sz"
 
-/* list.suspect versions and payload member names */
+/* list.suspect, isolated, and repaired versions and payload member names */
 #define	FM_SUSPECT_UUID			"uuid"
 #define	FM_SUSPECT_DIAG_CODE		"code"
 #define	FM_SUSPECT_DIAG_TIME		"diag-time"
 #define	FM_SUSPECT_DE			"de"
 #define	FM_SUSPECT_FAULT_LIST		"fault-list"
 #define	FM_SUSPECT_FAULT_SZ		"fault-list-sz"
+#define	FM_SUSPECT_FAULT_STATUS		"fault-status"
 #define	FM_SUSPECT_MESSAGE		"message"
 
 #define	FM_SUSPECT_VERS0		0
@@ -95,11 +101,18 @@ extern "C" {
 #define	FM_RSRC_VERSION			FM_RSRC_VERS0
 #define	FM_RSRC_RESOURCE		"resource"
 
-/* resource.*.asru.* payload member names */
+/* resource.fm.asru.* payload member names */
 #define	FM_RSRC_ASRU_UUID		"uuid"
+#define	FM_RSRC_ASRU_CODE		"code"
 #define	FM_RSRC_ASRU_FAULTY		"faulty"
 #define	FM_RSRC_ASRU_UNUSABLE		"unusable"
 #define	FM_RSRC_ASRU_EVENT		"event"
+
+/* resource.fm.xprt.* versions and payload member names */
+#define	FM_RSRC_XPRT_VERS0		0
+#define	FM_RSRC_XPRT_VERSION		FM_RSRC_XPRT_VERS0
+#define	FM_RSRC_XPRT_UUID		"uuid"
+#define	FM_RSRC_XPRT_SUBCLASS		"subclass"
 
 /*
  * FM ENA Format Macros

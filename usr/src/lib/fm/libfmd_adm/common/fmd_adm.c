@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,6 +141,10 @@ fmd_adm_svc_errmsg(enum fmd_adm_error err)
 		return ("specified UUID is invalid or has been repaired");
 	case FMD_ADM_ERR_CASEOPEN:
 		return ("specified UUID is still being diagnosed");
+	case FMD_ADM_ERR_XPRTSRCH:
+		return ("specified transport ID is invalid or has been closed");
+	case FMD_ADM_ERR_CASEXPRT:
+		return ("specified UUID is owned by a different fault manager");
 	default:
 		return ("unknown fault manager error");
 	}
@@ -597,6 +602,53 @@ fmd_adm_serd_reset(fmd_adm_t *ap, const char *mod, const char *name)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
+}
+
+int
+fmd_adm_xprt_iter(fmd_adm_t *ap, fmd_adm_xprt_f *func, void *arg)
+{
+	struct fmd_rpc_xprtlist rxl;
+	uint_t i;
+
+	bzero(&rxl, sizeof (rxl)); /* tell xdr to allocate memory for us */
+
+	if (fmd_adm_xprtlist_1(&rxl, ap->adm_clnt) != RPC_SUCCESS)
+		return (fmd_adm_set_errno(ap, EPROTO));
+
+	if (rxl.rxl_err != 0) {
+		xdr_free(xdr_fmd_rpc_xprtlist, (char *)&rxl);
+		return (fmd_adm_set_svcerr(ap, rxl.rxl_err));
+	}
+
+	for (i = 0; i < rxl.rxl_len; i++)
+		func(rxl.rxl_buf.rxl_buf_val[i], arg);
+
+	xdr_free(xdr_fmd_rpc_xprtlist, (char *)&rxl);
+	return (0);
+}
+
+int
+fmd_adm_xprt_stats(fmd_adm_t *ap, id_t id, fmd_adm_stats_t *sp)
+{
+	struct fmd_rpc_modstat rms;
+
+	if (sp == NULL)
+		return (fmd_adm_set_errno(ap, EINVAL));
+
+	bzero(&rms, sizeof (rms)); /* tell xdr to allocate memory for us */
+
+	if (fmd_adm_xprtstat_1(id, &rms, ap->adm_clnt) != RPC_SUCCESS)
+		return (fmd_adm_set_errno(ap, EPROTO));
+
+	if (rms.rms_err != 0) {
+		xdr_free(xdr_fmd_rpc_modstat, (char *)&rms);
+		return (fmd_adm_set_svcerr(ap, rms.rms_err));
+	}
+
+	sp->ams_buf = rms.rms_buf.rms_buf_val;
+	sp->ams_len = rms.rms_buf.rms_buf_len;
+
+	return (0);
 }
 
 int

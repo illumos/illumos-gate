@@ -62,6 +62,8 @@ f none usr/lib/fm/fmd/plugins/eft.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/eft.so 555 root bin
 f none usr/lib/fm/fmd/plugins/io-retire.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/io-retire.so 555 root bin
+f none usr/lib/fm/fmd/plugins/ip-transport.so 555 root bin
+f none usr/lib/fm/fmd/plugins/ip-transport.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/syslog-msgs.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/syslog-msgs.so 555 root bin
 d none usr/lib/fm/fmd/schemes 755 root bin

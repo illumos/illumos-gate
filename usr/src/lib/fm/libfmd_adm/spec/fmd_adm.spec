@@ -95,3 +95,11 @@ end
 function	fmd_adm_stats_read
 version		SUNWprivate
 end
+
+function	fmd_adm_xprt_iter
+version		SUNWprivate
+end
+
+function	fmd_adm_xprt_stats
+version		SUNWprivate
+end

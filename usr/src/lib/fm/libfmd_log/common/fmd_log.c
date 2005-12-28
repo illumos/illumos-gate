@@ -734,7 +734,7 @@ fmd_log_errmsg(fmd_log_t *lp, int err)
 {
 	const char *msg;
 
-	if (err > EFDL_BASE && err - EFDL_BASE < _fmd_nerr)
+	if (err >= EFDL_BASE && err - EFDL_BASE < _fmd_nerr)
 		msg = _fmd_errs[err - EFDL_BASE];
 	else
 		msg = strerror(err);

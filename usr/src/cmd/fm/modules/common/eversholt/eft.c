@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -56,7 +57,6 @@ fmd_hdl_t *Hdl;		/* handle in global for platform.c */
 
 int Debug = 1;	/* turn on here and let fmd_hdl_debug() decide if really on */
 char *Autoclose;	/* close cases automatically after solving */
-int Autoconvict;	/* true if autoconvict set in conf file */
 hrtime_t Hesitate;	/* hesitation time in ns */
 int Verbose;
 int Estats;
@@ -100,7 +100,6 @@ eft_timeout(fmd_hdl_t *hdl, id_t tid, void *arg)
 	fme_timer_fired(arg, tid);
 }
 
-/*ARGSUSED*/
 static void
 eft_close(fmd_hdl_t *hdl, fmd_case_t *fmcase)
 {
@@ -110,7 +109,6 @@ eft_close(fmd_hdl_t *hdl, fmd_case_t *fmcase)
 }
 
 static const fmd_prop_t eft_props[] = {
-	{ "autoconvict", FMD_TYPE_BOOL, NULL },
 	{ "autoclose", FMD_TYPE_STRING, NULL },
 	{ "estats", FMD_TYPE_BOOL, "false" },
 	{ "hesitate", FMD_TYPE_INT64, "10000000000" },
@@ -267,7 +265,6 @@ _fmd_init(fmd_hdl_t *hdl)
 	Warn = fmd_prop_get_int32(hdl, "warn");
 	Autoclose = fmd_prop_get_string(hdl, "autoclose");
 	Hesitate = fmd_prop_get_int64(hdl, "hesitate");
-	Autoconvict = fmd_prop_get_int32(hdl, "autoconvict");
 	Max_fme = fmd_prop_get_int32(hdl, "maxfme");
 
 	if ((fname = fmd_prop_get_string(hdl, "status")) != NULL) {
@@ -288,9 +285,8 @@ _fmd_init(fmd_hdl_t *hdl)
 	}
 
 	out(O_DEBUG,
-	    "initialized, verbose %d warn %d autoclose %s autoconvict %d "
-	    "maxfme %d", Verbose, Warn,
-	    Autoclose == NULL ? "(NULL)" : Autoclose, Autoconvict, Max_fme);
+	    "initialized, verbose %d warn %d autoclose %s maxfme %d",
+	    Verbose, Warn, Autoclose == NULL ? "(NULL)" : Autoclose, Max_fme);
 
 	out(O_DEBUG, "reconstituting any existing fmes");
 	while ((casep = fmd_case_next(hdl, casep)) != NULL) {

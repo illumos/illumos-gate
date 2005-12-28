@@ -91,8 +91,10 @@ fmd_rpc_svc_create_local(void (*disp)(struct svc_req *, SVCXPRT *),
 		if (strcmp(ncp->nc_protofmly, NC_LOOPBACK) != 0)
 			continue;
 
-		if (!force && rpcb_getaddr(prog, vers, ncp, &buf, HOST_SELF))
+		if (!force && rpcb_getaddr(prog, vers, ncp, &buf, HOST_SELF)) {
+			(void) endnetconfig(hdl);
 			return (fmd_set_errno(EFMD_RPC_BOUND));
+		}
 
 		if ((fd = t_open(ncp->nc_device, O_RDWR, NULL)) == -1) {
 			fmd_error(EFMD_RPC_REG, "failed to open %s: %s\n",
@@ -132,18 +134,13 @@ fmd_rpc_svc_create_local(void (*disp)(struct svc_req *, SVCXPRT *),
 		return (fmd_set_errno(EFMD_RPC_BOUND));
 
 	/*
-	 * Attempt to create a door server for the RPC program as well.  Door
-	 * servers in fmd must be setup as fmd threads, and fmd_transport_init()
-	 * already calls door_server_create() for us. We therefore rely on and
-	 * assert that fmd_transport_init() is called before fmd_rpc_init().
+	 * Attempt to create a door server for the RPC program as well.  Limit
+	 * the maximum request size for the door transport to the receive size.
 	 */
-	ASSERT(fmd.d_xprt_chan != NULL);
-
 	if ((xprt = svc_door_create(disp, prog, vers, ssz)) == NULL) {
 		fmd_error(EFMD_RPC_REG, "failed to create door for "
 		    "rpc service 0x%lx/0x%lx\n", prog, vers);
 	} else {
-		/* set the maximum request size for the door transport */
 		(void) svc_control(xprt, SVCSET_CONNMAXREC, &rsz);
 		n++;
 	}
@@ -189,9 +186,9 @@ fmd_rpc_svc_init(void (*disp)(struct svc_req *, SVCXPRT *),
 void
 fmd_rpc_init(void)
 {
-	int err, mode = RPC_SVC_MT_USER;
-	const char *errchan, *s;
+	int err, prog, mode = RPC_SVC_MT_USER;
 	uint64_t sndsize = 0, rcvsize = 0;
+	const char *s;
 
 	if (rpc_control(RPC_SVC_MTMODE_SET, &mode) == FALSE)
 		fmd_panic("failed to enable user-MT rpc mode");
@@ -201,12 +198,12 @@ fmd_rpc_init(void)
 
 	/*
 	 * Infer whether we are the "default" fault manager or an alternate one
-	 * based on whether we are subscribed to the default transport or not.
+	 * based on whether the initial setting of rpc.adm.prog is non-zero.
 	 */
-	(void) fmd_conf_getprop(fmd.d_conf, "errchan", &errchan);
+	(void) fmd_conf_getprop(fmd.d_conf, "rpc.adm.prog", &prog);
 	(void) fmd_conf_getprop(fmd.d_conf, "rpc.adm.path", &s);
 
-	if (errchan != NULL && strcmp(errchan, FM_ERROR_CHAN) == 0) {
+	if (prog != 0) {
 		err = fmd_rpc_svc_init(fmd_adm_1, "FMD_ADM", s, "rpc.adm.prog",
 		    FMD_ADM, FMD_ADM, FMD_ADM_VERSION_1,
 		    (uint_t)sndsize, (uint_t)rcvsize, TRUE);

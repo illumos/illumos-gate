@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -50,6 +51,7 @@ typedef enum fmd_errno {
     EFMD_CONF_OPEN,	/* failed to open configuration file */
     EFMD_CONF_KEYWORD,	/* invalid configuration file keyword */
     EFMD_CONF_NOPROP,	/* invalid configuration file parameter name */
+    EFMD_CONF_NODEFER,	/* deferred properties not permitted in this file */
     EFMD_CONF_PROPDUP,	/* duplicate configuration file parameter name */
     EFMD_CONF_INVAL,	/* invalid value for configuration file property */
     EFMD_CONF_OVERFLOW,	/* configuration value too large for data type */
@@ -59,6 +61,7 @@ typedef enum fmd_errno {
     EFMD_CONF_IO,	/* i/o error prevented configuration file processing */
     EFMD_CONF_PROPNAME,	/* configuration property name is not an identifier */
     EFMD_CONF_RDONLY,	/* configuration property is read-only */
+    EFMD_CONF_DEFER,	/* invalid deferred configuration file property */
     EFMD_MOD_INIT,	/* failed to initialize module */
     EFMD_MOD_FINI,	/* failed to uninitialize module */
     EFMD_MOD_THR,	/* failed to create processing thread for module */
@@ -72,11 +75,12 @@ typedef enum fmd_errno {
     EFMD_RTLD_INIT,	/* shared library plug-in does not define _fmd_init */
     EFMD_BLTIN_NAME,	/* built-in plug-in name not found in definition list */
     EFMD_BLTIN_INIT,	/* built-in plug-in does not define init function */
-    EFMD_XPRT_CLASS,	/* event received with invalid transport class */
-    EFMD_XPRT_INVAL,	/* event received with invalid payload */
-    EFMD_XPRT_OPEN,	/* failed to open transport device for event replay */
-    EFMD_XPRT_READ,	/* failed to read transport device for event replay */
-    EFMD_XPRT_MARK,	/* failed to mark transport record for completion */
+    EFMD_EVENT_INVAL,	/* event interface programming error */
+    EFMD_XPRT_INVAL,	/* transport interface programming error */
+    EFMD_XPRT_PAYLOAD,	/* transport event has invalid payload */
+    EFMD_XPRT_OWNER,	/* transport can only be manipulated by owner */
+    EFMD_XPRT_THR,	/* failed to create thread for transport */
+    EFMD_XPRT_LIMIT,	/* limit on number of open transports exceeded */
     EFMD_TIME_GETTOD,	/* failed to get current time-of-day */
     EFMD_LOG_OPEN,	/* failed to open and initialize log file */
     EFMD_LOG_CLOSE,	/* failed to close log file */

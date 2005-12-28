@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -587,6 +588,9 @@ fmd_ckpt_resv_case(fmd_ckpt_t *ckp, fmd_case_t *cp)
 	fmd_case_susp_t *cis;
 	uint_t n;
 
+	if (cip->ci_xprt != NULL)
+		return; /* do not checkpoint cases from remote transports */
+
 	n = fmd_buf_hash_count(&cip->ci_bufs);
 	fmd_buf_hash_apply(&cip->ci_bufs, (fmd_buf_f *)fmd_ckpt_resv_buf, ckp);
 	fmd_ckpt_resv(ckp, sizeof (fcf_buf_t) * n, sizeof (uint32_t));
@@ -629,6 +633,9 @@ fmd_ckpt_save_case(fmd_ckpt_t *ckp, fmd_case_t *cp)
 	fcf_secidx_t evsec = FCF_SECIDX_NONE;
 	fcf_secidx_t nvsec = FCF_SECIDX_NONE;
 	fcf_secidx_t prsec = FCF_SECIDX_NONE;
+
+	if (cip->ci_xprt != NULL)
+		return; /* do not checkpoint cases from remote transports */
 
 	if ((n = fmd_buf_hash_count(&cip->ci_bufs)) != 0) {
 		size_t size = sizeof (fcf_buf_t) * n;
@@ -677,8 +684,8 @@ fmd_ckpt_save_case(fmd_ckpt_t *ckp, fmd_case_t *cp)
 	case FMD_CASE_SOLVED:
 		fcfc.fcfc_state = FCF_CASE_SOLVED;
 		break;
-	case FMD_CASE_CLOSED:
-		fcfc.fcfc_state = FCF_CASE_CLOSED;
+	case FMD_CASE_CLOSE_WAIT:
+		fcfc.fcfc_state = FCF_CASE_CLOSE_WAIT;
 		break;
 	default:
 		fmd_panic("case %p (%s) has invalid state %u",
@@ -942,7 +949,7 @@ fmd_ckpt_restore_events(fmd_ckpt_t *ckp, fcf_secidx_t sid,
 	(void) pthread_rwlock_unlock(&fmd.d_log_lock);
 }
 
-static void
+static int
 fmd_ckpt_restore_suspects(fmd_ckpt_t *ckp, fmd_case_t *cp, fcf_secidx_t sid)
 {
 	const fcf_nvl_t *fcfn, *endn;
@@ -979,6 +986,8 @@ fmd_ckpt_restore_suspects(fmd_ckpt_t *ckp, fmd_case_t *cp, fcf_secidx_t sid)
 		size = P2ROUNDUP(size, sizeof (uint64_t));
 		fcfn = (fcf_nvl_t *)((uintptr_t)fcfn + size);
 	}
+
+	return (i);
 }
 
 static void
@@ -1022,15 +1031,17 @@ fmd_ckpt_restore_case(fmd_ckpt_t *ckp, fmd_module_t *mp, const fcf_sec_t *sp)
 	const fcf_case_t *fcfc = fmd_ckpt_dataptr(ckp, sp);
 	const char *uuid = fmd_ckpt_strptr(ckp, fcfc->fcfc_uuid, NULL);
 	fmd_case_t *cp;
+	int n;
 
-	if (uuid == NULL || fcfc->fcfc_state > FCF_CASE_CLOSED) {
+	if (uuid == NULL || fcfc->fcfc_state > FCF_CASE_CLOSE_WAIT) {
 		fmd_ckpt_error(ckp, EFMD_CKPT_INVAL, "corrupt %u case uuid "
 		    "and/or state\n", (uint_t)(sp - ckp->ckp_secp));
 	}
 
 	fmd_module_lock(mp);
 
-	if ((cp = fmd_case_recreate(mp, uuid)) == NULL) {
+	if ((cp = fmd_case_recreate(mp, NULL,
+	    FMD_CASE_UNSOLVED, uuid, NULL)) == NULL) {
 		fmd_ckpt_error(ckp, EFMD_CKPT_INVAL,
 		    "duplicate case uuid: %s\n", uuid);
 	}
@@ -1041,12 +1052,14 @@ fmd_ckpt_restore_case(fmd_ckpt_t *ckp, fmd_module_t *mp, const fcf_sec_t *sp)
 	fmd_ckpt_restore_events(ckp, fcfc->fcfc_events,
 	    (void (*)(void *, fmd_event_t *))fmd_case_insert_event, cp);
 
-	fmd_ckpt_restore_suspects(ckp, cp, fcfc->fcfc_suspects);
+	n = fmd_ckpt_restore_suspects(ckp, cp, fcfc->fcfc_suspects);
 
 	if (fcfc->fcfc_state == FCF_CASE_SOLVED)
-		fmd_case_transition(cp, FMD_CASE_SOLVED);
-	else if (fcfc->fcfc_state == FMD_CASE_CLOSED)
-		fmd_case_transition(cp, FMD_CASE_CLOSED);
+		fmd_case_transition(cp, FMD_CASE_SOLVED, FMD_CF_SOLVED);
+	else if (fcfc->fcfc_state == FCF_CASE_CLOSE_WAIT && n != 0)
+		fmd_case_transition(cp, FMD_CASE_CLOSE_WAIT, FMD_CF_SOLVED);
+	else if (fcfc->fcfc_state == FCF_CASE_CLOSE_WAIT && n == 0)
+		fmd_case_transition(cp, FMD_CASE_CLOSE_WAIT, 0);
 
 	fmd_module_unlock(mp);
 	fmd_ckpt_restore_bufs(ckp, mp, cp, fcfc->fcfc_bufs);

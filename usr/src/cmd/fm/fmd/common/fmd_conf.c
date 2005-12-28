@@ -83,7 +83,7 @@ get_bool(const fmd_conf_param_t *pp, void *ptr)
 }
 
 static int
-set_i32(fmd_conf_param_t *pp, const char *s)
+set_i32x(fmd_conf_param_t *pp, const char *s, int64_t min, int64_t max)
 {
 	int64_t val;
 	char *end;
@@ -91,7 +91,7 @@ set_i32(fmd_conf_param_t *pp, const char *s)
 	errno = 0;
 	val = strtoll(s, &end, 0);
 
-	if (errno == EOVERFLOW || val < INT32_MIN || val > INT32_MAX)
+	if (errno == EOVERFLOW || val < min || val > max)
 		return (fmd_set_errno(EFMD_CONF_OVERFLOW));
 
 	if (errno != 0 || end == s || *end != '\0')
@@ -99,6 +99,24 @@ set_i32(fmd_conf_param_t *pp, const char *s)
 
 	pp->cp_value.cpv_num = val;
 	return (0);
+}
+
+static int
+set_i8(fmd_conf_param_t *pp, const char *s)
+{
+	return (set_i32x(pp, s, INT8_MIN, INT8_MAX));
+}
+
+static int
+set_i16(fmd_conf_param_t *pp, const char *s)
+{
+	return (set_i32x(pp, s, INT16_MIN, INT16_MAX));
+}
+
+static int
+set_i32(fmd_conf_param_t *pp, const char *s)
+{
+	return (set_i32x(pp, s, INT32_MIN, INT32_MAX));
 }
 
 static void
@@ -108,7 +126,7 @@ get_i32(const fmd_conf_param_t *pp, void *ptr)
 }
 
 static int
-set_ui32(fmd_conf_param_t *pp, const char *s)
+set_ui32x(fmd_conf_param_t *pp, const char *s, uint64_t max)
 {
 	uint64_t val;
 	char *end;
@@ -116,7 +134,7 @@ set_ui32(fmd_conf_param_t *pp, const char *s)
 	errno = 0;
 	val = strtoull(s, &end, 0);
 
-	if (errno == EOVERFLOW || val > UINT32_MAX)
+	if (errno == EOVERFLOW || val > max)
 		return (fmd_set_errno(EFMD_CONF_OVERFLOW));
 
 	if (errno != 0 || end == s || *end != '\0')
@@ -124,6 +142,24 @@ set_ui32(fmd_conf_param_t *pp, const char *s)
 
 	pp->cp_value.cpv_num = val;
 	return (0);
+}
+
+static int
+set_ui8(fmd_conf_param_t *pp, const char *s)
+{
+	return (set_ui32x(pp, s, UINT8_MAX));
+}
+
+static int
+set_ui16(fmd_conf_param_t *pp, const char *s)
+{
+	return (set_ui32x(pp, s, UINT16_MAX));
+}
+
+static int
+set_ui32(fmd_conf_param_t *pp, const char *s)
+{
+	return (set_ui32x(pp, s, UINT32_MAX));
 }
 
 static void
@@ -514,9 +550,10 @@ set_par(fmd_conf_param_t *pp, const char *s)
  * array of fmd_conf_mode_t's where the final element has cm_name == NULL.
  */
 int
-fmd_conf_mode_set(const fmd_conf_mode_t *cmp,
+fmd_conf_mode_set(const fmd_conf_mode_t *cma,
     fmd_conf_param_t *pp, const char *value)
 {
+	const fmd_conf_mode_t *cmp;
 	char *p, *q, *s = fmd_strdup(value, FMD_SLEEP);
 	size_t len = value ? strlen(value) + 1 : 0;
 	uint_t mode = 0;
@@ -527,7 +564,7 @@ fmd_conf_mode_set(const fmd_conf_mode_t *cmp,
 	}
 
 	for (p = strtok_r(s, ",", &q); p != NULL; p = strtok_r(NULL, ",", &q)) {
-		for (; cmp->cm_name != NULL; cmp++) {
+		for (cmp = cma; cmp->cm_name != NULL; cmp++) {
 			if (strcmp(cmp->cm_name, p) == 0) {
 				mode |= cmp->cm_bits;
 				break;
@@ -569,6 +606,10 @@ fmd_conf_nop(fmd_conf_param_t *pp)
 	const fmd_conf_ops_t name = { a, b, c, d }
 
 CONF_DEFINE(fmd_conf_bool, set_bool, get_bool, fmd_conf_notsup, fmd_conf_nop);
+CONF_DEFINE(fmd_conf_int8, set_i8, get_i32, fmd_conf_notsup, fmd_conf_nop);
+CONF_DEFINE(fmd_conf_uint8, set_ui8, get_ui32, fmd_conf_notsup, fmd_conf_nop);
+CONF_DEFINE(fmd_conf_int16, set_i16, get_i32, fmd_conf_notsup, fmd_conf_nop);
+CONF_DEFINE(fmd_conf_uint16, set_ui16, get_ui32, fmd_conf_notsup, fmd_conf_nop);
 CONF_DEFINE(fmd_conf_int32, set_i32, get_i32, fmd_conf_notsup, fmd_conf_nop);
 CONF_DEFINE(fmd_conf_uint32, set_ui32, get_ui32, fmd_conf_notsup, fmd_conf_nop);
 CONF_DEFINE(fmd_conf_int64, set_i64, get_i64, fmd_conf_notsup, fmd_conf_nop);
@@ -759,13 +800,15 @@ fmd_conf_fill(fmd_conf_t *cfp, fmd_conf_param_t *ppbuf,
 }
 
 fmd_conf_t *
-fmd_conf_open(const char *file, int argc, const fmd_conf_formal_t *argv)
+fmd_conf_open(const char *file, int argc,
+    const fmd_conf_formal_t *argv, uint_t flag)
 {
 	fmd_conf_t *cfp = fmd_alloc(sizeof (fmd_conf_t), FMD_SLEEP);
 
 	(void) pthread_rwlock_init(&cfp->cf_lock, NULL);
 	cfp->cf_argv = argv;
 	cfp->cf_argc = argc;
+	cfp->cf_flag = flag;
 
 	cfp->cf_params = fmd_zalloc(
 	    sizeof (fmd_conf_param_t) * (_fmd_conf_defc + argc), FMD_SLEEP);
@@ -773,6 +816,8 @@ fmd_conf_open(const char *file, int argc, const fmd_conf_formal_t *argv)
 	cfp->cf_parhashlen = fmd.d_str_buckets;
 	cfp->cf_parhash = fmd_zalloc(
 	    sizeof (fmd_conf_param_t *) * cfp->cf_parhashlen, FMD_SLEEP);
+
+	cfp->cf_defer = NULL;
 
 	fmd_conf_fill(cfp, cfp->cf_params, _fmd_conf_defc, _fmd_conf_defv, 0);
 	fmd_conf_fill(cfp, cfp->cf_params + _fmd_conf_defc, argc, argv, 1);
@@ -792,10 +837,39 @@ fmd_conf_merge(fmd_conf_t *cfp, const char *file)
 }
 
 void
+fmd_conf_propagate(fmd_conf_t *src, fmd_conf_t *dst, const char *scope)
+{
+	size_t len = strlen(scope);
+	fmd_conf_defer_t *cdp;
+
+	(void) pthread_rwlock_rdlock(&src->cf_lock);
+
+	for (cdp = src->cf_defer; cdp != NULL; cdp = cdp->cd_next) {
+		if (len == (size_t)(strchr(cdp->cd_name, ':') - cdp->cd_name) &&
+		    strncmp(cdp->cd_name, scope, len) == 0 && fmd_conf_setprop(
+		    dst, cdp->cd_name + len + 1, cdp->cd_value) != 0) {
+			fmd_error(EFMD_CONF_DEFER,
+			    "failed to apply deferred property %s to %s: %s\n",
+			    cdp->cd_name, scope, fmd_strerror(errno));
+		}
+	}
+
+	(void) pthread_rwlock_unlock(&src->cf_lock);
+}
+
+void
 fmd_conf_close(fmd_conf_t *cfp)
 {
 	fmd_conf_param_t *pp = cfp->cf_params;
 	int i, nparams = _fmd_conf_defc + cfp->cf_argc;
+	fmd_conf_defer_t *cdp, *ndp;
+
+	for (cdp = cfp->cf_defer; cdp != NULL; cdp = ndp) {
+		ndp = cdp->cd_next;
+		fmd_strfree(cdp->cd_name);
+		fmd_strfree(cdp->cd_value);
+		fmd_free(cdp, sizeof (fmd_conf_defer_t));
+	}
 
 	fmd_free(cfp->cf_parhash,
 	    sizeof (fmd_conf_param_t *) * cfp->cf_parhashlen);
@@ -862,11 +936,44 @@ fmd_conf_getprop(fmd_conf_t *cfp, const char *name, void *data)
 	return (err);
 }
 
+static int
+fmd_conf_setdefer(fmd_conf_t *cfp, const char *name, const char *value)
+{
+	fmd_conf_defer_t *cdp;
+
+	if (!(cfp->cf_flag & FMD_CONF_DEFER))
+		return (fmd_set_errno(EFMD_CONF_NODEFER));
+
+	(void) pthread_rwlock_wrlock(&cfp->cf_lock);
+
+	for (cdp = cfp->cf_defer; cdp != NULL; cdp = cdp->cd_next) {
+		if (strcmp(name, cdp->cd_name) == 0) {
+			fmd_strfree(cdp->cd_value);
+			cdp->cd_value = fmd_strdup(value, FMD_SLEEP);
+			goto out;
+		}
+	}
+
+	cdp = fmd_alloc(sizeof (fmd_conf_defer_t), FMD_SLEEP);
+
+	cdp->cd_name = fmd_strdup(name, FMD_SLEEP);
+	cdp->cd_value = fmd_strdup(value, FMD_SLEEP);
+	cdp->cd_next = cfp->cf_defer;
+
+	cfp->cf_defer = cdp;
+out:
+	(void) pthread_rwlock_unlock(&cfp->cf_lock);
+	return (0);
+}
+
 int
 fmd_conf_setprop(fmd_conf_t *cfp, const char *name, const char *value)
 {
 	fmd_conf_param_t *pp;
 	int err;
+
+	if (strchr(name, ':') != NULL)
+		return (fmd_conf_setdefer(cfp, name, value));
 
 	(void) pthread_rwlock_wrlock(&cfp->cf_lock);
 

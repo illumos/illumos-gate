@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,10 +52,13 @@ typedef struct fmd_builtin {
 	void (*bltin_fini)(fmd_hdl_t *);
 } fmd_builtin_t;
 
-extern void fmd_builtin_loadall(fmd_modhash_t *);
+extern int fmd_builtin_loadall(fmd_modhash_t *);
 
 extern void self_init(fmd_hdl_t *);	/* see fmd_self.c */
 extern void self_fini(fmd_hdl_t *);	/* see fmd_self.c */
+
+extern void sysev_init(fmd_hdl_t *);	/* see fmd_transport.c */
+extern void sysev_fini(fmd_hdl_t *);	/* see fmd_transport.c */
 
 #ifdef	__cplusplus
 }

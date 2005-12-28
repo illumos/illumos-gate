@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,12 +37,12 @@
 extern "C" {
 #endif
 
-#include <fmd_module.h>
-#include <fmd_event.h>
+#include <fmd_idspace.h>
+#include <fmd_eventq.h>
 
 typedef struct fmd_dispqlist {
 	struct fmd_dispqlist *dq_next;	/* link to next subscription object */
-	fmd_module_t *dq_mod;		/* pointer to subscribing module */
+	fmd_eventq_t *dq_eventq;	/* pointer to subscribing eventq */
 } fmd_dispqlist_t;
 
 typedef struct fmd_dispqelem {
@@ -56,14 +57,21 @@ typedef struct fmd_dispqelem {
 typedef struct fmd_dispq {
 	pthread_rwlock_t dq_lock;	/* lock for event dispatch queue */
 	fmd_dispqelem_t *dq_root;	/* root hash table pointer */
+	fmd_idspace_t *dq_gids;		/* id hash for subscriber group ids */
+	id_t dq_gmax;			/* maximum group id allocated */
 } fmd_dispq_t;
 
 extern fmd_dispq_t *fmd_dispq_create(void);
 extern void fmd_dispq_destroy(fmd_dispq_t *);
 
-extern void fmd_dispq_insert(fmd_dispq_t *, fmd_module_t *, const char *);
-extern void fmd_dispq_delete(fmd_dispq_t *, fmd_module_t *, const char *);
+extern void fmd_dispq_insert(fmd_dispq_t *, fmd_eventq_t *, const char *);
+extern void fmd_dispq_delete(fmd_dispq_t *, fmd_eventq_t *, const char *);
 extern void fmd_dispq_dispatch(fmd_dispq_t *, fmd_event_t *, const char *);
+extern void fmd_dispq_dispatch_gid(fmd_dispq_t *, fmd_event_t *,
+    const char *, id_t);
+
+extern id_t fmd_dispq_getgid(fmd_dispq_t *, void *);
+extern void fmd_dispq_delgid(fmd_dispq_t *, id_t);
 
 #ifdef	__cplusplus
 }

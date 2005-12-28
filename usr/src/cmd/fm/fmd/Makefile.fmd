@@ -63,21 +63,22 @@ SRCS += fmd.c \
 	fmd_subr.c \
 	fmd_svc_adm.c \
 	fmd_svc_api.c \
+	fmd_sysevent.c \
 	fmd_thread.c \
 	fmd_time.c \
 	fmd_timerq.c \
 	fmd_trace.c \
-	fmd_transport.c \
 	fmd_ustat.c \
 	fmd_xdr_adm.c \
-	fmd_xdr_api.c
+	fmd_xdr_api.c \
+	fmd_xprt.c
 
 PROG = fmd
 MANIFEST = ../common/$(PROG).xml
 
 ROOTPDIR = $(ROOT)/usr/lib/fm/$(PROG)
 ROOTVDIR = $(ROOT)/var/fm/$(PROG)
-ROOTVSUB = $(ROOTVDIR)/ckpt $(ROOTVDIR)/rsrc
+ROOTVSUB = $(ROOTVDIR)/ckpt $(ROOTVDIR)/rsrc $(ROOTVDIR)/xprt
 ROOTPROG = $(ROOTPDIR)/$(PROG)
 
 ROOTMANIFESTDIR = $(ROOTSVCSYSTEM)

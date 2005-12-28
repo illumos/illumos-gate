@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -49,12 +50,14 @@ extern "C" {
 
 #define	FMD_API_VERSION_1	1
 #define	FMD_API_VERSION_2	2
+#define	FMD_API_VERSION_3	3
 
-#define	FMD_API_VERSION		FMD_API_VERSION_2
+#define	FMD_API_VERSION		FMD_API_VERSION_3
 
 typedef struct fmd_hdl fmd_hdl_t;
 typedef struct fmd_event fmd_event_t;
 typedef struct fmd_case fmd_case_t;
+typedef struct fmd_xprt fmd_xprt_t;
 
 #define	FMD_B_FALSE	0		/* false value for booleans as int */
 #define	FMD_B_TRUE	1		/* true value for booleans as int */
@@ -102,7 +105,12 @@ typedef struct fmd_hdl_ops {
 	void (*fmdo_close)(fmd_hdl_t *, fmd_case_t *);
 	void (*fmdo_stats)(fmd_hdl_t *);
 	void (*fmdo_gc)(fmd_hdl_t *);
+	int (*fmdo_send)(fmd_hdl_t *, fmd_xprt_t *, fmd_event_t *, nvlist_t *);
 } fmd_hdl_ops_t;
+
+#define	FMD_SEND_SUCCESS	0	/* fmdo_send queued event */
+#define	FMD_SEND_FAILED		1	/* fmdo_send unrecoverable error */
+#define	FMD_SEND_RETRY		2	/* fmdo_send requests retry */
 
 typedef struct fmd_hdl_info {
 	const char *fmdi_desc;		/* fmd client description string */
@@ -159,12 +167,10 @@ extern void fmd_stat_setstr(fmd_hdl_t *, fmd_stat_t *, const char *);
 extern fmd_case_t *fmd_case_open(fmd_hdl_t *, void *);
 extern void fmd_case_reset(fmd_hdl_t *, fmd_case_t *);
 extern void fmd_case_solve(fmd_hdl_t *, fmd_case_t *);
-extern void fmd_case_convict(fmd_hdl_t *, fmd_case_t *, nvlist_t *);
 extern void fmd_case_close(fmd_hdl_t *, fmd_case_t *);
 
 extern const char *fmd_case_uuid(fmd_hdl_t *, fmd_case_t *);
 extern fmd_case_t *fmd_case_uulookup(fmd_hdl_t *, const char *);
-extern void fmd_case_uuconvict(fmd_hdl_t *, const char *, nvlist_t *);
 extern void fmd_case_uuclose(fmd_hdl_t *, const char *);
 extern int fmd_case_uuclosed(fmd_hdl_t *, const char *);
 
@@ -215,6 +221,24 @@ extern int fmd_nvl_fmri_expand(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_present(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_unusable(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_contains(fmd_hdl_t *, nvlist_t *, nvlist_t *);
+extern nvlist_t *fmd_nvl_fmri_translate(fmd_hdl_t *, nvlist_t *, nvlist_t *);
+
+extern int fmd_event_local(fmd_hdl_t *, fmd_event_t *);
+
+#define	FMD_XPRT_RDONLY		0x1	/* transport is read-only */
+#define	FMD_XPRT_RDWR		0x3	/* transport is read-write */
+#define	FMD_XPRT_ACCEPT		0x4	/* transport is accepting connection */
+#define	FMD_XPRT_SUSPENDED	0x8	/* transport starts suspended */
+
+extern fmd_xprt_t *fmd_xprt_open(fmd_hdl_t *, uint_t, nvlist_t *, void *);
+extern void fmd_xprt_close(fmd_hdl_t *, fmd_xprt_t *);
+extern void fmd_xprt_post(fmd_hdl_t *, fmd_xprt_t *, nvlist_t *, hrtime_t);
+extern void fmd_xprt_suspend(fmd_hdl_t *, fmd_xprt_t *);
+extern void fmd_xprt_resume(fmd_hdl_t *, fmd_xprt_t *);
+extern int fmd_xprt_error(fmd_hdl_t *, fmd_xprt_t *);
+extern nvlist_t *fmd_xprt_translate(fmd_hdl_t *, fmd_xprt_t *, fmd_event_t *);
+extern void fmd_xprt_setspecific(fmd_hdl_t *, fmd_xprt_t *, void *);
+extern void *fmd_xprt_getspecific(fmd_hdl_t *, fmd_xprt_t *);
 
 #ifdef	__cplusplus
 }

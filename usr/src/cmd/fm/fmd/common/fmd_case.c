@@ -19,12 +19,87 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+/*
+ * FMD Case Subsystem
+ *
+ * Diagnosis engines are expected to group telemetry events related to the
+ * diagnosis of a particular problem on the system into a set of cases.  The
+ * diagnosis engine may have any number of cases open at a given point in time.
+ * Some cases may eventually be *solved* by associating a suspect list of one
+ * or more problems with the case, at which point fmd publishes a list.suspect
+ * event for the case and it becomes visible to administrators and agents.
+ *
+ * Every case is named using a UUID, and is globally visible in the case hash.
+ * Cases are reference-counted, except for the reference from the case hash
+ * itself.  Consumers of case references include modules, which store active
+ * cases on the mod_cases list, ASRUs in the resource cache, and the RPC code.
+ *
+ * Cases obey the following state machine.  In states UNSOLVED, SOLVED, and
+ * CLOSE_WAIT, a case's module refers to the owning module (a diagnosis engine
+ * or transport) and the case is referenced by the mod_cases list.  Once the
+ * case reaches the CLOSED or REPAIRED states, a case's module changes to refer
+ * to the root module (fmd.d_rmod) and is deleted from the owner's mod_cases.
+ *
+ *			+------------+
+ *	     +----------|  UNSOLVED  |
+ *	     |		+------------+
+ *	   1 |	             4 |
+ *           |                 |
+ *	+----v---+ /-2->+------v-----+	  3	+--------+
+ *      | SOLVED |<     | CLOSE_WAIT |--------->| CLOSED |
+ *	+--------+ \-5->+------------+		+--------+
+ *	                       |                    |
+ *                           6 |                    | 7
+ *      		+------v-----+              |
+ *	                |  REPAIRED  |<-------------+
+ *			+------------+
+ *
+ * The state machine changes are triggered by calls to fmd_case_transition()
+ * from various locations inside of fmd, as described below:
+ *
+ * [1] Called by: fmd_case_solve()
+ *       Actions: FMD_CF_SOLVED flag is set in ci_flags
+ *                conviction policy is applied to suspect list
+ *                suspects convicted are marked faulty (F) in R$
+ *                list.suspect event logged and dispatched
+ *
+ * [2] Called by: fmd_case_close(), fmd_case_uuclose(), fmd_xprt_event_uuclose()
+ *       Actions: FMD_CF_ISOLATED flag is set in ci_flags
+ *                suspects convicted (F) are marked unusable (U) in R$
+ *                diagnosis engine fmdo_close() entry point scheduled
+ *                case transitions to CLOSED [3] upon exit from CLOSE_WAIT
+ *
+ * [3] Called by: fmd_case_delete() (after fmdo_close() entry point returns)
+ *       Actions: list.isolated event dispatched
+ *                case deleted from module's list of open cases
+ *
+ * [4] Called by: fmd_case_close(), fmd_case_uuclose()
+ *       Actions: diagnosis engine fmdo_close() entry point scheduled
+ *                case is subsequently discarded by fmd_case_delete()
+ *
+ * [5] Called by: fmd_case_repair(), fmd_case_update()
+ *       Actions: FMD_CF_REPAIR flag is set in ci_flags
+ *                diagnosis engine fmdo_close() entry point scheduled
+ *                case transitions to REPAIRED [6] upon exit from CLOSE_WAIT
+ *
+ * [6] Called by: fmd_case_repair(), fmd_case_update()
+ *       Actions: FMD_CF_REPAIR flag is set in ci_flags
+ *                suspects convicted are marked non faulty (!F) in R$
+ *                list.repaired event dispatched
+ *
+ * [7] Called by: fmd_case_repair(), fmd_case_update()
+ *       Actions: FMD_CF_REPAIR flag is set in ci_flags
+ *                suspects convicted are marked non faulty (!F) in R$
+ *                list.repaired event dispatched
+ */
 
 #include <sys/fm/protocol.h>
 #include <uuid/uuid.h>
@@ -44,13 +119,16 @@
 #include <fmd_buf.h>
 #include <fmd_log.h>
 #include <fmd_asru.h>
+#include <fmd_xprt.h>
 
 #include <fmd.h>
 
 static const char *const _fmd_case_snames[] = {
 	"UNSOLVED",	/* FMD_CASE_UNSOLVED */
 	"SOLVED",	/* FMD_CASE_SOLVED */
+	"CLOSE_WAIT",	/* FMD_CASE_CLOSE_WAIT */
 	"CLOSED",	/* FMD_CASE_CLOSED */
+	"REPAIRED"	/* FMD_CASE_REPAIRED */
 };
 
 fmd_case_hash_t *
@@ -61,13 +139,14 @@ fmd_case_hash_create(void)
 	(void) pthread_rwlock_init(&chp->ch_lock, NULL);
 	chp->ch_hashlen = fmd.d_str_buckets;
 	chp->ch_hash = fmd_zalloc(sizeof (void *) * chp->ch_hashlen, FMD_SLEEP);
+	chp->ch_count = 0;
 
 	return (chp);
 }
 
 /*
  * Destroy the case hash.  Unlike most of our hash tables, no active references
- * are kept by the case hash because cases are destroyed when modules unload.
+ * are kept by the case hash itself; all references come from other subsystems.
  * The hash must be destroyed after all modules are unloaded; if anything was
  * present in the hash it would be by definition a reference count leak.
  */
@@ -78,68 +157,200 @@ fmd_case_hash_destroy(fmd_case_hash_t *chp)
 	fmd_free(chp, sizeof (fmd_case_hash_t));
 }
 
-static nvlist_t *
-fmd_case_mkevent(fmd_case_t *cp)
+/*
+ * Take a snapshot of the case hash by placing an additional hold on each
+ * member in an auxiliary array, and then call 'func' for each case.
+ */
+void
+fmd_case_hash_apply(fmd_case_hash_t *chp,
+    void (*func)(fmd_case_t *, void *), void *arg)
+{
+	fmd_case_impl_t *cp, **cps, **cpp;
+	uint_t cpc, i;
+
+	(void) pthread_rwlock_rdlock(&chp->ch_lock);
+
+	cps = cpp = fmd_alloc(chp->ch_count * sizeof (fmd_case_t *), FMD_SLEEP);
+	cpc = chp->ch_count;
+
+	for (i = 0; i < chp->ch_hashlen; i++) {
+		for (cp = chp->ch_hash[i]; cp != NULL; cp = cp->ci_next) {
+			fmd_case_hold((fmd_case_t *)cp);
+			*cpp++ = cp;
+		}
+	}
+
+	ASSERT(cpp == cps + cpc);
+	(void) pthread_rwlock_unlock(&chp->ch_lock);
+
+	for (i = 0; i < cpc; i++) {
+		func((fmd_case_t *)cps[i], arg);
+		fmd_case_rele((fmd_case_t *)cps[i]);
+	}
+
+	fmd_free(cps, cpc * sizeof (fmd_case_t *));
+}
+
+/*
+ * Look up the diagcode for this case and cache it in ci_code.  If no suspects
+ * were defined for this case or if the lookup fails, the event dictionary or
+ * module code is broken, and we set the event code to a precomputed default.
+ */
+static const char *
+fmd_case_mkcode(fmd_case_t *cp)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 	fmd_case_susp_t *cis;
 
-	char *code, **keys, **keyp;
-	nvlist_t **nva, **nvp;
+	char **keys, **keyp;
 	const char *s;
-
-	int msg = B_TRUE;
-	boolean_t b;
 
 	ASSERT(MUTEX_HELD(&cip->ci_lock));
 	ASSERT(cip->ci_state >= FMD_CASE_SOLVED);
 
-	code = alloca(cip->ci_mod->mod_codelen);
+	fmd_free(cip->ci_code, cip->ci_codelen);
+	cip->ci_codelen = cip->ci_mod->mod_codelen;
+	cip->ci_code = fmd_zalloc(cip->ci_codelen, FMD_SLEEP);
 	keys = keyp = alloca(sizeof (char *) * (cip->ci_nsuspects + 1));
-	nva = nvp = alloca(sizeof (nvlist_t *) * cip->ci_nsuspects);
 
-	/*
-	 * For each suspect associated with the case, store its fault event
-	 * nvlist in 'nva' and its fault class in 'keys'.  We also look to see
-	 * if any of the suspect faults have asked not to be messaged.  If any
-	 * of them have made such a request, propagate that to the suspect list.
-	 */
 	for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next) {
 		if (nvlist_lookup_string(cis->cis_nvl, FM_CLASS, keyp) == 0)
 			keyp++;
-
-		*nvp++ = cis->cis_nvl;
-
-		if (nvlist_lookup_boolean_value(cis->cis_nvl,
-		    FM_SUSPECT_MESSAGE, &b) == 0 && b == B_FALSE)
-			msg = B_FALSE;
 	}
 
 	*keyp = NULL; /* mark end of keys[] array for libdiagcode */
 
-	/*
-	 * Look up the diagcode corresponding to this suspect list.  If
-	 * no suspects were defined for this case or if the lookup
-	 * fails, the dictionary or module code is busted or not set up
-	 * properly.  Emit the event with our precomputed default code.
-	 */
 	if (cip->ci_nsuspects == 0 || fmd_module_dc_key2code(
-	    cip->ci_mod, keys, code, cip->ci_mod->mod_codelen) != 0) {
+	    cip->ci_mod, keys, cip->ci_code, cip->ci_codelen) != 0) {
 		(void) fmd_conf_getprop(fmd.d_conf, "nodiagcode", &s);
-		code = alloca(strlen(s) + 1);
-		(void) strcpy(code, s);
+		fmd_free(cip->ci_code, cip->ci_codelen);
+		cip->ci_codelen = strlen(s) + 1;
+		cip->ci_code = fmd_zalloc(cip->ci_codelen, FMD_SLEEP);
+		(void) strcpy(cip->ci_code, s);
 	}
 
-	return (fmd_protocol_suspects(cip->ci_mod->mod_fmri,
-	    cip->ci_uuid, code, cip->ci_nsuspects, nva, msg));
+	return (cip->ci_code);
+}
+
+nvlist_t *
+fmd_case_mkevent(fmd_case_t *cp, const char *class)
+{
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_case_susp_t *cis;
+
+	fmd_asru_hash_t *ahp = fmd.d_asrus;
+	fmd_asru_t *asru;
+
+	nvlist_t **nva, **nvp, *nvl, *fmri;
+	uint8_t *ba, *bp;
+
+	int msg = B_TRUE;
+	boolean_t b;
+
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	ASSERT(cip->ci_state >= FMD_CASE_SOLVED);
+
+	nva = nvp = alloca(sizeof (nvlist_t *) * cip->ci_nsuspects);
+	ba = bp = alloca(sizeof (uint8_t) * cip->ci_nsuspects);
+
+	/*
+	 * For each suspect associated with the case, store its fault event
+	 * nvlist in 'nva'.  We also look to see if any of the suspect faults
+	 * have asked not to be messaged.  If any of them have made such a
+	 * request, propagate that attribute to the composite list.* event.
+	 * Finally, store each suspect's faulty status into the bitmap 'ba'.
+	 */
+	for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next) {
+		if (nvlist_lookup_boolean_value(cis->cis_nvl,
+		    FM_SUSPECT_MESSAGE, &b) == 0 && b == B_FALSE)
+			msg = B_FALSE;
+
+		if (nvlist_lookup_nvlist(cis->cis_nvl,
+		    FM_FAULT_ASRU, &fmri) == 0 && (asru =
+		    fmd_asru_hash_lookup_nvl(ahp, fmri, FMD_B_FALSE)) != NULL) {
+			*bp++ = (asru->asru_flags & FMD_ASRU_FAULTY) != 0;
+			fmd_asru_hash_release(ahp, asru);
+		} else
+			*bp++ = 0;
+
+		*nvp++ = cis->cis_nvl;
+	}
+
+	if (cip->ci_code == NULL)
+		(void) fmd_case_mkcode(cp);
+
+	nvl = fmd_protocol_list(class, cip->ci_mod->mod_fmri,
+	    cip->ci_uuid, cip->ci_code, cip->ci_nsuspects, nva, ba, msg);
+
+	(void) pthread_mutex_unlock(&cip->ci_lock);
+	return (nvl);
 }
 
 /*
- * Publish appropriate events based on the specified case state.  For a case
- * that is FMD_CASE_SOLVED, we send ci_event.  For a case that is
- * FMD_CASE_CLOSED, we send a case-closed event to the owner module.
+ * Convict suspects in a case by applying a conviction policy and updating the
+ * resource cache prior to emitting the list.suspect event for the given case.
+ * At present, our policy is very simple: convict every suspect in the case.
+ * In the future, this policy can be extended and made configurable to permit:
+ *
+ * - convicting the suspect with the highest FIT rate
+ * - convicting the suspect with the cheapest FRU
+ * - convicting the suspect with the FRU that is in a depot's inventory
+ * - convicting the suspect with the longest lifetime
+ *
+ * and so forth.  A word to the wise: this problem is significantly harder that
+ * it seems at first glance.  Future work should heed the following advice:
+ *
+ * Hacking the policy into C code here is a very bad idea.  The policy needs to
+ * be decided upon very carefully and fundamentally encodes knowledge of what
+ * suspect list combinations can be emitted by what diagnosis engines.  As such
+ * fmd's code is the wrong location, because that would require fmd itself to
+ * be updated for every diagnosis engine change, defeating the entire design.
+ * The FMA Event Registry knows the suspect list combinations: policy inputs
+ * can be derived from it and used to produce per-module policy configuration.
+ *
+ * If the policy needs to be dynamic and not statically fixed at either fmd
+ * startup or module load time, any implementation of dynamic policy retrieval
+ * must employ some kind of caching mechanism or be part of a built-in module.
+ * The fmd_case_convict() function is called with locks held inside of fmd and
+ * is not a place where unbounded blocking on some inter-process or inter-
+ * system communication to another service (e.g. another daemon) can occur.
  */
 static void
+fmd_case_convict(fmd_case_t *cp)
+{
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_asru_hash_t *ahp = fmd.d_asrus;
+
+	fmd_case_susp_t *cis;
+	fmd_asru_t *asru;
+	nvlist_t *fmri;
+
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	(void) fmd_case_mkcode(cp);
+
+	for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next) {
+		if (nvlist_lookup_nvlist(cis->cis_nvl, FM_FAULT_ASRU, &fmri))
+			continue; /* no ASRU provided by diagnosis engine */
+
+		if ((asru = fmd_asru_hash_lookup_nvl(ahp,
+		    fmri, FMD_B_TRUE)) == NULL) {
+			fmd_error(EFMD_CASE_EVENT, "cannot convict suspect in "
+			    "%s: %s\n", cip->ci_uuid, fmd_strerror(errno));
+			continue;
+		}
+
+		(void) fmd_asru_clrflags(asru,
+		    FMD_ASRU_UNUSABLE, cp, cis->cis_nvl);
+		(void) fmd_asru_setflags(asru,
+		    FMD_ASRU_FAULTY, cp, cis->cis_nvl);
+
+		fmd_asru_hash_release(ahp, asru);
+	}
+
+	(void) pthread_mutex_unlock(&cip->ci_lock);
+}
+
+void
 fmd_case_publish(fmd_case_t *cp, uint_t state)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
@@ -147,21 +358,13 @@ fmd_case_publish(fmd_case_t *cp, uint_t state)
 	nvlist_t *nvl;
 	char *class;
 
+	if (state == FMD_CASE_CURRENT)
+		state = cip->ci_state; /* use current state */
+
 	switch (state) {
 	case FMD_CASE_SOLVED:
-		(void) pthread_mutex_lock(&cip->ci_lock);
-
-		/*
-		 * If ci_event is NULL, the event was not created because the
-		 * case was restored from a checkpoint before _fmd_init() was
-		 * called.  Now that the module is ready, create the event.
-		 */
-		if (cip->ci_event == NULL)
-			cip->ci_event = fmd_case_mkevent(cp);
-
-		(void) pthread_mutex_unlock(&cip->ci_lock);
-
-		(void) nvlist_xdup(cip->ci_event, &nvl, &fmd.d_nva);
+		fmd_case_convict(cp);
+		nvl = fmd_case_mkevent(cp, FM_LIST_SUSPECT_CLASS);
 		(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 
 		e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
@@ -176,7 +379,7 @@ fmd_case_publish(fmd_case_t *cp, uint_t state)
 
 		break;
 
-	case FMD_CASE_CLOSED:
+	case FMD_CASE_CLOSE_WAIT:
 		fmd_case_hold(cp);
 		e = fmd_event_create(FMD_EVT_CLOSE, FMD_HRT_NOW, NULL, cp);
 		fmd_eventq_insert_at_head(cip->ci_mod->mod_queue, e);
@@ -186,30 +389,21 @@ fmd_case_publish(fmd_case_t *cp, uint_t state)
 		(void) pthread_mutex_unlock(&cip->ci_mod->mod_stats_lock);
 
 		break;
+
+	case FMD_CASE_CLOSED:
+		nvl = fmd_case_mkevent(cp, FM_LIST_ISOLATED_CLASS);
+		(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
+		e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
+		fmd_dispq_dispatch(fmd.d_disp, e, class);
+		break;
+
+	case FMD_CASE_REPAIRED:
+		nvl = fmd_case_mkevent(cp, FM_LIST_REPAIRED_CLASS);
+		(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
+		e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
+		fmd_dispq_dispatch(fmd.d_disp, e, class);
+		break;
 	}
-}
-
-/*
- * Refresh all of the cases by publishing events for each case if appropriate.
- * We do this once during startup to trigger case close and list.suspect events
- * for cases restored by checkpoints.  By holding the read lock on the case
- * hash, we ensure that we only refresh the current set of cases.  New cases
- * created in response to the events will block in fmd_case_hash_insert().
- */
-void
-fmd_case_hash_refresh(fmd_case_hash_t *chp)
-{
-	fmd_case_impl_t *cip;
-	uint_t i;
-
-	(void) pthread_rwlock_rdlock(&chp->ch_lock);
-
-	for (i = 0; i < chp->ch_hashlen; i++) {
-		for (cip = chp->ch_hash[i]; cip != NULL; cip = cip->ci_next)
-			fmd_case_publish((fmd_case_t *)cip, cip->ci_state);
-	}
-
-	(void) pthread_rwlock_unlock(&chp->ch_lock);
 }
 
 fmd_case_t *
@@ -246,13 +440,17 @@ fmd_case_hash_insert(fmd_case_hash_t *chp, fmd_case_impl_t *cip)
 
 	for (eip = chp->ch_hash[h]; eip != NULL; eip = eip->ci_next) {
 		if (strcmp(cip->ci_uuid, eip->ci_uuid) == 0) {
+			fmd_case_hold((fmd_case_t *)eip);
 			(void) pthread_rwlock_unlock(&chp->ch_lock);
-			return (NULL); /* uuid already present */
+			return (eip); /* uuid already present */
 		}
 	}
 
 	cip->ci_next = chp->ch_hash[h];
 	chp->ch_hash[h] = cip;
+
+	chp->ch_count++;
+	ASSERT(chp->ch_count != 0);
 
 	(void) pthread_rwlock_unlock(&chp->ch_lock);
 	return (cip);
@@ -284,6 +482,9 @@ fmd_case_hash_delete(fmd_case_hash_t *chp, fmd_case_impl_t *cip)
 	*pp = cp->ci_next;
 	cp->ci_next = NULL;
 
+	ASSERT(chp->ch_count != 0);
+	chp->ch_count--;
+
 	(void) pthread_rwlock_unlock(&chp->ch_lock);
 }
 
@@ -291,6 +492,7 @@ fmd_case_t *
 fmd_case_create(fmd_module_t *mp, void *data)
 {
 	fmd_case_impl_t *cip = fmd_zalloc(sizeof (fmd_case_impl_t), FMD_SLEEP);
+	fmd_case_impl_t *eip = NULL;
 	uuid_t uuid;
 
 	(void) pthread_mutex_init(&cip->ci_lock, NULL);
@@ -318,9 +520,11 @@ fmd_case_create(fmd_module_t *mp, void *data)
 	 * attempting to do a hash insert until we get a unique one.
 	 */
 	do {
+		if (eip != NULL)
+			fmd_case_rele((fmd_case_t *)eip);
 		uuid_generate(uuid);
 		uuid_unparse(uuid, cip->ci_uuid);
-	} while (fmd_case_hash_insert(fmd.d_cases, cip) == NULL);
+	} while ((eip = fmd_case_hash_insert(fmd.d_cases, cip)) != cip);
 
 	ASSERT(fmd_module_locked(mp));
 	fmd_list_append(&mp->mod_cases, cip);
@@ -334,19 +538,79 @@ fmd_case_create(fmd_module_t *mp, void *data)
 }
 
 fmd_case_t *
-fmd_case_recreate(fmd_module_t *mp, const char *uuid)
+fmd_case_recreate(fmd_module_t *mp, fmd_xprt_t *xp,
+    uint_t state, const char *uuid, const char *code)
 {
 	fmd_case_impl_t *cip = fmd_zalloc(sizeof (fmd_case_impl_t), FMD_SLEEP);
+	fmd_case_impl_t *eip;
+
+	ASSERT(state < FMD_CASE_REPAIRED);
 
 	(void) pthread_mutex_init(&cip->ci_lock, NULL);
 	fmd_buf_hash_create(&cip->ci_bufs);
 
 	fmd_module_hold(mp);
 	cip->ci_mod = mp;
+	cip->ci_xprt = xp;
 	cip->ci_refs = 1;
-	cip->ci_state = FMD_CASE_UNSOLVED;
+	cip->ci_state = state;
 	cip->ci_uuid = fmd_strdup(uuid, FMD_SLEEP);
 	cip->ci_uuidlen = strlen(cip->ci_uuid);
+	cip->ci_code = fmd_strdup(code, FMD_SLEEP);
+	cip->ci_codelen = cip->ci_code ? strlen(cip->ci_code) + 1 : 0;
+
+	if (state > FMD_CASE_CLOSE_WAIT)
+		cip->ci_flags |= FMD_CF_SOLVED;
+
+	/*
+	 * Insert the case into the global case hash.  If the specified UUID is
+	 * already present, check to see if it is an orphan: if so, reclaim it;
+	 * otherwise if it is owned by a different module then return NULL.
+	 */
+	if ((eip = fmd_case_hash_insert(fmd.d_cases, cip)) != cip) {
+		(void) pthread_mutex_lock(&cip->ci_lock);
+		cip->ci_refs--; /* decrement to zero */
+		fmd_case_destroy((fmd_case_t *)cip, B_FALSE);
+
+		cip = eip; /* switch 'cip' to the existing case */
+		(void) pthread_mutex_lock(&cip->ci_lock);
+
+		/*
+		 * If the ASRU cache is trying to recreate an orphan, then just
+		 * return the existing case that we found without changing it.
+		 */
+		if (mp == fmd.d_rmod) {
+			(void) pthread_mutex_unlock(&cip->ci_lock);
+			fmd_case_rele((fmd_case_t *)cip);
+			return ((fmd_case_t *)cip);
+		}
+
+		/*
+		 * If the existing case isn't an orphan or is being proxied,
+		 * then we have a UUID conflict: return failure to the caller.
+		 */
+		if (cip->ci_mod != fmd.d_rmod || xp != NULL) {
+			(void) pthread_mutex_unlock(&cip->ci_lock);
+			fmd_case_rele((fmd_case_t *)cip);
+			return (NULL);
+		}
+
+		/*
+		 * If the new module is reclaiming an orphaned case, remove
+		 * the case from the root module, switch ci_mod, and then fall
+		 * through to adding the case to the new owner module 'mp'.
+		 */
+		fmd_module_lock(cip->ci_mod);
+		fmd_list_delete(&cip->ci_mod->mod_cases, cip);
+		fmd_module_unlock(cip->ci_mod);
+
+		fmd_module_rele(cip->ci_mod);
+		cip->ci_mod = mp;
+		fmd_module_hold(mp);
+
+		(void) pthread_mutex_unlock(&cip->ci_lock);
+		fmd_case_rele((fmd_case_t *)cip);
+	}
 
 	ASSERT(fmd_module_locked(mp));
 	fmd_list_append(&mp->mod_cases, cip);
@@ -355,16 +619,11 @@ fmd_case_recreate(fmd_module_t *mp, const char *uuid)
 	cip->ci_mod->mod_stats->ms_caseopen.fmds_value.ui64++;
 	(void) pthread_mutex_unlock(&cip->ci_mod->mod_stats_lock);
 
-	if (fmd_case_hash_insert(fmd.d_cases, cip) == NULL) {
-		fmd_case_destroy((fmd_case_t *)cip);
-		return (NULL);
-	}
-
 	return ((fmd_case_t *)cip);
 }
 
 void
-fmd_case_destroy(fmd_case_t *cp)
+fmd_case_destroy(fmd_case_t *cp, int visible)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 	fmd_case_item_t *cit, *ncit;
@@ -373,7 +632,10 @@ fmd_case_destroy(fmd_case_t *cp)
 	ASSERT(MUTEX_HELD(&cip->ci_lock));
 	ASSERT(cip->ci_refs == 0);
 
-	fmd_case_hash_delete(fmd.d_cases, cip);
+	if (visible) {
+		TRACE((FMD_DBG_CASE, "deleting case %s", cip->ci_uuid));
+		fmd_case_hash_delete(fmd.d_cases, cip);
+	}
 
 	for (cit = cip->ci_items; cit != NULL; cit = ncit) {
 		ncit = cit->cit_next;
@@ -390,21 +652,10 @@ fmd_case_destroy(fmd_case_t *cp)
 	if (cip->ci_principal != NULL)
 		fmd_event_rele(cip->ci_principal);
 
-	nvlist_free(cip->ci_event);
 	fmd_free(cip->ci_uuid, cip->ci_uuidlen + 1);
+	fmd_free(cip->ci_code, cip->ci_codelen);
 	fmd_buf_hash_destroy(&cip->ci_bufs);
 
-	/*
-	 * Unlike other case functions, fmd_case_destroy() can be called from
-	 * fmd_module_unload() after the module is unregistered and mod_stats
-	 * has been destroyed.  As such we must check for NULL mod_stats here.
-	 */
-	(void) pthread_mutex_lock(&cip->ci_mod->mod_stats_lock);
-	if (cip->ci_mod->mod_stats != NULL)
-		cip->ci_mod->mod_stats->ms_caseopen.fmds_value.ui64--;
-	(void) pthread_mutex_unlock(&cip->ci_mod->mod_stats_lock);
-
-	fmd_module_setcdirty(cip->ci_mod);
 	fmd_module_rele(cip->ci_mod);
 	fmd_free(cip, sizeof (fmd_case_impl_t));
 }
@@ -421,6 +672,16 @@ fmd_case_hold(fmd_case_t *cp)
 }
 
 void
+fmd_case_hold_locked(fmd_case_t *cp)
+{
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+
+	ASSERT(MUTEX_HELD(&cip->ci_lock));
+	cip->ci_refs++;
+	ASSERT(cip->ci_refs != 0);
+}
+
+void
 fmd_case_rele(fmd_case_t *cp)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
@@ -429,7 +690,7 @@ fmd_case_rele(fmd_case_t *cp)
 	ASSERT(cip->ci_refs != 0);
 
 	if (--cip->ci_refs == 0)
-		fmd_case_destroy((fmd_case_t *)cip);
+		fmd_case_destroy((fmd_case_t *)cip, B_TRUE);
 	else
 		(void) pthread_mutex_unlock(&cip->ci_lock);
 }
@@ -444,7 +705,7 @@ fmd_case_insert_principal(fmd_case_t *cp, fmd_event_t *ep)
 	fmd_event_hold(ep);
 	(void) pthread_mutex_lock(&cip->ci_lock);
 
-	if (cip->ci_state >= FMD_CASE_SOLVED && cip->ci_event != NULL)
+	if (cip->ci_flags & FMD_CF_SOLVED)
 		state = FMD_EVS_DIAGNOSED;
 	else
 		state = FMD_EVS_ACCEPTED;
@@ -478,7 +739,7 @@ fmd_case_insert_event(fmd_case_t *cp, fmd_event_t *ep)
 	cip->ci_items = cit;
 	cip->ci_nitems++;
 
-	if (cip->ci_state >= FMD_CASE_SOLVED && cip->ci_event != NULL)
+	if (cip->ci_flags & FMD_CF_SOLVED)
 		state = FMD_EVS_DIAGNOSED;
 	else
 		state = FMD_EVS_ACCEPTED;
@@ -511,6 +772,25 @@ fmd_case_insert_suspect(fmd_case_t *cp, nvlist_t *nvl)
 }
 
 void
+fmd_case_recreate_suspect(fmd_case_t *cp, nvlist_t *nvl)
+{
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_case_susp_t *cis = fmd_alloc(sizeof (fmd_case_susp_t), FMD_SLEEP);
+
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	ASSERT(cip->ci_state == FMD_CASE_CLOSED);
+	ASSERT(cip->ci_mod == fmd.d_rmod);
+
+	cis->cis_next = cip->ci_suspects;
+	cis->cis_nvl = nvl;
+
+	cip->ci_suspects = cis;
+	cip->ci_nsuspects++;
+
+	(void) pthread_mutex_unlock(&cip->ci_lock);
+}
+
+void
 fmd_case_reset_suspects(fmd_case_t *cp)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
@@ -533,18 +813,26 @@ fmd_case_reset_suspects(fmd_case_t *cp)
 	fmd_module_setcdirty(cip->ci_mod);
 }
 
+/*
+ * Grab ci_lock and update the case state and set the dirty bit.  Then perform
+ * whatever actions and emit whatever events are appropriate for the state.
+ * Refer to the topmost block comment explaining the state machine for details.
+ */
 void
-fmd_case_transition(fmd_case_t *cp, uint_t state)
+fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+
+	uint_t old_state;
+	fmd_case_susp_t *cis;
+	fmd_case_item_t *cit;
+	fmd_asru_t *asru;
+	fmd_event_t *e;
 	nvlist_t *nvl;
 
-	/*
-	 * Grab ci_lock and update the case state and set the dirty bit.  If we
-	 * are solving the case, create a list.suspects event as cip->ci_event
-	 * and iterate over all the case events and mark them as DIAGNOSED.
-	 */
+	ASSERT(state <= FMD_CASE_REPAIRED);
 	(void) pthread_mutex_lock(&cip->ci_lock);
+	cip->ci_flags |= flags;
 
 	if (cip->ci_state >= state) {
 		(void) pthread_mutex_unlock(&cip->ci_lock);
@@ -554,22 +842,15 @@ fmd_case_transition(fmd_case_t *cp, uint_t state)
 	TRACE((FMD_DBG_CASE, "case %s %s->%s", cip->ci_uuid,
 	    _fmd_case_snames[cip->ci_state], _fmd_case_snames[state]));
 
+	old_state = cip->ci_state;
 	cip->ci_state = state;
 	cip->ci_flags |= FMD_CF_DIRTY;
 
+	if (cip->ci_xprt == NULL && cip->ci_mod != fmd.d_rmod)
+		fmd_module_setcdirty(cip->ci_mod);
+
 	switch (state) {
-	case FMD_CASE_SOLVED: {
-		fmd_case_item_t *cit;
-
-		/*
-		 * If the module has been initialized, then fill in ci_event.
-		 * If not, we are being called from the checkpoint code, in
-		 * in which case fmd_case_hash_refresh() will create and
-		 * publish the event later once the module has initialized.
-		 */
-		if (cip->ci_mod->mod_flags & FMD_MOD_INIT)
-			cip->ci_event = fmd_case_mkevent(cp);
-
+	case FMD_CASE_SOLVED:
 		for (cit = cip->ci_items; cit != NULL; cit = cit->cit_next)
 			fmd_event_transition(cit->cit_event, FMD_EVS_DIAGNOSED);
 
@@ -578,14 +859,16 @@ fmd_case_transition(fmd_case_t *cp, uint_t state)
 			    FMD_EVS_DIAGNOSED);
 		}
 		break;
-	}
 
-	case FMD_CASE_CLOSED: {
-		fmd_case_susp_t *cis;
-		fmd_asru_t *asru;
-
-		if (cip->ci_flags & FMD_CF_REPAIR)
-			break; /* don't change ASRUs if repair closed case */
+	case FMD_CASE_CLOSE_WAIT:
+		/*
+		 * If the case was never solved, do not change ASRUs.
+		 * If the case was never fmd_case_closed, do not change ASRUs.
+		 * If the case was repaired, do not change ASRUs.
+		 */
+		if ((cip->ci_flags & (FMD_CF_SOLVED | FMD_CF_ISOLATED |
+		    FMD_CF_REPAIRED)) != (FMD_CF_SOLVED | FMD_CF_ISOLATED))
+			goto close_wait_finish;
 
 		/*
 		 * For each fault event in the suspect list, attempt to look up
@@ -598,26 +881,68 @@ fmd_case_transition(fmd_case_t *cp, uint_t state)
 			    &nvl) == 0 && (asru = fmd_asru_hash_lookup_nvl(
 			    fmd.d_asrus, nvl, FMD_B_FALSE)) != NULL) {
 				(void) fmd_asru_setflags(asru,
-				    FMD_ASRU_UNUSABLE,
-				    cip->ci_uuid, cis->cis_nvl);
+				    FMD_ASRU_UNUSABLE, cp, cis->cis_nvl);
 				fmd_asru_hash_release(fmd.d_asrus, asru);
 			}
 		}
+
+	close_wait_finish:
+		if (!fmd_case_orphaned(cp))
+			break; /* state transition complete */
+
+		/*
+		 * If an orphaned case transitions to CLOSE_WAIT, the owning
+		 * module is no longer loaded: continue on to CASE_CLOSED.
+		 */
+		state = cip->ci_state = FMD_CASE_CLOSED;
+		/*FALLTHRU*/
+
+	case FMD_CASE_CLOSED:
+		ASSERT(fmd_case_orphaned(cp));
+		fmd_module_lock(cip->ci_mod);
+		fmd_list_append(&cip->ci_mod->mod_cases, cip);
+		fmd_module_unlock(cip->ci_mod);
 		break;
-	}
+
+	case FMD_CASE_REPAIRED:
+		ASSERT(fmd_case_orphaned(cp));
+
+		if (old_state == FMD_CASE_CLOSE_WAIT)
+			break; /* case was never closed (transition 6 above) */
+
+		fmd_module_lock(cip->ci_mod);
+		fmd_list_delete(&cip->ci_mod->mod_cases, cip);
+		fmd_module_unlock(cip->ci_mod);
+		break;
 	}
 
 	(void) pthread_mutex_unlock(&cip->ci_lock);
-	fmd_module_setcdirty(cip->ci_mod);
 
 	/*
-	 * If the module has been initialized, then publish the appropriate
-	 * event for the new case state.  If not, we are being called from
-	 * the checkpoint code, in which case fmd_case_hash_refresh() will
-	 * publish the event later once all the modules have initialized.
+	 * If the module has initialized, then publish the appropriate event
+	 * for the new case state.  If not, we are being called from the
+	 * checkpoint code during module load, in which case the module's
+	 * _fmd_init() routine hasn't finished yet, and our event dictionaries
+	 * may not be open yet, which will prevent us from computing the event
+	 * code.  Defer the call to fmd_case_publish() by enqueuing a PUBLISH
+	 * event in our queue: this won't be processed until _fmd_init is done.
 	 */
 	if (cip->ci_mod->mod_flags & FMD_MOD_INIT)
 		fmd_case_publish(cp, state);
+	else {
+		fmd_case_hold(cp);
+		e = fmd_event_create(FMD_EVT_PUBLISH, FMD_HRT_NOW, NULL, cp);
+		fmd_eventq_insert_at_head(cip->ci_mod->mod_queue, e);
+	}
+
+	/*
+	 * If we transitioned to CLOSED or REPAIRED, adjust the reference count
+	 * to reflect our addition to or removal from fmd.d_rmod->mod_cases.
+	 */
+	if (state == FMD_CASE_CLOSED)
+		fmd_case_hold(cp);
+	else if (state == FMD_CASE_REPAIRED && old_state != FMD_CASE_CLOSE_WAIT)
+		fmd_case_rele(cp);
 }
 
 void
@@ -677,67 +1002,156 @@ fmd_case_update(fmd_case_t *cp)
 	fmd_asru_t *asru;
 	nvlist_t *nvl;
 
-	int state = 0;
+	int astate = 0;
+	uint_t cstate;
 
 	(void) pthread_mutex_lock(&cip->ci_lock);
+	cstate = cip->ci_state;
 
-	if (cip->ci_state < FMD_CASE_SOLVED) {
+	if (cip->ci_xprt != NULL || cip->ci_state < FMD_CASE_SOLVED) {
 		(void) pthread_mutex_unlock(&cip->ci_lock);
-		return; /* update is not yet appropriate */
+		return; /* update is not appropriate */
 	}
 
 	for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next) {
 		if (nvlist_lookup_nvlist(cis->cis_nvl, FM_FAULT_ASRU,
 		    &nvl) == 0 && (asru = fmd_asru_hash_lookup_nvl(
 		    fmd.d_asrus, nvl, FMD_B_FALSE)) != NULL) {
-			state |= fmd_asru_getstate(asru);
+			astate |= fmd_asru_getstate(asru);
 			fmd_asru_hash_release(fmd.d_asrus, asru);
 		}
 	}
 
-	if (!(state & FMD_ASRU_FAULTY))
-		cip->ci_flags |= FMD_CF_REPAIR;
-
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 
-	if (!(state & FMD_ASRU_FAULTY))
-		fmd_case_transition(cp, FMD_CASE_CLOSED);
+	if (astate & FMD_ASRU_FAULTY)
+		return; /* one or more suspects are still marked faulty */
+
+	if (cstate == FMD_CASE_CLOSED)
+		fmd_case_transition(cp, FMD_CASE_REPAIRED, FMD_CF_REPAIRED);
+	else
+		fmd_case_transition(cp, FMD_CASE_CLOSE_WAIT, FMD_CF_REPAIRED);
+}
+
+/*
+ * Delete a closed case from the module's case list once the fmdo_close() entry
+ * point has run to completion.  If the case is owned by a transport module,
+ * tell the transport to proxy a case close on the other end of the transport.
+ * If not, transition to the appropriate next state based on ci_flags.  This
+ * function represents the end of CLOSE_WAIT and transitions the case to either
+ * CLOSED or REPAIRED or discards it entirely because it was never solved;
+ * refer to the topmost block comment explaining the state machine for details.
+ */
+void
+fmd_case_delete(fmd_case_t *cp)
+{
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+
+	(void) pthread_mutex_lock(&cip->ci_mod->mod_stats_lock);
+	cip->ci_mod->mod_stats->ms_caseopen.fmds_value.ui64--;
+	(void) pthread_mutex_unlock(&cip->ci_mod->mod_stats_lock);
+
+	ASSERT(fmd_module_locked(cip->ci_mod));
+	fmd_list_delete(&cip->ci_mod->mod_cases, cip);
+
+	if (cip->ci_xprt == NULL)
+		fmd_module_setcdirty(cip->ci_mod);
+
+	fmd_module_rele(cip->ci_mod);
+	cip->ci_mod = fmd.d_rmod;
+	fmd_module_hold(cip->ci_mod);
+
+	/*
+	 * If a proxied case finishes CLOSE_WAIT, then it can be discarded
+	 * rather than orphaned because by definition it can have no entries
+	 * in the resource cache of the current fault manager.
+	 */
+	if (cip->ci_xprt != NULL)
+		fmd_xprt_uuclose(cip->ci_xprt, cip->ci_uuid);
+	else if (cip->ci_flags & FMD_CF_REPAIRED)
+		fmd_case_transition(cp, FMD_CASE_REPAIRED, 0);
+	else if (cip->ci_flags & FMD_CF_ISOLATED)
+		fmd_case_transition(cp, FMD_CASE_CLOSED, 0);
+
+	fmd_case_rele(cp);
+}
+
+void
+fmd_case_discard(fmd_case_t *cp)
+{
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+
+	(void) pthread_mutex_lock(&cip->ci_mod->mod_stats_lock);
+	cip->ci_mod->mod_stats->ms_caseopen.fmds_value.ui64--;
+	(void) pthread_mutex_unlock(&cip->ci_mod->mod_stats_lock);
+
+	ASSERT(fmd_module_locked(cip->ci_mod));
+	fmd_list_delete(&cip->ci_mod->mod_cases, cip);
+	fmd_case_rele(cp);
 }
 
 /*
  * Indicate that the problem corresponding to a case has been repaired by
- * clearing the faulty bit on each ASRU named as a suspect.  If the case has
- * not already been closed, this function initiates the case close transition.
+ * clearing the faulty bit on each ASRU named as a suspect.  If the case hasn't
+ * already been closed, this function initiates the transition to CLOSE_WAIT.
+ * The caller must have the case held from fmd_case_hash_lookup(), so we can
+ * grab and drop ci_lock without the case being able to be freed in between.
  */
 int
 fmd_case_repair(fmd_case_t *cp)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 	fmd_case_susp_t *cis;
-	fmd_asru_t *asru;
 	nvlist_t *nvl;
+	uint_t cstate;
+
+	fmd_asru_hash_t *ahp = fmd.d_asrus;
+	fmd_asru_t **aa;
+	uint_t i, an;
 
 	(void) pthread_mutex_lock(&cip->ci_lock);
+	cstate = cip->ci_state;
 
-	if (cip->ci_state < FMD_CASE_SOLVED) {
+	if (cip->ci_xprt != NULL) {
+		(void) pthread_mutex_unlock(&cip->ci_lock);
+		return (fmd_set_errno(EFMD_CASE_OWNER));
+	}
+
+	if (cstate < FMD_CASE_SOLVED) {
 		(void) pthread_mutex_unlock(&cip->ci_lock);
 		return (fmd_set_errno(EFMD_CASE_STATE));
 	}
 
-	for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next) {
-		if (nvlist_lookup_nvlist(cis->cis_nvl, FM_FAULT_ASRU,
-		    &nvl) == 0 && (asru = fmd_asru_hash_lookup_nvl(
-		    fmd.d_asrus, nvl, FMD_B_FALSE)) != NULL) {
-			(void) fmd_asru_clrflags(asru,
-			    FMD_ASRU_FAULTY, NULL, NULL);
-			fmd_asru_hash_release(fmd.d_asrus, asru);
-		}
+	/*
+	 * Take a snapshot of any ASRUs referenced by the case that are present
+	 * in the resource cache.  Then drop ci_lock and clear the faulty bit
+	 * on each ASRU (we can't call fmd_asru_clrflags() with ci_lock held).
+	 */
+	an = cip->ci_nsuspects;
+	aa = alloca(sizeof (fmd_asru_t *) * an);
+	bzero(aa, sizeof (fmd_asru_t *) * an);
+
+	for (i = 0, cis = cip->ci_suspects;
+	    cis != NULL; cis = cis->cis_next, i++) {
+		if (nvlist_lookup_nvlist(cis->cis_nvl,
+		    FM_FAULT_ASRU, &nvl) == 0)
+			aa[i] = fmd_asru_hash_lookup_nvl(ahp, nvl, FMD_B_FALSE);
 	}
 
-	cip->ci_flags |= FMD_CF_REPAIR;
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 
-	fmd_case_transition(cp, FMD_CASE_CLOSED);
+	for (i = 0; i < an; i++) {
+		if (aa[i] == NULL)
+			continue; /* no asru was found */
+		(void) fmd_asru_clrflags(aa[i], FMD_ASRU_FAULTY, NULL, NULL);
+		fmd_asru_hash_release(ahp, aa[i]);
+	}
+
+	if (cstate == FMD_CASE_CLOSED)
+		fmd_case_transition(cp, FMD_CASE_REPAIRED, FMD_CF_REPAIRED);
+	else
+		fmd_case_transition(cp, FMD_CASE_CLOSE_WAIT, FMD_CF_REPAIRED);
+
 	return (0);
 }
 
@@ -770,4 +1184,10 @@ fmd_case_contains(fmd_case_t *cp, fmd_event_t *ep)
 		fmd_event_transition(ep, state);
 
 	return (rv);
+}
+
+int
+fmd_case_orphaned(fmd_case_t *cp)
+{
+	return (((fmd_case_impl_t *)cp)->ci_mod == fmd.d_rmod);
 }

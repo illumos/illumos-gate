@@ -134,6 +134,7 @@ d none var/fm 755 root sys
 d none var/fm/fmd 755 root sys
 d none var/fm/fmd/ckpt 700 root sys
 d none var/fm/fmd/rsrc 700 root sys
+d none var/fm/fmd/xprt 700 root sys
 d none var/svc 755 root sys
 d none var/svc/manifest 755 root sys
 d none var/svc/manifest/system 755 root sys

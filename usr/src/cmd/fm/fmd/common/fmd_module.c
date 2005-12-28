@@ -48,6 +48,7 @@
 #include <fmd_protocol.h>
 #include <fmd_buf.h>
 #include <fmd_ckpt.h>
+#include <fmd_xprt.h>
 
 #include <fmd.h>
 
@@ -58,12 +59,10 @@
  * required in the future, the FMD_ADM_MODDSTAT service routine must change.
  */
 static const fmd_modstat_t _fmd_modstat_tmpl = {
-{ "fmd.loadtime", FMD_TYPE_TIME, "hrtime at which module was loaded" },
-{ "fmd.snaptime", FMD_TYPE_TIME, "hrtime of last statistics snapshot" },
+{
 { "fmd.dispatched", FMD_TYPE_UINT64, "total events dispatched to module" },
 { "fmd.dequeued", FMD_TYPE_UINT64, "total events dequeued by module" },
 { "fmd.prdequeued", FMD_TYPE_UINT64, "protocol events dequeued by module" },
-{ "fmd.accepted", FMD_TYPE_UINT64, "total events accepted by module" },
 { "fmd.dropped", FMD_TYPE_UINT64, "total events dropped on queue overflow" },
 { "fmd.wcnt", FMD_TYPE_UINT32, "count of events waiting on queue" },
 { "fmd.wtime", FMD_TYPE_TIME, "total wait time on queue" },
@@ -71,6 +70,10 @@ static const fmd_modstat_t _fmd_modstat_tmpl = {
 { "fmd.wlastupdate", FMD_TYPE_TIME, "hrtime of last wait queue update" },
 { "fmd.dtime", FMD_TYPE_TIME, "total processing time after dequeue" },
 { "fmd.dlastupdate", FMD_TYPE_TIME, "hrtime of last event dequeue completion" },
+},
+{ "fmd.loadtime", FMD_TYPE_TIME, "hrtime at which module was loaded" },
+{ "fmd.snaptime", FMD_TYPE_TIME, "hrtime of last statistics snapshot" },
+{ "fmd.accepted", FMD_TYPE_UINT64, "total events accepted by module" },
 { "fmd.debugdrop", FMD_TYPE_UINT64, "dropped debug messages" },
 { "fmd.memtotal", FMD_TYPE_SIZE, "total memory allocated by module" },
 { "fmd.memlimit", FMD_TYPE_SIZE, "limit on total memory allocated" },
@@ -86,6 +89,9 @@ static const fmd_modstat_t _fmd_modstat_tmpl = {
 { "fmd.ckptzero", FMD_TYPE_BOOL, "zeroed checkpoint at startup" },
 { "fmd.ckptcnt", FMD_TYPE_UINT64, "number of checkpoints taken" },
 { "fmd.ckpttime", FMD_TYPE_TIME, "total checkpoint time" },
+{ "fmd.xprtopen", FMD_TYPE_UINT32, "total number of open transports" },
+{ "fmd.xprtlimit", FMD_TYPE_UINT32, "limit on number of open transports" },
+{ "fmd.xprtqlimit", FMD_TYPE_UINT32, "limit on transport event queue length" },
 };
 
 static void
@@ -93,6 +99,7 @@ fmd_module_start(void *arg)
 {
 	fmd_module_t *mp = arg;
 	fmd_event_t *ep;
+	fmd_xprt_t *xp;
 
 	(void) pthread_mutex_lock(&mp->mod_lock);
 
@@ -102,11 +109,22 @@ fmd_module_start(void *arg)
 		goto out;
 	}
 
+	if (fmd.d_mod_event != NULL)
+		fmd_eventq_insert_at_head(mp->mod_queue, fmd.d_mod_event);
+
 	ASSERT(MUTEX_HELD(&mp->mod_lock));
 	mp->mod_flags |= FMD_MOD_INIT;
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
+
+	/*
+	 * If the module opened any transports while executing _fmd_init(),
+	 * they are suspended. Now that _fmd_init() is done, wake them up.
+	 */
+	for (xp = fmd_list_next(&mp->mod_transports);
+	    xp != NULL; xp = fmd_list_next(xp))
+		fmd_xprt_xresume(xp, FMD_XPRT_ISUSPENDED);
 
 	/*
 	 * Wait for events to arrive by checking mod_error and then sleeping in
@@ -114,26 +132,18 @@ fmd_module_start(void *arg)
 	 * been aborted and we continue on to call fini and exit the thread.
 	 */
 	while ((ep = fmd_eventq_delete(mp->mod_queue)) != NULL) {
-		fmd_event_impl_t *eip = (fmd_event_impl_t *)ep;
-
 		/*
-		 * If the event is a control event or the module has failed,
-		 * discard the event without ever passing it to the module.
-		 * If it's a control event, fmd_event_rele() will block in
-		 * fmd_ctl_rele() until all modules have reached a barrier.
+		 * If the module has failed, discard the event without ever
+		 * passing it to the module and go back to sleep.
 		 */
-		if (eip->ev_type == FMD_EVT_CTL || mp->mod_error != 0) {
-			if (eip->ev_type != FMD_EVT_CTL) {
-				fmd_modstat_eventq_dequeue(mp, eip->ev_type);
-				fmd_modstat_eventq_done(mp);
-			}
+		if (mp->mod_error != 0) {
+			fmd_eventq_done(mp->mod_queue);
 			fmd_event_rele(ep);
 			continue;
 		}
 
-		fmd_modstat_eventq_dequeue(mp, eip->ev_type);
 		mp->mod_ops->mop_dispatch(mp, ep);
-		fmd_modstat_eventq_done(mp);
+		fmd_eventq_done(mp->mod_queue);
 
 		/*
 		 * Once mop_dispatch() is complete, grab the lock and perform
@@ -142,10 +152,8 @@ fmd_module_start(void *arg)
 		 */
 		fmd_module_lock(mp);
 
-		if (eip->ev_type == FMD_EVT_CLOSE) {
-			fmd_list_delete(&mp->mod_cases, eip->ev_data);
-			fmd_case_rele(eip->ev_data);
-		}
+		if (FMD_EVENT_TYPE(ep) == FMD_EVT_CLOSE)
+			fmd_case_delete(FMD_EVENT_DATA(ep));
 
 		fmd_ckpt_save(mp);
 		fmd_module_unlock(mp);
@@ -159,8 +167,8 @@ fmd_module_start(void *arg)
 	mp->mod_flags |= FMD_MOD_FINI;
 
 out:
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 }
 
 fmd_module_t *
@@ -185,9 +193,6 @@ fmd_module_create(const char *path, const fmd_modops_t *ops)
 	mp->mod_path = fmd_strdup(path, FMD_SLEEP);
 	mp->mod_ops = ops;
 	mp->mod_ustat = fmd_ustat_create();
-
-	(void) fmd_conf_getprop(fmd.d_conf, "client.evqlim", &limit);
-	mp->mod_queue = fmd_eventq_create(mp, limit);
 
 	(void) fmd_conf_getprop(fmd.d_conf, "ckpt.dir", &dir);
 	(void) snprintf(buf, sizeof (buf),
@@ -218,6 +223,11 @@ fmd_module_create(const char *path, const fmd_modops_t *ops)
 		return (NULL);
 	}
 
+	(void) fmd_conf_getprop(fmd.d_conf, "client.evqlim", &limit);
+
+	mp->mod_queue = fmd_eventq_create(mp,
+	    &mp->mod_stats->ms_evqstat, &mp->mod_stats_lock, limit);
+
 	(void) fmd_conf_getprop(fmd.d_conf, "client.memlim",
 	    &mp->mod_stats->ms_memlimit.fmds_value.ui64);
 
@@ -226,6 +236,12 @@ fmd_module_create(const char *path, const fmd_modops_t *ops)
 
 	(void) fmd_conf_getprop(fmd.d_conf, "client.thrlim",
 	    &mp->mod_stats->ms_thrlimit.fmds_value.ui32);
+
+	(void) fmd_conf_getprop(fmd.d_conf, "client.xprtlim",
+	    &mp->mod_stats->ms_xprtlimit.fmds_value.ui32);
+
+	(void) fmd_conf_getprop(fmd.d_conf, "client.xprtqlim",
+	    &mp->mod_stats->ms_xprtqlimit.fmds_value.ui32);
 
 	(void) fmd_conf_getprop(fmd.d_conf, "ckpt.save",
 	    &mp->mod_stats->ms_ckpt_save.fmds_value.bool);
@@ -296,17 +312,17 @@ fmd_module_create(const char *path, const fmd_modops_t *ops)
 		return (NULL);
 	}
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 
 	fmd_dprintf(FMD_DBG_MOD, "loaded module %s\n", mp->mod_name);
 	return (mp);
 }
 
 static void
-fmd_module_untimeout(fmd_module_t *mp, id_t id)
+fmd_module_untimeout(fmd_idspace_t *ids, id_t id, fmd_module_t *mp)
 {
-	void *arg = fmd_timerq_remove(fmd.d_timers, mp->mod_timerids, id);
+	void *arg = fmd_timerq_remove(fmd.d_timers, ids, id);
 
 	/*
 	 * The root module calls fmd_timerq_install() directly and must take
@@ -317,32 +333,9 @@ fmd_module_untimeout(fmd_module_t *mp, id_t id)
 		fmd_free(arg, sizeof (fmd_modtimer_t));
 }
 
-/*
- * If an auxiliary thread exists for the specified module once _fmd_fini has
- * completed, send it an asynchronous cancellation to force it to exit and then
- * join with it (we expect this to either succeed quickly or return ESRCH).
- * Once this is complete we can destroy the associated fmd_thread_t data.
- */
-static void
-fmd_module_thrcancel(fmd_module_t *mp, id_t id)
-{
-	fmd_thread_t *tp = fmd_idspace_getspecific(mp->mod_threads, id);
-
-	fmd_dprintf(FMD_DBG_MOD, "cancelling %s auxiliary thread %u\n",
-	    mp->mod_name, tp->thr_tid);
-
-	ASSERT(tp->thr_tid == id);
-	(void) pthread_cancel(tp->thr_tid);
-	(void) pthread_join(tp->thr_tid, NULL);
-
-	fmd_thread_destroy(tp, FMD_THREAD_NOJOIN);
-}
-
 void
 fmd_module_unload(fmd_module_t *mp)
 {
-	fmd_case_t *cp;
-
 	(void) pthread_mutex_lock(&mp->mod_lock);
 
 	if (mp->mod_flags & FMD_MOD_QUIT) {
@@ -364,22 +357,17 @@ fmd_module_unload(fmd_module_t *mp)
 	while ((mp->mod_flags & (FMD_MOD_INIT | FMD_MOD_FINI)) == FMD_MOD_INIT)
 		(void) pthread_cond_wait(&mp->mod_cv, &mp->mod_lock);
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 
 	fmd_thread_destroy(mp->mod_thread, FMD_THREAD_JOIN);
 	mp->mod_thread = NULL;
 
 	/*
 	 * Once the module is no longer active, clean up any data structures
-	 * that are only required when the module is loaded, such as cases.
+	 * that are only required when the module is loaded.
 	 */
 	fmd_module_lock(mp);
-
-	while ((cp = fmd_list_next(&mp->mod_cases)) != NULL) {
-		fmd_list_delete(&mp->mod_cases, cp);
-		fmd_case_rele(cp);
-	}
 
 	if (mp->mod_timerids != NULL) {
 		fmd_idspace_apply(mp->mod_timerids,
@@ -390,9 +378,6 @@ fmd_module_unload(fmd_module_t *mp)
 	}
 
 	if (mp->mod_threads != NULL) {
-		fmd_idspace_apply(mp->mod_threads,
-		    (void (*)())fmd_module_thrcancel, mp);
-
 		fmd_idspace_destroy(mp->mod_threads);
 		mp->mod_threads = NULL;
 	}
@@ -439,6 +424,14 @@ fmd_module_destroy(fmd_module_t *mp)
 		mp->mod_queue = NULL;
 	}
 
+	if (mp->mod_ustat != NULL) {
+		(void) pthread_mutex_lock(&mp->mod_stats_lock);
+		fmd_ustat_destroy(mp->mod_ustat);
+		mp->mod_ustat = NULL;
+		mp->mod_stats = NULL;
+		(void) pthread_mutex_unlock(&mp->mod_stats_lock);
+	}
+
 	for (i = 0; i < mp->mod_dictc; i++)
 		fm_dc_closedict(mp->mod_dictv[i]);
 
@@ -453,9 +446,6 @@ fmd_module_destroy(fmd_module_t *mp)
 	}
 
 	fmd_free(mp->mod_argv, sizeof (fmd_conf_formal_t) * mp->mod_argc);
-
-	if (mp->mod_ustat != NULL)
-		fmd_ustat_destroy(mp->mod_ustat);
 
 	fmd_strfree(mp->mod_name);
 	fmd_strfree(mp->mod_path);
@@ -525,8 +515,8 @@ fmd_module_dispatch(fmd_module_t *mp, fmd_event_t *e)
 		fmd_module_error(mp, err);
 	}
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 
 	/*
 	 * If it's the first time through fmd_module_dispatch(), call the
@@ -543,7 +533,6 @@ fmd_module_dispatch(fmd_module_t *mp, fmd_event_t *e)
 			t = ep->ev_data;
 			ASSERT(t->mt_mod == mp);
 			ops->fmdo_timeout(hdl, t->mt_id, t->mt_arg);
-			fmd_free(t, sizeof (fmd_modtimer_t));
 			break;
 		case FMD_EVT_CLOSE:
 			ops->fmdo_close(hdl, ep->ev_data);
@@ -555,10 +544,23 @@ fmd_module_dispatch(fmd_module_t *mp, fmd_event_t *e)
 		case FMD_EVT_GC:
 			ops->fmdo_gc(hdl);
 			break;
+		case FMD_EVT_PUBLISH:
+			fmd_case_publish(ep->ev_data, FMD_CASE_CURRENT);
+			break;
 		}
 	}
 
 	fmd_module_exit(mp);
+}
+
+int
+fmd_module_transport(fmd_module_t *mp, fmd_xprt_t *xp, fmd_event_t *e)
+{
+	fmd_event_impl_t *ep = (fmd_event_impl_t *)e;
+	fmd_hdl_t *hdl = (fmd_hdl_t *)mp;
+
+	ASSERT(ep->ev_type == FMD_EVT_PROTOCOL);
+	return (mp->mod_info->fmdi_ops->fmdo_send(hdl, xp, e, ep->ev_nvl));
 }
 
 void
@@ -715,8 +717,8 @@ fmd_module_lock(fmd_module_t *mp)
 	mp->mod_owner = self;
 	mp->mod_flags |= FMD_MOD_LOCK;
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 }
 
 void
@@ -730,8 +732,8 @@ fmd_module_unlock(fmd_module_t *mp)
 	mp->mod_owner = 0;
 	mp->mod_flags &= ~FMD_MOD_LOCK;
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 }
 
 int
@@ -747,8 +749,8 @@ fmd_module_trylock(fmd_module_t *mp)
 	mp->mod_owner = pthread_self();
 	mp->mod_flags |= FMD_MOD_LOCK;
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 
 	return (1);
 }
@@ -775,8 +777,8 @@ fmd_module_enter(fmd_module_t *mp, void (*func)(fmd_hdl_t *))
 		fmd_module_error(mp, err);
 	}
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 
 	/*
 	 * If it's the first time through fmd_module_enter(), call the provided
@@ -798,8 +800,8 @@ fmd_module_exit(fmd_module_t *mp)
 	ASSERT(mp->mod_flags & FMD_MOD_BUSY);
 	mp->mod_flags &= ~FMD_MOD_BUSY;
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 }
 
 /*
@@ -872,7 +874,6 @@ fmd_module_hold(fmd_module_t *mp)
 	ASSERT(mp->mod_refs != 0);
 
 	(void) pthread_mutex_unlock(&mp->mod_lock);
-	(void) pthread_cond_broadcast(&mp->mod_cv);
 }
 
 void
@@ -884,13 +885,11 @@ fmd_module_rele(fmd_module_t *mp)
 	    (void *)mp, mp->mod_name, mp->mod_refs));
 
 	ASSERT(mp->mod_refs != 0);
-	if (--mp->mod_refs == 0) {
-		fmd_module_destroy(mp);
-		return;
-	}
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
-	(void) pthread_cond_broadcast(&mp->mod_cv);
+	if (--mp->mod_refs == 0)
+		fmd_module_destroy(mp);
+	else
+		(void) pthread_mutex_unlock(&mp->mod_lock);
 }
 
 /*
@@ -1215,103 +1214,6 @@ fmd_modhash_unload(fmd_modhash_t *mhp, const char *name)
 	return (0);
 }
 
-/*
- * Update statistics when an event is dispatched and placed on a module's event
- * queue.  This is essentially the same code as kstat_waitq_enter(9F).
- */
-void
-fmd_modstat_eventq_dispatch(fmd_module_t *mp)
-{
-	fmd_modstat_t *msp;
-	hrtime_t new, delta;
-	uint32_t wcnt;
-
-	(void) pthread_mutex_lock(&mp->mod_stats_lock);
-
-	if ((msp = mp->mod_stats) == NULL) {
-		(void) pthread_mutex_unlock(&mp->mod_stats_lock);
-		return; /* module is no longer registered */
-	}
-
-	new = gethrtime();
-	delta = new - msp->ms_wlastupdate.fmds_value.ui64;
-	msp->ms_wlastupdate.fmds_value.ui64 = new;
-	wcnt = msp->ms_wcnt.fmds_value.ui32++;
-
-	if (wcnt != 0) {
-		msp->ms_wlentime.fmds_value.ui64 += delta * wcnt;
-		msp->ms_wtime.fmds_value.ui64 += delta;
-	}
-
-	msp->ms_dispatched.fmds_value.ui64++;
-	(void) pthread_mutex_unlock(&mp->mod_stats_lock);
-}
-
-/*
- * Update statistics when an event is dequeued by a module and is sent to the
- * dispatch entry point.  This is essentially kstat_waitq_to_runq(9F), except
- * simplified because our modules are single-threaded (i.e. runq len == 1).
- */
-void
-fmd_modstat_eventq_dequeue(fmd_module_t *mp, uint_t type)
-{
-	fmd_modstat_t *msp;
-	hrtime_t new, delta;
-	uint32_t wcnt;
-
-	(void) pthread_mutex_lock(&mp->mod_stats_lock);
-
-	if ((msp = mp->mod_stats) == NULL) {
-		(void) pthread_mutex_unlock(&mp->mod_stats_lock);
-		return; /* module is no longer registered */
-	}
-
-	new = gethrtime();
-	delta = new - msp->ms_wlastupdate.fmds_value.ui64;
-
-	msp->ms_wlastupdate.fmds_value.ui64 = new;
-	msp->ms_dlastupdate.fmds_value.ui64 = new;
-
-	ASSERT(msp->ms_wcnt.fmds_value.ui32 != 0);
-	wcnt = msp->ms_wcnt.fmds_value.ui32--;
-
-	msp->ms_wlentime.fmds_value.ui64 += delta * wcnt;
-	msp->ms_wtime.fmds_value.ui64 += delta;
-
-	if (type == FMD_EVT_PROTOCOL)
-		msp->ms_prdequeued.fmds_value.ui64++;
-
-	msp->ms_dequeued.fmds_value.ui64++;
-	(void) pthread_mutex_unlock(&mp->mod_stats_lock);
-}
-
-/*
- * Update statistics when an event is done being processed by the module's
- * dispatch entry point.  This is essentially kstat_runq_exit(9F) simplified
- * for our principle that modules are single-threaded (i.e. runq len == 1).
- */
-void
-fmd_modstat_eventq_done(fmd_module_t *mp)
-{
-	fmd_modstat_t *msp;
-	hrtime_t new, delta;
-
-	(void) pthread_mutex_lock(&mp->mod_stats_lock);
-
-	if ((msp = mp->mod_stats) == NULL) {
-		(void) pthread_mutex_unlock(&mp->mod_stats_lock);
-		return; /* module is no longer registered */
-	}
-
-	new = gethrtime();
-	delta = new - msp->ms_dlastupdate.fmds_value.ui64;
-
-	msp->ms_dlastupdate.fmds_value.ui64 = new;
-	msp->ms_dtime.fmds_value.ui64 += delta;
-
-	(void) pthread_mutex_unlock(&mp->mod_stats_lock);
-}
-
 void
 fmd_modstat_publish(fmd_module_t *mp)
 {
@@ -1348,8 +1250,8 @@ fmd_modstat_snapshot(fmd_module_t *mp, fmd_ustat_snap_t *uss)
 	}
 
 	mp->mod_flags |= FMD_MOD_STSUB;
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 
 	/*
 	 * Create a stats pseudo-event and dispatch it to the module, forcing
@@ -1372,8 +1274,8 @@ fmd_modstat_snapshot(fmd_module_t *mp, fmd_ustat_snap_t *uss)
 		return (fmd_set_errno(EFMD_HDL_ABORT));
 	}
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 
 	/*
 	 * Update ms_snaptime and take the actual snapshot of the various
@@ -1399,8 +1301,8 @@ fmd_modstat_snapshot(fmd_module_t *mp, fmd_ustat_snap_t *uss)
 	ASSERT(mp->mod_flags & FMD_MOD_STPUB);
 	mp->mod_flags &= ~(FMD_MOD_STSUB | FMD_MOD_STPUB);
 
-	(void) pthread_mutex_unlock(&mp->mod_lock);
 	(void) pthread_cond_broadcast(&mp->mod_cv);
+	(void) pthread_mutex_unlock(&mp->mod_lock);
 
 	return (err);
 }

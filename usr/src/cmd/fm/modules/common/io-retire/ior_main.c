@@ -19,60 +19,30 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include <strings.h>
-#include <errno.h>
-#include <time.h>
-#include <fm/fmd_api.h>
 #include <sys/fm/protocol.h>
+#include <fm/fmd_api.h>
+#include <strings.h>
 
-static int Autoclose;
-static char *lastuuid;
+static int ior_autoclose;
 
 /*ARGSUSED*/
 static void
 ior_recv(fmd_hdl_t *hdl, fmd_event_t *ep, nvlist_t *nvl, const char *class)
 {
-	char *uuid = NULL;
-	char *entryname;
-	nvlist_t *asru;
-	nvlist_t **nva;
-	uint_t nvc = 0;
+	char *uuid;
 
-	fmd_hdl_debug(hdl, "recv: %s\n", class);
-	if (strcmp(class, FM_LIST_SUSPECT_CLASS) == 0) {
-		(void) nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid);
-		(void) nvlist_lookup_nvlist_array(nvl,
-		    FM_SUSPECT_FAULT_LIST, &nva, &nvc);
-
-		fmd_hdl_debug(hdl, "uuid: %s\n", uuid);
-		/* if getting called again with same uuid, return */
-		if (lastuuid != NULL && strcmp(lastuuid, uuid) == 0) {
-			fmd_hdl_debug(hdl, "repeat uuid\n");
-			return;
-		} else if (lastuuid)
-			fmd_hdl_strfree(hdl, lastuuid);
-		lastuuid = fmd_hdl_strdup(hdl, uuid, FMD_SLEEP);
-		for (; nvc-- != 0; nva++) {
-			(void) nvlist_lookup_string(*nva, FM_CLASS, &entryname);
-			if (nvlist_lookup_nvlist(*nva,
-			    FM_FAULT_ASRU, &asru) == 0) {
-				fmd_hdl_debug(hdl, "convict: %s\n", entryname);
-				fmd_case_uuconvict(hdl, uuid, *nva);
-			} else {
-				fmd_hdl_debug(hdl,
-				    "no convict: %s (no asru)\n", entryname);
-			}
-		}
-		if (Autoclose != 0)
-			fmd_case_uuclose(hdl, uuid);
-	}
+	if (ior_autoclose && strcmp(class, FM_LIST_SUSPECT_CLASS) == 0 &&
+	    nvlist_lookup_string(nvl, FM_SUSPECT_UUID, &uuid) == 0 &&
+	    !fmd_case_uuclosed(hdl, uuid))
+		fmd_case_uuclose(hdl, uuid);
 }
 
 static const fmd_hdl_ops_t fmd_ops = {
@@ -95,13 +65,6 @@ static const fmd_hdl_info_t fmd_info = {
 void
 _fmd_init(fmd_hdl_t *hdl)
 {
-	(void) fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info);
-	Autoclose = fmd_prop_get_int32(hdl, "autoclose");
-}
-
-/*ARGSUSED*/
-void
-_fmd_fini(fmd_hdl_t *hdl)
-{
-	/* nothing to do here */
+	if (fmd_hdl_register(hdl, FMD_API_VERSION, &fmd_info) == 0)
+		ior_autoclose = fmd_prop_get_int32(hdl, "autoclose");
 }

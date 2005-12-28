@@ -43,10 +43,10 @@ extern "C" {
 #include <fmd_serd.h>
 #include <fmd_buf.h>
 #include <fmd_api.h>
+#include <fmd_eventq.h>
 
 struct fmd_module;			/* see below */
 struct fmd_thread;			/* see <fmd_thread.h> */
-struct fmd_eventq;			/* see <fmd_eventq.h> */
 struct fmd_idspace;			/* see <fmd_idspace.h> */
 struct fmd_ustat;			/* see <fmd_ustat.h> */
 struct fmd_ustat_snap;			/* see <fmd_ustat.h> */
@@ -55,6 +55,8 @@ typedef struct fmd_modops {
 	int (*mop_init)(struct fmd_module *);
 	int (*mop_fini)(struct fmd_module *);
 	void (*mop_dispatch)(struct fmd_module *, struct fmd_event *);
+	int (*mop_transport)(struct fmd_module *,
+	    fmd_xprt_t *, struct fmd_event *);
 } fmd_modops_t;
 
 typedef struct fmd_modhash {
@@ -70,19 +72,10 @@ typedef struct fmd_modhash {
  * required in the future, the FMD_ADM_MODDSTAT service routine must change.
  */
 typedef struct fmd_modstat {
+	fmd_eventqstat_t ms_evqstat;	/* stats for main module event queue */
 	fmd_stat_t ms_loadtime;		/* hrtime at which module was loaded */
 	fmd_stat_t ms_snaptime;		/* hrtime of recent stats snapshot */
-	fmd_stat_t ms_dispatched;	/* total events dispatched to queue */
-	fmd_stat_t ms_dequeued;		/* total events dequeued by module */
-	fmd_stat_t ms_prdequeued;	/* protocol events dequeued by module */
 	fmd_stat_t ms_accepted;		/* total events accepted by module */
-	fmd_stat_t ms_dropped;		/* total events dropped by module */
-	fmd_stat_t ms_wcnt;		/* count of events waiting on queue */
-	fmd_stat_t ms_wtime;		/* total wait time (pre-dispatch) */
-	fmd_stat_t ms_wlentime;		/* total wait length * time product */
-	fmd_stat_t ms_wlastupdate;	/* hrtime of last wait queue update */
-	fmd_stat_t ms_dtime;		/* total dispatch time */
-	fmd_stat_t ms_dlastupdate;	/* hrtime of last dispatch */
 	fmd_stat_t ms_debugdrop;	/* dropped debug messages */
 	fmd_stat_t ms_memtotal;		/* total space allocated by module */
 	fmd_stat_t ms_memlimit;		/* limit on space allocated by module */
@@ -98,6 +91,9 @@ typedef struct fmd_modstat {
 	fmd_stat_t ms_ckpt_zeroed;	/* checkpoint was zeroed at startup */
 	fmd_stat_t ms_ckpt_cnt;		/* number of checkpoints taken */
 	fmd_stat_t ms_ckpt_time;	/* total checkpoint time */
+	fmd_stat_t ms_xprtopen;		/* total number of open transports */
+	fmd_stat_t ms_xprtlimit;	/* limit on number of open transports */
+	fmd_stat_t ms_xprtqlimit;	/* limit on transport eventq length */
 } fmd_modstat_t;
 
 typedef struct fmd_module {
@@ -136,6 +132,7 @@ typedef struct fmd_module {
 	fmd_list_t mod_cases;		/* list of cases owned by this module */
 	fmd_buf_hash_t mod_bufs;	/* hash of bufs owned by this module */
 	fmd_serd_hash_t mod_serds;	/* hash of serd engs owned by module */
+	fmd_list_t mod_transports;	/* list of transports owned by module */
 } fmd_module_t;
 
 #define	FMD_MOD_INIT	0x001		/* mod_ops->mop_init() has completed */
@@ -164,6 +161,7 @@ extern void fmd_module_unload(fmd_module_t *);
 extern void fmd_module_destroy(fmd_module_t *);
 
 extern void fmd_module_dispatch(fmd_module_t *, fmd_event_t *);
+extern int fmd_module_transport(fmd_module_t *, fmd_xprt_t *, fmd_event_t *);
 extern void fmd_module_timeout(fmd_modtimer_t *, id_t, hrtime_t);
 extern void fmd_module_gc(fmd_module_t *);
 extern void fmd_module_trygc(fmd_module_t *);
@@ -207,9 +205,6 @@ extern void fmd_modhash_apply(fmd_modhash_t *, void (*)(fmd_module_t *));
 extern void fmd_modhash_tryapply(fmd_modhash_t *, void (*)(fmd_module_t *));
 extern void fmd_modhash_dispatch(fmd_modhash_t *, fmd_event_t *);
 
-extern void fmd_modstat_eventq_dispatch(fmd_module_t *);
-extern void fmd_modstat_eventq_dequeue(fmd_module_t *, uint_t);
-extern void fmd_modstat_eventq_done(fmd_module_t *);
 extern void fmd_modstat_publish(fmd_module_t *);
 extern int fmd_modstat_snapshot(fmd_module_t *, struct fmd_ustat_snap *);
 

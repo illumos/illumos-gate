@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -52,6 +53,7 @@
 #include <fmd_asru.h>
 #include <fmd_fmri.h>
 #include <fmd_ckpt.h>
+#include <fmd_xprt.h>
 
 #include <fmd.h>
 
@@ -84,6 +86,7 @@ static const fmd_conf_ops_t *const _fmd_prop_ops[] = {
 static void
 fmd_api_vxerror(fmd_module_t *mp, int err, const char *format, va_list ap)
 {
+	int raw_err = err;
 	nvlist_t *nvl;
 	fmd_event_t *e;
 	char *class, *msg;
@@ -124,7 +127,7 @@ fmd_api_vxerror(fmd_module_t *mp, int err, const char *format, va_list ap)
 	 * Create an error event corresponding to the error, insert it into the
 	 * error log, and dispatch it to the fmd-self-diagnosis engine.
 	 */
-	if (mp != fmd.d_self) {
+	if (mp != fmd.d_self && (raw_err != EFMD_HDL_ABORT || fmd.d_running)) {
 		if ((c = msg[len1 + len2 - 1]) == '\n')
 			msg[len1 + len2 - 1] = '\0'; /* strip \n for event */
 
@@ -150,8 +153,11 @@ fmd_api_vxerror(fmd_module_t *mp, int err, const char *format, va_list ap)
 	 * Similar to fmd_vdebug(), if the debugging switches are enabled we
 	 * echo the module name and message to stderr and/or syslog.  Unlike
 	 * fmd_vdebug(), we also print to stderr if foreground mode is enabled.
+	 * We also print the message if a built-in module is aborting before
+	 * fmd has detached from its parent (e.g. default transport failure).
 	 */
-	if (fmd.d_fg || (fmd.d_hdl_dbout & FMD_DBOUT_STDERR)) {
+	if (fmd.d_fg || (fmd.d_hdl_dbout & FMD_DBOUT_STDERR) || (
+	    raw_err == EFMD_HDL_ABORT && !fmd.d_running)) {
 		(void) pthread_mutex_lock(&fmd.d_err_lock);
 		(void) fprintf(stderr, "%s: %s: %s",
 		    fmd.d_pname, mp->mod_name, msg);
@@ -205,14 +211,11 @@ fmd_api_error(fmd_module_t *mp, int err, const char *format, ...)
 }
 
 /*
- * fmd_api_module_lock() is used as a wrapper around fmd_module_lock() and a
- * common prologue to each fmd_api.c routine.  It verifies that the handle is
- * valid and owned by the current server thread, locks the handle, and then
- * verifies that the caller is performing an operation on a registered handle.
- * If any tests fail, the entire API call is aborted by fmd_api_error().
+ * Common code for fmd_api_module_lock() and fmd_api_transport_impl().  This
+ * code verifies that the handle is valid and associated with a proper thread.
  */
 static fmd_module_t *
-fmd_api_module_lock(fmd_hdl_t *hdl)
+fmd_api_module(fmd_hdl_t *hdl)
 {
 	fmd_thread_t *tp;
 	fmd_module_t *mp;
@@ -229,6 +232,15 @@ fmd_api_module_lock(fmd_hdl_t *hdl)
 		    "client handle %p from unknown thread\n", (void *)hdl);
 	}
 
+	/*
+	 * If our TSD refers to the root module and is a door server thread,
+	 * then it was created asynchronously at the request of a module but
+	 * is using now the module API as an auxiliary module thread.  We reset
+	 * tp->thr_mod to the module handle so it can act as a module thread.
+	 */
+	if (tp->thr_mod == fmd.d_rmod && tp->thr_func == &fmd_door_server)
+		tp->thr_mod = (fmd_module_t *)hdl;
+
 	if ((mp = tp->thr_mod) != (fmd_module_t *)hdl) {
 		fmd_api_error(mp, EFMD_HDL_INVAL,
 		    "client handle %p is not valid\n", (void *)hdl);
@@ -238,6 +250,21 @@ fmd_api_module_lock(fmd_hdl_t *hdl)
 		fmd_api_error(mp, EFMD_MOD_FAIL,
 		    "module has experienced an unrecoverable error\n");
 	}
+
+	return (mp);
+}
+
+/*
+ * fmd_api_module_lock() is used as a wrapper around fmd_module_lock() and a
+ * common prologue to each fmd_api.c routine.  It verifies that the handle is
+ * valid and owned by the current server thread, locks the handle, and then
+ * verifies that the caller is performing an operation on a registered handle.
+ * If any tests fail, the entire API call is aborted by fmd_api_error().
+ */
+static fmd_module_t *
+fmd_api_module_lock(fmd_hdl_t *hdl)
+{
+	fmd_module_t *mp = fmd_api_module(hdl);
 
 	fmd_module_lock(mp);
 
@@ -260,10 +287,32 @@ fmd_api_case_impl(fmd_module_t *mp, fmd_case_t *cp)
 
 	if (cip == NULL || cip->ci_mod != mp) {
 		fmd_api_error(mp, EFMD_CASE_OWNER,
-		    "case %p is not owned by caller\n", (void *)cip);
+		    "case %p is invalid or not owned by caller\n", (void *)cip);
 	}
 
 	return (cip);
+}
+
+/*
+ * Utility function for API entry points that accept fmd_xprt_t's.  We cast xp
+ * to fmd_transport_t and check to make sure the case is owned by the caller.
+ * Note that we could make this check safer by actually walking mp's transport
+ * list, but that requires holding the module lock and this routine needs to be
+ * MT-hot w.r.t. auxiliary module threads.  Ultimately any loadable module can
+ * cause us to crash anyway, so we optimize for scalability over safety here.
+ */
+static fmd_xprt_impl_t *
+fmd_api_transport_impl(fmd_hdl_t *hdl, fmd_xprt_t *xp)
+{
+	fmd_module_t *mp = fmd_api_module(hdl);
+	fmd_xprt_impl_t *xip = (fmd_xprt_impl_t *)xp;
+
+	if (xip == NULL || xip->xi_queue->eq_mod != mp) {
+		fmd_api_error(mp, EFMD_XPRT_OWNER,
+		    "xprt %p is invalid or not owned by caller\n", (void *)xp);
+	}
+
+	return (xip);
 }
 
 /*
@@ -298,7 +347,7 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	const fmd_prop_t *prop;
 	const fmd_conf_path_t *pap;
 	fmd_conf_formal_t *cfp;
-	fmd_hdl_ops_t *ops;
+	fmd_hdl_ops_t ops;
 
 	const char *conf = NULL;
 	char buf[PATH_MAX];
@@ -315,7 +364,7 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	 * the module thread to which we assigned this client handle.  The info
 	 * provided for the handle must be valid and have the minimal settings.
 	 */
-	if (version > FMD_API_VERSION_2)
+	if (version > FMD_API_VERSION_3)
 		return (fmd_hdl_register_error(mp, EFMD_VER_NEW));
 
 	if (version < FMD_API_VERSION_1)
@@ -327,9 +376,34 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	if (pthread_self() != mp->mod_thread->thr_tid)
 		return (fmd_hdl_register_error(mp, EFMD_HDL_TID));
 
-	if (mip == NULL || mip->fmdi_desc == NULL || mip->fmdi_vers == NULL ||
-	    mip->fmdi_ops == NULL || mip->fmdi_ops->fmdo_recv == NULL)
+	if (mip == NULL || mip->fmdi_desc == NULL ||
+	    mip->fmdi_vers == NULL || mip->fmdi_ops == NULL)
 		return (fmd_hdl_register_error(mp, EFMD_HDL_INFO));
+
+	/*
+	 * Copy the module's ops vector into a local variable to account for
+	 * changes in the module ABI.  Then if any of the optional entry points
+	 * are NULL, set them to nop so we don't have to check before calling.
+	 */
+	bzero(&ops, sizeof (ops));
+
+	if (version < FMD_API_VERSION_3)
+		bcopy(mip->fmdi_ops, &ops, sizeof (ops) - sizeof (void *));
+	else
+		bcopy(mip->fmdi_ops, &ops, sizeof (ops));
+
+	if (ops.fmdo_recv == NULL)
+		ops.fmdo_recv = (void (*)())fmd_hdl_nop;
+	if (ops.fmdo_timeout == NULL)
+		ops.fmdo_timeout = (void (*)())fmd_hdl_nop;
+	if (ops.fmdo_close == NULL)
+		ops.fmdo_close = (void (*)())fmd_hdl_nop;
+	if (ops.fmdo_stats == NULL)
+		ops.fmdo_stats = (void (*)())fmd_hdl_nop;
+	if (ops.fmdo_gc == NULL)
+		ops.fmdo_gc = (void (*)())fmd_hdl_nop;
+	if (ops.fmdo_send == NULL)
+		ops.fmdo_send = (int (*)())fmd_hdl_nop;
 
 	/*
 	 * Make two passes through the property array to initialize the formals
@@ -377,8 +451,10 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	}
 
 	if ((mp->mod_conf = fmd_conf_open(conf,
-	    mp->mod_argc, mp->mod_argv)) == NULL)
+	    mp->mod_argc, mp->mod_argv, 0)) == NULL)
 		return (fmd_hdl_register_error(mp, EFMD_MOD_CONF));
+
+	fmd_conf_propagate(fmd.d_conf, mp->mod_conf, mp->mod_name);
 
 	/*
 	 * Look up the list of the libdiagcode dictionaries associated with the
@@ -405,25 +481,8 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	mp->mod_info->fmdi_desc = fmd_strdup(mip->fmdi_desc, FMD_SLEEP);
 	mp->mod_info->fmdi_vers = fmd_strdup(mip->fmdi_vers, FMD_SLEEP);
 	mp->mod_info->fmdi_ops = fmd_alloc(sizeof (fmd_hdl_ops_t), FMD_SLEEP);
-	ops = (fmd_hdl_ops_t *)mp->mod_info->fmdi_ops;
+	bcopy(&ops, (void *)mp->mod_info->fmdi_ops, sizeof (fmd_hdl_ops_t));
 	mp->mod_info->fmdi_props = NULL;
-
-	/*
-	 * Fill in the copy of the module ops.  If any optional entry points
-	 * are NULL, set them to nop so we don't have to check before calling.
-	 */
-	ops->fmdo_recv = mip->fmdi_ops->fmdo_recv ?
-	    mip->fmdi_ops->fmdo_recv : (void (*)())fmd_hdl_nop;
-	ops->fmdo_timeout = mip->fmdi_ops->fmdo_timeout ?
-	    mip->fmdi_ops->fmdo_timeout : (void (*)())fmd_hdl_nop;
-	ops->fmdo_close = mip->fmdi_ops->fmdo_close ?
-	    mip->fmdi_ops->fmdo_close : (void (*)())fmd_hdl_nop;
-	ops->fmdo_stats = mip->fmdi_ops->fmdo_stats ?
-	    mip->fmdi_ops->fmdo_stats : (void (*)())fmd_hdl_nop;
-	ops->fmdo_stats = mip->fmdi_ops->fmdo_stats ?
-	    mip->fmdi_ops->fmdo_stats : (void (*)())fmd_hdl_nop;
-	ops->fmdo_gc = mip->fmdi_ops->fmdo_gc ?
-	    mip->fmdi_ops->fmdo_gc : (void (*)())fmd_hdl_nop;
 
 	/*
 	 * Allocate an FMRI representing this module.  We'll use this later
@@ -437,8 +496,10 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	 */
 	(void) fmd_conf_getprop(mp->mod_conf, FMD_PROP_SUBSCRIPTIONS, &pap);
 
-	for (i = 0; i < pap->cpa_argc; i++)
-		fmd_dispq_insert(fmd.d_disp, mp, pap->cpa_argv[i]);
+	for (i = 0; i < pap->cpa_argc; i++) {
+		fmd_dispq_insert(fmd.d_disp, mp->mod_queue, pap->cpa_argv[i]);
+		fmd_xprt_subscribe_all(pap->cpa_argv[i]);
+	}
 
 	/*
 	 * Unlock the module and restore any pre-existing module checkpoint.
@@ -449,30 +510,71 @@ fmd_hdl_register(fmd_hdl_t *hdl, int version, const fmd_hdl_info_t *mip)
 	return (0);
 }
 
+/*
+ * If an auxiliary thread exists for the specified module at unregistration
+ * time, send it an asynchronous cancellation to force it to exit and then
+ * join with it (we expect this to either succeed quickly or return ESRCH).
+ * Once this is complete we can destroy the associated fmd_thread_t data.
+ */
+static void
+fmd_module_thrcancel(fmd_idspace_t *ids, id_t id, fmd_module_t *mp)
+{
+	fmd_thread_t *tp = fmd_idspace_getspecific(ids, id);
+
+	fmd_dprintf(FMD_DBG_MOD, "cancelling %s auxiliary thread %u\n",
+	    mp->mod_name, tp->thr_tid);
+
+	ASSERT(tp->thr_tid == id);
+	(void) pthread_cancel(tp->thr_tid);
+	(void) pthread_join(tp->thr_tid, NULL);
+
+	fmd_thread_destroy(tp, FMD_THREAD_NOJOIN);
+}
+
 void
 fmd_module_unregister(fmd_module_t *mp)
 {
 	fmd_conf_formal_t *cfp = mp->mod_argv;
 	const fmd_conf_path_t *pap;
+	fmd_case_t *cp;
+	fmd_xprt_t *xp;
 	int i;
 
 	TRACE((FMD_DBG_MOD, "unregister %p (%s)", (void *)mp, mp->mod_name));
 	ASSERT(fmd_module_locked(mp));
 
+	/*
+	 * If any transports are still open, they have send threads that are
+	 * using the module handle: shut them down and join with these threads.
+	 */
+	while ((xp = fmd_list_next(&mp->mod_transports)) != NULL)
+		fmd_xprt_destroy(xp);
+
+	/*
+	 * If any auxiliary threads exist, they may be using our module handle,
+	 * and therefore could cause a fault as soon as we start destroying it.
+	 * Module writers should clean up any threads before unregistering: we
+	 * forcibly cancel any remaining auxiliary threads before proceeding.
+	 */
+	fmd_idspace_apply(mp->mod_threads,
+	    (void (*)())fmd_module_thrcancel, mp);
+
+	/*
+	 * Delete any cases associated with the module (UNSOLVED, SOLVED, or
+	 * CLOSE_WAIT) as if fmdo_close() has finished processing them.
+	 */
+	while ((cp = fmd_list_next(&mp->mod_cases)) != NULL)
+		fmd_case_delete(cp);
+
 	if (mp->mod_error == 0)
 		fmd_ckpt_save(mp); /* take one more checkpoint if needed */
 
+	fmd_ustat_delete_references(mp->mod_ustat);
 	(void) fmd_conf_getprop(mp->mod_conf, FMD_PROP_SUBSCRIPTIONS, &pap);
 
-	for (i = 0; i < pap->cpa_argc; i++)
-		fmd_dispq_delete(fmd.d_disp, mp, pap->cpa_argv[i]);
-
-	if (mp->mod_ustat != NULL) {
-		(void) pthread_mutex_lock(&mp->mod_stats_lock);
-		fmd_ustat_destroy(mp->mod_ustat);
-		mp->mod_ustat = NULL;
-		mp->mod_stats = NULL;
-		(void) pthread_mutex_unlock(&mp->mod_stats_lock);
+	for (i = 0; i < pap->cpa_argc; i++) {
+		fmd_xprt_unsubscribe_all(pap->cpa_argv[i]);
+		fmd_dispq_delete(fmd.d_disp, mp->mod_queue, pap->cpa_argv[i]);
 	}
 
 	fmd_conf_close(mp->mod_conf);
@@ -512,19 +614,26 @@ fmd_hdl_subscribe(fmd_hdl_t *hdl, const char *class)
 {
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
 
-	if (fmd_conf_setprop(mp->mod_conf, FMD_PROP_SUBSCRIPTIONS, class) == 0)
-		fmd_dispq_insert(fmd.d_disp, mp, class);
+	if (fmd_conf_setprop(mp->mod_conf,
+	    FMD_PROP_SUBSCRIPTIONS, class) == 0) {
+		fmd_dispq_insert(fmd.d_disp, mp->mod_queue, class);
+		fmd_xprt_subscribe_all(class);
+	}
 
 	fmd_module_unlock(mp);
 }
+
 
 void
 fmd_hdl_unsubscribe(fmd_hdl_t *hdl, const char *class)
 {
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
 
-	if (fmd_conf_delprop(mp->mod_conf, FMD_PROP_SUBSCRIPTIONS, class) == 0)
-		fmd_dispq_delete(fmd.d_disp, mp, class);
+	if (fmd_conf_delprop(mp->mod_conf,
+	    FMD_PROP_SUBSCRIPTIONS, class) == 0) {
+		fmd_xprt_unsubscribe_all(class);
+		fmd_dispq_delete(fmd.d_disp, mp->mod_queue, class);
+	}
 
 	fmd_module_unlock(mp);
 	fmd_eventq_cancel(mp->mod_queue, FMD_EVT_PROTOCOL, (void *)class);
@@ -892,39 +1001,7 @@ fmd_case_solve(fmd_hdl_t *hdl, fmd_case_t *cp)
 		    "case is already solved or closed\n", cip->ci_uuid);
 	}
 
-	fmd_case_transition(cp, FMD_CASE_SOLVED);
-	fmd_module_unlock(mp);
-}
-
-void
-fmd_case_convict(fmd_hdl_t *hdl, fmd_case_t *cp, nvlist_t *nvl)
-{
-	fmd_module_t *mp = fmd_api_module_lock(hdl);
-	fmd_case_impl_t *cip = fmd_api_case_impl(mp, cp);
-	fmd_asru_hash_t *ahp = fmd.d_asrus;
-
-	nvlist_t *fmri;
-	fmd_asru_t *asru;
-
-	if (cip->ci_state > FMD_CASE_SOLVED) {
-		fmd_api_error(mp, EFMD_CASE_STATE, "cannot convict suspect in "
-		    "%s: case is already closed\n", cip->ci_uuid);
-	}
-
-	if (nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU, &fmri) != 0) {
-		fmd_api_error(mp, EFMD_CASE_EVENT, "cannot convict suspect in "
-		    "%s: suspect event is missing asru\n", cip->ci_uuid);
-	}
-
-	if ((asru = fmd_asru_hash_lookup_nvl(ahp, fmri, FMD_B_TRUE)) == NULL) {
-		fmd_api_error(mp, EFMD_CASE_EVENT, "cannot convict suspect in "
-		    "%s: %s\n", cip->ci_uuid, fmd_strerror(errno));
-	}
-
-	(void) fmd_asru_clrflags(asru, FMD_ASRU_UNUSABLE, cip->ci_uuid, nvl);
-	(void) fmd_asru_setflags(asru, FMD_ASRU_FAULTY, cip->ci_uuid, nvl);
-
-	fmd_asru_hash_release(ahp, asru);
+	fmd_case_transition(cp, FMD_CASE_SOLVED, FMD_CF_SOLVED);
 	fmd_module_unlock(mp);
 }
 
@@ -934,7 +1011,7 @@ fmd_case_close(fmd_hdl_t *hdl, fmd_case_t *cp)
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
 
 	(void) fmd_api_case_impl(mp, cp); /* validate 'cp' */
-	fmd_case_transition(cp, FMD_CASE_CLOSED);
+	fmd_case_transition(cp, FMD_CASE_CLOSE_WAIT, FMD_CF_ISOLATED);
 
 	fmd_module_unlock(mp);
 }
@@ -967,58 +1044,16 @@ fmd_case_uulookup(fmd_hdl_t *hdl, const char *uuid)
 }
 
 void
-fmd_case_uuconvict(fmd_hdl_t *hdl, const char *uuid, nvlist_t *nvl)
-{
-	fmd_module_t *mp = fmd_api_module_lock(hdl);
-	fmd_case_t *cp = fmd_case_hash_lookup(fmd.d_cases, uuid);
-	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
-	fmd_asru_hash_t *ahp = fmd.d_asrus;
-
-	nvlist_t *fmri;
-	fmd_asru_t *asru;
-
-	if (cp == NULL) {
-		fmd_api_error(mp, EFMD_CASE_INVAL,
-		    "cannot convict suspect in %s", uuid);
-	}
-
-	if (cip->ci_state > FMD_CASE_SOLVED) {
-		fmd_case_rele(cp);
-		fmd_api_error(mp, EFMD_CASE_STATE, "cannot convict suspect in "
-		    "%s: case is already closed\n", uuid);
-	}
-
-	if (nvlist_lookup_nvlist(nvl, FM_FAULT_ASRU, &fmri) != 0) {
-		fmd_case_rele(cp);
-		fmd_api_error(mp, EFMD_CASE_EVENT, "cannot convict suspect in "
-		    "%s: suspect event is missing asru\n", uuid);
-	}
-
-	if ((asru = fmd_asru_hash_lookup_nvl(ahp, fmri, FMD_B_TRUE)) == NULL) {
-		fmd_case_rele(cp);
-		fmd_api_error(mp, EFMD_CASE_EVENT, "cannot convict suspect in "
-		    "%s: %s\n", uuid, fmd_strerror(errno));
-	}
-
-	(void) fmd_asru_clrflags(asru, FMD_ASRU_UNUSABLE, cip->ci_uuid, nvl);
-	(void) fmd_asru_setflags(asru, FMD_ASRU_FAULTY, cip->ci_uuid, nvl);
-
-	fmd_asru_hash_release(ahp, asru);
-	fmd_case_rele(cp);
-	fmd_module_unlock(mp);
-}
-
-void
 fmd_case_uuclose(fmd_hdl_t *hdl, const char *uuid)
 {
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
 	fmd_case_t *cp = fmd_case_hash_lookup(fmd.d_cases, uuid);
 
-	if (cp == NULL)
-		fmd_api_error(mp, EFMD_CASE_INVAL, "cannot close %s", uuid);
+	if (cp != NULL) {
+		fmd_case_transition(cp, FMD_CASE_CLOSE_WAIT, FMD_CF_ISOLATED);
+		fmd_case_rele(cp);
+	}
 
-	fmd_case_transition(cp, FMD_CASE_CLOSED);
-	fmd_case_rele(cp);
 	fmd_module_unlock(mp);
 }
 
@@ -1031,7 +1066,7 @@ fmd_case_uuclosed(fmd_hdl_t *hdl, const char *uuid)
 	int rv = FMD_B_TRUE;
 
 	if (cip != NULL) {
-		rv = cip->ci_state >= FMD_CASE_CLOSED;
+		rv = cip->ci_state >= FMD_CASE_CLOSE_WAIT;
 		fmd_case_rele(cp);
 	}
 
@@ -1059,7 +1094,7 @@ fmd_case_solved(fmd_hdl_t *hdl, fmd_case_t *cp)
 int
 fmd_case_closed(fmd_hdl_t *hdl, fmd_case_t *cp)
 {
-	return (fmd_case_instate(hdl, cp, FMD_CASE_CLOSED));
+	return (fmd_case_instate(hdl, cp, FMD_CASE_CLOSE_WAIT));
 }
 
 void
@@ -1461,11 +1496,6 @@ fmd_thr_create(fmd_hdl_t *hdl, void (*func)(void *), void *arg)
 	fmd_thread_t *tp;
 	pthread_t tid;
 
-	if (pthread_self() != mp->mod_thread->thr_tid) {
-		fmd_api_error(mp, EFMD_THR_INVAL, "auxiliary thread tried to "
-		    "create another auxiliary thread\n");
-	}
-
 	if (mp->mod_stats->ms_thrtotal.fmds_value.ui32 >=
 	    mp->mod_stats->ms_thrlimit.fmds_value.ui32) {
 		fmd_api_error(mp, EFMD_THR_LIMIT, "%s request to create an "
@@ -1705,4 +1735,267 @@ fmd_nvl_fmri_contains(fmd_hdl_t *hdl, nvlist_t *n1, nvlist_t *n2)
 	}
 
 	return (rv);
+}
+
+nvlist_t *
+fmd_nvl_fmri_translate(fmd_hdl_t *hdl, nvlist_t *fmri, nvlist_t *auth)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	nvlist_t *xfmri;
+
+	if (fmri == NULL || auth == NULL) {
+		fmd_api_error(mp, EFMD_NVL_INVAL,
+		    "invalid nvlist(s): %p, %p\n", (void *)fmri, (void *)auth);
+	}
+
+	xfmri = fmd_fmri_translate(fmri, auth);
+	fmd_module_unlock(mp);
+	return (xfmri);
+}
+
+int
+fmd_event_local(fmd_hdl_t *hdl, fmd_event_t *ep)
+{
+	if (hdl == NULL || ep == NULL) {
+		fmd_api_error(fmd_api_module_lock(hdl), EFMD_EVENT_INVAL,
+		    "NULL parameter specified to fmd_event_local\n");
+	}
+
+	return (((fmd_event_impl_t *)ep)->ev_flags & FMD_EVF_LOCAL);
+}
+
+fmd_xprt_t *
+fmd_xprt_open(fmd_hdl_t *hdl, uint_t flags, nvlist_t *auth, void *data)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	fmd_xprt_t *xp;
+
+	if (flags & ~FMD_XPRT_CMASK) {
+		fmd_api_error(mp, EFMD_XPRT_INVAL,
+		    "invalid transport flags 0x%x\n", flags);
+	}
+
+	if ((flags & FMD_XPRT_RDWR) != FMD_XPRT_RDWR &&
+	    (flags & FMD_XPRT_RDWR) != FMD_XPRT_RDONLY) {
+		fmd_api_error(mp, EFMD_XPRT_INVAL,
+		    "cannot open write-only transport\n");
+	}
+
+	if (mp->mod_stats->ms_xprtopen.fmds_value.ui32 >=
+	    mp->mod_stats->ms_xprtlimit.fmds_value.ui32) {
+		fmd_api_error(mp, EFMD_XPRT_LIMIT, "%s request to create a "
+		    "transport exceeds module transport limit (%u)\n",
+		    mp->mod_name, mp->mod_stats->ms_xprtlimit.fmds_value.ui32);
+	}
+
+	if ((xp = fmd_xprt_create(mp, flags, auth, data)) == NULL)
+		fmd_api_error(mp, errno, "cannot create transport");
+
+	fmd_module_unlock(mp);
+	return (xp);
+}
+
+void
+fmd_xprt_close(fmd_hdl_t *hdl, fmd_xprt_t *xp)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	fmd_xprt_impl_t *xip = fmd_api_transport_impl(hdl, xp);
+
+	/*
+	 * Although this could be supported, it doesn't seem necessary or worth
+	 * the trouble.  For now, just detect this and trigger a module abort.
+	 * If it is needed, transports should grow reference counts and a new
+	 * event type will need to be enqueued for the main thread to reap it.
+	 */
+	if (xip->xi_thread != NULL &&
+	    xip->xi_thread->thr_tid == pthread_self()) {
+		fmd_api_error(mp, EFMD_XPRT_INVAL,
+		    "fmd_xprt_close() cannot be called from fmdo_send()\n");
+	}
+
+	fmd_xprt_destroy(xp);
+	fmd_module_unlock(mp);
+}
+
+void
+fmd_xprt_post(fmd_hdl_t *hdl, fmd_xprt_t *xp, nvlist_t *nvl, hrtime_t hrt)
+{
+	fmd_xprt_impl_t *xip = fmd_api_transport_impl(hdl, xp);
+
+	/*
+	 * fmd_xprt_recv() must block during startup waiting for fmd to globally
+	 * clear FMD_XPRT_DSUSPENDED.  As such, we can't allow it to be called
+	 * from a module's _fmd_init() routine, because that would block
+	 * fmd from completing initial module loading, resulting in a deadlock.
+	 */
+	if ((xip->xi_flags & FMD_XPRT_ISUSPENDED) &&
+	    (pthread_self() == xip->xi_queue->eq_mod->mod_thread->thr_tid)) {
+		fmd_api_error(fmd_api_module_lock(hdl), EFMD_XPRT_INVAL,
+		    "fmd_xprt_post() cannot be called from _fmd_init()\n");
+	}
+
+	fmd_xprt_recv(xp, nvl, hrt);
+}
+
+void
+fmd_xprt_suspend(fmd_hdl_t *hdl, fmd_xprt_t *xp)
+{
+	(void) fmd_api_transport_impl(hdl, xp); /* validate 'xp' */
+	fmd_xprt_xsuspend(xp, FMD_XPRT_SUSPENDED);
+}
+
+void
+fmd_xprt_resume(fmd_hdl_t *hdl, fmd_xprt_t *xp)
+{
+	(void) fmd_api_transport_impl(hdl, xp); /* validate 'xp' */
+	fmd_xprt_xresume(xp, FMD_XPRT_SUSPENDED);
+}
+
+int
+fmd_xprt_error(fmd_hdl_t *hdl, fmd_xprt_t *xp)
+{
+	fmd_xprt_impl_t *xip = fmd_api_transport_impl(hdl, xp);
+	return (xip->xi_state == _fmd_xprt_state_err);
+}
+
+/*
+ * Translate all FMRIs in the specified name-value pair list for the specified
+ * FMRI authority, and return a new name-value pair list for the translation.
+ * This function is the recursive engine used by fmd_xprt_translate(), below.
+ */
+static nvlist_t *
+fmd_xprt_xtranslate(nvlist_t *nvl, nvlist_t *auth)
+{
+	uint_t i, j, n;
+	nvpair_t *nvp, **nvps;
+	uint_t nvpslen = 0;
+	char *name;
+	size_t namelen = 0;
+
+	nvlist_t **a, **b;
+	nvlist_t *l, *r;
+	data_type_t type;
+	char *s;
+	int err;
+
+	(void) nvlist_xdup(nvl, &nvl, &fmd.d_nva);
+
+	/*
+	 * Count up the number of name-value pairs in 'nvl' and compute the
+	 * maximum length of a name used in this list for use below.
+	 */
+	for (nvp = nvlist_next_nvpair(nvl, NULL);
+	    nvp != NULL; nvp = nvlist_next_nvpair(nvl, nvp), nvpslen++) {
+		size_t len = strlen(nvpair_name(nvp));
+		namelen = MAX(namelen, len);
+	}
+
+	nvps = alloca(sizeof (nvpair_t *) * nvpslen);
+	name = alloca(namelen + 1);
+
+	/*
+	 * Store a snapshot of the name-value pairs in 'nvl' into nvps[] so
+	 * that we can iterate over the original pairs in the loop below while
+	 * performing arbitrary insert and delete operations on 'nvl' itself.
+	 */
+	for (i = 0, nvp = nvlist_next_nvpair(nvl, NULL);
+	    nvp != NULL; nvp = nvlist_next_nvpair(nvl, nvp))
+		nvps[i++] = nvp;
+
+	/*
+	 * Now iterate over the snapshot of the name-value pairs.  If we find a
+	 * value that is of type NVLIST or NVLIST_ARRAY, we translate that
+	 * object by either calling ourself recursively on it, or calling into
+	 * fmd_fmri_translate() if the object is an FMRI.  We then rip out the
+	 * original name-value pair and replace it with the translated one.
+	 */
+	for (i = 0; i < nvpslen; i++) {
+		nvp = nvps[i];
+		type = nvpair_type(nvp);
+
+		switch (type) {
+		case DATA_TYPE_NVLIST_ARRAY:
+			if (nvpair_value_nvlist_array(nvp, &a, &n) != 0 ||
+			    a == NULL || n == 0)
+				continue; /* array is zero-sized; skip it */
+
+			b = fmd_alloc(sizeof (nvlist_t *) * n, FMD_SLEEP);
+
+			/*
+			 * If the first array nvlist element looks like an FMRI
+			 * then assume the other elements are FMRIs as well.
+			 * If any b[j]'s can't be translated, then EINVAL will
+			 * be returned from nvlist_add_nvlist_array() below.
+			 */
+			if (nvlist_lookup_string(*a, FM_FMRI_SCHEME, &s) == 0) {
+				for (j = 0; j < n; j++)
+					b[j] = fmd_fmri_translate(a[j], auth);
+			} else {
+				for (j = 0; j < n; j++)
+					b[j] = fmd_xprt_xtranslate(a[j], auth);
+			}
+
+			(void) strcpy(name, nvpair_name(nvp));
+			(void) nvlist_remove(nvl, name, type);
+			err = nvlist_add_nvlist_array(nvl, name, b, n);
+
+			for (j = 0; j < n; j++)
+				nvlist_free(b[j]);
+
+			fmd_free(b, sizeof (nvlist_t *) * n);
+
+			if (err != 0) {
+				nvlist_free(nvl);
+				errno = err;
+				return (NULL);
+			}
+			break;
+
+		case DATA_TYPE_NVLIST:
+			if (nvpair_value_nvlist(nvp, &l) == 0 &&
+			    nvlist_lookup_string(l, FM_FMRI_SCHEME, &s) == 0)
+				r = fmd_fmri_translate(l, auth);
+			else
+				r = fmd_xprt_xtranslate(l, auth);
+
+			if (r == NULL) {
+				nvlist_free(nvl);
+				return (NULL);
+			}
+
+			(void) strcpy(name, nvpair_name(nvp));
+			(void) nvlist_remove(nvl, name, type);
+			(void) nvlist_add_nvlist(nvl, name, r);
+
+			nvlist_free(r);
+			break;
+		}
+	}
+
+	return (nvl);
+}
+
+nvlist_t *
+fmd_xprt_translate(fmd_hdl_t *hdl, fmd_xprt_t *xp, fmd_event_t *ep)
+{
+	fmd_xprt_impl_t *xip = fmd_api_transport_impl(hdl, xp);
+
+	if (xip->xi_auth == NULL) {
+		fmd_api_error(fmd_api_module_lock(hdl), EFMD_XPRT_INVAL,
+		    "no authority defined for transport %p\n", (void *)xp);
+	}
+
+	return (fmd_xprt_xtranslate(FMD_EVENT_NVL(ep), xip->xi_auth));
+}
+
+void
+fmd_xprt_setspecific(fmd_hdl_t *hdl, fmd_xprt_t *xp, void *data)
+{
+	fmd_api_transport_impl(hdl, xp)->xi_data = data;
+}
+
+void *
+fmd_xprt_getspecific(fmd_hdl_t *hdl, fmd_xprt_t *xp)
+{
+	return (fmd_api_transport_impl(hdl, xp)->xi_data);
 }

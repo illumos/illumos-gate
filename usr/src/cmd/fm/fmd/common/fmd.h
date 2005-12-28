@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -49,13 +50,9 @@ struct fmd_case_hash;			/* see <fmd_case.h> */
 struct fmd_modhash;			/* see <fmd_module.h> */
 struct fmd_module;			/* see <fmd_module.h> */
 struct fmd_log;				/* see <fmd_log.h> */
+struct fmd_idspace;			/* see <fmd_idspace.h> */
 
 typedef struct fmd_statistics {
-	fmd_stat_t ds_received;		/* number of events received by xprt */
-	fmd_stat_t ds_discarded;	/* number of events discarded by xprt */
-	fmd_stat_t ds_retried;		/* number of events retried by xprt */
-	fmd_stat_t ds_replayed;		/* number of events replayed by xprt */
-	fmd_stat_t ds_lost;		/* number of events lost by xprt */
 	fmd_stat_t ds_log_replayed;	/* number of events replayed from log */
 	fmd_stat_t ds_log_partials;	/* number of events partially commit */
 	fmd_stat_t ds_err_enospc;	/* number of events w/ ENOSPC errlog */
@@ -71,6 +68,7 @@ typedef struct fmd {
 	pthread_key_t d_key;		/* key for fmd's thread-specific data */
 	volatile int d_signal;		/* signal indicating we should quit */
 	volatile int d_running;		/* flag set when fmd_run() succeeds */
+	volatile int d_booted;		/* flag set when fmd_run() completes */
 
 	uint_t d_fmd_debug;		/* mask of fmd active debugging modes */
 	uint_t d_fmd_dbout;		/* fmd debug output sinks (see below) */
@@ -81,10 +79,10 @@ typedef struct fmd {
 	pthread_t d_panictid;		/* tid of thread forcing a panic */
 	uint_t d_panicrefs;		/* number of attempts to panic */
 
-	pthread_mutex_t d_xprt_lock;	/* transport state lock */
-	pthread_cond_t d_xprt_cv;	/* transport state cv */
-	uint_t d_xprt_wait;		/* transport wait flag */
-	void *d_xprt_chan;		/* transport handle */
+	pthread_mutex_t d_xprt_lock;	/* transport suspend lock */
+	uint_t d_xprt_suspend;		/* transport suspend count  */
+	uint_t d_xprt_ttl;		/* transport default time-to-live */
+	struct fmd_idspace *d_xprt_ids;	/* transport id hash */
 
 	const fmd_timeops_t *d_clockops; /* system clock ops vector */
 	void *d_clockptr;		/* system clock private data */
@@ -97,6 +95,7 @@ typedef struct fmd {
 	pthread_mutex_t d_mod_lock;	/* lock for d_mod_list */
 	fmd_list_t d_mod_list;		/* list of modules in load order */
 	struct fmd_modhash *d_mod_hash;	/* hash of modules by base name */
+	fmd_event_t *d_mod_event;	/* boot event for module quiesce */
 
 	uint_t d_alloc_msecs;		/* initial delay time for alloc retry */
 	uint_t d_alloc_tries;		/* max # times to retry an allocation */
@@ -161,6 +160,7 @@ typedef struct fmd {
 extern const char _fmd_version[];
 extern fmd_t fmd;
 
+extern void fmd_door_server(void *);
 extern void fmd_create(fmd_t *, const char *, const char *, const char *);
 extern void fmd_destroy(fmd_t *);
 extern void fmd_run(fmd_t *, int);

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +52,8 @@ typedef struct fmd_asru {
 	pthread_cond_t asru_cv;		/* condition variable for asru_flags */
 	uint_t asru_refs;		/* reference count */
 	uint_t asru_flags;		/* flags (see below) */
-	char *asru_case;		/* case uuid from last change */
+	fmd_case_t *asru_case;		/* case associated with last change */
+	nvlist_t *asru_event;		/* case event inside of asru_case */
 } fmd_asru_t;
 
 #define	FMD_ASRU_FAULTY		0x01	/* asru has been diagnosed as faulty */
@@ -84,10 +86,9 @@ extern fmd_asru_t *fmd_asru_hash_lookup_nvl(fmd_asru_hash_t *, nvlist_t *, int);
 extern void fmd_asru_hash_release(fmd_asru_hash_t *, fmd_asru_t *);
 extern int fmd_asru_hash_delete_name(fmd_asru_hash_t *, const char *);
 
-extern int fmd_asru_setflags(fmd_asru_t *, uint_t, const char *, nvlist_t *);
-extern int fmd_asru_clrflags(fmd_asru_t *, uint_t, const char *, nvlist_t *);
+extern int fmd_asru_setflags(fmd_asru_t *, uint_t, fmd_case_t *, nvlist_t *);
+extern int fmd_asru_clrflags(fmd_asru_t *, uint_t, fmd_case_t *, nvlist_t *);
 extern int fmd_asru_getstate(fmd_asru_t *);
-extern char *fmd_asru_getcase(fmd_asru_t *, char *, size_t);
 
 #ifdef	__cplusplus
 }

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,13 +72,14 @@ extern void fmd_error(int, const char *, ...);
 #define	FMD_DBG_CASE	0x0400	/* enable case subsystem debug messages */
 #define	FMD_DBG_CKPT	0x0800	/* enable checkpoint debug messages */
 #define	FMD_DBG_RPC	0x1000	/* enable rpc service debug messages */
-#define	FMD_DBG_ALL	0xfffe	/* enable all debug modes (except DBG_HELP) */
+#define	FMD_DBG_TRACE	0x2000	/* display matching TRACE() calls */
+#define	FMD_DBG_ALL	0x1ffe	/* enable all modes except for HELP, TRACE */
 
 extern void fmd_vdprintf(int, const char *, va_list);
 extern void fmd_dprintf(int, const char *, ...);
 
 extern void fmd_trace_cpp(void *, const char *, int);
-extern void *fmd_trace(int, const char *, ...);
+extern void *fmd_trace(uint_t, const char *, ...);
 
 #ifdef DEBUG
 #define	TRACE(args)	{ fmd_trace_cpp(fmd_trace args, __FILE__, __LINE__); }
@@ -87,6 +89,7 @@ extern void *fmd_trace(int, const char *, ...);
 
 extern const char *fmd_ea_strerror(int);
 extern uint64_t fmd_ena(void);
+extern uint32_t fmd_ntz32(uint32_t);
 
 #ifdef	__cplusplus
 }

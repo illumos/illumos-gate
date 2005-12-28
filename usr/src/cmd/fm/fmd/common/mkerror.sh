@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,7 +33,7 @@ input="`cat`"
 
 echo "\
 /*\n\
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.\n\
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.\n\
  * Use is subject to license terms.\n\
  */\n\
 \n\
@@ -45,7 +45,7 @@ echo "\
 static const char *const _fmd_ereports[] = {"
 
 pattern='^[ ]*EFMD_\([A-Z0-9_]*\).*,*'
-replace='	"ereport.sunos.fmd.\1",'
+replace='	"ereport.fm.fmd.\1",'
 
 echo "$input" | sed -n "s/$pattern/$replace/p" | tr '[A-Z]' '[a-z]' || exit 1
 

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -829,10 +830,11 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
     data_type_t type, uint_t nelem, const void *data)
 {
 	nvpair_t *nvp;
+	uint_t i;
+
 	int nvp_sz, name_sz, value_sz;
 	int err = 0;
 
-	/* sanity check input params */
 	if (name == NULL || nvl == NULL || nvl->nvl_priv == 0)
 		return (EINVAL);
 
@@ -850,24 +852,24 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 	if (i_validate_nvpair_value(type, nelem, data) != 0)
 		return (EINVAL);
 
+	/*
+	 * If we're adding an nvlist or nvlist array, ensure that we are not
+	 * adding the input nvlist to itself, which would cause recursion,
+	 * and ensure that no NULL nvlist pointers are present.
+	 */
 	switch (type) {
 	case DATA_TYPE_NVLIST:
-		/*
-		 * Disallow adding oneself to oneself, avoid infinite recursion
-		 */
-		if ((nvlist_t *)data == nvl)
+		if (data == nvl || data == NULL)
 			return (EINVAL);
 		break;
 	case DATA_TYPE_NVLIST_ARRAY: {
-		nvlist_t **lists = (nvlist_t **)data;
-		uint_t l;
-		for (l = 0; l < nelem; l++)
-			if (*lists++ == nvl)
+		nvlist_t **onvlp = (nvlist_t **)data;
+		for (i = 0; i < nelem; i++) {
+			if (onvlp[i] == nvl || onvlp[i] == NULL)
 				return (EINVAL);
 		}
 		break;
-	default:
-		break;
+	}
 	}
 
 	/* calculate sizes of the nvpair elements and the nvpair itself */
@@ -888,7 +890,6 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 	case DATA_TYPE_BOOLEAN:
 		break;
 	case DATA_TYPE_STRING_ARRAY: {
-		int i;
 		char *const *strs = data;
 		char *buf = NVP_VALUE(nvp);
 		char **cstrs = (void *)buf;
@@ -918,7 +919,6 @@ nvlist_add_common(nvlist_t *nvl, const char *name,
 		nvlist_t **nvlp = EMBEDDED_NVL_ARRAY(nvp);
 		nvlist_t *embedded = (nvlist_t *)
 		    ((uintptr_t)nvlp + nelem * sizeof (uint64_t));
-		int i;
 
 		for (i = 0; i < nelem; i++) {
 			if ((err = nvlist_copy_embedded(nvl,

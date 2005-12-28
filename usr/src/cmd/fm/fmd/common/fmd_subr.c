@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -285,7 +286,7 @@ fmd_trace_cpp(void *ptr, const char *file, int line)
  */
 /*PRINTFLIKE2*/
 void *
-fmd_trace(int tag, const char *format, ...)
+fmd_trace(uint_t tag, const char *format, ...)
 {
 	fmd_thread_t *tp = pthread_getspecific(fmd.d_key);
 	va_list ap;
@@ -330,4 +331,39 @@ fmd_ena(void)
 	return ((uint64_t)((FM_ENA_FMT1 & ENA_FORMAT_MASK) |
 	    ((pthread_self() << ENA_FMT1_CPUID_SHFT) & ENA_FMT1_CPUID_MASK) |
 	    ((hrt << ENA_FMT1_TIME_SHFT) & ENA_FMT1_TIME_MASK)));
+}
+
+/*
+ * fmd_ntz32() computes the number of trailing zeroes.  The algorithm here is
+ * from "Hacker's Delight" by Henry Warren, Jr.
+ */
+uint32_t
+fmd_ntz32(uint32_t x)
+{
+	uint_t n = 1;
+
+	if (x == 0)
+		return (32);
+
+	if ((x & 0xFFFF) == 0) {
+		n += 16;
+		x >>= 16;
+	}
+
+	if ((x & 0xFF) == 0) {
+		n += 8;
+		x >>= 8;
+	}
+
+	if ((x & 0xF) == 0) {
+		n += 4;
+		x >>= 4;
+	}
+
+	if ((x & 0x3) == 0) {
+		n += 2;
+		x >>= 2;
+	}
+
+	return (n - (x & 1));
 }

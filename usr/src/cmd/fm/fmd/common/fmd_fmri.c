@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,35 +83,36 @@ fmd_fmri_warn(const char *format, ...)
  * RFC2396 Section 2.4 says that data must be escaped if it does not have a
  * representation using an unreserved character, where an unreserved character
  * is one that is either alphanumberic or one of the marks defined in S2.3.
- * We've amended the unreserved character list to include commas and colons,
- * as both are needed to make FMRIs readable without escaping.  We also permit
- * "/" to pass through unescaped as any path delimiters used by the event
- * creator are presumably intended to appear in the final path.
  */
-char *
-fmd_fmri_strescape(const char *s)
+static size_t
+fmd_fmri_uriescape(const char *s, const char *xmark, char *buf, size_t len)
 {
-	static const char rfc2396_mark[] = "-_.!~*'()" ":,";
+	static const char rfc2396_mark[] = "-_.!~*'()";
 	static const char hex_digits[] = "0123456789ABCDEF";
+	static const char empty_str[] = "";
 
 	const char *p;
-	char c, *q, *s2;
+	char c, *q;
 	size_t n = 0;
 
 	if (s == NULL)
-		return (NULL);
+		s = empty_str;
+
+	if (xmark == NULL)
+		xmark = empty_str;
 
 	for (p = s; (c = *p) != '\0'; p++) {
-		if (isalnum(c) || c == '/' || strchr(rfc2396_mark, c) != NULL)
+		if (isalnum(c) || strchr(rfc2396_mark, c) || strchr(xmark, c))
 			n++;	/* represent c as itself */
 		else
 			n += 3; /* represent c as escape */
 	}
 
-	s2 = fmd_alloc(n + 1, FMD_SLEEP);
+	if (buf == NULL)
+		return (n);
 
-	for (p = s, q = s2; (c = *p) != '\0'; p++) {
-		if (isalnum(c) || c == '/' || strchr(rfc2396_mark, c) != NULL) {
+	for (p = s, q = buf; (c = *p) != '\0' && q < buf + len; p++) {
+		if (isalnum(c) || strchr(rfc2396_mark, c) || strchr(xmark, c)) {
 			*q++ = c;
 		} else {
 			*q++ = '%';
@@ -119,8 +121,75 @@ fmd_fmri_strescape(const char *s)
 		}
 	}
 
-	ASSERT(q == s2 + n);
+	if (q == buf + len)
+		q--; /* len is too small: truncate output string */
+
 	*q = '\0';
+	return (n);
+}
+
+/*
+ * Convert a name-value pair list representing an FMRI authority into the
+ * corresponding RFC2396 string representation and return the new string.
+ */
+char *
+fmd_fmri_auth2str(nvlist_t *nvl)
+{
+	nvpair_t *nvp;
+	char *s, *p, *v;
+	size_t n = 0;
+
+	for (nvp = nvlist_next_nvpair(nvl, NULL);
+	    nvp != NULL; nvp = nvlist_next_nvpair(nvl, nvp)) {
+
+		if (nvpair_type(nvp) != DATA_TYPE_STRING)
+			continue; /* do not format non-string elements */
+
+		n += fmd_fmri_uriescape(nvpair_name(nvp), NULL, NULL, 0) + 1;
+		(void) nvpair_value_string(nvp, &v);
+		n += fmd_fmri_uriescape(v, ":", NULL, 0) + 1;
+	}
+
+	p = s = fmd_alloc(n, FMD_SLEEP);
+
+	for (nvp = nvlist_next_nvpair(nvl, NULL);
+	    nvp != NULL; nvp = nvlist_next_nvpair(nvl, nvp)) {
+
+		if (nvpair_type(nvp) != DATA_TYPE_STRING)
+			continue; /* do not format non-string elements */
+
+		if (p != s)
+			*p++ = ',';
+
+		p += fmd_fmri_uriescape(nvpair_name(nvp), NULL, p, n);
+		*p++ = '=';
+		(void) nvpair_value_string(nvp, &v);
+		p += fmd_fmri_uriescape(v, ":", p, n);
+	}
+
+	return (s);
+}
+
+/*
+ * Convert an input string to a URI escaped string and return the new string.
+ * We amend the unreserved character list to include commas and colons,
+ * as both are needed to make FMRIs readable without escaping.  We also permit
+ * "/" to pass through unescaped as any path delimiters used by the event
+ * creator are presumably intended to appear in the final path.
+ */
+char *
+fmd_fmri_strescape(const char *s)
+{
+	char *s2;
+	size_t n;
+
+	if (s == NULL)
+		return (NULL);
+
+	n = fmd_fmri_uriescape(s, ":,/", NULL, 0);
+	s2 = fmd_alloc(n + 1, FMD_SLEEP);
+	(void) fmd_fmri_uriescape(s, ":,/", s2, n + 1);
+
 	return (s2);
 }
 
@@ -273,4 +342,21 @@ fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
 
 	fmd_scheme_hash_release(fmd.d_schemes, sp);
 	return (rv);
+}
+
+nvlist_t *
+fmd_fmri_translate(nvlist_t *fmri, nvlist_t *auth)
+{
+	fmd_scheme_t *sp;
+	nvlist_t *nvl;
+
+	if ((sp = nvl2scheme(fmri)) == NULL)
+		return (NULL); /* errno is set for us */
+
+	(void) pthread_mutex_lock(&sp->sch_opslock);
+	nvl = sp->sch_ops.sop_translate(fmri, auth);
+	(void) pthread_mutex_unlock(&sp->sch_opslock);
+
+	fmd_scheme_hash_release(fmd.d_schemes, sp);
+	return (nvl);
 }

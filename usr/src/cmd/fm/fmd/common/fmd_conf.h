@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -60,13 +61,21 @@ typedef struct fmd_conf_param {
 	} cp_value;
 } fmd_conf_param_t;
 
+typedef struct fmd_conf_defer {
+	char *cd_name;
+	char *cd_value;
+	struct fmd_conf_defer *cd_next;
+} fmd_conf_defer_t;
+
 typedef struct fmd_conf {
 	pthread_rwlock_t cf_lock;
 	const fmd_conf_formal_t *cf_argv;
 	int cf_argc;
+	uint_t cf_flag;
 	fmd_conf_param_t *cf_params;
 	fmd_conf_param_t **cf_parhash;
 	uint_t cf_parhashlen;
+	fmd_conf_defer_t *cf_defer;
 } fmd_conf_t;
 
 typedef struct fmd_conf_verb {
@@ -93,6 +102,10 @@ extern int fmd_conf_notsup(fmd_conf_param_t *, const char *);
 extern void fmd_conf_nop(fmd_conf_param_t *);
 
 extern const fmd_conf_ops_t fmd_conf_bool;	/* int */
+extern const fmd_conf_ops_t fmd_conf_int8;	/* int8_t */
+extern const fmd_conf_ops_t fmd_conf_uint8;	/* uint8_t */
+extern const fmd_conf_ops_t fmd_conf_int16;	/* int16_t */
+extern const fmd_conf_ops_t fmd_conf_uint16;	/* uint16_t */
 extern const fmd_conf_ops_t fmd_conf_int32;	/* int32_t */
 extern const fmd_conf_ops_t fmd_conf_uint32;	/* uint32_t */
 extern const fmd_conf_ops_t fmd_conf_int64;	/* int64_t */
@@ -108,8 +121,12 @@ extern const fmd_conf_ops_t fmd_conf_parent;	/* any */
 extern const char FMD_PROP_SUBSCRIPTIONS[];	/* fmd_conf_list */
 extern const char FMD_PROP_DICTIONARIES[];	/* fmd_conf_list */
 
-extern fmd_conf_t *fmd_conf_open(const char *, int, const fmd_conf_formal_t *);
+#define	FMD_CONF_DEFER	0x1			/* permit deferred settings */
+
+extern fmd_conf_t *fmd_conf_open(const char *,
+    int, const fmd_conf_formal_t *, uint_t);
 extern void fmd_conf_merge(fmd_conf_t *, const char *);
+extern void fmd_conf_propagate(fmd_conf_t *, fmd_conf_t *, const char *);
 extern void fmd_conf_close(fmd_conf_t *);
 
 extern const fmd_conf_ops_t *fmd_conf_gettype(fmd_conf_t *, const char *);

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,23 +92,28 @@ fmd_trace_frame(uintptr_t pc, int sig, fmd_tracerec_t *trp)
 
 /*ARGSUSED*/
 fmd_tracerec_t *
-fmd_trace_none(fmd_tracebuf_t *tbp, uint8_t tag, const char *format, va_list ap)
+fmd_trace_none(fmd_tracebuf_t *tbp, uint_t tag, const char *format, va_list ap)
 {
 	return (NULL);
 }
 
 fmd_tracerec_t *
-fmd_trace_lite(fmd_tracebuf_t *tbp, uint8_t tag, const char *format, va_list ap)
+fmd_trace_lite(fmd_tracebuf_t *tbp, uint_t tag, const char *format, va_list ap)
 {
 	hrtime_t time = gethrtime();
 	fmd_tracerec_t *trp = tbp->tb_ptr;
 	char *p;
 
+	if (tbp->tb_depth++ != 0) {
+		tbp->tb_depth--;
+		return (NULL);
+	}
+
 	trp->tr_time = time;
 	trp->tr_file = NULL;
 	trp->tr_line = 0;
 	trp->tr_errno = (tag == FMD_DBG_ERR) ? errno : 0;
-	trp->tr_tag = tag;
+	trp->tr_tag = fmd_ntz32(tag);
 
 	(void) vsnprintf(trp->tr_msg, sizeof (trp->tr_msg), format, ap);
 	p = &trp->tr_msg[strlen(trp->tr_msg)];
@@ -119,16 +125,22 @@ fmd_trace_lite(fmd_tracebuf_t *tbp, uint8_t tag, const char *format, va_list ap)
 	else
 		tbp->tb_ptr = tbp->tb_buf;
 
+	tbp->tb_depth--;
 	return (trp);
 }
 
 fmd_tracerec_t *
-fmd_trace_full(fmd_tracebuf_t *tbp, uint8_t tag, const char *format, va_list ap)
+fmd_trace_full(fmd_tracebuf_t *tbp, uint_t tag, const char *format, va_list ap)
 {
 	hrtime_t time = gethrtime();
 	fmd_tracerec_t *trp = tbp->tb_ptr;
 	ucontext_t uc;
 	char *p;
+
+	if (tbp->tb_depth++ != 0) {
+		tbp->tb_depth--;
+		return (NULL);
+	}
 
 	(void) getcontext(&uc);
 	trp->tr_tag = tbp->tb_frames; /* for use by fmd_trace_frame() */
@@ -138,7 +150,10 @@ fmd_trace_full(fmd_tracebuf_t *tbp, uint8_t tag, const char *format, va_list ap)
 	trp->tr_file = NULL;
 	trp->tr_line = 0;
 	trp->tr_errno = (tag == FMD_DBG_ERR) ? errno : 0;
-	trp->tr_tag = tag;
+	trp->tr_tag = fmd_ntz32(tag);
+
+	if (fmd.d_fmd_debug & FMD_DBG_TRACE)
+		fmd_vdprintf(tag, format, ap);
 
 	(void) vsnprintf(trp->tr_msg, sizeof (trp->tr_msg), format, ap);
 	p = &trp->tr_msg[strlen(trp->tr_msg)];
@@ -150,5 +165,6 @@ fmd_trace_full(fmd_tracebuf_t *tbp, uint8_t tag, const char *format, va_list ap)
 	else
 		tbp->tb_ptr = tbp->tb_buf;
 
+	tbp->tb_depth--;
 	return (trp);
 }

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,7 +149,7 @@ inj_cmd_sleep(uint_t secs)
 inj_cmd_t *
 inj_cmd_addhrt(hrtime_t delta)
 {
-	const char *class = "resource.sunos.fmd.clock.addhrtime";
+	const char *class = "resource.fm.fmd.clock.addhrtime";
 	inj_cmd_t *cmd = inj_zalloc(sizeof (inj_cmd_t));
 	inj_defn_t *ev = inj_zalloc(sizeof (inj_defn_t));
 

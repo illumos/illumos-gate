@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -289,8 +289,8 @@ fmd_simulator_add(hrtime_t delta)
 	TRACE((FMD_DBG_TMR, "hrt clock set %llx", fts->fts_hrt));
 	fmd_dprintf(FMD_DBG_TMR, "hrt clock set %llx\n", fts->fts_hrt);
 
-	(void) pthread_mutex_unlock(&fts->fts_lock);
 	(void) pthread_cond_broadcast(&fts->fts_cv);
+	(void) pthread_mutex_unlock(&fts->fts_lock);
 }
 
 static void
@@ -328,8 +328,8 @@ fmd_simulator_cancel(pthread_t tid)
 
 	(void) pthread_mutex_lock(&fts->fts_lock);
 	fts->fts_cancel++;
-	(void) pthread_mutex_unlock(&fts->fts_lock);
 	(void) pthread_cond_signal(&fts->fts_cv);
+	(void) pthread_mutex_unlock(&fts->fts_lock);
 }
 
 /*

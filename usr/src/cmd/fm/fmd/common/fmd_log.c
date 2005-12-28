@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -369,6 +370,9 @@ fmd_log_xopen(const char *root, const char *name, const char *tag, int oflags)
 
 	if (strcmp(lp->log_tag, FMD_LOG_ERROR) == 0)
 		lp->log_flags |= FMD_LF_REPLAY;
+
+	if (strcmp(lp->log_tag, FMD_LOG_XPRT) == 0)
+		oflags &= ~O_SYNC;
 
 top:
 	if ((lp->log_fd = open64(lp->log_name, oflags, 0644)) == -1 ||
@@ -749,8 +753,8 @@ fmd_log_commit(fmd_log_t *lp, fmd_event_t *e)
 		ASSERT(lp->log_pending != 0);
 		lp->log_pending--;
 
-		(void) pthread_mutex_unlock(&lp->log_lock);
 		(void) pthread_cond_broadcast(&lp->log_cv);
+		(void) pthread_mutex_unlock(&lp->log_lock);
 
 	} else {
 		fmd_error(EFMD_LOG_COMMIT, "failed to log_commit %s %p: %s\n",
@@ -782,8 +786,8 @@ fmd_log_decommit(fmd_log_t *lp, fmd_event_t *e)
 	ASSERT(lp->log_pending != 0);
 	lp->log_pending--;
 
-	(void) pthread_mutex_unlock(&lp->log_lock);
 	(void) pthread_cond_broadcast(&lp->log_cv);
+	(void) pthread_mutex_unlock(&lp->log_lock);
 }
 
 static fmd_event_t *
@@ -951,8 +955,8 @@ out:
 	}
 
 	lp->log_flags &= ~FMD_LF_BUSY;
-	(void) pthread_mutex_unlock(&lp->log_lock);
 	(void) pthread_cond_broadcast(&lp->log_cv);
+	(void) pthread_mutex_unlock(&lp->log_lock);
 }
 
 void

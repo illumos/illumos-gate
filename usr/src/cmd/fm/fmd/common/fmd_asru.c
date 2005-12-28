@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -43,15 +44,17 @@
 #include <fmd_conf.h>
 #include <fmd_fmri.h>
 #include <fmd_dispq.h>
+#include <fmd_case.h>
+#include <fmd_module.h>
 #include <fmd_asru.h>
 
 #include <fmd.h>
 
 static const char *const _fmd_asru_events[] = {
-	"resource.sunos.fmd.asru.ok",		/* UNUSABLE=0 FAULTED=0 */
-	"resource.sunos.fmd.asru.degraded",	/* UNUSABLE=0 FAULTED=1 */
-	"resource.sunos.fmd.asru.unknown",	/* UNUSABLE=1 FAULTED=0 */
-	"resource.sunos.fmd.asru.faulted"	/* UNUSABLE=1 FAULTED=1 */
+	FMD_RSRC_CLASS "asru.ok",		/* UNUSABLE=0 FAULTED=0 */
+	FMD_RSRC_CLASS "asru.degraded",		/* UNUSABLE=0 FAULTED=1 */
+	FMD_RSRC_CLASS "asru.unknown",		/* UNUSABLE=1 FAULTED=0 */
+	FMD_RSRC_CLASS "asru.faulted"		/* UNUSABLE=1 FAULTED=1 */
 };
 
 static const char *const _fmd_asru_snames[] = {
@@ -78,6 +81,7 @@ fmd_asru_create(fmd_asru_hash_t *ahp, const char *uuid,
 	ap->asru_refs = 1;
 	ap->asru_flags = 0;
 	ap->asru_case = NULL;
+	ap->asru_event = NULL;
 
 	if (nvlist_lookup_string(ap->asru_fmri, FM_FMRI_SCHEME, &s) == 0 &&
 	    strcmp(s, FM_FMRI_SCHEME_FMD) == 0)
@@ -95,7 +99,9 @@ fmd_asru_destroy(fmd_asru_t *ap)
 	if (ap->asru_log != NULL)
 		fmd_log_rele(ap->asru_log);
 
-	fmd_strfree(ap->asru_case);
+	if (ap->asru_case != NULL)
+		fmd_case_rele(ap->asru_case);
+
 	fmd_strfree(ap->asru_name);
 	nvlist_free(ap->asru_fmri);
 	fmd_strfree(ap->asru_root);
@@ -154,12 +160,12 @@ fmd_asru_hash_lookup(fmd_asru_hash_t *ahp, const char *name)
 static void
 fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 {
-	nvlist_t *nvl = ((fmd_event_impl_t *)ep)->ev_nvl;
-	char *case_uuid = NULL;
+	nvlist_t *nvl = FMD_EVENT_NVL(ep);
+	char *case_uuid = NULL, *case_code = NULL;
 	char *name = NULL;
 	ssize_t namelen;
 
-	nvlist_t *fmri, *fsrc, *flt;
+	nvlist_t *fmri, *flt;
 	fmd_event_t *e;
 	char *class;
 
@@ -172,7 +178,6 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	 * 'unusable' from the event log.  If the event is malformed, return.
 	 */
 	if (nvlist_lookup_nvlist(nvl, FM_RSRC_RESOURCE, &fmri) != 0 ||
-	    nvlist_lookup_string(nvl, FM_RSRC_ASRU_UUID, &case_uuid) != 0 ||
 	    nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_FAULTY, &f) != 0 ||
 	    nvlist_lookup_boolean_value(nvl, FM_RSRC_ASRU_UNUSABLE, &u) != 0) {
 		fmd_error(EFMD_ASRU_EVENT, "failed to reload asru %s: "
@@ -235,6 +240,7 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 		} else {
 			fmd_error(EFMD_ASRU_DUP, "removing duplicate asru "
 			    "log %s for %s\n", lp->log_name, name);
+			fmd_free(name, namelen + 1);
 			fmd_asru_hash_release(ahp, ap);
 			ahp->ah_error = EFMD_ASRU_DUP;
 			return;
@@ -253,8 +259,36 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	    FM_SUSPECT_MESSAGE, &m) == 0 && m == B_FALSE)
 		ap->asru_flags |= FMD_ASRU_INVISIBLE;
 
-	if (case_uuid != NULL)
-		ap->asru_case = fmd_strdup(case_uuid, FMD_SLEEP);
+	/*
+	 * If the ASRU is present and the Faulty bit is set and a case event is
+	 * saved in the log, attempt to recreate the case in the CLOSED state.
+	 * If the case is already present, fmd_case_recreate() will return it.
+	 * If not, we'll create a new orphaned case, in which case we use the
+	 * ASRU event to insert a suspect into the partially-restored case.
+	 */
+	(void) nvlist_lookup_string(nvl, FM_RSRC_ASRU_UUID, &case_uuid);
+	(void) nvlist_lookup_string(nvl, FM_RSRC_ASRU_CODE, &case_code);
+
+	if (ps > 0 && !(ap->asru_flags & FMD_ASRU_INTERNAL) &&
+	    (ap->asru_flags & FMD_ASRU_FAULTY) && case_uuid != NULL &&
+	    nvlist_lookup_nvlist(nvl, FM_RSRC_ASRU_EVENT, &flt) == 0) {
+
+		fmd_module_lock(fmd.d_rmod);
+
+		ap->asru_case = fmd_case_recreate(fmd.d_rmod, NULL,
+		    FMD_CASE_CLOSED, case_uuid, case_code);
+
+		if (ap->asru_case != NULL)
+			fmd_case_hold(ap->asru_case);
+
+		fmd_module_unlock(fmd.d_rmod);
+
+		if (ap->asru_case != NULL && fmd_case_orphaned(ap->asru_case)) {
+			(void) nvlist_xdup(flt, &ap->asru_event, &fmd.d_nva);
+			fmd_case_recreate_suspect(
+			    ap->asru_case, ap->asru_event);
+		}
+	}
 
 	ap->asru_flags |= FMD_ASRU_VALID;
 	fmd_asru_hash_insert(ahp, ap);
@@ -267,15 +301,16 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	 * fault event that caused it be marked faulty.  This will cause the
 	 * agent subscribing to this fault class to again disable the resource.
 	 */
-	if (ps > 0 && !(ap->asru_flags & FMD_ASRU_INTERNAL) &&
-	    (ap->asru_flags & FMD_ASRU_STATE) == FMD_ASRU_FAULTY &&
-	    nvlist_lookup_nvlist(nvl, FM_RSRC_ASRU_EVENT, &fsrc) == 0) {
-
+	if (ap->asru_case != NULL && !(ap->asru_flags & FMD_ASRU_UNUSABLE)) {
 		fmd_dprintf(FMD_DBG_ASRU,
 		    "replaying fault event for %s", ap->asru_name);
 
-		(void) nvlist_xdup(fsrc, &flt, &fmd.d_nva);
+		(void) nvlist_xdup(flt, &flt, &fmd.d_nva);
 		(void) nvlist_lookup_string(flt, FM_CLASS, &class);
+
+		if (case_uuid != NULL)
+			(void) nvlist_add_string(flt, FMD_EVN_UUID, case_uuid);
+
 		e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, flt, class);
 		fmd_dispq_dispatch(fmd.d_disp, e, class);
 	}
@@ -524,8 +559,8 @@ fmd_asru_hash_lookup_nvl(fmd_asru_hash_t *ahp, nvlist_t *fmri, int create)
 
 		ap->asru_refs++;
 		ASSERT(ap->asru_refs != 0);
-		(void) pthread_mutex_unlock(&ap->asru_lock);
 		(void) pthread_cond_broadcast(&ap->asru_cv);
+		(void) pthread_mutex_unlock(&ap->asru_lock);
 
 		TRACE((FMD_DBG_ASRU, "asru %s created as %p",
 		    ap->asru_uuid, (void *)ap));
@@ -610,18 +645,21 @@ fmd_asru_hash_delete_name(fmd_asru_hash_t *ahp, const char *name)
 }
 
 static void
-fmd_asru_logevent(fmd_asru_t *ap, uint_t state, const char *cid, nvlist_t *evl)
+fmd_asru_logevent(fmd_asru_t *ap)
 {
-	boolean_t f = (state & FMD_ASRU_FAULTY) != 0;
-	boolean_t u = (state & FMD_ASRU_UNUSABLE) != 0;
+	boolean_t f = (ap->asru_flags & FMD_ASRU_FAULTY) != 0;
+	boolean_t u = (ap->asru_flags & FMD_ASRU_UNUSABLE) != 0;
 	boolean_t m = (ap->asru_flags & FMD_ASRU_INVISIBLE) == 0;
 
+	fmd_case_impl_t *cip;
 	fmd_event_t *e;
 	fmd_log_t *lp;
 	nvlist_t *nvl;
 	char *class;
 
 	ASSERT(MUTEX_HELD(&ap->asru_lock));
+	ASSERT(ap->asru_case != NULL);
+	cip = (fmd_case_impl_t *)ap->asru_case;
 
 	if ((lp = ap->asru_log) == NULL)
 		lp = fmd_log_open(ap->asru_root, ap->asru_uuid, FMD_LOG_ASRU);
@@ -629,8 +667,8 @@ fmd_asru_logevent(fmd_asru_t *ap, uint_t state, const char *cid, nvlist_t *evl)
 	if (lp == NULL)
 		return; /* can't log events if we can't open the log */
 
-	nvl = fmd_protocol_resource(_fmd_asru_events[f | (u << 1)],
-	    ap->asru_fmri, cid, f, u, m, evl);
+	nvl = fmd_protocol_rsrc_asru(_fmd_asru_events[f | (u << 1)],
+	    ap->asru_fmri, cip->ci_uuid, cip->ci_code, f, u, m, ap->asru_event);
 
 	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
@@ -649,85 +687,99 @@ fmd_asru_logevent(fmd_asru_t *ap, uint_t state, const char *cid, nvlist_t *evl)
 }
 
 int
-fmd_asru_setflags(fmd_asru_t *ap, uint_t sflag, const char *cid, nvlist_t *nvl)
+fmd_asru_setflags(fmd_asru_t *ap, uint_t sflag, fmd_case_t *cp, nvlist_t *nvl)
 {
+	fmd_case_t *old_case = NULL;
 	uint_t nstate, ostate;
-	char *uuid;
 	boolean_t msg;
 
 	ASSERT(!(sflag & ~FMD_ASRU_STATE));
 	ASSERT(sflag != FMD_ASRU_STATE);
 
-	uuid = fmd_strdup(cid, FMD_SLEEP);
 	(void) pthread_mutex_lock(&ap->asru_lock);
 
 	ostate = ap->asru_flags & FMD_ASRU_STATE;
 	ap->asru_flags |= sflag;
 	nstate = ap->asru_flags & FMD_ASRU_STATE;
 
-	if (nstate != ostate && uuid != NULL) {
-		fmd_strfree(ap->asru_case);
-		ap->asru_case = uuid;
-	} else if (nstate != ostate && uuid == NULL) {
-		cid = alloca(strlen(ap->asru_case) + 1);
-		(void) strcpy((char *)cid, ap->asru_case);
-	}
-
-	if (nstate != ostate) {
-		if (nvl != NULL && nvlist_lookup_boolean_value(nvl,
-		    FM_SUSPECT_MESSAGE, &msg) == 0 && msg == B_FALSE)
-			ap->asru_flags |= FMD_ASRU_INVISIBLE;
-
-		TRACE((FMD_DBG_ASRU, "asru %s %s->%s", ap->asru_uuid,
-		    _fmd_asru_snames[ostate], _fmd_asru_snames[nstate]));
-
-		fmd_asru_logevent(ap, nstate, cid, nvl);
+	if (nstate == ostate) {
 		(void) pthread_mutex_unlock(&ap->asru_lock);
-		(void) pthread_cond_broadcast(&ap->asru_cv);
-		return (1);
+		return (0);
 	}
 
+	if (cp != NULL && cp != ap->asru_case) {
+		old_case = ap->asru_case;
+		fmd_case_hold_locked(cp);
+		ap->asru_case = cp;
+		ap->asru_event = nvl;
+	}
+
+	if (nvl != NULL && nvlist_lookup_boolean_value(nvl,
+	    FM_SUSPECT_MESSAGE, &msg) == 0 && msg == B_FALSE)
+		ap->asru_flags |= FMD_ASRU_INVISIBLE;
+
+	TRACE((FMD_DBG_ASRU, "asru %s %s->%s", ap->asru_uuid,
+	    _fmd_asru_snames[ostate], _fmd_asru_snames[nstate]));
+
+	fmd_asru_logevent(ap);
+
+	(void) pthread_cond_broadcast(&ap->asru_cv);
 	(void) pthread_mutex_unlock(&ap->asru_lock);
-	fmd_strfree(uuid);
-	return (0);
+
+	if (old_case != NULL)
+		fmd_case_rele(old_case);
+
+	return (1);
 }
 
 int
-fmd_asru_clrflags(fmd_asru_t *ap, uint_t sflag, const char *cid, nvlist_t *nvl)
+fmd_asru_clrflags(fmd_asru_t *ap, uint_t sflag, fmd_case_t *cp, nvlist_t *nvl)
 {
+	fmd_case_t *old_case = NULL;
 	uint_t nstate, ostate;
-	char *uuid;
 
 	ASSERT(!(sflag & ~FMD_ASRU_STATE));
 	ASSERT(sflag != FMD_ASRU_STATE);
 
-	uuid = fmd_strdup(cid, FMD_SLEEP);
 	(void) pthread_mutex_lock(&ap->asru_lock);
 
 	ostate = ap->asru_flags & FMD_ASRU_STATE;
 	ap->asru_flags &= ~sflag;
 	nstate = ap->asru_flags & FMD_ASRU_STATE;
 
-	if (nstate != ostate && uuid != NULL) {
-		fmd_strfree(ap->asru_case);
-		ap->asru_case = uuid;
-	} else if (nstate != ostate && uuid == NULL) {
-		cid = alloca(strlen(ap->asru_case) + 1);
-		(void) strcpy((char *)cid, ap->asru_case);
-	}
-
-	if (nstate != ostate) {
-		TRACE((FMD_DBG_ASRU, "asru %s %s->%s", ap->asru_uuid,
-		    _fmd_asru_snames[ostate], _fmd_asru_snames[nstate]));
-		fmd_asru_logevent(ap, nstate, cid, nvl);
+	if (nstate == ostate) {
 		(void) pthread_mutex_unlock(&ap->asru_lock);
-		(void) pthread_cond_broadcast(&ap->asru_cv);
-		return (1);
+		return (0);
 	}
 
+	if (cp != NULL && cp != ap->asru_case) {
+		old_case = ap->asru_case;
+		fmd_case_hold_locked(cp);
+		ap->asru_case = cp;
+		ap->asru_event = nvl;
+	}
+
+	TRACE((FMD_DBG_ASRU, "asru %s %s->%s", ap->asru_uuid,
+	    _fmd_asru_snames[ostate], _fmd_asru_snames[nstate]));
+
+	fmd_asru_logevent(ap);
+
+	if (cp == NULL && (sflag & FMD_ASRU_FAULTY)) {
+		old_case = ap->asru_case;
+		ap->asru_case = NULL;
+		ap->asru_event = NULL;
+	}
+
+	(void) pthread_cond_broadcast(&ap->asru_cv);
 	(void) pthread_mutex_unlock(&ap->asru_lock);
-	fmd_strfree(uuid);
-	return (0);
+
+	if (old_case != NULL) {
+		if (cp == NULL && (sflag & FMD_ASRU_FAULTY))
+			fmd_case_update(old_case);
+		fmd_case_rele(old_case);
+	}
+
+	return (1);
 }
 
 /*
@@ -756,18 +808,4 @@ fmd_asru_getstate(fmd_asru_t *ap)
 		st &= ~FMD_ASRU_UNUSABLE;
 
 	return (st);
-}
-
-char *
-fmd_asru_getcase(fmd_asru_t *ap, char *buf, size_t buflen)
-{
-	(void) pthread_mutex_lock(&ap->asru_lock);
-
-	if (ap->asru_case != NULL)
-		(void) strlcpy(buf, ap->asru_case, buflen);
-	else if (buflen != 0)
-		buf[0] = '\0';
-
-	(void) pthread_mutex_unlock(&ap->asru_lock);
-	return (buf);
 }

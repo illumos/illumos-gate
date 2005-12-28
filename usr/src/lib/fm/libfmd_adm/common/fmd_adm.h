@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -114,6 +114,11 @@ typedef int fmd_adm_serd_f(const fmd_adm_serdinfo_t *, void *);
 extern int fmd_adm_serd_iter(fmd_adm_t *, const char *,
     fmd_adm_serd_f *, void *);
 extern int fmd_adm_serd_reset(fmd_adm_t *, const char *, const char *);
+
+typedef int fmd_adm_xprt_f(id_t, void *);
+
+extern int fmd_adm_xprt_iter(fmd_adm_t *, fmd_adm_xprt_f *, void *);
+extern int fmd_adm_xprt_stats(fmd_adm_t *, id_t, fmd_adm_stats_t *);
 
 extern int fmd_adm_log_rotate(fmd_adm_t *, const char *);
 

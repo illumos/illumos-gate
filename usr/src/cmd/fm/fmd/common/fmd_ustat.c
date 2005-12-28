@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -305,5 +306,36 @@ fmd_ustat_delete(fmd_ustat_t *usp, uint_t n, fmd_stat_t *sp)
 {
 	(void) pthread_rwlock_wrlock(&usp->us_lock);
 	fmd_ustat_delete_locked(usp, n, sp, FMD_B_TRUE);
+	(void) pthread_rwlock_unlock(&usp->us_lock);
+}
+
+/*
+ * Delete all statistics that are references to external memory (that is, all
+ * statistics inserted with FMD_STAT_NOALLOC), i.e. a NULL ep->use_chunk.
+ */
+void
+fmd_ustat_delete_references(fmd_ustat_t *usp)
+{
+	fmd_ustat_elem_t *ep, **pp;
+	uint_t i;
+
+	(void) pthread_rwlock_wrlock(&usp->us_lock);
+
+	for (i = 0; i < usp->us_hashlen; i++) {
+		for (pp = &usp->us_hash[i], ep = *pp; ep != NULL; ep = *pp) {
+			if (ep->use_chunk != NULL) {
+				pp = &ep->use_next;
+				continue;
+			}
+
+			if (ep->use_stat->fmds_type == FMD_TYPE_STRING)
+				fmd_strfree(ep->use_stat->fmds_value.str);
+
+			*pp = ep->use_next;
+			fmd_free(ep, sizeof (fmd_ustat_elem_t));
+			usp->us_nelems--;
+		}
+	}
+
 	(void) pthread_rwlock_unlock(&usp->us_lock);
 }
