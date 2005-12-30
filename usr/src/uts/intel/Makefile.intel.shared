@@ -366,6 +366,7 @@ DRV_KMODS	+= usbprn
 DRV_KMODS	+= ugen
 DRV_KMODS	+= usbser
 DRV_KMODS	+= usbsksp
+DRV_KMODS	+= usbs49_fw
 DRV_KMODS	+= usbsprl
 DRV_KMODS	+= usb_ac
 DRV_KMODS	+= usb_as

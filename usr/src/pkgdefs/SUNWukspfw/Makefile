@@ -1,4 +1,3 @@
-#!/bin/sh
 #
 # CDDL HEADER START
 #
@@ -21,40 +20,16 @@
 # CDDL HEADER END
 #
 #
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
-#
+#ident	"%Z%%M%	%I%	%E% SMI"
  
-PATH="/usr/bin:/usr/sbin:${PATH}"
-export PATH
+include ../Makefile.com
 
-if [ "${BASEDIR:=/}" != "/" ] 
-then
-	BASEDIR_OPT="-b $BASEDIR" 
-fi
+.KEEP_STATE:
 
-not_installed() {
-	driver=$1
-	grep "^${driver} " $BASEDIR/etc/name_to_major > /dev/null 2>&1
+all: $(FILES) depend
+install: all pkg
 
-	return $?
-}
-
-EXIT=0
-
-#"usb6cd,12a"	Keyspan USA49WLC serial adapter, after fw downloaded.
-#"usb6cd,11a"	Keyspan USA49WLC serial adapter, before fw downloaded.
-#"usb6cd,121"	Keyspan USA19HS serial adapter.
-USBSKSP_ALIASES="\
-	\"usb6cd,12a\" \
-	\"usb6cd,11a\" \
-	\"usb6cd,121\" \
-	"
-
-not_installed usbsksp || add_drv ${BASEDIR_OPT} -m '* 0666 root sys' \
-	-i "${USBSKSP_ALIASES}" -n usbsksp || EXIT=1
-
-exit $EXIT
+include ../Makefile.targ

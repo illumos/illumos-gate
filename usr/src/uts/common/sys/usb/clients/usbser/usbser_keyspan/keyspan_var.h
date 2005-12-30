@@ -40,9 +40,7 @@
 #include <sys/usb/clients/usbser/usbser_dsdi.h>
 
 #include <sys/usb/clients/usbser/usbser_keyspan/usa90msg.h>
-#ifdef	KEYSPAN_USA49WLC
 #include <sys/usb/clients/usbser/usbser_keyspan/usa49msg.h>
-#endif	/* If KEYSPAN_USA49WLC defined */
 
 #ifdef	__cplusplus
 extern "C" {
@@ -73,6 +71,15 @@ struct keyspan_pre_state {
 	usb_log_handle_t	kb_lh;		/* USBA log handle */
 	keyspan_pipe_t		kb_def_pipe;	/* default pipe */
 };
+
+/* Firmware structure */
+typedef struct usbser_keyspan_fw_record {
+	uint16_t address;
+	uint8_t data_len;
+	uint8_t data[64];
+} usbser_keyspan_fw_record_t;
+
+#define	ezusb_hex_record usbser_keyspan_fw_record
 
 /*
  * PM support
@@ -106,9 +113,7 @@ typedef struct keyspan_dev_spec {
  */
 typedef union keyspan_port_ctrl_msg {
 	keyspan_usa19hs_port_ctrl_msg_t	usa19hs;
-#ifdef	KEYSPAN_USA49WLC
 	keyspan_usa49_port_ctrl_msg_t usa49;
-#endif	/* If KEYSPAN_USA49WLC defined */
 } keyspan_port_ctrl_msg_t;
 
 /*
@@ -117,9 +122,7 @@ typedef union keyspan_port_ctrl_msg {
  */
 typedef union keyspan_port_status_msg {
 	keyspan_usa19hs_port_status_msg_t	usa19hs;
-#ifdef	KEYSPAN_USA49WLC
 	keyspan_usa49_port_status_msg_t usa49;
-#endif	/* If KEYSPAN_USA49WLC defined */
 } keyspan_port_status_msg_t;
 
 /*

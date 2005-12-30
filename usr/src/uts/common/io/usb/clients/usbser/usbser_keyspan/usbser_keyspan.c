@@ -127,13 +127,8 @@
 #include <sys/usb/clients/usbser/usbser.h>
 #include <sys/usb/clients/usbser/usbser_keyspan/keyspan_var.h>
 
-#ifdef	KEYSPAN_USA49WLC
-#include <sys/usb/clients/usbser/usbser_keyspan/usa49wlc_fw.h>
-#endif	/* If KEYSPAN_USA49WLC defined */
-
 #include <sys/byteorder.h>
 #include <sys/strsun.h>
-
 
 /* configuration entry points */
 static int	usbser_keyspan_getinfo(dev_info_t *, ddi_info_cmd_t, void *,
@@ -145,16 +140,12 @@ static int	usbser_keyspan_open(queue_t *, dev_t *, int, int, cred_t *);
 /* functions related with set config or firmware download */
 static int	keyspan_pre_attach(dev_info_t *, ddi_attach_cmd_t, void *);
 static int	keyspan_set_cfg(dev_info_t *);
-
-#ifdef	KEYSPAN_USA49WLC
-
 static int	keyspan_pre_detach(dev_info_t *, ddi_detach_cmd_t, void *);
 static boolean_t keyspan_need_fw(usb_client_dev_data_t *);
 static int	keyspan_set_reg(keyspan_pipe_t *, uchar_t);
 static int	keyspan_write_memory(keyspan_pipe_t *, uint16_t, uchar_t *,
 		uint16_t, uint8_t);
-
-#endif	/* If KEYSPAN_USA49WLC defined */
+static int	keyspan_download_firmware(keyspan_pre_state_t *);
 
 static void    *usbser_keyspan_statep;	/* soft state */
 
@@ -235,7 +226,7 @@ extern struct mod_ops mod_driverops;
 
 static struct modldrv modldrv = {
 	&mod_driverops,		/* type of module - driver */
-	"USB keyspan usb2serial driver 1.0",
+	"USB keyspan usb2serial driver %I%",
 	&usbser_keyspan_ops,
 };
 
@@ -243,6 +234,14 @@ static struct modlinkage modlinkage = {
 	MODREV_1, &modldrv, 0
 };
 
+/* debug support */
+static uint_t	keyspan_pre_errlevel = USB_LOG_L4;
+static uint_t	keyspan_pre_errmask = DPRINT_MASK_ALL;
+static uint_t	keyspan_pre_instance_debug = (uint_t)-1;
+
+/* firmware support for usa49wlc model */
+extern usbser_keyspan_fw_record_t *keyspan_usa49wlc_fw(void);
+#pragma weak keyspan_usa49wlc_fw
 
 /*
  * configuration entry points
@@ -322,18 +321,18 @@ usbser_keyspan_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 static int
 usbser_keyspan_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
-#ifdef	KEYSPAN_USA49WLC
+
 	if (ddi_get_driver_private(dip) == NULL) {
 
 		return (keyspan_pre_detach(dip, cmd, usbser_keyspan_statep));
 	} else {
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 
 		return (usbser_detach(dip, cmd, usbser_keyspan_statep));
 
-#ifdef	KEYSPAN_USA49WLC
+
 	}
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 }
 
 
@@ -345,24 +344,16 @@ usbser_keyspan_open(queue_t *rq, dev_t *dev, int flag, int sflag, cred_t *cr)
 
 /*
  * Switch config or download firmware
- * -----------------------------
  */
 /*ARGSUSED*/
 static int
 keyspan_pre_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, void *statep)
 {
 
-#ifdef	KEYSPAN_USA49WLC
-	int			instance;
-	keyspan_pre_state_t		*kbp;
-	struct fw_record *record;
-#endif	/* If KEYSPAN_USA49WLC defined */
-
-	usb_client_dev_data_t	*dev_data;
-
-#ifdef	KEYSPAN_USA49WLC
-
-	instance = ddi_get_instance(dip);
+	int			instance = ddi_get_instance(dip);
+	keyspan_pre_state_t	*kbp = NULL;
+	usb_client_dev_data_t	*dev_data = NULL;
+	int			rval = DDI_FAILURE;
 
 	switch (cmd) {
 	case DDI_ATTACH:
@@ -376,125 +367,77 @@ keyspan_pre_attach(dev_info_t *dip, ddi_attach_cmd_t cmd, void *statep)
 		return (DDI_FAILURE);
 	}
 
-#endif	/* If KEYSPAN_USA49WLC defined */
-
 	/* attach driver to USBA */
-	if (usb_client_attach(dip, USBDRV_VERSION, 0) != USB_SUCCESS) {
-
-		return (DDI_FAILURE);
+	if (usb_client_attach(dip, USBDRV_VERSION, 0) == USB_SUCCESS) {
+		(void) usb_get_dev_data(dip, &dev_data, USB_PARSE_LVL_IF, 0);
 	}
+	if (dev_data == NULL) {
 
-	if (usb_get_dev_data(dip, &dev_data, USB_PARSE_LVL_IF, 0) !=
-	    USB_SUCCESS) {
-
-		return (DDI_FAILURE);
+		goto fail;
 	}
-
-#ifndef	KEYSPAN_USA49WLC
-
-	/*
-	 * Disable USA49WLC.
-	 */
-	if (dev_data->dev_descr->idProduct == KEYSPAN_USA49WLC_PID) {
-
-		goto fail_unreg;
-	}
-
-#endif	/* If no KEYSPAN_USA49WLC defined */
 
 	/*
 	 * If 19HS, needn't download firmware, but need check the current cfg.
 	 * If 49WLC, need check the current cfg before download fw. And after
-	 * download, the product id will change, not be KEYSPAN_USA49WLC_PID.
+	 * download, the product id will change to KEYSPAN_USA49WLC_PID.
 	 */
 	if (dev_data->dev_descr->idProduct == KEYSPAN_USA19HS_PID ||
 	    dev_data->dev_descr->idProduct == KEYSPAN_USA49WLC_PID) {
-		if (keyspan_set_cfg(dip) != USB_SUCCESS) {
-
-			goto fail_unreg;
+		if (keyspan_set_cfg(dip) == USB_SUCCESS) {
+			/* Go to keyspan_attach() by return DDI_ECONTEXT. */
+			rval =	DDI_ECONTEXT;
 		}
-		usb_client_detach(dip, dev_data);
 
-		/* Go to keyspan_attach() by return DDI_ECONTEXT. */
-		return (DDI_ECONTEXT);
+		goto fail;
 	}
 
-#ifdef	KEYSPAN_USA49WLC
-
 	/*
-	 * By checking KEYSPAN_FW_FLAG,  we can know whether the firmware
-	 * is downloaded. If firmware is already there, then do normal attach.
+	 * By checking KEYSPAN_FW_FLAG,  we can check whether the firmware
+	 * has been downloaded.
+	 * If firmware is already there, then do normal attach.
 	 */
 	if (!keyspan_need_fw(dev_data)) {
-		usb_client_detach(dip, dev_data);
-
 		/* Go to keyspan_attach() by return DDI_ECONTEXT. */
-		return (DDI_ECONTEXT);
+		rval =	DDI_ECONTEXT;
+
+		goto fail;
 	}
 
 	/* Go on to download firmware. */
 
-	if (ddi_soft_state_zalloc(statep, instance) != DDI_SUCCESS) {
-
-		goto fail_unreg;
+	if (ddi_soft_state_zalloc(statep, instance) == DDI_SUCCESS) {
+		kbp = ddi_get_soft_state(statep, instance);
 	}
+	if (kbp) {
+		kbp->kb_dip = dip;
+		kbp->kb_instance = instance;
+		kbp->kb_dev_data = dev_data;
+		kbp->kb_def_pipe.pipe_handle = kbp->kb_dev_data->dev_default_ph;
+		kbp->kb_lh = usb_alloc_log_hdl(kbp->kb_dip, "keyspan[*].",
+		    &keyspan_pre_errlevel, &keyspan_pre_errmask,
+		    &keyspan_pre_instance_debug, 0);
 
-	if ((kbp = ddi_get_soft_state(statep, instance)) == NULL) {
+		kbp->kb_def_pipe.pipe_lh = kbp->kb_lh;
 
-		goto fail_unreg;
-	}
+		if (keyspan_download_firmware(kbp) == USB_SUCCESS) {
+			USB_DPRINTF_L4(DPRINT_ATTACH, kbp->kb_lh,
+			    "keyspan_pre_attach: completed.");
 
-	kbp->kb_dip = dip;
-	kbp->kb_instance = instance;
-	kbp->kb_dev_data = dev_data;
-	kbp->kb_def_pipe.pipe_handle = kbp->kb_dev_data->dev_default_ph;
-	kbp->kb_def_pipe.pipe_lh = kbp->kb_lh;
+			/* keyspan download firmware done. */
 
-	/* open control pipe for firmware download */
-	record = &keyspan_usa49wlc_firmware[0];
-
-	/* Set bit 1 before downloading firmware. */
-	if (keyspan_set_reg(&kbp->kb_def_pipe, 1) != USB_SUCCESS) {
-
-		goto fail_state;
-	}
-
-	/* Write until the last record of the firmware */
-	while (record->address != 0xffff) {
-		if (keyspan_write_memory(&kbp->kb_def_pipe,
-		    record->address, (uchar_t *)record->data,
-		    record->data_size, KEYSPAN_REQ_SET) != USB_SUCCESS) {
-
-			goto fail_state;
+			return (DDI_SUCCESS);
 		}
-		record++;
 	}
-
-	/*
-	 * Set bit 0, device will be enumerated again after a while,
-	 * and then go to keyspan_attach()
-	 */
-	if (keyspan_set_reg(&kbp->kb_def_pipe, 0) != USB_SUCCESS) {
-
-		goto fail_state;
+fail:
+	if (kbp) {
+		usb_free_log_hdl(kbp->kb_lh);
+		ddi_soft_state_free(statep, instance);
 	}
-
-	/* keyspan download firmware done. */
-	return (DDI_SUCCESS);
-
-fail_state:
-	ddi_soft_state_free(statep, instance);
-
-#endif	/* If KEYSPAN_USA49WLC defined */
-
-fail_unreg:
 	usb_client_detach(dip, dev_data);
 
-	return (DDI_FAILURE);
+	return (rval);
 }
 
-
-#ifdef	KEYSPAN_USA49WLC
 
 static int
 keyspan_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, void *statep)
@@ -516,13 +459,13 @@ keyspan_pre_detach(dev_info_t *dip, ddi_detach_cmd_t cmd, void *statep)
 		return (DDI_FAILURE);
 	}
 
+	usb_free_log_hdl(kbp->kb_lh);
 	usb_client_detach(dip, kbp->kb_dev_data);
 	ddi_soft_state_free(statep, instance);
 
 	return (DDI_SUCCESS);
 }
 
-#endif	/* If KEYSPAN_USA49WLC defined */
 
 /* Set cfg for the device which has more than one cfg */
 static int
@@ -537,7 +480,6 @@ keyspan_set_cfg(dev_info_t *dip)
 	return (USB_SUCCESS);
 }
 
-#ifdef	KEYSPAN_USA49WLC
 
 /* Return TRUE if need download firmware to the device. */
 static boolean_t
@@ -623,4 +565,57 @@ keyspan_write_memory(keyspan_pipe_t *pipe, uint16_t addr, uchar_t *buf,
 
 	return (USB_SUCCESS);
 }
-#endif	/* If KEYSPAN_USA49WLC defined */
+
+/* Download firmware into device */
+static int
+keyspan_download_firmware(keyspan_pre_state_t *kbp)
+{
+	usbser_keyspan_fw_record_t *record = NULL;
+
+	/* If the firmware module exists, then download it to device. */
+	if (&keyspan_usa49wlc_fw) {
+
+		record = keyspan_usa49wlc_fw();
+	}
+
+	if (!record) {
+		USB_DPRINTF_L1(DPRINT_ATTACH, kbp->kb_lh,
+		    "No firmware available for Keyspan usa49wlc"
+		    " usb-to-serial adapter. Refer to usbsksp(7D)"
+		    " for details.");
+
+		return (USB_FAILURE);
+	}
+
+	/* Set bit 1 before downloading firmware. */
+	if (keyspan_set_reg(&kbp->kb_def_pipe, 1) != USB_SUCCESS) {
+		USB_DPRINTF_L2(DPRINT_ATTACH, kbp->kb_lh,
+		    "keyspan_pre_attach: Set register failed.");
+
+		return (USB_FAILURE);
+	}
+
+	/* Write until the last record of the firmware */
+	while (record->address != 0xffff) {
+		if (keyspan_write_memory(&kbp->kb_def_pipe,
+		    record->address, (uchar_t *)record->data,
+		    record->data_len, KEYSPAN_REQ_SET) != USB_SUCCESS) {
+			USB_DPRINTF_L2(DPRINT_ATTACH, kbp->kb_lh,
+			    "keyspan_pre_attach: download firmware failed.");
+
+			return (USB_FAILURE);
+		}
+		record++;
+	}
+
+	/*
+	 * Set bit 0, device will be enumerated again after a while,
+	 * and then go to keyspan_attach()
+	 */
+	if (keyspan_set_reg(&kbp->kb_def_pipe, 0) != USB_SUCCESS) {
+
+		return (USB_FAILURE);
+	}
+
+	return (USB_SUCCESS);
+}

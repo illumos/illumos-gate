@@ -52,10 +52,7 @@
 #include <sys/usb/clients/usbser/usbser_keyspan/keyspan_pipe.h>
 
 #include <sys/usb/clients/usbser/usbser_keyspan/usa90msg.h>
-
-#ifdef	KEYSPAN_USA49WLC
 #include <sys/usb/clients/usbser/usbser_keyspan/usa49msg.h>
-#endif	/* If KEYSPAN_USA49WLC defined */
 
 /*
  * DSD operations which are filled in ds_ops structure.
@@ -148,13 +145,13 @@ static void	keyspan_build_cmd_msg_usa19hs(keyspan_port_t *,
 static void	keyspan_default_port_params_usa19hs(keyspan_port_t *);
 static void	keyspan_save_port_params_usa19hs(keyspan_port_t	*);
 
-#ifdef	KEYSPAN_USA49WLC
+
 /* usa49 specific functions */
 static void	keyspan_build_cmd_msg_usa49(keyspan_port_t *,
     ds_port_params_t *);
 static void	keyspan_default_port_params_usa49(keyspan_port_t *);
 static void	keyspan_save_port_params_usa49(keyspan_port_t	*);
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 
 /*
  * DSD ops structure
@@ -213,7 +210,7 @@ static uint16_t	keyspan_speedtab_usa19hs[] = {
 	0x6,	/* B153600 */
 	0x4,	/* B230400 */
 };
-#ifdef	KEYSPAN_USA49WLC
+
 /*
  *  For USA49WLC baud speed, precalculated.
  */
@@ -267,7 +264,7 @@ static uint8_t	keyspan_prescaler_49wlc[] = {
 	0xd,	/* B153600 */
 	0xd,	/* B230400 */
 };
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 
 /* convert baud code into baud rate */
 static int keyspan_speed2baud[] = {
@@ -596,7 +593,7 @@ keyspan_close_hw_port(keyspan_port_t *kp)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		keyspan_build_cmd_msg_usa49(kp, NULL);
 		kp->kp_ctrl_msg.usa49._txOn = 0;
@@ -613,7 +610,7 @@ keyspan_close_hw_port(keyspan_port_t *kp)
 		kp->kp_ctrl_msg.usa49.disablePort = 1;
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_close_hw_port:"
@@ -923,7 +920,7 @@ keyspan_set_modem_ctl(ds_hdl_t hdl, uint_t port_num, int mask, int val)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		if (mask & TIOCM_RTS) {
 
@@ -953,7 +950,7 @@ keyspan_set_modem_ctl(ds_hdl_t hdl, uint_t port_num, int mask, int val)
 		}
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_CTLOP, kp->kp_lh,
 		    "keyspan_get_modem_ctl:"
@@ -971,9 +968,6 @@ keyspan_set_modem_ctl(ds_hdl_t hdl, uint_t port_num, int mask, int val)
 
 		return (USB_FAILURE);
 	}
-
-	/* busy wait 10ms */
-	drv_usecwait(10000);
 
 	return (USB_SUCCESS);
 }
@@ -1017,7 +1011,7 @@ keyspan_get_modem_ctl(ds_hdl_t hdl, uint_t port_num, int mask, int *valp)
 		}
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		if (kp->kp_status_msg.usa49.dcd) {
 			val |= TIOCM_CD;
@@ -1029,7 +1023,7 @@ keyspan_get_modem_ctl(ds_hdl_t hdl, uint_t port_num, int mask, int *valp)
 			val |= TIOCM_DSR;
 		}
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_get_modem_ctl:"
@@ -1082,12 +1076,12 @@ keyspan_break_ctl(ds_hdl_t hdl, uint_t port_num, int ctl)
 
 			break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 		case KEYSPAN_USA49WLC_PID:
 			kp->kp_ctrl_msg.usa49.txBreak = 1;
 
 			break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 		default:
 			mutex_exit(&kp->kp_mutex);
 			USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
@@ -1112,13 +1106,13 @@ keyspan_break_ctl(ds_hdl_t hdl, uint_t port_num, int ctl)
 			kp->kp_ctrl_msg.usa19hs.txBreak = 0;
 
 			break;
-#ifdef	KEYSPAN_USA49WLC
+
 		case KEYSPAN_USA49WLC_PID:
 			kp->kp_ctrl_msg.usa49._txOn = 1;
 			kp->kp_ctrl_msg.usa49.txBreak = 0;
 
 			break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 		default:
 			mutex_exit(&kp->kp_mutex);
 			USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
@@ -1183,12 +1177,12 @@ keyspan_loopback(ds_hdl_t hdl, uint_t port_num, int ctl)
 
 			break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 		case KEYSPAN_USA49WLC_PID:
 			kp->kp_ctrl_msg.usa49.loopbackMode = 0;
 
 			break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 		default:
 			mutex_exit(&kp->kp_mutex);
 			USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
@@ -1208,12 +1202,12 @@ keyspan_loopback(ds_hdl_t hdl, uint_t port_num, int ctl)
 
 			break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 		case KEYSPAN_USA49WLC_PID:
 			kp->kp_ctrl_msg.usa49.loopbackMode = 1;
 
 			break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 		default:
 			mutex_exit(&kp->kp_mutex);
 			USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
@@ -1504,7 +1498,7 @@ keyspan_attach_dev(keyspan_state_t *ksp)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		ksp->ks_dev_spec.id_product = KEYSPAN_USA49WLC_PID;
 		ksp->ks_dev_spec.port_cnt = 4;
@@ -1520,7 +1514,7 @@ keyspan_attach_dev(keyspan_state_t *ksp)
 		ksp->ks_dev_spec.datain_ep_addr[3] = 0x84;
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		mutex_exit(&ksp->ks_mutex);
 		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
@@ -1666,12 +1660,12 @@ keyspan_send_cmd(keyspan_port_t *kp)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		size = sizeof (keyspan_usa49_port_ctrl_msg_t);
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh, "keyspan_break_ctl:"
 		    "the device's product id can't be recognized");
@@ -1694,10 +1688,6 @@ keyspan_send_cmd(keyspan_port_t *kp)
 	rval = usb_pipe_bulk_xfer(ksp->ks_ctrlout_pipe.pipe_handle, br,
 	    USB_FLAGS_SLEEP);
 	if (rval == USB_SUCCESS) {
-
-		/* busy wait 5ms for the cmd to complete */
-		drv_usecwait(5000);
-
 		mutex_enter(&kp->kp_mutex);
 		keyspan_save_port_params(kp);
 		mutex_exit(&kp->kp_mutex);
@@ -2153,7 +2143,7 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		if (len == 64) {
 			if ((data = allocb(len, BPRI_LO)) == NULL) {
@@ -2176,7 +2166,7 @@ keyspan_tx_start(keyspan_port_t *kp, int *xferd)
 		data->b_wptr++;
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 
 		mutex_enter(&kp->kp_mutex);
@@ -2323,7 +2313,7 @@ keyspan_put_head(mblk_t **mpp, mblk_t *bp, keyspan_port_t *kp)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 
 		/* get rid of the first byte of the msg data which is a flag */
@@ -2334,7 +2324,7 @@ keyspan_put_head(mblk_t **mpp, mblk_t *bp, keyspan_port_t *kp)
 		*mpp = bp;
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_OUT_DATA, kp->kp_lh, "keyspan_put_head:"
 		    "the device's product id can't be recognized");
@@ -2360,12 +2350,12 @@ keyspan_default_port_params(keyspan_port_t *kp)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		keyspan_default_port_params_usa49(kp);
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_default_port_params:"
@@ -2391,12 +2381,12 @@ keyspan_build_cmd_msg(keyspan_port_t *kp, ds_port_params_t *tp)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		keyspan_build_cmd_msg_usa49(kp, tp);
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_build_cmd_msg:"
@@ -2418,12 +2408,12 @@ keyspan_save_port_params(keyspan_port_t	*kp)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		keyspan_save_port_params_usa49(kp);
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_ATTACH, ksp->ks_lh,
 		    "keyspan_save_port_params:"
@@ -2728,7 +2718,7 @@ keyspan_build_cmd_msg_usa19hs(keyspan_port_t *kp, ds_port_params_t *tp)
 
 }
 
-#ifdef	KEYSPAN_USA49WLC
+
 /*
  * Build the command message according to the params from usbser.
  * The message will then be sent to deivce by keyspan_send_cmd.
@@ -3025,4 +3015,3 @@ keyspan_save_port_params_usa49(keyspan_port_t	*kp)
 	    "status_flag = %x", kp->kp_baud, kp->kp_lcr, kp->kp_status_flag);
 
 }
-#endif	/* If KEYSPAN_USA49WLC defined */

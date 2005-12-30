@@ -55,7 +55,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 # 
 CFLAGS += $(CCVERBOSE)
 
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser
+LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser -Nmisc/usbs49_fw
 
 #
 #	Define targets

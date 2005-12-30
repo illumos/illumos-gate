@@ -20,16 +20,16 @@
 # CDDL HEADER END
 #
 #
-#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# uts/intel/usbsksp/Makefile
-
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the Keyspan USB Serial
-#	Adapter driver.
+# uts/sparc/usbs49_fw/Makefile
+
+#
+#	This makefile drives the production of the usbs49_fw kernel module.
+#
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
 #
@@ -38,17 +38,22 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= usbsksp
-OBJECTS		= $(USBSER_KEYSPAN_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(USBSER_KEYSPAN_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
+MODULE		= usbs49_fw
+OBJECTS		= $(USBS49_FW_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(USBS49_FW_OBJS:%.o=$(LINTS_DIR)/%.ln)
+WARLOCK_OUT	= $(USBS49_FW_OBJS:%.o=%.ll)
+WARLOCK_OK	= $(MODULE).ok
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/intel/Makefile.intel
+include $(UTSBASE)/sparc/Makefile.sparc
 
-LDFLAGS         += -dy -Nmisc/usba -Nmisc/usbser -Nmisc/usbs49_fw
+# 
+# lint pass one enforcement 
+# 
+CFLAGS += $(CCVERBOSE)
 
 #
 #	Define targets
@@ -63,9 +68,11 @@ all:		$(ALL_DEPS)
 
 def:		$(DEF_DEPS)
 
-clean:		$(CLEAN_DEPS);
+clean:		$(CLEAN_DEPS); \
+                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
-clobber:	$(CLOBBER_DEPS);
+clobber:	$(CLOBBER_DEPS); \
+                $(RM) $(WARLOCK_OUT) $(WARLOCK_OK)
 
 lint:		$(LINT_DEPS)
 
@@ -78,4 +85,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/intel/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ

@@ -572,6 +572,25 @@ keyspan_bulkout_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	}
 }
 
+
+/* For incoming data only. Parse a status byte and return the err code */
+void
+keyspan_parse_status(uchar_t *status, uchar_t *err)
+{
+	if (*status & RXERROR_BREAK) {
+		/*
+		 * Parity and Framing errors only count if they
+		 * occur exclusive of a break being received.
+		 */
+		*status &= (uint8_t)(RXERROR_OVERRUN | RXERROR_BREAK);
+	}
+	*err |= (*status & RXERROR_OVERRUN) ? DS_OVERRUN_ERR : 0;
+	*err |= (*status & RXERROR_PARITY) ? DS_PARITY_ERR : 0;
+	*err |= (*status & RXERROR_FRAMING) ? DS_FRAMING_ERR : 0;
+	*err |= (*status & RXERROR_BREAK) ? DS_BREAK_ERR : 0;
+}
+
+
 /*
  * pipe callbacks
  * --------------
@@ -600,18 +619,24 @@ keyspan_bulkin_cb_usa19hs(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	/* put data on the read queue */
 	if ((data_len > 0) && (kp->kp_state != KEYSPAN_PORT_CLOSED) &&
 	    (cr == USB_CR_OK)) {
-
+		uchar_t	status = data->b_rptr[0];
+		uchar_t	err = 0;
+		mblk_t	*mp;
 		/*
-		 * According to Keyspan spec, if 0x80 bit set, the data
-		 * buf contains alternate status and data bytes;
-		 * if 0x80 bit is clear, then there are no status bytes,
-		 * so we put tail to send up data.
+		 * According to Keyspan spec, if 0x80 bit is clear, there is
+		 * only one status byte at the head of the data buf; if 0x80 bit
+		 * set, then data buf contains alternate status and data bytes;
+		 * In the first case, only OVERRUN err can exist; In the second
+		 * case, there are four kinds of err bits may appear in status.
 		 */
-		if ((data->b_rptr[0] & 0x80) == 0) {
+
+		/* if 0x80 bit AND overrun bit are clear, just send up data */
+		if (!(status & 0x80) && !(status & RXERROR_OVERRUN)) {
 			USB_DPRINTF_L4(DPRINT_IN_PIPE, bulkin->pipe_lh,
 			    "keyspan_bulkin_cb_usa19hs: len=%d",
 			    data_len);
 
+			/* Get rid of the first status byte and send up data */
 			data->b_rptr++;
 			data_len--;
 			if (data_len > 0) {
@@ -623,57 +648,121 @@ keyspan_bulkin_cb_usa19hs(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 				 */
 				req->bulk_data = NULL;
 			}
-		} else {  /* there might be some errs in the data */
+		} else if (!(status & 0x80)) {
+			/* If 0x80 bit is clear and overrun bit is set */
+			USB_DPRINTF_L2(DPRINT_IN_PIPE, bulkin->pipe_lh,
+			    "keyspan_bulkin_cb_usa19hs: usb xfer is OK,"
+			    " but there is overrun err in serial xfer");
 
-			USB_DPRINTF_L4(DPRINT_IN_PIPE, bulkin->pipe_lh,
-			    "keyspan_bulkin_cb_usa19hs:"
-			    " err in the data, len=%d",
-			    data_len);
+			keyspan_parse_status(&status, &err);
+			mutex_exit(&kp->kp_mutex);
+			if ((mp = allocb(2, BPRI_HI)) == NULL) {
+				USB_DPRINTF_L2(DPRINT_IN_PIPE, kp->kp_lh,
+				    "keyspan_bulkin_cb_usa19hs: allocb failed");
+				mutex_enter(&kp->kp_mutex);
 
+				return (0);
+			}
+			DB_TYPE(mp) = M_BREAK;
+			*mp->b_wptr++ = err;
+			*mp->b_wptr++ = status;
+			mutex_enter(&kp->kp_mutex);
+
+			/* Add to the received list; Send up the err code. */
+			keyspan_put_tail(&kp->kp_rx_mp, mp);
+
+			/*
+			 * Don't send up the first byte because
+			 * it is a status byte.
+			 */
+			data->b_rptr++;
+			data_len--;
+			if (data_len > 0) {
+				keyspan_put_tail(&kp->kp_rx_mp, data);
+
+				/*
+				 * the data will not be freed and
+				 * will be sent up later.
+				 */
+				req->bulk_data = NULL;
+			}
+		} else { /* 0x80 bit set, there are some errs in the data */
+			USB_DPRINTF_L2(DPRINT_IN_PIPE, bulkin->pipe_lh,
+			    "keyspan_bulkin_cb_usa19hs: usb xfer is OK,"
+			    " but there are errs in serial xfer");
+			/*
+			 * Usually, there are at least two bytes,
+			 * one status and one data.
+			 */
 			if (data_len > 1) {
 				int i = 0;
 				int j = 1;
-
-				/* get rid of status bytes. */
+				/*
+				 * In this case, there might be multi status
+				 * bytes. Parse each status byte and move the
+				 * data bytes together.
+				 */
 				for (j = 1; j < data_len; j += 2) {
+					status = data->b_rptr[j-1];
+					keyspan_parse_status(&status, &err);
+
+					/* move the data togeter */
 					data->b_rptr[i] = data->b_rptr[j];
 					i++;
 				}
 				data->b_wptr = data->b_rptr + i;
-				keyspan_put_tail(&kp->kp_rx_mp, data);
+			} else { /* There are only one byte in incoming buf */
+				keyspan_parse_status(&status, &err);
+			}
+			mutex_exit(&kp->kp_mutex);
+			if ((mp = allocb(2, BPRI_HI)) == NULL) {
+				USB_DPRINTF_L2(DPRINT_IN_PIPE, kp->kp_lh,
+				    "keyspan_bulkin_cb_usa19hs: allocb failed");
+				mutex_enter(&kp->kp_mutex);
 
+				return (0);
+			}
+			DB_TYPE(mp) = M_BREAK;
+			*mp->b_wptr++ = err;
+			if (data_len > 2) {
+				/*
+				 * There are multiple status bytes in this case.
+				 * Use err as status character since err is got
+				 * by or in all status bytes.
+				 */
+				*mp->b_wptr++ = err;
+			} else {
+				*mp->b_wptr++ = status;
+			}
+			mutex_enter(&kp->kp_mutex);
+
+			/* Add to the received list; Send up the err code. */
+			keyspan_put_tail(&kp->kp_rx_mp, mp);
+
+			if (data_len > 1) {
+				data_len = data->b_wptr - data->b_rptr;
+				keyspan_put_tail(&kp->kp_rx_mp, data);
 				/*
 				 * The data will not be freed and
 				 * will be sent up later.
 				 */
 				req->bulk_data = NULL;
-			} else {
-				/*
-				 * When zero len returned, no data will
-				 * be sent up and the data buf will be
-				 * just freed.
-				 */
-				data_len = 0;
 			}
 		}
-
-	} else {
-
-		/* usb error happened, so don't send up data */
+	} else { /* usb error happened, so don't send up data */
+		data_len = 0;
 		USB_DPRINTF_L4(DPRINT_IN_PIPE, bulkin->pipe_lh,
 		    "keyspan_bulkin_cb_usa19hs: error happened, len=%d, "
 		    "cr=0x%x, cb_flags=0x%x", data_len, cr, req->bulk_cb_flags);
-
-		data_len = 0;
-		if (kp->kp_state != KEYSPAN_PORT_OPEN) {
-			kp->kp_no_more_reads = B_TRUE;
-		}
+	}
+	if (kp->kp_state != KEYSPAN_PORT_OPEN) {
+		kp->kp_no_more_reads = B_TRUE;
 	}
 
 	return (data_len);
 }
 
-#ifdef	KEYSPAN_USA49WLC
+
 /*
  * pipe callbacks
  * --------------
@@ -701,71 +790,150 @@ keyspan_bulkin_cb_usa49(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	/* put data on the read queue */
 	if ((data_len > 0) && (kp->kp_state != KEYSPAN_PORT_CLOSED) &&
 	    (cr == USB_CR_OK)) {
-
+		uchar_t	status = data->b_rptr[0];
+		uchar_t	err = 0;
+		mblk_t	*mp;
 		/*
-		 * According to Keyspan spec, if 0x80 bit set, the data
-		 * buf contains alternate status and data bytes;
-		 * if 0x80 bit is clear, then there are no status bytes,
-		 * so we put tail to send up data.
+		 * According to Keyspan spec, if 0x80 bit is clear, there is
+		 * only one status byte at the head of the data buf; if 0x80 bit
+		 * set, then data buf contains alternate status and data bytes;
+		 * In the first case, only OVERRUN err can exist; In the second
+		 * case, there are four kinds of err bits may appear in status.
 		 */
-		if ((data->b_rptr[0] & 0x80) == 0) {
-			USB_DPRINTF_L4(DPRINT_IN_PIPE, bulkin->pipe_lh,
-			    "keyspan_bulkin_cb_usa49: len=%d"
-			    "cr=%d", data_len, cr);
 
+		/* if 0x80 bit AND overrun bit are clear, just send up data */
+		if (!(status & 0x80) && !(status & RXERROR_OVERRUN)) {
+			USB_DPRINTF_L4(DPRINT_IN_PIPE, bulkin->pipe_lh,
+			    "keyspan_bulkin_cb_usa49: len=%d",
+			    data_len);
+
+			/* Get rid of the first status byte and send up data */
 			data->b_rptr++;
 			data_len--;
 			if (data_len > 0) {
 				keyspan_put_tail(&kp->kp_rx_mp, data);
 
 				/*
-				 * The data will not be freed and
+				 * the data will not be freed and
 				 * will be sent up later.
 				 */
 				req->bulk_data = NULL;
 			}
-		} else {
+		} else if (!(status & 0x80)) {
+			/* If 0x80 bit is clear and overrun bit is set */
+			USB_DPRINTF_L2(DPRINT_IN_PIPE, bulkin->pipe_lh,
+			    "keyspan_bulkin_cb_usa49: usb xfer is OK,"
+			    " but there is overrun err in serial xfer");
+
+			keyspan_parse_status(&status, &err);
+			mutex_exit(&kp->kp_mutex);
+			if ((mp = allocb(2, BPRI_HI)) == NULL) {
+				USB_DPRINTF_L2(DPRINT_IN_PIPE, kp->kp_lh,
+				    "keyspan_bulkin_cb_usa49: allocb failed");
+				mutex_enter(&kp->kp_mutex);
+
+				return (0);
+			}
+			DB_TYPE(mp) = M_BREAK;
+			*mp->b_wptr++ = err;
+			*mp->b_wptr++ = status;
+			mutex_enter(&kp->kp_mutex);
+
+			/* Add to the received list; Send up the err code. */
+			keyspan_put_tail(&kp->kp_rx_mp, mp);
+
+			/*
+			 * Don't send up the first byte because
+			 * it is a status byte.
+			 */
+			data->b_rptr++;
+			data_len--;
+			if (data_len > 0) {
+				keyspan_put_tail(&kp->kp_rx_mp, data);
+
+				/*
+				 * the data will not be freed and
+				 * will be sent up later.
+				 */
+				req->bulk_data = NULL;
+			}
+		} else { /* 0x80 bit set, there are some errs in the data */
+			USB_DPRINTF_L2(DPRINT_IN_PIPE, bulkin->pipe_lh,
+			    "keyspan_bulkin_cb_usa49: usb xfer is OK,"
+			    " but there are errs in serial xfer");
+			/*
+			 * Usually, there are at least two bytes,
+			 * one status and one data.
+			 */
 			if (data_len > 1) {
 				int i = 0;
 				int j = 1;
-
-				/* get rid of the status bytes in the data. */
+				/*
+				 * In this case, there might be multi status
+				 * bytes. Parse each status byte and move the
+				 * data bytes together.
+				 */
 				for (j = 1; j < data_len; j += 2) {
+					status = data->b_rptr[j-1];
+					keyspan_parse_status(&status, &err);
+
+					/* move the data togeter */
 					data->b_rptr[i] = data->b_rptr[j];
 					i++;
 				}
 				data->b_wptr = data->b_rptr + i;
-				keyspan_put_tail(&kp->kp_rx_mp, data);
+			} else { /* There are only one byte in incoming buf */
+				keyspan_parse_status(&status, &err);
+			}
+			mutex_exit(&kp->kp_mutex);
+			if ((mp = allocb(2, BPRI_HI)) == NULL) {
+				USB_DPRINTF_L2(DPRINT_IN_PIPE, kp->kp_lh,
+				    "keyspan_bulkin_cb_usa49: allocb failed");
+				mutex_enter(&kp->kp_mutex);
 
+				return (0);
+			}
+			DB_TYPE(mp) = M_BREAK;
+			*mp->b_wptr++ = err;
+			if (data_len > 2) {
+				/*
+				 * There are multiple status bytes in this case.
+				 * Use err as status character since err is got
+				 * by or in all status bytes.
+				 */
+				*mp->b_wptr++ = err;
+			} else {
+				*mp->b_wptr++ = status;
+			}
+			mutex_enter(&kp->kp_mutex);
+
+			/* Add to the received list; Send up the err code. */
+			keyspan_put_tail(&kp->kp_rx_mp, mp);
+
+			if (data_len > 1) {
+				data_len = data->b_wptr - data->b_rptr;
+				keyspan_put_tail(&kp->kp_rx_mp, data);
 				/*
 				 * The data will not be freed and
 				 * will be sent up later.
 				 */
 				req->bulk_data = NULL;
-			} else {
-				/*
-				 * When zero len returned, no data will be sent
-				 * up and the data buf will be just freed.
-				 */
-				data_len = 0;
 			}
 		}
 	} else {
-
 		/* usb error happened, so don't send up data */
 		data_len = 0;
 		USB_DPRINTF_L2(DPRINT_IN_PIPE, bulkin->pipe_lh,
 		    "keyspan_bulkin_cb_usa49: port_state=%d"
 		    " b_rptr[0]=%c", kp->kp_state, data->b_rptr[0]);
-
-		if (kp->kp_state != KEYSPAN_PORT_OPEN) {
-			kp->kp_no_more_reads = B_TRUE;
-		}
+	}
+	if (kp->kp_state != KEYSPAN_PORT_OPEN) {
+		kp->kp_no_more_reads = B_TRUE;
 	}
 
 	return (data_len);
 }
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 
 /*
  * pipe callbacks
@@ -794,12 +962,12 @@ keyspan_bulkin_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		data_len = keyspan_bulkin_cb_usa49(pipe, req);
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_IN_PIPE, (&kp->kp_datain_pipe)->pipe_lh,
 		    "keyspan_bulkin_cb:"
@@ -907,7 +1075,7 @@ keyspan_status_cb_usa19hs(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 	}
 }
 
-#ifdef	KEYSPAN_USA49WLC
+
 /*
  * pipe callbacks
  * --------------
@@ -983,7 +1151,7 @@ keyspan_status_cb_usa49(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 		    " data_len=%d", cr, data_len);
 	}
 }
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 
 /*
  * pipe callbacks
@@ -1008,12 +1176,12 @@ keyspan_status_cb(usb_pipe_handle_t pipe, usb_bulk_req_t *req)
 
 		break;
 
-#ifdef	KEYSPAN_USA49WLC
+
 	case KEYSPAN_USA49WLC_PID:
 		keyspan_status_cb_usa49(pipe, req);
 
 		break;
-#endif	/* If KEYSPAN_USA49WLC defined */
+
 	default:
 		USB_DPRINTF_L2(DPRINT_IN_PIPE,
 		    (&ksp->ks_statin_pipe)->pipe_lh, "keyspan_status_cb:"

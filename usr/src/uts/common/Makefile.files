@@ -576,6 +576,8 @@ USBSER_OBJS += usbser.o usbser_rseq.o
 
 USBSER_KEYSPAN_OBJS += usbser_keyspan.o keyspan_dsd.o keyspan_pipe.o
 
+USBS49_FW_OBJS += keyspan_49fw.o
+
 USBSPRL_OBJS += usbser_pl2303.o pl2303_dsd.o
 
 WC_OBJS += wscons.o
