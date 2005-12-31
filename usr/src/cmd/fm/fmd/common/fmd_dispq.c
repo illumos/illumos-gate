@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -310,7 +311,7 @@ void
 fmd_dispq_dispatch_gid(fmd_dispq_t *dqp,
     fmd_event_t *ep, const char *class, id_t gid)
 {
-	size_t cvbuflen = strlen(class);
+	size_t cvbuflen = strlen(class) + 1;
 	uint_t cc, cvlen, n = 0;
 	char *c, *cvbuf, **cv;
 
@@ -332,13 +333,13 @@ fmd_dispq_dispatch_gid(fmd_dispq_t *dqp,
 	    FMD_EVENT_NVL(ep), FM_SUSPECT_FAULT_LIST, &nva, &nvc) == 0) {
 		for (nvi = 0; nvi < nvc; nvi++) {
 			if (nvlist_lookup_string(nva[nvi], FM_CLASS, &c) == 0) {
-				size_t len = strlen(c);
+				size_t len = strlen(c) + 1;
 				cvbuflen = MAX(cvbuflen, len);
 			}
 		}
 	}
 
-	cvbuf = alloca(cvbuflen + 1);
+	cvbuf = alloca(cvbuflen);
 	cvlen = cvbuflen / 2 + 1;
 	cv = alloca(sizeof (char *) * cvlen);
 
