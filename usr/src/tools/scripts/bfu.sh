@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -347,6 +347,9 @@ superfluous_local_zone_files="
 preserve_files="
 	kernel/misc/amd64/sysinit
 	kernel/misc/sysinit
+	kernel/misc/usbs49_fw
+	kernel/misc/amd64/usbs49_fw
+	kernel/misc/sparcv9/usbs49_fw
 	var/adm/aculog
 	var/adm/spellhist
 	var/adm/utmpx
