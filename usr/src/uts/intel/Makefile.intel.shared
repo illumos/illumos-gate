@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -366,7 +366,6 @@ DRV_KMODS	+= usbprn
 DRV_KMODS	+= ugen
 DRV_KMODS	+= usbser
 DRV_KMODS	+= usbsksp
-DRV_KMODS	+= usbs49_fw
 DRV_KMODS	+= usbsprl
 DRV_KMODS	+= usb_ac
 DRV_KMODS	+= usb_as
@@ -490,7 +489,7 @@ MISC_KMODS	+= strplumb
 MISC_KMODS	+= sysinit
 MISC_KMODS	+= terminal-emulator
 MISC_KMODS	+= tlimod
-MISC_KMODS	+= usba usba10
+MISC_KMODS	+= usba usba10 usbs49_fw
 MISC_KMODS	+= zmod
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
