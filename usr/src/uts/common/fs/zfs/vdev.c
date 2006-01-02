@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,8 +143,19 @@ vdev_lookup_by_path(vdev_t *vd, const char *path)
 	int c;
 	vdev_t *mvd;
 
-	if (vd->vdev_path != NULL && strcmp(path, vd->vdev_path) == 0)
-		return (vd);
+	if (vd->vdev_path != NULL) {
+		if (vd->vdev_wholedisk == 1) {
+			/*
+			 * For whole disks, the internal path has 's0', but the
+			 * path passed in by the user doesn't.
+			 */
+			if (strlen(path) == strlen(vd->vdev_path) - 2 &&
+			    strncmp(path, vd->vdev_path, strlen(path)) == 0)
+				return (vd);
+		} else if (strcmp(path, vd->vdev_path) == 0) {
+			return (vd);
+		}
+	}
 
 	for (c = 0; c < vd->vdev_children; c++)
 		if ((mvd = vdev_lookup_by_path(vd->vdev_child[c], path)) !=

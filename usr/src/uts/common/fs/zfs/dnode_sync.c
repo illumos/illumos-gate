@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -528,7 +528,7 @@ dnode_sync(dnode_t *dn, int level, zio_t *zio, dmu_tx_t *tx)
 		if (!(off < dn->dn_phys->dn_maxblkid ||
 		    dn->dn_phys->dn_maxblkid == 0 ||
 		    dnode_next_offset(dn, FALSE, &off, 1, 1) == ESRCH))
-			panic("data after EOF: off=%lld\n", off);
+			panic("data after EOF: off=%llu\n", (u_longlong_t)off);
 
 		dn->dn_dirtyblksz[txgoff] = 0;
 

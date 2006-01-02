@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1791,8 +1791,9 @@ dbuf_sync(dmu_buf_impl_t *db, zio_t *zio, dmu_tx_t *tx)
 		for (i = 0; i < (1 << epbs); i++) {
 			if (!BP_IS_HOLE(&bplist[i])) {
 				panic("data past EOF: "
-				    "db=%p level=%d id=%lld i=%d\n",
-				    db, db->db_level, db->db_blkid, i);
+				    "db=%p level=%d id=%llu i=%d\n",
+				    db, db->db_level,
+				    (u_longlong_t)db->db_blkid, i);
 			}
 		}
 		mutex_exit(&db->db_mtx);
