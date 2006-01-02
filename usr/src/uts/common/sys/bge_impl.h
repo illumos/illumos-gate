@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -836,6 +836,7 @@ typedef struct bge {
 	 */
 	kmutex_t		genlock[1];
 	krwlock_t		errlock[1];
+	kmutex_t		softintrlock[1];
 
 	/*
 	 * Current Ethernet address and multicast hash (bitmap) and

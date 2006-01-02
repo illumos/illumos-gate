@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -443,20 +443,17 @@ uint_t
 bge_reschedule(caddr_t arg)
 {
 	bge_t *bgep;
-	uint_t rslt;
 
 	bgep = (bge_t *)arg;
-	rslt = DDI_INTR_UNCLAIMED;
 
 	BGE_TRACE(("bge_reschedule($%p)", (void *)bgep));
 
 	if (bgep->bge_mac_state == BGE_MAC_STARTED && bgep->resched_needed) {
 		mac_tx_update(bgep->macp);
 		bgep->resched_needed = B_FALSE;
-		rslt = DDI_INTR_CLAIMED;
 	}
 
-	return (rslt);
+	return (DDI_INTR_CLAIMED);
 }
 
 /*

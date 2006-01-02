@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,7 @@ extern "C" {
 #define	DEVICE_ID_5705C			0x1653
 #define	DEVICE_ID_5705M			0x165d
 #define	DEVICE_ID_5705MA3		0x165e
+#define	DEVICE_ID_5705F			0x166e
 #define	DEVICE_ID_5706			0x164a
 #define	DEVICE_ID_5782			0x1696
 #define	DEVICE_ID_5788			0x169c
@@ -139,6 +140,7 @@ extern "C" {
 		((bgep->chipid.device == DEVICE_ID_5705C) ||\
 		(bgep->chipid.device == DEVICE_ID_5705M) ||\
 		(bgep->chipid.device == DEVICE_ID_5705MA3) ||\
+		(bgep->chipid.device == DEVICE_ID_5705F) ||\
 		(bgep->chipid.device == DEVICE_ID_5782) ||\
 		(bgep->chipid.device == DEVICE_ID_5788))
 

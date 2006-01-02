@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "BCM579x driver v0.47";
+static char bge_ident[] = "BCM579x driver v0.48";
 
 /*
  * Property names
@@ -1107,6 +1107,8 @@ bge_init_rings(bge_t *bgep)
 
 	mutex_init(bgep->genlock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(bgep->intr_pri));
+	mutex_init(bgep->softintrlock, NULL, MUTEX_DRIVER,
+		DDI_INTR_PRI(bgep->intr_pri));
 	rw_init(bgep->errlock, NULL, RW_DRIVER,
 	    DDI_INTR_PRI(bgep->intr_pri));
 
@@ -1139,6 +1141,7 @@ bge_fini_rings(bge_t *bgep)
 		bge_fini_send_ring(bgep, ring);
 
 	rw_destroy(bgep->errlock);
+	mutex_destroy(bgep->softintrlock);
 	mutex_destroy(bgep->genlock);
 }
 

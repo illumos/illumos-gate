@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1950,6 +1950,7 @@ bge_chip_id_init(bge_t *bgep)
 	case DEVICE_ID_5705C:
 	case DEVICE_ID_5705M:
 	case DEVICE_ID_5705MA3:
+	case DEVICE_ID_5705F:
 		cidp->chip_label = 5705;
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
@@ -3403,10 +3404,12 @@ static void bge_wake_factotum(bge_t *bgep);
 static void
 bge_wake_factotum(bge_t *bgep)
 {
+	mutex_enter(bgep->softintrlock);
 	if (bgep->factotum_flag == 0) {
 		bgep->factotum_flag = 1;
 		ddi_trigger_softintr(bgep->factotum_id);
 	}
+	mutex_exit(bgep->softintrlock);
 }
 
 /*
@@ -3793,8 +3796,12 @@ bge_chip_factotum(caddr_t arg)
 
 	BGE_TRACE(("bge_chip_factotum($%p)", (void *)bgep));
 
-	if (bgep->factotum_flag == 0)
+	mutex_enter(bgep->softintrlock);
+	if (bgep->factotum_flag == 0) {
+		mutex_exit(bgep->softintrlock);
 		return (DDI_INTR_UNCLAIMED);
+	}
+	mutex_exit(bgep->softintrlock);
 
 	bgep->factotum_flag = 0;
 	result = DDI_INTR_CLAIMED;
