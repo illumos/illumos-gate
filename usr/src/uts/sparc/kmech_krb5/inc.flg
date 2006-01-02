@@ -27,7 +27,6 @@
 # Use is subject to license terms.
 #
 find_files "s.*.h" usr/src/uts/common/sys
-find_files "s.*.h" usr/closed/uts/common/sys
 find_files "s.*.h" usr/src/uts/common/rpc
 find_files "s.*.h" usr/src/uts/common/gssapi
 find_files "s.*.h" usr/src/uts/common/vm
@@ -40,4 +39,3 @@ find_files "s.*.h" usr/src/lib/krb5/kadm5
 find_files "s.*" usr/src/uts/sparc/ml
 find_files "s.*" usr/src/uts/common/gssapi/mechs/krb5
 find_files "s.*" usr/src/lib/gss_mechs/mech_krb5
-find_files "s.*" usr/closed/lib/gss_mechs/mech_krb5

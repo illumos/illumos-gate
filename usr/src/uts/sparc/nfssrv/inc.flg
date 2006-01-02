@@ -38,14 +38,11 @@ find_files "s.*.h" \
 	usr/src/uts/common/fs \
 	usr/src/uts/common/netinet \
 	usr/src/uts/common/nfs \
-	usr/closed/uts/common/nfs \
 	usr/src/uts/common/rpc \
 	usr/src/uts/common/sys \
-	usr/closed/uts/common/sys \
 	usr/src/uts/common/vm \
 	usr/src/uts/sparc/sys \
-	usr/src/uts/sun/sys \
-	usr/closed/uts/sun/sys
+	usr/src/uts/sun/sys
 
 # Find RPC .x files and Makefile so that "make all_h" works.
 

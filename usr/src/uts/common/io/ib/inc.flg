@@ -34,16 +34,12 @@
 # header files
 find_files "s.*.h"	\
 	usr/src/uts/common/sys/ib	\
-	usr/closed/uts/common/sys/ib	\
 	usr/src/uts/common/sys		\
-	usr/closed/uts/common/sys		\
 	usr/src/uts/sparc/sys		\
 	usr/src/uts/sparc/v7/sys	\
 	usr/src/uts/sparc/v9/sys	\
 	usr/src/uts/sun/sys		\
-	usr/closed/uts/sun/sys		\
 	usr/src/uts/intel/sys		\
-	usr/closed/uts/intel/sys		\
 	usr/src/uts/intel/ia32/sys	\
 	usr/src/uts/common/rpc		\
 	usr/src/uts/common/netinet	\
@@ -67,18 +63,14 @@ find_files "s.*"	\
 	usr/src/uts/sparc/ibdm		\
 	usr/src/uts/sparc/ibmf		\
 	usr/src/uts/sparc/ibtl		\
-	usr/closed/uts/sparc/tavor	\
 	usr/src/uts/sparc/ibd		\
-	usr/closed/uts/sparc/daplt	\
 	usr/src/uts/sparc/rpcib		\
 	usr/src/uts/intel/ib		\
 	usr/src/uts/intel/ibcm		\
 	usr/src/uts/intel/ibdm		\
 	usr/src/uts/intel/ibmf		\
 	usr/src/uts/intel/ibtl		\
-	usr/closed/uts/intel/tavor	\
 	usr/src/uts/intel/ibd		\
-	usr/closed/uts/intel/daplt		\
 	usr/src/uts/intel/rpcib	
 
 # packaging files
@@ -108,52 +100,37 @@ echo_file  usr/src/uts/Makefile
 echo_file  usr/src/uts/Makefile.targ
 echo_file  usr/src/uts/Makefile.uts
 echo_file  usr/src/uts/sun/Makefile.files
-echo_file  usr/closed/uts/sun/Makefile.files
 echo_file  usr/src/uts/sun/Makefile.rules
-echo_file  usr/closed/uts/sun/Makefile.rules
 echo_file  usr/src/uts/common/Makefile.files
-echo_file  usr/closed/uts/common/Makefile.files
 echo_file  usr/src/uts/common/Makefile.rules
-echo_file  usr/closed/uts/common/Makefile.rules
 echo_file  usr/src/uts/common/sys/Makefile
-echo_file  usr/closed/uts/common/sys/Makefile
 echo_file  usr/src/uts/common/sys/lvm/Makefile
 echo_file  usr/src/uts/sparc/Makefile
 echo_file  usr/src/uts/sparc/Makefile.files
 echo_file  usr/src/uts/sparc/Makefile.rules
 echo_file  usr/src/uts/sparc/Makefile.sparc
 echo_file  usr/src/uts/sparc/Makefile.sparc.shared
-echo_file  usr/closed/uts/sparc/Makefile.sparc
 echo_file  usr/src/uts/sparc/Makefile.targ
 echo_file  usr/src/uts/sparc/Makefile.targ.shared
-echo_file  usr/closed/uts/sparc/Makefile.targ
 echo_file  usr/src/uts/sparc/ml/sparc.il
 echo_file  usr/src/uts/sparc/req.flg
 echo_file  usr/src/uts/intel/Makefile
 echo_file  usr/src/uts/intel/Makefile.files
-echo_file  usr/closed/uts/intel/Makefile.files
 echo_file  usr/src/uts/intel/Makefile.rules
-echo_file  usr/closed/uts/intel/Makefile.rules
 echo_file  usr/src/uts/intel/Makefile.intel
 echo_file  usr/src/uts/intel/Makefile.intel.shared
-echo_file  usr/closed/uts/intel/Makefile.intel
 echo_file  usr/src/uts/intel/Makefile.targ
 echo_file  usr/src/uts/intel/Makefile.targ.shared
-echo_file  usr/closed/uts/intel/Makefile.targ
 echo_file  usr/src/uts/intel/ia32/ml/ia32.il
 echo_file  usr/src/uts/sun4/Makefile.files
 echo_file  usr/src/uts/sun4/Makefile.rules
 echo_file  usr/src/uts/sun4u/Makefile
 echo_file  usr/src/uts/sun4u/Makefile.files
-echo_file  usr/closed/uts/sun4u/Makefile.files
 echo_file  usr/src/uts/sun4u/Makefile.rules
-echo_file  usr/closed/uts/sun4u/Makefile.rules
 echo_file  usr/src/uts/sun4u/Makefile.sun4u
 echo_file  usr/src/uts/sun4u/Makefile.sun4u.shared
-echo_file  usr/closed/uts/sun4u/Makefile.sun4u
 echo_file  usr/src/uts/sun4u/Makefile.targ
 echo_file  usr/src/uts/sun4u/Makefile.targ.shared
-echo_file  usr/closed/uts/sun4u/Makefile.targ
 echo_file  usr/src/uts/sun4u/Makefile.workarounds
 echo_file  usr/src/uts/sfmmu/Makefile.files
 echo_file  usr/src/uts/sfmmu/Makefile.rules
@@ -173,12 +150,3 @@ echo_file  usr/src/pkgdefs/etc/exception_list_sparc
 echo_file  usr/src/pkgdefs/etc/exception_list_i386
 echo_file  usr/src/cmd/mapfile_noexstk
 echo_file  usr/src/cmd/sgs/mapfiles/sparc/map.pagealign
-
-# these files are needed for forthdebug
-echo_file  usr/closed/uts/sun4u/forthdebug/Makefile
-echo_file  usr/closed/uts/sun4u/forthdebug/ib.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/ibcm.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/ibdm.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/ibmf.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/ibtl.fdbg
-echo_file  usr/closed/uts/sun4/forthdebug/tavor.fdbg

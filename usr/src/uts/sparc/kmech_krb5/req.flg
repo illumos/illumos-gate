@@ -30,12 +30,8 @@ echo_file usr/src/uts/sparc/Makefile
 echo_file usr/src/uts/sparc/Makefile.files
 echo_file usr/src/uts/sparc/Makefile.sparc
 echo_file usr/src/uts/sparc/Makefile.sparc.shared
-echo_file usr/closed/uts/sparc/Makefile.sparc
 echo_file usr/src/uts/sparc/Makefile.rules
 echo_file usr/src/uts/sparc/Makefile.targ
 echo_file usr/src/uts/sparc/Makefile.targ.shared
-echo_file usr/closed/uts/sparc/Makefile.targ
 echo_file usr/src/uts/common/Makefile.files
-echo_file usr/closed/uts/common/Makefile.files
 echo_file usr/src/uts/common/Makefile.rules
-echo_file usr/closed/uts/common/Makefile.rules

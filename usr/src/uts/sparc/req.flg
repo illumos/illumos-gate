@@ -32,20 +32,14 @@ echo_file usr/src/uts/sparc/Makefile.files
 echo_file usr/src/uts/sparc/Makefile.rules
 echo_file usr/src/uts/sparc/Makefile.sparc
 echo_file usr/src/uts/sparc/Makefile.sparc.shared
-echo_file usr/closed/uts/sparc/Makefile.sparc
 echo_file usr/src/uts/sparc/Makefile.targ
 echo_file usr/src/uts/sparc/Makefile.targ.shared
-echo_file usr/closed/uts/sparc/Makefile.targ
 
 echo_file usr/src/uts/sun/Makefile.files
-echo_file usr/closed/uts/sun/Makefile.files
 echo_file usr/src/uts/sun/Makefile.rules
-echo_file usr/closed/uts/sun/Makefile.rules
 
 echo_file usr/src/uts/common/Makefile.files
-echo_file usr/closed/uts/common/Makefile.files
 echo_file usr/src/uts/common/Makefile.rules
-echo_file usr/closed/uts/common/Makefile.rules
 
 # uts/Makefile.targ (version 1.17) says "All C objects depend on
 # inline files".  

@@ -34,31 +34,19 @@
 find_files "s.*"	\
 	usr/src/uts/common/io/warlock \
 	usr/src/uts/common/io/scsi \
-	usr/closed/uts/common/io/scsi \
 	usr/src/uts/common/sys \
-	usr/closed/uts/common/sys \
-	usr/closed/uts/sparc/dad	\
 	usr/src/uts/sparc/dada	\
 	usr/src/uts/sparc/esp	\
 	usr/src/uts/sparc/fas	\
-	usr/closed/uts/sparc/glm	\
-	usr/closed/uts/sparc/ifp	\
-	usr/closed/uts/sparc/isp	\
 	usr/src/uts/sparc/scsi	\
 	usr/src/uts/sparc/sd	\
 	usr/src/uts/sparc/ses	\
-	usr/closed/uts/sparc/sgen	\
-	usr/closed/uts/sparc/socal	\
 	usr/src/uts/sparc/ssd	\
 	usr/src/uts/sparc/st	\
-	usr/closed/uts/sparc/uata	\
 	usr/src/uts/sparc/warlock \
 	usr/src/uts/sun/io/dada \
-	usr/closed/uts/sun/io/dada \
 	usr/src/uts/sun/sys/dada \
-	usr/closed/uts/sun/sys/dada \
-	usr/src/uts/sun/sys/scsi \
-	usr/closed/uts/sun/sys/scsi
+	usr/src/uts/sun/sys/scsi
 
 find_files "s.*.h"	\
 	usr/src/uts/sparc/sys \
@@ -78,9 +66,7 @@ echo_file  usr/src/uts/Makefile
 echo_file  usr/src/uts/Makefile.targ
 echo_file  usr/src/uts/Makefile.uts
 echo_file  usr/src/uts/common/Makefile.files
-echo_file  usr/closed/uts/common/Makefile.files
 echo_file  usr/src/uts/common/Makefile.rules
-echo_file  usr/closed/uts/common/Makefile.rules
 echo_file  usr/src/uts/common/vm/as.h
 echo_file  usr/src/uts/common/vm/faultcode.h
 echo_file  usr/src/uts/common/vm/hat.h
@@ -93,23 +79,14 @@ echo_file  usr/src/uts/sparc/Makefile.files
 echo_file  usr/src/uts/sparc/Makefile.rules
 echo_file  usr/src/uts/sparc/Makefile.sparc
 echo_file  usr/src/uts/sparc/Makefile.sparc.shared
-echo_file  usr/closed/uts/sparc/Makefile.sparc
 echo_file  usr/src/uts/sparc/Makefile.targ
 echo_file  usr/src/uts/sparc/Makefile.targ.shared
-echo_file  usr/closed/uts/sparc/Makefile.targ
 echo_file  usr/src/uts/sparc/ml/sparc.il
 echo_file  usr/src/uts/sparc/req.flg
 echo_file  usr/src/uts/sun/Makefile.files
-echo_file  usr/closed/uts/sun/Makefile.files
 echo_file  usr/src/uts/sun/Makefile.rules
-echo_file  usr/closed/uts/sun/Makefile.rules
-echo_file  usr/closed/uts/sun/io/socal.c
-echo_file  usr/closed/uts/sun/io/socal_ucode.c
 echo_file  usr/src/uts/sun/sys/dmaga.h
 echo_file  usr/src/uts/sun/sys/obpdefs.h
 echo_file  usr/src/uts/sun/sys/promif.h
-echo_file  usr/closed/uts/sun/sys/socal_cq_defs.h
-echo_file  usr/closed/uts/sun/sys/socalmap.h
 echo_file  usr/src/uts/sun/sys/socalreg.h
-echo_file  usr/closed/uts/sun/sys/socalvar.h
 echo_file  usr/src/uts/sun/sys/socalio.h

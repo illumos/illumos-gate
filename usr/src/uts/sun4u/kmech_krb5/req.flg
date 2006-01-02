@@ -28,25 +28,17 @@
 #
 echo_file usr/src/uts/sun4u/Makefile
 echo_file usr/src/uts/sun4u/Makefile.files
-echo_file usr/closed/uts/sun4u/Makefile.files
 echo_file usr/src/uts/sun4u/Makefile.sun4u
 echo_file usr/src/uts/sun4u/Makefile.sun4u.shared
-echo_file usr/closed/uts/sun4u/Makefile.sun4u
 echo_file usr/src/uts/sun4u/Makefile.rules
-echo_file usr/closed/uts/sun4u/Makefile.rules
 echo_file usr/src/uts/sun4u/Makefile.targ
 echo_file usr/src/uts/sun4u/Makefile.targ.shared
-echo_file usr/closed/uts/sun4u/Makefile.targ
 echo_file usr/src/uts/sun4u/Makefile.workarounds
 echo_file usr/src/uts/sparc/Makefile.rules
 echo_file usr/src/uts/sparc/Makefile.files
 echo_file usr/src/uts/sun/Makefile.files
-echo_file usr/closed/uts/sun/Makefile.files
 echo_file usr/src/uts/sun/Makefile.rules
-echo_file usr/closed/uts/sun/Makefile.rules
 echo_file usr/src/uts/sparc/v9/Makefile.files
 echo_file usr/src/uts/sparc/v9/Makefile.rules
 echo_file usr/src/uts/common/Makefile.files
-echo_file usr/closed/uts/common/Makefile.files
 echo_file usr/src/uts/common/Makefile.rules
-echo_file usr/closed/uts/common/Makefile.rules

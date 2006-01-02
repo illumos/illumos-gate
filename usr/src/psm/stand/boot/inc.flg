@@ -33,13 +33,10 @@
 find_files "s.*.h"\
         usr/src/uts/sparc\
         usr/src/uts/sun\
-        usr/closed/uts/sun\
         usr/src/uts/common/sys\
-        usr/closed/uts/common/sys\
         usr/src/uts/common/vm\
         usr/src/uts/common/rpc\
         usr/src/uts/common/nfs\
-        usr/closed/uts/common/nfs\
         usr/src/stand/sys
 #
 # Get required directories

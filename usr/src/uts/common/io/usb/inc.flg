@@ -35,9 +35,6 @@ find_files "s.*.h"	\
 	usr/src/uts/common/sys
 
 find_files "s.*.h"	\
-	usr/closed/uts/common/sys
-
-find_files "s.*.h"	\
 	usr/src/uts/sparc/sys 
 
 find_files "s.*.h"	\
@@ -50,13 +47,7 @@ find_files "s.*.h"	\
 	usr/src/uts/intel/sys 
 
 find_files "s.*.h"	\
-	usr/closed/uts/intel/sys 
-
-find_files "s.*.h"	\
 	usr/src/uts/sun/sys 
-
-find_files "s.*.h"	\
-	usr/closed/uts/sun/sys 
 
 find_files "s.*.h"	\
 	usr/src/uts/common/vm 
@@ -83,7 +74,6 @@ find_files "s.*"	\
 	usr/src/uts/sparc/usb_ah \
 	usr/src/uts/sparc/ugen \
 	usr/src/uts/sparc/usbser \
-	usr/closed/uts/sparc/usbser_edge \
 	usr/src/uts/sparc/usbsksp \
 	usr/src/uts/sparc/usbsprl \
 	usr/src/uts/sparc/usbskel \
@@ -105,7 +95,6 @@ find_files "s.*"	\
 	usr/src/uts/intel/usb_as \
 	usr/src/uts/intel/usb_ah \
 	usr/src/uts/intel/usbser \
-	usr/closed/uts/intel/usbser_edge \
 	usr/src/uts/intel/usbsksp \
 	usr/src/uts/intel/usbsprl \
 	usr/src/uts/intel/ia32 \
@@ -129,57 +118,29 @@ echo_file  usr/src/uts/Makefile
 echo_file  usr/src/uts/Makefile.targ
 echo_file  usr/src/uts/Makefile.uts
 echo_file  usr/src/uts/sun/Makefile.files
-echo_file  usr/closed/uts/sun/Makefile.files
 echo_file  usr/src/uts/sun/Makefile.rules
-echo_file  usr/closed/uts/sun/Makefile.rules
 echo_file  usr/src/uts/common/Makefile.files
-echo_file  usr/closed/uts/common/Makefile.files
 echo_file  usr/src/uts/common/Makefile.rules
-echo_file  usr/closed/uts/common/Makefile.rules
 echo_file  usr/src/uts/sparc/Makefile
 echo_file  usr/src/uts/sparc/Makefile.files
 echo_file  usr/src/uts/sparc/Makefile.rules
 echo_file  usr/src/uts/sparc/Makefile.sparc
 echo_file  usr/src/uts/sparc/Makefile.sparc.shared
-echo_file  usr/closed/uts/sparc/Makefile.sparc
 echo_file  usr/src/uts/sparc/Makefile.targ
 echo_file  usr/src/uts/sparc/Makefile.targ.shared
-echo_file  usr/closed/uts/sparc/Makefile.targ
 echo_file  usr/src/uts/sparc/ml/sparc.il
 echo_file  usr/src/uts/sparc/req.flg
 echo_file  usr/src/uts/intel/Makefile
 echo_file  usr/src/uts/intel/Makefile.files
-echo_file  usr/closed/uts/intel/Makefile.files
 echo_file  usr/src/uts/intel/Makefile.rules
-echo_file  usr/closed/uts/intel/Makefile.rules
 echo_file  usr/src/uts/intel/Makefile.intel
 echo_file  usr/src/uts/intel/Makefile.intel.shared
-echo_file  usr/closed/uts/intel/Makefile.intel
 echo_file  usr/src/uts/intel/Makefile.targ
 echo_file  usr/src/uts/sparc/v9/Makefile.files
 echo_file  usr/src/uts/sparc/v9/Makefile.rules
 echo_file  usr/src/uts/sun4u/Makefile.rules
-echo_file  usr/closed/uts/sun4u/Makefile.rules
 echo_file  usr/src/uts/sun4/Makefile.rules
 echo_file  usr/src/uts/common/sys/Makefile
-echo_file  usr/closed/uts/common/sys/Makefile
 echo_file  usr/src/uts/common/os/privs.awk
 echo_file  usr/src/uts/common/os/priv_defs
 echo_file  usr/src/uts/intel/Makefile.targ.shared
-echo_file  usr/closed/uts/intel/Makefile.targ
-
-# these files are needed for forthdebug
-echo_file  usr/closed/uts/sun4u/forthdebug/Makefile
-echo_file  usr/closed/uts/sun4u/forthdebug/hid.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/hubd.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/ohci.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/ehci.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/usb_mid.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/usba.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/usbkbm.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/usbms.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/usbser.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/usbser_edge.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/usbprn.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/usb_audio.fdbg
-echo_file  usr/closed/uts/sun4u/forthdebug/ugen.fdbg

@@ -766,6 +766,32 @@ staffer() {
 	fi
 }
 
+#
+# Verify that the closed tree is present if it needs to be.
+# Sets CLOSED_IS_PRESENT for future use.
+#
+check_closed_tree() {
+	if [ -z "$CLOSED_IS_PRESENT" ]; then
+		if [ -d $SRC/../closed ]; then
+			CLOSED_IS_PRESENT="yes"
+		else
+			CLOSED_IS_PRESENT="no"
+		fi
+		export CLOSED_IS_PRESENT
+	fi
+	if [[ "$CLOSED_IS_PRESENT" = no && ! -d "$ON_CLOSED_BINS" ]]; then
+		#
+		# If it's an old (pre-split) tree or an empty
+		# workspace, don't complain.
+		#
+		if grep -s CLOSED_BUILD $SRC/Makefile.master > /dev/null; then
+			echo "If the closed sources are not present," \
+			    "ON_CLOSED_BINS"
+			echo "must point to the closed binaries tree."
+			exit 1
+		fi
+	fi
+}
 
 MACH=`uname -p`
 
@@ -1018,41 +1044,14 @@ if [ "$BRINGOVER_FILES" = "" ]; then
 	BRINGOVER_FILES="usr"
 fi
 
-if [ -z "$CLOSED_IS_PRESENT" ]; then
-	#
-	# See if the closed tree is present.  If the current workspace
-	# is empty, check the bringover workspace.  (This is for
-	# builds that start out with nothing but the environment
-	# file.)
-	#
-	if [ -d $SRC/../closed ]; then
-		CLOSED_IS_PRESENT="yes"
-	elif [ -d $SRC ]; then
-		CLOSED_IS_PRESENT="no"
-	elif [ -d $CLONE_WS/usr/closed ]; then
-		CLOSED_IS_PRESENT="yes"
-	else
-		CLOSED_IS_PRESENT="no"
-	fi
-	export CLOSED_IS_PRESENT
-fi
-
 #
 # If the closed sources are not present, the closed binaries must be
 # present for the build to succeed.  If there's no pointer to the
 # closed binaries, flag that now, rather than forcing the user to wait
 # a couple hours (or more) to find out.
 #
-if [[ "$CLOSED_IS_PRESENT" = no && ! -d "$ON_CLOSED_BINS" ]]; then
-	#
-	# If it's an old (pre-split) tree, don't complain.
-	#
-	if grep CLOSED_BUILD $SRC/Makefile.master > /dev/null; then
-		echo "If the closed sources are not present, ON_CLOSED_BINS"
-		echo "must point to the closed binaries tree."
-		exit 1
-	fi
-fi
+orig_closed_is_present="$CLOSED_IS_PRESENT"
+check_closed_tree
 
 #
 # Note: changes to the option letters here should also be applied to the
@@ -1837,6 +1836,13 @@ if [ "$n_FLAG" = "n" ]; then
 		echo "trouble with bringover, quitting at `date`." >> $LOGFILE
 		exit 1
 	fi
+
+	#
+	# Possible transition from pre-split workspace to split
+	# workspace.  See if the bringover changed anything.
+	#
+	CLOSED_IS_PRESENT="$orig_closed_is_present"
+	check_closed_tree
 else
 	echo "\n==== No bringover to $CODEMGR_WS ====\n" >> $LOGFILE
 fi
