@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,7 +37,8 @@ SUBDIRS= \
 	SUNW,Netra-T4 SUNW,Sun-Blade-2000 SUNW,Sun-Fire-280R \
 	SUNW,Sun-Fire-V890 SUNW,Sun-Fire-V490 SUNW,Sun-Fire-V250 \
 	SUNW,Sun-Fire-V210 SUNW,Netra-240 SUNW,Netra-440 \
-	SUNW,Sun-Fire-T200 SUNW,Netra-CP3010 SUNW,A70
+	SUNW,Sun-Fire-T200 SUNW,Netra-CP3010 SUNW,A70 \
+	SUNW,Sun-Fire-T1000
 
 include ../../../Makefile.subdirs
 
