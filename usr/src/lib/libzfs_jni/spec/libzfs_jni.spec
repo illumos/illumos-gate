@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -23,7 +23,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -120,6 +120,18 @@ function zjni_ipool_iter
 version SUNWprivate_1.1
 end
 
-function zjni_get_state_str
+function zjni_vdev_state_to_str
+version SUNWprivate_1.1
+end
+
+function zjni_vdev_aux_to_str
+version SUNWprivate_1.1
+end
+
+function zjni_pool_state_to_str
+version SUNWprivate_1.1
+end
+
+function zjni_pool_status_to_str
 version SUNWprivate_1.1
 end

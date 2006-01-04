@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,6 +175,44 @@ zjni_int_to_boolean(JNIEnv *env, uint64_t value)
 	    value ? "TRUE" : "FALSE", "Ljava/lang/Boolean;");
 
 	return (*env)->GetStaticObjectField(env, class_Boolean, id);
+}
+
+jobject
+zjni_int_to_enum(JNIEnv *env, int value, char *class_name,
+    char *default_field_name, zjni_field_mapping_t *mapping)
+{
+	int i;
+	char *field_name;
+	jclass class;
+	jfieldID id;
+	jobject field_value = NULL;
+	int found = 0;
+
+	for (i = 0; mapping[i].name != NULL; i++) {
+		if (value == mapping[i].value) {
+			field_name = mapping[i].name;
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found) {
+		field_name = default_field_name;
+	}
+
+	if (field_name != NULL) {
+		char signature[1024];
+
+		(void) snprintf(signature, sizeof (signature), "L%s;",
+		    class_name);
+
+		class = (*env)->FindClass(env, class_name);
+		id = (*env)->GetStaticFieldID(
+		    env, class, field_name, signature);
+		field_value = (*env)->GetStaticObjectField(env, class, id);
+	}
+
+	return (field_value);
 }
 
 jobject

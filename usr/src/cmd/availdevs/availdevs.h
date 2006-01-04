@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,19 +51,32 @@ extern "C" {
 #define	ELEMENT_POOL			"pool"
 #define	ELEMENT_ROOT			"zfsconfig"
 #define	ELEMENT_SLICE			"slice"
+
 #define	ATTR_ALIAS_NAME			"name"
+#define	ATTR_DEVICE_STATE		"devicestate"
+#define	ATTR_DEVICE_STATUS		"devicestatus"
 #define	ATTR_DISK_INUSE			"inuse"
 #define	ATTR_DISK_NAME			"name"
 #define	ATTR_DISK_SIZE			"size"
-#define	ATTR_POOL_HEALTH		"health"
+#define	ATTR_POOL_CHECKSUM_ERRORS	"checksumerrors"
 #define	ATTR_POOL_ID			"id"
 #define	ATTR_POOL_NAME			"name"
-#define	ATTR_POOL_STATE			"state"
+#define	ATTR_POOL_READ_BYTES		"readbytes"
+#define	ATTR_POOL_READ_ERRORS		"readerrors"
+#define	ATTR_POOL_READ_OPERATIONS	"readoperations"
+#define	ATTR_POOL_SIZE			"size"
+#define	ATTR_POOL_STATE			"poolstate"
+#define	ATTR_POOL_STATUS		"poolstatus"
+#define	ATTR_POOL_USED			"used"
+#define	ATTR_POOL_WRITE_BYTES		"writebytes"
+#define	ATTR_POOL_WRITE_ERRORS		"writeerrors"
+#define	ATTR_POOL_WRITE_OPERATIONS	"writeoperations"
 #define	ATTR_SLICE_NAME			"name"
 #define	ATTR_SLICE_SIZE			"size"
 #define	ATTR_SLICE_START		"start"
 #define	ATTR_SLICE_USED_BY		"used-by"
 #define	ATTR_SLICE_USED_NAME		"used-name"
+
 #define	VAL_ATTR_FALSE			"false"
 #define	VAL_ATTR_TRUE			"true"
 

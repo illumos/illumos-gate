@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -302,7 +302,8 @@ Java_com_sun_zfs_common_model_SystemDataModel_getDatasets(JNIEnv *env,
 	}
 
 	return (zjni_get_Datasets_below(env, containerUTF,
-	    ZFS_TYPE_FILESYSTEM, ZFS_TYPE_ANY, ZFSJNI_PACKAGE_DATA "Dataset"));
+	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME, ZFS_TYPE_ANY,
+	    ZFSJNI_PACKAGE_DATA "Dataset"));
 }
 
 /*

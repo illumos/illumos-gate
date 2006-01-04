@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,11 @@ typedef struct zjni_ArrayCallbackData {
 	zjni_Collection_t *list;
 } zjni_ArrayCallbackData_t;
 
+typedef struct zjni_field_mapping {
+	int value;
+	char *name;
+} zjni_field_mapping_t;
+
 /* Signature for function to free data */
 typedef void (*zjni_free_f)(void *);
 
@@ -89,6 +94,8 @@ jobjectArray zjni_Collection_to_array(JNIEnv *, zjni_Collection_t *, char *);
 void zjni_new_ArrayList(JNIEnv *, zjni_ArrayList_t *);
 void zjni_new_DatasetSet(JNIEnv *, zjni_DatasetSet_t *);
 jobject zjni_int_to_boolean(JNIEnv *, uint64_t);
+jobject zjni_int_to_enum(
+    JNIEnv *, int, char *, char *, zjni_field_mapping_t *);
 jobject zjni_str_to_long(JNIEnv *, char *);
 jobject zjni_long_to_Long(JNIEnv *, uint64_t);
 jobject zjni_str_to_date(JNIEnv *, char *);

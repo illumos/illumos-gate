@@ -20,14 +20,16 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "libzfs_jni_util.h"
 #include "libzfs_jni_dataset.h"
 #include "libzfs_jni_property.h"
+#include "libzfs_jni_pool.h"
 #include <strings.h>
 
 #define	REGEX_ZFS_NAME "^((([^/]*)(/.+)?)[/@])?([^/]+)/*"
@@ -56,8 +58,7 @@ typedef struct FileSystemBean {
 
 typedef struct PoolBean {
 	FileSystemBean_t super;
-
-	jmethodID method_setSize;
+	PoolStatsBean_t interface_PoolStats;
 } PoolBean_t;
 
 typedef struct VolumeBean {
@@ -165,10 +166,8 @@ new_PoolBean(JNIEnv *env, PoolBean_t *bean)
 		    (*env)->NewObject(env, object->class, object->constructor);
 	}
 
-	bean->method_setSize = (*env)->GetMethodID(
-	    env, object->class, "setSize", "(J)V");
-
 	new_FileSystemBean(env, (FileSystemBean_t *)bean);
+	new_PoolStats(env, &(bean->interface_PoolStats), object);
 }
 
 /* Create a FileSystemBean */
@@ -340,20 +339,49 @@ populate_DatasetBean(JNIEnv *env, zfs_handle_t *zhp, DatasetBean_t *bean)
 static int
 populate_PoolBean(JNIEnv *env, zfs_handle_t *zhp, PoolBean_t *bean)
 {
-	zjni_Object_t *object = (zjni_Object_t *)bean;
+	int result = 0;
 	const char *name = zfs_get_name(zhp);
 	zpool_handle_t *zphp = zpool_open_canfail(name);
 
 	if (zphp == NULL) {
-	    return (-1);
+		result = -1;
+	} else {
+		zjni_Object_t *object = (zjni_Object_t *)bean;
+		PoolStatsBean_t *pool_stats = &(bean->interface_PoolStats);
+		DeviceStatsBean_t *dev_stats = (DeviceStatsBean_t *)pool_stats;
+		nvlist_t *devices = zjni_get_root_vdev(zphp);
+
+		if (devices == NULL ||
+		    populate_DeviceStatsBean(env, devices, dev_stats, object)) {
+			result = -1;
+		} else {
+			char *msgid;
+
+			/* Override value set in populate_DeviceStatsBean */
+			(*env)->CallVoidMethod(env, object->object,
+			    dev_stats->method_setSize,
+			    zpool_get_space_total(zphp));
+
+			(*env)->CallVoidMethod(env, object->object,
+			    pool_stats->method_setPoolState,
+			    zjni_pool_state_to_obj(
+				env, zpool_get_state(zphp)));
+
+			(*env)->CallVoidMethod(env, object->object,
+			    pool_stats->method_setPoolStatus,
+			    zjni_pool_status_to_obj(env,
+				zpool_get_status(zphp, &msgid)));
+		}
+
+		zpool_close(zphp);
+
+		if (result == 0) {
+			result = populate_FileSystemBean(
+			    env, zhp, (FileSystemBean_t *)bean);
+		}
 	}
 
-	(*env)->CallVoidMethod(env, object->object,
-	    bean->method_setSize, zpool_get_space_total(zphp));
-
-	zpool_close(zphp);
-
-	return (populate_FileSystemBean(env, zhp, (FileSystemBean_t *)bean));
+	return (result != 0);
 }
 
 static int
@@ -561,10 +589,6 @@ open_device(JNIEnv *env, jstring nameUTF, zfs_type_t typemask)
 		    (*env)->GetStringUTFChars(env, nameUTF, NULL);
 
 		zhp = zfs_open(name, typemask);
-		if (zhp == NULL) {
-			zjni_throw_exception(env, "invalid device name: %s",
-			    name);
-		}
 
 		(*env)->ReleaseStringUTFChars(env, nameUTF, name);
 	}
@@ -627,27 +651,19 @@ zjni_get_Datasets_below(JNIEnv *env, jstring parentUTF,
 	/* Retrieve parent */
 	zhp = open_device(env, parentUTF, parent_typemask);
 	if (zhp != NULL) {
+		zjni_DatasetArrayCallbackData_t data = {0};
+		data.data.env = env;
+		data.data.list = (zjni_Collection_t *)list;
+		data.typemask = child_typemask;
 
-		if (!(zfs_get_type(zhp) & parent_typemask)) {
-			zjni_throw_exception(env, "wrong type: %s",
-			    zfs_get_name(zhp));
-		} else {
-
-			zjni_DatasetArrayCallbackData_t data = {0};
-			data.data.env = env;
-			data.data.list = (zjni_Collection_t *)list;
-			data.typemask = child_typemask;
-
-			(void) zfs_iter_children(zhp, zjni_create_add_Dataset,
-			    &data);
-		}
+		(void) zfs_iter_children(zhp, zjni_create_add_Dataset, &data);
 
 		zfs_close(zhp);
-	}
 
-	if ((*env)->ExceptionOccurred(env) == NULL) {
-		array = zjni_Collection_to_array(
-		    env, (zjni_Collection_t *)list, arrayClass);
+		if ((*env)->ExceptionOccurred(env) == NULL) {
+			array = zjni_Collection_to_array(
+			    env, (zjni_Collection_t *)list, arrayClass);
+		}
 	}
 
 	return (array);
@@ -677,11 +693,7 @@ zjni_get_Datasets_dependents(JNIEnv *env, jobjectArray paths)
 		    ((*env)->GetObjectArrayElement(env, paths, i));
 
 		zfs_handle_t *zhp = open_device(env, pathUTF, ZFS_TYPE_ANY);
-		if (zhp == NULL) {
-			/* Clear the exception */
-			(*env)->ExceptionClear(env);
-		} else {
-
+		if (zhp != NULL) {
 			/* Add all dependents of this Dataset to the list */
 			(void) zfs_iter_dependents(zhp,
 			    zjni_create_add_Dataset, &data);
@@ -708,19 +720,9 @@ zjni_get_Dataset(JNIEnv *env, jstring nameUTF, zfs_type_t typemask)
 {
 	jobject device = NULL;
 	zfs_handle_t *zhp = open_device(env, nameUTF, typemask);
-	if (zhp == NULL) {
-		/*
-		 * Clear the exception -- this function returns NULL
-		 * on invalid device
-		 */
-		(*env)->ExceptionClear(env);
-	} else {
-
-		/* Is this device the expected type? */
-		if (zfs_get_type(zhp) & typemask) {
-			/* Creates an object of the appropriate class */
-			device = create_DatasetBean(env, zhp);
-		}
+	if (zhp != NULL) {
+		/* Creates an object of the appropriate class */
+		device = create_DatasetBean(env, zhp);
 		zfs_close(zhp);
 	}
 

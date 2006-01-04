@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,8 +38,7 @@ extern "C" {
  */
 
 /* Callback function for importable pool iteration */
-typedef int (*zjni_ipool_iter_f)(char *name,
-    uint64_t guid, uint64_t pool_state, char *health, void *data);
+typedef int (*zjni_ipool_iter_f)(nvlist_t *config, void *data);
 
 /*
  * Function prototypes
@@ -47,7 +46,10 @@ typedef int (*zjni_ipool_iter_f)(char *name,
 
 extern int zjni_ipool_iter(
     int argc, char **argv, zjni_ipool_iter_f func, void *data);
-extern char *zjni_get_state_str(uint64_t pool_state);
+extern char *zjni_vdev_state_to_str(vdev_state_t state);
+extern char *zjni_vdev_aux_to_str(vdev_aux_t aux);
+extern char *zjni_pool_state_to_str(pool_state_t state);
+extern char *zjni_pool_status_to_str(zpool_status_t status);
 
 #ifdef __cplusplus
 }

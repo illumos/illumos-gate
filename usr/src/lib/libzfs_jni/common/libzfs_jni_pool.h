@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,19 +37,49 @@ extern "C" {
 #include <libnvpair.h>
 #include <libzfs.h>
 #include <libzfs_jni_ipool.h>
+#include <libzfs_jni_util.h>
+
+/*
+ * Types
+ */
+
+typedef struct DeviceStatsBean {
+	jmethodID method_setSize;
+	jmethodID method_setUsed;
+	jmethodID method_setReadBytes;
+	jmethodID method_setWriteBytes;
+	jmethodID method_setReadOperations;
+	jmethodID method_setWriteOperations;
+	jmethodID method_setReadErrors;
+	jmethodID method_setWriteErrors;
+	jmethodID method_setChecksumErrors;
+	jmethodID method_setDeviceState;
+	jmethodID method_setDeviceStatus;
+} DeviceStatsBean_t;
+
+typedef struct PoolStatsBean {
+	DeviceStatsBean_t super;
+	jmethodID method_setPoolState;
+	jmethodID method_setPoolStatus;
+} PoolStatsBean_t;
 
 /*
  * Function prototypes
  */
 
+void new_DeviceStats(JNIEnv *, DeviceStatsBean_t *, zjni_Object_t *);
+void new_PoolStats(JNIEnv *, PoolStatsBean_t *, zjni_Object_t *);
 nvlist_t *zjni_get_root_vdev(zpool_handle_t *);
 nvlist_t *zjni_get_vdev(zpool_handle_t *, nvlist_t *, uint64_t);
 jobject zjni_get_VirtualDevice_from_vdev(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
 jobject zjni_get_VirtualDevices_from_vdev(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
-int zjni_create_add_ImportablePool(char *name,
-    uint64_t guid, uint64_t pool_state, char *health, void *data);
+int zjni_create_add_ImportablePool(nvlist_t *, void *);
+int populate_DeviceStatsBean(
+    JNIEnv *, nvlist_t *, DeviceStatsBean_t *, zjni_Object_t *);
+jobject zjni_pool_state_to_obj(JNIEnv *, pool_state_t);
+jobject zjni_pool_status_to_obj(JNIEnv *, zpool_status_t);
 
 #ifdef __cplusplus
 }

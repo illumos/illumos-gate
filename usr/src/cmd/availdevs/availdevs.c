@@ -20,13 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "availdevs.h"
+#include <libzfs.h>
 #include <libzfs_jni_diskmgt.h>
 #include <libzfs_jni_ipool.h>
 #include <libxml/parser.h>
@@ -37,7 +38,7 @@
 
 static void handle_error(const char *, va_list);
 static int add_disk_to_xml(dmgt_disk_t *, void *);
-static int add_pool_to_xml(char *, uint64_t, uint64_t, char *, void *);
+static int add_pool_to_xml(nvlist_t *, void *);
 static xmlDocPtr create_doc();
 int main();
 
@@ -112,26 +113,73 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 }
 
 static int
-add_pool_to_xml(char *name, uint64_t guid,
-    uint64_t pool_state, char *health, void *data)
+add_pool_to_xml(nvlist_t *config, void *data)
 {
-	char *state;
+	char *c;
+	char *name;
+	uint64_t guid;
+	uint64_t state;
+	nvlist_t *devices;
+	uint_t n;
+	vdev_stat_t *vs;
 	char tmp[64];
+	xmlNodePtr pool;
 	xmlNodePtr importable = *((xmlNodePtr *)data);
 
-	xmlNodePtr pool = xmlNewChild(
-	    importable, NULL, (xmlChar *)ELEMENT_POOL, NULL);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_NAME, (xmlChar *)name);
-
-	state = zjni_get_state_str(pool_state);
-	if (state == NULL) {
-		state = "";
+	if (nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME, &name) ||
+	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) ||
+	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE, &state) ||
+	    nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &devices) ||
+	    nvlist_lookup_uint64_array(
+		devices, ZPOOL_CONFIG_STATS, (uint64_t **)&vs, &n)) {
+		return (-1);
 	}
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATE, (xmlChar *)state);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_HEALTH, (xmlChar *)health);
+
+	pool = xmlNewChild(importable, NULL, (xmlChar *)ELEMENT_POOL, NULL);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_NAME, (xmlChar *)name);
 
 	(void) snprintf(tmp, sizeof (tmp), "%llu", guid);
 	xmlSetProp(pool, (xmlChar *)ATTR_POOL_ID, (xmlChar *)tmp);
+
+	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_alloc);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_USED, (xmlChar *)tmp);
+
+	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_space);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_SIZE, (xmlChar *)tmp);
+
+	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_bytes[ZIO_TYPE_READ]);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_READ_BYTES, (xmlChar *)tmp);
+
+	(void) snprintf(tmp, sizeof (tmp), "%llu",
+	    vs->vs_bytes[ZIO_TYPE_WRITE]);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_WRITE_BYTES, (xmlChar *)tmp);
+
+	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_ops[ZIO_TYPE_READ]);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_READ_OPERATIONS, (xmlChar *)tmp);
+
+	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_ops[ZIO_TYPE_WRITE]);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_WRITE_OPERATIONS, (xmlChar *)tmp);
+
+	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_read_errors);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_READ_ERRORS, (xmlChar *)tmp);
+
+	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_write_errors);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_WRITE_ERRORS, (xmlChar *)tmp);
+
+	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_checksum_errors);
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_CHECKSUM_ERRORS, (xmlChar *)tmp);
+
+	xmlSetProp(pool, (xmlChar *)ATTR_DEVICE_STATE,
+	    (xmlChar *)zjni_vdev_state_to_str(vs->vs_state));
+
+	xmlSetProp(pool, (xmlChar *)ATTR_DEVICE_STATUS,
+	    (xmlChar *)zjni_vdev_aux_to_str(vs->vs_aux));
+
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATE,
+	    (xmlChar *)zjni_pool_state_to_str(state));
+
+	xmlSetProp(pool, (xmlChar *)ATTR_POOL_STATUS, (xmlChar *)
+	    zjni_pool_status_to_str(zpool_import_status(config, &c)));
 
 	return (0);
 }

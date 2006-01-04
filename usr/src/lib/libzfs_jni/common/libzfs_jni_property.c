@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -217,7 +217,7 @@ create_BasicProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
 			    env, class, constructor, propName, propValue,
 			    readOnly, propSource);
 		} else {
-			jobject lineage = zjni_get_lineage(env, srctype);
+			jobject lineage = zjni_int_to_Lineage(env, srctype);
 
 			(void) snprintf(signature, sizeof (signature),
 			    "(Ljava/lang/String;L%s;ZL"
@@ -305,7 +305,7 @@ create_ObjectProperty(JNIEnv *env, zfs_handle_t *zhp, zfs_prop_t prop,
 			    class, constructor, propValue, propSource);
 
 		} else {
-			jobject lineage = zjni_get_lineage(env, srctype);
+			jobject lineage = zjni_int_to_Lineage(env, srctype);
 
 			(void) snprintf(signature, sizeof (signature),
 			    "(L%s;L" ZFSJNI_PACKAGE_DATA "Property$Lineage;)V",
@@ -354,7 +354,7 @@ create_default_BasicProperty(JNIEnv *env, zfs_prop_t prop,
 
 			jclass class = (*env)->FindClass(env, propClass);
 			jobject lineage =
-			    zjni_get_lineage(env, ZFS_SRC_DEFAULT);
+			    zjni_int_to_Lineage(env, ZFS_SRC_DEFAULT);
 
 			(void) snprintf(signature, sizeof (signature),
 			    "(Ljava/lang/String;L%s;ZL" ZFSJNI_PACKAGE_DATA
@@ -421,7 +421,7 @@ create_default_ObjectProperty(JNIEnv *env, zfs_prop_t prop,
 
 			jclass class = (*env)->FindClass(env, propClass);
 			jobject lineage =
-			    zjni_get_lineage(env, ZFS_SRC_DEFAULT);
+			    zjni_int_to_Lineage(env, ZFS_SRC_DEFAULT);
 
 			(void) snprintf(signature, sizeof (signature),
 			    "(L%s;L" ZFSJNI_PACKAGE_DATA "Property$Lineage;)V",
@@ -549,42 +549,20 @@ zjni_get_property_from_name(const char *name)
 }
 
 jobject
-zjni_get_lineage(JNIEnv *env, zfs_source_t srctype)
+zjni_int_to_Lineage(JNIEnv *env, zfs_source_t srctype)
 {
-	char *field;
-	jclass class_Lineage;
-	jfieldID id;
+	/* zfs_source_t to Property$Lineage map */
+	static zjni_field_mapping_t lineage_map[] = {
+		{ ZFS_SRC_NONE, "ZFS_PROP_LINEAGE_NOTINHERITABLE" },
+		{ ZFS_SRC_DEFAULT, "ZFS_PROP_LINEAGE_DEFAULT" },
+		{ ZFS_SRC_LOCAL, "ZFS_PROP_LINEAGE_LOCAL" },
+		{ ZFS_SRC_TEMPORARY, "ZFS_PROP_LINEAGE_TEMPORARY" },
+		{ ZFS_SRC_INHERITED, "ZFS_PROP_LINEAGE_INHERITED" }
+	};
 
-	switch (srctype) {
-	case ZFS_SRC_NONE:
-		field = "ZFS_PROP_LINEAGE_NOTINHERITABLE";
-		break;
-
-	case ZFS_SRC_DEFAULT:
-		field = "ZFS_PROP_LINEAGE_DEFAULT";
-		break;
-
-	case ZFS_SRC_LOCAL:
-		field = "ZFS_PROP_LINEAGE_LOCAL";
-		break;
-
-	case ZFS_SRC_TEMPORARY:
-		field = "ZFS_PROP_LINEAGE_TEMPORARY";
-		break;
-
-	default:
-	case ZFS_SRC_INHERITED:
-		field = "ZFS_PROP_LINEAGE_INHERITED";
-		break;
-	}
-
-	class_Lineage = (*env)->FindClass(
-	    env, ZFSJNI_PACKAGE_DATA "Property$Lineage");
-
-	id = (*env)->GetStaticFieldID(env, class_Lineage,
-	    field, "L" ZFSJNI_PACKAGE_DATA "Property$Lineage;");
-
-	return (*env)->GetStaticObjectField(env, class_Lineage, id);
+	return (zjni_int_to_enum(env, srctype,
+	    ZFSJNI_PACKAGE_DATA "Property$Lineage",
+	    "ZFS_PROP_LINEAGE_INHERITED", lineage_map));
 }
 
 jobjectArray

@@ -20,14 +20,13 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "libzfs_jni_pool.h"
-#include "libzfs_jni_util.h"
 #include <strings.h>
 
 /*
@@ -36,20 +35,18 @@
 
 typedef struct ImportablePoolBean {
 	zjni_Object_t super;
+	PoolStatsBean_t interface_PoolStats;
 
 	jmethodID method_setName;
 	jmethodID method_setId;
-	jmethodID method_setState;
-	jmethodID method_setHealth;
 } ImportablePoolBean_t;
 
 typedef struct VirtualDeviceBean {
 	zjni_Object_t super;
+	DeviceStatsBean_t interface_DeviceStats;
 
 	jmethodID method_setPoolName;
 	jmethodID method_setIndex;
-	jmethodID method_setSize;
-	jmethodID method_setUsed;
 } VirtualDeviceBean_t;
 
 typedef struct DiskVirtualDeviceBean {
@@ -73,6 +70,67 @@ typedef struct MirrorVirtualDeviceBean {
 } MirrorVirtualDeviceBean_t;
 
 /*
+ * Data
+ */
+
+/* vdev_state_t to DeviceStats$DeviceState map */
+static zjni_field_mapping_t vdev_state_map[] = {
+	{ VDEV_STATE_CANT_OPEN, "VDEV_STATE_CANT_OPEN" },
+	{ VDEV_STATE_CLOSED, "VDEV_STATE_CLOSED" },
+	{ VDEV_STATE_DEGRADED, "VDEV_STATE_DEGRADED" },
+	{ VDEV_STATE_HEALTHY, "VDEV_STATE_HEALTHY" },
+	{ VDEV_STATE_OFFLINE, "VDEV_STATE_OFFLINE" },
+	{ VDEV_STATE_UNKNOWN, "VDEV_STATE_UNKNOWN" },
+	{ -1, NULL },
+};
+
+/* vdev_aux_t to DeviceStats$DeviceStatus map */
+static zjni_field_mapping_t vdev_aux_map[] = {
+	{ VDEV_AUX_NONE, "VDEV_AUX_NONE" },
+	{ VDEV_AUX_OPEN_FAILED, "VDEV_AUX_OPEN_FAILED" },
+	{ VDEV_AUX_CORRUPT_DATA, "VDEV_AUX_CORRUPT_DATA" },
+	{ VDEV_AUX_NO_REPLICAS, "VDEV_AUX_NO_REPLICAS" },
+	{ VDEV_AUX_BAD_GUID_SUM, "VDEV_AUX_BAD_GUID_SUM" },
+	{ VDEV_AUX_TOO_SMALL, "VDEV_AUX_TOO_SMALL" },
+	{ VDEV_AUX_BAD_LABEL, "VDEV_AUX_BAD_LABEL" },
+	{ -1, NULL },
+};
+
+/* zpool_state_t to PoolStats$PoolState map */
+static zjni_field_mapping_t pool_state_map[] = {
+	{ POOL_STATE_ACTIVE, "POOL_STATE_ACTIVE" },
+	{ POOL_STATE_EXPORTED, "POOL_STATE_EXPORTED" },
+	{ POOL_STATE_DESTROYED, "POOL_STATE_DESTROYED" },
+	{ POOL_STATE_UNINITIALIZED, "POOL_STATE_UNINITIALIZED" },
+	{ POOL_STATE_UNAVAIL, "POOL_STATE_UNAVAIL" },
+	{ -1, NULL },
+};
+
+/* zpool_status_t to PoolStats$PoolStatus map */
+static zjni_field_mapping_t zpool_status_map[] = {
+	{ ZPOOL_STATUS_CORRUPT_CACHE,
+	    "ZPOOL_STATUS_CORRUPT_CACHE" },
+	{ ZPOOL_STATUS_MISSING_DEV_R,
+	    "ZPOOL_STATUS_MISSING_DEV_R" },
+	{ ZPOOL_STATUS_MISSING_DEV_NR,
+	    "ZPOOL_STATUS_MISSING_DEV_NR" },
+	{ ZPOOL_STATUS_CORRUPT_LABEL_R,
+	    "ZPOOL_STATUS_CORRUPT_LABEL_R" },
+	{ ZPOOL_STATUS_CORRUPT_LABEL_NR,
+	    "ZPOOL_STATUS_CORRUPT_LABEL_NR" },
+	{ ZPOOL_STATUS_BAD_GUID_SUM, "ZPOOL_STATUS_BAD_GUID_SUM" },
+	{ ZPOOL_STATUS_CORRUPT_POOL, "ZPOOL_STATUS_CORRUPT_POOL" },
+	{ ZPOOL_STATUS_CORRUPT_DATA, "ZPOOL_STATUS_CORRUPT_DATA" },
+	{ ZPOOL_STATUS_FAILING_DEV, "ZPOOL_STATUS_FAILING_DEV" },
+	{ ZPOOL_STATUS_VERSION_MISMATCH,
+	    "ZPOOL_STATUS_VERSION_MISMATCH" },
+	{ ZPOOL_STATUS_RESILVERING, "ZPOOL_STATUS_RESILVERING" },
+	{ ZPOOL_STATUS_OFFLINE_DEV, "ZPOOL_STATUS_OFFLINE_DEV" },
+	{ ZPOOL_STATUS_OK, "ZPOOL_STATUS_OK" },
+	{ -1, NULL },
+};
+
+/*
  * Function prototypes
  */
 
@@ -82,9 +140,8 @@ static void new_DiskVirtualDeviceBean(JNIEnv *, DiskVirtualDeviceBean_t *);
 static void new_FileVirtualDeviceBean(JNIEnv *, FileVirtualDeviceBean_t *);
 static void new_RAIDVirtualDeviceBean(JNIEnv *, RAIDVirtualDeviceBean_t *);
 static void new_MirrorVirtualDeviceBean(JNIEnv *, MirrorVirtualDeviceBean_t *);
-static jobject uint64_to_state(JNIEnv *, uint64_t);
 static int populate_ImportablePoolBean(
-    JNIEnv *, ImportablePoolBean_t *, char *, uint64_t, uint64_t, char *);
+    JNIEnv *, ImportablePoolBean_t *, nvlist_t *);
 static int populate_VirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, VirtualDeviceBean_t *);
 static int populate_DiskVirtualDeviceBean(
@@ -95,8 +152,7 @@ static int populate_RAIDVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, RAIDVirtualDeviceBean_t *);
 static int populate_MirrorVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, MirrorVirtualDeviceBean_t *);
-static jobject create_ImportablePoolBean(
-    JNIEnv *, char *, uint64_t, uint64_t, char *);
+static jobject create_ImportablePoolBean(JNIEnv *, nvlist_t *);
 static jobject create_DiskVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
 static jobject create_FileVirtualDeviceBean(
@@ -105,6 +161,9 @@ static jobject create_RAIDVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
 static jobject create_MirrorVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
+static char *find_field(const zjni_field_mapping_t *, int);
+static jobject zjni_vdev_state_to_obj(JNIEnv *, vdev_state_t);
+static jobject zjni_vdev_aux_to_obj(JNIEnv *, vdev_aux_t);
 
 /*
  * Static functions
@@ -128,18 +187,13 @@ new_ImportablePoolBean(JNIEnv *env, ImportablePoolBean_t *bean)
 		    (*env)->NewObject(env, object->class, object->constructor);
 	}
 
+	new_PoolStats(env, &(bean->interface_PoolStats), object);
+
 	bean->method_setName = (*env)->GetMethodID(
 	    env, object->class, "setName", "(Ljava/lang/String;)V");
 
 	bean->method_setId = (*env)->GetMethodID(
 	    env, object->class, "setId", "(J)V");
-
-	bean->method_setState = (*env)->GetMethodID(
-	    env, object->class, "setState",
-	    "(L" ZFSJNI_PACKAGE_DATA "ImportablePool$State;)V");
-
-	bean->method_setHealth = (*env)->GetMethodID(
-	    env, object->class, "setHealth", "(Ljava/lang/String;)V");
 }
 
 /* Create a VirtualDeviceBean */
@@ -160,17 +214,13 @@ new_VirtualDevice(JNIEnv *env, VirtualDeviceBean_t *bean)
 		    (*env)->NewObject(env, object->class, object->constructor);
 	}
 
+	new_DeviceStats(env, &(bean->interface_DeviceStats), object);
+
 	bean->method_setPoolName = (*env)->GetMethodID(
 	    env, object->class, "setPoolName", "(Ljava/lang/String;)V");
 
 	bean->method_setIndex = (*env)->GetMethodID(
 	    env, object->class, "setIndex", "(J)V");
-
-	bean->method_setSize = (*env)->GetMethodID(
-	    env, object->class, "setSize", "(J)V");
-
-	bean->method_setUsed = (*env)->GetMethodID(
-	    env, object->class, "setUsed", "(J)V");
 }
 
 /* Create a DiskVirtualDeviceBean */
@@ -261,52 +311,41 @@ new_MirrorVirtualDeviceBean(JNIEnv *env, MirrorVirtualDeviceBean_t *bean)
 	new_VirtualDevice(env, (VirtualDeviceBean_t *)bean);
 }
 
-static jobject
-uint64_to_state(JNIEnv *env, uint64_t pool_state)
-{
-	jobject state_obj;
-
-	jclass class_State = (*env)->FindClass(
-	    env, ZFSJNI_PACKAGE_DATA "ImportablePool$State");
-
-	jmethodID method_valueOf = (*env)->GetStaticMethodID(
-	    env, class_State, "valueOf",
-	    "(Ljava/lang/String;)L"
-	    ZFSJNI_PACKAGE_DATA "ImportablePool$State;");
-
-	char *str = zjni_get_state_str(pool_state);
-	if (str != NULL) {
-	    jstring utf = (*env)->NewStringUTF(env, str);
-
-	    state_obj = (*env)->CallStaticObjectMethod(
-		env, class_State, method_valueOf, utf);
-	}
-
-	return (state_obj);
-}
-
 static int
 populate_ImportablePoolBean(JNIEnv *env, ImportablePoolBean_t *bean,
-    char *name, uint64_t guid, uint64_t pool_state, char *health)
+    nvlist_t *config)
 {
+	char *c;
+	char *name;
+	uint64_t guid;
+	uint64_t state;
+	nvlist_t *devices;
+
 	zjni_Object_t *object = (zjni_Object_t *)bean;
+	PoolStatsBean_t *pool_stats = &(bean->interface_PoolStats);
+	DeviceStatsBean_t *dev_stats = (DeviceStatsBean_t *)pool_stats;
 
-	/* Set name */
-	(*env)->CallVoidMethod(env, object->object, bean->method_setName,
-	    (*env)->NewStringUTF(env, name));
+	if (nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME, &name) ||
+	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) ||
+	    nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE, &state) ||
+	    nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE, &devices) ||
+	    populate_DeviceStatsBean(env, devices, dev_stats, object)) {
+		return (-1);
+	}
 
-	/* Set state */
-	(*env)->CallVoidMethod(
-	    env, object->object, bean->method_setState,
-	    uint64_to_state(env, pool_state));
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setName, (*env)->NewStringUTF(env, name));
 
-	/* Set guid */
-	(*env)->CallVoidMethod(
-	    env, object->object, bean->method_setId, (jlong)guid);
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setId, (jlong)guid);
 
-	/* Set health */
-	(*env)->CallVoidMethod(env, object->object, bean->method_setHealth,
-	    (*env)->NewStringUTF(env, health));
+	(*env)->CallVoidMethod(env, object->object,
+	    pool_stats->method_setPoolState,
+	    zjni_pool_state_to_obj(env, (pool_state_t)state));
+
+	(*env)->CallVoidMethod(env, object->object,
+	    pool_stats->method_setPoolStatus,
+	    zjni_pool_status_to_obj(env, zpool_import_status(config, &c)));
 
 	return (0);
 }
@@ -317,10 +356,18 @@ populate_VirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 {
 	int result;
 	uint64_t vdev_id;
+	jstring poolUTF;
+
 	zjni_Object_t *object = (zjni_Object_t *)bean;
+	DeviceStatsBean_t *stats = &(bean->interface_DeviceStats);
+
+	result = populate_DeviceStatsBean(env, vdev, stats, object);
+	if (result != 0) {
+		return (1);
+	}
 
 	/* Set pool name */
-	jstring poolUTF = (*env)->NewStringUTF(env, zpool_get_name(zhp));
+	poolUTF = (*env)->NewStringUTF(env, zpool_get_name(zhp));
 	(*env)->CallVoidMethod(
 	    env, object->object, bean->method_setPoolName, poolUTF);
 
@@ -330,28 +377,13 @@ populate_VirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 		zjni_throw_exception(env,
 		    "could not retrieve virtual device ID (pool %s)",
 		    zpool_get_name(zhp));
-	} else {
-
-		uint64_t used;
-		uint64_t total;
-
-		(*env)->CallVoidMethod(
-		    env, object->object, bean->method_setIndex, (jlong)vdev_id);
-
-		/* Set used space */
-		used = zpool_get_space_used(zhp);
-
-		(*env)->CallVoidMethod(
-		    env, object->object, bean->method_setUsed, (jlong)used);
-
-		/* Set available space */
-		total = zpool_get_space_total(zhp);
-
-		(*env)->CallVoidMethod(
-		    env, object->object, bean->method_setSize, (jlong)total);
+		return (1);
 	}
 
-	return (result != 0);
+	(*env)->CallVoidMethod(
+	    env, object->object, bean->method_setIndex, (jlong)vdev_id);
+
+	return (0);
 }
 
 static int
@@ -429,8 +461,7 @@ populate_MirrorVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 }
 
 static jobject
-create_ImportablePoolBean(JNIEnv *env, char *name,
-    uint64_t guid, uint64_t pool_state, char *health)
+create_ImportablePoolBean(JNIEnv *env, nvlist_t *config)
 {
 	int result;
 	ImportablePoolBean_t bean_obj = {0};
@@ -439,8 +470,7 @@ create_ImportablePoolBean(JNIEnv *env, char *name,
 	/* Construct ImportablePoolBean */
 	new_ImportablePoolBean(env, bean);
 
-	result = populate_ImportablePoolBean(
-	    env, bean, name, guid, pool_state, health);
+	result = populate_ImportablePoolBean(env, bean, config);
 	if (result) {
 		/* Must not call any more Java methods to preserve exception */
 		return (NULL);
@@ -527,9 +557,97 @@ create_MirrorVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp, nvlist_t *vdev)
 	return (((zjni_Object_t *)bean)->object);
 }
 
+static char *
+find_field(const zjni_field_mapping_t *mapping, int value) {
+	int i;
+	for (i = 0; mapping[i].name != NULL; i++) {
+		if (value == mapping[i].value) {
+			return (mapping[i].name);
+		}
+	}
+	return (NULL);
+}
+
+/*
+ * Converts a vdev_state_t to a Java DeviceStats$DeviceState object.
+ */
+static jobject
+zjni_vdev_state_to_obj(JNIEnv *env, vdev_state_t state)
+{
+	return (zjni_int_to_enum(env, state,
+	    ZFSJNI_PACKAGE_DATA "DeviceStats$DeviceState",
+	    "VDEV_STATE_UNKNOWN", vdev_state_map));
+}
+
+/*
+ * Converts a vdev_aux_t to a Java DeviceStats$DeviceStatus object.
+ */
+static jobject
+zjni_vdev_aux_to_obj(JNIEnv *env, vdev_aux_t aux)
+{
+	return (zjni_int_to_enum(env, aux,
+	    ZFSJNI_PACKAGE_DATA "DeviceStats$DeviceStatus",
+	    "VDEV_AUX_NONE", vdev_aux_map));
+}
+
 /*
  * Package-private functions
  */
+
+/* Create a DeviceStatsBean */
+void
+new_DeviceStats(JNIEnv *env, DeviceStatsBean_t *bean, zjni_Object_t *object)
+{
+	bean->method_setSize = (*env)->GetMethodID(
+	    env, object->class, "setSize", "(J)V");
+
+	bean->method_setUsed = (*env)->GetMethodID(
+	    env, object->class, "setUsed", "(J)V");
+
+	bean->method_setReadBytes = (*env)->GetMethodID(
+	    env, object->class, "setReadBytes", "(J)V");
+
+	bean->method_setWriteBytes = (*env)->GetMethodID(
+	    env, object->class, "setWriteBytes", "(J)V");
+
+	bean->method_setReadOperations = (*env)->GetMethodID(
+	    env, object->class, "setReadOperations", "(J)V");
+
+	bean->method_setWriteOperations = (*env)->GetMethodID(
+	    env, object->class, "setWriteOperations", "(J)V");
+
+	bean->method_setReadErrors = (*env)->GetMethodID(
+	    env, object->class, "setReadErrors", "(J)V");
+
+	bean->method_setWriteErrors = (*env)->GetMethodID(
+	    env, object->class, "setWriteErrors", "(J)V");
+
+	bean->method_setChecksumErrors = (*env)->GetMethodID(
+	    env, object->class, "setChecksumErrors", "(J)V");
+
+	bean->method_setDeviceState = (*env)->GetMethodID(
+	    env, object->class, "setDeviceState",
+	    "(L" ZFSJNI_PACKAGE_DATA "DeviceStats$DeviceState;)V");
+
+	bean->method_setDeviceStatus = (*env)->GetMethodID(
+	    env, object->class, "setDeviceStatus",
+	    "(L" ZFSJNI_PACKAGE_DATA "DeviceStats$DeviceStatus;)V");
+}
+
+/* Create a PoolStatsBean */
+void
+new_PoolStats(JNIEnv *env, PoolStatsBean_t *bean, zjni_Object_t *object)
+{
+	new_DeviceStats(env, (DeviceStatsBean_t *)bean, object);
+
+	bean->method_setPoolState = (*env)->GetMethodID(
+	    env, object->class, "setPoolState",
+	    "(L" ZFSJNI_PACKAGE_DATA "PoolStats$PoolState;)V");
+
+	bean->method_setPoolStatus = (*env)->GetMethodID(
+	    env, object->class, "setPoolStatus",
+	    "(L" ZFSJNI_PACKAGE_DATA "PoolStats$PoolStatus;)V");
+}
 
 /*
  * Gets the root vdev (an nvlist_t *) for the given pool.
@@ -706,15 +824,13 @@ zjni_get_VirtualDevices_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 }
 
 int
-zjni_create_add_ImportablePool(char *name,
-    uint64_t guid, uint64_t pool_state, char *health, void *data) {
+zjni_create_add_ImportablePool(nvlist_t *config, void *data) {
 
 	JNIEnv *env = ((zjni_ArrayCallbackData_t *)data)->env;
 	zjni_Collection_t *list = ((zjni_ArrayCallbackData_t *)data)->list;
 
 	/* Construct ImportablePool object */
-	jobject bean = create_ImportablePoolBean(
-	    env, name, guid, pool_state, health);
+	jobject bean = create_ImportablePoolBean(env, config);
 	if (bean == NULL) {
 		return (-1);
 	}
@@ -724,6 +840,81 @@ zjni_create_add_ImportablePool(char *name,
 	    ((zjni_Collection_t *)list)->method_add, bean);
 
 	return (0);
+}
+
+int
+populate_DeviceStatsBean(JNIEnv *env, nvlist_t *vdev,
+    DeviceStatsBean_t *bean, zjni_Object_t *object)
+{
+	uint_t c;
+	vdev_stat_t *vs;
+
+	int result = nvlist_lookup_uint64_array(
+	    vdev, ZPOOL_CONFIG_STATS, (uint64_t **)&vs, &c);
+	if (result != 0) {
+		zjni_throw_exception(env,
+		    "could not retrieve virtual device statistics");
+		return (1);
+	}
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setUsed, (jlong)vs->vs_alloc);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setSize, (jlong)vs->vs_space);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setReadBytes, (jlong)vs->vs_bytes[ZIO_TYPE_READ]);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setWriteBytes, (jlong)vs->vs_bytes[ZIO_TYPE_WRITE]);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setReadOperations, (jlong)vs->vs_ops[ZIO_TYPE_READ]);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setWriteOperations, (jlong)vs->vs_ops[ZIO_TYPE_WRITE]);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setReadErrors, (jlong)vs->vs_read_errors);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setWriteErrors, (jlong)vs->vs_write_errors);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setChecksumErrors, (jlong)vs->vs_checksum_errors);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setDeviceState,
+	    zjni_vdev_state_to_obj(env, vs->vs_state));
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setDeviceStatus,
+	    zjni_vdev_aux_to_obj(env, vs->vs_aux));
+
+	return (0);
+}
+
+/*
+ * Converts a pool_state_t to a Java PoolStats$PoolState object.
+ */
+jobject
+zjni_pool_state_to_obj(JNIEnv *env, pool_state_t state)
+{
+	return (zjni_int_to_enum(env, state,
+	    ZFSJNI_PACKAGE_DATA "PoolStats$PoolState",
+	    "POOL_STATE_ACTIVE", pool_state_map));
+}
+
+/*
+ * Converts a zpool_status_t to a Java PoolStats$PoolStatus object.
+ */
+jobject
+zjni_pool_status_to_obj(JNIEnv *env, zpool_status_t status)
+{
+	return (zjni_int_to_enum(env, status,
+	    ZFSJNI_PACKAGE_DATA "PoolStats$PoolStatus",
+	    "ZPOOL_STATUS_OK", zpool_status_map));
 }
 
 /*
@@ -741,30 +932,13 @@ zjni_ipool_iter(int argc, char **argv, zjni_ipool_iter_f func, void *data)
 	nvlist_t *pools = zpool_find_import(argc, argv);
 
 	if (pools != NULL) {
-
 		nvpair_t *elem = NULL;
+
 		while ((elem = nvlist_next_nvpair(pools, elem)) != NULL) {
 			nvlist_t *config;
-			char *name;
-			uint64_t guid;
-			uint64_t pool_state;
-			char *health;
 
 			if (nvpair_value_nvlist(elem, &config) != 0 ||
-			    nvlist_lookup_string(config,
-				ZPOOL_CONFIG_POOL_NAME, &name) != 0 ||
-			    nvlist_lookup_uint64(config,
-				ZPOOL_CONFIG_POOL_GUID, &guid) != 0 ||
-			    nvlist_lookup_uint64(config,
-				ZPOOL_CONFIG_POOL_STATE, &pool_state) != 0 ||
-			    nvlist_lookup_string(config,
-				ZPOOL_CONFIG_POOL_HEALTH, &health) != 0) {
-
-				return (-1);
-			}
-
-			/* Run the given function */
-			if (func(name, guid, pool_state, health, data)) {
+			    func(config, data)) {
 				return (-1);
 			}
 		}
@@ -774,30 +948,21 @@ zjni_ipool_iter(int argc, char **argv, zjni_ipool_iter_f func, void *data)
 }
 
 char *
-zjni_get_state_str(uint64_t pool_state)
-{
-	char *str = NULL;
-	switch (pool_state) {
-		case POOL_STATE_ACTIVE:
-			str = "POOL_STATE_ACTIVE";
-			break;
+zjni_vdev_state_to_str(vdev_state_t state) {
+	return (find_field(vdev_state_map, state));
+}
 
-		case POOL_STATE_EXPORTED:
-			str = "POOL_STATE_EXPORTED";
-			break;
+char *
+zjni_vdev_aux_to_str(vdev_aux_t aux) {
+	return (find_field(vdev_aux_map, aux));
+}
 
-		case POOL_STATE_DESTROYED:
-			str = "POOL_STATE_DESTROYED";
-			break;
+char *
+zjni_pool_state_to_str(pool_state_t state) {
+	return (find_field(pool_state_map, state));
+}
 
-		case POOL_STATE_UNINITIALIZED:
-			str = "POOL_STATE_UNINITIALIZED";
-			break;
-
-		case POOL_STATE_UNAVAIL:
-			str = "POOL_STATE_UNAVAIL";
-			break;
-	}
-
-	return (str);
+char *
+zjni_pool_status_to_str(zpool_status_t status) {
+	return (find_field(zpool_status_map, status));
 }

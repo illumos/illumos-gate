@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@ extern "C" {
 #include <libzfs.h>
 
 jobject zjni_get_default_property(JNIEnv *, zfs_prop_t);
-jobject zjni_get_lineage(JNIEnv *, zfs_source_t);
+jobject zjni_int_to_Lineage(JNIEnv *, zfs_source_t);
 jobjectArray zjni_get_Dataset_properties(JNIEnv *, zfs_handle_t *);
 zfs_prop_t zjni_get_property_from_name(const char *);
 

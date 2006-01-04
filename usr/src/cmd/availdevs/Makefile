@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,7 @@ INCS += -I/usr/include/libxml2
 # There is no lint library for libxml2, so we need to avoid linking against
 # it during lint, as well as turning off the warnings lint would generate.
 #
-LDLIBS += -lzfs_jni
+LDLIBS += -lzfs_jni -lnvpair -lzfs
 all install := LDLIBS += -lxml2
 LINTFLAGS += -xerroff=E_NAME_USED_NOT_DEF2
 
