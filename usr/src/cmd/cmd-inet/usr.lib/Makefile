@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,7 +36,7 @@ include ../../Makefile.cmd
 
 $(CLOSED_BUILD)SUBDIRS += \
 	$(CLOSED)/cmd/cmd-inet/usr.lib/ike-certutils \
-	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked \
+	$(CLOSED)/cmd/cmd-inet/usr.lib/in.iked
 
 POFILES=	dsvclockd/dsvclockd.po in.dhcpd/in.dhcpd.po \
 		inetd/inetd.po ncaconfd/ncaconfd.po \
