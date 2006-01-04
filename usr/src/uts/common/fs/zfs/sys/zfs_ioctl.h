@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@ typedef struct zfs_stats {
 	uint64_t	zs_snapdir;
 	uint64_t	zs_acl_mode;
 	uint64_t	zs_acl_inherit;
-	char		zs_mountpoint[MAXNAMELEN];
+	char		zs_mountpoint[MAXPATHLEN];
 	char		zs_atime_setpoint[MAXNAMELEN];
 	char		zs_recordsize_setpoint[MAXNAMELEN];
 	char		zs_readonly_setpoint[MAXNAMELEN];
@@ -60,7 +60,7 @@ typedef struct zfs_stats {
 	char		zs_setuid_setpoint[MAXNAMELEN];
 	char		zs_exec_setpoint[MAXNAMELEN];
 	char		zs_mountpoint_setpoint[MAXNAMELEN];
-	char		zs_sharenfs[MAXNAMELEN];
+	char		zs_sharenfs[MAXPATHLEN];
 	char		zs_sharenfs_setpoint[MAXNAMELEN];
 	char		zs_snapdir_setpoint[MAXNAMELEN];
 	char		zs_acl_mode_setpoint[MAXNAMELEN];
