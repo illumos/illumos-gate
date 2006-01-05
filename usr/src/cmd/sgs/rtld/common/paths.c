@@ -24,7 +24,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -822,21 +822,37 @@ expand_paths(Rt_map * clmp, const char *list, uint_t orig, uint_t omit)
 {
 	char	*str, *olist = 0, *nlist = (char *)list;
 	Pnode	*pnp, *npnp, *opnp;
+	int	fnull = FALSE;	/* TRUE if empty final path segment seen */
 
-	for (pnp = opnp = 0, str = nlist; *nlist; str = nlist) {
+	for (pnp = opnp = 0, str = nlist; *nlist || fnull; str = nlist) {
 		char	*ostr;
 		size_t	len, olen;
 		uint_t	tkns = 0;
 
 		if (*nlist == ';')
 			++nlist, ++str;
-		if (*nlist == ':') {
+		if ((*nlist == ':') || fnull) {
+			/* If not a final null segment, check following one */
+			fnull = !(fnull || *(nlist + 1));
+
+			if (*nlist)
+				nlist++;
+
+			/*
+			 * When the shell sees a null PATH segment, it
+			 * treats it as if it were the cwd (.). We mimic
+			 * this behavior for LD_LIBRARY_PATH and runpaths
+			 * (mainly for backwards compatibility with previous
+			 * behavior). For other paths, this makes no sense,
+			 * so we simply ignore the segment.
+			 */
+			if (!(orig & (LA_SER_LIBPATH | LA_SER_RUNPATH)))
+				continue; /* Process next segment */
+
 			if ((str = strdup(MSG_ORIG(MSG_FMT_CWD))) == NULL)
 				return ((Pnode *)0);
 			len = MSG_FMT_CWD_SIZE;
 
-			if (*nlist)
-				nlist++;
 		} else {
 			char	*elist;
 
@@ -844,6 +860,9 @@ expand_paths(Rt_map * clmp, const char *list, uint_t orig, uint_t omit)
 			while (*nlist && (*nlist != ':') && (*nlist != ';')) {
 				nlist++, len++;
 			}
+
+			/* Check for a following final null segment */
+			fnull = (*nlist == ':') && !*(nlist + 1);
 
 			if (*nlist)
 				nlist++;
