@@ -23,12 +23,15 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
 #
-# Get the path/filename for this ppd NickName
+# Get the path/ppdfilename for this ppd NickName
+# Input:
+#	make: model: ppd:
+#	PrintersRus: ABC Model 1234: Foomatic/Postscript (recommended):
 #
 
 if [[ $# -lt 3 ]]; then
@@ -36,14 +39,17 @@ if [[ $# -lt 3 ]]; then
 fi
 
 if [[ -f /usr/lib/lp/model/ppd/ppdcache ]]; then
-	typeset make=$1
-	shift
-	modelppd=$*
-	typeset model=$(echo $modelppd | nawk '{FS=":"; print $1}')
-	typeset ppd=$(echo $modelppd | nawk '{FS=":"; print $2}' |
+	typeset make=$(echo $* | /usr/bin/nawk '{FS=":"; print $1}')
+	# strip leading blanks
+	typeset model=$(echo $* | /usr/bin/nawk '{FS=":"; print $2}' |
+			sed -e 's/^[ ]*//')
+	typeset ppd=$(echo $* | /usr/bin/nawk '{FS=":"; print $3}' |
 			sed -e 's/^[ ]*//')
 
-	/bin/grep ^$1 /usr/lib/lp/model/ppd/ppdcache | 
+	# Do not use ":" with $make. printmgr collapses manufacturer name
+	# to first word, ie PrintersRus and PrintersRus International become
+	# PrintersRus
+	/bin/grep "${make}" /usr/lib/lp/model/ppd/ppdcache | 
 	/bin/grep "${model}:" |
 	/bin/grep "${ppd}:"  |
 	nawk '{FS=":"; print $4}' 

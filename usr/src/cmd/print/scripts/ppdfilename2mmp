@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -71,8 +71,13 @@ if [[ -f /usr/lib/lp/model/ppd/ppdcache ]]; then
     if [[ -z "$ppdfile" ]]; then
 		exit 1
     else
+		# Use only first word in manufacturer entry
 		echo $ppdfile | 
-		nawk '{FS=":"; print $1; print $2; print $3}'
+		nawk '{FS=":"; print $1}' |
+		nawk '{print $1}'
+
+		echo $ppdfile | 
+		nawk '{FS=":"; print $2; print $3}'
 		exit 0
     fi
 fi
