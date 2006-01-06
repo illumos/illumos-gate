@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -460,11 +460,18 @@ check_mount_state(caddr_t devstr, size_t str_size)
 			pfatal("%s IS CURRENTLY MOUNTED%s.",
 			    devstr, mountedfs == M_RW ? " READ/WRITE" : "");
 		} else {
-			pwarn("%s IS CURRENTLY MOUNTED READ/%s.",
-			    devstr, mountedfs == M_RW ? "WRITE" : "ONLY");
-			if (reply("CONTINUE") == 0) {
-				exitstat = EXMOUNTED;
-				errexit("Program terminated");
+			if (!nflag) {
+				pwarn("%s IS CURRENTLY MOUNTED READ/%s.",
+				    devstr, mountedfs == M_RW ? "WRITE" :
+				    "ONLY");
+				if (reply("CONTINUE") == 0) {
+					exitstat = EXMOUNTED;
+					errexit("Program terminated");
+				}
+			} else {
+				pwarn("%s IS CURRENTLY MOUNTED READ/%s.\n",
+				    devstr, mountedfs == M_RW ? "WRITE" :
+				    "ONLY");
 			}
 		}
 	} else if (is_dev && rflag) {

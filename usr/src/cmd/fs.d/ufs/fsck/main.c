@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -469,7 +469,7 @@ recount:
 		iscorrupt = 1;
 	}
 
-	if (mountedfs == M_RW) {
+	if (!nflag && mountedfs == M_RW) {
 		iscorrupt = 1;
 	}
 
