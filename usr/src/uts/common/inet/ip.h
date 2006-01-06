@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -1635,18 +1635,18 @@ typedef struct ill_rx_ring ill_rx_ring_t;
 /* Is this an ILL whose source address is used by other ILL's ? */
 #define	IS_USESRC_ILL(ill)			\
 	(((ill)->ill_usesrc_ifindex == 0) &&	\
-	((ill)->ill_usesrc_grp_next != NULL))	\
+	((ill)->ill_usesrc_grp_next != NULL))
 
 /* Is this a client/consumer of the usesrc ILL ? */
 #define	IS_USESRC_CLI_ILL(ill)			\
 	(((ill)->ill_usesrc_ifindex != 0) &&	\
-	((ill)->ill_usesrc_grp_next != NULL))	\
+	((ill)->ill_usesrc_grp_next != NULL))
 
 /* Is this an virtual network interface (vni) ILL ? */
 #define	IS_VNI(ill)							\
 	(((ill) != NULL) && !((ill)->ill_phyint->phyint_flags &		\
 	PHYI_LOOPBACK) && ((ill)->ill_phyint->phyint_flags &		\
-	PHYI_VIRTUAL))							\
+	PHYI_VIRTUAL))
 
 /*
  * IP Lower level Structure.
