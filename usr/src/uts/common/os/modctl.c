@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,6 +126,12 @@ kmutex_t	mod_lock;		/* protects &modules insert linkage, */
 					/* mod_lock should be avoided */
 kmutex_t	mod_uninstall_lock;	/* protects mod_uninstall_cv */
 kthread_id_t	mod_aul_thread;
+
+int		modunload_wait;
+kmutex_t	modunload_wait_mutex;
+kcondvar_t	modunload_wait_cv;
+int		modunload_active_count;
+int		modunload_disable_count;
 
 int	isminiroot;		/* set if running as miniroot */
 int	modrootloaded;		/* set after root driver and fs are loaded */
@@ -392,7 +398,6 @@ modctl_modunload(modid_t id)
 #endif
 		mod_uninstall_all();
 	} else {
-		(void) devfs_clean(ddi_root_node(), NULL, 0);
 		rval = modunload(id);
 	}
 	return (rval);
@@ -2016,7 +2021,15 @@ modunrload(modid_t id, struct modctl **rmodp, int unload)
 int
 modunload(modid_t id)
 {
-	return (modunrload(id, NULL, 1));
+	int		retval;
+
+	/* synchronize with any active modunload_disable() */
+	modunload_begin();
+	if (ddi_root_node())
+		(void) devfs_clean(ddi_root_node(), NULL, 0);
+	retval = modunrload(id, NULL, 1);
+	modunload_end();
+	return (retval);
 }
 
 /*
@@ -2797,6 +2810,8 @@ modinstall(struct modctl *mp)
 	return (val);
 }
 
+int	detach_driver_unconfig = 0;
+
 static int
 detach_driver(char *name)
 {
@@ -2815,7 +2830,7 @@ detach_driver(char *name)
 		return (0);
 
 	error = ndi_devi_unconfig_driver(ddi_root_node(),
-	    NDI_DETACH_DRIVER, major);
+	    NDI_DETACH_DRIVER | detach_driver_unconfig, major);
 	return (error == NDI_SUCCESS ? 0 : -1);
 }
 
@@ -2941,6 +2956,9 @@ mod_uninstall_all(void)
 	struct modctl	*mp;
 	modid_t		modid = 0;
 
+	/* synchronize with any active modunload_disable() */
+	modunload_begin();
+
 	/* mark this thread as doing autounloading */
 	(void) tsd_set(mod_autounload_key, (void *)1);
 
@@ -2965,20 +2983,57 @@ mod_uninstall_all(void)
 	}
 
 	(void) tsd_set(mod_autounload_key, NULL);
+	modunload_end();
 }
 
-static int modunload_disable_count;
-
+/* wait for unloads that have begun before registering disable */
 void
 modunload_disable(void)
 {
-	INCR_COUNT(&modunload_disable_count, &mod_uninstall_lock);
+	mutex_enter(&modunload_wait_mutex);
+	while (modunload_active_count) {
+		modunload_wait++;
+		cv_wait(&modunload_wait_cv, &modunload_wait_mutex);
+		modunload_wait--;
+	}
+	modunload_disable_count++;
+	mutex_exit(&modunload_wait_mutex);
 }
 
+/* mark end of disable and signal waiters */
 void
 modunload_enable(void)
 {
-	DECR_COUNT(&modunload_disable_count, &mod_uninstall_lock);
+	mutex_enter(&modunload_wait_mutex);
+	modunload_disable_count--;
+	if ((modunload_disable_count == 0) && modunload_wait)
+		cv_broadcast(&modunload_wait_cv);
+	mutex_exit(&modunload_wait_mutex);
+}
+
+/* wait for disables to complete before begining unload */
+void
+modunload_begin()
+{
+	mutex_enter(&modunload_wait_mutex);
+	while (modunload_disable_count) {
+		modunload_wait++;
+		cv_wait(&modunload_wait_cv, &modunload_wait_mutex);
+		modunload_wait--;
+	}
+	modunload_active_count++;
+	mutex_exit(&modunload_wait_mutex);
+}
+
+/* mark end of unload and signal waiters */
+void
+modunload_end()
+{
+	mutex_enter(&modunload_wait_mutex);
+	modunload_active_count--;
+	if ((modunload_active_count == 0) && modunload_wait)
+		cv_broadcast(&modunload_wait_cv);
+	mutex_exit(&modunload_wait_mutex);
 }
 
 void

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -488,6 +488,8 @@ extern int	modunload(int);
 extern int	mod_hold_stub(struct mod_stub_info *);
 extern void	modunload_disable(void);
 extern void	modunload_enable(void);
+extern void	modunload_begin(void);
+extern void	modunload_end(void);
 extern int	mod_remove_by_name(char *);
 extern int	mod_sysvar(const char *, const char *, u_longlong_t *);
 extern int	mod_sysctl(int, void *);
