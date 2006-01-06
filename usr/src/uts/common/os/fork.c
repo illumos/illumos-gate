@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -407,12 +407,11 @@ cfork(int isvfork, int isfork1)
 	corectl_path_hold(cp->p_corefile = p->p_corefile);
 	corectl_content_hold(cp->p_content = p->p_content);
 
-#if defined(__x86)
 	/*
-	 * Get the right ldt descr for the child.
+	 * Duplicate process context ops, if any.
 	 */
-	(void) ldt_dup(p, cp);
-#endif
+	if (p->p_pctx)
+		forkpctx(p, cp);
 
 #ifdef __sparc
 	utrap_dup(p, cp);
@@ -795,10 +794,6 @@ newproc(void (*pc)(), caddr_t arg, id_t cid, int pri, struct contract **ct)
 	}
 
 	p->p_as = &kas;
-
-#if defined(__x86)
-	(void) ldt_dup(&p0, p);		/* Get the default ldt descr */
-#endif
 
 	if ((lwp = lwp_create(pc, arg, 0, p, TS_STOPPED, pri,
 	    &curthread->t_hold, cid, 1)) == NULL) {

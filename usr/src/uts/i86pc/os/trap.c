@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -993,14 +993,39 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 		if (kern_gpfault(rp))
 			(void) die(type, rp, addr, cpuid);
 		goto cleanup;
+		/*FALLTHROUGH*/
 
+/*
+ * ONLY 32-bit PROCESSES can USE a PRIVATE LDT! 64-bit apps should have
+ * no legacy need for them, so we put a stop to it here.
+ *
+ * So: not-present fault is ONLY valid for 32-bit processes with a private LDT
+ * trying to do a system call. Emulate it.
+ *
+ * #gp fault is ONLY valid for 32-bit processes also, which DO NOT have private
+ * LDT, and are trying to do a system call. Emulate it.
+ */
 	case T_SEGFLT + USER:	/* segment not present fault */
+	case T_GPFLT + USER:	/* general protection violation */
 #ifdef _SYSCALL32_IMPL
+		if (p->p_model != DATAMODEL_NATIVE) {
+#endif /* _SYSCALL32_IMPL */
 		if (instr_is_syscall((caddr_t)rp->r_pc)) {
+			if (type == T_SEGFLT + USER)
+				ASSERT(p->p_ldt != NULL);
+
+			if ((p->p_ldt == NULL && type == T_GPFLT + USER) ||
+			    type == T_SEGFLT + USER) {
+
 			/*
-			 * System calls via the call gate come in through
-			 * not-present traps.
-			 *
+			 * The user attempted a system call via the obsolete
+			 * call gate mechanism. Because the process doesn't have
+			 * an LDT (i.e. the ldtr contains 0), a #gp results.
+			 * Emulate the syscall here, just as we do above for a
+			 * #np trap.
+			 */
+
+			/*
 			 * Since this is a not-present trap, rp->r_pc points to
 			 * the trapping lcall instruction. We need to bump it
 			 * to the next insn so the app can continue on.
@@ -1017,11 +1042,11 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 
 			dosyscall();
 			goto out;
+			}
+		}
+#ifdef _SYSCALL32_IMPL
 		}
 #endif /* _SYSCALL32_IMPL */
-		/*FALLTHROUGH*/
-
-	case T_GPFLT + USER:	/* general protection violation */
 		/*
 		 * If the current process is using a private LDT and the
 		 * trapping instruction is sysenter, the sysenter instruction

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,8 +64,9 @@
 #include <sys/cmn_err.h>
 
 static int setdscr(caddr_t ap);
-static void *setup_ldt(proc_t *pp);
+static void setup_ldt(proc_t *pp);
 static void *ldt_map(proc_t *pp, uint_t seli);
+static void ldt_free(proc_t *pp);
 
 extern void rtcsync(void);
 extern long ggmtl(void);
@@ -305,12 +306,36 @@ ssd_to_sgd(struct ssd *ssd, gate_desc_t *sgd)
 #endif
 }
 
-static void ldt_installctx(kthread_t *, kthread_t *);
+/*
+ * Load LDT register with the current process's LDT.
+ */
+void
+ldt_load(void)
+{
+	/*
+	 */
+	*((system_desc_t *)&CPU->cpu_gdt[GDT_LDT]) = curproc->p_ldt_desc;
+	wr_ldtr(ULDT_SEL);
+}
+
+/*
+ * Store a NULL selector in the LDTR. All subsequent illegal references to
+ * the LDT will result in a #gp.
+ */
+void
+ldt_unload(void)
+{
+	CPU->cpu_gdt[GDT_LDT] = zero_udesc;
+	wr_ldtr(0);
+}
 
 /*ARGSUSED*/
 static void
-ldt_savectx(kthread_t *t)
+ldt_savectx(proc_t *p)
 {
+	ASSERT(p->p_ldt != NULL);
+	ASSERT(p == curproc);
+
 #if defined(__amd64)
 	/*
 	 * The 64-bit kernel must be sure to clear any stale ldt
@@ -332,57 +357,87 @@ ldt_savectx(kthread_t *t)
 	clr_ldt_sregs();
 #endif
 
+	ldt_unload();
 	cpu_fast_syscall_enable(NULL);
 }
 
+static void
+ldt_restorectx(proc_t *p)
+{
+	ASSERT(p->p_ldt != NULL);
+	ASSERT(p == curproc);
+
+	ldt_load();
+	cpu_fast_syscall_disable(NULL);
+}
+
 /*
- * When a thread with a private LDT execs, fast syscalls must be enabled for the
- * new process image.
+ * When a process with a private LDT execs, fast syscalls must be enabled for
+ * the new process image.
  */
 /* ARGSUSED */
 static void
-ldt_freectx(kthread_t *t, int isexec)
+ldt_freectx(proc_t *p, int isexec)
 {
+	ASSERT(p->p_ldt);
+
 	if (isexec) {
 		kpreempt_disable();
 		cpu_fast_syscall_enable(NULL);
 		kpreempt_enable();
 	}
+
+	/*
+	 * ldt_free() will free the memory used by the private LDT, reset the
+	 * process's descriptor, and re-program the LDTR.
+	 */
+	ldt_free(p);
 }
 
 /*
  * Install ctx op that ensures syscall/sysenter are disabled.
  * See comments below.
  *
- * When a thread with a private LDT creates a new LWP or forks, the new LWP
+ * When a thread with a private LDT forks, the new process
  * must have the LDT context ops installed.
  */
 /* ARGSUSED */
 static void
-ldt_installctx(kthread_t *t, kthread_t *ct)
+ldt_installctx(proc_t *p, proc_t *cp)
 {
-	kthread_t *targ = t;
+	proc_t		*targ = p;
+	kthread_t	*t;
 
 	/*
-	 * If this is a fork or an lwp_create, operate on the child thread.
+	 * If this is a fork, operate on the child process.
 	 */
-	if (ct != NULL)
-		targ = ct;
+	if (cp != NULL) {
+		targ = cp;
+		ldt_dup(p, cp);
+	}
 
-	ASSERT(removectx(targ, NULL, ldt_savectx, cpu_fast_syscall_disable,
-	    ldt_installctx, ldt_installctx, cpu_fast_syscall_enable,
-	    ldt_freectx) == 0);
+	/*
+	 * The process context ops expect the target process as their argument.
+	 */
+	ASSERT(removepctx(targ, targ, ldt_savectx, ldt_restorectx,
+	    ldt_installctx, ldt_savectx, ldt_freectx) == 0);
 
-	installctx(targ, NULL, ldt_savectx, cpu_fast_syscall_disable,
-	    ldt_installctx, ldt_installctx, cpu_fast_syscall_enable,
-	    ldt_freectx);
+	installpctx(targ, targ, ldt_savectx, ldt_restorectx,
+	    ldt_installctx, ldt_savectx, ldt_freectx);
 
 	/*
 	 * We've just disabled fast system call and return instructions; take
 	 * the slow path out to make sure we don't try to use one to return
-	 * back to user.
+	 * back to user. We must set t_post_sys for every thread in the
+	 * process to make sure none of them escape out via fast return.
 	 */
-	targ->t_post_sys = 1;
+
+	mutex_enter(&targ->p_lock);
+	t = targ->p_tlist;
+	do {
+		t->t_post_sys = 1;
+	} while ((t = t->t_forw) != targ->p_tlist);
+	mutex_exit(&targ->p_lock);
 }
 
 static int
@@ -392,7 +447,6 @@ setdscr(caddr_t ap)
 	ushort_t seli; 		/* selector index */
 	user_desc_t *dscrp;	/* descriptor pointer */
 	proc_t	*pp = ttoproc(curthread);
-	kthread_t *t;
 
 	if (get_udatamodel() == DATAMODEL_LP64)
 		return (EINVAL);
@@ -410,7 +464,7 @@ setdscr(caddr_t ap)
 	 * check the selector index.
 	 */
 	seli = SELTOIDX(ssd.sel);
-	if (seli >= MAXNLDT || seli <= LDT_UDBASE)
+	if (seli >= MAXNLDT || seli < LDT_UDBASE)
 		return (EINVAL);
 
 	mutex_enter(&pp->p_ldtlock);
@@ -420,10 +474,8 @@ setdscr(caddr_t ap)
 	 * private LDT for it.
 	 */
 	if (pp->p_ldt == NULL) {
-		if (setup_ldt(pp) == NULL) {
-			mutex_exit(&pp->p_ldtlock);
-			return (ENOMEM);
-		}
+		kpreempt_disable();
+		setup_ldt(pp);
 
 		/*
 		 * Now that this process has a private LDT, the use of
@@ -431,26 +483,21 @@ setdscr(caddr_t ap)
 		 * is forbidden for this processes because they destroy
 		 * the contents of %cs and %ss segment registers.
 		 *
-		 * Explicity disable them here and add context handlers
-		 * to all lwps in the process. Note that disabling
+		 * Explicity disable them here and add a context handler
+		 * to the process. Note that disabling
 		 * them here means we can't use sysret or sysexit on
 		 * the way out of this system call - so we force this
 		 * thread to take the slow path (which doesn't make use
 		 * of sysenter or sysexit) back out.
 		 */
 
-		mutex_enter(&pp->p_lock);
-		t = pp->p_tlist;
-		do {
-			ldt_installctx(t, NULL);
-		} while ((t = t->t_forw) != pp->p_tlist);
-		mutex_exit(&pp->p_lock);
+		ldt_installctx(pp, NULL);
 
-		kpreempt_disable();
 		cpu_fast_syscall_disable(NULL);
-		kpreempt_enable();
+
 		ASSERT(curthread->t_post_sys != 0);
 		wr_ldtr(ULDT_SEL);
+		kpreempt_enable();
 	}
 
 	if (ldt_map(pp, seli) == NULL) {
@@ -604,9 +651,9 @@ setdscr(caddr_t ap)
 
 /*
  * Allocate a private LDT for this process and initialize it with the
- * default entries. Returns 0 for errors, pointer to LDT for success.
+ * default entries.
  */
-static void *
+void
 setup_ldt(proc_t *pp)
 {
 	user_desc_t *ldtp;	/* descriptor pointer */
@@ -620,17 +667,10 @@ setup_ldt(proc_t *pp)
 	/*
 	 * Allocate the minimum number of physical pages for LDT.
 	 */
-	if (segkmem_xalloc(NULL, ldtp, MINNLDT * sizeof (user_desc_t),
-	    VM_SLEEP, 0, segkmem_page_create, NULL) == NULL) {
-		vmem_free(heap_arena, ldtp, ptob(npages));
-		return (0);
-	}
-	bzero(ldtp, ptob(btopr(MINNLDT * sizeof (user_desc_t))));
+	(void) segkmem_xalloc(NULL, ldtp, MINNLDT * sizeof (user_desc_t),
+	    VM_SLEEP, 0, segkmem_page_create, NULL);
 
-	/*
-	 * Copy the default LDT entries into the new table.
-	 */
-	bcopy(ldt0_default, ldtp, MINNLDT * sizeof (user_desc_t));
+	bzero(ldtp, ptob(btopr(MINNLDT * sizeof (user_desc_t))));
 
 	kpreempt_disable();
 
@@ -645,22 +685,6 @@ setup_ldt(proc_t *pp)
 		*((system_desc_t *)&CPU->cpu_gdt[GDT_LDT]) = pp->p_ldt_desc;
 
 	kpreempt_enable();
-
-	return (ldtp);
-}
-
-/*
- * Load LDT register with the current process's LDT.
- */
-void
-ldt_load(void)
-{
-	proc_t *p = curthread->t_procp;
-
-	ASSERT(curthread->t_preempt != 0);
-
-	*((system_desc_t *)&CPU->cpu_gdt[GDT_LDT]) = p->p_ldt_desc;
-	wr_ldtr(ULDT_SEL);
 }
 
 /*
@@ -691,11 +715,8 @@ ldt_map(proc_t *pp, uint_t seli)
 		if (!on_trap(&otd, OT_DATA_ACCESS))
 			(void) *(volatile int *)page;	/* peek at the page */
 		else {		/* Allocate a physical page */
-			if (segkmem_xalloc(NULL, page, PAGESIZE, VM_SLEEP, 0,
-			    segkmem_page_create, NULL) == NULL) {
-				no_trap();
-				return (NULL);
-			}
+			(void) segkmem_xalloc(NULL, page, PAGESIZE, VM_SLEEP, 0,
+			    segkmem_page_create, NULL);
 			bzero(page, PAGESIZE);
 		}
 		no_trap();
@@ -719,7 +740,7 @@ ldt_map(proc_t *pp, uint_t seli)
 /*
  * Free up the kernel memory used for LDT of this process.
  */
-void
+static void
 ldt_free(proc_t *pp)
 {
 	on_trap_data_t otd;
@@ -747,9 +768,11 @@ ldt_free(proc_t *pp)
 	    ptob(btopr(MAXNLDT * sizeof (user_desc_t))));
 	kpreempt_disable();
 	pp->p_ldt = NULL;
-	pp->p_ldt_desc = ldt0_default_desc;
+	pp->p_ldt_desc = zero_sdesc;
+	pp->p_ldtlimit = 0;
+
 	if (pp == curproc)
-		ldt_load();
+		ldt_unload();
 	kpreempt_enable();
 	mutex_exit(&pp->p_ldtlock);
 }
@@ -757,7 +780,7 @@ ldt_free(proc_t *pp)
 /*
  * On fork copy new ldt for child.
  */
-int
+void
 ldt_dup(proc_t *pp, proc_t *cp)
 {
 	on_trap_data_t otd;
@@ -765,14 +788,9 @@ ldt_dup(proc_t *pp, proc_t *cp)
 	volatile caddr_t addr, caddr;
 	int	minsize;
 
-	if (pp->p_ldt == NULL) {
-		cp->p_ldt_desc = ldt0_default_desc;
-		return (0);
-	}
+	ASSERT(pp->p_ldt);
 
-	if (setup_ldt(cp) == NULL) {
-		return (ENOMEM);
-	}
+	setup_ldt(cp);
 
 	mutex_enter(&pp->p_ldtlock);
 	cp->p_ldtlimit = pp->p_ldtlimit;
@@ -789,19 +807,12 @@ ldt_dup(proc_t *pp, proc_t *cp)
 			(void) *(volatile int *)addr; /* peek at the address */
 			/* allocate a page if necessary */
 			if (caddr >= ((caddr_t)cp->p_ldt + minsize)) {
-				if (segkmem_xalloc(NULL, caddr, PAGESIZE,
-				    VM_SLEEP, 0, segkmem_page_create, NULL) ==
-				    NULL) {
-					no_trap();
-					ldt_free(cp);
-					mutex_exit(&pp->p_ldtlock);
-					return (ENOMEM);
-				}
+				(void) segkmem_xalloc(NULL, caddr, PAGESIZE,
+				    VM_SLEEP, 0, segkmem_page_create, NULL);
 			}
 			bcopy(addr, caddr, PAGESIZE);
 		}
 	}
 	no_trap();
 	mutex_exit(&pp->p_ldtlock);
-	return (0);
 }

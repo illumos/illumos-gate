@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -834,7 +834,6 @@ nosys()
 	return (set_errno(ENOSYS));
 }
 
-#ifdef _SYSCALL32_IMPL
 /*
  * Execute a 32-bit system call on behalf of the current thread.
  */
@@ -868,7 +867,6 @@ dosyscall(void)
 	syscall_exit(curthread, (int)ret & 0xffffffffu, (int)(ret >> 32));
 	syscall_mstate(LMS_SYSTEM, LMS_TRAP);
 }
-#endif /* _SYSCALL32_IMPL */
 
 /*
  * Get the arguments to the current system call. See comment atop

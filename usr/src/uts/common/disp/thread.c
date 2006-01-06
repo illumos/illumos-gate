@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -582,6 +582,8 @@ thread_exit()
 
 	if (t->t_ctx != NULL)
 		exitctx(t);
+	if (t->t_procp->p_pctx != NULL)
+		exitpctx(t->t_procp);
 
 	t->t_state = TS_ZOMB;	/* set zombie thread */
 
@@ -685,6 +687,8 @@ thread_free(kthread_t *t)
 		lwp_freeregs(t->t_lwp, 0);
 	if (t->t_ctx)
 		freectx(t, 0);
+	if (t->t_procp->p_pctx)
+		freepctx(t->t_procp, 0);
 	t->t_stk = NULL;
 	if (t->t_lwp)
 		lwp_stk_fini(t->t_lwp);
@@ -872,7 +876,7 @@ reapq_add(kthread_t *t)
 }
 
 /*
- * Install a device context for the current thread
+ * Install thread context ops for the current thread.
  */
 void
 installctx(
@@ -900,8 +904,8 @@ installctx(
 }
 
 /*
- * Remove a device context from the current thread
- * (Or allow the agent thread to remove device context from another
+ * Remove thread context ops from the current thread.
+ * (Or allow the agent thread to remove thread context ops from another
  * thread in the same, stopped, process)
  */
 int
@@ -1006,7 +1010,7 @@ exitctx(kthread_t *t)
 
 /*
  * freectx is called from thread_free() and exec() to get
- * rid of old device context.
+ * rid of old thread context ops.
  */
 void
 freectx(kthread_t *t, int isexec)

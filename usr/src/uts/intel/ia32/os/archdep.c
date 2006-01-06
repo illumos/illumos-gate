@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -633,7 +633,11 @@ fix_segreg(greg_t sr, model_t datamodel)
 	}
 
 	/*
-	 * Force it into the LDT in ring 3 for 32-bit processes.
+	 * Force it into the LDT in ring 3 for 32-bit processes, which by
+	 * default do not have an LDT, so that any attempt to use an invalid
+	 * selector will reference the (non-existant) LDT, and cause a #gp fault
+	 * for the process.
+	 *
 	 * 64-bit processes get the null gdt selector since they
 	 * are not allowed to have a private LDT.
 	 */

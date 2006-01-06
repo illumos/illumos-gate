@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 	
@@ -252,7 +252,7 @@ kernel_cs_code:
 	movw	$KTSS_SEL, %ax		/* setup kernel TSS */
 	ltr	%ax
 
-	movw	$ULDT_SEL, %ax		/* setup ldt */
+	xorw	%ax, %ax		/* clear LDTR */
 	lldt	%ax
 
 	/*
@@ -500,7 +500,7 @@ kernel_cs_code:
 	movw	$KTSS_SEL, %ax		/* setup kernel TSS */
 	ltr	%ax
 
-	movw	$ULDT_SEL, %ax		/* setup ldt */
+	xorw	%ax, %ax		/* clear LDTR */
 	lldt	%ax
 
 	/*
@@ -636,7 +636,7 @@ kernel_cs_code:
 	movl	TSS_ESP0(%esi),%esp
 	movw	$KTSS_SEL,%ax
 	ltr	%ax
-	movw	$ULDT_SEL, %ax		  /* setup ldt */
+	xorw	%ax, %ax		/* clear LDTR */
 	lldt	%ax
 	movl	%cr0,%edx
 	andl    $-1![CR0_TS|CR0_EM],%edx  /* clear emulate math chip bit */
@@ -719,7 +719,7 @@ kernel_cs_code:
 	mov	TSS_ESP0(%esi), %esp
 	mov	$(KTSS_SEL), %ax
 	ltr	%ax
-	mov	$ULDT_SEL, %ax		/* load user ldt */
+	xorw	%ax, %ax		/* clear LDTR */
 	lldt	%ax
 	mov	%cr0, %edx
 	and	$~(CR0_TS|CR0_EM), %edx	/* clear emulate math chip bit */

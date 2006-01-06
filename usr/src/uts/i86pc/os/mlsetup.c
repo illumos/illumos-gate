@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,23 +296,12 @@ mlsetup(struct regs *rp)
 
 	CPU->cpu_pri = 12;		/* initial PIL for the boot CPU */
 
-	CPU->cpu_ldt = ldt0_default;	/* default LDT */
 	CPU->cpu_gdt = gdt0;
 
 	/*
-	 * This must be done _after_ init_tables(), called above, has set up
-	 * ldt0_default_desc.
+	 * The kernel doesn't use LDTs unless a process explicitly requests one.
 	 */
-#if defined(__amd64)
-	/*
-	 * ldt0_default64 contains all invalid entries. We use that as p0's LDT
-	 * because p0 should never have any reason to use the LDT. This will
-	 * catch things early if such a scenario should ever occur.
-	 */
-	p0.p_ldt_desc = ldt0_default64_desc;
-#else
-	p0.p_ldt_desc = ldt0_default_desc;
-#endif /* __amd64 */
+	p0.p_ldt_desc = zero_sdesc;
 
 	/*
 	 * Kernel IDT.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -528,13 +528,10 @@ extern	gate_desc_t	idt0[NIDT];
 extern	desctbr_t	idt0_default_reg;
 #pragma	align	16(gdt0)
 extern	user_desc_t	gdt0[NGDT];
-#pragma	align	16(ldt0_default)
-extern	user_desc_t	ldt0_default[MINNLDT];
-extern	system_desc_t	ldt0_default_desc;
-#pragma align	16(ldt0_default64)
-extern user_desc_t	ldt0_default64[MINNLDT];
-extern system_desc_t	ldt0_default64_desc;
+
 extern user_desc_t	zero_udesc;
+extern system_desc_t	zero_sdesc;
+
 #if defined(__amd64)
 extern user_desc_t	zero_u32desc;
 #endif

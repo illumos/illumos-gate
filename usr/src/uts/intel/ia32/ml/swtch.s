@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -216,22 +216,18 @@ resume(kthread_t *t)
 	call	savectx			/* call ctx ops */
 
 .nosavectx:
+        /*
+         * Call savepctx if process has installed context ops.
+         */
+	movq	T_PROCP(%r13), %r14	/* %r14 = proc */
+        cmpq    $0, P_PCTX(%r14)         /* should current thread savectx? */
+        je      .nosavepctx              /* skip call when zero */
+
+        movq    %r14, %rdi              /* arg = proc pointer */
+        call    savepctx                 /* call ctx ops */
+.nosavepctx:
+
 	/*
-	 * Setup LDT register
-	 */
-	movq 	T_PROCP(%r12), %rax	/* load new thread proc */
-
-	/* make sure GDT contains the right LDT desc */
-	movq	%gs:CPU_GDT, %r11
-
-	movq	P_LDT_DESC(%rax), %r10
-	movq	_CONST(P_LDT_DESC+8)(%rax), %rax
-	movq	%r10, ULDT_SEL(%r11)
-	movq	%rax, _CONST(ULDT_SEL+8)(%r11)
-	movl	$ULDT_SEL, %edx
-	lldt	%dx
-
-	/* 
 	 * Temporarily switch to the idle thread's stack
 	 */
 	movq	CPU_IDLE_THREAD(%r15), %rax 	/* idle thread pointer */
@@ -329,9 +325,18 @@ resume(kthread_t *t)
 	jz	.norestorectx		/* skip call when zero */
 	movq	%r12, %rdi		/* arg = thread pointer */
 	call	restorectx		/* call ctx ops */
-
 .norestorectx:
 
+	/*
+	 * Call restorepctx if context ops have been installed for the proc.
+	 */
+	movq	T_PROCP(%r12), %rcx
+	cmpq	$0, P_PCTX(%rcx)
+	jz	.norestorepctx
+	movq	%rcx, %rdi
+	call	restorepctx
+.norestorepctx:
+	
 	/*
 	 * If we are resuming an interrupt thread, store a timestamp 
 	 * in the thread structure.
@@ -425,35 +430,28 @@ resume_return:
 	addl	$4, %esp		/* restore stack pointer */
 
 .nosavectx:
-	movl	T_LWP(%esi), %ecx
-	pushl	%ecx			/* save fp address for later check */
-
-	/*
-	 * Setup LDT register
-	 */
-	movl 	T_PROCP(%edi), %eax	/* load new proc */
-
-	/* make sure GDT contains the right LDT desc */
-	movl	%gs:CPU_GDT, %ecx
-
-	movl	P_LDT_DESC(%eax), %edx
-	movl	_CONST(P_LDT_DESC+4)(%eax), %eax
-	movl	%edx, ULDT_SEL(%ecx)
-	movl	%eax, _CONST(ULDT_SEL+4)(%ecx)
-	movl	$ULDT_SEL, %edx
-	lldt	%dx
+        /*
+         * Call savepctx if process has installed context ops.
+         */
+	movl	T_PROCP(%esi), %eax	/* %eax = proc */
+	cmpl	$0, P_PCTX(%eax)	/* should current thread savectx? */
+	je	.nosavepctx		/* skip call when zero */
+	pushl	%eax			/* arg = proc pointer */
+	call	savepctx		/* call ctx ops */
+	addl	$4, %esp
+.nosavepctx:	
 
 	/* 
 	 * Temporarily switch to the idle thread's stack
 	 */
 	movl	CPU_IDLE_THREAD(%ebx), %eax 	/* idle thread pointer */
-	popl	%ecx			/* restore pointer to fp structure. */
 
 	/* 
 	 * Set the idle thread as the current thread
 	 */
 	movl	T_SP(%eax), %esp	/* It is safe to set esp */
 	movl	%eax, CPU_THREAD(%ebx)
+	movl	T_LWP(%esi), %ecx	/* load pointer to pcb_fpu */
 	movl	%ecx, %ebx		/* save pcb_fpu pointer in %ebx */
 
 	/* switch in the hat context for the new thread */
@@ -530,6 +528,17 @@ resume_return:
 	call	restorectx		/* call ctx ops */
 	addl	$4, %esp		/* restore stack pointer */
 .norestorectx:
+
+	/*
+	 * Call restorepctx if context ops have been installed for the proc.
+	 */
+	movl	T_PROCP(%edi), %eax
+	cmpl	$0, P_PCTX(%eax)
+	je	.norestorepctx
+	pushl	%eax			/* arg = proc pointer */
+	call	restorepctx
+	addl	$4, %esp		/* restore stack pointer */
+.norestorepctx:
 
 	/*
 	 * If we are resuming an interrupt thread, store a timestamp 
@@ -633,21 +642,6 @@ resume_from_zombie(kthread_t *t)
 
 	movq	%gs:CPU_THREAD, %r13	/* %r13 = curthread */
 
-	/*
-	 * Setup LDT register
-	 */
-	movq 	T_PROCP(%r12), %rax	/* load new thread proc */
-
-	/* make sure GDT contains the right LDT desc */
-	movq	%gs:CPU_GDT, %r11
-
-	movq	P_LDT_DESC(%rax), %r10
-	movq	_CONST(P_LDT_DESC+8)(%rax), %rax
-	movq	%r10, ULDT_SEL(%r11)
-	movq	%rax, _CONST(ULDT_SEL+8)(%r11)
-	movl	$ULDT_SEL, %edx
-	lldt	%dx
-
 	/* clean up the fp unit. It might be left enabled */
 	movq	%cr0, %rax
 	testq	$CR0_TS, %rax
@@ -722,21 +716,6 @@ resume_from_zombie_return:
 	SAVE_REGS(%eax, %ecx)
 
 	movl	%gs:CPU_THREAD, %esi	/* %esi = curthread */
-
-	/*
-	 * Setup LDT register
-	 */
-	movl 	T_PROCP(%edi), %ecx	/* load new proc  */
-
-	/* make sure GDT contains the right LDT desc */
-	movl	%gs:CPU_GDT, %eax
-
-	movl	P_LDT_DESC(%ecx), %edx
-	movl	_CONST(P_LDT_DESC+4)(%ecx), %ecx
-	movl	%edx, ULDT_SEL(%eax)
-	movl	%ecx, _CONST(ULDT_SEL+4)(%eax)
-	movl	$ULDT_SEL, %edx
-	lldt	%dx
 
 	/* clean up the fp unit. It might be left enabled */
 	movl	%cr0, %eax

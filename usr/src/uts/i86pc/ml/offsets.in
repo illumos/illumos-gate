@@ -1,5 +1,5 @@
 \
-\ Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+\ Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 \ Use is subject to license terms.
 \
 \ CDDL HEADER START
@@ -75,6 +75,7 @@ proc		PROCSIZE
 	p_ldt
 	p_ldt_desc
 	p_model
+	p_pctx
 	p_agenttp
 
 _kthread	THREAD_SIZE

@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,11 +85,6 @@ static int hold_execsw(struct execsw *);
 uint_t auxv_hwcap = 0;	/* auxv AT_SUN_HWCAP value; determined on the fly */
 #if defined(_SYSCALL32_IMPL)
 uint_t auxv_hwcap32 = 0;	/* 32-bit version of auxv_hwcap */
-#endif
-
-#if defined(__i386) || defined(__amd64)
-extern void ldt_free(proc_t *p);
-extern void ldt_load(void);
 #endif
 
 int exec_lpg_disable = 0;
@@ -257,10 +252,12 @@ exec_common(const char *fname, const char **argp, const char **envp)
 	lwp_freeregs(lwp, 1);
 
 	/*
-	 * Free device context
+	 * Free thread and process context ops.
 	 */
 	if (curthread->t_ctx)
 		freectx(curthread, 1);
+	if (p->p_pctx)
+		freepctx(p, 1);
 
 	/*
 	 * Remember file name for accounting; clear any cached DTrace predicate.
@@ -342,30 +339,6 @@ exec_common(const char *fname, const char **argp, const char **envp)
 	mutex_exit(&p->p_pflock);
 
 	ASSERT(curthread->t_schedctl == NULL);
-
-#if defined(__i386) || defined(__amd64)
-	/* If the process uses a private LDT then change it to default */
-	if (p->p_ldt)
-		ldt_free(p);
-#endif	/* __i386 || __amd64 */
-
-#if defined(__amd64)
-	/*
-	 * Make sure the process has the correct LDT descriptor for its data
-	 * model.
-	 */
-	if (p->p_model == DATAMODEL_LP64)
-		p->p_ldt_desc = ldt0_default64_desc;
-	else
-		p->p_ldt_desc = ldt0_default_desc;
-
-	/*
-	 * Ensure the change of LDT is propagated into the LDTR.
-	 */
-	kpreempt_disable();
-	ldt_load();
-	kpreempt_enable();
-#endif /* __amd64 */
 
 #if defined(__sparc)
 	if (p->p_utraps != NULL)

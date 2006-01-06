@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,7 @@
 #include <sys/cmn_err.h>
 #include <sys/reboot.h>
 #include <sys/kdi.h>
+#include <sys/systm.h>
 
 extern void syscall_int(void);
 
@@ -65,16 +66,6 @@ extern void syscall_int(void);
 #pragma	align	16(gdt0)
 user_desc_t	gdt0[NGDT];		/* global descriptor table */
 desctbr_t	gdt0_default_r;
-
-#pragma	align	16(ldt0_default)
-user_desc_t	ldt0_default[MINNLDT];	/* default local descriptor table */
-system_desc_t	ldt0_default_desc;	/* seg descriptor for ldt0_default */
-
-#if defined(__amd64)
-#pragma align	16(ltd0_default64)
-user_desc_t	ldt0_default64[MINNLDT]; /* default LDT for 64-bit apps */
-system_desc_t	ldt0_default64_desc;	/* seg descriptor for ldt0_default64 */
-#endif	/* __amd64 */
 
 #pragma	align	16(idt0)
 gate_desc_t	idt0[NIDT]; 		/* interrupt descriptor table */
@@ -89,6 +80,7 @@ struct tss	dftss0;			/* #DF double-fault exception */
 #endif	/* __i386 */
 
 user_desc_t	zero_udesc;		/* base zero user desc native procs */
+system_desc_t	zero_sdesc;
 
 #if defined(__amd64)
 user_desc_t	zero_u32desc;		/* 32-bit compatibility procs */
@@ -347,18 +339,9 @@ init_gdt(void)
 	    SDP_PAGES, SDP_OP32);
 
 	/*
-	 * LDT descriptor for 64-bit processes
+	 * The 64-bit kernel has no default LDT. By default, the LDT descriptor
+	 * in the GDT is 0.
 	 */
-	set_syssegd((system_desc_t *)&gdt0[GDT_LDT], ldt0_default64,
-	    sizeof (ldt0_default64) - 1, SDT_SYSLDT, SEL_KPL);
-	ldt0_default64_desc = *((system_desc_t *)&gdt0[GDT_LDT]);
-
-	/*
-	 * LDT descriptor for 32-bit processes
-	 */
-	set_syssegd((system_desc_t *)&gdt0[GDT_LDT], ldt0_default,
-	    sizeof (ldt0_default) - 1, SDT_SYSLDT, SEL_KPL);
-	ldt0_default_desc = *((system_desc_t *)&gdt0[GDT_LDT]);
 
 	/*
 	 * Kernel TSS
@@ -444,14 +427,6 @@ init_gdt(void)
 	 */
 	set_usegd(&gdt0[GDT_UDATA], NULL, -1, SDT_MEMRWA, SEL_UPL, SDP_PAGES,
 	    SDP_OP32);
-
-	/*
-	 * LDT for current process
-	 */
-	set_syssegd((system_desc_t *)&gdt0[GDT_LDT], ldt0_default,
-	    sizeof (ldt0_default) - 1, SDT_SYSLDT, SEL_KPL);
-
-	ldt0_default_desc = *((system_desc_t *)&gdt0[GDT_LDT]);
 
 	/*
 	 * TSS for T_DBLFLT (double fault) handler
@@ -769,61 +744,17 @@ init_idt(void)
 
 #endif	/* __i386 */
 
-#if defined(__amd64)
-
-static void
-init_ldt(void)
-{
-	/*
-	 * System calls using call gates from libc.a and libc.so.1
-	 * must cause a #NP fault and be processed in trap().
-	 * Therefore clear the "present" bit in the gate descriptor.
-	 */
-
-	/*
-	 * call gate for libc.a (obsolete)
-	 */
-	set_gatesegd((gate_desc_t *)&ldt0_default[LDT_SYSCALL],
-	    (void (*)(void))&sys_lcall32, KCS_SEL, 1, SDT_SYSCGT, SEL_UPL);
-	((gate_desc_t *)&ldt0_default[LDT_SYSCALL])->sgd_p = 0;
-
-	/*
-	 * i386 call gate for system calls from libc.
-	 */
-	set_gatesegd((gate_desc_t *)&ldt0_default[LDT_ALTSYSCALL],
-	    (void (*)(void))&sys_lcall32, KCS_SEL, 1, SDT_SYSCGT, SEL_UPL);
-	((gate_desc_t *)&ldt0_default[LDT_ALTSYSCALL])->sgd_p = 0;
-
-	wr_ldtr(ULDT_SEL);
-}
-
-#elif defined(__i386)
-
 /*
- * Note that the call gates for system calls ask the hardware to copy exactly
- * one parameter onto the kernel stack for us; the parameter itself is not used.
- * The real reason this is done is to make room for a snapshot of EFLAGS. See
- * comment above sys_call() for details.
+ * The kernel does not deal with LDTs unless a user explicitly creates
+ * one. Under normal circumstances, the LDTR contains 0. Any process attempting
+ * to reference the LDT will therefore cause a #gp. System calls made via the
+ * obsolete lcall mechanism are emulated by the #gp fault handler.
  */
 static void
 init_ldt(void)
 {
-	/*
-	 * call gate for libc.a (obsolete)
-	 */
-	set_gatesegd((gate_desc_t *)&ldt0_default[LDT_SYSCALL],
-	    (void (*)(void))&sys_call, KCS_SEL, 1, SDT_SYSCGT, SEL_UPL);
-
-	/*
-	 * i386 call gate for system calls from libc.
-	 */
-	set_gatesegd((gate_desc_t *)&ldt0_default[LDT_ALTSYSCALL],
-	    (void (*)(void))&sys_call, KCS_SEL, 1, SDT_SYSCGT, SEL_UPL);
-
-	wr_ldtr(ULDT_SEL);
+	wr_ldtr(0);
 }
-
-#endif	/* __i386 */
 
 #if defined(__amd64)
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,10 +76,8 @@ struct	machcpu {
 	/* i86 hardware table addresses that cannot be shared */
 	user_desc_t	*mcpu_gdt;	/* GDT */
 	gate_desc_t	*mcpu_idt;	/* IDT */
-
 	struct tss	*mcpu_tss;	/* TSS */
 
-	user_desc_t	*mcpu_ldt;	/* LDT XXX - needed? */
 	struct	cpu_tables *mcpu_cp_tables;	/* pointer to space acquired */
 						/* while starting up */
 						/* auxillary processors */

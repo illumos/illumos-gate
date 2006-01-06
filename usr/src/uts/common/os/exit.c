@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,10 +74,6 @@
 #include <sys/pool.h>
 #include <sys/sdt.h>
 #include <sys/corectl.h>
-
-#if defined(__x86)
-extern void ldt_free(proc_t *pp);
-#endif
 
 /*
  * convert code/data pair into old style wait status
@@ -538,14 +534,6 @@ proc_exit(int why, int what)
 	} else
 		mutex_exit(&pidlock);
 
-#if defined(__x86)
-	/*
-	 * If the process was using a private LDT then free it.
-	 */
-	if (p->p_ldt)
-		ldt_free(p);
-#endif
-
 #if defined(__sparc)
 	if (p->p_utraps != NULL)
 		utrap_free(p);
@@ -767,6 +755,24 @@ proc_exit(int why, int what)
 	p->p_lwpdir_sz = 0;
 	p->p_tidhash = NULL;
 	p->p_tidhash_sz = 0;
+
+	/*
+	 * If the process has context ops installed, call the exit routine
+	 * on behalf of this last remaining thread. Normally exitpctx() is
+	 * called during thread_exit() or lwp_exit(), but because this is the
+	 * last thread in the process, we must call it here. By the time
+	 * thread_exit() is called (below), the association with the relevant
+	 * process has been lost.
+	 *
+	 * We also free the context here.
+	 */
+	if (p->p_pctx) {
+		kpreempt_disable();
+		exitpctx(p);
+		kpreempt_enable();
+
+		freepctx(p, 0);
+	}
 
 	/*
 	 * curthread's proc pointer is changed to point at p0 because

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -785,6 +785,12 @@ lwp_exit(void)
 	 * death-row by resume().  Avoid preemption after resetting t->t_procp.
 	 */
 	t->t_preempt++;
+
+	if (t->t_ctx != NULL)
+		exitctx(t);
+	if (p->p_pctx != NULL)
+		exitpctx(p);
+
 	t->t_procp = &p0;
 
 	/*
@@ -816,9 +822,6 @@ lwp_exit(void)
 	mutex_exit(&pidlock);
 
 	lwp_pcb_exit();
-
-	if (t->t_ctx != NULL)
-		exitctx(t);
 
 	t->t_state = TS_ZOMB;
 	swtch_from_zombie();
@@ -1617,12 +1620,7 @@ forklwp(klwp_t *lwp, proc_t *cp, id_t lwpid)
 	lwp_forkregs(lwp, clwp);
 
 	/*
-	 * fork device context, if any.
-	 *
-	 * Someday we could do the work to support the possibility of
-	 * forkctx() or lwp_createctx() failing.  Currently, this would
-	 * only be needed on x86 for the occasional process using a
-	 * private LDT.
+	 * Fork thread context ops, if any.
 	 */
 	if (t->t_ctx)
 		forkctx(t, ct);

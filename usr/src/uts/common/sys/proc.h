@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -85,6 +85,16 @@ typedef struct lwpent {
 	clock_t		le_start;	/* start time of this lwp */
 	struct vnode	*le_trace;	/* pointer to /proc lwp vnode */
 } lwpent_t;
+
+typedef struct pctxop {
+	void	(*save_op)(void *);	/* function to invoke to save ctx */
+	void	(*restore_op)(void *);	/* function to invoke to restore ctx */
+	void	(*fork_op)(void *, void *); /* invoke to fork context */
+	void	(*exit_op)(void *);	/* invoked during process exit */
+	void	(*free_op)(void *, int); /* function which frees the context */
+	void	*arg;			/* argument to above functions */
+	struct pctxop *next;		/* next pcontext ops */
+} pctxop_t;
 
 /*
  * Elements of the lwp directory, p->p_lwpdir[].
@@ -270,6 +280,9 @@ typedef struct	proc {
 	 * C2 Security  (C2_AUDIT)
 	 */
 	struct p_audit_data	*p_audit_data; /* per process audit structure */
+
+	pctxop_t	*p_pctx;
+
 #if defined(__x86)
 	/*
 	 * LDT support.
@@ -551,7 +564,7 @@ extern void upcount_inc(uid_t, zoneid_t);
 extern void upcount_dec(uid_t, zoneid_t);
 extern int upcount_get(uid_t, zoneid_t);
 #if defined(__x86)
-extern int ldt_dup(proc_t *, proc_t *);
+extern void ldt_dup(proc_t *, proc_t *);
 extern selector_t setup_thrptr(proc_t *, uintptr_t);
 #endif
 
@@ -644,6 +657,15 @@ extern	void	forkctx(kthread_t *, kthread_t *);
 extern	void	lwp_createctx(kthread_t *, kthread_t *);
 extern	void	exitctx(kthread_t *);
 extern	void	freectx(kthread_t *, int);
+extern	void	installpctx(proc_t *, void *, void (*)(), void (*)(),
+    void (*)(), void (*)(), void (*)());
+extern	int	removepctx(proc_t *, void *, void (*)(), void (*)(),
+    void (*)(), void (*)(), void (*)());
+extern	void	savepctx(proc_t *);
+extern	void	restorepctx(proc_t *);
+extern	void	forkpctx(proc_t *, proc_t *);
+extern	void	exitpctx(proc_t *);
+extern	void	freepctx(proc_t *, int);
 extern	kthread_t *thread_unpin(void);
 extern	void	thread_create_intr(struct cpu *);
 extern	void	thread_init(void);
