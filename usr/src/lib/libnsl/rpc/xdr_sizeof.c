@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
  * General purpose routine to see how much space something will use
  * when serialized using XDR.
  */
+#include "mt.h"
 #include <rpc/types.h>
 #include <rpc/xdr.h>
 #include <sys/types.h>

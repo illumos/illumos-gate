@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,6 +98,8 @@
  *	  any `lock-file' entry, so no need to call undial().
  * *************************************************************
  */
+
+#include "mt.h"
 
 #include <stdio.h>
 #include <stdlib.h>

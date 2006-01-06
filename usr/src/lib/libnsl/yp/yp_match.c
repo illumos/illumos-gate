@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,9 +36,9 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <stdlib.h>
 #include <unistd.h>
-#include "mt.h"
 #include "../rpc/rpc_mt.h"
 #include <rpc/rpc.h>
 #include <sys/types.h>
@@ -232,7 +232,7 @@ __yp_match_cflookup(char *domain, char *map, char *key, int keylen, char **val,
 			    reason == YPERR_BUSY /* as if */) {
 				yp_unbind(domain);
 				if (hardlookup)
-					(void) _sleep(_ypsleeptime); /* retry */
+					(void) sleep(_ypsleeptime); /* retry */
 				else
 					return (reason);
 			} else
@@ -422,7 +422,7 @@ __yp_match_rsvdport_cflookup(
 			    reason == YPERR_BUSY /* as if */) {
 				yp_unbind(domain);
 				if (hardlookup)
-					(void) _sleep(_ypsleeptime); /* retry */
+					(void) sleep(_ypsleeptime); /* retry */
 				else
 					return (reason);
 			} else

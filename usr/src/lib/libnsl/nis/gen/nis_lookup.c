@@ -21,17 +21,16 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- *	nis_lookup.c
- *
  * This module contains just the core lookup functions.
  */
+#include "mt.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <syslog.h>
@@ -191,7 +190,7 @@ follow_link:
 			sec = __nis_max_hard_lookup_time;
 			--times_thru;
 		}
-		_sleep(sec);
+		(void) sleep(sec);
 		__nis_reset_call_state(&state);
 	}
 call_done:

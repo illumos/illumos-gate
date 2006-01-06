@@ -20,12 +20,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # usr/src/lib/pam_modules/projects/Makefile.com
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 
 LIBRARY=	pam_projects.a
 VERS=		.1
@@ -33,7 +33,7 @@ OBJECTS = 	projects.o
 
 include		../../Makefile.pam_modules
 
-all:		$(LIBS)
+all:		$(LIBS) fnamecheck
 
 lint:		lintcheck
 

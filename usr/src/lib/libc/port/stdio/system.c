@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,14 +33,6 @@
 
 #include "synonyms.h"
 #include "mtlib.h"
-
-/*
- * system() is a cancellation point.
- * Undefine waitpid so we call the real waitpid() rather than _waitpid().
- * This ensures that we actually perform the cancellation logic.
- */
-#undef waitpid
-
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
@@ -52,6 +45,7 @@
 #include <errno.h>
 #include <synch.h>
 #include <spawn.h>
+#include "libc.h"
 
 extern const char **environ;
 
@@ -221,9 +215,14 @@ system(const char *cmd)
 		errno = error;
 		status = -1;
 	} else {
+		/*
+		 * system() is a cancellation point.
+		 * Call waitpid_cancel() rather than _waitpid() to make
+		 * sure that we actually perform the cancellation logic.
+		 */
 		pthread_cleanup_push(cleanup, &savemask);
 		do {
-			w = waitpid(pid, &status, 0);
+			w = waitpid_cancel(pid, &status, 0);
 		} while (w == -1 && errno == EINTR);
 		pthread_cleanup_pop(0);
 		if (w == -1)

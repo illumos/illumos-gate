@@ -21,15 +21,13 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * lib/libnsl/nss/gethostbyname_r.c
- *
  * gethostbyname_r() is defined in this file.  It is implemented on top of
  *   _get_hostserv_inetnetdir_byname() which is also used to implement
  *   netdir_getbyname() for inet family transports.  In turn the common code
@@ -51,6 +49,7 @@
  *   enumeration state, between gethostbyYY_r() and gethostent_r();
  */
 
+#include "mt.h"
 #include <netdb.h>
 #include <netdir.h>
 #include <sys/types.h>

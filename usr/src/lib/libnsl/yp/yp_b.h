@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,9 +157,6 @@ extern CLIENT *__yp_clnt_create_rsvdport(const char *, rpcprog_t,
     rpcvers_t, const char *, const uint_t, const uint_t);
 extern void __yp_rel_binding(struct dom_binding *);
 extern CLIENT *__clnt_create_loopback(rpcprog_t, rpcvers_t, int *);
-
-extern int _fcntl(int, int, ...);
-extern uint_t _sleep(uint_t);
 
 #ifdef __cplusplus
 }

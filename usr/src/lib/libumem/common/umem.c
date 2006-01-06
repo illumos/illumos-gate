@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -357,7 +358,7 @@
  *		lh_lock
  */
 
-#include "mtlib.h"
+#include "c_synonyms.h"
 #include <umem_impl.h>
 #include <sys/vmem_impl_user.h>
 #include "umem_base.h"

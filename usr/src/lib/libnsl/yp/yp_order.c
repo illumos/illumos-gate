@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <stdlib.h>
 #include <unistd.h>
 #include <rpc/rpc.h>
@@ -85,7 +86,7 @@ yp_order(char *domain, char *map, unsigned long *order)
 			__yp_rel_binding(pdomb);
 			if (reason == YPERR_RPC) {
 				yp_unbind(domain);
-				(void) _sleep(_ypsleeptime);
+				(void) sleep(_ypsleeptime);
 			} else {
 				break;
 			}

@@ -1,8 +1,8 @@
 #
-# Copyright 1997-2002 Sun Microsystems, Inc. All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 # lib/libresolv2/sparcv9/Makefile
 
@@ -17,11 +17,5 @@ include ../../Makefile.lib.64
 
 sparcv9_C_PICFLAGS = -K PIC
 sparcv9_CC_PICFLAGS = -KPIC
-
-LIBS = $(DYNLIB) $(LINTLIB)
-
-.KEEP_STATE:
-
-all: $(LIBS)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)

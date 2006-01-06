@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +45,7 @@
  * the string in a series of smaller buffers.
  */
 
-#include "lint.h"
+#include "synonyms.h"
 #include "file64.h"
 #include "mse_int.h"
 #include <stdio.h>

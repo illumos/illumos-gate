@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -320,10 +321,6 @@ alloc_pollset(int npollfds)
 	return (0);
 }
 
-extern int _sigemptyset(sigset_t *);
-extern int _sigaddset(sigset_t *, int);
-extern int _sigprocmask(int, const sigset_t *, sigset_t *);
-
 static void
 _svc_run(void)
 {
@@ -337,9 +334,9 @@ _svc_run(void)
 	 * to be interrupted due to alarm() but that we don't end up in
 	 * an MT-unsafe signal handler at an inopportune time.
 	 */
-	(void) _sigemptyset(&set);
-	(void) _sigaddset(&set, SIGALRM);
-	(void) _sigprocmask(SIG_BLOCK, &set, &oldset);
+	(void) sigemptyset(&set);
+	(void) sigaddset(&set, SIGALRM);
+	(void) sigprocmask(SIG_BLOCK, &set, &oldset);
 	while (!svc_exit_done) {
 		/*
 		 * Check whether there is any server fd on which we may want
@@ -354,9 +351,9 @@ _svc_run(void)
 		if (npollfds == 0)
 			break;	/* None waiting, hence return */
 
-		(void) _sigprocmask(SIG_SETMASK, &oldset, NULL);
+		(void) sigprocmask(SIG_SETMASK, &oldset, NULL);
 		i = poll(svc_pollset, npollfds, -1);
-		(void) _sigprocmask(SIG_BLOCK, &set, &oldset);
+		(void) sigprocmask(SIG_BLOCK, &set, &oldset);
 		switch (i) {
 		case -1:
 			/*
@@ -370,7 +367,7 @@ _svc_run(void)
 			svc_getreq_poll(svc_pollset, i);
 		}
 	}
-	(void) _sigprocmask(SIG_SETMASK, &oldset, NULL);
+	(void) sigprocmask(SIG_SETMASK, &oldset, NULL);
 }
 
 /*
@@ -777,12 +774,12 @@ create_pipe(void)
 				"RPC: svc could not create pipe - exiting"));
 		exit(1);
 	}
-	if (_fcntl(svc_pipe[0], F_SETFL, O_NONBLOCK) == -1) {
+	if (fcntl(svc_pipe[0], F_SETFL, O_NONBLOCK) == -1) {
 		syslog(LOG_ERR, dgettext(__nsl_dom,
 					"RPC: svc pipe error - exiting"));
 		exit(1);
 	}
-	if (_fcntl(svc_pipe[1], F_SETFL, O_NONBLOCK) == -1) {
+	if (fcntl(svc_pipe[1], F_SETFL, O_NONBLOCK) == -1) {
 		syslog(LOG_ERR, dgettext(__nsl_dom,
 					"RPC: svc pipe error - exiting"));
 		exit(1);

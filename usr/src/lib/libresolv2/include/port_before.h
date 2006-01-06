@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,7 +131,7 @@
 #endif
 
 #ifdef SUNW_SYNONYMS
-#include "synonyms.h"
+#include "c_synonyms.h"
 #endif
 
 /*

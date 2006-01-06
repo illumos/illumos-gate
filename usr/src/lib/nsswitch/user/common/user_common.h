@@ -19,10 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * Common code and structures used by name-service-switch "user" backends.
  */
 
@@ -31,7 +34,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "c_synonyms.h"
 #include <nss_common.h>
 #include <nss_dbdefs.h>
 #include <stdio.h>

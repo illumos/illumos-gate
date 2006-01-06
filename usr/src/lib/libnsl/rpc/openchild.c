@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,12 +36,11 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * openchild.c,
- *
  * Open two pipes to a child process, one for reading, one for writing. The
  * pipes are accessed by FILE pointers. This is NOT a public interface, but
  * for internal use only!
  */
+#include "mt.h"
 #include <stdio.h>
 #include <sys/types.h>
 #include <rpc/types.h>

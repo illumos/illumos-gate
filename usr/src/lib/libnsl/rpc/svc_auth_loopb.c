@@ -21,18 +21,18 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * svc_auth_loopb.c
  * Handles the loopback UNIX flavor authentication parameters on the
  * service side of rpc.
  */
 
+#include "mt.h"
 #include <stdio.h>
 #include <rpc/rpc.h>
 #include <syslog.h>

@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +115,7 @@ _tx_connect(
 	}
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
 
-	if ((fctlflg = _fcntl(fd, F_GETFL, 0)) < 0) {
+	if ((fctlflg = fcntl(fd, F_GETFL, 0)) < 0) {
 		t_errno = TSYSERR;
 		goto err_out;
 	}

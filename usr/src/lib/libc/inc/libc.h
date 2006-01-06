@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -333,7 +333,8 @@ extern wint_t _towlower(wint_t);
 extern int _doscan(FILE *, const char *, va_list);
 extern int _wcscoll(const wchar_t *, const wchar_t *);
 extern size_t _wcsxfrm(wchar_t *, const wchar_t *, size_t);
-extern wint_t	_fputwc(wint_t, FILE *);
+extern wint_t _fputwc(wint_t, FILE *);
+extern pid_t waitpid_cancel(pid_t, int *, int);
 #ifdef	__cplusplus
 }
 #endif

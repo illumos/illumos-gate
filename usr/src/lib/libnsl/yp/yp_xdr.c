@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
  * This contains ALL xdr routines used by the YP rpc interface.
  */
 
+#include "mt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <rpc/rpc.h>

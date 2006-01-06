@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,8 +35,7 @@
 #pragma weak des_encrypt = _des_encrypt
 #pragma weak des_setkey = _des_setkey
 
-#include "synonyms.h"
-#include "mtlib.h"
+#include "des_synonyms.h"
 #include <sys/types.h>
 #include <crypt.h>
 #include "des_soft.h"
@@ -336,13 +335,13 @@ _get_iobuf(thread_key_t *key, unsigned size)
 	char *iobuf = NULL;
 
 	if (thr_getspecific(*key, (void **)&iobuf) != 0) {
-		if (_thr_keycreate(key, free) != 0) {
+		if (thr_keycreate(key, free) != 0) {
 			return (NULL);
 		}
 	}
 
 	if (!iobuf) {
-		if (_thr_setspecific(*key, (void *)(iobuf = malloc(size)))
+		if (thr_setspecific(*key, (void *)(iobuf = malloc(size)))
 			!= 0) {
 			if (iobuf)
 				(void) free(iobuf);

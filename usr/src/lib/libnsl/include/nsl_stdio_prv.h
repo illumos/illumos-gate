@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,10 +96,6 @@ extern void		__nsl_xdrstdio_create(XDR *xdrs, __NSL_FILE *file,
 #define	__nsl_getc_unlocked(f) __nsl_fgetc(f)
 #define	__nsl_getc(f) __nsl_fgetc(f)
 #define	__nsl_rewind(f) __nsl_frewind(f)
-
-/* external functions */
-
-extern int	_fcntl(int, int, ...);
 
 #ifdef __cplusplus
 }

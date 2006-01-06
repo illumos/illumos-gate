@@ -21,15 +21,13 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- *	nis_rpc.c
- *
  * This module contains some grungy RPC binding functions that are
  * used by the client library.
  */
@@ -47,11 +45,6 @@
 #include "nis_clnt.h"
 #include "nis_local.h"
 
-#if defined(sparc)
-#define	_FSTAT _fstat
-#else  /* !sparc */
-#define	_FSTAT fstat
-#endif /* sparc */
 
 CLIENT * nis_make_rpchandle_uaddr(nis_server *, int, rpcprog_t, rpcvers_t,
     uint_t, int, int, char *);
@@ -655,7 +648,7 @@ new_address:
 		/* New entry */
 		sig_mutex_unlock(&srv_cache_lock);
 		if (clnt_control(clnt, CLGET_FD, (char *)&fd))
-			_fcntl(fd, F_SETFD, 1);
+			(void) fcntl(fd, F_SETFD, 1);
 		/* make it "close on exec" */
 	} else {
 		/* Match found in the cache */
@@ -1171,7 +1164,7 @@ set_rdev(server *srv)
 	struct stat stbuf;
 
 	if (clnt_control(srv->clnt, CLGET_FD, (char *)&fd) != TRUE ||
-	    _FSTAT(fd, &stbuf) == -1) {
+	    fstat(fd, &stbuf) == -1) {
 		syslog(LOG_DEBUG, "NIS+:  can't get rdev");
 		srv->fd = -1;
 		return;
@@ -1189,7 +1182,7 @@ check_rdev(server *srv)
 	if (srv->fd == -1)
 		return (1);    /* can't check it, assume it is okay */
 
-	if (_FSTAT(srv->fd, &stbuf) == -1) {
+	if (fstat(srv->fd, &stbuf) == -1) {
 		syslog(LOG_DEBUG, "NIS+:  can't stat %d", srv->fd);
 		/* could be because file descriptor was closed */
 		/* it's not our file descriptor, so don't try to close it */

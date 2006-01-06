@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,11 +33,12 @@
 
 #pragma weak des_encrypt1 = _des_encrypt1
 
-#include "synonyms.h"
+#include "des_synonyms.h"
 #include <sys/types.h>
 
 void
-des_encrypt1(char *block, char *L, char *IP, char *R, char *preS, char *E, char KS[][48], char S[][64], char *f, char *tempL, char *P, char *FP)
+des_encrypt1(char *block, char *L, char *IP, char *R, char *preS, char *E,
+	char KS[][48], char S[][64], char *f, char *tempL, char *P, char *FP)
 {
 /* EXPORT DELETE START */
 	int	i;

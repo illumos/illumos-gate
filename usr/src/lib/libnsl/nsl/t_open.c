@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,7 +91,7 @@ retry:
 	 * is module already pushed
 	 */
 	do {
-		retval = _ioctl(fd, I_FIND, "timod");
+		retval = ioctl(fd, I_FIND, "timod");
 	} while (retval < 0 && errno == EINTR);
 
 	if (retval < 0) {
@@ -112,7 +112,7 @@ retry:
 			 * Assumes (correctly) that I_PUSH  is
 			 * atomic w.r.t signals (EINTR error)
 			 */
-			retval = _ioctl(fd, I_PUSH, "timod");
+			retval = ioctl(fd, I_PUSH, "timod");
 		} while (retval < 0 && errno == EINTR);
 
 		if (retval < 0) {
@@ -175,7 +175,7 @@ retry:
 	(void) thr_sigsetmask(SIG_SETMASK, &mask, NULL);
 
 	do {
-		retval = _ioctl(fd, I_FLUSH, FLUSHRW);
+		retval = ioctl(fd, I_FLUSH, FLUSHRW);
 	} while (retval < 0 && errno == EINTR);
 
 	/*

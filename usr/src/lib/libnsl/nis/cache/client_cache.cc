@@ -19,13 +19,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	Copyright (c) 1996-2001 by Sun Microsystems, Inc.
- *	All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
@@ -33,19 +35,6 @@
 #include <sys/stat.h>
 #include "client_cache.h"
 #include "nis_cache.h"
-
-/*
- *  For BPC programs (which only run on SPARC), we need to use _fstat
- *  so that we get the 5.x version of fstat instead of the 4.x version.
- *  On other architectures, the regular fstat is the right one to use.
- */
-
-#if defined(sparc)
-#define	_FSTAT _fstat
-extern "C" int _fstat(int, struct stat *);
-#else  /* !sparc */
-#define	_FSTAT fstat
-#endif /* sparc */
 
 NisClientCache::NisClientCache(nis_error &err)
 	: NisMappedCache(err, 0, 0)
@@ -351,7 +340,7 @@ NisClientCache::setClntState()
 	struct stat stbuf;
 
 	if (clnt_control(mgr_clnt, CLGET_FD, (char *)&curFd) != TRUE ||
-	    _FSTAT(curFd, &stbuf) == -1) {
+	    fstat(curFd, &stbuf) == -1) {
 	    syslog(LOG_DEBUG, "NIS+ cache client: can't get rdev");
 		    curRdev = (dev_t)-1L;
 	} else {
@@ -370,7 +359,7 @@ NisClientCache::checkClntState()
 	/* check rdev of connection file descriptor */
 	/* do this first so that CLSET_FD_NCLOSE flag will be set if needed */
 	if (curRdev != (dev_t)-1L) {
-		if (_FSTAT(curFd, &stbuf) == -1) {
+		if (fstat(curFd, &stbuf) == -1) {
 			/* probably because file descriptor was closed */
 			syslog(LOG_DEBUG,
 				"NIS+ cache client:  can't stat %d", curFd);

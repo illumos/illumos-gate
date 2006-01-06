@@ -19,14 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1997-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -39,7 +39,7 @@
  * Similar to popen(3S) but with pipe to cmd's stdin and from stdout.
  */
 
-#include "synonyms.h"
+#include "gen_synonyms.h"
 #include <sys/types.h>
 #include <libgen.h>
 #include <stdio.h>

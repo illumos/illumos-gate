@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,12 +36,13 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * xdr_array.c, Generic XDR routines impelmentation.
+ * Generic XDR routines impelmentation.
  *
  * These are the "non-trivial" xdr primitives used to serialize and de-serialize
  * arrays.  See xdr.h for more info on the interface to xdr.
  */
 
+#include "mt.h"
 #include <sys/types.h>
 #include <syslog.h>
 #include <stdio.h>

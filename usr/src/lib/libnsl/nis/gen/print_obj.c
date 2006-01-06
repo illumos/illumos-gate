@@ -19,22 +19,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * print_obj.c
- *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- *
- * print_obj.c
- *
  * This module contains a function for printing objects to standard out.
  */
 
+#include "mt.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>

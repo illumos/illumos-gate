@@ -20,10 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 
@@ -85,7 +85,7 @@ $(NOT_RELEASE_BUILD)CPPFLAGS += -DDEBUG
 
 .KEEP_STATE:
 
-all: $(LIBS)
+all: $(LIBS) $(NOT_NATIVE) fnamecheck
 
 lint: $(LINTLIB) globallint
 

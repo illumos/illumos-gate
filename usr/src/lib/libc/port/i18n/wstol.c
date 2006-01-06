@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +33,7 @@
 
 #pragma weak wstol = _wstol
 
-#include "lint.h"
+#include "synonyms.h"
 #include <widec.h>
 #include <wchar.h>
 

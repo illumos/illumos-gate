@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,9 +35,9 @@
 void __umem_assert_failed(void) {}
 void _atomic_add_64(void) {}
 void _atomic_add_32_nv(void) {}
+void _dladdr1(void) {}
 void bcopy(void) {}
 void bzero(void) {}
-void dladdr1(void) {}
 void exit(void) {}
 void getenv(void) {}
 void gethrtime(void) {}

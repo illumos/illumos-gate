@@ -21,11 +21,11 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- *	auth_time.c
- *
+ */
+
+/*
  * This module contains the private function __rpc_get_time_offset()
  * which will return the difference in seconds between the local system's
  * notion of time and a remote server's notion of time. This must be
@@ -49,6 +49,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

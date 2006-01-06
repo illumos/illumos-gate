@@ -19,9 +19,8 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -219,6 +218,8 @@ LINTFLAGS64 +=	-m -DPORTMAP
 .KEEP_STATE:
 
 $(DYNLIB):	$(MAPFILES)
+
+all: $(LIBS) fnamecheck
 
 # Don't lint WRAPPERS as they are explicitly unclean
 SRCS=	$(DES:%.o=../des/%.c)			\

@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,7 +36,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * rtime_tli.c - get time from remote machine
+ * get time from remote machine
  *
  * gets time, obtaining value from host
  * on the (udp, tcp)/time tli connection. Since timeserver returns
@@ -43,6 +44,7 @@
  * subtract seconds before Jan 1, 1970 to get
  * what unix uses.
  */
+#include "mt.h"
 #include <rpc/rpc.h>
 #include <errno.h>
 #include <sys/poll.h>

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +36,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <rpcsvc/dbm.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -45,14 +46,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <errno.h>
-
-#if defined(sparc)
-#define	_FSTAT	_fstat
-extern int _fstat(int, struct stat *);
-#else  /* !sparc */
-#define	_FSTAT	fstat
-#endif /* sparc */
-
 
 void dbm_access(long);
 void delitem(char *, int);
@@ -96,7 +89,7 @@ dbminit(char *file)
 	}
 	if (pagf < 0 || dirf < 0)
 		return (-1);
-	(void) _FSTAT(dirf, &statb);
+	(void) fstat(dirf, &statb);
 	maxbno = statb.st_size*BYTESIZ-1;
 	return (0);
 }

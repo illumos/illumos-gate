@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1996-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "synonyms.h"
+#include "c_synonyms.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1998-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,7 +35,5 @@ include ../../Makefile.lib.64
 
 sparcv9_C_PICFLAGS = -K PIC
 sparcv9_CC_PICFLAGS = -KPIC
-
-all: $(LIBS)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)

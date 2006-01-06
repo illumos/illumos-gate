@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -891,6 +891,11 @@ waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options)
 	PERFORM(_waitid(idtype, id, infop, options))
 }
 
+/*
+ * waitpid_cancel() is a libc-private symbol for internal use
+ * where cancellation semantics is desired (see system()).
+ */
+#pragma weak waitpid_cancel = waitpid
 pid_t
 waitpid(pid_t pid, int *stat_loc, int options)
 {

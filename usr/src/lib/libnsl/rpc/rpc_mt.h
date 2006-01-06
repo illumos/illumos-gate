@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1986-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,12 +90,6 @@ extern void rpc_fd_unlock(const void *handle, int fd);
  * way to avoid the warnings.
  */
 
-struct stat;
-
-extern unsigned	_sleep(unsigned);
-extern int	_fstat(int, struct stat *);
-extern int	_stat(const char *, struct stat *);
-extern int	_fcntl(int, int, ...);
 extern int	__getpublickey_cached(char *, char *, int *);
 extern void	__getpublickey_flush(const char *);
 extern int	__can_use_af(sa_family_t);

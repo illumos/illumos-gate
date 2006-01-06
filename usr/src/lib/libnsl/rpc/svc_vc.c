@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,7 +36,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * svc_vc.c -- Server side for Connection Oriented RPC.
+ * Server side for Connection Oriented RPC.
  *
  * Actually implements two flavors of transporter -
  * a rendezvouser (a listener and connection establisher)
@@ -791,7 +792,7 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 	if (destfd < 256) {
 		int nfd;
 
-		nfd = _fcntl(destfd, F_DUPFD, 256);
+		nfd = fcntl(destfd, F_DUPFD, 256);
 		if (nfd != -1) {
 			if (t_close(destfd) == -1) {
 				char errorstr[100];
@@ -825,7 +826,7 @@ do_accept(int srcfd, char *tpname, char *netid, struct t_call *tcp,
 		t_errno = TBADF;
 		return;
 	}
-	(void) _fcntl(destfd, F_SETFD, 1); /* make it "close on exec" */
+	(void) fcntl(destfd, F_SETFD, 1); /* make it "close on exec" */
 	if ((tinfo.servtype != T_COTS) && (tinfo.servtype != T_COTS_ORD)) {
 		/* Not a connection oriented mode */
 		(void) syslog(LOG_ERR, errstring, do_accept_str,

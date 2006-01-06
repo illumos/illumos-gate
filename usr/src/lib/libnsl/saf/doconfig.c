@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +30,7 @@
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
+#include "mt.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -46,17 +46,6 @@
 #include <errno.h>
 #include <signal.h>
 #include "sac.h"
-
-#if defined(sparc)
-#define	_STAT _stat
-#define	_FSTAT _fstat
-#else  /* !sparc */
-#define	_STAT stat
-#define	_FSTAT fstat
-#endif /* sparc */
-
-extern int	_stat(const char *, struct stat *);
-extern int	_fstat(int, struct stat *);
 
 #define	COMMENT	'#'
 #define	NOWAIT	0
@@ -93,7 +82,7 @@ doconfig(int fd, char *script, long rflag)
 	char *p;		/* scratch pointer */
 
 	/* if the script does not exist, then there is nothing to do */
-	if (_STAT(script, &statbuf) < 0)
+	if (stat(script, &statbuf) < 0)
 		return (0);
 
 	fp = fopen(script, "r");

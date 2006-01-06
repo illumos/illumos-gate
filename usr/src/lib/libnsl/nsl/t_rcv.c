@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,7 @@ _tx_rcv(int fd, char *buf, unsigned nbytes, int *flags, int api_semantics)
 		 *
 		 */
 		do {
-			retval = _ioctl(fd, I_NREAD, &msglen);
+			retval = ioctl(fd, I_NREAD, &msglen);
 		} while (retval < 0 && errno == EINTR);
 
 		if (retval < 0) {

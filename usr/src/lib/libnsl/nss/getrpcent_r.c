@@ -21,14 +21,17 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * Rentrant (MT-safe) getrpcYY interfaces.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <ctype.h>
 #include <nss_dbdefs.h>
 #include <stdlib.h>

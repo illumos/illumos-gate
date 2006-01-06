@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,6 +42,8 @@ NX_MAP_i386=	$(SRC)/cmd/mapfile_noexdata
 NX_MAP_sparc=
 
 NX_MAP=		$(NX_MAP_$(MACH))
+
+C_SYNONYMS_H=	$(SRC)/lib/common/inc/c_synonyms.h
 
 #
 # If HDRDIR is left unset, then it's possible for the $(ROOTHDRDIR)/%

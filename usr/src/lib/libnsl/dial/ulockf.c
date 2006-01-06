@@ -21,29 +21,20 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include "uucp.h"
 
-#include <unistd.h>
-#include <stdlib.h>
-/* #include <sys/types.h> */
-/* #include <sys/stat.h> */
-
-#undef _STAT
-#undef _FSTAT
-
-#define	_STAT stat64
-#define	_FSTAT fstat64
-
-static void	stlock();
-static int	onelock();
+static void	stlock(char *);
+static int	onelock(char *, char *, char *);
 
 /*
  * make a lock file with given 'name'
@@ -260,7 +251,7 @@ fd_mklock(int fd)
 	struct stat64 _st_buf;
 	char lockname[BUFSIZ];
 
-	if (_FSTAT(fd, &_st_buf) != 0)
+	if (fstat64(fd, &_st_buf) != 0)
 		return (FAIL);
 
 	(void) snprintf(lockname, sizeof (lockname),
@@ -299,7 +290,7 @@ fd_rmlock(int fd)
 	struct stat64 _st_buf;
 	char lockname[BUFSIZ];
 
-	if (_FSTAT(fd, &_st_buf) == 0) {
+	if (fstat64(fd, &_st_buf) == 0) {
 		(void) snprintf(lockname, sizeof (lockname),
 			"%s.%3.3lu.%3.3lu.%3.3lu", L_LOCK,
 			(unsigned long)major(_st_buf.st_dev),

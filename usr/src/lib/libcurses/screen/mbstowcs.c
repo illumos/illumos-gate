@@ -19,22 +19,22 @@
  *
  * CDDL HEADER END
  */
+
 /*  Copyright (c) 1988 AT&T */
 /*    All Rights Reserved   */
 
-
 /*
- *      Copyright (c) 1997, by Sun Microsystems, Inc.
- *      All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*LINTLIBRARY*/
 
+#include "c_synonyms.h"
 #include <widec.h>
 #include <sys/types.h>
-#include "synonyms.h"
 #include <stdlib.h>
 #include "curses_inc.h"
 

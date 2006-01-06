@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -54,7 +54,7 @@ CPPFLAGS +=	-I.. -D_REENTRANT -D_FILE_OFFSET_BITS=64
 
 .KEEP_STATE:
 
-all: 
+all: $(LIBS) fnamecheck
 
 lint: lintcheck
 

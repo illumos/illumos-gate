@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +42,7 @@
  *  quotes, etc.
  */
 
-#include "synonyms.h"
+#include "c_synonyms.h"
 #include <sys/types.h>
 #include <assert.h>
 #include <string.h>

@@ -21,16 +21,17 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
+ */
+
+/*
  * Ye olde non-reentrant interface (MT-unsafe, caveat utor)
- *
- * lib/libnsl/nss/gethostent.c
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>

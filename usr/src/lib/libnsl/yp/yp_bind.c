@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,14 +54,6 @@
 #include <rpcsvc/ypclnt.h>
 #include <sys/tiuser.h>
 #include "nsl_stdio_prv.h"
-
-#if defined(sparc)
-#define	_FSTAT	_fstat
-extern int _fstat(int, struct stat *);
-#else  /* !sparc */
-#define	_FSTAT	fstat
-#endif	/* sparc */
-
 
 #define	BFSIZE	(YPMAXDOMAIN + 32)	/* size of binding file */
 int	 __ypipbufsize = 8192;		/* size used for clnt_tli_create */
@@ -425,7 +417,7 @@ load_dom_binding(struct ypbind_resp *ypbind_res, char *domain, int *err)
 	pdomb->cache_bad = 0;
 	set_rdev(pdomb);
 	if (clnt_control(pdomb->dom_client, CLGET_FD, (char *)&fd))
-		_fcntl(fd, F_SETFD, 1);  /* make it "close on exec" */
+		(void) fcntl(fd, F_SETFD, 1);  /* make it "close on exec" */
 
 	(void) strcpy(pdomb->dom_domain, domain); /* Remember the domain name */
 	pdomb->ref_count = 0;
@@ -1187,7 +1179,7 @@ set_rdev(struct dom_binding *pdomb)
 	struct stat stbuf;
 
 	if (clnt_control(pdomb->dom_client, CLGET_FD, (char *)&fd) != TRUE ||
-	    _FSTAT(fd, &stbuf) == -1) {
+	    fstat(fd, &stbuf) == -1) {
 		syslog(LOG_DEBUG, "ypbind client:  can't get rdev");
 		pdomb->fd = -1;
 		return;
@@ -1204,7 +1196,7 @@ check_rdev(struct dom_binding *pdomb)
 	if (pdomb->fd == -1)
 		return (1);    /* can't check it, assume it is okay */
 
-	if (_FSTAT(pdomb->fd, &stbuf) == -1) {
+	if (fstat(pdomb->fd, &stbuf) == -1) {
 		syslog(LOG_DEBUG, "yp_bind client:  can't stat %d", pdomb->fd);
 		/* could be because file descriptor was closed */
 		/* it's not our file descriptor, so don't try to close it */

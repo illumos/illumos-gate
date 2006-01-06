@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,10 +36,10 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * getdname.c
- *	Gets and sets the domain name of the system
+ * Gets and sets the domain name of the system
  */
 
+#include "mt.h"
 #include "rpc_mt.h"
 #include <stdio.h>
 #include <stdlib.h>

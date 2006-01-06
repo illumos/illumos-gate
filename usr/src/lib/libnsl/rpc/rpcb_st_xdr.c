@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +32,7 @@
  * routines used with the rpcbind stats facility.
  */
 
+#include "mt.h"
 #include <rpc/rpc.h>
 
 /* Link list of all the stats about getport and getaddr */

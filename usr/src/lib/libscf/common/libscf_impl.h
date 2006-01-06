@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +31,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #ifndef NATIVE_BUILD
-#include "mtlib.h"
+#include "c_synonyms.h"
 #endif
 
 #include <libscf.h>

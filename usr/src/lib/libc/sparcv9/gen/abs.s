@@ -19,8 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1997 Sun Microsystems, Inc.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 .ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,15 +31,40 @@
 
 #include <sys/asm_linkage.h>
 
+	ANSI_PRAGMA_WEAK(llabs,function)
+
+#include "synonyms.h"
+
 /*
- * int abs(register int arg);
+ * int abs(int arg);
  */
 	ENTRY(abs)
 	cmp	%o0, 0
-	bneg,a	%icc, .done
+	bneg,a	%icc, 1f
 	neg %o0
-.done:
+1:
 	retl
 	nop
-
 	SET_SIZE(abs)
+
+/*
+ * long labs(long arg);
+ */
+	ENTRY(labs)
+	brlz,a	%o0, 1f
+	neg %o0
+1:
+	retl
+	nop
+	SET_SIZE(labs)
+
+/*
+ * long long llabs(long long arg);
+ */
+	ENTRY(llabs)
+	brlz,a	%o0, 1f
+	neg %o0
+1:
+	retl
+	nop
+	SET_SIZE(llabs)

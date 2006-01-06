@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
  * FD_SETSIZE definition must precede any save isa_defs.h since that
  * is where _LP64 is defined....
  */
+#include "mt.h"
 #include <sys/isa_defs.h>
 #if !defined(_LP64)
 #ifdef FD_SETSIZE

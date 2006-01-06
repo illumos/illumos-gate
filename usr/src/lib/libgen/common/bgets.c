@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +39,7 @@
 
 #pragma weak bgets = _bgets
 
-#include "synonyms.h"
-#include "mtlib.h"
+#include "gen_synonyms.h"
 #include <sys/types.h>
 #include <libgen.h>
 #include <stdio.h>

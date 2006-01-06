@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,7 +43,7 @@
 /* CONSTANTS SHARED WITH regcmp() */
 #include "regex.h"
 
-#include "lint.h"
+#include "synonyms.h"
 #include "mtlib.h"
 #include <limits.h>
 #include <stdarg.h>

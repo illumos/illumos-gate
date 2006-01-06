@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +40,8 @@
  * DES encryption library routines
  */
 
+#include "des_synonyms.h"
 #include <sys/types.h>
-
 #include <rpc/des_crypt.h>
 #include <sys/stat.h>
 #include <fcntl.h>

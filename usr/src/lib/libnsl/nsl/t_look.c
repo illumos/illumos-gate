@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,7 +129,7 @@ _t_look_locked(
 	strpeek.flags = 0;
 
 	do {
-		retval = _ioctl(fd, I_PEEK, &strpeek);
+		retval = ioctl(fd, I_PEEK, &strpeek);
 	} while (retval < 0 && errno == EINTR);
 
 	if (retval < 0) {

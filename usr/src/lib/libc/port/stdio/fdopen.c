@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,14 +41,7 @@
 
 #pragma weak fdopen = _fdopen
 
-#include <sys/feature_tests.h>
-
-#define	fdopen		_fdopen
-#if !defined(_LP64)
-#define	lseek64		_lseek64
-#endif
-
-#include "lint.h"
+#include "synonyms.h"
 #include <mtlib.h>
 #include "file64.h"
 #include <sys/types.h>

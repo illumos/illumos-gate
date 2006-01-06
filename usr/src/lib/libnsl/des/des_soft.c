@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,7 @@
  * be moved to text.
  */
 
+#include "mt.h"
 #include <sys/types.h>
 #include <des/softdes.h>
 #include <des/desdata.h>

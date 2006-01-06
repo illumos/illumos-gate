@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,6 +112,7 @@
 #define	getcwd		_getcwd
 #define	opendir		_opendir
 #define	seekdir		_seekdir
+#define	strerror	_strerror
 #define	telldir		_telldir
 
 #include "lint.h"

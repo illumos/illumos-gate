@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +46,7 @@
  *	_doprnt: common code for printf, fprintf, sprintf
  */
 
-#include "../gen/synonyms.h"
+#include "../../../lib/common/inc/c_synonyms.h"
 #include <sys/types.h>
 #include "file64.h"
 #include <stdio.h>

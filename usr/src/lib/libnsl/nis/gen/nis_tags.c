@@ -19,23 +19,21 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	nis_tags.c
- *
- *	Copyright (c) 1988-2001 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * nis_tags.c
- *
  * This module contains the library functions that manipulate the
  * server state and statistics. It also includes the implementations
  * nis_getservlist and nis_freeservlist
  */
 
+#include "mt.h"
 #include <string.h>
 #include <malloc.h>
 #include <rpc/rpc.h>

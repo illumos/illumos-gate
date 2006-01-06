@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -48,12 +48,14 @@ $(LINTLIB):= SRCS = ../common/llib-lmail
 
 LINTSRC=	$(LINTLIB:%.ln=%)
 
-CPPFLAGS =	-I../inc $(CPPFLAGS.master)
+CPPFLAGS =	-I../inc -I../../common/inc $(CPPFLAGS.master)
 CFLAGS +=	$(CCVERBOSE)
 DYNFLAGS +=	-M $(MAPFILE)
 LDLIBS +=	-lc
 
 .KEEP_STATE:
+
+all: $(LIBS) fnamecheck
 
 lint: lintcheck
 

@@ -22,17 +22,13 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1999 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # lib/libmd5/i386/Makefile
 #
 
 MAPDIR= ../spec/i386
 include ../Makefile.com
-
-.KEEP_STATE:
-
-all: $(LIBS)
 
 install: all $(ROOTLIBS) $(ROOTLINKS) $(ROOTLINT)

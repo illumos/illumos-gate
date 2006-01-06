@@ -21,15 +21,13 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- *	nis_subr.c
- *
  * This module contains the subroutines used by the server to manipulate
  * objects and names.
  */
@@ -1765,7 +1763,7 @@ __nis_clnt_create(int fd, struct netconfig *nc, char *uaddr,
 	if (clnt) {
 		if (clnt_control(clnt, CLGET_FD, (char *)&fd))
 			/* make it "close on exec" */
-			_fcntl(fd, F_SETFD, FD_CLOEXEC);
+			(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 		(void) clnt_control(clnt, CLSET_FD_CLOSE, NULL);
 	}
 
@@ -2242,7 +2240,7 @@ __nis_local_root(void)
 	    case NIS_CACHEEXPIRED:
 		/* sleep 1 second and try same name again, up to 10 times */
 		/* REMIND: This is arbitrary! BAD! */
-		_sleep(1);
+		(void) sleep(1);
 		fatal_error = (try_count++ > 9);
 		break;
 	    case NIS_NAMEUNREACHABLE:

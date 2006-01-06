@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,9 @@ static const char rcsid[] = "$Id: eventlib.c,v 1.48 2002/07/17 07:37:34 marka Ex
 #include "port_after.h"
 
 #ifdef	SUNW_POLL
+#if defined(pselect)
+#undef pselect
+#endif
 #define	pselect	Pselect
 #endif	/* SUNW_POLL */
 

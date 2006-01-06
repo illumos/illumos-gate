@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,7 +127,7 @@ _tx_snddis(int fd, const struct t_call *call, int api_semantics)
 		_t_flush_lookevents(tiptr); /* flush but not on listener */
 
 	do {
-		retval = _ioctl(fd, I_FLUSH, FLUSHW);
+		retval = ioctl(fd, I_FLUSH, FLUSHW);
 	} while (retval < 0 && errno == EINTR);
 	if (retval < 0) {
 		sv_errno = errno;

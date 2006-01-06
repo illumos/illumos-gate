@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,7 +126,7 @@ _libnsl_lock_init()
 {
 	int	i;
 
-	(void) _sigfillset(&fillset);
+	(void) sigfillset(&fillset);
 
 	for (i = 0; i <  (sizeof (mutex_table) / sizeof (mutex_table[0])); i++)
 		(void) mutex_init(mutex_table[i], 0, (void *) 0);

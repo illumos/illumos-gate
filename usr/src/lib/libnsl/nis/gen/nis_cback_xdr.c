@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
  * Originally generated using rpcgen.
  */
 
+#include "mt.h"
 #include <rpc/rpc.h>
 #include <rpcsvc/nis_callback.h>
 #include "nis_clnt.h"

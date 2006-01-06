@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,15 +30,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include "uucp.h"
-
-#if defined(sparc)
-#define	_STAT _stat
-#else  /* !sparc */
-#define	_STAT stat
-#endif /* sparc */
-
-extern int _stat(const char *, struct stat *);
 
 /* copy str into data space -- caller should report errors. */
 
@@ -70,7 +63,7 @@ eaccess(char *path, mode_t amode)
 	struct stat	s;
 	uid_t euid;
 
-	if (_STAT(path, &s) == -1)
+	if (stat(path, &s) == -1)
 		return (-1);		/* can't stat file */
 	amode &= 07;
 

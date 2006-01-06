@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,22 +45,8 @@
 #include "nis_cache.h"
 #include <rpcsvc/daemon_utils.h>
 
-/*
- *  For BPC programs (which only run on SPARC), we need to use _fstat
- *  so that we get the 5.x version of fstat instead of the 4.x version.
- *  On other architectures, the regular fstat is the right one to use.
- */
-
-#if defined(sparc)
-#define	_FSTAT _fstat
-extern "C" int _fstat(int, struct stat *);
-#else  /* !sparc */
-#define	_FSTAT fstat
-#endif /* sparc */
-
 #define	CACHE_VERSION 3
 #define	CACHE_MAGIC   0xbabeeeeeU
-
 
 union semun {
 	int val;
@@ -209,7 +196,7 @@ NisMappedCache::mapCache()
 	fd = open(name, open_mode);
 	if (fd == -1)
 		goto done;
-	if (_FSTAT(fd, &stbuf) == -1) {
+	if (fstat(fd, &stbuf) == -1) {
 		syslog(LOG_ERR, "can't stat %s:  %m", name);
 		goto done;
 	}

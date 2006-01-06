@@ -21,11 +21,11 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * lib/libnsl/nss/gethostent_r.c
- *
+ */
+
+/*
  * This file defines and implements the re-entrant enumeration routines for
  *   hosts: sethostent(), gethostent_r(), and endhostent(). They consult
  *   the switch policy directly and do not "share" their enumeration state
@@ -37,6 +37,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <nss_dbdefs.h>

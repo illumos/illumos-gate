@@ -19,16 +19,16 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright (c) 1999, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
-#pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.2   */
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 /*LINTLIBRARY*/
 
 /*
@@ -47,7 +47,7 @@
 	false if any writes fail.
 */
 
-#include "synonyms.h"
+#include "c_synonyms.h"
 #include "libmail.h"
 #include <sys/types.h>
 

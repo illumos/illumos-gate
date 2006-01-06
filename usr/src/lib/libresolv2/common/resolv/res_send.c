@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -113,6 +113,9 @@ static const char rcsid[] = "$Id: res_send.c,v 8.52 2003/04/29 02:13:08 marka Ex
 #ifdef SUNW_POLL
 #include <stropts.h>
 #include <poll.h>
+#if defined(pselect)
+#undef pselect
+#endif
 #define	pselect	Pselect
 #endif /* SUNW_POLL */
 

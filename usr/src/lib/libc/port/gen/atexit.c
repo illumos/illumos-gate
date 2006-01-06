@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +30,9 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
+#pragma weak atexit = _atexit
 
-#include "lint.h"
+#include "synonyms.h"
 #include "thr_uberdata.h"
 #include "libc_int.h"
 #include "atexit.h"
@@ -94,7 +96,6 @@ atexit_unlocks()
  * atexit() is called before the primordial thread is fully set up.
  * Be careful about dereferencing self->ul_uberdata->atexit_root.
  */
-#pragma weak atexit = _atexit
 int
 _atexit(void (*func)(void))
 {

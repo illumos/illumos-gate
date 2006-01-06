@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,16 +30,14 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#pragma weak sigstack = _sigstack
-
-#include "lint.h"
+#include "synonyms.h"
 #include <sys/types.h>
 #include <sys/ucontext.h>
 #include <signal.h>
 #include <errno.h>
 
 int
-_sigstack(struct sigstack *nss, struct sigstack *oss)
+sigstack(struct sigstack *nss, struct sigstack *oss)
 {
 	struct sigaltstack nalt;
 	struct sigaltstack oalt;

@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,9 +38,8 @@
  * file isn't found, return NULL.
  */
 
-#include "synonyms.h"
+#include "gen_synonyms.h"
 #ifdef _REENTRANT
-#include "mtlib.h"
 #include <thread.h>
 #endif /* _REENTRANT */
 #include <sys/types.h>

@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,8 +36,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * rpc_prot.c
- *
  * This set of routines implements the rpc message definition,
  * its serializer and some common rpc utility routines.
  * The routines are meant for various implementations of rpc -
@@ -45,6 +44,7 @@
  * routines are also in this program.
  */
 
+#include "mt.h"
 #include <sys/param.h>
 #include <syslog.h>
 #include <rpc/rpc.h>

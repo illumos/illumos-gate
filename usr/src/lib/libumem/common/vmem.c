@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,7 +109,7 @@
  * sorted in address order.
  */
 
-#include "mtlib.h"
+#include "c_synonyms.h"
 #include <sys/vmem_impl_user.h>
 #include <alloca.h>
 #include <sys/sysmacros.h>

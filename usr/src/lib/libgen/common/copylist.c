@@ -19,13 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright (c) 1996, 1997, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1.3.2 */
@@ -43,7 +43,7 @@
 #endif
 #pragma weak copylist = _copylist
 
-#include "synonyms.h"
+#include "gen_synonyms.h"
 #include <sys/types.h>
 #include <libgen.h>
 #include <stdlib.h>

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +35,7 @@
 
 /* LINTLIBRARY */
 
+#include "c_synonyms.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <deflt.h>
@@ -41,7 +43,6 @@
 #include <string.h>
 #include <ctype.h>
 #include <limits.h>
-#include "mtlib.h"
 #include <thread.h>
 #include <synch.h>
 #include <libintl.h>

@@ -21,14 +21,14 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * xdr_stdio_prv.c, XDR implementation on special standard i/o file.
+ * XDR implementation on special standard i/o file.
  *
  * To avoid the file descriptor limitation in stdio, we implement
  * a private version of the same routines from xdr_stdio.c  using
@@ -38,6 +38,7 @@
  * from the stream.
  */
 
+#include "mt.h"
 #include "rpc_mt.h"
 #include <rpc/types.h>
 #include <stdio.h>

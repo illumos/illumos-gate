@@ -19,14 +19,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
-
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <stdlib.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -60,12 +61,12 @@ _raise_fd(int fd)
 	if (fd >= min_fd)
 		return (fd);
 
-	if ((nfd = _fcntl(fd, F_DUPFD, min_fd)) == -1) {
+	if ((nfd = fcntl(fd, F_DUPFD, min_fd)) == -1) {
 		/*
 		 * If the shell limits [See limit(1)] the
-		 * descriptors to 256, _fcntl will fail
+		 * descriptors to 256, fcntl will fail
 		 * and errno will be set to EINVAL. Since
-		 * the intention is to ignore _fcntl failures
+		 * the intention is to ignore fcntl failures
 		 * and continue working with 'fd', we should
 		 * reset errno to _prevent_ apps relying on errno
 		 * to treat this as an error.

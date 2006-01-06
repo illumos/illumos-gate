@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,12 +36,13 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * xdr.c, Generic XDR routines implementation.
+ * Generic XDR routines implementation.
  *
  * These are the "generic" xdr routines used to serialize and de-serialize
  * most common data items.  See xdr.h for more info on the interface to
  * xdr.
  */
+#include "mt.h"
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/isa_defs.h>

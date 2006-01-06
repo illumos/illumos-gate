@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,9 +36,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * clnt_simple.c
  * Simplified front end to client rpc.
- *
  */
 
 #include "mt.h"
@@ -147,7 +146,7 @@ rpc_call(const char *host, const rpcprog_t prognum, const rpcvers_t versnum,
 		(void) CLNT_CONTROL(rcp->client,
 				CLSET_RETRY_TIMEOUT, (char *)&timeout);
 		if (CLNT_CONTROL(rcp->client, CLGET_FD, (char *)&fd))
-			_fcntl(fd, F_SETFD, 1);	/* make it "close on exec" */
+			(void) fcntl(fd, F_SETFD, 1);	/* close on exec */
 		rcp->prognum = prognum;
 		rcp->versnum = versnum;
 		if ((strlen(host) < (size_t)MAXHOSTNAMELEN) &&

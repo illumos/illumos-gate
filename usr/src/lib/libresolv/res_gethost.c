@@ -11,10 +11,14 @@
  *
  */
 
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI" /* SunOS 1.11; UCB 6.32 */
 
-#include "synonyms.h"
-
+#include "c_synonyms.h"
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <netinet/in.h>

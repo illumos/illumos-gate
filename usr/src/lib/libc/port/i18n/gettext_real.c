@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,8 +75,8 @@ _real_gettext_u(const char *domain,
 	size_t	cblen, cur_locale_len, cur_domain_len;
 	unsigned int	hash_locale;
 
-	struct msg_pack	*mp, omp = { 0 };
-	struct cache_pack	*cp, ocp = { 0 };
+	struct msg_pack	*mp, omp;
+	struct cache_pack	*cp, ocp;
 
 #ifdef GETTEXT_DEBUG
 	(void) printf("*************** _real_gettext_u(%s, %s, "
@@ -87,8 +88,8 @@ _real_gettext_u(const char *domain,
 	if (msgid1 == NULL)
 		return (NULL);
 
-	cp = &ocp;			/* cache pack */
-	mp = &omp;			/* msg pack */
+	cp = memset(&ocp, 0, sizeof (ocp));	/* cache pack */
+	mp = memset(&omp, 0, sizeof (omp));	/* msg pack */
 
 	/*
 	 * category may be LC_MESSAGES or LC_TIME

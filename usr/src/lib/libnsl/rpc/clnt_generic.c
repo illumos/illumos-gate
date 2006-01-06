@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -34,6 +35,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include "rpc_mt.h"
 #include <stdio.h>
 #include <errno.h>
@@ -767,7 +769,7 @@ __rpc_raise_fd(int fd)
 	if (fd >= __rpc_minfd)
 		return (fd);
 
-	if ((nfd = _fcntl(fd, F_DUPFD, __rpc_minfd)) == -1)
+	if ((nfd = fcntl(fd, F_DUPFD, __rpc_minfd)) == -1)
 		return (fd);
 
 	if (t_sync(nfd) == -1) {

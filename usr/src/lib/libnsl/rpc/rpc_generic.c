@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,8 +36,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * rpc_generic.c, Miscl routines for RPC.
- *
+ * Miscl routines for RPC.
  */
 
 #include "mt.h"
@@ -58,14 +58,6 @@
 #include <sys/systeminfo.h>
 #include <netdir.h>
 #include <netdb.h>
-
-#if defined(sparc)
-#define	_STAT _stat
-#define	_FSTAT _fstat
-#else  /* !sparc */
-#define	_STAT stat
-#define	_FSTAT fstat
-#endif /* sparc */
 
 struct handle {
 	NCONF_HANDLE *nhandle;
@@ -443,7 +435,7 @@ __rpcfd_to_nconf(int fd, int servtype)
 	major_t fdmajor;
 	struct t_info tinfo;
 
-	if (_FSTAT(fd, &statbuf) == -1)
+	if (fstat(fd, &statbuf) == -1)
 		return (NULL);
 
 	fdmajor = major(statbuf.st_rdev);
@@ -478,7 +470,7 @@ __rpcfd_to_nconf(int fd, int servtype)
 
 	while (nconf = getnetconfig(hndl)) {
 		if (__rpc_matchserv(servtype, nconf->nc_semantics) == TRUE) {
-			if (!_STAT(nconf->nc_device, &statbuf)) {
+			if (!stat(nconf->nc_device, &statbuf)) {
 				if (fdmajor == major(statbuf.st_rdev))
 					break; /* self cloning driver ? */
 				if (fdmajor == minor(statbuf.st_rdev))

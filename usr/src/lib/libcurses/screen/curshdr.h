@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1997 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -281,7 +282,7 @@ extern	int	_overlap(WINDOW *, WINDOW *, int);
 extern	int	_scr_all(char *, int);
 extern	int	_slk_update(void);
 extern	int	_tcsearch(char *, short [], char *[], int, int);
-extern	int	_vsscanf(char *, char *, __va_list);
+extern	int	_vsscanf(const char *, const char *, __va_list);
 extern	int	force_doupdate(void);
 extern	int	init_acs(void);
 extern	int	mbscrw(int);

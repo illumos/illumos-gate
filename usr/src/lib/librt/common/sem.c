@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,7 +39,7 @@
 #pragma weak	sem_post = _sem_post
 #pragma weak	sem_getvalue = _sem_getvalue
 
-#include "synonyms.h"
+#include "c_synonyms.h"
 #include <sys/types.h>
 #include <semaphore.h>
 #include <synch.h>

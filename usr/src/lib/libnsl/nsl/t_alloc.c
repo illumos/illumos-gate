@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,7 +83,7 @@ _tx_alloc(int fd, int struct_type, int fields, int api_semantics)
 	strioc.ic_len = (int)sizeof (struct T_info_req);
 	strioc.ic_dp = (char *)&info;
 	do {
-		retval = _ioctl(fd, I_STR, &strioc);
+		retval = ioctl(fd, I_STR, &strioc);
 	} while (retval < 0 && errno == EINTR);
 
 	if (retval < 0) {

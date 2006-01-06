@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,7 +36,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * rpcb_clnt.c
  * interface to rpcbind rpc service.
  */
 
@@ -60,10 +60,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#if !(defined(__i386) && !defined(__amd64))
-extern int _uname();
-#endif
 
 static struct timeval tottimeout = { 60, 0 };
 static const struct timeval rmttimeout = { 3, 0 };
@@ -463,7 +459,7 @@ local_rpcb(void)
 #if defined(__i386) && !defined(__amd64)
 			if ((_nuname(&utsname) == -1) ||
 #else
-			if ((_uname(&utsname) == -1) ||
+			if ((uname(&utsname) == -1) ||
 #endif
 			    ((hostname = strdup(utsname.nodename)) == NULL)) {
 				syslog(LOG_ERR, "local_rpcb : strdup failed.");
@@ -634,7 +630,7 @@ __rpcbind_is_up(void)
 #if defined(__i386) && !defined(__amd64)
 	if (_nuname(&name) == -1)
 #else
-	if (_uname(&name) == -1)
+	if (uname(&name) == -1)
 #endif
 		return (TRUE);
 

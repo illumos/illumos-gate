@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +39,10 @@
  *	}
  */
 
+#include <sys/asm_linkage.h>
+
+	ANSI_PRAGMA_WEAK(llabs,function)
+
 #include "SYS.h"
 
 	ENTRY(abs)
@@ -49,7 +54,6 @@
 	ret
 	SET_SIZE(abs)
 
-
  	ENTRY(labs)
  	movq	%rdi, %rax
  	testq	%rax, %rax	/* arg < 0? */
@@ -58,3 +62,12 @@
 1:
  	ret
  	SET_SIZE(labs)
+
+ 	ENTRY(llabs)
+ 	movq	%rdi, %rax
+ 	testq	%rax, %rax	/* arg < 0? */
+ 	jns	1f
+ 	negq	%rax		/* yes, return -arg */
+1:
+ 	ret
+ 	SET_SIZE(llabs)

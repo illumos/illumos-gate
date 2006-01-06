@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 /*
  * YP updater interface
  */
+#include "mt.h"
 #include <stdio.h>
 #include <rpc/rpc.h>
 #include "yp_b.h"

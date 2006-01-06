@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,7 +52,7 @@
  * before calling sbrk().
  */
 
-#include "mtlib.h"
+#include "c_synonyms.h"
 #include <errno.h>
 #include <limits.h>
 #include <sys/sysmacros.h>

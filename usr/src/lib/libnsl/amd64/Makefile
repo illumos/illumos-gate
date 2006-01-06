@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,7 +34,5 @@ include ../../Makefile.lib.64
 # large parts of the 32-bit library with PIC unnecessarily.
 
 amd64_C_PICFLAGS = $(amd64_C_BIGPICFLAGS)
-
-all: $(LIBS)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)

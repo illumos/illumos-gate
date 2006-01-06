@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,9 +36,10 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * xcrypt.c: Hex encryption/decryption and utility routines
+ * Hex encryption/decryption and utility routines
  */
 
+#include "mt.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>

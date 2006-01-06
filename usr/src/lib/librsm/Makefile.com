@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,7 +52,7 @@ $(NOT_RELEASE_BUILD)DEBUG = -DDEBUG
 $(NOT_RELEASE_BUILD)COPTFLAG =
 $(NOT_RELEASE_BUILD)COPTFLAG64 =
 
-CPPFLAGS = -I../inc $(CPPFLAGS.master) -D_REENTRANT $(DEBUG)
+CPPFLAGS = -I../inc -I../../common/inc $(CPPFLAGS.master) -D_REENTRANT $(DEBUG)
 
 DYNFLAGS += -M$(MAPFILE)
 
@@ -60,7 +60,7 @@ LDLIBS += -lc
 
 .KEEP_STATE:
 
-all:  $(LIBS) $(LINTLIB)
+all:  $(LIBS) fnamecheck
 
 lint: lintcheck
 

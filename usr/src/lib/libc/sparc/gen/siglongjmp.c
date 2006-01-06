@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,7 +33,7 @@
 
 #pragma weak siglongjmp = _siglongjmp
 
-#include "lint.h"
+#include "synonyms.h"
 #include <sys/types.h>
 #include <sys/stack.h>
 #include <sys/frame.h>
@@ -43,7 +44,7 @@
 #include "libc.h"
 
 void
-_siglongjmp(sigjmp_buf env, int val)
+siglongjmp(sigjmp_buf env, int val)
 {
 	extern void _fetch_globals(greg_t *);
 	ucontext_t uc;

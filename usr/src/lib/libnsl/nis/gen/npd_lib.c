@@ -19,18 +19,20 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- *	npd_lib.c
+ */
+
+/*
  *	Contains the encryption routines required by the server
  *	and the client-side for NIS+ passwd update deamon.
- *
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include <string.h>
 #include <memory.h>
 #include <rpc/des_crypt.h>

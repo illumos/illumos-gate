@@ -19,8 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1987 Sun Microsystems, Inc.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 .ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5	*/
@@ -31,15 +33,24 @@
 
 /*
  * int abs(register int arg);
- * long labs(register long int arg);
  */
-	ENTRY2(abs,labs)
+	ENTRY(abs)
 	tst	%o0
 	bl,a	1f
 	neg	%o0
 1:
 	retl
 	nop
-
 	SET_SIZE(abs)
+
+/*
+ * long labs(register long int arg);
+ */
+	ENTRY(labs)
+	tst	%o0
+	bl,a	1f
+	neg	%o0
+1:
+	retl
+	nop
 	SET_SIZE(labs)

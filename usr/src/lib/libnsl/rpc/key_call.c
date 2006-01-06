@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -35,7 +36,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * key_call.c, Interface to keyserver
+ * Interface to keyserver
  *
  * setsecretkey(key) - set your secret key
  * encryptsessionkey(agent, deskey) - encrypt a session key to talk to agent
@@ -57,12 +58,6 @@
 #include <sys/stat.h>
 
 #define	CLASSIC_PK_DH(k, a)	(((k) == 192) && ((a) == 0))
-
-#if defined(sparc)
-#define	_FSTAT _fstat
-#else  /* !sparc */
-#define	_FSTAT fstat
-#endif /* sparc */
 
 #ifdef DEBUG
 #define	debug(msg)	(void) fprintf(stderr, "%s\n", msg);
@@ -844,7 +839,7 @@ getkeyserv_handle(int vers, int stale)
 		/* Update fd in kcp because it was reopened in _update_did */
 		if (clnt_control(kcp->client, CLGET_FD, (void *)&fd) &&
 		    (fd >= 0))
-			_fcntl(fd, F_SETFD, FD_CLOEXEC); /* "close on exec" */
+			(void) fcntl(fd, F_SETFD, FD_CLOEXEC); /* close exec */
 		kcp->fd = fd;
 		return (kcp->client);
 	}
@@ -854,7 +849,7 @@ getkeyserv_handle(int vers, int stale)
 
 	kcp->pid = getpid();
 	set_rdev(kcp);
-	_fcntl(kcp->fd, F_SETFD, FD_CLOEXEC);	/* make it "close on exec" */
+	(void) fcntl(kcp->fd, F_SETFD, FD_CLOEXEC);	/* close on exec */
 
 	return (kcp->client);
 }
@@ -984,7 +979,7 @@ set_rdev(struct key_call_private *kcp)
 	struct stat stbuf;
 
 	if (clnt_control(kcp->client, CLGET_FD, (char *)&fd) != TRUE ||
-	    _FSTAT(fd, &stbuf) == -1) {
+	    fstat(fd, &stbuf) == -1) {
 		syslog(LOG_DEBUG, "keyserv_client:  can't get info");
 		kcp->fd = -1;
 		return;
@@ -1001,7 +996,7 @@ check_rdev(struct key_call_private *kcp)
 	if (kcp->fd == -1)
 		return (1);    /* can't check it, assume it is okay */
 
-	if (_FSTAT(kcp->fd, &stbuf) == -1) {
+	if (fstat(kcp->fd, &stbuf) == -1) {
 		syslog(LOG_DEBUG, "keyserv_client:  can't stat %d", kcp->fd);
 		/* could be because file descriptor was closed */
 		/* it's not our file descriptor, so don't try to close it */

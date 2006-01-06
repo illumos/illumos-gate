@@ -19,13 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright (c) 1996, 1997, by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.5.3.2 */
@@ -47,7 +47,7 @@
  * returns -3 if removal stops because it's the current directory.
  */
 
-#include "synonyms.h"
+#include "gen_synonyms.h"
 #include <sys/types.h>
 #include <libgen.h>
 #include <sys/stat.h>

@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,7 +147,7 @@ _tx_accept(
 	}
 
 	if (fd != resfd) {
-		if ((retval = _ioctl(resfd, I_NREAD, &size)) < 0) {
+		if ((retval = ioctl(resfd, I_NREAD, &size)) < 0) {
 			sv_errno = errno;
 
 			t_errno = TSYSERR;
@@ -263,7 +263,7 @@ _tx_accept(
 		strfdinsert.offset = (int)sizeof (t_scalar_t);
 		strfdinsert.flags = 0;		/* could be EXPEDITED also */
 
-		if (_ioctl(fd, I_FDINSERT, &strfdinsert) < 0) {
+		if (ioctl(fd, I_FDINSERT, &strfdinsert) < 0) {
 			if (errno == EAGAIN)
 				t_errno = TFLOW;
 			else

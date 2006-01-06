@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +40,7 @@
 #pragma weak mq_setattr = _mq_setattr
 #pragma weak mq_getattr = _mq_getattr
 
-#include "synonyms.h"
+#include "c_synonyms.h"
 #define	_KMEMUSER
 #include <sys/param.h>		/* _MQ_OPEN_MAX, _MQ_PRIO_MAX, _SEM_VALUE_MAX */
 #undef	_KMEMUSER

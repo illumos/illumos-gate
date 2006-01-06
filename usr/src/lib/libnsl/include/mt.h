@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1993-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +45,7 @@
  *	 their default actions (killing the process, stopping the process).
  */
 
-#include "mtlib.h"
+#include "c_synonyms.h"
 #include <thread.h>
 #include <pthread.h>
 #include <signal.h>
@@ -64,10 +65,6 @@ extern void sig_rw_unlock(rwlock_t *);
 
 extern void _sigoff(void);
 extern void _sigon(void);
-
-extern int _fcntl(int, int, ...);
-extern int _ioctl(int, int, ...);
-extern int _sigfillset(sigset_t *);
 
 extern void *thr_get_storage(pthread_key_t *, size_t, void(*)(void *));
 

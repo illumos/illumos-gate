@@ -19,9 +19,8 @@
 #
 # CDDL HEADER END
 #
-
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -159,6 +158,8 @@ nis/gen/nis_clnt.c: $(PROTOCOL_DIR)/nis.x $(PROTOCOL_DIR)/nis_object.x
 	$(RPCGEN) -C -l $(PROTOCOL_DIR)/nis.x > nis_clnt-tmp.c
 	$(SED) -e 's!\"$(PROTOCOL_DIR)/nis.h\"!\<rpcsvc/nis.h\>!' \
 	    < nis_clnt-tmp.c |\
+	$(SED) -e '/#include <memory.h>/i\
+#include "mt.h"' |\
 	$(SED) -e 's/_3/_clnt/' > $@
 	$(RM) nis_clnt-tmp.c
 
@@ -168,6 +169,8 @@ nis/cache/nis_cache_xdr.cc: $(PROTOCOL_DIR)/nis_cache.x
 
 nis/cache/nis_cache_clnt.cc: $(PROTOCOL_DIR)/nis_cache.x
 	$(RPCGEN) -C -l $(PROTOCOL_DIR)/nis_cache.x |\
+	$(SED) -e '/#include <memory.h>/i\
+#include "mt.h"' |\
         $(SED) -e 's!\"$(PROTOCOL_DIR)/nis_cache.h\"!"nis_cache.h"!' > $@
 
 nis/cache/nis_cache.h: $(PROTOCOL_DIR)/nis_cache.x

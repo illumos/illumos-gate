@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,10 +33,5 @@ include ../Makefile.com
 include $(SRC)/lib/Makefile.lib.64
 
 DYNFLAGS += -Wl,-f/platform/\$$PLATFORM/lib/sparcv9/$(DYNLIBPSR)
-
-
-.KEEP_STATE:
-
-all: $(LIBS)
 
 install: all $(ROOTLIBS64) $(ROOTLINKS64)

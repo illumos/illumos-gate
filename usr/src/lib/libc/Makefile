@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -103,7 +103,7 @@ $(ROOTVARIANTDIR)/$(VAR2_DYNLIB)	:= FILEMODE= 755
 all:	check_i18n .WAIT spec .WAIT lib32 $(BUILD64) .WAIT lib64 .WAIT etc
 
 check_i18n:
-	@if [ ! -f $(ROOTFS_LIBDIR)/libc_i18n.a -a \
+	@if [ ! -f $(ROOTFS_LIBDIR)/libc_i18n.a -o \
 	    ! -f $(ROOTFS_LIBDIR64)/libc_i18n.a ]; then \
 		if [ "$$CLOSED_IS_PRESENT" = no ]; then \
 			$(ECHO) "Warning: closed binaries not" \
@@ -120,11 +120,20 @@ check_i18n:
 etc:	$($(MACH)_ETC)
 
 lib32:	$(MACHLIBS) $(MACH)/$(LIB_PIC) $(VARIANTLIBS)
+	mkdir -p $(MACH)/i18n_pics
+	cd $(MACH)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR)/libc_i18n.a
+	check_fnames -s $(C_SYNONYMS_H) -l $(MACH)/$(DYNLIB) \
+		$(MACH)/pics/*.o $(MACH)/i18n_pics/*.o
 
 lib64:	$(MACHLIBS64) $(MACH64)/$(LIB_PIC) $(VARIANTLIBS)
+	mkdir -p $(MACH64)/i18n_pics
+	cd $(MACH64)/i18n_pics ; $(AR) -x $(ROOTFS_LIBDIR64)/libc_i18n.a
+	check_fnames -s $(C_SYNONYMS_H) -l $(MACH64)/$(DYNLIB) \
+		$(MACH64)/pics/*.o $(MACH64)/i18n_pics/*.o
 
 $(VARIANTLIBS): FRC
 	@cd $(@D); pwd; VERSION='$(VERSION)' $(MAKE) $(@F)
+	check_fnames -s $(C_SYNONYMS_H) -l $(@D)/$(@F) $(@D)/pics/*.o
 
 $($(MACH)_ETC): FRC
 	@cd $(@); pwd; $(MAKE) $(TARGET)
@@ -194,6 +203,8 @@ spec $(SUBDIRS): FRC
 	@cd $@; pwd; VERSION='$(VERSION)' $(MAKE) $(TARGET)
 
 clean clobber: spec .WAIT $(SUBDIRS)
+	$(RM) -r $(MACH)/i18n_pics
+	$(BUILD64)$(RM) -r $(MACH64)/i18n_pics
 
 lint: $(SUBDIRS)
 

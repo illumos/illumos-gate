@@ -24,12 +24,13 @@
 /*	  All Rights Reserved	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include "mt.h"
 #include "uucp.h"
 
 static void alarmtr(int);
@@ -48,8 +49,6 @@ static int gdial(char *, char *[], int);
 static int	Modemctrl;
 static unsigned connecttime;
 static int (*Setup)();
-
-extern int	_fcntl(int, int, ...);
 
 /*
  *	to add a new caller:
@@ -275,8 +274,8 @@ processdev(char *flds[], char *dev[])
 
 		if (Modemctrl) {
 			DEBUG(7, "clear O_NDELAY\n%s", "");
-			if (_fcntl(dcf, F_SETFL,
-				(_fcntl(dcf, F_GETFL, 0) & ~O_NDELAY)) < 0) {
+			if (fcntl(dcf, F_SETFL,
+			    (fcntl(dcf, F_GETFL, 0) & ~O_NDELAY)) < 0) {
 				DEBUG(7, "clear O_NDELAY failed, errno %d\n",
 								errno);
 				Uerror = SS_DEVICE_FAILED;

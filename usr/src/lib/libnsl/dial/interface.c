@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,11 +35,12 @@
  *	provide alternate definitions for the I/O functions through global
  *	interfaces.
  */
-#include	"uucp.h"
-#include	<unistd.h>
+#include "mt.h"
+#include "uucp.h"
+#include <unistd.h>
 
 #ifdef TLI
-#include	<tiuser.h>
+#include <tiuser.h>
 #endif /*  TLI  */
 
 static void	sethup(int);

@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,7 +100,7 @@ _t_checkfd(int fd, int force_sync, int api_semantics)
 	 */
 	timodpushed = 0;
 	do {
-		retval = _ioctl(fd, I_FIND, "timod");
+		retval = ioctl(fd, I_FIND, "timod");
 	} while (retval < 0 && errno == EINTR);
 
 	if (retval < 0 || (retval == 0 && _T_IS_TLI(api_semantics))) {
@@ -131,7 +131,7 @@ _t_checkfd(int fd, int force_sync, int api_semantics)
 			 * Assumes (correctly) that I_PUSH  is
 			 * atomic w.r.t signals (EINTR error)
 			 */
-			retval = _ioctl(fd, I_PUSH, "timod");
+			retval = ioctl(fd, I_PUSH, "timod");
 		} while (retval < 0 && errno == EINTR);
 
 		if (retval < 0) {
@@ -162,7 +162,7 @@ _t_checkfd(int fd, int force_sync, int api_semantics)
 		 * not have been a network transport stream.
 		 */
 		if (timodpushed)
-			(void) _ioctl(fd, I_POP, 0);
+			(void) ioctl(fd, I_POP, 0);
 		errno = sv_errno;
 		return (NULL);
 	}
@@ -315,7 +315,7 @@ _t_is_event(int fd, struct _ti_user *tiptr)
 	int size, retval;
 
 	assert(MUTEX_HELD(&tiptr->ti_lock));
-	if ((retval = _ioctl(fd, I_NREAD, &size)) < 0) {
+	if ((retval = ioctl(fd, I_NREAD, &size)) < 0) {
 		t_errno = TSYSERR;
 		return (-1);
 	}
@@ -364,9 +364,9 @@ _t_is_ok(int fd, struct _ti_user *tiptr, t_scalar_t type)
 	 * Temporarily convert a non blocking endpoint to a
 	 * blocking one and restore status later
 	 */
-	cntlflag = _fcntl(fd, F_GETFL, 0);
+	cntlflag = fcntl(fd, F_GETFL, 0);
 	if (cntlflag & (O_NDELAY | O_NONBLOCK))
-		(void) _fcntl(fd, F_SETFL, cntlflag & ~(O_NDELAY | O_NONBLOCK));
+		(void) fcntl(fd, F_SETFL, cntlflag & ~(O_NDELAY | O_NONBLOCK));
 
 	flags = RS_HIPRI;
 
@@ -374,7 +374,7 @@ _t_is_ok(int fd, struct _ti_user *tiptr, t_scalar_t type)
 		if (errno == EINTR)
 			continue;
 		if (cntlflag & (O_NDELAY | O_NONBLOCK))
-			(void) _fcntl(fd, F_SETFL, cntlflag);
+			(void) fcntl(fd, F_SETFL, cntlflag);
 		t_errno = TSYSERR;
 		goto err_out;
 	}
@@ -382,7 +382,7 @@ _t_is_ok(int fd, struct _ti_user *tiptr, t_scalar_t type)
 	/* did I get entire message */
 	if (retval > 0) {
 		if (cntlflag & (O_NDELAY | O_NONBLOCK))
-			(void) _fcntl(fd, F_SETFL, cntlflag);
+			(void) fcntl(fd, F_SETFL, cntlflag);
 		t_errno = TSYSERR;
 		errno = EIO;
 		goto err_out;
@@ -393,14 +393,14 @@ _t_is_ok(int fd, struct _ti_user *tiptr, t_scalar_t type)
 	 */
 	if (ctlbuf.len < (int)sizeof (t_scalar_t)) {
 		if (cntlflag & (O_NDELAY | O_NONBLOCK))
-			(void) _fcntl(fd, F_SETFL, cntlflag);
+			(void) fcntl(fd, F_SETFL, cntlflag);
 		t_errno = TSYSERR;
 		errno = EPROTO;
 		goto err_out;
 	}
 
 	if (cntlflag & (O_NDELAY | O_NONBLOCK))
-		(void) _fcntl(fd, F_SETFL, cntlflag);
+		(void) fcntl(fd, F_SETFL, cntlflag);
 
 	/* LINTED pointer cast */
 	pptr = (union T_primitives *)ctlbuf.buf;
@@ -436,7 +436,7 @@ _t_is_ok(int fd, struct _ti_user *tiptr, t_scalar_t type)
 		 * there is something that needs attention
 		 */
 		if (pptr->error_ack.TLI_error == TOUTSTATE) {
-			if ((retval = _ioctl(fd, I_NREAD, &size)) < 0) {
+			if ((retval = ioctl(fd, I_NREAD, &size)) < 0) {
 				t_errno = TSYSERR;
 				goto err_out;
 			}
@@ -481,7 +481,7 @@ _t_do_ioctl(int fd, char *buf, int size, int cmd, int *retlenp)
 	strioc.ic_len = size;
 	strioc.ic_dp = buf;
 
-	if ((retval = _ioctl(fd, I_STR, &strioc)) < 0) {
+	if ((retval = ioctl(fd, I_STR, &strioc)) < 0) {
 		t_errno = TSYSERR;
 		return (-1);
 	}
@@ -1118,7 +1118,7 @@ _t_adjust_state(int fd, int instate)
 
 	arg.flags = 0;
 
-	if ((retval = _ioctl(fd, I_PEEK, &arg)) < 0)  {
+	if ((retval = ioctl(fd, I_PEEK, &arg)) < 0)  {
 		t_errno = TSYSERR;
 		return (-1);
 	}

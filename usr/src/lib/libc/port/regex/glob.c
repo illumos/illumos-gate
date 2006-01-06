@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +46,7 @@
  * Written by Eric Gisin.
  */
 
-#include "lint.h"
+#include "synonyms.h"
 #include <stdio.h>
 #include <unistd.h>
 #include <limits.h>
@@ -61,6 +62,7 @@
 
 #define	INITIAL	8		/* initial pathv allocation */
 #define	NULLCPP	((char **)0)	/* Null char ** */
+#define	NAME_MAX	1024	/* something large */
 
 static int	globit(size_t, const char *, glob_t *, int,
 	int (*)(const char *, int), char **);
@@ -164,11 +166,7 @@ globit(size_t dend, const char *sp, glob_t *gp, int flags,
 	struct stat64 sb;
 	DIR *dirp;
 	struct dirent64 *d;
-	struct dirent64 *entry = NULL;
-	int namemax;
 	int err;
-
-#define	FREE_ENTRY	if (entry) free(entry)
 
 	for (;;)
 		switch (*dp++ = *(unsigned char *)sp++) {
@@ -179,7 +177,6 @@ globit(size_t dend, const char *sp, glob_t *gp, int flags,
 				if (!(flags & GLOB_NOCHECK) ||
 				    flags & (GLOB__CHECK|GLOB_MARK))
 					if (stat64(*path, &sb) < 0) {
-						FREE_ENTRY;
 						return (0);
 					}
 				if (flags & GLOB_MARK && S_ISDIR(sb.st_mode)) {
@@ -187,7 +184,6 @@ globit(size_t dend, const char *sp, glob_t *gp, int flags,
 					*--dp = '/';
 				}
 				if (append(gp, *path) < 0) {
-					FREE_ENTRY;
 					return (GLOB_NOSPACE);
 				}
 				return (0);
@@ -211,25 +207,12 @@ globit(size_t dend, const char *sp, glob_t *gp, int flags,
 		Expand:
 			/* determine directory and open it */
 			(*path)[end] = '\0';
-#ifdef NAME_MAX
-			namemax = NAME_MAX;
-#else
-			namemax = 1024;  /* something large */
-#endif
-			if ((entry = (struct dirent64 *)malloc(
-				sizeof (struct dirent64) + namemax + 1))
-				== NULL) {
-				return (GLOB_NOSPACE);
-			}
-
 			dirp = opendir(**path == '\0' ? "." : *path);
-			if (dirp == (DIR *)0 || namemax == -1) {
+			if (dirp == NULL) {
 				if (errfn != 0 && errfn(*path, errno) != 0 ||
 				    flags&GLOB_ERR) {
-					FREE_ENTRY;
 					return (GLOB_ABORTED);
 				}
-				FREE_ENTRY;
 				return (0);
 			}
 
@@ -237,7 +220,6 @@ globit(size_t dend, const char *sp, glob_t *gp, int flags,
 			n = sp - pat;
 			if ((cp = malloc(n)) == NULL) {
 				(void) closedir(dirp);
-				FREE_ENTRY;
 				return (GLOB_NOSPACE);
 			}
 			pat = memcpy(cp, pat, n);
@@ -248,20 +230,17 @@ globit(size_t dend, const char *sp, glob_t *gp, int flags,
 			/* expand path to max. expansion */
 			n = dp - *path;
 			*path = realloc(*path,
-				strlen(*path)+namemax+strlen(sp)+1);
+				strlen(*path) + NAME_MAX + strlen(sp) + 1);
 			if (*path == NULL) {
 				(void) closedir(dirp);
 				free(pat);
-				FREE_ENTRY;
 				return (GLOB_NOSPACE);
 			}
 			dp = (*path) + n;
 
 			/* read directory and match entries */
 			err = 0;
-			while (readdir64_r(dirp, entry, &d) == 0) {
-				if (d == NULL)
-					break;
+			while ((d = readdir64(dirp)) != NULL) {
 				cp = d->d_name;
 				if ((flags&GLOB_NOESCAPE)
 				    ? fnmatch(pat, cp, FNM_PERIOD|FNM_NOESCAPE)
@@ -279,7 +258,6 @@ globit(size_t dend, const char *sp, glob_t *gp, int flags,
 
 			(void) closedir(dirp);
 			free(pat);
-			FREE_ENTRY;
 			return (err);
 		}
 		/* NOTREACHED */

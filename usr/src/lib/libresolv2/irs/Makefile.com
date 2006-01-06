@@ -1,5 +1,5 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -52,11 +52,12 @@ CRYPTFLAGS=	-DCYLINK_DSS -DHMAC_MD5 -DUSE_MD5 -DDNSSAFE
 
 CPPFLAGS +=	$(CRYPTFLAGS) $(CRYPTINCL)
 CPPFLAGS +=	-D_SYS_STREAM_H -D_REENTRANT -DSVR4 -DSUNW_OPTIONS \
-		-D__SUNW_IRS_INIT_NODEFINE $(SOLCOMPAT) -I../../include
+		-D__SUNW_IRS_INIT_NODEFINE $(SOLCOMPAT) \
+		-I../../include -I../../../common/inc
 
 .KEEP_STATE:
 
-all:	$(LIBS)
+all:	$(LIBS) fnamecheck
 
 lint:	lintcheck
 

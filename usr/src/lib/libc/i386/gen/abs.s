@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,12 +40,19 @@
 #include "SYS.h"
 
 	ENTRY(abs)
+	movl	4(%esp),%eax	/ arg < 0?
+	testl	%eax,%eax
+	jns	1f
+	negl	%eax		/ yes, return -arg
+1:
+	ret
+	SET_SIZE(abs)
+
 	ENTRY(labs)
 	movl	4(%esp),%eax	/ arg < 0?
 	testl	%eax,%eax
-	jns	.posit
+	jns	1f
 	negl	%eax		/ yes, return -arg
-.posit:
+1:
 	ret
-	SET_SIZE(abs)
 	SET_SIZE(labs)

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +40,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "lint.h"
+#include "synonyms.h"
 #include "file64.h"
 #include <sys/types.h>
 #include <stdio.h>

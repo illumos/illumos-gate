@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,8 +44,7 @@
  * Send query to name server and wait for reply.
  */
 
-#include "synonyms.h"
-
+#include "c_synonyms.h"
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/socket.h>

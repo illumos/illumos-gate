@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -140,9 +141,10 @@ dlsym(void *dlp, const char *name)
 	return (addr);
 }
 
+#pragma weak dladdr1 = _dladdr1
 /*ARGSUSED*/
 int
-dladdr1(void *address, Dl_info *dlip, void **info, int flags)
+_dladdr1(void *address, Dl_info *dlip, void **info, int flags)
 {
 	/*
 	 * umem uses this for debugging information.  We'll pretend to fail.

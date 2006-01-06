@@ -19,18 +19,15 @@
  *
  * CDDL HEADER END
  */
+
 /*
- *	nis_hash.c
- *
- *	Copyright (c) 1988-1992 Sun Microsystems Inc
- *	All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- *	nis_hash.c
- *
  * GENERIC hash functions for NIS names.
  *
  * These functions provide a basic hashing mechanisim for efficiently
@@ -46,6 +43,7 @@
  * all entries (used when enumerating groups).
  */
 
+#include "mt.h"
 #include <string.h>
 #include <ctype.h>
 #include <malloc.h>

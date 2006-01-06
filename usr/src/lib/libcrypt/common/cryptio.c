@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +37,7 @@
 #pragma weak crypt_close = _crypt_close
 #pragma weak makekey = _makekey
 
-#include "synonyms.h"
-#include "mtlib.h"
+#include "des_synonyms.h"
 #include <stdio.h>
 #include <signal.h>
 #include <fcntl.h>

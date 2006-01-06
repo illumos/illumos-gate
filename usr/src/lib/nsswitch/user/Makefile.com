@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 1993,2001-2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -43,3 +43,5 @@ CPPFLAGS +=	-I../../../common/inc
 
 LDLIBS +=	-lnsl
 DYNLIB1 =	nss_user.so$(VERS)
+
+all: $(DYNLIB1) fnamecheck

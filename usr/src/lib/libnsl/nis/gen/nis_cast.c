@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
  * nis_cast: multicast to a specific group of hosts.
  */
 
+#include "mt.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

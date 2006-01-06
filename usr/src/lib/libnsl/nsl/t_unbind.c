@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +119,7 @@ _tx_unbind_locked(int fd, struct _ti_user *tiptr, struct strbuf *ctlbufp)
 		goto err_out;
 	}
 
-	if (_ioctl(fd, I_FLUSH, FLUSHRW) < 0) {
+	if (ioctl(fd, I_FLUSH, FLUSHRW) < 0) {
 		t_errno = TSYSERR;
 		goto err_out;
 	}

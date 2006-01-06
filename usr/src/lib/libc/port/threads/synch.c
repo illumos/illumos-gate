@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3145,6 +3146,9 @@ record_spin_locks(ulwp_t *ulwp)
 /*
  * atexit function:  dump the queue statistics to stderr.
  */
+#if !defined(__lint)
+#define	fprintf	_fprintf
+#endif
 #include <stdio.h>
 void
 dump_queue_statistics(void)

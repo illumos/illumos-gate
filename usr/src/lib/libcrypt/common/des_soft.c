@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +50,7 @@
 #define	CRYPT	/* cannot configure out of user-level code */
 #endif
 
-#include "synonyms.h"
+#include "des_synonyms.h"
 #ifdef CRYPT
 #include <sys/types.h>
 #include <des/softdes.h>

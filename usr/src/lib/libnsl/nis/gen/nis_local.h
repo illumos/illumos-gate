@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +39,6 @@ extern "C" {
 #endif
 
 /*
- *	nis_local.h
- *
  * Manifest constants for the NIS+ client library.
  */
 
@@ -220,13 +218,6 @@ extern int	__nis_run_dump_callback(netobj *, rpcproc_t,
  * Internal variables
  */
 extern mutex_t __nis_callback_lock;
-
-/*
- * External functions without prototypes.
- */
-extern unsigned	_sleep(unsigned);
-extern int	_fstat(int, struct stat *);
-extern int	_fcntl(int, int, ...);
 
 #ifdef __cplusplus
 }
