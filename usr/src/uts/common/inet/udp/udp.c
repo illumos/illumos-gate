@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -358,6 +358,11 @@ static struct qinit udp_winit = {
 	&udp_info, NULL, NULL, NULL, STRUIOT_NONE
 };
 
+static struct qinit winit = {
+	(pfi_t)putnext, NULL, NULL, NULL, NULL,
+	&udp_info, NULL, NULL, NULL, STRUIOT_NONE
+};
+
 /* Support for just SNMP if UDP is not pushed directly over device IP */
 struct qinit udp_snmp_rinit = {
 	(pfi_t)putnext, NULL, udp_open, ip_snmpmod_close, NULL,
@@ -370,7 +375,7 @@ struct qinit udp_snmp_winit = {
 };
 
 struct streamtab udpinfo = {
-	&udp_rinit, &udp_winit
+	&udp_rinit, &winit
 };
 
 static	sin_t	sin_null;	/* Zero address for quick clears */
@@ -2859,6 +2864,8 @@ udp_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	(void) mi_set_sth_wroff(UDP_RD(q),
 	    udp->udp_max_hdr_len + udp_wroff_extra);
 	(void) mi_set_sth_hiwat(UDP_RD(q), udp_set_rcv_hiwat(udp, q->q_hiwat));
+
+	WR(UDP_RD(q))->q_qinfo = &udp_winit;
 
 	return (0);
 }

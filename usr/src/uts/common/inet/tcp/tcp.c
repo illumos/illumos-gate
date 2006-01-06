@@ -16789,16 +16789,16 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	ASSERT((connp->conn_fanout != NULL && connp->conn_ref >= 4) ||
 	    (connp->conn_fanout == NULL && connp->conn_ref >= 3));
 
-	/* Bypass tcp protocol for fused tcp loopback */
-	if (tcp->tcp_fused) {
-		msize = msgdsize(mp);
-		mutex_enter(&connp->conn_lock);
-		tcp->tcp_squeue_bytes -= msize;
-		mutex_exit(&connp->conn_lock);
+	ASSERT(DB_TYPE(mp) == M_DATA);
+	msize = (mp->b_cont == NULL) ? MBLKL(mp) : msgdsize(mp);
 
-		if (tcp_fuse_output(tcp, mp, msize))
-			return;
-	}
+	mutex_enter(&connp->conn_lock);
+	tcp->tcp_squeue_bytes -= msize;
+	mutex_exit(&connp->conn_lock);
+
+	/* Bypass tcp protocol for fused tcp loopback */
+	if (tcp->tcp_fused && tcp_fuse_output(tcp, mp, msize))
+		return;
 
 	mss = tcp->tcp_mss;
 	if (tcp->tcp_xmit_zc_clean)
@@ -16824,21 +16824,12 @@ tcp_output(void *arg, mblk_t *mp, void *arg2)
 	    (len == 0) ||
 	    (len > mss) ||
 	    (tcp->tcp_valid_bits != 0)) {
-		msize = msgdsize(mp);
-		mutex_enter(&connp->conn_lock);
-		tcp->tcp_squeue_bytes -= msize;
-		mutex_exit(&connp->conn_lock);
-
 		tcp_wput_data(tcp, mp, B_FALSE);
 		return;
 	}
 
 	ASSERT(tcp->tcp_xmit_tail_unsent == 0);
 	ASSERT(tcp->tcp_fin_sent == 0);
-
-	mutex_enter(&connp->conn_lock);
-	tcp->tcp_squeue_bytes -= len;
-	mutex_exit(&connp->conn_lock);
 
 	/* queue new packet onto retransmission queue */
 	if (tcp->tcp_xmit_head == NULL) {

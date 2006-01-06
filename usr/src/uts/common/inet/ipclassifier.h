@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,7 +37,6 @@ extern "C" {
 #include <inet/ip.h>
 #include <inet/mi.h>
 #include <inet/tcp.h>
-#include <inet/udp_impl.h>
 #include <inet/ip6.h>
 #include <netinet/in.h>		/* for IPPROTO_* constants */
 #include <sys/sdt.h>
@@ -178,7 +177,7 @@ struct conn_s {
 		pad_to_bit_31 : 1;
 
 	tcp_t		*conn_tcp;		/* Pointer to the tcp struct */
-	udp_t		*conn_udp;		/* Pointer to the udp struct */
+	struct udp_s	*conn_udp;		/* Pointer to the udp struct */
 
 	squeue_t	*conn_sqp;		/* Squeue for processing */
 	edesc_rpf	conn_recv;		/* Pointer to recv routine */

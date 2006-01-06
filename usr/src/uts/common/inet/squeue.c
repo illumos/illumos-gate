@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -184,6 +184,7 @@
 #include <sys/ddi.h>
 
 #include <inet/ipclassifier.h>
+#include <inet/udp_impl.h>
 
 /*
  * State flags.
