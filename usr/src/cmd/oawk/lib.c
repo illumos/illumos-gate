@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -183,7 +183,7 @@ isclvar(wchar_t *arg)
 			 * and alphabetics
 			 */
 			for (tmpptr++; *tmpptr; tmpptr++) {
-				if (!(isalnum(*tmpptr) || (*tmpptr == '_'))) {
+				if (!(iswalnum(*tmpptr) || (*tmpptr == '_'))) {
 					break;
 				}
 			}
@@ -415,7 +415,7 @@ isanumber(wchar_t *s)
 		if (s - es > 2)
 			return (0);
 		else if (s - es == 2 &&
-			10 * (*es-'0') + *(es+1)-'0' >= MAXEXPON)
+		    10 * (*es-'0') + *(es+1)-'0' >= MAXEXPON)
 			return (0);
 	}
 	while (*s == ' ' || *s == '\t' || *s == '\n')
