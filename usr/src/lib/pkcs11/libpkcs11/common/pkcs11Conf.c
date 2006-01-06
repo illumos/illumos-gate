@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -434,7 +434,7 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 		}
 
 		/*
-		 * Warn the administrator that a provider with
+		 * Warn the administrator (at debug) that a provider with
 		 * a significantly older or newer version of
 		 * CRYPTOKI is being used.  It should not cause
 		 * problems, but logging a warning makes it easier
@@ -444,7 +444,7 @@ pkcs11_slot_mapping(uentrylist_t *pplist, CK_VOID_PTR pInitArgs)
 			CRYPTOKI_VERSION_WARN_MINOR) ||
 		    (prov_info.cryptokiVersion.minor >
 			CRYPTOKI_VERSION_MINOR)) {
-			cryptoerror(LOG_INFO,
+			cryptoerror(LOG_DEBUG,
 			    "libpkcs11: %s CRYPTOKI minor version, %d, may "
 			    "not be compatible with minor version %d.",
 			    fullpath, prov_info.cryptokiVersion.minor,

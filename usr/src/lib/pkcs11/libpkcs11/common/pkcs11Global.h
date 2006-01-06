@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@ extern CK_SLOT_ID fast_slot;
 
 /* CK_INFO: Information about cryptoki */
 #define	CRYPTOKI_VERSION_MAJOR	2
-#define	CRYPTOKI_VERSION_MINOR	11
+#define	CRYPTOKI_VERSION_MINOR	20
 #define	CRYPTOKI_VERSION_WARN_MINOR 10
 #define	MANUFACTURER_ID		"Sun Microsystems, Inc.          "
 #define	LIBRARY_DESCRIPTION	"Sun Crypto PKCS#11 Library      "
