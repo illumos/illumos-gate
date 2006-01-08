@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6217,14 +6217,15 @@ gen_utf8_names(const char *filename)
 	    tempbuf, iconv_cd, _X_LINKPATH, PATH_MAX);
 	if ((xhdr_flgs & _X_PATH) == 0) {	/* Concatenate prefix & name */
 		(void) strncpy(tempbuf, dblock.dbuf.prefix, PRESIZ);
-		tempbuf[NAMSIZ] = '\0';
+		tempbuf[PRESIZ] = '\0';
 		nbytes = strlen(tempbuf);
 		if (nbytes > 0) {
 			tempbuf[nbytes++] = '/';
 			tempbuf[nbytes] = '\0';
 		}
-		(void) strncat(tempbuf + nbytes, dblock.dbuf.name, NAMSIZ);
-		tempbuf[nbytes + NAMSIZ] = '\0';
+		(void) strncat(tempbuf + nbytes, dblock.dbuf.name,
+		    (MAXNAM - nbytes));
+		tempbuf[MAXNAM] = '\0';
 	}
 	errors += local_utf8(&Xtarhdr.x_path, local_path,
 	    tempbuf, iconv_cd, _X_PATH, PATH_MAX);
