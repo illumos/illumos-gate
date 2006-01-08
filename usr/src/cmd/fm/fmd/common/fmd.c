@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -469,7 +469,9 @@ fmd_destroy(fmd_t *dp)
 
 	fmd_rpc_fini();
 	fmd_dr_fini();
-	fmd_xprt_suspend_all();
+
+	if (dp->d_xprt_ids != NULL)
+		fmd_xprt_suspend_all();
 
 	/*
 	 * Unload the self-diagnosis module first.  This ensures that it does

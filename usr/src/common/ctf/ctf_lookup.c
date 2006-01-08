@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,7 +32,17 @@
 
 /*
  * Compare the given input string and length against a table of known C storage
- * qualifier keywords.  We just ignore these in ctf_lookup_by_name, below.
+ * qualifier keywords.  We just ignore these in ctf_lookup_by_name, below.  To
+ * do this quickly, we use a pre-computed Perfect Hash Function similar to the
+ * technique originally described in the classic paper:
+ *
+ * R.J. Cichelli, "Minimal Perfect Hash Functions Made Simple",
+ * Communications of the ACM, Volume 23, Issue 1, January 1980, pp. 17-19.
+ *
+ * For an input string S of length N, we use hash H = S[N - 1] + N - 105, which
+ * for the current set of qualifiers yields a unique H in the range [0 .. 20].
+ * The hash can be modified when the keyword set changes as necessary.  We also
+ * store the length of each keyword and check it prior to the final strcmp().
  */
 static int
 isqualifier(const char *s, size_t len)
@@ -39,26 +50,19 @@ isqualifier(const char *s, size_t len)
 	static const struct qual {
 		const char *q_name;
 		size_t q_len;
-	} q[] = {
-		{ "auto", 4 },
-		{ "const", 5 },
-		{ "extern", 6 },
-		{ "register", 8 },
-		{ "restrict", 8 },
-		{ "_Restrict", 9 },
-		{ "static", 6 },
-		{ "volatile", 8 },
-		{ NULL, 0 }
+	} qhash[] = {
+		{ "static", 6 }, { "", 0 }, { "", 0 }, { "", 0 },
+		{ "volatile", 8 }, { "", 0 }, { "", 0 }, { "", 0 }, { "", 0 },
+		{ "", 0 }, { "auto", 4 }, { "extern", 6 }, { "", 0 }, { "", 0 },
+		{ "", 0 }, { "", 0 }, { "const", 5 }, { "register", 8 },
+		{ "", 0 }, { "restrict", 8 }, { "_Restrict", 9 }
 	};
 
-	int i;
+	int h = s[len - 1] + (int)len - 105;
+	const struct qual *qp = &qhash[h];
 
-	for (i = 0; q[i].q_name != NULL; i++) {
-		if (len == q[i].q_len && strncmp(s, q[i].q_name, len) == 0)
-			return (1);
-	}
-
-	return (0);
+	return (h >= 0 && h < sizeof (qhash) / sizeof (qhash[0]) &&
+	    len == qp->q_len && strncmp(qp->q_name, s, qp->q_len) == 0);
 }
 
 /*

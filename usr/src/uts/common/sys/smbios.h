@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,8 @@ extern "C" {
  * SMBIOS Structure Table Entry Point.  See DSP0134 2.1.1 for more information.
  * The structure table entry point is located by searching for the anchor.
  */
+#pragma pack(1)
+
 typedef struct smbios_entry {
 	char smbe_eanchor[4];		/* anchor tag (SMB_ENTRY_EANCHOR) */
 	uint8_t smbe_ecksum;		/* checksum of entry point structure */
@@ -70,10 +72,13 @@ typedef struct smbios_entry {
 	uint8_t smbe_bcdrev;		/* BCD value representing DMI version */
 } smbios_entry_t;
 
+#pragma pack()
+
 #define	SMB_ENTRY_EANCHOR	"_SM_"	/* structure table entry point anchor */
 #define	SMB_ENTRY_EANCHORLEN	4	/* length of entry point anchor */
 #define	SMB_ENTRY_IANCHOR	"_DMI_"	/* intermediate anchor string */
 #define	SMB_ENTRY_IANCHORLEN	5	/* length of intermediate anchor */
+#define	SMB_ENTRY_MAXLEN	256	/* maximum length of entry point */
 
 /*
  * Structure type codes.  The comments next to each type include an (R) note to

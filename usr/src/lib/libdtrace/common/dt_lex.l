@@ -20,7 +20,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -704,6 +704,7 @@ static int
 id_or_type(const char *s)
 {
 	dtrace_hdl_t *dtp = yypcb->pcb_hdl;
+	dt_decl_t *ddp = yypcb->pcb_dstack.ds_decl;
 	int c0, c1, ttok = DT_TOK_TNAME;
 	dt_ident_t *idp;
 
@@ -717,6 +718,21 @@ id_or_type(const char *s)
 	if (dt_idstack_lookup(&yypcb->pcb_globals, s) != NULL ||
 	    dt_idhash_lookup(yypcb->pcb_idents, s) != NULL ||
 	    dt_type_lookup(s, NULL) != 0)
+		return (DT_TOK_IDENT);
+
+	/*
+	 * If we're in the midst of parsing a declaration and a type_specifier
+	 * has already been shifted, then return DT_TOK_IDENT instead of TNAME.
+	 * This semantic is necessary to permit valid ISO C code such as:
+	 *
+	 * typedef int foo;
+	 * struct s { foo foo; };
+	 *
+	 * without causing shift/reduce conflicts in the direct_declarator part
+	 * of the grammar.  The result is that we must check for conflicting
+	 * redeclarations of the same identifier as part of dt_node_decl().
+	 */
+	if (ddp != NULL && ddp->dd_name != NULL)
 		return (DT_TOK_IDENT);
 
 	/*

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,6 +145,7 @@ typedef struct ctf_dmdef {
 
 typedef struct ctf_dtdef {
 	ctf_list_t dtd_list;	/* list forward/back pointers */
+	struct ctf_dtdef *dtd_hash; /* hash chain pointer for ctf_dthash */
 	char *dtd_name;		/* name associated with definition (if any) */
 	ctf_id_t dtd_type;	/* type identifier for this definition */
 	ctf_type_t dtd_data;	/* type node (see <sys/ctf.h>) */
@@ -200,6 +202,8 @@ struct ctf_file {
 	uint_t ctf_flags;	/* libctf flags (see below) */
 	int ctf_errno;		/* error code for most recent error */
 	int ctf_version;	/* CTF data version */
+	ctf_dtdef_t **ctf_dthash; /* hash of dynamic type definitions */
+	ulong_t ctf_dthashlen;	/* size of dynamic type hash bucket array */
 	ctf_list_t ctf_dtdefs;	/* list of dynamic type definitions */
 	size_t ctf_dtstrlen;	/* total length of dynamic type strings */
 	ulong_t ctf_dtnextid;	/* next dynamic type id to assign */
@@ -275,6 +279,7 @@ extern const ctf_type_t *ctf_lookup_by_id(ctf_file_t **, ctf_id_t);
 
 extern int ctf_hash_create(ctf_hash_t *, ulong_t);
 extern int ctf_hash_insert(ctf_hash_t *, ctf_file_t *, ushort_t, uint_t);
+extern int ctf_hash_define(ctf_hash_t *, ctf_file_t *, ushort_t, uint_t);
 extern ctf_helem_t *ctf_hash_lookup(ctf_hash_t *, ctf_file_t *,
     const char *, size_t);
 extern uint_t ctf_hash_size(const ctf_hash_t *);
@@ -286,6 +291,10 @@ extern void ctf_hash_destroy(ctf_hash_t *);
 extern void ctf_list_append(ctf_list_t *, void *);
 extern void ctf_list_prepend(ctf_list_t *, void *);
 extern void ctf_list_delete(ctf_list_t *, void *);
+
+extern void ctf_dtd_insert(ctf_file_t *, ctf_dtdef_t *);
+extern void ctf_dtd_delete(ctf_file_t *, ctf_dtdef_t *);
+extern ctf_dtdef_t *ctf_dtd_lookup(ctf_file_t *, ctf_id_t);
 
 extern void ctf_decl_init(ctf_decl_t *, char *, size_t);
 extern void ctf_decl_fini(ctf_decl_t *);

@@ -20,7 +20,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -175,7 +175,9 @@
 %type	<l_node>	parameter_declaration
 
 %type	<l_node>	array
+%type	<l_node>	array_parameters
 %type	<l_node>	function
+%type	<l_node>	function_parameters
 
 %type	<l_node>	expression
 %type	<l_node>	assignment_expression
@@ -804,25 +806,29 @@ direct_abstract_declarator:
 	|	function { dt_decl_func(NULL, $1); }
 	;
 
-array:		DT_TOK_LBRAC DT_TOK_RBRAC { $$ = NULL; }
-	|	DT_TOK_LBRAC { dt_scope_push(NULL, CTF_ERR); }
-		    constant_expression DT_TOK_RBRAC {
-			dt_scope_pop();
-			$$ = $3;
-		}
-	|	DT_TOK_LBRAC { dt_scope_push(NULL, CTF_ERR); }
-		    parameter_type_list DT_TOK_RBRAC {
+array:		DT_TOK_LBRAC { dt_scope_push(NULL, CTF_ERR); }
+		    array_parameters DT_TOK_RBRAC {
 			dt_scope_pop();
 			$$ = $3;
 		}
 	;
 
-function:	DT_TOK_LPAR DT_TOK_RPAR { $$ = NULL; }
-	|	DT_TOK_LPAR { dt_scope_push(NULL, CTF_ERR); }
-		    parameter_type_list DT_TOK_RPAR {
+array_parameters:
+		/* empty */ 		{ $$ = NULL; }
+	|	constant_expression	{ $$ = $1; }
+	|	parameter_type_list	{ $$ = $1; }
+	;
+
+function:	DT_TOK_LPAR { dt_scope_push(NULL, CTF_ERR); }
+		    function_parameters DT_TOK_RPAR {
 			dt_scope_pop();
 			$$ = $3;
 		}
+	;
+
+function_parameters:
+		/* empty */ 		{ $$ = NULL; }
+	|	parameter_type_list	{ $$ = $1; }
 	;
 
 %%

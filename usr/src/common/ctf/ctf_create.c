@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,8 +52,13 @@ ctf_create(int *errp)
 {
 	static const ctf_header_t hdr = { { CTF_MAGIC, CTF_VERSION, 0 } };
 
+	const ulong_t hashlen = 128;
+	ctf_dtdef_t **hash = ctf_alloc(hashlen * sizeof (ctf_dtdef_t *));
 	ctf_sect_t cts;
 	ctf_file_t *fp;
+
+	if (hash == NULL)
+		return (ctf_set_open_errno(errp, EAGAIN));
 
 	cts.cts_name = _CTF_SECTION;
 	cts.cts_type = SHT_PROGBITS;
@@ -62,12 +68,18 @@ ctf_create(int *errp)
 	cts.cts_entsize = 1;
 	cts.cts_offset = 0;
 
-	if ((fp = ctf_bufopen(&cts, NULL, NULL, errp)) != NULL) {
-		fp->ctf_flags |= LCTF_RDWR;
-		fp->ctf_dtstrlen = sizeof (_CTF_STRTAB_TEMPLATE);
-		fp->ctf_dtnextid = 1;
-		fp->ctf_dtoldid = 0;
+	if ((fp = ctf_bufopen(&cts, NULL, NULL, errp)) == NULL) {
+		ctf_free(hash, hashlen * sizeof (ctf_dtdef_t *));
+		return (NULL);
 	}
+
+	fp->ctf_flags |= LCTF_RDWR;
+	fp->ctf_dthashlen = hashlen;
+	bzero(hash, hashlen * sizeof (ctf_dtdef_t *));
+	fp->ctf_dthash = hash;
+	fp->ctf_dtstrlen = sizeof (_CTF_STRTAB_TEMPLATE);
+	fp->ctf_dtnextid = 1;
+	fp->ctf_dtoldid = 0;
 
 	return (fp);
 }
@@ -371,13 +383,18 @@ ctf_update(ctf_file_t *fp)
 	nfp->ctf_refcnt = fp->ctf_refcnt;
 	nfp->ctf_flags |= fp->ctf_flags & ~LCTF_DIRTY;
 	nfp->ctf_data.cts_data = NULL; /* force ctf_data_free() on close */
+	nfp->ctf_dthash = fp->ctf_dthash;
+	nfp->ctf_dthashlen = fp->ctf_dthashlen;
 	nfp->ctf_dtdefs = fp->ctf_dtdefs;
 	nfp->ctf_dtstrlen = fp->ctf_dtstrlen;
 	nfp->ctf_dtnextid = fp->ctf_dtnextid;
 	nfp->ctf_dtoldid = fp->ctf_dtnextid - 1;
 	nfp->ctf_specific = fp->ctf_specific;
 
+	fp->ctf_dthash = NULL;
+	fp->ctf_dthashlen = 0;
 	bzero(&fp->ctf_dtdefs, sizeof (ctf_list_t));
+
 	bcopy(fp, &ofp, sizeof (ctf_file_t));
 	bcopy(nfp, fp, sizeof (ctf_file_t));
 	bcopy(&ofp, nfp, sizeof (ctf_file_t));
@@ -398,6 +415,82 @@ ctf_update(ctf_file_t *fp)
 	return (0);
 }
 
+void
+ctf_dtd_insert(ctf_file_t *fp, ctf_dtdef_t *dtd)
+{
+	ulong_t h = dtd->dtd_type & (fp->ctf_dthashlen - 1);
+
+	dtd->dtd_hash = fp->ctf_dthash[h];
+	fp->ctf_dthash[h] = dtd;
+	ctf_list_append(&fp->ctf_dtdefs, dtd);
+}
+
+void
+ctf_dtd_delete(ctf_file_t *fp, ctf_dtdef_t *dtd)
+{
+	ulong_t h = dtd->dtd_type & (fp->ctf_dthashlen - 1);
+	ctf_dtdef_t *p, **q = &fp->ctf_dthash[h];
+	ctf_dmdef_t *dmd, *nmd;
+	size_t len;
+
+	for (p = *q; p != NULL; p = p->dtd_hash) {
+		if (p != dtd)
+			q = &p->dtd_hash;
+		else
+			break;
+	}
+
+	if (p != NULL)
+		*q = p->dtd_hash;
+
+	switch (CTF_INFO_KIND(dtd->dtd_data.ctt_info)) {
+	case CTF_K_STRUCT:
+	case CTF_K_UNION:
+	case CTF_K_ENUM:
+		for (dmd = ctf_list_next(&dtd->dtd_u.dtu_members);
+		    dmd != NULL; dmd = nmd) {
+			if (dmd->dmd_name != NULL) {
+				len = strlen(dmd->dmd_name) + 1;
+				ctf_free(dmd->dmd_name, len);
+				fp->ctf_dtstrlen -= len;
+			}
+			nmd = ctf_list_next(dmd);
+			ctf_free(dmd, sizeof (ctf_dmdef_t));
+		}
+		break;
+	case CTF_K_FUNCTION:
+		ctf_free(dtd->dtd_u.dtu_argv, sizeof (ctf_id_t) *
+		    CTF_INFO_VLEN(dtd->dtd_data.ctt_info));
+		break;
+	}
+
+	if (dtd->dtd_name) {
+		len = strlen(dtd->dtd_name) + 1;
+		ctf_free(dtd->dtd_name, len);
+		fp->ctf_dtstrlen -= len;
+	}
+
+	ctf_list_delete(&fp->ctf_dtdefs, dtd);
+	ctf_free(dtd, sizeof (ctf_dtdef_t));
+}
+
+ctf_dtdef_t *
+ctf_dtd_lookup(ctf_file_t *fp, ctf_id_t type)
+{
+	ulong_t h = type & (fp->ctf_dthashlen - 1);
+	ctf_dtdef_t *dtd;
+
+	if (fp->ctf_dthash == NULL)
+		return (NULL);
+
+	for (dtd = fp->ctf_dthash[h]; dtd != NULL; dtd = dtd->dtd_hash) {
+		if (dtd->dtd_type == type)
+			break;
+	}
+
+	return (dtd);
+}
+
 /*
  * Discard all of the dynamic type definitions that have been added to the
  * container since the last call to ctf_update().  We locate such types by
@@ -408,8 +501,6 @@ int
 ctf_discard(ctf_file_t *fp)
 {
 	ctf_dtdef_t *dtd, *ntd;
-	ctf_dmdef_t *dmd, *nmd;
-	size_t len;
 
 	if (!(fp->ctf_flags & LCTF_RDWR))
 		return (ctf_set_errno(fp, ECTF_RDONLY));
@@ -421,36 +512,8 @@ ctf_discard(ctf_file_t *fp)
 		if (dtd->dtd_type <= fp->ctf_dtoldid)
 			continue; /* skip types that have been committed */
 
-		switch (CTF_INFO_KIND(dtd->dtd_data.ctt_info)) {
-		case CTF_K_STRUCT:
-		case CTF_K_UNION:
-		case CTF_K_ENUM:
-			for (dmd = ctf_list_next(&dtd->dtd_u.dtu_members);
-			    dmd != NULL; dmd = nmd) {
-				if (dmd->dmd_name != NULL) {
-					len = strlen(dmd->dmd_name) + 1;
-					ctf_free(dmd->dmd_name, len);
-					fp->ctf_dtstrlen -= len;
-				}
-				nmd = ctf_list_next(dmd);
-				ctf_free(dmd, sizeof (ctf_dmdef_t));
-			}
-			break;
-		case CTF_K_FUNCTION:
-			ctf_free(dtd->dtd_u.dtu_argv, sizeof (ctf_id_t) *
-			    CTF_INFO_VLEN(dtd->dtd_data.ctt_info));
-			break;
-		}
-
-		if (dtd->dtd_name) {
-			len = strlen(dtd->dtd_name) + 1;
-			ctf_free(dtd->dtd_name, len);
-			fp->ctf_dtstrlen -= len;
-		}
-
 		ntd = ctf_list_next(dtd);
-		ctf_list_delete(&fp->ctf_dtdefs, dtd);
-		ctf_free(dtd, sizeof (ctf_dtdef_t));
+		ctf_dtd_delete(fp, dtd);
 	}
 
 	fp->ctf_dtnextid = fp->ctf_dtoldid + 1;
@@ -493,7 +556,7 @@ ctf_add_generic(ctf_file_t *fp, uint_t flag, const char *name, ctf_dtdef_t **rp)
 	if (s != NULL)
 		fp->ctf_dtstrlen += strlen(s) + 1;
 
-	ctf_list_append(&fp->ctf_dtdefs, dtd);
+	ctf_dtd_insert(fp, dtd);
 	fp->ctf_flags |= LCTF_DIRTY;
 
 	*rp = dtd;
@@ -599,16 +662,10 @@ ctf_add_array(ctf_file_t *fp, uint_t flag, const ctf_arinfo_t *arp)
 int
 ctf_set_array(ctf_file_t *fp, ctf_id_t type, const ctf_arinfo_t *arp)
 {
-	ctf_dtdef_t *dtd;
+	ctf_dtdef_t *dtd = ctf_dtd_lookup(fp, type);
 
 	if (!(fp->ctf_flags & LCTF_RDWR))
 		return (ctf_set_errno(fp, ECTF_RDONLY));
-
-	for (dtd = ctf_list_next(&fp->ctf_dtdefs);
-	    dtd != NULL; dtd = ctf_list_next(dtd)) {
-		if (dtd->dtd_type == type)
-			break;
-	}
 
 	if (dtd == NULL || CTF_INFO_KIND(dtd->dtd_data.ctt_info) != CTF_K_ARRAY)
 		return (ctf_set_errno(fp, ECTF_BADID));
@@ -661,36 +718,61 @@ ctf_add_function(ctf_file_t *fp, uint_t flag,
 ctf_id_t
 ctf_add_struct(ctf_file_t *fp, uint_t flag, const char *name)
 {
+	ctf_hash_t *hp = &fp->ctf_structs;
+	ctf_helem_t *hep = NULL;
 	ctf_dtdef_t *dtd;
 	ctf_id_t type;
 
-	if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
+	if (name != NULL)
+		hep = ctf_hash_lookup(hp, fp, name, strlen(name));
+
+	if (hep != NULL && ctf_type_kind(fp, hep->h_type) == CTF_K_FORWARD)
+		dtd = ctf_dtd_lookup(fp, type = hep->h_type);
+	else if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
 		return (CTF_ERR); /* errno is set for us */
 
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(CTF_K_STRUCT, flag, 0);
+	dtd->dtd_data.ctt_size = 0;
+
 	return (type);
 }
 
 ctf_id_t
 ctf_add_union(ctf_file_t *fp, uint_t flag, const char *name)
 {
+	ctf_hash_t *hp = &fp->ctf_unions;
+	ctf_helem_t *hep = NULL;
 	ctf_dtdef_t *dtd;
 	ctf_id_t type;
 
-	if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
+	if (name != NULL)
+		hep = ctf_hash_lookup(hp, fp, name, strlen(name));
+
+	if (hep != NULL && ctf_type_kind(fp, hep->h_type) == CTF_K_FORWARD)
+		dtd = ctf_dtd_lookup(fp, type = hep->h_type);
+	else if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
 		return (CTF_ERR); /* errno is set for us */
 
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(CTF_K_UNION, flag, 0);
+	dtd->dtd_data.ctt_size = 0;
+
 	return (type);
 }
 
 ctf_id_t
 ctf_add_enum(ctf_file_t *fp, uint_t flag, const char *name)
 {
+	ctf_hash_t *hp = &fp->ctf_enums;
+	ctf_helem_t *hep = NULL;
 	ctf_dtdef_t *dtd;
 	ctf_id_t type;
 
-	if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
+	if (name != NULL)
+		hep = ctf_hash_lookup(hp, fp, name, strlen(name));
+
+	if (hep != NULL && ctf_type_kind(fp, hep->h_type) == CTF_K_FORWARD)
+		dtd = ctf_dtd_lookup(fp, type = hep->h_type);
+	else if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
 		return (CTF_ERR); /* errno is set for us */
 
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(CTF_K_ENUM, flag, 0);
@@ -702,16 +784,39 @@ ctf_add_enum(ctf_file_t *fp, uint_t flag, const char *name)
 ctf_id_t
 ctf_add_forward(ctf_file_t *fp, uint_t flag, const char *name, uint_t kind)
 {
+	ctf_hash_t *hp;
+	ctf_helem_t *hep;
 	ctf_dtdef_t *dtd;
 	ctf_id_t type;
 
-	if (kind != CTF_K_STRUCT && kind != CTF_K_UNION && kind != CTF_K_ENUM)
+	switch (kind) {
+	case CTF_K_STRUCT:
+		hp = &fp->ctf_structs;
+		break;
+	case CTF_K_UNION:
+		hp = &fp->ctf_unions;
+		break;
+	case CTF_K_ENUM:
+		hp = &fp->ctf_enums;
+		break;
+	default:
 		return (ctf_set_errno(fp, ECTF_NOTSUE));
+	}
+
+	/*
+	 * If the type is already defined or exists as a forward tag, just
+	 * return the ctf_id_t of the existing definition.
+	 */
+	if (name != NULL && (hep = ctf_hash_lookup(hp,
+	    fp, name, strlen(name))) != NULL)
+		return (hep->h_type);
 
 	if ((type = ctf_add_generic(fp, flag, name, &dtd)) == CTF_ERR)
 		return (CTF_ERR); /* errno is set for us */
 
 	dtd->dtd_data.ctt_info = CTF_TYPE_INFO(CTF_K_FORWARD, flag, 0);
+	dtd->dtd_data.ctt_type = kind;
+
 	return (type);
 }
 
@@ -754,7 +859,7 @@ ctf_add_restrict(ctf_file_t *fp, uint_t flag, ctf_id_t ref)
 int
 ctf_add_enumerator(ctf_file_t *fp, ctf_id_t enid, const char *name, int value)
 {
-	ctf_dtdef_t *dtd;
+	ctf_dtdef_t *dtd = ctf_dtd_lookup(fp, enid);
 	ctf_dmdef_t *dmd;
 
 	uint_t kind, vlen, root;
@@ -765,12 +870,6 @@ ctf_add_enumerator(ctf_file_t *fp, ctf_id_t enid, const char *name, int value)
 
 	if (!(fp->ctf_flags & LCTF_RDWR))
 		return (ctf_set_errno(fp, ECTF_RDONLY));
-
-	for (dtd = ctf_list_next(&fp->ctf_dtdefs);
-	    dtd != NULL; dtd = ctf_list_next(dtd)) {
-		if (dtd->dtd_type == enid)
-			break;
-	}
 
 	if (dtd == NULL)
 		return (ctf_set_errno(fp, ECTF_BADID));
@@ -816,7 +915,7 @@ ctf_add_enumerator(ctf_file_t *fp, ctf_id_t enid, const char *name, int value)
 int
 ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type)
 {
-	ctf_dtdef_t *dtd;
+	ctf_dtdef_t *dtd = ctf_dtd_lookup(fp, souid);
 	ctf_dmdef_t *dmd;
 
 	ssize_t msize, malign, ssize;
@@ -825,12 +924,6 @@ ctf_add_member(ctf_file_t *fp, ctf_id_t souid, const char *name, ctf_id_t type)
 
 	if (!(fp->ctf_flags & LCTF_RDWR))
 		return (ctf_set_errno(fp, ECTF_RDONLY));
-
-	for (dtd = ctf_list_next(&fp->ctf_dtdefs);
-	    dtd != NULL; dtd = ctf_list_next(dtd)) {
-		if (dtd->dtd_type == souid)
-			break;
-	}
 
 	if (dtd == NULL)
 		return (ctf_set_errno(fp, ECTF_BADID));

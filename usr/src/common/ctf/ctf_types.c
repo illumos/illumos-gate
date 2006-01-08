@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -747,14 +748,14 @@ ctf_enum_value(ctf_file_t *fp, ctf_id_t type, const char *name, int *valp)
 	uint_t n;
 
 	if ((type = ctf_type_resolve(fp, type)) == CTF_ERR)
-		return (NULL); /* errno is set for us */
+		return (CTF_ERR); /* errno is set for us */
 
 	if ((tp = ctf_lookup_by_id(&fp, type)) == NULL)
-		return (NULL); /* errno is set for us */
+		return (CTF_ERR); /* errno is set for us */
 
 	if (LCTF_INFO_KIND(fp, tp->ctt_info) != CTF_K_ENUM) {
 		(void) ctf_set_errno(ofp, ECTF_NOTENUM);
-		return (NULL);
+		return (CTF_ERR);
 	}
 
 	(void) ctf_get_ctt_size(fp, tp, &size, &increment);

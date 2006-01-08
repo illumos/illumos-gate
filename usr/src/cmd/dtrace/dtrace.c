@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1141,7 +1142,7 @@ int
 main(int argc, char *argv[])
 {
 	dtrace_bufdesc_t buf;
-	struct sigaction act;
+	struct sigaction act, oact;
 	dtrace_status_t status[2];
 	dtrace_optval_t opt;
 	dtrace_cmd_t *dcp;
@@ -1582,6 +1583,13 @@ main(int argc, char *argv[])
 		return (g_status);
 
 	case DMODE_LINK:
+		if (g_cmdc == 0) {
+			(void) fprintf(stderr, "%s: -G requires one or more "
+			    "scripts or enabling options\n", g_pname);
+			dtrace_close(g_dtp);
+			return (E_USAGE);
+		}
+
 		for (i = 0; i < g_cmdc; i++)
 			link_prog(&g_cmdv[i]);
 
@@ -1645,8 +1653,12 @@ main(int argc, char *argv[])
 	(void) sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
 	act.sa_handler = intr;
-	(void) sigaction(SIGINT, &act, NULL);
-	(void) sigaction(SIGTERM, &act, NULL);
+
+	if (sigaction(SIGINT, NULL, &oact) == 0 && oact.sa_handler != SIG_IGN)
+		(void) sigaction(SIGINT, &act, NULL);
+
+	if (sigaction(SIGTERM, NULL, &oact) == 0 && oact.sa_handler != SIG_IGN)
+		(void) sigaction(SIGTERM, &act, NULL);
 
 	/*
 	 * Now that tracing is active and we are ready to consume trace data,

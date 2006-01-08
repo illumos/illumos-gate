@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2060,8 +2061,10 @@ Psetbkpt(struct ps_prochandle *P, uintptr_t address, ulong_t *saved)
 	 * Fail if there was already a breakpoint there from another debugger
 	 * or DTrace's user-level tracing on x86.
 	 */
-	if (old == BPT)
-		return (EBUSY);
+	if (old == BPT) {
+		errno = EBUSY;
+		return (-1);
+	}
 
 	*saved = (ulong_t)old;
 	return (0);

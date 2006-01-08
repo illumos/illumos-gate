@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1457,6 +1458,17 @@ dt_node_decl(void)
 	}
 
 	case DT_DC_TYPEDEF:
+		if (dt_idstack_lookup(&yypcb->pcb_globals, dsp->ds_ident)) {
+			xyerror(D_DECL_IDRED, "global variable identifier "
+			    "redeclared: %s\n", dsp->ds_ident);
+		}
+
+		if (ctf_lookup_by_name(dmp->dm_ctfp,
+		    dsp->ds_ident) != CTF_ERR) {
+			xyerror(D_DECL_IDRED,
+			    "typedef redeclared: %s\n", dsp->ds_ident);
+		}
+
 		/*
 		 * If the source type for the typedef is not defined in the
 		 * target container or its parent, copy the type to the target
@@ -1525,6 +1537,14 @@ dt_node_decl(void)
 		if (idp != NULL && idp->di_gen == 0) {
 			xyerror(D_DECL_IDRED, "built-in identifier "
 			    "redeclared: %s\n", idp->di_name);
+		}
+
+		if (dtrace_lookup_by_type(dtp, DTRACE_OBJ_CDEFS,
+		    dsp->ds_ident, NULL) == 0 ||
+		    dtrace_lookup_by_type(dtp, DTRACE_OBJ_DDEFS,
+		    dsp->ds_ident, NULL) == 0) {
+			xyerror(D_DECL_IDRED, "typedef identifier "
+			    "redeclared: %s\n", dsp->ds_ident);
 		}
 
 		/*
@@ -3258,17 +3278,20 @@ dt_cook_op2(dt_node_t *dnp, uint_t idflags)
 		/*
 		 * The rules for type checking for the additive operators are
 		 * described in the ANSI-C spec (see K&R[A7.7]).  Pointers and
-		 * integers may be manipulated according to specific rules.
+		 * integers may be manipulated according to specific rules.  In
+		 * these cases D permits strings to be treated as pointers.
 		 */
 		int lp_is_ptr, lp_is_int, rp_is_ptr, rp_is_int;
 
 		lp = dnp->dn_left = dt_node_cook(lp, DT_IDFLG_REF);
 		rp = dnp->dn_right = dt_node_cook(rp, DT_IDFLG_REF);
 
-		lp_is_ptr = dt_node_is_pointer(lp) && !dt_node_is_vfptr(lp);
+		lp_is_ptr = dt_node_is_string(lp) ||
+		    (dt_node_is_pointer(lp) && !dt_node_is_vfptr(lp));
 		lp_is_int = dt_node_is_integer(lp);
 
-		rp_is_ptr = dt_node_is_pointer(rp) && !dt_node_is_vfptr(rp);
+		rp_is_ptr = dt_node_is_string(rp) ||
+		    (dt_node_is_pointer(rp) && !dt_node_is_vfptr(rp));
 		rp_is_int = dt_node_is_integer(rp);
 
 		if (lp_is_int && rp_is_int) {

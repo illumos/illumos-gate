@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -155,8 +155,13 @@ typedef struct smb_cache {
 	uint8_t smbca_assoc;		/* associativity */
 } smb_cache_t;
 
-#define	SMB_CACHE_SIZE(s)	\
-	(((s) & 0x8000) ? (((s) & 0x7FFF) << 1) : (s))
+/*
+ * Convert encoded cache size to bytes: DSP0134 Section 3.3.8 explains the
+ * encoding.  The highest bit is 0 for 1k units, 1 for 64k units, and this
+ * macro decodes the value into bytes for exporting to our clients.
+ */
+#define	SMB_CACHE_SIZE(s)	(((s) & 0x8000) ? \
+	((uint32_t)((s) & 0x7FFF) * 64 * 1024) : ((uint32_t)(s) * 1024))
 
 #define	SMB_CACHE_CFG_MODE(c)		(((c) >> 8) & 3)
 #define	SMB_CACHE_CFG_ENABLED(c)	(((c) >> 7) & 1)

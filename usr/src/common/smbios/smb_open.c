@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,7 +138,15 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 		}
 	}
 
+	/*
+	 * Copy the entry point into our handle.  The underlying entry point
+	 * may be larger than our structure definition, so reset smbe_elen
+	 * to our internal size and recompute good checksums for our copy.
+	 */
 	bcopy(ep, &shp->sh_ent, sizeof (smbios_entry_t));
+	shp->sh_ent.smbe_elen = sizeof (smbios_entry_t);
+	smbios_checksum(shp, &shp->sh_ent);
+
 	shp->sh_buf = buf;
 	shp->sh_buflen = len;
 	shp->sh_structs = smb_alloc(sizeof (smb_struct_t) * ep->smbe_stnum);
@@ -164,11 +172,11 @@ smbios_bufopen(const smbios_entry_t *ep, const void *buf, size_t len,
 		smb_dprintf(shp, "struct [%u] type %u len %u hdl %u at %p\n",
 		    i, hp->smbh_type, hp->smbh_len, hp->smbh_hdl, (void *)hp);
 
-		if ((const uchar_t *)hp + hp->smbh_len > q - 2)
-			return (smb_open_error(shp, errp, ESMB_CORRUPT));
-
 		if (hp->smbh_type == SMB_TYPE_EOT)
 			break; /* ignore any entries beyond end-of-table */
+
+		if ((const uchar_t *)hp + hp->smbh_len > q - 2)
+			return (smb_open_error(shp, errp, ESMB_CORRUPT));
 
 		h = hp->smbh_hdl & (shp->sh_hashlen - 1);
 		p = s = (const uchar_t *)hp + hp->smbh_len;

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -195,15 +196,16 @@ init_symtab(ctf_file_t *fp, const ctf_header_t *hp,
  * and initialize the hash tables of each named type.
  */
 static int
-init_types(ctf_file_t *fp, const ctf_header_t *hp)
+init_types(ctf_file_t *fp, const ctf_header_t *cth)
 {
 	/* LINTED - pointer alignment */
-	const ctf_type_t *tbuf = (ctf_type_t *)(fp->ctf_buf + hp->cth_typeoff);
+	const ctf_type_t *tbuf = (ctf_type_t *)(fp->ctf_buf + cth->cth_typeoff);
 	/* LINTED - pointer alignment */
-	const ctf_type_t *tend = (ctf_type_t *)(fp->ctf_buf + hp->cth_stroff);
+	const ctf_type_t *tend = (ctf_type_t *)(fp->ctf_buf + cth->cth_stroff);
 
 	ulong_t pop[CTF_K_MAX + 1] = { 0 };
 	const ctf_type_t *tp;
+	ctf_hash_t *hp;
 	ushort_t id, dst;
 	uint_t *xp;
 
@@ -213,7 +215,7 @@ init_types(ctf_file_t *fp, const ctf_header_t *hp)
 	 * date cth_parname, we also scan the types themselves for references
 	 * to values in the range reserved for child types in our first pass.
 	 */
-	int child = hp->cth_parname != 0;
+	int child = cth->cth_parname != 0;
 	int nlstructs = 0, nlunions = 0;
 	int err;
 
@@ -266,6 +268,17 @@ init_types(ctf_file_t *fp, const ctf_header_t *hp)
 			vbytes = sizeof (ctf_enum_t) * vlen;
 			break;
 		case CTF_K_FORWARD:
+			/*
+			 * For forward declarations, ctt_type is the CTF_K_*
+			 * kind for the tag, so bump that population count too.
+			 * If ctt_type is unknown, treat the tag as a struct.
+			 */
+			if (tp->ctt_type == CTF_K_UNKNOWN ||
+			    tp->ctt_type >= CTF_K_MAX)
+				pop[CTF_K_STRUCT]++;
+			else
+				pop[tp->ctt_type]++;
+			/*FALLTHRU*/
 		case CTF_K_UNKNOWN:
 			vbytes = 0;
 			break;
@@ -299,8 +312,7 @@ init_types(ctf_file_t *fp, const ctf_header_t *hp)
 	 * Now that we've counted up the number of each type, we can allocate
 	 * the hash tables, type translation table, and pointer table.
 	 */
-	if ((err = ctf_hash_create(&fp->ctf_structs,
-	    pop[CTF_K_STRUCT] + pop[CTF_K_FORWARD])) != 0)
+	if ((err = ctf_hash_create(&fp->ctf_structs, pop[CTF_K_STRUCT])) != 0)
 		return (err);
 
 	if ((err = ctf_hash_create(&fp->ctf_unions, pop[CTF_K_UNION])) != 0)
@@ -382,18 +394,11 @@ init_types(ctf_file_t *fp, const ctf_header_t *hp)
 			break;
 
 		case CTF_K_STRUCT:
-			/*
-			 * If a struct's name is already present as a forward
-			 * tag, then replace the tag with the struct definition.
-			 */
-			if ((hep = ctf_hash_lookup(&fp->ctf_structs, fp,
-			    name, strlen(name))) == NULL) {
-				err = ctf_hash_insert(&fp->ctf_structs, fp,
-				    CTF_INDEX_TO_TYPE(id, child), tp->ctt_name);
-				if (err != 0 && err != ECTF_STRTAB)
-					return (err);
-			} else
-				hep->h_type = CTF_INDEX_TO_TYPE(id, child);
+			err = ctf_hash_define(&fp->ctf_structs, fp,
+			    CTF_INDEX_TO_TYPE(id, child), tp->ctt_name);
+
+			if (err != 0 && err != ECTF_STRTAB)
+				return (err);
 
 			if (fp->ctf_version == CTF_VERSION_1 ||
 			    size < CTF_LSTRUCT_THRESH)
@@ -405,8 +410,9 @@ init_types(ctf_file_t *fp, const ctf_header_t *hp)
 			break;
 
 		case CTF_K_UNION:
-			err = ctf_hash_insert(&fp->ctf_unions, fp,
+			err = ctf_hash_define(&fp->ctf_unions, fp,
 			    CTF_INDEX_TO_TYPE(id, child), tp->ctt_name);
+
 			if (err != 0 && err != ECTF_STRTAB)
 				return (err);
 
@@ -420,10 +426,12 @@ init_types(ctf_file_t *fp, const ctf_header_t *hp)
 			break;
 
 		case CTF_K_ENUM:
-			err = ctf_hash_insert(&fp->ctf_enums, fp,
+			err = ctf_hash_define(&fp->ctf_enums, fp,
 			    CTF_INDEX_TO_TYPE(id, child), tp->ctt_name);
+
 			if (err != 0 && err != ECTF_STRTAB)
 				return (err);
+
 			vbytes = sizeof (ctf_enum_t) * vlen;
 			break;
 
@@ -437,12 +445,26 @@ init_types(ctf_file_t *fp, const ctf_header_t *hp)
 
 		case CTF_K_FORWARD:
 			/*
-			 * Only insert forward tags into the struct hash if the
-			 * struct or tag name is not already present.
+			 * Only insert forward tags into the given hash if the
+			 * type or tag name is not already present.
 			 */
-			if (ctf_hash_lookup(&fp->ctf_structs, fp,
+			switch (tp->ctt_type) {
+			case CTF_K_STRUCT:
+				hp = &fp->ctf_structs;
+				break;
+			case CTF_K_UNION:
+				hp = &fp->ctf_unions;
+				break;
+			case CTF_K_ENUM:
+				hp = &fp->ctf_enums;
+				break;
+			default:
+				hp = &fp->ctf_structs;
+			}
+
+			if (ctf_hash_lookup(hp, fp,
 			    name, strlen(name)) == NULL) {
-				err = ctf_hash_insert(&fp->ctf_structs, fp,
+				err = ctf_hash_insert(hp, fp,
 				    CTF_INDEX_TO_TYPE(id, child), tp->ctt_name);
 				if (err != 0 && err != ECTF_STRTAB)
 					return (err);
@@ -774,7 +796,6 @@ void
 ctf_close(ctf_file_t *fp)
 {
 	ctf_dtdef_t *dtd, *ntd;
-	ctf_dmdef_t *dmd, *nmd;
 
 	if (fp == NULL)
 		return; /* allow ctf_close(NULL) to simplify caller code */
@@ -786,36 +807,15 @@ ctf_close(ctf_file_t *fp)
 		return;
 	}
 
-	for (dtd = ctf_list_next(&fp->ctf_dtdefs); dtd != NULL; dtd = ntd) {
-		switch (CTF_INFO_KIND(dtd->dtd_data.ctt_info)) {
-		case CTF_K_STRUCT:
-		case CTF_K_UNION:
-		case CTF_K_ENUM:
-			for (dmd = ctf_list_next(&dtd->dtd_u.dtu_members);
-			    dmd != NULL; dmd = nmd) {
-				if (dmd->dmd_name != NULL) {
-					ctf_free(dmd->dmd_name,
-					    strlen(dmd->dmd_name) + 1);
-				}
-				nmd = ctf_list_next(dmd);
-				ctf_free(dmd, sizeof (ctf_dmdef_t));
-			}
-			break;
-		case CTF_K_FUNCTION:
-			ctf_free(dtd->dtd_u.dtu_argv, sizeof (ctf_id_t) *
-			    CTF_INFO_VLEN(dtd->dtd_data.ctt_info));
-			break;
-		}
-
-		if (dtd->dtd_name != NULL)
-			ctf_free(dtd->dtd_name, strlen(dtd->dtd_name) + 1);
-
-		ntd = ctf_list_next(dtd);
-		ctf_free(dtd, sizeof (ctf_dtdef_t));
-	}
-
 	if (fp->ctf_parent != NULL)
 		ctf_close(fp->ctf_parent);
+
+	for (dtd = ctf_list_next(&fp->ctf_dtdefs); dtd != NULL; dtd = ntd) {
+		ntd = ctf_list_next(dtd);
+		ctf_dtd_delete(fp, dtd);
+	}
+
+	ctf_free(fp->ctf_dthash, fp->ctf_dthashlen * sizeof (ctf_dtdef_t *));
 
 	if (fp->ctf_flags & LCTF_MMAP) {
 		if (fp->ctf_data.cts_data != NULL)

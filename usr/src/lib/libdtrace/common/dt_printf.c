@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1436,7 +1437,7 @@ dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
 			*f++ = '#';
 		if (pfd->pfd_flags & DT_PFCONV_ZPAD)
 			*f++ = '0';
-		if (pfd->pfd_flags & DT_PFCONV_LEFT)
+		if (width < 0 || (pfd->pfd_flags & DT_PFCONV_LEFT))
 			*f++ = '-';
 		if (pfd->pfd_flags & DT_PFCONV_SPOS)
 			*f++ = '+';
@@ -1455,9 +1456,9 @@ dt_printf_format(dtrace_hdl_t *dtp, FILE *fp, const dt_pfargv_t *pfv,
 			width = 0;
 
 		if (width != 0)
-			f += snprintf(f, sizeof (format), "%d", width);
+			f += snprintf(f, sizeof (format), "%d", ABS(width));
 
-		if (prec != 0)
+		if (prec > 0)
 			f += snprintf(f, sizeof (format), ".%d", prec);
 
 		(void) strcpy(f, pfd->pfd_fmt);

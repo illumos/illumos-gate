@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,7 +64,7 @@ smbios_hdl_t *
 smbios_open(const char *file, int version, int flags, int *errp)
 {
 	smbios_hdl_t *shp = NULL;
-	smbios_entry_t ep;
+	smbios_entry_t *ep;
 	caddr_t stbuf, bios, p, q;
 	size_t bioslen;
 	int err;
@@ -88,29 +88,38 @@ smbios_open(const char *file, int version, int flags, int *errp)
 		return (smb_open_error(shp, errp, ESMB_NOTFOUND));
 	}
 
-	bcopy(p, &ep, sizeof (smbios_entry_t));
+	ep = smb_alloc(SMB_ENTRY_MAXLEN);
+	bcopy(p, ep, sizeof (smbios_entry_t));
+	ep->smbe_elen = MIN(ep->smbe_elen, SMB_ENTRY_MAXLEN);
+	bcopy(p, ep, ep->smbe_elen);
+
 	psm_unmap_phys(bios, bioslen);
-	bios = psm_map_phys(ep.smbe_staddr, ep.smbe_stlen, PSM_PROT_READ);
+	bios = psm_map_phys(ep->smbe_staddr, ep->smbe_stlen, PSM_PROT_READ);
 
-	if (bios == NULL)
+	if (bios == NULL) {
+		smb_free(ep, SMB_ENTRY_MAXLEN);
 		return (smb_open_error(shp, errp, ESMB_MAPDEV));
+	}
 
-	stbuf = smb_alloc(ep.smbe_stlen);
-	bcopy(bios, stbuf, ep.smbe_stlen);
-	psm_unmap_phys(bios, ep.smbe_stlen);
-	shp = smbios_bufopen(&ep, stbuf, ep.smbe_stlen, version, flags, &err);
+	stbuf = smb_alloc(ep->smbe_stlen);
+	bcopy(bios, stbuf, ep->smbe_stlen);
+	psm_unmap_phys(bios, ep->smbe_stlen);
+	shp = smbios_bufopen(ep, stbuf, ep->smbe_stlen, version, flags, &err);
 
 	if (shp == NULL) {
-		smb_free(stbuf, ep.smbe_stlen);
+		smb_free(stbuf, ep->smbe_stlen);
+		smb_free(ep, SMB_ENTRY_MAXLEN);
 		return (smb_open_error(shp, errp, err));
 	}
 
 	if (ksmbios == NULL) {
 		cmn_err(CE_CONT, "?SMBIOS v%u.%u loaded (%u bytes)",
-		    ep.smbe_major, ep.smbe_minor, ep.smbe_stlen);
+		    ep->smbe_major, ep->smbe_minor, ep->smbe_stlen);
 	}
 
 	shp->sh_flags |= SMB_FL_BUFALLOC;
+	smb_free(ep, SMB_ENTRY_MAXLEN);
+
 	return (shp);
 }
 

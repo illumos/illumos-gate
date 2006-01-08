@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 
+#include <alloca.h>
 #include <limits.h>
 #include <unistd.h>
 #include <strings.h>
@@ -50,32 +51,37 @@ smb_init(void)
 static smbios_hdl_t *
 smb_fileopen(int fd, int version, int flags, int *errp)
 {
+	smbios_entry_t *ep = alloca(SMB_ENTRY_MAXLEN);
 	smbios_hdl_t *shp = NULL;
-	smbios_entry_t ep;
+	ssize_t n, elen;
 	void *stbuf;
-	ssize_t n;
 
-	if ((n = pread64(fd, &ep, sizeof (ep), 0)) != sizeof (ep))
+	if ((n = pread64(fd, ep, sizeof (*ep), 0)) != sizeof (*ep))
 		return (smb_open_error(shp, errp, n < 0 ? errno : ESMB_NOHDR));
 
-	if (strncmp(ep.smbe_eanchor, SMB_ENTRY_EANCHOR, SMB_ENTRY_EANCHORLEN))
+	if (strncmp(ep->smbe_eanchor, SMB_ENTRY_EANCHOR, SMB_ENTRY_EANCHORLEN))
 		return (smb_open_error(shp, errp, ESMB_HEADER));
 
-	if ((stbuf = smb_alloc(ep.smbe_stlen)) == NULL)
+	elen = MIN(ep->smbe_elen, SMB_ENTRY_MAXLEN);
+
+	if ((n = pread64(fd, ep, elen, 0)) != elen)
+		return (smb_open_error(shp, errp, n < 0 ? errno : ESMB_NOHDR));
+
+	if ((stbuf = smb_alloc(ep->smbe_stlen)) == NULL)
 		return (smb_open_error(shp, errp, ESMB_NOMEM));
 
-	if ((n = pread64(fd, stbuf, ep.smbe_stlen,
-	    (off64_t)ep.smbe_staddr)) != ep.smbe_stlen) {
-		smb_free(stbuf, ep.smbe_stlen);
+	if ((n = pread64(fd, stbuf, ep->smbe_stlen,
+	    (off64_t)ep->smbe_staddr)) != ep->smbe_stlen) {
+		smb_free(stbuf, ep->smbe_stlen);
 		return (smb_open_error(shp, errp, n < 0 ? errno : ESMB_NOSTAB));
 	}
 
-	shp = smbios_bufopen(&ep, stbuf, ep.smbe_stlen, version, flags, errp);
+	shp = smbios_bufopen(ep, stbuf, ep->smbe_stlen, version, flags, errp);
 
 	if (shp != NULL)
 		shp->sh_flags |= SMB_FL_BUFALLOC;
 	else
-		smb_free(stbuf, ep.smbe_stlen);
+		smb_free(stbuf, ep->smbe_stlen);
 
 	return (shp);
 }
@@ -83,10 +89,10 @@ smb_fileopen(int fd, int version, int flags, int *errp)
 static smbios_hdl_t *
 smb_biosopen(int fd, int version, int flags, int *errp)
 {
+	smbios_entry_t *ep = alloca(SMB_ENTRY_MAXLEN);
 	smbios_hdl_t *shp = NULL;
 	size_t pgsize, pgmask, pgoff;
 	void *stbuf, *bios, *p, *q;
-	smbios_entry_t ep;
 
 	bios = mmap(NULL, SMB_RANGE_LIMIT - SMB_RANGE_START + 1,
 	    PROT_READ, MAP_SHARED, fd, (uint32_t)SMB_RANGE_START);
@@ -106,32 +112,34 @@ smb_biosopen(int fd, int version, int flags, int *errp)
 		return (smb_open_error(NULL, errp, ESMB_NOTFOUND));
 	}
 
-	bcopy(p, &ep, sizeof (smbios_entry_t));
+	bcopy(p, ep, sizeof (smbios_entry_t));
+	ep->smbe_elen = MIN(ep->smbe_elen, SMB_ENTRY_MAXLEN);
+	bcopy(p, ep, ep->smbe_elen);
 	(void) munmap(bios, SMB_RANGE_LIMIT - SMB_RANGE_START + 1);
 
 	pgsize = getpagesize();
 	pgmask = ~(pgsize - 1);
-	pgoff = ep.smbe_staddr & ~pgmask;
+	pgoff = ep->smbe_staddr & ~pgmask;
 
-	bios = mmap(NULL, ep.smbe_stlen + pgoff,
-	    PROT_READ, MAP_SHARED, fd, ep.smbe_staddr & pgmask);
+	bios = mmap(NULL, ep->smbe_stlen + pgoff,
+	    PROT_READ, MAP_SHARED, fd, ep->smbe_staddr & pgmask);
 
 	if (bios == MAP_FAILED)
 		return (smb_open_error(shp, errp, ESMB_MAPDEV));
 
-	if ((stbuf = smb_alloc(ep.smbe_stlen)) == NULL) {
-		(void) munmap(bios, ep.smbe_stlen + pgoff);
+	if ((stbuf = smb_alloc(ep->smbe_stlen)) == NULL) {
+		(void) munmap(bios, ep->smbe_stlen + pgoff);
 		return (smb_open_error(shp, errp, ESMB_NOMEM));
 	}
 
-	bcopy((char *)bios + pgoff, stbuf, ep.smbe_stlen);
-	(void) munmap(bios, ep.smbe_stlen + pgoff);
-	shp = smbios_bufopen(&ep, stbuf, ep.smbe_stlen, version, flags, errp);
+	bcopy((char *)bios + pgoff, stbuf, ep->smbe_stlen);
+	(void) munmap(bios, ep->smbe_stlen + pgoff);
+	shp = smbios_bufopen(ep, stbuf, ep->smbe_stlen, version, flags, errp);
 
 	if (shp != NULL)
 		shp->sh_flags |= SMB_FL_BUFALLOC;
 	else
-		smb_free(stbuf, ep.smbe_stlen);
+		smb_free(stbuf, ep->smbe_stlen);
 
 	return (shp);
 }

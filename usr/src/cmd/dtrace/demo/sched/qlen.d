@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,5 +33,5 @@ sched:::enqueue
 sched:::dequeue
 /qlen[args[2]->cpu_id]/
 {
-	qlen[args[2]->cpu_id]?;
+	qlen[args[2]->cpu_id]--;
 }

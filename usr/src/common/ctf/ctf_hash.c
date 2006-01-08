@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,6 +120,24 @@ ctf_hash_insert(ctf_hash_t *hp, ctf_file_t *fp, ushort_t type, uint_t name)
 	hep->h_next = hp->h_buckets[h];
 	hp->h_buckets[h] = hp->h_free++;
 
+	return (0);
+}
+
+/*
+ * Wrapper for ctf_hash_lookup/ctf_hash_insert: if the key is already in the
+ * hash, override the previous definition with this new official definition.
+ * If the key is not present, then call ctf_hash_insert() and hash it in.
+ */
+int
+ctf_hash_define(ctf_hash_t *hp, ctf_file_t *fp, ushort_t type, uint_t name)
+{
+	const char *str = ctf_strptr(fp, name);
+	ctf_helem_t *hep = ctf_hash_lookup(hp, fp, str, strlen(str));
+
+	if (hep == NULL)
+		return (ctf_hash_insert(hp, fp, type, name));
+
+	hep->h_type = type;
 	return (0);
 }
 
