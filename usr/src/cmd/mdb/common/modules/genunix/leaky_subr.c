@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -445,6 +445,7 @@ leaky_subr_run(void)
 {
 	unsigned long ps;
 	uintptr_t kstat_arena;
+	uintptr_t dmods;
 
 	if (mdb_readvar(&ps, "_pagesize") == -1) {
 		mdb_warn("couldn't read '_pagesize'");
@@ -463,6 +464,14 @@ leaky_subr_run(void)
 		mdb_warn("couldn't walk 'modctl'");
 		return (DCMD_ERR);
 	}
+
+	/*
+	 * If kmdb is loaded, we need to walk it's module list, since kmdb
+	 * modctl structures can reference kmem allocations.
+	 */
+	if ((mdb_readvar(&dmods, "kdi_dmods") != -1) && (dmods != NULL))
+		(void) mdb_pwalk("modctl", (mdb_walk_cb_t)leaky_modctl,
+		    NULL, dmods);
 
 	if (mdb_walk("thread", (mdb_walk_cb_t)leaky_thread, &ps) == -1) {
 		mdb_warn("couldn't walk 'thread'");

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,8 @@
 #include <kmdb/kmdb_wr_impl.h>
 #include <kmdb/kmdb_kdi.h>
 #include <mdb/mdb_errno.h>
+
+struct modctl		*kdi_dmods;
 
 /*
  * When a load is attempted, a check is first made of the modules on the
@@ -429,6 +431,7 @@ kctl_dmod_init(void)
 
 	bzero(&kctl_dmods, sizeof (struct modctl));
 	kctl_dmods.mod_next = kctl_dmods.mod_prev = &kctl_dmods;
+	kdi_dmods = &kctl_dmods;
 }
 
 void
@@ -436,4 +439,5 @@ kctl_dmod_fini(void)
 {
 	mutex_destroy(&kctl_dmods_lock);
 	mutex_destroy(&kctl_dmod_loads_lock);
+	kdi_dmods = NULL;
 }

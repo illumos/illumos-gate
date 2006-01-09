@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,8 @@
 #include <sys/atomic.h>
 #include <sys/kmem.h>
 
-kdi_debugvec_t *kdi_dvec;
+kdi_debugvec_t	*kdi_dvec;
+struct modctl	*kdi_dmods;
 
 static kdi_dtrace_state_t kdi_dtrace_state = KDI_DTSTATE_IDLE;
 

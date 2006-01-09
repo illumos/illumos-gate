@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,7 +65,8 @@ struct user_desc;
 typedef struct kdi_debugvec kdi_debugvec_t;
 typedef struct kdi kdi_t;
 
-extern kdi_debugvec_t *kdi_dvec;
+extern kdi_debugvec_t	*kdi_dvec;
+extern struct modctl	*kdi_dmods;
 
 #define	KDI_VERSION		6
 
