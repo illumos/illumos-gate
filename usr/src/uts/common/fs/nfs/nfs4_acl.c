@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1149,43 +1149,6 @@ ace4_to_aent_legal(nfsace4 *ace4p, int isserver)
 			error = ENOTSUP;
 			goto out;
 		}
-	}
-
-	/* bad whos */
-	if ((ace4p->who.utf8string_len == 12) &&
-	    (bcmp("INTERACTIVE@", ace4p->who.utf8string_val, 12) == 0)) {
-		error = ENOTSUP;
-		goto out;
-	}
-	if ((ace4p->who.utf8string_len == 8) &&
-	    (bcmp("NETWORK@", ace4p->who.utf8string_val, 8) == 0)) {
-		error = ENOTSUP;
-		goto out;
-	}
-	if ((ace4p->who.utf8string_len == 7) &&
-	    (bcmp("DIALUP@", ace4p->who.utf8string_val, 7) == 0)) {
-		error = ENOTSUP;
-		goto out;
-	}
-	if ((ace4p->who.utf8string_len == 6) &&
-	    (bcmp("BATCH@", ace4p->who.utf8string_val, 6) == 0)) {
-		error = ENOTSUP;
-		goto out;
-	}
-	if ((ace4p->who.utf8string_len == 10) &&
-	    (bcmp("ANONYMOUS@", ace4p->who.utf8string_val, 10) == 0)) {
-		error = ENOTSUP;
-		goto out;
-	}
-	if ((ace4p->who.utf8string_len == 14) &&
-	    (bcmp("AUTHENTICATED@", ace4p->who.utf8string_val, 14) == 0)) {
-		error = ENOTSUP;
-		goto out;
-	}
-	if ((ace4p->who.utf8string_len == 8) &&
-	    (bcmp("SERVICE@", ace4p->who.utf8string_val, 8) == 0)) {
-		error = ENOTSUP;
-		goto out;
 	}
 
 out:
