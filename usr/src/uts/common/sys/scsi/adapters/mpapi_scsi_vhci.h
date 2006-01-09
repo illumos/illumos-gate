@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,8 @@ extern "C" {
 
 
 #include <sys/scsi/adapters/mpapi_impl.h>
+
+#define	MPAPI_SCSI_MAXPCLASSLEN	25
 
 /* Structure for MP_OID (kernel level only) */
 
@@ -68,12 +70,12 @@ typedef union mpoid {
 typedef	struct mpapi_item {
 	mpoid_t			oid;
 	void			*idata; /* item data */
-}mpapi_item_t;
+} mpapi_item_t;
 
 typedef	struct mpapi_item_list {
 	mpapi_item_t		*item;
 	struct mpapi_item_list	*next;
-}mpapi_item_list_t;
+} mpapi_item_list_t;
 
 /*
  * MP API item header definition.
@@ -82,7 +84,7 @@ typedef	struct mpapi_item_list {
 typedef struct mpapi_list_header {
 	mpapi_item_list_t	*head;
 	mpapi_item_list_t	*tail;
-}mpapi_list_header_t;
+} mpapi_list_header_t;
 
 /*
  * Structure to maintain mpapi initiator data.
@@ -112,6 +114,7 @@ typedef struct mpapi_path_data {
 	void			*resp; /* pip */
 	char			*path_name;
 	int			valid;
+	char			pclass[MPAPI_SCSI_MAXPCLASSLEN];
 	mp_path_prop_t		prop;
 } mpapi_path_data_t;
 
@@ -123,6 +126,7 @@ typedef struct mpapi_tpg_data {
 	mpapi_list_header_t	*tport_list;
 	mpapi_list_header_t	*lu_list; /* mpath lu or lun list */
 	int			valid;
+	char			pclass[MPAPI_SCSI_MAXPCLASSLEN];
 	mp_tpg_prop_t		prop;
 } mpapi_tpg_data_t;
 
