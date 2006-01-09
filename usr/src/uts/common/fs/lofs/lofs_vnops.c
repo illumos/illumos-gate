@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -651,6 +651,7 @@ lo_create(
 {
 	int error;
 	vnode_t *vp = NULL;
+	vnode_t *tvp = NULL;
 
 #ifdef LODEBUG
 	lo_dprint(4, "lo_create vp %p realvp %p\n", dvp, realvp(dvp));
@@ -661,9 +662,21 @@ lo_create(
 	}
 
 	if (IS_ZONEDEVFS(dvp)) {
+
+		/*
+		 * In the case of an exclusive create, *vpp will not
+		 * be populated.  We must check to see if the file exists.
+		 */
+		if ((exclusive == EXCL) && (*nm != '\0')) {
+			(void) VOP_LOOKUP(dvp, nm, &tvp, NULL, 0, NULL, cr);
+		}
+
 		/* Is this truly a create?  If so, fail */
-		if (*vpp == NULL)
+		if ((*vpp == NULL) && (tvp == NULL))
 			return (EACCES);
+
+		if (tvp != NULL)
+			VN_RELE(tvp);
 
 		/* Is this an open of a non-special for writing?  If so, fail */
 		if (*vpp != NULL && (mode & VWRITE) && !IS_DEVVP(*vpp))
