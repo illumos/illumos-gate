@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -130,7 +130,7 @@ static int	npe_detach(dev_info_t *devi, ddi_detach_cmd_t cmd);
 struct dev_ops npe_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* refcnt  */
-	pcihp_info,		/* info */
+	npe_info,		/* info */
 	nulldev,		/* identify */
 	nulldev,		/* probe */
 	npe_attach,		/* attach */
@@ -145,6 +145,7 @@ struct dev_ops npe_ops = {
  */
 static int npe_removechild(dev_info_t *child);
 static int npe_initchild(dev_info_t *child);
+static int npe_check_if_device_is_pci(dev_info_t *);
 
 /*
  * External support routine
@@ -286,6 +287,7 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 	int 		rnumber;
 	int		length;
 	int		space;
+	dev_info_t	*parent;
 	ddi_acc_hdl_t	*hp;
 	ddi_map_req_t	mr;
 	pci_regspec_t	pci_reg;
@@ -375,6 +377,29 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 			if (is_amd_northbridge(rdip) == 0)
 				return (DDI_SUCCESS);
 
+			/*
+			 *
+			 * Next two checks are workarounds to fix
+			 * AMD-8132's inability to handle MMCFG
+			 * accesses on Galaxy's PE servers.
+			 *
+			 * Solution: Check if device_type is "pci"
+			 * and for any such device do I/O based config space
+			 * access.
+			 *
+			 * Leaf devices under AMD-8132 may not
+			 * have a device_type of "pci". This was observed
+			 * during testing. Hence, if first check fails
+			 * then check if the parent has "device_type"
+			 * of "pci" and allow I/O based config space access
+			 */
+			if (npe_check_if_device_is_pci(rdip))
+				return (DDI_SUCCESS);
+
+			parent = ddi_get_parent(rdip);
+			if (parent && npe_check_if_device_is_pci(parent))
+				return (DDI_SUCCESS);
+
 			/* FALLTHROUGH */
 		case PCI_ADDR_MEM64:
 			/*
@@ -420,6 +445,13 @@ npe_bus_map(dev_info_t *dip, dev_info_t *rdip, ddi_map_req_t *mp,
 
 		/* Check for AMD's northbridges */
 		if (is_amd_northbridge(rdip) == 0)
+			return (npe_map_legacy_pci(offset, len, vaddrp, hp));
+
+		if (npe_check_if_device_is_pci(rdip))
+			return (npe_map_legacy_pci(offset, len, vaddrp, hp));
+
+		parent = ddi_get_parent(rdip);
+		if (parent && npe_check_if_device_is_pci(parent))
 			return (npe_map_legacy_pci(offset, len, vaddrp, hp));
 
 		pci_rp->pci_phys_low = ddi_prop_get_int64(DDI_DEV_T_ANY,
@@ -780,4 +812,20 @@ static int
 npe_info(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **result)
 {
 	return (pcihp_info(dip, cmd, arg, result));
+}
+
+static int
+npe_check_if_device_is_pci(dev_info_t *child)
+{
+	int		ret = 0;
+	char		*dev_type = NULL;
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, child, DDI_PROP_DONTPASS,
+	    "device_type", &dev_type) == DDI_SUCCESS) {
+		if (strcmp(dev_type, "pci") == 0)
+			ret = 1;
+		ddi_prop_free(dev_type);
+	}
+
+	return (ret);
 }
