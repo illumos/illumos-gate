@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -872,6 +872,25 @@ copy:
 				if ((ret = chg_mode(target, UID(s1), GID(s1),
 				    FMODE(s1))) > 0)
 					return (1);
+				/*
+				 * Reapply ACL, since chmod may have
+				 * altered ACL
+				 */
+				if (s1acl != NULL) {
+					if ((acl_set(target, s1acl)) < 0) {
+						if (pflg || mve) {
+							(void) fprintf(
+							    stderr,
+					"%s: failed to set acl entries on %s\n",
+							    cmd,
+							    target);
+						}
+						/*
+						 * else: silent and
+						 * continue
+						 */
+					}
+				}
 				if ((ret = chg_time(target, s1)) > 0)
 					return (1);
 			}
@@ -1620,6 +1639,10 @@ copydir(char *source, char *target)
 	 * ACL for directory
 	 */
 	if (pflg || mve) {
+		if ((pret = chg_mode(target, UID(s1save), GID(s1save),
+		    FMODE(s1save))) == 0)
+			pret = chg_time(target, s1save);
+		ret += pret;
 		if (s1acl_save != NULL) {
 			if (acl_set(target, s1acl_save) < 0) {
 #ifdef XPG4
@@ -1641,10 +1664,6 @@ copydir(char *source, char *target)
 			acl_free(s1acl_save);
 			s1acl_save = NULL;
 		}
-		if ((pret = chg_mode(target, UID(s1save), GID(s1save),
-		    FMODE(s1save))) == 0)
-			pret = chg_time(target, s1save);
-		ret += pret;
 	} else if (fixmode != (mode_t)0)
 		(void) chmod(target, fixmode & MODEBITS);
 
@@ -2156,6 +2175,17 @@ copyattributes(char *source, char *target)
 						++error;
 					}
 				}
+			}
+			if (xacl && ((facl_set(targattrfd, xacl)) < 0)) {
+				if (!attrsilent) {
+					(void) fprintf(stderr, gettext(
+					    "%s: failed to set acl entries on"
+					    " attribute %s for"
+					    "%s\n"), cmd, dp->d_name, target);
+					++error;
+				}
+				acl_free(xacl);
+				xacl = NULL;
 			}
 		}
 next:

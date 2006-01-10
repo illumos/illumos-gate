@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -116,6 +116,8 @@ typedef	ulong_t		u_off_t;
 #define	CHAR_OFFSET_MAX	077777777777ULL	/* 11 octal digits */
 #define	ASC_OFFSET_MAX	0XFFFFFFFF	/* 8 hexadecimal digits */
 #define	BIN_OFFSET_MAX	LONG_MAX	/* signed long max value */
+
+#define	POSIXMODES	07777
 
 static char	aclchar = ' ';
 
@@ -3574,7 +3576,6 @@ gethdr(void)
 			if (Hdr_type != USTAR && Hdr_type != TAR) {
 				Gen.g_mode = Gen.g_mode & (~_XATTR_CPIO_MODE);
 				Gen.g_mode |= attrmode(xattrp->h_typeflag);
-
 			} else if (Hdr_type == USTAR || Hdr_type == TAR) {
 				Thdr_p->tbuf.t_typeflag = xattrp->h_typeflag;
 			}
@@ -5754,7 +5755,7 @@ write_hdr(int secflag, off_t len)
 		 */
 		if (G_p->g_attrnam_p != (char *)NULL && Hdr_type != USTAR &&
 		    Hdr_type != TAR) {
-			mode = (G_p->g_mode & S_IAMB) | _XATTR_CPIO_MODE;
+			mode = (G_p->g_mode & POSIXMODES) | _XATTR_CPIO_MODE;
 		} else {
 			mode = G_p->g_mode;
 		}
@@ -7429,6 +7430,8 @@ retry_attrdir_open(char *name)
 	struct timeval times[2];
 	mode_t newmode;
 	struct stat parentstat;
+	acl_t *aclp = NULL;
+	int error;
 
 	/*
 	 * We couldn't get to attrdir. See if its
@@ -7436,43 +7439,63 @@ retry_attrdir_open(char *name)
 	 * for example: a mode such as r-xr--r--
 	 * won't let us create an attribute dir
 	 * if it doesn't already exist.
+	 *
+	 * If file has a non-trivial ACL, then save it
+	 * off so that we can place it back on after doing
+	 * chmod's.
 	 */
 
 	if (stat(name, &parentstat) == -1) {
 		msg(ERRN, "Cannot stat file %s", name);
 		return (-1);
 	}
+
+	if ((error = acl_get(name, ACL_NO_TRIVIAL, &aclp)) != 0) {
+		msg(ERRN,
+		    "Failed to retrieve ACL on %s %s", name, strerror(errno));
+		return (-1);
+	}
+
 	newmode = S_IWUSR | parentstat.st_mode;
 	if (chmod(name, newmode) == -1) {
 		msg(ERRN, "Cannot change mode of file %s to %o", name, newmode);
+		if (aclp)
+			acl_free(aclp);
 		return (-1);
 	}
 
 	dirfd = attropen(name, ".", O_RDONLY);
-	if (dirfd == -1) {
-		msg(ERRN, "Cannot open attribute directory of file %s", name);
-		return (-1);
-	} else {
 
-		/*
-		 * Put mode back to original
-		 */
-		if (chmod(name, parentstat.st_mode) != 0) {
-			msg(ERRN, "Cannot restore permissions of file %s to %o",
-			    name, parentstat.st_mode);
+	/*
+	 * Don't print error here, caller will handle printing out
+	 * can't open message.
+	 */
+
+	/*
+	 * Put mode back to original
+	 */
+	if (chmod(name, parentstat.st_mode) != 0) {
+		msg(ERRN, "Cannot restore permissions of file %s to %o",
+		    name, parentstat.st_mode);
+	}
+
+	if (aclp) {
+		error = acl_set(name, aclp);
+		if (error) {
+			msg(ERRN, "failed to set ACL on %s", name);
 		}
+		acl_free(aclp);
+	}
+	/*
+	 * Put back time stamps
+	 */
 
-		/*
-		 * Put back time stamps
-		 */
-
-		times[0].tv_sec = parentstat.st_atime;
-		times[0].tv_usec = 0;
-		times[1].tv_sec = parentstat.st_mtime;
-		times[1].tv_usec = 0;
-		if (utimes(name, times) != 0) {
-			msg(ERRN, "Cannot reset timestamps on file %s");
-		}
+	times[0].tv_sec = parentstat.st_atime;
+	times[0].tv_usec = 0;
+	times[1].tv_sec = parentstat.st_mtime;
+	times[1].tv_usec = 0;
+	if (utimes(name, times) != 0) {
+		msg(ERRN, "Cannot reset timestamps on file %s");
 	}
 
 	return (dirfd);

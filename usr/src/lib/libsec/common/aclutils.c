@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,7 +72,7 @@
 
 #define	ACL_WRITE_OWNER_ERR_DENY		0x0000040
 #define	ACL_READ_NAMED_READER_SET_DENY		0x1000000
-#define	ACL_WRITE_NAMED_WRITER_SET_ALLO		W0x0200000
+
 typedef union {
 	const char *file;
 	int  fd;
@@ -148,21 +148,18 @@ acl_trivial(const char *filename)
 	aclcnt = acl(filename, cntcmd, 0, NULL);
 	if (aclcnt > 0) {
 		if (acl_flavor == _ACL_ACE_ENABLED) {
-			if (aclcnt != 6)
-				val = 1;
-			else {
-				acep = malloc(sizeof (ace_t) * aclcnt);
-				if (acep == NULL)
-					return (-1);
-				if (acl(filename, ACE_GETACL,
-				    aclcnt, acep) < 0) {
-					free(acep);
-					return (-1);
-				}
-
-				val = ace_trivial(acep, aclcnt);
+			acep = malloc(sizeof (ace_t) * aclcnt);
+			if (acep == NULL)
+				return (-1);
+			if (acl(filename, ACE_GETACL,
+			    aclcnt, acep) < 0) {
 				free(acep);
+				return (-1);
 			}
+
+			val = ace_trivial(acep, aclcnt);
+			free(acep);
+
 		} else if (aclcnt > MIN_ACL_ENTRIES)
 			val = 1;
 	}

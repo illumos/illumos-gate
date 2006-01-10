@@ -1404,7 +1404,7 @@ top:
 			    xattrp->h_typeflag == '5') {
 				Hiddendir = 1;
 				sp->st_mode =
-				    (S_IFDIR | (sp->st_mode & S_IAMB));
+				    (S_IFDIR | (sp->st_mode & POSIXMODES));
 			}
 			dblock.dbuf.typeflag = xattrp->h_typeflag;
 		}
@@ -2461,9 +2461,32 @@ doxtract(char *argv[])
 			}
 #endif
 			if (dirfd == -1) {
-				(void) fprintf(stderr, gettext(
-				    "tar: cannot open %s %s\n"), dirp,
-				    strerror(errno));
+#if defined(O_XATTR)
+				if (xattrp) {
+					(void) fprintf(vfile,
+					    gettext("tar: cannot open "
+					    "attribute %s of file %s: %s\n"),
+					    xattraname, dirp, strerror(errno));
+					/*
+					 * Reset typeflag back to real
+					 * value so passtape will skip
+					 * ahead correctly.
+					 */
+					dblock.dbuf.typeflag = _XATTR_HDRTYPE;
+					free(xattrhead);
+					xattrp = NULL;
+					xattr_linkp = NULL;
+					xattrhead = NULL;
+				} else {
+					fprintf(vfile,
+					    gettext("tar: cannot open %s %s\n"),
+					    dirp, strerror(errno));
+				}
+#else
+				fprintf(vfile,
+				    gettext("tar: cannot open %s %s\n"),
+				    dirp, strerror(errno));
+#endif
 				passtape();
 				continue;
 			}
@@ -6534,7 +6557,6 @@ getstat(int dirfd, char *longname, char *shortname)
 	else
 		i = fstatat(dirfd, shortname, &stbuf, 0);
 
-
 	if (i < 0) {
 		/* Initialize flag to print error mesg. */
 		printerr = 1;
@@ -6881,6 +6903,7 @@ read_xattr_hdr()
 	} else {
 		xattr_linkaname = NULL;
 	}
+
 	return (0);
 }
 #else
@@ -6981,6 +7004,8 @@ retry_attrdir_open(char *name)
 	struct timeval times[2];
 	mode_t newmode;
 	struct stat parentstat;
+	acl_t *aclp = NULL;
+	int error;
 
 	/*
 	 * We couldn't get to attrdir. See if its
@@ -6988,45 +7013,68 @@ retry_attrdir_open(char *name)
 	 * for example: a mode such as r-xr--r--
 	 * won't let us create an attribute dir
 	 * if it doesn't already exist.
+	 *
+	 * If file has a non-trivial ACL, then save it
+	 * off so that we can place it back on after doing
+	 * chmod's.
 	 */
 
 	if (stat(name, &parentstat) == -1) {
-		(void) fprintf(stderr, gettext("Cannot stat file %s %s\n"),
+		(void) fprintf(stderr, gettext("tar: cannot stat file %s %s\n"),
 		    name, strerror(errno));
-			return (1);
+			return (-1);
 	}
+	if ((error = acl_get(name, ACL_NO_TRIVIAL, &aclp)) != 0) {
+		(void) fprintf(stderr, gettext("tar: failed to retrieve ACL on"
+		    " %s %s\n"), name, strerror(errno));
+			return (-1);
+	}
+
 	newmode = S_IWUSR | parentstat.st_mode;
 	if (chmod(name, newmode) == -1) {
 		(void) fprintf(stderr,
-		    gettext("Cannot chmod file %s to %o %s\n"),
+		    gettext("tar: cannot chmod file %s to %o %s\n"),
 		    name, newmode, strerror(errno));
-		return (1);
-
+		if (aclp)
+			acl_free(aclp);
+		return (-1);
 	}
 
 	dirfd = attropen(name, ".", O_RDONLY);
-	if (dirfd == -1) {
+
+	/*
+	 * Don't print error message if attropen() failed,
+	 * caller will print message.
+	 */
+
+	/*
+	 * Put mode back to original
+	 */
+	if (chmod(name, parentstat.st_mode) == -1) {
 		(void) fprintf(stderr,
-		    gettext("Cannot open attribute directory of"
-		    " file %s %s\n"), name, strerror(errno));
-		return (1);
-	} else {
-
-		/*
-		 * Put mode back to original
-		 */
-		(void) chmod(name, parentstat.st_mode);
-
-		/*
-		 * Put back time stamps
-		 */
-
-		times[0].tv_sec = parentstat.st_atime;
-		times[0].tv_usec = 0;
-		times[1].tv_sec = parentstat.st_mtime;
-		times[1].tv_usec = 0;
-		(void) utimes(name, times);
+		    gettext("tar: cannot chmod file %s to %o %s\n"),
+		    name, newmode, strerror(errno));
 	}
+
+	if (aclp) {
+		error = acl_set(name, aclp);
+		if (error) {
+			(void) fprintf(stderr,
+			    gettext("tar: %s: failed to set acl entries\n"),
+			    name);
+		}
+		acl_free(aclp);
+	}
+
+	/*
+	 * Put back time stamps
+	 */
+
+	times[0].tv_sec = parentstat.st_atime;
+	times[0].tv_usec = 0;
+	times[1].tv_sec = parentstat.st_mtime;
+	times[1].tv_usec = 0;
+	(void) utimes(name, times);
 
 	return (dirfd);
 }

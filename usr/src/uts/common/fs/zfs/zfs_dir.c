@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -809,7 +809,7 @@ top:
 	 */
 	va.va_mask = AT_TYPE | AT_MODE | AT_UID | AT_GID;
 	va.va_type = VDIR;
-	va.va_mode = S_IFDIR | 0755;
+	va.va_mode = S_IFDIR | S_ISVTX | 0777;
 	va.va_uid = (uid_t)zp->z_phys->zp_uid;
 	va.va_gid = (gid_t)zp->z_phys->zp_gid;
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1407,15 +1407,17 @@ zfs_mkdir(vnode_t *dvp, char *dirname, vattr_t *vap, vnode_t **vpp, cred_t *cr)
 	}
 top:
 	*vpp = NULL;
-	if (error = zfs_zaccess(dzp, ACE_ADD_SUBDIRECTORY, cr)) {
-		ZFS_EXIT(zfsvfs);
-		return (error);
-	}
 
 	/*
 	 * First make sure the new directory doesn't exist.
 	 */
 	if (error = zfs_dirent_lock(&dl, dzp, dirname, &zp, ZNEW)) {
+		ZFS_EXIT(zfsvfs);
+		return (error);
+	}
+
+	if (error = zfs_zaccess(dzp, ACE_ADD_SUBDIRECTORY, cr)) {
+		zfs_dirent_unlock(dl);
 		ZFS_EXIT(zfsvfs);
 		return (error);
 	}
@@ -1911,6 +1913,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	int		trim_mask = FALSE;
 	int		saved_mask;
 	uint64_t	new_mode;
+	znode_t		*attrzp;
 	int		have_grow_lock;
 	int		need_policy = FALSE;
 	int		err;
@@ -1928,6 +1931,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 
 top:
 	have_grow_lock = FALSE;
+	attrzp = NULL;
 
 	if (zfsvfs->z_vfs->vfs_flag & VFS_RDONLY) {
 		ZFS_EXIT(zfsvfs);
@@ -2063,8 +2067,22 @@ top:
 			dmu_tx_hold_write(tx, zp->z_id, 0, zp->z_phys->zp_size);
 	}
 
+	if ((mask & (AT_UID | AT_GID)) && zp->z_phys->zp_xattr != 0) {
+		err = zfs_zget(zp->z_zfsvfs, zp->z_phys->zp_xattr, &attrzp);
+		if (err) {
+			dmu_tx_abort(tx);
+			if (have_grow_lock)
+				rw_exit(&zp->z_grow_lock);
+			ZFS_EXIT(zfsvfs);
+			return (err);
+		}
+		dmu_tx_hold_bonus(tx, attrzp->z_id);
+	}
+
 	err = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (err) {
+		if (attrzp)
+			VN_RELE(ZTOV(attrzp));
 		dmu_tx_abort(tx);
 		if (have_grow_lock)
 			rw_exit(&zp->z_grow_lock);
@@ -2109,11 +2127,24 @@ top:
 		ASSERT3U(err, ==, 0);
 	}
 
-	if (mask & AT_UID)
-		zp->z_phys->zp_uid = (uint64_t)vap->va_uid;
+	if (attrzp)
+		mutex_enter(&attrzp->z_lock);
 
-	if (mask & AT_GID)
+	if (mask & AT_UID) {
+		zp->z_phys->zp_uid = (uint64_t)vap->va_uid;
+		if (attrzp) {
+			attrzp->z_phys->zp_uid = (uint64_t)vap->va_uid;
+		}
+	}
+
+	if (mask & AT_GID) {
 		zp->z_phys->zp_gid = (uint64_t)vap->va_gid;
+		if (attrzp)
+			attrzp->z_phys->zp_gid = (uint64_t)vap->va_gid;
+	}
+
+	if (attrzp)
+		mutex_exit(&attrzp->z_lock);
 
 	if (mask & AT_ATIME)
 		ZFS_TIME_ENCODE(&vap->va_atime, pzp->zp_atime);
@@ -2127,11 +2158,15 @@ top:
 		zfs_time_stamper_locked(zp, STATE_CHANGED, tx);
 
 out:
+
 	if (mask_applied != 0)
 		seq = zfs_log_setattr(zilog, tx, TX_SETATTR, zp, vap,
 		    mask_applied);
 
 	mutex_exit(&zp->z_lock);
+
+	if (attrzp)
+		VN_RELE(ZTOV(attrzp));
 
 	if (have_grow_lock)
 		rw_exit(&zp->z_grow_lock);
