@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,13 +117,6 @@ uint_t enable486;
  */
 const char CyrixInstead[] = "CyrixInstead";
 
-struct cpuidr {
-	uint32_t	cp_eax;
-	uint32_t	cp_ebx;
-	uint32_t	cp_ecx;
-	uint32_t	cp_edx;
-};
-
 /*
  * These constants determine how many of the elements of the
  * cpuid we cache in the cpuid_info data structure; the
@@ -148,11 +141,10 @@ struct cpuid_info {
 	chipid_t cpi_chipid;		/* fn 1: %ebx: chip # on ht cpus */
 	uint_t cpi_brandid;		/* fn 1: %ebx: brand ID */
 	int cpi_clogid;			/* fn 1: %ebx: thread # */
-	uint_t cpi_ncpu_per_chip;
-
+	uint_t cpi_ncpu_per_chip;	/* fn 1: %ebx: logical cpu count */
 	uint8_t cpi_cacheinfo[16];	/* fn 2: intel-style cache desc */
 	uint_t cpi_ncache;		/* fn 2: number of elements */
-	struct cpuidr cpi_std[NMAX_CPI_STD];	/* 0 .. 5 */
+	struct cpuid_regs cpi_std[NMAX_CPI_STD];	/* 0 .. 5 */
 	/*
 	 * extended function information
 	 */
@@ -160,7 +152,10 @@ struct cpuid_info {
 	char cpi_brandstr[49];		/* fn 0x8000000[234] */
 	uint8_t cpi_pabits;		/* fn 0x80000006: %eax */
 	uint8_t cpi_vabits;		/* fn 0x80000006: %eax */
-	struct cpuidr cpi_extd[NMAX_CPI_EXTD];	/* 0x80000000 .. 0x80000008 */
+	struct cpuid_regs cpi_extd[NMAX_CPI_EXTD]; /* 0x8000000[0-8] */
+	id_t cpi_coreid;
+	uint_t cpi_ncore_per_chip;	/* AMD: fn 0x80000008: %ecx[7-0] */
+					/* Intel: fn 4: %eax[31-26] */
 	/*
 	 * supported feature information
 	 */
@@ -217,7 +212,7 @@ cpuid_pass1(cpu_t *cpu)
 	uint32_t mask_ecx, mask_edx;
 	uint_t feature = X86_CPUID;
 	struct cpuid_info *cpi;
-	struct cpuidr *cp;
+	struct cpuid_regs *cp;
 	int xcpuid;
 
 	/*
@@ -232,8 +227,8 @@ cpuid_pass1(cpu_t *cpu)
 		    kmem_zalloc(sizeof (*cpi), KM_SLEEP);
 
 	cp = &cpi->cpi_std[0];
-	cp->cp_eax = __cpuid_insn(0, &cp->cp_ebx, &cp->cp_ecx, &cp->cp_edx);
-	cpi->cpi_maxeax = cp->cp_eax;
+	cp->cp_eax = 0;
+	cpi->cpi_maxeax = __cpuid_insn(cp);
 	{
 		uint32_t *iptr = (uint32_t *)cpi->cpi_vendorstr;
 		*iptr++ = cp->cp_ebx;
@@ -283,7 +278,8 @@ cpuid_pass1(cpu_t *cpu)
 		goto pass1_done;
 
 	cp = &cpi->cpi_std[1];
-	cp->cp_eax = __cpuid_insn(1, &cp->cp_ebx, &cp->cp_ecx, &cp->cp_edx);
+	cp->cp_eax = 1;
+	(void) __cpuid_insn(cp);
 
 	/*
 	 * Extract identifying constants for easy access.
@@ -352,28 +348,32 @@ cpuid_pass1(cpu_t *cpu)
 			 * These CPUs have an incomplete implementation
 			 * of MCA/MCE which we mask away.
 			 */
-			mask_edx =
-			    CPUID_INTC_EDX_DE |
-			    CPUID_INTC_EDX_PSE |
-			    CPUID_INTC_EDX_TSC |
-			    CPUID_INTC_EDX_MSR |
-			    CPUID_INTC_EDX_CX8 |
-			    CPUID_INTC_EDX_PGE;
+			mask_edx &= ~(CPUID_INTC_EDX_MCE | CPUID_INTC_EDX_MCA);
+
+			/*
+			 * Model 0 uses the wrong (APIC) bit
+			 * to indicate PGE.  Fix it here.
+			 */
 			if (cpi->cpi_model == 0) {
-				/*
-				 * Model 0 uses the wrong (APIC) bit
-				 * to indicate PGE.  Fix it here.
-				 */
 				if (cp->cp_edx & 0x200) {
 					cp->cp_edx &= ~0x200;
 					cp->cp_edx |= CPUID_INTC_EDX_PGE;
 				}
-			} else if (cpi->cpi_model >= 6)
-				mask_edx |= CPUID_INTC_EDX_MMX;
-		} else if (cpi->cpi_family >= 0xf) {
-			/* SSE3 and CX16, at least, are valid; enable all */
-			mask_ecx = 0xffffffff;
+			}
+
+			/*
+			 * Early models had problems w/ MMX; disable.
+			 */
+			if (cpi->cpi_model < 6)
+				mask_edx &= ~CPUID_INTC_EDX_MMX;
 		}
+
+		/*
+		 * For newer families, SSE3 and CX16, at least, are valid;
+		 * enable all
+		 */
+		if (cpi->cpi_family >= 0xf)
+			mask_ecx = 0xffffffff;
 		break;
 	case X86_VENDOR_TM:
 		/*
@@ -520,12 +520,14 @@ cpuid_pass1(cpu_t *cpu)
 	 * (AMD chose to set the HTT bit on their CMP processors,
 	 * even though they're not actually hyperthreaded.  Thus it
 	 * takes a bit more work to figure out what's really going
-	 * on ... see the handling of the HTvalid bit below)
+	 * on ... see the handling of the CMP_LEGACY bit below)
 	 */
 	if (cp->cp_edx & CPUID_INTC_EDX_HTT) {
 		cpi->cpi_ncpu_per_chip = CPI_CPU_COUNT(cpi);
 		if (cpi->cpi_ncpu_per_chip > 1)
 			feature |= X86_HTT;
+	} else {
+		cpi->cpi_ncpu_per_chip = 1;
 	}
 
 	/*
@@ -561,8 +563,8 @@ cpuid_pass1(cpu_t *cpu)
 
 	if (xcpuid) {
 		cp = &cpi->cpi_extd[0];
-		cpi->cpi_xmaxeax = cp->cp_eax = __cpuid_insn(0x80000000,
-		    &cp->cp_ebx, &cp->cp_ecx, &cp->cp_edx);
+		cp->cp_eax = 0x80000000;
+		cpi->cpi_xmaxeax = __cpuid_insn(cp);
 	}
 
 	if (cpi->cpi_xmaxeax & 0x80000000) {
@@ -576,8 +578,8 @@ cpuid_pass1(cpu_t *cpu)
 			if (cpi->cpi_xmaxeax < 0x80000001)
 				break;
 			cp = &cpi->cpi_extd[1];
-			cp->cp_eax = __cpuid_insn(0x80000001,
-			    &cp->cp_ebx, &cp->cp_ecx, &cp->cp_edx);
+			cp->cp_eax = 0x80000001;
+			(void) __cpuid_insn(cp);
 			if (cpi->cpi_vendor == X86_VENDOR_AMD &&
 			    cpi->cpi_family == 5 &&
 			    cpi->cpi_model == 6 &&
@@ -599,14 +601,16 @@ cpuid_pass1(cpu_t *cpu)
 				feature |= X86_NX;
 
 			/*
-			 * Unless both the HTT bit is set, and the
-			 * HTvalid bit is set, then we're not actually
-			 * HyperThreaded at all..
+			 * If both the HTT and CMP_LEGACY bits are set,
+			 * then we're not actually HyperThreaded.  Read
+			 * "AMD CPUID Specification" for more details.
 			 */
 			if (cpi->cpi_vendor == X86_VENDOR_AMD &&
-			    (feature & X86_HTT) == X86_HTT &&
-			    (cp->cp_ecx & CPUID_AMD_ECX_HTvalid) == 0)
+			    (feature & X86_HTT) &&
+			    (cp->cp_ecx & CPUID_AMD_ECX_CMP_LEGACY)) {
 				feature &= ~X86_HTT;
+				feature |= X86_CMP;
+			}
 #if defined(_LP64)
 			/*
 			 * It's really tricky to support syscall/sysret in
@@ -630,48 +634,147 @@ cpuid_pass1(cpu_t *cpu)
 			break;
 		}
 
+		/*
+		 * Get CPUID data about processor cores and hyperthreads.
+		 */
 		switch (cpi->cpi_vendor) {
 		case X86_VENDOR_Intel:
+			if (cpi->cpi_maxeax >= 4) {
+				cp = &cpi->cpi_std[4];
+				cp->cp_eax = 4;
+				cp->cp_ecx = 0;
+				(void) __cpuid_insn(cp);
+			}
+			/*FALLTHROUGH*/
 		case X86_VENDOR_AMD:
 			if (cpi->cpi_xmaxeax < 0x80000008)
 				break;
 			cp = &cpi->cpi_extd[8];
-			cp->cp_eax = __cpuid_insn(0x80000008,
-			    &cp->cp_ebx, &cp->cp_ecx, &cp->cp_edx);
+			cp->cp_eax = 0x80000008;
+			(void) __cpuid_insn(cp);
 			/*
 			 * Virtual and physical address limits from
 			 * cpuid override previously guessed values.
 			 */
 			cpi->cpi_pabits = BITX(cp->cp_eax, 7, 0);
 			cpi->cpi_vabits = BITX(cp->cp_eax, 15, 8);
-
-			/*
-			 * This -might- be a CMP processor?
-			 */
-			if (cpi->cpi_vendor == X86_VENDOR_AMD) {
-				cpi->cpi_ncpu_per_chip =
-				    1 + BITX(cp->cp_ecx, 7, 0);
-				if (cpi->cpi_ncpu_per_chip > 1)
-					feature |= X86_CMP;
-			}
 			break;
 		default:
 			break;
 		}
+
+		switch (cpi->cpi_vendor) {
+		case X86_VENDOR_Intel:
+			if (cpi->cpi_maxeax < 4) {
+				cpi->cpi_ncore_per_chip = 1;
+				break;
+			} else {
+				cpi->cpi_ncore_per_chip =
+				    BITX((cpi)->cpi_std[4].cp_eax, 31, 26) + 1;
+			}
+			break;
+		case X86_VENDOR_AMD:
+			if (cpi->cpi_xmaxeax < 0x80000008) {
+				cpi->cpi_ncore_per_chip = 1;
+				break;
+			} else {
+				cpi->cpi_ncore_per_chip =
+				    BITX((cpi)->cpi_extd[8].cp_ecx, 7, 0) + 1;
+			}
+			break;
+		default:
+			cpi->cpi_ncore_per_chip = 1;
+			break;
+		}
+
 	}
 
+	/*
+	 * If more than one core, then this processor is CMP.
+	 */
+	if (cpi->cpi_ncore_per_chip > 1)
+		feature |= X86_CMP;
+	/*
+	 * If the number of cores is the same as the number
+	 * of CPUs, then we cannot have HyperThreading.
+	 */
+	if (cpi->cpi_ncpu_per_chip == cpi->cpi_ncore_per_chip)
+		feature &= ~X86_HTT;
+
 	if ((feature & (X86_HTT | X86_CMP)) == 0) {
+		/*
+		 * Single-core single-threaded processors.
+		 */
 		cpi->cpi_chipid = -1;
 		cpi->cpi_clogid = 0;
+		cpi->cpi_coreid = cpu->cpu_id;
 	} else if (cpi->cpi_ncpu_per_chip > 1) {
-		uint_t i, cid_shift, apic_id;
+		uint_t i;
+		uint_t chipid_shift = 0;
+		uint_t coreid_shift = 0;
+		uint_t apic_id = CPI_APIC_ID(cpi);
 
-		for (i = 1, cid_shift = 0;
-		    i < cpi->cpi_ncpu_per_chip; i <<= 1)
-			cid_shift++;
-		apic_id = CPI_APIC_ID(cpi);
-		cpi->cpi_chipid = apic_id >> cid_shift;
-		cpi->cpi_clogid = apic_id & ((1 << cid_shift) - 1);
+		for (i = 1; i < cpi->cpi_ncpu_per_chip; i <<= 1)
+			chipid_shift++;
+		cpi->cpi_chipid = apic_id >> chipid_shift;
+		cpi->cpi_clogid = apic_id & ((1 << chipid_shift) - 1);
+
+		if (cpi->cpi_vendor == X86_VENDOR_Intel) {
+			if (feature & X86_CMP) {
+				/*
+				 * Multi-core (and possibly multi-threaded)
+				 * processors.
+				 */
+				uint_t ncpu_per_core;
+				if (cpi->cpi_ncore_per_chip == 1)
+					ncpu_per_core = cpi->cpi_ncpu_per_chip;
+				else if (cpi->cpi_ncore_per_chip > 1)
+					ncpu_per_core = cpi->cpi_ncpu_per_chip /
+					    cpi->cpi_ncore_per_chip;
+				/*
+				 * 8bit APIC IDs on dual core Pentiums
+				 * look like this:
+				 *
+				 * +-----------------------+------+------+
+				 * | Physical Package ID   |  MC  |  HT  |
+				 * +-----------------------+------+------+
+				 * <------- chipid -------->
+				 * <------- coreid --------------->
+				 *			   <--- clogid -->
+				 *
+				 * Where the number of bits necessary to
+				 * represent MC and HT fields together equals
+				 * to the minimum number of bits necessary to
+				 * store the value of cpi->cpi_ncpu_per_chip.
+				 * Of those bits, the MC part uses the number
+				 * of bits necessary to store the value of
+				 * cpi->cpi_ncore_per_chip.
+				 */
+				for (i = 1; i < ncpu_per_core; i <<= 1)
+					coreid_shift++;
+				cpi->cpi_coreid =
+				    apic_id & ((1 << coreid_shift) - 1);
+			} else if (feature & X86_HTT) {
+				/*
+				 * Single-core multi-threaded processors.
+				 */
+				cpi->cpi_coreid = cpi->cpi_chipid;
+			}
+		} else if (cpi->cpi_vendor == X86_VENDOR_AMD) {
+			/*
+			 * AMD currently only has dual-core processors with
+			 * single-threaded cores.  If they ever release
+			 * multi-threaded processors, then this code
+			 * will have to be updated.
+			 */
+			cpi->cpi_coreid = cpu->cpu_id;
+		} else {
+			/*
+			 * All other processors are currently
+			 * assumed to have single cores.
+			 */
+			cpi->cpi_coreid = cpi->cpi_chipid;
+		}
 	}
 
 pass1_done:
@@ -693,7 +796,7 @@ cpuid_pass2(cpu_t *cpu)
 {
 	uint_t n, nmax;
 	int i;
-	struct cpuidr *cp;
+	struct cpuid_regs *cp;
 	uint8_t *dp;
 	uint32_t *iptr;
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
@@ -709,8 +812,8 @@ cpuid_pass2(cpu_t *cpu)
 	 * (We already handled n == 0 and n == 1 in pass 1)
 	 */
 	for (n = 2, cp = &cpi->cpi_std[2]; n < nmax; n++, cp++) {
-		cp->cp_eax = __cpuid_insn(n,
-		    &cp->cp_ebx, &cp->cp_ecx, &cp->cp_edx);
+		cp->cp_eax = n;
+		(void) __cpuid_insn(cp);
 		switch (n) {
 		case 2:
 			/*
@@ -781,8 +884,8 @@ cpuid_pass2(cpu_t *cpu)
 	 */
 	iptr = (void *)cpi->cpi_brandstr;
 	for (n = 2, cp = &cpi->cpi_extd[2]; n < nmax; cp++, n++) {
-		cp->cp_eax = __cpuid_insn(n + 0x80000000,
-		    &cp->cp_ebx, &cp->cp_ecx, &cp->cp_edx);
+		cp->cp_eax = 0x80000000 + n;
+		(void) __cpuid_insn(cp);
 		switch (n) {
 		case 2:
 		case 3:
@@ -895,7 +998,7 @@ intel_cpubrand(const struct cpuid_info *cpi)
 	case 6:
 		switch (cpi->cpi_model) {
 			uint_t celeron, xeon;
-			const struct cpuidr *cp;
+			const struct cpuid_regs *cp;
 		case 0:
 		case 1:
 		case 2:
@@ -1371,14 +1474,15 @@ cpuid_pass4(cpu_t *cpu)
 #endif
 	}
 
-	if (cpuid_is_ht(cpu))
+	if (x86_feature & X86_HTT)
 		hwcap_flags |= AV_386_PAUSE;
 
 	if (cpi->cpi_xmaxeax < 0x80000001)
 		goto pass4_done;
 
 	switch (cpi->cpi_vendor) {
-		uint32_t junk, *edx;
+		struct cpuid_regs cp;
+		uint32_t *edx;
 
 	case X86_VENDOR_Intel:	/* sigh */
 	case X86_VENDOR_AMD:
@@ -1416,8 +1520,9 @@ cpuid_pass4(cpu_t *cpu)
 		break;
 
 	case X86_VENDOR_TM:
-		edx = &cpi->cpi_support[TM_EDX_FEATURES];
-		(void) __cpuid_insn(0x80860001, &junk, &junk, edx);
+		cp.cp_eax = 0x80860001;
+		(void) __cpuid_insn(&cp);
+		cpi->cpi_support[TM_EDX_FEATURES] = cp.cp_edx;
 		break;
 
 	default:
@@ -1436,11 +1541,10 @@ pass4_done:
  * about the hardware, independently of kernel support.
  */
 uint32_t
-cpuid_insn(cpu_t *cpu,
-    uint32_t eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+cpuid_insn(cpu_t *cpu, struct cpuid_regs *cp)
 {
 	struct cpuid_info *cpi;
-	struct cpuidr *cp;
+	struct cpuid_regs *xcp;
 
 	if (cpu == NULL)
 		cpu = CPU;
@@ -1452,21 +1556,23 @@ cpuid_insn(cpu_t *cpu,
 	 * CPUID data is cached in two separate places: cpi_std for standard
 	 * CPUID functions, and cpi_extd for extended CPUID functions.
 	 */
-	if (eax <= cpi->cpi_maxeax && eax < NMAX_CPI_STD)
-		cp = &cpi->cpi_std[eax];
-	else if (eax >= 0x80000000 && eax <= cpi->cpi_xmaxeax &&
-	    eax < 0x80000000 + NMAX_CPI_EXTD)
-		cp = &cpi->cpi_extd[eax - 0x80000000];
+	if (cp->cp_eax <= cpi->cpi_maxeax && cp->cp_eax < NMAX_CPI_STD)
+		xcp = &cpi->cpi_std[cp->cp_eax];
+	else if (cp->cp_eax >= 0x80000000 && cp->cp_eax <= cpi->cpi_xmaxeax &&
+	    cp->cp_eax < 0x80000000 + NMAX_CPI_EXTD)
+		xcp = &cpi->cpi_extd[cp->cp_eax - 0x80000000];
 	else
 		/*
 		 * The caller is asking for data from an input parameter which
 		 * the kernel has not cached.  In this case we go fetch from
 		 * the hardware and return the data directly to the user.
 		 */
-		return (__cpuid_insn(eax, ebx, ecx, edx));
-	*ebx = cp->cp_ebx;
-	*ecx = cp->cp_ecx;
-	*edx = cp->cp_edx;
+		return (__cpuid_insn(cp));
+
+	cp->cp_eax = xcp->cp_eax;
+	cp->cp_ebx = xcp->cp_ebx;
+	cp->cp_ecx = xcp->cp_ecx;
+	cp->cp_edx = xcp->cp_edx;
 	return (cp->cp_eax);
 }
 
@@ -1486,7 +1592,7 @@ cpuid_getbrandstr(cpu_t *cpu, char *s, size_t n)
 }
 
 int
-cpuid_is_ht(cpu_t *cpu)
+cpuid_is_cmt(cpu_t *cpu)
 {
 	if (cpu == NULL)
 		cpu = CPU;
@@ -1528,7 +1634,7 @@ cpuid_getidstr(cpu_t *cpu, char *s, size_t n)
 
 	ASSERT(cpuid_checkpass(cpu, 1));
 
-	if (cpuid_is_ht(cpu))
+	if (cpuid_is_cmt(cpu))
 		return (snprintf(s, n, fmt_ht, cpi->cpi_chipid,
 		    cpi->cpi_vendorstr, cpi->cpi_family, cpi->cpi_model,
 		    cpi->cpi_step, cpu->cpu_type_info.pi_clock));
@@ -1573,6 +1679,13 @@ cpuid_get_ncpu_per_chip(cpu_t *cpu)
 }
 
 uint_t
+cpuid_get_ncore_per_chip(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_ncore_per_chip);
+}
+
+uint_t
 cpuid_getstep(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
@@ -1584,9 +1697,16 @@ chip_plat_get_chipid(cpu_t *cpu)
 {
 	ASSERT(cpuid_checkpass(cpu, 1));
 
-	if (cpuid_is_ht(cpu))
+	if (cpuid_is_cmt(cpu))
 		return (cpu->cpu_m.mcpu_cpi->cpi_chipid);
 	return (cpu->cpu_id);
+}
+
+id_t
+chip_plat_get_coreid(cpu_t *cpu)
+{
+	ASSERT(cpuid_checkpass(cpu, 1));
+	return (cpu->cpu_m.mcpu_cpi->cpi_coreid);
 }
 
 int
@@ -1636,7 +1756,7 @@ cpuid_get_dtlb_nent(cpu_t *cpu, size_t pagesize)
 	 * Check the L2 TLB info
 	 */
 	if (cpi->cpi_xmaxeax >= 0x80000006) {
-		struct cpuidr *cp = &cpi->cpi_extd[6];
+		struct cpuid_regs *cp = &cpi->cpi_extd[6];
 
 		switch (pagesize) {
 
@@ -1671,7 +1791,7 @@ cpuid_get_dtlb_nent(cpu_t *cpu, size_t pagesize)
 	 * No L2 TLB support for this size, try L1.
 	 */
 	if (cpi->cpi_xmaxeax >= 0x80000005) {
-		struct cpuidr *cp = &cpi->cpi_extd[5];
+		struct cpuid_regs *cp = &cpi->cpi_extd[5];
 
 		switch (pagesize) {
 		case 4 * 1024:
@@ -1700,7 +1820,7 @@ int
 cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 {
 	struct cpuid_info *cpi = cpu->cpu_m.mcpu_cpi;
-	uint_t eax, edx, junk;
+	uint_t eax;
 
 	if (cpi->cpi_vendor != X86_VENDOR_AMD)
 		return (0);
@@ -1860,8 +1980,10 @@ cpuid_opteron_erratum(cpu_t *cpu, uint_t erratum)
 		 * if this is a K8 family processor
 		 */
 		if (CPI_FAMILY(cpi) == 0xf) {
-			(void) __cpuid_insn(0x80000007, &junk, &junk, &edx);
-			return (!(edx & 0x100));
+			struct cpuid_regs regs;
+			regs.cp_eax = 0x80000007;
+			(void) __cpuid_insn(&regs);
+			return (!(regs.cp_edx & 0x100));
 		}
 		return (0);
 	default:
@@ -2165,7 +2287,7 @@ add_amd_l2_cache(dev_info_t *devi, const char *label,
 static void
 amd_cache_info(struct cpuid_info *cpi, dev_info_t *devi)
 {
-	struct cpuidr *cp;
+	struct cpuid_regs *cp;
 
 	if (cpi->cpi_xmaxeax < 0x80000005)
 		return;
@@ -2616,7 +2738,7 @@ intel_l2cinfo(void *arg, const struct cachetab *ct)
 static void
 amd_l2cacheinfo(struct cpuid_info *cpi, struct l2info *l2i)
 {
-	struct cpuidr *cp;
+	struct cpuid_regs *cp;
 	uint_t size, assoc;
 	int *ip;
 

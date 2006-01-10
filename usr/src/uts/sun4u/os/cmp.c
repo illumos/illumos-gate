@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -144,6 +144,15 @@ chipid_t
 chip_plat_get_chipid(cpu_t *cp)
 {
 	return (cmp_cpu_to_chip(cp->cpu_id));
+}
+
+/*
+ * We don't have any multi-threaded cores on sun4u yet.
+ */
+id_t
+chip_plat_get_coreid(cpu_t *cp)
+{
+	return (cp->cpu_id);
 }
 
 void

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -610,7 +610,7 @@ setcr8(ulong_t val)
 
 /*ARGSUSED*/
 uint32_t
-__cpuid_insn(uint32_t eax, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
+__cpuid_insn(struct cpuid_regs *regs)
 { return (0); }
 
 #else	/* __lint */
@@ -618,15 +618,21 @@ __cpuid_insn(uint32_t eax, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
 #if defined(__amd64)
 
 	ENTRY(__cpuid_insn)
-	movq	%rbx, %r11
-	movq	%rdx, %r8	/* r8 = ecxp */
-	movq	%rcx, %r9	/* r9 = edxp */
-	movl	%edi, %eax
+	movq	%rbx, %r8
+	movq	%rcx, %r9
+	movq	%rdx, %r11
+	movl	(%rdi), %eax		/* %eax = regs->cp_eax */
+	movl	0x4(%rdi), %ebx		/* %ebx = regs->cp_ebx */
+	movl	0x8(%rdi), %ecx		/* %ecx = regs->cp_ecx */
+	movl	0xc(%rdi), %edx		/* %edx = regs->cp_edx */
 	cpuid
-	movl	%ebx, (%rsi)
-	movl	%ecx, (%r8)
-	movl	%edx, (%r9)
-	movq	%r11, %rbx
+	movl	%eax, (%rdi)		/* regs->cp_eax = %eax */
+	movl	%ebx, 0x4(%rdi)		/* regs->cp_ebx = %ebx */
+	movl	%ecx, 0x8(%rdi)		/* regs->cp_ecx = %ecx */
+	movl	%edx, 0xc(%rdi)		/* regs->cp_edx = %edx */
+	movq	%r8, %rbx
+	movq	%r9, %rcx
+	movq	%r11, %rdx
 	ret
 	SET_SIZE(__cpuid_insn)
 
@@ -634,18 +640,21 @@ __cpuid_insn(uint32_t eax, uint32_t *ebxp, uint32_t *ecxp, uint32_t *edxp)
 
         ENTRY(__cpuid_insn)
 	pushl	%ebp
-	movl	%esp, %ebp
+	movl	0x8(%esp), %ebp		/* %ebp = regs */
 	pushl	%ebx
-	movl	8(%ebp), %eax
+	pushl	%ecx
+	pushl	%edx
+	movl	(%ebp), %eax		/* %eax = regs->cp_eax */
+	movl	0x4(%ebp), %ebx		/* %ebx = regs->cp_ebx */
+	movl	0x8(%ebp), %ecx		/* %ecx = regs->cp_ecx */
+	movl	0xc(%ebp), %edx		/* %edx = regs->cp_edx */
 	cpuid
-	pushl	%eax
-	movl	0x0c(%ebp), %eax
-	movl	%ebx, (%eax)
-	movl	0x10(%ebp), %eax
-	movl	%ecx, (%eax)
-	movl	0x14(%ebp), %eax
-	movl	%edx, (%eax)
-	popl	%eax
+	movl	%eax, (%ebp)		/* regs->cp_eax = %eax */
+	movl	%ebx, 0x4(%ebp)		/* regs->cp_ebx = %ebx */
+	movl	%ecx, 0x8(%ebp)		/* regs->cp_ecx = %ecx */
+	movl	%edx, 0xc(%ebp)		/* regs->cp_edx = %edx */
+	popl	%edx
+	popl	%ecx
 	popl	%ebx
 	popl	%ebp
 	ret

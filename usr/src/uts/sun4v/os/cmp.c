@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -104,7 +104,7 @@ chip_plat_get_chipid(cpu_t *cp)
 void
 chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
 {
-	cd->chipd_type = CHIP_CMP_SHARED_CACHE;
+	cd->chipd_type = CHIP_CMT;
 
 	/*
 	 * Define any needed adjustment of rechoose_interval
@@ -121,7 +121,7 @@ chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
  */
 
 id_t
-chip_plat_get_pipeid(cpu_t *cp)
+chip_plat_get_coreid(cpu_t *cp)
 {
 	return (cp->cpu_m.cpu_ipipe);
 }

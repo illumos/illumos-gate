@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -169,13 +169,28 @@ int simulator_run = 0;	/* patch to non-zero if running under simics */
 void
 chip_plat_define_chip(cpu_t *cp, chip_def_t *cd)
 {
-	if (x86_feature & (X86_HTT|X86_CMP))
+	if ((x86_feature & (X86_HTT|X86_CMP)) == X86_HTT) {
 		/*
-		 * Hyperthreading is SMT
+		 * Single-core Pentiums with Hyper-Threading enabled.
 		 */
 		cd->chipd_type = CHIP_SMT;
-	else
+	} else if ((x86_feature & (X86_HTT|X86_CMP)) == X86_CMP) {
+		/*
+		 * Multi-core Opterons or Multi-core Pentiums with
+		 * Hyper-Threading disabled.
+		 */
+		cd->chipd_type = CHIP_CMP_SPLIT_CACHE;
+	} else if ((x86_feature & (X86_HTT|X86_CMP)) == (X86_HTT|X86_CMP)) {
+		/*
+		 * Multi-core Pentiums with Hyper-Threading enabled.
+		 */
+		cd->chipd_type = CHIP_CMT;
+	} else {
+		/*
+		 * Single-core/single-threaded chips.
+		 */
 		cd->chipd_type = CHIP_DEFAULT;
+	}
 
 	cd->chipd_rechoose_adj = 0;
 }

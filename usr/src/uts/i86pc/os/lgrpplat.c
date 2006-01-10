@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,7 @@
 
 #define	LGRP_PLAT_PROBE_NROUNDS		64	/* default laps for probing */
 #define	LGRP_PLAT_PROBE_NSAMPLES	1	/* default samples to take */
-
+#define	LGRP_PLAT_PROBE_NREADS		256	/* number of vendor ID reads */
 
 /*
  * Multiprocessor Opteron machines have Non Uniform Memory Access (NUMA).
@@ -291,6 +291,11 @@ int			lgrp_plat_probe_nrounds = LGRP_PLAT_PROBE_NROUNDS;
  * Number of samples to take when probing each node
  */
 int			lgrp_plat_probe_nsamples = LGRP_PLAT_PROBE_NSAMPLES;
+
+/*
+ * Number of times to read vendor ID from Northbridge for each probe.
+ */
+int			lgrp_plat_probe_nreads = LGRP_PLAT_PROBE_NREADS;
 
 /*
  * How to probe to determine lgroup topology
@@ -1063,6 +1068,7 @@ lgrp_plat_probe_time(int to)
 	hrtime_t	max;
 	hrtime_t	min;
 	hrtime_t	start;
+	int		cnt;
 	extern int	use_sse_pagecopy;
 
 	/*
@@ -1142,9 +1148,10 @@ lgrp_plat_probe_time(int to)
 			outl(PCI_CONFADD, PCI_CADDR1(0, dev, opt_probe_func,
 			    OPT_PCS_OFF_VENDOR));
 			start = gethrtime();
-			dev_vendor = inl(PCI_CONFDATA);
+			for (cnt = 0; cnt < lgrp_plat_probe_nreads; cnt++)
+				dev_vendor = inl(PCI_CONFDATA);
 			end = gethrtime();
-			elapsed = end - start;
+			elapsed = (end - start) / lgrp_plat_probe_nreads;
 			splx(ipl);
 			kpreempt_enable();
 			break;

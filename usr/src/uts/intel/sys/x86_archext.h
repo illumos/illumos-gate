@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -154,7 +154,7 @@ extern "C" {
 	"\20cmov\17mca\16pge\15mtrr\14syscall\12apic\11cx8"	\
 	"\10mce\7pae\6msr\5tsc\4pse\3de\2vme\1fpu"
 
-#define	CPUID_AMD_ECX_HTvalid	0x00000001	/* AMD: HTT bit valid */
+#define	CPUID_AMD_ECX_CMP_LEGACY 0x00000010	/* AMD: multi-core chip */
 
 #define	FMT_CPUID_AMD_ECX					\
 	"\20"							\
@@ -457,6 +457,16 @@ extern const char CyrixInstead[];
 
 #if defined(_KERNEL)
 
+/*
+ * This structure is used to pass arguments and get return values back
+ * from the CPUID instruction in __cpuid_insn() routine.
+ */
+struct cpuid_regs {
+	uint32_t	cp_eax;
+	uint32_t	cp_ebx;
+	uint32_t	cp_ecx;
+	uint32_t	cp_edx;
+};
 
 extern uint64_t rdmsr(uint_t);
 extern void wrmsr(uint_t, const uint64_t);
@@ -473,9 +483,8 @@ extern void cpu_fast_syscall_disable(void *);
 struct cpu;
 
 extern int cpuid_checkpass(struct cpu *, int);
-extern uint32_t cpuid_insn(struct cpu *,
-    uint32_t, uint32_t *, uint32_t *, uint32_t *);
-extern uint32_t __cpuid_insn(uint32_t, uint32_t *, uint32_t *, uint32_t *);
+extern uint32_t cpuid_insn(struct cpu *, struct cpuid_regs *);
+extern uint32_t __cpuid_insn(struct cpuid_regs *);
 extern int cpuid_getbrandstr(struct cpu *, char *, size_t);
 extern int cpuid_getidstr(struct cpu *, char *, size_t);
 extern const char *cpuid_getvendorstr(struct cpu *);
@@ -484,7 +493,8 @@ extern uint_t cpuid_getfamily(struct cpu *);
 extern uint_t cpuid_getmodel(struct cpu *);
 extern uint_t cpuid_getstep(struct cpu *);
 extern uint_t cpuid_get_ncpu_per_chip(struct cpu *);
-extern int cpuid_is_ht(struct cpu *);
+extern uint_t cpuid_get_ncore_per_chip(struct cpu *);
+extern int cpuid_is_cmt(struct cpu *);
 extern int cpuid_syscall32_insn(struct cpu *);
 extern int getl2cacheinfo(struct cpu *, int *, int *, int *);
 

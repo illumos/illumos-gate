@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2072,6 +2072,7 @@ static struct {
 	kstat_named_t ci_cpu_fru;
 #endif
 	kstat_named_t ci_brandstr;
+	kstat_named_t ci_core_id;
 } cpu_info_template = {
 	{ "state",		KSTAT_DATA_CHAR },
 	{ "state_begin",	KSTAT_DATA_LONG },
@@ -2085,6 +2086,7 @@ static struct {
 	{ "cpu_fru",		KSTAT_DATA_STRING },
 #endif
 	{ "brand",		KSTAT_DATA_STRING },
+	{ "core_id",		KSTAT_DATA_LONG },
 };
 
 static kmutex_t cpu_info_template_lock;
@@ -2136,6 +2138,7 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	kstat_named_setstr(&cpu_info_template.ci_cpu_fru, cpu_fru_fmri(cp));
 #endif
 	kstat_named_setstr(&cpu_info_template.ci_brandstr, cp->cpu_brandstr);
+	cpu_info_template.ci_core_id.value.l = chip_plat_get_coreid(cp);
 	return (0);
 }
 

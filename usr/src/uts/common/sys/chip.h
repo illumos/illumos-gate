@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,6 +52,7 @@ typedef enum chip_type {
 	CHIP_SMT,			/* SMT, single core */
 	CHIP_CMP_SPLIT_CACHE,		/* CMP with split caches */
 	CHIP_CMP_SHARED_CACHE,		/* CMP with shared caches */
+	CHIP_CMT,			/* CMT w/ multiple cores and threads */
 	CHIP_NUM_TYPES
 } chip_type_t;
 
@@ -182,12 +183,9 @@ void		chip_kstat_create(chip_t *);
  * Platform chip operations
  */
 chipid_t	chip_plat_get_chipid(cpu_t *);
-#ifdef	sun4v
-id_t		chip_plat_get_pipeid(cpu_t *);
-#endif /* sun4v */
-
-void		chip_plat_define_chip(cpu_t *, chip_def_t *);
+id_t		chip_plat_get_coreid(cpu_t *);
 int		chip_plat_get_clogid(cpu_t *);
+void		chip_plat_define_chip(cpu_t *, chip_def_t *);
 
 #endif	/* !_KERNEL && !_KMEMUSER */
 

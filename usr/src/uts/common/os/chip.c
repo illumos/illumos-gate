@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -219,7 +219,7 @@ chip_cpu_init(cpu_t *cp)
 	 * leveraged to implement core level load balancing.
 	 */
 #ifdef	sun4v
-	cid = chip_plat_get_pipeid(cp);
+	cid = chip_plat_get_coreid(cp);
 #else
 	cid = chip_plat_get_chipid(cp);
 #endif /* sun4v */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -110,7 +110,7 @@ cpuid_open(dev_t *dev, int flag, int otyp, cred_t *cr)
 static int
 cpuid_read(dev_t dev, uio_t *uio, cred_t *cr)
 {
-	uint32_t crs[4];
+	struct cpuid_regs crs;
 	int error = 0;
 
 	if ((x86_feature & X86_CPUID) == 0)
@@ -127,10 +127,11 @@ cpuid_read(dev_t dev, uio_t *uio, cred_t *cr)
 			break;
 		}
 
-		crs[0] = cpuid_insn(NULL,
-		    (uint32_t)uoff, &crs[1], &crs[2], &crs[3]);
+		crs.cp_eax = (uint32_t)uoff;
+		crs.cp_ebx = crs.cp_ecx = crs.cp_edx = 0;
+		(void) cpuid_insn(NULL, &crs);
 
-		if ((error = uiomove(crs, sizeof (crs), UIO_READ, uio)) != 0)
+		if ((error = uiomove(&crs, sizeof (crs), UIO_READ, uio)) != 0)
 			break;
 		uio->uio_loffset = uoff + 1;
 	}
