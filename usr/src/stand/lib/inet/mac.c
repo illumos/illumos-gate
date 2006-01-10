@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +70,8 @@ struct ofw_net_types {
 	{ "ipib",	IFT_IB }
 };
 #endif	/* !__i386 */
+
+void mac_set_arp_timeout(unsigned int);
 
 /*
  * given the mac type, initialize the mac interface state.
@@ -393,6 +395,13 @@ mac_get_type(void)
 		return (-1);
 	else
 		return (mac_state.mac_type);
+}
+
+void
+mac_set_arp_timeout(unsigned int timeout)
+{
+	mac_state.mac_arp_timeout =
+	    timeout;
 }
 
 int

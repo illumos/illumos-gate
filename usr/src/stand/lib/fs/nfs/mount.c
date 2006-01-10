@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,9 @@
 #include "dhcpv4.h"
 #include <sys/mntent.h>
 
+/* ARP timeout in milliseconds for BOOTP/RARP */
+#define	ARP_INETBOOT_TIMEOUT 1000
+
 struct nfs_file		roothandle;			/* root file handle */
 static char		root_hostname[SYS_NMLN];	/* server hostname */
 static char		my_hostname[MAXHOSTNAMELEN];
@@ -73,6 +76,7 @@ char			rootopts[MAX_PATH_LEN];
 static gid_t		fake_gids = 1;	/* fake gids list for auth_unix */
 
 extern void set_default_filename(char *);	/* boot.c */
+extern void mac_set_arp_timeout(unsigned int);	/* mac.c */
 
 /*
  * xdr routines used by mount.
@@ -604,6 +608,23 @@ boot_nfs_mountroot(char *str)
 		 * services are local. Use DHCP if this bothers you.
 		 */
 		dontroute = TRUE;
+		/*
+		 * We are trying to keep the ARP response
+		 * timeout on the lower side with BOOTP/RARP.
+		 * We are doing this for BOOTP/RARP where policy
+		 * doesn't allow to route the packets outside
+		 * the subnet as it has no idea about the
+		 * netmask. By doing so, we are reducing
+		 * ARP response timeout for any packet destined
+		 * for outside booting clients subnet. Client can
+		 * not expect such ARP replies and will finally
+		 * timeout after a long delay. This would cause
+		 * booting client to get stalled for a longer
+		 * time. We can not avoid accepting any outside
+		 * subnet packets accidentally destined for the
+		 * booting client.
+		 */
+		mac_set_arp_timeout(ARP_INETBOOT_TIMEOUT);
 
 		/* now that we have an IP address, turn off promiscuous mode */
 		(void) ipv4_setpromiscuous(FALSE);

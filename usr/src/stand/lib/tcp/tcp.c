@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * tcp.c, Code implementing the TCP protocol.
@@ -678,6 +678,16 @@ tcp_send(int sock_id, tcp_t *tcp, const void *msg, int len)
 			return (-1);
 
 	tcp_wput_data(tcp, head, sock_id);
+	/*
+	 * errno should be reset here as it may be
+	 * set to ETIMEDOUT. This may be set by
+	 * the MAC driver in case it has timed out
+	 * waiting for ARP reply. Any segment which
+	 * was not transmitted because of ARP timeout
+	 * will be retransmitted by TCP.
+	 */
+	if (errno == ETIMEDOUT)
+		errno = 0;
 	return (cnt);
 }
 
@@ -1398,7 +1408,13 @@ tcp_connect(int sock_id)
 		/* Send out the SYN packet. */
 		ret = ipv4_tcp_output(sock_id, syn_mp);
 		freeb(syn_mp);
-		if (ret < 0) {
+		/*
+		 * errno ETIMEDOUT is set by the mac driver
+		 * in case it is not able to receive ARP reply.
+		 * TCP will retransmit this segment so we can
+		 * ignore the ARP timeout.
+		 */
+		if ((ret < 0) && (errno != ETIMEDOUT)) {
 			return (-1);
 		}
 		/* tcp_state_wait() will finish the 3 way handshake. */
