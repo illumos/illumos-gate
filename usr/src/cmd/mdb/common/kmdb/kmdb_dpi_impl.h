@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,14 +69,11 @@ struct dpi_ops {
 	int (*dpo_get_master_cpuid)(void);
 
 	const mdb_tgt_gregset_t *(*dpo_get_gregs)(int);
+	int (*dpo_get_register)(const char *, kreg_t *);
+	int (*dpo_set_register)(const char *, kreg_t);
 #ifdef __sparc
-	int (*dpo_get_cpu_register)(int, int, const char *, kreg_t *);
-	int (*dpo_set_cpu_register)(int, int, const char *, kreg_t);
 	int (*dpo_get_rwin)(int, int, struct rwindow *);
 	int (*dpo_get_nwin)(int);
-#else
-	int (*dpo_get_cpu_register)(int, const char *, kreg_t *);
-	int (*dpo_set_cpu_register)(int, const char *, kreg_t);
 #endif
 
 	int (*dpo_brkpt_arm)(uintptr_t, mdb_instr_t *);

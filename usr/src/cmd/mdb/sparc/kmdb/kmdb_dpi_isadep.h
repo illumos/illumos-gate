@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,13 +35,8 @@
 extern "C" {
 #endif
 
-#define	DPI_TOP_WINDOW		(-1)		/* matches cwp */
-
-extern int kmdb_dpi_get_win_register(int, const char *, kreg_t *);
-extern int kmdb_dpi_get_cpu_register(int, int, const char *, kreg_t *);
-
-extern int kmdb_dpi_set_win_register(int, const char *, kreg_t);
-extern int kmdb_dpi_set_cpu_register(int, int, const char *, kreg_t);
+extern int kmdb_dpi_get_register(const char *, kreg_t *);
+extern int kmdb_dpi_set_register(const char *, kreg_t);
 
 extern int kmdb_dpi_get_rwin(int, int, struct rwindow *);
 extern int kmdb_dpi_get_nwin(int);

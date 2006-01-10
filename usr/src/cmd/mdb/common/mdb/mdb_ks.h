@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,6 +63,8 @@ extern const char *mdb_major_to_name(major_t);
 
 extern int mdb_devinfo2driver(uintptr_t, char *, size_t);
 extern int mdb_devinfo2statep(uintptr_t, char *, uintptr_t *);
+
+extern int mdb_cpu2cpuid(uintptr_t);
 
 /*
  * Returns a pointer to the top of the soft state struct for the instance

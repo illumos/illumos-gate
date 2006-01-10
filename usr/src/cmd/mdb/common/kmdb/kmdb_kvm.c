@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <mdb/mdb_string.h>
 #include <mdb/mdb_ctf.h>
 #include <mdb/mdb_kreg_impl.h>
+#include <mdb/mdb_ks.h>
 #include <mdb/mdb.h>
 
 #include <strings.h>
@@ -313,17 +314,21 @@ static int
 kmt_cpuregs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 {
 	const mdb_tgt_gregset_t *gregs;
-	intptr_t cpu = DPI_MASTER_CPUID;
+	intptr_t cpuid = DPI_MASTER_CPUID;
 	int i;
 
 	if (flags & DCMD_ADDRSPEC) {
 		if (argc != 0)
 			return (DCMD_USAGE);
-		cpu = addr;
+		if ((cpuid = mdb_cpu2cpuid(addr)) < 0) {
+			(void) set_errno(EMDB_NOMAP);
+			mdb_warn("failed to find cpuid for cpu at %p", addr);
+			return (DCMD_ERR);
+		}
 	}
 
 	i = mdb_getopts(argc, argv,
-	    'c', MDB_OPT_UINTPTR, &cpu,
+	    'c', MDB_OPT_UINTPTR, &cpuid,
 	    NULL);
 
 	argc -= i;
@@ -332,8 +337,8 @@ kmt_cpuregs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (argc != 0)
 		return (DCMD_USAGE);
 
-	if ((gregs = kmdb_dpi_get_gregs(cpu)) == NULL) {
-		warn("failed to retrieve registers for cpu %d", (int)cpu);
+	if ((gregs = kmdb_dpi_get_gregs(cpuid)) == NULL) {
+		warn("failed to retrieve registers for cpu %d", (int)cpuid);
 		return (DCMD_ERR);
 	}
 
@@ -349,6 +354,33 @@ kmt_regs(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		return (DCMD_USAGE);
 
 	return (kmt_cpuregs(addr, flags, argc, argv));
+}
+
+static int
+kmt_cpustack_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	intptr_t cpuid = DPI_MASTER_CPUID;
+	uint_t verbose = 0;
+	int i;
+
+	if (flags & DCMD_ADDRSPEC) {
+		if ((cpuid = mdb_cpu2cpuid(addr)) < 0) {
+			(void) set_errno(EMDB_NOMAP);
+			mdb_warn("failed to find cpuid for cpu at %p", addr);
+			return (DCMD_ERR);
+		}
+		flags &= ~DCMD_ADDRSPEC;
+	}
+
+	i = mdb_getopts(argc, argv,
+	    'c', MDB_OPT_UINTPTR, &cpuid,
+	    'v', MDB_OPT_SETBITS, 1, &verbose,
+	    NULL);
+
+	argc -= i;
+	argv += i;
+
+	return (kmt_cpustack(addr, flags, argc, argv, cpuid, verbose));
 }
 
 /*
@@ -445,29 +477,6 @@ kmt_call(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	mdb_free(call_argv, sizeof (uintptr_t) * argc);
 
 	return (DCMD_OK);
-}
-
-static int
-kmt_cpustack_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
-{
-	intptr_t cpu = DPI_MASTER_CPUID;
-	uint_t verbose = 0;
-	int i;
-
-	if (flags & DCMD_ADDRSPEC) {
-		cpu = addr;
-		flags &= ~DCMD_ADDRSPEC;
-	}
-
-	i = mdb_getopts(argc, argv,
-	    'c', MDB_OPT_UINTPTR, &cpu,
-	    'v', MDB_OPT_SETBITS, 1, &verbose,
-	    NULL);
-
-	argc -= i;
-	argv += i;
-
-	return (kmt_cpustack(addr, flags, argc, argv, cpu, verbose));
 }
 
 /*ARGSUSED*/
@@ -901,7 +910,7 @@ kmt_lookup_by_addr(mdb_tgt_t *t, uintptr_t addr, uint_t flags,
 	 * result, kmdb_kvm doesn't find out about them, and can't turn their
 	 * addresses into symbols.  This can be most inconvenient during
 	 * debugger faults, as the dmod frames will show up without names.
-	 * We weren't able to turn the requeted address into a symbol, so we'll
+	 * We weren't able to turn the requested address into a symbol, so we'll
 	 * take a spin through the dmods, trying to match our address against
 	 * their symbols.
 	 */
@@ -1403,7 +1412,7 @@ kmt_defbp_enter_debugger(void)
 	/*
 	 * The debugger places a breakpoint here.  We can't have a simple
 	 * nop function here, because GCC knows much more than we do, and
-	 * will optimize away the call to this function.
+	 * will optimize away the call to it.
 	 */
 	(void) get_fp();
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -163,6 +163,11 @@ kmt_stack_common(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv,
 		grp = &gregs;
 	} else
 		grp = kmdb_dpi_get_gregs(cpuid);
+
+	if (grp == NULL) {
+		warn("failed to retrieve registers for cpu %d", cpuid);
+		return (DCMD_ERR);
+	}
 
 	if (argc != 0) {
 		if (argv->a_type == MDB_TYPE_CHAR || argc > 1)

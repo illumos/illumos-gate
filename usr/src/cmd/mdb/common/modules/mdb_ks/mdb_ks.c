@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -53,6 +53,7 @@
 #include <sys/fs/autofs.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/refstr_impl.h>
+#include <sys/cpuvar.h>
 #include <errno.h>
 
 #include <vm/seg_vn.h>
@@ -580,6 +581,17 @@ mdb_pid2proc(pid_t pid, proc_t *proc)
 		paddr = (uintptr_t)pidp.pid_link;
 	}
 	return (NULL);
+}
+
+int
+mdb_cpu2cpuid(uintptr_t cpup)
+{
+	cpu_t cpu;
+
+	if (mdb_vread(&cpu, sizeof (cpu_t), cpup) != sizeof (cpu_t))
+		return (-1);
+
+	return (cpu.cpu_id);
 }
 
 uintptr_t

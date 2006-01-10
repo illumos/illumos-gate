@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,43 +78,13 @@ kmdb_dpi_handle_fault(kreg_t tt, kreg_t tpc, kreg_t tnpc, kreg_t sp, int cpuid)
 int
 kmdb_dpi_get_register(const char *regname, kreg_t *kregp)
 {
-	return (mdb.m_dpi->dpo_get_cpu_register(DPI_MASTER_CPUID,
-	    DPI_TOP_WINDOW, regname, kregp));
-}
-
-int
-kmdb_dpi_get_win_register(int win, const char *regname, kreg_t *kregp)
-{
-	return (mdb.m_dpi->dpo_get_cpu_register(DPI_MASTER_CPUID,
-	    win, regname, kregp));
-}
-
-int
-kmdb_dpi_get_cpu_register(int cpuid, int win, const char *regname,
-    kreg_t *kregp)
-{
-	return (mdb.m_dpi->dpo_get_cpu_register(cpuid, win, regname, kregp));
+	return (mdb.m_dpi->dpo_get_register(regname, kregp));
 }
 
 int
 kmdb_dpi_set_register(const char *regname, kreg_t kreg)
 {
-	return (mdb.m_dpi->dpo_set_cpu_register(DPI_MASTER_CPUID,
-	    DPI_TOP_WINDOW, regname, kreg));
-}
-
-int
-kmdb_dpi_set_win_register(int win, const char *regname, kreg_t kreg)
-{
-	return (mdb.m_dpi->dpo_set_cpu_register(DPI_MASTER_CPUID,
-	    win, regname, kreg));
-}
-
-int
-kmdb_dpi_set_cpu_register(int cpuid, int win, const char *regname,
-    kreg_t kreg)
-{
-	return (mdb.m_dpi->dpo_set_cpu_register(cpuid, win, regname, kreg));
+	return (mdb.m_dpi->dpo_set_register(regname, kreg));
 }
 
 int

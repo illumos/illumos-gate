@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,16 +132,39 @@ kaif_enter_mon(void)
 	}
 }
 
+static kaif_cpusave_t *
+kaif_cpuid2save(int cpuid)
+{
+	kaif_cpusave_t *save;
+
+	if (cpuid == DPI_MASTER_CPUID)
+		return (&kaif_cpusave[kaif_master_cpuid]);
+
+	if (cpuid < 0 || cpuid >= kaif_ncpusave) {
+		(void) set_errno(EINVAL);
+		return (NULL);
+	}
+
+	save = &kaif_cpusave[cpuid];
+
+	if (save->krs_cpu_state != KAIF_CPU_STATE_MASTER &&
+	    save->krs_cpu_state != KAIF_CPU_STATE_SLAVE) {
+		(void) set_errno(EINVAL);
+		return (NULL);
+	}
+
+	return (save);
+}
+
 static int
 kaif_get_cpu_state(int cpuid)
 {
-	if (cpuid == DPI_MASTER_CPUID)
-		return (DPI_CPU_STATE_MASTER);
+	kaif_cpusave_t *save;
 
-	if (cpuid < 0 || cpuid >= kaif_ncpusave)
-		return (set_errno(EINVAL));
+	if ((save = kaif_cpuid2save(cpuid)) == NULL)
+		return (-1); /* errno is set for us */
 
-	switch (kaif_cpusave[cpuid].krs_cpu_state) {
+	switch (save->krs_cpu_state) {
 	case KAIF_CPU_STATE_MASTER:
 		return (DPI_CPU_STATE_MASTER);
 	case KAIF_CPU_STATE_SLAVE:
@@ -160,15 +183,12 @@ kaif_get_master_cpuid(void)
 static const mdb_tgt_gregset_t *
 kaif_get_gregs(int cpuid)
 {
-	if (cpuid == DPI_MASTER_CPUID)
-		cpuid = kaif_master_cpuid;
+	kaif_cpusave_t *save;
 
-	if (cpuid < 0 || cpuid >= kaif_ncpusave) {
-		(void) set_errno(EINVAL);
-		return (NULL);
-	}
+	if ((save = kaif_cpuid2save(cpuid)) == NULL)
+		return (NULL); /* errno is set for us */
 
-	return (kaif_cpusave[cpuid].krs_gregs);
+	return (save->krs_gregs);
 }
 
 typedef struct kaif_reg_synonyms {
@@ -177,7 +197,7 @@ typedef struct kaif_reg_synonyms {
 } kaif_reg_synonyms_t;
 
 static kreg_t *
-kaif_find_regp(int cpuid, const char *regname)
+kaif_find_regp(const char *regname)
 {
 	static const kaif_reg_synonyms_t synonyms[] = {
 #ifdef __amd64
@@ -191,15 +211,11 @@ kaif_find_regp(int cpuid, const char *regname)
 #endif
 	    { "tt", "trapno" }
 	};
+
+	kaif_cpusave_t *save;
 	int i;
 
-	if (cpuid == DPI_MASTER_CPUID)
-		cpuid = kaif_master_cpuid;
-
-	if (cpuid < 0 || cpuid >= kaif_ncpusave) {
-		(void) set_errno(EINVAL);
-		return (NULL);
-	}
+	save = kaif_cpuid2save(DPI_MASTER_CPUID);
 
 	for (i = 0; i < sizeof (synonyms) / sizeof (synonyms[0]); i++) {
 		if (strcmp(synonyms[i].rs_syn, regname) == 0)
@@ -210,8 +226,7 @@ kaif_find_regp(int cpuid, const char *regname)
 		const mdb_tgt_regdesc_t *rd = &mdb_isa_kregs[i];
 
 		if (strcmp(rd->rd_name, regname) == 0)
-			return (&kaif_cpusave[cpuid].krs_gregs->
-			    kregs[rd->rd_num]);
+			return (&save->krs_gregs->kregs[rd->rd_num]);
 	}
 
 	(void) set_errno(ENOENT);
@@ -220,11 +235,11 @@ kaif_find_regp(int cpuid, const char *regname)
 
 /*ARGSUSED*/
 static int
-kaif_get_cpu_register(int cpuid, const char *regname, kreg_t *valp)
+kaif_get_register(const char *regname, kreg_t *valp)
 {
 	kreg_t *regp;
 
-	if ((regp = kaif_find_regp(cpuid, regname)) == NULL)
+	if ((regp = kaif_find_regp(regname)) == NULL)
 		return (-1);
 
 	*valp = *regp;
@@ -233,11 +248,11 @@ kaif_get_cpu_register(int cpuid, const char *regname, kreg_t *valp)
 }
 
 static int
-kaif_set_cpu_register(int cpuid, const char *regname, kreg_t val)
+kaif_set_register(const char *regname, kreg_t val)
 {
 	kreg_t *regp;
 
-	if ((regp = kaif_find_regp(cpuid, regname)) == NULL)
+	if ((regp = kaif_find_regp(regname)) == NULL)
 		return (-1);
 
 	*regp = val;
@@ -630,10 +645,18 @@ kaif_call(uintptr_t funcva, uint_t argc, const uintptr_t argv[])
 }
 
 static void
-dump_crumb(kaif_crumb_t *crumb)
+dump_crumb(kaif_crumb_t *krmp)
 {
+	kaif_crumb_t krm;
+
+	if (mdb_vread(&krm, sizeof (kaif_crumb_t), (uintptr_t)krmp) !=
+	    sizeof (kaif_crumb_t)) {
+		warn("failed to read crumb at %p", krmp);
+		return;
+	}
+
 	mdb_printf("state: ");
-	switch (crumb->krm_cpu_state) {
+	switch (krm.krm_cpu_state) {
 	case KAIF_CPU_STATE_MASTER:
 		mdb_printf("M");
 		break;
@@ -641,12 +664,11 @@ dump_crumb(kaif_crumb_t *crumb)
 		mdb_printf("S");
 		break;
 	default:
-		mdb_printf("%d", crumb->krm_cpu_state);
+		mdb_printf("%d", krm.krm_cpu_state);
 	}
 
 	mdb_printf(" trapno %3d sp %08x flag %d pc %p %A\n",
-	    crumb->krm_trapno, crumb->krm_sp, crumb->krm_flag,
-	    crumb->krm_pc, crumb->krm_pc);
+	    krm.krm_trapno, krm.krm_sp, krm.krm_flag, krm.krm_pc, krm.krm_pc);
 }
 
 static void
@@ -656,7 +678,6 @@ dump_crumbs(kaif_cpusave_t *save)
 
 	for (i = KAIF_NCRUMBS; i > 0; i--) {
 		uint_t idx = (save->krs_curcrumbidx + i) % KAIF_NCRUMBS;
-
 		dump_crumb(&save->krs_crumbs[idx]);
 	}
 }
@@ -667,10 +688,11 @@ kaif_dump_crumbs(uintptr_t addr, int cpuid)
 	int i;
 
 	if (addr != NULL) {
+		/* dump_crumb will protect us against bogus addresses */
 		dump_crumb((kaif_crumb_t *)addr);
 
 	} else if (cpuid != -1) {
-		if (cpuid >= kaif_ncpusave)
+		if (cpuid < 0 || cpuid >= kaif_ncpusave)
 			return;
 
 		dump_crumbs(&kaif_cpusave[cpuid]);
@@ -797,12 +819,14 @@ kaif_msr_add(const kmdb_msr_t *msrs)
 static uint64_t
 kaif_msr_get(int cpuid, uint_t num)
 {
+	kaif_cpusave_t *save;
 	kmdb_msr_t *msr;
 	int i;
 
-	if (cpuid == DPI_MASTER_CPUID)
-		cpuid = kaif_master_cpuid;
-	msr = kaif_cpusave[cpuid].krs_msr;
+	if ((save = kaif_cpuid2save(cpuid)) == NULL)
+		return (-1); /* errno is set for us */
+
+	msr = save->krs_msr;
 
 	for (i = 0; msr[i].msr_num != 0; i++) {
 		if (msr[i].msr_num == num &&
@@ -862,11 +886,11 @@ kaif_init(kmdb_auxv_t *kav)
 	kaif_ncpusave = kav->kav_ncpu;
 
 	for (i = 0; i < kaif_ncpusave; i++) {
-		kaif_cpusave[i].krs_cpu_id = i;
+		kaif_cpusave_t *save = &kaif_cpusave[i];
 
-		kaif_cpusave[i].krs_curcrumb =
-		    &kaif_cpusave[i].krs_crumbs[KAIF_NCRUMBS - 1];
-		kaif_cpusave[i].krs_curcrumbidx = KAIF_NCRUMBS - 1;
+		save->krs_cpu_id = i;
+		save->krs_curcrumbidx = KAIF_NCRUMBS - 1;
+		save->krs_curcrumb = &save->krs_crumbs[save->krs_curcrumbidx];
 	}
 
 	kaif_idt_init();
@@ -910,8 +934,8 @@ dpi_ops_t kmdb_dpi_ops = {
 	kaif_get_cpu_state,
 	kaif_get_master_cpuid,
 	kaif_get_gregs,
-	kaif_get_cpu_register,
-	kaif_set_cpu_register,
+	kaif_get_register,
+	kaif_set_register,
 	kaif_brkpt_arm,
 	kaif_brkpt_disarm,
 	kaif_wapt_validate,

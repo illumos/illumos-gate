@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,16 +125,39 @@ kaif_get_nwin(int cpuid)
 	return (get_nwin());
 }
 
+static kaif_cpusave_t *
+kaif_cpuid2save(int cpuid)
+{
+	kaif_cpusave_t *save;
+
+	if (cpuid == DPI_MASTER_CPUID)
+		return (&kaif_cpusave[kaif_master_cpuid]);
+
+	if (cpuid < 0 || cpuid >= kaif_ncpusave) {
+		(void) set_errno(EINVAL);
+		return (NULL);
+	}
+
+	save = &kaif_cpusave[cpuid];
+
+	if (save->krs_cpu_state != KAIF_CPU_STATE_MASTER &&
+	    save->krs_cpu_state != KAIF_CPU_STATE_SLAVE) {
+		(void) set_errno(EINVAL);
+		return (NULL);
+	}
+
+	return (save);
+}
+
 static int
 kaif_get_cpu_state(int cpuid)
 {
-	if (cpuid == DPI_MASTER_CPUID)
-		return (DPI_CPU_STATE_MASTER);
+	kaif_cpusave_t *save;
 
-	if (cpuid < 0 || cpuid >= kaif_ncpusave)
-		return (set_errno(EINVAL));
+	if ((save = kaif_cpuid2save(cpuid)) == NULL)
+		return (-1); /* errno is set for us */
 
-	switch (kaif_cpusave[cpuid].krs_cpu_state) {
+	switch (save->krs_cpu_state) {
 	case KAIF_CPU_STATE_MASTER:
 		return (DPI_CPU_STATE_MASTER);
 	case KAIF_CPU_STATE_SLAVE:
@@ -147,20 +170,14 @@ kaif_get_cpu_state(int cpuid)
 static const mdb_tgt_gregset_t *
 kaif_get_gregs(int cpuid)
 {
-	kaif_cpusave_t *cpusave;
+	kaif_cpusave_t *save;
 	mdb_tgt_gregset_t *gregs;
 	int wp, i;
 
-	if (cpuid == DPI_MASTER_CPUID)
-		cpuid = kaif_master_cpuid;
+	if ((save = kaif_cpuid2save(cpuid)) == NULL)
+		return (NULL); /* errno is set for us */
 
-	if (cpuid < 0 || cpuid >= kaif_ncpusave) {
-		(void) set_errno(EINVAL);
-		return (NULL);
-	}
-
-	cpusave = &kaif_cpusave[cpuid];
-	gregs = &cpusave->krs_gregs;
+	gregs = &save->krs_gregs;
 
 	/*
 	 * The DPI startup routine populates the register window portions of
@@ -169,47 +186,33 @@ kaif_get_gregs(int cpuid)
 	 */
 	wp = gregs->kregs[KREG_CWP];
 	for (i = 0; i < 8; i++) {
-		gregs->kregs[KREG_L0 + i] = cpusave->krs_rwins[wp].rw_local[i];
-		gregs->kregs[KREG_I0 + i] = cpusave->krs_rwins[wp].rw_in[i];
+		gregs->kregs[KREG_L0 + i] = save->krs_rwins[wp].rw_local[i];
+		gregs->kregs[KREG_I0 + i] = save->krs_rwins[wp].rw_in[i];
 	}
 
-	gregs->kregs[KREG_PSTATE] = KREG_TSTATE_PSTATE(cpusave->krs_tstate);
+	gregs->kregs[KREG_PSTATE] = KREG_TSTATE_PSTATE(save->krs_tstate);
 
 	if (++wp == kaif_get_nwin(cpuid))
 		wp = 0;
 
 	for (i = 0; i < 8; i++)
-		gregs->kregs[KREG_O0 + i] = cpusave->krs_rwins[wp].rw_in[i];
+		gregs->kregs[KREG_O0 + i] = save->krs_rwins[wp].rw_in[i];
 
 	return (gregs);
 }
 
 static kreg_t *
-kaif_find_regp(int cpuid, int win, const char *regname)
+kaif_find_regp(kaif_cpusave_t *save, const char *regname)
 {
-	kaif_cpusave_t *cpusave;
 	mdb_tgt_gregset_t *gregs;
 	int nwin, i;
+	int win;
 
-	ASSERT(cpuid != DPI_MASTER_CPUID);
+	nwin = kaif_get_nwin(DPI_MASTER_CPUID);
 
-	if (cpuid < 0 || cpuid >= kaif_ncpusave) {
-		(void) set_errno(EINVAL);
-		return (NULL);
-	}
+	gregs = &save->krs_gregs;
 
-	nwin = kaif_get_nwin(cpuid);
-
-	if (win < -1 || win >= nwin) {
-		(void) set_errno(EINVAL);
-		return (NULL);
-	}
-
-	cpusave = &kaif_cpusave[cpuid];
-	gregs = &cpusave->krs_gregs;
-
-	if (win == DPI_TOP_WINDOW)
-		win = gregs->kregs[KREG_CWP];
+	win = gregs->kregs[KREG_CWP];
 
 	if (strcmp(regname, "sp") == 0)
 		regname = "o6";
@@ -225,10 +228,9 @@ kaif_find_regp(int cpuid, int win, const char *regname)
 				win = 0;
 			/*FALLTHROUGH*/
 		case 'i':
-			return ((kreg_t *)&cpusave->krs_rwins[win].rw_in[idx]);
+			return ((kreg_t *)&save->krs_rwins[win].rw_in[idx]);
 		case 'l':
-			return ((kreg_t *)
-			    &cpusave->krs_rwins[win].rw_local[idx]);
+			return ((kreg_t *)&save->krs_rwins[win].rw_local[idx]);
 		}
 	}
 
@@ -244,22 +246,19 @@ kaif_find_regp(int cpuid, int win, const char *regname)
 }
 
 static int
-kaif_get_cpu_register(int cpuid, int win, const char *regname, kreg_t *valp)
+kaif_get_register(const char *regname, kreg_t *valp)
 {
+	kaif_cpusave_t *save;
 	kreg_t *regp;
 
-	if (cpuid == DPI_MASTER_CPUID)
-		cpuid = kaif_master_cpuid;
-
-	if (cpuid < 0 || cpuid >= kaif_ncpusave)
-		return (set_errno(EINVAL));
+	save = kaif_cpuid2save(DPI_MASTER_CPUID);
 
 	if (strcmp(regname, "pstate") == 0) {
-		*valp = KREG_TSTATE_PSTATE(kaif_cpusave[cpuid].krs_tstate);
+		*valp = KREG_TSTATE_PSTATE(save->krs_tstate);
 		return (0);
 	}
 
-	if ((regp = kaif_find_regp(cpuid, win, regname)) == NULL)
+	if ((regp = kaif_find_regp(save, regname)) == NULL)
 		return (-1);
 
 	*valp = *regp;
@@ -268,27 +267,24 @@ kaif_get_cpu_register(int cpuid, int win, const char *regname, kreg_t *valp)
 }
 
 static int
-kaif_set_cpu_register(int cpuid, int win, const char *regname, kreg_t val)
+kaif_set_register(const char *regname, kreg_t val)
 {
+	kaif_cpusave_t *save;
 	kreg_t *regp;
 
-	if (cpuid == DPI_MASTER_CPUID)
-		cpuid = kaif_master_cpuid;
-
-	if (cpuid < 0 || cpuid >= kaif_ncpusave)
-		return (set_errno(EINVAL));
+	save = kaif_cpuid2save(DPI_MASTER_CPUID);
 
 	if (strcmp(regname, "g0") == 0) {
 		return (0);
 
 	} else if (strcmp(regname, "pstate") == 0) {
-		kaif_cpusave[cpuid].krs_tstate &= ~KREG_TSTATE_PSTATE_MASK;
-		kaif_cpusave[cpuid].krs_tstate |=
-		    (val & KREG_PSTATE_MASK) << KREG_TSTATE_PSTATE_SHIFT;
+		save->krs_tstate &= ~KREG_TSTATE_PSTATE_MASK;
+		save->krs_tstate |= (val & KREG_PSTATE_MASK) <<
+		    KREG_TSTATE_PSTATE_SHIFT;
 		return (0);
 	}
 
-	if ((regp = kaif_find_regp(cpuid, win, regname)) == NULL)
+	if ((regp = kaif_find_regp(save, regname)) == NULL)
 		return (-1);
 
 	*regp = val;
@@ -328,7 +324,7 @@ kaif_brkpt_disarm(uintptr_t addr, mdb_instr_t instrp)
  * should be used for activation comparison.
  */
 /*
- * Sun4v dosen't have watchpoint regs
+ * Sun4v doesn't have watchpoint regs
  */
 #ifndef	sun4v
 static uchar_t
@@ -426,7 +422,7 @@ static void
 kaif_wapt_arm(kmdb_wapt_t *wp)
 {
 	/*
-	 * Sun4v dosen't have watch point regs
+	 * Sun4v doesn't have watch point regs
 	 */
 #ifndef	sun4v
 	uint64_t mask = kaif_wapt_calc_mask(wp->wp_size);
@@ -457,7 +453,7 @@ static void
 kaif_wapt_disarm(kmdb_wapt_t *wp)
 {
 	/*
-	 * Sun4v dosen't have watch point regs
+	 * Sun4v doesn't have watch point regs
 	 */
 #ifndef	sun4v
 	if (wp->wp_type == DPI_WAPT_TYPE_PHYS) {
@@ -482,7 +478,7 @@ void
 kaif_wapt_set_regs(void)
 {
 	/*
-	 * Sun4v dosen't have watch point regs
+	 * Sun4v doesn't have watch point regs
 	 */
 #ifndef sun4v
 	uint64_t lsu;
@@ -503,7 +499,7 @@ void
 kaif_wapt_clear_regs(void)
 {
 	/*
-	 * Sun4v dosen't have watch point regs
+	 * Sun4v doesn't have watch point regs
 	 */
 #ifndef sun4v
 	uint64_t lsu = rdasi(ASI_LSU, NULL);
@@ -755,10 +751,18 @@ static const mdb_bitmask_t krm_flag_bits[] = {
 };
 
 static void
-dump_crumb(kaif_crumb_t *crumb)
+dump_crumb(kaif_crumb_t *krmp)
 {
+	kaif_crumb_t krm;
+
+	if (mdb_vread(&krm, sizeof (kaif_crumb_t), (uintptr_t)krmp) !=
+	    sizeof (kaif_crumb_t)) {
+		warn("failed to read crumb at %p", krmp);
+		return;
+	}
+
 	mdb_printf(" src: ");
-	switch (crumb->krm_src) {
+	switch (krm.krm_src) {
 	case KAIF_CRUMB_SRC_OBP:
 		mdb_printf("O");
 		break;
@@ -772,12 +776,11 @@ dump_crumb(kaif_crumb_t *crumb)
 		mdb_printf("-");
 		break;
 	default:
-		mdb_printf("%d", crumb->krm_src);
+		mdb_printf("%d", krm.krm_src);
 	}
 
 	mdb_printf(" tt %3x pc %8p %-20A <%b>\n",
-	    crumb->krm_tt, crumb->krm_pc, crumb->krm_pc,
-	    crumb->krm_flag, krm_flag_bits);
+	    krm.krm_tt, krm.krm_pc, krm.krm_pc, krm.krm_flag, krm_flag_bits);
 }
 
 static void
@@ -787,7 +790,6 @@ dump_crumbs(kaif_cpusave_t *save)
 
 	for (i = KAIF_NCRUMBS; i > 0; i--) {
 		uint_t idx = (save->krs_curcrumbidx + i) % KAIF_NCRUMBS;
-
 		dump_crumb(&save->krs_crumbs[idx]);
 	}
 }
@@ -798,6 +800,7 @@ kaif_dump_crumbs(uintptr_t addr, int cpuid)
 	int i;
 
 	if (addr != NULL) {
+		/* dump_crumb will protect us from bogus addresses */
 		dump_crumb((kaif_crumb_t *)addr);
 
 	} else if (cpuid != -1) {
@@ -824,16 +827,15 @@ kaif_dump_crumbs(uintptr_t addr, int cpuid)
 static int
 kaif_get_rwin(int cpuid, int win, struct rwindow *rwin)
 {
-	if (cpuid == DPI_MASTER_CPUID)
-		cpuid = kaif_master_cpuid;
-	if (win == DPI_TOP_WINDOW)
-		win = kaif_cpusave[cpuid].krs_gregs.kregs[KREG_CWP];
+	kaif_cpusave_t *save;
+
+	if ((save = kaif_cpuid2save(cpuid)) == NULL)
+		return (-1); /* errno is set for us */
 
 	if (win < 0 || win >= kaif_get_nwin(cpuid))
 		return (-1);
 
-	bcopy(&kaif_cpusave[cpuid].krs_rwins[win], rwin,
-	    sizeof (struct rwindow));
+	bcopy(&save->krs_rwins[win], rwin, sizeof (struct rwindow));
 
 	return (0);
 }
@@ -888,9 +890,9 @@ kaif_trap_set_debugger(void)
 }
 
 void
-kaif_trap_set_saved(kaif_cpusave_t *cpusave)
+kaif_trap_set_saved(kaif_cpusave_t *save)
 {
-	set_tba((caddr_t)cpusave->krs_gregs.kregs[KREG_TBA]);
+	set_tba((caddr_t)save->krs_gregs.kregs[KREG_TBA]);
 }
 
 static void
@@ -967,12 +969,12 @@ kaif_init(kmdb_auxv_t *kav)
 	    UM_SLEEP);
 
 	for (i = 0; i < kaif_ncpusave; i++) {
-		kaif_cpusave[i].krs_rwins = &rwins[nwin * i];
-		kaif_cpusave[i].krs_cpu_id = i;
+		kaif_cpusave_t *save = &kaif_cpusave[i];
 
-		kaif_cpusave[i].krs_curcrumb =
-		    &kaif_cpusave[i].krs_crumbs[KAIF_NCRUMBS - 1];
-		kaif_cpusave[i].krs_curcrumbidx = KAIF_NCRUMBS - 1;
+		save->krs_cpu_id = i;
+		save->krs_rwins = &rwins[nwin * i];
+		save->krs_curcrumbidx = KAIF_NCRUMBS - 1;
+		save->krs_curcrumb = &save->krs_crumbs[save->krs_curcrumbidx];
 	}
 
 	kaif_dseg = kav->kav_dseg;
@@ -1000,8 +1002,8 @@ dpi_ops_t kmdb_dpi_ops = {
 	kaif_get_cpu_state,
 	kaif_get_master_cpuid,
 	kaif_get_gregs,
-	kaif_get_cpu_register,
-	kaif_set_cpu_register,
+	kaif_get_register,
+	kaif_set_register,
 	kaif_get_rwin,
 	kaif_get_nwin,
 	kaif_brkpt_arm,

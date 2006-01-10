@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,8 +69,9 @@
 
 static int
 kmt_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
-    mdb_tgt_stack_f *func, void *arg, int cpu)
+    mdb_tgt_stack_f *func, void *arg, int cpuid)
 {
+	const mdb_tgt_gregset_t *grp;
 	mdb_tgt_gregset_t gregs;
 	kreg_t *kregs = &gregs.kregs[0];
 	long nwin, stopwin, canrestore, wp, i, sp;
@@ -81,13 +82,13 @@ kmt_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	 * specific location.  The normal iterator can handle that.
 	 */
 	if (gsp != NULL) {
-		if (cpu != DPI_MASTER_CPUID)
+		if (cpuid != DPI_MASTER_CPUID)
 			warn("register set provided - ignoring cpu argument\n");
 		return (mdb_kvm_v9stack_iter(t, gsp, func, arg));
 	}
 
-	if (kmdb_dpi_get_cpu_state(cpu) < 0) {
-		warn("failed to iterate through stack for cpu %u", cpu);
+	if (kmdb_dpi_get_cpu_state(cpuid) < 0) {
+		warn("failed to iterate through stack for cpu %u", cpuid);
 		return (DCMD_ERR);
 	}
 
@@ -97,11 +98,16 @@ kmt_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 	 * register windors.  If there's more to the trace than that,
 	 * we'll hand off to the normal iterator.
 	 */
-	bcopy(kmdb_dpi_get_gregs(cpu), &gregs, sizeof (mdb_tgt_gregset_t));
+	if ((grp = kmdb_dpi_get_gregs(cpuid)) == NULL) {
+		warn("failed to retrieve registers for cpu %d", cpuid);
+		return (DCMD_ERR);
+	}
+
+	bcopy(grp, &gregs, sizeof (mdb_tgt_gregset_t));
 
 	wp = kregs[KREG_CWP];
 	canrestore = kregs[KREG_CANRESTORE];
-	nwin = kmdb_dpi_get_nwin(cpu);
+	nwin = kmdb_dpi_get_nwin(cpuid);
 	stopwin = ((wp + nwin) - canrestore - 1) % nwin;
 
 	mdb_dprintf(MDB_DBG_KMOD, "dumping cwp = %lu, canrestore = %lu, "
@@ -133,7 +139,7 @@ kmt_stack_iter(mdb_tgt_t *t, const mdb_tgt_gregset_t *gsp,
 
 		bcopy(&kregs[KREG_I0], &kregs[KREG_O0], 8 * sizeof (kreg_t));
 
-		if (kmdb_dpi_get_rwin(cpu, wp, &rwin) < 0) {
+		if (kmdb_dpi_get_rwin(cpuid, wp, &rwin) < 0) {
 			warn("unable to get registers from window %ld\n", wp);
 			return (-1);
 		}

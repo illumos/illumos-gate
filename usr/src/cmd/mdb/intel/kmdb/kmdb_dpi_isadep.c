@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,16 +69,14 @@ kmdb_dpi_handle_fault(kreg_t trapno, kreg_t pc, kreg_t sp, int cpuid)
 int
 kmdb_dpi_get_register(const char *regname, kreg_t *kregp)
 {
-	return (mdb.m_dpi->dpo_get_cpu_register(DPI_MASTER_CPUID,
-	    regname, kregp));
+	return (mdb.m_dpi->dpo_get_register(regname, kregp));
 }
 
 /*ARGSUSED*/
 int
 kmdb_dpi_set_register(const char *regname, kreg_t kreg)
 {
-	return (mdb.m_dpi->dpo_set_cpu_register(DPI_MASTER_CPUID,
-	    regname, kreg));
+	return (mdb.m_dpi->dpo_set_register(regname, kreg));
 }
 
 /*
