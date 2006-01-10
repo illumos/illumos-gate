@@ -21,9 +21,10 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
+
 /* Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T */
 /* All Rights Reserved */
 /*
@@ -40,6 +41,8 @@
  *
  * Reentrant interface
  */
+
+#pragma weak inet_aton = _inet_aton
 
 #include "mt.h"
 #include "rpc_mt.h"
@@ -81,7 +84,6 @@ inet_ntoa(in)
 	return (inet_ntoa_r(in, b));
 }
 
-#pragma weak inet_aton = _inet_aton
 /*
  * Check whether "cp" is a valid ascii representation
  * of an Internet address and convert to a binary address.
@@ -90,7 +92,7 @@ inet_ntoa(in)
  * cannot distinguish between failure and a local broadcast address.
  */
 int
-_inet_aton(const char *cp, struct in_addr *addr)
+inet_aton(const char *cp, struct in_addr *addr)
 {
 	uint32_t val;
 	int base, n;
@@ -195,7 +197,7 @@ inet_addr(const char *cp)
 {
 	struct in_addr val;
 
-	if (_inet_aton(cp, &val))
+	if (inet_aton(cp, &val))
 		return (val.s_addr);
 	return (INADDR_NONE);
 }

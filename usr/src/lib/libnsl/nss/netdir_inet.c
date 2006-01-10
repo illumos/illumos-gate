@@ -21,11 +21,11 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
- *
- * lib/libnsl/nss/netdir_inet.c
- *
+ */
+
+/*
  * This is where we have chosen to combine every useful bit of code for
  * all the Solaris frontends to lookup hosts, services, and netdir information
  * for inet family (udp, tcp) transports. gethostbyYY(), getservbyYY(), and
@@ -191,7 +191,6 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 	struct in_addr	*inaddrs = NULL;
 	struct in6_addr	v6nameaddr;
 	char	**baddrlist = NULL;
-	extern	int _inet_aton();
 
 
 	if (nconf == NULL) {
@@ -228,7 +227,7 @@ _get_hostserv_inetnetdir_byname(struct netconfig *nconf,
 		 * gethostbyname, return that back as the address.
 		 * The nd_addr_lock mutex was added to be truely re-entrant.
 		 */
-		if (_inet_aton(args->arg.nss.host.name,
+		if (inet_aton(args->arg.nss.host.name,
 		    (struct in_addr *)&dotnameaddr)) {
 			(void) mutex_lock(&nd_addr_lock);
 			(void) memset(&sa_con, 0, sizeof (sa_con));

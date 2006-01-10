@@ -19,13 +19,19 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1996-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+/*
+ * Note: This weak symbol is probably not needed
+ * but it exists because it historically has.
+ */
+#pragma weak t_strerror = _t_strerror
 
 #include "mt.h"
 #include <tiuser.h>
@@ -193,11 +199,6 @@ t_sndudata(int fd, struct t_unitdata *unitdata)
 	return (_tx_sndudata(fd, unitdata, TX_TLI_API));
 }
 
-/*
- * Note: The weak symbol probably not needed but exists because it
- * historically has.
- */
-#pragma weak t_strerror = _t_strerror
 char *
 _t_strerror(int errnum)
 {

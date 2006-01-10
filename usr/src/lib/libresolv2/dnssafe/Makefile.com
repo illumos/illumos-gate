@@ -74,7 +74,7 @@ REDLOC=		$(ZREDLOCSYM)
 
 .KEEP_STATE:
 
-all:	$(LIBS) fnamecheck
+all:	$(LIBS)
 
 lint:	lintcheck
 

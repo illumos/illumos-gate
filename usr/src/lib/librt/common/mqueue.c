@@ -41,6 +41,15 @@
 #pragma weak mq_getattr = _mq_getattr
 
 #include "c_synonyms.h"
+#if !defined(__lint)	/* need a *_synonyms.h file */
+#define	sem_getvalue		_sem_getvalue
+#define	sem_init		_sem_init
+#define	sem_post		_sem_post
+#define	sem_reltimedwait_np	_sem_reltimedwait_np
+#define	sem_timedwait		_sem_timedwait
+#define	sem_trywait		_sem_trywait
+#define	sem_wait		_sem_wait
+#endif
 #define	_KMEMUSER
 #include <sys/param.h>		/* _MQ_OPEN_MAX, _MQ_PRIO_MAX, _SEM_VALUE_MAX */
 #undef	_KMEMUSER

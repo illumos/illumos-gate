@@ -57,7 +57,7 @@ CPPFLAGS +=	-D_SYS_STREAM_H -D_REENTRANT -DSVR4 -DSUNW_OPTIONS \
 
 .KEEP_STATE:
 
-all:	$(LIBS) fnamecheck
+all:	$(LIBS)
 
 lint:	lintcheck
 

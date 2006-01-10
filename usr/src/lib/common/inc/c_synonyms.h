@@ -36,6 +36,8 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
+#include <sys/feature_tests.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1010,6 +1012,12 @@ extern "C" {
 #define	sys_errlist			_sys_errlist
 #define	sys_nerr			_sys_nerr
 #endif	/* !_LP64 */
+
+/* 64-bit only interfaces */
+#if defined(_LP64)
+#define	getc_unlocked			_getc_unlocked
+#define	putc_unlocked			_putc_unlocked
+#endif	/* _LP64 */
 
 #endif	/* !defined(__lint) */
 

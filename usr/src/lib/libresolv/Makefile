@@ -83,7 +83,7 @@ package :=	TARGET= package
 
 LIBS = $(DYNLIB)
 
-all: $(SUBDIRS) $(LIBS) fnamecheck
+all: $(SUBDIRS) $(LIBS)
 
 install: all $(ROOTDYNLIBS) $(SUBDIRS)
 

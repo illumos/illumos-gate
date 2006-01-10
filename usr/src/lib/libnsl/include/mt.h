@@ -46,6 +46,10 @@
  */
 
 #include "c_synonyms.h"
+#if !defined(__lint)	/* libnsl synonyms */
+#define	inet_aton	_inet_aton
+#define	t_strerror	_t_strerror
+#endif
 #include <thread.h>
 #include <pthread.h>
 #include <signal.h>

@@ -37,25 +37,26 @@ SORT=/usr/bin/sort
 STATUS=0
 
 usage() {
-	echo "usage: $CMD -s synonyms-file -l shared-lib object-file ..."
-	$RM -f forbid.$$
+	echo "usage: $CMD -s synonyms-file -l shared-lib object-file ..." >&2
+	$RM -f /tmp/forbid.$$
 	exit 1
 }
 
 # Add to the list of forbidden names from the shared library
+# and its dependencies
 examine_library() {
 	if [ -f $1 ]
 	then
 		:
 	else
-		echo "$CMD: error: -l $1: non-existent file"
+		echo "$CMD: error: -l $1: non-existent file" >&2
 		usage
 	fi
 	if $FILE $1 | $GREP -q 'ELF .* dynamic lib'
 	then
 		:
 	else
-		echo "$CMD: error: -l $1: not a shared library"
+		echo "$CMD: error: -l $1: not a shared library" >&2
 		usage
 	fi
 
@@ -65,12 +66,11 @@ examine_library() {
 		SUBDIR=/64
 	fi
 
-	# Generate the list of forbidden names from the shared library
+	# First the library
+	$NM -Dphvx $1 | $GREP -v '^0x0000.*0000 ' >/tmp/match.$$
 
-	$NM -Dphvx $1 | $GREP -v '^0x0000.*0000 ' >match.$$
-	$ELFDUMP -d $1 | $GREP NEEDED >needed.$$
-	$ELFDUMP -d $1 | $GREP SUNW_FILTER >>needed.$$
-
+	# Then its dependencies
+	$ELFDUMP -d $1 | $GREP -E 'NEEDED|SUNW_FILTER' |
 	while read a b c NEEDED
 	do
 		case $NEEDED in
@@ -83,10 +83,13 @@ examine_library() {
 		fi
 		if [ -f "$NEEDED" ]
 		then
-			$NM -Dphvx $NEEDED |
-			$GREP -v '^0x0000.*0000 ' >>match.$$
+			echo $NEEDED
 		fi
-	done <needed.$$
+	done | $SORT -u |
+	while read DEPEND
+	do
+		$NM -Dphvx $DEPEND | $GREP -v '^0x0000.*0000 '
+	done >>/tmp/match.$$
 
 	addr1=""
 	name1=""
@@ -94,20 +97,38 @@ examine_library() {
 	do
 		if [ "$addr1" = "$addr2" ]
 		then
-			echo "$name1"
+			LIST="$name1"
 			while [ "$addr1" = "$addr2" ]
 			do
-				echo "$name2"
+				LIST="$LIST $name2"
 				addr1="$addr2"
 				name1="$name2"
 				read addr2 trash name2
 			done
+			UNDERBAR=0
+			for NAME in $LIST
+			do
+				case $NAME in
+				_etext|_edata|_end) ;;
+				_*) UNDERBAR=1 ;;
+				esac
+			done
+			if [ $UNDERBAR -ne 0 ]
+			then
+				for NAME in $LIST
+				do
+					case $NAME in
+					_*|.*) ;;
+					*) echo $NAME ;;
+					esac
+				done
+			fi
 		fi
 		addr1="$addr2"
 		name1="$name2"
-	done <match.$$ | $GREP -v '^[^\.]' >>forbid.$$
+	done </tmp/match.$$ >>/tmp/forbid.$$
 
-	$RM -f match.$$ needed.$$
+	$RM -f /tmp/match.$$
 }
 
 # Add to the list of forbidden names from the synonyms file
@@ -116,14 +137,14 @@ examine_synonyms() {
 	then
 		:
 	else
-		echo "$CMD: error: -s $1: non-existent file"
+		echo "$CMD: error: -s $1: non-existent file" >&2
 		usage
 	fi
 	$GREP '^#define' $1 | $GREP -v _COMMON_ |
 	while read d NAME trash
 	do
 		echo $NAME
-	done >>forbid.$$
+	done >>/tmp/forbid.$$
 }
 
 if [ $# -eq 0 ]
@@ -131,7 +152,7 @@ then
 	usage
 fi
 
->forbid.$$
+>/tmp/forbid.$$
 
 GOT_LIB_SYN=0
 while getopts l:s: ARG
@@ -154,14 +175,14 @@ then
 	usage
 fi
 
-$SORT -u -o forbid.$$ forbid.$$
+$SORT -u -o /tmp/forbid.$$ /tmp/forbid.$$
 
 # Examine each object file, looking for forbidden names
 for file
 do
 	if $FILE $file | $GREP -q 'ELF.*relocatable'
 	then
-		LIST="`$NM -uph $file | $GREP -w -f forbid.$$`"
+		LIST="`$NM -uph $file | $GREP -w -f /tmp/forbid.$$`"
 		if [ ! -z "$LIST" ]
 		then
 			echo "$CMD: error: forbidden names found in $file"
@@ -169,11 +190,11 @@ do
 			STATUS=1
 		fi
 	else
-		echo "$CMD: error: $file: not a relocatable object file"
+		echo "$CMD: error: $file: not a relocatable object file" >&2
 		STATUS=1
 	fi
 done
 
-$RM -f forbid.$$
+$RM -f /tmp/forbid.$$
 
 exit $STATUS

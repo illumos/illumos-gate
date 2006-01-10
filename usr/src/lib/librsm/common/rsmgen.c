@@ -28,6 +28,11 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include "c_synonyms.h"
+#if !defined(__lint)	/* need a *_synonyms.h file */
+#define	rsm_memseg_export_create	_rsm_memseg_export_create
+#define	rsm_memseg_export_destroy	_rsm_memseg_export_destroy
+#define	rsm_memseg_export_publish	_rsm_memseg_export_publish
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
