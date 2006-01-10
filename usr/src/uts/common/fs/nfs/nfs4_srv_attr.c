@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -753,19 +753,37 @@ rfs4_fattr4_rdattr_error(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	return (error);
 }
 
+/*
+ * Server side compare of a filehandle from the wire to a native
+ * server filehandle.
+ */
+static int
+rfs4fhcmp(nfs_fh4 *wirefh, nfs_fh4 *srvfh)
+{
+	nfs_fh4_fmt_t fh;
+
+	ASSERT(IS_P2ALIGNED(wirefh->nfs_fh4_val, sizeof (uint32_t)));
+
+	bzero(&fh, sizeof (nfs_fh4_fmt_t));
+	if (!xdr_inline_decode_nfs_fh4((uint32_t *)wirefh->nfs_fh4_val, &fh,
+	    wirefh->nfs_fh4_len))
+		return (1);
+
+	return (bcmp(srvfh->nfs_fh4_val, &fh, srvfh->nfs_fh4_len));
+}
+
 /* ARGSUSED */
 static int
 rfs4_fattr4_filehandle(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 	union nfs4_attr_u *na)
 {
-	int error = 0;
 	nfs_fh4 *fh;
 
 	switch (cmd) {
 	case NFS4ATTR_SUPPORTED:
 		if (sarg->op == NFS4ATTR_SETIT)
-			error = EINVAL;
-		break;		/* this attr is supported */
+			return (EINVAL);
+		return (0);	/* this attr is supported */
 	case NFS4ATTR_GETIT:
 		/*
 		 * If sarg->cs->fh is all zeros then should makefh a new
@@ -773,42 +791,44 @@ rfs4_fattr4_filehandle(nfs4_attr_cmd_t cmd, struct nfs4_svgetit_arg *sarg,
 		 */
 		fh = &sarg->cs->fh;
 		if (sarg->cs->fh.nfs_fh4_len == 0) {
-			if (sarg->rdattr_error && (sarg->cs->vp == NULL)) {
-				error = -1;	/* okay if rdattr_error */
-				break;
-			}
+			if (sarg->rdattr_error && (sarg->cs->vp == NULL))
+				return (-1);	/* okay if rdattr_error */
 			ASSERT(sarg->cs->vp != NULL);
 			na->filehandle.nfs_fh4_val =
-				kmem_alloc(NFS_FH4_LEN, KM_SLEEP);
-			error = makefh4(&na->filehandle, sarg->cs->vp,
-					sarg->cs->exi);
-		} else {
-			na->filehandle.nfs_fh4_val =
-				kmem_alloc(fh->nfs_fh4_len, KM_SLEEP);
-			nfs_fh4_copy(fh, &na->filehandle);
+			    kmem_alloc(NFS_FH4_LEN, KM_SLEEP);
+			return (makefh4(&na->filehandle, sarg->cs->vp,
+			    sarg->cs->exi));
 		}
-		break;
+		na->filehandle.nfs_fh4_val =
+		    kmem_alloc(fh->nfs_fh4_len, KM_SLEEP);
+		nfs_fh4_copy(fh, &na->filehandle);
+		return (0);
 	case NFS4ATTR_SETIT:
 		/*
 		 * read-only attr
 		 */
-		error = EINVAL;
-		break;
+		return (EINVAL);
 	case NFS4ATTR_VERIT:
-		if (nfs4cmpfh(&na->filehandle, &sarg->cs->fh))
-			error = -1;	/* no match */
-		break;
+		/*
+		 * A verify of a filehandle will have the client sending
+		 * the raw format which needs to be compared to the
+		 * native format.
+		 */
+		if (rfs4fhcmp(&na->filehandle, &sarg->cs->fh) == 1)
+			return (-1);	/* no match */
+		return (0);
 	case NFS4ATTR_FREEIT:
-		if (sarg->op == NFS4ATTR_GETIT) {
-			if (na->filehandle.nfs_fh4_val) {
-				kmem_free(na->filehandle.nfs_fh4_val,
-					na->filehandle.nfs_fh4_len);
-				bzero(&na->filehandle, sizeof (na->filehandle));
-			}
-		}
-		break;
+		if (sarg->op != NFS4ATTR_GETIT)
+			return (0);
+		if (na->filehandle.nfs_fh4_val == NULL)
+			return (0);
+		kmem_free(na->filehandle.nfs_fh4_val,
+		    na->filehandle.nfs_fh4_len);
+		na->filehandle.nfs_fh4_val = NULL;
+		na->filehandle.nfs_fh4_len = 0;
+		return (0);
 	}
-	return (error);
+	return (0);
 }
 
 /*

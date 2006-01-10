@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2005 Sun Microsystems, Inc.
+ *	Copyright 2006 Sun Microsystems, Inc.
  *	All rights reserved.  Use is subject to license terms.
  */
 
@@ -149,6 +149,179 @@ xdr_utf8string(XDR *xdrs, utf8string *objp)
 }
 
 /*
+ * XDR_INLINE decode a filehandle.
+ */
+bool_t
+xdr_inline_decode_nfs_fh4(uint32_t *ptr, nfs_fh4_fmt_t *fhp, uint32_t fhsize)
+{
+	uchar_t *bp = (uchar_t *)ptr;
+	uchar_t *cp;
+	uint32_t dsize;
+	uintptr_t resid;
+
+	/*
+	 * Check to see if what the client sent us is bigger or smaller
+	 * than what we can ever possibly send out. NFS_FHMAXDATA is
+	 * unfortunately badly named as it is no longer the max and is
+	 * really the min of what is sent over the wire.
+	 */
+	if (fhsize > sizeof (nfs_fh4_fmt_t) || fhsize < (sizeof (fsid_t) +
+	    sizeof (ushort_t) + NFS_FHMAXDATA +
+	    sizeof (ushort_t) + NFS_FHMAXDATA)) {
+		return (FALSE);
+	}
+
+	/*
+	 * All internal parts of a filehandle are in native byte order.
+	 *
+	 * Decode what should be fh4_fsid, it is aligned.
+	 */
+	fhp->fh4_fsid.val[0] = *(uint32_t *)bp;
+	bp += BYTES_PER_XDR_UNIT;
+	fhp->fh4_fsid.val[1] = *(uint32_t *)bp;
+	bp += BYTES_PER_XDR_UNIT;
+
+	/*
+	 * Decode what should be fh4_len.  fh4_len is two bytes, so we're
+	 * unaligned now.
+	 */
+	cp = (uchar_t *)&fhp->fh4_len;
+	*cp++ = *bp++;
+	*cp++ = *bp++;
+	fhsize -= 2 * BYTES_PER_XDR_UNIT + sizeof (ushort_t);
+
+	/*
+	 * For backwards compatability, the fid length may be less than
+	 * NFS_FHMAXDATA, but it was always encoded as NFS_FHMAXDATA bytes.
+	 */
+	dsize = fhp->fh4_len < NFS_FHMAXDATA ? NFS_FHMAXDATA : fhp->fh4_len;
+
+	/*
+	 * Make sure the client isn't sending us a bogus length for fh4_data.
+	 */
+	if (fhsize < dsize)
+		return (FALSE);
+	bcopy(bp, fhp->fh4_data, dsize);
+	bp += dsize;
+	fhsize -= dsize;
+
+	if (fhsize < sizeof (ushort_t))
+		return (FALSE);
+	cp = (uchar_t *)&fhp->fh4_xlen;
+	*cp++ = *bp++;
+	*cp++ = *bp++;
+	fhsize -= sizeof (ushort_t);
+
+	dsize = fhp->fh4_xlen < NFS_FHMAXDATA ? NFS_FHMAXDATA : fhp->fh4_xlen;
+
+	/*
+	 * Make sure the client isn't sending us a bogus length for fh4_xdata.
+	 */
+	if (fhsize < dsize)
+		return (FALSE);
+	bcopy(bp, fhp->fh4_xdata, dsize);
+	fhsize -= dsize;
+	bp += dsize;
+
+	/*
+	 * We realign things on purpose, so skip any padding
+	 */
+	resid = (uintptr_t)bp % BYTES_PER_XDR_UNIT;
+	if (resid != 0) {
+		if (fhsize < (BYTES_PER_XDR_UNIT - resid))
+			return (FALSE);
+		bp += BYTES_PER_XDR_UNIT - resid;
+		fhsize -= BYTES_PER_XDR_UNIT - resid;
+	}
+
+	if (fhsize < BYTES_PER_XDR_UNIT)
+		return (FALSE);
+	fhp->fh4_flag = *(uint32_t *)bp;
+	bp += BYTES_PER_XDR_UNIT;
+	fhsize -= BYTES_PER_XDR_UNIT;
+
+#ifdef VOLATILE_FH_TEST
+	if (fhsize < BYTES_PER_XDR_UNIT)
+		return (FALSE);
+	fhp->fh4_volatile_id = *(uint32_t *)bp;
+	bp += BYTES_PER_XDR_UNIT;
+	fhsize -= BYTES_PER_XDR_UNIT;
+#endif
+	/*
+	 * Make sure client didn't send extra bytes
+	 */
+	if (fhsize != 0)
+		return (FALSE);
+	return (TRUE);
+}
+
+static bool_t
+xdr_decode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
+{
+	uint32_t fhsize;		/* filehandle size */
+	uint32_t bufsize;
+	rpc_inline_t *ptr;
+	uchar_t *buf, *bp;
+
+	ASSERT(xdrs->x_op == XDR_DECODE);
+
+	/*
+	 * Retrieve the filehandle length.
+	 */
+	if (!XDR_GETINT32(xdrs, (int32_t *)&fhsize))
+		return (FALSE);
+
+	objp->nfs_fh4_val = NULL;
+	objp->nfs_fh4_len = 0;
+
+	/*
+	 * Check to see if what the client sent us is bigger or smaller
+	 * than what we can ever possibly send out. NFS_FHMAXDATA is
+	 * unfortunately badly named as it is no longer the max and is
+	 * really the min of what is sent over the wire.
+	 */
+	if (fhsize > sizeof (nfs_fh4_fmt_t) || fhsize < (sizeof (fsid_t) +
+	    sizeof (ushort_t) + NFS_FHMAXDATA +
+	    sizeof (ushort_t) + NFS_FHMAXDATA)) {
+		if (!XDR_CONTROL(xdrs, XDR_SKIPBYTES, &fhsize))
+			return (FALSE);
+		return (TRUE);
+	}
+
+	/*
+	 * bring in fhsize plus any padding
+	 */
+	bufsize = RNDUP(fhsize);
+	ptr = XDR_INLINE(xdrs, bufsize);
+	bp = (uchar_t *)ptr;
+	if (ptr == NULL) {
+		bp = buf = kmem_alloc(bufsize, KM_SLEEP);
+		if (!xdr_opaque(xdrs, (char *)bp, bufsize))
+			return (FALSE);
+	}
+
+	objp->nfs_fh4_val = kmem_zalloc(sizeof (nfs_fh4_fmt_t), KM_SLEEP);
+	objp->nfs_fh4_len = sizeof (nfs_fh4_fmt_t);
+
+	if (xdr_inline_decode_nfs_fh4((uint32_t *)bp,
+	    (nfs_fh4_fmt_t *)objp->nfs_fh4_val, fhsize) == FALSE) {
+		/*
+		 * If in the process of decoding we find the file handle
+		 * is not correctly formed, we need to continue decoding
+		 * and trigger an NFS layer error. Set the nfs_fh4_len to
+		 * zero so it gets caught as a bad length.
+		 */
+		kmem_free(objp->nfs_fh4_val, objp->nfs_fh4_len);
+		objp->nfs_fh4_val = NULL;
+		objp->nfs_fh4_len = 0;
+	}
+
+	if (ptr == NULL)
+		kmem_free(buf, bufsize);
+	return (TRUE);
+}
+
+/*
  * XDR_INLINE encode a filehandle.
  */
 bool_t
@@ -240,162 +413,6 @@ xdr_inline_encode_nfs_fh4(uint32_t **ptrp, uint32_t *ptr_redzone,
 }
 
 static bool_t
-xdr_decode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
-{
-	uint32_t fhsize;		/* filehandle size */
-	uint32_t bufsize;
-	uint32_t dsize;
-	nfs_fh4_fmt_t *fh_fmtp;
-	rpc_inline_t *ptr;
-	uintptr_t resid;
-	uchar_t *buf, *bp, *cp;
-
-	ASSERT(xdrs->x_op == XDR_DECODE);
-
-	/*
-	 * Retrieve the filehandle length.
-	 */
-	if (!XDR_GETINT32(xdrs, (int32_t *)&fhsize))
-		return (FALSE);
-
-	objp->nfs_fh4_val = NULL;
-	objp->nfs_fh4_len = 0;
-
-	/*
-	 * Check to see if what the client sent us is bigger or smaller
-	 * than what we can ever possibly send out. NFS_FHMAXDATA is
-	 * unfortunately badly named as it is no longer the max and is
-	 * really the min of what is sent over the wire.
-	 */
-	if (fhsize > sizeof (nfs_fh4_fmt_t) || fhsize < (sizeof (fsid_t) +
-	    sizeof (ushort_t) + NFS_FHMAXDATA +
-	    sizeof (ushort_t) + NFS_FHMAXDATA)) {
-		if (!XDR_CONTROL(xdrs, XDR_SKIPBYTES, &fhsize))
-			return (FALSE);
-		return (TRUE);
-	}
-
-	/*
-	 * bring in fhsize plus any padding
-	 */
-	bufsize = RNDUP(fhsize);
-	ptr = XDR_INLINE(xdrs, bufsize);
-	if (ptr == NULL) {
-		bp = buf = kmem_alloc(bufsize, KM_SLEEP);
-		if (!xdr_opaque(xdrs, (char *)bp, bufsize))
-			return (FALSE);
-	} else {
-		bp = (uchar_t *)ptr;
-	}
-
-	objp->nfs_fh4_val = kmem_zalloc(sizeof (nfs_fh4_fmt_t), KM_SLEEP);
-	objp->nfs_fh4_len = sizeof (nfs_fh4_fmt_t);
-	fh_fmtp = (nfs_fh4_fmt_t *)objp->nfs_fh4_val;
-
-	/*
-	 * All internal parts of a filehandle are in native byte order.
-	 *
-	 * Decode what should be fh4_fsid, it is aligned.
-	 */
-	fh_fmtp->fh4_fsid.val[0] = *(uint32_t *)bp;
-	bp += BYTES_PER_XDR_UNIT;
-	fh_fmtp->fh4_fsid.val[1] = *(uint32_t *)bp;
-	bp += BYTES_PER_XDR_UNIT;
-
-	/*
-	 * Decode what should be fh4_len.  fh4_len is two bytes, so we're
-	 * unaligned now.
-	 */
-	cp = (uchar_t *)&fh_fmtp->fh4_len;
-	*cp++ = *bp++;
-	*cp++ = *bp++;
-	fhsize -= 2 * BYTES_PER_XDR_UNIT + sizeof (ushort_t);
-
-	/*
-	 * For backwards compatability, the fid length may be less than
-	 * NFS_FHMAXDATA, but it was always encoded as NFS_FHMAXDATA bytes.
-	 */
-	dsize = fh_fmtp->fh4_len < NFS_FHMAXDATA ? NFS_FHMAXDATA :
-	    fh_fmtp->fh4_len;
-
-	/*
-	 * Make sure the client isn't sending us a bogus length for fh4_data.
-	 */
-	if (dsize > fhsize)
-		goto badfh;
-	bcopy(bp, fh_fmtp->fh4_data, dsize);
-	bp += dsize;
-	fhsize -= dsize;
-
-	if (fhsize < sizeof (ushort_t))
-		goto badfh;
-	cp = (uchar_t *)&fh_fmtp->fh4_xlen;
-	*cp++ = *bp++;
-	*cp++ = *bp++;
-	fhsize -= sizeof (ushort_t);
-
-	dsize = fh_fmtp->fh4_xlen < NFS_FHMAXDATA ? NFS_FHMAXDATA :
-	    fh_fmtp->fh4_xlen;
-	/*
-	 * Make sure the client isn't sending us a bogus length for fh4_xdata.
-	 */
-	if (dsize > fhsize)
-		goto badfh;
-	bcopy(bp, fh_fmtp->fh4_xdata, dsize);
-	fhsize -= dsize;
-	bp += dsize;
-
-	/*
-	 * We realign things on purpose, so skip any padding
-	 */
-	resid = (uintptr_t)bp % BYTES_PER_XDR_UNIT;
-	if (resid != 0) {
-		if (fhsize < (BYTES_PER_XDR_UNIT - resid))
-			goto badfh;
-		bp += BYTES_PER_XDR_UNIT - resid;
-		fhsize -= BYTES_PER_XDR_UNIT - resid;
-	}
-
-	if (fhsize < BYTES_PER_XDR_UNIT)
-		goto badfh;
-	fh_fmtp->fh4_flag = *(uint32_t *)bp;
-	bp += BYTES_PER_XDR_UNIT;
-	fhsize -= BYTES_PER_XDR_UNIT;
-
-#ifdef VOLATILE_FH_TEST
-	if (fhsize < BYTES_PER_XDR_UNIT)
-		goto badfh;
-	fh_fmtp->fh4_fh4_volatile_id = *(uint32_t *)bp;
-	bp += BYTES_PER_XDR_UNIT;
-	fhsize -= BYTES_PER_XDR_UNIT;
-#endif
-	/*
-	 * Make sure client didn't send extra bytes
-	 */
-	if (fhsize != 0)
-		goto badfh;
-
-	if (ptr == NULL)
-		kmem_free(buf, bufsize);
-	return (TRUE);
-
-badfh:
-	/*
-	 * If in the process of decoding we find the file handle
-	 * is not correctly formed, we need to continue decoding
-	 * and trigger an NFS layer error. Set the nfs_fh4_len to
-	 * zero so it gets caught as a bad length.
-	 */
-	if (objp->nfs_fh4_val != NULL)
-		kmem_free(objp->nfs_fh4_val, objp->nfs_fh4_len);
-	objp->nfs_fh4_val = NULL;
-	objp->nfs_fh4_len = 0;
-	if (ptr == NULL)
-		kmem_free(buf, bufsize);
-	return (TRUE);
-}
-
-static bool_t
 xdr_encode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 {
 	uint_t otw_len, fsize, xsize;   /* otw, file, and export sizes */
@@ -450,20 +467,26 @@ xdr_encode_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 
 /*
  * XDR a NFSv4 filehandle.
+ * Encoding interprets the contents (server).
+ * Decoding the contents are opaque (client).
  */
 bool_t
 xdr_nfs_fh4(XDR *xdrs, nfs_fh4 *objp)
 {
-	if (xdrs->x_op == XDR_DECODE)
-		return (xdr_decode_nfs_fh4(xdrs, objp));
-	else if (xdrs->x_op == XDR_ENCODE)
+	switch (xdrs->x_op) {
+	case XDR_ENCODE:
 		return (xdr_encode_nfs_fh4(xdrs, objp));
-
-	if (objp->nfs_fh4_val != NULL) {
-		kmem_free(objp->nfs_fh4_val, objp->nfs_fh4_len);
-		objp->nfs_fh4_val = NULL;
+	case XDR_DECODE:
+		return (xdr_bytes(xdrs, (char **)&objp->nfs_fh4_val,
+		    (uint_t *)&objp->nfs_fh4_len, NFS4_FHSIZE));
+	case XDR_FREE:
+		if (objp->nfs_fh4_val != NULL) {
+			kmem_free(objp->nfs_fh4_val, objp->nfs_fh4_len);
+			objp->nfs_fh4_val = NULL;
+		}
+		return (TRUE);
 	}
-	return (TRUE);
+	return (FALSE);
 }
 
 /* Called by xdr_array */
@@ -4397,7 +4420,7 @@ xdr_snfs_resop4(XDR *xdrs, nfs_resop4 *objp)
 		if (objp->nfs_resop4_u.opgetfh.status != NFS4_OK)
 			return (TRUE);
 		return (xdr_encode_nfs_fh4(xdrs,
-			&objp->nfs_resop4_u.opgetfh.object));
+		    &objp->nfs_resop4_u.opgetfh.object));
 	default:
 		return (xdr_nfs_resop4(xdrs, objp));
 	}
@@ -4715,35 +4738,78 @@ xdr_COMPOUND4res_srv(XDR *xdrs, COMPOUND4res *objp)
 				    objp->array_len, objp->array_len));
 }
 
+/*
+ * NFS server side callback, initiating the callback request so it
+ * is the RPC client. Must convert from server's internal filehandle
+ * format to wire format.
+ */
 static bool_t
-xdr_nfs_cb_argop4(XDR *xdrs, nfs_cb_argop4 *objp)
+xdr_snfs_cb_argop4(XDR *xdrs, nfs_cb_argop4 *objp)
 {
+	CB_GETATTR4args *gargs;
+	CB_RECALL4args *rargs;
+
+	ASSERT(xdrs->x_op == XDR_ENCODE);
+
+	if (!XDR_PUTINT32(xdrs, (int32_t *)&objp->argop))
+		return (FALSE);
+
+	switch (objp->argop) {
+	case OP_CB_GETATTR:
+		gargs = &objp->nfs_cb_argop4_u.opcbgetattr;
+
+		if (!xdr_encode_nfs_fh4(xdrs, &gargs->fh))
+			return (FALSE);
+		return (xdr_bitmap4(xdrs, &gargs->attr_request));
+	case OP_CB_RECALL:
+		rargs = &objp->nfs_cb_argop4_u.opcbrecall;
+
+		if (!XDR_PUTINT32(xdrs, (int32_t *)&rargs->stateid.seqid))
+			return (FALSE);
+		if (!xdr_opaque(xdrs, rargs->stateid.other, 12))
+			return (FALSE);
+		if (!XDR_PUTINT32(xdrs, (int32_t *)&rargs->truncate))
+			return (FALSE);
+		return (xdr_encode_nfs_fh4(xdrs, &rargs->fh));
+	case OP_CB_ILLEGAL:
+		return (TRUE);
+	}
+	return (FALSE);
+}
+
+/*
+ * NFS client side callback, receiving the callback request so it
+ * is the RPC server. Must treat the file handles as opaque.
+ */
+static bool_t
+xdr_cnfs_cb_argop4(XDR *xdrs, nfs_cb_argop4 *objp)
+{
+	CB_GETATTR4args *gargs;
+	CB_RECALL4args *rargs;
+
+	ASSERT(xdrs->x_op != XDR_ENCODE);
+
 	if (!xdr_u_int(xdrs, &objp->argop))
 		return (FALSE);
 	switch (objp->argop) {
 	case OP_CB_GETATTR:
-		if (!xdr_bytes(xdrs,
-		    (char **)&objp->nfs_cb_argop4_u.opcbgetattr.fh.nfs_fh4_val,
-		    (uint_t *)&objp->nfs_cb_argop4_u.opcbgetattr.fh.nfs_fh4_len,
-		    NFS4_FHSIZE))
+		gargs = &objp->nfs_cb_argop4_u.opcbgetattr;
+
+		if (!xdr_bytes(xdrs, (char **)&gargs->fh.nfs_fh4_val,
+		    (uint_t *)&gargs->fh.nfs_fh4_len, NFS4_FHSIZE))
 			return (FALSE);
-		return (xdr_bitmap4(xdrs,
-			&objp->nfs_cb_argop4_u.opcbgetattr.attr_request));
+		return (xdr_bitmap4(xdrs, &gargs->attr_request));
 	case OP_CB_RECALL:
-		if (!xdr_u_int(xdrs,
-			    &objp->nfs_cb_argop4_u.opcbrecall.stateid.seqid))
+		rargs = &objp->nfs_cb_argop4_u.opcbrecall;
+
+		if (!xdr_u_int(xdrs, &rargs->stateid.seqid))
 			return (FALSE);
-		if (!xdr_opaque(xdrs,
-			    objp->nfs_cb_argop4_u.opcbrecall.stateid.other,
-			    12))
+		if (!xdr_opaque(xdrs, rargs->stateid.other, 12))
 			return (FALSE);
-		if (!xdr_bool(xdrs,
-				&objp->nfs_cb_argop4_u.opcbrecall.truncate))
+		if (!xdr_bool(xdrs, &rargs->truncate))
 			return (FALSE);
-		return (xdr_bytes(xdrs,
-		    (char **)&objp->nfs_cb_argop4_u.opcbrecall.fh.nfs_fh4_val,
-		    (uint_t *)&objp->nfs_cb_argop4_u.opcbrecall.fh.nfs_fh4_len,
-		    NFS4_FHSIZE));
+		return (xdr_bytes(xdrs, (char **)&rargs->fh.nfs_fh4_val,
+		    (uint_t *)&rargs->fh.nfs_fh4_len, NFS4_FHSIZE));
 	case OP_CB_ILLEGAL:
 		return (TRUE);
 	}
@@ -4776,8 +4842,11 @@ xdr_nfs_cb_resop4(XDR *xdrs, nfs_cb_resop4 *objp)
 	return (FALSE);
 }
 
+/*
+ * The NFS client side callback, RPC server
+ */
 bool_t
-xdr_CB_COMPOUND4args(XDR *xdrs, CB_COMPOUND4args *objp)
+xdr_CB_COMPOUND4args_clnt(XDR *xdrs, CB_COMPOUND4args *objp)
 {
 	if (!xdr_bytes(xdrs, (char **)&objp->tag.utf8string_val,
 			(uint_t *)&objp->tag.utf8string_len,
@@ -4789,7 +4858,26 @@ xdr_CB_COMPOUND4args(XDR *xdrs, CB_COMPOUND4args *objp)
 		return (FALSE);
 	return (xdr_array(xdrs, (char **)&objp->array,
 			(uint_t *)&objp->array_len, NFS4_COMPOUND_LIMIT,
-			sizeof (nfs_cb_argop4), (xdrproc_t)xdr_nfs_cb_argop4));
+			sizeof (nfs_cb_argop4), (xdrproc_t)xdr_cnfs_cb_argop4));
+}
+
+/*
+ * The NFS server side callback, RPC client
+ */
+bool_t
+xdr_CB_COMPOUND4args_srv(XDR *xdrs, CB_COMPOUND4args *objp)
+{
+	if (!xdr_bytes(xdrs, (char **)&objp->tag.utf8string_val,
+			(uint_t *)&objp->tag.utf8string_len,
+			NFS4_MAX_UTF8STRING))
+		return (FALSE);
+	if (!xdr_u_int(xdrs, &objp->minorversion))
+		return (FALSE);
+	if (!xdr_u_int(xdrs, &objp->callback_ident))
+		return (FALSE);
+	return (xdr_array(xdrs, (char **)&objp->array,
+			(uint_t *)&objp->array_len, NFS4_COMPOUND_LIMIT,
+			sizeof (nfs_cb_argop4), (xdrproc_t)xdr_snfs_cb_argop4));
 }
 
 bool_t

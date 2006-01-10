@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -833,7 +833,7 @@ retry:
 		 */
 		args->callback_ident = cbp->cb_ident;
 
-		stat = clnt_call(ch, CB_COMPOUND, xdr_CB_COMPOUND4args,
+		stat = clnt_call(ch, CB_COMPOUND, xdr_CB_COMPOUND4args_srv,
 			(caddr_t)args, xdr_CB_COMPOUND4res,
 			(caddr_t)res, timeout);
 

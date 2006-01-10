@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1426,6 +1426,8 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	struct netbuf	nb;
 	bool_t logging_enabled = FALSE;
 	struct exportinfo *nfslog_exi = NULL;
+	char **procnames;
+	char cbuf[INET6_ADDRSTRLEN];	/* to hold both IPv4 and IPv6 addr */
 
 	vers = req->rq_vers;
 
@@ -1447,12 +1449,13 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 	(*(disptable[(int)vers].dis_proccntp))[which].value.ui64++;
 
 	disp = &disptable[(int)vers].dis_table[which];
+	procnames = disptable[(int)vers].dis_procnames;
 
 	auth_flavor = req->rq_cred.oa_flavor;
+
 	/*
 	 * Deserialize into the args struct.
 	 */
-
 	args = (char *)&args_buf;
 
 #ifdef DEBUG
@@ -1468,8 +1471,11 @@ common_dispatch(struct svc_req *req, SVCXPRT *xprt, rpcvers_t min_vers,
 		if (!SVC_GETARGS(xprt, disp->dis_xdrargs, args)) {
 			svcerr_decode(xprt);
 			error++;
-			cmn_err(CE_NOTE, "%s: bad getargs for %u/%d",
-			    pgmname, vers + min_vers, which);
+			cmn_err(CE_NOTE,
+			    "Failed to decode arguments for %s version %u "
+			    "procedure %s client %s%s",
+			    pgmname, vers + min_vers, procnames[which],
+			    client_name(req), client_addr(req, cbuf));
 			goto done;
 		}
 	}
@@ -1741,7 +1747,7 @@ static void
 rfs_dispatch(struct svc_req *req, SVCXPRT *xprt)
 {
 	common_dispatch(req, xprt, NFS_VERSMIN, NFS_VERSMAX,
-		"nfs_server", rfs_disptable);
+		"NFS", rfs_disptable);
 }
 
 static char *aclcallnames_v2[] = {
@@ -1867,7 +1873,7 @@ static void
 acl_dispatch(struct svc_req *req, SVCXPRT *xprt)
 {
 	common_dispatch(req, xprt, NFS_ACL_VERSMIN, NFS_ACL_VERSMAX,
-		"acl_server", acl_disptable);
+		"ACL", acl_disptable);
 }
 
 int

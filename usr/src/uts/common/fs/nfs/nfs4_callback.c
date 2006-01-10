@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,8 +93,6 @@ nfs_space_limit4 nfs4_deleg_space_phony = { NFS_LIMIT_SIZE, 8192 };
 nfs_space_limit4 nfs4_deleg_space_phony2 = { NFS_LIMIT_BLOCKS, 0 };
 nfs_modified_limit4 nfs4_deleg_space_phonyl = { 8, 512 };
 changeid4 nfs4_deleg_change_phony = 0x7eeeeeee76666660LL;
-/* ignore malformed file handle on recall, bug in linux server */
-int nfs4_linux_bug = 1;
 int nfs4_use_phony_limit;
 int nfs4_use_phony_recall;
 int nfs4_phony_recall_v;
@@ -192,7 +190,7 @@ cb_getattr(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
 	bool_t found = FALSE;
 	struct nfs4_server *sp;
 	struct fattr4 *fap;
-	char *fdata = NULL;
+	rpc_inline_t *fdata;
 	long mapcnt;
 	fattr4_change change;
 	fattr4_size size;
@@ -317,7 +315,7 @@ cb_getattr(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
 
 	fap->attrmask = 0;
 	/* attrlist4_len starts at 0 and increases as attrs are processed */
-	fap->attrlist4 = fdata;
+	fap->attrlist4 = (char *)fdata;
 	fap->attrlist4_len = 0;
 
 	/* don't supply attrs if request was zero */
@@ -359,6 +357,7 @@ cb_getattr(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
 			 */
 			IXDR_PUT_U_HYPER(fdata, change);
 			fap->attrlist4_len += 2 * BYTES_PER_XDR_UNIT;
+			fap->attrmask |= FATTR4_CHANGE_MASK;
 		}
 
 		if (args->attr_request & FATTR4_SIZE_MASK) {
@@ -376,6 +375,7 @@ cb_getattr(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
 			 */
 			IXDR_PUT_U_HYPER(fdata, size);
 			fap->attrlist4_len += 2 * BYTES_PER_XDR_UNIT;
+			fap->attrmask |= FATTR4_SIZE_MASK;
 		}
 	}
 
@@ -457,11 +457,6 @@ cb_recall(nfs_cb_argop4 *argop, nfs_cb_resop4 *resop, struct svc_req *req,
 			} else {
 #ifdef	DEBUG
 				CB_WARN("cb_recall: stateid OK, bad fh");
-
-				if (nfs4_linux_bug) {
-					found = TRUE;
-					break;
-				}
 #endif
 			}
 		}
@@ -735,7 +730,7 @@ cb_dispatch(struct svc_req *req, SVCXPRT *xprt)
 		break;
 
 	case CB_COMPOUND:
-		xdr_args = xdr_CB_COMPOUND4args;
+		xdr_args = xdr_CB_COMPOUND4args_clnt;
 		xdr_res = xdr_CB_COMPOUND4res;
 		proc = cb_compound;
 		freeproc = cb_compound_free;

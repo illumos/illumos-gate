@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1621,7 +1621,8 @@ extern  bool_t xdr_COMPOUND4args_clnt(XDR *, COMPOUND4args_clnt *);
 extern  bool_t xdr_COMPOUND4args_srv(XDR *, COMPOUND4args *);
 extern  bool_t xdr_COMPOUND4res_clnt(XDR *, COMPOUND4res_clnt *);
 extern  bool_t xdr_COMPOUND4res_srv(XDR *, COMPOUND4res *);
-extern  bool_t xdr_CB_COMPOUND4args(XDR *, CB_COMPOUND4args *);
+extern  bool_t xdr_CB_COMPOUND4args_clnt(XDR *, CB_COMPOUND4args *);
+extern  bool_t xdr_CB_COMPOUND4args_srv(XDR *, CB_COMPOUND4args *);
 extern  bool_t xdr_CB_COMPOUND4res(XDR *, CB_COMPOUND4res *);
 
 

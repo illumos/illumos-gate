@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1286,6 +1286,8 @@ extern const struct	fs_operation_def nfs4_vnodeops_template[];
 extern uint_t nfs4_tsize(struct knetconfig *);
 extern uint_t rfs4_tsize(struct svc_req *);
 
+extern bool_t	xdr_inline_decode_nfs_fh4(uint32_t *, nfs_fh4_fmt_t *,
+			uint32_t);
 extern bool_t	xdr_inline_encode_nfs_fh4(uint32_t **, uint32_t *,
 			nfs_fh4_fmt_t *);
 
