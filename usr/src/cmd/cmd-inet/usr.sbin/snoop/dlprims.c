@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,16 +19,20 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"		/* SunOS */
 
+#include	<stdlib.h>
+#include	<string.h>
 #include	<sys/types.h>
-#include	<sys/stropts.h>
+#include	<stropts.h>
 #include	<sys/signal.h>
 #include	<sys/dlpi.h>
+#include	<sys/sysmacros.h>
+#include	<errno.h>
 #include	<stdio.h>
 #include	<stdarg.h>
 
@@ -38,11 +41,15 @@
 #define	DLMAXWAIT	(10)	/* max wait in seconds for response */
 #define	DLMAXBUF	(256)
 
-
 static void sigalrm(int);
-static void strgetmsg(int, struct strbuf *, struct strbuf *, int *, char *);
-static void err(const char *, ...);
-static void syserr(char *);
+static void dl_msg_common(int, t_uscalar_t, t_uscalar_t, t_uscalar_t,
+    t_uscalar_t, void *, int);
+static int strputmsg(int, void *, size_t, int);
+static int strgetmsg(int, void *, size_t *, t_uscalar_t, t_uscalar_t, size_t);
+static int expecting(t_uscalar_t, t_uscalar_t, t_uscalar_t, void *, size_t);
+static void syserr(const char *, ...);
+static int timer_ctl(int);
+static char *show_dlerror(int);
 
 /*
  * Issue DL_INFO_REQ and wait for DL_INFO_ACK.
@@ -50,65 +57,35 @@ static void syserr(char *);
 void
 dlinforeq(int fd, dl_info_ack_t *infoackp)
 {
-	union	DL_primitives	*dlp;
-	char	buf[DLMAXBUF];
-	struct	strbuf	ctl;
-	int	flags;
+	dl_info_req_t	*dlireq;
+	uint64_t	vbuf[DLMAXBUF / sizeof (uint64_t)];
 
-	dlp = (union DL_primitives *)buf;
+	dlireq = (dl_info_req_t *)vbuf;
 
-	dlp->info_req.dl_primitive = DL_INFO_REQ;
+	dl_msg_common(fd, DL_INFO_REQ, DL_INFO_REQ_SIZE, DL_INFO_ACK,
+	    DL_INFO_ACK_SIZE, dlireq, RS_HIPRI);
 
-	ctl.maxlen = DLMAXBUF;
-	ctl.len = DL_INFO_REQ_SIZE;
-	ctl.buf = (char *)dlp;
+	/* Copy the response to the caller */
+	if (infoackp != NULL)
+		(void) memcpy(infoackp, vbuf, DL_INFO_ACK_SIZE);
 
-	flags = RS_HIPRI;
-
-	if (putmsg(fd, &ctl, NULL, flags) < 0)
-		syserr("dlinforeq:  putmsg");
-
-	strgetmsg(fd, &ctl, NULL, &flags, "dlinfoack");
-	expecting(DL_INFO_ACK, dlp, "dlinfoack");
-
-	if (ctl.len < DL_INFO_ACK_SIZE)
-		err("dlinfoack:  response ctl.len too short:  %d", ctl.len);
-
-	if (flags != RS_HIPRI)
-		err("dlinfoack:  DL_INFO_ACK was not M_PCPROTO");
-
-	if (infoackp)
-		*infoackp = dlp->info_ack;
 }
 
 /*
- * Issue DL_ATTACH_REQ.
- * Return zero on success, nonzero on error.
+ * Issue DL_ATTACH_REQ and wait for DL_OK_ACK.
  */
 void
 dlattachreq(int fd, ulong_t ppa)
 {
-	union	DL_primitives	*dlp;
-	char	buf[DLMAXBUF];
-	struct	strbuf	ctl;
-	int	flags;
+	dl_attach_req_t	*dlareq;
+	uint64_t	vbuf[DLMAXBUF / sizeof (uint64_t)];
 
-	dlp = (union DL_primitives *)buf;
+	dlareq = (dl_attach_req_t *)vbuf;
+	dlareq->dl_ppa = ppa;
 
-	dlp->attach_req.dl_primitive = DL_ATTACH_REQ;
-	dlp->attach_req.dl_ppa = ppa;
+	dl_msg_common(fd, DL_ATTACH_REQ, DL_ATTACH_REQ_SIZE, DL_OK_ACK,
+	    DL_OK_ACK_SIZE, dlareq, 0);
 
-	ctl.maxlen = DLMAXBUF;
-	ctl.len = DL_ATTACH_REQ_SIZE;
-	ctl.buf = (char *)dlp;
-
-	flags = 0;
-
-	if (putmsg(fd, &ctl, NULL, flags) < 0)
-		syserr("dlattachreq:  putmsg");
-
-	strgetmsg(fd, &ctl, NULL, &flags, "dlattachreq");
-	expecting(DL_OK_ACK, dlp, "dlattachreq");
 }
 
 /*
@@ -117,212 +94,256 @@ dlattachreq(int fd, ulong_t ppa)
 void
 dlpromiscon(int fd, int level)
 {
-	union	DL_primitives	*dlp;
-	char	buf[DLMAXBUF];
-	struct	strbuf	ctl;
-	int	flags;
+	dl_promiscon_req_t	*dlpon;
+	uint64_t		vbuf[DLMAXBUF / sizeof (uint64_t)];
 
-	dlp = (union DL_primitives *)buf;
+	dlpon = (dl_promiscon_req_t *)vbuf;
+	dlpon->dl_level = level;
 
-	dlp->promiscon_req.dl_primitive = DL_PROMISCON_REQ;
-	dlp->promiscon_req.dl_level = level;
+	dl_msg_common(fd, DL_PROMISCON_REQ, DL_PROMISCON_REQ_SIZE, DL_OK_ACK,
+	    DL_OK_ACK_SIZE, dlpon, 0);
 
-	ctl.maxlen = DLMAXBUF;
-	ctl.len = DL_PROMISCON_REQ_SIZE;
-	ctl.buf = (char *)dlp;
-
-	flags = 0;
-
-	if (putmsg(fd, &ctl, NULL, flags) < 0)
-		syserr("dlpromiscon:  putmsg");
-
-	strgetmsg(fd, &ctl, NULL, &flags, "dlpromisconreq");
-	expecting(DL_OK_ACK, dlp, "dlpromisconreq");
 }
 
+/*
+ * Issue DL_BIND_REQ and wait for DL_BIND_ACK
+ */
 void
 dlbindreq(int fd, ulong_t sap, ulong_t max_conind, ushort_t service_mode,
     ushort_t conn_mgmt)
 {
-	union	DL_primitives	*dlp;
-	char	buf[DLMAXBUF];
-	struct	strbuf	ctl;
-	int	flags;
+	dl_bind_req_t		*dlbreq;
+	uint64_t		vbuf[DLMAXBUF / sizeof (uint64_t)];
 
-	dlp = (union DL_primitives *)buf;
+	dlbreq = (dl_bind_req_t *)vbuf;
+	dlbreq->dl_sap = sap;
+	dlbreq->dl_max_conind = max_conind;
+	dlbreq->dl_service_mode = service_mode;
+	dlbreq->dl_conn_mgmt = conn_mgmt;
+	dlbreq->dl_xidtest_flg = 0;
 
-	dlp->bind_req.dl_primitive = DL_BIND_REQ;
-	dlp->bind_req.dl_sap = sap;
-	dlp->bind_req.dl_max_conind = max_conind;
-	dlp->bind_req.dl_service_mode = service_mode;
-	dlp->bind_req.dl_conn_mgmt = conn_mgmt;
-	dlp->bind_req.dl_xidtest_flg = 0;
+	dl_msg_common(fd, DL_BIND_REQ, DL_BIND_REQ_SIZE, DL_BIND_ACK,
+	    DL_BIND_ACK_SIZE, dlbreq, 0);
 
-	ctl.maxlen = DLMAXBUF;
-	ctl.len = DL_BIND_REQ_SIZE;
-	ctl.buf = (char *)dlp;
-
-	flags = 0;
-
-	if (putmsg(fd, &ctl, NULL, flags) < 0)
-		syserr("dlbindreq:  putmsg");
-
-	ctl.len = 0;
-
-	strgetmsg(fd, &ctl, NULL, &flags, "dlbindack");
-	expecting(DL_BIND_ACK, dlp, "dlbindack");
-
-	if (ctl.len < sizeof (DL_BIND_ACK_SIZE))
-		err("dlbindack:  response ctl.len too short:  %d", ctl.len);
 }
 
-/* ARGSUSED */
+/*
+ * Common routine for dispatching and retrieving DLPI requests.
+ */
 static void
-sigalrm(int unused)
+dl_msg_common(int fd, t_uscalar_t prim, t_uscalar_t primsz, t_uscalar_t rprim,
+    t_uscalar_t rprimsz, void *dlreq, int flags)
 {
-	(void) err("sigalrm:  TIMEOUT");
+	union DL_primitives	*dlp = dlreq;
+	size_t			size = primsz;
+
+	dlp->dl_primitive = prim;
+
+	/* Start a timer */
+	if (timer_ctl(DLMAXWAIT) < 0)
+		syserr("snoop: Failed to start timer");
+
+	/* Put the primitive downstream */
+	if (strputmsg(fd, dlreq, size, flags) == -1) {
+		syserr("snoop: error sending DLPI message to device: %s\t%s\n ",
+		    (device ? device : "Unknown"), strerror(errno));
+	}
+
+	/* Retrieve and check response to issued primitve */
+	if (strgetmsg(fd, dlreq, &size, prim, rprim, rprimsz) == -1) {
+		syserr("snoop: error reading DLPI message from device: %s"
+		    "\t%s\n ", (device ? device : "Unknown"), strerror(errno));
+	}
+
+	/* Stop the timer */
+	if (timer_ctl(0)  < 0)
+		syserr("snoop: Failed to stop timer");
+
 }
 
-void
-strgetmsg(int fd, struct strbuf *ctlp, struct strbuf *datap, int *flagsp,
-    char *caller)
+static int
+strputmsg(int fd, void *cbuf, size_t clen, int flags)
 {
-	int	rc;
-	static	char	errmsg[80];
+	struct strbuf	ctl;
 
-	/*
-	 * Start timer.
-	 */
-	if (snoop_alarm(DLMAXWAIT, sigalrm) < 0) {
-		sprintf(errmsg, "%s:  alarm", caller);
-		syserr(errmsg);
-	}
+	ctl.buf = cbuf;
+	ctl.len = clen;
 
-	/*
-	 * Set flags argument and issue getmsg().
-	 */
-	*flagsp = 0;
-	if ((rc = getmsg(fd, ctlp, datap, flagsp)) < 0) {
-		sprintf(errmsg, "%s:  getmsg", caller);
-		syserr(errmsg);
-	}
-
-	/*
-	 * Stop timer.
-	 */
-	if (snoop_alarm(0, sigalrm) < 0) {
-		sprintf(errmsg, "%s:  alarm", caller);
-		syserr(errmsg);
-	}
-
-	/*
-	 * Check for MOREDATA and/or MORECTL.
-	 */
-	if ((rc & (MORECTL | MOREDATA)) == (MORECTL | MOREDATA))
-		err("%s:  strgetmsg:  MORECTL|MOREDATA", caller);
-	if (rc & MORECTL)
-		err("%s:  strgetmsg:  MORECTL", caller);
-	if (rc & MOREDATA)
-		err("%s:  strgetmsg:  MOREDATA", caller);
-
-	/*
-	 * Check for at least sizeof (long) control data portion.
-	 */
-	if (ctlp->len < sizeof (long))
-		err("%s:  control portion length < sizeof (long)",
-		caller);
+	return (putmsg(fd, &ctl, NULL, flags));
 }
 
-char *
-show_dltype(int dl_errno)
+/*
+ * Retrieve messages from the descriptor. Check the retrieved message
+ * is the desired response to the issued primitive.
+ */
+static int
+strgetmsg(int fd, void *cbuf, size_t *csize, t_uscalar_t prim,
+    t_uscalar_t rprim, size_t rprimsz)
+{
+	struct strbuf   ctl;
+	int		flags = 0;
+	int		rc;
+
+	ctl.buf = cbuf;
+	ctl.len = 0;
+	ctl.maxlen = DLMAXBUF;
+
+	do {
+		if ((rc = getmsg(fd, &ctl, NULL, &flags)) < 0)
+			return (-1);
+
+		/*
+		 * The supplied DLMAXBUF sized buffers are large enough to
+		 * retrieve all valid DLPI responses in one iteration.
+		 * If MORECTL or MOREDATA are set this indicates that this
+		 * message is NOT a response we are interested in.
+		 * Temporary buffers are used to drain the remainder of this
+		 * message.  The special case we have to account for is if
+		 * a higher priority messages is enqueued whilst handling
+		 * this condition. We use a change in the flags parameter
+		 * returned by getmsg() to indicate the message has changed.
+		 */
+		while (rc & (MORECTL | MOREDATA)) {
+			struct strbuf	cscratch, dscratch;
+			uint64_t	bufc[DLMAXBUF], bufd[DLMAXBUF];
+			int		oflags = flags;
+
+			cscratch.buf = (char *)bufc;
+			dscratch.buf = (char *)bufd;
+			cscratch.len = dscratch.len = 0;
+			cscratch.maxlen = dscratch.maxlen = sizeof (bufc);
+
+			if ((rc = getmsg(fd, &cscratch, &dscratch, &flags)) < 0)
+				return (-1);
+
+			if ((flags != oflags) && !(rc & (MORECTL | MOREDATA)) &&
+			    (cscratch.len != 0)) {
+				ctl.len = MIN(cscratch.len, DLMAXBUF);
+				memcpy(cbuf, bufc, ctl.len);
+				break;
+			}
+		}
+		*csize = ctl.len;
+	} while (expecting(prim, rprim, rprimsz, cbuf, *csize) != 0);
+
+	return (0);
+}
+
+/*
+ * Checks the DLPI response for validity.
+ */
+static int
+expecting(t_uscalar_t prim, t_uscalar_t rprim, t_uscalar_t rprimsz,
+    void *dlpret, size_t size)
+{
+	union DL_primitives	*dlp = dlpret;
+
+	/*
+	 * We need at least enough space for a primitive and a
+	 * buffer to interpret.
+	 */
+	if ((dlp == NULL) || (size < sizeof (t_uscalar_t)))
+		return (-1);
+
+	if (dlp->dl_primitive == DL_ERROR_ACK) {
+		/*
+		 * Fatal Error. However, first check that it's big
+		 * enough to be a DL_ERROR_ACK and that it also in
+		 * response to the primitive we issued
+		 */
+		dl_error_ack_t  *dlerr = (dl_error_ack_t *)dlp;
+
+		if (size < DL_ERROR_ACK_SIZE)
+			return (-1);
+
+		/* Is it ours? */
+		if (dlerr->dl_error_primitive != prim)
+			return (-1);
+
+		/* As close as we can establish, it's our error */
+		syserr("snoop: fatal DLPI error: %d\t%s\nDevice: %s\n",
+		    dlerr->dl_errno, show_dlerror(dlerr->dl_errno),
+		    (device ? device : "Unknown"));
+	}
+
+	/*
+	 * Check to see if the returned primitive is what we were
+	 * expecting and if it is large enough to contain the minimum
+	 * size.
+	 */
+	if ((dlp->dl_primitive != rprim) || (size < rprimsz))
+		return (-1);
+
+	return (0);
+
+}
+
+static char *
+show_dlerror(int dl_errno)
 {
 	switch (dl_errno) {
-	case DL_ACCESS:	/* Improper permissions for request */
+	case DL_ACCESS:
 		return ("Improper permissions for request");
 	case DL_BADADDR:
 		return ("DLSAP addr in improper format or invalid");
-	case DL_BADCORR:	/* Seq number not from outstand DL_CONN_IND */
+	case DL_BADCORR:
 		return ("Seq number not from outstand DL_CONN_IND");
-	case DL_BADDATA:	/* User data exceeded provider limit */
+	case DL_BADDATA:
 		return ("User data exceeded provider limit");
-	case DL_BADPPA:	/* Specified PPA was invalid */
+	case DL_BADPPA:
 		return ("Specified PPA was invalid");
-	case DL_BADPRIM:	/* Primitive received not known by provider */
+	case DL_BADPRIM:
 		return ("Primitive received not known by provider");
-	case DL_BADQOSPARAM:	/* QOS parameters contained invalid values */
+	case DL_BADQOSPARAM:
 		return ("QOS parameters contained invalid values");
-	case DL_BADQOSTYPE:	/* QOS structure type is unknown/unsupported */
+	case DL_BADQOSTYPE:
 		return ("QOS structure type is unknown/unsupported");
-	case DL_BADSAP:	/* Bad LSAP selector */
+	case DL_BADSAP:
 		return ("Bad LSAP selector");
-	case DL_BADTOKEN:	/* Token used not an active stream */
+	case DL_BADTOKEN:
 		return ("Token used not an active stream");
-	case DL_BOUND:	/* Attempted second bind with dl_max_conind */
+	case DL_BOUND:
 		return ("Attempted second bind with dl_max_conind");
-	case DL_INITFAILED:	/* Physical Link initialization failed */
+	case DL_INITFAILED:
 		return ("Physical Link initialization failed");
-	case DL_NOADDR:	/* Provider couldn't allocate alt. address */
+	case DL_NOADDR:
 		return ("Provider couldn't allocate alt. address");
-	case DL_NOTINIT:	/* Physical Link not initialized */
+	case DL_NOTINIT:
 		return ("Physical Link not initialized");
-	case DL_OUTSTATE:	/* Primitive issued in improper state */
+	case DL_OUTSTATE:
 		return ("Primitive issued in improper state");
-	case DL_SYSERR:	/* UNIX system error occurred */
+	case DL_SYSERR:
 		return ("UNIX system error occurred");
-	case DL_UNSUPPORTED:	/* Requested serv. not supplied by provider */
+	case DL_UNSUPPORTED:
 		return ("Requested serv. not supplied by provider");
-	case DL_UNDELIVERABLE:	/* Previous data unit could not be delivered */
+	case DL_UNDELIVERABLE:
 		return ("Previous data unit could not be delivered");
-	case DL_NOTSUPPORTED:	/* Primitive is known but not supported */
+	case DL_NOTSUPPORTED:
 		return ("Primitive is known but not supported");
-	case DL_TOOMANY:	/* limit exceeded	*/
+	case DL_TOOMANY:
 		return ("Limit exceeded");
-	case DL_NOTENAB:	/* Promiscuous mode not enabled */
+	case DL_NOTENAB:
 		return ("Promiscuous mode not enabled");
-	case DL_BUSY:	/* Other streams for PPA in post-attached */
+	case DL_BUSY:
 		return ("Other streams for PPA in post-attached");
-	case DL_NOAUTO:	/* Automatic handling XID&TEST not supported */
+	case DL_NOAUTO:
 		return ("Automatic handling XID&TEST not supported");
-	case DL_NOXIDAUTO:    /* Automatic handling of XID not supported */
+	case DL_NOXIDAUTO:
 		return ("Automatic handling of XID not supported");
-	case DL_NOTESTAUTO:	/* Automatic handling of TEST not supported */
+	case DL_NOTESTAUTO:
 		return ("Automatic handling of TEST not supported");
-	case DL_XIDAUTO:	/* Automatic handling of XID response */
+	case DL_XIDAUTO:
 		return ("Automatic handling of XID response");
-	case DL_TESTAUTO:	/* AUtomatic handling of TEST response */
+	case DL_TESTAUTO:
 		return ("Automatic handling of TEST response");
-	case DL_PENDING:	/* pending outstanding connect indications */
+	case DL_PENDING:
 		return ("Pending outstanding connect indications");
 	}
 	return ("Unknown DLPI error");
 }
 
-int
-expecting(ulong_t prim, union DL_primitives *dlp, char *caller)
-{
-	if (dlp->dl_primitive == DL_ERROR_ACK) {
-		fprintf(stderr, "fatal dlpi error: %s. Device %s\n",
-			show_dltype(dlp->error_ack.dl_errno),
-			device ? device : "unknown");
-		err("%s:  DL_ERROR_ACK:  dl_errno %d unix_errno %d\n",
-		caller,
-		dlp->error_ack.dl_errno,
-		dlp->error_ack.dl_unix_errno);
-		return (1);
-	}
-
-	if (dlp->dl_primitive != prim) {
-		err("%s:  unexpected primitive 0x%x received\n",
-		caller,
-		dlp->dl_primitive);
-		return (1);
-	}
-
-	return (0);
-}
-
 static void
-err(const char *format, ...)
+syserr(const char *format, ...)
 {
 	va_list	alist;
 
@@ -334,9 +355,15 @@ err(const char *format, ...)
 	exit(1);
 }
 
-void
-syserr(char *s)
+static int
+timer_ctl(int timeout)
 {
-	perror(s);
-	exit(1);
+	return (snoop_alarm(timeout, sigalrm));
+}
+
+/* ARGSUSED */
+static void
+sigalrm(int unused)
+{
+	syserr("sigalrm:  TIMEOUT");
 }
