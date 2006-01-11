@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,7 @@ typedef struct dt_probe_iter {
 
 typedef struct dt_probe_instance {
 	char pi_fname[DTRACE_FUNCNAMELEN]; /* function name */
+	char pi_rname[DTRACE_FUNCNAMELEN + 20]; /* mangled relocation name */
 	uint32_t *pi_offs;		/* offsets into the function */
 	uint_t pi_noffs;		/* number of offsets */
 	uint_t pi_maxoffs;		/* size of pi_offs allocation */
@@ -103,7 +104,7 @@ extern void dt_probe_declare(dt_provider_t *, dt_probe_t *);
 extern void dt_probe_destroy(dt_probe_t *);
 
 extern int dt_probe_define(dt_provider_t *, dt_probe_t *,
-    const char *, uint32_t);
+    const char *, const char *, uint32_t);
 
 extern dt_node_t *dt_probe_tag(dt_probe_t *, uint_t, dt_node_t *);
 

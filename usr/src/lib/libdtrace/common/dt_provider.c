@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -508,24 +508,38 @@ dt_probe_destroy(dt_probe_t *prp)
 
 int
 dt_probe_define(dt_provider_t *pvp, dt_probe_t *prp,
-    const char *fname, uint32_t offset)
+    const char *fname, const char *rname, uint32_t offset)
 {
 	dtrace_hdl_t *dtp = pvp->pv_hdl;
 	dt_probe_instance_t *pip;
 
+	assert(fname != NULL);
+
 	for (pip = prp->pr_inst; pip != NULL; pip = pip->pi_next) {
-		if (strcmp(pip->pi_fname, fname) == 0)
+		if (strcmp(pip->pi_fname, fname) == 0 &&
+		    ((rname == NULL && pip->pi_rname[0] == '\0') ||
+		    (rname != NULL && strcmp(pip->pi_rname, rname)) == 0))
 			break;
 	}
 
 	if (pip == NULL) {
-		if ((pip = dt_alloc(dtp, sizeof (*pip))) == NULL ||
-		    (pip->pi_offs = dt_alloc(dtp, sizeof (uint32_t))) == NULL) {
+		if ((pip = dt_zalloc(dtp, sizeof (*pip))) == NULL)
+			return (-1);
+
+		if ((pip->pi_offs = dt_alloc(dtp, sizeof (uint32_t))) == NULL) {
 			dt_free(dtp, pip);
 			return (-1);
 		}
 
 		(void) strlcpy(pip->pi_fname, fname, sizeof (pip->pi_fname));
+		if (rname != NULL) {
+			if (strlen(rname) + 1 > sizeof (pip->pi_rname)) {
+				dt_free(dtp, pip->pi_offs);
+				dt_free(dtp, pip);
+				return (dt_set_errno(dtp, EDT_COMPILER));
+			}
+			(void) strcpy(pip->pi_rname, rname);
+		}
 		pip->pi_noffs = 0;
 		pip->pi_maxoffs = 1;
 		pip->pi_next = prp->pr_inst;
@@ -548,8 +562,9 @@ dt_probe_define(dt_provider_t *pvp, dt_probe_t *prp,
 		pip->pi_offs = new_offs;
 	}
 
-	dt_dprintf("defined probe %s:%s %s() +0x%x\n",
-	    pvp->pv_desc.dtvd_name, prp->pr_ident->di_name, fname, offset);
+	dt_dprintf("defined probe %s:%s %s() +0x%x (%s)\n",
+	    pvp->pv_desc.dtvd_name, prp->pr_ident->di_name, fname, offset,
+	    rname != NULL ? rname : fname);
 
 	assert(pip->pi_noffs < pip->pi_maxoffs);
 	pip->pi_offs[pip->pi_noffs++] = offset;

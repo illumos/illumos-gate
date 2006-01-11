@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -439,7 +439,17 @@ dof_add_probe(dt_idhash_t *dhp, dt_ident_t *idp, void *data)
 		dt_buf_write(dtp, &ddo->ddo_offs, pip->pi_offs,
 		    pip->pi_noffs * sizeof (uint32_t), sizeof (uint32_t));
 
-		dofr.dofr_name = dofpr.dofpr_func;
+		/*
+		 * If pi_rname isn't set, the relocation will be against the
+		 * function name. If it is, the relocation will be against
+		 * pi_rname. This will be used if the function is scoped
+		 * locally so an alternate symbol is added for the purpose
+		 * of this relocation.
+		 */
+		if (pip->pi_rname[0] == '\0')
+			dofr.dofr_name = dofpr.dofpr_func;
+		else
+			dofr.dofr_name = dof_add_string(ddo, pip->pi_rname);
 		dofr.dofr_type = DOF_RELO_SETX;
 		dofr.dofr_offset = dt_buf_len(&ddo->ddo_probes);
 		dofr.dofr_data = 0;
