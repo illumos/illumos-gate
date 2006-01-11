@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -400,10 +400,9 @@ acct(char st)
 	p = curproc;
 	bcopy(u.u_comm, ag->acctbuf.ac_comm, sizeof (ag->acctbuf.ac_comm));
 	ag->acctbuf.ac_btime = u.u_start.tv_sec;
-	ag->acctbuf.ac_utime = acct_compress(
-	    (comp_t)NSEC_TO_TICK(p->p_acct[LMS_USER]));
+	ag->acctbuf.ac_utime = acct_compress(NSEC_TO_TICK(p->p_acct[LMS_USER]));
 	ag->acctbuf.ac_stime = acct_compress(
-	    (comp_t)NSEC_TO_TICK(p->p_acct[LMS_SYSTEM] + p->p_acct[LMS_TRAP]));
+	    NSEC_TO_TICK(p->p_acct[LMS_SYSTEM] + p->p_acct[LMS_TRAP]));
 	ag->acctbuf.ac_etime = acct_compress(lbolt - u.u_ticks);
 	ag->acctbuf.ac_mem = acct_compress((ulong_t)u.u_mem);
 	ag->acctbuf.ac_io = acct_compress((ulong_t)p->p_ru.ioch);
