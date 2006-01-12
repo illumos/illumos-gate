@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1313,6 +1313,9 @@ kalloca(size_t size, size_t align, int cansleep, int physcontig,
 	vmem_t *vmp;
 	kmem_cache_t *cp = NULL;
 
+	if (attr->dma_attr_addr_lo > mmu_ptob((uint64_t)ddiphysmin))
+		return (NULL);
+
 	align = MAX(align, hdrsize);
 	ASSERT((align & (align - 1)) == 0);
 
@@ -1333,8 +1336,6 @@ kalloca(size_t size, size_t align, int cansleep, int physcontig,
 		}
 		return (NULL);
 	}
-
-	ASSERT(attr->dma_attr_addr_lo <= mmu_ptob((uint64_t)ddiphysmin));
 
 	a = kmem_io_index(attr->dma_attr_addr_hi);
 

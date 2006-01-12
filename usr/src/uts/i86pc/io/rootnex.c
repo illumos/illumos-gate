@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4149,7 +4149,6 @@ rootnex_dma_map(dev_info_t *dip, dev_info_t *rdip, struct ddi_dma_req *dmareq,
 	 * this interface is not supported in 64-bit x86 kernel. See comment in
 	 * rootnex_dma_mctl()
 	 */
-	ASSERT(0);
 	return (DDI_DMA_NORESOURCES);
 
 #else /* 32-bit x86 kernel */
@@ -4248,7 +4247,6 @@ rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 	 * It wasn't ported to the 64-bit kernel for s10, no reason to change
 	 * that in a future release.
 	 */
-	ASSERT(0);
 	return (DDI_FAILURE);
 
 #else /* 32-bit x86 kernel */
