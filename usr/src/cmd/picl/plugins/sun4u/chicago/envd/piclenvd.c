@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -367,7 +367,9 @@ static int 	disk_shutdown_interval	= DISK_SHUTDOWN_INTERVAL;
 static int	system_temp_monitor	= 1;	/* enabled */
 static int	fan_monitor		= 1;	/* enabled */
 static int	pm_monitor		= 1;	/* enabled */
-int		disk_temp_monitor	= 1;	/* enabled */
+
+/* Disable disk temperature monitoring until we have LSI fw support */
+int		disk_temp_monitor	= 0;
 
 static char	shutdown_cmd[] = SHUTDOWN_CMD;
 const char	*iofru_devname = I2C_DEVFS "/" IOFRU_DEV;
@@ -1824,10 +1826,16 @@ envd_setup(void)
 		pm_monitor = 0;
 	}
 
-	if (envd_setup_disks() < 0) {
-		if (env_debug)
-			envd_log(LOG_ERR, "Failed to setup disks\n");
-		disk_temp_monitor = 0;
+	/*
+	 * Disable disk temperature monitoring until we have
+	 * LSI fw support to read SATA disk temperature
+	 */
+	if (disk_temp_monitor) {
+		if (envd_setup_disks() < 0) {
+			if (env_debug)
+				envd_log(LOG_ERR, "Failed to setup disks\n");
+			disk_temp_monitor = 0;
+		}
 	}
 
 	/*
@@ -1903,6 +1911,14 @@ piclenvd_init(void)
 {
 
 	(void) env_picl_setup_tuneables();
+
+	/*
+	 * Do not allow disk temperature monitoring to be enabled
+	 * via tuneables. Disk temperature monitoring is disabled
+	 * until we have LSI fw support to read the temperature of
+	 * SATA disks
+	 */
+	disk_temp_monitor = 0;
 
 	/*
 	 * Setup the environmental data structures
