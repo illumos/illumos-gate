@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,10 +57,13 @@
 #include <sys/usb/clients/hid/hidminor.h>
 #include <sys/usb/clients/hidparser/hid_parser_driver.h>
 #include <sys/stropts.h>
+#include <sys/sunddi.h>
 
 extern int ddi_create_internal_pathname(dev_info_t *, char *, int, minor_t);
 extern void consconfig_link(major_t major, minor_t minor);
 extern int consconfig_unlink(major_t major, minor_t minor);
+
+static void hid_consconfig_relink(void *);
 
 /* Debugging support */
 uint_t	hid_errmask	= (uint_t)PRINT_MASK_ALL;
@@ -758,6 +761,8 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 	int rval;
 	int instance;
 	hid_state_t *hidp;
+	ddi_taskq_t *taskq;
+	char taskqname[32];
 	minor_t minor = getminor(*devp);
 
 	instance = HID_MINOR_TO_INSTANCE(minor);
@@ -843,15 +848,35 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		mutex_exit(&hidp->hid_mutex);
 
 		/*
+		 * We create a taskq with one thread, which will be used at the
+		 * time of closing physical keyboard, refer to hid_close().
+		 */
+		sprintf(taskqname, "hid_taskq_%d", instance);
+		taskq = ddi_taskq_create(hidp->hid_dip, taskqname, 1,
+		    TASKQ_DEFAULTPRI, 0);
+
+		if (!taskq) {
+			USB_DPRINTF_L3(PRINT_MASK_ALL, hidp->hid_log_handle,
+			    "hid_open: device is temporarily unavailable,"
+				" try it later");
+
+			return (EAGAIN);
+		}
+
+		/*
 		 * If unlink fails, fail the physical open.
 		 */
 		if ((rval = consconfig_unlink(ddi_driver_major(hidp->hid_dip),
 		    HID_MINOR_MAKE_INTERNAL(minor))) != 0) {
+			ddi_taskq_destroy(taskq);
 
 			return (rval);
 		}
 
 		mutex_enter(&hidp->hid_mutex);
+
+		ASSERT(!hidp->hid_taskq);
+		hidp->hid_taskq = taskq;
 	}
 
 	/* Initialize the queue pointers */
@@ -950,6 +975,7 @@ static int
 hid_close(queue_t *q, int flag, cred_t *credp)
 {
 	hid_state_t	*hidp = q->q_ptr;
+	ddi_taskq_t	*taskq;
 	queue_t		*wq;
 	mblk_t		*mp;
 
@@ -1008,9 +1034,24 @@ hid_close(queue_t *q, int flag, cred_t *credp)
 		 * will not be available underneath the virtual
 		 * one, and can only be accessed via physical
 		 * open.
+		 *
+		 * Up to now, we have been running in a thread context
+		 * which has corresponding LWP and proc context. This
+		 * thread represents a user thread executing in kernel
+		 * mode. The action of linking current keyboard to virtual
+		 * keyboard is completely a kernel action. It should not
+		 * be executed in a user thread context. So, we start a
+		 * new kernel thread to relink the keyboard to virtual
+		 * keyboard.
 		 */
-		consconfig_link(ddi_driver_major(hidp->hid_dip),
-		    HID_MINOR_MAKE_INTERNAL(hidp->hid_minor));
+		mutex_enter(&hidp->hid_mutex);
+		taskq = hidp->hid_taskq;
+		hidp->hid_taskq = NULL;
+		mutex_exit(&hidp->hid_mutex);
+		(void) ddi_taskq_dispatch(taskq, hid_consconfig_relink,
+		    hidp, DDI_SLEEP);
+		ddi_taskq_wait(taskq);
+		ddi_taskq_destroy(taskq);
 	}
 
 	return (0);
@@ -3180,4 +3221,13 @@ hid_polled_input_exit(hid_polled_handle_t hid_polled_inputp)
 	(void) usb_console_input_exit(hidp->hid_polled_console_info);
 
 	return (0);
+}
+
+static void
+hid_consconfig_relink(void *arg)
+{
+	hid_state_t *hidp = (hid_state_t *)arg;
+
+	consconfig_link(ddi_driver_major(hidp->hid_dip),
+	    HID_MINOR_MAKE_INTERNAL(hidp->hid_minor));
 }
