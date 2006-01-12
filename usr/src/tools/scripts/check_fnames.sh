@@ -25,6 +25,9 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
+# avoid confusion due to translated output from localized commands
+export LC_ALL=C 
+
 CMD=`/usr/bin/basename $0`
 ELFDUMP=/usr/ccs/bin/elfdump
 EXPR=/usr/bin/expr
