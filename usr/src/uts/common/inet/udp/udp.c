@@ -1335,13 +1335,9 @@ udp_bind(queue_t *q, mblk_t *mp)
 
 			/*
 			 * Check ipversion to allow IPv4 and IPv6 sockets to
-			 * have disjoint port number spaces, if *_EXCLBIND
-			 * is not set and only if the application binds to a
-			 * specific port. We use the same autoassigned port
-			 * number space for IPv4 and IPv6 sockets.
+			 * have disjoint port number spaces.
 			 */
-			if (udp->udp_ipversion != udp1->udp_ipversion &&
-			    bind_to_req_port_only)
+			if (udp->udp_ipversion != udp1->udp_ipversion)
 				continue;
 
 			/*
