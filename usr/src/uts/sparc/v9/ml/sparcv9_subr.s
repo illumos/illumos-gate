@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1753,3 +1753,22 @@ vpanic_common:
 	SET_SIZE(dtrace_vpanic)
 	
 #endif	/* lint */
+
+#if defined(lint)
+
+/*ARGSUSED*/
+
+uint_t
+get_subcc_ccr( uint64_t addrl, uint64_t addrr)
+{ return (0); }
+
+#else   /* lint */
+
+	ENTRY(get_subcc_ccr)
+	wr	%g0, %ccr	! clear condition codes
+	subcc	%o0, %o1, %g0
+	retl
+	rd	%ccr, %o0	! return condition codes
+	SET_SIZE(get_subcc_ccr)
+
+#endif  /* lint */

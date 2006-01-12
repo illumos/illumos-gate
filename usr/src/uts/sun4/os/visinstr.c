@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,6 +45,8 @@
 #define	FPU_REG_FIELD uint32_reg	/* Coordinate with FPU_REGS_TYPE. */
 #define	FPU_DREG_FIELD uint64_reg	/* Coordinate with FPU_DREGS_TYPE. */
 #define	FPU_FSR_FIELD uint64_reg	/* Coordinate with V9_FPU_FSR_TYPE. */
+
+extern	uint_t	get_subcc_ccr(uint64_t, uint64_t);
 
 static enum ftt_type vis_array(fp_simd_type *, vis_inst_type, struct regs *,
 				void *);
@@ -381,6 +383,7 @@ vis_edge(
 	uint64_t ah61l, ah61r;		/* Higher 61 bits of address */
 	int al3l, al3r;			/* Lower 3 bits of address */
 	int am32;			/* Whether PSTATE.AM == 1 */
+	uint_t	ccr;
 
 	nrs1 = inst.rs1;
 	nrs2 = inst.rs2;
@@ -531,20 +534,17 @@ vis_edge(
 	case edge32:
 	case edge32l:
 
-		/* We need to set the CCR if we have a carry overflow */
-		/* If this is a 64 bit app, we need to CCR.xcc.v */
-		/* This is the same as the SUBcc instruction */
-		if (addrl > addrr) {
-			if (am32 == 1) {
-				pregs->r_tstate |= TSTATE_IV;
-			} else {
-				pregs->r_tstate |= TSTATE_XV;
-			}
-		}
+		/* Update flags per SUBcc outcome */
+		pregs->r_tstate &= ~((uint64_t)TSTATE_CCR_MASK
+					<< TSTATE_CCR_SHIFT);
+		ccr = get_subcc_ccr(addrl, addrr);  /* get subcc cond. codes */
+		pregs->r_tstate |= ((uint64_t)ccr << TSTATE_CCR_SHIFT);
+
 		break;
 	}
 	return (ftt);
-	}
+}
+
 /*
  * Simulator for three dimentional array addressing instructions.
  */
