@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,21 @@ int pci_alloc_io_chunk(dev_info_t *,  uint64_t,  uint64_t *, uint64_t *);
 static int fcpci_indirect_map(dev_info_t *);
 
 int fcpci_unloadable;
+
+static ddi_dma_attr_t fcpci_dma_attr = {
+	DMA_ATTR_V0,	/* version number */
+	0x0,		/* lowest usable address */
+	0xFFFFFFFFull,	/* high DMA address range */
+	0xFFFFFFFFull,	/* DMA counter register */
+	1,		/* DMA address alignment */
+	1,		/* DMA burstsizes */
+	1,		/* min effective DMA size */
+	0xFFFFFFFFull,	/* max DMA xfer size */
+	0xFFFFFFFFull,	/* segment boundary */
+	1,		 /* s/g list length */
+	1,		/* granularity of device */
+	0		/* DMA transfer flags */
+};
 
 #ifndef	lint
 static char _depends_on[] = "misc/fcodem misc/busra";
@@ -288,7 +303,6 @@ pfc_dma_map_in(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	struct fc_resource *ip;
 	ddi_dma_cookie_t c;
 	struct buf *bp;
-	ddi_dma_attr_t attr;
 	uint_t ccnt;
 
 	if (fc_cell2int(cp->nargs) != 3)
@@ -320,7 +334,8 @@ pfc_dma_map_in(dev_info_t *ap, fco_handle_t rp, fc_ci_t *cp)
 	}
 
 	FC_DEBUG1(9, CE_CONT, "pfc_dma_map_in: dma_map_in; bp = %p\n", bp);
-	error = fc_ddi_dma_alloc_handle(ap, &attr, DDI_DMA_SLEEP, NULL, &h);
+	error = fc_ddi_dma_alloc_handle(ap, &fcpci_dma_attr, DDI_DMA_SLEEP,
+	    NULL, &h);
 	if (error != DDI_SUCCESS)  {
 		FC_DEBUG3(1, CE_CONT, "pfc_dma_map_in: real dma-map-in failed "
 		    "error: %d  virt: %p  len %d\n", error, virt, len);
