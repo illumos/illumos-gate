@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +61,6 @@
 #include "sd_xbuf.h"
 
 #include <sys/scsi/targets/sddef.h>
-
 
 /*
  * Loadable module info.
@@ -5245,10 +5244,21 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 		if (rval) {
 			goto done_err;
 		}
+
+		/*
+		 * The MMC standard allows READ CAPACITY to be
+		 * inaccurate by a bounded amount (in the interest of
+		 * response latency).  As a result, failed READs are
+		 * commonplace (due to the reading of metadata and not
+		 * data). Depending on the per-Vendor/drive Sense data,
+		 * the failed READ can cause many (unnecessary) retries.
+		 */
 		if ((rval = sd_send_scsi_READ(un, buf, lbasize,
-		    cap - 1, path_flag)) != 0) {
+		    cap - 1, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
+		    path_flag)) != 0) {
 			goto done_err;
 		}
+
 		sd_swap_efi_gpt((efi_gpt_t *)buf);
 		if ((rval = sd_validate_efi((efi_gpt_t *)buf)) != 0)
 			goto done_err;
@@ -18945,7 +18955,6 @@ sd_send_scsi_DOORLOCK(struct sd_lun *un, int flag, int path_flag)
 	return (status);
 }
 
-
 /*
  *    Function: sd_send_scsi_READ_CAPACITY
  *
@@ -23099,8 +23108,17 @@ sd_clear_efi(struct sd_lun *un)
 	if (rval) {
 		goto done;
 	}
+	/*
+	 * The MMC standard allows READ CAPACITY to be
+	 * inaccurate by a bounded amount (in the interest of
+	 * response latency).  As a result, failed READs are
+	 * commonplace (due to the reading of metadata and not
+	 * data). Depending on the per-Vendor/drive Sense data,
+	 * the failed READ can cause many (unnecessary) retries.
+	 */
 	if ((rval = sd_send_scsi_READ(un, gpt, lbasize,
-	    cap - 1, SD_PATH_DIRECT)) != 0) {
+	    cap - 1, ISCD(un) ? SD_PATH_DIRECT_PRIORITY :
+	    SD_PATH_DIRECT)) != 0) {
 		goto done;
 	}
 	sd_swap_efi_gpt(gpt);
