@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,7 @@ setdevaccess(char *dev, uid_t uid, gid_t gid, mode_t mode,
 		if (errno == ENOENT)	/* no such file */
 			return (0);
 		err = -1;
+		local_errno = errno;
 	}
 
 	while (fdetach(dev) == 0) {
@@ -375,9 +376,23 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 	int err = 0;
 	DIR *dirp;
 	struct dirent *direntp;
+	char errstring[MAX_LINELEN];
 
 	/* path must be a valid name */
 	if (stat(path, &stat_buf) == -1) {
+		/*
+		 * ENOENT errors are expected errors when there are
+		 * dangling /dev device links. Ignore them silently
+		 */
+		if (errno == ENOENT) {
+			return (0);
+		}
+		if (errmsg) {
+			(void) snprintf(errstring, MAX_LINELEN,
+			    "failed to stat %s: %s\n", path,
+			    strerror(errno));
+			(*errmsg)(errstring);
+		}
 		return (-1);
 	} else {
 		if (!S_ISDIR(stat_buf.st_mode)) {
@@ -457,7 +472,6 @@ dir_dev_acc(char *path, char *left_to_do, uid_t uid, gid_t gid, mode_t mode,
 				if (dir_dev_acc(newpath, remainder_path,
 				    uid, gid, mode, line, errmsg)) {
 					err = -1;
-					break;
 				}
 			}
 		}
