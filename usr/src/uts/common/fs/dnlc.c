@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -718,7 +717,6 @@ dnlc_purge_vp(vnode_t *vp)
 	nc_hash_t *nch;
 	ncache_t *ncp;
 	int index;
-	int i;
 	vnode_t *nc_rele[DNLC_MAX_RELE];
 
 	ASSERT(vp->v_count > 0);
@@ -756,14 +754,12 @@ dnlc_purge_vp(vnode_t *vp)
 		mutex_exit(&nch->hash_lock);
 
 		/* Release holds on all the vnodes now that we have no locks */
-		if (index) {
-			for (i = 0; i < index; i++) {
-				VN_RELE(nc_rele[i]);
-			}
+		while (index) {
+			VN_RELE(nc_rele[--index]);
+		}
 
-			if (vp->v_count == 1) {
-				return; /* no more dnlc references */
-			}
+		if (vp->v_count == 1) {
+			return; /* no more dnlc references */
 		}
 
 		if (ncp != (ncache_t *)nch) {
