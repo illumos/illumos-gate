@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -5724,10 +5724,12 @@ ip_fanout_tcp(queue_t *q, mblk_t *mp, ill_t *recv_ill, ipha_t *ipha,
 			 * here since this routine gets called only
 			 * for loopback (unlike the IPv6 counterpart).
 			 */
+			ASSERT(Q_TO_CONN(q) != NULL);
 			if (do_tcp_fusion &&
 			    !CONN_INBOUND_POLICY_PRESENT(connp) && !secure &&
-			    !IPP_ENABLED(IPP_LOCAL_IN) && !ip_policy) {
-				ASSERT(Q_TO_CONN(q) != NULL);
+			    !IPP_ENABLED(IPP_LOCAL_IN) && !ip_policy &&
+			    IPCL_IS_TCP(Q_TO_CONN(q))) {
+				ASSERT(Q_TO_CONN(q)->conn_sqp != NULL);
 				sqp = Q_TO_CONN(q)->conn_sqp;
 			} else {
 				sqp = IP_SQUEUE_GET(lbolt);
