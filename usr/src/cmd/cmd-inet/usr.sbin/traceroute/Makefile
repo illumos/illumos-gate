@@ -1,5 +1,5 @@
 #
-# Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -27,37 +27,23 @@
 # @(#) $Header: Makefile.in,v 1.24 97/04/22 13:31:20 leres Exp $ (LBL)
 
 PROG=		traceroute
-TRACEROUTEOBJS=	traceroute.o traceroute_aux.o traceroute_aux6.o
-COMMONOBJS=	ifaddrlist.o
-OBJS=		$(TRACEROUTEOBJS) $(COMMONOBJS)
-SUIDPROG=	traceroute
+OBJS=		traceroute.o traceroute_aux.o traceroute_aux6.o
+SRCS=		$(OBJS:.o=.c)
 
 include	../../../Makefile.cmd
-include	../../Makefile.cmd-inet
-
-TRACEROUTESRCS=	$(TRACEROUTEOBJS:.o=.c)
-COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:.o=.c)
-SRCS=		$(TRACEROUTESRCS) $(COMMONSRCS)
-HDRS=		traceroute.h $(CMDINETCOMMONDIR)/ifaddrlist.h
 
 $(ROOTUSRSBIN)/traceroute	:=	FILEMODE= 04555
 $(ROOTUSRSBIN)/traceroute	:=	OWNER= root
-
-CPPFLAGS +=	-I$(CMDINETCOMMONDIR)
 
 # Traceroute uses the ancillary data feature which is available only through
 # UNIX 98 standards version of Socket interface. This interface is supposed to
 # be accessed by -lxnet. In addition -lsocket and -lnsl are used to
 # capture new not-yet-standard interfaces. Someday -lxnet alone should be enough
 # when IPv6 inspired new interfaces are part of standards.
-LDLIBS +=	-lxnet -lsocket -lnsl  	
+LDLIBS +=	-lxnet -lsocket -lnsl -linetutil
 
-# these #defines are required to use UNIX 98 interfaces
-_D_UNIX98_EXTN= -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
-
-$(TRACEROUTEOBJS)		:= CPPFLAGS +=	$(_D_UNIX98_EXTN)
-
-LINTFLAGS +=	$(_D_UNIX98_EXTN)
+# These #defines are required to use UNIX 98 interfaces
+CPPFLAGS += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 
 #
 # Setting the above defines to use the UNIX98 ancillary data feature
@@ -76,9 +62,6 @@ all:	$(PROG)
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
-
-$(COMMONOBJS): $(COMMONSRCS)
-	$(COMPILE.c) $(COMMONSRCS)
 
 install: all $(ROOTUSRSBINPROG)
 

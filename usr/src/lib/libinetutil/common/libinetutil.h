@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +31,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
- * Contains SMI-private API for general internet functionality
+ * Contains SMI-private API for general Internet functionality
  */
 
 #ifdef	__cplusplus
@@ -58,6 +59,39 @@ typedef struct {
 
 extern boolean_t ifparse_ifspec(const char *, ifspec_t *);
 extern void get_netmask4(const struct in_addr *, struct in_addr *);
+
+/*
+ * Extended version of the classic BSD ifaddrlist() interface:
+ *
+ *    int ifaddrlist(struct ifaddrlist **addrlistp, int af, char *errbuf);
+ *
+ * 	* addrlistp: Upon success, ifaddrlist() sets *addrlistp to a
+ *	  dynamically-allocated array of addresses.
+ *
+ *	* af: Either AF_INET to obtain IPv4 addresses, or AF_INET6 to
+ *	  obtain IPv6 addresses.
+ *
+ *	* errbuf: A caller-supplied buffer of ERRBUFSIZE.  Upon failure,
+ *	  provides the reason for the failure.
+ *
+ * Upon success, ifaddrlist() returns the number of addresses in the array
+ * pointed to by `addrlistp'.  If the count is 0, then `addrlistp' is NULL.
+ */
+union any_in_addr {
+	struct in6_addr	addr6;
+	struct in_addr	addr;
+};
+
+struct ifaddrlist {
+	int		index;			/* interface index */
+	union any_in_addr addr;			/* interface address */
+	char		device[LIFNAMSIZ + 1];	/* interface name */
+	uint64_t	flags;			/* interface flags */
+};
+
+#define	ERRBUFSIZE 128			/* expected size of third argument */
+
+extern int ifaddrlist(struct ifaddrlist **, int, char *);
 
 /*
  * Timer queues

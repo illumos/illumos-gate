@@ -20,53 +20,37 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 PROG=		ping
-PINGOBJS=	ping.o ping_aux.o ping_aux6.o
-COMMONOBJS=	ifaddrlist.o
-OBJS=		$(PINGOBJS) $(COMMONOBJS)
-SUIDPROG=	ping
+OBJS=		ping.o ping_aux.o ping_aux6.o
+SRCS=		$(OBJS:.o=.c)
 
 include	../../../Makefile.cmd
-include	../../Makefile.cmd-inet
-
-PINGSRCS=	$(PINGOBJS:.o=.c)
-COMMONSRCS=	$(CMDINETCOMMONDIR)/$(COMMONOBJS:.o=.c)
-SRCS=		$(PINGSRCS) $(COMMONSRCS)
-HDRS=		ping.h $(CMDINETCOMMONDIR)/ifaddrlist.h
 
 $(ROOTUSRSBIN)/ping	:=	FILEMODE= 04555
 $(ROOTUSRSBIN)/ping	:=	OWNER= root
-
-
-CPPFLAGS +=	-I$(CMDINETCOMMONDIR)
 
 # Ping uses the ancillary data feature which is available only through
 # UNIX 98 standards version of Socket interface. This interface is supposed to
 # be accessed by -lxnet. In addition -lsocket and -lnsl are used to
 # capture new not-yet-standard interfaces. Someday -lxnet alone should be enough
 # when IPv6 inspired new interfaces are part of standards.
-LDLIBS +=	-lxnet -lsocket -lnsl -lm
+LDLIBS +=	-lxnet -lsocket -lnsl -lm -linetutil
 
-# these #defines are required to use UNIX 98 interfaces
-_D_UNIX98_EXTN = -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
-
-$(PINGOBJS)		:= CPPFLAGS +=	$(_D_UNIX98_EXTN)
-
-LINTFLAGS +=	$(_D_UNIX98_EXTN)
+# These #defines are required to use UNIX 98 interfaces
+CPPFLAGS += -D_XOPEN_SOURCE=500 -D__EXTENSIONS__
 
 # Setting the above defines to use the UNIX98 ancillary data feature
 # causes lint to output warnings about lint library declarations conflicting
 # with those in the header files. Since we need these features the best
 # course of action is to switch the types of the resulting warnings off
 # when running lint.
-LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2 -erroff=E_INCONS_ARG_DECL2 \
-	     -erroff=E_FUNC_DECL_VAR_ARG2
+LINTFLAGS += -erroff=E_INCONS_VAL_TYPE_DECL2 -erroff=E_INCONS_ARG_DECL2 
 
 .KEEP_STATE:
 .PARALLEL:
@@ -76,9 +60,6 @@ all:	$(PROG)
 $(PROG): $(OBJS)
 	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
 	$(POST_PROCESS)
-
-$(COMMONOBJS): $(COMMONSRCS)
-	$(COMPILE.c) $(COMMONSRCS)
 
 install: all $(ROOTUSRSBINPROG)
 

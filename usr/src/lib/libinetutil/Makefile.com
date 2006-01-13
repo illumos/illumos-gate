@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -28,7 +28,7 @@
 
 LIBRARY =	libinetutil.a
 VERS =		.1
-OBJECTS =	octet.o inetutil4.o ifspec.o eh.o tq.o
+OBJECTS =	octet.o inetutil4.o ifspec.o ifaddrlist.o eh.o tq.o
 
 include ../../Makefile.lib
 
@@ -38,7 +38,8 @@ include ../../Makefile.rootfs
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 SRCS = 		$(COMDIR)/octet.c $(SRCDIR)/inetutil4.c \
-		$(SRCDIR)/ifspec.c $(SRCDIR)/eh.c $(SRCDIR)/tq.c
+		$(SRCDIR)/ifspec.c $(SRCDIR)/eh.c $(SRCDIR)/tq.c \
+		$(SRCDIR)/ifaddrlist.c
 
 $(LINTLIB):=	SRCS = $(SRCDIR)/$(LINTSRC)
 LDLIBS +=	-lsocket -lc

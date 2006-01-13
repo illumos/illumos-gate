@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -66,8 +66,7 @@
 
 #include <priv_utils.h>
 
-
-#include <ifaddrlist.h>
+#include <libinetutil.h>
 #include "traceroute.h"
 
 #define	MAX_SEQ			65535	/* max sequence value for ICMP */

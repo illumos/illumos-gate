@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +49,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#include <ifaddrlist.h>
+#include <libinetutil.h>
 #include "traceroute.h"
 
 /*

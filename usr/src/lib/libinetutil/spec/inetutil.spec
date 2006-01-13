@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -49,6 +49,12 @@ include		<sys/types.h>
 include		<netinet/in.h>
 include         <libinetutil.h>
 declaration	void get_netmask4(const struct in_addr *np, struct in_addr *sp)
+version         SUNWprivate_1.1
+end
+
+function	ifaddrlist
+include		<libinetutil.h>
+declaration	int ifaddrlist(struct ifaddrlist **, int, char *);
 version         SUNWprivate_1.1
 end
 

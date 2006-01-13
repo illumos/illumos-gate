@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,7 +71,7 @@
 #include <stdlib.h>
 #include <priv_utils.h>
 
-#include <ifaddrlist.h>
+#include <libinetutil.h>
 #include "ping.h"
 
 /*

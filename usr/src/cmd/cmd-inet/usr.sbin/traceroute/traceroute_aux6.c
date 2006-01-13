@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,7 +52,7 @@
 
 #include <arpa/inet.h>
 
-#include <ifaddrlist.h>
+#include <libinetutil.h>
 #include "traceroute.h"
 
 int check_reply6(struct msghdr *, int, int, uchar_t *, uchar_t *);

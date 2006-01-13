@@ -22,17 +22,13 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright (c) 1989-2000 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-#
-# include global definitions
+
 include	../Makefile.cmd
 
-SUBDIR1=	common
-SUBDIR2=	etc sbin usr.bin usr.sbin usr.lib usr.sadm
-SUBDIRS=	$(SUBDIR1) $(SUBDIR2)
-
+SUBDIRS=	etc sbin usr.bin usr.sbin usr.lib usr.sadm
 MSGSUBDIRS=	usr.bin usr.sbin usr.lib usr.sadm
 POFILES=        usr.bin/usr.bin.po usr.sbin/usr.sbin.po usr.sadm/usr.sadm.po
 POFILE=		cmd-inet.po
@@ -48,9 +44,7 @@ _msg:=          TARGET= _msg
 
 .PARALLEL:	$(SUBDIRS)
 
-all install lint: $(SUBDIR1) .WAIT $(SUBDIR2)
-
-clean:		$(SUBDIRS)
+all clean install lint: $(SUBDIRS)
 
 clobber:	$(SUBDIRS) local_clobber
 
@@ -59,11 +53,11 @@ local_clobber:
 
 _msg: $(MSGSUBDIRS)
 	$(RM) $(POFILE)
-	cat $(POFILES) > $(POFILE)
+	$(CAT) $(POFILES) > $(POFILE)
 	$(RM)  $(MSGDOMAIN)/$(POFILE)
-	cp $(POFILE) $(MSGDOMAIN)
+	$(CP) $(POFILE) $(MSGDOMAIN)
 
 $(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:

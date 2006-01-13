@@ -19,8 +19,8 @@
  *
  * CDDL HEADER END
  */
-/* 
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,7 @@
 #include <netdb.h>
 #include <stdlib.h>
 
-#include <ifaddrlist.h>
+#include <libinetutil.h>
 #include "ping.h"
 
 void check_reply6(struct addrinfo *, struct msghdr *, int, ushort_t);

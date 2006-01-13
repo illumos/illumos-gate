@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,7 +29,6 @@
 include ../../Makefile.cmd
 
 COMMON = ../common
-CMDINETCOMMON = $(SRC)/cmd/cmd-inet/common
 
 RCM_SRC = \
 	$(COMMON)/rcm_event.c \
@@ -99,7 +98,7 @@ CLOBBERFILES = $(COMMON_RCM_MODS) $($(MACH)_RCM_MODS) $(RCM_DAEMON)
 
 LINT_MODULES = $(COMMON_MOD_SRC:.c=.ln) $($(MACH)_MOD_SRC:.c=.ln)
 
-CPPFLAGS += -I.. -I $(CMDINETCOMMON)
+CPPFLAGS += -I..
 CPPFLAGS += -D_POSIX_PTHREAD_SEMANTICS -D_REENTRANT
 CFLAGS += $(CCVERBOSE) $(C_PICFLAGS)
 
@@ -110,6 +109,7 @@ SUNW_pool_rcm.so := LDLIBS_MODULES += -L$(ROOT)/usr/lib -lpool
 SUNW_svm_rcm.so	:= LDLIBS_MODULES += -L$(ROOT)/usr/lib -lmeta
 SUNW_network_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -llaadm
 SUNW_ip_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
+SUNW_ip_anon_rcm.so := LDLIBS_MODULES += -L$(ROOT)/lib -linetutil
 
 LDLIBS += -lgen -lelf -lcmd -lrcm -lnvpair -ldevinfo -lnsl -lsocket -lrt
 
