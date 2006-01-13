@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -779,6 +779,19 @@ ib_update_intr_state(pci_t *pci_p, dev_info_t *rdip,
 	ib_mondo_t	mondo;
 	ih_t		*ih_p;
 	int		ret = DDI_FAILURE;
+
+	/*
+	 * For PULSE interrupts, pci driver don't allocate
+	 * ib_ino_info_t and ih_t data structures and also,
+	 * not maintains any interrupt state information.
+	 * So, just return success from here.
+	 */
+	if (hdlp->ih_vector & PCI_PULSE_INO) {
+		DEBUG0(DBG_IB, ib_p->ib_pci_p->pci_dip,
+		    "ib_update_intr_state: PULSE interrupt, return success\n");
+
+		return (DDI_SUCCESS);
+	}
 
 	mutex_enter(&ib_p->ib_ino_lst_mutex);
 
