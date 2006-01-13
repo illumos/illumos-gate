@@ -21,7 +21,7 @@
  */
 /* ONC_PLUS EXTRACT START */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -230,6 +230,8 @@ clock_t tim_tcap_wait = 2;
 
 /* Sleep timeout in tim_recover() */
 #define	TIMWAIT	(1*hz)
+/* Sleep timeout in tim_ioctl_retry() 0.2 seconds */
+#define	TIMIOCWAIT	(200*hz/1000)
 
 /*
  * Return values for ti_doname().
@@ -308,6 +310,7 @@ static void tim_addlink(struct tim_tim	*);
 static void tim_dellink(struct tim_tim	*);
 static struct tim_tim *tim_findlink(t_uscalar_t);
 static void tim_recover(queue_t *, mblk_t *, t_scalar_t);
+static void tim_ioctl_retry(queue_t *);
 
 int dotilog = 0;
 
@@ -1658,13 +1661,19 @@ timodwproc(queue_t *q, mblk_t *mp)
 
 		/*
 		 * TPI requires we await response to a previously sent message
-		 * before handling another, put it back on the head of the queue
-		 * putbq() schedules the queue for service.
+		 * before handling another, put it back on the head of queue.
+		 * Since putbq() may see QWANTR unset when called from the
+		 * service procedure, the queue must be explicitly scheduled
+		 * for service, as no backenable will occur for this case.
+		 * tim_ioctl_retry() sets a timer to handle the qenable.
 		 */
 		if (tp->tim_flags & WAITIOCACK) {
 			TILOG("timodwproc: putbq M_IOCTL(%d)\n",
 			    iocbp->ioc_cmd);
 			(void) putbq(q, mp);
+			/* Called from timodwsrv() and messages on queue */
+			if (!(q->q_flag & QWANTR))
+				tim_ioctl_retry(q);
 			return (1);
 		}
 /* ONC_PLUS EXTRACT END */
@@ -2622,6 +2631,27 @@ tim_recover(queue_t *q, mblk_t *mp, t_scalar_t size)
 		else
 			tp->tim_wbufcid = bid;
 	}
+}
+
+/*
+ * Timod is waiting on a downstream ioctl reply, come back soon
+ * to reschedule the write side service routine, which will check
+ * if the ioctl is done and another can proceed.
+ */
+static void
+tim_ioctl_retry(queue_t *q)
+{
+	struct tim_tim  *tp;
+
+	tp = (struct tim_tim *)q->q_ptr;
+
+	/*
+	 * Make sure there is at most one outstanding request per wqueue.
+	 */
+	if (tp->tim_wtimoutid || tp->tim_wbufcid)
+		return;
+
+	tp->tim_wtimoutid = qtimeout(RD(q), tim_timer, q, TIMIOCWAIT);
 }
 
 /*
