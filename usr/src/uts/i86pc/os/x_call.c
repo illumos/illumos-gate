@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -465,10 +465,13 @@ xc_common(
 		if ((cpup = cpu[cix]) == NULL ||
 		    (cpup->cpu_flags & CPU_READY) == 0) {
 			/*
-			 * In case CPU wasn't ready, but becomes ready later,
-			 * take the CPU out of the set now.
+			 * In case the non-local CPU is not ready but becomes
+			 * ready later, take it out of the set now. The local
+			 * CPU needs to remain in the set to complete the
+			 * requested function.
 			 */
-			CPUSET_DEL(set, cix);
+			if (cix != lcx)
+				CPUSET_DEL(set, cix);
 		} else if (cix != lcx && CPU_IN_SET(set, cix)) {
 			CPU_STATS_ADDQ(CPU, sys, xcalls, 1);
 			cpup->cpu_m.xc_ack[pri] = 0;

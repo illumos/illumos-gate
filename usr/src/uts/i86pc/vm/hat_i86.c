@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1954,7 +1954,7 @@ hat_demap(hat_t *hat, uintptr_t va)
 	/*
 	 * Otherwise we notify CPUs currently running in this HAT
 	 */
-	hat_enter(hat);
+	mutex_enter(&hat->hat_switch_mutex);
 	kpreempt_disable();
 	CPUSET_ONLY(justme, CPU->cpu_id);
 	if (CPUSET_ISEQUAL(hat->hat_cpus, justme))
@@ -1963,7 +1963,7 @@ hat_demap(hat_t *hat, uintptr_t va)
 		xc_call((xc_arg_t)hat, (xc_arg_t)va, NULL,
 		    X_CALL_HIPRI, hat->hat_cpus, hati_demap_func);
 	kpreempt_enable();
-	hat_exit(hat);
+	mutex_exit(&hat->hat_switch_mutex);
 }
 
 /*

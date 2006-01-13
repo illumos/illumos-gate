@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -923,7 +923,7 @@ link_ptp(htable_t *higher, htable_t *new, uintptr_t vaddr)
 	HTABLE_INC(higher->ht_valid_cnt);
 
 	found = x86pte_cas(higher, entry, 0, newptp);
-	if (found != 0)
+	if ((found & ~PT_REF) != 0)
 		panic("HAT: ptp not 0, found=" FMT_PTE, found);
 }
 

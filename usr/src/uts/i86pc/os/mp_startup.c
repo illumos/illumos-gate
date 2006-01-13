@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1004,6 +1004,10 @@ mp_cpu_unconfigure(int cpuid)
 /*
  * Startup function for 'other' CPUs (besides boot cpu).
  * Resumed from cpu_startup.
+ *
+ * WARNING: until CPU_READY is set, mp_startup and routines called by
+ * mp_startup should not call routines (e.g. kmem_free) that could call
+ * hat_unload which requires CPU_READY to be set.
  */
 void
 mp_startup(void)
@@ -1071,8 +1075,6 @@ mp_startup(void)
 
 	init_cpu_info(cp);
 
-	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
-
 	mutex_enter(&cpu_lock);
 	procset |= 1 << cp->cpu_id;
 	mutex_exit(&cpu_lock);
@@ -1095,6 +1097,8 @@ mp_startup(void)
 	cp->cpu_flags |= CPU_RUNNING | CPU_READY | CPU_ENABLE | CPU_EXISTS;
 	cpu_add_active(cp);
 	mutex_exit(&cpu_lock);
+
+	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
 
 	(void) spl0();				/* enable interrupts */
 
