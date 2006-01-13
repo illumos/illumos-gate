@@ -2226,17 +2226,15 @@ unshare_unmount_path(int type, char *path, int flags, int is_manual)
 			ret = zfs_unshareall(zhp);
 		}
 	} else {
-		if (strcmp(property, "legacy") == 0) {
-			if (is_manual) {
-				ret = zfs_unmount(zhp, NULL, flags);
-			} else {
-				(void) fprintf(stderr, gettext("cannot unmount "
-				    "'%s': legacy mountpoint\n"),
-				    zfs_get_name(zhp));
-				(void) fprintf(stderr, gettext("use umount(1M) "
-				    "to unmount this filesystem\n"));
-				ret = 1;
-			}
+		if (is_manual) {
+			ret = zfs_unmount(zhp, NULL, flags);
+		} else if (strcmp(property, "legacy") == 0) {
+			(void) fprintf(stderr, gettext("cannot unmount "
+			    "'%s': legacy mountpoint\n"),
+			    zfs_get_name(zhp));
+			(void) fprintf(stderr, gettext("use umount(1M) "
+			    "to unmount this filesystem\n"));
+			ret = 1;
 		} else {
 			ret = zfs_unmountall(zhp, flags);
 		}
