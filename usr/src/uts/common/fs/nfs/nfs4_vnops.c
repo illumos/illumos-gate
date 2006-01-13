@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2207,9 +2207,11 @@ nfs4_open_non_reg_file(vnode_t **vpp, int flag, cred_t *cr)
 static int
 nfs4_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 {
-	rnode4_t *rp;
-	int pc_err = 0;
-	nfs4_error_t e = { 0, NFS4_OK, RPC_SUCCESS };
+	rnode4_t	*rp;
+	int		 error = 0;
+	int		 r_error = 0;
+	int		 n4error = 0;
+	nfs4_error_t	 e = { 0, NFS4_OK, RPC_SUCCESS };
 
 	/*
 	 * Remove client state for this (lockowner, file) pair.
@@ -2277,27 +2279,42 @@ nfs4_close(vnode_t *vp, int flag, int count, offset_t offset, cred_t *cr)
 	 * dirty and uncommitted pages.
 	 */
 	ASSERT(!e.error);
-	if ((flag & FWRITE) && nfs4_has_pages(vp)) {
-		pc_err = nfs4_putpage_commit(vp, 0, 0, cr);
-	}
+	if ((flag & FWRITE) && nfs4_has_pages(vp))
+		error = nfs4_putpage_commit(vp, 0, 0, cr);
 
 	mutex_enter(&rp->r_statelock);
-	e.error = rp->r_error;
+	r_error = rp->r_error;
 	rp->r_error = 0;
 	mutex_exit(&rp->r_statelock);
 
-	/* Check to see if we need to close the file */
-
+	/*
+	 * If this file type is one for which no explicit 'open' was
+	 * done, then bail now (ie. no need for protocol 'close'). If
+	 * there was an error w/the vm subsystem, return _that_ error,
+	 * otherwise, return any errors that may've been reported via
+	 * the rnode.
+	 */
 	if (vp->v_type != VREG)
-		return (pc_err ? pc_err : e.error);
+		return (error ? error : r_error);
 
-	/* Let nfs4close_one figure out if an OTW close is needed. */
+	/*
+	 * The sync putpage commit may have failed above, but since
+	 * we're working w/a regular file, we need to do the protocol
+	 * 'close' (nfs4close_one will figure out if an otw close is
+	 * needed or not). Report any errors _after_ doing the protocol
+	 * 'close'.
+	 */
 	nfs4close_one(vp, NULL, cr, flag, NULL, &e, CLOSE_NORM, 0, 0, 0);
+	n4error = e.error ? e.error : geterrno4(e.stat);
 
-	if (pc_err)
-		return (pc_err);
-
-	return (e.error ? e.error : geterrno4(e.stat));
+	/*
+	 * Error reporting prio (Hi -> Lo)
+	 *
+	 *   i) nfs4_putpage_commit (error)
+	 *  ii) rnode's (r_error)
+	 * iii) nfs4close_one (n4error)
+	 */
+	return (error ? error : (r_error ? r_error : n4error));
 }
 
 /*
@@ -9325,7 +9342,7 @@ nfs4_bio(struct buf *bp, stable_how4 *stab_comm, cred_t *cr, bool_t readahead)
 			}
 			bp->b_error = error;
 			if (error && error != EINTR &&
-			    !(bp->b_vp->v_vfsp->vfs_flag && VFS_UNMOUNTED)) {
+			    !(bp->b_vp->v_vfsp->vfs_flag & VFS_UNMOUNTED)) {
 				/*
 				 * Don't print EDQUOT errors on the console.
 				 * Don't print asynchronous EACCES errors.
