@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,10 +89,10 @@ uint_t	usb_ac_instance_debug	= (uint_t)-1;
 
 #ifdef DEBUG
 /*
- * tunable timeout for usb_as response, allow at least 3 secs for control
+ * tunable timeout for usb_as response, allow at least 10 secs for control
  * cmd to timeout
  */
-int	usb_ac_wait_timeout = 4000000;
+int	usb_ac_wait_timeout = 10000000;
 #endif
 
 /*
@@ -3473,7 +3473,11 @@ usb_ac_set_config(audiohdl_t ahdl, int stream, int command, int flag,
 	    ahdl, stream, command, flag, arg1, arg2);
 
 	mutex_enter(&uacp->usb_ac_mutex);
-	ASSERT(uacp->usb_ac_plumbing_state >= USB_AC_STATE_PLUMBED);
+	if (uacp->usb_ac_plumbing_state < USB_AC_STATE_PLUMBED) {
+		mutex_exit(&uacp->usb_ac_mutex);
+
+		return (AUDIO_FAILURE);
+	}
 
 	if (uacp->usb_ac_dev_state != USB_DEV_ONLINE) {
 		mutex_exit(&uacp->usb_ac_mutex);
@@ -4672,7 +4676,17 @@ usb_ac_send_as_cmd(usb_ac_state_t *uacp, usb_ac_plumbed_t *plumb_infop,
 		    &uacp->usb_ac_mutex, tm);
 
 		if (streams_infop->acs_ac_to_as_req.acr_wait_flag) {
-			ASSERT(rval != -1);
+			if (rval == -1) {
+				USB_DPRINTF_L3(PRINT_MASK_ALL,
+				    uacp->usb_ac_log_handle,
+				    "usb_ac_send_as_cmd:"
+				    " timeout happen before cmd complete.");
+			} else {
+				USB_DPRINTF_L3(PRINT_MASK_ALL,
+				    uacp->usb_ac_log_handle,
+				    "usb_ac_send_as_cmd:"
+				    " not signaled by USB_AS_PLUMBED.");
+			}
 		}
 #endif
 	}

@@ -23,7 +23,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
  
@@ -44,7 +44,12 @@ installed() {
 
 EXIT=0
 
-USBSPRL_ALIASES="\"usb67b,2303\""
+# "usb67b,2303" Most adapters based on pl2303 chip set have this ID
+# "usb557,2008" Aten UC-232A USB serial adapter
+USBSPRL_ALIASES="\
+	\"usb67b,2303\" \
+	\"usb557,2008\" \
+	"
 
 if installed usbsprl ; then
 	echo "usbsprl already installed" || EXIT 1
