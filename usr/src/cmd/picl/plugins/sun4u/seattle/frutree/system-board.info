@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -355,6 +355,7 @@ name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-1
 	ENDNODE
 
 name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-1
+	PROP FRUDataAvailable void r
 	REFPROP _seeprom_source name:/platform/i2c@1f,530000/sasbp-fru-prom@0,64
 
 name:/platform/i2c@1f,530000/sasbp-fru-prom@0,64
@@ -379,6 +380,7 @@ name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3
 	ENDNODE
 
 name:/frutree/chassis/MB/system-board/HDDBP/disk-backplane-3
+	PROP FRUDataAvailable void r
 	REFPROP _seeprom_source name:/platform/i2c@1f,530000/sasbp-fru-prom@0,64
 
 name:/platform/i2c@1f,530000/sasbp-fru-prom@0,64
@@ -659,33 +661,42 @@ name:PCI_L
 name:PCI_L/pci-riser-board
 	PROP FRUDataAvailable void r
 	REFPROP _seeprom_source name:/platform/i2c@1f,530000/riser-fru-prom@0,a8
-	NODE PCI1 location
-	    PROP Label string r 0 "PCI1"
-	    PROP SlotType string r 0 "pci-x-e"
-	ENDNODE
-	REFNODE PCI3 location WITH /platform?PlatformName=SUNW,Sun-Fire-V245
 
 name:/platform/i2c@1f,530000/riser-fru-prom@0,a8
 	REFPROP _fru_parent PCI_L/pci-riser-board
 
+name:PCI_L/pci-riser-board
+	REFNODE PCI1 location WITH /platform?PlatformName=SUNW,Sun-Fire-V215
+
+name:PCI_L/pci-riser-board/PCI1
+	PROP Label string r 0 "PCI1"
+	PROP SlotType string r 0 "pci-x-e"
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl?DeviceID=0
+
+name:PCI_L/pci-riser-board
+	REFNODE PCI1 location WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+	REFNODE PCI3 location WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+
 name:PCI_L/pci-riser-board/PCI3
 	PROP Label string r 0 "PCI3"
 	PROP SlotType string r 0 "pci-x-e"
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/picl?DeviceID=2
+
+name:PCI_L/pci-riser-board/PCI1
+	PROP Label string r 0 "PCI1"
+	PROP SlotType string r 0 "pci-x-e"
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pciex@0/pci@8/picl?DeviceID=1
 
 /*
- * Populate PCI slots
+ * Populate PCI_R slots
  */
 name:PCI_R/pci-riser-board/PCI0
 	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl?DeviceID=0
 name:PCI_R/pci-riser-board/PCI2
 	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl?DeviceID=0
-name:PCI_L/pci-riser-board/PCI1
-	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/obp-device@0
-	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl?DeviceID=0
-	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@9/pciex@0/pci@8/picl?DeviceID=1
-name:PCI_L/pci-riser-board/PCI3
-	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl?DeviceID=0
-	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/picl?DeviceID=2
 
 /*
  * _fru_parent PCIEX devices
@@ -696,12 +707,12 @@ REFPROP _fru_parent PCI_R/pci-riser-board/PCI0/pci-card
 _class:/jbus/pciex@1e,600000/pciex@0/pciex@2/picl?DeviceID=0
 REFPROP _fru_parent PCI_R/pci-riser-board/PCI2/pci-card
 
-_class:/jbus/pciex@1f,700000/obp-device@0
+_class:/jbus/pciex@1f,700000/picl?DeviceID=0
 REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl?DeviceID=0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl?DeviceID=0
 REFPROP _fru_parent PCI_L/pci-riser-board/PCI1/pci-card
 
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl?DeviceID=0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl?DeviceID=0
 REFPROP _fru_parent PCI_L/pci-riser-board/PCI3/pci-card
 
 /*

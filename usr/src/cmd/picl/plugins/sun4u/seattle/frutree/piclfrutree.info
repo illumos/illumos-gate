@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -88,7 +88,10 @@ NODE frutree picl
 	    PROP SlotType string r 0 "power-supply"
 	    PROP Label string r 0 "PS0"
 	ENDNODE
-	REFNODE PS1 location WITH /platform?PlatformName=SUNW,Sun-Fire-V245
+	NODE PS1 location
+	    PROP SlotType string r 0 "power-supply"
+	    PROP Label string r 0 "PS1"
+	ENDNODE
 	NODE PDB location 
 	    PROP SlotType string r 0 "PDB"
 	    PROP Label string r 0 "PDB"
@@ -106,15 +109,6 @@ name:/frutree/chassis/PS0
 	REFNODE power-supply fru WITH name:/platform/i2c@1f,530000/power-supply-fru-prom@0,6c
 name:/frutree/chassis/PS1
 	REFNODE power-supply fru WITH name:/platform/i2c@1f,530000/power-supply-fru-prom@0,6e
-
-/*
- * add properties to 2u locations
- */
-
-/* extra power supply */
-name:/frutree/chassis/PS1
-	PROP SlotType string r 0 "power-supply"
-	PROP Label string r 0 "PS1"
 
 /* chassis fruid prom */
 name:/frutree/chassis/PDB
