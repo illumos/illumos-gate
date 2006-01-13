@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -87,13 +87,18 @@ log_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 }
 
 /*
- * log_open can be called for one of two devices, /dev/conslog or
- * /dev/log.  In the case of /dev/conslog it returns the global
- * console device (i.e., multiple opens return the same device), while
- * for /dev/log a new device is created for each open (up to a limit
- * of 16 per zone).  Most of the allocation details are handled in
- * log_alloc.
+ * log_open can be called for either /dev/log or dev/conslog.
+ *
+ * In the /dev/conslog case log_alloc() allocates a new minor device from
+ * its cache.
+ *
+ * In the case of /dev/log, LOG_NUMCLONES devices are pre-allocated at zone
+ * creation. log_alloc() finds the zone's next available minor device.
+ *
+ * On entry devp's minor number indicates which device (log or conslog), on
+ * successful return it is the device instance.
  */
+
 /* ARGSUSED */
 static int
 log_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *cr)
@@ -105,7 +110,7 @@ log_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *cr)
 		return (ENXIO);
 
 	switch (minor = getminor(*devp)) {
-	case LOG_CONSMIN:		/* normal open of /dev/conslog */
+	case LOG_CONSMIN:		/* clone open of /dev/conslog */
 		if (flag & FREAD)
 			return (EINVAL);	/* write-only device */
 		if (q->q_ptr)
@@ -143,6 +148,8 @@ log_close(queue_t *q, int flag, cred_t *cr)
 	log_update(lp, NULL, 0, NULL);
 	freemsg(lp->log_data);
 	lp->log_data = NULL;
+	if (lp->log_major == LOG_CONSMIN)
+		log_free(lp);
 	q->q_ptr = NULL;
 	WR(q)->q_ptr = NULL;
 
@@ -181,8 +188,8 @@ log_wput(queue_t *q, mblk_t *mp)
 	case M_IOCTL:
 		iocp = (struct iocblk *)mp->b_rptr;
 
-		if (lp->log_minor <= LOG_LOGMIN) {
-			/* not a cloned dev_t */
+		if (lp->log_major != LOG_LOGMIN) {
+			/* write-only device */
 			miocnak(q, mp, 0, EINVAL);
 			return (0);
 		}
