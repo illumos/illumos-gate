@@ -18,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -192,10 +193,16 @@ extern "C" {
 
 #define	DDI_NT_SCSI_NEXUS	"ddi_ctl:devctl:scsi"	/* nexus drivers */
 
+#define	DDI_NT_SATA_NEXUS	"ddi_ctl:devctl:sata"	/* nexus drivers */
+
 #define	DDI_NT_ATTACHMENT_POINT	"ddi_ctl:attachment_point" /* attachment pt */
 
 #define	DDI_NT_SCSI_ATTACHMENT_POINT	"ddi_ctl:attachment_point:scsi"
 						/* scsi attachment pt */
+
+#define	DDI_NT_SATA_ATTACHMENT_POINT	"ddi_ctl:attachment_point:sata"
+						/* sata attachment pt */
+
 #define	DDI_NT_PCI_ATTACHMENT_POINT	"ddi_ctl:attachment_point:pci"
 						/* PCI attachment pt */
 #define	DDI_NT_SBD_ATTACHMENT_POINT	"ddi_ctl:attachment_point:sbd"

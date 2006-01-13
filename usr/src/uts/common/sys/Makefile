@@ -785,6 +785,11 @@ FCHDRS=			\
 	fcal_linkapp.h	\
 	fcio.h
 
+SATAGENHDRS=		\
+	sata_hba.h	\
+	sata_defs.h	\
+	sata_cfgadm.h
+
 SYSEVENTHDRS=		\
 	ap_driver.h     \
 	dev.h		\
@@ -926,6 +931,7 @@ CHECKHDRS=						\
 	$(SCSITARGETSHDRS:%.h=scsi/targets/%.check)	\
 	$(SCSIVHCIHDRS:%.h=scsi/adapters/%.check)	\
 	$(FCHDRS:%.h=fc4/%.check)			\
+	$(SATAGENHDRS:%.h=sata/%.check)			\
 	$(SYSEVENTHDRS:%.h=sysevent/%.check)            \
 	$(CONTRACTHDRS:%.h=contract/%.check)            \
 	$(USBAUDHDRS:%.h=usb/clients/audio/%.check)   \

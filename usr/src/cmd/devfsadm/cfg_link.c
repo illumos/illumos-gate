@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #define	USB_CFG_LINK_RE		"^cfg/((usb[0-9]+)/([0-9]+)([.]([0-9])+)*)$"
 #define	PCI_CFG_LINK_RE		"^cfg/[:alnum:]$"
 #define	IB_CFG_LINK_RE		"^cfg/(hca[0-9A-F]+)$"
+#define	SATA_CFG_LINK_RE	"^cfg/((sata[0-9]+)/([0-9]+)([.]([0-9])+)*)$"
 
 #define	CFG_DIRNAME		"cfg"
 
@@ -46,6 +47,7 @@ static int	usb_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static char	*get_roothub(const char *path, void *cb_arg);
 static int	pci_cfg_creat_cb(di_minor_t minor, di_node_t node);
 static int	ib_cfg_creat_cb(di_minor_t minor, di_node_t node);
+static int	sata_cfg_creat_cb(di_minor_t minor, di_node_t node);
 
 /*
  * NOTE: The CREATE_DEFER flag is private to this module.
@@ -69,6 +71,9 @@ static devfsadm_create_t cfg_create_cbt[] = {
 	},
 	{ "attachment-point", "ddi_ctl:attachment_point:ib", NULL,
 	    TYPE_EXACT, ILEVEL_0, ib_cfg_creat_cb
+	},
+	{ "attachment-point", "ddi_ctl:attachment_point:sata", NULL,
+	    TYPE_EXACT, ILEVEL_0, sata_cfg_creat_cb
 	}
 };
 
@@ -91,6 +96,9 @@ static devfsadm_remove_t cfg_remove_cbt[] = {
 	    ILEVEL_0, devfsadm_rm_all
 	},
 	{ "attachment-point", IB_CFG_LINK_RE, RM_POST|RM_HOT|RM_ALWAYS,
+	    ILEVEL_0, devfsadm_rm_all
+	},
+	{ "attachment-point", SATA_CFG_LINK_RE, RM_POST|RM_HOT|RM_ALWAYS,
 	    ILEVEL_0, devfsadm_rm_all
 	}
 };
@@ -177,6 +185,43 @@ usb_cfg_creat_cb(di_minor_t minor, di_node_t node)
 	free(cp);
 
 	(void) devfsadm_mklink(path, node, minor, 0);
+
+	return (DEVFSADM_CONTINUE);
+}
+
+
+static int
+sata_cfg_creat_cb(di_minor_t minor, di_node_t node)
+{
+	char path[PATH_MAX + 1], l_path[PATH_MAX], *buf, *devfspath;
+	char *minor_nm;
+	devfsadm_enumerate_t rules[1] =
+		{"^cfg$/^sata([0-9]+)$", 1, MATCH_ADDR};
+
+	minor_nm = di_minor_name(minor);
+	if (minor_nm == NULL)
+		return (DEVFSADM_CONTINUE);
+
+	devfspath = di_devfs_path(node);
+	if (devfspath == NULL)
+		return (DEVFSADM_CONTINUE);
+
+	(void) strlcpy(path, devfspath, sizeof (path));
+	(void) strlcat(path, ":", sizeof (path));
+	(void) strlcat(path, minor_nm, sizeof (path));
+	di_devfs_path_free(devfspath);
+
+	/* build the physical path from the components */
+	if (devfsadm_enumerate_int(path, 0, &buf, rules, 1) ==
+	    DEVFSADM_FAILURE) {
+		return (DEVFSADM_CONTINUE);
+	}
+
+	(void) snprintf(l_path, sizeof (l_path), "%s/sata%s/%s", CFG_DIRNAME,
+			buf, minor_nm);
+	free(buf);
+
+	(void) devfsadm_mklink(l_path, node, minor, 0);
 
 	return (DEVFSADM_CONTINUE);
 }

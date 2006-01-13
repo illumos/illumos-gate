@@ -108,6 +108,9 @@ f none usr/include/sys/prom_isa.h 644 root bin
 f none usr/include/sys/prom_plat.h 644 root bin
 f none usr/include/sys/pte.h 644 root bin
 f none usr/include/sys/rtc.h 644 root bin
+d none usr/include/sys/sata 755 root sys
+f none usr/include/sys/sata/sata_hba.h 644 root bin
+f none usr/include/sys/sata/sata_defs.h 644 root bin
 f none usr/include/sys/scsi/targets/stdef.h 644 root bin
 f none usr/include/sys/segment.h 644 root bin
 f none usr/include/sys/segments.h 644 root bin

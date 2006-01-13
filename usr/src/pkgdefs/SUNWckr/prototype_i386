@@ -167,6 +167,7 @@ f none kernel/misc/pcicfg 755 root sys
 f none kernel/misc/pcihp 755 root sys
 f none kernel/misc/pcmcia 755 root sys
 f none kernel/misc/rpcsec 755 root sys
+f none kernel/misc/sata 755 root sys
 f none kernel/misc/scsi 755 root sys
 l none kernel/misc/sha1=../../kernel/crypto/sha1
 l none kernel/misc/sha2=../../kernel/crypto/sha2
@@ -333,6 +334,7 @@ f none kernel/misc/amd64/pcicfg 755 root sys
 f none kernel/misc/amd64/pcihp 755 root sys
 f none kernel/misc/amd64/pcmcia 755 root sys
 f none kernel/misc/amd64/rpcsec 755 root sys
+f none kernel/misc/amd64/sata 755 root sys
 f none kernel/misc/amd64/scsi 755 root sys
 l none kernel/misc/amd64/sha1=../../../kernel/crypto/amd64/sha1
 l none kernel/misc/amd64/sha2=../../../kernel/crypto/amd64/sha2

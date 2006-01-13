@@ -588,6 +588,8 @@ SCSI_OBJS +=	scsi_capabilities.o	scsi_control.o	scsi_watch.o \
 		scsi_hba.o	scsi_transport.o	scsi_confsubr.o \
 		scsi_reset_notify.o
 
+SATA_OBJS +=	sata.o
+
 USBA_OBJS +=	hcdi.o	usba.o	usbai.o hubdi.o parser.o genconsole.o \
 		usbai_pipe_mgmt.o usbai_req.o usbai_util.o usbai_register.o \
 		usba_devdb.o usba10_calls.o usba_ugen.o
@@ -700,6 +702,8 @@ TVHCI_OBJS += tvhci.o
 EMUL64_OBJS += emul64.o emul64_bsd.o
 
 ZCONS_OBJS += zcons.o
+
+SI3124_OBJS += si3124.o
 
 PCIIDE_OBJS += pci-ide.o
 

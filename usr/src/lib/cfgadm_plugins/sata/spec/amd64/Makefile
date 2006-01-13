@@ -18,49 +18,26 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/cfgadm_plugins/Makefile
-#
 
-include $(SRC)/Makefile.master
+include ../Makefile.targ
 
-CLOSED_PLUGIN = $(CLOSED)/lib/cfgadm_plugins/
+# Add arch specific objects here
+OBJECTS +=
 
-COMMON_SUBDIRS= scsi pci usb ib
-sparc_SUBDIRS=	sbd
+include $(SRC)/lib/Makefile.lib
+include $(SRC)/lib/Makefile.lib.64
 
-i386_SUBDIRS= sata
+# Uncomment the following if the linker complains
+#amd64_C_PICFLAGS = $(amd64_C_BIGPICFLAGS)
 
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/ac
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/sysctrl
+include $(SRC)/lib/Makefile.spec
 
-SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
+install: $(ROOTABILIB64)
 
-ALL_SUBDIRS= $(COMMON_SUBDIRS) $(sparc_SUBDIRS) $(i386_SUBDIRS)
-
-MSGSUBDIRS= $(ALL_SUBDIRS)
-
-all:= 		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-_msg:=		TARGET= _msg
-
-.KEEP_STATE:
-
-all clean clobber lint: $(SUBDIRS)
-
-install: all $(SUBDIRS)
-
-_msg: $(MSGSUBDIRS)
-
-$(ALL_SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:

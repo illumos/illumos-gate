@@ -18,49 +18,68 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/cfgadm_plugins/Makefile
+# lib/cfgadm_plugins/sata/Makefile.com
 #
 
-include $(SRC)/Makefile.master
+LIBRARY= sata.a
+VERS= .1
 
-CLOSED_PLUGIN = $(CLOSED)/lib/cfgadm_plugins/
+OBJECTS= cfga_sata.o cfga_rcm.o
 
-COMMON_SUBDIRS= scsi pci usb ib
-sparc_SUBDIRS=	sbd
+# include library definitions
+include ../../../Makefile.lib
 
-i386_SUBDIRS= sata
+ROOTLIBDIR=	$(ROOT)/usr/lib/cfgadm
+ROOTLIBDIR64=	$(ROOTLIBDIR)/$(MACH64)
 
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/ac
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/sysctrl
+MAPFILE=	$(MAPDIR)/mapfile
+CLOBBERFILES +=	$(MAPFILE)
 
-SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
+SRCS=		$(OBJECTS:%.o=../common/%.c)
 
-ALL_SUBDIRS= $(COMMON_SUBDIRS) $(sparc_SUBDIRS) $(i386_SUBDIRS)
+LIBS=	$(DYNLIB)
 
-MSGSUBDIRS= $(ALL_SUBDIRS)
+LINTFLAGS +=	-DDEBUG
+LINTFLAGS64 +=	-DDEBUG
 
-all:= 		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-_msg:=		TARGET= _msg
+CFLAGS +=	$(CCVERBOSE)
+CFLAGS64 +=	$(CCVERBOSE)
+
+DYNFLAGS +=	-M $(MAPFILE)
+LDLIBS +=	-lc -ldevice -ldevinfo -lrcm -lnvpair
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all:	$(LIBS)
 
-install: all $(SUBDIRS)
+lint:	lintcheck
 
-_msg: $(MSGSUBDIRS)
+$(DYNLIB):	$(MAPFILE)
 
-$(ALL_SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
+$(MAPFILE):
+	@cd $(MAPDIR); $(MAKE) mapfile
 
-FRC:
+# Install rules
+
+$(ROOTLIBDIR)/%: % $(ROOTLIBDIR)
+	$(INS.file)
+
+$(ROOTLIBDIR64)/%: % $(ROOTLIBDIR64)
+	$(INS.file)
+
+$(ROOTLIBDIR) $(ROOTLIBDIR64):
+	$(INS.dir)
+
+# include library targets
+include ../../../Makefile.targ
+
+objs/%.o pics/%.o: ../common/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)

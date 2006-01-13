@@ -18,49 +18,20 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-#
-# lib/cfgadm_plugins/Makefile
-#
+ 
+include ../Makefile.com
 
-include $(SRC)/Makefile.master
-
-CLOSED_PLUGIN = $(CLOSED)/lib/cfgadm_plugins/
-
-COMMON_SUBDIRS= scsi pci usb ib
-sparc_SUBDIRS=	sbd
-
-i386_SUBDIRS= sata
-
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/ac
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/sysctrl
-
-SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
-
-ALL_SUBDIRS= $(COMMON_SUBDIRS) $(sparc_SUBDIRS) $(i386_SUBDIRS)
-
-MSGSUBDIRS= $(ALL_SUBDIRS)
-
-all:= 		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-_msg:=		TARGET= _msg
+DATAFILES += depend
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all: $(FILES) depend postinstall postremove
+install: all pkg
 
-install: all $(SUBDIRS)
-
-_msg: $(MSGSUBDIRS)
-
-$(ALL_SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(TARGET)
-
-FRC:
+include ../Makefile.targ

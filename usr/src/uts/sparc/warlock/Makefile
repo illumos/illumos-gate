@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,10 +18,13 @@
 #
 # CDDL HEADER END
 #
+
+#
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 #	This makefile drives the production of the fas driver kernel module.
 #
@@ -58,7 +60,7 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #	lock_lint rules
 #
 all:	warlock warlock.1394 warlock.audio warlock.ecpp warlock.scsi \
-	warlock.smartcard warlock.usb warlock.ib
+	warlock.smartcard warlock.usb warlock.ib warlock.sata
 
 warlock: $(MODULE).ok 
 
@@ -134,3 +136,7 @@ warlock.ib:
 	@cd ../ibtl; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../ibcm; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../ibd; rm -f *.ll *.ok; $(MAKE) warlock
+
+warlock.sata:
+	@cd ../sata; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd ../si3124; rm -f *.ll *.ok; $(MAKE) warlock

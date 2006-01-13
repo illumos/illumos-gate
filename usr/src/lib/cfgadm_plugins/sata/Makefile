@@ -18,49 +18,56 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# lib/cfgadm_plugins/Makefile
-#
+# lib/cfgadm_plugins/sata/Makefile
 
-include $(SRC)/Makefile.master
+include		../../Makefile.lib
 
-CLOSED_PLUGIN = $(CLOSED)/lib/cfgadm_plugins/
+SUBDIRS=	spec .WAIT $(MACH) $(BUILD64) $(MACH64)
 
-COMMON_SUBDIRS= scsi pci usb ib
-sparc_SUBDIRS=	sbd
+all :=		TARGET= all
+clean :=	TARGET= clean
+clobber :=	TARGET= clobber
+delete :=	TARGET= delete
+install :=	TARGET= install
+lint := 	TARGET= lint
+_msg :=		TARGET= _msg
+package := 	TARGET= package
 
-i386_SUBDIRS= sata
+TEXT_DOMAIN= 	SUNW_OST_OSLIB
+XGETFLAGS=	-a -x sata.xcl
+POFILE=		sata.po
+POFILES=	generic.po
 
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/ac
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED_PLUGIN)/sysctrl
-
-SUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
-
-ALL_SUBDIRS= $(COMMON_SUBDIRS) $(sparc_SUBDIRS) $(i386_SUBDIRS)
-
-MSGSUBDIRS= $(ALL_SUBDIRS)
-
-all:= 		TARGET= all
-install:=	TARGET= install
-clean:=		TARGET= clean
-clobber:=	TARGET= clobber
-lint:=		TARGET= lint
-_msg:=		TARGET= _msg
+SED=	sed
+GREP=	grep
+CP=	cp
 
 .KEEP_STATE:
 
-all clean clobber lint: $(SUBDIRS)
+all clean clobber delete install lint package: $(SUBDIRS)
 
-install: all $(SUBDIRS)
-
-_msg: $(MSGSUBDIRS)
-
-$(ALL_SUBDIRS): FRC
+$(MACH) $(MACH64) spec: FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
+
+_msg:	$(MSGDOMAIN) $(POFILE)
+	$(RM) $(MSGDOMAIN)/$(POFILE)
+	$(CP) $(POFILE) $(MSGDOMAIN)
+
+$(POFILE):	$(POFILES)
+	$(RM) $@
+	$(CAT) $(POFILES) > $@
+
+$(POFILES):
+	$(RM) messages.po
+	$(XGETTEXT) $(XGETFLAGS) `$(GREP) -l gettext */*.[ch]`
+	$(SED) -e '/^# msg/d' -e '/^domain/d' messages.po > $@
+	$(RM) messages.po
 
 FRC:
