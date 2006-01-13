@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -362,6 +363,7 @@ MISC_KMODS	+= ctf
 MISC_KMODS	+= zmod
 MISC_KMODS	+= mac dls
 MISC_KMODS	+= cmlb
+MISC_KMODS	+= tem
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,14 +18,14 @@
 #
 # CDDL HEADER END
 #
+
 #
-# uts/intel/terminal-emulator/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the terminal-emulator module
+#	This makefile drives the production of the tem module
 #
 #	intel implementation architecture dependent
 #
@@ -39,9 +38,9 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= terminal-emulator
-OBJECTS		= $(TERMINAL_EMULATOR_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(TERMINAL_EMULATOR_OBJS:%.o=$(LINTS_DIR)/%.ln)
+MODULE		= tem
+OBJECTS		= $(TEM_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(TEM_OBJS:%.o=$(LINTS_DIR)/%.ln)
 ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
@@ -55,6 +54,8 @@ include $(UTSBASE)/intel/Makefile.intel
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+LDFLAGS += -dy -Ndacf/consconfig_dacf
 
 #
 #	Default build targets.

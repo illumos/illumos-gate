@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,6 +35,7 @@
 #ifdef	__cplusplus
 extern "C" {
 #endif
+
 
 #if defined(_KERNEL) || defined(_KMDB)
 
@@ -64,6 +65,11 @@ extern dev_t	stdindev;	/* default standard input device */
 extern dev_t	fbdev;		/* default framebuffer device */
 extern struct vnode *fbvp;	/* pointer to vnode for that device */
 extern dev_info_t *fbdip;	/* pointer to dev_info for fbdev (optional) */
+
+extern int	consmode;	/* CONS_FW or CONS_KFB */
+extern int	cons_tem_disable;
+#define	CONS_FW		0
+#define	CONS_KFB	1
 
 /*
  * Workstation console redirection.
@@ -213,10 +219,8 @@ extern cons_polledio_t *cons_polledio;
  * Workstation Console
  */
 #define	_WCIOC		(('W'<<24)|('C'<<16))
-#if	defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
 #define	WC_OPEN_FB	(_WCIOC | 0)
 #define	WC_CLOSE_FB	(_WCIOC | 1)
-#endif
 
 #endif	/* _KERNEL || _KMDB */
 

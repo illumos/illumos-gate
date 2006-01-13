@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance *with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -117,7 +117,6 @@ int vac_copyback = 1;
 char *cache_mode = NULL;
 int use_mix = 1;
 int prom_debug = 0;
-int usb_node_debug = 0;
 
 struct bootops *bootops = 0;	/* passed in from boot in %o2 */
 caddr_t boot_tba;		/* %tba at boot - used by kmdb */
@@ -224,7 +223,7 @@ static void startup_bop_gone(void);
 static void startup_vm(void);
 static void startup_end(void);
 static void setup_cage_params(void);
-static void startup_create_input_node(void);
+static void startup_create_io_node(void);
 
 static pgcnt_t npages;
 static struct memlist *memlist;
@@ -1628,7 +1627,7 @@ startup_modules(void)
 	 * Create OBP node for console input callbacks
 	 * if it is needed.
 	 */
-	startup_create_input_node();
+	startup_create_io_node();
 
 	if (modloadonly("fs", "specfs") == -1)
 		halt("Can't load specfs");
@@ -2836,10 +2835,17 @@ install_va_to_tte(void)
 }
 
 
+/*
+ * Because kmdb links prom_stdout_is_framebuffer into its own
+ * module, we add "device-type=display" here for /os-io node, so that
+ * prom_stdout_is_framebuffer still works corrrectly  after /os-io node
+ * is registered into OBP.
+ */
 static char *create_node =
 	"root-device "
 	"new-device "
 	"\" os-io\" device-name "
+	"\" display\" device-type "
 	": cb-r/w  ( adr,len method$ -- #read/#written ) "
 	"   2>r swap 2 2r> ['] $callback  catch  if "
 	"      2drop 3drop 0 "
@@ -2881,53 +2887,31 @@ static char *create_node =
 	"device-end ";
 
 /*
- * Create the obp input/output node only if the USB keyboard is the
- * standard input device.  When the USB software takes over the
- * input device at the time consconfig runs, it will switch OBP's
- * notion of the input device to this node.  Whenever the
- * forth user interface is used after this switch, the node will
- * call back into the kernel for console input.
+ * Create the OBP input/output node (FCode serial driver).
+ * It is needed for both USB console keyboard and for
+ * the kernel terminal emulator.  It is too early to check for a
+ * kernel console compatible framebuffer now, so we create this
+ * so that we're ready if we need to enable kernel terminal emulation.
  *
- * This callback mechanism is currently only used when the USB keyboard
- * is the input device.  If a serial device such as ttya or
- * a UART with a Type 5 keyboard attached is used, obp takes over the
- * serial device when the system goes to the debugger after the system is
- * booted.  This sharing of the relatively simple serial device is difficult
- * but possible.  Sharing the USB host controller is impossible due
- * its complexity
+ * When the USB software takes over the input device at the time
+ * consconfig runs, OBP's stdin is redirected to this node.
+ * Whenever the FORTH user interface is used after this switch,
+ * the node will call back into the kernel for console input.
+ * If a serial device such as ttya or a UART with a Type 5 keyboard
+ * attached is used, OBP takes over the serial device when the system
+ * goes to the debugger after the system is booted.  This sharing
+ * of the relatively simple serial device is difficult but possible.
+ * Sharing the USB host controller is impossible due its complexity.
+ *
+ * Similarly to USB keyboard input redirection, after consconfig_dacf
+ * configures a kernel console framebuffer as the standard output
+ * device, OBP's stdout is switched to to vector through the
+ * /os-io node into the kernel terminal emulator.
  */
 static void
-startup_create_input_node(void)
+startup_create_io_node(void)
 {
-	char *stdin_path;
-
-	/*
-	 * If usb_node_debug is set in /etc/system
-	 * then the user would like to test the callbacks
-	 * from the input node regardless of whether or
-	 * not the USB keyboard is the console input.
-	 * This variable is useful for debugging.
-	 */
-	if (usb_node_debug) {
-
-		prom_interpret(create_node, 0, 0, 0, 0, 0);
-
-		return;
-	}
-
-	/* Obtain the console input device */
-	stdin_path = prom_stdinpath();
-
-	/*
-	 * If the string "usb" and "keyboard" are in the path
-	 * then a USB keyboard is the console input device,
-	 * create the node.
-	 */
-	if ((strstr(stdin_path, "usb") != 0) &&
-	    (strstr(stdin_path, "keyboard") != 0)) {
-
-		prom_interpret(create_node, 0, 0, 0, 0, 0);
-	}
+	prom_interpret(create_node, 0, 0, 0, 0, 0);
 }
 
 

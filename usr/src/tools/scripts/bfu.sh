@@ -4585,6 +4585,18 @@ mondo_loop() {
 	# new: need to remove going backwards:
 	rm -f $root/etc/snmp/conf/mibiisa.rsrc-
 
+	# remove old terminal emulator module:
+	# (renamed from 'terminal-emulator' to 'tem')
+	#
+	# old: need to remove going forwards:
+	rm -f $root/kernel/misc/terminal-emulator
+	rm -f $root/kernel/misc/amd64/terminal-emulator
+	#
+	# new: need to remove going backwards:
+	rm -f $root/kernel/misc/tem
+	rm -f $root/kernel/misc/amd64/tem
+	rm -f $root/kernel/misc/sparcv9/tem
+
 	#
 	# Remove /dev/mc symlink and /platform/sun4u/kernel/drv/mc-us3.conf
 	# if any.

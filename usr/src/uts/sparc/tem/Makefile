@@ -23,11 +23,12 @@
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+
 #
-#	This makefile drives the production of the wc driver
+#	This makefile drives the production of the tem module
 #
-#	sparc architecture dependent
+#	sparc implementation architecture dependent
 #
 
 #
@@ -38,11 +39,11 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= wc
-OBJECTS		= $(WC_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(WC_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/sun/io
+MODULE		= tem
+OBJECTS		= $(TEM_OBJS:%=$(OBJS_DIR)/%)
+
+LINTS		= $(TEM_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
@@ -52,22 +53,13 @@ include $(UTSBASE)/sparc/Makefile.sparc
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-#
-#	Override defaults to build a unique, local modstubs.o.
-#
-MODSTUBS_DIR	 = $(OBJS_DIR)
-$(MODSTUBS_O)	:= AS_CPPFLAGS += -DWC_MODULE
-CLEANFILES	+= $(MODSTUBS_O)
-
-#
-# lint pass one enforcement
-#
 CFLAGS += $(CCVERBOSE)
-LDFLAGS += -dy -Nmisc/tem
+
+LDFLAGS += -dy -Ndacf/consconfig_dacf
 
 #
 #	Default build targets.

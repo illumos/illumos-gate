@@ -1,7 +1,8 @@
 /*
- * Copyright (c) 1995 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
@@ -10,6 +11,7 @@
 
 
 /* BEGIN CSTYLED */
+/* This is a derivation of a BDF font from the X consolidation */
 /* COMMENT  */
 /* COMMENT Donated by H. Kagotani <kagotani@cs.titech.ac.jp>; public domain */
 /* COMMENT font from Japan */
@@ -18,7 +20,7 @@
 /* Copyright notice from .bdf file: */
 /* COPYRIGHT "Public domain font.  Share and enjoy." */
 
-unsigned char FONTDATA[] = {
+static unsigned char FONTDATA[] = {
 
 /* 0x01 */
 0x00, /*         */
@@ -3365,7 +3367,7 @@ unsigned char FONTDATA[] = {
 0x30, /*   XX    */
 };
 
-unsigned char *ENCODINGS[256] = {
+static unsigned char *ENCODINGS[256] = {
 	FONTDATA+238,
 	FONTDATA+0,
 	FONTDATA+14,
@@ -3623,10 +3625,10 @@ unsigned char *ENCODINGS[256] = {
 	FONTDATA+2898,
 	FONTDATA+2912,
 };
-bitmap_data_t   builtin_font_data = {
-    7, 14,          /* width, height */
-    FONTDATA, 0,    /* image, image_size */
-    ENCODINGS, 0,   /* encoding, encoding_size */
+bitmap_data_t   font_data_7x14 = {
+    7, 14,	/* width, height */
+    FONTDATA,	/* image */
+    ENCODINGS,	/* encoding */
 };
 
 /* END CSTYLED */

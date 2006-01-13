@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1994,1998,2001-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,12 +136,19 @@ prom_read(ihandle_t fd, caddr_t buf, size_t len, uint_t startblk, char devtype)
 	return (p1275_cell2size(ci[6]));	/* Res1: actual length */
 }
 
+/*
+ * prom_write is the only prom_*() function we have to intercept
+ * because all the other prom_*() io interfaces eventually call
+ * into prom_write().
+ */
 /*ARGSUSED3*/
 ssize_t
 prom_write(ihandle_t fd, caddr_t buf, size_t len, uint_t startblk, char devtype)
 {
 	cell_t ci[7];
 	promif_owrap_t *ow;
+	ssize_t rlen;
+
 #ifdef PROM_32BIT_ADDRS
 	caddr_t obuf = NULL;
 	static char smallbuf[256];
@@ -160,6 +167,7 @@ prom_write(ihandle_t fd, caddr_t buf, size_t len, uint_t startblk, char devtype)
 		 * promplat_alloc() can block on a mutex and so
 		 * is called here before calling promif_preprom().
 		 */
+
 		if (len > sizeof (smallbuf)) {
 			obuf = buf;
 			buf = promplat_alloc(len);
@@ -190,16 +198,33 @@ prom_write(ihandle_t fd, caddr_t buf, size_t len, uint_t startblk, char devtype)
 		}
 	}
 #endif
+	/*
+	 * If the callback address is set, attempt to redirect
+	 * console output back into kernel terminal emulator.
+	 */
+	if (promif_redirect != NULL &&
+	    fd == prom_stdout_ihandle()) {
+		/*
+		 * even if we're re-directing output to the kernel
+		 * console device, we still have to call promif_preout()
+		 * and promif_preprom() because these functions make sure
+		 * that the console device is powered up before sending
+		 * output to it.
+		 */
+		rlen = promif_redirect(promif_redirect_arg,
+		    (uchar_t *)buf, len);
+	} else {
+		ci[0] = p1275_ptr2cell("write");	/* Service name */
+		ci[1] = (cell_t)3;			/* #argument cells */
+		ci[2] = (cell_t)1;			/* #result cells */
+		ci[3] = p1275_uint2cell((uint_t)fd);	/* Arg1: ihandle */
+		ci[4] = p1275_ptr2cell(buf);		/* Arg2: buffer addr */
+		ci[5] = p1275_size2cell(len);		/* Arg3: buffer len */
+		ci[6] = (cell_t)-1;			/* Res1: Prime result */
 
-	ci[0] = p1275_ptr2cell("write");	/* Service name */
-	ci[1] = (cell_t)3;			/* #argument cells */
-	ci[2] = (cell_t)1;			/* #result cells */
-	ci[3] = p1275_uint2cell((uint_t)fd);	/* Arg1: ihandle */
-	ci[4] = p1275_ptr2cell(buf);		/* Arg2: buffer address */
-	ci[5] = p1275_size2cell(len);		/* Arg3: buffer length */
-	ci[6] = (cell_t)-1;			/* Res1: Prime result */
-
-	(void) p1275_cif_handler(&ci);
+		(void) p1275_cif_handler(&ci);
+		rlen = p1275_cell2size(ci[6]);		/* Res1: actual len */
+	}
 
 	promif_postprom();
 	promif_postout(ow);
@@ -209,7 +234,7 @@ prom_write(ihandle_t fd, caddr_t buf, size_t len, uint_t startblk, char devtype)
 		promplat_free(buf, len);
 #endif
 
-	return (p1275_cell2size(ci[6]));	/* Res1: actual length */
+	return (rlen);
 }
 
 int

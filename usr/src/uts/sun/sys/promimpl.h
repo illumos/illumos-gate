@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -128,6 +128,14 @@ extern void		promplat_bcopy(const void *s1, void *s2, size_t n);
  */
 extern	int		prom_aligned_allocator;
 extern	void		*p1275cif;	/* P1275 client interface cookie */
+
+/*
+ * When this is non-NULL, the PROM output functions will attempt
+ * to redirect any thing directed to the PROM's stdout, which has
+ * been prequalified as being the console framebuffer.
+ */
+extern  promif_redir_arg_t promif_redirect_arg;
+extern  promif_redir_t	promif_redirect;
 
 /*
  * Every call into the prom is wrappered with these calls so that

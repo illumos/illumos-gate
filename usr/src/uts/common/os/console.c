@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,8 @@
 #include <sys/console.h>
 #include <sys/consdev.h>
 #include <sys/promif.h>
+#include <sys/note.h>
+#include <sys/polled_io.h>
 #include <sys/systm.h>
 #include <sys/file.h>
 #include <sys/conf.h>
@@ -44,6 +46,7 @@
 #include <sys/esunddi.h>
 #include <sys/fs/snode.h>
 #include <sys/termios.h>
+#include <sys/tem_impl.h>
 
 #define	MINLINES	10
 #define	MAXLINES	48
@@ -57,8 +60,6 @@
 
 vnode_t *console_vnode;
 taskq_t *console_taskq;
-vnode_t *ltemvp = NULL;
-dev_t ltemdev;
 
 /*
  * The current set of polled I/O routines (if any)
@@ -123,8 +124,8 @@ console_hold(void)
 
 	pm_cfb_check_and_powerup();
 
-#ifdef _CONSOLE_OUTPUT_VIA_FIRMWARE
-	if (ncpus > 1 && fbvp != NULL) {
+#ifdef _HAVE_TEM_FIRMWARE
+	if (consmode == CONS_FW && ncpus > 1 && fbvp != NULL) {
 		struct snode *csp = VTOS(VTOS(fbvp)->s_commonvp);
 
 		mutex_enter(&csp->s_lock);
@@ -135,7 +136,7 @@ console_hold(void)
 			console_busy = DEVI(fbdip)->devi_ref != 0;
 		}
 	}
-#endif
+#endif /* _HAVE_TEM_FIRMWARE */
 	return (console_busy);
 }
 
@@ -151,8 +152,8 @@ console_rele(void)
 	if (--console_depth != 0)
 		return; /* lock is being dropped recursively */
 
-#ifdef _CONSOLE_OUTPUT_VIA_FIRMWARE
-	if (ncpus > 1 && fbvp != NULL) {
+#ifdef _HAVE_TEM_FIRMWARE
+	if (consmode == CONS_FW && ncpus > 1 && fbvp != NULL) {
 		struct snode *csp = VTOS(VTOS(fbvp)->s_commonvp);
 
 		ASSERT(MUTEX_HELD(&csp->s_lock));
@@ -161,11 +162,37 @@ console_rele(void)
 
 		mutex_exit(&csp->s_lock);
 	}
-#endif
+#endif /* _HAVE_TEM_FIRMWARE */
 	pm_cfb_rele();
 	console_busy = 0;
 	rw_exit(&console_lock);
 }
+
+#ifdef _HAVE_TEM_FIRMWARE
+/*
+ *  This routine exists so that prom_write() can redirect writes
+ *  to the framebuffer through the kernel terminal emulator, if
+ *  that configuration is selected during consconfig.
+ *  When the kernel terminal emulator is enabled, consconfig_dacf
+ *  sets up the PROM output redirect vector to enter this function.
+ *  During panic the console will already be powered up as part of
+ *  calling into the prom_*() layer.
+ */
+ssize_t
+console_prom_write_cb(promif_redir_arg_t arg, uchar_t *s, size_t n)
+{
+	struct tem *tem = (struct tem *)arg;
+
+	ASSERT(consmode == CONS_KFB);
+
+	if (panicstr)
+		polled_io_cons_write(s, n);
+	else
+		tem->cons_wrtvec(tem, s, n, kcred);
+
+	return (n);
+}
+#endif /* _HAVE_TEM_FIRMWARE */
 
 static void
 console_getprop(dev_t dev, dev_info_t *dip, char *name, ushort_t *sp)
@@ -203,12 +230,12 @@ console_get_size(ushort_t *r, ushort_t *c, ushort_t *x, ushort_t *y)
 	 * them from the root node, which will eventually fall through to the
 	 * options node and get them from the prom.
 	 */
-	if (ltemvp == NULL) {
+	if (rwsconsvp == NULL || consmode == CONS_FW) {
 		dip = ddi_root_node();
 		dev = DDI_DEV_T_ANY;
 	} else {
-		dip = e_ddi_hold_devi_by_dev(ltemdev, 0);
-		dev = ltemdev;
+		dev = rwsconsvp->v_rdev; /* layering is wc -> tem */
+		dip = e_ddi_hold_devi_by_dev(dev, 0);
 		rel_needed = 1;
 	}
 
@@ -224,10 +251,10 @@ console_get_size(ushort_t *r, ushort_t *c, ushort_t *x, ushort_t *y)
 		return;
 	}
 
-	console_getprop(dev, dip, "screen-#columns", c);
-	console_getprop(dev, dip, "screen-#rows", r);
-	console_getprop(dev, dip, "screen-width", x);
-	console_getprop(dev, dip, "screen-height", y);
+	console_getprop(DDI_DEV_T_ANY, dip, "screen-#columns", c);
+	console_getprop(DDI_DEV_T_ANY, dip, "screen-#rows", r);
+	console_getprop(DDI_DEV_T_ANY, dip, "screen-width", x);
+	console_getprop(DDI_DEV_T_ANY, dip, "screen-height", y);
 
 	if (*c < MINCOLS)
 		*c = LOSCREENCOLS;
@@ -248,6 +275,11 @@ typedef struct console_msg {
 	char	cm_text[1];
 } console_msg_t;
 
+/*
+ * If we can't access the console stream, fall through to PROM, which redirects
+ * it back into to terminal emulator as appropriate.  The console stream should
+ * be available after consconfig runs.
+ */
 static void
 console_putmsg(console_msg_t *cm)
 {
@@ -310,7 +342,12 @@ console_printf(const char *fmt, ...)
 }
 
 /*
- * Write the specified number of bytes from a string to the console device.
+ * Avoid calling this function.
+ *
+ * Nothing in the kernel besides the wscons driver (wc) uses this
+ * function. It may hopefully one day be removed altogether.
+ * If a wayward module calls this they will pass through to PROM,
+ * get redirected into the kernel emulator as appropriate.
  */
 void
 console_puts(const char *s, size_t n)
@@ -326,7 +363,13 @@ console_puts(const char *s, size_t n)
 	console_rele();
 }
 
-void
+/*
+ * Let this function just go straight through to the PROM, since
+ * we are called in early boot prior to the kernel terminal
+ * emulator being available, and prior to the PROM stdout redirect
+ * vector being set.
+ */
+static void
 console_putc(int c)
 {
 	int busy = console_hold();

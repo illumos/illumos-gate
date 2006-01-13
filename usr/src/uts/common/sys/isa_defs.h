@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,17 +168,12 @@
  *              If the fdisk table is absent, it is assumed that the entire
  *              media is allocated for a single operating system.
  *
- * _CONSOLE_OUTPUT_VIA_FIRMWARE / _CONSOLE_OUTPUT_VIA_SOFTWARE
- *	This indicates whether framebuffer console output is done by
- *	firmware or software.
+ * _HAVE_TEM_FIRMWARE
+ *	Defined if this architecture has the (fallback) option of
+ *	using prom_* calls for doing I/O if a suitable kernel driver
+ *	is not available to do it.
  *
- *	_CONSOLE_OUTPUT_VIA_FIRMWARE
- *		Framebuffer console output is done via prom_* calls.
- *
- *	_CONSOLE_OUTPUT_VIA_SOFTWARE
- *		Framebuffer console output is done via the software
- *		terminal emulator.
- *	_DONT_USE_1275_GENERIC_NAMES
+ * _DONT_USE_1275_GENERIC_NAMES
  *		Controls whether or not device tree node names should
  *		comply with the IEEE 1275 "Generic Names" Recommended
  *		Practice. With _DONT_USE_GENERIC_NAMES, device-specific
@@ -269,7 +264,6 @@ extern "C" {
 #define	_SUNOS_VTOC_16
 #define	_DMA_USES_PHYSADDR
 #define	_FIRMWARE_NEEDS_FDISK
-#define	_CONSOLE_OUTPUT_VIA_SOFTWARE
 #define	__i386_COMPAT
 #define	_PSM_MODULES
 #define	_RTC_CONFIG
@@ -328,7 +322,6 @@ extern "C" {
 #define	_SUNOS_VTOC_16
 #define	_DMA_USES_PHYSADDR
 #define	_FIRMWARE_NEEDS_FDISK
-#define	_CONSOLE_OUTPUT_VIA_SOFTWARE
 #define	_PSM_MODULES
 #define	_RTC_CONFIG
 #define	_DONT_USE_1275_GENERIC_NAMES
@@ -403,7 +396,7 @@ extern "C" {
 #define	_SUNOS_VTOC_8
 #define	_DMA_USES_VIRTADDR
 #define	_NO_FDISK_PRESENT
-#define	_CONSOLE_OUTPUT_VIA_FIRMWARE
+#define	_HAVE_TEM_FIRMWARE
 
 /*
  * The following set of definitions characterize the implementation of

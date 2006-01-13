@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -59,6 +59,8 @@
 
 #include <sys/strredir.h>
 #include <sys/kbio.h>
+#include <sys/consdev.h>
+#include <sys/wscons.h>
 
 struct	buf	bfreelist;	/* Head of the free list of buffers */
 
@@ -229,13 +231,24 @@ struct autopush **strpcache;
 int strpmask = NSTRPHASH - 1;
 
 /*
+ * Flag whether console fb output is using PROM/PROM emulation
+ * terminal emulator, or is using the kernel terminal emulator.
+ */
+int	consmode = CONS_FW;
+
+/*
+ * The following allows systems to disable use of the kernel
+ * terminal emulator (retreat to PROM terminal emulator if there
+ * is PROM).
+ */
+int	cons_tem_disable;
+
+/*
  * Moved here from wscons.c
  * Package the redirection-related routines into an ops vector of the form
  * that the redirecting driver expects.
  */
-extern int wcvnget();
-extern void wcvnrele();
-srvnops_t	wscons_srvnops = {
+srvnops_t wscons_srvnops = {
 	wcvnget,
 	wcvnrele
 };

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,9 +63,8 @@
 #include <sys/ddi_impldefs.h>
 #include <sys/promif.h>
 #include <sys/policy.h>
-#if	defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
-#include <sys/terminal-emulator.h>
-#endif
+#include <sys/tem.h>
+#include <sys/wscons.h>
 
 #define	MINLINES	10
 #define	MAXLINES	48
@@ -77,18 +76,16 @@
 #define	LOSCREENCOLS	80
 #define	HISCREENCOLS	120
 
-static struct wscons {
+struct wscons {
+	struct tem *wc_tem;		/* Terminal emulator state */
 	int	wc_flags;		/* random flags (protected by */
 					/* write-side exclusion lock  */
 	dev_t	wc_dev;			/* major/minor for this device */
 	tty_common_t wc_ttycommon;	/* data common to all tty drivers */
-#if	defined(_CONSOLE_OUTPUT_VIA_FIRMWARE)
+#ifdef _HAVE_TEM_FIRMWARE
 	int	wc_pendc;		/* pending output character */
 	int	wc_defer_output;	/* set if output device is "slow" */
-#endif
-#if	defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
-	struct terminal_emulator *wc_tem;	/* Terminal emulator state */
-#endif
+#endif /* _HAVE_TEM_FIRMWARE */
 	queue_t	*wc_kbdqueue;		/* "console keyboard" device queue */
 					/* below us */
 	bufcall_id_t wc_bufcallid;	/* id returned by qbufcall */
@@ -177,22 +174,22 @@ DDI_DEFINE_STREAM_OPS(wc_ops, nulldev, nulldev, wc_attach, nodev, nodev,
 
 static void	wcreioctl(void *);
 static void 	wcioctl(queue_t *, mblk_t *);
-#if	defined(_CONSOLE_OUTPUT_VIA_FIRMWARE)
+#ifdef _HAVE_TEM_FIRMWARE
 static void	wcopoll(void *);
 static void	wconsout(void *);
-#endif
+#endif /* _HAVE_TEM_FIRMWARE */
 static void	wcrstrt(void *);
 static void	wcstart(void);
 static void	wc_open_kb_polledio(struct wscons *wc, queue_t *q, mblk_t *mp);
 static void	wc_close_kb_polledio(struct wscons *wc, queue_t *q, mblk_t *mp);
-#if	defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
-static void	wc_putchar(struct cons_polledio_arg *arg, unsigned char c);
-#endif
-static boolean_t wc_ischar(struct cons_polledio_arg *arg);
-static int	wc_getchar(struct cons_polledio_arg *arg);
+static void	wc_polled_putchar(struct cons_polledio_arg *arg,
+			unsigned char c);
+static boolean_t wc_polled_ischar(struct cons_polledio_arg *arg);
+static int	wc_polled_getchar(struct cons_polledio_arg *arg);
 static void	wc_polled_enter(struct cons_polledio_arg *arg);
 static void	wc_polled_exit(struct cons_polledio_arg *arg);
 static void	wc_get_size(struct wscons *wscons);
+static void	wc_modechg_cb(tem_modechg_cb_arg_t arg);
 
 #include <sys/types.h>
 #include <sys/conf.h>
@@ -212,7 +209,7 @@ static struct dev_ops wc_ops;
 static void	wc_dprintf(const char *fmt, ...) __KPRINTFLIKE(1);
 #define	DPRINTF(l, m, args) \
 	(((l) >= wc_errlevel) && ((m) & wc_errmask) ?	\
-		wc_dprintf args :				\
+		wc_dprintf args :			\
 		(void) 0)
 
 /*
@@ -278,6 +275,9 @@ wc_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		return (-1);
 	}
 	wc_dip = devi;
+
+	bzero(&(wscons.wc_polledio), sizeof (wscons.wc_polledio));
+
 	return (DDI_SUCCESS);
 }
 
@@ -307,18 +307,19 @@ wc_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg,
 	return (error);
 }
 
-#if	defined(_CONSOLE_OUTPUT_VIA_FIRMWARE)
+#ifdef _HAVE_TEM_FIRMWARE
 /*
  * Output buffer. Protected by the per-module inner perimeter.
  */
 #define	MAXHIWAT	2000
 static char obuf[MAXHIWAT];
-#endif
+#endif /* _HAVE_TEM_FIRMWARE */
 
 /*ARGSUSED*/
 static int
 wcopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 {
+	static boolean_t polledio_inited = B_FALSE;
 	struct termios *termiosp;
 	int len;
 
@@ -351,31 +352,39 @@ wcopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 		wscons.wc_ttycommon.t_iocpending = NULL;
 		wscons.wc_flags = WCS_ISOPEN;
 
+		wscons.wc_dev = *devp;
 		wc_get_size(&wscons);
 
-		bzero(&(wscons.wc_polledio), sizeof (wscons.wc_polledio));
-		wscons.wc_polledio.cons_polledio_version = CONSPOLLEDIO_V0;
-		wscons.wc_polledio.cons_polledio_argument =
-			(struct cons_polledio_arg *)&wscons;
-#if	defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
-		wscons.wc_polledio.cons_polledio_putchar = wc_putchar;
-#else
-		wscons.wc_polledio.cons_polledio_putchar = NULL;
-#endif
-		wscons.wc_polledio.cons_polledio_getchar = wc_getchar;
-		wscons.wc_polledio.cons_polledio_ischar = wc_ischar;
-		wscons.wc_polledio.cons_polledio_enter = wc_polled_enter;
-		wscons.wc_polledio.cons_polledio_exit = wc_polled_exit;
+		if (!polledio_inited) {
+			polledio_inited = B_TRUE;
 
-#if	defined(_CONSOLE_OUTPUT_VIA_FIRMWARE)
-		/*
-		 * If we're talking directly to a framebuffer, we assume
-		 * that it's a "slow" device, so that rendering should be
-		 * deferred to a timeout or softcall so that we write
-		 * a bunch of characters at once.
-		 */
-		wscons.wc_defer_output = prom_stdout_is_framebuffer();
-#endif
+			/*
+			 * Initialize the parts of the polled I/O struct that
+			 * are common to both input and output modes, but which
+			 * don't flag to the upper layers, which if any of the
+			 * two modes are available.  We don't know at this point
+			 * if system is configured CONS_KFB, but we will when
+			 * consconfig_dacf asks us with CONSOPENPOLLED I/O.
+			 */
+			wscons.wc_polledio.cons_polledio_version =
+				CONSPOLLEDIO_V0;
+			wscons.wc_polledio.cons_polledio_argument =
+				(struct cons_polledio_arg *)&wscons;
+			wscons.wc_polledio.cons_polledio_enter =
+				wc_polled_enter;
+			wscons.wc_polledio.cons_polledio_exit =
+				wc_polled_exit;
+
+#ifdef _HAVE_TEM_FIRMWARE
+			/*
+			 * If we're talking directly to a framebuffer, we assume
+			 * that it's a "slow" device, so that rendering should
+			 * be deferred to a timeout or softcall so that we write
+			 * a bunch of characters at once.
+			 */
+			wscons.wc_defer_output = prom_stdout_is_framebuffer();
+#endif /* _HAVE_TEM_FIRMWARE */
+		}
 	}
 
 	if (wscons.wc_ttycommon.t_flags & TS_XCLUDE) {
@@ -565,6 +574,46 @@ wcreioctl(void *arg)
 	}
 }
 
+static int
+wc_getterm(mblk_t *mp)
+{
+	char *term;
+	intptr_t arg;
+	int flag = ((struct iocblk *)mp->b_rptr)->ioc_flag;
+
+	STRUCT_DECL(cons_getterm, wcterm);
+	STRUCT_INIT(wcterm, flag);
+
+	arg = *((intptr_t *)mp->b_cont->b_rptr);
+
+	if (ddi_copyin((void *)arg, STRUCT_BUF(wcterm),
+	    STRUCT_SIZE(wcterm), flag) != 0) {
+		return (EFAULT);
+	}
+
+	if (consmode == CONS_FW) {
+		/* PROM terminal emulator */
+		term = "sun";
+	} else {
+		/* Kernel terminal emulator */
+		ASSERT(consmode == CONS_KFB);
+		term = "sun-color";
+	}
+
+	if (STRUCT_FGET(wcterm, cn_term_len) <
+	    strlen(term) + 1) {
+		return (EOVERFLOW);
+	}
+
+	if (ddi_copyout(term,
+	    STRUCT_FGETP(wcterm, cn_term_type),
+	    strlen(term) + 1, flag) != 0) {
+		return (EFAULT);
+	}
+
+	return (0);
+}
+
 /*
  * Process an "ioctl" message sent down to us.
  */
@@ -574,9 +623,7 @@ wcioctl(queue_t *q, mblk_t *mp)
 	struct iocblk *iocp;
 	size_t datasize;
 	int error;
-#if	defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
-	int len;
-#endif
+	long len;
 
 	iocp = (struct iocblk *)mp->b_rptr;
 
@@ -609,31 +656,27 @@ wcioctl(queue_t *q, mblk_t *mp)
 		}
 
 		/*
-		 * If the keyboard driver does not support polled I/O
-		 * then NAK this request.
+		 * We are given an appropriate-sized data block,
+		 * and return a pointer to our structure in it.
 		 */
-		if (wscons.wc_kb_polledio != NULL) {
-			/*
-			 * We are given an appropriate-sized data block,
-			 * and return a pointer to our structure in it.
-			 */
-			*(struct cons_polledio **)mp->b_cont->b_rptr =
-				&wscons.wc_polledio;
+		if (consmode == CONS_KFB)
+			wscons.wc_polledio.cons_polledio_putchar =
+			    wc_polled_putchar;
+		*(struct cons_polledio **)mp->b_cont->b_rptr =
+			&wscons.wc_polledio;
 
-			mp->b_datap->db_type = M_IOCACK;
-		} else {
-			/*
-			 * The driver does not support polled mode, so NAK
-			 * the request.
-			 */
-			miocnak(q, mp, 0, ENXIO);
-			return;
-		}
+		mp->b_datap->db_type = M_IOCACK;
 
 		qreply(q, mp);
 		break;
 
-#if	defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
+	case CONS_GETTERM:
+		if ((error = wc_getterm(mp)) != 0)
+			miocnak(q, mp, 0, error);
+		else
+			miocack(q, mp, 0, 0);
+		return;
+
 	case WC_OPEN_FB:
 		/*
 		 * Start out pessimistic, so that we can just jump to
@@ -681,14 +724,16 @@ wcioctl(queue_t *q, mblk_t *mp)
 		 * dimensions from a property, e.g. screen-#rows.
 		 */
 		iocp->ioc_error = tem_init(&wscons.wc_tem,
-			(char *)mp->b_cont->b_rptr, iocp->ioc_cr,
-			0, 0);
+			(char *)mp->b_cont->b_rptr, iocp->ioc_cr);
 		/*
 		 * Of course, if the terminal emulator initialization
 		 * failed, fail.
 		 */
 		if (iocp->ioc_error != 0)
 			goto open_fail;
+
+		tem_register_modechg_cb(wscons.wc_tem, wc_modechg_cb,
+			(tem_modechg_cb_arg_t)&wscons);
 
 		/*
 		 * Refresh terminal size with info from terminal emulator.
@@ -722,7 +767,6 @@ open_fail:
 close_fail:
 		qreply(q, mp);
 		break;
-#endif
 
 	default:
 
@@ -871,7 +915,7 @@ nomem:
 	qreply(q, mp);
 }
 
-#if	defined(_CONSOLE_OUTPUT_VIA_FIRMWARE)
+#ifdef _HAVE_TEM_FIRMWARE
 /* ARGSUSED */
 static void
 wcopoll(void *arg)
@@ -891,7 +935,7 @@ wcopoll(void *arg)
 			wscons.wc_timeoutid = qtimeout(q, wcopoll, NULL, 1);
 	}
 }
-#endif	/* _CONSOLE_OUTPUT_VIA_FIRMWARE */
+#endif	/* _HAVE_TEM_FIRMWARE */
 
 /*
  * Restart output on the console after a timeout.
@@ -911,10 +955,10 @@ wcrstrt(void *arg)
 static void
 wcstart(void)
 {
-#if	defined(_CONSOLE_OUTPUT_VIA_FIRMWARE)
+#ifdef _HAVE_TEM_FIRMWARE
 	int c;
 	ssize_t cc;
-#endif
+#endif /* _HAVE_TEM_FIRMWARE */
 	queue_t *q;
 	mblk_t *bp;
 	mblk_t *nbp;
@@ -926,7 +970,7 @@ wcstart(void)
 	 * new.
 	 */
 	if (wscons.wc_flags & (WCS_DELAY|WCS_BUSY|WCS_STOPPED))
-		goto out;
+		return;
 
 	q = wscons.wc_ttycommon.t_writeq;
 	/*
@@ -936,7 +980,7 @@ wcstart(void)
 	 */
 	for (;;) {
 		if ((bp = getq(q)) == NULL)
-			goto out;	/* nothing to transmit */
+			return;	/* nothing to transmit */
 
 		/*
 		 * We have a new message to work on.
@@ -958,7 +1002,7 @@ wcstart(void)
 			    (clock_t)(*(unsigned char *)bp->b_rptr + 6));
 			wscons.wc_flags |= WCS_DELAY;
 			freemsg(bp);
-			goto out;	/* wait for this to finish */
+			return;	/* wait for this to finish */
 
 		case M_IOCTL:
 			/*
@@ -970,23 +1014,29 @@ wcstart(void)
 			continue;
 		}
 
-#if	defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
-		if (wscons.wc_tem != NULL) {
-		    for (nbp = bp; nbp != NULL; nbp = nbp->b_cont) {
-			    if (nbp->b_wptr > nbp->b_rptr) {
-				    (void) tem_write(wscons.wc_tem,
-					nbp->b_rptr, nbp->b_wptr - nbp->b_rptr,
-					kcred);
-			    }
-		    }
+#ifdef _HAVE_TEM_FIRMWARE
+		if (consmode == CONS_KFB) {
+#endif /* _HAVE_TEM_FIRMWARE */
+			if (wscons.wc_tem != NULL) {
+				for (nbp = bp; nbp != NULL; nbp = nbp->b_cont) {
+					if (nbp->b_wptr > nbp->b_rptr) {
+						(void) tem_write(wscons.wc_tem,
+						    nbp->b_rptr,
+						    nbp->b_wptr - nbp->b_rptr,
+						    kcred);
+					}
+				}
+				freemsg(bp);
+			}
+#ifdef _HAVE_TEM_FIRMWARE
+			continue;
 		}
-		freemsg(bp);
-#else	/* _CONSOLE_OUTPUT_VIA_FIRMWARE */
+
+		/* consmode = CONS_FW */
 		if ((cc = bp->b_wptr - bp->b_rptr) == 0) {
 			freemsg(bp);
 			continue;
 		}
-
 		/*
 		 * Direct output to the frame buffer if this device
 		 * is not the "hardware" console.
@@ -999,18 +1049,17 @@ wcstart(void)
 			wscons.wc_flags |= WCS_BUSY;
 			wscons.wc_pendc = -1;
 			(void) putbq(q, bp);
-			if (q->q_count > 128) {	/* do it soon */
+			if (q->q_count > 128) { /* do it soon */
 				softcall(wconsout, NULL);
-			} else {		/* wait a bit */
+			} else {	/* wait a bit */
 				if (wscons.wc_timeoutid != 0)
 					(void) quntimeout(q,
 					    wscons.wc_timeoutid);
 				wscons.wc_timeoutid = qtimeout(q, wconsout,
 				    NULL, hz / 30);
 			}
-			goto out;
+			return;
 		}
-
 		for (;;) {
 			c = *bp->b_rptr++;
 			cc--;
@@ -1023,26 +1072,24 @@ wcstart(void)
 				wscons.wc_timeoutid = qtimeout(q, wcopoll,
 				    NULL, 1);
 				if (bp != NULL)
-				/* not done with this message yet */
+					/* not done with this message yet */
 					(void) putbq(q, bp);
-				goto out;
+				return;
 			}
 			while (cc <= 0) {
 				nbp = bp;
 				bp = bp->b_cont;
 				freeb(nbp);
 				if (bp == NULL)
-					goto out;
+					return;
 				cc = bp->b_wptr - bp->b_rptr;
 			}
 		}
-#endif
+#endif /* _HAVE_TEM_FIRMWARE */
 	}
-out:
-	;
 }
 
-#if	defined(_CONSOLE_OUTPUT_VIA_FIRMWARE)
+#ifdef _HAVE_TEM_FIRMWARE
 /*
  * Output to frame buffer console.
  * It takes a long time to scroll.
@@ -1111,7 +1158,7 @@ transmit:
 	wscons.wc_flags &= ~WCS_BUSY;
 	wcstart();
 }
-#endif
+#endif /* _HAVE_TEM_FIRMWARE */
 
 /*
  * Put procedure for lower read queue.
@@ -1174,7 +1221,13 @@ wclrput(queue_t *q, mblk_t *mp)
 						"ACK CONSOPENPOLLEDIO\n"));
 					wscons.wc_kb_polledio =
 					    *(struct cons_polledio **)
-						mp->b_cont->b_rptr;
+					    mp->b_cont->b_rptr;
+					wscons.wc_polledio.
+					    cons_polledio_getchar =
+						wc_polled_getchar;
+					wscons.wc_polledio.
+					    cons_polledio_ischar =
+						wc_polled_ischar;
 					break;
 
 				case CONSCLOSEPOLLEDIO:
@@ -1183,6 +1236,10 @@ wclrput(queue_t *q, mblk_t *mp)
 						"ACK CONSCLOSEPOLLEDIO\n"));
 					wscons.wc_kb_polledio = NULL;
 					wscons.wc_kbdqueue = NULL;
+					wscons.wc_polledio.
+					    cons_polledio_getchar = NULL;
+					wscons.wc_polledio.
+					    cons_polledio_ischar = NULL;
 					break;
 				default:
 					DPRINTF(PRINT_L1, PRINT_MASK_ALL,
@@ -1207,6 +1264,10 @@ wclrput(queue_t *q, mblk_t *mp)
 				case CONSCLOSEPOLLEDIO:
 					wscons.wc_kb_polledio = NULL;
 					wscons.wc_kbdqueue = NULL;
+					wscons.wc_polledio.
+					    cons_polledio_getchar = NULL;
+					wscons.wc_polledio.
+					    cons_polledio_ischar = NULL;
 					break;
 				}
 				break;
@@ -1279,16 +1340,16 @@ wcvnrele(minor_t unit, vnode_t *vp)
  * moved to space.c to allow "wc" to become a loadable module.
  */
 
-#if	defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
 /*
- * This is for systems without OBP.
+ * These are for systems without OBP, and for devices that cannot be
+ * shared between Solaris and the OBP.
  */
 
 static void
-wc_putchar(struct cons_polledio_arg *arg, unsigned char c)
+wc_polled_putchar(struct cons_polledio_arg *arg, unsigned char c)
 {
 	if (c == '\n')
-		wc_putchar(arg, '\r');
+		wc_polled_putchar(arg, '\r');
 
 	if (wscons.wc_tem == NULL) {
 		/*
@@ -1298,20 +1359,15 @@ wc_putchar(struct cons_polledio_arg *arg, unsigned char c)
 		return;
 	}
 
-	/*
-	 * We ignore the result code.  After all, what could we do?
-	 * Write something to the console??
-	 */
-	(void) tem_polled_write(wscons.wc_tem, &c, 1);
+	tem_polled_write(wscons.wc_tem, &c, 1);
 }
-#endif	/* _CONSOLE_OUTPUT_VIA_SOFTWARE */
 
 /*
  * These are for systems without OBP, and for devices that cannot be
  * shared between Solaris and the OBP.
  */
 static int
-wc_getchar(struct cons_polledio_arg *arg)
+wc_polled_getchar(struct cons_polledio_arg *arg)
 {
 	struct wscons *wscons = (struct wscons *)arg;
 
@@ -1323,11 +1379,11 @@ wc_getchar(struct cons_polledio_arg *arg)
 	}
 
 	return (wscons->wc_kb_polledio->cons_polledio_getchar(
-			wscons->wc_kb_polledio->cons_polledio_argument));
+	    wscons->wc_kb_polledio->cons_polledio_argument));
 }
 
 static boolean_t
-wc_ischar(struct cons_polledio_arg *arg)
+wc_polled_ischar(struct cons_polledio_arg *arg)
 {
 	struct wscons *wscons = (struct wscons *)arg;
 
@@ -1335,7 +1391,7 @@ wc_ischar(struct cons_polledio_arg *arg)
 		return (B_FALSE);
 
 	return (wscons->wc_kb_polledio->cons_polledio_ischar(
-			wscons->wc_kb_polledio->cons_polledio_argument));
+	    wscons->wc_kb_polledio->cons_polledio_argument));
 }
 
 static void
@@ -1348,7 +1404,7 @@ wc_polled_enter(struct cons_polledio_arg *arg)
 
 	if (wscons->wc_kb_polledio->cons_polledio_enter != NULL) {
 		wscons->wc_kb_polledio->cons_polledio_enter(
-			wscons->wc_kb_polledio->cons_polledio_argument);
+		    wscons->wc_kb_polledio->cons_polledio_argument);
 	}
 }
 
@@ -1362,7 +1418,7 @@ wc_polled_exit(struct cons_polledio_arg *arg)
 
 	if (wscons->wc_kb_polledio->cons_polledio_exit != NULL) {
 		wscons->wc_kb_polledio->cons_polledio_exit(
-			wscons->wc_kb_polledio->cons_polledio_argument);
+		    wscons->wc_kb_polledio->cons_polledio_argument);
 	}
 }
 
@@ -1378,44 +1434,18 @@ wc_dprintf(const char *fmt, ...)
 	(void) vsprintf(buf, fmt, ap);
 	va_end(ap);
 
-	cmn_err(CE_CONT, "wc: %s", buf);
+	cmn_err(CE_WARN, "wc: %s", buf);
 }
 #endif
 
-#if	defined(_CONSOLE_OUTPUT_VIA_FIRMWARE)
-static int
-atou_n(char *s, int n)
+static void
+update_property(struct wscons *wscons, char *name, ushort_t value)
 {
-	int res;
+	char data[8];
 
-	res = 0;
-	while (n > 0 && *s != '\0') {
-		if (*s < '0' || *s > '9')
-			return (0);
-		res *= 10;
-		res += *s - '0';
-		s++;
-		n--;
-	}
-	return (res);
+	(void) snprintf(data, sizeof (data), "%u", value);
+	(void) ddi_prop_update_string(wscons->wc_dev, wc_dip, name, data);
 }
-
-static int
-get_option_string_int(char *name)
-{
-	char *data;
-	uint_t len;
-	int res;
-
-	if (ddi_prop_lookup_byte_array(DDI_DEV_T_ANY, ddi_root_node(), 0,
-	    name, (uchar_t **)&data, &len) != DDI_PROP_SUCCESS)
-		return (0);
-
-	res = atou_n(data, len);
-	ddi_prop_free(data);
-	return (res);
-}
-#endif
 
 /*
  * Gets the number of text rows and columns and the
@@ -1424,58 +1454,25 @@ get_option_string_int(char *name)
 static void
 wc_get_size(struct wscons *wscons)
 {
-#if	defined _CONSOLE_OUTPUT_VIA_FIRMWARE
-	static char *cols = "screen-#columns";
-	static char *rows = "screen-#rows";
-	static char *width = "screen-width";
-	static char *height = "screen-height";
-	struct winsize *t;
+	struct winsize *t = &wscons->wc_ttycommon.t_size;
+	ushort_t r = LOSCREENLINES, c = LOSCREENCOLS, x = 0, y = 0;
 
-	t = &wscons->wc_ttycommon.t_size;
-
-	/*
-	 * Get the number of columns
-	 */
-	t->ws_col = (unsigned short)get_option_string_int(cols);
-
-	if (t->ws_col < MINCOLS)
-		t->ws_col = LOSCREENCOLS;
-	else if (t->ws_col > MAXCOLS)
-		t->ws_col = HISCREENCOLS;
-
-	/*
-	 * Get the number of rows
-	 */
-	t->ws_row = (unsigned short)get_option_string_int(rows);
-
-	if (t->ws_row < MINLINES)
-		t->ws_row = LOSCREENLINES;
-	else if (t->ws_row > MAXLINES)
-		t->ws_row = HISCREENLINES;
-
-	/*
-	 * Get the size in pixels.
-	 */
-	t->ws_xpixel = (unsigned short)get_option_string_int(width);
-	t->ws_ypixel = (unsigned short)get_option_string_int(height);
-
-#else	/* _CONSOLE_OUTPUT_VIA_SOFTWARE */
-	struct winsize *t;
-	int r, c, x, y;
-
-	t = &wscons->wc_ttycommon.t_size;
-
-	if (wscons->wc_tem != NULL) {
+	if (wscons->wc_tem != NULL)
 		tem_get_size(wscons->wc_tem, &r, &c, &x, &y);
-		t->ws_row = (unsigned short)r;
-		t->ws_col = (unsigned short)c;
-		t->ws_xpixel = (unsigned short)x;
-		t->ws_ypixel = (unsigned short)y;
-	} else {
-		t->ws_row = LOSCREENLINES;
-		t->ws_col = LOSCREENCOLS;
-		t->ws_xpixel = 0;
-		t->ws_ypixel = 0;
+#ifdef _HAVE_TEM_FIRMWARE
+	else {
+		console_get_size(&r, &c, &x, &y);
 	}
-#endif
+#endif /* _HAVE_TEM_FIRMWARE */
+
+	update_property(wscons, "screen-#cols",  t->ws_col = c);
+	update_property(wscons, "screen-#rows",  t->ws_row = r);
+	update_property(wscons, "screen-width",  t->ws_xpixel = x);
+	update_property(wscons, "screen-height", t->ws_ypixel = y);
+}
+
+static void
+wc_modechg_cb(tem_modechg_cb_arg_t arg)
+{
+	wc_get_size((struct wscons *)arg);
 }

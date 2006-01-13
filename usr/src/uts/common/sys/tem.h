@@ -24,8 +24,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef _SYS_FONT_H
-#define	_SYS_FONT_H
+#ifndef	_SYS_TEM_H
+#define	_SYS_TEM_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -33,27 +33,33 @@
 extern "C" {
 #endif
 
-struct font {
-	short	width;
-	short	height;
-	uchar_t	*char_ptr[256];
-	void	*image_data;
-};
+#ifdef _KERNEL
 
-typedef	struct  bitmap_data {
-	short		width;
-	short		height;
-	unsigned char	*image;
-	unsigned char	**encoding;
-} bitmap_data_t;
+#include <sys/visual_io.h>
+#include <sys/cred.h>
+#include <sys/beep.h>
 
-struct fontlist {
-	bitmap_data_t	*data;
-	bitmap_data_t   *(*fontload)(char *);
-};
+typedef struct __tem_modechg_cb_arg *tem_modechg_cb_arg_t;
+typedef void (*tem_modechg_cb_t) (tem_modechg_cb_arg_t arg);
+
+struct tem;
+int	tem_init(struct tem **,
+			char *, cred_t *);
+void	tem_write(struct tem *,
+			uchar_t *, ssize_t, cred_t *);
+void	tem_polled_write(struct tem *,
+			unsigned char *, int);
+void	tem_get_size(struct tem *, ushort_t *, ushort_t *,
+			ushort_t *, ushort_t *);
+int	tem_fini(struct tem *);
+
+void	tem_register_modechg_cb(struct tem *, tem_modechg_cb_t,
+					tem_modechg_cb_arg_t);
+
+#endif /* _KERNEL */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* !_SYS_FONT_H */
+#endif /* _SYS_TEM_H */

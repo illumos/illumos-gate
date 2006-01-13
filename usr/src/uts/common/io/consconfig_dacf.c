@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -100,6 +100,8 @@
 #include <sys/strsubr.h>
 
 #include <sys/consdev.h>
+#include <sys/console.h>
+#include <sys/wscons.h>
 #include <sys/kbio.h>
 #include <sys/debug.h>
 #include <sys/reboot.h>
@@ -120,6 +122,7 @@
 #include <sys/devops.h>
 #include <sys/note.h>
 
+#include <sys/tem_impl.h>
 #include <sys/polled_io.h>
 #include <sys/kmem.h>
 #include <sys/dacf.h>
@@ -295,7 +298,7 @@ consconfig_dprintf(int l, const char *fmt, ...)
 	if (!l) {
 		return;
 	}
-#endif
+#endif /* DEBUG */
 	if (l < consconfig_errlevel) {
 		return;
 	}
@@ -703,6 +706,18 @@ consconfig_relink_wc(cons_state_t *sp, ldi_handle_t new_lh, int *muxid)
 static void
 cons_build_upper_layer(cons_state_t *sp)
 {
+	ldi_handle_t		wc_lh;
+	struct strioctl		strioc;
+	int			rval;
+	dev_t			wc_dev;
+	dev_t			dev;
+#ifdef _HAVE_TEM_FIRMWARE
+	dev_info_t		*dip;
+	int			*int_array;
+	uint_t			nint;
+	boolean_t		kfb_mode;
+#endif /* _HAVE_TEM_FIRMWARE */
+
 	/*
 	 * Build the wc->conskbd portion of the keyboard console stream.
 	 * Even if no keyboard is attached to the system, the upper
@@ -775,50 +790,79 @@ cons_build_upper_layer(cons_state_t *sp)
 		cmn_err(CE_PANIC, "consconfig: "
 		    "unable to find iwscn device");
 
-#if defined(_CONSOLE_OUTPUT_VIA_SOFTWARE)
-	if (sp->cons_fb_path == NULL) {
-		cmn_err(CE_WARN, "consconfig: no screen found");
+	if (cons_tem_disable)
 		return;
-	} else {
-		ldi_handle_t		wc_lh;
-		struct strioctl		strioc;
-		dev_t			wc_dev;
-		int			err, rval;
 
-		/* make sure the frame buffer device exists */
-		if (ddi_pathname_to_dev_t(sp->cons_fb_path) == NODEV) {
-			cmn_err(CE_NOTE, "consconfig: "
-			    "cannot find driver for screen device %s",
-			    sp->cons_fb_path);
-			return;
-		}
-
-		/* tell wc to open the frame buffer device */
-		wc_dev = sp->cons_wc_vp->v_rdev;
-		err = ldi_open_by_dev(&wc_dev, OTYP_CHR, FREAD|FWRITE|FNOCTTY,
-		    kcred, &wc_lh, sp->cons_li);
-		ASSERT(wc_dev == sp->cons_wc_vp->v_rdev);
-		if (err) {
-			panic("cons_build_upper_layer: "
-			    "unable to open wc device");
-			/*NOTREACHED*/
-		}
-
-		strioc.ic_cmd = WC_OPEN_FB;
-		strioc.ic_timout = INFTIM;
-		strioc.ic_len = strlen(sp->cons_fb_path) + 1;
-		strioc.ic_dp = sp->cons_fb_path;
-
-		err = ldi_ioctl(wc_lh, I_STR, (intptr_t)&strioc,
-		    FKIOCTL, kcred, &rval);
-		if (err) {
-			cmn_err(CE_WARN, "cons_build_upper_layer: "
-			    "could not attach frame buffer, error %d", err);
-		}
-
-		(void) ldi_close(wc_lh, FREAD|FWRITE, kcred);
+	if (sp->cons_fb_path == NULL) {
+#if defined(i386) || defined(__i386) || defined(__ia64)
+		cmn_err(CE_WARN, "consconfig: no screen found");
+#endif /* defined(i386) || defined(__i386) || defined(__ia64) */
+		return;
 	}
-#endif /* _CONSOLE_OUTPUT_VIA_SOFTWARE */
+
+	/* make sure the frame buffer device exists */
+	dev = ddi_pathname_to_dev_t(sp->cons_fb_path);
+	if (dev == NODEV) {
+		cmn_err(CE_WARN, "consconfig: "
+		    "cannot find driver for screen device %s",
+		    sp->cons_fb_path);
+		return;
+	}
+
+#ifdef _HAVE_TEM_FIRMWARE
+	/*
+	 * Here we hold the driver and check "tem-support" property.
+	 * We're doing this with e_ddi_hold_devi_by_dev and
+	 * ddi_prop_lookup_int_array before opening the driver since
+	 * some video cards that don't support the kernel terminal
+	 * emulator could hang or crash if opened too early during
+	 * boot.
+	 */
+	if ((dip = e_ddi_hold_devi_by_dev(dev, 0)) == NULL) {
+		cmn_err(CE_WARN, "consconfig: cannot hold fb dev %s",
+		    sp->cons_fb_path);
+		return;
+	}
+
+	/*
+	 * Check the existance of the tem-support property AND that
+	 * it be equal to 1.
+	 */
+	kfb_mode = B_FALSE;
+	if (ddi_prop_lookup_int_array(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "tem-support", &int_array, &nint) ==
+	    DDI_SUCCESS) {
+		if (nint > 0)
+			kfb_mode = int_array[0] == 1;
+		ddi_prop_free(int_array);
+	}
+	ddi_release_devi(dip);
+	if (!kfb_mode)
+		return;
+#endif /* _HAVE_TEM_FIRMWARE */
+
+	/* tell wc to open the frame buffer device */
+	wc_dev = sp->cons_wc_vp->v_rdev;
+	if (ldi_open_by_dev(&wc_dev, OTYP_CHR, FREAD|FWRITE|FNOCTTY, kcred,
+	    &wc_lh, sp->cons_li)) {
+		cmn_err(CE_PANIC, "cons_build_upper_layer: "
+		    "unable to open wc device");
+		return;
+	}
+	ASSERT(wc_dev == sp->cons_wc_vp->v_rdev);
+
+	strioc.ic_cmd = WC_OPEN_FB;
+	strioc.ic_timout = INFTIM;
+	strioc.ic_len = strlen(sp->cons_fb_path) + 1;
+	strioc.ic_dp = sp->cons_fb_path;
+
+	if (ldi_ioctl(wc_lh, I_STR, (intptr_t)&strioc,
+	    FKIOCTL, kcred, &rval) == 0)
+		consmode = CONS_KFB;
+	else
+		cmn_err(CE_WARN,
+		    "consconfig: terminal emulator failed to initialize");
+	(void) ldi_close(wc_lh, FREAD|FWRITE, kcred);
 }
 
 static void

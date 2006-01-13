@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,12 +76,10 @@
 static void	polled_give_input(cell_t *cif);
 static void	polled_read(cell_t *cif);
 static void	polled_take_input(cell_t *cif);
-static void	polled_give_output(cell_t *cif);
+
 static void	polled_write(cell_t *cif);
-static void	polled_take_output(cell_t *cif);
 static void	polled_io_register(cons_polledio_t *,
 			polled_io_console_type_t, int);
-static void	polled_io_unregister(polled_io_console_type_t, int);
 static int	polled_io_take_console(polled_io_console_type_t, int);
 static int	polled_io_release_console(polled_io_console_type_t, int);
 
@@ -93,7 +91,6 @@ static polled_device_t	polled_output_device;
 static int polled_vx_handlers_init = 0;
 
 extern void	add_vx_handler(char *name, int flag, void (*func)(cell_t *));
-extern void	remove_vx_handler(char *name);
 
 /*
  * This is a useful flag for debugging the entry points.   This flag
@@ -127,11 +124,7 @@ polled_io_init(void)
 
 	add_vx_handler("exit-input", 1, polled_take_input);
 
-	add_vx_handler("give-output", 1, polled_give_output);
-
 	add_vx_handler("write", 1, polled_write);
-
-	add_vx_handler("take-output", 1, polled_take_output);
 
 	/*
 	 * Initialize lock to protect multiple thread access to the
@@ -190,66 +183,18 @@ int				flags
 }
 
 /*
- * Unregister a device for console input/output.
- */
-int
-polled_io_unregister_callbacks(
-cons_polledio_t			*polled_io,
-int				flags
-)
-{
-	/*
-	 * If polled_io is being used for input, then unregister it.
-	 */
-	if (polled_io == polled_input_device.polled_io) {
-
-		polled_io_unregister(
-			POLLED_IO_CONSOLE_INPUT, flags);
-	}
-
-	/*
-	 * If polled_io is being used for output, then unregister it.
-	 */
-	if (polled_io == polled_output_device.polled_io) {
-
-		polled_io_unregister(
-			POLLED_IO_CONSOLE_OUTPUT, flags);
-	}
-
-	return (DDI_SUCCESS);
-}
-
-/*
- * This routine is called when we are done handling polled io.  We will
- * remove all of our handlers and destroy any memory that we have allocated.
+ * Sends string through the polled output interfaces when the
+ * system is panicing.
  */
 void
-polled_io_fini()
+polled_io_cons_write(uchar_t *text, size_t len)
 {
-	/*
-	 * Remove the vx_handlers so that our functions will nolonger be
-	 * accessible.
-	 */
-	remove_vx_handler("enter-input");
+	cons_polledio_t *pio = polled_output_device.polled_io;
+	int i;
 
-	remove_vx_handler("read");
-
-	remove_vx_handler("exit-input");
-
-	remove_vx_handler("give-output");
-
-	remove_vx_handler("write");
-
-	remove_vx_handler("take-output");
-
-	/*
-	 * Destroy the mutexes, we will not need them anymore.
-	 */
-	mutex_destroy(&polled_input_device.polled_device_lock);
-
-	mutex_destroy(&polled_output_device.polled_device_lock);
-
-	polled_vx_handlers_init = 0;
+	for (i = 0; i < len; i++)
+		pio->cons_polledio_putchar(
+		    pio->cons_polledio_argument, text[i]);
 }
 
 /*
@@ -305,54 +250,17 @@ int				flags
 		 * Save the polled_io pointers so that we can access
 		 * them later.
 		 */
-		polled_input_device.polled_io = polled_io;
+		polled_output_device.polled_io = polled_io;
 
 		mutex_exit(&polled_output_device.polled_device_lock);
 
-		break;
-	}
-}
-
-/*
- * Generic internal routine for unregistering a polled input or output device.
- */
-/* ARGSUSED */
-static void
-polled_io_unregister(
-polled_io_console_type_t	type,
-int				flags
-)
-{
-	switch (type) {
-	case POLLED_IO_CONSOLE_INPUT:
-		/*
-		 * Tell the generic console framework to restore
-		 * the firmware's old stdin pointers.
-		 */
-		(void) polled_io_release_console(type, 0);
-
-		/*
-		 * Grab the device lock, because we are going to access
-		 * protected structure entries.
-		 */
-		mutex_enter(&polled_input_device.polled_device_lock);
-
-		polled_input_device.polled_io = NULL;
-
-		mutex_exit(&polled_input_device.polled_device_lock);
-
-		break;
-
-	case POLLED_IO_CONSOLE_OUTPUT:
-		/*
-		 * Grab the device lock, because we are going to access
-		 * protected structure entries.
-		 */
-		mutex_enter(&polled_output_device.polled_device_lock);
-
-		polled_output_device.polled_io = NULL;
-
-		mutex_exit(&polled_output_device.polled_device_lock);
+		if (!polled_debug) {
+			/*
+			 * Tell the generic console framework to
+			 * repoint firmware's stdout to the framebuffer.
+			 */
+			(void) polled_io_take_console(type, 0);
+		}
 
 		break;
 	}
@@ -402,7 +310,7 @@ int				flags
 		 * restore it if the device is released.
 		 */
 		prom_interpret(
-			"stdout @ swap ! \" /os-io\" output",
+			"stdout @ swap ! \" /os-io\" open-dev stdout !",
 			(uintptr_t)&polled_output_device.polled_old_handle,
 				0, 0, 0, 0);
 
@@ -411,44 +319,6 @@ int				flags
 
 	return (DDI_SUCCESS);
 }
-
-/*
- * This routine gives control of console input/output back to firmware.
- */
-/* ARGSUSED */
-static int
-polled_io_release_console(
-polled_io_console_type_t	type,
-int				flags
-)
-{
-	switch (type) {
-	case POLLED_IO_CONSOLE_INPUT:
-		/*
-		 * Restore the stdin handle
-		 */
-		prom_interpret("to stdin",
-			(uintptr_t)polled_input_device.
-				polled_old_handle,
-				0, 0, 0, 0);
-
-		break;
-
-	case POLLED_IO_CONSOLE_OUTPUT:
-		/*
-		 * Restore the stdout handle
-		 */
-		prom_interpret("to stdout",
-			(uintptr_t)polled_output_device.
-				polled_old_handle,
-				0, 0, 0, 0);
-
-		break;
-	}
-
-	return (DDI_SUCCESS);
-}
-
 
 /*
  * This is the routine that the firmware calls to save any state information
@@ -591,7 +461,8 @@ polled_read(cell_t *cif)
 	 */
 	polled_io = polled_input_device.polled_io;
 
-	if (polled_io == NULL) {
+	if (polled_io == NULL ||
+	    polled_io->cons_polledio_ischar == NULL) {
 
 		/*
 		 * The cif structure is already set up to return
@@ -693,50 +564,6 @@ polled_take_input(cell_t *cif)
 }
 
 /*
- * This is the routine that the firmware calls to save any state information
- * before using the output device.  This routine, and all of the
- * routines that it calls, are responsible for saving any state
- * information so that it can be restored when the debug  is over.
- *
- * WARNING:  This routine runs in debug mode.
- */
-static void
-polled_give_output(cell_t *cif)
-{
-	cons_polledio_t		*polled_io;
-
-	uint_t			out_args;
-
-	/*
-	 * Calculate the offset of the return arguments
-	 */
-	out_args = CIF_MIN_SIZE +
-		p1275_cell2uint(cif[CIF_NUMBER_IN_ARGS]);
-
-	/*
-	 * There is one argument being passed back to the firmware .
-	 */
-	cif[CIF_NUMBER_OUT_ARGS] = p1275_uint2cell((uint_t)1);
-	cif[out_args] = p1275_uint2cell(CIF_SUCCESS);
-
-	/*
-	 * We check to see if there is an
-	 * output device that has been registered.
-	 */
-	polled_io = polled_output_device.polled_io;
-
-	if (polled_io == NULL) {
-		return;
-	}
-
-	/*
-	 * Call down to the lower layers to save the state.
-	 */
-	polled_io->cons_polledio_enter(
-		polled_io->cons_polledio_argument);
-}
-
-/*
  * This is the routine that the firmware calls when
  * it wants to write a character.
  *
@@ -750,7 +577,6 @@ polled_write(cell_t *cif)
 	uint_t				out_args;
 	uchar_t				*buffer;
 	uint_t				buflen;
-	uint_t				i;
 
 	/*
 	 * The number of arguments passed in by the firmware
@@ -840,59 +666,11 @@ polled_write(cell_t *cif)
 		return;
 	}
 
-	for (i = 0; i < buflen; i++) {
-
-		polled_io->cons_polledio_putchar(
-			polled_io->cons_polledio_argument, *(buffer + i));
-	}
+	polled_io_cons_write(buffer, (size_t)buflen);
 
 	/*
 	 * Tell the firmware how many characters we are sending it.
 	 */
 	cif[out_args+0] = p1275_uint2cell((uint_t)CIF_SUCCESS);
 	cif[out_args+1] = p1275_uint2cell((uint_t)buflen);
-}
-
-/*
- * This is the routine that the firmware calls
- *  when it is giving up control of the
- * output device.  This routine, and the lower layer routines that it calls,
- * are responsible for restoring the controller state to the state it was
- * in before the firmware took control.
- *
- * WARNING: This routine runs in debug mode.
- */
-static void
-polled_take_output(cell_t *cif)
-{
-	cons_polledio_t		*polled_io;
-	uint_t			out_args;
-
-	/*
-	 * Calculate the offset of the return arguments
-	 */
-	out_args = CIF_MIN_SIZE +
-		p1275_cell2uint(cif[CIF_NUMBER_IN_ARGS]);
-
-	/*
-	 * There is one argument being passed back to the firmware.
-	 */
-	cif[CIF_NUMBER_OUT_ARGS] = p1275_uint2cell((uint_t)1);
-	cif[out_args] = p1275_uint2cell(CIF_SUCCESS);
-
-	/*
-	 * We check the pointer to see if there is an
-	 * output device that has been registered.
-	 */
-	polled_io = polled_output_device.polled_io;
-
-	if (polled_io == NULL) {
-		return;
-	}
-
-	/*
-	 * Call down to the lower layers to save the state.
-	 */
-	polled_io->cons_polledio_exit(
-		polled_io->cons_polledio_argument);
 }

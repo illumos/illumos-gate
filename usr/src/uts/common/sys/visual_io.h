@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -131,7 +131,7 @@ struct vis_cursor {
  */
 #define	VIS_GETCMAP	(VIOC|9)
 #define	VIS_PUTCMAP	(VIOC|10)
-struct viscmap {
+struct vis_cmap {
 	int		index; /* Index into colormap to start updating */
 	int		count; /* Number of entries to update */
 	unsigned char	*red; /* List of red values */
@@ -179,7 +179,7 @@ typedef union {
  * ioctl(fd, VIS_DEVINIT, struct vis_devinit *)
  */
 #define	VIS_DEVINIT	(VIOC|1)
-#define	VIS_CONS_REV		2 /* Console IO interface version */
+#define	VIS_CONS_REV		3 /* Console IO interface version */
 /* Modes */
 #define	VIS_TEXT		0 /* Use text mode when displaying data */
 #define	VIS_PIXEL		1 /* Use pixel mode when displaying data */
@@ -201,7 +201,6 @@ typedef union {
  * ioctl(fd, VIS_CONSCURSOR, struct vis_conscursor *)
  */
 #define	VIS_CONSCURSOR		(VIOC|3)
-#define	VIS_CURSOR_VERSION	1
 /* Cursor action - Either display or hide cursor */
 #define	VIS_HIDE_CURSOR		0
 #define	VIS_DISPLAY_CURSOR	1
@@ -218,8 +217,6 @@ typedef union {
  */
 
 #define	VIS_CONSDISPLAY		(VIOC|5)
-/* Version */
-#define	VIS_DISPLAY_VERSION		1
 
 /*
  * VIS_CONSCOPY:
@@ -231,11 +228,8 @@ typedef union {
  * ioctl(fd, VIS_CONSCOPY, struct vis_conscopy *)
  */
 #define	VIS_CONSCOPY		(VIOC|7)
-/* Version */
-#define	VIS_COPY_VERSION		2
 
 struct vis_consdisplay {
-	int		version; /* Version of this structure */
 	screen_pos_t	row; /* Row to display data at */
 	screen_pos_t	col; /* Col to display data at */
 	screen_size_t	width; /* Width of data */
@@ -246,7 +240,6 @@ struct vis_consdisplay {
 };
 
 struct vis_conscopy {
-	int		version; /* Version of this structure */
 	screen_pos_t	s_row; /* Starting row */
 	screen_pos_t	s_col; /* Starting col */
 	screen_pos_t	e_row; /* Ending row */
@@ -256,7 +249,6 @@ struct vis_conscopy {
 };
 
 struct vis_conscursor {
-	int		version; /* Version of this structure */
 	screen_pos_t	row; /* Row to display cursor at */
 	screen_pos_t	col; /* Col to display cursor at */
 	screen_size_t	width; /* Width of cursor */
@@ -269,10 +261,11 @@ struct vis_conscursor {
 /*
  * Each software-console-capable frame buffer driver defines its own
  * instance of this (with its own name!) and casts to/from this at the
- * interface with the terminal emulator.  This yields somewhat better
+ * interface with the terminal emulator.  These yield somewhat better
  * type checking than "void *".
  */
 struct vis_polledio_arg;
+struct vis_modechg_arg;
 
 /*
  * Each software-console-capable frame buffer driver supplies these routines
@@ -281,38 +274,38 @@ struct vis_polledio_arg;
  */
 struct vis_polledio {
 	struct vis_polledio_arg	*arg;
-	void	(*display)(struct vis_polledio_arg *,
-			struct vis_consdisplay *);
+	void	(*display)(struct vis_polledio_arg *, struct vis_consdisplay *);
 	void	(*copy)(struct vis_polledio_arg *, struct vis_conscopy *);
 	void	(*cursor)(struct vis_polledio_arg *, struct vis_conscursor *);
 };
 
+struct vis_devinit; /* forward decl. for typedef */
+
+typedef void (*vis_modechg_cb_t)(struct vis_modechg_arg *,
+    struct vis_devinit *);
+
 struct vis_devinit {
+	/*
+	 * This set of fields are used as parameters passed from the
+	 * layered framebuffer driver to the terminal emulator.
+	 */
 	int		version;	/* Console IO interface version */
 	screen_size_t	width;		/* Width of the device */
 	screen_size_t	height;		/* Height of the device */
 	screen_size_t	linebytes;	/* Bytes per scan line */
 	int		depth;		/* Device depth */
 	short		mode;		/* Mode to use when displaying data */
-	struct vis_polledio *polledio; /* Polled output routines */
+	struct vis_polledio *polledio;	/* Polled output routines */
+
+	/*
+	 * The following fields are used as parameters passed from the
+	 * terminal emulator to the underlying framebuffer driver.
+	 */
+	vis_modechg_cb_t modechg_cb;	/* Video mode change callback */
+	struct vis_modechg_arg *modechg_arg; /* Mode change cb arg */
 };
 
 #endif	/* _KERNEL */
-
-/*
- * VIS_CONS_MODE_CHANGE
- * Coordinates changes of the console frame buffer mode.
- *
- * The exact semantics of this request must be defined by a device-specific
- * contract between the X server and the frame buffer driver.  Normally,
- * this request notifies the terminal emulator and the frame buffer driver
- * that the X server has changed the frame buffer mode, but the contract
- * can specify that the responsibility is divided differently.  The contract
- * must specify the allowable modes.
- *
- * ioctl(fd, VIS_CONS_MODE_CHANGE, device_specific)
- */
-#define	VIS_CONS_MODE_CHANGE	(VIOC|11)
 
 #ifdef __cplusplus
 }

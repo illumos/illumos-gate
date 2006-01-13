@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
@@ -43,6 +43,9 @@
 #include	<dirent.h>
 #include	<sys/param.h>
 #include	<sys/acl.h>
+#include	<sys/stat.h>
+#include	<sys/types.h>
+#include	<sys/console.h>
 #include	"ttymon.h"
 #include	"tmextern.h"
 #include	"tmstruct.h"
@@ -165,6 +168,8 @@ parse_args(int argc, char **argv, struct pmtab *pmtab)
 	static	char	p_server[] = "/usr/bin/login";
 	extern	char	*lastname();
 	extern	void	getty_account();
+	static	char	termbuf[MAX_TERM_TYPE_LEN];
+	static	struct	cons_getterm cnterm = {sizeof (termbuf), termbuf};
 
 	/* initialize fields to some default first */
 	pmtab->p_tag = "";
@@ -190,9 +195,34 @@ parse_args(int argc, char **argv, struct pmtab *pmtab)
 		pmtab->p_ttylabel = "300";
 		getty_options(argc, argv, pmtab);
 	} else {
+		int	cn_fd;
+
 		pmtab->p_ttylabel = "9600";
 		ttymon_options(argc, argv, pmtab);
+
+		/*
+		 * The following code is only reached if -g was specified.
+		 * It attempts to determine a suitable terminal type for
+		 * the console login process.
+		 *
+		 * If -d /dev/console also specified, we send an ioctl
+		 * to the console device to query the TERM type.
+		 *
+		 * If any of the tests, system calls, or ioctls fail
+		 * then pmtab->p_termtype retains its default value
+		 * of "".  otherwise it is set to a term type value
+		 * that was returned.
+		 */
+		if ((strlen(pmtab->p_termtype) == 0) &&
+		    (strcmp(pmtab->p_device, "/dev/console") == 0) &&
+		    ((cn_fd = open("/dev/console", O_RDONLY)) != -1)) {
+
+			if (ioctl(cn_fd, CONS_GETTERM, &cnterm) != -1)
+				pmtab->p_termtype = cnterm.cn_term_type;
+			(void) close(cn_fd);
+		}
 	}
+
 	if ((pmtab->p_device != NULL) && (*(pmtab->p_device) != '\0'))
 		getty_account(pmtab->p_device); /* utmp accounting */
 	return (0);
