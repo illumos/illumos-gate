@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -468,6 +468,12 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 			rfs4_compound(cap, rbp, NULL, req, cr);
 
 			curthread->t_flag &= ~T_DONTPEND;
+
+			/*
+			 * dr_res must be initialized before calling
+			 * rfs4_dr_chstate (it frees the reply).
+			 */
+			drp->dr_res = res_buf;
 			if (curthread->t_flag & T_WOULDBLOCK) {
 				curthread->t_flag &= ~T_WOULDBLOCK;
 				/*
@@ -480,7 +486,6 @@ rfs4_dispatch(struct rpcdisp *disp, struct svc_req *req,
 				mutex_exit(&drp->drc->lock);
 				return (1);
 			}
-			drp->dr_res = res_buf;
 			break;
 
 		case NFS4_DUP_REPLAY:
