@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -499,42 +499,42 @@ ENDTABLE
 /*
  * Add a device table for each of the six fans
  */
-name:/frutree/chassis/FT0
+name:/frutree/chassis/MB/system-board/FT0/fan-tray/F0
 	TABLE Devices
 	ROW
 	PROP Class string r 0 "fan"
 	REFPROP _fan_ name:RMCLOMV/ft0_f0_tach
 	ENDROW
 	ENDTABLE
-name:/frutree/chassis/FT1
+name:/frutree/chassis/MB/system-board/FT1/fan-tray/F0
 	TABLE Devices
 	ROW
 	PROP Class string r 0 "fan"
 	REFPROP _fan_ name:RMCLOMV/ft1_f0_tach
 	ENDROW
 	ENDTABLE
-name:/frutree/chassis/FT2
+name:/frutree/chassis/MB/system-board/FT2/fan-tray/F0
 	TABLE Devices
 	ROW
 	PROP Class string r 0 "fan"
 	REFPROP _fan_ name:RMCLOMV/ft2_f0_tach
 	ENDROW
 	ENDTABLE
-name:/frutree/chassis/FT3
+name:/frutree/chassis/MB/system-board/FT3/fan-tray/F0
 	TABLE Devices
 	ROW
 	PROP Class string r 0 "fan"
 	REFPROP _fan_ name:RMCLOMV/ft3_f0_tach
 	ENDROW
 	ENDTABLE
-name:/frutree/chassis/FT4
+name:/frutree/chassis/MB/system-board/FT4/fan-tray/F0
 	TABLE Devices
 	ROW
 	PROP Class string r 0 "fan"
 	REFPROP _fan_ name:RMCLOMV/ft4_f0_tach
 	ENDROW
 	ENDTABLE
-name:/frutree/chassis/FT5
+name:/frutree/chassis/MB/system-board/FT5/fan-tray/F0
 	TABLE Devices
 	ROW
 	PROP Class string r 0 "fan"

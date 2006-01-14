@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -86,34 +86,33 @@ NODE frutree picl
 
 	NODE MB location
 	    PROP SlotType string r 0 "system-board"
-    	    PROP Label string r 0 "MB"
+	    PROP Label string r 0 "MB"
             NODE system-board fru
-            ENDNODE
-	ENDNODE
-
-	NODE FT0 fru
-	    PROP SlotType string r 0 "fan-tray"
-    	    PROP Label string r 0 "FT0"
-	ENDNODE
-	NODE FT1 fru
-	    PROP SlotType string r 0 "fan-tray"
-    	    PROP Label string r 0 "FT1"
-	ENDNODE
-	NODE FT2 fru
-	    PROP SlotType string r 0 "fan-tray"
-    	    PROP Label string r 0 "FT2"
-	ENDNODE
-	NODE FT3 fru
-	    PROP SlotType string r 0 "fan-tray"
-    	    PROP Label string r 0 "FT3"
-	ENDNODE
-	NODE FT4 fru
-	    PROP SlotType string r 0 "fan-tray"
-    	    PROP Label string r 0 "FT4"
-	ENDNODE
-	NODE FT5 fru
-	    PROP SlotType string r 0 "fan-tray"
-    	    PROP Label string r 0 "FT5"
+	        NODE FT0 location
+    	            PROP Label string r 0 "FT0"
+		    PROP SlotType string r 0 "fan-tray"
+	        ENDNODE
+	        NODE FT1 location
+    	            PROP Label string r 0 "FT1"
+		    PROP SlotType string r 0 "fan-tray"
+	        ENDNODE
+	        NODE FT2 location
+    	            PROP Label string r 0 "FT2"
+		    PROP SlotType string r 0 "fan-tray"
+	        ENDNODE
+	        NODE FT3 location
+    	            PROP Label string r 0 "FT3"
+		    PROP SlotType string r 0 "fan-tray"
+	        ENDNODE
+	        NODE FT4 location
+    	            PROP Label string r 0 "FT4"
+		    PROP SlotType string r 0 "fan-tray"
+	        ENDNODE
+	        NODE FT5 location
+    	            PROP Label string r 0 "FT5"
+		    PROP SlotType string r 0 "fan-tray"
+	        ENDNODE
+	    ENDNODE
 	ENDNODE
 
         NODE PDB location
@@ -145,7 +144,6 @@ NODE frutree picl
     ENDNODE
 ENDNODE
 
-name:/frutree/chassis/MB/system-board/PS0
 /*
  * Motherboard properties
  */
@@ -269,17 +267,45 @@ name:/frutree/chassis/MB/system-board/SC
     ENDNODE
 
 /*
- * built-in LSI PCIe disk controller and disk backplane
+ * Common properties for the disk controller location node.
  */
 name:/frutree/chassis/MB/system-board/HDDCNTRL
     PROP SlotType string r 0 "disk-controller"
     PROP Label string r 0 "HDDCNTRL"
-    NODE disk-controller fru
-        NODE HDDBP location
-            PROP Label string r 0 "HDDBP"
-            PROP SlotType string r 0 "disk-backplane-8"
-            NODE disk-backplane-8 fru
-            ENDNODE
+
+/*
+ * Create the disk-controller fru node here if the 1068e fruid prom is
+ * visible.
+ */
+name:/frutree/chassis/MB/system-board/HDDCNTRL
+    REFNODE disk-controller fru WITH name:/platform/i2c@1f,520000/sas-ctrl-fru-prom@0,46
+
+/*
+ * If the disk-controller node now exists, create properties that will
+ * allow its fruid prom to be accessed.
+ */
+name:/frutree/chassis/MB/system-board/HDDCNTRL/disk-controller
+    PROP FRUDataAvailable void r
+    REFPROP _seeprom_source name:/platform/i2c@1f,520000/sas-ctrl-fru-prom@0,46
+
+/*
+ * Create the disk-controller fru node here if the disk controller is
+ * a LSI Logic 1064x/1068x in slot 4.  Note that no fruid prom properties
+ * are created because in this case, there is no 1068e and its fruid
+ * prom is not present.  This ensures that the fru access library won't
+ * expect to see a fruid prom where none is present.
+ */
+name:/frutree/chassis/MB/system-board/HDDCNTRL
+    REFNODE disk-controller fru WITH name:/platform/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1
+
+/*
+ * Create the disk backplane node under the disk-controller node
+ */
+name:/frutree/chassis/MB/system-board/HDDCNTRL/disk-controller
+    NODE HDDBP location
+        PROP Label string r 0 "HDDBP"
+        PROP SlotType string r 0 "disk-backplane-8"
+        NODE disk-backplane-8 fru
         ENDNODE
     ENDNODE
 
@@ -338,40 +364,52 @@ name:/frutree/chassis/PS3
 name:/frutree/chassis/PDB
 	REFNODE power-distribution-board fru WITH name:/platform/i2c@1f,520000/pdb-fru-prom@0,da
 
+name:/frutree/chassis/MB/system-board/FT0
+    REFNODE fan-tray fru WITH name:RMCLOMV/ft0_f0_tach
+name:/frutree/chassis/MB/system-board/FT1
+    REFNODE fan-tray fru WITH name:RMCLOMV/ft1_f0_tach
+name:/frutree/chassis/MB/system-board/FT2
+    REFNODE fan-tray fru WITH name:RMCLOMV/ft2_f0_tach
+name:/frutree/chassis/MB/system-board/FT3
+    REFNODE fan-tray fru WITH name:RMCLOMV/ft3_f0_tach
+name:/frutree/chassis/MB/system-board/FT4
+    REFNODE fan-tray fru WITH name:RMCLOMV/ft4_f0_tach
+name:/frutree/chassis/MB/system-board/FT5
+    REFNODE fan-tray fru WITH name:RMCLOMV/ft5_f0_tach
+
 /*
  * system fans (on Boston, the trays are the fru's, not the fans)
  */
-name:/frutree/chassis/FT0
+name:/frutree/chassis/MB/system-board/FT0/fan-tray
     NODE F0 location
         PROP SlotType string r 0 "fan-unit"
         PROP Label string r 0 "F0"
     ENDNODE
-name:/frutree/chassis/FT1
+name:/frutree/chassis/MB/system-board/FT1/fan-tray
     NODE F0 location
         PROP SlotType string r 0 "fan-unit"
         PROP Label string r 0 "F0"
     ENDNODE
-name:/frutree/chassis/FT2
+name:/frutree/chassis/MB/system-board/FT2/fan-tray
     NODE F0 location
         PROP SlotType string r 0 "fan-unit"
         PROP Label string r 0 "F0"
     ENDNODE
-name:/frutree/chassis/FT3
+name:/frutree/chassis/MB/system-board/FT3/fan-tray
     NODE F0 location
         PROP SlotType string r 0 "fan-unit"
         PROP Label string r 0 "F0"
     ENDNODE
-name:/frutree/chassis/FT4
+name:/frutree/chassis/MB/system-board/FT4/fan-tray
     NODE F0 location
         PROP SlotType string r 0 "fan-unit"
         PROP Label string r 0 "F0"
     ENDNODE
-name:/frutree/chassis/FT5
+name:/frutree/chassis/MB/system-board/FT5/fan-tray
     NODE F0 location
         PROP SlotType string r 0 "fan-unit"
         PROP Label string r 0 "F0"
     ENDNODE
-
 
 /*
  * cdrom fru node

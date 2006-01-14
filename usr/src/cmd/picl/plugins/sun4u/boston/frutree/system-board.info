@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -96,13 +96,12 @@ name:/platform/i2c@1f,520000/sas-backplane-fru-prom@0,48
 
 /*
  * HDDCNTRL Board Seeprom Source
+ *
+ * Note: see piclfrutree.info for fruid prom info
  */
-name:/frutree/chassis/MB/system-board/HDDCNTRL/disk-controller
-    PROP FRUDataAvailable void r
-    REFPROP _seeprom_source name:/platform/i2c@1f,520000/sas-backplane-fru-prom@0,46
-
-name:/platform/i2c@1f,520000/sasctrl-fru-prom@0,46
+name:/platform/i2c@1f,520000/sas-ctrl-fru-prom@0,46
     REFPROP _fru_parent name:/frutree/chassis/MB/system-board/HDDCNTRL/disk-controller
+
 
 /*
  * Proccessor Board 0

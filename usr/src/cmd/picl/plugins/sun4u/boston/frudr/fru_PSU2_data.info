@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ident	"%Z%%M%	%I%	%E% SMI"
@@ -74,7 +74,7 @@ id("%Z%%M%	%I%	%E% SMI")
 
 name:/frutree/chassis/PS2/power-supply
 	PROP FRUDataAvailable void r
-	REFPROP _seeprom_source name:/platform/devices/i2c@1f,520000/power-supply-fru-prom@0,52
+	REFPROP _seeprom_source name:/platform/i2c@1f,520000/power-supply-fru-prom@0,52
 TABLE Devices
 ROW
 PROP Class string r 0 "led"
@@ -118,9 +118,9 @@ REFPROP _fan_ name:RMCLOMV/ps2_ff_fan
 ENDROW
 ENDTABLE
 
-name:/platform/devices/i2c@1f,520000/power-supply-fru-prom@0,52
+name:/platform/i2c@1f,520000/power-supply-fru-prom@0,52
 	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply
-        PROP FRUDevicePath string r 0 "/platform/devices/i2c@1f,520000/power-supply-fru-prom@0,52:power-supply-fru-prom"
+        PROP FRUDevicePath string r 0 "/devices/i2c@1f,520000/power-supply-fru-prom@0,52:power-supply-fru-prom"
 
 name:RMCLOMV/ps2_pok
 	REFPROP _fru_parent name:/frutree/chassis/PS2/power-supply

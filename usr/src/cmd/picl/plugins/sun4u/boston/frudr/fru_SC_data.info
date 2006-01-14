@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,17 +111,17 @@ id("%Z%%M%	%I%	%E% SMI")
  * parents for the fan tachometers
  */
 name:RMCLOMV/ft0_f0_tach
-	REFPROP	_fru_parent name:/frutree/chassis/FT0
+	REFPROP	_location_parent name:/frutree/chassis/MB/system-board/FT0/fan-tray/F0
 name:RMCLOMV/ft1_f0_tach
-	REFPROP	_fru_parent name:/frutree/chassis/FT1
+	REFPROP	_location_parent name:/frutree/chassis/MB/system-board/FT1/fan-tray/F0
 name:RMCLOMV/ft2_f0_tach
-	REFPROP _fru_parent name:/frutree/chassis/FT2
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/FT2/fan-tray/F0
 name:RMCLOMV/ft3_f0_tach
-	REFPROP _fru_parent name:/frutree/chassis/FT3
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/FT3/fan-tray/F0
 name:RMCLOMV/ft4_f0_tach
-	REFPROP _fru_parent name:/frutree/chassis/FT4
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/FT4/fan-tray/F0
 name:RMCLOMV/ft5_f0_tach
-	REFPROP _fru_parent name:/frutree/chassis/FT5
+	REFPROP _location_parent name:/frutree/chassis/MB/system-board/FT5/fan-tray/F0
 
 /*
  * parents for system leds
