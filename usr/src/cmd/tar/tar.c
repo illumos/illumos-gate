@@ -687,7 +687,7 @@ main(int argc, char *argv[])
 #ifdef	_iBCS2
 			if (sysv3_env) {
 				assert_string(*argv, gettext(
-					"tar: 'F' requires a file name\n"));
+				    "tar: 'F' requires a file name\n"));
 				Filefile = *argv++;
 				Fileflag++;
 			} else
@@ -832,8 +832,8 @@ main(int argc, char *argv[])
 
 	/* alloc a buffer of the right size */
 	if ((tbuf = (union hblock *)
-		    calloc(sizeof (union hblock) * nblock, sizeof (char))) ==
-		(union hblock *)NULL) {
+	    calloc(sizeof (union hblock) * nblock, sizeof (char))) ==
+	    (union hblock *)NULL) {
 		(void) fprintf(stderr, gettext(
 		"tar: cannot allocate physio buffer\n"));
 		exit(1);
@@ -910,7 +910,7 @@ main(int argc, char *argv[])
 
 			if (mt < 0) {
 				if (cflag == 0 || (mt =  creat(usefile, 0666))
-						< 0)
+				    < 0)
 				vperror(1, "%s", usefile);
 			}
 		}
@@ -967,8 +967,8 @@ main(int argc, char *argv[])
 
 		if (xflag) {
 			if (Aflag && vflag)
-				(void) printf(gettext
-				("Suppressing absolute pathnames.\n"));
+				(void) printf(gettext(
+				    "Suppressing absolute pathnames.\n"));
 
 #ifdef	_iBCS2
 			doxtract(argv, tbl_cnt);
@@ -1068,7 +1068,7 @@ dorep(char *argv[])
 
 			(void) sprintf(buf, "sort +0 -1 +1nr %s -o %s; awk '$1 "
 			    "!= prev {print; prev=$1}' %s >%sX;mv %sX %s",
-				tname, tname, tname, tname, tname, tname);
+			    tname, tname, tname, tname, tname, tname);
 			(void) fflush(tfile);
 			(void) system(buf);
 			(void) freopen(tname, "r", tfile);
@@ -1435,8 +1435,8 @@ passtape(void)
 	 *  with them so just skip reading the data block.
 	 */
 	if (dblock.dbuf.typeflag == '1' || dblock.dbuf.typeflag == '2' ||
-		dblock.dbuf.typeflag == '3' || dblock.dbuf.typeflag == '4' ||
-		dblock.dbuf.typeflag == '5' || dblock.dbuf.typeflag == '6')
+	    dblock.dbuf.typeflag == '3' || dblock.dbuf.typeflag == '4' ||
+	    dblock.dbuf.typeflag == '5' || dblock.dbuf.typeflag == '6')
 		return;
 	blocks = TBLOCKS(stbuf.st_size);
 
@@ -1996,7 +1996,8 @@ putfile(char *longname, char *shortname, char *parent,
 		 */
 		(void) sprintf(dblock.dbuf.chksum, "%07o", checksum(&dblock));
 		hint = writetbuf((char *)&dblock, 1);
-		maxread = max(stbuf.st_blksize, (nblock * TBLOCK));
+		maxread = max(min(stbuf.st_blksize, stbuf.st_size),
+		    (nblock * TBLOCK));
 		if ((bigbuf = calloc((unsigned)maxread, sizeof (char))) == 0) {
 			maxread = TBLOCK;
 			bigbuf = buf;
@@ -3166,9 +3167,9 @@ xsfile(int ofd)
 		(void) mbtowc(&yeschar, nl_langinfo(YESSTR), MB_LEN_MAX);
 		(void) mbtowc(&nochar, nl_langinfo(NOSTR), MB_LEN_MAX);
 		(void) printf(gettext(
-		"tar: first extent read is not #1\n"
-		"OK to read file beginning with extent #%d (%wc/%wc) ? "),
-		extno, yeschar, nochar);
+		    "tar: first extent read is not #1\n"
+		    "OK to read file beginning with extent #%d (%wc/%wc) ? "),
+		    extno, yeschar, nochar);
 		if (yesnoresponse() != yeschar) {
 canit:
 			passtape();
@@ -3223,8 +3224,8 @@ asknicely:
 		}
 		if (i != extno) {
 			(void) fprintf(stderr, gettext(
-		"tar: extent #%d received out of order\ntar: should be #%d\n"),
-		extno, i);
+			    "tar: extent #%d received out of order\ntar: "
+			    "should be #%d\n"), extno, i);
 			(void) fprintf(stderr, gettext(
 			    "Ignore error, Abort this file, or "
 			    "load New volume (i/a/n) ? "));
@@ -3679,7 +3680,7 @@ resugname(int dirfd, 	/* dir fd file resides in */
 			if (S_ISREG(sp->st_mode) && sp->st_uid == UID_NOBODY &&
 			    (sp->st_mode & S_ISUID) == S_ISUID)
 				(void) chmod(name,
-					MODEMASK & sp->st_mode & ~S_ISUID);
+				    MODEMASK & sp->st_mode & ~S_ISUID);
 			duid = sp->st_uid;
 		}
 
@@ -3693,7 +3694,7 @@ resugname(int dirfd, 	/* dir fd file resides in */
 			if (S_ISREG(sp->st_mode) && sp->st_gid == GID_NOBODY &&
 			    (sp->st_mode & S_ISGID) == S_ISGID)
 				(void) chmod(name,
-					MODEMASK & sp->st_mode & ~S_ISGID);
+				    MODEMASK & sp->st_mode & ~S_ISGID);
 			dgid = sp->st_gid;
 		}
 	} else if (checkflag == 2) { /* tar format and euid == 0 */
@@ -3884,7 +3885,8 @@ response(void)
 
 	c = getchar();
 	if (c != '\n')
-		while (getchar() != '\n');
+		while (getchar() != '\n')
+			;
 	else c = 'n';
 	return ((c >= 'A' && c <= 'Z') ? c + ('a'-'A') : c);
 }
@@ -4213,7 +4215,7 @@ readtape(char *buffer)
 		} else if (i == 0 && !rflag) {
 				if (first) {
 					(void) fprintf(stderr, gettext(
-						"tar: blocksize = %d\n"), i);
+					    "tar: blocksize = %d\n"), i);
 					done(Errflg);
 				}
 				else
@@ -4369,7 +4371,7 @@ backtape(void)
 
 		if (ioctl(mt, MTIOCTOP, &mtcmd) < 0) {
 			(void) fprintf(stderr,
-				gettext("tar: backspace over record failed\n"));
+			    gettext("tar: backspace over record failed\n"));
 			done(4);
 		}
 	}
@@ -4486,7 +4488,7 @@ initarg(char *argv[], char *filefile)
 	(void) fstat(fileno(FILEFile), &statbuf);
 	if ((statbuf.st_mode & S_IFMT) != S_IFREG) {
 		(void) fprintf(stderr, gettext(
-			"tar: %s is not a regular file\n"), filefile);
+		    "tar: %s is not a regular file\n"), filefile);
 		(void) fclose(FILEFile);
 		done(1);
 	}
@@ -4641,7 +4643,7 @@ defset(char *arch)
 	if ((bp = defread(arch)) == NULL) {
 		(void) fprintf(stderr, gettext(
 		    "tar: missing or invalid '%s' entry in %s.\n"),
-				arch, DEF_FILE);
+		    arch, DEF_FILE);
 		return (FALSE);
 	}
 	if ((usefile = strtok(bp, " \t")) == NULL) {
@@ -5032,7 +5034,7 @@ check_prefix(char **namep, char **dirp, char **compp)
 		(void) strcpy(fullname, xattrp->h_names);
 		(void) strcpy(dir, fullname);
 		(void) strcpy(component, xattrp->h_names +
-			strlen(xattrp->h_names) + 1);
+		    strlen(xattrp->h_names) + 1);
 	}
 #endif
 	*namep = fullname;
@@ -5048,7 +5050,8 @@ yesnoresponse(void)
 
 	c = getwchar();
 	if (c != '\n')
-		while (getwchar() != '\n');
+		while (getwchar() != '\n')
+			;
 	else c = 0;
 	return (c);
 }
@@ -5421,7 +5424,7 @@ doDirTimes(char *name, timestruc_t modTime)
 			if (modtimes[p - dirstack].tv_sec >= 0) {
 				*p = '\0';	 /* zap the slash */
 				setPathTimes(AT_FDCWD, dirstack,
-					modtimes[p - dirstack]);
+				    modtimes[p - dirstack]);
 				*p = '/';
 			}
 		++p;
@@ -5511,10 +5514,10 @@ delete_target(int fd, char *namep)
 				if ((xtractbuf.st_mode & S_IFMT) != S_IFLNK) {
 					(void) unlinkat(fd, namep, 0);
 				} else if ((n = readlink(namep, buf,
-					    PATH_MAX)) != -1) {
+				    PATH_MAX)) != -1) {
 					buf[n] = (char)NULL;
 					(void) unlinkat(fd, buf,
-						AT_REMOVEDIR);
+					    AT_REMOVEDIR);
 					if (errno == ENOTDIR)
 						(void) unlinkat(fd, buf, 0);
 				} else {
@@ -5645,7 +5648,7 @@ write_ancillary(union hblock *dblockp, char *secinfo, int len, char hdrtype)
 	/* for pre-2.5 versions of tar, need to make sure */
 	/* the ACL file is readable			  */
 	(void) sprintf(dblock.dbuf.mode, "%07lo",
-		(stbuf.st_mode & POSIXMODES) | 0000200);
+	    (stbuf.st_mode & POSIXMODES) | 0000200);
 	(void) sprintf(dblockp->dbuf.size, "%011o", len);
 	(void) sprintf(dblockp->dbuf.chksum, "%07o", checksum(dblockp));
 
@@ -6054,11 +6057,11 @@ chk_path_build(
 	}
 	if (xhdr_flgs & _X_LINKPATH)
 		return (build_dblock(name, tchar, type,
-			filetype, &stbuf, stbuf.st_dev,
+		    filetype, &stbuf, stbuf.st_dev,
 		    prefix));
 	else
 		return (build_dblock(name, linkname, type,
-			filetype, &stbuf, stbuf.st_dev, prefix));
+		    filetype, &stbuf, stbuf.st_dev, prefix));
 }
 
 /*
@@ -6077,8 +6080,8 @@ utf8_local(
 	char		*nl_target;
 	const	char	*iconv_src;
 	char		*iconv_trg;
-	size_t		inlen,
-			outlen;
+	size_t		inlen;
+	size_t		outlen;
 
 	if (charset_type == -1) {	/* iconv_open failed in earlier try */
 		(void) fprintf(stderr, gettext(
@@ -6183,8 +6186,8 @@ gen_utf8_names(const char *filename)
 	static	iconv_t	iconv_cd;
 	char		*nl_target;
 	char		tempbuf[MAXNAM + 1];
-	int		nbytes,
-			errors;
+	int		nbytes;
+	int		errors;
 
 	if (charset_type == -1)	{	/* Previous failure to open. */
 		(void) fprintf(stderr, gettext(
@@ -6277,8 +6280,8 @@ local_utf8(
 	const	char	*iconv_src;
 	const	char	*starting_src;
 	char		*iconv_trg;
-	size_t		inlen,
-			outlen;
+	size_t		inlen;
+	size_t		outlen;
 #ifdef ICONV_DEBUG
 	unsigned char	c_to_hex;
 #endif
