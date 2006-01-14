@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -620,7 +619,7 @@ ufs_direnter_cm(
 {
 	struct inode *tip;	/* inode of (existing) target file */
 	char *s;
-	struct slot slot;	/* slot info to pass around */
+	struct ufs_slot slot;	/* slot info to pass around */
 	int namlen;		/* length of name */
 	int err;		/* error number */
 	struct inode *nip;	/* new inode */
@@ -778,7 +777,7 @@ ufs_direnter_lr(
 {
 	struct inode *tip;	/* inode of (existing) target file */
 	char *s;
-	struct slot slot;	/* slot info to pass around */
+	struct ufs_slot slot;	/* slot info to pass around */
 	int namlen;		/* length of name */
 	int err;		/* error number */
 
@@ -989,7 +988,7 @@ ufs_dircheckforname(
 	struct inode *tdp,	/* inode of directory being checked */
 	char *namep,		/* name we're checking for */
 	int namlen,		/* length of name, excluding null */
-	struct slot *slotp,	/* slot structure */
+	struct ufs_slot *slotp,	/* slot structure */
 	struct inode **ipp,	/* return inode if we find one */
 	struct cred *cr,
 	int noentry)		/* noentry - just look for space */
@@ -1433,7 +1432,7 @@ ufs_dirrename(
 	struct inode *tdp,	/* parent directory of target */
 	char *namep,		/* entry we are trying to change */
 	struct inode *tip,	/* target inode */
-	struct slot *slotp,	/* slot for entry */
+	struct ufs_slot *slotp,	/* slot for entry */
 	struct cred *cr)	/* credentials */
 {
 	vnode_t *tdvp;
@@ -1508,10 +1507,10 @@ retry:
 			goto out;
 		}
 		/*
-		 * vn_vfswlock will prevent mounts from using the directory
+		 * vn_vfsrlock will prevent mounts from using the directory
 		 * until we are done.
 		 */
-		if (vn_vfswlock(ITOV(tip))) {
+		if (vn_vfsrlock(ITOV(tip))) {
 			err = EBUSY;
 			goto out;
 		}
@@ -1747,7 +1746,7 @@ ufs_diraddentry(
 	char *namep,
 	enum de_op op,
 	int namlen,
-	struct slot *slotp,
+	struct ufs_slot *slotp,
 	struct inode *sip,
 	struct inode *sdp,
 	struct cred *cr)
@@ -1934,7 +1933,7 @@ bad:
 static int
 dirprepareentry(
 	struct inode *dp,	/* directory we are working in */
-	struct slot *slotp,	/* available slot info */
+	struct ufs_slot *slotp,	/* available slot info */
 	struct cred *cr)
 {
 	struct direct *ep, *nep;
@@ -2399,7 +2398,7 @@ ufs_dirremove(
 	struct direct *ep, *pep, *nep;
 	struct inode *ip;
 	vnode_t *dvp, *vp;
-	struct slot slot;
+	struct ufs_slot slot;
 	int namlen;
 	int err;
 	int mode;
@@ -2460,9 +2459,9 @@ retry:
 	if (mode == IFDIR || mode == IFATTRDIR) {
 
 		/*
-		 * vn_vfswlock() prevents races between mount and rmdir.
+		 * vn_vfsrlock() prevents races between mount and rmdir.
 		 */
-		if (vn_vfswlock(vp)) {
+		if (vn_vfsrlock(vp)) {
 			err = EBUSY;
 			goto out_novfs;
 		}

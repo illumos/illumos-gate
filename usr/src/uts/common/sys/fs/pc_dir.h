@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1989, 1992, 1997-1998, 2000 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #ifndef	_SYS_FS_PC_DIR_H
@@ -219,7 +218,7 @@ struct pcdir_lfn {
  * sl_offset points to an empty directory slot if there are any. Otherwise
  * it is set to -1.
  */
-struct slot {
+struct pcslot {
 	enum {SL_NONE, SL_FOUND, SL_EXTEND} sl_status;	/* slot status */
 	daddr_t		sl_blkno;	/* disk block number which has entry */
 	int		sl_offset;	/* offset of entry within block */
@@ -263,9 +262,9 @@ extern int pc_read_long_fn(struct vnode *, struct uio *,
 extern int pc_read_short_fn(struct vnode *, struct uio *,
     struct pc_dirent *, struct pcdir **, offset_t *, struct buf **);
 extern int pc_match_long_fn(struct pcnode *, char *, struct pcdir **,
-    struct slot *, offset_t *);
+    struct pcslot *, offset_t *);
 extern int pc_match_short_fn(struct pcnode *, char *,
-    struct pcdir **, struct slot *, offset_t *);
+    struct pcdir **, struct pcslot *, offset_t *);
 extern uchar_t pc_checksum_long_fn(char *, char *);
 extern void set_long_fn_chunk(struct pcdir_lfn *, char *, int);
 extern int pc_valid_long_fn(char *);

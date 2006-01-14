@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -441,7 +440,7 @@ struct dinode {
  * end, thus shrinking the directory dynamically.
  */
 typedef enum {NONE, FOUND, EXIST} slotstat_t;
-struct slot {
+struct ufs_slot {
 	struct	direct *ep;	/* pointer to slot */
 	struct	fbuf *fbp;	/* dir buf where slot is */
 	off_t	offset;		/* offset of area with free space */
@@ -858,8 +857,8 @@ extern	int	ufs_dirmakeinode(struct inode *, struct inode **,
     struct vattr *, enum de_op, cred_t *);
 extern	int	ufs_dirremove(struct inode *, char *, struct inode *,
     vnode_t *, enum dr_op, cred_t *, vnode_t **);
-extern  int	ufs_dircheckforname(struct inode *, char *, int, struct slot *,
-    struct inode **, struct cred *, int);
+extern  int	ufs_dircheckforname(struct inode *, char *, int,
+    struct ufs_slot *, struct inode **, struct cred *, int);
 extern	int	ufs_xattrdirempty(struct inode *, ino_t, cred_t *);
 extern	int	blkatoff(struct inode *, off_t, char **, struct fbuf **);
 

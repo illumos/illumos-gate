@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +43,7 @@
 static int pc_makedirentry(struct pcnode *dp, struct pcdir *direntries,
     int	ndirentries, struct vattr *vap, offset_t offset);
 static int pc_dirempty(struct pcnode *);
-static int pc_findentry(struct pcnode *, char *, struct slot *, offset_t *);
+static int pc_findentry(struct pcnode *, char *, struct pcslot *, offset_t *);
 static int pc_parsename(char *, char *, char *);
 static int pc_remove_long_fn(struct pcnode *pcp,
     offset_t lfn_offset);
@@ -74,7 +73,7 @@ pc_dirlook(
 	struct pcnode **pcpp)		/* result */
 {
 	struct vnode *vp;
-	struct slot slot;
+	struct pcslot slot;
 	int error;
 
 	PC_DPRINTF2(4, "pc_dirlook (dp %p name %s)\n", (void *)dp, namep);
@@ -131,7 +130,7 @@ pc_direnter(
 	struct pcnode **pcpp)
 {
 	int error;
-	struct slot slot;
+	struct pcslot slot;
 	struct vnode *vp = PCTOV(dp);
 	struct pcfs *fsp = VFSTOPCFS(vp->v_vfsp);
 	offset_t offset;
@@ -387,7 +386,7 @@ pc_dirremove(
 	struct vnode *cdir,
 	enum vtype type)
 {
-	struct slot slot;
+	struct pcslot slot;
 	struct pcnode *pcp;
 	int error;
 	struct vnode *vp = PCTOV(dp);
@@ -558,7 +557,7 @@ pc_rename(
 {
 	struct pcnode *pcp;	/* pcnode we are trying to rename */
 	struct pcnode *tpcp;	/* pcnode that's in our way */
-	struct slot slot;
+	struct pcslot slot;
 	int error;
 	struct vnode *vp = PCTOV(dp);
 	struct vnode *svp = NULL;
@@ -878,7 +877,7 @@ static int
 pc_findentry(
 	struct pcnode *dp,		/* parent directory */
 	char *namep,			/* name to lookup */
-	struct slot *slotp,
+	struct pcslot *slotp,
 	offset_t *lfn_offset)
 {
 	offset_t offset;
@@ -1088,7 +1087,7 @@ pc_parsename(
  */
 int
 pc_match_long_fn(struct pcnode *pcp, char *namep, struct pcdir **epp,
-    struct slot *slotp, offset_t *offset)
+    struct pcslot *slotp, offset_t *offset)
 {
 	struct pcdir *ep = (struct pcdir *)*epp;
 	struct vnode *vp = PCTOV(pcp);
@@ -1123,7 +1122,7 @@ pc_match_long_fn(struct pcnode *pcp, char *namep, struct pcdir **epp,
  */
 int
 pc_match_short_fn(struct pcnode *pcp, char *namep, struct pcdir **epp,
-    struct slot *slotp, offset_t *offset)
+    struct pcslot *slotp, offset_t *offset)
 {
 	char fname[PCFNAMESIZE];
 	char fext[PCFEXTSIZE];
@@ -1401,7 +1400,7 @@ generate_short_name(struct pcnode *dp, char *namep, struct pcdir *inep)
 	char	fext[PCFEXTSIZE+1];
 	char	scratch[8];
 	int	error = 0;
-	struct slot slot;
+	struct	pcslot slot;
 	char	shortname[20];
 	int	force_tilde = 0;
 
