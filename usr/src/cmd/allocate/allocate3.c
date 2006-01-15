@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -588,6 +588,7 @@ allocate_dev(int optflg, uid_t uid, devalloc_t *dev_ent)
 	char	*list;
 	int	error = 0;
 	int	bytes_formated;
+	int	deallocate_optflg = 0;
 
 	bytes_formated = snprintf(file_name, MAXPATHLEN, "%s/%s", DAC_DIR,
 	    dev_ent->da_devname);
@@ -608,7 +609,12 @@ allocate_dev(int optflg, uid_t uid, devalloc_t *dev_ent)
 
 	if (DEV_ALLOCATED(stat_buf)) {
 		if (optflg & FORCE) {
-			if (deallocate_dev(FORCE, dev_ent, uid)) {
+			if (optflg & SILENT)
+				deallocate_optflg = FORCE|SILENT;
+			else
+				deallocate_optflg = FORCE;
+
+			if (deallocate_dev(deallocate_optflg, dev_ent, uid)) {
 				dprintf("Couldn't force deallocate device %s\n",
 				    dev_ent->da_devname);
 				return (CNTFRC);

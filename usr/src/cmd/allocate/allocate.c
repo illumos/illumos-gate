@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,13 +48,15 @@ extern int audit_allocate_record(int);
 static void
 usage(int func)
 {
-	char *use[5];
+	char *use[7];
 
 	use[0] = gettext("allocate [-s] [-U uname] [-F] device");
 	use[1] = gettext("allocate [-s] [-U uname] -g dev_type");
 	use[2] = gettext("deallocate [-s] [-F] device");
-	use[3] = gettext("deallocate [-s] [-I]");
-	use[4] = gettext("list_devices [-s] [-U uname] {-l|-n|-u} [device]");
+	use[3] = gettext("deallocate [-s] -I");
+	use[4] = gettext("list_devices [-s] [-U uid] -l [device]");
+	use[5] = gettext("list_devices [-s] [-U uid] -n [device]");
+	use[6] = gettext("list_devices [-s] [-U uid] -u [device]");
 
 	switch (func) {
 		case 0:
@@ -64,12 +66,14 @@ usage(int func)
 			(void) fprintf(stderr, "%s\n%s\n", use[2], use[3]);
 			break;
 		case 2:
-			(void) fprintf(stderr, "%s\n", use[4]);
+			(void) fprintf(stderr, "%s\n%s\n%s\n", use[4], use[5],
+			    use[6]);
 			break;
 		default:
 			(void) fprintf(stderr, "%s\n%s\n%s\n%s\n%s\n",
 				use[0], use[1], use[2], use[3], use[4]);
 	}
+	exit(1);
 }
 
 static void
@@ -190,7 +194,7 @@ int
 main(int argc, char *argv[], char *envp[])
 {
 	char	*name, *env;
-	int	func = -1, optflg = 0, errflg = 0, error = 0, c;
+	int	func = -1, optflg = 0, error = 0, c;
 	uid_t	uid = getuid();
 	char	*uname = NULL, *device = NULL;
 	struct passwd *pw_ent;
@@ -238,88 +242,152 @@ main(int argc, char *argv[], char *envp[])
 		func = 2;
 	else {
 		usage(ALL);
-		exit(1);
 	}
 
 	audit_allocate_argv(func, argc, argv);
 
-	while ((c = getopt(argc, argv, "slnugIU:F")) != -1)
-		switch (c) {
-		case 's':
-			optflg |= SILENT;
-			break;
-		case 'U':
-			optflg |= USERID;
-			uname = optarg;
-			break;
-		case 'g':
-			optflg |= TYPE;
-			break;
-		case 'l':
-			optflg |= LIST;
-			break;
-		case 'n':
-			optflg |= FREE;
-			break;
-		case 'u':
-			optflg |= CURRENT;
-			break;
-		case 'F':
-			optflg |= FORCE;
-			break;
-		case 'I':
-			optflg |= FORCE_ALL;
-			break;
-		case '?':
-			errflg++;
-			break;
-		default :
-			(void) fprintf(stderr, gettext("Bad option '%c'\n"), c);
+	if (func == 0) {	/* allocate */
+		while ((c = getopt(argc, argv, "sU:Fg")) != -1) {
+			switch (c) {
+			case 's':
+				optflg |= SILENT;
+				break;
+			case 'U':
+				optflg |= USERNAME;
+				uname = optarg;
+				break;
+			case 'g':
+				optflg |= TYPE;
+				break;
+			case 'F':
+				optflg |= FORCE;
+				break;
+			case '?':
+			default :
+				usage(func);
+			}
 		}
 
-	if (optind < argc) {
-		device = argv[optind];
+		if ((optflg & TYPE) && (optflg & FORCE))
+			usage(func);
+
+		/*
+		 * allocate(1) must be supplied with one device argument
+		 */
+		if ((argc - optind) != 1) {
+			usage(func);
+		} else {
+			device = argv[optind];
+		}
 	}
 
-	if (device == NULL && !(optflg & (LIST | FREE | CURRENT | FORCE_ALL)))
-		errflg++;
+	else if (func == 1) {	/* deallocate */
+		while ((c = getopt(argc, argv, "sFI")) != -1) {
+			switch (c) {
+			case 's':
+				optflg |= SILENT;
+				break;
+			case 'F':
+				optflg |= FORCE;
+				break;
+			case 'I':
+				optflg |= FORCE_ALL;
+				break;
+			case '?':
+			default :
+				usage(func);
+			}
+		}
 
-	if (errflg) {
-		usage(func);
-		exit(2);
+		if ((optflg & FORCE) && (optflg & FORCE_ALL))
+			usage(func);
+
+		/*
+		 * deallocate(1) must be supplied with one device
+		 * argument unless the '-I' argument is supplied
+		 */
+		if (!(optflg & FORCE_ALL)) {
+			if ((argc - optind) != 1) {
+				usage(func);
+			} else {
+				device = argv[optind];
+			}
+		} else {
+			if ((argc - optind) >= 1) {
+				usage(func);
+			}
+		}
 	}
 
-	if (optflg & USERID) {
+	else if (func == 2) {	/* list_devices */
+		while ((c = getopt(argc, argv, "sU:lnu")) != -1) {
+			switch (c) {
+			case 's':
+				optflg |= SILENT;
+				break;
+			case 'U':
+				optflg |= USERID;
+				uid = atoi(optarg);
+				break;
+			case 'l':
+				optflg |= LIST;
+				break;
+			case 'n':
+				optflg |= FREE;
+				break;
+			case 'u':
+				optflg |= CURRENT;
+				break;
+			case '?':
+			default :
+				usage(func);
+			}
+		}
+
+		if (((optflg & LIST) && (optflg & FREE)) ||
+		    ((optflg & LIST) && (optflg & CURRENT)) ||
+		    ((optflg & FREE) && (optflg & CURRENT)) ||
+		    (!(optflg & (LIST | FREE | CURRENT))))
+			usage(func);
+
+		/*
+		 * list_devices(1) takes an optional device argument
+		 */
+		if ((argc - optind) == 1) {
+			device = argv[optind];
+		} else {
+			if ((argc - optind) > 1) {
+				usage(func);
+			}
+		}
+	}
+
+	if (optflg & USERNAME) {
 		if ((pw_ent = getpwnam(uname)) == NULL) {
 			(void) fprintf(stderr, gettext(
 			    "Invalid user name -- %s -- \n"), uname);
-			exit(4);
+			exit(1);
+		}
+		uid = pw_ent->pw_uid;
+	}
+
+	if (optflg & USERID) {
+		if ((pw_ent = getpwuid(uid)) == NULL) {
+			(void) fprintf(stderr, gettext(
+			    "Invalid user ID -- %d -- \n"), uid);
+			exit(1);
 		}
 		uid = pw_ent->pw_uid;
 	}
 
 	if (func == 0) {
-		if (optflg & ~ALLOC_OPTS) {
-			usage(func);
-			exit(3);
-		} else {
-			error = allocate(optflg, uid, device);
-		}
+		error = allocate(optflg, uid, device);
 	} else if (func == 1) {
-		if (optflg & ~DEALLOC_OPTS) {
-			usage(func);
-			exit(3);
-		} else {
-			error = deallocate(optflg, uid, device);
-		}
+		error = deallocate(optflg, uid, device);
 	} else if (func == 2) {
-		if (optflg & ~LIST_OPTS) {
-			usage(func);
-			exit(3);
-		} else {
-			error = list_devices(optflg, uid, device);
-		}
+		error = list_devices(optflg, uid, device);
 	}
+
 	(void) audit_allocate_record(error);
 
 	if (error) {

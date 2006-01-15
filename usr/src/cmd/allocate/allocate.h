@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 1992-2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,17 +35,14 @@ extern "C" {
 
 /* Option Flags */
 #define	SILENT		0001	/* -s */
-#define	USERID		0002	/* -U */
+#define	USERID		0002	/* -U <uid> for list_devices(1) */
 #define	LIST		0004	/* -l */
 #define	FREE		0010	/* -n */
 #define	CURRENT 	0020	/* -u */
 #define	FORCE		0040	/* -F */
 #define	FORCE_ALL 	0100	/* -I */
 #define	TYPE		0200	/* -g */
-
-#define	ALLOC_OPTS	(SILENT | USERID | FORCE | TYPE)
-#define	DEALLOC_OPTS	(SILENT | FORCE | FORCE_ALL)
-#define	LIST_OPTS	(SILENT | USERID | LIST | FREE | CURRENT)
+#define	USERNAME	0400	/* -U <username> for allocate(1) */
 
 /* Misc. */
 
