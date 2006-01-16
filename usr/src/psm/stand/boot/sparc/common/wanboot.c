@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -610,7 +610,7 @@ get_url(char *name, url_t *url)
  */
 static int
 establish_http_connection(const char *what, http_handle_t *handlep,
-    url_t *url, off_t offset)
+    url_t *url, off64_t offset)
 {
 	static boolean_t	is_auth_file_init = B_FALSE;
 	static boolean_t	is_proxy_init = B_FALSE;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -165,8 +165,8 @@ static int	p12_format = 0;		/* Default to PEM format */
 
 
 /* prototypes for local functions */
-static int	http_req(http_handle_t, const char *, http_req_t, off_t,
-    size_t);
+static int	http_req(http_handle_t, const char *, http_req_t, off64_t,
+    off64_t);
 static boolean_t http_check_conn(http_conn_t *);
 static SSL_CTX *initialize_ctx(http_conn_t *);
 static int	tcp_connect(http_conn_t *, const char *, uint16_t);
@@ -843,7 +843,7 @@ http_get_request(http_handle_t handle, const char *abs_path)
  */
 int
 http_get_range_request(http_handle_t handle, const char *abs_path,
-    off_t curpos, size_t len)
+    off64_t curpos, off64_t len)
 {
 	http_conn_t *c_id = handle;
 
@@ -1528,7 +1528,7 @@ http_decode_err(ulong_t err, int *errlib, int *errfunc, int *errcode)
  */
 static int
 http_req(http_handle_t handle, const char *abs_path, http_req_t type,
-    off_t curpos, size_t len)
+    off64_t curpos, off64_t len)
 {
 	http_conn_t *c_id = handle;
 	char	*request;
@@ -1627,7 +1627,7 @@ http_req(http_handle_t handle, const char *abs_path, http_req_t type,
 	 * "Range: bytes=" + from + "-"  "\r\n"
 	 */
 	if (type == HTTP_REQ_TYPE_GET && curpos >= 0) {
-		off_t endpos;
+		off64_t endpos;
 
 		requestlen += 13 + count_digits(curpos) + 1 + 2;
 		if (len > 0) {
@@ -1642,9 +1642,9 @@ http_req(http_handle_t handle, const char *abs_path, http_req_t type,
 		}
 		request = newreq;
 
-		j += sprintf(&request[j], "Range: bytes=%ld-", curpos);
+		j += sprintf(&request[j], "Range: bytes=%lld-", curpos);
 		if (len > 0)
-			j += sprintf(&request[j], "%ld", endpos);
+			j += sprintf(&request[j], "%lld", endpos);
 		j += sprintf(&request[j], "\r\n");
 	}
 
