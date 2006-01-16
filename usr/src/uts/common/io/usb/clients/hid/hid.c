@@ -851,7 +851,7 @@ hid_open(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *credp)
 		 * We create a taskq with one thread, which will be used at the
 		 * time of closing physical keyboard, refer to hid_close().
 		 */
-		sprintf(taskqname, "hid_taskq_%d", instance);
+		(void) sprintf(taskqname, "hid_taskq_%d", instance);
 		taskq = ddi_taskq_create(hidp->hid_dip, taskqname, 1,
 		    TASKQ_DEFAULTPRI, 0);
 
