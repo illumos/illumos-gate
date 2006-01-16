@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -570,7 +570,6 @@ conskbdopen(queue_t *q, dev_t *devp, int flag, int sflag, cred_t *crp)
 	conskbd.conskbd_polledio.cons_polledio_enter = conskbd_polledio_enter;
 	conskbd.conskbd_polledio.cons_polledio_exit = conskbd_polledio_exit;
 	qprocson(q);
-	kbtrans_streams_enable(conskbd.conskbd_kbtrans);
 
 	return (0);
 
@@ -1398,7 +1397,7 @@ conskbd_lqs_ack_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 		conskbd_legacy_upstream_msg(lqs, mp);
 		break;
 
-	/* S4: wait lower queue to acknowledge KIOCSLED  message */
+	/* S4: wait lower queue to acknowledge KIOCSLED/KIOCGLED  message */
 	case LQS_KIOCSLED_ACK_PENDING:
 		conskbd_kiocsled_complete(lqs, mp);
 		break;
@@ -1623,13 +1622,20 @@ conskbd_kioclayout_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 	freemsg(mp);
 
 	fail = B_TRUE;
-	req = mkiocb(KIOCSLED);
+
+	if (conskbd.conskbd_led_state == -1)
+		req = mkiocb(KIOCGLED);
+	else
+		req = mkiocb(KIOCSLED);
+
 	if (req) {
 		req->b_cont = allocb(sizeof (uchar_t), BPRI_MED);
 		if (req->b_cont) {
-			*(uchar_t *)req->b_cont->b_wptr =
-			    conskbd.conskbd_led_state;
-			req->b_cont->b_wptr += sizeof (uchar_t);
+			if (conskbd.conskbd_led_state != -1) {
+				*(uchar_t *)req->b_cont->b_wptr =
+				    conskbd.conskbd_led_state;
+				req->b_cont->b_wptr += sizeof (uchar_t);
+			}
 
 			/* waiting for response to KIOCSLED */
 			lqs->lqs_state = LQS_KIOCSLED_ACK_PENDING;
@@ -1646,10 +1652,10 @@ conskbd_kioclayout_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 
 	if (fail) {
 		/*
-		 * If fail to allocate KIOCSLED message or put the message
-		 * into lower queue, we immediately link current keyboard
-		 * under conskbd. Thus, even if fails to set LED, this
-		 * keyboard could be available.
+		 * If fail to allocate KIOCSLED/KIOCGLED message or put
+		 * the message into lower queue, we immediately link
+		 * current keyboard under conskbd. Thus, even if fails
+		 * to set/get LED, this keyboard could be available.
 		 */
 		conskbd_link_lower_queue(lqs);
 	}
@@ -1660,13 +1666,32 @@ conskbd_kioclayout_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 static void
 conskbd_kiocsled_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 {
+	int	led_state;
+
 	ASSERT(lqs->lqs_pending_plink != NULL);
 	ASSERT(lqs->lqs_state == LQS_KIOCSLED_ACK_PENDING);
 
+	if (conskbd.conskbd_led_state == -1) {
+		switch (mp->b_datap->db_type) {
+		case M_IOCACK:
+			if (miocpullup(mp, sizeof (uchar_t)) == 0) {
+				led_state = *(uchar_t *)mp->b_cont->b_rptr;
+				conskbd.conskbd_led_state = led_state;
+				kbtrans_streams_setled(conskbd.conskbd_kbtrans,
+				    led_state);
+			}
+			break;
+
+		/* if fail, leave conskbd's led_state as it is */
+		case M_IOCNAK:
+			break;
+		}
+	}
+
 	/*
-	 * Basically, failure of setting LED is not a fatal error,
-	 * so we will plumb the lower queue into conskbd whether
-	 * setting LED succeeds or fails.
+	 * Basically, failure of setting/getting LED is not a fatal
+	 * error, so we will plumb the lower queue into conskbd whether
+	 * setting/getting LED succeeds or fails.
 	 */
 	freemsg(mp);
 	conskbd_link_lower_queue(lqs);

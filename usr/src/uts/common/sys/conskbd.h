@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,15 +63,16 @@ extern "C" {
  * 4) LQS_KIOCTRANS_ACK_PENDING	--->	LQS_KIOCLAYOUT_ACK_PENDING;
  * 	receive ack to KIOCTRANS, and send KIOCLAYOUT to lower queue
  *
- * 5) LQS_KIOCLAYOUT_ACK_PENDING --->	LQS_KIOCSLED_ACK_PENDING;
- * 	receive ack/nak to KIOCLAYOUT, and send KIOCSLED to lower queue
- *
- * 6) LQS_KIOCSLED_ACK_PENDING	--->	Destroy
+ * 5) LQS_KIOCTRANS_ACK_PENDING --->	Destroy
  * 	receive nak to KIOCTRANS, it is a fatal error so that this
  * 	keyboard is not avilable. destroy the lower queue struct.
  *
+ * 6) LQS_KIOCLAYOUT_ACK_PENDING --->	LQS_KIOCSLED_ACK_PENDING;
+ * 	receive ack/nak to KIOCLAYOUT, and send KIOCSLED/KIOCGLED to
+ *	lower queue.
+ *
  * 7) LQS_KIOCSLED_ACK_PENDING	--->	LQS_INITIALIZED
- * 	receive ack, the keyboard is linked under conskbd, multiplexed
+ * 	receive ack/nak, the keyboard is linked under conskbd, multiplexed
  * 	with other keyboards.
  *
  * 8) when lower queue is in the state of LQS_INITIALIZED_LEGACY or
@@ -83,7 +84,7 @@ enum conskbd_lqs_state {
 	LQS_KIOCTYPE_ACK_PENDING = 1,	/* waiting ACK for KIOCTYPE */
 	LQS_KIOCTRANS_ACK_PENDING = 2, /* waiting ACK for KIOCTRANS */
 	LQS_KIOCLAYOUT_ACK_PENDING = 3, /* waiting ACK for KIOCLAYOUT */
-	LQS_KIOCSLED_ACK_PENDING = 4, /* waiting ACK for KIOCSLED */
+	LQS_KIOCSLED_ACK_PENDING = 4, /* waiting ACK for KIOCSLED/KIOCGLED */
 	LQS_INITIALIZED_LEGACY = 5, /* only one lower legacy keyboard */
 	LQS_INITIALIZED = 6 /* virtual keyboard initialized */
 };

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -526,6 +526,33 @@ kbtrans_streams_enable(struct kbtrans *upper)
 {
 	/* Set the LED's */
 	kbtrans_setled(upper);
+}
+
+/*
+ * kbtrans_streams_setled():
+ *	This is the routine that is called to only update the led state
+ *	in kbtrans.
+ */
+void
+kbtrans_streams_setled(struct kbtrans *upper, int led_state)
+{
+	struct kbtrans_lower *lower;
+
+	lower = &upper->kbtrans_lower;
+	lower->kbtrans_led_state = (uchar_t)led_state;
+
+	if (lower->kbtrans_led_state & LED_CAPS_LOCK)
+		lower->kbtrans_togglemask |= CAPSMASK;
+	if (lower->kbtrans_led_state & LED_NUM_LOCK)
+		lower->kbtrans_togglemask |= NUMLOCKMASK;
+
+#if	defined(SCROLLMASK)
+	if (lower->kbtrans_led_state & LED_SCROLL_LOCK)
+		lower->kbtrans_togglemask |= SCROLLMASK;
+#endif
+
+	lower->kbtrans_shiftmask = lower->kbtrans_togglemask;
+
 }
 
 /*
