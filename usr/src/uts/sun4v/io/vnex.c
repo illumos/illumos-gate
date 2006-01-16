@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +69,6 @@ typedef struct vnex_id {
 	ddi_intr_handle_impl_t *vid_ddi_hdlp;
 	uint64_t vid_cfg_hdl;
 	struct vnex_id *vid_next;
-	struct vnex_id *vid_prev;
 } vnex_id_t;
 
 /* vnex interrupt descriptor list */
@@ -603,32 +602,32 @@ vnex_free_id(vnex_id_t *vid_p)
 static void
 vnex_rem_id(vnex_id_t *vid_p)
 {
-	if (vid_p->vid_prev == NULL) {
+	vnex_id_t *prev_p = vnex_id_list;
+
+	if (vnex_id_list == NULL)
+		cmn_err(CE_PANIC, "vnex: interrupt list empty");
+
+	if (vid_p == NULL)
+		cmn_err(CE_PANIC, "vnex: no element to remove");
+
+	if (vnex_id_list == vid_p) {
 		vnex_id_list = vid_p->vid_next;
-		vid_p->vid_prev = NULL;
-	} else if (vid_p->vid_next == NULL) {
-		vid_p->vid_prev->vid_next = NULL;
 	} else {
-		vid_p->vid_prev->vid_next = vid_p->vid_next;
-		vid_p->vid_next->vid_prev = vid_p->vid_prev;
+		while (prev_p != NULL && prev_p->vid_next != vid_p)
+			prev_p = prev_p->vid_next;
+
+		if (prev_p == NULL)
+			cmn_err(CE_PANIC, "vnex: element %p not in list",
+			    (void *) vid_p);
+
+		prev_p->vid_next = vid_p->vid_next;
 	}
 }
 
 static void
 vnex_add_id(vnex_id_t *vid_p)
 {
-	if (vnex_id_list == NULL) {
-		vnex_id_list = vid_p;
-		vid_p->vid_next = NULL;
-		vid_p->vid_prev = NULL;
-		return;
-	}
-	/*
-	 * We always just add to the front of the list
-	 */
-	vnex_id_list->vid_prev = vid_p;
 	vid_p->vid_next = vnex_id_list;
-	vid_p->vid_prev = NULL;
 	vnex_id_list = vid_p;
 }
 
