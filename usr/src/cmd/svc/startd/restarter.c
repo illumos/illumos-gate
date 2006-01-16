@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -764,6 +763,25 @@ instance_in_transition(restarter_inst_t *inst)
 }
 
 /*
+ * returns 1 if instance is already started, 0 if not
+ */
+static int
+instance_started(restarter_inst_t *inst)
+{
+	int ret;
+
+	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
+
+	if (inst->ri_i.i_state == RESTARTER_STATE_ONLINE ||
+	    inst->ri_i.i_state == RESTARTER_STATE_DEGRADED)
+		ret = 1;
+	else
+		ret = 0;
+
+	return (ret);
+}
+
+/*
  * Returns
  *   0 - success
  *   ECONNRESET - success, but h was rebound
@@ -777,8 +795,12 @@ restarter_instance_update_states(scf_handle_t *h, restarter_inst_t *ri,
 	int e;
 	uint_t retry_count = 0, msecs = ALLOC_DELAY;
 	boolean_t rebound = B_FALSE;
+	int prev_state_online;
+	int state_online;
 
 	assert(PTHREAD_MUTEX_HELD(&ri->ri_lock));
+
+	prev_state_online = instance_started(ri);
 
 retry:
 	e = _restarter_commit_states(h, &ri->ri_i, new_state, new_state_next,
@@ -828,7 +850,11 @@ retry:
 	graph_protocol_send_event(ri->ri_i.i_fmri, GRAPH_UPDATE_STATE_CHANGE,
 	    (void *)states);
 
-	if (new_state == RESTARTER_STATE_ONLINE)
+	state_online = instance_started(ri);
+
+	if (prev_state_online && !state_online)
+		ri->ri_post_offline_hook();
+	else if (!prev_state_online && state_online)
 		ri->ri_post_online_hook();
 
 	return (rebound ? ECONNRESET : 0);
@@ -939,25 +965,6 @@ restarter_post_fsminimal_thread(void *unused)
 	scf_handle_destroy(h);
 
 	return (NULL);
-}
-
-/*
- * returns 1 if instance is already started, 0 if not
- */
-static int
-instance_started(restarter_inst_t *inst)
-{
-	int ret;
-
-	assert(PTHREAD_MUTEX_HELD(&inst->ri_lock));
-
-	if (inst->ri_i.i_state == RESTARTER_STATE_ONLINE ||
-	    inst->ri_i.i_state == RESTARTER_STATE_DEGRADED)
-		ret = 1;
-	else
-		ret = 0;
-
-	return (ret);
 }
 
 /*
