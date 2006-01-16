@@ -22,7 +22,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # cmd/loadkeys/type_6/Makefile
@@ -35,11 +35,14 @@ KEYTABLES = \
         iceland croatia bulgaria belarus maltaus \
         maltauk albania turkeyq turkeyf 
 
+KEYTABLESCONFIG = kbd_layouts
+
 include ../../Makefile.cmd
 
 ROOTKEYTABLESDIR= $(ROOTSHLIB)/keytables
 ROOTKEYDIR= $(ROOTKEYTABLESDIR)/type_6
 ROOTKEYTABLES= $(KEYTABLES:%=$(ROOTKEYDIR)/%)
+ROOTKEYTABLESCON= $(KEYTABLESCONFIG:%=$(ROOTKEYDIR)/%)
 
 # there is an install target for each ROOT layout link
 #
@@ -54,6 +57,7 @@ LAYOUTS= \
 ROOTLINKS= $(LAYOUTS:%=$(ROOTKEYDIR)/%)
 
 $(ROOTKEYTABLES) := FILEMODE = 444
+$(ROOTKEYTABLESCON) := FILEMODE = 444
 
 # install rule
 $(ROOTKEYDIR)/%: %
@@ -63,7 +67,8 @@ $(ROOTKEYDIR)/%: %
 
 all:  $(KEYTABLES)
 
-install: all $(ROOTKEYTABLESDIR) $(ROOTKEYDIR) $(ROOTKEYTABLES) $(ROOTLINKS)
+install: all $(ROOTKEYTABLESDIR) $(ROOTKEYDIR) $(ROOTKEYTABLES) $(ROOTLINKS)\
+	$(ROOTKEYTABLESCON)
 
 clean:
 

@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T.
@@ -36,14 +36,16 @@
 if [ "${_INIT_ZONENAME:=`/sbin/zonename`}" = "global" ]; then
 
 	#
-	# Systems with no hardware keyboard ID will provide an eeprom value.
+	# Systems with no hardware keyboard ID may provide an eeprom value,
+	# or the value can be supplied in /etc/default/kbd. A value supplied
+	# in /etc/default/kbd will override the value supplied in eeprom.
 	#
 	[ -x /usr/lib/set_keyboard_layout ] && /usr/lib/set_keyboard_layout
-
-	# Load the keymap for the attached keyboard.
-	/usr/bin/loadkeys
 
 	# Initialize the keyboard defaults
 
 	[ -h /dev/kbd -a -x /usr/bin/kbd ] && /usr/bin/kbd -i >/dev/null 2>&1
+
+	# Load the keymap for the attached keyboard.
+	/usr/bin/loadkeys
 fi

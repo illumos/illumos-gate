@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -55,3 +55,9 @@
 # units in milliseconds:
 #REPEAT_DELAY=500
 #REPEAT_RATE=33
+
+# Uncomment the following line to set up the keyboard layout. The 
+# keyboard layouts supported can be listed by running 'kbd -s'.
+# The value will override the kbd-type value suppllied in eeprom
+# if it exists in eeprom when system boots.
+#LAYOUT=

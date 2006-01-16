@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,6 +319,9 @@ typedef enum vuid_device {
 #define	MOUSE_CAP_CHANGE_NUM_WHEEL	(MOUSE_CAP_CHANGE_FIRST+1) /* 32647 */
 
 #define	MOUSE_TYPE_ABSOLUTE	(VLOC_LAST+3)			/* 32648 */
+
+#define	MOUSE_LAST		(VLOC_LAST+3)			/* 32648 */
+#define	KEYBOARD_LAYOUT_CHANGE	(MOUSE_LAST+1)			/* 32649 */
 
 /*
  * Common names for certain input codes.  The buttons on the physical

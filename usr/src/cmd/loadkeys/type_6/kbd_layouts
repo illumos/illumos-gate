@@ -1,4 +1,3 @@
-#! /usr/bin/sh
 #
 # CDDL HEADER START
 #
@@ -19,13 +18,50 @@
 #
 # CDDL HEADER END
 #
-#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms. 
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-# get the layout name from the eeprom and set it into kernel.
-KBD_LAYOUT_NAME="`/usr/sbin/eeprom kbd-type | /usr/bin/sed -n s/kbd-type=//p`"
+# The following lines define the keyboard layouts supported in kernel.
+# The /usr/bin/kbd (-s option) reads the file to get the keyboard layout
+# infomation.
+# To add the new keytable, the new layout name and number need be defined
+# below.
+#
 
-/usr/bin/kbd -s $KBD_LAYOUT_NAME
+Albanian=264
+Belarusian=261
+Belgian=2
+Bulgarian=260
+Croatian=259
+Danish=6
+Dutch=18
+Finnish=7
+French=8
+German=9
+Icelandic=258
+Italian=14
+Japanese-type6=271
+Japanese-106/type7=15
+Korean=16
+Malta_UK=263
+Malta_US=262
+Norwegian=19
+Portuguese=22
+Russian=23
+Serbia-And-Montenegro=257
+Slovenian=256
+Slovakian=24
+Spanish=25
+Swedish=26
+Swiss-French=27
+Swiss-German=28
+Taiwanese=30
+TurkishQ=31
+TurkishF=35
+UK-English=32
+US-English=33

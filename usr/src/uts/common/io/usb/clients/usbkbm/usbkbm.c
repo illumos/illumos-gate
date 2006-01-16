@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -524,25 +524,16 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 		}
 	}
 
-	/*
-	 * In case of non-self identifying keyboards the country code
-	 *  has value 0. In this case we will set the layout to default US
-	 *  if the usbkbm_layout is 0.
-	 */
 	if (usbkbmd->usbkbm_report_descr != NULL) {
-		if ((hidparser_get_country_code(usbkbmd->usbkbm_report_descr,
+		if (hidparser_get_country_code(usbkbmd->usbkbm_report_descr,
 			(uint16_t *)&usbkbmd->usbkbm_layout) ==
-			HIDPARSER_FAILURE) || (usbkbmd->usbkbm_layout == 0)) {
+			HIDPARSER_FAILURE) {
 
-			if (!usbkbm_layout) {
-				USB_DPRINTF_L3(PRINT_MASK_OPEN,
-				    usbkbm_log_handle, "get_country_code failed"
-				    "setting default layout(0x21)");
+			USB_DPRINTF_L3(PRINT_MASK_OPEN,
+			    usbkbm_log_handle, "get_country_code failed"
+			    "setting default layout(0)");
 
-				/* Setting to default layout = US */
-				usbkbmd->usbkbm_layout = 0x21;
-			} else
-				usbkbmd->usbkbm_layout = usbkbm_layout;
+			usbkbmd->usbkbm_layout = usbkbm_layout;
 		}
 
 		if (hidparser_get_packet_size(usbkbmd->usbkbm_report_descr,
@@ -561,17 +552,12 @@ usbkbm_open(queue_t *q, dev_t *devp, int oflag, int sflag, cred_t *crp)
 		}
 	} else {
 		USB_DPRINTF_L3(PRINT_MASK_OPEN, usbkbm_log_handle,
-			"usbkbm: Invalid HID Descriptor Tree."
-			"setting default layout(0x21) & packet_size(8)");
+		    "usbkbm: Invalid HID Descriptor Tree."
+		    "setting default layout(0) & packet_size(8)");
 
-			if (!usbkbm_layout) {
-				/* Setting to default = US */
-				usbkbmd->usbkbm_layout = 0x21;
-			} else
-				usbkbmd->usbkbm_layout = usbkbm_layout;
-
-			usbkbmd->usbkbm_packet_size =
-				USB_KBD_DEFAULT_PACKET_SIZE;
+		usbkbmd->usbkbm_layout = usbkbm_layout;
+		usbkbmd->usbkbm_packet_size =
+			USB_KBD_DEFAULT_PACKET_SIZE;
 	}
 
 	/*

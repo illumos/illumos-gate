@@ -283,6 +283,7 @@ static int conskbd_kstat_update(kstat_t *, int);
 static void conskbd_ioc_plink(queue_t *, mblk_t *);
 static void conskbd_legacy_kbd_ioctl(queue_t *, mblk_t *);
 static void conskbd_virtual_kbd_ioctl(queue_t *, mblk_t *);
+static mblk_t *conskbd_alloc_firm_event(int, int);
 
 static conskbd_pending_msg_t *conskbd_mux_find_msg(mblk_t *);
 static void conskbd_mux_enqueue_msg(conskbd_pending_msg_t *);
@@ -332,6 +333,9 @@ static	conskbd_pending_msg_t	*conskbd_msg_queue;
  * Currently, only one virtual keyboard is support.
  */
 static conskbd_state_t	conskbd = { 0 };
+
+/* This variable backs up the layout state for non-self-ID keyboards */
+static int kbd_layout_bak = 0;
 
 /*
  * _init()
@@ -769,8 +773,10 @@ conskbdioctl(queue_t *q, mblk_t *mp)
 
 				lqs->lqs_queue->q_ptr =  NULL;
 				conskbd.conskbd_lqueue_nums --;
-				if (conskbd.conskbd_lqueue_nums == 0)
+				if (conskbd.conskbd_lqueue_nums == 0) {
+					kbd_layout_bak = conskbd.conskbd_layout;
 					conskbd.conskbd_layout = -1;
+				}
 
 				mutex_exit(&conskbd_lq_lock);
 
@@ -1588,6 +1594,27 @@ conskbd_kioctrans_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 
 }	/* conskbd_kioctrans_complete() */
 
+/*
+ * Allocate a firm event
+ */
+static mblk_t *
+conskbd_alloc_firm_event(int id, int value)
+{
+	mblk_t	*mb;
+	Firm_event *fe;
+
+	if ((mb = allocb(sizeof (Firm_event), BPRI_HI)) != NULL) {
+		fe = (Firm_event *)mb->b_wptr;
+		fe->id = id;
+		fe->pair_type = FE_PAIR_NONE;
+		fe->pair = NULL;
+		fe->value = value;
+		mb->b_wptr += sizeof (Firm_event);
+	}
+
+	return (mb);
+}
+
 static void
 conskbd_kioclayout_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 {
@@ -1608,8 +1635,29 @@ conskbd_kioclayout_complete(conskbd_lower_queue_t *lqs, mblk_t *mp)
 			 * keyboard is the first one, and if we get right
 			 * layout from it, we set conskbd's layout
 			 */
-			if (layout != -1 && conskbd.conskbd_layout == -1)
-				conskbd.conskbd_layout = layout;
+			if (layout != -1 && conskbd.conskbd_layout == -1) {
+				if (layout == 0) {
+					conskbd.conskbd_layout = kbd_layout_bak;
+				} else {
+					conskbd.conskbd_layout = layout;
+					if (layout == kbd_layout_bak) {
+						break;
+					}
+					if ((req = conskbd_alloc_firm_event(
+						KEYBOARD_LAYOUT_CHANGE,
+						layout)) != NULL) {
+						if (conskbd.conskbd_directio)
+							putnext(
+							    conskbd_regqueue,
+							    req);
+						else if (conskbd_consqueue
+							    != NULL)
+							putnext(
+							    conskbd_consqueue,
+							    req);
+					}
+				}
+			}
 		}
 		break;
 
