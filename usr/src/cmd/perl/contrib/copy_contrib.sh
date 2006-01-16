@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,10 +21,12 @@
 #
 
 #
-# Copyright (c) 2001 by Sun Microsystems, Inc.
-# All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #
 # Because we build more than one copy of perl at the same time we need each
 # to have its own copy of the contrib subdirectory so that the concurrent
@@ -72,6 +73,8 @@ done
 #
 # Now copy all the clearfiles over to the destination directory, but only if
 # the destination file doesn't exist or is older than the source file.
+# Note we also ignore the Teamware req.flg and inc.flg files, to prevent
+# Teamware bringover and putback warning about them not being in SCCS.
 #
 
 for obj in $(cd $src && find $modules -name SCCS -prune -o -print); do
@@ -87,11 +90,11 @@ for obj in $(cd $src && find $modules -name SCCS -prune -o -print); do
 		
 	# Handle plain files.
 	elif [[ -f $src/$obj ]]; then
-		if [[ $src/$obj -nt $dst/$obj ]]; then
+		if [[ $obj != */@(req|inc).flg && \
+		    $src/$obj -nt $dst/$obj ]]; then
 			set -e
 			rm -f $dst/$obj
-			printf 'cp -p %s/%s %s/%s\n' \
-			    $src $obj $dst $obj
+			printf 'cp -p %s/%s %s/%s\n' $src $obj $dst $obj
 			cp -p $src/$obj $dst/$obj
 			set +e
 		fi

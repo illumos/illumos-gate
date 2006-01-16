@@ -147,6 +147,7 @@ static	char	*local_patches[] = {
 	"23106 Numeric comparison operators mustn't compare addresses of ...",
 	"23320 [perl #30066] Memory leak in nested shared data structures ...",
 	"23321 [perl #31459] Bug in read()",
+ 	"SPRINTF0 - fixes for sprintf formatting issues - CVE-2005-3962",
 	NULL
 };
 
