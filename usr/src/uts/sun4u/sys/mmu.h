@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,6 +201,7 @@ extern "C" {
  * MMU PRIMARY/SECONDARY CONTEXT register
  */
 #define	CTXREG_CTX_MASK		0x1FFF
+#define	CTXREG_CTX_SHIFT	51
 #define	CTXREG_EXT_SHIFT	16
 #define	CTXREG_NEXT_SHIFT	58
 

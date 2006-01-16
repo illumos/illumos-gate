@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1069,6 +1069,9 @@ get_udb_errors(uint64_t *udbh, uint64_t *udbl)
 	stxa	%g3, [%g0]ASI_AFSR	! clear all the sticky bits
 	membar	#Sync			! membar sync required
 
+	RESET_USER_RTT_REGS(%g4, %g5, 3f)
+3:
+
 	set	cpu_async_error, %g1	! put cpu_async_error in g1
 	sethi	%hi(sys_trap), %g5
 	jmp	%g5 + %lo(sys_trap)	! goto sys_trap
@@ -1089,6 +1092,10 @@ get_udb_errors(uint64_t *udbh, uint64_t *udbl)
 	ldxa	[%g4]ASI_SDB_INTR_R, %g5 ! read sdb lower half into g5
 	sllx	%g5, 43, %g5		! shift upper bits to <52:43>
 	or	%g3, %g5, %g3		! or with afsr bits
+
+	RESET_USER_RTT_REGS(%g4, %g5, 1f)
+1:
+
 	sethi	%hi(sys_trap), %g5
 	jmp	%g5 + %lo(sys_trap)	! goto sys_trap
 	  sub	%g0, 1, %g4

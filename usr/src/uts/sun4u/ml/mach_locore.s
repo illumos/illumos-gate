@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -548,9 +548,34 @@ have_win:
 	bgeu,pn	%xcc, prom_trap
 	  rdpr	%pil, %g5
 1:
-	set	ktl0, %g6
-	save	%sp, -SA(REGOFF + REGSIZE), %sp
-	ba,a,pt	%xcc, have_win
+	!
+	! check if the primary context is of kernel.
+	!
+	mov     MMU_PCONTEXT, %g6
+	ldxa    [%g6]ASI_MMU_CTX, %g5
+	sllx    %g5, CTXREG_CTX_SHIFT, %g5      ! keep just the ctx bits
+	brnz,pn %g5, 2f				! assumes KCONTEXT == 0
+	  rdpr  %pil, %g5
+	!
+	! primary context is of kernel.
+	!
+        set     ktl0, %g6
+        save    %sp, -SA(REGOFF + REGSIZE), %sp
+        ba,a,pt %xcc, have_win
+2:
+	!
+	! primary context is of user. caller of sys_trap()
+	! or priv_trap() did not set kernel context. raise
+	! trap level to MAXTL-1 so that ptl1_panic() prints
+	! out all levels of trap data.
+	!
+	rdpr	%ver, %g5
+	srlx	%g5, VER_MAXTL_SHIFT, %g5
+	and	%g5, VER_MAXTL_MASK, %g5	! %g5 = MAXTL
+	sub	%g5, 1, %g5
+	wrpr	%g0, %g5, %tl
+	mov	PTL1_BAD_CTX, %g1
+	ba,a,pt	%xcc, ptl1_panic
 	SET_SIZE(priv_trap)
 
 	ENTRY_NP(utl0)
@@ -618,43 +643,57 @@ have_win:
 	wrpr	%g0, %l4, %pil
 	!
 	! raise tl (now using nucleus context)
-	! set pcontext to scontext for user execution
 	!
 	wrpr	%g0, 1, %tl
 
-	mov	MMU_SCONTEXT, %g1
-	ldxa	[%g1]ASI_MMU_CTX, %g2
-
-	mov	MMU_PCONTEXT, %g1
-	ldxa    [%g1]ASI_MMU_CTX, %g4		! need N_pgsz0/1 bits
-        srlx    %g4, CTXREG_NEXT_SHIFT, %g4
-        sllx    %g4, CTXREG_NEXT_SHIFT, %g4
-        or      %g4, %g2, %g2                   ! Or in Nuc pgsz bits
-
-	sethi	%hi(FLUSH_ADDR), %g3
-	stxa	%g2, [%g1]ASI_MMU_CTX
-	flush	%g3				! flush required by immu
-
-	!
-	! setup trap regs
-	!
-	ldn	[%l7 + PC_OFF], %g1
-	ldn	[%l7 + nPC_OFF], %g2
-	ldx	[%l7 + TSTATE_OFF], %l0
-	andn	%l0, TSTATE_CWP, %g7
-	wrpr	%g1, %tpc
-	wrpr	%g2, %tnpc
-	!
-	! switch "other" windows back to "normal" windows and
-	! restore to window we originally trapped in
-	!
+	! switch "other" windows back to "normal" windows.
 	rdpr	%otherwin, %g1
 	wrpr	%g0, 0, %otherwin
 	add	%l3, WSTATE_CLEAN_OFFSET, %l3	! convert to "clean" wstate
 	wrpr	%g0, %l3, %wstate
 	wrpr	%g0, %g1, %canrestore
+
+	! set pcontext to scontext for user execution
+	mov	MMU_SCONTEXT, %g3
+	ldxa	[%g3]ASI_MMU_CTX, %g2
+
+	mov	MMU_PCONTEXT, %g3
+	ldxa    [%g3]ASI_MMU_CTX, %g4		! need N_pgsz0/1 bits
+        srlx    %g4, CTXREG_NEXT_SHIFT, %g4
+        sllx    %g4, CTXREG_NEXT_SHIFT, %g4
+        or      %g4, %g2, %g2                   ! Or in Nuc pgsz bits
+
+	sethi	%hi(FLUSH_ADDR), %g4
+	stxa	%g2, [%g3]ASI_MMU_CTX
+	flush	%g4				! flush required by immu
 	!
+	! Within the code segment [rtt_ctx_start - rtt_ctx_end],
+	! PCONTEXT is set to run user code. If a trap happens in this
+	! window, and the trap needs to be handled at TL=0, the handler
+	! must make sure to set PCONTEXT to run kernel. A convenience
+	! macro, RESET_USER_RTT_REGS(scr1, scr2, label) is available to
+	! TL>1 handlers for this purpose.
+	!
+	! %g1 = %canrestore
+	! %l7 = regs
+	! %g6 = mpcb
+	!
+	.global	rtt_ctx_start
+rtt_ctx_start:
+	!
+	! setup trap regs
+	!
+	ldn	[%l7 + PC_OFF], %g3
+	ldn	[%l7 + nPC_OFF], %g2
+	ldx	[%l7 + TSTATE_OFF], %l0
+	andn	%l0, TSTATE_CWP, %g7
+	wrpr	%g3, %tpc
+	wrpr	%g2, %tnpc
+
+	!
+	! Restore to window we originally trapped in.
 	! First attempt to restore from the watchpoint saved register window
+	!
 	tst	%g1
 	bne,a	1f
 	  clrn	[%g6 + STACK_BIAS + MPCB_RSP0]
@@ -697,6 +736,8 @@ have_win:
 	rdpr	%cwp, %g1
 	wrpr	%g1, %g7, %tstate
 	retry
+	.global	rtt_ctx_end
+rtt_ctx_end:
 	/* NOTREACHED */
 	SET_SIZE(user_rtt)
 	SET_SIZE(utl0)

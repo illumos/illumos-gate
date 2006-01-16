@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -395,7 +395,8 @@ ptl1_panic_handler(ptl1_state_t *pstate)
 		"DTrace flags",			/* PTL1_BAD_DTRACE_FLAGS */
 		"attempt to steal locked ctx",  /* PTL1_BAD_CTX_STEAL */
 		"CPU ECC error loop",		/* PTL1_BAD_ECC */
-		"unknown trap",			/* PTL1_BAD_HCALL */
+		"non-kernel context in sys/priv_trap() below or",
+						/* PTL1_BAD_CTX */
 	};
 
 	uint_t reason = pstate->ptl1_regs.ptl1_g1;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -147,6 +147,125 @@ extern "C" {
 	ldx	[reg + scr], reg
 
 #endif	/* _ASM */
+
+/*
+ * If a high level trap handler decides to call sys_trap() to execute some
+ * base level code, context and other registers must be set to proper
+ * values to run kernel. This is true for most part of the kernel, except
+ * for user_rtt, a substantial part of which is executed with registers
+ * ready to run user code. The following macro may be used to detect this
+ * condition and handle it. Please note that, in general, we can't restart
+ * arbitrary piece of code running at tl > 0; user_rtt is a special case
+ * that can be handled.
+ *
+ * Entry condition:
+ *
+ * %tl = 2
+ * pstate.ag = 1
+ *
+ * Register usage:
+ *
+ * scr1, scr2 - destroyed
+ * normal %g5 and %g6 - destroyed
+ *
+ */
+/* BEGIN CSTYLED */
+#define	RESET_USER_RTT_REGS(scr1, scr2, label)				\
+	/*								\
+	 * do nothing if %tl != 2. this an attempt to stop this		\
+	 * piece of code from executing more than once before going	\
+	 * back to TL=0. more specifically, the changes we are doing	\
+	 * to %wstate, %canrestore and %otherwin can't be done more	\
+	 * than once before going to TL=0. note that it is okay to	\
+	 * execute this more than once if we restart at user_rtt and	\
+	 * come back from there.					\
+	 */								\
+	rdpr	%tl, scr1;						\
+	cmp	scr1, 2;						\
+	bne,a,pn %xcc, label;						\
+	nop;								\
+	/*								\
+	 * read tstate[2].%tpc. do nothing if it is not			\
+	 * between rtt_ctx_start and rtt_ctx_end.			\
+	 */								\
+	rdpr	%tpc, scr1;						\
+	set	rtt_ctx_end, scr2;					\
+	cmp	scr1, scr2;						\
+	bgu,a,pt %xcc, label;						\
+	nop;								\
+	set	rtt_ctx_start, scr2;					\
+	cmp	scr1, scr2;						\
+	blu,a,pt %xcc, label;						\
+	nop;								\
+	/*								\
+	 * pickup tstate[2].cwp						\
+	 */								\
+	rdpr	%tstate, scr1;						\
+	and	scr1, TSTATE_CWP, scr1;					\
+	/*								\
+	 * set tstate[1].cwp to tstate[2].cwp. fudge			\
+	 * tstate[1].tpc and tstate[1].tnpc to restart			\
+	 * user_rtt.							\
+	 */								\
+	wrpr	%g0, 1, %tl;						\
+	set	TSTATE_KERN | TSTATE_IE, scr2;				\
+	or	scr1, scr2, scr2;					\
+	wrpr    %g0, scr2, %tstate;					\
+	set	user_rtt, scr1;						\
+	wrpr	%g0, scr1, %tpc;					\
+	add	scr1, 4, scr1;						\
+	wrpr	%g0, scr1, %tnpc;					\
+	/*								\
+	 * restore %tl							\
+	 */								\
+	wrpr	%g0, 2, %tl;						\
+	/*								\
+	 * set %wstate							\
+	 */								\
+	rdpr	%wstate, scr1;						\
+	sllx	scr1, WSTATE_SHIFT, scr1;				\
+	wrpr    scr1, WSTATE_K64, %wstate;				\
+	/*								\
+	 * setup window registers					\
+	 * %cleanwin <-- nwin - 1					\
+	 * %otherwin <-- %canrestore					\
+	 * %canrestore <-- 0						\
+	 */								\
+	sethi   %hi(nwin_minus_one), scr1;				\
+	ld	[scr1 + %lo(nwin_minus_one)], scr1;			\
+	wrpr    %g0, scr1, %cleanwin;					\
+	rdpr	%canrestore, scr1;					\
+	wrpr	%g0, scr1, %otherwin;					\
+	wrpr	%g0, 0, %canrestore;					\
+	/*								\
+	 * set THREAD_REG, as we have restored user			\
+	 * registers in user_rtt. we trash %g5 and %g6			\
+	 * in the process.						\
+	 */								\
+	rdpr    %pstate, scr1;						\
+	wrpr	scr1, PSTATE_AG, %pstate;				\
+	/*								\
+	 * using normal globals now					\
+	 */								\
+	CPU_ADDR(%g5, %g6);						\
+	ldn	[%g5 + CPU_THREAD], %g6;				\
+	mov	%g6, THREAD_REG;					\
+	rdpr	%pstate, %g5;						\
+	wrpr	%g5, PSTATE_AG, %pstate;				\
+	/*								\
+	 * back to alternate globals.					\
+	 * set PCONTEXT to run kernel.					\
+	 * no need to demap I/DTLB as we				\
+	 * never went back to user mode.				\ 
+	 */								\
+	mov	MMU_PCONTEXT, scr1;					\
+	sethi	%hi(kcontextreg), scr2;					\
+	ldx     [scr2 + %lo(kcontextreg)], scr2;			\
+	stxa    scr2, [scr1]ASI_MMU_CTX;				\
+	sethi   %hi(FLUSH_ADDR), scr1;					\
+	flush	scr1;
+
+/* END CSTYLED */
 
 #ifdef	__cplusplus
 }

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Assembly code support for Cheetah/Cheetah+ modules
@@ -2010,6 +2010,8 @@ async_err_1:
 	 */
 	retry
 4:
+	RESET_USER_RTT_REGS(%g4, %g5, 5f)
+5:
 	set	cpu_deferred_error, %g1
 	ba	sys_trap
 	  mov	PIL_15, %g4		! run at pil 15

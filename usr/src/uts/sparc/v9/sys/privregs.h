@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -573,6 +573,8 @@ struct regs {
 #define	VER_MASK	0x00000000FF000000
 #define	VER_MAXTL	0x000000000000FF00
 #define	VER_MAXWIN	0x000000000000001F
+#define	VER_MAXTL_SHIFT	8
+#define	VER_MAXTL_MASK	(VER_MAXTL >> VER_MAXTL_SHIFT)
 
 /*
  * Tick Register (TICK)
