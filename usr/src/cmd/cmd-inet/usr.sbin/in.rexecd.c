@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,6 +55,7 @@
 #include <signal.h>
 #include <netdb.h>
 #include <syslog.h>
+#include <nss_dbdefs.h>
 #include <security/pam_appl.h>
 
 #ifdef SYSV
@@ -164,7 +165,8 @@ doit(int f, struct sockaddr_storage *fromp)
 	char cmdbuf[NCARGS+1], *cp;
 	char user[16];
 	char hostname [MAXHOSTNAMELEN + 1];
-	struct passwd *pwd;
+	struct passwd *pwd, pw_data;
+	char pwdbuf[NSS_BUFLEN_PASSWD];
 	int s;
 	ushort_t port;
 	pid_t pid;
@@ -268,15 +270,13 @@ doit(int f, struct sockaddr_storage *fromp)
 	getstr(pass, sizeof (pass), "password");
 	getstr(cmdbuf, sizeof (cmdbuf), "command");
 
-	setpwent();
-	pwd = getpwnam(user);
+	pwd = getpwnam_r(user, &pw_data, pwdbuf, sizeof (pwdbuf));
 	if (pwd == NULL) {
 		(void) audit_rexecd_fail("Login incorrect", hostname, user,
 		    cmdbuf);	    /* BSM */
 		error("Login incorrect.\n");
 		exit(1);
 	}
-	endpwent();
 
 	if (pam_start("rexec", user, &conv, &pamh) != PAM_SUCCESS) {
 		exit(1);
