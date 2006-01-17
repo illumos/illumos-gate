@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@ extern void cmd_dp_page_defer(fmd_hdl_t *, nvlist_t *, fmd_event_t *,
 extern void cmd_dp_page_replay(fmd_hdl_t *);
 extern void cmd_dp_page_restore(fmd_hdl_t *, cmd_page_t *);
 extern void cmd_dp_page_validate(fmd_hdl_t *);
+extern int cmd_dp_page_isdeferred(fmd_hdl_t *, cmd_page_t *);
 
 #ifdef __cplusplus
 }

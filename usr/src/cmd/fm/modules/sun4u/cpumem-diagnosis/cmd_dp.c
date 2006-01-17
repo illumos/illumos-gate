@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -333,7 +333,7 @@ cmd_dp_free(fmd_hdl_t *hdl, cmd_dp_t *dp, int destroy)
 	if (dp->dp_case != NULL)
 		cmd_case_fini(hdl, dp->dp_case, destroy);
 
-	if (dp->dp_erpt_type == DP_ERROR) {
+	if (destroy && dp->dp_erpt_type == DP_ERROR) {
 		--cmd.cmd_dp_flag;
 		/*
 		 * If there are no active datapath events, replay any
@@ -412,6 +412,8 @@ cmd_dp_fini(fmd_hdl_t *hdl)
 	while ((dp = cmd_list_next(&cmd.cmd_datapaths)) != NULL)
 		cmd_dp_free(hdl, dp, FMD_B_FALSE);
 
-	while ((dpage = cmd_list_next(&cmd.cmd_deferred_pages)) != NULL)
+	while ((dpage = cmd_list_next(&cmd.cmd_deferred_pages)) != NULL) {
+		cmd_list_delete(&cmd.cmd_deferred_pages, dpage);
 		fmd_hdl_free(hdl, dpage, sizeof (cmd_dp_defer_t));
+	}
 }

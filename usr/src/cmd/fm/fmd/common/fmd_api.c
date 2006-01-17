@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -559,15 +559,15 @@ fmd_module_unregister(fmd_module_t *mp)
 	fmd_idspace_apply(mp->mod_threads,
 	    (void (*)())fmd_module_thrcancel, mp);
 
+	if (mp->mod_error == 0)
+		fmd_ckpt_save(mp); /* take one more checkpoint if needed */
+
 	/*
 	 * Delete any cases associated with the module (UNSOLVED, SOLVED, or
 	 * CLOSE_WAIT) as if fmdo_close() has finished processing them.
 	 */
 	while ((cp = fmd_list_next(&mp->mod_cases)) != NULL)
 		fmd_case_delete(cp);
-
-	if (mp->mod_error == 0)
-		fmd_ckpt_save(mp); /* take one more checkpoint if needed */
 
 	fmd_ustat_delete_references(mp->mod_ustat);
 	(void) fmd_conf_getprop(mp->mod_conf, FMD_PROP_SUBSCRIPTIONS, &pap);

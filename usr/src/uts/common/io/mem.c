@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -689,9 +689,8 @@ mmioctl_get_mem_sid(intptr_t data)
 static int
 mmioctl(dev_t dev, int cmd, intptr_t data, int flag, cred_t *cred, int *rvalp)
 {
-	if (cmd == MEM_VTOP && (getminor(dev) != M_KMEM))
-		return (ENXIO);
-	else if (getminor(dev) != M_MEM)
+	if ((cmd == MEM_VTOP && getminor(dev) != M_KMEM) ||
+	    (cmd != MEM_VTOP && getminor(dev) != M_MEM))
 		return (ENXIO);
 
 	switch (cmd) {
@@ -1029,9 +1028,9 @@ mm_read_mem_name(intptr_t data, mem_name_t *mem_name)
 		mem_name->m_synd = mem_name32.m_synd;
 		mem_name->m_type[0] = mem_name32.m_type[0];
 		mem_name->m_type[1] = mem_name32.m_type[1];
-		mem_name->m_name = (caddr_t)mem_name32.m_name;
+		mem_name->m_name = (caddr_t)(uintptr_t)mem_name32.m_name;
 		mem_name->m_namelen = (size_t)mem_name32.m_namelen;
-		mem_name->m_sid = (caddr_t)mem_name32.m_sid;
+		mem_name->m_sid = (caddr_t)(uintptr_t)mem_name32.m_sid;
 		mem_name->m_sidlen = (size_t)mem_name32.m_sidlen;
 	}
 #endif	/* _SYSCALL32 */

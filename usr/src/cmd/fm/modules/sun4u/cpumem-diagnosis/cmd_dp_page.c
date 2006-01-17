@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -250,10 +250,28 @@ cmd_dp_page_validate(fmd_hdl_t *hdl)
 
 		page = dpage->dp_defer_page;
 
-		if (fmd_nvl_fmri_unusable(hdl, page->page_asru_nvl)) {
+		if (!fmd_nvl_fmri_present(hdl, page->page_asru_nvl)) {
 			cmd_page_destroy(hdl, page);
 			cmd_list_delete(&cmd.cmd_deferred_pages, dpage);
 			fmd_hdl_free(hdl, dpage, sizeof (cmd_dp_defer_t));
 		}
 	}
+}
+
+/*ARGSUSED*/
+int
+cmd_dp_page_isdeferred(fmd_hdl_t *hdl, cmd_page_t *page)
+{
+	cmd_dp_defer_t *dpage, *next;
+
+	for (dpage = cmd_list_next(&cmd.cmd_deferred_pages); dpage != NULL;
+	    dpage = next) {
+		next = cmd_list_next(dpage);
+
+		if (dpage->dp_defer_page == page) {
+			return (1);
+		}
+	}
+
+	return (0);
 }
