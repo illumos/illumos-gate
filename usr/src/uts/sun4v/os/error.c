@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -247,19 +247,23 @@ process_nonresumable_error(struct regs *rp, uint64_t tl,
 			 * If the trap occurred in privileged mode at TL=0,
 			 * we need to check to see if we were executing
 			 * in kernel under on_trap() or t_lofault
-			 * protection. If so, modify the saved registers
-			 * so that we return from the trap to the
-			 * appropriate trampoline routine.
+			 * protection. If so, and if it was a PIO or MEM
+			 * error, then modify the saved registers so that
+			 * we return from the trap to the appropriate
+			 * trampoline routine.
 			 */
-			if (aflt->flt_priv == 1 && aflt->flt_tl == 0)
+			if (aflt->flt_priv == 1 && aflt->flt_tl == 0 &&
+			    ((errh_flt.errh_er.attr & ERRH_ATTR_PIO) ||
+			    (errh_flt.errh_er.attr & ERRH_ATTR_MEM))) {
 				trampolined =
 				    errh_error_protected(rp, aflt, &expected);
+			}
 
 			if (!aflt->flt_priv || aflt->flt_prot ==
 			    AFLT_PROT_COPY) {
 				aflt->flt_panic |= aft_panic;
 			} else if (!trampolined &&
-			    aflt->flt_class != BUS_FAULT) {
+			    (errh_flt.errh_er.attr & ERRH_ATTR_MEM)) {
 				aflt->flt_panic = 1;
 			}
 
