@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -806,9 +806,7 @@
         mov     %g1, %o0
 
 
-	.align 16
-	nop			! two nops here give best icache alignment
-	nop			! for loop (better performance)
+	.align ICACHE_LINE_SIZE
 .large:
 	! The following test for BSTORE_SIZE is used to decide whether
 	! to store data with a block store or with individual stores.
@@ -834,11 +832,11 @@
 	! Load the rest of the current block 
 	! Recall that %o1 is further into SRC than %o0 is into DST
 
-	prefetch [%o1 + (3 * BLOCK_SIZE)], 21
-	prefetch [%o1 + (4 * BLOCK_SIZE)], 21
-	prefetch [%o1 + (5 * BLOCK_SIZE)], 21
+	prefetch [%o0 + (0 * BLOCK_SIZE)], 22
+	prefetch [%o0 + (1 * BLOCK_SIZE)], 22
+	prefetch [%o0 + (2 * BLOCK_SIZE)], 22
 	ldd	[%o1], %f2
-	prefetch [%o1 + (6 * BLOCK_SIZE)], 21
+	prefetch [%o1 + (3 * BLOCK_SIZE)], 21
 	ldd	[%o1 + 0x8], %f4
 	faligndata %f0, %f2, %f32
 	ldd	[%o1 + 0x10], %f6
@@ -847,6 +845,7 @@
 	faligndata %f4, %f6, %f36
 	ldd	[%o1 + 0x20], %f10
         or	%g0, -8, %o5		! if %o3 >= 0, %o5 = -8
+	prefetch [%o1 + (4 * BLOCK_SIZE)], 21
 	faligndata %f6, %f8, %f38
 	ldd	[%o1 + 0x28], %f12
 	movrlz	%o3, %g0, %o5		! if %o3 < 0, %o5 = 0  (needed lter)
@@ -855,12 +854,12 @@
 	faligndata %f10, %f12, %f42
 	ldd	[%o1 + 0x38], %f0
 	sub	%o2, BLOCK_SIZE, %o2	! update count
-	prefetch [%o1 + (7 * BLOCK_SIZE)], 21
+	prefetch [%o1 + (5 * BLOCK_SIZE)], 21
+	add	%o1, BLOCK_SIZE, %o1		! update SRC
 
 	! Main loop.  Write previous block.  Load rest of current block.
 	! Some bytes will be loaded that won't yet be written.
-1:
-	add	%o1, BLOCK_SIZE, %o1		! update SRC
+1:	
 	ldd	[%o1], %f2
 	faligndata %f12, %f14, %f44
 	ldd	[%o1 + 0x8], %f4
@@ -874,6 +873,9 @@
 	std	%f44, [%o0+48]
 	std	%f46, [%o0+56]
 	sub	%o2, BLOCK_SIZE, %o2		! update count
+	prefetch [%o0 + (6 * BLOCK_SIZE)], 22
+	prefetch [%o0 + (3 * BLOCK_SIZE)], 22
+	add	%o0, BLOCK_SIZE, %o0		! update DST
 	ldd	[%o1 + 0x10], %f6
 	faligndata %f0, %f2, %f32
 	ldd	[%o1 + 0x18], %f8
@@ -886,12 +888,9 @@
 	faligndata %f8, %f10, %f40
 	ldd	[%o1 + 0x38], %f0
 	faligndata %f10, %f12, %f42
-	add	%o0, BLOCK_SIZE, %o0		! update DST
-	prefetch [%o1 + (7 * BLOCK_SIZE)], 21
 	cmp	%o2, BLOCK_SIZE + 8
+	prefetch [%o1 + (5 * BLOCK_SIZE)], 21
 	bgu,pt	%ncc, 1b
-	prefetch [%o0 + (6 * BLOCK_SIZE)], 22
-
 	add	%o1, BLOCK_SIZE, %o1	! update SRC
 	faligndata %f12, %f14, %f44
 	faligndata %f14, %f0, %f46
@@ -941,7 +940,6 @@
 	nop
 	nop
 .xlarge:
-
 	! %o0 I/O DST is 64-byte aligned
 	! %o1 I/O 8-byte aligned (and we've set GSR.ALIGN)
 	! %d0 I/O already loaded with SRC data from [%o1-8]
@@ -953,6 +951,8 @@
 	! Load the rest of the current block 
 	! Recall that %o1 is further into SRC than %o0 is into DST
 
+	! prefetch [%o1 + (3 * BLOCK_SIZE)], 21
+	! executed in delay slot for branch to .xlarge
 	prefetch [%o1 + (4 * BLOCK_SIZE)], 21
 	prefetch [%o1 + (5 * BLOCK_SIZE)], 21
 	ldd	[%o1], %f2

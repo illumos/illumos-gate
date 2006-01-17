@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragam ident	"%Z%%M%	%I%	%E% SMI"
@@ -47,7 +47,7 @@ LIBS		= $(DYNLIB)
 IFLAGS		= -I$(SRC)/lib/libc/inc -I$(SRC)/uts/sun4u \
 		  -I$(ROOT)/usr/platform/sun4u/include
 # See note in memcpy.s for use of bst threshold.
-CPPFLAGS	= -DBSTORE_SIZE=65536 \
+CPPFLAGS	= -DBSTORE_SIZE=65536 -DPANTHER_ONLY \
 		  -D_REENTRANT -D$(MACH) $(IFLAGS) $(CPPFLAGS.master)
 ASDEFS		= -D__STDC__ -D_ASM $(CPPFLAGS)
 ASFLAGS		= -P $(ASDEFS)
