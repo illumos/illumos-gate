@@ -26,7 +26,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -265,11 +265,17 @@ doappend(char *a_string, section_info_table *info)
 	char *tp;
 
 	/*
-	 * Get the length of the string to be added.
+	 * Get the length of the string to be added. We accept any
+	 * string (even null), as this is arbitrary user defined text.
+	 *
+	 * The caller expects this routine to replace a NULL info->mdata
+	 * field with a pointer to a freshly allocated copy. Any attempt
+	 * to optimize away a null string append would have to deal with
+	 * that, as failing to do so will cause a segfault when the NULL
+	 * mdata field is dereferenced. Accepting null strings in
+	 * this very unimportant case eliminates the need for that.
 	 */
 	len = strlen(a_string);
-	if (len == 0)
-		return;
 
 	/*
 	 * Every modification operation will be done
