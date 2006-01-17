@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,6 +67,57 @@
  */
 static void cistpl_pd_parse(cistpl_t *, cistpl_cftable_entry_pwr_t *);
 static void cis_return_name(cistpl_callout_t *, cistpl_get_tuple_name_t *);
+
+/*
+ * Fetch data functions.
+ */
+uint16_t
+cis_get_short(cistpl_t *tp)
+{
+	uint16_t result;
+
+	if (tp->flags & CISTPLF_AM_SPACE) {
+		result = GET_AM_BYTE(tp);
+		result |= GET_AM_BYTE(tp) << 8;
+	} else {
+		result = GET_CM_BYTE(tp);
+		result |= GET_CM_BYTE(tp) << 8;
+	}
+	return (result);
+}
+
+uint16_t
+cis_get_be_short(cistpl_t *tp)
+{
+	uint16_t result;
+
+	if (tp->flags & CISTPLF_AM_SPACE) {
+		result = GET_AM_BYTE(tp) << 8;
+		result |= GET_AM_BYTE(tp);
+	} else {
+		result = GET_CM_BYTE(tp) << 8;
+		result |= GET_CM_BYTE(tp);
+	}
+	return (result);
+}
+
+uint32_t
+cis_get_int24(cistpl_t *tp)
+{
+	uint32_t result = cis_get_short(tp);
+
+	result |= GET_BYTE(tp) << 16;
+	return (result);
+}
+
+uint32_t
+cis_get_long(cistpl_t *tp)
+{
+	uint32_t result = cis_get_short(tp);
+
+	result |= cis_get_short(tp) << 16;
+	return (result);
+}
 
 /*
  * cis_tuple_handler - call the handler for the tuple described by the

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -329,20 +328,6 @@ typedef struct cistpl_t {
 				((uintptr_t)(tp)->read.byte - \
 					(uintptr_t)(tp)->data)) ? \
 			 *(tp)->read.byte++ : ((tp)->flags |= CISTPLF_MEM_ERR))
-#define	GET_CM_SHORT(tp)	(((size_t)(tp)->len >= \
-					(((uintptr_t)(tp)->read.byte - \
-						(uintptr_t)(tp)->data) + 1)) ? \
-				(*(tp)->read.byte++ | \
-					(*(tp)->read.byte++ << 8)) : \
-					((tp)->flags |= CISTPLF_MEM_ERR))
-#define	GET_CM_BE_SHORT(tp) (((size_t)(tp)->len >= \
-				(((uintptr_t)(tp)->read.byte - \
-					(uintptr_t)(tp)->data) + 1)) ? \
-				((*(tp)->read.byte++ << 8) | \
-					*(tp)->read.byte++) : \
-				((tp)->flags |= CISTPLF_MEM_ERR))
-#define	GET_CM_INT24(tp)	(GET_CM_SHORT(tp) | (GET_CM_BYTE(tp)<<16))
-#define	GET_CM_LONG(tp)	(GET_CM_SHORT(tp) | (GET_CM_SHORT(tp) << 16))
 #define	GET_CM_LEN(tp)	((size_t)(tp)->len - \
 				((uintptr_t)(tp)->read.byte - \
 				(uintptr_t)(tp)->data))
@@ -353,10 +338,6 @@ typedef struct cistpl_t {
 					(uintptr_t)(tp)->data))>>1) ? \
 			 *(cisdata_t *)(tp)->read.sword++ : \
 				((tp)->flags |= CISTPLF_MEM_ERR))
-#define	GET_AM_SHORT(tp) (GET_AM_BYTE(tp) | (GET_AM_BYTE(tp) << 8))
-#define	GET_AM_BE_SHORT(tp)  ((GET_AM_BYTE(tp) << 8) | GET_AM_BYTE(tp))
-#define	GET_AM_INT24(tp) (GET_AM_SHORT(tp) | (GET_AM_BYTE(tp)<<16))
-#define	GET_AM_LONG(tp)  (GET_AM_SHORT(tp) | (GET_AM_SHORT(tp) << 16))
 #define	GET_AM_LEN(tp)	((size_t)(tp)->len - (((uintptr_t)(tp)->read.byte - \
 				(uintptr_t)(tp)->data) >> 1))
 
@@ -367,14 +348,10 @@ typedef struct cistpl_t {
 
 #define	GET_BYTE(tp)	(((tp)->flags & CISTPLF_AM_SPACE) ? \
 				GET_AM_BYTE(tp) : GET_CM_BYTE(tp))
-#define	GET_SHORT(tp) 	(((tp)->flags & CISTPLF_AM_SPACE) ? \
-				GET_AM_SHORT(tp) : GET_CM_SHORT(tp))
-#define	GET_BE_SHORT(tp) (((tp)->flags & CISTPLF_AM_SPACE) ? \
-				GET_AM_BE_SHORT(tp) : GET_CM_BE_SHORT(tp))
-#define	GET_INT24(tp)	(((tp)->flags & CISTPLF_AM_SPACE) ? \
-				GET_AM_INT24(tp) : GET_CM_INT24(tp))
-#define	GET_LONG(tp)	(((tp)->flags & CISTPLF_AM_SPACE) ? \
-				GET_AM_LONG(tp) : GET_CM_LONG(tp))
+#define	GET_SHORT(tp)		cis_get_short(tp)
+#define	GET_BE_SHORT(tp)	cis_get_be_short(tp)
+#define	GET_INT24(tp)		cis_get_int24(tp)
+#define	GET_LONG(tp)		cis_get_long(tp)
 #define	GET_LEN(tp)	(((tp)->flags & CISTPLF_AM_SPACE) ? \
 				GET_AM_LEN(tp) : GET_CM_LEN(tp))
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6925,18 +6925,6 @@ cs_release_configuration(client_handle_t client_handle, release_config_t *rcfg)
 	set_socket.Vpp1Level = get_socket.Vpp1Level;
 	set_socket.Vpp2Level = get_socket.Vpp2Level;
 	set_socket.IFType = IF_MEMORY;
-
-#if defined(__i386) || defined(__amd64)
-	/*
-	 * Some adapters (PD67xx) can write-protect the CIS when the
-	 * socket is in memory mode
-	 */
-	if (client->present & CONFIG_OPTION_REG_PRESENT)
-	    csx_Put8(cis_handle, crt->cor_p, COR_SOFT_RESET);
-
-	if (cs_rq_delay)
-	    drv_usecwait(cs_rq_delay * 1000);
-#endif
 
 	if (client->present & CONFIG_OPTION_REG_PRESENT)
 	    csx_Put8(cis_handle, crt->cor_p, 0);

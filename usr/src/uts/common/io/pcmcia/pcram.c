@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1851,7 +1851,7 @@ pcram_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			struct vtoc32 vtoc32;
 
 			if (ddi_copyin((void *)arg, &vtoc32,
-			    sizeof (struct vtoc), mode))
+			    sizeof (struct vtoc32), mode))
 				return (EFAULT);
 			vtoc32tovtoc(vtoc32, vtoc);
 			break;
