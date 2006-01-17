@@ -115,7 +115,7 @@ int  http_set_private_key_file(http_handle_t, const char *);
 int   http_srv_connect(http_handle_t);
 int   http_head_request(http_handle_t, const char *);
 int   http_get_request(http_handle_t, const char *);
-int   http_get_range_request(http_handle_t, const char *, off64_t, off64_t);
+int   http_get_range_request(http_handle_t, const char *, offset_t, offset_t);
 void  http_free_respinfo(http_respinfo_t *);
 int   http_process_headers(http_handle_t, http_respinfo_t **);
 int   http_process_part_headers(http_handle_t, http_respinfo_t **);
