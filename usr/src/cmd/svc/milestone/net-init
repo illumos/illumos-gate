@@ -21,14 +21,13 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
-
 #
 # This is the second phase of TCP/IP configuration.  The first part is
-# run by the /lib/svc/method/net-physical script (the svc:/network/physical 
+# run by the /lib/svc/method/net-physical script (the svc:/network/physical
 # service) and includes configuring the interfaces and setting the machine's
 # hostname.  This script (the svc:/network/initial service), does all
 # configuration that can be done before name services are started. This
@@ -356,6 +355,16 @@ if [ "$ACCEPT6TO4RELAY" = yes ]; then
         else
                 /usr/sbin/6to4relay -e
         fi
+fi
+
+#
+# Read /etc/inet/static_routes and add each route.
+#
+if [ -f /etc/inet/static_routes ]; then
+	echo "Adding persistent routes:"
+	/usr/bin/egrep -v "^(#|$)" /etc/inet/static_routes | while read line; do
+		/usr/sbin/route add $line
+	done
 fi
 
 # Clear exit status.
