@@ -71,8 +71,6 @@ struct ofw_net_types {
 };
 #endif	/* !__i386 */
 
-void mac_set_arp_timeout(unsigned int);
-
 /*
  * given the mac type, initialize the mac interface state.
  */

@@ -76,7 +76,6 @@ char			rootopts[MAX_PATH_LEN];
 static gid_t		fake_gids = 1;	/* fake gids list for auth_unix */
 
 extern void set_default_filename(char *);	/* boot.c */
-extern void mac_set_arp_timeout(unsigned int);	/* mac.c */
 
 /*
  * xdr routines used by mount.
