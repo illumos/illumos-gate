@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -135,19 +135,34 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 
 	len = hw_rbd.len;
 
+#ifdef ASF_SUPPORT
 	/*
-	 * H/W will not strip the VLAN tag from incoming packet now, as
-	 * RECEIVE_MODE_KEEP_VLAN_TAG bit is set in RECEIVE_MAC_MODE_REG
-	 * register.
+	 * When IPMI/ASF is enalbed, VLAN tag must be stripped.
 	 */
-	maxsize = bgep->chipid.ethmax_size + VLAN_TAGSZ + ETHERFCSL;
+	if ((bgep->asf_flags == ASF_ENABLED) &&
+		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
+		maxsize = bgep->chipid.ethmax_size + ETHERFCSL;
+	} else
+#endif
+		/*
+		 * H/W will not strip the VLAN tag from incoming packet
+		 * now, as RECEIVE_MODE_KEEP_VLAN_TAG bit is set in
+		 * RECEIVE_MAC_MODE_REG register.
+		 */
+		maxsize = bgep->chipid.ethmax_size + VLAN_TAGSZ + ETHERFCSL;
 	if (len > maxsize) {
 		/* bogus, drop the packet */
 		BGE_PKTDUMP((bgep, &hw_rbd, srbdp, "oversize packet"));
 		goto refill;
 	}
 
-	minsize = ETHERMIN + ETHERFCSL;
+#ifdef ASF_SUPPORT
+	if ((bgep->asf_flags == ASF_ENABLED) &&
+		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
+		minsize = ETHERMIN + ETHERFCSL - VLAN_TAGSZ;
+	} else
+#endif
+		minsize = ETHERMIN + ETHERFCSL;
 	if (len < minsize) {
 		/* bogus, drop the packet */
 		BGE_PKTDUMP((bgep, &hw_rbd, srbdp, "undersize packet"));
@@ -161,7 +176,17 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 	 * sort of header.  This also has the side-effect of making
 	 * the packet *contents* 4-byte aligned, as required by NCA!
 	 */
-	mp = allocb(BGE_HEADROOM + len, 0);
+#ifdef ASF_SUPPORT
+	if ((bgep->asf_flags == ASF_ENABLED) &&
+		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
+		mp = allocb(BGE_HEADROOM + len + VLAN_TAGSZ, 0);
+	} else {
+#endif
+
+		mp = allocb(BGE_HEADROOM + len, 0);
+#ifdef ASF_SUPPORT
+	}
+#endif
 	if (mp == NULL) {
 		/* Nothing to do but drop the packet */
 		goto refill;
@@ -171,9 +196,36 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 	 * Sync the data and copy it to the STREAMS buffer.
 	 */
 	DMA_SYNC(srbdp->pbuf, DDI_DMA_SYNC_FORKERNEL);
-	mp->b_rptr = dp = mp->b_rptr + BGE_HEADROOM;
-	bcopy(DMA_VPTR(srbdp->pbuf), dp, len);
-	mp->b_wptr = dp + len - ETHERFCSL;
+#ifdef ASF_SUPPORT
+	if ((bgep->asf_flags == ASF_ENABLED) &&
+		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
+
+		/*
+		 * As VLAN tag has been stripped from incoming packet in ASF
+		 * scenario, we insert it into this packet again.
+		 */
+		struct ether_vlan_header *ehp;
+		mp->b_rptr = dp = mp->b_rptr + BGE_HEADROOM - VLAN_TAGSZ;
+		bcopy(DMA_VPTR(srbdp->pbuf), dp, 2 * ETHERADDRL);
+		ehp = (struct ether_vlan_header *)dp;
+		ehp->ether_tpid = ntohs(VLAN_TPID);
+		ehp->ether_tci = ntohs(hw_rbd.vlan_tci);
+		bcopy(((uchar_t *)(DMA_VPTR(srbdp->pbuf))) + 2 * ETHERADDRL,
+			dp + 2 * ETHERADDRL + VLAN_TAGSZ,
+			len - 2 * ETHERADDRL);
+	} else {
+#endif
+		mp->b_rptr = dp = mp->b_rptr + BGE_HEADROOM;
+		bcopy(DMA_VPTR(srbdp->pbuf), dp, len);
+#ifdef ASF_SUPPORT
+	}
+
+	if ((bgep->asf_flags == ASF_ENABLED) &&
+		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
+		mp->b_wptr = dp + len + VLAN_TAGSZ - ETHERFCSL;
+	} else
+#endif
+		mp->b_wptr = dp + len - ETHERFCSL;
 
 	/*
 	 * Special check for one specific type of data corruption;

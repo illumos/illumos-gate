@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,6 +129,10 @@ typedef struct {
 #define	BGE_PP_SPACE_STATISTICS	10		/* statistics block	*/
 #define	BGE_PP_SPACE_SEEPROM	11		/* SEEPROM (if fitted)	*/
 #define	BGE_PP_SPACE_FLASH	12		/* FLASH (if fitted)    */
+
+#ifndef __sparc
+#define	ASF_SUPPORT
+#endif
 
 #ifdef __cplusplus
 }
