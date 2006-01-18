@@ -1972,10 +1972,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
 		cidp->recv_slots = BGE_RECV_SLOTS_5705;
-		if (cidp->rx_rings > BGE_RECV_RINGS_MAX_5705)
-			cidp->rx_rings = BGE_RECV_RINGS_DEFAULT;
-		if (cidp->tx_rings > BGE_SEND_RINGS_MAX_5705)
-			cidp->tx_rings = BGE_SEND_RINGS_DEFAULT;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
@@ -1995,10 +1993,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
 		cidp->recv_slots = BGE_RECV_SLOTS_5705;
-		if (cidp->rx_rings > BGE_RECV_RINGS_MAX_5705)
-			cidp->rx_rings = BGE_RECV_RINGS_DEFAULT;
-		if (cidp->tx_rings > BGE_SEND_RINGS_MAX_5705)
-			cidp->tx_rings = BGE_SEND_RINGS_DEFAULT;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		cidp->statistic_type = BGE_STAT_REG;
 		dev_ok = B_TRUE;
@@ -2012,6 +2008,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_base = bge_mbuf_pool_base_5705;
 		cidp->mbuf_length = bge_mbuf_pool_len_5705;
 		cidp->recv_slots = BGE_RECV_SLOTS_5705;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->statistic_type = BGE_STAT_REG;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
 		dev_ok = B_TRUE;
@@ -2028,6 +2026,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5714;
 		cidp->bge_mlcr_default = bge_mlcr_default_5714;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->statistic_type = BGE_STAT_REG;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
@@ -2041,6 +2041,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5715;
 		cidp->bge_mlcr_default = bge_mlcr_default_5714;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->statistic_type = BGE_STAT_REG;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
@@ -2053,6 +2055,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_length = bge_mbuf_pool_len_5721;
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->statistic_type = BGE_STAT_REG;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
@@ -2066,6 +2070,8 @@ bge_chip_id_init(bge_t *bgep)
 		cidp->mbuf_length = bge_mbuf_pool_len_5721;
 		cidp->recv_slots = BGE_RECV_SLOTS_5721;
 		cidp->bge_dma_rwctrl = bge_dma_rwctrl_5721;
+		cidp->rx_rings = BGE_RECV_RINGS_MAX_5705;
+		cidp->tx_rings = BGE_RECV_RINGS_MAX_5705;
 		cidp->pci_type = BGE_PCI_E;
 		cidp->statistic_type = BGE_STAT_REG;
 		cidp->flags |= CHIP_FLAG_NO_JUMBO;
@@ -2327,7 +2333,11 @@ bge_chip_reset_engine(bge_t *bgep, bge_regno_t regno)
 #ifdef	__sparcv9
 		membar_sync();
 #endif	/* __sparcv9 */
-		drv_usecwait(200);
+		/*
+		 * On some platforms,system need about 300us for
+		 * link setup.
+		 */
+		drv_usecwait(300);
 
 		if (bgep->chipid.pci_type == BGE_PCI_E) {
 			/* PCI-E device need more reset time */
@@ -3077,6 +3087,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	uint32_t coalmode;
 	uint32_t ledctl;
 	uint32_t mtu;
+	uint32_t maxring;
 	uint64_t ring;
 
 	BGE_TRACE(("bge_chip_start($%p)",
@@ -3188,27 +3199,33 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 */
 	bge_reg_putrcb(bgep, STD_RCV_BD_RING_RCB_REG,
 		&bgep->buff[BGE_STD_BUFF_RING].hw_rcb);
-	bge_reg_putrcb(bgep, JUMBO_RCV_BD_RING_RCB_REG,
-		&bgep->buff[BGE_JUMBO_BUFF_RING].hw_rcb);
-	bge_reg_putrcb(bgep, MINI_RCV_BD_RING_RCB_REG,
-		&bgep->buff[BGE_MINI_BUFF_RING].hw_rcb);
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep)) {
+		bge_reg_putrcb(bgep, JUMBO_RCV_BD_RING_RCB_REG,
+			&bgep->buff[BGE_JUMBO_BUFF_RING].hw_rcb);
+		bge_reg_putrcb(bgep, MINI_RCV_BD_RING_RCB_REG,
+			&bgep->buff[BGE_MINI_BUFF_RING].hw_rcb);
+	}
 
 	/*
 	 * Step 40: set Receive Buffer Descriptor Ring replenish thresholds
 	 */
 	bge_reg_put32(bgep, STD_RCV_BD_REPLENISH_REG, bge_replenish_std);
-	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep)) {
 		bge_reg_put32(bgep, JUMBO_RCV_BD_REPLENISH_REG,
 		    bge_replenish_jumbo);
-	if (bgep->chipid.device == DEVICE_ID_5700)
 		bge_reg_put32(bgep, MINI_RCV_BD_REPLENISH_REG,
 		    bge_replenish_mini);
+	}
 
 	/*
 	 * Steps 41-43: clear Send Ring Producer Indices and initialise
 	 * Send Producer Rings (0x0100-0x01ff in NIC-local memory)
 	 */
-	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring) {
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		maxring = BGE_SEND_RINGS_MAX;
+	else
+		maxring = BGE_SEND_RINGS_MAX_5705;
+	for (ring = 0; ring < maxring; ++ring) {
 		bge_mbx_put(bgep, SEND_RING_HOST_INDEX_REG(ring), 0);
 		bge_mbx_put(bgep, SEND_RING_NIC_INDEX_REG(ring), 0);
 		bge_nic_putrcb(bgep, NIC_MEM_SEND_RING(ring),
@@ -3219,7 +3236,11 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Steps 44-45: initialise Receive Return Rings
 	 * (0x0200-0x02ff in NIC-local memory)
 	 */
-	for (ring = 0; ring < BGE_RECV_RINGS_MAX; ++ring)
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+		maxring = BGE_RECV_RINGS_MAX;
+	else
+		maxring = BGE_RECV_RINGS_MAX_5705;
+	for (ring = 0; ring < maxring; ++ring)
 		bge_nic_putrcb(bgep, NIC_MEM_RECV_RING(ring),
 			&bgep->recv[ring].hw_rcb);
 
@@ -3227,11 +3248,10 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 46: initialise Receive Buffer (Producer) Ring indexes
 	 */
 	bge_mbx_put(bgep, RECV_STD_PROD_INDEX_REG, 0);
-	if (DEVICE_5704_SERIES_CHIPSETS(bgep))
+	if (DEVICE_5704_SERIES_CHIPSETS(bgep)) {
 		bge_mbx_put(bgep, RECV_JUMBO_PROD_INDEX_REG, 0);
-	if (bgep->chipid.device == DEVICE_ID_5700)
 		bge_mbx_put(bgep, RECV_MINI_PROD_INDEX_REG, 0);
-
+	}
 	/*
 	 * Step 47: configure the MAC unicast address
 	 * Step 48: configure the random backoff seed
