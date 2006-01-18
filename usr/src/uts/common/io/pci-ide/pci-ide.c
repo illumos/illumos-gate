@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -660,9 +660,7 @@ pciide_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		*(int *)result = DDI_INTR_TYPE_FIXED;
 		break;
 	case DDI_INTROP_GETCAP:
-		if (i_ddi_intr_ops(dip, rdip, intr_op, hdlp, result)
-		    == DDI_FAILURE)
-			*(int *)result = 0;
+		*(int *)result = DDI_INTR_FLAG_LEVEL;
 		break;
 	case DDI_INTROP_NINTRS:
 		if (!PCIIDE_NATIVE_MODE(rdip)) {
