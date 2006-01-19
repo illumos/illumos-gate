@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -418,7 +418,7 @@ void
 plat_lgrp_init(void)
 {
 	pnode_t		curnode;
-	char		tmp_name[MAXSYSNAME];
+	char		tmp_name[sizeof (OBP_CPU) + 1];  /* extra padding */
 	int		portid;
 	int		cpucnt = 0;
 	int		max_portid = -1;
@@ -440,19 +440,16 @@ plat_lgrp_init(void)
 	curnode = prom_rootnode();
 	for (curnode = prom_childnode(curnode); curnode;
 	    curnode = prom_nextnode(curnode)) {
-		bzero(tmp_name, MAXSYSNAME);
-		if (prom_getproplen(curnode, OBP_NAME) < MAXSYSNAME) {
-			if (prom_getprop(curnode, OBP_NAME,
-			    (caddr_t)tmp_name) == -1 || prom_getprop(curnode,
-			    OBP_DEVICETYPE, tmp_name) == -1 || strcmp(tmp_name,
-			    "cpu") != 0)
+		bzero(tmp_name, sizeof (tmp_name));
+		if (prom_bounded_getprop(curnode, OBP_DEVICETYPE, tmp_name,
+		    sizeof (OBP_CPU)) == -1 || strcmp(tmp_name, OBP_CPU) != 0)
 			continue;
 
-			cpucnt++;
-			if (prom_getprop(curnode, "portid", (caddr_t)&portid) !=
-			    -1 && portid > max_portid)
-				max_portid = portid;
-		}
+		cpucnt++;
+
+		if (prom_getprop(curnode, "portid", (caddr_t)&portid) !=
+		    -1 && portid > max_portid)
+			max_portid = portid;
 	}
 	if (cpucnt <= 1)
 		max_mem_nodes = 1;
