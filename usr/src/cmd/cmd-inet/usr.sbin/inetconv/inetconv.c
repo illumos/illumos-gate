@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,24 +370,6 @@ invalid_props(inetd_prop_t *p)
 	return (buf);
 }
 
-/*
- * wrapper around put_prop_value() that errors and exits on malloc failures,
- * returns -1 on other failures, else returns 0.
- */
-static int
-my_put_prop_value(inetd_prop_t *props, char *pname, void *value)
-{
-	if (put_prop_value(props, pname, value) == 0)
-		return (0);
-
-	if (errno == ENOMEM) {
-		(void) fprintf(stderr, gettext("%s: malloc failed: %s\n"),
-		    progname, strerror(errno));
-		exit(EXIT_ERROR_SYS);
-	}
-	return (-1);
-}
-
 static boolean_t
 valid_basic_properties(struct inetconfent *iconf, struct fileinfo *finfo)
 {
@@ -402,22 +384,30 @@ valid_basic_properties(struct inetconfent *iconf, struct fileinfo *finfo)
 	(void) memcpy(prop, inetd_properties,
 	    prop_size * sizeof (inetd_prop_t));
 
-	(void) put_prop_value(prop, PR_ISRPC_NAME, &iconf->isrpc);
-	(void) put_prop_value(prop, PR_ISWAIT_NAME, &iconf->wait);
+	put_prop_value_boolean(prop, PR_ISRPC_NAME, iconf->isrpc);
+	put_prop_value_boolean(prop, PR_ISWAIT_NAME, iconf->wait);
 	if (iconf->isrpc) {
-		(void) put_prop_value(prop, PR_RPC_LW_VER_NAME,
-		    &iconf->rpc_low_version);
-		(void) put_prop_value(prop, PR_RPC_HI_VER_NAME,
-		    &iconf->rpc_high_version);
+		put_prop_value_int(prop, PR_RPC_LW_VER_NAME,
+		    iconf->rpc_low_version);
+		put_prop_value_int(prop, PR_RPC_HI_VER_NAME,
+		    iconf->rpc_high_version);
 		svc_name = iconf->rpc_prog;
 		proto += 4;	/* skip 'rpc/' */
 	}
 
-	if ((my_put_prop_value(prop, PR_SOCK_TYPE_NAME, iconf->endpoint)
-	    != 0) ||
-	    (my_put_prop_value(prop, PR_SVC_NAME_NAME, svc_name) != 0) ||
-	    (my_put_prop_value(prop, PR_PROTO_NAME, proto) != 0))
+	if (!put_prop_value_string(prop, PR_SOCK_TYPE_NAME, iconf->endpoint) ||
+	    !put_prop_value_string(prop, PR_SVC_NAME_NAME, svc_name)) {
 		valid = B_FALSE;
+
+		if (errno == ENOMEM) {
+			(void) fprintf(stderr,
+			    gettext("%s: failed to allocate memory: %s\n"),
+			    progname, strerror(errno));
+			exit(EXIT_ERROR_SYS);
+		}
+	}
+
+	put_prop_value_string_list(prop, PR_PROTO_NAME, get_protos(proto));
 
 	if (!valid_props(prop, NULL, NULL, NULL, NULL) || !valid) {
 		valid = B_FALSE;

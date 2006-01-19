@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -501,25 +501,20 @@ main(int argc, char **argv)
 }
 
 int tone[] = {
-0x034057, 0x026074, 0x136710, 0x126660, 0x147551, 0x034460,
-0x026775, 0x141727, 0x127670, 0x156532, 0x036064, 0x030721,
-0x134703, 0x126705, 0x046071, 0x030073, 0x036667, 0x140666,
-0x126137, 0x064463, 0x031064, 0x072677, 0x135652, 0x141734,
-0x036463, 0x027472, 0x137333, 0x127257, 0x152534, 0x033065,
-0x027723, 0x136313, 0x127735, 0x053473, 0x035470, 0x052666,
-0x167260, 0x140535, 0x045471, 0x034474, 0x132711, 0x132266,
-0x047127, 0x027077, 0x043705, 0x141676, 0x134110, 0x063400,
+0x076113, 0x153333, 0x147317, 0x144311, 0x147315, 0x050353, 0x037103, 0x051106,
+0x157155, 0x142723, 0x133273, 0x134664, 0x051712, 0x024465, 0x026447, 0x072473,
+0x136715, 0x126257, 0x135256, 0x047344, 0x034476, 0x027464, 0x036062, 0x133334,
+0x127256, 0x130660, 0x136262, 0x040724, 0x016446, 0x025437, 0x137171, 0x127672,
+0x124655, 0x134654, 0x032741, 0x021447, 0x037450, 0x125675, 0x127650, 0x077277,
+0x046514, 0x036077, 0x035471, 0x147131, 0x136272, 0x162720, 0x166151, 0x037527,
 };
 
 /*
- * Make a sound on /dev/audio according
- * to the length of the packet.  The tone
- * data above is a piece of waveform from
- * a Pink Floyd track. The amount of waveform
- * used is a function of packet length e.g.
- * a series of small packets is heard as
- * clicks, whereas a series of NFS packets
- * in an 8k read sounds like a "WHAAAARP".
+ * Make a sound on /dev/audio according to the length of the packet.  The
+ * tone data was ripped from /usr/share/audio/samples/au/bark.au.  The
+ * amount of waveform used is a function of packet length e.g.  a series
+ * of small packets is heard as clicks, whereas a series of NFS packets in
+ * an 8k read sounds like a "WHAAAARP".
  */
 void
 click(len)

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,17 +51,17 @@
 
 /* supported method properties and their attributes */
 static inetd_prop_t method_props[] = {
-{PR_EXEC_NAME, "", SCF_TYPE_ASTRING, B_FALSE, IVE_UNSET, NULL},
-{PR_ARG0_NAME, "", SCF_TYPE_ASTRING, B_TRUE, IVE_UNSET, NULL},
-{NULL, "", SCF_TYPE_COUNT, B_TRUE, IVE_UNSET, NULL}
+{PR_EXEC_NAME, "", INET_TYPE_STRING, B_FALSE, IVE_UNSET, NULL, B_FALSE},
+{PR_ARG0_NAME, "", INET_TYPE_STRING, B_TRUE, IVE_UNSET, NULL, B_FALSE},
+{SCF_PROPERTY_TIMEOUT, "", INET_TYPE_COUNT, B_TRUE, IVE_UNSET, NULL, B_FALSE},
+{NULL},
 };
 
 /* enumeration of method properties; used to index into method_props[] */
 typedef enum {
 	MP_EXEC,
 	MP_ARG0,
-	MP_TIMEOUT,
-	NUM_METHOD_PROPS
+	MP_TIMEOUT
 } method_prop_t;
 
 
@@ -84,17 +84,6 @@ config_init(void)
 		return (-1);
 	} else if (make_handle_bound(rep_handle) == -1) {
 		/* let config_fini clean-up */
-		return (-1);
-	}
-
-	/*
-	 * Work around the (const *) nature of SCF property #defines in
-	 * libscf.h that prevent us from directly initializing the name
-	 * element of members of the method properties table.
-	 */
-	if ((method_props[MP_TIMEOUT].ip_name = strdup(SCF_PROPERTY_TIMEOUT))
-	    == NULL) {
-		error_msg(strerror(errno));
 		return (-1);
 	}
 
@@ -167,7 +156,7 @@ create_method_info(const inetd_prop_t *mprops, boolean_t *exec_invalid)
 		goto alloc_fail;
 
 	/* Expand the exec string. */
-	if ((i = wordexp(get_prop_value(mprops, PR_EXEC_NAME),
+	if ((i = wordexp(get_prop_value_string(mprops, PR_EXEC_NAME),
 	    &ret->exec_args_we, WRDE_NOCMD|WRDE_UNDEF)) != 0) {
 		if (i == WRDE_NOSPACE)
 			goto alloc_fail;
@@ -188,13 +177,14 @@ create_method_info(const inetd_prop_t *mprops, boolean_t *exec_invalid)
 		 */
 		ret->wordexp_arg0_backup = ret->exec_args_we.we_wordv[0];
 		if ((ret->exec_args_we.we_wordv[0] =
-		    strdup(get_prop_value(mprops, PR_ARG0_NAME))) == NULL)
+		    strdup(get_prop_value_string(mprops, PR_ARG0_NAME)))
+		    == NULL)
 			goto alloc_fail;
 	}
 
 	if (mprops[MP_TIMEOUT].ip_error == IVE_VALID) {
-		ret->timeout = *(int64_t *)get_prop_value(mprops,
-		    (char *)SCF_PROPERTY_TIMEOUT);
+		ret->timeout = get_prop_value_count(mprops,
+		    SCF_PROPERTY_TIMEOUT);
 	} else {
 		ret->timeout = DEFAULT_METHOD_TIMEOUT;
 	}
@@ -332,33 +322,24 @@ populate_defaults(inetd_prop_t *bprops, basic_cfg_t *cfg)
 {
 	debug_msg("Entering populate_defaults");
 
-	/*
-	 * All time related values below are stored as 32 bits values because
-	 * the consumers of the data rely on this, and so we cast them all
-	 * to int's here.
-	 */
-	cfg->do_tcp_wrappers =
-	    *(boolean_t *)get_prop_value(bprops, PR_DO_TCP_WRAPPERS_NAME);
-	cfg->do_tcp_trace =
-	    *(boolean_t *)get_prop_value(bprops, PR_DO_TCP_TRACE_NAME);
-	cfg->inherit_env =
-	    *(boolean_t *)get_prop_value(bprops, PR_INHERIT_ENV_NAME);
-	cfg->wait_fail_cnt =
-	    *(int64_t *)get_prop_value(bprops, PR_MAX_FAIL_RATE_CNT_NAME);
-	cfg->wait_fail_interval = (int)*(int64_t *)get_prop_value(bprops,
+	cfg->do_tcp_wrappers = get_prop_value_boolean(bprops,
+	    PR_DO_TCP_WRAPPERS_NAME);
+	cfg->do_tcp_trace = get_prop_value_boolean(bprops,
+	    PR_DO_TCP_TRACE_NAME);
+	cfg->inherit_env = get_prop_value_boolean(bprops, PR_INHERIT_ENV_NAME);
+	cfg->wait_fail_cnt = get_prop_value_int(bprops,
+	    PR_MAX_FAIL_RATE_CNT_NAME);
+	cfg->wait_fail_interval =  get_prop_value_int(bprops,
 	    PR_MAX_FAIL_RATE_INTVL_NAME);
-	cfg->max_copies =
-	    *(int64_t *)get_prop_value(bprops, PR_MAX_COPIES_NAME);
-	cfg->conn_rate_offline =
-	    (int)*(int64_t *)get_prop_value(bprops, PR_CON_RATE_OFFLINE_NAME);
-	cfg->conn_rate_max =
-	    *(int64_t *)get_prop_value(bprops, PR_CON_RATE_MAX_NAME);
-	cfg->bind_fail_interval =
-	    (int)*(int64_t *)get_prop_value(bprops, PR_BIND_FAIL_INTVL_NAME);
-	cfg->bind_fail_max =
-	    *(int64_t *)get_prop_value(bprops, PR_BIND_FAIL_MAX_NAME);
+	cfg->max_copies = get_prop_value_int(bprops, PR_MAX_COPIES_NAME);
+	cfg->conn_rate_offline = get_prop_value_int(bprops,
+	    PR_CON_RATE_OFFLINE_NAME);
+	cfg->conn_rate_max = get_prop_value_int(bprops, PR_CON_RATE_MAX_NAME);
+	cfg->bind_fail_interval = get_prop_value_int(bprops,
+	    PR_BIND_FAIL_INTVL_NAME);
+	cfg->bind_fail_max = get_prop_value_int(bprops, PR_BIND_FAIL_MAX_NAME);
 	if ((cfg->bind_addr =
-	    strdup(get_prop_value(bprops, PR_BIND_ADDR_NAME))) == NULL) {
+	    strdup(get_prop_value_string(bprops, PR_BIND_ADDR_NAME))) == NULL) {
 		error_msg(strerror(errno));
 		return (-1);
 	}
@@ -436,7 +417,7 @@ read_method_props(const char *inst, instance_method_t method, scf_error_t *err)
 	}
 
 	(void) memcpy(ret, method_props, sizeof (method_props));
-	for (i = 0; i < NUM_METHOD_PROPS; i++) {
+	for (i = 0; ret[i].ip_name != NULL; i++) {
 		*err = read_prop(rep_handle, &ret[i], i, inst,
 		    methods[method].name);
 		if ((*err != 0) && (*err != SCF_ERROR_NOT_FOUND)) {
@@ -456,9 +437,10 @@ destroy_method_props(inetd_prop_t *mprop)
 	if (mprop == NULL)
 		return;
 
-	for (i = 0; i < NUM_METHOD_PROPS; i++) {
-		if (mprop[i].ip_type == SCF_TYPE_ASTRING)
-			free(mprop[i].ip_value.iv_astring);
+	for (i = 0; mprop[i].ip_name != NULL; i++) {
+		if (mprop[i].ip_type == INET_TYPE_STRING &&
+		    mprop[i].ip_error == IVE_VALID)
+			free(mprop[i].ip_value.iv_string);
 	}
 
 	free(mprop);
@@ -540,7 +522,7 @@ valid_inst_props(const char *fmri, inetd_prop_t *bprops, inetd_prop_t **mprops,
 	 * for each invalid/ missing property.
 	 */
 	(void) get_prop_table(&num_bprops);
-	for (i = 0; i < num_bprops; i++) {
+	for (i = 0; bprops[i].ip_name != NULL; i++) {
 		switch (bprops[i].ip_error) {
 		case IVE_UNSET:
 			if (!bprops[i].ip_default)
@@ -560,12 +542,12 @@ valid_inst_props(const char *fmri, inetd_prop_t *bprops, inetd_prop_t **mprops,
 		int	j;
 
 		/* check if any properties are set */
-		for (j = 0; j < NUM_METHOD_PROPS; j++) {
+		for (j = 0; mprops[i][j].ip_name != NULL; j++) {
 			if (mprops[i][j].ip_error != IVE_UNSET)
 				break;
 		}
 
-		if (j == NUM_METHOD_PROPS) {
+		if (mprops[i][j].ip_name == NULL) {
 			/* an unspecified method */
 			if ((instance_method_t)i == IM_START) {
 				error_msg(gettext(

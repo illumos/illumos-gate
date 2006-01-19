@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -285,8 +285,8 @@ typedef union {
 	int64_t		iv_int;
 	uint64_t	iv_cnt;
 	boolean_t	iv_boolean;
-	char		*iv_astring;
-	char		**iv_proto_list;
+	char		*iv_string;
+	char		**iv_string_list;
 } inetd_value_t;
 
 typedef enum {
@@ -295,10 +295,24 @@ typedef enum {
 	IVE_INVALID
 } iv_error_t;
 
+/*
+ * Operations on these types (like valid_default_prop()) need to be modified
+ * when this list is changed.
+ */
+typedef enum {
+	INET_TYPE_INVALID = 0,
+
+	INET_TYPE_BOOLEAN,
+	INET_TYPE_COUNT,
+	INET_TYPE_INTEGER,
+	INET_TYPE_STRING,
+	INET_TYPE_STRING_LIST
+} inet_type_t;
+
 typedef struct {
-	char		*ip_name;
-	char		*ip_pg;
-	scf_type_t	ip_type;
+	const char	*ip_name;
+	const char	*ip_pg;
+	inet_type_t	ip_type;
 	boolean_t	ip_default;
 	iv_error_t	ip_error;
 	inetd_value_t	ip_value;
@@ -306,13 +320,22 @@ typedef struct {
 } inetd_prop_t;
 
 inetd_prop_t *get_prop_table(size_t *);
-void *get_prop_value(const inetd_prop_t *, char *);
-int put_prop_value(inetd_prop_t *, char *, void *);
+inetd_prop_t *find_prop(const inetd_prop_t *, const char *, inet_type_t);
+int64_t get_prop_value_int(const inetd_prop_t *, const char *);
+uint64_t get_prop_value_count(const inetd_prop_t *, const char *);
+boolean_t get_prop_value_boolean(const inetd_prop_t *, const char *);
+const char *get_prop_value_string(const inetd_prop_t *, const char *);
+const char **get_prop_value_string_list(const inetd_prop_t *, const char *);
+void put_prop_value_int(inetd_prop_t *, const char *, int64_t);
+void put_prop_value_count(inetd_prop_t *, const char *, uint64_t);
+void put_prop_value_boolean(inetd_prop_t *, const char *, boolean_t);
+boolean_t put_prop_value_string(inetd_prop_t *, const char *, const char *);
+void put_prop_value_string_list(inetd_prop_t *, const char *, char **);
 boolean_t valid_props(inetd_prop_t *, const char *fmri, basic_cfg_t **,
     uu_list_pool_t *, uu_list_pool_t *);
 void destroy_basic_cfg(basic_cfg_t *);
 void destroy_proto_list(basic_cfg_t *);
-boolean_t valid_default_prop(char *, void *);
+boolean_t valid_default_prop(const char *, const void *);
 scf_error_t read_prop(scf_handle_t *, inetd_prop_t *, int, const char *,
     const char *);
 inetd_prop_t *read_instance_props(scf_handle_t *, const char *, size_t *,

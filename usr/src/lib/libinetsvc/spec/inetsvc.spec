@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -31,15 +31,73 @@ declaration	inetd_prop_t *get_prop_table(size_t *num_elements)
 version		SUNWprivate_1.1
 end
 
-function	get_prop_value
+function	find_prop
 include		<inetsvc.h>
-declaration	void *get_prop_value(const inetd_prop_t *prop, char *name)
+declaration	inetd_prop_t *find_prop(const inetd_prop_t *prop,
+		    const char *name, inet_type_t type)
 version		SUNWprivate_1.1
 end
 
-function	put_prop_value
+function	get_prop_value_int
 include		<inetsvc.h>
-declaration	int put_prop_value(inetd_prop_t *prop, char *name, void *value)
+declaration	int64_t get_prop_value_int(const inetd_prop_t *prop,
+		    const char *name)
+version		SUNWprivate_1.1
+end
+
+function	get_prop_value_count
+include		<inetsvc.h>
+declaration	uint64_t get_prop_value_count(const inetd_prop_t *prop,
+		    const char *name)
+version		SUNWprivate_1.1
+end
+
+function	get_prop_value_boolean
+include		<inetsvc.h>
+declaration	boolean_t get_prop_value_boolean(const inetd_prop_t *prop,
+		    const char *name)
+version		SUNWprivate_1.1
+end
+
+function	get_prop_value_string
+include		<inetsvc.h>
+declaration	char *get_prop_value_string(const inetd_prop_t *prop,
+		    const char *name)
+version		SUNWprivate_1.1
+end
+
+function	put_prop_value_int
+include		<inetsvc.h>
+declaration	void put_prop_value_int(inetd_prop_t *prop,
+		    const char *name, int64_t value)
+version		SUNWprivate_1.1
+end
+
+function	put_prop_value_count
+include		<inetsvc.h>
+declaration	void put_prop_value_count(inetd_prop_t *prop,
+		    const char *name, uint64_t value)
+version		SUNWprivate_1.1
+end
+
+function	put_prop_value_boolean
+include		<inetsvc.h>
+declaration	void put_prop_value_boolean(inetd_prop_t *prop,
+		    const char *name, boolean_t value)
+version		SUNWprivate_1.1
+end
+
+function	put_prop_value_string
+include		<inetsvc.h>
+declaration	boolean_t put_prop_value_string(inetd_prop_t *prop,
+		    const char *name, const char *value)
+version		SUNWprivate_1.1
+end
+
+function	put_prop_value_string_list
+include		<inetsvc.h>
+declaration	void put_prop_value_string_list(inetd_prop_t *prop,
+		    const char *name, char **value)
 version		SUNWprivate_1.1
 end
 
@@ -51,7 +109,8 @@ end
 
 function	valid_default_prop
 include		<inetsvc.h>
-declaration	boolean_t valid_default_prop(char *name, void *value)
+declaration	boolean_t valid_default_prop(const char *name,
+		    const void *value)
 version		SUNWprivate_1.1
 end
 

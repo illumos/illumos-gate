@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,51 +61,50 @@
 #include <libuutil.h>
 
 static inetd_prop_t inetd_properties[] = {
-	{PR_SVC_NAME_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_ASTRING,
+	{PR_SVC_NAME_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_STRING,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_SOCK_TYPE_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_ASTRING,
+	{PR_SOCK_TYPE_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_STRING,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_PROTO_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_ASTRING,
+	{PR_PROTO_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_STRING_LIST,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_ISRPC_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_BOOLEAN,
+	{PR_ISRPC_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_BOOLEAN,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_RPC_LW_VER_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_INTEGER,
+	{PR_RPC_LW_VER_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_RPC_HI_VER_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_INTEGER,
+	{PR_RPC_HI_VER_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_ISWAIT_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_BOOLEAN,
+	{PR_ISWAIT_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_BOOLEAN,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_EXEC_NAME, START_METHOD_NAME, SCF_TYPE_ASTRING,
+	{PR_EXEC_NAME, START_METHOD_NAME, INET_TYPE_STRING,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_ARG0_NAME, START_METHOD_NAME, SCF_TYPE_ASTRING,
+	{PR_ARG0_NAME, START_METHOD_NAME, INET_TYPE_STRING,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_USER_NAME, START_METHOD_NAME, SCF_TYPE_ASTRING,
+	{PR_USER_NAME, START_METHOD_NAME, INET_TYPE_STRING,
 	    B_FALSE, IVE_UNSET, NULL, B_FALSE},
-	{PR_BIND_ADDR_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_ASTRING,
+	{PR_BIND_ADDR_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_STRING,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_BIND_FAIL_MAX_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_INTEGER,
+	{PR_BIND_FAIL_MAX_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_BIND_FAIL_INTVL_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_INTEGER,
+	{PR_BIND_FAIL_INTVL_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_CON_RATE_MAX_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_INTEGER,
+	{PR_CON_RATE_MAX_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_MAX_COPIES_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_INTEGER,
+	{PR_MAX_COPIES_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_CON_RATE_OFFLINE_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_INTEGER,
+	{PR_CON_RATE_OFFLINE_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_MAX_FAIL_RATE_CNT_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_INTEGER,
+	{PR_MAX_FAIL_RATE_CNT_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_MAX_FAIL_RATE_INTVL_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_INTEGER,
+	{PR_MAX_FAIL_RATE_INTVL_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_INTEGER,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_INHERIT_ENV_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_BOOLEAN,
+	{PR_INHERIT_ENV_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_BOOLEAN,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_DO_TCP_TRACE_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_BOOLEAN,
+	{PR_DO_TCP_TRACE_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_BOOLEAN,
 	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
-	{PR_DO_TCP_WRAPPERS_NAME, PG_NAME_SERVICE_CONFIG, SCF_TYPE_BOOLEAN,
-	    B_TRUE, IVE_UNSET, NULL, B_FALSE}
+	{PR_DO_TCP_WRAPPERS_NAME, PG_NAME_SERVICE_CONFIG, INET_TYPE_BOOLEAN,
+	    B_TRUE, IVE_UNSET, NULL, B_FALSE},
+	{NULL},
 };
-
-#define	INETD_NUMPROPS (sizeof (inetd_properties) / sizeof (inetd_prop_t))
 
 #define	INETSVC_SVC_BUF_MAX (NSS_BUFLEN_RPC + sizeof (struct rpcent))
 
@@ -126,9 +125,9 @@ boolean_t
 is_tlx_service(inetd_prop_t *props)
 {
 	return ((strcmp(SOCKTYPE_TLI_STR,
-	    props[PT_SOCK_TYPE_INDEX].ip_value.iv_astring) == 0) ||
+	    props[PT_SOCK_TYPE_INDEX].ip_value.iv_string) == 0) ||
 	    (strcmp(SOCKTYPE_XTI_STR,
-	    props[PT_SOCK_TYPE_INDEX].ip_value.iv_astring) == 0));
+	    props[PT_SOCK_TYPE_INDEX].ip_value.iv_string) == 0));
 }
 
 /*
@@ -138,83 +137,182 @@ is_tlx_service(inetd_prop_t *props)
 inetd_prop_t *
 get_prop_table(size_t *num_elements)
 {
-	*num_elements = INETD_NUMPROPS;
+	*num_elements = sizeof (inetd_properties) / sizeof (inetd_prop_t);
 	return (&inetd_properties[0]);
 }
 
 /*
- * get_prop_value takes an array of inetd_prop_t's and a name of an inetd
- * property, and returns a pointer to the value of the requested property.
+ * find_prop takes an array of inetd_prop_t's, the name of an inetd
+ * property, the type expected, and returns a pointer to the matching member,
+ * or NULL.
  */
-
-void *
-get_prop_value(const inetd_prop_t *prop, char *name)
+inetd_prop_t *
+find_prop(const inetd_prop_t *prop, const char *name, inet_type_t type)
 {
-	int		i;
+	int		i = 0;
 
-	for (i = 0; i < INETD_NUMPROPS; i++) {
-		if (strcmp(name, prop[i].ip_name) != 0)
-			continue;
-		if (prop[i].ip_type == SCF_TYPE_ASTRING) {
-			if (i == PT_PROTO_INDEX) {
-				return ((void *)
-				    prop[i].ip_value.iv_proto_list);
-			} else {
-				return ((void *) prop[i].ip_value.iv_astring);
-			}
-		} else {
-			return ((void *) &prop[i].ip_value);
-		}
-	}
+	while (prop[i].ip_name != NULL && strcmp(name, prop[i].ip_name) != 0)
+		i++;
 
-	return (NULL);
+	if (prop[i].ip_name == NULL)
+		return (NULL);
+
+	if (prop[i].ip_type != type)
+		return (NULL);
+
+	return ((inetd_prop_t *)prop + i);
 }
 
 /*
- * put_prop_value takes an array of inetd_prop_t's, a name of an inetd
- * property, and a pointer to a value.  It copies the value into the property
- * in the array, and returns 0 for success and -1 for failure.
+ * get_prop_value_int takes an array of inetd_prop_t's together with the name of
+ * an inetd property and returns the value of the property.  It's expected that
+ * the property exists in the searched array.
  */
-
-int
-put_prop_value(inetd_prop_t *prop, char *name, void *value)
+int64_t
+get_prop_value_int(const inetd_prop_t *prop, const char *name)
 {
-	int		i;
+	inetd_prop_t	*p;
 
-	for (i = 0; i < INETD_NUMPROPS; i++) {
-		if (strcmp(name, prop[i].ip_name) != 0)
-			continue;
-		switch (prop[i].ip_type) {
-		case SCF_TYPE_INTEGER:
-			prop[i].ip_value.iv_int = *((int64_t *)value);
-			prop[i].ip_error = IVE_VALID;
-			return (0);
-		case SCF_TYPE_BOOLEAN:
-			prop[i].ip_value.iv_boolean =
-			    *((boolean_t *)value);
-			prop[i].ip_error = IVE_VALID;
-			return (0);
-		case SCF_TYPE_ASTRING:
-			if (i == PT_PROTO_INDEX) {
-				if ((prop[i].ip_value.iv_proto_list =
-				    get_protos((char *)value)) == NULL)
-					return (-1);
-			} else {
-				if (strlen((char *)value) >=
-				    scf_limit(SCF_LIMIT_MAX_VALUE_LENGTH)) {
-					errno = E2BIG;
-					return (-1);
-				}
-				if ((prop[i].ip_value.iv_astring =
-				    strdup((char *)value)) == NULL)
-					return (-1);
-			}
-			prop[i].ip_error = IVE_VALID;
-			return (0);
-		}
+	p = find_prop(prop, name, INET_TYPE_INTEGER);
+	return (p->ip_value.iv_int);
+}
+
+/*
+ * get_prop_value_count takes an array of inetd_prop_t's together with the name
+ * of an inetd property and returns the value of the property.  It's expected
+ * that the property exists in the searched array.
+ */
+uint64_t
+get_prop_value_count(const inetd_prop_t *prop, const char *name)
+{
+	inetd_prop_t	*p;
+
+	p = find_prop(prop, name, INET_TYPE_COUNT);
+	return (p->ip_value.iv_cnt);
+}
+
+/*
+ * get_prop_value_boolean takes an array of inetd_prop_t's together with the
+ * name of an inetd property and returns the value of the property.  It's
+ * expected that the property exists in the searched array.
+ */
+boolean_t
+get_prop_value_boolean(const inetd_prop_t *prop, const char *name)
+{
+	inetd_prop_t	*p;
+
+	p = find_prop(prop, name, INET_TYPE_BOOLEAN);
+	return (p->ip_value.iv_boolean);
+}
+
+/*
+ * get_prop_value_string takes an array of inetd_prop_t's together with
+ * the name of an inetd property and returns the value of the property.
+ * It's expected that the property exists in the searched array.
+ */
+const char *
+get_prop_value_string(const inetd_prop_t *prop, const char *name)
+{
+	inetd_prop_t	*p;
+
+	p = find_prop(prop, name, INET_TYPE_STRING);
+	return (p->ip_value.iv_string);
+}
+
+/*
+ * get_prop_value_string_list takes an array of inetd_prop_t's together
+ * with the name of an inetd property and returns the value of the property.
+ * It's expected that the property exists in the searched array.
+ */
+const char **
+get_prop_value_string_list(const inetd_prop_t *prop, const char *name)
+{
+	inetd_prop_t	*p;
+
+	p = find_prop(prop, name, INET_TYPE_STRING_LIST);
+	return ((const char **)p->ip_value.iv_string_list);
+}
+
+/*
+ * put_prop_value_int takes an array of inetd_prop_t's, a name of an inetd
+ * property, and a value.  It copies the value into the property
+ * in the array.  It's expected that the property exists in the searched array.
+ */
+void
+put_prop_value_int(inetd_prop_t *prop, const char *name, int64_t value)
+{
+	inetd_prop_t	*p;
+
+	p = find_prop(prop, name, INET_TYPE_INTEGER);
+	p->ip_value.iv_int = value;
+	p->ip_error = IVE_VALID;
+}
+
+/*
+ * put_prop_value_count takes an array of inetd_prop_t's, a name of an inetd
+ * property, and a value.  It copies the value into the property
+ * in the array.  It's expected that the property exists in the searched array.
+ */
+void
+put_prop_value_count(inetd_prop_t *prop, const char *name, uint64_t value)
+{
+	inetd_prop_t	*p;
+
+	p = find_prop(prop, name, INET_TYPE_COUNT);
+	p->ip_value.iv_cnt = value;
+	p->ip_error = IVE_VALID;
+}
+
+/*
+ * put_prop_value_boolean takes an array of inetd_prop_t's, a name of an inetd
+ * property, and a value.  It copies the value into the property
+ * in the array.  It's expected that the property exists in the searched array.
+ */
+void
+put_prop_value_boolean(inetd_prop_t *prop, const char *name, boolean_t value)
+{
+	inetd_prop_t	*p;
+
+	p = find_prop(prop, name, INET_TYPE_BOOLEAN);
+	p->ip_value.iv_boolean = value;
+	p->ip_error = IVE_VALID;
+}
+
+/*
+ * put_prop_value_string takes an array of inetd_prop_t's, a name of an inetd
+ * property, and a value.  It duplicates the value into the property
+ * in the array, and returns B_TRUE for success and B_FALSE for failure.  It's
+ * expected that the property exists in the searched array.
+ */
+boolean_t
+put_prop_value_string(inetd_prop_t *prop, const char *name, const char *value)
+{
+	inetd_prop_t	*p;
+
+	if (strlen(value) >= scf_limit(SCF_LIMIT_MAX_VALUE_LENGTH)) {
+		errno = E2BIG;
+		return (B_FALSE);
 	}
+	p = find_prop(prop, name, INET_TYPE_STRING);
+	if ((p->ip_value.iv_string = strdup(value)) == NULL)
+		return (B_FALSE);
+	p->ip_error = IVE_VALID;
+	return (B_TRUE);
+}
 
-	return (-1);
+/*
+ * put_prop_value_string_list takes an array of inetd_prop_t's, a name of an
+ * inetd property, and a value.  It copies the value into the property
+ * in the array.  It's expected that the property exists in the searched array.
+ */
+void
+put_prop_value_string_list(inetd_prop_t *prop, const char *name, char **value)
+{
+	inetd_prop_t	*p;
+
+	p = find_prop(prop, name, INET_TYPE_STRING_LIST);
+	p->ip_value.iv_string_list = value;
+	p->ip_error = IVE_VALID;
 }
 
 static void
@@ -466,7 +564,7 @@ valid_props(inetd_prop_t *prop, const char *fmri, basic_cfg_t **cfgpp,
 	 * Set all checkable properties to valid as a baseline.  We'll be
 	 * marking all invalid properties.
 	 */
-	for (i = 0; i < INETD_NUMPROPS; i++) {
+	for (i = 0; prop[i].ip_name != NULL; i++) {
 		if (prop[i].ip_error != IVE_UNSET)
 			prop[i].ip_error = IVE_VALID;
 	}
@@ -482,7 +580,7 @@ valid_props(inetd_prop_t *prop, const char *fmri, basic_cfg_t **cfgpp,
 	/* Check a service name was supplied */
 	if ((prop[PT_SVC_NAME_INDEX].ip_error == IVE_UNSET) ||
 	    ((cfg->svc_name =
-	    strdup(prop[PT_SVC_NAME_INDEX].ip_value.iv_astring)) == NULL))
+	    strdup(prop[PT_SVC_NAME_INDEX].ip_value.iv_string)) == NULL))
 		prop[PT_SVC_NAME_INDEX].ip_error = IVE_INVALID;
 
 	/* Check that iswait and isrpc have valid boolean values */
@@ -531,7 +629,7 @@ valid_props(inetd_prop_t *prop, const char *fmri, basic_cfg_t **cfgpp,
 	cfg->istlx = B_FALSE;
 	if ((prop[PT_SOCK_TYPE_INDEX].ip_error == IVE_UNSET) ||
 	    ((sock_type_id = get_sock_type_id(
-	    prop[PT_SOCK_TYPE_INDEX].ip_value.iv_astring)) == -1) &&
+	    prop[PT_SOCK_TYPE_INDEX].ip_value.iv_string)) == -1) &&
 	    !(cfg->istlx = is_tlx_service(prop)))
 		prop[PT_SOCK_TYPE_INDEX].ip_error = IVE_INVALID;
 
@@ -568,7 +666,7 @@ valid_props(inetd_prop_t *prop, const char *fmri, basic_cfg_t **cfgpp,
 			invalid_proto = B_TRUE;
 			goto past_proto_processing;
 		}
-		protos = prop[PT_PROTO_INDEX].ip_value.iv_proto_list;
+		protos = prop[PT_PROTO_INDEX].ip_value.iv_string_list;
 
 		/*
 		 * Get the next netid/proto.
@@ -801,7 +899,7 @@ past_proto_processing:
 	if (prop[PT_EXEC_INDEX].ip_error != IVE_UNSET) {
 		/* Don't pass any arguments to access() */
 		if ((bufp = strdup(
-		    prop[PT_EXEC_INDEX].ip_value.iv_astring)) == NULL) {
+		    prop[PT_EXEC_INDEX].ip_value.iv_string)) == NULL) {
 			prop[PT_EXEC_INDEX].ip_error = IVE_INVALID;
 		} else {
 			if ((cp = strpbrk(bufp, " \t")) != NULL)
@@ -817,10 +915,10 @@ past_proto_processing:
 		char		pw_buf[NSS_BUFLEN_PASSWD];
 		struct passwd	pw;
 
-		if (getpwnam_r(prop[PT_USER_INDEX].ip_value.iv_astring, &pw,
+		if (getpwnam_r(prop[PT_USER_INDEX].ip_value.iv_string, &pw,
 		    pw_buf, NSS_BUFLEN_PASSWD) == NULL) {
 			errno = 0;
-			uidl = strtol(prop[PT_USER_INDEX].ip_value.iv_astring,
+			uidl = strtol(prop[PT_USER_INDEX].ip_value.iv_string,
 			    &bufp, 10);
 			if ((errno != 0) || (*bufp != '\0') ||
 			    (getpwuid_r(uidl, &pw, pw_buf,
@@ -835,7 +933,7 @@ past_proto_processing:
 	 * according to whether any properties were marked invalid.
 	 */
 
-	for (i = 0; i < INETD_NUMPROPS; i++) {
+	for (i = 0; prop[i].ip_name != NULL; i++) {
 		if (prop[i].ip_error == IVE_UNSET)
 			continue;
 
@@ -864,29 +962,31 @@ past_proto_processing:
  */
 
 boolean_t
-valid_default_prop(char *name, void *value)
+valid_default_prop(const char *name, const void *value)
 {
 	int		i;
 
-	for (i = 0; i < INETD_NUMPROPS; i++) {
+	for (i = 0; inetd_properties[i].ip_name != NULL; i++) {
 		if (strcmp(name, inetd_properties[i].ip_name) != 0)
 			continue;
 		if (!inetd_properties[i].ip_default)
 			return (B_FALSE);
 
 		switch (inetd_properties[i].ip_type) {
-		case SCF_TYPE_INTEGER:
+		case INET_TYPE_INTEGER:
 			if (*((int64_t *)value) >= -1)
 				return (B_TRUE);
 			else
 				return (B_FALSE);
-		case SCF_TYPE_BOOLEAN:
+		case INET_TYPE_BOOLEAN:
 			if ((*((boolean_t *)value) == B_FALSE) ||
 			    (*((boolean_t *)value) == B_TRUE))
 				return (B_TRUE);
 			else
 				return (B_FALSE);
-		case SCF_TYPE_ASTRING:
+		case INET_TYPE_COUNT:
+		case INET_TYPE_STRING_LIST:
+		case INET_TYPE_STRING:
 			return (B_TRUE);
 		}
 	}
@@ -909,8 +1009,16 @@ read_prop(scf_handle_t *h, inetd_prop_t *iprop, int index, const char *inst,
 		return (scf_error());
 
 	switch (iprop->ip_type) {
-	case SCF_TYPE_ASTRING:
-		if (index == PT_PROTO_INDEX) {
+	case INET_TYPE_STRING:
+		if ((tmp_char = scf_simple_prop_next_astring(sprop)) == NULL)
+			goto scf_error;
+		if ((iprop->ip_value.iv_string = strdup(tmp_char)) == NULL) {
+			scf_simple_prop_free(sprop);
+			return (SCF_ERROR_NO_MEMORY);
+		}
+		break;
+	case INET_TYPE_STRING_LIST:
+		{
 			int	j = 0;
 
 			while ((tmp_char =
@@ -918,12 +1026,12 @@ read_prop(scf_handle_t *h, inetd_prop_t *iprop, int index, const char *inst,
 				char	**cpp;
 
 				if ((cpp = realloc(
-				    iprop->ip_value.iv_proto_list,
+				    iprop->ip_value.iv_string_list,
 				    (j + 2) * sizeof (char *))) == NULL) {
 					scf_simple_prop_free(sprop);
 					return (SCF_ERROR_NO_MEMORY);
 				}
-				iprop->ip_value.iv_proto_list = cpp;
+				iprop->ip_value.iv_string_list = cpp;
 				if ((cpp[j] = strdup(tmp_char)) == NULL) {
 					scf_simple_prop_free(sprop);
 					return (SCF_ERROR_NO_MEMORY);
@@ -932,29 +1040,20 @@ read_prop(scf_handle_t *h, inetd_prop_t *iprop, int index, const char *inst,
 			}
 			if ((j == 0) || (scf_error() != SCF_ERROR_NONE))
 				goto scf_error;
-		} else {
-			if ((tmp_char = scf_simple_prop_next_astring(sprop)) ==
-			    NULL)
-				goto scf_error;
-			if ((iprop->ip_value.iv_astring = strdup(tmp_char)) ==
-			    NULL) {
-				scf_simple_prop_free(sprop);
-				return (SCF_ERROR_NO_MEMORY);
-			}
 		}
 		break;
-	case SCF_TYPE_BOOLEAN:
+	case INET_TYPE_BOOLEAN:
 		if ((tmp_bool = scf_simple_prop_next_boolean(sprop)) == NULL)
 			goto scf_error;
 		iprop->ip_value.iv_boolean =
 		    (*tmp_bool == 0) ? B_FALSE : B_TRUE;
 		break;
-	case SCF_TYPE_COUNT:
+	case INET_TYPE_COUNT:
 		if ((tmp_cnt = scf_simple_prop_next_count(sprop)) == NULL)
 			goto scf_error;
 		iprop->ip_value.iv_cnt = *tmp_cnt;
 		break;
-	case SCF_TYPE_INTEGER:
+	case INET_TYPE_INTEGER:
 		if ((tmp_int = scf_simple_prop_next_integer(sprop)) == NULL)
 			goto scf_error;
 		iprop->ip_value.iv_int = *tmp_int;
@@ -999,7 +1098,7 @@ read_props(scf_handle_t *h, const char *instance, size_t *num_elements,
 
 	if (defaults_only)
 		instance = INETD_INSTANCE_FMRI;
-	for (i = 0; i < INETD_NUMPROPS; i++) {
+	for (i = 0; ret[i].ip_name != NULL; i++) {
 		if (defaults_only && !ret[i].ip_default)
 			continue;
 
@@ -1033,7 +1132,7 @@ read_props(scf_handle_t *h, const char *instance, size_t *num_elements,
 		}
 	}
 
-	*num_elements = INETD_NUMPROPS;
+	*num_elements = i;
 	return (ret);
 
 failure_cleanup:
@@ -1068,13 +1167,11 @@ free_instance_props(inetd_prop_t *prop)
 	if (prop == NULL)
 		return;
 
-	for (i = 0; i < INETD_NUMPROPS; i++) {
-		if (prop[i].ip_type == SCF_TYPE_ASTRING) {
-			if (i == PT_PROTO_INDEX) {
-				destroy_strings(prop[i].ip_value.iv_proto_list);
-			} else {
-				free(prop[i].ip_value.iv_astring);
-			}
+	for (i = 0; prop[i].ip_name != NULL; i++) {
+		if (prop[i].ip_type == INET_TYPE_STRING) {
+			free(prop[i].ip_value.iv_string);
+		} else if (prop[i].ip_type == INET_TYPE_STRING_LIST) {
+			destroy_strings(prop[i].ip_value.iv_string_list);
 		}
 	}
 	free(prop);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -387,11 +387,8 @@ commit_props(const scf_instance_t *inst, inetd_prop_t *mod, boolean_t defaults)
 {
 	int			i;
 	uint8_t			new_bool;
-	size_t			numprops;
 
-	(void) get_prop_table(&numprops);
-
-	for (i = 0; i < numprops; i++) {
+	for (i = 0; mod[i].ip_name != NULL; i++) {
 		switch (mod[i].ip_error) {
 		case IVE_UNSET:
 			break;
@@ -400,22 +397,27 @@ commit_props(const scf_instance_t *inst, inetd_prop_t *mod, boolean_t defaults)
 			break;
 		case IVE_VALID:
 			switch (mod[i].ip_type) {
-			case SCF_TYPE_ASTRING:
+			case INET_TYPE_STRING:
 				modify_prop(inst,
 				    defaults ? PG_NAME_SERVICE_DEFAULTS :
 				    mod[i].ip_pg, mod[i].ip_name,
 				    SCF_TYPE_ASTRING,
-				    (i == PT_PROTO_INDEX) ?
-				    (void *)mod[i].ip_value.iv_proto_list :
-				    (void *)mod[i].ip_value.iv_astring);
+				    mod[i].ip_value.iv_string);
 				break;
-			case SCF_TYPE_INTEGER:
+			case INET_TYPE_STRING_LIST:
+				modify_prop(inst,
+				    defaults ? PG_NAME_SERVICE_DEFAULTS :
+				    mod[i].ip_pg, mod[i].ip_name,
+				    SCF_TYPE_ASTRING,
+				    mod[i].ip_value.iv_string_list);
+				break;
+			case INET_TYPE_INTEGER:
 				modify_prop(inst,
 				    defaults ? PG_NAME_SERVICE_DEFAULTS :
 				    mod[i].ip_pg, mod[i].ip_name,
 				    SCF_TYPE_INTEGER, &mod[i].ip_value.iv_int);
 				break;
-			case SCF_TYPE_BOOLEAN:
+			case INET_TYPE_BOOLEAN:
 				new_bool = (mod[i].ip_value.iv_boolean) ? 1 : 0;
 
 				modify_prop(inst,
@@ -522,31 +524,31 @@ list_services()
 }
 
 static void
-print_prop_val(int index, inetd_prop_t *prop)
+print_prop_val(inetd_prop_t *prop)
 {
 	switch (prop->ip_type) {
-	case SCF_TYPE_ASTRING:
-		if (index == PT_PROTO_INDEX) {
+	case INET_TYPE_STRING:
+		(void) printf("\"%s\"\n", prop->ip_value.iv_string);
+		break;
+	case INET_TYPE_STRING_LIST:
+		{
 			int	j = 0;
-			char	**cpp = prop->ip_value.iv_proto_list;
+			char	**cpp = prop->ip_value.iv_string_list;
 
 			/*
-			 * Print proto string array as comma separated list.
+			 * Print string list as comma separated list.
 			 */
 
 			(void) printf("\"%s", cpp[j]);
 			while (cpp[++j] != NULL)
 				(void) printf(",%s", cpp[j]);
 			(void) printf("\"\n");
-		} else {
-			(void) printf("\"%s\"\n",
-			    prop->ip_value.iv_astring);
 		}
 		break;
-	case SCF_TYPE_INTEGER:
+	case INET_TYPE_INTEGER:
 		(void) printf("%lld\n", prop->ip_value.iv_int);
 		break;
-	case SCF_TYPE_BOOLEAN:
+	case INET_TYPE_BOOLEAN:
 		if (prop->ip_value.iv_boolean)
 			(void) printf("%s\n", INETADM_TRUE_STR);
 		else
@@ -636,7 +638,7 @@ list_props_cb(void *data, scf_walkinfo_t *wip)
 			(void) printf("%-9s%s=",
 			    proplist[i].from_inetd ? INETADM_DEFAULT_STR : "",
 			    proplist[i].ip_name);
-			print_prop_val(i, &proplist[i]);
+			print_prop_val(&proplist[i]);
 			continue;
 		}
 
@@ -732,7 +734,7 @@ list_defaults()
 		}
 
 		(void) printf("%s=", proptable[i].ip_name);
-		print_prop_val(i, &proptable[i]);
+		print_prop_val(&proptable[i]);
 	}
 
 	free_instance_props(proptable);
@@ -783,12 +785,12 @@ modify_inst_props_cb(void *data, scf_walkinfo_t *wip)
 		value++;
 
 		/* Find property name in array of properties */
-		for (j = 0; j < numprops; j++) {
+		for (j = 0; mod[j].ip_name != NULL; j++) {
 			if (strcmp(mod[j].ip_name, argv[i]) == 0)
 				break;
 		}
 
-		if (j >= numprops)
+		if (mod[j].ip_name == NULL)
 			uu_die(gettext("Error: \"%s\" is not a valid "
 			    "property.\n"), argv[i]);
 
@@ -809,7 +811,7 @@ modify_inst_props_cb(void *data, scf_walkinfo_t *wip)
 		}
 
 		switch (mod[j].ip_type) {
-		case SCF_TYPE_INTEGER:
+		case INET_TYPE_INTEGER:
 			if (uu_strtoint(value, &new_int, sizeof (new_int), NULL,
 			    NULL, NULL) == -1)
 				uu_die(gettext("Error: \"%s\" is not a valid "
@@ -817,36 +819,37 @@ modify_inst_props_cb(void *data, scf_walkinfo_t *wip)
 
 			mod[j].ip_value.iv_int = new_int;
 			break;
-		case SCF_TYPE_ASTRING:
-			if (j == PT_PROTO_INDEX) {
-				if ((mod[j].ip_value.iv_proto_list =
-				    get_protos(value)) == NULL) {
-					if (errno == ENOMEM) {
-						uu_die(gettext(
-						    "Error: Out of memory.\n"));
-					} else if (errno == E2BIG) {
-						uu_die(gettext(
-						    "Error: String value in "
-						    "%s property longer than "
-						    "%l characters.\n"),
-						    PR_PROTO_NAME, max_val);
-					} else {
-						uu_die(gettext(
-						    "Error: No values "
-						    "specified for %s "
-						    "property.\n"),
-						    PR_PROTO_NAME);
-					}
-				}
-			} else if (strlen(value) >= max_val) {
+		case INET_TYPE_STRING:
+			if (strlen(value) >= max_val) {
 				uu_die(gettext("Error: String value is longer "
 				    "than %l characters.\n"), max_val);
-			} else if ((mod[j].ip_value.iv_astring = strdup(value))
+			} else if ((mod[j].ip_value.iv_string = strdup(value))
 			    == NULL) {
 				uu_die(gettext("Error: Out of memory.\n"));
 			}
 			break;
-		case SCF_TYPE_BOOLEAN:
+		case INET_TYPE_STRING_LIST:
+			if ((mod[j].ip_value.iv_string_list =
+			    get_protos(value)) == NULL) {
+				if (errno == ENOMEM) {
+					uu_die(gettext(
+					    "Error: Out of memory.\n"));
+				} else if (errno == E2BIG) {
+					uu_die(gettext(
+					    "Error: String value in "
+					    "%s property longer than "
+					    "%l characters.\n"),
+					    PR_PROTO_NAME, max_val);
+				} else {
+					uu_die(gettext(
+					    "Error: No values "
+					    "specified for %s "
+					    "property.\n"),
+					    PR_PROTO_NAME);
+				}
+			}
+			break;
+		case INET_TYPE_BOOLEAN:
 			if (strcasecmp(value, INETADM_TRUE_STR) == 0)
 				mod[j].ip_value.iv_boolean = B_TRUE;
 			else if (strcasecmp(value, INETADM_FALSE_STR) == 0)
@@ -920,14 +923,14 @@ modify_defaults(int argc, char *argv[])
 		value++;
 
 		/* Find property name in array of defaults */
-		for (j = 0; j < numprops; j++) {
+		for (j = 0; mod[j].ip_name != NULL; j++) {
 			if (!mod[j].ip_default)
 				continue;
 			if (strcmp(mod[j].ip_name, argv[i]) == 0)
 				break;
 		}
 
-		if (j >= numprops)
+		if (mod[j].ip_name == NULL)
 			uu_die(gettext("Error: \"%s\" is not a default inetd "
 			    "property.\n"), argv[i]);
 
@@ -936,7 +939,7 @@ modify_defaults(int argc, char *argv[])
 			    "properties.\n"));
 
 		switch (mod[j].ip_type) {
-		case SCF_TYPE_INTEGER:
+		case INET_TYPE_INTEGER:
 			if (uu_strtoint(value, &new_int, sizeof (new_int), NULL,
 			    NULL, NULL) == -1)
 				uu_die(gettext("Error: \"%s\" is not a valid "
@@ -944,15 +947,15 @@ modify_defaults(int argc, char *argv[])
 
 			mod[j].ip_value.iv_int = new_int;
 			break;
-		case SCF_TYPE_ASTRING:
+		case INET_TYPE_STRING:
 			if (strlen(value) >= max_val)
 				uu_die(gettext("Error: String value is longer "
 				    "than %l characters.\n"), max_val);
-			if ((mod[j].ip_value.iv_astring = strdup(value))
+			if ((mod[j].ip_value.iv_string = strdup(value))
 			    == NULL)
 				uu_die(gettext("Error: Out of memory.\n"));
 			break;
-		case SCF_TYPE_BOOLEAN:
+		case INET_TYPE_BOOLEAN:
 			if (strcasecmp(value, INETADM_TRUE_STR) == 0)
 				mod[j].ip_value.iv_boolean = B_TRUE;
 			else if (strcasecmp(value, INETADM_FALSE_STR) == 0)
