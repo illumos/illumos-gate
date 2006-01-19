@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -220,8 +220,10 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	N_BOSTON_DISKS		8
 #define	SEATTLE_DISK_DEVCTL \
 	"/devices/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1:devctl"
-#define	BOSTON_DISK_DEVCTL \
+#define	BOSTON_DISK_DEVCTL_1068X \
 	"/devices/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1:devctl"
+#define	BOSTON_DISK_DEVCTL_1068E \
+	"/devices/pci@1e,600000/pci@0/pci@2/scsi@0:devctl"
 
 /*
  * led defines
@@ -288,6 +290,12 @@ static pthread_cond_t		g_cv;
 static pthread_cond_t		g_cv_ack;
 static pthread_mutex_t		g_mutex;
 static volatile boolean_t	g_finish_now = B_FALSE;
+
+/*
+ * Boston platform-specific flag which tells us if we are using
+ * a LSI 1068X disk controller (0) or a LSI 1068E (1).
+ */
+static int boston_1068e_flag = 0;
 
 /*
  * static strings
@@ -2255,7 +2263,11 @@ check_raid(int target)
 		fd = open(SEATTLE_DISK_DEVCTL, O_RDONLY);
 		break;
 	case PLAT_BOSTON:
-		fd = open(BOSTON_DISK_DEVCTL, O_RDONLY);
+		if (boston_1068e_flag) {
+		    fd = open(BOSTON_DISK_DEVCTL_1068E, O_RDONLY);
+		} else {
+		    fd = open(BOSTON_DISK_DEVCTL_1068X, O_RDONLY);
+		}
 		break;
 	default:
 		fd = -1;
@@ -2294,6 +2306,7 @@ disk_leds_thread(void *args)
 	int 	c;
 	int 	i;
 	char	**disk_dev;
+	int fd;
 
 	devctl_hdl_t dhdl;
 
@@ -2339,7 +2352,17 @@ disk_leds_thread(void *args)
 		"/pci@1e,600000/pci@0/pci@a/pci@0/pci@8/scsi@1/sd@3,0"
 	};
 
-	static char *boston_devs[] = {
+	static char *boston_devs_1068e[] = {
+		"/pci@1e,600000/pci@0/pci@2/scsi@0/sd@0,0",
+		"/pci@1e,600000/pci@0/pci@2/scsi@0/sd@1,0",
+		"/pci@1e,600000/pci@0/pci@2/scsi@0/sd@2,0",
+		"/pci@1e,600000/pci@0/pci@2/scsi@0/sd@3,0",
+		"/pci@1e,600000/pci@0/pci@2/scsi@0/sd@4,0",
+		"/pci@1e,600000/pci@0/pci@2/scsi@0/sd@5,0",
+		"/pci@1e,600000/pci@0/pci@2/scsi@0/sd@6,0",
+		"/pci@1e,600000/pci@0/pci@2/scsi@0/sd@7,0"
+	};
+	static char *boston_devs_1068x[] = {
 		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@0,0",
 		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@1,0",
 		"/pci@1f,700000/pci@0/pci@2/pci@0/pci@8/LSILogic,sas@1/sd@2,0",
@@ -2381,8 +2404,25 @@ disk_leds_thread(void *args)
 		break;
 
 	case PLAT_BOSTON:
+		/*
+		 * If we can open the devctl path for the built-in 1068E
+		 * controller then assume we're a 1068E-equipped Boston
+		 * and make all the paths appropriate for that hardware.
+		 * Otherwise assume we are a 1068X-equipped Boston and
+		 * make all of the paths appropriate for a 1068X PCI-X
+		 * controller in PCI slot 4.
+		 *
+		 * The flag is also used in the check_raid() function.
+		 */
+		if ((fd = open(BOSTON_DISK_DEVCTL_1068E, O_RDONLY)) != -1) {
+			boston_1068e_flag = 1;
+			disk_dev = boston_devs_1068e;
+		} else {
+			boston_1068e_flag = 0;
+			disk_dev = boston_devs_1068x;
+		}
+		(void) close(fd);
 		do_raid = 1;
-		disk_dev = boston_devs;
 		n_disks = N_BOSTON_DISKS;
 		break;
 
