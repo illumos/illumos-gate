@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -770,13 +770,6 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 	vfsp->vfs_flag |= VFS_UNMOUNTED;
 	zfs_objset_close(zfsvfs);
 
-	/*
-	 * We can now safely destroy the '.zfs' directory node, which will
-	 * release its hold on the vfs_t.
-	 */
-	if (zfsvfs->z_ctldir != NULL)
-		zfsctl_destroy(zfsvfs);
-
 	return (0);
 }
 
@@ -984,6 +977,12 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 	 * Finally close the objset
 	 */
 	dmu_objset_close(os);
+
+	/*
+	 * We can now safely destroy the '.zfs' directory node.
+	 */
+	if (zfsvfs->z_ctldir != NULL)
+		zfsctl_destroy(zfsvfs);
 
 }
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,14 +199,13 @@ zfsctl_create(zfsvfs_t *zfsvfs)
 }
 
 /*
- * Destroy the '.zfs' directory.  Only called when the filesystem is
- * unmounted, and there are no more references.  Release the vnode,
- * which will release the hold on the vfs structure.
+ * Destroy the '.zfs' directory.  Only called when the filesystem is unmounted.
+ * There might still be more references if we were force unmounted, but only
+ * new zfs_inactive() calls can occur and they don't reference .zfs
  */
 void
 zfsctl_destroy(zfsvfs_t *zfsvfs)
 {
-	ASSERT(zfsvfs->z_ctldir->v_count == 1);
 	VN_RELE(zfsvfs->z_ctldir);
 	zfsvfs->z_ctldir = NULL;
 }

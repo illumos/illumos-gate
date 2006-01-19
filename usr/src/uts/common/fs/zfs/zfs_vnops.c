@@ -2937,8 +2937,10 @@ zfs_inactive(vnode_t *vp, cred_t *cr)
 	 * Attempt to push any data in the page cache.  If this fails
 	 * we will get kicked out later in zfs_zinactive().
 	 */
-	if (vn_has_cached_data(vp))
-		(void) pvn_vplist_dirty(vp, 0, zfs_putapage, B_INVAL, cr);
+	if (vn_has_cached_data(vp)) {
+		(void) pvn_vplist_dirty(vp, 0, zfs_putapage, B_INVAL|B_ASYNC,
+		    cr);
+	}
 
 	if (zp->z_atime_dirty && zp->z_reap == 0) {
 		dmu_tx_t *tx = dmu_tx_create(zfsvfs->z_os);
