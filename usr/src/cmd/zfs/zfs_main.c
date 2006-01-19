@@ -1284,7 +1284,6 @@ error:
 typedef struct rollback_cbdata {
 	uint64_t	cb_create;
 	int		cb_first;
-	int		cb_force;
 	int		cb_doclones;
 	char		*cb_target;
 	int		cb_error;
@@ -1308,6 +1307,7 @@ rollback_check(zfs_handle_t *zhp, void *data)
 
 	if (!cbp->cb_dependent) {
 		if (strcmp(zfs_get_name(zhp), cbp->cb_target) != 0 &&
+		    zfs_get_type(zhp) == ZFS_TYPE_SNAPSHOT &&
 		    zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) >
 		    cbp->cb_create) {
 
@@ -1352,83 +1352,22 @@ rollback_check(zfs_handle_t *zhp, void *data)
 	return (0);
 }
 
-/*
- * Unmount any filesystems or snapshots that will need to be destroyed as part
- * of the rollback process.
- */
-static int
-rollback_unmount(zfs_handle_t *zhp, void *data)
-{
-	rollback_cbdata_t *cbp = data;
-
-	if (!cbp->cb_dependent) {
-		if (strcmp(zfs_get_name(zhp), cbp->cb_target) != 0 &&
-		    zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) >
-		    cbp->cb_create) {
-
-			cbp->cb_dependent = TRUE;
-			(void) zfs_iter_dependents(zhp, rollback_unmount, cbp);
-			cbp->cb_dependent = FALSE;
-
-			if (zfs_unmount(zhp, NULL,
-			    cbp->cb_force ? MS_FORCE: 0) != 0)
-				cbp->cb_error = 1;
-		}
-	} else if (zfs_unmount(zhp, NULL, cbp->cb_force ? MS_FORCE : 0) != 0) {
-		cbp->cb_error = 1;
-	}
-
-	zfs_close(zhp);
-	return (0);
-}
-
-/*
- * Destroy any more recent snapshots.  We invoke this callback on any dependents
- * of the snapshot first.  If the 'cb_dependent' member is non-zero, then this
- * is a dependent and we should just destroy it without checking the transaction
- * group.
- */
-static int
-rollback_destroy(zfs_handle_t *zhp, void *data)
-{
-	rollback_cbdata_t *cbp = data;
-
-	if (!cbp->cb_dependent) {
-		if (strcmp(zfs_get_name(zhp), cbp->cb_target) != 0 &&
-		    zfs_prop_get_int(zhp, ZFS_PROP_CREATETXG) >
-		    cbp->cb_create) {
-
-			cbp->cb_dependent = TRUE;
-			(void) zfs_iter_dependents(zhp, rollback_destroy, cbp);
-			cbp->cb_dependent = FALSE;
-
-			if (zfs_destroy(zhp) != 0)
-				cbp->cb_error = 1;
-		}
-	} else if (zfs_destroy(zhp) != 0) {
-		cbp->cb_error = 1;
-	}
-
-	zfs_close(zhp);
-	return (0);
-}
-
 static int
 zfs_do_rollback(int argc, char **argv)
 {
 	int ret;
 	int c;
 	rollback_cbdata_t cb = { 0 };
-	int was_mounted;
 	zfs_handle_t *zhp, *snap;
 	char parentname[ZFS_MAXNAMELEN];
 	char *delim;
+	int force = 0;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "rfR")) != -1) {
 		switch (c) {
 		case 'f':
-			cb.cb_force = TRUE;
+			force = 1;
 			break;
 		case 'r':
 			cb.cb_recurse = 1;
@@ -1457,13 +1396,12 @@ zfs_do_rollback(int argc, char **argv)
 		usage(FALSE);
 	}
 
-	cb.cb_target = argv[0];
-
 	/* open the snapshot */
-	if ((snap = zfs_open(cb.cb_target, ZFS_TYPE_SNAPSHOT)) == NULL)
+	if ((snap = zfs_open(argv[0], ZFS_TYPE_SNAPSHOT)) == NULL)
 		return (1);
 
-	(void) strlcpy(parentname, cb.cb_target, sizeof (parentname));
+	/* open the parent dataset */
+	(void) strlcpy(parentname, argv[0], sizeof (parentname));
 	verify((delim = strrchr(parentname, '@')) != NULL);
 	*delim = '\0';
 	if ((zhp = zfs_open(parentname, ZFS_TYPE_ANY)) == NULL) {
@@ -1471,15 +1409,12 @@ zfs_do_rollback(int argc, char **argv)
 		return (1);
 	}
 
-	/* See if this dataset is mounted */
-	was_mounted = zfs_is_mounted(zhp, NULL);
-
-	cb.cb_create = zfs_prop_get_int(snap, ZFS_PROP_CREATETXG);
-
 	/*
 	 * Check for more recent snapshots and/or clones based on the presence
 	 * of '-r' and '-R'.
 	 */
+	cb.cb_target = argv[0];
+	cb.cb_create = zfs_prop_get_int(snap, ZFS_PROP_CREATETXG);
 	cb.cb_first = 1;
 	cb.cb_error = 0;
 	(void) zfs_iter_children(zhp, rollback_check, &cb);
@@ -1487,33 +1422,10 @@ zfs_do_rollback(int argc, char **argv)
 	if ((ret = cb.cb_error) != 0)
 		goto out;
 
-	cb.cb_error = 0;
-
 	/*
-	 * Unmount any snapshots as well as the dataset itself.
+	 * Rollback parent to the given snapshot.
 	 */
-	if ((ret = zfs_iter_children(zhp, rollback_unmount,
-	    &cb)) != 0 || (ret = zfs_unmount(zhp, NULL,
-		cb.cb_force ? MS_FORCE : 0)) != 0)
-		goto out;
-
-	(void) zfs_iter_children(zhp, rollback_destroy, &cb);
-
-	if ((ret = cb.cb_error) != 0)
-		goto out;
-
-	/*
-	 * Now that we have verified that the snapshot is the latest, rollback
-	 * to the given snapshot.
-	 */
-	ret = zfs_rollback(zhp);
-
-	/*
-	 * We only want to re-mount the filesystem if it was mounted in the
-	 * first place.
-	 */
-	if (was_mounted)
-		(void) zfs_mount(zhp, NULL, 0);
+	ret = zfs_rollback(zhp, snap, force);
 
 out:
 	zfs_close(snap);

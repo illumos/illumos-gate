@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,7 @@ typedef struct prop_changelist prop_changelist_t;
 int changelist_prefix(prop_changelist_t *);
 int changelist_postfix(prop_changelist_t *);
 void changelist_rename(prop_changelist_t *, const char *, const char *);
+void changelist_remove(zfs_handle_t *, prop_changelist_t *);
 void changelist_free(prop_changelist_t *);
 prop_changelist_t *changelist_gather(zfs_handle_t *, zfs_prop_t, int);
 int changelist_unshare(prop_changelist_t *);

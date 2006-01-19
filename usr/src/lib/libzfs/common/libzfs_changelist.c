@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,7 @@
  *
  * Other interfaces:
  *
+ * changelist_remove() - remove a node from a gathered list
  * changelist_rename() - renames all datasets appropriately when doing a rename
  * changelist_unshare() - unshares all the nodes in a given changelist
  * changelist_haszonedchild() - check if there is any child exported to
@@ -74,6 +75,7 @@ struct prop_changelist {
 	uu_list_t		*cl_list;
 	int			cl_waslegacy;
 	int			cl_allchildren;
+	int			cl_alldependents;
 	int			cl_flags;
 	int			cl_haszonedchild;
 };
@@ -195,6 +197,28 @@ changelist_postfix(prop_changelist_t *clp)
 }
 
 /*
+ * Is this "dataset" a child of "parent"?
+ */
+static int
+isa_child_of(char *dataset, const char *parent)
+{
+	int len;
+
+	/* snapshot does not have a child */
+	if (strchr(parent, '@'))
+		return (FALSE);
+
+	len = strlen(parent);
+
+	if (strncmp(dataset, parent, len) == 0 &&
+	    (dataset[len] == '/' || dataset[len] == '\0'))
+		return (TRUE);
+	else
+		return (FALSE);
+
+}
+
+/*
  * If we rename a filesystem, and child filesystem handles are no longer valid,
  * since we identify datasets by their name in the ZFS namespace.  So, we have
  * to go through and fix up all the names appropriately.  We could do this
@@ -209,6 +233,12 @@ changelist_rename(prop_changelist_t *clp, const char *src, const char *dst)
 
 	for (cn = uu_list_first(clp->cl_list); cn != NULL;
 	    cn = uu_list_next(clp->cl_list, cn)) {
+		/*
+		 * Do not rename a clone that's not in the source hierarchy.
+		 */
+		if (!isa_child_of(cn->cn_handle->zfs_name, src))
+			continue;
+
 		/*
 		 * Destroy the previous mountpoint if needed.
 		 */
@@ -254,6 +284,26 @@ int
 changelist_haszonedchild(prop_changelist_t *clp)
 {
 	return (clp->cl_haszonedchild);
+}
+
+/*
+ * Remove a node from a gathered list.
+ */
+void
+changelist_remove(zfs_handle_t *zhp, prop_changelist_t *clp)
+{
+	prop_changenode_t *cn;
+
+	for (cn = uu_list_first(clp->cl_list); cn != NULL;
+	    cn = uu_list_next(clp->cl_list, cn)) {
+
+		if (strcmp(cn->cn_handle->zfs_name, zhp->zfs_name) == 0) {
+			uu_list_remove(clp->cl_list, cn);
+			zfs_close(cn->cn_handle);
+			free(cn);
+			return;
+		}
+	}
 }
 
 /*
@@ -306,8 +356,8 @@ change_one(zfs_handle_t *zhp, void *data)
 	    FALSE) != 0)
 		return (0);
 
-	if (clp->cl_allchildren || sourcetype == ZFS_SRC_DEFAULT ||
-	    sourcetype == ZFS_SRC_INHERITED) {
+	if (clp->cl_alldependents || clp->cl_allchildren ||
+	    sourcetype == ZFS_SRC_DEFAULT || sourcetype == ZFS_SRC_INHERITED) {
 		cn = zfs_malloc(sizeof (prop_changenode_t));
 
 		cn->cn_handle = zhp;
@@ -320,10 +370,16 @@ change_one(zfs_handle_t *zhp, void *data)
 			clp->cl_haszonedchild = TRUE;
 
 		uu_list_node_init(cn, &cn->cn_listnode, clp->cl_pool);
-		verify(uu_list_insert_before(clp->cl_list,
-		    uu_list_first(clp->cl_list), cn) == 0);
 
-		return (zfs_iter_children(zhp, change_one, data));
+		if (clp->cl_alldependents) {
+			verify(uu_list_insert_after(clp->cl_list,
+				uu_list_last(clp->cl_list), cn) == 0);
+			return (0);
+		} else {
+			verify(uu_list_insert_before(clp->cl_list,
+				uu_list_first(clp->cl_list), cn) == 0);
+			return (zfs_iter_children(zhp, change_one, data));
+		}
 	} else {
 		zfs_close(zhp);
 	}
@@ -361,8 +417,14 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	 * If this is a rename or the 'zoned' property, we pretend we're
 	 * changing the mountpoint and flag it so we can catch all children in
 	 * change_one().
+	 *
+	 * Flag cl_alldependents to catch all children plus the
+	 * dependents (clones) that are not in the hierarchy.
 	 */
-	if (prop == ZFS_PROP_NAME || prop == ZFS_PROP_ZONED) {
+	if (prop == ZFS_PROP_NAME) {
+		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
+		clp->cl_alldependents = TRUE;
+	} else if (prop == ZFS_PROP_ZONED) {
 		clp->cl_prop = ZFS_PROP_MOUNTPOINT;
 		clp->cl_allchildren = TRUE;
 	} else {
@@ -374,7 +436,12 @@ changelist_gather(zfs_handle_t *zhp, zfs_prop_t prop, int flags)
 	    clp->cl_prop != ZFS_PROP_SHARENFS)
 		return (clp);
 
-	if (zfs_iter_children(zhp, change_one, clp) != 0) {
+	if (clp->cl_alldependents) {
+		if (zfs_iter_dependents(zhp, change_one, clp) != 0) {
+			changelist_free(clp);
+			return (NULL);
+		}
+	} else if (zfs_iter_children(zhp, change_one, clp) != 0) {
 		changelist_free(clp);
 		return (NULL);
 	}

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -204,7 +204,7 @@ extern int zfs_create(const char *, zfs_type_t, const char *, const char *);
 extern int zfs_destroy(zfs_handle_t *);
 extern int zfs_clone(zfs_handle_t *, const char *);
 extern int zfs_snapshot(const char *);
-extern int zfs_rollback(zfs_handle_t *);
+extern int zfs_rollback(zfs_handle_t *, zfs_handle_t *, int);
 extern int zfs_rename(zfs_handle_t *, const char *);
 extern int zfs_backup(zfs_handle_t *, zfs_handle_t *);
 extern int zfs_restore(const char *, int, int, int);
