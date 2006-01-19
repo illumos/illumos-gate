@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # jstyle - check for some common stylistic errors.
@@ -260,8 +260,13 @@ line: while (<STDIN>) {
 		}
 	}
 
-	# allow spaces to be used to draw pictures in header comments.
-	if (/[^ ]     / && !/".*     .*"/ && !$in_header_comment) {
+	# Allow spaces to be used to draw pictures in header comments, but
+	# disallow blocks of spaces almost everywhere else.  In particular,
+	# five spaces are also allowed at the end of a line's indentation
+	# if the rest of the line belongs to a block comment.
+	if (!$in_header_comment &&
+	    /[^ ]     / &&
+	    !(/^\t*     \*/ && !/^\t*     \*.*     /)) {
 		err("spaces instead of tabs");
 	}
 	if ($tabs && /^ / && !/^ \*[ \t\/]/ && !/^ \*$/ &&
