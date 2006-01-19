@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,6 +134,7 @@ extern "C" {
 #define	XMITS_PARITY_INJECT_REG_OFFSET		0x2050
 #define	XMITS_PARITY_INJECT_1_REG_OFFSET	0x2058
 #define	XMITS_PARITY_INJECT_0_REG_OFFSET	0x2060
+#define	XMITS_UPPER_RETRY_COUNTER_REG_OFFSET	0x2310
 
 /*
  * Offsets of IO Cache Registers:
@@ -371,6 +372,11 @@ extern "C" {
 #define	PBM_AFSR_TO_DWORDMASK(afsr)	\
 	((afsr & SCHIZO_PCI_AFSR_DWORDMASK) >>	\
 		SCHIZO_PCI_AFSR_DWORDMASK_SHIFT)
+
+/*
+ * XMITS Upper Retry Counter Register (bits 15:0)
+ */
+#define	XMITS_UPPER_RETRY_MASK			0xFFFF
 
 /*
  * XMITS PCI-X Diagnostic Register bit definitions

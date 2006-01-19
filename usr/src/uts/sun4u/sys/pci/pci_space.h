@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -146,6 +146,7 @@ extern uint64_t xmits_error_intr_enable;
 extern uint_t xmits_perr_recov_int_enable;
 extern uint_t xmits_max_transactions;
 extern uint_t xmits_max_read_bytes;
+extern uint_t xmits_upper_retry_counter;
 
 extern int pci_dvma_remap_enabled;
 extern kthread_t *pci_reloc_thread;

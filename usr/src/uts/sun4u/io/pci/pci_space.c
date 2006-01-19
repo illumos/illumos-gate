@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,3 +296,9 @@ uint_t xmits_max_transactions = 0;
  * 0 = 512 Max Memory Read Bytes, 1 = 1024, 2 = 2048, 3 = 4096.
  */
 uint_t xmits_max_read_bytes = 0;
+
+/*
+ * Bits 15:0 increase the maximum PIO retries allowed by XMITS.
+ * Initialized to maximum retry limit 0xFFFF
+ */
+uint_t xmits_upper_retry_counter = 0xFFFF;

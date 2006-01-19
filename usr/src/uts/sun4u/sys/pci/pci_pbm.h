@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +89,7 @@ struct pbm {
 	volatile uint64_t *pbm_estar_reg;
 	volatile uint64_t *pbm_pcix_err_stat_reg;
 	volatile uint64_t *pbm_pci_ped_ctrl;
+	volatile uint64_t *pbm_upper_retry_counter_reg; /* for xmits */
 
 	/*
 	 * PCI configuration header block for the PBM:

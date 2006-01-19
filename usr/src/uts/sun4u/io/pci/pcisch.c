@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -958,6 +958,24 @@ pbm_configure(pbm_t *pbm_p)
 
 	(void) ndi_prop_update_int(DDI_DEV_T_ANY, dip, "latency-timer",
 		(int)pbm_p->pbm_config_header->ch_latency_timer_reg);
+
+	/*
+	 * Adjust xmits_upper_retry_counter if set in /etc/system
+	 *
+	 * NOTE: current implementation resets UPPR_RTRY counter for
+	 * _all_ XMITS' PBMs and does not support tuning per PBM.
+	 */
+	if (CHIP_TYPE(pci_p) == PCI_CHIP_XMITS) {
+		uint_t xurc = xmits_upper_retry_counter &
+		    XMITS_UPPER_RETRY_MASK;
+
+		if (xurc) {
+			*pbm_p->pbm_upper_retry_counter_reg = (uint64_t)xurc;
+			DEBUG1(DBG_ATTACH, dip, "pbm_configure: Setting XMITS"
+			    " uppr_rtry counter = 0x%lx\n",
+			    *pbm_p->pbm_upper_retry_counter_reg);
+		}
+	}
 }
 
 uint_t
@@ -1348,6 +1366,10 @@ non_schizo:
 		pci_dvma_sync_before_unmap = 1;
 		pa = pci_p->pci_cb_p->cb_icbase_pa;
 	}
+	if (CHIP_TYPE(pci_p) == PCI_CHIP_XMITS)
+		pbm_p->pbm_upper_retry_counter_reg =
+		    (uint64_t *)(a + XMITS_UPPER_RETRY_COUNTER_REG_OFFSET);
+
 	pbm_p->pbm_sync_reg_pa = pa + PBM_DMA_SYNC_PEND_REG_OFFSET;
 }
 
