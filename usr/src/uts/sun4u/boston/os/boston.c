@@ -258,7 +258,7 @@ plat_add_mem_unum_label(char *unum, int mcid, int bank, int dimm)
 int
 plat_get_cpu_unum(int cpuid, char *buf, int buflen, int *lenp)
 {
-	if (snprintf(buf, buflen, "MB") >= buflen) {
+	if (snprintf(buf, buflen, "MB/C%d", cpuid) >= buflen) {
 		return (ENOSPC);
 	} else {
 		*lenp = strlen(buf);
