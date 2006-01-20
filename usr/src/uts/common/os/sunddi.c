@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -832,7 +832,7 @@ ddi_dma_buf_setup(dev_info_t *dip, struct buf *bp, uint_t flags,
 	dmareq.dmar_arg = arg;
 	dmareq.dmar_object.dmao_size = (uint_t)bp->b_bcount;
 
-	if ((bp->b_flags & (B_PAGEIO|B_REMAPPED)) == B_PAGEIO) {
+	if (bp->b_flags & B_PAGEIO) {
 		dmareq.dmar_object.dmao_type = DMA_OTYP_PAGES;
 		dmareq.dmar_object.dmao_obj.pp_obj.pp_pp = bp->b_pages;
 		dmareq.dmar_object.dmao_obj.pp_obj.pp_offset =
@@ -840,7 +840,7 @@ ddi_dma_buf_setup(dev_info_t *dip, struct buf *bp, uint_t flags,
 	} else {
 		dmareq.dmar_object.dmao_type = DMA_OTYP_BUFVADDR;
 		dmareq.dmar_object.dmao_obj.virt_obj.v_addr = bp->b_un.b_addr;
-		if ((bp->b_flags & (B_SHADOW|B_REMAPPED)) == B_SHADOW) {
+		if (bp->b_flags & B_SHADOW) {
 			dmareq.dmar_object.dmao_obj.virt_obj.v_priv =
 							bp->b_shadow;
 		} else {
@@ -854,8 +854,8 @@ ddi_dma_buf_setup(dev_info_t *dip, struct buf *bp, uint_t flags,
 		 * mapped into the kernel's address space), then
 		 * the address space is kas (kernel address space).
 		 */
-		if (bp->b_proc == NULL || bp->b_proc->p_as == &kas ||
-		    (bp->b_flags & B_REMAPPED) != 0) {
+		if ((bp->b_proc == NULL) || (bp->b_proc->p_as == &kas) ||
+		    (bp->b_flags & B_REMAPPED)) {
 			dmareq.dmar_object.dmao_obj.virt_obj.v_as = 0;
 		} else {
 			dmareq.dmar_object.dmao_obj.virt_obj.v_as =
@@ -6698,20 +6698,20 @@ ddi_dma_buf_bind_handle(ddi_dma_handle_t handle, struct buf *bp,
 	dmareq.dmar_arg = arg;
 	dmareq.dmar_object.dmao_size = (uint_t)bp->b_bcount;
 
-	if ((bp->b_flags & (B_PAGEIO|B_REMAPPED)) == B_PAGEIO) {
+	if (bp->b_flags & B_PAGEIO) {
 		dmareq.dmar_object.dmao_type = DMA_OTYP_PAGES;
 		dmareq.dmar_object.dmao_obj.pp_obj.pp_pp = bp->b_pages;
 		dmareq.dmar_object.dmao_obj.pp_obj.pp_offset =
 		    (uint_t)(((uintptr_t)bp->b_un.b_addr) & MMU_PAGEOFFSET);
 	} else {
 		dmareq.dmar_object.dmao_obj.virt_obj.v_addr = bp->b_un.b_addr;
-		if ((bp->b_flags & (B_SHADOW|B_REMAPPED)) == B_SHADOW) {
+		if (bp->b_flags & B_SHADOW) {
 			dmareq.dmar_object.dmao_obj.virt_obj.v_priv =
 							bp->b_shadow;
 			dmareq.dmar_object.dmao_type = DMA_OTYP_BUFVADDR;
 		} else {
 			dmareq.dmar_object.dmao_type =
-				(bp->b_flags & (B_PHYS | B_REMAPPED))?
+				(bp->b_flags & (B_PHYS | B_REMAPPED)) ?
 				DMA_OTYP_BUFVADDR : DMA_OTYP_VADDR;
 			dmareq.dmar_object.dmao_obj.virt_obj.v_priv = NULL;
 		}
@@ -6723,8 +6723,8 @@ ddi_dma_buf_bind_handle(ddi_dma_handle_t handle, struct buf *bp,
 		 * mapped into the kernel's address space), then
 		 * the address space is kas (kernel address space).
 		 */
-		if (bp->b_proc == NULL || bp->b_proc->p_as == &kas ||
-		    (bp->b_flags & B_REMAPPED) != 0) {
+		if ((bp->b_proc == NULL) || (bp->b_proc->p_as == &kas) ||
+		    (bp->b_flags & B_REMAPPED)) {
 			dmareq.dmar_object.dmao_obj.virt_obj.v_as = 0;
 		} else {
 			dmareq.dmar_object.dmao_obj.virt_obj.v_as =

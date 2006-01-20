@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,6 +37,7 @@
 #include <sys/machparam.h>
 #include <vm/page.h>
 #include <vm/seg_kmem.h>
+#include <vm/seg_kpm.h>
 
 #ifdef __sparc
 #include <sys/cpu_module.h>
@@ -48,7 +49,8 @@
 static vmem_t *bp_map_arena;
 static size_t bp_align;
 static uint_t bp_devload_flags = PROT_READ | PROT_WRITE | HAT_NOSYNC;
-int bp_max_cache = 1 << 17;		/* 128K default; tunable */
+int	bp_max_cache = 1 << 17;		/* 128K default; tunable */
+int	bp_mapin_kpm_enable = 1;	/* enable default; tunable */
 
 static void *
 bp_vmem_alloc(vmem_t *vmp, size_t size, int vmflag)
@@ -74,16 +76,16 @@ bp_init(size_t align, uint_t devload_flags)
 void *
 bp_mapin_common(struct buf *bp, int flag)
 {
-	struct as *as;
-	pfn_t pfnum;
-	page_t *pp = NULL;
-	page_t **pplist = NULL;
-	caddr_t kaddr;
-	caddr_t addr = (caddr_t)bp->b_un.b_addr;
-	uintptr_t off = (uintptr_t)addr & PAGEOFFSET;
-	size_t size = P2ROUNDUP(bp->b_bcount + off, PAGESIZE);
-	pgcnt_t npages = btop(size);
-	int color;
+	struct as	*as;
+	pfn_t		pfnum;
+	page_t		*pp;
+	page_t		**pplist;
+	caddr_t		kaddr;
+	caddr_t		addr;
+	uintptr_t	off;
+	size_t		size;
+	pgcnt_t		npages;
+	int		color;
 
 	/* return if already mapped in, no pageio/physio, or physio to kas */
 	if ((bp->b_flags & B_REMAPPED) ||
@@ -93,6 +95,24 @@ bp_mapin_common(struct buf *bp, int flag)
 		return (bp->b_un.b_addr);
 
 	ASSERT((bp->b_flags & (B_PAGEIO | B_PHYS)) != (B_PAGEIO | B_PHYS));
+
+	addr = (caddr_t)bp->b_un.b_addr;
+	off = (uintptr_t)addr & PAGEOFFSET;
+	size = P2ROUNDUP(bp->b_bcount + off, PAGESIZE);
+	npages = btop(size);
+
+	/* Fastpath single page IO to locked memory by using kpm. */
+	if ((bp->b_flags & (B_SHADOW | B_PAGEIO)) && (npages == 1) &&
+	    kpm_enable && bp_mapin_kpm_enable) {
+		if (bp->b_flags & B_SHADOW)
+			pp = *bp->b_shadow;
+		else
+			pp = bp->b_pages;
+		kaddr = hat_kpm_mapin(pp, NULL);
+		bp->b_un.b_addr = kaddr + off;
+		bp->b_flags |= B_REMAPPED;
+		return (bp->b_un.b_addr);
+	}
 
 	/*
 	 * Allocate kernel virtual space for remapping.
@@ -120,9 +140,13 @@ bp_mapin_common(struct buf *bp, int flag)
 	 */
 	if (bp->b_flags & B_PAGEIO) {
 		pp = bp->b_pages;
+		pplist = NULL;
 	} else if (bp->b_flags & B_SHADOW) {
+		pp = NULL;
 		pplist = bp->b_shadow;
 	} else {
+		pp = NULL;
+		pplist = NULL;
 		if (bp->b_proc == NULL || (as = bp->b_proc->p_as) == NULL)
 			as = &kas;
 	}
@@ -135,8 +159,9 @@ bp_mapin_common(struct buf *bp, int flag)
 			pfnum = pp->p_pagenum;
 			pp = pp->p_next;
 		} else if (pplist == NULL) {
-			if ((pfnum = hat_getpfnum(as->a_hat, addr - off)) ==
-			    PFN_INVALID)
+			pfnum = hat_getpfnum(as->a_hat,
+			    (caddr_t)((uintptr_t)addr & MMU_PAGEMASK));
+			if (pfnum == PFN_INVALID)
 				panic("bp_mapin_common: hat_getpfnum for"
 				    " addr %p failed\n", (void *)addr);
 			addr += PAGESIZE;
@@ -168,21 +193,44 @@ bp_mapin(struct buf *bp)
 void
 bp_mapout(struct buf *bp)
 {
-	if (bp->b_flags & B_REMAPPED) {
-		uintptr_t addr = (uintptr_t)bp->b_un.b_addr;
-		uintptr_t off = addr & PAGEOFFSET;
-		uintptr_t base = addr - off;
-		uintptr_t color = P2PHASE(base, bp_align);
-		size_t size = P2ROUNDUP(bp->b_bcount + off, PAGESIZE);
-		bp->b_un.b_addr = (caddr_t)off;		/* debugging aid */
-		BP_FLUSH(base, size);
-		hat_unload(kas.a_hat, (void *)base, size,
-		    HAT_UNLOAD_NOSYNC | HAT_UNLOAD_UNLOCK);
-		if (bp_map_arena != NULL)
-			vmem_free(bp_map_arena, (void *)(base - color),
-			    P2ROUNDUP(color + size, bp_align));
+	caddr_t		addr;
+	uintptr_t	off;
+	uintptr_t	base;
+	uintptr_t	color;
+	size_t		size;
+	pgcnt_t		npages;
+	page_t		*pp;
+
+	if ((bp->b_flags & B_REMAPPED) == 0)
+		return;
+
+	addr = bp->b_un.b_addr;
+	off = (uintptr_t)addr & PAGEOFFSET;
+	size = P2ROUNDUP(bp->b_bcount + off, PAGESIZE);
+	npages = btop(size);
+
+	bp->b_un.b_addr = (caddr_t)off;		/* debugging aid */
+
+	if ((bp->b_flags & (B_SHADOW | B_PAGEIO)) && (npages == 1) &&
+	    kpm_enable && bp_mapin_kpm_enable) {
+		if (bp->b_flags & B_SHADOW)
+			pp = *bp->b_shadow;
 		else
-			vmem_free(heap_arena, (void *)base, size);
+			pp = bp->b_pages;
+		hat_kpm_mapout(pp, NULL, addr);
 		bp->b_flags &= ~B_REMAPPED;
+		return;
 	}
+
+	base = (uintptr_t)addr & MMU_PAGEMASK;
+	BP_FLUSH(base, size);
+	hat_unload(kas.a_hat, (void *)base, size,
+	    HAT_UNLOAD_NOSYNC | HAT_UNLOAD_UNLOCK);
+	if (bp_map_arena != NULL) {
+		color = P2PHASE(base, bp_align);
+		vmem_free(bp_map_arena, (void *)(base - color),
+		    P2ROUNDUP(color + size, bp_align));
+	} else
+		vmem_free(heap_arena, (void *)base, size);
+	bp->b_flags &= ~B_REMAPPED;
 }
