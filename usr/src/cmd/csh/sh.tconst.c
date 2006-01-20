@@ -1,5 +1,5 @@
 /*
- * Copyright 2000 by Sun Microsystems, Inc. All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,6 +90,8 @@ tchar S_SPLESLESSP[] = {' ', '<', '<', ' ', 0};	/* << */
 tchar S_SPLESSP[] = {' ', '<', ' ', 0};	/* < */
 tchar S_SPPPP[] = {' ', '.', '.', '.', 0};	/* ... */
 tchar S_SPRBRA[] = {' ', ')', 0};	/* )*/
+tchar S_SUNW_VARLEN[] = {'S', 'U', 'N', 'W', '_',
+	'V', 'A', 'R', 'L', 'E', 'N', 0};
 tchar S_TERM[] = {'T','E','R','M',0};/*TERM*/
 tchar S_TIL[] = {'~', 0};	/* ~ */
 tchar S_TOPBIT[] = {(tchar)QUOTE, 0};	/* Was "\200".  A hack! */

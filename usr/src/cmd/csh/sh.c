@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,6 +120,8 @@ main(int c, char **av)
 	struct sigvec osv;
 	struct sigaction sa;
 	tchar s_prompt[MAXHOSTNAMELEN+3];
+	char *c_max_var_len;
+	int c_max_var_len_size;
 
 	pfcshflag = 0;
 
@@ -202,6 +204,13 @@ main(int c, char **av)
 	 * STATUS is also munged in several places.
 	 * CHILD is munged when forking/waiting
 	 */
+
+	c_max_var_len_size = snprintf(NULL, 0, "%ld", MAX_VAR_LEN);
+	c_max_var_len = (char *)xalloc(c_max_var_len_size + 1);
+	(void) snprintf(c_max_var_len, (c_max_var_len_size + 1),
+	    "%ld", MAX_VAR_LEN);
+	set(S_SUNW_VARLEN,  strtots(NOSTR, c_max_var_len));
+	xfree(c_max_var_len);
 
 	/* don't do globbing here, just set exact copies */
 	setNS(S_noglob);

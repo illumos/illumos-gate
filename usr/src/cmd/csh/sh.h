@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -386,9 +386,9 @@ struct varent *adrof1();
 #define	value(v)	value1(v, &shvhed)
 
 /*
- * MAX_VAR_LEN - maximum variable name defined by csh man page to be 20
+ * MAX_VAR_LEN - maximum variable name defined by csh man page to be 128
  */
-#define	MAX_VAR_LEN	20
+#define	MAX_VAR_LEN	128
 
 /*
  * MAX_VREF_LEN - maximum variable reference $name[...]
