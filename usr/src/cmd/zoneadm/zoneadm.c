@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -71,6 +71,7 @@
 #include <door.h>
 #include <macros.h>
 #include <libgen.h>
+#include <fnmatch.h>
 
 #include <pool.h>
 #include <sys/pool.h>
@@ -111,9 +112,13 @@ static size_t nzents;
 #define	CMD_UNINSTALL	8
 #define	CMD_MOUNT	9
 #define	CMD_UNMOUNT	10
+#define	CMD_CLONE	11
+#define	CMD_MOVE	12
 
 #define	CMD_MIN		CMD_HELP
-#define	CMD_MAX		CMD_UNMOUNT
+#define	CMD_MAX		CMD_MOVE
+
+#define	SINGLE_USER_RETRY	30
 
 struct cmd {
 	uint_t	cmd_num;				/* command number */
@@ -132,6 +137,8 @@ struct cmd {
 #define	SHELP_VERIFY	"verify"
 #define	SHELP_INSTALL	"install"
 #define	SHELP_UNINSTALL	"uninstall [-F]"
+#define	SHELP_CLONE	"clone [-m method] zonename"
+#define	SHELP_MOVE	"move zonepath"
 
 static int help_func(int argc, char *argv[]);
 static int ready_func(int argc, char *argv[]);
@@ -144,6 +151,8 @@ static int install_func(int argc, char *argv[]);
 static int uninstall_func(int argc, char *argv[]);
 static int mount_func(int argc, char *argv[]);
 static int unmount_func(int argc, char *argv[]);
+static int clone_func(int argc, char *argv[]);
+static int move_func(int argc, char *argv[]);
 static int sanity_check(char *zone, int cmd_num, boolean_t running,
     boolean_t unsafe_when_running);
 static int cmd_match(char *cmd);
@@ -160,9 +169,11 @@ static struct cmd cmdtab[] = {
 	{ CMD_INSTALL,		"install",	SHELP_INSTALL,	install_func },
 	{ CMD_UNINSTALL,	"uninstall",	SHELP_UNINSTALL,
 	    uninstall_func },
-	/* Private commands for admin/install */
+	/* mount and unmount are private commands for admin/install */
 	{ CMD_MOUNT,		"mount",	NULL,		mount_func },
-	{ CMD_UNMOUNT,		"unmount",	NULL,		unmount_func }
+	{ CMD_UNMOUNT,		"unmount",	NULL,		unmount_func },
+	{ CMD_CLONE,		"clone",	SHELP_CLONE,	clone_func },
+	{ CMD_MOVE,		"move",		SHELP_MOVE,	move_func }
 };
 
 /* global variables */
@@ -234,6 +245,11 @@ long_help(int cmd_num)
 			return (gettext("Uninstall the configuration from the "
 			    "system.  The -F flag can be used\n\tto force the "
 			    "action."));
+		case CMD_CLONE:
+			return (gettext("Clone the installation of another "
+			    "zone."));
+		case CMD_MOVE:
+			return (gettext("Move the zone to a new zonepath."));
 		default:
 			return ("");
 	}
@@ -737,7 +753,8 @@ validate_zonepath(char *path, int cmd_num)
 	}
 	if ((res = resolvepath(path, rpath, sizeof (rpath))) == -1) {
 		if ((errno != ENOENT) ||
-		    (cmd_num != CMD_VERIFY && cmd_num != CMD_INSTALL)) {
+		    (cmd_num != CMD_VERIFY && cmd_num != CMD_INSTALL &&
+		    cmd_num != CMD_CLONE && cmd_num != CMD_MOVE)) {
 			zperror(path, B_FALSE);
 			return (Z_ERR);
 		}
@@ -778,7 +795,7 @@ validate_zonepath(char *path, int cmd_num)
 		 * worry about a subsequent ENOENT, thus this should
 		 * only recurse once.
 		 */
-		return (validate_zonepath(path, CMD_INSTALL));
+		return (validate_zonepath(path, cmd_num));
 	}
 	rpath[res] = '\0';
 	if (strcmp(path, rpath) != 0) {
@@ -1595,6 +1612,7 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 				return (Z_ERR);
 			}
 			break;
+		case CMD_CLONE:
 		case CMD_INSTALL:
 			if (state == ZONE_STATE_INSTALLED) {
 				zerror(gettext("is already %s."),
@@ -1607,6 +1625,7 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 				return (Z_ERR);
 			}
 			break;
+		case CMD_MOVE:
 		case CMD_READY:
 		case CMD_BOOT:
 		case CMD_MOUNT:
@@ -2334,7 +2353,7 @@ install_func(int argc, char *argv[])
 
 	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
 		zerror(gettext("another %s may have an operation in progress."),
-		    "zoneadmd");
+		    "zoneadm");
 		return (Z_ERR);
 	}
 	err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
@@ -2393,6 +2412,932 @@ done:
 }
 
 /*
+ * Check that the inherited pkg dirs are the same for the clone and its source.
+ * The easiest way to do that is check that the list of ipds is the same
+ * by matching each one against the other.  This algorithm should be fine since
+ * the list of ipds should not be that long.
+ */
+static int
+valid_ipd_clone(zone_dochandle_t s_handle, char *source_zone,
+	zone_dochandle_t t_handle, char *target_zone)
+{
+	int err;
+	int res = Z_OK;
+	int s_cnt = 0;
+	int t_cnt = 0;
+	struct zone_fstab s_fstab;
+	struct zone_fstab t_fstab;
+
+	/*
+	 * First check the source of the clone against the target.
+	 */
+	if ((err = zonecfg_setipdent(s_handle)) != Z_OK) {
+		errno = err;
+		zperror2(source_zone, gettext("could not enumerate "
+		    "inherit-pkg-dirs"));
+		return (Z_ERR);
+	}
+
+	while (zonecfg_getipdent(s_handle, &s_fstab) == Z_OK) {
+		boolean_t match = B_FALSE;
+
+		s_cnt++;
+
+		if ((err = zonecfg_setipdent(t_handle)) != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("could not enumerate "
+			    "inherit-pkg-dirs"));
+			(void) zonecfg_endipdent(s_handle);
+			return (Z_ERR);
+		}
+
+		while (zonecfg_getipdent(t_handle, &t_fstab) == Z_OK) {
+			if (strcmp(s_fstab.zone_fs_dir, t_fstab.zone_fs_dir)
+			    == 0) {
+				match = B_TRUE;
+				break;
+			}
+		}
+		(void) zonecfg_endipdent(t_handle);
+
+		if (!match) {
+			(void) fprintf(stderr, gettext("inherit-pkg-dir "
+			    "'%s' is not configured in zone %s.\n"),
+			    s_fstab.zone_fs_dir, target_zone);
+			res = Z_ERR;
+		}
+	}
+
+	(void) zonecfg_endipdent(s_handle);
+
+	/* skip the next check if we already have errors */
+	if (res == Z_ERR)
+		return (res);
+
+	/*
+	 * Now check the number of ipds in the target so we can verify
+	 * that the source is not a subset of the target.
+	 */
+	if ((err = zonecfg_setipdent(t_handle)) != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not enumerate "
+		    "inherit-pkg-dirs"));
+		return (Z_ERR);
+	}
+
+	while (zonecfg_getipdent(t_handle, &t_fstab) == Z_OK)
+		t_cnt++;
+
+	(void) zonecfg_endipdent(t_handle);
+
+	if (t_cnt != s_cnt) {
+		(void) fprintf(stderr, gettext("Zone %s is configured "
+		    "with inherit-pkg-dirs that are not configured in zone "
+		    "%s.\n"), target_zone, source_zone);
+		res = Z_ERR;
+	}
+
+	return (res);
+}
+
+static void
+warn_dev_match(zone_dochandle_t s_handle, char *source_zone,
+	zone_dochandle_t t_handle, char *target_zone)
+{
+	int err;
+	struct zone_devtab s_devtab;
+	struct zone_devtab t_devtab;
+
+	if ((err = zonecfg_setdevent(t_handle)) != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not enumerate devices"));
+		return;
+	}
+
+	while (zonecfg_getdevent(t_handle, &t_devtab) == Z_OK) {
+		if ((err = zonecfg_setdevent(s_handle)) != Z_OK) {
+			errno = err;
+			zperror2(source_zone,
+			    gettext("could not enumerate devices"));
+			(void) zonecfg_enddevent(t_handle);
+			return;
+		}
+
+		while (zonecfg_getdevent(s_handle, &s_devtab) == Z_OK) {
+			/*
+			 * Use fnmatch to catch the case where wildcards
+			 * were used in one zone and the other has an
+			 * explicit entry (e.g. /dev/dsk/c0t0d0s6 vs.
+			 * /dev/\*dsk/c0t0d0s6).
+			 */
+			if (fnmatch(t_devtab.zone_dev_match,
+			    s_devtab.zone_dev_match, FNM_PATHNAME) == 0 ||
+			    fnmatch(s_devtab.zone_dev_match,
+			    t_devtab.zone_dev_match, FNM_PATHNAME) == 0) {
+				(void) fprintf(stderr,
+				    gettext("WARNING: device '%s' "
+				    "is configured in both zones.\n"),
+				    t_devtab.zone_dev_match);
+				break;
+			}
+		}
+		(void) zonecfg_enddevent(s_handle);
+	}
+
+	(void) zonecfg_enddevent(t_handle);
+}
+
+/*
+ * Check if the specified mount option (opt) is contained within the
+ * options string.
+ */
+static boolean_t
+opt_match(char *opt, char *options)
+{
+	char *p;
+	char *lastp;
+
+	if ((p = strtok_r(options, ",", &lastp)) != NULL) {
+		if (strcmp(p, opt) == 0)
+			return (B_TRUE);
+		while ((p = strtok_r(NULL, ",", &lastp)) != NULL) {
+			if (strcmp(p, opt) == 0)
+				return (B_TRUE);
+		}
+	}
+
+	return (B_FALSE);
+}
+
+#define	RW_LOFS	"WARNING: read-write lofs file-system on '%s' is configured " \
+	"in both zones.\n"
+
+static void
+print_fs_warnings(struct zone_fstab *s_fstab, struct zone_fstab *t_fstab)
+{
+	/*
+	 * It is ok to have shared lofs mounted fs but we want to warn if
+	 * either is rw since this will effect the other zone.
+	 */
+	if (strcmp(t_fstab->zone_fs_type, "lofs") == 0) {
+		zone_fsopt_t *optp;
+
+		/* The default is rw so no options means rw */
+		if (t_fstab->zone_fs_options == NULL ||
+		    s_fstab->zone_fs_options == NULL) {
+			(void) fprintf(stderr, gettext(RW_LOFS),
+			    t_fstab->zone_fs_special);
+			return;
+		}
+
+		for (optp = s_fstab->zone_fs_options; optp != NULL;
+		    optp = optp->zone_fsopt_next) {
+			if (opt_match("rw", optp->zone_fsopt_opt)) {
+				(void) fprintf(stderr, gettext(RW_LOFS),
+				    s_fstab->zone_fs_special);
+				return;
+			}
+		}
+
+		for (optp = t_fstab->zone_fs_options; optp != NULL;
+		    optp = optp->zone_fsopt_next) {
+			if (opt_match("rw", optp->zone_fsopt_opt)) {
+				(void) fprintf(stderr, gettext(RW_LOFS),
+				    t_fstab->zone_fs_special);
+				return;
+			}
+		}
+
+		return;
+	}
+
+	/*
+	 * TRANSLATION_NOTE
+	 * The first variable is the file-system type and the second is
+	 * the file-system special device.  For example,
+	 * WARNING: ufs file-system on '/dev/dsk/c0t0d0s0' ...
+	 */
+	(void) fprintf(stderr, gettext("WARNING: %s file-system on '%s' "
+	    "is configured in both zones.\n"), t_fstab->zone_fs_type,
+	    t_fstab->zone_fs_special);
+}
+
+static void
+warn_fs_match(zone_dochandle_t s_handle, char *source_zone,
+	zone_dochandle_t t_handle, char *target_zone)
+{
+	int err;
+	struct zone_fstab s_fstab;
+	struct zone_fstab t_fstab;
+
+	if ((err = zonecfg_setfsent(t_handle)) != Z_OK) {
+		errno = err;
+		zperror2(target_zone,
+		    gettext("could not enumerate file-systems"));
+		return;
+	}
+
+	while (zonecfg_getfsent(t_handle, &t_fstab) == Z_OK) {
+		if ((err = zonecfg_setfsent(s_handle)) != Z_OK) {
+			errno = err;
+			zperror2(source_zone,
+			    gettext("could not enumerate file-systems"));
+			(void) zonecfg_endfsent(t_handle);
+			return;
+		}
+
+		while (zonecfg_getfsent(s_handle, &s_fstab) == Z_OK) {
+			if (strcmp(t_fstab.zone_fs_special,
+			    s_fstab.zone_fs_special) == 0) {
+				print_fs_warnings(&s_fstab, &t_fstab);
+				break;
+			}
+		}
+		(void) zonecfg_endfsent(s_handle);
+	}
+
+	(void) zonecfg_endfsent(t_handle);
+}
+
+/*
+ * We don't catch the case where you used the same IP address but
+ * it is not an exact string match.  For example, 192.9.0.128 vs. 192.09.0.128.
+ * However, we're not going to worry about that but we will check for
+ * a possible netmask on one of the addresses (e.g. 10.0.0.1 and 10.0.0.1/24)
+ * and handle that case as a match.
+ */
+static void
+warn_ip_match(zone_dochandle_t s_handle, char *source_zone,
+	zone_dochandle_t t_handle, char *target_zone)
+{
+	int err;
+	struct zone_nwiftab s_nwiftab;
+	struct zone_nwiftab t_nwiftab;
+
+	if ((err = zonecfg_setnwifent(t_handle)) != Z_OK) {
+		errno = err;
+		zperror2(target_zone,
+		    gettext("could not enumerate network interfaces"));
+		return;
+	}
+
+	while (zonecfg_getnwifent(t_handle, &t_nwiftab) == Z_OK) {
+		char *p;
+
+		/* remove an (optional) netmask from the address */
+		if ((p = strchr(t_nwiftab.zone_nwif_address, '/')) != NULL)
+			*p = '\0';
+
+		if ((err = zonecfg_setnwifent(s_handle)) != Z_OK) {
+			errno = err;
+			zperror2(source_zone,
+			    gettext("could not enumerate network interfaces"));
+			(void) zonecfg_endnwifent(t_handle);
+			return;
+		}
+
+		while (zonecfg_getnwifent(s_handle, &s_nwiftab) == Z_OK) {
+			/* remove an (optional) netmask from the address */
+			if ((p = strchr(s_nwiftab.zone_nwif_address, '/'))
+			    != NULL)
+				*p = '\0';
+
+			if (strcmp(t_nwiftab.zone_nwif_address,
+			    s_nwiftab.zone_nwif_address) == 0) {
+				(void) fprintf(stderr,
+				    gettext("WARNING: network address '%s' "
+				    "is configured in both zones.\n"),
+				    t_nwiftab.zone_nwif_address);
+				break;
+			}
+		}
+		(void) zonecfg_endnwifent(s_handle);
+	}
+
+	(void) zonecfg_endnwifent(t_handle);
+}
+
+static void
+warn_dataset_match(zone_dochandle_t s_handle, char *source_zone,
+	zone_dochandle_t t_handle, char *target_zone)
+{
+	int err;
+	struct zone_dstab s_dstab;
+	struct zone_dstab t_dstab;
+
+	if ((err = zonecfg_setdsent(t_handle)) != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not enumerate datasets"));
+		return;
+	}
+
+	while (zonecfg_getdsent(t_handle, &t_dstab) == Z_OK) {
+		if ((err = zonecfg_setdsent(s_handle)) != Z_OK) {
+			errno = err;
+			zperror2(source_zone,
+			    gettext("could not enumerate datasets"));
+			(void) zonecfg_enddsent(t_handle);
+			return;
+		}
+
+		while (zonecfg_getdsent(s_handle, &s_dstab) == Z_OK) {
+			if (strcmp(t_dstab.zone_dataset_name,
+			    s_dstab.zone_dataset_name) == 0) {
+				(void) fprintf(stderr,
+				    gettext("WARNING: dataset '%s' "
+				    "is configured in both zones.\n"),
+				    t_dstab.zone_dataset_name);
+				break;
+			}
+		}
+		(void) zonecfg_enddsent(s_handle);
+	}
+
+	(void) zonecfg_enddsent(t_handle);
+}
+
+static int
+validate_clone(char *source_zone, char *target_zone)
+{
+	int err = Z_OK;
+	zone_dochandle_t s_handle;
+	zone_dochandle_t t_handle;
+
+	if ((t_handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_handle(target_zone, t_handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
+		zonecfg_fini_handle(t_handle);
+		return (Z_ERR);
+	}
+
+	if ((s_handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
+		zonecfg_fini_handle(t_handle);
+		return (Z_ERR);
+	}
+	if ((err = zonecfg_get_handle(source_zone, s_handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_CLONE), B_TRUE);
+		goto done;
+	}
+
+	/* verify new zone has same inherit-pkg-dirs */
+	err = valid_ipd_clone(s_handle, source_zone, t_handle, target_zone);
+
+	/* warn about imported fs's which are the same */
+	warn_fs_match(s_handle, source_zone, t_handle, target_zone);
+
+	/* warn about imported IP addresses which are the same */
+	warn_ip_match(s_handle, source_zone, t_handle, target_zone);
+
+	/* warn about imported devices which are the same */
+	warn_dev_match(s_handle, source_zone, t_handle, target_zone);
+
+	/* warn about imported datasets which are the same */
+	warn_dataset_match(s_handle, source_zone, t_handle, target_zone);
+
+done:
+	zonecfg_fini_handle(t_handle);
+	zonecfg_fini_handle(s_handle);
+
+	return ((err == Z_OK) ? Z_OK : Z_ERR);
+}
+
+static int
+copy_zone(char *src, char *dst)
+{
+	boolean_t out_null = B_FALSE;
+	int status;
+	int err;
+	char *outfile;
+	char cmdbuf[MAXPATHLEN * 2 + 128];
+
+	if ((outfile = tempnam("/var/log", "zone")) == NULL) {
+		outfile = "/dev/null";
+		out_null = B_TRUE;
+	}
+
+	(void) snprintf(cmdbuf, sizeof (cmdbuf),
+	    "cd %s && /usr/bin/find . -depth -print | "
+	    "/usr/bin/cpio -pdmuP@ %s > %s 2>&1",
+	    src, dst, outfile);
+
+	status = do_subproc(cmdbuf);
+
+	if ((err = subproc_status("copy", status)) != Z_OK) {
+		if (!out_null)
+			(void) fprintf(stderr, gettext("\nThe copy failed.\n"
+			    "More information can be found in %s\n"), outfile);
+		return (err);
+	}
+
+	if (!out_null)
+		(void) unlink(outfile);
+
+	return (Z_OK);
+}
+
+/*
+ * Wait until the target_zone has booted to single-user.  Return Z_OK once
+ * the zone has booted to that level or return Z_BAD_ZONE_STATE if the zone
+ * has not booted to single-user after the timeout.
+ */
+static int
+zone_wait_single_user()
+{
+	char cmdbuf[ZONENAME_MAX + 256];
+	int retry;
+
+	(void) snprintf(cmdbuf, sizeof (cmdbuf),
+	    "test \"`/usr/sbin/zlogin -S %s /usr/bin/svcprop -p "
+	    "restarter/state svc:/milestone/single-user:default 2>/dev/null`\" "
+	    "= \"online\"",
+	    target_zone);
+
+	for (retry = 0; retry < SINGLE_USER_RETRY; retry++) {
+		int status;
+
+		status = do_subproc(cmdbuf);
+		if (WIFEXITED(status)) {
+			if (WEXITSTATUS(status) == 0)
+				return (Z_OK);
+
+			(void) sleep(2);
+		} else {
+			return (Z_BAD_ZONE_STATE);
+		}
+	}
+
+	return (Z_BAD_ZONE_STATE);
+}
+
+
+/* ARGSUSED */
+int
+zfm_print(const char *p, void *r) {
+	zerror("  %s\n", p);
+	return (0);
+}
+
+static int
+clone_func(int argc, char *argv[])
+{
+	char cmdbuf[MAXPATHLEN];
+	char *source_zone = NULL;
+	int lockfd;
+	int err, arg;
+	char zonepath[MAXPATHLEN];
+	char source_zonepath[MAXPATHLEN];
+	int status;
+	zone_state_t state;
+	zone_entry_t *zent;
+	char *method = "copy";
+	char *boot_args[] = { "-s", NULL };
+	char *halt_args[] = { NULL };
+	struct stat unconfig_buf;
+	boolean_t revert;
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot clone zone in alternate root"));
+		return (Z_ERR);
+	}
+
+	optind = 0;
+	if ((arg = getopt(argc, argv, "?m:")) != EOF) {
+		switch (arg) {
+		case '?':
+			sub_usage(SHELP_CLONE, CMD_CLONE);
+			return (optopt == '?' ? Z_OK : Z_USAGE);
+		case 'm':
+			method = optarg;
+			break;
+		default:
+			sub_usage(SHELP_CLONE, CMD_CLONE);
+			return (Z_USAGE);
+		}
+	}
+	if (argc != (optind + 1) || strcmp(method, "copy") != 0) {
+		sub_usage(SHELP_CLONE, CMD_CLONE);
+		return (Z_USAGE);
+	}
+	source_zone = argv[optind];
+	if (sanity_check(target_zone, CMD_CLONE, B_FALSE, B_TRUE) != Z_OK)
+		return (Z_ERR);
+	if (verify_details(CMD_CLONE) != Z_OK)
+		return (Z_ERR);
+
+	/*
+	 * We also need to do some extra validation on the source zone.
+	 */
+
+	if (strcmp(source_zone, GLOBAL_ZONENAME) == 0) {
+		zerror(gettext("%s operation is invalid for the global zone."),
+		    cmd_to_str(CMD_CLONE));
+		return (Z_ERR);
+	}
+
+	if (strncmp(source_zone, "SUNW", 4) == 0) {
+		zerror(gettext("%s operation is invalid for zones starting "
+		    "with SUNW."), cmd_to_str(CMD_CLONE));
+		return (Z_ERR);
+	}
+
+	zent = lookup_running_zone(source_zone);
+	if (zent != NULL) {
+		/* check whether the zone is ready or running */
+		if ((err = zone_get_state(zent->zname, &zent->zstate_num))
+		    != Z_OK) {
+			errno = err;
+			zperror2(zent->zname, gettext("could not get state"));
+			/* can't tell, so hedge */
+			zent->zstate_str = "ready/running";
+		} else {
+			zent->zstate_str = zone_state_str(zent->zstate_num);
+		}
+		zerror(gettext("%s operation is invalid for %s zones."),
+		    cmd_to_str(CMD_CLONE), zent->zstate_str);
+		return (Z_ERR);
+	}
+
+	if ((err = zone_get_state(source_zone, &state)) != Z_OK) {
+		errno = err;
+		zperror2(source_zone, gettext("could not get state"));
+		return (Z_ERR);
+	}
+	if (state != ZONE_STATE_INSTALLED) {
+		(void) fprintf(stderr,
+		    gettext("%s: zone %s is %s; %s is required.\n"),
+		    execname, source_zone, zone_state_str(state),
+		    zone_state_str(ZONE_STATE_INSTALLED));
+		return (Z_ERR);
+	}
+
+	/*
+	 * The source zone checks out ok, continue with the clone.
+	 */
+
+	if (validate_clone(source_zone, target_zone) != Z_OK)
+		return (Z_ERR);
+
+	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
+		zerror(gettext("another %s may have an operation in progress."),
+		    "zoneadm");
+		return (Z_ERR);
+	}
+
+	if ((err = zone_get_zonepath(source_zone, source_zonepath,
+	    sizeof (source_zonepath))) != Z_OK) {
+		errno = err;
+		zperror2(source_zone, gettext("could not get zone path"));
+		goto done;
+	}
+
+	if ((err = zone_get_zonepath(target_zone, zonepath, sizeof (zonepath)))
+	    != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not get zone path"));
+		goto done;
+	}
+
+	/* Don't clone the zone if anything is still mounted there */
+	if (zonecfg_find_mounts(source_zonepath, NULL, NULL)) {
+		zerror(gettext("These file-systems are mounted on "
+		    "subdirectories of %s.\n"), source_zonepath);
+		(void) zonecfg_find_mounts(source_zonepath, zfm_print, NULL);
+		err = Z_ERR;
+		goto done;
+	}
+
+	if ((err = zone_set_state(target_zone, ZONE_STATE_INCOMPLETE))
+	    != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not set state"));
+		goto done;
+	}
+
+	(void) printf(gettext("Cloning zonepath %s..."), source_zonepath);
+	(void) fflush(stdout);
+
+	if ((err = copy_zone(source_zonepath, zonepath)) != Z_OK)
+		goto done;
+
+	/*
+	 * We have to set the state of the zone to installed so that we
+	 * can boot it and sys-unconfig it from within the zone.  However,
+	 * if something fails during the boot/sys-unconfig, we want to set
+	 * the state back to incomplete.  We use the revert flag to keep
+	 * track of this.
+	 */
+	revert = B_TRUE;
+
+	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("\ncould not set state"));
+		goto done;
+	}
+
+	/*
+	 * Check if the zone is already sys-unconfiged.  This saves us
+	 * the work of booting the zone so we can unconfigure it.
+	 */
+	(void) snprintf(cmdbuf, sizeof (cmdbuf), "%s/root/etc/.UNCONFIGURED",
+	    zonepath);
+	if (stat(cmdbuf, &unconfig_buf) == -1) {
+		if ((err = boot_func(1, boot_args)) != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("\nCould not boot zone "
+			    "for sys-unconfig\n"));
+			goto done;
+		}
+
+		if ((err = zone_wait_single_user()) != Z_OK) {
+			errno = err;
+			zperror2(target_zone, gettext("\nCould not boot zone "
+			    "for sys-unconfig\n"));
+			(void) halt_func(0, halt_args);
+			goto done;
+		}
+
+		(void) snprintf(cmdbuf, sizeof (cmdbuf),
+		    "echo y | /usr/sbin/zlogin -S %s /usr/sbin/sys-unconfig",
+		    target_zone);
+
+		status = do_subproc(cmdbuf);
+		if ((err = subproc_status("sys-unconfig", status)) != Z_OK) {
+			errno = err;
+			zperror2(target_zone,
+			    gettext("\nsys-unconfig failed\n"));
+			/*
+			 * The sys-unconfig halts the zone but if it failed,
+			 * for some reason, we'll try to halt it now.
+			 */
+			(void) halt_func(0, halt_args);
+			goto done;
+		}
+	}
+
+	revert = B_FALSE;
+
+done:
+	(void) printf("\n");
+
+	if (revert)
+		(void) zone_set_state(target_zone, ZONE_STATE_INCOMPLETE);
+
+	release_lock_file(lockfd);
+	return ((err == Z_OK) ? Z_OK : Z_ERR);
+}
+
+#define	RMCOMMAND	"/usr/bin/rm -rf"
+
+static int
+move_func(int argc, char *argv[])
+{
+	/* 6: "exec " and " " */
+	char cmdbuf[sizeof (RMCOMMAND) + MAXPATHLEN + 6];
+	char *new_zonepath = NULL;
+	int lockfd;
+	int err, arg;
+	char zonepath[MAXPATHLEN];
+	zone_dochandle_t handle;
+	boolean_t fast;
+	boolean_t revert;
+	struct stat zonepath_buf;
+	struct stat new_zonepath_buf;
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot move zone in alternate root"));
+		return (Z_ERR);
+	}
+
+	optind = 0;
+	if ((arg = getopt(argc, argv, "?")) != EOF) {
+		switch (arg) {
+		case '?':
+			sub_usage(SHELP_MOVE, CMD_MOVE);
+			return (optopt == '?' ? Z_OK : Z_USAGE);
+		default:
+			sub_usage(SHELP_MOVE, CMD_MOVE);
+			return (Z_USAGE);
+		}
+	}
+	if (argc != (optind + 1)) {
+		sub_usage(SHELP_MOVE, CMD_MOVE);
+		return (Z_USAGE);
+	}
+	new_zonepath = argv[optind];
+	if (sanity_check(target_zone, CMD_MOVE, B_FALSE, B_TRUE) != Z_OK)
+		return (Z_ERR);
+	if (verify_details(CMD_MOVE) != Z_OK)
+		return (Z_ERR);
+
+	/*
+	 * Check out the new zonepath.  This has the side effect of creating
+	 * a directory for the new zonepath.  We depend on this later when we
+	 * stat to see if we are doing a cross file-system move or not.
+	 */
+	if (validate_zonepath(new_zonepath, CMD_MOVE) != Z_OK)
+		return (Z_ERR);
+
+	if ((err = zone_get_zonepath(target_zone, zonepath, sizeof (zonepath)))
+	    != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not get zone path"));
+		return (Z_ERR);
+	}
+
+	if (stat(zonepath, &zonepath_buf) == -1) {
+		zperror(gettext("could not stat zone path"), B_FALSE);
+		return (Z_ERR);
+	}
+
+	if (stat(new_zonepath, &new_zonepath_buf) == -1) {
+		zperror(gettext("could not stat new zone path"), B_FALSE);
+		return (Z_ERR);
+	}
+
+	/* Don't move the zone if anything is still mounted there */
+	if (zonecfg_find_mounts(zonepath, NULL, NULL)) {
+		zerror(gettext("These file-systems are mounted on "
+		    "subdirectories of %s.\n"), zonepath);
+		(void) zonecfg_find_mounts(zonepath, zfm_print, NULL);
+		return (Z_ERR);
+	}
+
+	/*
+	 * Check if we are moving in the same filesystem and can do a fast
+	 * move or if we are crossing filesystems and have to copy the data.
+	 */
+	fast = (zonepath_buf.st_dev == new_zonepath_buf.st_dev);
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_MOVE), B_TRUE);
+		return (Z_ERR);
+	}
+
+	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_MOVE), B_TRUE);
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
+		zerror(gettext("another %s may have an operation in progress."),
+		    "zoneadm");
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	/*
+	 * We're making some file-system changes now so we have to clean up
+	 * the file-system before we are done.  This will either clean up the
+	 * new zonepath if the zonecfg update failed or it will clean up the
+	 * old zonepath if everything is ok.
+	 */
+	revert = B_TRUE;
+
+	if (fast) {
+		/* same filesystem, use rename for a quick move */
+
+		/*
+		 * Remove the new_zonepath directory that got created above
+		 * during the validation.  It gets in the way of the rename.
+		 */
+		if (rmdir(new_zonepath) != 0) {
+			zperror(gettext("could not rmdir new zone path"),
+			    B_FALSE);
+			zonecfg_fini_handle(handle);
+			release_lock_file(lockfd);
+			return (Z_ERR);
+		}
+
+		if (rename(zonepath, new_zonepath) != 0) {
+			/*
+			 * If this fails we don't need to do all of the
+			 * cleanup that happens for the rest of the code
+			 * so just return from this error.
+			 */
+			zperror(gettext("could not move zone"), B_FALSE);
+			zonecfg_fini_handle(handle);
+			release_lock_file(lockfd);
+			return (Z_ERR);
+		}
+
+	} else {
+		(void) printf(gettext(
+		    "Moving across file-systems; copying zonepath %s..."),
+		    zonepath);
+		(void) fflush(stdout);
+
+		err = copy_zone(zonepath, new_zonepath);
+
+		(void) printf("\n");
+		if (err != Z_OK)
+			goto done;
+	}
+
+	if ((err = zonecfg_set_zonepath(handle, new_zonepath)) != Z_OK) {
+		errno = err;
+		zperror(gettext("could not set new zonepath"), B_TRUE);
+		goto done;
+	}
+
+	if ((err = zonecfg_save(handle)) != Z_OK) {
+		errno = err;
+		zperror(gettext("zonecfg save failed"), B_TRUE);
+		goto done;
+	}
+
+	revert = B_FALSE;
+
+done:
+	zonecfg_fini_handle(handle);
+	release_lock_file(lockfd);
+
+	/*
+	 * Clean up the file-system based on how things went.  We either
+	 * clean up the new zonepath if the operation failed for some reason
+	 * or we clean up the old zonepath if everything is ok.
+	 */
+	if (revert) {
+		/* The zonecfg update failed, cleanup the new zonepath. */
+		if (fast) {
+			if (rename(new_zonepath, zonepath) != 0) {
+				zperror(gettext("could not restore zonepath"),
+				    B_FALSE);
+				/*
+				 * err is already != Z_OK since we're reverting
+				 */
+			}
+		} else {
+			int status;
+
+			(void) printf(gettext("Cleaning up zonepath %s..."),
+			    new_zonepath);
+			(void) fflush(stdout);
+
+			/*
+			 * "exec" the command so that the returned status is
+			 * that of rm and not the shell.
+			 */
+			(void) snprintf(cmdbuf, sizeof (cmdbuf),
+			    "exec " RMCOMMAND " %s", new_zonepath);
+
+			status = do_subproc(cmdbuf);
+
+			(void) printf("\n");
+
+			if ((err = subproc_status("rm", status)) != Z_OK) {
+				errno = err;
+				zperror(gettext("could not remove new "
+				    "zonepath"), B_TRUE);
+			} else {
+				/*
+				 * Because we're reverting we know the mainline
+				 * code failed but we just reused the err
+				 * variable so we reset it back to Z_ERR.
+				 */
+				err = Z_ERR;
+			}
+		}
+
+	} else {
+		/* The move was successful, cleanup the old zonepath. */
+		if (!fast) {
+			int status;
+
+			(void) printf(
+			    gettext("Cleaning up zonepath %s..."), zonepath);
+			(void) fflush(stdout);
+
+			/*
+			 * "exec" the command so that the returned status is
+			 * that of rm and not the shell.
+			 */
+			(void) snprintf(cmdbuf, sizeof (cmdbuf),
+			    "exec " RMCOMMAND " %s", zonepath);
+
+			status = do_subproc(cmdbuf);
+
+			(void) printf("\n");
+
+			if ((err = subproc_status("rm", status)) != Z_OK) {
+				errno = err;
+				zperror(gettext("could not remove zonepath"),
+				    B_TRUE);
+			}
+		}
+	}
+
+	return ((err == Z_OK) ? Z_OK : Z_ERR);
+}
+
+/*
  * On input, TRUE => yes, FALSE => no.
  * On return, TRUE => 1, FALSE => 0, could not ask => -1.
  */
@@ -2415,15 +3360,6 @@ ask_yesno(boolean_t default_answer, const char *question)
 		if (tolower(line[0]) == 'n')
 			return (0);
 	}
-}
-
-#define	RMCOMMAND	"/usr/bin/rm -rf"
-
-/* ARGSUSED */
-int
-zfm_print(const char *p, void *r) {
-	zerror("  %s\n", p);
-	return (0);
 }
 
 static int
@@ -2507,7 +3443,7 @@ uninstall_func(int argc, char *argv[])
 
 	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
 		zerror(gettext("another %s may have an operation in progress."),
-		    "zoneadmd");
+		    "zoneadm");
 		return (Z_ERR);
 	}
 
