@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,12 +91,23 @@ typedef struct fmd_adm_rsrcinfo {
 #define	FMD_ADM_RSRC_UNUSABLE	0x2	/* resource is unusable */
 #define	FMD_ADM_RSRC_INVISIBLE	0x4	/* resource is not directly visible */
 
-typedef int fmd_adm_rsrc_f(const fmd_adm_rsrcinfo_t *, void *);
+typedef struct fmd_adm_caseinfo {
+	const char *aci_uuid;
+	const char *aci_code;
+	const char *aci_url;
+	nvlist_t *aci_event;
+} fmd_adm_caseinfo_t;
 
+typedef int fmd_adm_rsrc_f(const fmd_adm_rsrcinfo_t *, void *);
+typedef int fmd_adm_case_f(const fmd_adm_caseinfo_t *, void *);
+
+extern int fmd_adm_rsrc_count(fmd_adm_t *, int, uint32_t *);
 extern int fmd_adm_rsrc_iter(fmd_adm_t *, int, fmd_adm_rsrc_f *, void *);
 extern int fmd_adm_rsrc_flush(fmd_adm_t *, const char *);
 extern int fmd_adm_rsrc_repair(fmd_adm_t *, const char *);
 extern int fmd_adm_case_repair(fmd_adm_t *, const char *);
+extern int fmd_adm_case_iter(fmd_adm_t *, const char *, fmd_adm_case_f *,
+    void *);
 
 typedef struct fmd_adm_serdinfo {
 	const char *asi_name;		/* name of serd engine */

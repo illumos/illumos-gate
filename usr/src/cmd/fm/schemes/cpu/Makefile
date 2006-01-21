@@ -20,33 +20,15 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
 
-include ../Makefile.com
+include ../../../Makefile.cmd
 
-SCHEME_COMMON = ../common
+SUBDIRS = $(MACH)
+$(BUILD64)SUBDIRS += $(MACH64)
 
-sparc_SRCS =	\
-	cpu_mdesc.c \
-	mdesc_devinit.c
-
-SRCS =	\
-	cpu.c \
-	$($(MACH)_SRCS)
-
-sparc_LDLIBS = -L$(ROOTLIB)/fm -lmdesc
-LDLIBS += -lkstat $($(MACH)_LDLIBS)
-
-LDFLAGS += -R/usr/lib/fm
-
-include ../Makefile.targ
-
-%.o: $(SCHEME_COMMON)/%.c
-	$(COMPILE.c) -o $@ $<
-	$(CTFCONVERT_O)
-
-%.ln: $(SCHEME_COMMON)/%.c
-	$(LINT.c) -erroff=E_BAD_PTR_CAST_ALIGN -v -c $<
+include ../../Makefile.subdirs

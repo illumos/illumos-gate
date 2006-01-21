@@ -264,7 +264,7 @@ static int
 unum_contains_bypat(const char *erunum, const char *eeunum)
 {
 	char **ernms, **eenms;
-	uint_t nernms, neenms;
+	size_t nernms, neenms;
 	int i, j, rv = 1;
 
 	if (mem_unum_burst(erunum, &ernms, &nernms) < 0)

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -702,6 +702,132 @@ fmd_adm_caserepair_1_svc(char *uuid, int *rvp, struct svc_req *req)
 		fmd_case_rele(cp);
 
 	*rvp = err;
+	return (TRUE);
+}
+
+void
+fmd_adm_caselist_case(fmd_case_t *cp, void *arg)
+{
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	struct fmd_rpc_caselist *rcl = arg;
+	size_t uuid_len, buf_len;
+	void *p;
+
+	if (rcl->rcl_err != 0)
+		return;
+
+	/*
+	 * Lock the case and reallocate rcl_buf[] to be large enough to hold
+	 * another string, doubling it as needed.  Then copy the new string
+	 * on to the end, and increment rcl_len to indicate the used space.
+	 */
+	if (!(cip->ci_flags & FMD_CF_SOLVED))
+		return;
+
+	(void) pthread_mutex_lock(&cip->ci_lock);
+
+	uuid_len = cip->ci_uuidlen + 1;
+
+	while (rcl->rcl_len + uuid_len > rcl->rcl_buf.rcl_buf_len) {
+		if (rcl->rcl_buf.rcl_buf_len != 0)
+			buf_len = rcl->rcl_buf.rcl_buf_len * 2;
+		else
+			buf_len = 1024; /* default buffer size */
+
+		if ((p = realloc(rcl->rcl_buf.rcl_buf_val, buf_len)) != NULL) {
+			bzero((char *)p + rcl->rcl_buf.rcl_buf_len,
+			    buf_len - rcl->rcl_buf.rcl_buf_len);
+			rcl->rcl_buf.rcl_buf_val = p;
+			rcl->rcl_buf.rcl_buf_len = buf_len;
+		} else {
+			rcl->rcl_err = FMD_ADM_ERR_NOMEM;
+			break;
+		}
+	}
+
+	if (rcl->rcl_err == 0) {
+		bcopy(cip->ci_uuid, (char *)rcl->rcl_buf.rcl_buf_val +
+		    rcl->rcl_len, uuid_len);
+		rcl->rcl_len += uuid_len;
+		rcl->rcl_cnt++;
+	}
+
+	(void) pthread_mutex_unlock(&cip->ci_lock);
+}
+
+bool_t
+fmd_adm_caselist_1_svc(struct fmd_rpc_caselist *rvp, struct svc_req *req)
+{
+	rvp->rcl_buf.rcl_buf_len = 0;
+	rvp->rcl_buf.rcl_buf_val = NULL;
+	rvp->rcl_len = 0;
+	rvp->rcl_cnt = 0;
+	rvp->rcl_err = 0;
+
+	if (fmd_rpc_deny(req))
+		rvp->rcl_err = FMD_ADM_ERR_PERM;
+	else
+		fmd_case_hash_apply(fmd.d_cases, fmd_adm_caselist_case, rvp);
+
+	return (TRUE);
+}
+
+bool_t
+fmd_adm_caseinfo_1_svc(char *uuid, struct fmd_rpc_caseinfo *rvp,
+    struct svc_req *req)
+{
+	fmd_case_impl_t *cip;
+	nvlist_t *nvl;
+	int err = 0;
+
+	bzero(rvp, sizeof (struct fmd_rpc_caseinfo));
+
+	if (fmd_rpc_deny(req)) {
+		rvp->rci_err = FMD_ADM_ERR_PERM;
+		return (TRUE);
+	}
+
+	if ((cip = (fmd_case_impl_t *)fmd_case_hash_lookup(fmd.d_cases, uuid))
+	    == NULL) {
+		rvp->rci_err = FMD_ADM_ERR_CASESRCH;
+		return (TRUE);
+	}
+
+	if (!(cip->ci_flags & FMD_CF_SOLVED)) {
+		fmd_case_rele((fmd_case_t *)cip);
+		rvp->rci_err = FMD_ADM_ERR_CASESRCH;
+		return (TRUE);
+	}
+
+	/*
+	 * Avoid a race on cip->ci_diag; we can't call fmd_case_mkevent
+	 * while holding the case lock, so we do this dance instead.
+	 */
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	nvl = cip->ci_diag;
+	(void) pthread_mutex_unlock(&cip->ci_lock);
+
+	if (nvl == NULL)
+		nvl = fmd_case_mkevent((fmd_case_t *)cip,
+		    FM_LIST_SUSPECT_CLASS);
+
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	if (cip->ci_diag == NULL) {
+		cip->ci_diag = nvl;
+	} else if (nvl != cip->ci_diag) {
+		nvlist_free(nvl);
+		nvl = cip->ci_diag;
+	}
+	(void) pthread_mutex_unlock(&cip->ci_lock);
+
+	err = nvlist_pack(nvl, &rvp->rci_evbuf.rci_evbuf_val,
+	    &rvp->rci_evbuf.rci_evbuf_len, NV_ENCODE_XDR, 0);
+
+	if (err != 0)
+		rvp->rci_err = FMD_ADM_ERR_NOMEM;
+
+	fmd_case_rele((fmd_case_t *)cip);
+
 	return (TRUE);
 }
 

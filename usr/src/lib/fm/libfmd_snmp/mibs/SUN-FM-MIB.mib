@@ -1,0 +1,514 @@
+--
+-- CDDL HEADER START
+--
+-- The contents of this file are subject to the terms of the
+-- Common Development and Distribution License (the "License").
+-- You may not use this file except in compliance with the License.
+--
+-- You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+-- or http://www.opensolaris.org/os/licensing.
+-- See the License for the specific language governing permissions
+-- and limitations under the License.
+--
+-- When distributing Covered Code, include this CDDL HEADER in each
+-- file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+-- If applicable, add the following below this CDDL HEADER, with the
+-- fields enclosed by brackets "[]" replaced with your own identifying
+-- information: Portions Copyright [yyyy] [name of copyright owner]
+--
+-- CDDL HEADER END
+--
+
+--
+-- Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+-- Use is subject to license terms.
+--
+
+-- ident	"%Z%%M%	%I%	%E% SMI"
+
+SUN-FM-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+	products
+		FROM SUN-MIB
+	Gauge32, Unsigned32, OBJECT-TYPE, NOTIFICATION-TYPE, MODULE-IDENTITY
+		FROM SNMPv2-SMI
+	TEXTUAL-CONVENTION, DateAndTime, DisplayString
+		FROM SNMPv2-TC
+	OBJECT-GROUP, NOTIFICATION-GROUP
+		FROM SNMPv2-CONF
+	URLString
+		FROM NETWORK-SERVICES-MIB;
+
+sunFmMIB MODULE-IDENTITY
+	LAST-UPDATED	"200601130000Z"
+	ORGANIZATION	"Sun Microsystems, Inc."
+	CONTACT-INFO	"Sun Microsystems, Inc.
+			 4150 Network Circle
+			 Santa Clara, CA 95054
+
+			 1-800-555-9SUN or
+			 1-650-960-1300
+
+			 http://www.sun.com
+			 or contact your local support representative"
+	DESCRIPTION
+		"Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+		 Use is subject to license terms.
+
+		MIB providing access to Sun Fault Manager information"
+	REVISION	"200601130000Z"
+	DESCRIPTION	"Version: 1.0"
+	::= { fm 1 }
+
+fm OBJECT IDENTIFIER ::= { products 195 }
+
+SunFmUuidString ::= TEXTUAL-CONVENTION
+	STATUS	current
+	DESCRIPTION
+		"Represents a Universal Unique Identifier (UUID)."
+	SYNTAX	OCTET STRING (SIZE (0..64))
+
+SunFmModuleState ::= TEXTUAL-CONVENTION
+	STATUS	current
+	DESCRIPTION
+		"Represents the status of an fmd(1M) module."
+	SYNTAX	INTEGER {
+		other(1),	-- Unknown or unsupported
+		active(2),
+		failed(3)
+	}
+
+SunFmResourceState ::= TEXTUAL-CONVENTION
+	STATUS	current
+	DESCRIPTION
+		"Represents the status of a system resource as diagnosed
+		by the fault manager."
+	SYNTAX	INTEGER {
+		other(1),	-- Unknown or unsupported
+		ok(2),
+		degraded(3),
+		unknown(4),
+		faulted(5)
+	}
+
+--
+-- The problem table is analogous to the output of fmadm faulty organized
+-- by the UUID of the case in which the faulty diagnosis was made.  The
+-- list of events contributing to this diagnosis is in a separate table
+-- (fmFaultEventTable).  Because SNMP does not allow nested tables, we
+-- indicate here only the number of events contributing to the diagnosis.
+--
+
+sunFmProblemTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF SunFmProblemEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"Table listing all of the known problems that have been
+		diagnosed by the fault manager associated with this managed
+		system element that are still present in that system."
+	::= { sunFmMIB 1 }
+
+sunFmProblemEntry OBJECT-TYPE
+	SYNTAX		SunFmProblemEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"A problem diagnosed by the fault manager and still
+		present in the system."
+	INDEX 		{ sunFmProblemUUIDIndex }
+	::= { sunFmProblemTable 1 }
+
+SunFmProblemEntry ::= SEQUENCE {
+	sunFmProblemUUIDIndex		SunFmUuidString,
+	sunFmProblemUUID		SunFmUuidString,
+	sunFmProblemCode		DisplayString,
+	sunFmProblemURL			URLString,
+	sunFmProblemDiagEngine		URLString,
+	sunFmProblemDiagTime		DateAndTime,
+	sunFmProblemSuspectCount	Gauge32
+}
+
+sunFmProblemUUIDIndex OBJECT-TYPE
+	SYNTAX		SunFmUuidString
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"The Universal Unique Identifier (UUID) for this problem, as
+		recorded by fmd(1M) and shown by fmadm(1M) or fmdump(1M).
+		This is the index into sunFmProblemTable."
+	::= { sunFmProblemEntry 1 }
+
+sunFmProblemUUID OBJECT-TYPE
+	SYNTAX		SunFmUuidString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The Universal Unique Identifier (UUID) for this problem, as
+		recorded by fmd(1M) and shown by fmadm(1M) or fmdump(1M)."
+	::= { sunFmProblemEntry 2 }
+
+sunFmProblemCode OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The SUNW-MSG-ID static message identifier for this class of
+		problem, as recorded by fmd(1M) and shown by fmdump(1M).  The
+		message identifier can be used as a key at http://sun.com/msg/"
+	::= { sunFmProblemEntry 3 }
+
+sunFmProblemURL OBJECT-TYPE
+	SYNTAX		URLString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The URL of an appropriate knowledge article providing more
+		detailed information about this problem."
+	::= { sunFmProblemEntry 4 }
+
+sunFmProblemDiagEngine OBJECT-TYPE
+	SYNTAX		URLString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The Sun FMRI of the Fault Manager diagnosis engine that
+		performed the diagnosis of this problem, including its version."
+	::= { sunFmProblemEntry 5 }
+
+sunFmProblemDiagTime OBJECT-TYPE
+	SYNTAX		DateAndTime
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The date and time at which the problem was diagnosed."
+	::= { sunFmProblemEntry 6 }
+
+sunFmProblemSuspectCount OBJECT-TYPE
+	SYNTAX		Gauge32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The number of individual suspect defects or faults
+		associated with this problem diagnosis, as shown by
+		fmdump(1M) -v -u <UUID>."
+	::= { sunFmProblemEntry 7 }
+
+--
+-- Events are indexed by the associated problem UUID and an index ranging
+-- from 1 to sunFmProblemEntry.fmProblemSuspectCount.<UUID> for easy retrieval
+-- and reconstruction of the information available via fmdump -v.  A
+-- fault appears once for each diagnosis referencing it.
+--
+
+sunFmFaultEventTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF SunFmFaultEventEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"List of individual suspect defects or faults associated with
+		a problem diagnosis, as shown by fmdump(1M) -v -u <UUID>."
+	::= { sunFmMIB 2 }
+
+sunFmFaultEventEntry OBJECT-TYPE
+	SYNTAX		SunFmFaultEventEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"Sun Fault Management fault or defect event containing a
+		suspect problem and the corresponding FRU and ASRU."
+	INDEX	{ sunFmFaultEventUUIDIndex, sunFmFaultEventIndex }
+	::= { sunFmFaultEventTable 1 }
+
+SunFmFaultEventEntry ::= SEQUENCE {
+	sunFmFaultEventUUIDIndex	SunFmUuidString,
+	sunFmFaultEventIndex		Unsigned32,
+	sunFmFaultEventProblemUUID	SunFmUuidString,
+	sunFmFaultEventClass		DisplayString,
+	sunFmFaultEventCertainty	Gauge32,
+	sunFmFaultEventASRU		URLString,
+	sunFmFaultEventFRU		URLString,
+	sunFmFaultEventResource		URLString
+}
+
+sunFmFaultEventUUIDIndex OBJECT-TYPE
+	SYNTAX		SunFmUuidString
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"UUID of a problem diagnosis with which this event is
+		associated.  An event may appear multiple times in association
+		with different diagnoses.  This is an index into
+		sunFmFaultEventTable."
+	::= { sunFmFaultEventEntry 1 }
+
+sunFmFaultEventIndex OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"Index number of this event with respect to the problem
+		diagnosis."
+	::= { sunFmFaultEventEntry 2 }
+
+sunFmFaultEventProblemUUID OBJECT-TYPE
+	SYNTAX		SunFmUuidString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"UUID of a problem diagnosis with which this event is
+		associated.  An event may appear multiple times in association
+		with different diagnoses."
+	::= { sunFmFaultEventEntry 3 }
+
+sunFmFaultEventClass OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Sun Fault Management event class string."
+	::= { sunFmFaultEventEntry 4 }
+
+sunFmFaultEventCertainty OBJECT-TYPE
+	SYNTAX		Gauge32 (0..100)
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Percentage likelihood associated with this suspect for
+		this diagnosis."
+	::= { sunFmFaultEventEntry 5 }
+
+sunFmFaultEventASRU OBJECT-TYPE
+	SYNTAX		URLString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Sun FMRI of the Automated System Reconfiguration Unit (ASRU)
+		that is believed to contain the specified fault or defect."
+	::= { sunFmFaultEventEntry 6 }
+
+sunFmFaultEventFRU OBJECT-TYPE
+	SYNTAX		URLString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Sun FMRI of the Field Replaceable Unit (FRU) that should be
+		replaced in order to repair the specified fault or defect."
+	::= { sunFmFaultEventEntry 7 }
+
+sunFmFaultEventResource OBJECT-TYPE
+	SYNTAX		URLString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Sun FMRI of the resource responsible for the generation of
+		the telemetry leading to the diagnosis."
+	::= { sunFmFaultEventEntry 8 }
+
+--
+-- sunFmModuleTable provides fmd configuration information equivalent to
+-- the output of fmadm config.
+--
+
+sunFmModuleTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF SunFmModuleEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"List of modules configured in fmd(1M)."
+	::= { sunFmMIB 3 }
+
+sunFmModuleEntry OBJECT-TYPE
+	SYNTAX		SunFmModuleEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"A module which has been loaded into fmd(1M) to handle events.
+		The information provided is equivalent to the output of
+		fmadm(1) config'"
+	INDEX	{ sunFmModuleIndex }
+	::= { sunFmModuleTable 1 }
+
+SunFmModuleEntry ::= SEQUENCE {
+	sunFmModuleIndex		Unsigned32,
+	sunFmModuleName			DisplayString,
+	sunFmModuleVersion		DisplayString,
+	sunFmModuleStatus		SunFmModuleState,
+	sunFmModuleDescription		DisplayString
+}
+
+sunFmModuleIndex OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"Unique integer index associated with this fault management
+		module's entry."
+	::= { sunFmModuleEntry 1 }
+
+sunFmModuleName OBJECT-TYPE
+	SYNTAX		DisplayString (SIZE(0..64))
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Name of the fault management module."
+	::= { sunFmModuleEntry 2 }
+
+sunFmModuleVersion OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Version string associated with the fault management module."
+	::= { sunFmModuleEntry 3 }
+
+sunFmModuleStatus OBJECT-TYPE
+	SYNTAX		SunFmModuleState
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Current status of the fault management module."
+	::= { sunFmModuleEntry 4 }
+
+sunFmModuleDescription OBJECT-TYPE
+	SYNTAX		DisplayString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"A text description of the fault management module."
+	::= { sunFmModuleEntry 5 }
+
+sunFmResourceCount OBJECT-TYPE
+	SYNTAX		Gauge32
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The number of managed elements currently believed by
+		the fault manager to be faulty."
+	::= { sunFmMIB 4 }
+
+sunFmResourceTable OBJECT-TYPE
+	SYNTAX		SEQUENCE OF SunFmResourceEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"A table containing information about all resources for which
+		the fault manager has received telemetry.  This is the same
+		information provided by the fmadm(1M) faulty command."
+	::= { sunFmMIB 5 }
+
+sunFmResourceEntry OBJECT-TYPE
+	SYNTAX		SunFmResourceEntry
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"Information about the state of a resource the fault manager
+		believes to be faulty."
+	INDEX		{ sunFmResourceIndex }
+	::= { sunFmResourceTable 1 }
+
+SunFmResourceEntry ::= SEQUENCE {
+	sunFmResourceIndex		Unsigned32,
+	sunFmResourceFMRI		DisplayString,
+	sunFmResourceStatus		SunFmResourceState,
+	sunFmResourceDiagnosisUUID	SunFmUuidString
+}
+
+sunFmResourceIndex OBJECT-TYPE
+	SYNTAX		Unsigned32
+	MAX-ACCESS	not-accessible
+	STATUS		current
+	DESCRIPTION
+		"Index of the resource in the resource table."
+	::= { sunFmResourceEntry 1 }
+
+sunFmResourceFMRI OBJECT-TYPE
+	SYNTAX		DisplayString (SIZE(0..255))
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"Sun FMRI of the Automated System Reconfiguration Unit (ASRU)
+		which the fault manager believes to be faulty."
+	::= { sunFmResourceEntry 2 }
+
+sunFmResourceStatus OBJECT-TYPE
+	SYNTAX		SunFmResourceState
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The current status of the resource.  See fmadm(1M) faulty."
+	::= { sunFmResourceEntry 3 }
+
+sunFmResourceDiagnosisUUID OBJECT-TYPE
+	SYNTAX		SunFmUuidString
+	MAX-ACCESS	read-only
+	STATUS		current
+	DESCRIPTION
+		"The Universal Unique Identifier (UUID) for the problem
+		associated with the fault in this resource, as recorded by
+		fmd(1M) and shown by fmadm(1M)."
+	::= { sunFmResourceEntry 4 }
+
+sunFmObjectGroups OBJECT IDENTIFIER ::= { sunFmMIB 6 }
+
+sunFmObjectGroup OBJECT-GROUP OBJECTS {
+		sunFmProblemUUID,
+		sunFmProblemCode,
+		sunFmProblemURL,
+		sunFmProblemDiagEngine,
+		sunFmProblemDiagTime,
+		sunFmProblemSuspectCount,
+		sunFmFaultEventProblemUUID,
+		sunFmFaultEventClass,
+		sunFmFaultEventCertainty,
+		sunFmFaultEventASRU,
+		sunFmFaultEventFRU,
+		sunFmFaultEventResource,
+		sunFmModuleName,
+		sunFmModuleVersion,
+		sunFmModuleStatus,
+		sunFmModuleDescription,
+		sunFmResourceCount,
+		sunFmResourceFMRI,
+		sunFmResourceStatus,
+		sunFmResourceDiagnosisUUID
+	}
+	STATUS	current
+	DESCRIPTION
+		"A collection of objects providing access to Sun Fault
+		Manager operational data."
+	::= { sunFmObjectGroups 1 }
+	
+
+--
+-- RFC 3584 requires that the next-to-last sub-ID be zero to allow for
+-- mapping v2/v3 notifications to v1 traps.
+--
+
+sunFmTraps OBJECT IDENTIFIER ::= { sunFmMIB 7 0 }
+
+sunFmProblemTrap NOTIFICATION-TYPE
+	OBJECTS	{
+		sunFmProblemUUID,
+		sunFmProblemCode,
+		sunFmProblemURL
+	}
+	STATUS	current
+	DESCRIPTION
+		"Trap notification that a diagnosis has been made or the
+		fault manager fmd(1M) has restarted and the corresponding
+		problem is still believed to be present in the managed entity."
+	::= { sunFmTraps 1 }
+
+sunFmNotificationGroup NOTIFICATION-GROUP NOTIFICATIONS {
+		sunFmProblemTrap
+	}
+	STATUS	current
+	DESCRIPTION
+		"A collection of notifications provided by the Sun Fault
+		Manager."
+	::= { sunFmObjectGroups 2 }
+
+END
+

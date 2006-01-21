@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,11 +30,16 @@
 #include <stdlib.h>
 #include <netdir.h>
 #include <errno.h>
+#include <alloca.h>
+#include <locale.h>
+#include <uuid/uuid.h>
 
+#include <sys/fm/protocol.h>
 #include <fmd_adm_impl.h>
 #include <fmd_rpc_adm.h>
 
 static const uint_t _fmd_adm_bufsize = 128 * 1024;
+static const char _url_fallback[] = "http://sun.com/msg/";
 
 fmd_adm_t *
 fmd_adm_open(const char *host, uint32_t prog, int version)
@@ -392,6 +396,29 @@ fmd_adm_module_stats(fmd_adm_t *ap, const char *name, fmd_adm_stats_t *sp)
 	return (0);
 }
 
+int
+fmd_adm_rsrc_count(fmd_adm_t *ap, int all, uint32_t *rcp)
+{
+	struct fmd_rpc_rsrclist rrl;
+
+	if (rcp == NULL)
+		return (fmd_adm_set_errno(ap, EINVAL));
+
+	bzero(&rrl, sizeof (rrl)); /* tell xdr to allocate memory for us */
+
+	if (fmd_adm_rsrclist_1(all, &rrl, ap->adm_clnt) != RPC_SUCCESS)
+		return (fmd_adm_set_errno(ap, EPROTO));
+
+	if (rrl.rrl_err != 0) {
+		xdr_free(xdr_fmd_rpc_rsrclist, (char *)&rrl);
+		return (fmd_adm_set_svcerr(ap, rrl.rrl_err));
+	}
+
+	*rcp = rrl.rrl_cnt;
+	xdr_free(xdr_fmd_rpc_rsrclist, (char *)&rrl);
+	return (0);
+}
+
 static int
 fmd_adm_rsrc_cmp(const void *lp, const void *rp)
 {
@@ -530,6 +557,162 @@ fmd_adm_case_repair(fmd_adm_t *ap, const char *uuid)
 		return (fmd_adm_set_errno(ap, EPROTO));
 
 	return (fmd_adm_set_svcerr(ap, err));
+}
+
+static int
+fmd_adm_case_cmp(const void *lp, const void *rp)
+{
+	return (strcmp(*(char **)lp, *(char **)rp));
+}
+
+static int
+fmd_adm_case_one(fmd_adm_caseinfo_t *acp, const char *url_token,
+    fmd_adm_case_f *func, void *arg)
+{
+	char *p, *urlcode, *dict, *olang;
+	const char *url;
+	size_t	len;
+
+	if ((p = strchr(acp->aci_code, '-')) == NULL ||
+	    p == acp->aci_code) {
+		acp->aci_url = NULL;
+	} else {
+		dict = alloca((size_t)(p - acp->aci_code) + 1);
+		(void) strncpy(dict, acp->aci_code,
+		    (size_t)(p - acp->aci_code));
+		dict[(size_t)(p - acp->aci_code)] = '\0';
+
+		/*
+		 * If we're given a token to use in looking up the URL, try
+		 * to use it.  Otherwise, or if we don't find it that way,
+		 * use the fallback.
+		 */
+		if (url_token == NULL) {
+			url = _url_fallback;
+		} else if ((url = dgettext(dict, url_token)) == url_token) {
+			/*
+			 * We didn't find a translation in the
+			 * dictionary for the current language.  Fall
+			 * back to C and try again.
+			 */
+			olang = setlocale(LC_MESSAGES, NULL);
+			(void) setlocale(LC_MESSAGES, "C");
+			if ((url = dgettext(dict, url_token)) == url_token)
+				url = _url_fallback;
+			(void) setlocale(LC_MESSAGES, olang);
+		}
+		len = strlen(url);
+		if (url[len - 1] == '/') {
+			len += strlen(acp->aci_code) + 1;
+			urlcode = alloca(len);
+			(void) snprintf(urlcode, len, "%s%s", url,
+			    acp->aci_code);
+		} else {
+			urlcode = (char *)url;
+		}
+		acp->aci_url = urlcode;
+	}
+
+	return (func(acp, arg));
+}
+
+/*
+ * Our approach to cases is the same as for resources: we first obtain a
+ * list of UUIDs, sort them, then obtain the case information for each.
+ */
+int
+fmd_adm_case_iter(fmd_adm_t *ap, const char *url_token, fmd_adm_case_f *func,
+    void *arg)
+{
+	struct fmd_rpc_caselist rcl;
+	struct fmd_rpc_caseinfo rci;
+	fmd_adm_caseinfo_t aci;
+	char **uuids, *p;
+	int i, rv;
+
+	bzero(&rcl, sizeof (rcl)); /* tell xdr to allocate memory for us */
+
+	if (fmd_adm_caselist_1(&rcl, ap->adm_clnt) != RPC_SUCCESS)
+		return (fmd_adm_set_errno(ap, EPROTO));
+
+	if (rcl.rcl_err != 0) {
+		xdr_free(xdr_fmd_rpc_caselist, (char *)&rcl);
+		return (fmd_adm_set_svcerr(ap, rcl.rcl_err));
+	}
+
+	if ((uuids = malloc(sizeof (char *) * rcl.rcl_cnt)) == NULL) {
+		xdr_free(xdr_fmd_rpc_caselist, (char *)&rcl);
+		return (fmd_adm_set_errno(ap, EAGAIN));
+	}
+
+	p = rcl.rcl_buf.rcl_buf_val;
+
+	for (i = 0; i < rcl.rcl_cnt; i++, p += strlen(p) + 1)
+		uuids[i] = p;
+
+	qsort(uuids, rcl.rcl_cnt, sizeof (char *), fmd_adm_case_cmp);
+
+	for (i = 0; i < rcl.rcl_cnt; i++) {
+		bzero(&rci, sizeof (rci));
+
+		if (fmd_adm_caseinfo_1(uuids[i], &rci, ap->adm_clnt)
+		    != RPC_SUCCESS) {
+			free(uuids);
+			xdr_free(xdr_fmd_rpc_caselist, (char *)&rcl);
+			return (fmd_adm_set_errno(ap, EPROTO));
+		}
+
+		if (rci.rci_err != 0 && rci.rci_err != FMD_ADM_ERR_CASESRCH) {
+			xdr_free(xdr_fmd_rpc_caseinfo, (char *)&rci);
+			free(uuids);
+			xdr_free(xdr_fmd_rpc_caselist, (char *)&rcl);
+			return (fmd_adm_set_svcerr(ap, rci.rci_err));
+		}
+
+		if (rci.rci_err == FMD_ADM_ERR_CASESRCH) {
+			xdr_free(xdr_fmd_rpc_caseinfo, (char *)&rci);
+			continue;
+		}
+
+		bzero(&aci, sizeof (aci));
+
+		if ((rv = nvlist_unpack(rci.rci_evbuf.rci_evbuf_val,
+		    rci.rci_evbuf.rci_evbuf_len, &aci.aci_event, 0)) != 0) {
+			xdr_free(xdr_fmd_rpc_caseinfo, (char *)&rci);
+			free(uuids);
+			xdr_free(xdr_fmd_rpc_caselist, (char *)&rcl);
+			return (fmd_adm_set_errno(ap, rv));
+		}
+
+		if ((rv = nvlist_lookup_string(aci.aci_event, FM_SUSPECT_UUID,
+		    (char **)&aci.aci_uuid)) != 0) {
+			xdr_free(xdr_fmd_rpc_caseinfo, (char *)&rci);
+			free(uuids);
+			xdr_free(xdr_fmd_rpc_caselist, (char *)&rcl);
+			nvlist_free(aci.aci_event);
+			return (fmd_adm_set_errno(ap, rv));
+		}
+		if ((rv = nvlist_lookup_string(aci.aci_event,
+		    FM_SUSPECT_DIAG_CODE, (char **)&aci.aci_code)) != 0) {
+			xdr_free(xdr_fmd_rpc_caseinfo, (char *)&rci);
+			free(uuids);
+			xdr_free(xdr_fmd_rpc_caselist, (char *)&rcl);
+			nvlist_free(aci.aci_event);
+			return (fmd_adm_set_errno(ap, rv));
+		}
+
+		rv = fmd_adm_case_one(&aci, url_token, func, arg);
+
+		xdr_free(xdr_fmd_rpc_caseinfo, (char *)&rci);
+		nvlist_free(aci.aci_event);
+
+		if (rv != 0)
+			break;
+	}
+
+	free(uuids);
+	xdr_free(xdr_fmd_rpc_caselist, (char *)&rcl);
+	return (0);
 }
 
 static int
