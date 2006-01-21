@@ -1,4 +1,4 @@
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
@@ -63,7 +63,7 @@ all: $(PROG)
 	$(COMPILE.c) $<
 	$(POST_PROCESS_O)
 
-$(CSH_PROG): sh.tconst.h .WAIT $(COMMONOBJS) $(PFOBJS) $(LOCALOBJS)
+$(CSH_PROG): $(COMMONOBJS) $(PFOBJS) $(LOCALOBJS)
 	$(LINK.c) $(COMMONOBJS) $(PFOBJS) $(LOCALOBJS) -o $@ $(LDLIBS)
 	$(POST_PROCESS)
 
@@ -71,19 +71,15 @@ $(ROOTPFCSH): $(ROOTPROG)
 	$(RM) $@
 	$(LN) $(ROOTPROG) $@
 
-sh.tconst.h: ../sh.tconst.c ../make.sh.tconst.h.ed 	
-	$(RM) $@
-	ed ../sh.tconst.c < ../make.sh.tconst.h.ed 
-
-$(HDDEP): sh.tconst.h
+$(HDDEP): ../sh.tconst.h
 
 install: all $(ROOTBINPROG)  $(ROOTPROG) $(ROOTPFCSH)
 
-lint:	sh.tconst.h
+lint:	../sh.tconst.h
 	$(LINT.c) $(COMMONSRCS) $(PFSRCS) signal.c
 
 clean:
-	$(RM) $(LOCALOBJS) $(COMMONOBJS) $(PFOBJS) sh.tconst.h
+	$(RM) $(LOCALOBJS) $(COMMONOBJS) $(PFOBJS)
 
 clobber:	clean
 	$(RM)  $(PROG)

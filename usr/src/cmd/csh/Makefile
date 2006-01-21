@@ -1,4 +1,4 @@
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 
 #	Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
@@ -25,6 +25,7 @@ GREP= egrep
 SED= sed
 POFILE= csh.po
 CLOBBERFILES += sh.tconst.h
+CLEANFILES += sh.tconst.h
 
 all :=          TARGET = all
 install :=      TARGET = install
@@ -66,7 +67,7 @@ $(MSGDOMAIN):
 $(POFILE):	$(POFILES)
 	$(RM) $@; cat $(POFILES) > $@
 
-sh.tconst.h:
+sh.tconst.h: sh.tconst.c make.sh.tconst.h.ed
 	$(RM) $@; $(ED) sh.tconst.c < make.sh.tconst.h.ed
 
 clobber: local_clobber $(MACH)
@@ -74,7 +75,12 @@ clobber: local_clobber $(MACH)
 local_clobber:
 	$(RM) $(CLOBBERFILES)
 
-$(MACH): FRC
+clean: local_clean 
+
+local_clean:
+	$(RM) $(CLEANFILES)
+
+$(MACH): sh.tconst.h .WAIT FRC
 	@cd $@; pwd; $(MAKE) $(TARGET)
 
 FRC:
