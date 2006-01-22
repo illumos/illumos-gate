@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -171,7 +171,11 @@ uscsi(int fd, struct uscsi_cmd *scmd)
 			if ((SENSE_KEY(rqbuf) == 2) && (ASC(rqbuf) == 4) &&
 			    (ASCQ(rqbuf) == 8)) {
 				total_retries++;
-				ms_delay(500);
+				if ((device_type != CD_RW) &&
+				    (scmd->uscsi_cdb[0] == CLOSE_TRACK_CMD))
+					(void) sleep(3);
+				else
+					ms_delay(500);
 				continue;
 			}
 			/*

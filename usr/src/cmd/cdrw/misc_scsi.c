@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -450,21 +450,19 @@ finalize(cd_device *dev)
 
 	if (!close_track(dev->d_fd, 0, 1, immediate)) {
 		/*
-		 * For DVD-RW close track is not well defined
-		 * some drives dont like it, others want us
-		 * to close track before closing the session.
-		 * NOTE that for MMC specification it is not mandatory
-		 * to support close track.
+		 * For DAO mode which we use for DVD-RW, the latest MMC
+		 * specification does not mention close_track. Some
+		 * newer drives will return an ILLEGAL INSTRUCTION
+		 * which we will ignore. We have also found a Panasonic
+		 * drive which will return a MEDIA ERROR. It is safe
+		 * to ignore both errors as this is not needed for
+		 * these drives.
+		 * This is kept for older drives which had needed
+		 * us to issue close_track to flush the cache fully.
+		 * once we are certain these drives have cleared the
+		 * market, this can be removed.
 		 */
 		if (device_type == DVD_MINUS) {
-			if (!close_track(dev->d_fd, 1, 0, immediate)) {
-				return (0);
-			} else {
-				/* command is already done */
-				if (!immediate)
-					return (1);
-			}
-		} else {
 			return (0);
 		}
 	} else {
@@ -955,9 +953,13 @@ write_fini(void)
 					    ASC(rqbuf), ASCQ(rqbuf));
 				}
 
-				if ((device_type == DVD_MINUS) &&
-				    (SENSE_KEY(rqbuf) == 5)) {
-
+				/*
+				 * Different vendor drives return different
+				 * sense error info for CLOSE SESSION command.
+				 * The Panasonic drive that we are using is
+				 * one such drive.
+				 */
+				if (device_type == DVD_MINUS) {
 					if (verbose) {
 						(void) printf(
 						    "skipping finalizing\n");
