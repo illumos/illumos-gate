@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1447,6 +1447,7 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 	int dzp_working_mode = 0;
 	int zp_working_mode = 0;
 	int dzp_error, zp_error;
+	int error;
 
 	/*
 	 * Arghh, this check is going to require a couple of questions
@@ -1490,7 +1491,7 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 		return (dzp_error);
 
 	if (dzp_working_mode & (ACE_WRITE_DATA|ACE_EXECUTE))
-		return (0);
+		goto sticky;
 
 	/*
 	 * Fourth Row
@@ -1498,10 +1499,18 @@ zfs_zaccess_delete(znode_t *dzp, znode_t *zp, cred_t *cr)
 
 	if (((dzp_working_mode & (ACE_WRITE_DATA|ACE_EXECUTE)) == 0) &&
 	    (zp_working_mode & ACE_DELETE))
-		return (0);
+		goto sticky;
 
-	return (secpolicy_vnode_access(cr, ZTOV(zp), dzp->z_phys->zp_uid,
-	    S_IWRITE|S_IEXEC));
+	error = secpolicy_vnode_access(cr, ZTOV(zp),
+	    dzp->z_phys->zp_uid, S_IWRITE|S_IEXEC);
+
+	if (error)
+		return (error);
+
+sticky:
+	error = zfs_sticky_remove_access(dzp, zp, cr);
+
+	return (error);
 }
 
 int
@@ -1539,10 +1548,7 @@ zfs_zaccess_rename(znode_t *sdzp, znode_t *szp, znode_t *tdzp,
 	/*
 	 * Now check for add permissions
 	 */
-	if (error = zfs_zaccess(sdzp, add_perm, cr))
-		return (error);
-
-	error = zfs_sticky_remove_access(sdzp, szp, cr);
+	error = zfs_zaccess(tdzp, add_perm, cr);
 
 	return (error);
 }

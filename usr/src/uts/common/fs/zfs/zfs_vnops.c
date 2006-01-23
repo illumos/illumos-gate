@@ -1239,12 +1239,6 @@ top:
 	}
 
 	/*
-	 * Check the restrictions that apply on sticky directories.
-	 */
-	if (error = zfs_sticky_remove_access(dzp, zp, cr))
-		goto out;
-
-	/*
 	 * Need to use rmdir for removing directories.
 	 */
 	if (vp->v_type == VDIR) {
@@ -1513,12 +1507,6 @@ top:
 	if (error = zfs_zaccess_delete(dzp, zp, cr)) {
 		goto out;
 	}
-
-	/*
-	 * Check the restrictions that apply on sticky directories.
-	 */
-	if (error = zfs_sticky_remove_access(dzp, zp, cr))
-		goto out;
 
 	if (vp->v_type != VDIR) {
 		error = ENOTDIR;
@@ -1926,6 +1914,9 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 
 	if (mask & AT_SIZE && vp->v_type == VDIR)
 		return (EISDIR);
+
+	if (mask & AT_SIZE && vp->v_type != VREG)
+		return (EINVAL);
 
 	ZFS_ENTER(zfsvfs);
 
