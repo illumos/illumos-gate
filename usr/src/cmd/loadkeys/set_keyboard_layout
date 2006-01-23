@@ -25,7 +25,14 @@
 # Use is subject to license terms. 
 #
 
-# get the layout name from the eeprom and set it into kernel.
-KBD_LAYOUT_NAME="`/usr/sbin/eeprom kbd-type | /usr/bin/sed -n s/kbd-type=//p`"
+# get the valid layout name from the eeprom and set it into kernel.
+# check space and tab to make sure that the kbd -s interaction mode
+# doesn't run here.
+KBD_LAYOUT_NAME="`/usr/sbin/eeprom kbd-type |\
+                 /usr/bin/sed -n 's/kbd-type=//g; s/[ |	]*//p'`"
 
-/usr/bin/kbd -s $KBD_LAYOUT_NAME
+if test -n "$KBD_LAYOUT_NAME"
+then
+	# Set the keyboard layout
+	/usr/bin/kbd -s $KBD_LAYOUT_NAME
+fi
