@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -162,9 +162,10 @@ static int		desc_fd = 0;
 static char *
 get_user_home_sunw_path(char *home_path)
 {
-	struct passwd *user_info;
+	struct passwd pwd, *user_info;
+	char pwdbuf[PWD_BUFFER_SIZE];
 
-	user_info = getpwuid(getuid());
+	(void) getpwuid_r(getuid(), &pwd, pwdbuf, PWD_BUFFER_SIZE, &user_info);
 
 	(void) snprintf(home_path, MAXPATHLEN, "%s/%s",
 	    user_info ? user_info->pw_dir : "", SUNW_PATH);

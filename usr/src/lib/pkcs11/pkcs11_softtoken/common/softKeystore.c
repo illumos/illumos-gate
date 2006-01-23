@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,7 +62,6 @@ soft_gen_iv(CK_BYTE *iv)
 
 }
 
-#define	PWD_BUFFER_SIZE	1024
 
 /*
  * soft_gen_hashed_pin()

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -314,10 +314,6 @@ out:
 			*(uint32_t *)iv8 = *(uint32_t *)last8;
 			/* LINTED: pointer alignment */
 			*(uint32_t *)&iv8[4] = *(uint32_t *)&last8[4];
-			/* LINTED: pointer alignment */
-			*(uint32_t *)&iv8[8] = *(uint32_t *)&last8[8];
-			/* LINTED: pointer alignment */
-			*(uint32_t *)&iv8[12] = *(uint32_t *)&last8[12];
 		} else {
 			BLOWFISH_COPY_BLOCK(last8, iv8);
 		}

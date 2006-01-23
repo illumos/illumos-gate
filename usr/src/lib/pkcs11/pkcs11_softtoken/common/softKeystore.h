@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,7 @@ extern "C" {
 
 #define	PBKD2_SALT_SIZE	16
 #define	PBKD2_ITERATIONS (1000)
+#define	PWD_BUFFER_SIZE	1024
 
 extern boolean_t soft_token_present;
 
