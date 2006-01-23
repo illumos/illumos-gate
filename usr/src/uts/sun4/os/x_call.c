@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -755,19 +755,8 @@ xc_attention(cpuset_t cpuset)
 	/*
 	 * inform the target processors to enter into xc_loop()
 	 */
-	tmpset = xc_cpuset;
 	init_mondo(setsoftint_tl1, xc_loop_inum, 0);
-	for (pix = 0; pix < NCPU; pix++) {
-		if (CPU_IN_SET(tmpset, pix)) {
-			ASSERT(xc_mbox[pix].xc_state == XC_IDLE);
-			xc_mbox[pix].xc_state = XC_ENTER;
-			send_one_mondo(pix);
-			CPUSET_DEL(tmpset, pix);
-			if (CPUSET_ISNULL(tmpset)) {
-				break;
-			}
-		}
-	}
+	SEND_MBOX_MONDO_XC_ENTER(xc_cpuset);
 	xc_spl_enter[lcx] = 0;
 
 	/*

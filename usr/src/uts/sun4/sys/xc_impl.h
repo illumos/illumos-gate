@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,13 +148,35 @@ extern uint_t sendmondo_in_recover;
 		if (CPU_IN_SET(tmpset, pix)) {			\
 			ASSERT(xc_mbox[pix].xc_state == state);	\
 			XC_SETUP(pix, func, arg1, arg2);	\
-			membar_stld();				\
-			send_one_mondo(pix);			\
 			CPUSET_DEL(tmpset, pix);		\
 			if (CPUSET_ISNULL(tmpset))		\
 				break;				\
 		}						\
 	}							\
+	membar_stld();						\
+	send_mondo_set(xc_cpuset);				\
+}
+
+/*
+ * set up and notify a x-call request, signalling xc_cpuset
+ * cpus to enter xc_loop()
+ */
+#define	SEND_MBOX_MONDO_XC_ENTER(xc_cpuset)			\
+{								\
+	int pix;						\
+	cpuset_t  tmpset = xc_cpuset;				\
+	for (pix = 0; pix < NCPU; pix++) {			\
+		if (CPU_IN_SET(tmpset, pix)) {			\
+			ASSERT(xc_mbox[pix].xc_state ==		\
+			    XC_IDLE);				\
+			xc_mbox[pix].xc_state = XC_ENTER;	\
+			CPUSET_DEL(tmpset, pix);		\
+			if (CPUSET_ISNULL(tmpset)) {		\
+				break;				\
+			}					\
+		}						\
+	}							\
+	send_mondo_set(xc_cpuset);				\
 }
 
 /*

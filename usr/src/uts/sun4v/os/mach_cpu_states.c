@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -591,8 +591,20 @@ send_one_mondo(int cpuid)
 	stat = shipit(1, mcpup->cpu_list_ra);
 	endtick = starttick + xc_tick_limit;
 	retries = 0;
-	while (stat != 0) {
-		ASSERT(stat == H_EWOULDBLOCK);
+	while (stat != H_EOK) {
+		if (stat != H_EWOULDBLOCK) {
+			if (panic_quiesce)
+				return;
+			if (stat == H_ECPUERROR)
+				cmn_err(CE_PANIC, "send_one_mondo: "
+				    "cpuid: 0x%x has been marked in "
+				    "error", cpuid);
+			else
+				cmn_err(CE_PANIC, "send_one_mondo: "
+				    "unexpected hypervisor error 0x%x "
+				    "while sending a mondo to cpuid: "
+				    "0x%x", stat, cpuid);
+		}
 		tick = gettick();
 		/*
 		 * If there is a big jump between the current tick
@@ -615,11 +627,11 @@ send_one_mondo(int cpuid)
 	}
 #ifdef SEND_MONDO_STATS
 	{
-		int n = gettick() - starttick;
+		uint64_t n = gettick() - starttick;
 		if (n < 8192)
 			x_one_stimes[n >> 7]++;
-		else if (n < 16*8192)
-			x_one_ltimes[(n >> 13) & 0xf]++;
+		else if (n < 15*8192)
+			x_one_ltimes[n >> 13]++;
 		else
 			x_one_ltimes[0xf]++;
 	}
@@ -630,38 +642,110 @@ void
 send_mondo_set(cpuset_t set)
 {
 	uint64_t starttick, endtick, tick, lasttick;
-	int i, retries, stat, fcpuid, lcpuid;
-	int ncpuids = 0;
 	int shipped = 0;
+	int retries = 0;
 	struct machcpu	*mcpup = &(CPU->cpu_m);
 
 	ASSERT(!CPUSET_ISNULL(set));
 	starttick = lasttick = gettick();
 	endtick = starttick + xc_tick_limit;
 
-	fcpuid = -1;
-	for (i = 0; i < NCPU; i++) {
-		if (CPU_IN_SET(set, i)) {
-			ncpuids++;
-			mcpup->cpu_list[0] = (uint16_t)i;
-			stat = shipit(1, mcpup->cpu_list_ra);
-			if (stat != 0) {
-				ASSERT(stat == H_EWOULDBLOCK);
-				if (fcpuid < 0)
-					fcpuid = i;
-				lcpuid = i;
-				continue;
-			}
-			shipped++;
-			CPUSET_DEL(set, i);
-			if (CPUSET_ISNULL(set))
-				break;
-		}
-	}
+	do {
+		int ncpuids = 0;
+		int i, stat;
 
-	retries = 0;
-	while (shipped < ncpuids) {
-		ASSERT(fcpuid >= 0 && fcpuid <= lcpuid && lcpuid < NCPU);
+		/* assemble CPU list for HV argument */
+		for (i = 0; i < NCPU; i++) {
+			if (CPU_IN_SET(set, i)) {
+				mcpup->cpu_list[ncpuids] = (uint16_t)i;
+				ncpuids++;
+			}
+		}
+
+		stat = shipit(ncpuids, mcpup->cpu_list_ra);
+		if (stat == H_EOK) {
+			shipped += ncpuids;
+			break;
+		}
+
+		/*
+		 * Either not all CPU mondos were sent, or an
+		 * error occurred. CPUs that were sent mondos
+		 * have their CPU IDs overwritten in cpu_list.
+		 * Reset the cpuset so that its only members
+		 * are those CPU IDs that still need to be sent.
+		 */
+		CPUSET_ZERO(set);
+		for (i = 0; i < ncpuids; i++) {
+			if (mcpup->cpu_list[i] == HV_SEND_MONDO_ENTRYDONE) {
+				shipped++;
+			} else {
+				CPUSET_ADD(set, mcpup->cpu_list[i]);
+			}
+		}
+
+		/*
+		 * Now handle possible errors returned
+		 * from hypervisor.
+		 */
+		if (stat == H_ECPUERROR) {
+			cpuset_t error_set;
+
+			/*
+			 * One or more of the CPUs passed to HV is
+			 * in the error state. Remove those CPUs from
+			 * set and record them in error_set.
+			 */
+			CPUSET_ZERO(error_set);
+			for (i = 0; i < NCPU; i++) {
+				if (CPU_IN_SET(set, i)) {
+					uint64_t state;
+					(void) hv_cpu_state(i, &state);
+					if (state == CPU_STATE_ERROR) {
+						CPUSET_ADD(error_set, i);
+						CPUSET_DEL(set, i);
+					}
+				}
+			}
+
+			if (!panic_quiesce) {
+				if (CPUSET_ISNULL(error_set)) {
+					cmn_err(CE_PANIC, "send_mondo_set: "
+					    "hypervisor returned "
+					    "H_ECPUERROR but no CPU in "
+					    "cpu_list in error state");
+				}
+
+				cmn_err(CE_CONT, "send_mondo_set: cpuid(s) ");
+				for (i = 0; i < NCPU; i++) {
+					if (CPU_IN_SET(error_set, i)) {
+						cmn_err(CE_CONT, "0x%x ", i);
+					}
+				}
+				cmn_err(CE_CONT, "have been marked in "
+				    "error\n");
+				cmn_err(CE_PANIC, "send_mondo_set: CPU(s) "
+				    "in error state");
+			}
+		} else if (stat != H_EWOULDBLOCK) {
+			if (panic_quiesce)
+				return;
+			/*
+			 * For all other errors, panic.
+			 */
+			cmn_err(CE_CONT, "send_mondo_set: unexpected "
+			    "hypervisor error 0x%x while sending a "
+			    "mondo to cpuid(s):", stat);
+			for (i = 0; i < NCPU; i++) {
+				if (CPU_IN_SET(set, i)) {
+					cmn_err(CE_CONT, " 0x%x", i);
+				}
+			}
+			cmn_err(CE_CONT, "\n");
+			cmn_err(CE_PANIC, "send_mondo_set: unexpected "
+			    "hypervisor error");
+		}
+
 		tick = gettick();
 		/*
 		 * If there is a big jump between the current tick
@@ -676,54 +760,27 @@ send_mondo_set(cpuset_t set)
 				return;
 			cmn_err(CE_CONT, "send mondo timeout "
 			    "[retries: 0x%x]  cpuids: ", retries);
-			for (i = fcpuid; i <= lcpuid; i++) {
+			for (i = 0; i < NCPU; i++)
 				if (CPU_IN_SET(set, i))
 					cmn_err(CE_CONT, " 0x%x", i);
-			}
 			cmn_err(CE_CONT, "\n");
 			cmn_err(CE_PANIC, "send_mondo_set: timeout");
 		}
 
-		/* adjust fcpuid to the first CPU in set */
-		for (; fcpuid <= lcpuid; fcpuid++)
-			if (CPU_IN_SET(set, fcpuid))
-				break;
-
-		/* adjust lcpuid to the last CPU in set */
-		for (; lcpuid >= fcpuid; lcpuid--)
-			if (CPU_IN_SET(set, lcpuid))
-				break;
-
-		/* resend undelivered mondo */
-		for (i = fcpuid; i <= lcpuid; i++) {
-			if (CPU_IN_SET(set, i)) {
-				mcpup->cpu_list[0] = (uint16_t)i;
-				stat = shipit(1, mcpup->cpu_list_ra);
-				if (stat != 0) {
-					ASSERT(stat == H_EWOULDBLOCK);
-					continue;
-				}
-				shipped++;
-				CPUSET_DEL(set, i);
-				if (shipped == ncpuids)
-					break;
-			}
-		}
-		if (shipped == ncpuids)
-			break;
-
 		while (gettick() < (tick + sys_clock_mhz))
 			;
 		retries++;
-	}
+	} while (!CPUSET_ISNULL(set));
+
+	CPU_STATS_ADDQ(CPU, sys, xcalls, shipped);
 
 #ifdef SEND_MONDO_STATS
 	{
-		int n = gettick() - starttick;
+		uint64_t n = gettick() - starttick;
 		if (n < 8192)
 			x_set_stimes[n >> 7]++;
-		else if (n < 16*8192)
-			x_set_ltimes[(n >> 13) & 0xf]++;
+		else if (n < 15*8192)
+			x_set_ltimes[n >> 13]++;
 		else
 			x_set_ltimes[0xf]++;
 	}

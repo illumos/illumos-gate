@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +73,12 @@ extern "C" {
 
 #define	H_BREAK			-1	/* Console Break */
 #define	H_HUP			-2	/* Console Break */
+
+/*
+ * Mondo CPU ID argument processing.
+ */
+#define	HV_SEND_MONDO_ENTRYDONE	0xffff
+
 /*
  * Function numbers for FAST_TRAP.
  */
