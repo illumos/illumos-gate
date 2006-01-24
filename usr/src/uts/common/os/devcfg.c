@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -94,9 +94,9 @@ struct devi_nodeid_list {
 
 /* used to keep track of branch remove events to be generated */
 struct brevq_node {
-	char *deviname;
-	struct brevq_node *sibling;
-	struct brevq_node *child;
+	char *brn_deviname;
+	struct brevq_node *brn_sibling;
+	struct brevq_node *brn_child;
 };
 
 static struct devi_nodeid_list devi_nodeid_list;
@@ -4063,10 +4063,10 @@ brevq_enqueue(struct brevq_node **brevqp, dev_info_t *dip,
 	(void) ddi_deviname(dip, deviname);
 
 	brn = kmem_zalloc(sizeof (*brn), KM_SLEEP);
-	brn->deviname = i_ddi_strdup(deviname, KM_SLEEP);
+	brn->brn_deviname = i_ddi_strdup(deviname, KM_SLEEP);
 	kmem_free(deviname, MAXNAMELEN);
-	brn->child = child;
-	brn->sibling = *brevqp;
+	brn->brn_child = child;
+	brn->brn_sibling = *brevqp;
 	*brevqp = brn;
 
 	return (brn);
@@ -4081,9 +4081,9 @@ free_brevq(struct brevq_node *brevq)
 	struct brevq_node *brn, *next_brn;
 
 	for (brn = brevq; brn != NULL; brn = next_brn) {
-		next_brn = brn->sibling;
-		ASSERT(brn->child == NULL);
-		kmem_free(brn->deviname, strlen(brn->deviname) + 1);
+		next_brn = brn->brn_sibling;
+		ASSERT(brn->brn_child == NULL);
+		kmem_free(brn->brn_deviname, strlen(brn->brn_deviname) + 1);
 		kmem_free(brn, sizeof (*brn));
 	}
 }
@@ -4101,8 +4101,8 @@ log_and_free_brevq(char *node_path, struct brevq_node *brevq)
 	char *p;
 
 	p = node_path + strlen(node_path);
-	for (brn = brevq; brn != NULL; brn = brn->sibling) {
-		(void) strcpy(p, brn->deviname);
+	for (brn = brevq; brn != NULL; brn = brn->brn_sibling) {
+		(void) strcpy(p, brn->brn_deviname);
 		(void) i_log_devfs_branch_remove(node_path);
 	}
 	*p = '\0';
@@ -4140,12 +4140,12 @@ log_and_free_br_events_on_grand_children(dev_info_t *dip,
 	path = kmem_alloc(MAXPATHLEN, KM_SLEEP);
 	(void) ddi_pathname(dip, path);
 	p = path + strlen(path);
-	for (brn = brevq; brn != NULL; brn = brn->sibling) {
-		if (brn->child) {
-			(void) strcpy(p, brn->deviname);
+	for (brn = brevq; brn != NULL; brn = brn->brn_sibling) {
+		if (brn->brn_child) {
+			(void) strcpy(p, brn->brn_deviname);
 			/* now path contains the node path to the dip's child */
-			log_and_free_brevq(path, brn->child);
-			brn->child = NULL;
+			log_and_free_brevq(path, brn->brn_child);
+			brn->brn_child = NULL;
 		}
 	}
 	kmem_free(path, MAXPATHLEN);
@@ -4168,12 +4168,12 @@ cleanup_br_events_on_grand_children(dev_info_t *dip, struct brevq_node **brevqp)
 
 	ndi_devi_enter(dip, &circ);
 	for (brn = brevq; brn != NULL; brn = next_brn) {
-		next_brn = brn->sibling;
+		next_brn = brn->brn_sibling;
 		for (child = ddi_get_child(dip); child != NULL;
 		    child = ddi_get_next_sibling(child)) {
 			if (i_ddi_node_state(child) >= DS_INITIALIZED) {
 				(void) ddi_deviname(child, path);
-				if (strcmp(path, brn->deviname) == 0)
+				if (strcmp(path, brn->brn_deviname) == 0)
 					break;
 			}
 		}
@@ -4181,33 +4181,34 @@ cleanup_br_events_on_grand_children(dev_info_t *dip, struct brevq_node **brevqp)
 		if (child != NULL && !(DEVI_EVREMOVE(child))) {
 			/*
 			 * Event state is not REMOVE. So branch remove event
-			 * is not going be generated on brn->child.
+			 * is not going be generated on brn->brn_child.
 			 * If any branch remove events were queued up on
-			 * brn->child log them and remove the brn
+			 * brn->brn_child log them and remove the brn
 			 * from the queue.
 			 */
-			if (brn->child) {
+			if (brn->brn_child) {
 				(void) ddi_pathname(dip, path);
-				(void) strcat(path, brn->deviname);
-				log_and_free_brevq(path, brn->child);
+				(void) strcat(path, brn->brn_deviname);
+				log_and_free_brevq(path, brn->brn_child);
 			}
 
 			if (prev_brn)
-				prev_brn->sibling = next_brn;
+				prev_brn->brn_sibling = next_brn;
 			else
 				*brevqp = next_brn;
 
-			kmem_free(brn->deviname, strlen(brn->deviname) + 1);
+			kmem_free(brn->brn_deviname,
+			    strlen(brn->brn_deviname) + 1);
 			kmem_free(brn, sizeof (*brn));
 		} else {
 			/*
 			 * Free up the outstanding branch remove events
-			 * queued on brn->child since brn->child
+			 * queued on brn->brn_child since brn->brn_child
 			 * itself is eligible for branch remove event.
 			 */
-			if (brn->child) {
-				free_brevq(brn->child);
-				brn->child = NULL;
+			if (brn->brn_child) {
+				free_brevq(brn->brn_child);
+				brn->brn_child = NULL;
 			}
 			prev_brn = brn;
 		}
@@ -6177,7 +6178,7 @@ mt_config_thread(void *arg)
 			struct brevq_node *brevq = NULL;
 			rv = devi_unconfig_common(dip, dipp, flags, major,
 			    &brevq);
-			mcd->mtc_brn->child = brevq;
+			mcd->mtc_brn->brn_child = brevq;
 		} else
 			rv = devi_unconfig_common(dip, dipp, flags, major,
 			    NULL);
@@ -6219,7 +6220,7 @@ mt_config_children(struct mt_config_handle *hdl)
 	major_t			major = hdl->mtc_major;
 	dev_info_t		*dip;
 	int			circ;
-	struct brevq_node	*brn = NULL;
+	struct brevq_node	*brn;
 	struct mt_config_data	*mcd_head = NULL;
 	struct mt_config_data	*mcd_tail = NULL;
 	struct mt_config_data	*mcd;
@@ -6245,7 +6246,8 @@ mt_config_children(struct mt_config_handle *hdl)
 			 * unconfiguration.
 			 */
 			brn = brevq_enqueue(hdl->mtc_brevqp, dip, NULL);
-		}
+		} else
+			brn = NULL;
 
 		/*
 		 * Hold the child that we are processing so he does not get
