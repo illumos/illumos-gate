@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License, (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -464,6 +463,9 @@ main(int argc, char *argv[])
 	 */
 	if (use_udp)
 		send_reply = _B_FALSE;
+
+	if (getenv("MACHINE_THAT_GOES_PING") != NULL)
+		stats = _B_TRUE;
 
 	targethost = argv[optind];
 	optind++;
@@ -2203,17 +2205,16 @@ finish()
 
 	/* if packet is big enough to store timeval AND ... */
 	if ((datalen >= sizeof (struct timeval)) && (nreceived > 0)) {
-		int precision = nreceived < 10 ? 3 : nreceived < 100 ? 4 : 5;
 		double mean = (double)tsum / nreceived;
 		double smean = (double)tsum2 / nreceived;
 		double sd =
 		    sqrt(((smean - mean*mean) * nreceived) / (nreceived-1));
 
 		Printf("round-trip (ms)  min/avg/max/stddev = "
-		    TIMEFORMAT "/" TIMEFORMAT_V "/"
-		    TIMEFORMAT "/" TIMEFORMAT_V "\n",
-		    (double)tmin / 1000, precision, mean / 1000,
-		    (double)tmax / 1000, precision-1, sd / 1000);
+		    TIMEFORMAT "/" TIMEFORMAT "/"
+		    TIMEFORMAT "/" TIMEFORMAT "\n",
+		    (double)tmin / 1000, mean / 1000,
+		    (double)tmax / 1000, sd / 1000);
 	}
 	(void) fflush(stdout);
 
