@@ -3259,22 +3259,30 @@ ddi_prop_1275_string(prop_handle_t *ph, uint_t cmd, char *data)
 			return (DDI_PROP_RESULT_ERROR);
 		}
 
-		n = strlen((char *)ph->ph_cur_pos) + 1;
-		if ((char *)ph->ph_cur_pos > ((char *)ph->ph_data +
-				ph->ph_size - n)) {
-			return (DDI_PROP_RESULT_ERROR);
+		/*
+		 * Match DDI_PROP_CMD_GET_DSIZE logic for when to stop and
+		 * how to NULL terminate result.
+		 */
+		p = (char *)ph->ph_cur_pos;
+		end = (char *)ph->ph_data + ph->ph_size;
+		if (p >= end)
+			return (DDI_PROP_RESULT_EOF);
+
+		while (p < end) {
+			*data++ = *p;
+			if (*p++ == 0) {	/* NULL from OBP */
+				ph->ph_cur_pos = p;
+				return (DDI_PROP_RESULT_OK);
+			}
 		}
 
 		/*
-		 * Copy the NULL terminated string
+		 * If OBP did not NULL terminate string, which happens
+		 * (at least) for 'true'/'false' boolean values, account for
+		 * the space and store null termination on decode.
 		 */
-		bcopy(ph->ph_cur_pos, data, n);
-
-		/*
-		 * Move the current location to the start of the next bit of
-		 * undecoded data.
-		 */
-		ph->ph_cur_pos = (char *)ph->ph_cur_pos + n;
+		ph->ph_cur_pos = p;
+		*data = 0;
 		return (DDI_PROP_RESULT_OK);
 
 	case DDI_PROP_CMD_ENCODE:
@@ -3319,19 +3327,22 @@ ddi_prop_1275_string(prop_handle_t *ph, uint_t cmd, char *data)
 		 */
 		p = (char *)ph->ph_cur_pos;
 		end = (char *)ph->ph_data + ph->ph_size;
-
-		if (p == end) {
+		if (p >= end)
 			return (DDI_PROP_RESULT_EOF);
-		}
 
-		for (n = 0; p < end; n++) {
-			if (*p++ == 0) {
+		while (p < end) {
+			if (*p++ == 0) {	/* NULL from OBP */
 				ph->ph_cur_pos = p;
 				return (DDI_PROP_RESULT_OK);
 			}
 		}
 
-		return (DDI_PROP_RESULT_ERROR);
+		/*
+		 * Accommodate the fact that OBP does not always NULL
+		 * terminate strings.
+		 */
+		ph->ph_cur_pos = p;
+		return (DDI_PROP_RESULT_OK);
 
 	case DDI_PROP_CMD_GET_ESIZE:
 		/*
@@ -3341,20 +3352,30 @@ ddi_prop_1275_string(prop_handle_t *ph, uint_t cmd, char *data)
 
 	case DDI_PROP_CMD_GET_DSIZE:
 		/*
-		 * Return the string length plus one for the NULL
+		 * Return the string length plus one for the NULL.
 		 * We know the size of the property, we need to
 		 * ensure that the string is properly formatted,
 		 * since we may be looking up random OBP data.
 		 */
 		p = (char *)ph->ph_cur_pos;
 		end = (char *)ph->ph_data + ph->ph_size;
+		if (p >= end)
+			return (DDI_PROP_RESULT_EOF);
+
 		for (n = 0; p < end; n++) {
-			if (*p++ == 0) {
+			if (*p++ == 0) {	/* NULL from OBP */
 				ph->ph_cur_pos = p;
-				return (n+1);
+				return (n + 1);
 			}
 		}
-		return (DDI_PROP_RESULT_ERROR);
+
+		/*
+		 * If OBP did not NULL terminate string, which happens for
+		 * 'true'/'false' boolean values, account for the space
+		 * to store null termination here.
+		 */
+		ph->ph_cur_pos = p;
+		return (n + 1);
 
 	default:
 #ifdef DEBUG
