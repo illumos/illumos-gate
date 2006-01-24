@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2437,7 +2437,6 @@ mail_result(struct usr *p, struct runinfo *pr, size_t filesize)
 	cmd = xmalloc(strlen(MAIL)+strlen(p->name)+2);
 	(void) sprintf(cmd, "%s %s", MAIL, p->name);
 	mailpipe = popen(cmd, "w");
-	contract_abandon_latest(0);
 	free(cmd);
 	if (mailpipe == NULL)
 		exit(127);
@@ -3307,12 +3306,8 @@ contract_abandon_latest(pid_t pid)
 		    REMOVE_FIFO | CONSOLE_MSG);
 
 	if (r = contract_latest(&id)) {
-		if (pid == 0)
-			msg("could not obtain latest contract from "
-			    "popen(3C): %s", strerror(r));
-		else
-			msg("could not obtain latest contract for "
-			    "PID %ld: %s", pid, strerror(r));
+		msg("could not obtain latest contract for "
+		    "PID %ld: %s", pid, strerror(r));
 		cts_lost++;
 		return;
 	}
