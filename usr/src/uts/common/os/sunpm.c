@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -8605,7 +8605,8 @@ pm_busop_set_power(dev_info_t *dip, void *impl_arg, pm_bus_power_op_t op,
 		thresh = cur_threshold(dip, comp);
 		idletime = gethrestime_sec() - cp->pmc_timestamp;
 		if (scan && ((PM_KUC(dip) != 0) ||
-		    (cp->pmc_busycount > 0) || (idletime < thresh))) {
+		    (cp->pmc_busycount > 0) ||
+		    ((idletime < thresh) && !PM_IS_PID(dip)))) {
 #ifdef	DEBUG
 			if (DEVI(dip)->devi_pm_kidsupcnt != 0)
 				PMD(PMD_SET, ("%s: scan failed: "
