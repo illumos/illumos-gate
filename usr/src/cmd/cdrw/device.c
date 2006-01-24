@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,11 +206,11 @@ get_device(char *user_supplied, char *node)
 		dev->d_speed_ctrl = cd_speed_ctrl;
 	} else {
 		/*
-		 * If feature 8 (see GET CONF MMC command) is supported,
-		 * READ CD will work and will return jitter free audio data.
-		 * Otherwise look at page code 2A for this info.
+		 * If the CD Read Feature is supported, READ CD will work
+		 * and will return jitter free audio data. Otherwise, look
+		 * at Page Code 2A for this information.
 		 */
-		if (get_configuration(fd, 0x1E, 8, cap)) {
+		if (ftr_supported(fd, MMC_FTR_CD_READ) == 1) {
 			dev->d_read_audio = read_audio_through_read_cd;
 			dev->d_cap |= DEV_CAP_ACCURATE_CDDA;
 		} else if (get_mode_page(fd, 0x2A, 0, 8, cap)) {
@@ -221,11 +221,11 @@ get_device(char *user_supplied, char *node)
 			}
 		}
 		/*
-		 * If feature 0x0107 is suported then Real-time streaming
-		 * commands can be used for speed control. Otherwise try
-		 * SET CD SPEED.
+		 * If the Real Time Streaming Feature is supported then
+		 * Real-time streaming commands can be used for speed control.
+		 * Otherwise try SET CD SPEED.
 		 */
-		if (get_configuration(fd, 0x0107, 8, cap)) {
+		if (ftr_supported(fd, MMC_FTR_RT_STREAM) == 1) {
 			dev->d_speed_ctrl = rt_streaming_ctrl;
 			if (debug)
 				(void) printf("using rt speed ctrl\n");
@@ -246,15 +246,12 @@ get_device(char *user_supplied, char *node)
 	 */
 
 	if (ioctl(fd, DKIOCGMEDIAINFO, &mediainfo) < 0) {
-
 		/*
 		 * If DKIOCGMEDIAINFO fails we'll try to get
 		 * the blocksize from the device itself.
 		 */
-
 		if (debug)
 			(void) printf("DKIOCGMEDIAINFO failed\n");
-
 		if (read_capacity(fd, cap))
 			dev->d_blksize = read_scsi32(cap + 4);
 	} else {
@@ -768,21 +765,13 @@ list(void)
 void
 get_media_type(int fd)
 {
-	uchar_t cap[DVD_CONFIG_SIZE];
-	uint_t i;
+	uchar_t *cap = (uchar_t *)my_zalloc(MMC_FTR_HDR_LEN);
 
-
-	(void) memset(cap, 0, DVD_CONFIG_SIZE);
-	if (get_configuration(fd, 0, DVD_CONFIG_SIZE, cap)) {
-		if (debug && verbose) {
-			(void) printf("\nprofile = ");
-
-			for (i = 7; i < 0x20; i += 4)
-				(void) printf(" 0x%x", cap[i]);
-			(void) printf("\n");
-		}
-
-		switch (cap[7]) {
+	if (get_configuration(fd, MMC_FTR_PRFL_LIST,
+	    MMC_FTR_HDR_LEN, cap)) {
+		if (debug)
+			(void) print_profile_list(fd);
+		switch (read_scsi16(&cap[6])) {
 			case 0x8: /* CD-ROM */
 				if (debug)
 					(void) printf("CD-ROM found\n");
@@ -863,6 +852,7 @@ get_media_type(int fd)
 				device_type = CD_RW;
 		}
 	}
+	free(cap);
 }
 
 /* Translate a transfer rate (eg, KB/s) into a Speed (eg, "2X") */

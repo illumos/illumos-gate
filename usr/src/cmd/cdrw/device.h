@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -78,6 +78,8 @@ int scan_for_cd_device(int mode, cd_device **found);
 void write_next_track(int mode, bstreamhandle h);
 int check_device(cd_device *dev, int cond);
 void get_media_type(int fd);
+void print_profile_list(int fd);
+int ftr_supported(int fd, uint16_t feature);
 uint_t cdrw_bandwidth_to_x(uint_t rate);
 uint_t cdrw_x_to_bandwidth(uint_t x);
 

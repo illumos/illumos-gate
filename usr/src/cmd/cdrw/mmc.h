@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,32 @@ extern "C" {
 #define	GET_PERF_DATA_LEN	24
 #define	SET_STREAM_DATA_LEN	28
 
-#define	DEFAULT_SCSI_TIMEOUT	60
+#define	DEFAULT_SCSI_TIMEOUT    60
+
+#define	MMC_FTR_HDR_LEN		8	/* byte len of Feature Header */
+/*
+ * byte length of the static part of a Feature Descriptor
+ */
+#define	MMC_FTR_DSCRPTR_BASE_LEN	4
+#define	MMC_PRFL_DSCRPTR_LEN	4	/* byte len of Profile Descriptor */
+/*
+ * MMC Features; can be added to over time
+ */
+#define	MMC_FTR_PRFL_LIST	0x0000	/* Profile List Feature */
+#define	MMC_FTR_CORE		0x0001	/* Core Feature */
+#define	MMC_FTR_MORPHING	0x0002	/* Morphing Feature */
+#define	MMC_FTR_REM_MED		0x0003	/* Removable Medium Feature */
+#define	MMC_FTR_WR_PROTECT	0x0004	/* Write Protect Feature */
+#define	MMC_FTR_RAND_READ	0x0010	/* Random Readable Feature */
+#define	MMC_FTR_MULTI_READ	0x001D	/* Multi-Read Feature */
+#define	MMC_FTR_CD_READ		0x001E	/* CD Read Feature */
+#define	MMC_FTR_DVD_READ	0x001F	/* DVD Read Feature */
+#define	MMC_FTR_RAND_WR		0x0020	/* Random Writable Feature */
+#define	MMC_FTR_INC_STR_WR	0x0021	/* Incremental Streaming Writable */
+#define	MMC_FTR_SCTR_ERSBL	0x0022	/* Sector Erasable Feature */
+#define	MMC_FTR_FORMATTABLE	0x0023	/* Formattable Feature */
+#define	MMC_FTR_DFCT_MNGMNT	0x0024	/* Hardware Defect Management Feature */
+#define	MMC_FTR_RT_STREAM	0x0107	/* Real Time Streaming Feature */
 
 int test_unit_ready(int fd);
 int inquiry(int fd, uchar_t *inq);

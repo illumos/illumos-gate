@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -670,4 +670,206 @@ read_format_capacity(int fd, uint_t *bsize)
 	*bsize = (uint16_t)(((uchar_t)buf[10] << 8) + (uchar_t)buf[11]);
 
 	return (filesize);
+}
+
+/*
+ * Function:    ftr_supported
+ *
+ * Description: Check to see if a device supports a Feature
+ *
+ * Arguments:   fd      - file descriptor
+ *              feature - the MMC Feature for which we'd like to know
+ *                        if there's support
+ *
+ * Return Code: 1       - Feature is supported
+ *		0	- Feature is not supported
+ *
+ */
+int
+ftr_supported(int fd, uint16_t feature)
+{
+	size_t response_len;
+	uchar_t *bufp;
+	int ret;
+
+	response_len = MMC_FTR_HDR_LEN + MMC_FTR_DSCRPTR_BASE_LEN;
+	bufp = (uchar_t *)my_zalloc(response_len);
+
+	/*
+	 * If a Feature is supported, a device will return a Feature Descriptor
+	 * for that Feature, and its Current Bit will be set.
+	 */
+	if (get_configuration(fd, feature, response_len, bufp) == 1) {
+		/*
+		 * To check that a Feature Descriptor was returned, we
+		 * check to see if the Data Length field of the Feature
+		 * Header holds a value greater than four.  To check if
+		 * the Current Bit is set, we check bit 1 of byte 10.
+		 */
+		if (read_scsi32(bufp) > 4 && bufp[10] & 1)
+			ret = 1;
+		else
+			ret = 0;
+	} else {
+		/* get_configuration failed */
+		ret = 0;
+	}
+	free(bufp);
+	return (ret);
+}
+
+/*
+ * Function:    print_profile_name
+ *
+ * Description: Prints a list of the Profiles the device supports
+ *
+ * Parameters:  num     - hexadecimal representation of Profile
+ *              current - 1 if the Profile is Current, otherwise 0
+ */
+static void
+print_profile_name(uint16_t num, uchar_t current)
+{
+	(void) printf(" 0x%04x: ", num);
+	switch (num) {
+	case 0x0000:
+		(void) printf("No Current Profile");
+		break;
+	case 0x0001:
+		(void) printf("Non-Removable Disk");
+		break;
+	case 0x0002:
+		(void) printf("Removable Disk");
+		break;
+	case 0x0003:
+		(void) printf("Magneto-Optical Erasable");
+		break;
+	case 0x0004:
+		(void) printf("Optical Write Once");
+		break;
+	case 0x0005:
+		(void) printf("AS-MO");
+		break;
+	case 0x0008:
+		(void) printf("CD-ROM");
+		break;
+	case 0x0009:
+		(void) printf("CD-R");
+		break;
+	case 0x000A:
+		(void) printf("CD-RW");
+		break;
+	case 0x0010:
+		(void) printf("DVD-ROM");
+		break;
+	case 0x0011:
+		(void) printf("DVD-R Sequential Recording");
+		break;
+	case 0x0012:
+		(void) printf("DVD-RAM");
+		break;
+	case 0x0013:
+		(void) printf("DVD-RW Restricted Overwrite");
+		break;
+	case 0x0014:
+		(void) printf("DVD-RW Sequential Recording");
+		break;
+	case 0x001A:
+		(void) printf("DVD+RW");
+		break;
+	case 0x001B:
+		(void) printf("DVD+R");
+		break;
+	case 0x0020:
+		(void) printf("DDCD-ROM");
+		break;
+	case 0x0021:
+		(void) printf("DDCD-R");
+		break;
+	case 0x0022:
+		(void) printf("DDCD-RW");
+		break;
+	case 0x002B:
+		(void) printf("DVD+R Double Layer");
+		break;
+	case 0x0040:
+		(void) printf("BD-ROM");
+		break;
+	case 0x0041:
+		(void) printf("BD-R Sequential Recording (SRM) Profile");
+		break;
+	case 0x0042:
+		(void) printf("BD-R Random Recording (RRM) Profile");
+		break;
+	case 0x0043:
+		(void) printf("BD-RE");
+		break;
+	case 0xFFFF:
+		(void) printf("Nonstandard Profile");
+		break;
+	default:
+		break;
+	}
+	if (current == 1)
+		(void) printf(" (Current Profile)");
+	(void) printf("\n");
+}
+
+/*
+ * Function: print_profile_list
+ *
+ * Description: Print a list of Profiles supported by the Logical Unit.
+ *
+ * Parameters:	fd 	- file descriptor for device whose list of
+ *			  profiles we wish to print
+ */
+void
+print_profile_list(int fd)
+{
+	size_t i;
+	size_t buflen;
+	uint16_t current;
+	uint16_t other;
+	uchar_t *bufp = (uchar_t *)my_zalloc(MMC_FTR_HDR_LEN);
+
+	/*
+	 * First get_configuration call is used to determine amount of memory
+	 * needed to hold all the Profiles.  The first four bytes of bufp
+	 * concatenated tell us the number of bytes of memory we need but do
+	 * not take themselves into account.  Therefore, add four, and
+	 * allocate that number of bytes.
+	 */
+	if (get_configuration(fd, MMC_FTR_PRFL_LIST, MMC_FTR_HDR_LEN,
+	    bufp)) {
+		buflen = read_scsi32(bufp) + 4;
+		free(bufp);
+		bufp = (uchar_t *)my_zalloc(buflen);
+
+		/*
+		 * Now get all the Profiles
+		 */
+		if (get_configuration(fd, MMC_FTR_PRFL_LIST, buflen, bufp)) {
+			(void) printf("\nProfile List\n");
+			(void) printf("---------------------------------\n");
+
+			/*
+			 * Find out the Logical Unit's Current Profile
+			 */
+			current = read_scsi16(&bufp[6]);
+
+			/*
+			 * Print out the Profile List and indicate which
+			 * Profile is Current
+			 */
+			for (i = MMC_FTR_HDR_LEN + MMC_FTR_DSCRPTR_BASE_LEN;
+			    i < buflen; i += MMC_PRFL_DSCRPTR_LEN) {
+				other = read_scsi16(&bufp[i]);
+				if (other == current)
+					print_profile_name(other, 1);
+				else
+					print_profile_name(other, 0);
+			}
+			(void) printf("\n");
+		}
+	}
+	free(bufp);
 }

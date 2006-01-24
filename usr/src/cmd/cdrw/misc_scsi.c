@@ -859,18 +859,6 @@ write_init(int mode)
 		write_mode = DAO_MODE;
 	}
 
-	/* For debug, print out device config information */
-	if (debug) {
-		int i;
-		uchar_t cap[80];
-
-		if (get_configuration(target->d_fd, 0, 80, cap))
-			(void) printf("Drive profile = ");
-			for (i = 10; i < 70; i += 8)
-				(void) printf(" 0x%x", cap[i]);
-			(void) printf("\n");
-	}
-
 	/* DVD+ and DVD- have no support for AUDIO, bail out */
 	if ((mode == TRACK_MODE_AUDIO) && (device_type != CD_RW)) {
 		err_msg(gettext("Audio mode is only supported for CD media\n"));
