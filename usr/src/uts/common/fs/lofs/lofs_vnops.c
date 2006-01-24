@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -78,6 +77,12 @@ lo_open(vnode_t **vpp, int flag, struct cred *cr)
 		 * new reference on vp
 		 */
 		*vpp = makelonode(rvp, vtoli(oldvp->v_vfsp), 0);
+		if ((*vpp)->v_type == VDIR) {
+			/*
+			 * Copy over any looping flags to the new lnode.
+			 */
+			(vtol(*vpp))->lo_looping |= (vtol(oldvp))->lo_looping;
+		}
 		if (IS_DEVVP(*vpp)) {
 			vnode_t *svp;
 
@@ -598,13 +603,34 @@ lo_lookup(
 			 * vnode.
 			 */
 			VN_RELE(vp);
-			vp = tvp;	/* this is an autonode */
+			vp = tvp;	/* possibly is an autonode */
 
 			/*
 			 * Need to find the covered vnode
 			 */
+			if (vp->v_vfsp->vfs_vnodecovered == NULL) {
+				/*
+				 * We don't have a covered vnode so this isn't
+				 * an autonode. To find the autonode simply
+				 * find the vnode covered by the lofs rootvp.
+				 */
+				vp = li->li_rootvp;
+				vp = vp->v_vfsp->vfs_vnodecovered;
+				VN_RELE(tvp);
+				error = VFS_ROOT(vp->v_vfsp, &tvp);
+				if (error)
+					goto out;
+				vp = tvp;	/* now this is an autonode */
+				if (vp->v_vfsp->vfs_vnodecovered == NULL) {
+					/*
+					 * Still can't find a covered vnode.
+					 * Fail the lookup, or we'd loop.
+					 */
+					error = ENOENT;
+					goto out;
+				}
+			}
 			vp = vp->v_vfsp->vfs_vnodecovered;
-			ASSERT(vp);
 			VN_HOLD(vp);
 			VN_RELE(tvp);
 			/*
