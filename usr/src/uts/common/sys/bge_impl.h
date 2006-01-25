@@ -919,13 +919,14 @@ typedef struct bge {
 	 */
 	bge_recv_rule_t	recv_rules[RECV_RULES_NUM_MAX];
 
-#ifdef ASF_SUPPORT
-	uint32_t		asf_flags;
-	timeout_id_t		asf_tid;
+#ifdef BGE_IPMI_ASF
+	boolean_t		asf_enabled;
 	boolean_t		asf_wordswapped;
 	boolean_t		asf_newhandshake;
-	uint32_t		asf_status;
 	boolean_t		asf_pseudostop;
+
+	uint32_t		asf_status;
+	timeout_id_t		asf_timeout_id;
 #endif
 } bge_t;
 
@@ -1158,19 +1159,17 @@ void bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma);
 void bge_chip_id_init(bge_t *bgep);
 void bge_chip_start(bge_t *bgep, boolean_t reset_phy);
 void bge_chip_stop(bge_t *bgep, boolean_t fault);
-#ifdef ASF_SUPPORT
+#ifdef BGE_IPMI_ASF
 void bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data);
 #pragma	inline(bge_nic_put32)
 uint32_t bge_nic_read32(bge_t *bgep, bge_regno_t addr);
 void bge_asf_update_status(bge_t *bgep);
-void bge_asf_start_timer(bge_t *um_bgep);
+void bge_asf_heartbeat(void *bgep);
 void bge_asf_stop_timer(bge_t *bgep);
-boolean_t bge_firmware_getparameters(bge_t *bgep);
-void bge_firmware_disable(bge_t *bgep);
-boolean_t bge_firmware_waitinit(bge_t *bgep);
-void bge_asf_legacy_signature(bge_t *bgep, uint32_t mode);
-void bge_asf_post_reset_signature(bge_t *bgep, uint32_t mode);
-void bge_asf_pre_reset_signature(bge_t *bgep, uint32_t mode);
+void bge_asf_get_config(bge_t *bgep);
+void bge_asf_pre_reset_operations(bge_t *bgep, uint32_t mode);
+void bge_asf_post_reset_old_mode(bge_t *bgep, uint32_t mode);
+void bge_asf_post_reset_new_mode(bge_t *bgep, uint32_t mode);
 void bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode);
 void bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive);
 #else
@@ -1240,17 +1239,13 @@ uint64_t bge_atomic_claim(uint64_t *count_p, uint64_t limit);
 uint64_t bge_atomic_clr64(uint64_t *sp, uint64_t bits);
 uint32_t bge_atomic_shl32(uint32_t *sp, uint_t count);
 
-#ifdef ASF_SUPPORT
+
 /*
  * Reset type
  */
 #define	BGE_SHUTDOWN_RESET	0
 #define	BGE_INIT_RESET		1
 #define	BGE_SUSPEND_RESET	2
-
-/* For asf_flags */
-#define	ASF_DISABLED 			0
-#define	ASF_ENABLED 			1
 
 /* For asf_status */
 #define	ASF_STAT_NONE			0
@@ -1264,7 +1259,7 @@ uint32_t bge_atomic_shl32(uint32_t *sp, uint_t count);
 #define	ASF_MODE_POST_SHUTDOWN	3	/* only do post-shutdown */
 #define	ASF_MODE_POST_INIT	4	/* only do post-init	 */
 
-#endif
+#define	BGE_ASF_HEARTBEAT_INTERVAL		1500000
 
 #ifdef __cplusplus
 }

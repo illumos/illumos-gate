@@ -135,14 +135,13 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 
 	len = hw_rbd.len;
 
-#ifdef ASF_SUPPORT
+#ifdef BGE_IPMI_ASF
 	/*
-	 * When IPMI/ASF is enalbed, VLAN tag must be stripped.
+	 * When IPMI/ASF is enabled, VLAN tag must be stripped.
 	 */
-	if ((bgep->asf_flags == ASF_ENABLED) &&
-		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
+	if (bgep->asf_enabled && (hw_rbd.flags & RBD_FLAG_VLAN_TAG))
 		maxsize = bgep->chipid.ethmax_size + ETHERFCSL;
-	} else
+	else
 #endif
 		/*
 		 * H/W will not strip the VLAN tag from incoming packet
@@ -156,11 +155,10 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 		goto refill;
 	}
 
-#ifdef ASF_SUPPORT
-	if ((bgep->asf_flags == ASF_ENABLED) &&
-		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
+#ifdef BGE_IPMI_ASF
+	if (bgep->asf_enabled && (hw_rbd.flags & RBD_FLAG_VLAN_TAG))
 		minsize = ETHERMIN + ETHERFCSL - VLAN_TAGSZ;
-	} else
+	else
 #endif
 		minsize = ETHERMIN + ETHERFCSL;
 	if (len < minsize) {
@@ -176,15 +174,14 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 	 * sort of header.  This also has the side-effect of making
 	 * the packet *contents* 4-byte aligned, as required by NCA!
 	 */
-#ifdef ASF_SUPPORT
-	if ((bgep->asf_flags == ASF_ENABLED) &&
-		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
+#ifdef BGE_IPMI_ASF
+	if (bgep->asf_enabled && (hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
 		mp = allocb(BGE_HEADROOM + len + VLAN_TAGSZ, 0);
 	} else {
 #endif
 
 		mp = allocb(BGE_HEADROOM + len, 0);
-#ifdef ASF_SUPPORT
+#ifdef BGE_IPMI_ASF
 	}
 #endif
 	if (mp == NULL) {
@@ -196,10 +193,8 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 	 * Sync the data and copy it to the STREAMS buffer.
 	 */
 	DMA_SYNC(srbdp->pbuf, DDI_DMA_SYNC_FORKERNEL);
-#ifdef ASF_SUPPORT
-	if ((bgep->asf_flags == ASF_ENABLED) &&
-		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
-
+#ifdef BGE_IPMI_ASF
+	if (bgep->asf_enabled && (hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
 		/*
 		 * As VLAN tag has been stripped from incoming packet in ASF
 		 * scenario, we insert it into this packet again.
@@ -217,11 +212,10 @@ bge_receive_packet(bge_t *bgep, bge_rbd_t *hw_rbd_p)
 #endif
 		mp->b_rptr = dp = mp->b_rptr + BGE_HEADROOM;
 		bcopy(DMA_VPTR(srbdp->pbuf), dp, len);
-#ifdef ASF_SUPPORT
+#ifdef BGE_IPMI_ASF
 	}
 
-	if ((bgep->asf_flags == ASF_ENABLED) &&
-		(hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
+	if (bgep->asf_enabled && (hw_rbd.flags & RBD_FLAG_VLAN_TAG)) {
 		mp->b_wptr = dp + len + VLAN_TAGSZ - ETHERFCSL;
 	} else
 #endif

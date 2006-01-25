@@ -131,7 +131,7 @@ typedef struct {
 #define	BGE_PP_SPACE_FLASH	12		/* FLASH (if fitted)    */
 
 #ifndef __sparc
-#define	ASF_SUPPORT
+#define	BGE_IPMI_ASF
 #endif
 
 #ifdef __cplusplus
