@@ -20,7 +20,7 @@
  */
 
 /*
- *  Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *  Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  *  Use is subject to license terms.
  */
 
@@ -82,7 +82,7 @@ extern struct mod_ops mod_miscops;
 static struct modlmisc modlmisc =
 {
 	&mod_miscops,
-	"PCIe hotplug driver v%I%",
+	"PCIe hotplug driver v1.2",
 };
 
 static struct modlinkage modlinkage =
@@ -1270,15 +1270,11 @@ pciehpc_slot_control(caddr_t ops_arg, hpc_slot_t slot_hdl,
 
 	    case HPC_CTRL_DEV_CONFIG_START:
 	    case HPC_CTRL_DEV_UNCONFIG_START:
-		/* make sure POWER LED is blinking */
-		pciehpc_set_led_state(ctrl_p, HPC_POWER_LED, HPC_LED_BLINK);
+		/* no action is needed here */
 		break;
 	    case HPC_CTRL_DEV_CONFIGURED:
 	    case HPC_CTRL_DEV_UNCONFIGURED:
-		/* make sure PWR LED is ON */
-		pciehpc_set_led_state(ctrl_p, HPC_POWER_LED, HPC_LED_ON);
-		/* make sure ATTN LED is OFF */
-		pciehpc_set_led_state(ctrl_p, HPC_ATTN_LED, HPC_LED_OFF);
+		/* no action is needed here */
 		break;
 	    default:
 		PCIEHPC_DEBUG((CE_WARN,
