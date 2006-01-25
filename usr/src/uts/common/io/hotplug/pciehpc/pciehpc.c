@@ -82,7 +82,7 @@ extern struct mod_ops mod_miscops;
 static struct modlmisc modlmisc =
 {
 	&mod_miscops,
-	"PCIe hotplug driver v1.2",
+	"PCIe hotplug driver v%I%",
 };
 
 static struct modlinkage modlinkage =
