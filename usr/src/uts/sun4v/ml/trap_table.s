@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -186,8 +186,8 @@
 
 /*
  * SYSCALL is used for system calls on both ILP32 and LP64 kernels
- * depending on the "which" parameter (should be either syscall_trap
- * or syscall_trap32).
+ * depending on the "which" parameter (should be syscall_trap,
+ * syscall_trap32, or nosys for unused system call traps).
  */
 #define	SYSCALL(which)			\
 	TT_TRACE(trace_gen)		;\
@@ -1253,12 +1253,13 @@ trap_table0:
 	DTRACE_RETURN;			/* 13A	dtrace pid return probe */
 	BAD; BAD4;			/* 13B - 13F unused */
 	SYSCALL(syscall_trap)		/* 140  LP64 system call */
-	BAD;				/* 141  unused */
+	SYSCALL(nosys);			/* 141  unused system call trap */
 #ifdef DEBUG_USER_TRAPTRACECTL
 	GOTO(.traptrace_freeze);	/* 142  freeze traptrace */
 	GOTO(.traptrace_unfreeze);	/* 143  unfreeze traptrace */
 #else
-	BAD; BAD;			/* 142 - 143 unused */
+	SYSCALL(nosys);			/* 142  unused system call trap */
+	SYSCALL(nosys);			/* 143  unused system call trap */
 #endif
 	BAD4; BAD4; BAD4;		/* 144 - 14F unused */
 	BAD4; BAD4; BAD4; BAD4;		/* 150 - 15F unused */

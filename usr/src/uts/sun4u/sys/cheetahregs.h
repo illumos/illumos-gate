@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1228,7 +1228,9 @@ extern "C" {
 #define	CH_ERR_TL1_DATA		(CH_ERR_TL1_LOGOUT + CH_CLO_DATA)
 #define	CH_ERR_TL1_SDW_DATA	(CH_ERR_TL1_LOGOUT + CH_CLO_SDW_DATA)
 #define	CH_ERR_TL1_NEST_CNT	(CH_ERR_TL1_LOGOUT + CH_CLO_NEST_CNT)
+#define	CH_ERR_TL1_AFAR		(CH_ERR_TL1_DATA + CH_CHD_AFAR)
 #define	CH_ERR_TL1_AFSR		(CH_ERR_TL1_DATA + CH_CHD_AFSR)
+#define	CH_ERR_TL1_SDW_AFAR	(CH_ERR_TL1_SDW_DATA + CH_CHD_AFAR)
 #define	CH_ERR_TL1_SDW_AFSR	(CH_ERR_TL1_SDW_DATA + CH_CHD_AFSR)
 #define	CH_ERR_TL1_SDW_AFSR_EXT	(CH_ERR_TL1_SDW_DATA + CH_CHD_AFSR_EXT)
 

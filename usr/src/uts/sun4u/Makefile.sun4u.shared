@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -275,19 +275,16 @@ IF_TRAPTRACE_OBJ = $(IF_DEBUG_OBJ)
 # comment this out for a non-debug kernel with TRAPTRACE
 #IF_TRAPTRACE_OBJ = $(OBJS_DIR)/
 
-$(IF_TRAPTRACE_OBJ)locore.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mach_locore.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mlsetup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)syscall_trap.o 	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mach_startup.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mp_startup.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
-$(IF_TRAPTRACE_OBJ)mach_mp_startup.o 	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)cpu_states.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mach_cpu_states.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)interrupt.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mach_interrupt.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
-$(IF_TRAPTRACE_OBJ)mach_sfmmu_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)sfmmu_asm.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)trap_table.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)xc.o			:=	DEBUG_DEFS	+= -DTRAPTRACE
@@ -295,7 +292,12 @@ $(IF_TRAPTRACE_OBJ)mach_xc.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)wbuf.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)trap.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
 $(IF_TRAPTRACE_OBJ)mach_trap.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
-$(IF_TRAPTRACE_OBJ)cheetah_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)x_call.o		:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)spitfire_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)us3_common_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)us3_cheetah_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)us3_cheetahplus_asm.o :=	DEBUG_DEFS	+= -DTRAPTRACE
+$(IF_TRAPTRACE_OBJ)us3_jalapeno_asm.o	:=	DEBUG_DEFS	+= -DTRAPTRACE
 
 # Comment these out if you don't want dispatcher lock statistics.
 
