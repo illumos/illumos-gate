@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -83,4 +83,4 @@ OPENSSL_LDFLAGS +=	-L$(PARENT_ROOT)$(SFWLIBDIR)
 OPENSSL_LDFLAGS +=	-L$(SFWLIBDIR)
 
 OPENSSL_DYNFLAGS =	-R $(SFWLIBDIR)
-$(__GNUC)CFLAGS += -_gcc=-fasm
+CFLAGS += -_gcc=-fasm

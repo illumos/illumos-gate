@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T
@@ -96,8 +96,8 @@ LINTSEC	=	$(LPLIB)/secure/llib-llpsec.ln
 LINTSYS	=	$(LPLIB)/systems/llib-llpsys.ln
 LINTUSR	=	$(LPLIB)/users/llib-llpusr.ln
 
-$(__GNUC)CFLAGS += -_gcc=-fwritable-strings -_gcc=-Wno-sequence-points
-$(__GNUC)CFLAGS64 += -_gcc=-fwritable-strings -_gcc=-Wno-sequence-points
+CFLAGS += -_gcc=-fwritable-strings -_gcc=-Wno-sequence-points
+CFLAGS64 += -_gcc=-fwritable-strings -_gcc=-Wno-sequence-points
 
 all:=           TARGET= all
 install:=       TARGET= install

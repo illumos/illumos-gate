@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -917,7 +917,6 @@ CFLAGS += $(CCVERBOSE) $(CTF_FLAGS)
 # This is necessary to avoid problems with calling _ex_unwind().
 # We probably don't want any inlining anyway.
 XINLINE = -xinline=
-$(__GNUC)XINLINE =
 CFLAGS += $(XINLINE)
 
 # Setting THREAD_DEBUG = -DTHREAD_DEBUG (make THREAD_DEBUG=-DTHREAD_DEBUG ...)
@@ -951,10 +950,6 @@ DYNFLAGS =	$(HSONAME) $(ZTEXT) $(ZDEFS) $(ZCOMBRELOC)
 DYNFLAGS +=	$(SPECMAPFILE:%=-M %) $(PGA_MAPFILE:%=-M %) $(NX_MAP:%=-M%) \
 		-e __rtboot -M $(MAPFILE) $(RTLDINFO)
 DYNFLAGS +=	$(EXTN_DYNFLAGS)
-
-# special case for fp/fpsetsticky.s
-$(__GNUC)pics/fpsetsticky.o := \
-	ASFLAGS += --no-warn
 
 BUILD.s=	$(AS) $(ASFLAGS) $< -o $@
 
@@ -1055,7 +1050,6 @@ TIL=				\
 	unwind.o
 
 THREADS_INLINES = $(LIBCBASE)/threads/i386.il
-$(__GNUC)THREADS_INLINES =
 $(TIL:%=pics/%) := CFLAGS += $(THREADS_INLINES)
 
 # pics/mul64.o := CFLAGS += $(LIBCBASE)/crt/mul64.il

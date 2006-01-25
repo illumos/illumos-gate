@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,15 +38,11 @@ INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
 #
 # 	Overrides
 #
-CFLAGS_CPP_COMMENTS = -xCC
-$(__GNUC)CFLAGS_CPP_COMMENTS =
-
-CFLAGS += $(CFLAGS_CPP_COMMENTS)
 
 #
 #	Default build targets.
 #
-#.KEEP_STATE:
+.KEEP_STATE:
 
 def:		$(DEF_DEPS)
 

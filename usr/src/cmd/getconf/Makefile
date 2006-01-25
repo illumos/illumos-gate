@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,7 +68,6 @@ $(XPG4) := CFLAGS += -D_XOPEN_SOURCE -I$(SRC)/lib/libc/inc
 # if we use the c89 utility as opposed to cc.
 
 XPG6MODE = $(C99_ENABLE)
-$(__GNUC)XPG6MODE = $(C99_ENABLE)
 $(XPG6) := C99MODE = $(XPG6MODE)
 $(XPG6) := CFLAGS += -D_XOPEN_SOURCE=600 -I$(SRC)/lib/libc/inc
 

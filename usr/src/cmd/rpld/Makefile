@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -38,7 +38,7 @@ OBJS= 	rpld.o llcsetup.o debug.o sighandler.o params.o \
 LIBOBJS=	dl_open.o dl_bind.o dl_snd.o dl_rcv.o dl_addr.o dl_close.o \
 	 	dl_unbind.o dl_attach.o dl_info.o dl_error.o
 
-$(__GNUC)rplin.o :=	CFLAGS += -_gcc=-Wno-return-type
+rplin.o :=	CFLAGS += -_gcc=-Wno-return-type
 
 LIBDLA= 	libdla.a
 
