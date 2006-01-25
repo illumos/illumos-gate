@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2001,2002 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -90,38 +90,6 @@ typedef struct l_cgarc64 {		/* Linker call graph arc entry */
 } L_cgarc64;
 
 
-/*
- * Snapshots of this profile buffer are taken by `ldmon' and packaged into
- * a gmon.out file appropriate for analysis by gprof(1).  This gmon file
- * consists of three sections (taken from gmon.h); a header, a profil(2)
- * buffer, and an array of call graph arc structures.
- */
-
-typedef struct m_hdr {			/* Monitor profile buffer header */
-	char		*hd_lpc;		/* Low pc value */
-	char		*hd_hpc;		/* High pc value */
-	int		hd_off;		/* Offset into call graph array */
-} M_hdr;
-
-typedef struct m_hdr64 {		/* Monitor profile buffer header */
-	u_longlong_t	hd_lpc;		/* Low pc value */
-	u_longlong_t	hd_hpc;		/* High pc value */
-	int		hd_off;		/* Offset into call graph array */
-} M_hdr64;
-
-typedef struct m_cgarc {		/* Monitor call graph arc entry */
-	unsigned int	cg_from;	/* Source of call */
-	unsigned int	cg_to;		/* Destination of call */
-	int		cg_count;	/* Instance count */
-} M_cgarc;
-
-typedef struct m_cnt {			/* Prof(1) function count structure */
-	char		*fc_fnpc;	/* Called functions address */
-	int		fc_mcnt;	/* Instance count */
-} M_cnt;
-
-
-#define	PROF_LIBRARY	"ldprofile.so.1"
 
 /*
  * Generic defines for creating profiled output buffer.

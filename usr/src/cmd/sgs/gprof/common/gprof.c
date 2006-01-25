@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1532,7 +1532,7 @@ openpfile(char *filename, size_t *fsz)
 	struct hdr	tmp;
 	FILE		*pfile;
 	unsigned long	magic_num;
-	size_t		hdrsize = sizeof (struct hdr);
+	size_t		hdrsize;
 	static bool	first_time = TRUE;
 	extern bool	old_style;
 
@@ -1590,6 +1590,8 @@ openpfile(char *filename, size_t *fsz)
 	else
 		rflag = FALSE;
 
+	hdrsize = Bflag ? sizeof (struct hdr) : sizeof (struct hdr32);
+
 	if (rflag) {
 		if (Bflag) {
 			L_hdr64		l_hdr64;
@@ -1614,7 +1616,7 @@ openpfile(char *filename, size_t *fsz)
 			}
 			tmp.lowpc = 0;
 			tmp.highpc = (pctype)l_hdr64.hd_hpc;
-			tmp.ncnt = sizeof (M_hdr64) + l_hdr64.hd_psize;
+			tmp.ncnt = hdrsize + l_hdr64.hd_psize;
 		} else {
 			L_hdr		l_hdr;
 
@@ -1638,8 +1640,7 @@ openpfile(char *filename, size_t *fsz)
 			}
 			tmp.lowpc = 0;
 			tmp.highpc = (pctype)(uintptr_t)l_hdr.hd_hpc;
-			tmp.ncnt = sizeof (M_hdr) + l_hdr.hd_psize;
-			hdrsize = sizeof (M_hdr);
+			tmp.ncnt = hdrsize + l_hdr.hd_psize;
 		}
 	} else {
 		if (Bflag) {
@@ -1661,7 +1662,6 @@ openpfile(char *filename, size_t *fsz)
 			tmp.lowpc = hdr32.lowpc;
 			tmp.highpc = hdr32.highpc;
 			tmp.ncnt = hdr32.ncnt;
-			hdrsize = sizeof (struct hdr32);
 		}
 	}
 
