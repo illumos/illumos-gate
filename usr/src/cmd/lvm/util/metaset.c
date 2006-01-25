@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1402,7 +1401,6 @@ parse_releaseset(int argc, char **argv)
 	md_error_t	status = mdnullerror;
 	md_error_t	*ep = &status;
 	char		*sname = MD_LOCAL_NAME;
-	int		no_lock = 0;
 	sdssc_boolean_e	cluster_release = SDSSC_False;
 	sdssc_version_t	vers;
 	rval_e		rval;
@@ -1411,13 +1409,10 @@ parse_releaseset(int argc, char **argv)
 	/* reset and parse args */
 	optind = 1;
 	opterr = 1;
-	while ((c = getopt(argc, argv, "C:ns:r")) != -1) {
+	while ((c = getopt(argc, argv, "C:s:r")) != -1) {
 		switch (c) {
 		case 'C':
 			cluster_release = SDSSC_True;
-			break;
-		case 'n':
-			no_lock = 1;
 			break;
 		case 's':
 			sname = optarg;
@@ -1486,12 +1481,8 @@ parse_releaseset(int argc, char **argv)
 	}
 
 	if (meta_lock_nowait(sp, ep) != 0) {
-		if (no_lock) {
-			mdclrerror(ep);		/* continue */
-		} else {
-			mde_perror(ep, "");
-			md_exit(sp, 10);	/* special errcode */
-		}
+		mde_perror(ep, "");
+		md_exit(sp, 10);	/* special errcode */
 	}
 
 	if (meta_set_release(sp, ep)) {
@@ -1516,7 +1507,6 @@ parse_takeset(int argc, char **argv)
 	static char	*nullopts[] = { NULL };
 	md_error_t	status = mdnullerror;
 	md_error_t	*ep = &status;
-	int		no_lock = 0;
 	sdssc_boolean_e	cluster_take = SDSSC_False;
 	sdssc_version_t	vers;
 	rval_e		rval;
@@ -1524,16 +1514,13 @@ parse_takeset(int argc, char **argv)
 	/* reset and parse args */
 	optind = 1;
 	opterr = 1;
-	while ((c = getopt(argc, argv, "C:fns:tu:y")) != -1) {
+	while ((c = getopt(argc, argv, "C:fs:tu:y")) != -1) {
 		switch (c) {
 		case 'C':
 			cluster_take = SDSSC_True;
 			break;
 		case 'f':
 			flags |= TAKE_FORCE;
-			break;
-		case 'n':
-			no_lock = 1;
 			break;
 		case 's':
 			sname = optarg;
@@ -1655,12 +1642,8 @@ parse_takeset(int argc, char **argv)
 	}
 
 	if (meta_lock_nowait(sp, ep) != 0) {
-		if (no_lock) {
-			mdclrerror(ep);
-		} else {
-			mde_perror(ep, "");
-			md_exit(sp, 10);	/* special errcode */
-		}
+		mde_perror(ep, "");
+		md_exit(sp, 10);	/* special errcode */
 	}
 
 	if (meta_set_take(sp, &mhiargs, flags, usetag, &status)) {
@@ -2094,7 +2077,7 @@ parse_cluster(int argc, char **argv)
 	/* reset and parse args */
 	optind = 1;
 	opterr = 1;
-	while ((c = getopt(argc, argv, "C:s:h:fntu:yr")) != -1) {
+	while ((c = getopt(argc, argv, "C:s:h:ftu:yr")) != -1) {
 		switch (c) {
 		case 'C':
 			if (cmd != ccnotspecified) {
@@ -2129,7 +2112,6 @@ parse_cluster(int argc, char **argv)
 			break;
 
 		case 'f':
-		case 'n':
 		case 't':
 		case 'u':
 		case 'y':
@@ -2279,7 +2261,7 @@ main(int argc, char *argv[])
 	 * NOTE: The "C" option is strictly for cluster use. it is not
 	 * and should not be documented for the customer. - JST
 	 */
-	while ((c = getopt(argc, argv, "C:MaA:bdfh:jl:Lm:noPqrs:tu:wy?"))
+	while ((c = getopt(argc, argv, "C:MaA:bdfh:jl:Lm:oPqrs:tu:wy?"))
 	    != -1) {
 		switch (c) {
 		case 'M':
@@ -2337,8 +2319,6 @@ main(int argc, char *argv[])
 		case 'L':
 			break;
 		case 'm':
-			break;
-		case 'n':
 			break;
 		case 'o':
 			if (cmd != notspecified) {

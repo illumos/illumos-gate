@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4429,8 +4428,8 @@ mdrpc_lock_set_common(
 	int			op_mode = W_OK;
 	md_setkey_t		*svc_skp;
 	md_setkey_t		new_sk;
-	md_set_desc		*sd;
-	mdsetname_t		*sp;
+	md_set_desc		*sd = NULL;
+	mdsetname_t		*sp = NULL;
 
 	/* setup, check permissions */
 	(void) memset(res, 0, sizeof (*res));
@@ -4440,6 +4439,50 @@ mdrpc_lock_set_common(
 		return (TRUE);
 
 	svc_skp = svc_get_setkey(args->cl_sk->sk_setno);
+
+	/* The set is locked */
+	if (svc_skp != NULL) {
+
+		/*
+		 * This lock request could be for a new diskset, as
+		 * such metasetnosetname() may not return anything
+		 * useful. Only call it if there is already a key.
+		 */
+		if ((sp = metasetnosetname(args->cl_sk->sk_setno, ep))
+		    != NULL) {
+			sd = metaget_setdesc(sp, ep);
+		}
+
+		/*
+		 * meta_lock() provides local locking for non-MN
+		 * disksets. The local lock is held before we call
+		 * this RPC function. We should not receive a lock
+		 * request from the host which owns the lock. If we
+		 * do, release the lock.
+		 */
+		if (!((sd != NULL) && (MD_MNSET_DESC(sd))) &&
+		    (strcmp(svc_skp->sk_host, args->cl_sk->sk_host) == 0)) {
+			md_eprintf(
+			    "Warning: set locked when lock_set called!\n");
+
+			md_eprintf("Held lock info:\n");
+
+			md_eprintf("\tLock:\n");
+			md_eprintf("\t\tSetname: %s\n", svc_skp->sk_setname);
+			md_eprintf("\t\tSetno:   %d\n", svc_skp->sk_setno);
+			md_eprintf("\t\tHost:    %s\n", svc_skp->sk_host);
+			md_eprintf("\t\tKey:     %d/%d %s\n",
+			    svc_skp->sk_key.tv_sec, svc_skp->sk_key.tv_usec,
+			    ctime((const time_t *)&svc_skp->sk_key.tv_sec));
+
+			/* Unlock set */
+			del_sk(svc_skp->sk_setno);
+			free_sk(svc_skp);
+			svc_skp = NULL;
+
+			md_eprintf("Released lock held by requesting host\n");
+		}
+	}
 
 	/* The set is unlocked */
 	if (svc_skp == NULL) {
@@ -4470,9 +4513,7 @@ mdrpc_lock_set_common(
 	 * commands are issued at the same time - one will complete
 	 * and the other command will fail with MDE_DS_NOTNOW_CMD.
 	 */
-	if (((sp = metasetnosetname(args->cl_sk->sk_setno, ep)) != NULL) &&
-	    ((sd = metaget_setdesc(sp, ep)) != NULL) &&
-	    (MD_MNSET_DESC(sd))) {
+	if ((sd != NULL) && MD_MNSET_DESC(sd)) {
 		(void) mddserror(ep, MDE_DS_NOTNOW_CMD,
 		    svc_skp->sk_setno, mynode(),
 		    svc_skp->sk_host, svc_skp->sk_setname);
