@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -266,7 +266,6 @@ extern Sym_desc *	reg_find(Sym *, Ofl_desc *);
 extern uintptr_t	reloc_local(Rel_desc *, Ofl_desc *);
 extern uintptr_t	reloc_plt(Rel_desc *, Ofl_desc *);
 extern uintptr_t	reloc_register(Rel_desc *, Is_desc *, Ofl_desc *);
-extern uintptr_t	reloc_relobj(Boolean, Rel_desc *, Ofl_desc *);
 extern void		reloc_remain_entry(Rel_desc *, Os_desc *, Ofl_desc *);
 extern uintptr_t	reloc_GOT_relative(Boolean, Rel_desc *, Ofl_desc *);
 extern uintptr_t	reloc_GOTOP(Boolean, Rel_desc *, Ofl_desc *);

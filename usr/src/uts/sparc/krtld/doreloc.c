@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -72,11 +72,10 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 /* R_SPARC_GOT13 */	{0x0, FLG_RE_GOTADD | FLG_RE_VERIFY | FLG_RE_SIGN,
 				4, 0, 13},
 /* R_SPARC_GOT22 */	{0x0, FLG_RE_GOTADD, 4, 10, 22},
-/* R_SPARC_PC10 */	{0x3ff, FLG_RE_PCREL | FLG_RE_GOTPC | FLG_RE_SIGN |
-				FLG_RE_LOCLBND, 4, 0, 13},
-/* R_SPARC_PC22 */	{0x0, FLG_RE_PCREL | FLG_RE_GOTPC | FLG_RE_SIGN |
-				FLG_RE_VERIFY | FLG_RE_LOCLBND,
-				4, 10, 22},
+/* R_SPARC_PC10 */	{0x3ff, FLG_RE_PCREL | FLG_RE_SIGN | FLG_RE_LOCLBND,
+				4, 0, 13},
+/* R_SPARC_PC22 */	{0x0, FLG_RE_PCREL | FLG_RE_SIGN | FLG_RE_VERIFY |
+				FLG_RE_LOCLBND, 4, 10, 22},
 /* R_SPARC_WPLT30 */	{0x0, FLG_RE_PCREL | FLG_RE_PLTREL |
 				FLG_RE_VERIFY | FLG_RE_SIGN,
 				4, 2, 30},
@@ -111,11 +110,11 @@ const Rel_entry	reloc_table[R_SPARC_NUM] = {
 /* R_SPARC_HH22 */	{0x0, FLG_RE_VERIFY, 4, 42, 22},	/* V9 */
 /* R_SPARC_HM10 */	{0x3ff, FLG_RE_SIGN, 4, 32, 13},	/* V9 */
 /* R_SPARC_LM22 */	{0x0, FLG_RE_NOTREL, 4, 10, 22},	/* V9 */
-/* R_SPARC_PC_HH22 */	{0x0, FLG_RE_PCREL | FLG_RE_VERIFY | FLG_RE_GOTPC,
+/* R_SPARC_PC_HH22 */	{0x0, FLG_RE_PCREL | FLG_RE_VERIFY,
 				4, 42, 22},			/* V9 */
-/* R_SPARC_PC_HM10 */	{0x3ff, FLG_RE_PCREL | FLG_RE_SIGN | FLG_RE_GOTPC,
+/* R_SPARC_PC_HM10 */	{0x3ff, FLG_RE_PCREL | FLG_RE_SIGN,
 				4, 32, 13},			/* V9 */
-/* R_SPARC_PC_LM22 */	{0x0, FLG_RE_PCREL | FLG_RE_GOTPC,
+/* R_SPARC_PC_LM22 */	{0x0, FLG_RE_PCREL,
 				4, 10, 22},			/* V9 */
 /* R_SPARC_WDISP16 */	{0x0, FLG_RE_PCREL | FLG_RE_WDISP16 |
 				FLG_RE_VERIFY | FLG_RE_SIGN,

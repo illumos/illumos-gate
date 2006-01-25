@@ -19,12 +19,13 @@
  *
  * CDDL HEADER END
  */
+
 /*
  *	Copyright (c) 1990, 1991 UNIX System Laboratories, Inc.
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -642,26 +643,26 @@ tls_fixups(Rel_desc *arsp)
 uintptr_t
 do_activerelocs(Ofl_desc *ofl)
 {
-	Rel_desc *	arsp;
-	Rel_cache *	rcp;
-	Listnode *	lnp;
+	Rel_desc	*arsp;
+	Rel_cache	*rcp;
+	Listnode	*lnp;
 	uintptr_t	return_code = 1;
 	Word		flags = ofl->ofl_flags;
 	Word		dtflags1 = ofl->ofl_dtflags_1;
 
 	DBG_CALL(Dbg_reloc_doactiverel());
 	/*
-	 * process active relocs
+	 * Process active relocations.
 	 */
 	for (LIST_TRAVERSE(&ofl->ofl_actrels, lnp, rcp)) {
 		/* LINTED */
 		for (arsp = (Rel_desc *)(rcp + 1);
 		    arsp < rcp->rc_free; arsp++) {
 			uchar_t		*addr;
-			Word 		value;
+			Xword 		value;
 			Sym_desc	*sdp;
 			const char	*ifl_name;
-			Word		refaddr;
+			Xword		refaddr;
 			int		moved = 0;
 			Gotref		gref;
 
@@ -723,7 +724,7 @@ do_activerelocs(Ofl_desc *ofl)
 				value = 0;
 			else if (ELF_ST_TYPE(sdp->sd_sym->st_info) ==
 			    STT_SECTION) {
-				Sym_desc *	sym;
+				Sym_desc	*sym;
 
 				/*
 				 * The value for a symbol pointing to a SECTION
@@ -746,20 +747,21 @@ do_activerelocs(Ofl_desc *ofl)
 					value = sym->sd_sym->st_value;
 					moved = 1;
 				} else {
-					value = (Off)_elf_getxoff(sdp->sd_isc->
-					    is_indata);
+					value = _elf_getxoff(
+					    sdp->sd_isc->is_indata);
 					if (sdp->sd_isc->is_shdr->sh_flags &
 					    SHF_ALLOC)
-					    value += sdp->sd_isc->is_osdesc->
-					    os_shdr->sh_addr;
+						value += sdp->sd_isc->
+						    is_osdesc->os_shdr->sh_addr;
 				}
 				if (sdp->sd_isc->is_shdr->sh_flags & SHF_TLS)
 					value -= ofl->ofl_tlsphdr->p_vaddr;
-			} else
+			} else {
 				/*
 				 * else the value is the symbols value
 				 */
 				value = sdp->sd_sym->st_value;
+			}
 
 			/*
 			 * Relocation against the GLOBAL_OFFSET_TABLE.
@@ -773,10 +775,9 @@ do_activerelocs(Ofl_desc *ofl)
 			 * address.
 			 */
 			if ((arsp->rel_flags & FLG_REL_LOAD) &&
-			    !(flags & FLG_OF_RELOBJ))
+			    ((flags & FLG_OF_RELOBJ) == 0))
 				refaddr += arsp->rel_isdesc->is_osdesc->
 				    os_shdr->sh_addr;
-
 
 			/*
 			 * If this entry has a PLT assigned to it, it's
@@ -788,7 +789,17 @@ do_activerelocs(Ofl_desc *ofl)
 					value = calc_plt_addr(sdp, ofl);
 			}
 
-			if (arsp->rel_flags & FLG_REL_GOT) {
+			/*
+			 * Determine whether the value needs further adjustment.
+			 * Filter through the attributes of the relocation to
+			 * determine what adjustment is required.  Note, many
+			 * of the following cases are only applicable when a
+			 * .got is present.  As a .got is not generated when a
+			 * relocatable object is being built, any adjustments
+			 * that require a .got need to be skipped.
+			 */
+			if ((arsp->rel_flags & FLG_REL_GOT) &&
+			    ((flags & FLG_OF_RELOBJ) == 0)) {
 				Xword		R1addr;
 				uintptr_t	R2addr;
 				Word		gotndx;
@@ -827,51 +838,64 @@ do_activerelocs(Ofl_desc *ofl)
 				/*
 				 * And do it.
 				 */
-				*(Word *)R2addr = (Word)value;
+				*(Xword *)R2addr = value;
 				continue;
 
-			} else if (IS_GOT_BASED(arsp->rel_rtype)) {
+			} else if (IS_GOT_BASED(arsp->rel_rtype) &&
+			    ((flags & FLG_OF_RELOBJ) == 0)) {
 				value -= ofl->ofl_osgot->os_shdr->sh_addr;
-			} else if (IS_GOT_PC(arsp->rel_rtype)) {
-				value = (Word) (ofl->ofl_osgot->os_shdr->
-				    sh_addr) - refaddr;
+
+			} else if (IS_GOT_PC(arsp->rel_rtype) &&
+			    ((flags & FLG_OF_RELOBJ) == 0)) {
+				value =
+				    (Xword)(ofl->ofl_osgot->os_shdr->sh_addr) -
+				    refaddr;
+
 			} else if ((IS_PC_RELATIVE(arsp->rel_rtype)) &&
-			    (!(flags & FLG_OF_RELOBJ) ||
+			    (((flags & FLG_OF_RELOBJ) == 0) ||
 			    (arsp->rel_osdesc == sdp->sd_isc->is_osdesc))) {
 				value -= refaddr;
+
 			} else if (IS_TLS_INS(arsp->rel_rtype) &&
-			    IS_GOT_RELATIVE(arsp->rel_rtype)) {
+			    IS_GOT_RELATIVE(arsp->rel_rtype) &&
+			    ((flags & FLG_OF_RELOBJ) == 0)) {
 				Gotndx	*gnp;
 
 				gnp = find_gotndx(&(sdp->sd_GOTndxs), gref,
 				    ofl, 0);
 				assert(gnp);
-				value = (Word)gnp->gn_gotndx * M_GOT_ENTSIZE;
+				value = (Xword)gnp->gn_gotndx * M_GOT_ENTSIZE;
 				if (arsp->rel_rtype == R_386_TLS_IE) {
-					value += ofl->ofl_osgot->os_shdr->
-					    sh_addr;
+					value +=
+					    ofl->ofl_osgot->os_shdr->sh_addr;
 				}
-			} else if (IS_GOT_RELATIVE(arsp->rel_rtype)) {
-				Gotndx *	gnp;
+
+			} else if (IS_GOT_RELATIVE(arsp->rel_rtype) &&
+			    ((flags & FLG_OF_RELOBJ) == 0)) {
+				Gotndx *gnp;
 
 				gnp = find_gotndx(&(sdp->sd_GOTndxs),
 				    GOT_REF_GENERIC, ofl, 0);
 				assert(gnp);
-				value = (Word)gnp->gn_gotndx * M_GOT_ENTSIZE;
-			} else if (arsp->rel_flags & FLG_REL_STLS) {
+				value = (Xword)gnp->gn_gotndx * M_GOT_ENTSIZE;
+
+			} else if ((arsp->rel_flags & FLG_REL_STLS) &&
+			    ((flags & FLG_OF_RELOBJ) == 0)) {
 				Xword	tlsstatsize;
+
 				/*
 				 * This is the LE TLS reference model.  Static
 				 * offset is hard-coded.
 				 */
-				tlsstatsize = S_ROUND(ofl->
-				    ofl_tlsphdr->p_memsz,
+				tlsstatsize =
+				    S_ROUND(ofl->ofl_tlsphdr->p_memsz,
 				    M_TLSSTATALIGN);
 				value = tlsstatsize - value;
+
 				/*
-				 * Since this code is fixedup
-				 * it assumes a negative offset
-				 * that can be added to the thread pointer
+				 * Since this code is fixed up, it assumes a
+				 * negative offset that can be added to the
+				 * thread pointer.
 				 */
 				if ((arsp->rel_rtype == R_386_TLS_LDO_32) ||
 				    (arsp->rel_rtype == R_386_TLS_LE))
@@ -943,7 +967,6 @@ do_activerelocs(Ofl_desc *ofl)
 			if (moved)
 				value -= *addr;
 
-
 			/*
 			 * If '-z noreloc' is specified - skip the do_reloc
 			 * stage.
@@ -960,12 +983,15 @@ do_activerelocs(Ofl_desc *ofl)
 	return (return_code);
 }
 
+/*
+ * Add an output relocation record.
+ */
 uintptr_t
-add_outrel(Word flags, Rel_desc * rsp, Ofl_desc * ofl)
+add_outrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
 {
-	Rel_desc *	orsp;
-	Rel_cache *	rcp;
-	Sym_desc *	sdp = rsp->rel_sym;
+	Rel_desc	*orsp;
+	Rel_cache	*rcp;
+	Sym_desc	*sdp = rsp->rel_sym;
 
 	/*
 	 * Static executables *do not* want any relocations against them.
@@ -1036,13 +1062,13 @@ add_outrel(Word flags, Rel_desc * rsp, Ofl_desc * ofl)
 		 * be tagged with the FLG_OS_OUTREL flag.
 		 */
 		if ((sdp->sd_flags & FLG_SY_SPECSEC) &&
-		    (sdp->sd_shndx == SHN_COMMON))
+		    (sdp->sd_shndx == SHN_COMMON)) {
 			if (ELF_ST_TYPE(sdp->sd_sym->st_info) != STT_TLS)
 				ofl->ofl_flags1 |= FLG_OF1_BSSOREL;
 			else
 				ofl->ofl_flags1 |= FLG_OF1_TLSOREL;
-		else {
-			Os_desc *	osp = sdp->sd_isc->is_osdesc;
+		} else {
+			Os_desc	*osp = sdp->sd_isc->is_osdesc;
 
 			if ((osp->os_flags & FLG_OS_OUTREL) == 0) {
 				ofl->ofl_dynshdrcnt++;
@@ -1080,11 +1106,9 @@ add_outrel(Word flags, Rel_desc * rsp, Ofl_desc * ofl)
 		ofl->ofl_reloccnt++;
 
 	/*
-	 * A R_386_GOTPC or R_386_GOTOFF relocation triggers the creation of
-	 * the GLOBAL_OFFSET_TABLE (as defined by the ABI).
+	 * Insure a GLOBAL_OFFSET_TABLE is generated if required.
 	 */
-	if ((orsp->rel_rtype == R_386_GOTPC) ||
-	    (orsp->rel_rtype == R_386_GOTOFF))
+	if (IS_GOT_REQUIRED(orsp->rel_rtype))
 		ofl->ofl_flags |= FLG_OF_BLDGOT;
 
 	/*
@@ -1099,81 +1123,6 @@ add_outrel(Word flags, Rel_desc * rsp, Ofl_desc * ofl)
 	DBG_CALL(Dbg_reloc_ors_entry(M_MACH, orsp));
 	return (1);
 }
-
-
-uintptr_t
-add_actrel(Word flags, Rel_desc * rsp, Ofl_desc * ofl)
-{
-	Rel_desc * 	arsp;
-	Rel_cache *	rcp;
-
-	/*
-	 * If no relocation cache structures are available allocate a
-	 * new one and link it into the bucket list.
-	 */
-	if ((ofl->ofl_actrels.tail == 0) ||
-	    ((rcp = (Rel_cache *)ofl->ofl_actrels.tail->data) == 0) ||
-	    ((arsp = rcp->rc_free) == rcp->rc_end)) {
-		static size_t	nextsize = 0;
-		size_t		size;
-
-		/*
-		 * Typically, when generating an executable or shared object
-		 * there will be a active relocation for every input relocation.
-		 */
-		if (nextsize == 0) {
-			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
-				if ((size = ofl->ofl_relocincnt) == 0)
-					size = REL_LAIDESCNO;
-				if (size > REL_HAIDESCNO)
-					nextsize = REL_HAIDESCNO;
-				else
-					nextsize = REL_LAIDESCNO;
-			} else
-				nextsize = size = REL_HAIDESCNO;
-		} else
-			size = nextsize;
-
-		size = size * sizeof (Rel_desc);
-
-		if (((rcp = libld_malloc(sizeof (Rel_cache) + size)) == 0) ||
-		    (list_appendc(&ofl->ofl_actrels, rcp) == 0))
-			return (S_ERROR);
-
-		/* LINTED */
-		rcp->rc_free = arsp = (Rel_desc *)(rcp + 1);
-		/* LINTED */
-		rcp->rc_end = (Rel_desc *)((char *)rcp->rc_free + size);
-	}
-
-	*arsp = *rsp;
-	arsp->rel_flags |= flags;
-
-	rcp->rc_free++;
-	ofl->ofl_actrelscnt++;
-
-	/*
-	 * A R_386_GOTPC or R_386_GOTOFF relocation triggers the creation of
-	 * the GLOBAL_OFFSET_TABLE (as defined by the ABI).
-	 */
-	if ((arsp->rel_rtype == R_386_GOTPC) ||
-	    (arsp->rel_rtype == R_386_GOTOFF))
-		ofl->ofl_flags |= FLG_OF_BLDGOT;
-
-	/*
-	 * If this is a displacement relocation relocation, warn.
-	 */
-	if (arsp->rel_flags & FLG_REL_DISP) {
-		ofl->ofl_dtflags_1 |= DF_1_DISPRELDNE;
-
-		if (ofl->ofl_flags & FLG_OF_VERBOSE)
-			disp_errmsg(MSG_INTL(MSG_REL_DISPREL3), arsp, ofl);
-	}
-
-	DBG_CALL(Dbg_reloc_ars_entry(M_MACH, arsp));
-	return (1);
-}
-
 
 /*
  * Stub routine since register symbols are not supported on i386.
@@ -1463,59 +1412,6 @@ reloc_TLS(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
 	return (add_actrel(FLG_REL_DTLS, rsp, ofl));
 }
 
-uintptr_t
-reloc_relobj(Boolean local, Rel_desc * rsp, Ofl_desc * ofl)
-{
-	Word		rtype = rsp->rel_rtype;
-	Sym_desc *	sdp = rsp->rel_sym;
-	Is_desc *	isp = rsp->rel_isdesc;
-	Word		flags = ofl->ofl_flags;
-
-	/*
-	 * Try to determine if we can do any relocations at
-	 * this point.  We can if:
-	 *
-	 * (local_symbol) and (non_GOT_relocation) and
-	 * (IS_PC_RELATIVE()) and
-	 * (relocation to symbol in same section)
-	 */
-	if (local && !IS_GOT_RELATIVE(rtype) && !IS_GOT_BASED(rtype) &&
-	    !IS_GOT_PC(rtype) && IS_PC_RELATIVE(rtype) &&
-	    ((sdp->sd_isc) && (sdp->sd_isc->is_osdesc == isp->is_osdesc))) {
-		return (add_actrel(NULL, rsp, ofl));
-	}
-
-	/*
-	 * If '-zredlocsym' is in effect make all local sym relocations
-	 * against the 'section symbols', since they are the only symbols
-	 * which will be added to the .symtab.
-	 */
-	if (local && (((ofl->ofl_flags1 & FLG_OF1_REDLSYM) &&
-	    (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL)) ||
-	    ((sdp->sd_flags1 & FLG_SY1_ELIM) && (flags & FLG_OF_PROCRED)))) {
-		/*
-		 * But if this is a PIC code, don't allow it for now.
-		 */
-		if (IS_GOT_RELATIVE(rsp->rel_rtype)) {
-			eprintf(ERR_FATAL, MSG_INTL(MSG_REL_PICREDLOC),
-			    demangle(rsp->rel_sname),
-			    rsp->rel_isdesc->is_file->ifl_name,
-			    conv_reloc_386_type_str(rsp->rel_rtype));
-			return (S_ERROR);
-		}
-		if (add_actrel(NULL, rsp, ofl) == S_ERROR)
-			return (S_ERROR);
-		return (add_outrel(FLG_REL_SCNNDX, rsp, ofl));
-	}
-
-	if (ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION)
-		if (add_actrel(NULL, rsp, ofl) == S_ERROR)
-			return (S_ERROR);
-
-	return (add_outrel(NULL, rsp, ofl));
-}
-
-
 /* ARGSUSED3 */
 Gotndx *
 find_gotndx(List * lst, Gotref gref, Ofl_desc * ofl, Rel_desc * rdesc)
@@ -1604,6 +1500,7 @@ assign_plt_ndx(Sym_desc * sdp, Ofl_desc *ofl)
 {
 	sdp->sd_aux->sa_PLTndx = 1 + ofl->ofl_pltcnt++;
 	sdp->sd_aux->sa_PLTGOTndx = ofl->ofl_gotcnt++;
+	ofl->ofl_flags |= FLG_OF_BLDGOT;
 }
 
 /*

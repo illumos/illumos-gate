@@ -24,8 +24,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -197,7 +196,7 @@ disp_bsearch(const void *key, const void *array)
  */
 static Sym_desc *
 disp_scansyms(Ifl_desc * ifl, Rel_desc *rld, Boolean rlocal, int inspect,
-    Ofl_desc * ofl)
+    Ofl_desc *ofl)
 {
 	Sym_desc	*tsdp, *rsdp;
 	Sym		*rsym, *tsym;
@@ -243,7 +242,7 @@ disp_scansyms(Ifl_desc * ifl, Rel_desc *rld, Boolean rlocal, int inspect,
 	} else {
 		/*
 		 * If both symbols are local, no copy relocations can occur to
-		 * either.
+		 * either symbol.
 		 */
 		if ((rlocal == TRUE) && ((tsdp->sd_flags1 & FLG_SY1_LOCL) ||
 		    ((ofl->ofl_flags & FLG_OF_AUTOLCL) &&
@@ -258,7 +257,18 @@ disp_scansyms(Ifl_desc * ifl, Rel_desc *rld, Boolean rlocal, int inspect,
 		ttype = ELF_ST_TYPE(tsym->st_info);
 
 		/*
-		 * One of the symbols must reference a data element.
+		 * If the reference symbol is local, and the target isn't a
+		 * data element, then no copy relocations can occur to either
+		 * symbol.  Note, this catches pc-relative relocations against
+		 * the _GLOBAL_OFFSET_TABLE_, which is effectively treated as
+		 * a local symbol.
+		 */
+		if ((rlocal == TRUE) && (ttype != STT_OBJECT) &&
+		    (ttype != STT_SECTION))
+			return (tsdp);
+
+		/*
+		 * Finally, one of the symbols must reference a data element.
 		 */
 		if ((rtype != STT_OBJECT) && (rtype != STT_SECTION) &&
 		    (ttype != STT_OBJECT) && (ttype != STT_SECTION))
@@ -407,6 +417,85 @@ disp_inspect(Ofl_desc *ofl, Rel_desc *rld, Boolean rlocal)
 	 */
 	if (ifl->ifl_sortcnt)
 		(void) disp_scansyms(ifl, rld, rlocal, 0, ofl);
+	return (1);
+}
+
+/*
+ * Add an active relocation record.
+ */
+uintptr_t
+add_actrel(Word flags, Rel_desc *rsp, Ofl_desc *ofl)
+{
+	Rel_desc	*arsp;
+	Rel_cache	*rcp;
+
+	/*
+	 * If no relocation cache structures are available, allocate a new
+	 * one and link it into the bucket list.
+	 */
+	if ((ofl->ofl_actrels.tail == 0) ||
+	    ((rcp = (Rel_cache *)ofl->ofl_actrels.tail->data) == 0) ||
+	    ((arsp = rcp->rc_free) == rcp->rc_end)) {
+		static size_t	nextsize = 0;
+		size_t		size;
+
+		/*
+		 * Typically, when generating an executable or shared object
+		 * there will be an active relocation for every input
+		 * relocation.
+		 */
+		if (nextsize == 0) {
+			if ((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) {
+				if ((size = ofl->ofl_relocincnt) == 0)
+					size = REL_LAIDESCNO;
+				if (size > REL_HAIDESCNO)
+					nextsize = REL_HAIDESCNO;
+				else
+					nextsize = REL_LAIDESCNO;
+			} else
+				nextsize = size = REL_HAIDESCNO;
+		} else
+			size = nextsize;
+
+		size = size * sizeof (Rel_desc);
+
+		if (((rcp = libld_malloc(sizeof (Rel_cache) + size)) == 0) ||
+		    (list_appendc(&ofl->ofl_actrels, rcp) == 0))
+			return (S_ERROR);
+
+		/* LINTED */
+		rcp->rc_free = arsp = (Rel_desc *)(rcp + 1);
+		/* LINTED */
+		rcp->rc_end = (Rel_desc *)((char *)rcp->rc_free + size);
+	}
+
+	*arsp = *rsp;
+	arsp->rel_flags |= flags;
+
+	rcp->rc_free++;
+	ofl->ofl_actrelscnt++;
+
+	/*
+	 * Any GOT relocation reference requires the creation of a .got table.
+	 * Most references to a .got require a .got entry,  which is accounted
+	 * for with the ofl_gotcnt counter.  However, some references are
+	 * relative to the .got table, but require no .got entry.  This test
+	 * insures a .got is created regardless of the type of reference.
+	 */
+	if (IS_GOT_REQUIRED(arsp->rel_rtype))
+		ofl->ofl_flags |= FLG_OF_BLDGOT;
+
+	/*
+	 * If this is a displacement relocation generate a warning.
+	 */
+	if (arsp->rel_flags & FLG_REL_DISP) {
+		ofl->ofl_dtflags_1 |= DF_1_DISPRELDNE;
+
+		if (ofl->ofl_flags & FLG_OF_VERBOSE)
+			disp_errmsg(MSG_INTL(MSG_REL_DISPREL3), arsp, ofl);
+	}
+
+	DBG_CALL(Dbg_reloc_ars_entry(M_MACH, arsp));
 	return (1);
 }
 
@@ -815,6 +904,81 @@ reloc_generic(Rel_desc *rsp, Ofl_desc *ofl)
 	return (add_actrel(NULL, rsp, ofl));
 }
 
+/*
+ * Process relocations when building a relocatable object.  Typically, there
+ * aren't many relocations that can be caught at this point, most are simply
+ * passed through to the output relocatable object.
+ */
+static uintptr_t
+reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
+{
+	Word		rtype = rsp->rel_rtype;
+	Sym_desc	*sdp = rsp->rel_sym;
+	Is_desc		*isp = rsp->rel_isdesc;
+	Word		oflags = NULL;
+
+	/*
+	 * Determine if we can do any relocations at this point.  We can if:
+	 *
+	 *	this is local_symbol and a non-GOT relocation, and
+	 *	the relocation is pc-relative, and
+	 *	the relocation is against a symbol in same section
+	 */
+	if (local && !IS_GOT_RELATIVE(rtype) && !IS_GOT_BASED(rtype) &&
+	    !IS_GOT_PC(rtype) && IS_PC_RELATIVE(rtype) &&
+	    ((sdp->sd_isc) && (sdp->sd_isc->is_osdesc == isp->is_osdesc)))
+		return (add_actrel(NULL, rsp, ofl));
+
+	/*
+	 * If -zredlocsym is in effect, translate all local symbol relocations
+	 * to be against section symbols, since section symbols are the only
+	 * symbols which will be added to the .symtab.
+	 */
+	if (local && (((ofl->ofl_flags1 & FLG_OF1_REDLSYM) &&
+	    (ELF_ST_BIND(sdp->sd_sym->st_info) == STB_LOCAL)) ||
+	    ((sdp->sd_flags1 & FLG_SY1_ELIM) &&
+	    (ofl->ofl_flags & FLG_OF_PROCRED)))) {
+		/*
+		 * But if this is PIC code, don't allow it for now.
+		 */
+		if (IS_GOT_RELATIVE(rsp->rel_rtype)) {
+			Ifl_desc	*ifl = rsp->rel_isdesc->is_file;
+
+			eprintf(ERR_FATAL, MSG_INTL(MSG_REL_PICREDLOC),
+			    demangle(rsp->rel_sname), ifl->ifl_name,
+			    conv_reloc_type_str(ifl->ifl_ehdr->e_machine,
+			    rsp->rel_rtype));
+			return (S_ERROR);
+		}
+
+		/*
+		 * Indicate that this relocation should be processed the same
+		 * as a section symbol.  For SPARC and AMD (Rela), indicate
+		 * that the addend also needs to be applied to this relocation.
+		 */
+#if	defined(__i386)
+		oflags = FLG_REL_SCNNDX;
+#else
+		oflags = FLG_REL_SCNNDX | FLG_REL_ADVAL;
+#endif
+	}
+
+#if	defined(__i386)
+	/*
+	 * Intel (Rel) relocations do not contain an addend.  Any addend is
+	 * contained within the file at the location identified by the
+	 * relocation offset.  Therefore, if we're processing a section symbol,
+	 * or a -zredlocsym relocation (that basically transforms a local symbol
+	 * reference into a section reference), perform an active relocation to
+	 * propagate any addend.
+	 */
+	if ((ELF_ST_TYPE(sdp->sd_sym->st_info) == STT_SECTION) ||
+	    (oflags == FLG_REL_SCNNDX))
+		if (add_actrel(NULL, rsp, ofl) == S_ERROR)
+			return (S_ERROR);
+#endif
+	return (add_outrel(oflags, rsp, ofl));
+}
 
 uintptr_t
 process_sym_reloc(Ofl_desc * ofl, Rel_desc * reld, Rel * reloc,
@@ -1474,20 +1638,14 @@ reloc_init(Ofl_desc *ofl)
 	}
 
 	/*
-	 * Make a got section if:
-	 *
-	 *	BLDGOT flag set
-	 *		or
-	 *	ofl_gotcnt != GOT_XNumber
-	 *		or
-	 *	not-relobj & GOT symbol referenced
-	 *
+	 * GOT sections are created for dynamic executables and shared objects
+	 * if the FLG_OF_BLDGOT is set, or explicit reference has been made to
+	 * a GOT symbol.
 	 */
-	if ((ofl->ofl_flags & FLG_OF_BLDGOT) ||
-	    (ofl->ofl_gotcnt != M_GOT_XNumber) ||
-	    (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
-	    ((sym_find(MSG_ORIG(MSG_SYM_GOFTBL), SYM_NOHASH, 0, ofl) != 0) ||
-	    (sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U), SYM_NOHASH, 0, ofl) != 0)))) {
+	if (((ofl->ofl_flags & FLG_OF_RELOBJ) == 0) &&
+	    ((ofl->ofl_flags & FLG_OF_BLDGOT) ||
+	    (sym_find(MSG_ORIG(MSG_SYM_GOFTBL), SYM_NOHASH, 0, ofl) != 0) ||
+	    (sym_find(MSG_ORIG(MSG_SYM_GOFTBL_U), SYM_NOHASH, 0, ofl) != 0))) {
 		if (make_got(ofl) == S_ERROR)
 			return (S_ERROR);
 

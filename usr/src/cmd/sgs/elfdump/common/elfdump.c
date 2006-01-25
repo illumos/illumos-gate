@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -344,6 +345,19 @@ sections(const char *file, Cache *cache, GElf_Word shnum, GElf_Word phnum,
 			 * name for the section output.
 			 */
 			sname = MSG_ORIG(MSG_STR_EMPTY);
+		}
+
+		/*
+		 * Identify any sections that are suspicious.  A .got section
+		 * shouldn't exist in a relocatable object.
+		 */
+		if (ehdr->e_type == ET_REL) {
+			if (strncmp(sname, MSG_ORIG(MSG_ELF_GOT),
+			    MSG_ELF_GOT_SIZE) == 0) {
+				(void) fprintf(stderr,
+				    MSG_INTL(MSG_GOT_UNEXPECTED), file, sname);
+				(void) fflush(stderr);
+			}
 		}
 
 		dbg_print(MSG_ORIG(MSG_STR_EMPTY));
@@ -2138,7 +2152,8 @@ hash(Cache *cache, GElf_Word shnum, const char *name, const char *file,
 
 			if (_cnt >= MAXCOUNT) {
 				(void) fprintf(stderr,
-				    MSG_INTL(MSG_HASH_OVERFLW),
+				    MSG_INTL(MSG_HASH_OVERFLW), file,
+				    _cache->c_name,
 				    /* LINTED */
 				    (int)ndx, _cnt);
 				(void) fflush(stderr);
@@ -2295,17 +2310,28 @@ got(Cache *cache, GElf_Word shnum, GElf_Word phnum, GElf_Ehdr *ehdr,
 	GElf_Xword	gsymaddr;
 
 	/*
-	 * First we find the got
+	 * First, find the got.
 	 */
 	for (cnt = 1; cnt < shnum; cnt++) {
 		_cache = &cache[cnt];
-		if (strncmp(_cache->c_name, MSG_ORIG(MSG_ELF_GOT), 4) == 0) {
+		if (strncmp(_cache->c_name, MSG_ORIG(MSG_ELF_GOT),
+		    MSG_ELF_GOT_SIZE) == 0) {
 			gotcache = _cache;
 			break;
 		}
 	}
 	if (!gotcache)
 		return;
+
+	/*
+	 * A got section within a relocatable object is suspicious.
+	 */
+	if (ehdr->e_type == ET_REL) {
+		(void) fprintf(stderr, MSG_INTL(MSG_GOT_UNEXPECTED), file,
+		    _cache->c_name);
+		(void) fflush(stderr);
+	}
+
 	gotshdr = &gotcache->c_shdr;
 	gotbgn = gotshdr->sh_addr;
 

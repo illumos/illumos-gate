@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,6 +18,11 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -147,16 +149,19 @@
 @ MSG_ELF_HASH_BKTS1	"%10.10s  buckets contain %8d symbols"
 @ MSG_ELF_HASH_BKTS2	"%10.10s  buckets         %8d symbols (globals)"
 @ MSG_ELF_HASH_INFO	"    bucket    symndx    name"
-@ MSG_HASH_OVERFLW	"warning: too many symbols to count, bucket=%d count=%d"
+@ MSG_HASH_OVERFLW	"%s: warning: section %s: too many symbols to count, \
+			 bucket=%d count=%d"
 @ MSG_ELF_ERR_SHDR	"\tunable to obtain section header: shstrtab[%lld]\n"
 @ MSG_ELF_ERR_DATA	"\tunable to obtain section data: shstrtab[%lld]\n"
 @ MSG_ELF_ERR_SCN	"\tunable to obtain section header: section[%d]\n"
 @ MSG_ELF_ERR_SCNDATA	"\tunable to obtain section data: section[%d]\n"
 @ MSG_ARCHIVE_SYMTAB	"\nSymbol Table: (archive)"
 @ MSG_ARCHIVE_FIELDS	"     index    offset    member name and symbol"
+
 @ MSG_GOT_MULTIPLE	"%s: multiple relocations against \
 			 the same GOT entry ndx: %d addr: 0x%llx\n"
-
+@ MSG_GOT_UNEXPECTED	"%s: warning: section %s: section unexpected within \
+			 relocatable object\n"
 
 
 # Miscellaneous clutter

@@ -1084,3 +1084,5 @@ Bugid   Risk Synopsis
 6326497 ld.so not properly processing LD_LIBRARY_PATH ending in :
 6307146 mcs dumps core when appending null string to comment section
 6371877 LD_PROFILE_64 with gprof does not produce correct results on amd64
+6372082 ld -r erroneously creates .got section on i386
+6201866 amd64: linker symbol elimination is broken
