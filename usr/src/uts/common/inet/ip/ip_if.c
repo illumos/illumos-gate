@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -15809,11 +15809,13 @@ ilm_move_v6(ill_t *from_ill, ill_t *to_ill, int ifindex)
 
 	ilmp = &from_ill->ill_ilm;
 	for (ilm = from_ill->ill_ilm; ilm != NULL; ilm = ilm_next) {
-
-		if (ilm->ilm_flags & ILM_DELETED)
-			continue;
-
 		ilm_next = ilm->ilm_next;
+
+		if (ilm->ilm_flags & ILM_DELETED) {
+			ilmp = &ilm->ilm_next;
+			continue;
+		}
+
 		new_ilm = ilm_lookup_ill_index_v6(to_ill, &ilm->ilm_v6addr,
 		    ilm->ilm_orig_ifindex, ilm->ilm_zoneid);
 		ASSERT(ilm->ilm_orig_ifindex != 0);
@@ -16140,11 +16142,13 @@ ilm_move_v4(ill_t *from_ill, ill_t *to_ill, ipif_t *ipif)
 
 	ilmp = &from_ill->ill_ilm;
 	for (ilm = from_ill->ill_ilm; ilm != NULL; ilm = ilm_next) {
-
-		if (ilm->ilm_flags & ILM_DELETED)
-			continue;
-
 		ilm_next = ilm->ilm_next;
+
+		if (ilm->ilm_flags & ILM_DELETED) {
+			ilmp = &ilm->ilm_next;
+			continue;
+		}
+
 		ASSERT(ilm->ilm_ipif != NULL);
 
 		if (ilm->ilm_ipif != ipif) {
