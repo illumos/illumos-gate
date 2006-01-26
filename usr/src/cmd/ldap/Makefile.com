@@ -1,8 +1,8 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-# ident	"%Z%%M%	%I%	%E% SMI"
+#ident	"%Z%%M%	%I%	%E% SMI"
 #
 # cmd/ldap/Makefile.com
 # Native LDAP II commands (makestyle clean).
@@ -18,11 +18,8 @@ LDAPSRCS=	$(LDAPPROG:%=../common/%.c)
 LDAPOBJS=	$(LDAPPROG:%=%.o)
 
 #ldap common
-# convutf8 used to be a C++ file, but there's no need.  It's all C code.
-LDAPCOMM_CC=	# convutf8
-LDAPCOMM_C=     common ldaptool-sasl fileurl convutf8
-LDAPCOMM=       $(LDAPCOMM_C) $(LDAPCOMM_CC)
-LDAPCOMMOBJS=   $(LDAPCOMM:%=%.o)
+LDAPCOMMSRC=	common.c ldaptool-sasl.c fileurl.c convutf8.c
+LDAPCOMMOBJS=	$(LDAPCOMMSRC:%.c=%.o)
 
 # LDAP Naming service commands
 # idsconfig command
@@ -76,15 +73,13 @@ clean:=         TARGET= clean
 clobber:=       TARGET= clobber
 lint:=          TARGET= lint
 
-CPPFLAGS +=	-DSUN -DSVR4 -D_SYS_STREAM_H -DSOLARIS_LDAP_CMD
-CFLAGS +=	-I ../../../lib/libldap5/include/ldap \
+# C Pre-Processor flags used by C, CC & lint
+CPPFLAGS +=	-DSUN -DSVR4 -D_SYS_STREAM_H -DSOLARIS_LDAP_CMD \
+		-I ../../../lib/libldap5/include/ldap \
 		-I ../../../lib/libsldap/common \
 		-I ../../../lib/libnsl/include/rpcsvc \
 		-DNO_LIBLCACHE -DLDAP_REFERRALS -DNET_SSL -DLDAPSSLIO \
 		-DHAVE_SASL_OPTIONS -DSOLARIS_LDAP_CMD
-LINTFLAGS +=	-I ../../../lib/libldap5/include/ldap \
-		-I ../../../lib/libsldap/common \
-		-I ../../../lib/libnsl/include/rpcsvc
 LDLIBS +=	$(COMPLIB)
 
 ldapmodrdn :=	LDLIBS += -lldap
@@ -107,14 +102,6 @@ $(LDAPADD):	$(LDAPMOD)
 $(LDAPPROG):	../common/$$@.c $(LDAPCOMMOBJS)
 		$(LINK.c) -o $@ ../common/$@.c $(LDAPCOMMOBJS) $(LDLIBS)
 		$(POST_PROCESS)
-
-$(LDAPCOMM_CC:%=%.o):	../common/$$(@:%.o=%.cc)
-		$(COMPILE.cc) -o $@ ../common/$(@:%.o=%.cc)
-		$(POST_PROCESS_O)
-
-$(LDAPCOMM_C%=%.o):	../common/$$(@:%.o=%.c)
-		$(COMPILE.c) -o $@ ../common/$(@:%.o=%.c)
-		$(POST_PROCESS_O)
 
 %.o:		../common/%.c
 		$(COMPILE.c) -o $@ $<
@@ -159,9 +146,10 @@ $(ROOTUSRLIBLDAP)/%:	%
 FRC:
 
 clean:
+	$(RM) $(OBJS)
 
 lint: lintns_ldaplist lintns_ldapaddent lintns_ldapclient \
-	$(LDAPPROG:%=lintc_%) $(LDAPMOD:%=lintc_%)
+	$(LDAPPROG:%=lintc_%)
 
 lintns_ldaplist:
 	$(LINT.c) $(LDAPLISTSRCS:%=../ns_ldap/%) $(LDLIBS) -lsldap \
@@ -176,7 +164,7 @@ lintns_ldapclient:
 		>> $(LINTOUT) 2>&1
 
 lintc_%:
-	$(LINT.c) $(@:lintc_%=../common/%.c) $(LDAPCOMM) $(LDLIBS) \
-		>> $(LINTOUT) 2>&1
+	$(LINT.c) $(@:lintc_%=../common/%.c) $(LDAPCOMMSRC:%=../common/%) \
+		 $(LDLIBS) >> $(LINTOUT) 2>&1
 
 include $(SRC)/cmd/Makefile.targ
