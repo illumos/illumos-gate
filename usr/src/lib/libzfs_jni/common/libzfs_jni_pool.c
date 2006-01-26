@@ -49,16 +49,22 @@ typedef struct VirtualDeviceBean {
 	jmethodID method_setIndex;
 } VirtualDeviceBean_t;
 
-typedef struct DiskVirtualDeviceBean {
+typedef struct LeafVirtualDeviceBean {
 	VirtualDeviceBean_t super;
 
-	jmethodID method_setDiskName;
+	jmethodID method_setName;
+} LeafVirtualDeviceBean_t;
+
+typedef struct DiskVirtualDeviceBean {
+	LeafVirtualDeviceBean_t super;
 } DiskVirtualDeviceBean_t;
 
-typedef struct FileVirtualDeviceBean {
-	VirtualDeviceBean_t super;
+typedef struct SliceVirtualDeviceBean {
+	LeafVirtualDeviceBean_t super;
+} SliceVirtualDeviceBean_t;
 
-	jmethodID method_setFileName;
+typedef struct FileVirtualDeviceBean {
+	LeafVirtualDeviceBean_t super;
 } FileVirtualDeviceBean_t;
 
 typedef struct RAIDVirtualDeviceBean {
@@ -136,7 +142,9 @@ static zjni_field_mapping_t zpool_status_map[] = {
 
 static void new_ImportablePoolBean(JNIEnv *, ImportablePoolBean_t *);
 static void new_VirtualDevice(JNIEnv *, VirtualDeviceBean_t *);
+static void new_LeafVirtualDevice(JNIEnv *, LeafVirtualDeviceBean_t *);
 static void new_DiskVirtualDeviceBean(JNIEnv *, DiskVirtualDeviceBean_t *);
+static void new_SliceVirtualDeviceBean(JNIEnv *, SliceVirtualDeviceBean_t *);
 static void new_FileVirtualDeviceBean(JNIEnv *, FileVirtualDeviceBean_t *);
 static void new_RAIDVirtualDeviceBean(JNIEnv *, RAIDVirtualDeviceBean_t *);
 static void new_MirrorVirtualDeviceBean(JNIEnv *, MirrorVirtualDeviceBean_t *);
@@ -144,8 +152,12 @@ static int populate_ImportablePoolBean(
     JNIEnv *, ImportablePoolBean_t *, nvlist_t *);
 static int populate_VirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, VirtualDeviceBean_t *);
+static int populate_LeafVirtualDeviceBean(
+    JNIEnv *, zpool_handle_t *, nvlist_t *, LeafVirtualDeviceBean_t *);
 static int populate_DiskVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, DiskVirtualDeviceBean_t *);
+static int populate_SliceVirtualDeviceBean(
+    JNIEnv *, zpool_handle_t *, nvlist_t *, SliceVirtualDeviceBean_t *);
 static int populate_FileVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, FileVirtualDeviceBean_t *);
 static int populate_RAIDVirtualDeviceBean(
@@ -154,6 +166,8 @@ static int populate_MirrorVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *, MirrorVirtualDeviceBean_t *);
 static jobject create_ImportablePoolBean(JNIEnv *, nvlist_t *);
 static jobject create_DiskVirtualDeviceBean(
+    JNIEnv *, zpool_handle_t *, nvlist_t *);
+static jobject create_SliceVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
 static jobject create_FileVirtualDeviceBean(
     JNIEnv *, zpool_handle_t *, nvlist_t *);
@@ -223,6 +237,30 @@ new_VirtualDevice(JNIEnv *env, VirtualDeviceBean_t *bean)
 	    env, object->class, "setIndex", "(J)V");
 }
 
+/* Create a LeafVirtualDeviceBean */
+static void
+new_LeafVirtualDevice(JNIEnv *env, LeafVirtualDeviceBean_t *bean)
+{
+	zjni_Object_t *object = (zjni_Object_t *)bean;
+
+	if (object->object == NULL) {
+		object->class =
+		    (*env)->FindClass(env,
+			ZFSJNI_PACKAGE_DATA "LeafVirtualDeviceBean");
+
+		object->constructor =
+		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
+
+		object->object =
+		    (*env)->NewObject(env, object->class, object->constructor);
+	}
+
+	new_VirtualDevice(env, (VirtualDeviceBean_t *)bean);
+
+	bean->method_setName = (*env)->GetMethodID(
+	    env, object->class, "setName", "(Ljava/lang/String;)V");
+}
+
 /* Create a DiskVirtualDeviceBean */
 static void
 new_DiskVirtualDeviceBean(JNIEnv *env, DiskVirtualDeviceBean_t *bean)
@@ -240,11 +278,27 @@ new_DiskVirtualDeviceBean(JNIEnv *env, DiskVirtualDeviceBean_t *bean)
 		    (*env)->NewObject(env, object->class, object->constructor);
 	}
 
-	new_VirtualDevice(env, (VirtualDeviceBean_t *)bean);
+	new_LeafVirtualDevice(env, (LeafVirtualDeviceBean_t *)bean);
+}
 
-	bean->method_setDiskName = (*env)->GetMethodID(
-	    env, object->class, "setDiskName", "(Ljava/lang/String;)V");
+/* Create a SliceVirtualDeviceBean */
+static void
+new_SliceVirtualDeviceBean(JNIEnv *env, SliceVirtualDeviceBean_t *bean)
+{
+	zjni_Object_t *object = (zjni_Object_t *)bean;
 
+	if (object->object == NULL) {
+		object->class = (*env)->FindClass(
+		    env, ZFSJNI_PACKAGE_DATA "SliceVirtualDeviceBean");
+
+		object->constructor =
+		    (*env)->GetMethodID(env, object->class, "<init>", "()V");
+
+		object->object =
+		    (*env)->NewObject(env, object->class, object->constructor);
+	}
+
+	new_LeafVirtualDevice(env, (LeafVirtualDeviceBean_t *)bean);
 }
 
 /* Create a FileVirtualDeviceBean */
@@ -264,10 +318,7 @@ new_FileVirtualDeviceBean(JNIEnv *env, FileVirtualDeviceBean_t *bean)
 		    (*env)->NewObject(env, object->class, object->constructor);
 	}
 
-	new_VirtualDevice(env, (VirtualDeviceBean_t *)bean);
-
-	bean->method_setFileName = (*env)->GetMethodID(
-	    env, object->class, "setFileName", "(Ljava/lang/String;)V");
+	new_LeafVirtualDevice(env, (LeafVirtualDeviceBean_t *)bean);
 }
 
 /* Create a RAIDVirtualDeviceBean */
@@ -387,12 +438,20 @@ populate_VirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 }
 
 static int
+populate_LeafVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
+    nvlist_t *vdev, LeafVirtualDeviceBean_t *bean)
+{
+	return (populate_VirtualDeviceBean(
+	    env, zhp, vdev, (VirtualDeviceBean_t *)bean));
+}
+
+static int
 populate_DiskVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
     nvlist_t *vdev, DiskVirtualDeviceBean_t *bean)
 {
 	char *path;
-	int result = populate_VirtualDeviceBean(
-	    env, zhp, vdev, (VirtualDeviceBean_t *)bean);
+	int result = populate_LeafVirtualDeviceBean(
+	    env, zhp, vdev, (LeafVirtualDeviceBean_t *)bean);
 
 	if (result) {
 		/* Must not call any more Java methods to preserve exception */
@@ -407,9 +466,63 @@ populate_DiskVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 		    zpool_get_name(zhp));
 	} else {
 
+		regex_t re;
+		regmatch_t matches[2];
+		jstring pathUTF = NULL;
+
+		/* Strip off slice portion of name, if applicable */
+		if (regcomp(&re, "^(/dev/dsk/.*)s[0-9]+$", REG_EXTENDED) == 0) {
+			if (regexec(&re, path, 2, matches, 0) == 0) {
+				regmatch_t *match = matches + 1;
+				if (match->rm_so != -1 && match->rm_eo != -1) {
+					char *tmp = strdup(path);
+					if (tmp != NULL) {
+						char *end = tmp + match->rm_eo;
+						*end = '\0';
+						pathUTF = (*env)->NewStringUTF(
+						    env, tmp);
+						free(tmp);
+					}
+				}
+			}
+			regfree(&re);
+		}
+
+		if (pathUTF == NULL) {
+		    pathUTF = (*env)->NewStringUTF(env, path);
+		}
+
+		(*env)->CallVoidMethod(env, ((zjni_Object_t *)bean)->object,
+		    ((LeafVirtualDeviceBean_t *)bean)->method_setName, pathUTF);
+	}
+
+	return (result != 0);
+}
+
+static int
+populate_SliceVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
+    nvlist_t *vdev, SliceVirtualDeviceBean_t *bean)
+{
+	char *path;
+	int result = populate_LeafVirtualDeviceBean(
+	    env, zhp, vdev, (LeafVirtualDeviceBean_t *)bean);
+
+	if (result) {
+		/* Must not call any more Java methods to preserve exception */
+		return (-1);
+	}
+
+	/* Set path */
+	result = nvlist_lookup_string(vdev, ZPOOL_CONFIG_PATH, &path);
+	if (result != 0) {
+		zjni_throw_exception(env,
+		    "could not retrive path from slice virtual device (pool "
+		    "%s)", zpool_get_name(zhp));
+	} else {
+
 		jstring pathUTF = (*env)->NewStringUTF(env, path);
 		(*env)->CallVoidMethod(env, ((zjni_Object_t *)bean)->object,
-		    bean->method_setDiskName, pathUTF);
+		    ((LeafVirtualDeviceBean_t *)bean)->method_setName, pathUTF);
 	}
 
 	return (result != 0);
@@ -420,8 +533,8 @@ populate_FileVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
     nvlist_t *vdev, FileVirtualDeviceBean_t *bean)
 {
 	char *path;
-	int result = populate_VirtualDeviceBean(
-	    env, zhp, vdev, (VirtualDeviceBean_t *)bean);
+	int result = populate_LeafVirtualDeviceBean(
+	    env, zhp, vdev, (LeafVirtualDeviceBean_t *)bean);
 
 	if (result) {
 		/* Must not call any more Java methods to preserve exception */
@@ -438,7 +551,7 @@ populate_FileVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp,
 
 		jstring pathUTF = (*env)->NewStringUTF(env, path);
 		(*env)->CallVoidMethod(env, ((zjni_Object_t *)bean)->object,
-		    bean->method_setFileName, pathUTF);
+		    ((LeafVirtualDeviceBean_t *)bean)->method_setName, pathUTF);
 	}
 
 	return (result != 0);
@@ -490,6 +603,25 @@ create_DiskVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp, nvlist_t *vdev)
 	new_DiskVirtualDeviceBean(env, bean);
 
 	result = populate_DiskVirtualDeviceBean(env, zhp, vdev, bean);
+	if (result) {
+		/* Must not call any more Java methods to preserve exception */
+		return (NULL);
+	}
+
+	return (((zjni_Object_t *)bean)->object);
+}
+
+static jobject
+create_SliceVirtualDeviceBean(JNIEnv *env, zpool_handle_t *zhp, nvlist_t *vdev)
+{
+	int result;
+	SliceVirtualDeviceBean_t bean_obj = {0};
+	SliceVirtualDeviceBean_t *bean = &bean_obj;
+
+	/* Construct SliceVirtualDeviceBean */
+	new_SliceVirtualDeviceBean(env, bean);
+
+	result = populate_SliceVirtualDeviceBean(env, zhp, vdev, bean);
 	if (result) {
 		/* Must not call any more Java methods to preserve exception */
 		return (NULL);
@@ -600,6 +732,9 @@ new_DeviceStats(JNIEnv *env, DeviceStatsBean_t *bean, zjni_Object_t *object)
 {
 	bean->method_setSize = (*env)->GetMethodID(
 	    env, object->class, "setSize", "(J)V");
+
+	bean->method_setReplacementSize = (*env)->GetMethodID(
+	    env, object->class, "setReplacementSize", "(J)V");
 
 	bean->method_setUsed = (*env)->GetMethodID(
 	    env, object->class, "setUsed", "(J)V");
@@ -735,7 +870,15 @@ zjni_get_VirtualDevice_from_vdev(JNIEnv *env, zpool_handle_t *zhp,
 
 	if (result == 0) {
 		if (strcmp(type, VDEV_TYPE_DISK) == 0) {
-			obj = create_DiskVirtualDeviceBean(env, zhp, vdev);
+			uint64_t wholedisk;
+			if (nvlist_lookup_uint64(vdev, ZPOOL_CONFIG_WHOLE_DISK,
+			    &wholedisk) == 0 && wholedisk) {
+				obj = create_DiskVirtualDeviceBean(
+				    env, zhp, vdev);
+			} else {
+				obj = create_SliceVirtualDeviceBean(
+				    env, zhp, vdev);
+			}
 		} else if (strcmp(type, VDEV_TYPE_FILE) == 0) {
 			obj = create_FileVirtualDeviceBean(env, zhp, vdev);
 		} else if (strcmp(type, VDEV_TYPE_RAIDZ) == 0) {
@@ -862,6 +1005,9 @@ populate_DeviceStatsBean(JNIEnv *env, nvlist_t *vdev,
 
 	(*env)->CallVoidMethod(env, object->object,
 	    bean->method_setSize, (jlong)vs->vs_space);
+
+	(*env)->CallVoidMethod(env, object->object,
+	    bean->method_setReplacementSize, (jlong)vs->vs_rsize);
 
 	(*env)->CallVoidMethod(env, object->object,
 	    bean->method_setReadBytes, (jlong)vs->vs_bytes[ZIO_TYPE_READ]);

@@ -45,6 +45,7 @@ extern "C" {
 
 typedef struct DeviceStatsBean {
 	jmethodID method_setSize;
+	jmethodID method_setReplacementSize;
 	jmethodID method_setUsed;
 	jmethodID method_setReadBytes;
 	jmethodID method_setWriteBytes;
