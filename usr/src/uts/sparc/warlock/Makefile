@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -140,3 +140,4 @@ warlock.ib:
 warlock.sata:
 	@cd ../sata; rm -f *.ll *.ok; $(MAKE) warlock
 	@cd ../si3124; rm -f *.ll *.ok; $(MAKE) warlock
+	@cd $(CLOSED)/uts/sparc/marvell88sx ; rm -f *.ll *.ok; $(MAKE) warlock
