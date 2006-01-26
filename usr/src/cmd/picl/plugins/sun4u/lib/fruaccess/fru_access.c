@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -762,6 +762,8 @@ fru_open_container(picl_nodehdl_t fruhdl)
 {
 	int			retval;
 	int			count;
+	int			device_fd;
+	uchar_t			first_byte;
 	char			*bname;
 	char			devpath[PATH_MAX];
 	char			nmbuf[SYS_NMLN];
@@ -817,6 +819,20 @@ fru_open_container(picl_nodehdl_t fruhdl)
 
 	(void) strlcpy(cont_hash_obj->u.cont_obj->device_pathname, devpath,
 	    sizeof (devpath));
+
+	/* check for sun or non-sun type fru */
+	if (strcmp(bname, "i2c-at34c02") == 0) {
+		device_fd = open(devpath, O_RDONLY);
+		if (device_fd < 0) {
+			return (NULL);
+		}
+		first_byte = 0x00;
+
+		retval = pread(device_fd, &first_byte, sizeof (first_byte), 0);
+		close(device_fd);
+		if (first_byte == 0x08)
+			(void) strcpy(bname, "i2c-at34cps");
+	}
 
 	/* if there's a platform-specific conf file, use that */
 	retval = -1;
