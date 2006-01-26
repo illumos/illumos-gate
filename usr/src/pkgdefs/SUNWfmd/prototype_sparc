@@ -90,8 +90,12 @@ d none usr/lib/fm/topo/SUNW,Sun-Fire-T1000 755 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Fire-T1000/platform.topo 444 root bin
 d none usr/lib/fm/topo/SUNW,Sun-Fire-V240 755 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Fire-V240/platform.topo 444 root bin
+d none usr/lib/fm/topo/SUNW,Sun-Fire-V245 755 root bin
+f none usr/lib/fm/topo/SUNW,Sun-Fire-V245/platform.topo 444 root bin
 d none usr/lib/fm/topo/SUNW,Sun-Fire-V440 755 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Fire-V440/platform.topo 444 root bin
+d none usr/lib/fm/topo/SUNW,Sun-Fire-V445 755 root bin
+f none usr/lib/fm/topo/SUNW,Sun-Fire-V445/platform.topo 444 root bin
 d none usr/lib/fm/topo/SUNW,Sun-Fire 755 root bin
 f none usr/lib/fm/topo/SUNW,Sun-Fire/platform.topo 444 root bin
 d none usr/lib/fm/topo/SUNW,Ultra-250 755 root bin
@@ -120,6 +124,8 @@ d none usr/lib/fm/topo/SUNW,Netra-240 755 root bin
 l none usr/lib/fm/topo/SUNW,Netra-240/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-V240/platform.topo
 d none usr/lib/fm/topo/SUNW,Sun-Fire-V210 755 root bin
 l none usr/lib/fm/topo/SUNW,Sun-Fire-V210/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-V240/platform.topo
+d none usr/lib/fm/topo/SUNW,Sun-Fire-V215 755 root bin
+l none usr/lib/fm/topo/SUNW,Sun-Fire-V215/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-V245/platform.topo
 d none usr/lib/fm/topo/SUNW,Sun-Fire-V250 755 root bin
 l none usr/lib/fm/topo/SUNW,Sun-Fire-V250/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-V240/platform.topo
 d none usr/lib/fm/topo/SUNW,Sun-Fire-V490 755 root bin
