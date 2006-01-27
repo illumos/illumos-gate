@@ -464,6 +464,7 @@ gexec(
 	int setid;
 	cred_t *oldcred, *newcred = NULL;
 	int privflags = 0;
+	int setidfl;
 
 	/*
 	 * If the SNOCD or SUGID flag is set, turn it off and remember the
@@ -574,11 +575,18 @@ gexec(
 	 * This also makes the runtime linker agree with the on exec
 	 * values of SNOCD and SUGID.
 	 */
+	setidfl = 0;
+	if (cred->cr_uid != cred->cr_ruid || (cred->cr_rgid != cred->cr_gid &&
+	    !supgroupmember(cred->cr_gid, cred))) {
+		setidfl |= EXECSETID_UGIDS;
+	}
+	if (setid & PRIV_SETUGID)
+		setidfl |= EXECSETID_SETID;
+	if (setid & PRIV_INCREASE)
+		setidfl |= EXECSETID_PRIVS;
+
 	error = (*eswp->exec_func)(vp, uap, args, idatap, level, execsz,
-		(setid & PRIV_INCREASE) != 0 ||
-		cred->cr_uid != cred->cr_ruid ||
-		(cred->cr_rgid != cred->cr_gid &&
-		!supgroupmember(cred->cr_gid, cred)), exec_file, cred);
+		setidfl, exec_file, cred);
 	rw_exit(eswp->exec_lock);
 	if (error != 0) {
 		if (newcred != NULL)

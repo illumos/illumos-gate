@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -572,7 +572,12 @@ elfexec(vnode_t *vp, execa_t *uap, uarg_t *args, intpdata_t *idatap,
 		 * Linker flags. (security)
 		 * p_flag not yet set at this time.
 		 * We rely on gexec() to provide us with the information.
+		 * If the application is set-uid but this is not reflected
+		 * in a mismatch between real/effective uids/gids, then
+		 * don't treat this as a set-uid exec.  So we care about
+		 * the EXECSETID_UGIDS flag but not the ...SETID flag.
 		 */
+		setid &= ~EXECSETID_SETID;
 		ADDAUX(aux, AT_SUN_AUXFLAGS,
 		    setid ? AF_SUN_SETUGID | auxf : auxf);
 		/*

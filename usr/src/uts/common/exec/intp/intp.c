@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -207,7 +207,15 @@ intpexec(
 	/* don't free resolvepn until we are done with args */
 	pn_free(&intppn);
 
-	if (setid) { /* close security hole */
+	/*
+	 * When we're executing a set-uid script resulting in uids
+	 * mismatching or when we execute with additional privileges,
+	 * we close the "replace script between exec and open by shell"
+	 * hole by passing the script as /dev/fd parameter.
+	 */
+	if ((setid & EXECSETID_PRIVS) != 0 ||
+	    (setid & (EXECSETID_UGIDS|EXECSETID_SETID)) ==
+	    (EXECSETID_UGIDS|EXECSETID_SETID)) {
 		(void) strcpy(devfd, "/dev/fd/");
 		if (error = execopen(&vp, &fd))
 			goto done;
