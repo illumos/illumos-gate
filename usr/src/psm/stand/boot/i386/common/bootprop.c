@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -199,8 +199,13 @@ setup_bootprop(void)
 			val = "true";
 			cp = NULL;	/* terminate loop */
 		} else if (*val != '\'' && *val != '\"') {
-			cp = strtok(val, ",");
-			cp = strtok(NULL, "");
+			if (*val == ',') {
+				cp = val + 1;
+				val = "";
+			} else {
+				cp = strtok(val, ",");
+				cp = strtok(NULL, "");
+			}
 		} else {
 			/* look for closing single or double quote */
 			cp = val + 1;

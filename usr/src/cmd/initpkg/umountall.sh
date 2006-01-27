@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -170,7 +170,7 @@ ZONENAME=`zonename`
 # Check and if needed sync the boot archive before unmounting things.
 #
 if [ -z "${RFLAG}${NFLAG}${HFLAG}" -a "$ZONENAME" = "global" -a \
-    `uname -p` = "i386" ] ; then
+    `uname -p` = "i386" -a -x /sbin/bootadm ] ; then
 	/sbin/bootadm -a update_all
 fi
 
