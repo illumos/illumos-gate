@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,12 +69,12 @@
  * those pages. Pages which could not be retired while the system is running
  * are scrubbed prior to rebooting to avoid latent errors on the next boot.
  *
- * Single CE pages and UE pages without persistent errors are scrubbed and
- * returned to service. Recidivist pages, as well as FMA-directed requests
- * for retirement, result in the page being taken out of service. Once the
- * decision is made to take a page out of service, the page is cleared, hashed
- * onto the retired_pages vnode, marked as retired, and it is unlocked.  No
- * other requesters (except for unretire) are allowed to lock retired pages.
+ * UE pages without persistent errors are scrubbed and returned to service.
+ * Recidivist pages, as well as FMA-directed requests for retirement, result
+ * in the page being taken out of service. Once the decision is made to take
+ * a page out of service, the page is cleared, hashed onto the retired_pages
+ * vnode, marked as retired, and it is unlocked.  No other requesters (except
+ * for unretire) are allowed to lock retired pages.
  *
  * The public routines return (sadly) 0 if they worked and a non-zero error
  * value if something went wrong. This is done for the ioctl side of the
@@ -468,7 +468,8 @@ page_settoxic(page_t *pp, uchar_t bits)
 
 /*
  * Note that multiple bits may cleared in a single clrtoxic operation.
- * Must be called with the page exclusively locked.
+ * Must be called with the page exclusively locked to prevent races which
+ * may attempt to retire a page without any toxic bits set.
  */
 void
 page_clrtoxic(page_t *pp, uchar_t bits)
@@ -489,7 +490,7 @@ page_retire_done(page_t *pp, int code)
 	int		i;
 
 	if (pp != NULL) {
-		pa = mmu_ptob(pp->p_pagenum);
+		pa = mmu_ptob((uint64_t)pp->p_pagenum);
 	}
 
 	prop = NULL;
@@ -983,6 +984,12 @@ page_retire_thread(void)
 	mutex_enter(&pr_thread_mutex);
 	for (;;) {
 		if (pr_enable && PR_KSTAT_PENDING) {
+			/*
+			 * Sigh. It's SO broken how we have to try to shake
+			 * loose the holder of the page. Since we have no
+			 * idea who or what has it locked, we go bang on
+			 * every door in the city to try to locate it.
+			 */
 			kmem_reap();
 			seg_preap();
 			page_retire_hunt(page_retire_thread_cb);
@@ -1042,17 +1049,26 @@ page_retire_pp(page_t *pp)
 	}
 
 	if (PP_ISFREE(pp)) {
+		int dbgnoreclaim = MTBF(recl_calls, recl_mtbf) == 0;
+
 		PR_DEBUG(prd_free);
-		if (!MTBF(recl_calls, recl_mtbf) || !page_reclaim(pp, NULL)) {
+
+		if (dbgnoreclaim || !page_reclaim(pp, NULL)) {
 			PR_DEBUG(prd_noreclaim);
 			PR_INCR_KSTAT(pr_failed);
-			page_unlock(pp);
+			/*
+			 * page_reclaim() returns with `pp' unlocked when
+			 * it fails.
+			 */
+			if (dbgnoreclaim)
+				page_unlock(pp);
 			return (page_retire_done(pp, PRD_FAILED));
 		}
 	}
+	ASSERT(!PP_ISFREE(pp));
 
-	if ((toxic & PR_UE) == 0 && pp->p_vnode && !PP_ISFREE(pp) &&
-	    !PP_ISNORELOCKERNEL(pp) && MTBF(reloc_calls, reloc_mtbf)) {
+	if ((toxic & PR_UE) == 0 && pp->p_vnode && !PP_ISNORELOCKERNEL(pp) &&
+	    MTBF(reloc_calls, reloc_mtbf)) {
 		page_t *newpp;
 		spgcnt_t count;
 
@@ -1094,7 +1110,6 @@ page_retire_pp(page_t *pp)
 	}
 
 	(void) hat_pageunload(pp, HAT_FORCE_PGUNLOAD);
-	ASSERT(!PP_ISFREE(pp));
 	ASSERT(!hat_page_is_mapped(pp));
 
 	/*
@@ -1287,7 +1302,7 @@ page_unretire_pp(page_t *pp, int free)
 		}
 
 		PR_MESSAGE(CE_NOTE, 1, "unretiring retired"
-		    " page 0x%08x.%08x", mmu_ptob(pp->p_pagenum));
+		    " page 0x%08x.%08x", mmu_ptob((uint64_t)pp->p_pagenum));
 		if (pp->p_toxic & PR_FMA) {
 			PR_DECR_KSTAT(pr_fma);
 		} else if (pp->p_toxic & PR_UE) {

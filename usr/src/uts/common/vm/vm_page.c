@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -971,8 +971,7 @@ page_find(vnode_t *vp, u_offset_t off)
 	PAGE_HASH_SEARCH(index, pp, vp, off);
 	mutex_exit(phm);
 
-	ASSERT(pp != NULL);
-	ASSERT(PAGE_LOCKED(pp) || panicstr);
+	ASSERT(pp == NULL || PAGE_LOCKED(pp) || panicstr);
 	return (pp);
 }
 

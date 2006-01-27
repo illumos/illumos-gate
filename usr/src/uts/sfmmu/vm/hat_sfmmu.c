@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -11801,8 +11801,13 @@ sfmmu_init_tsbs(void)
 		tsbmissp->uhashsz = uhmehash_num;
 	}
 
+	sfmmu_tsb_cb_id = hat_register_callback('T'<<16 | 'S' << 8 | 'B',
+	    sfmmu_tsb_pre_relocator, sfmmu_tsb_post_relocator, NULL, 0);
+
 	if (kpm_enable == 0)
 		return;
+
+	/* -- Begin KPM specific init -- */
 
 	if (kpm_smallpages) {
 		/*
@@ -11855,8 +11860,7 @@ sfmmu_init_tsbs(void)
 			kpmtsbmp->flags |= KPMTSBM_TSBPHYS_FLAG;
 	}
 
-	sfmmu_tsb_cb_id = hat_register_callback('T'<<16 | 'S' << 8 | 'B',
-	    sfmmu_tsb_pre_relocator, sfmmu_tsb_post_relocator, NULL, 0);
+	/* -- End KPM specific init -- */
 }
 
 /* Avoid using sfmmu_tsbinfo_alloc() to avoid kmem_alloc - no real reason */

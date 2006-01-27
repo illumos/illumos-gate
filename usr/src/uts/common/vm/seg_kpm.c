@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,13 +211,18 @@ faultcode_t
 segkpm_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t len,
 	enum fault_type type, enum seg_rw rw)
 {
-	faultcode_t error;
-
 	ASSERT(seg->s_as && AS_LOCK_HELD(seg->s_as, &seg->s_as->a_lock));
 
-	error = hat_kpm_fault(hat, addr);
-
-	return (error);
+	switch (type) {
+	case F_INVAL:
+		return (hat_kpm_fault(hat, addr));
+	case F_SOFTLOCK:
+	case F_SOFTUNLOCK:
+		return (0);
+	default:
+		return (FC_NOSUPPORT);
+	}
+	/*NOTREACHED*/
 }
 
 #define	addr_to_vcolor(addr, vcolors) \

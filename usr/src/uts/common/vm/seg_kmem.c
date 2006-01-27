@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -424,6 +424,10 @@ static faultcode_t
 segkmem_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t size,
 	enum fault_type type, enum seg_rw rw)
 {
+	pgcnt_t npages;
+	spgcnt_t pg;
+	page_t *pp;
+
 	ASSERT(RW_READ_HELD(&seg->s_as->a_lock));
 
 	if (seg->s_as != &kas || size > seg->s_size ||
@@ -431,7 +435,6 @@ segkmem_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t size,
 		panic("segkmem_fault: bad args");
 
 	if (segkp_bitmap && seg == &kvseg) {
-
 		/*
 		 * If it is one of segkp pages, call segkp_fault.
 		 */
@@ -440,21 +443,50 @@ segkmem_fault(struct hat *hat, struct seg *seg, caddr_t addr, size_t size,
 			return (SEGOP_FAULT(hat, segkp, addr, size, type, rw));
 	}
 
+	if (rw != S_READ && rw != S_WRITE && rw != S_OTHER)
+		return (FC_NOSUPPORT);
+
+	npages = btopr(size);
+
 	switch (type) {
 	case F_SOFTLOCK:	/* lock down already-loaded translations */
-		if (rw == S_OTHER) {
-			hat_reserve(seg->s_as, addr, size);
-			return (0);
+		for (pg = 0; pg < npages; pg++) {
+			pp = page_lookup(&kvp, (u_offset_t)(uintptr_t)addr,
+			    SE_SHARED);
+			if (pp == NULL) {
+				/*
+				 * Hmm, no page. Does a kernel mapping
+				 * exist for it?
+				 */
+				if (!hat_probe(kas.a_hat, addr)) {
+					addr -= PAGESIZE;
+					while (--pg >= 0) {
+						pp = page_find(&kvp,
+						(u_offset_t)(uintptr_t)addr);
+						if (pp)
+							page_unlock(pp);
+						addr -= PAGESIZE;
+					}
+					return (FC_NOMAP);
+				}
+			}
+			addr += PAGESIZE;
 		}
-		/*FALLTHROUGH*/
+		if (rw == S_OTHER)
+			hat_reserve(seg->s_as, addr, size);
+		return (0);
 	case F_SOFTUNLOCK:
-		if (rw == S_READ || rw == S_WRITE)
-			return (0);
-		/*FALLTHROUGH*/
+		while (npages--) {
+			pp = page_find(&kvp, (u_offset_t)(uintptr_t)addr);
+			if (pp)
+				page_unlock(pp);
+			addr += PAGESIZE;
+		}
+		return (0);
 	default:
-		break;
+		return (FC_NOSUPPORT);
 	}
-	return (FC_NOSUPPORT);
+	/*NOTREACHED*/
 }
 
 static int
@@ -620,8 +652,10 @@ segkmem_dump(struct seg *seg)
 
 /*
  * lock/unlock kmem pages over a given range [addr, addr+len).
- * Returns a shadow list of pages in ppp if *ppp is not NULL
- * and memory can be allocated to hold the shadow list.
+ * Returns a shadow list of pages in ppp. If there are holes
+ * in the range (e.g. some of the kernel mappings do not have
+ * underlying page_ts) returns ENOTSUP so that as_pagelock()
+ * will handle the range via as_fault(F_SOFTLOCK).
  */
 /*ARGSUSED*/
 static int
@@ -630,7 +664,10 @@ segkmem_pagelock(struct seg *seg, caddr_t addr, size_t len,
 {
 	page_t **pplist, *pp;
 	pgcnt_t npages;
+	spgcnt_t pg;
 	size_t nb;
+
+	ASSERT(ppp != NULL);
 
 	if (segkp_bitmap && seg == &kvseg) {
 		/*
@@ -649,49 +686,39 @@ segkmem_pagelock(struct seg *seg, caddr_t addr, size_t len,
 	nb = sizeof (page_t *) * npages;
 
 	if (type == L_PAGEUNLOCK) {
-		if ((pplist = *ppp) == NULL) {
-			/*
-			 * No shadow list.  Iterate over the range
-			 * using page_find() and unlock the pages
-			 * that we encounter.
-			 */
-			while (npages--) {
-				pp = page_find(&kvp,
-				    (u_offset_t)(uintptr_t)addr);
-				if (pp)
-					page_unlock(pp);
-				addr += PAGESIZE;
-			}
-			return (0);
-		}
+		pplist = *ppp;
+		ASSERT(pplist != NULL);
 
-		while (npages--) {
-			pp = *pplist++;
-			if (pp)
-				page_unlock(pp);
+		for (pg = 0; pg < npages; pg++) {
+			pp = pplist[pg];
+			page_unlock(pp);
 		}
-		kmem_free(*ppp, nb);
+		kmem_free(pplist, nb);
 		return (0);
 	}
 
 	ASSERT(type == L_PAGELOCK);
 
-	pplist = NULL;
-	if (ppp != NULL)
-		*ppp = pplist = kmem_alloc(nb, KM_NOSLEEP);
+	pplist = kmem_alloc(nb, KM_NOSLEEP);
+	if (pplist == NULL) {
+		*ppp = NULL;
+		return (ENOTSUP);	/* take the slow path */
+	}
 
-	while (npages--) {
+	for (pg = 0; pg < npages; pg++) {
 		pp = page_lookup(&kvp, (u_offset_t)(uintptr_t)addr, SE_SHARED);
-		/*
-		 * We'd like to ASSERT(pp != NULL) here, but we can't
-		 * because there are legitimate cases where the address
-		 * isn't really mapped -- for instance, attaching a
-		 * kernel debugger and poking at a non-existent address.
-		 */
-		if (pplist)
-			*pplist++ = pp;
+		if (pp == NULL) {
+			while (--pg >= 0)
+				page_unlock(pplist[pg]);
+			kmem_free(pplist, nb);
+			*ppp = NULL;
+			return (ENOTSUP);
+		}
+		pplist[pg] = pp;
 		addr += PAGESIZE;
 	}
+
+	*ppp = pplist;
 	return (0);
 }
 
