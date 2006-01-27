@@ -1341,11 +1341,21 @@ list_func(int argc, char *argv[])
 			case '?':
 				sub_usage(SHELP_LIST, CMD_LIST);
 				return (optopt == '?' ? Z_OK : Z_USAGE);
+				/*
+				 * The 'i' and 'c' options are not mutually
+				 * exclusive so if 'c' is given, then min_state
+				 * is set to 0 (ZONE_STATE_CONFIGURED) which is
+				 * the lowest possible state.  If 'i' is given,
+				 * then min_state is set to be the lowest state
+				 * so far.
+				 */
 			case 'c':
 				min_state = ZONE_STATE_CONFIGURED;
 				break;
 			case 'i':
-				min_state = ZONE_STATE_INSTALLED;
+				min_state = min(ZONE_STATE_INSTALLED,
+				    min_state);
+
 				break;
 			case 'p':
 				parsable = B_TRUE;
