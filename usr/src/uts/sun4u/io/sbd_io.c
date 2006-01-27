@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -369,8 +369,7 @@ sbd_check_io_attached(dev_info_t *dip, void *arg)
 		int state;
 
 		state = ddi_get_devstate(dip);
-		if (i_ddi_node_state(dip) >= DS_ATTACHED ||
-		    (state == DDI_DEVSTATE_UP)) {
+		if (i_ddi_devi_attached(dip) || (state == DDI_DEVSTATE_UP)) {
 			*tdip = NULL;
 			return (DDI_WALK_TERMINATE);
 		}

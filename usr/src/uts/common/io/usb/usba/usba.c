@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2751,7 +2751,7 @@ usba_check_for_leaks(usba_device_t *usba_device)
 				dev_data = entry->cddl_dev_data;
 
 
-				if (i_ddi_node_state(dip) < DS_ATTACHED) {
+				if (!i_ddi_devi_attached(dip)) {
 					USB_DPRINTF_L2(DPRINT_MASK_USBA,
 					    usba_log_handle,
 					    "%s%d: leaking dev_data 0x%p",

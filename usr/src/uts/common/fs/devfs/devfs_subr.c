@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -778,7 +778,7 @@ dv_find_leafnode(dev_info_t *devi, char *minor_nm, struct ddi_minor_data *r_mi)
 {
 	struct ddi_minor_data *dmd;
 
-	ASSERT(i_ddi_node_state(devi) >= DS_ATTACHED);
+	ASSERT(i_ddi_devi_attached(devi));
 	ASSERT(MUTEX_HELD(&DEVI(devi)->devi_lock));
 
 	dcmn_err3(("dv_find_leafnode: %s\n", minor_nm));
@@ -1010,7 +1010,7 @@ founddv:
 		goto notfound;
 	}
 
-	ASSERT(devi && (i_ddi_node_state(devi) >= DS_ATTACHED));
+	ASSERT(devi && i_ddi_devi_attached(devi));
 
 	/*
 	 * Invalidate cache to notice newly created minor nodes.

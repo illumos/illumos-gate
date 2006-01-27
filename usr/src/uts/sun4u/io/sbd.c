@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4784,7 +4784,7 @@ sbd_board_discovery(sbd_board_t *sbp)
 		/*
 		 * XXX Is the devstate check needed ?
 		 */
-		if (i_ddi_node_state(dip) >= DS_ATTACHED ||
+		if (i_ddi_devi_attached(dip) ||
 		    ddi_get_devstate(dip) == DDI_DEVSTATE_UP) {
 
 			/*

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2448,7 +2448,7 @@ db_save_config_regs(db_ctrl_t *dbp)
 
 	for (i = 0, dip = ddi_get_child(dbp->dip); dip != NULL;
 		dip = ddi_get_next_sibling(dip)) {
-		if (i_ddi_node_state(dip) >= DS_ATTACHED)
+		if (i_ddi_devi_attached(dip))
 			i++;
 	}
 	dbp->config_state_index = i;
@@ -2476,7 +2476,7 @@ db_save_config_regs(db_ctrl_t *dbp)
 		dip != NULL;
 		dip = ddi_get_next_sibling(dip)) {
 
-		if (i_ddi_node_state(dip) < DS_ATTACHED)
+		if (!i_ddi_devi_attached(dip))
 			continue;
 
 		if (pci_config_setup(dip, &config_handle) != DDI_SUCCESS) {

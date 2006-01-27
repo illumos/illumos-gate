@@ -1697,7 +1697,7 @@ find_dip(dev_info_t *dip, char *dev_name, int holddip)
 	for (; dip != NULL; dip = ddi_get_next_sibling(dip)) {
 		if (strcmp(ddi_node_name(dip), device) == 0) {
 			/* If the driver isn't loaded, we prune the search */
-			if (i_ddi_node_state(dip) < DS_READY) {
+			if (!i_ddi_devi_attached(dip)) {
 				continue;
 			}
 			if (strcmp(ddi_get_name_addr(dip), addr) == 0) {

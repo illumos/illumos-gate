@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -989,8 +989,8 @@ e_ddi_branch_unconfigure(
 	if (flags & DEVI_BRANCH_EVENT)
 		nflags |= NDI_POST_EVENT;
 
-	if (i_ddi_node_state(pdip) == DS_READY &&
-	    i_ddi_node_state(rdip) >= DS_INITIALIZED) {
+	if (i_ddi_devi_attached(pdip) &&
+	    (i_ddi_node_state(rdip) >= DS_INITIALIZED)) {
 		rv = ndi_devi_unconfig_one(pdip, devnm+1, dipp, nflags);
 	} else {
 		rv = e_ddi_devi_unconfig(rdip, dipp, nflags);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -294,8 +294,7 @@ dr_check_dip(dev_info_t *dip, void *arg, uint_t ref)
 			PR_QR("\n  %s (major# %d) is referenced(%u)\n",
 				dname, major, ref);
 		}
-		if (dr_is_unsafe_major(major) &&
-		    i_ddi_node_state(dip) >= DS_ATTACHED) {
+		if (dr_is_unsafe_major(major) && i_ddi_devi_attached(dip)) {
 			PR_QR("\n  %s (major# %d) not hotpluggable\n",
 				dname, major);
 			if (rp->arr != NULL && rp->idx != NULL)

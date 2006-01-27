@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -184,7 +184,12 @@ typedef enum {
 } ddi_devmap_cmd_t;
 
 /*
- * Definitions for node state
+ * Definitions for node state.
+ *
+ * NOTE: DS_ATTACHED and DS_READY should only be used by the devcfg.c state
+ * model code itself, other code should use i_ddi_devi_attached() to avoid
+ * logic errors associated with transient DS_READY->DS_ATTACHED->DS_READY
+ * state changes while the node is attached.
  */
 typedef enum {
 	DS_INVAL = -1,
@@ -193,8 +198,8 @@ typedef enum {
 	DS_BOUND,	/* in per-driver list */
 	DS_INITIALIZED, /* bus address assigned */
 	DS_PROBED,	/* device known to exist */
-	DS_ATTACHED,	/* driver attached */
-	DS_READY	/* post attach complete */
+	DS_ATTACHED,	/* don't use, see NOTE above: driver attached */
+	DS_READY	/* don't use, see NOTE above: post attach complete */
 } ddi_node_state_t;
 
 /*

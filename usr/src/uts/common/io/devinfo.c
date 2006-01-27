@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1633,7 +1633,7 @@ di_copytree(struct dev_info *root, di_off_t *off_p, struct di_state *st)
 		(void *)root, *off_p));
 
 	/* force attach drivers */
-	if ((i_ddi_node_state((dev_info_t *)root) == DS_READY) &&
+	if (i_ddi_devi_attached((dev_info_t *)root) &&
 	    (st->command & DINFOSUBTREE) && (st->command & DINFOFORCE)) {
 		(void) ndi_devi_config((dev_info_t *)root,
 		    NDI_CONFIG | NDI_DEVI_PERSIST | NDI_NO_EVENT |
@@ -2927,7 +2927,7 @@ di_getprop(struct ddi_prop *prop, di_off_t *off_p, struct di_state *st,
 	 * the driver property list. No one should rely on such
 	 * properties.
 	 */
-	if (i_ddi_node_state((dev_info_t *)dip) < DS_ATTACHED) {
+	if (!i_ddi_devi_attached((dev_info_t *)dip)) {
 		off = *off_p;
 		*off_p = 0;
 		return (off);

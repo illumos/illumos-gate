@@ -1422,7 +1422,7 @@ ddi_uninitchild(dev_info_t *dip)
 }
 
 /*
- * i_ddi_attachchild: transform node to DS_READY state
+ * i_ddi_attachchild: transform node to DS_READY/i_ddi_devi_attached() state
  */
 static int
 i_ddi_attachchild(dev_info_t *dip)
@@ -1455,7 +1455,8 @@ i_ddi_attachchild(dev_info_t *dip)
  * i_ddi_detachchild: transform node down to DS_PROBED state
  *	If it fails, put it back to DS_READY state.
  * NOTE: A node that fails detach may be at DS_ATTACHED instead
- * of DS_READY for a small amount of time.
+ * of DS_READY for a small amount of time - this is the source of
+ * transient DS_READY->DS_ATTACHED->DS_READY state changes.
  */
 static int
 i_ddi_detachchild(dev_info_t *dip, uint_t flags)
@@ -1779,6 +1780,18 @@ i_ddi_set_node_state(dev_info_t *dip, ddi_node_state_t state)
 {
 	DEVI(dip)->devi_node_state = state;
 	membar_enter();			/* make sure stores are flushed */
+}
+
+/*
+ * Determine if node is attached. The implementation accommodates transient
+ * DS_READY->DS_ATTACHED->DS_READY state changes.  Outside this file, this
+ * function should be instead of i_ddi_node_state() DS_ATTACHED/DS_READY
+ * state checks.
+ */
+int
+i_ddi_devi_attached(dev_info_t *dip)
+{
+	return (DEVI(dip)->devi_node_state >= DS_ATTACHED);
 }
 
 /*
@@ -3121,7 +3134,7 @@ struct match_info {
 	dev_info_t	*dip;		/* result */
 	char		*nodename;	/* if non-null, nodename must match */
 	int		instance;	/* if != -1, instance must match */
-	int		attached;	/* if != 0, state >= DS_ATTACHED */
+	int		attached;	/* if != 0, i_ddi_devi_attached() */
 };
 
 static int
@@ -3133,8 +3146,7 @@ i_find_devi(dev_info_t *dip, void *arg)
 		(strcmp(ddi_node_name(dip), info->nodename) == 0)) &&
 	    ((info->instance == -1) ||
 		(ddi_get_instance(dip) == info->instance)) &&
-	    ((info->attached == 0) ||
-		(i_ddi_node_state(dip) >= DS_ATTACHED))) {
+	    ((info->attached == 0) || i_ddi_devi_attached(dip))) {
 		info->dip = dip;
 		ndi_hold_devi(dip);
 		return (DDI_WALK_TERMINATE);
@@ -3285,7 +3297,7 @@ resolve_pathname(char *pathname,
 		return (error);
 	pn_skipslash(&pn);
 
-	ASSERT(i_ddi_node_state(parent) >= DS_ATTACHED);
+	ASSERT(i_ddi_devi_attached(parent));
 	ndi_hold_devi(parent);
 
 	component = kmem_alloc(MAXNAMELEN, KM_SLEEP);
@@ -3322,7 +3334,7 @@ resolve_pathname(char *pathname,
 			return (-1);
 		}
 
-		ASSERT(i_ddi_node_state(child) >= DS_ATTACHED);
+		ASSERT(i_ddi_devi_attached(child));
 		ndi_rele_devi(parent);
 		parent = child;
 		pn_skipslash(&pn);
@@ -3346,7 +3358,7 @@ resolve_pathname(char *pathname,
 			return (-1);
 		}
 		minorname = NULL;	/* look for default minor */
-		ASSERT(i_ddi_node_state(child) >= DS_ATTACHED);
+		ASSERT(i_ddi_devi_attached(child));
 		ndi_rele_devi(parent);
 		parent = child;
 	}
@@ -3752,7 +3764,7 @@ i_ndi_devi_report_status_change(dev_info_t *dip, char *path)
 		status = "quiesced";
 	} else if (DEVI_IS_BUS_DOWN(dip)) {
 		status = "down";
-	} else if (i_ddi_node_state(dip) == DS_READY) {
+	} else if (i_ddi_devi_attached(dip)) {
 		status = "online";
 	} else {
 		status = "unknown";
@@ -4274,8 +4286,7 @@ init_bound_node_ev(dev_info_t *pdip, dev_info_t *dip, int flags)
 {
 	if (need_remove_event(dip, flags) &&
 	    i_ddi_node_state(dip) == DS_BOUND &&
-	    i_ddi_node_state(pdip) >= DS_ATTACHED &&
-	    !(DEVI_IS_DEVICE_OFFLINE(dip)))
+	    i_ddi_devi_attached(pdip) && !DEVI_IS_DEVICE_OFFLINE(dip))
 		(void) ddi_initchild(pdip, dip);
 }
 
@@ -4287,7 +4298,7 @@ devi_attach_node(dev_info_t *dip, uint_t flags)
 {
 	mutex_enter(&(DEVI(dip)->devi_lock));
 	if (flags & NDI_DEVI_ONLINE) {
-		if (i_ddi_node_state(dip) != DS_READY)
+		if (!i_ddi_devi_attached(dip))
 			DEVI_SET_REPORT(dip);
 		DEVI_SET_DEVICE_ONLINE(dip);
 	}
@@ -4372,7 +4383,7 @@ static int
 config_immediate_children(dev_info_t *pdip, uint_t flags, major_t major)
 {
 	int circ;
-	ASSERT(i_ddi_node_state(pdip) >= DS_ATTACHED);
+	ASSERT(i_ddi_devi_attached(pdip));
 
 	if (!NEXUS_DRV(ddi_get_driver(pdip)))
 		return (NDI_SUCCESS);
@@ -4423,7 +4434,7 @@ devi_config_common(dev_info_t *dip, int flags, major_t major)
 	int error;
 	int (*f)();
 
-	if (i_ddi_node_state(dip) <  DS_READY)
+	if (!i_ddi_devi_attached(dip))
 		return (NDI_FAILURE);
 
 	if (pm_pre_config(dip, NULL) != DDI_SUCCESS)
@@ -4616,7 +4627,7 @@ ndi_devi_config_one(dev_info_t *dip, char *devnm, dev_info_t **dipp, int flags)
 	int branch_event = 0;
 
 	ASSERT(dipp);
-	ASSERT(i_ddi_node_state(dip) >= DS_ATTACHED);
+	ASSERT(i_ddi_devi_attached(dip));
 
 	NDI_CONFIG_DEBUG((CE_CONT,
 	    "ndi_devi_config_one: par = %s%d (%p), child = %s\n",
@@ -4676,7 +4687,7 @@ ndi_devi_config_obp_args(dev_info_t *parent, char *devnm,
 	int (*f)();
 
 	ASSERT(childp);
-	ASSERT(i_ddi_node_state(parent) >= DS_ATTACHED);
+	ASSERT(i_ddi_devi_attached(parent));
 
 	NDI_CONFIG_DEBUG((CE_CONT, "ndi_devi_config_obp_args: "
 	    "par = %s%d (%p), child = %s\n", ddi_driver_name(parent),
@@ -4706,7 +4717,7 @@ devi_detach_node(dev_info_t *dip, uint_t flags)
 	ddi_eventcookie_t cookie;
 
 	if (flags & NDI_POST_EVENT) {
-		if (pdip && i_ddi_node_state(pdip) >= DS_ATTACHED) {
+		if (pdip && i_ddi_devi_attached(pdip)) {
 			if (ddi_get_eventcookie(dip, DDI_DEVI_REMOVE_EVENT,
 			    &cookie) == NDI_SUCCESS)
 				(void) ndi_post_event(dip, dip, cookie, NULL);
@@ -4902,7 +4913,7 @@ devi_unconfig_common(
 	 * the bus_unconfig entry point cannot be used to remove
 	 * or unconfigure the descendants.
 	 */
-	if (i_ddi_node_state(dip) < DS_ATTACHED ||
+	if (!i_ddi_devi_attached(dip) ||
 	    (DEVI(dip)->devi_ops->devo_bus_ops == NULL) ||
 	    (DEVI(dip)->devi_ops->devo_bus_ops->busops_rev < BUSO_REV_5) ||
 	    (f = DEVI(dip)->devi_ops->devo_bus_ops->bus_unconfig) == NULL) {
@@ -4995,7 +5006,7 @@ ndi_devi_unconfig_one(
 	dev_info_t *child;
 	struct brevq_node *brevq = NULL;
 
-	ASSERT(i_ddi_node_state(pdip) >= DS_ATTACHED);
+	ASSERT(i_ddi_devi_attached(pdip));
 
 	NDI_CONFIG_DEBUG((CE_CONT,
 	    "ndi_devi_unconfig_one: par = %s%d (%p), child = %s\n",
@@ -5190,7 +5201,7 @@ ndi_devi_online(dev_info_t *dip, uint_t flags)
 	 * We skip the devfs_clean() step because the cache invalidation
 	 * is done higher up in the device tree.
 	 */
-	if (rv == NDI_SUCCESS && i_ddi_node_state(pdip) == DS_READY &&
+	if (rv == NDI_SUCCESS && i_ddi_devi_attached(pdip) &&
 	    !DEVI_BUSY_OWNED(pdip))
 		(void) devfs_clean(pdip, NULL, 0);
 	return (rv);
@@ -5466,7 +5477,7 @@ hold_devi(major_t major, int instance, int flags)
 			 * detach_node() code path.
 			 */
 			ndi_hold_devi(dip);
-			if ((i_ddi_node_state(dip) >= DS_ATTACHED) &&
+			if (i_ddi_devi_attached(dip) &&
 			    !DEVI_IS_DETACHING(dip)) {
 				UNLOCK_DEV_OPS(&(dnp->dn_lock));
 				return (dip);	/* fast-path with devi held */
@@ -5688,7 +5699,7 @@ i_ddi_attach_node_hierarchy(dev_info_t *dip)
 {
 	dev_info_t *parent;
 
-	if (i_ddi_node_state(dip) == DS_READY)
+	if (i_ddi_devi_attached(dip))
 		return (DDI_SUCCESS);
 
 	/*
@@ -5840,7 +5851,7 @@ i_ddi_devs_attached(major_t major)
 	dnp = &devnamesp[major];
 	LOCK_DEV_OPS(&dnp->dn_lock);
 	for (dip = dnp->dn_head; dip != NULL; dip = ddi_get_next(dip)) {
-		if (i_ddi_node_state(dip) >= DS_ATTACHED) {
+		if (i_ddi_devi_attached(dip)) {
 			error = DDI_SUCCESS;
 			break;
 		}
@@ -6356,7 +6367,7 @@ mt_config_driver(struct mt_config_handle *hdl)
 		ndi_hold_devi(dip);
 
 		/* skip leaf nodes and nodes not fully attached */
-		if ((i_ddi_node_state(dip) < DS_READY) || is_leaf_node(dip)) {
+		if (!i_ddi_devi_attached(dip) || is_leaf_node(dip)) {
 			ndi_rele_devi(dip);
 			dip = ddi_get_next(dip);
 			continue;

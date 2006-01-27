@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4498,7 +4498,7 @@ rib_get_ibd_insts_cb(dev_info_t *dip, void *arg)
 	ib_guid_t	hca_guid;
 	ib_gid_t	port_gid;
 
-	if ((i_ddi_node_state(dip) >= DS_ATTACHED) &&
+	if (i_ddi_devi_attached(dip) &&
 	    (strcmp(ddi_node_name(dip), "ibport") == 0) &&
 	    (strstr(ddi_get_name_addr(dip), "ipib") != NULL)) {
 

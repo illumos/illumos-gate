@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -320,7 +320,7 @@ spec_size(struct snode *csp)
 
 	/* Return non-cached UNKNOWN_SIZE if not attached. */
 	if (((csp->s_flag & SDIPSET) == 0) || (csp->s_dip == NULL) ||
-	    (i_ddi_node_state(csp->s_dip) < DS_ATTACHED)) {
+	    !i_ddi_devi_attached(csp->s_dip)) {
 		mutex_exit(&csp->s_lock);
 		return ((cvp->v_type == VCHR) ? 0 : UNKNOWN_SIZE);
 	}
@@ -553,7 +553,7 @@ spec_open(struct vnode **vpp, int flag, struct cred *cr)
 #ifdef  DEBUG
 	/* verify attach/open exclusion guarantee */
 	dip = csp->s_dip;
-	ASSERT((dip == NULL) || (i_ddi_node_state(dip) >= DS_ATTACHED));
+	ASSERT((dip == NULL) || i_ddi_devi_attached(dip));
 #endif  /* DEBUG */
 
 	if ((error = secpolicy_spec_open(cr, cvp, flag)) != 0)

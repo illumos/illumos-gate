@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,7 +70,7 @@ cpr_suspend_devices(dev_info_t *dip)
 		DEBUG2(errp("Suspending device %s\n", devi_string(dip, buf)));
 		ASSERT((DEVI(dip)->devi_cpr_flags & DCF_CPR_SUSPENDED) == 0);
 
-		if (i_ddi_node_state(dip) != DS_READY)
+		if (!i_ddi_devi_attached(dip))
 			error = DDI_FAILURE;
 		else
 			error = devi_detach(dip, DDI_SUSPEND);
@@ -138,7 +138,7 @@ cpr_resume_devices(dev_info_t *start, int resume_failed)
 			 * before cpr gets around to issuing it a DDI_RESUME,
 			 * we'll have problems.
 			 */
-			if (i_ddi_node_state(dip) != DS_READY) {
+			if (!i_ddi_devi_attached(dip)) {
 				DEBUG2(errp("WARNING: Skipping %s, device "
 				    "not ready for resume\n",
 				    devi_string(dip, buf)));

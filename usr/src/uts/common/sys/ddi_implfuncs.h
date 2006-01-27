@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,6 +201,14 @@ extern int
 i_ddi_minorname_to_devtspectype(dev_info_t *dip, char *minor_name,
 	dev_t *devp, int *spectypep);
 
+/*
+ * Routines in ddi_v9_asm.s
+ */
+extern int do_peek(size_t, void *, void *);
+extern int do_poke(size_t, void *, void *);
+extern void peek_fault(void);
+extern void poke_fault(void);
+extern int peekpoke_mem(ddi_ctl_enum_t, peekpoke_ctlops_t *);
 
 /*
  * Helper functions
@@ -211,29 +219,13 @@ ddi_prop_t *i_ddi_prop_list_dup(ddi_prop_t *, uint_t);
 int i_ddi_load_drvconf(major_t);
 int i_ddi_unload_drvconf(major_t);
 ddi_node_state_t i_ddi_node_state(dev_info_t *);
-
-/*
- * Routines in ddi_v9_asm.s
- */
-extern int do_peek(size_t, void *, void *);
-extern int do_poke(size_t, void *, void *);
-extern void peek_fault(void);
-extern void poke_fault(void);
-
-extern int peekpoke_mem(ddi_ctl_enum_t, peekpoke_ctlops_t *);
-
-char *i_ddi_strdup(char *, uint_t);
+int i_ddi_devi_attached(dev_info_t *);
 void i_ddi_parse_name(char *, char **, char **, char **);
-ddi_node_state_t i_ddi_node_state(dev_info_t *);
 void i_ddi_set_node_state(dev_info_t *, ddi_node_state_t);
 int i_ddi_detach_installed_driver(major_t, int);
-int i_ddi_load_drvconf(major_t);
-int i_ddi_unload_drvconf(major_t);
 void i_ddi_set_binding_name(dev_info_t *, char *);
 void i_ddi_bind_devs();
 void i_ddi_unbind_devs(major_t);
-ddi_prop_t *i_ddi_prop_list_dup(ddi_prop_t *, uint_t);
-void i_ddi_prop_list_delete(ddi_prop_t *);
 ddi_prop_list_t *i_ddi_prop_list_create(ddi_prop_t *);
 struct devnames;
 void i_ddi_prop_list_hold(ddi_prop_list_t *, struct devnames *);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -896,7 +896,7 @@ simba_save_config_regs(simba_devstate_t *simba_p)
 
 	for (i = 0, dip = ddi_get_child(simba_p->dip); dip != NULL;
 		dip = ddi_get_next_sibling(dip)) {
-		if (i_ddi_node_state(dip) >= DS_ATTACHED)
+		if (i_ddi_devi_attached(dip))
 			i++;
 	}
 	if (!i)
@@ -914,7 +914,7 @@ simba_save_config_regs(simba_devstate_t *simba_p)
 		dip != NULL;
 		dip = ddi_get_next_sibling(dip)) {
 
-		if (i_ddi_node_state(dip) < DS_ATTACHED) {
+		if (!i_ddi_devi_attached(dip)) {
 			DEBUG4(D_DETACH, "%s%d: skipping unattached %s%d\n",
 				ddi_driver_name(simba_p->dip),
 				ddi_get_instance(simba_p->dip),

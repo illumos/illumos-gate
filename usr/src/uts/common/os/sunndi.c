@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -476,7 +476,7 @@ ndi_devctl_device_online(dev_info_t *dip, struct devctl_iocdata *dcp,
 		 * Invalidate devfs cached directory contents. For the checks
 		 * in the "if" condition see the comment in ndi_devi_online().
 		 */
-		if (i_ddi_node_state(dip) == DS_READY && !DEVI_BUSY_OWNED(dip))
+		if (i_ddi_devi_attached(dip) && !DEVI_BUSY_OWNED(dip))
 			(void) devfs_clean(dip, NULL, 0);
 
 	} else if (rval == NDI_BUSY) {

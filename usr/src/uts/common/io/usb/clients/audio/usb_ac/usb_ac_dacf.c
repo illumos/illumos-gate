@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -512,7 +512,7 @@ usb_ac_mux_walk_siblings(usb_ac_state_t *uacp, ldi_handle_t mux_lh)
 			continue;
 		}
 
-		if (i_ddi_node_state(child_dip) < DS_ATTACHED) {
+		if (!i_ddi_devi_attached(child_dip)) {
 			child_dip = ddi_get_next_sibling(child_dip);
 
 			continue;

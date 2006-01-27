@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -1599,7 +1599,7 @@ mdi_failover(dev_info_t *vdip, dev_info_t *cdip, int flags)
 	 * checks again.
 	 */
 	if ((MDI_CLIENT_IS_DETACHED(ct)) || (MDI_CLIENT_IS_FAILED(ct)) ||
-	    (i_ddi_node_state(ct->ct_dip) < DS_READY)) {
+	    (!i_ddi_devi_attached(ct->ct_dip))) {
 		/*
 		 * Client is in failed state. Nothing more to do.
 		 */
@@ -1867,8 +1867,7 @@ mdi_select_path(dev_info_t *cdip, struct buf *bp, int flags,
 		 * If not so, let the vHCI driver manually select a path
 		 * (standby) and let the probe/attach process to continue.
 		 */
-		if ((MDI_CLIENT_IS_DETACHED(ct)) ||
-		    i_ddi_node_state(cdip) < DS_READY) {
+		if (MDI_CLIENT_IS_DETACHED(ct) || !i_ddi_devi_attached(cdip)) {
 			MDI_DEBUG(4, (CE_NOTE, cdip, "!Devi is onlining\n"));
 			MDI_CLIENT_UNLOCK(ct);
 			return (MDI_DEVI_ONLINING);
@@ -3211,8 +3210,7 @@ i_mdi_pi_state_change(mdi_pathinfo_t *pip, mdi_pathinfo_state_t state, int flag)
 			switch (MDI_CLIENT_STATE(ct)) {
 			case MDI_CLIENT_STATE_OPTIMAL:
 			case MDI_CLIENT_STATE_DEGRADED:
-				if (cdip &&
-				    (i_ddi_node_state(cdip) < DS_READY) &&
+				if (cdip && !i_ddi_devi_attached(cdip) &&
 				    ((state == MDI_PATHINFO_STATE_ONLINE) ||
 				    (state == MDI_PATHINFO_STATE_STANDBY))) {
 
@@ -3362,7 +3360,7 @@ mdi_pi_online(mdi_pathinfo_t *pip, int flags)
 	 */
 	cdip = ct->ct_dip;
 	ASSERT(cdip);
-	if (cdip == NULL || (i_ddi_node_state(cdip) < DS_ATTACHED))
+	if (cdip == NULL || !i_ddi_devi_attached(cdip))
 		return (rv);
 
 	MDI_CLIENT_LOCK(ct);
@@ -5625,7 +5623,7 @@ i_mdi_pm_rele_client(mdi_client_t *ct, int decr)
 {
 	ASSERT(ct);
 
-	if (i_ddi_node_state(ct->ct_dip) >= DS_READY) {
+	if (i_ddi_devi_attached(ct->ct_dip)) {
 		ct->ct_power_cnt -= decr;
 		MDI_DEBUG(4, (CE_NOTE, ct->ct_dip, "i_mdi_pm_rele_client "
 		    "ct_power_cnt = %d decr = %d\n", ct->ct_power_cnt, decr));
@@ -5963,7 +5961,7 @@ i_mdi_pm_pre_unconfig_one(dev_info_t *child, int *held, int flags)
 	while (MDI_CLIENT_IS_POWER_TRANSITION(ct))
 		cv_wait(&ct->ct_powerchange_cv, &ct->ct_mutex);
 
-	if (i_ddi_node_state(ct->ct_dip) < DS_READY) {
+	if (!i_ddi_devi_attached(ct->ct_dip)) {
 		MDI_DEBUG(4, (CE_NOTE, child,
 		    "i_mdi_pm_pre_unconfig node detached already\n"));
 		MDI_CLIENT_UNLOCK(ct);
@@ -6064,7 +6062,7 @@ i_mdi_pm_post_config_one(dev_info_t *child)
 	/* another thread might have powered it down or detached it */
 	if ((MDI_CLIENT_IS_POWERED_DOWN(ct) &&
 	    !DEVI_IS_ATTACHING(ct->ct_dip)) ||
-	    (i_ddi_node_state(ct->ct_dip) < DS_READY &&
+	    (!i_ddi_devi_attached(ct->ct_dip) &&
 	    !DEVI_IS_ATTACHING(ct->ct_dip))) {
 		MDI_DEBUG(4, (CE_NOTE, child,
 		    "i_mdi_pm_post_config i_mdi_pm_reset_client\n"));
@@ -6137,8 +6135,8 @@ i_mdi_pm_post_unconfig_one(dev_info_t *child)
 
 	/* failure detaching or another thread just attached it */
 	if ((MDI_CLIENT_IS_POWERED_DOWN(ct) &&
-	    i_ddi_node_state(ct->ct_dip) == DS_READY) ||
-	    (i_ddi_node_state(ct->ct_dip) != DS_READY &&
+	    i_ddi_devi_attached(ct->ct_dip)) ||
+	    (!i_ddi_devi_attached(ct->ct_dip) &&
 	    !DEVI_IS_ATTACHING(ct->ct_dip))) {
 		MDI_DEBUG(4, (CE_NOTE, child,
 		    "i_mdi_pm_post_unconfig i_mdi_pm_reset_client\n"));

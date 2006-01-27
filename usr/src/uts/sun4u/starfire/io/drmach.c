@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2911,8 +2911,7 @@ drmach_io_is_attached(drmachid_t id, int *yes)
 	}
 
 	state = ddi_get_devstate(dip);
-	*yes = ((i_ddi_node_state(dip) >= DS_ATTACHED) ||
-	    (state == DDI_DEVSTATE_UP));
+	*yes = (i_ddi_devi_attached(dip) || (state == DDI_DEVSTATE_UP));
 
 	return (NULL);
 }

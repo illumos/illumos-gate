@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1180,7 +1180,7 @@ e_devid_minor_to_devlist(
 	int			minor_all = 0;
 	int			ndevts = *devtcntp;
 
-	ASSERT(i_ddi_node_state(dip) >= DS_ATTACHED);
+	ASSERT(i_ddi_devi_attached(dip));
 
 	/* are we looking for a set of minor nodes? */
 	if ((minor_name == DEVID_MINOR_NAME_ALL) ||

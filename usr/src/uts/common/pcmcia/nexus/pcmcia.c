@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4097,8 +4097,8 @@ pcmcia_dump_minors(dev_info_t *dip)
 		    np = (dev_info_t *)DEVI(np)->devi_next) {
 			char *cf2 = "";
 			char *cur = "";
-			if (i_ddi_node_state(np) == DS_READY)
-				cf2 = "DS_READY";
+			if (i_ddi_devi_attached(np))
+				cf2 = "ATTACHED";
 			if (np == dip)
 				cur = "CUR";
 			cmn_err(CE_CONT, "\tsibs: %s %s %s\n",

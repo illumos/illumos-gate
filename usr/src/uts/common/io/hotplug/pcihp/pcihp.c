@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -650,7 +650,7 @@ pcihp_list_occupants(dev_info_t *dip, void *hdl)
 		 * ask for the property explicitly which will cause it
 		 * to be re-freshed right before checking with rcm.
 		 */
-		if ((major == -1) || (i_ddi_node_state(dip) < DS_ATTACHED))
+		if ((major == -1) || !i_ddi_devi_attached(dip))
 			return (DDI_WALK_PRUNECHILD);
 
 		/*

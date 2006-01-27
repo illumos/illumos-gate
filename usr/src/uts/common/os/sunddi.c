@@ -1757,7 +1757,7 @@ ddi_prop_search_common(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
 		 */
 
 		bop = ddi_bus_prop_op;
-		if ((i_ddi_node_state(pdip) == DS_READY) &&
+		if (i_ddi_devi_attached(pdip) &&
 		    (i_ddi_node_state(dip) >= DS_INITIALIZED))
 			bop = DEVI(pdip)->devi_ops->devo_bus_ops->bus_prop_op;
 
@@ -5046,7 +5046,7 @@ ddi_dev_affinity(dev_info_t *a, dev_info_t *b)
 int
 ddi_streams_driver(dev_info_t *dip)
 {
-	if ((i_ddi_node_state(dip) >= DS_ATTACHED) &&
+	if (i_ddi_devi_attached(dip) &&
 	    (DEVI(dip)->devi_ops->devo_cb_ops != NULL) &&
 	    (DEVI(dip)->devi_ops->devo_cb_ops->cb_str != NULL))
 		return (DDI_SUCCESS);

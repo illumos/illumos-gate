@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2184,7 +2184,7 @@ hubd_check_disconnected_ports(dev_info_t *dip, void *arg)
 	 */
 	if (!usba_is_root_hub(dip)) {
 		if ((ddi_driver_major(dip) != hub_major) ||
-		    (i_ddi_node_state(dip) < DS_ATTACHED)) {
+		    !i_ddi_devi_attached(dip)) {
 
 			return (DDI_WALK_PRUNECHILD);
 		}
@@ -7646,7 +7646,7 @@ hubd_cfgadm_state(hubd_t *hubd, usb_port_t port)
 			 * connected,  now check if driver exists
 			 */
 			if (DEVI_IS_DEVICE_OFFLINE(child_dip) ||
-			    (i_ddi_node_state(child_dip) < DS_ATTACHED)) {
+			    !i_ddi_devi_attached(child_dip)) {
 				state = HUBD_CFGADM_UNCONFIGURED;
 			} else {
 				state = HUBD_CFGADM_CONFIGURED;
