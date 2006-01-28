@@ -1,5 +1,5 @@
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,8 +84,8 @@ extern	char *RemoteHostName;
 extern	boolean_t auth_debug_mode;
 extern	int net;
 
-#define	DEFAULT_ENCTYPE ENCTYPE_DES_CBC_CRC
-#define	ACCEPT_ENCTYPES (ENCTYPE_DES_CBC_CRC | ENCTYPE_DES_CBC_MD5)
+#define	ACCEPTED_ENCTYPE(a) \
+	(a == ENCTYPE_DES_CBC_CRC || a == ENCTYPE_DES_CBC_MD5)
 /* for comapatibility with non-Solaris KDC's, this has to be big enough */
 #define	KERBEROS_BUFSIZ	8192
 
@@ -205,6 +205,9 @@ kerberos5_send(Authenticator *ap)
 
 	krb5_keyblock *newkey = 0;
 
+	int i;
+	krb5_enctype *ktypes;
+
 	if (!UserNameRequested) {
 		if (auth_debug_mode)
 			(void) printf(gettext("telnet: Kerberos V5: "
@@ -256,8 +259,44 @@ kerberos5_send(Authenticator *ap)
 		krb5_free_cred_contents(telnet_context, &creds);
 		return (0);
 	}
+/*
+ * Check to to confirm that at least one of the supported
+ * encryption types (des-cbc-md5, des-cbc-crc is available. If
+ * one is available then use it to obtain credentials.
+ */
 
-	creds.keyblock.enctype = DEFAULT_ENCTYPE;
+	if ((retval = krb5_get_tgs_ktypes(telnet_context, creds.server,
+		&ktypes))) {
+		if (auth_debug_mode) {
+			(void) printf(gettext(
+			    "telnet: Kerberos V5: could not determine "
+				"TGS encryption types "
+				"(see default_tgs_enctypes in krb5.conf) "
+			    "(%s)\r\n"), error_message(retval));
+		}
+		krb5_free_cred_contents(telnet_context, &creds);
+		return (0);
+	}
+
+	for (i = 0; ktypes[i]; i++) {
+		if (ACCEPTED_ENCTYPE(ktypes[i]))
+			break;
+	}
+
+	if (ktypes[i] == 0) {
+		if (auth_debug_mode) {
+			(void) printf(gettext(
+				"telnet: Kerberos V5: "
+				"failure on encryption types. "
+				"Cannot find des-cbc-md5 or des-cbc-crc "
+				"in list of TGS encryption types "
+				"(see default_tgs_enctypes in krb5.conf)\n"));
+		}
+		krb5_free_cred_contents(telnet_context, &creds);
+		return (0);
+	}
+
+	creds.keyblock.enctype = ktypes[i];
 	if ((retval = krb5_get_credentials(telnet_context, 0,
 		ccache, &creds, &new_creds))) {
 		if (auth_debug_mode) {
@@ -310,8 +349,8 @@ kerberos5_send(Authenticator *ap)
 		 * keep the key in our private storage, but don't use it
 		 * yet---see kerberos5_reply() below
 		 */
-		if (!(newkey->enctype & ACCEPT_ENCTYPES)) {
-		    if (!(new_creds->keyblock.enctype & ACCEPT_ENCTYPES))
+		if (!(ACCEPTED_ENCTYPE(newkey->enctype))) {
+		    if (!(ACCEPTED_ENCTYPE(new_creds->keyblock.enctype)))
 			/* use the session key in credentials instead */
 			krb5_copy_keyblock(telnet_context,
 				&new_creds->keyblock, &session_key);
