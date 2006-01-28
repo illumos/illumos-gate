@@ -19,15 +19,14 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
 
 /*
  * stdiom.h - shared guts of stdio
@@ -173,7 +172,7 @@ extern void	close_pid(void);
 /*
  * Internal routines from fileno.c
  */
-extern int _fileno_unlocked(FILE *iop);
+extern int _fileno(FILE *iop);
 
 /*
  * Internal routines from _findbuf.c
@@ -186,12 +185,7 @@ extern Uchar 	*_findbuf(FILE *iop);
 extern	FILE	*_endopen(const char *, const char *, FILE *, int);
 
 /*
- * Internal routine from ferror.c
- */
-extern int _ferror_unlocked(FILE *);
-
-/*
- * Internal routine from ferror.c
+ * Internal routine from fwrite.c
  */
 extern size_t _fwrite_unlocked(const void *, size_t, size_t, FILE *);
 

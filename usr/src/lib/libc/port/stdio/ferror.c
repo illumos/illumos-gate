@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,9 +29,6 @@
 
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
-
-
-#pragma weak ferror_unlocked = _ferror_unlocked
 
 #include "synonyms.h"
 #include "file64.h"
@@ -45,12 +43,6 @@
 
 int
 ferror(FILE *iop)
-{
-	FLOCKRETURN(iop, iop->_flag & _IOERR)
-}
-
-int
-_ferror_unlocked(FILE *iop)
 {
 	return (iop->_flag & _IOERR);
 }

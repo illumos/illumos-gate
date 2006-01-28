@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,8 +30,6 @@
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
-#pragma weak fileno_unlocked = _fileno_unlocked
 #pragma weak fileno = _fileno
 
 #include "synonyms.h"
@@ -44,12 +43,6 @@
 
 int
 _fileno(FILE *iop)
-{
-	FLOCKRETURN(iop, iop->_file)
-}
-
-int
-_fileno_unlocked(FILE *iop)
 {
 	return (iop->_file);
 }

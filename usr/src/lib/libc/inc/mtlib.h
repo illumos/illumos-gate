@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,10 +104,8 @@ extern	void	assert_no_libc_locks_held(void);
 #endif
 
 #define	_FWRITE _fwrite_unlocked
-#define	FILENO(s) _fileno_unlocked(s)
-#define	FEOF(s) _feof_unlocked(s)
-#define	FERROR(s) _ferror_unlocked(s)
-#define	CLEARERR(s) _clearerr_unlocked(s)
+#define	FILENO(s) _fileno(s)
+#define	FERROR(s) ferror(s)
 #define	GETC(s) _getc_unlocked(s)
 #define	UNGETC(c, s) _ungetc_unlocked(c, s)
 #define	PUTC(c, s) _putc_unlocked(c, s)

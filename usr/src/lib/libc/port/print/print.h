@@ -19,12 +19,12 @@
  *
  * CDDL HEADER END
  */
+
 /*	Copyright (c) 1988 AT&T	*/
 /*	  All Rights Reserved  	*/
 
-
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -52,10 +52,6 @@ _ndoprnt(const char *format, va_list in_args, FILE *iop, int flag);
 
 extern ssize_t
 _wndoprnt(const wchar_t *format, va_list in_args, FILE *iop, int flag);
-
-extern ssize_t
-_dostrfmon_unlocked(size_t limit_cnt, const char *format, \
-    va_list in_args, FILE *iop);
 
 extern void
 __aconvert(double arg, int ndigits, int *exp, int *sign, char *buf);
