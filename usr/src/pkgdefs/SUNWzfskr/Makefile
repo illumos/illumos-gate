@@ -26,11 +26,12 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-!include prototype_com
+include ../Makefile.com
 
-#
-# SUNWzfsr
-#
-d none lib/amd64 755 root bin
-s none lib/amd64/libzfs.so=libzfs.so.1
-f none lib/amd64/libzfs.so.1 755 root bin
+.KEEP_STATE:
+
+all: $(FILES) depend
+
+install: all pkg
+
+include ../Makefile.targ

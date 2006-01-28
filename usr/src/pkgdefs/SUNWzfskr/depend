@@ -25,12 +25,28 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-
-!include prototype_com
-
+# This package information file defines software dependencies associated
+# with the pkg.  You can define three types of pkg dependencies with this file:
+#	 P indicates a prerequisite for installation
+#	 I indicates an incompatible package
+#	 R indicates a reverse dependency
+# <pkg.abbr> see pkginfo(4), PKG parameter
+# <name> see pkginfo(4), NAME parameter
+# <version> see pkginfo(4), VERSION parameter
+# <arch> see pkginfo(4), ARCH parameter
+# <type> <pkg.abbr> <name>
+#	(<arch>)<version>
+#	(<arch>)<version>
+#	...
+# <type> <pkg.abbr> <name>
+# ...
 #
-# SUNWzfsr
-#
-d none lib/amd64 755 root bin
-s none lib/amd64/libzfs.so=libzfs.so.1
-f none lib/amd64/libzfs.so.1 755 root bin
+
+P SUNWcar	Core Architecture, (Root)
+P SUNWcakr	Core Solaris Kernel Architecture (Root)
+P SUNWkvm	Core Architecture, (Kvm)
+P SUNWcsr	Core Solaris, (Root)
+P SUNWckr	Core Solaris Kernel (Root)
+P SUNWcsu	Core Solaris, (Usr)
+P SUNWcsd	Core Solaris Devices
+P SUNWcsl	Core Solaris Libraries

@@ -26,11 +26,16 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-!include prototype_com
+# packaging files
+i copyright
+i depend
+i pkginfo
 
 #
-# SUNWzfsr
+# SUNWzfskr
 #
-d none lib/amd64 755 root bin
-s none lib/amd64/libzfs.so=libzfs.so.1
-f none lib/amd64/libzfs.so.1 755 root bin
+d none kernel 755 root sys
+d none kernel/kmdb 755 root sys
+d none kernel/drv 755 root sys
+f none kernel/drv/zfs.conf 644 root sys
+d none kernel/fs 755 root sys

@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -40,11 +40,6 @@ d none etc/fs/zfs 755 root sys
 s none etc/fs/zfs/mount=../../../sbin/zfs
 s none etc/fs/zfs/umount=../../../sbin/zfs
 d none etc/zfs 755 root sys
-d none kernel 755 root sys
-d none kernel/kmdb 755 root sys
-d none kernel/drv 755 root sys
-f none kernel/drv/zfs.conf 644 root sys
-d none kernel/fs 755 root sys
 d none lib 755 root bin
 s none lib/libzfs.so=libzfs.so.1
 f none lib/libzfs.so.1 755 root bin

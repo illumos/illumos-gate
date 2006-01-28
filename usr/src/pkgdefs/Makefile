@@ -339,6 +339,7 @@ COMMON_SUBDIRS= \
 	SUNWqosu \
 	SUNWxge \
 	SUNWchxge \
+	SUNWzfskr \
 	SUNWzfsr \
 	SUNWzfsu \
 	SUNWzoneint \

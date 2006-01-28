@@ -29,8 +29,14 @@
 !include prototype_com
 
 #
-# SUNWzfsr
+# SUNWzfskr
 #
-d none lib/amd64 755 root bin
-s none lib/amd64/libzfs.so=libzfs.so.1
-f none lib/amd64/libzfs.so.1 755 root bin
+f none kernel/drv/zfs 755 root sys
+d none kernel/drv/amd64 755 root sys
+f none kernel/drv/amd64/zfs 755 root sys
+l none kernel/fs/zfs=../../kernel/drv/zfs
+d none kernel/fs/amd64 755 root sys
+l none kernel/fs/amd64/zfs=../../../kernel/drv/amd64/zfs
+f none kernel/kmdb/zfs 555 root sys
+d none kernel/kmdb/amd64 755 root sys
+f none kernel/kmdb/amd64/zfs 555 root sys
