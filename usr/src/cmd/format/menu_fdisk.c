@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -187,6 +187,42 @@ getlong(uchar_t **bp)
 }
 #endif /* defined(sparc) */
 
+/*
+ * Convert cn[tn]dn to cn[tn]dns2 path
+ */
+static void
+get_sname(char *name)
+{
+	char		buf[MAXPATHLEN];
+	char		*devp = "/dev/dsk";
+	char		*rdevp = "/dev/rdsk";
+	char		np[MAXNAMELEN];
+	char		*npt;
+
+	/*
+	 * If it is a full path /dev/[r]dsk/cn[tn]dn, use this path
+	 */
+	(void) strcpy(np, cur_disk->disk_name);
+	if (strncmp(rdevp, cur_disk->disk_name, strlen(rdevp)) == 0 ||
+	    strncmp(devp, cur_disk->disk_name, strlen(devp)) == 0) {
+		/*
+		 * Skip if the path is already included with sN
+		 */
+		if (strchr(np, 's') == strrchr(np, 's')) {
+			npt = strrchr(np, 'p');
+			/* If pN is found, do not include it */
+			if (isdigit(*++npt)) {
+				*--npt = '\0';
+			}
+			(void) snprintf(buf, sizeof (buf), "%ss2", np);
+		} else {
+			(void) snprintf(buf, sizeof (buf), "%s", np);
+		}
+	} else {
+		(void) snprintf(buf, sizeof (buf), "/dev/rdsk/%ss2", np);
+	}
+	(void) strcpy(name, buf);
+}
 
 /*
  * Convert cn[tn]dnsn to cn[tn]dnp0 path
@@ -241,7 +277,13 @@ open_cur_file(int mode)
 		dkpath = pbuf;
 		break;
 	    case FD_USE_CUR_DISK_PATH:
-		dkpath = cur_disk->disk_path;
+		if (cur_disk->fdisk_part.systid == SUNIXOS ||
+		    cur_disk->fdisk_part.systid == SUNIXOS2) {
+			(void) get_sname(&pbuf[0]);
+			dkpath = pbuf;
+		} else {
+			dkpath = cur_disk->disk_path;
+		}
 		break;
 	    default:
 		err_print("Error: Invalid mode option for opening cur_file\n");

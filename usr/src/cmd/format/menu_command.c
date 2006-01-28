@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1453,6 +1453,17 @@ c_label()
 
 		(void) memset((char *)&label, 0, sizeof (struct dk_label));
 
+		if ((cur_disk->fdisk_part.systid == EFI_PMBR) ||
+		    (((cur_disk->fdisk_part.systid == SUNIXOS) ||
+		    (cur_disk->fdisk_part.systid == SUNIXOS2)) &&
+		    (cur_disk->fdisk_part.numsect == 0))) {
+			fmt_print("You must use fdisk to delete the current "
+			    "EFI partition and create a new\n"
+			    "Solaris partition before you can convert the "
+			    "label.\n");
+			return (-1);
+		}
+
 		(void) strcpy(x86_devname, cur_disk->disk_name);
 		if (cur_ctype->ctype_ctype == DKC_DIRECT)
 			dptr = auto_direct_get_geom_label(cur_file,  &label);
@@ -1460,14 +1471,6 @@ c_label()
 			dptr = auto_sense(cur_file, 1, &label);
 		if (dptr == NULL) {
 			fmt_print("Autoconfiguration failed.\n");
-			return (-1);
-		}
-
-		if (cur_disk->fdisk_part.systid == EFI_PMBR) {
-			fmt_print("You must use fdisk to delete the current "
-				"EFI partition and create a new\n"
-				"Solaris partition before you can convert the "
-				"label.\n");
 			return (-1);
 		}
 
