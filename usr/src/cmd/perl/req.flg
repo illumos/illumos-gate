@@ -27,7 +27,6 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-find_files "s.*" usr/closed/cmd/perl
 echo_file usr/src/lib/Makefile.lib
 echo_file usr/src/lib/Makefile.targ
 find_files "s.*" usr/src/lib/common
