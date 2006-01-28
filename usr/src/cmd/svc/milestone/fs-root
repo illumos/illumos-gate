@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,24 +50,24 @@ libc_mount() {
 # This mount function is sun4v only. It may be melded with the sun4u-us3
 # version later.
 sun4v_libc_psr_mount() {
-	LIBC_MOE_32=`/usr/bin/moe -32 '/platform/sun4v/lib/libc_psr/$HWCAP'`
+	LIBC_MOE_32=`/usr/bin/moe -32 /platform/$PLAT/lib/libc_psr/'$HWCAP'`
 	if [ -n "$LIBC_MOE_32" ]; then
 		/usr/sbin/mount |
-		    egrep -s "^/platform/sun4v/lib/libc_psr.so.1 on "
+		    egrep -s "^/platform/[^/]*/lib/libc_psr.so.1 on "
 		if [ $? -ne 0 ]; then
 			/usr/sbin/mount -O -F lofs $LIBC_MOE_32 \
-			    /platform/sun4v/lib/libc_psr.so.1
+			    /platform/$PLAT/lib/libc_psr.so.1
 		fi
 	fi
 
 	LIBC_MOE_64=`/usr/bin/moe -64 \
-	    '/platform/sun4v/lib/sparcv9/libc_psr/$HWCAP'`
+	    /platform/$PLAT/lib/sparcv9/libc_psr/'$HWCAP'`
 	if [ -n "$LIBC_MOE_64" ]; then
 		/usr/sbin/mount |
-		    egrep -s "^/platform/sun4v/lib/sparcv9/libc_psr.so.1 on "
+		    egrep -s "^/platform/[^/]*/lib/sparcv9/libc_psr.so.1 on "
 		if [ $? -ne 0 ]; then
 			/usr/sbin/mount -O -F lofs $LIBC_MOE_64 \
-			    /platform/sun4v/lib/sparcv9/libc_psr.so.1
+			    /platform/$PLAT/lib/sparcv9/libc_psr.so.1
 		fi
 	fi
 }

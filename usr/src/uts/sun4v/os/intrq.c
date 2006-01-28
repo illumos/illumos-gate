@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,8 +106,8 @@ cpu_intrq_setup(struct cpu *cpu)
 		cpu_list_size = INTR_REPORT_SIZE;
 
 	mcpup->cpu_list = contig_mem_alloc(cpu_list_size);
-	if (mcpup->mondo_data == NULL)
-		cmn_err(CE_PANIC, "cpu%d: cpu mondo_data allocation failed",
+	if (mcpup->cpu_list == NULL)
+		cmn_err(CE_PANIC, "cpu%d: cpu cpu_list allocation failed",
 		    cpu->cpu_id);
 	mcpup->cpu_list_ra = va_to_pa(mcpup->cpu_list);
 

@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -34,19 +34,28 @@ export PATH
 
 EXIT=0
 
-LIBC_MOE_32=`moe -32 '/platform/sun4v/lib/libc_psr/$HWCAP'`
+# If architecture is not sun4v then do mount the libc_psr_hwcap1 library.
+ARCH=`uname -m`
+if [ $ARCH != "sun4v" ]
+then
+	exit $EXIT
+fi
+
+PLAT=`uname -i`
+LIBC_MOE_32=`moe -32 /platform/$PLAT/lib/libc_psr/'$HWCAP'`
 if [ -n "$LIBC_MOE_32" ]; then
-	mount | egrep -s "^/platform/sun4v/lib/libc_psr.so.1 on "
+	mount | egrep -s "^/platform/[^/]*/lib/libc_psr.so.1 on "
 	if [ $? -ne 0 ]; then
-		mount -O -F lofs $LIBC_MOE_32 /platform/sun4v/lib/libc_psr.so.1
+		mount -O -F lofs $LIBC_MOE_32 /platform/$PLAT/lib/libc_psr.so.1
 	fi
 fi
 
-LIBC_MOE_64=`moe -64 '/platform/sun4v/lib/sparcv9/libc_psr/$HWCAP'`
+LIBC_MOE_64=`moe -64 /platform/$PLAT/lib/sparcv9/libc_psr/'$HWCAP'`
 if [ -n "$LIBC_MOE_64" ]; then
-	mount | egrep -s "^/platform/sun4v/lib/sparcv9/libc_psr.so.1 on "
+	mount | egrep -s "^/platform/[^/]*/lib/sparcv9/libc_psr.so.1 on "
 	if [ $? -ne 0 ]; then
-		mount -O -F lofs $LIBC_MOE_64 /platform/sun4v/lib/sparcv9/libc_psr.so.1
+		mount -O -F lofs $LIBC_MOE_64 \
+		    /platform/$PLAT/lib/sparcv9/libc_psr.so.1
 	fi
 fi
 

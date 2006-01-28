@@ -3513,18 +3513,36 @@ then
 		umount /lib/libc.so.1
 	fi
 
-	# umount /platform/sun4v/lib/libc_psr.so.1 if necessary
-	if [ -n "`mount | grep '^/platform/sun4v/lib/libc_psr.so.1'`" ]
+	PLAT=`/usr/bin/uname -i`
+	ARCH=`/usr/bin/uname -m`
+	# umount /platform/$PLAT/lib/libc_psr.so.1 if necessary
+	if [ -n "`mount | grep "^/platform/$PLAT/lib/libc_psr.so.1"`" ]
 	then
-		print "Unmounting /platform/sun4v/lib/libc_psr.so.1 ..."
-		umount /platform/sun4v/lib/libc_psr.so.1
+		print "Unmounting /platform/$PLAT/lib/libc_psr.so.1 ..."
+		umount /platform/$PLAT/lib/libc_psr.so.1
+	else
+		# umount /platform/$ARCH/lib/libc_psr.so.1 if necessary
+		if [ -n "`mount | grep "^/platform/$ARCH/lib/libc_psr.so.1"`" ]
+		then
+			print "Unmounting /platform/$ARCH/lib/libc_psr.so.1 ..."
+			umount /platform/$ARCH/lib/libc_psr.so.1
+		fi
 	fi
 
-	# umount /platform/sun4v/lib/sparcv9/libc_psr.so.1 if necessary
-	if [ -n "`mount | grep '^/platform/sun4v/lib/sparcv9/libc_psr.so.1'`" ]
+	# umount /platform/$PLAT/lib/sparcv9/libc_psr.so.1 if necessary
+	if [ -n "`mount | grep "^/platform/$PLAT/lib/sparcv9/libc_psr.so.1"`" ]
 	then
-		print "Unmounting /platform/sun4v/lib/sparcv9/libc_psr.so.1 ..."
-		umount /platform/sun4v/lib/sparcv9/libc_psr.so.1
+		print "Unmounting /platform/$PLAT/lib/sparcv9/libc_psr.so.1 ..."
+		umount /platform/$PLAT/lib/sparcv9/libc_psr.so.1
+	else
+		# umount /platform/$ARCH/lib/sparcv9/libc_psr.so.1 if necessary
+		if [ -n "`mount | grep \
+		    "^/platform/$ARCH/lib/sparcv9/libc_psr.so.1"`" ]
+		then
+			print "Unmounting \c"
+			print "/platform/$ARCH/lib/sparcv9/libc_psr.so.1 ..."
+			umount /platform/$ARCH/lib/sparcv9/libc_psr.so.1
+		fi
 	fi
 
 	# umount /platform/sun4u-us3/lib/libc_psr.so.1 if necessary
