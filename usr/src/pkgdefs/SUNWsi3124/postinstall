@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -127,4 +127,4 @@ check_add_drv()
 
 }
 
-check_add_drv -i '"pci1095,3124"' -b "$BASEDIR" si3124
+check_add_drv -i '"pci1095,3124"' -b "$BASEDIR" -m '* 0644 root sys' si3124
