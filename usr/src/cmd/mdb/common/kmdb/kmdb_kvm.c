@@ -1286,8 +1286,7 @@ kmt_addr_to_ctf(mdb_tgt_t *t, uintptr_t addr)
 			return (kmt_load_ctfdata(t, km));
 	}
 
-	(void) set_errno(EMDB_NOMAP);
-	return (NULL);
+	return (kmdb_module_addr_to_ctf(addr));
 }
 
 ctf_file_t *
@@ -1296,10 +1295,14 @@ kmt_name_to_ctf(mdb_tgt_t *t, const char *name)
 	kmt_data_t *kt = t->t_data;
 	kmt_module_t *km;
 
-	if (name == MDB_TGT_OBJ_EXEC)
+	if (name == MDB_TGT_OBJ_EXEC) {
 		name = KMT_CTFPARENT; /* base CTF data is kept in genunix */
-	else if (name == MDB_TGT_OBJ_RTLD)
+	} else if (name == MDB_TGT_OBJ_RTLD) {
 		name = KMT_RTLD_NAME; /* replace with krtld */
+	} else if (strncmp(name, "DMOD`", 5) == 0) {
+		/* Request for CTF data for a DMOD symbol */
+		return (kmdb_module_name_to_ctf(name + 5));
+	}
 
 	for (km = mdb_list_next(&kt->kmt_modlist); km != NULL;
 	    km = mdb_list_next(km)) {

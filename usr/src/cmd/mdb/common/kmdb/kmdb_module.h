@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +45,6 @@ extern "C" {
 #define	KMDB_MC_STATE_UNLOADING	3
 
 #define	KMDB_MC_FL_NOUNLOAD	0x1
-#define	KMDB_MC_FL_CTFCOPIED	0x2
 
 /*
  * The mdb_module_t describes the runtime attributes of dmods - things that
@@ -87,8 +86,6 @@ typedef struct kmdb_modctl {
 	int kmc_state;			/* KMDB_MC_STATE_* (above) */
 	mdb_gelf_symtab_t *kmc_symtab;	/* This dmod's symbol table */
 	GElf_Ehdr kmc_ehdr;		/* Copy of ehdr in gelf format */
-	caddr_t kmc_ctfdata;		/* Ptr to CTF to be used for dmod */
-	size_t kmc_ctfsize;		/* Size of CTF to be used for dmod */
 } kmdb_modctl_t;
 
 extern int kmdb_module_loaded(kmdb_wr_load_t *);
@@ -104,6 +101,8 @@ extern int kmdb_module_lookup_by_addr(uintptr_t, uint_t, char *, size_t,
     GElf_Sym *, mdb_syminfo_t *);
 extern int kmdb_module_lookup_by_name(const char *, const char *, GElf_Sym *,
     mdb_syminfo_t *);
+extern ctf_file_t *kmdb_module_addr_to_ctf(uintptr_t);
+extern ctf_file_t *kmdb_module_name_to_ctf(const char *);
 extern int kmdb_module_symbol_iter(const char *, uint_t, mdb_tgt_sym_f *,
     void *);
 extern void kmdb_module_sync(void);

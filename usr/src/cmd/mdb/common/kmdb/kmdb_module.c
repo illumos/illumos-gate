@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -64,6 +64,22 @@ kmdb_module_path_ack(kmdb_wr_path_t *dpth)
 	if (dpth->dpth_path != NULL)
 		mdb_path_free(dpth->dpth_path, dpth->dpth_pathlen);
 	mdb_free(dpth, sizeof (kmdb_wr_path_t));
+}
+
+static kmdb_modctl_t *
+kmdb_module_lookup_loaded(const char *name)
+{
+	kmdb_modctl_t *kmc;
+	mdb_var_t *v;
+
+	if ((v = mdb_nv_lookup(&mdb.m_dmodctl, name)) == NULL)
+		return (NULL);
+
+	kmc = MDB_NV_COOKIE(v);
+	if (kmc->kmc_state != KMDB_MC_STATE_LOADED)
+		return (NULL);
+
+	return (kmc);
 }
 
 /*
@@ -138,14 +154,8 @@ kmdb_module_lookup_by_name(const char *obj, const char *name, GElf_Sym *symp,
     mdb_syminfo_t *sip)
 {
 	kmdb_modctl_t *kmc;
-	mdb_var_t *v;
 
-	if ((v = mdb_nv_lookup(&mdb.m_dmodctl, obj)) == NULL)
-		return (set_errno(EMDB_NOSYMADDR));
-
-	kmc = MDB_NV_COOKIE(v);
-
-	if (kmc->kmc_state != KMDB_MC_STATE_LOADED)
+	if ((kmc = kmdb_module_lookup_loaded(obj)) == NULL)
 		return (set_errno(EMDB_NOSYMADDR));
 
 	if (mdb_gelf_symtab_lookup_by_name(kmc->kmc_symtab, name,
@@ -155,6 +165,57 @@ kmdb_module_lookup_by_name(const char *obj, const char *name, GElf_Sym *symp,
 	}
 
 	return (set_errno(EMDB_NOSYM));
+}
+
+ctf_file_t *
+kmdb_module_addr_to_ctf(uintptr_t addr)
+{
+	mdb_var_t *v;
+
+	mdb_nv_rewind(&mdb.m_dmodctl);
+	while ((v = mdb_nv_advance(&mdb.m_dmodctl)) != NULL) {
+		kmdb_modctl_t *kmc = MDB_NV_COOKIE(v);
+		struct module *mp;
+
+		if (kmc->kmc_state != KMDB_MC_STATE_LOADED)
+			continue;
+
+		mp = kmc->kmc_modctl->mod_mp;
+		if (addr - (uintptr_t)mp->text < mp->text_size ||
+		    addr - (uintptr_t)mp->data < mp->data_size ||
+		    addr - mp->bss < mp->bss_size) {
+			ctf_file_t *ctfp = kmc->kmc_mod->mod_ctfp;
+
+			if (ctfp == NULL) {
+				(void) set_errno(EMDB_NOCTF);
+				return (NULL);
+			}
+
+			return (ctfp);
+		}
+	}
+
+	(void) set_errno(EMDB_NOMAP);
+	return (NULL);
+}
+
+ctf_file_t *
+kmdb_module_name_to_ctf(const char *obj)
+{
+	kmdb_modctl_t *kmc;
+	ctf_file_t *ctfp;
+
+	if ((kmc = kmdb_module_lookup_loaded(obj)) == NULL) {
+		(void) set_errno(EMDB_NOOBJ);
+		return (NULL);
+	}
+
+	if ((ctfp = kmc->kmc_mod->mod_ctfp) == NULL) {
+		(void) set_errno(EMDB_NOCTF);
+		return (NULL);
+	}
+
+	return (ctfp);
 }
 
 static int

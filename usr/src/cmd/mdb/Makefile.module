@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -192,7 +192,7 @@ $(KMODFILE): kmod .WAIT $(KMODOBJS) $(MAPFILE)
 	$(LD) -dy -r $(MAPFILE:%=-M%) -Nmisc/kmdbmod -o $@ $(KMODOBJS)
 	$(KMDB_LINKTEST_CMD)
 	$(KMDB_FPTEST_CMD)
-	$(CTFMERGE) -L VERSION -o $@ $(KMODOBJS)
+	$(CTFMERGE) -f -L VERSION -o $@ $(KMODOBJS)
 	$(SETDYNFLAG) -f DF_1_NOKSYMS $@
 
 linktest: linktest_check .WAIT kmod .WAIT $(KMODOBJS)

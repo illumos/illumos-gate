@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include <mdb/mdb_modapi.h>
 #include <mdb/mdb_debug.h>
 #include <mdb/mdb_string.h>
+#include <mdb/mdb_ctf.h>
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_io.h>
 #include <mdb/mdb_frame.h>
@@ -51,9 +52,6 @@ static void kmdb_module_request_unload(kmdb_modctl_t *, const char *, int);
 static void
 kmc_free(kmdb_modctl_t *kmc)
 {
-	if (kmc->kmc_flags & KMDB_MC_FL_CTFCOPIED)
-		mdb_free(kmc->kmc_ctfdata, kmc->kmc_ctfsize);
-
 	if (kmc->kmc_modname != NULL)
 		strfree(kmc->kmc_modname);
 	mdb_free(kmc, sizeof (kmdb_modctl_t));
@@ -179,36 +177,8 @@ kmdb_module_loaded(kmdb_wr_load_t *dlr)
 	    mp->symtbl, mp->strhdr, mp->strings,
 	    MDB_TGT_SYMTAB);
 
-	if (mp->flags & KOBJ_PRIM) {
+	if (mp->flags & KOBJ_PRIM)
 		kmc->kmc_flags |= KMDB_MC_FL_NOUNLOAD;
-
-		/*
-		 * Prior to the unmapping of boot scratch memory, CTF and symbol
-		 * data for primary kernel modules is exported (copied) to vmem.
-		 * If we start using the pre-export CTF data, we'll be in for a
-		 * rude surprise when it moves.  Unfortunately, we can't simply
-		 * adapt to the moved data, as we may have already passed out
-		 * pointers (via libstandctf) into the data at the old location.
-		 * To avoid this problem, we'll copy the CTF data into Oz if
-		 * we're seeing the module before it has been exported.  This
-		 * issue only arises when we enter boot-loaded kmdb before the
-		 * completion of kdi_dvec_modavail().
-		 *
-		 * Note that this still leaves us with a migratory symbol table.
-		 * Unlike with CTF, we have the ability to deal with symbol
-		 * tables whose addresses change, so we'll just rebuild the kmc
-		 * symtab when we detect the export.
-		 */
-		if (!(mp->flags & KOBJ_EXPORTED) && mp->ctfdata != NULL) {
-			kmc->kmc_ctfdata = mdb_alloc(mp->ctfsize, UM_SLEEP);
-			kmc->kmc_ctfsize = mp->ctfsize;
-			bcopy(mp->ctfdata, kmc->kmc_ctfdata, kmc->kmc_ctfsize);
-			kmc->kmc_flags |= KMDB_MC_FL_CTFCOPIED;
-		}
-	} else {
-		kmc->kmc_ctfdata = mp->ctfdata;
-		kmc->kmc_ctfsize = mp->ctfsize;
-	}
 
 	if (mdb_module_create(modname, modp->mod_filename,
 	    kmc->kmc_loadmode, &kmc->kmc_mod) < 0)
@@ -372,7 +342,11 @@ kmdb_module_unload_ack(kmdb_wr_unload_t *dur)
  * exportation of dmod symbol tables, which will happen during the boot
  * process for dmods that were loaded prior to kernel startup.  If this
  * has occurred, we'll need to reconstruct our view of the symbol tables for
- * the affected dmods.
+ * the affected dmods, since the old symbol tables lived in bootmem
+ * and have been moved during the kobj_export_module().
+ *
+ * Also, any ctf_file_t we might have opened is now invalid, since it
+ * has internal pointers to the old data as well.
  */
 void
 kmdb_module_sync(void)
@@ -402,6 +376,11 @@ kmdb_module_sync(void)
 			    &kmc->kmc_ehdr, mp->symhdr, mp->symtbl, mp->strhdr,
 			    mp->strings, MDB_TGT_SYMTAB);
 
+			if (kmc->kmc_mod->mod_ctfp != NULL) {
+				ctf_close(kmc->kmc_mod->mod_ctfp);
+				kmc->kmc_mod->mod_ctfp =
+				    mdb_ctf_open(kmc->kmc_modname, NULL);
+			}
 			kmc->kmc_exported = TRUE;
 		}
 	}

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -291,12 +291,16 @@ kmdb_startup(void)
 		 * on console, we'll get a terminal type from the PROM.  If not,
 		 * we'll use the default.
 		 */
-		if ((mdb.m_termtype = kmdb_prom_term_type()) == NULL) {
-			warn("unable to determine terminal type: assuming "
-			    "`" KMDB_DEF_TERM_TYPE "'\n");
-			mdb.m_termtype = strdup(KMDB_DEF_TERM_TYPE);
+		const char *ttype;
+
+		if ((ttype = kmdb_prom_term_type()) == NULL) {
+			ttype = KMDB_DEF_TERM_TYPE;
+			warn("unable to determine terminal type: "
+			    "assuming `%s'\n", ttype);
 		}
+
 		mdb.m_flags |= MDB_FL_TERMGUESS;
+		mdb.m_termtype = strdup(ttype);
 
 	} else if (mdb.m_flags & MDB_FL_TERMGUESS) {
 		/*
