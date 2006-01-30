@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -115,7 +114,7 @@ hsfs_read(struct vnode *vp, struct uio *uiop, int ioflag, struct cred *cred,
 
 	/* Sanity checks. */
 	if (uiop->uio_resid == 0 ||		/* No data wanted. */
-	    uiop->uio_loffset >= MAXOFF_T ||	/* Offset too big. */
+	    uiop->uio_loffset > HS_MAXFILEOFF ||	/* Offset too big. */
 	    uiop->uio_loffset >= filesize)	/* Past EOF. */
 		return (0);
 
@@ -391,8 +390,8 @@ hsfs_readdir(
 			*eofp = 1;
 		return (0);
 	}
-	ASSERT(uiop->uio_loffset <= MAXOFF_T);
-	offset = (uint_t)uiop->uio_offset;
+	ASSERT(uiop->uio_loffset <= HS_MAXFILEOFF);
+	offset = uiop->uio_loffset;
 
 	dname_size = fsp->hsfs_namemax + 1;	/* 1 for the ending NUL */
 	dname = kmem_alloc(dname_size, KM_SLEEP);
@@ -530,12 +529,12 @@ done:
 	ndlen = ((char *)nd - outbuf);
 	if (ndlen != 0) {
 		error = uiomove(outbuf, (size_t)ndlen, UIO_READ, uiop);
-		uiop->uio_offset = offset;
+		uiop->uio_loffset = offset;
 	}
 	kmem_free(dname, dname_size);
 	kmem_free(outbuf, bufsize);
 	if (eofp && error == 0)
-		*eofp = (uiop->uio_offset >= dirsiz);
+		*eofp = (uiop->uio_loffset >= dirsiz);
 	return (error);
 }
 
@@ -875,7 +874,7 @@ again:
 			 * remaining_bytes can't be zero, as we derived
 			 * which_chunk_lbn directly from byte_offset.
 			 */
-			if ((remaining_bytes+byte_offset) < (off+len)) {
+			if ((remaining_bytes + byte_offset) < (off + len)) {
 				/* coalesce-read the rest of the chunk */
 				bufs[count].b_bcount = remaining_bytes;
 			} else {
@@ -903,6 +902,10 @@ again:
 			}
 
 			bufs[count].b_bufsize = bufs[count].b_bcount;
+			if (((offset_t)byte_offset + bufs[count].b_bcount) >
+				HS_MAXFILEOFF) {
+				break;
+			}
 			byte_offset += bufs[count].b_bcount;
 
 			(void) bdev_strategy(&bufs[count]);
@@ -1014,7 +1017,7 @@ hsfs_getpage(
 		return (ENOSYS);
 	}
 
-	ASSERT(off <= MAXOFF_T);
+	ASSERT(off <= HS_MAXFILEOFF);
 
 	/*
 	 * Determine file data size for EOF check.
@@ -1090,7 +1093,7 @@ hsfs_putpage(
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
 
-	ASSERT(off <= MAXOFF_T);
+	ASSERT(off <= HS_MAXFILEOFF);
 
 	if (!vn_has_cached_data(vp))	/* no pages mapped */
 		return (0);
@@ -1168,8 +1171,8 @@ hsfs_map(
 	if (vp->v_flag & VNOMAP)
 		return (ENOSYS);
 
-	if (off > MAXOFF_T || off < 0 ||
-	    (off + len) < 0 || (off + len) > MAXOFF_T)
+	if (off > HS_MAXFILEOFF || off < 0 ||
+	    (off + len) < 0 || (off + len) > HS_MAXFILEOFF)
 		return (ENXIO);
 
 	if (vp->v_type != VREG) {

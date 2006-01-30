@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,6 +90,7 @@ extern void	hs_parse_longdate(uchar_t *, struct timeval *);
 #define	HS_SEC_PER_PAGE	(PAGESIZE/HS_SECTOR_SIZE)	/* sectors per page */
 #define	HS_SYSAREA_SEC	0		/* 1st sector of system area */
 #define	HS_VOLDESC_SEC	16		/* 1st sector of volume descriptors */
+#define	HS_MAXFILEOFF 4294967295U	/* Max file offset (4Gb - 1). */
 #define	MAXHSOFFSET (HS_SECTOR_SIZE - 1)
 #define	MAXHSMASK   (~MAXHSOFFSET)
 
