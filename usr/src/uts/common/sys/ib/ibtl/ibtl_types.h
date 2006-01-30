@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -885,7 +885,8 @@ typedef enum ibt_va_flags_e {
 	IBT_VA_NOSLEEP		= (1 << 0),
 	IBT_VA_NONCOHERENT	= (1 << 1),
 	IBT_VA_FMR		= (1 << 2),
-	IBT_VA_BLOCK_MODE	= (1 << 3)
+	IBT_VA_BLOCK_MODE	= (1 << 3),
+	IBT_VA_BUF		= (1 << 4)
 } ibt_va_flags_t;
 
 
@@ -898,6 +899,7 @@ typedef struct ibt_va_attr_s {
 	size_t		va_phys_buf_min;
 	size_t		va_phys_buf_max;
 	ibt_va_flags_t	va_flags;
+	struct buf	*va_buf;
 } ibt_va_attr_t;
 
 
