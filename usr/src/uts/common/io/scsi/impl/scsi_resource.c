@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,10 +160,13 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		pktw->pcw_kmflags = 0;
 		in_pktp = &(pktw->pcw_pkt);
 		/*
-		 * target driver initializes pkt_comp, pkt_flags,
-		 * and pkt_time
+		 * target drivers should initialize pkt_comp and
+		 * pkt_time, but sometimes they don't so initialize
+		 * them here to be safe.
 		 */
 		in_pktp->pkt_address = *ap;
+		in_pktp->pkt_flags = 0;
+		in_pktp->pkt_time = 0;
 		in_pktp->pkt_resid = 0;
 		in_pktp->pkt_state = 0;
 		in_pktp->pkt_statistics = 0;
@@ -173,14 +176,14 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		if ((tranp->tran_hba_flags & SCSI_HBA_TRAN_CDB) &&
 		    (cmdlen > DEFAULT_CDBLEN)) {
 			pktw->pcw_kmflags |= NEED_EXT_CDB;
-			in_pktp->pkt_cdbp = kmem_zalloc(cmdlen, kf);
+			in_pktp->pkt_cdbp = kmem_alloc(cmdlen, kf);
 			if (in_pktp->pkt_cdbp == NULL)
 				goto fail2;
 		}
 		in_pktp->pkt_tgtlen = pplen;
 		if (pplen > DEFAULT_PRIVLEN) {
 			pktw->pcw_kmflags |= NEED_EXT_TGT;
-			in_pktp->pkt_private = kmem_zalloc(pplen, kf);
+			in_pktp->pkt_private = kmem_alloc(pplen, kf);
 			if (in_pktp->pkt_private == NULL)
 				goto fail3;
 		}
@@ -188,7 +191,7 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 		if ((tranp->tran_hba_flags & SCSI_HBA_TRAN_SCB) &&
 		    (statuslen > DEFAULT_SCBLEN)) {
 			pktw->pcw_kmflags |= NEED_EXT_SCB;
-			in_pktp->pkt_scbp = kmem_zalloc(statuslen, kf);
+			in_pktp->pkt_scbp = kmem_alloc(statuslen, kf);
 			if (in_pktp->pkt_scbp == NULL)
 				goto fail4;
 		}
@@ -196,6 +199,12 @@ scsi_init_cache_pkt(struct scsi_address *ap, struct scsi_pkt *in_pktp,
 			func, NULL) == -1) {
 				goto fail5;
 		}
+		if (cmdlen)
+			bzero((void *)in_pktp->pkt_cdbp, cmdlen);
+		if (pplen)
+			bzero((void *)in_pktp->pkt_private, pplen);
+		if (statuslen)
+			bzero((void *)in_pktp->pkt_scbp, statuslen);
 	}
 	if (bp && bp->b_bcount) {
 		if ((*tranp->tran_setup_bp) (in_pktp, bp,
