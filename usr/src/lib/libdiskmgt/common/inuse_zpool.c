@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,7 @@
 #include <dlfcn.h>
 #include <link.h>
 #include <ctype.h>
+#include <sys/fs/zfs.h>
 
 #include "libdiskmgt.h"
 #include "disks_private.h"
@@ -51,7 +52,7 @@
 /*
  * Pointers to libzfs.so functions that we dynamically resolve.
  */
-static	int	(*zfsdl_zpool_in_use)(int fd, char **desc, char **name);
+static	int	(*zfsdl_zpool_in_use)(int fd, pool_state_t *state, char **name);
 
 static mutex_t			init_lock = DEFAULTMUTEX;
 static rwlock_t			zpool_lock = DEFAULTRWLOCK;
@@ -59,12 +60,13 @@ static	int			initialized = 0;
 
 static void	*init_zpool();
 
-int
-inuse_zpool(char *slice, nvlist_t *attrs, int *errp)
+static int
+inuse_zpool_common(char *slice, nvlist_t *attrs, int *errp, char *type)
 {
 	int		found = 0;
-	char		*desc, *name;
+	char		*name;
 	int		fd;
+	pool_state_t	state;
 
 	*errp = 0;
 	if (slice == NULL) {
@@ -86,17 +88,37 @@ inuse_zpool(char *slice, nvlist_t *attrs, int *errp)
 	(void) mutex_unlock(&init_lock);
 	(void) rw_rdlock(&zpool_lock);
 	if ((fd = open(slice, O_RDONLY)) > 0) {
-		if (zfsdl_zpool_in_use(fd, &desc, &name)) {
-			libdiskmgt_add_str(attrs, DM_USED_BY,
-				DM_USE_ZPOOL, errp);
-			libdiskmgt_add_str(attrs, DM_USED_NAME,
-				name, errp);
-			found = 1;
+		if (zfsdl_zpool_in_use(fd, &state, &name)) {
+			if (strcmp(type, DM_USE_ACTIVE_ZPOOL) == 0) {
+				if (state == POOL_STATE_ACTIVE)
+					found = 1;
+			} else {
+				found = 1;
+			}
+
+			if (found) {
+				libdiskmgt_add_str(attrs, DM_USED_BY,
+				    type, errp);
+				libdiskmgt_add_str(attrs, DM_USED_NAME,
+					name, errp);
+			}
 		}
 	}
 	(void) rw_unlock(&zpool_lock);
 
 	return (found);
+}
+
+int
+inuse_active_zpool(char *slice, nvlist_t *attrs, int *errp)
+{
+	return (inuse_zpool_common(slice, attrs, errp, DM_USE_ACTIVE_ZPOOL));
+}
+
+int
+inuse_exported_zpool(char *slice, nvlist_t *attrs, int *errp)
+{
+	return (inuse_zpool_common(slice, attrs, errp, DM_USE_EXPORTED_ZPOOL));
 }
 
 /*
@@ -114,8 +136,8 @@ init_zpool()
 	 * Instantiate the functions needed to get zpool configuration
 	 * data
 	 */
-	if ((zfsdl_zpool_in_use = (int (*)(int, char **, char **))dlsym(lh,
-	    "zpool_in_use")) == NULL) {
+	if ((zfsdl_zpool_in_use = (int (*)(int, pool_state_t *, char **))
+	    dlsym(lh, "zpool_in_use")) == NULL) {
 		(void) dlclose(lh);
 		return (NULL);
 	}

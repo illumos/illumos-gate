@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,371 +109,55 @@ vdev_error(const char *fmt, ...)
 	va_end(ap);
 }
 
-void
-_libdskmgt_error(int err, const char *file, int line)
+static void
+libdiskmgt_error(int error)
 {
-	if (err == 0)
-		no_memory();
-
-	/*
-	 * Some of the libdiskmgt stuff requires root privileges in order to
-	 * examine devices.  Bail out gracefully in this case.
-	 */
-	if (err == EACCES) {
-		(void) fprintf(stderr, gettext("cannot determine disk "
-		    "configuration: permission denied\n"));
-		exit(1);
-	}
-
-	(void) fprintf(stderr, gettext("internal error: disk configuration "
-	    "error %d at line %d of file %s\n"), err, line, file);
-	abort();
-}
-
-#define	libdskmgt_error(err)	(_libdskmgt_error((err), __FILE__, __LINE__))
-
-/*
- * Checks whether a single slice overlaps with any of the slices in the provided
- * list.  Called by check_overlapping().
- */
-int
-is_overlapping(dm_descriptor_t slice, dm_descriptor_t media,
-	dm_descriptor_t *slice_list, int *error, char **overlaps_with)
-{
-	int 		i = 0;
-	uint32_t	in_snum;
-	uint64_t 	start_block = 0;
-	uint64_t 	end_block = 0;
-	uint64_t 	media_size = 0;
-	uint64_t 	size = 0;
-	nvlist_t 	*media_attrs;
-	nvlist_t 	*slice_attrs;
-
-	media_attrs = dm_get_attributes(media, error);
-	if (*error != 0) {
-		return (-1);
-	}
-
-	if (media_attrs == NULL) {
-		return (0);
-	}
-
-	*error = nvlist_lookup_uint64(media_attrs, DM_NACCESSIBLE, &media_size);
-	if (*error != 0) {
-		nvlist_free(media_attrs);
-		return (-1);
-	}
-
-	slice_attrs = dm_get_attributes(slice, error);
-	if (*error != 0) {
-		nvlist_free(media_attrs);
-		return (-1);
-	}
-	/*
-	 * Not really possible, but the error above would catch any system
-	 * errors.
-	 */
-	if (slice_attrs == NULL) {
-		nvlist_free(media_attrs);
-		return (0);
-	}
-
-	*error = nvlist_lookup_uint64(slice_attrs, DM_START, &start_block);
-	if (*error != 0) {
-		nvlist_free(media_attrs);
-		nvlist_free(slice_attrs);
-		return (-1);
-	}
-
-	*error = nvlist_lookup_uint64(slice_attrs, DM_SIZE, &size);
-	if (*error != 0) {
-		nvlist_free(media_attrs);
-		nvlist_free(slice_attrs);
-		return (-1);
-	}
-	*error = nvlist_lookup_uint32(slice_attrs, DM_INDEX, &in_snum);
-	if (*error != 0) {
-		nvlist_free(media_attrs);
-		nvlist_free(slice_attrs);
-		return (-1);
-	}
-
-	end_block = (start_block + size) - 1;
-
-	for (i = 0; slice_list[i]; i ++) {
-		uint64_t other_start;
-		uint64_t other_end;
-		uint64_t other_size;
-		uint32_t snum;
-
-		nvlist_t *other_attrs = dm_get_attributes(slice_list[i], error);
-		if (*error != 0) {
-			return (-1);
-		}
-
-		if (other_attrs == NULL)
-			continue;
-
-		*error = nvlist_lookup_uint64(other_attrs, DM_START,
-			&other_start);
-		if (*error) {
-		    nvlist_free(media_attrs);
-		    nvlist_free(slice_attrs);
-		    nvlist_free(other_attrs);
-		    return (-1);
-		}
-
-		*error = nvlist_lookup_uint64(other_attrs, DM_SIZE,
-			&other_size);
-
-		if (*error) {
-		    nvlist_free(media_attrs);
-		    nvlist_free(slice_attrs);
-		    nvlist_free(other_attrs);
-		    return (-1);
-		}
-
-		other_end = (other_size + other_start) - 1;
-
-		*error = nvlist_lookup_uint32(other_attrs, DM_INDEX,
-			&snum);
-
-		if (*error) {
-		    nvlist_free(media_attrs);
-		    nvlist_free(slice_attrs);
-		    nvlist_free(other_attrs);
-		    return (-1);
-		}
-
-		/*
-		 * Check to see if there are > 2 overlapping regions
-		 * on this media in the same region as this slice.
-		 * This is done by assuming the following:
-		 *   	Slice 2 is the backup slice if it is the size
-		 *	of the whole disk
-		 * If slice 2 is the overlap and slice 2 is the size of
-		 * the whole disk, continue. If another slice is found
-		 * that overlaps with our slice, return it.
-		 * There is the potential that there is more than one slice
-		 * that our slice overlaps with, however, we only return
-		 * the first overlapping slice we find.
-		 *
-		 */
-
-		if (start_block >= other_start && start_block <= other_end) {
-			if ((snum == 2 && (other_size == media_size)) ||
-				snum == in_snum) {
-				continue;
-			} else {
-				char *str = dm_get_name(slice_list[i], error);
-				if (*error != 0) {
-					nvlist_free(media_attrs);
-					nvlist_free(slice_attrs);
-					nvlist_free(other_attrs);
-					return (-1);
-				}
-				*overlaps_with = strdup(str);
-				dm_free_name(str);
-				nvlist_free(media_attrs);
-				nvlist_free(slice_attrs);
-				nvlist_free(other_attrs);
-				return (1);
-			}
-		} else if (other_start >= start_block &&
-			other_start <= end_block) {
-			if ((snum == 2 && (other_size == media_size)) ||
-				snum == in_snum) {
-				continue;
-			} else {
-				char *str = dm_get_name(slice_list[i], error);
-				if (*error != 0) {
-					nvlist_free(media_attrs);
-					nvlist_free(slice_attrs);
-					nvlist_free(other_attrs);
-					return (-1);
-				}
-				*overlaps_with = strdup(str);
-				dm_free_name(str);
-				nvlist_free(media_attrs);
-				nvlist_free(slice_attrs);
-				nvlist_free(other_attrs);
-				return (1);
-			}
-		}
-		nvlist_free(other_attrs);
-	}
-	nvlist_free(media_attrs);
-	nvlist_free(slice_attrs);
-	return (0);
+	(void) fprintf(stderr, gettext("warning: device in use checking "
+	    "failed: %s\n"), strerror(error));
 }
 
 /*
- * Check to see whether the given slice overlaps with any other slices.  Get the
- * associated slice information and pass on to is_overlapping().
+ * Validate a device, passing the bulk of the work off to libdiskmgt.
  */
 int
-check_overlapping(const char *slicename, dm_descriptor_t slice)
+check_slice(const char *path, int force, int wholedisk)
 {
-	dm_descriptor_t *media;
-	dm_descriptor_t *slices;
-	int error;
-	char *overlaps;
+	char *msg;
+	int error = 0;
 	int ret = 0;
 
-	/*
-	 * Get the list of slices be fetching the associated media, and then all
-	 * associated slices.
-	 */
-	media = dm_get_associated_descriptors(slice, DM_MEDIA, &error);
-	if (media == NULL || *media == NULL || error != 0)
-		libdskmgt_error(error);
+	if (dm_inuse((char *)path, &msg,
+	    force ? DM_WHO_ZPOOL_FORCE : DM_WHO_ZPOOL, &error) || error) {
+		if (error != 0) {
+			libdiskmgt_error(error);
+			return (0);
+		} else {
+			vdev_error("%s", msg);
+			free(msg);
+		}
 
-	slices = dm_get_associated_descriptors(*media, DM_SLICE, &error);
-	if (slices == NULL || *slices == NULL || error != 0)
-		libdskmgt_error(error);
-
-
-	overlaps = NULL;
-	if (is_overlapping(slice, *media, slices, &error, &overlaps)) {
-		vdev_error(gettext("device '%s' overlaps with '%s'\n"),
-		    slicename, overlaps);
 		ret = -1;
 	}
 
-	if (overlaps != NULL)
-		free(overlaps);
-	dm_free_descriptors(slices);
-	dm_free_descriptors(media);
+	/*
+	 * If we're given a whole disk, ignore overlapping slices since we're
+	 * about to label it anyway.
+	 */
+	error = 0;
+	if (!wholedisk && !force &&
+	    (dm_isoverlapping((char *)path, &msg, &error) || error)) {
+		if (error != 0) {
+			libdiskmgt_error(error);
+			return (0);
+		} else {
+			vdev_error("%s overlaps with %s\n", path, msg);
+			free(msg);
+		}
+
+		ret = -1;
+	}
 
 	return (ret);
-}
-
-/*
- * Validate the given slice.  If 'diskname' is non-NULL, then this is a single
- * slice on a complete disk.  If 'force' is set, then the user specified '-f'
- * and we only want to report error for completely forbidden uses.
- */
-int
-check_slice(const char *slicename, dm_descriptor_t slice, int force,
-    int overlap)
-{
-	nvlist_t *stats;
-	int err;
-	nvpair_t *nvwhat, *nvdesc;
-	char *what, *desc, *name;
-	int found = FALSE;
-	int found_zfs = FALSE;
-	int fd;
-
-	if ((stats = dm_get_stats(slice, DM_SLICE_STAT_USE, &err)) == NULL)
-		libdskmgt_error(err);
-
-	/*
-	 * Always check to see if this is used by an active ZFS pool.
-	 */
-	if ((fd = open(slicename, O_RDONLY)) > 0) {
-		if (zpool_in_use(fd, &desc, &name)) {
-
-			if (!force) {
-				vdev_error(gettext("%s is part of %s pool "
-				    "'%s'\n"), slicename, desc, name);
-				found = found_zfs = TRUE;
-			}
-
-			free(desc);
-			free(name);
-		}
-
-		(void) close(fd);
-	}
-
-	/*
-	 * This slice is in use.  Print out a descriptive message describing who
-	 * is using it.  The 'used_by' nvlist is formatted as:
-	 *
-	 * 	(used_by=what, used_name=desc, ...)
-	 *
-	 * Each 'used_by' must be accompanied by a 'used_name'.
-	 */
-	nvdesc = NULL;
-	for (;;) {
-		nvwhat = nvlist_next_nvpair(stats, nvdesc);
-		nvdesc = nvlist_next_nvpair(stats, nvwhat);
-
-		if (nvwhat == NULL || nvdesc == NULL)
-			break;
-
-		assert(strcmp(nvpair_name(nvwhat), DM_USED_BY) == 0);
-		assert(strcmp(nvpair_name(nvdesc), DM_USED_NAME) == 0);
-
-		verify(nvpair_value_string(nvwhat, &what) == 0);
-		verify(nvpair_value_string(nvdesc, &desc) == 0);
-
-		/*
-		 * For currently mounted filesystems, filesystems in
-		 * /etc/vfstab, or dedicated dump devices, we can never use
-		 * them, even if '-f' is specified.  The rest of the errors
-		 * indicate that a filesystem was detected on disk, which can be
-		 * overridden with '-f'.
-		 */
-		if (strcmp(what, DM_USE_MOUNT) == 0 ||
-		    strcmp(what, DM_USE_VFSTAB) == 0 ||
-		    strcmp(what, DM_USE_DUMP) == 0) {
-			found = TRUE;
-			if (strcmp(what, DM_USE_MOUNT) == 0) {
-				vdev_error(gettext("%s is "
-				    "currently mounted on %s\n"),
-				    slicename, desc);
-			} else if (strcmp(what, DM_USE_VFSTAB) == 0) {
-				vdev_error(gettext("%s is usually "
-				    "mounted at %s in /etc/vfstab\n"),
-				    slicename, desc);
-			} else if (strcmp(what, DM_USE_DUMP) == 0) {
-				vdev_error(gettext("%s is the "
-				    "dedicated dump device\n"), slicename);
-			}
-		} else if (!force) {
-			found = TRUE;
-			if (strcmp(what, DM_USE_SVM) == 0) {
-				vdev_error(gettext("%s is part of "
-				    "SVM volume %s\n"), slicename, desc);
-			} else if (strcmp(what, DM_USE_LU) == 0) {
-				vdev_error(gettext("%s is in use "
-				    "for live upgrade %s\n"), slicename, desc);
-			} else if (strcmp(what, DM_USE_VXVM) == 0) {
-				vdev_error(gettext("%s is part of "
-				    "VxVM volume %s\n"), slicename, desc);
-			} else if (strcmp(what, DM_USE_FS) == 0) {
-				/*
-				 * We should have already caught ZFS in-use
-				 * filesystems above.  If the ZFS version is
-				 * different, or there was some other critical
-				 * failure, it's possible for fstyp to report it
-				 * as in-use, but zpool_open_by_dev() to fail.
-				 */
-				if (strcmp(desc, MNTTYPE_ZFS) != 0)
-					vdev_error(gettext("%s contains a %s "
-					    "filesystem\n"), slicename, desc);
-				else if (!found_zfs)
-					vdev_error(gettext("%s is part of an "
-					    "outdated or damaged ZFS "
-					    "pool\n"), slicename);
-			} else {
-				vdev_error(gettext("is used by %s as %s\n"),
-				    slicename, what, desc);
-			}
-		} else {
-			found = FALSE;
-		}
-	}
-
-	/*
-	 * Perform any overlap checking if requested to do so.
-	 */
-	if (overlap && !force)
-		found |= (check_overlapping(slicename, slice) != 0);
-
-	return (found ? -1 : 0);
 }
 
 /*
@@ -494,12 +178,19 @@ check_disk(const char *name, dm_descriptor_t disk, int force)
 	 * because we already have an alias handle open for the device.
 	 */
 	if ((drive = dm_get_associated_descriptors(disk, DM_DRIVE,
-	    &err)) == NULL || *drive == NULL)
-		libdskmgt_error(err);
+	    &err)) == NULL || *drive == NULL) {
+		if (err)
+			libdiskmgt_error(err);
+		return (0);
+	}
 
 	if ((media = dm_get_associated_descriptors(*drive, DM_MEDIA,
-	    &err)) == NULL)
-		libdskmgt_error(err);
+	    &err)) == NULL) {
+		dm_free_descriptors(drive);
+		if (err)
+			libdiskmgt_error(err);
+		return (0);
+	}
 
 	dm_free_descriptors(drive);
 
@@ -508,14 +199,18 @@ check_disk(const char *name, dm_descriptor_t disk, int force)
 	 * and the media is not present.
 	 */
 	if (*media == NULL) {
-		vdev_error(gettext("'%s' has no media in drive\n"), name);
 		dm_free_descriptors(media);
+		vdev_error(gettext("'%s' has no media in drive\n"), name);
 		return (-1);
 	}
 
 	if ((slice = dm_get_associated_descriptors(*media, DM_SLICE,
-	    &err)) == NULL)
-		libdskmgt_error(err);
+	    &err)) == NULL) {
+		dm_free_descriptors(media);
+		if (err)
+			libdiskmgt_error(err);
+		return (0);
+	}
 
 	dm_free_descriptors(media);
 
@@ -526,8 +221,7 @@ check_disk(const char *name, dm_descriptor_t disk, int force)
 	 * overlapping slices because we are using the whole disk.
 	 */
 	for (i = 0; slice[i] != NULL; i++) {
-		if (check_slice(dm_get_name(slice[i], &err), slice[i],
-		    force, FALSE) != 0)
+		if (check_slice(dm_get_name(slice[i], &err), force, TRUE) != 0)
 			ret = -1;
 	}
 
@@ -535,17 +229,15 @@ check_disk(const char *name, dm_descriptor_t disk, int force)
 	return (ret);
 }
 
-
 /*
- * Validate a device.  Determines whether the device is a disk, slice, or
- * partition, and passes it off to an appropriate function.
+ * Validate a device.
  */
 int
 check_device(const char *path, int force)
 {
 	dm_descriptor_t desc;
 	int err;
-	char *dev, rpath[MAXPATHLEN];
+	char *dev;
 
 	/*
 	 * For whole disks, libdiskmgt does not include the leading dev path.
@@ -553,47 +245,13 @@ check_device(const char *path, int force)
 	dev = strrchr(path, '/');
 	assert(dev != NULL);
 	dev++;
-	if ((desc = dm_get_descriptor_by_name(DM_ALIAS, dev, &err)) != NULL)
-		return (check_disk(path, desc, force));
-
-	/*
-	 * If 'err' is not ENODEV, then we've had an unexpected error from
-	 * libdiskmgt.  The only explanation is that we ran out of memory.
-	 */
-	if (err != ENODEV)
-		libdskmgt_error(err);
-
-	/*
-	 * Determine if this is a slice.
-	 */
-	if ((desc = dm_get_descriptor_by_name(DM_SLICE, (char *)path, &err))
-	    != NULL)
-		return (check_slice(path, desc, force, TRUE));
-
-	if (err != ENODEV)
-		libdskmgt_error(err);
-
-	/*
-	 * Check for a partition.  libdiskmgt expects path of /dev/rdsk when
-	 * dealing with partitions, so convert it.
-	 */
-	(void) snprintf(rpath, sizeof (rpath), "/dev/rdsk/%s", dev);
-	if ((desc = dm_get_descriptor_by_name(DM_PARTITION, rpath, &err))
-	    != NULL) {
-		/* XXZFS perform checking on partitions */
-		return (0);
+	if ((desc = dm_get_descriptor_by_name(DM_ALIAS, dev, &err)) != NULL) {
+		err = check_disk(path, desc, force);
+		dm_free_descriptor(desc);
+		return (err);
 	}
 
-	if (err != ENODEV)
-		libdskmgt_error(err);
-
-	/*
-	 * At this point, libdiskmgt failed to find the device as either a whole
-	 * disk or a slice.  Ignore these errors, as we know that it at least a
-	 * block device.  The user may have provided us with some unknown device
-	 * that libdiskmgt doesn't know about.
-	 */
-	return (0);
+	return (check_slice(path, force, FALSE));
 }
 
 /*
@@ -603,22 +261,41 @@ check_device(const char *path, int force)
 int
 check_file(const char *file, int force)
 {
-	char *desc, *name;
+	char  *name;
 	int fd;
 	int ret = 0;
+	pool_state_t state;
 
 	if ((fd = open(file, O_RDONLY)) < 0)
 		return (0);
 
-	if (zpool_in_use(fd, &desc, &name)) {
-		if (strcmp(desc, gettext("active")) == 0 ||
-		    !force) {
+	if (zpool_in_use(fd, &state, &name)) {
+		const char *desc;
+
+		switch (state) {
+		case POOL_STATE_ACTIVE:
+			desc = gettext("active");
+			break;
+
+		case POOL_STATE_EXPORTED:
+			desc = gettext("exported");
+			break;
+
+		case POOL_STATE_POTENTIALLY_ACTIVE:
+			desc = gettext("potentially active");
+			break;
+
+		default:
+			desc = gettext("unknown");
+			break;
+		}
+
+		if (state == POOL_STATE_ACTIVE || !force) {
 			vdev_error(gettext("%s is part of %s pool '%s'\n"),
 			    file, desc, name);
 			ret = -1;
 		}
 
-		free(desc);
 		free(name);
 	}
 

@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -131,3 +131,7 @@ declaration	void dm_inuse(char * dev_name, char **msg, dm_who_type_t who,
 version		SUNWprivate_1.1
 end
 
+function	dm_isoverlapping
+declaration	int dm_isoverlapping(char *dev_name, char **msg, int *errp)
+version		SUNWprivate_1.1
+end

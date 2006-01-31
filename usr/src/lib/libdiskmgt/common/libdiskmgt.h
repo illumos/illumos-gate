@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@ typedef uint64_t  dm_descriptor_t;
 typedef enum {
 	DM_WHO_MKFS = 0,
 	DM_WHO_ZPOOL,
+	DM_WHO_ZPOOL_FORCE,
 	DM_WHO_FORMAT,
 	DM_WHO_SWAP,
 	DM_WHO_DUMP
@@ -212,7 +213,8 @@ typedef enum {
 #define	DM_USE_VXVM		"vxvm"
 #define	DM_USE_FS		"fs"
 #define	DM_USE_VFSTAB		"vfstab"
-#define	DM_USE_ZPOOL		"zpool"
+#define	DM_USE_EXPORTED_ZPOOL	"exported_zpool"
+#define	DM_USE_ACTIVE_ZPOOL	"active_zpool"
 
 /* event */
 #define	DM_EV_NAME		"name"
@@ -255,6 +257,7 @@ void			dm_get_slice_stats(char *slice, nvlist_t **dev_stats,
 void			dm_get_usage_string(char *who, char *data, char **msg);
 int			dm_inuse(char *dev_name, char **msg, dm_who_type_t who,
 			    int *errp);
+int			dm_isoverlapping(char *dev_name, char **msg, int *errp);
 
 #ifdef __cplusplus
 }

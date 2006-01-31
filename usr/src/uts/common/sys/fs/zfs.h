@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -182,17 +182,17 @@ typedef enum vdev_aux {
 } vdev_aux_t;
 
 /*
- * pool state.  The following states are actually written to disk as part of the
- * normal SPA lifecycle: ACTIVE, EXPORTED, DESTROYED.  The remaining states
- * (UNITIALIZED, UNAVAIL) are software abstractions used at various levels to
- * communicate pool state.
+ * pool state.  The following states are written to disk as part of the normal
+ * SPA lifecycle: ACTIVE, EXPORTED, DESTROYED.  The remaining states are
+ * software abstractions used at various levels to communicate pool state.
  */
 typedef enum pool_state {
 	POOL_STATE_ACTIVE = 0,		/* In active use		*/
 	POOL_STATE_EXPORTED,		/* Explicitly exported		*/
 	POOL_STATE_DESTROYED,		/* Explicitly destroyed		*/
 	POOL_STATE_UNINITIALIZED,	/* Internal spa_t state		*/
-	POOL_STATE_UNAVAIL		/* Internal libzfs state	*/
+	POOL_STATE_UNAVAIL,		/* Internal libzfs state	*/
+	POOL_STATE_POTENTIALLY_ACTIVE	/* Internal libzfs state	*/
 } pool_state_t;
 
 /*

@@ -261,8 +261,7 @@ extern int zfs_remove_link(zfs_handle_t *);
 /*
  * Given a device or file, determine if it is part of a pool.
  */
-extern int zpool_in_use(int fd, char **state,
-    char **name);
+extern int zpool_in_use(int fd, pool_state_t *state, char **name);
 
 /*
  * ftyp special.  Read the label from a given device.

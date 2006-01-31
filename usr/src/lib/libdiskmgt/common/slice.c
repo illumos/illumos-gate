@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,18 +54,18 @@
 #define	FMT_VTOC	1
 #define	FMT_EFI		2
 
-static struct inuse_detectors {
-	int	(*detectorp)(char *slice, nvlist_t *attrs, int *errp);
-	char	*used_by;
-} detectors[] = {
-	{inuse_mnt, DM_USE_MOUNT},
-	{inuse_svm, DM_USE_SVM},
-	{inuse_zpool, DM_USE_ZPOOL},
-	{inuse_lu, DM_USE_LU},
-	{inuse_dump, DM_USE_DUMP},
-	{inuse_vxvm, DM_USE_VXVM},
-	{inuse_fs, DM_USE_FS},  /* fs should always be last */
-	{NULL, NULL}
+typedef int (*detectorp)(char *, nvlist_t *, int *);
+
+static detectorp detectors[] = {
+	inuse_mnt,
+	inuse_svm,
+	inuse_active_zpool,
+	inuse_lu,
+	inuse_dump,
+	inuse_vxvm,
+	inuse_exported_zpool,
+	inuse_fs,  /* fs should always be last */
+	NULL
 };
 
 static int	add_inuse(char *name, nvlist_t *attrs);
@@ -358,8 +358,8 @@ add_inuse(char *name, nvlist_t *attrs)
 	int	i;
 	int	error;
 
-	for (i = 0; detectors[i].detectorp != NULL; i ++) {
-	    if ((detectors[i].detectorp)(name, attrs, &error) || error != 0) {
+	for (i = 0; detectors[i] != NULL; i ++) {
+	    if (detectors[i](name, attrs, &error) || error != 0) {
 		if (error != 0) {
 		    return (error);
 		}

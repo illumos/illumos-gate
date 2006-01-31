@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -670,16 +670,16 @@ find_guid(nvlist_t *nv, uint64_t guid)
  * must be freed by the caller.
  */
 int
-zpool_in_use(int fd, char **statestr, char **namestr)
+zpool_in_use(int fd, pool_state_t *state, char **namestr)
 {
 	nvlist_t *config;
-	uint64_t state;
 	char *name;
 	int ret;
 	zfs_cmd_t zc = { 0 };
 	uint64_t guid, vdev_guid;
 	zpool_handle_t *zhp;
 	nvlist_t *pool_config;
+	uint64_t stateval;
 
 	if ((config = zpool_read_label(fd)) == NULL)
 		return (FALSE);
@@ -687,16 +687,14 @@ zpool_in_use(int fd, char **statestr, char **namestr)
 	verify(nvlist_lookup_string(config, ZPOOL_CONFIG_POOL_NAME,
 	    &name) == 0);
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
-	    &state) == 0);
+	    &stateval) == 0);
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID,
 	    &guid) == 0);
 	verify(nvlist_lookup_uint64(config, ZPOOL_CONFIG_GUID,
 	    &vdev_guid) == 0);
 
-	switch (state) {
+	switch (stateval) {
 	case POOL_STATE_EXPORTED:
-		*statestr = zfs_strdup(dgettext(TEXT_DOMAIN, "exported"));
-		*namestr = zfs_strdup(name);
 		ret = TRUE;
 		break;
 
@@ -726,27 +724,24 @@ zpool_in_use(int fd, char **statestr, char **namestr)
 
 				verify(nvlist_lookup_nvlist(pool_config,
 				    ZPOOL_CONFIG_VDEV_TREE, &nvroot) == 0);
-				if (find_guid(nvroot, vdev_guid)) {
-					*statestr = zfs_strdup(
-					    dgettext(TEXT_DOMAIN, "active"));
-					*namestr = zfs_strdup(name);
-					ret = TRUE;
-				} else {
-					ret = FALSE;
-				}
+				ret = find_guid(nvroot, vdev_guid);
 			} else {
 				ret = FALSE;
 			}
 		} else {
-			*statestr = zfs_strdup(dgettext(TEXT_DOMAIN,
-			    "potentially active"));
-			*namestr = zfs_strdup(name);
+			stateval = POOL_STATE_POTENTIALLY_ACTIVE;
 			ret = TRUE;
 		}
 		break;
 
 	default:
 		ret = FALSE;
+	}
+
+
+	if (ret) {
+		*namestr = zfs_strdup(name);
+		*state = (pool_state_t)stateval;
 	}
 
 	nvlist_free(config);

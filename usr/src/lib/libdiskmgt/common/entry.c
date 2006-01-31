@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -555,6 +555,179 @@ dm_get_slice_stats(char *slice, nvlist_t **dev_stats, int *errp)
 }
 
 /*
+ * Checks for overlapping slices.   If the given device is a slice, and it
+ * overlaps with any non-backup slice on the disk, return true with a detailed
+ * description similar to dm_inuse().
+ */
+int
+dm_isoverlapping(char *slicename, char **overlaps_with, int *errp)
+{
+	dm_descriptor_t slice = NULL;
+	dm_descriptor_t *media = NULL;
+	dm_descriptor_t *slices = NULL;
+	int 		i = 0;
+	uint32_t	in_snum;
+	uint64_t 	start_block = 0;
+	uint64_t 	end_block = 0;
+	uint64_t 	media_size = 0;
+	uint64_t 	size = 0;
+	nvlist_t 	*media_attrs = NULL;
+	nvlist_t 	*slice_attrs = NULL;
+	int		ret = 0;
+
+	slice = dm_get_descriptor_by_name(DM_SLICE, slicename, errp);
+	if (slice == NULL)
+		goto out;
+
+	/*
+	 * Get the list of slices be fetching the associated media, and then all
+	 * associated slices.
+	 */
+	media = dm_get_associated_descriptors(slice, DM_MEDIA, errp);
+	if (media == NULL || *media == NULL || *errp != 0)
+		goto out;
+
+	slices = dm_get_associated_descriptors(*media, DM_SLICE, errp);
+	if (slices == NULL || *slices == NULL || *errp != 0)
+		goto out;
+
+	media_attrs = dm_get_attributes(*media, errp);
+	if (media_attrs == NULL || *errp)
+		goto out;
+
+	*errp = nvlist_lookup_uint64(media_attrs, DM_NACCESSIBLE, &media_size);
+	if (*errp != 0)
+		goto out;
+
+	slice_attrs = dm_get_attributes(slice, errp);
+	if (slice_attrs == NULL || *errp != 0)
+		goto out;
+
+	*errp = nvlist_lookup_uint64(slice_attrs, DM_START, &start_block);
+	if (*errp != 0)
+		goto out;
+
+	*errp = nvlist_lookup_uint64(slice_attrs, DM_SIZE, &size);
+	if (*errp != 0)
+		goto out;
+
+	*errp = nvlist_lookup_uint32(slice_attrs, DM_INDEX, &in_snum);
+	if (*errp != 0)
+		goto out;
+
+	end_block = (start_block + size) - 1;
+
+	for (i = 0; slices[i]; i ++) {
+		uint64_t other_start;
+		uint64_t other_end;
+		uint64_t other_size;
+		uint32_t snum;
+
+		nvlist_t *other_attrs = dm_get_attributes(slices[i], errp);
+
+		if (other_attrs == NULL)
+			continue;
+
+		if (*errp != 0)
+			goto out;
+
+		*errp = nvlist_lookup_uint64(other_attrs, DM_START,
+		    &other_start);
+		if (*errp) {
+			nvlist_free(other_attrs);
+			goto out;
+		}
+
+		*errp = nvlist_lookup_uint64(other_attrs, DM_SIZE,
+		    &other_size);
+
+		if (*errp) {
+			nvlist_free(other_attrs);
+			ret = -1;
+			goto out;
+		}
+
+		other_end = (other_size + other_start) - 1;
+
+		*errp = nvlist_lookup_uint32(other_attrs, DM_INDEX,
+		    &snum);
+
+		if (*errp) {
+			nvlist_free(other_attrs);
+			ret = -1;
+			goto out;
+		}
+
+		/*
+		 * Check to see if there are > 2 overlapping regions
+		 * on this media in the same region as this slice.
+		 * This is done by assuming the following:
+		 *   	Slice 2 is the backup slice if it is the size
+		 *	of the whole disk
+		 * If slice 2 is the overlap and slice 2 is the size of
+		 * the whole disk, continue. If another slice is found
+		 * that overlaps with our slice, return it.
+		 * There is the potential that there is more than one slice
+		 * that our slice overlaps with, however, we only return
+		 * the first overlapping slice we find.
+		 *
+		 */
+		if (start_block >= other_start && start_block <= other_end) {
+			if ((snum == 2 && (other_size == media_size)) ||
+			    snum == in_snum) {
+				continue;
+			} else {
+				char *str = dm_get_name(slices[i], errp);
+				if (*errp != 0) {
+					nvlist_free(other_attrs);
+					ret = -1;
+					goto out;
+				}
+				*overlaps_with = strdup(str);
+				dm_free_name(str);
+				nvlist_free(other_attrs);
+				ret = 1;
+				goto out;
+			}
+		} else if (other_start >= start_block &&
+		    other_start <= end_block) {
+			if ((snum == 2 && (other_size == media_size)) ||
+			    snum == in_snum) {
+				continue;
+			} else {
+				char *str = dm_get_name(slices[i], errp);
+				if (*errp != 0) {
+					nvlist_free(other_attrs);
+					ret = -1;
+					goto out;
+				}
+				*overlaps_with = strdup(str);
+				dm_free_name(str);
+				nvlist_free(other_attrs);
+				ret = 1;
+				goto out;
+			}
+		}
+		nvlist_free(other_attrs);
+	}
+
+out:
+	if (media_attrs)
+		nvlist_free(media_attrs);
+	if (slice_attrs)
+		nvlist_free(slice_attrs);
+
+	if (slices)
+		dm_free_descriptors(slices);
+	if (media)
+		dm_free_descriptors(media);
+	if (slice)
+		dm_free_descriptor(slice);
+
+	return (ret);
+}
+
+/*
  * Returns 'in use' details, if found, about a specific dev_name,
  * based on the caller(who). It is important to note that it is possible
  * for there to be more than one 'in use' statistic regarding a dev_name.
@@ -648,7 +821,8 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 				 * All others are in use.
 				 */
 				if (strcmp(by, DM_USE_LU) == 0 ||
-				    strcmp(by, DM_USE_FS) == 0) {
+				    strcmp(by, DM_USE_FS) == 0 ||
+				    strcmp(by, DM_USE_EXPORTED_ZPOOL) == 0) {
 					break;
 				}
 				if (build_usage_string(dname,
@@ -663,7 +837,8 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 				 * Not in use for this.
 				 */
 				if (strcmp(by, DM_USE_DUMP) == 0 ||
-				    strcmp(by, DM_USE_FS) == 0) {
+				    strcmp(by, DM_USE_FS) == 0 ||
+				    strcmp(by, DM_USE_EXPORTED_ZPOOL) == 0) {
 					break;
 				}
 
@@ -681,7 +856,8 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 				if ((strcmp(by, DM_USE_MOUNT) == 0 &&
 				    strcmp(data, "swap") == 0) ||
 				    strcmp(by, DM_USE_DUMP) == 0 ||
-				    strcmp(by, DM_USE_FS) == 0) {
+				    strcmp(by, DM_USE_FS) == 0 ||
+				    strcmp(by, DM_USE_EXPORTED_ZPOOL) == 0) {
 					break;
 				}
 				if (build_usage_string(dname,
@@ -693,7 +869,8 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 				break;
 
 			case DM_WHO_FORMAT:
-				if (strcmp(by, DM_USE_FS) == 0)
+				if (strcmp(by, DM_USE_FS) == 0 ||
+				    strcmp(by, DM_USE_EXPORTED_ZPOOL) == 0)
 					break;
 				if (build_usage_string(dname,
 				    by, data, msg, &found, errp) != 0) {
@@ -702,6 +879,20 @@ dm_inuse(char *dev_name, char **msg, dm_who_type_t who, int *errp)
 					}
 				}
 				break;
+
+			case DM_WHO_ZPOOL_FORCE:
+				if (strcmp(by, DM_USE_FS) == 0 ||
+				    strcmp(by, DM_USE_EXPORTED_ZPOOL) == 0)
+					break;
+				/* FALLTHROUGH */
+			case DM_WHO_ZPOOL:
+				if (build_usage_string(dname,
+				    by, data, msg, &found, errp) != 0) {
+					if (*errp)
+						goto out;
+				}
+				break;
+
 			default:
 				/*
 				 * nothing found in use for this client
@@ -745,7 +936,7 @@ dm_get_usage_string(char *what, char *how, char **usage_string)
 		    "Please remove this entry to use this device.\n");
 	} else if (strcmp(what, DM_USE_FS) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
-		    "Warning: %s contains a %s filesystem.\n");
+		    "%s contains a %s filesystem.\n");
 	} else if (strcmp(what, DM_USE_SVM) == 0) {
 		if (strcmp(how, "mdb") == 0) {
 			*usage_string = dgettext(TEXT_DOMAIN,
@@ -767,9 +958,13 @@ dm_get_usage_string(char *what, char *how, char **usage_string)
 		*usage_string = dgettext(TEXT_DOMAIN,
 		    "%s is in use by %s. Please see dumpadm(1M)."
 		    "\n");
-	} else if (strcmp(what, DM_USE_ZPOOL) == 0) {
+	} else if (strcmp(what, DM_USE_EXPORTED_ZPOOL) == 0) {
 		*usage_string = dgettext(TEXT_DOMAIN,
-		    "%s is in use by zpool %s. Please see zpool(1M)."
+		    "%s is part of exported or potentially active ZFS pool %s. "
+		    "Please see zpool(1M).\n");
+	} else if (strcmp(what, DM_USE_ACTIVE_ZPOOL) == 0) {
+		*usage_string = dgettext(TEXT_DOMAIN,
+		    "%s is part of active ZFS pool %s. Please see zpool(1M)."
 		    "\n");
 	}
 }
