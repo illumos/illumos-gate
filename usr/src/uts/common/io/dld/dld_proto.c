@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,11 +61,12 @@ static void proto_poll_disable(dld_str_t *);
 static boolean_t proto_poll_enable(dld_str_t *, dl_capab_dls_t *);
 static boolean_t proto_capability_advertise(dld_str_t *, mblk_t *);
 
+static task_func_t proto_process_unbind_req, proto_process_detach_req;
+
 static void proto_soft_ring_disable(dld_str_t *);
 static boolean_t proto_soft_ring_enable(dld_str_t *, dl_capab_dls_t *);
 static boolean_t proto_capability_advertise(dld_str_t *, mblk_t *);
 static void proto_change_soft_ring_fanout(dld_str_t *, int);
-static void proto_stop_soft_ring_threads(void *);
 
 #define	DL_ACK_PENDING(state) \
 	((state) == DL_ATTACH_PENDING || \
@@ -151,31 +152,25 @@ dld_proto(dld_str_t *dsp, mblk_t *mp)
 }
 
 /*
- * Finish any pending operations.  At this moment we are single-threaded,
- * hence there is no need to hold ds_lock as writer because we're already
- * exclusive.
+ * Finish any pending operations.
+ * Requests that need to be processed asynchronously will be handled
+ * by a separate thread. After this function returns, other threads
+ * will be allowed to enter dld; they will not be able to do anything
+ * until ds_dlstate transitions to a non-pending state.
  */
 void
 dld_finish_pending_ops(dld_str_t *dsp)
 {
+	task_func_t *op = NULL;
+
 	ASSERT(MUTEX_HELD(&dsp->ds_thr_lock));
 	ASSERT(dsp->ds_thr == 0);
 
-	/* Pending DL_DETACH_REQ? */
-	if (dsp->ds_detach_req != NULL) {
-		mblk_t *mp;
-
-		ASSERT(dsp->ds_dlstate == DL_DETACH_PENDING);
-		dld_str_detach(dsp);
-
-		mp = dsp->ds_detach_req;
-		dsp->ds_detach_req = NULL;
-
-		mutex_exit(&dsp->ds_thr_lock);
-		dlokack(dsp->ds_wq, mp, DL_DETACH_REQ);
-	} else {
-		mutex_exit(&dsp->ds_thr_lock);
-	}
+	op = dsp->ds_pending_op;
+	dsp->ds_pending_op = NULL;
+	mutex_exit(&dsp->ds_thr_lock);
+	if (op != NULL)
+		(void) taskq_dispatch(system_taskq, op, dsp, TQ_SLEEP);
 }
 
 #define	NEG(x)	-(x)
@@ -425,6 +420,27 @@ failed:
 /*
  * DL_DETACH_REQ
  */
+static void
+proto_process_detach_req(void *arg)
+{
+	dld_str_t	*dsp = arg;
+	mblk_t		*mp;
+
+	/*
+	 * We don't need to hold locks because no other thread
+	 * would manipulate dsp while it is in a PENDING state.
+	 */
+	ASSERT(dsp->ds_pending_req != NULL);
+	ASSERT(dsp->ds_dlstate == DL_DETACH_PENDING);
+
+	mp = dsp->ds_pending_req;
+	dsp->ds_pending_req = NULL;
+	dld_str_detach(dsp);
+	dlokack(dsp->ds_wq, mp, DL_DETACH_REQ);
+
+	DLD_WAKEUP(dsp);
+}
+
 /*ARGSUSED*/
 static boolean_t
 proto_detach_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
@@ -455,8 +471,10 @@ proto_detach_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	 * Complete the detach when the driver is single-threaded.
 	 */
 	mutex_enter(&dsp->ds_thr_lock);
-	ASSERT(dsp->ds_detach_req == NULL);
-	dsp->ds_detach_req = mp;
+	ASSERT(dsp->ds_pending_req == NULL);
+	dsp->ds_pending_req = mp;
+	dsp->ds_pending_op = proto_process_detach_req;
+	dsp->ds_pending_cnt++;
 	mutex_exit(&dsp->ds_thr_lock);
 	rw_exit(&dsp->ds_lock);
 
@@ -569,25 +587,18 @@ failed:
  * DL_UNBIND_REQ
  */
 /*ARGSUSED*/
-static boolean_t
-proto_unbind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+static void
+proto_process_unbind_req(void *arg)
 {
-	queue_t		*q = dsp->ds_wq;
-	t_uscalar_t	dl_err;
+	dld_str_t	*dsp = arg;
+	mblk_t		*mp;
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-
-	if (MBLKL(mp) < sizeof (dl_unbind_req_t)) {
-		dl_err = DL_BADPRIM;
-		goto failed;
-	}
-
-	if (dsp->ds_dlstate != DL_IDLE) {
-		dl_err = DL_OUTSTATE;
-		goto failed;
-	}
-
-	dsp->ds_dlstate = DL_UNBIND_PENDING;
+	/*
+	 * We don't need to hold locks because no other thread
+	 * would manipulate dsp while it is in a PENDING state.
+	 */
+	ASSERT(dsp->ds_pending_req != NULL);
+	ASSERT(dsp->ds_dlstate == DL_UNBIND_PENDING);
 
 	/*
 	 * Flush any remaining packets scheduled for transmission.
@@ -616,24 +627,51 @@ proto_unbind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 
 	/*
 	 * If soft rings were enabled, the workers
-	 * should be quiesced. Start a task that will
-	 * get this in motion. We cannot check for
+	 * should be quiesced. We cannot check for
 	 * ds_soft_ring flag because
 	 * proto_soft_ring_disable() called from
 	 * proto_capability_req() would have reset it.
 	 */
-	if (dls_soft_ring_workers(dsp->ds_dc)) {
-		dsp->ds_unbind_req = mp;
-		dsp->ds_task_id = taskq_dispatch(system_taskq,
-		    proto_stop_soft_ring_threads, (void *)dsp, TQ_SLEEP);
-		rw_exit(&dsp->ds_lock);
-		return (B_TRUE);
+	if (dls_soft_ring_workers(dsp->ds_dc))
+		dls_soft_ring_disable(dsp->ds_dc);
+
+	mp = dsp->ds_pending_req;
+	dsp->ds_pending_req = NULL;
+	dsp->ds_dlstate = DL_UNBOUND;
+	dlokack(dsp->ds_wq, mp, DL_UNBIND_REQ);
+
+	DLD_WAKEUP(dsp);
+}
+
+/*ARGSUSED*/
+static boolean_t
+proto_unbind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
+{
+	queue_t		*q = dsp->ds_wq;
+	t_uscalar_t	dl_err;
+
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+
+	if (MBLKL(mp) < sizeof (dl_unbind_req_t)) {
+		dl_err = DL_BADPRIM;
+		goto failed;
 	}
 
-	dsp->ds_dlstate = DL_UNBOUND;
+	if (dsp->ds_dlstate != DL_IDLE) {
+		dl_err = DL_OUTSTATE;
+		goto failed;
+	}
+
+	dsp->ds_dlstate = DL_UNBIND_PENDING;
+
+	mutex_enter(&dsp->ds_thr_lock);
+	ASSERT(dsp->ds_pending_req == NULL);
+	dsp->ds_pending_req = mp;
+	dsp->ds_pending_op = proto_process_unbind_req;
+	dsp->ds_pending_cnt++;
+	mutex_exit(&dsp->ds_thr_lock);
 	rw_exit(&dsp->ds_lock);
 
-	dlokack(q, mp, DL_UNBIND_REQ);
 	return (B_TRUE);
 failed:
 	rw_exit(&dsp->ds_lock);
@@ -1528,7 +1566,7 @@ proto_poll_disable(dld_str_t *dsp)
 {
 	mac_handle_t	mh;
 
-	ASSERT(RW_WRITE_HELD(&dsp->ds_lock));
+	ASSERT(dsp->ds_pending_req != NULL || RW_WRITE_HELD(&dsp->ds_lock));
 
 	if (!dsp->ds_polling)
 		return;
@@ -1646,21 +1684,6 @@ proto_change_soft_ring_fanout(dld_str_t *dsp, int type)
 		rx = (dls_rx_t)dls_ether_soft_ring_fanout;
 	}
 	dls_soft_ring_rx_set(dsp->ds_dc, rx, dsp, type);
-}
-
-static void
-proto_stop_soft_ring_threads(void *arg)
-{
-	dld_str_t	*dsp = (dld_str_t *)arg;
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-	dls_soft_ring_disable(dsp->ds_dc);
-	dsp->ds_dlstate = DL_UNBOUND;
-	rw_exit(&dsp->ds_lock);
-	dlokack(dsp->ds_wq, dsp->ds_unbind_req, DL_UNBIND_REQ);
-	rw_enter(&dsp->ds_lock, RW_WRITER);
-	dsp->ds_task_id = NULL;
-	rw_exit(&dsp->ds_lock);
 }
 
 /*

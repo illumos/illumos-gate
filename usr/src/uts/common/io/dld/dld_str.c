@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -259,7 +259,13 @@ dld_close(queue_t *rq)
 {
 	dld_str_t	*dsp = rq->q_ptr;
 
-	ASSERT(dsp->ds_task_id == NULL);
+	/*
+	 * Wait until pending requests are processed.
+	 */
+	mutex_enter(&dsp->ds_thr_lock);
+	while (dsp->ds_pending_cnt > 0)
+		cv_wait(&dsp->ds_pending_cv, &dsp->ds_thr_lock);
+	mutex_exit(&dsp->ds_thr_lock);
 
 	/*
 	 * Disable the queue srv(9e) routine.
@@ -594,7 +600,7 @@ dld_str_destroy(dld_str_t *dsp)
 
 	ASSERT(MUTEX_NOT_HELD(&dsp->ds_thr_lock));
 	ASSERT(dsp->ds_thr == 0);
-	ASSERT(dsp->ds_detach_req == NULL);
+	ASSERT(dsp->ds_pending_req == NULL);
 
 	/*
 	 * Reinitialize all the flags.
@@ -642,6 +648,7 @@ str_constructor(void *buf, void *cdrarg, int kmflags)
 	mutex_init(&dsp->ds_thr_lock, NULL, MUTEX_DRIVER, NULL);
 	rw_init(&dsp->ds_lock, NULL, RW_DRIVER, NULL);
 	mutex_init(&dsp->ds_tx_list_lock, NULL, MUTEX_DRIVER, NULL);
+	cv_init(&dsp->ds_pending_cv, NULL, CV_DRIVER, NULL);
 
 	return (0);
 }
@@ -690,7 +697,10 @@ str_destructor(void *buf, void *cdrarg)
 
 	ASSERT(MUTEX_NOT_HELD(&dsp->ds_thr_lock));
 	mutex_destroy(&dsp->ds_thr_lock);
-	ASSERT(dsp->ds_detach_req == NULL);
+	ASSERT(dsp->ds_pending_req == NULL);
+	ASSERT(dsp->ds_pending_op == NULL);
+	ASSERT(dsp->ds_pending_cnt == 0);
+	cv_destroy(&dsp->ds_pending_cv);
 }
 
 /*
@@ -853,11 +863,6 @@ dld_str_detach(dld_str_t *dsp)
 	mac_notify_remove(dsp->ds_mh, dsp->ds_mnh);
 
 	/*
-	 * Re-initialize the DLPI state machine.
-	 */
-	dsp->ds_dlstate = DL_UNATTACHED;
-
-	/*
 	 * Clear the polling and promisc flags.
 	 */
 	dsp->ds_polling = B_FALSE;
@@ -872,6 +877,12 @@ dld_str_detach(dld_str_t *dsp)
 	dsp->ds_mh = NULL;
 
 	(void) qassociate(dsp->ds_wq, -1);
+
+	/*
+	 * Re-initialize the DLPI state machine.
+	 */
+	dsp->ds_dlstate = DL_UNATTACHED;
+
 }
 
 /*

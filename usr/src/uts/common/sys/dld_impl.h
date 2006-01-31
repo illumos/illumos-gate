@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -189,15 +189,15 @@ struct dld_str {
 
 	/*
 	 * Number of threads currently in dld.  If there is a pending
-	 * DL_DETACH_REQ, the request is placed in the ds_detach_req
-	 * and the operation will be finished when the driver goes
-	 * single-threaded.
+	 * request, it is placed in ds_pending_req and the operation
+	 * will finish when dld becomes single-threaded.
 	 */
 	kmutex_t		ds_thr_lock;
 	uint_t			ds_thr;
-	taskqid_t		ds_task_id;
-	mblk_t			*ds_detach_req;
-	mblk_t			*ds_unbind_req;
+	uint_t			ds_pending_cnt;
+	mblk_t			*ds_pending_req;
+	task_func_t		*ds_pending_op;
+	kcondvar_t		ds_pending_cv;
 } dld_str;
 
 /*
@@ -257,10 +257,18 @@ extern uint32_t		dld_opt;
 #define	DLD_EXIT(dsp) {							\
 	mutex_enter(&dsp->ds_thr_lock);					\
 	ASSERT(dsp->ds_thr > 0);					\
-	if (--dsp->ds_thr == 0 && dsp->ds_detach_req != NULL)		\
+	if (--dsp->ds_thr == 0 && dsp->ds_pending_req != NULL)		\
 		dld_finish_pending_ops(dsp);				\
 	else								\
 		mutex_exit(&dsp->ds_thr_lock);				\
+}
+
+#define	DLD_WAKEUP(dsp) {						\
+	mutex_enter(&dsp->ds_thr_lock);					\
+	ASSERT(dsp->ds_pending_cnt > 0);				\
+	if (--dsp->ds_pending_cnt == 0)					\
+		cv_signal(&dsp->ds_pending_cv);				\
+	mutex_exit(&dsp->ds_thr_lock);					\
 }
 
 #ifdef DEBUG
