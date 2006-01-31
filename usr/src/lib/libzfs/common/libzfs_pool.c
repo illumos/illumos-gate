@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1149,4 +1149,146 @@ zpool_remove_zvol_links(zpool_handle_t *zhp)
 
 	zfs_close(zfp);
 	return (ret);
+}
+
+/*
+ * Convert from a devid string to a path.
+ */
+static char *
+devid_to_path(char *devid_str)
+{
+	ddi_devid_t devid;
+	char *minor;
+	char *path;
+	devid_nmlist_t *list = NULL;
+	int ret;
+
+	if (devid_str_decode(devid_str, &devid, &minor) != 0)
+		return (NULL);
+
+	ret = devid_deviceid_to_nmlist("/dev", devid, minor, &list);
+
+	devid_str_free(minor);
+	devid_free(devid);
+
+	if (ret != 0)
+		return (NULL);
+
+	path = zfs_strdup(list[0].devname);
+	devid_free_nmlist(list);
+
+	return (path);
+}
+
+/*
+ * Convert from a path to a devid string.
+ */
+static char *
+path_to_devid(const char *path)
+{
+	int fd;
+	ddi_devid_t devid;
+	char *minor, *ret;
+
+	if ((fd = open(path, O_RDONLY)) < 0)
+		return (NULL);
+
+	minor = NULL;
+	ret = NULL;
+	if (devid_get(fd, &devid) == 0) {
+		if (devid_get_minor_name(fd, &minor) == 0)
+			ret = devid_str_encode(devid, minor);
+		if (minor != NULL)
+			devid_str_free(minor);
+		devid_free(devid);
+	}
+	(void) close(fd);
+
+	return (ret);
+}
+
+/*
+ * Issue the necessary ioctl() to update the stored path value for the vdev.  We
+ * ignore any failure here, since a common case is for an unprivileged user to
+ * type 'zpool status', and we'll display the correct information anyway.
+ */
+static void
+set_path(zpool_handle_t *zhp, nvlist_t *nv, const char *path)
+{
+	zfs_cmd_t zc = { 0 };
+
+	(void) strncpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
+	(void) strncpy(zc.zc_prop_value, path, sizeof (zc.zc_prop_value));
+	verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID,
+	    &zc.zc_pool_guid) == 0);
+
+	(void) ioctl(zfs_fd, ZFS_IOC_VDEV_SETPATH, &zc);
+}
+
+/*
+ * Given a vdev, return the name to display in iostat.  If the vdev has a path,
+ * we use that, stripping off any leading "/dev/dsk/"; if not, we use the type.
+ * We also check if this is a whole disk, in which case we strip off the
+ * trailing 's0' slice name.
+ *
+ * This routine is also responsible for identifying when disks have been
+ * reconfigured in a new location.  The kernel will have opened the device by
+ * devid, but the path will still refer to the old location.  To catch this, we
+ * first do a path -> devid translation (which is fast for the common case).  If
+ * the devid matches, we're done.  If not, we do a reverse devid -> path
+ * translation and issue the appropriate ioctl() to update the path of the vdev.
+ * If 'zhp' is NULL, then this is an exported pool, and we don't need to do any
+ * of these checks.
+ */
+char *
+zpool_vdev_name(zpool_handle_t *zhp, nvlist_t *nv)
+{
+	char *path, *devid;
+	uint64_t wholedisk;
+
+	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
+
+		if (zhp != NULL &&
+		    nvlist_lookup_string(nv, ZPOOL_CONFIG_DEVID, &devid) == 0) {
+			/*
+			 * Determine if the current path is correct.
+			 */
+			char *newdevid = path_to_devid(path);
+
+			if (newdevid == NULL ||
+			    strcmp(devid, newdevid) != 0) {
+				char *newpath;
+
+				if ((newpath = devid_to_path(devid)) != NULL) {
+					/*
+					 * Update the path appropriately.
+					 */
+					set_path(zhp, nv, newpath);
+					verify(nvlist_add_string(nv,
+					    ZPOOL_CONFIG_PATH, newpath) == 0);
+					free(newpath);
+					verify(nvlist_lookup_string(nv,
+					    ZPOOL_CONFIG_PATH, &path) == 0);
+				}
+
+				if (newdevid)
+					devid_str_free(newdevid);
+			}
+
+		}
+
+		if (strncmp(path, "/dev/dsk/", 9) == 0)
+			path += 9;
+
+		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
+		    &wholedisk) == 0 && wholedisk) {
+			char *tmp = zfs_strdup(path);
+			tmp[strlen(path) - 2] = '\0';
+			return (tmp);
+		}
+	} else {
+		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &path) == 0);
+	}
+
+	return (zfs_strdup(path));
 }

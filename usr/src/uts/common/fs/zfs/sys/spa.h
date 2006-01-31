@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -307,6 +307,7 @@ extern int spa_vdev_attach(spa_t *spa, const char *path, nvlist_t *nvroot,
 extern int spa_vdev_detach(spa_t *spa, const char *path, uint64_t guid,
     int replace_done);
 extern void spa_vdev_replace_done(spa_t *spa);
+extern int spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath);
 
 /* scrubbing */
 extern int spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force);

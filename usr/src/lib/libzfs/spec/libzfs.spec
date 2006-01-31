@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -334,4 +334,8 @@ end
 
 function zpool_vdev_detach
 version SUNWprivate_1.1
+end
+
+function zpool_vdev_name
+version  SUNWprivate_1.1
 end

@@ -144,6 +144,11 @@ extern int zpool_import(nvlist_t *, const char *, const char *);
 extern nvlist_t *zpool_find_import(int argc, char **argv);
 
 /*
+ * Miscellaneous pool functions
+ */
+extern char *zpool_vdev_name(zpool_handle_t *, nvlist_t *);
+
+/*
  * Basic handle manipulations.  These functions do not create or destroy the
  * underlying datasets, only the references to them.
  */

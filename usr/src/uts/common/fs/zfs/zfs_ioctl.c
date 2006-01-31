@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -621,6 +621,25 @@ zfs_ioc_vdev_detach(zfs_cmd_t *zc)
 }
 
 static int
+zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	char *path = zc->zc_prop_value;
+	uint64_t guid = zc->zc_pool_guid;
+	int error;
+
+	error = spa_open(zc->zc_name, &spa, FTAG);
+	if (error != 0)
+		return (error);
+
+	error = spa_vdev_setpath(spa, guid, path);
+
+	spa_close(spa, FTAG);
+	return (error);
+}
+
+
+static int
 zfs_get_stats(zfs_cmd_t *zc)
 {
 	char *name = zc->zc_name;
@@ -1075,6 +1094,7 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_vdev_offline,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_attach,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_vdev_detach,		zfs_secpolicy_config,	pool_name },
+	{ zfs_ioc_vdev_setpath,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_objset_stats,		zfs_secpolicy_read,	dataset_name },
 	{ zfs_ioc_dataset_list_next,	zfs_secpolicy_read,	dataset_name },
 	{ zfs_ioc_snapshot_list_next,	zfs_secpolicy_read,	dataset_name },

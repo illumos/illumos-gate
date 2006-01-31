@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1199,6 +1199,33 @@ spa_vdev_replace_done(spa_t *spa)
 	}
 
 	list_destroy(&vdlist);
+}
+
+/*
+ * Update the stored path for this vdev.  Dirty the vdev configuration, relying
+ * on spa_vdev_enter/exit() to synchronize the labels and cache.
+ */
+int
+spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath)
+{
+	vdev_t *rvd, *vd;
+	uint64_t txg;
+
+	rvd = spa->spa_root_vdev;
+
+	txg = spa_vdev_enter(spa);
+
+	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
+		return (spa_vdev_exit(spa, NULL, txg, ENOENT));
+
+	spa_strfree(vd->vdev_path);
+	vd->vdev_path = spa_strdup(newpath);
+
+	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
+
+	vdev_config_dirty(vd->vdev_top);
+
+	return (spa_vdev_exit(spa, NULL, txg, 0));
 }
 
 /*

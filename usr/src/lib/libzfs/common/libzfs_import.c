@@ -108,6 +108,7 @@ get_devid(const char *path)
 			devid_str_free(minor);
 		devid_free(devid);
 	}
+	(void) close(fd);
 
 	return (ret);
 }
@@ -123,8 +124,9 @@ fix_paths(nvlist_t *nv, name_entry_t *names)
 	nvlist_t **child;
 	uint_t c, children;
 	uint64_t guid;
-	name_entry_t *ne;
-	char *devid;
+	name_entry_t *ne, *best;
+	char *path, *devid;
+	int matched;
 
 	if (nvlist_lookup_nvlist_array(nv, ZPOOL_CONFIG_CHILDREN,
 	    &child, &children) == 0) {
@@ -137,19 +139,55 @@ fix_paths(nvlist_t *nv, name_entry_t *names)
 	 * This is a leaf (file or disk) vdev.  In either case, go through
 	 * the name list and see if we find a matching guid.  If so, replace
 	 * the path and see if we can calculate a new devid.
+	 *
+	 * There may be multiple names associated with a particular guid, in
+	 * which case we have overlapping slices or multiple paths to the same
+	 * disk.  If this is the case, then we want to pick the path that is
+	 * the most similar to the original, where "most similar" is the number
+	 * of matching characters starting from the end of the path.  This will
+	 * preserve slice numbers even if the disks have been reorganized, and
+	 * will also catch preferred disk names if multiple paths exist.
 	 */
 	verify(nvlist_lookup_uint64(nv, ZPOOL_CONFIG_GUID, &guid) == 0);
+	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) != 0)
+		path = NULL;
 
-	for (ne = names; ne != NULL; ne = ne->ne_next)
-		if (ne->ne_guid == guid)
-			break;
+	matched = 0;
+	best = NULL;
+	for (ne = names; ne != NULL; ne = ne->ne_next) {
+		if (ne->ne_guid == guid) {
+			const char *src, *dst;
+			int count;
 
-	if (ne == NULL)
+			if (path == NULL) {
+				best = ne;
+				break;
+			}
+
+			src = ne->ne_name + strlen(ne->ne_name) - 1;
+			dst = path + strlen(path) - 1;
+			for (count = 0; src >= ne->ne_name && dst >= path;
+			    src--, dst--, count++)
+				if (*src != *dst)
+					break;
+
+			/*
+			 * At this point, 'count' is the number of characters
+			 * matched from the end.
+			 */
+			if (count > matched || best == NULL) {
+				best = ne;
+				matched = count;
+			}
+		}
+	}
+
+	if (best == NULL)
 		return;
 
-	verify(nvlist_add_string(nv, ZPOOL_CONFIG_PATH, ne->ne_name) == 0);
+	verify(nvlist_add_string(nv, ZPOOL_CONFIG_PATH, best->ne_name) == 0);
 
-	if ((devid = get_devid(ne->ne_name)) == NULL) {
+	if ((devid = get_devid(best->ne_name)) == NULL) {
 		(void) nvlist_remove_all(nv, ZPOOL_CONFIG_DEVID);
 	} else {
 		verify(nvlist_add_string(nv, ZPOOL_CONFIG_DEVID, devid) == 0);

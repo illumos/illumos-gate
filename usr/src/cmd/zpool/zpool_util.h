@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,6 @@ extern "C" {
 void *safe_malloc(size_t);
 char *safe_strdup(const char *);
 void no_memory(void);
-
-char *vdev_get_name(nvlist_t *nv);
 
 /*
  * Virtual device functions

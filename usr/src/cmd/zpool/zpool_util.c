@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,34 +77,4 @@ no_memory(void)
 	(void) fprintf(stderr,
 	    gettext("internal error: out of memory\n"));
 	exit(1);
-}
-
-/*
- * Given a vdev, return the name to display in iostat.  If the vdev has a path,
- * we use that, stripping off any leading "/dev/dsk/"; if not, we use the type.
- * We also check if this is a whole disk, in which case we strip off the
- * trailing 's0' slice name.
- */
-char *
-vdev_get_name(nvlist_t *nv)
-{
-	char *path;
-	uint64_t wholedisk;
-
-	if (nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0) {
-
-		if (strncmp(path, "/dev/dsk/", 9) == 0)
-			path += 9;
-
-		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
-		    &wholedisk) == 0 && wholedisk) {
-			char *tmp = safe_strdup(path);
-			tmp[strlen(path) - 2] = '\0';
-			return (tmp);
-		}
-	} else {
-		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_TYPE, &path) == 0);
-	}
-
-	return (safe_strdup(path));
 }

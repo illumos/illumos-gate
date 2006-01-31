@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -261,7 +261,7 @@ state_to_name(int state)
 }
 
 void
-print_vdev_tree(const char *name, nvlist_t *nv, int indent)
+print_vdev_tree(zpool_handle_t *zhp, const char *name, nvlist_t *nv, int indent)
 {
 	nvlist_t **child;
 	uint_t c, children;
@@ -275,8 +275,8 @@ print_vdev_tree(const char *name, nvlist_t *nv, int indent)
 		return;
 
 	for (c = 0; c < children; c++) {
-		vname = vdev_get_name(child[c]);
-		print_vdev_tree(vname, child[c], indent + 2);
+		vname = zpool_vdev_name(zhp, child[c]);
+		print_vdev_tree(zhp, vname, child[c], indent + 2);
 		free(vname);
 	}
 }
@@ -364,8 +364,8 @@ zpool_do_add(int argc, char **argv)
 		(void) printf(gettext("would update '%s' to the following "
 		    "configuration:\n"), zpool_get_name(zhp));
 
-		print_vdev_tree(poolname, poolnvroot, 0);
-		print_vdev_tree(NULL, nvroot, 0);
+		print_vdev_tree(zhp, poolname, poolnvroot, 0);
+		print_vdev_tree(zhp, NULL, nvroot, 0);
 
 		ret = 0;
 	} else {
@@ -527,7 +527,7 @@ zpool_do_create(int argc, char **argv)
 		(void) printf(gettext("would create '%s' with the "
 		    "following layout:\n\n"), poolname);
 
-		print_vdev_tree(poolname, nvroot, 0);
+		print_vdev_tree(NULL, poolname, nvroot, 0);
 
 		ret = 0;
 	} else {
@@ -691,9 +691,9 @@ zpool_do_export(int argc, char **argv)
  * name column.
  */
 static int
-max_width(nvlist_t *nv, int depth, int max)
+max_width(zpool_handle_t *zhp, nvlist_t *nv, int depth, int max)
 {
-	char *name = vdev_get_name(nv);
+	char *name = zpool_vdev_name(zhp, nv);
 	nvlist_t **child;
 	uint_t c, children;
 	int ret;
@@ -708,7 +708,7 @@ max_width(nvlist_t *nv, int depth, int max)
 		return (max);
 
 	for (c = 0; c < children; c++)
-		if ((ret = max_width(child[c], depth + 2, max)) > max)
+		if ((ret = max_width(zhp, child[c], depth + 2, max)) > max)
 			max = ret;
 
 	return (max);
@@ -766,7 +766,7 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 		return;
 
 	for (c = 0; c < children; c++) {
-		vname = vdev_get_name(child[c]);
+		vname = zpool_vdev_name(NULL, child[c]);
 		print_import_config(vname, child[c],
 		    namewidth, depth + 2);
 		free(vname);
@@ -875,7 +875,7 @@ show_import(nvlist_t *config)
 
 	(void) printf(gettext("config:\n\n"));
 
-	namewidth = max_width(nvroot, 0, 0);
+	namewidth = max_width(NULL, nvroot, 0, 0);
 	if (namewidth < 10)
 		namewidth = 10;
 	print_import_config(name, nvroot, namewidth, 0);
@@ -1192,8 +1192,8 @@ print_one_stat(uint64_t value)
  * is a verbose output, and we don't want to display the toplevel pool stats.
  */
 void
-print_vdev_stats(const char *name, nvlist_t *oldnv, nvlist_t *newnv,
-	iostat_cbdata_t *cb, int depth)
+print_vdev_stats(zpool_handle_t *zhp, const char *name, nvlist_t *oldnv,
+    nvlist_t *newnv, iostat_cbdata_t *cb, int depth)
 {
 	nvlist_t **oldchild, **newchild;
 	uint_t c, children;
@@ -1260,8 +1260,8 @@ print_vdev_stats(const char *name, nvlist_t *oldnv, nvlist_t *newnv,
 		return;
 
 	for (c = 0; c < children; c++) {
-		vname = vdev_get_name(newchild[c]);
-		print_vdev_stats(vname, oldnv ? oldchild[c] : NULL,
+		vname = zpool_vdev_name(zhp, newchild[c]);
+		print_vdev_stats(zhp, vname, oldnv ? oldchild[c] : NULL,
 		    newchild[c], cb, depth + 2);
 		free(vname);
 	}
@@ -1308,7 +1308,7 @@ print_iostat(zpool_handle_t *zhp, void *data)
 	/*
 	 * Print out the statistics for the pool.
 	 */
-	print_vdev_stats(zpool_get_name(zhp), oldnvroot, newnvroot, cb, 0);
+	print_vdev_stats(zhp, zpool_get_name(zhp), oldnvroot, newnvroot, cb, 0);
 
 	if (cb->cb_verbose)
 		print_iostat_separator(cb);
@@ -1328,7 +1328,7 @@ get_namewidth(zpool_handle_t *zhp, void *data)
 		if (!cb->cb_verbose)
 			cb->cb_namewidth = strlen(zpool_get_name(zhp));
 		else
-			cb->cb_namewidth = max_width(nvroot, 0, 0);
+			cb->cb_namewidth = max_width(zhp, nvroot, 0, 0);
 	}
 
 	/*
@@ -2158,7 +2158,8 @@ print_scrub_status(nvlist_t *nvroot)
  * Print out configuration state as requested by status_callback.
  */
 void
-print_status_config(const char *name, nvlist_t *nv, int namewidth, int depth)
+print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
+    int namewidth, int depth)
 {
 	nvlist_t **child;
 	uint_t c, children;
@@ -2214,8 +2215,8 @@ print_status_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 	(void) printf("\n");
 
 	for (c = 0; c < children; c++) {
-		vname = vdev_get_name(child[c]);
-		print_status_config(vname, child[c],
+		vname = zpool_vdev_name(zhp, child[c]);
+		print_status_config(zhp, vname, child[c],
 		    namewidth, depth + 2);
 		free(vname);
 	}
@@ -2352,14 +2353,15 @@ status_callback(zpool_handle_t *zhp, void *data)
 		(void) printf(gettext(" scrub: "));
 		print_scrub_status(nvroot);
 
-		namewidth = max_width(nvroot, 0, 0);
+		namewidth = max_width(zhp, nvroot, 0, 0);
 		if (namewidth < 10)
 			namewidth = 10;
 
 		(void) printf(gettext("config:\n\n"));
 		(void) printf(gettext("\t%-*s  %-8s %5s %5s %5s\n"), namewidth,
 		    "NAME", "STATE", "READ", "WRITE", "CKSUM");
-		print_status_config(zpool_get_name(zhp), nvroot, namewidth, 0);
+		print_status_config(zhp, zpool_get_name(zhp), nvroot,
+		    namewidth, 0);
 	} else {
 		(void) printf(gettext("config: The configuration cannot be "
 		    "determined.\n"));
