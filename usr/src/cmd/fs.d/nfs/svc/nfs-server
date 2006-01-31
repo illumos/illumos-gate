@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,6 +41,16 @@ case "$1" in
 		exit $SMF_EXIT_OK
 	fi
 
+	# Share any ZFS filesystems marked for sharing.  The environment
+	# variable prevents share(1M) from checking whether each filesystem
+	# is in use, an O(n^2) operation with no purpose at this time
+
+	if [ -x /usr/sbin/zfs ]; then
+		SHARE_NOINUSE_CHECK=1; export SHARE_NOINUSE_CHECK
+		/usr/sbin/zfs share -a
+		unset SHARE_NOINUSE_CHECK
+	fi
+
 	# If /etc/dfs/dfstab exists and has non-blank or non-commented-out
 	# lines, then run shareall to export them.
 
@@ -51,11 +61,6 @@ case "$1" in
 		/usr/sbin/shareall -F nfs
 	fi
 
-	# Share any ZFS filesystems marked for sharing.
-
-	if [ -x /usr/sbin/zfs ]; then
-		/usr/sbin/zfs share -a
-	fi
 
 	# Start up mountd and nfsd if anything is exported.
 

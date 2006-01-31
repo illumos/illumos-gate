@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -91,11 +91,11 @@ zfs_callback(zfs_handle_t *zhp, void *data)
 	}
 
 	/*
-	 * If 'recurse' is set, and the datasets can have datasets of the
-	 * appropriate type, then recurse over its children.
+	 * Recurse if necessary.
 	 */
 	if (cb->cb_recurse && (zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM ||
-	    (cb->cb_types & ZFS_TYPE_SNAPSHOT)))
+	    (zfs_get_type(zhp) == ZFS_TYPE_VOLUME && (cb->cb_types &
+	    ZFS_TYPE_SNAPSHOT))))
 		(void) zfs_iter_children(zhp, zfs_callback, data);
 
 	if (!dontclose)

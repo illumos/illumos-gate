@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -212,10 +212,10 @@ zfs_name_to_prop(const char *propname)
 /*
  * Return the default value for the given property.
  */
-void
-zfs_prop_default_string(zfs_prop_t prop, char *buf, size_t buflen)
+const char *
+zfs_prop_default_string(zfs_prop_t prop)
 {
-	(void) strncpy(buf, zfs_prop_table[prop].pd_strdefault, buflen);
+	return (zfs_prop_table[prop].pd_strdefault);
 }
 
 uint64_t

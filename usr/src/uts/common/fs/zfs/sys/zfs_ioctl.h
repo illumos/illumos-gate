@@ -42,31 +42,6 @@ extern "C" {
 #define	ZFS_SNAPDIR_HIDDEN		0
 #define	ZFS_SNAPDIR_VISIBLE		1
 
-typedef struct zfs_stats {
-	uint64_t	zs_atime;
-	uint64_t	zs_recordsize;
-	uint64_t	zs_readonly;
-	uint64_t	zs_devices;
-	uint64_t	zs_exec;
-	uint64_t	zs_setuid;
-	uint64_t	zs_snapdir;
-	uint64_t	zs_acl_mode;
-	uint64_t	zs_acl_inherit;
-	char		zs_mountpoint[MAXPATHLEN];
-	char		zs_atime_setpoint[MAXNAMELEN];
-	char		zs_recordsize_setpoint[MAXNAMELEN];
-	char		zs_readonly_setpoint[MAXNAMELEN];
-	char		zs_devices_setpoint[MAXNAMELEN];
-	char		zs_setuid_setpoint[MAXNAMELEN];
-	char		zs_exec_setpoint[MAXNAMELEN];
-	char		zs_mountpoint_setpoint[MAXNAMELEN];
-	char		zs_sharenfs[MAXPATHLEN];
-	char		zs_sharenfs_setpoint[MAXNAMELEN];
-	char		zs_snapdir_setpoint[MAXNAMELEN];
-	char		zs_acl_mode_setpoint[MAXNAMELEN];
-	char		zs_acl_inherit_setpoint[MAXNAMELEN];
-} zfs_stats_t;
-
 #define	DMU_BACKUP_VERSION (1ULL)
 #define	DMU_BACKUP_MAGIC 0x2F5bacbacULL
 
@@ -141,7 +116,6 @@ typedef struct zfs_cmd {
 	uint64_t	zc_volsize;
 	uint64_t	zc_volblocksize;
 	uint64_t	zc_objset_type;
-	zfs_stats_t	zc_zfs_stats;
 	dmu_object_info_t zc_object_info;
 	dmu_objset_stats_t zc_objset_stats;
 	struct drr_begin zc_begin_record;

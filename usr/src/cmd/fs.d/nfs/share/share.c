@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -148,15 +148,17 @@ main(int argc, char *argv[])
 	if (argc - optind > 1)
 		res = argv[optind + 1];
 
-	switch (shareable(dir)) {
-	case 0:
-		exit(RET_ERR);
-		break;
-	case 1:
-		break;
-	case 2:
-		replace = 1;
-		break;
+	if (getenv("SHARE_NOINUSE_CHECK") == NULL) {
+		switch (shareable(dir)) {
+		case 0:
+			exit(RET_ERR);
+			break;
+		case 1:
+			break;
+		case 2:
+			replace = 1;
+			break;
+		}
 	}
 
 	ex.ex_path = dir;

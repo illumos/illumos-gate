@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -553,14 +553,8 @@ typedef struct dmu_objset_stats {
 	uint64_t dds_available;
 
 	/*
-	 * Various properties.
+	 * Miscellaneous
 	 */
-	uint64_t dds_compression;
-	uint64_t dds_checksum;
-	uint64_t dds_zoned;
-	char dds_compression_setpoint[MAXNAMELEN];
-	char dds_checksum_setpoint[MAXNAMELEN];
-	char dds_zoned_setpoint[MAXNAMELEN];
 	char dds_altroot[MAXPATHLEN];
 
 	/* The following are for debugging purposes only */

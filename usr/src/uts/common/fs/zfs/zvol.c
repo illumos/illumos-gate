@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -164,10 +164,6 @@ zvol_get_stats(zfs_cmd_t *zc, objset_t *os)
 
 	if (error == 0)
 		zc->zc_volblocksize = doi.doi_data_block_size;
-
-	error = dsl_prop_get_integer(zc->zc_name, "readonly",
-			&zc->zc_zfs_stats.zs_readonly,
-			zc->zc_zfs_stats.zs_readonly_setpoint);
 
 	return (error);
 }

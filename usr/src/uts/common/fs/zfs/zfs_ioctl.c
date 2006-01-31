@@ -640,46 +640,13 @@ zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
 
 
 static int
-zfs_get_stats(zfs_cmd_t *zc)
-{
-	char *name = zc->zc_name;
-	zfs_stats_t *zs = &zc->zc_zfs_stats;
-	int error;
-
-	bzero(zs, sizeof (zfs_stats_t));
-
-	if ((error = dsl_prop_get_integer(name, "atime",
-	    &zs->zs_atime, zs->zs_atime_setpoint)) != 0 ||
-	    (error = dsl_prop_get_integer(name, "recordsize",
-	    &zs->zs_recordsize, zs->zs_recordsize_setpoint)) != 0 ||
-	    (error = dsl_prop_get_integer(name, "readonly",
-	    &zs->zs_readonly, zs->zs_readonly_setpoint)) != 0 ||
-	    (error = dsl_prop_get_integer(name, "devices",
-	    &zs->zs_devices, zs->zs_devices_setpoint)) != 0 ||
-	    (error = dsl_prop_get_integer(name, "setuid",
-	    &zs->zs_setuid, zs->zs_setuid_setpoint)) != 0 ||
-	    (error = dsl_prop_get_integer(name, "exec",
-	    &zs->zs_exec, zs->zs_exec_setpoint)) != 0 ||
-	    (error = dsl_prop_get_string(name, "mountpoint", zs->zs_mountpoint,
-	    sizeof (zs->zs_mountpoint), zs->zs_mountpoint_setpoint)) != 0 ||
-	    (error = dsl_prop_get_string(name, "sharenfs", zs->zs_sharenfs,
-	    sizeof (zs->zs_sharenfs), zs->zs_sharenfs_setpoint)) != 0 ||
-	    (error = dsl_prop_get_integer(name, "aclmode",
-	    &zs->zs_acl_mode, zs->zs_acl_mode_setpoint)) != 0 ||
-	    (error = dsl_prop_get_integer(name, "snapdir",
-	    &zs->zs_snapdir, zs->zs_snapdir_setpoint)) != 0 ||
-	    (error = dsl_prop_get_integer(name, "aclinherit",
-	    &zs->zs_acl_inherit, zs->zs_acl_inherit_setpoint)) != 0)
-		return (error);
-
-	return (0);
-}
-
-static int
 zfs_ioc_objset_stats(zfs_cmd_t *zc)
 {
 	objset_t *os = NULL;
 	int error;
+	nvlist_t *nv;
+	size_t sz;
+	char *buf;
 
 retry:
 	error = dmu_objset_open(zc->zc_name, DMU_OST_ANY,
@@ -701,16 +668,25 @@ retry:
 
 	dmu_objset_stats(os, &zc->zc_objset_stats);
 
-	switch (zc->zc_objset_stats.dds_type) {
-
-	case DMU_OST_ZFS:
-		error = zfs_get_stats(zc);
-		break;
-
-	case DMU_OST_ZVOL:
-		error = zvol_get_stats(zc, os);
-		break;
+	if (zc->zc_config_src != NULL &&
+	    (error = dsl_prop_get_all(os, &nv)) == 0) {
+		VERIFY(nvlist_size(nv, &sz, NV_ENCODE_NATIVE) == 0);
+		if (sz > zc->zc_config_src_size) {
+			zc->zc_config_src_size = sz;
+			error = ENOMEM;
+		} else {
+			buf = kmem_alloc(sz, KM_SLEEP);
+			VERIFY(nvlist_pack(nv, &buf, &sz,
+			    NV_ENCODE_NATIVE, 0) == 0);
+			error = xcopyout(buf,
+			    (void *)(uintptr_t)zc->zc_config_src, sz);
+			kmem_free(buf, sz);
+		}
+		nvlist_free(nv);
 	}
+
+	if (!error && zc->zc_objset_stats.dds_type == DMU_OST_ZVOL)
+		error = zvol_get_stats(zc, os);
 
 	dmu_objset_close(os);
 	return (error);

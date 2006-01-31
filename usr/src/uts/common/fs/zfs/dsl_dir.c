@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -556,15 +556,6 @@ dsl_dir_stats(dsl_dir_t *dd, dmu_objset_stats_t *dds)
 		dsl_dataset_close(ds, DS_MODE_NONE, FTAG);
 		rw_exit(&dd->dd_pool->dp_config_rwlock);
 	}
-
-	VERIFY(dsl_prop_get_ds_integer(dd, "checksum",
-	    &dds->dds_checksum, dds->dds_checksum_setpoint) == 0);
-
-	VERIFY(dsl_prop_get_ds_integer(dd, "compression",
-	    &dds->dds_compression, dds->dds_compression_setpoint) == 0);
-
-	VERIFY(dsl_prop_get_ds_integer(dd, "zoned",
-	    &dds->dds_zoned, dds->dds_zoned_setpoint) == 0);
 
 	spa_altroot(dd->dd_pool->dp_spa, dds->dds_altroot,
 	    sizeof (dds->dds_altroot));

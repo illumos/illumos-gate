@@ -183,7 +183,7 @@ int zfs_prop_inheritable(zfs_prop_t);
 int zfs_prop_inherit(zfs_handle_t *, zfs_prop_t);
 const char *zfs_prop_values(zfs_prop_t);
 int zfs_prop_valid_for_type(zfs_prop_t, int);
-void zfs_prop_default_string(zfs_prop_t prop, char *buf, size_t buflen);
+const char *zfs_prop_default_string(zfs_prop_t prop);
 uint64_t zfs_prop_default_numeric(zfs_prop_t);
 int zfs_prop_is_string(zfs_prop_t prop);
 const char *zfs_prop_column_name(zfs_prop_t);
@@ -201,6 +201,8 @@ typedef int (*zfs_iter_f)(zfs_handle_t *, void *);
 extern int zfs_iter_root(zfs_iter_f, void *);
 extern int zfs_iter_children(zfs_handle_t *, zfs_iter_f, void *);
 extern int zfs_iter_dependents(zfs_handle_t *, zfs_iter_f, void *);
+extern int zfs_iter_filesystems(zfs_handle_t *, zfs_iter_f, void *);
+extern int zfs_iter_snapshots(zfs_handle_t *, zfs_iter_f, void *);
 
 /*
  * Functions to create and destroy datasets.

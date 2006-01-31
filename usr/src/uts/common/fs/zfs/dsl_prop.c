@@ -20,13 +20,14 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/dmu.h>
+#include <sys/dmu_objset.h>
 #include <sys/dmu_tx.h>
 #include <sys/dsl_dataset.h>
 #include <sys/dsl_dir.h>
@@ -50,7 +51,7 @@ dodefault(const char *propname, int intsz, int numint, void *buf)
 	if (zfs_prop_get_type(prop) == prop_type_string) {
 		if (intsz != 1)
 			return (EOVERFLOW);
-		zfs_prop_default_string(prop, buf, numint);
+		(void) strncpy(buf, zfs_prop_default_string(prop), numint);
 	} else {
 		if (intsz != 8 || numint < 1)
 			return (EOVERFLOW);
@@ -363,6 +364,106 @@ dsl_prop_set(const char *ddname, const char *propname,
 	err = dsl_dir_sync_task(dd, dsl_prop_set_sync, &psa, 0);
 
 	dsl_dir_close(dd, FTAG);
+
+	return (err);
+}
+
+/*
+ * Iterate over all properties for this dataset and return them in an nvlist.
+ */
+int
+dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
+{
+	dsl_dataset_t *ds = os->os->os_dsl_dataset;
+	dsl_dir_t *dd, *parent;
+	int err = 0;
+	dsl_pool_t *dp;
+	objset_t *mos;
+	zap_cursor_t zc;
+	zap_attribute_t za;
+	char setpoint[MAXNAMELEN];
+	char *tmp;
+	nvlist_t *prop;
+
+	if (dsl_dataset_is_snapshot(ds)) {
+		VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+		return (0);
+	}
+
+	dd = ds->ds_dir;
+
+	VERIFY(nvlist_alloc(nvp, NV_UNIQUE_NAME, KM_SLEEP) == 0);
+
+	dp = dd->dd_pool;
+	mos = dp->dp_meta_objset;
+
+	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	while (dd != NULL) {
+		dsl_dir_name(dd, setpoint);
+
+		for (zap_cursor_init(&zc, mos, dd->dd_phys->dd_props_zapobj);
+		    (err = zap_cursor_retrieve(&zc, &za)) == 0;
+		    zap_cursor_advance(&zc)) {
+			if (nvlist_lookup_nvlist(*nvp, za.za_name, &prop) == 0)
+				continue;
+
+			VERIFY(nvlist_alloc(&prop, NV_UNIQUE_NAME,
+			    KM_SLEEP) == 0);
+			if (za.za_integer_length == 1) {
+				/*
+				 * String property
+				 */
+
+				tmp = kmem_alloc(za.za_num_integers, KM_SLEEP);
+				err = zap_lookup(mos,
+				    dd->dd_phys->dd_props_zapobj,
+				    za.za_name, 1, za.za_num_integers,
+				    tmp);
+				if (err != 0) {
+					kmem_free(tmp, za.za_num_integers);
+					break;
+				}
+				VERIFY(nvlist_add_string(prop,
+				    ZFS_PROP_VALUE, tmp) == 0);
+				kmem_free(tmp, za.za_num_integers);
+			} else {
+				/*
+				 * Integer property
+				 */
+				ASSERT(za.za_integer_length == 8);
+				(void) nvlist_add_uint64(prop, ZFS_PROP_VALUE,
+				    za.za_first_integer);
+			}
+
+			VERIFY(nvlist_add_string(prop,
+			    ZFS_PROP_SOURCE, setpoint) == 0);
+			VERIFY(nvlist_add_nvlist(*nvp, za.za_name,
+			    prop) == 0);
+			nvlist_free(prop);
+		}
+		zap_cursor_fini(&zc);
+
+		if (err != ENOENT) {
+			if (dd != ds->ds_dir)
+				dsl_dir_close(dd, FTAG);
+			break;
+		} else {
+			err = 0;
+		}
+
+		/*
+		 * Continue to parent.
+		 */
+		if (dd->dd_phys->dd_parent_obj == 0)
+			parent = NULL;
+		else
+			parent = dsl_dir_open_obj(dp,
+			    dd->dd_phys->dd_parent_obj, NULL, FTAG);
+		if (dd != ds->ds_dir)
+			dsl_dir_close(dd, FTAG);
+		dd = parent;
+	}
+	rw_exit(&dp->dp_config_rwlock);
 
 	return (err);
 }

@@ -45,7 +45,7 @@ struct zfs_handle {
 	char zfs_name[ZFS_MAXNAMELEN];
 	zfs_type_t zfs_type;
 	dmu_objset_stats_t zfs_dmustats;
-	zfs_stats_t zfs_zplstats;
+	nvlist_t *zfs_props;
 	uint64_t zfs_volsize;
 	uint64_t zfs_volblocksize;
 	char *zfs_mntopts;

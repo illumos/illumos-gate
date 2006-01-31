@@ -80,7 +80,15 @@ function zfs_iter_dependents
 version SUNWprivate_1.1
 end
 
+function zfs_iter_filesystems
+version SUNWprivate_1.1
+end
+
 function zfs_iter_root
+version SUNWprivate_1.1
+end
+
+function zfs_iter_snapshots
 version SUNWprivate_1.1
 end
 

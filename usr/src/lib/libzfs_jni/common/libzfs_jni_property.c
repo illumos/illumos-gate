@@ -333,9 +333,7 @@ create_default_BasicProperty(JNIEnv *env, zfs_prop_t prop,
 		jobject propValue;
 
 		if (convert_str != NULL) {
-			char propbuf[ZFS_MAXPROPLEN];
-			zfs_prop_default_string(
-			    prop, propbuf, sizeof (propbuf));
+			char *propbuf = (char *)zfs_prop_default_string(prop);
 			propValue = convert_str(env, propbuf);
 		} else {
 			uint64_t value = zfs_prop_default_numeric(prop);
@@ -406,9 +404,7 @@ create_default_ObjectProperty(JNIEnv *env, zfs_prop_t prop,
 		jobject propValue;
 
 		if (convert_str != NULL) {
-			char propbuf[ZFS_MAXPROPLEN];
-			zfs_prop_default_string(
-			    prop, propbuf, sizeof (propbuf));
+			char *propbuf = (char *)zfs_prop_default_string(prop);
 			propValue = convert_str(env, propbuf);
 		} else {
 			uint64_t value = zfs_prop_default_numeric(prop);

@@ -96,12 +96,15 @@ typedef enum {
 
 #define	ZFS_NPROP_VISIBLE	ZFS_PROP_CREATETXG
 
+#define	ZFS_PROP_VALUE		"value"
+#define	ZFS_PROP_SOURCE		"source"
+
 /*
  * The following functions are shared between libzfs and the kernel.
  */
 zfs_prop_t zfs_name_to_prop(const char *);
 int zfs_prop_readonly(zfs_prop_t);
-void zfs_prop_default_string(zfs_prop_t, char *, size_t);
+const char *zfs_prop_default_string(zfs_prop_t);
 uint64_t zfs_prop_default_numeric(zfs_prop_t);
 
 /*

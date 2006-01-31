@@ -1770,6 +1770,75 @@ zfs_do_restore(int argc, char **argv)
 	return (err != 0);
 }
 
+typedef struct get_all_cbdata {
+	zfs_handle_t	**cb_handles;
+	size_t		cb_alloc;
+	size_t		cb_used;
+} get_all_cbdata_t;
+
+static int
+get_one_filesystem(zfs_handle_t *zhp, void *data)
+{
+	get_all_cbdata_t *cbp = data;
+
+	/*
+	 * Skip any zvols
+	 */
+	if (zfs_get_type(zhp) != ZFS_TYPE_FILESYSTEM) {
+		zfs_close(zhp);
+		return (0);
+	}
+
+	if (cbp->cb_alloc == cbp->cb_used) {
+		zfs_handle_t **handles;
+
+		if (cbp->cb_alloc == 0)
+			cbp->cb_alloc = 64;
+		else
+			cbp->cb_alloc *= 2;
+
+		handles = safe_malloc(cbp->cb_alloc * sizeof (void *));
+
+		if (cbp->cb_handles) {
+			bcopy(cbp->cb_handles, handles,
+			    cbp->cb_used * sizeof (void *));
+			free(cbp->cb_handles);
+		}
+
+		cbp->cb_handles = handles;
+	}
+
+	cbp->cb_handles[cbp->cb_used++] = zhp;
+
+	return (zfs_iter_filesystems(zhp, get_one_filesystem, data));
+}
+
+static void
+get_all_filesystems(zfs_handle_t ***fslist, size_t *count)
+{
+	get_all_cbdata_t cb = { 0 };
+
+	(void) zfs_iter_root(get_one_filesystem, &cb);
+
+	*fslist = cb.cb_handles;
+	*count = cb.cb_used;
+}
+
+static int
+mountpoint_compare(const void *a, const void *b)
+{
+	zfs_handle_t **za = (zfs_handle_t **)a;
+	zfs_handle_t **zb = (zfs_handle_t **)b;
+	char mounta[MAXPATHLEN];
+	char mountb[MAXPATHLEN];
+
+	verify(zfs_prop_get(*za, ZFS_PROP_MOUNTPOINT, mounta,
+	    sizeof (mounta), NULL, NULL, 0, FALSE) == 0);
+	verify(zfs_prop_get(*zb, ZFS_PROP_MOUNTPOINT, mountb,
+	    sizeof (mountb), NULL, NULL, 0, FALSE) == 0);
+
+	return (strcmp(mounta, mountb));
+}
 
 /*
  * Generic callback for sharing or mounting filesystems.  Because the code is so
@@ -1975,13 +2044,30 @@ share_or_mount(int type, int argc, char **argv)
 
 	/* check number of arguments */
 	if (do_all) {
+		zfs_handle_t **fslist = NULL;
+		size_t i, count = 0;
+
 		if (argc != 0) {
 			(void) fprintf(stderr, gettext("too many arguments\n"));
 			usage(FALSE);
 		}
 
-		ret = zfs_for_each(argc, argv, TRUE,
-		    ZFS_TYPE_FILESYSTEM, share_mount_callback, &cb);
+		get_all_filesystems(&fslist, &count);
+
+		if (count == 0)
+			return (0);
+
+		qsort(fslist, count, sizeof (void *), mountpoint_compare);
+
+		for (i = 0; i < count; i++) {
+			if ((ret = share_mount_callback(fslist[i], &cb)) != 0)
+				break;
+		}
+
+		for (i = 0; i < count; i++)
+			zfs_close(fslist[i]);
+
+		free(fslist);
 	} else if (argc == 0) {
 		struct mnttab entry;
 
