@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -188,13 +188,13 @@ yylex()
 static char
 *rel(oper, r1, r2) register char *r1, *r2;
 {
-	long long i;
+	long long i, l1, l2;
 
 	if (ematch(r1, "-\\{0,1\\}[0-9]*$") &&
 	    ematch(r2, "-\\{0,1\\}[0-9]*$")) {
 		errno = 0;
-		i = strtoll(r1, (char **)NULL, 10) -
-		    strtoll(r2, (char **)NULL, 10);
+		l1 = strtoll(r1, (char **)NULL, 10);
+		l2 = strtoll(r2, (char **)NULL, 10);
 		if (errno) {
 #ifdef XPG6
 		/* XPG6: stdout will always contain newline even on error */
@@ -209,28 +209,50 @@ static char
 				exit(3);
 			}
 		}
+		switch (oper) {
+		case EQ:
+			i = (l1 == l2);
+			break;
+		case GT:
+			i = (l1 > l2);
+			break;
+		case GEQ:
+			i = (l1 >= l2);
+			break;
+		case LT:
+			i = (l1 < l2);
+			break;
+		case LEQ:
+			i = (l1 <= l2);
+			break;
+		case NEQ:
+			i = (l1 != l2);
+			break;
+		}
 	}
 	else
-		i = strcoll(r1, r2);
-	switch (oper) {
-	case EQ:
-		i = i == 0;
-		break;
-	case GT:
-		i = i > 0;
-		break;
-	case GEQ:
-		i = i >= 0;
-		break;
-	case LT:
-		i = i < 0;
-		break;
-	case LEQ:
-		i = i <= 0;
-		break;
-	case NEQ:
-		i = i != 0;
-		break;
+	{
+			i = strcoll(r1, r2);
+		switch (oper) {
+		case EQ:
+			i = i == 0;
+			break;
+		case GT:
+			i = i > 0;
+			break;
+		case GEQ:
+			i = i >= 0;
+			break;
+		case LT:
+			i = i < 0;
+			break;
+		case LEQ:
+			i = i <= 0;
+			break;
+		case NEQ:
+			i = i != 0;
+			break;
+		}
 	}
 	return (i ? "1": "0");
 }
