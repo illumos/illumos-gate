@@ -846,7 +846,7 @@ zvol_ioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cr, int *rvalp)
 		(void) strcpy(dkc.dki_cname, "zvol");
 		(void) strcpy(dkc.dki_dname, "zvol");
 		dkc.dki_ctype = DKC_UNKNOWN;
-		dkc.dki_maxtransfer = 1 << 15;
+		dkc.dki_maxtransfer = 1 << (SPA_MAXBLOCKSHIFT - zv->zv_min_bs);
 		mutex_exit(&zvol_state_lock);
 		if (ddi_copyout(&dkc, (void *)arg, sizeof (dkc), flag))
 			error = EFAULT;
