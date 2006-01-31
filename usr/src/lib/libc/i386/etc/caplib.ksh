@@ -23,7 +23,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -35,7 +35,7 @@
 # scripts, which remounts them in the preexit phase.
 #  
 
-if [ -z $FLASH_PID ]; then
+if [ -z "$FLASH_PID" ]; then
 	echo "$0: ERROR: FLASH_PID not set in execution environment, exiting..."
 	exit 1 
 fi
@@ -65,7 +65,7 @@ done
 LIBS=`$MOUNT | $EGREP "^/lib|^/usr/lib" | \
     $SED -e 's:^\(/[^ ]*\) on \([^ ]*\).*$:\1@\2:'`
 
-if [ ! $LIBS ]; then
+if [ ! "$LIBS" ]; then
 	exit 0
 fi
 

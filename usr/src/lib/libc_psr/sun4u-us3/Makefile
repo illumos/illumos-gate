@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,13 +75,13 @@ $(ROOT_PSM_LIB_DIR):
 	-$(INS.dir.root.bin)
 
 $(ROOT_PSM_LIB_DIR)/$(MODULE):	$(ROOT_PSM_LIB_DIR) $(MODULE)
-	$(RM) -r $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(MODULE)
+	$(RM) -r $@; $(INS) -s -f $(@D) $(MODULE)
 
 $(ROOT_PSM_LIB64_DIR):
 	-$(INS.dir.root.bin)
 
 $(ROOT_PSM_LIB64_DIR)/$(MODULE):	$(ROOT_PSM_LIB64_DIR) $(MODULE)
-	$(RM) -r $@; $(INS) -s -m $(FILEMODE) -f $(@D) $(MODULE)
+	$(RM) -r $@; $(INS) -s -f $(@D) $(MODULE)
 
 $(LIBC_PSR_DIRS):
 	-$(INS.dir.root.bin)

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -133,7 +133,7 @@ d none platform/SUNW,Netra-CP3010/lib/sparcv9 755 root bin
 d none platform/sun4u-us3/lib/sparcv9 755 root bin
 d none platform/sun4u-us3/lib/sparcv9/libc_psr 755 root bin
 f none platform/sun4u/lib/sparcv9/libc_psr.so.1 755 root bin
-v none platform/sun4u-us3/lib/sparcv9/libc_psr.so.1 644 root bin
+v none platform/sun4u-us3/lib/sparcv9/libc_psr.so.1 755 root bin
 f none platform/sun4u-us3/lib/sparcv9/libc_psr/libc_psr_hwcap1.so.1 755 root bin
 f none platform/sun4u-us3/lib/sparcv9/libc_psr/libc_psr_hwcap2.so.1 755 root bin
 s none platform/SUNW,Netra-T12/lib/sparcv9/libc_psr.so.1=../../../sun4u-us3/lib/sparcv9/libc_psr.so.1
@@ -242,7 +242,7 @@ d none platform/SUNW,Netra-CP2300/lib 755 root bin
 d none platform/SUNW,Netra-CP3010/lib 755 root bin
 f none platform/sun4u/lib/libc_psr.so.1 755 root bin
 d none platform/sun4u-us3/lib 755 root sys
-v none platform/sun4u-us3/lib/libc_psr.so.1 644 root bin
+v none platform/sun4u-us3/lib/libc_psr.so.1 755 root bin
 d none platform/sun4u-us3/lib/libc_psr 755 root sys
 f none platform/sun4u-us3/lib/libc_psr/libc_psr_hwcap1.so.1 755 root bin
 f none platform/sun4u-us3/lib/libc_psr/libc_psr_hwcap2.so.1 755 root bin

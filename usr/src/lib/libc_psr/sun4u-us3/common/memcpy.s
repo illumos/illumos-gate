@@ -189,6 +189,7 @@
 	subcc	%o2, 31, %o2		! adjust length to allow cc test
 					! for end of loop
 	ble,pt  %ncc, .dbmedl31		! skip big loop if less than 32
+	nop
 .dbmedl32:
 	ldx	[%o1-8], %o4		! load
 	subcc	%o2, 32, %o2		! decrement length count
