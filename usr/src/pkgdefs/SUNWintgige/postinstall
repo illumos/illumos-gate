@@ -21,7 +21,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"	
@@ -171,16 +171,8 @@ check_add_drv()
 	"pci8086,107d"
 	"pci8086,107e"
 	"pci8086,108a"
-	"pci8086,108b"
-	"pci8086,108c"
-	"pci8086,109a"
 	"pciex8086,105e"
 	"pciex8086,105f"
-	"pciex8086,1060"
 	"pciex8086,107d"
-	"pciex8086,107e"
-	"pciex8086,107f"
-	"pciex8086,108b"
-	"pciex8086,108c"
-	"pciex8086,109a"' \
+	"pciex8086,107e"' \
 	-m '* 0666 root root' e1000g
