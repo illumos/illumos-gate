@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -370,24 +370,24 @@ match_edd(biosdev_data_t *bdata)
 	if (strncmp(bd->interface_type, "SCSI", 4) == 0) {
 
 		/* at this time sd doesnot support luns greater than uchar_t */
-		(void) snprintf(path, MAXPATHLEN, "%s/sd@%d,%d", devfspath,
+		(void) snprintf(path, MAXPATHLEN, "%s/sd@%x,%x", devfspath,
 		    bd->devicepath.scsi.target, bd->devicepath.scsi.lun_lo);
 
 	} else if (strncmp(bd->interface_type, "ATAPI", 5) == 0) {
 
-		(void) snprintf(path, MAXPATHLEN, "%s/ide@%d/sd@%d,0",
+		(void) snprintf(path, MAXPATHLEN, "%s/ide@%d/sd@%x,0",
 		    devfspath, bd->interfacepath.pci.channel,
 		    bd->devicepath.ata.chan);
 
 	} else if (strncmp(bd->interface_type, "ATA", 3) == 0) {
 
-		(void) snprintf(path, MAXPATHLEN, "%s/ide@%d/cmdk@%d,0",
+		(void) snprintf(path, MAXPATHLEN, "%s/ide@%d/cmdk@%x,0",
 		    devfspath, bd->interfacepath.pci.channel,
 		    bd->devicepath.ata.chan);
 
 	} else if (strncmp(bd->interface_type, "SATA", 4) == 0) {
 
-		(void) snprintf(path, MAXPATHLEN, "%s/ide@%d/cmdk@%d,0",
+		(void) snprintf(path, MAXPATHLEN, "%s/ide@%d/cmdk@%x,0",
 		    devfspath, bd->interfacepath.pci.channel,
 		    bd->devicepath.ata.chan);
 
