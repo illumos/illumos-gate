@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -505,22 +504,39 @@ ufs_fault_v(vnode_t *vp, char *fmt, va_list adx)
 	case TRIAGE_ATTEND_TO:
 
 		/* q thread not running yet? */
-		mutex_enter(&ufs_fix.uq_mutex);
-		if (!ufs_fix.uq_threadp) {
-			mutex_exit(&ufs_fix.uq_mutex);
-			ufs_thread_start(&ufs_fix, ufsfx_thread_fix_failures,
-								    NULL);
-			ufs_fix.uq_threadp->t_flag |= T_DONTBLOCK;
-			mutex_enter(&ufs_fix.uq_mutex);
+		if (mutex_tryenter(&ufs_fix.uq_mutex)) {
+			if (!ufs_fix.uq_threadp) {
+				mutex_exit(&ufs_fix.uq_mutex);
+				ufs_thread_start(&ufs_fix,
+				    ufsfx_thread_fix_failures, NULL);
+				ufs_fix.uq_threadp->t_flag |= T_DONTBLOCK;
+				mutex_enter(&ufs_fix.uq_mutex);
+			} else {
+				/*
+				 * We got the lock but we are not the current
+				 * threadp so we have to release the lock.
+				 */
+				mutex_exit(&ufs_fix.uq_mutex);
+			}
 		} else {
 			MINOR((": fix failure thread already running "));
+			/*
+			 * No need to log another failure as one is already
+			 * being logged.
+			 */
+			break;
 		}
 
 		if (ufs_fix.uq_threadp && ufs_fix.uq_threadp == curthread) {
 			mutex_exit(&ufs_fix.uq_mutex);
 			cmn_err(CE_WARN, "ufs_fault_v: recursive ufs_fault");
 		} else {
-			mutex_exit(&ufs_fix.uq_mutex);
+			/*
+			 * Must check if we actually still own the lock and
+			 * if so then release the lock and move on with life.
+			 */
+			if (mutex_owner(&ufs_fix.uq_mutex) == curthread)
+				mutex_exit(&ufs_fix.uq_mutex);
 		}
 
 		new = init_failure(vp, fmt, adx);
