@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -291,6 +291,7 @@ zil_create(zilog_t *zilog)
 	dmu_tx_t *tx;
 	blkptr_t blk;
 	int error;
+	int no_blk;
 
 	ASSERT(zilog->zl_header->zh_claim_txg == 0);
 	ASSERT(zilog->zl_header->zh_replay_seq == 0);
@@ -304,10 +305,17 @@ zil_create(zilog_t *zilog)
 	txg = dmu_tx_get_txg(tx);
 
 	/*
-	 * Allocate the first log block and assign its checksum verifier.
+	 * If we don't have a log block already then
+	 * allocate the first log block and assign its checksum verifier.
 	 */
-	error = zio_alloc_blk(zilog->zl_spa, ZIO_CHECKSUM_ZILOG,
-	    ZIL_MIN_BLKSZ, &blk, txg);
+	no_blk = BP_IS_HOLE(&zilog->zl_header->zh_log);
+	if (no_blk) {
+		error = zio_alloc_blk(zilog->zl_spa, ZIO_CHECKSUM_ZILOG,
+		    ZIL_MIN_BLKSZ, &blk, txg);
+	} else {
+		blk = zilog->zl_header->zh_log;
+		error = 0;
+	}
 	if (error == 0) {
 		ZIO_SET_CHECKSUM(&blk.blk_cksum,
 		    spa_get_random(-1ULL), spa_get_random(-1ULL),
@@ -331,7 +339,8 @@ zil_create(zilog_t *zilog)
 	}
 
 	dmu_tx_commit(tx);
-	txg_wait_synced(zilog->zl_dmu_pool, txg);
+	if (no_blk)
+		txg_wait_synced(zilog->zl_dmu_pool, txg);
 }
 
 /*
@@ -357,6 +366,9 @@ zil_destroy(zilog_t *zilog)
 
 	zil_parse(zilog, zil_free_log_block, zil_free_log_record, tx,
 	    zilog->zl_header->zh_claim_txg);
+	/*
+	 * zil_sync clears the zil header as soon as the zl_destroy_txg commits
+	 */
 	zilog->zl_destroy_txg = txg;
 
 	dmu_tx_commit(tx);
@@ -981,6 +993,26 @@ zil_free(zilog_t *zilog)
 }
 
 /*
+ * return true if there is a valid initial zil log block
+ */
+static int
+zil_empty(zilog_t *zilog)
+{
+	blkptr_t blk;
+	char *lrbuf;
+	int error;
+
+	blk = zilog->zl_header->zh_log;
+	if (BP_IS_HOLE(&blk))
+		return (1);
+
+	lrbuf = zio_buf_alloc(SPA_MAXBLOCKSIZE);
+	error = zil_read_log_block(zilog, &blk, lrbuf);
+	zio_buf_free(lrbuf, SPA_MAXBLOCKSIZE);
+	return (error ? 1 : 0);
+}
+
+/*
  * Open an intent log.
  */
 zilog_t *
@@ -1001,7 +1033,8 @@ zil_open(objset_t *os, zil_get_data_t *get_data)
 void
 zil_close(zilog_t *zilog)
 {
-	txg_wait_synced(zilog->zl_dmu_pool, 0);
+	if (!zil_empty(zilog))
+		txg_wait_synced(zilog->zl_dmu_pool, 0);
 	taskq_destroy(zilog->zl_clean_taskq);
 	zilog->zl_clean_taskq = NULL;
 	zilog->zl_get_data = NULL;
@@ -1210,14 +1243,24 @@ zil_replay_log_record(zilog_t *zilog, lr_t *lr, void *zra, uint64_t claim_txg)
 }
 
 /*
- * If this dataset has an intent log, replay it and destroy it.
+ * If this dataset has a non-empty intent log, replay it and destroy it.
  */
 void
 zil_replay(objset_t *os, void *arg, uint64_t *txgp,
 	zil_replay_func_t *replay_func[TX_MAX_TYPE], void (*rm_sync)(void *arg))
 {
 	zilog_t *zilog = dmu_objset_zil(os);
-	zil_replay_arg_t zr;
+		zil_replay_arg_t zr;
+
+	if (zil_empty(zilog)) {
+		/*
+		 * Initialise the log header but don't free the log block
+		 * which will get reused.
+		 */
+		zilog->zl_header->zh_claim_txg = 0;
+		zilog->zl_header->zh_replay_seq = 0;
+		return;
+	}
 
 	zr.zr_os = os;
 	zr.zr_replay = replay_func;
