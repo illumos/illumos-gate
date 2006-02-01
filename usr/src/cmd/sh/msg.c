@@ -24,7 +24,7 @@
 
 
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,7 @@ const char	baddir[]	= "bad directory";
 const char	badtrap[]	= "bad trap";
 const char	wtfailed[]	= "is read only";
 const char	notid[]		= "is not an identifier";
-const char 	badulimit[]	= "bad ulimit";
+const char 	badulimit[]	= "exceeds allowable limit";
 const char 	badresource[]	= "no such resource";
 const char	badreturn[] 	= "cannot return when not in function";
 const char	badexport[] 	= "cannot export functions";

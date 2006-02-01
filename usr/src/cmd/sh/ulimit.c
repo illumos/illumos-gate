@@ -19,16 +19,15 @@
  *
  * CDDL HEADER END
  */
+/*
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
+ */
 /*	Copyright (c) 1984, 1986, 1987, 1988, 1989 AT&T	*/
 /*	  All Rights Reserved  	*/
 
 
-/*
- * Copyright (c) 1996,1997 by Sun Microsystems, Inc.
- * All rights reserved.
- */
-
-#ident	"%Z%%M%	%I%	%E% SMI"
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 /*
  * ulimit builtin
@@ -63,6 +62,7 @@ sysulimit(int argc, char **argv)
 	int savopterr, savoptind, savsp;
 	char *savoptarg;
 	char *args;
+	char errargs[PATH_MAX];
 	int hard, soft, cnt, c, res;
 	rlim_t limit, new_limit;
 	struct rlimit rlimit;
@@ -190,7 +190,9 @@ sysulimit(int argc, char **argv)
 		new_limit = limit = 0;
 		do {
 			if (*args < '0' || *args > '9') {
-				failure(argv[0], badulimit);
+				snprintf(errargs, PATH_MAX-1,
+				"%s: %s", argv[0], args);
+				failure(errargs, badnum);
 				goto err;
 			}
 			/* Check for overflow! */
@@ -198,7 +200,9 @@ sysulimit(int argc, char **argv)
 			if (new_limit >= limit) {
 				limit = new_limit;
 			} else {
-				failure(argv[0], badulimit);
+				snprintf(errargs, PATH_MAX-1,
+				"%s: %s", argv[0], args);
+				failure(errargs, badnum);
 				goto err;
 			}
 		} while (*++args);
@@ -208,13 +212,15 @@ sysulimit(int argc, char **argv)
 		if (new_limit >= limit) {
 			limit = new_limit;
 		} else {
-			failure(argv[0], badulimit);
+			snprintf(errargs, PATH_MAX-1,
+			"%s: %s", argv[0], args);
+			failure(errargs, badnum);
 			goto err;
 		}
 	}
 
 	if (getrlimit(res, &rlimit) < 0) {
-		failure(argv[0], badulimit);
+		failure(argv[0], badnum);
 		goto err;
 	}
 
@@ -230,7 +236,9 @@ sysulimit(int argc, char **argv)
 	}
 
 	if (setrlimit(res, &rlimit) < 0) {
-		failure(argv[0], badulimit);
+		snprintf(errargs, PATH_MAX-1,
+		"%s: %s", argv[0], argv[optind]);
+		failure(errargs, badulimit);
 	}
 
 err:
