@@ -3,7 +3,7 @@
  *
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1350,8 +1350,8 @@ int getlock;
 		if (getlock) {
 			READ_ENTER(&ipf_nat);
 		}
-		n = nat_inlookup(&fin, 0, fin.fin_p, nat->nat_oip,
-				nat->nat_inip);
+		n = nat_inlookup(&fin, nat->nat_flags, fin.fin_p,
+			nat->nat_oip, nat->nat_outip);
 		if (getlock) {
 			RWLOCK_EXIT(&ipf_nat);
 		}
@@ -1360,14 +1360,14 @@ int getlock;
 			goto junkput;
 		}
 	} else if (nat->nat_dir == NAT_INBOUND) {
-		fin.fin_data[0] = ntohs(nat->nat_outport);
+		fin.fin_data[0] = ntohs(nat->nat_inport);
 		fin.fin_data[1] = ntohs(nat->nat_oport);
 		fin.fin_ifp = nat->nat_ifps[0];
 		if (getlock) {
 			READ_ENTER(&ipf_nat);
 		}
-		n = nat_outlookup(&fin, 0, fin.fin_p, nat->nat_outip,
-			nat->nat_oip);
+		n = nat_outlookup(&fin, nat->nat_flags, fin.fin_p,
+			nat->nat_outip, nat->nat_oip);
 		if (getlock) {
 			RWLOCK_EXIT(&ipf_nat);
 		}
