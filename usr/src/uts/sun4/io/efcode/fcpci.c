@@ -94,7 +94,7 @@ static ddi_dma_attr_t fcpci_dma_attr = {
 };
 
 #ifndef	lint
-static char _depends_on[] = "misc/fcodem misc/busra";
+char _depends_on[] = "misc/fcodem misc/busra";
 #endif
 
 #define	HIADDR(n) ((uint32_t)(((uint64_t)(n) & 0xFFFFFFFF00000000)>> 32))

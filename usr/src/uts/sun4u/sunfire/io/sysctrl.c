@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -327,7 +327,7 @@ static struct modlinkage modlinkage = {
 };
 
 #ifndef lint
-static char _depends_on[] = "drv/fhc";
+char _depends_on[] = "drv/fhc";
 #endif /* lint */
 
 /*
