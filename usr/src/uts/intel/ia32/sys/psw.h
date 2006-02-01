@@ -24,7 +24,7 @@
 /*	  All Rights Reserved   */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -65,6 +65,7 @@ typedef struct flags {
 #endif		/* !_ASM */
 
 #define	PS_C		0x0001		/* carry bit			*/
+#define	PS_MB1		0x0002		/* unused; must be 1.		*/
 #define	PS_P		0x0004		/* parity bit			*/
 #define	PS_AC		0x0010		/* auxiliary carry bit		*/
 #define	PS_Z		0x0040		/* zero bit			*/
@@ -92,6 +93,9 @@ typedef struct flags {
 
 /* user variable PS bits */
 #define	PSL_USERMASK	(PS_ICC|PS_D|PS_T|PS_V|PS_P|PS_ACHK|PS_NT)
+
+/* PS bits changeable by the sahf instruction */
+#define	PSL_LSAHFMASK	(PS_ICC|PS_P)
 
 /*
  * kernel flags settings

@@ -274,6 +274,60 @@ instr_is_syscall(caddr_t pc)
 	return (0);
 }
 
+#ifdef __amd64
+
+/*
+ * In the first revisions of AMD64 CPUs produced by AMD, the LAHF and
+ * SAHF instructions were not implemented in 64bit mode. Later revisions
+ * did implement these instructions. An extension to the cpuid instruction
+ * was added to check for the capability of executing these instructions
+ * in 64bit mode.
+ *
+ * Intel originally did not implement these instructions in EM64T either,
+ * but added them in later revisions.
+ *
+ * So, there are different chip revisions by both vendors out there that
+ * may or may not implement these instructions. The easy solution is to
+ * just always emulate these instructions on demand.
+ *
+ * SAHF == store %ah in the lower 8 bits of %rflags (opcode 0x9e)
+ * LAHF == load the lower 8 bits of %rflags into %ah (opcode 0x9f)
+ */
+
+#define	LSAHFSIZE 1
+
+static int
+instr_is_lsahf(caddr_t pc, uchar_t *instr)
+{
+	if (copyin_nowatch(pc, (caddr_t)instr, LSAHFSIZE) == 0 &&
+	    (*instr == 0x9e || *instr == 0x9f))
+		return (1);
+	return (0);
+}
+
+/*
+ * Emulate the LAHF and SAHF instructions. The reference manuals define
+ * these instructions to always load/store bit 1 as a 1, and bits 3 and 5
+ * as a 0. The other, defined, bits are copied (the PS_ICC bits and PS_P).
+ *
+ * Note that %ah is bits 8-15 of %rax.
+ */
+static void
+emulate_lsahf(struct regs *rp, uchar_t instr)
+{
+	if (instr == 0x9e) {
+		/* sahf. Copy bits from %ah to flags. */
+		rp->r_ps = (rp->r_ps & ~0xff) |
+		    ((rp->r_rax >> 8) & PSL_LSAHFMASK) | PS_MB1;
+	} else {
+		/* lahf. Copy bits from flags to %ah. */
+		rp->r_rax = (rp->r_rax & ~0xff00) |
+		    (((rp->r_ps & PSL_LSAHFMASK) | PS_MB1) << 8);
+	}
+	rp->r_pc += LSAHFSIZE;
+}
+#endif /* __amd64 */
+
 #ifdef OPTERON_ERRATUM_91
 
 /*
@@ -336,6 +390,9 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	caddr_t vaddr;
 	size_t sz;
 	int ta;
+#ifdef __amd64
+	uchar_t instr;
+#endif
 
 	ASSERT_STACK_ALIGNED();
 
@@ -784,6 +841,19 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 				    curthread->t_procp->p_pid);
 #endif /* DEBUG */
 		}
+
+#ifdef __amd64
+		/*
+		 * Emulate the LAHF and SAHF instructions if needed.
+		 * See the instr_is_lsahf function for details.
+		 */
+		if (p->p_model == DATAMODEL_LP64 &&
+		    instr_is_lsahf((caddr_t)rp->r_pc, &instr)) {
+			emulate_lsahf(rp, instr);
+			goto out;
+		}
+#endif
+
 		/*FALLTHROUGH*/
 
 		if (tudebug)
