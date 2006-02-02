@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -26,7 +26,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "sys/bge_impl.h"
+#include "sys/bge_impl2.h"
 
 #define	PIO_ADDR(bgep, offset)	((void *)((caddr_t)(bgep)->io_regs+(offset)))
 
@@ -34,6 +34,7 @@
  * Future features ... ?
  */
 #define	BGE_CFG_IO8	0	/* 8/16-bit cfg space BIS/BIC	*/
+#define	BGE_NIC_IO32	0	/* NIC memory 32-bit accesses	*/
 #define	BGE_IND_IO32	0	/* indirect access code		*/
 #define	BGE_SEE_IO32	1	/* SEEPROM access code		*/
 #define	BGE_FLASH_IO32	1	/* FLASH access code		*/
@@ -524,9 +525,6 @@ bge_chip_cfg_init(bge_t *bgep, chip_id_t *cidp, boolean_t enable_dma)
 
 	pci_config_put32(handle, PCI_CONF_BGE_MHCR, mhcr);
 
-#ifdef BGE_IPMI_ASF
-	bgep->asf_wordswapped = B_FALSE;
-#endif
 	/*
 	 * Step 1 (also step 7): Enable PCI Memory Space accesses
 	 *			 Disable Memory Write/Invalidate
@@ -823,6 +821,7 @@ bge_nic_setwin(bge_t *bgep, bge_regno_t base)
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, base);
 }
 
+#if	BGE_NIC_IO32
 
 static uint32_t bge_nic_get32(bge_t *bgep, bge_regno_t addr);
 #pragma	inline(bge_nic_get32)
@@ -831,16 +830,6 @@ static uint32_t
 bge_nic_get32(bge_t *bgep, bge_regno_t addr)
 {
 	uint32_t data;
-
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled && !bgep->asf_wordswapped) {
-		/* workaround for word swap error */
-		if (addr & 4)
-			addr = addr - 4;
-		else
-			addr = addr + 4;
-	}
-#endif
 
 	bge_nic_setwin(bgep, addr & ~MWBAR_GRANULE_MASK);
 	addr &= MWBAR_GRANULE_MASK;
@@ -854,21 +843,14 @@ bge_nic_get32(bge_t *bgep, bge_regno_t addr)
 	return (data);
 }
 
-void
+static void bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data);
+#pragma	inline(bge_nic_put32)
+
+static void
 bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data)
 {
 	BGE_TRACE(("bge_nic_put32($%p, 0x%lx, 0x%08x)",
 		(void *)bgep, addr, data));
-
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled && !bgep->asf_wordswapped) {
-		/* workaround for word swap error */
-		if (addr & 4)
-			addr = addr - 4;
-		else
-			addr = addr + 4;
-	}
-#endif
 
 	bge_nic_setwin(bgep, addr & ~MWBAR_GRANULE_MASK);
 	addr &= MWBAR_GRANULE_MASK;
@@ -877,6 +859,7 @@ bge_nic_put32(bge_t *bgep, bge_regno_t addr, uint32_t data)
 	BGE_PCICHK(bgep);
 }
 
+#endif	/* BGE_NIC_IO32 */
 
 static uint64_t bge_nic_get64(bge_t *bgep, bge_regno_t addr);
 #pragma	inline(bge_nic_get64)
@@ -2525,19 +2508,11 @@ bge_sync_mac_modes(bge_t *bgep)
  * the multicast hash table, the required level of promiscuity, and
  * the current loopback mode ...
  */
-#ifdef BGE_IPMI_ASF
-void bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive);
-#else
 void bge_chip_sync(bge_t *bgep);
-#endif
 #pragma	no_inline(bge_chip_sync)
 
 void
-#ifdef BGE_IPMI_ASF
-bge_chip_sync(bge_t *bgep, boolean_t asf_keeplive)
-#else
 bge_chip_sync(bge_t *bgep)
-#endif
 {
 	void (*opfn)(bge_t *bgep, bge_regno_t reg, uint32_t bits);
 	boolean_t promisc;
@@ -2573,18 +2548,8 @@ bge_chip_sync(bge_t *bgep)
 	 * can be patched to re-enable the old behaviour ...
 	 */
 	if (bge_stop_start_on_sync) {
-#ifdef BGE_IPMI_ASF
-		if (bgep->asf_enabled) {
-			(void) bge_chip_disable_engine(bgep,
-			    RECEIVE_MAC_MODE_REG, 0);
-		} else {
-			(void) bge_chip_disable_engine(bgep,
-			    RECEIVE_MAC_MODE_REG, RECEIVE_MODE_KEEP_VLAN_TAG);
-		}
-#else
 		(void) bge_chip_disable_engine(bgep, RECEIVE_MAC_MODE_REG,
 		    RECEIVE_MODE_KEEP_VLAN_TAG);
-#endif
 		(void) bge_chip_disable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0);
 		(void) bge_chip_reset_engine(bgep, RECEIVE_MAC_MODE_REG);
 	}
@@ -2596,28 +2561,22 @@ bge_chip_sync(bge_t *bgep)
 		bge_reg_put32(bgep, MAC_HASH_REG(i),
 			bgep->mcast_hash[i] | fill);
 
-#ifdef BGE_IPMI_ASF
-	if (!bgep->asf_enabled || !asf_keeplive) {
-#endif
-		/*
-		 * Transform the MAC address from host to chip format, then
-		 * reprogram the transmit random backoff seed and the unicast
-		 * MAC address(es) ...
-		 */
-		for (i = 0, fill = 0, macaddr = 0ull; i < ETHERADDRL; ++i) {
-			macaddr <<= 8;
-			macaddr |= bgep->curr_addr.addr[i];
-			fill += bgep->curr_addr.addr[i];
-		}
-		bge_reg_put32(bgep, MAC_TX_RANDOM_BACKOFF_REG, fill);
-		for (i = 0; i < MAC_ADDRESS_REGS_MAX; ++i)
-			bge_reg_put64(bgep, MAC_ADDRESS_REG(i), macaddr);
-
-		BGE_DEBUG(("bge_chip_sync($%p) setting MAC address %012llx",
-			(void *)bgep, macaddr));
-#ifdef BGE_IPMI_ASF
+	/*
+	 * Transform the MAC address from host to chip format, then
+	 * reprogram the transmit random backoff seed and the unicast
+	 * MAC address(es) ...
+	 */
+	for (i = 0, fill = 0, macaddr = 0ull; i < ETHERADDRL; ++i) {
+		macaddr <<= 8;
+		macaddr |= bgep->curr_addr.addr[i];
+		fill += bgep->curr_addr.addr[i];
 	}
-#endif
+	bge_reg_put32(bgep, MAC_TX_RANDOM_BACKOFF_REG, fill);
+	for (i = 0; i < MAC_ADDRESS_REGS_MAX; ++i)
+		bge_reg_put64(bgep, MAC_ADDRESS_REG(i), macaddr);
+
+	BGE_DEBUG(("bge_chip_sync($%p) setting MAC address %012llx",
+		(void *)bgep, macaddr));
 
 	/*
 	 * Set or clear the PROMISCUOUS mode bit
@@ -2635,18 +2594,8 @@ bge_chip_sync(bge_t *bgep)
 	 */
 	if (bgep->bge_chip_state == BGE_CHIP_RUNNING) {
 		(void) bge_chip_enable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0);
-#ifdef BGE_IPMI_ASF
-		if (bgep->asf_enabled) {
-			(void) bge_chip_enable_engine(bgep,
-			    RECEIVE_MAC_MODE_REG, 0);
-		} else {
-			(void) bge_chip_enable_engine(bgep,
-			    RECEIVE_MAC_MODE_REG, RECEIVE_MODE_KEEP_VLAN_TAG);
-		}
-#else
 		(void) bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG,
 		    RECEIVE_MODE_KEEP_VLAN_TAG);
-#endif
 	}
 }
 
@@ -2779,29 +2728,17 @@ bge_poll_firmware(bge_t *bgep)
 	 * GENCOMM word as "the upper half of a 64-bit quantity" makes
 	 * it work correctly on both big- and little-endian hosts.
 	 */
-#ifdef BGE_IPMI_ASF
-	if (!bgep->asf_enabled) {
-#endif
-		magic = (uint64_t)T3_MAGIC_NUMBER << 32;
-		bge_nic_put64(bgep, NIC_MEM_GENCOMM, magic);
-		BGE_DEBUG(("bge_poll_firmware: put T3 magic 0x%llx in GENCOMM"
-			" 0x%lx", magic, NIC_MEM_GENCOMM));
-#ifdef BGE_IPMI_ASF
-	}
-#endif
+	magic = (uint64_t)T3_MAGIC_NUMBER << 32;
+	bge_nic_put64(bgep, NIC_MEM_GENCOMM, magic);
+	BGE_DEBUG(("bge_poll_firmware: put T3 magic 0x%llx in GENCOMM 0x%lx",
+		magic, NIC_MEM_GENCOMM));
 
 	for (i = 0; i < 1000; ++i) {
 		drv_usecwait(1000);
 		gen = bge_nic_get64(bgep, NIC_MEM_GENCOMM) >> 32;
 		mac = bge_reg_get64(bgep, MAC_ADDRESS_REG(0));
-#ifdef BGE_IPMI_ASF
-		if (!bgep->asf_enabled) {
-#endif
-			if (gen != ~T3_MAGIC_NUMBER)
-				continue;
-#ifdef BGE_IPMI_ASF
-		}
-#endif
+		if (gen != ~T3_MAGIC_NUMBER)
+			continue;
 		if (mac != 0ULL)
 			break;
 		if (bgep->bge_chip_state != BGE_CHIP_INITIAL)
@@ -2817,19 +2754,11 @@ bge_poll_firmware(bge_t *bgep)
 	return (mac);
 }
 
-#ifdef BGE_IPMI_ASF
-void bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode);
-#else
 void bge_chip_reset(bge_t *bgep, boolean_t enable_dma);
-#endif
 #pragma	no_inline(bge_chip_reset)
 
 void
-#ifdef BGE_IPMI_ASF
-bge_chip_reset(bge_t *bgep, boolean_t enable_dma, uint_t asf_mode)
-#else
 bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
-#endif
 {
 	chip_id_t chipid;
 	uint64_t mac;
@@ -2837,9 +2766,6 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	uint32_t mhcr;
 	uint32_t sx0;
 	uint32_t i;
-#ifdef BGE_IPMI_ASF
-	uint32_t mailbox;
-#endif
 
 	BGE_TRACE(("bge_chip_reset($%p, %d)",
 		(void *)bgep, enable_dma));
@@ -2870,15 +2796,6 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 		break;
 	}
 
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled) {
-		if (asf_mode == ASF_MODE_INIT) {
-			bge_asf_pre_reset_operations(bgep, BGE_INIT_RESET);
-		} else if (asf_mode == ASF_MODE_SHUTDOWN) {
-			bge_asf_pre_reset_operations(bgep, BGE_SHUTDOWN_RESET);
-		}
-	}
-#endif
 	/*
 	 * Adapted from Broadcom document 570X-PG102-R, pp 102-116.
 	 * Updated to reflect Broadcom document 570X-PG104-R, pp 146-159.
@@ -2900,10 +2817,7 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 	mhcr |= MHCR_ENABLE_ENDIAN_WORD_SWAP | MHCR_ENABLE_ENDIAN_BYTE_SWAP;
 #endif  /* _BIG_ENDIAN */
 	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MHCR, mhcr);
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled)
-		bgep->asf_wordswapped = B_FALSE;
-#endif
+
 	(void) bge_chip_reset_engine(bgep, MISC_CONFIG_REG);
 	bge_chip_cfg_init(bgep, &chipid, enable_dma);
 
@@ -2936,41 +2850,8 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 #else
 	modeflags = MODE_WORD_SWAP_FRAME | MODE_BYTE_SWAP_FRAME;
 #endif	/* _BIG_ENDIAN */
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled)
-		modeflags |= MODE_HOST_STACK_UP;
-#endif
 	bge_reg_put32(bgep, MODE_CONTROL_REG, modeflags);
 
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled) {
-		if (asf_mode != ASF_MODE_NONE) {
-			/* Wait for NVRAM init */
-			i = 0;
-			drv_usecwait(5000);
-			mailbox = bge_nic_get32(bgep, BGE_FIRMWARE_MAILBOX);
-			while ((mailbox != (uint32_t)
-				~BGE_MAGIC_NUM_FIRMWARE_INIT_DONE) &&
-				(i < 10000)) {
-				drv_usecwait(100);
-				mailbox = bge_nic_get32(bgep,
-					BGE_FIRMWARE_MAILBOX);
-				i++;
-			}
-			if (!bgep->asf_newhandshake) {
-				if ((asf_mode == ASF_MODE_INIT) ||
-					(asf_mode == ASF_MODE_POST_INIT)) {
-
-					bge_asf_post_reset_old_mode(bgep,
-						BGE_INIT_RESET);
-				} else {
-					bge_asf_post_reset_old_mode(bgep,
-						BGE_SHUTDOWN_RESET);
-				}
-			}
-		}
-	}
-#endif
 	/*
 	 * Steps 16-17: poll for firmware completion
 	 */
@@ -3053,22 +2934,6 @@ bge_chip_reset(bge_t *bgep, boolean_t enable_dma)
 			bgep->chipid.vendor_addr.set = 1;
 		}
 	}
-
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled && bgep->asf_newhandshake) {
-		if (asf_mode != ASF_MODE_NONE) {
-			if ((asf_mode == ASF_MODE_INIT) ||
-				(asf_mode == ASF_MODE_POST_INIT)) {
-
-				bge_asf_post_reset_new_mode(bgep,
-					BGE_INIT_RESET);
-			} else {
-				bge_asf_post_reset_new_mode(bgep,
-					BGE_SHUTDOWN_RESET);
-			}
-		}
-	}
-#endif
 
 	/*
 	 * Record the new state
@@ -3260,11 +3125,7 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Step 48: configure the random backoff seed
 	 * Step 96: set up multicast filters
 	 */
-#ifdef BGE_IPMI_ASF
-	bge_chip_sync(bgep, B_FALSE);
-#else
 	bge_chip_sync(bgep);
-#endif
 
 	/*
 	 * Step 49: configure the MTU
@@ -3436,17 +3297,8 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	 * Steps 89-90: enable Transmit & Receive MAC Engines
 	 */
 	(void) bge_chip_enable_engine(bgep, TRANSMIT_MAC_MODE_REG, 0);
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled) {
-		(void) bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG, 0);
-	} else {
-		(void) bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG,
-		    RECEIVE_MODE_KEEP_VLAN_TAG);
-	}
-#else
 	(void) bge_chip_enable_engine(bgep, RECEIVE_MAC_MODE_REG,
 	    RECEIVE_MODE_KEEP_VLAN_TAG);
-#endif
 
 	/*
 	 * Step 91: disable auto-polling of PHY status
@@ -3510,22 +3362,10 @@ bge_chip_start(bge_t *bgep, boolean_t reset_phys)
 	bge_reg_set32(bgep, ETHERNET_MAC_EVENT_ENABLE_REG,
 		ETHERNET_EVENT_LINK_INT |
 		ETHERNET_STATUS_PCS_ERROR_INT);
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled) {
-		bge_reg_set32(bgep, MODE_CONTROL_REG,
-			MODE_INT_ON_FLOW_ATTN |
-			MODE_INT_ON_DMA_ATTN |
-			MODE_HOST_STACK_UP|
-			MODE_INT_ON_MAC_ATTN);
-	} else {
-#endif
-		bge_reg_set32(bgep, MODE_CONTROL_REG,
-			MODE_INT_ON_FLOW_ATTN |
-			MODE_INT_ON_DMA_ATTN |
-			MODE_INT_ON_MAC_ATTN);
-#ifdef BGE_IPMI_ASF
-	}
-#endif
+	bge_reg_set32(bgep, MODE_CONTROL_REG,
+		MODE_INT_ON_FLOW_ATTN |
+		MODE_INT_ON_DMA_ATTN |
+		MODE_INT_ON_MAC_ATTN);
 
 	/*
 	 * Step 97: enable PCI interrupts!!!
@@ -3721,23 +3561,6 @@ bge_intr(caddr_t arg1, caddr_t arg2)
 				 * over to see whether anything can be done
 				 * about it ...
 				 */
-#ifdef BGE_IPMI_ASF
-				if (bgep->asf_enabled &&
-					(bgep->asf_status == ASF_STAT_RUN)) {
-					/*
-					 * We must stop ASF heart beat before
-					 * bge_chip_stop(), otherwise some
-					 * computers (ex. IBM HS20 blade
-					 * server) may crash.
-					 */
-					bge_asf_update_status(bgep);
-					bge_asf_stop_timer(bgep);
-					bgep->asf_status = ASF_STAT_STOP;
-
-					bge_asf_pre_reset_operations(bgep,
-						BGE_INIT_RESET);
-				}
-#endif
 				bge_chip_stop(bgep, B_TRUE);
 				result = DDI_INTR_UNCLAIMED;
 			}
@@ -4026,21 +3849,6 @@ bge_chip_factotum(caddr_t arg)
 		if (bge_autorecover) {
 			BGE_REPORT((bgep, "automatic recovery activated"));
 			bge_restart(bgep, B_FALSE);
-#ifdef BGE_IPMI_ASF
-			/*
-			 * Start our ASF heartbeat counter as soon as possible.
-			 */
-			if (bgep->asf_enabled) {
-				if (bgep->asf_status != ASF_STAT_RUN) {
-					bgep->asf_timeout_id = timeout(
-						bge_asf_heartbeat,
-						(void *)bgep,
-						drv_usectohz(
-						BGE_ASF_HEARTBEAT_INTERVAL));
-					bgep->asf_status = ASF_STAT_RUN;
-				}
-			}
-#endif
 		}
 		break;
 	}
@@ -4049,23 +3857,8 @@ bge_chip_factotum(caddr_t arg)
 	 * If an error is detected, stop the chip now, marking it as
 	 * faulty, so that it will be reset next time through ...
 	 */
-	if (error) {
-#ifdef BGE_IPMI_ASF
-		if (bgep->asf_enabled && (bgep->asf_status == ASF_STAT_RUN)) {
-			/*
-			 * We must stop ASF heart beat before bge_chip_stop(),
-			 * otherwise some computers (ex. IBM HS20 blade server)
-			 * may crash.
-			 */
-			bge_asf_update_status(bgep);
-			bge_asf_stop_timer(bgep);
-			bgep->asf_status = ASF_STAT_STOP;
-
-			bge_asf_pre_reset_operations(bgep, BGE_INIT_RESET);
-		}
-#endif
+	if (error)
 		bge_chip_stop(bgep, B_TRUE);
-	}
 	mutex_exit(bgep->genlock);
 
 	/*
@@ -4942,186 +4735,3 @@ bge_chip_blank(void *arg, time_t ticks, uint_t count)
 	bge_reg_put32(bgep, RCV_COALESCE_TICKS_REG, ticks);
 	bge_reg_put32(bgep, RCV_COALESCE_MAX_BD_REG, count);
 }
-
-#ifdef BGE_IPMI_ASF
-
-uint32_t
-bge_nic_read32(bge_t *bgep, bge_regno_t addr)
-{
-	uint32_t data;
-
-	if (!bgep->asf_wordswapped) {
-		/* a workaround word swap error */
-		if (addr & 4)
-			addr = addr - 4;
-		else
-			addr = addr + 4;
-	}
-
-	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, addr);
-	data = pci_config_get32(bgep->cfg_handle, PCI_CONF_BGE_MWDAR);
-	pci_config_put32(bgep->cfg_handle, PCI_CONF_BGE_MWBAR, 0);
-
-	return (data);
-}
-
-
-void
-bge_asf_update_status(bge_t *bgep)
-{
-	uint32_t event;
-
-	bge_nic_put32(bgep, BGE_CMD_MAILBOX, BGE_CMD_NICDRV_ALIVE);
-	bge_nic_put32(bgep, BGE_CMD_LENGTH_MAILBOX, 4);
-	bge_nic_put32(bgep, BGE_CMD_DATA_MAILBOX,   3);
-
-	event = bge_reg_get32(bgep, RX_RISC_EVENT_REG);
-	bge_reg_put32(bgep, RX_RISC_EVENT_REG, event | RRER_ASF_EVENT);
-}
-
-
-/*
- * The driver is supposed to notify ASF that the OS is still running
- * every three seconds, otherwise the management server may attempt
- * to reboot the machine.  If it hasn't actually failed, this is
- * not a desireable result.  However, this isn't running as a real-time
- * thread, and even if it were, it might not be able to generate the
- * heartbeat in a timely manner due to system load.  As it isn't a
- * significant strain on the machine, we will set the interval to half
- * of the required value.
- */
-void
-bge_asf_heartbeat(void *bgep)
-{
-	bge_asf_update_status((bge_t *)bgep);
-	((bge_t *)bgep)->asf_timeout_id = timeout(bge_asf_heartbeat, bgep,
-		drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
-}
-
-
-void
-bge_asf_stop_timer(bge_t *bgep)
-{
-	timeout_id_t tmp_id = 0;
-
-	while ((bgep->asf_timeout_id != 0) &&
-		(tmp_id != bgep->asf_timeout_id)) {
-		tmp_id = bgep->asf_timeout_id;
-		(void) untimeout(tmp_id);
-	}
-	bgep->asf_timeout_id = 0;
-}
-
-
-
-/*
- * This function should be placed at the earliest postion of bge_attach().
- */
-void
-bge_asf_get_config(bge_t *bgep)
-{
-	uint32_t nicsig;
-	uint32_t niccfg;
-
-	nicsig = bge_nic_read32(bgep, BGE_NIC_DATA_SIG_ADDR);
-	if (nicsig == BGE_NIC_DATA_SIG) {
-		niccfg = bge_nic_read32(bgep, BGE_NIC_DATA_NIC_CFG_ADDR);
-		if (niccfg & BGE_NIC_CFG_ENABLE_ASF)
-			/*
-			 * Here, we don't consider BAXTER, because BGE haven't
-			 * supported BAXTER (that is 5752). Also, as I know,
-			 * BAXTER doesn't support ASF feature.
-			 */
-			bgep->asf_enabled = B_TRUE;
-		else
-			bgep->asf_enabled = B_FALSE;
-	} else
-		bgep->asf_enabled = B_FALSE;
-}
-
-
-void
-bge_asf_pre_reset_operations(bge_t *bgep, uint32_t mode)
-{
-	uint32_t tries;
-	uint32_t event;
-
-	ASSERT(bgep->asf_enabled);
-
-	/* Issues "pause firmware" command and wait for ACK */
-	bge_nic_put32(bgep, BGE_CMD_MAILBOX, BGE_CMD_NICDRV_PAUSE_FW);
-	event = bge_reg_get32(bgep, RX_RISC_EVENT_REG);
-	bge_reg_put32(bgep, RX_RISC_EVENT_REG, event | RRER_ASF_EVENT);
-
-	event = bge_reg_get32(bgep, RX_RISC_EVENT_REG);
-	tries = 0;
-	while ((event & RRER_ASF_EVENT) && (tries < 100)) {
-		drv_usecwait(1);
-		tries ++;
-		event = bge_reg_get32(bgep, RX_RISC_EVENT_REG);
-	}
-
-	bge_nic_put32(bgep, BGE_FIRMWARE_MAILBOX,
-		BGE_MAGIC_NUM_FIRMWARE_INIT_DONE);
-
-	if (bgep->asf_newhandshake) {
-		switch (mode) {
-		case BGE_INIT_RESET:
-			bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-				BGE_DRV_STATE_START);
-			break;
-		case BGE_SHUTDOWN_RESET:
-			bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-				BGE_DRV_STATE_UNLOAD);
-			break;
-		case BGE_SUSPEND_RESET:
-			bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-				BGE_DRV_STATE_SUSPEND);
-			break;
-		default:
-			break;
-		}
-	}
-}
-
-
-void
-bge_asf_post_reset_old_mode(bge_t *bgep, uint32_t mode)
-{
-	switch (mode) {
-	case BGE_INIT_RESET:
-		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_START);
-		break;
-	case BGE_SHUTDOWN_RESET:
-		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_UNLOAD);
-		break;
-	case BGE_SUSPEND_RESET:
-		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_SUSPEND);
-		break;
-	default:
-		break;
-	}
-}
-
-
-void
-bge_asf_post_reset_new_mode(bge_t *bgep, uint32_t mode)
-{
-	switch (mode) {
-	case BGE_INIT_RESET:
-		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_START_DONE);
-		break;
-	case BGE_SHUTDOWN_RESET:
-		bge_nic_put32(bgep, BGE_DRV_STATE_MAILBOX,
-			BGE_DRV_STATE_UNLOAD_DONE);
-		break;
-	default:
-		break;
-	}
-}
-
-#endif /* BGE_IPMI_ASF */

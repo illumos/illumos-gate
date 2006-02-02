@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -26,14 +26,14 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "sys/bge_impl.h"
+#include "sys/bge_impl2.h"
 #include <sys/sdt.h>
 
 /*
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "BCM579x driver v0.49";
+static char bge_ident[] = "BCM579x driver v0.48";
 
 /*
  * Property names
@@ -245,11 +245,7 @@ bge_reinit_rings(bge_t *bgep)
  *	bge_reset() -- reset h/w & rings to initial state
  */
 static void
-#ifdef BGE_IPMI_ASF
-bge_reset(bge_t *bgep, uint_t asf_mode)
-#else
 bge_reset(bge_t *bgep)
-#endif
 {
 	uint64_t	ring;
 
@@ -269,11 +265,7 @@ bge_reset(bge_t *bgep)
 	for (ring = 0; ring < BGE_SEND_RINGS_MAX; ++ring)
 		mutex_enter(bgep->send[ring].tc_lock);
 
-#ifdef BGE_IPMI_ASF
-	bge_chip_reset(bgep, B_TRUE, asf_mode);
-#else
 	bge_chip_reset(bgep, B_TRUE);
-#endif
 	bge_reinit_rings(bgep);
 
 	/*
@@ -300,15 +292,7 @@ bge_stop(bge_t *bgep)
 
 	ASSERT(mutex_owned(bgep->genlock));
 
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled) {
-		bgep->asf_pseudostop = B_TRUE;
-	} else {
-#endif
-		bge_chip_stop(bgep, B_FALSE);
-#ifdef BGE_IPMI_ASF
-	}
-#endif
+	bge_chip_stop(bgep, B_FALSE);
 
 	BGE_DEBUG(("bge_stop($%p) done", (void *)bgep));
 }
@@ -339,14 +323,7 @@ bge_restart(bge_t *bgep, boolean_t reset_phys)
 {
 	ASSERT(mutex_owned(bgep->genlock));
 
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled) {
-		bge_reset(bgep, ASF_MODE_POST_INIT);
-	} else
-		bge_reset(bgep, ASF_MODE_NONE);
-#else
 	bge_reset(bgep);
-#endif
 	if (bgep->bge_mac_state == BGE_MAC_STARTED) {
 		bge_start(bgep, reset_phys);
 		bgep->watchdog = 0;
@@ -399,38 +376,11 @@ bge_m_start(void *arg)
 	 * Start processing and record new GLD state
 	 */
 	mutex_enter(bgep->genlock);
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled) {
-		if ((bgep->asf_status == ASF_STAT_RUN) &&
-			(bgep->asf_pseudostop)) {
-
-			bgep->link_up_msg = bgep->link_down_msg
-				= " (initialized)";
-			bgep->bge_mac_state = BGE_MAC_STARTED;
-			mutex_exit(bgep->genlock);
-			return (0);
-		}
-	}
-	bge_reset(bgep, ASF_MODE_INIT);
-#else
 	bge_reset(bgep);
-#endif
 	bgep->link_up_msg = bgep->link_down_msg = " (initialized)";
 	bge_start(bgep, B_TRUE);
 	bgep->bge_mac_state = BGE_MAC_STARTED;
 	BGE_DEBUG(("bge_m_start($%p) done", arg));
-
-#ifdef BGE_IPMI_ASF
-	if (bgep->asf_enabled) {
-		if (bgep->asf_status != ASF_STAT_RUN) {
-			/* start ASF heart beat */
-			bgep->asf_timeout_id = timeout(bge_asf_heartbeat,
-				(void *)bgep,
-				drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
-			bgep->asf_status = ASF_STAT_RUN;
-		}
-	}
-#endif
 	mutex_exit(bgep->genlock);
 
 	return (0);
@@ -453,43 +403,7 @@ bge_m_unicst(void *arg, const uint8_t *macaddr)
 	 */
 	mutex_enter(bgep->genlock);
 	ethaddr_copy(macaddr, bgep->curr_addr.addr);
-#ifdef BGE_IPMI_ASF
-	bge_chip_sync(bgep, B_FALSE);
-	if (bgep->asf_enabled) {
-		/*
-		 * The above bge_chip_sync() function wrote the ethernet MAC
-		 * addresses registers which destroyed the IPMI/ASF sideband.
-		 * Here, we have to reset chip to make IPMI/ASF sideband work.
-		 */
-		if (bgep->asf_status == ASF_STAT_RUN) {
-			/*
-			 * We must stop ASF heart beat before bge_chip_stop(),
-			 * otherwise some computers (ex. IBM HS20 blade server)
-			 * may crash.
-			 */
-			bge_asf_update_status(bgep);
-			bge_asf_stop_timer(bgep);
-			bgep->asf_status = ASF_STAT_STOP;
-
-			bge_asf_pre_reset_operations(bgep, BGE_INIT_RESET);
-		}
-		bge_chip_stop(bgep, B_TRUE);
-
-		bge_restart(bgep, B_FALSE);
-		/*
-		 * Start our ASF heartbeat counter as soon as possible.
-		 */
-		if (bgep->asf_status != ASF_STAT_RUN) {
-			/* start ASF heart beat */
-			bgep->asf_timeout_id = timeout(bge_asf_heartbeat,
-				(void *)bgep,
-				drv_usectohz(BGE_ASF_HEARTBEAT_INTERVAL));
-			bgep->asf_status = ASF_STAT_RUN;
-		}
-	}
-#else
 	bge_chip_sync(bgep);
-#endif
 	BGE_DEBUG(("bge_m_unicst_set($%p) done", arg));
 	mutex_exit(bgep->genlock);
 
@@ -550,20 +464,12 @@ bge_m_multicst(void *arg, boolean_t add, const uint8_t *mca)
 	if (add) {
 		if ((*refp)++ == 0) {
 			bgep->mcast_hash[word] |= bit;
-#ifdef BGE_IPMI_ASF
-			bge_chip_sync(bgep, B_TRUE);
-#else
 			bge_chip_sync(bgep);
-#endif
 		}
 	} else {
 		if (--(*refp) == 0) {
 			bgep->mcast_hash[word] &= ~bit;
-#ifdef BGE_IPMI_ASF
-			bge_chip_sync(bgep, B_TRUE);
-#else
 			bge_chip_sync(bgep);
-#endif
 		}
 	}
 	BGE_DEBUG(("bge_m_multicst($%p) done", arg));
@@ -590,11 +496,7 @@ bge_m_promisc(void *arg, boolean_t on)
 	 */
 	mutex_enter(bgep->genlock);
 	bgep->promisc = on;
-#ifdef BGE_IPMI_ASF
-	bge_chip_sync(bgep, B_TRUE);
-#else
 	bge_chip_sync(bgep);
-#endif
 	BGE_DEBUG(("bge_m_promisc_set($%p) done", arg));
 	mutex_exit(bgep->genlock);
 	return (0);
@@ -825,11 +727,7 @@ bge_m_ioctl(void *arg, queue_t *wq, mblk_t *mp)
 	case IOC_RESTART_REPLY:
 	case IOC_RESTART_ACK:
 		bge_phys_update(bgep);
-#ifdef BGE_IPMI_ASF
-		bge_chip_sync(bgep, B_FALSE);
-#else
 		bge_chip_sync(bgep);
-#endif
 		if (bgep->intr_type == DDI_INTR_TYPE_MSI)
 			bge_chip_msi_trig(bgep);
 		break;
@@ -1639,11 +1537,7 @@ bge_find_mac_address(bge_t *bgep, chip_id_t *cidp)
 }
 
 static void
-#ifdef BGE_IPMI_ASF
-bge_unattach(bge_t *bgep, uint_t asf_mode)
-#else
 bge_unattach(bge_t *bgep)
-#endif
 {
 	mac_t	*macp;
 
@@ -1672,19 +1566,7 @@ bge_unattach(bge_t *bgep)
 		bge_phys_reset(bgep);
 	if (bgep->progress & PROGRESS_HWINT) {
 		mutex_enter(bgep->genlock);
-#ifdef BGE_IPMI_ASF
-		bge_chip_reset(bgep, B_FALSE, asf_mode);
-		if (bgep->asf_enabled) {
-			/*
-			 * This register has been overlaid. We restore its
-			 * initial value here.
-			 */
-			bge_nic_put32(bgep, BGE_NIC_DATA_SIG_ADDR,
-			    BGE_NIC_DATA_SIG);
-		}
-#else
 		bge_chip_reset(bgep, B_FALSE);
-#endif
 		mutex_exit(bgep->genlock);
 	}
 
@@ -1725,15 +1607,6 @@ bge_resume(dev_info_t *devinfo)
 	 */
 	if (bgep->devinfo != devinfo)
 		return (DDI_FAILURE);
-
-#ifdef BGE_IPMI_ASF
-	/*
-	 * Power management hasn't been supported in BGE now. If you
-	 * want to implement it, please add the ASF/IPMI related
-	 * code here.
-	 */
-
-#endif
 
 	/*
 	 * Read chip ID & set up config space command register(s)
@@ -1780,9 +1653,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	mac_info_t *mip;
 	int intr_types;
 	int i;
-#ifdef BGE_IPMI_ASF
-	uint32_t mhcrValue;
-#endif
 
 	instance = ddi_get_instance(devinfo);
 
@@ -1845,15 +1715,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * and allow interrupts only when everything else is set up.
 	 */
 	err = pci_config_setup(devinfo, &bgep->cfg_handle);
-#ifdef BGE_IPMI_ASF
-	mhcrValue = pci_config_get32(bgep->cfg_handle, PCI_CONF_BGE_MHCR);
-	if (mhcrValue & MHCR_ENABLE_ENDIAN_WORD_SWAP) {
-		bgep->asf_wordswapped = B_TRUE;
-	} else {
-		bgep->asf_wordswapped = B_FALSE;
-	}
-	bge_asf_get_config(bgep);
-#endif
 	if (err != DDI_SUCCESS) {
 		bge_problem(bgep, "pci_config_setup() failed");
 		goto attach_fail;
@@ -1862,15 +1723,6 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	cidp = &bgep->chipid;
 	bzero(cidp, sizeof (*cidp));
 	bge_chip_cfg_init(bgep, cidp, B_FALSE);
-
-#ifdef BGE_IPMI_ASF
-	if (DEVICE_5721_SERIES_CHIPSETS(bgep) ||
-	    DEVICE_5714_SERIES_CHIPSETS(bgep)) {
-		bgep->asf_newhandshake = B_TRUE;
-	} else {
-		bgep->asf_newhandshake = B_FALSE;
-	}
-#endif
 
 	/*
 	 * Update those parts of the chip ID derived from volatile
@@ -2034,11 +1886,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	 * Reset chip & rings to initial state; also reset address
 	 * filtering, promiscuity, loopback mode.
 	 */
-#ifdef BGE_IPMI_ASF
-	bge_reset(bgep, ASF_MODE_SHUTDOWN);
-#else
 	bge_reset(bgep);
-#endif
 
 	bzero(bgep->mcast_hash, sizeof (bgep->mcast_hash));
 	bzero(bgep->mcast_refs, sizeof (bgep->mcast_refs));
@@ -2129,11 +1977,7 @@ bge_attach(dev_info_t *devinfo, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 
 attach_fail:
-#ifdef BGE_IPMI_ASF
-	bge_unattach(bgep, ASF_MODE_NONE);
-#else
 	bge_unattach(bgep);
-#endif
 	return (DDI_FAILURE);
 }
 
@@ -2147,13 +1991,6 @@ bge_suspend(bge_t *bgep)
 	 * Stop processing and idle (powerdown) the PHY ...
 	 */
 	mutex_enter(bgep->genlock);
-#ifdef BGE_IPMI_ASF
-	/*
-	 * Power management hasn't been supported in BGE now. If you
-	 * want to implement it, please add the ASF/IPMI related
-	 * code here.
-	 */
-#endif
 	bge_stop(bgep);
 	bge_phys_idle(bgep);
 	mutex_exit(bgep->genlock);
@@ -2168,10 +2005,6 @@ static int
 bge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 {
 	bge_t *bgep;
-#ifdef BGE_IPMI_ASF
-	uint_t asf_mode;
-	asf_mode = ASF_MODE_NONE;
-#endif
 
 	BGE_GTRACE(("bge_detach($%p, %d)", (void *)devinfo, cmd));
 
@@ -2188,28 +2021,6 @@ bge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 		break;
 	}
 
-#ifdef BGE_IPMI_ASF
-	mutex_enter(bgep->genlock);
-	if (bgep->asf_enabled && (bgep->asf_status == ASF_STAT_RUN)) {
-
-		bge_asf_update_status(bgep);
-		bge_asf_stop_timer(bgep);
-		bgep->asf_status = ASF_STAT_STOP;
-
-		bge_asf_pre_reset_operations(bgep, BGE_SHUTDOWN_RESET);
-
-		if (bgep->asf_pseudostop) {
-			bgep->link_up_msg = bgep->link_down_msg = " (stopped)";
-			bge_chip_stop(bgep, B_FALSE);
-			bgep->bge_mac_state = BGE_MAC_STOPPED;
-			bgep->asf_pseudostop = B_FALSE;
-		}
-
-		asf_mode = ASF_MODE_POST_SHUTDOWN;
-	}
-	mutex_exit(bgep->genlock);
-#endif
-
 	/*
 	 * Unregister from the GLD subsystem.  This can fail, in
 	 * particular if there are DLPI style-2 streams still open -
@@ -2222,11 +2033,7 @@ bge_detach(dev_info_t *devinfo, ddi_detach_cmd_t cmd)
 	/*
 	 * All activity stopped, so we can clean up & exit
 	 */
-#ifdef BGE_IPMI_ASF
-	bge_unattach(bgep, asf_mode);
-#else
 	bge_unattach(bgep);
-#endif
 	return (DDI_SUCCESS);
 }
 
