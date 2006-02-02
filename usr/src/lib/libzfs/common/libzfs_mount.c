@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -230,8 +230,7 @@ zfs_mount(zfs_handle_t *zhp, const char *options, int flags)
 		switch (errno) {
 		case EBUSY:
 			zfs_error(dgettext(TEXT_DOMAIN, "cannot mount '%s': "
-			    "mountpoint '%s' is busy"), zhp->zfs_name,
-			    mountpoint);
+			    "mountpoint or dataset is busy"), zhp->zfs_name);
 			break;
 		case EPERM:
 		case EACCES:
