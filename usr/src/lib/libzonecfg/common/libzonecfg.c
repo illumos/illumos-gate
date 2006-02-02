@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3788,15 +3788,15 @@ zonecfg_notify_bind(int(*func)(const char *zonename, zoneid_t zid,
 	zevtchan->zn_failed = B_FALSE;
 
 	if (pthread_mutex_init(&(zevtchan->zn_mutex), NULL))
-		goto out2;
+		goto out3;
 	if (pthread_cond_init(&(zevtchan->zn_cond), NULL)) {
 		(void) pthread_mutex_destroy(&(zevtchan->zn_mutex));
-		goto out2;
+		goto out3;
 	}
 	if (pthread_mutex_init(&(zevtchan->zn_bigmutex), NULL)) {
 		(void) pthread_mutex_destroy(&(zevtchan->zn_mutex));
 		(void) pthread_cond_destroy(&(zevtchan->zn_cond));
-		goto out2;
+		goto out3;
 	}
 
 	if (sysevent_evc_bind(ZONE_EVENT_CHANNEL, &(zevtchan->zn_eventchan),
@@ -3809,7 +3809,7 @@ zonecfg_notify_bind(int(*func)(const char *zonename, zoneid_t zid,
 		 * no chance of successfully registering.
 		 */
 		if (i > 999)
-			goto out;
+			goto out1;
 
 		(void) sprintf(zevtchan->zn_subscriber_id, "zone_%li_%i",
 		    getpid() % 999999l, i);
@@ -3823,12 +3823,13 @@ zonecfg_notify_bind(int(*func)(const char *zonename, zoneid_t zid,
 	} while (r);
 
 	return (zevtchan);
-out:
+out1:
 	sysevent_evc_unbind(zevtchan->zn_eventchan);
+out2:
 	(void) pthread_mutex_destroy(&zevtchan->zn_mutex);
 	(void) pthread_cond_destroy(&zevtchan->zn_cond);
 	(void) pthread_mutex_destroy(&(zevtchan->zn_bigmutex));
-out2:
+out3:
 	free(zevtchan);
 
 	return (NULL);
