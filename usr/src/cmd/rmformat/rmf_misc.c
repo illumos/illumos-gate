@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2152,8 +2152,8 @@ get_media_info(device_t *t_dev, char *sdev, char *pname, char *sn)
 			(void) close(fd);
 		} else {
 			process_p_flag(handle, fd);
-			/* Clear dev_name */
-			dev_name = NULL;
 		}
 	}
+	/* Clear dev_name */
+	dev_name = NULL;
 }
