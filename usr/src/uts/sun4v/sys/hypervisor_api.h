@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -165,6 +165,9 @@ extern "C" {
 
 #define	HV_NCS_REQUEST		0x110
 
+#define	FIRE_GET_PERFREG	0x120
+#define	FIRE_SET_PERFREG	0x121
+
 #define	HV_RA2PA		0x200
 #define	HV_HPRIV		0x201
 
@@ -298,6 +301,26 @@ struct mmu_stat {
 #define	HVIO_DMA_SYNC_DIR_TO_DEV	0x01
 #define	HVIO_DMA_SYNC_DIR_FROM_DEV	0x02
 
+/*
+ * Performance counter register definitions.
+ */
+#define	HVIO_FIRE_PERFREG_JBC_SEL	0
+#define	HVIO_FIRE_PERFREG_JBC_CNT0	1
+#define	HVIO_FIRE_PERFREG_JBC_CNT1	2
+#define	HVIO_FIRE_PERFREG_PCIE_IMU_SEL	3
+#define	HVIO_FIRE_PERFREG_PCIE_IMU_CNT0	4
+#define	HVIO_FIRE_PERFREG_PCIE_IMU_CNT1	5
+#define	HVIO_FIRE_PERFREG_PCIE_MMU_SEL	6
+#define	HVIO_FIRE_PERFREG_PCIE_MMU_CNT0	7
+#define	HVIO_FIRE_PERFREG_PCIE_MMU_CNT1	8
+#define	HVIO_FIRE_PERFREG_PCIE_TLU_SEL	9
+#define	HVIO_FIRE_PERFREG_PCIE_TLU_CNT0	10
+#define	HVIO_FIRE_PERFREG_PCIE_TLU_CNT1	11
+#define	HVIO_FIRE_PERFREG_PCIE_TLU_CNT2	12
+#define	HVIO_FIRE_PERFREG_PCIE_LNK_SEL	13
+#define	HVIO_FIRE_PERFREG_PCIE_LNK_CNT1	14
+#define	HVIO_FIRE_PERFREG_PCIE_LNK_CNT2	15
+
 #ifndef _ASM
 
 extern uint64_t hv_mmu_map_perm_addr(void *, int, uint64_t, int);
@@ -350,6 +373,7 @@ extern uint64_t hvio_intr_getstate(uint64_t sysino,
 extern uint64_t hvio_intr_setstate(uint64_t sysino, int intr_state);
 extern uint64_t hvio_intr_gettarget(uint64_t sysino, uint32_t *cpuid);
 extern uint64_t hvio_intr_settarget(uint64_t sysino, uint32_t cpuid);
+
 #endif
 
 #ifdef __cplusplus
