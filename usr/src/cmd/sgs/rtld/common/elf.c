@@ -24,7 +24,7 @@
  *	Copyright (c) 1988 AT&T
  *	  All Rights Reserved
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -2918,6 +2918,7 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 	ulong_t		ndx, cnt, base, _value;
 	Sym		*sym, *_sym;
 	const char	*str;
+	int		_flags;
 
 	/*
 	 * If we don't have a .hash table there are no symbols to look at.
@@ -2961,9 +2962,8 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 			break;
 	}
 
+	_flags = flags & RTLD_DL_MASK;
 	if (_sym) {
-		int	_flags = flags & RTLD_DL_MASK;
-
 		if (_flags == RTLD_DL_SYMENT)
 			*info = (void *)_sym;
 		else if (_flags == RTLD_DL_LINKMAP)
@@ -2971,6 +2971,42 @@ elf_dladdr(ulong_t addr, Rt_map *lmp, Dl_info *dlip, void **info, int flags)
 
 		dlip->dli_sname = str + _sym->st_name;
 		dlip->dli_saddr = (void *)_value;
+	} else {
+		/*
+		 * addr lies between the beginning of the mapped segment and
+		 * the first global symbol. We have no symbol to return
+		 * and the caller requires one. We use _START_, the base
+		 * address of the mapping.
+		 */
+
+		if (_flags == RTLD_DL_SYMENT) {
+			/*
+			 * An actual symbol struct is needed, so we
+			 * construct one for _START_. To do this in a
+			 * fully accurate way requires a different symbol
+			 * for each mapped segment. This requires the
+			 * use of dynamic memory and a mutex. That's too much
+			 * plumbing for a fringe case of limited importance.
+			 *
+			 * Fortunately, we can simplify:
+			 *    - Only the st_size and st_info fields are useful
+			 *	outside of the linker internals. The others
+			 *	reference things that outside code cannot see,
+			 *	and can be set to 0.
+			 *    - It's just a label and there is no size
+			 *	to report. So, the size should be 0.
+			 * This means that only st_info needs a non-zero
+			 * (constant) value. A static struct will suffice.
+			 * It must be const (readonly) so the caller can't
+			 * change its meaning for subsequent callers.
+			 */
+			static const Sym fsym = { 0, 0, 0,
+				ELF_ST_INFO(STB_LOCAL, STT_OBJECT) };
+			*info = (void *) &fsym;
+		}
+
+		dlip->dli_sname = MSG_ORIG(MSG_SYM_START);
+		dlip->dli_saddr = (void *) ADDR(lmp);
 	}
 }
 

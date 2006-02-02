@@ -1086,3 +1086,4 @@ Bugid   Risk Synopsis
 6371877 LD_PROFILE_64 with gprof does not produce correct results on amd64
 6372082 ld -r erroneously creates .got section on i386
 6201866 amd64: linker symbol elimination is broken
+6372620 printstack() segfaults when called from static function 

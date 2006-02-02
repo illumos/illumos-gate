@@ -21,7 +21,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -295,6 +295,8 @@
 @ MSG_SYM_LAOBJFILTER	"la_objfilter"
 @ MSG_SYM_LAOBJCLOSE	"la_objclose"
 @ MSG_SYM_LADYNDATA	"la_dyndata"
+
+@ MSG_SYM_START		"_START_"
 
 @ MSG_SPECFIL_DYNPLT	"dyn_plt(ld.so.1)"
 
