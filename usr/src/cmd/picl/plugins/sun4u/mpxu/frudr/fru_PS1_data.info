@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * #ident	"%Z%%M%	%I%	%E% SMI"
@@ -89,6 +89,10 @@ PROP Class string r 0 "voltage-indicator"
 REFPROP _voltage-indicator_ name:RMCLOMV/ps1_p_pwr
 ENDROW
 ROW
+PROP Class string r 0 "voltage-indicator"
+REFPROP _voltage-indicator_ name:RMCLOMV/ps1_ff_pok
+ENDROW
+ROW
 PROP Class string r 0 "current-indicator"
 REFPROP _current-indicator_ name:RMCLOMV/ps1_ff_oc
 ENDROW
@@ -123,6 +127,8 @@ name:RMCLOMV/ps1_ff_uv
 name:RMCLOMV/ps1_ff_ov
 	REFPROP _fru_parent name:/frutree/chassis/PS1/power-supply
 name:RMCLOMV/ps1_p_pwr
+	REFPROP _fru_parent name:/frutree/chassis/PS1/power-supply
+name:RMCLOMV/ps1_ff_pok
 	REFPROP _fru_parent name:/frutree/chassis/PS1/power-supply
 name:RMCLOMV/ps1_ff_oc
 	REFPROP _fru_parent name:/frutree/chassis/PS1/power-supply
