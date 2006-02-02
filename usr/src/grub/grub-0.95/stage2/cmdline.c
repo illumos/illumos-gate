@@ -19,6 +19,9 @@
  */
 
 #include <shared.h>
+#include <term.h>
+
+extern struct term_entry *current_term;
 
 #ifdef SUPPORT_DISKLESS
 # include <grub.h>
@@ -198,6 +201,13 @@ run_script (char *script, char *heap)
 	{
 	  errnum = ERR_NONE;
 
+          /*
+           * At this point something must have gone wrong, so dump the
+           * buffer and flip output back on.
+           */
+          builtin = find_command("verbose");
+          (builtin->func) ("on", BUILTIN_SCRIPT);
+
 	  /* If a fallback entry is defined, don't prompt a user's
 	     intervention.  */
 	  if (fallback_entryno < 0)
@@ -222,6 +232,13 @@ run_script (char *script, char *heap)
 	  /* If any kernel is not loaded, just exit successfully.  */
 	  if (kernel_type == KERNEL_TYPE_NONE)
 	    return 0;
+
+          if (reset_term)
+            if (current_term->shutdown) {
+              (*current_term->shutdown)();
+              current_term = term_table; /* assumption: console is first */
+            }
+
 
 	  /* Otherwise, the command boot is run implicitly.  */
 	  grub_memmove (heap, "boot", 5);

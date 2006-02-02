@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -31,6 +31,7 @@
 #include <sys/varargs.h>
 #include <sys/promif.h>
 #include <sys/salib.h>
+#include <sys/psw.h>
 
 #include "util.h"
 #include "serial.h"
@@ -38,8 +39,11 @@
 #include "vga.h"
 #include "console.h"
 #include "debug.h"
-#include "graphics.h"
 #include "bootprop.h"
+
+#include "biosint.h"
+
+#define	dprintf if (debug & D_ALLOC) printf
 
 static int cons_color = CONS_COLOR;
 int console = CONS_SCREEN_TEXT;
@@ -60,13 +64,6 @@ clear_screen(void)
 	 */
 	vga_clear(cons_color);
 	vga_setpos(0, 0);
-}
-
-void
-text_init(void)
-{
-	(void) set_videomode(0x3);
-	clear_screen();
 }
 
 /* Put the character C on the screen. */
@@ -105,6 +102,22 @@ screen_putchar(int c)
 		}
 		break;
 	}
+}
+
+static int
+get_videomode(void)
+{
+	struct int_pb ic = {0};
+	int error;
+
+	ic.ax = 0x0f00;
+
+	if ((error = bios_doint(0x10, &ic)) & PS_C) {
+		dprintf("get_videomode: bios_doint failed: %d\n", error);
+		return (-1);
+	}
+
+	return (ic.ax & 0xFF);
 }
 
 /* serial port stuff */
@@ -317,7 +330,7 @@ serial_adjust_prop(void)
 	}
 }
 
-void
+char *
 console_init(char *bootstr)
 {
 	char *cons;
@@ -332,14 +345,18 @@ console_init(char *bootstr)
 		if (cons)
 			cons += strlen("output-device=");
 	}
+
+	/* both "graphics" and "text" mean "detect graphics mode" now */
 	if (cons) {
 		if (strncmp(cons, "ttya", 4) == 0)
 			console = CONS_TTYA;
 		else if (strncmp(cons, "ttyb", 4) == 0)
 			console = CONS_TTYB;
 		else if (strncmp(cons, "graphics", 9) == 0)
-			console = CONS_SCREEN_GRAPHICS;
+			console = CONS_SCREEN_TEXT;
 		else if (strncmp(cons, "text", 4) == 0)
+			console = CONS_SCREEN_TEXT;
+		else if (strncmp(cons, "screen", 6) == 0)
 			console = CONS_SCREEN_TEXT;
 	}
 
@@ -361,11 +378,9 @@ console_init(char *bootstr)
 		clear_screen();
 		kb_init();
 		break;
-		/*
-		 * if console is CONS_SCREEN_GRAPHICS,
-		 * initialize it in console_init2()
-		 */
 	}
+
+	return (cons);
 }
 
 /*
@@ -380,6 +395,7 @@ console_init2(char *inputdev, char *outputdev, char *consoledev)
 
 	if (console_state == CONS_INVALID) {
 
+		/* both "graphics" and "text" mean "detect graphics mode" now */
 		if (consoledev) {
 			if (strcmp(consoledev, "ttya") == 0)
 				cons = CONS_TTYA;
@@ -388,7 +404,9 @@ console_init2(char *inputdev, char *outputdev, char *consoledev)
 			else if (strcmp(consoledev, "text") == 0)
 				cons = CONS_SCREEN_TEXT;
 			else if (strcmp(consoledev, "graphics") == 0)
-				cons = CONS_SCREEN_GRAPHICS;
+				cons = CONS_SCREEN_TEXT;
+			else if (strcmp(consoledev, "screen") == 0)
+				cons = CONS_SCREEN_TEXT;
 		}
 
 		if (cons == CONS_INVALID) {
@@ -433,11 +451,16 @@ console_init2(char *inputdev, char *outputdev, char *consoledev)
 	case CONS_TTYB:
 		serial_init();
 		break;
-	case CONS_SCREEN_GRAPHICS:
-		if (!graphics_init())
-			printf("failed to initialize "
-			    "console to graphics mode\n");
-		break;
+	default:
+		if (get_videomode() == VGA_GRAPHICS) {
+			console_state = CONS_SCREEN_GRAPHICS;
+			(void) bsetprop(NULL, "console", "graphics",
+			    sizeof ("graphics"));
+		} else {
+			console_state = CONS_SCREEN_TEXT;
+			(void) bsetprop(NULL, "console", "text",
+			    sizeof ("text"));
+		}
 	};
 }
 
@@ -491,9 +514,6 @@ _doputchar(int c)
 	case CONS_SCREEN_TEXT:
 		screen_putchar(c);
 		return;
-	case CONS_SCREEN_GRAPHICS:
-		if (verbosemode)
-			graphics_putchar(c);
 	}
 }
 

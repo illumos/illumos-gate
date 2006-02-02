@@ -22,6 +22,9 @@
 
 grub_jmp_buf restart_env;
 
+struct silentbuf silent;
+int reset_term;
+
 #if defined(PRESET_MENU_STRING) || defined(SUPPORT_DISKLESS)
 
 # if defined(PRESET_MENU_STRING)
@@ -712,15 +715,22 @@ restart:
   /* Attempt to boot an entry.  */
   
  boot_entry:
+
+  if (silent.status != DEFER_VERBOSE)
+    silent.status = SILENT;
+
+  reset_term = 1;
   
   cls ();
   setcursor (1);
+
   /* if our terminal needed initialization, we should shut it down
    * before booting the kernel, but we want to save what it was so
    * we can come back if needed */
   prev_term = current_term;
-  if (current_term->shutdown) 
-    {
+
+  if (silent.status != SILENT)
+    if (current_term->shutdown) {
       (*current_term->shutdown)();
       current_term = term_table; /* assumption: console is first */
     }
@@ -729,7 +739,7 @@ restart:
     {
       if (config_entries)
 	printf ("  Booting \'%s\'\n\n",
-		get_entry (menu_entries, first_entry + entryno, 0));
+		  get_entry (menu_entries, first_entry + entryno, 0));
       else
 	printf ("  Booting command-list\n\n");
 
@@ -758,13 +768,16 @@ restart:
 	break;
     }
 
-  /* if we get back here, we should go back to what our term was before */
-  current_term = prev_term;
-  if (current_term->startup)
-      /* if our terminal fails to initialize, fall back to console since
-       * it should always work */
-      if ((*current_term->startup)() == 0)
-          current_term = term_table; /* we know that console is first */
+  if (silent.status != SILENT) { /* don't reset if we never changed terms */
+    /* if we get back here, we should go back to what our term was before */
+    current_term = prev_term;
+    if (current_term->startup)
+        /* if our terminal fails to initialize, fall back to console since
+         * it should always work */
+        if ((*current_term->startup)() == 0)
+            current_term = term_table; /* we know that console is first */
+  }
+
   show_menu = 1;
   goto restart;
 }
@@ -852,6 +865,10 @@ cmain (void)
   int config_len, menu_len, num_entries;
   char *config_entries, *menu_entries;
   char *kill_buf = (char *) KILL_BUF;
+
+  silent.status = DEFER_SILENT;
+  silent.looped = 0;
+  silent.buffer_start = silent.buffer;
 
   auto void reset (void);
   void reset (void)

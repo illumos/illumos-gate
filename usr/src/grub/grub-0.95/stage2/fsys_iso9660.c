@@ -97,7 +97,7 @@ iso9660_devread (int sector, int byte_offset, int byte_len, char *buf)
 
   read_count += (byte_len >> 9);
   if ((read_count >> 11) > threshold) {
-	printf(".");
+	noisy_printf(".");
 	threshold += 2;	/* one dot every 2 MB */
   }
   return rawread(current_drive, part_start + sector, byte_offset, byte_len, buf);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,11 +41,13 @@ extern "C" {
 
 #define	CONS_COLOR	7
 
+#define	VGA_GRAPHICS 0x12
+
 extern void kb_init(void);
 extern int kb_getchar(void);
 extern int kb_ischar(void);
 
-extern void console_init(char *);
+extern char *console_init(char *);
 extern void console_init2(char *, char *, char *);
 extern void text_init(void);
 extern void putchar(int);

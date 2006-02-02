@@ -971,15 +971,63 @@ static struct builtin builtin_dhcp =
 
 static int terminal_func (char *arg, int flags);
 
+static int verbose_func(char *arg, int flags) {
+
+    if (grub_strcmp(arg, "off") == 0) {
+      silent.status = DEFER_SILENT;
+      return;
+    } else
+        if (flags == BUILTIN_CMDLINE) {
+          silent.status = DEFER_VERBOSE;
+          return;
+        }
+
+  silent.status = VERBOSE;
+
+  /* get back to text console XXX setje -- tty??? */
+  if (current_term->shutdown) {
+    (*current_term->shutdown)();
+    current_term = term_table; /* assumption: console is first */
+  }
+
+  /* dump the buffer */
+  if (!silent.looped) {
+    /* if the buffer hasn't looped, just print it */
+    printf("%s", silent.buffer);
+  } else {
+    /*
+     * If the buffer has looped, first print the oldest part of the buffer,
+     * which is one past the current null. Then print the newer part which
+     * starts at the beginning of the buffer.
+     */
+    printf("%s", silent.buffer_start + 1);
+    printf("%s", silent.buffer);
+  }
+
+  return 0;
+}
+
+static struct builtin builtin_verbose =
+{
+  "verbose",
+  verbose_func,
+  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_SCRIPT | BUILTIN_HELP_LIST,
+  "verbose",
+  "Verbose output during menu entry (script) execution."
+};
+
 #ifdef SUPPORT_GRAPHICS
 
 static int splashimage_func(char *arg, int flags) {
     char splashimage[64];
     int i;
-    
+
     /* filename can only be 64 characters due to our buffer size */
     if (strlen(arg) > 63)
 	return 1;
+
+    if (flags == BUILTIN_SCRIPT)
+        flags = BUILTIN_CMDLINE;
 
     if (flags == BUILTIN_CMDLINE) {
 	if (!grub_open(arg))
@@ -1000,6 +1048,11 @@ static int splashimage_func(char *arg, int flags) {
     graphics_set_splash(splashimage);
 
     if (flags == BUILTIN_CMDLINE && graphics_inited) {
+	/*
+	 * calling graphics_end() here flickers the screen black. OTOH not
+	 * calling it gets us odd plane interlacing / early palette switching ?
+	 * ideally one should figure out how to double buffer and switch...
+	 */
 	graphics_end();
 	graphics_init();
 	graphics_cls();
@@ -1009,6 +1062,8 @@ static int splashimage_func(char *arg, int flags) {
      * side effect here? */
     terminal_func("graphics", flags);
 
+    reset_term = 0;
+
     return 0;
 }
 
@@ -1016,7 +1071,7 @@ static struct builtin builtin_splashimage =
 {
   "splashimage",
   splashimage_func,
-  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_HELP_LIST,
+  BUILTIN_CMDLINE | BUILTIN_MENU | BUILTIN_SCRIPT | BUILTIN_HELP_LIST,
   "splashimage FILE",
   "Load FILE as the background image when in graphics mode."
 };
@@ -5139,5 +5194,6 @@ struct builtin *builtin_table[] =
   &builtin_unhide,
   &builtin_uppermem,
   &builtin_vbeprobe,
+  &builtin_verbose,
   0
 };

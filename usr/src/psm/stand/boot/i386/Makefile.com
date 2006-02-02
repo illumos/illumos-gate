@@ -19,7 +19,7 @@
 #
 # CDDL HEADER END
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -58,7 +58,7 @@ $(PAMD64_SL_SRC:%.s=%.o)	:= ASFLAGS = -P	$(CPPDEFS) -D_ASM $(CPPINCS)
 MACH_C_SRC	= bios.c bootflags.c bootops.c bootprop.c
 MACH_C_SRC	+= boot_plat.c boot_ramdisk.c console.c
 MACH_C_SRC	+= keyboard.c keyboard_table.c memory.c
-MACH_C_SRC	+= multiboot.c standalloc.c vga.c graphics.c
+MACH_C_SRC	+= multiboot.c standalloc.c vga.c
 MACH_C_SRC	+= bootenv.c vgaprobe.c check_iopath.c
 
 BIOS_C_SRC	= biosutil.c

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,20 +39,24 @@
 extern void outb(int, uchar_t);
 
 static int graphics_mode;
-static int cursor_y = 400;
-static int cursor_x = 210;
-static uchar_t bar[4][32];
+static int cursor_y = 309;
+static int cursor_x = 136;
+
+#define	BAR_STEPS 46
+
+static uchar_t bar[BAR_STEPS];
 static kthread_t *progressbar_tid;
 static kmutex_t pbar_lock;
 static kcondvar_t pbar_cv;
 static char *videomem = (caddr_t)VIDEOMEM;
 static int videomem_size;
 
+/* select the plane(s) to draw to */
 static void
-mapmask(int value)
+mapmask(int plane)
 {
 	outb(0x3c4, 2);
-	outb(0x3c5, value);
+	outb(0x3c5, plane);
 }
 
 static void
@@ -65,21 +69,20 @@ bitmask(int value)
 static void
 progressbar_show(void)
 {
-	int i, j, k, offset;
+	int j, k, offset;
 	uchar_t *mem, *ptr;
 
 	offset = cursor_y * 80 + cursor_x / 8;
 	mem = (uchar_t *)videomem + offset;
 
-	for (i = 0; i < 4; i++) {
-		mapmask(1 << i);
-		for (j = 0; j < 16; j++) {   /* bar height 16 pixel */
-			ptr = mem + j * 80;
-			for (k = 0; k < 32; k++, ptr++)
-				*ptr = bar[i][k];
-		}
+	bitmask(0xff);
+	mapmask(0xff); /* write to all planes at once? */
+	for (j = 0; j < 4; j++) {   /* bar height: 4 pixels */
+		ptr = mem + j * 80;
+		for (k = 0; k < BAR_STEPS; k++, ptr++)
+			*ptr = bar[k];
 	}
-	mapmask(15);
+	bitmask(0x00);
 }
 
 /*
@@ -102,11 +105,9 @@ progressbar_init()
 		return;
 
 	graphics_mode = 1;
-	bitmask(0xff);
 
-	for (i = 0; i < 32; i++) {
-		bar[0][i] = bar[1][i] = 0xf0;
-		bar[2][i] = bar[3][i] = 0xf0;
+	for (i = 0; i < BAR_STEPS; i++) {
+		bar[i] = 0x00;
 	}
 
 	progressbar_show();
@@ -116,15 +117,16 @@ static void
 progressbar_step()
 {
 	static int limit = 0;
-	int i;
 
-	if (limit == 0) {	/* reset */
-		for (i = 0; i < 32; i++)
-			bar[3][i] = 0xf0;
-	}
-	bar[3][limit] = 0xff;
+	bar[limit] = 0xff;
+
+	if (limit > 3)
+		bar[limit - 4] = 0x00;
+	else
+		bar[limit + BAR_STEPS - 4] = 0x00;
+
 	limit++;
-	if (limit == 32)
+	if (limit == BAR_STEPS)
 		limit = 0;
 
 	progressbar_show();
@@ -139,7 +141,7 @@ progressbar_thread(void *arg)
 	mutex_enter(&pbar_lock);
 	while (graphics_mode) {
 		progressbar_step();
-		end = ddi_get_lbolt() + drv_usectohz(200000);
+		end = ddi_get_lbolt() + drv_usectohz(150000);
 		(void) cv_timedwait(&pbar_cv, &pbar_lock, end);
 	}
 	mutex_exit(&pbar_lock);

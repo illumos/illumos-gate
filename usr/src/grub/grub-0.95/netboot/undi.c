@@ -1293,7 +1293,7 @@ int eb_pxenv_tftp_read(uint8_t *buf, uint16_t *len)
 	*len = undi.pxs->tftp_read.BufferSize;
 	tftp_count++;
 	if ((tftp_count % 1000) == 0)
-		printf(".");
+		noisy_printf(".");
 	return success;
 }
 

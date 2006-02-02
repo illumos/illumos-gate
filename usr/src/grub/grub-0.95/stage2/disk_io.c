@@ -1316,17 +1316,17 @@ print_fsys_type (void)
 {
   if (! do_completion)
     {
-      printf (" Filesystem type ");
+      grub_printf (" Filesystem type ");
       
       if (fsys_type != NUM_FSYS)
-	printf ("is %s, ", fsys_table[fsys_type].name);
+	grub_printf ("is %s, ", fsys_table[fsys_type].name);
       else
-	printf ("unknown, ");
+	grub_printf ("unknown, ");
       
       if (current_partition == 0xFFFFFF)
-	printf ("using whole disk\n");
+	grub_printf ("using whole disk\n");
       else
-	printf ("partition type 0x%x\n", current_slice & 0xFF);
+	grub_printf ("partition type 0x%x\n", current_slice & 0xFF);
     }
 }
 #endif /* STAGE1_5 */

@@ -175,13 +175,10 @@ grub_putstr (const char *str)
     grub_putchar (*str++);
 }
 
-void
-grub_printf (const char *format,...)
+static void
+grub_vprintf (const char *format, int *dataptr)
 {
-  int *dataptr = (int *) &format;
   char c, str[16];
-  
-  dataptr++;
 
   while ((c = *(format++)) != 0)
     {
@@ -214,22 +211,22 @@ grub_printf (const char *format,...)
 }
 
 #ifndef STAGE1_5
-int
-grub_sprintf (char *buffer, const char *format, ...)
+static int
+grub_vsprintf (char *buffer, const char *format, int *dataptr)
 {
   /* XXX hohmuth
      ugly hack -- should unify with printf() */
-  int *dataptr = (int *) &format;
   char c, *ptr, str[16];
   char *bp = buffer;
-
-  dataptr++;
+  int len = 0;
 
   while ((c = *format++) != 0)
     {
-      if (c != '%')
-	*bp++ = c; /* putchar(c); */
-      else
+      if (c != '%') {
+	if (buffer)
+	  *bp++ = c; /* putchar(c); */
+        len++;
+      } else {
 	switch (c = *(format++))
 	  {
 	  case 'd': case 'u': case 'x':
@@ -237,27 +234,49 @@ grub_sprintf (char *buffer, const char *format, ...)
 
 	    ptr = str;
 
-	    while (*ptr)
-	      *bp++ = *(ptr++); /* putchar(*(ptr++)); */
+	    while (*ptr) {
+	      if (buffer)
+	        *bp++ = *(ptr++); /* putchar(*(ptr++)); */
+              else
+	        ptr++;
+              len++;
+            }
 	    break;
 
-	  case 'c': *bp++ = (*(dataptr++))&0xff;
+	  case 'c':
+            if (buffer)
+              *bp++ = (*(dataptr++))&0xff;
+            else
+              dataptr++;
+            len++;
 	    /* putchar((*(dataptr++))&0xff); */
 	    break;
 
 	  case 's':
 	    ptr = (char *) (*(dataptr++));
 
-	    while ((c = *ptr++) != 0)
-	      *bp++ = c; /* putchar(c); */
+	    while ((c = *ptr++) != 0) {
+              if (buffer)
+	        *bp++ = c; /* putchar(c); */
+              len++;
+            }
 	    break;
 	  }
+       }
     }
 
   *bp = 0;
-  return bp - buffer;
+  return (len);
 }
 
+int
+grub_sprintf (char *buffer, const char *format, ...)
+{
+  int *dataptr = (int *) &format;
+  dataptr++;
+
+  return (grub_vsprintf (buffer, format, dataptr));
+}
 
 void
 init_page (void)
@@ -923,6 +942,45 @@ safe_parse_maxint (char **str_ptr, int *myint_ptr)
   return 1;
 }
 #endif /* STAGE1_5 */
+
+void
+noisy_printf (const char *format,...)
+{
+	int *dataptr = (int *) &format;
+	dataptr++;
+
+	grub_vprintf(format, dataptr);
+}
+
+/*
+ * print to a buffer, unless verbose mode is on
+ * if verbos mode is switched on, the buffer is dumped in verbose_func()
+ */
+void
+grub_printf (const char *format,...)
+{
+        int len;
+        int *dataptr = (int *) &format;
+        dataptr++;
+
+#ifndef STAGE1_5
+        if (silent.status != SILENT)
+#endif
+                grub_vprintf(format, dataptr);
+#ifndef STAGE1_5
+        else {
+                len = grub_vsprintf(NULL, format, dataptr);
+                if (silent.buffer_start - silent.buffer + len + 1 >=
+                    SCREENBUF) {
+                        silent.buffer_start = silent.buffer;
+                        silent.looped = 1;
+                }
+                if (len < SCREENBUF) /* all other cases loop safely */
+                        silent.buffer_start +=
+                           grub_vsprintf(silent.buffer_start, format, dataptr);
+        }
+#endif
+}
 
 #if !defined(STAGE1_5) || defined(FSYS_FAT)
 int

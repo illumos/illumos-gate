@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,7 @@ extern void init_paging(void);
 extern int mountroot(char *);
 extern int openfile(char *, char *);
 extern int close(int);
-extern void console_init(char *);
+extern char *console_init(char *);
 extern void kmem_init(void);
 extern void init_biosprog();
 extern func_t readfile(int fd, int print);
@@ -111,7 +111,7 @@ main(ulong_t magic, ulong_t addr, ulong_t header)
 	mbh = (multiboot_header_t *)header;
 
 	grub_bootstr = (char *)mbi->cmdline;
-	console_init(grub_bootstr);	/* so we can do printf */
+	console_prop =  console_init(grub_bootstr); /* so we can do printf */
 	kmem_init();		/* initialize memory allocator */
 	setup_memlists();	/* memory core for the allocator */
 

@@ -697,6 +697,28 @@ extern unsigned long extended_memory;
 extern grub_error_t errnum;
 extern char *err_list[];
 
+/* don't print geeky noise */
+typedef enum
+{
+  SILENT,
+  VERBOSE,
+  DEFER_SILENT,
+  DEFER_VERBOSE
+} silent_status;
+
+/* one screen worth of messages 80x24 = 1920 chars -- more with newlines */
+#define	SCREENBUF 2000
+
+struct silentbuf {
+	silent_status status;
+	int looped;
+	char buffer[SCREENBUF];
+	char *buffer_start;
+};
+
+extern struct silentbuf silent;
+extern int reset_term;
+
 /* Simplify declaration of entry_addr. */
 typedef void (*entry_func) (int, int, int, int, int, int)
      __attribute__ ((noreturn));
@@ -891,6 +913,8 @@ int grub_memcmp (const char *s1, const char *s2, int n);
 int grub_strcmp (const char *s1, const char *s2);
 int grub_strlen (const char *str);
 char *grub_strcpy (char *dest, const char *src);
+
+void noisy_printf (const char *format,...);
 
 #ifndef GRUB_UTIL
 typedef unsigned long grub_jmp_buf[6];
