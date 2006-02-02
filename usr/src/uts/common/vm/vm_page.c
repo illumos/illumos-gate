@@ -537,6 +537,8 @@ add_physmem(
 	total_pages += num;
 	set_max_page_get(total_pages);
 
+	PLCNT_MODIFY_MAX(pnum, (long)num);
+
 	/*
 	 * The physical space for the pages array
 	 * representing ram pages has already been

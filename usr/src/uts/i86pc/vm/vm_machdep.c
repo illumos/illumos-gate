@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1020,6 +1020,37 @@ mtype_func(int mnode, int mtype, uint_t flags)
 			return (mtype);
 	}
 	return (-1);
+}
+
+/*
+ * Update the page list max counts with the pfn range specified by the
+ * input parameters.  Called from add_physmem() when physical memory with
+ * page_t's are initially added to the page lists.
+ */
+void
+mtype_modify_max(pfn_t startpfn, long cnt)
+{
+	int	mtype = 0;
+	pfn_t	endpfn = startpfn + cnt, pfn;
+	pgcnt_t	inc;
+
+	ASSERT(cnt > 0);
+
+	for (pfn = startpfn; pfn < endpfn; ) {
+		if (pfn <= mnoderanges[mtype].mnr_pfnhi) {
+			if (endpfn < mnoderanges[mtype].mnr_pfnhi) {
+				inc = endpfn - pfn;
+			} else {
+				inc = mnoderanges[mtype].mnr_pfnhi - pfn + 1;
+			}
+			mnoderanges[mtype].mnr_mt_pgmax += inc;
+			if (physmax4g && mtype <= mtype4g)
+				maxmem4g += inc;
+			pfn += inc;
+		}
+		mtype++;
+		ASSERT(mtype < mnoderangecnt || pfn >= endpfn);
+	}
 }
 
 /*

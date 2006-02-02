@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@
 #include <vm/seg_kmem.h>
 #include <vm/seg_kpm.h>
 #include <vm/page.h>
+#include <vm/vm_dep.h>
 #define	SUNDDI_IMPL		/* so sunddi.h will not redefine splx() et al */
 #include <sys/sunddi.h>
 #include <sys/mem_config.h>
@@ -436,6 +437,8 @@ kphysm_add_memory_dynamic(pfn_t base, pgcnt_t npgs)
 	for (pp = seg->pages; pp < seg->epages; pp++) {
 		page_free(pp, 1);
 	}
+
+	PLCNT_MODIFY_MAX(seg->pages_base, (long)npgs);
 
 	/*
 	 * Now that we've updated the appropriate memory lists we
@@ -2544,6 +2547,9 @@ kphysm_del_cleanup(struct mem_handle *mhp)
 			}
 			ASSERT(seg->pages_base >= mdsp->mds_base);
 			ASSERT(seg->pages_end <= p_end);
+
+			PLCNT_MODIFY_MAX(seg->pages_base,
+			    seg->pages_base - seg->pages_end);
 
 			/* Hide the memseg from future scans. */
 			hat_kpm_delmem_mseg_update(seg, segpp);

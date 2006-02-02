@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -173,9 +173,6 @@ typedef	struct {
 
 #define	PLCNT_DO(pp, mn, mtype, szc, cnt, flags) {			\
 	int	bin = PP_2_BIN(pp);					\
-	if (flags & (PG_LIST_ISINIT | PG_LIST_ISCAGE))			\
-		atomic_add_long(&plcnt[mn][mtype].plc_mt_pgmax,	\
-		    cnt);						\
 	if (flags & PG_CACHE_LIST)					\
 		atomic_add_long(&plcnt[mn][mtype].plc_mt_clpgcnt, cnt);	\
 	else if (szc)							\
@@ -197,8 +194,6 @@ typedef	struct {
 /* PG_FREE_LIST may not be explicitly set in flags for large pages */
 
 #define	PLCNT_DO(pp, mn, mtype, szc, cnt, flags) {			\
-	if (flags & (PG_LIST_ISINIT | PG_LIST_ISCAGE))			\
-		atomic_add_long(&plcnt[mn][mtype].plc_mt_pgmax, cnt);	\
 	if (flags & PG_CACHE_LIST)					\
 		atomic_add_long(&plcnt[mn][mtype].plc_mt_clpgcnt, cnt);	\
 	else if (szc)							\
@@ -221,16 +216,25 @@ typedef	struct {
 
 /*
  * macros to update page list max counts - done when pages transferred
- * between mtypes (as in kcage_assimilate_page).
+ * from RELOC to NORELOC mtype (kcage_init or kcage_assimilate_page).
  */
-#define	PLCNT_MAX_INCR(pp, mn, mtype, szc) {				\
-	long	cnt = (1 << PAGE_BSZS_SHIFT(szc));			\
-	atomic_add_long(&plcnt[mn][mtype].plc_mt_pgmax, cnt);		\
+
+#define	PLCNT_XFER_NORELOC(pp) {					\
+	long	cnt = (1 << PAGE_BSZS_SHIFT((pp)->p_szc));		\
+	int	mn = PP_2_MEM_NODE(pp);					\
+	atomic_add_long(&plcnt[mn][MTYPE_NORELOC].plc_mt_pgmax, cnt);	\
+	atomic_add_long(&plcnt[mn][MTYPE_RELOC].plc_mt_pgmax, -cnt);	\
 }
 
-#define	PLCNT_MAX_DECR(pp, mn, mtype, szc) {				\
-	long	cnt = ((-1) << PAGE_BSZS_SHIFT(szc));			\
-	atomic_add_long(&plcnt[mn][mtype].plc_mt_pgmax, cnt);		\
+/*
+ * macro to modify the page list max counts when memory is added to
+ * the page lists during startup (add_physmem) or during a DR operation
+ * when memory is added (kphysm_add_memory_dynamic) or deleted
+ * (kphysm_del_cleanup).
+ */
+#define	PLCNT_MODIFY_MAX(pfn, cnt) {					\
+	int	mn = PFN_2_MEM_NODE(pfn);				\
+	atomic_add_long(&plcnt[mn][MTYPE_RELOC].plc_mt_pgmax, (cnt));	\
 }
 
 extern plcnt_t	plcnt;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1059,18 +1059,6 @@ page_freelist_unlock(int mnode)
 }
 
 /*
- * update the page list max counts for already allocated pages that has xfer'ed
- * (kcage_assimilate_page) between different mtypes.
- */
-/* ARGSUSED */
-void
-page_list_xfer(page_t *pp, int to_mtype, int from_mtype)
-{
-	PLCNT_MAX_INCR(pp, PP_2_MEM_NODE(pp), to_mtype, pp->p_szc);
-	PLCNT_MAX_DECR(pp, PP_2_MEM_NODE(pp), from_mtype, pp->p_szc);
-}
-
-/*
  * add pp to the specified page list. Defaults to head of the page list
  * unless PG_LIST_TAIL is specified.
  */
@@ -1174,7 +1162,7 @@ page_list_noreloc_startup(page_t *pp)
 	uint_t		bin;
 	int		mnode;
 	int		mtype;
-	int		flags = PG_LIST_ISCAGE;
+	int		flags = 0;
 
 	/*
 	 * If this is a large page on the freelist then

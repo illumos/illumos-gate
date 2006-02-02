@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -864,7 +864,7 @@ kcage_init(pgcnt_t preferred_size)
 				PP_SETNORELOC(pp);
 			}
 		}
-
+		PLCNT_XFER_NORELOC(pp);
 		wanted -= 1;
 	}
 
@@ -1237,13 +1237,14 @@ check_free_and_return:
 	if (PP_ISFREE(pp)) {
 		int which = PP_ISAGED(pp) ? PG_FREE_LIST : PG_CACHE_LIST;
 
-		page_list_sub(pp, which | PG_LIST_ISCAGE);
+		page_list_sub(pp, which);
 		ASSERT(pp->p_szc == 0);
 		PP_SETNORELOC(pp);
-		page_list_add(pp, which | PG_LIST_TAIL | PG_LIST_ISCAGE);
+		page_list_add(pp, which | PG_LIST_TAIL);
 
 		page_unlock(pp);
 		*nfreedp = 1;
+		PLCNT_XFER_NORELOC(pp);
 		return (0);
 	} else {
 		if (pp->p_szc != 0) {
@@ -1255,7 +1256,7 @@ check_free_and_return:
 		} else {
 			PP_SETNORELOC(pp);
 		}
-		page_list_xfer(pp, MTYPE_NORELOC, MTYPE_RELOC);
+		PLCNT_XFER_NORELOC(pp);
 		return (kcage_invalidate_page(pp, nfreedp));
 	}
 	/*NOTREACHED*/

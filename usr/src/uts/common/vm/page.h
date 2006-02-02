@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -633,7 +633,6 @@ struct lgrp;
 
 /* called from */
 #define	PG_LIST_ISINIT	0x1000
-#define	PG_LIST_ISCAGE	0x2000
 
 /*
  * Page frame operations.

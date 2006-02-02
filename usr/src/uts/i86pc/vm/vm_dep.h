@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,9 +105,6 @@ typedef struct {
 }
 #define	PLCNT_DO(pp, mtype, szc, cnt, flags) {				\
 	int	bin = PP_2_BIN(pp);					\
-	if (flags & PG_LIST_ISINIT)					\
-		mnoderanges[mtype].mnr_mt_pgmax += cnt;			\
-	ASSERT((flags & PG_LIST_ISCAGE) == 0);				\
 	if (flags & PG_CACHE_LIST)					\
 		atomic_add_long(&mnoderanges[mtype].			\
 		    mnr_mt_clpgcnt, cnt);				\
@@ -126,8 +123,6 @@ typedef struct {
 #define	PLCNT_SZ(ctrs_sz)
 #define	PLCNT_INIT(base)
 #define	PLCNT_DO(pp, mtype, szc, cnt, flags) {				\
-	if (flags & PG_LIST_ISINIT)					\
-		mnoderanges[mtype].mnr_mt_pgmax += cnt;			\
 	if (flags & PG_CACHE_LIST)					\
 		atomic_add_long(&mnoderanges[mtype].			\
 		    mnr_mt_clpgcnt, cnt);				\
@@ -145,10 +140,6 @@ typedef struct {
 	ASSERT(mtype == PP_2_MTYPE(pp));				\
 	if (physmax4g && mtype <= mtype4g)				\
 		atomic_add_long(&freemem4g, cnt);			\
-	if (flags & PG_LIST_ISINIT) {					\
-		if (physmax4g && mtype <= mtype4g)			\
-			maxmem4g += cnt;				\
-	}								\
 	PLCNT_DO(pp, mtype, szc, cnt, flags);				\
 }
 
@@ -163,8 +154,9 @@ typedef struct {
 /*
  * macros to update page list max counts.  no-op on x86.
  */
-#define	PLCNT_MAX_INCR(pp, mnode, mtype, szc)
-#define	PLCNT_MAX_DECR(pp, mnode, mtype, szc)
+#define	PLCNT_XFER_NORELOC(pp)
+
+#define	PLCNT_MODIFY_MAX(pfn, cnt)	mtype_modify_max(pfn, (pgcnt_t)cnt)
 
 extern mnoderange_t	*mnoderanges;
 extern int		mnoderangecnt;
@@ -213,6 +205,7 @@ extern int		restricted_kmemalloc;
 extern int		memrange_num(pfn_t);
 extern int		pfn_2_mtype(pfn_t);
 extern int		mtype_func(int, int, uint_t);
+extern void		mtype_modify_max(pfn_t, long);
 extern int		mnode_pgcnt(int);
 
 #define	NUM_MEM_RANGES	4		/* memory range types */
