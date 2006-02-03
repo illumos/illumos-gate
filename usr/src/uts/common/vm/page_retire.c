@@ -284,7 +284,9 @@ extern struct vnode kvp;
 
 #ifdef	DEBUG
 struct page_retire_debug {
-	int prd_dup;
+	int prd_dup1;
+	int prd_dup2;
+	int prd_qdup;
 	int prd_noaction;
 	int prd_queued;
 	int prd_notqueued;
@@ -313,7 +315,8 @@ struct page_retire_debug {
 	int prd_uunretired;
 	int prd_unotlocked;
 	int prd_checkhit;
-	int prd_checkmiss;
+	int prd_checkmiss_pend;
+	int prd_checkmiss_noerr;
 	int prd_tctop;
 	int prd_tclocked;
 	int prd_hunt;
@@ -427,8 +430,8 @@ static page_retire_op_t page_retire_ops[] = {
 	{PRD_PENDING,		0,	EAGAIN,	2,
 		"Page 0x%08x.%08x will be retired on free"},
 	{PRD_FAILED,		0,	EAGAIN,	0, NULL},
-	{PRD_DUPLICATE,		0,	EBUSY,	2,
-		"Page 0x%08x.%08x already retired"},
+	{PRD_DUPLICATE,		0,	EIO,	2,
+		"Page 0x%08x.%08x already retired or pending"},
 	{PRD_INVALID_PA,	0,	EINVAL, 2,
 		"PA 0x%08x.%08x is not a relocatable page"},
 	{PRD_LIMIT,		0,	0,	1,
@@ -439,7 +442,7 @@ static page_retire_op_t page_retire_ops[] = {
 		"Page 0x%08x.%08x returned to service"},
 	{PRD_UNR_CANTLOCK,	0,	EAGAIN,	2,
 		"Page 0x%08x.%08x could not be unretired"},
-	{PRD_UNR_NOT,		0,	EBADF,	2,
+	{PRD_UNR_NOT,		0,	EIO,	2,
 		"Page 0x%08x.%08x is not retired"},
 	{PRD_INVALID_KEY,	0,	0,	0, NULL} /* MUST BE LAST! */
 };
@@ -552,7 +555,7 @@ page_retire_enqueue(page_t *pp)
 	for (i = 0; i < PR_PENDING_QMAX; i++) {
 		if (pr_pending_q[i] == pp) {
 			mutex_exit(&pr_q_mutex);
-			PR_DEBUG(prd_dup);
+			PR_DEBUG(prd_qdup);
 			return;
 		} else if (nslot == -1 && pr_pending_q[i] == NULL) {
 			nslot = i;
@@ -1212,8 +1215,8 @@ page_tryretire(page_t *pp)
  *
  *   - 0 on success,
  *   - EINVAL when the PA is whacko,
- *   - EBUSY if the page is already retired, or
- *   - EAGAIN if the page could not be _immediately_ retired.
+ *   - EIO if the page is already retired or already pending retirement, or
+ *   - EAGAIN if the page could not be _immediately_ retired but is pending.
  */
 int
 page_retire(uint64_t pa, uchar_t reason)
@@ -1230,12 +1233,16 @@ page_retire(uint64_t pa, uchar_t reason)
 		return (page_retire_done(pp, PRD_INVALID_PA));
 	}
 	if (PP_RETIRED(pp)) {
+		PR_DEBUG(prd_dup1);
 		return (page_retire_done(pp, PRD_DUPLICATE));
 	}
 
-	if (reason & PR_UE) {
+	if ((reason & PR_UE) && !PP_TOXIC(pp)) {
 		PR_MESSAGE(CE_NOTE, 1, "Scheduling clearing of error on"
 		    " page 0x%08x.%08x", pa);
+	} else if (PP_PR_REQ(pp)) {
+		PR_DEBUG(prd_dup2);
+		return (page_retire_done(pp, PRD_DUPLICATE));
 	} else {
 		PR_MESSAGE(CE_NOTE, 1, "Scheduling removal of"
 		    " page 0x%08x.%08x", pa);
@@ -1344,7 +1351,7 @@ page_unretire_pp(page_t *pp, int free)
  *   - 0 if the page is unretired,
  *   - EAGAIN if the pp can not be locked,
  *   - EINVAL if the PA is whacko, and
- *   - EBADF if the pp is not retired.
+ *   - EIO if the pp is not retired.
  */
 int
 page_unretire(uint64_t pa)
@@ -1371,9 +1378,12 @@ page_retire_check_pp(page_t *pp, uint64_t *errors)
 	if (PP_RETIRED(pp)) {
 		PR_DEBUG(prd_checkhit);
 		rc = 0;
-	} else {
-		PR_DEBUG(prd_checkmiss);
+	} else if (PP_PR_REQ(pp)) {
+		PR_DEBUG(prd_checkmiss_pend);
 		rc = EAGAIN;
+	} else {
+		PR_DEBUG(prd_checkmiss_noerr);
+		rc = EIO;
 	}
 
 	/*
@@ -1401,7 +1411,8 @@ page_retire_check_pp(page_t *pp, uint64_t *errors)
  * Returns:
  *
  *   - 0 if the page is retired,
- *   - EAGAIN if it is not, and
+ *   - EIO if the page is not retired and has no errors,
+ *   - EAGAIN if the page is not retired but is pending; and
  *   - EINVAL if the PA is whacko.
  */
 int
