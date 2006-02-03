@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,7 +74,8 @@ dmu_zfetch_colinear(zfetch_t *zf, zstream_t *zh)
 	zstream_t	*z_walk;
 	zstream_t	*z_comp;
 
-	rw_enter(&zf->zf_rwlock, RW_WRITER);
+	if (! rw_tryenter(&zf->zf_rwlock, RW_WRITER))
+		return (0);
 
 	if (zh == NULL) {
 		rw_exit(&zf->zf_rwlock);
@@ -462,7 +463,8 @@ dmu_zfetch_stream_reclaim(zfetch_t *zf)
 {
 	zstream_t	*zs;
 
-	rw_enter(&zf->zf_rwlock, RW_WRITER);
+	if (! rw_tryenter(&zf->zf_rwlock, RW_WRITER))
+		return (0);
 
 	for (zs = list_head(&zf->zf_stream); zs;
 	    zs = list_next(&zf->zf_stream, zs)) {
