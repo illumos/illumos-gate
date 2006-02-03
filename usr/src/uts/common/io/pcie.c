@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,6 +201,8 @@ pcie_uninitchild(dev_info_t *cdip)
 		return;
 
 	pcie_disable_errors(cdip, config_handle);
+
+	pci_config_teardown(&config_handle);
 }
 
 /* ARGSUSED */
