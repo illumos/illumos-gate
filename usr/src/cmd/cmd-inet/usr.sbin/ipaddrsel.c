@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -393,14 +393,15 @@ printpolicy(int sock)
 	 * since we expect users to be able to redirect this output to
 	 * a usable configuration file if need be.
 	 */
-	(void) printf("# Prefix                  Precedence Label\n");
+	(void) printf("# Prefix                  "
+		"                    Precedence Label\n");
 	for (policy_index = 0; policy_index < count; policy_index++) {
 		(void) snprintf(prefixstr, sizeof (prefixstr), "%s/%d",
 		    inet_ntop(AF_INET6,
 			&policy_ptr[policy_index].ip6_asp_prefix, prefixstr,
 			sizeof (prefixstr)),
 		    ip_mask_to_plen_v6(&policy_ptr[policy_index].ip6_asp_mask));
-		(void) printf("%-25s %10d %s\n", prefixstr,
+		(void) printf("%-45s %10d %s\n", prefixstr,
 		    policy_ptr[policy_index].ip6_asp_precedence,
 		    policy_ptr[policy_index].ip6_asp_label);
 	}
