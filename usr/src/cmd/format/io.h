@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -120,7 +120,7 @@ int	sup_gettoken(char *buf);
 void	sup_pushtoken(char *token_buf, int token_type);
 void	get_inputline(char *, int);
 int	istokenpresent(void);
-int	execute_shell(char *);
+int	execute_shell(char *, size_t);
 void	print_efi_string(char *vendor, char *product, char *revision,
     uint64_t capacity);
 

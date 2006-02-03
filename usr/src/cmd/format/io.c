@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -455,6 +455,7 @@ input(type, promptstr, delim, param, deflt, cmdflag)
 	char		**str, **strings;
 	TOKEN		token, cleantoken;
 	TOKEN		token2, cleantoken2;
+	char		*arg;
 	struct		bounds *bounds;
 	char		*s;
 	int		value;
@@ -636,26 +637,35 @@ reprompt:
 	if ((cmdflag == CMD_INPUT) && (token[0] == '!')) {
 
 	    /* get the list of arguments to shell command */
-		(void) memset(shell_argv, 0, MAXPATHLEN);
-		if (strlen(token) > 1) {
-			if (strlcpy(shell_argv, &token[1], MAXPATHLEN) >=
-				MAXPATHLEN) {
-				err_print("Error: token length exceeds "
-					"MAXPATHLEN\n");
-				fullabort();
-			}
-		}
+		(void) memset(shell_argv, 0, sizeof (shell_argv));
+
+		/* initialize to the first token... */
+		arg = &token[1];
 
 		/*
-		 * collect all tokens till the end of line as arguments
+		 * ... and then collect all tokens until the end of
+		 * the line as arguments
 		 */
-		while (token_present && (gettoken(token) != NULL)) {
-			(void) strcat(shell_argv, " ");
-			(void) strcat(shell_argv, token);
-		}
+		do {
+			/* skip empty tokens. */
+			if (*arg == '\0')
+				continue;
+			/*
+			 * If either of the following two strlcat()
+			 * operations overflows, report an error and
+			 * exit gracefully.
+			 */
+			if ((strlcat(shell_argv, arg, sizeof (shell_argv)) >=
+				sizeof (shell_argv)) ||
+			    (strlcat(shell_argv, " ", sizeof (shell_argv)) >=
+				sizeof (shell_argv))) {
+				err_print("Error: Command line too long.\n");
+				fullabort();
+			}
+		} while (token_present && (arg = gettoken(token)) != NULL);
 
 		/* execute the shell command */
-		(void) execute_shell(shell_argv);
+		(void) execute_shell(shell_argv, sizeof (shell_argv));
 		redisplay_menu_list((char **)param->io_charlist);
 		if (interactive) {
 			goto reprompt;
@@ -2425,8 +2435,9 @@ get_inputline(line, nbytes)
  * execute the shell escape command
  */
 int
-execute_shell(s)
+execute_shell(s, buff_size)
 	char	*s;
+	size_t	buff_size;
 {
 	struct	termio	termio;
 	struct	termios	tty;
@@ -2442,11 +2453,9 @@ execute_shell(s)
 		if (shell_name == NULL) {
 			shell_name = default_shell;
 		}
-
-		if (strlcpy(s, shell_name, MAXPATHLEN) >=
-		    MAXPATHLEN) {
-			err_print("Error: length of shell command"
-				" ($SHELL) exceeds MAXPATHLEN\n");
+		if (strlcpy(s, shell_name, buff_size) >=
+		    buff_size) {
+			err_print("Error: Shell command ($SHELL) too long.\n");
 			fullabort();
 		}
 	}

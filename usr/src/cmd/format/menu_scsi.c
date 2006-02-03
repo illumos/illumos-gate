@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -301,7 +301,7 @@ Please display the page on which you'd like to do a mode select\n");
 					destroy_data((char *)chg_item);
 				}
 		} else if (s[0] == '!') {
-			(void) execute_shell(&s[1]);
+			(void) execute_shell(&s[1], sizeof (s) - 1);
 			help = 1;
 		} else if (s[0] != 0) {
 			err_print("Syntax error: %s\n", s);
