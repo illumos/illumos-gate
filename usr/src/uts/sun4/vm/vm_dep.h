@@ -52,12 +52,12 @@ extern "C" {
 
 #define	PP_2_MTYPE(pp)	(PP_ISNORELOC(pp) ? MTYPE_NORELOC : MTYPE_RELOC)
 
-#define	MTYPE_INIT(mtype, vp, vaddr, flags)				\
+#define	MTYPE_INIT(mtype, vp, vaddr, flags, pgsz)			\
 	mtype = (flags & PG_NORELOC) ? MTYPE_NORELOC : MTYPE_RELOC;
 
 /* mtype init for page_get_replacement_page */
 
-#define	MTYPE_PGR_INIT(mtype, flags, pp, mnode)				\
+#define	MTYPE_PGR_INIT(mtype, flags, pp, mnode, pgcnt)			\
 	mtype = (flags & PG_NORELOC) ? MTYPE_NORELOC : MTYPE_RELOC;
 
 #define	MNODETYPE_2_PFN(mnode, mtype, pfnlo, pfnhi)			\
@@ -161,9 +161,9 @@ typedef	struct {
 		colors = page_get_pagecolors(szc);			\
 		for (mn = 0; mn < max_mem_nodes; mn++) {		\
 			for (mt = 0; mt < MAX_MEM_TYPES; mt++) {	\
-				plcnt[mn][mt].plc_mts[szc].	\
+				plcnt[mn][mt].plc_mts[szc].		\
 				    plc_mts_colors = colors;		\
-				plcnt[mn][mt].plc_mts[szc].	\
+				plcnt[mn][mt].plc_mts[szc].		\
 				    plc_mtsc_pgcnt = (pgcnt_t *)base;	\
 				base += (colors * sizeof (pgcnt_t));	\
 			}						\

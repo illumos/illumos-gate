@@ -54,6 +54,11 @@ extern pfn_t		*memranges;
 	((mtype > 0) ? memranges[mtype - 1] - 1: physmax)
 #define	MEMRANGELO(mtype)	(memranges[mtype])
 
+#define	MTYPE_FREEMEM(mt)						\
+	(mnoderanges[mt].mnr_mt_clpgcnt +				\
+	    mnoderanges[mt].mnr_mt_flpgcnt +				\
+	    mnoderanges[mt].mnr_mt_lgpgcnt)
+
 /*
  * combined memory ranges from mnode and memranges[] to manage single
  * mnode/mtype dimension in the page lists.
@@ -201,6 +206,26 @@ extern int		desfree4gshift;
 #define	RESTRICT4G_ALLOC					\
 	(physmax4g && (freemem4g < DESFREE4G) && ((freemem4g << 1) < freemem))
 
+/*
+ * 16m memory management:
+ *
+ * reserve some amount of physical memory below 16m for legacy devices.
+ *
+ * RESTRICT16M_ALLOC returns true if an there are sufficient free pages above
+ * 16m or if the 16m pool drops below DESFREE16M.
+ *
+ * In this case, general page allocations via page_get_{free,cache}list
+ * routines will be restricted from allocating from the 16m pool. Allocations
+ * that require specific pfn ranges (page_get_anylist) are not restricted.
+ */
+
+#define	FREEMEM16M	MTYPE_FREEMEM(0)
+#define	DESFREE16M	desfree16m
+#define	RESTRICT16M_ALLOC(freemem, pgcnt)			\
+	(freemem != 0 && ((freemem >= (FREEMEM16M)) ||		\
+	    (FREEMEM16M  < (DESFREE16M + pgcnt))))
+extern pgcnt_t		desfree16m;
+
 extern int		restricted_kmemalloc;
 extern int		memrange_num(pfn_t);
 extern int		pfn_2_mtype(pfn_t);
@@ -270,18 +295,22 @@ extern struct cpu	cpus[];
 /*
  * set the mtype range (called from page_get_{free,cache}list)
  *   - set range to above 4g if the system has more than 4g of memory and the
- *   amount of memory below 4g runs low otherwise set range to all of memory
+ *   amount of memory below 4g runs low. If not, set range to above 16m if
+ *   16m threshold is reached otherwise set range to all of memory
  *   starting from the hi pfns.
  *
  * page_get_anylist gets its mtype range from the specified ddi_dma_attr_t.
  */
-#define	MTYPE_INIT(mtype, vp, vaddr, flags) {				\
+#define	MTYPE_INIT(mtype, vp, vaddr, flags, pgsz) {			\
 	mtype = mnoderangecnt - 1;					\
 	if (RESTRICT4G_ALLOC) {						\
 		VM_STAT_ADD(vmm_vmstats.restrict4gcnt);			\
 		/* here only for > 4g systems */			\
 		flags |= PGI_MT_RANGE4G;				\
+	} else if (RESTRICT16M_ALLOC(freemem, btop(pgsz))) {		\
+		flags |= PGI_MT_RANGE16M;				\
 	} else {							\
+		VM_STAT_ADD(vmm_vmstats.unrestrict16mcnt);		\
 		flags |= PGI_MT_RANGE0;					\
 	}								\
 }
@@ -295,20 +324,29 @@ extern struct cpu	cpus[];
  *   below 4g runs low.
  */
 
-#define	MTYPE_INIT(mtype, vp, vaddr, flags) {				\
+#define	MTYPE_INIT(mtype, vp, vaddr, flags, pgsz) {			\
 	if (restricted_kmemalloc && (vp) == &kvp &&			\
 	    (caddr_t)(vaddr) >= kernelheap &&				\
 	    (caddr_t)(vaddr) < ekernelheap) {				\
 		ASSERT(physmax4g);					\
 		mtype = mtype4g;					\
-		flags |= PGI_MT_RANGE0;					\
+		if (RESTRICT16M_ALLOC(freemem4g - btop(pgsz),		\
+		    btop(pgsz))) {					\
+			flags |= PGI_MT_RANGE16M;			\
+		} else {						\
+			VM_STAT_ADD(vmm_vmstats.unrestrict16mcnt);	\
+			flags |= PGI_MT_RANGE0;				\
+		}							\
 	} else {							\
 		mtype = mnoderangecnt - 1;				\
 		if (RESTRICT4G_ALLOC) {					\
 			VM_STAT_ADD(vmm_vmstats.restrict4gcnt);		\
 			/* here only for > 4g systems */		\
 			flags |= PGI_MT_RANGE4G;			\
+		} else if (RESTRICT16M_ALLOC(freemem, btop(pgsz))) {	\
+			flags |= PGI_MT_RANGE16M;			\
 		} else {						\
+			VM_STAT_ADD(vmm_vmstats.unrestrict16mcnt);	\
 			flags |= PGI_MT_RANGE0;				\
 		}							\
 	}								\
@@ -340,9 +378,14 @@ extern struct cpu	cpus[];
 
 /* mtype init for page_get_replacement_page */
 
-#define	MTYPE_PGR_INIT(mtype, flags, pp, mnode) {			\
+#define	MTYPE_PGR_INIT(mtype, flags, pp, mnode, pgcnt) {		\
 	mtype = mnoderangecnt - 1;					\
-	flags |= PGI_MT_RANGE0;						\
+	if (RESTRICT16M_ALLOC(freemem, pgcnt)) {			\
+		flags |= PGI_MT_RANGE16M;				\
+	} else {							\
+		VM_STAT_ADD(vmm_vmstats.unrestrict16mcnt);		\
+		flags |= PGI_MT_RANGE0;					\
+	}								\
 }
 
 #define	MNODE_PGCNT(mnode)		mnode_pgcnt(mnode)
@@ -434,9 +477,10 @@ extern int	l2cache_sz, l2cache_linesz, l2cache_assoc;
  * PGI range flags - should not overlap PGI flags
  */
 #define	PGI_MT_RANGE0	0x1000000	/* mtype range to 0 */
-#define	PGI_MT_RANGE4G	0x2000000	/* mtype range to 4g */
-#define	PGI_MT_NEXT	0x4000000	/* get next mtype */
-#define	PGI_MT_RANGE	(PGI_MT_RANGE0 | PGI_MT_RANGE4G)
+#define	PGI_MT_RANGE16M	0x2000000	/* mtype range to 16m */
+#define	PGI_MT_RANGE4G	0x4000000	/* mtype range to 4g */
+#define	PGI_MT_NEXT	0x8000000	/* get next mtype */
+#define	PGI_MT_RANGE	(PGI_MT_RANGE0 | PGI_MT_RANGE16M | PGI_MT_RANGE4G)
 
 /*
  * hash as and addr to get a bin.
@@ -539,6 +583,7 @@ struct vmm_vmstats_str {
 	ulong_t page_ctrs_coalesce_all;	/* page coalesce all counter */
 	ulong_t page_ctrs_cands_skip_all; /* candidates useful for all func */
 	ulong_t	restrict4gcnt;
+	ulong_t	unrestrict16mcnt;	/* non-DMA 16m allocs allowed */
 };
 extern struct vmm_vmstats_str vmm_vmstats;
 #endif	/* VM_STATS */

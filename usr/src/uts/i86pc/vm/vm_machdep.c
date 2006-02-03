@@ -101,6 +101,9 @@ int		physmax4g;
 int		desfree4gshift = 4;	/* maxmem4g shift to derive DESFREE4G */
 int		lotsfree4gshift = 3;
 
+/* 16m memory management: desired number of free pages below 16m. */
+pgcnt_t		desfree16m = 0x380;
+
 #ifdef VM_STATS
 struct {
 	ulong_t	pga_alloc;
@@ -996,7 +999,7 @@ mnode_range_setup(mnoderange_t *mnoderanges)
 /*
  * Determine if the mnode range specified in mtype contains memory belonging
  * to memory node mnode.  If flags & PGI_MT_RANGE is set then mtype contains
- * the range of indices to 0 or 4g.
+ * the range of indices from high pfn to 0, 16m or 4g.
  *
  * Return first mnode range type index found otherwise return -1 if none found.
  */
@@ -1004,12 +1007,16 @@ int
 mtype_func(int mnode, int mtype, uint_t flags)
 {
 	if (flags & PGI_MT_RANGE) {
-		int	mtlim = 0;	/* default to PGI_MT_RANGEO */
+		int	mtlim;
 
 		if (flags & PGI_MT_NEXT)
 			mtype--;
-		if (flags & PGI_MT_RANGE4G)
-			mtlim = mtype4g + 1;
+		if (flags & PGI_MT_RANGE0)
+			mtlim = 0;
+		else if (flags & PGI_MT_RANGE4G)
+			mtlim = mtype4g + 1;	/* exclude 0-4g range */
+		else if (flags & PGI_MT_RANGE16M)
+			mtlim = 1;		/* exclude 0-16m range */
 		while (mtype >= mtlim) {
 			if (mnoderanges[mtype].mnr_mnode == mnode)
 				return (mtype);
@@ -1066,9 +1073,7 @@ mnode_pgcnt(int mnode)
 	mtype = mtype_func(mnode, mtype, flags);
 
 	while (mtype != -1) {
-		pgcnt += (mnoderanges[mtype].mnr_mt_flpgcnt +
-		    mnoderanges[mtype].mnr_mt_lgpgcnt +
-		    mnoderanges[mtype].mnr_mt_clpgcnt);
+		pgcnt += MTYPE_FREEMEM(mtype);
 		mtype = mtype_func(mnode, mtype, flags | PGI_MT_NEXT);
 	}
 	return (pgcnt);

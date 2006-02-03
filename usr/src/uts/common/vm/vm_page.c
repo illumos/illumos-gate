@@ -1819,7 +1819,7 @@ page_create_get_something(vnode_t *vp, u_offset_t off, struct seg *seg,
 
 	flags &= ~PG_MATCH_COLOR;
 	locked = 0;
-#ifndef __sparc
+#if defined(__i386) || defined(__amd64)
 	/*
 	 * page_create_get_something may be called because 4g memory may be
 	 * depleted. Set flags to allow for relocation of base page below

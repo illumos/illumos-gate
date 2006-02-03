@@ -3084,7 +3084,7 @@ page_get_freelist(struct vnode *vp, u_offset_t off, struct seg *seg,
 	}
 
 	/* LINTED */
-	MTYPE_INIT(mtype, vp, vaddr, flags);
+	MTYPE_INIT(mtype, vp, vaddr, flags, size);
 
 	/*
 	 * Convert size to page size code.
@@ -3235,7 +3235,7 @@ page_get_cachelist(struct vnode *vp, u_offset_t off, struct seg *seg,
 	ASSERT(bin <= page_colors_mask);
 
 	/* LINTED */
-	MTYPE_INIT(mtype, vp, vaddr, flags);
+	MTYPE_INIT(mtype, vp, vaddr, flags, MMU_PAGESIZE);
 
 	VM_STAT_ADD(vmm_vmstats.pgc_alloc);
 
@@ -3537,7 +3537,7 @@ page_get_replacement_page(page_t *orig_like_pp, struct lgrp *lgrp_target,
 		pgrflags |= PGR_SAMESZC;
 
 	/* LINTED */
-	MTYPE_PGR_INIT(mtype, flags, like_pp, page_mnode);
+	MTYPE_PGR_INIT(mtype, flags, like_pp, page_mnode, npgs);
 
 	while (npgs) {
 		pplist = NULL;
