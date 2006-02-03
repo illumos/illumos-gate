@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 #include <libgen.h>
+#include "stdusers.h"
 
 
 #define	FILE_BUFF	40960
@@ -92,87 +93,22 @@ file_copy(char *src_file, char *dest_file)
 void
 chown_file(const char *file, const char *group, const char *owner)
 {
-	gid_t	grp;
-	gid_t	own;
+	gid_t	grp = -1;
+	uid_t	own = -1;
 
 	if (group) {
-		if (strcmp(group, "bin") == 0)
-			grp = 2;
-		else if (strcmp(group, "sys") == 0)
-			grp = 3;
-		else if (strcmp(group, "adm") == 0)
-			grp = 4;
-		else if (strcmp(group, "uucp") == 0)
-			grp = 5;
-		else if (strcmp(group, "mail") == 0)
-			grp = 6;
-		else if (strcmp(group, "tty") == 0)
-			grp = 7;
-		else if (strcmp(group, "lp") == 0)
-			grp = 8;
-		else if (strcmp(group, "other") == 0)
-			grp = 1;
-		else if (strcmp(group, "nuucp") == 0)
-			grp = 9;
-		else if (strcmp(group, "staff") == 0)
-			grp = 10;
-		else if (strcmp(group, "daemon") == 0)
-			grp = 12;
-		else if (strcmp(group, "root") == 0)
-			grp = 0;
-		else if (strcmp(group, "sysadmin") == 0)
-			grp = 14;
-		else if (strcmp(group, "smmsp") == 0)
-			grp = 25;
-		else if (strcmp(group, "nobody") == 0)
-			grp = 60001;
-		else if (strcmp(group, "noaccess") == 0)
-			grp = 60002;
-		else if (strcmp(group, "svvs_grp") == 0)
-			grp = 101;
-		else
+		grp = stdfind(group, groupnames);
+		if (grp < 0)
 			(void) fprintf(stderr, "unknown group(%s)\n", group);
-	} else {
-		grp = -1;
 	}
 
 	if (owner) {
-		if (strcmp(owner, "bin") == 0)
-			own = 2;
-		else if (strcmp(owner, "daemon") == 0)
-			own = 1;
-		else if (strcmp(owner, "sys") == 0)
-			own = 3;
-		else if (strcmp(owner, "adm") == 0)
-			own = 4;
-		else if (strcmp(owner, "lp") == 0)
-			own = 71;
-		else if (strcmp(owner, "root") == 0)
-			own = 0;
-		else if (strcmp(owner, "uucp") == 0)
-			own = 5;
-		else if (strcmp(owner, "nuucp") == 0)
-			own = 9;
-		else if (strcmp(owner, "smmsp") == 0)
-			own = 25;
-		else if (strcmp(owner, "listen") == 0)
-			own = 37;
-		else if (strcmp(owner, "nobody") == 0)
-			own = 60001;
-		else if (strcmp(owner, "noaccess") == 0)
-			own = 60002;
-		/*
-		 * This is a temporary HACK that should be removed!!!
-		 */
-		else if (strcmp(owner, "sysadm") == 0)
-			own = 0;
-		else {
+		own = stdfind(owner, usernames);
+		if (own < 0) {
 			(void) fprintf(stderr, "unknown owner(%s)\n", owner);
 			exit(1);
 		}
 
-	} else {
-		own = -1;
 	}
 
 	if (chown(file, own, grp) == -1) {

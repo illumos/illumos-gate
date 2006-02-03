@@ -19,9 +19,10 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright (c) 1998 - 2001 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -35,6 +36,7 @@
 #include <ftw.h>
 #include <strings.h>
 #include <stdlib.h>
+#include "stdusers.h"
 
 #define	MAX_DEPTH	50
 
@@ -43,7 +45,8 @@ static int
 visit_dir(const char *path, const struct stat *st,
 	int file_type, struct FTW *ft)
 {
-	char	*uid, *gid, ftype;
+	const char	*uid, *gid;
+	char	ftype;
 	char	symsrc[MAXPATHLEN];
 	char	buffer[MAXPATHLEN];
 	char	*abs_name;
@@ -129,102 +132,13 @@ visit_dir(const char *path, const struct stat *st,
 		break;
 	}
 
-	switch (st->st_uid) {
-	case 0:
-		uid = "root";
-		break;
-	case 1:
-		uid = "daemon";
-		break;
-	case 2:
-		uid = "bin";
-		break;
-	case 3:
-		uid = "sys";
-		break;
-	case 4:
-		uid = "adm";
-		break;
-	case 5:
-		uid = "uucp";
-		break;
-	case 9:
-		uid = "nuucp";
-		break;
-	case 25:
-		uid = "smmsp";
-		break;
-	case 37:
-		uid = "listen";
-		break;
-	case 71:
-		uid = "lp";
-		break;
-	case 60001:
-	case 65534:
-		uid = "nobody";
-		break;
-	case 60002:
-		uid = "noaccess";
-		break;
-	default:
+	uid = stdfindbyvalue(st->st_uid, usernames);
+	if (uid == NULL)
 		uid = "NO_SUCH_UID";
-		break;
-	}
 
-	switch (st->st_gid) {
-	case 0:
-		gid = "root";
-		break;
-	case 1:
-		gid = "other";
-		break;
-	case 2:
-		gid = "bin";
-		break;
-	case 3:
-		gid = "sys";
-		break;
-	case 4:
-		gid = "adm";
-		break;
-	case 5:
-		gid = "uucp";
-		break;
-	case 6:
-		gid = "mail";
-		break;
-	case 7:
-		gid = "tty";
-		break;
-	case 8:
-		gid = "lp";
-		break;
-	case 9:
-		gid = "nuucp";
-		break;
-	case 10:
-		gid = "staff";
-		break;
-	case 12:
-		gid = "daemon";
-		break;
-	case 25:
-		gid = "smmsp";
-		break;
-	case 60001:
-		gid = "nobody";
-		break;
-	case 60002:
-		gid = "noaccess";
-		break;
-	case 65534:
-		gid = "nogroup";
-		break;
-	default:
+	gid = stdfindbyvalue(st->st_gid, groupnames);
+	if (gid == NULL)
 		gid = "NO_SUCH_GID";
-		break;
-	}
 	if (st->st_nlink == 1)
 		inum = 0;
 	else

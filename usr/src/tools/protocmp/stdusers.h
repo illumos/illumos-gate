@@ -20,11 +20,18 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
+#ifndef _STDUSERS_H
+#define	_STDUSERS_H
+
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#ifdef	__cplusplus
+extern "C" {
+#endif
 
 struct stdlist {
 	const char *name;
@@ -35,3 +42,10 @@ extern const struct stdlist usernames[];
 extern const struct stdlist groupnames[];
 
 int stdfind(const char *, const struct stdlist *);
+const char *stdfindbyvalue(int value, const struct stdlist *list);
+
+#ifdef	__cplusplus
+}
+#endif
+
+#endif	/* _STDUSERS_H */

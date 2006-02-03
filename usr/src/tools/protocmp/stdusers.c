@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -28,6 +28,8 @@
 
 #include <string.h>
 #include "stdusers.h"
+
+/* LINTLIBRARY */
 
 const struct stdlist usernames[] = {
 	{ "root", 0 },
@@ -39,7 +41,9 @@ const struct stdlist usernames[] = {
 	{ "nuucp", 9 },
 	{ "smmsp", 25 },
 	{ "listen", 37 },
+	{ "gdm", 50 },
 	{ "lp", 71 },
+	{ "webservd", 80 },
 	{ "nobody", 60001 },
 	{ "noaccess", 60002 },
 	{ "nobody4", 65534 },
@@ -61,6 +65,8 @@ const struct stdlist groupnames[] = {
 	{ "daemon", 12 },
 	{ "sysadmin", 14 },
 	{ "smmsp", 25 },
+	{ "gdm", 50 },
+	{ "webservd", 80 },
 	{ "nobody", 60001 },
 	{ "noaccess", 60002 },
 	{ "nogroup", 65534 },
@@ -76,4 +82,15 @@ stdfind(const char *name, const struct stdlist *list)
 		list++;
 	}
 	return (-1);
+}
+
+const char *
+stdfindbyvalue(int value, const struct stdlist *list)
+{
+	while (list->name != NULL) {
+		if (value == list->value)
+			return (list->name);
+		list++;
+	}
+	return (NULL);
 }

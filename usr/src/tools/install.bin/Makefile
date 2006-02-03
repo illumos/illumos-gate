@@ -22,26 +22,33 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # tools/install.bin/Makefile
 #
 
 PROG=	install.bin
-OBJS=	$(PROG).o
-SRCS=	$(OBJS:%.o=%.c)
+OBJS=	$(PROG).o stdusers.o
+SRCS=	$(PROG).c ../protocmp/stdusers.c
 
 include ../Makefile.tools
 
 OWNER=	root
 GROUP=	bin
 CFLAGS += $(CCVERBOSE)
+CPPFLAGS += -I../protocmp
 LDLIBS += -lgen
+CLEANFILES += $(OBJS)
 
 .KEEP_STATE:
 
 all:	$(PROG)
+
+$(PROG): $(OBJS)
+	$(LINK.c) -o $@ $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+
 
 install: all .WAIT $(ROOTONBLDMACHPROG)
 	$(RM) $(ROOTONBLDBINMACH)/install
@@ -51,5 +58,9 @@ lint:	lint_SRCS
 
 clean:
 	$(RM) $(CLEANFILES)
+
+%.o: ../protocmp/%.c
+	$(COMPILE.c) -o $@ $<
+	$(POST_PROCESS_O)
 
 include ../Makefile.targ
