@@ -37,6 +37,7 @@
  */
 
 static void handle_error(const char *, va_list);
+static void set_uint64_prop(xmlNodePtr, const char *, uint64_t);
 static int add_disk_to_xml(dmgt_disk_t *, void *);
 static int add_pool_to_xml(nvlist_t *, void *);
 static xmlDocPtr create_doc();
@@ -53,19 +54,26 @@ handle_error(const char *fmt, va_list ap)
 	(void) fprintf(stderr, "\n");
 }
 
+static void
+set_uint64_prop(xmlNodePtr node, const char *attr, uint64_t value)
+{
+	static char tmp[64];
+	(void) snprintf(tmp, sizeof (tmp), "%llu", value);
+	xmlSetProp(node, (xmlChar *)attr, (xmlChar *)tmp);
+}
+
 static int
 add_disk_to_xml(dmgt_disk_t *dp, void *data)
 {
 	int i;
-	char tmp[64];
 	xmlNodePtr available = *((xmlNodePtr *)data);
 
 	xmlNodePtr disk = xmlNewChild(
 	    available, NULL, (xmlChar *)ELEMENT_DISK, NULL);
 	xmlSetProp(disk,
 	    (xmlChar *)ATTR_DISK_NAME, (xmlChar *)dp->name);
-	(void) snprintf(tmp, sizeof (tmp), "%llu", dp->size);
-	xmlSetProp(disk, (xmlChar *)ATTR_DISK_SIZE, (xmlChar *)tmp);
+
+	set_uint64_prop(disk, ATTR_DISK_SIZE, dp->size);
 
 	xmlSetProp(disk, (xmlChar *)ATTR_DISK_INUSE, (xmlChar *)
 	    (dp->in_use ? VAL_ATTR_TRUE : VAL_ATTR_FALSE));
@@ -88,13 +96,8 @@ add_disk_to_xml(dmgt_disk_t *dp, void *data)
 			xmlSetProp(slice,
 			    (xmlChar *)ATTR_SLICE_NAME, (xmlChar *)sp->name);
 
-			(void) snprintf(tmp, sizeof (tmp), "%llu", sp->size);
-			xmlSetProp(slice, (xmlChar *)ATTR_SLICE_SIZE,
-			    (xmlChar *)tmp);
-
-			(void) snprintf(tmp, sizeof (tmp), "%llu", sp->start);
-			xmlSetProp(slice, (xmlChar *)ATTR_SLICE_START,
-			    (xmlChar *)tmp);
+			set_uint64_prop(slice, ATTR_SLICE_SIZE, sp->size);
+			set_uint64_prop(slice, ATTR_SLICE_START, sp->start);
 
 			if (sp->used_name != NULL) {
 				xmlSetProp(slice,
@@ -122,7 +125,6 @@ add_pool_to_xml(nvlist_t *config, void *data)
 	nvlist_t *devices;
 	uint_t n;
 	vdev_stat_t *vs;
-	char tmp[64];
 	xmlNodePtr pool;
 	xmlNodePtr importable = *((xmlNodePtr *)data);
 
@@ -138,36 +140,22 @@ add_pool_to_xml(nvlist_t *config, void *data)
 	pool = xmlNewChild(importable, NULL, (xmlChar *)ELEMENT_POOL, NULL);
 	xmlSetProp(pool, (xmlChar *)ATTR_POOL_NAME, (xmlChar *)name);
 
-	(void) snprintf(tmp, sizeof (tmp), "%llu", guid);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_ID, (xmlChar *)tmp);
-
-	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_alloc);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_USED, (xmlChar *)tmp);
-
-	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_space);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_SIZE, (xmlChar *)tmp);
-
-	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_bytes[ZIO_TYPE_READ]);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_READ_BYTES, (xmlChar *)tmp);
-
-	(void) snprintf(tmp, sizeof (tmp), "%llu",
+	set_uint64_prop(pool, ATTR_POOL_ID, guid);
+	set_uint64_prop(pool, ATTR_POOL_USED, vs->vs_alloc);
+	set_uint64_prop(pool, ATTR_POOL_SIZE, vs->vs_space);
+	set_uint64_prop(pool, ATTR_POOL_REPLACEMENT_SIZE, vs->vs_rsize);
+	set_uint64_prop(pool, ATTR_POOL_READ_BYTES,
+	    vs->vs_bytes[ZIO_TYPE_READ]);
+	set_uint64_prop(pool, ATTR_POOL_WRITE_BYTES,
 	    vs->vs_bytes[ZIO_TYPE_WRITE]);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_WRITE_BYTES, (xmlChar *)tmp);
-
-	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_ops[ZIO_TYPE_READ]);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_READ_OPERATIONS, (xmlChar *)tmp);
-
-	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_ops[ZIO_TYPE_WRITE]);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_WRITE_OPERATIONS, (xmlChar *)tmp);
-
-	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_read_errors);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_READ_ERRORS, (xmlChar *)tmp);
-
-	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_write_errors);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_WRITE_ERRORS, (xmlChar *)tmp);
-
-	(void) snprintf(tmp, sizeof (tmp), "%llu", vs->vs_checksum_errors);
-	xmlSetProp(pool, (xmlChar *)ATTR_POOL_CHECKSUM_ERRORS, (xmlChar *)tmp);
+	set_uint64_prop(pool, ATTR_POOL_READ_OPERATIONS,
+	    vs->vs_ops[ZIO_TYPE_READ]);
+	set_uint64_prop(pool, ATTR_POOL_WRITE_OPERATIONS,
+	    vs->vs_ops[ZIO_TYPE_WRITE]);
+	set_uint64_prop(pool, ATTR_POOL_READ_ERRORS, vs->vs_read_errors);
+	set_uint64_prop(pool, ATTR_POOL_WRITE_ERRORS, vs->vs_write_errors);
+	set_uint64_prop(pool, ATTR_POOL_CHECKSUM_ERRORS,
+	    vs->vs_checksum_errors);
 
 	xmlSetProp(pool, (xmlChar *)ATTR_DEVICE_STATE,
 	    (xmlChar *)zjni_vdev_state_to_str(vs->vs_state));

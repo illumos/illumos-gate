@@ -64,6 +64,7 @@ extern "C" {
 #define	ATTR_POOL_READ_BYTES		"readbytes"
 #define	ATTR_POOL_READ_ERRORS		"readerrors"
 #define	ATTR_POOL_READ_OPERATIONS	"readoperations"
+#define	ATTR_POOL_REPLACEMENT_SIZE	"replacementsize"
 #define	ATTR_POOL_SIZE			"size"
 #define	ATTR_POOL_STATE			"poolstate"
 #define	ATTR_POOL_STATUS		"poolstatus"
