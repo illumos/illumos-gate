@@ -1087,3 +1087,4 @@ Bugid   Risk Synopsis
 6372082 ld -r erroneously creates .got section on i386
 6201866 amd64: linker symbol elimination is broken
 6372620 printstack() segfaults when called from static function 
+6380470 32-bit ld(1) incorrectly builds 64-bit relocatable objects

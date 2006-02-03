@@ -956,14 +956,14 @@ reloc_relobj(Boolean local, Rel_desc *rsp, Ofl_desc *ofl)
 		 * as a section symbol.  For SPARC and AMD (Rela), indicate
 		 * that the addend also needs to be applied to this relocation.
 		 */
-#if	defined(__i386)
+#if	(defined(__i386) || defined(__amd64)) && !defined(_ELF64)
 		oflags = FLG_REL_SCNNDX;
 #else
 		oflags = FLG_REL_SCNNDX | FLG_REL_ADVAL;
 #endif
 	}
 
-#if	defined(__i386)
+#if	(defined(__i386) || defined(__amd64)) && !defined(_ELF64)
 	/*
 	 * Intel (Rel) relocations do not contain an addend.  Any addend is
 	 * contained within the file at the location identified by the
