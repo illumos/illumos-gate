@@ -85,76 +85,111 @@ _umem_logging_init(void)
 	return ("fail,contents"); /* $UMEM_LOGGING setting */
 }
 
+typedef enum {
+	HELP_ADD,
+	HELP_ATTACH,
+	HELP_CREATE,
+	HELP_DESTROY,
+	HELP_DETACH,
+	HELP_EXPORT,
+	HELP_IMPORT,
+	HELP_IOSTAT,
+	HELP_LIST,
+	HELP_OFFLINE,
+	HELP_ONLINE,
+	HELP_REPLACE,
+	HELP_SCRUB,
+	HELP_STATUS
+} zpool_help_t;
+
+
 typedef struct zpool_command {
 	const char	*name;
 	int		(*func)(int, char **);
-	const char	*usage;
+	zpool_help_t	usage;
 } zpool_command_t;
 
 /*
  * Master command table.  Each ZFS command has a name, associated function, and
- * usage message.  These commands are organized according to how they are
- * displayed in the usage message.  An empty command (one with a NULL name)
- * indicates an empty line in the generic usage message.
+ * usage message.  Unfortunately, the usage messages need to be
+ * iternationalized, so we have to have a function to return the usage message
+ * based on a command index.
+ *
+ * These commands are organized according to how they are displayed in the usage
+ * message.  An empty command (one with a NULL name) indicates an empty line in
+ * the generic usage message.
  */
 static zpool_command_t command_table[] = {
-	{ "create",	zpool_do_create,
-	    "\tcreate  [-fn] [-R root] [-m mountpoint] <pool> <vdev> ...\n" },
-	{ "destroy",	zpool_do_destroy,
-	    "\tdestroy [-f] <pool>\n"					},
-
-
+	{ "create",	zpool_do_create,	HELP_CREATE		},
+	{ "destroy",	zpool_do_destroy,	HELP_DESTROY		},
 	{ NULL },
-
-	{ "add",	zpool_do_add,
-	    "\tadd [-fn] <pool> <vdev> ...\n"				},
-
+	{ "add",	zpool_do_add,		HELP_ADD		},
 	{ NULL },
-
-	{ "list",	zpool_do_list,
-	    "\tlist [-H] [-o field[,field]*] [pool] ...\n"		},
-	{ "iostat",	zpool_do_iostat,
-	    "\tiostat [-v] [pool] ... [interval [count]]\n"		},
-	{ "status",	zpool_do_status,
-	    "\tstatus [-vx] [pool] ...\n"				},
-
+	{ "list",	zpool_do_list,		HELP_LIST		},
+	{ "iostat",	zpool_do_iostat,	HELP_IOSTAT		},
+	{ "status",	zpool_do_status,	HELP_STATUS		},
 	{ NULL },
-
-	{ "online",	zpool_do_online,
-	    "\tonline <pool> <device>\n"				},
-	{ "offline",	zpool_do_offline,
-	    "\toffline <pool> <device>\n"				},
-
+	{ "online",	zpool_do_online,	HELP_ONLINE		},
+	{ "offline",	zpool_do_offline,	HELP_OFFLINE		},
 	{ NULL },
-
-	{ "attach",	zpool_do_attach,
-	    "\tattach [-f] <pool> <device> <new_device>\n"		},
-	{ "detach",	zpool_do_detach,
-	    "\tdetach <pool> <device>\n"				},
-	{ "replace",	zpool_do_replace,
-	    "\treplace [-f] <pool> <device> [new_device]\n"		},
-
+	{ "attach",	zpool_do_attach,	HELP_ATTACH		},
+	{ "detach",	zpool_do_detach,	HELP_DETACH		},
+	{ "replace",	zpool_do_replace,	HELP_REPLACE		},
 	{ NULL },
-
-	{ "scrub",	zpool_do_scrub,
-	    "\tscrub [-s] <pool> ...\n"					},
-
+	{ "scrub",	zpool_do_scrub,		HELP_SCRUB		},
 	{ NULL },
-
-	{ "import",	zpool_do_import,
-	    "\timport [-d dir]\n"
-	    "\timport [-d dir] [-f] [-o opts] [-R root] -a\n"
-	    "\timport [-d dir] [-f] [-o opts] [-R root ]<pool | id> "
-	    "[newpool]\n"						},
-	{ "export",	zpool_do_export,
-	    "\texport [-f] <pool> ...\n"				},
-
-	{ NULL }
+	{ "import",	zpool_do_import,	HELP_IMPORT		},
+	{ "export",	zpool_do_export,	HELP_EXPORT		},
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
 
 zpool_command_t *current_command;
+
+static const char *
+get_usage(zpool_help_t idx) {
+	switch (idx) {
+	case HELP_ADD:
+		return (gettext("\tadd [-fn] <pool> <vdev> ...\n"));
+	case HELP_ATTACH:
+		return (gettext("\tattach [-f] <pool> <device> "
+		    "<new_device>\n"));
+	case HELP_CREATE:
+		return (gettext("\tcreate  [-fn] [-R root] [-m mountpoint] "
+		    "<pool> <vdev> ...\n"));
+	case HELP_DESTROY:
+		return (gettext("\tdestroy [-f] <pool>\n"));
+	case HELP_DETACH:
+		return (gettext("\tdetach <pool> <device>\n"));
+	case HELP_EXPORT:
+		return (gettext("\texport [-f] <pool> ...\n"));
+	case HELP_IMPORT:
+		return (gettext("\timport [-d dir]\n"
+		    "\timport [-d dir] [-f] [-o opts] [-R root] -a\n"
+		    "\timport [-d dir] [-f] [-o opts] [-R root ] <pool | id> "
+		    "[newpool]\n"));
+	case HELP_IOSTAT:
+		return (gettext("\tiostat [-v] [pool] ... [interval "
+		    "[count]]\n"));
+	case HELP_LIST:
+		return (gettext("\tlist [-H] [-o field[,field]*] "
+		    "[pool] ...\n"));
+	case HELP_OFFLINE:
+		return (gettext("\toffline <pool> <device>\n"));
+	case HELP_ONLINE:
+		return (gettext("\tonline <pool> <device>\n"));
+	case HELP_REPLACE:
+		return (gettext("\treplace [-f] <pool> <device> "
+		    "[new_device]\n"));
+	case HELP_SCRUB:
+		return (gettext("\tscrub [-s] <pool> ...\n"));
+	case HELP_STATUS:
+		return (gettext("\tstatus [-vx] [pool] ...\n"));
+	}
+
+	abort();
+	/* NOTREACHED */
+}
 
 /*
  * Fields available for 'zpool list'.
@@ -224,11 +259,11 @@ usage(int requested)
 				(void) fprintf(fp, "\n");
 			else
 				(void) fprintf(fp, "%s",
-				    command_table[i].usage);
+				    get_usage(command_table[i].usage));
 		}
 	} else {
 		(void) fprintf(fp, gettext("usage:\n"));
-		(void) fprintf(fp, current_command->usage);
+		(void) fprintf(fp, "%s", get_usage(current_command->usage));
 
 		if (strcmp(current_command->name, "list") == 0) {
 			(void) fprintf(fp, gettext("\nwhere 'field' is one "

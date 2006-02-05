@@ -84,77 +84,129 @@ _umem_logging_init(void)
 	return ("fail,contents"); /* $UMEM_LOGGING setting */
 }
 
+typedef enum {
+	HELP_BACKUP,
+	HELP_CLONE,
+	HELP_CREATE,
+	HELP_DESTROY,
+	HELP_GET,
+	HELP_INHERIT,
+	HELP_LIST,
+	HELP_MOUNT,
+	HELP_RENAME,
+	HELP_RESTORE,
+	HELP_ROLLBACK,
+	HELP_SET,
+	HELP_SHARE,
+	HELP_SNAPSHOT,
+	HELP_UNMOUNT,
+	HELP_UNSHARE
+} zfs_help_t;
+
 typedef struct zfs_command {
 	const char	*name;
 	int		(*func)(int argc, char **argv);
-	const char	*usage;
+	zfs_help_t	usage;
 } zfs_command_t;
 
 /*
  * Master command table.  Each ZFS command has a name, associated function, and
- * usage message.  These commands are organized according to how they are
- * displayed in the usage message.  An empty command (one with a NULL name)
- * indicates an empty line in the generic usage message.  A command with a NULL
- * usage message indicates an alias for an existing command, and is not
- * displayed in the general usage message.
+ * usage message.  Unfortunately, the usage messages need to be
+ * iternationalized, so we have to have a function to return the usage message
+ * based on a command index.
+ *
+ * These commands are organized according to how they are displayed in the usage
+ * message.  An empty command (one with a NULL name) indicates an empty line in
+ * the generic usage message.
  */
 static zfs_command_t command_table[] = {
-	{ "create",	zfs_do_create,
-	    "\tcreate <filesystem>\n"
-	    "\tcreate [-s] [-b blocksize] -V <size> <volume>\n"		},
-	{ "destroy",	zfs_do_destroy,
-	    "\tdestroy [-rRf] <filesystem|volume|snapshot>\n"		},
+	{ "create",	zfs_do_create,		HELP_CREATE		},
+	{ "destroy",	zfs_do_destroy,		HELP_DESTROY		},
 	{ NULL },
-	{ "snapshot",	zfs_do_snapshot,
-	    "\tsnapshot <filesystem@name|volume@name>\n"		},
-	{ "rollback",	zfs_do_rollback,
-	    "\trollback [-rRf] <snapshot>\n"				},
-	{ "clone",	zfs_do_clone,
-	    "\tclone <snapshot> <filesystem|volume>\n"			},
-	{ "rename",	zfs_do_rename,
-	    "\trename <filesystem|volume|snapshot> "
-	    "<filesystem|volume|snapshot>\n"				},
+	{ "snapshot",	zfs_do_snapshot,	HELP_SNAPSHOT		},
+	{ "rollback",	zfs_do_rollback,	HELP_ROLLBACK		},
+	{ "clone",	zfs_do_clone,		HELP_CLONE		},
+	{ "rename",	zfs_do_rename,		HELP_RENAME		},
 	{ NULL },
-	{ "list",	zfs_do_list,
-	    "\tlist [-rH] [-o property[,property]...] [-t type[,type]...]\n"
-	    "\t    [filesystem|volume|snapshot] ...\n"			},
+	{ "list",	zfs_do_list,		HELP_LIST		},
 	{ NULL },
-	{ "set",	zfs_do_set,
-	    "\tset <property=value> <filesystem|volume> ...\n"		},
-	{ "get", 	zfs_do_get,
-	    "\tget [-rHp] [-o field[,field]...] [-s source[,source]...]\n"
-	    "\t    <all | property[,property]...> "
-	    "<filesystem|volume|snapshot> ...\n"			},
-	{ "inherit",	zfs_do_inherit,
-	    "\tinherit [-r] <property> <filesystem|volume> ...\n"	},
+	{ "set",	zfs_do_set,		HELP_SET		},
+	{ "get", 	zfs_do_get,		HELP_GET		},
+	{ "inherit",	zfs_do_inherit,		HELP_INHERIT		},
 	{ NULL },
-	{ "mount",	zfs_do_mount,
-	    "\tmount\n"
-	    "\tmount [-o opts] [-O] -a\n"
-	    "\tmount [-o opts] [-O] <filesystem>\n"			},
+	{ "mount",	zfs_do_mount,		HELP_MOUNT		},
 	{ NULL },
-	{ "unmount",	zfs_do_unmount,
-	    "\tunmount [-f] -a\n"
-	    "\tunmount [-f] <filesystem|mountpoint>\n"			},
+	{ "unmount",	zfs_do_unmount,		HELP_UNMOUNT		},
 	{ NULL },
-	{ "share",	zfs_do_share,
-	    "\tshare -a\n"
-	    "\tshare <filesystem>\n"					},
+	{ "share",	zfs_do_share,		HELP_SHARE		},
 	{ NULL },
-	{ "unshare",	zfs_do_unshare,
-	    "\tunshare [-f] -a\n"
-	    "\tunshare [-f] <filesystem|mountpoint>\n"			},
+	{ "unshare",	zfs_do_unshare,		HELP_UNSHARE		},
 	{ NULL },
-	{ "backup",	zfs_do_backup,
-	    "\tbackup [-i <snapshot>] <snapshot>\n"			},
-	{ "restore",	zfs_do_restore,
-	    "\trestore [-vn] <filesystem|volume|snapshot>\n"
-	    "\trestore [-vn] -d <filesystem>\n"				},
+	{ "backup",	zfs_do_backup,		HELP_BACKUP		},
+	{ "restore",	zfs_do_restore,		HELP_RESTORE		},
 };
 
 #define	NCOMMAND	(sizeof (command_table) / sizeof (command_table[0]))
 
 zfs_command_t *current_command;
+
+static const char *
+get_usage(zfs_help_t idx)
+{
+	switch (idx) {
+	case HELP_BACKUP:
+		return (gettext("\tbackup [-i <snapshot>] <snapshot>\n"));
+	case HELP_CLONE:
+		return (gettext("\tclone <snapshot> <filesystem|volume>\n"));
+	case HELP_CREATE:
+		return (gettext("\tcreate <filesystem>\n"
+		    "\tcreate [-s] [-b blocksize] -V <size> <volume>\n"));
+	case HELP_DESTROY:
+		return (gettext("\tdestroy [-rRf] "
+		    "<filesystem|volume|snapshot>\n"));
+	case HELP_GET:
+		return (gettext("\tget [-rHp] [-o field[,field]...] "
+		    "[-s source[,source]...]\n"
+		    "\t    <all | property[,property]...> "
+		    "<filesystem|volume|snapshot> ...\n"));
+	case HELP_INHERIT:
+		return (gettext("\tinherit [-r] <property> "
+		    "<filesystem|volume> ...\n"));
+	case HELP_LIST:
+		return (gettext("\tlist [-rH] [-o property[,property]...] "
+		    "[-t type[,type]...]\n"
+		    "\t    [filesystem|volume|snapshot] ...\n"));
+	case HELP_MOUNT:
+		return (gettext("\tmount\n"
+		    "\tmount [-o opts] [-O] -a\n"
+		    "\tmount [-o opts] [-O] <filesystem>\n"));
+	case HELP_RENAME:
+		return (gettext("\trename <filesystem|volume|snapshot> "
+		    "<filesystem|volume|snapshot>\n"));
+	case HELP_RESTORE:
+		return (gettext("\trestore [-vn] <filesystem|volume|snapshot>\n"
+		    "\trestore [-vn] -d <filesystem>\n"));
+	case HELP_ROLLBACK:
+		return (gettext("\trollback [-rRf] <snapshot>\n"));
+	case HELP_SET:
+		return (gettext("\tset <property=value> "
+		    "<filesystem|volume> ...\n"));
+	case HELP_SHARE:
+		return (gettext("\tshare -a\n"
+		    "\tshare <filesystem>\n"));
+	case HELP_SNAPSHOT:
+		return (gettext("\tsnapshot <filesystem@name|volume@name>\n"));
+	case HELP_UNMOUNT:
+		return (gettext("\tunmount [-f] -a\n"
+		    "\tunmount [-f] <filesystem|mountpoint>\n"));
+	case HELP_UNSHARE:
+		return (gettext("\tunshare [-f] -a\n"
+		    "\tunshare [-f] <filesystem|mountpoint>\n"));
+	}
+
+	abort();
+	/* NOTREACHED */
+}
 
 /*
  * Utility function to guarantee malloc() success.
@@ -195,14 +247,14 @@ usage(int requested)
 				(void) fprintf(fp, "\n");
 			else
 				(void) fprintf(fp, "%s",
-				    command_table[i].usage);
+				    get_usage(command_table[i].usage));
 		}
 
 		(void) fprintf(fp, gettext("\nEach dataset is of the form: "
 		    "pool/[dataset/]*dataset[@name]\n"));
 	} else {
 		(void) fprintf(fp, gettext("usage:\n"));
-		(void) fprintf(fp, current_command->usage);
+		(void) fprintf(fp, "%s", get_usage(current_command->usage));
 	}
 
 	if (current_command == NULL ||
