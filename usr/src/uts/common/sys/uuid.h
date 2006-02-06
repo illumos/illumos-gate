@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000,2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -77,6 +77,8 @@ struct uuid {
 };
 
 #define	UUID_LEN	16
+
+#define	UUID_PRINTABLE_STRING_LENGTH 37
 
 typedef uchar_t		uuid_t[UUID_LEN];
 

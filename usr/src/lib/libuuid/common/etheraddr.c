@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2000,2002 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -845,8 +845,8 @@ get_ethernet_address(uuid_node_t *node)
 	/*
 	 * go get all interface names
 	 */
-	if (get_net_if_names(&ifnames) == 0) {
-		return (0);
+	if (get_net_if_names(&ifnames) != 0) {
+		return (-1);
 	}
 
 	/*
@@ -864,14 +864,14 @@ get_ethernet_address(uuid_node_t *node)
 			ifname = ifnames[i];
 			/* Gross hack to avoid getting errors from /dev/lo0 */
 			if (strcmp(ifname, LOOPBACK_IF) != 0) {
-			    if (dlpi_get_address(ifname, &addr) == 0) {
-				bcopy(&addr, node, 6);
-				/*
-				 * found one, set result to successful
-				 */
-				found = 0;
-				continue;
-			    }
+				if (dlpi_get_address(ifname, &addr) == 0) {
+					bcopy(&addr, node, 6);
+					/*
+					 * found one, set result to successful
+					 */
+					found = 0;
+					continue;
+				}
 			}
 			i++;
 		}

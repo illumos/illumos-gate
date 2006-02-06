@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -75,7 +75,6 @@
 #define	STATE_LOCATION		"/var/sadm/system/uuid_state"
 #define	URANDOM_PATH		"/dev/urandom"
 #define	MAX_RETRY		8
-#define	UUID_PRINTF_SIZE	37
 #define	VER1_MASK		0xefff
 
 static	mutex_t			ulock = DEFAULTMUTEX;
@@ -664,7 +663,7 @@ uuid_unparse(uuid_t uu, char *out)
 
 	/* XXX user should have allocated enough memory */
 	/*
-	 * if (strlen(out) < UUID_PRINTF_SIZE) {
+	 * if (strlen(out) < UUID_PRINTABLE_STRING_LENGTH) {
 	 * return;
 	 * }
 	 */
@@ -680,7 +679,7 @@ uuid_unparse(uuid_t uu, char *out)
 	(void) snprintf(out, 25, "%08x-%04x-%04x-%04x-",
 	    uuid.time_low, uuid.time_mid, uuid.time_hi_and_version,
 		clock_seq);
-	(void) strlcat(out, etheraddr, UUID_PRINTF_SIZE);
+	(void) strlcat(out, etheraddr, UUID_PRINTABLE_STRING_LENGTH);
 }
 
 /*

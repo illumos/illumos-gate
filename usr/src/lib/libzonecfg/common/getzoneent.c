@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -279,7 +279,7 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 	boolean_t exists = B_FALSE, need_quotes;
 	char *cp, *p;
 	char path[MAXPATHLEN];
-	char uuidstr[37];		/* hard-coded because of CR 6305641 */
+	char uuidstr[UUID_PRINTABLE_STRING_LENGTH];
 	size_t tlen;
 
 	assert(ze != NULL);
