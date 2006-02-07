@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +21,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2001-2002 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 
@@ -41,19 +40,14 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/sun4u/ngdr/io/%.c
 
 NGDR_IO=	$(UTSBASE)/sun4u/ngdr/io
 SBD_IOCTL=	$(UTSBASE)/sun4u/sys/sbd_ioctl.h
-SBDGENERR=	$(NGDR_IO)/sbdgenerr
+SBDGENERR=	$(NGDR_IO)/sbdgenerr.pl
+SBDGENERRCMD=   $(PERL) $(SBDGENERR)
 
-CLEANFILES +=	$(SBDGENERR)
 CLEANFILES +=	$(NGDR_IO)/dr_err.c
 
 $(NGDR_IO)/dr_err.c:	$(SBDGENERR) $(SBD_IOCTL)
 	$(RM) $@
-	$(SBDGENERR) ESBD < $(SBD_IOCTL) > $(NGDR_IO)/dr_err.c
-
-$(SBDGENERR):			$(NGDR_IO)/sbdgenerr.pl
-	$(RM) $@
-	$(CAT) $(NGDR_IO)/sbdgenerr.pl > $@
-	$(CHMOD) +x $@
+	$(SBDGENERRCMD) ESBD < $(SBD_IOCTL) > $(NGDR_IO)/dr_err.c
 
 #
 # Section 1b: Lint object build rules

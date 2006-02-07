@@ -21,7 +21,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #	Global definitions for sun4u starcat implementation specific modules.
@@ -59,13 +59,6 @@ USR_STARCAT_INC_DIR	= $(USR_STARCAT_DIR)/include
 USR_STARCAT_ISYS_DIR	= $(USR_STARCAT_INC_DIR)/sys
 
 STARCAT_LINT_LIB_DIR	= $(UTSBASE)/$(PLATFORM)/starcat/lint-libs/$(OBJS_DIR)
-
-
-#
-# Build dependencies
-#
-
-drmach: dr
 
 #
 #	Include the makefiles which define build rule templates, the
