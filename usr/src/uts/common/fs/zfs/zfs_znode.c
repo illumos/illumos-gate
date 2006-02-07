@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1127,6 +1127,9 @@ zfs_freesp(znode_t *zp, uint64_t from, uint64_t len, int flag, dmu_tx_t *tx,
 	uint64_t size = zp->z_phys->zp_size;
 	uint64_t end = from + len;
 	int have_grow_lock, error;
+
+	if (ZTOV(zp)->v_type == VFIFO)
+		return (0);
 
 	have_grow_lock = RW_WRITE_HELD(&zp->z_grow_lock);
 

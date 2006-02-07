@@ -1915,7 +1915,7 @@ zfs_setattr(vnode_t *vp, vattr_t *vap, int flags, cred_t *cr,
 	if (mask & AT_SIZE && vp->v_type == VDIR)
 		return (EISDIR);
 
-	if (mask & AT_SIZE && vp->v_type != VREG)
+	if (mask & AT_SIZE && vp->v_type != VREG && vp->v_type != VFIFO)
 		return (EINVAL);
 
 	ZFS_ENTER(zfsvfs);
