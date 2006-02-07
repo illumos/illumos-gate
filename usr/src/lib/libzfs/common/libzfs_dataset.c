@@ -1761,7 +1761,7 @@ check_parents(const char *path, zfs_type_t type)
 
 	/* we are in a non-global zone, but parent is in the global zone */
 	if (getzoneid() != GLOBAL_ZONEID &&
-	    zfs_prop_get_int(zhp, ZFS_PROP_ZONED)) {
+	    !zfs_prop_get_int(zhp, ZFS_PROP_ZONED)) {
 		zfs_error(dgettext(TEXT_DOMAIN,
 		    "cannot create '%s': permission denied"), path);
 		zfs_close(zhp);

@@ -1923,6 +1923,89 @@ verify_ipd(zone_dochandle_t handle)
 	return (return_code);
 }
 
+/* ARGSUSED */
+static void
+zfs_fs_err_handler(const char *fmt, va_list ap)
+{
+	/*
+	 * Do nothing - do not print the libzfs error messages.
+	 */
+}
+
+/*
+ * Verify that the ZFS dataset exists, and its mountpoint
+ * property is set to "legacy".
+ */
+static int
+verify_fs_zfs(struct zone_fstab *fstab)
+{
+	zfs_handle_t *zhp;
+	char propbuf[ZFS_MAXPROPLEN];
+
+	zfs_set_error_handler(zfs_fs_err_handler);
+
+	if ((zhp = zfs_open(fstab->zone_fs_special, ZFS_TYPE_ANY)) == NULL) {
+		(void) fprintf(stderr, gettext("cannot verify fs %s: "
+			"could not access zfs dataset '%s'\n"),
+			fstab->zone_fs_dir, fstab->zone_fs_special);
+		return (Z_ERR);
+	}
+
+	if (zfs_get_type(zhp) != ZFS_TYPE_FILESYSTEM) {
+		(void) fprintf(stderr, gettext("cannot verify fs %s: "
+			"'%s' is not a filesystem\n"),
+			fstab->zone_fs_dir, fstab->zone_fs_special);
+		zfs_close(zhp);
+		return (Z_ERR);
+	}
+
+	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, propbuf, sizeof (propbuf),
+	    NULL, NULL, 0, 0) != 0 || strcmp(propbuf, "legacy") != 0) {
+		(void) fprintf(stderr, gettext("cannot verify fs %s: zfs '%s' "
+			"mountpoint is not \"legacy\"\n"),
+			fstab->zone_fs_dir, fstab->zone_fs_special);
+		zfs_close(zhp);
+		return (Z_ERR);
+	}
+
+	zfs_close(zhp);
+	return (Z_OK);
+}
+
+/*
+ * Verify that the special device/filesystem exists and is valid.
+ */
+static int
+verify_fs_special(struct zone_fstab *fstab)
+{
+	struct stat st;
+
+	if (strcmp(fstab->zone_fs_type, MNTTYPE_ZFS) == 0)
+		return (verify_fs_zfs(fstab));
+
+	if (stat(fstab->zone_fs_special, &st) != 0) {
+		(void) fprintf(stderr, gettext("cannot verify fs "
+		    "%s: could not access %s: %s\n"), fstab->zone_fs_dir,
+		    fstab->zone_fs_special, strerror(errno));
+		return (Z_ERR);
+	}
+
+	if (strcmp(st.st_fstype, MNTTYPE_NFS) == 0) {
+		/*
+		 * TRANSLATION_NOTE
+		 * fs and NFS are literals that should
+		 * not be translated.
+		 */
+		(void) fprintf(stderr, gettext("cannot verify "
+		    "fs %s: NFS mounted file-system.\n"
+		    "\tA local file-system must be used.\n"),
+		    fstab->zone_fs_special);
+		return (Z_ERR);
+	}
+
+	return (Z_OK);
+}
+
 static int
 verify_filesystems(zone_dochandle_t handle)
 {
@@ -2007,29 +2090,12 @@ verify_filesystems(zone_dochandle_t handle)
 			return_code = Z_ERR;
 			goto next_fs;
 		}
-		/*
-		 * Verify fs_special and optionally fs_raw, exists.
-		 */
-		if (stat(fstab.zone_fs_special, &st) != 0) {
-			(void) fprintf(stderr, gettext("could not verify fs "
-			    "%s: could not access %s: %s\n"), fstab.zone_fs_dir,
-			    fstab.zone_fs_special, strerror(errno));
-			return_code = Z_ERR;
+
+		/* Verify fs_special. */
+		if ((return_code = verify_fs_special(&fstab)) != Z_OK)
 			goto next_fs;
-		}
-		if (strcmp(st.st_fstype, MNTTYPE_NFS) == 0) {
-			/*
-			 * TRANSLATION_NOTE
-			 * fs and NFS are literals that should
-			 * not be translated.
-			 */
-			(void) fprintf(stderr, gettext("cannot verify "
-			    "fs %s: NFS mounted file-system.\n"
-			    "\tA local file-system must be used.\n"),
-			    fstab.zone_fs_special);
-			return_code = Z_ERR;
-			goto next_fs;
-		}
+
+		/* Verify fs_raw. */
 		if (fstab.zone_fs_raw[0] != '\0' &&
 		    stat(fstab.zone_fs_raw, &st) != 0) {
 			/*
