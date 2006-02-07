@@ -42,10 +42,10 @@
 #include <sys/dmv.h>
 #include <sys/sysmacros.h>
 
-#ifdef DEBUG
+#ifdef TRAPTRACE
 uint_t x_dstat[NCPU][XC_LOOP_EXIT+1];
 uint_t x_rstat[NCPU][4];
-#endif /* DEBUG */
+#endif /* TRAPTRACE */
 
 static int xc_serv_inum;	/* software interrupt number for xc_serv() */
 static int xc_loop_inum;	/* software interrupt number for xc_loop() */
@@ -128,12 +128,12 @@ xc_init(void)
 	mutex_init(&xc_sys_mutex, NULL, MUTEX_SPIN,
 	    (void *)ipltospl(XCALL_PIL));
 
-#ifdef DEBUG
+#ifdef TRAPTRACE
 	/* Initialize for all possible CPUs. */
 	for (pix = 0; pix < NCPU; pix++) {
 		XC_STAT_INIT(pix);
 	}
-#endif /* DEBUG */
+#endif /* TRAPTRACE */
 
 	xc_serv_inum = add_softintr(XCALL_PIL, (softintrfunc)xc_serv, 0);
 	xc_loop_inum = add_softintr(XCALL_PIL, (softintrfunc)xc_loop, 0);

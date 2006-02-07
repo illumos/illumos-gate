@@ -246,7 +246,7 @@ enum xc_states {
 #define	XC_TRACE(type, cpus, func, arg1, arg2)
 #endif /* TRAPTRACE */
 
-#ifdef DEBUG
+#if defined(DEBUG) || defined(TRAPTRACE)
 /*
  * get some statistics when xc/xt routines are called
  */
@@ -286,14 +286,14 @@ extern	uint_t x_rstat[NCPU][4];
 	x_rstat[cpuid][XC_CPUID] = 0xffffff00 | cpuid;	\
 }
 
-#else /* DEBUG */
+#else /* DEBUG || TRAPTRACE */
 
 #define	XC_STAT_INIT(cpuid)
 #define	XC_STAT_INC(a)
 #define	XC_ATTENTION_CPUSET(x)
 #define	XC_DISMISSED_CPUSET(x)
 
-#endif /* DEBUG */
+#endif /* DEBUG || TRAPTRACE */
 
 #endif	/* !_ASM */
 
