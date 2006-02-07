@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -15032,8 +15031,18 @@ illgrp_insert(ill_group_t **illgrp_head, ill_t *ill, char *groupname,
 
 			ill_t *tmp_ill;
 
-			tmp_ill = illgrp->illgrp_ill;
-			ASSERT(tmp_ill != NULL && tmp_ill->ill_phyint != NULL);
+			/*
+			 * If we have an ill_group_t in the list which has
+			 * no ill_t assigned then we must be in the process of
+			 * removing this group. We skip this as illgrp_delete()
+			 * will remove it from the list.
+			 */
+			if ((tmp_ill = illgrp->illgrp_ill) == NULL) {
+				ASSERT(illgrp->illgrp_ill_count == 0);
+				continue;
+			}
+
+			ASSERT(tmp_ill->ill_phyint != NULL);
 			phyi = tmp_ill->ill_phyint;
 			/*
 			 * Look at groups which has names only.

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -8233,6 +8232,19 @@ ip_newroute_ipif(queue_t *q, mblk_t *mp, ipif_t *ipif, ipaddr_t dst,
 			}
 
 			ire->ire_marks |= ire_marks;
+
+			/*
+			 * If IRE_MARK_NOADD is set then we need to convert
+			 * the max_fragp to a useable value now. This is
+			 * normally done in ire_add_v[46].
+			 */
+			if (ire->ire_marks & IRE_MARK_NOADD) {
+				uint_t  max_frag;
+
+				max_frag = *ire->ire_max_fragp;
+				ire->ire_max_fragp = NULL;
+				ire->ire_max_frag = max_frag;
+			}
 
 			/* Prevent save_ire from getting deleted */
 			if (save_ire != NULL) {
