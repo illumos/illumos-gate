@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,16 +84,13 @@ static enum {
 	LD_JAVA
 } log_dest = LD_SYSLOG;
 
-typedef enum {
-	PGAS_GET_ONLY = 1,
-	PGAS_GET_AND_SET
-} pgas_mode_t;
-
 static const char PNAME_FMT[] = "%s: ";
 static const char ERRNO_FMT[] = ": %s";
 
-static JavaVM *jvm;
-static int lflag;
+static pthread_mutex_t jvm_lock = PTHREAD_MUTEX_INITIALIZER;
+static JavaVM *jvm;		/* protected by jvm_lock */
+static int instance_running;	/* protected by jvm_lock */
+static int lflag;		/* specifies poold logging mode */
 
 static jmethodID log_mid;
 static jobject severity_err;
@@ -101,11 +98,10 @@ static jobject severity_notice;
 static jobject base_log;
 static jclass poold_class;
 static jobject poold_instance;
-static int instance_running;
-static pthread_mutex_t instance_running_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static sigset_t hdl_set;
 
+static void pu_notice(const char *fmt, ...);
 static void pu_die(const char *fmt, ...) __NORETURN;
 
 static void
@@ -117,14 +113,52 @@ usage(void)
 }
 
 static void
+check_thread_attached(JNIEnv **env)
+{
+	int ret;
+
+	ret = (*jvm)->GetEnv(jvm, (void **)env, JNI_VERSION_1_4);
+	if (*env == NULL) {
+		if (ret == JNI_EVERSION) {
+			/*
+			 * Avoid recursively calling
+			 * check_thread_attached()
+			 */
+			if (log_dest == LD_JAVA)
+				log_dest = LD_TERMINAL;
+			pu_notice(gettext("incorrect JNI version"));
+			exit(E_ERROR);
+		}
+		if ((*jvm)->AttachCurrentThreadAsDaemon(jvm, (void **)env,
+			NULL) != 0) {
+			/*
+			 * Avoid recursively calling
+			 * check_thread_attached()
+			 */
+			if (log_dest == LD_JAVA)
+				log_dest = LD_TERMINAL;
+			pu_notice(gettext("thread attach failed"));
+			exit(E_ERROR);
+		}
+	}
+}
+
+/*
+ * Output a message to the designated logging destination.
+ *
+ * severity - Specified the severity level when using LD_JAVA logging
+ * fmt - specified the format of the output message
+ * alist - varargs used in the output message
+ */
+static void
 pu_output(int severity, const char *fmt, va_list alist)
 {
 	int err = errno;
 	char line[255] = "";
 	jobject jseverity;
 	jobject jline;
-	JNIEnv *env;
-	int detach_required = 0;
+	JNIEnv *env = NULL;
+
 	if (pname != NULL && log_dest == LD_TERMINAL)
 		(void) snprintf(line, sizeof (line), gettext(PNAME_FMT), pname);
 
@@ -152,107 +186,93 @@ pu_output(int severity, const char *fmt, va_list alist)
 			jseverity = severity_notice;
 
 		if (jvm) {
-			(*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_2);
-			if (env == NULL) {
-				detach_required = 1;
-				(*jvm)->AttachCurrentThread(jvm,
-				    (void **)&env, NULL);
-			}
+			check_thread_attached(&env);
 			if ((jline = (*env)->NewStringUTF(env, line)) != NULL)
 				(*env)->CallVoidMethod(env, base_log, log_mid,
 				    jseverity, jline);
-			if (detach_required)
-				(*jvm)->DetachCurrentThread(jvm);
 		}
 	}
 }
 
+/*
+ * Notify the user with the supplied message.
+ */
 /*PRINTFLIKE1*/
 static void
 pu_notice(const char *fmt, ...)
 {
 	va_list alist;
+
 	va_start(alist, fmt);
 	pu_output(LOG_NOTICE, fmt, alist);
 	va_end(alist);
 }
 
+/*
+ * Stop the application executing inside the JVM. Always ensure that jvm_lock
+ * is held before invoking this function.
+ */
+static void
+halt_application(void)
+{
+	JNIEnv *env = NULL;
+	jmethodID poold_shutdown_mid;
+
+	if (jvm && instance_running) {
+		check_thread_attached(&env);
+		if ((poold_shutdown_mid = (*env)->GetMethodID(
+		    env, poold_class, "shutdown", "()V")) != NULL) {
+			(*env)->CallVoidMethod(env, poold_instance,
+			    poold_shutdown_mid);
+		} else {
+			if (lflag && (*env)->ExceptionOccurred(env)) {
+				(*env)->ExceptionDescribe(env);
+				pu_notice("could not invoke proper shutdown\n");
+			}
+		}
+		instance_running = 0;
+	}
+}
+
+/*
+ * Warn the user with the supplied error message, halt the application,
+ * destroy the JVM and then exit the process.
+ */
 /*PRINTFLIKE1*/
 static void
 pu_die(const char *fmt, ...)
 {
 	va_list alist;
+
 	va_start(alist, fmt);
 	pu_output(LOG_ERR, fmt, alist);
 	va_end(alist);
+	halt_application();
+	if (jvm) {
+		(*jvm)->DestroyJavaVM(jvm);
+		jvm = NULL;
+	}
 	exit(E_ERROR);
 }
 
 /*
- * Reconfigure the JVM by simply updating a dummy property on the
- * system element to force pool_conf_update() to detect a change.
+ * Warn the user with the supplied error message and halt the
+ * application. This function is very similar to pu_die(). However,
+ * this function is designed to be called from the signal handling
+ * routine (handle_sig()) where although we wish to let the user know
+ * that an error has occurred, we do not wish to destroy the JVM or
+ * exit the process.
  */
+/*PRINTFLIKE1*/
 static void
-reconfigure()
+pu_terminate(const char *fmt, ...)
 {
-	JNIEnv *env;
-	pool_conf_t *conf;
-	pool_elem_t *pe;
-	pool_value_t *val;
-	const char *err_desc;
-	int detach_required = 0;
+	va_list alist;
 
-	if ((conf = pool_conf_alloc()) == NULL) {
-		err_desc = pool_strerror(pool_error());
-		goto destroy;
-	}
-	if (pool_conf_open(conf, pool_dynamic_location(), PO_RDWR) != 0) {
-		err_desc = pool_strerror(pool_error());
-		pool_conf_free(conf);
-		goto destroy;
-	}
-
-	if ((val = pool_value_alloc()) == NULL) {
-		err_desc = pool_strerror(pool_error());
-		(void) pool_conf_close(conf);
-		pool_conf_free(conf);
-		goto destroy;
-	}
-	pe = pool_conf_to_elem(conf);
-	pool_value_set_bool(val, 1);
-	if (pool_put_property(conf, pe, "system.poold.sighup", val) !=
-	    PO_SUCCESS) {
-		err_desc = pool_strerror(pool_error());
-		pool_value_free(val);
-		(void) pool_conf_close(conf);
-		pool_conf_free(conf);
-		goto destroy;
-	}
-	pool_value_free(val);
-	(void) pool_rm_property(conf, pe, "system.poold.sighup");
-	if (pool_conf_commit(conf, 0) != PO_SUCCESS) {
-		err_desc = pool_strerror(pool_error());
-		(void) pool_conf_close(conf);
-		pool_conf_free(conf);
-		goto destroy;
-	}
-	(void) pool_conf_close(conf);
-	pool_conf_free(conf);
-	return;
-destroy:
-	if (jvm) {
-		(*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_2);
-		if (env == NULL) {
-			detach_required = 1;
-			(*jvm)->AttachCurrentThread(jvm, (void **)&env, NULL);
-		}
-		if (lflag && (*env)->ExceptionOccurred(env))
-			(*env)->ExceptionDescribe(env);
-		if (detach_required)
-			(*jvm)->DetachCurrentThread(jvm);
-		(*jvm)->DestroyJavaVM(jvm);
-	}
-	pu_die(err_desc);
+	va_start(alist, fmt);
+	pu_output(LOG_ERR, fmt, alist);
+	va_end(alist);
+	halt_application();
 }
 
 /*
@@ -268,14 +288,16 @@ destroy:
 static void *
 handle_sig(void *arg)
 {
-	for (;;) {
-		JNIEnv *env;
-		jmethodID poold_shutdown_mid;
+	pool_conf_t *conf = NULL;
+	pool_elem_t *pe;
+	pool_value_t *val;
+	const char *err_desc;
+	int keep_handling = 1;
+
+	while (keep_handling) {
 		int sig;
 		char buf[SIG2STR_MAX];
-		int detach_required = 0;
 
-retry:
 		if ((sig = sigwait(&hdl_set)) < 0) {
 			/*
 			 * We used forkall() previously to ensure that
@@ -286,57 +308,70 @@ retry:
 			 * EINTR and if it is wait again.
 			 */
 			if (errno == EINTR)
-				goto retry;
-			pu_die("unexpected error: %d\n", errno);
-		}
+				continue;
+			(void) pthread_mutex_lock(&jvm_lock);
+			pu_terminate("unexpected error: %d\n", errno);
+			keep_handling = 0;
+		} else
+			(void) pthread_mutex_lock(&jvm_lock);
 		(void) sig2str(sig, buf);
 		switch (sig) {
 		case SIGHUP:
-			reconfigure();
+			if ((conf = pool_conf_alloc()) == NULL) {
+				err_desc = pool_strerror(pool_error());
+				goto destroy;
+			}
+			if (pool_conf_open(conf, pool_dynamic_location(),
+			    PO_RDWR) != 0) {
+				err_desc = pool_strerror(pool_error());
+				goto destroy;
+			}
+
+			if ((val = pool_value_alloc()) == NULL) {
+				err_desc = pool_strerror(pool_error());
+				goto destroy;
+			}
+			pe = pool_conf_to_elem(conf);
+			pool_value_set_bool(val, 1);
+			if (pool_put_property(conf, pe, "system.poold.sighup",
+			    val) != PO_SUCCESS) {
+				err_desc = pool_strerror(pool_error());
+				pool_value_free(val);
+				goto destroy;
+			}
+			pool_value_free(val);
+			(void) pool_rm_property(conf, pe,
+			    "system.poold.sighup");
+			if (pool_conf_commit(conf, 0) != PO_SUCCESS) {
+				err_desc = pool_strerror(pool_error());
+				goto destroy;
+			}
+			break;
+destroy:
+			if (conf) {
+				(void) pool_conf_close(conf);
+				pool_conf_free(conf);
+			}
+			pu_terminate(err_desc);
+			keep_handling = 0;
 			break;
 		case SIGINT:
 		case SIGTERM:
-			(void) pthread_mutex_lock(&instance_running_lock);
-			if (instance_running) {
-				(void) pthread_mutex_unlock(
-				    &instance_running_lock);
-				(*jvm)->GetEnv(jvm, (void **)&env,
-				    JNI_VERSION_1_2);
-				if (env == NULL) {
-					detach_required = 1;
-					(*jvm)->AttachCurrentThread(jvm,
-					    (void **)&env, NULL);
-				}
-				pu_notice("terminating due to signal: SIG%s\n",
-				    buf);
-				if ((poold_shutdown_mid = (*env)->GetMethodID(
-				    env, poold_class, "shutdown", "()V")) !=
-				    NULL) {
-					(*env)->CallVoidMethod(env,
-					    poold_instance,
-					    poold_shutdown_mid);
-				} else {
-					(*env)->ExceptionDescribe(env);
-					pu_die("could not invoke"
-					    " proper shutdown\n");
-				}
-				if (detach_required)
-					(*jvm)->DetachCurrentThread(jvm);
-			} else {
-				(void) pthread_mutex_unlock(
-				    &instance_running_lock);
-				pu_die("terminated with signal: SIG%s\n", buf);
-				/*NOTREACHED*/
-			}
-			break;
 		default:
-			pu_die("unexpected signal: SIG%s\n", buf);
+			pu_terminate("terminating due to signal: SIG%s\n", buf);
+			keep_handling = 0;
+			break;
 		}
+		(void) pthread_mutex_unlock(&jvm_lock);
 	}
+	pthread_exit(NULL);
 	/*NOTREACHED*/
 	return (NULL);
 }
 
+/*
+ * Return the name of the process
+ */
 static const char *
 pu_getpname(const char *arg0)
 {
@@ -384,11 +419,10 @@ main(int argc, char *argv[])
 	jclass severity_class;
 	jmethodID severity_cons_mid;
 	jfieldID base_log_fid;
-	int explain_ex = 1;
-	JavaVM *jvm_tmp;
 	pthread_t hdl_thread;
 	FILE *p;
 
+	(void) pthread_mutex_lock(&jvm_lock);
 	pname = pu_getpname(argv[0]);
 	openlog(pname, 0, LOG_DAEMON);
 	(void) chdir("/");
@@ -511,14 +545,8 @@ main(int argc, char *argv[])
 	vm_args.ignoreUnrecognized = JNI_FALSE;
 	vm_args.version = 0x00010002;
 
-	/*
-	 * Use jvm_tmp when creating the jvm to prevent race
-	 * conditions with signal handlers. As soon as the call
-	 * returns, assign the global jvm to jvm_tmp.
-	 */
-	if (JNI_CreateJavaVM(&jvm_tmp, (void **)&env, &vm_args) < 0)
+	if (JNI_CreateJavaVM(&jvm, (void **)&env, &vm_args) < 0)
 		pu_die(gettext("can't create Java VM"));
-	jvm = jvm_tmp;
 
 	/*
 	 * Locate the Poold class and construct an instance.  A side
@@ -558,7 +586,6 @@ main(int argc, char *argv[])
 		    severity_class, severity_cons_mid, log_severity_string)) ==
 		    NULL) {
 			err_desc = gettext("invalid level specified\n");
-			explain_ex = 0;
 			goto destroy;
 		}
 	} else
@@ -627,20 +654,24 @@ main(int argc, char *argv[])
 			return (E_PO_SUCCESS);
 		}
 
-	(void) pthread_mutex_lock(&instance_running_lock);
 	instance_running = 1;
-	(void) pthread_mutex_unlock(&instance_running_lock);
+	(void) pthread_mutex_unlock(&jvm_lock);
+
 	(*env)->CallVoidMethod(env, poold_instance, poold_run_mid);
 
-	if ((*env)->ExceptionOccurred(env))
+	(void) pthread_mutex_lock(&jvm_lock);
+	if ((*env)->ExceptionOccurred(env)) {
 		goto destroy;
-
-	(*jvm)->DestroyJavaVM(jvm);
+	}
+	if (jvm) {
+		(*jvm)->DestroyJavaVM(jvm);
+		jvm = NULL;
+	}
+	(void) pthread_mutex_unlock(&jvm_lock);
 	return (E_PO_SUCCESS);
 
 destroy:
-	if (lflag && explain_ex && (*env)->ExceptionOccurred(env))
+	if (lflag && (*env)->ExceptionOccurred(env))
 		(*env)->ExceptionDescribe(env);
-	(*jvm)->DestroyJavaVM(jvm);
 	pu_die(err_desc);
 }
