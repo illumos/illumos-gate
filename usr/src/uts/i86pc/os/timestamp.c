@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -271,6 +271,8 @@ tsc_sync_slave(void)
 
 	flags = clear_int_flag();
 
+	/* to test tsc_gethrtime_delta, add wrmsr(REG_TSC, 0) here */
+
 	/*
 	 * Tell the master CPU that we're ready, and wait for the master to
 	 * tell us to begin reading our TSC.
@@ -331,8 +333,8 @@ tsc_hrtimeinit(uint64_t cpu_freq_hz)
 }
 
 /*
- * Called once per second on CPU 0 from the cyclic subsystem's CY_HIGH_LEVEL
- * interrupt.
+ * Called once per second on some CPU from the cyclic subsystem's
+ * CY_HIGH_LEVEL interrupt.  (no longer CPU0-only)
  */
 void
 tsc_tick(void)
@@ -357,6 +359,9 @@ tsc_tick(void)
 	CLOCK_LOCK(&spl);
 
 	now = tsc_read();
+
+	if (gethrtimef == tsc_gethrtime_delta)
+		now += tsc_sync_tick_delta[CPU->cpu_id];
 
 	if (now < tsc_last) {
 		/*
@@ -474,7 +479,7 @@ dtrace_gethrtime(void)
 		 */
 		if ((tsc = tsc_read()) >= shadow_tsc_last)
 			tsc -= shadow_tsc_last;
-		else if (tsc >= shadow_tsc_last - 2*tsc_max_delta)
+		else if (tsc >= shadow_tsc_last - 2 * tsc_max_delta)
 			tsc = 0;
 
 		hrt = shadow_tsc_hrtime_base;
@@ -488,21 +493,39 @@ dtrace_gethrtime(void)
 hrtime_t
 tsc_gethrtime_delta(void)
 {
-	hrtime_t hrt;
+	uint32_t old_hres_lock;
+	hrtime_t tsc, hrt;
 	int flags;
 
-	/*
-	 * We need to disable interrupts here to assure that we don't migrate
-	 * between the call to tsc_gethrtime() and adding the CPU's hrtime
-	 * delta. Note that disabling and reenabling preemption is forbidden
-	 * here because we may be in the middle of a fast trap. In the amd64
-	 * kernel we cannot tolerate preemption during a fast trap. See
-	 * _update_sregs().
-	 */
+	do {
+		old_hres_lock = hres_lock;
 
-	flags = clear_int_flag();
-	hrt = tsc_gethrtime() + tsc_sync_delta[CPU->cpu_id];
-	restore_int_flag(flags);
+		/*
+		 * We need to disable interrupts here to assure that we
+		 * don't migrate between the call to tsc_read() and
+		 * adding the CPU's TSC tick delta. Note that disabling
+		 * and reenabling preemption is forbidden here because
+		 * we may be in the middle of a fast trap. In the amd64
+		 * kernel we cannot tolerate preemption during a fast
+		 * trap. See _update_sregs().
+		 */
+
+		flags = clear_int_flag();
+		tsc = tsc_read() + tsc_sync_tick_delta[CPU->cpu_id];
+		restore_int_flag(flags);
+
+		/* See comments in tsc_gethrtime() above */
+
+		if (tsc >= tsc_last) {
+			tsc -= tsc_last;
+		} else if (tsc >= tsc_last - 2 * tsc_max_delta) {
+			tsc = 0;
+		}
+
+		hrt = tsc_hrtime_base;
+
+		TSC_CONVERT_AND_ADD(tsc, hrt, nsec_scale);
+	} while ((old_hres_lock & ~1) != hres_lock);
 
 	return (hrt);
 }

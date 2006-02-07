@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3014,9 +3014,6 @@ apic_disable_intr(processorid_t cpun)
 {
 	int bind_cpu = 0, i, hardbound = 0, iflag;
 	apic_irq_t *irq_ptr;
-
-	if (cpun == 0)
-		return (PSM_FAILURE);
 
 	iflag = intr_clear();
 	lock_set(&apic_ioapic_lock);

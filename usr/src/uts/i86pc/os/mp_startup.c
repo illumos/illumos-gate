@@ -867,7 +867,7 @@ void
 start_other_cpus(int cprboot)
 {
 	unsigned who;
-	int cpuid = getbootcpuid();
+	int cpuid = 0;
 	int delays = 0;
 	int started_cpu;
 	ushort_t *warm_reset_vector = NULL;
@@ -1137,8 +1137,6 @@ int
 mp_cpu_start(struct cpu *cp)
 {
 	ASSERT(MUTEX_HELD(&cpu_lock));
-	if (cp->cpu_id == getbootcpuid())
-		return (EBUSY); 	/* Cannot start boot CPU */
 	return (0);
 }
 
@@ -1149,9 +1147,16 @@ mp_cpu_start(struct cpu *cp)
 int
 mp_cpu_stop(struct cpu *cp)
 {
+	extern int cbe_psm_timer_mode;
 	ASSERT(MUTEX_HELD(&cpu_lock));
-	if (cp->cpu_id == getbootcpuid())
-		return (EBUSY); 	/* Cannot stop boot CPU */
+
+	/*
+	 * If TIMER_PERIODIC mode is used, CPU0 is the one running it;
+	 * can't stop it.  (This is true only for machines with no TSC.)
+	 */
+
+	if ((cbe_psm_timer_mode == TIMER_PERIODIC) && (cp->cpu_id == 0))
+		return (1);
 
 	return (0);
 }
@@ -1185,12 +1190,6 @@ mp_cpu_poweroff(struct cpu *cp)
 int
 cpu_disable_intr(struct cpu *cp)
 {
-	/*
-	 * cannot disable interrupts on boot cpu
-	 */
-	if (cp == cpu[getbootcpuid()])
-		return (EBUSY);
-
 	if (psm_disable_intr(cp->cpu_id) != DDI_SUCCESS)
 		return (EBUSY);
 
@@ -1205,22 +1204,11 @@ void
 cpu_enable_intr(struct cpu *cp)
 {
 	ASSERT(MUTEX_HELD(&cpu_lock));
-	if (cp == cpu[getbootcpuid()])
-		return;
-
 	cp->cpu_flags |= CPU_ENABLE;
 	psm_enable_intr(cp->cpu_id);
 }
 
 
-/*
- * return the cpu id of the initial startup cpu
- */
-processorid_t
-getbootcpuid(void)
-{
-	return (0);
-}
 
 static ushort_t *
 mp_map_warm_reset_vector()

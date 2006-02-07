@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -201,6 +201,7 @@ cbe_enable(void *arg)
 {
 	processorid_t me = ((cpu_t *)arg)->cpu_id;
 
+	/* neither enable nor disable cpu0 if TIMER_PERIODIC is set */
 	if ((cbe_psm_timer_mode != TIMER_ONESHOT) && (me == 0))
 		return;
 
@@ -215,13 +216,9 @@ cbe_disable(void *arg)
 {
 	processorid_t me = ((cpu_t *)arg)->cpu_id;
 
-	if (me == 0) {
-		/*
-		 * If this is the boot CPU, we'll quietly refuse to disable
-		 * our clock interrupt.
-		 */
+	/* neither enable nor disable cpu0 if TIMER_PERIODIC is set */
+	if ((cbe_psm_timer_mode != TIMER_ONESHOT) && (me == 0))
 		return;
-	}
 
 	ASSERT(CPU_IN_SET(cbe_enabled, me));
 	CPUSET_DEL(cbe_enabled, me);
@@ -230,8 +227,7 @@ cbe_disable(void *arg)
 }
 
 /*
- * Called only on CPU 0. This is done since TSCs can have deltas between
- * different cpus see tsc_tick()
+ * Unbound cyclic, called once per tick (every nsec_per_tick ns).
  */
 void
 cbe_hres_tick(void)
@@ -311,9 +307,6 @@ cbe_init(void)
 	when.cyt_interval = nsec_per_tick;
 
 	cbe_hres_cyclic = cyclic_add(&hdlr, &when);
-
-	/* bind to cpu 0, which is also the boot cpu */
-	cyclic_bind(cbe_hres_cyclic, CPU, NULL);
 
 	if (psm_post_cyclic_setup != NULL)
 		(*psm_post_cyclic_setup)(NULL);

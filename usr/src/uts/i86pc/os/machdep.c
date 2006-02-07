@@ -151,17 +151,6 @@ void debug_enter(char *);
 
 int	procset = 1;
 
-/*
- * Flags set by mdboot if we're panicking and we invoke mdboot on a CPU which
- * is not the boot CPU.  When set, panic_idle() on the boot CPU will invoke
- * mdboot with the corresponding arguments.
- */
-
-#define	BOOT_WAIT	-1		/* Flag indicating we should idle */
-
-volatile int cpu_boot_cmd = BOOT_WAIT;
-volatile int cpu_boot_fcn = BOOT_WAIT;
-
 extern void pm_cfb_check_and_powerup(void);
 extern void pm_cfb_rele(void);
 
@@ -181,22 +170,9 @@ mdboot(int cmd, int fcn, char *mdep, boolean_t invoke_cb)
 {
 	extern void mtrr_resync(void);
 
-	/*
-	 * The PSMI guarantees the implementor of psm_shutdown that it will
-	 * only be called on the boot CPU.  This was needed by Corollary
-	 * because the hardware does not allow other CPUs to reset the
-	 * boot CPU.  So before rebooting, we switch over to the boot CPU.
-	 * If we are panicking, the other CPUs are at high spl spinning in
-	 * panic_idle(), so we set the cpu_boot_* variables and wait for
-	 * the boot CPU to re-invoke mdboot() for us.
-	 */
 	if (!panicstr) {
 		kpreempt_disable();
-		affinity_set(getbootcpuid());
-	} else if (CPU->cpu_id != getbootcpuid()) {
-		cpu_boot_cmd = cmd;
-		cpu_boot_fcn = fcn;
-		for (;;);
+		affinity_set(CPU_CURRENT);
 	}
 
 	/*
@@ -772,22 +748,13 @@ lwp_stk_fini(klwp_t *lwp)
 {}
 
 /*
- * If we're not the panic CPU, we wait in panic_idle for reboot.  If we're
- * the boot CPU, then we are responsible for actually doing the reboot, so
- * we watch for cpu_boot_cmd to be set.
+ * If we're not the panic CPU, we wait in panic_idle for reboot.
  */
 static void
 panic_idle(void)
 {
 	splx(ipltospl(CLOCK_LEVEL));
 	(void) setjmp(&curthread->t_pcb);
-
-	if (CPU->cpu_id == getbootcpuid()) {
-		while (cpu_boot_cmd == BOOT_WAIT || cpu_boot_fcn == BOOT_WAIT)
-			drv_usecwait(10);
-
-		mdboot(cpu_boot_cmd, cpu_boot_fcn, NULL, B_FALSE);
-	}
 
 	for (;;);
 }

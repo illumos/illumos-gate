@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,7 +50,6 @@ extern "C" {
 
 #ifdef _KERNEL
 
-extern processorid_t getbootcpuid(void);
 extern void mp_halt(char *);
 
 extern int Cpudelay;
