@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -550,6 +550,8 @@ static int
 audio1575_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
 	audio1575_state_t	*statep;
+	uint32_t		intrsr;
+	uint32_t		intrcr;
 	int 			instance;
 	audio_sup_reg_data_t	data;
 
@@ -663,11 +665,25 @@ audio1575_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	/* Enable PCI I/O and Memory Spaces */
 	audio1575_pci_enable(statep);
 
+	/*
+	 * clear the interrupt control and status register
+	 * READ/WRITE/READ workaround required
+	 * for buggy hardware
+	 */
+
+	intrcr = 0L;
+	M1575_AM_PUT32(M1575_INTRCR_REG, intrcr);
+	intrcr = M1575_AM_GET32(M1575_INTRCR_REG);
+
+	intrsr = M1575_AM_GET32(M1575_INTRSR_REG);
+	M1575_AM_PUT32(M1575_INTRSR_REG, (intrsr & M1575_INTR_MASK));
+	intrsr = M1575_AM_GET32(M1575_INTRSR_REG);
+
 	/* initialize the audio state structures */
 	if ((audio1575_init_state(statep, dip)) != AUDIO_SUCCESS) {
 		audio_sup_log(statep->m1575_ahandle, CE_WARN,
 		    "!attach() init state structure failure");
-		goto error_unmap;
+		goto error_pci_disable;
 	}
 
 	/* from here on, must destroy the mutex on error */
@@ -710,18 +726,25 @@ audio1575_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		kstat_install(statep->m1575_ksp);
 	}
 
-	/* Clear the Interrupt control & status registers */
-	M1575_AM_PUT32(M1575_INTRCR_REG, 0L);
-	M1575_AM_PUT32(M1575_INTRSR_REG, 0L);
+	/* now add our interrupt handler */
+	if (ddi_intr_add_handler(statep->m1575_h_table[0],
+	    (ddi_intr_handler_t *)audio1575_intr, (caddr_t)statep, NULL)) {
+		audio_sup_log(statep->m1575_ahandle,
+		    CE_WARN, "!attach() ddi_intr_add_handler() failure");
+		ATRACE("audio1575_attach() ddi_intr_add_handler() failure",
+		    NULL);
+		goto error_kstat;
+	}
 
 	/* Enable PCI Interrupts */
 	M1575_PCI_PUT8(M1575_PCIMISC_REG, M1575_PCIMISC_INTENB);
 
+	/* enable audio interrupts */
 	if (ddi_intr_enable(statep->m1575_h_table[0]) != DDI_SUCCESS) {
 		audio_sup_log(statep->m1575_ahandle, CE_WARN,
 		    "!attach() - ddi_intr_enable() failure");
 		ATRACE("audio1575_attach() ddi_add_intr failure", NULL);
-		goto error_kstat;
+		goto error_intr_enable;
 	}
 
 	/* everything worked out, so report the device */
@@ -732,6 +755,12 @@ audio1575_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	ATRACE("audio1575_attach() returning DDI_SUCCESS", NULL);
 
 	return (DDI_SUCCESS);
+
+error_intr_enable:
+	ATRACE("audio1575_attach() error_intr_enable", NULL)
+	/* Disable PCI Interrupts */
+	M1575_PCI_PUT8(M1575_PCIMISC_REG, 0);
+	(void) ddi_intr_remove_handler(statep->m1575_h_table[0]);
 
 error_kstat:
 	ATRACE("audio1575_attach() error_kstat", NULL);
@@ -748,10 +777,13 @@ error_dealloc:
 
 error_destroy:
 	ATRACE("audio1575_attach() error_destroy", statep);
-	(void) ddi_intr_remove_handler(statep->m1575_h_table[0]);
 	(void) ddi_intr_free(statep->m1575_h_table[0]);
 	kmem_free(statep->m1575_h_table, sizeof (ddi_intr_handle_t));
 	mutex_destroy(&statep->m1575_intr_mutex);
+
+error_pci_disable:
+	ATRACE("audio1575_attach() error_pci_disable", NULL)
+	audio1575_pci_disable(statep);
 
 error_unmap:
 	ATRACE("audio1575_attach() error_unmap", NULL);
@@ -865,6 +897,18 @@ audio1575_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 	/* Remove the interrupt handler */
 	(void) ddi_intr_remove_handler(statep->m1575_h_table[0]);
 
+	mutex_enter(&statep->m1575_intr_mutex);
+
+	/* reset the AD1981B codec */
+	M1575_AM_PUT32(M1575_SCR_REG, M1575_SCR_COLDRST);
+
+	/* turn off the AC_LINK clock */
+	M1575_PCI_PUT8(M1575_PCIACD_REG, 0);
+	M1575_PCI_PUT8(M1575_PCIACD_REG, 4);
+	M1575_PCI_PUT8(M1575_PCIACD_REG, 0);
+
+	mutex_exit(&statep->m1575_intr_mutex);
+
 	/* detach audio mixer */
 	(void) am_detach(statep->m1575_ahandle, cmd);
 
@@ -918,7 +962,12 @@ audio1575_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
  *	Each of buffer descriptor has a field IOC(interrupt on completion)
  *	When both this and the IOC bit of correspondent dma control register
  *	is set, it means that the controller should issue an interrupt upon
- *	completion of this buffer.
+ *	completion of this buffer. Note that in the clearing of the interrupts
+ *	below that the PCM IN and PCM out interrupts ar cleared by their
+ *	respective control registers and not by writing a '1' to the INTRSR
+ *	the interrupt status register. Only CPRINTR,SPINTR,and GPIOINTR
+ *	require a '1' written to the INTRSR register to clear those
+ *	interrupts. See comments below.
  *
  * Arguments:
  *	caddr_t		arg	Pointer to the interrupting device's state
@@ -945,6 +994,11 @@ audio1575_intr(caddr_t arg)
 
 	/* check if device is interrupting */
 	if (intrsr == 0) {
+		if (statep->m1575_ksp) {
+			/* increment the spurious ino5 interrupt cnt */
+			M1575_KIOP(statep)->intrs[KSTAT_INTR_SPURIOUS]++;
+		}
+
 		mutex_exit(&statep->m1575_intr_mutex);
 
 		ATRACE("audio1575_intr() not our interrupt", intrsr);
@@ -953,48 +1007,66 @@ audio1575_intr(caddr_t arg)
 	}
 
 	/*
-	 * PCM IN interrupt
-	 * clear the interrupt flags
+	 * The Uli M1575 generates an interrupt for each interrupt
+	 * type. therefore we only process one interrupt type
+	 * per invocation of the audio1575_intr() routine.
+	 * WARNING: DO NOT attempt to optimize this by looping
+	 * until the INTRSR register is clear as this will
+	 * generate spurious ino5 interrupts.
 	 */
 	if (intrsr & M1575_INTRSR_PCMIINTR) {
+		/* Clear PCM IN interrupt */
+		ATRACE("audio1575_intr() PCMIINTR", intrsr);
 		sr = M1575_AM_GET16(M1575_PCMISR_REG);
-
-		/* Ack the interrupt */
 		M1575_AM_PUT16(M1575_PCMISR_REG, sr & M1575_STATUS_CLR);
+		/*
+		 * Note: This interrupt is not cleared by writing a '1'
+		 * to the M1575_INTRSR_REG according to the M1575 Super I/O
+		 * data sheet on page 189.
+		 */
 
 		if (statep->m1575_flags & M1575_DMA_RECD_STARTED) {
 			audio1575_reclaim_record_buf(statep);
 			(void) audio1575_prepare_record_buf(statep);
 		}
-		M1575_AM_PUT32(M1575_INTRSR_REG,
-		    (intrsr & M1575_INTRSR_PCMIINTR));
-	}
-
-	/*
-	 * PCM OUT interrupt
-	 * clear the interrupt flags
-	 */
-	if (intrsr & M1575_INTRSR_PCMOINTR) {
+	} else if (intrsr & M1575_INTRSR_PCMOINTR) {
+		/* Clear PCM OUT interrupt */
+		ATRACE("audio1575_intr() PCMOINTR", intrsr);
 		sr = M1575_AM_GET16(M1575_PCMOSR_REG);
-
-		/* Ack the interrupt */
 		M1575_AM_PUT16(M1575_PCMOSR_REG, sr & M1575_STATUS_CLR);
+		/*
+		 * Note: This interrupt is not cleared by writing a '1'
+		 * to the M1575_INTRSR_REG according to the M1575 Super I/O
+		 * data sheet on page 189.
+		 */
 
 		if (statep->m1575_flags & M1575_DMA_PLAY_STARTED) {
 			audio1575_reclaim_play_buf(statep);
 			(void) audio1575_fill_play_buf(statep);
 		}
-		M1575_AM_PUT32(M1575_INTRSR_REG,
-		    (intrsr & M1575_INTRSR_PCMOINTR));
+	} else if (intrsr & M1575_INTRSR_SPRINTR) {
+		/* Clear Status Register Available Interrupt */
+		ATRACE("audio1575_intr() SPRINTR", intrsr);
+		M1575_AM_PUT32(M1575_INTRSR_REG, M1575_INTRSR_SPRINTR);
+
+	} else if (intrsr & M1575_INTRSR_CPRINTR) {
+		/* Clear Command Register Available Interrupt */
+		ATRACE("audio1575_intr() CPRINTR", intrsr);
+		M1575_AM_PUT32(M1575_INTRSR_REG, M1575_INTRSR_CPRINTR);
+	} else if (intrsr & M1575_INTRSR_GPIOINTR) {
+		/* Clear General Purpose I/O Register Interrupt */
+		ATRACE("audio1575_intr() GPIOINTR", intrsr);
+		M1575_AM_PUT32(M1575_INTRSR_REG, M1575_INTRSR_GPIOINTR);
+	} else {
+		/* Clear Unknown Interrupt */
+		ATRACE("audio1575_intr() Unknown Interrupt", intrsr);
+		M1575_AM_PUT32(M1575_INTRSR_REG, (intrsr & M1575_INTR_MASK));
 	}
 
 	/* update the kernel interrupt statistics */
 	if (statep->m1575_ksp) {
 		M1575_KIOP(statep)->intrs[KSTAT_INTR_HARD]++;
 	}
-
-	/* clear all other interrupts */
-	M1575_AM_PUT32(M1575_INTRSR_REG, (intrsr & M1575_UNUSED_INTR_MASK));
 
 	mutex_exit(&statep->m1575_intr_mutex);
 
@@ -1776,16 +1848,6 @@ audio1575_init_state(audio1575_state_t *statep, dev_info_t *dip)
 		goto error_free;
 	}
 
-	/* now add our interrupt handler */
-	if (ddi_intr_add_handler(statep->m1575_h_table[0],
-	    (ddi_intr_handler_t *)audio1575_intr, (caddr_t)statep, NULL)) {
-		audio_sup_log(statep->m1575_ahandle, CE_WARN,
-		    "!init_state() ddi_intr_add_handler() failure");
-		ATRACE("audio1575_init_state) ddi_intr_add_handler() failure",
-		    NULL);
-		goto error_free;
-	}
-
 	/* fill in the device default state */
 	statep->m1575_defaults.play.sample_rate = M1575_DEFAULT_SR;
 	statep->m1575_defaults.play.channels = M1575_DEFAULT_CH;
@@ -2403,9 +2465,15 @@ audio1575_init_ac97(audio1575_state_t *statep, int restore)
 		shadow[M1575_CODEC_REG(AC97_PHONE_VOLUME_REGISTER)] =
 		    PVR_MUTE|PVR_0dB_GAIN;
 
-		/* 0eh - set mic input, mute, 0dB attenuation */
+		/*
+		 * 0eh - set mic input, mute, +20dB attenuation
+		 * actually this is 30dB when MICVR_20dB_Boost
+		 * is set. (see misc. register 0x76 setting
+		 * of MIC_30dB_GAIN below.)
+		 */
 		shadow[M1575_CODEC_REG(AC97_MIC_VOLUME_REGISTER)] =
-		    MICVR_MUTE | MICVR_0dB_GAIN;
+		    MICVR_MUTE | MICVR_20dB_BOOST | MICVR_0dB_GAIN;
+		statep->m1575_ad_info.ad_add_mode |= AM_ADD_MODE_MIC_BOOST;
 
 		/* 10h - set line input, mute, 0dB attenuation */
 		shadow[M1575_CODEC_REG(AC97_LINE_IN_VOLUME_REGISTER)] =
@@ -2457,7 +2525,7 @@ audio1575_init_ac97(audio1575_state_t *statep, int restore)
 
 		/* 76h - Misc. Control Bit  Register */
 		shadow[M1575_CODEC_REG(AC97_MISC_CONTROL_BIT_REGISTER)] =
-		    MIC_20dB_GAIN | C1MIC;
+		    MIC_30dB_GAIN | C1MIC;
 	}
 
 	/* Now we set the AC97 codec registers to the saved values */
@@ -2602,20 +2670,21 @@ audio1575_chip_init(audio1575_state_t *statep, int restore)
 #ifndef __lock_lint
 			delay(ticks);
 #endif
-		/* Read the System Status Reg */
-		ssr = M1575_AM_GET32(M1575_SSR_REG);
+			/* Read the System Status Reg */
+			ssr = M1575_AM_GET32(M1575_SSR_REG);
 
-		/* make sure and release the blocked reset bit */
-		if (ssr & M1575_SSR_RSTBLK) {
-			ATRACE("audio1575_chip_init()! RSTBLK failure", ssr);
-			mutex_exit(&statep->m1575_intr_mutex);
-			return (AUDIO_FAILURE);
-		}
+			/* make sure and release the blocked reset bit */
+			if (ssr & M1575_SSR_RSTBLK) {
+				ATRACE("audio1575_chip_init()! RSTBLK failure",
+				    ssr);
+				mutex_exit(&statep->m1575_intr_mutex);
+				return (AUDIO_FAILURE);
+			}
 
-		/* Reset the controller */
-		M1575_AM_PUT32(M1575_SCR_REG, M1575_SCR_COLDRST);
+			/* Reset the controller */
+			M1575_AM_PUT32(M1575_SCR_REG, M1575_SCR_COLDRST);
 #ifndef __lock_lint
-		delay(ticks);
+			delay(ticks);
 #endif
 		}
 
@@ -2690,9 +2759,6 @@ audio1575_chip_init(audio1575_state_t *statep, int restore)
 	M1575_AM_PUT32(M1575_FIFOCR2_REG, 0x81818181);
 	M1575_AM_PUT32(M1575_FIFOCR3_REG, 0x81818181);
 
-	/* clear the interrupt status register */
-	M1575_AM_PUT32(M1575_INTRSR_REG, 0L);
-
 	/* Disable SPDIF Output */
 	M1575_AM_PUT8(M1575_CSPOCR_REG, 0);
 
@@ -2728,6 +2794,8 @@ static void
 audio1575_dma_stop(audio1575_state_t *statep)
 {
 	uint32_t	dmacr;
+	uint32_t	intrsr;
+	uint32_t	intrcr;
 	uint16_t	sr;
 	int		i;
 
@@ -2796,8 +2864,19 @@ audio1575_dma_stop(audio1575_state_t *statep)
 	sr = M1575_AM_GET16(M1575_MICI2SR_REG) | M1575_STATUS_CLR;
 	M1575_AM_PUT16(M1575_MICI2SR_REG, sr);
 
-	M1575_AM_PUT32(M1575_INTRSR_REG, 0L);
-	M1575_AM_PUT32(M1575_INTRCR_REG, 0L);
+	/*
+	 * clear the interrupt control and status register
+	 * READ/WRITE/READ workaround required
+	 * for buggy hardware
+	 */
+
+	intrcr = 0L;
+	M1575_AM_PUT32(M1575_INTRCR_REG, intrcr);
+	intrcr = M1575_AM_GET32(M1575_INTRCR_REG);
+
+	intrsr = M1575_AM_GET32(M1575_INTRSR_REG);
+	M1575_AM_PUT32(M1575_INTRSR_REG, (intrsr & M1575_INTR_MASK));
+	intrsr = M1575_AM_GET32(M1575_INTRSR_REG);
 
 	/* clear all flags except DMA suspend flag */
 	statep->m1575_flags &= M1575_DMA_SUSPENDED;
