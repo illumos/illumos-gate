@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -49,7 +50,7 @@ extern "C" {
  * Please refer to the "Solaris Dynamic Tracing Guide" for more information.
  */
 
-#define	DTRACE_VERSION	2		/* library ABI interface version */
+#define	DTRACE_VERSION	3		/* library ABI interface version */
 
 struct ps_prochandle;
 typedef struct dtrace_hdl dtrace_hdl_t;
@@ -132,6 +133,8 @@ extern void dtrace_program_info(dtrace_hdl_t *, dtrace_prog_t *,
 
 extern int dtrace_program_link(dtrace_hdl_t *, dtrace_prog_t *,
     uint_t, const char *, int, char *const []);
+
+extern int dtrace_program_header(dtrace_hdl_t *, FILE *, const char *);
 
 extern void *dtrace_dof_create(dtrace_hdl_t *, dtrace_prog_t *, uint_t);
 extern void dtrace_dof_destroy(dtrace_hdl_t *, void *);
@@ -294,7 +297,7 @@ typedef struct dtrace_dropdata {
 typedef int dtrace_handle_drop_f(const dtrace_dropdata_t *, void *);
 extern int dtrace_handle_drop(dtrace_hdl_t *, dtrace_handle_drop_f *, void *);
 
-typedef void dtrace_handle_proc_f(struct ps_prochandle *, void *);
+typedef void dtrace_handle_proc_f(struct ps_prochandle *, const char *, void *);
 extern int dtrace_handle_proc(dtrace_hdl_t *, dtrace_handle_proc_f *, void *);
 
 #define	DTRACE_BUFDATA_AGGKEY		0x0001	/* aggregation key */

@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,8 +41,9 @@ extern "C" {
 #define	DT_PROC_ERR	(-1)
 #define	DT_PROC_ALIGN	(-2)
 
-extern void dt_pid_create_probes(dtrace_probedesc_t *, dtrace_hdl_t *);
-extern void dt_pid_create_probes_module(dtrace_hdl_t *, dt_proc_t *);
+extern int dt_pid_create_probes(dtrace_probedesc_t *, dtrace_hdl_t *,
+    dt_pcb_t *pcb);
+extern int dt_pid_create_probes_module(dtrace_hdl_t *, dt_proc_t *);
 
 extern int dt_pid_create_entry_probe(struct ps_prochandle *, dtrace_hdl_t *,
     fasttrap_probe_spec_t *, const GElf_Sym *);

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -389,6 +389,13 @@ dtrace_getustack_common(uint64_t *pcstack, int pcstack_limit, uintptr_t sp)
 			}
 		}
 	} else {
+		/*
+		 * Truncate the stack pointer to 32-bits as there may be
+		 * garbage in the upper bits which would normally be ignored
+		 * by the processor in 32-bit mode.
+		 */
+		sp = (uint32_t)sp;
+
 		for (;;) {
 			struct frame32 *fr = (struct frame32 *)sp;
 			uint32_t pc;
@@ -576,6 +583,13 @@ dtrace_getufpstack(uint64_t *pcstack, uint64_t *fpstack, int pcstack_limit)
 			pcstack_limit--;
 		}
 	} else {
+		/*
+		 * Truncate the stack pointer to 32-bits as there may be
+		 * garbage in the upper bits which would normally be ignored
+		 * by the processor in 32-bit mode.
+		 */
+		sp = (uint32_t)sp;
+
 		while (pcstack_limit > 0) {
 			struct frame32 *fr = (struct frame32 *)sp;
 			uint32_t pc;

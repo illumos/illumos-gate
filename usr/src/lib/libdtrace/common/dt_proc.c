@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -161,7 +162,7 @@ dt_proc_bpmatch(dtrace_hdl_t *dtp, dt_proc_t *dpr)
 	(void) Pxecbkpt(dpr->dpr_proc, dbp->dbp_instr);
 }
 
-static void
+void
 dt_proc_bpenable(dt_proc_t *dpr)
 {
 	dt_bkpt_t *dbp;
@@ -174,9 +175,11 @@ dt_proc_bpenable(dt_proc_t *dpr)
 		    dbp->dbp_addr, &dbp->dbp_instr) == 0)
 			dbp->dbp_active = B_TRUE;
 	}
+
+	dt_dprintf("breakpoints enabled\n");
 }
 
-static void
+void
 dt_proc_bpdisable(dt_proc_t *dpr)
 {
 	dt_bkpt_t *dbp;
@@ -188,6 +191,35 @@ dt_proc_bpdisable(dt_proc_t *dpr)
 		if (dbp->dbp_active && Pdelbkpt(dpr->dpr_proc,
 		    dbp->dbp_addr, dbp->dbp_instr) == 0)
 			dbp->dbp_active = B_FALSE;
+	}
+
+	dt_dprintf("breakpoints disabled\n");
+}
+
+static void
+dt_proc_notify(dtrace_hdl_t *dtp, dt_proc_hash_t *dph, dt_proc_t *dpr,
+    const char *msg)
+{
+	dt_proc_notify_t *dprn = dt_alloc(dtp, sizeof (dt_proc_notify_t));
+
+	if (dprn == NULL) {
+		dt_dprintf("failed to allocate notification for %d %s\n",
+		    (int)dpr->dpr_pid, msg);
+	} else {
+		dprn->dprn_dpr = dpr;
+		if (msg == NULL)
+			dprn->dprn_errmsg[0] = '\0';
+		else
+			(void) strlcpy(dprn->dprn_errmsg, msg,
+			    sizeof (dprn->dprn_errmsg));
+
+		(void) pthread_mutex_lock(&dph->dph_lock);
+
+		dprn->dprn_next = dph->dph_notify;
+		dph->dph_notify = dprn;
+
+		(void) pthread_cond_broadcast(&dph->dph_cv);
+		(void) pthread_mutex_unlock(&dph->dph_lock);
 	}
 }
 
@@ -239,12 +271,14 @@ dt_proc_rdevent(dtrace_hdl_t *dtp, dt_proc_t *dpr, const char *evname)
 
 	switch (rdm.type) {
 	case RD_DLACTIVITY:
-		if (rdm.u.state == RD_CONSISTENT) {
-			Pupdate_syms(dpr->dpr_proc);
-			dt_proc_bpdisable(dpr);
-			dt_pid_create_probes_module(dtp, dpr);
-			dt_proc_bpenable(dpr);
-		}
+		if (rdm.u.state != RD_CONSISTENT)
+			break;
+
+		Pupdate_syms(dpr->dpr_proc);
+		if (dt_pid_create_probes_module(dtp, dpr) != 0)
+			dt_proc_notify(dtp, dtp->dt_procs, dpr,
+			    dpr->dpr_errmsg);
+
 		break;
 	case RD_PREINIT:
 		Pupdate_syms(dpr->dpr_proc);
@@ -588,15 +622,8 @@ pwait_locked:
 	 * If the control thread detected PS_UNDEAD or PS_LOST, then enqueue
 	 * the dt_proc_t structure on the dt_proc_hash_t notification list.
 	 */
-	if (notify) {
-		(void) pthread_mutex_lock(&dph->dph_lock);
-
-		dpr->dpr_notify = dph->dph_notify;
-		dph->dph_notify = dpr;
-
-		(void) pthread_mutex_unlock(&dph->dph_lock);
-		(void) pthread_cond_broadcast(&dph->dph_cv);
-	}
+	if (notify)
+		dt_proc_notify(dtp, dph, dpr, NULL);
 
 	/*
 	 * Destroy and remove any remaining breakpoints, set dpr_done and clear
@@ -609,8 +636,8 @@ pwait_locked:
 	dpr->dpr_done = B_TRUE;
 	dpr->dpr_tid = 0;
 
-	(void) pthread_mutex_unlock(&dpr->dpr_lock);
 	(void) pthread_cond_broadcast(&dpr->dpr_cv);
+	(void) pthread_mutex_unlock(&dpr->dpr_lock);
 
 	return (NULL);
 }
@@ -661,7 +688,7 @@ dt_proc_destroy(dtrace_hdl_t *dtp, struct ps_prochandle *P)
 {
 	dt_proc_t *dpr = dt_proc_lookup(dtp, P, B_FALSE);
 	dt_proc_hash_t *dph = dtp->dt_procs;
-	dt_proc_t *npr, **npp;
+	dt_proc_notify_t *npr, **npp;
 	int rflag;
 
 	assert(dpr != NULL);
@@ -723,16 +750,13 @@ dt_proc_destroy(dtrace_hdl_t *dtp, struct ps_prochandle *P)
 	(void) dt_proc_lookup(dtp, P, B_TRUE);
 	npp = &dph->dph_notify;
 
-	for (npr = *npp; npr != NULL; npr = npr->dpr_notify) {
-		if (npr != dpr)
-			npp = &npr->dpr_notify;
-		else
-			break;
-	}
-
-	if (npr != NULL) {
-		*npp = npr->dpr_notify;
-		npr->dpr_notify = NULL;
+	while ((npr = *npp) != NULL) {
+		if (npr->dprn_dpr == dpr) {
+			*npp = npr->dprn_next;
+			dt_free(dtp, npr);
+		} else {
+			npp = &npr->dprn_next;
+		}
 	}
 
 	(void) pthread_mutex_unlock(&dph->dph_lock);
@@ -814,15 +838,7 @@ dt_proc_create_thread(dtrace_hdl_t *dtp, dt_proc_t *dpr, uint_t stop)
 			}
 
 			err = ESRCH; /* cause grab() or create() to fail */
-		} else {
-			/*
-			 * Disable breakpoints while the process is stopped so
-			 * the pid provider can correctly disassemble all
-			 * functions.
-			 */
-			dt_proc_bpdisable(dpr);
 		}
-
 	} else {
 		(void) dt_proc_error(dpr->dpr_hdl, dpr,
 		    "failed to create control thread for process-id %d: %s\n",
@@ -988,11 +1004,6 @@ dt_proc_continue(dtrace_hdl_t *dtp, struct ps_prochandle *P)
 	(void) pthread_mutex_lock(&dpr->dpr_lock);
 
 	if (dpr->dpr_stop & DT_PROC_STOP_IDLE) {
-		/*
-		 * Breakpoints are disabled while the process is stopped so
-		 * the pid provider can correctly disassemble all functions.
-		 */
-		dt_proc_bpenable(dpr);
 		dpr->dpr_stop &= ~DT_PROC_STOP_IDLE;
 		(void) pthread_cond_broadcast(&dpr->dpr_cv);
 	}

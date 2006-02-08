@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1434,10 +1435,14 @@ dt_setcontext(dtrace_hdl_t *dtp, dtrace_probedesc_t *pdp)
 	/*
 	 * If the provider name ends with what could be interpreted as a
 	 * number, we assume that it's a pid and that we may need to
-	 * dynamically create those probes for that process.
+	 * dynamically create those probes for that process. On an error,
+	 * dt_pid_create_probes() will set the error message and tag --
+	 * we just have to longjmp() out of here.
 	 */
-	if (isdigit(pdp->dtpd_provider[strlen(pdp->dtpd_provider) - 1]))
-		dt_pid_create_probes(pdp, dtp);
+	if (isdigit(pdp->dtpd_provider[strlen(pdp->dtpd_provider) - 1]) &&
+	    dt_pid_create_probes(pdp, dtp, yypcb) != 0) {
+		longjmp(yypcb->pcb_jmpbuf, EDT_COMPILER);
+	}
 
 	/*
 	 * Call dt_probe_info() to get the probe arguments and attributes.  If

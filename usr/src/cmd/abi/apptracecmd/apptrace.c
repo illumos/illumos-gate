@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -366,7 +366,7 @@ usage(char const *prog)
 	    "		A comma separated list of interfaces to trace.\n"
 	    "		A list preceded by ! is an exlusion list.\n"
 	    "	-v <verboselist>\n"
-	    "		A comman separated list of interfaces to trace\n"
+	    "		A comma separated list of interfaces to trace\n"
 	    "		verbosely.\n"
 	    "		A list preceded by ! is an exclusion list.\n"
 	    "		Interfaces matched in -v do not also need to be\n"

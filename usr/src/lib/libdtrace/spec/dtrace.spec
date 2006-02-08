@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -241,6 +241,10 @@ version		SUNWprivate_1.1
 end
 
 function	dtrace_program_exec
+version		SUNWprivate_1.1
+end
+
+function	dtrace_program_header
 version		SUNWprivate_1.1
 end
 

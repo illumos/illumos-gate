@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,9 +42,9 @@ extern "C" {
 typedef struct dt_proc {
 	dt_list_t dpr_list;		/* prev/next pointers for lru chain */
 	struct dt_proc *dpr_hash;	/* next pointer for pid hash chain */
-	struct dt_proc *dpr_notify;	/* next pointer for notification list */
 	dtrace_hdl_t *dpr_hdl;		/* back pointer to libdtrace handle */
 	struct ps_prochandle *dpr_proc;	/* proc handle for libproc calls */
+	char dpr_errmsg[BUFSIZ];	/* error message */
 	rd_agent_t *dpr_rtld;		/* rtld handle for librtld_db calls */
 	pthread_mutex_t dpr_lock;	/* lock for manipulating dpr_hdl */
 	pthread_cond_t dpr_cv;		/* cond for dpr_stop/quit/done */
@@ -59,6 +60,12 @@ typedef struct dt_proc {
 	pthread_t dpr_tid;		/* control thread (or zero if none) */
 	dt_list_t dpr_bps;		/* list of dt_bkpt_t structures */
 } dt_proc_t;
+
+typedef struct dt_proc_notify {
+	dt_proc_t *dprn_dpr;		/* process associated with the event */
+	char dprn_errmsg[BUFSIZ];	/* error message */
+	struct dt_proc_notify *dprn_next; /* next pointer */
+} dt_proc_notify_t;
 
 #define	DT_PROC_STOP_IDLE	0x01	/* idle on owner's stop request */
 #define	DT_PROC_STOP_CREATE	0x02	/* wait on dpr_cv at process exec */
@@ -82,7 +89,7 @@ typedef struct dt_bkpt {
 typedef struct dt_proc_hash {
 	pthread_mutex_t dph_lock;	/* lock protecting dph_notify list */
 	pthread_cond_t dph_cv;		/* cond for waiting for dph_notify */
-	dt_proc_t *dph_notify;		/* list of pending proc notifications */
+	dt_proc_notify_t *dph_notify;	/* list of pending proc notifications */
 	dt_list_t dph_lrulist;		/* list of dt_proc_t's in lru order */
 	uint_t dph_lrulim;		/* limit on number of procs to hold */
 	uint_t dph_lrucnt;		/* count of cached process handles */
@@ -99,6 +106,9 @@ extern void dt_proc_continue(dtrace_hdl_t *, struct ps_prochandle *);
 extern void dt_proc_lock(dtrace_hdl_t *, struct ps_prochandle *);
 extern void dt_proc_unlock(dtrace_hdl_t *, struct ps_prochandle *);
 extern dt_proc_t *dt_proc_lookup(dtrace_hdl_t *, struct ps_prochandle *, int);
+
+extern void dt_proc_bpenable(dt_proc_t *);
+extern void dt_proc_bpdisable(dt_proc_t *);
 
 extern void dt_proc_hash_create(dtrace_hdl_t *);
 extern void dt_proc_hash_destroy(dtrace_hdl_t *);

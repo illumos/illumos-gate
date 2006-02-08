@@ -2498,6 +2498,7 @@ dt_node_provider(char *name, dt_node_t *probes)
 	dtrace_hdl_t *dtp = yypcb->pcb_hdl;
 	dt_node_t *dnp = dt_node_alloc(DT_NODE_PROVIDER);
 	dt_node_t *lnp;
+	size_t len;
 
 	dnp->dn_provname = name;
 	dnp->dn_probes = probes;
@@ -2507,9 +2508,14 @@ dt_node_provider(char *name, dt_node_t *probes)
 		    "contain scoping operator: %s\n", name);
 	}
 
-	if (strlen(name) >= DTRACE_PROVNAMELEN) {
+	if ((len = strlen(name)) >= DTRACE_PROVNAMELEN) {
 		dnerror(dnp, D_PROV_BADNAME, "provider name may not exceed %d "
 		    "characters: %s\n", DTRACE_PROVNAMELEN - 1, name);
+	}
+
+	if (isdigit(name[len - 1])) {
+		dnerror(dnp, D_PROV_BADNAME, "provider name may not "
+		    "end with a digit: %s\n", name);
 	}
 
 	/*

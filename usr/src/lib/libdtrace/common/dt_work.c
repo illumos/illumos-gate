@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,7 +48,7 @@ dtrace_sleep(dtrace_hdl_t *dtp)
 {
 	dt_proc_hash_t *dph = dtp->dt_procs;
 	dtrace_optval_t policy = dtp->dt_options[DTRACEOPT_BUFPOLICY];
-	dt_proc_t *dpr;
+	dt_proc_notify_t *dprn;
 
 	hrtime_t earliest = INT64_MAX;
 	struct timespec tv;
@@ -91,12 +92,18 @@ dtrace_sleep(dtrace_hdl_t *dtp)
 	 */
 	(void) pthread_cond_reltimedwait_np(&dph->dph_cv, &dph->dph_lock, &tv);
 
-	while ((dpr = dph->dph_notify) != NULL) {
-		dph->dph_notify = dpr->dpr_notify;
-		dpr->dpr_notify = NULL;
+	while ((dprn = dph->dph_notify) != NULL) {
+		if (dtp->dt_prochdlr != NULL) {
+			char *err = dprn->dprn_errmsg;
+			if (*err == '\0')
+				err = NULL;
 
-		if (dtp->dt_prochdlr != NULL)
-			dtp->dt_prochdlr(dpr->dpr_proc, dtp->dt_procarg);
+			dtp->dt_prochdlr(dprn->dprn_dpr->dpr_proc, err,
+			    dtp->dt_procarg);
+		}
+
+		dph->dph_notify = dprn->dprn_next;
+		dt_free(dtp, dprn);
 	}
 
 	(void) pthread_mutex_unlock(&dph->dph_lock);
