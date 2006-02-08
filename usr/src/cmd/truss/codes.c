@@ -89,6 +89,7 @@
 #include <sys/aggr.h>
 #include <sys/dld.h>
 #include <sys/fs/zfs.h>
+#include <inet/kssl/kssl.h>
 
 #include "ramdata.h"
 #include "proto.h"
@@ -925,6 +926,12 @@ const struct ioc {
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_SENDBACKUP,		"ZFS_IOC_SENDBACKUP",
 		"zfs_cmd_t" },
+
+	/* kssl ioctls */
+	{ (uint_t)KSSL_ADD_ENTRY,		"KSSL_ADD_ENTRY",
+		"kssl_params_t"},
+	{ (uint_t)KSSL_DELETE_ENTRY,		"KSSL_DELETE_ENTRY",
+		"sockaddr_in"},
 
 	{ (uint_t)0, NULL, NULL	}
 };

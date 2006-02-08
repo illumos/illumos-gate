@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -206,13 +206,15 @@ kssl_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	return (DDI_SUCCESS);
 }
 
+static kstat_t *kssl_ksp = NULL;
+
 static int
 kssl_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 {
 	if (cmd != DDI_DETACH)
 		return (DDI_FAILURE);
 
-	if (kssl_entry_tab_nentries != 0)
+	if (kssl_entry_tab_nentries != 0 || kssl_cache_count != 0)
 		return (DDI_FAILURE);
 
 	mutex_destroy(&kssl_tab_mutex);
@@ -220,6 +222,12 @@ kssl_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 
 	if (kssl_cache != NULL) {
 		kmem_cache_destroy(kssl_cache);
+		kssl_cache = NULL;
+	}
+
+	if (kssl_ksp != NULL) {
+		kstat_delete(kssl_ksp);
+		kssl_ksp = NULL;
 	}
 
 	ddi_remove_minor_node(dip, NULL);
@@ -507,17 +515,15 @@ kssl_stats_t *kssl_statp;
 static void
 kssl_global_init()
 {
-	kstat_t *ksp;
-
 	mutex_init(&kssl_tab_mutex, NULL, MUTEX_DRIVER, NULL);
 
 	kssl_cache = kmem_cache_create("kssl_cache", sizeof (ssl_t),
 	    0, kssl_constructor, kssl_destructor, NULL, NULL, NULL, 0);
 
-	if ((ksp = kstat_create("kssl", 0, "kssl_stats", "crypto",
+	if ((kssl_ksp = kstat_create("kssl", 0, "kssl_stats", "crypto",
 	    KSTAT_TYPE_NAMED, sizeof (kssl_stats_t) / sizeof (kstat_named_t),
 	    KSTAT_FLAG_PERSISTENT)) != NULL) {
-		kssl_statp = ksp->ks_data;
+		kssl_statp = kssl_ksp->ks_data;
 
 		kstat_named_init(&kssl_statp->sid_cache_lookups,
 		    "kssl_sid_cache_lookups", KSTAT_DATA_UINT64);
@@ -556,7 +562,7 @@ kssl_global_init()
 		kstat_named_init(&kssl_statp->bad_pre_master_secret,
 		    "kssl_bad_pre_master_secret", KSTAT_DATA_UINT64);
 
-		kstat_install(ksp);
+		kstat_install(kssl_ksp);
 	};
 }
 

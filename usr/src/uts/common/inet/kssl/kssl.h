@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,7 +93,7 @@ typedef struct kssl_params_s {
 } kssl_params_t;
 
 /* The ioctls to /dev/kssl */
-#define	KSSL_IOC(x)		(('k' << 8) | (x))
+#define	KSSL_IOC(x)		(('s' << 24) | ('s' << 16) | ('l' << 8) | (x))
 #define	KSSL_ADD_ENTRY		KSSL_IOC(1)
 #define	KSSL_DELETE_ENTRY	KSSL_IOC(2)
 
