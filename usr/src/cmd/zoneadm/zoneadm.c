@@ -1945,7 +1945,7 @@ verify_fs_zfs(struct zone_fstab *fstab)
 	zfs_set_error_handler(zfs_fs_err_handler);
 
 	if ((zhp = zfs_open(fstab->zone_fs_special, ZFS_TYPE_ANY)) == NULL) {
-		(void) fprintf(stderr, gettext("cannot verify fs %s: "
+		(void) fprintf(stderr, gettext("could not verify fs %s: "
 			"could not access zfs dataset '%s'\n"),
 			fstab->zone_fs_dir, fstab->zone_fs_special);
 		return (Z_ERR);
@@ -1961,8 +1961,8 @@ verify_fs_zfs(struct zone_fstab *fstab)
 
 	if (zfs_prop_get(zhp, ZFS_PROP_MOUNTPOINT, propbuf, sizeof (propbuf),
 	    NULL, NULL, 0, 0) != 0 || strcmp(propbuf, "legacy") != 0) {
-		(void) fprintf(stderr, gettext("cannot verify fs %s: zfs '%s' "
-			"mountpoint is not \"legacy\"\n"),
+		(void) fprintf(stderr, gettext("could not verify fs %s: "
+			"zfs '%s' mountpoint is not \"legacy\"\n"),
 			fstab->zone_fs_dir, fstab->zone_fs_special);
 		zfs_close(zhp);
 		return (Z_ERR);
@@ -1984,7 +1984,7 @@ verify_fs_special(struct zone_fstab *fstab)
 		return (verify_fs_zfs(fstab));
 
 	if (stat(fstab->zone_fs_special, &st) != 0) {
-		(void) fprintf(stderr, gettext("cannot verify fs "
+		(void) fprintf(stderr, gettext("could not verify fs "
 		    "%s: could not access %s: %s\n"), fstab->zone_fs_dir,
 		    fstab->zone_fs_special, strerror(errno));
 		return (Z_ERR);
