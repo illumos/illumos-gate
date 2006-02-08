@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * STREAMS Crypto Module
@@ -1477,7 +1477,7 @@ aes_cbc_cts_decrypt(struct tmodinfo *tmi, uchar_t *buff, size_t length)
 			bcopy(buff + (blockno * DEFAULT_AES_BLOCKLEN),
 				tmi->dec_data.block, DEFAULT_AES_BLOCKLEN);
 
-			result = crypto_decrypt_update(&tmi->dec_data.ctx,
+			result = crypto_decrypt_update(tmi->dec_data.ctx,
 					&ct, &pt, NULL);
 			if (result != CRYPTO_SUCCESS) {
 				cmn_err(CE_WARN, "aes_cbc_cts_decrypt: "
