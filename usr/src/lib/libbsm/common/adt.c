@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1520,13 +1520,14 @@ adt_set_user(const adt_session_data_t *session_data,
  */
 int
 adt_set_from_ucred(const adt_session_data_t *session_data,
-    const ucred_t *ucred,
-    enum adt_user_context user_context)
+    const ucred_t *uc, enum adt_user_context user_context)
 {
 	adt_internal_state_t	*state;
 	int			rc = -1;
 	const au_tid64_addr_t		*tid64;
 	au_tid_addr_t		termid, *tid;
+	ucred_t	*ucred = (ucred_t *)uc;
+	boolean_t	local_uc = B_FALSE;
 
 	if (session_data == NULL) /* no session exists to audit */
 		return (0);
@@ -1539,6 +1540,7 @@ adt_set_from_ucred(const adt_session_data_t *session_data,
 
 		if (ucred == NULL)
 			goto return_rc;
+		local_uc = B_TRUE;
 	}
 
 	switch (user_context) {
@@ -1590,6 +1592,9 @@ adt_set_from_ucred(const adt_session_data_t *session_data,
 	state->as_egid = ucred_getegid(ucred);
 
 return_rc:
+	if (local_uc) {
+		ucred_free(ucred);
+	}
 	return (rc);
 }
 
