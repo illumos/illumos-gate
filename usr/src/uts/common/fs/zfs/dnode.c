@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -319,8 +319,10 @@ dnode_allocate(dnode_t *dn, dmu_object_type_t ot, int blocksize, int ibs,
 
 	if (blocksize == 0)
 		blocksize = 1 << zfs_default_bs;
-
-	blocksize = MIN(MAX(blocksize, SPA_MINBLOCKSIZE), SPA_MAXBLOCKSIZE);
+	else if (blocksize > SPA_MAXBLOCKSIZE)
+		blocksize = SPA_MAXBLOCKSIZE;
+	else
+		blocksize = P2ROUNDUP(blocksize, SPA_MINBLOCKSIZE);
 
 	if (ibs == 0)
 		ibs = zfs_default_ibs;
