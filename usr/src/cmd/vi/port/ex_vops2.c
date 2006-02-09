@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,8 @@
 #endif
 #endif /* PRESUNEUC */
 
+extern size_t strlcpy(char *, const char *, size_t);
+
 /*
  * Low level routines for operations sequences,
  * and mostly, insert mode (and a subroutine
@@ -55,6 +57,9 @@ extern unsigned char	*vUA1, *vUA2;		/* extern; also in ex_vops.c */
 extern unsigned char	*vUD1, *vUD2;		/* extern; also in ex_vops.c */
 
 int vmaxrep(unsigned char, int);
+static void imultlinerep(int, line *, int, int);
+static void omultlinerep(int, line *, int);
+static void fixdisplay(void);
 
 /*
  * Obleeperate characters in hardcopy
@@ -171,6 +176,20 @@ vappend(int ch, int cnt, int indent)
 	bool escape;
 	int repcnt, savedoomed;
 	short oldhold = hold;
+	int savecnt = cnt;
+	line *startsrcline;
+	int startsrccol, endsrccol;
+	int gotNL = 0;
+	int imultlinecnt = 0;
+	int omultlinecnt = 0;
+
+	if ((savecnt > 1) && (ch == 'o' || ch == 'O')) {
+		omultlinecnt = 1;
+	}
+#ifdef XPG6
+	if ((savecnt > 1) && (ch == 'a' || ch == 'A' || ch == 'i' || ch == 'I'))
+		imultlinecnt = 1;
+#endif /* XPG6 */
 
 	/*
 	 * Before a move in hardopen when the line is dirty
@@ -368,6 +387,9 @@ vappend(int ch, int cnt, int indent)
 	 */
 	gobblebl = 0;
 
+	startsrcline = dot;
+	startsrccol = cursor - linebuf;
+
 	/*
 	 * Text gathering loop.
 	 * New text goes into genbuf starting at gcursor.
@@ -381,6 +403,17 @@ vappend(int ch, int cnt, int indent)
 		else {
 			ixlatctl(1);
 			gcursor = vgetline(repcnt, gcursor, &escape, ch);
+
+			/* vgetline() only returns when it got ESCAPE or NL */
+			if (escape == '\n') {
+				gotNL = 1;
+			} else {
+				/*
+				 * Upon escape, gcursor is pointing to '\0'
+				 * terminating the string in genbuf.
+				 */
+				endsrccol = gcursor - genbuf - 1;
+			}
 			ixlatctl(0);
 
 			/*
@@ -416,6 +449,16 @@ vappend(int ch, int cnt, int indent)
 			if (!HADUP)
 				indent = i;
 			gcursor = strend(genbuf);
+		}
+
+		/*
+		 * Set cnt to 1 to avoid repeating the text on the same line.
+		 * Do this for commands 'i', 'I', 'a', and 'A', if we're
+		 * inserting anything with a newline for XPG6.  Always do this
+		 * for commands 'o' and 'O'.
+		 */
+		if ((imultlinecnt && gotNL) || omultlinecnt) {
+			cnt = 1;
 		}
 
 		/*
@@ -591,6 +634,12 @@ vappend(int ch, int cnt, int indent)
 		*gcursor = 0;
 		cursor = linebuf;
 		vgotoCL(nqcolumn(cursor - 1, genbuf));
+	} /* end for (;;) loop in vappend() */
+
+	if (imultlinecnt && gotNL) {
+		imultlinerep(savecnt, startsrcline, startsrccol, endsrccol);
+	} else if (omultlinecnt) {
+		omultlinerep(savecnt, startsrcline, endsrccol);
 	}
 
 	/*
@@ -598,8 +647,11 @@ vappend(int ch, int cnt, int indent)
 	 * and sync the screen.
 	 */
 	hold = oldhold;
-	if (cursor > linebuf)
+	if ((imultlinecnt && gotNL) || omultlinecnt) {
+		fixdisplay();
+	} else if (cursor > linebuf) {
 		cursor = lastchr(linebuf, cursor);
+	}
 	if (state != HARDOPEN)
 		vsyncCL();
 	else if (cursor > linebuf)
@@ -607,6 +659,129 @@ vappend(int ch, int cnt, int indent)
 	doomed = 0;
 	wcursor = cursor;
 	(void) vmove();
+}
+
+/*
+ * XPG6
+ * To repeat multi-line input for [count]a, [count]A, [count]i, [count]I,
+ * or a subsequent [count]. :
+ * insert input count-1 more times.
+ */
+
+static void
+imultlinerep(int savecnt, line *startsrcline, int startsrccol, int endsrccol)
+{
+	int tmpcnt = 2;	/* 1st insert counts as 1 repeat */
+	line *srcline, *endsrcline;
+	size_t destsize = LBSIZE - endsrccol - 1;
+
+	endsrcline = dot;
+
+	/* Save linebuf into temp file before moving off the line. */
+	vsave();
+
+	/*
+	 * At this point the temp file contains the first iteration of
+	 * a multi-line insert, and we need to repeat it savecnt - 1
+	 * more times in the temp file.  dot is the last line in the
+	 * first iteration of the insert.  Decrement dot so that
+	 * vdoappend() will append each new line before the last line.
+	 */
+	--dot;
+	--vcline;
+	/*
+	 * Use genbuf to rebuild the last line in the 1st iteration
+	 * of the repeated insert, then copy this line to the temp file.
+	 */
+	(void) strlcpy((char *)genbuf, (char *)linebuf, sizeof (genbuf));
+	getline(*startsrcline);
+	if (strlcpy((char *)(genbuf + endsrccol + 1),
+	    (char *)(linebuf + startsrccol), destsize) >= destsize) {
+		error(gettext("Line too long"));
+	}
+	vdoappend(genbuf);
+	vcline++;
+	/*
+	 * Loop from the second line of the first iteration
+	 * through endsrcline, appending after dot.
+	 */
+	++startsrcline;
+
+	while (tmpcnt <= savecnt) {
+		for (srcline = startsrcline; srcline <= endsrcline;
+		    ++srcline) {
+			if ((tmpcnt == savecnt) &&
+			    (srcline == endsrcline)) {
+				/*
+				 * The last line is already in place,
+				 * just make it the current line.
+				 */
+				vcline++;
+				dot++;
+				getDOT();
+				cursor = linebuf + endsrccol;
+			} else {
+				getline(*srcline);
+				/* copy linebuf to temp file */
+				vdoappend(linebuf);
+				vcline++;
+			}
+		}
+		++tmpcnt;
+	}
+}
+
+/*
+ * To repeat input for [count]o, [count]O, or a subsequent [count]. :
+ * append input count-1 more times to the end of the already added
+ * text, each time starting on a new line.
+ */
+
+static void
+omultlinerep(int savecnt, line *startsrcline, int endsrccol)
+{
+	int tmpcnt = 2;	/* 1st insert counts as 1 repeat */
+	line *srcline, *endsrcline;
+
+	endsrcline = dot;
+	/* Save linebuf into temp file before moving off the line. */
+	vsave();
+
+	/*
+	 * Loop from the first line of the first iteration
+	 * through endsrcline, appending after dot.
+	 */
+	while (tmpcnt <= savecnt) {
+		for (srcline = startsrcline; srcline <= endsrcline; ++srcline) {
+			getline(*srcline);
+			/* copy linebuf to temp file */
+			vdoappend(linebuf);
+			vcline++;
+		}
+		++tmpcnt;
+	}
+	cursor = linebuf + endsrccol;
+}
+
+/*
+ * Similiar to a ctrl-l, however always vrepaint() in case the last line
+ * of the repeat would exceed the bottom of the screen.
+ */
+
+static void
+fixdisplay(void)
+{
+	vclear();
+	vdirty(0, vcnt);
+	if (state != VISUAL) {
+		vclean();
+		vcnt = 0;
+		vmoveto(dot, cursor, 0);
+	} else {
+		vredraw(WTOP);
+		vrepaint(cursor);
+		vfixcurs();
+	}
 }
 
 /*

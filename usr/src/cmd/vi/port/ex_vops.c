@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -691,13 +691,6 @@ smallchange:
 
 /*
  * Open new lines.
- *
- * Tricky thing here is slowopen.  This causes display updating
- * to be held off so that 300 baud dumb terminals don't lose badly.
- * This also suppressed counts, which otherwise say how many blank
- * space to open up.  Counts are also suppressed on intelligent terminals.
- * Actually counts are obsoleted, since if your terminal is slow
- * you are better off with slowopen.
  */
 void
 voOpen(int c, int cnt)
@@ -705,8 +698,6 @@ voOpen(int c, int cnt)
 	int ind = 0, i;
 	short oldhold = hold;
 
-	if (value(vi_SLOWOPEN) || value(vi_REDRAW) && insert_line && delete_line)
-		cnt = 1;
 	vsave();
 	setLAST();
 	if (value(vi_AUTOINDENT))
@@ -751,7 +742,7 @@ voOpen(int c, int cnt)
 		vsync1(LINE(vcline));
 	cursor = linebuf;
 	linebuf[0] = 0;
-	vappend('o', 1, ind);
+	vappend('o', cnt, ind);
 }
 
 /*
@@ -1004,6 +995,12 @@ vyankit(void)
 			notecnt = 0;
 		vrepaint(cursor);
 		return (0);
+	} else {
+		/*
+		 * For one line y<motion> commands, eg. 2yw, save the
+		 * command for a subsequent [count].
+		 */
+		setLAST();
 	}
 	takeout(DEL);
 	return (0);

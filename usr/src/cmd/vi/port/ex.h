@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -612,6 +612,10 @@ int lfind();
 void source();
 void commands();
 void addmac();
+void vmoveto();
+void vrepaint();
+void getDOT(void);
+void vclear(void);
 
 unsigned char *lastchr();
 unsigned char *nextchr();

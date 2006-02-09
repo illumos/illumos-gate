@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -62,7 +62,7 @@ POFILE= port.po
 $(XPG4) := CFLAGS += -DXPG4 -DXPG4ONLY
 
 # Include all XPG4 changes, but don't include XPG4ONLY in the XPG6 version
-$(XPG6) := CFLAGS += -DXPG4 -I$(SRC)/lib/libc/inc
+$(XPG6) := CFLAGS += -DXPG4 -DXPG6 -I$(SRC)/lib/libc/inc
 
 CPPFLAGS +=  -DUSG -DSTDIO -DVMUNIX -DTABS=8 -DSINGLE -DTAG_STACK
 CLOBBERFILES += $(LIBPROGS)
