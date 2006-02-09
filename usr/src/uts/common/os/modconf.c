@@ -991,6 +991,7 @@ mod_removefs(struct modlfs *modl, struct modlinkage *modlp)
 	/* XXX - Shouldn't the refcount be sufficient? */
 
 	if (vfs_opsinuse(&vswp->vsw_vfsops)) {
+		vfs_unrefvfssw(vswp);
 		WUNLOCK_VFSSW();
 		return (EBUSY);
 	}
