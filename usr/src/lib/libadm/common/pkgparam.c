@@ -23,8 +23,8 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright (c) 1995-1998 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma	ident	"%Z%%M%	%I%	%E% SMI"	/* SVr4.0 1.1 */
@@ -77,14 +77,22 @@ static char Adm_pkgadm[PATH_MAX] = { 0 }; /* added for newroot */
 int
 pkginfofind(char *path, char *pkg_dir, char *pkginst)
 {
+	int len = 0;
+
 	/* Construct the temporary pkginfo file name. */
-	(void) sprintf(path, "%s/.save.%s/pkginfo", pkg_dir, pkginst);
+	len =  snprintf(path, PATH_MAX, "%s/.save.%s/pkginfo", pkg_dir,
+	    pkginst);
+	if (len > PATH_MAX)
+		return (0);
 	if (access(path, 0)) {
 		/*
 		 * This isn't a temporary directory, so we look for a
 		 * regular one.
 		 */
-		(void) sprintf(path, "%s/%s/pkginfo", pkg_dir, pkginst);
+		len =  snprintf(path, PATH_MAX, "%s/%s/pkginfo", pkg_dir,
+		    pkginst);
+		if (len > PATH_MAX)
+			return (0);
 		if (access(path, 0))
 			return (0); /* doesn't appear to be a package */
 	}
@@ -128,7 +136,7 @@ fpkgparam(FILE *fp, char *param)
 
 		/* Get the next token. */
 		while ((c = getc(fp)) != EOF) {
-			ch = (char) c;
+			ch = (char)c;
 			if (strchr(sepset, ch))
 				break;
 			if (++n < VALSIZ)
@@ -168,7 +176,7 @@ fpkgparam(FILE *fp, char *param)
 
 		/* Now read the parameter value. */
 		while ((c = getc(fp)) != EOF) {
-			ch = (char) c;
+			ch = (char)c;
 			if (begline && ((ch == ' ') || (ch == '\t')))
 				continue; /* ignore leading white space */
 
