@@ -1,15 +1,38 @@
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #
 # MM_Solaris_ON.pm overrides various parts of MakeMaker so that perl modules
 # build correctly as part of Solaris/ON.  The changes are:
 #    1.  parse_args is overriden to merge the values of DEFINE specified in
 #        Makefile.PL and on the command line.  The default behaviour is that
 #        the command line value overwrites any value specified in Makefile.PL.
-#    2.  constants() is overriden to add the incluide paths specified in the
+#    2.  constants() is overriden to add the include paths specified in the
 #        ENVCPPFLAGS[1-n] environment variables to the compiler command-line so
 #        that the compiler looks in the proto area for include files.
 #    3.  ext() is overriden to add the library paths specified in the
@@ -22,7 +45,7 @@ package ExtUtils::MM_Solaris_ON;
 use strict;
 use warnings;
 our ($VERSION, @ISA);
-$VERSION = '1.1';
+$VERSION = '%I%';
 require ExtUtils::MM_Any;
 require ExtUtils::MM_Unix;
 @ISA = qw(ExtUtils::MM_Any ExtUtils::MM_Unix);
@@ -66,7 +89,7 @@ sub constants
 	# Find all the ENVCPPFLAGS[1-n] environment variables
 	my (%inc_seen, @newincs, %proto_seen, @protos);
 	foreach my $ip (map({ /^ENVCPPFLAGS\d+$/ ? split(' ', $ENV{$_}) : () }
-	    keys(%ENV))) {
+	    sort(keys(%ENV)))) {
 		# Ignore everything except '-I' flags.
 		next unless ($ip =~ s!^-I(.*)$!$1!);
 
@@ -123,7 +146,7 @@ sub ext
 	# Find all the ENVLDLIBS[1-n] environment variables
 	my (%lib_seen, @lib_prefix, @newlibs, %proto_seen, @protos);
 	foreach my $lp (map({ /^ENVLDLIBS\d+$/ ? split(' ', $ENV{$_}) : () }
-	    keys(%ENV))) {
+	    sort(keys(%ENV)))) {
 		# Ignore everything except '-L' flags
 		next unless ($lp =~ s!^-L(.*)$!$1!);
 

@@ -1,6 +1,7 @@
 #
 # This is a version of the 5.8.4 installperl script that has been modified to
 # work correctly as part of the ON build process.  The changes are as follows:
+#    * 'use filetest' added so the build works across mismatched NFSv4 domains
 #    * umask set to 022
 #    * install locations modified to be relative to $ROOT
 #    * check for 'make test' being run before install removed
@@ -20,6 +21,7 @@ BEGIN {
 }
 
 use strict;
+use filetest qw(access);
 my ($Is_VMS, $Is_W32, $Is_OS2, $Is_Cygwin, $Is_Darwin,
     $nonono, $dostrip, $versiononly, $silent, $verbose, $force,
     $otherperls, $archname, $Is_NetWare, $nwinstall, $nopods);

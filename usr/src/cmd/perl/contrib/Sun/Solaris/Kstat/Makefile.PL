@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,34 +18,43 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# cmd/perl/contrib/Sun/Solaris/Kstat/Makefile.PL
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 use ExtUtils::MakeMaker;
-my ($def, $inc) = ('', '');
+my ($defines, $includes) = ('', '');
 
-#$def .= '-DKSTAT_DEBUG ';	# Uncomment this to turn on assertions
-#$def .= '-DREPORT_UNKNOWN ';	# Uncomment this to report unknown binary kstats
+# Uncomment this to turn on assertions
+#$defines .= '-DKSTAT_DEBUG ';
+
+# Uncomment this to report unknown binary kstats
+#$defines .= '-DREPORT_UNKNOWN ';
 
 #
 # Because there are still platform specific raw kstats, we need to include the
 # platform specific header files, so work out where they live.
 #
-my $plat_dir = qx{uname -m}; chomp($plat_dir);
-$plat_dir = 'sun4u' if ($plat =~ /^sun4/);
-$plat_dir = "-I/usr/platform/$plat_dir/include";
+my $arch = qx{uname -p}; chomp($arch);
+if ($arch eq 'sparc') {
+	$includes .= '-I/usr/platform/sun4u/include' .
+	    ' -I/usr/platform/sun4v/include';
+} elsif ($arch eq 'i386') {
+	$includes .= '-I/usr/platform/i86pc/include' .
+	    ' -I/usr/platform/i86xen/include';
+} else {
+	die("Unknown architecture $arch\n");
+}
 
 WriteMakefile(
     NAME         => 'Sun::Solaris::Kstat',
     VERSION_FROM => 'Kstat.pm',
     LIBS         => [ '-lkstat' ],
-    INC          => $plat_dir,
+    DEFINE       => $defines,
+    INC          => $includes,
     OBJECT       => '$(O_FILES)',
-    DEFINE       => $def,
 );

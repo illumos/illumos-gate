@@ -1,13 +1,9 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -22,7 +18,14 @@
 #
 # CDDL HEADER END
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #
 # Utils.pm provides the bootstrap for the Sun::Solaris::Utils module.
 #
@@ -32,7 +35,7 @@ use strict;
 use Exporter;
 use DynaLoader;
 use vars qw($VERSION @ISA @EXPORT_OK);
-$VERSION = '1.00';
+$VERSION = '%I%';
 @ISA = qw(Exporter DynaLoader);
 @EXPORT_OK = qw(gmatch gettext textdomain bindtextdomain dcgettext dgettext);
 bootstrap Sun::Solaris::Utils $VERSION;

@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,13 +18,12 @@
 #
 # CDDL HEADER END
 #
+
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
-#
-# Makefile.PL for ::PerlGcc
+# ident	"%Z%%M%	%I%	%E% SMI"
 #
 
 require 5.6.1;
@@ -33,17 +31,45 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
+#
+# Compare OS versions.
+#
+sub cmp_os_ver
+{
+	our ($a, $b);
+	my @v1 = split(/\./, $a);
+	my @v2 = split(/\./, $b);
+	my $diff = 0;
+	while (@v1 || @v2) {
+		last if (($diff = shift(@v1) - shift(@v2)) != 0);
+	}
+	return ($diff);
+}
+
 # Check we are on a supported OS version.
-my ($os, $host, $rel, $ver, $arch, $isa, $plat) = split(' ', qx{uname -a});
-my $hw = $arch;
-$hw = 'x86' if ($hw eq 'i86pc');
-$hw = 'sparc' if ($hw =~ /^sun4/);
+my $rel = qx{uname -r}; chomp($rel);
+my $arch = qx{uname -p}; chomp($arch);
 my $pver = sprintf('%vd', $^V);
 
-# Figure out the appropriate Config.pm
-my $configpm = "config/$pver/$rel/$hw/Config.pm";
-die("Unsupported Perl version/OS version/Architecture $pver/$rel/$hw\n")
-    unless (-f $configpm);
+# Figure out the appropriate Config.pm.  Use an older version if necessary.
+my $configpm = "config/$pver/$rel/$arch/Config.pm";
+if (! -f $configpm) {
+	my $p = "config/$pver";
+	my $dh;
+	opendir($dh, $p) || die("Can't read directory $_: $!\n");
+	my $old_rel = (sort(cmp_os_ver
+	    grep(-d "$p/$_" && $_ =~ /^\d[\d.]+\d$/, readdir($dh))))[-1];
+	closedir($dh);
+	if (defined($old_rel)) {
+		print(STDERR "Warning: No config file for OS version $rel, " .
+		    "using $old_rel file\n");
+		$rel = $old_rel;
+		$configpm = "config/$pver/$rel/$arch/Config.pm";
+	} else {
+		die("Unsupported version of Perl/OS/Architecture " .
+		    "$pver/$rel/$arch\n");
+	}
+}
 
 our %man1pods;
 # Only install the pods for onn-ON builds.
