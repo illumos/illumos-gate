@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -1871,6 +1871,90 @@ typedef struct {
 	uint32_t	etherStatsJabbers;
 	uint32_t	etherStatsUndersizePkts;
 } bge_statistics_reg_t;
+
+
+#ifdef BGE_IPMI_ASF
+
+/*
+ * Device internal memory entries
+ */
+
+#define	BGE_FIRMWARE_MAILBOX				0x0b50
+#define	BGE_MAGIC_NUM_FIRMWARE_INIT_DONE		0x4b657654
+#define	BGE_MAGIC_NUM_DISABLE_DMAW_ON_LINK_CHANGE	0x4861764b
+
+
+#define	BGE_NIC_DATA_SIG_ADDR			0x0b54
+#define	BGE_NIC_DATA_SIG			0x4b657654
+
+
+#define	BGE_NIC_DATA_NIC_CFG_ADDR		0x0b58
+
+#define	BGE_NIC_CFG_LED_MODE_TRIPLE_SPEED	0x000004
+#define	BGE_NIC_CFG_LED_MODE_LINK_SPEED		0x000008
+#define	BGE_NIC_CFG_LED_MODE_OPEN_DRAIN		0x000004
+#define	BGE_NIC_CFG_LED_MODE_OUTPUT		0x000008
+#define	BGE_NIC_CFG_LED_MODE_MASK		0x00000c
+
+#define	BGE_NIC_CFG_PHY_TYPE_UNKNOWN		0x000000
+#define	BGE_NIC_CFG_PHY_TYPE_COPPER		0x000010
+#define	BGE_NIC_CFG_PHY_TYPE_FIBER		0x000020
+#define	BGE_NIC_CFG_PHY_TYPE_MASK		0x000030
+
+#define	BGE_NIC_CFG_ENABLE_WOL			0x000040
+#define	BGE_NIC_CFG_ENABLE_ASF			0x000080
+#define	BGE_NIC_CFG_EEPROM_WP			0x000100
+#define	BGE_NIC_CFG_POWER_SAVING		0x000200
+#define	BGE_NIC_CFG_SWAP_PORT			0x000800
+#define	BGE_NIC_CFG_MINI_PCI			0x001000
+#define	BGE_NIC_CFG_FIBER_WOL_CAPABLE		0x004000
+#define	BGE_NIC_CFG_5753_12x12			0x100000
+
+
+#define	BGE_NIC_DATA_FIRMWARE_VERSION		0x0b5c
+
+
+#define	BGE_NIC_DATA_PHY_ID_ADDR		0x0b74
+#define	BGE_NIC_PHY_ID1_MASK			0xffff0000
+#define	BGE_NIC_PHY_ID2_MASK			0x0000ffff
+
+
+#define	BGE_CMD_MAILBOX				0x0b78
+#define	BGE_CMD_NICDRV_ALIVE			0x00000001
+#define	BGE_CMD_NICDRV_PAUSE_FW			0x00000002
+#define	BGE_CMD_NICDRV_IPV4ADDR_CHANGE		0x00000003
+#define	BGE_CMD_NICDRV_IPV6ADDR_CHANGE		0x00000004
+
+
+#define	BGE_CMD_LENGTH_MAILBOX			0x0b7c
+#define	BGE_CMD_DATA_MAILBOX			0x0b80
+#define	BGE_ASF_FW_STATUS_MAILBOX		0x0c00
+
+#define	BGE_DRV_STATE_MAILBOX			0x0c04
+#define	BGE_DRV_STATE_START			0x00000001
+#define	BGE_DRV_STATE_START_DONE		0x80000001
+#define	BGE_DRV_STATE_UNLOAD			0x00000002
+#define	BGE_DRV_STATE_UNLOAD_DONE		0x80000002
+#define	BGE_DRV_STATE_WOL			0x00000003
+#define	BGE_DRV_STATE_SUSPEND			0x00000004
+
+
+#define	BGE_FW_LAST_RESET_TYPE_MAILBOX		0x0c08
+#define	BGE_FW_LAST_RESET_TYPE_WARM		0x0001
+#define	BGE_FW_LAST_RESET_TYPE_COLD		0x0002
+
+
+#define	BGE_MAC_ADDR_HIGH_MAILBOX		0x0c14
+#define	BGE_MAC_ADDR_LOW_MAILBOX		0x0c18
+
+
+/*
+ * RX-RISC event register
+ */
+#define	RX_RISC_EVENT_REG			0x6810
+#define	RRER_ASF_EVENT				0x4000
+
+#endif /* BGE_IPMI_ASF */
 
 #ifdef __cplusplus
 }
