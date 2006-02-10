@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -167,6 +167,10 @@ extern uint_t _thr_self();
 #define	MAX_CACHED		(1 << MAX_CACHED_SHIFT)
 #define	MIN_CACHED_SHIFT	4	/* smaller requests rounded up */
 #define	MTMALLOC_MIN_ALIGN	8	/* min guaranteed alignment */
+
+/* maximum size before overflow */
+#define	MAX_MTMALLOC	(SIZE_MAX - (SIZE_MAX % MTMALLOC_MIN_ALIGN) \
+			- OVSZ_HEADER_SIZE)
 
 #define	NUM_CACHES	(MAX_CACHED_SHIFT - MIN_CACHED_SHIFT + 1)
 #define	CACHELIST_SIZE	ALIGN(NUM_CACHES * sizeof (cache_head_t), \
@@ -1209,12 +1213,11 @@ oversize(size_t size)
 	oversize_t *big;
 	int bucket;
 
-	/*
-	 * The idea with the global lock is that we are sure to
-	 * block in the kernel anyway since given an oversize alloc
-	 * we are sure to have to call morecore();
-	 */
-	(void) mutex_lock(&oversize_lock);
+	/* make sure we will not overflow */
+	if (size > MAX_MTMALLOC) {
+		errno = ENOMEM;
+		return (NULL);
+	}
 
 	/*
 	 * Since we ensure every address we hand back is
@@ -1224,6 +1227,13 @@ oversize(size_t size)
 	 * particularly where coalescing occurs.
 	 */
 	size = ALIGN(size, MTMALLOC_MIN_ALIGN);
+
+	/*
+	 * The idea with the global lock is that we are sure to
+	 * block in the kernel anyway since given an oversize alloc
+	 * we are sure to have to call morecore();
+	 */
+	(void) mutex_lock(&oversize_lock);
 
 	if ((big = find_oversize(size)) != NULL) {
 		if (reinit == 0 && (debugopt & MTDEBUGPATTERN))
