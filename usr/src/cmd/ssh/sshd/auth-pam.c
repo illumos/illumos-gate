@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,7 +123,7 @@ derive_pam_svc_name(Authmethod *method)
 			return "sshd-hostbased";
 		}
 		if (strncmp(method_name, "gss", 3) == 0) {
-			/* "hostbased" can't really be shortened... */
+			/* "gss" is too short, elongate it */
 			return "sshd-gssapi";
 		}
 	}
