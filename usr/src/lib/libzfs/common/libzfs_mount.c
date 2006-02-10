@@ -141,6 +141,7 @@ zfs_is_mounted(zfs_handle_t *zhp, char **where)
 	 * also let us find mounts when the mountpoint is 'legacy'.
 	 */
 	search.mnt_special = (char *)zfs_get_name(zhp);
+	search.mnt_fstype = MNTTYPE_ZFS;
 
 	rewind(mnttab_file);
 	if (getmntany(mnttab_file, &entry, &search) != 0)
@@ -260,6 +261,7 @@ zfs_unmount(zfs_handle_t *zhp, const char *mountpoint, int flags)
 
 	/* check to see if need to unmount the filesystem */
 	search.mnt_special = (char *)zfs_get_name(zhp);
+	search.mnt_fstype = MNTTYPE_ZFS;
 	rewind(mnttab_file);
 	if (mountpoint != NULL || ((zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) &&
 	    getmntany(mnttab_file, &entry, &search) == 0)) {
@@ -439,6 +441,7 @@ zfs_unshare(zfs_handle_t *zhp, const char *mountpoint)
 
 	/* check to see if need to unmount the filesystem */
 	search.mnt_special = (char *)zfs_get_name(zhp);
+	search.mnt_fstype = MNTTYPE_ZFS;
 	rewind(mnttab_file);
 	if (mountpoint != NULL || ((zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) &&
 	    getmntany(mnttab_file, &entry, &search) == 0)) {

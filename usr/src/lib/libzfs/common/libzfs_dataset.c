@@ -1249,6 +1249,7 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 			struct mnttab search = { 0 }, entry;
 
 			search.mnt_special = (char *)zhp->zfs_name;
+			search.mnt_fstype = MNTTYPE_ZFS;
 			rewind(mnttab_file);
 
 			if (getmntany(mnttab_file, &entry, &search) == 0)
