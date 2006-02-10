@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3905,6 +3905,7 @@ zone(int cmd, void *arg1, void *arg2, void *arg3, void *arg4)
 			zs.zone_privs =
 			    (const struct priv_set *)
 			    (unsigned long)zs32.zone_privs;
+			zs.zone_privssz = zs32.zone_privssz;
 			zs.rctlbuf = (caddr_t)(unsigned long)zs32.rctlbuf;
 			zs.rctlbufsz = zs32.rctlbufsz;
 			zs.zfsbuf = (caddr_t)(unsigned long)zs32.zfsbuf;

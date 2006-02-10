@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
 <!--
- Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  Use is subject to license terms.
 
  CDDL HEADER START
@@ -34,6 +34,10 @@
 
 <service_bundle type='manifest' name='SUNWzoner:zones'>
 
+<!--
+	The only effect of this service is to causes zones with the
+	"autoboot" property set to "true" to boot at system startup.
+-->
 <service
 	name='system/zones'
 	type='service'
@@ -74,13 +78,13 @@
 	<template>
 		<common_name>
 			<loctext xml:lang='C'>
-			Solaris zones
+			Zones autoboot
 			</loctext>
 		</common_name>
 		<documentation>
 			<manpage title='zones' section='5' manpath='/usr/share/man' />
 			<manpage
-				title='zoneadm'
+				title='zonecfg'
 				section='1M'
 				manpath='/usr/share/man' />
 		</documentation>
