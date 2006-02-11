@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,8 @@
 #include <sys/psw.h>
 #include "../../../../common/pci/pci_strings.h"
 #include <io/pciex/pcie_ck804_boot.h>
+#include <sys/acpi/acpi.h>
+#include <sys/acpica.h>
 
 #define	pci_getb	(*pci_getb_func)
 #define	pci_getw	(*pci_getw_func)
@@ -77,6 +79,9 @@ static void add_bus_slot_names_prop(int);
 static void add_ppb_ranges_prop(int);
 static void add_bus_available_prop(int);
 static void alloc_res_array();
+
+/* set non-zero to force PCI peer-bus renumbering */
+int pci_bus_always_renumber = 0;
 
 /*
  * Enumerate all PCI devices
@@ -128,11 +133,149 @@ pci_setup_tree()
 	}
 }
 
+/*
+ * >0 = present, 0 = not present, <0 = error
+ */
+static int
+pci_bbn_present(int bus)
+{
+	ACPI_HANDLE	hdl;
+	ACPI_BUFFER	rb;
+	int	rv;
+
+	/* no dip means no _BBN */
+	if (pci_bus_res[bus].dip == NULL)
+		return (0);
+
+	rv = acpica_find_pciobj(pci_bus_res[bus].dip, &hdl);
+	if (rv != AE_OK)
+		return (-1);
+
+	rb.Length = ACPI_ALLOCATE_BUFFER;
+
+	rv = AcpiEvaluateObject(hdl, "_BBN", NULL, &rb);
+
+	if (rb.Length > 0)
+		AcpiOsFree(rb.Pointer);
+
+	if (rv == AE_OK)
+		return (1);
+	else if (rv == AE_NOT_FOUND)
+		return (0);
+	else
+		return (-1);
+}
+
+/*
+ * Return non-zero if any PCI bus in the system has an associated
+ * _BBN object, 0 otherwise.
+ */
+static int
+pci_roots_have_bbn(void)
+{
+	int	i;
+
+	/*
+	 * Scan the PCI busses and look for at least 1 _BBN
+	 */
+	for (i = 0; i <= pci_bios_nbus; i++) {
+		/* skip non-root (peer) PCI busses */
+		if (pci_bus_res[i].par_bus != (uchar_t)-1)
+			continue;
+
+		if (pci_bbn_present(i) > 0)
+			return (1);
+	}
+	return (0);
+
+}
+
+/*
+ * return non-zero if the machine is one on which we renumber
+ * the internal pci unit-addresses
+ */
+static int
+pci_bus_renumber()
+{
+	ACPI_TABLE_HEADER *fadt;
+
+	if (pci_bus_always_renumber)
+		return (1);
+
+	/* get the FADT */
+	if (AcpiGetFirmwareTable(FADT_SIG, 1, ACPI_LOGICAL_ADDRESSING,
+	    (ACPI_TABLE_HEADER **)&fadt) != AE_OK)
+		return (0);
+
+	/* compare OEM Table ID to "SUNm31" */
+	if (strncmp("SUNm31", fadt->OemId, 6))
+		return (0);
+	else
+		return (1);
+}
+
+/*
+ * Initial enumeration of the physical PCI bus hierarchy can
+ * leave 'gaps' in the order of peer PCI bus unit-addresses.
+ * Systems with more than one peer PCI bus *must* have an ACPI
+ * _BBN object associated with each peer bus; use the presence
+ * of this object to remove gaps in the numbering of the peer
+ * PCI bus unit-addresses - only peer busses with an associated
+ * _BBN are counted.
+ */
+static void
+pci_renumber_root_busses(void)
+{
+	int pci_regs[] = {0, 0, 0};
+	int	i, root_addr = 0;
+
+	/*
+	 * Currently, we only enable the re-numbering on specific
+	 * Sun machines; this is a work-around for the more complicated
+	 * issue of upgrade changing physical device paths
+	 */
+	if (!pci_bus_renumber())
+		return;
+
+	/*
+	 * If we find no _BBN objects at all, we either don't need
+	 * to do anything or can't do anything anyway
+	 */
+	if (!pci_roots_have_bbn())
+		return;
+
+	for (i = 0; i <= pci_bios_nbus; i++) {
+		/* skip non-root (peer) PCI busses */
+		if (pci_bus_res[i].par_bus != (uchar_t)-1)
+			continue;
+
+		if (pci_bbn_present(i) < 1) {
+			pci_bus_res[i].root_addr = (uchar_t)-1;
+			continue;
+		}
+
+		ASSERT(pci_bus_res[i].dip != NULL);
+		if (pci_bus_res[i].root_addr != root_addr) {
+			/* update reg property for node */
+			pci_bus_res[i].root_addr = root_addr;
+			pci_regs[0] = pci_bus_res[i].root_addr;
+			(void) ndi_prop_update_int_array(DDI_DEV_T_NONE,
+			    pci_bus_res[i].dip, "reg", (int *)pci_regs, 3);
+		}
+		root_addr++;
+	}
+}
+
 void
 pci_reprogram(void)
 {
 	int i, pci_reconfig = 1;
 	char *onoff;
+
+	/*
+	 * Excise phantom roots if possible
+	 */
+	pci_renumber_root_busses();
 
 	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, ddi_root_node(),
 	    DDI_PROP_DONTPASS, "pci-reprog", &onoff) == DDI_SUCCESS) {

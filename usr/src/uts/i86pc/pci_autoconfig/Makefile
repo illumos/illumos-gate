@@ -21,7 +21,7 @@
 #
 #
 # uts/i86pc/pci_autoconfig/Makefile
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -58,6 +58,11 @@ include $(UTSBASE)/i86pc/Makefile.i86pc
 ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
+
+#
+# Depends on acpica ACPI CA interpreter
+#
+LDFLAGS		+= -dy -N misc/acpica
 
 #
 #	Default build targets.
