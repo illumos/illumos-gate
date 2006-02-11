@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,6 @@
 #include <sys/param.h>
 #include <sys/utsname.h>
 #include <sys/log.h>
-#include <sys/fm/util.h>
 
 #ifdef	__cplusplus
 extern "C" {

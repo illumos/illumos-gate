@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -424,6 +424,7 @@ $(CLOSED_BUILD)COMMON_SUBDIRS += \
 	$(CLOSED)/cmd/llc2	\
 	$(CLOSED)/cmd/localedef	\
 	$(CLOSED)/cmd/more_xpg4	\
+	$(CLOSED)/cmd/mtst	\
 	$(CLOSED)/cmd/od	\
 	$(CLOSED)/cmd/patch	\
 	$(CLOSED)/cmd/pax	\
@@ -447,7 +448,6 @@ sparc_SUBDIRS=		\
 	cvcd		\
 	dcs		\
 	fruadm		\
-	$(CLOSED)/cmd/mtst	\
 	prtfru		\
 	$(CLOSED)/cmd/scadm	\
 	sckmd		\

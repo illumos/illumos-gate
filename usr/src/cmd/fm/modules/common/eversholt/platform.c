@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * platform.c -- interfaces to the platform's configuration information
@@ -48,7 +48,7 @@
 #include <sys/param.h>
 #include <sys/fm/protocol.h>
 #include <fm/fmd_api.h>
-#include <fm/libtopo_enum.h>
+#include <fm/libtopo.h>
 #include "alloc.h"
 #include "out.h"
 #include "tree.h"
@@ -70,18 +70,13 @@ extern fmd_hdl_t *Hdl;		/* handle from eft.c */
  * we take one and save it in Initcfg below.
  */
 static struct cfgdata *Lastcfg;
+static topo_hdl_t *Eft_topo_hdl;
 
 /*
  * Initcfg points to any config snapshot we have to make prior
  * to starting our first fme.
  */
 static struct cfgdata *Initcfg;
-
-void
-topo_use_out(const char *obuf)
-{
-	out(O_ALTFP, "topo: %s", obuf);
-}
 
 void *
 topo_use_alloc(size_t bytes)
@@ -125,6 +120,8 @@ nv_alloc_t Eft_nv_hdl;
 static char *Root;
 static char *Mach;
 static char *Plat;
+static char tmpbuf[MAXPATHLEN];
+static char numbuf[MAXPATHLEN];
 
 /*
  * platform_globals -- set global variables based on sysinfo() calls
@@ -145,51 +142,17 @@ platform_free_globals()
 	fmd_prop_free_string(Hdl, Plat);
 }
 
-static void
-platform_topo_paths(int *n, const char ***p)
-{
-	const char **cp;
-	char *tmpbuf;
-
-	*n = 2;
-	cp = *p = MALLOC(2 * sizeof (const char *));
-
-	tmpbuf = MALLOC(MAXPATHLEN);
-	(void) snprintf(tmpbuf,
-	    MAXPATHLEN, "%s/usr/lib/fm/topo/%s", Root, Plat);
-	*cp++ = STRDUP(tmpbuf);
-	(void) snprintf(tmpbuf, MAXPATHLEN, "%s/usr/lib/fm/topo", Root);
-	*cp = STRDUP(tmpbuf);
-	FREE(tmpbuf);
-}
-
-void
-platform_free_paths(int n, const char **p)
-{
-	int i;
-
-	for (i = 0; i < n; i++)
-		FREE((void *)p[i]);
-	FREE(p);
-}
-
 /*
  * platform_init -- perform any platform-specific initialization
  */
 void
 platform_init(void)
 {
-	const char **paths;
-	int npaths;
-
 	(void) nv_alloc_init(&Eft_nv_hdl, &Eft_nv_alloc_ops);
-	topo_set_mem_methods(topo_use_alloc, topo_use_free);
-	topo_set_out_method(topo_use_out);
-
+	Eft_topo_hdl = fmd_hdl_topology(Hdl, TOPO_VERSION);
 	platform_globals();
-	platform_topo_paths(&npaths, &paths);
-	topo_init(npaths, (const char **)paths);
-	platform_free_paths(npaths, paths);
+
+	out(O_ALTFP, "platform_init() sucessful");
 }
 
 void
@@ -206,7 +169,8 @@ platform_fini(void)
 
 	platform_free_globals();
 	(void) nv_alloc_fini(&Eft_nv_hdl);
-	topo_fini();
+
+	out(O_ALTFP, "platform_fini() sucessful");
 }
 
 /*
@@ -374,35 +338,164 @@ cfgadjust(struct cfgdata *rawdata, int addlen)
 	}
 }
 
+static char *
+hc_path(tnode_t *node)
+{
+	int i, err;
+	char *name, *instance, *estr;
+	nvlist_t *fmri, **hcl;
+	ulong_t ul;
+	uint_t nhc;
+
+	if (topo_prop_get_fmri(node, TOPO_PGROUP_PROTOCOL, TOPO_PROP_RESOURCE,
+	    &fmri, &err) < 0)
+		return (NULL);
+
+	if (nvlist_lookup_nvlist_array(fmri, FM_FMRI_HC_LIST, &hcl, &nhc)
+	    != 0) {
+		nvlist_free(fmri);
+		return (NULL);
+	}
+
+	tmpbuf[0] = '\0';
+	for (i = 0; i < nhc; ++i) {
+		err = nvlist_lookup_string(hcl[i], FM_FMRI_HC_NAME, &name);
+		err |= nvlist_lookup_string(hcl[i], FM_FMRI_HC_ID, &instance);
+		if (err) {
+			nvlist_free(fmri);
+			return (NULL);
+		}
+
+		ul = strtoul(instance, &estr, 10);
+		/* conversion to number failed? */
+		if (estr == instance) {
+			nvlist_free(fmri);
+			return (NULL);
+		}
+
+		(void) strlcat(tmpbuf, "/", MAXPATHLEN);
+		(void) strlcat(tmpbuf, name, MAXPATHLEN);
+		(void) snprintf(numbuf, MAXPATHLEN, "%u", ul);
+		(void) strlcat(tmpbuf, numbuf, MAXPATHLEN);
+	}
+
+	nvlist_free(fmri);
+
+	return (tmpbuf);
+}
+
+static void
+add_prop_val(topo_hdl_t *thp, struct cfgdata *rawdata, char *propn,
+    nvpair_t *pv_nvp)
+{
+	int addlen, err;
+	char *propv, *fmristr = NULL;
+	nvlist_t *fmri;
+
+	/*
+	 * At least try to collect the protocol
+	 * properties
+	 */
+	if (nvpair_type(pv_nvp) == DATA_TYPE_NVLIST) {
+		(void) nvpair_value_nvlist(pv_nvp, &fmri);
+		if (topo_fmri_nvl2str(thp, fmri, &fmristr, &err) < 0) {
+			out(O_ALTFP, "cfgcollect: failed to convert fmri to "
+			    "string");
+			return;
+		} else {
+			propv = fmristr;
+		}
+
+	} else if (nvpair_type(pv_nvp) == DATA_TYPE_STRING)
+		(void) nvpair_value_string(pv_nvp, &propv);
+	else {
+		return;
+	}
+
+	/* = & NULL */
+	addlen = strlen(propn) + strlen(propv) + 2;
+	cfgadjust(rawdata, addlen);
+	(void) snprintf(rawdata->nextfree,
+	    rawdata->end - rawdata->nextfree, "%s=%s",
+	    propn, propv);
+	rawdata->nextfree += addlen;
+
+	if (fmristr != NULL)
+		topo_hdl_strfree(thp, fmristr);
+}
+
 /*
  * cfgcollect -- Assemble raw configuration data in string form suitable
  *		 for checkpointing.
  */
-static void
-cfgcollect(tnode_t *node, void *arg)
+static int
+cfgcollect(topo_hdl_t *thp, tnode_t *node, void *arg)
 {
 	struct cfgdata *rawdata = (struct cfgdata *)arg;
-	const char *propn, *propv;
-	char *path;
 	int addlen;
+	char *propn, *path = NULL;
+	nvlist_t *p_nv, *pg_nv, *pv_nv;
+	nvpair_t *nvp, *pg_nvp, *pv_nvp;
 
-	path = topo_hc_path(node);
+	path = hc_path(node);
+	if (path == NULL)
+		return (TOPO_WALK_ERR);
+
 	addlen = strlen(path) + 1;
 
 	cfgadjust(rawdata, addlen);
 	(void) strcpy(rawdata->nextfree, path);
 	rawdata->nextfree += addlen;
 
-	propn = NULL;
-	while ((propn = topo_next_prop(node, propn)) != NULL) {
-		propv = topo_get_prop(node, propn);
-		addlen = strlen(propn) + strlen(propv) + 2; /* = & NULL */
-		cfgadjust(rawdata, addlen);
-		(void) snprintf(rawdata->nextfree,
-		    rawdata->end - rawdata->nextfree, "%s=%s", propn, propv);
-		rawdata->nextfree += addlen;
+	/*
+	 * Collect properties
+	 *
+	 * eversholt should support alternate property types
+	 * Better yet, topo properties could be represented as
+	 * a packed nvlist
+	 */
+	p_nv = topo_prop_get_all(thp, node);
+	for (nvp = nvlist_next_nvpair(p_nv, NULL); nvp != NULL;
+	    nvp = nvlist_next_nvpair(p_nv, nvp)) {
+		if (strcmp(TOPO_PROP_GROUP, nvpair_name(nvp)) != 0 ||
+		    nvpair_type(nvp) != DATA_TYPE_NVLIST)
+			continue;
+
+		(void) nvpair_value_nvlist(nvp, &pg_nv);
+
+		for (pg_nvp = nvlist_next_nvpair(pg_nv, NULL); pg_nvp != NULL;
+		    pg_nvp = nvlist_next_nvpair(pg_nv, pg_nvp)) {
+
+			if (strcmp(TOPO_PROP_VAL, nvpair_name(pg_nvp)) != 0 ||
+			    nvpair_type(pg_nvp) != DATA_TYPE_NVLIST)
+				continue;
+
+			(void) nvpair_value_nvlist(pg_nvp, &pv_nv);
+
+			for (pv_nvp = nvlist_next_nvpair(pv_nv, NULL);
+			    pv_nvp != NULL;
+			    pv_nvp = nvlist_next_nvpair(pv_nv, pv_nvp)) {
+
+				/* Get property name */
+				propn = nvpair_name(pv_nvp);
+				if (strcmp(TOPO_PROP_VAL_NAME, propn) != 0)
+					continue;
+				if (nvpair_value_string(pv_nvp, &propn) != 0)
+					continue;
+
+				/*
+				 * Get property value
+				 */
+				pv_nvp = nvlist_next_nvpair(pv_nv, pv_nvp);
+				add_prop_val(thp, rawdata, propn, pv_nvp);
+			}
+
+		}
 	}
-	topo_free_path(path);
+
+	nvlist_free(p_nv);
+
+	return (TOPO_WALK_NEXT);
 }
 
 /*
@@ -411,7 +504,9 @@ cfgcollect(tnode_t *node, void *arg)
 struct cfgdata *
 platform_config_snapshot(void)
 {
-	tnode_t *root;
+	int err;
+	char *uuid;
+	topo_walk_t *twp;
 
 	/*
 	 *
@@ -437,322 +532,83 @@ platform_config_snapshot(void)
 	Lastcfg->devcache = NULL;
 	Lastcfg->cpucache = NULL;
 
-	if ((root = topo_next_sibling(NULL, NULL)) == NULL)
-		out(O_DIE, "NULL topology tree");
+	out(O_ALTFP, "platform_config_snapshot(): topo snapshot");
+	if ((uuid = topo_snap_hold(Eft_topo_hdl, NULL, &err)) == NULL)
+		out(O_DIE, "platform_config_snapshot: topo snapshot failed: %s",
+		    topo_strerror(err));
 
-	topo_walk(root, TOPO_VISIT_SELF_FIRST, Lastcfg, cfgcollect);
-	topo_tree_release(root);
-	topo_reset();
+	if ((twp = topo_walk_init(Eft_topo_hdl, FM_FMRI_SCHEME_HC, cfgcollect,
+	    Lastcfg, &err)) == NULL) {
+		topo_hdl_strfree(Eft_topo_hdl, uuid);
+		out(O_DIE, "platform_config_snapshot: NULL topology tree: %s",
+		    topo_strerror(err));
+	}
+
+	if (topo_walk_step(twp, TOPO_WALK_CHILD) == TOPO_WALK_ERR) {
+		topo_hdl_strfree(Eft_topo_hdl, uuid);
+		topo_walk_fini(twp);
+		out(O_DIE, "platform_config_snapshot: error walking topology "
+		    "tree");
+	}
+
+	topo_walk_fini(twp);
+
+	topo_hdl_strfree(Eft_topo_hdl, uuid);
+	topo_snap_release(Eft_topo_hdl);
 
 	return (Lastcfg);
 }
 
-static nvlist_t **
-make_hc_pairs(char *fromstr, int *num)
+static const char *
+cfgstrprop_lookup(struct config *croot, char *path, char *pname)
 {
-	nvlist_t **pa;
-	char *starti, *startn, *endi, *endi2;
-	char *ne, *ns;
-	char *cname;
-	char *find;
-	char *cid;
-	int nslashes = 0;
-	int npairs = 0;
-	int i, e;
+	struct config *cresource;
+	const char *fmristr;
 
 	/*
-	 * Count equal signs and slashes to determine how many
-	 * hc-pairs will be present in the final FMRI.  There should
-	 * be at least as many slashes as equal signs.  There can be
-	 * more, though if the string after an = includes them.
-	 */
-	find = fromstr;
-	while ((ne = strchr(find, '=')) != NULL) {
-		find = ne + 1;
-		npairs++;
-	}
-
-	find = fromstr;
-	while ((ns = strchr(find, '/')) != NULL) {
-		find = ns + 1;
-		nslashes++;
-	}
-
-	/*
-	 * Do we appear to have a well-formed string version of the FMRI?
-	 */
-	if (nslashes < npairs || npairs == 0)
-		return (NULL);
-
-	*num = npairs;
-
-	find = fromstr;
-	pa = MALLOC(npairs * sizeof (nvlist_t *));
-	/*
-	 * We go through a pretty complicated procedure to find the
-	 * name and id for each pair.  That's because, unfortunately,
-	 * we have some ids that can have slashes within them.  So
-	 * we can't just search for the next slash after the equal sign
-	 * and decide that starts a new pair.  Instead we have to find
-	 * an equal sign for the next pair and work our way back to the
-	 * slash from there.
-	 */
-	for (i = 0; i < npairs; i++) {
-		pa[i] = NULL;
-		startn = strchr(find, '/');
-		if (startn == NULL)
-			break;
-		startn++;
-		starti = strchr(find, '=');
-		if (starti == NULL)
-			break;
-		*starti = '\0';
-		cname = STRDUP(startn);
-		*starti++ = '=';
-		endi = strchr(starti, '=');
-		if (endi != NULL) {
-			*endi = '\0';
-			endi2 = strrchr(starti, '/');
-			if (endi2 == NULL)
-				break;
-			*endi = '=';
-			*endi2 = '\0';
-			cid = STRDUP(starti);
-			*endi2 = '/';
-			find = endi2;
-		} else {
-			cid = STRDUP(starti);
-			find = starti + strlen(starti);
-		}
-		e = nvlist_xalloc(&pa[i], NV_UNIQUE_NAME, &Eft_nv_hdl);
-		if (e != 0)
-			out(O_DIE|O_SYS, "alloc of an fmri nvl failed");
-		e = nvlist_add_string(pa[i], FM_FMRI_HC_NAME, cname);
-		e |= nvlist_add_string(pa[i], FM_FMRI_HC_ID, cid);
-		FREE(cname);
-		FREE(cid);
-		if (e != 0) {
-			out(O_DEBUG|O_SYS,
-			    "Construction of new hc-pair nvl failed");
-			break;
-		}
-	}
-	if (i < npairs) {
-		while (i >= 0)
-			if (pa[i--] != NULL)
-				nvlist_free(pa[i + 1]);
-		FREE(pa);
-		return (NULL);
-	}
-	return (pa);
-}
-
-static nvlist_t *
-hc_fmri_fromstr(const char *str)
-{
-	nvlist_t **pa = NULL;
-	nvlist_t *na = NULL;
-	nvlist_t *nf = NULL;
-	char *copy;
-	int npairs;
-	int i, e;
-
-	/* We're expecting a string version of an hc scheme FMRI */
-	if (strncmp(str, "hc:///", 6) != 0)
-		return (NULL);
-
-	copy = STRDUP(str + 5);
-	if ((pa = make_hc_pairs(copy, &npairs)) == NULL) {
-		FREE(copy);
-		return (NULL);
-	}
-
-	FREE(copy);
-	if ((e = nvlist_xalloc(&na, NV_UNIQUE_NAME, &Eft_nv_hdl)) != 0) {
-		out(O_DEBUG|O_SYS, "alloc of an fmri nvl failed");
-		goto hcfmbail;
-	}
-	e = nvlist_add_string(na, FM_FMRI_AUTH_PRODUCT, Plat);
-	if (e != 0) {
-		out(O_DEBUG|O_SYS, "Construction of new authority nvl failed");
-		goto hcfmbail;
-	}
-
-	if ((e = nvlist_xalloc(&nf, NV_UNIQUE_NAME, &Eft_nv_hdl)) != 0) {
-		out(O_DEBUG|O_SYS, "alloc of an fmri nvl failed");
-		goto hcfmbail;
-	}
-	e = nvlist_add_string(nf, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC);
-	e |= nvlist_add_nvlist(nf, FM_FMRI_AUTHORITY, na);
-	e |= nvlist_add_uint8(nf, FM_VERSION, FM_HC_SCHEME_VERSION);
-	e |= nvlist_add_string(nf, FM_FMRI_HC_ROOT, "");
-	e |= nvlist_add_uint32(nf, FM_FMRI_HC_LIST_SZ, npairs);
-	if (e == 0)
-		e = nvlist_add_nvlist_array(nf, FM_FMRI_HC_LIST, pa, npairs);
-	if (e != 0) {
-		out(O_DEBUG|O_SYS, "Construction of new hc nvl failed");
-		goto hcfmbail;
-	}
-	nvlist_free(na);
-	for (i = 0; i < npairs; i++)
-		nvlist_free(pa[i]);
-	FREE(pa);
-	return (nf);
-
-hcfmbail:
-	if (nf != NULL)
-		nvlist_free(nf);
-	if (na != NULL)
-		nvlist_free(na);
-	for (i = 0; i < npairs; i++)
-		nvlist_free(pa[i]);
-	FREE(pa);
-	return (NULL);
-}
-
-static nvlist_t *
-cpu_fmri(struct config *cpu, int cpu_id)
-{
-	nvlist_t *na = NULL;
-	const char *propv;
-	uint64_t ser_id;
-	int e;
-
-	if ((propv = config_getprop(cpu, "SERIAL-ID")) == NULL) {
-		out(O_DEBUG|O_SYS, "cpu serial id missing");
-		return (NULL);
-	}
-	ser_id = strtoll(propv, NULL, 0);
-
-	if ((e = nvlist_xalloc(&na, NV_UNIQUE_NAME, &Eft_nv_hdl)) != 0)
-		out(O_DIE|O_SYS, "alloc of an fmri nvl failed");
-
-	e = nvlist_add_string(na, FM_FMRI_SCHEME, FM_FMRI_SCHEME_CPU);
-	e |= nvlist_add_uint8(na, FM_VERSION, FM_CPU_SCHEME_VERSION);
-	e |= nvlist_add_uint32(na, FM_FMRI_CPU_ID, cpu_id);
-	e |= nvlist_add_uint64(na, FM_FMRI_CPU_SERIAL_ID, ser_id);
-	if (e != 0) {
-		out(O_DEBUG|O_SYS, "Construction of new ASRU nvl failed");
-		nvlist_free(na);
-		return (NULL);
-	}
-	return (na);
-}
-
-static nvlist_t *
-dev_fmri(const char *devpath)
-{
-	nvlist_t *na = NULL;
-	int e;
-
-	if (strcmp(devpath, "none") == 0)
-		return (NULL);
-
-	if ((e = nvlist_xalloc(&na, NV_UNIQUE_NAME, &Eft_nv_hdl)) != 0)
-		out(O_DIE|O_SYS, "alloc of an fmri nvl failed");
-	e = nvlist_add_string(na, FM_FMRI_SCHEME, FM_FMRI_SCHEME_DEV);
-	e |= nvlist_add_uint8(na, FM_VERSION, FM_DEV_SCHEME_VERSION);
-	e |= nvlist_add_string(na, FM_FMRI_DEV_PATH, devpath);
-	if (e != 0) {
-		out(O_DEBUG|O_SYS, "Construction of new ASRU nvl failed");
-		nvlist_free(na);
-		return (NULL);
-	}
-	return (na);
-}
-
-static void
-rewrite_asru(nvlist_t **ap, struct config *croot, char *path)
-{
-	struct config *casru;
-	nvlist_t *na = NULL;
-	const char *propv;
-	char *cname;
-	int cinst;
-
-	/*
-	 * The first order of business is to find the ASRU in the
+	 * The first order of business is to find the resource in the
 	 * config database so we can examine properties associated with
 	 * that node.
 	 */
-	if ((casru = config_lookup(croot, path, 0)) == NULL) {
-		out(O_DEBUG, "Cannot find config info for %s.", path);
-		return;
+	if ((cresource = config_lookup(croot, path, 0)) == NULL) {
+		out(O_ALTFP, "Cannot find config info for %s.", path);
+		return (NULL);
 	}
-
-	/*
-	 * CPUs have their own scheme.
-	 */
-	config_getcompname(casru, &cname, &cinst);
-	if (cname == NULL) {
-		out(O_DEBUG,
-		    "Final component of ASRU path (%s) has no name ?", path);
-		return;
-	} else if (strcmp(cname, "cpu") == 0) {
-		if ((na = cpu_fmri(casru, cinst)) != NULL)
-			*ap = na;
-		return;
+	if ((fmristr = config_getprop(cresource, pname)) == NULL) {
+		out(O_ALTFP, "Cannot find %s property for %s resource "
+		    "re-write", pname, path);
+		return (NULL);
 	}
-
-	/*
-	 * Look for a PLAT-ASRU property.
-	 */
-	if ((propv = config_getprop(casru, PLATASRU)) != NULL) {
-		if ((na = hc_fmri_fromstr(propv)) != NULL)
-			*ap = na;
-		return;
-	}
-	out(O_DEBUG, "No " PLATASRU " prop for constructing "
-	    "rewritten version of %s.", path);
-
-	/*
-	 * No, PLAT-ASRU, how about DEV?
-	 */
-	if ((propv = config_getprop(casru, DEV)) == NULL) {
-		out(O_DEBUG, "No " DEV " prop for constructing "
-		    "dev scheme version of %s.", path);
-		return;
-	}
-	if ((na = dev_fmri(propv)) != NULL)
-		*ap = na;
+	return (fmristr);
 }
 
-static void
-rewrite_fru(nvlist_t **fp, struct config *croot, char *path)
+static nvlist_t *
+rewrite_resource(char *pname, struct config *croot, char *path)
 {
-	struct config *cfru;
-	const char *propv;
-	nvlist_t *na = NULL;
+	const char *fmristr;
+	nvlist_t *fmri;
+	int err;
 
-	/*
-	 * The first order of business is to find the FRU in the
-	 * config database so we can examine properties associated with
-	 * that node.
-	 */
-	if ((cfru = config_lookup(croot, path, 0)) == NULL) {
-		out(O_DEBUG, "Cannot find config info for %s.", path);
-		return;
+	if ((fmristr = cfgstrprop_lookup(croot, path, pname)) == NULL)
+		return (NULL);
+
+	if (topo_fmri_str2nvl(Eft_topo_hdl, fmristr, &fmri, &err) < 0) {
+		out(O_ALTFP, "Can not convert config info: %s",
+		    topo_strerror(err));
+		return (NULL);
 	}
 
-	/*
-	 * Look first for a PLAT-FRU property.
-	 */
-	if ((propv = config_getprop(cfru, PLATFRU)) != NULL) {
-		if ((na = hc_fmri_fromstr(propv)) != NULL)
-			*fp = na;
-		return;
-	}
-	out(O_DEBUG, "No " PLATFRU " prop for constructing "
-	    "rewritten version of %s.", path);
+	return (fmri);
 }
 
 static void
 defect_units(nvlist_t **ap, nvlist_t **fp, struct config *croot, char *path)
 {
-	struct config *cnode;
-	const char *drvname;
-	nvlist_t *nf = NULL;
+	const char *driverstr;
+	nvlist_t *cf, *nf;
 	nvlist_t *na;
+	nvlist_t *arg;
+	int err;
 
 	/*
 	 * Defects aren't required to have ASRUs and FRUs defined with
@@ -764,26 +620,48 @@ defect_units(nvlist_t **ap, nvlist_t **fp, struct config *croot, char *path)
 		return;
 
 	/*
-	 * In order to find an ASRU and FRU for the defect we need
-	 * the name of the driver.
+	 * Find the driver for this resource and use that to get
+	 * mod and pkg fmris for ASRU and FRU respectively.
 	 */
-	if ((cnode = config_lookup(croot, path, 0)) == NULL) {
-		out(O_DEBUG, "Cannot find config info for %s.", path);
-		return;
-	}
-	if ((drvname = config_getprop(cnode, DRIVER)) == NULL) {
-		out(O_DEBUG, "No " DRIVER "prop for constructing "
-		    "mod scheme version of %s.", path);
-		return;
-	}
-	if ((na = topo_driver_asru(drvname, &nf)) == NULL)
+	if ((driverstr = cfgstrprop_lookup(croot, path, "DRIVER")) == NULL)
 		return;
 
-	if (*ap == NULL)
-		*ap = na;
+	if (topo_hdl_nvalloc(Eft_topo_hdl, &arg, NV_UNIQUE_NAME) != 0) {
+		out(O_ALTFP, "Can not allocate nvlist for MOD fmri lookup");
+		return;
+	}
+	if (nvlist_add_string(arg, "DRIVER", driverstr) != 0) {
+		out(O_ALTFP, "Failed to add DRIVER string to arg nvlist");
+		nvlist_free(arg);
+		return;
+	}
+	na = topo_fmri_create(Eft_topo_hdl, FM_FMRI_SCHEME_MOD,
+	    FM_FMRI_SCHEME_MOD, 0, arg, &err);
+	if (na == NULL) {
+		out(O_ALTFP, "topo_fmri_create() of %s scheme fmri"
+		    " for driver %s failed.", FM_FMRI_SCHEME_MOD, driverstr);
+		nvlist_free(arg);
+		return;
+	}
+	nvlist_free(arg);
 
-	if (*fp == NULL)
-		*fp = nf;
+	if (*ap != NULL)
+		nvlist_free(*ap);
+	*ap = na;
+
+	err = nvlist_lookup_nvlist(na, FM_FMRI_MOD_PKG, &cf);
+	if (err != 0) {
+		out(O_ALTFP, "No pkg RTI within mod FMRI for %s (%s)\n",
+		    driverstr, topo_strerror(err));
+		return;
+	}
+	if (nvlist_xdup(cf, &nf, &Eft_nv_hdl) != 0) {
+		out(O_ALTFP, "Dup of pkg FMRI to be FRU FMRI failed\n");
+		return;
+	}
+	if (*fp != NULL)
+		nvlist_free(*fp);
+	*fp = nf;
 }
 
 /*
@@ -796,19 +674,20 @@ void
 platform_units_translate(int isdefect, struct config *croot,
     nvlist_t **dfltasru, nvlist_t **dfltfru, nvlist_t **dfltrsrc, char *path)
 {
-	nvlist_t *sva;
-	nvlist_t *svf;
+	nvlist_t *asru, *rsrc, *fru;
 
-	out(O_DEBUG, "platform_units_translate(%d, ....)", isdefect);
-
-	sva = *dfltasru;
-	svf = *dfltfru;
+	out(O_ALTFP, "platform_units_translate(%d, ....)", isdefect);
 
 	/*
-	 * If there's room, keep a copy of our original ASRU as the rsrc
+	 * Get our FMRIs from libtopo
 	 */
-	if (*dfltrsrc == NULL)
-		*dfltrsrc = *dfltasru;
+	if ((rsrc = rewrite_resource(TOPO_PROP_RESOURCE, croot, path))
+	    == NULL) {
+		out(O_ALTFP, "Cannot rewrite resource for %s.", path);
+	} else {
+		nvlist_free(*dfltrsrc);
+		*dfltrsrc = rsrc;
+	}
 
 	/*
 	 * If it is a defect we want to re-write the FRU as the pkg
@@ -818,42 +697,27 @@ platform_units_translate(int isdefect, struct config *croot,
 	 */
 	if (isdefect) {
 		defect_units(dfltasru, dfltfru, croot, path);
-		if (sva != *dfltasru && sva != *dfltrsrc && sva != NULL)
-			nvlist_free(sva);
-		if (svf != *dfltfru && svf != NULL)
-			nvlist_free(svf);
 		return;
 	}
 
-	if (*dfltasru != NULL) {
-		/*
-		 * The ASRU will be re-written per the following rules:
-		 *
-		 * 1) If there's a PLAT-ASRU property, we convert it into
-		 *	a real hc FMRI nvlist.
-		 * 2) Otherwise, if we find a DEV property, we make a DEV
-		 *	scheme FMRI of it
-		 * 3) Otherwise, we leave the ASRU as is.
-		 */
-		rewrite_asru(dfltasru, croot, path);
+	/*
+	 * Find the TOPO_PROP_ASRU and TOPO_PROP_FRU properties
+	 * for this resource
+	 */
+	if ((asru = rewrite_resource(TOPO_PROP_ASRU, croot, path)) == NULL) {
+		out(O_ALTFP, "Cannot rewrite %s for %s.", TOPO_PROP_ASRU, path);
+	} else {
+		nvlist_free(*dfltasru);
+		*dfltasru = asru;
 	}
 
-	if (*dfltfru != NULL) {
-		/*
-		 * The FRU will be re-written per the following rules:
-		 *
-		 * 1) If there's a PLAT-FRU property, we convert it into
-		 *	a real hc FMRI nvlist.
-		 * 2) Otherwise, we leave the ASRU as is, but include a
-		 *	FRU label property if possible.
-		 */
-		rewrite_fru(dfltfru, croot, path);
+	if ((fru = rewrite_resource(TOPO_PROP_FRU, croot, path)) == NULL) {
+		out(O_ALTFP, "Cannot rewrite %s for %s.",
+		    TOPO_PROP_FRU, path);
+	} else {
+		nvlist_free(*dfltfru);
+		*dfltfru = fru;
 	}
-
-	if (sva != *dfltasru && sva != *dfltrsrc && sva != NULL)
-		nvlist_free(sva);
-	if (svf != *dfltfru && svf != NULL)
-		nvlist_free(svf);
 }
 
 /*
@@ -933,6 +797,8 @@ platform_get_files(const char *dirname[], const char *fnstr, int nodups)
 				totlen = strlen(dirname[i]) + 1;
 				totlen += strlen(dp->d_name) + 1;
 				files[nfiles] = MALLOC(totlen);
+				out(O_DEBUG, "File %d: \"%s/%s\"", nfiles,
+				    dirname[i], dp->d_name);
 				(void) snprintf(files[nfiles++], totlen,
 				    "%s/%s", dirname[i], dp->d_name);
 			}
@@ -1119,60 +985,6 @@ forkandexecve(const char *path, char *const argv[], char *const envp[],
 	}
 
 	return (rt);
-}
-
-/*
- * extract the first string in outbuf, either
- *   a) convert it to a number, or
- *   b) convert it to an address via stable()
- * and place the result (number or address) in valuep.
- *
- * return 0 if conversion was successful, nonzero if otherwise
- */
-static int
-string2number(char *outbuf, size_t outbuflen, struct evalue *valuep)
-{
-	char *ptr, *startptr, *endptr;
-	int spval;
-	size_t nchars, i, ier;
-
-	/* determine start and length of first string */
-	nchars = 0;
-	for (i = 0; i < outbuflen && *(outbuf + i) != '\0'; i++) {
-		spval = isspace((int)*(outbuf + i));
-		if (spval != 0 && nchars > 0)
-			break;
-		if (spval == 0) {
-			/* startptr: first nonspace character */
-			if (nchars == 0)
-				startptr = outbuf + i;
-			nchars++;
-		}
-	}
-	if (nchars == 0)
-		return (1);
-
-	ptr = MALLOC(sizeof (char) * (nchars + 1));
-	(void) strncpy(ptr, startptr, nchars);
-	*(ptr + nchars) = '\0';
-
-	/* attempt conversion to number */
-	errno = 0;
-	valuep->t = UINT64;
-	valuep->v = strtoull(ptr, &endptr, 0);
-	ier = errno;
-
-	/*
-	 * test for endptr since the call to strtoull() should be
-	 * considered a success only if the whole string was converted
-	 */
-	if (ier != 0 || endptr != (ptr + nchars)) {
-		valuep->t = STRING;
-		valuep->v = (unsigned long long)stable(ptr);
-	}
-	FREE(ptr);
-
-	return (0);
 }
 
 #define	MAXDIGITIDX	23
@@ -1447,10 +1259,16 @@ platform_call(struct node *np, struct lut **globals, struct config *croot,
 		outfl(O_OK, np->file, np->line,
 			"call: failure in fork + exec of %s", argv[0]);
 	} else {
-		ret = string2number(outbuf, sizeof (outbuf), valuep);
-		if (ret)
-			outfl(O_OK, np->file, np->line,
-				"call: no result from %s", argv[0]);
+		char *ptr;
+
+		/* chomp the result */
+		for (ptr = outbuf; *ptr; ptr++)
+			if (*ptr == '\n' || *ptr == '\r') {
+				*ptr = '\0';
+				break;
+			}
+		valuep->t = STRING;
+		valuep->v = (unsigned long long)stable(outbuf);
 	}
 
 	if (errbuf[0] != '\0') {
@@ -1465,6 +1283,125 @@ platform_call(struct node *np, struct lut **globals, struct config *croot,
 	FREE(argv);
 
 	return (ret);
+}
+
+/*
+ * platform_confcall -- call a configuration database function
+ *
+ * returns result in *valuep, return 0 on success
+ */
+/*ARGSUSED*/
+int
+platform_confcall(struct node *np, struct lut **globals, struct config *croot,
+	struct arrow *arrowp, struct evalue *valuep)
+{
+	nvlist_t *rsrc, *hcs;
+	nvpair_t *nvp;
+
+	ASSERT(np != NULL);
+
+	/* assume we're returning true */
+	valuep->t = UINT64;
+	valuep->v = 1;
+
+	/*
+	 * We've detected a well-formed confcall() to rewrite
+	 * an ASRU in a fault.  We get here via lines like this
+	 * in the eversholt rules:
+	 *
+	 *	event fault.memory.page@dimm, FITrate=PAGE_FIT,
+	 *		ASRU=dimm, message=0,
+	 *		count=stat.page_fault@dimm,
+	 *		action=confcall("rewrite-ASRU");
+	 *
+	 * So first rewrite the resource in the fault.  Any payload data
+	 * following the FM_FMRI_HC_SPECIFIC member is used to expand the
+	 * resource nvlist.  Next, use libtopo to compute the ASRU from
+	 * from the new resource.
+	 */
+	if (np->t == T_QUOTE && np->u.quote.s == stable("rewrite-ASRU")) {
+		int err;
+		nvlist_t *asru;
+
+		out(O_ALTFP|O_VERB, "platform_confcall: rewrite-ASRU");
+
+		if (nvlist_lookup_nvlist(Action_nvl, FM_FAULT_RESOURCE, &rsrc)
+		    != 0) {
+			outfl(O_ALTFP|O_VERB, np->file, np->line, "no resource "
+			    "in fault event");
+			return (0);
+		}
+
+		if (topo_hdl_nvalloc(Eft_topo_hdl, &hcs, NV_UNIQUE_NAME) != 0) {
+			outfl(O_ALTFP|O_VERB, np->file, np->line,
+			    "unable to allocate nvlist for resource rewrite");
+			return (0);
+		}
+
+		/*
+		 * Loop until we run across asru-specific payload
+		 */
+		for (nvp = nvlist_next_nvpair(Action_nvl, NULL); nvp != NULL;
+		    nvp = nvlist_next_nvpair(Action_nvl, nvp)) {
+			uint64_t ui;
+			char *us;
+
+			if (strncmp(nvpair_name(nvp), "asru-", 5) != 0)
+				continue;
+
+			if (nvpair_type(nvp) == DATA_TYPE_UINT64) {
+				err = nvpair_value_uint64(nvp, &ui);
+				err |= nvlist_add_uint64(hcs, nvpair_name(nvp),
+				    ui);
+			} else if (nvpair_type(nvp) == DATA_TYPE_STRING) {
+				err = nvpair_value_string(nvp, &us);
+				err |= nvlist_add_string(hcs, nvpair_name(nvp),
+				    us);
+			} else {
+				continue;
+			}
+
+			if (err != 0) {
+				nvlist_free(hcs);
+				outfl(O_ALTFP|O_VERB, np->file, np->line,
+				    "unable to rewrite resource");
+				return (0);
+			}
+		}
+
+		if (nvlist_add_nvlist(rsrc, FM_FMRI_HC_SPECIFIC, hcs) != 0) {
+			nvlist_free(hcs);
+			outfl(O_ALTFP|O_VERB, np->file, np->line, "unable to "
+			    "rewrite resource with HC specific data");
+			return (0);
+		}
+		nvlist_free(hcs);
+
+		if (topo_fmri_asru(Eft_topo_hdl, rsrc, &asru, &err) != 0) {
+			outfl(O_ALTFP|O_VERB, np->file, np->line, "unable to "
+			    "rewrite asru: %s", topo_strerror(err));
+			return (0);
+		}
+
+		if (nvlist_remove(Action_nvl, FM_FAULT_ASRU, DATA_TYPE_NVLIST)
+		    != 0) {
+			nvlist_free(asru);
+			outfl(O_ALTFP|O_VERB, np->file, np->line,
+			    "failed to remove old asru during rewrite");
+			return (0);
+		}
+		if (nvlist_add_nvlist(Action_nvl, FM_FAULT_ASRU, asru) != 0) {
+			nvlist_free(asru);
+			outfl(O_ALTFP|O_VERB, np->file, np->line,
+			    "unable to add re-written asru");
+			return (0);
+		}
+		nvlist_free(asru);
+	} else {
+		outfl(O_ALTFP|O_VERB, np->file, np->line, "unknown confcall");
+	}
+
+	return (0);
 }
 
 /*
@@ -1560,19 +1497,26 @@ get_array_info(const char *inputstr, const char **name, unsigned int *index)
 	return (0);
 }
 
+/*
+ * platform_payloadprop -- fetch a payload value
+ *
+ * XXX this function should be replaced and eval_func() should be
+ * XXX changed to use the more general platform_payloadprop_values().
+ */
 int
 platform_payloadprop(struct node *np, struct evalue *valuep)
 {
 	nvlist_t *basenvp;
+	nvlist_t *embnvp = NULL;
 	nvpair_t *nvpair;
 	const char *nameptr, *propstr, *lastnameptr;
 	int not_array = 0;
 	unsigned int index = 0;
 	uint_t nelem;
 	char *nvpname, *nameslist = NULL;
+	char *scheme = NULL;
 
 	ASSERT(np->t == T_QUOTE);
-	valuep->t = UNDEFINED;
 
 	propstr = np->u.quote.s;
 	if (payloadnvp == NULL) {
@@ -1652,12 +1596,28 @@ platform_payloadprop(struct node *np, struct evalue *valuep)
 	if (nvpair == NULL) {
 		out(O_ALTFP, "platform_payloadprop: no entry for %s", propstr);
 		return (1);
+	} else if (valuep == NULL) {
+		/*
+		 * caller is interested in the existence of a property with
+		 * this name, regardless of type or value
+		 */
+		return (0);
 	}
+
+	valuep->t = UNDEFINED;
 
 	/*
 	 * get to this point if we found an entry.  figure out its data
 	 * type and copy its value.
 	 */
+	(void) nvpair_value_nvlist(nvpair, &embnvp);
+	if (nvlist_lookup_string(embnvp, FM_FMRI_SCHEME, &scheme) == 0) {
+		if (strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
+			valuep->t = NODEPTR;
+			valuep->v = (unsigned long long)hc_fmri_nodeize(embnvp);
+			return (0);
+		}
+	}
 	switch (nvpair_type(nvpair)) {
 	case DATA_TYPE_BOOLEAN:
 	case DATA_TYPE_BOOLEAN_VALUE: {
@@ -1844,7 +1804,7 @@ platform_payloadprop(struct node *np, struct evalue *valuep)
 	}
 
 	default :
-		out(O_DEBUG,
+		out(O_ALTFP|O_VERB2,
 		    "platform_payloadprop: unsupported data type for %s",
 		    propstr);
 		return (1);
@@ -1853,7 +1813,380 @@ platform_payloadprop(struct node *np, struct evalue *valuep)
 	return (0);
 
 invalid:
-	out(O_DEBUG, "platform_payloadprop: invalid array reference for %s",
-	    propstr);
+	out(O_ALTFP|O_VERB2,
+	    "platform_payloadprop: invalid array reference for %s", propstr);
 	return (1);
+}
+
+/*ARGSUSED*/
+int
+platform_path_exists(nvlist_t *fmri)
+{
+	return (fmd_nvl_fmri_present(Hdl, fmri));
+}
+
+struct evalue *
+platform_payloadprop_values(const char *propstr, int *nvals)
+{
+	struct evalue *retvals;
+	nvlist_t *basenvp;
+	nvpair_t *nvpair;
+	char *nvpname;
+
+	*nvals = 0;
+
+	if (payloadnvp == NULL)
+		return (NULL);
+
+	basenvp = payloadnvp;
+
+	/* search for nvpair entry */
+	nvpair = NULL;
+	while ((nvpair = nvlist_next_nvpair(basenvp, nvpair)) != NULL) {
+		nvpname = nvpair_name(nvpair);
+		ASSERT(nvpname != NULL);
+
+		if (strcmp(propstr, nvpname) == 0)
+			break;
+	}
+
+	if (nvpair == NULL)
+		return (NULL);	/* property not found */
+
+	switch (nvpair_type(nvpair)) {
+	case DATA_TYPE_NVLIST: {
+		nvlist_t *embnvp = NULL;
+		char *scheme = NULL;
+
+		(void) nvpair_value_nvlist(nvpair, &embnvp);
+		if (nvlist_lookup_string(embnvp, FM_FMRI_SCHEME,
+		    &scheme) == 0) {
+			if (strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
+				*nvals = 1;
+				retvals = MALLOC(sizeof (struct evalue));
+				retvals->t = NODEPTR;
+				retvals->v =
+				    (unsigned long long)hc_fmri_nodeize(embnvp);
+				return (retvals);
+			}
+		}
+		return (NULL);
+	}
+	case DATA_TYPE_NVLIST_ARRAY: {
+		char *scheme = NULL;
+		nvlist_t **nvap;
+		uint_t nel;
+		int i;
+		int hccount;
+
+		/*
+		 * since we're only willing to handle hc fmri's, we
+		 * must count them first before allocating retvals.
+		 */
+		if (nvpair_value_nvlist_array(nvpair, &nvap, &nel) != 0)
+			return (NULL);
+
+		hccount = 0;
+		for (i = 0; i < nel; i++) {
+			if (nvlist_lookup_string(nvap[i], FM_FMRI_SCHEME,
+			    &scheme) == 0 &&
+			    strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
+				hccount++;
+			}
+		}
+
+		if (hccount == 0)
+			return (NULL);
+
+		*nvals = hccount;
+		retvals = MALLOC(sizeof (struct evalue) * hccount);
+
+		hccount = 0;
+		for (i = 0; i < nel; i++) {
+			if (nvlist_lookup_string(nvap[i], FM_FMRI_SCHEME,
+			    &scheme) == 0 &&
+			    strcmp(scheme, FM_FMRI_SCHEME_HC) == 0) {
+				retvals[hccount].t = NODEPTR;
+				retvals[hccount].v = (unsigned long long)
+				    hc_fmri_nodeize(nvap[i]);
+				hccount++;
+			}
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_BOOLEAN:
+	case DATA_TYPE_BOOLEAN_VALUE: {
+		boolean_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_boolean_value(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+	case DATA_TYPE_BYTE: {
+		uchar_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_byte(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+	case DATA_TYPE_STRING: {
+		char *val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		retvals->t = STRING;
+		(void) nvpair_value_string(nvpair, &val);
+		retvals->v = (unsigned long long)stable(val);
+		return (retvals);
+	}
+
+	case DATA_TYPE_INT8: {
+		int8_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_int8(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+	case DATA_TYPE_UINT8: {
+		uint8_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_uint8(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+
+	case DATA_TYPE_INT16: {
+		int16_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_int16(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+	case DATA_TYPE_UINT16: {
+		uint16_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_uint16(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+
+	case DATA_TYPE_INT32: {
+		int32_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_int32(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+	case DATA_TYPE_UINT32: {
+		uint32_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_uint32(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+
+	case DATA_TYPE_INT64: {
+		int64_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_int64(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+	case DATA_TYPE_UINT64: {
+		uint64_t val;
+
+		*nvals = 1;
+		retvals = MALLOC(sizeof (struct evalue));
+		(void) nvpair_value_uint64(nvpair, &val);
+		retvals->t = UINT64;
+		retvals->v = (unsigned long long)val;
+		return (retvals);
+	}
+
+	case DATA_TYPE_BOOLEAN_ARRAY: {
+		boolean_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_boolean_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_BYTE_ARRAY: {
+		uchar_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_byte_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_STRING_ARRAY: {
+		char **val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_string_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = STRING;
+			retvals[i].v = (unsigned long long)stable(val[i]);
+		}
+		return (retvals);
+	}
+
+	case DATA_TYPE_INT8_ARRAY: {
+		int8_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_int8_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_UINT8_ARRAY: {
+		uint8_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_uint8_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_INT16_ARRAY: {
+		int16_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_int16_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_UINT16_ARRAY: {
+		uint16_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_uint16_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_INT32_ARRAY: {
+		int32_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_int32_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_UINT32_ARRAY: {
+		uint32_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_uint32_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_INT64_ARRAY: {
+		int64_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_int64_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+	case DATA_TYPE_UINT64_ARRAY: {
+		uint64_t *val;
+		uint_t nel;
+		int i;
+
+		(void) nvpair_value_uint64_array(nvpair, &val, &nel);
+		*nvals = nel;
+		retvals = MALLOC(sizeof (struct evalue) * nel);
+		for (i = 0; i < nel; i++) {
+			retvals[i].t = UINT64;
+			retvals[i].v = (unsigned long long)val[i];
+		}
+		return (retvals);
+	}
+
+	}
+
+	return (NULL);
 }

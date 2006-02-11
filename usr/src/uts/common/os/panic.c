@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -143,6 +143,7 @@
 #include <sys/spl.h>
 #include <sys/errorq.h>
 #include <sys/panic.h>
+#include <sys/fm/util.h>
 
 /*
  * Panic variables which are set once during the QUIESCE state by the

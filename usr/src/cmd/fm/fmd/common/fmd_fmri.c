@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,6 +38,8 @@
 #include <fmd_scheme.h>
 #include <fmd_fmri.h>
 #include <fmd.h>
+
+#include <fm/libtopo.h>
 
 /*
  * Interfaces to be used by the plugins
@@ -227,6 +229,13 @@ fmd_fmri_get_drgen(void)
 	(void) pthread_mutex_unlock(&fmd.d_stats_lock);
 
 	return (gen);
+}
+
+struct topo_hdl *
+fmd_fmri_topology(int version)
+{
+	ASSERT(version == TOPO_VERSION);
+	return (fmd.d_topo);
 }
 
 /*

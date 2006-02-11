@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -897,6 +898,34 @@ fmd_conf_getparam(fmd_conf_t *cfp, const char *name)
 	}
 
 	return (NULL);
+}
+
+/*
+ * String-friendly version of fmd_conf_getprop(): return the string as our
+ * return value, and return NULL if the string is the empty string.
+ */
+const char *
+fmd_conf_getnzstr(fmd_conf_t *cfp, const char *name)
+{
+	const fmd_conf_param_t *pp;
+	char *s = NULL;
+
+	(void) pthread_rwlock_rdlock(&cfp->cf_lock);
+
+	if ((pp = fmd_conf_getparam(cfp, name)) != NULL) {
+		ASSERT(pp->cp_formal->cf_ops == &fmd_conf_string);
+		pp->cp_formal->cf_ops->co_get(pp, &s);
+	} else
+		(void) fmd_set_errno(EFMD_CONF_NOPROP);
+
+	(void) pthread_rwlock_unlock(&cfp->cf_lock);
+
+	if (s != NULL && s[0] == '\0') {
+		(void) fmd_set_errno(EFMD_CONF_UNDEF);
+		s = NULL;
+	}
+
+	return (s);
 }
 
 const fmd_conf_ops_t *

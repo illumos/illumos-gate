@@ -30,8 +30,6 @@ i pkginfo
 i copyright
 i depend
 #
-# SUNWfmd
-#
 d none usr 755 root sys
 d none usr/include 755 root bin
 d none usr/include/fm 755 root bin
@@ -42,7 +40,7 @@ f none usr/include/fm/fmd_fmri.h 644 root bin
 f none usr/include/fm/fmd_log.h 644 root bin
 f none usr/include/fm/fmd_snmp.h 644 root bin
 f none usr/include/fm/libtopo.h 644 root bin
-f none usr/include/fm/libtopo_enum.h 644 root bin
+f none usr/include/fm/topo_mod.h 644 root bin
 d none usr/lib 755 root bin
 d none usr/lib/fm 755 root bin
 d none usr/lib/fm/dict 755 root bin
@@ -57,6 +55,7 @@ d none usr/lib/fm/fmd 755 root bin
 f none usr/lib/fm/fmd/fmd 555 root bin
 f none usr/lib/fm/fmd/fminject 555 root bin
 f none usr/lib/fm/fmd/fmsim 555 root bin
+f none usr/lib/fm/fmd/fmtopo 555 root bin
 d none usr/lib/fm/fmd/plugins 755 root bin
 f none usr/lib/fm/fmd/plugins/cpumem-retire.conf 644 root bin
 f none usr/lib/fm/fmd/plugins/cpumem-retire.so 555 root bin
@@ -76,6 +75,7 @@ f none usr/lib/fm/fmd/schemes/dev.so 555 root bin
 f none usr/lib/fm/fmd/schemes/fmd.so 555 root bin
 f none usr/lib/fm/fmd/schemes/hc.so 555 root bin
 f none usr/lib/fm/fmd/schemes/legacy-hc.so 555 root bin
+f none usr/lib/fm/fmd/schemes/mem.so 555 root bin
 f none usr/lib/fm/fmd/schemes/mod.so 555 root bin
 f none usr/lib/fm/fmd/schemes/pkg.so 555 root bin
 f none usr/lib/fm/libdiagcode.so.1 755 root bin
@@ -98,13 +98,6 @@ f none usr/lib/fm/libtopo.so.1 755 root bin
 s none usr/lib/fm/libtopo.so=libtopo.so.1
 f none usr/lib/fm/llib-ltopo 644 root bin
 f none usr/lib/fm/llib-ltopo.ln 644 root bin
-d none usr/lib/fm/topo 755 root bin
-f none usr/lib/fm/topo/cpu.so 555 root sys
-f none usr/lib/fm/topo/cpu.topo 444 root bin
-f none usr/lib/fm/topo/pcibus.so 555 root sys
-f none usr/lib/fm/topo/pcibus.topo 444 root bin
-f none usr/lib/fm/topo/pciexbus.topo 444 root bin
-f none usr/lib/fm/topo/pciexrc.topo 444 root bin
 d none usr/lib/locale 755 root bin
 d none usr/lib/locale/C 755 root bin
 d none usr/lib/locale/C/LC_MESSAGES 755 root bin
@@ -120,3 +113,8 @@ d none usr/sbin 755 root bin
 f none usr/sbin/fmadm 555 root bin
 f none usr/sbin/fmdump 555 root bin
 f none usr/sbin/fmstat 555 root bin
+d none usr/share 755 root sys
+d none usr/share/lib 755 root sys
+d none usr/share/lib/xml 755 root sys
+d none usr/share/lib/xml/dtd 755 root sys
+f none usr/share/lib/xml/dtd/topology.dtd.1 444 root bin

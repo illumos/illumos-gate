@@ -20,7 +20,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * escparse.y -- parser for esc
@@ -85,7 +85,7 @@
 %right '!' '~'
 %left '.'
 
-%token <tok> PROP MASK ARROW EVENT ENGINE ASRU FRU CONFIG
+%token <tok> PROP MASK ARROW EVENT ENGINE ASRU FRU COUNT CONFIG
 %token <tok> ID QUOTE NUMBER IF PATHFUNC
 %type <tok> enameid
 %type <np> root stmtlist stmt nvpairlist nvpair nvname nvexpr
@@ -189,6 +189,12 @@ nvpair	: nvname '=' nvexpr
 			$$ = tree_expr(T_NVPAIR,
 				tree_name($1.s, IT_NONE, $1.file, $1.line), $3);
 		}
+	| COUNT '=' nvexpr
+		/* "count" is a reserved word, but a valid property name */
+		{
+			$$ = tree_expr(T_NVPAIR,
+				tree_name($1.s, IT_NONE, $1.file, $1.line), $3);
+		}
 	;
 
 nvname	: ID
@@ -205,6 +211,8 @@ nvexpr	: numexpr
 	| ename epname
 		{ $$ = tree_event($1, $2, NULL); }
 	| pname
+	| globid
+	| func
 	| NUMBER ID
 		/*
 		 * ID must be timevals only ("ms", "us", etc.).
@@ -357,11 +365,16 @@ parg	: pfunc
 		{ $$ = tree_quote($1.s, $1.file, $1.line); }
 	;
 
-/* asru() and fru() show up as functions in the parse tree */
+/*
+ * these functions are in the grammar so we can force the arg to be
+ * a path or an event.  they show up as functions in the parse tree.
+ */
 pfunc	: ASRU '(' pname ')'
 		{ $$ = tree_func($1.s, tree_pname($3), $1.file, $1.line); }
 	| FRU '(' pname ')'
 		{ $$ = tree_func($1.s, tree_pname($3), $1.file, $1.line); }
+	| COUNT '(' event ')'
+		{ $$ = tree_func($1.s, $3, $1.file, $1.line); }
 	;
 
 globid	: '$' ID

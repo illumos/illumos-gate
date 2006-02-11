@@ -26,11 +26,12 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-include ../Makefile.com
+include ../../Makefile.com
 include $(SRC)/Makefile.master.64
 
-LDFLAGS += -R/usr/lib/fm/$(MACH64)
+SRCS = cpu.c
+LDFLAGS += -lkstat
 
-include ../Makefile.targ
+include ../../Makefile.targ
 
 install: all $(ROOTPROG64)

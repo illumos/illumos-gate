@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * stats.c -- simple stats tracking table module
@@ -151,6 +151,17 @@ stats_counter_add(struct stats *sp, int n)
 	ASSERT(sp->t == STATS_COUNTER);
 
 	sp->u.counter += n;
+}
+
+void
+stats_counter_reset(struct stats *sp)
+{
+	if (sp == NULL)
+		return;
+
+	ASSERT(sp->t == STATS_COUNTER);
+
+	sp->u.counter = 0;
 }
 
 int

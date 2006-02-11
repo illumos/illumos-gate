@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -37,4 +37,5 @@
 	fmd_fmri_get_rootdir = FUNCTION extern;
 	fmd_fmri_get_platform = FUNCTION extern;
 	fmd_fmri_get_drgen = FUNCTION extern;
+	fmd_fmri_topology = FUNCTION extern;
 };

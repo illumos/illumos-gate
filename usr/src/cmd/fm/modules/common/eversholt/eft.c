@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +41,7 @@
 #include "tree.h"
 #include "ipath.h"
 #include "itree.h"
+#include "iexpr.h"
 #include "ptree.h"
 #include "check.h"
 #include "version.h"
@@ -57,6 +58,7 @@ fmd_hdl_t *Hdl;		/* handle in global for platform.c */
 
 int Debug = 1;	/* turn on here and let fmd_hdl_debug() decide if really on */
 char *Autoclose;	/* close cases automatically after solving */
+int Dupclose;		/* close cases on duplicate diagosis */
 hrtime_t Hesitate;	/* hesitation time in ns */
 int Verbose;
 int Estats;
@@ -110,6 +112,7 @@ eft_close(fmd_hdl_t *hdl, fmd_case_t *fmcase)
 
 static const fmd_prop_t eft_props[] = {
 	{ "autoclose", FMD_TYPE_STRING, NULL },
+	{ "dupclose", FMD_TYPE_BOOL, "false" },
 	{ "estats", FMD_TYPE_BOOL, "false" },
 	{ "hesitate", FMD_TYPE_INT64, "10000000000" },
 	{ "verbose", FMD_TYPE_INT32, "0" },
@@ -190,6 +193,8 @@ call_finis(void)
 	fme_fini();
 	itree_fini();
 	ipath_fini();
+	iexpr_fini();
+	istat_fini();
 	lex_free();
 	check_fini();
 	tree_fini();
@@ -232,6 +237,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	lut_init();
 	tree_init();
 	ipath_init();
+	iexpr_init();
 	Efts = platform_get_eft_files();
 	lex_init(Efts, NULL, 0);
 	check_init();
@@ -264,6 +270,7 @@ _fmd_init(fmd_hdl_t *hdl)
 	Verbose = fmd_prop_get_int32(hdl, "verbose");
 	Warn = fmd_prop_get_int32(hdl, "warn");
 	Autoclose = fmd_prop_get_string(hdl, "autoclose");
+	Dupclose = fmd_prop_get_int32(hdl, "dupclose");
 	Hesitate = fmd_prop_get_int64(hdl, "hesitate");
 	Max_fme = fmd_prop_get_int32(hdl, "maxfme");
 
@@ -284,14 +291,16 @@ _fmd_init(fmd_hdl_t *hdl)
 		out(O_ALTFP|O_STAMP, "\neft.so startup");
 	}
 
-	out(O_DEBUG,
-	    "initialized, verbose %d warn %d autoclose %s maxfme %d",
-	    Verbose, Warn, Autoclose == NULL ? "(NULL)" : Autoclose, Max_fme);
+	out(O_DEBUG, "initialized, verbose %d warn %d autoclose %s "
+	    "dupclose %d maxfme %d",
+	    Verbose, Warn, Autoclose == NULL ? "(NULL)" : Autoclose,
+	    Dupclose, Max_fme);
 
 	out(O_DEBUG, "reconstituting any existing fmes");
 	while ((casep = fmd_case_next(hdl, casep)) != NULL) {
 		fme_restart(hdl, casep);
 	}
+	fme_istat_load(hdl);
 }
 
 /*ARGSUSED*/

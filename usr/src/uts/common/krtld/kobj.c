@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2970,7 +2970,7 @@ kobj_getelfsym(char *name, void *mp, int *size)
 }
 
 uintptr_t
-kobj_lookup(void *mod, char *name)
+kobj_lookup(struct module *mod, const char *name)
 {
 	Sym *sp;
 

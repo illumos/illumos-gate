@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,18 +47,22 @@ extern "C" {
 #endif
 
 /*
- * The injector allows for the declaration, definition, and injection of three
- * types of things - Events, FMRIs, and Authorities.  While each has a different
- * function within the FMA framework, their internal composition is similar
- * enough to allow for the use of a single struct to represent all three.  The
- * inj_itemtype_t enum is used to describe which of the three types is being
- * represented by a given object.
+ * The injector allows for the declaration, definition, and injection of four
+ * types of things - Events, FMRIs, Authorities, and lists.  The first three
+ * are essentially lists with extra membership requirements (FMRIs, for
+ * example, must include a member called `scheme').  So while each has a
+ * different function within the FMA framework, we can use a single struct to
+ * store all three.  The inj_itemtype_t enum is used to describe which of the
+ * four types is being represented by a given object.
  */
 typedef enum inj_itemtype {
 	ITEMTYPE_EVENT,
 	ITEMTYPE_FMRI,
-	ITEMTYPE_AUTH
+	ITEMTYPE_AUTH,
+	ITEMTYPE_LIST
 } inj_itemtype_t;
+
+#define	ITEMTYPE_NITEMS		4
 
 /*
  * The member name-value pairs of Events, FMRIs, and Authorities are typed.
@@ -78,7 +82,8 @@ typedef enum inj_memtype {
 	MEMTYPE_ENUM,
 	MEMTYPE_EVENT,
 	MEMTYPE_FMRI,
-	MEMTYPE_AUTH
+	MEMTYPE_AUTH,
+	MEMTYPE_LIST
 } inj_memtype_t;
 
 /*
@@ -157,7 +162,7 @@ typedef enum inj_defnmemtype {
 	DEFNMEM_FMRI,
 	DEFNMEM_AUTH,
 	DEFNMEM_ARRAY,
-	DEFNMEM_SUBLIST
+	DEFNMEM_LIST
 } inj_defnmemtype_t;
 
 typedef struct inj_defnmem {
@@ -168,7 +173,7 @@ typedef struct inj_defnmem {
 
 	union {
 		const char *_dfm_str;	/* String value of member */
-		inj_list_t _dfm_list;	/* Enum, evt, auth, arr, sublist vals */
+		inj_list_t _dfm_list;	/* Enum, evt, auth, arr, list vals */
 	} _dfm_u;
 } inj_defnmem_t;
 

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -69,11 +69,16 @@ check		:=	TARGET= check
 .PARALLEL:	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS) \
 		modlist modlist.intel
 
-def all clean clobber clean.lint: genassym unix .WAIT \
+INITIAL_TARGETS = \
+	genassym \
+	unix \
+	cpu/scripts
+
+def all clean clobber clean.lint: setup genassym unix .WAIT \
 	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
 
-install: install_platforms genassym unix .WAIT $(KMODS) $(CLOSED_KMODS) \
-	$(XMODS) $(CLOSED_XMODS)
+install: install_platforms setup genassym unix .WAIT \
+	$(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
 
 # list the modules under i86pc.
 modlist: unix $(KMODS) $(CLOSED_KMODS) $(XMODS) $(CLOSED_XMODS)
@@ -90,6 +95,9 @@ modlintlib:	$(KMODS) $(CLOSED_KMODS)
 
 genassym unix $(KMODS):	FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)
+
+setup: FRC
+	@cd cpu/scripts; pwd; $(MAKE) setup
 
 $(XMODS):	FRC
 	@if [ -f $@/Makefile  ]; then \

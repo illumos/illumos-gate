@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ptree.c -- routines for printing the prop tree
@@ -76,6 +76,7 @@ is_stmt(struct node *np)
 	case T_ERROR:
 	case T_EREPORT:
 	case T_SERD:
+	case T_STAT:
 	case T_PROP:
 	case T_MASK:
 	case T_ASRU:
@@ -371,6 +372,7 @@ ptree(int flags, struct node *np, int no_iterators, int fileline)
 		out(flags, ";");
 		break;
 	case T_SERD:
+	case T_STAT:
 		if (fileline)
 			out(flags, "# %d \"%s\"", np->line, np->file);
 		out(flags|O_NONL, "engine ");
@@ -532,6 +534,7 @@ ptree_nodetype2str(enum nodetype t)
 	case T_ERROR: return L_error;
 	case T_EREPORT: return L_ereport;
 	case T_SERD: return L_serd;
+	case T_STAT: return L_stat;
 	case T_PROP: return L_prop;
 	case T_MASK: return L_mask;
 	default:
@@ -553,6 +556,7 @@ ptree_nametype2str(enum nametype t)
 	case N_ERROR: return L_error;
 	case N_EREPORT: return L_ereport;
 	case N_SERD: return L_serd;
+	case N_STAT: return L_stat;
 	default:
 		(void) sprintf(buf, "[unexpected nametype: %d]", t);
 		return (buf);
@@ -701,6 +705,9 @@ ptree_type_pattern(int flags, enum nodetype t, const char *pat)
 	case T_SERD:
 		lut_walk(SERDs, (lut_cb)byname_printer, (void *)&info);
 		return;
+	case T_STAT:
+		lut_walk(STATs, (lut_cb)byname_printer, (void *)&info);
+		return;
 	case T_ASRU:
 		lut_walk(ASRUs, (lut_cb)byname_printer, (void *)&info);
 		return;
@@ -765,6 +772,12 @@ void
 ptree_serd(int flags, const char *pat)
 {
 	ptree_type_pattern(flags, T_SERD, pat);
+}
+
+void
+ptree_stat(int flags, const char *pat)
+{
+	ptree_type_pattern(flags, T_STAT, pat);
 }
 
 void

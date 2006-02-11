@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * itree.h -- public definitions for itree module
@@ -42,6 +42,38 @@ extern "C" {
 /* Numerical representation of propagation N value (A), short for All */
 #define	N_IS_ALL	-1
 
+/*
+ * effects_test event cached_state bits
+ * - reset on each call to effects_test()
+ */
+#define	CREDIBLE_EFFECT 1
+#define	WAIT_EFFECT 2
+#define	PARENT_WAIT 4
+
+/*
+ * arrow mark bits (for K-count)
+ */
+#define	EFFECTS_COUNTER 8
+#define	REQMNTS_COUNTER 16
+
+/*
+ * requirements_test event cached_state bits
+ */
+#define	REQMNTS_CREDIBLE 32
+#define	REQMNTS_DISPROVED 64
+#define	REQMNTS_WAIT 128
+
+/*
+ * requirements_test bubble mark bits
+ */
+#define	BUBBLE_ELIDED 256
+#define	BUBBLE_OK 512
+
+/*
+ * causes_test event cached_state bits
+ */
+#define	CAUSES_TESTED 1024
+
 struct event {
 	enum nametype t;		/* defined in tree.h */
 	struct event *suspects;
@@ -52,7 +84,10 @@ struct event {
 	struct node *enode;		/* event node in parse tree */
 	const struct ipath *ipp;	/* instanced version of event */
 	struct lut *props;		/* instanced version of nvpairs */
+	struct lut *payloadprops;	/* nvpairs for problem payload */
 	int count;			/* for reports, number seen */
+	int cached_state;
+	unsigned long long cached_delay;
 	struct bubble {
 		struct bubble *next;
 		int gen;		/* generation # */
@@ -76,7 +111,8 @@ struct event {
 					/* deferred constraints */
 					struct node *cnode;
 				} *constraints;
-				int causes_tested;
+				int forever_false;
+				int mark;
 				unsigned long long mindelay;
 				unsigned long long maxdelay;
 			} *arrowp;

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -6400,13 +6400,14 @@ void
 cpu_ereport_post(struct async_flt *aflt)
 {
 	char *cpu_type, buf[FM_MAX_CLASS];
+	char sbuf[21]; /* sizeof (UINT64_MAX) + '\0' */
 	nv_alloc_t *nva = NULL;
 	nvlist_t *ereport, *detector, *resource;
 	errorq_elem_t *eqep;
 	ch_async_flt_t *ch_flt = (ch_async_flt_t *)aflt;
 	char unum[UNUM_NAMLEN];
 	int len = 0;
-	uint8_t  msg_type;
+	uint8_t msg_type, mask;
 	plat_ecc_ch_async_flt_t	plat_ecc_ch_flt;
 
 	if (aflt->flt_panic || panicstr) {
@@ -6447,9 +6448,11 @@ cpu_ereport_post(struct async_flt *aflt)
 		cpu_type = FM_EREPORT_CPU_UNSUPPORTED;
 		break;
 	}
+	mask = cpunodes[aflt->flt_inst].version;
+	(void) snprintf(sbuf, sizeof (sbuf), "%llX",
+	    (u_longlong_t)cpunodes[aflt->flt_inst].device_id);
 	(void) fm_fmri_cpu_set(detector, FM_CPU_SCHEME_VERSION, NULL,
-	    aflt->flt_inst, (uint8_t)cpunodes[aflt->flt_inst].version,
-	    cpunodes[aflt->flt_inst].device_id);
+	    aflt->flt_inst, &mask, (const char *)sbuf);
 
 	/*
 	 * Encode all the common data into the ereport.

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,7 +177,8 @@ extern "C" {
 #define	FM_HC_VERS0			0
 #define	FM_HC_SCHEME_VERSION		FM_HC_VERS0
 #define	CPU_SCHEME_VERSION0		0
-#define	FM_CPU_SCHEME_VERSION		CPU_SCHEME_VERSION0
+#define	CPU_SCHEME_VERSION1		1
+#define	FM_CPU_SCHEME_VERSION		CPU_SCHEME_VERSION1
 #define	MEM_SCHEME_VERSION0		0
 #define	FM_MEM_SCHEME_VERSION		MEM_SCHEME_VERSION0
 #define	MOD_SCHEME_VERSION0		0
@@ -194,6 +195,7 @@ extern "C" {
 #define	FM_FMRI_HC_ROOT			"hc-root"
 #define	FM_FMRI_HC_LIST_SZ		"hc-list-sz"
 #define	FM_FMRI_HC_LIST			"hc-list"
+#define	FM_FMRI_HC_SPECIFIC		"hc-specific"
 
 /* hc-list version and member names */
 #define	FM_FMRI_HC_NAME			"hc-name"
@@ -201,6 +203,9 @@ extern "C" {
 
 #define	HC_LIST_VERSION0		0
 #define	FM_HC_LIST_VERSION		HC_LIST_VERSION0
+
+/* hc-specific member names */
+#define	FM_FMRI_HC_SPECIFIC_OFFSET	"offset"
 
 /* fmd module scheme member names */
 #define	FM_FMRI_FMD_NAME		"mod-name"
@@ -261,13 +266,13 @@ extern void fm_ereport_set(nvlist_t *, int, const char *, uint64_t,
     const nvlist_t *, ...);
 extern void fm_payload_set(nvlist_t *, ...);
 extern int i_fm_payload_set(nvlist_t *, const char *, va_list);
-extern void fm_fmri_hc_set(nvlist_t *, int, const nvlist_t *, const char *,
-    const char *, const char *, const char *, uint32_t, ...);
+extern void fm_fmri_hc_set(nvlist_t *, int, const nvlist_t *, nvlist_t *,
+    int, ...);
 extern void fm_fmri_dev_set(nvlist_t *, int, const nvlist_t *, const char *,
     const char *);
 extern void fm_fmri_de_set(nvlist_t *, int, const nvlist_t *, const char *);
 extern void fm_fmri_cpu_set(nvlist_t *, int, const nvlist_t *, uint32_t,
-    uint8_t, uint64_t);
+    uint8_t *, const char *);
 extern void fm_fmri_mem_set(nvlist_t *, int, const nvlist_t *, const char *,
     const char *, uint64_t);
 extern void fm_authority_set(nvlist_t *, int, const char *, const char *,

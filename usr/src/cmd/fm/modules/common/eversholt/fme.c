@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.c -- fault management exercise module
@@ -57,9 +57,13 @@
 
 /* imported from eft.c... */
 extern char *Autoclose;
+extern int Dupclose;
 extern hrtime_t Hesitate;
 extern nv_alloc_t Eft_nv_hdl;
 extern int Max_fme;
+extern fmd_hdl_t *Hdl;
+
+static int Istat_need_save;
 
 /* fme under construction is global so we can free it on module abort */
 static struct fme *Nfmep;
@@ -106,7 +110,8 @@ static struct fme {
 		FME_NOTHING = 5000,	/* not evaluated yet */
 		FME_WAIT,		/* need to wait for more info */
 		FME_CREDIBLE,		/* suspect list is credible */
-		FME_DISPROVED		/* no valid suspects found */
+		FME_DISPROVED,		/* no valid suspects found */
+		FME_DEFERRED		/* don't know yet (k-count not met) */
 	} state;
 
 	unsigned long long pull;	/* time passed since created */
@@ -134,8 +139,7 @@ static struct case_list {
 
 static void fme_eval(struct fme *fmep, fmd_event_t *ffep);
 static enum fme_state hypothesise(struct fme *fmep, struct event *ep,
-	unsigned long long at_latest_by, unsigned long long *pdelay,
-	struct arrow *arrowp);
+	unsigned long long at_latest_by, unsigned long long *pdelay);
 static struct node *eventprop_lookup(struct event *ep, const char *propname);
 static struct node *pathstring2epnamenp(char *path);
 static void publish_undiagnosable(fmd_hdl_t *hdl, fmd_event_t *ffep);
@@ -466,6 +470,7 @@ reconstitute_observations(struct fme *fmep)
 			pkd = MALLOC(pkdlen);
 			fmd_buf_read(fmep->hdl,
 			    fmep->fmcase, tmpbuf, pkd, pkdlen);
+			ASSERT(ep->nvp == NULL);
 			if (nvlist_xunpack(pkd,
 			    pkdlen, &ep->nvp, &Eft_nv_hdl) != 0)
 				out(O_DIE|O_SYS, "pack of observed nvl failed");
@@ -645,6 +650,17 @@ badcase:
 	}
 }
 
+/*ARGSUSED*/
+static void
+globals_destructor(void *left, void *right, void *arg)
+{
+	struct evalue *evp = (struct evalue *)right;
+	if (evp->t == NODEPTR)
+		tree_free((struct node *)evp->v);
+	evp->v = NULL;
+	FREE(evp);
+}
+
 void
 destroy_fme(struct fme *f)
 {
@@ -659,6 +675,7 @@ destroy_fme(struct fme *f)
 
 	itree_free(f->eventtree);
 	config_free(f->cfgdata);
+	lut_free(f->globals, globals_destructor, NULL);
 	FREE(f);
 }
 
@@ -670,6 +687,7 @@ fme_state2str(enum fme_state s)
 	case FME_WAIT:		return ("WAIT");
 	case FME_CREDIBLE:	return ("CREDIBLE");
 	case FME_DISPROVED:	return ("DISPROVED");
+	case FME_DEFERRED:	return ("DEFERRED");
 	default:		return ("UNKNOWN");
 	}
 }
@@ -696,32 +714,6 @@ static int
 is_upset(enum nametype t)
 {
 	return (t == N_UPSET);
-}
-
-/*ARGSUSED*/
-static void
-clear_causes_tested(struct event *lhs, struct event *ep, void *arg)
-{
-	struct bubble *bp;
-	struct arrowlist *ap;
-
-	for (bp = itree_next_bubble(ep, NULL); bp;
-	    bp = itree_next_bubble(ep, bp)) {
-		if (bp->t != B_FROM)
-			continue;
-		for (ap = itree_next_arrow(bp, NULL); ap;
-		    ap = itree_next_arrow(bp, ap))
-			ap->arrowp->causes_tested = 0;
-	}
-}
-
-/*
- * call this function with initcode set to 0 to initialize cycle tracking
- */
-static void
-initialize_cycles(struct fme *fmep)
-{
-	lut_walk(fmep->eventtree, (lut_cb)clear_causes_tested, NULL);
 }
 
 static void
@@ -786,11 +778,13 @@ pathstring2epnamenp(char *path)
  * returns true if engine tripped and *enamep and *ippp were filled in.
  */
 static int
-serd_eval(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase,
-	struct event *sp, const char **enamep, const struct ipath **ippp)
+serd_eval(struct fme *fmep, fmd_hdl_t *hdl, fmd_event_t *ffep,
+    fmd_case_t *fmcase, struct event *sp, const char **enamep,
+    const struct ipath **ippp)
 {
 	struct node *serdinst;
 	char *serdname;
+	struct node *nid;
 
 	ASSERT(sp->t == N_UPSET);
 	ASSERT(ffep != NULL);
@@ -806,6 +800,39 @@ serd_eval(fmd_hdl_t *hdl, fmd_event_t *ffep, fmd_case_t *fmcase,
 
 	serdname = ipath2str(serdinst->u.stmt.np->u.event.ename->u.name.s,
 	    ipath(serdinst->u.stmt.np->u.event.epname));
+
+	/* handle serd engine "id" property, if there is one */
+	if ((nid =
+	    lut_lookup(serdinst->u.stmt.lutp, (void *)L_id, NULL)) != NULL) {
+		struct evalue *gval;
+		char suffixbuf[200];
+		char *suffix;
+		char *nserdname;
+		size_t nname;
+
+		out(O_ALTFP|O_NONL, "serd \"%s\" id: ", serdname);
+		ptree_name_iter(O_ALTFP|O_NONL, nid);
+
+		ASSERTinfo(nid->t == T_GLOBID, ptree_nodetype2str(nid->t));
+
+		if ((gval = lut_lookup(fmep->globals,
+		    (void *)nid->u.globid.s, NULL)) == NULL) {
+			out(O_ALTFP, " undefined");
+		} else if (gval->t == UINT64) {
+			out(O_ALTFP, " %llu", gval->v);
+			(void) sprintf(suffixbuf, "%llu", gval->v);
+			suffix = suffixbuf;
+		} else {
+			out(O_ALTFP, " \"%s\"", (char *)gval->v);
+			suffix = (char *)gval->v;
+		}
+
+		nname = strlen(serdname) + strlen(suffix) + 2;
+		nserdname = MALLOC(nname);
+		(void) snprintf(nserdname, nname, "%s:%s", serdname, suffix);
+		FREE(serdname);
+		serdname = nserdname;
+	}
 
 	if (!fmd_serd_exists(hdl, serdname)) {
 		struct node *nN, *nT;
@@ -869,13 +896,6 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 	int ntrip, nupset, i;
 
 	/*
-	 * we avoid recursion by calling fme_receive_report() at the end of
-	 * this function with a NULL ffep
-	 */
-	if (ffep == NULL)
-		return (0);
-
-	/*
 	 * count the number of upsets to determine the upper limit on
 	 * expected trip ereport strings.  remember that one upset can
 	 * lead to at most one ereport.
@@ -899,12 +919,12 @@ upsets_eval(struct fme *fmep, fmd_event_t *ffep)
 	ntrip = 0;
 	for (sp = fmep->suspects; sp; sp = sp->suspects)
 		if (sp->t == N_UPSET &&
-		    serd_eval(fmep->hdl, ffep, fmep->fmcase, sp,
+		    serd_eval(fmep, fmep->hdl, ffep, fmep->fmcase, sp,
 			    &tripped[ntrip].ename, &tripped[ntrip].ipp))
 			ntrip++;
 
 	for (i = 0; i < ntrip; i++)
-		fme_receive_report(fmep->hdl, NULL,
+		fme_receive_report(fmep->hdl, ffep,
 		    tripped[i].ename, tripped[i].ipp, NULL);
 
 	return (ntrip);
@@ -939,6 +959,28 @@ fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep, nvlist_t *nvl,
 	fme_receive_report(hdl, ffep, stable(eventstring), ipp, nvl);
 }
 
+static int mark_arrows(struct fme *fmep, struct event *ep, int mark,
+    unsigned long long at_latest_by, unsigned long long *pdelay);
+
+/* ARGSUSED */
+static void
+clear_arrows(struct event *ep, struct event *ep2, struct fme *fmep)
+{
+	struct bubble *bp;
+	struct arrowlist *ap;
+
+	ep->cached_state = 0;
+	for (bp = itree_next_bubble(ep, NULL); bp;
+	    bp = itree_next_bubble(ep, bp)) {
+		if (bp->t != B_FROM)
+			continue;
+		bp->mark = 0;
+		for (ap = itree_next_arrow(bp, NULL); ap;
+		    ap = itree_next_arrow(bp, ap))
+			ap->arrowp->mark = 0;
+	}
+}
+
 static void
 fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
     const char *eventstring, const struct ipath *ipp, nvlist_t *nvl)
@@ -959,6 +1001,7 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		int prev_verbose;
 		unsigned long long my_delay = TIMEVAL_EVENTUALLY;
 		enum fme_state state;
+		nvlist_t *pre_peek_nvp = NULL;
 
 		if (fmep->overflow) {
 			if (!(fmd_case_closed(fmep->hdl, fmep->fmcase)))
@@ -979,6 +1022,10 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 			ep->observations = fmep->observations;
 			fmep->observations = ep;
 			ep->nvp = evnv_dupnvl(nvl);
+		} else {
+			/* use new payload values for peek */
+			pre_peek_nvp = ep->nvp;
+			ep->nvp = evnv_dupnvl(nvl);
 		}
 
 		/* tell hypothesise() not to mess with suspect list */
@@ -989,8 +1036,8 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		if (Debug == 0)
 			Verbose = 0;
 
-		initialize_cycles(fmep);
-		state = hypothesise(fmep, fmep->e0, fmep->ull, &my_delay, NULL);
+		lut_walk(fmep->eventtree, (lut_cb)clear_arrows, (void *)fmep);
+		state = hypothesise(fmep, fmep->e0, fmep->ull, &my_delay);
 
 		fmep->peek = 0;
 
@@ -1003,6 +1050,9 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 			out(O_ALTFP|O_NONL, "[");
 			ipath_print(O_ALTFP|O_NONL, eventstring, ipp);
 			out(O_ALTFP, " explained by FME%d]", fmep->id);
+
+			if (pre_peek_nvp)
+				nvlist_free(pre_peek_nvp);
 
 			if (ep->count == 1)
 				serialize_observation(fmep, eventstring, ipp);
@@ -1024,6 +1074,9 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 				ep->observations = NULL;
 				nvlist_free(ep->nvp);
 				ep->nvp = NULL;
+			} else {
+				nvlist_free(ep->nvp);
+				ep->nvp = pre_peek_nvp;
 			}
 		}
 	}
@@ -1112,6 +1165,10 @@ fme_receive_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
 		fmep->observations = ep;
 		ep->nvp = evnv_dupnvl(nvl);
 		serialize_observation(fmep, eventstring, ipp);
+	} else {
+		/* new payload overrides any previous */
+		nvlist_free(ep->nvp);
+		ep->nvp = evnv_dupnvl(nvl);
 	}
 
 	stats_counter_bump(fmep->Rcount);
@@ -1551,6 +1608,264 @@ trim_suspects(struct fme *fmep, boolean_t no_upsets, struct rsl **begin,
 	rsluniq(*begin, *end, &fmep->nsuspects, &fmep->nonfault);
 }
 
+/*
+ * addpayloadprop -- add a payload prop to a problem
+ */
+static void
+addpayloadprop(const char *lhs, struct evalue *rhs, nvlist_t *fault)
+{
+	ASSERT(fault != NULL);
+	ASSERT(lhs != NULL);
+	ASSERT(rhs != NULL);
+
+	if (rhs->t == UINT64) {
+		out(O_ALTFP|O_VERB2, "addpayloadprop: %s=%llu", lhs, rhs->v);
+
+		if (nvlist_add_uint64(fault, lhs, rhs->v) != 0)
+			out(O_DIE,
+			    "cannot add payloadprop \"%s\" to fault", lhs);
+	} else {
+		out(O_ALTFP|O_VERB2, "addpayloadprop: %s=\"%s\"",
+		    lhs, (char *)rhs->v);
+
+		if (nvlist_add_string(fault, lhs, (char *)rhs->v) != 0)
+			out(O_DIE,
+			    "cannot add payloadprop \"%s\" to fault", lhs);
+	}
+}
+
+static char *Istatbuf;
+static char *Istatbufptr;
+static int Istatsz;
+
+/*
+ * istataddsize -- calculate size of istat and add it to Istatsz
+ */
+/*ARGSUSED2*/
+static void
+istataddsize(const struct istat_entry *lhs, struct stats *rhs, void *arg)
+{
+	int val;
+
+	ASSERT(lhs != NULL);
+	ASSERT(rhs != NULL);
+
+	if ((val = stats_counter_value(rhs)) == 0)
+		return;	/* skip zero-valued stats */
+
+	/* count up the size of the stat name */
+	Istatsz += ipath2strlen(lhs->ename, lhs->ipath);
+	Istatsz++;	/* for the trailing NULL byte */
+
+	/* count up the size of the stat value */
+	Istatsz += snprintf(NULL, 0, "%d", val);
+	Istatsz++;	/* for the trailing NULL byte */
+}
+
+/*
+ * istat2str -- serialize an istat, writing result to *Istatbufptr
+ */
+/*ARGSUSED2*/
+static void
+istat2str(const struct istat_entry *lhs, struct stats *rhs, void *arg)
+{
+	char *str;
+	int len;
+	int val;
+
+	ASSERT(lhs != NULL);
+	ASSERT(rhs != NULL);
+
+	if ((val = stats_counter_value(rhs)) == 0)
+		return;	/* skip zero-valued stats */
+
+	/* serialize the stat name */
+	str = ipath2str(lhs->ename, lhs->ipath);
+	len = strlen(str);
+
+	ASSERT(Istatbufptr + len + 1 < &Istatbuf[Istatsz]);
+	(void) strlcpy(Istatbufptr, str, &Istatbuf[Istatsz] - Istatbufptr);
+	Istatbufptr += len;
+	FREE(str);
+	*Istatbufptr++ = '\0';
+
+	/* serialize the stat value */
+	Istatbufptr += snprintf(Istatbufptr, &Istatbuf[Istatsz] - Istatbufptr,
+	    "%d", val);
+	*Istatbufptr++ = '\0';
+
+	ASSERT(Istatbufptr <= &Istatbuf[Istatsz]);
+}
+
+void
+istat_save()
+{
+	if (Istat_need_save == 0)
+		return;
+
+	/* figure out how big the serialzed info is */
+	Istatsz = 0;
+	lut_walk(Istats, (lut_cb)istataddsize, NULL);
+
+	if (Istatsz == 0) {
+		/* no stats to save */
+		fmd_buf_destroy(Hdl, NULL, WOBUF_ISTATS);
+		return;
+	}
+
+	/* create the serialized buffer */
+	Istatbufptr = Istatbuf = MALLOC(Istatsz);
+	lut_walk(Istats, (lut_cb)istat2str, NULL);
+
+	/* clear out current saved stats */
+	fmd_buf_destroy(Hdl, NULL, WOBUF_ISTATS);
+
+	/* write out the new version */
+	fmd_buf_write(Hdl, NULL, WOBUF_ISTATS, Istatbuf, Istatsz);
+	FREE(Istatbuf);
+
+	Istat_need_save = 0;
+}
+
+int
+istat_cmp(struct istat_entry *ent1, struct istat_entry *ent2)
+{
+	if (ent1->ename != ent2->ename)
+		return (ent2->ename - ent1->ename);
+	if (ent1->ipath != ent2->ipath)
+		return ((char *)ent2->ipath - (char *)ent1->ipath);
+
+	return (0);
+}
+
+/*
+ * istat-verify -- verify the component associated with a stat still exists
+ *
+ * if the component no longer exists, this routine resets the stat and
+ * returns 0.  if the component still exists, it returns 1.
+ */
+static int
+istat_verify(struct node *snp, struct istat_entry *entp)
+{
+	struct stats *statp;
+	nvlist_t *fmri;
+
+	fmri = node2fmri(snp->u.event.epname);
+	if (platform_path_exists(fmri)) {
+		nvlist_free(fmri);
+		return (1);
+	}
+	nvlist_free(fmri);
+
+	/* component no longer in system.  zero out the associated stats */
+	if ((statp = (struct stats *)
+	    lut_lookup(Istats, entp, (lut_cmp)istat_cmp)) == NULL ||
+	    stats_counter_value(statp) == 0)
+		return (0);	/* stat is already reset */
+
+	Istat_need_save = 1;
+	stats_counter_reset(statp);
+	return (0);
+}
+
+static void
+istat_bump(struct node *snp, int n)
+{
+	struct stats *statp;
+	struct istat_entry ent;
+
+	ASSERT(snp != NULL);
+	ASSERTinfo(snp->t == T_EVENT, ptree_nodetype2str(snp->t));
+	ASSERT(snp->u.event.epname != NULL);
+
+	/* class name should be hoisted into a single stable entry */
+	ASSERT(snp->u.event.ename->u.name.next == NULL);
+	ent.ename = snp->u.event.ename->u.name.s;
+	ent.ipath = ipath(snp->u.event.epname);
+
+	if (!istat_verify(snp, &ent)) {
+		/* component no longer exists in system, nothing to do */
+		return;
+	}
+
+	if ((statp = (struct stats *)
+	    lut_lookup(Istats, &ent, (lut_cmp)istat_cmp)) == NULL) {
+		/* need to create the counter */
+		int cnt = 0;
+		struct node *np;
+		char *sname;
+		char *snamep;
+		struct istat_entry *newentp;
+
+		/* count up the size of the stat name */
+		np = snp->u.event.ename;
+		while (np != NULL) {
+			cnt += strlen(np->u.name.s);
+			cnt++;	/* for the '.' or '@' */
+			np = np->u.name.next;
+		}
+		np = snp->u.event.epname;
+		while (np != NULL) {
+			cnt += snprintf(NULL, 0, "%s%llu",
+			    np->u.name.s, np->u.name.child->u.ull);
+			cnt++;	/* for the '/' or trailing NULL byte */
+			np = np->u.name.next;
+		}
+
+		/* build the stat name */
+		snamep = sname = alloca(cnt);
+		np = snp->u.event.ename;
+		while (np != NULL) {
+			snamep += snprintf(snamep, &sname[cnt] - snamep,
+			    "%s", np->u.name.s);
+			np = np->u.name.next;
+			if (np)
+				*snamep++ = '.';
+		}
+		*snamep++ = '@';
+		np = snp->u.event.epname;
+		while (np != NULL) {
+			snamep += snprintf(snamep, &sname[cnt] - snamep,
+			    "%s%llu", np->u.name.s, np->u.name.child->u.ull);
+			np = np->u.name.next;
+			if (np)
+				*snamep++ = '/';
+		}
+		*snamep++ = '\0';
+
+		/* create the new stat & add it to our list */
+		newentp = MALLOC(sizeof (*newentp));
+		*newentp = ent;
+		statp = stats_new_counter(NULL, sname, 0);
+		Istats = lut_add(Istats, (void *)newentp, (void *)statp,
+		    (lut_cmp)istat_cmp);
+	}
+
+	/* if n is non-zero, set that value instead of bumping */
+	if (n) {
+		stats_counter_reset(statp);
+		stats_counter_add(statp, n);
+	} else
+		stats_counter_bump(statp);
+	Istat_need_save = 1;
+}
+
+/*ARGSUSED*/
+static void
+istat_destructor(void *left, void *right, void *arg)
+{
+	struct istat_entry *entp = (struct istat_entry *)left;
+	struct stats *statp = (struct stats *)right;
+	FREE(entp);
+	stats_delete(statp);
+}
+
+void
+istat_fini(void)
+{
+	lut_free(Istats, istat_destructor, NULL);
+}
+
 static void
 publish_suspects(struct fme *fmep)
 {
@@ -1562,8 +1877,11 @@ publish_suspects(struct fme *fmep)
 	uint8_t cert;
 	uint_t *frs;
 	uint_t fravg, frsum, fr;
+	uint_t messval;
+	struct node *snp;
 	int frcnt, fridx;
 	boolean_t no_upsets = B_FALSE;
+	boolean_t allfaulty = B_TRUE;
 
 	stats_counter_bump(fmep->diags);
 
@@ -1680,6 +1998,8 @@ publish_suspects(struct fme *fmep)
 	for (rp = erl; rp >= srl; rp--) {
 		if (rp->suspect == NULL)
 			continue;
+		if (!is_fault(rp->suspect->t))
+			allfaulty = B_FALSE;
 		if (fmep->nonfault != fmep->nsuspects)
 			cert = percentof(frs[--fridx], frsum);
 		fault = fmd_nvl_create_fault(fmep->hdl,
@@ -1690,13 +2010,83 @@ publish_suspects(struct fme *fmep)
 		    rp->rsrc);
 		if (fault == NULL)
 			out(O_DIE, "fault creation failed");
+		/* if "message" property exists, add it to the fault */
+		if (node2uint(eventprop_lookup(rp->suspect, L_message),
+		    &messval) == 0) {
+
+			out(O_ALTFP,
+			    "[FME%d, %s adds message=%d to suspect list]",
+			    fmep->id,
+			    rp->suspect->enode->u.event.ename->u.name.s,
+			    messval);
+			if (nvlist_add_boolean_value(fault,
+			    FM_SUSPECT_MESSAGE,
+			    (messval) ? B_TRUE : B_FALSE) != 0) {
+				out(O_DIE, "cannot add no-message to fault");
+			}
+		}
+		/* add any payload properties */
+		lut_walk(rp->suspect->payloadprops,
+		    (lut_cb)addpayloadprop, (void *)fault);
 		fmd_case_add_suspect(fmep->hdl, fmep->fmcase, fault);
 		rp->suspect->fault = fault;
 		rslfree(rp);
+		/* if "count" property exists, increment the appropriate stat */
+		if ((snp = eventprop_lookup(rp->suspect, L_count)) != NULL) {
+			out(O_ALTFP|O_NONL,
+			    "[FME%d, %s count ", fmep->id,
+			    rp->suspect->enode->u.event.ename->u.name.s);
+			ptree_name_iter(O_ALTFP|O_NONL, snp);
+			out(O_ALTFP, "]");
+			istat_bump(snp, 0);
+		}
+		/* if "action" property exists, evaluate it */
+		if ((snp = eventprop_lookup(rp->suspect, L_action)) != NULL) {
+			struct evalue evalue;
+
+			out(O_ALTFP|O_NONL,
+			    "[FME%d, %s action ", fmep->id,
+			    rp->suspect->enode->u.event.ename->u.name.s);
+			ptree_name_iter(O_ALTFP|O_NONL, snp);
+			out(O_ALTFP, "]");
+			Action_nvl = fault;
+			(void) eval_expr(snp, NULL, NULL, NULL, NULL,
+			    NULL, 0, &evalue);
+		}
+		/*
+		 * if "dupclose" tunable is set, check if the asru is
+		 * already marked as "faulty".
+		 */
+		if (Dupclose && allfaulty) {
+			nvlist_t *asru;
+
+			out(O_ALTFP|O_VERB, "FMD%d dupclose check ", fmep->id);
+			itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, rp->suspect);
+			out(O_ALTFP|O_VERB|O_NONL, " ");
+			if (nvlist_lookup_nvlist(fault,
+			    FM_FAULT_ASRU, &asru) != 0) {
+				out(O_ALTFP|O_VERB, "NULL asru");
+				allfaulty = B_FALSE;
+			} else if (fmd_nvl_fmri_faulty(fmep->hdl, asru)) {
+				out(O_ALTFP|O_VERB, "faulty");
+			} else {
+				out(O_ALTFP|O_VERB, "not faulty");
+				allfaulty = B_FALSE;
+			}
+		}
+
 	}
-	fmd_case_solve(fmep->hdl, fmep->fmcase);
-	out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
-	    fmd_case_uuid(fmep->hdl, fmep->fmcase));
+	if (Dupclose && allfaulty) {
+		out(O_ALTFP, "[dupclose FME%d, case %s]", fmep->id,
+		    fmd_case_uuid(fmep->hdl, fmep->fmcase));
+		fmd_case_close(fmep->hdl, fmep->fmcase);
+	} else {
+		out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
+		    fmd_case_uuid(fmep->hdl, fmep->fmcase));
+		fmd_case_solve(fmep->hdl, fmep->fmcase);
+	}
+
+	istat_save();	/* write out any istat changes */
 
 	/*
 	 * revert to the original suspect list
@@ -1837,7 +2227,7 @@ fme_close_case(fmd_hdl_t *hdl, fmd_case_t *fmcase)
  *	If the time we need to wait for the given FME is less than the
  *	current timer, kick that old timer out and establish a new one.
  */
-static void
+static int
 fme_set_timer(struct fme *fmep, unsigned long long wull)
 {
 	out(O_ALTFP|O_VERB|O_NONL, " fme_set_timer: request to wait ");
@@ -1848,7 +2238,7 @@ fme_set_timer(struct fme *fmep, unsigned long long wull)
 		ptree_timeval(O_ALTFP|O_VERB, &fmep->pull);
 		out(O_ALTFP|O_VERB, NULL);
 		/* we've waited at least wull already, don't need timer */
-		return;
+		return (0);
 	}
 
 	out(O_ALTFP|O_VERB|O_NONL, " currently ");
@@ -1864,15 +2254,25 @@ fme_set_timer(struct fme *fmep, unsigned long long wull)
 	if (fmep->wull != 0)
 		if (wull >= fmep->wull)
 			/* New timer would fire later than established timer */
-			return;
+			return (0);
 
-	if (fmep->wull != 0)
+	if (fmep->wull != 0) {
 		fmd_timer_remove(fmep->hdl, fmep->timer);
+		if (fmep->timer == fmep->htid) {
+			out(O_ALTFP,
+			    "[stopped hesitating FME%d, case %s]",
+			    fmep->id,
+			    fmd_case_uuid(fmep->hdl,
+			    fmep->fmcase));
+			fmep->htid = 0;
+		}
+	}
 
 	fmep->timer = fmd_timer_install(fmep->hdl, (void *)fmep,
 	    fmep->e0r, wull);
 	out(O_ALTFP|O_VERB, "timer set, id is %ld", fmep->timer);
 	fmep->wull = wull;
+	return (1);
 }
 
 void
@@ -1890,14 +2290,19 @@ fme_timer_fired(struct fme *fmep, id_t tid)
 		return;
 	}
 
+	out(O_ALTFP, "Timer fired %lx %lx", tid, fmep->htid);
 	if (tid != fmep->htid) {
 		/*
-		 * normal timer (not the hesitation timer
+		 * normal timer (not the hesitation timer)
 		 */
 		fmep->pull = fmep->wull;
 		fmep->wull = 0;
 		fmd_buf_write(fmep->hdl, fmep->fmcase,
 		    WOBUF_PULL, (void *)&fmep->pull, sizeof (fmep->pull));
+		/*
+		 * no point in heistating if we've already waited.
+		 */
+		fmep->hesitated = 1;
 	} else {
 		fmep->hesitated = 1;
 	}
@@ -1968,8 +2373,8 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 	out(O_ALTFP|O_VERB, "Evaluate FME %d", fmep->id);
 	indent_set("  ");
 
-	initialize_cycles(fmep);
-	fmep->state = hypothesise(fmep, fmep->e0, fmep->ull, &my_delay, NULL);
+	lut_walk(fmep->eventtree, (lut_cb)clear_arrows, (void *)fmep);
+	fmep->state = hypothesise(fmep, fmep->e0, fmep->ull, &my_delay);
 
 	out(O_ALTFP|O_VERB|O_NONL, "FME%d state: %s, suspect list:", fmep->id,
 	    fme_state2str(fmep->state));
@@ -2030,10 +2435,8 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 					ptree_timeval(O_ALTFP|O_NONL,
 					    (unsigned long long *)&Hesitate);
 					out(O_ALTFP, "]");
-					fme_set_timer(fmep, my_delay);
-					fmep->htid =
-					    fmd_timer_install(fmep->hdl,
-					    (void *)fmep, NULL, Hesitate);
+					if (fme_set_timer(fmep, Hesitate))
+						fmep->htid = fmep->timer;
 				} else {
 					out(O_ALTFP,
 					    "[still hesitating FME%d, case %s]",
@@ -2071,7 +2474,7 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 				fmep->state = FME_CREDIBLE;
 			} else {
 				ASSERT(my_delay > fmep->ull);
-				fme_set_timer(fmep, my_delay);
+				(void) fme_set_timer(fmep, my_delay);
 				print_suspects(SLWAIT, fmep);
 			}
 			break;
@@ -2111,20 +2514,63 @@ fme_eval(struct fme *fmep, fmd_event_t *ffep)
 	}
 }
 
-/*
- * below here is the code derived from the Emrys prototype
- */
-
 static void indent(void);
 static int triggered(struct fme *fmep, struct event *ep, int mark);
-static void mark_arrows(struct fme *fmep, struct event *ep, int mark);
 static enum fme_state effects_test(struct fme *fmep,
-    struct event *fault_event);
+    struct event *fault_event, unsigned long long at_latest_by,
+    unsigned long long *pdelay);
 static enum fme_state requirements_test(struct fme *fmep, struct event *ep,
-    unsigned long long at_latest_by, unsigned long long *pdelay,
-    struct arrow *arrowp);
+    unsigned long long at_latest_by, unsigned long long *pdelay);
 static enum fme_state causes_test(struct fme *fmep, struct event *ep,
     unsigned long long at_latest_by, unsigned long long *pdelay);
+
+static int
+checkconstraints(struct fme *fmep, struct arrow *arrowp)
+{
+	struct constraintlist *ctp;
+	struct evalue value;
+
+	if (arrowp->forever_false) {
+		char *sep = "";
+		indent();
+		out(O_ALTFP|O_VERB|O_NONL, "  Forever false constraint: ");
+		for (ctp = arrowp->constraints; ctp != NULL; ctp = ctp->next) {
+			out(O_ALTFP|O_VERB|O_NONL, sep);
+			ptree(O_ALTFP|O_VERB|O_NONL, ctp->cnode, 1, 0);
+			sep = ", ";
+		}
+		out(O_ALTFP|O_VERB, NULL);
+		return (0);
+	}
+
+	for (ctp = arrowp->constraints; ctp != NULL; ctp = ctp->next) {
+		if (eval_expr(ctp->cnode, NULL, NULL,
+		    &fmep->globals, fmep->cfgdata->cooked,
+		    arrowp, 0, &value)) {
+			/* evaluation successful */
+			if (value.t == UNDEFINED || value.v == 0) {
+				/* known false */
+				arrowp->forever_false = 1;
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL,
+				    "  False constraint: ");
+				ptree(O_ALTFP|O_VERB|O_NONL, ctp->cnode, 1, 0);
+				out(O_ALTFP|O_VERB, NULL);
+				return (0);
+			}
+		} else {
+			/* evaluation unsuccessful -- unknown value */
+			indent();
+			out(O_ALTFP|O_VERB|O_NONL,
+			    "  Deferred constraint: ");
+			ptree(O_ALTFP|O_VERB|O_NONL, ctp->cnode, 1, 0);
+			out(O_ALTFP|O_VERB, NULL);
+			return (2);
+		}
+	}
+	/* known true */
+	return (1);
+}
 
 static int
 triggered(struct fme *fmep, struct event *ep, int mark)
@@ -2141,7 +2587,7 @@ triggered(struct fme *fmep, struct event *ep, int mark)
 		for (ap = itree_next_arrow(bp, NULL); ap;
 		    ap = itree_next_arrow(bp, ap)) {
 			/* check count of marks against K in the bubble */
-			if (ap->arrowp->tail->mark == mark &&
+			if ((ap->arrowp->mark & mark) &&
 			    ++count >= bp->nork)
 				return (1);
 		}
@@ -2149,79 +2595,151 @@ triggered(struct fme *fmep, struct event *ep, int mark)
 	return (0);
 }
 
-static void
-mark_arrows(struct fme *fmep, struct event *ep, int mark)
+static int
+mark_arrows(struct fme *fmep, struct event *ep, int mark,
+    unsigned long long at_latest_by, unsigned long long *pdelay)
 {
 	struct bubble *bp;
 	struct arrowlist *ap;
+	unsigned long long overall_delay = TIMEVAL_EVENTUALLY;
+	unsigned long long my_delay;
+	enum fme_state result;
+	int retval = 0;
 
 	for (bp = itree_next_bubble(ep, NULL); bp;
 	    bp = itree_next_bubble(ep, bp)) {
 		if (bp->t != B_FROM)
 			continue;
-		if (bp->mark != mark) {
-			stats_counter_bump(fmep->Marrowcount);
-			bp->mark = mark;
-			for (ap = itree_next_arrow(bp, NULL); ap;
-			    ap = itree_next_arrow(bp, ap)) {
-				struct constraintlist *ctp;
-				struct evalue value;
-				int do_not_follow = 0;
-				/*
-				 * see if false constraint prevents us
-				 * from traversing this arrow, but don't
-				 * bother if the event is an ereport we
-				 * haven't seen
-				 */
-				if (ap->arrowp->head->myevent->t != N_EREPORT ||
-				    ap->arrowp->head->myevent->count != 0) {
-					platform_set_payloadnvp(
-					    ap->arrowp->head->myevent->nvp);
-					for (ctp = ap->arrowp->constraints;
-					    ctp != NULL; ctp = ctp->next) {
-						if (eval_expr(ctp->cnode,
-						    NULL, NULL,
-						    &fmep->globals,
-						    fmep->cfgdata->cooked,
-						    ap->arrowp, 0,
-						    &value) == 0 ||
-						    value.t == UNDEFINED ||
-						    value.v == 0) {
-							do_not_follow = 1;
-							break;
-						}
-					}
-					platform_set_payloadnvp(NULL);
+		stats_counter_bump(fmep->Marrowcount);
+		for (ap = itree_next_arrow(bp, NULL); ap;
+		    ap = itree_next_arrow(bp, ap)) {
+			struct event *ep2 = ap->arrowp->head->myevent;
+			/*
+			 * if we're clearing marks, we can avoid doing
+			 * all that work evaluating constraints.
+			 */
+			if (mark == 0) {
+				ap->arrowp->mark &= ~EFFECTS_COUNTER;
+				ep2->cached_state &=
+				    ~(WAIT_EFFECT|CREDIBLE_EFFECT|PARENT_WAIT);
+				(void) mark_arrows(fmep, ep2, mark, 0, NULL);
+				continue;
+			}
+			if (ep2->cached_state & REQMNTS_DISPROVED) {
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL,
+				    "  ALREADY DISPROVED ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+				continue;
+			}
+			if (ep2->cached_state & WAIT_EFFECT) {
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL,
+				    "  ALREADY EFFECTS WAIT ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+				continue;
+			}
+			if (ep2->cached_state & CREDIBLE_EFFECT) {
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL,
+				    "  ALREADY EFFECTS CREDIBLE ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+				continue;
+			}
+			if ((ep2->cached_state & PARENT_WAIT) &&
+			    (mark & PARENT_WAIT)) {
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL,
+				    "  ALREADY PARENT EFFECTS WAIT ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+				continue;
+			}
+			platform_set_payloadnvp(ep2->nvp);
+			if (checkconstraints(fmep, ap->arrowp) != 1) {
+				platform_set_payloadnvp(NULL);
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL,
+				    "  CONSTRAINTS FAIL ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+				continue;
+			}
+			platform_set_payloadnvp(NULL);
+			ap->arrowp->mark |= EFFECTS_COUNTER;
+			if (!triggered(fmep, ep2, EFFECTS_COUNTER)) {
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL,
+				    "  K-COUNT NOT YET MET ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+				continue;
+			}
+			ep2->cached_state &= ~PARENT_WAIT;
+			result = requirements_test(fmep, ep2, at_latest_by +
+			    ap->arrowp->maxdelay,
+			    &my_delay);
+			if (result == FME_WAIT) {
+				retval = WAIT_EFFECT;
+				if (overall_delay > my_delay)
+					overall_delay = my_delay;
+				ep2->cached_state |= WAIT_EFFECT;
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL, "  EFFECTS WAIT ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+				indent_push("  E");
+				if (mark_arrows(fmep, ep2, PARENT_WAIT,
+				    at_latest_by, &my_delay) == WAIT_EFFECT) {
+					retval = WAIT_EFFECT;
+					if (overall_delay > my_delay)
+						overall_delay = my_delay;
 				}
-
-				if (do_not_follow) {
-					indent();
+				indent_pop();
+			} else if (result == FME_DISPROVED) {
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL,
+				    "  EFFECTS DISPROVED ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+			} else {
+				ep2->cached_state |= mark;
+				indent();
+				if (mark == CREDIBLE_EFFECT)
 					out(O_ALTFP|O_VERB|O_NONL,
-					    "  False arrow to ");
-					itree_pevent_brief(
-					    O_ALTFP|O_VERB|O_NONL,
-					    ap->arrowp->head->myevent);
-					out(O_ALTFP|O_VERB|O_NONL, " ");
-					ptree(O_ALTFP|O_VERB|O_NONL,
-					    ctp->cnode, 1, 0);
-					out(O_ALTFP|O_VERB, NULL);
-					continue;
+					    "  EFFECTS CREDIBLE ");
+				else
+					out(O_ALTFP|O_VERB|O_NONL,
+					    "  PARENT EFFECTS WAIT ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep2);
+				out(O_ALTFP|O_VERB, NULL);
+				indent_push("  E");
+				if (mark_arrows(fmep, ep2, mark, at_latest_by,
+				    &my_delay) == WAIT_EFFECT) {
+					retval = WAIT_EFFECT;
+					if (overall_delay > my_delay)
+						overall_delay = my_delay;
 				}
-
-				if (triggered(fmep, ap->arrowp->head->myevent,
-				    mark))
-					mark_arrows(fmep,
-					    ap->arrowp->head->myevent, mark);
+				indent_pop();
 			}
 		}
 	}
+	if (retval == WAIT_EFFECT)
+		*pdelay = overall_delay;
+	return (retval);
 }
 
 static enum fme_state
-effects_test(struct fme *fmep, struct event *fault_event)
+effects_test(struct fme *fmep, struct event *fault_event,
+    unsigned long long at_latest_by, unsigned long long *pdelay)
 {
 	struct event *error_event;
 	enum fme_state return_value = FME_CREDIBLE;
+	unsigned long long overall_delay = TIMEVAL_EVENTUALLY;
+	unsigned long long my_delay;
 
 	stats_counter_bump(fmep->Ecallcount);
 	indent_push("  E");
@@ -2230,13 +2748,22 @@ effects_test(struct fme *fmep, struct event *fault_event)
 	itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, fault_event);
 	out(O_ALTFP|O_VERB, NULL);
 
-	mark_arrows(fmep, fault_event, 1);
+	(void) mark_arrows(fmep, fault_event, CREDIBLE_EFFECT, at_latest_by,
+	    &my_delay);
 	for (error_event = fmep->observations;
 	    error_event; error_event = error_event->observations) {
 		indent();
 		out(O_ALTFP|O_VERB|O_NONL, " ");
 		itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, error_event);
-		if (!triggered(fmep, error_event, 1)) {
+		if (!(error_event->cached_state & CREDIBLE_EFFECT)) {
+			if (error_event->cached_state &
+			    (PARENT_WAIT|WAIT_EFFECT)) {
+				return_value = FME_WAIT;
+				if (overall_delay > my_delay)
+					overall_delay = my_delay;
+				out(O_ALTFP|O_VERB, " NOT YET triggered");
+				continue;
+			}
 			return_value = FME_DISPROVED;
 			out(O_ALTFP|O_VERB, " NOT triggered");
 			break;
@@ -2244,23 +2771,26 @@ effects_test(struct fme *fmep, struct event *fault_event)
 			out(O_ALTFP|O_VERB, " triggered");
 		}
 	}
-	mark_arrows(fmep, fault_event, 0);
+	(void) mark_arrows(fmep, fault_event, 0, 0, NULL);
 
 	indent();
-	out(O_ALTFP|O_VERB|O_NONL, "<-%s ", fme_state2str(return_value));
+	out(O_ALTFP|O_VERB|O_NONL, "<-EFFECTS %s ",
+	    fme_state2str(return_value));
 	itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, fault_event);
 	out(O_ALTFP|O_VERB, NULL);
 	indent_pop();
+	if (return_value == FME_WAIT)
+		*pdelay = overall_delay;
 	return (return_value);
 }
 
 static enum fme_state
 requirements_test(struct fme *fmep, struct event *ep,
-    unsigned long long at_latest_by, unsigned long long *pdelay,
-    struct arrow *arrowp)
+    unsigned long long at_latest_by, unsigned long long *pdelay)
 {
 	int waiting_events;
 	int credible_events;
+	int deferred_events;
 	enum fme_state return_value = FME_CREDIBLE;
 	unsigned long long overall_delay = TIMEVAL_EVENTUALLY;
 	unsigned long long arrow_delay;
@@ -2269,6 +2799,30 @@ requirements_test(struct fme *fmep, struct event *ep,
 	struct bubble *bp;
 	struct arrowlist *ap;
 
+	if (ep->cached_state & REQMNTS_CREDIBLE) {
+		indent();
+		out(O_ALTFP|O_VERB|O_NONL, "  REQMNTS ALREADY CREDIBLE ");
+		itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
+		out(O_ALTFP|O_VERB, NULL);
+		return (FME_CREDIBLE);
+	}
+	if (ep->cached_state & REQMNTS_DISPROVED) {
+		indent();
+		out(O_ALTFP|O_VERB|O_NONL, "  REQMNTS ALREADY DISPROVED ");
+		itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
+		out(O_ALTFP|O_VERB, NULL);
+		return (FME_DISPROVED);
+	}
+	if (ep->cached_state & REQMNTS_WAIT) {
+		indent();
+		*pdelay = ep->cached_delay;
+		out(O_ALTFP|O_VERB|O_NONL, "  REQMNTS ALREADY WAIT ");
+		itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
+		out(O_ALTFP|O_VERB|O_NONL, ", wait for: ");
+		ptree_timeval(O_ALTFP|O_VERB|O_NONL, &at_latest_by);
+		out(O_ALTFP|O_VERB, NULL);
+		return (FME_WAIT);
+	}
 	stats_counter_bump(fmep->Rcallcount);
 	indent_push("  R");
 	indent();
@@ -2283,49 +2837,26 @@ requirements_test(struct fme *fmep, struct event *ep,
 			if (fmep->pull >= at_latest_by) {
 				return_value = FME_DISPROVED;
 			} else {
-				*pdelay = at_latest_by;
+				ep->cached_delay = *pdelay = at_latest_by;
 				return_value = FME_WAIT;
 			}
-		} else if (arrowp != NULL) {
-			/*
-			 * evaluate constraints only for current observation
-			 */
-			struct constraintlist *ctp;
-			struct evalue value;
-
-			platform_set_payloadnvp(ep->nvp);
-			for (ctp = arrowp->constraints; ctp != NULL;
-				ctp = ctp->next) {
-				if (eval_expr(ctp->cnode, NULL, NULL,
-				    &fmep->globals, fmep->cfgdata->cooked,
-				    arrowp, 0, &value) == 0 ||
-				    value.t == UNDEFINED || value.v == 0) {
-					indent();
-					out(O_ALTFP|O_VERB|O_NONL,
-					    "  False constraint ");
-					out(O_ALTFP|O_VERB|O_NONL, " ");
-					ptree(O_ALTFP|O_VERB|O_NONL,
-					    ctp->cnode, 1, 0);
-					out(O_ALTFP|O_VERB, NULL);
-					return_value = FME_DISPROVED;
-					break;
-				}
-			}
-			platform_set_payloadnvp(NULL);
 		}
 
 		indent();
 		switch (return_value) {
 		case FME_CREDIBLE:
-			out(O_ALTFP|O_VERB|O_NONL, "<-CREDIBLE ");
+			ep->cached_state |= REQMNTS_CREDIBLE;
+			out(O_ALTFP|O_VERB|O_NONL, "<-REQMNTS CREDIBLE ");
 			itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
 			break;
 		case FME_DISPROVED:
-			out(O_ALTFP|O_VERB|O_NONL, "<-DISPROVED ");
+			ep->cached_state |= REQMNTS_DISPROVED;
+			out(O_ALTFP|O_VERB|O_NONL, "<-REQMNTS DISPROVED ");
 			itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
 			break;
 		case FME_WAIT:
-			out(O_ALTFP|O_VERB|O_NONL, "<-WAIT ");
+			ep->cached_state |= REQMNTS_WAIT;
+			out(O_ALTFP|O_VERB|O_NONL, "<-REQMNTS WAIT ");
 			itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
 			out(O_ALTFP|O_VERB|O_NONL, " to ");
 			ptree_timeval(O_ALTFP|O_VERB|O_NONL, &at_latest_by);
@@ -2343,124 +2874,129 @@ requirements_test(struct fme *fmep, struct event *ep,
 	/* this event is not a report, descend the tree */
 	for (bp = itree_next_bubble(ep, NULL); bp;
 	    bp = itree_next_bubble(ep, bp)) {
+		int n;
+
 		if (bp->t != B_FROM)
 			continue;
-		if (bp->mark == 0) {
-			int n = bp->nork;
 
-			bp->mark = 1;
-			credible_events = 0;
-			waiting_events = 0;
-			arrow_delay = TIMEVAL_EVENTUALLY;
-			/*
-			 * n is -1 for 'A' so adjust it.
-			 * XXX just count up the arrows for now.
-			 */
-			if (n < 0) {
-				n = 0;
-				for (ap = itree_next_arrow(bp, NULL); ap;
-				    ap = itree_next_arrow(bp, ap))
-					n++;
-				indent();
-				out(O_ALTFP|O_VERB, " Bubble Counted N=%d", n);
-			} else {
-				indent();
-				out(O_ALTFP|O_VERB, " Bubble N=%d", n);
-			}
+		n = bp->nork;
 
+		credible_events = 0;
+		waiting_events = 0;
+		deferred_events = 0;
+		arrow_delay = TIMEVAL_EVENTUALLY;
+		/*
+		 * n is -1 for 'A' so adjust it.
+		 * XXX just count up the arrows for now.
+		 */
+		if (n < 0) {
+			n = 0;
+			for (ap = itree_next_arrow(bp, NULL); ap;
+			    ap = itree_next_arrow(bp, ap))
+				n++;
+			indent();
+			out(O_ALTFP|O_VERB, " Bubble Counted N=%d", n);
+		} else {
+			indent();
+			out(O_ALTFP|O_VERB, " Bubble N=%d", n);
+		}
+
+		if (n == 0)
+			continue;
+		if (!(bp->mark & (BUBBLE_ELIDED|BUBBLE_OK))) {
 			for (ap = itree_next_arrow(bp, NULL); ap;
 			    ap = itree_next_arrow(bp, ap)) {
 				ep2 = ap->arrowp->head->myevent;
-				if (n <= credible_events)
+				platform_set_payloadnvp(ep2->nvp);
+				if (checkconstraints(fmep, ap->arrowp) == 0) {
+					/*
+					 * if any arrow is invalidated by the
+					 * constraints, then we should elide the
+					 * whole bubble to be consistant with
+					 * the tree creation time behaviour
+					 */
+					bp->mark |= BUBBLE_ELIDED;
+					platform_set_payloadnvp(NULL);
 					break;
+				}
+				platform_set_payloadnvp(NULL);
+			}
+		}
+		if (bp->mark & BUBBLE_ELIDED)
+			continue;
+		bp->mark |= BUBBLE_OK;
+		for (ap = itree_next_arrow(bp, NULL); ap;
+		    ap = itree_next_arrow(bp, ap)) {
+			ep2 = ap->arrowp->head->myevent;
+			if (n <= credible_events)
+				break;
 
-				if (triggered(fmep, ep2, 1))
-					/* XXX adding max timevals! */
-					switch (requirements_test(fmep, ep2,
-					    at_latest_by + ap->arrowp->maxdelay,
-					    &my_delay, ap->arrowp)) {
-					case FME_CREDIBLE:
-						credible_events++;
-						break;
-					case FME_DISPROVED:
-						break;
-					case FME_WAIT:
-						if (my_delay < arrow_delay)
-							arrow_delay = my_delay;
-						waiting_events++;
-						break;
-					default:
-						out(O_DIE,
-						"Bug in requirements_test.");
-					}
-				else
+			ap->arrowp->mark |= REQMNTS_COUNTER;
+			if (triggered(fmep, ep2, REQMNTS_COUNTER))
+				/* XXX adding max timevals! */
+				switch (requirements_test(fmep, ep2,
+				    at_latest_by + ap->arrowp->maxdelay,
+				    &my_delay)) {
+				case FME_DEFERRED:
+					deferred_events++;
+					break;
+				case FME_CREDIBLE:
 					credible_events++;
-			}
+					break;
+				case FME_DISPROVED:
+					break;
+				case FME_WAIT:
+					if (my_delay < arrow_delay)
+						arrow_delay = my_delay;
+					waiting_events++;
+					break;
+				default:
+					out(O_DIE,
+					"Bug in requirements_test.");
+				}
+			else
+				deferred_events++;
+		}
+		indent();
+		out(O_ALTFP|O_VERB, " Credible: %d Waiting %d",
+		    credible_events + deferred_events, waiting_events);
+		if (credible_events + deferred_events + waiting_events < n) {
+			/* Can never meet requirements */
+			ep->cached_state |= REQMNTS_DISPROVED;
 			indent();
-			out(O_ALTFP|O_VERB, " Credible: %d Waiting %d",
-			    credible_events, waiting_events);
-			if (credible_events + waiting_events < n) {
-				/* Can never meet requirements */
-				indent();
-				out(O_ALTFP|O_VERB|O_NONL, "<-DISPROVED ");
-				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
-				out(O_ALTFP|O_VERB, NULL);
-				indent_pop();
-				return (FME_DISPROVED);
-			}
-			if (credible_events < n) { /* will have to wait */
-				/* wait time is shortest known */
-				if (arrow_delay < overall_delay)
-					overall_delay = arrow_delay;
-				return_value = FME_WAIT;
-			}
-		} else {
-			indent();
-			out(O_ALTFP|O_VERB|O_NONL, " Mark was set: ");
+			out(O_ALTFP|O_VERB|O_NONL, "<-REQMNTS DISPROVED ");
 			itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
-			out(O_ALTFP|O_VERB|O_NONL, " to");
-			for (ap = itree_next_arrow(bp, NULL); ap;
-			    ap = itree_next_arrow(bp, ap)) {
-				out(O_ALTFP|O_VERB|O_NONL, " ");
-				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL,
-				    ap->arrowp->head->myevent);
-			}
 			out(O_ALTFP|O_VERB, NULL);
+			indent_pop();
+			return (FME_DISPROVED);
+		}
+		if (credible_events + deferred_events < n) {
+			/* will have to wait */
+			/* wait time is shortest known */
+			if (arrow_delay < overall_delay)
+				overall_delay = arrow_delay;
+			return_value = FME_WAIT;
+		} else if (credible_events < n) {
+			if (return_value != FME_WAIT)
+				return_value = FME_DEFERRED;
 		}
 	}
 
 	/*
-	 * evaluate constraints for ctlist, which is the list of
-	 * constraints for the arrow pointing into this node of the tree
+	 * don't mark as FME_DEFERRED. If this event isn't reached by another
+	 * path, then this will be considered FME_CREDIBLE. But if it is
+	 * reached by a different path so the K-count is met, then might
+	 * get overridden by FME_WAIT or FME_DISPROVED.
 	 */
-	if (return_value == FME_CREDIBLE && arrowp != NULL) {
-		struct constraintlist *ctp;
-		struct evalue value;
-
-		platform_set_payloadnvp(ep->nvp);
-		for (ctp = arrowp->constraints; ctp != NULL;
-			ctp = ctp->next) {
-			if (eval_expr(ctp->cnode, NULL,	NULL, &fmep->globals,
-			    fmep->cfgdata->cooked, arrowp, 0, &value) == 0 ||
-			    value.t == UNDEFINED || value.v == 0) {
-				indent();
-				out(O_ALTFP|O_VERB|O_NONL,
-				    "  False constraint ");
-				out(O_ALTFP|O_VERB|O_NONL, " ");
-				ptree(O_ALTFP|O_VERB|O_NONL,
-				    ctp->cnode, 1, 0);
-				out(O_ALTFP|O_VERB, NULL);
-				return_value = FME_DISPROVED;
-				break;
-			}
-		}
-		platform_set_payloadnvp(NULL);
+	if (return_value == FME_WAIT) {
+		ep->cached_state |= REQMNTS_WAIT;
+		ep->cached_delay = *pdelay = overall_delay;
+	} else if (return_value == FME_CREDIBLE) {
+		ep->cached_state |= REQMNTS_CREDIBLE;
 	}
-
-	if (return_value == FME_WAIT)
-		*pdelay = overall_delay;
 	indent();
-	out(O_ALTFP|O_VERB|O_NONL, "<-%s ", fme_state2str(return_value));
+	out(O_ALTFP|O_VERB|O_NONL, "<-REQMNTS %s ",
+	    fme_state2str(return_value));
 	itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
 	out(O_ALTFP|O_VERB, NULL);
 	indent_pop();
@@ -2495,27 +3031,30 @@ causes_test(struct fme *fmep, struct event *ep,
 		k = bp->nork;	/* remember the K value */
 		for (ap = itree_next_arrow(bp, NULL); ap;
 		    ap = itree_next_arrow(bp, ap)) {
-			struct constraintlist *ctp;
-			struct evalue value;
 			int do_not_follow = 0;
+
+			/*
+			 * if we get to the same event multiple times
+			 * only worry about the first one.
+			 */
+			if (ap->arrowp->tail->myevent->cached_state &
+			    CAUSES_TESTED) {
+				indent();
+				out(O_ALTFP|O_VERB|O_NONL,
+				    "  causes test already run for ");
+				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL,
+				    ap->arrowp->tail->myevent);
+				out(O_ALTFP|O_VERB, NULL);
+				continue;
+			}
+
 			/*
 			 * see if false constraint prevents us
 			 * from traversing this arrow
 			 */
 			platform_set_payloadnvp(ep->nvp);
-			for (ctp = ap->arrowp->constraints;
-			    ctp != NULL; ctp = ctp->next) {
-				if (eval_expr(ctp->cnode, NULL, NULL,
-				    &fmep->globals,
-				    fmep->cfgdata->cooked,
-				    ap->arrowp, 0,
-				    &value) == 0 ||
-				    value.t == UNDEFINED ||
-				    value.v == 0) {
-					do_not_follow = 1;
-					break;
-				}
-			}
+			if (checkconstraints(fmep, ap->arrowp) != 1)
+				do_not_follow = 1;
 			platform_set_payloadnvp(NULL);
 			if (do_not_follow) {
 				indent();
@@ -2523,32 +3062,15 @@ causes_test(struct fme *fmep, struct event *ep,
 				    "  False arrow from ");
 				itree_pevent_brief(O_ALTFP|O_VERB|O_NONL,
 				    ap->arrowp->tail->myevent);
-				out(O_ALTFP|O_VERB|O_NONL, " ");
-				ptree(O_ALTFP|O_VERB|O_NONL, ctp->cnode, 1, 0);
 				out(O_ALTFP|O_VERB, NULL);
 				continue;
 			}
 
-			if (ap->arrowp->causes_tested++ > 0) {
-				/*
-				 * get to this point if this is not the
-				 * first time we're going through this
-				 * arrow in the causes test.  consider this
-				 * branch to be credible and let the
-				 * credible/noncredible outcome depend on
-				 * the other branches in this cycle.
-				 */
-				fstate = FME_CREDIBLE;
-			} else {
-				/*
-				 * get to this point if this is the first
-				 * time we're going through this arrow.
-				 */
-				tail_event = ap->arrowp->tail->myevent;
-				fstate = hypothesise(fmep, tail_event,
-						    at_latest_by,
-						    &my_delay, ap->arrowp);
-			}
+			ap->arrowp->tail->myevent->cached_state |=
+			    CAUSES_TESTED;
+			tail_event = ap->arrowp->tail->myevent;
+			fstate = hypothesise(fmep, tail_event, at_latest_by,
+			    &my_delay);
 
 			switch (fstate) {
 			case FME_WAIT:
@@ -2564,15 +3086,12 @@ causes_test(struct fme *fmep, struct event *ep,
 			default:
 				out(O_DIE, "Bug in causes_test");
 			}
-
-			ap->arrowp->causes_tested--;
-			ASSERT(ap->arrowp->causes_tested >= 0);
 		}
 	}
 	/* compare against K */
 	if (credible_results + waiting_results < k) {
 		indent();
-		out(O_ALTFP|O_VERB|O_NONL, "<-DISPROVED ");
+		out(O_ALTFP|O_VERB|O_NONL, "<-CAUSES DISPROVED ");
 		itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
 		out(O_ALTFP|O_VERB, NULL);
 		indent_pop();
@@ -2581,7 +3100,7 @@ causes_test(struct fme *fmep, struct event *ep,
 	if (waiting_results != 0) {
 		*pdelay = overall_delay;
 		indent();
-		out(O_ALTFP|O_VERB|O_NONL, "<-WAIT ");
+		out(O_ALTFP|O_VERB|O_NONL, "<-CAUSES WAIT ");
 		itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
 		out(O_ALTFP|O_VERB|O_NONL, " to ");
 		ptree_timeval(O_ALTFP|O_VERB|O_NONL, &at_latest_by);
@@ -2590,7 +3109,7 @@ causes_test(struct fme *fmep, struct event *ep,
 		return (FME_WAIT);
 	}
 	indent();
-	out(O_ALTFP|O_VERB|O_NONL, "<-CREDIBLE ");
+	out(O_ALTFP|O_VERB|O_NONL, "<-CAUSES CREDIBLE ");
 	itree_pevent_brief(O_ALTFP|O_VERB|O_NONL, ep);
 	out(O_ALTFP|O_VERB, NULL);
 	indent_pop();
@@ -2599,8 +3118,7 @@ causes_test(struct fme *fmep, struct event *ep,
 
 static enum fme_state
 hypothesise(struct fme *fmep, struct event *ep,
-	unsigned long long at_latest_by, unsigned long long *pdelay,
-	struct arrow *arrowp)
+	unsigned long long at_latest_by, unsigned long long *pdelay)
 {
 	enum fme_state rtr, otr;
 	unsigned long long my_delay;
@@ -2615,13 +3133,12 @@ hypothesise(struct fme *fmep, struct event *ep,
 	ptree_timeval(O_ALTFP|O_VERB|O_NONL, &at_latest_by);
 	out(O_ALTFP|O_VERB, NULL);
 
-	rtr = requirements_test(fmep, ep, at_latest_by, &my_delay, arrowp);
-	mark_arrows(fmep, ep, 0); /* clean up after requirements test */
+	rtr = requirements_test(fmep, ep, at_latest_by, &my_delay);
 	if ((rtr == FME_WAIT) && (my_delay < overall_delay))
 		overall_delay = my_delay;
 	if (rtr != FME_DISPROVED) {
 		if (is_problem(ep->t)) {
-			otr = effects_test(fmep, ep);
+			otr = effects_test(fmep, ep, at_latest_by, &my_delay);
 			if (otr != FME_DISPROVED) {
 				if (fmep->peek == 0 && ep->is_suspect++ == 0) {
 					ep->suspects = fmep->suspects;
@@ -2679,4 +3196,73 @@ hypothesise(struct fme *fmep, struct event *ep,
 	out(O_ALTFP|O_VERB, NULL);
 	indent_pop();
 	return (FME_CREDIBLE);
+}
+
+/*
+ * fme_istat_load -- reconstitute any persistent istats
+ */
+void
+fme_istat_load(fmd_hdl_t *hdl)
+{
+	int sz;
+	char *sbuf;
+	char *ptr;
+
+	if ((sz = fmd_buf_size(hdl, NULL, WOBUF_ISTATS)) == 0) {
+		out(O_ALTFP, "fme_istat_load: No stats");
+		return;
+	}
+
+	sbuf = alloca(sz);
+
+	fmd_buf_read(hdl, NULL, WOBUF_ISTATS, sbuf, sz);
+
+	/*
+	 * pick apart the serialized stats
+	 *
+	 * format is:
+	 *	<class-name>, '@', <path>, '\0', <value>, '\0'
+	 * for example:
+	 *	"stat.first@stat0/path0\02\0stat.second@stat0/path1\023\0"
+	 *
+	 * since this is parsing our own serialized data, any parsing issues
+	 * are fatal, so we check for them all with ASSERT() below.
+	 */
+	ptr = sbuf;
+	while (ptr < &sbuf[sz]) {
+		char *sepptr;
+		struct node *np;
+		int val;
+
+		sepptr = strchr(ptr, '@');
+		ASSERT(sepptr != NULL);
+		*sepptr = '\0';
+
+		/* construct the event */
+		np = newnode(T_EVENT, NULL, 0);
+		np->u.event.ename = newnode(T_NAME, NULL, 0);
+		np->u.event.ename->u.name.t = N_STAT;
+		np->u.event.ename->u.name.s = stable(ptr);
+		np->u.event.ename->u.name.it = IT_ENAME;
+		np->u.event.ename->u.name.last = np->u.event.ename;
+
+		ptr = sepptr + 1;
+		ASSERT(ptr < &sbuf[sz]);
+		ptr += strlen(ptr);
+		ptr++;	/* move past the '\0' separating path from value */
+		ASSERT(ptr < &sbuf[sz]);
+		ASSERT(isdigit(*ptr));
+		val = atoi(ptr);
+		ASSERT(val > 0);
+		ptr += strlen(ptr);
+		ptr++;	/* move past the final '\0' for this entry */
+
+		np->u.event.epname = pathstring2epnamenp(sepptr + 1);
+		ASSERT(np->u.event.epname != NULL);
+
+		istat_bump(np, val);
+		tree_free(np);
+	}
+
+	istat_save();
 }

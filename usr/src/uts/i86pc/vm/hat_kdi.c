@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +33,7 @@
  * operations may be performed.
  */
 
+#include <sys/cpuvar.h>
 #include <sys/kdi_impl.h>
 #include <sys/errno.h>
 #include <sys/systm.h>

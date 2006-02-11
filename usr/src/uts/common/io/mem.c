@@ -68,13 +68,15 @@
 #include <sys/debug.h>
 #include <sys/fm/protocol.h>
 
-#ifdef __sparc
+#if defined(__sparc)
 extern int cpu_get_mem_name(uint64_t, uint64_t *, uint64_t, char *, int, int *);
 extern int cpu_get_mem_info(uint64_t, uint64_t, uint64_t *, uint64_t *,
     uint64_t *, int *, int *, int *);
 extern size_t cpu_get_name_bufsize(void);
 extern int cpu_get_mem_sid(char *, char *, int, int *);
 extern int cpu_get_mem_addr(char *, char *, uint64_t, uint64_t *);
+#elif defined(__i386) || defined(__amd64)
+#include <sys/cpu_module.h>
 #endif	/* __sparc */
 
 /*
@@ -415,6 +417,9 @@ mmwrite(dev_t dev, struct uio *uio, cred_t *cred)
 static int
 mmioctl_vtop(intptr_t data)
 {
+#ifdef _SYSCALL32
+	mem_vtop32_t vtop32;
+#endif
 	mem_vtop_t mem_vtop;
 	proc_t *p;
 	pfn_t pfn = (pfn_t)PFN_INVALID;
@@ -422,13 +427,36 @@ mmioctl_vtop(intptr_t data)
 	struct as *as;
 	struct seg *seg;
 
-	if (copyin((void *)data, &mem_vtop, sizeof (mem_vtop_t)))
-		return (EFAULT);
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (copyin((void *)data, &mem_vtop, sizeof (mem_vtop_t)))
+			return (EFAULT);
+	}
+#ifdef _SYSCALL32
+	else {
+		if (copyin((void *)data, &vtop32, sizeof (mem_vtop32_t)))
+			return (EFAULT);
+		mem_vtop.m_as = (struct as *)vtop32.m_as;
+		mem_vtop.m_va = (void *)vtop32.m_va;
+
+		if (mem_vtop.m_as != NULL)
+			return (EINVAL);
+	}
+#endif
+
 	if (mem_vtop.m_as == &kas) {
 		pfn = hat_getpfnum(kas.a_hat, mem_vtop.m_va);
-	} else if (mem_vtop.m_as == NULL) {
-		return (EIO);
 	} else {
+		if (mem_vtop.m_as == NULL) {
+			/*
+			 * Assume the calling process's address space if the
+			 * caller didn't specify one.
+			 */
+			p = curthread->t_procp;
+			if (p == NULL)
+				return (EIO);
+			mem_vtop.m_as = p->p_as;
+		}
+
 		mutex_enter(&pidlock);
 		for (p = practive; p != NULL; p = p->p_next) {
 			if (p->p_as == mem_vtop.m_as) {
@@ -461,8 +489,18 @@ mmioctl_vtop(intptr_t data)
 	mem_vtop.m_pfn = pfn;
 	if (pfn == PFN_INVALID)
 		return (EIO);
-	if (copyout(&mem_vtop, (void *)data, sizeof (mem_vtop_t)))
-		return (EFAULT);
+
+	if (get_udatamodel() == DATAMODEL_NATIVE) {
+		if (copyout(&mem_vtop, (void *)data, sizeof (mem_vtop_t)))
+			return (EFAULT);
+	}
+#ifdef _SYSCALL32
+	else {
+		vtop32.m_pfn = mem_vtop.m_pfn;
+		if (copyout(&vtop32, (void *)data, sizeof (mem_vtop32_t)))
+			return (EFAULT);
+	}
+#endif
 
 	return (0);
 }
@@ -533,7 +571,7 @@ mmioctl_page_fmri_retire(int cmd, intptr_t data)
 	if ((err = mm_get_mem_fmri(&mpage, &nvl)) < 0)
 		return (err);
 
-	if ((err = mm_get_paddr(nvl, &pa)) < 0) {
+	if ((err = mm_get_paddr(nvl, &pa)) != 0) {
 		nvlist_free(nvl);
 		return (err);
 	}
@@ -1120,7 +1158,7 @@ mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
 	 * If the "offset" member is not present, then the address is
 	 * retrieved from the "physaddr" member.
 	 */
-#ifdef __sparc
+#if defined(__sparc)
 	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &offset) != 0) {
 		if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &pa) !=
 		    0) {
@@ -1134,9 +1172,11 @@ mm_get_paddr(nvlist_t *nvl, uint64_t *paddr)
 		if ((err = cpu_get_mem_addr(unum, serids[0], offset, &pa)) != 0)
 			return (err);
 	}
-#else /* __i386, __amd64 */
-	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &pa) != 0)
+#elif defined(__i386) || defined(__amd64)
+	if (cmi_mc_unumtopa(NULL, nvl, &pa) == 0)
 		return (EINVAL);
+#else
+#error "port me"
 #endif /* __sparc */
 
 	*paddr = pa;

@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,6 +51,7 @@ struct fmd_modhash;			/* see <fmd_module.h> */
 struct fmd_module;			/* see <fmd_module.h> */
 struct fmd_log;				/* see <fmd_log.h> */
 struct fmd_idspace;			/* see <fmd_idspace.h> */
+struct topo_hdl;			/* see <fm/libtopo.h> */
 
 typedef struct fmd_statistics {
 	fmd_stat_t ds_log_replayed;	/* number of events replayed from log */
@@ -109,6 +110,7 @@ typedef struct fmd {
 	void *d_dr_hdl;			/* DR event handle (see fmd_dr.c) */
 	nv_alloc_t d_nva;		/* libnvpair allocator handle */
 	nvlist_t *d_auth;		/* FMRI authority nvlist */
+	struct topo_hdl *d_topo;	/* libtopo handle */
 
 	struct fmd_conf *d_conf;	/* global configuration properties */
 	uint_t d_fg;			/* cached value of "fg" property */

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -300,4 +300,21 @@ fmd_fmri_warn(const char *format, ...)
 	va_start(ap, format);
 	fmdump_vwarn(format, ap);
 	va_end(ap);
+}
+
+/*ARGSUSED*/
+struct topo_hdl *
+fmd_fmri_topology(int version)
+{
+	int err;
+
+	if (g_thp == NULL) {
+		if ((g_thp = topo_open(TOPO_VERSION, "/", &err)) == NULL) {
+			(void) fprintf(stderr, "topo_open failed: %s\n",
+			    topo_strerror(err));
+			exit(1);
+		}
+	}
+
+	return (g_thp);
 }

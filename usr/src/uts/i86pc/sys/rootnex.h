@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -325,14 +325,15 @@ typedef enum {
  *   r_counters - profile/performance counters
  */
 typedef struct rootnex_state_s {
-	uint_t		r_prealloc_cookies;
-	uint_t		r_prealloc_size;
-	kmem_cache_t	*r_dmahdl_cache;
-	uintptr_t	r_dvma_call_list_id;
-	kmutex_t	r_peekpoke_mutex;
-	dev_info_t	*r_dip;
-	boolean_t	r_reserved_msg_printed;
-	uint64_t	r_counters[ROOTNEX_CNT_LAST];
+	uint_t			r_prealloc_cookies;
+	uint_t			r_prealloc_size;
+	kmem_cache_t		*r_dmahdl_cache;
+	uintptr_t		r_dvma_call_list_id;
+	kmutex_t		r_peekpoke_mutex;
+	dev_info_t		*r_dip;
+	ddi_iblock_cookie_t	r_err_ibc;
+	boolean_t		r_reserved_msg_printed;
+	uint64_t		r_counters[ROOTNEX_CNT_LAST];
 } rootnex_state_t;
 
 

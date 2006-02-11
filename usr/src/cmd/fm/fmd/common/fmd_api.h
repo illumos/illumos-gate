@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,6 +58,8 @@ typedef struct fmd_hdl fmd_hdl_t;
 typedef struct fmd_event fmd_event_t;
 typedef struct fmd_case fmd_case_t;
 typedef struct fmd_xprt fmd_xprt_t;
+
+struct topo_hdl;
 
 #define	FMD_B_FALSE	0		/* false value for booleans as int */
 #define	FMD_B_TRUE	1		/* true value for booleans as int */
@@ -132,6 +134,7 @@ extern void fmd_hdl_setspecific(fmd_hdl_t *, void *);
 extern void *fmd_hdl_getspecific(fmd_hdl_t *);
 
 extern void fmd_hdl_opendict(fmd_hdl_t *, const char *);
+extern struct topo_hdl *fmd_hdl_topology(fmd_hdl_t *, int);
 
 #define	FMD_NOSLEEP		0x0	/* do not sleep or retry on failure */
 #define	FMD_SLEEP		0x1	/* sleep or retry if alloc fails */
@@ -220,6 +223,7 @@ extern int fmd_nvl_class_match(fmd_hdl_t *, nvlist_t *, const char *);
 extern int fmd_nvl_fmri_expand(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_present(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_unusable(fmd_hdl_t *, nvlist_t *);
+extern int fmd_nvl_fmri_faulty(fmd_hdl_t *, nvlist_t *);
 extern int fmd_nvl_fmri_contains(fmd_hdl_t *, nvlist_t *, nvlist_t *);
 extern nvlist_t *fmd_nvl_fmri_translate(fmd_hdl_t *, nvlist_t *, nvlist_t *);
 

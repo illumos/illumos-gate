@@ -124,6 +124,18 @@ chip_find(chipid_t chipid)
 	return (NULL);
 }
 
+chip_t *
+chip_lookup(chipid_t chipid)
+{
+	chip_t *chp;
+
+	mutex_enter(&cpu_lock);
+	chp = chip_find(chipid);
+	mutex_exit(&cpu_lock);
+
+	return (chp);
+}
+
 #ifndef sun4v
 /*
  * Setup the kstats for this chip, if needed

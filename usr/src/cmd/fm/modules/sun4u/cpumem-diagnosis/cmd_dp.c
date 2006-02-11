@@ -50,6 +50,7 @@ dp_cpu_fmri(fmd_hdl_t *hdl, uint32_t cpuid, uint64_t serial_id)
 {
 	nvlist_t	*nvl = NULL;
 	int		err;
+	char sbuf[21]; /* sizeof (UINT64_MAX) + '\0' */
 
 	if (nvlist_alloc(&nvl, NV_UNIQUE_NAME, 0) != 0)
 		return (NULL);
@@ -57,7 +58,12 @@ dp_cpu_fmri(fmd_hdl_t *hdl, uint32_t cpuid, uint64_t serial_id)
 	err = nvlist_add_string(nvl, FM_FMRI_SCHEME, FM_FMRI_SCHEME_CPU);
 	err |= nvlist_add_uint8(nvl, FM_VERSION, FM_CPU_SCHEME_VERSION);
 	err |= nvlist_add_uint32(nvl, FM_FMRI_CPU_ID, cpuid);
-	err |= nvlist_add_uint64(nvl, FM_FMRI_CPU_SERIAL_ID, serial_id);
+
+	/*
+	 * Version 1 calls for a string-based serial number
+	 */
+	(void) snprintf(sbuf, sizeof (sbuf), "%llX", (u_longlong_t)serial_id);
+	err |= nvlist_add_string(nvl, FM_FMRI_CPU_SERIAL_ID, sbuf);
 	if (err != 0) {
 		nvlist_free(nvl);
 		return (NULL);

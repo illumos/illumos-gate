@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +62,7 @@ typedef enum fmd_errno {
     EFMD_CONF_PROPNAME,	/* configuration property name is not an identifier */
     EFMD_CONF_RDONLY,	/* configuration property is read-only */
     EFMD_CONF_DEFER,	/* invalid deferred configuration file property */
+    EFMD_CONF_UNDEF,	/* configuration property is not defined */
     EFMD_MOD_INIT,	/* failed to initialize module */
     EFMD_MOD_FINI,	/* failed to uninitialize module */
     EFMD_MOD_THR,	/* failed to create processing thread for module */
@@ -71,6 +72,7 @@ typedef enum fmd_errno {
     EFMD_MOD_LOADED,	/* specified module is already loaded */
     EFMD_MOD_NOMOD,	/* specified module is not loaded */
     EFMD_MOD_FAIL,	/* module failed due to preceding error */
+    EFMD_MOD_TOPO,	/* failed to obtain topology handle */
     EFMD_RTLD_OPEN,	/* rtld failed to open shared library plug-in */
     EFMD_RTLD_INIT,	/* shared library plug-in does not define _fmd_init */
     EFMD_BLTIN_NAME,	/* built-in plug-in name not found in definition list */

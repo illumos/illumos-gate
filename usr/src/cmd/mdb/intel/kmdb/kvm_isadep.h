@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,6 +43,9 @@ extern int kmt_out_dcmd(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 extern int kmt_rdmsr(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int kmt_wrmsr(uintptr_t, uint_t, int, const mdb_arg_t *);
+
+extern int kmt_rdpcicfg(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int kmt_wrpcicfg(uintptr_t, uint_t, int, const mdb_arg_t *);
 
 extern int kmt_msr_validate(const kmdb_msr_t *);
 

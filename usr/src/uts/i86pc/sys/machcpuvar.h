@@ -52,7 +52,8 @@ extern "C" {
  */
 typedef void *cpu_pri_lev_t;
 
-struct cpuid_info;			/* (deliberately not visible here) */
+struct cpuid_info;
+struct cmi;
 
 struct	machcpu {
 	/* define all the x_call stuff */
@@ -91,6 +92,8 @@ struct	machcpu {
 	uint64_t	pil_high_start[HIGH_LEVELS];
 	uint64_t	intrstat[PIL_MAX + 1][2];
 	struct cpuid_info	 *mcpu_cpi;
+	struct cmi	*mcpu_cmi;	/* CPU module state */
+	void		*mcpu_cmidata;
 #if defined(__amd64)
 	greg_t	mcpu_rtmp_rsp;		/* syscall: temporary %rsp stash */
 	greg_t	mcpu_rtmp_r15;		/* syscall: temporary %r15 stash */

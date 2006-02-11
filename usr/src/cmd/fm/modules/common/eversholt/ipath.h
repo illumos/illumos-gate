@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ipath.h -- public definitions for ipath module
@@ -39,6 +39,7 @@ extern "C" {
 void ipath_init(void);
 const struct ipath *ipath(struct node *np);
 char *ipath2str(const char *ename, const struct ipath *ipp);
+size_t ipath2strlen(const char *ename, const struct ipath *ipp);
 void ipath_print(int flags, const char *ename, const struct ipath *ipp);
 void ipath_fini(void);
 

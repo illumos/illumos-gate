@@ -62,6 +62,9 @@ struct mod_ops {
  * The defined set of mod_ops structures for each loadable module type
  * Defined in modctl.c
  */
+#if defined(__i386) || defined(__amd64)
+extern struct mod_ops mod_cpuops;
+#endif
 extern struct mod_ops mod_cryptoops;
 extern struct mod_ops mod_driverops;
 extern struct mod_ops mod_execops;
@@ -106,6 +109,17 @@ struct modlfs {
 	char			*fs_linkinfo;
 	struct vfsdef_v3	*fs_vfsdef;	/* version may actually vary */
 };
+
+#if defined(__i386) || defined(__amd64)
+struct cmi_ops;
+
+/* For CPU modules */
+struct modlcpu {
+	struct mod_ops		*cpu_modops;
+	char			*cpu_linkinfo;
+	struct cmi_ops		*cpu_cmiops;
+};
+#endif
 
 /* For cryptographic providers */
 struct modlcrypto {
@@ -417,7 +431,7 @@ struct modctl_list {
  * are replicated in the modctl structure so that mod_containing_pc()
  * doesn't have to grab any locks (modctls are persistent; modules are not.)
  */
-struct modctl {
+typedef struct modctl {
 	struct modctl	*mod_next;	/* &modules based list */
 	struct modctl	*mod_prev;
 	int		mod_id;
@@ -449,7 +463,7 @@ struct modctl {
 
 	int		mod_gencount;	/* # times loaded/unloaded */
 	struct modctl	*mod_requisite_loading;	/* mod circular dependency */
-};
+} modctl_t;
 
 /*
  * mod_loadflags
@@ -479,7 +493,10 @@ extern int moddebug;
  * this is the head of a doubly linked list.  Only the next and prev
  * pointers are used
  */
-extern struct modctl modules;
+extern modctl_t modules;
+
+extern int modload_qualified(const char *,
+    const char *, const char *, const char *, uint_t[], int);
 
 extern void	mod_setup(void);
 extern int	modload(char *, char *);
@@ -494,7 +511,7 @@ extern int	mod_remove_by_name(char *);
 extern int	mod_sysvar(const char *, const char *, u_longlong_t *);
 extern int	mod_sysctl(int, void *);
 struct sysparam;
-extern int	mod_hold_by_modctl(struct modctl *, int);
+extern int	mod_hold_by_modctl(modctl_t *, int);
 #define		MOD_WAIT_ONCE		0x01
 #define		MOD_WAIT_FOREVER	0x02
 #define		MOD_LOCK_HELD		0x04
@@ -506,13 +523,15 @@ extern void	mod_release_stub(struct mod_stub_info *);
 extern void	mod_askparams(void);
 extern void	mod_uninstall_daemon(void);
 extern void	modreap(void);
-extern struct modctl *mod_hold_by_name(char *);
-extern void	mod_release_mod(struct modctl *);
-extern uintptr_t	modlookup(char *, char *);
+extern modctl_t *mod_hold_by_id(modid_t);
+extern modctl_t *mod_hold_by_name(const char *);
+extern void	mod_release_mod(modctl_t *);
+extern uintptr_t modlookup(const char *, const char *);
+extern uintptr_t modlookup_by_modctl(modctl_t *, const char *);
 extern char	*modgetsymname(uintptr_t, unsigned long *);
-extern void	mod_release_requisites(struct modctl *);
-extern struct modctl *mod_load_requisite(struct modctl *, char *);
-extern struct modctl *mod_find_by_filename(char *, char *);
+extern void	mod_release_requisites(modctl_t *);
+extern modctl_t *mod_load_requisite(modctl_t *, char *);
+extern modctl_t *mod_find_by_filename(char *, char *);
 extern uintptr_t	modgetsymvalue(char *, int);
 
 extern void	mod_rele_dev_by_major(major_t);
@@ -532,11 +551,11 @@ extern void read_class_file(void);
 extern void setbootpath(char *);
 extern void setbootfstype(char *);
 
-extern int install_stubs_by_name(struct modctl *, char *);
-extern void install_stubs(struct modctl *);
-extern void uninstall_stubs(struct modctl *);
-extern void reset_stubs(struct modctl *);
-extern struct modctl *mod_getctl(struct modlinkage *);
+extern int install_stubs_by_name(modctl_t *, char *);
+extern void install_stubs(modctl_t *);
+extern void uninstall_stubs(modctl_t *);
+extern void reset_stubs(modctl_t *);
+extern modctl_t *mod_getctl(struct modlinkage *);
 extern major_t mod_name_to_major(char *);
 extern modid_t mod_name_to_modid(char *);
 extern char *mod_major_to_name(major_t);
@@ -550,7 +569,7 @@ extern char *mod_containing_pc(caddr_t);
 extern int mod_in_autounload(void);
 extern char	*mod_modname(struct modlinkage *);
 
-extern int dev_minorperm(dev_info_t *dip, char *name, mperm_t *rmp);
+extern int dev_minorperm(dev_info_t *, char *, mperm_t *);
 
 /*
  * Declarations used for dynamic linking support routines.  Interfaces

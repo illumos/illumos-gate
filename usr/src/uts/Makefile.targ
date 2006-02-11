@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -144,6 +144,9 @@ $(USR_MOD_DIRS_32):	$(USR_MOD_DIR)
 	-$(INS.dir.root.sys)
 
 $(ROOT_MOD_DIR)/%:	$(OBJS_DIR)/% $(ROOT_MOD_DIR) FRC
+	$(INS.file)
+
+$(ROOT_CPU_DIR)/%:	$(OBJS_DIR)/% $(ROOT_CPU_DIR) FRC
 	$(INS.file)
 
 $(ROOT_DRV_DIR)/%:	$(OBJS_DIR)/% $(ROOT_DRV_DIR) FRC

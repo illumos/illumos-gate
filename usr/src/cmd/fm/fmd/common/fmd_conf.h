@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,6 +129,7 @@ extern void fmd_conf_merge(fmd_conf_t *, const char *);
 extern void fmd_conf_propagate(fmd_conf_t *, fmd_conf_t *, const char *);
 extern void fmd_conf_close(fmd_conf_t *);
 
+extern const char *fmd_conf_getnzstr(fmd_conf_t *, const char *);
 extern const fmd_conf_ops_t *fmd_conf_gettype(fmd_conf_t *, const char *);
 extern int fmd_conf_getprop(fmd_conf_t *, const char *, void *);
 extern int fmd_conf_setprop(fmd_conf_t *, const char *, const char *);

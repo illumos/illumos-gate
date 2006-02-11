@@ -26,9 +26,19 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
 
-sparc_SUBDIRS = libmdesc
+include ../Makefile.lib
 
-SUBDIRS = libdiagcode libfmd_adm libfmd_log libfmd_snmp libtopo \
-	$($(MACH)_SUBDIRS)
+sparc_SUBDIRS = \
+	libmdesc
+
+i386_SUBDIRS =
+
+SUBDIRS = \
+	libdiagcode \
+	libfmd_adm \
+	libfmd_log \
+	libfmd_snmp \
+	$($(MACH)_SUBDIRS) \
+	topo
 
 include ./Makefile.subdirs

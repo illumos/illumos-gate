@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -33,4 +33,8 @@ ROOTFMHDRDIR = $(ROOTHDRDIR)/fm
 ROOTFMHDRS   = $(FMHDRS:%=$(ROOTFMHDRDIR)/%)
 
 ROOTLIBDIR = $(ROOT)/usr/lib/fm
-ROOTLIBDIR64 = $(ROOT)/usr/lib/fm/$(MACH64)
+ROOTLIBDIR64 = $(ROOTLIBDIR)/$(MACH64)
+
+ROOTLIBTOPODIR = $(ROOT)/usr/lib/fm/topo
+ROOTLIBTOPODIR64 = $(ROOTLIBTOPODIR)/$(MACH64)
+

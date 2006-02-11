@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -159,7 +159,7 @@ kobj_searchsym(struct module *mp, uintptr_t value, ulong_t *offset)
 
 /*ARGSUSED*/
 uintptr_t
-kobj_lookup(void *mod, char *name)
+kobj_lookup(struct module *mod, const char *name)
 {
 	return (0);
 }

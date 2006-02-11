@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -658,7 +658,6 @@ fmd_asru_logevent(fmd_asru_t *ap)
 	char *class;
 
 	ASSERT(MUTEX_HELD(&ap->asru_lock));
-	ASSERT(ap->asru_case != NULL);
 	cip = (fmd_case_impl_t *)ap->asru_case;
 
 	if ((lp = ap->asru_log) == NULL)
@@ -668,7 +667,8 @@ fmd_asru_logevent(fmd_asru_t *ap)
 		return; /* can't log events if we can't open the log */
 
 	nvl = fmd_protocol_rsrc_asru(_fmd_asru_events[f | (u << 1)],
-	    ap->asru_fmri, cip->ci_uuid, cip->ci_code, f, u, m, ap->asru_event);
+	    ap->asru_fmri, cip ? cip->ci_uuid : NULL,
+	    cip ? cip->ci_code : NULL, f, u, m, ap->asru_event);
 
 	(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
 	e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);

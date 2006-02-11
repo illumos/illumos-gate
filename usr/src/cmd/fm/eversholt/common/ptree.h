@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ptree.h -- public definitions for tree print module
@@ -66,6 +66,7 @@ void ptree_defect(int flags, const char *pat);
 void ptree_error(int flags, const char *pat);
 void ptree_ereport(int flags, const char *pat);
 void ptree_serd(int flags, const char *pat);
+void ptree_stat(int flags, const char *pat);
 void ptree_config(int flags, const char *pat);
 void ptree_prop(int flags, const char *pat);
 void ptree_mask(int flags, const char *pat);

@@ -19,7 +19,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -95,6 +95,10 @@ f none usr/include/sys/i2o/i2omstr.h 644 root bin
 f none usr/include/sys/i8272A.h 644 root bin
 f none usr/include/sys/immu.h 644 root bin
 f none usr/include/sys/kd.h 644 root bin
+f none usr/include/sys/mc.h 644 root bin
+f none usr/include/sys/mc_amd.h 644 root bin
+f none usr/include/sys/mca_amd.h 644 root bin
+f none usr/include/sys/mca_x86.h 644 root bin
 f none usr/include/sys/mmu.h 644 root bin
 f none usr/include/sys/mutex_impl.h 644 root bin
 f none usr/include/sys/obpdefs.h 644 root bin

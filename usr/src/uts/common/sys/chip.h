@@ -172,6 +172,7 @@ void		chip_cpu_fini(cpu_t *);
 void		chip_cpu_assign(cpu_t *);
 void		chip_cpu_unassign(cpu_t *);
 void		chip_cpu_startup(cpu_t *);
+chip_t		*chip_lookup(chipid_t);
 void		chip_bootstrap_cpu(cpu_t *);
 
 void		chip_cpu_move_part(cpu_t *, struct cpupart *,

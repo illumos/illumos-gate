@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -405,7 +405,7 @@ sparc_SUBDIRS= \
 	lib/wrsm \
 	stand
 
-$(CLOSED_BUILD)sparc_SUBDIRS += $(CLOSED)/cmd/mtst
+$(CLOSED_BUILD)COMMON_SUBDIRS += $(CLOSED)/cmd/mtst
 
 LINTSUBDIRS= $(COMMON_SUBDIRS) $($(MACH)_SUBDIRS)
 

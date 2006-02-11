@@ -1,0 +1,778 @@
+# CDDL HEADER START
+#
+# The contents of this file are subject to the terms of the
+# Common Development and Distribution License, Version 1.0 only
+# (the "License").  You may not use this file except in compliance
+# with the License.
+#
+# You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+# or http://www.opensolaris.org/os/licensing.
+# See the License for the specific language governing permissions
+# and limitations under the License.
+#
+# When distributing Covered Code, include this CDDL HEADER in each
+# file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+# If applicable, add the following below this CDDL HEADER, with the
+# fields enclosed by brackets "[]" replaced with your own identifying
+# information: Portions Copyright [yyyy] [name of copyright owner]
+#
+# CDDL HEADER END
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
+funcunit = dc
+
+desc = Correctable D$ data infill from system memory
+error = ereport.cpu.amd.dc.inf_sys_ecc1
+
+mask on  = AMD_BANK_STAT_CECC
+mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	bus	src	0	drd		mem/io	lg	-
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = Correctable D$ data infill from L2$
+error = ereport.cpu.amd.dc.inf_l2_ecc1
+
+mask on  = AMD_BANK_STAT_CECC
+mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	drd		-	l2	data
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = Uncorrectable D$ data infill from system memory
+error =  ereport.cpu.amd.dc.inf_sys_eccm
+
+mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	bus	src	0	drd		mem/io	lg	-
+
+panic = always
+flags =
+
+# ---
+
+desc = Uncorrectable D$ data infill from L2$
+error = ereport.cpu.amd.dc.inf_l2_eccm
+
+mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	drd		-	l2	data
+
+panic = always
+flags = correctable
+
+# ---
+
+desc = Correctable single-bit error in Data Array from scrub
+error = ereport.cpu.amd.dc.data_ecc1
+
+mask on  = AMD_BANK_STAT_CECC, AMD_BANK_STAT_SCRUB
+mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	gen		-	l1	data
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = Uncorrectable single-bit error in Data Array
+error = ereport.cpu.amd.dc.data_ecc1_uc
+
+mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_CECC
+mask off = AMD_BANK_STAT_SCRUB
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	drd/dwr/ev/snp	-	l1	data
+
+panic = always
+flags =
+
+# ---
+
+desc = Uncorrectable multi-bit error in Data Array
+error = ereport.cpu.amd.dc.data_eccm
+
+mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_SCRUB
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	drd/dwr/ev/snp	-	l1	data
+
+panic = always
+flags =
+
+# ---
+
+desc = Uncorrectable multi-bit error in Data Array from scrub
+error = ereport.cpu.amd.dc.data_eccm
+
+mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_SCRUB
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	gen		-	l1	data
+
+panic = always
+flags =
+
+# ---
+
+desc = Main Tag Array Parity Error
+error = ereport.cpu.amd.dc.tag_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	drd/dwr		-	l1	data
+
+panic = always
+flags =
+
+# ---
+
+desc = Snoop Tag Array Parity Error
+error = ereport.cpu.amd.dc.stag_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	snp/ev		-	l1	data
+
+panic = always
+flags =
+
+# ---
+
+desc = L1 DTLB Parity Error
+error = ereport.cpu.amd.dc.l1tlb_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	tlb	-	-	-		-	l1	data
+
+panic = always
+flags =
+
+# ---
+
+desc = L1 DTLB Parity Error (multimatch)
+error = ereport.cpu.amd.dc.l1tlb_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0001	tlb	-	-	-		-	l1	data
+
+panic = always
+flags = 
+
+# ---
+
+desc = L2 DTLB Parity Error
+error = ereport.cpu.amd.dc.l2tlb_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	tlb	-	-	-		-	l2	data
+
+panic = always
+flags = 
+
+# ---
+
+desc = L2 DTLB Parity Error (multimatch)
+error = ereport.cpu.amd.dc.l2tlb_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0001	tlb	-	-	-		-	l2	data
+
+panic = always
+flags = 
+
+#
+# Instruction Cache Functional Unit
+#
+
+funcunit = ic
+
+desc = Correctable I$ data infill from system memory
+error = ereport.cpu.amd.ic.inf_sys_ecc1
+
+mask on  = AMD_BANK_STAT_CECC
+mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	bus	src	0	ird		mem	lg	-
+
+panic = never
+flags = correctable
+
+# ----
+
+desc = Correctable I$ data infill from L2$
+error = ereport.cpu.amd.ic.inf_l2_ecc1
+
+mask on  = AMD_BANK_STAT_CECC
+mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	ird		-	l2	instr
+
+panic = never
+flags = correctable
+
+# ----
+
+desc = Uncorrectable I$ data infill from system memory
+error = ereport.cpu.amd.ic.inf_sys_eccm
+
+mask on  = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	bus	src	0	ird		mem	lg	-
+
+panic = always
+flags =
+
+# ---
+
+desc = Uncorrectable I$ data infill from L2$
+error = ereport.cpu.amd.ic.inf_l2_eccm
+
+mask on  = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	ird		-	l2	instr
+
+panic = always
+flags =
+
+# ---
+
+desc = Data Array Parity Error
+error = ereport.cpu.amd.ic.data_par
+
+mask on  = 
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	ird		-	l1	instr
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = Main Tag Array Parity Error
+error = ereport.cpu.amd.ic.tag_par
+
+mask on  = 
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	ird/ev		-	l1	instr
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = Snoop Tag Array Parity Error
+error = ereport.cpu.amd.ic.stag_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	snp/ev		-	l1	instr
+
+panic = always
+flags =
+
+# ---
+
+desc = L1 ITLB Parity Error
+error = ereport.cpu.amd.ic.l1tlb_par
+
+mask on  =
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	tlb	-	-	-		-	l1	instr
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = L1 ITLB Parity Error (multimatch)
+error = ereport.cpu.amd.ic.l1tlb_par
+
+mask on  =
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0001	tlb	-	-	-		-	l1	instr
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = L2 ITLB Parity Error
+error = ereport.cpu.amd.ic.l2tlb_par
+
+mask on  =
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	tlb	-	-	-		-	l2	instr
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = L2 ITLB Parity Error (multimatch)
+error = ereport.cpu.amd.ic.l2tlb_par
+
+mask on  =
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0001	tlb	-	-	-		-	l2	instr
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = System Data Read Error
+error = ereport.cpu.amd.ic.rdde
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	bus	src	0	ird		mem	lg	-
+
+panic = always
+flags =
+
+#
+# ---
+#
+
+funcunit = bu
+
+# ---
+
+desc = L2 data array single-bit ECC during TLB reload, snoop, or copyback
+error = ereport.cpu.amd.bu.l2d_ecc1
+
+mask on  = AMD_BANK_STAT_CECC
+mask off = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	rd/snp/ev	-	l2	gen
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = L2 data array multi-bit ECC during TLB reload, snoop, or copyback
+error = ereport.cpu.amd.bu.l2d_eccm
+
+mask on  = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	mem	-	-	rd/snp/ev	-	l2	gen
+
+panic = always
+flags =
+
+# ---
+
+desc = L2 main tag array single-bit ECC error on scrubber access
+error = ereport.cpu.amd.bu.l2t_ecc1
+
+mask on  = AMD_BANK_STAT_CECC, AMD_BANK_STAT_SCRUB
+mask off = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0010	mem	-	-	gen		-	l2	instr
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = L2 main tag array multi-bit ECC error on scrubber access
+error = ereport.cpu.amd.bu.l2t_eccm
+
+mask on  = AMD_BANK_STAT_UECC, AMD_BANK_STAT_UC, AMD_BANK_STAT_SCRUB
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0010	mem	-	-	gen		-	l2	instr
+
+panic = always
+flags =
+
+# ---
+
+desc = L2 main tag array parity error on I$ fetch
+error = ereport.cpu.amd.bu.l2t_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0010	mem	-	-	ird		-	l2	instr
+
+panic = always
+flags =
+
+# ---
+
+desc = L2 main tag array parity error on D$ fetch
+error = ereport.cpu.amd.bu.l2t_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0010	mem	-	-	drd		-	l2	data
+
+panic = always
+flags =
+
+# ---
+
+desc = L2 main tag array parity error on TLB reload, snoop, or copyback
+error = ereport.cpu.amd.bu.l2t_par
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0010	mem	-	-	rd/snp/ev	-	l2	gen
+
+panic = always
+flags =
+
+# ---
+
+desc = L2 main tag array parity error on scrubber access
+error = ereport.cpu.amd.bu.l2t_par
+
+mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_SCRUB
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0010	mem	-	-	gen		-	l2	instr
+
+panic = always
+flags =
+
+# ---
+
+desc = System data single-bit ECC for hardware prefetch or TLB reload
+error = ereport.cpu.amd.bu.s_ecc1
+
+mask on  = AMD_BANK_STAT_CECC
+mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	bus	src	0	rd/pf		mem/io	lg	-
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = System data multi-bit ECC for hardware prefetch or TLB reload
+error = ereport.cpu.amd.bu.s_eccm
+
+mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	bus	src	0	rd/pf		mem/io	lg	-
+
+panic = always
+flags =
+
+# ---
+
+desc = System data read error for TLB reload or hardware prefetch
+error = ereport.cpu.amd.bu.s_rde
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	bus	src	0	rd/pf		mem/io	lg	-
+
+panic = always
+flags =
+
+#
+# ---
+#
+
+funcunit = ls
+
+desc = System data read error
+error = ereport.cpu.amd.ls.s_rde
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code =	0000	bus	src	0	rd/wr		mem/io	lg	-
+
+panic = always
+flags =
+
+#
+# ---
+#
+
+funcunit = nb
+
+desc = Correctable ECC error from Normal ECC
+error = ereport.cpu.amd.nb.mem_ce
+
+mask on  = AMD_BANK_STAT_CECC
+mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 0000	bus	src/rsp	0	rd/wr		mem	lg	-
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = Uncorrectable ECC error from Normal ECC
+error = ereport.cpu.amd.nb.mem_ue
+
+mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 0000	bus	src/rsp	0	rd/wr		mem	lg	-
+
+panic = always
+flags = 
+
+# ---
+
+desc = Correctable ECC error from ChipKill ECC
+error = ereport.cpu.amd.nb.mem_ce
+
+mask on  = AMD_BANK_STAT_CECC
+mask off = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 1000	bus	src/rsp	0	rd/wr		mem	lg	-
+
+panic = never
+flags = correctable
+
+# ---
+
+desc = Uncorrectable ECC error from ChipKill ECC
+error = ereport.cpu.amd.nb.mem_ue
+
+mask on  = AMD_BANK_STAT_UC, AMD_BANK_STAT_UECC
+mask off = AMD_BANK_STAT_CECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 1000	bus	src/rsp	0	rd/wr		mem	lg	-
+
+panic = always
+flags = 
+
+# ---
+
+desc = Hypertransport CRC error
+error = ereport.cpu.amd.nb.ht_crc
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 0001	bus	obs	0	gen		gen	lg	-
+
+panic = always
+flags = 
+
+# ---
+
+desc = Hypertransport Sync packet error
+error = ereport.cpu.amd.nb.ht_sync
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 0010	bus	obs	0	gen		gen	lg	-
+
+panic = always
+flags = 
+
+# ---
+
+desc = Master Abort
+error = ereport.cpu.amd.nb.ma
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 0011	bus	src/obs	0	rd/wr		mem/io	lg	-
+
+panic = never
+flags = 
+
+# ---
+
+desc = Target Abort
+error = ereport.cpu.amd.nb.ta
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 0100	bus	src/obs	0	rd/wr		mem/io	lg	-
+
+panic = never
+flags = 
+
+# ---
+
+desc = GART Table Walk Error
+error = ereport.cpu.amd.nb.gart_walk
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 0101	tlb	-	-	-		-	lg	gen
+
+panic = always
+flags = 
+
+# ---
+
+desc = Atomic Read/Modify/Write error
+error = ereport.cpu.amd.nb.rmw
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 0110	bus	obs	0	gen		io	lg	-
+
+panic = always
+flags = 
+
+# ---
+
+desc = Watchdog error (timeout)
+error = ereport.cpu.amd.nb.wdog
+
+mask on  = AMD_BANK_STAT_UC
+mask off = AMD_BANK_STAT_CECC, AMD_BANK_STAT_UECC
+
+#	ext	type	pp	t	rrrr		ii	ll	tt
+#       ------- -------	-------	-------	---------------	------- ------- -----
+code  = 0111	bus	gen	1	gen		gen	lg	-
+
+panic = always
+flags = 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,7 +41,7 @@
 #include <inj_list.h>
 #include <inj.h>
 
-static inj_hash_t inj_decls[3];
+static inj_hash_t inj_decls[ITEMTYPE_NITEMS];
 static int inj_decls_initialized;
 
 static inj_hash_t *
@@ -224,10 +224,9 @@ inj_decl_validate_fmri(inj_decl_t *decl)
 	return (1);
 }
 
-/* Authorities don't have any semantic requirements - yet */
 /*ARGSUSED*/
 static int
-inj_decl_validate_auth(inj_decl_t *decl)
+inj_decl_validate_nop(inj_decl_t *decl)
 {
 	return (1);
 }
@@ -238,7 +237,8 @@ inj_decl_finish(inj_decl_t *decl, const char *name, inj_itemtype_t type)
 	static int (*const validators[])(inj_decl_t *) = {
 		inj_decl_validate_event,
 		inj_decl_validate_fmri,
-		inj_decl_validate_auth
+		inj_decl_validate_nop,	/* no validation for auth */
+		inj_decl_validate_nop	/* no validation for lists */
 	};
 
 	inj_hash_t *hash = item2hash(type);

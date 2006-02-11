@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -594,6 +594,7 @@ xget_object(
 				/* exacct_error set above. */
 				return (EO_ERROR);
 			if (xread(f, buf, sz) != sz) {
+				ea_free(buf, sz);
 				EXACCT_SET_ERR(EXR_CORRUPT_FILE);
 				return (EO_ERROR);
 			}

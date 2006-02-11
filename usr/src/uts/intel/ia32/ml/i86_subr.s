@@ -1999,10 +1999,20 @@ repoutsd(int port, uint32_t *addr, int count)
 #endif	/* __lint */
 
 /*
+ * void int3(void)
+ * void int18(void)
  * void int20(void)
  */
 
 #if defined(__lint)
+
+void
+int3(void)
+{}
+
+void
+int18(void)
+{}
 
 void
 int20(void)
@@ -2010,12 +2020,22 @@ int20(void)
 
 #else	/* __lint */
 
+	ENTRY(int3)
+	int	$T_BPTFLT
+	ret
+	SET_SIZE(int3)
+
+	ENTRY(int18)
+	int	$T_MCE
+	ret
+	SET_SIZE(int18)
+
 	ENTRY(int20)
 	movl	boothowto, %eax
 	andl	$RB_DEBUG, %eax
 	jz	1f
 
-	int	$20
+	int	$T_DBGENTR
 1:
 	rep;	ret	/* use 2 byte return instruction when branch target */
 			/* AMD Software Optimization Guide - Section 6.2 */

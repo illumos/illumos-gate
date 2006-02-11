@@ -31,7 +31,6 @@
 f none usr/lib/fm/dict/SUN4.dict 444 root bin
 f none usr/lib/fm/dict/SUN4U.dict 444 root bin
 f none usr/lib/fm/dict/SUN4V.dict 444 root bin
-f none usr/lib/fm/fmd/schemes/mem.so 555 root bin
 f none usr/lib/fm/libmdesc.so.1 755 root bin
 s none usr/lib/fm/libmdesc.so=libmdesc.so.1 755 root bin
 f none usr/lib/fm/llib-lmdesc 644 root bin
@@ -64,82 +63,6 @@ f none usr/lib/fm/sparcv9/llib-lfmd_snmp.ln 644 root bin
 f none usr/lib/fm/sparcv9/libtopo.so.1 755 root bin
 s none usr/lib/fm/sparcv9/libtopo.so=libtopo.so.1
 f none usr/lib/fm/sparcv9/llib-ltopo.ln 644 root bin
-d none usr/lib/fm/topo/SUNW,Netra-210 755 root bin
-f none usr/lib/fm/topo/SUNW,Netra-210/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Netra-T12 755 root bin
-f none usr/lib/fm/topo/SUNW,Netra-T12/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Serverblade1 755 root bin
-f none usr/lib/fm/topo/SUNW,Serverblade1/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Blade-100 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Blade-100/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Blade-1000 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Blade-1000/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Blade-1500 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Blade-1500/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Blade-2500 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Blade-2500/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Netra-CP3010 755 root bin
-f none usr/lib/fm/topo/SUNW,Netra-CP3010/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Fire-15000 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-15000/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Fire-480R 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-480R/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Fire-880 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-880/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Fire-T1000 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-T1000/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Fire-V240 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-V240/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Fire-V245 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-V245/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Fire-V440 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-V440/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Fire-V445 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-V445/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Sun-Fire 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Ultra-250 755 root bin
-f none usr/lib/fm/topo/SUNW,Ultra-250/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Ultra-30 755 root bin
-f none usr/lib/fm/topo/SUNW,Ultra-30/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Ultra-4 755 root bin
-f none usr/lib/fm/topo/SUNW,Ultra-4/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Ultra-5_10 755 root bin
-f none usr/lib/fm/topo/SUNW,Ultra-5_10/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Ultra-60 755 root bin
-f none usr/lib/fm/topo/SUNW,Ultra-60/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Ultra-80 755 root bin
-f none usr/lib/fm/topo/SUNW,Ultra-80/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,UltraAX-i2 755 root bin
-f none usr/lib/fm/topo/SUNW,UltraAX-i2/platform.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,Netra-T4 755 root bin
-l none usr/lib/fm/topo/SUNW,Netra-T4/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Blade-1000/platform.topo
-d none usr/lib/fm/topo/SUNW,Netra-440 755 root bin
-l none usr/lib/fm/topo/SUNW,Netra-440/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-V440/platform.topo
-d none usr/lib/fm/topo/SUNW,Sun-Blade-2000 755 root bin
-l none usr/lib/fm/topo/SUNW,Sun-Blade-2000/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Blade-1000/platform.topo
-d none usr/lib/fm/topo/SUNW,Sun-Fire-280R 755 root bin
-l none usr/lib/fm/topo/SUNW,Sun-Fire-280R/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Blade-1000/platform.topo
-d none usr/lib/fm/topo/SUNW,Netra-240 755 root bin
-l none usr/lib/fm/topo/SUNW,Netra-240/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-V240/platform.topo
-d none usr/lib/fm/topo/SUNW,Sun-Fire-V210 755 root bin
-l none usr/lib/fm/topo/SUNW,Sun-Fire-V210/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-V240/platform.topo
-d none usr/lib/fm/topo/SUNW,Sun-Fire-V215 755 root bin
-l none usr/lib/fm/topo/SUNW,Sun-Fire-V215/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-V245/platform.topo
-d none usr/lib/fm/topo/SUNW,Sun-Fire-V250 755 root bin
-l none usr/lib/fm/topo/SUNW,Sun-Fire-V250/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-V240/platform.topo
-d none usr/lib/fm/topo/SUNW,Sun-Fire-V490 755 root bin
-l none usr/lib/fm/topo/SUNW,Sun-Fire-V490/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-480R/platform.topo
-d none usr/lib/fm/topo/SUNW,Sun-Fire-V890 755 root bin
-l none usr/lib/fm/topo/SUNW,Sun-Fire-V890/platform.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-880/platform.topo
-d none usr/lib/fm/topo/SUNW,Sun-Fire-T200 755 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-T200/platform.topo 444 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-T200/pciexdev.topo 444 root bin
-f none usr/lib/fm/topo/SUNW,Sun-Fire-T200/pcidev.topo 444 root bin
-d none usr/lib/fm/topo/SUNW,A70 755 root bin
-f none usr/lib/fm/topo/SUNW,A70/platform.topo 444 root bin
-l none usr/lib/fm/topo/SUNW,A70/pciexdev.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-T200/pciexdev.topo
-l none usr/lib/fm/topo/SUNW,A70/pcidev.topo=../../../../../usr/lib/fm/topo/SUNW,Sun-Fire-T200/pcidev.topo
 f none usr/lib/locale/C/LC_MESSAGES/SUN4.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4U.mo 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/SUN4V.mo 444 root bin
@@ -161,6 +84,12 @@ f none usr/platform/sun4u/lib/fm/fmd/plugins/datapath-retire.so 555 root bin
 f none usr/platform/sun4u/lib/fm/fmd/plugins/datapath-retire.conf 644 root bin
 f none usr/platform/sun4u/lib/fm/fmd/plugins/USII-io-diagnosis.so 555 root bin
 f none usr/platform/sun4u/lib/fm/fmd/plugins/USII-io-diagnosis.conf 644 root bin
+d none usr/platform/sun4u/lib/fm/topo 755 root bin
+f none usr/platform/sun4u/lib/fm/topo/hc-topology.xml 444 root bin
+d none usr/platform/sun4u/lib/fm/topo/plugins 755 root bin
+f none usr/platform/sun4u/lib/fm/topo/plugins/chip.so 555 root bin
+f none usr/platform/sun4u/lib/fm/topo/plugins/hostbridge.so 555 root bin
+f none usr/platform/sun4u/lib/fm/topo/plugins/pcibus.so 555 root bin
 d none usr/platform/sun4v 755 root sys
 d none usr/platform/sun4v/lib 755 root bin
 d none usr/platform/sun4v/lib/fm 755 root bin
@@ -172,8 +101,30 @@ f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.so 555 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/cpumem-diagnosis.conf 644 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/etm.so 555 root bin
 f none usr/platform/sun4v/lib/fm/fmd/plugins/etm.conf 644 root bin
+d none usr/platform/sun4v/lib/fm/topo 755 root bin
+f none usr/platform/sun4v/lib/fm/topo/hc-topology.xml 444 root bin
+d none usr/platform/sun4v/lib/fm/topo/plugins 755 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/chip.so 555 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/hostbridge.so 555 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/pcibus.so 555 root bin
+d none usr/platform/SUNW,Sun-Fire 755 root sys
+d none usr/platform/SUNW,Sun-Fire/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire/lib/fm 755 root bin
+d none usr/platform/SUNW,Sun-Fire/lib/fm/topo 755 root bin
+f none usr/platform/SUNW,Sun-Fire/lib/fm/topo/hc-topology.xml 444 root bin
+d none usr/platform/SUNW,Sun-Fire/lib/fm/topo/plugins 755 root bin
+f none usr/platform/SUNW,Sun-Fire/lib/fm/topo/plugins/ioboard.so 555 root bin
 d none usr/platform/SUNW,Sun-Fire-15000 755 root sys
 d none usr/platform/SUNW,Sun-Fire-15000/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire-15000/lib/fm 755 root bin
 d none usr/platform/SUNW,Sun-Fire-15000/lib/fm/eft 755 root bin
 f none usr/platform/SUNW,Sun-Fire-15000/lib/fm/eft/SUNW,Sun-Fire-15000.eft 444 root bin
+d none usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo 755 root bin
+f none usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/hc-topology.xml 444 root bin
+d none usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/plugins 755 root bin
+f none usr/platform/SUNW,Sun-Fire-15000/lib/fm/topo/plugins/ioboard.so 555 root bin
+d none usr/platform/SUNW,Sun-Fire-T200 755 root sys
+d none usr/platform/SUNW,Sun-Fire-T200/lib 755 root bin
+d none usr/platform/SUNW,Sun-Fire-T200/lib/fm 755 root bin
+d none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo 755 root bin
+f none usr/platform/SUNW,Sun-Fire-T200/lib/fm/topo/hc-topology.xml 444 root bin

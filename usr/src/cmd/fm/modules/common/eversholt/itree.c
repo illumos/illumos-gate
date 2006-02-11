@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * itree.c -- instance tree creation and manipulation
@@ -43,6 +43,7 @@
 #include "ptree.h"
 #include "itree.h"
 #include "ipath.h"
+#include "iexpr.h"
 #include "eval.h"
 #include "config.h"
 
@@ -438,8 +439,17 @@ nv_instantiate(void *name, void *val, void *arg)
 		nrhs = tevent_dup_to_epname(orhs, pd->epname);
 		pd->props = lut_add(pd->props, name, nrhs, NULL);
 		break;
+	case T_GLOBID:
+		nrhs = newnode(T_GLOBID, orhs->file, orhs->line);
+		nrhs->u.globid.s = orhs->u.globid.s;
+		pd->props = lut_add(pd->props, name, nrhs, NULL);
+		break;
+	case T_FUNC:
+		/* for T_FUNC, we don't duplicate it, just point to node */
+		pd->props = lut_add(pd->props, name, orhs, NULL);
+		break;
 	default:
-		out(O_DEBUG, "unexpected nvpair value type %s",
+		out(O_DIE, "unexpected nvpair value type %s",
 		    ptree_nodetype2str(((struct node *)val)->t));
 	}
 }
@@ -468,7 +478,15 @@ instances_destructor(void *left, void *right, void *arg)
 		lut_free(dn->u.stmt.lutp, instances_destructor, NULL);
 		dn->u.stmt.lutp = NULL;
 	}
-	tree_free(dn);
+	if (dn->t != T_FUNC)	/* T_FUNC pointed to original node */
+		tree_free(dn);
+}
+
+/*ARGSUSED*/
+static void
+payloadprops_destructor(void *left, void *right, void *arg)
+{
+	FREE(right);
 }
 
 /*
@@ -1591,6 +1609,9 @@ itree_destructor(void *left, void *right, void *arg)
 	/* Free the properties */
 	lut_free(ep->props, instances_destructor, NULL);
 
+	/* Free the payload properties */
+	lut_free(ep->payloadprops, payloadprops_destructor, NULL);
+
 	/* Free my bubbles */
 	for (bub = ep->bubbles; bub != NULL; ) {
 		nextbub = bub->next;
@@ -1718,6 +1739,7 @@ itree_add_arrow(struct bubble *frombubblep, struct bubble *tobubblep,
 	ASSERTinfo(tobubblep->t == B_TO || tobubblep->t == B_INHIBIT,
 	    itree_bubbletype2str(tobubblep->t));
 	newa = MALLOC(sizeof (struct arrow));
+	bzero(newa, sizeof (struct arrow));
 	newa->tail = frombubblep;
 	newa->head = tobubblep;
 	newa->pnode = apnode;
@@ -1800,7 +1822,7 @@ itree_set_arrow_traits(struct arrow *ap, struct node *fromev,
 
 	/* if we came up with any deferred constraints, add them to arrow */
 	if (newc != NULL)
-		(void) itree_add_constraint(ap, newc);
+		(void) itree_add_constraint(ap, iexpr(newc));
 
 	return (1);	/* constraints allow arrow */
 }
@@ -1937,7 +1959,8 @@ itree_free_constraints(struct arrow *ap)
 	while (cl != NULL) {
 		ncl = cl->next;
 		ASSERT(cl->cnode != NULL);
-		tree_free(cl->cnode);
+		if (!iexpr_cached(cl->cnode))
+			tree_free(cl->cnode);
 		bzero(cl, sizeof (*cl));
 		FREE(cl);
 		cl = ncl;

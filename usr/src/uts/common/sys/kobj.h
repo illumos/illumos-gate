@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -152,7 +152,7 @@ typedef struct {
 
 extern int kobj_load_module(struct modctl *, int);
 extern void kobj_unload_module(struct modctl *);
-extern uintptr_t kobj_lookup(void *, char *);
+extern uintptr_t kobj_lookup(struct module *, const char *);
 extern Sym *kobj_lookup_all(struct module *, char *, int);
 extern int kobj_addrcheck(void *, caddr_t);
 extern int kobj_module_to_id(void *);

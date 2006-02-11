@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,6 +37,7 @@ CORE_OBJS +=			\
 	beeper.o		\
 	biosdisk.o		\
 	cbe.o			\
+	cmi.o			\
 	confunix.o		\
 	cpuid.o			\
 	dis_tables.o		\
@@ -126,6 +127,12 @@ AGPGART_OBJS	+=	agpgart.o \
 			agp_kstat.o
 AGPTARGET_OBJS	+=	agptarget.o
 AMD64GART_OBJS	+=	amd64_gart.o
+
+include $(SRC)/common/mc/mc-amd/Makefile.mcamd
+MCAMD_OBJS	+= \
+	$(MCAMD_CMN_OBJS) \
+	mcamd_drv.o \
+	mcamd_subr.o
 
 #
 #	PCI-Express driver modules

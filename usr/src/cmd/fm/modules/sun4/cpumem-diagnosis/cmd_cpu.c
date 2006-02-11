@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -921,7 +921,8 @@ cmd_cpu_lookup(fmd_hdl_t *hdl, nvlist_t *asru, const char *class)
 	    FM_VERSION, DATA_TYPE_UINT8, &vers,
 	    FM_FMRI_SCHEME, DATA_TYPE_STRING, &scheme,
 	    FM_FMRI_CPU_ID, DATA_TYPE_UINT32, &cpuid,
-	    NULL) != 0 || vers != FM_EREPORT_VERSION ||
+	    NULL) != 0 || (vers != CPU_SCHEME_VERSION0 &&
+	    vers != CPU_SCHEME_VERSION1) ||
 	    strcmp(scheme, FM_FMRI_SCHEME_CPU) != 0) {
 		CMD_STAT_BUMP(bad_cpu_asru);
 		return (NULL);

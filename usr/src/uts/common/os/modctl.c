@@ -19,6 +19,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -84,15 +85,14 @@ static int		modinfo(modid_t, struct modinfo *);
 
 static void		mod_uninstall_all(void);
 static int		mod_getinfo(struct modctl *, struct modinfo *);
-static struct modctl	*allocate_modp(char *, char *);
+static struct modctl	*allocate_modp(const char *, const char *);
 
 static int		mod_load(struct modctl *, int);
 static void		mod_unload(struct modctl *);
 static int		modinstall(struct modctl *);
 static int		moduninstall(struct modctl *);
 
-static struct modctl	*mod_hold_by_name_common(struct modctl *, char *);
-static struct modctl	*mod_hold_by_id(modid_t);
+static struct modctl	*mod_hold_by_name_common(struct modctl *, const char *);
 static struct modctl	*mod_hold_next_by_id(modid_t);
 static struct modctl	*mod_hold_loaded_mod(struct modctl *, char *, int *);
 static struct modctl	*mod_hold_installed_mod(char *, int, int *);
@@ -1943,6 +1943,71 @@ modload(char *subdir, char *filename)
 }
 
 /*
+ * Load a module using a series of qualified names from most specific to least
+ * specific, e.g. for subdir "foo", p1 "bar", p2 "baz", we might try:
+ *
+ * foo/bar.baz.1.2.3
+ * foo/bar.baz.1.2
+ * foo/bar.baz.1
+ *
+ * Return the module ID on success; -1 if no module was loaded.
+ */
+int
+modload_qualified(const char *subdir, const char *p1,
+    const char *p2, const char *delim, uint_t suffv[], int suffc)
+{
+	char path[MOD_MAXPATH];
+	size_t n, resid = sizeof (path);
+	char *p = path;
+
+	char **dotv;
+	int i, rc, id;
+	modctl_t *mp;
+
+	if (p2 != NULL)
+		n = snprintf(p, resid, "%s/%s%s%s", subdir, p1, delim, p2);
+	else
+		n = snprintf(p, resid, "%s/%s", subdir, p1);
+
+	if (n >= resid)
+		return (-1);
+
+	p += n;
+	resid -= n;
+	dotv = kmem_alloc(sizeof (char *) * (suffc + 1), KM_SLEEP);
+
+	for (i = 0; i < suffc; i++) {
+		dotv[i] = p;
+		n = snprintf(p, resid, "%s%u", delim, suffv[i]);
+
+		if (n >= resid) {
+			kmem_free(dotv, sizeof (char *) * (suffc + 1));
+			return (-1);
+		}
+
+		p += n;
+		resid -= n;
+	}
+
+	dotv[suffc] = p;
+
+	for (i = suffc; i >= 0; i--) {
+		dotv[i][0] = '\0';
+		mp = mod_hold_installed_mod(path, 1, &rc);
+
+		if (mp != NULL) {
+			kmem_free(dotv, sizeof (char *) * (suffc + 1));
+			id = mp->mod_id;
+			mod_release_mod(mp);
+			return (id);
+		}
+	}
+
+	kmem_free(dotv, sizeof (char *) * (suffc + 1));
+	return (-1);
+}
+
+/*
  * Load a module.
  */
 int
@@ -2440,7 +2505,7 @@ modadd(struct modctl *mp)
 
 /*ARGSUSED*/
 static struct modctl *
-allocate_modp(char *filename, char *modname)
+allocate_modp(const char *filename, const char *modname)
 {
 	struct modctl *mp;
 
@@ -2473,12 +2538,12 @@ modgetsymname(uintptr_t value, ulong_t *offset)
 }
 
 /*
- * Lookup a symbol in a specified module.  This is a wrapper routine that
- * calls kobj_lookup().  kobj_lookup() may go away but this
- * wrapper will prevent callers from noticing.
+ * Lookup a symbol in a specified module.  These are wrapper routines that
+ * call kobj_lookup().  kobj_lookup() may go away but these wrappers will
+ * prevent callers from noticing.
  */
 uintptr_t
-modlookup(char *modname, char *symname)
+modlookup(const char *modname, const char *symname)
 {
 	struct modctl *modp;
 	uintptr_t val;
@@ -2488,6 +2553,14 @@ modlookup(char *modname, char *symname)
 	val = kobj_lookup(modp->mod_mp, symname);
 	mod_release_mod(modp);
 	return (val);
+}
+
+uintptr_t
+modlookup_by_modctl(modctl_t *modp, const char *symname)
+{
+	ASSERT(modp->mod_ref > 0 || modp->mod_busy);
+
+	return (kobj_lookup(modp->mod_mp, symname));
 }
 
 /*
@@ -3149,9 +3222,9 @@ mod_hold_by_modctl(struct modctl *mp, int f)
 }
 
 static struct modctl *
-mod_hold_by_name_common(struct modctl *dep, char *filename)
+mod_hold_by_name_common(struct modctl *dep, const char *filename)
 {
-	char		*modname;
+	const char	*modname;
 	struct modctl	*mp;
 	char		*curname, *newname;
 	int		found = 0;
@@ -3232,12 +3305,12 @@ mod_hold_by_name_requisite(struct modctl *dep, char *filename)
 }
 
 struct modctl *
-mod_hold_by_name(char *filename)
+mod_hold_by_name(const char *filename)
 {
 	return (mod_hold_by_name_common(NULL, filename));
 }
 
-static struct modctl *
+struct modctl *
 mod_hold_by_id(modid_t modid)
 {
 	struct modctl	*mp;

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -39,3 +39,5 @@ CMA_VERSION = "1.1"
 INCDIRS = .
 
 CPPFLAGS += $(INCDIRS:%=-I%) -DCMA_VERSION='$(CMA_VERSION)'
+LDFLAGS += -R/usr/lib/fm
+LDLIBS += -L$(ROOTLIB)/fm -ltopo

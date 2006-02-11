@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,6 +30,7 @@
 #include <unistd.h>
 #include <strings.h>
 #include <dlfcn.h>
+#include <ctype.h>
 #include <link.h>
 
 #include <mdb/mdb_module.h>
@@ -46,7 +47,7 @@ mdb_module_load(const char *name, int mode)
 {
 	const char *wformat = "no module '%s' could be found\n";
 	const char *fullname = NULL;
-	char buf[MAXPATHLEN], *p;
+	char buf[MAXPATHLEN], *p, *q;
 	int i;
 
 	ASSERT(!(mode & MDB_MOD_DEFER));
@@ -56,8 +57,25 @@ mdb_module_load(const char *name, int mode)
 
 		(void) mdb_iob_snprintf(buf, sizeof (buf), "%s",
 		    strbasename(name));
-		if ((p = strchr(buf, '.')) != NULL)
-			*p = '\0'; /* eliminate suffixes */
+
+		/*
+		 * Remove any .so(.[0-9]+)? suffix
+		 */
+		if ((p = strrchr(buf, '.')) != NULL) {
+			for (q = p + 1; isdigit(*q); q++)
+				;
+
+			if (*q == '\0') {
+				/* found digits to remove */
+				*p = '\0';
+				p = strrchr(buf, '.'); /* search for ".so" */
+			}
+		}
+
+		if (p != NULL) {
+			if (strcmp(p, ".so") == 0)
+				*p = '\0';
+		}
 
 		fullname = name;
 		name = buf;

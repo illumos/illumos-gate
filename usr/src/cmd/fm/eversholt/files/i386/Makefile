@@ -20,11 +20,14 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+SUBDIRS=i86pc
 EFT_COMMON_FILES= pci.eft sca500.eft sca1000.eft
+
+include ../../../Makefile.subdirs
 
 include ../Makefile.com

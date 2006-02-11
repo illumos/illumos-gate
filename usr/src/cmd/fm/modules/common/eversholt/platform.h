@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * platform -- platform-specific access to configuration database
@@ -39,6 +39,8 @@ extern "C" {
 
 #include "config.h"
 
+nvlist_t *Action_nvl;	/* nvl for problem with action=... prop on it */
+
 void platform_init(void);
 void platform_fini(void);
 void platform_run_poller(const char *poller);
@@ -54,7 +56,11 @@ void platform_free_eft_files(char **);
 
 int platform_call(struct node *np, struct lut **globals, struct config *croot,
     struct arrow *arrowp, struct evalue *valuep);
+int platform_confcall(struct node *np, struct lut **globals,
+    struct config *croot, struct arrow *arrowp, struct evalue *valuep);
 int platform_payloadprop(struct node *np, struct evalue *valuep);
+struct evalue *platform_payloadprop_values(const char *s, int *nvals);
+int platform_path_exists(nvlist_t *fmri);
 
 #ifdef	__cplusplus
 }

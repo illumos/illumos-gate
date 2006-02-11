@@ -36,12 +36,9 @@
 #include <time.h>
 #include <sys/mem.h>
 
-/*
- * The scheme plugin for mem FMRIs.
- */
-
 mem_t mem;
 
+#ifdef	sparc
 /*
  * Retry values for handling the case where the kernel is not yet ready
  * to provide DIMM serial ids.  Some platforms acquire DIMM serial id
@@ -221,7 +218,10 @@ mem_get_serids_from_cache(const char *unum, char ***seridsp, size_t *nseridsp)
 	return (rc);
 }
 
+#else
+/*ARGSUSED*/
 static int
+#endif	/* sparc */
 mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
 {
 	/*
@@ -229,10 +229,15 @@ mem_get_serids_by_unum(const char *unum, char ***seridsp, size_t *nseridsp)
 	 * mem scheme plugin but instead support making serial ids available
 	 * via the kernel.
 	 */
+#ifdef	sparc
 	if (mem.mem_dm == NULL)
 		return (mem_get_serids_from_kernel(unum, seridsp, nseridsp));
 	else
 		return (mem_get_serids_from_cache(unum, seridsp, nseridsp));
+#else
+	errno = ENOTSUP;
+	return (-1);
+#endif	/* sparc */
 }
 
 static int
@@ -254,40 +259,70 @@ mem_fmri_get_unum(nvlist_t *nvl, char **unump)
 ssize_t
 fmd_fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
-	const char *fmt = "mem:///component=%1$s";
+	char format[64];
 	ssize_t size, presz;
-	uint64_t pa;
-	char *rawunum, *preunum, *escunum;
+	char *rawunum, *preunum, *escunum, *prefix;
+	uint64_t val;
 	int i;
 
 	if (mem_fmri_get_unum(nvl, &rawunum) < 0)
 		return (-1); /* errno is set for us */
 
-	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &pa) == 0)
-		fmt = "mem:///pa=%2$llx/component=%1$s";
+	/*
+	 * If we have a well-formed unum (hc-FMRI), use the string verbatim
+	 * to form the initial mem:/// components.  Otherwise use unum=%s.
+	 */
+	if (strncmp(rawunum, "hc:///", 6) != 0)
+		prefix = FM_FMRI_MEM_UNUM "=";
+	else
+		prefix = "";
 
 	/*
-	 * If we leave the unum as-is, the spaces and colons will be escaped,
-	 * rendering the resulting FMRI pretty much unreadable.  We're therefore
-	 * going to do some escaping of our own first.
+	 * If we have a DIMM offset, include it in the string.  If we have a PA
+	 * then use that.  Otherwise just format the unum element.
 	 */
-	preunum = fmd_fmri_strdup(rawunum);
-	presz = strlen(preunum) + 1;
-
-	for (i = 0; i < presz - 1; i++) {
-		if (preunum[i] == ':' && preunum[i + 1] == ' ') {
-			bcopy(preunum + i + 2, preunum + i + 1,
-			    presz - (i + 2));
-		} else if (preunum[i] == ' ') {
-			preunum[i] = ',';
-		}
+	if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val) == 0) {
+		(void) snprintf(format, sizeof (format),
+		    "%s:///%s%%1$s/%s=%%2$llx",
+		    FM_FMRI_SCHEME_MEM, prefix, FM_FMRI_MEM_OFFSET);
+	} else if (nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val) == 0) {
+		(void) snprintf(format, sizeof (format),
+		    "%s:///%s%%1$s/%s=%%2$llx",
+		    FM_FMRI_SCHEME_MEM, prefix, FM_FMRI_MEM_PHYSADDR);
+	} else {
+		(void) snprintf(format, sizeof (format),
+		    "%s:///%s%%1$s", FM_FMRI_SCHEME_MEM, prefix);
 	}
 
-	escunum = fmd_fmri_strescape(preunum);
-	fmd_fmri_free(preunum, presz);
+	/*
+	 * If we have a well-formed unum (hc-FMRI), leave it as is.
+	 * Otherwise, the spaces and colons will be escaped,
+	 * rendering the resulting FMRI pretty much unreadable.
+	 * We're therefore going to do some escaping of our own first.
+	 */
+	if (strncmp(rawunum, "hc:///", 6) == 0) {
+		/* LINTED: variable format specifier */
+		size = snprintf(buf, buflen, format, rawunum + 6, val);
+	} else {
+		preunum = fmd_fmri_strdup(rawunum);
+		presz = strlen(preunum) + 1;
 
-	size = snprintf(buf, buflen, fmt, escunum, (u_longlong_t)pa);
-	fmd_fmri_strfree(escunum);
+		for (i = 0; i < presz - 1; i++) {
+			if (preunum[i] == ':' && preunum[i + 1] == ' ') {
+				bcopy(preunum + i + 2, preunum + i + 1,
+				    presz - (i + 2));
+			} else if (preunum[i] == ' ') {
+				preunum[i] = ',';
+			}
+		}
+
+		escunum = fmd_fmri_strescape(preunum);
+		fmd_fmri_free(preunum, presz);
+
+		/* LINTED: variable format specifier */
+		size = snprintf(buf, buflen, format, escunum, val);
+		fmd_fmri_strfree(escunum);
+	}
 
 	return (size);
 }
@@ -409,7 +444,7 @@ int
 fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
 {
 	char *erunum, *eeunum;
-	uint64_t erpa = 0, eepa = 0;
+	uint64_t erval = 0, eeval = 0;
 
 	if (mem_fmri_get_unum(er, &erunum) < 0 ||
 	    mem_fmri_get_unum(ee, &eeunum) < 0)
@@ -418,47 +453,69 @@ fmd_fmri_contains(nvlist_t *er, nvlist_t *ee)
 	if (mem_unum_contains(erunum, eeunum) <= 0)
 		return (0); /* can't parse/match, so assume no containment */
 
-	if (nvlist_lookup_uint64(er, FM_FMRI_MEM_PHYSADDR, &erpa) == 0) {
-		/* container has a PA; only match if containee has same PA */
-		return (nvlist_lookup_uint64(ee, FM_FMRI_MEM_PHYSADDR,
-		    &eepa) == 0 && erpa == eepa);
+	if (nvlist_lookup_uint64(er, FM_FMRI_MEM_OFFSET, &erval) == 0) {
+		return (nvlist_lookup_uint64(ee,
+		    FM_FMRI_MEM_OFFSET, &eeval) == 0 && erval == eeval);
+	}
+
+	if (nvlist_lookup_uint64(er, FM_FMRI_MEM_PHYSADDR, &erval) == 0) {
+		return (nvlist_lookup_uint64(ee,
+		    FM_FMRI_MEM_PHYSADDR, &eeval) == 0 && erval == eeval);
 	}
 
 	return (1);
 }
 
+/*
+ * We can only make a usable/unusable determination for pages.  Mem FMRIs
+ * without page addresses will be reported as usable since Solaris has no
+ * way at present to dynamically disable an entire DIMM or DIMM pair.
+ */
 int
 fmd_fmri_unusable(nvlist_t *nvl)
 {
-	uint64_t pageaddr;
+	uint64_t val;
 	uint8_t version;
-	int rc, err;
-
-	/*
-	 * We can only make a usable/unusable determination for pages.  FMRIs
-	 * without page addresses will be reported as usable.
-	 */
+	int rc, err1, err2;
+	nvlist_t *nvlcp = NULL;
+	int retval;
 
 	if (nvlist_lookup_uint8(nvl, FM_VERSION, &version) != 0 ||
 	    version > FM_MEM_SCHEME_VERSION)
 		return (fmd_fmri_set_errno(EINVAL));
 
-	if ((err = nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR,
-	    &pageaddr)) == ENOENT)
+	err1 = nvlist_lookup_uint64(nvl, FM_FMRI_MEM_OFFSET, &val);
+	err2 = nvlist_lookup_uint64(nvl, FM_FMRI_MEM_PHYSADDR, &val);
+
+	if (err1 == ENOENT && err2 == ENOENT)
 		return (0); /* no page, so assume it's still usable */
-	else if (err != 0)
+
+	if ((err1 != 0 && err1 != ENOENT) || (err2 != 0 && err2 != ENOENT))
 		return (fmd_fmri_set_errno(EINVAL));
 
-	if ((rc = mem_page_cmd(MEM_PAGE_FMRI_ISRETIRED, nvl)) < 0 &&
-	    errno == EIO) {
-		return (0); /* the page wonders, "why all the fuss?" */
+	if ((err1 = mem_unum_rewrite(nvl, &nvlcp)) != 0)
+		return (fmd_fmri_set_errno(err1));
+
+	/*
+	 * Ask the kernel if the page is retired, using either the rewritten
+	 * hc FMRI or the original mem FMRI with the specified offset or PA.
+	 * Refer to the kernel's page_retire_check() for the error codes.
+	 */
+	rc = mem_page_cmd(MEM_PAGE_FMRI_ISRETIRED, nvlcp ? nvlcp : nvl);
+
+	if (rc == -1 && errno == EIO) {
+		/*
+		 * The page is not retired and is not scheduled for retirement
+		 * (i.e. no request pending and has not seen any errors)
+		 */
+		retval = 0;
 	} else if (rc == 0 || errno == EAGAIN || errno == EINVAL) {
 		/*
 		 * The page has been retired, is in the process of being
 		 * retired, or doesn't exist.  The latter is valid if the page
 		 * existed in the past but has been DR'd out.
 		 */
-		return (1);
+		retval = 1;
 	} else {
 		/*
 		 * Errors are only signalled to the caller if they're the
@@ -466,21 +523,33 @@ fmd_fmri_unusable(nvlist_t *nvl)
 		 * retirement-check code.  We'll whine about it and tell
 		 * the caller the page is unusable.
 		 */
-		fmd_fmri_warn("failed to determine usability of page %llx",
-		    pageaddr);
-		return (1);
+		fmd_fmri_warn("failed to determine page %s=%llx usability: "
+		    "rc=%d errno=%d\n", err1 == 0 ? FM_FMRI_MEM_OFFSET :
+		    FM_FMRI_MEM_PHYSADDR, (u_longlong_t)val, rc, errno);
+		retval = 1;
 	}
+
+	if (nvlcp)
+		nvlist_free(nvlcp);
+
+	return (retval);
 }
 
 int
 fmd_fmri_init(void)
 {
-	bzero(&mem, sizeof (mem_t));
 	return (mem_discover());
 }
 
 void
 fmd_fmri_fini(void)
 {
-	mem_destroy();
+	mem_dimm_map_t *dm, *em;
+
+	for (dm = mem.mem_dm; dm != NULL; dm = em) {
+		em = dm->dm_next;
+		fmd_fmri_strfree(dm->dm_label);
+		fmd_fmri_strfree(dm->dm_device);
+		fmd_fmri_free(dm, sizeof (mem_dimm_map_t));
+	}
 }

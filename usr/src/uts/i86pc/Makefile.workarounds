@@ -19,10 +19,7 @@
 #
 # CDDL HEADER END
 #
-#
-# uts/i86pc/Makefile.workarounds
-#
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +52,11 @@ WORKAROUND_DEFS += -DOPTERON_ERRATUM_95
 # Compatibility Mode Branches Transfer to Illegal Address
 #
 WORKAROUND_DEFS += -DOPTERON_ERRATUM_100
+
+#
+# DRAM Scrubber May Cause Data Corruption When Using Node-Interleaved Memory
+#
+WORKAROUND_DEFS += -DOPTERON_ERRATUM_101
 
 #
 # CPUID Instruction May Return Incorrect Model Number in Some Processors

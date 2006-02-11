@@ -63,7 +63,6 @@
 #include <sys/rootnex.h>
 #include <vm/hat_i86.h>
 
-
 /*
  * enable/disable extra checking of function parameters. Useful for debugging
  * drivers.
@@ -81,6 +80,9 @@ int rootnex_bind_check_inuse = 0;
 int rootnex_unbind_verify_buffer = 0;
 int rootnex_sync_check_parms = 0;
 #endif
+
+/* Master Abort and Target Abort panic flag */
+int rootnex_fm_ma_ta_panic_flag = 0;
 
 /* Semi-temporary patchables to phase in bug fixes, test drivers, etc. */
 int rootnex_bind_fail = 1;
@@ -321,6 +323,8 @@ static int rootnex_maxxfer_window_boundary(ddi_dma_impl_t *hp,
 static int rootnex_valid_sync_parms(ddi_dma_impl_t *hp, rootnex_window_t *win,
     off_t offset, size_t size, uint_t cache_flags);
 static int rootnex_verify_buffer(rootnex_dma_t *dma);
+static int rootnex_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr,
+    const void *no_used);
 
 
 /*
@@ -365,6 +369,7 @@ _fini(void)
 static int
 rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 {
+	int fmcap;
 	int e;
 
 
@@ -385,11 +390,23 @@ rootnex_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	rootnex_state = kmem_zalloc(sizeof (rootnex_state_t), KM_SLEEP);
 
 	rootnex_state->r_dip = dip;
+	rootnex_state->r_err_ibc = (ddi_iblock_cookie_t)ipltospl(15);
 	rootnex_state->r_reserved_msg_printed = B_FALSE;
 	rootnex_cnt = &rootnex_state->r_counters[0];
 
 	mutex_init(&rootnex_state->r_peekpoke_mutex, NULL, MUTEX_SPIN,
 	    (void *)ipltospl(15));
+
+	/*
+	 * Set minimum fm capability level for i86pc platforms and then
+	 * initialize error handling. Since we're the rootnex, we don't
+	 * care what's returned in the fmcap field.
+	 */
+	ddi_system_fmcap = DDI_FM_ERRCB_CAPABLE;
+	fmcap = ddi_system_fmcap;
+	ddi_fm_init(dip, &fmcap, &rootnex_state->r_err_ibc);
+	if (fmcap & DDI_FM_ERRCB_CAPABLE)
+		ddi_fm_handler_register(dip, rootnex_fm_callback, NULL);
 
 	/* initialize DMA related state */
 	e = rootnex_dma_init();
@@ -4406,4 +4423,11 @@ rootnex_dma_mctl(dev_info_t *dip, dev_info_t *rdip, ddi_dma_handle_t handle,
 
 	return (DDI_FAILURE);
 #endif /* defined(__amd64) */
+}
+
+/*ARGSUSED*/
+static int
+rootnex_fm_callback(dev_info_t *dip, ddi_fm_error_t *derr, const void *no_used)
+{
+	return (rootnex_fm_ma_ta_panic_flag ? DDI_FM_FATAL : DDI_FM_NONFATAL);
 }

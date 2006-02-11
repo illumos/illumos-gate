@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -45,7 +45,25 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/conf/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.s
+	$(COMPILE.s) -o $@ $<
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.s
+	$(COMPILE.s) -o $@ $<
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
+$(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/mc/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
@@ -118,6 +136,10 @@ $(OBJS_DIR)/%.o:		$(UTSBASE)/common/io/power/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
 
+$(OBJS_DIR)/%.o:		$(SRC)/common/mc/mc-amd/%.c
+	$(COMPILE.c) -o $@ $<
+	$(CTFCONVERT_O)
+
 $(OBJS_DIR)/%.o:		$(UTSBASE)/i86pc/io/acpica/%.c
 	$(COMPILE.c) -o $@ $<
 	$(CTFCONVERT_O)
@@ -179,7 +201,22 @@ $(DTRACESTUBS):	$(DTRACESTUBS_O)
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/conf/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/amd_opteron/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/cpu/generic_cpu/%.s
+	@($(LHEAD) $(LINT.s) $< $(LTAIL))
+
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/mc/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/pci/%.c
@@ -225,6 +262,9 @@ $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/agpgart/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(SRC)/common/atomic/%.c
+	@($(LHEAD) $(LINT.c) $< $(LTAIL))
+
+$(LINTS_DIR)/%.ln:		$(SRC)/common/mc/mc-amd/%.c
 	@($(LHEAD) $(LINT.c) $< $(LTAIL))
 
 $(LINTS_DIR)/%.ln:		$(UTSBASE)/i86pc/io/acpica/%.s

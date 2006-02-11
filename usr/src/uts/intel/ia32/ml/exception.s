@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -943,13 +943,46 @@ check_for_user_address:
 	/*
 	 * #MC
 	 */
+	.globl	cmi_mca_trap	/* see uts/i86pc/os/cmi.c */
+
+#if defined(__amd64)
+
 	ENTRY_NP(mcetrap)
 	TRAP_NOERR(T_MCE)	/* $18 */
-#if defined(__amd64)
 	SET_CPU_GSBASE
-#endif
-	jmp	cmninttrap
+	INTR_PUSH
+
+	TRACE_PTR(%rdi, %rbx, %ebx, %rcx, $TT_TRAP)
+	TRACE_REGS(%rdi, %rsp, %rbx, %rcx)
+	TRACE_STAMP(%rdi)
+
+	DISABLE_INTR_FLAGS
+	movq	%rsp, %rbp
+
+	movq	%rsp, %rdi	/* arg0 = struct regs *rp */
+	call	cmi_mca_trap	/* cmi_mca_trap(rp); */
+
+	jmp	_sys_rtt
 	SET_SIZE(mcetrap)
+
+#else
+
+	ENTRY_NP(mcetrap)
+	TRAP_NOERR(T_MCE)	/* $18 */
+	INTR_PUSH
+
+	DISABLE_INTR_FLAGS
+	movl	%esp, %ebp
+
+	movl	%esp, %ecx
+	pushl	%ecx		/* arg0 = struct regs *rp */
+	call	cmi_mca_trap	/* cmi_mca_trap(rp) */
+	addl	$4, %esp	/* pop arg0 */
+
+	jmp	_sys_rtt
+	SET_SIZE(mcetrap)
+
+#endif
 
 	/*
 	 * #XF

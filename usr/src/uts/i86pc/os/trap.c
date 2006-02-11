@@ -497,15 +497,6 @@ trap(struct regs *rp, caddr_t addr, processorid_t cpuid)
 	}
 
 	switch (type) {
-
-	case T_MCE:	/* Machine check exception */
-	case T_MCE + USER:
-		if (x86_feature & X86_MCA) {
-			if (mca_exception(rp))
-				(void) die(type, rp, addr, cpuid);
-			type &= ~USER;
-			goto cleanup;
-		}
 	default:
 		if (type & USER) {
 			if (tudebug)

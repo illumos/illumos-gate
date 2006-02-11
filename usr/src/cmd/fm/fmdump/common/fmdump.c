@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -48,6 +48,7 @@ const char *g_pname;
 ulong_t g_errs;
 ulong_t g_recs;
 char *g_root;
+struct topo_hdl *g_thp;
 
 /*PRINTFLIKE2*/
 void

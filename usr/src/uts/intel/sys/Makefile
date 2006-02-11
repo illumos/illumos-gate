@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -55,6 +55,11 @@ HDRS	=			\
 	machlock.h		\
 	machsig.h		\
 	machtypes.h		\
+	mc.h			\
+	mc_amd.h		\
+	mca_amd.h		\
+	mca_x86.h		\
+	memtest.h		\
 	mii.h			\
 	miipriv.h		\
 	mmu.h			\

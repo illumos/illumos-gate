@@ -28,9 +28,10 @@
 
 include ../Makefile.com
 
-LDLIBS += -L$(ROOTLIB)/fm -lmdesc
+SRCS += mdesc_devinit.c
+LDLIBS += -L$(ROOTLIB)/fm -lmdesc -ltopo
 LDFLAGS += -R/usr/lib/fm
 
-include ../Makefile.targ
+include ../../Makefile.targ
 
 install: all $(ROOTPROG)

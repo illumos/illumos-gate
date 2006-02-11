@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,6 +57,7 @@ typedef struct cma {
 	hrtime_t cma_page_maxdelay;	/* Maximum retry sleep interval */
 	id_t cma_page_timerid;		/* fmd timer ID for retry sleep */
 	uint_t cma_page_doretire;	/* Whether to retire pages */
+	uint_t cma_page_maxretries;	/* Maximum retry on page retires */
 } cma_t;
 
 typedef struct cma_stats {
@@ -69,6 +70,7 @@ typedef struct cma_stats {
 	fmd_stat_t page_fails;		/* Failed page retires */
 	fmd_stat_t page_supp;		/* Suppressed retires */
 	fmd_stat_t page_nonent;		/* Retires for non-present pages */
+	fmd_stat_t page_retmax;		/* Retires for page reached max */
 	fmd_stat_t bad_flts;		/* Malformed faults */
 	fmd_stat_t nop_flts;		/* Inapplicable faults */
 	fmd_stat_t auto_flts;		/* Auto-close faults */

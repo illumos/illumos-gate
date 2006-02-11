@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -145,7 +145,8 @@ extern "C" {
 
 #define	MSR_AMD_HWCR	0xc0010015
 
-#define	AMD_HWCR_FFDIS	0x40		/* set to disable TLB Flush Filter */
+#define	AMD_HWCR_FFDIS			0x00040	/* disable TLB Flush Filter */
+#define	AMD_HWCR_MCI_STATUS_WREN	0x40000	/* enable write of MCi_STATUS */
 
 /* AMD's NorthBridge Config MSR, SHOULD ONLY BE WRITTEN TO BY BIOS */
 

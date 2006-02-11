@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -59,19 +59,37 @@ HDRS=  \
 	vmparam.h	\
 	sysconfig_impl.h
 
-FPUHDRS=   fpu_simulator.h	fpusystm.h	globals.h	ieee.h
+FPUHDRS= \
+	fpu_simulator.h \
+	fpusystm.h \
+	globals.h \
+	ieee.h
+
+FMCPUHDRS= \
+	UltraSPARC-II.h \
+	UltraSPARC-III.h \
+	UltraSPARC-T1.h
 
 ROOTDIR=	$(ROOT)/usr/include/sys
-ROOTDIRS=	$(ROOTDIR) $(ROOTDIR)/fpu
+ROOTDIRS= \
+	$(ROOTDIR) \
+	$(ROOTDIR)/fm/cpu \
+	$(ROOTDIR)/fpu
 
 ROOTHDRS= $(HDRS:%=$(ROOTDIR)/%)
 ROOTFPUHDRS= $(FPUHDRS:%=$(ROOTDIR)/fpu/%)
+ROOTFMCPUHDRS= $(FMCPUHDRS:%=$(ROOTDIR)/fm/cpu/%)
 
 fpu/%.check:	fpu/%.h
 	$(DOT_H_CHECK)
 
-CHECKHDRS= $(HDRS:%.h=%.check) \
-	$(FPUHDRS:%.h=fpu/%.check)
+fm/cpu/%.check:	fm/cpu/%.h
+	$(DOT_H_CHECK)
+
+CHECKHDRS= \
+	$(HDRS:%.h=%.check) \
+	$(FPUHDRS:%.h=fpu/%.check) \
+	$(FMCPUHDRS:%.h=fm/cpu/%.check)
 
 # install rules
 $(ROOTDIR)/%: %
@@ -80,11 +98,14 @@ $(ROOTDIR)/%: %
 $(ROOTDIR)/fpu/%: fpu/%
 	$(INS.file)
 
+$(ROOTDIR)/fm/cpu/%: fm/cpu/%
+	$(INS.file)
+
 .KEEP_STATE:
 
-.PARALLEL: $(CHECKHDRS) $(ROOTHDRS) $(ROOTFPUHDRS)
+.PARALLEL: $(CHECKHDRS) $(ROOTHDRS) $(ROOTFPUHDRS) $(ROOTFMCPUHDRS)
 
-install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTFPUHDRS)
+install_h: $(ROOTDIRS) .WAIT $(ROOTHDRS) $(ROOTFPUHDRS) $(ROOTFMCPUHDRS)
 
 $(ROOTDIRS):
 	$(INS.dir)

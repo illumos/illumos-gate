@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,6 +130,7 @@ static void	*memscrub_pte;
  * we can patch these defaults in /etc/system if necessary
  */
 uint_t disable_memscrub = 0;
+static uint_t disable_memscrub_quietly = 0;
 pgcnt_t memscrub_min_pages = MEMSCRUB_MIN_PAGES;
 pgcnt_t memscrub_span_pages = MEMSCRUB_DFL_SPAN_PAGES;
 time_t memscrub_period_sec = MEMSCRUB_DFL_PERIOD_SEC;
@@ -150,6 +152,7 @@ static uint_t memscrub_phys_pages;
 
 static kcondvar_t memscrub_cv;
 static kmutex_t memscrub_lock;
+
 /*
  * memscrub_lock protects memscrub_memlist
  */
@@ -197,6 +200,16 @@ memscrub_init()
 	 */
 	(void) thread_create(NULL, 0, (void (*)())memscrubber, NULL, 0, &p0,
 	    TS_RUN, memscrub_thread_pri);
+}
+
+/*
+ * Function to cause the software memscrubber to exit quietly if the
+ * platform support has located a hardware scrubber and enabled it.
+ */
+void
+memscrub_disable(void)
+{
+	disable_memscrub_quietly = 1;
 }
 
 #ifdef MEMSCRUB_DEBUG
@@ -267,7 +280,7 @@ memscrubber()
 	deadline = gethrestime_sec() + memscrub_delay_start_sec;
 
 	for (;;) {
-		if (disable_memscrub)
+		if (disable_memscrub || disable_memscrub_quietly)
 			break;
 
 		mutex_enter(&memscrub_lock);
@@ -317,7 +330,7 @@ memscrubber()
 			pgcnt_t pages = memscrub_span_pages;
 			uint64_t address = mlp_next_addr;
 
-			if (disable_memscrub)
+			if (disable_memscrub || disable_memscrub_quietly)
 				break;
 
 			mutex_enter(&memscrub_lock);
@@ -379,7 +392,8 @@ memscrubber()
 
 memscrub_exit:
 
-	cmn_err(CE_NOTE, "memory scrubber exiting.");
+	if (!disable_memscrub_quietly)
+		cmn_err(CE_NOTE, "memory scrubber exiting.");
 
 	cv_destroy(&memscrub_cv);
 

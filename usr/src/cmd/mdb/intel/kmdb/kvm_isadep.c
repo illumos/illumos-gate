@@ -46,6 +46,7 @@
 #include <sys/frame.h>
 #include <sys/trap.h>
 #include <sys/bitmap.h>
+#include <sys/pci_impl.h>
 
 /* Higher than the highest trap number for which we have a defined specifier */
 #define	KMT_MAXTRAPNO	0x20
@@ -278,6 +279,15 @@ kmt_in_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+static uint64_t
+kmt_numarg(const mdb_arg_t *arg)
+{
+	if (arg->a_type == MDB_TYPE_STRING)
+		return (mdb_strtoull(arg->a_un.a_str));
+	else
+		return (arg->a_un.a_val);
+}
+
 /*ARGSUSED1*/
 int
 kmt_out_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
@@ -294,10 +304,7 @@ kmt_out_dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		len = mdb.m_dcount;
 
 	argv += argc - 1;
-	if (argv->a_type == MDB_TYPE_STRING)
-		val = mdb_strtoull(argv->a_un.a_str);
-	else
-		val = argv->a_un.a_val;
+	val = kmt_numarg(argv);
 
 	if (kmt_io_check(len, addr, IOCHECK_WARN) < 0)
 		return (DCMD_ERR);
@@ -360,10 +367,7 @@ kmt_wrmsr(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (!(flags & DCMD_ADDRSPEC) || argc != 1)
 		return (DCMD_USAGE);
 
-	if (argv->a_type == MDB_TYPE_STRING)
-		val = mdb_strtoull(argv->a_un.a_str);
-	else
-		val = argv->a_un.a_val;
+	val = kmt_numarg(argv);
 
 	if (kmt_rwmsr(addr, &val, wrmsr)) {
 		warn("wrmsr failed");
@@ -431,6 +435,89 @@ ssize_t
 kmt_iowrite(mdb_tgt_t *t, const void *buf, size_t nbytes, uintptr_t addr)
 {
 	return (kmt_iorw(t, (void *)buf, nbytes, addr, kmt_out));
+}
+
+static int
+kmt_pcicfg_common(uintptr_t off, uint32_t *valp, const mdb_arg_t *argv,
+    void (*rw)(void *, size_t, uintptr_t))
+{
+	uint32_t bus, dev, func;
+	uint32_t addr;
+
+	bus = kmt_numarg(&argv[0]);
+	dev = kmt_numarg(&argv[1]);
+	func = kmt_numarg(&argv[2]);
+
+	if ((bus & 0xffff) != bus) {
+		warn("invalid bus number (must be 0-0xffff)\n");
+		return (DCMD_ERR);
+	}
+
+	if ((dev & 0x1f) != dev) {
+		warn("invalid device number (must be 0-0x1f)\n");
+		return (DCMD_ERR);
+	}
+
+	if ((func & 0x7) != func) {
+		warn("invalid function number (must be 0-7)\n");
+		return (DCMD_ERR);
+	}
+
+	if ((off & 0xfc) != off) {
+		warn("invalid register number (must be 0-0xff, and 4-byte "
+		    "aligned\n");
+		return (DCMD_ERR);
+	}
+
+	addr = PCI_CADDR1(bus, dev, func, off);
+
+	if (kmt_iowrite(mdb.m_target, &addr, sizeof (addr), PCI_CONFADD) !=
+	    sizeof (addr)) {
+		warn("write of PCI_CONFADD failed");
+		return (DCMD_ERR);
+	}
+
+	if (kmt_iorw(mdb.m_target, valp, sizeof (*valp), PCI_CONFDATA, rw) !=
+	    sizeof (*valp)) {
+		warn("access to PCI_CONFDATA failed");
+		return (DCMD_ERR);
+	}
+
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+int
+kmt_rdpcicfg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint32_t val;
+
+	if (argc != 3 || !(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	if (kmt_pcicfg_common(addr, &val, argv, kmt_in) != DCMD_OK)
+		return (DCMD_ERR);
+
+	mdb_printf("%llx\n", (u_longlong_t)val);
+
+	return (DCMD_OK);
+}
+
+/*ARGSUSED*/
+int
+kmt_wrpcicfg(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	uint32_t val;
+
+	if (argc != 4 || !(flags & DCMD_ADDRSPEC))
+		return (DCMD_USAGE);
+
+	val = (uint32_t)kmt_numarg(&argv[3]);
+
+	if (kmt_pcicfg_common(addr, &val, argv, kmt_out) != DCMD_OK)
+		return (DCMD_ERR);
+
+	return (DCMD_OK);
 }
 
 const char *

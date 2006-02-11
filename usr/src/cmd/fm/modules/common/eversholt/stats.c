@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * stats.c -- simple stats tracking table module
@@ -79,10 +79,20 @@ stats_new(const char *name, const char *desc, enum stats_type t)
 	bzero(ret, sizeof (*ret));
 	ret->t = t;
 
-	(void) strlcpy(ret->fmd_stats.fmds_name, name,
-	    sizeof (ret->fmd_stats.fmds_name));
 	(void) strlcpy(ret->fmd_stats.fmds_desc, desc,
 	    sizeof (ret->fmd_stats.fmds_desc));
+
+	/* NULL name means generate a unique name */
+	if (name == NULL) {
+		static int uniqstat;
+
+		(void) snprintf(ret->fmd_stats.fmds_name,
+		    sizeof (ret->fmd_stats.fmds_name),
+		    "stat.rules%d", uniqstat++);
+	} else {
+		(void) strlcpy(ret->fmd_stats.fmds_name, name,
+		    sizeof (ret->fmd_stats.fmds_name));
+	}
 
 	switch (t) {
 	case STATS_COUNTER:
@@ -145,6 +155,17 @@ stats_counter_add(struct stats *sp, int n)
 	ASSERT(sp->t == STATS_COUNTER);
 
 	sp->fmd_stats.fmds_value.i32 += n;
+}
+
+void
+stats_counter_reset(struct stats *sp)
+{
+	if (sp == NULL)
+		return;
+
+	ASSERT(sp->t == STATS_COUNTER);
+
+	sp->fmd_stats.fmds_value.i32 = 0;
 }
 
 int

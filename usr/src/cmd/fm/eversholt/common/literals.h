@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * literals.h -- public definitions for literals in string table
@@ -72,6 +72,7 @@ L_DECL(ereport);
 
 /* engine types */
 L_DECL(serd);
+L_DECL(stat);
 
 /* timeval suffixes */
 L_DECL(nanosecond);
@@ -119,9 +120,11 @@ L_DECL(infinity);
 
 /* property names */
 L_DECL(ASRU);
+L_DECL(action);
 L_DECL(FITrate);
 L_DECL(FRU);
-L_DECL(FRU);
+L_DECL(id);
+L_DECL(message);
 L_DECL(FRUID);
 L_DECL(N);
 L_DECL(T);
@@ -147,14 +150,20 @@ L_DECL(inhibit);
  */
 L_DECL(within);
 L_DECL(call);
+L_DECL(confcall);
 L_DECL(confprop);
+L_DECL(defined);
 L_DECL(payloadprop);
+L_DECL(payloadprop_contains);
+L_DECL(payloadprop_defined);
+L_DECL(setpayloadprop);
 L_DECL(envprop);
 L_DECL(is_connected);
 L_DECL(is_under);
 L_DECL(is_on);
 L_DECL(is_present);
 L_DECL(is_type);
+L_DECL(count);
 
 /* our enumerated types (used for debugging) */
 L_DECL(T_NOTHING);
@@ -201,6 +210,7 @@ L_DECL(T_DEFECT);
 L_DECL(T_ERROR);
 L_DECL(T_EREPORT);
 L_DECL(T_SERD);
+L_DECL(T_STAT);
 L_DECL(T_PROP);
 L_DECL(T_MASK);
 L_DECL(N_UNSPEC);

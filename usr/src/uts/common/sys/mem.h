@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,14 @@ typedef struct mem_vtop {
 	void		*m_va;
 	pfn_t		m_pfn;
 } mem_vtop_t;
+
+#if defined(_SYSCALL32)
+typedef struct mem_vtop32 {
+	uint32_t	m_as;
+	uint32_t	m_va;
+	uint32_t	m_pfn;
+} mem_vtop32_t;
+#endif
 
 /*
  * Private ioctls for fmd(1M).  These interfaces are Sun Private.  Applications

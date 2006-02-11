@@ -64,6 +64,7 @@
 #include <vm/hat_i86.h>
 #include <sys/memnode.h>
 #include <sys/pci_cfgspace.h>
+#include <sys/cpu_module.h>
 
 struct cpu	cpus[1];			/* CPU data */
 struct cpu	*cpu[NCPU] = {&cpus[0]};	/* pointers to all CPUs */
@@ -1024,11 +1025,6 @@ mp_startup(void)
 	 */
 	if (x86_feature & X86_MTRR)
 		mtrr_sync();
-	/*
-	 * Enable machine check architecture
-	 */
-	if (x86_feature & X86_MCA)
-		setup_mca();
 
 	/*
 	 * Initialize this CPU's syscall handlers
@@ -1101,6 +1097,18 @@ mp_startup(void)
 	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
 
 	(void) spl0();				/* enable interrupts */
+
+	/*
+	 * Set up the CPU module for this CPU.  This can't be done before
+	 * this CPU is made CPU_READY, because we may (in heterogeneous systems)
+	 * need to go load another CPU module.  The act of attempting to load
+	 * a module may trigger a cross-call, which will ASSERT unless this
+	 * cpu is CPU_READY.
+	 */
+	cmi_init();
+
+	if (x86_feature & X86_MCA)
+		cmi_mca_init();
 
 	if (boothowto & RB_DEBUG)
 		kdi_dvec_cpu_init(cp);
@@ -1238,15 +1246,17 @@ mp_unmap_warm_reset_vector(ushort_t *warm_reset_vector)
 	psm_unmap_phys((caddr_t)warm_reset_vector, sizeof (ushort_t *));
 }
 
-/*ARGSUSED*/
 void
 mp_cpu_faulted_enter(struct cpu *cp)
-{}
+{
+	cmi_faulted_enter(cp);
+}
 
-/*ARGSUSED*/
 void
 mp_cpu_faulted_exit(struct cpu *cp)
-{}
+{
+	cmi_faulted_exit(cp);
+}
 
 /*
  * The following two routines are used as context operators on threads belonging

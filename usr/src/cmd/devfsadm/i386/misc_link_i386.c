@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <ctype.h>
+#include <sys/mc.h>
 
 static int lp(di_minor_t minor, di_node_t node);
 static int serial_dialout(di_minor_t minor, di_node_t node);
@@ -43,6 +44,7 @@ static int kdmouse(di_minor_t minor, di_node_t node);
 static int bmc(di_minor_t minor, di_node_t node);
 static int smbios(di_minor_t minor, di_node_t node);
 static int agp_process(di_minor_t minor, di_node_t node);
+static int mc_node(di_minor_t minor, di_node_t node);
 
 static devfsadm_create_t misc_cbt[] = {
 	{ "vt00", "ddi_display", NULL,
@@ -69,17 +71,20 @@ static devfsadm_create_t misc_cbt[] = {
 	{ "serial",  "ddi_serial:dialout,mb", NULL,
 	    TYPE_EXACT, ILEVEL_1, serial_dialout
 	},
-	{"agp", "ddi_agp:pseudo", NULL,
+	{ "agp", "ddi_agp:pseudo", NULL,
 	    TYPE_EXACT, ILEVEL_0, agp_process
 	},
-	{"agp", "ddi_agp:target", NULL,
+	{ "agp", "ddi_agp:target", NULL,
 	    TYPE_EXACT, ILEVEL_0, agp_process
 	},
-	{"agp", "ddi_agp:cpugart", NULL,
+	{ "agp", "ddi_agp:cpugart", NULL,
 	    TYPE_EXACT, ILEVEL_0, agp_process
 	},
-	{"agp", "ddi_agp:master", NULL,
+	{ "agp", "ddi_agp:master", NULL,
 	    TYPE_EXACT, ILEVEL_0, agp_process
+	},
+	{ "memory-controller", "ddi_mem_ctrl", NULL,
+	    TYPE_EXACT, ILEVEL_0, mc_node
 	}
 };
 
@@ -426,5 +431,32 @@ agp_process(di_minor_t minor, di_node_t node)
 	free(p_path);
 	free(I_path);
 
+	return (DEVFSADM_CONTINUE);
+}
+
+/*
+ * /dev/mc/mc<chipid> -> /devices/.../pci1022,1102@<chipid+24>,2:mc-amd
+ */
+static int
+mc_node(di_minor_t minor, di_node_t node)
+{
+	const char *minorname = di_minor_name(minor);
+	const char *busaddr = di_bus_addr(node);
+	char linkpath[PATH_MAX];
+	int unitaddr;
+	char *c;
+
+	if (minorname == NULL || busaddr == NULL)
+		return (DEVFSADM_CONTINUE);
+
+	errno = 0;
+	unitaddr = strtol(busaddr, &c, 16);
+
+	if (errno != 0 || unitaddr < MC_AMD_DEV_OFFSET)
+		return (DEVFSADM_CONTINUE);
+
+	(void) snprintf(linkpath, sizeof (linkpath), "mc/mc%u",
+	    unitaddr - MC_AMD_DEV_OFFSET);
+	(void) devfsadm_mklink(linkpath, node, minor, 0);
 	return (DEVFSADM_CONTINUE);
 }

@@ -24,7 +24,7 @@
 /*	  All Rights Reserved  	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -58,7 +58,7 @@ extern "C" {
 #define	T_PGFLT		0xe	/* #pf	page fault			*/
 #define	T_EXTERRFLT	0x10	/* #mf	x87 FPU error fault		*/
 #define	T_ALIGNMENT	0x11	/* #ac	alignment check error		*/
-#define	T_MCE		0x12	/* #mc	machine check exception (P6 only) */
+#define	T_MCE		0x12	/* #mc	machine check exception		*/
 #define	T_SIMDFPE	0x13	/* #xm	SSE/SSE exception		*/
 #define	T_DBGENTR	0x14	/*	debugger entry 			*/
 #define	T_ENDPERR	0x21	/*	emulated extension error flt	*/

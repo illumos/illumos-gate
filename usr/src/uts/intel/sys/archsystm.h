@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +60,8 @@ extern void tenmicrosec(void);
 extern void restore_int_flag(int);
 extern int clear_int_flag(void);
 
+extern void int3(void);
+extern void int18(void);
 extern void int20(void);
 
 #if defined(__amd64)

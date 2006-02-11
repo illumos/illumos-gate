@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * stats.h -- public definitions for stats module
@@ -43,6 +43,7 @@ struct stats *stats_new_counter(const char *name, const char *desc, int ext);
 void stats_delete(struct stats *sp);
 void stats_counter_bump(struct stats *sp);
 void stats_counter_add(struct stats *sp, int n);
+void stats_counter_reset(struct stats *sp);
 int stats_counter_value(struct stats *sp);
 struct stats *stats_new_elapse(const char *name, const char *desc, int ext);
 void stats_elapse_start(struct stats *sp);

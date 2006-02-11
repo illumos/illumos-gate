@@ -1,7 +1,4 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
-# Use is subject to license terms.
-#
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
@@ -21,6 +18,9 @@
 # information: Portions Copyright [yyyy] [name of copyright owner]
 #
 # CDDL HEADER END
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -65,6 +65,7 @@
 	fmd_hdl_strdup = FUNCTION extern;
 	fmd_hdl_strfree = FUNCTION extern;
 	fmd_hdl_subscribe = FUNCTION extern;
+	fmd_hdl_topology = FUNCTION extern;
 	fmd_hdl_unregister = FUNCTION extern;
 	fmd_hdl_unsubscribe = FUNCTION extern;
 	fmd_hdl_vabort = FUNCTION extern;
@@ -77,6 +78,7 @@
 	fmd_nvl_fmri_expand = FUNCTION extern;
 	fmd_nvl_fmri_present = FUNCTION extern;
 	fmd_nvl_fmri_unusable = FUNCTION extern;
+	fmd_nvl_fmri_faulty = FUNCTION extern;
 	fmd_nvl_fmri_contains = FUNCTION extern;
 	fmd_nvl_fmri_translate = FUNCTION extern;
 

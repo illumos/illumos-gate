@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * tree.h -- public definitions for tree module
@@ -84,6 +84,7 @@ struct node {
 		T_ERROR,		/* error declaration */
 		T_EREPORT,		/* ereport declaration */
 		T_SERD,			/* SERD engine declaration */
+		T_STAT,			/* STAT engine declaration */
 		T_PROP,			/* prop statement */
 		T_MASK,			/* mask statement */
 		T_CONFIG		/* config statement */
@@ -155,7 +156,8 @@ struct node {
 				N_DEFECT,
 				N_ERROR,
 				N_EREPORT,
-				N_SERD
+				N_SERD,
+				N_STAT
 			} t:3;
 			enum itertype {
 				IT_NONE,
@@ -193,7 +195,6 @@ struct node {
 			 */
 			const char *s;		/* name of function */
 			struct node *arglist;
-			void *cachedval;	/* runtime cache of value */
 		} func;
 
 		struct {
@@ -308,6 +309,7 @@ struct lut *Errors;
 struct lut *Ereports;
 struct lut *Ereportenames;
 struct lut *SERDs;
+struct lut *STATs;
 struct lut *ASRUs;
 struct lut *FRUs;
 struct lut *Configs;

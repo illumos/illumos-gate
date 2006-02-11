@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,8 +61,8 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 	}
 
 	for (i = 0; i < size; i++) {
-		char *class = NULL, *rname = NULL, *fname = NULL;
-		nvlist_t *fru, *rsc;
+		char *class = NULL, *rname = NULL, *aname = NULL, *fname = NULL;
+		nvlist_t *fru, *asru, *rsrc;
 		uint8_t pct = 0;
 
 		(void) nvlist_lookup_uint8(nva[i], FM_FAULT_CERTAINTY, &pct);
@@ -70,17 +71,30 @@ flt_verb1(fmd_log_t *lp, const fmd_log_record_t *rp, FILE *fp)
 		if (nvlist_lookup_nvlist(nva[i], FM_FAULT_FRU, &fru) == 0)
 			fname = fmdump_nvl2str(fru);
 
-		if (nvlist_lookup_nvlist(nva[i], FM_FAULT_RESOURCE, &rsc) == 0)
-			rname = fmdump_nvl2str(rsc);
-		else if (nvlist_lookup_nvlist(nva[i], FM_FAULT_ASRU, &rsc) == 0)
-			rname = fmdump_nvl2str(rsc);
+		if (nvlist_lookup_nvlist(nva[i], FM_FAULT_ASRU, &asru) == 0)
+			aname = fmdump_nvl2str(asru);
 
-		fmdump_printf(fp, "  %3u%%  %s\n"
-		    "         FRU: %s\n        rsrc: %s\n\n",
-		    pct, class ? class : "-",
-		    fname ? fname : "-", rname ? rname : "-");
+		if (nvlist_lookup_nvlist(nva[i], FM_FAULT_RESOURCE, &rsrc) == 0)
+			rname = fmdump_nvl2str(rsrc);
+
+		fmdump_printf(fp, "  %3u%%  %s\n\n",
+		    pct, class ? class : "-");
+
+		/*
+		 * Originally we didn't require FM_FAULT_RESOURCE, so if it
+		 * isn't defined in the event, display the ASRU FMRI instead.
+		 */
+		fmdump_printf(fp, "        Problem in: %s\n",
+		    rname ? rname : aname ? aname : "-");
+
+		fmdump_printf(fp, "           Affects: %s\n",
+		    aname ? aname : "-");
+
+		fmdump_printf(fp, "               FRU: %s\n\n",
+		    fname ? fname : "-");
 
 		free(fname);
+		free(aname);
 		free(rname);
 	}
 

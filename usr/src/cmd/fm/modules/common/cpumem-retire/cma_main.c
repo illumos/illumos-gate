@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -47,6 +47,7 @@ cma_stats_t cma_stats = {
 	{ "page_fails", FMD_TYPE_UINT64, "page faults unresolveable" },
 	{ "page_supp", FMD_TYPE_UINT64, "page retires suppressed" },
 	{ "page_nonent", FMD_TYPE_UINT64, "retires for non-existent fmris" },
+	{ "page_retmax", FMD_TYPE_UINT64, "hit max retries for page retire" },
 	{ "bad_flts", FMD_TYPE_UINT64, "invalid fault events received" },
 	{ "nop_flts", FMD_TYPE_UINT64, "inapplicable fault events received" },
 	{ "auto_flts", FMD_TYPE_UINT64, "auto-close faults received" }
@@ -60,9 +61,17 @@ typedef struct cma_subscriber {
 } cma_subscriber_t;
 
 static const cma_subscriber_t cma_subrs[] = {
+	{ "fault.cpu.*", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    cma_cpu_retire },
 	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
 	{ "fault.memory.dimm", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.dimm_sb", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.dimm_ck", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	    NULL },
+	{ "fault.memory.dimm_ue", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
 	    NULL },
 	{ "fault.memory.bank", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
@@ -196,6 +205,18 @@ static const fmd_prop_t fmd_props[] = {
 	{ "page_ret_mindelay", FMD_TYPE_TIME, "1sec" },
 	{ "page_ret_maxdelay", FMD_TYPE_TIME, "5min" },
 	{ "page_retire_enable", FMD_TYPE_BOOL, "true" },
+#ifdef	i386
+	/*
+	 * On i386, leaving cases open while we retry the
+	 * retire can cause the eft module to use large amounts
+	 * of memory.  Until eft is fixed, we set a maximum number
+	 * of retries on page retires, after which the case will
+	 * be closed.
+	 */
+	{ "page_retire_maxretries", FMD_TYPE_UINT32, "8" },
+#else
+	{ "page_retire_maxretries", FMD_TYPE_UINT32, "0" },
+#endif	/* i386 */
 	{ NULL, 0, NULL }
 };
 
@@ -232,6 +253,8 @@ _fmd_init(fmd_hdl_t *hdl)
 	cma.cma_cpu_doblacklist = fmd_prop_get_int32(hdl,
 	    "cpu_blacklist_enable");
 	cma.cma_page_doretire = fmd_prop_get_int32(hdl, "page_retire_enable");
+	cma.cma_page_maxretries =
+	    fmd_prop_get_int32(hdl, "page_retire_maxretries");
 
 	if (cma.cma_page_maxdelay < cma.cma_page_mindelay)
 		fmd_hdl_abort(hdl, "page retirement delays conflict\n");

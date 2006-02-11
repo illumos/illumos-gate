@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/fm/protocol.h>
 #include <fm/fmd_log.h>
+#include <fm/libtopo.h>
 
 enum {
 	FMDUMP_SHORT,
@@ -76,6 +77,7 @@ extern const char *g_pname;
 extern ulong_t g_errs;
 extern ulong_t g_recs;
 extern char *g_root;
+extern struct topo_hdl *g_thp;
 
 extern void fmdump_printf(FILE *, const char *, ...);
 extern void fmdump_warn(const char *, ...);

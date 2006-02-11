@@ -262,54 +262,7 @@ extern "C" {
 #define	MSR_PRP4_LBSTK_TO_14	0x6ce
 #define	MSR_PRP4_LBSTK_TO_15	0x6cf
 
-#define	REG_MCG_CAP		0x179
-#define	REG_MCG_STATUS		0x17a
-#define	REG_MCG_CTL		0x17b
-
-#define	REG_MC0_CTL		0x400
-#define	REG_MC0_STATUS		0x401
-#define	REG_MC0_ADDR		0x402
-#define	REG_MC0_MISC		0x403
-#define	REG_MC1_CTL		0x404
-#define	REG_MC1_STATUS		0x405
-#define	REG_MC1_ADDR		0x406
-#define	REG_MC1_MISC		0x407
-#define	REG_MC2_CTL		0x408
-#define	REG_MC2_STATUS		0x409
-#define	REG_MC2_ADDR		0x40a
-#define	REG_MC2_MISC		0x40b
-#define	REG_MC4_CTL		0x40c
-#define	REG_MC4_STATUS		0x40d
-#define	REG_MC4_ADDR		0x40e
-#define	REG_MC4_MISC		0x40f
-#define	REG_MC3_CTL		0x410
-#define	REG_MC3_STATUS		0x411
-#define	REG_MC3_ADDR		0x412
-#define	REG_MC3_MISC		0x413
-
-#define	P6_MCG_CAP_COUNT	5
-#define	MCG_CAP_COUNT_MASK	0xff
-#define	MCG_CAP_CTL_P		0x100
-
-#define	MCG_STATUS_RIPV		0x01
-#define	MCG_STATUS_EIPV		0x02
-#define	MCG_STATUS_MCIP		0x04
-
-#define	MCG_CTL_VALUE		0xffffffff
-
 #define	MCI_CTL_VALUE		0xffffffff
-#define	MCI_STATUS_ERRCODE	0xffff
-#define	MCI_STATUS_MSERRCODE	0xffff0000
-#define	MCI_STATUS_PCC		((long long)0x200000000000000)
-#define	MCI_STATUS_ADDRV	((long long)0x400000000000000)
-#define	MCI_STATUS_MISCV	((long long)0x800000000000000)
-#define	MCI_STATUS_EN		((long long)0x1000000000000000)
-#define	MCI_STATUS_UC		((long long)0x2000000000000000)
-#define	MCI_STATUS_O		((long long)0x4000000000000000)
-#define	MCI_STATUS_VAL		((long long)0x8000000000000000)
-
-#define	MSERRCODE_SHFT		16
-
 
 #define	MTRRTYPE_MASK		0xff
 
@@ -437,6 +390,8 @@ typedef	struct	mtrrvar {
 #define	X86_VENDOR_TM		9	/* GenuineTMx86 */
 #define	X86_VENDOR_NSC		10	/* Geode by NSC */
 
+#define	X86_VENDOR_STRLEN	13	/* vendor string max len + \0 */
+
 #if !defined(_ASM)
 
 #if defined(_KERNEL) || defined(_KMEMUSER)
@@ -471,8 +426,6 @@ struct cpuid_regs {
 extern uint64_t rdmsr(uint_t);
 extern void wrmsr(uint_t, const uint64_t);
 extern void invalidate_cache(void);
-struct regs;
-extern int mca_exception(struct regs *);
 extern ulong_t getcr4(void);
 extern void setcr4(ulong_t);
 extern void mtrr_sync(void);

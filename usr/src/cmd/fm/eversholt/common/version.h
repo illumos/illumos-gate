@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * verion.h -- define current version numbers for eversholt
@@ -37,7 +37,7 @@ extern "C" {
 #endif
 
 #define	VERSION_MAJOR 1
-#define	VERSION_MINOR 13
+#define	VERSION_MINOR 16
 
 #ifdef __cplusplus
 }

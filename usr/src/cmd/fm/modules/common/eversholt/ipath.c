@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * ipath.c -- instanced pathname module
@@ -262,6 +262,35 @@ ipath2str(const char *ename, const struct ipath *ipp)
 	*cp++ = '\0';
 
 	return (ret);
+}
+
+/*
+ * ipath2strlen -- calculate the len of what ipath2str() would return
+ */
+size_t
+ipath2strlen(const char *ename, const struct ipath *ipp)
+{
+	int i;
+	size_t len = 0;
+
+	/* count up length of class string */
+	if (ename != NULL)
+		len += strlen(ename);
+
+	/* count up length of path string, including slash separators */
+	if (ipp != NULL) {
+		for (i = 0; ipp[i].s != NULL; i++) {
+			/* add slash separator, but no leading slash */
+			if (i != 0)
+				len++;
+			len += snprintf(NULL, 0, "%s%d", ipp[i].s, ipp[i].i);
+		}
+	}
+
+	if (ename != NULL && ipp != NULL)
+		len++;	/* room for '@' */
+
+	return (len);
 }
 
 /*

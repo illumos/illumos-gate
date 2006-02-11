@@ -2628,9 +2628,12 @@ add_cpunode2devtree(processorid_t cpu_id, struct cpuid_info *cpi)
 			"chunks", CPI_CHUNKS(cpi));
 		(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 			"apic-id", CPI_APIC_ID(cpi));
-		if (cpi->cpi_chipid >= 0)
+		if (cpi->cpi_chipid >= 0) {
 			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
 			    "chip#", cpi->cpi_chipid);
+			(void) ndi_prop_update_int(DDI_DEV_T_NONE, cpu_devi,
+			    "clog#", cpi->cpi_clogid);
+		}
 	}
 
 	/* cpuid-features */

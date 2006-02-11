@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -49,10 +49,11 @@ LINTFILES = $(SRCS:%.c=%.ln)
 CLEANFILES += inj_grammar.c inj_grammar.h inj_lex.c y.tab.h y.tab.c
 
 CPPFLAGS += -I. -I../common
-CFLAGS += $(CCVERBOSE)
+CFLAGS += $(CCVERBOSE) $(CTF_FLAGS)
 LDLIBS += -L$(ROOT)/usr/lib/fm -lfmd_log -lsysevent -lnvpair -lumem
 LDFLAGS += -R/usr/lib/fm
 LINTFLAGS = -mnux
+STRIPFLAG =
 
 LFLAGS = -t -v
 YFLAGS = -d
@@ -63,6 +64,7 @@ all: $(PROG)
 
 $(PROG): $(OBJS)
 	$(LINK.c) $(OBJS) -o $@ $(LDLIBS)
+	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
 	$(POST_PROCESS)
 
 inj_lex.c: ../common/inj_lex.l inj_grammar.c
@@ -75,9 +77,11 @@ inj_grammar.c: ../common/inj_grammar.y
 
 %.o: %.c
 	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
 
 %.o: ../common/%.c
 	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
 
 clean:
 	$(RM) $(OBJS) $(LINTFILES) $(CLEANFILES)

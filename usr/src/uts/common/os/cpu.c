@@ -59,6 +59,9 @@
 #include <sys/msacct.h>
 #include <sys/time.h>
 #include <sys/archsystm.h>
+#if defined(__i386) || defined(__amd64)
+#include <sys/x86_archext.h>
+#endif
 
 extern int	mp_cpu_start(cpu_t *);
 extern int	mp_cpu_stop(cpu_t *);
@@ -2067,12 +2070,19 @@ static struct {
 	kstat_named_t ci_clock_MHz;
 	kstat_named_t ci_chip_id;
 	kstat_named_t ci_implementation;
-#ifdef __sparcv9
+	kstat_named_t ci_brandstr;
+	kstat_named_t ci_core_id;
+#if defined(__sparcv9)
 	kstat_named_t ci_device_ID;
 	kstat_named_t ci_cpu_fru;
 #endif
-	kstat_named_t ci_brandstr;
-	kstat_named_t ci_core_id;
+#if defined(__i386) || defined(__amd64)
+	kstat_named_t ci_vendorstr;
+	kstat_named_t ci_family;
+	kstat_named_t ci_model;
+	kstat_named_t ci_step;
+	kstat_named_t ci_clogid;
+#endif
 } cpu_info_template = {
 	{ "state",		KSTAT_DATA_CHAR },
 	{ "state_begin",	KSTAT_DATA_LONG },
@@ -2081,12 +2091,19 @@ static struct {
 	{ "clock_MHz",		KSTAT_DATA_LONG },
 	{ "chip_id",		KSTAT_DATA_LONG },
 	{ "implementation",	KSTAT_DATA_STRING },
-#ifdef __sparcv9
+	{ "brand",		KSTAT_DATA_STRING },
+	{ "core_id",		KSTAT_DATA_LONG },
+#if defined(__sparcv9)
 	{ "device_ID",		KSTAT_DATA_UINT64 },
 	{ "cpu_fru",		KSTAT_DATA_STRING },
 #endif
-	{ "brand",		KSTAT_DATA_STRING },
-	{ "core_id",		KSTAT_DATA_LONG },
+#if defined(__i386) || defined(__amd64)
+	{ "vendor_id",		KSTAT_DATA_STRING },
+	{ "family",		KSTAT_DATA_INT32 },
+	{ "model",		KSTAT_DATA_INT32 },
+	{ "stepping",		KSTAT_DATA_INT32 },
+	{ "clog_id",		KSTAT_DATA_INT32 },
+#endif
 };
 
 static kmutex_t cpu_info_template_lock;
@@ -2132,13 +2149,23 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	cpu_info_template.ci_chip_id.value.l = chip_plat_get_chipid(cp);
 	kstat_named_setstr(&cpu_info_template.ci_implementation,
 	    cp->cpu_idstr);
-#ifdef __sparcv9
+	kstat_named_setstr(&cpu_info_template.ci_brandstr, cp->cpu_brandstr);
+
+#if defined(__sparcv9)
 	cpu_info_template.ci_device_ID.value.ui64 =
 	    cpunodes[cp->cpu_id].device_id;
 	kstat_named_setstr(&cpu_info_template.ci_cpu_fru, cpu_fru_fmri(cp));
 #endif
-	kstat_named_setstr(&cpu_info_template.ci_brandstr, cp->cpu_brandstr);
+#if defined(__i386) || defined(__amd64)
 	cpu_info_template.ci_core_id.value.l = chip_plat_get_coreid(cp);
+	kstat_named_setstr(&cpu_info_template.ci_vendorstr,
+	    cpuid_getvendorstr(cp));
+	cpu_info_template.ci_family.value.l = cpuid_getfamily(cp);
+	cpu_info_template.ci_model.value.l = cpuid_getmodel(cp);
+	cpu_info_template.ci_step.value.l = cpuid_getstep(cp);
+	cpu_info_template.ci_clogid.value.l = chip_plat_get_clogid(cp);
+#endif
+
 	return (0);
 }
 
@@ -2155,12 +2182,15 @@ cpu_info_kstat_create(cpu_t *cp)
 		zoneid = ALL_ZONES;
 	if ((cp->cpu_info_kstat = kstat_create_zone("cpu_info", cp->cpu_id,
 	    NULL, "misc", KSTAT_TYPE_NAMED,
-	    sizeof (cpu_info_template) / sizeof (kstat_named_t),
-	    KSTAT_FLAG_VIRTUAL, zoneid)) != NULL) {
+		    sizeof (cpu_info_template) / sizeof (kstat_named_t),
+		    KSTAT_FLAG_VIRTUAL, zoneid)) != NULL) {
 		cp->cpu_info_kstat->ks_data_size += 2 * CPU_IDSTRLEN;
-#ifdef __sparcv9
+#if defined(__sparcv9)
 		cp->cpu_info_kstat->ks_data_size +=
 		    strlen(cpu_fru_fmri(cp)) + 1;
+#endif
+#if defined(__i386) || defined(__amd64)
+		cp->cpu_info_kstat->ks_data_size += X86_VENDOR_STRLEN;
 #endif
 		cp->cpu_info_kstat->ks_lock = &cpu_info_template_lock;
 		cp->cpu_info_kstat->ks_data = &cpu_info_template;

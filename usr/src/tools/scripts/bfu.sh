@@ -4344,6 +4344,16 @@ mondo_loop() {
 	rm -rf $usr/platform/SUNW,Sun-Fire-15000/lib/fm
 
 	#
+	# Remove old topology data
+	#
+	rm -rf $usr/lib/fm/topo
+
+	#
+	# Remove old prtopo
+	#
+	rm -f $usr/lib/fm/prtopo
+
+	#
 	# Remove obsolete buildmnttab script.  Backwards BFUs will
 	# resurrect it by extracting it from the archives.
 	#

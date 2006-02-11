@@ -20,7 +20,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,7 @@
 %token	INJ_TOK_EVDEF
 %token	INJ_TOK_FMRIDEF
 %token	INJ_TOK_AUTHDEF
+%token	INJ_TOK_LISTDEF
 
 %token	INJ_TOK_INT8
 %token	INJ_TOK_INT16
@@ -98,6 +99,7 @@
 %token	INJ_TOK_EVENT
 %token	INJ_TOK_FMRI
 %token	INJ_TOK_AUTH
+%token	INJ_TOK_LIST
 
 %token	INJ_TOK_ADDHRT
 %token	INJ_TOK_ENDHRT
@@ -125,7 +127,7 @@ statement:	decl
 	;
 
 /*
- * Event, FMRI, Authority declarations
+ * Event, FMRI, Authority, and list declarations
  */
 
 decl:		INJ_TOK_EVDEF INJ_TOK_FMACLASS '{' decl_memlist '}' {
@@ -139,6 +141,10 @@ decl:		INJ_TOK_EVDEF INJ_TOK_FMACLASS '{' decl_memlist '}' {
 	|	INJ_TOK_AUTHDEF INJ_TOK_IDENT '{' decl_memlist '}' {
 			if ($4 != NULL)
 				inj_decl_finish($4, $2, ITEMTYPE_AUTH);
+		}
+	|	INJ_TOK_LISTDEF INJ_TOK_IDENT '{' decl_memlist '}' {
+			if ($4 != NULL)
+				inj_decl_finish($4, $2, ITEMTYPE_LIST);
 		}
 	;
 
@@ -207,6 +213,10 @@ decl_mem_cplx:	INJ_TOK_ENUM INJ_TOK_IDENT '{' decl_enumlist '}' {
 			$$ = inj_decl_mem_create_defined($3, $2,
 			    ITEMTYPE_AUTH);
 		}
+	|	INJ_TOK_LIST INJ_TOK_IDENT INJ_TOK_IDENT {
+			$$ = inj_decl_mem_create_defined($3, $2,
+			    ITEMTYPE_LIST);
+		}
 	;
 
 decl_enumlist:	INJ_TOK_IDENT {
@@ -225,7 +235,7 @@ decl_enumlist:	INJ_TOK_IDENT {
 	;
 
 /*
- * Event, FMRI, Authority definitions
+ * Event, FMRI, Authority, and list definitions
  */
 
 defn:		INJ_TOK_EVENT INJ_TOK_FMACLASS INJ_TOK_IDENT '='
@@ -268,7 +278,7 @@ defn_memvals:	defn_val
 			$$ = inj_defn_mem_create_list($2, DEFNMEM_ARRAY);
 		}
 	|	'{' defn_memlist '}' {
-			$$ = inj_defn_mem_create_list($2, DEFNMEM_SUBLIST);
+			$$ = inj_defn_mem_create_list($2, DEFNMEM_LIST);
 		}
 	;
 
@@ -360,7 +370,10 @@ inj_program_read(const char *file)
 		if ((yyin = fopen(file, "r")) == NULL)
 			die("failed to open %s", file);
 
-		if ((yyinname = strrchr(file, '/')) == NULL)
+		yyinname = strrchr(file, '/');
+		if (yyinname != NULL)
+			yyinname++;
+		else
 			yyinname = file;
 	}
 

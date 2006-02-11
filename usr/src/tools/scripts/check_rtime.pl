@@ -117,7 +117,8 @@ $SkipUndefDirs = qr{
 	usr/lib/rmmount |		# rmmount actions have callbacks
 	/lib/mdb/ |			# mdb modules have callbacks
 	/lib/fm/fmd/plugins/ |		# fmd modules have callbacks
-	/lib/fm/fmd/schemes/ 		# fmd schemes have callbacks
+	/lib/fm/fmd/schemes/ |		# fmd schemes have callbacks
+	/i86pc/lib/mtst/		# mtst modules have callbacks
 }x;
 
 $SkipUndefFiles = qr{ ^(?:

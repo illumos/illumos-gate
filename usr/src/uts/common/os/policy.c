@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1275,6 +1275,12 @@ secpolicy_proc_zone(const cred_t *scr)
 
 int
 secpolicy_kmdb(const cred_t *scr)
+{
+	return (PRIV_POLICY(scr, PRIV_ALL, B_FALSE, EPERM, NULL));
+}
+
+int
+secpolicy_error_inject(const cred_t *scr)
 {
 	return (PRIV_POLICY(scr, PRIV_ALL, B_FALSE, EPERM, NULL));
 }

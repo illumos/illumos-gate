@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +34,7 @@
 #include <sys/sysmacros.h>
 #include <sys/dumphdr.h>
 #include <sys/dumpadm.h>
+#include <sys/fm/util.h>
 
 #include <libsysevent.h>
 #include <libnvpair.h>

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -123,6 +123,7 @@
 #include <sys/cpc_impl.h>
 #include <sys/chip.h>
 #include <sys/x86_archext.h>
+#include <sys/cpu_module.h>
 #include <sys/smbios.h>
 
 extern void progressbar_init(void);
@@ -1289,11 +1290,6 @@ startup_modules(void)
 	mod_setup();
 
 	/*
-	 * Setup machine check architecture on P6
-	 */
-	setup_mca();
-
-	/*
 	 * Initialize system parameters.
 	 */
 	param_init();
@@ -1337,6 +1333,19 @@ startup_modules(void)
 	 * then invoke bus specific code to probe devices.
 	 */
 	setup_ddi();
+
+	/*
+	 * Set up the CPU module subsystem.  Modifies the device tree, so it
+	 * must be done after setup_ddi().
+	 */
+	cmi_init();
+
+	/*
+	 * Initialize the MCA handlers
+	 */
+	if (x86_feature & X86_MCA)
+		cmi_mca_init();
+
 	/*
 	 * Fake a prom tree such that /dev/openprom continues to work
 	 */
@@ -1879,6 +1888,11 @@ post_startup(void)
 	memscrub_init();
 
 	/*
+	 * Complete CPU module initialization
+	 */
+	cmi_post_init();
+
+	/*
 	 * Perform forceloading tasks for /etc/system.
 	 */
 	(void) mod_sysctl(SYS_FORCELOAD, NULL);
@@ -2378,86 +2392,6 @@ uint64_t mtrrdef, pat_attr_reg;
  * Disable reprogramming of MTRRs by default.
  */
 int	enable_relaxed_mtrr = 0;
-
-/*
- * These must serve for Pentium, Pentium Pro (P6/Pentium II/Pentium III)
- * and Pentium 4, and yes, they are named 0, 1, 2, 4, 3 in ascending
- * address order (starting from 0x400).  The Pentium 4 only implements
- * 4 sets, and while they are named 0-3 in the doc, the corresponding
- * names for P6 are 0,1,2,4.  So define these arrays in address order
- * so that they work for both pre-Pentium4 and Pentium 4 processors.
- */
-
-static uint_t	mci_ctl[] = {REG_MC0_CTL, REG_MC1_CTL, REG_MC2_CTL,
-		    REG_MC4_CTL, REG_MC3_CTL};
-static uint_t	mci_status[] = {REG_MC0_STATUS, REG_MC1_STATUS, REG_MC2_STATUS,
-		    REG_MC4_STATUS, REG_MC3_STATUS};
-static uint_t	mci_addr[] = {REG_MC0_ADDR, REG_MC1_ADDR, REG_MC2_ADDR,
-		    REG_MC4_ADDR, REG_MC3_ADDR};
-static int	mca_cnt;
-
-
-void
-setup_mca()
-{
-	int 		i;
-	uint64_t	mca_cap;
-
-	if (!(x86_feature & X86_MCA))
-		return;
-	mca_cap = rdmsr(REG_MCG_CAP);
-	if (mca_cap & MCG_CAP_CTL_P)
-		wrmsr(REG_MCG_CTL, -1ULL);	/* all ones */
-	mca_cnt = mca_cap & MCG_CAP_COUNT_MASK;
-	if (mca_cnt > P6_MCG_CAP_COUNT)
-		mca_cnt = P6_MCG_CAP_COUNT;
-	for (i = 1; i < mca_cnt; i++)
-		wrmsr(mci_ctl[i], -1ULL);	/* all ones */
-	for (i = 0; i < mca_cnt; i++)
-		wrmsr(mci_status[i], 0ULL);
-	setcr4(getcr4() | CR4_MCE);
-
-}
-
-int
-mca_exception(struct regs *rp)
-{
-	uint64_t	status, addr;
-	int		i, ret = 1, errcode, mserrcode;
-
-	status = rdmsr(REG_MCG_STATUS);
-	if (status & MCG_STATUS_RIPV)
-		ret = 0;
-	if (status & MCG_STATUS_EIPV)
-		cmn_err(CE_WARN, "MCE at 0x%lx", rp->r_pc);
-	wrmsr(REG_MCG_STATUS, 0ULL);
-	for (i = 0; i < mca_cnt; i++) {
-		status = rdmsr(mci_status[i]);
-		/*
-		 * If status register not valid skip this bank
-		 */
-		if (!(status & MCI_STATUS_VAL))
-			continue;
-		errcode = status & MCI_STATUS_ERRCODE;
-		mserrcode = (status  >> MSERRCODE_SHFT) & MCI_STATUS_ERRCODE;
-		if (status & MCI_STATUS_ADDRV) {
-			/*
-			 * If mci_addr contains the address where
-			 * error occurred, display the address
-			 */
-			addr = rdmsr(mci_addr[i]);
-			cmn_err(CE_WARN, "MCE: Bank %d: error code 0x%x:"\
-			    "addr = 0x%" PRIx64 ", model errcode = 0x%x", i,
-			    errcode, addr, mserrcode);
-		} else {
-			cmn_err(CE_WARN,
-			    "MCE: Bank %d: error code 0x%x, mserrcode = 0x%x",
-			    i, errcode, mserrcode);
-		}
-		wrmsr(mci_status[i], 0ULL);
-	}
-	return (ret);
-}
 
 void
 setup_mtrr()

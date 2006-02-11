@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * check.c -- routines for checking the prop tree
@@ -47,12 +47,15 @@
 static int check_reportlist(enum nodetype t, const char *s, struct node *np);
 static int check_num(enum nodetype t, const char *s, struct node *np);
 static int check_quote(enum nodetype t, const char *s, struct node *np);
+static int check_action(enum nodetype t, const char *s, struct node *np);
 static int check_num_func(enum nodetype t, const char *s, struct node *np);
 static int check_fru_asru(enum nodetype t, const char *s, struct node *np);
 static int check_engine(enum nodetype t, const char *s, struct node *np);
+static int check_count(enum nodetype t, const char *s, struct node *np);
 static int check_timeval(enum nodetype t, const char *s, struct node *np);
 static int check_id(enum nodetype t, const char *s, struct node *np);
 static int check_serd_method(enum nodetype t, const char *s, struct node *np);
+static int check_serd_id(enum nodetype t, const char *s, struct node *np);
 static int check_nork(struct node *np);
 static void check_cycle_lhs(struct node *stmtnp, struct node *arrow);
 static void check_cycle_lhs_try(struct node *stmtnp, struct node *lhs,
@@ -70,6 +73,9 @@ static struct {
 	{ T_FAULT, "FITrate", 1, check_num_func, O_ERR },
 	{ T_FAULT, "FRU", 0, check_fru_asru, O_ERR },
 	{ T_FAULT, "ASRU", 0, check_fru_asru, O_ERR },
+	{ T_FAULT, "message", 0, check_num_func, O_ERR },
+	{ T_FAULT, "action", 0, check_action, O_ERR },
+	{ T_FAULT, "count", 0, check_count, O_ERR },
 	{ T_UPSET, "engine", 0, check_engine, O_ERR },
 	{ T_DEFECT, "FRU", 0, check_fru_asru, O_ERR },
 	{ T_DEFECT, "ASRU", 0, check_fru_asru, O_ERR },
@@ -80,6 +86,7 @@ static struct {
 	{ T_SERD, "method", 1, check_serd_method, O_ERR },
 	{ T_SERD, "trip", 1, check_reportlist, O_ERR },
 	{ T_SERD, "FRU", 0, check_fru_asru, O_ERR },
+	{ T_SERD, "id", 0, check_serd_id, O_ERR },
 	{ T_ERROR, "ASRU", 0, check_fru_asru, O_ERR },
 	{ T_CONFIG, NULL, 0, check_quote, O_ERR },
 	{ 0, NULL, 0 },
@@ -255,6 +262,18 @@ check_quote(enum nodetype t, const char *s, struct node *np)
 }
 
 static int
+check_action(enum nodetype t, const char *s, struct node *np)
+{
+	ASSERTinfo(np != NULL, ptree_nodetype2str(t));
+
+	if (np->t != T_FUNC)
+		outfl(O_ERR, np->file, np->line,
+		    "%s %s property must be a function or list of functions",
+		    ptree_nodetype2str(t), s);
+	return (1);
+}
+
+static int
 check_num_func(enum nodetype t, const char *s, struct node *np)
 {
 	ASSERTinfo(np != NULL, ptree_nodetype2str(t));
@@ -307,6 +326,20 @@ check_engine(enum nodetype t, const char *s, struct node *np)
 }
 
 static int
+check_count(enum nodetype t, const char *s, struct node *np)
+{
+	ASSERTinfo(np != NULL, ptree_nodetype2str(t));
+	if (np->t != T_EVENT)
+		outfl(O_ERR, np->file, np->line,
+		    "%s %s property must be an engine name "
+		    "(i.e. stat.x or stat.x@a/b)",
+		    ptree_nodetype2str(t), s);
+
+	/* XXX confirm engine has been declared */
+	return (1);
+}
+
+static int
 check_timeval(enum nodetype t, const char *s, struct node *np)
 {
 	ASSERTinfo(np != NULL, ptree_nodetype2str(t));
@@ -337,6 +370,17 @@ check_serd_method(enum nodetype t, const char *s, struct node *np)
 	    np->u.name.s != L_persistent))
 		outfl(O_ERR, np->file, np->line,
 		    "%s %s property must be \"volatile\" or \"persistent\"",
+		    ptree_nodetype2str(t), s);
+	return (1);
+}
+
+static int
+check_serd_id(enum nodetype t, const char *s, struct node *np)
+{
+	ASSERTinfo(np != NULL, ptree_nodetype2str(t));
+	if (np->t != T_GLOBID)
+		outfl(O_ERR, np->file, np->line,
+		    "%s %s property must be a global ID",
 		    ptree_nodetype2str(t), s);
 	return (1);
 }
@@ -791,7 +835,7 @@ check_cycle_lhs(struct node *stmtnp, struct node *arrow)
 		/*
 		 * return if there's a list of events internal to
 		 * cascaded props (which is not allowed)
-		*/
+		 */
 		if (arrow->u.arrow.lhs->u.arrow.rhs->t != T_EVENT)
 			return;
 
@@ -1081,6 +1125,14 @@ check_func(struct node *np)
 			    "argument to is_type() must be a call to "
 			    "fru() or asru()");
 		}
+	} else if (np->u.func.s == L_confcall) {
+		if (np->u.func.arglist->t != T_QUOTE &&
+		    (np->u.func.arglist->t != T_LIST ||
+		    np->u.func.arglist->u.expr.left->t != T_QUOTE))
+			outfl(O_ERR, np->u.func.arglist->file,
+			    np->u.func.arglist->line,
+			    "confcall(): first argument must be a string "
+			    "(the name of the operation)");
 	} else if (np->u.func.s == L_confprop) {
 		if (np->u.func.arglist->t == T_LIST &&
 		    (np->u.func.arglist->u.expr.left->t == T_FUNC &&
@@ -1095,11 +1147,49 @@ check_func(struct node *np)
 			    "fru() or asru(); "
 			    "second argument must be a string");
 		}
+	} else if (np->u.func.s == L_count) {
+		if (np->u.func.arglist->t != T_EVENT) {
+			outfl(O_ERR, np->u.func.arglist->file,
+			    np->u.func.arglist->line,
+			    "count(): argument must be an engine name");
+		}
+	} else if (np->u.func.s == L_defined) {
+		if (np->u.func.arglist->t != T_GLOBID)
+			outfl(O_ERR, np->u.func.arglist->file,
+				np->u.func.arglist->line,
+				"argument to defined() must be a global");
 	} else if (np->u.func.s == L_payloadprop) {
 		if (np->u.func.arglist->t != T_QUOTE)
 			outfl(O_ERR, np->u.func.arglist->file,
 				np->u.func.arglist->line,
 				"argument to payloadprop() must be a string");
+	} else if (np->u.func.s == L_payloadprop_contains) {
+		if (np->u.func.arglist->t != T_LIST ||
+		    np->u.func.arglist->u.expr.left->t != T_QUOTE ||
+		    np->u.func.arglist->u.expr.right == NULL)
+			outfl(O_ERR, np->u.func.arglist->file,
+			    np->u.func.arglist->line,
+			    "args to payloadprop_contains(): must be a quoted "
+			    "string (property name) and an expression "
+			    "(to match)");
+	} else if (np->u.func.s == L_payloadprop_defined) {
+		if (np->u.func.arglist->t != T_QUOTE)
+			outfl(O_ERR, np->u.func.arglist->file,
+			    np->u.func.arglist->line,
+			    "arg to payloadprop_defined(): must be a quoted "
+			    "string");
+	} else if (np->u.func.s == L_setpayloadprop) {
+		if (np->u.func.arglist->t == T_LIST &&
+		    np->u.func.arglist->u.expr.left->t == T_QUOTE) {
+			if (np->u.func.arglist->u.expr.right->t == T_FUNC)
+				check_func(np->u.func.arglist->u.expr.right);
+		} else {
+			outfl(O_ERR, np->u.func.arglist->file,
+			    np->u.func.arglist->line,
+			    "setpayloadprop(): "
+			    "first arg must be a string, "
+			    "second arg a value");
+		}
 	} else if (np->u.func.s == L_envprop) {
 		if (np->u.func.arglist->t != T_QUOTE)
 			outfl(O_ERR, np->u.func.arglist->file,
@@ -1130,7 +1220,7 @@ void
 check_event(struct node *np)
 {
 	ASSERT(np != NULL);
-	ASSERT(np->t == T_EVENT);
+	ASSERTinfo(np->t == T_EVENT, ptree_nodetype2str(np->t));
 
 	if (np->u.event.epname == NULL) {
 		outfl(O_ERR|O_NONL, np->file, np->line,

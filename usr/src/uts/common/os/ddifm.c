@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -477,7 +477,10 @@ ddi_fm_handler_register(dev_info_t *dip, ddi_err_func_t handler,
 		return;
 	}
 
-	pdip = (dev_info_t *)DEVI(dip)->devi_parent;
+	if (dip == ddi_root_node())
+		pdip = dip;
+	else
+		pdip = (dev_info_t *)DEVI(dip)->devi_parent;
 
 	ASSERT(pdip);
 
@@ -529,7 +532,10 @@ ddi_fm_handler_unregister(dev_info_t *dip)
 		return;
 	}
 
-	pdip = (dev_info_t *)DEVI(dip)->devi_parent;
+	if (dip == ddi_root_node())
+		pdip = dip;
+	else
+		pdip = (dev_info_t *)DEVI(dip)->devi_parent;
 
 	ASSERT(pdip);
 
@@ -581,10 +587,11 @@ ddi_fm_handler_unregister(dev_info_t *dip)
  * This function must be called from a driver's attach(9E) entry point.
  */
 void
-ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibc)
+ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibcp)
 {
 	struct dev_info *devi = DEVI(dip);
 	struct i_ddi_fmhdl *fmhdl;
+	ddi_iblock_cookie_t ibc;
 	int pcap, newcap = DDI_FM_NOT_CAPABLE;
 
 	if (!DEVI_IS_ATTACHING(dip)) {
@@ -606,11 +613,12 @@ ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibc)
 		 * Initialize the default ibc.  The parent may change it
 		 * depending upon its capabilities.
 		 */
-		*ibc = (ddi_iblock_cookie_t)ipltospl(FM_ERR_PIL);
+		ibc = (ddi_iblock_cookie_t)ipltospl(FM_ERR_PIL);
 
-		pcap = i_ndi_busop_fm_init(dip, *fmcap, ibc);
+		pcap = i_ndi_busop_fm_init(dip, *fmcap, &ibc);
 	} else {
 		pcap = *fmcap;
+		ibc = *ibcp;
 	}
 
 	/* Initialize the per-device instance FM handle */
@@ -636,7 +644,7 @@ ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibc)
 	fmhdl->fh_acc_cache = NULL;
 	fmhdl->fh_tgts = NULL;
 	fmhdl->fh_dip = dip;
-	fmhdl->fh_ibc = *ibc;
+	fmhdl->fh_ibc = ibc;
 	mutex_init(&fmhdl->fh_lock, NULL, MUTEX_DRIVER, fmhdl->fh_ibc);
 	devi->devi_fmhdl = fmhdl;
 
@@ -672,7 +680,7 @@ ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibc)
 	 */
 
 	if (DDI_FM_DMA_ERR_CAP(*fmcap) && DDI_FM_DMA_ERR_CAP(pcap)) {
-		i_ndi_fmc_create(&fmhdl->fh_dma_cache, 2, *ibc);
+		i_ndi_fmc_create(&fmhdl->fh_dma_cache, 2, ibc);
 
 		/* Set-up dma chk capability prop */
 		if (ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
@@ -684,7 +692,7 @@ ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibc)
 	}
 
 	if (DDI_FM_ACC_ERR_CAP(*fmcap) && DDI_FM_ACC_ERR_CAP(pcap)) {
-		i_ndi_fmc_create(&fmhdl->fh_acc_cache, 2, *ibc);
+		i_ndi_fmc_create(&fmhdl->fh_acc_cache, 2, ibc);
 		/* Set-up dma chk capability prop */
 		if (ddi_getprop(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
 		    "fm-accchk-capable", 0) == 0)
@@ -700,6 +708,9 @@ ddi_fm_init(dev_info_t *dip, int *fmcap, ddi_iblock_cookie_t *ibc)
 	 */
 	fmhdl->fh_cap = newcap;
 	*fmcap = newcap;
+
+	if (ibcp != NULL)
+		*ibcp = ibc;
 }
 
 /*

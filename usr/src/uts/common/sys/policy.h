@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -88,6 +88,7 @@ boolean_t secpolicy_contract_event_choice(const cred_t *);
 int secpolicy_coreadm(const cred_t *);
 int secpolicy_cpc_cpu(const cred_t *);
 int secpolicy_dispadm(const cred_t *);
+int secpolicy_error_inject(const cred_t *);
 int secpolicy_excl_open(const cred_t *);
 int secpolicy_fs_mount(cred_t *, vnode_t *, struct vfs *);
 int secpolicy_fs_unmount(cred_t *, struct vfs *);

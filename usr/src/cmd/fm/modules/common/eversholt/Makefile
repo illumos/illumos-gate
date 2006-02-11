@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -37,7 +37,7 @@ CLASS = common
 
 YSRCS=escparse.y 
 SRCS =	alloc.c check.c config.c eft.c eftread.c esclex.c eval.c evnv.c \
-	fme.c io.c ipath.c itree.c lut.c literals.c out.c platform.c \
+	fme.c iexpr.c io.c ipath.c itree.c lut.c literals.c out.c platform.c \
 	ptree.c stable.c stats.c tree.c
 
 include ../../Makefile.plugin
@@ -45,6 +45,8 @@ include ../../Makefile.plugin
 CPPFLAGS += -DFMAPLUGIN -I$(EVERSRCDIR) -I.
 LDFLAGS += -R/usr/lib/fm
 LDLIBS += -L$(ROOTLIB)/fm -ltopo
+
+CLEANFILES += y.tab.h y.tab.c
 
 esclex.o: escparse.o
 
@@ -56,6 +58,6 @@ esclex.o: escparse.o
 	$(LINT.c) -c $<
 
 escparse.o: $(EVERSRCDIR)/escparse.y
-	$(YACC) -dtv $(EVERSRCDIR)/escparse.y
+	$(YACC) -dt $(EVERSRCDIR)/escparse.y
 	$(COMPILE.c) -DYYDEBUG -c -o $@ y.tab.c
 	$(CTFCONVERT_O)

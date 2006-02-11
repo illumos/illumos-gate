@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +33,7 @@
 const char *
 inj_item2str(inj_itemtype_t item)
 {
-	static const char *const names[] = { "event", "fmri", "auth" };
+	static const char *const names[] = { "event", "fmri", "auth", "list" };
 
 	return (item >= 0 &&
 	    item < sizeof (names) / sizeof (char *) ? names[item] : "???");
@@ -43,7 +43,7 @@ inj_memtype_t
 inj_item2mem(inj_itemtype_t item)
 {
 	static const inj_memtype_t mems[] = {
-		MEMTYPE_EVENT, MEMTYPE_FMRI, MEMTYPE_AUTH
+		MEMTYPE_EVENT, MEMTYPE_FMRI, MEMTYPE_AUTH, MEMTYPE_LIST
 	};
 
 	assert(item >= 0 && item < sizeof (mems) / sizeof (inj_memtype_t));
@@ -63,6 +63,8 @@ inj_mem2item(inj_memtype_t mem)
 		return (ITEMTYPE_FMRI);
 	case MEMTYPE_AUTH:
 		return (ITEMTYPE_AUTH);
+	case MEMTYPE_LIST:
+		return (ITEMTYPE_LIST);
 	default:
 		return (-1);
 	}

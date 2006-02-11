@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * esclex.c -- lexer for esc
@@ -99,6 +99,7 @@ static const struct {
 	const int val;
 } Rwords[] = {
 	{ "asru", ASRU },
+	{ "count", COUNT },
 	{ "div", DIV },
 	{ "engine", ENGINE },
 	{ "event", EVENT },

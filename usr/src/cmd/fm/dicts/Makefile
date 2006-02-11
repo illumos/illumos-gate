@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -36,6 +36,9 @@ common_DCNAMES = \
 	SCA500 \
 	SCA1000
 
+i386_DCNAMES = \
+	AMD
+
 sparc_DCNAMES = \
 	SUN4 \
 	SUN4U \
@@ -47,7 +50,8 @@ DCNAMES = \
 
 ALLDCNAMES = \
 	$(common_DCNAMES) \
-	$(sparc_DCNAMES)
+	$(sparc_DCNAMES) \
+	$(i386_DCNAMES)
 
 DCFILES = $(DCNAMES:%=%.dict)
 POFILES = $(DCNAMES:%=%.po)

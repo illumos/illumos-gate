@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * fme.h -- public definitions for fme module
@@ -63,16 +63,27 @@ extern "C" {
 #define	WOBUF_PULL	"timewaited"
 #define	WOBUF_CFG	"rawcfgdata"
 #define	WOBUF_ID	"fmeid"
+#define	WOBUF_ISTATS	"istats"
+
+struct lut *Istats;	/* instanced stats a la "count=" */
 
 struct fme;
 
 void fme_receive_external_report(fmd_hdl_t *hdl, fmd_event_t *ffep,
     nvlist_t *nvl, const char *eventstring);
 void fme_restart(fmd_hdl_t *hdl, fmd_case_t *inprogress);
+void fme_istat_load(fmd_hdl_t *hdl);
 void fme_close_case(fmd_hdl_t *hdl, fmd_case_t *fmcase);
 void fme_timer_fired(struct fme *, id_t);
 void fme_status(int flags);
 void fme_fini(void);
+void istat_fini(void);
+
+struct istat_entry {
+	const char *ename;
+	const struct ipath *ipath;
+};
+int istat_cmp(struct istat_entry *ent1, struct istat_entry *ent2);
 
 #ifdef	__cplusplus
 }

@@ -105,6 +105,7 @@ i386_SUBDIRS= \
 	SUNWgrub \
 	SUNWgrubS \
 	SUNWkvm.i  \
+	SUNWonmtst.i \
 	SUNWos86r  \
 	SUNWpsdcr  \
 	SUNWpsdir  \

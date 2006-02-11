@@ -20,7 +20,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,8 +42,6 @@ const char *yyinname;
 
 %}
 
-%a		3000	/* Number of transitions */
-
 /*
  * S0 is for normal input processing.  SCOMMENT is used to process comments.
  * We need a separate state for comments to prevent the lex regexp engine from
@@ -64,6 +62,7 @@ RGX_IDENT	[a-zA-Z][a-zA-Z0-9\-_]*
 <S0>evdef		{ return (INJ_TOK_EVDEF); }
 <S0>fmridef		{ return (INJ_TOK_FMRIDEF); }
 <S0>authdef		{ return (INJ_TOK_AUTHDEF); }
+<S0>listdef		{ return (INJ_TOK_LISTDEF); }
 
 <S0>int8_t		{ return (INJ_TOK_INT8); }
 <S0>int16_t		{ return (INJ_TOK_INT16); }
@@ -81,6 +80,7 @@ RGX_IDENT	[a-zA-Z][a-zA-Z0-9\-_]*
 <S0>event		{ return (INJ_TOK_EVENT); }
 <S0>fmri		{ return (INJ_TOK_FMRI); }
 <S0>auth		{ return (INJ_TOK_AUTH); }
+<S0>list		{ return (INJ_TOK_LIST); }
 
 <S0>addhrtime		{ return (INJ_TOK_ADDHRT); }
 <S0>endhrtime		{ return (INJ_TOK_ENDHRT); }

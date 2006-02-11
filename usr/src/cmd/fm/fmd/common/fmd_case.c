@@ -701,12 +701,14 @@ fmd_case_rele(fmd_case_t *cp)
 		(void) pthread_mutex_unlock(&cip->ci_lock);
 }
 
-void
+int
 fmd_case_insert_principal(fmd_case_t *cp, fmd_event_t *ep)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_case_item_t *cit;
 	fmd_event_t *oep;
 	uint_t state;
+	int new;
 
 	fmd_event_hold(ep);
 	(void) pthread_mutex_lock(&cip->ci_lock);
@@ -719,7 +721,14 @@ fmd_case_insert_principal(fmd_case_t *cp, fmd_event_t *ep)
 	oep = cip->ci_principal;
 	cip->ci_principal = ep;
 
+	for (cit = cip->ci_items; cit != NULL; cit = cit->cit_next) {
+		if (cit->cit_event == ep)
+			break;
+	}
+
 	cip->ci_flags |= FMD_CF_DIRTY;
+	new = cit == NULL && ep != oep;
+
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 
 	fmd_module_setcdirty(cip->ci_mod);
@@ -727,17 +736,44 @@ fmd_case_insert_principal(fmd_case_t *cp, fmd_event_t *ep)
 
 	if (oep != NULL)
 		fmd_event_rele(oep);
+
+	return (new);
 }
 
-void
+int
 fmd_case_insert_event(fmd_case_t *cp, fmd_event_t *ep)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
-	fmd_case_item_t *cit = fmd_alloc(sizeof (fmd_case_item_t), FMD_SLEEP);
+	fmd_case_item_t *cit;
 	uint_t state;
+	int new;
 
-	fmd_event_hold(ep);
 	(void) pthread_mutex_lock(&cip->ci_lock);
+
+	if (cip->ci_flags & FMD_CF_SOLVED)
+		state = FMD_EVS_DIAGNOSED;
+	else
+		state = FMD_EVS_ACCEPTED;
+
+	for (cit = cip->ci_items; cit != NULL; cit = cit->cit_next) {
+		if (cit->cit_event == ep)
+			break;
+	}
+
+	new = cit == NULL && ep != cip->ci_principal;
+
+	/*
+	 * If the event is already in the case or the case is already solved,
+	 * there is no reason to save it: just transition it appropriately.
+	 */
+	if (cit != NULL || (cip->ci_flags & FMD_CF_SOLVED)) {
+		(void) pthread_mutex_unlock(&cip->ci_lock);
+		fmd_event_transition(ep, state);
+		return (new);
+	}
+
+	cit = fmd_alloc(sizeof (fmd_case_item_t), FMD_SLEEP);
+	fmd_event_hold(ep);
 
 	cit->cit_next = cip->ci_items;
 	cit->cit_event = ep;
@@ -745,16 +781,13 @@ fmd_case_insert_event(fmd_case_t *cp, fmd_event_t *ep)
 	cip->ci_items = cit;
 	cip->ci_nitems++;
 
-	if (cip->ci_flags & FMD_CF_SOLVED)
-		state = FMD_EVS_DIAGNOSED;
-	else
-		state = FMD_EVS_ACCEPTED;
-
 	cip->ci_flags |= FMD_CF_DIRTY;
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 
 	fmd_module_setcdirty(cip->ci_mod);
 	fmd_event_transition(ep, state);
+
+	return (new);
 }
 
 void

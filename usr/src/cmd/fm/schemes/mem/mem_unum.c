@@ -28,6 +28,7 @@
 
 #include <mem.h>
 #include <fm/fmd_fmri.h>
+#include <fm/libtopo.h>
 
 #include <string.h>
 #include <strings.h>
@@ -367,4 +368,40 @@ mem_unum_contains(const char *erunum, const char *eeunum)
 	}
 
 	return (rc);
+}
+
+/*
+ * If an asru has a unum string that is an hc path string then return
+ * a new nvl (to be freed by the caller) that is a duplicate of the
+ * original but with an additional member of a reconstituted hc fmri.
+ */
+int
+mem_unum_rewrite(nvlist_t *nvl, nvlist_t **rnvl)
+{
+	int err;
+	char *unumstr;
+	nvlist_t *unum;
+	struct topo_hdl *thp;
+
+	if (nvlist_lookup_string(nvl, FM_FMRI_MEM_UNUM, &unumstr) != 0 ||
+	    strncmp(unumstr, "hc:/", 4) != 0)
+		return (0);
+
+	thp = fmd_fmri_topology(TOPO_VERSION);
+
+	if (topo_fmri_str2nvl(thp, unumstr, &unum, &err) != 0)
+		return (EINVAL);
+
+	if ((err = nvlist_dup(nvl, rnvl, 0)) != 0) {
+		nvlist_free(unum);
+		return (err);
+	}
+
+	err = nvlist_add_nvlist(*rnvl, FM_FMRI_MEM_UNUM "-fmri", unum);
+	nvlist_free(unum);
+
+	if (err != 0)
+		nvlist_free(*rnvl);
+
+	return (err);
 }

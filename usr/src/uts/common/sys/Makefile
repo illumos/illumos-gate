@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -657,12 +657,6 @@ FMHDRS=				\
 	protocol.h		\
 	util.h
 
-sparc_FMCPUHDRS=		\
-	UltraSPARC-II.h		\
-	UltraSPARC-III.h	\
-	UltraSPARC-T1.h
-FMCPUHDRS=$($(MACH)_FMCPUHDRS)
-
 FMIOHDRS=			\
 	ddi.h			\
 	pci.h			\
@@ -920,7 +914,6 @@ CHECKHDRS=						\
 	$(TAVORHDRS:%.h=ib/adapters/tavor/%.check)	\
 	$(ISOHDRS:%.h=iso/%.check)			\
 	$(FMHDRS:%.h=fm/%.check)			\
-	$(FMCPUHDRS:%.h=fm/cpu/%.check)			\
 	$(FMIOHDRS:%.h=fm/io/%.check)			\
 	$(FSHDRS:%.h=fs/%.check)			\
 	$(LVMHDRS:%.h=lvm/%.check)			\
@@ -955,8 +948,7 @@ CHECKHDRS=						\
 	$(ROOTDCAMHDRS)		\
 	$(ROOTISOHDRS)		\
 	$(ROOTFMHDRS)		\
-	$(ROOTFMCPUHDRS)	\
-	$(ROOTFMIOHDRS)	\
+	$(ROOTFMIOHDRS)		\
 	$(ROOTFSHDRS)		\
 	$(ROOTIBDHDRS)		\
 	$(ROOTIBHDRS)		\
@@ -1000,7 +992,6 @@ install_h:			\
 	$(ROOTDCAMHDRS)		\
 	$(ROOTISOHDRS)		\
 	$(ROOTFMHDRS)		\
-	$(ROOTFMCPUHDRS)	\
 	$(ROOTFMIOHDRS)	\
 	$(ROOTFSHDRS)		\
 	$(ROOTIBDHDRS)		\

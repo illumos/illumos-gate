@@ -32,7 +32,9 @@
 #include <sys/param.h>
 #include <sys/systeminfo.h>
 #include <sys/fm/util.h>
+#include <fm/libtopo.h>
 
+#include <smbios.h>
 #include <limits.h>
 #include <unistd.h>
 #include <signal.h>
@@ -70,6 +72,8 @@ const char _fmd_version[] = "1.1";		/* daemon version string */
 static char _fmd_plat[MAXNAMELEN];		/* native platform string */
 static char _fmd_isa[MAXNAMELEN];		/* native instruction set */
 static struct utsname _fmd_uts;			/* native uname(2) info */
+static char _fmd_csn[MAXNAMELEN];		/* chassis serial number */
+static char _fmd_prod[MAXNAMELEN];		/* product name string */
 
 /*
  * Note: the configuration file path is ordered from most common to most host-
@@ -223,7 +227,7 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "agent.path", &fmd_conf_path, _fmd_agent_path }, /* path for agents */
 { "alloc_msecs", &fmd_conf_uint32, "10" },	/* msecs before alloc retry */
 { "alloc_tries", &fmd_conf_uint32, "3" },	/* max # of alloc retries */
-{ "chassis", &fmd_conf_string, NULL },		/* chassis serial number */
+{ "chassis", &fmd_conf_string, _fmd_csn },	/* chassis serial number */
 { "ckpt.dir", &fmd_conf_string, "var/fm/fmd/ckpt" }, /* ckpt directory path */
 { "ckpt.dirmode", &fmd_conf_int32, "0700" },	/* ckpt directory perm mode */
 { "ckpt.mode", &fmd_conf_int32, "0400" },	/* ckpt file perm mode */
@@ -270,6 +274,7 @@ static const fmd_conf_formal_t _fmd_conf[] = {
 { "platform", &fmd_conf_string, _fmd_plat },	/* platform string (uname -i) */
 { "plugin.close", &fmd_conf_bool, "true" },	/* dlclose plugins on fini */
 { "plugin.path", &fmd_conf_path, _fmd_plugin_path }, /* path for plugin mods */
+{ "product", &fmd_conf_string, _fmd_prod },	/* product name string */
 { "rootdir", &fmd_conf_string, "" },		/* root directory for paths */
 { "rpc.adm.path", &fmd_conf_string, NULL },	/* FMD_ADM rendezvous file */
 { "rpc.adm.prog", &fmd_conf_uint32, "100169" },	/* FMD_ADM rpc program num */
@@ -318,9 +323,23 @@ fmd_create(fmd_t *dp, const char *arg0, const char *root, const char *conf)
 	fmd_stat_t *sp;
 	int i;
 
+	smbios_hdl_t *shp;
+	smbios_system_t s1;
+	smbios_info_t s2;
+	id_t id;
+
 	(void) sysinfo(SI_PLATFORM, _fmd_plat, sizeof (_fmd_plat));
 	(void) sysinfo(SI_ARCHITECTURE, _fmd_isa, sizeof (_fmd_isa));
 	(void) uname(&_fmd_uts);
+
+	if ((shp = smbios_open(NULL, SMB_VERSION, 0, NULL)) != NULL) {
+		if ((id = smbios_info_system(shp, &s1)) != SMB_ERR &&
+		    smbios_info_common(shp, id, &s2) != SMB_ERR) {
+			(void) strlcpy(_fmd_prod, s2.smbi_product, MAXNAMELEN);
+			(void) strlcpy(_fmd_csn, s2.smbi_serial, MAXNAMELEN);
+		}
+		smbios_close(shp);
+	}
 
 	bzero(dp, sizeof (fmd_t));
 
@@ -575,6 +594,9 @@ fmd_destroy(fmd_t *dp)
 	if (dp->d_conf != NULL)
 		fmd_conf_close(dp->d_conf);
 
+	if (dp->d_topo != NULL)
+		topo_close(dp->d_topo);
+
 	nvlist_free(dp->d_auth);
 	(void) nv_alloc_fini(&dp->d_nva);
 	dp->d_clockops->fto_fini(dp->d_clockptr);
@@ -694,7 +716,7 @@ fmd_run(fmd_t *dp, int pfd)
 	const char *name;
 	fmd_conf_path_t *pap;
 	fmd_event_t *e;
-	int dbout;
+	int dbout, err;
 
 	/*
 	 * Cache all the current debug property settings in d_fmd_debug,
@@ -723,6 +745,14 @@ fmd_run(fmd_t *dp, int pfd)
 	 * This work is done here rather than in fmd_create() to permit the -o
 	 * command-line option to modify properties after fmd_create() is done.
 	 */
+	name = dp->d_rootdir != NULL &&
+	    *dp->d_rootdir != '\0' ? dp->d_rootdir : NULL;
+
+	if ((dp->d_topo = topo_open(TOPO_VERSION, name, &err)) == NULL) {
+		fmd_error(EFMD_EXIT, "failed to initialize "
+		    "topology library: %s\n", topo_strerror(err));
+	}
+
 	dp->d_clockptr = dp->d_clockops->fto_init();
 	dp->d_xprt_ids = fmd_idspace_create("xprt_ids", 1, INT_MAX);
 	fmd_xprt_suspend_all();

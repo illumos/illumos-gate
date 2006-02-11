@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,7 +89,7 @@ inj_defn_destroy_memlist(inj_defnmem_t *m)
 
 		switch (m->dfm_type) {
 		case DEFNMEM_ARRAY:
-		case DEFNMEM_SUBLIST:
+		case DEFNMEM_LIST:
 			inj_defn_destroy_memlist(inj_list_next(&m->dfm_list));
 			break;
 		default:
@@ -546,11 +546,11 @@ inj_defn_memcmp_strenum_array(inj_declmem_t *dlm, inj_defnmem_t *dfm,
 }
 
 /*
- * Validator for embedded lists (events, fmris, authorities, etc.).  There are
- * two cases to deal with here.  The user could either have provided the name
- * of a previously-defined list, in which case we just make a copy of said
- * list for insertion into ours.  Alternatively, the user could simply define
- * a new sublist here.  In that case, we recursively invoke the member
+ * Validator for embedded lists (events, fmris, authorities, lists, etc.).
+ * There are two cases to deal with here.  The user could either have provided
+ * the name of a previously-defined list, in which case we just make a copy of
+ * said list for insertion into ours.  Alternatively, the user could simply
+ * define a new list here.  In that case, we recursively invoke the member
  * comparator, but against the list type for the member being defined.
  */
 static nvlist_t *inj_defn_validate_memlist(inj_declmem_t *, inj_defnmem_t *);
@@ -604,7 +604,7 @@ inj_defn_memcmp_sub_makenvl(inj_declmem_t *dlm, inj_defnmem_t *dfm)
 	inj_memtype_t dltype = dlm->dlm_type;
 	nvlist_t *new = NULL;
 
-	if (dftype == DEFNMEM_SUBLIST)
+	if (dftype == DEFNMEM_LIST)
 		new = inj_defn_memcmp_sub_list(dlm, dfm);
 	else if (dftype == DEFNMEM_IDENT && (dltype == MEMTYPE_EVENT ||
 	    dltype == MEMTYPE_FMRI || dltype == MEMTYPE_AUTH))
@@ -669,7 +669,7 @@ inj_defn_memcmp_sub_array(inj_declmem_t *dlm, inj_defnmem_t *dfm, nvlist_t *nvl)
 
 /*
  * The declaration-definition member comparator.  Designed to recursive
- * invocation to allow for the validation of embedded/referenced sublists.
+ * invocation to allow for the validation of embedded/referenced lists.
  */
 nvlist_t *
 inj_defn_validate_memlist(inj_declmem_t *dlm, inj_defnmem_t *dfm)
@@ -742,6 +742,7 @@ inj_defn_validate_memlist(inj_declmem_t *dlm, inj_defnmem_t *dfm)
 		case MEMTYPE_EVENT:
 		case MEMTYPE_FMRI:
 		case MEMTYPE_AUTH:
+		case MEMTYPE_LIST:
 			if (dlm->dlm_flags & DECLMEM_F_ARRAY)
 				rc = inj_defn_memcmp_sub_array(dlm, dfm, nvl);
 			else

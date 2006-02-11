@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -55,16 +55,20 @@ fmd_protocol_authority(void)
 		fmd_panic("failed to xalloc authority nvlist");
 
 	err |= nvlist_add_uint8(nvl, FM_VERSION, FM_FMRI_AUTH_VERSION);
-	(void) fmd_conf_getprop(fmd.d_conf, "platform", &str);
-	err |= nvlist_add_string(nvl, FM_FMRI_AUTH_PRODUCT, str);
 
-	if (fmd_conf_getprop(fmd.d_conf, "chassis", &str) == 0 && str != NULL)
+	if ((str = fmd_conf_getnzstr(fmd.d_conf, "product")) == NULL)
+		str = fmd_conf_getnzstr(fmd.d_conf, "platform");
+
+	if (str != NULL)
+		err |= nvlist_add_string(nvl, FM_FMRI_AUTH_PRODUCT, str);
+
+	if ((str = fmd_conf_getnzstr(fmd.d_conf, "chassis")) != NULL)
 		err |= nvlist_add_string(nvl, FM_FMRI_AUTH_CHASSIS, str);
 
-	if (fmd_conf_getprop(fmd.d_conf, "domain", &str) == 0 && str != NULL)
+	if ((str = fmd_conf_getnzstr(fmd.d_conf, "domain")) != NULL)
 		err |= nvlist_add_string(nvl, FM_FMRI_AUTH_DOMAIN, str);
 
-	if (fmd_conf_getprop(fmd.d_conf, "server", &str) == 0 && str != NULL)
+	if ((str = fmd_conf_getnzstr(fmd.d_conf, "server")) != NULL)
 		err |= nvlist_add_string(nvl, FM_FMRI_AUTH_SERVER, str);
 
 	if (err != 0)
@@ -188,8 +192,13 @@ fmd_protocol_rsrc_asru(const char *class,
 	err |= nvlist_add_uint8(nvl, FM_VERSION, FM_RSRC_VERSION);
 	err |= nvlist_add_string(nvl, FM_CLASS, class);
 	err |= nvlist_add_nvlist(nvl, FM_RSRC_RESOURCE, fmri);
-	err |= nvlist_add_string(nvl, FM_RSRC_ASRU_UUID, uuid);
-	err |= nvlist_add_string(nvl, FM_RSRC_ASRU_CODE, code);
+
+	if (uuid != NULL)
+		err |= nvlist_add_string(nvl, FM_RSRC_ASRU_UUID, uuid);
+
+	if (code != NULL)
+		err |= nvlist_add_string(nvl, FM_RSRC_ASRU_CODE, code);
+
 	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_FAULTY, faulty);
 	err |= nvlist_add_boolean_value(nvl, FM_RSRC_ASRU_UNUSABLE, unusable);
 	err |= nvlist_add_boolean_value(nvl, FM_SUSPECT_MESSAGE, message);

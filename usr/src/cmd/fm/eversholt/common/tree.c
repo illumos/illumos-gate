@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * tree.c -- routines for manipulating the prop tree
@@ -58,6 +58,7 @@ static struct stats *Defectcount;
 static struct stats *Errorcount;
 static struct stats *Ereportcount;
 static struct stats *SERDcount;
+static struct stats *STATcount;
 static struct stats *ASRUcount;
 static struct stats *FRUcount;
 static struct stats *Configcount;
@@ -76,6 +77,7 @@ tree_init(void)
 	Errorcount = stats_new_counter("parser.error", "error decls", 1);
 	Ereportcount = stats_new_counter("parser.ereport", "ereport decls", 1);
 	SERDcount = stats_new_counter("parser.SERD", "SERD engine decls", 1);
+	STATcount = stats_new_counter("parser.STAT", "STAT engine decls", 1);
 	ASRUcount = stats_new_counter("parser.ASRU", "ASRU decls", 1);
 	FRUcount = stats_new_counter("parser.FRU", "FRU decls", 1);
 	Configcount = stats_new_counter("parser.config", "config stmts", 1);
@@ -97,6 +99,7 @@ tree_fini(void)
 	stats_delete(Errorcount);
 	stats_delete(Ereportcount);
 	stats_delete(SERDcount);
+	stats_delete(STATcount);
 	stats_delete(ASRUcount);
 	stats_delete(FRUcount);
 	stats_delete(Configcount);
@@ -124,6 +127,8 @@ tree_fini(void)
 	Ereportenames = NULL;
 	lut_free(SERDs, NULL, NULL);
 	SERDs = NULL;
+	lut_free(STATs, NULL, NULL);
+	STATs = NULL;
 	lut_free(ASRUs, NULL, NULL);
 	ASRUs = NULL;
 	lut_free(FRUs, NULL, NULL);
@@ -169,8 +174,6 @@ tree_free(struct node *root)
 		break;
 	case T_FUNC:
 		tree_free(root->u.func.arglist);
-		if (root->u.func.cachedval != NULL)
-			FREE(root->u.func.cachedval);
 		break;
 	case T_AND:
 	case T_OR:
@@ -225,6 +228,7 @@ tree_free(struct node *root)
 	case T_ASRU:
 	case T_FRU:
 	case T_SERD:
+	case T_STAT:
 	case T_CONFIG:
 		tree_free(root->u.stmt.np);
 		if (root->u.stmt.nvpairs)
@@ -352,6 +356,7 @@ tree_treecmp(struct node *np1, struct node *np2, enum nodetype t,
 	case T_ASRU:
 	case T_FRU:
 	case T_SERD:
+	case T_STAT:
 		if (tree_treecmp(np1->u.stmt.np, np2->u.stmt.np, t, cmp_func))
 			return (1);
 		return (tree_treecmp(np1->u.stmt.nvpairs, np2->u.stmt.nvpairs,
@@ -504,6 +509,8 @@ tree_name(const char *s, enum itertype it, const char *file, int line)
 			ret->u.name.t = N_EREPORT;
 		else if (s == L_serd)
 			ret->u.name.t = N_SERD;
+		else if (s == L_stat)
+			ret->u.name.t = N_STAT;
 		else
 			outfl(O_ERR, file, line, "unknown class: %s", s);
 	}
@@ -680,7 +687,7 @@ tree_func(const char *s, struct node *np, const char *file, int line)
  * iterator names.
  */
 static void
-make_explicit(struct node *np)
+make_explicit(struct node *np, int eventonly)
 {
 	struct node *pnp;	/* component of pathname */
 	struct node *pnp2;
@@ -696,20 +703,46 @@ make_explicit(struct node *np)
 		return;		/* all done */
 
 	switch (np->t) {
-		case T_ARROW:
-			/* cascaded arrow, already done */
-			break;
-
+		case T_ASSIGN:
+		case T_CONDIF:
+		case T_CONDELSE:
+		case T_NE:
+		case T_EQ:
+		case T_LT:
+		case T_LE:
+		case T_GT:
+		case T_GE:
+		case T_BITAND:
+		case T_BITOR:
+		case T_BITXOR:
+		case T_BITNOT:
+		case T_LSHIFT:
+		case T_RSHIFT:
 		case T_LIST:
-			make_explicit(np->u.expr.left);
-			make_explicit(np->u.expr.right);
+		case T_AND:
+		case T_OR:
+		case T_NOT:
+		case T_ADD:
+		case T_SUB:
+		case T_MUL:
+		case T_DIV:
+		case T_MOD:
+			make_explicit(np->u.expr.left, eventonly);
+			make_explicit(np->u.expr.right, eventonly);
 			break;
 
 		case T_EVENT:
-			make_explicit(np->u.event.epname);
+			make_explicit(np->u.event.epname, 0);
+			make_explicit(np->u.event.eexprlist, 1);
+			break;
+
+		case T_FUNC:
+			make_explicit(np->u.func.arglist, eventonly);
 			break;
 
 		case T_NAME:
+			if (eventonly)
+				return;
 			for (pnp = np; pnp != NULL; pnp = pnp->u.name.next)
 				if (pnp->u.name.child == NULL) {
 					/*
@@ -758,19 +791,13 @@ make_explicit(struct node *np)
 					pnp->u.name.childgen = 1;
 				}
 			break;
-
-		default:
-			outfl(O_DIE, np->file, np->line,
-			    "internal error: make_explicit: "
-			    "unexpected type: %s",
-			    ptree_nodetype2str(np->t));
 	}
 }
 
 struct node *
 tree_pname(struct node *np)
 {
-	make_explicit(np);
+	make_explicit(np, 0);
 	return (np);
 }
 
@@ -791,8 +818,8 @@ tree_arrow(struct node *lhs, struct node *nnp, struct node *knp,
 	ret->u.arrow.knp = knp;
 	ret->u.arrow.rhs = rhs;
 
-	make_explicit(lhs);
-	make_explicit(rhs);
+	make_explicit(lhs, 0);
+	make_explicit(rhs, 0);
 
 	check_arrow(ret);
 
@@ -1008,6 +1035,11 @@ tree_decl(enum nodetype t, struct node *np, struct node *nvpairs,
 			lut_walk(Upsets, update_serd_refstmt, np);
 			break;
 
+		case N_STAT:
+			ret = dodecl(T_STAT, file, line, np, nvpairs,
+			    &STATs, STATcount, 0);
+			break;
+
 		default:
 			outfl(O_ERR, file, line,
 			    "tree_decl: internal error, engine name type %s",
@@ -1150,6 +1182,7 @@ tree_report()
 	lut_walk(Errors, (lut_cb)check_required_props, (void *)T_ERROR);
 	lut_walk(Ereports, (lut_cb)check_required_props, (void *)T_EREPORT);
 	lut_walk(SERDs, (lut_cb)check_required_props, (void *)T_SERD);
+	lut_walk(STATs, (lut_cb)check_required_props, (void *)T_STAT);
 
 	/*
 	 * we do this now rather than while building the parse

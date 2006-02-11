@@ -615,6 +615,10 @@ static const mdb_dcmd_t kmt_dcmds[] = {
 	{ "out", ":[-L len] val", "write to I/O port", kmt_out_dcmd },
 	{ "rdmsr", ":", "read an MSR", kmt_rdmsr },
 	{ "wrmsr", ": val", "write an MSR", kmt_wrmsr },
+	{ "rdpcicfg", ": bus dev func", "read a register in PCI config space",
+	kmt_rdpcicfg },
+	{ "wrpcicfg", ": bus dev func val", "write a register in PCI config "
+	"space", kmt_wrpcicfg },
 #endif
 	{ "noducttape", NULL, NULL, kmt_noducttape },
 	{ "regs", NULL, "print general-purpose registers", kmt_regs },

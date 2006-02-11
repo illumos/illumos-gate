@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1515,41 +1516,12 @@ kcpc_invalidate(kthread_t *t)
 int
 kcpc_pcbe_tryload(const char *prefix, uint_t first, uint_t second, uint_t third)
 {
-	char	modname[PCBE_NAMELEN];
-	char	stub[PCBE_NAMELEN];
+	uint_t s[3];
 
-	if (prefix != NULL)
-		(void) snprintf(stub, PCBE_NAMELEN, "pcbe.%s", prefix);
-	else
-		(void) snprintf(stub, PCBE_NAMELEN, "pcbe");
+	s[0] = first;
+	s[1] = second;
+	s[2] = third;
 
-	(void) snprintf(modname, PCBE_NAMELEN, "%s.%u.%u.%u",
-	    stub, first, second, third);
-
-	DTRACE_PROBE1(kcpc__pcbe__spec, char *, modname);
-
-	if (modload("pcbe", modname) >= 0)
-		return (0);
-
-	(void) snprintf(modname, PCBE_NAMELEN, "%s.%u.%u",
-	    stub, first, second);
-	if (modload("pcbe", modname) >= 0)
-		return (0);
-
-	(void) snprintf(modname, PCBE_NAMELEN, "%s.%u", stub, first);
-	if (modload("pcbe", modname) >= 0)
-		return (0);
-
-	if (prefix == NULL)
-		/*
-		 * If no prefix was given, we have tried all possible
-		 * PCBE names.
-		 */
-		return (-1);
-
-	(void) snprintf(modname, PCBE_NAMELEN, "%s", stub);
-	if (modload("pcbe", modname) >= 0)
-		return (0);
-
-	return (-1);
+	return (modload_qualified("pcbe",
+	    "pcbe", prefix, ".", s, 3) < 0 ? -1 : 0);
 }

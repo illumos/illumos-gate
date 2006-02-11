@@ -22,7 +22,7 @@
 #
 # uts/intel/mm/Makefile
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -50,6 +50,8 @@ CONF_SRCDIR	= $(UTSBASE)/common/io
 #	Include common rules.
 #
 include $(UTSBASE)/intel/Makefile.intel
+
+CPPFLAGS += -I$(UTSBASE)/i86pc
 
 #
 #	Define targets

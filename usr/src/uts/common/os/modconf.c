@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,6 +98,11 @@ static int mod_null(struct modldrv *, struct modlinkage *);
 static int mod_infonull(void *, struct modlinkage *, int *);
 
 struct mod_ops mod_miscops = {
+	mod_null, mod_null, mod_infonull
+};
+
+/* CPU Modules */
+struct mod_ops mod_cpuops = {
 	mod_null, mod_null, mod_infonull
 };
 

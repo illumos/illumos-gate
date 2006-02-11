@@ -20,13 +20,10 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
-
-sparc_SUBDIRS = \
-	mem
 
 SUBDIRS = \
 	cpu \
@@ -34,8 +31,8 @@ SUBDIRS = \
 	fmd \
 	hc  \
 	legacy-hc \
+	mem \
 	mod \
-	pkg \
-	$($(MACH)_SUBDIRS)
+	pkg
 
 include ../Makefile.subdirs

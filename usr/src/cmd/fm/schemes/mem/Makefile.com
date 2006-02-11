@@ -28,10 +28,7 @@
 
 include ../../Makefile.com
 
-SCHEME_COMMON = ../../common
-
 SRCS =	\
-	mdesc_devinit.c \
 	mem.c \
 	mem_disc.c \
 	mem_read.c \

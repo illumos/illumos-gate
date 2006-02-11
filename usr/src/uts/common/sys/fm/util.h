@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,8 +75,13 @@ typedef struct erpt_dump {
 } erpt_dump_t;
 
 #ifdef _KERNEL
+#include <sys/systm.h>
 
+#define	FM_STK_DEPTH	20	/* maximum stack depth */
+#define	FM_SYM_SZ	64	/* maximum symbol size */
 #define	FM_ERR_PIL	2	/* PIL for ereport_errorq drain processing */
+
+#define	FM_EREPORT_PAYLOAD_NAME_STACK		"stack"
 
 extern errorq_t *ereport_errorq;
 extern void *ereport_dumpbuf;
@@ -88,6 +94,8 @@ extern void fm_banner(void);
 
 extern void fm_ereport_dump(void);
 extern void fm_ereport_post(nvlist_t *, int);
+
+extern void fm_payload_stack_add(nvlist_t *, const pc_t *, int);
 
 #endif  /* _KERNEL */
 

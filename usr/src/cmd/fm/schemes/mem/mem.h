@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -30,7 +31,6 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/types.h>
-#include <sys/mdesc.h>
 #include <sys/nvpair.h>
 
 #ifdef __cplusplus
@@ -105,8 +105,6 @@ extern "C" {
 
 /* 8+nul for SPD, 6+nul for SEEPROM, 15+nul max for Serengeti, Starcat, LW8 */
 #define	MEM_SERID_MAXLEN	16
-#define	MDESC_PATH		"%s/devices/pseudo/mdesc@0:mdesc"
-#define	MDESC_MAXPATHLEN	128
 
 typedef struct mem_dimm_map {
 	struct mem_dimm_map *dm_next;	/* The next DIMM map */
@@ -119,18 +117,14 @@ typedef struct mem_dimm_map {
 typedef struct mem {
 	mem_dimm_map_t *mem_dm;		/* List supported DIMMs */
 	uint64_t mem_memconfig;		/* HV memory-configuration-id# */
-	md_t *mem_mdp;			/* pointer to mdesc buffer */
-	size_t mem_mdbufsz;		/* size of mdesc buffer */
 } mem_t;
 
-extern md_t *mdesc_devinit(size_t *);
 extern int mem_discover(void);
-extern void mem_destroy(void);
-
 extern int mem_get_serid(const char *, char *, size_t);
 
 extern int mem_unum_burst(const char *, char ***, size_t *);
 extern int mem_unum_contains(const char *, const char *);
+extern int mem_unum_rewrite(nvlist_t *, nvlist_t **);
 
 extern void mem_strarray_free(char **, size_t);
 extern int mem_page_cmd(int, nvlist_t *);

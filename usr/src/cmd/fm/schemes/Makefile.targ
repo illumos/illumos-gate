@@ -36,7 +36,19 @@ $(PROG): $(OBJS) $(MAPFILE)
 	$(CTFMERGE) -L VERSION -o $@ $(OBJS)
 	$(POST_PROCESS_SO)
 
+%.o: %.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: ../$(MACH)/%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
 %.o: ../%.c
+	$(COMPILE.c) $<
+	$(CTFCONVERT_O)
+
+%.o: ../../common/%.c
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
@@ -46,8 +58,17 @@ clean:
 clobber: clean
 	$(RM) $(PROG)
 
+%.ln: %.c
+	$(LINT.c) -c $<
+
+%.ln: ../$(MACH)/%.c
+	$(LINT.c) -c $<
+
 %.ln: ../%.c
 	$(LINT.c) -c $<
+
+%.ln: ../../common/%.c
+	$(LINT.c) -erroff=E_BAD_PTR_CAST_ALIGN -v -c $<
 
 lint: $(LINTFILES)
 	$(LINT) $(LINTFLAGS) $(LINTFILES) $(LDLIBS)

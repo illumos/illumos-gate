@@ -29,6 +29,7 @@
 
 #include <sys/types.h>
 #include <sys/fm/protocol.h>
+#include <fm/libtopo.h>
 
 #include <unistd.h>
 #include <signal.h>
@@ -686,6 +687,22 @@ fmd_hdl_opendict(fmd_hdl_t *hdl, const char *dict)
 	fmd_module_unlock(mp);
 }
 
+topo_hdl_t *
+fmd_hdl_topology(fmd_hdl_t *hdl, int v)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	topo_hdl_t *thp;
+
+	if (v != TOPO_VERSION) {
+		fmd_api_error(mp, EFMD_MOD_TOPO, "libtopo version mismatch: "
+		    "fmd version %d != client version %d\n", TOPO_VERSION, v);
+	}
+
+	thp = fmd.d_topo;
+	fmd_module_unlock(mp);
+	return (thp);
+}
+
 void *
 fmd_hdl_alloc(fmd_hdl_t *hdl, size_t size, int flags)
 {
@@ -1103,8 +1120,9 @@ fmd_case_add_ereport(fmd_hdl_t *hdl, fmd_case_t *cp, fmd_event_t *ep)
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
 
 	(void) fmd_api_case_impl(mp, cp); /* validate 'cp' */
-	fmd_case_insert_event(cp, ep);
-	mp->mod_stats->ms_accepted.fmds_value.ui64++;
+
+	if (fmd_case_insert_event(cp, ep))
+		mp->mod_stats->ms_accepted.fmds_value.ui64++;
 
 	fmd_module_unlock(mp);
 }
@@ -1124,10 +1142,11 @@ fmd_case_add_serd(fmd_hdl_t *hdl, fmd_case_t *cp, const char *name)
 	(void) fmd_api_case_impl(mp, cp); /* validate 'cp' */
 
 	for (sep = fmd_list_next(&sgp->sg_list);
-	    sep != NULL; sep = fmd_list_next(sep))
-		fmd_case_insert_event(cp, sep->se_event);
+	    sep != NULL; sep = fmd_list_next(sep)) {
+		if (fmd_case_insert_event(cp, sep->se_event))
+			mp->mod_stats->ms_accepted.fmds_value.ui64++;
+	}
 
-	mp->mod_stats->ms_accepted.fmds_value.ui64 += sgp->sg_count;
 	fmd_module_unlock(mp);
 }
 
@@ -1187,8 +1206,9 @@ fmd_case_setprincipal(fmd_hdl_t *hdl, fmd_case_t *cp, fmd_event_t *ep)
 	fmd_module_t *mp = fmd_api_module_lock(hdl);
 
 	(void) fmd_api_case_impl(mp, cp); /* validate 'cp' */
-	fmd_case_insert_principal(cp, ep);
-	mp->mod_stats->ms_accepted.fmds_value.ui64++;
+
+	if (fmd_case_insert_principal(cp, ep))
+		mp->mod_stats->ms_accepted.fmds_value.ui64++;
 
 	fmd_module_unlock(mp);
 }
@@ -1712,6 +1732,28 @@ fmd_nvl_fmri_unusable(fmd_hdl_t *hdl, nvlist_t *nvl)
 		    "fmd_nvl_fmri_unusable\n");
 	}
 
+	return (rv);
+}
+
+int
+fmd_nvl_fmri_faulty(fmd_hdl_t *hdl, nvlist_t *nvl)
+{
+	fmd_module_t *mp = fmd_api_module_lock(hdl);
+	fmd_asru_hash_t *ahp = fmd.d_asrus;
+	fmd_asru_t *ap;
+	int rv = 0;
+
+	if (nvl == NULL) {
+		fmd_api_error(mp, EFMD_NVL_INVAL,
+		    "invalid nvlist %p\n", (void *)nvl);
+	}
+
+	if ((ap = fmd_asru_hash_lookup_nvl(ahp, nvl, FMD_B_FALSE)) != NULL) {
+		rv = (ap->asru_flags & FMD_ASRU_FAULTY) != 0;
+		fmd_asru_hash_release(ahp, ap);
+	}
+
+	fmd_module_unlock(mp);
 	return (rv);
 }
 

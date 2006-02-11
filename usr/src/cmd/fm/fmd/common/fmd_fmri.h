@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,6 +54,8 @@ extern "C" {
  * fmd to facilitate the implementation of each FMRI scheme library.
  */
 
+struct topo_hdl;
+
 #ifndef	MIN
 #define	MIN(x, y) ((x) < (y) ? (x) : (y))
 #endif
@@ -78,6 +80,8 @@ extern const char *fmd_fmri_get_rootdir(void);
 extern const char *fmd_fmri_get_platform(void);
 
 extern uint64_t fmd_fmri_get_drgen(void);
+
+extern struct topo_hdl *fmd_fmri_topology(int);
 
 /*
  * The following entry points are to be implemented by each scheme:

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,7 +60,6 @@
 #include <sys/sysevent.h>
 #include <sys/sysevent_impl.h>
 #include <sys/nvpair.h>
-#include <sys/nvpair_impl.h>
 #include <sys/cmn_err.h>
 #include <sys/cpuvar.h>
 #include <sys/sysmacros.h>
@@ -73,6 +72,8 @@
 #include <sys/cpuvar.h>
 #include <sys/console.h>
 #include <sys/panic.h>
+#include <sys/kobj.h>
+#include <sys/sunddi.h>
 #include <sys/systeminfo.h>
 #include <sys/sysevent/eventdefs.h>
 #include <sys/fm/util.h>
@@ -614,15 +615,13 @@ fm_nvlist_create(nv_alloc_t *nva)
 void
 fm_nvlist_destroy(nvlist_t *nvl, int flag)
 {
-	nv_alloc_t *nvhdl;
-
-	nvhdl = ((nvpriv_t *)(uintptr_t)nvl->nvl_priv)->nvp_nva;
+	nv_alloc_t *nva = nvlist_lookup_nv_alloc(nvl);
 
 	nvlist_free(nvl);
 
-	if (nvhdl != NULL) {
+	if (nva != NULL) {
 		if (flag == FM_NVA_FREE)
-			fm_nva_xdestroy(nvhdl);
+			fm_nva_xdestroy(nva);
 	}
 }
 
@@ -820,53 +819,88 @@ fm_ereport_set(nvlist_t *ereport, int version, const char *erpt_class,
 		atomic_add_64(&erpt_kstat_data.erpt_set_failed.value.ui64, 1);
 }
 
+/*
+ * Set-up and validate the members of an hc fmri according to;
+ *
+ *	Member name		Type		Value
+ *	===================================================
+ *	version			uint8_t		0
+ *	auth			nvlist_t	<auth>
+ *	hc-name			string		<name>
+ *	hc-id			string		<id>
+ *
+ * Note that auth and hc-id are optional members.
+ */
+
+#define	HC_MAXPAIRS	20
+#define	HC_MAXNAMELEN	50
+
 static int
-i_fm_fmri_hc_set_v0(nvlist_t *hc, uint32_t size, va_list ap)
+fm_fmri_hc_set_common(nvlist_t *fmri, int version, const nvlist_t *auth)
 {
-	int i, ret;
-	const char *name, *id;
-	nvlist_t **hc_nvl;
-
-	if (size <= 0)
+	if (version != FM_HC_SCHEME_VERSION) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
 		return (0);
-
-	hc_nvl = kmem_zalloc(size * sizeof (nvlist_t *), KM_SLEEP);
-
-	for (i = 0; i < size; ++i) {
-		name = va_arg(ap, const char *);
-		if (name == NULL) {
-			ret = EINVAL;
-			goto fail;
-		}
-		id = va_arg(ap, const char *);
-		if ((hc_nvl[i] = fm_nvlist_create(
-		    ((nvpriv_t *)(uintptr_t)hc->nvl_priv)->nvp_nva)) == NULL) {
-			ret = ENOMEM;
-			goto fail;
-		}
-		if ((ret = nvlist_add_string(hc_nvl[i], FM_FMRI_HC_NAME,
-		    name)) != 0)
-			goto fail;
-		if ((ret = nvlist_add_string(hc_nvl[i], FM_FMRI_HC_ID,
-		    id)) != 0)
-			goto fail;
 	}
 
-	if ((ret = nvlist_add_nvlist_array(hc, FM_FMRI_HC_LIST, hc_nvl,
-	    size)) != 0)
-		goto fail;
-
-	kmem_free(hc_nvl, size * sizeof (nvlist_t *));
-	return (0);
-
-fail:
-	for (i = 0; i < size; ++i) {
-		if (hc_nvl[i] != NULL)
-			fm_nvlist_destroy(hc_nvl[i], FM_NVA_RETAIN);
+	if (nvlist_add_uint8(fmri, FM_VERSION, version) != 0 ||
+	    nvlist_add_string(fmri, FM_FMRI_SCHEME, FM_FMRI_SCHEME_HC) != 0) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		return (0);
 	}
 
-	kmem_free(hc_nvl, size * sizeof (nvlist_t *));
-	return (ret);
+	if (auth != NULL && nvlist_add_nvlist(fmri, FM_FMRI_AUTHORITY,
+	    (nvlist_t *)auth) != 0) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		return (0);
+	}
+
+	return (1);
+}
+
+void
+fm_fmri_hc_set(nvlist_t *fmri, int version, const nvlist_t *auth,
+    nvlist_t *snvl, int npairs, ...)
+{
+	nv_alloc_t *nva = nvlist_lookup_nv_alloc(fmri);
+	nvlist_t *pairs[HC_MAXPAIRS];
+	va_list ap;
+	int i;
+
+	if (!fm_fmri_hc_set_common(fmri, version, auth))
+		return;
+
+	npairs = MIN(npairs, HC_MAXPAIRS);
+
+	va_start(ap, npairs);
+	for (i = 0; i < npairs; i++) {
+		const char *name = va_arg(ap, const char *);
+		uint32_t id = va_arg(ap, uint32_t);
+		char idstr[11];
+
+		(void) snprintf(idstr, sizeof (idstr), "%u", id);
+
+		pairs[i] = fm_nvlist_create(nva);
+		if (nvlist_add_string(pairs[i], FM_FMRI_HC_NAME, name) != 0 ||
+		    nvlist_add_string(pairs[i], FM_FMRI_HC_ID, idstr) != 0) {
+			atomic_add_64(
+			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		}
+	}
+	va_end(ap);
+
+	if (nvlist_add_nvlist_array(fmri, FM_FMRI_HC_LIST, pairs, npairs) != 0)
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+
+	for (i = 0; i < npairs; i++)
+		fm_nvlist_destroy(pairs[i], FM_NVA_RETAIN);
+
+	if (snvl != NULL) {
+		if (nvlist_add_nvlist(fmri, FM_FMRI_HC_SPECIFIC, snvl) != 0) {
+			atomic_add_64(
+			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		}
+	}
 }
 
 /*
@@ -930,47 +964,45 @@ fm_fmri_dev_set(nvlist_t *fmri_dev, int version, const nvlist_t *auth,
  *	cpumask			uint8_t		<cpu_mask>
  *	serial			uint64_t	<serial_id>
  *
- * Note that auth is an optional member.
+ * Note that auth, cpumask, serial are optional members.
  *
  */
 void
 fm_fmri_cpu_set(nvlist_t *fmri_cpu, int version, const nvlist_t *auth,
-    uint32_t cpu_id, uint8_t cpu_mask, uint64_t serial_id)
+    uint32_t cpu_id, uint8_t *cpu_maskp, const char *serial_idp)
 {
-	if (version != CPU_SCHEME_VERSION0) {
-		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+	uint64_t *failedp = &erpt_kstat_data.fmri_set_failed.value.ui64;
+
+	if (version < CPU_SCHEME_VERSION1) {
+		atomic_add_64(failedp, 1);
 		return;
 	}
 
 	if (nvlist_add_uint8(fmri_cpu, FM_VERSION, version) != 0) {
-		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		atomic_add_64(failedp, 1);
 		return;
 	}
 
 	if (nvlist_add_string(fmri_cpu, FM_FMRI_SCHEME,
 	    FM_FMRI_SCHEME_CPU) != 0) {
-		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		atomic_add_64(failedp, 1);
 		return;
 	}
 
-	if (auth != NULL)
-		if (nvlist_add_nvlist(fmri_cpu, FM_FMRI_AUTHORITY,
-		    (nvlist_t *)auth) != 0) {
-			atomic_add_64(
-			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
-		}
+	if (auth != NULL && nvlist_add_nvlist(fmri_cpu, FM_FMRI_AUTHORITY,
+	    (nvlist_t *)auth) != 0)
+		atomic_add_64(failedp, 1);
 
-	if (nvlist_add_uint32(fmri_cpu, FM_FMRI_CPU_ID, cpu_id) != 0) {
-		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
-	}
+	if (nvlist_add_uint32(fmri_cpu, FM_FMRI_CPU_ID, cpu_id) != 0)
+		atomic_add_64(failedp, 1);
 
-	if (nvlist_add_uint8(fmri_cpu, FM_FMRI_CPU_MASK, cpu_mask) != 0) {
-		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
-	}
+	if (cpu_maskp != NULL && nvlist_add_uint8(fmri_cpu, FM_FMRI_CPU_MASK,
+	    *cpu_maskp) != 0)
+		atomic_add_64(failedp, 1);
 
-	if (nvlist_add_uint64(fmri_cpu, FM_FMRI_CPU_SERIAL_ID, serial_id)
-	    != 0)
-		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+	if (serial_idp == NULL || nvlist_add_string(fmri_cpu,
+	    FM_FMRI_CPU_SERIAL_ID, (char *)serial_idp) != 0)
+			atomic_add_64(failedp, 1);
 }
 
 /*
@@ -1158,4 +1190,30 @@ fm_ena_time_get(uint64_t ena)
 	}
 
 	return (time);
+}
+
+/*
+ * Convert a getpcstack() trace to symbolic name+offset, and add the resulting
+ * string array to a Fault Management ereport as FM_EREPORT_PAYLOAD_NAME_STACK.
+ */
+void
+fm_payload_stack_add(nvlist_t *payload, const pc_t *stack, int depth)
+{
+	int i;
+	char *sym;
+	ulong_t off;
+	char *stkpp[FM_STK_DEPTH];
+	char buf[FM_STK_DEPTH * FM_SYM_SZ];
+	char *stkp = buf;
+
+	for (i = 0; i < depth && i != FM_STK_DEPTH; i++, stkp += FM_SYM_SZ) {
+		if ((sym = kobj_getsymname(stack[i], &off)) != NULL)
+			(void) snprintf(stkp, FM_SYM_SZ, "%s+%lx", sym, off);
+		else
+			(void) snprintf(stkp, FM_SYM_SZ, "%lx", (long)stack[i]);
+		stkpp[i] = stkp;
+	}
+
+	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_STACK,
+	    DATA_TYPE_STRING_ARRAY, FM_STK_DEPTH, stkpp, NULL);
 }

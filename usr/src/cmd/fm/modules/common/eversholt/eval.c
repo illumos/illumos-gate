@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * eval.c -- constraint evaluation module
@@ -42,13 +42,17 @@
 #include "tree.h"
 #include "ptree.h"
 #include "itree.h"
+#include "ipath.h"
 #include "eval.h"
 #include "config.h"
 #include "platform.h"
-
+#include "fme.h"
+#include "stats.h"
 
 static struct node *eval_dup(struct node *np, struct lut *ex,
-			    struct node *epnames[]);
+    struct node *epnames[]);
+static int check_expr_args(struct evalue *lp, struct evalue *rp,
+    enum datatype dtype, struct node *np);
 
 /*
  * begins_with -- return true if rhs path begins with everything in lhs path
@@ -158,6 +162,12 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		valuep->t = NODEPTR;
 		valuep->v = (unsigned long long)eval_asru(np);
 		return (1);
+	} else if (funcname == L_defined) {
+		ASSERTeq(np->t, T_GLOBID, ptree_nodetype2str);
+		valuep->t = UINT64;
+		valuep->v = (lut_lookup(*globals,
+		    (void *)np->u.globid.s, NULL) != NULL);
+		return (1);
 	} else if (funcname == L_call) {
 		return (! platform_call(np, globals, croot, arrowp, valuep));
 	} else if (funcname == L_is_connected) {
@@ -174,53 +184,190 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		outfl(O_DIE, np->file, np->line,
 		    "eval_func: %s not yet supported", funcname);
 	} else if (funcname == L_payloadprop) {
-		outfl(O_ALTFP|O_VERB|O_NONL, np->file, np->line,
+		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
 		    "payloadprop(\"%s\") ", np->u.quote.s);
-		if (funcnp->u.func.cachedval != NULL) {
-			*valuep = *(struct evalue *)(funcnp->u.func.cachedval);
 
-			switch (valuep->t) {
-			case UINT64:
-			case NODEPTR:
-				out(O_ALTFP|O_VERB, "cached: %llu", valuep->v);
-				break;
-			case STRING:
-				out(O_ALTFP|O_VERB, "cached: \"%s\"",
-				    (char *)valuep->v);
-				break;
-			default:
-				out(O_ALTFP|O_VERB, "undefined");
-				break;
-			}
-
-			return (1);
-		} else if (platform_payloadprop(np, valuep)) {
-			/* platform_payloadprop() returned false, pass it on */
-			out(O_ALTFP|O_VERB, "failed.");
+		if (platform_payloadprop(np, valuep)) {
+			/* platform_payloadprop() returned false */
+			out(O_ALTFP|O_VERB2, "not found.");
 			return (0);
 		} else {
-			/* got back true, cache the value */
-			funcnp->u.func.cachedval =
-			    MALLOC(sizeof (struct evalue));
-			*(struct evalue *)(funcnp->u.func.cachedval) =
-			    *valuep;
-
 			switch (valuep->t) {
 			case UINT64:
 			case NODEPTR:
-				out(O_ALTFP|O_VERB, "cached: %llu", valuep->v);
+				out(O_ALTFP|O_VERB2, "found: %llu", valuep->v);
 				break;
 			case STRING:
-				out(O_ALTFP|O_VERB, "cached: \"%s\"",
+				out(O_ALTFP|O_VERB2, "found: \"%s\"",
 				    (char *)valuep->v);
 				break;
 			default:
-				out(O_ALTFP|O_VERB, "undefined");
+				out(O_ALTFP|O_VERB2, "found: undefined");
 				break;
 			}
-
 			return (1);
 		}
+	} else if (funcname == L_setpayloadprop) {
+		struct evalue *payloadvalp;
+
+		ASSERTinfo(np->t == T_LIST, ptree_nodetype2str(np->t));
+		ASSERTinfo(np->u.expr.left->t == T_QUOTE,
+		    ptree_nodetype2str(np->u.expr.left->t));
+
+		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
+		    "setpayloadprop: %s: %s=",
+		    arrowp->tail->myevent->enode->u.event.ename->u.name.s,
+		    np->u.expr.left->u.quote.s);
+		ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, np->u.expr.right);
+
+		/*
+		 * allocate a struct evalue to hold the payload property's
+		 * value, unless we've been here already, in which case we
+		 * might calculate a different value, but we'll store it
+		 * in the already-allocated struct evalue.
+		 */
+		if ((payloadvalp = (struct evalue *)lut_lookup(
+		    arrowp->tail->myevent->payloadprops,
+		    (void *)np->u.expr.left->u.quote.s, NULL)) == NULL) {
+			payloadvalp = MALLOC(sizeof (*payloadvalp));
+		}
+
+		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
+		    arrowp, try, payloadvalp)) {
+			out(O_ALTFP|O_VERB2, " (cannot eval, using zero)");
+			payloadvalp->t = UINT64;
+			payloadvalp->v = 0;
+		} else {
+			if (payloadvalp->t == UINT64)
+				out(O_ALTFP|O_VERB2,
+				    " (%llu)", payloadvalp->v);
+			else
+				out(O_ALTFP|O_VERB2,
+				    " (\"%s\")", (char *)payloadvalp->v);
+		}
+
+		/* add to table of payload properties for current problem */
+		arrowp->tail->myevent->payloadprops =
+		    lut_add(arrowp->tail->myevent->payloadprops,
+		    (void *)np->u.expr.left->u.quote.s,
+		    (void *)payloadvalp, NULL);
+
+		/* function is always true */
+		valuep->t = UINT64;
+		valuep->v = 1;
+		return (1);
+	} else if (funcname == L_payloadprop_defined) {
+		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
+		    "payloadprop_defined(\"%s\") ", np->u.quote.s);
+
+		if (platform_payloadprop(np, NULL)) {
+			/* platform_payloadprop() returned false */
+			valuep->v = 0;
+			out(O_ALTFP|O_VERB2, "not found.");
+		} else {
+			valuep->v = 1;
+			out(O_ALTFP|O_VERB2, "found.");
+		}
+		valuep->t = UINT64;
+		return (1);
+	} else if (funcname == L_payloadprop_contains) {
+		int nvals;
+		struct evalue *vals;
+		struct evalue cmpval;
+
+		ASSERTinfo(np->t == T_LIST, ptree_nodetype2str(np->t));
+		ASSERTinfo(np->u.expr.left->t == T_QUOTE,
+		    ptree_nodetype2str(np->u.expr.left->t));
+
+		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line,
+		    "payloadprop_contains(\"%s\", ",
+		    np->u.expr.left->u.quote.s);
+		ptree_name_iter(O_ALTFP|O_VERB2|O_NONL, np->u.expr.right);
+		outfl(O_ALTFP|O_VERB2|O_NONL, np->file, np->line, ") ");
+
+		/* evaluate the expression we're comparing against */
+		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
+		    arrowp, try, &cmpval)) {
+			out(O_ALTFP|O_VERB2|O_NONL,
+			    "(cannot eval, using zero) ");
+			cmpval.t = UINT64;
+			cmpval.v = 0;
+		} else {
+			if (cmpval.t == UINT64)
+				out(O_ALTFP|O_VERB2,
+				    "(%llu) ", cmpval.v);
+			else
+				out(O_ALTFP|O_VERB2,
+				    "(\"%s\") ", (char *)cmpval.v);
+		}
+
+		/* get the payload values and check for a match */
+		vals = platform_payloadprop_values(np->u.expr.left->u.quote.s,
+		    &nvals);
+		valuep->t = UINT64;
+		valuep->v = 0;
+		if (nvals == 0) {
+			out(O_ALTFP|O_VERB2, "not found.");
+		} else {
+			struct evalue preval;
+			int i;
+
+			out(O_ALTFP|O_VERB2|O_NONL, "found %d values ", nvals);
+
+			for (i = 0; i < nvals; i++) {
+
+				preval.t = vals[i].t;
+				preval.v = vals[i].v;
+
+				if (check_expr_args(&vals[i], &cmpval,
+				    UNDEFINED, np))
+					continue;
+
+				/*
+				 * If we auto-converted the value to a
+				 * string, we need to free the
+				 * original tree value.
+				 */
+				if (preval.t == NODEPTR &&
+				    ((struct node *)(preval.v))->t == T_NAME) {
+					tree_free((struct node *)preval.v);
+				}
+
+				if (vals[i].v == cmpval.v) {
+					valuep->v = 1;
+					break;
+				}
+			}
+
+			if (valuep->v)
+				out(O_ALTFP|O_VERB2, "match.");
+			else
+				out(O_ALTFP|O_VERB2, "no match.");
+
+			for (i = 0; i < nvals; i++) {
+				if (vals[i].t == NODEPTR) {
+					tree_free((struct node *)vals[i].v);
+					break;
+				}
+			}
+			FREE(vals);
+		}
+		return (1);
+	} else if (funcname == L_confcall) {
+		return (!platform_confcall(np, globals, croot, arrowp, valuep));
+	} else if (funcname == L_count) {
+		struct stats *statp;
+
+		ASSERTinfo(np->t == T_EVENT, ptree_nodetype2str(np->t));
+
+		valuep->t = UINT64;
+		if ((statp = (struct stats *)
+		    lut_lookup(Istats, np, (lut_cmp)istat_cmp)) == NULL)
+			valuep->v = 0;
+		else
+			valuep->v = stats_counter_value(statp);
+
+		return (1);
 	} else
 		outfl(O_DIE, np->file, np->line,
 		    "eval_func: unexpected func: %s", funcname);
@@ -419,6 +566,18 @@ eval_dup(struct node *np, struct lut *ex, struct node *epnames[])
 		break;
 	}
 
+	case T_EVENT:
+		newnp = newnode(T_NAME, np->file, np->line);
+
+		newnp->u.name.t = np->u.event.ename->u.name.t;
+		newnp->u.name.s = np->u.event.ename->u.name.s;
+		newnp->u.name.it = np->u.event.ename->u.name.it;
+		newnp->u.name.last = newnp;
+
+		return (tree_event(newnp,
+		    eval_dup(np->u.event.epname, ex, epnames),
+		    eval_dup(np->u.event.eexprlist, ex, epnames)));
+
 	case T_FUNC:
 		return (tree_func(np->u.func.s,
 		    eval_dup(np->u.func.arglist, ex, epnames),
@@ -525,6 +684,37 @@ static int
 check_expr_args(struct evalue *lp, struct evalue *rp, enum datatype dtype,
 		struct node *np)
 {
+	/* auto-convert T_NAMES to strings */
+	if (lp->t == NODEPTR && ((struct node *)(lp->v))->t == T_NAME) {
+		char *s = ipath2str(NULL, ipath((struct node *)lp->v));
+		lp->t = STRING;
+		lp->v = (unsigned long long)stable(s);
+		FREE(s);
+		out(O_ALTFP|O_VERB2, "convert lhs path to \"%s\"",
+		    (char *)lp->v);
+	}
+	if (rp != NULL &&
+	    rp->t == NODEPTR && ((struct node *)(rp->v))->t == T_NAME) {
+		char *s = ipath2str(NULL, ipath((struct node *)rp->v));
+		rp->t = STRING;
+		rp->v = (unsigned long long)stable(s);
+		FREE(s);
+		out(O_ALTFP|O_VERB2, "convert rhs path to \"%s\"",
+		    (char *)rp->v);
+	}
+
+	/* auto-convert strings to numbers */
+	if (dtype == UINT64) {
+		if (lp->t == STRING) {
+			lp->t = UINT64;
+			lp->v = strtoull((char *)lp->v, NULL, 0);
+		}
+		if (rp != NULL && rp->t == STRING) {
+			rp->t = UINT64;
+			rp->v = strtoull((char *)rp->v, NULL, 0);
+		}
+	}
+
 	if (dtype != UNDEFINED && lp->t != dtype) {
 		outfl(O_OK, np->file, np->line,
 			"invalid datatype of argument for operation %s",
@@ -619,8 +809,23 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 
 		gval->t = rval.t;
 		gval->v = rval.v;
-		valuep->t = rval.t;
-		valuep->v = rval.v;
+
+		if (gval->t == UINT64) {
+			out(O_ALTFP|O_VERB2,
+			    "assign $%s=%llu",
+			    np->u.expr.left->u.globid.s, gval->v);
+		} else {
+			out(O_ALTFP|O_VERB2,
+			    "assign $%s=\"%s\"",
+			    np->u.expr.left->u.globid.s, (char *)gval->v);
+		}
+
+		/*
+		 * but always return true -- an assignment should not
+		 * cause a constraint to be false.
+		 */
+		valuep->t = UINT64;
+		valuep->v = 1;
 		return (1);
 
 	case T_EQ:
@@ -675,7 +880,7 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
 				arrowp, try, &rval))
 			return (0);
-		if (check_expr_args(&lval, &rval, UNDEFINED, np))
+		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
 
 		valuep->t = UINT64;
@@ -689,7 +894,7 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
 				arrowp, try, &rval))
 			return (0);
-		if (check_expr_args(&lval, &rval, UNDEFINED, np))
+		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
 
 		valuep->t = UINT64;
@@ -703,7 +908,7 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
 				arrowp, try, &rval))
 			return (0);
-		if (check_expr_args(&lval, &rval, UNDEFINED, np))
+		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
 
 		valuep->t = UINT64;
@@ -717,7 +922,7 @@ eval_expr(struct node *np, struct lut *ex, struct node *epnames[],
 		if (!eval_expr(np->u.expr.right, ex, epnames, globals, croot,
 				arrowp, try, &rval))
 			return (0);
-		if (check_expr_args(&lval, &rval, UNDEFINED, np))
+		if (check_expr_args(&lval, &rval, UINT64, np))
 			return (0);
 
 		valuep->t = UINT64;

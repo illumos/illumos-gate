@@ -1,0 +1,841 @@
+/*
+ * CDDL HEADER START
+ *
+ * The contents of this file are subject to the terms of the
+ * Common Development and Distribution License, Version 1.0 only
+ * (the "License").  You may not use this file except in compliance
+ * with the License.
+ *
+ * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
+ * or http://www.opensolaris.org/os/licensing.
+ * See the License for the specific language governing permissions
+ * and limitations under the License.
+ *
+ * When distributing Covered Code, include this CDDL HEADER in each
+ * file and include the License file at usr/src/OPENSOLARIS.LICENSE.
+ * If applicable, add the following below this CDDL HEADER, with the
+ * fields enclosed by brackets "[]" replaced with your own identifying
+ * information: Portions Copyright [yyyy] [name of copyright owner]
+ *
+ * CDDL HEADER END
+ */
+
+/* 
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved. 
+ * Use is subject to license terms. 
+ */ 
+ 
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+#pragma dictionary "AMD" 
+
+/*
+ * Eversholt rules for the AMD Opteron CPU/Memory
+ */
+
+fru dimm; 
+asru dimm; 
+
+fru chip;
+asru chip/cpu;
+ 
+
+/*								#MEM#
+ * GET_ADDR relies on the fact that variables have global scope across an FME.
+ * Thus for each FME the assignment only occurs for the first invocation
+ * but the comparison happens on each. Thus if the new address matches the 
+ * address of an existing open FME, then we return true running in the context
+ * of that FME. If the new address doesn't match the address of any existing 
+ * open FME, then we return true in the context of a newly opened FME.
+ */
+#define GET_ADDR (defined($addr) ? ($addr == payloadprop("addr")) :	\
+	($addr = payloadprop("addr")))
+
+#define	GET_OFFSET ($offset = payloadprop("resource[0].hc-specific.offset"))
+
+/*
+ * SET_ADDR is used to set a payload value in the fault that we diagnose
+ * for page faults, to record the physical address of the faulting page.
+ */
+#define	SET_ADDR (setpayloadprop("asru-physaddr", $addr))
+
+#define	SET_OFFSET (setpayloadprop("asru-offset", $offset))
+
+/*
+ * RESOURCE_EXISTS is true if a pair with name "resource" exists in the
+ * payload - regardless of type (e.g., nvlist or nvlist array) or value.
+ */
+#define	RESOURCE_EXISTS	(payloadprop_defined("resource"))
+
+/*
+ * CONTAINS_DIMM is true if the "resource" nvlist array (as used in memory
+ * ereports) exists and one if its members matches the path for the
+ * dimm node.  Our memory propogation are of the form "foo@dimm -> blah@cpu"
+ * since cpus detect memory errors;  in eversholt such a propogation, where
+ * the lhs path and rhs path do not match, expands to the cross-product of
+ * all dimms and cpus in the system.  We use CONTAINS_DIMM to constrain
+ * the propogation such that it only happens if the payload resource
+ * matches the dimm.
+ */
+#define	CONTAINS_DIMM (payloadprop_contains("resource", asru(dimm)))
+
+/*
+ * The following will tell us whether a syndrome that is known to be
+ * correctable (from a mem_ecc1) is single-bit or multi-bit.  For a
+ * correctable ChipKill syndrome the number of bits set in the lowest
+ * nibble indicates how many bit were in error.
+ */
+
+#define	CBITMASK(synd) ((synd) & 0xf)
+
+#define	CKSINGLE(synd)							\
+	((synd) == 0 ||							\
+	(CBITMASK(synd) == 0x1 || CBITMASK(synd) == 0x2 ||		\
+	CBITMASK(synd) == 0x4 || CBITMASK(synd) == 0x8))
+
+#define	SINGLE_BIT_CE							\
+	(payloadprop("syndrome-type") == "E" ||				\
+	(payloadprop("syndrome-type") == "C" &&				\
+	CKSINGLE(payloadprop("syndrome"))))
+
+#define	MULTI_BIT_CE							\
+	(payloadprop("syndrome-type") == "C" &&				\
+	!CKSINGLE(payloadprop("syndrome")))
+
+/* 
+ * A single bit fault in a memory dimm can cause:
+ * 
+ *  - mem_ce : reported by nb for an access from a remote cpu
+ *
+ * Single-bit errors are fed into a per-DIMM SERD engine; if a SERD engine
+ * trips we diagnose a fault.memory.page so that the response agent can
+ * retire the page that caused the trip.  If the total number of pages
+ * faulted in this way on a single DIMM exceeds a threshold we will
+ * diagnose a fault.memory.dimm_sb against the DIMM.
+ *
+ * Multibit ChipKill-correctable errors produce an immediate page fault
+ * and corresponding fault.memory.dimm_ck.  This is achieved through
+ * SERD engines using N=0 so the facility is there to be a little more
+ * tolerant of these errors.
+ *
+ * Uncorrectable errors produce an immediate page fault and corresponding
+ * fault.memory.dimm_ue.
+ *
+ * Page faults are essentially internal - action is only required when
+ * they are accompanied by a dimm fault.  As such we include message=0
+ * on DIMM faults.
+ */
+
+event ereport.cpu.amd.nb.mem_ce@cpu;
+
+/*
+ * If the address is not valid then no resource member will be included
+ * in a nb.mem_ce or nb.mem_ue ereport.  These cases should be rare.
+ * We will discard such ereports.  An alternative may be to SERD them 
+ * on a per MC basis and trip if we see too many such events.
+ */
+
+event upset.memory.discard@cpu;
+
+/*								#PAGE#
+ * Page faults of all types diagnose to a single fault class and are
+ * counted with a stat.
+ *
+ * Single-bit errors are diagnosed as upsets and feed into per-DIMM
+ * SERD engines which diagnose fault.memory.page if they trip.
+ */
+
+#define PAGE_FIT		1
+#define PAGE_SB_COUNT		2
+#define PAGE_SB_TIME		72h
+#define	PAGE_CK_COUNT		0
+#define	PAGE_CK_TIME		1h
+
+engine stat.page_fault@dimm;
+event fault.memory.page@dimm, FITrate=PAGE_FIT,
+    ASRU=dimm, message=0, count=stat.page_fault@dimm,
+    action=confcall("rewrite-ASRU");
+event error.memory.page_sb@dimm;
+event error.memory.page_ck@dimm;
+event error.memory.page_ue@dimm;
+
+prop fault.memory.page@dimm (1)->
+    error.memory.page_sb@dimm,
+    error.memory.page_ck@dimm,
+    error.memory.page_ue@dimm;
+
+event ereport.memory.page_sb_trip@dimm;
+engine serd.memory.page_sb@dimm, N=PAGE_SB_COUNT, T=PAGE_SB_TIME,
+    method=persistent, trip=ereport.memory.page_sb_trip@dimm;
+event upset.memory.page_sb@dimm, engine=serd.memory.page_sb@dimm;
+
+event ereport.memory.page_ck_trip@dimm;
+engine serd.memory.page_ck@dimm, N=PAGE_CK_COUNT, T=PAGE_CK_TIME,
+    method=persistent, trip=ereport.memory.page_ck_trip@dimm;
+event upset.memory.page_ck@dimm, engine=serd.memory.page_ck@dimm;
+
+prop upset.memory.page_sb@dimm (0)->
+    ereport.cpu.amd.nb.mem_ce@cpu { CONTAINS_DIMM && SINGLE_BIT_CE };
+
+prop upset.memory.page_ck@dimm (0)->
+    ereport.cpu.amd.nb.mem_ce@cpu { CONTAINS_DIMM && MULTI_BIT_CE };
+  
+prop error.memory.page_sb@dimm (1)->
+    ereport.memory.page_sb_trip@dimm;
+
+prop error.memory.page_ck@dimm (1)->
+    ereport.memory.page_ck_trip@dimm;
+
+prop fault.memory.page@dimm { SET_ADDR && SET_OFFSET } (0)->
+    ereport.cpu.amd.nb.mem_ce@cpu { CONTAINS_DIMM && GET_ADDR && GET_OFFSET };
+
+prop upset.memory.discard@cpu (1)->
+    ereport.cpu.amd.nb.mem_ce@cpu { !RESOURCE_EXISTS };
+
+/*								#DIMM_SB#
+ * Single-bit DIMM faults are diagnosed when the number of page faults
+ * (of all types since they all are counted in a single per-DIMM stat engine)
+ * reaches a threshold.  Since our tolerance of ChipKill and UE faults
+ * is much lower than that for single-bit errors the threshold will only be
+ * reached for repeated single-bit page faults.  We do not stop diagnosing
+ * further single-bit page faults once we have declared a single-bit DIMM
+ * fault - we continue diagnosing them and response agents can continue to
+ * retire those pages up to the system-imposed retirement limit.
+ *
+ * We maintain a parallel SERD engine to the page_sb engine which trips
+ * in unison, but on trip it generates a distinct ereport which we
+ * diagnose to a dimm_sb fault if the threshold has been reached, or
+ * to a throwaway upset if not.
+ */
+
+#define DIMM_SB_FIT		2000 
+#define DIMM_SB_THRESH		128
+
+event fault.memory.dimm_sb@dimm, FITrate=DIMM_SB_FIT, FRU=dimm, ASRU=dimm;
+
+event ereport.memory.dimm_sb_trip@dimm;
+event upset.memory.discard@dimm;
+engine serd.memory.dimm_sb@dimm, N=PAGE_SB_COUNT, T=PAGE_SB_TIME,
+    method=persistent, trip=ereport.memory.dimm_sb_trip@dimm;
+event upset.memory.dimm_sb@dimm, engine=serd.memory.dimm_sb@dimm;
+
+prop upset.memory.dimm_sb@dimm (0)->
+    ereport.cpu.amd.nb.mem_ce@cpu { CONTAINS_DIMM };	/* sb and ck */
+
+prop upset.memory.discard@dimm (1)->
+    ereport.memory.dimm_sb_trip@dimm;
+
+prop fault.memory.dimm_sb@dimm (0)->
+    ereport.memory.dimm_sb_trip@dimm {
+	count(stat.page_fault@dimm) >= DIMM_SB_THRESH };
+
+/*								#DIMM_CK#
+ * ChipKill-correctable multi-bit faults indicate a likely failing SDRAM
+ * part.  We will SERD them but with a very low/zero tolerance.
+ */
+
+#define DIMM_CK_FIT		4000 
+#define	DIMM_CK_COUNT		0
+#define	DIMM_CK_TIME		1h
+
+event fault.memory.dimm_ck@dimm, FITrate=DIMM_CK_FIT, FRU=dimm, ASRU=dimm;
+
+event ereport.memory.dimm_ck_trip@dimm;
+engine serd.memory.dimm_ck@dimm, N=DIMM_CK_COUNT, T=DIMM_CK_TIME,
+    method=persistent, trip=ereport.memory.dimm_ck_trip@dimm;
+event upset.memory.dimm_ck@dimm, engine=serd.memory.dimm_ck@dimm;
+
+prop upset.memory.dimm_ck@dimm (0)->
+    ereport.cpu.amd.nb.mem_ce@cpu { CONTAINS_DIMM && MULTI_BIT_CE };
+
+prop fault.memory.dimm_ck@dimm (1)->
+    ereport.memory.dimm_ck_trip@dimm;
+
+prop fault.memory.page@dimm { SET_ADDR && SET_OFFSET } (0)->
+    ereport.cpu.amd.nb.mem_ce@cpu { CONTAINS_DIMM && MULTI_BIT_CE &&
+    GET_ADDR && GET_OFFSET };
+
+/* 								#DIMM_UE#
+ * A multi-bit fault in a memory dimm can cause:
+ * 
+ *  - ue    : reported by nb for an access from a remote cpu
+ *
+ * Note we use a SERD engine here simply as a way of ensuring that we get
+ * both dimm and page faults reported
+ */ 
+
+#define DIMM_UE_FIT		6000 
+
+event ereport.cpu.amd.nb.mem_ue@cpu;
+event ereport.memory.page_ue_trip@dimm;
+event ereport.memory.dimm_ue_trip@dimm;
+event fault.memory.dimm_ue@dimm, FITrate=DIMM_UE_FIT, FRU=dimm, ASRU=dimm;
+event upset.memory.page_ue@dimm, engine=serd.memory.page_ue@dimm;
+event upset.memory.dimm_ue@dimm, engine=serd.memory.dimm_ue@dimm;
+ 
+engine serd.memory.dimm_ue@dimm, N=0, T=1h,
+    method=persistent, trip=ereport.memory.dimm_ue_trip@dimm;
+
+engine serd.memory.page_ue@dimm, N=0, T=1h,
+    method=persistent, trip=ereport.memory.page_ue_trip@dimm;
+
+prop upset.memory.page_ue@dimm (0)->
+    ereport.cpu.amd.nb.mem_ue@cpu { CONTAINS_DIMM };
+
+prop upset.memory.dimm_ue@dimm (0)->
+    ereport.cpu.amd.nb.mem_ue@cpu { CONTAINS_DIMM };
+
+prop error.memory.page_ue@dimm (1)->
+    ereport.memory.page_ue_trip@dimm;
+
+prop fault.memory.page@dimm { SET_ADDR && SET_OFFSET } (0)-> 
+    ereport.cpu.amd.nb.mem_ue@cpu { CONTAINS_DIMM && GET_ADDR & GET_OFFSET };
+
+prop fault.memory.dimm_ue@dimm (1)-> 
+    ereport.memory.dimm_ue_trip@dimm;
+
+prop upset.memory.discard@cpu (1)->
+    ereport.cpu.amd.nb.mem_ce@cpu { !RESOURCE_EXISTS };
+
+/*								#L2D#
+ * l2 cache data errors.
+ */
+
+#define L2CACHEDATA_FIT		1000 
+#define L2CACHEDATA_SB_COUNT	3
+#define L2CACHEDATA_SB_TIME	12h
+
+event fault.cpu.amd.l2cachedata@chip/cpu, FITrate=L2CACHEDATA_FIT,
+	FRU=chip, ASRU=chip/cpu;
+event error.cpu.amd.l2cachedata_sb@chip/cpu;
+event error.cpu.amd.l2cachedata_mb@chip/cpu;
+
+prop fault.cpu.amd.l2cachedata@chip/cpu (1)->
+    error.cpu.amd.l2cachedata_sb@chip/cpu,
+    error.cpu.amd.l2cachedata_mb@chip/cpu;
+
+/* 								#L2D_SINGLE#
+ * A single bit data array fault in an l2 cache can cause:
+ * 
+ *  - inf_l2_ecc1 : reported by ic on this cpu
+ *  - inf_l2_ecc1 : reported by dc on this cpu
+ *  - l2d_ecc1 : reported by bu on copyback or on snoop from another cpu 
+ *
+ * Single-bit errors are diagnosed to cache upsets.  SERD engines are used
+ * to count upsets resulting from CEs.
+ */ 
+
+event ereport.cpu.amd.ic.inf_l2_ecc1@chip/cpu{within(5s)};
+event ereport.cpu.amd.dc.inf_l2_ecc1@chip/cpu{within(5s)};
+event ereport.cpu.amd.bu.l2d_ecc1@chip/cpu{within(5s)};
+event ereport.cpu.amd.l2d_sb_trip@chip/cpu;
+
+engine serd.cpu.amd.l2d_sb@chip/cpu,
+    N=L2CACHEDATA_SB_COUNT, T=L2CACHEDATA_SB_TIME, method=persistent, 
+    trip=ereport.cpu.amd.l2d_sb_trip@chip/cpu;
+
+event upset.cpu.amd.l2d_sb@chip/cpu,
+	engine=serd.cpu.amd.l2d_sb@chip/cpu;
+
+prop upset.cpu.amd.l2d_sb@chip/cpu (1)->
+    ereport.cpu.amd.ic.inf_l2_ecc1@chip/cpu,
+    ereport.cpu.amd.dc.inf_l2_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.l2d_ecc1@chip/cpu;
+
+prop error.cpu.amd.l2cachedata_sb@chip/cpu (1)-> 
+    ereport.cpu.amd.l2d_sb_trip@chip/cpu;
+
+prop fault.cpu.amd.l2cachedata@chip/cpu (0)->
+    ereport.cpu.amd.ic.inf_l2_ecc1@chip/cpu,
+    ereport.cpu.amd.dc.inf_l2_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.l2d_ecc1@chip/cpu;
+
+/* 								#L2D_MULTI#
+ * A multi-bit data array fault in an l2 cache can cause:
+ * 
+ *  - inf_l2_eccm : reported by ic on this cpu
+ *  - inf_l2_eccm : reported by dc on this cpu
+ *  - l2d_eccm : reported by bu on copyback or on snoop from another cpu 
+ */ 
+
+event ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu;
+event ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu;
+event ereport.cpu.amd.bu.l2d_eccm@chip/cpu;
+
+prop error.cpu.amd.l2cachedata_mb@chip/cpu (1)->
+    ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu,
+    ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu,
+    ereport.cpu.amd.bu.l2d_eccm@chip/cpu;
+
+prop fault.cpu.amd.l2cachedata@chip/cpu (0)->
+    ereport.cpu.amd.ic.inf_l2_eccm@chip/cpu,
+    ereport.cpu.amd.dc.inf_l2_eccm@chip/cpu,
+    ereport.cpu.amd.bu.l2d_eccm@chip/cpu;
+
+/*								#L2T#
+ * l2 cache main tag errors
+ */
+
+#define L2CACHETAG_FIT		1000 
+#define L2CACHETAG_SB_COUNT	3
+#define L2CACHETAG_SB_TIME	12h
+
+event fault.cpu.amd.l2cachetag@chip/cpu, FITrate=L2CACHETAG_FIT,
+	FRU=chip, ASRU=chip/cpu;
+event error.cpu.amd.l2cachetag_sb@chip/cpu;
+event error.cpu.amd.l2cachetag_mb@chip/cpu;
+ 
+prop fault.cpu.amd.l2cachetag@chip/cpu (1)->
+    error.cpu.amd.l2cachetag_sb@chip/cpu,
+    error.cpu.amd.l2cachetag_mb@chip/cpu;
+
+/* 								#L2T_SINGLE#
+ * A single bit tag array fault in an l2 cache can cause:
+ * 
+ *  - l2t_ecc1 : reported by bu on this cpu when detected during snoop
+ *  - l2t_par : reported by bu on this cpu when detected other than during snoop
+ *
+ * Note that the bu.l2t_par ereport could be due to a single bit or multi bit
+ * event. If the l2t_sb_trip has already triggered it will be treated as another
+ * ce, otherwise it will be treated as a ue event.
+ */ 
+
+event ereport.cpu.amd.bu.l2t_ecc1@chip/cpu{within(5s)};
+event ereport.cpu.amd.bu.l2t_par@chip/cpu;
+event ereport.cpu.amd.l2t_sb_trip@chip/cpu;
+
+engine serd.cpu.amd.l2t_sb@chip/cpu,
+    N=L2CACHETAG_SB_COUNT, T=L2CACHETAG_SB_TIME, method=persistent, 
+    trip=ereport.cpu.amd.l2t_sb_trip@chip/cpu;
+
+event upset.cpu.amd.l2t_sb@chip/cpu,
+	engine=serd.cpu.amd.l2t_sb@chip/cpu;
+
+prop upset.cpu.amd.l2t_sb@chip/cpu (1)->
+    ereport.cpu.amd.bu.l2t_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.l2t_par@chip/cpu;
+
+prop error.cpu.amd.l2cachetag_sb@chip/cpu (1)-> 
+    ereport.cpu.amd.l2t_sb_trip@chip/cpu;
+
+prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
+    ereport.cpu.amd.bu.l2t_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.l2t_par@chip/cpu;
+
+/* 								#L2T_MULTI#
+ * A multi-bit tag array fault in an l2 cache can cause:
+ * 
+ *  - l2t_eccm : reported by bu on this cpu when detected during snoop
+ *  - l2t_par : reported by bu on this cpu when detected other than during snoop
+ */ 
+
+event ereport.cpu.amd.bu.l2t_eccm@chip/cpu;
+
+prop error.cpu.amd.l2cachetag_mb@chip/cpu (1)->
+    ereport.cpu.amd.bu.l2t_eccm@chip/cpu,
+    ereport.cpu.amd.bu.l2t_par@chip/cpu;
+
+prop fault.cpu.amd.l2cachetag@chip/cpu (0)->
+    ereport.cpu.amd.bu.l2t_eccm@chip/cpu,
+    ereport.cpu.amd.bu.l2t_par@chip/cpu;
+
+/* 								#ICD_PAR#
+ * A data array parity fault in an I cache can cause:
+ * 
+ *  - data_par : reported by ic on this cpu
+ */ 
+
+#define ICACHEDATA_FIT		1000 
+#define ICACHEDATA_SB_COUNT	2
+#define ICACHEDATA_SB_TIME	168h
+
+event ereport.cpu.amd.ic.data_par@chip/cpu{within(5s)};
+event ereport.cpu.amd.ic_dp_trip@chip/cpu;
+
+event fault.cpu.amd.icachedata@chip/cpu, FITrate=ICACHEDATA_FIT,
+	FRU=chip, ASRU=chip/cpu;
+ 
+engine serd.cpu.amd.icachedata@chip/cpu,
+    N=ICACHEDATA_SB_COUNT, T=ICACHEDATA_SB_TIME, method=persistent, 
+    trip=ereport.cpu.amd.ic_dp_trip@chip/cpu;
+
+event upset.cpu.amd.icachedata@chip/cpu,
+	engine=serd.cpu.amd.icachedata@chip/cpu;
+
+prop upset.cpu.amd.icachedata@chip/cpu (1)->
+    ereport.cpu.amd.ic.data_par@chip/cpu;
+
+prop fault.cpu.amd.icachedata@chip/cpu (1)-> 
+    ereport.cpu.amd.ic_dp_trip@chip/cpu;
+
+prop fault.cpu.amd.icachedata@chip/cpu (0)->
+    ereport.cpu.amd.ic.data_par@chip/cpu;
+
+/* 								#ICT_PAR#
+ * A tag array parity fault in an I cache can cause:
+ * 
+ *  - tag_par : reported by ic on this cpu
+ */ 
+
+#define ICACHETAG_FIT		1000 
+#define ICACHETAG_SB_COUNT	2
+#define ICACHETAG_SB_TIME	168h
+
+event ereport.cpu.amd.ic.tag_par@chip/cpu{within(5s)};
+event ereport.cpu.amd.ic_tp_trip@chip/cpu;
+
+event fault.cpu.amd.icachetag@chip/cpu, FITrate=ICACHETAG_FIT,
+	FRU=chip, ASRU=chip/cpu;
+ 
+engine serd.cpu.amd.icachetag@chip/cpu,
+    N=ICACHETAG_SB_COUNT, T=ICACHETAG_SB_TIME, method=persistent, 
+    trip=ereport.cpu.amd.ic_tp_trip@chip/cpu;
+
+event upset.cpu.amd.icachetag@chip/cpu,
+	engine=serd.cpu.amd.icachetag@chip/cpu;
+
+prop upset.cpu.amd.icachetag@chip/cpu (1)->
+    ereport.cpu.amd.ic.tag_par@chip/cpu;
+
+prop fault.cpu.amd.icachetag@chip/cpu (1)-> 
+    ereport.cpu.amd.ic_tp_trip@chip/cpu;
+
+prop fault.cpu.amd.icachetag@chip/cpu (0)->
+    ereport.cpu.amd.ic.tag_par@chip/cpu;
+
+/* 								#ICT_SNOOP#
+ * A snoop tag array parity fault in an I cache can cause:
+ * 
+ *  - stag_par : reported by ic on this cpu
+ */ 
+
+#define ICACHESTAG_FIT		1000 
+
+event ereport.cpu.amd.ic.stag_par@chip/cpu{within(5s)};
+
+event fault.cpu.amd.icachestag@chip/cpu, FITrate=ICACHESTAG_FIT,
+	FRU=chip, ASRU=chip/cpu;
+ 
+prop fault.cpu.amd.icachestag@chip/cpu (1)->
+    ereport.cpu.amd.ic.stag_par@chip/cpu;
+
+/* 								#ICTLB_1#
+ * An l1tlb parity fault in an I cache can cause:
+ * 
+ *  - l1tlb_par : reported by ic on this cpu
+ */ 
+
+#define ICACHEL1TLB_FIT		1000 
+#define ICACHEL1TLB_SB_COUNT	2
+#define ICACHEL1TLB_SB_TIME	168h
+
+event ereport.cpu.amd.ic.l1tlb_par@chip/cpu{within(5s)};
+event ereport.cpu.amd.ic_l1tlb_trip@chip/cpu;
+
+event fault.cpu.amd.l1itlb@chip/cpu, FITrate=ICACHEL1TLB_FIT,
+	FRU=chip, ASRU=chip/cpu;
+ 
+engine serd.cpu.amd.l1itlb@chip/cpu,
+    N=ICACHEL1TLB_SB_COUNT, T=ICACHEL1TLB_SB_TIME, method=persistent, 
+    trip=ereport.cpu.amd.ic_l1tlb_trip@chip/cpu;
+
+event upset.cpu.amd.l1itlb@chip/cpu,
+	engine=serd.cpu.amd.l1itlb@chip/cpu;
+
+prop upset.cpu.amd.l1itlb@chip/cpu (1)->
+    ereport.cpu.amd.ic.l1tlb_par@chip/cpu;
+
+prop fault.cpu.amd.l1itlb@chip/cpu (1)-> 
+    ereport.cpu.amd.ic_l1tlb_trip@chip/cpu;
+
+prop fault.cpu.amd.l1itlb@chip/cpu (0)->
+    ereport.cpu.amd.ic.l1tlb_par@chip/cpu;
+
+/* 								#ICTLB_2#
+ * An l2tlb parity fault in an I cache can cause:
+ * 
+ *  - l2tlb_par : reported by ic on this cpu
+ */ 
+
+#define ICACHEL2TLB_FIT		1000 
+#define ICACHEL2TLB_SB_COUNT	2
+#define ICACHEL2TLB_SB_TIME	168h
+
+event ereport.cpu.amd.ic.l2tlb_par@chip/cpu{within(5s)};
+event ereport.cpu.amd.ic_l2tlb_trip@chip/cpu;
+
+event fault.cpu.amd.l2itlb@chip/cpu, FITrate=ICACHEL2TLB_FIT,
+	FRU=chip, ASRU=chip/cpu;
+ 
+engine serd.cpu.amd.l2itlb@chip/cpu,
+    N=ICACHEL2TLB_SB_COUNT, T=ICACHEL2TLB_SB_TIME, method=persistent, 
+    trip=ereport.cpu.amd.ic_l2tlb_trip@chip/cpu;
+
+event upset.cpu.amd.l2itlb@chip/cpu,
+	engine=serd.cpu.amd.l2itlb@chip/cpu;
+
+prop upset.cpu.amd.l2itlb@chip/cpu (1)->
+    ereport.cpu.amd.ic.l2tlb_par@chip/cpu;
+
+prop fault.cpu.amd.l2itlb@chip/cpu (1)-> 
+    ereport.cpu.amd.ic_l2tlb_trip@chip/cpu;
+
+prop fault.cpu.amd.l2itlb@chip/cpu (0)->
+    ereport.cpu.amd.ic.l2tlb_par@chip/cpu;
+
+/*								#DCD#
+ * dcache data errors
+ */
+
+#define DCACHEDATA_FIT		1000 
+#define DCACHEDATA_SB_COUNT	2
+#define DCACHEDATA_SB_TIME	168h
+
+event fault.cpu.amd.dcachedata@chip/cpu, FITrate=DCACHEDATA_FIT,
+	FRU=chip, ASRU=chip/cpu;
+event error.cpu.amd.dcachedata_sb@chip/cpu;
+event error.cpu.amd.dcachedata_mb@chip/cpu;
+ 
+prop fault.cpu.amd.dcachedata@chip/cpu (1)->
+    error.cpu.amd.dcachedata_sb@chip/cpu,
+    error.cpu.amd.dcachedata_mb@chip/cpu;
+
+/* 								#DCD_SINGLE#
+ * A single bit data array fault in an D cache can cause:
+ * 
+ *  - data_ecc1 : reported by dc on this cpu by scrubber
+ *  - data_ecc1_uc : reported by dc on this cpu other than by scrubber
+ *
+ * Make data_ecc1_uc fault immediately as it may have caused a panic
+ */ 
+
+event ereport.cpu.amd.dc.data_ecc1@chip/cpu{within(5s)};
+event ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu{within(5s)};
+event ereport.cpu.amd.dc_sb_trip@chip/cpu;
+
+engine serd.cpu.amd.dc_sb@chip/cpu,
+    N=DCACHEDATA_SB_COUNT, T=DCACHEDATA_SB_TIME, method=persistent, 
+    trip=ereport.cpu.amd.dc_sb_trip@chip/cpu;
+
+engine serd.cpu.amd.dc_sb_uc@chip/cpu,
+    N=0, T=1hr, method=persistent, 
+    trip=ereport.cpu.amd.dc_sb_trip@chip/cpu;
+
+event upset.cpu.amd.dc_sb@chip/cpu,
+	engine=serd.cpu.amd.dc_sb@chip/cpu;
+
+event upset.cpu.amd.dc_sb_uc@chip/cpu,
+	engine=serd.cpu.amd.dc_sb_uc@chip/cpu;
+
+prop upset.cpu.amd.dc_sb@chip/cpu (1)->
+    ereport.cpu.amd.dc.data_ecc1@chip/cpu;
+
+prop upset.cpu.amd.dc_sb_uc@chip/cpu (1)->
+    ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu;
+
+prop error.cpu.amd.dcachedata_sb@chip/cpu (1)-> 
+    ereport.cpu.amd.dc_sb_trip@chip/cpu;
+
+prop fault.cpu.amd.dcachedata@chip/cpu (0)->
+    ereport.cpu.amd.dc.data_ecc1@chip/cpu,
+    ereport.cpu.amd.dc.data_ecc1_uc@chip/cpu;
+
+/* 								#DCD_MULTI#
+ * A multi-bit data array fault in an D cache can cause:
+ * 
+ *  - data_eccm : reported by dc on this cpu
+ */ 
+
+event ereport.cpu.amd.dc.data_eccm@chip/cpu;
+
+prop error.cpu.amd.dcachedata_mb@chip/cpu (1)->
+    ereport.cpu.amd.dc.data_eccm@chip/cpu;
+
+prop fault.cpu.amd.dcachedata@chip/cpu (0)->
+    ereport.cpu.amd.dc.data_eccm@chip/cpu;
+
+/* 								#DCT_PAR#
+ * A tag array parity fault in an D cache can cause:
+ * 
+ *  - tag_par : reported by dc on this cpu
+ */ 
+
+#define DCACHETAG_FIT		1000 
+
+event ereport.cpu.amd.dc.tag_par@chip/cpu{within(5s)};
+
+event fault.cpu.amd.dcachetag@chip/cpu, FITrate=DCACHETAG_FIT,
+	FRU=chip, ASRU=chip/cpu;
+ 
+prop fault.cpu.amd.dcachetag@chip/cpu (1)->
+    ereport.cpu.amd.dc.tag_par@chip/cpu;
+
+/* 								#DCT_SNOOP#
+ * A snoop tag array parity fault in an D cache can cause:
+ * 
+ *  - stag_par : reported by dc on this cpu
+ */ 
+
+#define DCACHESTAG_FIT		1000 
+
+event ereport.cpu.amd.dc.stag_par@chip/cpu{within(5s)};
+
+event fault.cpu.amd.dcachestag@chip/cpu, FITrate=DCACHESTAG_FIT,
+	FRU=chip, ASRU=chip/cpu;
+ 
+prop fault.cpu.amd.dcachestag@chip/cpu (1)->
+    ereport.cpu.amd.dc.stag_par@chip/cpu;
+
+/* 								#DCTLB_1#
+ * An l1tlb parity fault in an D cache can cause:
+ * 
+ *  - l1tlb_par : reported by dc on this cpu
+ */ 
+
+#define L1DTLB_FIT		1000 
+
+event ereport.cpu.amd.dc.l1tlb_par@chip/cpu{within(5s)};
+
+event fault.cpu.amd.l1dtlb@chip/cpu, FITrate=L1DTLB_FIT,
+	FRU=chip, ASRU=chip/cpu;
+ 
+prop fault.cpu.amd.l1dtlb@chip/cpu (1)->
+    ereport.cpu.amd.dc.l1tlb_par@chip/cpu;
+
+/* 								#DCTLB_2#
+ * An l2tlb parity fault in an D cache can cause:
+ * 
+ *  - l2tlb_par : reported by dc on this cpu
+ */ 
+
+#define L2DTLB_FIT		1000 
+
+event ereport.cpu.amd.dc.l2tlb_par@chip/cpu{within(5s)};
+
+event fault.cpu.amd.l2dtlb@chip/cpu, FITrate=L2DTLB_FIT,
+	FRU=chip, ASRU=chip/cpu;
+ 
+prop fault.cpu.amd.l2dtlb@chip/cpu (1)->
+    ereport.cpu.amd.dc.l2tlb_par@chip/cpu;
+
+/*								#DPATH_SB#
+ * Datapath errors between NB/MC and core.
+ */
+
+#define	CPU_DP_FIT		1000
+
+event fault.cpu.amd.datapath@chip/cpu, FITrate=CPU_DP_FIT, FRU=chip,
+	ASRU=chip/cpu;
+event error.cpu.amd.datapath_sb@chip/cpu;
+event error.cpu.amd.datapath_mb@chip/cpu;
+
+prop fault.cpu.amd.datapath@chip/cpu (1)->
+    error.cpu.amd.datapath_sb@chip/cpu,
+    error.cpu.amd.datapath_mb@chip/cpu;
+
+/*
+ * A single bit fault in the datapath between the NB and requesting core
+ * can cause:
+ *
+ *  - inf_sys_ecc1 : reported by ic on access from a local cpu
+ *  - inf_sys_ecc1 : reported by dc on access from a local cpu
+ *  - s_ecc1 : reported by bu on access from a local cpu (hw prefetch etc)
+ */
+
+#define	CPU_DP_COUNT	3
+#define	CPU_DP_TIME	12h
+
+event ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu{within(5s)};
+event ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu{within(5s)};
+event ereport.cpu.amd.bu.s_ecc1@chip/cpu{within(5s)};
+event upset.cpu.dp_sb@chip/cpu, engine=serd.cpu.dp_sb@chip/cpu;
+event ereport.cpu.amd.dp_sb_trip@chip/cpu;
+
+engine serd.cpu.dp_sb@chip/cpu, N=CPU_DP_COUNT, T=CPU_DP_TIME,
+    method=persistent, trip=ereport.cpu.amd.dp_sb_trip@chip/cpu;
+
+prop upset.cpu.dp_sb@chip/cpu (1)->
+    ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu;
+
+prop error.cpu.amd.datapath_sb@chip/cpu (1)->
+    ereport.cpu.amd.dp_sb_trip@chip/cpu;
+
+prop fault.cpu.amd.datapath@chip/cpu (0)->
+    ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu,
+    ereport.cpu.amd.bu.s_ecc1@chip/cpu;
+
+/*								#DPATH_MB#
+ * A multi-bit fault in the datapath between the NB and requesting core
+ * can cause:
+ *
+ *  - inf_sys_eccm : reported by ic on access from a local cpu
+ *  - inf_sys_eccm : reported by dc on access from a local cpu
+ *  - s_eccm : reported by bu on access from a local cpu (hw prefetch etc)
+ */
+
+event ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu;
+event ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu;
+event ereport.cpu.amd.bu.s_eccm@chip/cpu;
+
+prop error.cpu.amd.datapath_mb@chip/cpu (1)->
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.bu.s_eccm@chip/cpu;
+
+prop fault.cpu.amd.datapath@chip/cpu (0)->
+    ereport.cpu.amd.ic.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.dc.inf_sys_eccm@chip/cpu,
+    ereport.cpu.amd.bu.s_eccm@chip/cpu;
+
+/*
+ * Ereports that should not normally happen and which we will discard
+ * without diagnosis if they do.  These fall into a few categories:
+ *
+ *	- the corresponding detector is not enabled, typically because
+ *	  detection/handling of the event is taking place elsewhere
+ *	  (nb.ma, nb.ta, ls.rde, ic.rdde, bu.s_rde, nb.gart_walk)
+ *	- the event is associated with a sync flood so even if the detector is
+ *	  enabled we will never handle the event and generate an ereport *and*
+ *	  even if the ereport did arrive we could perform no useful diagnosis
+ *	  e.g., the NB can be configured for sync flood on nb.mem_eccm
+ *	  but we don't choose to discard that ereport here since we could have
+ *	  made a useful diagnosis from it had it been delivered
+ *	  (nb.ht_sync, nb.ht_crc)
+ *	- events that will be accompanied by an immediate panic and
+ *	  delivery of the ereport during subsequent reboot but from
+ *	  which no useful diagnosis can be made. (nb.rmw, nb.wdog)
+ *
+ * Ereports for all of these can be generated by error simulation and
+ * injection.  We will perform a null diagnosos of all these ereports in order
+ * to avoid "no subscription" complaints during test harness runs.
+ */
+
+event ereport.cpu.amd.nb.ma@cpu;
+event ereport.cpu.amd.nb.ta@cpu;
+event ereport.cpu.amd.ls.s_rde@cpu;
+event ereport.cpu.amd.ic.rdde@cpu;
+event ereport.cpu.amd.bu.s_rde@cpu;
+event ereport.cpu.amd.nb.gart_walk@cpu;
+event ereport.cpu.amd.nb.ht_sync@cpu;
+event ereport.cpu.amd.nb.ht_crc@cpu;
+event ereport.cpu.amd.nb.rmw@cpu;
+event ereport.cpu.amd.nb.wdog@cpu;
+event ereport.cpu.amd.unknown@cpu;
+
+event upset.null_diag@cpu;
+
+prop upset.null_diag@cpu (1)->
+    ereport.cpu.amd.nb.ma@cpu,
+    ereport.cpu.amd.nb.ta@cpu,
+    ereport.cpu.amd.ls.s_rde@cpu,
+    ereport.cpu.amd.ic.rdde@cpu,
+    ereport.cpu.amd.bu.s_rde@cpu,
+    ereport.cpu.amd.nb.gart_walk@cpu,
+    ereport.cpu.amd.nb.ht_sync@cpu,
+    ereport.cpu.amd.nb.ht_crc@cpu,
+    ereport.cpu.amd.nb.rmw@cpu,
+    ereport.cpu.amd.nb.wdog@cpu,
+    ereport.cpu.amd.unknown@cpu;

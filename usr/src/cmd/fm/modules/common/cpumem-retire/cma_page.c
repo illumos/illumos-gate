@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +57,7 @@
 #include <unistd.h>
 #include <strings.h>
 #include <fm/fmd_api.h>
+#include <fm/libtopo.h>
 #include <sys/fm/protocol.h>
 #include <sys/mem.h>
 
@@ -110,12 +112,29 @@ cma_page_free(fmd_hdl_t *hdl, cma_page_t *page)
 	fmd_hdl_free(hdl, page, sizeof (cma_page_t));
 }
 
+/*
+ * Retire the specified ASRU, referring to a memory page by PA or by DIMM
+ * offset (i.e. the encoded coordinates internal bank, row, and column).
+ * In the initial FMA implementation, fault.memory.page exported an ASRU
+ * with an explicit physical address, which is valid at the initial time of
+ * diagnosis but may not be later following DR, DIMM removal, or interleave
+ * changes.  On SPARC, this issue was solved by exporting the DIMM offset
+ * and pushing the entire FMRI to the platform memory controller through
+ * /dev/mem so it can derive the current PA from the DIMM and offset.
+ * On x64, we also use DIMM and offset, but the mem:/// unum string is an
+ * encoded hc:/// FMRI that is then used by the x64 memory controller driver.
+ * At some point these three approaches need to be rationalized: all platforms
+ * should use the same scheme, either with decoding in the kernel or decoding
+ * in userland (i.e. with a libtopo method to compute and update the PA).
+ */
 /*ARGSUSED*/
 void
 cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 {
 	cma_page_t *page;
 	uint64_t pageaddr;
+	char *unumstr;
+	nvlist_t *asrucp = NULL;
 
 	/* It should already be expanded, but we'll do it again anyway */
 	if (fmd_nvl_fmri_expand(hdl, asru) < 0) {
@@ -146,12 +165,54 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 		return;
 	}
 
-	if (cma_page_cmd(hdl, MEM_PAGE_FMRI_RETIRE, asru) == 0) {
+	/*
+	 * If the unum is an hc fmri string expand it to an fmri and include
+	 * that in a modified asru nvlist.
+	 */
+	if (nvlist_lookup_string(asru, FM_FMRI_MEM_UNUM, &unumstr) == 0 &&
+	    strncmp(unumstr, "hc:/", 4) == 0) {
+		int err;
+		nvlist_t *unumfmri;
+		struct topo_hdl *thp = fmd_hdl_topology(hdl, TOPO_VERSION);
+
+		if (topo_fmri_str2nvl(thp, unumstr, &unumfmri, &err) != 0) {
+			fmd_hdl_debug(hdl, "page retire str2nvl failed: %s\n",
+			    topo_strerror(err));
+			return;
+		}
+
+		if (nvlist_dup(asru, &asrucp, 0) != 0) {
+			fmd_hdl_debug(hdl, "page retire nvlist dup failed\n");
+			nvlist_free(unumfmri);
+			return;
+		}
+
+		if (nvlist_add_nvlist(asrucp, FM_FMRI_MEM_UNUM "-fmri",
+		    unumfmri) != 0) {
+			fmd_hdl_debug(hdl, "page retire failed to add "
+			    "unumfmri to modified asru");
+			nvlist_free(unumfmri);
+			nvlist_free(asrucp);
+			return;
+		}
+		nvlist_free(unumfmri);
+	}
+
+	if (cma_page_cmd(hdl, MEM_PAGE_FMRI_RETIRE,
+	    asrucp ? asrucp : asru) == 0) {
 		fmd_hdl_debug(hdl, "retired page 0x%llx\n",
 		    (u_longlong_t)pageaddr);
 		cma_stats.page_flts.fmds_value.ui64++;
 		if (uuid != NULL)
 			fmd_case_uuclose(hdl, uuid);
+		if (asrucp)
+			nvlist_free(asrucp);
+		return;
+	} else if (errno != EAGAIN) {
+		fmd_hdl_debug(hdl, "retire of page 0x%llx failed, will not "
+		    "retry: %s\n", (u_longlong_t)pageaddr, strerror(errno));
+		if (asrucp)
+			nvlist_free(asrucp);
 		return;
 	}
 
@@ -163,7 +224,11 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 
 	page = fmd_hdl_zalloc(hdl, sizeof (cma_page_t), FMD_SLEEP);
 	page->pg_addr = pageaddr;
-	(void) nvlist_dup(asru, &page->pg_fmri, 0);
+	if (asrucp) {
+		page->pg_fmri = asrucp;
+	} else {
+		(void) nvlist_dup(asru, &page->pg_fmri, 0);
+	}
 	if (uuid != NULL)
 		page->pg_uuid = fmd_hdl_strdup(hdl, uuid, FMD_SLEEP);
 
@@ -246,9 +311,28 @@ cma_page_retry(fmd_hdl_t *hdl)
 				fmd_hdl_strfree(hdl, page->pg_uuid);
 
 			cma_page_free(hdl, page);
-		} else {
+		} else if (cma.cma_page_maxretries == 0 ||
+		    page->pg_nretries < cma.cma_page_maxretries) {
 			page->pg_nretries++;
 			pagep = &page->pg_next;
+		} else {
+			/*
+			 * Tunable maxretries was set and we reached
+			 * the max, so just close the case.
+			 */
+			fmd_hdl_debug(hdl,
+			    "giving up page retire 0x%llx on retry %u\n",
+			    page->pg_addr, page->pg_nretries);
+			cma_stats.page_retmax.fmds_value.ui64++;
+
+			if (page->pg_uuid != NULL) {
+				fmd_case_uuclose(hdl, page->pg_uuid);
+				fmd_hdl_strfree(hdl, page->pg_uuid);
+			}
+
+			*pagep = page->pg_next;
+
+			cma_page_free(hdl, page);
 		}
 	}
 

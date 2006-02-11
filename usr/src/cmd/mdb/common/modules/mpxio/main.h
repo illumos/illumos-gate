@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -51,8 +51,6 @@ extern "C" {
 #include <sys/scsi/scsi_types.h>
 #include <sys/disp.h>
 #include <sys/types.h>
-#include <sys/nvpair.h>
-#include <sys/nvpair_impl.h>
 #include <sys/mdb_modapi.h>
 
 #define	FT(var, typ)	(*((typ *)(&(var))))
