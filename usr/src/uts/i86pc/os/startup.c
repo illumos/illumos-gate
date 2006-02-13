@@ -977,10 +977,13 @@ startup_memlist(void)
 	 * the computed value unless it is larger than the real
 	 * amount of memory on hand.
 	 */
-	if (physmem == 0 || physmem > npages)
+	if (physmem == 0 || physmem > npages) {
 		physmem = npages;
-	else
+	} else if (physmem < npages) {
+		cmn_err(CE_WARN, "limiting physmem to 0x%lx of"
+		    " 0x%lx available pages", physmem, npages);
 		npages = physmem;
+	}
 	PRM_DEBUG(physmem);
 
 	/*
@@ -1673,44 +1676,6 @@ startup_vm(void)
 	PRM_POINT("setup up p0_va");
 	p0_va = i86devmap(0, 1, PROT_READ);
 	PRM_DEBUG(p0_va);
-
-	/*
-	 * If the following is true, someone has patched phsymem to be less
-	 * than the number of pages that the system actually has.  Remove
-	 * pages until system memory is limited to the requested amount.
-	 * Since we have allocated page structures for all pages, we
-	 * correct the amount of memory we want to remove by the size of
-	 * the memory used to hold page structures for the non-used pages.
-	 */
-	if (physmem < npages) {
-		uint_t diff;
-		offset_t off;
-		struct page *pp;
-		caddr_t rand_vaddr;
-		struct seg kseg;
-
-		cmn_err(CE_WARN, "limiting physmem to %lu pages", physmem);
-
-		off = 0;
-		diff = npages - physmem;
-		diff -= mmu_btopr(diff * sizeof (struct page));
-		kseg.s_as = &kas;
-		while (diff--) {
-			rand_vaddr = (caddr_t)
-			    (((uintptr_t)&unused_pages_vp >> 7) ^
-			    (uintptr_t)((u_offset_t)off >> MMU_PAGESHIFT));
-			pp = page_create_va(&unused_pages_vp, off, MMU_PAGESIZE,
-				PG_WAIT | PG_EXCL, &kseg, rand_vaddr);
-			if (pp == NULL) {
-				panic("limited physmem too much!");
-				/*NOTREACHED*/
-			}
-			page_io_unlock(pp);
-			page_downgrade(pp);
-			availrmem--;
-			off += MMU_PAGESIZE;
-		}
-	}
 
 	cmn_err(CE_CONT, "?mem = %luK (0x%lx)\n",
 	    physinstalled << (MMU_PAGESHIFT - 10), ptob(physinstalled));
@@ -2548,6 +2513,12 @@ get_system_configuration()
 		segmapfreelists = 0;	/* use segmap driver default */
 	} else {
 		segmapfreelists = (int)lvalue;
+	}
+
+	if ((BOP_GETPROPLEN(bootops, "physmem") <= sizeof (prop)) &&
+	    (BOP_GETPROP(bootops, "physmem", prop) >= 0) &&
+	    (kobj_getvalue(prop, &lvalue) != -1)) {
+		physmem = (uintptr_t)lvalue;
 	}
 }
 

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -538,10 +538,19 @@ param_calc(int platform_max_nprocs)
 	 * Note: 2^20 is a meg; shifting right by (20 - PAGESHIFT)
 	 * converts pages to megs without integer overflow.
 	 */
+#if defined(__sparc)
 	if (physmem > original_physmem) {
 		physmem = original_physmem;
 		cmn_err(CE_NOTE, "physmem limited to %ld", physmem);
 	}
+#else
+	if (physmem != original_physmem) {
+		cmn_err(CE_NOTE, "physmem cannot be modified to 0x%lx"
+		    " via /etc/system. Please use eeprom(1M) instead.",
+		    physmem);
+		physmem = original_physmem;
+	}
+#endif
 	if (maxusers == 0) {
 		pgcnt_t physmegs = physmem >> (20 - PAGESHIFT);
 		pgcnt_t virtmegs = vmem_size(heap_arena, VMEM_FREE) >> 20;

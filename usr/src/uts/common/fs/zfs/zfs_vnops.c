@@ -3299,6 +3299,8 @@ zfs_map(vnode_t *vp, offset_t off, struct as *as, caddr_t *addrp,
 	vn_a.cred = cr;
 	vn_a.amp = NULL;
 	vn_a.flags = flags & ~MAP_TYPE;
+	vn_a.szc = 0;
+	vn_a.lgrp_mem_policy_flags = 0;
 
 	error = as_map(as, *addrp, len, segvn_create, &vn_a);
 
