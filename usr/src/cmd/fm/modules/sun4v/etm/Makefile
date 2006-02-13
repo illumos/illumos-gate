@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -32,5 +32,3 @@ ARCH = sun4v
 SRCS = etm.c etm_xport_api_dd.c
 
 include ../../Makefile.plugin
-
-LDLIBS += -lsysevent

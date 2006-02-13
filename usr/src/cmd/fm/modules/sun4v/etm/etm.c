@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,11 +39,9 @@
  */
 
 #include <sys/fm/protocol.h>
-#include <sys/sysevent/eventdefs.h>
 #include <sys/fm/util.h>
 #include <netinet/in.h>
 #include <fm/fmd_api.h>
-#include <libsysevent.h>
 
 #include "etm_xport_api.h"
 #include "etm_etm_proto.h"
@@ -80,6 +78,7 @@ static const fmd_hdl_ops_t fmd_ops = {
 	NULL,		/* fmdo_close */
 	NULL,		/* fmdo_stats */
 	NULL,		/* fmdo_gc */
+	NULL,		/* fmdo_send */
 };
 
 static const fmd_prop_t fmd_props[] = {
@@ -133,6 +132,9 @@ etm_debug_lvl = 0;	/* debug level: 0 is off, 1 is on, 2 is more, etc */
 
 static int
 etm_debug_max_ev_cnt = -1; /* max allowed event count for debugging */
+
+static fmd_xprt_t
+*etm_fmd_xprt = NULL;	/* FMD transport layer handle */
 
 static pthread_t
 etm_svr_tid = NULL;	/* thread id of connection acceptance server */
@@ -218,8 +220,6 @@ static struct stats {
 
 	/* system and library failures */
 
-	fmd_stat_t etm_os_sysevent_publish_fail;
-	fmd_stat_t etm_os_sysevent_bind_fail;
 	fmd_stat_t etm_os_nvlist_pack_fail;
 	fmd_stat_t etm_os_nvlist_unpack_fail;
 	fmd_stat_t etm_os_nvlist_size_fail;
@@ -340,10 +340,6 @@ static struct stats {
 
 	/* system and library failures */
 
-	{ "etm_os_sysevent_publish_fail", FMD_TYPE_UINT64,
-		"sysevent_evc_publish failures" },
-	{ "etm_os_sysevent_bind_fail", FMD_TYPE_UINT64,
-		"sysevent_evc_bind failures" },
 	{ "etm_os_nvlist_pack_fail", FMD_TYPE_UINT64,
 		"nvlist_pack failures" },
 	{ "etm_os_nvlist_unpack_fail", FMD_TYPE_UINT64,
@@ -1002,66 +998,35 @@ etm_hdr_write(fmd_hdl_t *hdl, etm_xport_conn_t conn, nvlist_t *evp,
 
 /*
  * etm_post_to_fmd - post the given FMA event to FMD
- *			[via sysevent or via a FMD transport API call ],
+ *			via a FMD transport API call,
  *			return 0 or -errno value
  *
- * Design_Note:	This routine exists to ease future porting to both
- *		FMA Phase 2 FMD as well as porting to Linux which lacks
- *		a native sysevent.
+ * caveats:	the FMA event (evp) is freed by FMD,
+ *		thus callers of this function should
+ *		immediately discard any ptr they have to the
+ *		nvlist without freeing or dereferencing it
  */
 
 static int
 etm_post_to_fmd(fmd_hdl_t *hdl, nvlist_t *evp)
 {
-	int			rv;		/* ret val */
-	evchan_t		*scp;		/* sysevent channel ptr */
-	ssize_t			n;		/* gen use */
+	ssize_t			ev_sz;		/* sizeof *evp */
 
-	rv = 0; /* default success */
-
-	scp = NULL;
+	(void) nvlist_size(evp, (size_t *)&ev_sz, NV_ENCODE_XDR);
 
 	if (etm_debug_lvl >= 2) {
 		etm_show_time(hdl, "ante ev post");
 	}
-	if ((n = sysevent_evc_bind(FM_ERROR_CHAN, &scp,
-				EVCH_CREAT | EVCH_HOLD_PEND)) != 0) {
-		rv = (-n);
-		fmd_hdl_error(hdl, "error: FMA event dropped: "
-				"sysevent bind errno %d\n", n);
-		etm_stats.etm_os_sysevent_bind_fail.fmds_value.ui64++;
-		etm_stats.etm_rd_drop_fmaevent.fmds_value.ui64++;
-		goto func_ret;
-	}
-
-	if ((n = sysevent_evc_publish(scp, EC_FM, ESC_FM_ERROR, "com.sun",
-				getexecname(), evp, EVCH_SLEEP)) != 0) {
-		rv = (-n);
-		fmd_hdl_error(hdl, "error: FMA event dropped: "
-				"sysevent publish errno %d\n", n);
-		etm_stats.etm_os_sysevent_publish_fail.fmds_value.ui64++;
-		etm_stats.etm_rd_drop_fmaevent.fmds_value.ui64++;
-		goto func_ret;
-	}
-
-func_ret:
-
-	if (scp != NULL) {
-		sysevent_evc_unbind(scp);
-	}
-	if (rv == 0) {
-		etm_stats.etm_wr_fmd_fmaevent.fmds_value.ui64++;
-		(void) nvlist_size(evp, (size_t *)&n, NV_ENCODE_XDR);
-		etm_stats.etm_wr_fmd_bytes.fmds_value.ui64 += n;
-		if (etm_debug_lvl >= 1) {
-			fmd_hdl_debug(hdl, "info: event %p post ok to FMD\n",
-								evp);
-		}
+	fmd_xprt_post(hdl, etm_fmd_xprt, evp, 0);
+	etm_stats.etm_wr_fmd_fmaevent.fmds_value.ui64++;
+	etm_stats.etm_wr_fmd_bytes.fmds_value.ui64 += ev_sz;
+	if (etm_debug_lvl >= 1) {
+		fmd_hdl_debug(hdl, "info: event %p post ok to FMD\n", evp);
 	}
 	if (etm_debug_lvl >= 2) {
 		etm_show_time(hdl, "post ev post");
 	}
-	return (rv);
+	return (0);
 
 } /* etm_post_to_fmd() */
 
@@ -1398,9 +1363,9 @@ etm_handle_new_conn(fmd_hdl_t *hdl, etm_xport_conn_t conn)
 						"class %s\n", evp, class);
 			}
 			resp_code = etm_post_to_fmd(hdl, evp);
+			evp = NULL;
 			(void) etm_maybe_send_response(hdl, conn,
 							ev_hdrp, resp_code);
-			nvlist_free(evp);
 			bp += ev_hdrp->ev_lens[i];
 		} /* foreach FMA event in the body buffer */
 
@@ -1531,6 +1496,7 @@ etm_server(void *arg)
 	fmd_hdl_debug(hdl, "info: connection server starting\n");
 
 	while (!etm_is_dying) {
+
 		if ((conn = etm_xport_accept(hdl, NULL)) == NULL) {
 			/* errno assumed set by above call */
 			n = errno;
@@ -1603,6 +1569,10 @@ _fmd_init(fmd_hdl_t *hdl)
 	fmd_hdl_debug(hdl, "info: etm_debug_lvl %d "
 			"etm_debug_max_ev_cnt %d\n",
 			etm_debug_lvl, etm_debug_max_ev_cnt);
+
+	/* obtain an FMD transport handle so we can post FMA events later */
+
+	etm_fmd_xprt = fmd_xprt_open(hdl, FMD_XPRT_RDONLY, NULL, NULL);
 
 	/* encourage protocol transaction id to be unique per module load */
 
@@ -1776,6 +1746,9 @@ _fmd_fini(fmd_hdl_t *hdl)
 
 	if ((n = etm_xport_fini(hdl)) != 0) {
 		fmd_hdl_error(hdl, "warning: xport fini errno %d\n", (-n));
+	}
+	if (etm_fmd_xprt != NULL) {
+		fmd_xprt_close(hdl, etm_fmd_xprt);
 	}
 
 	fmd_hdl_debug(hdl, "info: module finalized ok\n");
