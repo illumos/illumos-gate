@@ -127,6 +127,8 @@ mpt "pci1000,50"
 mpt "pci1000,54"
 mpt "pci1000,56"
 mpt "pci1000,58"
+mpt "pciex1000,56"
+mpt "pciex1000,58"
 power "ali1535d+-power"
 ramdisk SUNW,ramdisk
 dmfe "pci108e,9102"
