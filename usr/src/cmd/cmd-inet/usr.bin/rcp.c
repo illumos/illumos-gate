@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1826,7 +1826,7 @@ sendacl(int f)
 	 * imply its not trivial.
 	 */
 	if (aclp && (trivial != ACL_IS_TRIVIAL)) {
-		acltext = acl_totext(aclp);
+		acltext = acl_totext(aclp, 0);
 		if (acltext == NULL) {
 			error("rcp: failed to convert to text\n");
 			acl_free(aclp);

@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -126,6 +126,8 @@ typedef struct acl_info acl_t;
     ACE_INHERIT_ONLY_ACE | \
     ACE_IDENTIFIER_GROUP)
 
+#define	ACE_TYPE_FLAGS	(ACE_OWNER|ACE_GROUP|ACE_EVERYONE|ACE_IDENTIFIER_GROUP)
+
 /* cmd args to acl(2) for aclent_t  */
 #define	GETACL			1
 #define	SETACL			2
@@ -166,6 +168,14 @@ typedef struct acl_info acl_t;
  * controls whether a trivial acl should be returned.
  */
 #define	ACL_NO_TRIVIAL	0x2
+
+
+/*
+ * Flags to control acl_totext()
+ */
+
+#define	ACL_APPEND_ID	0x1 	/* append uid/gid to user/group entries */
+#define	ACL_COMPACT_FMT	0x2 	/* build ACL in ls -V format */
 
 /*
  * Legacy aclcheck errors for aclent_t ACLs
@@ -210,7 +220,7 @@ extern int acl_set(const char *, acl_t *acl);
 extern int facl_set(int, acl_t *acl);
 extern int acl_strip(const char *, uid_t, gid_t, mode_t);
 extern int acl_trivial(const char *);
-extern char *acl_totext(acl_t *);
+extern char *acl_totext(acl_t *, int);
 extern int acl_fromtext(const char *, acl_t **);
 extern int acl_check(acl_t *, int);
 

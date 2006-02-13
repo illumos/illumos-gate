@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -221,6 +221,7 @@ static int		Lflg;
 static int		Rflg;
 static int		Sflg;
 static int		vflg;
+static int		Vflg;
 static long		hscale;
 static mode_t		flags;
 static int		err = 0;	/* Contains return code */
@@ -287,7 +288,7 @@ main(int argc, char *argv[])
 	}
 
 	while ((c = getopt(argc, argv,
-	    "aAbcCdeEfFghHilLmnopqrRsStux1@v")) != EOF)
+	    "aAbcCdeEfFghHilLmnopqrRsStux1@vV")) != EOF)
 		switch (c) {
 		case 'a':
 			aflg++;
@@ -416,6 +417,9 @@ main(int argc, char *argv[])
 			cflg = 0;
 			uflg++;
 			continue;
+		case 'V':
+			Vflg++;
+			/*FALLTHROUGH*/
 		case 'v':
 			vflg++;
 #if !defined(XPG4)
@@ -460,7 +464,7 @@ main(int argc, char *argv[])
 		}
 	if (opterr) {
 		(void) fprintf(stderr, gettext(
-		    "usage: ls -aAbcCdeEfFghHilLmnopqrRsStuxv1@ [files]\n"));
+		    "usage: ls -aAbcCdeEfFghHilLmnopqrRsStuxvV1@ [files]\n"));
 		exit(2);
 	}
 
@@ -868,7 +872,7 @@ pentry(struct lbuf *ap)
 	if (vflg) {
 		new_line();
 		if (p->aclp) {
-			acl_printacl(p->aclp, num_cols);
+			acl_printacl(p->aclp, num_cols, Vflg);
 		}
 	}
 }
@@ -1376,6 +1380,11 @@ gstat(char *file, int argfl, struct ditem *myparent)
 					rep->lflags |= (groupperm & mask) << 3;
 
 				}
+			}
+
+			if (!vflg && !Vflg && rep->aclp) {
+				acl_free(rep->aclp);
+				rep->aclp = NULL;
 			}
 
 			if (atflg && pathconf(file, _PC_XATTR_EXISTS) == 1)

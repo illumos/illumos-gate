@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -429,7 +429,6 @@ parse_acl_args(char *arg, acl_args_t **acl_args)
 {
 	acl_t *new_acl = NULL;
 	int slot;
-	int error;
 	int len;
 	int action;
 	acl_args_t *new_acl_args;
@@ -478,9 +477,8 @@ parse_acl_args(char *arg, acl_args_t **acl_args)
 		return (1);
 
 	if (acl_spec) {
-		if (error = acl_fromtext(acl_spec, &new_acl)) {
-			errmsg(1, 1, "%s\n", acl_strerror(error));
-			return (1);
+		if (acl_parse(acl_spec, &new_acl)) {
+			exit(1);
 		}
 	}
 

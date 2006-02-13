@@ -3025,7 +3025,6 @@ filedone:
 						/* header is 8 */
 						attrsize = 8 + (int)strlen(
 						    &attr->attr_info[0]) + 1;
-
 						error =
 						    acl_fromtext(
 						    &attr->attr_info[0], &aclp);
@@ -5571,7 +5570,7 @@ append_secattr(
 	switch (acl_type(aclp)) {
 	case ACLENT_T:
 	case ACE_T:
-		attrtext = acl_totext(aclp);
+		attrtext = acl_totext(aclp, ACL_APPEND_ID | ACL_COMPACT_FMT);
 		if (attrtext == NULL) {
 			(void) fprintf(stderr, "acltotext failed\n");
 			return (-1);

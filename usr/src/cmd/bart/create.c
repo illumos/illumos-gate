@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -642,7 +642,7 @@ get_acl_string(const char *fname, const struct stat64 *statb, int *err_code)
 		(void) fprintf(stderr, "%s: %s\n", fname, acl_strerror(error));
 		return (safe_strdup("-"));
 	} else {
-		acltext = acl_totext(aclp);
+		acltext = acl_totext(aclp, 0);
 		acl_free(aclp);
 		return (acltext);
 	}

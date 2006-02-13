@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -41,7 +41,9 @@ install :=	TARGET= install
 lint :=		TARGET= lint
 
 MSGFILES=	common/acltext.c common/aclutils.c common/aclmode.c \
-		common/aclsort.c common/aclcheck.c
+		common/aclsort.c common/aclcheck.c common/acl_lex.l \
+		common/acl.y
+
 POFILE=		libsec.po
 
 .KEEP_STATE:

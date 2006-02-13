@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,33 +35,24 @@
 #include <errno.h>
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/acl.h>
 #include <aclutils.h>
-#include <libintl.h>
 
+#define	ID_STR_MAX	20	/* digits in LONG_MAX */
+
+#define	APPENDED_ID_MAX	ID_STR_MAX + 1		/* id + colon */
+/*
+ * yyinteractive controls whether yyparse should print out
+ * error messages to stderr, and whether or not id's should be
+ * allowed from acl_fromtext().
+ */
+int	yyinteractive;
+acl_t	*yyacl;
+char	*yybuf;
 
 extern acl_t *acl_alloc(enum acl_type);
 
-/*
- * acltotext() converts each ACL entry to look like this:
- *
- *    entry_type:uid^gid^name:perms
- *
- * The maximum length of entry_type is 14 ("defaultgroup::" and
- * "defaultother::") hence ENTRYTYPELEN is set to 14.
- *
- * The max length of a uid^gid^name entry (in theory) is 8, hence we use
- * LOGNAME_MAX.
- *
- * The length of a perms entry is 4 to allow for the comma appended to each
- * to each acl entry.  Hence PERMS is set to 4.
- */
-
-#define	ENTRYTYPELEN	14
-#define	PERMS		4
-#define	ACL_ENTRY_SIZE	(ENTRYTYPELEN + LOGNAME_MAX + PERMS)
-
-#define	UPDATE_WHERE	where = dstr->aclexport + strlen(dstr->aclexport)
 
 struct dynaclstr {
 	size_t bufsize;		/* current size of aclexport */
@@ -72,20 +63,504 @@ static char *strappend(char *, char *);
 static char *convert_perm(char *, o_mode_t);
 static int increase_length(struct dynaclstr *, size_t);
 
-static int
-acl_str_to_id(char *str, int *id)
+static void
+aclent_perms(int perm, char *txt_perms)
 {
-	char *end;
-	uid_t value;
+	if (perm & S_IROTH)
+		txt_perms[0] = 'r';
+	else
+		txt_perms[0] = '-';
+	if (perm & S_IWOTH)
+		txt_perms[1] = 'w';
+	else
+		txt_perms[1] = '-';
+	if (perm & S_IXOTH)
+		txt_perms[2] = 'x';
+	else
+		txt_perms[2] = '-';
+	txt_perms[3] = '\0';
+}
 
-	value = strtol(str, &end, 10);
+static char *
+pruname(uid_t uid, char *uidp)
+{
+	struct passwd	*passwdp;
 
-	if (errno != 0 || *end != '\0')
-		return (EACL_INVALID_USER_GROUP);
+	passwdp = getpwuid(uid);
+	if (passwdp == (struct passwd *)NULL) {
+		/* could not get passwd information: display uid instead */
+		(void) sprintf(uidp, "%ld", (long)uid);
+		return (uidp);
+	} else
+		return (passwdp->pw_name);
+}
 
-	*id = value;
+static char *
+prgname(gid_t gid, char *gidp)
+{
+	struct group	*groupp;
 
-	return (0);
+	groupp = getgrgid(gid);
+	if (groupp == (struct group *)NULL) {
+		/* could not get group information: display gid instead */
+		(void) sprintf(gidp, "%ld", (long)gid);
+		return (gidp);
+	} else
+		return (groupp->gr_name);
+}
+static void
+aclent_printacl(acl_t *aclp)
+{
+	aclent_t *tp;
+	int aclcnt;
+	int mask;
+	int slot = 0;
+	char perm[4];
+	char uidp[10];
+	char gidp[10];
+
+	/* display ACL: assume it is sorted. */
+	aclcnt = aclp->acl_cnt;
+	for (tp = aclp->acl_aclp; tp && aclcnt--; tp++) {
+		if (tp->a_type == CLASS_OBJ)
+			mask = tp->a_perm;
+	}
+	aclcnt = aclp->acl_cnt;
+	for (tp = aclp->acl_aclp; aclcnt--; tp++) {
+		(void) printf("     %d:", slot++);
+		switch (tp->a_type) {
+		case USER:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("user:%s:%s\t\t",
+			    pruname(tp->a_id, uidp), perm);
+			aclent_perms((tp->a_perm & mask), perm);
+			(void) printf("#effective:%s\n", perm);
+			break;
+		case USER_OBJ:
+			/* no need to display uid */
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("user::%s\n", perm);
+			break;
+		case GROUP:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("group:%s:%s\t\t",
+			    prgname(tp->a_id, gidp), perm);
+			aclent_perms(tp->a_perm & mask, perm);
+			(void) printf("#effective:%s\n", perm);
+			break;
+		case GROUP_OBJ:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("group::%s\t\t", perm);
+			aclent_perms(tp->a_perm & mask, perm);
+			(void) printf("#effective:%s\n", perm);
+			break;
+		case CLASS_OBJ:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("mask:%s\n", perm);
+			break;
+		case OTHER_OBJ:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("other:%s\n", perm);
+			break;
+		case DEF_USER:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("default:user:%s:%s\n",
+			    pruname(tp->a_id, uidp), perm);
+			break;
+		case DEF_USER_OBJ:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("default:user::%s\n", perm);
+			break;
+		case DEF_GROUP:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("default:group:%s:%s\n",
+			    prgname(tp->a_id, gidp), perm);
+			break;
+		case DEF_GROUP_OBJ:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("default:group::%s\n", perm);
+			break;
+		case DEF_CLASS_OBJ:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("default:mask:%s\n", perm);
+			break;
+		case DEF_OTHER_OBJ:
+			aclent_perms(tp->a_perm, perm);
+			(void) printf("default:other:%s\n", perm);
+			break;
+		default:
+			(void) fprintf(stderr,
+			    gettext("unrecognized entry\n"));
+			break;
+		}
+	}
+}
+
+static void
+split_line(char *str, int cols)
+{
+	char *ptr;
+	int len;
+	int i;
+	int last_split;
+	char *pad = "";
+	int pad_len;
+
+	len = strlen(str);
+	ptr = str;
+	pad_len = 0;
+
+	ptr = str;
+	last_split = 0;
+	for (i = 0; i != len; i++) {
+		if ((i + pad_len + 4) >= cols) {
+			(void) printf("%s%.*s\n", pad, last_split, ptr);
+			ptr = &ptr[last_split];
+			len = strlen(ptr);
+			i = 0;
+			pad_len = 4;
+			pad = "         ";
+		} else {
+			if (ptr[i] == '/' || ptr[i] == ':') {
+				last_split = i;
+			}
+		}
+	}
+	if (i == len) {
+		(void) printf("%s%s\n", pad, ptr);
+	}
+}
+
+#define	OWNERAT_TXT	"owner@"
+#define	GROUPAT_TXT	"group@"
+#define	EVERYONEAT_TXT	"everyone@"
+#define	GROUP_TXT	"group:"
+#define	USER_TXT	"user:"
+
+char *
+ace_type_txt(char *buf, char **endp, ace_t *acep)
+{
+
+	char idp[10];
+
+	if (buf == NULL)
+		return (NULL);
+
+	switch (acep->a_flags & ACE_TYPE_FLAGS) {
+	case ACE_OWNER:
+		strcpy(buf, OWNERAT_TXT);
+		*endp = buf + sizeof (OWNERAT_TXT) - 1;
+		break;
+
+	case ACE_GROUP|ACE_IDENTIFIER_GROUP:
+		strcpy(buf, GROUPAT_TXT);
+		*endp = buf + sizeof (GROUPAT_TXT) - 1;
+		break;
+
+	case ACE_IDENTIFIER_GROUP:
+		strcpy(buf, GROUP_TXT);
+		strcat(buf, prgname(acep->a_who, idp));
+		*endp = buf + strlen(buf);
+		break;
+
+	case ACE_EVERYONE:
+		strcpy(buf, EVERYONEAT_TXT);
+		*endp = buf + sizeof (EVERYONEAT_TXT) - 1;
+		break;
+
+	case 0:
+		strcpy(buf, USER_TXT);
+		strcat(buf, pruname(acep->a_who, idp));
+		*endp = buf + strlen(buf);
+		break;
+	}
+
+	return (buf);
+}
+
+#define	READ_DATA_TXT	"read_data/"
+#define	WRITE_DATA_TXT	"write_data/"
+#define	EXECUTE_TXT	"execute/"
+#define	READ_XATTR_TXT	"read_xattr/"
+#define	WRITE_XATTR_TXT	"write_xattr/"
+#define	READ_ATTRIBUTES_TXT "read_attributes/"
+#define	WRITE_ATTRIBUTES_TXT "write_attributes/"
+#define	DELETE_TXT	"delete/"
+#define	DELETE_CHILD_TXT "delete_child/"
+#define	WRITE_OWNER_TXT "write_owner/"
+#define	READ_ACL_TXT	"read_acl/"
+#define	WRITE_ACL_TXT	"write_acl/"
+#define	APPEND_DATA_TXT "append_data/"
+#define	READ_DIR_TXT	"list_directory/read_data/"
+#define	ADD_DIR_TXT	"add_subdirectory/append_data/"
+#define	ADD_FILE_TXT	"add_file/write_data/"
+#define	SYNCHRONIZE_TXT "synchronize"	/* not slash on this one */
+
+char *
+ace_perm_txt(char *buf, char **endp, uint32_t mask,
+    uint32_t iflags, int isdir, int flags)
+{
+	char *lend = buf;		/* local end */
+
+	if (buf == NULL)
+		return (NULL);
+
+	if (flags & ACL_COMPACT_FMT) {
+
+		if (mask & ACE_READ_DATA)
+			buf[0] = 'r';
+		else
+			buf[0] = '-';
+		if (mask & ACE_WRITE_DATA)
+			buf[1] = 'w';
+		else
+			buf[1] = '-';
+		if (mask & ACE_EXECUTE)
+			buf[2] = 'x';
+		else
+			buf[2] = '-';
+		if (mask & ACE_APPEND_DATA)
+			buf[3] = 'p';
+		else
+			buf[3] = '-';
+		if (mask & ACE_DELETE)
+			buf[4] = 'd';
+		else
+			buf[4] = '-';
+		if (mask & ACE_DELETE_CHILD)
+			buf[5] = 'D';
+		else
+			buf[5] = '-';
+		if (mask & ACE_READ_ATTRIBUTES)
+			buf[6] = 'a';
+		else
+			buf[6] = '-';
+		if (mask & ACE_WRITE_ATTRIBUTES)
+			buf[7] = 'A';
+		else
+			buf[7] = '-';
+		if (mask & ACE_READ_NAMED_ATTRS)
+			buf[8] = 'R';
+		else
+			buf[8] = '-';
+		if (mask & ACE_WRITE_NAMED_ATTRS)
+			buf[9] = 'W';
+		else
+			buf[9] = '-';
+		if (mask & ACE_READ_ACL)
+			buf[10] = 'c';
+		else
+			buf[10] = '-';
+		if (mask & ACE_WRITE_ACL)
+			buf[11] = 'C';
+		else
+			buf[11] = '-';
+		if (mask & ACE_WRITE_OWNER)
+			buf[12] = 'o';
+		else
+			buf[12] = '-';
+		if (mask & ACE_SYNCHRONIZE)
+			buf[13] = 's';
+		else
+			buf[13] = '-';
+		buf[14] = '\0';
+		*endp = buf + 14;
+		return (buf);
+	} else {
+		/*
+		 * If ACE is a directory, but inheritance indicates its
+		 * for a file then print permissions for file rather than
+		 * dir.
+		 */
+		if (isdir) {
+			if (mask & ACE_LIST_DIRECTORY) {
+				if (iflags == ACE_FILE_INHERIT_ACE) {
+					strcpy(lend, READ_DATA_TXT);
+					lend += sizeof (READ_DATA_TXT) - 1;
+				} else {
+					strcpy(lend, READ_DIR_TXT);
+					lend += sizeof (READ_DIR_TXT) - 1;
+				}
+			}
+			if (mask & ACE_ADD_FILE) {
+				if (iflags == ACE_FILE_INHERIT_ACE) {
+					strcpy(lend, WRITE_DATA_TXT);
+					lend += sizeof (WRITE_DATA_TXT) - 1;
+				} else {
+					strcpy(lend, ADD_FILE_TXT);
+					lend +=
+					    sizeof (ADD_FILE_TXT) -1;
+				}
+			}
+			if (mask & ACE_ADD_SUBDIRECTORY) {
+				if (iflags == ACE_FILE_INHERIT_ACE) {
+					strcpy(lend, APPEND_DATA_TXT);
+					lend += sizeof (APPEND_DATA_TXT) - 1;
+				} else {
+					strcpy(lend, ADD_DIR_TXT);
+					lend += sizeof (ADD_DIR_TXT) - 1;
+				}
+			}
+		} else {
+			if (mask & ACE_READ_DATA) {
+				strcpy(lend, READ_DATA_TXT);
+				lend += sizeof (READ_DATA_TXT) - 1;
+			}
+			if (mask & ACE_WRITE_DATA) {
+				strcpy(lend, WRITE_DATA_TXT);
+				lend += sizeof (WRITE_DATA_TXT) - 1;
+			}
+			if (mask & ACE_APPEND_DATA) {
+				strcpy(lend, APPEND_DATA_TXT);
+				lend += sizeof (APPEND_DATA_TXT) - 1;
+			}
+		}
+		if (mask & ACE_READ_NAMED_ATTRS) {
+			strcpy(lend, READ_XATTR_TXT);
+			lend += sizeof (READ_XATTR_TXT) - 1;
+		}
+		if (mask & ACE_WRITE_NAMED_ATTRS) {
+			strcpy(lend, WRITE_XATTR_TXT);
+			lend += sizeof (WRITE_XATTR_TXT) - 1;
+		}
+		if (mask & ACE_EXECUTE) {
+			strcpy(lend, EXECUTE_TXT);
+			lend += sizeof (EXECUTE_TXT) - 1;
+		}
+		if (mask & ACE_DELETE_CHILD) {
+			strcpy(lend, DELETE_CHILD_TXT);
+			lend += sizeof (DELETE_CHILD_TXT) - 1;
+		}
+		if (mask & ACE_READ_ATTRIBUTES) {
+			strcpy(lend, READ_ATTRIBUTES_TXT);
+			lend += sizeof (READ_ATTRIBUTES_TXT) - 1;
+		}
+		if (mask & ACE_WRITE_ATTRIBUTES) {
+			strcpy(lend, WRITE_ATTRIBUTES_TXT);
+			lend += sizeof (WRITE_ATTRIBUTES_TXT) - 1;
+		}
+		if (mask & ACE_DELETE) {
+			strcpy(lend, DELETE_TXT);
+			lend += sizeof (DELETE_TXT) - 1;
+		}
+		if (mask & ACE_READ_ACL) {
+			strcpy(lend, READ_ACL_TXT);
+			lend += sizeof (READ_ACL_TXT) - 1;
+		}
+		if (mask & ACE_WRITE_ACL) {
+			strcpy(lend, WRITE_ACL_TXT);
+			lend += sizeof (WRITE_ACL_TXT) - 1;
+		}
+		if (mask & ACE_WRITE_OWNER) {
+			strcpy(lend, WRITE_OWNER_TXT);
+			lend += sizeof (WRITE_OWNER_TXT) - 1;
+		}
+		if (mask & ACE_SYNCHRONIZE) {
+			strcpy(lend, SYNCHRONIZE_TXT);
+			lend += sizeof (SYNCHRONIZE_TXT) - 1;
+		}
+
+		if (*(lend - 1) == '/')
+			*--lend = '\0';
+	}
+
+	*endp = lend;
+	return (buf);
+}
+
+#define	ALLOW_TXT	"allow"
+#define	DENY_TXT	"deny"
+#define	ALARM_TXT	"alarm"
+#define	AUDIT_TXT	"audit"
+#define	UNKNOWN_TXT	"unknown"
+char *
+ace_access_txt(char *buf, char **endp, int type)
+{
+
+	if (buf == NULL)
+		return (NULL);
+
+	if (type == ACE_ACCESS_ALLOWED_ACE_TYPE) {
+		strcpy(buf, ALLOW_TXT);
+		*endp += sizeof (ALLOW_TXT) - 1;
+	} else if (type == ACE_ACCESS_DENIED_ACE_TYPE) {
+		strcpy(buf, DENY_TXT);
+		*endp += sizeof (DENY_TXT) - 1;
+	} else if (type == ACE_SYSTEM_AUDIT_ACE_TYPE) {
+		strcpy(buf, AUDIT_TXT);
+		*endp += sizeof (AUDIT_TXT) - 1;
+	} else if (type == ACE_SYSTEM_ALARM_ACE_TYPE) {
+		strcpy(buf, ALARM_TXT);
+		*endp += sizeof (ALARM_TXT) - 1;
+	} else {
+		strcpy(buf, UNKNOWN_TXT);
+		*endp += sizeof (UNKNOWN_TXT) - 1;
+	}
+
+	return (buf);
+}
+
+static char *
+ace_inherit_txt(char *buf, char **endp, uint32_t iflags, int flags)
+{
+
+	char *lend = buf;
+
+	if (buf == NULL) {
+		return (NULL);
+	}
+
+	if (flags & ACL_COMPACT_FMT) {
+		if (iflags & ACE_FILE_INHERIT_ACE)
+			buf[0] = 'f';
+		else
+			buf[0] = '-';
+		if (iflags & ACE_DIRECTORY_INHERIT_ACE)
+			buf[1] = 'd';
+		else
+			buf[1] = '-';
+		if (iflags & ACE_INHERIT_ONLY_ACE)
+			buf[2] = 'i';
+		else
+			buf[2] = '-';
+		if (iflags & ACE_NO_PROPAGATE_INHERIT_ACE)
+			buf[3] = 'n';
+		else
+			buf[3] = '-';
+		if (iflags & ACE_SUCCESSFUL_ACCESS_ACE_FLAG)
+			buf[4] = 'S';
+		else
+			buf[4] = '-';
+		if (iflags & ACE_FAILED_ACCESS_ACE_FLAG)
+			buf[5] = 'F';
+		else
+			buf[5] = '-';
+		buf[6] = '\0';
+		*endp = buf + 6;
+	} else {
+		if (iflags & ACE_FILE_INHERIT_ACE) {
+			strcpy(lend, "file_inherit/");
+			lend += sizeof ("file_inherit/") - 1;
+		}
+		if (iflags & ACE_DIRECTORY_INHERIT_ACE) {
+			strcpy(lend, "dir_inherit/");
+			lend += sizeof ("dir_inherit/") - 1;
+		}
+		if (iflags & ACE_NO_PROPAGATE_INHERIT_ACE) {
+			strcpy(lend, "no_propagate/");
+			lend += sizeof ("no_propagate/") - 1;
+		}
+		if (iflags & ACE_INHERIT_ONLY_ACE) {
+			strcpy(lend, "inherit_only/");
+			lend += sizeof ("inherit_only/") - 1;
+		}
+
+		if (*(lend - 1) == '/')
+			*--lend = '\0';
+		*endp = lend;
+	}
+
+	return (buf);
 }
 
 /*
@@ -99,8 +574,29 @@ acl_str_to_id(char *str, int *id)
  * The LOGNAME_MAX, ENTRYTYPELEN and PERMS limits are otherwise always
  * adhered to.
  */
+
+/*
+ * acltotext() converts each ACL entry to look like this:
+ *
+ *    entry_type:uid^gid^name:perms[:id]
+ *
+ * The maximum length of entry_type is 14 ("defaultgroup::" and
+ * "defaultother::") hence ENTRYTYPELEN is set to 14.
+ *
+ * The max length of a uid^gid^name entry (in theory) is 8, hence we use,
+ * however the ID could be a number so we therefore use ID_STR_MAX
+ *
+ * The length of a perms entry is 4 to allow for the comma appended to each
+ * to each acl entry.  Hence PERMS is set to 4.
+ */
+
+#define	ENTRYTYPELEN	14
+#define	PERMS		4
+#define	ACL_ENTRY_SIZE	(ENTRYTYPELEN + ID_STR_MAX + PERMS + APPENDED_ID_MAX)
+#define	UPDATE_WHERE	where = dstr->aclexport + strlen(dstr->aclexport)
+
 char *
-acltotext(aclent_t *aclp, int aclcnt)
+aclent_acltotext(aclent_t  *aclp, int aclcnt, int flags)
 {
 	char		*aclexport;
 	char		*where;
@@ -109,6 +605,7 @@ acltotext(aclent_t *aclp, int aclcnt)
 	struct dynaclstr *dstr;
 	int		i, rtn;
 	size_t		excess = 0;
+	char		id[20], *idstr;
 
 	if (aclp == NULL)
 		return (NULL);
@@ -218,240 +715,33 @@ acltotext(aclent_t *aclp, int aclcnt)
 			return (NULL);
 
 		}
+
+		if ((flags & ACL_APPEND_ID) && ((aclp->a_type == USER) ||
+		    (aclp->a_type == DEF_USER) || (aclp->a_type == GROUP) ||
+		    (aclp->a_type == DEF_GROUP))) {
+			where = strappend(where, ":");
+			id[ID_STR_MAX - 1] = '\0'; /* null terminate buffer */
+			idstr = lltostr(aclp->a_id, &id[ID_STR_MAX - 1]);
+			where = strappend(where, idstr);
+		}
 		if (i < aclcnt - 1)
 			where = strappend(where, ",");
 	}
 	aclexport = dstr->aclexport;
 	free(dstr);
 	return (aclexport);
+
+
+
+
 }
 
-/*
- * Convert external acl representation to internal representation.
- * The accepted syntax is: <acl_entry>[,<acl_entry>]*[,]
- * The comma at the end is not prescribed by the man pages.
- * But it is needed not to break the old programs.
- */
-static int
-aclent_aclfromtext(char *aclstr, acl_t **ret_aclp)
+char *
+acltotext(aclent_t *aclp, int aclcnt)
 {
-	char		*fieldp;
-	char		*tp;
-	char		*nextp;
-	char		*allocp;
-	char		*aclimport;
-	int		entry_type;
-	int		id;
-	int		len;
-	int		error;
-	o_mode_t	perm;
-	aclent_t	*tmpaclp;
-	acl_t		*aclp;
-	struct group	*groupp;
-	struct passwd	*passwdp;
-
-	aclp = NULL;
-
-	if (! aclstr)
-		return (NULL);
-
-	aclp = acl_alloc(ACLENT_T);
-	if (aclp == NULL) {
-		return (EACL_MEM_ERROR);
-	}
-
-	*ret_aclp = NULL;
-
-	len = strlen(aclstr);
-
-	if ((aclimport = allocp = strdup(aclstr)) == NULL) {
-		return (EACL_MEM_ERROR);
-	}
-
-	if (aclimport[len - 1] == ',')
-		aclimport[len - 1] = '\0';
-
-	for (; aclimport; ) {
-		/* look for an ACL entry */
-		tp = strchr(aclimport, ',');
-		if (tp == NULL) {
-			nextp = NULL;
-		} else {
-			*tp = '\0';
-			nextp = tp + 1;
-		}
-
-		aclp->acl_cnt += 1;
-
-		/*
-		 * get additional memory:
-		 * can be more efficient by allocating a bigger block
-		 * each time.
-		 */
-		if (aclp->acl_cnt > 1)
-			tmpaclp = (aclent_t *)realloc(aclp->acl_aclp,
-			    sizeof (aclent_t) * (aclp->acl_cnt));
-		else
-			tmpaclp = (aclent_t *)malloc(sizeof (aclent_t));
-		if (tmpaclp == NULL) {
-			free(allocp);
-			acl_free(aclp);
-			return (EACL_MEM_ERROR);
-		}
-		aclp->acl_aclp = tmpaclp;
-		tmpaclp = (aclent_t *)aclp->acl_aclp + (aclp->acl_cnt - 1);
-
-		/* look for entry type field */
-		tp = strchr(aclimport, ':');
-		if (tp == NULL) {
-			free(allocp);
-			if (aclp)
-				acl_free(aclp);
-			return (EACL_ENTRY_ERROR);
-		} else
-			*tp = '\0';
-		if (strcmp(aclimport, "user") == 0) {
-			if (*(tp+1) == ':')
-				entry_type = USER_OBJ;
-			else
-				entry_type = USER;
-		} else if (strcmp(aclimport, "group") == 0) {
-			if (*(tp+1) == ':')
-				entry_type = GROUP_OBJ;
-			else
-				entry_type = GROUP;
-		} else if (strcmp(aclimport, "other") == 0)
-			entry_type = OTHER_OBJ;
-		else if (strcmp(aclimport, "mask") == 0)
-			entry_type = CLASS_OBJ;
-		else if (strcmp(aclimport, "defaultuser") == 0) {
-			if (*(tp+1) == ':')
-				entry_type = DEF_USER_OBJ;
-			else
-				entry_type = DEF_USER;
-		} else if (strcmp(aclimport, "defaultgroup") == 0) {
-			if (*(tp+1) == ':')
-				entry_type = DEF_GROUP_OBJ;
-			else
-				entry_type = DEF_GROUP;
-		} else if (strcmp(aclimport, "defaultmask") == 0)
-			entry_type = DEF_CLASS_OBJ;
-		else if (strcmp(aclimport, "defaultother") == 0)
-			entry_type = DEF_OTHER_OBJ;
-		else {
-			free(allocp);
-			acl_free(aclp);
-			return (EACL_ENTRY_ERROR);
-		}
-
-		/* look for user/group name */
-		if (entry_type != CLASS_OBJ && entry_type != OTHER_OBJ &&
-		    entry_type != DEF_CLASS_OBJ &&
-		    entry_type != DEF_OTHER_OBJ) {
-			fieldp = tp + 1;
-			tp = strchr(fieldp, ':');
-			if (tp == NULL) {
-				free(allocp);
-				acl_free(aclp);
-				return (EACL_INVALID_USER_GROUP);
-			} else
-				*tp = '\0';
-			if (fieldp != tp) {
-				/*
-				 * The second field could be empty. We only care
-				 * when the field has user/group name.
-				 */
-				if (entry_type == USER ||
-				    entry_type == DEF_USER) {
-					/*
-					 * The reentrant interface getpwnam_r()
-					 * is uncommitted and subject to
-					 * change. Use the friendlier interface
-					 * getpwnam().
-					 */
-					error = 0;
-					passwdp = getpwnam(fieldp);
-					if (passwdp == NULL) {
-						error = acl_str_to_id(fieldp,
-						    &id);
-					} else {
-						id = passwdp->pw_uid;
-					}
-
-					if (error) {
-						free(allocp);
-						acl_free(aclp);
-						return (error);
-					}
-
-				} else {
-					error = 0;
-					if (entry_type == GROUP ||
-					    entry_type == DEF_GROUP) {
-						groupp = getgrnam(fieldp);
-						if (groupp == NULL) {
-							error = acl_str_to_id(
-							    fieldp, &id);
-						}
-						if (error == 0)
-							id = groupp->gr_gid;
-					}
-					if (error) {
-						free(allocp);
-						acl_free(aclp);
-						return (error);
-					}
-				}
-			} else {
-				/*
-				 * The second field is empty.
-				 * Treat it as undefined (-1)
-				 */
-				id = -1;
-			}
-		} else {
-			/*
-			 * Let's not break the old applications
-			 * that use mask::rwx, other::rwx format,
-			 * though they violate the man pages.
-			 */
-			if (*(tp + 1) == ':')
-				*++tp = 0;
-		}
-
-		/* next field: permission */
-		fieldp = tp + 1;
-		if (strlen(fieldp) != 3) {
-			/*  not "rwx" format */
-			free(allocp);
-			acl_free(aclp);
-			return (EACL_PERM_MASK_ERROR);
-		} else {
-			char	s[] = "rwx";
-			int	mask = 0x04;
-			int	i;
-			perm = 0;
-
-			for (i = 0; i < 3; i++, mask /= 2) {
-				if (fieldp[i] == s[i])
-					perm |= mask;
-				else if (fieldp[i] != '-') {
-					free(allocp);
-					acl_free(aclp);
-					return (EACL_PERM_MASK_ERROR);
-				}
-			}
-		}
-
-		tmpaclp->a_type = entry_type;
-		tmpaclp->a_id = id;
-		tmpaclp->a_perm = perm;
-		aclimport = nextp;
-	}
-	free(allocp);
-	*ret_aclp = aclp;
-	return (0);
+	return (aclent_acltotext(aclp, aclcnt, 0));
 }
+
 
 aclent_t *
 aclfromtext(char *aclstr, int *aclcnt)
@@ -460,15 +750,15 @@ aclfromtext(char *aclstr, int *aclcnt)
 	aclent_t *aclentp;
 	int error;
 
-	error = aclent_aclfromtext(aclstr, &aclp);
+	error = acl_fromtext(aclstr, &aclp);
 	if (error)
 		return (NULL);
 
 	aclentp = aclp->acl_aclp;
 	aclp->acl_aclp = NULL;
-	acl_free(aclp);
-
 	*aclcnt = aclp->acl_cnt;
+
+	acl_free(aclp);
 	return (aclentp);
 }
 
@@ -483,143 +773,20 @@ strappend(char *where, char *newstr)
 static char *
 convert_perm(char *where, o_mode_t perm)
 {
-	if (perm & 04)
+	if (perm & S_IROTH)
 		where = strappend(where, "r");
 	else
 		where = strappend(where, "-");
-	if (perm & 02)
+	if (perm & S_IWOTH)
 		where = strappend(where, "w");
 	else
 		where = strappend(where, "-");
-	if (perm & 01)
+	if (perm & S_IXOTH)
 		where = strappend(where, "x");
 	else
 		where = strappend(where, "-");
 	/* perm is the last field */
 	return (where);
-}
-
-static char *
-ace_convert_perm(char *where, mode_t perm, int isdir, int iflags)
-{
-	char *start = where;
-
-	/*
-	 * The following mneumonics all have the
-	 * same value.  The only difference is the
-	 * first value is for files and second for directories
-	 * ACE_READ_DATA/ACE_LIST_DIRECTORY
-	 * ACE_WRITE_DATA/ACE_ADD_FILE
-	 * ACE_APPEND_DATA/ACE_ADD_SUBDIRECTORY
-	 */
-
-	/*
-	 * If ACE is a directory, but inheritance indicates its
-	 * for a file then print permissions for file rather than
-	 * dir.
-	 */
-	if (isdir) {
-		if (perm & ACE_LIST_DIRECTORY) {
-			if (iflags == ACE_FILE_INHERIT_ACE)
-				where = strappend(where, "read_data/");
-			else
-				where = strappend(where,
-				    "list_directory/read_data/");
-		}
-		if (perm & ACE_ADD_FILE) {
-			if (iflags == ACE_FILE_INHERIT_ACE)
-				where = strappend(where, "write_data/");
-			else
-				where = strappend(where,
-				    "add_file/write_data/");
-		}
-		if (perm & ACE_ADD_SUBDIRECTORY) {
-			if (iflags == ACE_FILE_INHERIT_ACE)
-				where = strappend(where, "append_data/");
-			else
-				where = strappend(where,
-				    "add_subdirectory/append_data/");
-		}
-	} else {
-		if (perm & ACE_READ_DATA)
-			where = strappend(where, "read_data/");
-		if (perm & ACE_WRITE_DATA)
-			where = strappend(where, "write_data/");
-		if (perm & ACE_APPEND_DATA)
-			where = strappend(where, "append_data/");
-	}
-	if (perm & ACE_READ_NAMED_ATTRS)
-		where = strappend(where, "read_xattr/");
-	if (perm & ACE_WRITE_NAMED_ATTRS)
-		where = strappend(where, "write_xattr/");
-	if (perm & ACE_EXECUTE)
-		where = strappend(where, "execute/");
-	if (perm & ACE_DELETE_CHILD)
-		where = strappend(where, "delete_child/");
-	if (perm & ACE_READ_ATTRIBUTES)
-		where = strappend(where, "read_attributes/");
-	if (perm & ACE_WRITE_ATTRIBUTES)
-		where = strappend(where, "write_attributes/");
-	if (perm & ACE_DELETE)
-		where = strappend(where, "delete/");
-	if (perm & ACE_READ_ACL)
-		where = strappend(where, "read_acl/");
-	if (perm & ACE_WRITE_ACL)
-		where = strappend(where, "write_acl/");
-	if (perm & ACE_WRITE_OWNER)
-		where = strappend(where, "write_owner/");
-	if (perm & ACE_SYNCHRONIZE)
-		where = strappend(where, "synchronize");
-
-	if (start[strlen(start) - 1] == '/') {
-		start[strlen(start) - 1] = '\0';
-		where = start + strlen(start);
-	}
-	return (where);
-}
-
-int
-ace_permask(char *perm_tok, int *perm)
-{
-	if (strcmp(perm_tok, "read_data") == 0)
-		*perm |= ACE_READ_DATA;
-	else if (strcmp(perm_tok, "list_directory") == 0)
-		*perm |= ACE_LIST_DIRECTORY;
-	else if (strcmp(perm_tok, "write_data") == 0)
-		*perm |= ACE_WRITE_DATA;
-	else if (strcmp(perm_tok, "add_file") == 0)
-		*perm |= ACE_ADD_FILE;
-	else if (strcmp(perm_tok, "append_data") == 0)
-		*perm |= ACE_APPEND_DATA;
-	else if (strcmp(perm_tok, "add_subdirectory") == 0)
-		*perm |= ACE_ADD_SUBDIRECTORY;
-	else if (strcmp(perm_tok, "read_xattr") == 0)
-		*perm |= ACE_READ_NAMED_ATTRS;
-	else if (strcmp(perm_tok, "write_xattr") == 0)
-		*perm |= ACE_WRITE_NAMED_ATTRS;
-	else if (strcmp(perm_tok, "execute") == 0)
-		*perm |= ACE_EXECUTE;
-	else if (strcmp(perm_tok, "delete_child") == 0)
-		*perm |= ACE_DELETE_CHILD;
-	else if (strcmp(perm_tok, "read_attributes") == 0)
-		*perm |= ACE_READ_ATTRIBUTES;
-	else if (strcmp(perm_tok, "write_attributes") == 0)
-		*perm |= ACE_WRITE_ATTRIBUTES;
-	else if (strcmp(perm_tok, "delete") == 0)
-		*perm |= ACE_DELETE;
-	else if (strcmp(perm_tok, "read_acl") == 0)
-		*perm |= ACE_READ_ACL;
-	else if (strcmp(perm_tok, "write_acl") == 0)
-		*perm |= ACE_WRITE_ACL;
-	else if (strcmp(perm_tok, "write_owner") == 0)
-		*perm |= ACE_WRITE_OWNER;
-	else if (strcmp(perm_tok, "synchronize") == 0)
-		*perm |= ACE_SYNCHRONIZE;
-	else {
-		return (1);
-	}
-
-	return (0);
 }
 
 /*
@@ -643,14 +810,14 @@ increase_length(struct dynaclstr *dacl, size_t increase)
 }
 
 /*
- * ace_acltotext() conver each ace formatted acl to look like this:
+ * ace_acltotext() convert each ace formatted acl to look like this:
  *
- * entry_type:uid^gid^name:perms:allow^deny[:flags][,]
+ * entry_type:uid^gid^name:perms[:flags]:<allow|deny>[:id][,]
  *
  * The maximum length of entry_type is 5 ("group")
  *
- * The max length of a uid^gid^name entry (in theory) is 8, hence we use
- * LOGNAME_MAX.
+ * The max length of a uid^gid^name entry (in theory) is 8,
+ * however id could be a number so we therefore use ID_STR_MAX
  *
  * The length of a perms entry is 144 i.e read_data/write_data...
  * to each acl entry.
@@ -661,517 +828,397 @@ increase_length(struct dynaclstr *dacl, size_t increase)
 
 #define	ACE_ENTRYTYPLEN		6
 #define	IFLAGS_SIZE		51
-#define	ACCESS_TYPE_SIZE	5
+#define	ACCESS_TYPE_SIZE	7	/* if unknown */
 #define	COLON_CNT		3
 #define	PERMS_LEN		216
-#define	ACE_ENTRY_SIZE	(ACE_ENTRYTYPLEN + LOGNAME_MAX + PERMS_LEN +\
-    ACCESS_TYPE_SIZE + IFLAGS_SIZE + COLON_CNT)
+#define	ACE_ENTRY_SIZE	(ACE_ENTRYTYPLEN + ID_STR_MAX + PERMS_LEN +\
+    ACCESS_TYPE_SIZE + IFLAGS_SIZE + COLON_CNT + APPENDED_ID_MAX)
 
 static char *
-ace_acltotext(acl_t *aceaclp)
+ace_acltotext(acl_t *aceaclp, int flags)
 {
 	ace_t		*aclp = aceaclp->acl_aclp;
 	int		aclcnt = aceaclp->acl_cnt;
 	char		*aclexport;
-	char		*where;
-	char		*start;
-	struct group	*groupp;
-	struct passwd	*passwdp;
-	struct dynaclstr *dstr;
-	int		i, rtn;
+	char		*endp;
+	int		i;
+	char		id[ID_STR_MAX], *idstr;
 	int		isdir = (aceaclp->acl_flags & ACL_IS_DIR);
-	size_t		excess = 0;
 
 	if (aclp == NULL)
 		return (NULL);
-	if ((dstr = malloc(sizeof (struct dynaclstr))) == NULL)
+	if ((aclexport = malloc(aclcnt * ACE_ENTRY_SIZE)) == NULL)
 		return (NULL);
-	dstr->bufsize = aclcnt * ACE_ENTRY_SIZE;
-	if ((dstr->aclexport = malloc(dstr->bufsize)) == NULL)
-		return (NULL);
-	*dstr->aclexport = '\0';
-	where = dstr->aclexport;
 
+	aclexport[0] = '\0';
+	endp = aclexport;
 	for (i = 0; i < aclcnt; i++, aclp++) {
-		switch (aclp->a_flags & 0xf040) {
-		case ACE_OWNER:
-		case 0:
-			if ((aclp->a_flags & 0xf040) == ACE_OWNER)
-				where = strappend(where, "owner@");
-			else
-				where = strappend(where, "user:");
-			if ((aclp->a_flags & 0xf040) == 0) {
-				passwdp = getpwuid(aclp->a_who);
-				if (passwdp == (struct passwd *)NULL) {
-					/* put in uid instead */
-					(void) sprintf(where, "%d",
-					    aclp->a_who);
-				} else {
-					excess = strlen(passwdp->pw_name) -
-					    LOGNAME_MAX;
-					if (excess > 0) {
-						rtn = increase_length(dstr,
-						    excess);
-						if (rtn == 1)
-							/* reset where */
-							where =
-							    dstr->aclexport +
-							    strlen(
-							    dstr->aclexport);
-						else
-							return (NULL);
-					}
-					where = strappend(where,
-					    passwdp->pw_name);
-				}
-			} else {
-				where = strappend(where, "");
-			}
-			where = strappend(where, ":");
-			break;
-		case ACE_GROUP|ACE_IDENTIFIER_GROUP:
-		case ACE_IDENTIFIER_GROUP:
-			if ((aclp->a_flags & 0xf040) ==
-			    (ACE_GROUP | ACE_IDENTIFIER_GROUP))
-				where = strappend(where, "group@");
-			else
-				where = strappend(where, "group:");
-			if (!(aclp->a_flags & ACE_GROUP)) {
-				groupp = getgrgid(aclp->a_who);
-				if (groupp == (struct group *)NULL) {
-					/* put in gid instead */
-					(void) sprintf(where,
-					    "%d", aclp->a_who);
-				} else {
-					excess = strlen(groupp->gr_name) -
-					    LOGNAME_MAX;
-					if (excess > 0) {
-						rtn = increase_length(dstr,
-						    excess);
-						if (rtn == 1)
-							/* reset where */
-							where =
-							    dstr->aclexport +
-							    strlen(
-							    dstr->aclexport);
-						else
-							return (NULL);
-					}
-					where = strappend(where,
-					    groupp->gr_name);
-				}
-			} else {
-					where = strappend(where, "");
-			}
-			where = strappend(where, ":");
-			break;
-		case ACE_EVERYONE:
-			where = strappend(where, "everyone@:");
-			break;
-		default:
-			free(dstr->aclexport);
-			free(dstr);
-			return (NULL);
 
+		(void) ace_type_txt(endp, &endp, aclp);
+		*endp++ = ':';
+		*endp = '\0';
+		(void) ace_perm_txt(endp, &endp, aclp->a_access_mask,
+		    aclp->a_flags, isdir, flags);
+		*endp++ = ':';
+		*endp = '\0';
+		(void) ace_inherit_txt(endp, &endp, aclp->a_flags, flags);
+		if (flags & ACL_COMPACT_FMT || aclp->a_flags &
+		    (ACE_FILE_INHERIT_ACE | ACE_DIRECTORY_INHERIT_ACE |
+		    (ACE_INHERIT_ONLY_ACE | ACE_NO_PROPAGATE_INHERIT_ACE))) {
+			*endp++ = ':';
+			*endp = '\0';
 		}
-		where = ace_convert_perm(where, aclp->a_access_mask,
-		    isdir, (aclp->a_flags &
-		    (ACE_FILE_INHERIT_ACE|ACE_DIRECTORY_INHERIT_ACE)));
-		where = strappend(where,
-		    (aclp->a_type == ACE_ACCESS_ALLOWED_ACE_TYPE) ?
-		    ":allow" : ":deny");
+		(void) ace_access_txt(endp, &endp, aclp->a_type);
 
-		/*
-		 * slap on inheritance flags if we have any
-		 */
-
-		if (aclp->a_flags & 0xf) {
-			where = strappend(where, ":");
-			start = where;
-			if (aclp->a_flags & ACE_FILE_INHERIT_ACE)
-				where = strappend(where, "file_inherit/");
-			if (aclp->a_flags & ACE_DIRECTORY_INHERIT_ACE)
-				where = strappend(where, "dir_inherit/");
-			if (aclp->a_flags & ACE_NO_PROPAGATE_INHERIT_ACE)
-				where = strappend(where, "no_propagate/");
-			if (aclp->a_flags & ACE_INHERIT_ONLY_ACE)
-				where = strappend(where, "inherit_only");
-
-			/*
-			 * chop off trailing slash, if present
-			 */
-			if (start[strlen(start) - 1] == '/') {
-				start[strlen(start) - 1] = '\0';
-				where = start + strlen(start);
-			}
+		if ((flags & ACL_APPEND_ID) &&
+		    (((aclp->a_flags & ACE_TYPE_FLAGS) == 0) ||
+		    ((aclp->a_flags & ACE_TYPE_FLAGS) ==
+		    ACE_IDENTIFIER_GROUP))) {
+			*endp++ = ':';
+			*endp = '\0';
+			id[ID_STR_MAX -1] = '\0'; /* null terminate buffer */
+			idstr = lltostr(aclp->a_who, &id[ID_STR_MAX - 1]);
+			strcpy(endp, idstr);
+			endp += strlen(idstr);
 		}
-		if (i < aclcnt - 1)
-			where = strappend(where, ",");
+		if (i < aclcnt - 1) {
+			*endp++ = ',';
+			*(endp + 1) = '\0';
+		}
 	}
-	aclexport = dstr->aclexport;
-	free(dstr);
 	return (aclexport);
 }
 
-static int
-build_iflags(char *str, int *iflags)
+char *
+acl_totext(acl_t *aclp, int flags)
 {
 
-	char *tok;
-	*iflags = 0;
+	char *txtp;
 
-	tok = strtok(str, "/");
-
-	if (tok == NULL)
-		return (1);
-
-	do {
-		if (strcmp(tok, "file_inherit") == 0)
-			*iflags |= ACE_FILE_INHERIT_ACE;
-		else if (strcmp(tok, "dir_inherit") == 0)
-			*iflags |= ACE_DIRECTORY_INHERIT_ACE;
-		else if (strcmp(tok, "inherit_only") == 0)
-			*iflags |= ACE_INHERIT_ONLY_ACE;
-		else if (strcmp(tok, "no_propagate") == 0)
-			*iflags |= ACE_NO_PROPAGATE_INHERIT_ACE;
-		else
-			return (1);
-	} while (tok = strtok(NULL, "/"));
-	return (0);
-}
-
-/*
- * Convert external acl representation to internal representation.
- * The accepted syntax is: <acl_entry>[,<acl_entry>]*[,]
- * The comma at the end is not prescribed by the man pages.
- * But it is needed not to break the old programs.
- */
-
-int
-ace_aclfromtext(char *aclstr, acl_t **ret_aclp)
-{
-	char		*fieldp;
-	char		*tp;
-	char		*nextp;
-	char		*allocp;
-	char		*aclimport;
-	char 		*str;
-	char		*perm_tok;
-	int		entry_type;
-	int		id;
-	int		type;
-	int		iflags;
-	int		len;
-	int		error;
-	int32_t		perm;
-	ace_t		*tmpaclp;
-	acl_t		*aclp;
-	struct group	*groupp;
-	struct passwd	*passwdp;
-
-	if (! aclstr)
-		return (EACL_INVALID_STR);
-
-	len = strlen(aclstr);
-
-	aclp = acl_alloc(ACE_T);
-	if (aclp == NULL) {
-		return (EACL_MEM_ERROR);
-	}
-
-	*ret_aclp = NULL;
-
-	if ((aclimport = allocp = strdup(aclstr)) == NULL) {
-		return (EACL_MEM_ERROR);
-	}
-
-
-	if (aclimport[len - 1] == ',')
-		aclimport[len - 1] = '\0';
-
-	for (; aclimport; ) {
-		/* look for an ACL entry */
-		tp = strchr(aclimport, ',');
-		if (tp == NULL) {
-			nextp = NULL;
-		} else {
-			*tp = '\0';
-			nextp = tp + 1;
-		}
-
-		aclp->acl_cnt += 1;
-
-		/*
-		 * get additional memory:
-		 * can be more efficient by allocating a bigger block
-		 * each time.
-		 */
-		if (aclp->acl_cnt > 1)
-			tmpaclp = (ace_t *)realloc(aclp->acl_aclp,
-			    sizeof (ace_t) * (aclp->acl_cnt));
-		else
-			tmpaclp = (ace_t *)malloc(sizeof (ace_t));
-		if (tmpaclp == NULL) {
-			free(allocp);
-			acl_free(aclp);
-			return (EACL_MEM_ERROR);
-		}
-		aclp->acl_aclp = tmpaclp;
-		tmpaclp = (ace_t *)aclp->acl_aclp + (aclp->acl_cnt - 1);
-
-		/* look for entry type field */
-		tp = strchr(aclimport, ':');
-		if (tp == NULL) {
-			free(allocp);
-			acl_free(aclp);
-			return (EACL_ENTRY_ERROR);
-		} else
-			*tp = '\0';
-		if (strcmp(aclimport, "owner@") == 0) {
-			entry_type = ACE_OWNER;
-		} else if (strcmp(aclimport, "group@") == 0) {
-			entry_type = ACE_GROUP | ACE_IDENTIFIER_GROUP;
-		} else if (strcmp(aclimport, "everyone@") == 0) {
-			entry_type = ACE_EVERYONE;
-		} else if (strcmp(aclimport, "group") == 0) {
-			entry_type = ACE_IDENTIFIER_GROUP;
-		} else if (strcmp(aclimport, "user") == 0) {
-			entry_type = 0;
-		} else {
-			free(allocp);
-			acl_free(aclp);
-			return (EACL_ENTRY_ERROR);
-		}
-
-		/*
-		 * If not an abstraction owner@, group@ or everyone@
-		 * then we must have a user/group name next
-		 */
-
-		if (entry_type == 0 || entry_type == ACE_IDENTIFIER_GROUP) {
-			fieldp = tp + 1;
-			tp = strchr(fieldp, ':');
-			if (tp == NULL) {
-				free(allocp);
-				acl_free(aclp);
-				return (EACL_INVALID_USER_GROUP);
-			} else
-				*tp = '\0';
-			if (fieldp != tp) {
-				/*
-				 * The second field could be empty. We only care
-				 * when the field has user/group name.
-				 */
-				if (entry_type == 0) {
-					/*
-					 * The reentrant interface getpwnam_r()
-					 * is uncommitted and subject to
-					 * change. Use the friendlier interface
-					 * getpwnam().
-					 */
-					error = 0;
-					passwdp = getpwnam(fieldp);
-					if (passwdp == NULL) {
-						error = acl_str_to_id(
-						    fieldp, &id);
-					} else {
-						id = passwdp->pw_uid;
-					}
-
-					if (error) {
-						free(allocp);
-						acl_free(aclp);
-						return (error);
-					}
-				} else {
-					error = 0;
-					if (entry_type ==
-					    ACE_IDENTIFIER_GROUP) {
-						groupp = getgrnam(fieldp);
-						if (groupp == NULL) {
-							/* no group? */
-							error = acl_str_to_id(
-							    fieldp, &id);
-						} else
-							id = groupp->gr_gid;
-
-					} else if ((entry_type == ACE_OWNER) ||
-					    (entry_type ==
-					    (ACE_IDENTIFIER_GROUP|ACE_GROUP)) ||
-					    (entry_type != ACE_EVERYONE)) {
-						error = EACL_FIELD_NOT_BLANK;
-					} else {
-						error = EACL_ENTRY_ERROR;
-					}
-
-					if (error) {
-						free(allocp);
-						acl_free(aclp);
-						return (error);
-					}
-				}
-			}
-		} else {
-			id = -1;
-		}
-
-		/* next field: permission */
-		fieldp = tp + 1;
-		tp = strchr(fieldp, ':');
-		if (tp == NULL) {
-			free(allocp);
-			acl_free(aclp);
-			return (EACL_PERM_MASK_ERROR);
-		} else
-			*tp = '\0';
-
-		perm = 0;
-
-		perm_tok = strtok(fieldp, "/");
-		if (perm_tok == NULL) {
-			perm = 0;
-		} else {
-			do {
-				if (ace_permask(perm_tok, &perm) != 0) {
-					free(allocp);
-					acl_free(aclp);
-					return (EACL_PERM_MASK_ERROR);
-				}
-			} while (perm_tok = strtok(NULL, "/"));
-		}
-
-		/* grab allow/deny */
-		fieldp = tp + 1;
-		tp = strchr(fieldp, ':');
-		if (tp != NULL)
-			*tp = '\0';
-
-		if (strcmp(fieldp, "allow") == 0)
-			type = ACE_ACCESS_ALLOWED_ACE_TYPE;
-		else if (strcmp(fieldp, "deny") == 0)
-			type = ACE_ACCESS_DENIED_ACE_TYPE;
-		else {
-			free(allocp);
-			acl_free(aclp);
-			return (EACL_INVALID_ACCESS_TYPE);
-		}
-
-		/* grab option inherit flags */
-
-		iflags = 0;
-		if (tp != NULL) {
-			fieldp = tp + 1;
-			if (fieldp != NULL) {
-				*tp = '\0';
-				str = fieldp;
-				if (build_iflags(str, &iflags) != 0) {
-					free(allocp);
-					acl_free(aclp);
-					return (EACL_INHERIT_ERROR);
-				}
-			} else {
-				free(allocp);
-				acl_free(aclp);
-				return (EACL_UNKNOWN_DATA);
-			}
-		}
-		/* slap fields into ace_t structure */
-
-		tmpaclp->a_flags = entry_type;
-		tmpaclp->a_flags |= iflags;
-		tmpaclp->a_who = id;
-		tmpaclp->a_access_mask = perm;
-		tmpaclp->a_type = type;
-		aclimport = nextp;
-	}
-	free(allocp);
-	*ret_aclp = aclp;
-	return (0);
-}
-
-char
-*acl_totext(acl_t *aclp)
-{
 	if (aclp == NULL)
 		return (NULL);
 
 	switch (aclp->acl_type) {
 	case ACE_T:
-		return (ace_acltotext(aclp));
+		txtp = ace_acltotext(aclp, flags);
+		break;
 	case ACLENT_T:
-		return (acltotext(aclp->acl_aclp, aclp->acl_cnt));
+		txtp = aclent_acltotext(aclp->acl_aclp, aclp->acl_cnt, flags);
+		break;
 	}
-	return (NULL);
+
+	return (txtp);
 }
 
 int
 acl_fromtext(const char *acltextp, acl_t **ret_aclp)
 {
-	acl_t *aclp;
-	char *token;
-	char *ptr;
-	char *textp;
-	enum acl_type flavor;
-	int colon_cnt = 0;
+	int error;
+	char *buf;
+
+	buf = malloc(strlen(acltextp) + 2);
+	if (buf == NULL)
+		return (EACL_MEM_ERROR);
+	strcpy(buf, acltextp);
+	strcat(buf, "\n");
+	yybuf = buf;
+	yyreset();
+	error = yyparse();
+	free(buf);
+
+	if (yyacl) {
+		if (error == 0)
+			*ret_aclp = yyacl;
+		else {
+			acl_free(yyacl);
+		}
+		yyacl = NULL;
+	}
+	return (error);
+}
+
+int
+acl_parse(const char *acltextp, acl_t **aclp)
+{
 	int error;
 
-	/*
-	 * first try and detect what type of acl entries we have
-	 *
-	 * aclent_t can have 1, 2 or 3 colons
-	 * if 3 then must have word default:
-	 *
-	 * ace_t can have 2, 3 or 4
-	 * for 2 then must be owner@, group@ or everyone@
-	 */
-
-	textp = strdup(acltextp);
-	if (textp == NULL)
-		return (-1);
-
-	token = strtok(textp, ",");
-	if (token == NULL) {
-		free(textp);
-		return (-1);
-	}
-
-	for (ptr = token; *ptr; ptr++) {
-		if (*ptr == ':')
-			colon_cnt++;
-	}
-
-	if (colon_cnt == 1 || colon_cnt == 2) {
-		if ((strncmp(acltextp, "owner@", 6) == 0) ||
-		    (strncmp(acltextp, "group@", 6) == 0) ||
-		    (strncmp(acltextp, "everyone@", 9) == 0))
-			flavor = ACE_T;
-		else
-			flavor = ACLENT_T;
-	} else if (colon_cnt == 3) {
-		ptr = strtok(token, ":");
-		if (ptr == NULL) {
-			free(textp);
-			return (EACL_MISSING_FIELDS);
-		} else if (strcmp(ptr, "default") == 0) {
-			flavor = ACLENT_T;
-		} else {
-			flavor = ACE_T;
-		}
-	} else if (colon_cnt == 4) {
-		flavor = ACE_T;
-	} else {
-		free(textp);
-		return (EACL_MISSING_FIELDS);
-	}
-
-
-	free(textp);
-
-	if (flavor == ACLENT_T)
-		error = aclent_aclfromtext((char *)acltextp, &aclp);
-	else
-		error = ace_aclfromtext((char *)acltextp, &aclp);
-
-	*ret_aclp = aclp;
+	yyinteractive = 1;
+	error = acl_fromtext(acltextp, aclp);
+	yyinteractive = 0;
 	return (error);
+}
+
+static void
+ace_compact_printacl(acl_t *aclp)
+{
+	int cnt;
+	ace_t *acep;
+	char *endp;
+	char buf[ACE_ENTRY_SIZE];
+
+	for (cnt = 0, acep = aclp->acl_aclp;
+	    cnt != aclp->acl_cnt; cnt++, acep++) {
+		buf[0] = '\0';
+		(void) printf("    %14s:", ace_type_txt(buf, &endp, acep));
+		(void) printf("%s:", ace_perm_txt(endp, &endp,
+		    acep->a_access_mask, acep->a_flags,
+		    aclp->acl_flags & ACL_IS_DIR, ACL_COMPACT_FMT));
+		(void) printf("%s:",
+		    ace_inherit_txt(endp, &endp, acep->a_flags,
+			ACL_COMPACT_FMT));
+		(void) printf("%s\n", ace_access_txt(endp, &endp,
+		    acep->a_type));
+	}
+}
+
+static void
+ace_printacl(acl_t *aclp, int cols, int compact)
+{
+	int  slot = 0;
+	char *token;
+	char *acltext;
+
+	if (compact) {
+		ace_compact_printacl(aclp);
+		return;
+	}
+
+	acltext = acl_totext(aclp, 0);
+
+	if (acltext == NULL)
+		return;
+
+	token = strtok(acltext, ",");
+	if (token == NULL) {
+		free(acltext);
+		return;
+	}
+
+	do {
+		(void) printf("     %d:", slot++);
+		split_line(token, cols - 5);
+	} while (token = strtok(NULL, ","));
+	free(acltext);
+}
+
+/*
+ * pretty print an ACL.
+ * For aclent_t ACL's the format is
+ * similar to the old format used by getfacl,
+ * with the addition of adding a "slot" number
+ * before each entry.
+ *
+ * for ace_t ACL's the cols variable will break up
+ * the long lines into multiple lines and will also
+ * print a "slot" number.
+ */
+void
+acl_printacl(acl_t *aclp, int cols, int compact)
+{
+
+	switch (aclp->acl_type) {
+	case ACLENT_T:
+		aclent_printacl(aclp);
+		break;
+	case ACE_T:
+		ace_printacl(aclp, cols, compact);
+		break;
+	}
+}
+
+typedef struct value_table {
+	char		p_letter; /* perm letter such as 'r' */
+	uint32_t	p_value; /* value for perm when pletter found */
+} value_table_t;
+
+#define	ACE_PERM_COUNT 14
+
+/*
+ * The permission tables are layed out in positional order
+ * a '-' character will indicate a permission at a given
+ * position is not specified.  The '-' is not part of the
+ * table, but will be checked for in the permission computation
+ * routine.
+ */
+value_table_t ace_perm_table[ACE_PERM_COUNT] = {
+	{ 'r', ACE_READ_DATA},
+	{ 'w', ACE_WRITE_DATA},
+	{ 'x', ACE_EXECUTE},
+	{ 'p', ACE_APPEND_DATA},
+	{ 'd', ACE_DELETE},
+	{ 'D', ACE_DELETE_CHILD},
+	{ 'a', ACE_READ_ATTRIBUTES},
+	{ 'A', ACE_WRITE_ATTRIBUTES},
+	{ 'R', ACE_READ_NAMED_ATTRS},
+	{ 'W', ACE_WRITE_NAMED_ATTRS},
+	{ 'c', ACE_READ_ACL},
+	{ 'C', ACE_WRITE_ACL},
+	{ 'o', ACE_WRITE_OWNER},
+	{ 's', ACE_SYNCHRONIZE}
+};
+
+#define	ACLENT_PERM_COUNT 3
+
+value_table_t aclent_perm_table[ACLENT_PERM_COUNT] = {
+	{ 'r', S_IROTH},
+	{ 'w', S_IWOTH},
+	{ 'x', S_IXOTH}
+};
+
+#define	IFLAG_COUNT	6
+value_table_t inherit_table[IFLAG_COUNT] = {
+	{'f', ACE_FILE_INHERIT_ACE},
+	{'d', ACE_DIRECTORY_INHERIT_ACE},
+	{'i', ACE_INHERIT_ONLY_ACE},
+	{'n', ACE_NO_PROPAGATE_INHERIT_ACE},
+	{'S', ACE_SUCCESSFUL_ACCESS_ACE_FLAG},
+	{'F', ACE_FAILED_ACCESS_ACE_FLAG}
+};
+
+/*
+ * compute value from a permission table or inheritance table
+ * based on string passed in.  If positional is set then
+ * string must match order in permtab, otherwise any order
+ * is allowed.
+ */
+int
+compute_values(value_table_t *permtab, int count,
+    char *permstr, int positional, uint32_t *mask)
+{
+	uint32_t perm_val = 0;
+	char *pstr;
+	int i, found;
+
+	if (count < 0)
+		return (1);
+
+	if (positional) {
+		for (i = 0, pstr = permstr; i != count && pstr &&
+		    *pstr; i++, pstr++) {
+			if (*pstr == permtab[i].p_letter) {
+				perm_val |= permtab[i].p_value;
+			} else if (*pstr != '-') {
+				return (1);
+			}
+		}
+	} else {  /* random order single letters with no '-' */
+		for (pstr = permstr; pstr && *pstr; pstr++) {
+			for (found = 0, i = 0; i != count; i++) {
+				if (*pstr == permtab[i].p_letter) {
+					perm_val |= permtab[i].p_value;
+					found = 1;
+					break;
+				}
+			}
+			if (found == 0)
+				return (1);
+		}
+	}
+
+	*mask = perm_val;
+	return (0);
+}
+
+/*
+ * compute value for inheritance flags.
+ */
+int
+compute_ace_inherit(char *str, uint32_t *imask)
+{
+	int error;
+	int positional = 0;
+
+	if (strlen(str) == IFLAG_COUNT)
+		positional = 1;
+
+	error = compute_values(inherit_table, IFLAG_COUNT,
+	    str, positional, imask);
+
+	if (error)
+		return (EACL_INHERIT_ERROR);
+
+	return (error);
+}
+
+
+/*
+ * compute value for ACE permissions.
+ */
+int
+compute_ace_perms(char *str, uint32_t *mask)
+{
+	int positional = 0;
+	int error;
+
+	if (strlen(str) == ACE_PERM_COUNT)
+		positional = 1;
+
+	error = compute_values(ace_perm_table, ACE_PERM_COUNT,
+	    str, positional, mask);
+
+	if (error && positional) {
+		/*
+		 * If positional was set, then make sure permissions
+		 * aren't actually valid in non positional case where
+		 * all permissions are specified, just in random order.
+		 */
+		error = compute_values(ace_perm_table,
+		    ACE_PERM_COUNT, str, 0, mask);
+	}
+	if (error)
+		error = EACL_PERM_MASK_ERROR;
+
+	return (error);
+}
+
+
+
+/*
+ * compute values for aclent permissions.
+ */
+int
+compute_aclent_perms(char *str, o_mode_t *mask)
+{
+	int error;
+	uint32_t pmask;
+
+	if (strlen(str) != ACLENT_PERM_COUNT)
+		return (EACL_PERM_MASK_ERROR);
+
+	*mask = 0;
+	error = compute_values(aclent_perm_table, ACLENT_PERM_COUNT,
+	    str, 1, &pmask);
+	if (error == 0) {
+		*mask = (o_mode_t)pmask;
+	} else
+		error = EACL_PERM_MASK_ERROR;
+	return (error);
+}
+
+/*
+ * determine ACE permissions.
+ */
+int
+ace_perm_mask(struct acl_perm_type *aclperm, uint32_t *mask)
+{
+	int error;
+
+	if (aclperm->perm_style == PERM_TYPE_EMPTY) {
+		*mask = 0;
+		return (0);
+	}
+
+	if (aclperm->perm_style == PERM_TYPE_ACE) {
+		*mask = aclperm->perm_val;
+		return (0);
+	}
+
+	error = compute_ace_perms(aclperm->perm_str, mask);
+	if (error) {
+		acl_error(gettext("Invalid permission(s) '%s' specified\n"),
+		    aclperm->perm_str);
+		return (EACL_PERM_MASK_ERROR);
+	}
+
+	return (0);
 }

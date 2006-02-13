@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
@@ -136,7 +136,7 @@ end
 
 function	acl_totext
 include		<sys/acl.h>
-declaration	char *acl_totext(acl_t *acl);
+declaration	char *acl_totext(acl_t *acl, int flags);
 version		SUNW_1.2
 exception	$return == 0
 end
@@ -167,7 +167,7 @@ end
 
 function	acl_printacl
 include		<sys/acl.h>
-declaration	void acl_printacl(acl_t *aclp, int cols);
+declaration	void acl_printacl(acl_t *aclp, int cols, int compact);
 version		SUNWprivate_1.1
 end
 
@@ -217,5 +217,17 @@ end
 function	acl_data
 include		<aclutils.h>
 declaration	void *acl_data(acl_t *);
+version		SUNWprivate_1.1
+end
+
+function	acl_error
+include		<aclutils.h>
+declaration	void acl_error(const char *, ...)
+version		SUNWprivate_1.1
+end
+
+function	acl_parse
+include		<aclutils.h>
+declaration	void acl_parse(char *textp, acl_t **);
 version		SUNWprivate_1.1
 end

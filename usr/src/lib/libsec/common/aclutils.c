@@ -36,6 +36,7 @@
 #include <sys/acl.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <sys/varargs.h>
 #include <locale.h>
 #include <aclutils.h>
 #include <acl_common.h>
@@ -1136,226 +1137,6 @@ acl_addentries(acl_t *acl1, acl_t *acl2, int where)
 	return (0);
 }
 
-static void
-aclent_perms(int perm, char *txt_perms)
-{
-	if (perm & S_IROTH)
-		txt_perms[0] = 'r';
-	else
-		txt_perms[0] = '-';
-	if (perm & S_IWOTH)
-		txt_perms[1] = 'w';
-	else
-		txt_perms[1] = '-';
-	if (perm & S_IXOTH)
-		txt_perms[2] = 'x';
-	else
-		txt_perms[2] = '-';
-	txt_perms[3] = '\0';
-}
-
-static char *
-pruname(uid_t uid)
-{
-	struct passwd	*passwdp;
-	static char	uidp[10];	/* big enough */
-
-	passwdp = getpwuid(uid);
-	if (passwdp == (struct passwd *)NULL) {
-		/* could not get passwd information: display uid instead */
-		(void) sprintf(uidp, "%ld", (long)uid);
-		return (uidp);
-	} else
-		return (passwdp->pw_name);
-}
-
-static char *
-prgname(gid_t gid)
-{
-	struct group	*groupp;
-	static char	gidp[10];	/* big enough */
-
-	groupp = getgrgid(gid);
-	if (groupp == (struct group *)NULL) {
-		/* could not get group information: display gid instead */
-		(void) sprintf(gidp, "%ld", (long)gid);
-		return (gidp);
-	} else
-		return (groupp->gr_name);
-}
-static void
-aclent_printacl(acl_t *aclp)
-{
-	aclent_t *tp;
-	int aclcnt;
-	int mask;
-	int slot = 0;
-	char perm[4];
-
-	/* display ACL: assume it is sorted. */
-	aclcnt = aclp->acl_cnt;
-	for (tp = aclp->acl_aclp; aclcnt--; tp++) {
-		if (tp->a_type == CLASS_OBJ)
-			mask = tp->a_perm;
-	}
-	aclcnt = aclp->acl_cnt;
-	for (tp = aclp->acl_aclp; aclcnt--; tp++) {
-		(void) printf("     %d:", slot++);
-		switch (tp->a_type) {
-		case USER:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("user:%s:%s\t\t",
-			    pruname(tp->a_id), perm);
-			aclent_perms((tp->a_perm & mask), perm);
-			(void) printf("#effective:%s\n", perm);
-			break;
-		case USER_OBJ:
-			/* no need to display uid */
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("user::%s\n", perm);
-			break;
-		case GROUP:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("group:%s:%s\t\t",
-			    prgname(tp->a_id), perm);
-			aclent_perms(tp->a_perm & mask, perm);
-			(void) printf("#effective:%s\n", perm);
-			break;
-		case GROUP_OBJ:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("group::%s\t\t", perm);
-			aclent_perms(tp->a_perm & mask, perm);
-			(void) printf("#effective:%s\n", perm);
-			break;
-		case CLASS_OBJ:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("mask:%s\n", perm);
-			break;
-		case OTHER_OBJ:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("other:%s\n", perm);
-			break;
-		case DEF_USER:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("default:user:%s:%s\n",
-			    pruname(tp->a_id), perm);
-			break;
-		case DEF_USER_OBJ:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("default:user::%s\n", perm);
-			break;
-		case DEF_GROUP:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("default:group:%s:%s\n",
-			    prgname(tp->a_id), perm);
-			break;
-		case DEF_GROUP_OBJ:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("default:group::%s\n", perm);
-			break;
-		case DEF_CLASS_OBJ:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("default:mask:%s\n", perm);
-			break;
-		case DEF_OTHER_OBJ:
-			aclent_perms(tp->a_perm, perm);
-			(void) printf("default:other:%s\n", perm);
-			break;
-		default:
-			(void) fprintf(stderr,
-			    gettext("unrecognized entry\n"));
-			break;
-		}
-	}
-}
-
-static void
-split_line(char *str, int cols)
-{
-	char *ptr;
-	int len;
-	int i;
-	int last_split;
-	char pad[11];
-	int pad_len;
-
-	len = strlen(str);
-	ptr = str;
-	(void) strcpy(pad, "");
-	pad_len = 0;
-
-	ptr = str;
-	last_split = 0;
-	for (i = 0; i != len; i++) {
-		if ((i + pad_len + 4) >= cols) {
-			(void) printf("%s%.*s\n", pad, last_split, ptr);
-			ptr = &ptr[last_split];
-			len = strlen(ptr);
-			i = 0;
-			pad_len = 4;
-			(void) strcpy(pad, "         ");
-		} else {
-			if (ptr[i] == '/' || ptr[i] == ':') {
-				last_split = i;
-			}
-		}
-	}
-	if (i == len) {
-		(void) printf("%s%s\n", pad, ptr);
-	}
-}
-
-static void
-ace_printacl(acl_t *aclp, int cols)
-{
-	int  slot = 0;
-	char *token;
-	char *acltext;
-
-	acltext = acl_totext(aclp);
-
-	if (acltext == NULL)
-		return;
-
-	token = strtok(acltext, ",");
-	if (token == NULL) {
-		free(acltext);
-		return;
-	}
-
-	do {
-		(void) printf("     %d:", slot++);
-		split_line(token, cols - 5);
-	} while (token = strtok(NULL, ","));
-	free(acltext);
-}
-
-/*
- * pretty print an ACL.
- * For aclent_t ACL's the format is
- * similar to the old format used by getfacl,
- * with the addition of adding a "slot" number
- * before each entry.
- *
- * for ace_t ACL's the cols variable will break up
- * the long lines into multiple lines and will also
- * print a "slot" number.
- */
-void
-acl_printacl(acl_t *aclp, int cols)
-{
-
-	switch (aclp->acl_type) {
-	case ACLENT_T:
-		aclent_printacl(aclp);
-		break;
-	case ACE_T:
-		ace_printacl(aclp, cols);
-		break;
-	}
-}
-
-
 /*
  * return text for an ACL error.
  */
@@ -1365,10 +1146,10 @@ acl_strerror(int errnum)
 	switch (errnum) {
 	case EACL_GRP_ERROR:
 		return (dgettext(TEXT_DOMAIN,
-		    "There is more than one user group owner entry"));
+		    "There is more than one group or default group entry"));
 	case EACL_USER_ERROR:
 		return (dgettext(TEXT_DOMAIN,
-		    "There is more than one user owner entry"));
+		    "There is more than one user or default user entry"));
 	case EACL_OTHER_ERROR:
 		return (dgettext(TEXT_DOMAIN,
 		    "There is more than one other entry"));
@@ -1430,4 +1211,20 @@ acl_strerror(int errnum)
 		errno = EINVAL;
 		return (dgettext(TEXT_DOMAIN, "Unknown error"));
 	}
+}
+
+extern int yyinteractive;
+
+/* PRINTFLIKE1 */
+void
+acl_error(const char *fmt, ...)
+{
+	va_list va;
+
+	if (yyinteractive == 0)
+		return;
+
+	va_start(va, fmt);
+	(void) vfprintf(stderr, fmt, va);
+	va_end(va);
 }

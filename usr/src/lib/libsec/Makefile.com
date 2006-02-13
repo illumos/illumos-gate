@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -31,9 +31,14 @@
 LIBRARY= libsec.a
 VERS= .1
 
+YFLAGS =	-d -v -b acl
+LFLAGS = 	-t
 OBJS_SHARED= acl_common.o
+GENERATED_SRCS = acl.tab.o acl_lex.o
 OBJS_COMMON= aclcheck.o aclmode.o aclsort.o acltext.o aclutils.o
-OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED)
+OBJECTS= $(OBJS_COMMON) $(OBJS_SHARED) $(GENERATED_SRCS)
+CLEANFILES += acl_lex.c acl.tab.c acl.tab.h
+LINTSRCS = $(OBJS_COMMON)
 
 # include library definitions
 include ../../Makefile.lib
@@ -41,8 +46,8 @@ include ../../Makefile.lib
 LIBS =		$(DYNLIB) $(LINTLIB)
 
 CFLAGS +=	$(CCVERBOSE)
-CPPFLAGS +=	-I$(SRCDIR) -I../../../common/acl
-LDLIBS += -lc 
+CPPFLAGS +=	-I$(SRCDIR) -I. -I../../../common/acl
+LDLIBS += -lc
 
 # install this library in the root filesystem
 include ../../Makefile.rootfs
@@ -65,5 +70,11 @@ lint: lintcheck
 pics/%.o: ../../../common/acl/%.c
 	$(COMPILE.c) -o $@ $<
 	$(POST_PROCESS_O)
+
+acl.tab.c acl.tab.h:	$(SRCDIR)/acl.y
+	$(YACC) $(YFLAGS) $(SRCDIR)/acl.y
+
+acl_lex.c: $(SRCDIR)/acl_lex.l acl.tab.h
+	$(LEX) $(LFLAGS) $(SRCDIR)/acl_lex.l > $@
 
 include ../../Makefile.targ
