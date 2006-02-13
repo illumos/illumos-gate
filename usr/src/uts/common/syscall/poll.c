@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -784,11 +784,21 @@ retry:
 				 * Object (fd) is associated with an event port,
 				 * => send event notification to the port.
 				 */
-				pkevp->portkev_events |= events &
-				    (pdp->pd_events | POLLHUP | POLLERR);
+				ASSERT(pkevp->portkev_flags
+				    & PORT_ALLOC_CACHED);
+				mutex_enter(&pkevp->portkev_lock);
 				if (pkevp->portkev_flags & PORT_KEV_VALID) {
 					pkevp->portkev_flags &= ~PORT_KEV_VALID;
+					pkevp->portkev_events |= events &
+					    (pdp->pd_events | POLLHUP |
+					    POLLERR);
+					/*
+					 * portkev_lock mutex will be released
+					 * by port_send_event()
+					 */
 					(void) port_send_event(pdp->pd_portev);
+				} else {
+					mutex_exit(&pkevp->portkev_lock);
 				}
 				continue;
 			}

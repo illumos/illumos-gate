@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -76,6 +76,9 @@ port_send_event(port_kevent_t *pkevp)
 
 	if (pkevp->portkev_flags & PORT_KEV_DONEQ) {
 		/* Event already in the port queue */
+		if (pkevp->portkev_flags & PORT_ALLOC_CACHED) {
+			mutex_exit(&pkevp->portkev_lock);
+		}
 		mutex_exit(&portq->portq_mutex);
 		return (0);
 	}
@@ -90,6 +93,10 @@ port_send_event(port_kevent_t *pkevp)
 	 */
 	portq->portq_flags &= ~PORTQ_WAIT_EVENTS;
 	pkevp->portkev_flags |= PORT_KEV_DONEQ;		/* event enqueued */
+
+	if (pkevp->portkev_flags & PORT_ALLOC_CACHED) {
+		mutex_exit(&pkevp->portkev_lock);
+	}
 
 	/* Check if thread is in port_close() waiting for outstanding events */
 	if (portq->portq_flags & PORTQ_CLOSE) {
@@ -180,6 +187,7 @@ port_alloc_event(int port, int flags, int source, port_kevent_t **pkevpp)
 		return (ENOMEM);
 	}
 	atomic_add_32(&pp->port_curr, 1);
+	mutex_init(&(*pkevpp)->portkev_lock, NULL, MUTEX_DEFAULT, NULL);
 	(*pkevpp)->portkev_source = source;
 	(*pkevpp)->portkev_flags = flags;
 	(*pkevpp)->portkev_pid = curproc->p_pid;
@@ -224,6 +232,7 @@ port_alloc_event_local(port_t *pp, int source, int flags,
 		return (ENOMEM);
 
 	atomic_add_32(&pp->port_curr, 1);
+	mutex_init(&(*pkevpp)->portkev_lock, NULL, MUTEX_DEFAULT, NULL);
 	(*pkevpp)->portkev_flags = flags;
 	(*pkevpp)->portkev_port = pp;
 	(*pkevpp)->portkev_source = source;
@@ -260,6 +269,7 @@ port_alloc_event_block(port_t *pp, int source, int flags,
 
 	*pkevp = kmem_cache_alloc(port_control.pc_cache, KM_SLEEP);
 	atomic_add_32(&pp->port_curr, 1);
+	mutex_init(&(*pkevp)->portkev_lock, NULL, MUTEX_DEFAULT, NULL);
 	(*pkevp)->portkev_flags = flags;
 	(*pkevp)->portkev_port = pp;
 	(*pkevp)->portkev_source = source;
@@ -380,6 +390,7 @@ port_free_event_local(port_kevent_t *pkevp, int counter)
 	pkevp->portkev_callback = NULL;
 	pkevp->portkev_flags = 0;
 	pkevp->portkev_port = NULL;
+	mutex_destroy(&pkevp->portkev_lock);
 	kmem_cache_free(port_control.pc_cache, pkevp);
 
 	/* Check if blocking calls are waiting for event slots */
@@ -446,7 +457,14 @@ port_pcache_remove_fd(port_fdcache_t *pcp, portfd_t *pfd)
 	cpdp = PFTOD(*bucket);
 	if (pdp == cpdp) {
 		*bucket = PDTOF(pdp->pd_hashnext);
-		pcp->pc_fdcount--;
+		if (--pcp->pc_fdcount == 0) {
+			/*
+			 * signal the thread which may have blocked in
+			 * port_close_sourcefd() on lastclose waiting
+			 * for pc_fdcount to drop to 0.
+			 */
+			cv_signal(&pcp->pc_lclosecv);
+		}
 		kmem_free(pfd, sizeof (portfd_t));
 		return;
 	}
@@ -457,7 +475,14 @@ port_pcache_remove_fd(port_fdcache_t *pcp, portfd_t *pfd)
 		if (cpdp == pdp) {
 			/* polldat struct found */
 			lpdp->pd_hashnext = pdp->pd_hashnext;
-			pcp->pc_fdcount--;
+			if (--pcp->pc_fdcount == 0) {
+				/*
+				 * signal the thread which may have blocked in
+				 * port_close_sourcefd() on lastclose waiting
+				 * for pc_fdcount to drop to 0.
+				 */
+				cv_signal(&pcp->pc_lclosecv);
+			}
 			break;
 		}
 	}
@@ -540,9 +565,10 @@ port_close_pfd(portfd_t *pfd)
 	port_t		*pp;
 	port_fdcache_t	*pcp;
 
-	/* only association owner is allowed to remove the association */
-	if (curproc->p_pid != PFTOD(pfd)->pd_portev->portkev_pid)
-		return;
+	/*
+	 * the portfd_t passed in should be for this proc.
+	 */
+	ASSERT(curproc->p_pid == PFTOD(pfd)->pd_portev->portkev_pid);
 	pp = PFTOD(pfd)->pd_portev->portkev_port;
 	pcp = pp->port_queue.portq_pcp;
 	mutex_enter(&pcp->pc_lock);

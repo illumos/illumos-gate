@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -738,9 +738,6 @@ port_create(int *fdp)
 		return (EMFILE);
 	}
 
-	/* set user file pointer */
-	if (fdp != NULL)
-		setf(*fdp, fp);
 	mutex_exit(&fp->f_tlock);
 
 	pp->port_fd = *fdp;
@@ -751,6 +748,8 @@ port_create(int *fdp)
 
 	/* initializes port private data */
 	port_init(pp);
+	/* set user file pointer */
+	setf(*fdp, fp);
 	return (0);
 }
 

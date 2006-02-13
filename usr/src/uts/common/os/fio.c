@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,7 +80,7 @@ static uint32_t afd_wait;	/* count of waits on non-zero ref count */
 kmem_cache_t *file_cache;
 static int vpsetattr(vnode_t *, vattr_t *, int);
 
-static void port_close_fd(portfd_t *, int);
+static void port_close_fd(portfd_t *);
 
 /*
  * File descriptor allocation.
@@ -746,7 +746,7 @@ closeandsetf(int fd, file_t *newfp)
 	if (fpip != NULL)
 		pollcacheclean(fpip, fd);
 	if (pfd)
-		port_close_fd(pfd, fd);
+		port_close_fd(pfd);
 
 	/*
 	 * Keep the file descriptor entry reserved across the closef().
@@ -850,9 +850,11 @@ closeall(uf_info_t *fip)
 		if ((fp = ufp->uf_file) != NULL) {
 			ufp->uf_file = NULL;
 			if (ufp->uf_portfd != NULL) {
+				portfd_t *pfd;
 				/* remove event port association */
-				port_close_fd(ufp->uf_portfd, fd);
+				pfd = ufp->uf_portfd;
 				ufp->uf_portfd = NULL;
+				port_close_fd(pfd);
 			}
 			ASSERT(ufp->uf_fpollinfo == NULL);
 			(void) closef(fp);
@@ -1354,7 +1356,7 @@ close_exec(uf_info_t *fip)
 			if (fpip != NULL)
 				pollcacheclean(fpip, fd);
 			if (pfd)
-				port_close_fd(pfd, fd);
+				port_close_fd(pfd);
 			(void) closef(fp);
 		}
 	}
@@ -1676,16 +1678,18 @@ delfd_port(int fd, portfd_t *pfd)
 }
 
 static void
-port_close_fd(portfd_t *pfd, int fd)
+port_close_fd(portfd_t *pfd)
 {
 	portfd_t	*pfdn;
-	struct uf_entry *ufp;
-	uf_info_t *fip = P_FINFO(curproc);
 
-	UF_ENTER(ufp, fip, fd);
+	/*
+	 * At this point, no other thread should access
+	 * the portfd_t list for this fd. The uf_file, uf_portfd
+	 * pointers in the uf_entry_t struct for this fd would
+	 * be set to NULL.
+	 */
 	for (; pfd != NULL; pfd = pfdn) {
 		pfdn = pfd->pfd_next;
 		port_close_pfd(pfd);
 	}
-	UF_EXIT(ufp);
 }

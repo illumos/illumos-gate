@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -50,6 +50,7 @@ extern "C" {
  * Every event is associated to a port (portkev_port).
  */
 typedef	struct	port_kevent {
+	kmutex_t	portkev_lock;	/* used by PORT_SOURCE_FD source */
 	int	portkev_source;		/* event: source */
 	int	portkev_events; 	/* event: data */
 	int	portkev_flags;		/* internal flags */
@@ -109,6 +110,7 @@ typedef struct port_source {
  */
 typedef struct port_fdcache {
 	kmutex_t	pc_lock;	/* lock to protect portcache */
+	kcondvar_t	pc_lclosecv;
 	struct portfd	**pc_hash;	/* points to a hash table of ptrs */
 	int		pc_hashsize;	/* the size of current hash table */
 	int		pc_fdcount;	/* track how many fd's are hashed */

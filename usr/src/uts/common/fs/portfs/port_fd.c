@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -272,21 +272,28 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 		/*
 		 * Check if the re-association happens before the last
 		 * submitted event of the file descriptor was retrieved.
+		 * Clear the PORT_KEV_VALID flag if set. No new events
+		 * should get submitted after this flag is cleared.
 		 */
+		mutex_enter(&pkevp->portkev_lock);
+		if (pkevp->portkev_flags & PORT_KEV_VALID) {
+			pkevp->portkev_flags &= ~PORT_KEV_VALID;
+		}
 		if (pkevp->portkev_flags & PORT_KEV_DONEQ) {
+			mutex_exit(&pkevp->portkev_lock);
 			/*
-			 * Event was fired for this fd and it is still in
-			 * the port queue.
-			 * => remove event from port queue.
+			 * Remove any events that where already fired
+			 * for this fd and are still in the port queue.
 			 */
 			port_remove_done_event(pkevp);
+		} else {
+			mutex_exit(&pkevp->portkev_lock);
 		}
 		pkevp->portkev_user = user;
 	}
 
 	pkevp->portkev_events = 0;	/* no fired events */
 	pdp->pd_events = events;	/* events associated */
-	pkevp->portkev_flags |= PORT_KEV_VALID;	/* events can be submitted */
 
 	/*
 	 * do VOP_POLL and cache this poll fd.
@@ -340,16 +347,22 @@ port_associate_fd(port_t *pp, int source, uintptr_t object, int events,
 	 * revents was already set after the VOP_POLL above or
 	 * it was updated in port_bind_pollhead().
 	 */
+	mutex_enter(&pkevp->portkev_lock);
 	if (revents) {
+		ASSERT((pkevp->portkev_flags & PORT_KEV_DONEQ) == 0);
 		revents = revents & (pdp->pd_events | POLLHUP | POLLERR);
-		if ((pkevp->portkev_flags & PORT_KEV_DONEQ) == 0) {
-			/* send events to the event port */
-			pkevp->portkev_events = revents;
-			(void) port_send_event(pkevp);
-		} else {
-			/* update events */
-			pkevp->portkev_events |= revents;
-		}
+		/* send events to the event port */
+		pkevp->portkev_events = revents;
+		/*
+		 * port_send_event will release the portkev_lock mutex.
+		 */
+		(void) port_send_event(pkevp);
+	} else {
+		/*
+		 * events can be submitted
+		 */
+		pkevp->portkev_flags |= PORT_KEV_VALID;
+		mutex_exit(&pkevp->portkev_lock);
 	}
 
 	releasef(fd);
@@ -540,10 +553,16 @@ port_remove_portfd(polldat_t *pdp, port_fdcache_t *pcp)
 	ASSERT(MUTEX_HELD(&pcp->pc_lock));
 	pp = pdp->pd_portev->portkev_port;
 	fp = getf(pdp->pd_fd);
-	ASSERT(fp != NULL);
-	delfd_port(pdp->pd_fd, PDTOF(pdp));
-	releasef(pdp->pd_fd);
-	port_remove_fd_object(PDTOF(pdp), pp, pcp);
+	/*
+	 * If we did not get the fp for pd_fd but its portfd_t
+	 * still exist in the cache, it means the pd_fd is being
+	 * closed by some other thread which will also free the portfd_t.
+	 */
+	if (fp != NULL) {
+		delfd_port(pdp->pd_fd, PDTOF(pdp));
+		releasef(pdp->pd_fd);
+		port_remove_fd_object(PDTOF(pdp), pp, pcp);
+	}
 }
 
 /*
@@ -580,11 +599,6 @@ port_close_sourcefd(void *arg, int port, pid_t pid, int lastclose)
 		return;
 
 	mutex_enter(&pcp->pc_lock);
-	if (lastclose) {
-		/* event port vnode will be destroyed -> remove everything */
-		pp->port_queue.portq_pcp = NULL;
-	}
-
 	/*
 	 * Scan the cache and free all allocated portfd_t and port_kevent_t
 	 * structures.
@@ -602,6 +616,20 @@ port_close_sourcefd(void *arg, int port, pid_t pid, int lastclose)
 				port_remove_portfd(pdp, pcp);
 			}
 		}
+	}
+	if (lastclose) {
+		/*
+		 * Wait for all the portfd's to be freed.
+		 * The remaining portfd_t's are the once we did not
+		 * free in port_remove_portfd since some other thread
+		 * is closing the fd. These threads will free the portfd_t's
+		 * once we drop the pc_lock mutex.
+		 */
+		while (pcp->pc_fdcount) {
+			(void) cv_wait_sig(&pcp->pc_lclosecv, &pcp->pc_lock);
+		}
+		/* event port vnode will be destroyed -> remove everything */
+		pp->port_queue.portq_pcp = NULL;
 	}
 	mutex_exit(&pcp->pc_lock);
 	/*
