@@ -6089,6 +6089,34 @@ mondo_loop() {
 				disable_boot_service
 			fi
 		fi
+
+		# Check for damage due to CR 6379341.  This was actually fixed
+		# back in snv_24, but users BFUing from an S10 build up to
+		# Nevada can still encounter it.
+		rzi=$root/etc/zones/index
+		if [ -f $rzi ]; then
+			# Look for duplicated UUIDs.  If there are any, then
+			# just wipe them out.
+			if nawk -F: '
+				/^\#/ || NF != 4 { print $0; next; }
+				{
+					if (flags[$4])
+						sub(/:[-0-9a-z]*$/,":");
+					print $0;
+					flags[$4]=1;
+				}
+			' < $rzi > ${rzi}.bfu.$$; then
+				if cmp -s $rzi ${rzi}.bfu.$$; then
+					rm -f ${rzi}.bfu.$$
+				else
+					chown root:sys ${rzi}.bfu.$$
+					chmod 644 ${rzi}.bfu.$$
+					mv ${rzi}.bfu.$$ $rzi
+				fi
+			else
+				rm -f ${rzi}.bfu.$$
+			fi
+		fi
 	fi
 
 

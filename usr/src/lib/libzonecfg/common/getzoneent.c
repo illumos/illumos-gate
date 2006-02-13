@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -272,15 +271,14 @@ int
 putzoneent(struct zoneent *ze, zoneent_op_t operation)
 {
 	FILE *index_file, *tmp_file;
-	char *tmp_file_name, buf[MAX_INDEX_LEN], orig_buf[MAX_INDEX_LEN];
-	char zone[ZONENAME_MAX];
-	char line[MAX_INDEX_LEN];
+	char *tmp_file_name, buf[MAX_INDEX_LEN];
 	int tmp_file_desc, lock_fd, err;
-	boolean_t exists = B_FALSE, need_quotes;
-	char *cp, *p;
+	boolean_t exist, need_quotes;
+	char *cp;
 	char path[MAXPATHLEN];
 	char uuidstr[UUID_PRINTABLE_STRING_LENGTH];
-	size_t tlen;
+	size_t tlen, namelen;
+	const char *zone_name, *zone_state, *zone_path, *zone_uuid;
 
 	assert(ze != NULL);
 	if (operation == PZE_ADD &&
@@ -324,104 +322,128 @@ putzoneent(struct zoneent *ze, zoneent_op_t operation)
 		goto error;
 	}
 
-	/*
-	 * We need to quote a path which contains a ":"; this should only
-	 * affect the zonepath, as zone names do not allow such characters,
-	 * and zone states do not have them either.  Same with double-quotes
-	 * themselves: they are not allowed in zone names, and do not occur
-	 * in zone states, and in theory should never occur in a zonepath
-	 * since zonecfg does not support a method for escaping them.
-	 */
-	need_quotes = (strchr(ze->zone_path, ':') != NULL);
-
-	/*
-	 * If this zone doesn't yet have a unique identifier, then give it one.
-	 */
-	if (uuid_is_null(ze->zone_uuid))
-		uuid_generate(ze->zone_uuid);
-	uuid_unparse(ze->zone_uuid, uuidstr);
-
-	(void) snprintf(line, sizeof (line), "%s:%s:%s%s%s:%s\n",
-	    ze->zone_name, zone_state_str(ze->zone_state),
-	    need_quotes ? "\"" : "", ze->zone_path, need_quotes ? "\"" : "",
-	    uuidstr);
+	exist = B_FALSE;
+	zone_name = ze->zone_name;
+	namelen = strlen(zone_name);
 	for (;;) {
 		if (fgets(buf, sizeof (buf), index_file) == NULL) {
-			if (operation == PZE_ADD && !exists)
-				(void) fputs(line, tmp_file);
+			if (operation == PZE_ADD && !exist) {
+				zone_state = zone_state_str(ze->zone_state);
+				zone_path = ze->zone_path;
+				zone_uuid = "";
+				goto add_entry;
+			}
+			/*
+			 * It's not considered an error to delete something
+			 * that doesn't exist, but we can't modify a missing
+			 * record.
+			 */
+			if (operation == PZE_MODIFY && !exist) {
+				err = Z_UPDATING_INDEX;
+				goto error;
+			}
 			break;
 		}
-		(void) strlcpy(orig_buf, buf, sizeof (orig_buf));
+
+		if (buf[0] == '#') {
+			/* skip and preserve comment lines */
+			(void) fputs(buf, tmp_file);
+			continue;
+		}
+
+		if (strncmp(buf, zone_name, namelen) != 0 ||
+		    buf[namelen] != ':') {
+			/* skip and preserve non-target lines */
+			(void) fputs(buf, tmp_file);
+			continue;
+		}
 
 		if ((cp = strpbrk(buf, "\r\n")) == NULL) {
-			/* this represents a line that's too long */
+			/* this represents a line that's too long; delete */
 			continue;
 		}
 		*cp = '\0';
-		cp = buf;
-		if (*cp == '#') {
-			/* skip comment lines */
-			(void) fputs(orig_buf, tmp_file);
-			continue;
+
+		/*
+		 * Skip over the zone name.  Because we've already matched the
+		 * target zone (above), we know for certain here that the zone
+		 * name is present and correctly formed.  No need to check.
+		 */
+		cp = strchr(buf, ':') + 1;
+
+		zone_state = gettok(&cp);
+		if (*zone_state == '\0') {
+			/* state field should not be empty */
+			err = Z_UPDATING_INDEX;
+			goto error;
 		}
-		p = gettok(&cp);
-		if (*p == '\0' || strlen(p) >= ZONENAME_MAX) {
+		zone_path = gettok(&cp);
+		zone_uuid = gettok(&cp);
+
+		switch (operation) {
+		case PZE_ADD:
+			/* can't add same zone */
+			err = Z_UPDATING_INDEX;
+			goto error;
+
+		case PZE_MODIFY:
 			/*
-			 * empty or very long zone names are not allowed
+			 * If the caller specified a new state for the zone,
+			 * then use that.  Otherwise, use the current state.
 			 */
-			continue;
-		}
-		(void) strlcpy(zone, p, ZONENAME_MAX);
-
-		if (strcmp(zone, ze->zone_name) == 0) {
-			exists = B_TRUE;		/* already there */
-			if (operation == PZE_ADD) {
-				/* can't add same zone */
-				err = Z_UPDATING_INDEX;
-				goto error;
-			} else if (operation == PZE_MODIFY) {
-				char tmp_state[ZONE_STATE_MAXSTRLEN + 1];
-				char *tmp_name;
-
-				if (ze->zone_state >= 0 &&
-				    strlen(ze->zone_path) > 0) {
-					/* use specified values */
-					(void) fputs(line, tmp_file);
-					continue;
-				}
-				/* use existing value for state */
-				p = gettok(&cp);
-				if (*p == '\0') {
-					/* state field should not be empty */
-					err = Z_UPDATING_INDEX;
-					goto error;
-				}
-				(void) strlcpy(tmp_state,
-				    (ze->zone_state < 0) ? p :
-				    zone_state_str(ze->zone_state),
-				    sizeof (tmp_state));
-
-				p = gettok(&cp);
+			if (ze->zone_state >= 0) {
+				zone_state = zone_state_str(ze->zone_state);
 
 				/*
-				 * If a new name is supplied, use it.
+				 * If the caller is uninstalling this zone,
+				 * then wipe out the uuid.  The zone's contents
+				 * are no longer known.
 				 */
-				if (strlen(ze->zone_newname) != 0)
-					tmp_name = ze->zone_newname;
-				else
-					tmp_name = ze->zone_name;
-
-				(void) fprintf(tmp_file, "%s:%s:%s%s%s:%s\n",
-				    tmp_name, tmp_state,
-				    need_quotes ? "\"" : "",
-				    (strlen(ze->zone_path) == 0) ? p :
-				    ze->zone_path, need_quotes ? "\"" : "",
-				    uuidstr);
+				if (ze->zone_state < ZONE_STATE_INSTALLED)
+					zone_uuid = "";
 			}
-			/* else if (operation == PZE_REMOVE) { no-op } */
-		} else {
-			(void) fputs(orig_buf, tmp_file);
+
+			/* If a new name is supplied, use it. */
+			if (ze->zone_newname[0] != '\0')
+				zone_name = ze->zone_newname;
+
+			if (ze->zone_path[0] != '\0')
+				zone_path = ze->zone_path;
+			break;
+
+		case PZE_REMOVE:
+		default:
+			continue;
 		}
+
+	add_entry:
+		/*
+		 * If the entry in the file is in greater than configured
+		 * state, then we must have a UUID.  Make sure that we do.
+		 * (Note that the file entry is only tokenized, not fully
+		 * parsed, so we need to do a string comparison here.)
+		 */
+		if (strcmp(zone_state, ZONE_STATE_STR_CONFIGURED) != 0 &&
+		    *zone_uuid == '\0') {
+			if (uuid_is_null(ze->zone_uuid))
+				uuid_generate(ze->zone_uuid);
+			uuid_unparse(ze->zone_uuid, uuidstr);
+			zone_uuid = uuidstr;
+		}
+		/*
+		 * We need to quote a path that contains a ":"; this should
+		 * only affect the zonepath, as zone names do not allow such
+		 * characters, and zone states do not have them either.  Same
+		 * with double-quotes themselves: they are not allowed in zone
+		 * names, and do not occur in zone states, and in theory should
+		 * never occur in a zonepath since zonecfg does not support a
+		 * method for escaping them.
+		 */
+		need_quotes = (strchr(zone_path, ':') != NULL);
+		(void) fprintf(tmp_file, "%s:%s:%s%s%s:%s\n", zone_name,
+		    zone_state, need_quotes ? "\"" : "", zone_path,
+		    need_quotes ? "\"" : "", zone_uuid);
+		exist = B_TRUE;
 	}
 
 	(void) fclose(index_file);
