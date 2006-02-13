@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,10 +166,11 @@ typedef struct usbms_state {
 #define	USB_BYTECLIP(x)	(char)((x) > 127 ? 127 : ((x) < -127 ? -127 : (x)))
 
 /*
- * Default number of buttons
+ * Default and MAX (supported) number of buttons
  */
 
 #define	USB_MS_DEFAULT_BUTTON_NO	3
+#define	USB_MS_MAX_BUTTON_NO		8
 
 
 /*

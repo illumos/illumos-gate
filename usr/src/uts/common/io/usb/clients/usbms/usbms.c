@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -177,6 +177,10 @@ static int		usbms_service_wheel_state(
 				uint_t	cmd);
 static void		usbms_ack_ioctl(mblk_t	*);
 static int		usbms_read_input_data_format(usbms_state_t *);
+static int		usbms_get_coordinate(
+				uint_t			pos,
+				uint_t			len,
+				mblk_t			*mp);
 extern void		uniqtime32();
 
 /*
@@ -357,6 +361,9 @@ usbms_open(queue_t			*q,
 				HIDPARSER_ITEM_REPORT_COUNT,
 				(int32_t *)&usbmsp->usbms_num_buttons) ==
 				HIDPARSER_SUCCESS) {
+			if (usbmsp->usbms_num_buttons > USB_MS_MAX_BUTTON_NO)
+				usbmsp->usbms_num_buttons =
+					USB_MS_MAX_BUTTON_NO;
 			USB_DPRINTF_L2(PRINT_MASK_ALL,
 				usbms_log_handle, "Num of buttons is : %d",
 				usbmsp->usbms_num_buttons);
@@ -1660,8 +1667,6 @@ usbms_mctl_receive(register queue_t		*q,
  *	dx, dy, timestamp.
  *
  *	Watch out for overflow!
- *
- *	cxyz, sxyz and ixyz stand for different length value in sample data.
  */
 static void
 usbms_input(usbms_state_t		*usbmsp,
@@ -1670,14 +1675,9 @@ usbms_input(usbms_state_t		*usbmsp,
 	register struct usbmousebuf	*b;
 	register struct usbmouseinfo	*mi;
 	register int			jitter_radius;
-	register int			temp = 0;
 	register int32_t		nbutt;
 	ushort_t			i;
 	char				c;
-	char				cxyz = 0;	/* for one byte */
-	short				sxyz = 0;	/* for two bytes */
-	int				ixyz = 0;	/* for four bytes */
-
 
 	nbutt = usbmsp->usbms_num_buttons;
 	b = usbmsp->usbms_buf;
@@ -1729,87 +1729,18 @@ usbms_input(usbms_state_t		*usbmsp,
 		}
 	}
 
-	/*
-	 * According to the length of the X coordinate,
-	 * the current delta X is got from the sample.
-	 */
-	switch ((usbmsp->usbms_idf).xlen) {
+	/* get the delta X and Y from the sample */
+	mi->mi_x += usbms_get_coordinate((usbmsp->usbms_idf).xpos,
+				    (usbmsp->usbms_idf).xlen, mp);
 
-	case	1:
-
-		cxyz = mp->b_rptr[((usbmsp->usbms_idf).xpos)];
-		temp = (int)(mi->mi_x + cxyz);
-
-		break;
-	case	2:
-
-		for (i = 0; i < 2; i++) {
-			sxyz = sxyz | (mp->b_rptr[((usbmsp->usbms_idf).xpos)
-				+ i] << (8 * i));
-		}
-		temp = (int)(mi->mi_x + sxyz);
-
-		break;
-
-	case	4:
-		for (i = 0; i < 4; i++) {
-			ixyz = ixyz | (mp->b_rptr[((usbmsp->usbms_idf).xpos)
-				+ i] << (8 * i));
-		}
-		temp = (int)(mi->mi_x + ixyz);
-
-		break;
-
-	}
-
-	if (((usbmsp->usbms_idf).xlen) == 1) {
-		mi->mi_x = USB_BYTECLIP(temp);
-	} else {
-		mi->mi_x = temp;
-	}
 	USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR,
 		usbms_log_handle, "x = %d", (int)mi->mi_x);
 
 	uniqtime32(&mi->mi_time); /* record time when sample arrived */
 
-	/*
-	 * According to the length of the Y coordinate,
-	 * the current delta Y is got from the sample.
-	 */
-	cxyz = sxyz = ixyz = 0;
-	switch ((usbmsp->usbms_idf).ylen) {
+	mi->mi_y += usbms_get_coordinate((usbmsp->usbms_idf).ypos,
+				    (usbmsp->usbms_idf).ylen, mp);
 
-	case	1:
-
-		cxyz = mp->b_rptr[((usbmsp->usbms_idf).ypos)];
-		temp = (int)(mi->mi_y + cxyz);
-
-		break;
-	case	2:
-
-		for (i = 0; i < 2; i++) {
-			sxyz = sxyz | (mp->b_rptr[((usbmsp->usbms_idf).ypos)
-				+ i] << (8 * i));
-		}
-		temp = (int)(mi->mi_y + sxyz);
-
-		break;
-
-	case	4:
-		for (i = 0; i < 4; i++) {
-			ixyz = ixyz | (mp->b_rptr[((usbmsp->usbms_idf).ypos)
-				+ i] << (8 * i));
-		}
-		temp = (int)(mi->mi_y + ixyz);
-
-		break;
-
-	}
-	if (((usbmsp->usbms_idf).ylen) == 1) {
-		mi->mi_y = USB_BYTECLIP(temp);
-	} else {
-		mi->mi_y = temp;
-	}
 	USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
 		"y = %d", (int)mi->mi_y);
 
@@ -1819,42 +1750,9 @@ usbms_input(usbms_state_t		*usbmsp,
 	 */
 
 	if (usbmsp->usbms_num_wheels) {
-		cxyz = sxyz = ixyz = temp = 0;
-		switch ((usbmsp->usbms_idf).zlen) {
+		mi->mi_z += usbms_get_coordinate((usbmsp->usbms_idf).zpos,
+					    (usbmsp->usbms_idf).zlen, mp);
 
-		case	1:
-
-			cxyz = mp->b_rptr[((usbmsp->usbms_idf).zpos)];
-			temp = (int)(mi->mi_z + cxyz);
-
-			break;
-		case	2:
-
-			for (i = 0; i < 2; i++) {
-				sxyz = sxyz |
-					(mp->b_rptr[((usbmsp->usbms_idf).zpos)
-					+ i] << (8 * i));
-			}
-			temp = (int)(mi->mi_z + sxyz);
-
-			break;
-
-		case	4:
-			for (i = 0; i < 4; i++) {
-				ixyz = ixyz |
-					(mp->b_rptr[((usbmsp->usbms_idf).zpos)
-					+ i] << (8 * i));
-			}
-			temp = (int)(mi->mi_z + ixyz);
-
-			break;
-		}
-
-		if (((usbmsp->usbms_idf).zlen) == 1) {
-			mi->mi_z = USB_BYTECLIP(temp);
-		} else {
-			mi->mi_z = temp;
-		}
 		USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
 			"z = %d", (int)mi->mi_z);
 	}
@@ -1908,6 +1806,37 @@ usbms_input(usbms_state_t		*usbmsp,
 
 	USB_DPRINTF_L3(PRINT_MASK_INPUT_INCR, usbms_log_handle,
 			"usbms_input exiting");
+}
+
+
+/*
+ * usbms_get_coordinate():
+ * get the X, Y, WHEEL coordinate values
+ */
+static int
+usbms_get_coordinate(uint_t pos, uint_t len, mblk_t *mp)
+{
+	uint_t utmp, bitval, val;
+	int i, xyz;
+
+	/* get the unsigned int value from the bit stream */
+	utmp = 0;
+	for (i = (pos + len - 1); i >= pos; i--) {
+		bitval = (mp->b_rptr[i/8] & (1 << (i%8))) >> (i%8);
+		utmp = utmp * 2 + bitval;
+	}
+
+	/* convert the unsigned int value into int value */
+	val = 1 << (len - 1);
+	xyz = (int)(utmp - val);
+	if (xyz < 0)
+		xyz += val;
+	else if (xyz == 0)
+		xyz = -(val - 1);
+	else
+		xyz -= val;
+
+	return (xyz);
 }
 
 
@@ -2245,7 +2174,7 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 {
 
 	hidparser_rpt_t *ms_rpt;
-	uint_t i, j, button_page;
+	uint_t i, button_page;
 	uint_t limit = 0;
 	uint32_t	rptcnt, rptsz;
 	usbms_idf *idf = &(usbmsp->usbms_idf);
@@ -2275,61 +2204,39 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 		return (USB_FAILURE);
 	}
 
+	button_page = 0;
 	for (i = 0; i < ms_rpt->no_of_usages; i++) {
 		rptcnt = ms_rpt->usage_descr[i].rptcnt;
 		rptsz = ms_rpt->usage_descr[i].rptsz;
-		if (rptcnt == 0) {
+		if ((ms_rpt->usage_descr[i].usage_page ==
+				    HID_BUTTON_PAGE) && (!button_page)) {
+			idf->bpos = limit;
+			limit += (rptcnt * rptsz);
+			button_page = 1;
 			continue;
 		}
-		button_page = 0;
-		for (j = 0; j < rptcnt; j++) {
-			if (ms_rpt->usage_descr[j + i].usage_id == HID_GD_X) {
-				idf->xpos = limit + (j * rptsz);
-				idf->xpos /= 8;
-				idf->xlen = rptsz;
-				if (idf->xlen % 8) {
-					idf->xlen = (idf->xlen / 8) + 1;
-				} else {
-					idf->xlen /= 8;
-				}
-			} else if (ms_rpt->usage_descr[j + i].usage_id ==
-				    HID_GD_Y) {
-				idf->ypos = limit + (j * rptsz);
-				idf->ypos /= 8;
-				idf->ylen =  rptsz;
-				if (idf->ylen % 8) {
-					idf->ylen = (idf->ylen / 8) + 1;
-				} else {
-					idf->ylen /= 8;
-				}
-			} else if (ms_rpt->usage_descr[j + i].usage_id ==
-				    HID_GD_WHEEL) {
-				idf->zpos = limit + (j * rptsz);
-				idf->zpos /= 8;
-				idf->zlen =  rptsz;
-				if (idf->zlen % 8) {
-					idf->zlen = (idf->zlen / 8) + 1;
-				} else {
-					idf->zlen /= 8;
-				}
-			} else if (ms_rpt->usage_descr[j + i].usage_page ==
-				    HID_BUTTON_PAGE) {
-				if (ms_rpt->usage_descr[j + i].usage_id !=
-				    HID_USAGE_UNDEFINED) {
-					idf->bpos = limit;
-				}
-				button_page = 1;
-				break;
-			}
-		}
 
-		i += j;
+		switch (ms_rpt->usage_descr[i].usage_id) {
 
-		/* enter the next valid usage */
-		if (button_page == 0) {
-			i --;
+		case HID_GD_X:
+			idf->xpos = limit;
+			idf->xlen = rptsz;
+			limit += rptsz;
+			break;
+		case HID_GD_Y:
+			idf->ypos = limit;
+			idf->ylen = rptsz;
+			limit += rptsz;
+			break;
+		case HID_GD_WHEEL:
+			idf->zpos = limit;
+			idf->zlen = rptsz;
+			limit += rptsz;
+			break;
+		default:
+			limit += rptcnt * rptsz;
+			break;
 		}
-		limit = limit + (rptcnt * rptsz);
 	}
 
 	kmem_free(ms_rpt, sizeof (hidparser_rpt_t));
@@ -2432,19 +2339,6 @@ usbms_read_input_data_format(usbms_state_t *usbmsp)
 			fep->value = NULL;
 			mb->b_wptr += sizeof (Firm_event);
 			putnext(q, mb);
-		}
-	} else {
-		/* general data format of relative mouse */
-		idf->xlen = idf->ylen = idf->zlen = 1;
-		idf->xpos = 1;
-		idf->ypos = 2;
-		idf->zpos = 3;
-
-		/* three-byte packet for general mouse */
-		if (limit % 8) {
-			USB_DPRINTF_L3(PRINT_MASK_ALL, usbms_log_handle,
-			    "Data per packet include %d bits", limit);
-			idf->tlen = 3;
 		}
 	}
 

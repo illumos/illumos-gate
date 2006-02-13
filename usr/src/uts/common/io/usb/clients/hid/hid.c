@@ -416,6 +416,12 @@ hid_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	hidp->hid_dev_descr	= dev_data->dev_descr;
 	hidp->hid_interfaceno	= dev_data->dev_curr_if;
 	hidp->hid_if_descr	= altif_data->altif_descr;
+	/*
+	 * Make sure that the bInterfaceProtocol only has meaning to
+	 * Boot Interface Subclass.
+	 */
+	if (hidp->hid_if_descr.bInterfaceSubClass != BOOT_INTERFACE)
+		hidp->hid_if_descr.bInterfaceProtocol = NONE_PROTOCOL;
 	mutex_exit(&hidp->hid_mutex);
 
 	if ((ep_data = usb_lookup_ep_data(dip, dev_data,

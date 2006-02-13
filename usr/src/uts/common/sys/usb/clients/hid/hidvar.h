@@ -73,10 +73,13 @@ extern "C" {
  */
 
 
+/* Boot Interface Subclass for HID devices */
+#define	BOOT_INTERFACE		0x01
+
 /* Boot protocol values for keyboard and mouse */
 #define	KEYBOARD_PROTOCOL	0x01		/* legacy keyboard */
 #define	MOUSE_PROTOCOL		0x02		/* legacy mouse */
-
+#define	NONE_PROTOCOL		0
 /*
  * If the hid descriptor is not valid, the following values are
  * used.
