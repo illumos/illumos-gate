@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1386,16 +1386,16 @@ scsa2usb_override(scsa2usb_state_t *scsa2usbp)
 			    scsa2usbp->scsa2usb_log_handle,
 			    "vid=0x%x pid=0x%x rev=0x%x subclass=0x%x "
 			    "protocol=0x%x "
-			    "pmoff=%d not_removable=%d modesense=%d "
+			    "pmoff=%d fake_removable=%d modesense=%d "
 			    "reduced-cmd-support=%d",
 			    ov.vid, ov.pid, ov.rev, ov.subclass, ov.protocol,
-			    ov.pmoff, ov.not_removable, ov.no_modesense,
+			    ov.pmoff, ov.fake_removable, ov.no_modesense,
 			    ov.reduced_cmd_support);
 
 			if (ov.pmoff) {
 				scsa2usbp->scsa2usb_attrs &= ~SCSA2USB_ATTRS_PM;
 			}
-			if (ov.not_removable) {
+			if (ov.fake_removable) {
 				scsa2usbp->scsa2usb_attrs &=
 				    ~SCSA2USB_ATTRS_RMB;
 			}
@@ -1509,8 +1509,8 @@ scsa2usb_parse_input_str(char *str, scsa2usb_ov_t *ovp,
 				return (USB_FAILURE);
 			}
 		} else if (strcasecmp(input_field, "removable") == 0) {
-			if (strcasecmp(input_value, "false") == 0) {
-				ovp->not_removable = 1;
+			if (strcasecmp(input_value, "true") == 0) {
+				ovp->fake_removable = 1;
 				break;
 			} else {
 				scsa2usb_override_error("removable", scsa2usbp);
@@ -1770,6 +1770,32 @@ scsa2usb_create_luns(scsa2usb_state_t *scsa2usbp)
 			USB_DPRINTF_L2(DPRINT_MASK_SCSA,
 			    scsa2usbp->scsa2usb_log_handle,
 			    "ndi_prop_update_int target failed %d", rval);
+			(void) ndi_devi_free(cdip);
+			continue;
+		}
+
+		rval = ndi_prop_create_boolean(DDI_DEV_T_NONE, cdip,
+		    "hotpluggable");
+		if (rval != DDI_PROP_SUCCESS) {
+			USB_DPRINTF_L2(DPRINT_MASK_SCSA,
+			    scsa2usbp->scsa2usb_log_handle,
+			    "ndi_prop_create_boolean hotpluggable failed %d",
+			    rval);
+			ddi_prop_remove_all(cdip);
+			(void) ndi_devi_free(cdip);
+			continue;
+		}
+		/*
+		 * Some devices don't support LOG SENSE, so tells
+		 * sd driver not to send this command.
+		 */
+		rval = ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+		    "pm-capable", 1);
+		if (rval != DDI_PROP_SUCCESS) {
+			USB_DPRINTF_L2(DPRINT_MASK_SCSA,
+			    scsa2usbp->scsa2usb_log_handle,
+			    "ndi_prop_update_int pm-capable failed %d", rval);
+			ddi_prop_remove_all(cdip);
 			(void) ndi_devi_free(cdip);
 			continue;
 		}
@@ -2099,7 +2125,7 @@ scsa2usb_scsi_tgt_probe(struct scsi_device *sd, int (*waitfunc)(void))
 	scsi_hba_tran_t *tran;
 	scsa2usb_state_t *scsa2usbp;
 	dev_info_t *dip = ddi_get_parent(sd->sd_dev);
-	int rval;
+	int	rval;
 
 	ASSERT(dip);
 
@@ -2125,11 +2151,11 @@ scsa2usb_scsi_tgt_probe(struct scsi_device *sd, int (*waitfunc)(void))
 
 	if ((rval = scsi_hba_probe(sd, waitfunc)) == SCSIPROBE_EXISTS) {
 		/*
-		 * fake the removable bit on all USB storage devices
+		 * respect the removable bit on all USB storage devices
 		 * unless overridden by a scsa2usb.conf entry
 		 */
 		mutex_enter(&scsa2usbp->scsa2usb_mutex);
-		if (scsa2usbp->scsa2usb_attrs & SCSA2USB_ATTRS_RMB) {
+		if (!(scsa2usbp->scsa2usb_attrs & SCSA2USB_ATTRS_RMB)) {
 			_NOTE(SCHEME_PROTECTS_DATA("unshared", scsi_inquiry))
 			sd->sd_inq->inq_rmb = 1;
 		}

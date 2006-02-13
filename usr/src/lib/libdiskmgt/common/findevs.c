@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,6 +56,7 @@
 #define	PROD_ID_PROP		"inquiry-product-id"
 #define	PROD_ID_USB_PROP	"usb-product-name"
 #define	REMOVABLE_PROP		"removable-media"
+#define	HOTPLUGGABLE_PROP	"hotpluggable"
 #define	SCSI_OPTIONS_PROP	"scsi-options"
 #define	VENDOR_ID_PROP		"inquiry-vendor-id"
 #define	VENDOR_ID_USB_PROP	"usb-vendor-name"
@@ -973,9 +974,19 @@ create_disk(char *deviceid, char *kernel_name, struct search_args *args)
 	    diskp->drv_type = DM_DT_FLOPPY;
 	    diskp->removable = 1;
 	} else {
-	    /* not a "CD-ROM" or Floppy */
+		/* not a "CD-ROM" or Floppy */
 
 	    diskp->removable = get_prop(REMOVABLE_PROP, args->node);
+	    if (diskp->removable == -1) {
+		/*
+		 * This is a workaround. Hotpluggable devices don't export
+		 * a "removable-media" property, but they are treated as
+		 * removable media devices by vold to implement automount.
+		 * Once vold is EOL'ed, it should be removed.
+		 */
+		diskp->removable = get_prop(HOTPLUGGABLE_PROP, args->node);
+	    }
+
 	    if (diskp->removable == -1) {
 		diskp->removable = 0;
 #if defined(i386) || defined(__amd64)

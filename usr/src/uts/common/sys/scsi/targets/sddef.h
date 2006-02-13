@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -422,7 +422,7 @@ struct sd_lun {
 						/* a part of error recovery. */
 	    un_f_is_fibre		:1,	/* The device supports fibre */
 						/* channel */
-	    un_f_sync_cache_unsupported	:1,	/* sync cache cmd not */
+	    un_f_sync_cache_supported	:1,	/* sync cache cmd supported */
 						/* supported */
 	    un_f_format_in_progress	:1,	/* The device is currently */
 						/* executing a FORMAT cmd. */
@@ -462,6 +462,34 @@ struct sd_lun {
 	    un_f_doorlock_supported	:1,	/* Device supports Doorlock */
 	    un_f_start_stop_supported	:1;	/* device has motor */
 
+	uint32_t
+	    un_f_vtoc_label_supported	:1,	/* have vtoc disk label */
+	    un_f_vtoc_errlog_supported	:1,	/* write error in system */
+						/* log if VTOC is not valid */
+	    un_f_default_vtoc_supported	:1,	/* build default */
+						/* label if disk has */
+						/* no valid one */
+	    un_f_mboot_supported	:1,	/* mboot supported */
+	    un_f_is_hotpluggable	:1,	/* hotpluggable */
+	    un_f_has_removable_media	:1,	/* has removable media */
+	    un_f_non_devbsize_supported	:1,	/* non-512 blocksize */
+	    un_f_devid_supported	:1,	/* device ID supported */
+	    un_f_eject_media_supported	:1,	/* media can be ejected */
+	    un_f_chk_wp_open		:1,	/* check if write-protected */
+						/* when being opened */
+	    un_f_descr_format_supported	:1,	/* support descriptor format */
+						/* for sense data */
+	    un_f_check_start_stop	:1,	/* needs to check if */
+						/* START-STOP command is */
+						/* supported by hardware */
+						/* before issuing it */
+	    un_f_monitor_media_state	:1,	/* need a watch thread to */
+						/* monitor device state */
+	    un_f_attach_spinup		:1,	/* spin up once the */
+						/* device is attached */
+	    un_f_log_sense_supported	:1,	/* support log sense */
+	    un_f_pm_supported		:1, 	/* support power-management */
+	    un_f_reserved		:16;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
@@ -485,7 +513,6 @@ struct sd_lun {
 	timeout_id_t	un_pm_timeid;		/* timeout id for pm */
 	uint_t		un_pm_busy;
 	kcondvar_t	un_pm_busy_cv;
-	int		un_pm_capable_prop;	/* "pm-capable" prop value */
 	short		un_power_level;		/* Power Level */
 	uchar_t		un_save_state;
 	kcondvar_t	un_suspend_cv;		/* power management */
@@ -620,35 +647,18 @@ struct sd_lun {
 #endif
 #define	SD_MAX_XFER_SIZE		(1024 * 1024)
 
-
-#if defined(__i386) || defined(__amd64)
-#ifndef _lock_lint
-#undef _NOTE
-#define	_NOTE(s)
-#endif
-#endif
-
-
 /*
  * Warlock annotations
  */
-
 _NOTE(MUTEX_PROTECTS_DATA(scsi_device::sd_mutex, sd_lun))
 _NOTE(READ_ONLY_DATA(sd_lun::un_sd))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_reservation_type))
-_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_pm_capable_prop))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_mincdb))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_maxcdb))
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_status_len))
-
-
-#if defined(__i386) || defined(__amd64)
-_NOTE(READ_ONLY_DATA(sd_lun::un_f_arq_enabled))
-#else
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_f_arq_enabled))
-#endif
-
 _NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_ctype))
+_NOTE(DATA_READABLE_WITHOUT_LOCK(sd_lun::un_solaris_offset))
 
 _NOTE(SCHEME_PROTECTS_DATA("safe sharing",
 	sd_lun::un_mhd_token
@@ -743,7 +753,6 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_lun::un_fi_mutex,
 #define	ISCD(un)		((un)->un_ctype == CTYPE_CDROM)
 #define	ISROD(un)		((un)->un_ctype == CTYPE_ROD)
 #define	ISPXRE(un)		((un)->un_ctype == CTYPE_PXRE)
-#define	ISREMOVABLE(un)		(ISCD(un) || (un)->un_sd->sd_inq->inq_rmb)
 
 /*
  * This macro checks the vendor of the device to see if it is LSI. Because
@@ -769,7 +778,7 @@ _NOTE(MUTEX_PROTECTS_DATA(sd_lun::un_fi_mutex,
  * Macros for non-512 byte writes to removable devices.
  */
 #define	NOT_DEVBSIZE(un)	\
-	(ISREMOVABLE(un) && ((un)->un_tgt_blocksize != (un)->un_sys_blocksize))
+	((un)->un_tgt_blocksize != (un)->un_sys_blocksize)
 
 /*
  * Check that a write map, used for locking lba ranges for writes, is in

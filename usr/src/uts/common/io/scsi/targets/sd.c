@@ -30,6 +30,9 @@
  * SCSI disk target driver.
  */
 
+
+
+
 #include <sys/scsi/scsi.h>
 #include <sys/dkbad.h>
 #include <sys/dklabel.h>
@@ -49,6 +52,12 @@
 #include <sys/efi_partition.h>
 #include <sys/var.h>
 #include <sys/aio_req.h>
+
+#ifdef __lock_lint
+#define	_LP64
+#define	__amd64
+#endif
+
 #if (defined(__fibre))
 /* Note: is there a leadville version of the following? */
 #include <sys/fc4/fcal_linkapp.h>
@@ -61,6 +70,7 @@
 #include "sd_xbuf.h"
 
 #include <sys/scsi/targets/sddef.h>
+
 
 /*
  * Loadable module info.
@@ -822,6 +832,7 @@ static int sd_pm_idletime = 1;
 #define	sddetach			ssddetach
 #define	sd_unit_attach			ssd_unit_attach
 #define	sd_unit_detach			ssd_unit_detach
+#define	sd_set_unit_attributes		ssd_set_unit_attributes
 #define	sd_create_minor_nodes		ssd_create_minor_nodes
 #define	sd_create_errstats		ssd_create_errstats
 #define	sd_set_errstats			ssd_set_errstats
@@ -1153,6 +1164,7 @@ static int  sddetach(dev_info_t *devi, ddi_detach_cmd_t cmd);
 static int  sd_unit_attach(dev_info_t *devi);
 static int  sd_unit_detach(dev_info_t *devi);
 
+static void sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi);
 static int  sd_create_minor_nodes(struct sd_lun *un, dev_info_t *devi);
 static void sd_create_errstats(struct sd_lun *un, int instance);
 static void sd_set_errstats(struct sd_lun *un);
@@ -1272,6 +1284,12 @@ static void sd_shadow_buf_free(struct buf *bp);
 
 static void sd_print_transport_rejected_message(struct sd_lun *un,
 	struct sd_xbuf *xp, int code);
+static void sd_print_incomplete_msg(struct sd_lun *un, struct buf *bp,
+    void *arg, int code);
+static void sd_print_sense_failed_msg(struct sd_lun *un, struct buf *bp,
+    void *arg, int code);
+static void sd_print_cmd_incomplete_msg(struct sd_lun *un, struct buf *bp,
+    void *arg, int code);
 
 static void sd_retry_command(struct sd_lun *un, struct buf *bp,
 	int retry_check_flag,
@@ -3246,12 +3264,7 @@ sd_read_unit_properties(struct sd_lun *un)
 	/* check for LSI device */
 	sd_is_lsi(un);
 
-	/*
-	 * Set this in sd.conf to 0 in order to disable kstats.  The default
-	 * is 1, so they are enabled by default.
-	 */
-	un->un_f_pkstats_enabled = (ddi_prop_get_int(DDI_DEV_T_ANY,
-	    SD_DEVINFO(un), DDI_PROP_DONTPASS, "enable-partition-kstats", 1));
+
 }
 
 
@@ -4192,12 +4205,7 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 	 * at this point it is either labeled with a VTOC or it is
 	 * under 1TB
 	 */
-
-	/*
-	 * Only DIRECT ACCESS devices will have Sun labels.
-	 * CD's supposedly have a Sun label, too
-	 */
-	if (SD_INQUIRY(un)->inq_dtype == DTYPE_DIRECT || ISREMOVABLE(un)) {
+	if (un->un_f_vtoc_label_supported) {
 		struct	dk_label *dkl;
 		offset_t dkl1;
 		offset_t label_addr, real_addr;
@@ -4287,17 +4295,9 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 	/*
 	 * If a valid label was not found, AND if no reservation conflict
 	 * was detected, then go ahead and create a default label (4069506).
-	 *
-	 * Note: currently, for VTOC_8 devices, the default label is created
-	 * for removables only.  For VTOC_16 devices, the default label will
-	 * be created for both removables and non-removables alike.
-	 * (see sd_build_default_label)
 	 */
-#if defined(_SUNOS_VTOC_8)
-	if (ISREMOVABLE(un) && (label_error != EACCES)) {
-#elif defined(_SUNOS_VTOC_16)
-	if (label_error != EACCES) {
-#endif
+
+	if (un->un_f_default_vtoc_supported && (label_error != EACCES)) {
 		if (un->un_f_geometry_is_valid == FALSE) {
 			sd_build_default_label(un);
 		}
@@ -4305,9 +4305,10 @@ sd_validate_geometry(struct sd_lun *un, int path_flag)
 	}
 
 no_solaris_partition:
-	if ((!ISREMOVABLE(un) ||
-	    (ISREMOVABLE(un) && un->un_mediastate == DKIO_EJECTED)) &&
-	    (un->un_state == SD_STATE_NORMAL && gvalid == FALSE)) {
+	if ((!un->un_f_has_removable_media ||
+	    (un->un_f_has_removable_media &&
+		un->un_mediastate == DKIO_EJECTED)) &&
+		(un->un_state == SD_STATE_NORMAL && !gvalid)) {
 		/*
 		 * Print out a message indicating who and what we are.
 		 * We do this only when we happen to really validate the
@@ -5255,8 +5256,8 @@ sd_use_efi(struct sd_lun *un, int path_flag)
 		 */
 		if ((rval = sd_send_scsi_READ(un, buf, lbasize,
 		    cap - 1, (ISCD(un)) ? SD_PATH_DIRECT_PRIORITY :
-		    path_flag)) != 0) {
-			goto done_err;
+			path_flag)) != 0) {
+				goto done_err;
 		}
 
 		sd_swap_efi_gpt((efi_gpt_t *)buf);
@@ -5375,7 +5376,7 @@ sd_uselabel(struct sd_lun *un, struct dk_label *labp, int path_flag)
 	if (labp->dkl_magic != DKL_MAGIC) {
 #if defined(__sparc)
 		if ((un->un_state == SD_STATE_NORMAL) &&
-		    !ISREMOVABLE(un)) {
+			un->un_f_vtoc_errlog_supported) {
 			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 			    "Corrupt label; wrong magic number\n");
 		}
@@ -5392,10 +5393,11 @@ sd_uselabel(struct sd_lun *un, struct dk_label *labp, int path_flag)
 	}
 
 	if (sum != 0) {
-#if defined(_SUNOS_VTOC_16)
-		if (un->un_state == SD_STATE_NORMAL && !ISCD(un)) {
+#if	defined(_SUNOS_VTOC_16)
+		if ((un->un_state == SD_STATE_NORMAL) && !ISCD(un)) {
 #elif defined(_SUNOS_VTOC_8)
-		if (un->un_state == SD_STATE_NORMAL && !ISREMOVABLE(un)) {
+		if ((un->un_state == SD_STATE_NORMAL) &&
+		    un->un_f_vtoc_errlog_supported) {
 #endif
 			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 			    "Corrupt label - label checksum failed\n");
@@ -5640,10 +5642,10 @@ sd_build_default_label(struct sd_lun *un)
 	/*
 	 * Note: This is a legacy check for non-removable devices on VTOC_8
 	 * only. This may be a valid check for VTOC_16 as well.
+	 * Once we understand why there is this difference between SPARC and
+	 * x86 platform, we could remove this legacy check.
 	 */
-	if (!ISREMOVABLE(un)) {
-		return;
-	}
+	ASSERT(un->un_f_default_vtoc_supported);
 #endif
 
 	bzero(&un->un_g, sizeof (struct dk_geom));
@@ -5797,7 +5799,6 @@ sd_build_default_label(struct sd_lun *un)
 
 	un->un_g.dkg_apc = 0;
 	un->un_vtoc.v_nparts = V_NUMPAR;
-	un->un_vtoc.v_version = V_VERSION;
 
 	/* Add backup slice */
 	un->un_vtoc.v_part[2].p_start = 0;
@@ -5822,6 +5823,7 @@ sd_build_default_label(struct sd_lun *un)
 
 	un->un_g.dkg_intrlv = 1;
 
+	un->un_vtoc.v_version = V_VERSION;
 	un->un_vtoc.v_sanity  = VTOC_SANE;
 
 	un->un_f_geometry_is_valid = TRUE;
@@ -5989,7 +5991,6 @@ sd_register_devid(struct sd_lun *un, dev_info_t *devi, int reservation_flag)
 
 		/* collect page 83 data if available */
 		if (un->un_vpd_page_mask & SD_VPD_DEVID_WWN_PG) {
-
 			mutex_exit(SD_MUTEX(un));
 			inq83 = kmem_zalloc(inq83_len, KM_SLEEP);
 			rval = sd_send_scsi_INQUIRY(un, inq83, inq83_len,
@@ -6420,56 +6421,17 @@ sd_setup_pm(struct sd_lun *un, dev_info_t *devi)
 	    "pm-hardware-state", "needs-suspend-resume");
 
 	/*
-	 * Check if HBA has set the "pm-capable" property.
-	 * If "pm-capable" exists and is non-zero then we can
-	 * power manage the device without checking the start/stop
-	 * cycle count log sense page.
-	 *
-	 * If "pm-capable" exists and is SD_PM_CAPABLE_FALSE (0)
-	 * then we should not power manage the device.
-	 *
-	 * If "pm-capable" doesn't exist then un->un_pm_capable_prop will
-	 * be set to SD_PM_CAPABLE_UNDEFINED (-1).  In this case, sd will
-	 * check the start/stop cycle count log sense page and power manage
-	 * the device if the cycle count limit has not been exceeded.
-	 */
-	un->un_pm_capable_prop =
-	    ddi_prop_get_int(DDI_DEV_T_ANY, devi, DDI_PROP_DONTPASS,
-		"pm-capable", SD_PM_CAPABLE_UNDEFINED);
-	if (un->un_pm_capable_prop != SD_PM_CAPABLE_UNDEFINED) {
-		/*
-		 * pm-capable property exists.
-		 *
-		 * Convert "TRUE" values for un_pm_capable_prop to
-		 * SD_PM_CAPABLE_TRUE (1) to make it easier to check later.
-		 * "TRUE" values are any values except SD_PM_CAPABLE_FALSE (0)
-		 *  and SD_PM_CAPABLE_UNDEFINED (-1)
-		 */
-		if (un->un_pm_capable_prop != SD_PM_CAPABLE_FALSE) {
-			un->un_pm_capable_prop = SD_PM_CAPABLE_TRUE;
-		}
-
-		SD_INFO(SD_LOG_ATTACH_DETACH, un,
-		    "sd_unit_attach: un:0x%p pm-capable "
-		    "property set to %d.\n", un, un->un_pm_capable_prop);
-	}
-
-	/*
 	 * This complies with the new power management framework
 	 * for certain desktop machines. Create the pm_components
 	 * property as a string array property.
-	 *
-	 * If this is a removable device or if the pm-capable property
-	 * is SD_PM_CAPABLE_TRUE (1) then we should create the
-	 * pm_components property without checking for the existance of
-	 * the start-stop cycle counter log page
 	 */
-	if (ISREMOVABLE(un) ||
-	    un->un_pm_capable_prop == SD_PM_CAPABLE_TRUE) {
+	if (un->un_f_pm_supported) {
 		/*
 		 * not all devices have a motor, try it first.
 		 * some devices may return ILLEGAL REQUEST, some
 		 * will hang
+		 * The following START_STOP_UNIT is used to check if target
+		 * device has a motor.
 		 */
 		un->un_f_start_stop_supported = TRUE;
 		if (sd_send_scsi_START_STOP_UNIT(un, SD_TARGET_START,
@@ -6483,19 +6445,12 @@ sd_setup_pm(struct sd_lun *un, dev_info_t *devi)
 		 */
 		(void) sd_create_pm_components(devi, un);
 		un->un_f_pm_is_enabled = TRUE;
+		return;
+	}
 
-		/*
-		 * Need to create a zero length (Boolean) property
-		 * removable-media for the removable media devices.
-		 * Note that the return value of the property is not being
-		 * checked, since if unable to create the property
-		 * then do not want the attach to fail altogether. Consistent
-		 * with other property creation in attach.
-		 */
-		if (ISREMOVABLE(un)) {
-			(void) ddi_prop_create(DDI_DEV_T_NONE, devi,
-			    DDI_PROP_CANSLEEP, "removable-media", NULL, 0);
-		}
+	if (!un->un_f_log_sense_supported) {
+		un->un_power_level = SD_SPINDLE_ON;
+		un->un_f_pm_is_enabled = FALSE;
 		return;
 	}
 
@@ -6513,7 +6468,7 @@ sd_setup_pm(struct sd_lun *un, dev_info_t *devi)
 	 * or if the pm-capable property is SD_PM_CAPABLE_FALSE (0)
 	 * then we should not create the pm_components property.
 	 */
-	if (rval == -1 || un->un_pm_capable_prop == SD_PM_CAPABLE_FALSE) {
+	if (rval == -1) {
 		/*
 		 * Error.
 		 * Reading log sense failed, most likely this is
@@ -6613,7 +6568,7 @@ sd_create_pm_components(dev_info_t *devi, struct sd_lun *un)
 		 * fails. In the case of removable media, the start/stop
 		 * will fail if the media is not present.
 		 */
-		if ((!ISREMOVABLE(un)) && (pm_raise_power(SD_DEVINFO(un), 0,
+		if (un->un_f_attach_spinup && (pm_raise_power(SD_DEVINFO(un), 0,
 		    SD_SPINDLE_ON) == DDI_SUCCESS)) {
 			mutex_enter(SD_MUTEX(un));
 			un->un_power_level = SD_SPINDLE_ON;
@@ -6934,7 +6889,7 @@ sd_ddi_resume(dev_info_t *devi)
 	 * inserted and hence there is a chance that raise power will fail with
 	 * media not present.
 	 */
-	if (!ISREMOVABLE(un)) {
+	if (un->un_f_attach_spinup) {
 		mutex_exit(SD_MUTEX(un));
 		(void) pm_raise_power(SD_DEVINFO(un), 0, SD_SPINDLE_ON);
 		mutex_enter(SD_MUTEX(un));
@@ -7073,7 +7028,7 @@ sd_pm_idletimeout_handler(void *arg)
 		 * Update the chain types.
 		 * This takes affect on the next new command received.
 		 */
-		if (ISREMOVABLE(un)) {
+		if (un->un_f_non_devbsize_supported) {
 			un->un_buf_chain_type = SD_CHAIN_INFO_RMMEDIA;
 		} else {
 			un->un_buf_chain_type = SD_CHAIN_INFO_DISK;
@@ -7224,13 +7179,11 @@ sdpower(dev_info_t *devi, int component, int level)
 	mutex_exit(SD_MUTEX(un));
 
 	/*
-	 * Bypass checking the log sense information for removables
-	 * and devices for which the HBA set the pm-capable property.
-	 * If un->un_pm_capable_prop is SD_PM_CAPABLE_UNDEFINED (-1)
-	 * then the HBA did not create the property.
+	 * If "pm-capable" property is set to TRUE by HBA drivers,
+	 * bypass the following checking, otherwise, check the log
+	 * sense information for this device
 	 */
-	if ((level == SD_SPINDLE_OFF) && (!ISREMOVABLE(un)) &&
-	    un->un_pm_capable_prop == SD_PM_CAPABLE_UNDEFINED) {
+	if ((level == SD_SPINDLE_OFF) && un->un_f_log_sense_supported) {
 		/*
 		 * Get the log sense information to understand whether the
 		 * the powercycle counts have gone beyond the threshhold.
@@ -7446,7 +7399,7 @@ sdpower(dev_info_t *devi, int component, int level)
 	    ((level == SD_SPINDLE_ON) ? SD_TARGET_START : SD_TARGET_STOP),
 	    SD_PATH_DIRECT);
 	/* Command failed, check for media present. */
-	if ((sval == ENXIO) && ISREMOVABLE(un)) {
+	if ((sval == ENXIO) && un->un_f_has_removable_media) {
 		medium_present = FALSE;
 	}
 
@@ -7479,7 +7432,7 @@ sdpower(dev_info_t *devi, int component, int level)
 		/*
 		 * The stop command from above succeeded.
 		 */
-		if (ISREMOVABLE(un)) {
+		if (un->un_f_monitor_media_state) {
 			/*
 			 * Terminate watch thread in case of removable media
 			 * devices going into low power state. This is as per
@@ -7524,7 +7477,7 @@ sdpower(dev_info_t *devi, int component, int level)
 		 * Resume the watch thread since it was suspended
 		 * when the device went into low power mode.
 		 */
-		if (ISREMOVABLE(un)) {
+		if (un->un_f_monitor_media_state) {
 			mutex_enter(SD_MUTEX(un));
 			if (un->un_f_watcht_stopped == TRUE) {
 				opaque_t temp_token;
@@ -8010,12 +7963,6 @@ sd_unit_attach(dev_info_t *devi)
 		ddi_prop_free(variantp);
 	}
 
-	/*
-	 * Assume doorlock commands are supported. If not, the first
-	 * call to sd_send_scsi_DOORLOCK() will set to FALSE
-	 */
-	un->un_f_doorlock_supported = TRUE;
-
 	un->un_cmd_timeout	= SD_IO_TIME;
 
 	/* Info on current states, statuses, etc. (Updated frequently) */
@@ -8071,7 +8018,23 @@ sd_unit_attach(dev_info_t *devi)
 	    "sd_unit_attach: un:0x%p property configuration complete.\n", un);
 
 	/*
-	 * By default, we mark the capacity, lbazize, and geometry
+	 * Only if a device has "hotpluggable" property, it is
+	 * treated as hotpluggable device. Otherwise, it is
+	 * regarded as non-hotpluggable one.
+	 */
+	if (ddi_prop_get_int(DDI_DEV_T_ANY, devi, 0, "hotpluggable",
+	    -1) != -1) {
+		un->un_f_is_hotpluggable = TRUE;
+	}
+
+	/*
+	 * set unit's attributes(flags) according to "hotpluggable" and
+	 * RMB bit in INQUIRY data.
+	 */
+	sd_set_unit_attributes(un, devi);
+
+	/*
+	 * By default, we mark the capacity, lbasize, and geometry
 	 * as invalid. Only if we successfully read a valid capacity
 	 * will we update the un_blockcount and un_tgt_blocksize with the
 	 * valid values (the geometry will be validated later).
@@ -8096,7 +8059,7 @@ sd_unit_attach(dev_info_t *devi)
 	/*
 	 * Set up the IO chains to use, based upon the target type.
 	 */
-	if (ISREMOVABLE(un)) {
+	if (un->un_f_non_devbsize_supported) {
 		un->un_buf_chain_type = SD_CHAIN_INFO_RMMEDIA;
 	} else {
 		un->un_buf_chain_type = SD_CHAIN_INFO_DISK;
@@ -8276,7 +8239,7 @@ sd_unit_attach(dev_info_t *devi)
 	 * of these could fail and in some cases we would continue with
 	 * the attach despite the failure (see below).
 	 */
-	if (devp->sd_inq->inq_dtype == DTYPE_DIRECT && !ISREMOVABLE(un)) {
+	if (un->un_f_descr_format_supported) {
 		switch (sd_spin_up_unit(un)) {
 		case 0:
 			/*
@@ -8419,7 +8382,7 @@ sd_unit_attach(dev_info_t *devi)
 		 * layers are added to the command chain, these values will
 		 * have to be re-evaluated for correctness.
 		 */
-		if (ISREMOVABLE(un)) {
+		if (un->un_f_non_devbsize_supported) {
 			un->un_buf_chain_type = SD_CHAIN_INFO_RMMEDIA_NO_PM;
 		} else {
 			un->un_buf_chain_type = SD_CHAIN_INFO_DISK_NO_PM;
@@ -8475,38 +8438,37 @@ sd_unit_attach(dev_info_t *devi)
 	un->un_f_geometry_is_valid = FALSE;
 	un->un_mediastate = DKIO_NONE;
 	un->un_reserved = -1;
-	if (!ISREMOVABLE(un)) {
+
+	/*
+	 * Read and validate the device's geometry (ie, disk label)
+	 * A new unformatted drive will not have a valid geometry, but
+	 * the driver needs to successfully attach to this device so
+	 * the drive can be formatted via ioctls.
+	 */
+	if (((sd_validate_geometry(un, SD_PATH_DIRECT) ==
+	    ENOTSUP)) &&
+	    (un->un_blockcount < DK_MAX_BLOCKS)) {
 		/*
-		 * Read and validate the device's geometry (ie, disk label)
-		 * A new unformatted drive will not have a valid geometry, but
-		 * the driver needs to successfully attach to this device so
-		 * the drive can be formatted via ioctls.
+		 * We found a small disk with an EFI label on it;
+		 * we need to fix up the minor nodes accordingly.
 		 */
-		if (((sd_validate_geometry(un, SD_PATH_DIRECT) ==
-		    ENOTSUP)) &&
-		    (un->un_blockcount < DK_MAX_BLOCKS)) {
-			/*
-			 * We found a small disk with an EFI label on it;
-			 * we need to fix up the minor nodes accordingly.
-			 */
-			ddi_remove_minor_node(devi, "h");
-			ddi_remove_minor_node(devi, "h,raw");
-			(void) ddi_create_minor_node(devi, "wd",
-			    S_IFBLK,
-			    (instance << SDUNIT_SHIFT) | WD_NODE,
-			    un->un_node_type, NULL);
-			(void) ddi_create_minor_node(devi, "wd,raw",
-			    S_IFCHR,
-			    (instance << SDUNIT_SHIFT) | WD_NODE,
-			    un->un_node_type, NULL);
-		}
+		ddi_remove_minor_node(devi, "h");
+		ddi_remove_minor_node(devi, "h,raw");
+		(void) ddi_create_minor_node(devi, "wd",
+		    S_IFBLK,
+		    (instance << SDUNIT_SHIFT) | WD_NODE,
+		    un->un_node_type, NULL);
+		(void) ddi_create_minor_node(devi, "wd,raw",
+		    S_IFCHR,
+		    (instance << SDUNIT_SHIFT) | WD_NODE,
+		    un->un_node_type, NULL);
 	}
 
 	/*
 	 * Read and initialize the devid for the unit.
 	 */
 	ASSERT(un->un_errstats != NULL);
-	if (!ISREMOVABLE(un)) {
+	if (un->un_f_devid_supported) {
 		sd_register_devid(un, devi, reservation_flag);
 	}
 	mutex_exit(SD_MUTEX(un));
@@ -8560,7 +8522,7 @@ sd_unit_attach(dev_info_t *devi)
 	 *	   stats (sd_set_pstats)here, following sd_validate_geometry(),
 	 *	   sd_register_devid(), and sd_disable_caching().
 	 */
-	if (!ISREMOVABLE(un) && (un->un_f_pkstats_enabled == TRUE)) {
+	if (un->un_f_pkstats_enabled) {
 		sd_set_pstats(un);
 		SD_TRACE(SD_LOG_ATTACH_DETACH, un,
 		    "sd_unit_attach: un:0x%p pstats created and set\n", un);
@@ -9104,8 +9066,8 @@ sd_unit_detach(dev_info_t *devi)
 		un->un_errstats = NULL;
 	}
 
-	/* Remove partition stats (not created for removables) */
-	if (!ISREMOVABLE(un)) {
+	/* Remove partition stats */
+	if (un->un_f_pkstats_enabled) {
 		for (i = 0; i < NSDMAP; i++) {
 			if (un->un_pstats[i] != NULL) {
 				kstat_delete(un->un_pstats[i]);
@@ -9983,7 +9945,7 @@ sd_pm_entry(struct sd_lun *un)
 			    "sd_pm_entry: changing uscsi_chain_type from %d\n",
 			    un->un_uscsi_chain_type);
 
-			if (ISREMOVABLE(un)) {
+			if (un->un_f_non_devbsize_supported) {
 				un->un_buf_chain_type =
 				    SD_CHAIN_INFO_RMMEDIA_NO_PM;
 			} else {
@@ -10227,7 +10189,7 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 	 * more permissive implementation that allows the open to succeed and
 	 * WRITE attempts to fail when appropriate.
 	 */
-	if (ISREMOVABLE(un)) {
+	if (un->un_f_chk_wp_open) {
 		if ((flag & FWRITE) && (!nodelay)) {
 			mutex_exit(SD_MUTEX(un));
 			/*
@@ -10264,11 +10226,7 @@ sdopen(dev_t *dev_p, int flag, int otyp, cred_t *cred_p)
 		 */
 		if ((rval != SD_READY_VALID) ||
 		    (!ISCD(un) && un->un_map[part].dkl_nblk <= 0)) {
-			if (ISREMOVABLE(un)) {
-				rval = ENXIO;
-			} else {
-				rval = EIO;
-			}
+			rval = un->un_f_has_removable_media ? ENXIO : EIO;
 			SD_ERROR(SD_LOG_OPEN_CLOSE, un, "sdopen: "
 			    "device not ready or invalid disk block value\n");
 			goto open_fail;
@@ -10457,7 +10415,7 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 			 * supported device.
 			 */
 #if defined(__i386) || defined(__amd64)
-			if (!ISREMOVABLE(un) ||
+			if (un->un_f_sync_cache_supported ||
 			    un->un_f_dvdram_writable_device == TRUE) {
 #else
 			if (un->un_f_dvdram_writable_device == TRUE) {
@@ -10481,13 +10439,12 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 			}
 
 			/*
-			 * For removable media devices, send an ALLOW MEDIA
-			 * REMOVAL command, but don't get upset if it fails.
-			 * Also invalidate the geometry. We need to raise
-			 * the power of the drive before we can call
-			 * sd_send_scsi_DOORLOCK()
+			 * For devices which supports DOOR_LOCK, send an ALLOW
+			 * MEDIA REMOVAL command, but don't get upset if it
+			 * fails. We need to raise the power of the drive before
+			 * we can call sd_send_scsi_DOORLOCK()
 			 */
-			if (ISREMOVABLE(un)) {
+			if (un->un_f_doorlock_supported) {
 				mutex_exit(SD_MUTEX(un));
 				if (sd_pm_entry(un) == DDI_SUCCESS) {
 					rval = sd_send_scsi_DOORLOCK(un,
@@ -10502,31 +10459,40 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 					rval = EIO;
 				}
 				mutex_enter(SD_MUTEX(un));
-
-				sr_ejected(un);
-				/*
-				 * Destroy the cache (if it exists) which was
-				 * allocated for the write maps since this is
-				 * the last close for this media.
-				 */
-				if (un->un_wm_cache) {
-					/*
-					 * Check if there are pending commands.
-					 * and if there are give a warning and
-					 * do not destroy the cache.
-					 */
-					if (un->un_ncmds_in_driver > 0) {
-						scsi_log(SD_DEVINFO(un),
-						    sd_label, CE_WARN,
-						    "Unable to clean up memory "
-						    "because of pending I/O\n");
-					} else {
-						kmem_cache_destroy(
-						    un->un_wm_cache);
-						un->un_wm_cache = NULL;
-					}
-				}
 			}
+
+			/*
+			 * If a device has removable media, invalidate all
+			 * parameters related to media, such as geometry,
+			 * blocksize, and blockcount.
+			 */
+			if (un->un_f_has_removable_media) {
+				sr_ejected(un);
+			}
+
+		}
+	}
+
+	/*
+	 * Destroy the cache (if it exists) which was
+	 * allocated for the write maps since this is
+	 * the last close for this media.
+	 */
+	if (un->un_wm_cache) {
+		/*
+		 * Check if there are pending commands.
+		 * and if there are give a warning and
+		 * do not destroy the cache.
+		 */
+		if (un->un_ncmds_in_driver > 0) {
+			scsi_log(SD_DEVINFO(un),
+			    sd_label, CE_WARN,
+			    "Unable to clean up memory "
+			    "because of pending I/O\n");
+		} else {
+			kmem_cache_destroy(
+			    un->un_wm_cache);
+			un->un_wm_cache = NULL;
 		}
 	}
 
@@ -10575,7 +10541,11 @@ sd_ready_and_valid(struct sd_lun *un)
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
 	mutex_enter(SD_MUTEX(un));
-	if (ISREMOVABLE(un)) {
+	/*
+	 * If a device has removable media, we must check if media is
+	 * ready when checking if this device is ready and valid.
+	 */
+	if (un->un_f_has_removable_media) {
 		mutex_exit(SD_MUTEX(un));
 		if (sd_send_scsi_TEST_UNIT_READY(un, 0) != 0) {
 			rval = SD_NOT_READY_VALID;
@@ -10603,30 +10573,6 @@ sd_ready_and_valid(struct sd_lun *un)
 		}
 
 		/*
-		 * If this is a non 512 block device, allocate space for
-		 * the wmap cache. This is being done here since every time
-		 * a media is changed this routine will be called and the
-		 * block size is a function of media rather than device.
-		 */
-		if (NOT_DEVBSIZE(un)) {
-			if (!(un->un_wm_cache)) {
-				(void) snprintf(name_str, sizeof (name_str),
-				    "%s%d_cache",
-				    ddi_driver_name(SD_DEVINFO(un)),
-				    ddi_get_instance(SD_DEVINFO(un)));
-				un->un_wm_cache = kmem_cache_create(
-				    name_str, sizeof (struct sd_w_map),
-				    8, sd_wm_cache_constructor,
-				    sd_wm_cache_destructor, NULL,
-				    (void *)un, NULL, 0);
-				if (!(un->un_wm_cache)) {
-					rval = ENOMEM;
-					goto done;
-				}
-			}
-		}
-
-		/*
 		 * Check if the media in the device is writable or not.
 		 */
 		if ((un->un_f_geometry_is_valid == FALSE) && ISCD(un)) {
@@ -10643,6 +10589,30 @@ sd_ready_and_valid(struct sd_lun *un)
 		mutex_enter(SD_MUTEX(un));
 	}
 
+
+	/*
+	 * If this is a non 512 block device, allocate space for
+	 * the wmap cache. This is being done here since every time
+	 * a media is changed this routine will be called and the
+	 * block size is a function of media rather than device.
+	 */
+	if (un->un_f_non_devbsize_supported && NOT_DEVBSIZE(un)) {
+		if (!(un->un_wm_cache)) {
+			(void) snprintf(name_str, sizeof (name_str),
+			    "%s%d_cache",
+			    ddi_driver_name(SD_DEVINFO(un)),
+			    ddi_get_instance(SD_DEVINFO(un)));
+			un->un_wm_cache = kmem_cache_create(
+			    name_str, sizeof (struct sd_w_map),
+			    8, sd_wm_cache_constructor,
+			    sd_wm_cache_destructor, NULL,
+			    (void *)un, NULL, 0);
+			if (!(un->un_wm_cache)) {
+					rval = ENOMEM;
+					goto done;
+			}
+		}
+	}
 
 	if (un->un_state == SD_STATE_NORMAL) {
 		/*
@@ -10710,11 +10680,11 @@ sd_ready_and_valid(struct sd_lun *un)
 #endif
 
 	/*
-	 * If this is a removable media device, try and send
-	 * a PREVENT MEDIA REMOVAL command, but don't get upset
+	 * If this device supports DOOR_LOCK command, try and send
+	 * this command to PREVENT MEDIA REMOVAL, but don't get upset
 	 * if it fails. For a CD, however, it is an error
 	 */
-	if (ISREMOVABLE(un)) {
+	if (un->un_f_doorlock_supported) {
 		mutex_exit(SD_MUTEX(un));
 		if ((sd_send_scsi_DOORLOCK(un, SD_REMOVAL_PREVENT,
 		    SD_PATH_DIRECT) != 0) && ISCD(un)) {
@@ -10736,7 +10706,6 @@ done:
 	 * Initialize the capacity kstat value, if no media previously
 	 * (capacity kstat is 0) and a media has been inserted
 	 * (un_blockcount > 0).
-	 * This is a more generic way then checking for ISREMOVABLE.
 	 */
 	if (un->un_errstats != NULL) {
 		stp = (struct sd_errstats *)un->un_errstats->ks_data;
@@ -12095,7 +12064,7 @@ sd_mapblockaddr_iostart(int index, struct sd_lun *un, struct buf *bp)
 		 * issue a read() just because it can see TOC on the CD. So
 		 * do not print a message for removables.
 		 */
-		if (!ISREMOVABLE(un)) {
+		if (!un->un_f_has_removable_media) {
 			scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
 			    "i/o to invalid geometry\n");
 		}
@@ -12988,7 +12957,7 @@ sd_init_cdb_limits(struct sd_lun *un)
 	un->un_mincdb = SD_CDB_GROUP1;
 #if !defined(__fibre)
 	if (!un->un_f_is_fibre && !un->un_f_cfg_is_atapi && !ISROD(un) &&
-	    !ISREMOVABLE(un)) {
+	    !un->un_f_has_removable_media) {
 		un->un_mincdb = SD_CDB_GROUP0;
 	}
 #endif
@@ -12999,9 +12968,11 @@ sd_init_cdb_limits(struct sd_lun *un)
 	 * kernel.
 	 */
 #ifdef _LP64
-	un->un_maxcdb = (ISREMOVABLE(un)) ? SD_CDB_GROUP5 : SD_CDB_GROUP4;
+	un->un_maxcdb = (un->un_f_has_removable_media) ? SD_CDB_GROUP5 :
+	    SD_CDB_GROUP4;
 #else
-	un->un_maxcdb = (ISREMOVABLE(un)) ? SD_CDB_GROUP5 : SD_CDB_GROUP1;
+	un->un_maxcdb = (un->un_f_has_removable_media) ? SD_CDB_GROUP5 :
+	    SD_CDB_GROUP1;
 #endif
 
 	/*
@@ -15215,6 +15186,14 @@ sd_retry_command(struct sd_lun *un, struct buf *bp, int retry_check_flag,
 			if (user_funcp != NULL) {
 				(*user_funcp)(un, bp, user_arg,
 				    SD_IMMEDIATE_RETRY_ISSUED);
+#ifdef __lock_lint
+				sd_print_incomplete_msg(un, bp, user_arg,
+				    SD_IMMEDIATE_RETRY_ISSUED);
+				sd_print_cmd_incomplete_msg(un, bp, user_arg,
+				    SD_IMMEDIATE_RETRY_ISSUED);
+				sd_print_sense_failed_msg(un, bp, user_arg,
+				    SD_IMMEDIATE_RETRY_ISSUED);
+#endif
 			}
 
 			SD_TRACE(SD_LOG_IO_CORE | SD_LOG_ERROR, un,
@@ -17395,7 +17374,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 	 */
 	if (xp->xb_retry_count >= un->un_notready_retry_count) {
 		/* Special check for error message printing for removables. */
-		if ((ISREMOVABLE(un)) && (asc == 0x04) &&
+		if (un->un_f_has_removable_media && (asc == 0x04) &&
 		    (ascq >= 0x04)) {
 			si.ssi_severity = SCSI_ERR_ALL;
 		}
@@ -17516,7 +17495,7 @@ sd_sense_key_not_ready(struct sd_lun *un,
 			 * mainly represent a user-initiated operation
 			 * instead of a system failure.
 			 */
-			if (ISREMOVABLE(un)) {
+			if (un->un_f_has_removable_media) {
 				si.ssi_severity = SCSI_ERR_ALL;
 				goto fail_command;
 			}
@@ -17772,6 +17751,7 @@ sd_sense_key_unit_attention(struct sd_lun *un,
 	 * under certain conditions.
 	 */
 	int	retry_check_flag = SD_RETRIES_UA;
+	boolean_t	kstat_updated = B_FALSE;
 	struct	sd_sense_info		si;
 
 	ASSERT(un != NULL);
@@ -17802,7 +17782,7 @@ sd_sense_key_unit_attention(struct sd_lun *un,
 		/* FALLTHRU */
 
 	case 0x28: /* NOT READY TO READY CHANGE, MEDIUM MAY HAVE CHANGED */
-		if (!ISREMOVABLE(un)) {
+		if (!un->un_f_has_removable_media) {
 			break;
 		}
 
@@ -17827,6 +17807,15 @@ sd_sense_key_unit_attention(struct sd_lun *un,
 			sd_print_sense_msg(un, bp, &si, SD_NO_RETRY_ISSUED);
 			sd_return_failed_command(un, bp, EIO);
 		}
+
+		/*
+		 * If failed to dispatch sd_media_change_task(), we already
+		 * updated kstat. If succeed to dispatch sd_media_change_task(),
+		 * we should update kstat later if it encounters an error. So,
+		 * we update kstat_updated flag here.
+		 */
+		kstat_updated = B_TRUE;
+
 		/*
 		 * Either the command has been successfully dispatched to a
 		 * task Q for retrying, or the dispatch failed. In either case
@@ -17841,13 +17830,10 @@ sd_sense_key_unit_attention(struct sd_lun *un,
 		break;
 	}
 
-	if (!ISREMOVABLE(un)) {
-		/*
-		 * Do not update these here for removables. For removables
-		 * these stats are updated (1) above if we failed to dispatch
-		 * sd_media_change_task(), or (2) sd_media_change_task() may
-		 * update these later if it encounters an error.
-		 */
+	/*
+	 * Update kstat if we haven't done that.
+	 */
+	if (!kstat_updated) {
 		SD_UPDATE_ERRSTATS(un, sd_harderrs);
 		SD_UPDATE_ERRSTATS(un, sd_rq_nodev_err);
 	}
@@ -17914,7 +17900,8 @@ sd_sense_key_blank_check(struct sd_lun *un, struct buf *bp,
 	 * Blank check is not fatal for removable devices, therefore
 	 * it does not require a console message.
 	 */
-	si.ssi_severity = (ISREMOVABLE(un)) ? SCSI_ERR_ALL : SCSI_ERR_FATAL;
+	si.ssi_severity = (un->un_f_has_removable_media) ? SCSI_ERR_ALL :
+	    SCSI_ERR_FATAL;
 	si.ssi_pfa_flag = FALSE;
 
 	sd_print_sense_msg(un, bp, &si, SD_NO_RETRY_ISSUED);
@@ -18777,7 +18764,7 @@ sd_media_change_task(void *arg)
 	un = SD_GET_UN(bp);
 	ASSERT(un != NULL);
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
-	ASSERT(ISREMOVABLE(un));
+	ASSERT(un->un_f_monitor_media_state);
 
 	si.ssi_severity = SCSI_ERR_INFO;
 	si.ssi_pfa_flag = FALSE;
@@ -18845,7 +18832,7 @@ sd_handle_mchange(struct sd_lun *un)
 	int		rval;
 
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
-	ASSERT(ISREMOVABLE(un));
+	ASSERT(un->un_f_monitor_media_state);
 
 	if ((rval = sd_send_scsi_READ_CAPACITY(un, &capacity, &lbasize,
 	    SD_PATH_DIRECT_PRIORITY)) != 0) {
@@ -19132,7 +19119,8 @@ sd_send_scsi_READ_CAPACITY(struct sd_lun *un, uint64_t *capp, uint32_t *lbap,
 	 * On x86, compensate for off-by-1 error (number of sectors on
 	 * media)  (1175930)
 	 */
-	if (!ISREMOVABLE(un) && (lbasize == un->un_sys_blocksize)) {
+	if (!un->un_f_has_removable_media && !un->un_f_is_hotpluggable &&
+	    (lbasize == un->un_sys_blocksize)) {
 		capacity -= 1;
 	}
 #endif
@@ -19366,7 +19354,7 @@ sd_send_scsi_START_STOP_UNIT(struct sd_lun *un, int flag, int path_flag)
 	SD_TRACE(SD_LOG_IO, un,
 	    "sd_send_scsi_START_STOP_UNIT: entry: un:0x%p\n", un);
 
-	if (ISREMOVABLE(un) &&
+	if (un->un_f_check_start_stop &&
 	    ((flag == SD_TARGET_START) || (flag == SD_TARGET_STOP)) &&
 	    (un->un_f_start_stop_supported != TRUE)) {
 		return (0);
@@ -20070,7 +20058,7 @@ sd_send_scsi_SYNCHRONIZE_CACHE_biodone(struct buf *bp)
 			    (sense_buf->es_key == KEY_ILLEGAL_REQUEST)) {
 				/* Ignore Illegal Request error */
 				mutex_enter(SD_MUTEX(un));
-				un->un_f_sync_cache_unsupported = TRUE;
+				un->un_f_sync_cache_supported = FALSE;
 				mutex_exit(SD_MUTEX(un));
 				status = ENOTSUP;
 				goto done;
@@ -20840,7 +20828,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 		case FDEJECT:
 		case DKIOCEJECT:
 		case CDROMEJECT:
-			if (!ISREMOVABLE(un)) {
+			if (!un->un_f_eject_media_supported) {
 				un->un_ncmds_in_driver--;
 				ASSERT(un->un_ncmds_in_driver >= 0);
 				mutex_exit(SD_MUTEX(un));
@@ -20863,6 +20851,7 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 			mutex_enter(SD_MUTEX(un));
 			/* FALLTHROUGH */
 		case DKIOCREMOVABLE:
+		case DKIOCHOTPLUGGABLE:
 		case DKIOCINFO:
 		case DKIOCGMEDIAINFO:
 		case MHIOCENFAILFAST:
@@ -20913,11 +20902,12 @@ sdioctl(dev_t dev, int cmd, intptr_t arg, int flag, cred_t *cred_p, int *rval_p)
 			case DKIOCGETEFI:
 			case DKIOCSGEOM:
 			case DKIOCREMOVABLE:
+			case DKIOCHOTPLUGGABLE:
 			case DKIOCSAPART:
 			case DKIOCSETEFI:
 				break;
 			default:
-				if (ISREMOVABLE(un)) {
+				if (un->un_f_has_removable_media) {
 					err = ENXIO;
 				} else {
 					/* Do not map EACCES to EIO */
@@ -21058,7 +21048,28 @@ skip_ready_valid:
 
 	case DKIOCREMOVABLE:
 		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCREMOVABLE\n");
-		if (ISREMOVABLE(un)) {
+		/*
+		 * At present, vold only does automount for removable-media
+		 * devices, in order not to break current applications, we
+		 * still let hopluggable devices pretend to be removable media
+		 * devices for vold. In the near future, once vold is EOL'ed,
+		 * we should remove this workaround.
+		 */
+		if (un->un_f_has_removable_media || un->un_f_is_hotpluggable) {
+			i = 1;
+		} else {
+			i = 0;
+		}
+		if (ddi_copyout(&i, (void *)arg, sizeof (int), flag) != 0) {
+			err = EFAULT;
+		} else {
+			err = 0;
+		}
+		break;
+
+	case DKIOCHOTPLUGGABLE:
+		SD_TRACE(SD_LOG_IOCTL, un, "DKIOCHOTPLUGGABLE\n");
+		if (un->un_f_is_hotpluggable) {
 			i = 1;
 		} else {
 			i = 0;
@@ -21125,7 +21136,7 @@ skip_ready_valid:
 		SD_TRACE(SD_LOG_IOCTL, un, "MHIOCREREGISTERDEVID\n");
 		if (drv_priv(cred_p) == EPERM) {
 			err = EPERM;
-		} else if (ISREMOVABLE(un) || ISCD(un)) {
+		} else if (!un->un_f_devid_supported) {
 			err = ENOTTY;
 		} else {
 			err = sd_mhdioc_register_devid(dev);
@@ -21334,7 +21345,7 @@ skip_ready_valid:
 	case DKIOCEJECT:
 	case CDROMEJECT:
 		SD_TRACE(SD_LOG_IOCTL, un, "EJECT\n");
-		if (!ISREMOVABLE(un)) {
+		if (!un->un_f_eject_media_supported) {
 			err = ENOTTY;
 		} else {
 			err = sr_eject(dev);
@@ -21744,10 +21755,10 @@ skip_ready_valid:
 			struct dk_callback *dkc = (struct dk_callback *)arg;
 
 			mutex_enter(SD_MUTEX(un));
-			if (un->un_f_sync_cache_unsupported ||
-			    ! un->un_f_write_cache_enabled) {
-				err = un->un_f_sync_cache_unsupported ?
-					ENOTSUP : 0;
+			if (!un->un_f_sync_cache_supported ||
+			    !un->un_f_write_cache_enabled) {
+				err = un->un_f_sync_cache_supported ?
+					0 : ENOTSUP;
 				mutex_exit(SD_MUTEX(un));
 				if ((flag & FKIOCTL) && dkc != NULL &&
 				    dkc->dkc_callback != NULL) {
@@ -22908,7 +22919,7 @@ sd_dkio_set_vtoc(dev_t dev, caddr_t arg, int flag)
 	 * writing to the disk acyl for the case where a devid has been
 	 * fabricated.
 	 */
-	if (!ISREMOVABLE(un) && !ISCD(un) &&
+	if (un->un_f_devid_supported &&
 	    (un->un_f_opt_fab_devid == TRUE)) {
 		if (un->un_devid == NULL) {
 			sd_register_devid(un, SD_DEVINFO(un),
@@ -23118,7 +23129,7 @@ sd_clear_efi(struct sd_lun *un)
 	 */
 	if ((rval = sd_send_scsi_READ(un, gpt, lbasize,
 	    cap - 1, ISCD(un) ? SD_PATH_DIRECT_PRIORITY :
-	    SD_PATH_DIRECT)) != 0) {
+		SD_PATH_DIRECT)) != 0) {
 		goto done;
 	}
 	sd_swap_efi_gpt(gpt);
@@ -23462,11 +23473,7 @@ sd_dkio_get_mboot(dev_t dev, caddr_t arg, int flag)
 		return (ENXIO);
 	}
 
-#if defined(_SUNOS_VTOC_8)
-	if ((!ISREMOVABLE(un)) || (arg == NULL)) {
-#elif defined(_SUNOS_VTOC_16)
-	if (arg == NULL) {
-#endif
+	if (!un->un_f_mboot_supported || arg == NULL) {
 		return (EINVAL);
 	}
 
@@ -23524,11 +23531,9 @@ sd_dkio_set_mboot(dev_t dev, caddr_t arg, int flag)
 
 	ASSERT(!mutex_owned(SD_MUTEX(un)));
 
-#if defined(_SUNOS_VTOC_8)
-	if (!ISREMOVABLE(un)) {
+	if (!un->un_f_mboot_supported) {
 		return (EINVAL);
 	}
-#endif
 
 	if (arg == NULL) {
 		return (EINVAL);
@@ -23572,8 +23577,7 @@ sd_dkio_set_mboot(dev_t dev, caddr_t arg, int flag)
 	 * Also preserve the device id by writing to the disk acyl for the case
 	 * where a devid has been fabricated.
 	 */
-	if (!ISREMOVABLE(un) && !ISCD(un) &&
-	    (un->un_f_opt_fab_devid == TRUE)) {
+	if (un->un_f_devid_supported && un->un_f_opt_fab_devid) {
 		if (un->un_devid == NULL) {
 			sd_register_devid(un, SD_DEVINFO(un),
 			    SD_TARGET_IS_UNRESERVED);
@@ -23592,6 +23596,11 @@ sd_dkio_set_mboot(dev_t dev, caddr_t arg, int flag)
 			}
 		}
 	}
+
+#ifdef __lock_lint
+	sd_setup_default_geometry(un);
+#endif
+
 #else
 	if (rval == 0) {
 		/*
@@ -23749,7 +23758,7 @@ sd_update_fdisk_and_vtoc(struct sd_lun *un)
 	 * Only DIRECT ACCESS devices will have Sun labels.
 	 * CD's supposedly have a Sun label, too
 	 */
-	if (SD_INQUIRY(un)->inq_dtype == DTYPE_DIRECT || ISREMOVABLE(un)) {
+	if (un->un_f_vtoc_label_supported) {
 		fdisk_rval = sd_read_fdisk(un, capacity, lbasize,
 		    SD_PATH_DIRECT);
 		if (fdisk_rval == SD_CMD_FAILURE) {
@@ -23798,9 +23807,10 @@ sd_update_fdisk_and_vtoc(struct sd_lun *un)
 	}
 
 no_solaris_partition:
-	if ((!ISREMOVABLE(un) ||
-	    (ISREMOVABLE(un) && un->un_mediastate == DKIO_EJECTED)) &&
-	    (un->un_state == SD_STATE_NORMAL && gvalid == FALSE)) {
+	if ((!un->un_f_has_removable_media ||
+	    (un->un_f_has_removable_media &&
+	    un->un_mediastate == DKIO_EJECTED)) &&
+		(un->un_state == SD_STATE_NORMAL && !gvalid)) {
 		/*
 		 * Print out a message indicating who and what we are.
 		 * We do this only when we happen to really validate the
@@ -24056,7 +24066,6 @@ done:
 	 * Update the capacity kstat value, if no media previously
 	 * (capacity kstat is 0) and a media has been inserted
 	 * (un_f_blockcount_is_valid == TRUE)
-	 * This is a more generic way then checking for ISREMOVABLE.
 	 */
 	if (un->un_errstats) {
 		struct sd_errstats	*stp = NULL;
@@ -30419,3 +30428,534 @@ sd_faultinjection(struct scsi_pkt *pktp)
 }
 
 #endif /* SD_FAULT_INJECTION */
+
+/*
+ * This routine is invoked in sd_unit_attach(). Before calling it, the
+ * properties in conf file should be processed already, and "hotpluggable"
+ * property was processed also.
+ *
+ * The sd driver distinguishes 3 different type of devices: removable media,
+ * non-removable media, and hotpluggable. Below the differences are defined:
+ *
+ * 1. Device ID
+ *
+ *     The device ID of a device is used to identify this device. Refer to
+ *     ddi_devid_register(9F).
+ *
+ *     For a non-removable media disk device which can provide 0x80 or 0x83
+ *     VPD page (refer to INQUIRY command of SCSI SPC specification), a unique
+ *     device ID is created to identify this device. For other non-removable
+ *     media devices, a default device ID is created only if this device has
+ *     at least 2 alter cylinders. Otherwise, this device has no devid.
+ *
+ *     -------------------------------------------------------
+ *     removable media   hotpluggable  | Can Have Device ID
+ *     -------------------------------------------------------
+ *         false             false     |     Yes
+ *         false             true      |     Yes
+ *         true                x       |     No
+ *     ------------------------------------------------------
+ *
+ *
+ * 2. SCSI group 4 commands
+ *
+ *     In SCSI specs, only some commands in group 4 command set can use
+ *     8-byte addresses that can be used to access >2TB storage spaces.
+ *     Other commands have no such capability. Without supporting group4,
+ *     it is impossible to make full use of storage spaces of a disk with
+ *     capacity larger than 2TB.
+ *
+ *     -----------------------------------------------
+ *     removable media   hotpluggable   LP64  |  Group
+ *     -----------------------------------------------
+ *           false          false       false |   1
+ *           false          false       true  |   4
+ *           false          true        false |   1
+ *           false          true        true  |   4
+ *           true             x           x   |   5
+ *     -----------------------------------------------
+ *
+ *
+ * 3. Check for VTOC Label
+ *
+ *     If a direct-access disk has no EFI label, sd will check if it has a
+ *     valid VTOC label. Now, sd also does that check for removable media
+ *     and hotpluggable devices.
+ *
+ *     --------------------------------------------------------------
+ *     Direct-Access   removable media    hotpluggable |  Check Label
+ *     -------------------------------------------------------------
+ *         false          false           false        |   No
+ *         false          false           true         |   No
+ *         false          true            false        |   Yes
+ *         false          true            true         |   Yes
+ *         true            x                x          |   Yes
+ *     --------------------------------------------------------------
+ *
+ *
+ * 4. Building default VTOC label
+ *
+ *     As section 3 says, sd checks if some kinds of devices have VTOC label.
+ *     If those devices have no valid VTOC label, sd(7d) will attempt to
+ *     create default VTOC for them. Currently sd creates default VTOC label
+ *     for all devices on x86 platform (VTOC_16), but only for removable
+ *     media devices on SPARC (VTOC_8).
+ *
+ *     -----------------------------------------------------------
+ *       removable media hotpluggable platform   |   Default Label
+ *     -----------------------------------------------------------
+ *             false          false    sparc     |     No
+ *             false          true      x86      |     Yes
+ *             false          true     sparc     |     Yes
+ *             true             x        x       |     Yes
+ *     ----------------------------------------------------------
+ *
+ *
+ * 5. Supported blocksizes of target devices
+ *
+ *     Sd supports non-512-byte blocksize for removable media devices only.
+ *     For other devices, only 512-byte blocksize is supported. This may be
+ *     changed in near future because some RAID devices require non-512-byte
+ *     blocksize
+ *
+ *     -----------------------------------------------------------
+ *     removable media    hotpluggable    | non-512-byte blocksize
+ *     -----------------------------------------------------------
+ *           false          false         |   No
+ *           false          true          |   No
+ *           true             x           |   Yes
+ *     -----------------------------------------------------------
+ *
+ *
+ * 6. Automatic mount & unmount (i.e. vold)
+ *
+ *     Sd(7d) driver provides DKIOCREMOVABLE ioctl. This ioctl is used to query
+ *     if a device is removable media device. It return 1 for removable media
+ *     devices, and 0 for others.
+ *
+ *     Vold treats a device as removable one only if DKIOREMOVABLE returns 1.
+ *     And it does automounting only for removable media devices. In order to
+ *     preserve users' experience and let vold continue to do automounting for
+ *     USB disk devices, DKIOCREMOVABLE ioctl still returns 1 for USB/1394 disk
+ *     devices.
+ *
+ *      ------------------------------------------------------
+ *       removable media    hotpluggable   |  automatic mount
+ *      ------------------------------------------------------
+ *             false          false        |   No
+ *             false          true         |   Yes
+ *             true             x          |   Yes
+ *      ------------------------------------------------------
+ *
+ *
+ * 7. fdisk partition management
+ *
+ *     Fdisk is traditional partition method on x86 platform. Sd(7d) driver
+ *     just supports fdisk partitions on x86 platform. On sparc platform, sd
+ *     doesn't support fdisk partitions at all. Note: pcfs(7fs) can recognize
+ *     fdisk partitions on both x86 and SPARC platform.
+ *
+ *     -----------------------------------------------------------
+ *       platform   removable media  USB/1394  |  fdisk supported
+ *     -----------------------------------------------------------
+ *        x86         X               X        |       true
+ *     ------------------------------------------------------------
+ *        sparc       X               X        |       false
+ *     ------------------------------------------------------------
+ *
+ *
+ * 8. MBOOT/MBR
+ *
+ *     Although sd(7d) doesn't support fdisk on SPARC platform, it does support
+ *     read/write mboot for removable media devices on sparc platform.
+ *
+ *     -----------------------------------------------------------
+ *       platform   removable media  USB/1394  |  mboot supported
+ *     -----------------------------------------------------------
+ *        x86         X               X        |       true
+ *     ------------------------------------------------------------
+ *        sparc      false           false     |       false
+ *        sparc      false           true      |       true
+ *        sparc      true            false     |       true
+ *        sparc      true            true      |       true
+ *     ------------------------------------------------------------
+ *
+ *
+ * 9.  error handling during opening device
+ *
+ *     If failed to open a disk device, an errno is returned. For some kinds
+ *     of errors, different errno is returned depending on if this device is
+ *     a removable media device. This brings USB/1394 hard disks in line with
+ *     expected hard disk behavior. It is not expected that this breaks any
+ *     application.
+ *
+ *     ------------------------------------------------------
+ *       removable media    hotpluggable   |  errno
+ *     ------------------------------------------------------
+ *             false          false        |   EIO
+ *             false          true         |   EIO
+ *             true             x          |   ENXIO
+ *     ------------------------------------------------------
+ *
+ *
+ * 10. off-by-1 workaround (bug 1175930, and 4996920) (x86 only)
+ *
+ *     [ this is a bit of very ugly history, soon to be removed ]
+ *
+ *     SCSI READ_CAPACITY command returns the last valid logical block number
+ *     which starts from 0. So real capacity is larger than the returned
+ *     value by 1. However, because scdk.c (which was EOL'ed) directly used
+ *     the logical block number as capacity of disk devices, off-by-1 work-
+ *     around was applied. This workaround causes fixed SCSI disk to loss a
+ *     sector on x86 platform, and precludes exchanging fixed hard disks
+ *     between sparc and x86.
+ *
+ *     ------------------------------------------------------
+ *       removable media    hotplug        |   Off-by-1 works
+ *     -------------------------------------------------------
+ *             false          false        |     Yes
+ *             false          true         |     No
+ *             true           false        |     No
+ *             true           true         |     No
+ *     ------------------------------------------------------
+ *
+ *
+ * 11. ioctls: DKIOCEJECT, CDROMEJECT
+ *
+ *     These IOCTLs are applicable only to removable media devices.
+ *
+ *     -----------------------------------------------------------
+ *       removable media    hotpluggable   |DKIOCEJECT, CDROMEJECT
+ *     -----------------------------------------------------------
+ *             false          false        |     No
+ *             false          true         |     No
+ *             true            x           |     Yes
+ *     -----------------------------------------------------------
+ *
+ *
+ * 12. Kstats for partitions
+ *
+ *     sd creates partition kstat for non-removable media devices. USB and
+ *     Firewire hard disks now have partition kstats
+ *
+ *      ------------------------------------------------------
+ *       removable media    hotplugable    |   kstat
+ *      ------------------------------------------------------
+ *             false          false        |    Yes
+ *             false          true         |    Yes
+ *             true             x          |    No
+ *       ------------------------------------------------------
+ *
+ *
+ * 13. Removable media & hotpluggable properties
+ *
+ *     Sd driver creates a "removable-media" property for removable media
+ *     devices. Parent nexus drivers create a "hotpluggable" property if
+ *     it supports hotplugging.
+ *
+ *     ---------------------------------------------------------------------
+ *     removable media   hotpluggable |  "removable-media"   " hotpluggable"
+ *     ---------------------------------------------------------------------
+ *       false            false       |    No                   No
+ *       false            true        |    No                   Yes
+ *       true             false       |    Yes                  No
+ *       true             true        |    Yes                  Yes
+ *     ---------------------------------------------------------------------
+ *
+ *
+ * 14. Power Management
+ *
+ *     sd only power manages removable media devices or devices that support
+ *     LOG_SENSE or have a "pm-capable" property  (PSARC/2002/250)
+ *
+ *     A parent nexus that supports hotplugging can also set "pm-capable"
+ *     if the disk can be power managed.
+ *
+ *     ------------------------------------------------------------
+ *       removable media hotpluggable pm-capable  |   power manage
+ *     ------------------------------------------------------------
+ *             false          false     false     |     No
+ *             false          false     true      |     Yes
+ *             false          true      false     |     No
+ *             false          true      true      |     Yes
+ *             true             x        x        |     Yes
+ *     ------------------------------------------------------------
+ *
+ *      USB and firewire hard disks can now be power managed independently
+ *      of the framebuffer
+ *
+ *
+ * 15. Support for USB disks with capacity larger than 1TB
+ *
+ *     Currently, sd doesn't permit a fixed disk device with capacity
+ *     larger than 1TB to be used in a 32-bit operating system environment.
+ *     However, sd doesn't do that for removable media devices. Instead, it
+ *     assumes that removable media devices cannot have a capacity larger
+ *     than 1TB. Therefore, using those devices on 32-bit system is partially
+ *     supported, which can cause some unexpected results.
+ *
+ *     ---------------------------------------------------------------------
+ *       removable media    USB/1394 | Capacity > 1TB |   Used in 32-bit env
+ *     ---------------------------------------------------------------------
+ *             false          false  |   true         |     no
+ *             false          true   |   true         |     no
+ *             true           false  |   true         |     Yes
+ *             true           true   |   true         |     Yes
+ *     ---------------------------------------------------------------------
+ *
+ *
+ * 16. Check write-protection at open time
+ *
+ *     When a removable media device is being opened for writing without NDELAY
+ *     flag, sd will check if this device is writable. If attempting to open
+ *     without NDELAY flag a write-protected device, this operation will abort.
+ *
+ *     ------------------------------------------------------------
+ *       removable media    USB/1394   |   WP Check
+ *     ------------------------------------------------------------
+ *             false          false    |     No
+ *             false          true     |     No
+ *             true           false    |     Yes
+ *             true           true     |     Yes
+ *     ------------------------------------------------------------
+ *
+ *
+ * 17. syslog when corrupted VTOC is encountered
+ *
+ *      Currently, if an invalid VTOC is encountered, sd only print syslog
+ *      for fixed SCSI disks.
+ *     ------------------------------------------------------------
+ *       removable media    USB/1394   |   print syslog
+ *     ------------------------------------------------------------
+ *             false          false    |     Yes
+ *             false          true     |     No
+ *             true           false    |     No
+ *             true           true     |     No
+ *     ------------------------------------------------------------
+ */
+static void
+sd_set_unit_attributes(struct sd_lun *un, dev_info_t *devi)
+{
+	int	pm_capable_prop;
+
+	ASSERT(un->un_sd);
+	ASSERT(un->un_sd->sd_inq);
+
+#if defined(_SUNOS_VTOC_16)
+	/*
+	 * For VTOC_16 devices, the default label will be created for all
+	 * devices. (see sd_build_default_label)
+	 */
+	un->un_f_default_vtoc_supported = TRUE;
+#endif
+
+	if (un->un_sd->sd_inq->inq_rmb) {
+		/*
+		 * The media of this device is removable. And for this kind
+		 * of devices, it is possible to change medium after openning
+		 * devices. Thus we should support this operation.
+		 */
+		un->un_f_has_removable_media = TRUE;
+
+#if defined(_SUNOS_VTOC_8)
+		/*
+		 * Note: currently, for VTOC_8 devices, default label is
+		 * created for removable and hotpluggable devices only.
+		 */
+		un->un_f_default_vtoc_supported = TRUE;
+#endif
+		/*
+		 * support non-512-byte blocksize of removable media devices
+		 */
+		un->un_f_non_devbsize_supported = TRUE;
+
+		/*
+		 * Assume that all removable media devices support DOOR_LOCK
+		 */
+		un->un_f_doorlock_supported = TRUE;
+
+		/*
+		 * For a removable media device, it is possible to be opened
+		 * with NDELAY flag when there is no media in drive, in this
+		 * case we don't care if device is writable. But if without
+		 * NDELAY flag, we need to check if media is write-protected.
+		 */
+		un->un_f_chk_wp_open = TRUE;
+
+		/*
+		 * need to start a SCSI watch thread to monitor media state,
+		 * when media is being inserted or ejected, notify syseventd.
+		 */
+		un->un_f_monitor_media_state = TRUE;
+
+		/*
+		 * Some devices don't support START_STOP_UNIT command.
+		 * Therefore, we'd better check if a device supports it
+		 * before sending it.
+		 */
+		un->un_f_check_start_stop = TRUE;
+
+		/*
+		 * support eject media ioctl:
+		 *		FDEJECT, DKIOCEJECT, CDROMEJECT
+		 */
+		un->un_f_eject_media_supported = TRUE;
+
+		/*
+		 * Because many removable-media devices don't support
+		 * LOG_SENSE, we couldn't use this command to check if
+		 * a removable media device support power-management.
+		 * We assume that they support power-management via
+		 * START_STOP_UNIT command and can be spun up and down
+		 * without limitations.
+		 */
+		un->un_f_pm_supported = TRUE;
+
+		/*
+		 * Need to create a zero length (Boolean) property
+		 * removable-media for the removable media devices.
+		 * Note that the return value of the property is not being
+		 * checked, since if unable to create the property
+		 * then do not want the attach to fail altogether. Consistent
+		 * with other property creation in attach.
+		 */
+		(void) ddi_prop_create(DDI_DEV_T_NONE, devi,
+		    DDI_PROP_CANSLEEP, "removable-media", NULL, 0);
+
+	} else {
+		/*
+		 * create device ID for device
+		 */
+		un->un_f_devid_supported = TRUE;
+
+		/*
+		 * Spin up non-removable-media devices once it is attached
+		 */
+		un->un_f_attach_spinup = TRUE;
+
+		/*
+		 * According to SCSI specification, Sense data has two kinds of
+		 * format: fixed format, and descriptor format. At present, we
+		 * don't support descriptor format sense data for removable
+		 * media.
+		 */
+		if (SD_INQUIRY(un)->inq_dtype == DTYPE_DIRECT) {
+			un->un_f_descr_format_supported = TRUE;
+		}
+
+		/*
+		 * kstats are created only for non-removable media devices.
+		 *
+		 * Set this in sd.conf to 0 in order to disable kstats.  The
+		 * default is 1, so they are enabled by default.
+		 */
+		un->un_f_pkstats_enabled = (ddi_prop_get_int(DDI_DEV_T_ANY,
+		    SD_DEVINFO(un), DDI_PROP_DONTPASS,
+			"enable-partition-kstats", 1));
+
+		/*
+		 * Check if HBA has set the "pm-capable" property.
+		 * If "pm-capable" exists and is non-zero then we can
+		 * power manage the device without checking the start/stop
+		 * cycle count log sense page.
+		 *
+		 * If "pm-capable" exists and is SD_PM_CAPABLE_FALSE (0)
+		 * then we should not power manage the device.
+		 *
+		 * If "pm-capable" doesn't exist then pm_capable_prop will
+		 * be set to SD_PM_CAPABLE_UNDEFINED (-1).  In this case,
+		 * sd will check the start/stop cycle count log sense page
+		 * and power manage the device if the cycle count limit has
+		 * not been exceeded.
+		 */
+		pm_capable_prop = ddi_prop_get_int(DDI_DEV_T_ANY, devi,
+		    DDI_PROP_DONTPASS, "pm-capable", SD_PM_CAPABLE_UNDEFINED);
+		if (pm_capable_prop == SD_PM_CAPABLE_UNDEFINED) {
+			un->un_f_log_sense_supported = TRUE;
+		} else {
+			/*
+			 * pm-capable property exists.
+			 *
+			 * Convert "TRUE" values for pm_capable_prop to
+			 * SD_PM_CAPABLE_TRUE (1) to make it easier to check
+			 * later. "TRUE" values are any values except
+			 * SD_PM_CAPABLE_FALSE (0) and
+			 * SD_PM_CAPABLE_UNDEFINED (-1)
+			 */
+			if (pm_capable_prop == SD_PM_CAPABLE_FALSE) {
+				un->un_f_log_sense_supported = FALSE;
+			} else {
+				un->un_f_pm_supported = TRUE;
+			}
+
+			SD_INFO(SD_LOG_ATTACH_DETACH, un,
+			    "sd_unit_attach: un:0x%p pm-capable "
+			    "property set to %d.\n", un, un->un_f_pm_supported);
+		}
+	}
+
+	if (un->un_f_is_hotpluggable) {
+#if defined(_SUNOS_VTOC_8)
+		/*
+		 * Note: currently, for VTOC_8 devices, default label is
+		 * created for removable and hotpluggable devices only.
+		 */
+		un->un_f_default_vtoc_supported = TRUE;
+#endif
+
+		/*
+		 * Temporarily, let hotpluggable devices pretend to be
+		 * removable-media devices for vold.
+		 */
+		un->un_f_monitor_media_state = TRUE;
+
+		un->un_f_check_start_stop = TRUE;
+
+	}
+
+	/*
+	 * By default, only DIRECT ACCESS devices and CDs will have Sun
+	 * labels.
+	 */
+	if ((SD_INQUIRY(un)->inq_dtype == DTYPE_DIRECT) ||
+	    (un->un_sd->sd_inq->inq_rmb)) {
+		/*
+		 * Direct access devices have disk label
+		 */
+		un->un_f_vtoc_label_supported = TRUE;
+	}
+
+	/*
+	 * Fdisk partitions are supported for all direct access devices on
+	 * x86 platform, and just for removable media and hotpluggable
+	 * devices on SPARC platform. Later, we will set the following flag
+	 * to FALSE if current device is not removable media or hotpluggable
+	 * device and if sd works on SAPRC platform.
+	 */
+	if (SD_INQUIRY(un)->inq_dtype == DTYPE_DIRECT) {
+		un->un_f_mboot_supported = TRUE;
+	}
+
+	if (!un->un_f_is_hotpluggable &&
+	    !un->un_sd->sd_inq->inq_rmb) {
+
+#if defined(_SUNOS_VTOC_8)
+		/*
+		 * Don't support fdisk on fixed disk
+		 */
+		un->un_f_mboot_supported = FALSE;
+#endif
+
+		/*
+		 * Fixed disk support SYNC CACHE
+		 */
+		un->un_f_sync_cache_supported = TRUE;
+
+		/*
+		 * For fixed disk, if its VTOC is not valid, we will write
+		 * errlog into system log
+		 */
+		if (un->un_f_vtoc_label_supported)
+			un->un_f_vtoc_errlog_supported = TRUE;
+	}
+}

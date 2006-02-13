@@ -19,7 +19,7 @@
  *
  * CDDL HEADER END
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,7 +193,7 @@ typedef struct scsa2usb_ov {
 	int	subclass;	/* subclass override */
 	int	protocol;	/* protocol override */
 	int	pmoff;		/* power management override */
-	int	not_removable;	/* removable device override */
+	int	fake_removable;	/* removable device override */
 	int	no_modesense;	/* no mode sense */
 				/* no modesense, doorlock, PM, start/stop */
 	int	reduced_cmd_support;

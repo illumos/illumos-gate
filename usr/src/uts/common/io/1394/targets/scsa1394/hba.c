@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -201,7 +201,7 @@ int scsa1394_start_stop_timeout_max = SCSA1394_START_STOP_TIMEOUT_MAX;
 
 /* workarounds */
 int scsa1394_wrka_rbc2direct = 1;
-int scsa1394_wrka_force_rmb = 1;
+int scsa1394_wrka_fake_rmb = 0;
 int scsa1394_wrka_fake_prin = 1;
 
 int scsa1394_wrka_symbios = 1;
@@ -732,6 +732,26 @@ scsa1394_create_children(scsa1394_state_t *sp)
 			continue;
 		}
 
+		/*
+		 * Some devices don't support LOG SENSE, so tell
+		 * sd driver not to send this command.
+		 */
+		ret = ndi_prop_update_int(DDI_DEV_T_NONE, cdip,
+		    "pm-capable", 1);
+		if (ret != DDI_PROP_SUCCESS) {
+			ddi_prop_remove_all(cdip);
+			(void) ndi_devi_free(cdip);
+			continue;
+		}
+
+		ret = ndi_prop_create_boolean(DDI_DEV_T_NONE, cdip,
+		    "hotpluggable");
+		if (ret != DDI_PROP_SUCCESS) {
+			ddi_prop_remove_all(cdip);
+			(void) ndi_devi_free(cdip);
+			continue;
+		}
+
 		if (driver_name) {
 			compatible[0] = driver_name;
 			ret = ndi_prop_update_string_array(DDI_DEV_T_NONE, cdip,
@@ -951,8 +971,7 @@ scsa1394_scsi_tgt_probe(struct scsi_device *sd, int (*waitfunc)())
 #endif
 	}
 
-	/* vold only handles devices with removeable bit set */
-	if (scsa1394_wrka_force_rmb) {
+	if (scsa1394_wrka_fake_rmb) {
 		sd->sd_inq->inq_rmb = 1;
 	}
 
@@ -2392,7 +2411,7 @@ scsa1394_cmd_status_wrka(scsa1394_lun_t *lp, scsa1394_cmd_t *cmd)
 
 		/* force RMB to 1 */
 		lp->l_rmb_orig = inq->inq_rmb;
-		if (scsa1394_wrka_force_rmb) {
+		if (scsa1394_wrka_fake_rmb) {
 			inq->inq_rmb = 1;
 		}
 		break;

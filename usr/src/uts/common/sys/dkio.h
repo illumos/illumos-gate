@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -211,6 +211,12 @@ struct dk_callback {
 #define	DKIOCUNLOCK	(DKIOC|8)	/* Generic 'unlock' */
 #define	DKIOCSTATE	(DKIOC|13)	/* Inquire insert/eject state */
 #define	DKIOCREMOVABLE	(DKIOC|16)	/* is media removable */
+
+
+/*
+ * ioctl for hotpluggable devices
+ */
+#define	DKIOCHOTPLUGGABLE	(DKIOC|35)	/* is hotpluggable */
 
 /*
  * Ioctl to force driver to re-read the alternate partition and rebuild
