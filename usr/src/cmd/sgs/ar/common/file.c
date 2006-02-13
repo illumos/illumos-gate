@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- *	Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ *	Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  *	Use is subject to license terms.
  */
 
@@ -106,6 +106,97 @@ getaf(Cmd_info *cmd_info)
 		exit(1);
 	}
 	return (fd);
+}
+
+/*
+ * If the current archive item is a 32 or 64-bit object, then
+ * ar(1) may have added newline padding at the end in order to
+ * bring 64-bit objects into 8-byte alignment within the file. This
+ * padding cannot be distinguished from data using the information kept
+ * in the ar headers. This routine examines the objects, using knowledge of
+ * ELF and how our tools lay out objects to determine whether padding was
+ * added to an archive item. If so, it adjusts the st_size and
+ * st_padding fields of the file argument to reflect it.
+ */
+static void
+recover_padding(Elf *elf, ARFILE *file)
+{
+	long extent;
+	long padding;
+	GElf_Ehdr ehdr;
+
+
+	/* ar(1) only pads objects, so bail if not looking at one */
+	if (gelf_getclass(elf) == ELFCLASSNONE)
+		return;
+
+	/*
+	 * elflib always puts the section header array at the end
+	 * of the object, and all of our compilers and other tools
+	 * use elflib or follow this convention. So, it is extremely
+	 * likely that the section header array is at the end of this
+	 * object: Find the address at the end of the array and compare
+	 * it to the archive ar_size. If they are within 8 bytes, then
+	 * we've found the end, and the difference is padding (no ELF
+	 * section can fit into 8 bytes).
+	 */
+	extent = gelf_getehdr(elf, &ehdr)
+		? (ehdr.e_shoff + (ehdr.e_shnum * ehdr.e_shentsize)) : 0;
+	padding = file->ar_size - extent;
+
+	if ((padding < 0) || (padding >= 8)) {
+		/*
+		 * The section header array is not at the end of the object.
+		 * Traverse the section headers and look for the one with
+		 * the highest used address. If this address is within
+		 * 8-bytes of ar_size, then this is the end of the object.
+		 */
+		Elf_Scn *scn = 0;
+
+		do {
+			scn = elf_nextscn(elf, scn);
+			if (scn) {
+				GElf_Shdr shdr;
+
+				if (gelf_getshdr(scn, &shdr)) {
+					long t = shdr.sh_offset + shdr.sh_size;
+					if (t > extent)
+						extent = t;
+				}
+			}
+		} while (scn);
+	}
+
+	/*
+	 * Now, test the padding. We only act on padding in the range
+	 * 1-7 (ar(1) will never add more than this). A pad of 0
+	 * requires no action, and any other size outside of 1-7 means
+	 * that we don't understand the layout of this object, and as such,
+	 * cannot do anything.
+	 *
+	 * If the padding is in the range 1-7, and the raw data for the
+	 * object is available, then we perform one additional sanity
+	 * check before moving forward: ar(1) always pads with newline
+	 * characters. If anything else is seen, it is not padding so
+	 * leave it alone.
+	 */
+	if ((padding > 0) && (padding < 8)) {
+		if (file->ar_contents) {
+			long cnt = padding;
+			char *p = file->ar_contents + extent;
+
+			while (cnt--) {
+				if (*p++ != '\n') {   /* No padding */
+					padding = 0;
+					break;
+				}
+			}
+		}
+
+		/* Remove the padding from the size */
+		file->ar_size -= padding;
+		file->ar_padding = padding;
+	}
 }
 
 ARFILE *
@@ -206,6 +297,9 @@ getfile(Cmd_info *cmd_info)
 		}
 		file->ar_elf = elf;
 	}
+
+	recover_padding(elf, file);
+
 	(void) elf_next(elf);
 	return (file);
 }
