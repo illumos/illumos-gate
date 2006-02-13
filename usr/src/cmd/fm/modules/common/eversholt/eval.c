@@ -357,12 +357,16 @@ eval_func(struct node *funcnp, struct lut *ex, struct node *epnames[],
 		return (!platform_confcall(np, globals, croot, arrowp, valuep));
 	} else if (funcname == L_count) {
 		struct stats *statp;
+		struct istat_entry ent;
 
 		ASSERTinfo(np->t == T_EVENT, ptree_nodetype2str(np->t));
 
+		ent.ename = np->u.event.ename->u.name.s;
+		ent.ipath = ipath(np->u.event.epname);
+
 		valuep->t = UINT64;
 		if ((statp = (struct stats *)
-		    lut_lookup(Istats, np, (lut_cmp)istat_cmp)) == NULL)
+		    lut_lookup(Istats, &ent, (lut_cmp)istat_cmp)) == NULL)
 			valuep->v = 0;
 		else
 			valuep->v = stats_counter_value(statp);
