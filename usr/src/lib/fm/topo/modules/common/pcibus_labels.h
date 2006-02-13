@@ -24,12 +24,12 @@
  * Use is subject to license terms.
  */
 
-#ifndef _PCI_LABELS_H
-#define	_PCI_LABELS_H
+#ifndef _PCIBUS_LABELS_H
+#define	_PCIBUS_LABELS_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "hostbridge.h"
+#include <hostbridge.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -107,4 +107,4 @@ extern int pci_label_cmn(tnode_t *, nvlist_t *, nvlist_t **);
 }
 #endif
 
-#endif /* _PCI_LABELS_H */
+#endif /* _PCIBUS_LABELS_H */

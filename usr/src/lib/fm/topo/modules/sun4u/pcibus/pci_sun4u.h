@@ -29,7 +29,7 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#include "pcibus_labels.h"
+#include <pcibus_labels.h>
 
 #ifdef __cplusplus
 extern "C" {

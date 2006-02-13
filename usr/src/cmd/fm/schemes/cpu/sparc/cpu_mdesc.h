@@ -25,8 +25,8 @@
  * Use is subject to license terms.
  */
 
-#ifndef	_CPU_H
-#define	_CPU_H
+#ifndef	_CPU_MDESC_H
+#define	_CPU_MDESC_H
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
@@ -59,4 +59,4 @@ extern md_t *mdesc_devinit(size_t *);
 }
 #endif
 
-#endif	/* _CPU_H */
+#endif	/* _CPU_MDESC_H */

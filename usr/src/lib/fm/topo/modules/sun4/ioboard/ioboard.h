@@ -30,7 +30,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <libdevinfo.h>
-#include "did.h"
+#include <did.h>
 
 #ifdef __cplusplus
 extern "C" {

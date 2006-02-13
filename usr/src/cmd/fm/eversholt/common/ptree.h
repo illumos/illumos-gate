@@ -38,7 +38,7 @@
 extern "C" {
 #endif
 
-#include "tree.h"
+#include <tree.h>
 
 /*
  * Use a pointer to one of these structs as the "arg" argument when

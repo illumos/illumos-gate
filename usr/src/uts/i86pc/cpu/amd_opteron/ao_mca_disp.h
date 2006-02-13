@@ -32,7 +32,7 @@
 #include <sys/mca_amd.h>
 #include <sys/fm/cpu/AMD.h>
 
-#include "ao.h"
+#include <ao.h>
 
 #ifdef __cplusplus
 extern "C" {
