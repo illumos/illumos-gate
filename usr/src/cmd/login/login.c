@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1658,10 +1658,12 @@ validate_account(void)
 
 				(void) printf("Choose a new password.\n");
 
-				error = pam_chauthtok(pamh, 0);
+				error = pam_chauthtok(pamh,
+				    PAM_CHANGE_EXPIRED_AUTHTOK);
 				if (error == PAM_TRY_AGAIN) {
 					(void) sleep(1);
-					error = pam_chauthtok(pamh, 0);
+					error = pam_chauthtok(pamh,
+					    PAM_CHANGE_EXPIRED_AUTHTOK);
 				}
 				tries++;
 			}

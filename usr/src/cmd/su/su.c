@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1130,8 +1130,8 @@ validate(char *usernam, int *pw_change)
 			tries = 0;
 			message(ERR, gettext("Password for user "
 			    "'%s' has expired"), pwd.pw_name);
-			while ((error = pam_chauthtok(pamh, 0)) !=
-			    PAM_SUCCESS) {
+			while ((error = pam_chauthtok(pamh,
+			    PAM_CHANGE_EXPIRED_AUTHTOK)) != PAM_SUCCESS) {
 				if ((error == PAM_AUTHTOK_ERR ||
 				    error == PAM_TRY_AGAIN) &&
 				    (tries++ < DEF_ATTEMPTS)) {
