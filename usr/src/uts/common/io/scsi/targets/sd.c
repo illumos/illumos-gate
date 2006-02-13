@@ -29331,7 +29331,13 @@ sd_range_lock(struct sd_lun *un, daddr_t startb, daddr_t endb, ushort_t typ)
 			sl_wmp->wm_wanted_count++;
 			cv_wait(&sl_wmp->wm_avail, SD_MUTEX(un));
 			sl_wmp->wm_wanted_count--;
-			if (!(sl_wmp->wm_flags & SD_WM_BUSY)) {
+			/*
+			 * We can reuse the memory from the completed sl_wmp
+			 * lock range for our new lock, but only if noone is
+			 * waiting for it.
+			 */
+			ASSERT(!(sl_wmp->wm_flags & SD_WM_BUSY));
+			if (sl_wmp->wm_wanted_count == 0) {
 				if (wmp != NULL)
 					CHK_N_FREEWMP(un, wmp);
 				wmp = sl_wmp;
