@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 1996 by Sun Microsystems, Inc.
- * All Rights Reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -65,6 +65,7 @@
  *	STATUS: G (good), D (diag fail), T (time not provided) or
  *		P (last phone update failed)
  */
+#define	PRECISION	(-10)   /* precision assumed (about 1 us) */
 #define MAXUNITS 1		/* max number of LEITCH units */
 #define LEITCHREFID	"ATOM"	/* reference id */
 #define LEITCH_DESCRIPTION "Leitch: CSD 5300 Master Clock System Driver"
@@ -430,7 +431,7 @@ leitch_start(unit, peer)
 	 * return success. Note that root delay and root dispersion are
 	 * always zero for this clock.
 	 */
-	peer->precision = 0;
+	peer->precision = PRECISION;
 	peer->rootdelay = 0;
 	peer->rootdispersion = 0;
 	peer->stratum = stratumtouse[unit];
