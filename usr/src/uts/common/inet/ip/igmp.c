@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /* Copyright (c) 1990 Mentat Inc. */
@@ -205,8 +205,8 @@ igmp_start_timers(unsigned next)
 		igmp_time_to_next = MIN(igmp_time_to_next, next);
 		igmp_timeout_id = timeout(igmp_timeout_handler, NULL,
 		    MSEC_TO_TICK(igmp_time_to_next));
-		igmp_timer_setter_active = B_FALSE;
 	}
+	igmp_timer_setter_active = B_FALSE;
 	mutex_exit(&igmp_timer_lock);
 }
 
@@ -287,8 +287,8 @@ mld_start_timers(unsigned next)
 		mld_time_to_next = MIN(mld_time_to_next, next);
 		mld_timeout_id = timeout(mld_timeout_handler, NULL,
 		    MSEC_TO_TICK(mld_time_to_next));
-		mld_timer_setter_active = B_FALSE;
 	}
+	mld_timer_setter_active = B_FALSE;
 	mutex_exit(&mld_timer_lock);
 }
 
