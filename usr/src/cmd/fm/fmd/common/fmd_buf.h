@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +55,7 @@ typedef struct fmd_buf_hash {
 } fmd_buf_hash_t;
 
 extern void fmd_buf_hash_create(fmd_buf_hash_t *);
-extern void fmd_buf_hash_destroy(fmd_buf_hash_t *);
+extern size_t fmd_buf_hash_destroy(fmd_buf_hash_t *);
 extern void fmd_buf_hash_apply(fmd_buf_hash_t *, fmd_buf_f *, void *);
 extern void fmd_buf_hash_commit(fmd_buf_hash_t *);
 extern uint_t fmd_buf_hash_count(fmd_buf_hash_t *);

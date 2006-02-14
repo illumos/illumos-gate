@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -382,7 +383,7 @@ fmd_module_unload(fmd_module_t *mp)
 		mp->mod_threads = NULL;
 	}
 
-	fmd_buf_hash_destroy(&mp->mod_bufs);
+	(void) fmd_buf_hash_destroy(&mp->mod_bufs);
 	fmd_serd_hash_destroy(&mp->mod_serds);
 
 	fmd_module_unlock(mp);
@@ -1002,7 +1003,7 @@ fmd_modhash_destroy(fmd_modhash_t *mhp)
 
 static void
 fmd_modhash_loaddir(fmd_modhash_t *mhp, const char *dir,
-    const fmd_modops_t *ops)
+    const fmd_modops_t *ops, const char *suffix)
 {
 	char path[PATH_MAX];
 	struct dirent *dp;
@@ -1016,9 +1017,13 @@ fmd_modhash_loaddir(fmd_modhash_t *mhp, const char *dir,
 		if (dp->d_name[0] == '.')
 			continue; /* skip "." and ".." */
 
-		if ((p = strrchr(dp->d_name, '.')) != NULL &&
-		    strcmp(p, ".conf") == 0)
+		p = strrchr(dp->d_name, '.');
+
+		if (p != NULL && strcmp(p, ".conf") == 0)
 			continue; /* skip .conf files */
+
+		if (suffix != NULL && (p == NULL || strcmp(p, suffix) != 0))
+			continue; /* skip files with the wrong suffix */
 
 		(void) snprintf(path, sizeof (path), "%s/%s", dir, dp->d_name);
 		(void) fmd_modhash_load(mhp, path, ops);
@@ -1029,12 +1034,12 @@ fmd_modhash_loaddir(fmd_modhash_t *mhp, const char *dir,
 
 void
 fmd_modhash_loadall(fmd_modhash_t *mhp, const fmd_conf_path_t *pap,
-    const fmd_modops_t *ops)
+    const fmd_modops_t *ops, const char *suffix)
 {
 	int i;
 
 	for (i = 0; i < pap->cpa_argc; i++)
-		fmd_modhash_loaddir(mhp, pap->cpa_argv[i], ops);
+		fmd_modhash_loaddir(mhp, pap->cpa_argv[i], ops, suffix);
 }
 
 void

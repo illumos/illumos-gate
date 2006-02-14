@@ -118,6 +118,7 @@
 #include <fmd_buf.h>
 #include <fmd_log.h>
 #include <fmd_asru.h>
+#include <fmd_fmri.h>
 #include <fmd_xprt.h>
 
 #include <fmd.h>
@@ -657,7 +658,7 @@ fmd_case_destroy(fmd_case_t *cp, int visible)
 
 	fmd_free(cip->ci_uuid, cip->ci_uuidlen + 1);
 	fmd_free(cip->ci_code, cip->ci_codelen);
-	fmd_buf_hash_destroy(&cip->ci_bufs);
+	(void) fmd_buf_hash_destroy(&cip->ci_bufs);
 
 	if (cip->ci_diag != NULL)
 		nvlist_free(cip->ci_diag);
@@ -984,6 +985,57 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 		fmd_case_rele(cp);
 }
 
+/*
+ * Transition the specified case to *at least* the specified state by first
+ * re-validating the suspect list using the resource cache.  This function is
+ * employed by the checkpoint code when restoring a saved, solved case to see
+ * if the state of the case has effectively changed while fmd was not running
+ * or the module was not loaded.  If none of the suspects are present anymore,
+ * advance the state to REPAIRED.  If none are usable, advance to CLOSE_WAIT.
+ */
+void
+fmd_case_transition_update(fmd_case_t *cp, uint_t state, uint_t flags)
+{
+	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
+	fmd_case_susp_t *cis;
+	fmd_asru_t *asru;
+	nvlist_t *nvl;
+
+	int present = 0;	/* are any suspects present? */
+	int usable = 0;		/* are any suspects usable? */
+
+	ASSERT(state >= FMD_CASE_SOLVED);
+	(void) pthread_mutex_lock(&cip->ci_lock);
+
+	for (cis = cip->ci_suspects; cis != NULL; cis = cis->cis_next) {
+		if (nvlist_lookup_nvlist(cis->cis_nvl, FM_FAULT_ASRU,
+		    &nvl) == 0 && (asru = fmd_asru_hash_lookup_nvl(
+		    fmd.d_asrus, nvl, FMD_B_TRUE)) != NULL) {
+
+			if ((asru->asru_flags & FMD_ASRU_INTERNAL) ||
+			    fmd_fmri_present(asru->asru_fmri) > 0)
+				present++;
+
+			if (fmd_fmri_unusable(asru->asru_fmri) <= 0)
+				usable++;
+
+			fmd_asru_hash_release(fmd.d_asrus, asru);
+		}
+	}
+
+	(void) pthread_mutex_unlock(&cip->ci_lock);
+
+	if (!present) {
+		state = MAX(state, FMD_CASE_CLOSE_WAIT);
+		flags |= FMD_CF_REPAIRED;
+	} else if (!usable) {
+		state = MAX(state, FMD_CASE_CLOSE_WAIT);
+		flags |= FMD_CF_ISOLATED;
+	}
+
+	fmd_case_transition(cp, state, flags);
+}
+
 void
 fmd_case_setdirty(fmd_case_t *cp)
 {
@@ -1085,13 +1137,23 @@ void
 fmd_case_delete(fmd_case_t *cp)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
-
-	(void) pthread_mutex_lock(&cip->ci_mod->mod_stats_lock);
-	cip->ci_mod->mod_stats->ms_caseopen.fmds_value.ui64--;
-	(void) pthread_mutex_unlock(&cip->ci_mod->mod_stats_lock);
+	fmd_modstat_t *msp;
+	size_t buftotal;
 
 	ASSERT(fmd_module_locked(cip->ci_mod));
 	fmd_list_delete(&cip->ci_mod->mod_cases, cip);
+	buftotal = fmd_buf_hash_destroy(&cip->ci_bufs);
+
+	(void) pthread_mutex_lock(&cip->ci_mod->mod_stats_lock);
+	msp = cip->ci_mod->mod_stats;
+
+	ASSERT(msp->ms_caseopen.fmds_value.ui64 != 0);
+	msp->ms_caseopen.fmds_value.ui64--;
+
+	ASSERT(msp->ms_buftotal.fmds_value.ui64 >= buftotal);
+	msp->ms_buftotal.fmds_value.ui64 -= buftotal;
+
+	(void) pthread_mutex_unlock(&cip->ci_mod->mod_stats_lock);
 
 	if (cip->ci_xprt == NULL)
 		fmd_module_setcdirty(cip->ci_mod);

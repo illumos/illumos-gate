@@ -833,10 +833,16 @@ mc_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 	 * number plus 24.  The node number can then be used to associate this
 	 * memory controller device with a given processor chip.
 	 */
-	(void) ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
-	    "unit-address", &unitstr);
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip,
+	    DDI_PROP_DONTPASS, "unit-address", &unitstr) != DDI_PROP_SUCCESS) {
+		cmn_err(CE_WARN, "failed to find unit-address for %s", bindnm);
+		return (DDI_FAILURE);
+	}
+
 	rc = ddi_strtol(unitstr, NULL, 16, &unitaddr);
 	ASSERT(rc == 0 && unitaddr >= MC_AMD_DEV_OFFSET);
+	ddi_prop_free(unitstr);
+
 	if (rc != 0 || unitaddr < MC_AMD_DEV_OFFSET) {
 		cmn_err(CE_WARN, "failed to parse unit address %s for %s\n",
 		    unitstr, bindnm);

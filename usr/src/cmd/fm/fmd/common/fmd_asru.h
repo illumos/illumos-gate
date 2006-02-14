@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,6 +61,7 @@ typedef struct fmd_asru {
 #define	FMD_ASRU_VALID		0x04	/* asru is initialized and valid */
 #define	FMD_ASRU_INTERNAL	0x08	/* asru is managed by fmd itself */
 #define	FMD_ASRU_INVISIBLE	0x10	/* asru is not visibly administered */
+#define	FMD_ASRU_RECREATED	0x20	/* asru recreated by cache replay */
 
 #define	FMD_ASRU_STATE	(FMD_ASRU_FAULTY | FMD_ASRU_UNUSABLE)
 

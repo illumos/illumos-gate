@@ -233,10 +233,12 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	 * delete the existing entry and continue on using the new entry; if
 	 * the new entry is no "better", return an error and ignore it.
 	 */
-	if ((ap = fmd_asru_hash_lookup(ahp, name)) != NULL) {
+	if ((ap = fmd_asru_hash_lookup(ahp, name)) != NULL &&
+	    (ap->asru_flags & FMD_ASRU_RECREATED)) {
 		if (!u && (ap->asru_flags & FMD_ASRU_UNUSABLE)) {
 			(void) fmd_asru_hash_delete_name(ahp, name);
 			fmd_asru_hash_release(ahp, ap);
+			ap = NULL;
 		} else {
 			fmd_error(EFMD_ASRU_DUP, "removing duplicate asru "
 			    "log %s for %s\n", lp->log_name, name);
@@ -247,8 +249,13 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 		}
 	}
 
-	ap = fmd_asru_create(ahp, fmd_strbasename(lp->log_name), name, fmri);
+	if (ap == NULL) {
+		ap = fmd_asru_create(ahp,
+		    fmd_strbasename(lp->log_name), name, fmri);
+	}
+
 	fmd_free(name, namelen + 1);
+	ap->asru_flags |= FMD_ASRU_RECREATED;
 
 	if (f)
 		ap->asru_flags |= FMD_ASRU_FAULTY;
@@ -290,8 +297,10 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 		}
 	}
 
-	ap->asru_flags |= FMD_ASRU_VALID;
-	fmd_asru_hash_insert(ahp, ap);
+	if (!(ap->asru_flags & FMD_ASRU_VALID)) {
+		ap->asru_flags |= FMD_ASRU_VALID;
+		fmd_asru_hash_insert(ahp, ap);
+	}
 
 	TRACE((FMD_DBG_ASRU, "asru %s recreated as %p (%s)", ap->asru_uuid,
 	    (void *)ap, _fmd_asru_snames[ap->asru_flags & FMD_ASRU_STATE]));

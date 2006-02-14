@@ -560,6 +560,7 @@ fmd_destroy(fmd_t *dp)
 	while ((cp = fmd_list_next(&dp->d_rmod->mod_cases)) != NULL)
 		fmd_case_discard(cp);
 
+
 	fmd_module_unlock(dp->d_rmod);
 	fmd_free(dp->d_rmod->mod_stats, sizeof (fmd_modstat_t));
 	dp->d_rmod->mod_stats = NULL;
@@ -864,10 +865,10 @@ fmd_run(fmd_t *dp, int pfd)
 		(void) write(pfd, &status, sizeof (status));
 
 	(void) fmd_conf_getprop(dp->d_conf, "plugin.path", &pap);
-	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_rtld_ops);
+	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_rtld_ops, ".so");
 
 	(void) fmd_conf_getprop(dp->d_conf, "agent.path", &pap);
-	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_proc_ops);
+	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_proc_ops, NULL);
 
 	/*
 	 * With all modules loaded, replay fault events from the ASRU cache for

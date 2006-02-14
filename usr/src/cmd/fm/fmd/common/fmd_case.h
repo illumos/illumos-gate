@@ -120,6 +120,7 @@ extern void fmd_case_reset_suspects(fmd_case_t *);
 extern nvlist_t *fmd_case_mkevent(fmd_case_t *, const char *);
 extern void fmd_case_publish(fmd_case_t *, uint_t);
 extern void fmd_case_transition(fmd_case_t *, uint_t, uint_t);
+extern void fmd_case_transition_update(fmd_case_t *, uint_t, uint_t);
 extern void fmd_case_setdirty(fmd_case_t *);
 extern void fmd_case_clrdirty(fmd_case_t *);
 extern void fmd_case_commit(fmd_case_t *);

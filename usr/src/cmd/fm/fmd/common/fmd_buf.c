@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,21 +63,24 @@ fmd_buf_hash_create(fmd_buf_hash_t *bhp)
 	bhp->bh_count = 0;
 }
 
-void
+size_t
 fmd_buf_hash_destroy(fmd_buf_hash_t *bhp)
 {
+	size_t total = 0;
 	fmd_buf_t *bp, *np;
 	uint_t i;
 
 	for (i = 0; i < bhp->bh_hashlen; i++) {
 		for (bp = bhp->bh_hash[i]; bp != NULL; bp = np) {
 			np = bp->buf_next;
+			total += bp->buf_size;
 			fmd_buf_free(bp);
 		}
 	}
 
 	fmd_free(bhp->bh_hash, sizeof (void *) * bhp->bh_hashlen);
 	bzero(bhp, sizeof (fmd_buf_hash_t));
+	return (total);
 }
 
 void

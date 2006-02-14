@@ -19,8 +19,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -196,7 +197,7 @@ extern fmd_module_t *fmd_modhash_load(fmd_modhash_t *,
     const char *, const fmd_modops_t *);
 
 extern void fmd_modhash_loadall(fmd_modhash_t *,
-    const fmd_conf_path_t *, const fmd_modops_t *);
+    const fmd_conf_path_t *, const fmd_modops_t *, const char *);
 
 extern fmd_module_t *fmd_modhash_lookup(fmd_modhash_t *, const char *);
 extern int fmd_modhash_unload(fmd_modhash_t *, const char *);
