@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -19,11 +18,14 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
-#ident	"%Z%%M%	%I%	%E% SMI"
+# ident	"%Z%%M%	%I%	%E% SMI"
+#
+
 #
 # This required package information file contains a list of package contents.
 # The 'pkgmk' command uses this file to identify the contents of a package
@@ -56,6 +58,7 @@ f none opt/onbld/bin/acr 555 root bin
 f none opt/onbld/bin/bfu 555 root bin
 f none opt/onbld/bin/bldenv 555 root bin
 f none opt/onbld/bin/build_cscope 555 root bin
+f none opt/onbld/bin/cddlchk 555 root bin
 f none opt/onbld/bin/check_fnames 555 root bin
 f none opt/onbld/bin/check_rtime 555 root bin
 f none opt/onbld/bin/checkpaths 555 root bin
@@ -106,6 +109,7 @@ d none opt/onbld/man/man1 755 root bin
 f none opt/onbld/man/man1/Install.1 644 root bin
 f none opt/onbld/man/man1/acr.1 644 root bin
 f none opt/onbld/man/man1/bldenv.1 644 root bin
+f none opt/onbld/man/man1/cddlchk.1 644 root bin
 f none opt/onbld/man/man1/check_rtime.1 644 root bin
 f none opt/onbld/man/man1/checkpaths.1 644 root bin
 f none opt/onbld/man/man1/codereview.1 644 root bin

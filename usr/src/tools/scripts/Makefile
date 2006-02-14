@@ -18,6 +18,7 @@
 #
 # CDDL HEADER END
 #
+
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
@@ -54,6 +55,7 @@ SHFILES= \
 	xref
 
 PERLFILES= \
+	cddlchk \
 	check_rtime \
 	hdrchk \
 	jstyle \
@@ -65,6 +67,7 @@ MAN1FILES= \
 	Install.1 \
 	acr.1 \
 	bldenv.1 \
+	cddlchk.1 \
 	checkpaths.1 \
 	check_rtime.1 \
 	cstyle.1 \
@@ -83,7 +86,7 @@ MAN1FILES= \
 MAKEFILES= \
 	xref.mk
 
-CLEANFILES = $(SHFILES)
+CLEANFILES = $(SHFILES) $(PERLFILES) cddlchk.1
 
 include ../Makefile.tools
 
@@ -101,6 +104,10 @@ install: all .WAIT $(ROOTONBLDSHFILES) $(ROOTONBLDPERLFILES) \
 
 clean:
 	$(RM) $(CLEANFILES)
+
+cddlchk.1: cddlchk.pl
+	/usr/perl5/bin/pod2man --center='User Commands' --name=cddlchk \
+	--section=1 --release='SunOS $(RELEASE)' $? > $@
 
 include ../Makefile.targ
 

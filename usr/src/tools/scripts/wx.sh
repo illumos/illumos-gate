@@ -20,13 +20,15 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+
+#
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
-# 
 # 
 #ident	"@(#)wx	1.12	98/11/09 SMI" (from bonwick)
 #ident  "@(#)wxx 1.26     03/01/23 SMI" (from fiveash)
 #ident	"%Z%%M%	%I%	%E% SMI"
+#
 
 # wx -- workspace extensions.  Jeff Bonwick, December 1992.
 
@@ -890,6 +892,9 @@ Usage:  $ME command [-D] [args]
         $ME copyright   make sure there is a correct copyright message
                         that contains the current year
                         skips files in wx/copyright.NOT
+	$ME cddlchk     make sure there is a current CDDL block in
+                        active files
+                        skips files in wx/cddlchk.NOT
         $ME rmdelchk    make sure sccs rmdel was not run on active files
                         (This causes Teamware problems.)
         $ME deltachk    make sure only 1 sccs delta in active files
@@ -903,7 +908,7 @@ Usage:  $ME command [-D] [args]
                         active list.
         $ME nits [file ...]
                         nits checking.  Run cstyle, jstyle, hdrchk, copyright,
-                        and keywords over files to which they are
+                        cddlchk, and keywords over files to which they are
                         applicable (makestyle is not currently run
                         because it seems to be quite broken -- more
                         noise than data).  This is a subset of pbchk checks
@@ -913,8 +918,8 @@ Usage:  $ME command [-D] [args]
                         Will skip checks for files listed in wx/nits.NOT.
         $ME pbchk [file ...]
                         putback check.  Run cstyle, jstyle, hdrchk, copyright,
-                        keywords, rmdelchk, deltachk, comchk, rtichk and
-                        outchk over files to which they are
+                        cddlchk, keywords, rmdelchk, deltachk, comchk, rtichk
+			and outchk over files to which they are
                         applicable (makestyle is not currently run
                         because it seems to be quite broken -- more
                         noise than data).  Good command to run before
@@ -2182,6 +2187,26 @@ Warning!!!
 $filepath 
 has copyright problems.  See
 /net/wizard.eng/export/misc/general_docs/golden_rules.txt
+for more info.
+			EOF
+			if [[ $force -ne 1 ]]; then
+				yesno "Continue with create?" 
+				if [[ "$answer" != 'yes' ]]; then
+					echo "Aborting create $filepath"
+					return 1
+				fi
+			fi
+		fi
+
+		if ! cddlchk -a $filepath; then
+			# Sound bell
+			ring_bell
+			cat >&2 <<-EOF
+
+Warning!!!
+$filepath 
+has CDDL block problems.  See
+http://www.opensolaris.org/os/community/onnv/devref_toc/devref_7/#7_2_3_nonformatting_considerations
 for more info.
 			EOF
 			if [[ $force -ne 1 ]]; then
@@ -4627,10 +4652,10 @@ shift
 case $command in
 	apply|eval)	subcommand=$1; shift;;
 	grep|egrep|sed|nawk)	pattern=$1; shift;;
-	nits)	comlist="cstyle jstyle hdrchk copyright keywords"; 
+	nits)	comlist="cstyle jstyle hdrchk copyright cddlchk keywords"; 
 		echo "Note, nits is a subset of pbchk checks.";;
-	pbchk)	comlist="cstyle jstyle hdrchk copyright keywords rmdelchk"
-		comlist="$comlist deltachk comchk rtichk outchk";;
+	pbchk)	comlist="cstyle jstyle hdrchk copyright cddlchk keywords"
+		comlist="$comlist rmdelchk deltachk comchk rtichk outchk";;
 esac
 
 orig_args="$*"
@@ -5040,6 +5065,33 @@ case $command in
 
 	deltachk)  echo "\nDoing multi delta check:"; wx_eval deltachk;;
 	copyright) echo "\nDoing copyright check:"; wx_eval wx_copyright;;
+	cddlchk)
+		echo "\nDoing CDDL block check:";
+		cd $workspace;
+		cddlnot="";
+		if [[ -s $wxdir/${command}.NOT ]]; then
+			cddlnot="-x $wxdir/${command}.NOT"
+		fi
+
+		#
+		# Split the file list into new files and existing files.
+		# New files must have a CDDL block whereas existing files don't
+		# necessarily have to have a block, but if they do it must be
+		# valid.  Both sets of files are subject to cddlchk.NOT
+		# exception processing.
+		# 
+		old=""
+		new=""
+		for filepath in $file_list; do
+			if wx_pnt_filepath $filepath; then
+				old="$old $filepath"
+			else
+				new="$new $filepath"
+			fi
+		done
+		[[ ! -z $new ]] && cddlchk $cddlnot $args -a $new
+		[[ ! -z $old ]] && cddlchk $cddlnot $args $old
+		;;
 	comchk)	 echo "\nDoing comments check:"; wx_summary -n 2>&1;;
 	outchk)	 echo "\nDoing out check:"; outchk;;
 	backup|bu) wx_backup $args;;

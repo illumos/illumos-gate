@@ -1,4 +1,3 @@
-.\" ident	"%Z%%M%	%I%	%E% SMI"
 .\" CDDL HEADER START
 .\"
 .\" The contents of this file are subject to the terms of the
@@ -17,10 +16,13 @@
 .\" information: Portions Copyright [yyyy] [name of copyright owner]
 .\"
 .\" CDDL HEADER END
-.\" "
-.\" "Copyright 2005 Sun Microsystems, Inc.  All rights reserved"
-.\" "Use is subject to license terms."
-.TH wx 1 "27 October 2005"
+.\"
+.\" Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+.\" Use is subject to license terms.
+.\"
+.\" ident	"%Z%%M%	%I%	%E% SMI"
+.\"
+.TH wx 1 "18 January 2006"
 .SH NAME
 .I wx
 \- tool to track changes to a workspace, follow ON gate rules and much more
@@ -94,6 +96,12 @@ alias for backup command
 .TP
 .B bugs [-u]
 display all bugids in check-in comments
+
+.TP
+.B cddlchk [cddlchk options]
+Warn about obsolete or corrupt CDDL blocks in active files.  Note that only
+files that already contain a CDDL block will be checked unless the '-a' flag
+is specified, and that files listed in wx/cddlchk.NOT will be skipped.
 
 .TP
 .B checkin
@@ -373,11 +381,11 @@ accurate if new cache isn't current).
 
 .TP
 .B nits [file ...]
-nits checking.  Run cstyle, jstyle, hdrchk, copyright, and keywords over files
-to which they are applicable (makestyle is not currently run because it
-seems to be quite broken -- more noise than data).  This is a subset of
-pbchk checks suitable for checking files during development.  Use pbchk
-before doing the final putback.  Will run checks on all active files if
+nits checking.  Run cstyle, jstyle, hdrchk, copyright, cddlchk, and
+keywords over files to which they are applicable (makestyle is not currently
+run because it seems to be quite broken -- more noise than data).  This is a
+subset of pbchk checks suitable for checking files during development.  Use
+pbchk before doing the final putback.  Will run checks on all active files if
 no file args.  Will skip checks for files listed in wx/nits.NOT.
 
 .TP
@@ -396,9 +404,9 @@ alias for putback.
 
 .TP
 .B pbchk [file ...]
-putback check.  Run cstyle, jstyle, hdrchk, copyright, keywords, rmdelchk,
-deltachk, comchk, rtichk and outchk over all files to which they are
-applicable (makestyle is not currently run because it seems to be quite
+putback check.  Run cstyle, jstyle, hdrchk, copyright, cddlchk, keywords,
+rmdelchk, deltachk, comchk, rtichk and outchk over all files to which they
+are applicable (makestyle is not currently run because it seems to be quite
 broken -- more noise than data).  Should be run before doing a putback.
 Will run checks on all active files if no file args.
 Will skip checks for files listed in wx/pbchk.NOT.
