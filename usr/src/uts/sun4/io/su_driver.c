@@ -24,7 +24,7 @@
 /*	  All Rights Reserved					*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2247,10 +2247,30 @@ async_restart(void *arg)
 #endif
 	mutex_enter(asy->asy_excl);
 	if (async->async_flags & ASYNC_BREAK) {
+		unsigned int rate;
+
 		mutex_enter(asy->asy_excl_hi);
 		lcr = INB(LCR);
 		OUTB(LCR, (lcr & ~SETBREAK));
+
+		/*
+		 * Go to sleep for the time it takes for at least one
+		 * stop bit to be received by the device at the other
+		 * end of the line as stated in the RS-232 specification.
+		 * The wait period is equal to:
+		 * 2 clock cycles * (1 MICROSEC / baud rate)
+		 */
+		rate = async->async_ttycommon.t_cflag & CBAUD;
+		if (async->async_ttycommon.t_cflag & CBAUDEXT)
+			rate += 16;
+		if (rate >= N_SU_SPEEDS || rate == B0) {
+			rate = B9600;
+		}
+
 		mutex_exit(asy->asy_excl_hi);
+		mutex_exit(asy->asy_excl);
+		drv_usecwait(2 * MICROSEC / baudtable[rate]);
+		mutex_enter(asy->asy_excl);
 	}
 	async->async_flags &= ~(ASYNC_DELAY|ASYNC_BREAK|ASYNC_DRAINING);
 	if ((q = async->async_ttycommon.t_writeq) != NULL) {
