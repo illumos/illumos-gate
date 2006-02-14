@@ -19,9 +19,9 @@
 .\" "
 .\" " CDDL HEADER END
 .\" "
-.\" "Copyright 2003 Sun Microsystems, Inc.  All rights reserved."
+.\" "Copyright 2006 Sun Microsystems, Inc.  All rights reserved."
 .\" "Use is subject to license terms."
-.TH xref 1 "21 Jan 2003"
+.TH xref 1 "10 Feb 2006"
 .SH NAME
 .I xref
 \- build and maintain source cross-references
@@ -137,6 +137,15 @@ Build just the standard cscope cross-reference for $SRC/uts:
 .LP
 $ CSCOPE=cscope CSFLAGS=-b xref -x cscope $SRC/uts
 .LP
+Build a cscope database containing just the ZFS source:
+.LP
+.nf
+$ cd $SRC
+$ cat > /tmp/zfs.mk
+XRDIRS=uts/common/fs/zfs common/zfs lib/libzfs cmd/zfs cmd/zpool
+.fi
+$ xref -f -x cscope -m /tmp/zfs.mk
+.LP
 .SH ENVIRONMENT VARIABLES
 Because xref uses xref.mk to carry out the requested operations and
 invokes make(1) with the -e option, the value of any macros used by
@@ -150,7 +159,7 @@ references; see \fIEXAMPLES\fP.
 .IR bringover(1),
 .IR flg.flp(1)
 .SH NOTES
-The etags utility is no longer bundled with the Sun ONE Studio, which
+The etags utility is no longer bundled with the Sun Studio, which
 means it may not be available on all developer systems.  If xref cannot
 locate the etags utility and the -x option has not been specified, then
 xref will silently not build etags.
