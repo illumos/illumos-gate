@@ -98,6 +98,7 @@ i386_SUBDIRS= \
         SUNWagp \
         SUNWagph \
 	SUNWamr \
+	SUNWatheros \
 	SUNWcakr.i \
 	SUNWcar.i  \
 	SUNWcpc.i \
@@ -115,7 +116,6 @@ i386_SUBDIRS= \
 	SUNWrtls \
 	SUNWsi3124 \
 	SUNWvia823x \
-	SUNWatheros \
 	SUNWmv88sx
 
 i386_XMODS= \
