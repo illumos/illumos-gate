@@ -2516,6 +2516,51 @@ remove_perl_500503()
 }
 
 #
+# Remove ASET
+#
+remove_eof_aset()
+{
+	# Packages to remove
+	typeset -r aset_pkgs='SUNWast'
+	typeset -r pkgroot=${rootprefix:+-R $rootprefix}
+	typeset pkg
+
+	printf 'Removing ASET... '
+
+	#
+	# First, attempt to remove the packages cleanly if possible.
+	#
+	for pkg in $aset_pkgs
+	do
+		if pkginfo $pkgroot -q $pkg; then
+			printf ' %s' $pkg
+			pkgrm $pkgroot -n $pkg >/dev/null 2>&1
+		fi
+	done
+	printf '\n'
+
+	#
+	# In case that didn't work, do it manually.
+	# Remove ASET from $rootprefix/var/sadm/install/contents
+	#
+	for pkg in $aset_pkgs
+	do
+		if [ -d $rootprefix/var/sadm/pkg/$pkg ]; then
+			rm -rf $rootprefix/var/sadm/pkg/$pkg
+			grep -vw $pkg $rootprefix/var/sadm/install/contents > \
+			    /tmp/contents.$$
+			cp /tmp/contents.$$ $rootprefix/var/sadm/install/contents.$$
+			rm /tmp/contents.$$
+		fi
+	done
+
+	#
+	# Cleanup any remaining ASET files, symlinks, and directories.
+	#
+	rm -rf $usr/aset
+}
+
+#
 # Remove BIND 8 named server/tools packages
 #
 remove_eof_bind8()
@@ -4791,6 +4836,13 @@ mondo_loop() {
 	#
 	if [ -d $usr/oasys -o -d $usr/vmsys ]; then
 		remove_eof_face
+	fi
+
+	#
+	# Remove ASET
+	#
+	if [ -d $usr/aset ]; then
+		remove_eof_aset
 	fi
 
 	#

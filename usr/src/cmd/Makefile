@@ -60,7 +60,6 @@ COMMON_SUBDIRS=		\
 	acctadm		\
 	arch		\
 	asa		\
-	aset		\
 	audio		\
 	auths		\
 	autopush	\

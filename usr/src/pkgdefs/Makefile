@@ -138,7 +138,6 @@ COMMON_SUBDIRS= \
 	SUNWatfsu  \
 	SUNWarc  \
 	SUNWarcr  \
-	SUNWast  \
 	SUNWav1394 \
 	SUNWbart  \
 	SUNWbge \
