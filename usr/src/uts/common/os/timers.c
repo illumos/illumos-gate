@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1141,10 +1141,40 @@ tv2hrt(struct timeval *tvp)
 }
 
 void
-hrt2tv(hrtime_t ts, struct timeval *tvp)
+hrt2tv(hrtime_t hrt, struct timeval *tvp)
 {
-	tvp->tv_sec = ts / NANOSEC;
-	tvp->tv_usec = (ts % NANOSEC) / (NANOSEC / MICROSEC);
+	uint32_t sec, nsec, tmp;
+	uint32_t q, r, t;
+
+	tmp = (uint32_t)(hrt >> 30);
+	sec = tmp - (tmp >> 2);
+	sec = tmp - (sec >> 5);
+	sec = tmp + (sec >> 1);
+	sec = tmp - (sec >> 6) + 7;
+	sec = tmp - (sec >> 3);
+	sec = tmp + (sec >> 1);
+	sec = tmp + (sec >> 3);
+	sec = tmp + (sec >> 4);
+	tmp = (sec << 7) - sec - sec - sec;
+	tmp = (tmp << 7) - tmp - tmp - tmp;
+	tmp = (tmp << 7) - tmp - tmp - tmp;
+	nsec = (uint32_t)hrt - (tmp << 9);
+	while (nsec >= NANOSEC) {
+		nsec -= NANOSEC;
+		sec++;
+	}
+	tvp->tv_sec = (time_t)sec;
+/*
+ * this routine is very similar to hr2ts, but requires microseconds
+ * instead of nanoseconds, so an interger divide by 1000 routine
+ * completes the conversion
+ */
+	t = (nsec >> 7) + (nsec >> 8) + (nsec >> 12);
+	q = (nsec >> 1) + t + (nsec >> 15) + (t >> 11) + (t >> 14);
+	q = q >> 9;
+	r = nsec - q*1000;
+	tvp->tv_usec = q + ((r + 24) >> 10);
+
 }
 
 int
