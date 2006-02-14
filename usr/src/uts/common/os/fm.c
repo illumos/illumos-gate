@@ -1215,5 +1215,5 @@ fm_payload_stack_add(nvlist_t *payload, const pc_t *stack, int depth)
 	}
 
 	fm_payload_set(payload, FM_EREPORT_PAYLOAD_NAME_STACK,
-	    DATA_TYPE_STRING_ARRAY, FM_STK_DEPTH, stkpp, NULL);
+	    DATA_TYPE_STRING_ARRAY, depth, stkpp, NULL);
 }

@@ -57,7 +57,7 @@
 #include "ao_mca_disp.h"
 
 errorq_t *ao_mca_queue;			/* machine-check ereport queue */
-int ao_mca_stack_flag = 1;		/* record stack trace in ereports */
+int ao_mca_stack_flag = 0;		/* record stack trace in ereports */
 int ao_mca_smi_disable = 1;		/* attempt to disable SMI polling */
 
 ao_bank_regs_t ao_bank_regs[AMD_MCA_BANK_COUNT] = {
