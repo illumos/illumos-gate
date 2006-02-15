@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3515,7 +3515,6 @@ audiots_set_idle(audiots_state_t *state)
 static int
 audiots_set_monitor_gain(audiots_state_t *state, int gain)
 {
-	uint32_t	tmp_word;
 	uint16_t	tmp_short;
 	int		rc = AUDIO_SUCCESS;
 
@@ -3527,19 +3526,43 @@ audiots_set_monitor_gain(audiots_state_t *state, int gain)
 		gain = AUDIO_MAX_GAIN;
 	}
 
+	if (gain == 0) {
+		/* disable loopbacks when gain == 0 */
+		tmp_short = MVR_MUTE;
+	} else {
+		/* Adjust the value of gain to meet the requirement of AC'97 */
+		tmp_short = (((AUDIO_MAX_GAIN - gain) >> TS_GAIN_SHIFT3) <<
+		    TS_BYTE_SHIFT) & PCMOVR_LEFT_GAIN_MASK;
+		tmp_short |= ((AUDIO_MAX_GAIN - gain) >> TS_GAIN_SHIFT3) &
+		    PCMOVR_RIGHT_GAIN_MASK;
+	}
+
 	mutex_enter(&state->ts_lock);
 
 	switch (state->ts_input_port) {
 	case AUDIO_NONE:
+		/*
+		 * It is possible to set the value of gain before any input
+		 * is selected. So, we just save the gain and then return
+		 * SUCCESS.
+		 */
 		break;
 	case AUDIO_MICROPHONE:
-		tmp_word = AC97_MIC_VOLUME_REGISTER;
+		/*
+		 * MIC input has 20dB boost, we just preserve it
+		 */
+		tmp_short |= state->ts_shadow[TS_CODEC_REG(
+		    AC97_MIC_VOLUME_REGISTER)] & MICVR_20dB_BOOST;
+		audiots_set_ac97(state,
+		    AC97_MIC_VOLUME_REGISTER, tmp_short);
 		break;
 	case AUDIO_LINE_IN:
-		tmp_word = AC97_LINE_IN_VOLUME_REGISTER;
+		audiots_set_ac97(state,
+		    AC97_LINE_IN_VOLUME_REGISTER, tmp_short);
 		break;
 	case AUDIO_CD:
-		tmp_word = AC97_CD_VOLUME_REGISTER;
+		audiots_set_ac97(state,
+		    AC97_CD_VOLUME_REGISTER, tmp_short);
 		break;
 	case AUDIO_CODEC_LOOPB_IN:
 		/* we already are getting the loopback, so done */
@@ -3556,18 +3579,8 @@ audiots_set_monitor_gain(audiots_state_t *state, int gain)
 	}
 
 	if (gain == 0) {
-		/* disable loopbacks when gain == 0 */
-		audiots_or_ac97(state, tmp_word, MVR_MUTE);
 		state->ts_monitor_gain = 0;
 	} else {
-		/* enable loopbacks and set gain */
-		tmp_short =
-		    state->ts_shadow[TS_CODEC_REG(tmp_word)] & MICVR_20dB_BOOST;
-		tmp_short = (((AUDIO_MAX_GAIN - gain) >> TS_GAIN_SHIFT3) <<
-		    TS_BYTE_SHIFT) & PCMOVR_LEFT_GAIN_MASK;
-		tmp_short |= ((AUDIO_MAX_GAIN - gain) >> TS_GAIN_SHIFT3) &
-		    PCMOVR_RIGHT_GAIN_MASK;
-		audiots_set_ac97(state, tmp_word, tmp_short);
 		state->ts_monitor_gain = tmp_short;
 	}
 	mutex_exit(&state->ts_lock);

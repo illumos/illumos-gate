@@ -3262,7 +3262,6 @@ audio1575_set_port(audio1575_state_t *statep, int dir, int port)
 static int
 audio1575_set_monitor_gain(audio1575_state_t *statep, int gain)
 {
-	uint32_t	tmp_word;
 	uint16_t	tmp_short;
 	int		rc = AUDIO_SUCCESS;
 
@@ -3273,20 +3272,41 @@ audio1575_set_monitor_gain(audio1575_state_t *statep, int gain)
 		gain = AUDIO_MAX_GAIN;
 	}
 
+	if (gain == 0) {
+		/* disable loopbacks when gain == 0 */
+		tmp_short = MVR_MUTE;
+	} else {
+		/* Adjust the value of gain to the requirement of AC'97 */
+		tmp_short = (((AUDIO_MAX_GAIN - gain) >> M1575_GAIN_SHIFT3) <<
+		    M1575_BYTE_SHIFT) & PCMOVR_LEFT_GAIN_MASK;
+		tmp_short |= ((AUDIO_MAX_GAIN - gain) >> M1575_GAIN_SHIFT3) &
+		    PCMOVR_RIGHT_GAIN_MASK;
+	}
+
 	switch (statep->m1575_input_port) {
 	case AUDIO_NONE:
+		/*
+		 * It is possible to set the value of gain before any input
+		 * is selected. So, we just save the gain and then return
+		 * SUCCESS.
+		 */
 		break;
 
 	case AUDIO_MICROPHONE:
-		tmp_word = AC97_MIC_VOLUME_REGISTER;
+		tmp_short |= statep->m1575_codec_shadow[M1575_CODEC_REG(
+		    AC97_MIC_VOLUME_REGISTER)] & MICVR_20dB_BOOST;
+		(void) audio1575_write_ac97(statep,
+		    AC97_MIC_VOLUME_REGISTER, tmp_short);
 		break;
 
 	case AUDIO_LINE_IN:
-		tmp_word = AC97_LINE_IN_VOLUME_REGISTER;
+		(void) audio1575_write_ac97(statep,
+		    AC97_LINE_IN_VOLUME_REGISTER, tmp_short);
 		break;
 
 	case AUDIO_CD:
-		tmp_word = AC97_CD_VOLUME_REGISTER;
+		(void) audio1575_write_ac97(statep,
+		    AC97_CD_VOLUME_REGISTER, tmp_short);
 		break;
 
 	case AUDIO_CODEC_LOOPB_IN:
@@ -3302,19 +3322,8 @@ audio1575_set_monitor_gain(audio1575_state_t *statep, int gain)
 	}
 
 	if (gain == 0) {
-		/* disable loopbacks when gain == 0 */
-		(void) audio1575_or_ac97(statep, tmp_word, MVR_MUTE);
 		statep->m1575_monitor_gain = 0;
 	} else {
-		/* enable loopbacks and set gain */
-		tmp_short = (((AUDIO_MAX_GAIN - gain) >> M1575_GAIN_SHIFT3) <<
-		    M1575_BYTE_SHIFT) & PCMOVR_LEFT_GAIN_MASK;
-		tmp_short |= ((AUDIO_MAX_GAIN - gain) >> M1575_GAIN_SHIFT3) &
-		    PCMOVR_RIGHT_GAIN_MASK;
-		tmp_short |=
-		    statep->m1575_codec_shadow[M1575_CODEC_REG(tmp_word)] &
-		    MICVR_20dB_BOOST;
-		(void) audio1575_write_ac97(statep, tmp_word, tmp_short);
 		statep->m1575_monitor_gain = tmp_short;
 	}
 
