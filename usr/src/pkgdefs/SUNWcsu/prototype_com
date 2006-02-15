@@ -1092,7 +1092,9 @@ d none usr/share/lib/zoneinfo/America/Indiana 755 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Indianapolis 644 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Knox 644 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Marengo 644 root bin
+f none usr/share/lib/zoneinfo/America/Indiana/Petersburg 644 root bin
 f none usr/share/lib/zoneinfo/America/Indiana/Vevay 644 root bin
+f none usr/share/lib/zoneinfo/America/Indiana/Vincennes 644 root bin
 l none usr/share/lib/zoneinfo/America/Indianapolis=../../../../../usr/share/lib/zoneinfo/America/Indiana/Indianapolis
 f none usr/share/lib/zoneinfo/America/Inuvik 644 root bin
 f none usr/share/lib/zoneinfo/America/Iqaluit 644 root bin
@@ -1117,6 +1119,7 @@ f none usr/share/lib/zoneinfo/America/Menominee 644 root bin
 f none usr/share/lib/zoneinfo/America/Merida 644 root bin
 f none usr/share/lib/zoneinfo/America/Mexico_City 644 root bin
 f none usr/share/lib/zoneinfo/America/Miquelon 644 root bin
+f none usr/share/lib/zoneinfo/America/Moncton 644 root bin
 f none usr/share/lib/zoneinfo/America/Monterrey 644 root bin
 f none usr/share/lib/zoneinfo/America/Montevideo 644 root bin
 f none usr/share/lib/zoneinfo/America/Montreal 644 root bin
@@ -1308,7 +1311,7 @@ l none usr/share/lib/zoneinfo/Brazil/DeNoronha=../../../../../usr/share/lib/zone
 l none usr/share/lib/zoneinfo/Brazil/East=../../../../../usr/share/lib/zoneinfo/America/Sao_Paulo
 l none usr/share/lib/zoneinfo/Brazil/West=../../../../../usr/share/lib/zoneinfo/America/Manaus
 f none usr/share/lib/zoneinfo/CET 644 root bin
-l none usr/share/lib/zoneinfo/CST6CDT=../../../../usr/share/lib/zoneinfo/America/Chicago
+f none usr/share/lib/zoneinfo/CST6CDT 644 root bin
 d none usr/share/lib/zoneinfo/Canada 755 root bin
 l none usr/share/lib/zoneinfo/Canada/Atlantic=../../../../../usr/share/lib/zoneinfo/America/Halifax
 l none usr/share/lib/zoneinfo/Canada/Central=../../../../../usr/share/lib/zoneinfo/America/Winnipeg
@@ -1324,8 +1327,8 @@ l none usr/share/lib/zoneinfo/Chile/Continental=../../../../../usr/share/lib/zon
 l none usr/share/lib/zoneinfo/Chile/EasterIsland=../../../../../usr/share/lib/zoneinfo/Pacific/Easter
 l none usr/share/lib/zoneinfo/Cuba=../../../../usr/share/lib/zoneinfo/America/Havana
 f none usr/share/lib/zoneinfo/EET 644 root bin
-l none usr/share/lib/zoneinfo/EST=../../../../usr/share/lib/zoneinfo/America/Panama
-l none usr/share/lib/zoneinfo/EST5EDT=../../../../usr/share/lib/zoneinfo/America/New_York
+f none usr/share/lib/zoneinfo/EST 644 root bin
+f none usr/share/lib/zoneinfo/EST5EDT 644 root bin
 l none usr/share/lib/zoneinfo/Egypt=../../../../usr/share/lib/zoneinfo/Africa/Cairo
 l none usr/share/lib/zoneinfo/Eire=../../../../usr/share/lib/zoneinfo/Europe/Dublin
 d none usr/share/lib/zoneinfo/Etc 755 root bin
@@ -1426,7 +1429,7 @@ l none usr/share/lib/zoneinfo/GMT+0=../../../../usr/share/lib/zoneinfo/Etc/GMT
 l none usr/share/lib/zoneinfo/GMT-0=../../../../usr/share/lib/zoneinfo/Etc/GMT
 l none usr/share/lib/zoneinfo/GMT0=../../../../usr/share/lib/zoneinfo/Etc/GMT
 l none usr/share/lib/zoneinfo/Greenwich=../../../../usr/share/lib/zoneinfo/Etc/GMT
-l none usr/share/lib/zoneinfo/HST=../../../../usr/share/lib/zoneinfo/Pacific/Honolulu
+f none usr/share/lib/zoneinfo/HST 644 root bin
 l none usr/share/lib/zoneinfo/Hongkong=../../../../usr/share/lib/zoneinfo/Asia/Hong_Kong
 l none usr/share/lib/zoneinfo/Iceland=../../../../usr/share/lib/zoneinfo/Atlantic/Reykjavik
 d none usr/share/lib/zoneinfo/Indian 755 root bin
@@ -1448,8 +1451,8 @@ l none usr/share/lib/zoneinfo/Japan=../../../../usr/share/lib/zoneinfo/Asia/Toky
 l none usr/share/lib/zoneinfo/Kwajalein=../../../../usr/share/lib/zoneinfo/Pacific/Kwajalein
 l none usr/share/lib/zoneinfo/Libya=../../../../usr/share/lib/zoneinfo/Africa/Tripoli
 f none usr/share/lib/zoneinfo/MET 644 root bin
-l none usr/share/lib/zoneinfo/MST=../../../../usr/share/lib/zoneinfo/America/Phoenix
-l none usr/share/lib/zoneinfo/MST7MDT=../../../../usr/share/lib/zoneinfo/America/Denver
+f none usr/share/lib/zoneinfo/MST 644 root bin
+f none usr/share/lib/zoneinfo/MST7MDT 644 root bin
 d none usr/share/lib/zoneinfo/Mexico 755 root bin
 l none usr/share/lib/zoneinfo/Mexico/BajaNorte=../../../../../usr/share/lib/zoneinfo/America/Tijuana
 l none usr/share/lib/zoneinfo/Mexico/BajaSur=../../../../../usr/share/lib/zoneinfo/America/Mazatlan
@@ -1462,7 +1465,7 @@ l none usr/share/lib/zoneinfo/NZ=../../../../usr/share/lib/zoneinfo/Pacific/Auck
 l none usr/share/lib/zoneinfo/NZ-CHAT=../../../../usr/share/lib/zoneinfo/Pacific/Chatham
 l none usr/share/lib/zoneinfo/Navajo=../../../../usr/share/lib/zoneinfo/America/Denver
 l none usr/share/lib/zoneinfo/PRC=../../../../usr/share/lib/zoneinfo/Asia/Shanghai
-l none usr/share/lib/zoneinfo/PST8PDT=../../../../usr/share/lib/zoneinfo/America/Los_Angeles
+f none usr/share/lib/zoneinfo/PST8PDT 644 root bin
 d none usr/share/lib/zoneinfo/Pacific 755 root bin
 f none usr/share/lib/zoneinfo/Pacific/Apia 644 root bin
 f none usr/share/lib/zoneinfo/Pacific/Auckland 644 root bin

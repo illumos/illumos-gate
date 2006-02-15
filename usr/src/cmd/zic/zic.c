@@ -1,10 +1,10 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-static char	elsieid[] = "@(#)zic.c	7.124";
+static char	elsieid[] = "@(#)zic.c	7.128";
 
 /*
  * #define	LEAPSECOND_SUPPORT
@@ -1648,7 +1648,7 @@ const int			zonecount;
 	typecnt = 0;
 	charcnt = 0;
 	/*
-	 * Thanks to Earl Chew (earl@dnd.icp.nec.com.au)
+	 * Thanks to Earl Chew
 	 * for noting the need to unconditionally initialize startttisstd.
 	 */
 	startttisstd = FALSE;

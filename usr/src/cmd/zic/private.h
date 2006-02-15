@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -54,7 +54,7 @@ char 	*icpyalloc(const char *string);
 char 	*imalloc(int n);
 void 	*irealloc(void *pointer, int size);
 void	ifree(char *pointer);
-char	*scheck(const char *string, char *format);
+const char	*scheck(const char *string, const char *format);
 
 /*
  * Finally, some convenience items.

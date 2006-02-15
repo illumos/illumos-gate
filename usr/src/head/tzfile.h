@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -35,7 +34,6 @@
 /*
  * A part of this file comes from public domain source, so
  * clarified as of June 5, 1996 by Arthur David Olson
- * (arthur_david_olson@nih.gov).
  */
 
 #include <sys/types.h>
@@ -51,7 +49,7 @@
 
 /*
  * This file is in the public domain, so clarified as of
- * June 5, 1996 by Arthur David Olson (arthur_david_olson@nih.gov).
+ * 1996-06-05 by Arthur David Olson.
  */
 
 /*
@@ -62,7 +60,7 @@
  * Thank you!
  */
 
-/* static char	tzfilehid[] = "@(#)tzfile.h	7.17"; */
+/* static char	tzfilehid[] = "@(#)tzfile.h	7.18"; */
 
 /*
  * Note: Despite warnings from the authors of this code, Solaris has
@@ -155,7 +153,7 @@ struct tzhead {
 #ifdef NOSOLAR
 /*
  * Must be at least 14 for Europe/Riga as of Jan 12 1995,
- * as noted by Earl Chew <earl@hpato.aus.hp.com>.
+ * as noted by Earl Chew.
  */
 #define	TZ_MAX_TYPES	20	/* Maximum number of local time types */
 #endif /* !defined NOSOLAR */
