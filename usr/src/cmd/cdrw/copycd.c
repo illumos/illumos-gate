@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -137,6 +137,7 @@ ensure_media_space(uint32_t total_nblks, uchar_t end_tno)
 {
 	off_t nblks_avail;
 	uint_t bsize;
+	uint_t leadin_size = 0;
 
 	get_media_type(target->d_fd);
 
@@ -156,6 +157,7 @@ ensure_media_space(uint32_t total_nblks, uchar_t end_tno)
 				    "Cannot find out media capacity.\n"));
 				exit(1);
 			}
+		leadin_size = end_tno*300;
 		}
 	} else {
 		if (device_type == CD_RW) {
@@ -176,11 +178,11 @@ ensure_media_space(uint32_t total_nblks, uchar_t end_tno)
 		}
 	}
 
-	if ((total_nblks + end_tno*300) > nblks_avail) {
+	if ((total_nblks + leadin_size) > nblks_avail) {
 		err_msg(gettext("Not enough space on the media.\n"));
 		if (debug) {
 			(void) printf("Need %u  only found %u \n",
-			    (total_nblks + end_tno*300),
+			    (total_nblks + leadin_size),
 			    (uint32_t)nblks_avail);
 		}
 
@@ -267,8 +269,7 @@ copy_cd(void)
 			gettext("Copying multisession CD is not supported\n"));
 			exit(1);
 		}
-		if ((ti->ti_flags & TI_PACKET_MODE) ||
-		    (ti->ti_flags & TI_BLANK_TRACK) ||
+		if ((ti->ti_flags & TI_BLANK_TRACK) ||
 		    (ti->ti_flags & TI_DAMAGED_TRACK) ||
 		    (data_cd && audio_cd) || (ti->ti_data_mode == 2)) {
 
@@ -373,6 +374,36 @@ copy_cd(void)
 	if ((device_type != DVD_PLUS) && (device_type != DVD_PLUS_W)) {
 		ensure_media_space(total_nblks, end_tno);
 		write_init(audio_cd ? TRACK_MODE_AUDIO : TRACK_MODE_DATA);
+	}
+
+	if (device_type == DVD_PLUS_W) {
+		/*
+		 * DVD+RW requires that we format the media before
+		 * writing.
+		 */
+		(void) print_n_flush(gettext("Formatting media..."));
+		if (!format_media(target->d_fd)) {
+			(void) printf(gettext(
+			    "Could not format media\n"));
+			exit(1);
+		} else {
+			int counter;
+			uchar_t *di;
+
+			/* poll until format is done */
+			di = (uchar_t *)my_zalloc(DISC_INFO_BLOCK_SIZE);
+			(void) sleep(10);
+			for (counter = 0; counter < 200; counter++) {
+				ret = read_disc_info(target->d_fd, di);
+				if ((SENSE_KEY(rqbuf) == 2) &&
+				    (ASC(rqbuf) == 4)) {
+					(void) print_n_flush(".");
+					(void) sleep(5);
+				} else {
+					break;
+				}
+			}
+		}
 	}
 
 	/* for each track */
