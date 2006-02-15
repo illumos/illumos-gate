@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2627,6 +2627,59 @@ call_minor_init(module_t *module)
 	return (DEVFSADM_SUCCESS);
 }
 
+static int
+i_mknod(char *path, int stype, int mode, dev_t dev, uid_t uid, gid_t gid)
+{
+	struct stat sbuf;
+
+	assert((stype & (S_IFCHR|S_IFBLK)) != 0);
+	assert((mode & S_IFMT) == 0);
+
+	if (stat(path, &sbuf) == 0) {
+		/*
+		 * the node already exists, check if it's device
+		 * information is correct
+		 */
+		if (((sbuf.st_mode & S_IFMT) == stype) &&
+		    (sbuf.st_rdev == dev)) {
+			/* the device node is correct, continue */
+			return (DEVFSADM_SUCCESS);
+		}
+		/*
+		 * the device node already exists but has the wrong
+		 * mode/dev_t value.  we need to delete the current
+		 * node and re-create it with the correct mode/dev_t
+		 * value, but we also want to preserve the current
+		 * owner and permission information.
+		 */
+		uid = sbuf.st_uid;
+		gid = sbuf.st_gid;
+		mode = sbuf.st_mode & ~S_IFMT;
+		s_unlink(path);
+	}
+
+top:
+	if (mknod(path, stype | mode, dev) == -1) {
+		if (errno == ENOENT) {
+			/* dirpath to node doesn't exist, create it */
+			char *hide = strrchr(path, '/');
+			*hide = '\0';
+			s_mkdirp(path, S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);
+			*hide = '/';
+			goto top;
+		}
+		err_print(MKNOD_FAILED, path, strerror(errno));
+		return (DEVFSADM_FAILURE);
+	} else {
+		/*
+		 * If we successfully made the node, then set its owner
+		 * and group.  Existing nodes will be unaffected.
+		 */
+		(void) chown(path, uid, gid);
+	}
+	return (DEVFSADM_SUCCESS);
+}
+
 /*ARGSUSED*/
 int
 devfsadm_mklink_zone(struct zone_devinfo *z, char *link, di_node_t node,
@@ -2686,34 +2739,8 @@ devfsadm_mklink_zone(struct zone_devinfo *z, char *link, di_node_t node,
 	    acontents, aminor ? aminor : "<NULL>", di_minor_spectype(minor),
 	    dev, mode, uid, gid);
 
-	/*
-	 * Create the node; if the enclosing directory doesn't exist,
-	 * make it too.
-	 */
-top:
-	if (mknod(path, di_minor_spectype(minor) | mode, dev) == -1) {
-		if (errno == ENOENT) {
-			/* dirpath to node doesn't exist */
-			char *hide = strrchr(path, '/');
-			*hide = '\0';
-			s_mkdirp(path,
-			    S_IRWXU|S_IRGRP|S_IXGRP|S_IROTH|S_IXOTH);
-			*hide = '/';
-			goto top;
-		} else if (errno == EEXIST) {
-			return (DEVFSADM_SUCCESS);
-		}
-		err_print(MKNOD_FAILED, path, strerror(errno));
-		return (DEVFSADM_FAILURE);
-	} else {
-		/*
-		 * If we successfully made the node, then set its owner
-		 * and group.  Existing nodes will be unaffected.
-		 */
-		(void) chown(path, uid, gid);
-	}
-
-	return (DEVFSADM_SUCCESS);
+	/* Create the node */
+	return (i_mknod(path, di_minor_spectype(minor), mode, dev, uid, gid));
 }
 
 /*
