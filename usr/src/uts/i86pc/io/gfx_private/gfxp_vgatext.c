@@ -29,7 +29,7 @@
 /*	actual or intended publication of such source code.	*/
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -490,11 +490,6 @@ gfxp_vgatext_ioctl(
 	}
 	return (0);
 }
-
-#pragma weak progressbar_stop
-void
-progressbar_stop(void)
-{}
 
 static int
 vgatext_kdsetmode(struct vgatext_softc *softc, int mode)
