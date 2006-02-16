@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -815,13 +815,20 @@ asn1_error_code asn1_decode_sequence_of_checksum(asn1buf *buf, krb5_checksum ***
 
 static asn1_error_code asn1_decode_etype_info2_entry(asn1buf *buf, krb5_etype_info_entry *val )
 {
+  /*
+   * Solaris Kerberos:
+   * Use a temporary char* (tmpp) in place of val->salt when calling
+   * get_lenfield(). val->salt cannot be cast to a char* as casting will not
+   * produce an lvalue. Use the new value pointed to by tmpp as the value for
+   * val->salt.
+   */
   char *tmpp;
   setup();
   { begin_structure();
     get_field(val->etype,0,asn1_decode_enctype);
     if (tagnum == 1) {
-      tmpp = (char *)val->salt; /* SUNW14resync hack */
       get_lenfield(val->length,tmpp,1,asn1_decode_generalstring);
+      val->salt = (krb5_octet*)tmpp;	/* SUNW14resync hack */
     } else {
 	    val->length = KRB5_ETYPE_NO_SALT;
 	    val->salt = 0;
