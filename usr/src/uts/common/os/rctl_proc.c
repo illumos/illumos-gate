@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -317,13 +316,13 @@ rctlproc_init()
 	rctlproc_legacy[RLIMIT_STACK] = rctl_register("process.max-stack-size",
 	    RCENTITY_PROCESS, RCTL_GLOBAL_LOWERABLE | RCTL_GLOBAL_DENY_ALWAYS |
 	    RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_BYTES,
-	    MAXSSIZ, INT32_MAX, &proc_stack_ops);
+	    MAXSSIZ, USRSTACK32 - PAGESIZE, &proc_stack_ops);
 #endif	/* __sparc */
 #else 	/* _LP64 */
 	rctlproc_legacy[RLIMIT_STACK] = rctl_register("process.max-stack-size",
 	    RCENTITY_PROCESS, RCTL_GLOBAL_LOWERABLE | RCTL_GLOBAL_DENY_ALWAYS |
 	    RCTL_GLOBAL_SIGNAL_NEVER | RCTL_GLOBAL_BYTES,
-	    INT32_MAX, INT32_MAX, &proc_stack_ops);
+	    USRSTACK - PAGESIZE, USRSTACK - PAGESIZE, &proc_stack_ops);
 #endif
 	rctlproc_legacy[RLIMIT_CORE] = rctl_register("process.max-core-size",
 	    RCENTITY_PROCESS, RCTL_GLOBAL_LOWERABLE | RCTL_GLOBAL_DENY_ALWAYS |
