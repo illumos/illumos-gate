@@ -596,6 +596,8 @@ char *file;
 		} else {
 			ipn.ipn_dsize = 0;
 			in = (nat_save_t *)malloc(sizeof(*in));
+			if (in == NULL)
+				break;
 		}
 		bcopy((char *)ipnp, (char *)in, sizeof(ipn));
 

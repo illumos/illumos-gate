@@ -232,6 +232,8 @@ int type;
 	opt_t *o;
 
 	o = (opt_t *)malloc(sizeof(*o));
+	if (o == NULL)
+		yyerror("sorry, out of memory");
 	o->o_type = type;
 	o->o_line = yylineNum;
 	o->o_num = 0;

@@ -574,11 +574,21 @@ char *msg;
 		   yytokentype == YY_NUMBER) {
 		if (yystr == NULL) {
 			txt = yytexttostr(yypos, YYBUFSIZ);
+			if (txt == NULL) {
+				fprintf(stderr, "sorry, out of memory,"
+					" bailing out\n");
+				exit(1);
+			}
 			freetxt = 1;
 		} else
 			txt = yystr;
 	} else {
 		txt = yykeytostr(yytokentype);
+		if (txt == NULL) {
+			fprintf(stderr, "sorry, out of memory,"
+				" bailing out\n");
+			exit(1);
+		}
 	}
 	fprintf(stderr, "%s error at \"%s\", line %d\n", msg, txt, yylineNum);
 	if (freetxt == 1)

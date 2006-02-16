@@ -345,6 +345,10 @@ natstat_t *nsp;
 
 	maptable = (hostmap_t **)malloc(sizeof(hostmap_t *) *
 					nsp->ns_hostmap_sz);
+	if (maptable == NULL) {
+		perror("malloc");
+		exit(1);
+	}
 	if (kmemcpy((char *)maptable, (u_long)nsp->ns_maptable,
 		    sizeof(hostmap_t *) * nsp->ns_hostmap_sz)) {
 		perror("kmemcpy (maptable)");

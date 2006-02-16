@@ -207,6 +207,10 @@ char *argv[];
 		if (iface == NULL || *iface == '\0')
 			iface = ifname;
 		ifp = get_unit(iface, IP_V(ip));
+		if (ifp == NULL) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
 		if (!use_inet6) {
 			ip->ip_off = ntohs(ip->ip_off);
 			ip->ip_len = ntohs(ip->ip_len);

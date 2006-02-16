@@ -1782,6 +1782,8 @@ static void newrule()
 	frentry_t *frn;
 
 	frn = (frentry_t *)calloc(1, sizeof(frentry_t));
+	if (frn == NULL)
+		yyerror("sorry, out of memory");
 	for (fr = frtop; fr != NULL && fr->fr_next != NULL; fr = fr->fr_next)
 		;
 	if (fr != NULL)
@@ -1809,6 +1811,8 @@ static void setipftype()
 		if (fr->fr_type == FR_T_NONE) {
 			fr->fr_type = FR_T_IPF;
 			fr->fr_data = (void *)calloc(sizeof(fripf_t), 1);
+			if (fr->fr_data == NULL)
+				yyerror("sorry, out of memory");
 			fr->fr_dsize = sizeof(fripf_t);
 			fr->fr_ip.fi_v = frc->fr_v;
 			fr->fr_mip.fi_v = 0xf;
@@ -1833,11 +1837,15 @@ static frentry_t *addrule()
 	count = nrules;
 	if (count == 0) {
 		f = (frentry_t *)calloc(sizeof(*f), 1);
+		if (f == NULL)
+			yyerror("sorry, out of memory");
 		added++;
 		f2->fr_next = f;
 		bcopy(f2, f, sizeof(*f));
 		if (f2->fr_caddr != NULL) {
 			f->fr_caddr = malloc(f->fr_dsize);
+			if (f->fr_caddr == NULL)
+				yyerror("sorry, out of memory");
 			bcopy(f2->fr_caddr, f->fr_caddr, f->fr_dsize);
 		}
 		f->fr_next = NULL;
@@ -1846,12 +1854,16 @@ static frentry_t *addrule()
 	f = f2;
 	for (f1 = frc; count > 0; count--, f1 = f1->fr_next) {
 		f->fr_next = (frentry_t *)calloc(sizeof(*f), 1);
+		if (f->fr_next == NULL) 
+			yyerror("sorry, out of memory");
 		added++;
 		f = f->fr_next;
 		bcopy(f1, f, sizeof(*f));
 		f->fr_next = NULL;
 		if (f->fr_caddr != NULL) {
 			f->fr_caddr = malloc(f->fr_dsize);
+			if (f->fr_caddr == NULL)
+				yyerror("sorry, out of memory");
 			bcopy(f1->fr_caddr, f->fr_caddr, f->fr_dsize);
 		}
 	}
@@ -1906,10 +1918,14 @@ char *phrase;
 		if (!strncmp(phrase, "\"0x", 2)) {
 			phrase++;
 			fr->fr_data = malloc(4);
+			if (fr->fr_data == NULL)
+				yyerror("sorry, out of memory");
 
 			for (i = 0, s = strtok(phrase, " \r\n\t"; s != NULL;
 			     s = strtok(NULL, " \r\n\t"), i++) {
 				fr->fr_data = realloc(fr->fr_data, (i + 1) * 4);
+				if (fr->fr_data == NULL)
+					yyerror("sorry, out of memory");
 				l = (u_32_t)strtol(s, NULL, 0);
 				((u_32_t *)fr->fr_data)[i] = l;
 			}
@@ -1933,6 +1949,8 @@ char *phrase;
 
 		fr->fr_dsize = bpf.bf_len * sizeof(struct bpf_insn);
 		fr->fr_data = malloc(bpf.bf_len);
+		if (fr->fr_data == NULL)
+			yyerror("sorry, out of memory");
 		bcopy((char *)bpf.bf_insns, fr->fr_data, bpf.bf_len);
 		if (!bpf_validate(fr->fr_data, bpf.bf_len)) {
 			fprintf(stderr, "BPF validation failed\n");
@@ -1996,6 +2014,8 @@ alist_t *list;
 		n->ipn_info = a->al_not;
 		if (a->al_next != NULL) {
 			n->ipn_next = calloc(1, sizeof(*n));
+			if (n->ipn_next == NULL)
+				yyerror("sorry, out of memory");
 			n = n->ipn_next;
 		}
 	}
@@ -2038,6 +2058,8 @@ alist_t *list;
 		n->ipe_value = 0;
 		if (a->al_next != NULL) {
 			n->ipe_next = calloc(1, sizeof(*n));
+			if (n->ipe_next == NULL)
+				yyerror("sorry, out of memory");
 			n = n->ipe_next;
 		}
 	}

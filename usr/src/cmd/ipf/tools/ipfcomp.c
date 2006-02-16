@@ -152,9 +152,18 @@ frentry_t *fr;
 	int i;
 
 	f = (frentry_t *)malloc(sizeof(*f));
+	if (f == NULL) {
+		fprintf(stderr, "out of memory\n");
+		exit(1);
+	}
+
 	bcopy((char *)fr, (char *)f, sizeof(*fr));
 	if (fr->fr_ipf) {
 		f->fr_ipf = (fripf_t *)malloc(sizeof(*f->fr_ipf));
+		if (f->fr_ipf == NULL) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
 		bcopy((char *)fr->fr_ipf, (char *)f->fr_ipf,
 		      sizeof(*fr->fr_ipf));
 	}
@@ -167,6 +176,10 @@ frentry_t *fr;
 
 	if (g == NULL) {
 		g = (frgroup_t *)calloc(1, sizeof(*g));
+		if (g == NULL) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
 		g->fg_next = groups;
 		groups = g;
 		g->fg_head = f;
@@ -207,6 +220,10 @@ static u_long ipf%s_rule_data_%s_%u[] = {\n",
 				break;
 		if (g == NULL) {
 			g = (frgroup_t *)calloc(1, sizeof(*g));
+			if (g == NULL) {
+				fprintf(stderr, "out of memory\n");
+				exit(1);
+			}
 			g->fg_next = groups;
 			groups = g;
 			g->fg_head = f;
@@ -924,6 +941,10 @@ u_int incount, outcount;
 	}
 	if (n == NULL)
 		n = (mc_t *)malloc(sizeof(*n) * FRC_MAX);
+		if (n == NULL) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
 	bcopy((char *)m, (char *)n, sizeof(*n) * FRC_MAX);
 	sin = in;
 }
@@ -937,6 +958,10 @@ int dir;
 
 	if (m == NULL)
 		m = (mc_t *)calloc(1, sizeof(*m) * FRC_MAX);
+		if (m == NULL) {
+			fprintf(stderr, "out of memory\n");
+			exit(1);
+		}
 
 	for (g = groups; g != NULL; g = g->fg_next) {
 		if ((dir == 0) && ((g->fg_flags & FR_INQUE) != 0))

@@ -229,6 +229,8 @@ addrlist:
 grouplist:
 	groupentry next grouplist	{ $$ = $1; $1->ipe_next = $3; }
 	| addrmask next grouplist	{ $$ = calloc(1, sizeof(iphtent_t));
+					  if ($$ == NULL)
+						yyerror("sorry, out of memory");
 					  if  (set_ipv6_addr)
 					  	$$->ipe_family = AF_INET6;
 					  else
@@ -243,6 +245,8 @@ grouplist:
 	  				  $$->ipe_next = $3; }
 	| groupentry next		{ $$ = $1; }
 	| addrmask next			{ $$ = calloc(1, sizeof(iphtent_t));
+					  if ($$ == NULL)
+						yyerror("sorry, out of memory");
 					  if  (set_ipv6_addr)
 					  	$$->ipe_family = AF_INET6;
 					  else
@@ -264,6 +268,8 @@ setgrouplist:
 
 groupentry:
 	addrmask ',' setgroup	{ $$ = calloc(1, sizeof(iphtent_t));
+				  if ($$ == NULL)
+					yyerror("sorry, out of memory");
 				  if  (set_ipv6_addr)
 				  	$$->ipe_family = AF_INET6;
 				  else
@@ -281,6 +287,8 @@ groupentry:
 	;
 
 range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
+			  if ($$ == NULL)
+				yyerror("sorry, out of memory");
 			  $$->ipn_info = 0;
 			  if (set_ipv6_addr) {
 				  $$->ipn_addr.adf_family = AF_INET6;
@@ -295,6 +303,8 @@ range:	addrmask	{ $$ = calloc(1, sizeof(*$$));
 			  set_ipv6_addr = 0;
 			}
 	| '!' addrmask	{ $$ = calloc(1, sizeof(*$$));
+			  if ($$ == NULL)
+				yyerror("sorry, out of memory");
 			  $$->ipn_info = 1;
 			  if (set_ipv6_addr) {
 				  $$->ipn_addr.adf_family = AF_INET6;
@@ -315,6 +325,8 @@ hashlist:
 
 hashentry:
 	addrmask 			{ $$ = calloc(1, sizeof(iphtent_t));
+					  if ($$ == NULL)
+						yyerror("sorry, out of memory");
 					  if  (set_ipv6_addr)
 					  	$$->ipe_family = AF_INET6;
 					  else

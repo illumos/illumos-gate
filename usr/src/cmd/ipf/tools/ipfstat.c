@@ -772,6 +772,10 @@ char *comment;
 		if (type == FR_T_IPF || type == FR_T_BPFOPC) {
 			if (fp->fr_dsize) {
 				data = malloc(fp->fr_dsize);
+				if (data == NULL) {
+					perror("malloc");
+					exit(1);
+				}
 
 				if (kmemcpy(data, (u_long)fp->fr_data,
 					    fp->fr_dsize) == -1) {
@@ -879,6 +883,10 @@ ips_stat_t *ipsp;
 
 	sz = sizeof(*buckets) * ipsp->iss_statesize;
 	buckets = (u_long *)malloc(sz);
+	if (buckets == NULL) {
+		perror("malloc");
+		exit(1);
+	}
 	if (kmemcpy((char *)buckets, (u_long)ipsp->iss_bucketlen, sz)) {
 		free(buckets);
 		return;
@@ -1004,7 +1012,7 @@ int topclosed;
 		bzero((char *)&ipsst, sizeof(ipsst));
 		if ((ioctl(state_fd, SIOCGETFS, &ipfo) == -1)) {
 			perror("ioctl(SIOCGETFS)");
-			exit(-1);
+			break;
 		}
 
 		/* clear the history */
@@ -1043,7 +1051,7 @@ int topclosed;
 					tstable = realloc(tstable, maxtsentries * sizeof(statetop_t));
 					if (!tstable) {
 						perror("malloc");
-						exit(-1);
+						goto breakout;
 					}
 				}
 
@@ -1261,9 +1269,7 @@ int topclosed;
 			if (tolower(c) == 'l') {
 				redraw = 1;
 			} else if (tolower(c) == 'q') {
-				nocbreak();
-				endwin();
-				exit(0);
+				break;
 			} else if (tolower(c) == 'r') {
 				reverse = !reverse;
 			} else if (tolower(c) == 's') {
@@ -1274,11 +1280,13 @@ int topclosed;
 		}
 	} /* while */
 
+breakout:
 	printw("\n");
 	nocbreak();
 	endwin();
 
-	free(tstable);
+	if (tstable != NULL)
+		free(tstable);
 }
 #endif
 

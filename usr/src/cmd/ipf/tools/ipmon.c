@@ -921,6 +921,10 @@ int	logtype, blen;
 			if (bp)
 				bpo = bp;
 			bp = (char *)malloc(blen);
+			if (bp == NULL) {
+				perror("malloc");
+				exit(1);
+			}
 			bcopy((char *)ipl, bp, blen);
 			if (bpo) {
 				free(bpo);

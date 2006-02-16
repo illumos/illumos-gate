@@ -611,6 +611,14 @@ int v;
 	if (*s && isdigit(*s)) {
 		ifp->if_unit = atoi(s);
 		ifp->if_name = (char *)malloc(s - name + 1);
+		if (ifp->if_name == NULL) {
+			/*
+			 * XXX do it more elegantly: free up mem,
+			 * return NULL
+			 */
+			perror("malloc");
+			exit(1);
+		}
 		strncpy(ifp->if_name, name, s - name);
 		ifp->if_name[s - name] = '\0';
 	} else {
