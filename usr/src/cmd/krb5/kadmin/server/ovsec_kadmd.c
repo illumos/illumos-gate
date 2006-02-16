@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -771,16 +771,6 @@ main(int argc, char *argv[])
 	if (rpc_gss_set_svc_name(names[1].name,
 				"kerberos_v5", 0, KADM, KADMVERS))
 		oldnames++;
-	if (!oldnames) {
-		krb5_klog_syslog(LOG_ERR,
-		    gettext("Cannot initialize GSS-API authentication, "
-			"failing."));
-		fprintf(stderr,
-		    gettext("%s:Cannot initialize GSS-API authentication.\n"),
-		    whoami);
-		krb5_klog_close(context);
-		exit(1);
-	}
 
 	retdn = getdomnames(context, params.realm, &dnames);
 	if (retdn == 0 && dnames) {
@@ -922,6 +912,23 @@ main(int argc, char *argv[])
 					KRB5_IPROP_PROG, KRB5_IPROP_VERS);
 		}
 
+	} else {
+		if (!oldnames) {
+		/* rpc_gss_set_svc_name failed for both kadmin/<fqdn> and
+		 * changepw/<fqdn>.
+		 */
+			krb5_klog_syslog(LOG_ERR,
+					gettext("Unable to set RPCSEC_GSS service names "
+						"('%s, %s')"),
+					names[0].name, names[1].name);
+			fprintf(stderr,
+					gettext("%s: Unable to set RPCSEC_GSS service names "
+						"('%s, %s')\n"),
+					whoami,
+					names[0].name, names[1].name);
+			krb5_klog_close(context);
+			exit(1);
+		}
 	}
 
 	if (dnames)
