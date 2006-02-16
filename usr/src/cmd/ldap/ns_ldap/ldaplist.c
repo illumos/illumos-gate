@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,15 +36,16 @@
 extern char *set_filter(char **, char *, char **);
 extern char *set_filter_publickey(char **, char *, int, char **);
 extern void _printResult(ns_ldap_result_t *);
+extern void printMapping();
 
 int listflag = 0;
 
 void
 usage(char *msg) {
 	if (msg)
-		fprintf(stderr, "%s\n", msg);
+		(void) fprintf(stderr, "%s\n", msg);
 
-	fprintf(stderr,
+	(void) fprintf(stderr,
 	gettext(
 	"ldaplist [-lvh] [<database> [<key>] ...]\n"
 	"\tOptions:\n"
@@ -132,16 +132,17 @@ char **err, char *userdata)
 		char *p;
 		(void) __ns_ldap_err2str(rc, &p);
 		if (errorp && errorp->message) {
-			sprintf(buf, "%s (%s)", p, errorp->message);
-			__ns_ldap_freeError(&errorp);
+			(void) snprintf(buf, sizeof (buf), "%s (%s)",
+					p, errorp->message);
+			(void) __ns_ldap_freeError(&errorp);
 		} else
-			sprintf(buf, "%s", p);
+			(void) snprintf(buf, sizeof (buf), "%s", p);
 		*err = strdup(buf);
 		return (rc);
 	}
 
 	_printResult(result);
-	__ns_ldap_freeResult(&result);
+	(void) __ns_ldap_freeResult(&result);
 	return (0);
 }
 
@@ -162,7 +163,6 @@ int
 main(int argc, char **argv)
 {
 
-	extern char *optarg;
 	extern int optind;
 	char	*database = NULL;
 	char	*ldapfilter = NULL;
@@ -173,7 +173,7 @@ main(int argc, char **argv)
 	char	*err = NULL;
 	char	*p;
 	int	index = 1;
-	int	c, repeat = 1;
+	int	c;
 	int	rc;
 	int	verbose = 0;
 	char	*udata = NULL;
@@ -191,6 +191,7 @@ main(int argc, char **argv)
 		case 'h':
 			(void) printMapping();
 			exit(0);
+			break; /* Never reached */
 		case 'l':
 			attribute = "NULL";
 			break;
@@ -238,11 +239,13 @@ main(int argc, char **argv)
 		ldapfilter = set_filter_publickey(key, database, 0, &udata);
 		if (ldapfilter) {
 			if (verbose) {
-				fprintf(stdout, gettext("+++ database=%s\n"),
+				(void) fprintf(stdout,
+					gettext("+++ database=%s\n"),
 					(database ? database : "NULL"));
-				fprintf(stdout, gettext("+++ filter=%s\n"),
+				(void) fprintf(stdout,
+					gettext("+++ filter=%s\n"),
 					(ldapfilter ? ldapfilter : "NULL"));
-				fprintf(stdout,
+				(void) fprintf(stdout,
 				gettext("+++ template for merging"
 					"SSD filter=%s\n"),
 					(udata ? udata : "NULL"));
@@ -256,11 +259,13 @@ main(int argc, char **argv)
 		ldapfilter = set_filter_publickey(key, database, 1, &udata);
 		if (ldapfilter) {
 			if (verbose) {
-				fprintf(stdout, gettext("+++ database=%s\n"),
+				(void) fprintf(stdout,
+					gettext("+++ database=%s\n"),
 					(database ? database : "NULL"));
-				fprintf(stdout, gettext("+++ filter=%s\n"),
+				(void) fprintf(stdout,
+					gettext("+++ filter=%s\n"),
 					(ldapfilter ? ldapfilter : "NULL"));
-				fprintf(stdout,
+				(void) fprintf(stdout,
 				gettext("+++ template for merging"
 					"SSD filter=%s\n"),
 					(udata ? udata : "NULL"));
@@ -272,11 +277,11 @@ main(int argc, char **argv)
 		}
 		if (rc == -1 && rc1 == -1) {
 			/* this should never happen */
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			    gettext("ldaplist: invalid publickey lookup\n"));
 			rc = 2;
 		} if (rc != 0 && rc1 != 0) {
-			fprintf(stderr,
+			(void) fprintf(stderr,
 			gettext("ldaplist: %s\n"), (err ? err : err1));
 			if (rc == -1)
 				rc = rc1;
@@ -297,19 +302,20 @@ main(int argc, char **argv)
 	}
 
 	if (verbose) {
-		fprintf(stdout, gettext("+++ database=%s\n"),
+		(void) fprintf(stdout, gettext("+++ database=%s\n"),
 			(database ? database : "NULL"));
-		fprintf(stdout, gettext("+++ filter=%s\n"),
+		(void) fprintf(stdout, gettext("+++ filter=%s\n"),
 			(ldapfilter ? ldapfilter : "NULL"));
-		fprintf(stdout,
+		(void) fprintf(stdout,
 			gettext("+++ template for merging SSD filter=%s\n"),
 			(udata ? udata : "NULL"));
 	}
 	if (rc = list(database, ldapfilter, ldapattribute, &err, udata))
-		fprintf(stderr, gettext("ldaplist: %s\n"), err);
+		(void) fprintf(stderr, gettext("ldaplist: %s\n"), err);
 	if (ldapfilter)
 		free(ldapfilter);
 	if (udata)
 		free(udata);
 	exit(switch_err(rc));
+	return (0); /* Never reached */
 }

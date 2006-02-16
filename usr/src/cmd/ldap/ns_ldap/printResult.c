@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,8 +19,8 @@
  * CDDL HEADER END
  */
 /*
- * Copyright (c) 1999 by Sun Microsystems, Inc.
- * All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
+ * Use is subject to license terms.
  */
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -30,18 +29,18 @@
 #include "../../../lib/libsldap/common/ns_sldap.h"
 
 void
-_printEntry(ns_ldap_entry_t * entry) {
+_printEntry(ns_ldap_entry_t *entry) {
 	int	j, k;
 	char	*cp;
 	for (j = 0; j < entry->attr_count; j++) {
 		cp = entry->attr_pair[j]->attrname;
 		if (j == 0) {
-			fprintf(stdout, "%s: %s\n", cp,
+			(void) fprintf(stdout, "%s: %s\n", cp,
 				entry->attr_pair[j]->attrvalue[0]);
 		} else {
 			for (k = 0; (k < entry->attr_pair[j]->value_count) &&
 			    (entry->attr_pair[j]->attrvalue[k]); k++)
-				fprintf(stdout, "\t%s: %s\n", cp,
+				(void) fprintf(stdout, "\t%s: %s\n", cp,
 					entry->attr_pair[j]->attrvalue[k]);
 		}
 	}
@@ -49,9 +48,9 @@ _printEntry(ns_ldap_entry_t * entry) {
 
 
 void
-_printResult(ns_ldap_result_t * result) {
-	int i, j, k;
+_printResult(ns_ldap_result_t *result) {
 	ns_ldap_entry_t *curEntry;
+	int	i;
 
 	if (result == NULL) {
 		return;
@@ -59,7 +58,7 @@ _printResult(ns_ldap_result_t * result) {
 	curEntry = result->entry;
 	for (i = 0; i < result->entries_count; i++) {
 		if (i != 0)
-			fprintf(stdout, "\n");
+			(void) fprintf(stdout, "\n");
 		_printEntry(curEntry);
 		curEntry = curEntry->next;
 	}

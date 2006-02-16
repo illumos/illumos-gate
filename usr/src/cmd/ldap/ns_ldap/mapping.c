@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,7 +32,6 @@
 #include "../../../lib/libsldap/common/ns_sldap.h"
 
 
-#define	MAXLINE	2000
 #define	SAME	0
 
 struct mapping {
@@ -72,64 +70,121 @@ static struct mapping maplist[] = {
 	{NULL, NULL, NULL, NULL}
 };
 
+/* Malloc and print error message in case of failure */
+#define	MALLOC(ptr, len) \
+	if ((ptr = (char *)malloc(len)) == NULL) { \
+		(void) fprintf(stderr, gettext("out of memory\n")); \
+	}
+
+/*
+ * Allocate memory for filter and user data. Set
+ * error to 1 if either of the mallocs fail.
+ * In addition, free the memory allocated for filter,
+ * if memory allocation for user data fails.
+ */
+#define	MALLOC_FILTER_UDATA(ptr1, len1, ptr2, len2, error) \
+	error = 0; \
+	MALLOC(ptr1, len1); \
+	if (!ptr1) { \
+		error = 1; \
+	} \
+	else { \
+		MALLOC(ptr2, len2); \
+		if (!ptr2) { \
+			error = 1; \
+			free(ptr1); \
+		} \
+	}
 
 void
 printMapping()
 {
 	int	i;
 
-	fprintf(stdout,
+	(void) fprintf(stdout,
 		gettext("database       default type        objectclass\n"));
-	fprintf(stdout,
+	(void) fprintf(stdout,
 		gettext("=============  =================   =============\n"));
 	/* first dump auto_* and automount which are not in maplist[] */
-	fprintf(stdout, "%-15s%-20s%s\n", "auto_*", "automountKey",
+	(void) fprintf(stdout, "%-15s%-20s%s\n", "auto_*", "automountKey",
 		"automount");
-	fprintf(stdout, "%-15s%-20s%s\n", "automount", "automountMapName",
+	(void) fprintf(stdout, "%-15s%-20s%s\n", "automount",
+		"automountMapName",
 		"automountMap");
 	for (i = 0; maplist[i].database != NULL; i++) {
 	/* skip printing shadow */
 	if (strcasecmp(maplist[i].database, "shadow") != 0)
-		fprintf(stdout, "%-15s%-20s%s\n", maplist[i].database,
+		(void) fprintf(stdout, "%-15s%-20s%s\n", maplist[i].database,
 			maplist[i].def_type, maplist[i].objectclass);
 	}
 }
 
+/*
+ * set_key routine to handle user specified keys.
+ * A key can be of the form: attribute=value or value.
+ * A filter is constructed from a set of keys specified in
+ * the form (|(key1)(key2)...(keyn))
+ * It returns: NULL if no keys are defined or
+ *		the keyfilter as constructed above.
+ */
 
 char *
 set_keys(char **key, char *attrtype)
 {
 	char	*keyeq = NULL;
-	static char	keyfilter[MAXLINE];
-	char	typeeq[100];
-	char	buf[100];
+	char	*keyfilter = NULL;
+	int	len, totlen = 1; /* Terminating NULL byte */
 	char	*k, **karray;
+	char	*tmpptr;
 
 	if (!key || !key[0])	/* should never contain NULL string */
 		return (NULL);
 
-	if (attrtype) {
-		strcpy(typeeq, attrtype);
-		strcat(typeeq, "=");
+	if (key[1]) {
+		totlen += 3;
+		/* Allocate memory for '(|)' */
+		MALLOC(keyfilter, totlen);
+		if (!keyfilter)
+			exit(2);
+		(void) snprintf(keyfilter, totlen, "(|");
 	}
 
-	keyfilter[0] = '\0';
-	if (key[1])
-		strcat(keyfilter, "(|");
 	karray = key;
-	while (k = *karray) {
+	while ((k = *karray) != 0) {
 		keyeq = strchr(k, '=');
-		sprintf(buf, "(%s%s)", (keyeq ? "" : typeeq), k);
-		if (strlen(buf) + strlen(keyfilter) >= MAXLINE) {
-			fprintf(stdout,
-				gettext("***ERROR: ldapfilter too long\n"));
+		if (keyeq) {
+			/* make enough room for (%s) */
+			totlen += strlen(k) + 2;
+		} else {
+			/* make enough room for (%s=%s) */
+			totlen += strlen(attrtype) + strlen(k) + 3;
+		}
+
+		len = keyfilter ? strlen(keyfilter) : 0;
+
+		if (!(tmpptr = (char *)realloc(keyfilter, totlen))) {
+			if (keyfilter)
+				free(keyfilter);
+			(void) fprintf(stderr, gettext("out of memory\n"));
 			exit(2);
 		}
-		strcat(keyfilter, buf);
+		keyfilter = tmpptr;
+
+		if (keyeq) {
+			(void) snprintf(keyfilter + len, totlen - len,
+					"(%s)", k);
+		} else {
+			(void) snprintf(keyfilter + len, totlen - len,
+					"(%s=%s)", attrtype, k);
+		}
 		karray++;
 	}
-	if (key[1])
-		strcat(keyfilter, ")");
+
+	if (key[1]) {
+		/* We allocated memory for this earlier */
+		(void) strlcat(keyfilter, ")", totlen);
+	}
+
 	return (keyfilter);
 }
 
@@ -145,54 +200,66 @@ int
 set_keys_publickey(char **key, char *attrtype, int type, char **ret)
 {
 	char	*keyeq = NULL;
-	static char	keyfilter[MAXLINE];
-	char	pre_filter[MAXLINE];
-	char	buf[100];
+	char	*keyfilter = NULL;
+	char	*pre_filter = NULL;
 	char	*k, **karray;
 	int	count = 0;
+	int	len, totlen = 1; /* Terminating NULL byte */
+	char	*tmpptr;
 
 	if (!key || !key[0]) {	/* should never contain NULL string */
 		*ret = NULL;
 		return (-1);
 	}
 
-	keyfilter[0] = '\0';
-	pre_filter[0] = '\0';
 	karray = key;
-	while (k = *karray) {
+	while ((k = *karray) != 0) {
 		keyeq = strchr(k, '=');
-		if (keyeq)
-			sprintf(buf, "(%s)", k);
-		else {
-			if (type == 0 && isdigit(*k)) {
+		if (keyeq) {
+			/* make enough room for (%s) */
+			totlen += strlen(k) + 2;
+		} else {
+			if ((type == 0 && isdigit(*k)) ||
 				/* user type keys */
-				sprintf(buf, "(%s=%s)", attrtype, k);
-			} else if (type == 1 && (!isdigit(*k))) {
+			    (type == 1 && (!isdigit(*k)))) {
 				/* hosts type keys */
-				sprintf(buf, "(%s=%s)", attrtype, k);
+				/* make enough room for (%s=%s) */
+				totlen += strlen(k) + strlen(attrtype) + 3;
 			} else {
 				karray++;
 				continue;
 			}
 		}
-		if (strlen(buf) + strlen(pre_filter) >= MAXLINE) {
-			fprintf(stdout,
-				gettext("***ERROR: ldapfilter too long\n"));
+
+		len = pre_filter ? strlen(pre_filter) : 0;
+
+		if (!(tmpptr = (char *)realloc(pre_filter, totlen))) {
+			if (pre_filter)
+				free(pre_filter);
+			(void) fprintf(stderr, gettext("out of memory\n"));
 			exit(2);
 		}
-		strcat(pre_filter, buf);
+		pre_filter = tmpptr;
+
+		if (keyeq) {
+			(void) snprintf(pre_filter + len, totlen - len,
+					"(%s)", k);
+		} else {
+			(void) snprintf(pre_filter + len, totlen - len,
+					"(%s=%s)", attrtype, k);
+		}
 		karray++;
 		count++;
 	}
 	if (count > 1) {
-		if (strlen(pre_filter) + 4 >= MAXLINE) {
-			fprintf(stdout,
-				gettext("***ERROR: ldapfilter too long\n"));
+		len = strlen(pre_filter) + 4;
+		if (!(keyfilter = (char *)malloc(len))) {
+			(void) fprintf(stderr, gettext("out of memory\n"));
+			free(pre_filter);
 			exit(2);
 		}
-		strcat(keyfilter, "(|");
-		strcat(keyfilter, pre_filter);
-		strcat(keyfilter, ")");
+		(void) snprintf(keyfilter, len, "(|%s)", pre_filter);
+		free(pre_filter);
 		*ret = keyfilter;
 	} else
 		*ret = pre_filter;
@@ -207,31 +274,16 @@ set_keys_publickey(char **key, char *attrtype, int type, char **ret)
 char *
 set_filter_publickey(char **key, char *database, int type, char **udata)
 {
-	char 	*filter;
+	char 	*filter = NULL;
 	char 	*userdata;
-	char	*keyfilter;
+	char	*keyfilter = NULL;
 	int	rc;
+	int	filterlen, udatalen;
+	short	nomem = 0;
 
-	if (!database) {
+	if (!database || !udata) {
 		return (NULL);
 	}
-	if (!udata) {
-		return (NULL);
-	}
-
-	filter = (char *)malloc(MAXLINE);
-	if (!filter) {
-		return (NULL);
-	}
-	filter[0] = '\0';
-
-	userdata = (char *)malloc(MAXLINE);
-	if (!userdata) {
-		free(filter);
-		return (NULL);
-	}
-	userdata[0] = '\0';
-	*udata = userdata;
 
 	if (strcasecmp(database, maplist[PUBLICKEY].database) == SAME) {
 		rc = set_keys_publickey(key,
@@ -239,31 +291,66 @@ set_filter_publickey(char **key, char *database, int type, char **udata)
 				&keyfilter);
 		switch (rc) {
 		case -1:
-			sprintf(filter, "objectclass=%s",
-				maplist[PUBLICKEY].objectclass);
-			sprintf(userdata, "%%s");
+			filterlen = strlen(maplist[PUBLICKEY].objectclass) + 13;
+			udatalen = 3;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+						udatalen, nomem);
+			if (!nomem) {
+				(void) snprintf(filter, filterlen,
+					"objectclass=%s",
+					maplist[PUBLICKEY].objectclass);
+				(void) snprintf(userdata, udatalen, "%%s");
+			}
 			break;
 		case 0:
 			return (NULL);
 		default:
-			sprintf(filter, "(&(objectclass=%s)%s)",
+			filterlen = strlen(maplist[PUBLICKEY].objectclass) +
+				strlen(keyfilter) + 18;
+			udatalen = strlen(keyfilter) + 8;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+						udatalen, nomem);
+			if (!nomem) {
+			    (void) snprintf(filter, filterlen,
+				"(&(objectclass=%s)%s)",
 				maplist[PUBLICKEY].objectclass, keyfilter);
-			sprintf(userdata, "(&(%%s)%s)",
-				keyfilter);
+			    (void) snprintf(userdata, udatalen, "(&(%%s)%s)",
+					keyfilter);
+			}
 		}
 	} else {
 		if ((keyfilter = set_keys(key, "cn")) == NULL) {
-			sprintf(filter, "objectclass=*");
-			sprintf(userdata, "%%s");
+			filterlen = 14;
+			udatalen = 3;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+						udatalen, nomem);
+			if (!nomem) {
+				(void) snprintf(filter, filterlen,
+						"objectclass=*");
+				(void) snprintf(userdata, udatalen, "%%s");
+			}
 		} else {
-			sprintf(filter, "%s", keyfilter);
-			sprintf(userdata, "(&(%%s)%s)", keyfilter);
+			filterlen = strlen(keyfilter) + 1;
+			udatalen = strlen(keyfilter) + 8;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+						udatalen, nomem);
+			if (!nomem) {
+				(void) snprintf(filter, filterlen, "%s",
+						keyfilter);
+				(void) snprintf(userdata, udatalen,
+						"(&(%%s)%s)", keyfilter);
+			}
 		}
 	}
 #ifdef DEBUG
-	fprintf(stdout, "set_filter: filter=\"%s\"\n", filter);
-	fprintf(stdout, "set_filter: userdata=\"%s\"\n", userdata);
+	(void) fprintf(stdout, "set_filter: filter=\"%s\"\n", filter);
+	(void) fprintf(stdout, "set_filter: userdata=\"%s\"\n", userdata);
 #endif /* DEBUG */
+	if (keyfilter)
+		free(keyfilter);
+	if (nomem)
+		exit(2);
+	*udata = userdata;
 	return (filter);
 }
 
@@ -272,34 +359,19 @@ set_filter_publickey(char **key, char *database, int type, char **udata)
 char *
 set_filter(char **key, char *database, char **udata)
 {
-	char 		*filter;
-	char 		*userdata;
+	char 		*filter = NULL;
+	char 		*userdata = NULL;
 	char		*keyfilter;
-	int		i;
+	int		i, filterlen, udatalen;
 	int		rc, v2 = 1;
 	void		**paramVal = NULL;
 	ns_ldap_error_t	*errorp = NULL;
+	short		nomem;
 
-	if (!database) {
-		return (NULL);
-	}
-	if (!udata) {
+	if (!database || !udata) {
 		return (NULL);
 	}
 
-	filter = (char *)malloc(MAXLINE);
-	if (!filter) {
-		return (NULL);
-	}
-	filter[0] = '\0';
-
-	userdata = (char *)malloc(MAXLINE);
-	if (!userdata) {
-		free(filter);
-		return (NULL);
-	}
-	userdata[0] = '\0';
-	*udata = userdata;
 
 	/*
 	 * Check for version of the profile the client is using
@@ -331,21 +403,32 @@ set_filter(char **key, char *database, char **udata)
 		if (strcasecmp(database, maplist[i].database) == SAME) {
 			if ((keyfilter = set_keys(key, maplist[i].def_type))
 							== NULL) {
-				snprintf(filter, MAXLINE, "objectclass=%s",
-					maplist[i].objectclass);
-				sprintf(userdata, "%%s");
+				filterlen = strlen(maplist[i].objectclass) + 13;
+				udatalen = 3;
+				MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+						udatalen, nomem);
+				if (!nomem) {
+					(void) snprintf(filter, filterlen,
+						"objectclass=%s",
+						maplist[i].objectclass);
+					(void) snprintf(userdata, udatalen,
+							"%%s");
+				}
 			} else {
-				snprintf(filter, MAXLINE,
-					"(&(objectclass=%s)%s)",
-					maplist[i].objectclass, keyfilter);
-				snprintf(userdata, MAXLINE, "(&(%%s)%s)",
-					keyfilter);
-#ifdef DEBUG
-	fprintf(stdout, "set_filter: filter=\"%s\"\n", filter);
-	fprintf(stdout, "set_filter: userdata=\"%s\"\n", userdata);
-#endif /* DEBUG */
+				filterlen = strlen(maplist[i].objectclass) +
+					strlen(keyfilter) + 18;
+				udatalen = strlen(keyfilter) + 8;
+				MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+						udatalen, nomem);
+				if (!nomem) {
+					(void) snprintf(filter, filterlen,
+					    "(&(objectclass=%s)%s)",
+					    maplist[i].objectclass, keyfilter);
+					(void) snprintf(userdata, udatalen,
+						"(&(%%s)%s)", keyfilter);
+				}
 			}
-			return (filter);
+			goto done;
 		}
 	}
 
@@ -356,22 +439,50 @@ set_filter(char **key, char *database, char **udata)
 	    if (v2) {
 		if ((keyfilter = set_keys(key, "automountKey"))
 			!= NULL) {
-			snprintf(filter, MAXLINE,
-				"(&(objectclass=automount)%s)", keyfilter);
-			snprintf(userdata, MAXLINE, "(&(%%s)%s)", keyfilter);
+			filterlen = strlen(keyfilter) + 27;
+			udatalen = strlen(keyfilter) + 8;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+					udatalen, nomem);
+			if (!nomem) {
+				(void) snprintf(filter, filterlen,
+				    "(&(objectclass=automount)%s)",
+					keyfilter);
+				(void) snprintf(userdata, udatalen,
+					"(&(%%s)%s)", keyfilter);
+			}
 		} else {
-			strcpy(filter, "objectclass=automount");
-			strcpy(userdata, "%s");
+			filterlen = 22;
+			udatalen = 3;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+					udatalen, nomem);
+			if (!nomem) {
+				(void) strlcpy(filter, "objectclass=automount",
+					filterlen);
+				(void) strlcpy(userdata, "%s", udatalen);
+			}
 		}
 	    } else {
-		if ((keyfilter = set_keys(key, "cn"))
-			!= NULL) {
-			snprintf(filter, MAXLINE,
-				"(&(objectclass=nisObject)%s)", keyfilter);
-			snprintf(userdata, MAXLINE, "(&(%%s)%s)", keyfilter);
+		if ((keyfilter = set_keys(key, "cn")) != NULL) {
+			filterlen = strlen(keyfilter) + 27;
+			udatalen = strlen(keyfilter) + 8;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+					udatalen, nomem);
+			if (!nomem) {
+				(void) snprintf(filter, filterlen,
+				    "(&(objectclass=nisObject)%s)", keyfilter);
+				(void) snprintf(userdata, udatalen,
+					"(&(%%s)%s)", keyfilter);
+			}
 		} else {
-			strcpy(filter, "objectclass=nisObject");
-			strcpy(userdata, "%s");
+			filterlen = 22;
+			udatalen = 3;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+					udatalen, nomem);
+			if (!nomem) {
+				(void) strlcpy(filter, "objectclass=nisObject",
+						filterlen);
+				(void) strlcpy(userdata, "%s", udatalen);
+			}
 		}
 	    }
 	    goto done;
@@ -382,22 +493,53 @@ set_filter(char **key, char *database, char **udata)
 	    if (v2) {
 		if ((keyfilter = set_keys(key, "automountMapName"))
 			!= NULL) {
-			snprintf(filter, MAXLINE,
-				"(&(objectclass=automountMap)%s)", keyfilter);
-			snprintf(userdata, MAXLINE, "(&(%%s)%s)", keyfilter);
+			filterlen = strlen(keyfilter) + 30;
+			udatalen = strlen(keyfilter) + 8;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+					udatalen, nomem);
+			if (!nomem) {
+				(void) snprintf(filter, filterlen,
+					"(&(objectclass=automountMap)%s)",
+					keyfilter);
+				(void) snprintf(userdata, udatalen,
+					"(&(%%s)%s)", keyfilter);
+			}
 		} else {
-			strcpy(filter, "objectclass=automountMap");
-			strcpy(userdata, "%s");
+			filterlen = 25;
+			udatalen = 3;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+					udatalen, nomem);
+			if (!nomem) {
+				(void) strlcpy(filter,
+					"objectclass=automountMap",
+					filterlen);
+				(void) strlcpy(userdata, "%s", udatalen);
+			}
 		}
 	    } else {
 		if ((keyfilter = set_keys(key, "nisMapName"))
 			!= NULL) {
-			snprintf(filter, MAXLINE, "(&(objectclass=nisMap)%s)",
-				keyfilter);
-			snprintf(userdata, MAXLINE, "(&(%%s)%s)", keyfilter);
+			filterlen = strlen(keyfilter) + 24;
+			udatalen = strlen(keyfilter) + 8;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+					udatalen, nomem);
+			if (!nomem) {
+				(void) snprintf(filter, filterlen,
+					"(&(objectclass=nisMap)%s)",
+					keyfilter);
+				(void) snprintf(userdata, udatalen,
+					"(&(%%s)%s)", keyfilter);
+			}
 		} else {
-			strcpy(filter, "objectclass=nisMap");
-			strcpy(userdata, "%s");
+			filterlen = 19;
+			udatalen = 3;
+			MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+					udatalen, nomem);
+			if (!nomem) {
+			    (void) strlcpy(filter, "objectclass=nisMap",
+					filterlen);
+			    (void) strlcpy(userdata, "%s", udatalen);
+			}
 		}
 	    }
 	    goto done;
@@ -405,17 +547,35 @@ set_filter(char **key, char *database, char **udata)
 
 	/* other services (catch all) */
 	if ((keyfilter = set_keys(key, "cn")) == NULL) {
-		snprintf(filter, MAXLINE, "objectclass=*");
-		strcpy(userdata, "%s");
+		filterlen = 14;
+		udatalen = 3;
+		MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+				udatalen, nomem);
+		if (!nomem) {
+			(void) snprintf(filter, filterlen, "objectclass=*");
+			(void) strlcpy(userdata, "%s", udatalen);
+		}
 	} else {
-		snprintf(filter, MAXLINE, "%s", keyfilter);
-		snprintf(userdata, MAXLINE, "(&(%%s)(%s))", keyfilter);
+		filterlen = strlen(keyfilter) + 1;
+		udatalen = strlen(keyfilter) + 8;
+		MALLOC_FILTER_UDATA(filter, filterlen, userdata,
+				udatalen, nomem);
+		if (!nomem) {
+			(void) snprintf(filter, filterlen, "%s", keyfilter);
+			(void) snprintf(userdata, udatalen, "(&(%%s)%s)",
+					keyfilter);
+		}
 	}
 
 done:
 #ifdef DEBUG
-	fprintf(stdout, "set_filter: filter=\"%s\"\n", filter);
-	fprintf(stdout, "set_filter: userdata=\"%s\"\n", userdata);
+	(void) fprintf(stdout, "set_filter: filter=\"%s\"\n", filter);
+	(void) fprintf(stdout, "set_filter: userdata=\"%s\"\n", userdata);
 #endif /* DEBUG */
+	if (keyfilter)
+		free(keyfilter);
+	if (nomem)
+		exit(2);
+	*udata = userdata;
 	return (filter);
 }
