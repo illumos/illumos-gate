@@ -699,7 +699,7 @@ send_mondo_set(cpuset_t set)
 			CPUSET_ZERO(error_set);
 			for (i = 0; i < NCPU; i++) {
 				if (CPU_IN_SET(set, i)) {
-					uint64_t state;
+					uint64_t state = CPU_STATE_INVALID;
 					(void) hv_cpu_state(i, &state);
 					if (state == CPU_STATE_ERROR) {
 						CPUSET_ADD(error_set, i);
