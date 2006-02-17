@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Database-speficic definitions for the getXXXbyYYY routines
@@ -135,7 +134,7 @@ extern "C" {
 
 #define	NSS_BUFSIZ		1024
 
-#define	NSS_LINELEN_GROUP	((NSS_BUFSIZ) * 4)
+#define	NSS_LINELEN_GROUP	((NSS_BUFSIZ) * 8)
 #define	NSS_LINELEN_HOSTS	((NSS_BUFSIZ) * 8)
 #define	NSS_LINELEN_IPNODES	((NSS_BUFSIZ) * 8)
 #define	NSS_LINELEN_NETMASKS	NSS_BUFSIZ
@@ -169,7 +168,7 @@ extern "C" {
  * === These might more reasonably go in <pwd.h>, <netdb.h> et al
  */
 
-#define	NSS_BUFLEN_GROUP	(NSS_LINELEN_GROUP + 800 * sizeof (char *))
+#define	NSS_BUFLEN_GROUP	NSS_LINELEN_GROUP
 #define	NSS_BUFLEN_HOSTS	\
 	(NSS_LINELEN_HOSTS + (MAXALIASES + MAXADDRS + 2) * sizeof (char *))
 #define	NSS_BUFLEN_IPNODES	\
@@ -192,7 +191,7 @@ extern "C" {
 #define	NSS_BUFLEN_AUTHATTR	NSS_BUFLEN_ATTRDB
 #define	NSS_BUFLEN_EXECATTR	NSS_BUFLEN_ATTRDB
 #define	NSS_BUFLEN_PROFATTR	NSS_BUFLEN_ATTRDB
-#define	NSS_BUFLEN_USERATTR	NSS_BUFLEN_ATTRDB
+#define	NSS_BUFLEN_USERATTR	((NSS_BUFLEN_ATTRDB) * 8)
 
 
 /*
