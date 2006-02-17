@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -368,72 +367,6 @@ include		<sys/socket.h>, <netinet/in.h>, <strings.h>, <bsm/libbsm.h>
 declaration	int audit_settid(int fd)
 version		SUNWprivate_1.1
 end
-
-function	audit_login_bad_dialup
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_bad_dialup(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_bad_pw
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_bad_pw(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_maxtrys
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_maxtrys(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_not_console
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_not_console(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_save_flags
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_save_flags(int rflag, int hflag)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_save_host
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_save_host(char *host)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_save_machine
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_save_machine(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_save_port
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_save_port(void)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_save_pw
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_save_pw(struct passwd *pwd)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_save_ttyn
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_save_ttyn(char *ttyn)
-version		SUNWprivate_1.1
-end		
-
-function	audit_login_success
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_login_success(void)
-version		SUNWprivate_1.1
-end		
 
 function	audit_mountd_mount
 include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
@@ -930,53 +863,6 @@ end
 function	audit_crontab_process_not_audited
 include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
 declaration	int audit_crontab_process_not_audited()
-version		SUNWprivate_1.1
-end		
-
-function	audit_delete_user_fail
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-version		SUNWprivate_1.1
-end		
-
-function	audit_delete_user_success
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-version		SUNWprivate_1.1
-end		
-
-function	audit_user_create_event
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-version		SUNWprivate_1.1
-end		
-
-function	audit_user_dde_event_setup
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-version		SUNWprivate_1.1
-end		
-
-function	audit_user_modify_event
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-version		SUNWprivate_1.1
-end		
-
-function	audit_users_modified_by_group_fail
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-version		SUNWprivate_1.1
-end		
-
-function	audit_users_modified_by_group_success
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-version		SUNWprivate_1.1
-end		
-
-function	audit_admin_auth_fail
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_admin_auth_fail(char *user_name, char *host, int status)
-version		SUNWprivate_1.1
-end		
-
-function	audit_admin_auth_success
-include		<sys/types.h>, <bsm/audit.h>, <bsm/libbsm.h>, <bsm/audit_record.h>, <bsm/devices.h>, <pwd.h>
-declaration	int audit_admin_auth_success(char *user_name, char *host, uint32_t session_ID)
 version		SUNWprivate_1.1
 end		
 

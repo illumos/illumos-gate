@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Do not add to this file unless it is to cover an existing private
@@ -177,23 +176,6 @@ extern	int	audit_shutdown_fail(void);
 extern	int	audit_reboot_setup(void);
 extern	int	audit_reboot_success(void);
 extern	int	audit_reboot_fail(void);
-
-/*
- * audit_login.c
- * login
- */
-extern	int	audit_login_save_flags(int, int);
-extern	int	audit_login_save_host(char *);
-extern	int	audit_login_save_ttyn(char *);
-extern	int	audit_login_save_port(void);
-extern	int	audit_login_save_machine(void);
-extern	int	audit_login_success(void);
-extern	int	audit_login_save_pw(struct passwd *);
-extern	int	audit_login_bad_pw(void);
-extern	int	audit_login_maxtrys(void);
-extern	int	audit_login_not_console(void);
-extern	int	audit_login_bad_dialup(void);
-extern	int	audit_login_maxtrys(void);
 
 /*
  * audit_newgrp.c

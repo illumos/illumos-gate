@@ -2,15 +2,14 @@
 # Two "#" are comments that are copied to audit_record_attr
 # other comments are removed.
 ##
-## Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+## Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 ## Use is subject to license terms.
 ##
 ## CDDL HEADER START
 ##
 ## The contents of this file are subject to the terms of the
-## Common Development and Distribution License, Version 1.0 only
-## (the "License").  You may not use this file except in compliance
-## with the License.
+## Common Development and Distribution License (the "License").
+## You may not use this file except in compliance with the License.
 ##
 ## You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 ## or http://www.opensolaris.org/os/licensing.
@@ -1999,8 +1998,7 @@ label=AUE_create_user
     comment=path:
     comment=server:
     comment=permissions
-# see audit_mgrs.c
-# last used by AdminSuite 3.0; SMC uses new records types
+# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
 
 label=AUE_cron_invoke
   program=/usr/sbin/cron
@@ -2058,22 +2056,19 @@ label=AUE_delete_user
   program=administration: delete user
   format=text1
     comment=uid
-# See audit_mgrs.c
-# last used by AdminSuite 3.0; SMC uses new records types
+# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
 
 label=AUE_disable_user
   program=administration: disable user
   format=text1
     comment=uid
-# See audit_mgrs.c
-# last used by AdminSuite 3.0; SMC uses new records types
+# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
 
 label=AUE_enable_user
   program=administration: enable user
   format=text1
     comment=uid
-# See audit_mgrs.c
-# last used by AdminSuite 3.0; SMC uses new records types
+# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
 
 label=AUE_ftpd
   program=/usr/sbin/in.ftpd
@@ -2214,15 +2209,6 @@ label=AUE_login
   see=login(1);dtlogin
   format=text1
   comment=error message or "successful login"
-# See audit_login.c
-#	header,81,2,login - local,,Fri Nov 09 13:54:46 2001, + 150 msec
-#	subject,tuser1,tuser1,staff,tuser1,staff,322,322,0 0 tmach2
-#	text,invalid password
-#	return,failure: Interrupted system call,-1
-#	header,81,2,login - local,,Fri Nov 09 13:55:00 2001, + 550 msec
-#	subject,tuser1,tuser1,staff,tuser1,staff,342,342,0 0 tmach2
-#	text,successful login
-#	return,success,0
 
 label=AUE_logout
   title=login: logout
@@ -2230,11 +2216,6 @@ label=AUE_logout
   see=login(1)
   format=text1
   comment="logout" username
-# See audit_login.c
-#	header,81,2,logout,,Tue Oct 23 12:45:22 2001, + 197 msec
-#	subject,tuser1,tuser1,emacs,tuser1,emacs,23400,3451581082,24 7 tmach2
-#	text,logout tuser1
-#	return,success,0
 
 label=AUE_modify_user
   program=administration: modify user
@@ -2253,8 +2234,7 @@ label=AUE_modify_user
     comment=path:
     comment=server:
     comment=permissions
-# See audit_mgrs.c
-# last used by AdminSuite 3.0; SMC uses new records types
+# Obsolete, last used by AdminSuite 3.0; SMC uses new records types
 
 label=AUE_mountd_mount
   title=mountd: NFS mount
@@ -2404,19 +2384,6 @@ label=AUE_rlogin
   see=login(1) - rlogin
   format=[text]1
     comment=success/fail message
-# See audit_login.c
-#	header,81,2,login - rlogin,,Fri Nov 09 13:05:30 2001, + 483 msec
-#	subject,tuser2,tuser2,staff,tuser2,staff,10345,10345,24 18 tmach3
-#	text,invalid password
-#	return,failure: Interrupted system call,-1
-#	header,81,2,login - rlogin,,Fri Nov 09 13:05:39 2001, + 269 msec
-#	subject,tuser2,tuser2,staff,tuser2,staff,10345,10345,24 18 tmach3
-#	text,invalid password
-#	return,failure: Interrupted system call,-1
-#	header,81,2,login - rlogin,,Fri Nov 09 13:05:49 2001, + 94 msec
-#	subject,tuser2,tuser2,staff,tuser2,staff,10345,10345,255 197121 tmach3
-#	text,successful login
-#	return,success,0
 
 label=AUE_role_login
   program=SMC server
@@ -2546,11 +2513,6 @@ label=AUE_telnet
   see=login(1) - telnet
   format=[text]1
   comment=success/fail message
-# See audit_login.c
-#	header,81,2,login - telnet,,Fri Nov 09 13:49:44 2001, + 374 msec
-#	subject,tuser2,tuser2,staff,tuser2,staff,10409,10409,11856 196631 tmach3
-#	text,successful login
-#	return,success,0
 
 label=AUE_uadmin_solaris
   title=uadmin
