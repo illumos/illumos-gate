@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +74,26 @@ extern "C" {
 #define	ERRH_MODE_UNKNOWN	0
 #define	ERRH_MODE_USER		1
 #define	ERRH_MODE_PRIV		2
+
+/*
+ * For the second argument passed to process_nonresumable_error(), it is
+ * an uint64_t. The upper 32 bits are reserved for various flags, the
+ * lower 32 bits are used to pass the "current tl-1". Right now only bit
+ * 32 in the upper 32 bits is being used as user's fill/spill flag.
+ * If bit 32 is set, it means the first error in the error
+ * queue happened in user fill/spill trap and it needs to be handled
+ * differently.
+ *
+ * -Argument 2 of process_nonresumable_error()
+ *    ----------------------------------------------
+ *    |  reserved        |x|  current_tl - 1       |
+ *    ----------------------------------------------
+ *    63                 32 31                     0
+ * x - bit 32, user fill/spill trap flag
+ */
+#define	ERRH_U_SPILL_FILL		0x100000000
+#define	ERRH_U_SPILL_FILL_SHIFT		32
+#define	ERRH_TL_MASK			0xffffffff
 
 #ifndef	_ASM
 /*

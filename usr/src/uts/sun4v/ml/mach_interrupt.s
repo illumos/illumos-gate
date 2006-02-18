@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #include <sys/cmn_err.h>
 #include <sys/ftrace.h>
 #include <sys/machasi.h>
+#include <sys/scb.h>
 #include <sys/error.h>
 #define	INTR_REPORT_SIZE	64
 
@@ -530,7 +531,57 @@ nonresumable_error(void)
 	sllx	%g3, 32, %g3			! %g3.h = tail offset
 	or	%g3, %g2, %g3			! %g3.l = head offset
 	rdpr	%tl, %g2			! %g2 = current tl
-	sub	%g2, 1, %g2			! %g2 = previous tl, arg2
+
+	/*
+	 * Now check if the first error that sent us here was caused
+	 * in user's SPILL/FILL trap. If it was, we call sys_trap to
+	 * kill the user process. Several considerations:
+	 * - If multiple nonresumable errors happen, we only check the
+	 *   first one. Nonresumable errors cause system either panic
+	 *   or kill the user process. So the system has already
+	 *   panic'ed or killed user process after processing the first
+	 *   error. Therefore, no need to check if other error packet
+	 *   for this type of error.
+	 * - Errors happen in user's SPILL/FILL trap will bring us at
+	 *   TL = 2.
+	 * - We need to lower TL to 1 to get the trap type and tstate.
+	 *   We don't go back to TL = 2 so no need to save states.
+	 */
+	cmp	%g2, 2	
+	bne,pt	%xcc, 3f			! if tl != 2
+	nop
+	/* Check to see if the trap pc is in a window spill/fill handling */
+	rdpr	%tpc, %g4
+	/* tpc should be in the trap table */
+	set	trap_table, %g5
+	cmp	%g4, %g5
+	blu,pt	%xcc, 3f
+	nop
+	set	etrap_table, %g5
+	cmp	%g4, %g5
+	bgeu,pt	%xcc, 3f
+	nop	
+	/* Set tl to 1 in order to read tt[1] and tstate[1] */
+	wrpr	%g0, 1, %tl
+	rdpr	%tt, %g4			! %g4 = tt[1]
+	/* Check if tt[1] is a window trap */
+	and	%g4, WTRAP_TTMASK, %g4
+	cmp	%g4, WTRAP_TYPE
+	bne,pt	%xcc, 3f
+	nop
+	rdpr	%tstate, %g5			! %g5 = tstate[1]
+	btst	TSTATE_PRIV, %g5
+	bnz	%xcc, 3f			! Is it from user code?
+	nop
+	/*
+	 * Now we know the error happened in user's SPILL/FILL trap.
+	 * Turn on the user spill/fill flag in %g2
+	 */
+	mov	1, %g4
+	sllx	%g4, ERRH_U_SPILL_FILL_SHIFT, %g4
+	or	%g2, %g4, %g2			! turn on flag in %g2
+	
+3:	sub	%g2, 1, %g2			! %g2.l = previous tl
 
 	set	process_nonresumable_error, %g1
 	rdpr	%pil, %g4

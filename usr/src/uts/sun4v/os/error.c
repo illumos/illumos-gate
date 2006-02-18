@@ -182,7 +182,7 @@ process_resumable_error(struct regs *rp, uint32_t head_offset,
 }
 
 void
-process_nonresumable_error(struct regs *rp, uint64_t tl,
+process_nonresumable_error(struct regs *rp, uint64_t flags,
     uint32_t head_offset, uint32_t tail_offset)
 {
 	struct machcpu *mcpup;
@@ -192,6 +192,7 @@ process_nonresumable_error(struct regs *rp, uint64_t tl,
 	int trampolined = 0;
 	int expected = DDI_FM_ERR_UNEXPECTED;
 	uint64_t exec_mode;
+	uint8_t u_spill_fill;
 
 	mcpup = &(CPU->cpu_m);
 
@@ -230,17 +231,33 @@ process_nonresumable_error(struct regs *rp, uint64_t tl,
 		    >> ERRH_MODE_SHIFT;
 		aflt->flt_priv = (exec_mode == ERRH_MODE_PRIV ||
 		    exec_mode == ERRH_MODE_UNKNOWN);
-		aflt->flt_tl = (uchar_t)tl;
 		aflt->flt_prot = AFLT_PROT_NONE;
+		aflt->flt_tl = (uchar_t)(flags & ERRH_TL_MASK);
 		aflt->flt_panic = ((aflt->flt_tl != 0) ||
 		    (aft_testfatal != 0));
 
+		/*
+		 * For the first error packet on the queue, check if it
+		 * happened in user fill/spill trap.
+		 */
+		if (flags & ERRH_U_SPILL_FILL) {
+			u_spill_fill = 1;
+			/* clear the user fill/spill flag in flags */
+			flags = (uint64_t)aflt->flt_tl;
+		} else
+			u_spill_fill = 0;
+
 		switch (errh_flt.errh_er.desc) {
 		case ERRH_DESC_PR_NRE:
+			if (u_spill_fill) {
+				aflt->flt_panic = 0;
+				break;
+			}
 			/*
 			 * Fall through, precise fault also need to check
 			 * to see if it was protected.
 			 */
+			/*FALLTHRU*/
 
 		case ERRH_DESC_DEF_NRE:
 			/*
@@ -309,12 +326,13 @@ process_nonresumable_error(struct regs *rp, uint64_t tl,
 			errh_page_retire(&errh_flt, PR_UE);
 
 		/*
-		 * If we queued an error and the it was in user mode or
-		 * protected by t_lofault,
+		 * If we queued an error and the it was in user mode, or
+		 * protected by t_lofault, or user_spill_fill is set, we
 		 * set AST flag so the queue will be drained before
 		 * returning to user mode.
 		 */
-		if (!aflt->flt_priv || aflt->flt_prot == AFLT_PROT_COPY) {
+		if (!aflt->flt_priv || aflt->flt_prot == AFLT_PROT_COPY ||
+		    u_spill_fill) {
 			int pcb_flag = 0;
 
 			if (aflt->flt_class == CPU_FAULT)
@@ -553,6 +571,10 @@ mem_scrub(uint64_t paddr, uint64_t len)
 	}
 }
 
+/*
+ * Call hypervisor to flush the memory region. The memory region
+ * must be within the same page frame.
+ */
 void
 mem_sync(caddr_t va, size_t len)
 {
@@ -562,6 +584,8 @@ mem_sync(caddr_t va, size_t len)
 
 	if (pa == (uint64_t)-1)
 		return;
+
+	ASSERT((pa >> MMU_PAGESHIFT) == ((pa + len) >> MMU_PAGESHIFT));
 
 	length = len;
 	flushed = 0;

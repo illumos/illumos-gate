@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -299,9 +299,14 @@ extern "C" {
 #define	PTL1_BAD_GL		15
 
 /*
+ * Defines the max trap level allowed
+ */
+#define	MAXPTL			2
+
+/*
  * Defines used for ptl1 related data structs.
  */
-#define	PTL1_MAXTL		2
+#define	PTL1_MAXTL		MAXPTL
 #define	PTL1_MAXGL		2
 #define	PTL1_DEBUG_TRAP		0x7C
 #define	PTL1_SSIZE		1024	/* minimum stack size */
