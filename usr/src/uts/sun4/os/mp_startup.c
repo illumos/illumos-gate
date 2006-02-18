@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -305,7 +304,6 @@ setup_cpu_common(int cpuid)
 #endif /* TRAPTRACE */
 
 	extern void idle();
-	extern void init_intr_threads(struct cpu *);
 
 	ASSERT(MUTEX_HELD(&cpu_lock));
 	ASSERT(cpu[cpuid] == NULL);
@@ -411,7 +409,7 @@ setup_cpu_common(int cpuid)
 	 * Initialize the interrupt threads for this CPU
 	 */
 	init_intr_pool(cp);
-	init_intr_threads(cp);
+	cpu_intr_alloc(cp, NINTR_THREADS);
 
 	/*
 	 * Add CPU to list of available CPUs.

@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -572,6 +572,7 @@ int	cpu_intr_count(cpu_t *cp);	/* count # of CPUs handling intrs */
 int	cpu_intr_on(cpu_t *cp);		/* CPU taking I/O interrupts? */
 void	cpu_intr_enable(cpu_t *cp);	/* enable I/O interrupts */
 int	cpu_intr_disable(cpu_t *cp);	/* disable I/O interrupts */
+void	cpu_intr_alloc(cpu_t *cp, int n); /* allocate interrupt threads */
 
 /*
  * Routines for checking CPU states.

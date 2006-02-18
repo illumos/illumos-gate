@@ -58,6 +58,7 @@ COMMON_CORE_OBJS +=		\
 		rctl_proc.o	\
 		rwlock.o	\
 		seg_kmem.o	\
+		thread_intr.o	\
 		vm_page.o	\
 		vm_pagelist.o
 

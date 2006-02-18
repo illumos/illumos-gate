@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -429,8 +428,6 @@ static pgcnt_t kphysm_init(page_t *, struct memseg *, pgcnt_t, pgcnt_t);
  * (*) support for memory configurations above 32gb will require manual tuning
  * of kernelbase to balance out the need of user applications.
  */
-
-void init_intr_threads(struct cpu *);
 
 /* real-time-clock initialization parameters */
 long gmt_lag;		/* offset in seconds of gmt to local time */
@@ -1806,7 +1803,7 @@ startup_end(void)
 	 * support.
 	 */
 	setx86isalist();
-	init_intr_threads(CPU);
+	cpu_intr_alloc(CPU, NINTR_THREADS);
 	psm_install();
 
 	/*
