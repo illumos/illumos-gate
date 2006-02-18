@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -205,7 +204,7 @@ static int apic_max_usecs_clear_pending = 1000;
  */
 #define	UCHAR_MAX	((1 << NBBY) - 1)
 
-uchar_t	apic_reserved_irqlist[MAX_ISA_IRQ];
+uchar_t	apic_reserved_irqlist[MAX_ISA_IRQ + 1];
 
 /*
  * The following vector assignments influence the value of ipltopri and

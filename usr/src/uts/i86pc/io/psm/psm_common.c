@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -297,7 +296,7 @@ build_reserved_irqlist(uchar_t *reserved_irqs_table)
 	uint_t	elcrval;
 
 	/* Initialize the reserved ISA IRQs: */
-	for (i = 0; i < MAX_ISA_IRQ; i++)
+	for (i = 0; i <= MAX_ISA_IRQ; i++)
 		reserved_irqs_table[i] = 0;
 
 	if (acpi_irq_check_elcr) {
@@ -307,7 +306,7 @@ build_reserved_irqlist(uchar_t *reserved_irqs_table)
 		    ELCR_EDGE(elcrval, 2) && ELCR_EDGE(elcrval, 8) &&
 		    ELCR_EDGE(elcrval, 13)) {
 			/* valid ELCR */
-			for (i = 0; i < MAX_ISA_IRQ; i++)
+			for (i = 0; i <= MAX_ISA_IRQ; i++)
 				if (!ELCR_LEVEL(elcrval, i))
 					reserved_irqs_table[i] = 1;
 		}
