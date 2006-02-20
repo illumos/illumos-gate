@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -138,7 +137,8 @@ int		ehci_register_intrs_and_init_mutex(
 				ehci_state_t		*ehcip);
 static int	ehci_add_intrs(ehci_state_t		*ehcip,
 				int			intr_type);
-int		ehci_init_ctlr(ehci_state_t		*ehcip);
+int		ehci_init_ctlr(ehci_state_t		*ehcip,
+				int			init_type);
 static int	ehci_take_control(ehci_state_t		*ehcip);
 static int	ehci_init_periodic_frame_lst_table(
 				ehci_state_t		*ehcip);
@@ -913,19 +913,16 @@ ehci_add_intrs(ehci_state_t	*ehcip,
 
 
 /*
- * ehci_init_ctlr:
+ * ehci_init_hardware
  *
- * Initialize the Host Controller (HC).
+ * take control from BIOS, reset EHCI host controller, and check version, etc.
  */
 int
-ehci_init_ctlr(ehci_state_t	*ehcip)
+ehci_init_hardware(ehci_state_t	*ehcip)
 {
 	int			revision;
 	uint16_t		cmd_reg;
-	clock_t			sof_time_wait;
 	int			abort_on_BIOS_take_over_failure;
-
-	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl, "ehci_init_ctlr:");
 
 	/* Take control from the BIOS */
 	if (ehci_take_control(ehcip) != USB_SUCCESS) {
@@ -965,8 +962,8 @@ ehci_init_ctlr(ehci_state_t	*ehcip)
 	/* Verify the version number */
 	revision = Get_16Cap(ehci_version);
 
-	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-	    "ehci_init_ctlr: Revision 0x%x", revision);
+	USB_DPRINTF_L3(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+	    "ehci_init_hardware: Revision 0x%x", revision);
 
 	/*
 	 * EHCI driver supports EHCI host controllers compliant to
@@ -1024,80 +1021,18 @@ ehci_init_ctlr(ehci_state_t	*ehcip)
 		}
 	}
 
-	/*
-	 * Check for Asynchronous schedule park capability feature. If this
-	 * feature is supported, then, program ehci command register with
-	 * appropriate values..
-	 */
-	if (Get_Cap(ehci_hcc_params) & EHCI_HCC_ASYNC_SCHED_PARK_CAP) {
+	return (DDI_SUCCESS);
+}
 
-		USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "ehci_init_ctlr: Async park mode is supported");
 
-		Set_OpReg(ehci_command, (Get_OpReg(ehci_command) |
-		    (EHCI_CMD_ASYNC_PARK_ENABLE |
-		    EHCI_CMD_ASYNC_PARK_COUNT_3)));
-	}
-
-	/*
-	 * Check for programmable periodic frame list feature. If this
-	 * feature is supported, then, program ehci command register with
-	 * 1024 frame list value.
-	 */
-	if (Get_Cap(ehci_hcc_params) & EHCI_HCC_PROG_FRAME_LIST_FLAG) {
-
-		USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "ehci_init_ctlr: Variable programmable periodic "
-		    "frame list is supported");
-
-		Set_OpReg(ehci_command, (Get_OpReg(ehci_command) |
-		    EHCI_CMD_FRAME_1024_SIZE));
-	}
-
-	/*
-	 * Currently EHCI driver doesn't support 64 bit addressing.
-	 *
-	 * If we are using 64 bit addressing capability, then, program
-	 * ehci_ctrl_segment register with 4 Gigabyte segment where all
-	 * of the interface data structures are allocated.
-	 */
-	if (Get_Cap(ehci_hcc_params) & EHCI_HCC_64BIT_ADDR_CAP) {
-
-		USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "ehci_init_ctlr: EHCI driver doesn't support "
-		    "64 bit addressing");
-	}
-
-	/* 64 bit addressing is not support */
-	Set_OpReg(ehci_ctrl_segment, 0x00000000);
-
-	/* Turn on/off the schedulers */
-	ehci_toggle_scheduler(ehcip);
-
-	/*
-	 * Set the Periodic Frame List Base Address register with the
-	 * starting physical address of the Periodic Frame List.
-	 */
-	Set_OpReg(ehci_periodic_list_base,
-	    (uint32_t)(ehcip->ehci_pflt_cookie.dmac_address & 0xFFFFF000));
-
-	/*
-	 * Set ehci_interrupt to enable all interrupts except Root
-	 * Hub Status change interrupt.
-	 */
-	Set_OpReg(ehci_interrupt, EHCI_INTR_HOST_SYSTEM_ERROR |
-	    EHCI_INTR_FRAME_LIST_ROLLOVER | EHCI_INTR_USB_ERROR |
-	    EHCI_INTR_USB);
-
-	/*
-	 * Set the desired interrupt threshold and turn on EHCI host controller.
-	 */
-	Set_OpReg(ehci_command,
-	    ((Get_OpReg(ehci_command) & ~EHCI_CMD_INTR_THRESHOLD) |
-		(EHCI_CMD_01_INTR | EHCI_CMD_HOST_CTRL_RUN)));
-
-	ASSERT(Get_OpReg(ehci_command) & EHCI_CMD_HOST_CTRL_RUN);
-
+/*
+ * ehci_init_workaround
+ *
+ * some workarounds during initializing ehci
+ */
+int
+ehci_init_workaround(ehci_state_t	*ehcip)
+{
 	/*
 	 * Acer Labs Inc. M5273 EHCI controller does not send
 	 * interrupts unless the Root hub ports are routed to the EHCI
@@ -1123,8 +1058,8 @@ ehci_init_ctlr(ehci_state_t	*ehcip)
 	    if (ehcip->ehci_rev_id >= PCI_VIA_REVISION_6212) {
 
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-		    "ehci_init_ctlr: Applying VIA workarounds for "
-		    "the 6212 chip.");
+		    "ehci_init_workaround: Applying VIA workarounds "
+		    "for the 6212 chip.");
 
 	    } else if (strcmp(DEVI(ehcip->ehci_dip)->devi_binding_name,
 		"pciclass,0c0320") == 0) {
@@ -1158,6 +1093,20 @@ ehci_init_ctlr(ehci_state_t	*ehcip)
 		    "Applying VIA workarounds");
 	    }
 	}
+
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * ehci_init_check_status
+ *
+ * Check if EHCI host controller is running
+ */
+int
+ehci_init_check_status(ehci_state_t	*ehcip)
+{
+	clock_t			sof_time_wait;
 
 	/*
 	 * Get the number of clock ticks to wait.
@@ -1196,8 +1145,119 @@ ehci_init_ctlr(ehci_state_t	*ehcip)
 		return (DDI_FAILURE);
 	}
 
-	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
-	    "ehci_init_ctlr: SOF's have started");
+	return (DDI_SUCCESS);
+}
+
+
+/*
+ * ehci_init_ctlr:
+ *
+ * Initialize the Host Controller (HC).
+ */
+int
+ehci_init_ctlr(ehci_state_t	*ehcip,
+		int		init_type)
+{
+	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl, "ehci_init_ctlr:");
+
+	if (init_type == EHCI_NORMAL_INITIALIZATION) {
+
+		if (ehci_init_hardware(ehcip) != DDI_SUCCESS) {
+
+			return (DDI_FAILURE);
+		}
+	}
+
+	/*
+	 * Check for Asynchronous schedule park capability feature. If this
+	 * feature is supported, then, program ehci command register with
+	 * appropriate values..
+	 */
+	if (Get_Cap(ehci_hcc_params) & EHCI_HCC_ASYNC_SCHED_PARK_CAP) {
+
+		USB_DPRINTF_L3(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		    "ehci_init_ctlr: Async park mode is supported");
+
+		Set_OpReg(ehci_command, (Get_OpReg(ehci_command) |
+		    (EHCI_CMD_ASYNC_PARK_ENABLE |
+		    EHCI_CMD_ASYNC_PARK_COUNT_3)));
+	}
+
+	/*
+	 * Check for programmable periodic frame list feature. If this
+	 * feature is supported, then, program ehci command register with
+	 * 1024 frame list value.
+	 */
+	if (Get_Cap(ehci_hcc_params) & EHCI_HCC_PROG_FRAME_LIST_FLAG) {
+
+		USB_DPRINTF_L3(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		    "ehci_init_ctlr: Variable programmable periodic "
+		    "frame list is supported");
+
+		Set_OpReg(ehci_command, (Get_OpReg(ehci_command) |
+		    EHCI_CMD_FRAME_1024_SIZE));
+	}
+
+	/*
+	 * Currently EHCI driver doesn't support 64 bit addressing.
+	 *
+	 * If we are using 64 bit addressing capability, then, program
+	 * ehci_ctrl_segment register with 4 Gigabyte segment where all
+	 * of the interface data structures are allocated.
+	 */
+	if (Get_Cap(ehci_hcc_params) & EHCI_HCC_64BIT_ADDR_CAP) {
+
+		USB_DPRINTF_L3(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		    "ehci_init_ctlr: EHCI driver doesn't support "
+		    "64 bit addressing");
+	}
+
+	/* 64 bit addressing is not support */
+	Set_OpReg(ehci_ctrl_segment, 0x00000000);
+
+	/* Turn on/off the schedulers */
+	ehci_toggle_scheduler(ehcip);
+
+	/*
+	 * Set the Periodic Frame List Base Address register with the
+	 * starting physical address of the Periodic Frame List.
+	 */
+	Set_OpReg(ehci_periodic_list_base,
+	    (uint32_t)(ehcip->ehci_pflt_cookie.dmac_address &
+		EHCI_PERIODIC_LIST_BASE));
+
+	/*
+	 * Set ehci_interrupt to enable all interrupts except Root
+	 * Hub Status change interrupt.
+	 */
+	Set_OpReg(ehci_interrupt, EHCI_INTR_HOST_SYSTEM_ERROR |
+	    EHCI_INTR_FRAME_LIST_ROLLOVER | EHCI_INTR_USB_ERROR |
+	    EHCI_INTR_USB);
+
+	/*
+	 * Set the desired interrupt threshold and turn on EHCI host controller.
+	 */
+	Set_OpReg(ehci_command,
+	    ((Get_OpReg(ehci_command) & ~EHCI_CMD_INTR_THRESHOLD) |
+		(EHCI_CMD_01_INTR | EHCI_CMD_HOST_CTRL_RUN)));
+
+	ASSERT(Get_OpReg(ehci_command) & EHCI_CMD_HOST_CTRL_RUN);
+
+	if (init_type == EHCI_NORMAL_INITIALIZATION) {
+
+		if (ehci_init_workaround(ehcip) != DDI_SUCCESS) {
+
+			return (DDI_FAILURE);
+		}
+
+		if (ehci_init_check_status(ehcip) != DDI_SUCCESS) {
+
+			return (DDI_FAILURE);
+		}
+
+		USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+		    "ehci_init_ctlr: SOF's have started");
+	}
 
 	/* Route all Root hub ports to EHCI host controller */
 	Set_OpReg(ehci_config_flag, EHCI_CONFIG_FLAG_EHCI);
@@ -1389,7 +1449,7 @@ ehci_init_periodic_frame_lst_table(ehci_state_t *ehcip)
 		goto failure;
 	}
 
-	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+	USB_DPRINTF_L3(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 	    "ehci_init_periodic_frame_lst_table: "
 	    "Real length %lu", real_length);
 
@@ -1870,20 +1930,20 @@ ehci_cpr_suspend(ehci_state_t	*ehcip)
 	}
 	ASSERT(ehcip->ehci_reclaim_list == NULL);
 
-	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+	USB_DPRINTF_L3(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 	    "ehci_cpr_suspend: Disable HC QH list processing");
 
 	/* Disable all EHCI QH list processing */
 	Set_OpReg(ehci_command, (Get_OpReg(ehci_command) &
 	    ~(EHCI_CMD_ASYNC_SCHED_ENABLE | EHCI_CMD_PERIODIC_SCHED_ENABLE)));
 
-	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+	USB_DPRINTF_L3(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 	    "ehci_cpr_suspend: Disable HC interrupts");
 
 	/* Disable all EHCI interrupts */
 	Set_OpReg(ehci_interrupt, 0);
 
-	USB_DPRINTF_L4(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
+	USB_DPRINTF_L3(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 	    "ehci_cpr_suspend: Wait for the next SOF");
 
 	/* Wait for the next SOF */
@@ -1929,7 +1989,7 @@ ehci_cpr_resume(ehci_state_t	*ehcip)
 	ehci_cpr_cleanup(ehcip);
 
 	/* Restart the controller */
-	if (ehci_init_ctlr(ehcip) != DDI_SUCCESS) {
+	if (ehci_init_ctlr(ehcip, EHCI_NORMAL_INITIALIZATION) != DDI_SUCCESS) {
 
 		USB_DPRINTF_L2(PRINT_MASK_ATTA, ehcip->ehci_log_hdl,
 		    "ehci_cpr_resume: ehci host controller resume failed ");
@@ -2142,7 +2202,7 @@ ehci_allocate_classic_tt_bandwidth(
 
 	mutex_exit(&child_ud->usb_mutex);
 
-	USB_DPRINTF_L4(PRINT_MASK_BW, ehcip->ehci_log_hdl,
+	USB_DPRINTF_L3(PRINT_MASK_BW, ehcip->ehci_log_hdl,
 	    "ehci_allocate_classic_tt_bandwidth: "
 	    "child_ud 0x%p parent_ud 0x%p", child_ud, parent_ud);
 
@@ -2161,7 +2221,7 @@ ehci_allocate_classic_tt_bandwidth(
 		return (USB_NOT_SUPPORTED);
 	}
 
-	USB_DPRINTF_L4(PRINT_MASK_BW, ehcip->ehci_log_hdl,
+	USB_DPRINTF_L3(PRINT_MASK_BW, ehcip->ehci_log_hdl,
 	    "ehci_allocate_classic_tt_bandwidth: bandwidth %d", bandwidth);
 
 	mutex_enter(&parent_ud->usb_mutex);
@@ -3543,7 +3603,7 @@ ehci_do_soft_reset(ehci_state_t	*ehcip)
 	ehci_save_regs->ehci_periodic_list_base =
 	    Get_OpReg(ehci_periodic_list_base);
 
-	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_do_soft_reset: Save reg = 0x%p", ehci_save_regs);
 
 	/* Disable all list processing and interrupts */
@@ -3560,7 +3620,7 @@ ehci_do_soft_reset(ehci_state_t	*ehcip)
 	Set_OpReg(ehci_command,
 	    Get_OpReg(ehci_command) | EHCI_CMD_LIGHT_HC_RESET);
 
-	USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+	USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 	    "ehci_do_soft_reset: Reset in progress");
 
 	/* Wait for reset to complete */

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,7 +133,7 @@ static struct dev_ops ehci_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module. This one is a driver */
-	"USB EHCI Driver %I%", /* Name of the module. */
+	"USB EHCI Driver 1.18", /* Name of the module. */
 	&ehci_ops,		/* Driver ops */
 };
 
@@ -293,7 +292,7 @@ ehci_attach(dev_info_t		*dip,
 	mutex_enter(&ehcip->ehci_int_mutex);
 
 	/* Initialize the controller */
-	if (ehci_init_ctlr(ehcip) != DDI_SUCCESS) {
+	if (ehci_init_ctlr(ehcip, EHCI_NORMAL_INITIALIZATION) != DDI_SUCCESS) {
 		mutex_exit(&ehcip->ehci_int_mutex);
 		(void) ehci_cleanup(ehcip);
 
@@ -628,7 +627,7 @@ ehci_intr(caddr_t arg1, caddr_t arg2)
 
 	/* Check for Frame List Rollover */
 	if (intr & EHCI_INTR_FRAME_LIST_ROLLOVER) {
-		USB_DPRINTF_L4(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
+		USB_DPRINTF_L3(PRINT_MASK_INTR, ehcip->ehci_log_hdl,
 		    "ehci_intr: Frame List Rollover");
 
 		ehci_handle_frame_list_rollover(ehcip);

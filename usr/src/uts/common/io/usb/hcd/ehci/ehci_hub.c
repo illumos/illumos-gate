@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1833,6 +1832,36 @@ ehci_handle_root_hub_status_change(void *arg)
 	USB_DPRINTF_L4(PRINT_MASK_ROOT_HUB, ehcip->ehci_log_hdl,
 	    "ehci_handle_root_hub_status_change: state = %d",
 	    ehcip->ehci_root_hub.rh_intr_pipe_state);
+
+#if defined(__x86)
+	/*
+	 * When ohci are attached in ferrari 4000, SMI will reset ehci
+	 * registers. If ehci registers have been reset, we must re-initialize
+	 * them. During booting, this function will be called 2~3 times. When
+	 * this function is called 16 times, ohci drivers have been attached
+	 * and stop checking the ehci registers.
+	 */
+	if (ehcip->ehci_polled_root_hub_count < 16) {
+
+		if (Get_OpReg(ehci_config_flag) == 0) {
+
+			USB_DPRINTF_L2(PRINT_MASK_ROOT_HUB,
+			    ehcip->ehci_log_hdl,
+			    "ehci_handle_root_hub_status_change:",
+			    " EHCI have been reset");
+
+			/* Reinitialize the controller */
+			if (ehci_init_ctlr(ehcip, EHCI_REINITIALIZATION) !=
+			    DDI_SUCCESS) {
+				mutex_exit(&ehcip->ehci_int_mutex);
+
+				return;
+			}
+		}
+
+		ehcip->ehci_polled_root_hub_count++;
+	}
+#endif	/* __x86 */
 
 	/* Get the current interrupt request pointer */
 	curr_intr_reqp = ehcip->ehci_root_hub.rh_curr_intr_reqp;
