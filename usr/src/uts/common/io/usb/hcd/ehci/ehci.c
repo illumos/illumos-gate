@@ -133,7 +133,7 @@ static struct dev_ops ehci_ops = {
  */
 static struct modldrv modldrv = {
 	&mod_driverops, 	/* Type of module. This one is a driver */
-	"USB EHCI Driver 1.18", /* Name of the module. */
+	"USB EHCI Driver %I%", /* Name of the module. */
 	&ehci_ops,		/* Driver ops */
 };
 
