@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -32,6 +31,7 @@
 #include <limits.h>
 #include <grp.h>
 #include <pwd.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <sys/acl.h>
 #include <errno.h>
@@ -40,6 +40,9 @@
 #include <locale.h>
 #include <aclutils.h>
 #include <acl_common.h>
+#include <sys/avl.h>
+
+#define	offsetof(s, m)	((size_t)(&(((s *)0)->m)))
 
 #define	ACL_PATH	0
 #define	ACL_FD		1
@@ -49,30 +52,104 @@
     ACE_READ_ATTRIBUTES | ACE_READ_ACL | ACE_WRITE_ACL)
 
 
-#define	ACL_SYNCHRONIZE_SET_ALLOW		0x0000002
 #define	ACL_SYNCHRONIZE_SET_DENY		0x0000001
+#define	ACL_SYNCHRONIZE_SET_ALLOW		0x0000002
+#define	ACL_SYNCHRONIZE_ERR_DENY		0x0000004
+#define	ACL_SYNCHRONIZE_ERR_ALLOW		0x0000008
 
-#define	ACL_WRITE_OWNER_SET_ALLOW		0x0000020
 #define	ACL_WRITE_OWNER_SET_DENY		0x0000010
+#define	ACL_WRITE_OWNER_SET_ALLOW		0x0000020
+#define	ACL_WRITE_OWNER_ERR_DENY		0x0000040
+#define	ACL_WRITE_OWNER_ERR_ALLOW		0x0000080
 
-#define	ACL_WRITE_ATTRS_OWNER_SET_ALLOW		0x0002000
+#define	ACL_DELETE_SET_DENY			0x0000100
+#define	ACL_DELETE_SET_ALLOW			0x0000200
+#define	ACL_DELETE_ERR_DENY			0x0000400
+#define	ACL_DELETE_ERR_ALLOW			0x0000800
+
 #define	ACL_WRITE_ATTRS_OWNER_SET_DENY		0x0001000
+#define	ACL_WRITE_ATTRS_OWNER_SET_ALLOW		0x0002000
+#define	ACL_WRITE_ATTRS_OWNER_ERR_DENY		0x0004000
+#define	ACL_WRITE_ATTRS_OWNER_ERR_ALLOW		0x0008000
 
 #define	ACL_WRITE_ATTRS_WRITER_SET_DENY		0x0010000
-
-#define	ACL_DELETE_SET_ALLOW			0x0000200
-#define	ACL_DELETE_SET_DENY			0x0000100
-
-#define	ACL_READ_NAMED_READER_SET_ALLOW		0x2000000
-
-#define	ACL_WRITE_NAMED_WRITER_SET_ALLOW	0x0200000
-#define	ACL_WRITE_NAMED_WRITER_SET_DENY		0x0100000
-
-#define	ACL_WRITE_ATTRS_OWNER_SET_ALLOW		0x0002000
 #define	ACL_WRITE_ATTRS_WRITER_SET_ALLOW	0x0020000
+#define	ACL_WRITE_ATTRS_WRITER_ERR_DENY		0x0040000
+#define	ACL_WRITE_ATTRS_WRITER_ERR_ALLOW	0x0080000
 
-#define	ACL_WRITE_OWNER_ERR_DENY		0x0000040
+#define	ACL_WRITE_NAMED_WRITER_SET_DENY		0x0100000
+#define	ACL_WRITE_NAMED_WRITER_SET_ALLOW	0x0200000
+#define	ACL_WRITE_NAMED_WRITER_ERR_DENY		0x0400000
+#define	ACL_WRITE_NAMED_WRITER_ERR_ALLOW	0x0800000
+
 #define	ACL_READ_NAMED_READER_SET_DENY		0x1000000
+#define	ACL_READ_NAMED_READER_SET_ALLOW		0x2000000
+#define	ACL_READ_NAMED_READER_ERR_DENY		0x4000000
+#define	ACL_READ_NAMED_READER_ERR_ALLOW		0x8000000
+
+
+#define	ACE_VALID_MASK_BITS (\
+    ACE_READ_DATA | \
+    ACE_LIST_DIRECTORY | \
+    ACE_WRITE_DATA | \
+    ACE_ADD_FILE | \
+    ACE_APPEND_DATA | \
+    ACE_ADD_SUBDIRECTORY | \
+    ACE_READ_NAMED_ATTRS | \
+    ACE_WRITE_NAMED_ATTRS | \
+    ACE_EXECUTE | \
+    ACE_DELETE_CHILD | \
+    ACE_READ_ATTRIBUTES | \
+    ACE_WRITE_ATTRIBUTES | \
+    ACE_DELETE | \
+    ACE_READ_ACL | \
+    ACE_WRITE_ACL | \
+    ACE_WRITE_OWNER | \
+    ACE_SYNCHRONIZE)
+
+#define	ACE_MASK_UNDEFINED			0x80000000
+
+#define	ACE_VALID_FLAG_BITS (ACE_FILE_INHERIT_ACE | \
+    ACE_DIRECTORY_INHERIT_ACE | \
+    ACE_NO_PROPAGATE_INHERIT_ACE | ACE_INHERIT_ONLY_ACE | \
+    ACE_SUCCESSFUL_ACCESS_ACE_FLAG | ACE_FAILED_ACCESS_ACE_FLAG | \
+    ACE_IDENTIFIER_GROUP | ACE_OWNER | ACE_GROUP | ACE_EVERYONE)
+
+/*
+ * ACL conversion helpers
+ */
+
+typedef enum {
+	ace_unused,
+	ace_user_obj,
+	ace_user,
+	ace_group, /* includes GROUP and GROUP_OBJ */
+	ace_other_obj
+} ace_to_aent_state_t;
+
+typedef struct acevals {
+	uid_t key;
+	avl_node_t avl;
+	uint32_t mask;
+	uint32_t allowed;
+	uint32_t denied;
+	int aent_type;
+} acevals_t;
+
+typedef struct ace_list {
+	acevals_t user_obj;
+	avl_tree_t user;
+	int numusers;
+	acevals_t group_obj;
+	avl_tree_t group;
+	int numgroups;
+	acevals_t other_obj;
+	uint32_t acl_mask;
+	int hasmask;
+	int dfacl_flag;
+	ace_to_aent_state_t state;
+	int seen; /* bitmask of all aclent_t a_type values seen */
+} ace_list_t;
 
 typedef union {
 	const char *file;
@@ -533,7 +610,6 @@ convert_aent_to_ace(aclent_t *aclentp, int aclcnt, int isdir,
 {
 	ace_t *acep;
 	ace_t *dfacep;
-	ace_t *newacep;
 	int acecnt = 0;
 	int dfacecnt = 0;
 	int dfaclstart = 0;
@@ -550,8 +626,8 @@ convert_aent_to_ace(aclent_t *aclentp, int aclcnt, int isdir,
 	}
 
 	if (i < aclcnt) {
-		dfaclstart = aclcnt - i;
-		dfaclcnt = i;
+		dfaclstart = i;
+		dfaclcnt = aclcnt - i;
 	}
 
 	if (dfaclcnt && isdir == 0) {
@@ -573,26 +649,790 @@ convert_aent_to_ace(aclent_t *aclentp, int aclcnt, int isdir,
 		}
 	}
 
-	newacep = malloc(sizeof (ace_t) * (acecnt + dfacecnt));
-	if (newacep == NULL)
-		return (-1);
-
-	(void) memcpy(newacep, acep, sizeof (ace_t) * acecnt);
-	if (dfaclcnt) {
-		(void) memcpy(newacep + acecnt, dfacep,
-		    sizeof (ace_t) * dfacecnt);
+	if (dfacecnt != 0) {
+		acep = realloc(acep, sizeof (ace_t) * (acecnt + dfacecnt));
+		if (acep == NULL)
+			return (-1);
+		if (dfaclcnt) {
+			(void) memcpy(acep + acecnt, dfacep,
+			    sizeof (ace_t) * dfacecnt);
+		}
 	}
-	free(acep);
 	if (dfaclcnt)
 		free(dfacep);
 
 	*retacecnt = acecnt + dfacecnt;
-	*retacep = newacep;
+	*retacep = acep;
 	return (0);
 }
 
+static void
+acevals_init(acevals_t *vals, uid_t key)
+{
+	bzero(vals, sizeof (*vals));
+	vals->allowed = ACE_MASK_UNDEFINED;
+	vals->denied = ACE_MASK_UNDEFINED;
+	vals->mask = ACE_MASK_UNDEFINED;
+	vals->key = key;
+}
+
+static void
+ace_list_init(ace_list_t *al, int dfacl_flag)
+{
+	acevals_init(&al->user_obj, NULL);
+	acevals_init(&al->group_obj, NULL);
+	acevals_init(&al->other_obj, NULL);
+	al->numusers = 0;
+	al->numgroups = 0;
+	al->acl_mask = 0;
+	al->hasmask = 0;
+	al->state = ace_unused;
+	al->seen = 0;
+	al->dfacl_flag = dfacl_flag;
+}
+
+/*
+ * Find or create an acevals holder for a given id and avl tree.
+ *
+ * Note that only one thread will ever touch these avl trees, so
+ * there is no need for locking.
+ */
+static acevals_t *
+acevals_find(ace_t *ace, avl_tree_t *avl, int *num)
+{
+	acevals_t key, *rc;
+	avl_index_t where;
+
+	key.key = ace->a_who;
+	rc = avl_find(avl, &key, &where);
+	if (rc != NULL)
+		return (rc);
+
+	/* this memory is freed by ln_ace_to_aent()->ace_list_free() */
+	rc = calloc(1, sizeof (acevals_t));
+	if (rc == NULL)
+		return (rc);
+	acevals_init(rc, ace->a_who);
+	avl_insert(avl, rc, where);
+	(*num)++;
+
+	return (rc);
+}
 
 static int
+access_mask_check(ace_t *acep, int mask_bit, int isowner)
+{
+	int set_deny, err_deny;
+	int set_allow, err_allow;
+	int acl_consume;
+	int haswriteperm, hasreadperm;
+
+	if (acep->a_type == ACE_ACCESS_DENIED_ACE_TYPE) {
+		haswriteperm = (acep->a_access_mask & ACE_WRITE_DATA) ? 0 : 1;
+		hasreadperm = (acep->a_access_mask & ACE_READ_DATA) ? 0 : 1;
+	} else {
+		haswriteperm = (acep->a_access_mask & ACE_WRITE_DATA) ? 1 : 0;
+		hasreadperm = (acep->a_access_mask & ACE_READ_DATA) ? 1 : 0;
+	}
+
+	acl_consume = (ACL_SYNCHRONIZE_ERR_DENY |
+	    ACL_DELETE_ERR_DENY |
+	    ACL_WRITE_OWNER_ERR_DENY |
+	    ACL_WRITE_OWNER_ERR_ALLOW |
+	    ACL_WRITE_ATTRS_OWNER_SET_ALLOW |
+	    ACL_WRITE_ATTRS_OWNER_ERR_DENY |
+	    ACL_WRITE_ATTRS_WRITER_SET_DENY |
+	    ACL_WRITE_ATTRS_WRITER_ERR_ALLOW |
+	    ACL_WRITE_NAMED_WRITER_ERR_DENY |
+	    ACL_READ_NAMED_READER_ERR_DENY);
+
+	if (mask_bit == ACE_SYNCHRONIZE) {
+		set_deny = ACL_SYNCHRONIZE_SET_DENY;
+		err_deny =  ACL_SYNCHRONIZE_ERR_DENY;
+		set_allow = ACL_SYNCHRONIZE_SET_ALLOW;
+		err_allow = ACL_SYNCHRONIZE_ERR_ALLOW;
+	} else if (mask_bit == ACE_WRITE_OWNER) {
+		set_deny = ACL_WRITE_OWNER_SET_DENY;
+		err_deny =  ACL_WRITE_OWNER_ERR_DENY;
+		set_allow = ACL_WRITE_OWNER_SET_ALLOW;
+		err_allow = ACL_WRITE_OWNER_ERR_ALLOW;
+	} else if (mask_bit == ACE_DELETE) {
+		set_deny = ACL_DELETE_SET_DENY;
+		err_deny =  ACL_DELETE_ERR_DENY;
+		set_allow = ACL_DELETE_SET_ALLOW;
+		err_allow = ACL_DELETE_ERR_ALLOW;
+	} else if (mask_bit == ACE_WRITE_ATTRIBUTES) {
+		if (isowner) {
+			set_deny = ACL_WRITE_ATTRS_OWNER_SET_DENY;
+			err_deny =  ACL_WRITE_ATTRS_OWNER_ERR_DENY;
+			set_allow = ACL_WRITE_ATTRS_OWNER_SET_ALLOW;
+			err_allow = ACL_WRITE_ATTRS_OWNER_ERR_ALLOW;
+		} else if (haswriteperm) {
+			set_deny = ACL_WRITE_ATTRS_WRITER_SET_DENY;
+			err_deny =  ACL_WRITE_ATTRS_WRITER_ERR_DENY;
+			set_allow = ACL_WRITE_ATTRS_WRITER_SET_ALLOW;
+			err_allow = ACL_WRITE_ATTRS_WRITER_ERR_ALLOW;
+		} else {
+			if ((acep->a_access_mask & mask_bit) &&
+			    (acep->a_type & ACE_ACCESS_ALLOWED_ACE_TYPE)) {
+				return (ENOTSUP);
+			}
+			return (0);
+		}
+	} else if (mask_bit == ACE_READ_NAMED_ATTRS) {
+		if (!hasreadperm)
+			return (0);
+
+		set_deny = ACL_READ_NAMED_READER_SET_DENY;
+		err_deny = ACL_READ_NAMED_READER_ERR_DENY;
+		set_allow = ACL_READ_NAMED_READER_SET_ALLOW;
+		err_allow = ACL_READ_NAMED_READER_ERR_ALLOW;
+	} else if (mask_bit == ACE_WRITE_NAMED_ATTRS) {
+		if (!haswriteperm)
+			return (0);
+
+		set_deny = ACL_WRITE_NAMED_WRITER_SET_DENY;
+		err_deny = ACL_WRITE_NAMED_WRITER_ERR_DENY;
+		set_allow = ACL_WRITE_NAMED_WRITER_SET_ALLOW;
+		err_allow = ACL_WRITE_NAMED_WRITER_ERR_ALLOW;
+	} else {
+		return (EINVAL);
+	}
+
+	if (acep->a_type == ACE_ACCESS_DENIED_ACE_TYPE) {
+		if (acl_consume & set_deny) {
+			if (!(acep->a_access_mask & mask_bit)) {
+				return (ENOTSUP);
+			}
+		} else if (acl_consume & err_deny) {
+			if (acep->a_access_mask & mask_bit) {
+				return (ENOTSUP);
+			}
+		}
+	} else {
+		/* ACE_ACCESS_ALLOWED_ACE_TYPE */
+		if (acl_consume & set_allow) {
+			if (!(acep->a_access_mask & mask_bit)) {
+				return (ENOTSUP);
+			}
+		} else if (acl_consume & err_allow) {
+			if (acep->a_access_mask & mask_bit) {
+				return (ENOTSUP);
+			}
+		}
+	}
+	return (0);
+}
+
+static int
+ace_to_aent_legal(ace_t *acep)
+{
+	int error = 0;
+	int isowner;
+
+	/* only ALLOW or DENY */
+	if ((acep->a_type != ACE_ACCESS_ALLOWED_ACE_TYPE) &&
+	    (acep->a_type != ACE_ACCESS_DENIED_ACE_TYPE)) {
+		error = ENOTSUP;
+		goto out;
+	}
+
+	/* check for invalid flags */
+	if (acep->a_flags & ~(ACE_VALID_FLAG_BITS)) {
+		error = EINVAL;
+		goto out;
+	}
+
+	/* some flags are illegal */
+	if (acep->a_flags & (ACE_SUCCESSFUL_ACCESS_ACE_FLAG |
+	    ACE_FAILED_ACCESS_ACE_FLAG |
+	    ACE_NO_PROPAGATE_INHERIT_ACE)) {
+		error = ENOTSUP;
+		goto out;
+	}
+
+	/* check for invalid masks */
+	if (acep->a_access_mask & ~(ACE_VALID_MASK_BITS)) {
+		error = EINVAL;
+		goto out;
+	}
+
+	if ((acep->a_flags & ACE_OWNER)) {
+		isowner = 1;
+	} else {
+		isowner = 0;
+	}
+
+	error = access_mask_check(acep, ACE_SYNCHRONIZE, isowner);
+	if (error)
+		goto out;
+
+	error = access_mask_check(acep, ACE_WRITE_OWNER, isowner);
+	if (error)
+		goto out;
+
+	error = access_mask_check(acep, ACE_DELETE, isowner);
+	if (error)
+		goto out;
+
+	error = access_mask_check(acep, ACE_WRITE_ATTRIBUTES, isowner);
+	if (error)
+		goto out;
+
+	error = access_mask_check(acep, ACE_READ_NAMED_ATTRS, isowner);
+	if (error)
+		goto out;
+
+	error = access_mask_check(acep, ACE_WRITE_NAMED_ATTRS, isowner);
+	if (error)
+		goto out;
+
+	/* more detailed checking of masks */
+	if (acep->a_type == ACE_ACCESS_ALLOWED_ACE_TYPE) {
+		if (! (acep->a_access_mask & ACE_READ_ATTRIBUTES)) {
+			error = ENOTSUP;
+			goto out;
+		}
+		if ((acep->a_access_mask & ACE_WRITE_DATA) &&
+		    (! (acep->a_access_mask & ACE_APPEND_DATA))) {
+			error = ENOTSUP;
+			goto out;
+		}
+		if ((! (acep->a_access_mask & ACE_WRITE_DATA)) &&
+		    (acep->a_access_mask & ACE_APPEND_DATA)) {
+			error = ENOTSUP;
+			goto out;
+		}
+	}
+
+	/* ACL enforcement */
+	if ((acep->a_access_mask & ACE_READ_ACL) &&
+	    (acep->a_type != ACE_ACCESS_ALLOWED_ACE_TYPE)) {
+		error = ENOTSUP;
+		goto out;
+	}
+	if (acep->a_access_mask & ACE_WRITE_ACL) {
+		if ((acep->a_type == ACE_ACCESS_DENIED_ACE_TYPE) &&
+		    (isowner)) {
+			error = ENOTSUP;
+			goto out;
+		}
+		if ((acep->a_type == ACE_ACCESS_ALLOWED_ACE_TYPE) &&
+		    (! isowner)) {
+			error = ENOTSUP;
+			goto out;
+		}
+	}
+
+out:
+	return (error);
+}
+
+static int
+ace_mask_to_mode(uint32_t  mask, o_mode_t *modep, int isdir)
+{
+	int error = 0;
+	o_mode_t mode = 0;
+	uint32_t bits, wantbits;
+
+	/* read */
+	if (mask & ACE_READ_DATA)
+		mode |= 04;
+
+	/* write */
+	wantbits = (ACE_WRITE_DATA | ACE_APPEND_DATA);
+	if (isdir)
+		wantbits |= ACE_DELETE_CHILD;
+	bits = mask & wantbits;
+	if (bits != 0) {
+		if (bits != wantbits) {
+			error = ENOTSUP;
+			goto out;
+		}
+		mode |= 02;
+	}
+
+	/* exec */
+	if (mask & ACE_EXECUTE) {
+		mode |= 01;
+	}
+
+	*modep = mode;
+
+out:
+	return (error);
+}
+
+static int
+ace_allow_to_mode(uint32_t mask, o_mode_t *modep, int isdir)
+{
+	/* ACE_READ_ACL and ACE_READ_ATTRIBUTES must both be set */
+	if ((mask & (ACE_READ_ACL | ACE_READ_ATTRIBUTES)) !=
+	    (ACE_READ_ACL | ACE_READ_ATTRIBUTES)) {
+		return (ENOTSUP);
+	}
+
+	return (ace_mask_to_mode(mask, modep, isdir));
+}
+
+static int
+acevals_to_aent(acevals_t *vals, aclent_t *dest, ace_list_t *list,
+    uid_t owner, gid_t group, int isdir)
+{
+	int error;
+	uint32_t  flips = ACE_POSIX_SUPPORTED_BITS;
+
+	if (isdir)
+		flips |= ACE_DELETE_CHILD;
+	if (vals->allowed != (vals->denied ^ flips)) {
+		error = ENOTSUP;
+		goto out;
+	}
+	if ((list->hasmask) && (list->acl_mask != vals->mask) &&
+	    (vals->aent_type & (USER | GROUP | GROUP_OBJ))) {
+		error = ENOTSUP;
+		goto out;
+	}
+	error = ace_allow_to_mode(vals->allowed, &dest->a_perm, isdir);
+	if (error != 0)
+		goto out;
+	dest->a_type = vals->aent_type;
+	if (dest->a_type & (USER | GROUP)) {
+		dest->a_id = vals->key;
+	} else if (dest->a_type & USER_OBJ) {
+		dest->a_id = owner;
+	} else if (dest->a_type & GROUP_OBJ) {
+		dest->a_id = group;
+	} else if (dest->a_type & OTHER_OBJ) {
+		dest->a_id = 0;
+	} else {
+		error = EINVAL;
+		goto out;
+	}
+
+out:
+	return (error);
+}
+
+static int
+ace_list_to_aent(ace_list_t *list, aclent_t **aclentp, int *aclcnt,
+    uid_t owner, gid_t group, int isdir)
+{
+	int error = 0;
+	aclent_t *aent, *result = NULL;
+	acevals_t *vals;
+	int resultcount;
+
+	if ((list->seen & (USER_OBJ | GROUP_OBJ | OTHER_OBJ)) !=
+	    (USER_OBJ | GROUP_OBJ | OTHER_OBJ)) {
+		error = ENOTSUP;
+		goto out;
+	}
+	if ((! list->hasmask) && (list->numusers + list->numgroups > 0)) {
+		error = ENOTSUP;
+		goto out;
+	}
+
+	resultcount = 3 + list->numusers + list->numgroups;
+	/*
+	 * This must be the same condition as below, when we add the CLASS_OBJ
+	 * (aka ACL mask)
+	 */
+	if ((list->hasmask) || (! list->dfacl_flag))
+		resultcount += 1;
+
+	result = aent = calloc(1, resultcount * sizeof (aclent_t));
+
+	if (result == NULL) {
+		error = ENOMEM;
+		goto out;
+	}
+
+	/* USER_OBJ */
+	if (!(list->user_obj.aent_type & USER_OBJ)) {
+		error = EINVAL;
+		goto out;
+	}
+
+	error = acevals_to_aent(&list->user_obj, aent, list, owner, group,
+	    isdir);
+
+	if (error != 0)
+		goto out;
+	++aent;
+	/* USER */
+	vals = NULL;
+	for (vals = avl_first(&list->user); vals != NULL;
+	    vals = AVL_NEXT(&list->user, vals)) {
+		if (!(vals->aent_type & USER)) {
+			error = EINVAL;
+			goto out;
+		}
+		error = acevals_to_aent(vals, aent, list, owner, group,
+		    isdir);
+		if (error != 0)
+			goto out;
+		++aent;
+	}
+	/* GROUP_OBJ */
+	if (!(list->group_obj.aent_type & GROUP_OBJ)) {
+		error = EINVAL;
+		goto out;
+	}
+	error = acevals_to_aent(&list->group_obj, aent, list, owner, group,
+	    isdir);
+	if (error != 0)
+		goto out;
+	++aent;
+	/* GROUP */
+	vals = NULL;
+	for (vals = avl_first(&list->group); vals != NULL;
+	    vals = AVL_NEXT(&list->group, vals)) {
+		if (!(vals->aent_type & GROUP)) {
+			error = EINVAL;
+			goto out;
+		}
+		error = acevals_to_aent(vals, aent, list, owner, group,
+		    isdir);
+		if (error != 0)
+			goto out;
+		++aent;
+	}
+	/*
+	 * CLASS_OBJ (aka ACL_MASK)
+	 *
+	 * An ACL_MASK is not fabricated if the ACL is a default ACL.
+	 * This is to follow UFS's behavior.
+	 */
+	if ((list->hasmask) || (! list->dfacl_flag)) {
+		if (list->hasmask) {
+			uint32_t flips = ACE_POSIX_SUPPORTED_BITS;
+			if (isdir)
+				flips |= ACE_DELETE_CHILD;
+			error = ace_mask_to_mode(list->acl_mask ^ flips,
+			    &aent->a_perm, isdir);
+			if (error != 0)
+				goto out;
+		} else {
+			/* fabricate the ACL_MASK from the group permissions */
+			error = ace_mask_to_mode(list->group_obj.allowed,
+			    &aent->a_perm, isdir);
+			if (error != 0)
+				goto out;
+		}
+		aent->a_id = 0;
+		aent->a_type = CLASS_OBJ | list->dfacl_flag;
+		++aent;
+	}
+	/* OTHER_OBJ */
+	if (!(list->other_obj.aent_type & OTHER_OBJ)) {
+		error = EINVAL;
+		goto out;
+	}
+	error = acevals_to_aent(&list->other_obj, aent, list, owner, group,
+	    isdir);
+	if (error != 0)
+		goto out;
+	++aent;
+
+	*aclentp = result;
+	*aclcnt = resultcount;
+
+out:
+	if (error != 0) {
+		if (result != NULL)
+			free(result);
+	}
+
+	return (error);
+}
+
+/*
+ * free all data associated with an ace_list
+ */
+static void
+ace_list_free(ace_list_t *al)
+{
+	acevals_t *node;
+	void *cookie;
+
+	if (al == NULL)
+		return;
+
+	cookie = NULL;
+	while ((node = avl_destroy_nodes(&al->user, &cookie)) != NULL)
+		free(node);
+	cookie = NULL;
+	while ((node = avl_destroy_nodes(&al->group, &cookie)) != NULL)
+		free(node);
+
+	avl_destroy(&al->user);
+	avl_destroy(&al->group);
+
+	/* free the container itself */
+	free(al);
+}
+
+static int
+acevals_compare(const void *va, const void *vb)
+{
+	const acevals_t *a = va, *b = vb;
+
+	if (a->key == b->key)
+		return (0);
+
+	if (a->key > b->key)
+		return (1);
+
+	else
+		return (-1);
+}
+
+/*
+ * Convert a list of ace_t entries to equivalent regular and default
+ * aclent_t lists.  Return error (ENOTSUP) when conversion is not possible.
+ */
+static int
+ln_ace_to_aent(ace_t *ace, int n, uid_t owner, gid_t group,
+    aclent_t **aclentp, int *aclcnt, aclent_t **dfaclentp, int *dfaclcnt,
+    int isdir)
+{
+	int error = 0;
+	ace_t *acep;
+	uint32_t bits;
+	int i;
+	ace_list_t *normacl = NULL, *dfacl = NULL, *acl;
+	acevals_t *vals;
+
+	*aclentp = NULL;
+	*aclcnt = 0;
+	*dfaclentp = NULL;
+	*dfaclcnt = 0;
+
+	/* we need at least user_obj, group_obj, and other_obj */
+	if (n < 6) {
+		error = ENOTSUP;
+		goto out;
+	}
+	if (ace == NULL) {
+		error = EINVAL;
+		goto out;
+	}
+
+	normacl = calloc(1, sizeof (ace_list_t));
+
+	if (normacl == NULL) {
+		error = errno;
+		goto out;
+	}
+
+	avl_create(&normacl->user, acevals_compare, sizeof (acevals_t),
+	    offsetof(acevals_t, avl));
+	avl_create(&normacl->group, acevals_compare, sizeof (acevals_t),
+	    offsetof(acevals_t, avl));
+
+	ace_list_init(normacl, 0);
+
+	dfacl = calloc(1, sizeof (ace_list_t));
+	if (dfacl == NULL) {
+		error = errno;
+		goto out;
+	}
+	avl_create(&dfacl->user, acevals_compare, sizeof (acevals_t),
+	    offsetof(acevals_t, avl));
+	avl_create(&dfacl->group, acevals_compare, sizeof (acevals_t),
+	    offsetof(acevals_t, avl));
+	ace_list_init(dfacl, ACL_DEFAULT);
+
+	/* process every ace_t... */
+	for (i = 0; i < n; i++) {
+		acep = &ace[i];
+
+		/* rule out certain cases quickly */
+		error = ace_to_aent_legal(acep);
+		if (error != 0)
+			goto out;
+
+		/*
+		 * Turn off these bits in order to not have to worry about
+		 * them when doing the checks for compliments.
+		 */
+		acep->a_access_mask &= ~(ACE_WRITE_OWNER | ACE_DELETE |
+		    ACE_SYNCHRONIZE | ACE_WRITE_ATTRIBUTES |
+		    ACE_READ_NAMED_ATTRS | ACE_WRITE_NAMED_ATTRS);
+
+		/* see if this should be a regular or default acl */
+		bits = acep->a_flags &
+		    (ACE_INHERIT_ONLY_ACE |
+		    ACE_FILE_INHERIT_ACE |
+		    ACE_DIRECTORY_INHERIT_ACE);
+		if (bits != 0) {
+			/* all or nothing on these inherit bits */
+			if (bits != (ACE_INHERIT_ONLY_ACE |
+			    ACE_FILE_INHERIT_ACE |
+			    ACE_DIRECTORY_INHERIT_ACE)) {
+				error = ENOTSUP;
+				goto out;
+			}
+			acl = dfacl;
+		} else {
+			acl = normacl;
+		}
+
+		if ((acep->a_flags & ACE_OWNER)) {
+			if (acl->state > ace_user_obj) {
+				error = ENOTSUP;
+				goto out;
+			}
+			acl->state = ace_user_obj;
+			acl->seen |= USER_OBJ;
+			vals = &acl->user_obj;
+			vals->aent_type = USER_OBJ | acl->dfacl_flag;
+		} else if ((acep->a_flags & ACE_EVERYONE)) {
+			acl->state = ace_other_obj;
+			acl->seen |= OTHER_OBJ;
+			vals = &acl->other_obj;
+			vals->aent_type = OTHER_OBJ | acl->dfacl_flag;
+		} else if (acep->a_flags & ACE_IDENTIFIER_GROUP) {
+			if (acl->state > ace_group) {
+				error = ENOTSUP;
+				goto out;
+			}
+			if ((acep->a_flags & ACE_GROUP)) {
+				acl->seen |= GROUP_OBJ;
+				vals = &acl->group_obj;
+				vals->aent_type = GROUP_OBJ | acl->dfacl_flag;
+			} else {
+				acl->seen |= GROUP;
+				vals = acevals_find(acep, &acl->group,
+				    &acl->numgroups);
+				if (vals == NULL) {
+					error = ENOMEM;
+					goto out;
+				}
+				vals->aent_type = GROUP | acl->dfacl_flag;
+			}
+			acl->state = ace_group;
+		} else {
+			if (acl->state > ace_user) {
+				error = ENOTSUP;
+				goto out;
+			}
+			acl->state = ace_user;
+			acl->seen |= USER;
+			vals = acevals_find(acep, &acl->user,
+			    &acl->numusers);
+			if (vals == NULL) {
+				error = ENOMEM;
+				goto out;
+			}
+			vals->aent_type = USER | acl->dfacl_flag;
+		}
+
+		if (!(acl->state > ace_unused)) {
+			error = EINVAL;
+			goto out;
+		}
+
+		if (acep->a_type == ACE_ACCESS_ALLOWED_ACE_TYPE) {
+			/* no more than one allowed per aclent_t */
+			if (vals->allowed != ACE_MASK_UNDEFINED) {
+				error = ENOTSUP;
+				goto out;
+			}
+			vals->allowed = acep->a_access_mask;
+		} else {
+			/*
+			 * it's a DENY; if there was a previous DENY, it
+			 * must have been an ACL_MASK.
+			 */
+			if (vals->denied != ACE_MASK_UNDEFINED) {
+				/* ACL_MASK is for USER and GROUP only */
+				if ((acl->state != ace_user) &&
+				    (acl->state != ace_group)) {
+					error = ENOTSUP;
+					goto out;
+				}
+
+				if (! acl->hasmask) {
+					acl->hasmask = 1;
+					acl->acl_mask = vals->denied;
+				/* check for mismatched ACL_MASK emulations */
+				} else if (acl->acl_mask != vals->denied) {
+					error = ENOTSUP;
+					goto out;
+				}
+				vals->mask = vals->denied;
+			}
+			vals->denied = acep->a_access_mask;
+		}
+	}
+
+	/* done collating; produce the aclent_t lists */
+	if (normacl->state != ace_unused) {
+		error = ace_list_to_aent(normacl, aclentp, aclcnt,
+		    owner, group, isdir);
+		if (error != 0) {
+			goto out;
+		}
+	}
+	if (dfacl->state != ace_unused) {
+		error = ace_list_to_aent(dfacl, dfaclentp, dfaclcnt,
+		    owner, group, isdir);
+		if (error != 0) {
+			goto out;
+		}
+	}
+
+out:
+	if (normacl != NULL)
+		ace_list_free(normacl);
+	if (dfacl != NULL)
+		ace_list_free(dfacl);
+
+	return (error);
+}
+
+static int
+convert_ace_to_aent(ace_t *acebufp, int acecnt, int isdir,
+    uid_t owner, gid_t group, aclent_t **retaclentp, int *retaclcnt)
+{
+	int error;
+	aclent_t *aclentp, *dfaclentp;
+	int aclcnt, dfaclcnt;
+
+	error = ln_ace_to_aent(acebufp, acecnt, owner, group,
+	    &aclentp, &aclcnt, &dfaclentp, &dfaclcnt, isdir);
+
+	if (error)
+		return (error);
+
+
+	if (dfaclcnt != 0) {
+		/*
+		 * Slap aclentp and dfaclentp into a single array.
+		 */
+		aclentp = realloc(aclentp, (sizeof (aclent_t) * aclcnt) +
+		    (sizeof (aclent_t) * dfaclcnt));
+		if (aclentp != NULL) {
+			(void) memcpy(aclentp + aclcnt,
+			    dfaclentp, sizeof (aclent_t) * dfaclcnt);
+		} else {
+			error = -1;
+		}
+	}
+
+	if (aclentp) {
+		*retaclentp = aclentp;
+		*retaclcnt = aclcnt + dfaclcnt;
+	}
+
+	if (dfaclentp)
+		free(dfaclentp);
+
+	return (error);
+}
+
 cacl_get(acl_inp inp, int get_flag, int type, acl_t **aclp)
 {
 	const char *fname;
@@ -740,6 +1580,56 @@ facl_get(int fd, int get_flag, acl_t **aclp)
 	return (cacl_get(acl_inp, get_flag, ACL_FD, aclp));
 }
 
+static int
+acl_translate(acl_t *aclp, int target_flavor, int isdir, uid_t owner,
+    gid_t group)
+{
+	int aclcnt;
+	void *acldata;
+	int error;
+
+	/*
+	 * See if we need to translate
+	 */
+	if ((target_flavor == _ACL_ACE_ENABLED && aclp->acl_type == ACE_T) ||
+	    (target_flavor == _ACL_ACLENT_ENABLED &&
+	    aclp->acl_type == ACLENT_T))
+		return (0);
+
+	if (target_flavor == -1)
+		return (-1);
+
+	if (target_flavor ==  _ACL_ACE_ENABLED &&
+	    aclp->acl_type == ACLENT_T) {
+		error = convert_aent_to_ace(aclp->acl_aclp,
+		    aclp->acl_cnt, isdir, (ace_t **)&acldata, &aclcnt);
+		if (error) {
+			errno = error;
+			return (-1);
+		}
+	} else if (target_flavor == _ACL_ACLENT_ENABLED &&
+	    aclp->acl_type == ACE_T) {
+		error = convert_ace_to_aent(aclp->acl_aclp, aclp->acl_cnt,
+		    isdir, owner, group, (aclent_t **)&acldata, &aclcnt);
+		if (error) {
+			errno = error;
+			return (-1);
+		}
+	} else {
+		errno = ENOTSUP;
+		return (-1);
+	}
+
+	/*
+	 * replace old acl with newly translated acl
+	 */
+	free(aclp->acl_aclp);
+	aclp->acl_aclp = acldata;
+	aclp->acl_cnt = aclcnt;
+	aclp->acl_type = (target_flavor == _ACL_ACE_ENABLED) ? ACE_T : ACLENT_T;
+	return (0);
+}
+
 /*
  * Set an ACL, translates acl to ace_t when appropriate.
  */
@@ -748,8 +1638,6 @@ cacl_set(acl_inp *acl_inp, acl_t *aclp, int type)
 {
 	int error = 0;
 	int acl_flavor_target;
-	ace_t *acep = NULL;
-	int acecnt;
 	struct stat64 statbuf;
 	int stat_error;
 	int isdir;
@@ -769,27 +1657,9 @@ cacl_set(acl_inp *acl_inp, acl_t *aclp, int type)
 
 	isdir = S_ISDIR(statbuf.st_mode);
 
-	if (acl_flavor_target == -1)
-		return (-1);
-
-	/*
-	 * Translate aclent_t ACL's to ACE ACL's.
-	 */
-	if (acl_flavor_target ==  _ACL_ACE_ENABLED &&
-	    aclp->acl_type == ACLENT_T) {
-		error = convert_aent_to_ace(aclp->acl_aclp,
-		    aclp->acl_cnt, isdir, &acep, &acecnt);
-		if (error) {
-			errno = ENOTSUP;
-			return (-1);
-		}
-		/*
-		 * replace old acl with newly translated acl
-		 */
-		free(aclp->acl_aclp);
-		aclp->acl_aclp = acep;
-		aclp->acl_cnt = acecnt;
-		aclp->acl_type = ACE_T;
+	if ((error = acl_translate(aclp, acl_flavor_target, isdir,
+	    statbuf.st_uid, statbuf.st_gid)) != 0) {
+		return (error);
 	}
 
 	if (type == ACL_PATH) {

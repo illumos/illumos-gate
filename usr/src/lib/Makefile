@@ -467,6 +467,7 @@ udapl/udapl_tavor:	udapl/libdat
 libzfs:		libdevinfo libdevid libgen libnvpair libuutil
 libzfs_jni:	libdiskmgt libnvpair libzfs
 libzpool:	libavl libumem libnvpair
+libsec:		libavl
 
 #
 # The reason this rule checks for the existence of the
