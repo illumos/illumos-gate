@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -68,6 +68,8 @@ typedef struct pcb {
 #define	WATCH_STEP	0x20	/* single-stepping in watchpoint emulation */
 #define	CPC_OVERFLOW	0x40	/* performance counters overflowed */
 #define	RUPDATE_PENDING	0x80	/* new register values in the pcb -> regs */
+#define	REQUEST_STEP	0x100	/* request pending to single-step this lwp */
+#define	REQUEST_NOSTEP	0x200	/* request pending to disable single-step */
 
 /* fpu_flags */
 #define	FPU_EN		0x1	/* flag signifying fpu in use */

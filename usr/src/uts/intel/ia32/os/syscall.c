@@ -659,6 +659,22 @@ sig_check:
 		 */
 		if (lwp->lwp_pcb.pcb_flags & CPC_OVERFLOW)
 			aston(t);
+
+		/*
+		 * /proc can't enable/disable the trace bit itself
+		 * because that could race with the call gate used by
+		 * system calls via "lcall". If that happened, an
+		 * invalid EFLAGS would result. prstep()/prnostep()
+		 * therefore schedule an AST for the purpose.
+		 */
+		if (lwp->lwp_pcb.pcb_flags & REQUEST_STEP) {
+			lwp->lwp_pcb.pcb_flags &= ~REQUEST_STEP;
+			rp->r_ps |= PS_T;
+		}
+		if (lwp->lwp_pcb.pcb_flags & REQUEST_NOSTEP) {
+			lwp->lwp_pcb.pcb_flags &= ~REQUEST_NOSTEP;
+			rp->r_ps &= ~PS_T;
+		}
 	}
 
 	lwp->lwp_errno = 0;		/* clear error for next time */

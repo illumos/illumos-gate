@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -305,16 +305,21 @@ prgetpsaddr(proc_t *p)
 void
 prstep(klwp_t *lwp, int watchstep)
 {
-	struct regs *r = lwptoregs(lwp);
-
 	ASSERT(MUTEX_NOT_HELD(&lwptoproc(lwp)->p_lock));
+
+	/*
+	 * flag LWP so that its r_efl trace bit (PS_T) will be set on
+	 * next return to usermode.
+	 */
+	lwp->lwp_pcb.pcb_flags |= REQUEST_STEP;
+	lwp->lwp_pcb.pcb_flags &= ~REQUEST_NOSTEP;
 
 	if (watchstep)
 		lwp->lwp_pcb.pcb_flags |= WATCH_STEP;
 	else
 		lwp->lwp_pcb.pcb_flags |= NORMAL_STEP;
 
-	r->r_ps |= PS_T;	/* set the trace flag in PSW */
+	aston(lwptot(lwp));	/* let trap() set PS_T in rp->r_efl */
 }
 
 /*
@@ -323,13 +328,19 @@ prstep(klwp_t *lwp, int watchstep)
 void
 prnostep(klwp_t *lwp)
 {
-	struct regs *r = lwptoregs(lwp);
-
 	ASSERT(ttolwp(curthread) == lwp ||
 	    MUTEX_NOT_HELD(&lwptoproc(lwp)->p_lock));
 
-	r->r_ps &= ~PS_T;	/* turn off trace flag in PSW */
-	lwp->lwp_pcb.pcb_flags &= ~(NORMAL_STEP|WATCH_STEP|DEBUG_PENDING);
+	/*
+	 * flag LWP so that its r_efl trace bit (PS_T) will be cleared on
+	 * next return to usermode.
+	 */
+	lwp->lwp_pcb.pcb_flags |= REQUEST_NOSTEP;
+
+	lwp->lwp_pcb.pcb_flags &=
+	    ~(REQUEST_STEP|NORMAL_STEP|WATCH_STEP|DEBUG_PENDING);
+
+	aston(lwptot(lwp));	/* let trap() clear PS_T in rp->r_efl */
 }
 
 /*
