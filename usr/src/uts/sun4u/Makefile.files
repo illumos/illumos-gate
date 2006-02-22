@@ -177,7 +177,6 @@ RSAPROV_OBJS    += mont_mulf.o
 TODMOSTEK_OBJS	+= todmostek.o
 TODDS1287_OBJS	+= todds1287.o
 TODDS1337_OBJS	+= todds1337.o
-TODM5823_OBJS	+= todm5823.o
 TODSTARFIRE_OBJS += todstarfire.o
 TODBLADE_OBJS += todblade.o
 TODM5819_OBJS	+= todm5819.o
