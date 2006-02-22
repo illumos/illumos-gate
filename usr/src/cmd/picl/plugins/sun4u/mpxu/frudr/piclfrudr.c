@@ -143,8 +143,8 @@ static picld_plugin_reg_t  my_reg_info = {
 #define	BOSTON_FRONT_CLEAR_DIR	0x0
 #define	BOSTON_FRONT_CLEAR_POL	0x0
 #define	BOSTON_FRONT_LED_MASK	0xffffffff
-#define	BOSTON_REAR_SRVC_LED	0x2000
-#define	BOSTON_REAR_ACT_LED	0x8000
+#define	BOSTON_REAR_SRVC_LED	0x8000
+#define	BOSTON_REAR_ACT_LED	0x2000
 #define	BOSTON_REAR_CLEAR_POL	0x0000
 #define	BOSTON_REAR_LED_MASK	0xe000
 
