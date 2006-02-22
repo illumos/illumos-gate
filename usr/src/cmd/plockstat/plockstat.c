@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,6 +39,7 @@
 #include <strings.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <libgen.h>
 #include <libproc.h>
 
 static char *g_pname;
@@ -75,6 +76,7 @@ static const char *g_hold_histogram =
 "	@rw_w_hold[arg0, ustack()] =\n"
 "	    quantize(timestamp - self->rwhold[arg0]);\n"
 "	self->rwhold[arg0] = 0;\n"
+"	rw_w_hold_found = 1;\n"
 "}\n"
 "plockstat$target:::rw-release\n"
 "/self->rwhold[arg0]/\n"
@@ -82,32 +84,78 @@ static const char *g_hold_histogram =
 "	@rw_r_hold[arg0, ustack()] =\n"
 "	    quantize(timestamp - self->rwhold[arg0]);\n"
 "	self->rwhold[arg0] = 0;\n"
+"	rw_r_hold_found = 1;\n"
 "}\n"
 "plockstat$target:::mutex-release\n"
 "/mtxhold[arg0] && arg1 == 0/\n"
 "{\n"
 "	@mtx_hold[arg0, ustack()] = quantize(timestamp - mtxhold[arg0]);\n"
 "	mtxhold[arg0] = 0;\n"
+"	mtx_hold_found = 1;\n"
+"}\n"
+"\n"
+"END\n"
+"/mtx_hold_found/\n"
+"{\n"
+"	trace(\"Mutex hold\");\n"
+"	printa(@mtx_hold);\n"
+"}\n"
+"END\n"
+"/rw_r_hold_found/\n"
+"{\n"
+"	trace(\"R/W reader hold\");\n"
+"	printa(@rw_r_hold);\n"
+"}\n"
+"END\n"
+"/rw_w_hold_found/\n"
+"{\n"
+"	trace(\"R/W writer hold\");\n"
+"	printa(@rw_w_hold);\n"
 "}\n";
 
 static const char *g_hold_times =
 "plockstat$target:::rw-release\n"
 "/self->rwhold[arg0] && arg1 == 1/\n"
 "{\n"
-"	@rw_w_hold[arg0, ustack(5)] = avg(timestamp - self->rwhold[arg0]);\n"
+"	@rw_w_hold[arg0, ustack(5)] = sum(timestamp - self->rwhold[arg0]);\n"
+"	@rw_w_hold_count[arg0, ustack(5)] = count();\n"
 "	self->rwhold[arg0] = 0;\n"
+"	rw_w_hold_found = 1;\n"
 "}\n"
 "plockstat$target:::rw-release\n"
 "/self->rwhold[arg0]/\n"
 "{\n"
-"	@rw_r_hold[arg0, ustack(5)] = avg(timestamp - self->rwhold[arg0]);\n"
+"	@rw_r_hold[arg0, ustack(5)] = sum(timestamp - self->rwhold[arg0]);\n"
+"	@rw_r_hold_count[arg0, ustack(5)] = count();\n"
 "	self->rwhold[arg0] = 0;\n"
+"	rw_r_hold_found = 1;\n"
 "}\n"
 "plockstat$target:::mutex-release\n"
 "/mtxhold[arg0] && arg1 == 0/\n"
 "{\n"
-"	@mtx_hold[arg0, ustack(5)] = avg(timestamp - mtxhold[arg0]);\n"
+"	@mtx_hold[arg0, ustack(5)] = sum(timestamp - mtxhold[arg0]);\n"
+"	@mtx_hold_count[arg0, ustack(5)] = count();\n"
 "	mtxhold[arg0] = 0;\n"
+"	mtx_hold_found = 1;\n"
+"}\n"
+"\n"
+"END\n"
+"/mtx_hold_found/\n"
+"{\n"
+"	trace(\"Mutex hold\");\n"
+"	printa(@mtx_hold, @mtx_hold_count);\n"
+"}\n"
+"END\n"
+"/rw_r_hold_found/\n"
+"{\n"
+"	trace(\"R/W reader hold\");\n"
+"	printa(@rw_r_hold, @rw_r_hold_count);\n"
+"}\n"
+"END\n"
+"/rw_w_hold_found/\n"
+"{\n"
+"	trace(\"R/W writer hold\");\n"
+"	printa(@rw_w_hold, @rw_w_hold_count);\n"
 "}\n";
 
 
@@ -137,6 +185,7 @@ static const char *g_ctnd_histogram =
 "	@rw_w_block[arg0, ustack()] =\n"
 "	    quantize(timestamp - self->rwblock[arg0]);\n"
 "	self->rwblock[arg0] = 0;\n"
+"	rw_w_block_found = 1;\n"
 "}\n"
 "plockstat$target:::rw-blocked\n"
 "/self->rwblock[arg0] && arg2 != 0/\n"
@@ -144,6 +193,7 @@ static const char *g_ctnd_histogram =
 "	@rw_r_block[arg0, ustack()] =\n"
 "	    quantize(timestamp - self->rwblock[arg0]);\n"
 "	self->rwblock[arg0] = 0;\n"
+"	rw_r_block_found = 1;\n"
 "}\n"
 "plockstat$target:::rw-blocked\n"
 "/self->rwblock[arg0]/\n"
@@ -156,6 +206,7 @@ static const char *g_ctnd_histogram =
 "	@mtx_spin[arg0, ustack()] =\n"
 "	    quantize(timestamp - self->mtxspin[arg0]);\n"
 "	self->mtxspin[arg0] = 0;\n"
+"	mtx_spin_found = 1;\n"
 "}\n"
 "plockstat$target:::mutex-spun\n"
 "/self->mtxspin[arg0]/\n"
@@ -163,6 +214,7 @@ static const char *g_ctnd_histogram =
 "	@mtx_vain_spin[arg0, ustack()] =\n"
 "	    quantize(timestamp - self->mtxspin[arg0]);\n"
 "	self->mtxspin[arg0] = 0;\n"
+"	mtx_vain_spin_found = 1;\n"
 "}\n"
 "plockstat$target:::mutex-blocked\n"
 "/self->mtxblock[arg0] && arg1 != 0/\n"
@@ -170,11 +222,43 @@ static const char *g_ctnd_histogram =
 "	@mtx_block[arg0, ustack()] =\n"
 "	    quantize(timestamp - self->mtxblock[arg0]);\n"
 "	self->mtxblock[arg0] = 0;\n"
+"	mtx_block_found = 1;\n"
 "}\n"
 "plockstat$target:::mutex-blocked\n"
 "/self->mtxblock[arg0]/\n"
 "{\n"
 "	self->mtxblock[arg0] = 0;\n"
+"}\n"
+"\n"
+"END\n"
+"/mtx_block_found/\n"
+"{\n"
+"	trace(\"Mutex block\");\n"
+"	printa(@mtx_block);\n"
+"}\n"
+"END\n"
+"/mtx_spin_found/\n"
+"{\n"
+"	trace(\"Mutex spin\");\n"
+"	printa(@mtx_spin);\n"
+"}\n"
+"END\n"
+"/mtx_vain_spin_found/\n"
+"{\n"
+"	trace(\"Mutex unsuccessful spin\");\n"
+"	printa(@mtx_vain_spin);\n"
+"}\n"
+"END\n"
+"/rw_r_block_found/\n"
+"{\n"
+"	trace(\"R/W reader block\");\n"
+"	printa(@rw_r_block);\n"
+"}\n"
+"END\n"
+"/rw_w_block_found/\n"
+"{\n"
+"	trace(\"R/W writer block\");\n"
+"	printa(@rw_w_block);\n"
 "}\n";
 
 
@@ -183,15 +267,19 @@ static const char *g_ctnd_times =
 "/self->rwblock[arg0] && arg1 == 1 && arg2 != 0/\n"
 "{\n"
 "	@rw_w_block[arg0, ustack(5)] =\n"
-"	    avg(timestamp - self->rwblock[arg0]);\n"
+"	    sum(timestamp - self->rwblock[arg0]);\n"
+"	@rw_w_block_count[arg0, ustack(5)] = count();\n"
 "	self->rwblock[arg0] = 0;\n"
+"	rw_w_block_found = 1;\n"
 "}\n"
 "plockstat$target:::rw-blocked\n"
 "/self->rwblock[arg0] && arg2 != 0/\n"
 "{\n"
 "	@rw_r_block[arg0, ustack(5)] =\n"
-"	    avg(timestamp - self->rwblock[arg0]);\n"
+"	    sum(timestamp - self->rwblock[arg0]);\n"
+"	@rw_r_block_count[arg0, ustack(5)] = count();\n"
 "	self->rwblock[arg0] = 0;\n"
+"	rw_r_block_found = 1;\n"
 "}\n"
 "plockstat$target:::rw-blocked\n"
 "/self->rwblock[arg0]/\n"
@@ -202,33 +290,71 @@ static const char *g_ctnd_times =
 "/self->mtxspin[arg0] && arg1 != 0/\n"
 "{\n"
 "	@mtx_spin[arg0, ustack(5)] =\n"
-"	    avg(timestamp - self->mtxspin[arg0]);\n"
+"	    sum(timestamp - self->mtxspin[arg0]);\n"
+"	@mtx_spin_count[arg0, ustack(5)] = count();\n"
 "	self->mtxspin[arg0] = 0;\n"
+"	mtx_spin_found = 1;\n"
 "}\n"
 "plockstat$target:::mutex-spun\n"
 "/self->mtxspin[arg0]/\n"
 "{\n"
 "	@mtx_vain_spin[arg0, ustack(5)] =\n"
-"	    avg(timestamp - self->mtxspin[arg0]);\n"
+"	    sum(timestamp - self->mtxspin[arg0]);\n"
+"	@mtx_vain_spin_count[arg0, ustack(5)] = count();\n"
 "	self->mtxspin[arg0] = 0;\n"
+"	mtx_vain_spin_found = 1;\n"
 "}\n"
 "plockstat$target:::mutex-blocked\n"
 "/self->mtxblock[arg0] && arg1 != 0/\n"
 "{\n"
 "	@mtx_block[arg0, ustack(5)] =\n"
-"	    avg(timestamp - self->mtxblock[arg0]);\n"
+"	    sum(timestamp - self->mtxblock[arg0]);\n"
+"	@mtx_block_count[arg0, ustack(5)] = count();\n"
 "	self->mtxblock[arg0] = 0;\n"
+"	mtx_block_found = 1;\n"
 "}\n"
 "plockstat$target:::mutex-blocked\n"
 "/self->mtxblock[arg0]/\n"
 "{\n"
 "	self->mtxblock[arg0] = 0;\n"
+"}\n"
+"\n"
+"END\n"
+"/mtx_block_found/\n"
+"{\n"
+"	trace(\"Mutex block\");\n"
+"	printa(@mtx_block, @mtx_block_count);\n"
+"}\n"
+"END\n"
+"/mtx_spin_found/\n"
+"{\n"
+"	trace(\"Mutex spin\");\n"
+"	printa(@mtx_spin, @mtx_spin_count);\n"
+"}\n"
+"END\n"
+"/mtx_vain_spin_found/\n"
+"{\n"
+"	trace(\"Mutex unsuccessful spin\");\n"
+"	printa(@mtx_vain_spin, @mtx_vain_spin_count);\n"
+"}\n"
+"END\n"
+"/rw_r_block_found/\n"
+"{\n"
+"	trace(\"R/W reader block\");\n"
+"	printa(@rw_r_block, @rw_r_block_count);\n"
+"}\n"
+"END\n"
+"/rw_w_block_found/\n"
+"{\n"
+"	trace(\"R/W writer block\");\n"
+"	printa(@rw_w_block, @rw_w_block_count);\n"
 "}\n";
 
-static char g_prog[2048];
+static char g_prog[4096];
 static size_t g_proglen;
 static int g_opt_V, g_opt_s;
 static int g_intr;
+static int g_exited;
 static dtrace_optval_t g_nframes;
 static ulong_t g_nent = ULONG_MAX;
 
@@ -321,6 +447,7 @@ dprog_add(const char *prog)
 	size_t len = strlen(prog);
 	bcopy(prog, g_prog + g_proglen, len + 1);
 	g_proglen += len;
+	assert(g_proglen < sizeof (g_prog));
 }
 
 static void
@@ -341,28 +468,6 @@ dprog_compile(void)
 
 	if (dtrace_program_exec(g_dtp, prog, &info) == -1)
 		dfatal("failed to enable probes");
-}
-
-static void
-print_header(const char *aggname)
-{
-	if (strcmp(aggname, "mtx_hold") == 0) {
-		(void) printf("\nMutex hold\n\n");
-	} else if (strcmp(aggname, "mtx_block") == 0) {
-		(void) printf("\nMutex block\n\n");
-	} else if (strcmp(aggname, "mtx_spin") == 0) {
-		(void) printf("\nMutex spin\n\n");
-	} else if (strcmp(aggname, "mtx_vain_spin") == 0) {
-		(void) printf("\nMutex unsuccessful spin\n\n");
-	} else if (strcmp(aggname, "rw_r_hold") == 0) {
-		(void) printf("\nR/W reader hold\n\n");
-	} else if (strcmp(aggname, "rw_w_hold") == 0) {
-		(void) printf("\nR/W writer hold\n\n");
-	} else if (strcmp(aggname, "rw_r_block") == 0) {
-		(void) printf("\nR/W reader block\n\n");
-	} else if (strcmp(aggname, "rw_w_block") == 0) {
-		(void) printf("\nR/W writer block\n\n");
-	}
 }
 
 void
@@ -429,60 +534,54 @@ getsym(struct ps_prochandle *P, uintptr_t addr, char *buf, size_t size,
 
 /*ARGSUSED*/
 static int
-process_aggregate(const dtrace_aggdata_t *agg, void *arg)
+process_aggregate(const dtrace_aggdata_t **aggsdata, int naggvars, void *arg)
 {
-	static dtrace_aggid_t last = DTRACE_AGGIDNONE;
-	static uint_t nent;
-	const dtrace_aggdesc_t *aggdesc = agg->dtada_desc;
-	caddr_t data = agg->dtada_data;
 	const dtrace_recdesc_t *rec;
-	uint64_t *a, count, avg;
-	char buf[256];
 	uintptr_t lock;
-	pid_t pid;
 	uint64_t *stack;
+	caddr_t data;
+	pid_t pid;
 	struct ps_prochandle *P;
+	char buf[256];
 	int i, j;
+	uint64_t sum, count, avg;
 
-	if (aggdesc->dtagd_id != last) {
-		print_header(aggdesc->dtagd_name);
-		nent = 0;
-	}
-	if (nent >= g_nent)
-		goto out;
-	nent++;
+	if ((*(uint_t *)arg)++ >= g_nent)
+		return (DTRACE_AGGWALK_NEXT);
 
-	rec = aggdesc->dtagd_rec;
+	rec = aggsdata[0]->dtada_desc->dtagd_rec;
+	data = aggsdata[0]->dtada_data;
 
 	/*LINTED - alignment*/
 	lock = (uintptr_t)*(uint64_t *)(data + rec[1].dtrd_offset);
 	/*LINTED - alignment*/
 	stack = (uint64_t *)(data + rec[2].dtrd_offset);
-	/*LINTED - alignment*/
-	a = (uint64_t *)(data + rec[aggdesc->dtagd_nrecs - 1].dtrd_offset);
 
 	if (!g_opt_s) {
-		if (aggdesc->dtagd_id != last) {
-			print_legend();
-			print_bar();
-		}
-
-		count = a[0];
-		avg = a[1] / a[0];
+		/*LINTED - alignment*/
+		sum = *(uint64_t *)(aggsdata[1]->dtada_data +
+		    aggsdata[1]->dtada_desc->dtagd_rec[3].dtrd_offset);
+		/*LINTED - alignment*/
+		count = *(uint64_t *)(aggsdata[2]->dtada_data +
+		    aggsdata[2]->dtada_desc->dtagd_rec[3].dtrd_offset);
 	} else {
+		uint64_t *a;
+
+		/*LINTED - alignment*/
+		a = (uint64_t *)(aggsdata[1]->dtada_data +
+		    aggsdata[1]->dtada_desc->dtagd_rec[3].dtrd_offset);
+
 		print_bar();
 		print_legend();
-		count = avg = 0;
 
-		for (i = DTRACE_QUANTIZE_ZEROBUCKET, j = 0;
+		for (count = sum = 0, i = DTRACE_QUANTIZE_ZEROBUCKET, j = 0;
 		    i < DTRACE_QUANTIZE_NBUCKETS; i++, j++) {
 			count += a[i];
-			avg += a[i] << (j - 64);
+			sum += a[i] << (j - 64);
 		}
-
-		avg /= count;
 	}
 
+	avg = sum / count;
 	(void) printf("%5llu %8llu ", (u_longlong_t)count, (u_longlong_t)avg);
 
 	pid = stack[0];
@@ -501,7 +600,11 @@ process_aggregate(const dtrace_aggdata_t *agg, void *arg)
 		int stack_done = 0;
 		int quant_done = 0;
 		int first_bin, last_bin;
-		uint64_t bin_size;
+		uint64_t bin_size, *a;
+
+		/*LINTED - alignment*/
+		a = (uint64_t *)(aggsdata[1]->dtada_data +
+		    aggsdata[1]->dtada_desc->dtagd_rec[3].dtrd_offset);
 
 		print_histogram_header();
 
@@ -543,18 +646,21 @@ process_aggregate(const dtrace_aggdata_t *agg, void *arg)
 
 	dtrace_proc_release(g_dtp, P);
 
-out:
-	last = aggdesc->dtagd_id;
-
 	return (DTRACE_AGGWALK_NEXT);
 }
 
-static int
-prochandler(struct ps_prochandle *P)
+/*ARGSUSED*/
+static void
+prochandler(struct ps_prochandle *P, const char *msg, void *arg)
 {
 	const psinfo_t *prp = Ppsinfo(P);
 	int pid = Pstatus(P)->pr_pid;
 	char name[SIG2STR_MAX];
+
+	if (msg != NULL) {
+		notice("pid %d: %s\n", pid, msg);
+		return;
+	}
 
 	switch (Pstate(P)) {
 	case PS_UNDEAD:
@@ -576,14 +682,65 @@ prochandler(struct ps_prochandle *P)
 		} else {
 			notice("pid %d has exited\n", pid);
 		}
-		return (1);
+		g_exited = 1;
+		break;
 
 	case PS_LOST:
 		notice("pid %d exec'd a set-id or unobservable program\n", pid);
-		return (1);
+		g_exited = 1;
+		break;
+	}
+}
+
+/*ARGSUSED*/
+static int
+chewrec(const dtrace_probedata_t *data, const dtrace_recdesc_t *rec, void *arg)
+{
+	dtrace_eprobedesc_t *epd = data->dtpda_edesc;
+	dtrace_aggvarid_t aggvars[2];
+	const void *buf;
+	int i, nagv;
+
+	/*
+	 * A NULL rec indicates that we've processed the last record.
+	 */
+	if (rec == NULL)
+		return (DTRACE_CONSUME_NEXT);
+
+	buf = data->dtpda_data - rec->dtrd_offset;
+
+	switch (rec->dtrd_action) {
+	case DTRACEACT_DIFEXPR:
+		(void) printf("\n%s\n\n", (char *)buf + rec->dtrd_offset);
+		if (!g_opt_s) {
+			print_legend();
+			print_bar();
+		}
+		return (DTRACE_CONSUME_NEXT);
+
+	case DTRACEACT_PRINTA:
+		for (nagv = 0, i = 0; i < epd->dtepd_nrecs - 1; i++) {
+			const dtrace_recdesc_t *nrec = &rec[i];
+
+			if (nrec->dtrd_uarg != rec->dtrd_uarg)
+				break;
+
+			/*LINTED - alignment*/
+			aggvars[nagv++] = *(dtrace_aggvarid_t *)((caddr_t)buf +
+			    nrec->dtrd_offset);
+		}
+
+		if (nagv == (g_opt_s ? 1 : 2)) {
+			uint_t nent = 0;
+			if (dtrace_aggregate_walk_joined(g_dtp, aggvars, nagv,
+			    process_aggregate, &nent) != 0)
+				dfatal("failed to walk aggregate");
+		}
+
+		return (DTRACE_CONSUME_NEXT);
 	}
 
-	return (0);
+	return (DTRACE_CONSUME_THIS);
 }
 
 /*ARGSUSED*/
@@ -603,10 +760,8 @@ main(int argc, char **argv)
 	struct sigaction act;
 	int done = 0;
 
-	if ((g_pname = strrchr(argv[0], '/')) == NULL)
-		g_pname = argv[0];
-	else
-		argv[0] = ++g_pname;		/* for getopt() */
+	g_pname = basename(argv[0]);
+	argv[0] = g_pname; /* rewrite argv[0] for getopt errors */
 
 	/*
 	 * Make sure we have the required dtrace_proc privilege.
@@ -676,9 +831,29 @@ main(int argc, char **argv)
 		fatal("failed to initialize dtrace: %s\n",
 		    dtrace_errmsg(NULL, err));
 
+	/*
+	 * The longest string we trace is 23 bytes long -- so 32 is plenty.
+	 */
+	if (dtrace_setopt(g_dtp, "strsize", "32") == -1)
+		dfatal("failed to set 'strsize'");
+
+	/*
+	 * 1k should be more than enough for all trace() and printa() actions.
+	 */
+	if (dtrace_setopt(g_dtp, "bufsize", "1k") == -1)
+		dfatal("failed to set 'bufsize'");
+
+	/*
+	 * The table we produce has the hottest locks at the top.
+	 */
+	if (dtrace_setopt(g_dtp, "aggsortrev", NULL) == -1)
+		dfatal("failed to set 'aggsortrev'");
+
+	/*
+	 * These are two reasonable defaults which should suffice.
+	 */
 	if (dtrace_setopt(g_dtp, "aggsize", "256k") == -1)
 		dfatal("failed to set 'aggsize'");
-
 	if (dtrace_setopt(g_dtp, "aggrate", "1sec") == -1)
 		dfatal("failed to set 'aggrate'");
 
@@ -770,6 +945,9 @@ main(int argc, char **argv)
 
 	dprog_compile();
 
+	if (dtrace_handle_proc(g_dtp, &prochandler, NULL) == -1)
+		dfatal("failed to establish proc handler");
+
 	(void) sigemptyset(&act.sa_mask);
 	act.sa_flags = 0;
 	act.sa_handler = intr;
@@ -788,29 +966,27 @@ main(int argc, char **argv)
 		(void) printf("%s: tracing enabled for pid %d\n", g_pname,
 		    (int)Pstatus(g_pr)->pr_pid);
 
-	while (!done) {
-		(void) sleep(1);
+	do {
+		if (!g_intr && !done)
+			dtrace_sleep(g_dtp);
 
-		if (dtrace_status(g_dtp) == DTRACE_STATUS_EXITED)
+		if (done || g_intr || g_exited) {
 			done = 1;
+			if (dtrace_stop(g_dtp) == -1)
+				dfatal("couldn't stop tracing");
+		}
 
-		/* Done if the user hits control-C. */
-		if (g_intr)
+		switch (dtrace_work(g_dtp, stdout, NULL, chewrec, NULL)) {
+		case DTRACE_WORKSTATUS_DONE:
 			done = 1;
+			break;
+		case DTRACE_WORKSTATUS_OKAY:
+			break;
+		default:
+			dfatal("processing aborted");
+		}
 
-		if (prochandler(g_pr) == 1)
-			done = 1;
-
-		if (dtrace_aggregate_snap(g_dtp) != 0)
-			dfatal("failed to add to aggregate");
-	}
-
-	if (dtrace_aggregate_snap(g_dtp) != 0)
-		dfatal("failed to add to aggregate");
-
-	if (dtrace_aggregate_walk_valrevsorted(g_dtp,
-	    process_aggregate, NULL) != 0)
-		dfatal("failed to print aggregations");
+	} while (!done);
 
 	dtrace_close(g_dtp);
 
