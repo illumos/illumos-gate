@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -56,21 +55,26 @@ static struct {
 
 static const char cmdname[] = "psrinfo";
 
-#define	CORES_PER_CHIP_MAX 256	/* ABEN (Arbitrarily big-enough number) */
+#define	CPUS_PER_CHIP_MAX 256	/* ABEN (Arbitrarily big-enough number) */
 static int chip_count = 0;
-static int max_chip_id;
-static struct chip {
+
+typedef struct chip {
+	int chip_id;
 	int visible;
 	int online;
-	int core_count;
+	int cpu_count;
 	char impl[128];
 	char brand[128];
-	processorid_t cores[CORES_PER_CHIP_MAX];
-} *chips;
+	struct chip *next;
+	processorid_t cpus[CPUS_PER_CHIP_MAX];
+} chipdata;
+static chipdata *chiplist = NULL;
 
 static void cpu_info(kstat_ctl_t *kc, kstat_t *ksp, int verbosity,
 	int phys_view, int visible);
 static void print_cpuid_list(processorid_t *ids, int count);
+
+static chipdata *get_chipdata(int chip_id);
 
 static void
 usage(char *msg)
@@ -145,21 +149,8 @@ main(int argc, char *argv[])
 	cpu_states[5].state = PS_OFFLINE;
 	cpu_states[5].lstate = gettext(PS_OFFLINE);
 
-	if (phys_view) {
-		/*
-		 * Note that we assume that MAX_CHIPID is <= MAX_CPUID.
-		 * If this becomes untrue, a new sysconf() would be warranted.
-		 */
-		max_chip_id = sysconf(_SC_CPUID_MAX);
-		chips = calloc(max_chip_id + 1, sizeof (struct chip));
-		if (chips == NULL) {
-			perror("calloc");
-			exit(1);
-		}
-	}
-
 	/*
-	 * In the physical view, we want to display all the core info or
+	 * In the physical view, we want to display all the cpu info or
 	 * none, even when the user specifies a range of CPUIDs.  So for
 	 * "psrinfo -pv <range>" or "psrinfo -ps <range>", we inventory
 	 * every cpu_info kstat, and *then* we go through the user
@@ -184,7 +175,7 @@ main(int argc, char *argv[])
 		/*
 		 * N.B. We're assuming that instance number == cpuid.
 		 * A number of things break if this isn't true.  In
-		 * particular, print_cpuid_list() assumes that c->cores[]
+		 * particular, print_cpuid_list() assumes that c->cpus[]
 		 * is numerically sorted, which is true only because we
 		 * add each virtual processor in cpuid order here.
 		 */
@@ -259,29 +250,28 @@ main(int argc, char *argv[])
 	}
 
 	if (phys_view) {
-		int i;
+		chipdata *c;
 
 		switch (verbosity) {
 		case 0:
 			/*
-			 * Print "1" if all the cores on this chip are
+			 * Print "1" if all the cpus on this chip are
 			 * online.  "0" otherwise.
 			 */
-			for (i = 0; i <= max_chip_id; i++) {
-				struct chip *c = &chips[i];
+			for (c = chiplist; c != NULL; c = c->next) {
 
 				if (!c->visible)
 					continue;
 				(void) printf("%d\n",
-				    c->online == c->core_count);
+				    c->online == c->cpu_count);
 				exit(0);
 			}
 			break;
 		case 1:
 			/*
 			 * Print the number of unique chips represented by
-			 * all the cores specified on the command line
-			 * (or, with no args, all the cores in the system).
+			 * all the cpus specified on the command line
+			 * (or, with no args, all the cpus in the system).
 			 */
 			(void) printf("%d\n", chip_count);
 			break;
@@ -289,19 +279,17 @@ main(int argc, char *argv[])
 			/*
 			 * Print a report on each chip.
 			 */
-			for (i = 0; i <= max_chip_id; i++) {
-				struct chip *c = &chips[i];
-
+			for (c = chiplist; c != NULL; c = c->next) {
 				if (!c->visible)
 					continue;
 
 				(void) printf(gettext("The physical "
 				    "processor has %d virtual %s ("),
-				    c->core_count,
-				    c->core_count == 1 ?
+				    c->cpu_count,
+				    c->cpu_count == 1 ?
 					gettext("processor") :
 					gettext("processors"));
-				print_cpuid_list(c->cores, c->core_count);
+				print_cpuid_list(c->cpus, c->cpu_count);
 				(void) printf(")\n");
 
 				(void) printf("  %s\n", c->impl);
@@ -360,7 +348,7 @@ cpu_info(kstat_ctl_t *kc, kstat_t *ksp, int verbosity, int phys_view,
 	if (phys_view) {
 		kstat_named_t *k =
 		    (kstat_named_t *)kstat_data_lookup(ksp, "chip_id");
-		struct chip *c;
+		chipdata *c;
 
 		if (k == NULL) {
 			(void) fprintf(stderr,
@@ -370,9 +358,9 @@ cpu_info(kstat_ctl_t *kc, kstat_t *ksp, int verbosity, int phys_view,
 			exit(1);
 		}
 
-		c = &chips[k->value.i32];
+		c = get_chipdata(k->value.i32);
 
-		if (visible && c->core_count != c->visible) {
+		if (visible && c->cpu_count != c->visible) {
 			/*
 			 * We've already inventoried this chip.  And the user
 			 * specified a range of CPUIDs.  So, now we just
@@ -383,7 +371,7 @@ cpu_info(kstat_ctl_t *kc, kstat_t *ksp, int verbosity, int phys_view,
 			return;
 		}
 
-		if (c->core_count == 0) {
+		if (c->cpu_count == 0) {
 			char *str;
 
 			str = GETLONGSTR("implementation");
@@ -397,8 +385,8 @@ cpu_info(kstat_ctl_t *kc, kstat_t *ksp, int verbosity, int phys_view,
 			chip_count++;
 		}
 
-		c->cores[c->core_count] = cpu_id;
-		c->core_count++;
+		c->cpus[c->cpu_count] = cpu_id;
+		c->cpu_count++;
 		c->online += strcmp(GETSTR("state"), "on-line") == 0;
 
 		if (visible)
@@ -466,5 +454,92 @@ print_cpuid_list(processorid_t *ids, int count)
 
 		(void) printf("%s%d", separator, ids[i]);
 		separator = " ";
+	}
+}
+
+
+/*
+ * get_chipdata(chip_id)
+ * Search for the chipdata structure (if allocated previously) that
+ * matches the chip_id argument and return a pointer to it.
+ * Allocate and return a pointer to a new chipdata if none
+ * is found matching the chip_id. The new chipdata will be inserted
+ * into the chiplist in ascending chip_id order.
+ * This routine allows us to support chip id (portid/deviceid)
+ * space which could be disjoint or/and larger from the logical cpuid space.
+ * Note that the number of chips visible to psrinfo is bounded by the
+ * number of (virtual) cpus. It is not possible to see more chips
+ * than (virtual) cpus.
+ */
+static chipdata *
+get_chipdata(int chip_id)
+{
+	chipdata *chip_ptr;
+	chipdata *newchip_ptr;
+	chipdata *prevchip_ptr = NULL;
+
+	if (chiplist == NULL) {
+		/*
+		 * first time - allocate the chipdata structure for
+		 * this new chip.
+		 */
+		if ((chiplist = calloc(1, sizeof (chipdata))) == NULL) {
+			(void) fprintf(stderr,
+			    gettext("%s: Calloc failed\n"), cmdname);
+			exit(1);
+		}
+		chiplist->chip_id = chip_id;
+		chiplist->next = NULL;
+		return (chiplist);
+	} else {
+		/*
+		 * look for the chipdata if it already
+		 * been allocated.
+		 */
+		for (chip_ptr = chiplist; chip_ptr != NULL;
+		    chip_ptr = chip_ptr->next) {
+			if (chip_ptr->chip_id == chip_id) {
+				/* found the allocated chipdata */
+				return (chip_ptr);
+			} else if (chip_ptr->chip_id > chip_id) {
+				/*
+				 * End search here since chiplist
+				 * is sorted in ascending order
+				 */
+				break;
+			}
+			prevchip_ptr = chip_ptr;
+		}
+
+		/*
+		 * Not found. Need to allocate a new chipdata
+		 * structure and insert it into the chiplist in
+		 * ascending chip_id order
+		 */
+		if ((newchip_ptr = calloc(1, sizeof (chipdata))) == NULL) {
+			(void) fprintf(stderr,
+			    gettext("%s: Calloc failed\n"), cmdname);
+			exit(1);
+		}
+		newchip_ptr->chip_id = chip_id;
+
+		/*
+		 * See if it needs to go in front of the list
+		 * by looking at the result of the previous
+		 * search, prevchip_ptr being NULL.
+		 */
+		if (prevchip_ptr == NULL) {
+			/* put it in front of the list */
+			newchip_ptr->next = chiplist;
+			chiplist = newchip_ptr;
+		} else {
+			/*
+			 * Insert the new chipdata in the list
+			 * after the one pointed by prevchip_ptr
+			 */
+			newchip_ptr->next = prevchip_ptr->next;
+			prevchip_ptr->next = newchip_ptr;
+		}
+		return (newchip_ptr);
 	}
 }
