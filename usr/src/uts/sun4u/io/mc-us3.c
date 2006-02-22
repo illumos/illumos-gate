@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -160,6 +159,7 @@ static mc_dlist_t *mc_node_get(int id, mc_dlist_t *head);
 static void mc_add_mem_unum_label(char *buf, int mcid, int bank, int dimm);
 static int mc_populate_sid_cache(void);
 static int mc_get_sid_cache_index(int mcid);
+static void mc_update_bank(struct bank_info *bank);
 
 #pragma weak p2get_mem_unum
 #pragma weak p2get_mem_info
@@ -1748,6 +1748,11 @@ mlayout_add(int mc_id, int bank_no, uint64_t reg, void *dimminfop)
 	DPRINTF(MC_CNSTRC_DEBUG, ("mlayout_add: + bank to seg, id %d\n",
 	    seg_curr->seg_node.id));
 
+	if (mc_dimm_sids) {
+		rw_enter(&mcdimmsids_rw, RW_WRITER);
+		mc_update_bank(bank_curr);
+		rw_exit(&mcdimmsids_rw);
+	}
 	mc_node_add((mc_dlist_t *)bank_curr, &bank_head, &bank_tail);
 
 	memsize += size;
@@ -2021,6 +2026,40 @@ mc_get_sid_cache_index(int mcid)
 	return (-1);
 }
 
+static void
+mc_update_bank(struct bank_info *bank)
+{
+	int i, j;
+	int bankid, mcid, dgrp_no;
+
+	/*
+	 * Mark the MC if DIMM sids are not available.
+	 * Mark which segment the DIMMs belong to.  Allocate
+	 * space to store DIMM serial ids which are later
+	 * provided by the platform layer, and update the bank_info
+	 * structure with pointers to its serial ids.
+	 */
+	bankid = bank->bank_node.id;
+	mcid = bankid / NBANKS;
+	i = mc_get_sid_cache_index(mcid);
+	if (mc_dimm_sids[i].state == MC_DIMM_SIDS_INVALID)
+		mc_dimm_sids[i].state = MC_DIMM_SIDS_REQUESTED;
+
+	mc_dimm_sids[i].seg_id = bank->seg_id;
+
+	if (mc_dimm_sids[i].sids == NULL) {
+		mc_dimm_sids[i].sids = (dimm_sid_t *)kmem_zalloc(
+		    sizeof (dimm_sid_t) * (NDGRPS * NDIMMS), KM_SLEEP);
+	}
+
+	dgrp_no = bank->devgrp_id % NDGRPS;
+
+	for (j = 0; j < NDIMMS; j++) {
+		bank->dimmsidp[j] =
+		    &mc_dimm_sids[i].sids[j + (NDIMMS * dgrp_no)];
+	}
+}
+
 static int
 mc_populate_sid_cache(void)
 {
@@ -2031,44 +2070,14 @@ mc_populate_sid_cache(void)
 
 	ASSERT(RW_WRITE_HELD(&mcdimmsids_rw));
 
-	/*
-	 * Mark which MCs are present and which segment
-	 * the DIMMs belong to.  Allocate space to
-	 * store DIMM serial ids which are later provided
-	 * by the platform layer, and update each bank_info
-	 * structure with pointers to its serial ids.
-	 */
 	bank = (struct bank_info *)bank_head;
 	while (bank != NULL) {
-		int i, j;
-		int bankid, mcid, dgrp_no;
-
 		if (!bank->valid) {
 			bank = (struct bank_info *)bank->bank_node.next;
 			continue;
 		}
 
-		bankid = bank->bank_node.id;
-		mcid = bankid / NBANKS;
-		i = mc_get_sid_cache_index(mcid);
-		if (mc_dimm_sids[i].state == MC_DIMM_SIDS_AVAILABLE) {
-			bank = (struct bank_info *)bank->bank_node.next;
-			continue;
-		} else if (mc_dimm_sids[i].state != MC_DIMM_SIDS_REQUESTED) {
-			mc_dimm_sids[i].state = MC_DIMM_SIDS_REQUESTED;
-			mc_dimm_sids[i].seg_id = bank->seg_id;
-		}
-
-		if (mc_dimm_sids[i].sids == NULL) {
-			mc_dimm_sids[i].sids = (dimm_sid_t *)kmem_zalloc(
-			    sizeof (dimm_sid_t) * (NDGRPS * NDIMMS), KM_SLEEP);
-		}
-
-		dgrp_no = bank->devgrp_id % NDGRPS;
-
-		for (j = 0; j < NDIMMS; j++)
-			bank->dimmsidp[j] =
-			    &mc_dimm_sids[i].sids[j + (NDIMMS * dgrp_no)];
+		mc_update_bank(bank);
 
 		bank = (struct bank_info *)bank->bank_node.next;
 	}
