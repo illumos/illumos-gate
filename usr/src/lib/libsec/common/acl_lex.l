@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -60,12 +59,13 @@ int yybufpos;
 
 %}
 
-%s TS NS PS AIS US ES
+%s TS NS PS AIS AS US ES
 /*
  * TS = type state
  * NS = name state
  * PS = Permission state
  * AIS = Allow/deny/inheritance state
+ * AS = Allow state (only used when inheritance detected)
  * US = UID/GID state
  * ES = End state
  */
@@ -179,12 +179,12 @@ INHERIT_STR [fdinFS-]+
 <TS>.			{
 				if (grab_string(":\n") != 0) {
 					acl_error(gettext("Failed to retrieve"
-					    " error string\n"));
+					    " error string.\n"));
 					yylval.val = EACL_MEM_ERROR;
 					return (ERROR);
 				}
 				acl_error(gettext("Invalid ACL entry "
-				    "type '%s' specified\n"), yylval.str);
+				    "type '%s' specified.\n"), yylval.str);
 				free(yylval.str);
 				yylval.val = EACL_ENTRY_ERROR;
 				return (ERROR);
@@ -205,13 +205,13 @@ INHERIT_STR [fdinFS-]+
 			}
 <NS>{BADLOGNAME}	{
 				acl_error(gettext("Missing fields after "
-				    "user/group '%s'\n"), yytext);
+				    "user/group '%s'.\n"), yytext);
 				yylval.val = EACL_MISSING_FIELDS;
 				return (ERROR);
 			}
 <NS>"\n"		{
 				acl_error(gettext("Missing user/group name"
-				    " from ACL specification\n"));
+				    " from ACL specification.\n"));
 				yylval.val = EACL_MISSING_FIELDS;
 				return (ERROR);
 			}
@@ -221,11 +221,11 @@ INHERIT_STR [fdinFS-]+
 				error = grab_string(":\n");
 				if (error != 0) {
 					acl_error(gettext("Invalid user/group "
-					    "name specification\n"));
+					    "name specification.\n"));
 					yylval.val = EACL_INVALID_USER_GROUP;
 				} else {
 					acl_error(gettext("User/Group name "
-					    "'%s' not specified correctly\n"),
+					    "'%s' not specified correctly.\n"),
 					    yylval.str);
 					free(yylval.str);
 					yylval.val = EACL_ENTRY_ERROR;
@@ -323,7 +323,7 @@ INHERIT_STR [fdinFS-]+
 			}
 <PS>"/:"		{
 				acl_error(gettext("Invalid permission /: "
-				    "specified\n"));
+				    "specified.\n"));
 				yylval.val = EACL_ENTRY_ERROR;
 				return (ERROR);
 			}
@@ -343,21 +343,85 @@ INHERIT_STR [fdinFS-]+
 			}
 <PS>"\n"		{
 				acl_error(gettext("ACL entry is missing "
-				    "permission fields\n"));
+				    "permission fields.\n"));
 				yylval.val = EACL_MISSING_FIELDS;
 				return (ERROR);
 			}
 <PS>. 			{
 				if (grab_string("/:\n") != 0) {
 					acl_error(gettext("Failed to retrieve"
-					    " error string\n"));
+					    " error string.\n"));
 					yylval.val = EACL_MEM_ERROR;
 					return (ERROR);
 				}
 				acl_error(gettext("Invalid permission '%s' "
-				    "specified\n"), yylval.str); 
+				    "specified.\n"), yylval.str); 
 				free(yylval.str);
 				yylval.val = EACL_PERM_MASK_ERROR;
+				return (ERROR);
+			}
+<AS>allow/[:,\n]	{
+
+				int c;
+			
+				c = input();
+				unput(c);
+				if (c == ',' || c == '\n')
+					BEGIN ES;
+				else
+					BEGIN US;
+				yylval.val = ACE_ACCESS_ALLOWED_ACE_TYPE;
+				return (ACCESS_TYPE);
+			}
+<AS>deny/[:,\n]		{
+
+				int c;
+				
+				c = input();
+				unput(c);
+				if (c == ',' || c == '\n')
+					BEGIN ES;
+				else
+					BEGIN US;
+
+				yylval.val = ACE_ACCESS_DENIED_ACE_TYPE;
+				return (ACCESS_TYPE);
+			}
+<AS>:			{
+				
+				acl_error(gettext("Invalid Access type "
+				    "specified.\nThe field is blank, when"
+				    " it should be either allow or deny.\n"));
+				yylval.val = EACL_INVALID_ACCESS_TYPE;
+				return (ERROR);
+			}
+<AS>"\n"		{
+				acl_error(gettext("ACL access type must "
+				    "be specified.\n"));
+				yylval.val = EACL_INVALID_ACCESS_TYPE;
+				return (ERROR);
+			}
+<AS>.			{
+				if (yytext[0] != '\n' && yytext[0] != '\0') {
+					if (grab_string(":\n") != 0) {
+						acl_error(gettext("Failed to "
+						    "retrieve error "
+						    "string.\n"));
+						yylval.val = EACL_MEM_ERROR;
+						return (ERROR);
+					}
+					acl_error(
+					    gettext("Invalid access "
+					    "type '%s' specified.\n"),
+					    yylval.str);
+				} else {
+					acl_error(
+					    gettext("No access "
+					    "type specified.\n"), yylval.str);
+				}
+
+				free(yylval.str);
+				yylval.val = EACL_INVALID_ACCESS_TYPE;
 				return (ERROR);
 			}
 <AIS>allow/[:,\n]	{
@@ -365,24 +429,28 @@ INHERIT_STR [fdinFS-]+
 				int c;
 			
 				c = input();
+				unput(c);
 				if (c == ',' || c == '\n')
 					BEGIN ES;
-				unput(c);
+				else
+					BEGIN US;
 				yylval.val = ACE_ACCESS_ALLOWED_ACE_TYPE;
 				return (ACCESS_TYPE);
 			}
 <AIS>deny/[:,\n]	{
 
 				int c;
-		
+				
 				c = input();
+				unput(c);
 				if (c == ',' || c == '\n')
 					BEGIN ES;
-				unput(c);
+				else
+					BEGIN US;
+
 				yylval.val = ACE_ACCESS_DENIED_ACE_TYPE;
 				return (ACCESS_TYPE);
 			}
-
 <AIS>file_inherit/[:/] {
 				yylval.val = ACE_FILE_INHERIT_ACE;
 				return (ACE_INHERIT);
@@ -399,7 +467,7 @@ INHERIT_STR [fdinFS-]+
 				yylval.val = ACE_INHERIT_ONLY_ACE;
 				return (ACE_INHERIT);
 			}
-<AIS>{INHERIT_STR}	{
+<AIS>{INHERIT_STR}/[:]	{
 				yylval.str = strdup(yytext);
 				if (yylval.str == NULL) {
 					yylval.val = EACL_MEM_ERROR;
@@ -408,14 +476,12 @@ INHERIT_STR [fdinFS-]+
 				return (INHERIT_TOK);
 			}
 <AIS>:			{
-				int c;
-
-				c = input();
-				unput(c);
-
-				if (isdigit(c)) {
-					BEGIN US;
-				} 
+				/*
+				 * Only inheritance fields should hit this.
+				 * allow/deny fields match on ":" as part
+				 * of the regexp.
+				 */
+				BEGIN AS;
 				return (COLON);
 			}
 <AIS>"/"		{
@@ -423,8 +489,10 @@ INHERIT_STR [fdinFS-]+
 			}
 <AIS>"\n"		{
 				acl_error(
-				    gettext("Extra data on end of ACL "
-				    "specification\n"), yylval.str);
+				    gettext("Invalid ACL specification."
+				    "\nWas expecting to find"
+				    " access type or inheritance flags.\n"),
+				    yylval.str);
 				yylval.val = EACL_UNKNOWN_DATA;
 				return (ERROR);
 			}
@@ -432,18 +500,19 @@ INHERIT_STR [fdinFS-]+
 				if (yytext[0] != '\n' && yytext[0] != '\0') {
 					if (grab_string(":\n") != 0) {
 						acl_error(gettext("Failed to "
-						    "retrieve error string\n"));
+						    "retrieve error "
+						    "string.\n"));
 						yylval.val = EACL_MEM_ERROR;
 						return (ERROR);
 					}
 					acl_error(
 					    gettext("Invalid inheritance or"
-				    	    " access type '%s' specified\n"),
+				    	    " access type '%s' specified.\n"),
 				    	    yylval.str);
 				} else {
 					acl_error(
 					    gettext("No inheritance or "
-					    "access type specified\n"),
+					    "access type specified.\n"),
 					    yylval.str);
 				}
 
@@ -456,25 +525,38 @@ INHERIT_STR [fdinFS-]+
 				yylval.val = atoi(yytext);
 				return (ID);
 			}
+<US>:			{
+				return (COLON);
+			}
+<US>{INHERIT_STR}	{	/*
+				 * Catch specific error to produce
+				 * nice message for users who are trying
+				 * to use old syntax format which had
+				 * inheritance flags as the last field.
+				 */
+				acl_error(gettext("Access type should be final"
+				    " field in ACL specification.\n"));
+				yylval.val = EACL_ENTRY_ERROR;
+				return (ERROR);
+			}
 <US>.			{ 
 				if (grab_string(",\n") != 0) {
 					acl_error(gettext("Failed to retrieve"
-					    " error string\n"));	
+					    " error string.\n"));	
 					yylval.val = EACL_MEM_ERROR;
 					return (ERROR);
 				}
 				acl_error(
-				    gettext("Invalid uid/gid '%s' specified\n"),
-			    	    yylval.str);
+				    gettext("Invalid data ':%s' specified"	
+				    " on end of ACL.\n"), yylval.str);
 				free(yylval.str);
 				yylval.val = EACL_ENTRY_ERROR;
 				return (ERROR);
 			}
 <US>"\n"		{
 				acl_error(gettext("Missing fields in ACL "
-				    "specification.\nShould either have "
-				    "inheritance flags or uid/gid "
-				    "specified.\n"));
+				    "specification.\nWas expecting to find "
+				    "uid/gid.\n"));
 				yylval.val = EACL_ENTRY_ERROR;
 				return (ERROR);
 			}
@@ -486,13 +568,13 @@ INHERIT_STR [fdinFS-]+
 				if (grab_string("/:\n") != 0) {
 					acl_error(
 					    gettext("Failed to retrieve error"
-				    	    " string\n"));
+				    	    " string.\n"));
 					yylval.val = EACL_MEM_ERROR;
 					return (ERROR);
 				}
 				acl_error(
 				    gettext("Unrecognized data '%s' found"
-			    	    " in ACL specification\n"), yylval.str);
+			    	    " in ACL specification.\n"), yylval.str);
 				free(yylval.str);
 				yylval.val = EACL_UNKNOWN_DATA;
 				return (ERROR);

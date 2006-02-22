@@ -3,9 +3,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -57,7 +56,7 @@ extern acl_t *yyacl;
 %type <aclent> aclent
 %type <val> iflags verbose_iflag compact_iflag access_type id entry_type
 
-%left	ERROR COLON
+%left ERROR COLON
 
 %%
 
@@ -92,7 +91,7 @@ acl_entry: ace
 		$$ = yyacl;
 		if ($$->acl_type == ACLENT_T) {
 			acl_error(gettext("Cannot have POSIX draft ACL entries"
-			     " with NFSV4/ZFS ACL entries\n"));
+			     " with NFSv4/ZFS ACL entries.\n"));
 			acl_free(yyacl);
 			yyacl = NULL;
 			return (EACL_DIFF_TYPE);
@@ -121,7 +120,7 @@ acl_entry: ace
 		$$ = yyacl;
 		if ($$->acl_type == ACE_T) {
 			acl_error(gettext("Cannot have NFSv4/ZFS ACL entries"
-			     " with POSIX draft ACL entries\n"));
+			     " with POSIX draft ACL entries.\n"));
 			acl_free(yyacl);
 			yyacl = NULL;
 			return (EACL_DIFF_TYPE);
@@ -146,7 +145,7 @@ ace:	entry_type idname ace_perms access_type
 
 		error = get_id($1, $2, &id);
 		if (error) {
-			acl_error(gettext("Invalid user %s specified\n"), $2);
+			acl_error(gettext("Invalid user %s specified.\n"), $2);
 			free($2);
 			return (EACL_INVALID_USER_GROUP);
 		}
@@ -167,7 +166,7 @@ ace:	entry_type idname ace_perms access_type
 
 		if (yyinteractive) {
 			acl_error(gettext("Extra fields on the end of "
-			    "ACL specification\n"));
+			    "ACL specification.\n"));
 			return (EACL_UNKNOWN_DATA);
 		}
 		error = get_id($1, $2, &id);
@@ -190,7 +189,7 @@ ace:	entry_type idname ace_perms access_type
 
 		error = get_id($1, $2, &id);
 		if (error) {
-			acl_error(gettext("Invalid user %s specified\n"), $2);
+			acl_error(gettext("Invalid user %s specified.\n"), $2);
 			free($2);
 			return (EACL_INVALID_USER_GROUP);
 		}
@@ -211,7 +210,7 @@ ace:	entry_type idname ace_perms access_type
 
 		if (yyinteractive) {
 			acl_error(gettext("Extra fields on the end of "
-			    "ACL specification\n"));
+			    "ACL specification.\n"));
 			return (EACL_UNKNOWN_DATA);
 		}
 		error = get_id($1, $2, &id);
@@ -246,7 +245,7 @@ ace:	entry_type idname ace_perms access_type
 	{
 		if (yyinteractive) {
 			acl_error(gettext("Extra fields on the end of "
-			    "ACL specification\n"));
+			    "ACL specification.\n"));
 			return (EACL_UNKNOWN_DATA);
 		}
 
@@ -269,7 +268,7 @@ ace:	entry_type idname ace_perms access_type
 	{
 		if (yyinteractive) {
 			acl_error(gettext("Extra fields on the end of "
-			    "ACL specification\n"));
+			    "ACL specification.\n"));
 			return (EACL_UNKNOWN_DATA);
 		}
 		return (EACL_ENTRY_ERROR);
@@ -282,7 +281,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 
 		error = get_id($1, $2, &id);
 		if (error) {
-			acl_error(gettext("Invalid user '%s' specified\n"),
+			acl_error(gettext("Invalid user '%s' specified.\n"),
 			    $2);
 			free($2);
 			return (EACL_INVALID_USER_GROUP);
@@ -292,7 +291,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		if (error) {
 			free($2);
 			acl_error(gettext(
-			    "Invalid permission(s) '%s' specified\n"),
+			    "Invalid permission(s) '%s' specified.\n"),
 			    $3.perm_str);
 			return (error);
 		}
@@ -301,8 +300,8 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		free($2);
 		if (error) {
 			acl_error(
-			    gettext("Invalid ACL entry type '%s' specified\n"),
-			    $1);
+			    gettext("Invalid ACL entry type '%s' "
+			    "specified.\n"), $1);
 			return (error);
 		}
 	}
@@ -313,7 +312,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		error = compute_aclent_perms($3.perm_str, &$$.a_perm);
 		if (error) {
 			acl_error(gettext(
-			    "Invalid permission(s) '%s' specified\n"),
+			    "Invalid permission(s) '%s' specified.\n"),
 			    $3.perm_str);
 			return (error);
 		}
@@ -321,7 +320,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		error = aclent_entry_type($1, 1, &$$.a_type);
 		if (error) {
 			acl_error(
-			    gettext("Invalid ACL entry type '%s' specified\n"),
+			    gettext("Invalid ACL entry type '%s' specified.\n"),
 			    $1);
 			return (error);
 		}
@@ -330,7 +329,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 	{ 
 		if (yyinteractive) {
 			acl_error(gettext("Extra fields on the end of "
-			    "ACL specification\n"));
+			    "ACL specification.\n"));
 			return (EACL_UNKNOWN_DATA);
 		}
 		return (EACL_ENTRY_ERROR);
@@ -342,14 +341,14 @@ aclent: entry_type idname aclent_perm	/* user or group */
 
 		if (yyinteractive) {
 			acl_error(gettext("Extra fields on the end of "
-			    "ACL specification\n"));
+			    "ACL specification.\n"));
 			return (EACL_UNKNOWN_DATA);
 		}
 		error = compute_aclent_perms($3.perm_str, &$$.a_perm);
 		if (error) {
 			free($2);
 			acl_error(gettext(
-			    "Invalid permission(s) '%s' specified\n"),
+			    "Invalid permission(s) '%s' specified.\n"),
 			    $3.perm_str);
 			return (error);
 		}
@@ -363,7 +362,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		free($2);
 		if (error) {
 			acl_error(
-			    gettext("Invalid ACL entry type '%s' specified\n"),
+			    gettext("Invalid ACL entry type '%s' specified.\n"),
 			    $1);
 			return (error);
 		}
@@ -375,7 +374,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		error = compute_aclent_perms($2.perm_str, &$$.a_perm);
 		if (error) {
 			acl_error(gettext(
-			    "Invalid permission(s) '%s' specified\n"),
+			    "Invalid permission(s) '%s' specified.\n"),
 			    $2.perm_str);
 			return (error);
 		}
@@ -383,7 +382,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 		error = aclent_entry_type($1, 0, &$$.a_type);
 		if (error) {
 			acl_error(
-			    gettext("Invalid ACL entry type specified %d\n"),
+			    gettext("Invalid ACL entry type specified %d.\n"),
 			    error);
 			return (error);
 		}
@@ -392,7 +391,7 @@ aclent: entry_type idname aclent_perm	/* user or group */
 	{
 		if (yyinteractive) {
 			acl_error(gettext("Extra fields on the end of "
-			    "ACL specification\n"));
+			    "ACL specification.\n"));
 			return (EACL_UNKNOWN_DATA);
 		}
 		return (EACL_ENTRY_ERROR);
@@ -410,7 +409,7 @@ compact_iflag : INHERIT_TOK
 		error = compute_ace_inherit($1, &iflags);
 		if (error) {
 			acl_error(gettext("Invalid inheritance flags "
-			    "'%s' specified\n"), $1);
+			    "'%s' specified.\n"), $1);
 			free($1);
 			return (error);
 		}
@@ -419,7 +418,7 @@ compact_iflag : INHERIT_TOK
 	| INHERIT_TOK SLASH verbose_iflag
 	{
 		acl_error(gettext("Can't mix compact inherit flags with"
-		    " verbose inheritance flags\n"));
+		    " verbose inheritance flags.\n"));
 		return (EACL_INHERIT_ERROR);
 	}
 
@@ -428,7 +427,13 @@ verbose_iflag: ACE_INHERIT	{$$ |= $1;}
 	| ACE_INHERIT SLASH compact_iflag
 	{
 		acl_error(gettext("Can't mix verbose inherit flags with"
-		    " compact inheritance flags\n"));
+		    " compact inheritance flags.\n"));
+		return (EACL_INHERIT_ERROR);
+	}
+	| ACE_INHERIT SLASH ACCESS_TYPE
+	{
+		acl_error(gettext("Inheritance flags can't be mixed with"
+		    " access type.\n"));
 		return (EACL_INHERIT_ERROR);
 	}
 	| ACE_INHERIT SLASH ERROR {return ($3);}
@@ -442,14 +447,20 @@ aclent_perm: PERM_TOK
 	| PERM_TOK ERROR 
 	{
 		acl_error(gettext("ACL entry permissions are incorrectly "
-		    "specified\n"));
+		    "specified.\n"));
 		return ($2);
 	}
 
-access_type: ACCESS_TYPE { $$ = $1;}
-	   | ERROR {return ($1);}
+access_type: ACCESS_TYPE {$$ = $1;}	
+	| ERROR {return ($1);}
 
 id: ID {$$ = $1;}
+  	| COLON
+	{
+		acl_error(gettext("Invalid uid/gid specified.\nThe field"
+		    " should be a numeric value.\n")); 
+		return (EACL_UNKNOWN_DATA);
+	}
 	| ERROR {return ($1);}
 
 ace_perms: perm {$$ = $1;}
@@ -473,10 +484,12 @@ perms: ACE_PERM
 	{
 
 		acl_error(gettext("Can't mix verbose permissions with"
-		    " compact permission\n"));
+		    " compact permission.\n"));
 		return (EACL_PERM_MASK_ERROR);
 
 	}
+	| ACE_PERM SLASH ERROR {return ($3);}
+		
 
 idname: IDNAME {$$ = $1;}
 
