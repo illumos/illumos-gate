@@ -150,7 +150,31 @@ static void startup_end(void);
 /*
  * Declare these as initialized data so we can patch them.
  */
+#ifdef __i386
+/*
+ * Due to virtual address space limitations running in 32 bit mode, restrict
+ * the amount of physical memory configured to a max of PHYSMEM32 pages (16g).
+ *
+ * If the physical max memory size of 64g were allowed to be configured, the
+ * size of user virtual address space will be less than 1g. A limited user
+ * address space greatly reduces the range of applications that can run.
+ *
+ * If more physical memory than PHYSMEM32 is required, users should preferably
+ * run in 64 bit mode which has no virtual address space limitation issues.
+ *
+ * If 64 bit mode is not available (as in IA32) and/or more physical memory
+ * than PHYSMEM32 is required in 32 bit mode, physmem can be set to the desired
+ * value or to 0 (to configure all available memory) via eeprom(1M). kernelbase
+ * should also be carefully tuned to balance out the need of the user
+ * application while minimizing the risk of kernel heap exhaustion due to
+ * kernelbase being set too high.
+ */
+#define	PHYSMEM32	0x400000
+
+pgcnt_t physmem = PHYSMEM32;
+#else
 pgcnt_t physmem = 0;	/* memory size in pages, patch if you want less */
+#endif
 pgcnt_t obp_pages;	/* Memory used by PROM for its text and data */
 
 char *kobj_file_buf;
@@ -826,6 +850,7 @@ startup_memlist(void)
 	caddr_t page_ctrs_mem;
 	size_t page_ctrs_size;
 	struct memlist *current;
+	pgcnt_t orig_npages = 0;
 	extern void startup_build_mem_nodes(struct memlist *);
 
 	/* XX64 fix these - they should be in include files */
@@ -977,8 +1002,7 @@ startup_memlist(void)
 	if (physmem == 0 || physmem > npages) {
 		physmem = npages;
 	} else if (physmem < npages) {
-		cmn_err(CE_WARN, "limiting physmem to 0x%lx of"
-		    " 0x%lx available pages", physmem, npages);
+		orig_npages = npages;
 		npages = physmem;
 	}
 	PRM_DEBUG(physmem);
@@ -1244,6 +1268,30 @@ startup_memlist(void)
 	 */
 	bp_init(MMU_PAGESIZE, HAT_STORECACHING_OK);
 
+	/*
+	 * orig_npages is non-zero if physmem has been configured for less
+	 * than the available memory.
+	 */
+	if (orig_npages) {
+#ifdef __i386
+		/*
+		 * use npages for physmem in case it has been temporarily
+		 * modified via /etc/system in kmem_init/mod_read_system_file.
+		 */
+		if (npages == PHYSMEM32) {
+			cmn_err(CE_WARN, "!Due to 32 bit virtual"
+			    " address space limitations, limiting"
+			    " physmem to 0x%lx of 0x%lx available pages",
+			    npages, orig_npages);
+		} else {
+			cmn_err(CE_WARN, "!limiting physmem to 0x%lx of"
+			    " 0x%lx available pages", npages, orig_npages);
+		}
+#else
+		cmn_err(CE_WARN, "!limiting physmem to 0x%lx of"
+		    " 0x%lx available pages", npages, orig_npages);
+#endif
+	}
 #if defined(__i386)
 	if (eprom_kernelbase && (eprom_kernelbase != kernelbase))
 		cmn_err(CE_WARN, "kernelbase value, User specified 0x%lx, "
