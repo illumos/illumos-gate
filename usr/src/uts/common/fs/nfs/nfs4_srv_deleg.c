@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1608,6 +1607,7 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 	vnode_t *vp;
 	int open_prev = *recall;
 
+	ASSERT(rfs4_dbe_islocked(sp->dbe));
 	ASSERT(rfs4_dbe_islocked(fp->dbe));
 
 	/* Shouldn't happen */
@@ -1619,13 +1619,26 @@ rfs4_deleg_state(rfs4_state_t *sp, open_delegation_type4 dtype, int *recall)
 
 	/* Unlock to avoid deadlock */
 	rfs4_dbe_unlock(fp->dbe);
+	rfs4_dbe_unlock(sp->dbe);
 
 	dsp = rfs4_finddeleg(sp, &create);
 
+	rfs4_dbe_lock(sp->dbe);
 	rfs4_dbe_lock(fp->dbe);
 
 	if (dsp == NULL)
 		return (NULL);
+
+	/*
+	 * It is possible that since we dropped the lock
+	 * in order to call finddeleg, the rfs4_file_t
+	 * was marked such that we should not grant a
+	 * delegation, if so bail out.
+	 */
+	if (fp->dinfo->hold_grant > 0) {
+		rfs4_deleg_state_rele(dsp);
+		return (NULL);
+	}
 
 	if (create == FALSE) {
 		if (sp->owner->client == dsp->client &&
