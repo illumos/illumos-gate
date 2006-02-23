@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -6522,10 +6521,7 @@ udp_wput_data(queue_t *q, mblk_t *mp, struct sockaddr *addr, socklen_t addrlen)
 
 	udp_output(connp, mp, addr, addrlen);
 
-	mutex_enter(&connp->conn_lock);
-	UDP_MODE_ASSERTIONS(udp, UDP_EXIT);
-	UDP_READERS_DECREF(udp);
-	mutex_exit(&connp->conn_lock);
+	udp_exit(connp);
 }
 
 /*
