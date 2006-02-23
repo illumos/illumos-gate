@@ -2,7 +2,7 @@
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 /* $Id: acconfig.h,v 1.145 2002/09/26 00:38:48 tim Exp $ */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -968,6 +968,10 @@ extern "C" {
 
 /* Define if compiling in ON */
 #define SUNW_SSH 1
+
+/* Define if you have mkstemp, mkstemps and mkdtemp */
+#define	HAVE_MKDTEMP
+
 
 /* ******************* Shouldn't need to edit below this line ************** */
 

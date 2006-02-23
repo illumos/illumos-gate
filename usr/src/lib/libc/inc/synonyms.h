@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -58,6 +57,7 @@ extern "C" {
 #define	lseek64			_lseek64
 #define	lstat64			_lstat64
 #define	mkstemp64		_mkstemp64
+#define	mkstemps64		_mkstemps64
 #define	mmap64			_mmap64
 #define	openat64		_openat64
 #define	open64			_open64
@@ -563,9 +563,11 @@ extern "C" {
 #define	memset			_memset
 #define	mincore			_mincore
 #define	mkdir			_mkdir
+#define	mkdtemp			_mkdtemp
 #define	mkfifo			_mkfifo
 #define	mknod			_mknod
 #define	mkstemp			_mkstemp
+#define	mkstemps		_mkstemps
 #define	mktemp			_mktemp
 #define	mlockall		_mlockall
 #define	mlock			_mlock

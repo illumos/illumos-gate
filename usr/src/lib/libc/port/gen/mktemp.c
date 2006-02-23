@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -121,7 +120,7 @@ highbit(uint_t i)
 }
 
 char *
-mktemp(char *as)
+libc_mktemps(char *as, int slen)
 {
 	/* statics are protected by this static mutex */
 	static mutex_t	mktemp_lock = DEFAULTMUTEX;
@@ -167,6 +166,9 @@ mktemp(char *as)
 	/* count the X's */
 	xcnt = 0;
 	len = (int)strlen(as);
+	if (slen >= len || slen < 0)
+		goto fail;
+	len -= slen;
 	s = as + (len - 1);
 	while ((len != 0) && (xcnt < XCNT) && (*s == 'X')) {
 		xcnt++;
@@ -248,4 +250,10 @@ fail:
 	lmutex_unlock(&mktemp_lock);
 	*as = '\0';
 	return (as);
+}
+
+char *
+mktemp(char *template)
+{
+	return (libc_mktemps(template, 0));
 }

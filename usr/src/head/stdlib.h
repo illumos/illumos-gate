@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,8 +97,10 @@ typedef long	uid_t;			/* (historical version) */
 
 #ifdef	__PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname	mkstemp		mkstemp64
+#pragma redefine_extname	mkstemps	mkstemps64
 #else	/* __PRAGMA_REDEFINE_EXTNAME */
 #define	mkstemp			mkstemp64
+#define	mkstemps		mkstemps64
 #endif	/* __PRAGMA_REDEFINE_EXTNAME */
 
 #endif	/* _FILE_OFFSET_BITS == 64 */
@@ -109,8 +110,10 @@ typedef long	uid_t;			/* (historical version) */
 
 #ifdef	__PRAGMA_REDEFINE_EXTNAME
 #pragma redefine_extname	mkstemp64	mkstemp
+#pragma redefine_extname	mkstemps64	mkstemps
 #else	/* __PRAGMA_REDEFINE_EXTNAME */
 #define	mkstemp64		mkstemp
+#define	mkstemps64		mkstemps
 #endif	/* __PRAGMA_REDEFINE_EXTNAME */
 
 #endif	/* _LP64 && _LARGEFILE64_SOURCE */
@@ -166,11 +169,13 @@ extern void swab(const char *, char *, ssize_t);
 	!defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
 	(defined(_LARGEFILE_SOURCE) && _FILE_OFFSET_BITS == 64)
 extern int	mkstemp(char *);
+extern int	mkstemps(char *, int);
 #endif /* defined(__EXTENSIONS__) ... */
 
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int	mkstemp64(char *);
+extern int	mkstemps64(char *, int);
 #endif	/* _LARGEFILE64_SOURCE... */
 
 #if defined(__EXTENSIONS__) || \
@@ -226,6 +231,7 @@ extern int getpw(uid_t, char *);
 extern int isatty(int);
 extern void *memalign(size_t, size_t);
 extern char *ttyname(int);
+extern char *mkdtemp(char *);
 
 #if !defined(_STRICT_STDC) && defined(_LONGLONG_TYPE)
 extern char *lltostr(long long, char *);
@@ -266,11 +272,13 @@ extern void swab();
 	!defined(__XOPEN_OR_POSIX) || defined(_XPG4_2) || \
 	(defined(_LARGEFILE_SOURCE) && _FILE_OFFSET_BITS == 64)
 extern int	mkstemp();
+extern int	mkstemps();
 #endif	/* defined(__EXTENSIONS__) ... */
 
 #if	defined(_LARGEFILE64_SOURCE) && !((_FILE_OFFSET_BITS == 64) && \
 	    !defined(__PRAGMA_REDEFINE_EXTNAME))
 extern int	mkstemp64();
+extern int	mkstemps64();
 #endif	/* _LARGEFILE64_SOURCE... */
 
 #if defined(__EXTENSIONS__) || !defined(__XOPEN_OR_POSIX) || defined(_XPG4_2)
@@ -320,6 +328,7 @@ extern int getpw();
 extern int isatty();
 extern void *memalign();
 extern char *ttyname();
+extern char *mkdtemp();
 
 #if defined(_LONGLONG_TYPE)
 extern char *lltostr();

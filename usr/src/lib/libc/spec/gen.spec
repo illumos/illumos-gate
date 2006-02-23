@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -1019,7 +1018,7 @@ end
 function	_ftw
 weak		ftw
 version		SUNWprivate_1.1
-end		
+end
 
 function	gconvert
 include		<floatingpoint.h>
@@ -1088,10 +1087,10 @@ version		sparc=SYSVABI_1.3 i386=SYSVABI_1.3 sparcv9=SUNW_0.7  \
 		amd64=SUNW_0.7
 end
 
-function	getextmntent 
+function	getextmntent
 include		<stdio.h>, <sys/mnttab.h>
 declaration	int getextmntent(FILE *fp, struct extmnttab *mp, size_t len)
-version		SUNW_1.20 
+version		SUNW_1.20
 exception	$return != 0
 end
 
@@ -2014,6 +2013,18 @@ auxiliary	sparc=/platform/$PLATFORM/lib/libc_psr.so.1 \
 		sparcv9=/platform/$PLATFORM/lib/sparcv9/libc_psr.so.1
 end
 
+function	mkdtemp
+include		<stdlib.h>
+declaration	char *mkdtemp(char *template)
+version		SUNW_1.22.1
+exception	$return == 0
+end
+
+function	_mkdtemp
+weak		mkdtemp
+version		SUNW_1.22.1
+end
+
 function	mkfifo
 include		<sys/types.h>, <sys/stat.h>
 declaration	int mkfifo(const char *path, mode_t mode)
@@ -2038,6 +2049,18 @@ end
 function        _mkstemp
 weak            mkstemp
 version         SUNW_0.7
+end
+
+function        mkstemps
+include         <stdlib.h>
+declaration     int mkstemps(char *template, int suffixlen)
+version         SUNW_1.22.1
+exception       $return == -1
+end
+
+function        _mkstemps
+weak            mkstemps
+version         SUNW_1.22.1
 end
 
 function	mktemp
@@ -2595,7 +2618,7 @@ function	_readdir
 weak		readdir
 version		sparc=SYSVABI_1.3 i386=SYSVABI_1.3 sparcv9=SUNW_0.7 \
 		amd64=SUNW_0.7
-end		
+end
 
 # NOTE: The declarations of the various versions of readdir_r()
 # in <dirent.h> are hopelessly convoluted, so we can't declare
@@ -2678,7 +2701,7 @@ end
 function	resetmnttab
 include		<stdio.h>, <sys/mnttab.h>
 declaration	void resetmnttab(FILE *fp)
-version		SUNW_1.20 
+version		SUNW_1.20
 end
 
 function	rewind
@@ -4202,7 +4225,7 @@ end
 
 function	priv_set
 include		<priv.h>
-declaration	int priv_set(priv_op_t, priv_ptype_t, ...) 
+declaration	int priv_set(priv_op_t, priv_ptype_t, ...)
 version		SUNW_1.22
 exception	$return != 0
 errno		ENOMEM EPERM EINVAL
@@ -4215,7 +4238,7 @@ end
 
 function	priv_str_to_set
 include		<priv.h>
-declaration	priv_set_t *priv_str_to_set(const char *, const char *, const char **) 
+declaration	priv_set_t *priv_str_to_set(const char *, const char *, const char **)
 version		SUNW_1.22
 exception	$return == 0
 errno		ENOMEM EINVAL
@@ -4261,7 +4284,7 @@ end
 
 function	__priv_getsetbynum
 include		<priv.h>
-declaration	const char *__priv_getsetbynum(int, void *) 
+declaration	const char *__priv_getsetbynum(int, void *)
 version		SUNW_1.22
 exception	$return == 0
 errno		EINVAL
@@ -4273,7 +4296,7 @@ end
 
 function	__priv_getbynum
 include		<priv.h>
-declaration	const char *__priv_getbynum(int, void *) 
+declaration	const char *__priv_getbynum(int, void *)
 version		SUNW_1.22
 exception	$return == 0
 errno		EINVAL
@@ -4281,7 +4304,7 @@ end
 
 function	priv_getbynum
 include		<priv.h>
-declaration	const char *priv_getbynum(int) 
+declaration	const char *priv_getbynum(int)
 version		SUNW_1.22
 exception	$return == 0
 errno		EINVAL
@@ -4294,7 +4317,7 @@ end
 
 function	priv_getsetbynum
 include		<priv.h>
-declaration	const char *priv_getsetbynum(int) 
+declaration	const char *priv_getsetbynum(int)
 version		SUNW_1.22
 exception	$return == 0
 errno		EINVAL
@@ -4307,7 +4330,7 @@ end
 
 function	__priv_getsetbyname
 include		<priv.h>
-declaration	int __priv_getsetbyname(const char *, void *) 
+declaration	int __priv_getsetbyname(const char *, void *)
 version		SUNW_1.22
 exception	$return == -1
 errno		EINVAL
@@ -4315,7 +4338,7 @@ end
 
 function	__priv_getbyname
 include		<priv.h>
-declaration	int __priv_getbyname(const char *, void *) 
+declaration	int __priv_getbyname(const char *, void *)
 version		SUNW_1.22
 exception	$return == -1
 errno		EINVAL
@@ -4323,7 +4346,7 @@ end
 
 function	priv_getbyname
 include		<priv.h>
-declaration	int priv_getbyname(const char *) 
+declaration	int priv_getbyname(const char *)
 version		SUNW_1.22
 exception	$return == -1
 errno		EINVAL
@@ -4336,7 +4359,7 @@ end
 
 function	priv_getsetbyname
 include		<priv.h>
-declaration	int priv_getsetbyname(const char *) 
+declaration	int priv_getsetbyname(const char *)
 version		SUNW_1.22
 exception	$return == -1
 errno		EINVAL
@@ -4349,7 +4372,7 @@ end
 
 function	priv_gettext
 include		<priv.h>
-declaration	char *priv_gettext(const char *) 
+declaration	char *priv_gettext(const char *)
 version		SUNW_1.22
 exception	$return == 0
 end
@@ -4361,7 +4384,7 @@ end
 
 function	priv_allocset
 include		<priv.h>
-declaration	priv_set_t *priv_allocset(void) 
+declaration	priv_set_t *priv_allocset(void)
 version		SUNW_1.22
 exception	$return == 0
 errno		ENOMEM
@@ -4374,7 +4397,7 @@ end
 
 function	priv_freeset
 include		<priv.h>
-declaration	void priv_freeset(priv_set_t *) 
+declaration	void priv_freeset(priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4385,7 +4408,7 @@ end
 
 function	priv_emptyset
 include		<priv.h>
-declaration	void priv_emptyset(priv_set_t *) 
+declaration	void priv_emptyset(priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4396,7 +4419,7 @@ end
 
 function	priv_fillset
 include		<priv.h>
-declaration	void priv_fillset(priv_set_t *) 
+declaration	void priv_fillset(priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4407,7 +4430,7 @@ end
 
 function	priv_isemptyset
 include		<priv.h>
-declaration	boolean_t priv_isemptyset(const priv_set_t *) 
+declaration	boolean_t priv_isemptyset(const priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4418,7 +4441,7 @@ end
 
 function	priv_isfullset
 include		<priv.h>
-declaration	boolean_t priv_isfullset(const priv_set_t *) 
+declaration	boolean_t priv_isfullset(const priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4429,7 +4452,7 @@ end
 
 function	priv_isequalset
 include		<priv.h>
-declaration	boolean_t priv_isequalset(const priv_set_t *, const priv_set_t *) 
+declaration	boolean_t priv_isequalset(const priv_set_t *, const priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4440,7 +4463,7 @@ end
 
 function	priv_issubset
 include		<priv.h>
-declaration	boolean_t priv_issubset(const priv_set_t *, const priv_set_t *) 
+declaration	boolean_t priv_issubset(const priv_set_t *, const priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4451,7 +4474,7 @@ end
 
 function	priv_intersect
 include		<priv.h>
-declaration	void priv_intersect(const priv_set_t *, priv_set_t *) 
+declaration	void priv_intersect(const priv_set_t *, priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4462,7 +4485,7 @@ end
 
 function	priv_union
 include		<priv.h>
-declaration	void priv_union(const priv_set_t *, priv_set_t *) 
+declaration	void priv_union(const priv_set_t *, priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4473,7 +4496,7 @@ end
 
 function	priv_inverse
 include		<priv.h>
-declaration	void priv_inverse(priv_set_t *) 
+declaration	void priv_inverse(priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4484,7 +4507,7 @@ end
 
 function	priv_addset
 include		<priv.h>
-declaration	int priv_addset(priv_set_t *, const char *) 
+declaration	int priv_addset(priv_set_t *, const char *)
 version		SUNW_1.22
 end
 
@@ -4495,7 +4518,7 @@ end
 
 function	priv_delset
 include		<priv.h>
-declaration	int priv_delset(priv_set_t *, const char *) 
+declaration	int priv_delset(priv_set_t *, const char *)
 version		SUNW_1.22
 end
 
@@ -4506,7 +4529,7 @@ end
 
 function	priv_copyset
 include		<priv.h>
-declaration	void priv_copyset(const priv_set_t *, priv_set_t *) 
+declaration	void priv_copyset(const priv_set_t *, priv_set_t *)
 version		SUNW_1.22
 end
 
@@ -4517,7 +4540,7 @@ end
 
 function	priv_ismember
 include		<priv.h>
-declaration	boolean_t priv_ismember(const priv_set_t *, const char *) 
+declaration	boolean_t priv_ismember(const priv_set_t *, const char *)
 version		SUNW_1.22
 end
 
@@ -4528,7 +4551,7 @@ end
 
 function	ucred_get
 include		<ucred.h>
-declaration	ucred_t *ucred_get(pid_t pid) 
+declaration	ucred_t *ucred_get(pid_t pid)
 version		SUNW_1.22
 end
 
@@ -4545,7 +4568,7 @@ end
 
 function	ucred_free
 include		<ucred.h>
-declaration	void ucred_free(ucred_t *) 
+declaration	void ucred_free(ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4556,7 +4579,7 @@ end
 
 function	ucred_geteuid
 include		<ucred.h>
-declaration	uid_t ucred_geteuid(const ucred_t *) 
+declaration	uid_t ucred_geteuid(const ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4567,7 +4590,7 @@ end
 
 function	ucred_getruid
 include		<ucred.h>
-declaration	uid_t ucred_getruid(const ucred_t *) 
+declaration	uid_t ucred_getruid(const ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4578,7 +4601,7 @@ end
 
 function	ucred_getsuid
 include		<ucred.h>
-declaration	uid_t ucred_getsuid(const ucred_t *) 
+declaration	uid_t ucred_getsuid(const ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4589,7 +4612,7 @@ end
 
 function	ucred_getegid
 include		<ucred.h>
-declaration	gid_t ucred_getegid(const ucred_t *) 
+declaration	gid_t ucred_getegid(const ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4600,7 +4623,7 @@ end
 
 function	ucred_getrgid
 include		<ucred.h>
-declaration	gid_t ucred_getrgid(const ucred_t *) 
+declaration	gid_t ucred_getrgid(const ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4611,7 +4634,7 @@ end
 
 function	ucred_getsgid
 include		<ucred.h>
-declaration	gid_t ucred_getsgid(const ucred_t *) 
+declaration	gid_t ucred_getsgid(const ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4622,7 +4645,7 @@ end
 
 function	ucred_getgroups
 include		<ucred.h>
-declaration	int ucred_getgroups(const ucred_t *, const gid_t **) 
+declaration	int ucred_getgroups(const ucred_t *, const gid_t **)
 version		SUNW_1.22
 end
 
@@ -4633,7 +4656,7 @@ end
 
 function	ucred_getprivset
 include		<ucred.h>
-declaration	const priv_set_t *ucred_getprivset(const ucred_t *, priv_ptype_t) 
+declaration	const priv_set_t *ucred_getprivset(const ucred_t *, priv_ptype_t)
 version		SUNW_1.22
 end
 
@@ -4644,7 +4667,7 @@ end
 
 function	ucred_getpid
 include		<ucred.h>
-declaration	pid_t ucred_getpid(const ucred_t *) 
+declaration	pid_t ucred_getpid(const ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4655,7 +4678,7 @@ end
 
 function	ucred_getprojid
 include		<ucred.h>
-declaration	projid_t ucred_getprojid(const ucred_t *) 
+declaration	projid_t ucred_getprojid(const ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4666,7 +4689,7 @@ end
 
 function	ucred_getzoneid
 include		<ucred.h>
-declaration	zoneid_t ucred_getzoneid(const ucred_t *) 
+declaration	zoneid_t ucred_getzoneid(const ucred_t *)
 version		SUNW_1.22
 end
 
@@ -4677,7 +4700,7 @@ end
 
 function	ucred_getpflags
 include		<ucred.h>
-declaration	uint_t ucred_getpflags(const ucred_t *, uint_t) 
+declaration	uint_t ucred_getpflags(const ucred_t *, uint_t)
 version		SUNW_1.22
 end
 
@@ -4686,7 +4709,7 @@ weak		ucred_getpflags
 version		SUNW_1.22
 end
 
-function	zonept	
+function	zonept
 include		<stdlib.h> <sys/zone.h>
 declaration	int zonept(int filedes, zoneid_t zoneid)
 version		SUNWprivate_1.1
@@ -4834,7 +4857,7 @@ end
 
 function	ucred_getauid
 include		<ucred.h>, <bsm/audit.h>
-declaration	au_id_t ucred_getauid(const ucred_t *) 
+declaration	au_id_t ucred_getauid(const ucred_t *)
 version		SUNWprivate_1.1
 end
 
@@ -4845,7 +4868,7 @@ end
 
 function	ucred_getasid
 include		<ucred.h>, <bsm/audit.h>
-declaration	au_asid_t ucred_getasid(const ucred_t *) 
+declaration	au_asid_t ucred_getasid(const ucred_t *)
 version		SUNWprivate_1.1
 end
 
@@ -4856,7 +4879,7 @@ end
 
 function	ucred_getamask
 include		<ucred.h>, <bsm/audit.h>
-declaration	const au_mask_t *ucred_getamask(const ucred_t *) 
+declaration	const au_mask_t *ucred_getamask(const ucred_t *)
 version		SUNWprivate_1.1
 end
 
@@ -4867,7 +4890,7 @@ end
 
 function	ucred_getatid
 include		<ucred.h>, <bsm/audit.h>
-declaration	const au_tid64_addr_t *ucred_getatid(const ucred_t *) 
+declaration	const au_tid64_addr_t *ucred_getatid(const ucred_t *)
 version		SUNWprivate_1.1
 end
 

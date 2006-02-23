@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  *
  * Copyright (c) 1983, 1984, 1985, 1986, 1987, 1988, 1989 AT&T
@@ -37,9 +36,13 @@
 
 #if !defined(_LP64) && _FILE_OFFSET_BITS == 64
 #pragma weak mkstemp64 = _mkstemp64
+#pragma weak mkstemps64 = _mkstemps64
 #define	_mkstemp	_mkstemp64
+#define	_mkstemps	_mkstemps64
+#define	libc_mkstemps	libc_mkstemps64		/* prefer unique statics */
 #else
 #pragma weak mkstemp = _mkstemp
+#pragma weak mkstemps = _mkstemps
 #endif
 
 #include "synonyms.h"
@@ -52,20 +55,26 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+extern char *libc_mktemps(char *, int);
 
-int
-_mkstemp(char *as)
+static int
+libc_mkstemps(char *as, int slen)
 {
 	int	fd;
+	int	len;
 	char	*tstr, *str, *mkret;
 
 	if (as == NULL || *as == NULL)
 		return (-1);
 
-	tstr = alloca(strlen(as) + 1);
+	len = (int)strlen(as);
+	tstr = alloca(len + 1);
 	(void) strcpy(tstr, as);
 
-	str = tstr + (strlen(tstr) - 1);
+	if (slen < 0 || slen >= len)
+		return (-1);
+
+	str = tstr + (len - 1 - slen);
 
 	/*
 	 * The following for() loop is doing work.  mktemp() will generate
@@ -75,7 +84,7 @@ _mkstemp(char *as)
 
 	for (; ; ) {
 		if (*str == 'X') { /* If no trailing X's don't call mktemp. */
-			mkret = mktemp(as);
+			mkret = libc_mktemps(as, slen);
 			if (*mkret == '\0') {
 				return (-1);
 			}
@@ -101,4 +110,16 @@ _mkstemp(char *as)
 		}
 		(void) strcpy(as, tstr);
 	}
+}
+
+int
+_mkstemp(char *as)
+{
+	return (libc_mkstemps(as, 0));
+}
+
+int
+_mkstemps(char *as, int slen)
+{
+	return (libc_mkstemps(as, slen));
 }
