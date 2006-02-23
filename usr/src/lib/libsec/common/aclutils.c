@@ -1433,6 +1433,7 @@ convert_ace_to_aent(ace_t *acebufp, int acecnt, int isdir,
 	return (error);
 }
 
+static int
 cacl_get(acl_inp inp, int get_flag, int type, acl_t **aclp)
 {
 	const char *fname;
