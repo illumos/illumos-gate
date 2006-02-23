@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1279,11 +1278,27 @@ common_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 		ASSERT(ctx == NULL);
 		switch (optype) {
 		case KCF_OP_SESSION_OPEN:
+			/*
+			 * so_pd may be a logical provider, in which case
+			 * we need to check whether it has been removed.
+			 */
+			if (KCF_IS_PROV_REMOVED(sops->so_pd)) {
+				err = CRYPTO_DEVICE_ERROR;
+				break;
+			}
 			err = KCF_PROV_SESSION_OPEN(pd, sops->so_sid_ptr,
 			    rhndl, sops->so_pd);
 			break;
 
 		case KCF_OP_SESSION_CLOSE:
+			/*
+			 * so_pd may be a logical provider, in which case
+			 * we need to check whether it has been removed.
+			 */
+			if (KCF_IS_PROV_REMOVED(sops->so_pd)) {
+				err = CRYPTO_DEVICE_ERROR;
+				break;
+			}
 			err = KCF_PROV_SESSION_CLOSE(pd, sops->so_sid,
 			    rhndl, sops->so_pd);
 			break;
@@ -1373,6 +1388,14 @@ common_submit_request(kcf_provider_desc_t *pd, crypto_ctx_t *ctx,
 		ASSERT(ctx == NULL);
 		switch (optype) {
 		case KCF_OP_MGMT_EXTINFO:
+			/*
+			 * po_pd may be a logical provider, in which case
+			 * we need to check whether it has been removed.
+			 */
+			if (KCF_IS_PROV_REMOVED(pops->po_pd)) {
+				err = CRYPTO_DEVICE_ERROR;
+				break;
+			}
 			err = KCF_PROV_EXT_INFO(pd, pops->po_ext_info, rhndl,
 			    pops->po_pd);
 			break;
