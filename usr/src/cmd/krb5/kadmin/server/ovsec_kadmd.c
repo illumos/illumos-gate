@@ -73,6 +73,7 @@ void kadm_svc_run(void);
 void setup_signal_handlers(iprop_role iproprole);
 void sig_exit(int);
 void sig_pipe(int);
+krb5_error_code log_kt_error(char*, char*);
 
 #ifdef POSIX_SIGNALS
 static struct sigaction s_action;
@@ -725,6 +726,17 @@ main(int argc, char *argv[])
 	 */
 	krb5_overridekeyname = params.admin_keytab;
 
+	/* Solaris Kerberos:
+	 * The only service principals which matter here are
+	 *  -> names[0].name (kadmin/<fqdn>)
+	 *  -> names[1].name (changepw/<fqdn>)
+	 * KADM5_ADMIN_SERVICE_P, KADM5_CHANGEPW_SERVICE_P,
+	 * OVSEC_KADM_ADMIN_SERVICE_P, OVSEC_KADM_CHANGEPW_SERVICE_P
+	 * are all legacy service princs and calls to rpc_gss_set_svc_name()
+	 * using these principals will always fail as they are not host
+	 * based principals.
+	 */
+
 	(void) kadm5_get_adm_host_srv_name(context,
 					   params.realm, &names[0].name);
 	(void) kadm5_get_cpw_host_srv_name(context,
@@ -765,12 +777,21 @@ main(int argc, char *argv[])
 	if (rpc_gss_set_svc_name(names[2].name,
 				"kerberos_v5", 0, KADM, KADMVERS))
 		oldnames++;
+
+    /* If rpc_gss_set_svc_name() fails for either kadmin/<fqdn> or
+     * for changepw/<fqdn> then try to determine if this is caused
+     * by a missing keytab file or entry. If so, log it and continue.
+     */
 	if (rpc_gss_set_svc_name(names[0].name,
 				"kerberos_v5", 0, KADM, KADMVERS))
 		oldnames++;
+	else
+		log_kt_error(names[0].name, whoami);
 	if (rpc_gss_set_svc_name(names[1].name,
 				"kerberos_v5", 0, KADM, KADMVERS))
 		oldnames++;
+	else
+		log_kt_error(names[1].name, whoami);
 
 	retdn = getdomnames(context, params.realm, &dnames);
 	if (retdn == 0 && dnames) {
@@ -885,10 +906,13 @@ main(int argc, char *argv[])
 			rpc_gss_error_t err;
 			(void) rpc_gss_get_error(&err);
 
+		/* Try to determine if the error was caused by a missing keytab or
+		 * missing keytab entries (and log it).
+		 */
+			log_kt_error(kiprop_name, whoami);
 			krb5_klog_syslog(LOG_ERR,
     gettext("Unable to set RPCSEC_GSS service name (`%s'), failing."),
 					kiprop_name ? kiprop_name : "<null>");
-
 			fprintf(stderr,
     gettext("%s: Unable to set RPCSEC_GSS service name (`%s'), failing.\n"),
 				whoami,
@@ -1085,3 +1109,95 @@ sig_pipe(int unused)
 	krb5_klog_syslog(LOG_NOTICE, gettext("Warning: Received a SIGPIPE; "
 		"probably a client aborted.  Continuing."));
 }
+
+
+/*
+ * Given a service name (s_name) determine if the keytab file exists
+ * and if the keytab entry is present. Log missing keytab
+ * at LOG_ERR and log missing keytab entries at LOG_WARNING.
+ * If any of krb5_* (or strdup) fail it will return the failure. 
+ */
+krb5_error_code log_kt_error(char *s_name, char *whoami) {
+	krb5_keytab kt;
+	krb5_principal princ;
+	krb5_keytab_entry entry;
+	krb5_error_code	code = 0;
+	char kt_name[MAX_KEYTAB_NAME_LEN];
+	char *service;
+	char *host;
+
+	service = strdup(s_name);
+	if(!service)
+		return ENOMEM;
+
+	host = strchr(service, '@');
+	*host++ = '\0';
+	if (code = krb5_sname_to_principal(context, host,
+				service, KRB5_NT_SRV_HST, &princ)) {
+		krb5_klog_syslog(LOG_ERR,
+				gettext("krb5_sname_to_principal failed: %s"),
+				error_message(code));
+		fprintf(stderr,
+				gettext("%s: krb5_sname_to_principal failed: %s"),
+				whoami, error_message(code));
+		free(service);
+		return code;
+	} 
+
+	if (code = krb5_kt_default_name(context, kt_name, sizeof (kt_name))) {
+		krb5_klog_syslog(LOG_ERR,
+				gettext("krb5_kt_default_name failed: %s"),
+				error_message(code));
+		fprintf(stderr,
+				gettext("%s: krb5_kt_default_name failed: %s"),
+				whoami, error_message(code));
+		krb5_free_principal(context, princ);
+		free(service);
+		return code;
+	}
+
+	if (code = krb5_kt_default(context, &kt)) {
+		krb5_klog_syslog(LOG_ERR,
+				gettext("krb5_kt_default failed: %s"),
+				error_message(code));
+		fprintf(stderr,
+				gettext("%s: krb5_kt_default failed: %s"),
+				whoami, error_message(code));
+		krb5_free_principal(context, princ);
+		free(service);
+		return code;
+	} 
+
+	code = krb5_kt_get_entry(context, kt, princ, 0, 0, &entry);
+
+	switch (code) {
+		case 0:
+			krb5_kt_free_entry(context, &entry);
+			break;
+		case KRB5_KT_NOTFOUND:
+			krb5_klog_syslog(LOG_WARNING,
+					gettext("Keytab entry \"%s/%s\" is missing from \"%s\""),
+					service, host,
+					kt_name);
+			fprintf(stderr,
+					gettext("%s: Keytab entry \"%s/%s\" is missing from \"%s\".\n"),
+					whoami,
+					service, host,
+					kt_name);
+			break;
+		case ENOENT:
+			krb5_klog_syslog(LOG_ERR,
+					gettext("Keytab file \"%s\" does not exist"),
+					kt_name);
+			fprintf(stderr,
+					gettext("%s: Keytab file \"%s\" does not exist.\n"),
+					whoami,
+					kt_name);
+			break;
+	}
+	krb5_kt_close(context,kt);
+	krb5_free_principal(context, princ);
+	free(service);
+	return code;
+}
+

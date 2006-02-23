@@ -1,5 +1,5 @@
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -139,6 +139,10 @@ process_chpw_request(krb5_context context, void *server_handle,
 	ptr += ap_req.length;
 
 	if (ret = krb5_auth_con_init(context, &auth_context)) {
+		krb5_klog_syslog(LOG_ERR,
+				gettext("Change password request failed. "
+						"Failed initializing auth context: %s"),
+				error_message(ret));
 		numresult = KRB5_KPASSWD_HARDERROR;
 		(void) strlcpy(strresult, "Failed initializing auth context",
 					sizeof (strresult));
@@ -147,6 +151,11 @@ process_chpw_request(krb5_context context, void *server_handle,
 
 	if (ret = krb5_auth_con_setflags(context, auth_context,
 					KRB5_AUTH_CONTEXT_DO_SEQUENCE)) {
+		krb5_klog_syslog(LOG_ERR,
+				gettext("Change password request failed. "
+						"Failed setting auth "
+					    "context flags: %s"),
+				error_message(ret));
 		numresult = KRB5_KPASSWD_HARDERROR;
 		(void) strlcpy(strresult, "Failed initializing auth context",
 					sizeof (strresult));
@@ -155,6 +164,11 @@ process_chpw_request(krb5_context context, void *server_handle,
 
 	if (ret = krb5_build_principal(context, &changepw, strlen(realm), realm,
 				    "kadmin", "changepw", NULL)) {
+		krb5_klog_syslog(LOG_ERR,
+			gettext("Change password request failed "
+					"Failed to build kadmin/changepw "
+					"principal: %s"),
+			error_message(ret));
 		numresult = KRB5_KPASSWD_HARDERROR;
 		(void) strlcpy(strresult,
 				"Failed building kadmin/changepw principal",
@@ -166,6 +180,32 @@ process_chpw_request(krb5_context context, void *server_handle,
 			NULL, &ticket);
 
 	if (ret) {
+		char kt_name[MAX_KEYTAB_NAME_LEN];
+		if (krb5_kt_get_name(context, keytab,
+				kt_name, sizeof (kt_name)))
+			strncpy(kt_name, "default keytab", sizeof (kt_name));
+
+		switch (ret) {
+		case KRB5_KT_NOTFOUND:
+		krb5_klog_syslog(LOG_ERR,
+			gettext("Change password request failed because "
+					"keytab entry \"kadmin/changepw\" "
+					"is missing from \"%s\""),
+			kt_name);
+		break;
+		case ENOENT:
+		krb5_klog_syslog(LOG_ERR,
+			gettext("Change password request failed because "
+					"keytab file \"%s\" does not exist"),
+			kt_name);
+		break;
+		default:
+		krb5_klog_syslog(LOG_ERR,
+			gettext("Change password request failed. "
+					"Failed to parse Kerberos AP_REQ message: %s"),
+			error_message(ret));
+		}
+
 		numresult = KRB5_KPASSWD_AUTHERROR;
 		(void) strlcpy(strresult, "Failed reading application request",
 					sizeof (strresult));

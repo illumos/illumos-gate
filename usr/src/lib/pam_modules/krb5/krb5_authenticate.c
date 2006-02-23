@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -594,6 +593,10 @@ attempt_krb5_auth(
 		if (verify_tik) {
 			krb5_verify_init_creds_opt vopts;
 
+			krb5_principal sp = NULL;
+			char kt_name[MAX_KEYTAB_NAME_LEN];
+			char *fqdn;
+
 			krb5_verify_init_creds_opt_init(&vopts);
 
 			code = krb5_verify_init_creds(kmd->kcontext,
@@ -617,11 +620,53 @@ attempt_krb5_auth(
 					    krb5_auth_messages, NULL);
 				}
 
-				syslog(LOG_ERR,
+		/*
+		 * Give a better error message when the keytable entry isn't
+		 * found or the keytab file cannot be found
+		 */
+				if (krb5_sname_to_principal(kmd->kcontext, NULL,
+						NULL, KRB5_NT_SRV_HST, &sp))
+					fqdn = "<fqdn>";
+				else
+					fqdn = sp->data[1].data;
+
+				if (krb5_kt_default_name(kmd->kcontext, kt_name,
+							sizeof (kt_name)))
+					(void) strncpy(kt_name,
+						"default keytab",
+						sizeof (kt_name));
+
+				switch (code) {
+				case KRB5_KT_NOTFOUND:
+					syslog(LOG_ERR,
 					dgettext(TEXT_DOMAIN,
-					"PAM-KRB5 (auth): "
-					"krb5_verify_init_creds failed: %s"),
-					error_message(code));
+						"PAM-KRB5 (auth): "
+						"krb5_verify_init_creds failed:"
+						" Key table entry \"host/%s\""
+						" not found in %s"),
+						fqdn, kt_name);
+					break;
+				case ENOENT:
+					syslog(LOG_ERR,
+					dgettext(TEXT_DOMAIN,
+						"PAM-KRB5 (auth): "
+						"krb5_verify_init_creds failed:"
+						" Keytab file \"%s\""
+						" does not exist.\n"),
+						kt_name);
+					break;
+				default:
+					syslog(LOG_ERR,
+					dgettext(TEXT_DOMAIN,
+						"PAM-KRB5 (auth): "
+						"krb5_verify_init_creds failed:"
+						" %s"),
+						error_message(code));
+					break;
+				}
+
+				if (sp)
+					krb5_free_principal(kmd->kcontext, sp);
 			}
 		}
 		break;
