@@ -2776,7 +2776,6 @@ zfs_putapage(vnode_t *vp, page_t *pp, u_offset_t *offp,
 	znode_t		*zp = VTOZ(vp);
 	zfsvfs_t	*zfsvfs = zp->z_zfsvfs;
 	zilog_t		*zilog = zfsvfs->z_log;
-	uint64_t	seq = 0;
 	dmu_tx_t	*tx;
 	u_offset_t	off;
 	ssize_t		len;
@@ -2810,7 +2809,7 @@ top:
 	ppmapout(va);
 
 	zfs_time_stamper(zp, CONTENT_MODIFIED, tx);
-	seq = zfs_log_write(zilog, tx, TX_WRITE, zp, off, len, 0, NULL);
+	(void) zfs_log_write(zilog, tx, TX_WRITE, zp, off, len, 0, NULL);
 	dmu_tx_commit(tx);
 
 	rw_exit(&zp->z_grow_lock);
@@ -2821,7 +2820,6 @@ top:
 	if (lenp)
 		*lenp = len;
 
-	zil_commit(zilog, seq, (flags & B_ASYNC) ? 0 : FDSYNC);
 out:
 	return (err);
 }
@@ -2862,8 +2860,7 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 		 */
 		error = pvn_vplist_dirty(vp, (u_offset_t)off, zfs_putapage,
 		    flags, cr);
-		ZFS_EXIT(zfsvfs);
-		return (error);
+		goto out;
 	}
 
 	if (off > zp->z_phys->zp_size) {
@@ -2874,8 +2871,7 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 
 	len = MIN(len, zp->z_phys->zp_size - off);
 
-	io_off = off;
-	while (io_off < off + len) {
+	for (io_off = off; io_off < off + len; io_off += io_len) {
 		if ((flags & B_INVAL) || ((flags & B_ASYNC) == 0)) {
 			pp  = page_lookup(vp, io_off,
 				(flags & (B_INVAL | B_FREE)) ?
@@ -2897,8 +2893,9 @@ zfs_putpage(vnode_t *vp, offset_t off, size_t len, int flags, cred_t *cr)
 		} else {
 			io_len = PAGESIZE;
 		}
-		io_off += io_len;
 	}
+out:
+	zil_commit(zfsvfs->z_log, UINT64_MAX, (flags & B_ASYNC) ? 0 : FDSYNC);
 	ZFS_EXIT(zfsvfs);
 	return (error);
 }
