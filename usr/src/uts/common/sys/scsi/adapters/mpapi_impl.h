@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -93,17 +93,25 @@ typedef struct mp_driver_prop {
 #define	MP_DRVR_AUTO_FAILBACK_SUPPORT_LU		(1<<1)
 
 
-/* Constants for defaultLoadBalanceType */
 
-#define	MP_DRVR_LOAD_BALANCE_TYPE_UNKNOWN		0
-#define	MP_DRVR_LOAD_BALANCE_TYPE_ROUNDROBIN		(1<<0)
-#define	MP_DRVR_LOAD_BALANCE_TYPE_LEASTBLOCKS		(1<<1)
-#define	MP_DRVR_LOAD_BALANCE_TYPE_LEASTIO		(1<<2)
-#define	MP_DRVR_LOAD_BALANCE_TYPE_DEVICE_PRODUCT	(1<<3)
-#define	MP_DRVR_LOAD_BALANCE_TYPE_LBA_REGION		(1<<4)
+/*
+ * Declaration of the MP_LOAD_BALANCE_TYPE constants - should be
+ * the same defines as in mpapi.h
+ */
+#define	MP_DRVR_LOAD_BALANCE_TYPE_NONE			0
+#define	MP_DRVR_LOAD_BALANCE_TYPE_UNKNOWN		(1<<0)
+#define	MP_DRVR_LOAD_BALANCE_TYPE_ROUNDROBIN		(1<<1)
+#define	MP_DRVR_LOAD_BALANCE_TYPE_LEASTBLOCKS		(1<<2)
+#define	MP_DRVR_LOAD_BALANCE_TYPE_LEASTIO		(1<<3)
+#define	MP_DRVR_LOAD_BALANCE_TYPE_DEVICE_PRODUCT	(1<<4)
+#define	MP_DRVR_LOAD_BALANCE_TYPE_LBA_REGION		(1<<5)
+#define	MP_DRVR_LOAD_BALANCE_TYPE_FAILOVER_ONLY		(1<<6)
+/*
+ * Proprietary load balance type should start from 0x10000(1<<16) or greater.
+ * It is exposed through API MP_GetProprietaryLoadBalanceProperties if exists.
+ */
 #define	MP_DRVR_LOAD_BALANCE_TYPE_PROPRIETARY1		(1<<16)
 #define	MP_DRVR_LOAD_BALANCE_TYPE_PROPRIETARY2		(1<<17)
-
 
 /* Constants for autoProbingSupport */
 
