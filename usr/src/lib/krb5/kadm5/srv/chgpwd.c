@@ -141,7 +141,7 @@ process_chpw_request(krb5_context context, void *server_handle,
 	if (ret = krb5_auth_con_init(context, &auth_context)) {
 		krb5_klog_syslog(LOG_ERR,
 				gettext("Change password request failed. "
-						"Failed initializing auth context: %s"),
+					"Failed initializing auth context: %s"),
 				error_message(ret));
 		numresult = KRB5_KPASSWD_HARDERROR;
 		(void) strlcpy(strresult, "Failed initializing auth context",
@@ -202,7 +202,7 @@ process_chpw_request(krb5_context context, void *server_handle,
 		default:
 		krb5_klog_syslog(LOG_ERR,
 			gettext("Change password request failed. "
-					"Failed to parse Kerberos AP_REQ message: %s"),
+				"Failed to parse Kerberos AP_REQ message: %s"),
 			error_message(ret));
 		}
 
