@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -53,6 +52,7 @@
 #include <sys/dmu.h>
 #include <sys/atomic.h>
 #include <sys/zfs_ctldir.h>
+#include <sys/dnlc.h>
 
 /*
  * Lock a directory entry.  A dirlock on <dzp, name> protects that name
@@ -84,6 +84,7 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 	zfs_dirlock_t	*dl;
 	uint64_t	zoid;
 	int		error;
+	vnode_t		*vp;
 
 	*zpp = NULL;
 	*dlpp = NULL;
@@ -153,7 +154,25 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 		zoid = dzp->z_phys->zp_xattr;
 		error = (zoid == 0 ? ENOENT : 0);
 	} else {
-		error = zap_lookup(zfsvfs->z_os, dzp->z_id, name, 8, 1, &zoid);
+		vp = dnlc_lookup(ZTOV(dzp), name);
+		if (vp == DNLC_NO_VNODE) {
+			VN_RELE(vp);
+			error = ENOENT;
+		} else if (vp) {
+			if (flag & ZNEW) {
+				zfs_dirent_unlock(dl);
+				VN_RELE(vp);
+				return (EEXIST);
+			}
+			*dlpp = dl;
+			*zpp = VTOZ(vp);
+			return (0);
+		} else {
+			error = zap_lookup(zfsvfs->z_os, dzp->z_id, name,
+			    8, 1, &zoid);
+			if (error == ENOENT)
+				dnlc_update(ZTOV(dzp), name, DNLC_NO_VNODE);
+		}
 	}
 	if (error) {
 		if (error != ENOENT || (flag & ZEXISTS)) {
@@ -170,6 +189,8 @@ zfs_dirent_lock(zfs_dirlock_t **dlpp, znode_t *dzp, char *name, znode_t **zpp,
 			zfs_dirent_unlock(dl);
 			return (error);
 		}
+		if (!(flag & ZXATTR))
+			dnlc_update(ZTOV(dzp), name, ZTOV(*zpp));
 	}
 
 	*dlpp = dl;
@@ -645,6 +666,8 @@ zfs_link_create(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag)
 	    8, 1, &zp->z_id, tx);
 	ASSERT(error == 0);
 
+	dnlc_update(ZTOV(dzp), dl->dl_name, vp);
+
 	return (0);
 }
 
@@ -664,6 +687,8 @@ zfs_link_destroy(zfs_dirlock_t *dl, znode_t *zp, dmu_tx_t *tx, int flag,
 	int zp_is_dir = (vp->v_type == VDIR);
 	int reaped = 0;
 	int error;
+
+	dnlc_remove(ZTOV(dzp), dl->dl_name);
 
 	if (!(flag & ZRENAMING)) {
 		dmu_buf_will_dirty(zp->z_dbuf, tx);

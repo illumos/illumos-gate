@@ -129,14 +129,19 @@ static int nc_hashmask;		/* size of hash table minus 1 */
 
 /*
  * The dnlc_reduce_cache() taskq queue is activated when there are
- * ncsize name cache entries and it reduces the size down to
- * dnlc_nentries_low_water, which is by default one hundreth
- * less (or 99%) of ncsize.
+ * ncsize name cache entries and if no parameter is provided, it reduces
+ * the size down to dnlc_nentries_low_water, which is by default one
+ * hundreth less (or 99%) of ncsize.
+ *
+ * If a parameter is provided to dnlc_reduce_cache(), then we reduce
+ * the size down based on ncsize_onepercent - where ncsize_onepercent
+ * is 1% of ncsize.
  */
 #define	DNLC_LOW_WATER_DIVISOR_DEFAULT 100
 uint_t dnlc_low_water_divisor = DNLC_LOW_WATER_DIVISOR_DEFAULT;
 uint_t dnlc_nentries_low_water;
 int dnlc_reduce_idle = 1; /* no locking needed */
+uint_t ncsize_onepercent;
 
 /*
  * If dnlc_nentries hits dnlc_max_nentries (twice ncsize)
@@ -296,7 +301,6 @@ static dchead_t dc_head; /* anchor of cached directories */
 /* Prototypes */
 static ncache_t *dnlc_get(uchar_t namlen);
 static ncache_t *dnlc_search(vnode_t *dp, char *name, uchar_t namlen, int hash);
-static void dnlc_reduce_cache(void *unused);
 static void dnlc_dir_reclaim(void *unused);
 static void dnlc_dir_abort(dircache_t *dcp);
 static void dnlc_dir_adjust_fhash(dircache_t *dcp);
@@ -334,6 +338,7 @@ dnlc_init()
 		return;
 	}
 	dnlc_max_nentries = ncsize * 2;
+	ncsize_onepercent = ncsize / 100;
 
 	/*
 	 * Initialise the hash table.
@@ -994,16 +999,31 @@ dnlc_get(uchar_t namlen)
 
 /*
  * Taskq routine to free up name cache entries to reduce the
- * cache size to the low water mark.
+ * cache size to the low water mark if "reduce_percent" is not provided.
+ * If "reduce_percent" is provided, reduce cache size by
+ * (ncsize_onepercent * reduce_percent).
+ *
+ * This routine can also be called directly by ZFS's ARC when memory is low.
  */
 /*ARGSUSED*/
-static void
-dnlc_reduce_cache(void *unused)
+void
+dnlc_reduce_cache(void *reduce_percent)
 {
 	nc_hash_t *hp = dnlc_free_rotor;
 	vnode_t *vp;
 	ncache_t *ncp;
 	int cnt;
+	uint_t low_water = dnlc_nentries_low_water;
+
+	if (reduce_percent) {
+		uint_t reduce_cnt;
+
+		reduce_cnt = ncsize_onepercent * (uint_t)reduce_percent;
+		if (reduce_cnt > dnlc_nentries)
+			low_water = 0;
+		else
+			low_water = dnlc_nentries - reduce_cnt;
+	}
 
 	do {
 		/*
@@ -1014,7 +1034,7 @@ dnlc_reduce_cache(void *unused)
 		do {
 			if (++hp == &nc_hash[nc_hashsz]) {
 				hp = nc_hash;
-				if (dnlc_nentries < dnlc_nentries_low_water) {
+				if (dnlc_nentries <= low_water) {
 					dnlc_reduce_idle = 1;
 					return;
 				}
@@ -1064,7 +1084,7 @@ found:
 		VN_RELE(vp);
 		VN_RELE(ncp->dp);
 		dnlc_free(ncp);
-	} while (dnlc_nentries > dnlc_nentries_low_water);
+	} while (dnlc_nentries > low_water);
 
 	dnlc_free_rotor = hp;
 	dnlc_reduce_idle = 1;

@@ -65,6 +65,7 @@
 #include <sys/filio.h>
 #include "fs/fs_subr.h"
 #include <sys/zfs_ctldir.h>
+#include <sys/dnlc.h>
 
 /*
  * Programming rules.
@@ -1249,6 +1250,8 @@ top:
 	}
 
 	vnevent_remove(vp);
+
+	dnlc_remove(dvp, name);
 
 	mutex_enter(&vp->v_lock);
 	may_delete_now = vp->v_count == 1 && !vn_has_cached_data(vp);
