@@ -295,6 +295,17 @@ extern void *long_mode_64(void);
 	cp->cpu_dispatch_pri = DISP_PRIO(tp);
 
 	/*
+	 * cpu_base_spl must be set explicitly here to prevent any blocking
+	 * operations in mp_startup from causing the spl of the cpu to drop
+	 * to 0 (allowing device interrupts before we're ready) in resume().
+	 * cpu_base_spl MUST remain at LOCK_LEVEL until the cpu is CPU_READY.
+	 * As an extra bit of security on DEBUG kernels, this is enforced with
+	 * an assertion in mp_startup() -- before cpu_base_spl is set to its
+	 * proper value.
+	 */
+	cp->cpu_base_spl = ipltospl(LOCK_LEVEL);
+
+	/*
 	 * Now, initialize per-CPU idle thread for this CPU.
 	 */
 	tp = thread_create(NULL, PAGESIZE, idle, NULL, 0, procp, TS_ONPROC, -1);
@@ -1002,7 +1013,7 @@ mp_cpu_unconfigure(int cpuid)
 
 /*
  * Startup function for 'other' CPUs (besides boot cpu).
- * Resumed from cpu_startup.
+ * Called from real_mode_start (after *ap_mlsetup).
  *
  * WARNING: until CPU_READY is set, mp_startup and routines called by
  * mp_startup should not call routines (e.g. kmem_free) that could call
@@ -1093,6 +1104,10 @@ mp_startup(void)
 	mutex_exit(&cpu_lock);
 
 	add_cpunode2devtree(cp->cpu_id, cp->cpu_m.mcpu_cpi);
+
+	/* The base spl should still be at LOCK LEVEL here */
+	ASSERT(cp->cpu_base_spl == ipltospl(LOCK_LEVEL));
+	set_base_spl();		/* Restore the spl to its proper value */
 
 	(void) spl0();				/* enable interrupts */
 
