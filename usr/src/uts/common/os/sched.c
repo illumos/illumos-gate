@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -583,10 +582,6 @@ top:
 			    tp->t_swap, stack_size, F_SOFTLOCK, S_OTHER);
 			rw_exit(&kas.a_lock);
 
-#ifdef __sparc
-			lwp_swapin(tp);
-#endif /* __sparc */
-
 			/*
 			 * Re-acquire the p_lock.
 			 */
@@ -595,6 +590,9 @@ top:
 				num_swapped_in = 0;
 				break;
 			} else {
+#ifdef __sparc
+				lwp_swapin(tp);
+#endif /* __sparc */
 				CPU_STATS_ADDQ(cpup, vm, swapin, 1);
 				CPU_STATS_ADDQ(cpup, vm, pgswapin,
 				    stack_pages);
