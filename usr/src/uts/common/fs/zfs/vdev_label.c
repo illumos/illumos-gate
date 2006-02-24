@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -250,6 +249,16 @@ vdev_config_generate(vdev_t *vd, int getstats)
 			nvlist_free(child[c]);
 
 		kmem_free(child, vd->vdev_children * sizeof (nvlist_t *));
+
+	} else {
+		if (!vd->vdev_tmpoffline) {
+		    if (vd->vdev_offline)
+			VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_OFFLINE,
+				B_TRUE) == 0);
+		    else
+			(void) nvlist_remove(nv, ZPOOL_CONFIG_OFFLINE,
+				DATA_TYPE_UINT64);
+		}
 	}
 
 	return (nv);

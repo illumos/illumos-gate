@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -861,7 +860,7 @@ zpool_vdev_online(zpool_handle_t *zhp, const char *path)
  * Take the specified vdev offline
  */
 int
-zpool_vdev_offline(zpool_handle_t *zhp, const char *path)
+zpool_vdev_offline(zpool_handle_t *zhp, const char *path, int istmp)
 {
 	zfs_cmd_t zc = { 0 };
 	char msg[1024];
@@ -869,6 +868,8 @@ zpool_vdev_offline(zpool_handle_t *zhp, const char *path)
 	(void) strlcpy(zc.zc_name, zhp->zpool_name, sizeof (zc.zc_name));
 	(void) snprintf(zc.zc_prop_value, sizeof (zc.zc_prop_value),
 	    "%s%s", path[0] == '/' ? "" : "/dev/dsk/", path);
+
+	zc.zc_cookie = istmp;
 
 	if (ioctl(zfs_fd, ZFS_IOC_VDEV_OFFLINE, &zc) == 0)
 		return (0);

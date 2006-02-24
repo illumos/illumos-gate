@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -175,9 +174,9 @@ get_usage(zpool_help_t idx) {
 		return (gettext("\tlist [-H] [-o field[,field]*] "
 		    "[pool] ...\n"));
 	case HELP_OFFLINE:
-		return (gettext("\toffline <pool> <device>\n"));
+		return (gettext("\toffline [-t] <pool> <device> ...\n"));
 	case HELP_ONLINE:
-		return (gettext("\tonline <pool> <device>\n"));
+		return (gettext("\tonline <pool> <device> ...\n"));
 	case HELP_REPLACE:
 		return (gettext("\treplace [-f] <pool> <device> "
 		    "[new_device]\n"));
@@ -861,6 +860,11 @@ show_import(nvlist_t *config)
 
 	case ZPOOL_STATUS_CORRUPT_DATA:
 		(void) printf(gettext("status: The pool data is corrupted.\n"));
+		break;
+
+	case ZPOOL_STATUS_OFFLINE_DEV:
+		(void) printf(gettext("status: One or more devices "
+		    "are offlined.\n"));
 		break;
 
 	default:
@@ -1966,10 +1970,7 @@ zpool_do_detach(int argc, char **argv)
 }
 
 /*
- * zpool online [-t] <pool> <device>
- *
- *	-t	Only bring the device on-line temporarily.  The online
- *		state will not be persistent across reboots.
+ * zpool online <pool> <device> ...
  */
 /* ARGSUSED */
 int
@@ -2020,7 +2021,7 @@ zpool_do_online(int argc, char **argv)
 }
 
 /*
- * zpool offline [-ft] <pool> <device>
+ * zpool offline [-ft] <pool> <device> ...
  *
  *	-f	Force the device into the offline state, even if doing
  *		so would appear to compromise pool availability.
@@ -2028,7 +2029,6 @@ zpool_do_online(int argc, char **argv)
  *
  *	-t	Only take the device off-line temporarily.  The offline
  *		state will not be persistent across reboots.
- *		(not supported yet)
  */
 /* ARGSUSED */
 int
@@ -2037,13 +2037,15 @@ zpool_do_offline(int argc, char **argv)
 	int c, i;
 	char *poolname;
 	zpool_handle_t *zhp;
-	int ret = 0;
+	int ret = 0, istmp = FALSE;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "ft")) != -1) {
 		switch (c) {
-		case 'f':
 		case 't':
+			istmp = TRUE;
+			break;
+		case 'f':
 		case '?':
 			(void) fprintf(stderr, gettext("invalid option '%c'\n"),
 			    optopt);
@@ -2070,7 +2072,7 @@ zpool_do_offline(int argc, char **argv)
 		return (1);
 
 	for (i = 1; i < argc; i++)
-		if (zpool_vdev_offline(zhp, argv[i]) == 0)
+		if (zpool_vdev_offline(zhp, argv[i], istmp) == 0)
 			(void) printf(gettext("Bringing device %s offline\n"),
 			    argv[i]);
 		else

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -361,7 +360,7 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 {
 	vdev_ops_t *ops;
 	char *type;
-	uint64_t guid = 0;
+	uint64_t guid = 0, offline = 0;
 	vdev_t *vd;
 
 	ASSERT(spa_config_held(spa, RW_WRITER));
@@ -417,11 +416,17 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 	}
 
 	/*
-	 * If we're a leaf vdev, try to load the DTL object.
+	 * If we're a leaf vdev, try to load the DTL object
+	 * and the offline state.
 	 */
+	vd->vdev_offline = B_FALSE;
 	if (vd->vdev_ops->vdev_op_leaf && alloctype == VDEV_ALLOC_LOAD) {
 		(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_DTL,
 		    &vd->vdev_dtl.smo_object);
+
+		if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_OFFLINE, &offline)
+		    == 0)
+			vd->vdev_offline = offline;
 	}
 
 	/*
@@ -1341,18 +1346,19 @@ vdev_description(vdev_t *vd)
 int
 vdev_online(spa_t *spa, const char *path)
 {
-	vdev_t *vd;
+	vdev_t *rvd, *vd;
+	uint64_t txg;
 
-	spa_config_enter(spa, RW_WRITER);
+	txg = spa_vdev_enter(spa);
 
-	if ((vd = vdev_lookup_by_path(spa->spa_root_vdev, path)) == NULL) {
-		spa_config_exit(spa);
-		return (ENODEV);
-	}
+	rvd = spa->spa_root_vdev;
+	if ((vd = vdev_lookup_by_path(rvd, path)) == NULL)
+		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
 
 	dprintf("ONLINE: %s\n", vdev_description(vd));
 
 	vd->vdev_offline = B_FALSE;
+	vd->vdev_tmpoffline = B_FALSE;
 
 	/*
 	 * Clear the error counts.  The idea is that you expect to see all
@@ -1365,7 +1371,11 @@ vdev_online(spa_t *spa, const char *path)
 
 	vdev_reopen(vd->vdev_top, NULL);
 
-	spa_config_exit(spa);
+	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
+
+	vdev_config_dirty(vd->vdev_top);
+
+	(void) spa_vdev_exit(spa, NULL, txg, 0);
 
 	VERIFY(spa_scrub(spa, POOL_SCRUB_RESILVER, B_TRUE) == 0);
 
@@ -1373,18 +1383,22 @@ vdev_online(spa_t *spa, const char *path)
 }
 
 int
-vdev_offline(spa_t *spa, const char *path)
+vdev_offline(spa_t *spa, const char *path, int istmp)
 {
-	vdev_t *vd;
+	vdev_t *rvd, *vd;
+	uint64_t txg;
 
-	spa_config_enter(spa, RW_WRITER);
+	txg = spa_vdev_enter(spa);
 
-	if ((vd = vdev_lookup_by_path(spa->spa_root_vdev, path)) == NULL) {
-		spa_config_exit(spa);
-		return (ENODEV);
-	}
+	rvd = spa->spa_root_vdev;
+	if ((vd = vdev_lookup_by_path(rvd, path)) == NULL)
+		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
 
 	dprintf("OFFLINE: %s\n", vdev_description(vd));
+
+	/* vdev is already offlined, do nothing */
+	if (vd->vdev_offline)
+		return (spa_vdev_exit(spa, NULL, txg, 0));
 
 	/*
 	 * If this device's top-level vdev has a non-empty DTL,
@@ -1393,10 +1407,8 @@ vdev_offline(spa_t *spa, const char *path)
 	 * XXX -- we should make this more precise by allowing the offline
 	 * as long as the remaining devices don't have any DTL holes.
 	 */
-	if (vd->vdev_top->vdev_dtl_map.sm_space != 0) {
-		spa_config_exit(spa);
-		return (EBUSY);
-	}
+	if (vd->vdev_top->vdev_dtl_map.sm_space != 0)
+		return (spa_vdev_exit(spa, NULL, txg, EBUSY));
 
 	/*
 	 * Set this device to offline state and reopen its top-level vdev.
@@ -1408,13 +1420,18 @@ vdev_offline(spa_t *spa, const char *path)
 	if (vdev_is_dead(vd->vdev_top)) {
 		vd->vdev_offline = B_FALSE;
 		vdev_reopen(vd->vdev_top, NULL);
-		spa_config_exit(spa);
-		return (EBUSY);
+		return (spa_vdev_exit(spa, NULL, txg, EBUSY));
 	}
 
-	spa_config_exit(spa);
+	vd->vdev_tmpoffline = istmp;
+	if (istmp)
+		return (spa_vdev_exit(spa, NULL, txg, 0));
 
-	return (0);
+	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
+
+	vdev_config_dirty(vd->vdev_top);
+
+	return (spa_vdev_exit(spa, NULL, txg, 0));
 }
 
 int
