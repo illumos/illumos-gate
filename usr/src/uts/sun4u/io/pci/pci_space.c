@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -299,6 +298,5 @@ uint_t xmits_max_read_bytes = 0;
 
 /*
  * Bits 15:0 increase the maximum PIO retries allowed by XMITS.
- * Initialized to maximum retry limit 0xFFFF
  */
-uint_t xmits_upper_retry_counter = 0xFFFF;
+uint_t xmits_upper_retry_counter = 0x3E8;
