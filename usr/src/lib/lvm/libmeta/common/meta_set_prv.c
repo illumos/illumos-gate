@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,6 +35,7 @@
 #include <sys/cladm.h>
 #include <devid.h>
 #include <sys/lvm/md_convert.h>
+#include <sdssc.h>
 
 /*
  * Exported Entry Points
@@ -645,6 +645,7 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 	char			*minor_name = NULL;
 	size_t			sz;
 	char			*devid_str = NULL;
+	sdssc_version_t		version;
 
 	if ((sd = metaget_setdesc(sp, ep)) == NULL)
 		return (-1);
@@ -730,7 +731,14 @@ setup_db_bydd(mdsetname_t *sp, md_drive_desc *dd, int force, md_error_t *ep)
 			}
 		}
 
-		if ((dnp->devid == NULL) || MD_MNSET_DESC(sd)) {
+		/*
+		 * If the device does not have a devid or is a multinode
+		 * diskset or we are in a SunCluster 3.x enviroment then
+		 * do not use devids.
+		 */
+		if ((dnp->devid == NULL) || MD_MNSET_DESC(sd) ||
+		    ((sdssc_version(&version) == SDSSC_OKAY) &&
+		    (version.major >= 3))) {
 			use_devid = 0;
 		}
 
