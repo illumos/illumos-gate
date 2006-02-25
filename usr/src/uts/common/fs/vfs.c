@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -494,6 +493,10 @@ vfs_init(vfs_t *vfsp, vfsops_t *op, void *data)
 	vfsp->vfs_mntopts.mo_list = NULL;
 	vfsp->vfs_femhead = NULL;
 	vfsp->vfs_zone = NULL;
+	/*
+	 * Note: Don't initialize vfs_vskap, vfs_fstypevsp since it
+	 * could be a problem for unbundled file systems.
+	 */
 	vfs_setops((vfsp), (op));
 	sema_init(&vfsp->vfs_reflock, 1, NULL, SEMA_DEFAULT, NULL);
 }
@@ -657,6 +660,8 @@ vfs_mountroot(void)
 	struct vnode	*rvp = NULL;
 	char		*path;
 	size_t		plen;
+	struct vfssw	*vswp;
+	extern void setup_vopstats(vfs_t *);
 
 	rw_init(&vfssw_lock, NULL, RW_DEFAULT, NULL);
 	rw_init(&vfslist, NULL, RW_DEFAULT, NULL);
@@ -704,6 +709,16 @@ vfs_mountroot(void)
 	 * Notify cluster software that the root filesystem is available.
 	 */
 	clboot_mountroot();
+
+	/* Now that we're all done with the root FS, set up its vopstats */
+	if ((vswp = vfs_getvfsswbyvfsops(vfs_getops(rootvfs))) != NULL) {
+		/* Set flag for statistics collection */
+		if (vswp->vsw_flag & VSW_STATS) {
+			rootvfs->vfs_flag |= VFS_STATS;
+		}
+		vfs_unrefvfssw(vswp);
+	}
+	setup_vopstats(rootvfs);
 
 	/*
 	 * Mount /devices, /system/contract, /etc/mnttab, /etc/svc/volatile,
@@ -848,6 +863,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	char		*resource = NULL, *mountpt = NULL;
 	refstr_t	*oldresource, *oldmntpt;
 	struct pathname	pn, rpn;
+	extern void setup_vopstats(vfs_t *);
 
 	/*
 	 * The v_flag value for the mount point vp is permanently set
@@ -1390,16 +1406,27 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 				    optlen, NULL);
 			}
 		}
+
+		/* Set flag for statistics collection */
+		if (vswp->vsw_flag & VSW_STATS) {
+			vfsp->vfs_flag |= VFS_STATS;
+		}
+
 		vfs_unlock(vfsp);
 	}
 	mount_completed();
 	if (splice)
 		vn_vfsunlock(vp);
 
-	/*
-	 * Return vfsp to caller.
-	 */
 	if ((error == 0) && (copyout_error == 0)) {
+		/*
+		 * If this isn't a remount, set up the vopstats before
+		 * anyone can touch this
+		 */
+		if (!remount)
+			setup_vopstats(vfsp);
+
+		/* Return vfsp to caller. */
 		*vfspp = vfsp;
 	}
 errout:
@@ -2458,6 +2485,7 @@ dounmount(struct vfs *vfsp, int flag, cred_t *cr)
 {
 	vnode_t *coveredvp;
 	int error;
+	extern void teardown_vopstats(vfs_t *);
 
 	/*
 	 * Get covered vnode. This will be NULL if the vfs is not linked
@@ -2487,6 +2515,7 @@ dounmount(struct vfs *vfsp, int flag, cred_t *cr)
 		if (coveredvp != NULL)
 			vn_vfsunlock(coveredvp);
 	} else if (coveredvp != NULL) {
+		teardown_vopstats(vfsp);
 		/*
 		 * vfs_remove() will do a VN_RELE(vfsp->vfs_vnodecovered)
 		 * when it frees vfsp so we do a VN_HOLD() so we can
@@ -2497,6 +2526,7 @@ dounmount(struct vfs *vfsp, int flag, cred_t *cr)
 		vn_vfsunlock(coveredvp);
 		VN_RELE(coveredvp);
 	} else {
+		teardown_vopstats(vfsp);
 		/*
 		 * Release the reference to vfs that is not linked
 		 * into the name space.
@@ -3648,6 +3678,8 @@ vfsinit(void)
 {
 	struct vfssw *vswp;
 	int error;
+	extern void vopstats_startup();
+	extern void setup_vopstats(vfs_t *);
 
 	static const fs_operation_def_t EIO_vfsops_template[] = {
 		VFSNAME_MOUNT,		vfs_EIO,
@@ -3702,6 +3734,9 @@ vfsinit(void)
 			(*vswp->vsw_init)(vswp - vfssw, vswp->vsw_name);
 		RUNLOCK_VFSSW();
 	}
+
+	vopstats_startup();
+	setup_vopstats(&EIO_vfs);
 }
 
 /*

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -157,6 +156,24 @@ typedef struct mntopts {
 } mntopts_t;
 
 /*
+ * The kstat structures associated with the vopstats are kept in an
+ * AVL tree.  This is to avoid the case where a file system does not
+ * use a unique fsid_t for each vfs (e.g., namefs).  In order to do
+ * this, we need a structure that the AVL tree can use that also
+ * references the kstat.
+ * Note that the vks_fsid is generated from the value reported by
+ * VFS_STATVFS().
+ */
+typedef struct vskstat_anchor {
+	avl_node_t	vsk_node;	/* Required for use by AVL routines */
+	kstat_t		*vsk_ksp;	/* kstat structure for vopstats */
+	ulong_t		vsk_fsid;	/* fsid associated w/this FS */
+} vsk_anchor_t;
+
+extern avl_tree_t	vskstat_tree;
+extern kmutex_t		vskstat_tree_lock;
+
+/*
  * Structure per mounted file system.  Each mounted file system has
  * an array of operations and an instance record.
  *
@@ -215,6 +232,12 @@ typedef struct vfs {
 	struct zone	*vfs_zone;		/* zone that owns the mount */
 	struct vfs	*vfs_zone_next;		/* next VFS visible in zone */
 	struct vfs	*vfs_zone_prev;		/* prev VFS visible in zone */
+	/*
+	 * Support for statistics on the vnode operations
+	 */
+	vsk_anchor_t	*vfs_vskap;		/* anchor for vopstats' kstat */
+	vopstats_t	*vfs_fstypevsp;		/* ptr to per-fstype vopstats */
+	vopstats_t	vfs_vopstats;		/* per-mount vnode op stats */
 } vfs_t;
 
 /*
@@ -232,6 +255,7 @@ typedef struct vfs {
 #define	VFS_XATTR	0x400		/* fs supports extended attributes */
 #define	VFS_NODEVICES	0x800		/* device-special files disallowed */
 #define	VFS_NOEXEC	0x1000		/* executables disallowed */
+#define	VFS_STATS	0x2000		/* file system can collect stats */
 
 #define	VFS_NORESOURCE	"unspecified_resource"
 #define	VFS_NOMNTPT	"unspecified_mountpoint"
@@ -272,8 +296,6 @@ enum vntrans {
 	VNTRANS_DESTROYED
 };
 typedef enum vntrans vntrans_t;
-
-
 
 
 /*
@@ -374,6 +396,7 @@ int fs_build_vector(void *vector, int *unused_ops,
 #define	VSW_CANREMOUNT	0x04	/* file system supports remounts */
 #define	VSW_NOTZONESAFE	0x08	/* zone_enter(2) should fail for these files */
 #define	VSW_VOLATILEDEV	0x10	/* vfs_dev can change each time fs is mounted */
+#define	VSW_STATS	0x20	/* file system can collect stats */
 
 #define	VSW_INSTALLED	0x8000	/* this vsw is associated with a file system */
 

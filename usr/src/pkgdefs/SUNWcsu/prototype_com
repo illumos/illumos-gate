@@ -127,6 +127,7 @@ f none usr/bin/fmli 755 root bin
 f none usr/bin/fmt 555 root bin
 f none usr/bin/fmtmsg 555 root bin
 f none usr/bin/fold 555 root bin
+f none usr/bin/fsstat 555 root bin
 f none usr/bin/geniconvtbl 555 root bin
 f none usr/bin/getconf 555 root bin
 f none usr/bin/getdev 555 root bin

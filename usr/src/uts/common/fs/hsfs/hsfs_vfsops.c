@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -125,7 +125,7 @@ static vfsdef_t vfw = {
 	VFSDEF_VERSION,
 	"hsfs",
 	hsfsinit,
-	VSW_HASPROTO,	/* We don't suppport remounting */
+	VSW_HASPROTO|VSW_STATS,	/* We don't suppport remounting */
 	&hsfs_proto_opttbl
 };
 

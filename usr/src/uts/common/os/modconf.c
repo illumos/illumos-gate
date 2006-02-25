@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -34,6 +33,7 @@
 #include <sys/conf.h>
 #include <sys/class.h>
 #include <sys/vfs.h>
+#include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/systm.h>
 #include <sys/modctl.h>
@@ -56,6 +56,7 @@
 #include <sys/strsubr.h>
 #include <sys/kcpc.h>
 #include <sys/cpc_pcbe.h>
+#include <sys/kstat.h>
 
 extern int moddebug;
 
@@ -890,8 +891,16 @@ mod_installfs(struct modlfs *modl, struct modlinkage *modlp)
 	struct vfssw *vswp;
 	struct modctl *mcp;
 	char *fsname;
+	char ksname[KSTAT_STRLEN + 1];
+	int fstype;	/* index into vfssw[] and vsanchor_fstype[] */
 	int allocated;
 	int err;
+	int vsw_stats_enabled;
+	/* Not for public consumption so these aren't in a header file */
+	extern int	vopstats_enabled;
+	extern vopstats_t **vopstats_fstype;
+	extern kstat_t *new_vskstat(char *, vopstats_t *);
+	extern void initialize_vopstats(vopstats_t *);
 
 	if (modl->fs_vfsdef->def_version == VFSDEF_VERSION) {
 		/* Version matched */
@@ -931,7 +940,11 @@ mod_installfs(struct modlfs *modl, struct modlinkage *modlp)
 	}
 	ASSERT(vswp != NULL);
 
-	vswp->vsw_flag = modl->fs_vfsdef->flags;
+	fstype = vswp - vfssw;	/* Pointer arithmetic to get the fstype */
+
+	/* Turn on everything by default *except* VSW_STATS */
+	vswp->vsw_flag = modl->fs_vfsdef->flags & ~(VSW_STATS);
+
 	if (modl->fs_vfsdef->flags & VSW_HASPROTO) {
 		vfs_mergeopttbl(&vfs_mntopts, modl->fs_vfsdef->optproto,
 		    &vswp->vsw_optproto);
@@ -945,10 +958,19 @@ mod_installfs(struct modlfs *modl, struct modlinkage *modlp)
 		 */
 		vswp->vsw_flag |= VSW_CANREMOUNT;
 	}
+
+	/*
+	 * If stats are enabled system wide and for this fstype, then
+	 * set the VSW_STATS flag in the proper vfssw[] table entry.
+	 */
+	if (vopstats_enabled && modl->fs_vfsdef->flags & VSW_STATS) {
+		vswp->vsw_flag |= VSW_STATS;
+	}
+
 	if (modl->fs_vfsdef->init == NULL)
 		err = EFAULT;
 	else
-		err = (*(modl->fs_vfsdef->init))(vswp - vfssw, fsname);
+		err = (*(modl->fs_vfsdef->init))(fstype, fsname);
 
 	if (err != 0) {
 		if (allocated) {
@@ -959,9 +981,22 @@ mod_installfs(struct modlfs *modl, struct modlinkage *modlp)
 		vswp->vsw_init = NULL;
 	}
 
+	/* We don't want to hold the vfssw[] write lock over a kmem_alloc() */
+	vsw_stats_enabled = vswp->vsw_flag & VSW_STATS;
+
 	vfs_unrefvfssw(vswp);
 	WUNLOCK_VFSSW();
 
+	/* If everything is on, set up the per-fstype vopstats */
+	if (vsw_stats_enabled && vopstats_enabled &&
+	    vopstats_fstype && vopstats_fstype[fstype] == NULL) {
+		(void) strlcpy(ksname, VOPSTATS_STR, sizeof (ksname));
+		(void) strlcat(ksname, vfssw[fstype].vsw_name, sizeof (ksname));
+		vopstats_fstype[fstype] =
+		    kmem_alloc(sizeof (vopstats_t), KM_SLEEP);
+		initialize_vopstats(vopstats_fstype[fstype]);
+		(void) new_vskstat(ksname, vopstats_fstype[fstype]);
+	}
 	return (err);
 }
 

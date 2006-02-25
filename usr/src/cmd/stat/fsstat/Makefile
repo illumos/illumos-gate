@@ -24,25 +24,33 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-# cmd/stat/Makefile
-#
 
-include ../Makefile.cmd
+PROG = fsstat
+OBJS = fsstat.o
+SRCS =$(OBJS:%.o=%.c)
 
-SUBDIRS=	iostat mpstat vmstat fsstat
+include $(SRC)/cmd/Makefile.cmd
 
-all :=		TARGET = all
-install :=	TARGET = install
-clean :=	TARGET = clean
-clobber :=	TARGET = clobber
-lint :=		TARGET = lint
-_msg :=		TARGET = _msg
+LDLIBS += -lkstat
+CFLAGS += $(CCVERBOSE) -I${STATCOMMONDIR} -g
+FILEMODE= 0555
+GROUP= bin
+
+lint := LINTFLAGS = -muxs -I$(STATCOMMONDIR)
 
 .KEEP_STATE:
 
-all install lint clean clobber _msg: $(SUBDIRS)
+all: $(PROG)
 
-$(SUBDIRS): FRC
-	@cd $@; pwd; $(MAKE) $(MFLAGS) $(TARGET)
+install: all $(ROOTPROG)
 
-FRC:
+$(PROG): $(OBJS)
+	$(LINK.c) -o $(PROG) $(OBJS) $(LDLIBS)
+	$(POST_PROCESS)
+	
+clean:
+	-$(RM) $(OBJS)
+
+lint: lint_SRCS
+
+include $(SRC)/cmd/Makefile.targ

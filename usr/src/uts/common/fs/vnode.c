@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -74,6 +73,70 @@
 
 /* Tunable via /etc/system; used only by admin/install */
 int nfs_global_client_only;
+
+/*
+ * Array of vopstats_t for per-FS-type vopstats.  This array has the same
+ * number of entries as and parallel to the vfssw table.  (Arguably, it could
+ * be part of the vfssw table.)  Once it's initialized, it's accessed using
+ * the same fstype index that is used to index into the vfssw table.
+ */
+vopstats_t **vopstats_fstype;
+
+/* vopstats initialization template used for fast initialization via bcopy() */
+static vopstats_t *vs_templatep;
+
+/* Kmem cache handle for vsk_anchor_t allocations */
+kmem_cache_t *vsk_anchor_cache;
+
+/*
+ * Root of AVL tree for the kstats associated with vopstats.  Lock protects
+ * updates to vsktat_tree.
+ */
+avl_tree_t	vskstat_tree;
+kmutex_t	vskstat_tree_lock;
+
+/* Global variable which enables/disables the vopstats collection */
+int vopstats_enabled = 1;
+
+/*
+ * The following is the common set of actions needed to update the
+ * vopstats structure from a vnode op.  Both VOPSTATS_UPDATE() and
+ * VOPSTATS_UPDATE_IO() do almost the same thing, except for the
+ * recording of the bytes transferred.  Since the code is similar
+ * but small, it is nearly a duplicate.  Consequently any changes
+ * to one may need to be reflected in the other.
+ * Rundown of the variables:
+ * vp - Pointer to the vnode
+ * counter - Partial name structure member to update in vopstats for counts
+ * bytecounter - Partial name structure member to update in vopstats for bytes
+ * bytesval - Value to update in vopstats for bytes
+ * fstype - Index into vsanchor_fstype[], same as index into vfssw[]
+ * vsp - Pointer to vopstats structure (either in vfs or vsanchor_fstype[i])
+ */
+
+#define	VOPSTATS_UPDATE(vp, counter) {					\
+	vfs_t *vfsp = (vp)->v_vfsp;					\
+	if (vfsp && (vfsp->vfs_flag & VFS_STATS) && (vp)->v_type != VBAD) { \
+		vopstats_t *vsp = &vfsp->vfs_vopstats;			\
+		vsp->counter.value.ui64++;				\
+		if ((vsp = vfsp->vfs_fstypevsp) != NULL) {		\
+			vsp->counter.value.ui64++;			\
+		}							\
+	}								\
+}
+
+#define	VOPSTATS_UPDATE_IO(vp, counter, bytecounter, bytesval) {	\
+	vfs_t *vfsp = (vp)->v_vfsp;					\
+	if (vfsp && (vfsp->vfs_flag & VFS_STATS) && (vp)->v_type != VBAD) { \
+		vopstats_t *vsp = &vfsp->vfs_vopstats;			\
+		vsp->counter.value.ui64++;				\
+		vsp->bytecounter.value.ui64 += bytesval;		\
+		if ((vsp = vfsp->vfs_fstypevsp) != NULL) {		\
+			vsp->counter.value.ui64++;			\
+			vsp->bytecounter.value.ui64 += bytesval;	\
+		}							\
+	}								\
+}
 
 /*
  * Convert stat(2) formats to vnode types and vice versa.  (Knows about
@@ -241,6 +304,329 @@ static const fs_operation_trans_def_t vn_ops_table[] = {
 	NULL, 0, NULL, NULL
 };
 
+/*
+ * Used by the AVL routines to compare two vsk_anchor_t structures in the tree.
+ * We use the f_fsid reported by VFS_STATVFS() since we use that for the
+ * kstat name.
+ */
+static int
+vska_compar(const void *n1, const void *n2)
+{
+	int ret;
+	ulong_t p1 = ((vsk_anchor_t *)n1)->vsk_fsid;
+	ulong_t p2 = ((vsk_anchor_t *)n2)->vsk_fsid;
+
+	if (p1 < p2) {
+		ret = -1;
+	} else if (p1 > p2) {
+		ret = 1;
+	} else {
+		ret = 0;
+	}
+
+	return (ret);
+}
+
+/*
+ * Used to create a single template which will be bcopy()ed to a newly
+ * allocated vsanchor_combo_t structure in new_vsanchor(), below.
+ */
+static vopstats_t *
+create_vopstats_template()
+{
+	vopstats_t		*vsp;
+
+	vsp = kmem_alloc(sizeof (vopstats_t), KM_SLEEP);
+	bzero(vsp, sizeof (*vsp));	/* Start fresh */
+
+	/* VOP_OPEN */
+	kstat_named_init(&vsp->nopen, "nopen", KSTAT_DATA_UINT64);
+	/* VOP_CLOSE */
+	kstat_named_init(&vsp->nclose, "nclose", KSTAT_DATA_UINT64);
+	/* VOP_READ I/O */
+	kstat_named_init(&vsp->nread, "nread", KSTAT_DATA_UINT64);
+	kstat_named_init(&vsp->read_bytes, "read_bytes", KSTAT_DATA_UINT64);
+	/* VOP_WRITE I/O */
+	kstat_named_init(&vsp->nwrite, "nwrite", KSTAT_DATA_UINT64);
+	kstat_named_init(&vsp->write_bytes, "write_bytes", KSTAT_DATA_UINT64);
+	/* VOP_IOCTL */
+	kstat_named_init(&vsp->nioctl, "nioctl", KSTAT_DATA_UINT64);
+	/* VOP_SETFL */
+	kstat_named_init(&vsp->nsetfl, "nsetfl", KSTAT_DATA_UINT64);
+	/* VOP_GETATTR */
+	kstat_named_init(&vsp->ngetattr, "ngetattr", KSTAT_DATA_UINT64);
+	/* VOP_SETATTR */
+	kstat_named_init(&vsp->nsetattr, "nsetattr", KSTAT_DATA_UINT64);
+	/* VOP_ACCESS */
+	kstat_named_init(&vsp->naccess, "naccess", KSTAT_DATA_UINT64);
+	/* VOP_LOOKUP */
+	kstat_named_init(&vsp->nlookup, "nlookup", KSTAT_DATA_UINT64);
+	/* VOP_CREATE */
+	kstat_named_init(&vsp->ncreate, "ncreate", KSTAT_DATA_UINT64);
+	/* VOP_REMOVE */
+	kstat_named_init(&vsp->nremove, "nremove", KSTAT_DATA_UINT64);
+	/* VOP_LINK */
+	kstat_named_init(&vsp->nlink, "nlink", KSTAT_DATA_UINT64);
+	/* VOP_RENAME */
+	kstat_named_init(&vsp->nrename, "nrename", KSTAT_DATA_UINT64);
+	/* VOP_MKDIR */
+	kstat_named_init(&vsp->nmkdir, "nmkdir", KSTAT_DATA_UINT64);
+	/* VOP_RMDIR */
+	kstat_named_init(&vsp->nrmdir, "nrmdir", KSTAT_DATA_UINT64);
+	/* VOP_READDIR I/O */
+	kstat_named_init(&vsp->nreaddir, "nreaddir", KSTAT_DATA_UINT64);
+	kstat_named_init(&vsp->readdir_bytes, "readdir_bytes",
+	    KSTAT_DATA_UINT64);
+	/* VOP_SYMLINK */
+	kstat_named_init(&vsp->nsymlink, "nsymlink", KSTAT_DATA_UINT64);
+	/* VOP_READLINK */
+	kstat_named_init(&vsp->nreadlink, "nreadlink", KSTAT_DATA_UINT64);
+	/* VOP_FSYNC */
+	kstat_named_init(&vsp->nfsync, "nfsync", KSTAT_DATA_UINT64);
+	/* VOP_INACTIVE */
+	kstat_named_init(&vsp->ninactive, "ninactive", KSTAT_DATA_UINT64);
+	/* VOP_FID */
+	kstat_named_init(&vsp->nfid, "nfid", KSTAT_DATA_UINT64);
+	/* VOP_RWLOCK */
+	kstat_named_init(&vsp->nrwlock, "nrwlock", KSTAT_DATA_UINT64);
+	/* VOP_RWUNLOCK */
+	kstat_named_init(&vsp->nrwunlock, "nrwunlock", KSTAT_DATA_UINT64);
+	/* VOP_SEEK */
+	kstat_named_init(&vsp->nseek, "nseek", KSTAT_DATA_UINT64);
+	/* VOP_CMP */
+	kstat_named_init(&vsp->ncmp, "ncmp", KSTAT_DATA_UINT64);
+	/* VOP_FRLOCK */
+	kstat_named_init(&vsp->nfrlock, "nfrlock", KSTAT_DATA_UINT64);
+	/* VOP_SPACE */
+	kstat_named_init(&vsp->nspace, "nspace", KSTAT_DATA_UINT64);
+	/* VOP_REALVP */
+	kstat_named_init(&vsp->nrealvp, "nrealvp", KSTAT_DATA_UINT64);
+	/* VOP_GETPAGE */
+	kstat_named_init(&vsp->ngetpage, "ngetpage", KSTAT_DATA_UINT64);
+	/* VOP_PUTPAGE */
+	kstat_named_init(&vsp->nputpage, "nputpage", KSTAT_DATA_UINT64);
+	/* VOP_MAP */
+	kstat_named_init(&vsp->nmap, "nmap", KSTAT_DATA_UINT64);
+	/* VOP_ADDMAP */
+	kstat_named_init(&vsp->naddmap, "naddmap", KSTAT_DATA_UINT64);
+	/* VOP_DELMAP */
+	kstat_named_init(&vsp->ndelmap, "ndelmap", KSTAT_DATA_UINT64);
+	/* VOP_POLL */
+	kstat_named_init(&vsp->npoll, "npoll", KSTAT_DATA_UINT64);
+	/* VOP_DUMP */
+	kstat_named_init(&vsp->ndump, "ndump", KSTAT_DATA_UINT64);
+	/* VOP_PATHCONF */
+	kstat_named_init(&vsp->npathconf, "npathconf", KSTAT_DATA_UINT64);
+	/* VOP_PAGEIO */
+	kstat_named_init(&vsp->npageio, "npageio", KSTAT_DATA_UINT64);
+	/* VOP_DUMPCTL */
+	kstat_named_init(&vsp->ndumpctl, "ndumpctl", KSTAT_DATA_UINT64);
+	/* VOP_DISPOSE */
+	kstat_named_init(&vsp->ndispose, "ndispose", KSTAT_DATA_UINT64);
+	/* VOP_SETSECATTR */
+	kstat_named_init(&vsp->nsetsecattr, "nsetsecattr", KSTAT_DATA_UINT64);
+	/* VOP_GETSECATTR */
+	kstat_named_init(&vsp->ngetsecattr, "ngetsecattr", KSTAT_DATA_UINT64);
+	/* VOP_SHRLOCK */
+	kstat_named_init(&vsp->nshrlock, "nshrlock", KSTAT_DATA_UINT64);
+	/* VOP_VNEVENT */
+	kstat_named_init(&vsp->nvnevent, "nvnevent", KSTAT_DATA_UINT64);
+
+	return (vsp);
+}
+
+/*
+ * Creates a kstat structure associated with a vopstats structure.
+ */
+kstat_t *
+new_vskstat(char *ksname, vopstats_t *vsp)
+{
+	kstat_t		*ksp;
+
+	if (!vopstats_enabled) {
+		return (NULL);
+	}
+
+	ksp = kstat_create("unix", 0, ksname, "misc", KSTAT_TYPE_NAMED,
+	    sizeof (vopstats_t)/sizeof (kstat_named_t),
+	    KSTAT_FLAG_VIRTUAL|KSTAT_FLAG_WRITABLE);
+	if (ksp) {
+		ksp->ks_data = vsp;
+		kstat_install(ksp);
+	}
+
+	return (ksp);
+}
+
+/*
+ * Called from vfsinit() to initialize the support mechanisms for vopstats
+ */
+void
+vopstats_startup()
+{
+	if (!vopstats_enabled)
+		return;
+
+	/*
+	 * Creates the AVL tree which holds per-vfs vopstat anchors.  This
+	 * is necessary since we need to check if a kstat exists before we
+	 * attempt to create it.  Also, initialize its lock.
+	 */
+	avl_create(&vskstat_tree, vska_compar, sizeof (vsk_anchor_t),
+	    offsetof(vsk_anchor_t, vsk_node));
+	mutex_init(&vskstat_tree_lock, NULL, MUTEX_DEFAULT, NULL);
+
+	vsk_anchor_cache = kmem_cache_create("vsk_anchor_cache",
+	    sizeof (vsk_anchor_t), sizeof (uintptr_t), NULL, NULL, NULL,
+	    NULL, NULL, 0);
+
+	/*
+	 * Set up the array of pointers for the vopstats-by-FS-type.
+	 * The entries will be allocated/initialized as each file system
+	 * goes through modload/mod_installfs.
+	 */
+	vopstats_fstype = (vopstats_t **)kmem_zalloc(
+	    (sizeof (vopstats_t *) * nfstype), KM_SLEEP);
+
+	/* Set up the global vopstats initialization template */
+	vs_templatep = create_vopstats_template();
+}
+
+/*
+ * We need to have the all of the counters zeroed.
+ * The initialization of the vopstats_t includes on the order of
+ * 50 calls to kstat_named_init().  Rather that do that on every call,
+ * we do it once in a template (vs_templatep) then bcopy it over.
+ */
+void
+initialize_vopstats(vopstats_t *vsp)
+{
+	if (vsp == NULL)
+		return;
+
+	bcopy(vs_templatep, vsp, sizeof (vopstats_t));
+}
+
+/*
+ * Create and initialize the vopstat structure for a vfs. Also, generate
+ * a kstat name, create the kstat structure, and associate it with the
+ * vfs' vopstats.  This must only be called from mount.
+ */
+void
+setup_vopstats(vfs_t *vfsp)
+{
+	int		fstype = 0;		/* Index into vfssw[] */
+	char		kstatstr[KSTAT_STRLEN]; /* kstat name for vopstats */
+	statvfs64_t	statvfsbuf;		/* Needed to find f_fsid */
+	vsk_anchor_t	*vskp;			/* vfs <--> kstat anchor */
+	vfsops_t	*vfsops;		/* vfs operations vector */
+	vfssw_t		*vswp;			/* Ptr into vfssw[] table */
+	kstat_t		*ksp;			/* Ptr to new kstat */
+	avl_index_t	where;			/* Location in the AVL tree */
+
+	if (vfsp == NULL || (vfsp->vfs_flag & VFS_STATS) == 0 ||
+	    !vopstats_enabled)
+		return;
+
+	initialize_vopstats(&vfsp->vfs_vopstats);
+
+	/*
+	 * Set up the fstype.  We go to so much trouble because all versions
+	 * of NFS use the same fstype in their vfs even though they have
+	 * distinct entries in the vfssw[] table.
+	 */
+	if (vfsp && (vfsops = vfs_getops(vfsp)) != NULL) {
+		vswp = vfs_getvfsswbyvfsops(vfsops);
+		/* A special vfs (e.g., EIO_vfs) may not have an entry */
+		if (vswp) {
+			fstype = vswp - vfssw;	/* Gets us the index */
+			vfs_unrefvfssw(vswp);	/* Must release reference */
+		}
+	} else {
+		fstype = vfsp->vfs_fstype;
+	}
+
+	/*
+	 * Point to the per-fstype vopstats. The only valid values are
+	 * non-zero positive values less than the number of vfssw[] table
+	 * entries.
+	 */
+	if (fstype > 0 && fstype < nfstype) {
+		vfsp->vfs_fstypevsp = vopstats_fstype[fstype];
+	} else {
+		/* Otherwise, never attempt to update stats by fstype */
+		vfsp->vfs_fstypevsp = NULL;
+	}
+
+	/* Need to get the fsid to build a kstat name */
+	if (VFS_STATVFS(vfsp, &statvfsbuf) == 0) {
+		/* Create a name for our kstats based on fsid */
+		(void) snprintf(kstatstr, KSTAT_STRLEN, "%s%lx",
+		    VOPSTATS_STR, statvfsbuf.f_fsid);
+
+		/* Allocate and initialize the vsk_anchor_t */
+		vskp = kmem_cache_alloc(vsk_anchor_cache, KM_SLEEP);
+		bzero(vskp, sizeof (*vskp));
+		vskp->vsk_fsid = statvfsbuf.f_fsid;
+		vfsp->vfs_vskap = vskp;
+
+		mutex_enter(&vskstat_tree_lock);
+		if (avl_find(&vskstat_tree, vskp, &where) == NULL) {
+			avl_insert(&vskstat_tree, vskp, where);
+			mutex_exit(&vskstat_tree_lock);
+
+			/*
+			 * Now that we've got the anchor in the AVL
+			 * tree, we can create the kstat.
+			 */
+			ksp = new_vskstat(kstatstr, &vfsp->vfs_vopstats);
+			if (ksp) {
+				vskp->vsk_ksp = ksp;
+			}
+		} else {
+			/* Oops, found one! Release memory and lock. */
+			mutex_exit(&vskstat_tree_lock);
+			vfsp->vfs_vskap = NULL;
+			kmem_cache_free(vsk_anchor_cache, vskp);
+		}
+	}
+}
+
+/*
+ * We're in the process of tearing down the vfs and need to cleanup
+ * the data structures associated with the vopstats. Must only be called
+ * from dounmount().
+ */
+void
+teardown_vopstats(vfs_t *vfsp)
+{
+	vsk_anchor_t	*vskap;
+	avl_index_t	where;
+
+	if (vfsp == NULL || (vfsp->vfs_flag & VFS_STATS) == 0 ||
+	    !vopstats_enabled)
+		return;
+
+	/* This is a safe check since VFS_STATS must be set (see above) */
+	if ((vskap = vfsp->vfs_vskap) == NULL)
+		return;
+
+	/* Whack the pointer right away */
+	vfsp->vfs_vskap = NULL;
+
+	/* Lock the tree, remove the node, and delete the kstat */
+	mutex_enter(&vskstat_tree_lock);
+	if (avl_find(&vskstat_tree, vskap, &where)) {
+		avl_remove(&vskstat_tree, vskap);
+	}
+
+	if (vskap->vsk_ksp) {
+		kstat_delete(vskap->vsk_ksp);
+	}
+	mutex_exit(&vskstat_tree_lock);
+
+	kmem_cache_free(vsk_anchor_cache, vskap);
+}
 
 /*
  * Read or write a vnode.  Called from kernel code.
@@ -2307,6 +2693,7 @@ fop_open(
 		 * Use the saved vp just in case the vnode ptr got trashed
 		 * by the error.
 		 */
+		VOPSTATS_UPDATE(vp, nopen);
 		if ((vp->v_type == VREG) && (mode & FREAD))
 			atomic_add_32(&(vp->v_rdcnt), -1);
 		if ((vp->v_type == VREG) && (mode & FWRITE))
@@ -2320,7 +2707,7 @@ fop_open(
 		 * casing each filesystem. Adjust the vnode counts to
 		 * reflect the vnode switch.
 		 */
-
+		VOPSTATS_UPDATE(*vpp, nopen);
 		if (*vpp != vp && *vpp != NULL) {
 			vn_copypath(vp, *vpp);
 			if (((*vpp)->v_type == VREG) && (mode & FREAD))
@@ -2345,8 +2732,10 @@ fop_close(
 	offset_t offset,
 	cred_t *cr)
 {
-	int error;
-	error = (*(vp)->v_op->vop_close)(vp, flag, count, offset, cr);
+	int err;
+
+	err = (*(vp)->v_op->vop_close)(vp, flag, count, offset, cr);
+	VOPSTATS_UPDATE(vp, nclose);
 	/*
 	 * Check passed in count to handle possible dups. Vnode counts are only
 	 * kept on regular files
@@ -2361,7 +2750,7 @@ fop_close(
 			atomic_add_32(&(vp->v_wrcnt), -1);
 		}
 	}
-	return (error);
+	return (err);
 }
 
 int
@@ -2372,7 +2761,13 @@ fop_read(
 	cred_t *cr,
 	struct caller_context *ct)
 {
-	return (*(vp)->v_op->vop_read)(vp, uiop, ioflag, cr, ct);
+	int	err;
+	ssize_t	resid_start = uiop->uio_resid;
+
+	err = (*(vp)->v_op->vop_read)(vp, uiop, ioflag, cr, ct);
+	VOPSTATS_UPDATE_IO(vp, nread,
+	    read_bytes, (resid_start - uiop->uio_resid));
+	return (err);
 }
 
 int
@@ -2383,7 +2778,13 @@ fop_write(
 	cred_t *cr,
 	struct caller_context *ct)
 {
-	return (*(vp)->v_op->vop_write)(vp, uiop, ioflag, cr, ct);
+	int	err;
+	ssize_t	resid_start = uiop->uio_resid;
+
+	err = (*(vp)->v_op->vop_write)(vp, uiop, ioflag, cr, ct);
+	VOPSTATS_UPDATE_IO(vp, nwrite,
+	    write_bytes, (resid_start - uiop->uio_resid));
+	return (err);
 }
 
 int
@@ -2395,7 +2796,11 @@ fop_ioctl(
 	cred_t *cr,
 	int *rvalp)
 {
-	return (*(vp)->v_op->vop_ioctl)(vp, cmd, arg, flag, cr, rvalp);
+	int	err;
+
+	err = (*(vp)->v_op->vop_ioctl)(vp, cmd, arg, flag, cr, rvalp);
+	VOPSTATS_UPDATE(vp, nioctl);
+	return (err);
 }
 
 int
@@ -2405,7 +2810,11 @@ fop_setfl(
 	int nflags,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_setfl)(vp, oflags, nflags, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_setfl)(vp, oflags, nflags, cr);
+	VOPSTATS_UPDATE(vp, nsetfl);
+	return (err);
 }
 
 int
@@ -2415,7 +2824,11 @@ fop_getattr(
 	int flags,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_getattr)(vp, vap, flags, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_getattr)(vp, vap, flags, cr);
+	VOPSTATS_UPDATE(vp, ngetattr);
+	return (err);
 }
 
 int
@@ -2426,7 +2839,11 @@ fop_setattr(
 	cred_t *cr,
 	caller_context_t *ct)
 {
-	return (*(vp)->v_op->vop_setattr)(vp, vap, flags, cr, ct);
+	int	err;
+
+	err = (*(vp)->v_op->vop_setattr)(vp, vap, flags, cr, ct);
+	VOPSTATS_UPDATE(vp, nsetattr);
+	return (err);
 }
 
 int
@@ -2436,7 +2853,11 @@ fop_access(
 	int flags,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_access)(vp, mode, flags, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_access)(vp, mode, flags, cr);
+	VOPSTATS_UPDATE(vp, naccess);
+	return (err);
 }
 
 int
@@ -2452,8 +2873,12 @@ fop_lookup(
 	int ret;
 
 	ret = (*(dvp)->v_op->vop_lookup)(dvp, nm, vpp, pnp, flags, rdir, cr);
-	if (ret == 0 && *vpp && (*vpp)->v_path == NULL)
-		vn_setpath(rootdir, dvp, *vpp, nm, strlen(nm));
+	if (ret == 0 && *vpp) {
+		VOPSTATS_UPDATE(*vpp, nlookup);
+		if ((*vpp)->v_path == NULL) {
+			vn_setpath(rootdir, dvp, *vpp, nm, strlen(nm));
+		}
+	}
 
 	return (ret);
 }
@@ -2473,8 +2898,12 @@ fop_create(
 
 	ret = (*(dvp)->v_op->vop_create)
 				(dvp, name, vap, excl, mode, vpp, cr, flag);
-	if (ret == 0 && *vpp && (*vpp)->v_path == NULL)
-		vn_setpath(rootdir, dvp, *vpp, name, strlen(name));
+	if (ret == 0 && *vpp) {
+		VOPSTATS_UPDATE(*vpp, ncreate);
+		if ((*vpp)->v_path == NULL) {
+			vn_setpath(rootdir, dvp, *vpp, name, strlen(name));
+		}
+	}
 
 	return (ret);
 }
@@ -2485,7 +2914,11 @@ fop_remove(
 	char *nm,
 	cred_t *cr)
 {
-	return (*(dvp)->v_op->vop_remove)(dvp, nm, cr);
+	int	err;
+
+	err = (*(dvp)->v_op->vop_remove)(dvp, nm, cr);
+	VOPSTATS_UPDATE(dvp, nremove);
+	return (err);
 }
 
 int
@@ -2495,7 +2928,11 @@ fop_link(
 	char *tnm,
 	cred_t *cr)
 {
-	return (*(tdvp)->v_op->vop_link)(tdvp, svp, tnm, cr);
+	int	err;
+
+	err = (*(tdvp)->v_op->vop_link)(tdvp, svp, tnm, cr);
+	VOPSTATS_UPDATE(tdvp, nlink);
+	return (err);
 }
 
 int
@@ -2506,7 +2943,11 @@ fop_rename(
 	char *tnm,
 	cred_t *cr)
 {
-	return (*(sdvp)->v_op->vop_rename)(sdvp, snm, tdvp, tnm, cr);
+	int	err;
+
+	err = (*(sdvp)->v_op->vop_rename)(sdvp, snm, tdvp, tnm, cr);
+	VOPSTATS_UPDATE(sdvp, nrename);
+	return (err);
 }
 
 int
@@ -2520,8 +2961,13 @@ fop_mkdir(
 	int ret;
 
 	ret = (*(dvp)->v_op->vop_mkdir)(dvp, dirname, vap, vpp, cr);
-	if (ret == 0 && *vpp && (*vpp)->v_path == NULL)
-		vn_setpath(rootdir, dvp, *vpp, dirname, strlen(dirname));
+	if (ret == 0 && *vpp) {
+		VOPSTATS_UPDATE(*vpp, nmkdir);
+		if ((*vpp)->v_path == NULL) {
+			vn_setpath(rootdir, dvp, *vpp, dirname,
+			    strlen(dirname));
+		}
+	}
 
 	return (ret);
 }
@@ -2533,7 +2979,11 @@ fop_rmdir(
 	vnode_t *cdir,
 	cred_t *cr)
 {
-	return (*(dvp)->v_op->vop_rmdir)(dvp, nm, cdir, cr);
+	int	err;
+
+	err = (*(dvp)->v_op->vop_rmdir)(dvp, nm, cdir, cr);
+	VOPSTATS_UPDATE(dvp, nrmdir);
+	return (err);
 }
 
 int
@@ -2543,7 +2993,13 @@ fop_readdir(
 	cred_t *cr,
 	int *eofp)
 {
-	return (*(vp)->v_op->vop_readdir)(vp, uiop, cr, eofp);
+	int	err;
+	ssize_t	resid_start = uiop->uio_resid;
+
+	err = (*(vp)->v_op->vop_readdir)(vp, uiop, cr, eofp);
+	VOPSTATS_UPDATE_IO(vp, nreaddir,
+	    readdir_bytes, (resid_start - uiop->uio_resid));
+	return (err);
 }
 
 int
@@ -2554,7 +3010,11 @@ fop_symlink(
 	char *target,
 	cred_t *cr)
 {
-	return (*(dvp)->v_op->vop_symlink) (dvp, linkname, vap, target, cr);
+	int	err;
+
+	err = (*(dvp)->v_op->vop_symlink) (dvp, linkname, vap, target, cr);
+	VOPSTATS_UPDATE(dvp, nsymlink);
+	return (err);
 }
 
 int
@@ -2563,7 +3023,11 @@ fop_readlink(
 	uio_t *uiop,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_readlink)(vp, uiop, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_readlink)(vp, uiop, cr);
+	VOPSTATS_UPDATE(vp, nreadlink);
+	return (err);
 }
 
 int
@@ -2572,7 +3036,11 @@ fop_fsync(
 	int syncflag,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_fsync)(vp, syncflag, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_fsync)(vp, syncflag, cr);
+	VOPSTATS_UPDATE(vp, nfsync);
+	return (err);
 }
 
 void
@@ -2580,6 +3048,8 @@ fop_inactive(
 	vnode_t *vp,
 	cred_t *cr)
 {
+	/* Need to update stats before vop call since we may lose the vnode */
+	VOPSTATS_UPDATE(vp, ninactive);
 	(*(vp)->v_op->vop_inactive)(vp, cr);
 }
 
@@ -2588,7 +3058,11 @@ fop_fid(
 	vnode_t *vp,
 	fid_t *fidp)
 {
-	return (*(vp)->v_op->vop_fid)(vp, fidp);
+	int	err;
+
+	err = (*(vp)->v_op->vop_fid)(vp, fidp);
+	VOPSTATS_UPDATE(vp, nfid);
+	return (err);
 }
 
 int
@@ -2597,7 +3071,11 @@ fop_rwlock(
 	int write_lock,
 	caller_context_t *ct)
 {
-	return ((*(vp)->v_op->vop_rwlock)(vp, write_lock, ct));
+	int	ret;
+
+	ret = ((*(vp)->v_op->vop_rwlock)(vp, write_lock, ct));
+	VOPSTATS_UPDATE(vp, nrwlock);
+	return (ret);
 }
 
 void
@@ -2607,6 +3085,7 @@ fop_rwunlock(
 	caller_context_t *ct)
 {
 	(*(vp)->v_op->vop_rwunlock)(vp, write_lock, ct);
+	VOPSTATS_UPDATE(vp, nrwunlock);
 }
 
 int
@@ -2615,7 +3094,11 @@ fop_seek(
 	offset_t ooff,
 	offset_t *noffp)
 {
-	return (*(vp)->v_op->vop_seek)(vp, ooff, noffp);
+	int	err;
+
+	err = (*(vp)->v_op->vop_seek)(vp, ooff, noffp);
+	VOPSTATS_UPDATE(vp, nseek);
+	return (err);
 }
 
 int
@@ -2623,7 +3106,11 @@ fop_cmp(
 	vnode_t *vp1,
 	vnode_t *vp2)
 {
-	return (*(vp1)->v_op->vop_cmp)(vp1, vp2);
+	int	err;
+
+	err = (*(vp1)->v_op->vop_cmp)(vp1, vp2);
+	VOPSTATS_UPDATE(vp1, ncmp);
+	return (err);
 }
 
 int
@@ -2636,8 +3123,12 @@ fop_frlock(
 	struct flk_callback *flk_cbp,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_frlock)
+	int	err;
+
+	err = (*(vp)->v_op->vop_frlock)
 				(vp, cmd, bfp, flag, offset, flk_cbp, cr);
+	VOPSTATS_UPDATE(vp, nfrlock);
+	return (err);
 }
 
 int
@@ -2650,7 +3141,11 @@ fop_space(
 	cred_t *cr,
 	caller_context_t *ct)
 {
-	return (*(vp)->v_op->vop_space)(vp, cmd, bfp, flag, offset, cr, ct);
+	int	err;
+
+	err = (*(vp)->v_op->vop_space)(vp, cmd, bfp, flag, offset, cr, ct);
+	VOPSTATS_UPDATE(vp, nspace);
+	return (err);
 }
 
 int
@@ -2658,7 +3153,11 @@ fop_realvp(
 	vnode_t *vp,
 	vnode_t **vpp)
 {
-	return (*(vp)->v_op->vop_realvp)(vp, vpp);
+	int	err;
+
+	err = (*(vp)->v_op->vop_realvp)(vp, vpp);
+	VOPSTATS_UPDATE(vp, nrealvp);
+	return (err);
 }
 
 int
@@ -2674,8 +3173,12 @@ fop_getpage(
 	enum seg_rw rw,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_getpage)
+	int	err;
+
+	err = (*(vp)->v_op->vop_getpage)
 			(vp, off, len, protp, plarr, plsz, seg, addr, rw, cr);
+	VOPSTATS_UPDATE(vp, ngetpage);
+	return (err);
 }
 
 int
@@ -2686,7 +3189,11 @@ fop_putpage(
 	int flags,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_putpage)(vp, off, len, flags, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_putpage)(vp, off, len, flags, cr);
+	VOPSTATS_UPDATE(vp, nputpage);
+	return (err);
 }
 
 int
@@ -2701,8 +3208,12 @@ fop_map(
 	uint_t flags,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_map)
+	int	err;
+
+	err = (*(vp)->v_op->vop_map)
 			(vp, off, as, addrp, len, prot, maxprot, flags, cr);
+	VOPSTATS_UPDATE(vp, nmap);
+	return (err);
 }
 
 int
@@ -2748,6 +3259,7 @@ fop_addmap(
 					(int64_t)delta);
 		}
 	}
+	VOPSTATS_UPDATE(vp, naddmap);
 	return (error);
 }
 
@@ -2798,6 +3310,7 @@ fop_delmap(
 					(int64_t)(-delta));
 		}
 	}
+	VOPSTATS_UPDATE(vp, ndelmap);
 	return (error);
 }
 
@@ -2810,7 +3323,11 @@ fop_poll(
 	short *reventsp,
 	struct pollhead **phpp)
 {
-	return (*(vp)->v_op->vop_poll)(vp, events, anyyet, reventsp, phpp);
+	int	err;
+
+	err = (*(vp)->v_op->vop_poll)(vp, events, anyyet, reventsp, phpp);
+	VOPSTATS_UPDATE(vp, npoll);
+	return (err);
 }
 
 int
@@ -2820,7 +3337,11 @@ fop_dump(
 	int lbdn,
 	int dblks)
 {
-	return (*(vp)->v_op->vop_dump)(vp, addr, lbdn, dblks);
+	int	err;
+
+	err = (*(vp)->v_op->vop_dump)(vp, addr, lbdn, dblks);
+	VOPSTATS_UPDATE(vp, ndump);
+	return (err);
 }
 
 int
@@ -2830,7 +3351,11 @@ fop_pathconf(
 	ulong_t *valp,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_pathconf)(vp, cmd, valp, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_pathconf)(vp, cmd, valp, cr);
+	VOPSTATS_UPDATE(vp, npathconf);
+	return (err);
 }
 
 int
@@ -2842,7 +3367,11 @@ fop_pageio(
 	int flags,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_pageio)(vp, pp, io_off, io_len, flags, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_pageio)(vp, pp, io_off, io_len, flags, cr);
+	VOPSTATS_UPDATE(vp, npageio);
+	return (err);
 }
 
 int
@@ -2851,7 +3380,10 @@ fop_dumpctl(
 	int action,
 	int *blkp)
 {
-	return (*(vp)->v_op->vop_dumpctl)(vp, action, blkp);
+	int	err;
+	err = (*(vp)->v_op->vop_dumpctl)(vp, action, blkp);
+	VOPSTATS_UPDATE(vp, ndumpctl);
+	return (err);
 }
 
 void
@@ -2862,6 +3394,8 @@ fop_dispose(
 	int dn,
 	cred_t *cr)
 {
+	/* Must do stats first since it's possible to lose the vnode */
+	VOPSTATS_UPDATE(vp, ndispose);
 	(*(vp)->v_op->vop_dispose)(vp, pp, flag, dn, cr);
 }
 
@@ -2872,7 +3406,11 @@ fop_setsecattr(
 	int flag,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_setsecattr) (vp, vsap, flag, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_setsecattr) (vp, vsap, flag, cr);
+	VOPSTATS_UPDATE(vp, nsetsecattr);
+	return (err);
 }
 
 int
@@ -2882,7 +3420,11 @@ fop_getsecattr(
 	int flag,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_getsecattr) (vp, vsap, flag, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_getsecattr) (vp, vsap, flag, cr);
+	VOPSTATS_UPDATE(vp, ngetsecattr);
+	return (err);
 }
 
 int
@@ -2893,11 +3435,19 @@ fop_shrlock(
 	int flag,
 	cred_t *cr)
 {
-	return (*(vp)->v_op->vop_shrlock)(vp, cmd, shr, flag, cr);
+	int	err;
+
+	err = (*(vp)->v_op->vop_shrlock)(vp, cmd, shr, flag, cr);
+	VOPSTATS_UPDATE(vp, nshrlock);
+	return (err);
 }
 
 int
 fop_vnevent(vnode_t *vp, vnevent_t vnevent)
 {
-	return (*(vp)->v_op->vop_vnevent)(vp, vnevent);
+	int	err;
+
+	err = (*(vp)->v_op->vop_vnevent)(vp, vnevent);
+	VOPSTATS_UPDATE(vp, nvnevent);
+	return (err);
 }
