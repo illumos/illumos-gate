@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -843,7 +842,7 @@ static int sd_pm_idletime = 1;
 #define	sd_ddi_scsi_poll		ssd_ddi_scsi_poll
 #define	sd_init_event_callbacks		ssd_init_event_callbacks
 #define	sd_event_callback		ssd_event_callback
-#define	sd_disable_caching		ssd_disable_caching
+#define	sd_cache_control		ssd_cache_control
 #define	sd_get_write_cache_enabled	ssd_get_write_cache_enabled
 #define	sd_make_device			ssd_make_device
 #define	sdopen				ssdopen
@@ -1183,8 +1182,15 @@ static void sd_init_event_callbacks(struct sd_lun *un);
 static void  sd_event_callback(dev_info_t *, ddi_eventcookie_t, void *, void *);
 #endif
 
+/*
+ * Defines for sd_cache_control
+ */
 
-static int   sd_disable_caching(struct sd_lun *un);
+#define	SD_CACHE_ENABLE		1
+#define	SD_CACHE_DISABLE	0
+#define	SD_CACHE_NOCHANGE	-1
+
+static int   sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag);
 static int   sd_get_write_cache_enabled(struct sd_lun *un, int *is_enabled);
 static dev_t sd_make_device(dev_info_t *devi);
 
@@ -2148,7 +2154,6 @@ static struct sd_chain_index	sd_chain_index_map[] = {
 
 #define	SD_NEXT_IODONE(index, un, bp)				\
 	((*(sd_iodone_chain[(index) - 1]))((index) - 1, un, bp))
-
 
 /*
  *    Function: _init
@@ -3842,7 +3847,7 @@ sd_set_vers1_properties(struct sd_lun *un, int flags, sd_tunables *prop_list)
 
 	/*
 	 * Set the flag to indicate cache is to be disabled. An attempt
-	 * to disable the cache via sd_disable_caching() will be made
+	 * to disable the cache via sd_cache_control() will be made
 	 * later during attach once the basic initialization is complete.
 	 */
 	if (flags & SD_CONF_BSET_NOCACHE) {
@@ -7992,6 +7997,9 @@ sd_unit_attach(dev_info_t *devi)
 	/* Power management support. */
 	un->un_power_level = SD_SPINDLE_UNINIT;
 
+	cv_init(&un->un_wcc_cv,   NULL, CV_DRIVER, NULL);
+	un->un_f_wcc_inprog = 0;
+
 	/*
 	 * The open/close semaphore is used to serialize threads executing
 	 * in the driver's open & close entry point routines for a given
@@ -8090,7 +8098,7 @@ sd_unit_attach(dev_info_t *devi)
 	 *	   iopath (i.e. sd_send_scsi_cmd).
 	 *	2) Initialize the error stats (sd_set_errstats) and partition
 	 *	   stats (sd_set_pstats), following sd_validate_geometry(),
-	 *	   sd_register_devid(), and sd_disable_caching().
+	 *	   sd_register_devid(), and sd_cache_control().
 	 */
 
 	un->un_stats = kstat_create(sd_label, instance,
@@ -8490,7 +8498,12 @@ sd_unit_attach(dev_info_t *devi)
 #endif
 
 	if (un->un_f_opt_disable_cache == TRUE) {
-		if (sd_disable_caching(un) != 0) {
+		/*
+		 * Disable both read cache and write cache.  This is
+		 * the historic behavior of the keywords in the config file.
+		 */
+		if (sd_cache_control(un, SD_CACHE_DISABLE, SD_CACHE_DISABLE) !=
+		    0) {
 			SD_ERROR(SD_LOG_ATTACH_DETACH, un,
 			    "sd_unit_attach: un:0x%p Could not disable "
 			    "caching", un);
@@ -8499,12 +8512,8 @@ sd_unit_attach(dev_info_t *devi)
 	}
 
 	/*
-	 * NOTE: Since there is currently no mechanism to
-	 * change the state of the Write Cache Enable mode select,
-	 * this code just checks the value of the WCE bit
-	 * at device attach time.  If a mechanism
-	 * is added to the driver to change WCE, un_f_write_cache_enabled
-	 * must be updated appropriately.
+	 * Check the value of the WCE bit now and
+	 * set un_f_write_cache_enabled accordingly.
 	 */
 	(void) sd_get_write_cache_enabled(un, &wc_enabled);
 	mutex_enter(SD_MUTEX(un));
@@ -8520,7 +8529,7 @@ sd_unit_attach(dev_info_t *devi)
 	 *	   (i.e. sd_send_scsi_cmd).
 	 *	2) Initialize the error stats (sd_set_errstats) and partition
 	 *	   stats (sd_set_pstats)here, following sd_validate_geometry(),
-	 *	   sd_register_devid(), and sd_disable_caching().
+	 *	   sd_register_devid(), and sd_cache_control().
 	 */
 	if (un->un_f_pkstats_enabled) {
 		sd_set_pstats(un);
@@ -9086,6 +9095,8 @@ sd_unit_detach(dev_info_t *devi)
 	mutex_destroy(&un->un_pm_mutex);
 	cv_destroy(&un->un_pm_busy_cv);
 
+	cv_destroy(&un->un_wcc_cv);
+
 	/* Open/close semaphore */
 	sema_destroy(&un->un_semoclose);
 
@@ -9565,16 +9576,17 @@ sd_event_callback(dev_info_t *dip, ddi_eventcookie_t event, void *arg,
 }
 #endif
 
-
 /*
- *    Function: sd_disable_caching()
+ *    Function: sd_cache_control()
  *
- * Description: This routine is the driver entry point for disabling
+ * Description: This routine is the driver entry point for setting
  *		read and write caching by modifying the WCE (write cache
  *		enable) and RCD (read cache disable) bits of mode
  *		page 8 (MODEPAGE_CACHING).
  *
  *   Arguments: un - driver soft state (unit) structure
+ *		rcd_flag - flag for controlling the read cache
+ *		wce_flag - flag for controlling the write cache
  *
  * Return Code: EIO
  *		code returned by sd_send_scsi_MODE_SENSE and
@@ -9584,7 +9596,7 @@ sd_event_callback(dev_info_t *dip, ddi_eventcookie_t event, void *arg,
  */
 
 static int
-sd_disable_caching(struct sd_lun *un)
+sd_cache_control(struct sd_lun *un, int rcd_flag, int wce_flag)
 {
 	struct mode_caching	*mode_caching_page;
 	uchar_t			*header;
@@ -9592,6 +9604,7 @@ sd_disable_caching(struct sd_lun *un)
 	int			hdrlen;
 	int			bd_len;
 	int			rval = 0;
+	struct mode_header_grp2	*mhp;
 
 	ASSERT(un != NULL);
 
@@ -9609,9 +9622,13 @@ sd_disable_caching(struct sd_lun *un)
 
 	/*
 	 * Allocate memory for the retrieved mode page and its headers.  Set
-	 * a pointer to the page itself.
+	 * a pointer to the page itself.  Use mode_cache_scsi3 to insure
+	 * we get all of the mode sense data otherwise, the mode select
+	 * will fail.  mode_cache_scsi3 is a superset of mode_caching.
 	 */
-	buflen = hdrlen + MODE_BLK_DESC_LENGTH + sizeof (struct mode_caching);
+	buflen = hdrlen + MODE_BLK_DESC_LENGTH +
+		sizeof (struct mode_cache_scsi3);
+
 	header = kmem_zalloc(buflen, KM_SLEEP);
 
 	/* Get the information from the device. */
@@ -9624,7 +9641,7 @@ sd_disable_caching(struct sd_lun *un)
 	}
 	if (rval != 0) {
 		SD_ERROR(SD_LOG_IOCTL_RMMEDIA, un,
-		    "sd_disable_caching: Mode Sense Failed\n");
+		    "sd_cache_control: Mode Sense Failed\n");
 		kmem_free(header, buflen);
 		return (rval);
 	}
@@ -9635,7 +9652,6 @@ sd_disable_caching(struct sd_lun *un)
 	 * should return MODE_BLK_DESC_LENGTH.
 	 */
 	if (un->un_f_cfg_is_atapi == TRUE) {
-		struct mode_header_grp2	*mhp;
 		mhp	= (struct mode_header_grp2 *)header;
 		bd_len  = (mhp->bdesc_length_hi << 8) | mhp->bdesc_length_lo;
 	} else {
@@ -9644,7 +9660,7 @@ sd_disable_caching(struct sd_lun *un)
 
 	if (bd_len > MODE_BLK_DESC_LENGTH) {
 		scsi_log(SD_DEVINFO(un), sd_label, CE_WARN,
-		    "sd_disable_caching: Mode Sense returned invalid "
+		    "sd_cache_control: Mode Sense returned invalid "
 		    "block descriptor length\n");
 		kmem_free(header, buflen);
 		return (EIO);
@@ -9653,12 +9669,33 @@ sd_disable_caching(struct sd_lun *un)
 	mode_caching_page = (struct mode_caching *)(header + hdrlen + bd_len);
 
 	/* Check the relevant bits on successful mode sense. */
-	if ((mode_caching_page->wce) || !(mode_caching_page->rcd)) {
+	if ((mode_caching_page->rcd && rcd_flag == SD_CACHE_ENABLE) ||
+	    (!mode_caching_page->rcd && rcd_flag == SD_CACHE_DISABLE) ||
+	    (mode_caching_page->wce && wce_flag == SD_CACHE_DISABLE) ||
+	    (!mode_caching_page->wce && wce_flag == SD_CACHE_ENABLE)) {
+
+		size_t sbuflen;
+
 		/*
-		 * Read or write caching is enabled.  Disable both of them.
+		 * Construct select buffer length based on the
+		 * length of the sense data returned.
 		 */
-		mode_caching_page->wce = 0;
-		mode_caching_page->rcd = 1;
+		sbuflen =  hdrlen + MODE_BLK_DESC_LENGTH +
+				sizeof (struct mode_page) +
+				(int)mode_caching_page->mode_page.length;
+
+		/*
+		 * Set the caching bits as requested.
+		 */
+		if (rcd_flag == SD_CACHE_ENABLE)
+			mode_caching_page->rcd = 0;
+		else if (rcd_flag == SD_CACHE_DISABLE)
+			mode_caching_page->rcd = 1;
+
+		if (wce_flag == SD_CACHE_ENABLE)
+			mode_caching_page->wce = 1;
+		else if (wce_flag == SD_CACHE_DISABLE)
+			mode_caching_page->wce = 0;
 
 		/* Clear reserved bits before mode select. */
 		mode_caching_page->mode_page.ps = 0;
@@ -9669,13 +9706,21 @@ sd_disable_caching(struct sd_lun *un)
 		 */
 		bzero(header, hdrlen);
 
-		/* Change the cache page to disable all caching. */
+		if (un->un_f_cfg_is_atapi == TRUE) {
+			mhp = (struct mode_header_grp2 *)header;
+			mhp->bdesc_length_hi = bd_len >> 8;
+			mhp->bdesc_length_lo = (uchar_t)bd_len & 0xff;
+		} else {
+			((struct mode_header *)header)->bdesc_length = bd_len;
+		}
+
+		/* Issue mode select to change the cache settings */
 		if (un->un_f_cfg_is_atapi == TRUE) {
 			rval = sd_send_scsi_MODE_SELECT(un, CDB_GROUP1, header,
-			    buflen, SD_SAVE_PAGE, SD_PATH_DIRECT);
+			    sbuflen, SD_SAVE_PAGE, SD_PATH_DIRECT);
 		} else {
 			rval = sd_send_scsi_MODE_SELECT(un, CDB_GROUP0, header,
-			    buflen, SD_SAVE_PAGE, SD_PATH_DIRECT);
+			    sbuflen, SD_SAVE_PAGE, SD_PATH_DIRECT);
 		}
 	}
 
@@ -21785,6 +21830,98 @@ skip_ready_valid:
 			}
 		}
 		break;
+
+	case DKIOCGETWCE: {
+
+		int wce;
+
+		if ((err = sd_get_write_cache_enabled(un, &wce)) != 0) {
+			break;
+		}
+
+		if (ddi_copyout(&wce, (void *)arg, sizeof (wce), flag)) {
+			err = EFAULT;
+		}
+		break;
+	}
+
+	case DKIOCSETWCE: {
+
+		int wce, sync_supported;
+
+		if (ddi_copyin((void *)arg, &wce, sizeof (wce), flag)) {
+			err = EFAULT;
+			break;
+		}
+
+		/*
+		 * Synchronize multiple threads trying to enable
+		 * or disable the cache via the un_f_wcc_cv
+		 * condition variable.
+		 */
+		mutex_enter(SD_MUTEX(un));
+
+		/*
+		 * Don't allow the cache to be enabled if the
+		 * config file has it disabled.
+		 */
+		if (un->un_f_opt_disable_cache && wce) {
+			mutex_exit(SD_MUTEX(un));
+			err = EINVAL;
+			break;
+		}
+
+		/*
+		 * Wait for write cache change in progress
+		 * bit to be clear before proceeding.
+		 */
+		while (un->un_f_wcc_inprog)
+			cv_wait(&un->un_wcc_cv, SD_MUTEX(un));
+
+		un->un_f_wcc_inprog = 1;
+
+		if (un->un_f_write_cache_enabled && wce == 0) {
+			/*
+			 * Disable the write cache.  Don't clear
+			 * un_f_write_cache_enabled until after
+			 * the mode select and flush are complete.
+			 */
+			sync_supported = un->un_f_sync_cache_supported;
+			mutex_exit(SD_MUTEX(un));
+			if ((err = sd_cache_control(un, SD_CACHE_NOCHANGE,
+			    SD_CACHE_DISABLE)) == 0 && sync_supported) {
+				err = sd_send_scsi_SYNCHRONIZE_CACHE(un, NULL);
+			}
+
+			mutex_enter(SD_MUTEX(un));
+			if (err == 0) {
+				un->un_f_write_cache_enabled = 0;
+			}
+
+		} else if (!un->un_f_write_cache_enabled && wce != 0) {
+			/*
+			 * Set un_f_write_cache_enabled first, so there is
+			 * no window where the cache is enabled, but the
+			 * bit says it isn't.
+			 */
+			un->un_f_write_cache_enabled = 1;
+			mutex_exit(SD_MUTEX(un));
+
+			err = sd_cache_control(un, SD_CACHE_NOCHANGE,
+				SD_CACHE_ENABLE);
+
+			mutex_enter(SD_MUTEX(un));
+
+			if (err) {
+				un->un_f_write_cache_enabled = 0;
+			}
+		}
+
+		un->un_f_wcc_inprog = 0;
+		cv_broadcast(&un->un_wcc_cv);
+		mutex_exit(SD_MUTEX(un));
+		break;
+	}
 
 	default:
 		err = ENOTTY;

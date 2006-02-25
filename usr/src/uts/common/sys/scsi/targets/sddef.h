@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -489,7 +488,11 @@ struct sd_lun {
 						/* device is attached */
 	    un_f_log_sense_supported	:1,	/* support log sense */
 	    un_f_pm_supported		:1, 	/* support power-management */
-	    un_f_reserved		:16;
+	    un_f_cfg_is_lsi		:1,	/* Is LSI device, */
+						/* default to NO */
+	    un_f_wcc_inprog		:1,	/* write cache change in */
+						/* progress */
+	    un_f_reserved		:14;
 
 	/* Ptr to table of strings for ASC/ASCQ error message printing */
 	struct scsi_asq_key_strings	*un_additional_codes;
@@ -561,14 +564,8 @@ struct sd_lun {
 	/* Callback routine active counter */
 	short		un_in_callback;
 
-	/*
-	 * Another bit fields for various configuration/state/status info.
-	 * Comments indicate the condition if the value of the
-	 * variable is TRUE (nonzero).
-	 */
-	uint32_t
-		un_f_cfg_is_lsi	:1,	/* Is LSI device, default to NO */
-		un_f_pad_uint32	:1;	/* padding, 31 bits available */
+	kcondvar_t	un_wcc_cv;	/* synchronize changes to */
+					/* un_f_write_cache_enabled */
 
 #ifdef SD_FAULT_INJECTION
 	/* SD Fault Injection */
