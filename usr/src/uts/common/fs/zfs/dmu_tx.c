@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -379,7 +378,7 @@ dmu_tx_hold_zap_impl(dmu_tx_t *tx, dnode_t *dn, uint64_t nops, uint64_t cops)
 		 * block.  So there will be at most 2 blocks total,
 		 * including the header block.
 		 */
-		dmu_tx_count_write(tx, dn, 0, 2 << ZAP_BLOCK_SHIFT);
+		dmu_tx_count_write(tx, dn, 0, 2 << fzap_default_block_shift);
 		return;
 	}
 
@@ -403,7 +402,7 @@ dmu_tx_hold_zap_impl(dmu_tx_t *tx, dnode_t *dn, uint64_t nops, uint64_t cops)
 	 * 3 new blocks written per op: new split leaf, 2 grown ptrtbl blocks
 	 */
 	dmu_tx_count_write(tx, dn, dn->dn_maxblkid * dn->dn_datablksz,
-	    (nops * 6ULL + cops * 3ULL) << ZAP_BLOCK_SHIFT);
+	    (nops * 6ULL + cops * 3ULL) << dn->dn_datablkshift);
 
 	/*
 	 * If the modified blocks are scattered to the four winds,

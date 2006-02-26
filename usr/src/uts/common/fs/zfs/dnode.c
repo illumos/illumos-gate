@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -766,12 +765,6 @@ dnode_set_blksz(dnode_t *dn, uint64_t size, int ibs, dmu_tx_t *tx)
 
 	/* obtain the old block */
 	db = dbuf_hold(dn, 0);
-
-	/* Not allowed to decrease the size if there is data present */
-	if (size < db->db.db_size) {
-		dbuf_rele(db);
-		goto end;
-	}
 
 	dbuf_new_size(db, size, tx);
 

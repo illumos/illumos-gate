@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -69,7 +68,6 @@ zap_byteswap(void *buf, size_t size)
 		mzap_byteswap(buf, size);
 		return;
 	default:
-		ASSERT(size == (1<<ZAP_BLOCK_SHIFT));
 		fzap_byteswap(buf, size);
 		return;
 	}
@@ -202,6 +200,7 @@ mzap_open(objset_t *os, uint64_t obj, dmu_buf_t *db)
 
 	if (((uint64_t *)db->db_data)[0] != ZBT_MICRO) {
 		mutex_init(&zap->zap_f.zap_num_entries_mtx, 0, 0, 0);
+		zap->zap_f.zap_block_shift = highbit(db->db_size) - 1;
 	} else {
 		zap->zap_ismicro = TRUE;
 	}
@@ -235,6 +234,25 @@ mzap_open(objset_t *os, uint64_t obj, dmu_buf_t *db)
 		}
 	} else {
 		zap->zap_salt = zap->zap_f.zap_phys->zap_salt;
+
+		ASSERT3U(sizeof (struct zap_leaf_header), ==,
+		    2*ZAP_LEAF_CHUNKSIZE);
+
+		/*
+		 * The embedded pointer table should not overlap the
+		 * other members.
+		 */
+		ASSERT3P(&ZAP_EMBEDDED_PTRTBL_ENT(zap, 0), >,
+		    &zap->zap_f.zap_phys->zap_salt);
+
+		/*
+		 * The embedded pointer table should end at the end of
+		 * the block
+		 */
+		ASSERT3U((uintptr_t)&ZAP_EMBEDDED_PTRTBL_ENT(zap,
+		    1<<ZAP_EMBEDDED_PTRTBL_SHIFT(zap)) -
+		    (uintptr_t)zap->zap_f.zap_phys, ==,
+		    zap->zap_dbuf->db_size);
 	}
 	rw_exit(&zap->zap_rwlock);
 	return (zap);
@@ -339,7 +357,7 @@ mzap_upgrade(zap_t *zap, dmu_tx_t *tx)
 	nchunks = zap->zap_m.zap_num_chunks;
 
 	err = dmu_object_set_blocksize(zap->zap_objset, zap->zap_object,
-	    1ULL << ZAP_BLOCK_SHIFT, 0, tx);
+	    1ULL << fzap_default_block_shift, 0, tx);
 	ASSERT(err == 0);
 
 	dprintf("upgrading obj=%llu with %u chunks\n",
@@ -454,9 +472,8 @@ zap_pageout(dmu_buf_t *db, void *vmzap)
 
 	rw_destroy(&zap->zap_rwlock);
 
-	if (zap->zap_ismicro) {
+	if (zap->zap_ismicro)
 		mze_destroy(zap);
-	}
 
 	kmem_free(zap, sizeof (zap_t));
 }

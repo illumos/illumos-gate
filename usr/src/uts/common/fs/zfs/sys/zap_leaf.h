@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -38,19 +37,48 @@ struct zap;
 #define	ZAP_LEAF_MAGIC 0x2AB1EAF
 
 /* chunk size = 24 bytes */
+#define	ZAP_LEAF_CHUNKSIZE 24
 
-#define	ZAP_LEAF_NUMCHUNKS 5118
-#define	ZAP_LEAF_ARRAY_BYTES 21
-#define	ZAP_LEAF_HASH_SHIFT 12
-#define	ZAP_LEAF_HASH_NUMENTRIES (1 << ZAP_LEAF_HASH_SHIFT)
-#define	ZAP_LLA_DATA_BYTES ((1 << ZAP_BLOCK_SHIFT) - 16)
+/*
+ * The amount of space available for chunks is:
+ * block size (1<<l->l_bs) - hash entry size (2) * number of hash
+ * entries - header space (2*chunksize)
+ */
+#define	ZAP_LEAF_NUMCHUNKS(l) \
+	(((1<<(l)->l_bs) - 2*ZAP_LEAF_HASH_NUMENTRIES(l)) / \
+	ZAP_LEAF_CHUNKSIZE - 2)
 
-typedef enum zap_entry_type {
-	ZAP_LEAF_FREE = 253,
-	ZAP_LEAF_ENTRY = 252,
-	ZAP_LEAF_ARRAY = 251,
-	ZAP_LEAF_TYPE_MAX = 250
-} zap_entry_type_t;
+/*
+ * The amount of space within the chunk available for the array is:
+ * chunk size - space for type (1) - space for next pointer (2)
+ */
+#define	ZAP_LEAF_ARRAY_BYTES (ZAP_LEAF_CHUNKSIZE - 3)
+
+/*
+ * The leaf hash table has block size / 2^5 (32) number of entries,
+ * which should be more than enough for the maximum number of entries,
+ * which is less than block size / CHUNKSIZE (24) / minimum number of
+ * chunks per entry (3).
+ */
+#define	ZAP_LEAF_HASH_SHIFT(l) ((l)->l_bs - 5)
+#define	ZAP_LEAF_HASH_NUMENTRIES(l) (1 << ZAP_LEAF_HASH_SHIFT(l))
+
+/*
+ * The chunks start immediately after the hash table.  The end of the
+ * hash table is at l_hash + HASH_NUMENTRIES, which we simply cast to a
+ * chunk_t.
+ */
+#define	ZAP_LEAF_CHUNK(l, idx) \
+	((zap_leaf_chunk_t *) \
+	((l)->l_phys->l_hash + ZAP_LEAF_HASH_NUMENTRIES(l)))[idx]
+#define	ZAP_LEAF_ENTRY(l, idx) (&ZAP_LEAF_CHUNK(l, idx).l_entry)
+
+typedef enum zap_chunk_type {
+	ZAP_CHUNK_FREE = 253,
+	ZAP_CHUNK_ENTRY = 252,
+	ZAP_CHUNK_ARRAY = 251,
+	ZAP_CHUNK_TYPE_MAX = 250
+} zap_chunk_type_t;
 
 /*
  * TAKE NOTE:
@@ -80,37 +108,45 @@ typedef struct zap_leaf_phys {
 		uint8_t lh_pad2[12];
 	} l_hdr; /* 2 24-byte chunks */
 
-	uint16_t l_hash[ZAP_LEAF_HASH_NUMENTRIES];
-	/* 170 24-byte chunks plus 16 bytes leftover space */
+	/*
+	 * The header is followed by a hash table with
+	 * ZAP_LEAF_HASH_NUMENTRIES(zap) entries.  The hash table is
+	 * followed by an array of ZAP_LEAF_NUMCHUNKS(zap)
+	 * zap_leaf_chunk structures.  These structures are accessed
+	 * with the ZAP_LEAF_CHUNK() macro.
+	 */
 
-	union zap_leaf_chunk {
-		struct zap_leaf_entry {
-			uint8_t le_type; 	/* always ZAP_LEAF_ENTRY */
-			uint8_t le_int_size;	/* size of ints */
-			uint16_t le_next;	/* next entry in hash chain */
-			uint16_t le_name_chunk;	/* first chunk of the name */
-			uint16_t le_name_length; /* bytes in name, incl null */
-			uint16_t le_value_chunk; /* first chunk of the value */
-			uint16_t le_value_length; /* value length in ints */
-			uint32_t le_cd;		/* collision differentiator */
-			uint64_t le_hash;	/* hash value of the name */
-		} l_entry;
-		struct zap_leaf_array {
-			uint8_t la_type;
-			uint8_t la_array[ZAP_LEAF_ARRAY_BYTES];
-			uint16_t la_next;	/* next blk or CHAIN_END */
-		} l_array;
-		struct zap_leaf_free {
-			uint8_t lf_type;	/* always ZAP_LEAF_FREE */
-			uint8_t lf_pad[ZAP_LEAF_ARRAY_BYTES];
-			uint16_t lf_next;  /* next in free list, or CHAIN_END */
-		} l_free;
-	} l_chunk[ZAP_LEAF_NUMCHUNKS];
+	uint16_t l_hash[1];
 } zap_leaf_phys_t;
+
+typedef union zap_leaf_chunk {
+	struct zap_leaf_entry {
+		uint8_t le_type; 		/* always ZAP_CHUNK_ENTRY */
+		uint8_t le_int_size;		/* size of ints */
+		uint16_t le_next;		/* next entry in hash chain */
+		uint16_t le_name_chunk;		/* first chunk of the name */
+		uint16_t le_name_length;	/* bytes in name, incl null */
+		uint16_t le_value_chunk;	/* first chunk of the value */
+		uint16_t le_value_length;	/* value length in ints */
+		uint32_t le_cd;			/* collision differentiator */
+		uint64_t le_hash;		/* hash value of the name */
+	} l_entry;
+	struct zap_leaf_array {
+		uint8_t la_type;		/* always ZAP_CHUNK_ARRAY */
+		uint8_t la_array[ZAP_LEAF_ARRAY_BYTES];
+		uint16_t la_next;		/* next blk or CHAIN_END */
+	} l_array;
+	struct zap_leaf_free {
+		uint8_t lf_type;		/* always ZAP_CHUNK_FREE */
+		uint8_t lf_pad[ZAP_LEAF_ARRAY_BYTES];
+		uint16_t lf_next;	/* next in free list, or CHAIN_END */
+	} l_free;
+} zap_leaf_chunk_t;
 
 typedef struct zap_leaf {
 	krwlock_t l_rwlock; 		/* only used on head of chain */
 	uint64_t l_blkid;		/* 1<<ZAP_BLOCK_SHIFT byte block off */
+	int l_bs;			/* block size shift */
 	struct zap_leaf *l_next;	/* next in chain */
 	dmu_buf_t *l_dbuf;
 	zap_leaf_phys_t *l_phys;
@@ -185,7 +221,7 @@ extern int zap_entry_create(zap_leaf_t *l,
  */
 
 extern void zap_leaf_init(zap_leaf_t *l);
-extern void zap_leaf_byteswap(zap_leaf_phys_t *buf);
+extern void zap_leaf_byteswap(zap_leaf_phys_t *buf, int len);
 
 extern zap_leaf_t *zap_leaf_split(struct zap *zap, zap_leaf_t *l, dmu_tx_t *tx);
 

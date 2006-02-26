@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,15 +36,17 @@
 extern "C" {
 #endif
 
+extern int fzap_default_block_shift;
+
 #define	ZAP_MAGIC 0x2F52AB2AB
 
-#define	ZAP_BLOCK_SHIFT		17
+#define	FZAP_BLOCK_SHIFT(zap)	((zap)->zap_f.zap_block_shift)
 
 #define	ZAP_MAXCD		(uint32_t)(-1)
 #define	ZAP_HASHBITS		28
 #define	MZAP_ENT_LEN		64
 #define	MZAP_NAME_LEN		(MZAP_ENT_LEN - 8 - 4 - 2)
-#define	MZAP_MAX_BLKSHIFT	ZAP_BLOCK_SHIFT
+#define	MZAP_MAX_BLKSHIFT	SPA_MAXBLOCKSHIFT
 #define	MZAP_MAX_BLKSZ		(1 << MZAP_MAX_BLKSHIFT)
 
 typedef struct mzap_ent_phys {
@@ -73,7 +74,7 @@ typedef struct mzap_ent {
 
 /*
  * The (fat) zap is stored in one object. It is an array of
- * 1<<ZAP_BLOCK_SHIFT byte blocks. The layout looks like one of:
+ * 1<<FZAP_BLOCK_SHIFT byte blocks. The layout looks like one of:
  *
  * ptrtbl fits in first block:
  * 	[zap_phys_t zap_ptrtbl_shift < 6] [zap_leaf_t] ...
@@ -91,8 +92,20 @@ struct zap_leaf;
 #define	ZBT_MICRO		((1ULL << 63) + 3)
 /* any other values are ptrtbl blocks */
 
-/* 1/2 the block size */
-#define	ZAP_PTRTBL_MIN_SHIFT (ZAP_BLOCK_SHIFT - 3 - 1)
+/*
+ * the embedded pointer table takes up half a block:
+ * block size / entry size (2^3) / 2
+ */
+#define	ZAP_EMBEDDED_PTRTBL_SHIFT(zap) (FZAP_BLOCK_SHIFT(zap) - 3 - 1)
+
+/*
+ * The embedded pointer table starts half-way through the block.  Since
+ * the pointer table itself is half the block, it starts at (64-bit)
+ * word number (1<<ZAP_EMBEDDED_PTRTBL_SHIFT(zap)).
+ */
+#define	ZAP_EMBEDDED_PTRTBL_ENT(zap, idx) \
+	((uint64_t *)(zap)->zap_f.zap_phys) \
+	[(idx) + (1<<ZAP_EMBEDDED_PTRTBL_SHIFT(zap))]
 
 /*
  * TAKE NOTE:
@@ -114,8 +127,12 @@ typedef struct zap_phys {
 	uint64_t zap_num_leafs;		/* number of leafs */
 	uint64_t zap_num_entries;	/* number of entries */
 	uint64_t zap_salt;		/* salt to stir into hash function */
-	uint64_t zap_pad[8181];
-	uint64_t zap_leafs[1 << ZAP_PTRTBL_MIN_SHIFT];
+	/*
+	 * This structure is followed by padding, and then the embedded
+	 * pointer table.  The embedded pointer table takes up second
+	 * half of the block.  It is accessed using the
+	 * ZAP_EMBEDDED_PTRTBL_ENT() macro.
+	 */
 } zap_phys_t;
 
 typedef struct zap_table_phys zap_table_phys_t;
@@ -136,6 +153,7 @@ typedef struct zap {
 			 * zap_num_entries
 			 */
 			kmutex_t zap_num_entries_mtx;
+			int zap_block_shift;
 		} zap_fat;
 		struct {
 			mzap_phys_t *zap_phys;
