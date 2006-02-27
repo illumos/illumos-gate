@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -18,6 +17,9 @@
  * information: Portions Copyright [yyyy] [name of copyright owner]
  *
  * CDDL HEADER END
+ */
+
+/*
  *
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -193,11 +195,12 @@ rct_csintlv_bits(uint_t mcrev, int width, uint_t csmode, int factor,
 	const struct csrcb_map *rcm;
 
 	/*
-	 * Dispatch the three "Not implemented" exceptions.
+	 * 8-way cs interleave for some large cs sizes in 128-bit mode is
+	 * not implemented.
 	 */
-	if ((mcrev == MC_REV_PRE_D && width == 128 && csmode == 0x6) ||
-	    (mcrev == MC_REV_D_E && width == 128 && (csmode == 0x9 ||
-	    csmode == 0xa))) {
+	if (factor == 8 && width == 128 &&
+	    ((mcrev == MC_REV_PRE_D && csmode == 0x6) ||
+	    (mcrev == MC_REV_D_E && (csmode == 0x9 || csmode == 0xa)))) {
 		csid->csi_factor = 0;
 		return;
 	}

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -2031,16 +2031,15 @@ publish_suspects(struct fme *fmep)
 		fmd_case_add_suspect(fmep->hdl, fmep->fmcase, fault);
 		rp->suspect->fault = fault;
 		rslfree(rp);
-		/* if "count" property exists, increment the appropriate stat */
-		if ((snp = eventprop_lookup(rp->suspect, L_count)) != NULL) {
-			out(O_ALTFP|O_NONL,
-			    "[FME%d, %s count ", fmep->id,
-			    rp->suspect->enode->u.event.ename->u.name.s);
-			ptree_name_iter(O_ALTFP|O_NONL, snp);
-			out(O_ALTFP, "]");
-			istat_bump(snp, 0);
-		}
-		/* if "action" property exists, evaluate it */
+
+		/*
+		 * If "action" property exists, evaluate it;  this must be done
+		 * before the dupclose check below since some actions may
+		 * modify the asru to be used in fmd_nvl_fmri_faulty.  This
+		 * needs to be restructured if any new actions are introduced
+		 * that have effects that we do not want to be visible if
+		 * we decide not to publish in the dupclose check below.
+		 */
 		if ((snp = eventprop_lookup(rp->suspect, L_action)) != NULL) {
 			struct evalue evalue;
 
@@ -2053,6 +2052,7 @@ publish_suspects(struct fme *fmep)
 			(void) eval_expr(snp, NULL, NULL, NULL, NULL,
 			    NULL, 0, &evalue);
 		}
+
 		/*
 		 * if "dupclose" tunable is set, check if the asru is
 		 * already marked as "faulty".
@@ -2076,17 +2076,43 @@ publish_suspects(struct fme *fmep)
 		}
 
 	}
+
+	/*
+	 * Close the case if all asrus are already known to be faulty and if
+	 * Dupclose is enabled.  Otherwise we are going to publish so take
+	 * any pre-publication actions.
+	 */
 	if (Dupclose && allfaulty) {
 		out(O_ALTFP, "[dupclose FME%d, case %s]", fmep->id,
 		    fmd_case_uuid(fmep->hdl, fmep->fmcase));
 		fmd_case_close(fmep->hdl, fmep->fmcase);
 	} else {
+		for (rp = erl; rp >= srl; rp--) {
+			struct event *suspect = rp->suspect;
+
+			if (suspect == NULL)
+				continue;
+
+			fault = suspect->fault;
+
+			/* if "count" exists, increment the appropriate stat */
+			if ((snp = eventprop_lookup(suspect,
+			    L_count)) != NULL) {
+				out(O_ALTFP|O_NONL,
+				    "[FME%d, %s count ", fmep->id,
+				    suspect->enode->u.event.ename->u.name.s);
+				ptree_name_iter(O_ALTFP|O_NONL, snp);
+				out(O_ALTFP, "]");
+				istat_bump(snp, 0);
+
+			}
+		}
+		istat_save();	/* write out any istat changes */
+
 		out(O_ALTFP, "[solving FME%d, case %s]", fmep->id,
 		    fmd_case_uuid(fmep->hdl, fmep->fmcase));
 		fmd_case_solve(fmep->hdl, fmep->fmcase);
 	}
-
-	istat_save();	/* write out any istat changes */
 
 	/*
 	 * revert to the original suspect list

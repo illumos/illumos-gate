@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -215,15 +214,16 @@ mem_asru(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 {
 	int err;
 	uint64_t pa = 0, offset = 0;
+	int incl_pa = 0, incl_offset = 0;
 	nvlist_t *hcsp = NULL;
 	nvlist_t *asru;
 	char *cstr;
 
 	if (nvlist_lookup_nvlist(in, FM_FMRI_HC_SPECIFIC, &hcsp) == 0) {
-		(void) nvlist_lookup_uint64(hcsp, "asru-"FM_FMRI_MEM_PHYSADDR,
-		    &pa);
-		(void) nvlist_lookup_uint64(hcsp, "asru-"FM_FMRI_MEM_OFFSET,
-		    &offset);
+		incl_pa = (nvlist_lookup_uint64(hcsp,
+		    "asru-"FM_FMRI_MEM_PHYSADDR, &pa) == 0);
+		incl_offset = (nvlist_lookup_uint64(hcsp,
+		    "asru-"FM_FMRI_MEM_OFFSET, &offset) == 0);
 	}
 
 	if (topo_fmri_nvl2str(topo_mod_handle(mod), in, &cstr, &err) < 0)
@@ -236,8 +236,10 @@ mem_asru(topo_mod_t *mod, tnode_t *node, topo_version_t version,
 	err = nvlist_add_uint8(asru, FM_VERSION, FM_MEM_SCHEME_VERSION);
 	err |= nvlist_add_string(asru, FM_FMRI_SCHEME, FM_FMRI_SCHEME_MEM);
 	err |= nvlist_add_string(asru, FM_FMRI_MEM_UNUM, cstr);
-	err |= nvlist_add_uint64(asru, FM_FMRI_MEM_PHYSADDR, pa);
-	err |= nvlist_add_uint64(asru, FM_FMRI_MEM_OFFSET, offset);
+	if (incl_pa)
+		err |= nvlist_add_uint64(asru, FM_FMRI_MEM_PHYSADDR, pa);
+	if (incl_offset)
+		err |= nvlist_add_uint64(asru, FM_FMRI_MEM_OFFSET, offset);
 	topo_mod_strfree(mod, cstr);
 	if (err != 0) {
 		nvlist_free(asru);

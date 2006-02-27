@@ -34,6 +34,8 @@
 #include <strings.h>
 #include <ctype.h>
 
+#define	ISHCUNUM(unum) (strncmp(unum, "hc:/", 4) == 0)
+
 /*
  * Given a DIMM or bank unum, mem_unum_burst will break it apart into individual
  * DIMM names.  If it's a DIMM, one name will be returned.  If it's a bank, the
@@ -321,6 +323,7 @@ static int
 unum_contains_bysubstr(const char *erunum, const char *eeunum)
 {
 	uint_t erlen, eelen;
+	int nojnumstrip = 0;
 
 	/*
 	 * This comparison method is only known to work on specific types of
@@ -329,11 +332,19 @@ unum_contains_bysubstr(const char *erunum, const char *eeunum)
 	if ((strncmp(erunum, "/N", 2) != 0 && strncmp(erunum, "/IO", 3) != 0 &&
 	    strncmp(erunum, "/SB", 3) != 0) ||
 	    (strncmp(eeunum, "/N", 2) != 0 && strncmp(eeunum, "/IO", 3) != 0 &&
-	    strncmp(eeunum, "/SB", 3) != 0))
-		return (fmd_fmri_set_errno(EINVAL));
+	    strncmp(eeunum, "/SB", 3) != 0)) {
+		if (ISHCUNUM(erunum) && ISHCUNUM(eeunum))
+			nojnumstrip = 1;
+		else
+			return (fmd_fmri_set_errno(EINVAL));
+	}
 
-	erlen = unum_strip_one_jnum(erunum, &erlen) ? erlen : strlen(erunum);
-	eelen = unum_strip_one_jnum(eeunum, &eelen) ? eelen : strlen(eeunum);
+	if (!nojnumstrip) {
+		erlen = unum_strip_one_jnum(erunum, &erlen) ?
+		    erlen : strlen(erunum);
+		eelen = unum_strip_one_jnum(eeunum, &eelen) ?
+		    eelen : strlen(eeunum);
+	}
 
 	return (strncmp(erunum, eeunum, MIN(erlen, eelen)) == 0);
 }
@@ -384,7 +395,7 @@ mem_unum_rewrite(nvlist_t *nvl, nvlist_t **rnvl)
 	struct topo_hdl *thp;
 
 	if (nvlist_lookup_string(nvl, FM_FMRI_MEM_UNUM, &unumstr) != 0 ||
-	    strncmp(unumstr, "hc:/", 4) != 0)
+	    !ISHCUNUM(unumstr))
 		return (0);
 
 	thp = fmd_fmri_topology(TOPO_VERSION);

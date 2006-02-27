@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -61,17 +60,15 @@ typedef struct cma_subscriber {
 } cma_subscriber_t;
 
 static const cma_subscriber_t cma_subrs[] = {
-	{ "fault.cpu.*", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
-	    cma_cpu_retire },
 	{ "fault.memory.page", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    cma_page_retire },
 	{ "fault.memory.dimm", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
-	{ "fault.memory.dimm_sb", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	{ "fault.memory.dimm_sb", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
-	{ "fault.memory.dimm_ck", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	{ "fault.memory.dimm_ck", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
-	{ "fault.memory.dimm_ue", FM_FMRI_SCHEME_HC, FM_HC_SCHEME_VERSION,
+	{ "fault.memory.dimm_ue", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
 	{ "fault.memory.bank", FM_FMRI_SCHEME_MEM, FM_MEM_SCHEME_VERSION,
 	    NULL },
