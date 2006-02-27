@@ -2842,7 +2842,7 @@ install_va_to_tte(void)
  * is registered into OBP.
  */
 static char *create_node =
-	"root-device "
+	"\" /\" find-device "
 	"new-device "
 	"\" os-io\" device-name "
 	"\" display\" device-type "
@@ -2858,7 +2858,7 @@ static char *create_node =
 	"               swap >r 1-  0  ?do  drop  loop  r> "
 	"       else "
 	"               -2 "
-	"       then l->n "
+	"       then "
 	";    "
 	": write ( adr,len -- #written ) "
 	"       \" write\" ['] cb-r/w catch  if  2drop 2drop 0 exit  then "
