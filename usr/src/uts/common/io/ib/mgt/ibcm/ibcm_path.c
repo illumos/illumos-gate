@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -134,7 +133,7 @@ ibt_aget_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
     ibt_path_attr_t *attrp, uint8_t max_paths, ibt_path_handler_t func,
     void  *arg)
 {
-	IBTF_DPRINTF_L3(cmlog, "ibt_aget_paths(%p, 0x%lX, %p, %d, %p)",
+	IBTF_DPRINTF_L3(cmlog, "ibt_aget_paths(%p, 0x%X, %p, %d, %p)",
 	    ibt_hdl, flags, attrp, max_paths, func);
 
 	if (func == NULL) {
@@ -407,7 +406,7 @@ ibt_get_paths(ibt_clnt_hdl_t ibt_hdl, ibt_path_flags_t flags,
 
 	ASSERT(paths != NULL);
 
-	IBTF_DPRINTF_L3(cmlog, "ibt_get_paths(%p, 0x%lX, %p, %d)",
+	IBTF_DPRINTF_L3(cmlog, "ibt_get_paths(%p, 0x%X, %p, %d)",
 	    ibt_hdl, flags, attrp, max_paths);
 
 	if (paths == NULL) {
@@ -609,7 +608,7 @@ ibcm_validate_path_attributes(ibt_path_attr_t *attrp, ibt_path_flags_t flags,
 		for (i = 0; i < attrp->pa_num_dgids; i++) {
 			ib_gid_t	gid = attrp->pa_dgids[i];
 
-			IBTF_DPRINTF_L3(cmlog, "ibcm_validate_path_attributes: "
+			IBTF_DPRINTF_L2(cmlog, "ibcm_validate_path_attributes: "
 			    "DGID[%d] = %llX:%llX", i, gid.gid_prefix,
 			    gid.gid_guid);
 
@@ -1124,9 +1123,10 @@ ibcm_saa_path_rec(ibcm_path_tqargs_t *p_arg, ibtl_cm_port_list_t *sl,
 		}
 	}
 
-	if ((rec_found == 0) && (retval == IBT_SUCCESS))
-		retval = IBT_PATH_RECORDS_NOT_FOUND;
-	else if (rec_found != *max_count)
+	if (rec_found == 0)  {
+		if (retval == IBT_SUCCESS)
+			retval = IBT_PATH_RECORDS_NOT_FOUND;
+	} else if (rec_found != *max_count)
 		retval = IBT_INSUFF_DATA;
 	else if (rec_found != 0)
 		retval = IBT_SUCCESS;

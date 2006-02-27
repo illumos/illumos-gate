@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2686,9 +2685,9 @@ ibt_bind_service(ibt_srv_hdl_t srv_hdl, ib_gid_t gid, ibt_srv_bind_t *srv_bind,
 			if (srv_bind == NULL ||
 			    srv_bind->sb_pkey == sbp->sbind_pkey) {
 				IBTF_DPRINTF_L2(cmlog, "ibt_bind_service: "
-				    "failed: GID %llx:%llx and PKEY %x is "
+				    "failed: GID %llX:%llX and PKEY %x is "
 				    "already bound", gid.gid_guid,
-				    gid.gid_prefix, srv_bind->sb_pkey);
+				    gid.gid_prefix, sbp->sbind_pkey);
 				mutex_exit(&ibcm_svc_info_lock);
 				ibcm_dec_hca_acc_cnt(hcap);
 				kmem_free(sbindp, sizeof (*sbindp));
@@ -5616,7 +5615,7 @@ ibt_get_companion_port_gids(ib_gid_t gid, ib_guid_t hca_guid,
 	void			*res_p;
 	ibmf_saa_handle_t	saa_handle;
 	int			sa_ret;
-	ibt_status_t		retval;
+	ibt_status_t		retval = IBT_SUCCESS;
 	ibcm_hca_info_t		*hcap;
 	ibtl_cm_hca_port_t	hport;
 	int			i, j;
@@ -5757,8 +5756,8 @@ get_comp_for_multism:
 			if (saa_handle == NULL) {
 				IBTF_DPRINTF_L2(cmlog,
 				    "ibt_get_companion_port_gids: "
-				    "Port (%d)  - NOT ACTIVE", port);
-				retval = IBT_HCA_PORT_NOT_ACTIVE;
+				    "Port (%d)  - NOT ACTIVE", port + 1);
+				retval = IBT_GIDS_NOT_FOUND;
 				continue;
 			}
 
@@ -5775,7 +5774,7 @@ get_comp_for_multism:
 				    "ibt_get_companion_port_gids: SnPrefix of "
 				    "GID(%llX) and Port SN_Pfx(%llX) differ",
 				    gid.gid_prefix, sgid.gid_prefix);
-				retval = IBT_NODE_RECORDS_NOT_FOUND;
+				retval = IBT_GIDS_NOT_FOUND;
 				continue;
 			}
 
@@ -5814,7 +5813,7 @@ get_comp_for_multism:
 					    "for the DGID (0x%llX) from SGID "
 					    "(0x%llX)", sa_ret, gid.gid_guid,
 					    sgid.gid_guid);
-					retval = IBT_NODE_RECORDS_NOT_FOUND;
+					retval = IBT_GIDS_NOT_FOUND;
 					continue;
 				}
 
@@ -5993,6 +5992,8 @@ get_comp_for_multism:
 			goto get_comp_for_multihca;
 		}
 	}
+	if (*num_gids_p == 0)
+		retval = IBT_GIDS_NOT_FOUND;
 
 get_comp_pgid_exit:
 	if (guid_array)

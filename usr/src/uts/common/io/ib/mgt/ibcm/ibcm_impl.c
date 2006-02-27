@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -578,6 +577,7 @@ ibcm_init(void)
 		ibcm_fini_locks();
 		return (IBCM_FAILURE);
 	}
+	ibcm_rc_flow_control_init();
 
 	_NOTE(NOW_INVISIBLE_TO_OTHER_THREADS(ibcm_taskq))
 	ibcm_taskq = system_taskq;
@@ -607,9 +607,10 @@ ibcm_init(void)
 		IBTF_DPRINTF_L2(cmlog, "ibcm_init(): ibt_attach failed %d",
 		    status);
 		(void) ibcm_ar_fini();
+		ibcm_stop_timeout_thread();
 		ibcm_fini_ids();
 		ibcm_fini_locks();
-		ibcm_stop_timeout_thread();
+		ibcm_rc_flow_control_fini();
 		return (IBCM_FAILURE);
 	}
 
@@ -623,8 +624,6 @@ ibcm_init(void)
 
 	/* Unblock any waiting HCA DR asyncs in CM */
 	mutex_exit(&ibcm_global_hca_lock);
-
-	ibcm_rc_flow_control_init();
 
 	IBTF_DPRINTF_L4(cmlog, "ibcm_init: done");
 	return (IBCM_SUCCESS);
