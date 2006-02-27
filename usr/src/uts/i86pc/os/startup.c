@@ -610,7 +610,8 @@ perform_allocations(void)
 void
 startup(void)
 {
-	extern void startup_bios_disk();
+	extern void startup_bios_disk(void);
+	extern void startup_pci_bios(void);
 	/*
 	 * Make sure that nobody tries to use sekpm until we have
 	 * initialized it properly.
@@ -623,6 +624,7 @@ startup(void)
 	progressbar_init();
 	startup_init();
 	startup_memlist();
+	startup_pci_bios();
 	startup_modules();
 	startup_bios_disk();
 	startup_bop_gone();

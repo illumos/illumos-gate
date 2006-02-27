@@ -67,6 +67,7 @@ CORE_OBJS +=			\
 	memscrub.o		\
 	mpcore.o		\
 	notes.o			\
+	pci_bios.o		\
 	pci_cfgspace.o		\
 	pci_mech1.o		\
 	pci_mech2.o		\
