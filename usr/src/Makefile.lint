@@ -403,6 +403,7 @@ sparc_SUBDIRS= \
 	cmd/wrsmstat \
 	lib/libwrsmconf \
 	lib/wrsm \
+	lib/libpcp \
 	stand
 
 $(CLOSED_BUILD)COMMON_SUBDIRS += $(CLOSED)/cmd/mtst
