@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -933,6 +932,20 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 				pp = page_lookup(vp, off, SE_SHARED);
 				ASSERT(pp != NULL);
 				if (lpg_cnt == 0) {
+					lpg_cnt++;
+					/*
+					 * For a small page, we are done --
+					 * lpg_count is reset to 0 below.
+					 *
+					 * For a large page, we are guaranteed
+					 * to find the anon structures of all
+					 * constituent pages and a non-zero
+					 * lpg_cnt ensures that we don't test
+					 * for mlock for these. We are done
+					 * when lpg_count reaches (npgs + 1).
+					 * If we are not the first constituent
+					 * page, restart at the first one.
+					 */
 					npgs = page_get_pagecnt(pp->p_szc);
 					if (!IS_P2ALIGNED(an_idx, npgs)) {
 						an_idx = P2ALIGN(an_idx, npgs);
@@ -940,7 +953,7 @@ segspt_dismpagelock(struct seg *seg, caddr_t addr, size_t len,
 						continue;
 					}
 				}
-				if (++lpg_cnt == npgs)
+				if (++lpg_cnt > npgs)
 					lpg_cnt = 0;
 
 				/*
