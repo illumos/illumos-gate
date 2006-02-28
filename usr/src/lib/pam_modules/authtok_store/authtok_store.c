@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +42,7 @@
 #define	SUNW_OLDRPCPASS "SUNW-OLD-RPC-PASSWORD"
 
 /*PRINTFLIKE3*/
-void
+static void
 error(int nowarn, pam_handle_t *pamh, char *fmt, ...)
 {
 	va_list ap;
@@ -53,6 +52,21 @@ error(int nowarn, pam_handle_t *pamh, char *fmt, ...)
 	(void) vsnprintf(messages[0], sizeof (messages[0]), fmt, ap);
 	if (nowarn == 0)
 		(void) __pam_display_msg(pamh, PAM_ERROR_MSG, 1, messages,
+		    NULL);
+	va_end(ap);
+}
+
+/*PRINTFLIKE3*/
+static void
+info(int nowarn, pam_handle_t *pamh, char *fmt, ...)
+{
+	va_list ap;
+	char messages[PAM_MAX_NUM_MSG][PAM_MAX_MSG_SIZE];
+
+	va_start(ap, fmt);
+	(void) vsnprintf(messages[0], sizeof (messages[0]), fmt, ap);
+	if (nowarn == 0)
+		(void) __pam_display_msg(pamh, PAM_TEXT_INFO, 1, messages,
 		    NULL);
 	va_end(ap);
 }
@@ -215,7 +229,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		for (i = 1; i <= REP_LAST; i <<= 1) {
 			if ((updated_reps & i) == 0)
 				continue;
-			error(nowarn, pamh, dgettext(TEXT_DOMAIN,
+			info(nowarn, pamh, dgettext(TEXT_DOMAIN,
 			    "%s: password successfully changed for %s"),
 			    service, user);
 		}
@@ -226,7 +240,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		 * update went well too... Inform the user
 		 */
 		if (updated_reps & REP_NISPLUS)
-			error(nowarn, pamh, dgettext(TEXT_DOMAIN,
+			info(nowarn, pamh, dgettext(TEXT_DOMAIN,
 			    "%s: credential information changed for %s"),
 			    service, user);
 		res = PAM_SUCCESS;
@@ -280,7 +294,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		/*
 		 * yppasswdd detected that we're not changing anything.
 		 */
-		error(nowarn, pamh, dgettext(TEXT_DOMAIN,
+		info(nowarn, pamh, dgettext(TEXT_DOMAIN,
 		    "%s: Password information unchanged."), service);
 		res = PAM_SUCCESS;
 		break;
@@ -303,7 +317,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		 */
 
 		/* First inform the user about the passsword update */
-		error(nowarn, pamh, dgettext(TEXT_DOMAIN,
+		info(nowarn, pamh, dgettext(TEXT_DOMAIN,
 			"%s: password successfully changed for %s"),
 			service, user);
 
@@ -334,7 +348,7 @@ pam_sm_chauthtok(pam_handle_t *pamh, int flags, int argc, const char **argv)
 		res = PAM_SUCCESS;
 		break;
 	case PWU_UPDATED_SOME_CREDS:
-		error(nowarn, pamh, dgettext(TEXT_DOMAIN,
+		info(nowarn, pamh, dgettext(TEXT_DOMAIN,
 			"%s: password successfully changed for %s"),
 			service, user);
 
