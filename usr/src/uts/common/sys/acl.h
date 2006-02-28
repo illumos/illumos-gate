@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -176,6 +175,7 @@ typedef struct acl_info acl_t;
 
 #define	ACL_APPEND_ID	0x1 	/* append uid/gid to user/group entries */
 #define	ACL_COMPACT_FMT	0x2 	/* build ACL in ls -V format */
+#define	ACL_NORESOLVE	0x4	/* don't do name service lookups */
 
 /*
  * Legacy aclcheck errors for aclent_t ACLs

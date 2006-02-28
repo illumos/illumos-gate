@@ -744,6 +744,7 @@ acl_str_to_id(char *str, int *id)
 	char *end;
 	uid_t value;
 
+	errno = 0;
 	value = strtol(str, &end, 10);
 
 	if (errno != 0 || *end != '\0')

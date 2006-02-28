@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -107,6 +106,9 @@ extern "C" {
 #define	ZONE_CONFIG_ROOT	"/etc/zones"
 #define	ZONE_INDEX_FILE		ZONE_CONFIG_ROOT "/index"
 
+/* The maximum length of the VERSION string in the pkginfo(4) file. */
+#define	ZONE_PKG_VERSMAX	256
+
 /*
  * The integer field expresses the current values on a get.
  * On a put, it represents the new values if >= 0 or "don't change" if < 0.
@@ -165,6 +167,23 @@ struct zone_attrtab {
 
 struct zone_dstab {
 	char	zone_dataset_name[MAXNAMELEN];
+};
+
+struct zone_pkgtab {
+	char	zone_pkg_name[MAXNAMELEN];
+	char	zone_pkg_version[ZONE_PKG_VERSMAX];
+};
+
+struct zone_patchtab {
+	char	zone_patch_id[MAXNAMELEN];
+};
+
+struct zone_devpermtab {
+	char	zone_devperm_name[MAXPATHLEN];
+	uid_t	zone_devperm_uid;
+	gid_t	zone_devperm_gid;
+	mode_t	zone_devperm_mode;
+	char	*zone_devperm_acl;
 };
 
 /*
@@ -280,6 +299,22 @@ extern	int	zonecfg_modify_ds(zone_dochandle_t, struct zone_dstab *,
 extern	int	zonecfg_lookup_ds(zone_dochandle_t, struct zone_dstab *);
 
 /*
+ * attach/detach support.
+ */
+extern	int	zonecfg_get_attach_handle(const char *, const char *,
+    boolean_t, zone_dochandle_t);
+extern	int	zonecfg_detach_save(zone_dochandle_t);
+extern	int	zonecfg_get_detach_info(zone_dochandle_t, boolean_t);
+extern	boolean_t zonecfg_detached(const char *);
+extern	void	zonecfg_rm_detached(zone_dochandle_t, boolean_t forced);
+extern	int	zonecfg_devwalk(zone_dochandle_t handle,
+    int (*cb)(const char *, uid_t, gid_t, mode_t, const char *, void *),
+    void *data);
+extern	int	zonecfg_devperms_apply(zone_dochandle_t, const char *,
+    uid_t, gid_t, mode_t, const char *);
+
+
+/*
  * '*ent' iterator routines.
  */
 extern	int	zonecfg_setfsent(zone_dochandle_t);
@@ -303,6 +338,16 @@ extern	int	zonecfg_endrctlent(zone_dochandle_t);
 extern	int	zonecfg_setdsent(zone_dochandle_t);
 extern	int	zonecfg_getdsent(zone_dochandle_t, struct zone_dstab *);
 extern	int	zonecfg_enddsent(zone_dochandle_t);
+extern	int	zonecfg_setpkgent(zone_dochandle_t);
+extern	int	zonecfg_getpkgent(zone_dochandle_t, struct zone_pkgtab *);
+extern	int	zonecfg_endpkgent(zone_dochandle_t);
+extern	int	zonecfg_setpatchent(zone_dochandle_t);
+extern	int	zonecfg_getpatchent(zone_dochandle_t, struct zone_patchtab *);
+extern	int	zonecfg_endpatchent(zone_dochandle_t);
+extern	int	zonecfg_setdevperment(zone_dochandle_t);
+extern	int	zonecfg_getdevperment(zone_dochandle_t,
+    struct zone_devpermtab *);
+extern	int	zonecfg_enddevperment(zone_dochandle_t);
 
 /*
  * Privilege-related functions.

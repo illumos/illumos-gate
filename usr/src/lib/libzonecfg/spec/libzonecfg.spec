@@ -1,13 +1,12 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -55,6 +54,12 @@ include		<libzonecfg.h>
 declaration	int zonecfg_get_handle(const char *, zone_dochandle_t)
 version		SUNWprivate_1.1
 end		
+
+function	zonecfg_get_attach_handle
+include		<libzonecfg.h>
+declaration	int zonecfg_get_attach_handle(const char *, const char *, boolean_t, zone_dochandle_t)
+version		SUNWprivate_1.1
+end
 
 function	zonecfg_get_snapshot_handle
 include		<libzonecfg.h>
@@ -501,6 +506,60 @@ declaration	int zonecfg_enddsent(zone_dochandle_t)
 version		SUNWprivate_1.1
 end		
 
+function	zonecfg_setpkgent
+include		<libzonecfg.h>
+declaration	int zonecfg_setpkgent(zone_dochandle_t);
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_getpkgent
+include		<libzonecfg.h>
+declaration	int zonecfg_getpkgent(zone_dochandle_t, struct zone_pkgtab *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_endpkgent
+include		<libzonecfg.h>
+declaration	int zonecfg_endpkgent(zone_dochandle_t)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_setpatchent
+include		<libzonecfg.h>
+declaration	int zonecfg_setpatchent(zone_dochandle_t);
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_getpatchent
+include		<libzonecfg.h>
+declaration	int zonecfg_getpatchent(zone_dochandle_t, struct zone_patchtab *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_endpatchent
+include		<libzonecfg.h>
+declaration	int zonecfg_endpatchent(zone_dochandle_t)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_setdevperment
+include		<libzonecfg.h>
+declaration	int zonecfg_setdevperment(zone_dochandle_t);
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_getdevperment
+include		<libzonecfg.h>
+declaration	int zonecfg_getdevperment(zone_dochandle_t, struct zone_devpermtab *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_enddevperment
+include		<libzonecfg.h>
+declaration	int zonecfg_enddevperment(zone_dochandle_t)
+version		SUNWprivate_1.1
+end		
+
 function	zonecfg_destroy
 include		<libzonecfg.h>
 declaration	int zonecfg_destroy(const char *, boolean_t)
@@ -524,6 +583,42 @@ include		<libzonecfg.h>
 declaration	int zonecfg_save(zone_dochandle_t)
 version		SUNWprivate_1.1
 end		
+
+function	zonecfg_detach_save
+include		<libzonecfg.h>
+declaration	int zonecfg_detach_save(zone_dochandle_t)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_get_detach_info
+include		<libzonecfg.h>
+declaration	int zonecfg_get_detach_info(zone_dochandle_t, boolean_t)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_detached
+include		<libzonecfg.h>
+declaration	boolean_t zonecfg_detached(const char *)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_rm_detached
+include		<libzonecfg.h>
+declaration	void zonecfg_rm_sw_inventory(zone_dochandle_t, boolean_t)
+version		SUNWprivate_1.1
+end		
+
+function	zonecfg_devwalk
+include		<libzonecfg.h>
+declaration	int zonecfg_devwalk(zone_dochandle_t, int (*cb)(const char *, uid_t, gid_t, mode_t, const char *, void *), void *data)
+version		SUNWprivate_1.1
+end
+
+function	zonecfg_devperms_apply
+include		<libzonecfg.h>
+declaration	int zonecfg_devperms_apply(zone_dochandle_t, const char *, uid_t, gid_t, mode_t, const char *)
+version		SUNWprivate_1.1
+end
 
 function	zonecfg_access
 include		<libzonecfg.h>

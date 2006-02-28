@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -114,9 +113,11 @@ static size_t nzents;
 #define	CMD_UNMOUNT	10
 #define	CMD_CLONE	11
 #define	CMD_MOVE	12
+#define	CMD_DETACH	13
+#define	CMD_ATTACH	14
 
 #define	CMD_MIN		CMD_HELP
-#define	CMD_MAX		CMD_MOVE
+#define	CMD_MAX		CMD_ATTACH
 
 #define	SINGLE_USER_RETRY	30
 
@@ -139,6 +140,8 @@ struct cmd {
 #define	SHELP_UNINSTALL	"uninstall [-F]"
 #define	SHELP_CLONE	"clone [-m method] zonename"
 #define	SHELP_MOVE	"move zonepath"
+#define	SHELP_DETACH	"detach"
+#define	SHELP_ATTACH	"attach [-F]"
 
 static int help_func(int argc, char *argv[]);
 static int ready_func(int argc, char *argv[]);
@@ -153,6 +156,8 @@ static int mount_func(int argc, char *argv[]);
 static int unmount_func(int argc, char *argv[]);
 static int clone_func(int argc, char *argv[]);
 static int move_func(int argc, char *argv[]);
+static int detach_func(int argc, char *argv[]);
+static int attach_func(int argc, char *argv[]);
 static int sanity_check(char *zone, int cmd_num, boolean_t running,
     boolean_t unsafe_when_running);
 static int cmd_match(char *cmd);
@@ -173,7 +178,9 @@ static struct cmd cmdtab[] = {
 	{ CMD_MOUNT,		"mount",	NULL,		mount_func },
 	{ CMD_UNMOUNT,		"unmount",	NULL,		unmount_func },
 	{ CMD_CLONE,		"clone",	SHELP_CLONE,	clone_func },
-	{ CMD_MOVE,		"move",		SHELP_MOVE,	move_func }
+	{ CMD_MOVE,		"move",		SHELP_MOVE,	move_func },
+	{ CMD_DETACH,		"detach",	SHELP_DETACH,	detach_func },
+	{ CMD_ATTACH,		"attach",	SHELP_ATTACH,	attach_func }
 };
 
 /* global variables */
@@ -904,9 +911,11 @@ validate_zonepath(char *path, int cmd_num)
 	/*
 	 * The existence of the root path is only bad in the configured state,
 	 * as it is *supposed* to be there at the installed and later states.
+	 * However, the root path is expected to be there if the zone is
+	 * detached.
 	 * State/command mismatches are caught earlier in verify_details().
 	 */
-	if (state == ZONE_STATE_CONFIGURED) {
+	if (state == ZONE_STATE_CONFIGURED && cmd_num != CMD_ATTACH) {
 		if (snprintf(rootpath, sizeof (rootpath), "%s/root", rpath) >=
 		    sizeof (rootpath)) {
 			/*
@@ -918,9 +927,17 @@ validate_zonepath(char *path, int cmd_num)
 			return (Z_ERR);
 		}
 		if ((res = stat(rootpath, &stbuf)) == 0) {
-			(void) fprintf(stderr, gettext("Rootpath %s exists; "
-			    "remove or move aside prior to %s.\n"), rootpath,
-			    cmd_to_str(CMD_INSTALL));
+			if (zonecfg_detached(rpath))
+				(void) fprintf(stderr,
+				    gettext("Cannot %s detached "
+				    "zone.\nUse attach or remove %s "
+				    "directory.\n"), cmd_to_str(cmd_num),
+				    rpath);
+			else
+				(void) fprintf(stderr,
+				    gettext("Rootpath %s exists; "
+				    "remove or move aside prior to %s.\n"),
+				    rootpath, cmd_to_str(cmd_num));
 			return (Z_ERR);
 		}
 	}
@@ -1622,6 +1639,7 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 				return (Z_ERR);
 			}
 			break;
+		case CMD_ATTACH:
 		case CMD_CLONE:
 		case CMD_INSTALL:
 			if (state == ZONE_STATE_INSTALLED) {
@@ -1635,6 +1653,7 @@ sanity_check(char *zone, int cmd_num, boolean_t running,
 				return (Z_ERR);
 			}
 			break;
+		case CMD_DETACH:
 		case CMD_MOVE:
 		case CMD_READY:
 		case CMD_BOOT:
@@ -3409,6 +3428,549 @@ done:
 			}
 		}
 	}
+
+	return ((err == Z_OK) ? Z_OK : Z_ERR);
+}
+
+static int
+detach_func(int argc, char *argv[])
+{
+	int lockfd;
+	int err, arg;
+	char zonepath[MAXPATHLEN];
+	zone_dochandle_t handle;
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot detach zone in alternate root"));
+		return (Z_ERR);
+	}
+
+	optind = 0;
+	if ((arg = getopt(argc, argv, "?")) != EOF) {
+		switch (arg) {
+		case '?':
+			sub_usage(SHELP_DETACH, CMD_DETACH);
+			return (optopt == '?' ? Z_OK : Z_USAGE);
+		default:
+			sub_usage(SHELP_DETACH, CMD_DETACH);
+			return (Z_USAGE);
+		}
+	}
+	if (sanity_check(target_zone, CMD_DETACH, B_FALSE, B_TRUE) != Z_OK)
+		return (Z_ERR);
+	if (verify_details(CMD_DETACH) != Z_OK)
+		return (Z_ERR);
+
+	if ((err = zone_get_zonepath(target_zone, zonepath, sizeof (zonepath)))
+	    != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not get zone path"));
+		return (Z_ERR);
+	}
+
+	/* Don't detach the zone if anything is still mounted there */
+	if (zonecfg_find_mounts(zonepath, NULL, NULL)) {
+		zerror(gettext("These file-systems are mounted on "
+		    "subdirectories of %s.\n"), zonepath);
+		(void) zonecfg_find_mounts(zonepath, zfm_print, NULL);
+		return (Z_ERR);
+	}
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_DETACH), B_TRUE);
+		return (Z_ERR);
+	}
+
+	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_DETACH), B_TRUE);
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
+		zerror(gettext("another %s may have an operation in progress."),
+		    "zoneadm");
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	if ((err = zonecfg_get_detach_info(handle, B_TRUE)) != Z_OK) {
+		errno = err;
+		zperror(gettext("getting the detach information failed"),
+		    B_TRUE);
+		goto done;
+	}
+
+	if ((err = zonecfg_detach_save(handle)) != Z_OK) {
+		errno = err;
+		zperror(gettext("saving the detach manifest failed"), B_TRUE);
+		goto done;
+	}
+
+	if ((err = zone_set_state(target_zone, ZONE_STATE_CONFIGURED))
+	    != Z_OK) {
+		errno = err;
+		zperror(gettext("could not reset state"), B_TRUE);
+	}
+
+done:
+	zonecfg_fini_handle(handle);
+	release_lock_file(lockfd);
+
+	return ((err == Z_OK) ? Z_OK : Z_ERR);
+}
+
+/*
+ * Find the specified package in the sw inventory on the handle and check
+ * if the version matches what is passed in.
+ * Return 0 if the packages match
+ *        1 if the package is found but we have a version mismatch
+ *        -1 if the package is not found
+ */
+static int
+pkg_cmp(zone_dochandle_t handle, char *pkg_name, char *pkg_vers,
+    char *return_vers, int vers_size)
+{
+	int res = -1;
+	struct zone_pkgtab pkgtab;
+
+	if (zonecfg_setpkgent(handle) != Z_OK) {
+		(void) fprintf(stderr,
+		    gettext("unable to enumerate packages\n"));
+		return (Z_ERR);
+	}
+
+	while (zonecfg_getpkgent(handle, &pkgtab) == Z_OK) {
+		if (strcmp(pkg_name, pkgtab.zone_pkg_name) != 0)
+			continue;
+
+		if (strcmp(pkg_vers, pkgtab.zone_pkg_version) == 0) {
+			res = 0;
+			break;
+		}
+
+		(void) strlcpy(return_vers, pkgtab.zone_pkg_version, vers_size);
+		res = 1;
+		break;
+	}
+
+	(void) zonecfg_endpkgent(handle);
+	return (res);
+}
+
+/*
+ * Used in software comparisons to check the packages between the two zone
+ * handles.  The packages have to match or we print a message telling the
+ * user what is out of sync.  The src_cmp flag tells us if the first handle
+ * is the source machine global zone or not.  This is used to enable the
+ * right messages to be printed and also to enable extra version checking
+ * that is not needed for the opposite comparison.
+ */
+static int
+pkg_check(char *header, zone_dochandle_t handle1, zone_dochandle_t handle2,
+    boolean_t src_cmp)
+{
+	int			err;
+	int			res = Z_OK;
+	boolean_t		do_header = B_TRUE;
+	char			other_vers[ZONE_PKG_VERSMAX];
+	struct zone_pkgtab	pkgtab;
+
+	if (zonecfg_setpkgent(handle1) != Z_OK) {
+		(void) fprintf(stderr,
+		    gettext("unable to enumerate packages\n"));
+		return (Z_ERR);
+	}
+
+	while (zonecfg_getpkgent(handle1, &pkgtab) == Z_OK) {
+		if ((err = pkg_cmp(handle2, pkgtab.zone_pkg_name,
+		    pkgtab.zone_pkg_version, other_vers, sizeof (other_vers)))
+		    != 0) {
+			if (do_header && (err < 0 || src_cmp)) {
+				/* LINTED E_SEC_PRINTF_VAR_FMT */
+				(void) fprintf(stderr, header);
+				do_header = B_FALSE;
+			}
+			if (err < 0) {
+				(void) fprintf(stderr,
+				    (src_cmp == B_TRUE) ?
+				    gettext("\t%s: not installed\n\t\t(%s)\n") :
+				    gettext("\t%s (%s)\n"),
+				    pkgtab.zone_pkg_name,
+				    pkgtab.zone_pkg_version);
+				res = Z_ERR;
+			} else if (src_cmp) {
+				(void) fprintf(stderr, gettext(
+				    "\t%s: version mismatch\n\t\t(%s)"
+				    "\n\t\t(%s)\n"),
+				    pkgtab.zone_pkg_name,
+				    pkgtab.zone_pkg_version, other_vers);
+				res = Z_ERR;
+			}
+		}
+	}
+
+	(void) zonecfg_endpkgent(handle1);
+
+	return (res);
+}
+
+/*
+ * Find the specified patch in the sw inventory on the handle and check
+ * if the version matches what is passed in.
+ * Return 0 if the patches match
+ *        1 if the patches is found but we have a version mismatch
+ *        -1 if the patches is not found
+ */
+static int
+patch_cmp(zone_dochandle_t handle, char *patch_id, char *patch_vers,
+    char *return_vers, int vers_size)
+{
+	int			res = -1;
+	struct zone_patchtab	patchtab;
+
+	if (zonecfg_setpatchent(handle) != Z_OK) {
+		(void) fprintf(stderr,
+		    gettext("unable to enumerate patches\n"));
+		return (Z_ERR);
+	}
+
+	while (zonecfg_getpatchent(handle, &patchtab) == Z_OK) {
+		char *p;
+
+		if ((p = strchr(patchtab.zone_patch_id, '-')) != NULL)
+			*p++ = '\0';
+		else
+			p = "";
+
+		if (strcmp(patch_id, patchtab.zone_patch_id) != 0)
+			continue;
+
+		if (strcmp(patch_vers, p) == 0) {
+			res = 0;
+			break;
+		}
+
+		(void) strlcpy(return_vers, p, vers_size);
+		/*
+		 * Keep checking.  This handles the case where multiple
+		 * versions of the same patch is installed.
+		 */
+		res = 1;
+	}
+
+	(void) zonecfg_endpatchent(handle);
+	return (res);
+}
+
+/*
+ * Used in software comparisons to check the patches between the two zone
+ * handles.  The patches have to match or we print a message telling the
+ * user what is out of sync.  The src_cmp flag tells us if the first handle
+ * is the source machine global zone or not.  This is used to enable the
+ * right messages to be printed and also to enable extra version checking
+ * that is not needed for the opposite comparison.
+ */
+static int
+patch_check(char *header, zone_dochandle_t handle1, zone_dochandle_t handle2,
+    boolean_t src_cmp)
+{
+	int			err;
+	int			res = Z_OK;
+	boolean_t		do_header = B_TRUE;
+	char			other_vers[MAXNAMELEN];
+	struct zone_patchtab	patchtab;
+
+	if (zonecfg_setpatchent(handle1) != Z_OK) {
+		(void) fprintf(stderr,
+		    gettext("unable to enumerate patches\n"));
+		return (Z_ERR);
+	}
+
+	while (zonecfg_getpatchent(handle1, &patchtab) == Z_OK) {
+		char *patch_vers;
+
+		if ((patch_vers = strchr(patchtab.zone_patch_id, '-')) != NULL)
+			*patch_vers++ = '\0';
+		else
+			patch_vers = "";
+
+		if ((err = patch_cmp(handle2, patchtab.zone_patch_id,
+		    patch_vers, other_vers, sizeof (other_vers))) != 0) {
+			if (do_header && (err < 0 || src_cmp)) {
+				/* LINTED E_SEC_PRINTF_VAR_FMT */
+				(void) fprintf(stderr, header);
+				do_header = B_FALSE;
+			}
+			if (err < 0) {
+				(void) fprintf(stderr,
+				    (src_cmp == B_TRUE) ?
+				    gettext("\t%s: not installed\n") :
+				    gettext("\t%s\n"),
+				    patchtab.zone_patch_id);
+				res = Z_ERR;
+			} else if (src_cmp) {
+				(void) fprintf(stderr,
+				    gettext("\t%s: version mismatch\n\t\t(%s) "
+				    "(%s)\n"), patchtab.zone_patch_id,
+				    patch_vers, other_vers);
+				res = Z_ERR;
+			}
+		}
+	}
+
+	(void) zonecfg_endpatchent(handle1);
+
+	return (res);
+}
+
+/*
+ * Compare the software on the local global zone and source system global
+ * zone.  Used when we are trying to attach a zone during migration.
+ * l_handle is for the local system and s_handle is for the source system.
+ * These have a snapshot of the appropriate packages and patches in the global
+ * zone for the two machines.
+ * The functions called here will print any messages that are needed to
+ * inform the user about package or patch problems.
+ */
+static int
+sw_cmp(zone_dochandle_t l_handle, zone_dochandle_t s_handle)
+{
+	char		*hdr;
+	int		res = Z_OK;
+
+	/*
+	 * Check the source host for pkgs (and versions) that are not on the
+	 * local host.
+	 */
+	hdr = gettext("These packages installed on the source system are "
+	    "inconsistent with this system:\n");
+	if (pkg_check(hdr, s_handle, l_handle, B_TRUE) != Z_OK)
+		res = Z_ERR;
+
+	/*
+	 * Now check the local host for pkgs that were not on the source host.
+	 * We already handled version mismatches in the loop above.
+	 */
+	hdr = gettext("These packages installed on this system were "
+	    "not installed on the source system:\n");
+	if (pkg_check(hdr, l_handle, s_handle, B_FALSE) != Z_OK)
+		res = Z_ERR;
+
+	/*
+	 * Check the source host for patches that are not on the local host.
+	 */
+	hdr = gettext("These patches installed on the source system are "
+	    "inconsistent with this system:\n");
+	if (patch_check(hdr, s_handle, l_handle, B_TRUE) != Z_OK)
+		res = Z_ERR;
+
+	/*
+	 * Check the local host for patches that were not on the source host.
+	 * We already handled version mismatches in the loop above.
+	 */
+	hdr = gettext("These patches installed on this system were "
+	    "not installed on the source system:\n");
+	if (patch_check(hdr, l_handle, s_handle, B_FALSE) != Z_OK)
+		res = Z_ERR;
+
+	return (res);
+}
+
+/*
+ * During attach we go through and fix up the /dev entries for the zone
+ * we are attaching.  In order to regenerate /dev with the correct devices,
+ * the old /dev will be removed, the zone readied (which generates a new
+ * /dev) then halted, then we use the info from the manifest to update
+ * the modes, owners, etc. on the new /dev.
+ */
+static int
+dev_fix(zone_dochandle_t handle)
+{
+	int			res;
+	int			err;
+	int			status;
+	struct zone_devpermtab	devtab;
+	zone_cmd_arg_t		zarg;
+	char			devpath[MAXPATHLEN];
+				/* 6: "exec " and " " */
+	char			cmdbuf[sizeof (RMCOMMAND) + MAXPATHLEN + 6];
+
+	if ((res = zonecfg_get_zonepath(handle, devpath, sizeof (devpath)))
+	    != Z_OK)
+		return (res);
+
+	if (strlcat(devpath, "/dev", sizeof (devpath)) >= sizeof (devpath))
+		return (Z_TOO_BIG);
+
+	/*
+	 * "exec" the command so that the returned status is that of
+	 * RMCOMMAND and not the shell.
+	 */
+	(void) snprintf(cmdbuf, sizeof (cmdbuf), "exec " RMCOMMAND " %s",
+	    devpath);
+	status = do_subproc(cmdbuf);
+	if ((err = subproc_status(RMCOMMAND, status)) != Z_OK) {
+		(void) fprintf(stderr,
+		    gettext("could not remove existing /dev\n"));
+		return (Z_ERR);
+	}
+
+	/* In order to ready the zone, it must be in the installed state */
+	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
+		errno = err;
+		zperror(gettext("could not reset state"), B_TRUE);
+		return (Z_ERR);
+	}
+
+	/* We have to ready the zone to regen the dev tree */
+	zarg.cmd = Z_READY;
+	if (call_zoneadmd(target_zone, &zarg) != 0) {
+		zerror(gettext("call to %s failed"), "zoneadmd");
+		return (Z_ERR);
+	}
+
+	zarg.cmd = Z_HALT;
+	if (call_zoneadmd(target_zone, &zarg) != 0) {
+		zerror(gettext("call to %s failed"), "zoneadmd");
+		return (Z_ERR);
+	}
+
+	if (zonecfg_setdevperment(handle) != Z_OK) {
+		(void) fprintf(stderr,
+		    gettext("unable to enumerate device entries\n"));
+		return (Z_ERR);
+	}
+
+	while (zonecfg_getdevperment(handle, &devtab) == Z_OK) {
+		int err;
+
+		if ((err = zonecfg_devperms_apply(handle,
+		    devtab.zone_devperm_name, devtab.zone_devperm_uid,
+		    devtab.zone_devperm_gid, devtab.zone_devperm_mode,
+		    devtab.zone_devperm_acl)) != Z_OK && err != Z_INVAL)
+			(void) fprintf(stderr, gettext("error updating device "
+			    "%s: %s\n"), devtab.zone_devperm_name,
+			    zonecfg_strerror(err));
+
+		free(devtab.zone_devperm_acl);
+	}
+
+	(void) zonecfg_enddevperment(handle);
+
+	return (Z_OK);
+}
+
+static int
+attach_func(int argc, char *argv[])
+{
+	int lockfd;
+	int err, arg;
+	boolean_t force = B_FALSE;
+	zone_dochandle_t handle;
+	zone_dochandle_t athandle = NULL;
+	char zonepath[MAXPATHLEN];
+
+	if (zonecfg_in_alt_root()) {
+		zerror(gettext("cannot attach zone in alternate root"));
+		return (Z_ERR);
+	}
+
+	optind = 0;
+	if ((arg = getopt(argc, argv, "?F")) != EOF) {
+		switch (arg) {
+		case '?':
+			sub_usage(SHELP_ATTACH, CMD_ATTACH);
+			return (optopt == '?' ? Z_OK : Z_USAGE);
+		case 'F':
+			force = B_TRUE;
+			break;
+		default:
+			sub_usage(SHELP_ATTACH, CMD_ATTACH);
+			return (Z_USAGE);
+		}
+	}
+	if (sanity_check(target_zone, CMD_ATTACH, B_FALSE, B_TRUE) != Z_OK)
+		return (Z_ERR);
+	if (verify_details(CMD_ATTACH) != Z_OK)
+		return (Z_ERR);
+
+	if ((err = zone_get_zonepath(target_zone, zonepath, sizeof (zonepath)))
+	    != Z_OK) {
+		errno = err;
+		zperror2(target_zone, gettext("could not get zone path"));
+		return (Z_ERR);
+	}
+
+	if ((handle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		return (Z_ERR);
+	}
+
+	if ((err = zonecfg_get_handle(target_zone, handle)) != Z_OK) {
+		errno = err;
+		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	if (grab_lock_file(target_zone, &lockfd) != Z_OK) {
+		zerror(gettext("another %s may have an operation in progress."),
+		    "zoneadm");
+		zonecfg_fini_handle(handle);
+		return (Z_ERR);
+	}
+
+	if (force)
+		goto forced;
+
+	if ((athandle = zonecfg_init_handle()) == NULL) {
+		zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		goto done;
+	}
+
+	if ((err = zonecfg_get_attach_handle(zonepath, target_zone, B_TRUE,
+	    athandle)) != Z_OK) {
+		if (err == Z_NO_ZONE)
+			zerror(gettext("Not a detached zone"));
+		else if (err == Z_INVALID_DOCUMENT)
+			zerror(gettext("Cannot attach to an earlier release "
+			    "of the operating system"));
+		else
+			zperror(cmd_to_str(CMD_ATTACH), B_TRUE);
+		goto done;
+	}
+
+	/* Get the detach information for the locally defined zone. */
+	if ((err = zonecfg_get_detach_info(handle, B_FALSE)) != Z_OK) {
+		errno = err;
+		zperror(gettext("getting the attach information failed"),
+		    B_TRUE);
+		goto done;
+	}
+
+	/* sw_cmp prints error msgs as necessary */
+	if ((err = sw_cmp(handle, athandle)) != Z_OK)
+		goto done;
+
+	if ((err = dev_fix(athandle)) != Z_OK)
+		goto done;
+
+forced:
+
+	zonecfg_rm_detached(handle, force);
+
+	if ((err = zone_set_state(target_zone, ZONE_STATE_INSTALLED)) != Z_OK) {
+		errno = err;
+		zperror(gettext("could not reset state"), B_TRUE);
+	}
+
+done:
+	zonecfg_fini_handle(handle);
+	release_lock_file(lockfd);
+	if (athandle != NULL)
+		zonecfg_fini_handle(athandle);
 
 	return ((err == Z_OK) ? Z_OK : Z_ERR);
 }

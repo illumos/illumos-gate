@@ -103,7 +103,7 @@ extern int lex_lineno;
 	"add <property-name> <property-value>\n\t(resource scope)"
 #define	SHELP_CANCEL	"cancel"
 #define	SHELP_COMMIT	"commit"
-#define	SHELP_CREATE	"create [-F] [ -b | -t <template> ]"
+#define	SHELP_CREATE	"create [-F] [ -a <path> | -b | -t <template> ]"
 #define	SHELP_DELETE	"delete [-F]"
 #define	SHELP_END	"end"
 #define	SHELP_EXIT	"exit [-F]"
@@ -1158,8 +1158,10 @@ create_func(cmd_t *cmd)
 {
 	int err, arg;
 	char zone_template[ZONENAME_MAX];
+	char attach_path[MAXPATHLEN];
 	zone_dochandle_t tmphandle;
 	bool force = FALSE;
+	bool attach = FALSE;
 
 	assert(cmd != NULL);
 
@@ -1167,7 +1169,7 @@ create_func(cmd_t *cmd)
 	(void) strlcpy(zone_template, "SUNWdefault", sizeof (zone_template));
 
 	optind = 0;
-	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?bFt:")) != EOF) {
+	while ((arg = getopt(cmd->cmd_argc, cmd->cmd_argv, "?a:bFt:")) != EOF) {
 		switch (arg) {
 		case '?':
 			if (optopt == '?')
@@ -1175,6 +1177,11 @@ create_func(cmd_t *cmd)
 			else
 				short_usage(CMD_CREATE);
 			return;
+		case 'a':
+			(void) strlcpy(attach_path, optarg,
+			    sizeof (attach_path));
+			attach = TRUE;
+			break;
 		case 'b':
 			(void) strlcpy(zone_template, "SUNWblank",
 			    sizeof (zone_template));
@@ -1213,10 +1220,24 @@ create_func(cmd_t *cmd)
 		zone_perror(execname, Z_NOMEM, TRUE);
 		exit(Z_ERR);
 	}
-	if ((err = zonecfg_get_template_handle(zone_template, zone,
-	    tmphandle)) != Z_OK) {
+
+	if (attach)
+		err = zonecfg_get_attach_handle(attach_path, zone, B_FALSE,
+		    tmphandle);
+	else
+		err = zonecfg_get_template_handle(zone_template, zone,
+		    tmphandle);
+
+	if (err != Z_OK) {
 		zonecfg_fini_handle(tmphandle);
-		zone_perror(zone_template, err, TRUE);
+		if (attach && err == Z_NO_ZONE)
+			(void) fprintf(stderr, gettext("invalid path to "
+			    "detached zone\n"));
+		else if (attach && err == Z_INVALID_DOCUMENT)
+			(void) fprintf(stderr, gettext("Cannot attach to an "
+			    "earlier release of the operating system\n"));
+		else
+			zone_perror(zone_template, err, TRUE);
 		return;
 	}
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -43,6 +42,8 @@
 #include <sys/mnttab.h>
 #include <sys/types.h>
 #include <sys/nvpair.h>
+#include <sys/acl.h>
+#include <ftw.h>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -54,6 +55,8 @@
 
 #include <libdevinfo.h>
 #include <uuid/uuid.h>
+
+#include <dirent.h>
 
 #include <libzonecfg.h>
 #include "zonecfg_impl.h"
@@ -76,6 +79,11 @@
 #define	DTD_ELEM_RCTLVALUE	(const xmlChar *) "rctl-value"
 #define	DTD_ELEM_ZONE		(const xmlChar *) "zone"
 #define	DTD_ELEM_DATASET	(const xmlChar *) "dataset"
+#define	DTD_ELEM_PACKAGE	(const xmlChar *) "package"
+#define	DTD_ELEM_PATCH		(const xmlChar *) "patch"
+#define	DTD_ELEM_OBSOLETES	(const xmlChar *) "obsoletes"
+#define	DTD_ELEM_INCOMPATIBLE	(const xmlChar *) "incompatible"
+#define	DTD_ELEM_DEV_PERM	(const xmlChar *) "dev-perm"
 
 #define	DTD_ATTR_ACTION		(const xmlChar *) "action"
 #define	DTD_ATTR_ADDRESS	(const xmlChar *) "address"
@@ -92,6 +100,12 @@
 #define	DTD_ATTR_TYPE		(const xmlChar *) "type"
 #define	DTD_ATTR_VALUE		(const xmlChar *) "value"
 #define	DTD_ATTR_ZONEPATH	(const xmlChar *) "zonepath"
+#define	DTD_ATTR_VERSION	(const xmlChar *) "version"
+#define	DTD_ATTR_ID		(const xmlChar *) "id"
+#define	DTD_ATTR_UID		(const xmlChar *) "uid"
+#define	DTD_ATTR_GID		(const xmlChar *) "gid"
+#define	DTD_ATTR_MODE		(const xmlChar *) "mode"
+#define	DTD_ATTR_ACL		(const xmlChar *) "acl"
 
 #define	DTD_ENTITY_BOOLEAN	"boolean"
 #define	DTD_ENTITY_DEVPATH	"devpath"
@@ -105,6 +119,17 @@
 
 #define	DTD_ENTITY_BOOL_LEN	6	/* "false" */
 
+#define	DETACHED	"SUNWdetached.xml"
+#define	ATTACH_FORCED	"SUNWattached.xml"
+#define	PKG_PATH	"/var/sadm/pkg"
+#define	CONTENTS_FILE	"/var/sadm/install/contents"
+#define	ALL_ZONES	"SUNW_PKG_ALLZONES=true\n"
+#define	THIS_ZONE	"SUNW_PKG_THISZONE=true\n"
+#define	VERSION		"VERSION="
+#define	PATCHLIST	"PATCHLIST="
+#define	PATCHINFO	"PATCH_INFO_"
+#define	PKGINFO_RD_LEN	128
+
 struct zone_dochandle {
 	char		*zone_dh_rootdir;
 	xmlDocPtr	zone_dh_doc;
@@ -112,6 +137,7 @@ struct zone_dochandle {
 	xmlNodePtr	zone_dh_top;
 	boolean_t	zone_dh_newzone;
 	boolean_t	zone_dh_snapshot;
+	boolean_t	zone_dh_sw_inv;
 	char		zone_dh_delete_name[ZONENAME_MAX];
 };
 
@@ -128,6 +154,14 @@ struct znotify {
 	char zn_subscriber_id[MAX_SUBID_LEN];
 	volatile boolean_t zn_failed;
 	int zn_failure_count;
+};
+
+struct zone_pkginfo {
+	boolean_t	zpi_all_zones;
+	boolean_t	zpi_this_zone;
+	int		zpi_patch_cnt;
+	char		*zpi_version;
+	char		**zpi_patchinfo;
 };
 
 char *zonecfg_root = "";
@@ -414,6 +448,25 @@ stripcomments(zone_dochandle_t handle)
 	}
 }
 
+static void
+strip_sw_inv(zone_dochandle_t handle)
+{
+	xmlNodePtr root, child, next;
+
+	root = xmlDocGetRootElement(handle->zone_dh_doc);
+	for (child = root->xmlChildrenNode; child != NULL; child = next) {
+		next = child->next;
+		if (child->name == NULL)
+			continue;
+		if (xmlStrcmp(child->name, DTD_ELEM_PACKAGE) == 0 ||
+		    xmlStrcmp(child->name, DTD_ELEM_PATCH) == 0) {
+			next = child->next;
+			xmlUnlinkNode(child);
+			xmlFreeNode(child);
+		}
+	}
+}
+
 static int
 zonecfg_get_handle_impl(const char *zonename, const char *filename,
     zone_dochandle_t handle)
@@ -454,6 +507,38 @@ zonecfg_get_handle(const char *zonename, zone_dochandle_t handle)
 	handle->zone_dh_newzone = B_FALSE;
 
 	return (zonecfg_get_handle_impl(zonename, path, handle));
+}
+
+int
+zonecfg_get_attach_handle(const char *path, const char *zonename,
+    boolean_t preserve_sw, zone_dochandle_t handle)
+{
+	char		migpath[MAXPATHLEN];
+	int		err;
+	struct stat	buf;
+
+	if (snprintf(migpath, sizeof (migpath), "%s/root", path) >=
+	    sizeof (migpath))
+		return (Z_NOMEM);
+
+	if (stat(migpath, &buf) == -1 || !S_ISDIR(buf.st_mode))
+		return (Z_NO_ZONE);
+
+	if (snprintf(migpath, sizeof (migpath), "%s/%s", path, DETACHED) >=
+	    sizeof (migpath))
+		return (Z_NOMEM);
+
+	if ((err = zonecfg_get_handle_impl(zonename, migpath, handle)) != Z_OK)
+		return (err);
+
+	if (!preserve_sw)
+		strip_sw_inv(handle);
+
+	handle->zone_dh_newzone = B_TRUE;
+	if ((err = setrootattr(handle, DTD_ATTR_ZONEPATH, path)) != Z_OK)
+		return (err);
+
+	return (setrootattr(handle, DTD_ATTR_NAME, zonename));
 }
 
 int
@@ -899,9 +984,10 @@ zonecfg_save(zone_dochandle_t handle)
 		return (Z_BAD_HANDLE);
 
 	/*
-	 * We don't support saving snapshots at this time.
+	 * We don't support saving snapshots or a tree containing a sw
+	 * inventory at this time.
 	 */
-	if (handle->zone_dh_snapshot)
+	if (handle->zone_dh_snapshot || handle->zone_dh_sw_inv)
 		return (Z_INVAL);
 
 	if ((err = zonecfg_get_name(handle, zname, sizeof (zname))) != Z_OK)
@@ -929,6 +1015,106 @@ zonecfg_save(zone_dochandle_t handle)
 	}
 
 	return (Z_OK);
+}
+
+int
+zonecfg_detach_save(zone_dochandle_t handle)
+{
+	char zname[ZONENAME_MAX];
+	char path[MAXPATHLEN];
+	char migpath[MAXPATHLEN];
+	xmlValidCtxt cvp = { NULL };
+	int err = Z_SAVING_FILE;
+
+	if (zonecfg_check_handle(handle) != Z_OK)
+		return (Z_BAD_HANDLE);
+
+	/*
+	 * We can only detach if we have taken a sw inventory.
+	 */
+	if (!handle->zone_dh_sw_inv)
+		return (Z_INVAL);
+
+	if ((err = zonecfg_get_name(handle, zname, sizeof (zname))) != Z_OK)
+		return (err);
+
+	if ((err = zone_get_zonepath(zname, path, sizeof (path))) != Z_OK)
+		return (err);
+
+	if (snprintf(migpath, sizeof (migpath), "%s/%s", path, DETACHED) >=
+	    sizeof (migpath))
+		return (Z_NOMEM);
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	addcomment(handle, "\n    DO NOT EDIT THIS FILE.  "
+	    "Use zonecfg(1M) and zoneadm(1M) attach.\n");
+
+	cvp.error = zonecfg_error_func;
+	cvp.warning = zonecfg_error_func;
+
+	/*
+	 * We do a final validation of the document-- but the library has
+	 * malfunctioned if it fails to validate, so it's an assert.
+	 */
+	assert(xmlValidateDocument(&cvp, handle->zone_dh_doc) != 0);
+
+	if (xmlSaveFormatFile(migpath, handle->zone_dh_doc, 1) <= 0)
+		return (Z_SAVING_FILE);
+
+	(void) chmod(migpath, 0644);
+
+	stripcomments(handle);
+
+	handle->zone_dh_newzone = B_FALSE;
+
+	return (Z_OK);
+}
+
+boolean_t
+zonecfg_detached(const char *path)
+{
+	char		migpath[MAXPATHLEN];
+	struct stat	buf;
+
+	if (snprintf(migpath, sizeof (migpath), "%s/%s", path, DETACHED) >=
+	    sizeof (migpath))
+		return (B_FALSE);
+
+	if (stat(migpath, &buf) != -1)
+		return (B_TRUE);
+
+	return (B_FALSE);
+}
+
+void
+zonecfg_rm_detached(zone_dochandle_t handle, boolean_t forced)
+{
+	char zname[ZONENAME_MAX];
+	char path[MAXPATHLEN];
+	char detached[MAXPATHLEN];
+	char attached[MAXPATHLEN];
+
+	if (zonecfg_check_handle(handle) != Z_OK)
+		return;
+
+	if (zonecfg_get_name(handle, zname, sizeof (zname)) != Z_OK)
+		return;
+
+	if (zone_get_zonepath(zname, path, sizeof (path)) != Z_OK)
+		return;
+
+	(void) snprintf(detached, sizeof (detached), "%s/%s", path, DETACHED);
+	(void) snprintf(attached, sizeof (attached), "%s/%s", path,
+	    ATTACH_FORCED);
+
+	if (forced) {
+		(void) rename(detached, attached);
+	} else {
+		(void) unlink(attached);
+		(void) unlink(detached);
+	}
 }
 
 /*
@@ -1326,6 +1512,21 @@ fetchprop(xmlNodePtr cur, const xmlChar *propname, char *dst, size_t dstsize)
 	xmlFree(property);
 	if (srcsize >= dstsize)
 		return (Z_TOO_BIG);
+	return (Z_OK);
+}
+
+static int
+fetch_alloc_prop(xmlNodePtr cur, const xmlChar *propname, char **dst)
+{
+	xmlChar *property;
+
+	if ((property = xmlGetProp(cur, propname)) == NULL)
+		return (Z_BAD_PROPERTY);
+	if ((*dst = strdup((char *)property)) == NULL) {
+		xmlFree(property);
+		return (Z_NOMEM);
+	}
+	xmlFree(property);
 	return (Z_OK);
 }
 
@@ -1885,6 +2086,141 @@ zonecfg_modify_dev(
 	if ((err = zonecfg_add_dev_core(handle, newtabptr)) != Z_OK)
 		return (err);
 
+	return (Z_OK);
+}
+
+/* Lock to serialize all zonecfg_devwalks */
+static pthread_mutex_t zonecfg_devwalk_lock = PTHREAD_MUTEX_INITIALIZER;
+/*
+ * Global variables used to pass data from zonecfg_devwalk to the nftw
+ * call-back (zonecfg_devwalk_cb).  g_devwalk_data is really the void*
+ * parameter and g_devwalk_cb is really the *cb parameter from zonecfg_devwalk.
+ */
+static void *g_devwalk_data;
+static int (*g_devwalk_cb)(const char *, uid_t, gid_t, mode_t, const char *,
+    void *);
+static size_t g_devwalk_skip_prefix;
+
+/*
+ * This is the nftw call-back function used by zonecfg_devwalk.  It is
+ * responsible for calling the actual call-back that is passed in to
+ * zonecfg_devwalk as the *cb argument.
+ */
+/* ARGSUSED2 */
+static int
+zonecfg_devwalk_cb(const char *path, const struct stat *st, int f,
+    struct FTW *ftw)
+{
+	acl_t *acl;
+	char *acl_txt = NULL;
+
+	/* skip all but character and block devices */
+	if (!S_ISBLK(st->st_mode) && !S_ISCHR(st->st_mode))
+		return (0);
+
+	if ((acl_get(path, ACL_NO_TRIVIAL, &acl) == 0) &&
+	    acl != NULL) {
+		acl_txt = acl_totext(acl, ACL_NORESOLVE);
+		acl_free(acl);
+	}
+
+	if (strlen(path) <= g_devwalk_skip_prefix)
+		return (0);
+
+	g_devwalk_cb(path + g_devwalk_skip_prefix, st->st_uid, st->st_gid,
+	    st->st_mode & S_IAMB, acl_txt != NULL ? acl_txt : "",
+	    g_devwalk_data);
+	free(acl_txt);
+	return (0);
+}
+
+/*
+ * Walk the dev tree for the zone specified by hdl and call the call-back (cb)
+ * function for each entry in the tree.  The call-back will be passed the
+ * name, uid, gid, mode, acl string and the void *data input parameter
+ * for each dev entry.
+ *
+ * Data is passed to the zonecfg_devwalk_cb through the global variables
+ * g_devwalk_data, *g_devwalk_cb, and g_devwalk_skip_prefix.  The
+ * zonecfg_devwalk_cb function will actually call *cb.
+ */
+int
+zonecfg_devwalk(zone_dochandle_t hdl,
+    int (*cb)(const char *, uid_t, gid_t, mode_t, const char *, void *),
+    void *data)
+{
+	char path[MAXPATHLEN];
+	int ret;
+
+	if ((ret = zonecfg_get_zonepath(hdl, path, sizeof (path))) != Z_OK)
+		return (ret);
+
+	if (strlcat(path, "/dev", sizeof (path)) >= sizeof (path))
+		return (Z_TOO_BIG);
+	g_devwalk_skip_prefix = strlen(path) + 1;
+
+	/*
+	 * We have to serialize all zonecfg_devwalks in the same process
+	 * (which should be fine), since nftw() is so badly designed.
+	 */
+	(void) pthread_mutex_lock(&zonecfg_devwalk_lock);
+
+	g_devwalk_data = data;
+	g_devwalk_cb = cb;
+	(void) nftw(path, zonecfg_devwalk_cb, 0, FTW_PHYS);
+
+	(void) pthread_mutex_unlock(&zonecfg_devwalk_lock);
+	return (Z_OK);
+}
+
+/*
+ * Update the owner, group, mode and acl on the specified dev (inpath) for
+ * the zone (hdl).  This function can be used to fix up the dev tree after
+ * attaching a migrated zone.
+ */
+int
+zonecfg_devperms_apply(zone_dochandle_t hdl, const char *inpath, uid_t owner,
+    gid_t group, mode_t mode, const char *acltxt)
+{
+	int ret;
+	char path[MAXPATHLEN];
+	struct stat st;
+	acl_t *aclp;
+
+	if ((ret = zonecfg_get_zonepath(hdl, path, sizeof (path))) != Z_OK)
+		return (ret);
+
+	if (strlcat(path, "/dev/", sizeof (path)) >= sizeof (path))
+		return (Z_TOO_BIG);
+	if (strlcat(path, inpath, sizeof (path)) >= sizeof (path))
+		return (Z_TOO_BIG);
+
+	if (stat(path, &st) == -1)
+		return (Z_INVAL);
+
+	/* make sure we're only touching device nodes */
+	if (!S_ISCHR(st.st_mode) && !S_ISBLK(st.st_mode))
+		return (Z_INVAL);
+
+	if (chown(path, owner, group) == -1)
+		return (Z_SYSTEM);
+
+	if (chmod(path, mode) == -1)
+		return (Z_SYSTEM);
+
+	if ((acltxt == NULL) || (strcmp(acltxt, "") == 0))
+		return (Z_OK);
+
+	if (acl_fromtext(acltxt, &aclp) != 0)
+		return (Z_SYSTEM);
+
+	errno = 0;
+	if (acl_set(path, aclp) == -1) {
+		free(aclp);
+		return (Z_SYSTEM);
+	}
+
+	free(aclp);
 	return (Z_OK);
 }
 
@@ -3732,7 +4068,8 @@ zonecfg_notify_critical_exit(void * h)
 	(void) pthread_mutex_lock(&(zevtchan->zn_mutex));
 	zevtchan->zn_state = ZN_PING_INFLIGHT;
 
-	sysevent_evc_publish(zevtchan->zn_eventchan, ZONE_EVENT_STATUS_CLASS,
+	(void) sysevent_evc_publish(zevtchan->zn_eventchan,
+	    ZONE_EVENT_STATUS_CLASS,
 	    ZONE_EVENT_PING_SUBCLASS, ZONE_EVENT_PING_PUBLISHER,
 	    zevtchan->zn_subscriber_id, NULL, EVCH_SLEEP);
 
@@ -4030,4 +4367,823 @@ int
 zonecfg_enddsent(zone_dochandle_t handle)
 {
 	return (zonecfg_endent(handle));
+}
+
+int
+zonecfg_setpkgent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getpkgent(zone_dochandle_t handle, struct zone_pkgtab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_PACKAGE))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_NAME, tabptr->zone_pkg_name,
+	    sizeof (tabptr->zone_pkg_name))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_VERSION, tabptr->zone_pkg_version,
+	    sizeof (tabptr->zone_pkg_version))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_endpkgent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+int
+zonecfg_setpatchent(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getpatchent(zone_dochandle_t handle, struct zone_patchtab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_PATCH))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_ID, tabptr->zone_patch_id,
+	    sizeof (tabptr->zone_patch_id))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_endpatchent(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+int
+zonecfg_setdevperment(zone_dochandle_t handle)
+{
+	return (zonecfg_setent(handle));
+}
+
+int
+zonecfg_getdevperment(zone_dochandle_t handle, struct zone_devpermtab *tabptr)
+{
+	xmlNodePtr cur;
+	int err;
+	char buf[128];
+
+	tabptr->zone_devperm_acl = NULL;
+
+	if (handle == NULL)
+		return (Z_INVAL);
+
+	if ((cur = handle->zone_dh_cur) == NULL)
+		return (Z_NO_ENTRY);
+
+	for (; cur != NULL; cur = cur->next)
+		if (!xmlStrcmp(cur->name, DTD_ELEM_DEV_PERM))
+			break;
+	if (cur == NULL) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (Z_NO_ENTRY);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_NAME, tabptr->zone_devperm_name,
+	    sizeof (tabptr->zone_devperm_name))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	if ((err = fetchprop(cur, DTD_ATTR_UID, buf, sizeof (buf))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+	tabptr->zone_devperm_uid = (uid_t)atol(buf);
+
+	if ((err = fetchprop(cur, DTD_ATTR_GID, buf, sizeof (buf))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+	tabptr->zone_devperm_gid = (gid_t)atol(buf);
+
+	if ((err = fetchprop(cur, DTD_ATTR_MODE, buf, sizeof (buf))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+	tabptr->zone_devperm_mode = (mode_t)strtol(buf, (char **)NULL, 8);
+
+	if ((err = fetch_alloc_prop(cur, DTD_ATTR_ACL,
+	    &(tabptr->zone_devperm_acl))) != Z_OK) {
+		handle->zone_dh_cur = handle->zone_dh_top;
+		return (err);
+	}
+
+	handle->zone_dh_cur = cur->next;
+	return (Z_OK);
+}
+
+int
+zonecfg_enddevperment(zone_dochandle_t handle)
+{
+	return (zonecfg_endent(handle));
+}
+
+/*
+ * Process a list of pkgs from an entry in the contents file, adding each pkg
+ * name to the list of pkgs.
+ *
+ * It is possible for the pkg name to be preceeded by a special character
+ * which indicates some bookkeeping information for pkging.  Check if the
+ * first char is not an Alpha char.  If so, skip over it.
+ */
+static int
+add_pkg_list(char *lastp, char ***plist, int *pcnt)
+{
+	char	*p;
+	int	pkg_cnt = *pcnt;
+	char	**pkgs = *plist;
+	int	res = Z_OK;
+
+	while ((p = strtok_r(NULL, " ", &lastp)) != NULL) {
+		char	**tmpp;
+		int	i;
+
+		/* skip over any special pkg bookkeeping char */
+		if (!isalpha(*p))
+			p++;
+
+		/* Check if the pkg is already in the list */
+		for (i = 0; i < pkg_cnt; i++) {
+			if (strcmp(p, pkgs[i]) == 0)
+				break;
+		}
+
+		if (i < pkg_cnt)
+			continue;
+
+		/* The pkg is not in the list; add it. */
+		if ((tmpp = (char **)realloc(pkgs,
+		    sizeof (char *) * (pkg_cnt + 1))) == NULL) {
+			res = Z_NOMEM;
+			break;
+		}
+		pkgs = tmpp;
+
+		if ((pkgs[pkg_cnt] = strdup(p)) == NULL) {
+			res = Z_NOMEM;
+			break;
+		}
+		pkg_cnt++;
+	}
+
+	*plist = pkgs;
+	*pcnt = pkg_cnt;
+
+	return (res);
+}
+
+/*
+ * Process an entry from the contents file (type "directory") and if the
+ * directory path is in the list of paths, add the associated list of pkgs
+ * to the pkg list.  The input parameter "entry" will be broken up by
+ * the parser within this function so its value will be modified when this
+ * function exits.
+ *
+ * The entries we are looking for will look something like:
+ *	/usr d none 0755 root sys SUNWctpls SUNWidnl SUNWlibCf ....
+ */
+static int
+get_path_pkgs(char *entry, char **paths, int cnt, char ***pkgs, int *pkg_cnt)
+{
+	char	*f1;
+	char	*f2;
+	char	*lastp;
+	int	i;
+	int	res = Z_OK;
+
+	if ((f1 = strtok_r(entry, " ", &lastp)) == NULL ||
+	    (f2 = strtok_r(NULL, " ", &lastp)) == NULL || strcmp(f2, "d") != 0)
+		return (Z_OK);
+
+	/* Check if this directory entry is in the list of paths. */
+	for (i = 0; i < cnt; i++) {
+		if (fnmatch(paths[i], f1, FNM_PATHNAME) == 0) {
+			/*
+			 * We do want the pkgs for this path.  First, skip
+			 * over the next 4 fields in the entry so that we call
+			 * add_pkg_list starting with the pkg names.
+			 */
+			int j;
+
+			for (j = 0; j < 4 &&
+			    strtok_r(NULL, " ", &lastp) != NULL; j++);
+			/*
+			 * If there are < 4 fields this entry is corrupt,
+			 * just skip it.
+			 */
+			if (j < 4)
+				return (Z_OK);
+
+			res = add_pkg_list(lastp, pkgs, pkg_cnt);
+			break;
+		}
+	}
+
+	return (res);
+}
+
+/*
+ * Read an entry from a pkginfo or contents file.  Some of these lines can
+ * either be arbitrarily long or be continued by a backslash at the end of
+ * the line.  This function coalesces lines that are longer than the read
+ * buffer, and lines that are continued, into one buffer which is returned.
+ * The caller must free this memory.  NULL is returned when we hit EOF or
+ * if we run out of memory (errno is set to ENOMEM).
+ */
+static char *
+read_pkg_data(FILE *fp)
+{
+	char *start;
+	char *inp;
+	char *p;
+	int char_cnt = 0;
+
+	errno = 0;
+	if ((start = (char *)malloc(PKGINFO_RD_LEN)) == NULL) {
+		errno = ENOMEM;
+		return (NULL);
+	}
+
+	inp = start;
+	while ((p = fgets(inp, PKGINFO_RD_LEN, fp)) != NULL) {
+		int len;
+
+		len = strlen(inp);
+		if (inp[len - 1] == '\n' &&
+		    (len == 1 || inp[len - 2] != '\\')) {
+			char_cnt = len;
+			break;
+		}
+
+		if (inp[len - 2] == '\\')
+			char_cnt += len - 2;
+		else
+			char_cnt += PKGINFO_RD_LEN - 1;
+
+		if ((p = realloc(start, char_cnt + PKGINFO_RD_LEN)) == NULL) {
+			errno = ENOMEM;
+			break;
+		}
+
+		start = p;
+		inp = start + char_cnt;
+	}
+
+	if (errno == ENOMEM || (p == NULL && char_cnt == 0)) {
+		free(start);
+		start = NULL;
+	}
+
+	return (start);
+}
+
+static void
+free_ipd_pkgs(char **pkgs, int cnt)
+{
+	int i;
+
+	for (i = 0; i < cnt; i++)
+		free(pkgs[i]);
+	free(pkgs);
+}
+
+/*
+ * Get the list of inherited-pkg-dirs (ipd) for the zone and then get the
+ * list of pkgs that deliver into those dirs.
+ */
+static int
+get_ipd_pkgs(zone_dochandle_t handle, char ***pkg_list, int *cnt)
+{
+	int	res;
+	struct zone_fstab fstab;
+	int	ipd_cnt = 0;
+	char	**ipds = NULL;
+	int	pkg_cnt = 0;
+	char	**pkgs = NULL;
+	int	i;
+
+	if ((res = zonecfg_setipdent(handle)) != Z_OK)
+		return (res);
+
+	while (zonecfg_getipdent(handle, &fstab) == Z_OK) {
+		char	**p;
+		int	len;
+
+		if ((p = (char **)realloc(ipds,
+		    sizeof (char *) * (ipd_cnt + 2))) == NULL) {
+			res = Z_NOMEM;
+			break;
+		}
+		ipds = p;
+
+		if ((ipds[ipd_cnt] = strdup(fstab.zone_fs_dir)) == NULL) {
+			res = Z_NOMEM;
+			break;
+		}
+		ipd_cnt++;
+
+		len = strlen(fstab.zone_fs_dir) + 3;
+		if ((ipds[ipd_cnt] = malloc(len)) == NULL) {
+			res = Z_NOMEM;
+			break;
+		}
+
+		(void) snprintf(ipds[ipd_cnt], len, "%s/*", fstab.zone_fs_dir);
+		ipd_cnt++;
+	}
+
+	(void) zonecfg_endipdent(handle);
+
+	if (res != Z_OK) {
+		for (i = 0; i < ipd_cnt; i++)
+			free(ipds[i]);
+		free(ipds);
+		return (res);
+	}
+
+	/* We only have to process the contents file if we have ipds. */
+	if (ipd_cnt > 0) {
+		FILE	*fp;
+
+		if ((fp = fopen(CONTENTS_FILE, "r")) != NULL) {
+			char	*buf;
+
+			while ((buf = read_pkg_data(fp)) != NULL) {
+				res = get_path_pkgs(buf, ipds, ipd_cnt, &pkgs,
+				    &pkg_cnt);
+				free(buf);
+				if (res != Z_OK)
+					break;
+			}
+
+			(void) fclose(fp);
+		}
+	}
+
+	for (i = 0; i < ipd_cnt; i++)
+		free(ipds[i]);
+	free(ipds);
+
+	if (res != Z_OK) {
+		free_ipd_pkgs(pkgs, pkg_cnt);
+	} else {
+		*pkg_list = pkgs;
+		*cnt = pkg_cnt;
+	}
+
+	return (res);
+}
+
+/*
+ * Return true if pkg_name is in the list of pkgs that deliver into an
+ * inherited pkg directory for the zone.
+ */
+static boolean_t
+dir_pkg(char *pkg_name, char **pkg_list, int cnt)
+{
+	int i;
+
+	for (i = 0; i < cnt; i++) {
+		if (strcmp(pkg_name, pkg_list[i]) == 0)
+			return (B_TRUE);
+	}
+
+	return (B_FALSE);
+}
+
+/*
+ * Start by adding the patch to the sw inventory on the handle.
+ *
+ * The info parameter will be the portion of the PATCH_INFO_ entry following
+ * the '='.  For example:
+ * Installed: Wed Dec  7 07:13:51 PST 2005 From: mum Obsoletes: 120777-03 \
+ *	121087-02 119108-07 Requires: 119575-02 119255-06 Incompatibles:
+ *
+ * We also want to add the Obsolete and Incompatible patches to the
+ * sw inventory description of this patch.
+ */
+static int
+add_patch(zone_dochandle_t handle, char *patch, char *info)
+{
+	xmlNodePtr	node;
+	xmlNodePtr	cur;
+	int		err;
+	char		*p;
+	char		*lastp;
+	boolean_t	add_info = B_FALSE;
+	boolean_t	obsolete;
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	node = xmlNewTextChild(cur, NULL, DTD_ELEM_PATCH, NULL);
+	if ((err = newprop(node, DTD_ATTR_ID, patch)) != Z_OK)
+		return (err);
+
+	/*
+	 * Start with the first token.  This will probably be "Installed:".
+	 * If we can't tokenize this entry, just return.
+	 */
+	if ((p = strtok_r(info, " ", &lastp)) == NULL)
+		return (Z_OK);
+
+	do {
+		xmlNodePtr new_node;
+		char	*nlp;
+
+		if (strcmp(p, "Installed:") == 0 ||
+		    strcmp(p, "Requires:") == 0 ||
+		    strcmp(p, "From:") == 0) {
+			add_info = B_FALSE;
+			continue;
+		} else if (strcmp(p, "Obsoletes:") == 0) {
+			obsolete = B_TRUE;
+			add_info = B_TRUE;
+			continue;
+		} else if (strcmp(p, "Incompatibles:") == 0) {
+			obsolete = B_FALSE;
+			add_info = B_TRUE;
+			continue;
+		}
+
+		if (!add_info)
+			continue;
+
+		/* strip newline from last patch in the line */
+		nlp = (p + strlen(p) - 1);
+		if (*nlp == '\n')
+			*nlp = '\0';
+
+		if (obsolete)
+			new_node = xmlNewTextChild(node, NULL,
+			    DTD_ELEM_OBSOLETES, NULL);
+		else
+			new_node = xmlNewTextChild(node, NULL,
+			    DTD_ELEM_INCOMPATIBLE, NULL);
+
+		if ((err = newprop(new_node, DTD_ATTR_ID, p)) != Z_OK)
+			return (err);
+
+	} while ((p = strtok_r(NULL, " ", &lastp)) != NULL);
+
+	return (Z_OK);
+}
+
+static boolean_t
+unique_patch(zone_dochandle_t handle, char *patch)
+{
+	xmlNodePtr	cur;
+	char		id[MAXNAMELEN];
+
+	cur = xmlDocGetRootElement(handle->zone_dh_doc);
+	for (cur = cur->xmlChildrenNode; cur != NULL; cur = cur->next) {
+		if (xmlStrcmp(cur->name, DTD_ELEM_PATCH) == 0) {
+			if (fetchprop(cur, DTD_ATTR_ID, id, sizeof (id))
+			    != Z_OK)
+				continue;
+
+			if (strcmp(patch, id) == 0)
+				return (B_FALSE);
+		}
+	}
+
+	return (B_TRUE);
+}
+
+/*
+ * Add the unique patches associated with this pkg to the sw inventory on the
+ * handle.
+ *
+ * We are processing entries of the form:
+ * PATCH_INFO_121454-02=Installed: Wed Dec  7 07:13:51 PST 2005 From: mum \
+ *	Obsoletes: 120777-03 121087-02 119108-07 Requires: 119575-02 \
+ *	119255-06 Incompatibles:
+ *
+ */
+static int
+add_patches(zone_dochandle_t handle, struct zone_pkginfo *infop)
+{
+	int i;
+	int res = Z_OK;
+
+	for (i = 0; i < infop->zpi_patch_cnt; i++) {
+		char *p, *ep;
+
+		if (strlen(infop->zpi_patchinfo[i]) < (sizeof (PATCHINFO) - 1))
+			continue;
+
+		/* Skip over "PATCH_INFO_" to get the patch id. */
+		p = infop->zpi_patchinfo[i] + sizeof (PATCHINFO) - 1;
+		if ((ep = strchr(p, '=')) == NULL)
+			continue;
+
+		*ep = '\0';
+		if (unique_patch(handle, p))
+			res = add_patch(handle, p, ep + 1);
+	}
+
+	return (res);
+}
+
+/*
+ * Add the pkg to the sw inventory on the handle.
+ */
+static int
+add_pkg(zone_dochandle_t handle, char *name, char *version)
+{
+	xmlNodePtr newnode;
+	xmlNodePtr cur;
+	int err;
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_PACKAGE, NULL);
+	if ((err = newprop(newnode, DTD_ATTR_NAME, name)) != Z_OK)
+		return (err);
+	if ((err = newprop(newnode, DTD_ATTR_VERSION, version)) != Z_OK)
+		return (err);
+	return (Z_OK);
+}
+
+static void
+free_pkginfo(struct zone_pkginfo *infop)
+{
+	free(infop->zpi_version);
+	if (infop->zpi_patch_cnt > 0) {
+		int i;
+
+		for (i = 0; i < infop->zpi_patch_cnt; i++)
+			free(infop->zpi_patchinfo[i]);
+		free(infop->zpi_patchinfo);
+	}
+}
+
+/*
+ * Read the pkginfo file and populate the structure with the data we need
+ * from this pkg for a sw inventory.
+ */
+static int
+get_pkginfo(char *pkginfo, struct zone_pkginfo *infop)
+{
+	FILE	*fp;
+	char	*buf;
+	int	err = 0;
+
+	infop->zpi_all_zones = B_FALSE;
+	infop->zpi_this_zone = B_FALSE;
+	infop->zpi_version = NULL;
+	infop->zpi_patch_cnt = 0;
+	infop->zpi_patchinfo = NULL;
+
+	if ((fp = fopen(pkginfo, "r")) == NULL)
+		return (errno);
+
+	while ((buf = read_pkg_data(fp)) != NULL) {
+		if (strncmp(buf, VERSION, sizeof (VERSION) - 1) == 0) {
+			int len;
+
+			if ((infop->zpi_version =
+			    strdup(buf + sizeof (VERSION) - 1)) == NULL) {
+				err = ENOMEM;
+				break;
+			}
+
+			/* remove trailing newline */
+			len = strlen(infop->zpi_version);
+			*(infop->zpi_version + len - 1) = 0;
+
+		} else if (strcmp(buf, ALL_ZONES) == 0) {
+			infop->zpi_all_zones = B_TRUE;
+
+		} else if (strcmp(buf, THIS_ZONE) == 0) {
+			infop->zpi_this_zone = B_TRUE;
+
+		} else if (strncmp(buf, PATCHINFO, sizeof (PATCHINFO) - 1)
+		    == 0) {
+			char **p;
+
+			if ((p = (char **)realloc(infop->zpi_patchinfo,
+			    sizeof (char *) * (infop->zpi_patch_cnt + 1)))
+			    == NULL) {
+				err = ENOMEM;
+				break;
+			}
+			infop->zpi_patchinfo = p;
+
+			if ((infop->zpi_patchinfo[infop->zpi_patch_cnt] =
+			    strdup(buf)) == NULL) {
+				err = ENOMEM;
+				break;
+			}
+			infop->zpi_patch_cnt++;
+		}
+
+		free(buf);
+	}
+
+	free(buf);
+
+	if (errno == ENOMEM) {
+		err = ENOMEM;
+		/* Clean up anything we did manage to allocate. */
+		free_pkginfo(infop);
+	}
+
+	(void) fclose(fp);
+
+	return (err);
+}
+
+/*
+ * Take a software inventory of the global zone.  We need to get the set of
+ * packages and patches that are on the global zone that the specified
+ * non-global zone depends on.  The packages we need in the inventory are:
+ *
+ * - skip the package if SUNW_PKG_THISZONE is 'true'
+ * otherwise,
+ * - add the package if
+ * a) SUNW_PKG_ALLZONES is 'true',
+ * or
+ * b) any file delivered by the package is in a file system that is inherited
+ * from the global zone.
+ * If the zone does not inherit any file systems (whole root)
+ * then (b) will be skipped.
+ *
+ * For each of the packages that is being added to the inventory, we will also
+ * add all of the associated, unique patches to the inventory.
+ */
+static int
+zonecfg_sw_inventory(zone_dochandle_t handle)
+{
+	char		pkginfo[MAXPATHLEN];
+	int		res;
+	struct dirent	*dp;
+	DIR		*dirp;
+	struct stat	buf;
+	struct zone_pkginfo	info;
+	int		pkg_cnt = 0;
+	char		**pkgs = NULL;
+
+	if ((res = get_ipd_pkgs(handle, &pkgs, &pkg_cnt)) != Z_OK)
+		return (res);
+
+	if ((dirp = opendir(PKG_PATH)) == NULL) {
+		free_ipd_pkgs(pkgs, pkg_cnt);
+		return (Z_OK);
+	}
+
+	while ((dp = readdir(dirp)) != (struct dirent *)0) {
+		if (strcmp(dp->d_name, ".") == 0 ||
+		    strcmp(dp->d_name, "..") == 0)
+			continue;
+
+		(void) snprintf(pkginfo, sizeof (pkginfo), "%s/%s/pkginfo",
+		    PKG_PATH, dp->d_name);
+
+		if (stat(pkginfo, &buf) == -1 || !S_ISREG(buf.st_mode))
+			continue;
+
+		if (get_pkginfo(pkginfo, &info) != 0) {
+			res = Z_NOMEM;
+			break;
+		}
+
+		if (!info.zpi_this_zone &&
+		    (info.zpi_all_zones ||
+		    dir_pkg(dp->d_name, pkgs, pkg_cnt))) {
+			if ((res = add_pkg(handle, dp->d_name,
+			    info.zpi_version)) == Z_OK) {
+				if (info.zpi_patch_cnt > 0)
+					res = add_patches(handle, &info);
+			}
+		}
+
+		free_pkginfo(&info);
+
+		if (res != Z_OK)
+			break;
+	}
+
+	(void) closedir(dirp);
+
+	free_ipd_pkgs(pkgs, pkg_cnt);
+
+	if (res == Z_OK)
+		handle->zone_dh_sw_inv = B_TRUE;
+
+	return (res);
+}
+
+/*
+ * zonecfg_devwalk call-back function used during detach to generate the
+ * dev info in the manifest.
+ */
+static int
+get_detach_dev_entry(const char *name, uid_t uid, gid_t gid, mode_t mode,
+    const char *acl, void *hdl)
+{
+	zone_dochandle_t handle = (zone_dochandle_t)hdl;
+	xmlNodePtr newnode;
+	xmlNodePtr cur;
+	int err;
+	char buf[128];
+
+	if ((err = operation_prep(handle)) != Z_OK)
+		return (err);
+
+	cur = handle->zone_dh_cur;
+	newnode = xmlNewTextChild(cur, NULL, DTD_ELEM_DEV_PERM, NULL);
+	if ((err = newprop(newnode, DTD_ATTR_NAME, (char *)name)) != Z_OK)
+		return (err);
+	(void) snprintf(buf, sizeof (buf), "%lu", uid);
+	if ((err = newprop(newnode, DTD_ATTR_UID, buf)) != Z_OK)
+		return (err);
+	(void) snprintf(buf, sizeof (buf), "%lu", gid);
+	if ((err = newprop(newnode, DTD_ATTR_GID, buf)) != Z_OK)
+		return (err);
+	(void) snprintf(buf, sizeof (buf), "%o", mode);
+	if ((err = newprop(newnode, DTD_ATTR_MODE, buf)) != Z_OK)
+		return (err);
+	if ((err = newprop(newnode, DTD_ATTR_ACL, (char *)acl)) != Z_OK)
+		return (err);
+	return (Z_OK);
+}
+
+/*
+ * Get the information required to support detaching a zone.  This is
+ * called on the source system when detaching (the detaching parameter should
+ * be set to true) and on the destination system before attaching (the
+ * detaching parameter should be false).
+ *
+ * For native Solaris zones, the detach/attach process involves validating
+ * that the software on the global zone can support the zone when we attach.
+ * To do this we take a software inventory of the global zone.  We also
+ * have to keep track of the device configuration so that we can properly
+ * recreate it on the destination.
+ */
+int
+zonecfg_get_detach_info(zone_dochandle_t handle, boolean_t detaching)
+{
+	int		res;
+
+	if ((res = zonecfg_sw_inventory(handle)) != Z_OK)
+		return (res);
+
+	if (detaching)
+		res = zonecfg_devwalk(handle, get_detach_dev_entry, handle);
+
+	return (res);
 }

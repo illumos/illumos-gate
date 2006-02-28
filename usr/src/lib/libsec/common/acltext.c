@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -600,8 +599,8 @@ aclent_acltotext(aclent_t  *aclp, int aclcnt, int flags)
 {
 	char		*aclexport;
 	char		*where;
-	struct group	*groupp;
-	struct passwd	*passwdp;
+	struct group	*groupp = NULL;
+	struct passwd	*passwdp = NULL;
 	struct dynaclstr *dstr;
 	int		i, rtn;
 	size_t		excess = 0;
@@ -635,7 +634,8 @@ aclent_acltotext(aclent_t  *aclp, int aclcnt, int flags)
 				where = strappend(where, "user:");
 			else
 				where = strappend(where, "defaultuser:");
-			passwdp = getpwuid(aclp->a_id);
+			if ((flags & ACL_NORESOLVE) == 0)
+				passwdp = getpwuid(aclp->a_id);
 			if (passwdp == (struct passwd *)NULL) {
 				/* put in uid instead */
 				(void) sprintf(where, "%d", aclp->a_id);
@@ -671,7 +671,8 @@ aclent_acltotext(aclent_t  *aclp, int aclcnt, int flags)
 				where = strappend(where, "group:");
 			else
 				where = strappend(where, "defaultgroup:");
-			groupp = getgrgid(aclp->a_id);
+			if ((flags & ACL_NORESOLVE) == 0)
+				groupp = getgrgid(aclp->a_id);
 			if (groupp == (struct group *)NULL) {
 				/* put in gid instead */
 				(void) sprintf(where, "%d", aclp->a_id);
