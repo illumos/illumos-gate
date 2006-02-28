@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -379,8 +378,10 @@ struct connf_s {
 	(connp)->conn_ports = ports;					\
 }
 
-#define	IPCL_BIND_HASH(lport)						\
-	((unsigned)(((lport) >> 8) ^ (lport)) % ipcl_bind_fanout_size)
+#define	IPCL_PORT_HASH(port, size) \
+	((((port) >> 8) ^ (port)) & ((size) - 1))
+
+#define	IPCL_BIND_HASH(lport)	IPCL_PORT_HASH(lport, ipcl_bind_fanout_size)
 
 #define	IPCL_BIND_MATCH(connp, proto, laddr, lport)			\
 	((connp)->conn_ulp == (proto) &&				\
@@ -435,16 +436,12 @@ struct connf_s {
 #define	ipcl_proto_search(protocol)					\
 	(ipcl_proto_fanout[(protocol)].connf_head)
 
-#ifdef _BIG_ENDIAN
-#define	IPCL_UDP_HASH(port)		((port) & 0xFF)
-#else   /* _BIG_ENDIAN */
-#define	IPCL_UDP_HASH(port)		(((uint16_t)(port)) >> 8)
-#endif  /* _BIG_ENDIAN */
+#define	IPCL_UDP_HASH(lport)	IPCL_PORT_HASH(lport, ipcl_udp_fanout_size)
 
 #define	CONN_G_HASH_SIZE	1024
 
 /* Raw socket hash function. */
-#define	IPCL_RAW_HASH(lport) (((lport) * 31) & (ipcl_raw_fanout_size - 1))
+#define	IPCL_RAW_HASH(lport)	IPCL_PORT_HASH(lport, ipcl_raw_fanout_size)
 
 /*
  * This is similar to IPCL_BIND_MATCH except that the local port check
