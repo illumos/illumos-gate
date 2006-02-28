@@ -981,7 +981,7 @@ arc_kmem_reap_now(arc_reclaim_strategy_t strat)
 	 * First purge some DNLC entries, in case the DNLC is using
 	 * up too much memory.
 	 */
-	dnlc_reduce_cache((void *)arc_reduce_dnlc_percent);
+	dnlc_reduce_cache((void *)(uintptr_t)arc_reduce_dnlc_percent);
 #endif
 
 	/*

@@ -1018,7 +1018,8 @@ dnlc_reduce_cache(void *reduce_percent)
 	if (reduce_percent) {
 		uint_t reduce_cnt;
 
-		reduce_cnt = ncsize_onepercent * (uint_t)reduce_percent;
+		reduce_cnt = ncsize_onepercent *
+		    (uint_t)(uintptr_t)reduce_percent;
 		if (reduce_cnt > dnlc_nentries)
 			low_water = 0;
 		else
