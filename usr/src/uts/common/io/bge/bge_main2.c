@@ -33,7 +33,7 @@
  * This is the string displayed by modinfo, etc.
  * Make sure you keep the version ID up to date!
  */
-static char bge_ident[] = "BCM579x driver v0.49";
+static char bge_ident[] = "BCM579x driver v0.50";
 
 /*
  * Property names

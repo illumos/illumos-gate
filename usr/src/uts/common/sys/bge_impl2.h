@@ -897,6 +897,7 @@ typedef struct bge {
 	 */
 	uint32_t		watchdog;	/* watches for Tx stall	*/
 	boolean_t		resched_needed;
+	boolean_t		resched_running;
 	uint32_t		factotum_flag;	/* softint pending	*/
 	uintptr_t		pagemask;
 

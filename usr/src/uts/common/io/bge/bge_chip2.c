@@ -4001,9 +4001,9 @@ bge_chip_factotum(caddr_t arg)
 		mutex_exit(bgep->softintrlock);
 		return (DDI_INTR_UNCLAIMED);
 	}
+	bgep->factotum_flag = 0;
 	mutex_exit(bgep->softintrlock);
 
-	bgep->factotum_flag = 0;
 	result = DDI_INTR_CLAIMED;
 	error = B_FALSE;
 	linkchg = B_FALSE;

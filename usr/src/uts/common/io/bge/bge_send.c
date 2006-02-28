@@ -183,14 +183,15 @@ restart:
 
 		if (*srp->cons_index_p == srp->tc_next)
 			continue;		/* no slots to recycle	*/
-		if (mutex_tryenter(srp->tc_lock) == 0)
-			continue;		/* already in process	*/
+
+		mutex_enter(srp->tc_lock);
 		bge_recycle_ring(bgep, srp);
 		mutex_exit(srp->tc_lock);
 
-		if (bgep->resched_needed)
+		if (bgep->resched_needed && !bgep->resched_running) {
+			bgep->resched_running = B_TRUE;
 			ddi_trigger_softintr(bgep->resched_id);
-
+		}
 		/*
 		 * Restart from ring 0, if we're not on ring 0 already.
 		 * As H/W selects send BDs totally based on priority and
@@ -336,6 +337,7 @@ bge_send(bge_t *bgep, mblk_t *mp)
 	enum send_status status;
 	struct ether_vlan_header *ehp;
 	boolean_t need_strip = B_FALSE;
+	bge_status_t *bsp;
 	uint16_t tci;
 	uint_t ring = 0;
 
@@ -399,6 +401,10 @@ bge_send(bge_t *bgep, mblk_t *mp)
 		tci = 0;
 	}
 
+	if (srp->tx_free <= 16) {
+		bsp = DMA_VPTR(bgep->status_block);
+		bge_recycle(bgep, bsp);
+	}
 	/*
 	 * We've reserved a place :-)
 	 * These ASSERTions check that our invariants still hold:
@@ -451,6 +457,7 @@ bge_reschedule(caddr_t arg)
 	if (bgep->bge_mac_state == BGE_MAC_STARTED && bgep->resched_needed) {
 		mac_tx_update(bgep->macp);
 		bgep->resched_needed = B_FALSE;
+		bgep->resched_running = B_FALSE;
 	}
 
 	return (DDI_INTR_CLAIMED);
