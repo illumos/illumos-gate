@@ -1,5 +1,5 @@
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -191,12 +191,22 @@ int
 add_admin_princs(void *handle, krb5_context context, char *realm)
 {
   krb5_error_code ret = 0;
-  
-	if ((ret = add_admin_old_princ(handle, context,
-			     KADM5_ADMIN_SERVICE, realm,
-			     KRB5_KDB_DISALLOW_TGT_BASED,
-			     ADMIN_LIFETIME)))
-       goto clean_and_exit;
+
+/*
+ * Solaris Kerberos:
+ * The kadmin/admin principal is unused on Solaris. This principal is used
+ * in AUTH_GSSAPI but Solaris doesn't support AUTH_GSSAPI. RPCSEC_GSS can only
+ * be used with host-based principals. 
+ *
+ */ 
+
+#if 0
+  if ((ret = add_admin_old_princ(handle, context,
+  		     KADM5_ADMIN_SERVICE, realm,
+  		     KRB5_KDB_DISALLOW_TGT_BASED,
+  		     ADMIN_LIFETIME)))
+     goto clean_and_exit;
+#endif 
 
 	if ((ret = add_admin_old_princ(handle, context,
 			     KADM5_CHANGEPW_SERVICE, realm, 
@@ -215,6 +225,12 @@ add_admin_princs(void *handle, krb5_context context, char *realm)
 		    KADM5_CHANGEPW_HOST_SERVICE,
 		    KRB5_KDB_DISALLOW_TGT_BASED |
 		    KRB5_KDB_PWCHANGE_SERVICE,
+		    ADMIN_LIFETIME)))
+		goto clean_and_exit;
+
+	if ((ret = add_admin_sname_princ(handle, context,
+		    KADM5_KIPROP_HOST_SERVICE,
+		    KRB5_KDB_DISALLOW_TGT_BASED,
 		    ADMIN_LIFETIME)))
 		goto clean_and_exit;
 
