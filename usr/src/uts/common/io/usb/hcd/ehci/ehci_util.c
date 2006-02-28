@@ -4125,7 +4125,7 @@ ehci_print_qtd(
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "\tqtd_ctrl_phase: 0x%x ", Get_QTD(qtd->qtd_ctrl_phase));
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-	    "\tqtd_xfer_addr: 0x%x ", Get_QTD(qtd->qtd_xfer_addr));
+	    "\tqtd_xfer_offs: 0x%x ", Get_QTD(qtd->qtd_xfer_offs));
 	USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "\tqtd_xfer_len: 0x%x ", Get_QTD(qtd->qtd_xfer_len));
 }

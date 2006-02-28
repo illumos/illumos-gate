@@ -580,7 +580,13 @@ typedef void (*ehci_handler_function_t)(
  *
  * The transfer wrapper represents a USB transfer on the bus and there
  * is one instance per USB transfer.  A transfer is made up of one or
- * more transactions.
+ * more transactions. EHCI uses one QTD for one transaction. So one
+ * transfer wrapper may have one or more QTDs associated.
+ *
+ * The data to be transferred are contained in the TW buffer which is
+ * virtually contiguous but physically discontiguous. When preparing
+ * the QTDs for a USB transfer, the DMA cookies corresponding to the
+ * TW buffer need to be walked through to retrieve the DMA addresses.
  *
  * Control and bulk pipes will have one transfer wrapper per transfer
  * and where as Isochronous and Interrupt pipes will only have one
@@ -593,6 +599,9 @@ typedef struct ehci_trans_wrapper {
 	ddi_dma_handle_t		tw_dmahandle;	/* DMA handle */
 	ddi_acc_handle_t		tw_accesshandle; /* Acc hndle */
 	ddi_dma_cookie_t		tw_cookie;	/* DMA cookie */
+	uint_t				tw_ncookies;	/* DMA cookie count */
+	uint_t				tw_cookie_idx;	/* DMA cookie index */
+	size_t				tw_dma_offs;	/* DMA buffer offset */
 	uint32_t			tw_id;		/* 32bit ID */
 	size_t				tw_length;	/* Txfer length */
 	char				*tw_buf;	/* Buffer for Xfer */

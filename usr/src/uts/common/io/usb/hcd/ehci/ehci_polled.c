@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -80,7 +79,7 @@ static void	ehci_polled_fill_in_qtd(
 				ehci_state_t		*ehcip,
 				ehci_qtd_t		*qtd,
 				uint_t			qtd_ctrl,
-				uint32_t		qtd_iommu_cbp,
+				size_t			qtd_dma_offs,
 				size_t			qtd_length,
 				ehci_trans_wrapper_t	*tw);
 static void	ehci_polled_insert_qtd_on_tw(
@@ -1111,9 +1110,8 @@ ehci_polled_handle_normal_qtd(
 
 	if (residue) {
 
-		length = (Get_QTD(qtd->qtd_xfer_addr) +
-		    Get_QTD(qtd->qtd_xfer_len) - residue) -
-		    tw->tw_cookie.dmac_address;
+		length = Get_QTD(qtd->qtd_xfer_offs) +
+		    Get_QTD(qtd->qtd_xfer_len) - residue;
 	}
 
 	/* Sync IO buffer */
@@ -1201,7 +1199,7 @@ ehci_polled_insert_qtd(
 	 * add the new dummy to the end.
 	 */
 	ehci_polled_fill_in_qtd(ehcip, curr_dummy_qtd, qtd_control,
-	    tw->tw_cookie.dmac_address, tw->tw_length, tw);
+	    0, tw->tw_length, tw);
 
 	/* Insert this qtd onto the tw */
 	ehci_polled_insert_qtd_on_tw(ehcip, tw, curr_dummy_qtd);
@@ -1216,25 +1214,35 @@ ehci_polled_insert_qtd(
  * ehci_polled_fill_in_qtd:
  *
  * Fill in the fields of a Transfer Descriptor (QTD).
+ * The "Buffer Pointer" fields of a QTD are retrieved from the TW
+ * it is associated with.
  *
  * Unlike the it's ehci_fill_in_qtd counterpart, we do not
  * set the alternative ptr in polled mode.  There is not need
  * for it in polled mode, because it doesn't need to cleanup
  * short xfer conditions.
+ *
+ * Note:
+ * qtd_dma_offs - the starting offset into the TW buffer, where the QTD
+ *                should transfer from. It should be 4K aligned. And when
+ *                a TW has more than one QTDs, the QTDs must be filled in
+ *                increasing order.
+ * qtd_length - the total bytes to transfer.
  */
 static void
 ehci_polled_fill_in_qtd(
 	ehci_state_t		*ehcip,
 	ehci_qtd_t		*qtd,
 	uint_t			qtd_ctrl,
-	uint32_t		qtd_iommu_cbp,
+	size_t			qtd_dma_offs,
 	size_t			qtd_length,
 	ehci_trans_wrapper_t	*tw)
 {
-	uint32_t		buf_addr = qtd_iommu_cbp;
+	uint32_t		buf_addr;
 	size_t			buf_len = qtd_length;
 	uint32_t		ctrl = qtd_ctrl;
 	uint_t			i = 0;
+	int			rem_len;
 
 	/* Assert that the qtd to be filled in is a dummy */
 	ASSERT(Get_QTD(qtd->qtd_state) == EHCI_QTD_DUMMY);
@@ -1247,22 +1255,62 @@ ehci_polled_fill_in_qtd(
 	    & EHCI_QTD_CTRL_BYTES_TO_XFER) | EHCI_QTD_CTRL_MAX_ERR_COUNTS);
 
 	/*
-	 * Save the starting buffer address used and
+	 * QTDs must be filled in increasing DMA offset order.
+	 * tw_dma_offs is initialized to be 0 at TW creation and
+	 * is only increased in this function.
+	 */
+	ASSERT(buf_len == 0 || qtd_dma_offs >= tw->tw_dma_offs);
+
+	/*
+	 * Save the starting dma buffer offset used and
 	 * length of data that will be transfered in
 	 * the current QTD.
 	 */
-	Set_QTD(qtd->qtd_xfer_addr, buf_addr);
+	Set_QTD(qtd->qtd_xfer_offs, qtd_dma_offs);
 	Set_QTD(qtd->qtd_xfer_len, buf_len);
 
 	while (buf_len) {
+		/*
+		 * Advance to the next DMA cookie until finding the cookie
+		 * that qtd_dma_offs falls in.
+		 * It is very likely this loop will never repeat more than
+		 * once. It is here just to accommodate the case qtd_dma_offs
+		 * is increased by multiple cookies during two consecutive
+		 * calls into this function. In that case, the interim DMA
+		 * buffer is allowed to be skipped.
+		 */
+		while ((tw->tw_dma_offs + tw->tw_cookie.dmac_size) <=
+		    qtd_dma_offs) {
+			/*
+			 * tw_dma_offs always points to the starting offset
+			 * of a cookie
+			 */
+			tw->tw_dma_offs += tw->tw_cookie.dmac_size;
+			ddi_dma_nextcookie(tw->tw_dmahandle, &tw->tw_cookie);
+			tw->tw_cookie_idx++;
+			ASSERT(tw->tw_cookie_idx < tw->tw_ncookies);
+		}
+
+		/*
+		 * Counting the remained buffer length to be filled in
+		 * the QTD for current DMA cookie
+		 */
+		rem_len = (tw->tw_dma_offs + tw->tw_cookie.dmac_size) -
+		    qtd_dma_offs;
+
 		/* Update the beginning of the buffer */
+		buf_addr = (qtd_dma_offs - tw->tw_dma_offs) +
+		    tw->tw_cookie.dmac_address;
+		ASSERT((buf_addr % EHCI_4K_ALIGN) == 0);
 		Set_QTD(qtd->qtd_buf[i], buf_addr);
 
 		if (buf_len <= EHCI_MAX_QTD_BUF_SIZE) {
+			ASSERT(buf_len <= rem_len);
 			break;
 		} else {
+			ASSERT(rem_len >= EHCI_MAX_QTD_BUF_SIZE);
 			buf_len -= EHCI_MAX_QTD_BUF_SIZE;
-			buf_addr += EHCI_MAX_QTD_BUF_SIZE;
+			qtd_dma_offs += EHCI_MAX_QTD_BUF_SIZE;
 		}
 
 		i++;

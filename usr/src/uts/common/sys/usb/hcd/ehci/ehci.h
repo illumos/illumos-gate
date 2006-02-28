@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -83,12 +82,15 @@ extern "C" {
 #define	EHCI_DMA_ATTR_MAX_XFER		0x00ffffffull
 #define	EHCI_DMA_ATTR_COUNT_MAX		0x00ffffffull
 #define	EHCI_DMA_ATTR_GRANULAR		1
-#define	EHCI_DMA_ATTR_ALIGNMENT		1
+#define	EHCI_DMA_ATTR_ALIGNMENT		EHCI_4K_ALIGN
 #endif
 
 /* Set the default data structure (QTD,QH,SITD,ITD) to a 32 byte alignment */
 #define	EHCI_DMA_ATTR_TD_QH_ALIGNMENT	0x0020
 #define	EHCI_DMA_ATTR_PFL_ALIGNMENT	EHCI_4K_ALIGN
+
+/* TW scatter/gatter list defines */
+#define	EHCI_DMA_ATTR_TW_SGLLEN		0x7fffffff
 
 /*
  * EHCI Capability Registers
@@ -481,7 +483,7 @@ typedef	volatile struct ehci_qtd {
 	uint32_t	qtd_active_qtd_prev;	/* Prev QTD on active list */
 	uint32_t	qtd_state;		/* QTD state */
 	uint32_t	qtd_ctrl_phase;		/* Control xfer phase info */
-	uint32_t	qtd_xfer_addr;		/* Starting buffer address */
+	uint32_t	qtd_xfer_offs;		/* Starting buffer offset */
 	uint32_t	qtd_xfer_len;		/* Transfer length */
 	uint8_t		qtd_pad[12];		/* Required padding */
 } ehci_qtd_t;

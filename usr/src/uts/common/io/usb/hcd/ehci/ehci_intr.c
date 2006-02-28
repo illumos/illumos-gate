@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -676,9 +675,8 @@ ehci_check_for_short_xfer(
 		    "ehci_check_for_short_xfer: residue=%d direction=0x%x",
 		    residue, tw->tw_direction);
 
-		length = (Get_QTD(qtd->qtd_xfer_addr) +
-		    Get_QTD(qtd->qtd_xfer_len) - residue) -
-		    tw->tw_cookie.dmac_address;
+		length = Get_QTD(qtd->qtd_xfer_offs) +
+		    Get_QTD(qtd->qtd_xfer_len) - residue;
 
 		if (tw->tw_direction == EHCI_QTD_CTRL_IN_PID) {
 			xfer_attrs = ehci_get_xfer_attrs(ehcip, pp, tw);
@@ -1237,10 +1235,13 @@ ehci_sendup_qtd_message(
 
 	if ((eptd->bmAttributes & USB_EP_ATTR_MASK) == USB_EP_ATTR_CONTROL) {
 		/* Get the correct length */
-		length = length - SETUP_SIZE;
+		if (((usb_ctrl_req_t *)curr_xfer_reqp)->ctrl_wLength)
+			length = length - EHCI_MAX_QTD_BUF_SIZE;
+		else
+			length = length - SETUP_SIZE;
 
 		/* Set the length of the buffer to skip */
-		skip_len = SETUP_SIZE;
+		skip_len = EHCI_MAX_QTD_BUF_SIZE;
 	}
 
 	/* Copy the data into the mblk_t */
@@ -1285,7 +1286,7 @@ ehci_sendup_qtd_message(
 		}
 
 		/* Sync IO buffer */
-		Sync_IO_Buffer(tw->tw_dmahandle, length);
+		Sync_IO_Buffer(tw->tw_dmahandle, (skip_len + length));
 
 		/* since we specified NEVERSWAP, we can just use bcopy */
 		bcopy(buf, mp->b_rptr, length);

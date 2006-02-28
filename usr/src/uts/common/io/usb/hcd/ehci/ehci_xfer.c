@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -168,7 +167,7 @@ int		ehci_stop_periodic_pipe_polling(
 int		ehci_insert_qtd(
 				ehci_state_t		*ehcip,
 				uint32_t		qtd_ctrl,
-				uint32_t		qtd_iommu_cbp,
+				size_t			qtd_dma_offs,
 				size_t			qtd_length,
 				uint32_t		qtd_ctrl_phase,
 				ehci_pipe_private_t	*pp,
@@ -179,7 +178,7 @@ static void	ehci_fill_in_qtd(
 				ehci_state_t		*ehcip,
 				ehci_qtd_t		*qtd,
 				uint32_t		qtd_ctrl,
-				uint32_t		qtd_iommu_cbp,
+				size_t			qtd_dma_offs,
 				size_t			qtd_length,
 				uint32_t		qtd_ctrl_phase,
 				ehci_pipe_private_t	*pp,
@@ -1443,6 +1442,7 @@ ehci_allocate_ctrl_resources(
 	usb_flags_t		usb_flags)
 {
 	size_t			qtd_count = 2;
+	size_t			ctrl_buf_size;
 	ehci_trans_wrapper_t	*tw;
 
 	/* Add one more td for data phase */
@@ -1450,8 +1450,21 @@ ehci_allocate_ctrl_resources(
 		qtd_count += 1;
 	}
 
-	tw = ehci_allocate_tw_resources(ehcip, pp,
-	    ctrl_reqp->ctrl_wLength + SETUP_SIZE,
+	/*
+	 * If we have a control data phase, the data buffer starts
+	 * on the next 4K page boundary. So the TW buffer is allocated
+	 * to be larger than required. The buffer in the range of
+	 * [SETUP_SIZE, EHCI_MAX_QTD_BUF_SIZE) is just for padding
+	 * and not to be transferred.
+	 */
+	if (ctrl_reqp->ctrl_wLength) {
+		ctrl_buf_size = EHCI_MAX_QTD_BUF_SIZE +
+		    ctrl_reqp->ctrl_wLength;
+	} else {
+		ctrl_buf_size = SETUP_SIZE;
+	}
+
+	tw = ehci_allocate_tw_resources(ehcip, pp, ctrl_buf_size,
 	    usb_flags, qtd_count);
 
 	return (tw);
@@ -1525,8 +1538,7 @@ ehci_insert_ctrl_req(
 	 * Once this QTD is placed on the done list, the
 	 * data or status phase QTD will be enqueued.
 	 */
-	(void) ehci_insert_qtd(ehcip, ctrl,
-	    tw->tw_cookie.dmac_address, SETUP_SIZE,
+	(void) ehci_insert_qtd(ehcip, ctrl, 0, SETUP_SIZE,
 	    EHCI_CTRL_SETUP_PHASE, pp, tw);
 
 	USB_DPRINTF_L3(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
@@ -1545,11 +1557,11 @@ ehci_insert_ctrl_req(
 			tw->tw_direction = EHCI_QTD_CTRL_OUT_PID;
 
 			/* Copy the data into the message */
-			bcopy(data->b_rptr, tw->tw_buf + SETUP_SIZE,
-						wLength);
+			bcopy(data->b_rptr, tw->tw_buf + EHCI_MAX_QTD_BUF_SIZE,
+				wLength);
 
 			Sync_IO_Buffer_for_device(tw->tw_dmahandle,
-						wLength + SETUP_SIZE);
+				wLength + EHCI_MAX_QTD_BUF_SIZE);
 		}
 
 		ctrl = (EHCI_QTD_CTRL_DATA_TOGGLE_1 | tw->tw_direction);
@@ -1557,11 +1569,14 @@ ehci_insert_ctrl_req(
 		/*
 		 * Create the QTD.  If this is an OUT transaction,
 		 * the data is already in the buffer of the TW.
+		 * The transfer should start from EHCI_MAX_QTD_BUF_SIZE
+		 * which is 4K aligned, though the ctrl phase only
+		 * transfers a length of SETUP_SIZE. The padding data
+		 * in the TW buffer are discarded.
 		 */
-		(void) ehci_insert_qtd(ehcip, ctrl,
-		    tw->tw_cookie.dmac_address + SETUP_SIZE,
-		    tw->tw_length - SETUP_SIZE, EHCI_CTRL_DATA_PHASE,
-		    pp, tw);
+		(void) ehci_insert_qtd(ehcip, ctrl, EHCI_MAX_QTD_BUF_SIZE,
+		    tw->tw_length - EHCI_MAX_QTD_BUF_SIZE,
+		    EHCI_CTRL_DATA_PHASE, pp, tw);
 
 		/*
 		 * The direction of the STATUS QTD depends  on
@@ -1587,7 +1602,7 @@ ehci_insert_ctrl_req(
 	}
 
 
-	(void) ehci_insert_qtd(ehcip, ctrl, NULL, 0,
+	(void) ehci_insert_qtd(ehcip, ctrl, 0, 0,
 	    EHCI_CTRL_STATUS_PHASE, pp,  tw);
 
 	/* Start the timer for this control transfer */
@@ -1719,9 +1734,8 @@ ehci_insert_bulk_req(
 		}
 
 		/* Insert the QTD onto the endpoint */
-		(void) ehci_insert_qtd(ehcip, ctrl,
-		    tw->tw_cookie.dmac_address + len,
-		    bulk_pkt_size, 0, pp, tw);
+		(void) ehci_insert_qtd(ehcip, ctrl, len, bulk_pkt_size,
+		    0, pp, tw);
 
 		len = len + bulk_pkt_size;
 	}
@@ -2131,8 +2145,7 @@ ehci_insert_intr_req(
 	ctrl = (tw->tw_direction | EHCI_QTD_CTRL_INTR_ON_COMPLETE);
 
 	/* Insert another interrupt QTD */
-	(void) ehci_insert_qtd(ehcip, ctrl,
-	    tw->tw_cookie.dmac_address, tw->tw_length, 0, pp, tw);
+	(void) ehci_insert_qtd(ehcip, ctrl, 0, tw->tw_length, 0, pp, tw);
 
 	/* Start the timer for this Interrupt transfer */
 	ehci_start_xfer_timer(ehcip, pp, tw);
@@ -2198,7 +2211,7 @@ int
 ehci_insert_qtd(
 	ehci_state_t		*ehcip,
 	uint32_t		qtd_ctrl,
-	uint32_t		qtd_iommu_cbp,
+	size_t			qtd_dma_offs,
 	size_t			qtd_length,
 	uint32_t		qtd_ctrl_phase,
 	ehci_pipe_private_t	*pp,
@@ -2237,7 +2250,7 @@ ehci_insert_qtd(
 	 * add the new dummy to the end.
 	 */
 	ehci_fill_in_qtd(ehcip, curr_dummy_qtd, qtd_ctrl,
-	    qtd_iommu_cbp, qtd_length, qtd_ctrl_phase, pp, tw);
+	    qtd_dma_offs, qtd_length, qtd_ctrl_phase, pp, tw);
 
 	/* Insert this qtd onto the tw */
 	ehci_insert_qtd_on_tw(ehcip, tw, curr_dummy_qtd);
@@ -2317,6 +2330,15 @@ ehci_allocate_qtd_from_pool(ehci_state_t	*ehcip)
  * ehci_fill_in_qtd:
  *
  * Fill in the fields of a Transfer Descriptor (QTD).
+ * The "Buffer Pointer" fields of a QTD are retrieved from the TW
+ * it is associated with.
+ *
+ * Note:
+ * qtd_dma_offs - the starting offset into the TW buffer, where the QTD
+ *                should transfer from. It should be 4K aligned. And when
+ *                a TW has more than one QTDs, the QTDs must be filled in
+ *                increasing order.
+ * qtd_length - the total bytes to transfer.
  */
 /*ARGSUSED*/
 static void
@@ -2324,20 +2346,21 @@ ehci_fill_in_qtd(
 	ehci_state_t		*ehcip,
 	ehci_qtd_t		*qtd,
 	uint32_t		qtd_ctrl,
-	uint32_t		qtd_iommu_cbp,
+	size_t			qtd_dma_offs,
 	size_t			qtd_length,
 	uint32_t		qtd_ctrl_phase,
 	ehci_pipe_private_t	*pp,
 	ehci_trans_wrapper_t	*tw)
 {
-	uint32_t		buf_addr = qtd_iommu_cbp;
+	uint32_t		buf_addr;
 	size_t			buf_len = qtd_length;
 	uint32_t		ctrl = qtd_ctrl;
 	uint_t			i = 0;
+	int			rem_len;
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-	    "ehci_fill_in_qtd: qtd 0x%p ctrl 0x%x buf 0x%x "
-	    "len 0x%lx", qtd, qtd_ctrl, qtd_iommu_cbp, qtd_length);
+	    "ehci_fill_in_qtd: qtd 0x%p ctrl 0x%x bufoffs 0x%lx "
+	    "len 0x%lx", qtd, qtd_ctrl, qtd_dma_offs, qtd_length);
 
 	/* Assert that the qtd to be filled in is a dummy */
 	ASSERT(Get_QTD(qtd->qtd_state) == EHCI_QTD_DUMMY);
@@ -2350,22 +2373,67 @@ ehci_fill_in_qtd(
 	    & EHCI_QTD_CTRL_BYTES_TO_XFER) | EHCI_QTD_CTRL_MAX_ERR_COUNTS);
 
 	/*
-	 * Save the starting buffer address used and
+	 * QTDs must be filled in increasing DMA offset order.
+	 * tw_dma_offs is initialized to be 0 at TW creation and
+	 * is only increased in this function.
+	 */
+	ASSERT(buf_len == 0 || qtd_dma_offs >= tw->tw_dma_offs);
+
+	/*
+	 * Save the starting dma buffer offset used and
 	 * length of data that will be transfered in
 	 * the current QTD.
 	 */
-	Set_QTD(qtd->qtd_xfer_addr, buf_addr);
+	Set_QTD(qtd->qtd_xfer_offs, qtd_dma_offs);
 	Set_QTD(qtd->qtd_xfer_len, buf_len);
 
 	while (buf_len) {
+		/*
+		 * Advance to the next DMA cookie until finding the cookie
+		 * that qtd_dma_offs falls in.
+		 * It is very likely this loop will never repeat more than
+		 * once. It is here just to accommodate the case qtd_dma_offs
+		 * is increased by multiple cookies during two consecutive
+		 * calls into this function. In that case, the interim DMA
+		 * buffer is allowed to be skipped.
+		 */
+		while ((tw->tw_dma_offs + tw->tw_cookie.dmac_size) <=
+		    qtd_dma_offs) {
+			/*
+			 * tw_dma_offs always points to the starting offset
+			 * of a cookie
+			 */
+			tw->tw_dma_offs += tw->tw_cookie.dmac_size;
+			ddi_dma_nextcookie(tw->tw_dmahandle, &tw->tw_cookie);
+			tw->tw_cookie_idx++;
+			ASSERT(tw->tw_cookie_idx < tw->tw_ncookies);
+		}
+
+		/*
+		 * Counting the remained buffer length to be filled in
+		 * the QTD for current DMA cookie
+		 */
+		rem_len = (tw->tw_dma_offs + tw->tw_cookie.dmac_size) -
+		    qtd_dma_offs;
+
 		/* Update the beginning of the buffer */
+		buf_addr = (qtd_dma_offs - tw->tw_dma_offs) +
+		    tw->tw_cookie.dmac_address;
+		ASSERT((buf_addr % EHCI_4K_ALIGN) == 0);
 		Set_QTD(qtd->qtd_buf[i], buf_addr);
 
+		USB_DPRINTF_L3(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
+		    "ehci_fill_in_qtd: dmac_addr 0x%p dmac_size "
+		    "0x%lx idx %d", buf_addr, tw->tw_cookie.dmac_size,
+		    tw->tw_cookie_idx);
+
 		if (buf_len <= EHCI_MAX_QTD_BUF_SIZE) {
+			ASSERT(buf_len <= rem_len);
 			break;
 		} else {
+			ASSERT(rem_len >= EHCI_MAX_QTD_BUF_SIZE);
 			buf_len -= EHCI_MAX_QTD_BUF_SIZE;
-			buf_addr += EHCI_MAX_QTD_BUF_SIZE;
+			qtd_dma_offs += EHCI_MAX_QTD_BUF_SIZE;
 		}
 
 		i++;
@@ -2879,10 +2947,12 @@ ehci_create_transfer_wrapper(
 	uint_t			usb_flags)
 {
 	ddi_device_acc_attr_t	dev_attr;
+	ddi_dma_attr_t		dma_attr;
 	int			result;
 	size_t			real_length;
-	uint_t			ccount;	/* Cookie count */
 	ehci_trans_wrapper_t	*tw;
+	int			kmem_flag;
+	int			(*dmamem_wait)(caddr_t);
 
 	USB_DPRINTF_L4(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
 	    "ehci_create_transfer_wrapper: length = 0x%lx flags = 0x%x",
@@ -2890,8 +2960,17 @@ ehci_create_transfer_wrapper(
 
 	ASSERT(mutex_owned(&ehcip->ehci_int_mutex));
 
+	/* SLEEP flag should not be used in interrupt context */
+	if (servicing_interrupt()) {
+		kmem_flag = KM_NOSLEEP;
+		dmamem_wait = DDI_DMA_DONTWAIT;
+	} else {
+		kmem_flag = KM_SLEEP;
+		dmamem_wait = DDI_DMA_SLEEP;
+	}
+
 	/* Allocate space for the transfer wrapper */
-	tw = kmem_zalloc(sizeof (ehci_trans_wrapper_t), KM_NOSLEEP);
+	tw = kmem_zalloc(sizeof (ehci_trans_wrapper_t), kmem_flag);
 
 	if (tw == NULL) {
 		USB_DPRINTF_L2(PRINT_MASK_LISTS,  ehcip->ehci_log_hdl,
@@ -2900,11 +2979,14 @@ ehci_create_transfer_wrapper(
 		return (NULL);
 	}
 
-	ehcip->ehci_dma_attr.dma_attr_align = EHCI_DMA_ATTR_ALIGNMENT;
+	/* allow sg lists for transfer wrapper dma memory */
+	bcopy(&ehcip->ehci_dma_attr, &dma_attr, sizeof (ddi_dma_attr_t));
+	dma_attr.dma_attr_sgllen = EHCI_DMA_ATTR_TW_SGLLEN;
+	dma_attr.dma_attr_align = EHCI_DMA_ATTR_ALIGNMENT;
 
 	/* Allocate the DMA handle */
 	result = ddi_dma_alloc_handle(ehcip->ehci_dip,
-	    &ehcip->ehci_dma_attr, DDI_DMA_DONTWAIT, 0, &tw->tw_dmahandle);
+	    &dma_attr, dmamem_wait, 0, &tw->tw_dmahandle);
 
 	if (result != DDI_SUCCESS) {
 		USB_DPRINTF_L2(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
@@ -2923,7 +3005,7 @@ ehci_create_transfer_wrapper(
 
 	/* Allocate the memory */
 	result = ddi_dma_mem_alloc(tw->tw_dmahandle, length,
-	    &dev_attr, DDI_DMA_CONSISTENT, DDI_DMA_DONTWAIT, NULL,
+	    &dev_attr, DDI_DMA_CONSISTENT, dmamem_wait, NULL,
 	    (caddr_t *)&tw->tw_buf, &real_length, &tw->tw_accesshandle);
 
 	if (result != DDI_SUCCESS) {
@@ -2941,24 +3023,9 @@ ehci_create_transfer_wrapper(
 	/* Bind the handle */
 	result = ddi_dma_addr_bind_handle(tw->tw_dmahandle, NULL,
 	    (caddr_t)tw->tw_buf, real_length, DDI_DMA_RDWR|DDI_DMA_CONSISTENT,
-	    DDI_DMA_DONTWAIT, NULL, &tw->tw_cookie, &ccount);
+	    dmamem_wait, NULL, &tw->tw_cookie, &tw->tw_ncookies);
 
-	if (result == DDI_DMA_MAPPED) {
-		/* The cookie count should be 1 */
-		if (ccount != 1) {
-			USB_DPRINTF_L2(PRINT_MASK_LISTS, ehcip->ehci_log_hdl,
-			    "ehci_create_transfer_wrapper: More than 1 cookie");
-
-			result = ddi_dma_unbind_handle(tw->tw_dmahandle);
-			ASSERT(result == DDI_SUCCESS);
-
-			ddi_dma_mem_free(&tw->tw_accesshandle);
-			ddi_dma_free_handle(&tw->tw_dmahandle);
-			kmem_free(tw, sizeof (ehci_trans_wrapper_t));
-
-			return (NULL);
-		}
-	} else {
+	if (result != DDI_DMA_MAPPED) {
 		ehci_decode_ddi_dma_addr_bind_handle_result(ehcip, result);
 
 		ddi_dma_mem_free(&tw->tw_accesshandle);
@@ -2967,6 +3034,9 @@ ehci_create_transfer_wrapper(
 
 		return (NULL);
 	}
+
+	tw->tw_cookie_idx = 0;
+	tw->tw_dma_offs = 0;
 
 	/*
 	 * Only allow one wrapper to be added at a time. Insert the
@@ -2995,7 +3065,8 @@ ehci_create_transfer_wrapper(
 	ASSERT(tw->tw_id != NULL);
 
 	USB_DPRINTF_L4(PRINT_MASK_ALLOC, ehcip->ehci_log_hdl,
-	    "ehci_create_transfer_wrapper: tw = 0x%p", tw);
+	    "ehci_create_transfer_wrapper: tw = 0x%p, ncookies = %u",
+	    tw, tw->tw_ncookies);
 
 	return (tw);
 }
