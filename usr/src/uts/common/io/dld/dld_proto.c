@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1474,6 +1473,13 @@ proto_unitdata_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 
 	if (size > dsp->ds_mip->mi_sdu_max)
 		goto baddata;
+
+	/*
+	 * sap <= ETHERMTU indicates that LLC is being used
+	 * and ethertype needs to be set to the payload length.
+	 */
+	if (sap <= ETHERMTU)
+		sap = (uint16_t)size;
 
 	/*
 	 * Build a packet header.

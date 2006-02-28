@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -124,6 +123,15 @@ i_dls_link_destructor(void *buf, void *arg)
 	(((uint16_t *)(_pkt_a))[7] == ((uint16_t *)(_pkt_b))[7]) &&	\
 	(((uint16_t *)(_pkt_a))[8] == ((uint16_t *)(_pkt_b))[8]))
 
+#define	ETHER_STRIP_PADDING(typelen, hdrlen, p) {		\
+	if (typelen <= ETHERMTU) {				\
+		ssize_t delta = typelen + hdrlen - msgdsize(p);	\
+								\
+		if (delta < 0)					\
+			(void) adjmsg(p, delta);		\
+	}							\
+}
+
 static mblk_t *
 i_dls_link_ether_subchain(mblk_t *mp, uint_t *header_lengthp,
     uint8_t **daddrp, uint16_t *type_lengthp, uint16_t *vidp,
@@ -161,20 +169,22 @@ i_dls_link_ether_subchain(mblk_t *mp, uint_t *header_lengthp,
 
 	/*
 	 * Compare with subsequent headers until we find one that has
-	 * differing header information. After checking each packet skip over
-	 * the header.
+	 * differing header information. After checking each packet
+	 * strip padding and skip over the header.
 	 */
 	npacket = 1;
 	for (pp = &(mp->b_next); (p = *pp) != NULL; pp = &(p->b_next)) {
 		if (!ETHER_MATCH(p->b_rptr, mp->b_rptr) != 0)
 			break;
+		ETHER_STRIP_PADDING(*type_lengthp, *header_lengthp, p);
 		p->b_rptr += sizeof (struct ether_header);
 		npacket++;
 	}
 
 	/*
-	 * Skip over the initial packet's header.
+	 * Strip padding and skip over the initial packet's header.
 	 */
+	ETHER_STRIP_PADDING(*type_lengthp, *header_lengthp, mp);
 	mp->b_rptr += sizeof (struct ether_header);
 	goto done;
 
@@ -194,20 +204,22 @@ vlan:
 
 	/*
 	 * Compare with subsequent headers until we find one that has
-	 * differing header information. After checking each packet skip over
-	 * the header.
+	 * differing header information. After checking each packet
+	 * strip padding and skip over the header.
 	 */
 	npacket = 1;
 	for (pp = &(mp->b_next); (p = *pp) != NULL; pp = &(p->b_next)) {
 		if (!ETHER_VLAN_MATCH(p->b_rptr, mp->b_rptr) != 0)
 			break;
+		ETHER_STRIP_PADDING(*type_lengthp, *header_lengthp, p);
 		p->b_rptr += sizeof (struct ether_vlan_header);
 		npacket++;
 	}
 
 	/*
-	 * Skip over the initial packet's header.
+	 * Strip padding and skip over the initial packet's header.
 	 */
+	ETHER_STRIP_PADDING(*type_lengthp, *header_lengthp, mp);
 	mp->b_rptr += sizeof (struct ether_vlan_header);
 
 done:
