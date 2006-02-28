@@ -2198,7 +2198,7 @@ for more info.
 			fi
 		fi
 
-		if ! cddlchk -a $filepath; then
+		if ! cddlchk -a $file; then
 			# Sound bell
 			ring_bell
 			cat >&2 <<-EOF
