@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -70,6 +69,7 @@
 #define	LINEBUF_SIZE		LINE_MAX	/* input or output lines */
 #define	REMOTE_FS		"/etc/dfs/fstypes"
 #define	N_FSTYPES		20
+#define	SHELL_MAXARGS		253	/* see doexec() for description */
 
 /*
  * This is the list of operations
@@ -185,7 +185,7 @@ struct Arglist
 
 static int		compile();
 static int		execute();
-static int		doexec();
+static int		doexec(char *, char **, int *);
 static struct Args	*lookup();
 static int		ok();
 static void		usage(void)	__NORETURN;
@@ -224,7 +224,8 @@ static int		error = 0;
 static int		paren_cnt = 0;	/* keeps track of parentheses */
 static int		hflag = 0;
 static int		lflag = 0;
-static int		varexecrc = 0;
+/* set when doexec()-invoked utility returns non-zero */
+static int		exec_exitcode = 0;
 extern char		**environ;
 
 int
@@ -369,13 +370,14 @@ main(int argc, char **argv)
 	while (lastlist) {
 		if (lastlist->end != lastlist->nextstr) {
 			*lastlist->nextvar = 0;
-			(void) doexec((char *)0, lastlist->arglist);
+			(void) doexec((char *)0, lastlist->arglist,
+			    &exec_exitcode);
 		}
 		lastlist = lastlist->next;
 	}
 	if (output != stdout)
 		return (cmdclose(output));
-	return ((varexecrc != 0) ? varexecrc : error);
+	return ((exec_exitcode != 0) ? exec_exitcode : error);
 }
 
 /*
@@ -876,7 +878,7 @@ struct FTW *state;
 			val = ok(name, np->first.ap);
 			break;
 		case EXEC:
-			val = doexec(name, np->first.ap);
+			val = doexec(name, np->first.ap, NULL);
 			break;
 
 		case VARARGS: {
@@ -894,7 +896,8 @@ struct FTW *state;
 				*ap->nextvar++ = name;
 				*ap->nextvar = 0;
 				val = 1;
-				varexecrc = doexec((char *)0, ap->arglist);
+				(void) doexec((char *)0, ap->arglist,
+				    &exec_exitcode);
 				ap->nextstr = ap->end;
 				ap->nextvar = ap->firstvar;
 			}
@@ -1011,23 +1014,29 @@ char *argv[];
 			exit(2);
 		else
 			c = getchar();
-	return (yes? doexec(name, argv): 0);
+	return (yes? doexec(name, argv, NULL): 0);
 }
 
 /*
  * execute argv with {} replaced by name
+ *
+ * Per XPG6, find must exit non-zero if an invocation through
+ * -exec, punctuated by a plus sign, exits non-zero, so set
+ * exitcode if we see a non-zero exit.
+ * exitcode should be NULL when -exec or -ok is not punctuated
+ * by a plus sign.
  */
 
 static int
-doexec(name, argv)
-char *name;
-char *argv[];
+doexec(char *name, char *argv[], int *exitcode)
 {
 	char *cp;
 	char **av = argv;
+	char *newargs[1 + SHELL_MAXARGS + 1];
 	int dummyseen = 0;
-	int r = 0;
-	pid_t pid;
+	int i, j, status, rc, r = 0;
+	int exit_status = 0;
+	pid_t pid, pid1;
 
 	(void) fflush(stdout);	  /* to flush possible `-print' */
 	if (name) {
@@ -1042,18 +1051,97 @@ char *argv[];
 	if (argv[0] == NULL)    /* null command line */
 		return (r);
 
-	if (pid = fork()) {
-		while (wait(&r) != pid);
-	} else /* child */ {
-		(void) execvp(argv[0], argv);
-		exit(1);
+	if ((pid = fork()) == -1) {
+		/* fork failed */
+		if (exitcode != NULL)
+			*exitcode = 1;
+		return (0);
 	}
+	if (pid != 0) {
+		/* parent */
+		do {
+			/* wait for child to exit */
+			if ((rc = wait(&r)) == -1 && errno != EINTR) {
+				(void) fprintf(stderr,
+				    gettext("wait failed %s"), strerror(errno));
+
+				if (exitcode != NULL)
+					*exitcode = 1;
+				return (0);
+			}
+		} while (rc != pid);
+	} else {
+		/* child */
+		(void) execvp(argv[0], argv);
+		if (errno != E2BIG)
+			exit(1);
+
+		/*
+		 * We are in a situation where argv[0] points to a
+		 * script without the interpreter line, e.g. #!/bin/sh.
+		 * execvp() will execute either /usr/bin/sh or
+		 * /usr/xpg4/bin/sh against the script, and you will be
+		 * limited to SHELL_MAXARGS arguments. If you try to
+		 * pass more than SHELL_MAXARGS arguments, execvp()
+		 * fails with E2BIG.
+		 * See usr/src/lib/libc/port/gen/execvp.c.
+		 *
+		 * In this situation, process the argument list by
+		 * packets of SHELL_MAXARGS arguments with respect of
+		 * the following rules:
+		 * 1. the invocations have to complete before find exits
+		 * 2. only one invocation can be running at a time
+		 */
+
+		i = 1;
+		newargs[0] = argv[0];
+
+		while (argv[i]) {
+			j = 1;
+			while (j <= SHELL_MAXARGS && argv[i]) {
+				newargs[j++] = argv[i++];
+			}
+			newargs[j] = NULL;
+
+			if ((pid1 = fork()) == -1) {
+				/* fork failed */
+				exit(1);
+			}
+			if (pid1 == 0) {
+				/* child */
+				(void) execvp(newargs[0], newargs);
+				exit(1);
+			}
+
+			status = 0;
+
+			do {
+				/* wait for the child to exit */
+				if ((rc = wait(&status)) == -1 &&
+				    errno != EINTR) {
+					(void) fprintf(stderr,
+					    gettext("wait failed %s"),
+					    strerror(errno));
+					exit(1);
+				}
+			} while (rc != pid1);
+
+			if (status)
+				exit_status = 1;
+		}
+		/* all the invocations have completed */
+		exit(exit_status);
+	}
+
 	if (name && dummyseen) {
 		for (av = argv; cp = *av++; ) {
 			if (cp == name)
 				av[-1] = dummyarg;
 		}
 	}
+
+	if (r && exitcode != NULL)
+		*exitcode = 3; /* use to indicate error in cmd invocation */
 
 	return (!r);
 }
