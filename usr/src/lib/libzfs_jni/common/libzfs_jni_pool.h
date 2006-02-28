@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -29,15 +29,15 @@
 
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <jni.h>
 #include <libnvpair.h>
 #include <libzfs.h>
 #include <libzfs_jni_ipool.h>
 #include <libzfs_jni_util.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Types
@@ -71,11 +71,11 @@ typedef struct PoolStatsBean {
 void new_DeviceStats(JNIEnv *, DeviceStatsBean_t *, zjni_Object_t *);
 void new_PoolStats(JNIEnv *, PoolStatsBean_t *, zjni_Object_t *);
 nvlist_t *zjni_get_root_vdev(zpool_handle_t *);
-nvlist_t *zjni_get_vdev(zpool_handle_t *, nvlist_t *, uint64_t);
+nvlist_t *zjni_get_vdev(zpool_handle_t *, nvlist_t *, uint64_t, uint64_t *);
 jobject zjni_get_VirtualDevice_from_vdev(
-    JNIEnv *, zpool_handle_t *, nvlist_t *);
+    JNIEnv *, zpool_handle_t *, nvlist_t *, uint64_t *p_vdev_id);
 jobject zjni_get_VirtualDevices_from_vdev(
-    JNIEnv *, zpool_handle_t *, nvlist_t *);
+    JNIEnv *, zpool_handle_t *, nvlist_t *, uint64_t *p_vdev_id);
 int zjni_create_add_ImportablePool(nvlist_t *, void *);
 int populate_DeviceStatsBean(
     JNIEnv *, nvlist_t *, DeviceStatsBean_t *, zjni_Object_t *);

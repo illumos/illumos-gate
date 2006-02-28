@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,6 +18,7 @@
  *
  * CDDL HEADER END
  */
+
 /*
  * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
@@ -339,10 +339,14 @@ Java_com_sun_zfs_common_model_SystemDataModel_getVirtualDevice(JNIEnv *env,
 		(*env)->ReleaseStringUTFChars(env, poolUTF, pool);
 
 		if (zhp != NULL) {
-			nvlist_t *vdev_cfg = zjni_get_vdev(zhp, NULL, index);
+			uint64_t p_vdev_id;
+			nvlist_t *vdev_cfg = zjni_get_vdev(
+			    zhp, NULL, index, &p_vdev_id);
+
 			if (vdev_cfg != NULL) {
-				vdev = zjni_get_VirtualDevice_from_vdev(env,
-				    zhp, vdev_cfg);
+				vdev = zjni_get_VirtualDevice_from_vdev(
+				    env, zhp, vdev_cfg,
+				    p_vdev_id == index ? NULL : &p_vdev_id);
 			}
 			zpool_close(zhp);
 		}
@@ -373,10 +377,13 @@ Java_com_sun_zfs_common_model_SystemDataModel_getVirtualDevices__Ljava_lang_Stri
 
 		/* Is the pool valid? */
 		if (zhp != NULL) {
-			nvlist_t *vdev_cfg = zjni_get_vdev(zhp, NULL, index);
+			uint64_t p_vdev_id = index;
+			nvlist_t *vdev_cfg = zjni_get_vdev(
+			    zhp, NULL, index, NULL);
+
 			if (vdev_cfg != NULL) {
 				vdevs = zjni_get_VirtualDevices_from_vdev(
-				    env, zhp, vdev_cfg);
+				    env, zhp, vdev_cfg, &p_vdev_id);
 			}
 			zpool_close(zhp);
 		}
@@ -408,7 +415,7 @@ Java_com_sun_zfs_common_model_SystemDataModel_getVirtualDevices__Ljava_lang_Stri
 		/* Is the pool valid? */
 		if (zhp != NULL) {
 			vdevs = zjni_get_VirtualDevices_from_vdev(env,
-			    zhp, NULL);
+			    zhp, NULL, NULL);
 			zpool_close(zhp);
 		}
 	}
