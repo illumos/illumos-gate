@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,41 +165,69 @@ px_mmu_map_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
 	dev_info_t	*dip = mmu_p->mmu_px_p->px_dip;
 	px_dvma_addr_t	pg_index = MMU_PAGE_INDEX(mmu_p, dvma_pg);
 	io_attributes_t	attr = PX_GET_MP_TTE(mp->dmai_tte);
-	int		ret;
 
 	ASSERT(npages <= mp->dmai_ndvmapages);
-	DBG(DBG_MAP_WIN, mmu_p->mmu_px_p->px_dip,
-		"px_mmu_map_pages:%x+%x=%x npages=0x%x pfn_index=0x%x\n",
-		(uint_t)mmu_p->dvma_base_pg, (uint_t)pg_index, dvma_pg,
-		(uint_t)npages, (uint_t)pfn_index);
+	DBG(DBG_MAP_WIN, dip, "px_mmu_map_pages:%x+%x=%x "
+	    "npages=0x%x pfn_index=0x%x\n", (uint_t)mmu_p->dvma_base_pg,
+	    (uint_t)pg_index, dvma_pg, (uint_t)npages, (uint_t)pfn_index);
 
-	if ((ret = px_lib_iommu_map(dip, PCI_TSBID(0, pg_index), npages,
-	    attr, (void *)mp, pfn_index, MMU_MAP_MP)) != DDI_SUCCESS) {
-		DBG(DBG_MAP_WIN, mmu_p->mmu_px_p->px_dip,
-		    "px_mmu_map_pages: px_iommu_map failed, ret %x\n", ret);
+	if (px_lib_iommu_map(dip, PCI_TSBID(0, pg_index), npages, attr,
+	    (void *)mp, pfn_index, MMU_MAP_MP) != DDI_SUCCESS) {
+		DBG(DBG_MAP_WIN, dip, "px_mmu_map_pages: "
+		    "px_lib_iommu_map failed\n");
 
-		return (ret);
+		return (DDI_FAILURE);
 	}
 
+	if (!PX_MAP_BUFZONE(mp))
+		goto done;
+
+	DBG(DBG_MAP_WIN, dip, "px_mmu_map_pages: redzone pg=%x\n",
+	    pg_index + npages);
+
+	ASSERT(PX_HAS_REDZONE(mp));
+
+	if (px_lib_iommu_map(dip, PCI_TSBID(0, pg_index + npages), 1, attr,
+	    (void *)mp, pfn_index + npages, MMU_MAP_MP) != DDI_SUCCESS) {
+		DBG(DBG_MAP_WIN, dip, "px_mmu_map_pages: mapping "
+		    "REDZONE page failed\n");
+
+		(void) px_lib_iommu_demap(dip, PCI_TSBID(0, pg_index), npages);
+		return (DDI_FAILURE);
+	}
+
+done:
 	if (PX_DVMA_DBG_ON(mmu_p))
 		px_dvma_alloc_debug(mmu_p, (char *)mp->dmai_mapping,
 		    mp->dmai_size, mp);
 
-	return (ret);
+	return (DDI_SUCCESS);
 }
 
 void
-px_mmu_unmap_pages(px_mmu_t *mmu_p, px_dvma_addr_t dvma_pg, uint_t npages)
+px_mmu_unmap_pages(px_mmu_t *mmu_p, ddi_dma_impl_t *mp, px_dvma_addr_t dvma_pg,
+    uint_t npages)
 {
 	px_dvma_addr_t	pg_index = MMU_PAGE_INDEX(mmu_p, dvma_pg);
 
 	DBG(DBG_UNMAP_WIN, mmu_p->mmu_px_p->px_dip,
-		"px_mmu_unmap_pages:%x+%x=%x npages=0x%x\n",
-		(uint_t)mmu_p->dvma_base_pg, (uint_t)pg_index, dvma_pg,
-		(uint_t)npages);
+	    "px_mmu_unmap_pages:%x+%x=%x npages=0x%x\n",
+	    (uint_t)mmu_p->dvma_base_pg, (uint_t)pg_index, dvma_pg,
+	    (uint_t)npages);
 
 	(void) px_lib_iommu_demap(mmu_p->mmu_px_p->px_dip,
 	    PCI_TSBID(0, pg_index), npages);
+
+	if (!PX_MAP_BUFZONE(mp))
+		return;
+
+	DBG(DBG_MAP_WIN, mmu_p->mmu_px_p->px_dip, "px_mmu_unmap_pages: "
+	    "redzone pg=%x\n", pg_index + npages);
+
+	ASSERT(PX_HAS_REDZONE(mp));
+
+	(void) px_lib_iommu_demap(mmu_p->mmu_px_p->px_dip,
+	    PCI_TSBID(0, pg_index + npages), 1);
 }
 
 /*
@@ -252,7 +279,7 @@ px_mmu_unmap_window(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 	px_dvma_addr_t dvma_pg = MMU_BTOP(mp->dmai_mapping);
 	uint_t npages = MMU_BTOP(mp->dmai_winsize);
 
-	px_mmu_unmap_pages(mmu_p, dvma_pg, npages);
+	px_mmu_unmap_pages(mmu_p, mp, dvma_pg, npages);
 
 	if (PX_DVMA_DBG_ON(mmu_p))
 		px_dvma_free_debug(mmu_p, (char *)mp->dmai_mapping,

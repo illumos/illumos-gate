@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -329,6 +328,23 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	pxb->pxb_device_id = pci_config_get16(config_handle, PCI_CONF_DEVID);
 
 	/*
+	 * This is a software workaround to fix the Broadcom PCIe-PCI bridge
+	 * prefetch bug. Create a boolean property and its existence means
+	 * the px nexus driver has to allocate an extra page & make it valid
+	 * one, for any DVMA request that comes from any of the Broadcom child
+	 * device.
+	 */
+	if (PXB_IS_BCM5714(pxb)) {
+		if (ndi_prop_create_boolean(DDI_DEV_T_NONE, pxb->pxb_dip,
+		    "cross-page-prefetch") != DDI_PROP_SUCCESS) {
+			DBG(DBG_ATTACH, pxb->pxb_dip,
+			    "ndi_prop_create_boolean() failed\n");
+
+			goto fail;
+		}
+	}
+
+	/*
 	 * Power management setup. This also makes sure that switch/bridge
 	 * is at D0 during attach.
 	 */
@@ -354,7 +370,6 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		DBG(DBG_ATTACH, devi, "This is not a switch or bridge\n");
 		goto fail;
 	}
-
 
 	/*
 	 * Make sure the "device_type" property exists.
@@ -460,6 +475,9 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 
 		if (pxb->pxb_init_flags & PXB_INIT_FM)
 			pxb_fm_fini(pxb);
+
+		(void) ndi_prop_remove(DDI_DEV_T_NONE, pxb->pxb_dip,
+		    "cross-page-prefetch");
 
 		if (pxb->pxb_init_flags & PXB_INIT_CONFIG_HANDLE)
 			pci_config_teardown(&pxb->pxb_config_handle);

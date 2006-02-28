@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -43,7 +42,10 @@ typedef	pfn_t px_iopfn_t;
 		(cp)->dmac_size = (size);	\
 	}
 
-#define	HAS_REDZONE(mp)	(((mp)->dmai_rflags & DDI_DMA_REDZONE) ? 1 : 0)
+#define	PX_HAS_REDZONE(mp)	\
+	(((mp)->dmai_flags & PX_DMAI_FLAGS_REDZONE) ? 1 : 0)
+#define	PX_MAP_BUFZONE(mp)	\
+	(((mp)->dmai_flags & PX_DMAI_FLAGS_MAP_BUFZONE) ? 1 :0)
 
 typedef struct px_dma_hdl {
 	ddi_dma_impl_t	pdh_ddi_hdl;
@@ -122,9 +124,12 @@ struct px_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
 #define	PX_DMAI_FLAGS_NOSYNC		0x4000
 #define	PX_DMAI_FLAGS_PTP32		0x10000
 #define	PX_DMAI_FLAGS_PTP64		0x20000
+#define	PX_DMAI_FLAGS_MAP_BUFZONE	0x40000
+#define	PX_DMAI_FLAGS_REDZONE		0x80000
 #define	PX_DMAI_FLAGS_PRESERVE	(PX_DMAI_FLAGS_PEER_ONLY | \
 	PX_DMAI_FLAGS_BYPASSREQ | PX_DMAI_FLAGS_NOSYSLIMIT | \
-	PX_DMAI_FLAGS_NOFASTLIMIT | PX_DMAI_FLAGS_NOCTX)
+	PX_DMAI_FLAGS_NOFASTLIMIT | PX_DMAI_FLAGS_NOCTX | \
+	PX_DMAI_FLAGS_MAP_BUFZONE | PX_DMAI_FLAGS_REDZONE)
 
 #define	PX_HAS_NOFASTLIMIT(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_NOFASTLIMIT)
 #define	PX_HAS_NOSYSLIMIT(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_NOSYSLIMIT)
@@ -136,10 +141,10 @@ struct px_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
 #define	PX_DMA_ISPTP(mp)	(PX_DMA_TYPE(mp) == PX_DMAI_FLAGS_PTP)
 #define	PX_DMA_ISPTP32(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_PTP32)
 #define	PX_DMA_ISPTP64(mp)	((mp)->dmai_flags & PX_DMAI_FLAGS_PTP64)
-#define	PX_DMA_CANFAST(mp)	(((mp)->dmai_ndvmapages + HAS_REDZONE(mp) \
+#define	PX_DMA_CANFAST(mp)	(((mp)->dmai_ndvmapages + PX_HAS_REDZONE(mp) \
 		<= px_dvma_page_cache_clustsz) && PX_HAS_NOFASTLIMIT(mp))
 #define	PX_DMA_WINNPGS(mp)	MMU_BTOP((mp)->dmai_winsize)
-#define	PX_DMA_CANCACHE(mp)	(!HAS_REDZONE(mp) && \
+#define	PX_DMA_CANCACHE(mp)	(!PX_HAS_REDZONE(mp) && \
 		(PX_DMA_WINNPGS(mp) == 1) && PX_HAS_NOSYSLIMIT(mp))
 
 #define	PX_DEV_NOFASTLIMIT(lo, hi, fastlo, fasthi, align_pg) \
@@ -164,9 +169,9 @@ struct px_dma_impl { /* forthdebug only, keep in sync with ddi_dma_impl_t */
 
 /* collect fast track failure statistics */
 #define	PX_DVMA_FASTTRAK_PROF(mp) { \
-if ((mp->dmai_ndvmapages + HAS_REDZONE(mp)) > px_dvma_page_cache_clustsz) \
+if ((mp->dmai_ndvmapages + PX_HAS_REDZONE(mp)) > px_dvma_page_cache_clustsz) \
 	px_dvmaft_npages++; \
-else if (!HAS_NOFASTLIMIT(mp)) \
+else if (!PX_HAS_NOFASTLIMIT(mp)) \
 	px_dvmaft_limit++; \
 }
 

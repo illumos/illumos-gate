@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -111,6 +110,10 @@ px_dma_allocmp(dev_info_t *dip, dev_info_t *rdip, int (*waitfp)(caddr_t),
 	mp->dmai_error.err_expected = DDI_FM_ERR_UNEXPECTED;
 	mp->dmai_error.err_ontrap = NULL;
 	mp->dmai_error.err_fep = NULL;
+
+	if (px_child_prefetch(mp->dmai_rdip))
+		mp->dmai_flags |= (PX_DMAI_FLAGS_MAP_BUFZONE |
+		    PX_DMAI_FLAGS_REDZONE);
 
 	return (mp);
 }
@@ -422,7 +425,8 @@ px_dma_type(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 		return (DDI_DMA_NOMAPPING);
 	}
 	mp->dmai_flags |= (mp->dmai_flags & PX_DMAI_FLAGS_BYPASSREQ) ?
-		PX_DMAI_FLAGS_BYPASS : PX_DMAI_FLAGS_DVMA;
+	    PX_DMAI_FLAGS_BYPASS : PX_DMAI_FLAGS_DVMA |
+	    (mp->dmai_rflags & DDI_DMA_REDZONE ? PX_DMAI_FLAGS_REDZONE : 0);
 done:
 	mp->dmai_object	 = *dobj_p;			/* whole object    */
 	mp->dmai_pfn0	 = (void *)pfn0;		/* cache pfn0	   */
@@ -598,7 +602,7 @@ err:
 int
 px_dvma_win(px_t *px_p, ddi_dma_req_t *dmareq, ddi_dma_impl_t *mp)
 {
-	uint32_t redzone_sz	= HAS_REDZONE(mp) ? MMU_PAGE_SIZE : 0;
+	uint32_t redzone_sz	= PX_HAS_REDZONE(mp) ? MMU_PAGE_SIZE : 0;
 	size_t obj_sz		= mp->dmai_object.dmao_size;
 	size_t xfer_sz;
 	ulong_t pg_off;
@@ -675,11 +679,11 @@ px_dvma_map_fast(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 	uint8_t *lock_addr = mmu_p->mmu_dvma_cache_locks + i;
 	px_dvma_addr_t dvma_pg;
 	size_t npages = MMU_BTOP(mp->dmai_winsize);
-	dev_info_t *px_dip = mmu_p->mmu_px_p->px_dip;
+	dev_info_t *dip = mmu_p->mmu_px_p->px_dip;
 
 	extern uint8_t ldstub(uint8_t *);
 	ASSERT(MMU_PTOB(npages) == mp->dmai_winsize);
-	ASSERT(npages + HAS_REDZONE(mp) <= clustsz);
+	ASSERT(npages + PX_HAS_REDZONE(mp) <= clustsz);
 
 	for (; i < entries && ldstub(lock_addr); i++, lock_addr++);
 	if (i >= entries) {
@@ -698,10 +702,31 @@ px_dvma_map_fast(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 	i *= clustsz;
 	dvma_pg = mmu_p->dvma_base_pg + i;
 
-	if (px_lib_iommu_map(px_dip, PCI_TSBID(0, i), npages, attr,
-	    (void *)mp, 0, MMU_MAP_MP) != DDI_SUCCESS)
-		return (DDI_FAILURE);
+	if (px_lib_iommu_map(dip, PCI_TSBID(0, i), npages, attr,
+	    (void *)mp, 0, MMU_MAP_MP) != DDI_SUCCESS) {
+		DBG(DBG_MAP_WIN, dip, "px_dvma_map_fast: "
+		    "px_lib_iommu_map failed\n");
 
+		return (DDI_FAILURE);
+	}
+
+	if (!PX_MAP_BUFZONE(mp))
+		goto done;
+
+	DBG(DBG_MAP_WIN, dip, "px_dvma_map_fast: redzone pg=%x\n", i + npages);
+
+	ASSERT(PX_HAS_REDZONE(mp));
+
+	if (px_lib_iommu_map(dip, PCI_TSBID(0, i + npages), 1, attr,
+	    (void *)mp, npages, MMU_MAP_MP) != DDI_SUCCESS) {
+		DBG(DBG_MAP_WIN, dip, "px_dvma_map_fast: "
+		    "mapping REDZONE page failed\n");
+
+		(void) px_lib_iommu_demap(dip, PCI_TSBID(0, i), npages);
+		return (DDI_FAILURE);
+	}
+
+done:
 #ifdef PX_DMA_PROF
 	px_dvmaft_success++;
 #endif
@@ -736,7 +761,7 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 	 *	size_t align, size_t phase, size_t nocross,
 	 *	void *minaddr, void *maxaddr, int vmflag)
 	 */
-	if ((npages == 1) && PX_HAS_NOSYSLIMIT(mp)) {
+	if ((npages == 1) && !PX_HAS_REDZONE(mp) && PX_HAS_NOSYSLIMIT(mp)) {
 		dvma_addr = vmem_alloc(mmu_p->mmu_dvma_map,
 			MMU_PAGE_SIZE, sleep);
 		mp->dmai_flags |= PX_DMAI_FLAGS_VMEMCACHE;
@@ -745,7 +770,7 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 #endif	/* PX_DMA_PROF */
 	} else {
 		dvma_addr = vmem_xalloc(mmu_p->mmu_dvma_map,
-			MMU_PTOB(npages + HAS_REDZONE(mp)),
+			MMU_PTOB(npages + PX_HAS_REDZONE(mp)),
 			MAX(mp->dmai_attr.dma_attr_align, MMU_PAGE_SIZE),
 			0,
 			mp->dmai_attr.dma_attr_seg + 1,
@@ -777,7 +802,7 @@ px_dvma_map(ddi_dma_impl_t *mp, ddi_dma_req_t *dmareq, px_mmu_t *mmu_p)
 #endif /* PX_DMA_PROF */
 		} else {
 			vmem_xfree(mmu_p->mmu_dvma_map, (void *)dvma_addr,
-			    MMU_PTOB(npages + HAS_REDZONE(mp)));
+			    MMU_PTOB(npages + PX_HAS_REDZONE(mp)));
 #ifdef PX_DMA_PROF
 			px_dvma_vmem_xfree++;
 #endif /* PX_DMA_PROF */
@@ -821,7 +846,7 @@ px_dvma_unmap(px_mmu_t *mmu_p, ddi_dma_impl_t *mp)
 		px_dvma_vmem_free++;
 #endif /* PX_DMA_PROF */
 	} else {
-		size_t npages = MMU_BTOP(mp->dmai_winsize) + HAS_REDZONE(mp);
+		size_t npages = MMU_BTOP(mp->dmai_winsize) + PX_HAS_REDZONE(mp);
 		vmem_xfree(mmu_p->mmu_dvma_map, (void *)dvma_addr,
 			MMU_PTOB(npages));
 #ifdef PX_DMA_PROF
