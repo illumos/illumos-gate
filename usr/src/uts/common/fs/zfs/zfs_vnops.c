@@ -949,8 +949,10 @@ zfs_lookup(vnode_t *dvp, char *nm, vnode_t **vpp, struct pathname *pnp,
 		return (error);
 	}
 
-	if (dvp->v_type != VDIR)
+	if (dvp->v_type != VDIR) {
+		ZFS_EXIT(zfsvfs);
 		return (ENOTDIR);
+	}
 
 	/*
 	 * Check accessibility of directory.
@@ -3456,6 +3458,7 @@ zfs_fid(vnode_t *vp, fid_t *fidp)
 	size = (zfsvfs->z_parent != zfsvfs) ? LONG_FID_LEN : SHORT_FID_LEN;
 	if (fidp->fid_len < size) {
 		fidp->fid_len = size;
+		ZFS_EXIT(zfsvfs);
 		return (ENOSPC);
 	}
 
