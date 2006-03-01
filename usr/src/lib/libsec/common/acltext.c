@@ -81,11 +81,12 @@ aclent_perms(int perm, char *txt_perms)
 }
 
 static char *
-pruname(uid_t uid, char *uidp)
+pruname(uid_t uid, char *uidp, int noresolve)
 {
-	struct passwd	*passwdp;
+	struct passwd	*passwdp = NULL;
 
-	passwdp = getpwuid(uid);
+	if (noresolve == 0)
+		passwdp = getpwuid(uid);
 	if (passwdp == (struct passwd *)NULL) {
 		/* could not get passwd information: display uid instead */
 		(void) sprintf(uidp, "%ld", (long)uid);
@@ -95,11 +96,12 @@ pruname(uid_t uid, char *uidp)
 }
 
 static char *
-prgname(gid_t gid, char *gidp)
+prgname(gid_t gid, char *gidp, int noresolve)
 {
-	struct group	*groupp;
+	struct group	*groupp = NULL;
 
-	groupp = getgrgid(gid);
+	if (noresolve == 0)
+		groupp = getgrgid(gid);
 	if (groupp == (struct group *)NULL) {
 		/* could not get group information: display gid instead */
 		(void) sprintf(gidp, "%ld", (long)gid);
@@ -131,7 +133,7 @@ aclent_printacl(acl_t *aclp)
 		case USER:
 			aclent_perms(tp->a_perm, perm);
 			(void) printf("user:%s:%s\t\t",
-			    pruname(tp->a_id, uidp), perm);
+			    pruname(tp->a_id, uidp, 0), perm);
 			aclent_perms((tp->a_perm & mask), perm);
 			(void) printf("#effective:%s\n", perm);
 			break;
@@ -143,7 +145,7 @@ aclent_printacl(acl_t *aclp)
 		case GROUP:
 			aclent_perms(tp->a_perm, perm);
 			(void) printf("group:%s:%s\t\t",
-			    prgname(tp->a_id, gidp), perm);
+			    prgname(tp->a_id, gidp, 0), perm);
 			aclent_perms(tp->a_perm & mask, perm);
 			(void) printf("#effective:%s\n", perm);
 			break;
@@ -164,7 +166,7 @@ aclent_printacl(acl_t *aclp)
 		case DEF_USER:
 			aclent_perms(tp->a_perm, perm);
 			(void) printf("default:user:%s:%s\n",
-			    pruname(tp->a_id, uidp), perm);
+			    pruname(tp->a_id, uidp, 0), perm);
 			break;
 		case DEF_USER_OBJ:
 			aclent_perms(tp->a_perm, perm);
@@ -173,7 +175,7 @@ aclent_printacl(acl_t *aclp)
 		case DEF_GROUP:
 			aclent_perms(tp->a_perm, perm);
 			(void) printf("default:group:%s:%s\n",
-			    prgname(tp->a_id, gidp), perm);
+			    prgname(tp->a_id, gidp, 0), perm);
 			break;
 		case DEF_GROUP_OBJ:
 			aclent_perms(tp->a_perm, perm);
@@ -237,7 +239,7 @@ split_line(char *str, int cols)
 #define	USER_TXT	"user:"
 
 char *
-ace_type_txt(char *buf, char **endp, ace_t *acep)
+ace_type_txt(char *buf, char **endp, ace_t *acep, int flags)
 {
 
 	char idp[10];
@@ -258,7 +260,7 @@ ace_type_txt(char *buf, char **endp, ace_t *acep)
 
 	case ACE_IDENTIFIER_GROUP:
 		strcpy(buf, GROUP_TXT);
-		strcat(buf, prgname(acep->a_who, idp));
+		strcat(buf, prgname(acep->a_who, idp, flags & ACL_NORESOLVE));
 		*endp = buf + strlen(buf);
 		break;
 
@@ -269,7 +271,7 @@ ace_type_txt(char *buf, char **endp, ace_t *acep)
 
 	case 0:
 		strcpy(buf, USER_TXT);
-		strcat(buf, pruname(acep->a_who, idp));
+		strcat(buf, pruname(acep->a_who, idp, flags & ACL_NORESOLVE));
 		*endp = buf + strlen(buf);
 		break;
 	}
@@ -855,7 +857,7 @@ ace_acltotext(acl_t *aceaclp, int flags)
 	endp = aclexport;
 	for (i = 0; i < aclcnt; i++, aclp++) {
 
-		(void) ace_type_txt(endp, &endp, aclp);
+		(void) ace_type_txt(endp, &endp, aclp, flags);
 		*endp++ = ':';
 		*endp = '\0';
 		(void) ace_perm_txt(endp, &endp, aclp->a_access_mask,
@@ -960,7 +962,7 @@ ace_compact_printacl(acl_t *aclp)
 	for (cnt = 0, acep = aclp->acl_aclp;
 	    cnt != aclp->acl_cnt; cnt++, acep++) {
 		buf[0] = '\0';
-		(void) printf("    %14s:", ace_type_txt(buf, &endp, acep));
+		(void) printf("    %14s:", ace_type_txt(buf, &endp, acep, 0));
 		(void) printf("%s:", ace_perm_txt(endp, &endp,
 		    acep->a_access_mask, acep->a_flags,
 		    aclp->acl_flags & ACL_IS_DIR, ACL_COMPACT_FMT));
