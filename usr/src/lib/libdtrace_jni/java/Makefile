@@ -183,7 +183,8 @@ $(JNI)/$(APIHDR): $(JNI) $(DTRACE_JNI_CLASSES)
 $(DOCAPIDESTDIR)/index.html: $(DTRACE_API_CLASSES)
 		-@mkdir -p $(DOCAPIDESTDIR)
 		-$(RM) -r $(DOCAPIDESTDIR)/*
-		cd $(APIJAVASRC); $(JAVADOC) -protected -use \
+		cd $(APIJAVASRC); umask 022; \
+		$(JAVADOC) -protected -use -notimestamp \
 		-classpath $(APICLASSPATH) -d $(DOCAPIDESTDIR) \
 		$(PKGNAME)
 
@@ -237,6 +238,7 @@ install_h lint:
 
 doc:
 		-@mkdir -p $(DOCAPI)
-		cd $(APIJAVASRC); $(JAVADOC) -protected -use \
+		cd $(APIJAVASRC); umask 022; \
+		$(JAVADOC) -protected -use -notimestamp \
 		-classpath $(APICLASSPATH) -d $(DOCAPI) \
 		$(PKGNAME)
