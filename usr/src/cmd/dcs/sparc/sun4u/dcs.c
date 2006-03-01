@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -106,6 +105,7 @@ static char *basename(char *path);
 static boolean_t is_socket(int fd);
 static uint8_t dcs_get_alg(dcs_alg_t *algs, char *arg, dcs_err_code *error);
 static void dcs_log_bad_alg(char optopt, char *optarg);
+static boolean_t dcs_global_policy(void);
 
 
 /*
@@ -484,11 +484,13 @@ init_server(struct pollfd *pfd, uint8_t ah_auth_alg, uint8_t esp_encr_alg,
 
 		/*
 		 * Enable per-socket IPsec if the user specified an
-		 * AH or ESP algorithm to use.
+		 * AH or ESP algorithm to use and global policy is not in
+		 * effect.
 		 */
-		if (ah_auth_alg != SADB_AALG_NONE ||
+		if (!dcs_global_policy() &&
+		    (ah_auth_alg != SADB_AALG_NONE ||
 		    esp_encr_alg != SADB_EALG_NONE ||
-		    esp_auth_alg != SADB_AALG_NONE) {
+		    esp_auth_alg != SADB_AALG_NONE)) {
 			int err;
 
 			bzero(&ipsec_req, sizeof (ipsec_req));
@@ -2213,4 +2215,66 @@ is_socket(int fd)
 		return (B_FALSE);
 	}
 	return (S_ISSOCK(statb.st_mode));
+}
+
+/*
+ * has_dcs_token
+ *
+ * Look for "?port [sun-dr|665]" in input buf.
+ * Assume only a single thread calls here.
+ */
+static boolean_t
+has_dcs_token(char *buf)
+{
+	char 		*token;
+	char		*delims = "{} \t\n";
+	boolean_t 	port = B_FALSE;
+
+	while ((token = strtok(buf, delims)) != NULL) {
+		buf = NULL;
+		if (port == B_TRUE) {
+			if (strcmp(token, "sun-dr") == 0 ||
+			    strcmp(token, "665") == 0) {
+				return (B_TRUE);
+			} else {
+				return (B_FALSE);
+			}
+		}
+		if (strlen(token) == 5) {
+			token++;
+			if (strcmp(token, "port") == 0) {
+				port = B_TRUE;
+				continue;
+			}
+		}
+	}
+	return (B_FALSE);
+}
+
+/*
+ * dcs_global_policy
+ *
+ * Check global policy file for dcs entry. Just covers common cases.
+ */
+static boolean_t
+dcs_global_policy()
+{
+	FILE		*fp;
+	char		buf[256];
+	boolean_t	rv = B_FALSE;
+
+	fp = fopen("/etc/inet/ipsecinit.conf", "r");
+	if (fp == NULL)
+		return (B_FALSE);
+	while (fgets(buf, sizeof (buf), fp) != NULL) {
+		if (buf[0] == '#')
+			continue;
+		if (has_dcs_token(buf)) {
+			rv = B_TRUE;
+			syslog(LOG_NOTICE, "dcs using global policy");
+			break;
+		}
+	}
+	(void) fclose(fp);
+	return (rv);
 }
