@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -4331,8 +4330,8 @@ graph_runlevel_changed(char rl, int online)
 
 	if (online) {
 		if (rl == trl) {
+			current_runlevel = trl;
 			signal_init(trl);
-			current_runlevel = rl;
 		} else if (rl == 'S') {
 			/*
 			 * At boot, set the entry early for the benefit of the
@@ -4342,11 +4341,11 @@ graph_runlevel_changed(char rl, int online)
 		}
 	} else {
 		if (rl == '3' && trl == '2') {
+			current_runlevel = trl;
 			signal_init(trl);
-			current_runlevel = rl;
 		} else if (rl == '2' && trl == 'S') {
+			current_runlevel = trl;
 			signal_init(trl);
-			current_runlevel = rl;
 		}
 	}
 }
@@ -4432,6 +4431,39 @@ dgraph_set_runlevel(scf_propertygroup_t *pg, scf_property_t *prop)
 	if (current_runlevel == '4' && rl == '3')
 		mark_rl = 1;
 
+	/*
+	 * 1. If we are here after an "init X":
+	 *
+	 * init X
+	 *	init/lscf_set_runlevel()
+	 *		process_pg_event()
+	 *		dgraph_set_runlevel()
+	 *
+	 * then we haven't passed through graph_runlevel_changed() yet,
+	 * therefore 'current_runlevel' has not changed for sure but 'rl' has.
+	 * In consequence, if 'rl' is lower than 'current_runlevel', we change
+	 * the system runlevel and execute the appropriate /etc/rc?.d/K* scripts
+	 * past this test.
+	 *
+	 * 2. On the other hand, if we are here after a "svcadm milestone":
+	 *
+	 * svcadm milestone X
+	 *	dgraph_set_milestone()
+	 *		handle_graph_update_event()
+	 *		dgraph_set_instance_state()
+	 *		graph_post_X_[online|offline]()
+	 *		graph_runlevel_changed()
+	 *		signal_init()
+	 *			init/lscf_set_runlevel()
+	 *				process_pg_event()
+	 *				dgraph_set_runlevel()
+	 *
+	 * then we already passed through graph_runlevel_changed() (by the way
+	 * of dgraph_set_milestone()) and 'current_runlevel' may have changed
+	 * and already be equal to 'rl' so we are going to return immediately
+	 * from dgraph_set_runlevel() without changing the system runlevel and
+	 * without executing the /etc/rc?.d/K* scripts.
+	 */
 	if (rl == current_runlevel) {
 		ms = NULL;
 		goto out;
@@ -4598,6 +4630,9 @@ mark_subgraph(graph_edge_t *e, void *arg)
  * act appropriately.
  *
  * If norepository is true, the function will not change the repository.
+ *
+ * The decision to change the system run level in accordance with the milestone
+ * is taken in dgraph_set_runlevel().
  *
  * Returns
  *   0 - success
