@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -296,13 +295,37 @@ ppcopy_kernel__relocatable(page_t *fm_pp, page_t *to_pp)
 void
 ppcopy(page_t *fm_pp, page_t *to_pp)
 {
-	caddr_t fm_va, to_va;
+	caddr_t fm_va;
+	caddr_t to_va;
+	boolean_t fast;
 
-	fm_va = ppmapin(fm_pp, PROT_READ, (caddr_t)-1);
-	to_va = ppmapin(to_pp, PROT_READ | PROT_WRITE, fm_va);
+	ASSERT(PAGE_LOCKED(fm_pp));
+	ASSERT(PAGE_LOCKED(to_pp));
+
+	/*
+	 * Try to map using KPM.  If it fails, fall back to
+	 * ppmapin/ppmapout.
+	 */
+	if ((fm_va = hat_kpm_mapin(fm_pp, NULL)) == NULL ||
+	    (to_va = hat_kpm_mapin(to_pp, NULL)) == NULL) {
+		if (fm_va != NULL)
+			hat_kpm_mapout(fm_pp, NULL, fm_va);
+		fm_va = ppmapin(fm_pp, PROT_READ, (caddr_t)-1);
+		to_va = ppmapin(to_pp, PROT_READ | PROT_WRITE, fm_va);
+		fast = B_FALSE;
+	} else
+		fast = B_TRUE;
+
 	bcopy(fm_va, to_va, PAGESIZE);
-	ppmapout(fm_va);
-	ppmapout(to_va);
+
+	/* Unmap */
+	if (fast) {
+		hat_kpm_mapout(fm_pp, NULL, fm_va);
+		hat_kpm_mapout(to_pp, NULL, to_va);
+	} else {
+		ppmapout(fm_va);
+		ppmapout(to_va);
+	}
 }
 
 /*
@@ -311,12 +334,14 @@ ppcopy(page_t *fm_pp, page_t *to_pp)
  *
  * Again, we'll try per cpu mapping first.
  */
+
 void
 pagezero(page_t *pp, uint_t off, uint_t len)
 {
 	caddr_t va;
 	extern int hwblkclr(void *, size_t);
 	extern int use_hw_bzero;
+	boolean_t fast;
 
 	ASSERT((int)len > 0 && (int)off >= 0 && off + len <= PAGESIZE);
 	ASSERT(PAGE_LOCKED(pp));
@@ -329,7 +354,16 @@ pagezero(page_t *pp, uint_t off, uint_t len)
 
 	kpreempt_disable();
 
-	va = ppmapin(pp, PROT_READ | PROT_WRITE, (caddr_t)-1);
+	/*
+	 * Try to use KPM.  If that fails, fall back to
+	 * ppmapin/ppmapout.
+	 */
+	fast = B_TRUE;
+	va = hat_kpm_mapin(pp, NULL);
+	if (va == NULL) {
+		fast = B_FALSE;
+		va = ppmapin(pp, PROT_READ | PROT_WRITE, (caddr_t)-1);
+	}
 
 	if (!use_hw_bzero) {
 		bzero(va + off, len);
@@ -342,13 +376,17 @@ pagezero(page_t *pp, uint_t off, uint_t len)
 		sync_icache(va + off, len);
 	} else {
 		/*
-		 * We have used blk commit, and flushed the I-$. However we
-		 * still may have an instruction in the pipeline. Only a flush
-		 * instruction will invalidate that.
+		 * We have used blk commit, and flushed the I-$.
+		 * However we still may have an instruction in the
+		 * pipeline. Only a flush will invalidate that.
 		 */
 		doflush(va);
 	}
 
-	ppmapout(va);
+	if (fast) {
+		hat_kpm_mapout(pp, NULL, va);
+	} else {
+		ppmapout(va);
+	}
 	kpreempt_enable();
 }

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -13332,7 +13331,7 @@ sfmmu_kpm_getvaddr(page_t *pp, int *kpm_vac_rangep)
 	paddr = ptob(pp->p_pagenum);
 	vcolor_pa = addr_to_vcolor(paddr);
 
-	if (IS_SWAPFSVP(pp->p_vnode)) {
+	if (pp->p_vnode && IS_SWAPFSVP(pp->p_vnode)) {
 		vcolor = (PP_NEWPAGE(pp) || PP_ISNC(pp)) ?
 		    vcolor_pa : PP_GET_VCOLOR(pp);
 	} else {
