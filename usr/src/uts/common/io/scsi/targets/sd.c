@@ -10515,29 +10515,28 @@ sdclose(dev_t dev, int flag, int otyp, cred_t *cred_p)
 				sr_ejected(un);
 			}
 
-		}
-	}
-
-	/*
-	 * Destroy the cache (if it exists) which was
-	 * allocated for the write maps since this is
-	 * the last close for this media.
-	 */
-	if (un->un_wm_cache) {
-		/*
-		 * Check if there are pending commands.
-		 * and if there are give a warning and
-		 * do not destroy the cache.
-		 */
-		if (un->un_ncmds_in_driver > 0) {
-			scsi_log(SD_DEVINFO(un),
-			    sd_label, CE_WARN,
-			    "Unable to clean up memory "
-			    "because of pending I/O\n");
-		} else {
-			kmem_cache_destroy(
-			    un->un_wm_cache);
-			un->un_wm_cache = NULL;
+			/*
+			 * Destroy the cache (if it exists) which was
+			 * allocated for the write maps since this is
+			 * the last close for this media.
+			 */
+			if (un->un_wm_cache) {
+				/*
+				 * Check if there are pending commands.
+				 * and if there are give a warning and
+				 * do not destroy the cache.
+				 */
+				if (un->un_ncmds_in_driver > 0) {
+					scsi_log(SD_DEVINFO(un),
+					    sd_label, CE_WARN,
+					    "Unable to clean up memory "
+					    "because of pending I/O\n");
+				} else {
+					kmem_cache_destroy(
+					    un->un_wm_cache);
+					un->un_wm_cache = NULL;
+				}
+			}
 		}
 	}
 
