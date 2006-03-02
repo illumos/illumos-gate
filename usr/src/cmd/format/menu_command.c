@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1480,21 +1479,24 @@ c_label()
 		nhead = label.dkl_nhead;
 		nsect = label.dkl_nsect;
 
-		cur_label = L_TYPE_SOLARIS;
-		cur_disk->label_type = L_TYPE_SOLARIS;
-		free(cur_parts->etoc);
-		free(cur_parts);
-		dptr->dtype_next = cur_dtype->dtype_next;
-		free(cur_disk->disk_type);
-		cur_disk->disk_type = dptr;
-		cur_disk->disk_parts = dptr->dtype_plist;
-		cur_dtype = dptr;
-		cur_parts = dptr->dtype_plist;
-		dptr->dtype_next = NULL;
+		if (delete_disk_type(cur_disk->disk_type) == 0) {
+			cur_label = L_TYPE_SOLARIS;
+			cur_disk->label_type = L_TYPE_SOLARIS;
+			cur_disk->disk_type = dptr;
+			cur_disk->disk_parts = dptr->dtype_plist;
+			cur_dtype = dptr;
+			cur_parts = dptr->dtype_plist;
 
-		if (status = write_label())
+			if (status = write_label())
+				err_print("Label failed.\n");
+			else
+				cur_disk->disk_flags &= ~DSK_LABEL_DIRTY;
+
+			return (status);
+		} else {
 			err_print("Label failed.\n");
-		return (status);
+			return (-1);
+		}
 
 
 	    case 1:
@@ -1539,20 +1541,33 @@ c_label()
 		    err_check(vtoc64);
 		    err_print("Warning: error writing EFI.\n");
 		    return (-1);
+		} else {
+			cur_disk->disk_flags &= ~DSK_LABEL_DIRTY;
 		}
 		/*
 		 * copy over the EFI vtoc onto the SMI vtoc and return
 		 * okay.
 		 */
-		cur_parts->etoc = vtoc64;
+		dptr = auto_efi_sense(cur_file, &efinfo);
+		if (dptr == NULL) {
+			fmt_print("Autoconfiguration failed.\n");
+			return (-1);
+		}
+
 		cur_label = L_TYPE_EFI;
 		cur_disk->label_type = L_TYPE_EFI;
-		(void) strlcpy(cur_dtype->vendor, efinfo.vendor, 9);
-		(void) strlcpy(cur_dtype->product, efinfo.product, 17);
-		(void) strlcpy(cur_dtype->revision, efinfo.revision, 5);
-		cur_dtype->capacity = efinfo.capacity;
-		free(cur_dtype->dtype_asciilabel);
+		cur_disk->disk_type = dptr;
+		cur_disk->disk_parts = dptr->dtype_plist;
+		cur_dtype = dptr;
+		cur_parts = dptr->dtype_plist;
+		cur_parts->etoc = vtoc64;
+
 		ncyl = pcyl = nsect = psect = acyl = phead = 0;
+
+		/*
+		 * Get the Solais Fdisk Partition information.
+		 */
+		(void) copy_solaris_part(&cur_disk->fdisk_part);
 
 		return (0);
 	    }

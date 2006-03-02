@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -213,6 +212,7 @@ static struct disk_type *new_direct_disk_type(int fd, char *disk_name,
 static struct disk_info *find_direct_disk_info(struct dk_cinfo *dkinfo);
 static int efi_ioctl(int fd, int cmd, dk_efi_t *dk_ioc);
 static int auto_label_init(struct dk_label *label);
+static struct ctlr_type *find_direct_ctlr_type(void);
 static struct ctlr_info *find_direct_ctlr_info(struct dk_cinfo	*dkinfo);
 static  struct disk_info *find_direct_disk_info(struct dk_cinfo *dkinfo);
 
@@ -313,9 +313,14 @@ auto_efi_sense(int fd, struct efi_info *label)
 	    }
 	    return (NULL);
 	}
-	ctlr = find_scsi_ctlr_info(&dkinfo);
+	if (cur_ctype->ctype_ctype == DKC_DIRECT) {
+		ctlr = find_direct_ctlr_info(&dkinfo);
+		disk_info = find_direct_disk_info(&dkinfo);
+	} else {
+		ctlr = find_scsi_ctlr_info(&dkinfo);
+		disk_info = find_scsi_disk_info(&dkinfo);
+	}
 	disk = (struct disk_type *)zalloc(sizeof (struct disk_type));
-	disk_info = find_scsi_disk_info(&dkinfo);
 	assert(disk_info->disk_ctlr == ctlr);
 	dp = ctlr->ctlr_ctype->ctype_dlist;
 	if (dp == NULL) {
@@ -360,6 +365,25 @@ efi_ioctl(int fd, int cmd, dk_efi_t *dk_ioc)
 	dk_ioc->dki_data = data;
 
 	return (error);
+}
+
+static struct ctlr_type *
+find_direct_ctlr_type()
+{
+	struct	mctlr_list	*mlp;
+
+	mlp = controlp;
+
+	while (mlp != NULL) {
+		if (mlp->ctlr_type->ctype_ctype == DKC_DIRECT) {
+			return (mlp->ctlr_type);
+		}
+		mlp = mlp->next;
+	}
+
+	impossible("no DIRECT controller type");
+
+	return ((struct ctlr_type *)NULL);
 }
 
 static struct ctlr_info *
@@ -723,7 +747,6 @@ auto_direct_get_geom_label(int fd, struct dk_label *label)
 		return (disk_type);
 	}
 }
-
 
 /*
  * Auto-sense a scsi disk configuration, ie get the information
@@ -1890,6 +1913,49 @@ new_scsi_disk_type(
 	disk_info->disk_parts = part;
 
 	return (disk);
+}
+
+
+/*
+ * Delete a disk type from disk type list.
+ */
+int
+delete_disk_type(
+		struct disk_type *disk_type)
+{
+	struct ctlr_type	*ctlr;
+	struct disk_type	*dp, *disk;
+
+	if (cur_ctype->ctype_ctype == DKC_DIRECT)
+		ctlr = find_direct_ctlr_type();
+	else
+		ctlr = find_scsi_ctlr_type();
+	if (ctlr == NULL || ctlr->ctype_dlist == NULL) {
+		return (-1);
+	}
+
+	disk = ctlr->ctype_dlist;
+	if (disk == disk_type) {
+		ctlr->ctype_dlist = disk->dtype_next;
+		if (cur_label == L_TYPE_EFI)
+			free(disk->dtype_plist->etoc);
+		free(disk->dtype_plist);
+		free(disk);
+		return (0);
+	} else {
+		for (dp = disk->dtype_next; dp != NULL;
+		    disk = disk->dtype_next, dp = dp->dtype_next) {
+			if (dp == disk_type) {
+				disk->dtype_next = dp->dtype_next;
+				if (cur_label == L_TYPE_EFI)
+					free(dp->dtype_plist->etoc);
+				free(dp->dtype_plist);
+				free(dp);
+				return (0);
+			}
+		}
+		return (-1);
+	}
 }
 
 
