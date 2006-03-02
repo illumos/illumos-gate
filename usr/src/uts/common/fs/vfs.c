@@ -87,6 +87,11 @@
 
 #include <fs/fs_subr.h>
 
+/* Private interfaces to create vopstats-related data structures */
+extern void		initialize_vopstats(vopstats_t *);
+extern vopstats_t	*get_fstype_vopstats(struct vfs *, struct vfssw *);
+extern vsk_anchor_t	*get_vskstat_anchor(struct vfs *);
+
 static void vfs_clearmntopt_nolock(mntopts_t *, const char *, int);
 static void vfs_setmntopt_nolock(mntopts_t *, const char *,
     const char *, int, int);
@@ -661,7 +666,6 @@ vfs_mountroot(void)
 	char		*path;
 	size_t		plen;
 	struct vfssw	*vswp;
-	extern void setup_vopstats(vfs_t *);
 
 	rw_init(&vfssw_lock, NULL, RW_DEFAULT, NULL);
 	rw_init(&vfslist, NULL, RW_DEFAULT, NULL);
@@ -714,11 +718,14 @@ vfs_mountroot(void)
 	if ((vswp = vfs_getvfsswbyvfsops(vfs_getops(rootvfs))) != NULL) {
 		/* Set flag for statistics collection */
 		if (vswp->vsw_flag & VSW_STATS) {
+			initialize_vopstats(&rootvfs->vfs_vopstats);
 			rootvfs->vfs_flag |= VFS_STATS;
+			rootvfs->vfs_fstypevsp =
+			    get_fstype_vopstats(rootvfs, vswp);
+			rootvfs->vfs_vskap = get_vskstat_anchor(rootvfs);
 		}
 		vfs_unrefvfssw(vswp);
 	}
-	setup_vopstats(rootvfs);
 
 	/*
 	 * Mount /devices, /system/contract, /etc/mnttab, /etc/svc/volatile,
@@ -863,7 +870,7 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 	char		*resource = NULL, *mountpt = NULL;
 	refstr_t	*oldresource, *oldmntpt;
 	struct pathname	pn, rpn;
-	extern void setup_vopstats(vfs_t *);
+	vsk_anchor_t	*vskap;
 
 	/*
 	 * The v_flag value for the mount point vp is permanently set
@@ -1407,9 +1414,20 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 			}
 		}
 
-		/* Set flag for statistics collection */
-		if (vswp->vsw_flag & VSW_STATS) {
+		/*
+		 * If this isn't a remount, set up the vopstats before
+		 * anyone can touch this
+		 */
+		if (!remount && vswp->vsw_flag & VSW_STATS) {
+			initialize_vopstats(&vfsp->vfs_vopstats);
+			/*
+			 * We need to set vfs_vskap to NULL because there's
+			 * a chance it won't be set below.  This is checked
+			 * in teardown_vopstats() so we can't have garbage.
+			 */
+			vfsp->vfs_vskap = NULL;
 			vfsp->vfs_flag |= VFS_STATS;
+			vfsp->vfs_fstypevsp = get_fstype_vopstats(vfsp, vswp);
 		}
 
 		vfs_unlock(vfsp);
@@ -1419,13 +1437,23 @@ domount(char *fsname, struct mounta *uap, vnode_t *vp, struct cred *credp,
 		vn_vfsunlock(vp);
 
 	if ((error == 0) && (copyout_error == 0)) {
-		/*
-		 * If this isn't a remount, set up the vopstats before
-		 * anyone can touch this
-		 */
-		if (!remount)
-			setup_vopstats(vfsp);
-
+		if (!remount) {
+			/*
+			 * Don't call get_vskstat_anchor() while holding
+			 * locks since it allocates memory and calls
+			 * VFS_STATVFS().  For NFS, the latter can generate
+			 * an over-the-wire call.
+			 */
+			vskap = get_vskstat_anchor(vfsp);
+			/* Only take the lock if we have something to do */
+			if (vskap != NULL) {
+				vfs_lock_wait(vfsp);
+				if (vfsp->vfs_flag & VFS_STATS) {
+					vfsp->vfs_vskap = vskap;
+				}
+				vfs_unlock(vfsp);
+			}
+		}
 		/* Return vfsp to caller. */
 		*vfspp = vfsp;
 	}
@@ -3678,8 +3706,8 @@ vfsinit(void)
 {
 	struct vfssw *vswp;
 	int error;
+	extern int vopstats_enabled;
 	extern void vopstats_startup();
-	extern void setup_vopstats(vfs_t *);
 
 	static const fs_operation_def_t EIO_vfsops_template[] = {
 		VFSNAME_MOUNT,		vfs_EIO,
@@ -3736,7 +3764,14 @@ vfsinit(void)
 	}
 
 	vopstats_startup();
-	setup_vopstats(&EIO_vfs);
+
+	if (vopstats_enabled) {
+		/* EIO_vfs can collect stats, but we don't retrieve them */
+		initialize_vopstats(&EIO_vfs.vfs_vopstats);
+		EIO_vfs.vfs_fstypevsp = NULL;
+		EIO_vfs.vfs_vskap = NULL;
+		EIO_vfs.vfs_flag |= VFS_STATS;
+	}
 }
 
 /*

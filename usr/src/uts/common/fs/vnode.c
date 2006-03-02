@@ -508,40 +508,26 @@ initialize_vopstats(vopstats_t *vsp)
 }
 
 /*
- * Create and initialize the vopstat structure for a vfs. Also, generate
- * a kstat name, create the kstat structure, and associate it with the
- * vfs' vopstats.  This must only be called from mount.
+ * If possible, determine which vopstats by fstype to use and
+ * return a pointer to the caller.
  */
-void
-setup_vopstats(vfs_t *vfsp)
+vopstats_t *
+get_fstype_vopstats(vfs_t *vfsp, struct vfssw *vswp)
 {
-	int		fstype = 0;		/* Index into vfssw[] */
-	char		kstatstr[KSTAT_STRLEN]; /* kstat name for vopstats */
-	statvfs64_t	statvfsbuf;		/* Needed to find f_fsid */
-	vsk_anchor_t	*vskp;			/* vfs <--> kstat anchor */
-	vfsops_t	*vfsops;		/* vfs operations vector */
-	vfssw_t		*vswp;			/* Ptr into vfssw[] table */
-	kstat_t		*ksp;			/* Ptr to new kstat */
-	avl_index_t	where;			/* Location in the AVL tree */
+	int		fstype = 0;	/* Index into vfssw[] */
+	vopstats_t	*vsp = NULL;
 
 	if (vfsp == NULL || (vfsp->vfs_flag & VFS_STATS) == 0 ||
 	    !vopstats_enabled)
-		return;
-
-	initialize_vopstats(&vfsp->vfs_vopstats);
-
+		return (NULL);
 	/*
 	 * Set up the fstype.  We go to so much trouble because all versions
 	 * of NFS use the same fstype in their vfs even though they have
 	 * distinct entries in the vfssw[] table.
+	 * NOTE: A special vfs (e.g., EIO_vfs) may not have an entry.
 	 */
-	if (vfsp && (vfsops = vfs_getops(vfsp)) != NULL) {
-		vswp = vfs_getvfsswbyvfsops(vfsops);
-		/* A special vfs (e.g., EIO_vfs) may not have an entry */
-		if (vswp) {
-			fstype = vswp - vfssw;	/* Gets us the index */
-			vfs_unrefvfssw(vswp);	/* Must release reference */
-		}
+	if (vswp) {
+		fstype = vswp - vfssw;	/* Gets us the index */
 	} else {
 		fstype = vfsp->vfs_fstype;
 	}
@@ -552,11 +538,29 @@ setup_vopstats(vfs_t *vfsp)
 	 * entries.
 	 */
 	if (fstype > 0 && fstype < nfstype) {
-		vfsp->vfs_fstypevsp = vopstats_fstype[fstype];
-	} else {
-		/* Otherwise, never attempt to update stats by fstype */
-		vfsp->vfs_fstypevsp = NULL;
+		vsp = vopstats_fstype[fstype];
 	}
+
+	return (vsp);
+}
+
+/*
+ * Generate a kstat name, create the kstat structure, and allocate a
+ * vsk_anchor_t to hold it together.  Return the pointer to the vsk_anchor_t
+ * to the caller.  This must only be called from a mount.
+ */
+vsk_anchor_t *
+get_vskstat_anchor(vfs_t *vfsp)
+{
+	char		kstatstr[KSTAT_STRLEN]; /* kstat name for vopstats */
+	statvfs64_t	statvfsbuf;		/* Needed to find f_fsid */
+	vsk_anchor_t	*vskp = NULL;		/* vfs <--> kstat anchor */
+	kstat_t		*ksp;			/* Ptr to new kstat */
+	avl_index_t	where;			/* Location in the AVL tree */
+
+	if (vfsp == NULL || (vfsp->vfs_flag & VFS_STATS) == 0 ||
+	    !vopstats_enabled)
+		return (NULL);
 
 	/* Need to get the fsid to build a kstat name */
 	if (VFS_STATVFS(vfsp, &statvfsbuf) == 0) {
@@ -568,7 +572,6 @@ setup_vopstats(vfs_t *vfsp)
 		vskp = kmem_cache_alloc(vsk_anchor_cache, KM_SLEEP);
 		bzero(vskp, sizeof (*vskp));
 		vskp->vsk_fsid = statvfsbuf.f_fsid;
-		vfsp->vfs_vskap = vskp;
 
 		mutex_enter(&vskstat_tree_lock);
 		if (avl_find(&vskstat_tree, vskp, &where) == NULL) {
@@ -586,10 +589,11 @@ setup_vopstats(vfs_t *vfsp)
 		} else {
 			/* Oops, found one! Release memory and lock. */
 			mutex_exit(&vskstat_tree_lock);
-			vfsp->vfs_vskap = NULL;
 			kmem_cache_free(vsk_anchor_cache, vskp);
+			vskp = NULL;
 		}
 	}
+	return (vskp);
 }
 
 /*
