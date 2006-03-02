@@ -2701,17 +2701,14 @@ eri_poffreq(queue_t *wq, mblk_t *mp)
 	switch (((dl_promiscoff_req_t *)mp->b_rptr)->dl_level) {
 	case DL_PROMISC_PHYS:
 		flag = ERI_SALLPHYS;
-		sbp->sb_flags &= ~ERI_SALLPHYS;
 		break;
 
 	case DL_PROMISC_SAP:
 		flag = ERI_SALLSAP;
-		sbp->sb_flags &= ~ERI_SALLSAP;
 		break;
 
 	case DL_PROMISC_MULTI:
 		flag = ERI_SALLMULTI;
-		sbp->sb_flags &= ~ERI_SALLMULTI;
 		break;
 
 	default:
@@ -2723,6 +2720,8 @@ eri_poffreq(queue_t *wq, mblk_t *mp)
 		dlerrorack(wq, mp, DL_PROMISCOFF_REQ, DL_NOTENAB, 0);
 		return;
 	}
+
+	sbp->sb_flags &= ~flag;
 
 	erip = sbp->sb_erip;
 	if (erip) {
@@ -3162,7 +3161,7 @@ eri_nreq(queue_t *wq, mblk_t *mp)
 	uint32_t	dl_notification;
 
 	if (MBLKL(mp) < DL_NOTIFY_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_NOTIFY_ACK, DL_BADPRIM, 0);
+		dlerrorack(wq, mp, DL_NOTIFY_REQ, DL_BADPRIM, 0);
 		return;
 	}
 
@@ -3177,7 +3176,7 @@ eri_nreq(queue_t *wq, mblk_t *mp)
 	sbp = (struct eristr *)wq->q_ptr;
 
 	if (sbp->sb_state != DL_IDLE) {
-		dlerrorack(wq, mp, DL_NOTIFY_ACK, DL_OUTSTATE, 0);
+		dlerrorack(wq, mp, DL_NOTIFY_REQ, DL_OUTSTATE, 0);
 		return;
 	}
 

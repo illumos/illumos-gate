@@ -498,6 +498,8 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	t_scalar_t	sap;
 	queue_t		*q = dsp->ds_wq;
 
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+
 	if (MBLKL(mp) < sizeof (dl_bind_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
@@ -512,8 +514,6 @@ proto_bind_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		dl_err = DL_UNSUPPORTED;
 		goto failed;
 	}
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (dsp->ds_dlstate != DL_UNBOUND) {
 		dl_err = DL_OUTSTATE;
@@ -690,12 +690,12 @@ proto_promiscon_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	uint32_t	promisc_saved;
 	queue_t		*q = dsp->ds_wq;
 
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+
 	if (MBLKL(mp) < sizeof (dl_promiscon_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
 	}
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
@@ -767,13 +767,12 @@ proto_promiscoff_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	uint32_t	promisc_saved;
 	queue_t		*q = dsp->ds_wq;
 
+	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (MBLKL(mp) < sizeof (dl_promiscoff_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
 	}
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
@@ -1085,6 +1084,8 @@ proto_udqos_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	off = dlp->dl_qos_offset;
 	len = dlp->dl_qos_length;
 
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+
 	if (MBLKL(mp) < sizeof (dl_udqos_req_t) || !MBLKIN(mp, off, len)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
@@ -1095,8 +1096,6 @@ proto_udqos_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 		dl_err = DL_BADQOSTYPE;
 		goto failed;
 	}
-
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 
 	if (dsp->ds_vid == VLAN_ID_NONE ||
 	    selp->dl_priority > (1 << VLAN_PRI_SIZE) - 1 ||
@@ -1370,12 +1369,13 @@ proto_notify_req(dld_str_t *dsp, union DL_primitives *udlp, mblk_t *mp)
 	    DL_NOTE_LINK_DOWN |
 	    DL_NOTE_CAPAB_RENEG;
 
+	rw_enter(&dsp->ds_lock, RW_WRITER);
+
 	if (MBLKL(mp) < sizeof (dl_notify_req_t)) {
 		dl_err = DL_BADPRIM;
 		goto failed;
 	}
 
-	rw_enter(&dsp->ds_lock, RW_WRITER);
 	if (dsp->ds_dlstate == DL_UNATTACHED ||
 	    DL_ACK_PENDING(dsp->ds_dlstate)) {
 		dl_err = DL_OUTSTATE;

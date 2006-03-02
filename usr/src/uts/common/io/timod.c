@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1116,8 +1115,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 				    mblk_t *tmp = allocb(expected_ack_size,
 					BPRI_HI);
 				    if (tmp == NULL) {
-					ASSERT((mp->b_datap->db_lim -
-						mp->b_datap->db_base) <
+					ASSERT(MBLKSIZE(mp) >=
 						sizeof (struct T_error_ack));
 
 					tilog("timodrproc: allocb failed no "
@@ -1126,7 +1124,7 @@ timodrproc(queue_t *q, mblk_t *mp)
 					mp->b_rptr = mp->b_datap->db_base;
 					pptr = (union T_primitives *)
 						mp->b_rptr;
-					pptr->error_ack.ERROR_prim = T_INFO_ACK;
+					pptr->error_ack.ERROR_prim = T_INFO_REQ;
 					pptr->error_ack.TLI_error = TSYSERR;
 					pptr->error_ack.UNIX_error = EAGAIN;
 					pptr->error_ack.PRIM_type = T_ERROR_ACK;

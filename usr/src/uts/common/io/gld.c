@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1304,12 +1303,12 @@ gld_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
 			rc = DDI_FAILURE;
 		} else if (minor <= GLD_MAX_STYLE1_MINOR) {
 			/* Style 1:  calculate the PPA from the minor */
-			*(int *)resultp = GLD_STYLE1_MINOR_TO_PPA(minor);
+			*resultp = (void *)GLD_STYLE1_MINOR_TO_PPA(minor);
 			rc = DDI_SUCCESS;
 		} else {
 			/* Clone:  look for it.  Not a static mapping */
 			if ((devinfo = gld_finddevinfo((dev_t)arg)) != NULL) {
-				*(int *)resultp = ddi_get_instance(devinfo);
+				*resultp = (void *)ddi_get_instance(devinfo);
 				rc = DDI_SUCCESS;
 			}
 		}
@@ -1533,6 +1532,7 @@ gld_open(queue_t *q, dev_t *dev, int flag, int sflag, cred_t *cred)
 		mac_pvt = (gld_mac_pvt_t *)macinfo->gldm_mac_pvt;
 		if (!mac_pvt->started) {
 			if (gld_start_mac(macinfo) != GLD_SUCCESS) {
+				gld_rem_vlan(vlan);
 				GLDM_UNLOCK(macinfo);
 				mutex_exit(&glddev->gld_devlock);
 				kmem_free(gld, sizeof (gld_t));

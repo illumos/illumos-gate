@@ -5780,7 +5780,7 @@ hmenreq(queue_t *wq, mblk_t *mp)
 	uint32_t		dl_notification;
 
 	if (MBLKL(mp) < DL_NOTIFY_REQ_SIZE) {
-		dlerrorack(wq, mp, DL_NOTIFY_ACK, DL_BADPRIM, 0);
+		dlerrorack(wq, mp, DL_NOTIFY_REQ, DL_BADPRIM, 0);
 		return;
 	}
 
@@ -5796,7 +5796,7 @@ hmenreq(queue_t *wq, mblk_t *mp)
 	sbp = (struct hmestr *)wq->q_ptr;
 
 	if (sbp->sb_state != DL_IDLE) {
-		dlerrorack(wq, mp, DL_NOTIFY_ACK, DL_BADPRIM, 0);
+		dlerrorack(wq, mp, DL_NOTIFY_REQ, DL_BADPRIM, 0);
 		return;
 	}
 
