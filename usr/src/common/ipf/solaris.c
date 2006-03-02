@@ -2,7 +2,7 @@
  * Copyright (C) 1993-2001, 2003 by Darren Reed.
  * See the IPFILTER.LICENCE file for details on licencing.
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -29,6 +29,7 @@
 #include <sys/socket.h>
 #include <sys/dlpi.h>
 #include <sys/stropts.h>
+#include <sys/kstat.h>
 #include <sys/sockio.h>
 #include <net/if.h>
 #if SOLARIS2 >= 6
@@ -210,6 +211,118 @@ static	size_t	hdrsizes[57][2] = {
 
 static dev_info_t *ipf_dev_info = NULL;
 
+static const filter_kstats_t ipf_kstat_tmp = {
+	{ "pass",			KSTAT_DATA_ULONG },
+	{ "block",			KSTAT_DATA_ULONG },
+	{ "nomatch",			KSTAT_DATA_ULONG },
+	{ "short",			KSTAT_DATA_ULONG },
+	{ "pass, logged",		KSTAT_DATA_ULONG },
+	{ "block, logged",		KSTAT_DATA_ULONG },
+	{ "nomatch, logged",		KSTAT_DATA_ULONG },
+	{ "logged",			KSTAT_DATA_ULONG },
+	{ "skip",			KSTAT_DATA_ULONG },
+	{ "return sent",		KSTAT_DATA_ULONG },
+	{ "acct",			KSTAT_DATA_ULONG },
+	{ "bad frag state alloc",	KSTAT_DATA_ULONG },
+	{ "new frag state kept",	KSTAT_DATA_ULONG },
+	{ "new frag state compl. pkt",	KSTAT_DATA_ULONG },
+	{ "bad pkt state alloc",	KSTAT_DATA_ULONG },
+	{ "new pkt kept state",		KSTAT_DATA_ULONG },
+	{ "cachehit",			KSTAT_DATA_ULONG },
+	{ "tcp cksum bad",		KSTAT_DATA_ULONG },
+	{{ "pullup ok",			KSTAT_DATA_ULONG },
+	{ "pullup nok",			KSTAT_DATA_ULONG }},
+	{ "src != route",		KSTAT_DATA_ULONG },
+	{ "ttl invalid",		KSTAT_DATA_ULONG },
+	{ "bad ip pkt",			KSTAT_DATA_ULONG },
+	{ "ipv6 pkt",			KSTAT_DATA_ULONG },
+	{ "dropped:pps ceiling",	KSTAT_DATA_ULONG },
+	{ "ip upd. fail",		KSTAT_DATA_ULONG }
+};
+
+kstat_t		*ipf_kstatp[2] = {NULL, NULL};
+static int	ipf_kstat_update(kstat_t *ksp, int rwflag);
+
+static void
+ipf_kstat_init(void)
+{
+	int 	i;
+
+	for (i = 0; i < 2; i++) {
+		ipf_kstatp[i] = kstat_create("ipf", 0,
+			(i==0)?"inbound":"outbound",
+			"net",
+			KSTAT_TYPE_NAMED,
+			sizeof (filter_kstats_t) / sizeof (kstat_named_t),
+			0);
+		if (ipf_kstatp[i] != NULL) {
+			bcopy(&ipf_kstat_tmp, ipf_kstatp[i]->ks_data,
+				sizeof (filter_kstats_t));
+			ipf_kstatp[i]->ks_update = ipf_kstat_update;
+			ipf_kstatp[i]->ks_private = &frstats[i];
+			kstat_install(ipf_kstatp[i]);
+		}
+	}
+
+#ifdef	IPFDEBUG
+	cmn_err(CE_NOTE, "IP Filter: ipf_kstat_init() installed 0x%x, 0x%x",
+		ipf_kstatp[0], ipf_kstatp[1]);
+#endif
+}
+
+static void
+ipf_kstat_fini(void)
+{
+	int i;
+	for (i = 0; i < 2; i++) {
+		if (ipf_kstatp[i] != NULL) {
+			kstat_delete(ipf_kstatp[i]);
+			ipf_kstatp[i] = NULL;
+		}
+	}
+}
+
+static int
+ipf_kstat_update(kstat_t *ksp, int rwflag)
+{
+	filter_kstats_t	*fkp;
+	filterstats_t	*fsp;
+
+	if (rwflag == KSTAT_WRITE)
+		return (EACCES);
+
+	fkp = ksp->ks_data;
+	fsp = ksp->ks_private;
+
+	fkp->fks_pass.value.ul		= fsp->fr_pass;
+	fkp->fks_block.value.ul		= fsp->fr_block;
+	fkp->fks_nom.value.ul		= fsp->fr_nom;
+	fkp->fks_short.value.ul		= fsp->fr_short;
+	fkp->fks_ppkl.value.ul		= fsp->fr_ppkl;
+	fkp->fks_bpkl.value.ul		= fsp->fr_bpkl;
+	fkp->fks_npkl.value.ul		= fsp->fr_npkl;
+	fkp->fks_pkl.value.ul		= fsp->fr_pkl;
+	fkp->fks_skip.value.ul		= fsp->fr_skip;
+	fkp->fks_ret.value.ul		= fsp->fr_ret;
+	fkp->fks_acct.value.ul		= fsp->fr_acct;
+	fkp->fks_bnfr.value.ul		= fsp->fr_bnfr;
+	fkp->fks_nfr.value.ul		= fsp->fr_nfr;
+	fkp->fks_cfr.value.ul		= fsp->fr_cfr;
+	fkp->fks_bads.value.ul		= fsp->fr_bads;
+	fkp->fks_ads.value.ul		= fsp->fr_ads;
+	fkp->fks_chit.value.ul		= fsp->fr_chit;
+	fkp->fks_tcpbad.value.ul 	= fsp->fr_tcpbad;
+	fkp->fks_pull[0].value.ul 	= fsp->fr_pull[0];
+	fkp->fks_pull[1].value.ul 	= fsp->fr_pull[1];
+	fkp->fks_badsrc.value.ul 	= fsp->fr_badsrc;
+	fkp->fks_badttl.value.ul 	= fsp->fr_badttl;
+	fkp->fks_bad.value.ul		= fsp->fr_bad;
+	fkp->fks_ipv6.value.ul		= fsp->fr_ipv6;
+	fkp->fks_ppshit.value.ul 	= fsp->fr_ppshit;
+	fkp->fks_ipud.value.ul		= fsp->fr_ipud;
+
+	return (0);
+}
 
 int _init()
 {
@@ -220,11 +333,14 @@ int _init()
 	 */
 	RWLOCK_INIT(&ipf_global, "ipf filter load/unload mutex");
 	RWLOCK_INIT(&ipf_mutex, "ipf filter rwlock");
+	ipf_kstat_init();
 	status = mod_install(&modlink1);
 	if (status != 0) {
 		RW_DESTROY(&ipf_mutex);
 		RW_DESTROY(&ipf_global);
+		ipf_kstat_fini();
 	}
+
 	return status;
 }
 
@@ -236,6 +352,7 @@ int _fini(void)
 	status = mod_remove(&modlink1);
 	if (status != 0)
 		return status;
+	ipf_kstat_fini();
 	RW_DESTROY(&ipf_mutex);
 	RW_DESTROY(&ipf_global);
 	return status;

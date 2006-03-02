@@ -5,7 +5,7 @@
  *
  * $Id: ip_fil.h,v 2.146 2003/07/01 18:30:19 darrenr Exp $
  *
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -686,6 +686,8 @@ typedef	struct	ipfsetctl	{
  * Some of the statistics below are in their own counters, but most are kept
  * in this single structure so that they can all easily be collected and
  * copied back as required.
+ *
+ * NOTE: when changing, keep in sync with kstats (below).
  */
 typedef	struct	filterstats {
 	u_long	fr_pass;	/* packets allowed */
@@ -714,6 +716,38 @@ typedef	struct	filterstats {
 	u_long	fr_ppshit;	/* dropped because of pps ceiling */
 	u_long	fr_ipud;	/* IP id update failures */
 } filterstats_t;
+
+/*
+ * kstat "copy" of the above - keep in sync!
+ * also keep in sync with initialisation code in solaris.c, ipf_kstat_init().
+ */
+typedef struct  filter_kstats {
+	kstat_named_t   fks_pass;	/* see above for comments */
+	kstat_named_t   fks_block;
+	kstat_named_t   fks_nom;
+	kstat_named_t   fks_short;
+	kstat_named_t   fks_ppkl;
+	kstat_named_t   fks_bpkl;
+	kstat_named_t   fks_npkl;
+	kstat_named_t   fks_pkl;
+	kstat_named_t   fks_skip;
+	kstat_named_t   fks_ret;
+	kstat_named_t   fks_acct;
+	kstat_named_t   fks_bnfr;
+	kstat_named_t   fks_nfr;
+	kstat_named_t   fks_cfr;
+	kstat_named_t   fks_bads;
+	kstat_named_t   fks_ads;
+	kstat_named_t   fks_chit;
+	kstat_named_t   fks_tcpbad;
+	kstat_named_t   fks_pull[2];
+	kstat_named_t   fks_badsrc;
+	kstat_named_t   fks_badttl;
+	kstat_named_t   fks_bad;
+	kstat_named_t   fks_ipv6;
+	kstat_named_t   fks_ppshit;
+	kstat_named_t   fks_ipud;
+} filter_kstats_t;
 
 /*
  * Log structure.  Each packet header logged is prepended by one of these.
