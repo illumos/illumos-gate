@@ -19,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -504,7 +504,10 @@ print_raidconfig(int c, raid_config_t config)
 	}
 
 	/* Get RAID Disks */
-	(void) printf("c%dt%dd0\t\t", c, config.disk[0]);
+	if (config.disk[0] != 0xff)
+		(void) printf("c%dt%dd0\t\t", c, config.disk[0]);
+	else
+		(void) printf("-\t\t");
 
 	/* Get RAID Disk's Status */
 	if (config.diskstatus[0] & RAID_DISKSTATUS_FAILED) {
@@ -516,7 +519,12 @@ print_raidconfig(int c, raid_config_t config)
 	}
 
 	for (i = 1; i < config.ndisks; i++) {
-		(void) printf("\t\t\t\tc%dt%dd0\t\t", c, config.disk[i]);
+		if (config.disk[i] != 0xff)
+			(void) printf("\t\t\t\tc%dt%dd0\t\t", c,
+				config.disk[i]);
+		else
+			(void) printf("\t\t\t\t-\t\t");
+
 		if (config.diskstatus[i] & RAID_DISKSTATUS_FAILED) {
 			(void) printf(gettext("FAILED\n"));
 		} else if (config.diskstatus[i] & RAID_DISKSTATUS_MISSING) {
@@ -1205,7 +1213,6 @@ do_delete(char *d, int force)
 				"RAID0 volume, \"%s\" is mounted.\n"), d);
 			return (INVALID_ARG);
 		}
-
 		if (!force) {
 			(void) fprintf(stderr, gettext("Deleting volume "
 				"c%dt%dd0 will destroy all data it contains, "
@@ -1216,6 +1223,18 @@ do_delete(char *d, int force)
 				(void) close(fd);
 				return (SUCCESS);
 			}
+		}
+	}
+	/* if this volume is a mirror, prompt user to verify the operation */
+	else if (config.raid_level == RAID_MIRROR && !force) {
+		(void) fprintf(stderr, gettext("Are you sure you want to "
+			"delete RAID-1 Volume c%dt%dd0(%s/%s)? "),
+			ctrl, t, yeschr, nochr);
+		if (!yes()) {
+			(void) fprintf(stderr, gettext("RAID volume "
+				"c%dt%dd0 not deleted.\n\n"), ctrl, t);
+			(void) close(fd);
+			return (SUCCESS);
 		}
 	}
 
