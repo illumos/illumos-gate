@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -706,11 +705,15 @@ leaky_subr_bufctl_cmp(const leak_bufctl_t *lhs, const leak_bufctl_t *rhs)
 int
 leaky_subr_estimate(size_t *estp)
 {
-	int umem_flags;
-	int umem_ready;
+	if (umem_ready == 0) {
+		mdb_warn(
+		    "findleaks: umem is not loaded in the address space\n");
+		return (DCMD_ERR);
+	}
 
-	if (umem_readvar(&umem_ready, "umem_ready") == -1) {
-		mdb_warn("couldn't read 'umem_ready'");
+	if (umem_ready == UMEM_READY_INIT_FAILED) {
+		mdb_warn("findleaks: umem initialization failed -- no "
+		    "possible leaks.\n");
 		return (DCMD_ERR);
 	}
 
@@ -718,16 +721,6 @@ leaky_subr_estimate(size_t *estp)
 		mdb_warn("findleaks: No allocations have occured -- no "
 		    "possible leaks.\n");
 		return (DCMD_ERR);
-	}
-
-	if (umem_readvar(&umem_flags, "umem_flags") == -1) {
-		mdb_warn("couldn't read 'umem_flags'");
-		return (DCMD_ERR);
-	}
-
-	if (umem_flags & UMF_RANDOMIZE) {
-		mdb_warn("findleaks: might not work with "
-		    "UMEM_DEBUG=randomize\n");
 	}
 
 	if (mdb_walk("umem_cache", (mdb_walk_cb_t)leaky_estimate, estp) == -1) {

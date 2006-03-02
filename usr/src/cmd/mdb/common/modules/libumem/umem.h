@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -36,8 +35,7 @@
 extern "C" {
 #endif
 
-extern uint32_t umem_max_ncpus;
-
+extern int umem_ready;
 extern uint32_t umem_stack_depth;
 
 extern int umem_cache_walk_init(mdb_walk_state_t *);
@@ -113,6 +111,8 @@ extern int umalog(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int umausers(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int umem_cache(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int umem_log(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int umem_malloc_dist(uintptr_t, uint_t, int, const mdb_arg_t *);
+extern int umem_malloc_info(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int umem_status(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int umem_verify(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int umem_verify_alloc(uintptr_t, uint_t, int, const mdb_arg_t *);
@@ -120,14 +120,16 @@ extern int umem_verify_free(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int vmem(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int vmem_seg(uintptr_t, uint_t, int, const mdb_arg_t *);
 extern int whatis(uintptr_t, uint_t, int, const mdb_arg_t *);
+
 extern void bufctl_help(void);
+extern void umem_malloc_dist_help(void);
+extern void umem_malloc_info_help(void);
 extern void vmem_seg_help(void);
 
 /*
  * utility functions for the rest of libumem
  */
 extern int umem_init(void);
-extern int umem_init_walkers(uintptr_t, const umem_cache_t *, void *);
 extern int umem_get_magsize(const umem_cache_t *);
 extern size_t umem_estimate_allocated(uintptr_t, const umem_cache_t *);
 

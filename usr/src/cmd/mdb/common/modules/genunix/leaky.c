@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -603,7 +602,11 @@ leaky_cleanup(int force)
 	 */
 	lk_free_state = NULL;
 
-	if (lk_state == LK_CLEANING) {
+	switch (lk_state) {
+	case LK_CLEAN:
+		return;		/* nothing to do */
+
+	case LK_CLEANING:
 		mdb_warn("interrupted during ::findleaks cleanup; some mdb "
 		    "memory will be leaked\n");
 
@@ -618,10 +621,16 @@ leaky_cleanup(int force)
 		bzero(&lk_beans, sizeof (lk_beans));
 		lk_state = LK_CLEAN;
 		return;
-	}
 
-	if (!force && lk_state != LK_SWEEPING)
-		return;
+	case LK_SWEEPING:
+		break;		/* must clean up */
+
+	case LK_DONE:
+	default:
+		if (!force)
+			return;
+		break;		/* only clean up if forced */
+	}
 
 	lk_state = LK_CLEANING;
 
@@ -797,7 +806,7 @@ findleaks(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	if (lk_state == LK_DONE) {
 		if (lk_verbose)
 			mdb_printf("findleaks: using cached results "
-			    "(-f will force a full run)\n");
+			    "(use '-f' to force a full run)\n");
 		goto dump;
 	}
 

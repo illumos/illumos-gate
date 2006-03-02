@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,8 +31,10 @@
 #include <umem_impl.h>
 
 #include <alloca.h>
+#include <limits.h>
 
 #include "misc.h"
+#include "leaky.h"
 
 #include "umem_pagesize.h"
 
@@ -42,46 +43,64 @@
 #define	UM_BUFCTL		0x4
 #define	UM_HASH			0x8
 
-uint32_t umem_max_ncpus;
+int umem_ready;
 
+static int umem_stack_depth_warned;
+static uint32_t umem_max_ncpus;
 uint32_t umem_stack_depth;
+
 size_t umem_pagesize;
 
 #define	UMEM_READVAR(var)				\
 	(umem_readvar(&(var), #var) == -1 &&		\
-	    ((void) mdb_warn("failed to read "#var), 1))
+	    (mdb_warn("failed to read "#var), 1))
 
 int
-umem_init(void)
+umem_update_variables(void)
 {
 	size_t pagesize;
-	GElf_Sym sym;
 
 	/*
-	 * Figure out which type of umem is being used
+	 * Figure out which type of umem is being used; if it's not there
+	 * yet, succeed quietly.
 	 */
-	if (mdb_lookup_by_obj("libumem.so.1", "umem_alloc", &sym) != 0)
-		umem_set_standalone();
+	if (umem_set_standalone() == -1) {
+		umem_ready = 0;
+		return (0);		/* umem not there yet */
+	}
 
-	if (UMEM_READVAR(umem_max_ncpus))
+	/*
+	 * Solaris 9 used a different name for umem_max_ncpus.  It's
+	 * cheap backwards compatibility to check for both names.
+	 */
+	if (umem_readvar(&umem_max_ncpus, "umem_max_ncpus") == -1 &&
+	    umem_readvar(&umem_max_ncpus, "max_ncpus") == -1) {
+		mdb_warn("unable to read umem_max_ncpus or max_ncpus");
+		return (-1);
+	}
+	if (UMEM_READVAR(umem_ready))
 		return (-1);
 	if (UMEM_READVAR(umem_stack_depth))
 		return (-1);
 	if (UMEM_READVAR(pagesize))
 		return (-1);
 
-	umem_pagesize = pagesize;
-
 	if (umem_stack_depth > UMEM_MAX_STACK_DEPTH) {
-		mdb_warn("umem_stack_depth corrupted (%d > %d)\n",
-		    umem_stack_depth, UMEM_MAX_STACK_DEPTH);
+		if (umem_stack_depth_warned == 0) {
+			mdb_warn("umem_stack_depth corrupted (%d > %d)\n",
+			    umem_stack_depth, UMEM_MAX_STACK_DEPTH);
+			umem_stack_depth_warned = 1;
+		}
 		umem_stack_depth = 0;
 	}
+
+	umem_pagesize = pagesize;
+
 	return (0);
 }
 
 /*ARGSUSED*/
-int
+static int
 umem_init_walkers(uintptr_t addr, const umem_cache_t *c, void *ignored)
 {
 	mdb_walker_t w;
@@ -101,6 +120,52 @@ umem_init_walkers(uintptr_t addr, const umem_cache_t *c, void *ignored)
 		mdb_warn("failed to add %s walker", c->cache_name);
 
 	return (WALK_NEXT);
+}
+
+/*ARGSUSED*/
+static void
+umem_statechange_cb(void *arg)
+{
+	static int been_ready = 0;
+
+#ifndef _KMDB
+	leaky_cleanup(1);	/* state changes invalidate leaky state */
+#endif
+
+	if (umem_update_variables() == -1)
+		return;
+
+	if (been_ready)
+		return;
+
+	if (umem_ready != UMEM_READY)
+		return;
+
+	been_ready = 1;
+	(void) mdb_walk("umem_cache", (mdb_walk_cb_t)umem_init_walkers, NULL);
+}
+
+int
+umem_init(void)
+{
+	mdb_walker_t w = {
+		"umem_cache", "walk list of umem caches", umem_cache_walk_init,
+		umem_cache_walk_step, umem_cache_walk_fini
+	};
+
+	if (mdb_add_walker(&w) == -1) {
+		mdb_warn("failed to add umem_cache walker");
+		return (-1);
+	}
+
+	if (umem_update_variables() == -1)
+		return (-1);
+
+	/* install a callback so that our variables are always up-to-date */
+	(void) mdb_callback_add(MDB_CALLBACK_STCHG, umem_statechange_cb, NULL);
+	umem_statechange_cb(NULL);
+
+	return (0);
 }
 
 int
@@ -190,7 +255,6 @@ umem_debug_flags_t umem_status_flags[] = {
 int
 umem_status(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *argv)
 {
-	int umem_ready;
 	int umem_logging;
 
 	umem_log_header_t *umem_transaction_log;
@@ -198,15 +262,16 @@ umem_status(uintptr_t addr, uint_t flags, int ac, const mdb_arg_t *argv)
 	umem_log_header_t *umem_failure_log;
 	umem_log_header_t *umem_slab_log;
 
-	if (UMEM_READVAR(umem_ready))
-		goto err;
-
 	mdb_printf("Status:\t\t%s\n",
 	    umem_ready == UMEM_READY_INIT_FAILED ? "initialization failed" :
 	    umem_ready == UMEM_READY_STARTUP ? "uninitialized" :
 	    umem_ready == UMEM_READY_INITING ? "initialization in process" :
 	    umem_ready == UMEM_READY ? "ready and active" :
+	    umem_ready == 0 ? "not loaded into address space" :
 	    "unknown (umem_ready invalid)");
+
+	if (umem_ready == 0)
+		return (DCMD_OK);
 
 	mdb_printf("Concurrency:\t%d\n", umem_max_ncpus);
 
@@ -673,7 +738,7 @@ umem_get_magsize(const umem_cache_t *cp)
 	    (cp->cache_flags & UMF_NOMAGAZINE))
 		return (res);
 
-	if (mdb_lookup_by_name("umem_magtype", &mt_sym) == -1) {
+	if (umem_lookup_by_name("umem_magtype", &mt_sym) == -1) {
 		mdb_warn("unable to read 'umem_magtype'");
 	} else if (addr < mt_sym.st_value ||
 	    addr + sizeof (mt) - 1 > mt_sym.st_value + mt_sym.st_size - 1 ||
@@ -742,7 +807,7 @@ umem_estimate_allocated(uintptr_t addr, const umem_cache_t *cp)
 }
 
 int
-umem_read_magazines(umem_cache_t *cp, uintptr_t addr, int ncpus,
+umem_read_magazines(umem_cache_t *cp, uintptr_t addr,
     void ***maglistp, size_t *magcntp, size_t *magmaxp, int alloc_flags)
 {
 	umem_magazine_t *ump, *mp;
@@ -756,8 +821,12 @@ umem_read_magazines(umem_cache_t *cp, uintptr_t addr, int ncpus,
 	 * correctness.
 	 */
 	magsize = umem_get_magsize(cp);
-	if (magsize == 0)
-		magsize = 1;
+	if (magsize == 0) {
+		*maglistp = NULL;
+		*magcntp = 0;
+		*magmaxp = 0;
+		return (WALK_NEXT);
+	}
 
 	/*
 	 * There are several places where we need to go buffer hunting:
@@ -771,13 +840,13 @@ umem_read_magazines(umem_cache_t *cp, uintptr_t addr, int ncpus,
 	 * is live (the number "100" comes from the same fudge factor in
 	 * crash(1M)).
 	 */
-	magmax = (cp->cache_full.ml_total + 2 * ncpus + 100) * magsize;
+	magmax = (cp->cache_full.ml_total + 2 * umem_max_ncpus + 100) * magsize;
 	magbsize = offsetof(umem_magazine_t, mag_round[magsize]);
 
 	if (magbsize >= PAGESIZE / 2) {
 		mdb_warn("magazine size for cache %p unreasonable (%x)\n",
 		    addr, magbsize);
-		goto fail;
+		return (WALK_ERR);
 	}
 
 	maglist = mdb_alloc(magmax * sizeof (void *), alloc_flags);
@@ -802,7 +871,7 @@ umem_read_magazines(umem_cache_t *cp, uintptr_t addr, int ncpus,
 	 * Now whip through the CPUs, snagging the loaded magazines
 	 * and full spares.
 	 */
-	for (cpu = 0; cpu < ncpus; cpu++) {
+	for (cpu = 0; cpu < umem_max_ncpus; cpu++) {
 		umem_cpu_cache_t *ccp = &cp->cache_cpu[cpu];
 
 		dprintf(("reading cpu cache %p\n",
@@ -897,8 +966,9 @@ static int
 umem_walk_init_common(mdb_walk_state_t *wsp, int type)
 {
 	umem_walk_t *umw;
-	int ncpus, csize;
+	int csize;
 	umem_cache_t *cp;
+	size_t vm_quantum;
 
 	size_t magmax, magcnt;
 	void **maglist = NULL;
@@ -917,16 +987,35 @@ umem_walk_init_common(mdb_walk_state_t *wsp, int type)
 	dprintf(("walking %p\n", addr));
 
 	/*
-	 * First we need to figure out how many CPUs are configured in the
-	 * system to know how much to slurp out.
+	 * The number of "cpus" determines how large the cache is.
 	 */
-	umem_readvar(&ncpus, "umem_max_ncpus");
-
-	csize = UMEM_CACHE_SIZE(ncpus);
+	csize = UMEM_CACHE_SIZE(umem_max_ncpus);
 	cp = mdb_alloc(csize, UM_SLEEP);
 
 	if (mdb_vread(cp, csize, addr) == -1) {
 		mdb_warn("couldn't read cache at addr %p", addr);
+		goto out2;
+	}
+
+	/*
+	 * It's easy for someone to hand us an invalid cache address.
+	 * Unfortunately, it is hard for this walker to survive an
+	 * invalid cache cleanly.  So we make sure that:
+	 *
+	 *	1. the vmem arena for the cache is readable,
+	 *	2. the vmem arena's quantum is a power of 2,
+	 *	3. our slabsize is a multiple of the quantum, and
+	 *	4. our chunksize is >0 and less than our slabsize.
+	 */
+	if (mdb_vread(&vm_quantum, sizeof (vm_quantum),
+	    (uintptr_t)&cp->cache_arena->vm_quantum) == -1 ||
+	    vm_quantum == 0 ||
+	    (vm_quantum & (vm_quantum - 1)) != 0 ||
+	    cp->cache_slabsize < vm_quantum ||
+	    P2PHASE(cp->cache_slabsize, vm_quantum) != 0 ||
+	    cp->cache_chunksize == 0 ||
+	    cp->cache_chunksize > cp->cache_slabsize) {
+		mdb_warn("%p is not a valid umem_cache_t\n", addr);
 		goto out2;
 	}
 
@@ -951,8 +1040,8 @@ umem_walk_init_common(mdb_walk_state_t *wsp, int type)
 	/*
 	 * Read in the contents of the magazine layer
 	 */
-	if (umem_read_magazines(cp, addr, ncpus, &maglist, &magcnt,
-	    &magmax, UM_SLEEP) == WALK_ERR)
+	if (umem_read_magazines(cp, addr, &maglist, &magcnt, &magmax,
+	    UM_SLEEP) == WALK_ERR)
 		goto out2;
 
 	/*
@@ -1027,7 +1116,10 @@ out1:
 			mdb_free(umw->umw_ubase, slabsize +
 			    sizeof (umem_bufctl_t));
 
-		mdb_free(umw->umw_maglist, umw->umw_max * sizeof (uintptr_t));
+		if (umw->umw_maglist)
+			mdb_free(umw->umw_maglist, umw->umw_max *
+			    sizeof (uintptr_t));
+
 		mdb_free(umw, sizeof (umem_walk_t));
 		wsp->walk_data = NULL;
 	}
@@ -3516,6 +3608,647 @@ umausers(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 		    umo->umo_total_size, umo->umo_num, umo->umo_data_size);
 		for (i = 0; i < umo->umo_depth; i++)
 			mdb_printf("\t %a\n", umo->umo_stack[i]);
+	}
+
+	return (DCMD_OK);
+}
+
+struct malloc_data {
+	uint32_t malloc_size;
+	uint32_t malloc_stat; /* == UMEM_MALLOC_ENCODE(state, malloc_size) */
+};
+
+#ifdef _LP64
+#define	UMI_MAX_BUCKET		(UMEM_MAXBUF - 2*sizeof (struct malloc_data))
+#else
+#define	UMI_MAX_BUCKET		(UMEM_MAXBUF - sizeof (struct malloc_data))
+#endif
+
+typedef struct umem_malloc_info {
+	size_t um_total;	/* total allocated buffers */
+	size_t um_malloc;	/* malloc buffers */
+	size_t um_malloc_size;	/* sum of malloc buffer sizes */
+	size_t um_malloc_overhead; /* sum of in-chunk overheads */
+
+	umem_cache_t *um_cp;
+
+	uint_t *um_bucket;
+} umem_malloc_info_t;
+
+static const int *
+dist_linear(int buckets, int beg, int end)
+{
+	int *out = mdb_alloc((buckets + 1) * sizeof (*out), UM_SLEEP | UM_GC);
+	int pos;
+	int dist = end - beg + 1;
+
+	for (pos = 0; pos < buckets; pos++)
+		out[pos] = beg + (pos * dist)/buckets;
+	out[buckets] = end + 1;
+
+	return (out);
+}
+
+/*
+ * We want the bins to be a constant ratio:
+ *
+ *	b_0	  = beg;
+ *	b_idx	  = b_{idx-1} * r;
+ *	b_buckets = end + 1;
+ *
+ * That is:
+ *
+ *	       buckets
+ *	beg * r        = end
+ *
+ * Which reduces to:
+ *
+ *		  buckets ___________________
+ *	      r = -------/ ((end + 1) / beg)
+ *
+ *		  log ((end + 1) / beg)
+ *	  log r = ---------------------
+ *		         buckets
+ *
+ *		   (log ((end + 1) / beg)) / buckets
+ *	      r = e
+ */
+static const int *
+dist_geometric(int buckets, int beg, int end, int minbucketsize)
+{
+#ifdef	_KMDB
+	return (dist_linear(buckets, beg, end));
+#else
+	int *out = mdb_alloc((buckets + 1) * sizeof (*out), UM_SLEEP | UM_GC);
+
+	extern double log(double);
+	extern double exp(double);
+
+	double r;
+	double b;
+	int idx = 0;
+	int last;
+	int begzero;
+
+	if (minbucketsize == 0)
+		minbucketsize = 1;
+
+	if (buckets == 1) {
+		out[0] = beg;
+		out[1] = end + 1;
+		return (out);
+	}
+
+	begzero = (beg == 0);
+	if (begzero)
+		beg = 1;
+
+	r = exp(log((double)(end + 1) / beg) / buckets);
+
+	/*
+	 * We've now computed r, using the previously derived formula.  We
+	 * now need to generate the array of bucket bounds.  There are
+	 * two major variables:
+	 *
+	 *	b	holds b_idx, the current index, as a double.
+	 *	last	holds the integer which goes into out[idx]
+	 *
+	 * Our job is to transform the smooth function b_idx, defined
+	 * above, into integer-sized buckets, with a specified minimum
+	 * bucket size.  Since b_idx is an exponentially growing function,
+	 * any inadequate buckets must be at the beginning.  To deal
+	 * with this, we make buckets of minimum size until b catches up
+	 * with last.
+	 *
+	 * A final wrinkle is that beg *can* be zero.  We compute r and b
+	 * as if beg was 1, then start last as 0.  This can lead to a bit
+	 * of oddness around the 0 bucket, but it's mostly reasonable.
+	 */
+
+	b = last = beg;
+	if (begzero)
+		last = 0;
+
+	for (idx = 0; idx < buckets; idx++) {
+		int next;
+
+		out[idx] = last;
+
+		b *= r;
+		next = (int)b;
+
+		if (next > last + minbucketsize - 1)
+			last = next;
+		else
+			last += minbucketsize;
+	}
+	out[buckets] = end + 1;
+
+	return (out);
+#endif
+}
+
+#define	NCHARS	50
+static void
+umem_malloc_print_dist(uint_t *um_bucket, size_t minmalloc, size_t maxmalloc,
+    size_t maxbuckets, size_t minbucketsize, int geometric)
+{
+	size_t um_malloc;
+	int minb = -1;
+	int maxb = -1;
+	int buckets;
+	int nbucks;
+	int i;
+	int n;
+	int b;
+	const char *dist = " Distribution ";
+	char dashes[NCHARS + 1];
+	const int *distarray;
+
+	minb = (int)minmalloc;
+	maxb = (int)maxmalloc;
+
+	nbucks = buckets = maxb - minb + 1;
+
+	um_malloc = 0;
+	for (b = minb; b <= maxb; b++)
+		um_malloc += um_bucket[b];
+	if (um_malloc == 0)
+		um_malloc = 1;			/* avoid divide-by-zero */
+
+	if (maxbuckets != 0)
+		buckets = MIN(buckets, maxbuckets);
+
+	if (minbucketsize > 1) {
+		buckets = MIN(buckets, nbucks/minbucketsize);
+		if (buckets == 0) {
+			buckets = 1;
+			minbucketsize = nbucks;
+		}
+	}
+
+
+	if (geometric)
+		distarray = dist_geometric(buckets, minb, maxb, minbucketsize);
+	else
+		distarray = dist_linear(buckets, minb, maxb);
+
+	n = (NCHARS - strlen(dist)) / 2;
+	(void) memset(dashes, '-', n);
+	dashes[n] = 0;
+
+	mdb_printf("%11s  %s%s%s %s\n",
+	    "malloc size", dashes, dist, dashes, "count");
+
+	for (i = 0; i < buckets; i++) {
+		int bb = distarray[i];
+		int be = distarray[i+1] - 1;
+		uint64_t amount = 0;
+
+		int nats;
+		char ats[NCHARS + 1], spaces[NCHARS + 1];
+		char range[40];
+
+		for (b = bb; b <= be; b++)
+			amount += um_bucket[b];
+
+		nats = (NCHARS * amount)/um_malloc;
+		(void) memset(ats, '@', nats);
+		ats[nats] = 0;
+		(void) memset(spaces, ' ', NCHARS - nats);
+		spaces[NCHARS - nats] = 0;
+
+		if (bb == be)
+			mdb_snprintf(range, sizeof (range), "%d", bb);
+		else
+			mdb_snprintf(range, sizeof (range), "%d-%d", bb, be);
+		mdb_printf("%11s |%s%s %lld\n", range, ats, spaces, amount);
+	}
+	mdb_printf("\n");
+}
+#undef NCHARS
+
+/*
+ * A malloc()ed buffer looks like:
+ *
+ *	<----------- mi.malloc_size --->
+ *	<----------- cp.cache_bufsize ------------------>
+ *	<----------- cp.cache_chunksize -------------------------------->
+ *	+-------+-----------------------+---------------+---------------+
+ *	|/tag///| mallocsz		|/round-off/////|/debug info////|
+ *	+-------+---------------------------------------+---------------+
+ *		<-- usable space ------>
+ *
+ * mallocsz is the argument to malloc(3C).
+ * mi.malloc_size is the actual size passed to umem_alloc(), which
+ * is rounded up to the smallest available cache size, which is
+ * cache_bufsize.  If there is debugging or alignment overhead in
+ * the cache, that is reflected in a larger cache_chunksize.
+ *
+ * The tag at the beginning of the buffer is either 8-bytes or 16-bytes,
+ * depending upon the ISA's alignment requirements.  For 32-bit allocations,
+ * it is always a 8-byte tag.  For 64-bit allocations larger than 8 bytes,
+ * the tag has 8 bytes of padding before it.
+ *
+ * 32-byte, 64-byte buffers <= 8 bytes:
+ *	+-------+-------+--------- ...
+ *	|/size//|/stat//| mallocsz ...
+ *	+-------+-------+--------- ...
+ *			^
+ *			pointer returned from malloc(3C)
+ *
+ * 64-byte buffers > 8 bytes:
+ *	+---------------+-------+-------+--------- ...
+ *	|/padding///////|/size//|/stat//| mallocsz ...
+ *	+---------------+-------+-------+--------- ...
+ *					^
+ *					pointer returned from malloc(3C)
+ *
+ * The "size" field is "malloc_size", which is mallocsz + the padding.
+ * The "stat" field is derived from malloc_size, and functions as a
+ * validation that this buffer is actually from malloc(3C).
+ */
+/*ARGSUSED*/
+static int
+um_umem_buffer_cb(uintptr_t addr, void *buf, umem_malloc_info_t *ump)
+{
+	struct malloc_data md;
+	size_t m_addr = addr;
+	size_t overhead = sizeof (md);
+	size_t mallocsz;
+
+	ump->um_total++;
+
+#ifdef _LP64
+	if (ump->um_cp->cache_bufsize > UMEM_SECOND_ALIGN) {
+		m_addr += overhead;
+		overhead += sizeof (md);
+	}
+#endif
+
+	if (mdb_vread(&md, sizeof (md), m_addr) == -1) {
+		mdb_warn("unable to read malloc header at %p", m_addr);
+		return (WALK_NEXT);
+	}
+
+	switch (UMEM_MALLOC_DECODE(md.malloc_stat, md.malloc_size)) {
+	case MALLOC_MAGIC:
+#ifdef _LP64
+	case MALLOC_SECOND_MAGIC:
+#endif
+		mallocsz = md.malloc_size - overhead;
+
+		ump->um_malloc++;
+		ump->um_malloc_size += mallocsz;
+		ump->um_malloc_overhead += overhead;
+
+		/* include round-off and debug overhead */
+		ump->um_malloc_overhead +=
+		    ump->um_cp->cache_chunksize - md.malloc_size;
+
+		if (ump->um_bucket != NULL && mallocsz <= UMI_MAX_BUCKET)
+			ump->um_bucket[mallocsz]++;
+
+		break;
+	default:
+		break;
+	}
+
+	return (WALK_NEXT);
+}
+
+int
+get_umem_alloc_sizes(int **out, size_t *out_num)
+{
+	GElf_Sym sym;
+
+	if (umem_lookup_by_name("umem_alloc_sizes", &sym) == -1) {
+		mdb_warn("unable to look up umem_alloc_sizes");
+		return (-1);
+	}
+
+	*out = mdb_alloc(sym.st_size, UM_SLEEP | UM_GC);
+	*out_num = sym.st_size / sizeof (int);
+
+	if (mdb_vread(*out, sym.st_size, sym.st_value) == -1) {
+		mdb_warn("unable to read umem_alloc_sizes (%p)", sym.st_value);
+		*out = NULL;
+		return (-1);
+	}
+
+	return (0);
+}
+
+
+static int
+um_umem_cache_cb(uintptr_t addr, umem_cache_t *cp, umem_malloc_info_t *ump)
+{
+	if (strncmp(cp->cache_name, "umem_alloc_", strlen("umem_alloc_")) != 0)
+		return (WALK_NEXT);
+
+	ump->um_cp = cp;
+
+	if (mdb_pwalk("umem", (mdb_walk_cb_t)um_umem_buffer_cb, ump, addr) ==
+	    -1) {
+		mdb_warn("can't walk 'umem' for cache %p", addr);
+		return (WALK_ERR);
+	}
+
+	return (WALK_NEXT);
+}
+
+void
+umem_malloc_dist_help(void)
+{
+	mdb_printf("%s\n",
+	    "report distribution of outstanding malloc()s");
+	mdb_dec_indent(2);
+	mdb_printf("%<b>OPTIONS%</b>\n");
+	mdb_inc_indent(2);
+	mdb_printf("%s",
+"  -b maxbins\n"
+"        Use at most maxbins bins for the data\n"
+"  -B minbinsize\n"
+"        Make the bins at least minbinsize bytes apart\n"
+"  -d    dump the raw data out, without binning\n"
+"  -g    use geometric binning instead of linear binning\n");
+}
+
+/*ARGSUSED*/
+int
+umem_malloc_dist(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	umem_malloc_info_t mi;
+	uint_t geometric = 0;
+	uint_t dump = 0;
+	size_t maxbuckets = 0;
+	size_t minbucketsize = 0;
+
+	size_t minalloc = 0;
+	size_t maxalloc = UMI_MAX_BUCKET;
+
+	if (flags & DCMD_ADDRSPEC)
+		return (DCMD_USAGE);
+
+	if (mdb_getopts(argc, argv,
+	    'd', MDB_OPT_SETBITS, TRUE, &dump,
+	    'g', MDB_OPT_SETBITS, TRUE, &geometric,
+	    'b', MDB_OPT_UINTPTR, &maxbuckets,
+	    'B', MDB_OPT_UINTPTR, &minbucketsize,
+	    0) != argc)
+		return (DCMD_USAGE);
+
+	bzero(&mi, sizeof (mi));
+	mi.um_bucket = mdb_zalloc((UMI_MAX_BUCKET + 1) * sizeof (*mi.um_bucket),
+	    UM_SLEEP | UM_GC);
+
+	if (mdb_walk("umem_cache", (mdb_walk_cb_t)um_umem_cache_cb,
+	    &mi) == -1) {
+		mdb_warn("unable to walk 'umem_cache'");
+		return (DCMD_ERR);
+	}
+
+	if (dump) {
+		int i;
+		for (i = minalloc; i <= maxalloc; i++)
+			mdb_printf("%d\t%d\n", i, mi.um_bucket[i]);
+
+		return (DCMD_OK);
+	}
+
+	umem_malloc_print_dist(mi.um_bucket, minalloc, maxalloc,
+	    maxbuckets, minbucketsize, geometric);
+
+	return (DCMD_OK);
+}
+
+void
+umem_malloc_info_help(void)
+{
+	mdb_printf("%s\n",
+	    "report information about malloc()s by cache.  ");
+	mdb_dec_indent(2);
+	mdb_printf("%<b>OPTIONS%</b>\n");
+	mdb_inc_indent(2);
+	mdb_printf("%s",
+"  -b maxbins\n"
+"        Use at most maxbins bins for the data\n"
+"  -B minbinsize\n"
+"        Make the bins at least minbinsize bytes apart\n"
+"  -d    dump the raw distribution data without binning\n"
+#ifndef _KMDB
+"  -g    use geometric binning instead of linear binning\n"
+#endif
+	    "");
+}
+int
+umem_malloc_info(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+	umem_cache_t c;
+	umem_malloc_info_t mi;
+
+	int skip = 0;
+
+	size_t maxmalloc;
+	size_t overhead;
+	size_t allocated;
+	size_t avg_malloc;
+	size_t overhead_pct;	/* 1000 * overhead_percent */
+
+	uint_t verbose = 0;
+	uint_t dump = 0;
+	uint_t geometric = 0;
+	size_t maxbuckets = 0;
+	size_t minbucketsize = 0;
+
+	int *alloc_sizes;
+	int idx;
+	size_t num;
+	size_t minmalloc;
+
+	if (mdb_getopts(argc, argv,
+	    'd', MDB_OPT_SETBITS, TRUE, &dump,
+	    'g', MDB_OPT_SETBITS, TRUE, &geometric,
+	    'b', MDB_OPT_UINTPTR, &maxbuckets,
+	    'B', MDB_OPT_UINTPTR, &minbucketsize,
+	    0) != argc)
+		return (DCMD_USAGE);
+
+	if (dump || geometric || (maxbuckets != 0) || (minbucketsize != 0))
+		verbose = 1;
+
+	if (!(flags & DCMD_ADDRSPEC)) {
+		if (mdb_walk_dcmd("umem_cache", "umem_malloc_info",
+		    argc, argv) == -1) {
+			mdb_warn("can't walk umem_cache");
+			return (DCMD_ERR);
+		}
+		return (DCMD_OK);
+	}
+
+	if (!mdb_vread(&c, sizeof (c), addr)) {
+		mdb_warn("unable to read cache at %p", addr);
+		return (DCMD_ERR);
+	}
+
+	if (strncmp(c.cache_name, "umem_alloc_", strlen("umem_alloc_")) != 0) {
+		if (!(flags & DCMD_LOOP))
+			mdb_warn("umem_malloc_info: cache \"%s\" is not used "
+			    "by malloc()\n", c.cache_name);
+		skip = 1;
+	}
+
+	/*
+	 * normally, print the header only the first time.  In verbose mode,
+	 * print the header on every non-skipped buffer
+	 */
+	if ((!verbose && DCMD_HDRSPEC(flags)) || (verbose && !skip))
+		mdb_printf("%<ul>%-?s %6s %6s %8s %8s %10s %10s %6s%</ul>\n",
+		    "CACHE", "BUFSZ", "MAXMAL",
+		    "BUFMALLC", "AVG_MAL", "MALLOCED", "OVERHEAD", "%OVER");
+
+	if (skip)
+		return (DCMD_OK);
+
+	maxmalloc = c.cache_bufsize - sizeof (struct malloc_data);
+#ifdef _LP64
+	if (c.cache_bufsize > UMEM_SECOND_ALIGN)
+		maxmalloc -= sizeof (struct malloc_data);
+#endif
+
+	bzero(&mi, sizeof (mi));
+	mi.um_cp = &c;
+	if (verbose)
+		mi.um_bucket =
+		    mdb_zalloc((UMI_MAX_BUCKET + 1) * sizeof (*mi.um_bucket),
+		    UM_SLEEP | UM_GC);
+
+	if (mdb_pwalk("umem", (mdb_walk_cb_t)um_umem_buffer_cb, &mi, addr) ==
+	    -1) {
+		mdb_warn("can't walk 'umem'");
+		return (DCMD_ERR);
+	}
+
+	overhead = mi.um_malloc_overhead;
+	allocated = mi.um_malloc_size;
+
+	/* do integer round off for the average */
+	if (mi.um_malloc != 0)
+		avg_malloc = (allocated + (mi.um_malloc - 1)/2) / mi.um_malloc;
+	else
+		avg_malloc = 0;
+
+	/*
+	 * include per-slab overhead
+	 *
+	 * Each slab in a given cache is the same size, and has the same
+	 * number of chunks in it;  we read in the first slab on the
+	 * slab list to get the number of chunks for all slabs.  To
+	 * compute the per-slab overhead, we just subtract the chunk usage
+	 * from the slabsize:
+	 *
+	 * +------------+-------+-------+ ... --+-------+-------+-------+
+	 * |////////////|	|	| ...	|	|///////|///////|
+	 * |////color///| chunk	| chunk	| ...	| chunk	|/color/|/slab//|
+	 * |////////////|	|	| ...	|	|///////|///////|
+	 * +------------+-------+-------+ ... --+-------+-------+-------+
+	 * |		\_______chunksize * chunks_____/		|
+	 * \__________________________slabsize__________________________/
+	 *
+	 * For UMF_HASH caches, there is an additional source of overhead;
+	 * the external umem_slab_t and per-chunk bufctl structures.  We
+	 * include those in our per-slab overhead.
+	 *
+	 * Once we have a number for the per-slab overhead, we estimate
+	 * the actual overhead by treating the malloc()ed buffers as if
+	 * they were densely packed:
+	 *
+	 *	additional overhead = (# mallocs) * (per-slab) / (chunks);
+	 *
+	 * carefully ordering the multiply before the divide, to avoid
+	 * round-off error.
+	 */
+	if (mi.um_malloc != 0) {
+		umem_slab_t slab;
+		uintptr_t saddr = (uintptr_t)c.cache_nullslab.slab_next;
+
+		if (mdb_vread(&slab, sizeof (slab), saddr) == -1) {
+			mdb_warn("unable to read slab at %p\n", saddr);
+		} else {
+			long chunks = slab.slab_chunks;
+			if (chunks != 0 && c.cache_chunksize != 0 &&
+			    chunks <= c.cache_slabsize / c.cache_chunksize) {
+				uintmax_t perslab =
+				    c.cache_slabsize -
+				    (c.cache_chunksize * chunks);
+
+				if (c.cache_flags & UMF_HASH) {
+					perslab += sizeof (umem_slab_t) +
+					    chunks *
+					    ((c.cache_flags & UMF_AUDIT) ?
+					    sizeof (umem_bufctl_audit_t) :
+					    sizeof (umem_bufctl_t));
+				}
+				overhead +=
+				    (perslab * (uintmax_t)mi.um_malloc)/chunks;
+			} else {
+				mdb_warn("invalid #chunks (%d) in slab %p\n",
+				    chunks, saddr);
+			}
+		}
+	}
+
+	if (allocated != 0)
+		overhead_pct = (1000ULL * overhead) / allocated;
+	else
+		overhead_pct = 0;
+
+	mdb_printf("%0?p %6ld %6ld %8ld %8ld %10ld %10ld %3ld.%01ld%%\n",
+	    addr, c.cache_bufsize, maxmalloc,
+	    mi.um_malloc, avg_malloc, allocated, overhead,
+	    overhead_pct / 10, overhead_pct % 10);
+
+	if (!verbose)
+		return (DCMD_OK);
+
+	if (!dump)
+		mdb_printf("\n");
+
+	if (get_umem_alloc_sizes(&alloc_sizes, &num) == -1)
+		return (DCMD_ERR);
+
+	for (idx = 0; idx < num; idx++) {
+		if (alloc_sizes[idx] == c.cache_bufsize)
+			break;
+		if (alloc_sizes[idx] == 0) {
+			idx = num;	/* 0-terminated array */
+			break;
+		}
+	}
+	if (idx == num) {
+		mdb_warn(
+		    "cache %p's size (%d) not in umem_alloc_sizes\n",
+		    addr, c.cache_bufsize);
+		return (DCMD_ERR);
+	}
+
+	minmalloc = (idx == 0)? 0 : alloc_sizes[idx - 1];
+	if (minmalloc > 0) {
+#ifdef _LP64
+		if (minmalloc > UMEM_SECOND_ALIGN)
+			minmalloc -= sizeof (struct malloc_data);
+#endif
+		minmalloc -= sizeof (struct malloc_data);
+		minmalloc += 1;
+	}
+
+	if (dump) {
+		for (idx = minmalloc; idx <= maxmalloc; idx++)
+			mdb_printf("%d\t%d\n", idx, mi.um_bucket[idx]);
+		mdb_printf("\n");
+	} else {
+		umem_malloc_print_dist(mi.um_bucket, minmalloc, maxmalloc,
+		    maxbuckets, minbucketsize, geometric);
 	}
 
 	return (DCMD_OK);

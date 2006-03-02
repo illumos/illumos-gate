@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -343,6 +342,12 @@ static const mdb_dcmd_t dcmds[] = {
 		"users of the umem allocator", umausers },
 	{ "umem_cache", "?", "print a umem cache", umem_cache },
 	{ "umem_log", "?", "dump umem transaction log", umem_log },
+	{ "umem_malloc_dist", "[-dg] [-b maxbins] [-B minbinsize]",
+		"report distribution of outstanding malloc()s",
+		umem_malloc_dist, umem_malloc_dist_help },
+	{ "umem_malloc_info", "?[-dg] [-b maxbins] [-B minbinsize]",
+		"report information about malloc()s by cache",
+		umem_malloc_info, umem_malloc_info_help },
 	{ "umem_verify", "?", "check integrity of umem-managed memory",
 		umem_verify },
 	{ "vmem", "?", "print a vmem_t", vmem },
@@ -424,25 +429,8 @@ static const mdb_modinfo_t modinfo = {MDB_API_VERSION, dcmds, walkers};
 const mdb_modinfo_t *
 _mdb_init(void)
 {
-	mdb_walker_t w = {
-		"umem_cache", "walk list of umem caches", umem_cache_walk_init,
-		umem_cache_walk_step, umem_cache_walk_fini
-	};
-
 	if (umem_init() != 0)
 		return (NULL);
-
-	/*
-	 * Load the umem_cache walker manually, and then invoke it to add
-	 * named walks for each cache.  This walker needs to be added by
-	 * hand since walkers in the linkage structure cannot be loaded
-	 * until _mdb_init returns the pointer to the linkage structure.
-	 */
-	if (mdb_add_walker(&w) == 0) {
-		(void) mdb_walk("umem_cache", (mdb_walk_cb_t)
-		    umem_init_walkers, NULL);
-	} else
-		mdb_warn("failed to add umem_cache walker");
 
 	return (&modinfo);
 }

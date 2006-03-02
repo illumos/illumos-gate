@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -65,7 +64,8 @@
 
 size_t vmem_sbrk_pagesize = 0; /* the preferred page size of the heap */
 
-#define	MIN_ALLOC	(64*1024)
+#define	VMEM_SBRK_MINALLOC	(64 * 1024)
+size_t vmem_sbrk_minalloc = VMEM_SBRK_MINALLOC; /* minimum allocation */
 
 static size_t real_pagesize;
 static vmem_t *sbrk_heap;
@@ -176,7 +176,7 @@ vmem_sbrk_alloc(vmem_t *src, size_t size, int vmflags)
 	    (ret = vmem_sbrk_tryfail(src, size, vmflags)) != NULL)
 		return (ret);
 
-	buf_size = MAX(size, MIN_ALLOC);
+	buf_size = MAX(size, vmem_sbrk_minalloc);
 
 	/*
 	 * buf_size gets overwritten with the actual allocated size
@@ -248,6 +248,11 @@ vmem_sbrk_arena(vmem_alloc_t **a_out, vmem_free_t **f_out)
 			}
 		}
 		vmem_sbrk_pagesize = heap_size;
+
+		/* validate vmem_sbrk_minalloc */
+		if (vmem_sbrk_minalloc < VMEM_SBRK_MINALLOC)
+			vmem_sbrk_minalloc = VMEM_SBRK_MINALLOC;
+		vmem_sbrk_minalloc = P2ROUNDUP(vmem_sbrk_minalloc, heap_size);
 
 		sbrk_heap = vmem_init("sbrk_top", real_pagesize,
 		    vmem_sbrk_alloc, vmem_free,

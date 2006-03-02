@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +40,7 @@
 #include <vm/page.h>
 
 #include "kmem.h"
+#include "leaky.h"
 
 #define	dprintf(x) if (mdb_debug_level) { \
 	mdb_printf("kmem debug: ");  \
@@ -55,8 +55,6 @@
 #define	KM_HASH			0x10
 
 static int mdb_debug_level = 0;
-
-static void *kmem_ready_cbhdl;
 
 /*ARGSUSED*/
 static int
@@ -551,8 +549,12 @@ kmem_read_magazines(kmem_cache_t *cp, uintptr_t addr, int ncpus,
 	 * correctness.
 	 */
 	magsize = kmem_get_magsize(cp);
-	if (magsize == 0)
-		magsize = 1;
+	if (magsize == 0) {
+		*maglistp = NULL;
+		*magcntp = 0;
+		*magmaxp = 0;
+		return (WALK_NEXT);
+	}
 
 	/*
 	 * There are several places where we need to go buffer hunting:
@@ -572,7 +574,7 @@ kmem_read_magazines(kmem_cache_t *cp, uintptr_t addr, int ncpus,
 	if (magbsize >= PAGESIZE / 2) {
 		mdb_warn("magazine size for cache %p unreasonable (%x)\n",
 		    addr, magbsize);
-		goto fail;
+		return (WALK_ERR);
 	}
 
 	maglist = mdb_alloc(magmax * sizeof (void *), alloc_flags);
@@ -693,6 +695,7 @@ kmem_walk_init_common(mdb_walk_state_t *wsp, int type)
 	kmem_walk_t *kmw;
 	int ncpus, csize;
 	kmem_cache_t *cp;
+	size_t vm_quantum;
 
 	size_t magmax, magcnt;
 	void **maglist = NULL;
@@ -721,6 +724,28 @@ kmem_walk_init_common(mdb_walk_state_t *wsp, int type)
 
 	if (mdb_vread(cp, csize, addr) == -1) {
 		mdb_warn("couldn't read cache at addr %p", addr);
+		goto out2;
+	}
+
+	/*
+	 * It's easy for someone to hand us an invalid cache address.
+	 * Unfortunately, it is hard for this walker to survive an
+	 * invalid cache cleanly.  So we make sure that:
+	 *
+	 *	1. the vmem arena for the cache is readable,
+	 *	2. the vmem arena's quantum is a power of 2,
+	 *	3. our slabsize is a multiple of the quantum, and
+	 *	4. our chunksize is >0 and less than our slabsize.
+	 */
+	if (mdb_vread(&vm_quantum, sizeof (vm_quantum),
+	    (uintptr_t)&cp->cache_arena->vm_quantum) == -1 ||
+	    vm_quantum == 0 ||
+	    (vm_quantum & (vm_quantum - 1)) != 0 ||
+	    cp->cache_slabsize < vm_quantum ||
+	    P2PHASE(cp->cache_slabsize, vm_quantum) != 0 ||
+	    cp->cache_chunksize == 0 ||
+	    cp->cache_chunksize > cp->cache_slabsize) {
+		mdb_warn("%p is not a valid kmem_cache_t\n", addr);
 		goto out2;
 	}
 
@@ -832,7 +857,10 @@ out1:
 			mdb_free(kmw->kmw_ubase, slabsize +
 			    sizeof (kmem_bufctl_t));
 
-		mdb_free(kmw->kmw_maglist, kmw->kmw_max * sizeof (uintptr_t));
+		if (kmw->kmw_maglist)
+			mdb_free(kmw->kmw_maglist,
+			    kmw->kmw_max * sizeof (uintptr_t));
+
 		mdb_free(kmw, sizeof (kmem_walk_t));
 		wsp->walk_data = NULL;
 	}
@@ -3784,16 +3812,19 @@ kmem_ready_check(void)
 
 /*ARGSUSED*/
 static void
-kmem_ready_cb(void *arg)
+kmem_statechange_cb(void *arg)
 {
+	static int been_ready = 0;
+
+	leaky_cleanup(1);	/* state changes invalidate leaky state */
+
+	if (been_ready)
+		return;
+
 	if (kmem_ready_check() <= 0)
 		return;
 
-	if (kmem_ready_cbhdl != NULL) {
-		mdb_callback_remove(kmem_ready_cbhdl);
-		kmem_ready_cbhdl = NULL;
-	}
-
+	been_ready = 1;
 	(void) mdb_walk("kmem_cache", (mdb_walk_cb_t)kmem_init_walkers, NULL);
 }
 
@@ -3818,12 +3849,8 @@ kmem_init(void)
 		return;
 	}
 
-	if (kmem_ready_check() > 0) {
-		kmem_ready_cb(NULL);
-	} else {
-		kmem_ready_cbhdl = mdb_callback_add(MDB_CALLBACK_STCHG,
-		    kmem_ready_cb, NULL);
-	}
+	(void) mdb_callback_add(MDB_CALLBACK_STCHG, kmem_statechange_cb, NULL);
+	kmem_statechange_cb(NULL);
 }
 
 typedef struct whatthread {

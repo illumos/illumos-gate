@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,10 +44,37 @@ umem_debug(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
-void
+/*
+ * To further confuse the issue, this dmod can run against either
+ * libumem.so.1 *or* the libstandumem.so linked into kmdb(1M).  To figure
+ * out which one we are working against, we look up "umem_alloc" in both
+ * libumem.so and the executable.
+ *
+ * A further wrinkle is that libumem.so may not yet be loaded into the
+ * process' address space.  That can lead to either the lookup failing, or
+ * being unable to read from the data segment.  We treat either case as
+ * an error.
+ */
+int
 umem_set_standalone(void)
 {
-	umem_is_standalone = 1;
+	GElf_Sym sym;
+	int ready;
+
+	if (mdb_lookup_by_obj(UMEM_OBJNAME, "umem_alloc", &sym) == 0)
+		umem_is_standalone = 0;
+	else if (mdb_lookup_by_obj(MDB_OBJ_EXEC, "umem_alloc", &sym) == 0)
+		umem_is_standalone = 1;
+	else
+		return (-1);
+
+	/*
+	 * now that we know where things should be, make sure we can actually
+	 * read things out.
+	 */
+	if (umem_readvar(&ready, "umem_ready") == -1)
+		return (-1);
+	return (0);
 }
 
 ssize_t
@@ -80,5 +106,5 @@ is_umem_sym(const char *sym, const char *prefix)
 	char *tick_p = strrchr(sym, '`');
 
 	return (strncmp(sym, "libumem", 7) == 0 && tick_p != NULL &&
-		strncmp(tick_p + 1, prefix, strlen(prefix)) == 0);
+	    strncmp(tick_p + 1, prefix, strlen(prefix)) == 0);
 }

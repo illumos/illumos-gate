@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -89,6 +88,9 @@ static arg_process_t umem_backend_process;
 
 static arg_process_t umem_log_process;
 
+static size_t umem_size_tempval;
+static arg_process_t umem_size_process;
+
 const char *____umem_environ_msg_options = "-- UMEM_OPTIONS --";
 
 static umem_env_item_t umem_options_items[] = {
@@ -118,7 +120,27 @@ static umem_env_item_t umem_options_items[] = {
 		NULL, 0,	&umem_reap_interval
 	},
 
+	{ "size_add",		"Private",	ITEM_SPECIAL,
+		"add a size to the cache size table",
+		NULL, 0, NULL,
+		&umem_size_tempval,		&umem_size_process
+	},
+	{ "size_clear",		"Private",	ITEM_SPECIAL,
+		"clear all but the largest size from the cache size table",
+		NULL, 0, NULL,
+		&umem_size_tempval,		&umem_size_process
+	},
+	{ "size_remove",	"Private",	ITEM_SPECIAL,
+	    "remove a size from the cache size table",
+		NULL, 0, NULL,
+		&umem_size_tempval,		&umem_size_process
+	},
+
 #ifndef UMEM_STANDALONE
+	{ "sbrk_minalloc",	"Private",	ITEM_SIZE,
+		"The minimum allocation chunk for the sbrk(2) heap.",
+		NULL, 0, NULL,	&vmem_sbrk_minalloc
+	},
 	{ "sbrk_pagesize",	"Private",	ITEM_SIZE,
 		"The preferred page size for the sbrk(2) heap.",
 		NULL, 0, NULL,	&vmem_sbrk_pagesize
@@ -382,6 +404,49 @@ umem_log_process(const umem_env_item_t *item, const char *item_arg)
 		*item->item_size_target = 64*1024;
 
 	umem_logging = 1;
+	return (ARG_SUCCESS);
+}
+
+static int
+umem_size_process(const umem_env_item_t *item, const char *item_arg)
+{
+	const char *name = item->item_name;
+	void (*action_func)(size_t);
+
+	size_t result;
+
+	int ret;
+
+	if (strcmp(name, "size_clear") == 0) {
+		if (item_arg != NULL) {
+			log_message("%s: %s: does not take a value. ignored\n",
+			    CURRENT, name);
+			return (ARG_BAD);
+		}
+		umem_alloc_sizes_clear();
+		return (ARG_SUCCESS);
+	} else if (strcmp(name, "size_add") == 0) {
+		action_func = umem_alloc_sizes_add;
+	} else if (strcmp(name, "size_remove") == 0) {
+		action_func = umem_alloc_sizes_remove;
+	} else {
+		log_message("%s: %s: internally unrecognized\n",
+		    CURRENT, name, name, name);
+		return (ARG_BAD);
+	}
+
+	if (item_arg == NULL) {
+		log_message("%s: %s: requires a value. ignored\n",
+		    CURRENT, name);
+		return (ARG_BAD);
+	}
+
+	ret = item_size_process(item, item_arg);
+	if (ret != ARG_SUCCESS)
+		return (ret);
+
+	result = *item->item_size_target;
+	action_func(result);
 	return (ARG_SUCCESS);
 }
 
