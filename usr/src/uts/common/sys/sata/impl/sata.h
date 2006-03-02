@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -613,6 +613,15 @@ _NOTE(SCHEME_PROTECTS_DATA("unshared data", scsi_pkt))
 #define	SATA_MINOR2INSTANCE(minor) \
 	((minor >> SATA_CNTRL_INSTANCE_SHIFT) & SATA_CNTRL_INSTANCE_MASK)
 
+/*
+ * Macro for creating an attachment point number from sata address.
+ * Address qualifier has to be one of:
+ * SATA_ADDR_DCPORT, SATA_ADDR_DPMPORT, SATA_ADDR_CPORT or SATA_ADDR_PMPORT
+ */
+#define	SATA_MAKE_AP_NUMBER(cport, pmport, qual) \
+	((qual & (SATA_ADDR_PMPORT | SATA_ADDR_DPMPORT)) ? \
+	(SATA_PMULT_AP | (pmport << SATA_PMULT_PORT_SHIFT) | cport) : \
+	(cport))
 
 /*
  * SCSI target number format

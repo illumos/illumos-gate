@@ -20,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,6 +44,9 @@
 #include <sys/thread.h>
 #include <sys/kstat.h>
 #include <sys/note.h>
+#include <sys/sysevent.h>
+#include <sys/sysevent/eventdefs.h>
+#include <sys/sysevent/dr.h>
 
 #include <sys/sata/impl/sata.h>
 #include <sys/sata/sata_hba.h>
@@ -192,8 +195,8 @@ static	int sata_mode_select_page_8(sata_pkt_txlate_t *,
     struct mode_cache_scsi3 *, int, int *, int *, int *);
 static	void sata_save_drive_settings(sata_drive_info_t *);
 static	void sata_show_drive_info(sata_hba_inst_t *, sata_drive_info_t *);
-
 static	void sata_log(sata_hba_inst_t *, uint_t, char *fmt, ...);
+static	void sata_gen_sysevent(sata_hba_inst_t *, sata_address_t *, int);
 
 /*
  * SATA Framework will ignore SATA HBA driver cb_ops structure and
@@ -1050,6 +1053,12 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			rv = EIO;
 			break;
 		}
+		/* Sanity check */
+		if (SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst) == NULL) {
+			/* No physical port deactivation supported. */
+			break;
+		}
+
 		/*
 		 * set port's dev_state to not ready - this will disable
 		 * an access to an attached device.
@@ -1105,22 +1114,25 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			}
 			/*
 			 * Note: PMult info requires different handling.
-			 * Put PMult handling code here, when PNult is
+			 * Put PMult handling code here, when PMult is
 			 * supported.
 			 */
+
 		}
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
-		/* Sanity check */
-		if (SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst) == NULL) {
-			/* No physical port deactivation supported. */
-			break;
-		}
-
 		/* Just ask HBA driver to deactivate port */
 		sata_device.satadev_addr.qual = SATA_ADDR_DCPORT;
 
 		rval = (*SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst))
 		    (dip, &sata_device);
+
+		/*
+		 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+		 * without the hint.
+		 */
+		sata_gen_sysevent(sata_hba_inst,
+		    &sata_device.satadev_addr, SE_NO_HINT);
+
 		mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
 		    cport_mutex);
 		sata_update_port_info(sata_hba_inst, &sata_device);
@@ -1135,6 +1147,11 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				cportinfo->cport_state = SATA_PSTATE_FAILED;
 			rv = EIO;
 		} else {
+			/*
+			 * Deactivation succeded. From now on the framework
+			 * will not know what is happening to the device, until
+			 * the port is activated again.
+			 */
 			cportinfo->cport_state |= SATA_PSTATE_SHUTDOWN;
 		}
 		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->cport_mutex);
@@ -1243,14 +1260,19 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		if (sata_reprobe_port(sata_hba_inst, &sata_device) ==
 		    SATA_FAILURE)
 			rv = EIO;
-
+		/*
+		 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+		 * without the hint
+		 */
+		sata_gen_sysevent(sata_hba_inst,
+		    &sata_device.satadev_addr, SE_NO_HINT);
 		/*
 		 * If there is a device attached to the port, emit
 		 * a message.
 		 */
 		if (cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
 			sata_log(sata_hba_inst, CE_WARN,
-			    "SATA device attached at port %d", cport);
+			    "SATA device detected at port %d", cport);
 		}
 		break;
 	}
@@ -1299,7 +1321,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			break;
 		}
 		if (cportinfo->cport_state & SATA_PSTATE_SHUTDOWN) {
-			target = TRUE;
+			target = FALSE;
 			mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, cport)->
 			    cport_mutex);
 
@@ -1332,6 +1354,13 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 					break;
 				}
 			}
+			/*
+			 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+			 * without the hint.
+			 */
+			sata_gen_sysevent(sata_hba_inst,
+			    &sata_device.satadev_addr, SE_NO_HINT);
+
 			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
 			    cport_mutex);
 			/* Virgin port state */
@@ -1349,11 +1378,11 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 		if (target == FALSE &&
 		    cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
 			/*
-			 * That's the transition from "inactive" port to
-			 * active with device attached.
+			 * That's the transition from "inactive" port
+			 * to active one with device attached.
 			 */
 			sata_log(sata_hba_inst, CE_WARN,
-			    "SATA device attached at port %d",
+			    "SATA device detected at port %d",
 			    cport);
 		}
 
@@ -1847,6 +1876,14 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			/* Just let HBA driver to deactivate port */
 			rval = (*SATA_PORT_DEACTIVATE_FUNC(sata_hba_inst))
 			    (dip, &sata_device);
+			/*
+			 * Generate sysevent -
+			 * EC_DR / ESC_DR_AP_STATE_CHANGE
+			 * without the hint
+			 */
+			sata_gen_sysevent(sata_hba_inst,
+			    &sata_device.satadev_addr, SE_NO_HINT);
+
 			mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, cport)->
 			    cport_mutex);
 			sata_update_port_info(sata_hba_inst, &sata_device);
@@ -1931,6 +1968,14 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 			 */
 			(void) sata_reprobe_port(sata_hba_inst, &sata_device);
 
+			/*
+			 * Generate sysevent -
+			 * EC_DR / ESC_DR_AP_STATE_CHANGE
+			 * without the hint.
+			 */
+			sata_gen_sysevent(sata_hba_inst,
+			    &sata_device.satadev_addr, SE_NO_HINT);
+
 			if (dev_existed == FALSE &&
 			    cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
 				/*
@@ -1940,7 +1985,7 @@ sata_hba_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
 				 * a device attached.
 				 */
 				sata_log(sata_hba_inst, CE_WARN,
-				    "SATA device attached at port %d", cport);
+				    "SATA device detected at port %d", cport);
 			}
 
 			break;
@@ -6633,9 +6678,6 @@ sata_reprobe_port(sata_hba_inst_t *sata_hba_inst, sata_device_t *sata_device)
 				sdinfo->satadrv_addr.qual = SATA_ADDR_DCPORT;
 				sdinfo->satadrv_type = SATA_DTYPE_UNKNOWN;
 				sdinfo->satadrv_state = SATA_STATE_UNKNOWN;
-				sata_log(sata_hba_inst, CE_WARN,
-				    "SATA device attached to port %d",
-				    cportinfo->cport_addr.cport);
 			} else {
 				/*
 				 * Port is not in ready state, we
@@ -9466,7 +9508,11 @@ sata_process_device_detached(sata_hba_inst_t *sata_hba_inst,
 			    "removed device."));
 		}
 	}
-
+	/*
+	 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+	 * with the hint: SE_HINT_REMOVE
+	 */
+	sata_gen_sysevent(sata_hba_inst, saddr, SE_HINT_REMOVE);
 }
 
 
@@ -9488,6 +9534,7 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 	sata_drive_info_t *sdevinfo;
 	sata_device_t sata_device;
 	dev_info_t *tdip;
+	int rval;
 
 	SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
 	    "Processing port %d device attached", saddr->cport);
@@ -9520,7 +9567,57 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 		    "Arbitrarily detaching old device info."));
 	}
 	cportinfo->cport_dev_type = SATA_DTYPE_NONE;
+
+	/* For sanity, re-probe the port */
+	sata_device.satadev_rev = SATA_DEVICE_REV;
+	sata_device.satadev_addr = *saddr;
+
+	/*
+	 * We have to exit mutex, because the HBA probe port function may
+	 * block on its own mutex.
+	 */
 	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
+	rval = (*SATA_PROBE_PORT_FUNC(sata_hba_inst))
+	    (SATA_DIP(sata_hba_inst), &sata_device);
+	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
+	sata_update_port_info(sata_hba_inst, &sata_device);
+	if (rval != SATA_SUCCESS) {
+		/* Something went wrong? Fail the port */
+		cportinfo->cport_state = SATA_PSTATE_FAILED;
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
+		    cport_mutex);
+		SATA_LOG_D((sata_hba_inst, CE_WARN, "Port %d probing failed",
+		    saddr->cport));
+		return;
+	} else {
+		/* port probed successfully */
+		cportinfo->cport_state |= SATA_STATE_PROBED | SATA_STATE_READY;
+	}
+	/*
+	 * Check if a device is still attached. For sanity, check also
+	 * link status - if no link, there is no device.
+	 */
+	if ((sata_device.satadev_scr.sstatus & SATA_PORT_DEVLINK_UP_MASK) !=
+	    SATA_PORT_DEVLINK_UP || sata_device.satadev_type ==
+	    SATA_DTYPE_NONE) {
+		/*
+		 * No device - ignore attach event.
+		 */
+		mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->
+		    cport_mutex);
+		SATADBG1(SATA_DBG_EVENTS_PROC, sata_hba_inst,
+		    "Ignoring attach - no device connected to port %d",
+		    sata_device.satadev_addr.cport);
+		return;
+	}
+
+	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
+	/*
+	 * Generate sysevent - EC_DR / ESC_DR_AP_STATE_CHANGE
+	 * with the hint: SE_HINT_INSERT
+	 */
+	sata_gen_sysevent(sata_hba_inst, saddr, SE_HINT_INSERT);
+
 	/*
 	 * Make sure that there is no target node for that device.
 	 * If so, release it. It should not happen, unless we had problem
@@ -9561,9 +9658,8 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 	}
 
 	/*
-	 * Reprobing port will take care of detecting device presence,
-	 * creation of the device info structure and determination of the
-	 * device type.
+	 * Reprobing port will take care of the creation of the device info
+	 * structure and determination of the device type.
 	 */
 	sata_device.satadev_addr = *saddr;
 	(void) sata_reprobe_port(sata_hba_inst, &sata_device);
@@ -9573,13 +9669,17 @@ sata_process_device_attached(sata_hba_inst_t *sata_hba_inst,
 	 */
 	mutex_enter(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
 	if ((cportinfo->cport_state & SATA_STATE_READY) &&
-	    cportinfo->cport_dev_type != SATA_DTYPE_NONE &&
-	    SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL) {
-		sata_drive_info_t new_sdinfo;
+	    cportinfo->cport_dev_type != SATA_DTYPE_NONE) {
+		sata_log(sata_hba_inst, CE_WARN,
+		    "SATA device attached at port %d", saddr->cport);
 
-		/* Log device info data */
-		new_sdinfo = *(SATA_CPORTINFO_DRV_INFO(cportinfo));
-		sata_show_drive_info(sata_hba_inst, &new_sdinfo);
+		if (SATA_CPORTINFO_DRV_INFO(cportinfo) != NULL) {
+			sata_drive_info_t new_sdinfo;
+
+			/* Log device info data */
+			new_sdinfo = *(SATA_CPORTINFO_DRV_INFO(cportinfo));
+			sata_show_drive_info(sata_hba_inst, &new_sdinfo);
+		}
 	}
 	mutex_exit(&SATA_CPORT_INFO(sata_hba_inst, saddr->cport)->cport_mutex);
 }
@@ -9744,4 +9844,61 @@ sata_restore_drive_settings(sata_hba_inst_t *sata_hba_inst,
 	sdinfo->satadrv_id = new_sdinfo.satadrv_id;
 
 	return (rval);
+}
+
+
+static void
+sata_gen_sysevent(sata_hba_inst_t *sata_hba_inst, sata_address_t *saddr,
+    int hint)
+{
+	char ap[MAXPATHLEN];
+	nvlist_t *ev_attr_list = NULL;
+	int err;
+
+	/* Allocate and build sysevent attribute list */
+	err = nvlist_alloc(&ev_attr_list, NV_UNIQUE_NAME_TYPE, DDI_NOSLEEP);
+	if (err != 0) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_gen_sysevent: "
+		    "cannot allocate memory for sysevent attributes\n"));
+		return;
+	}
+	/* Add hint attribute */
+	err = nvlist_add_string(ev_attr_list, DR_HINT, SE_HINT2STR(hint));
+	if (err != 0) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_gen_sysevent: "
+		    "failed to add DR_HINT attr for sysevent"));
+		nvlist_free(ev_attr_list);
+		return;
+	}
+	/*
+	 * Add AP attribute.
+	 * Get controller pathname and convert it into AP pathname by adding
+	 * a target number.
+	 */
+	(void) snprintf(ap, MAXPATHLEN, "/devices");
+	(void) ddi_pathname(SATA_DIP(sata_hba_inst), ap + strlen(ap));
+	(void) snprintf(ap + strlen(ap), MAXPATHLEN - strlen(ap), ":%d",
+	    SATA_MAKE_AP_NUMBER(saddr->cport, saddr->pmport, saddr->qual));
+
+	err = nvlist_add_string(ev_attr_list, DR_AP_ID, ap);
+	if (err != 0) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_gen_sysevent: "
+		    "failed to add DR_AP_ID attr for sysevent"));
+		nvlist_free(ev_attr_list);
+		return;
+	}
+
+	/* Generate/log sysevent */
+	err = ddi_log_sysevent(SATA_DIP(sata_hba_inst), DDI_VENDOR_SUNW, EC_DR,
+	    ESC_DR_AP_STATE_CHANGE, ev_attr_list, NULL, DDI_NOSLEEP);
+	if (err != DDI_SUCCESS) {
+		SATA_LOG_D((sata_hba_inst, CE_WARN,
+		    "sata_gen_sysevent: "
+		    "cannot log sysevent, err code %x\n", err));
+	}
+
+	nvlist_free(ev_attr_list);
 }
