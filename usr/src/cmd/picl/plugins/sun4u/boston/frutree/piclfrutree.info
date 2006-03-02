@@ -482,9 +482,9 @@ name:/frutree/chassis/MB/system-board/HDDCNTRL/disk-controller/HDDBP/disk-backpl
  * the eight PCIe/PCI-x slots...
  */
 name:/frutree/chassis/MB/system-board/PCI0
-	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl?DeviceID=0
 name:/frutree/chassis/MB/system-board/PCI1
-	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl?DeviceID=0
 name:/frutree/chassis/MB/system-board/PCI2
 	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@1/pciex@0/pci@8/picl?DeviceID=1
 name:/frutree/chassis/MB/system-board/PCI3
@@ -494,9 +494,9 @@ name:/frutree/chassis/MB/system-board/PCI4
 name:/frutree/chassis/MB/system-board/PCI5
 	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@2/pciex@0/pci@8/picl?DeviceID=2
 name:/frutree/chassis/MB/system-board/PCI6
-	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl?DeviceID=0
 name:/frutree/chassis/MB/system-board/PCI7
-	REFNODE pci-card fru WITH _class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl?DeviceID=0
+	REFNODE pci-card fru WITH _class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl?DeviceID=0
 
 #include "system-board.info"
 #include <fru_SC_data.info>
@@ -513,42 +513,42 @@ _class:/jbus/pciex@1f,700000/pciex@0/pciex@1/pciex@0/usb@1c,2/obp-device@1
 /*
  * devices in PCIe/PCI-x slots
  */
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI0/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,0
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI0/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,1
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,1
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI0/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,2
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,2
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI0/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,3
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,3
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI0/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,4
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,4
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI0/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,5
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,5
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI0/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,6
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,6
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI0/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0,7
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0,7
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI0/pci-card
 
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI1/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI1/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,1
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,1
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI1/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,2
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,2
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI1/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,3
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,3
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI1/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,4
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,4
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI1/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,5
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,5
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI1/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,6
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,6
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI1/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,7
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,7
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI1/pci-card
 
 _class:/jbus/pciex@1e,600000/pciex@0/pciex@1/pciex@0/pci@8/picl@1
@@ -627,40 +627,40 @@ _class:/jbus/pciex@1f,700000/pciex@0/pciex@2/pciex@0/pci@8/picl@2,6
 _class:/jbus/pciex@1f,700000/pciex@0/pciex@2/pciex@0/pci@8/picl@2,7
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI5/pci-card
 
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI6/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,0
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI6/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,1
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,1
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI6/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,2
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,2
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI6/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,3
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,3
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI6/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,4
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,4
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI6/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,5
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,5
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI6/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,6
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,6
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI6/pci-card
-_class:/jbus/pciex@1f,700000/pciex@0/pciex@8/picl@0,7
+_class:/jbus/pciex@1e,600000/pciex@0/pciex@9/picl@0,7
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI6/pci-card
 
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI7/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8,0/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9,0/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI7/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8,1/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9,1/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI7/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8,2/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9,2/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI7/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8,3/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9,3/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI7/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8,4/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9,4/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI7/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8,5/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9,5/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI7/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8,6/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9,6/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI7/pci-card
-_class:/jbus/pciex@1e,600000/pciex@0/pciex@8,7/picl@0
+_class:/jbus/pciex@1f,700000/pciex@0/pciex@9,7/picl@0
         REFPROP _fru_parent name:/frutree/chassis/MB/system-board/PCI7/pci-card
