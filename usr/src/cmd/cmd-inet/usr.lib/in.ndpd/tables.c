@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -469,13 +468,11 @@ start_over:
 	/* Set linkinfo parameters */
 	(void) strncpy(lifr.lifr_name, pi->pi_name, sizeof (lifr.lifr_name));
 	lifr.lifr_name[sizeof (lifr.lifr_name) - 1] = '\0';
-	if (ioctl(fd, SIOCGLIFLNKINFO, (char *)&lifr) < 0) {
-		logperror_pi(pi, "phyint_init_from_k: SIOCGLIFLNKINFO");
-		goto error;
-	}
 	lifr.lifr_ifinfo.lir_maxhops = pi->pi_CurHopLimit;
 	lifr.lifr_ifinfo.lir_reachtime = pi->pi_ReachableTime;
 	lifr.lifr_ifinfo.lir_reachretrans = pi->pi_RetransTimer;
+	/* Setting maxmtu to 0 means that we're leaving the MTU alone */
+	lifr.lifr_ifinfo.lir_maxmtu = 0;
 	if (ioctl(fd, SIOCSLIFLNKINFO, (char *)&lifr) < 0) {
 		logperror_pi(pi, "phyint_init_from_k: SIOCSLIFLNKINFO");
 		goto error;
