@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -385,10 +384,14 @@ kctl_dmod_path_set(kmdb_wr_path_t *pth)
 	kmdb_wr_path_t *opth;
 
 	if (kctl.kctl_flags & KMDB_F_DRV_DEBUG) {
-		int i;
-		kctl_dprintf("changing dmod path to: %p", pth);
-		for (i = 0; pth->dpth_path[i] != NULL; i++)
-			kctl_dprintf(" %s", pth->dpth_path[i]);
+		if (pth != NULL) {
+			int i;
+			kctl_dprintf("changing dmod path to: %p", pth);
+			for (i = 0; pth->dpth_path[i] != NULL; i++)
+				kctl_dprintf(" %s", pth->dpth_path[i]);
+		} else {
+			kctl_dprintf("changing dmod path to NULL");
+		}
 	}
 
 	opth = kctl_dmod_path;

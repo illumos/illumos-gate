@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -397,6 +396,16 @@ kmt_write(mdb_tgt_t *t, const void *buf, size_t nbytes, uintptr_t addr)
 	if (!(t->t_flags & MDB_TGT_F_ALLOWIO) &&
 	    (nbytes = kmdb_kdi_range_is_nontoxic(addr, nbytes, 1)) == 0)
 		return (set_errno(EMDB_NOMAP));
+
+	/*
+	 * No writes to user space are allowed.  If we were to allow it, we'd
+	 * be in the unfortunate situation where kmdb could place a breakpoint
+	 * on a userspace executable page; this dirty page would end up being
+	 * flushed back to disk, incurring sadness when it's next executed.
+	 * Besides, we can't allow trapping in from userspace anyway.
+	 */
+	if (addr < kmdb_kdi_get_userlimit())
+		return (set_errno(EMDB_TGTNOTSUP));
 
 	return (kmt_rw(t, (void *)buf, nbytes, addr, kmt_writer));
 }
