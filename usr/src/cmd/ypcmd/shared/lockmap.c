@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -61,7 +60,7 @@ static int	lockfile;
 int
 hash(char *s)
 {
-	int n = 0;
+	unsigned int n = 0;
 	int i;
 
 	for (i = 1; *s; i += 10, s++) {
@@ -180,7 +179,7 @@ init_lock_map()
 	 * File exists with correct size, is open, and we're holding
 	 * the file lock.
 	 */
-	shmlockarray = (lockarray *)mmap((caddr_t) 0, sizeof (lockarray),
+	shmlockarray = (lockarray *)mmap((caddr_t)0, sizeof (lockarray),
 	    PROT_READ | PROT_WRITE, MAP_SHARED, lockfile, 0);
 	if (shmlockarray == MAP_FAILED) {
 		syslog(LOG_ERR, "mmap(%s) => errno=%d", LOCKFILE, errno);
@@ -239,7 +238,7 @@ lock_map(char *mapname)
 
 	hashval = hash(mapname);
 
-	return( lock_core(hashval));
+	return (lock_core(hashval));
 }
 
 /*
@@ -258,7 +257,7 @@ lock_core(int hashval)
 	int rc;
 
 	/*
-	 *Robust, cross-process lock implementation
+	 * Robust, cross-process lock implementation
 	 */
 	rc = mutex_lock(&(shmlockarray->locknode[hashval]));
 	while (rc != 0) {
@@ -322,7 +321,7 @@ unlock_map(char *mapname)
 
 	hashval = hash(mapname);
 
-	return( unlock_core( hashval ));
+	return (unlock_core(hashval));
 }
 
 /*
