@@ -25,6 +25,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
+CLASS = plat
 PLATFORMS = SUNW,Sun-Fire-15000
 
 include ../../sun4/ioboard/Makefile.iob

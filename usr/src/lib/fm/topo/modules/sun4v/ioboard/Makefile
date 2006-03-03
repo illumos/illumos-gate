@@ -25,6 +25,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 
-SUBDIRS = chip hostbridge ioboard pcibus
+CLASS = arch
+ARCH = sun4v
 
-include ../../../Makefile.subdirs
+include ../../sun4/ioboard/Makefile.iob

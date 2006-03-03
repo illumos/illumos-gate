@@ -31,44 +31,20 @@
     <node instance='0'>
       <propgroup name='protocol'>
         <propval name='FRU' type='fmri'
-          value='hc:///motherboard=0' />
+          value='hc:///component=MB' />
         <propval name='label' type='string'
           value='MB' />
       </propgroup>
     </node>
     <dependents grouping='children'>
-      <range name='CMP' min='0' max='0'>
-	<node instance='0'>
-          <propgroup name='protocol'>
-            <propval name='FRU' type='fmri'
-              value='hc:///motherboard=0/CMP=0' />
-            <propval name='label' type='string'
-              value='MB/CMP0' />
-          </propgroup>
-        </node>
-        <dependents grouping='children'>
-          <range name='cpu' min='0' max='100'>
-            <enum-method name='chip' version='1'
-              path='%r/usr/platform/sun4v/lib/fm/topo/plugins' />
-          </range>
-        </dependents>
+      <range name='ioboard' min='0' max='0'>
+        <enum-method name='ioboard' version='1'
+          path='%r/usr/platform/sun4v/lib/fm/topo/plugins' />
       </range>
     </dependents>
   </range>
   <range name='ioboard' min='0' max='0'>
-    <node instance='0'>
-      <propgroup name='protocol'>
-        <propval name='FRU' type='fmri'
-          value='hc:///ioboard=0' />
-	<propval name='label' type='string'
-          value='IOBD' />
-      </propgroup>
-    </node>
-    <dependents grouping='children'>
-      <range name='hostbridge' min='0' max='254'>
-        <enum-method name='hostbridge' version='1'
-          path='%r/usr/platform/sun4v/lib/fm/topo/plugins' />
-      </range>
-    </dependents>
+    <enum-method name='ioboard' version='1'
+      path='%r/usr/platform/sun4v/lib/fm/topo/plugins' />
   </range>
 </topology>

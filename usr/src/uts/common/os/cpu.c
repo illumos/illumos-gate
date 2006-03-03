@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -2150,6 +2149,7 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	kstat_named_setstr(&cpu_info_template.ci_implementation,
 	    cp->cpu_idstr);
 	kstat_named_setstr(&cpu_info_template.ci_brandstr, cp->cpu_brandstr);
+	cpu_info_template.ci_core_id.value.l = chip_plat_get_coreid(cp);
 
 #if defined(__sparcv9)
 	cpu_info_template.ci_device_ID.value.ui64 =
@@ -2157,7 +2157,6 @@ cpu_info_kstat_update(kstat_t *ksp, int rw)
 	kstat_named_setstr(&cpu_info_template.ci_cpu_fru, cpu_fru_fmri(cp));
 #endif
 #if defined(__i386) || defined(__amd64)
-	cpu_info_template.ci_core_id.value.l = chip_plat_get_coreid(cp);
 	kstat_named_setstr(&cpu_info_template.ci_vendorstr,
 	    cpuid_getvendorstr(cp));
 	cpu_info_template.ci_family.value.l = cpuid_getfamily(cp);

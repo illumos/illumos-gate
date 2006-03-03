@@ -26,7 +26,6 @@
 # ident	"%Z%%M%	%I%	%E% SMI"
 
 MODULE = ioboard
-CLASS = plat
 SUN4DIR = ../../sun4/$(MODULE)
 IOBSRCS = ioboard.c did.c did_hash.c did_props.c util.c
 MODULESRCS = $(IOBSRCS) iob_platform.c

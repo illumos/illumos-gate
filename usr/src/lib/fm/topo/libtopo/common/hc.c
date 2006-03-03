@@ -742,7 +742,8 @@ static int
 hc_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
     nvlist_t *in, nvlist_t **out)
 {
-	nvlist_t *args, *pfmri;
+	int ret;
+	nvlist_t *args, *pfmri = NULL;
 	nvlist_t *auth;
 	uint32_t inst;
 	char *name, *serial, *rev, *part;
@@ -755,18 +756,30 @@ hc_fmri_create_meth(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 		return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
 	if (nvlist_lookup_uint32(in, TOPO_METH_FMRI_ARG_INST, &inst) != 0)
 		return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
-	if (nvlist_lookup_nvlist(in, TOPO_METH_FMRI_ARG_NVL, &args) != 0)
-		return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
-	if (nvlist_lookup_nvlist(args, TOPO_METH_FMRI_ARG_PARENT, &pfmri) != 0)
-		return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
 
-	/* And then optional arguments */
+	/*
+	 * args is optional
+	 */
+	pfmri = NULL;
 	auth = NULL;
 	serial = rev = part = NULL;
-	(void) nvlist_lookup_nvlist(args, TOPO_METH_FMRI_ARG_AUTH, &auth);
-	(void) nvlist_lookup_string(args, TOPO_METH_FMRI_ARG_PART, &part);
-	(void) nvlist_lookup_string(args, TOPO_METH_FMRI_ARG_REV, &rev);
-	(void) nvlist_lookup_string(args, TOPO_METH_FMRI_ARG_SER, &serial);
+	if ((ret = nvlist_lookup_nvlist(in, TOPO_METH_FMRI_ARG_NVL, &args))
+	    != 0) {
+		if (ret != ENOENT)
+			return (topo_mod_seterrno(mp, EMOD_METHOD_INVAL));
+	} else {
+
+		/* And then optional arguments */
+		(void) nvlist_lookup_nvlist(args, TOPO_METH_FMRI_ARG_PARENT,
+		    &pfmri);
+		(void) nvlist_lookup_nvlist(args, TOPO_METH_FMRI_ARG_AUTH,
+		    &auth);
+		(void) nvlist_lookup_string(args, TOPO_METH_FMRI_ARG_PART,
+		    &part);
+		(void) nvlist_lookup_string(args, TOPO_METH_FMRI_ARG_REV, &rev);
+		(void) nvlist_lookup_string(args, TOPO_METH_FMRI_ARG_SER,
+		    &serial);
+	}
 
 	*out = hc_fmri_create(mp,
 	    pfmri, version, name, inst, auth, part, rev, serial);
