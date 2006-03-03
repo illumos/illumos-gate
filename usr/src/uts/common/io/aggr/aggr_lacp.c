@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -84,6 +83,22 @@ static const char *lacp_mux_str[] = LACP_MUX_STRINGS;
 static uint16_t lacp_port_priority = 0x1000;
 static uint16_t lacp_system_priority = 0x1000;
 
+/*
+ * Maintains a list of all ports in ATTACHED state. This information
+ * is used to detect misconfiguration.
+ */
+typedef struct lacp_sel_ports {
+	uint16_t sp_key;
+	char sp_devname[MAXNAMELEN + 1];
+	uint_t sp_port;
+	struct ether_addr sp_partner_system;
+	uint32_t sp_partner_key;
+	struct lacp_sel_ports *sp_next;
+} lacp_sel_ports_t;
+
+static lacp_sel_ports_t *sel_ports = NULL;
+static kmutex_t lacp_sel_lock;
+
 static void periodic_timer_pop_locked(aggr_port_t *);
 static void periodic_timer_pop(void *);
 static void lacp_xmit_sm(aggr_port_t *);
@@ -103,6 +118,20 @@ static void stop_current_while_timer(aggr_port_t *);
 static void current_while_timer_pop(void *);
 static void update_default_selected(aggr_port_t *);
 static boolean_t update_selected(aggr_port_t *, lacp_t *);
+static boolean_t lacp_sel_ports_add(aggr_port_t *);
+static void lacp_sel_ports_del(aggr_port_t *);
+
+void
+aggr_lacp_init(void)
+{
+	mutex_init(&lacp_sel_lock, NULL, MUTEX_DEFAULT, NULL);
+}
+
+void
+aggr_lacp_fini(void)
+{
+	mutex_destroy(&lacp_sel_lock);
+}
 
 static int
 inst_num(char *devname)
@@ -118,6 +147,33 @@ inst_num(char *devname)
 	}
 
 	return (inst);
+}
+
+/*
+ * Set the port LACP state to SELECTED. Returns B_FALSE if the operation
+ * could not be performed due to a memory allocation error, B_TRUE otherwise.
+ */
+static boolean_t
+lacp_port_select(aggr_port_t *portp)
+{
+	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+
+	if (!lacp_sel_ports_add(portp))
+		return (B_FALSE);
+	portp->lp_lacp.sm.selected = AGGR_SELECTED;
+	return (B_TRUE);
+}
+
+/*
+ * Set the port LACP state to UNSELECTED.
+ */
+static void
+lacp_port_unselect(aggr_port_t *portp)
+{
+	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+
+	lacp_sel_ports_del(portp);
+	portp->lp_lacp.sm.selected = AGGR_UNSELECTED;
 }
 
 /*
@@ -145,8 +201,8 @@ aggr_lacp_init_port(aggr_port_t *portp)
 	uint32_t instance;
 
 	ASSERT(AGGR_LACP_LOCK_HELD(aggrp));
-	ASSERT(RW_WRITE_HELD(&aggrp->lg_lock) || RW_READ_HELD(&aggrp->lg_lock));
-	ASSERT(RW_WRITE_HELD(&portp->lp_lock) || RW_READ_HELD(&portp->lp_lock));
+	ASSERT(RW_LOCK_HELD(&aggrp->lg_lock));
+	ASSERT(RW_LOCK_HELD(&portp->lp_lock));
 
 	/*
 	 * Port numbers must be unique. For now, we encode the first two
@@ -204,8 +260,9 @@ aggr_lacp_init_port(aggr_port_t *portp)
 	pl->sm.actor_churn = B_FALSE;
 	pl->sm.partner_churn = B_FALSE;
 	pl->sm.ready_n = B_FALSE;
-	pl->sm.selected = AGGR_UNSELECTED;
 	pl->sm.port_moved = B_FALSE;
+
+	lacp_port_unselect(portp);
 
 	pl->sm.periodic_state = LACP_NO_PERIODIC;
 	pl->sm.receive_state = LACP_INITIALIZE;
@@ -260,7 +317,8 @@ lacp_reset_port(aggr_port_t *portp)
 	pl->sm.actor_churn = B_FALSE;
 	pl->sm.partner_churn = B_FALSE;
 	pl->sm.ready_n = B_FALSE;
-	pl->sm.selected = AGGR_UNSELECTED;
+
+	lacp_port_unselect(portp);
 
 	pl->sm.periodic_state = LACP_NO_PERIODIC;
 	pl->sm.receive_state = LACP_INITIALIZE;
@@ -627,6 +685,7 @@ lacp_mux_sm(aggr_port_t *portp)
 	if (pl->sm.begin || !pl->sm.lacp_enabled)
 		pl->sm.mux_state = LACP_DETACHED;
 
+again:
 	/* determine next state, or return if state unchanged */
 	switch (pl->sm.mux_state) {
 	case LACP_DETACHED:
@@ -721,6 +780,14 @@ lacp_mux_sm(aggr_port_t *portp)
 
 		pl->ActorOperPortState.bit.distributing = B_FALSE;
 		NTT_updated = B_TRUE;
+		if (pl->PartnerOperPortState.bit.sync) {
+			/*
+			 * We had already received an updated sync from
+			 * the partner. Attempt to transition to
+			 * collecting/distributing now.
+			 */
+			goto again;
+		}
 		break;
 
 	case LACP_COLLECTING_DISTRIBUTING:
@@ -960,48 +1027,6 @@ aggr_lacp_set_mode(aggr_grp_t *grp, aggr_lacp_mode_t mode,
 	}
 }
 
-static void
-lacp_misconfig_walker(aggr_grp_t *grp, void *arg)
-{
-	lacp_misconfig_check_state_t *state = arg;
-	aggr_port_t *port = state->cs_portp;
-	aggr_port_t *cport;
-
-	if (state->cs_found)
-		return;
-
-	if (grp == state->cs_portp->lp_grp)
-		return;
-
-	AGGR_LACP_LOCK(grp);
-	rw_enter(&grp->lg_lock, RW_READER);
-
-	for (cport = grp->lg_ports; cport != NULL; cport = cport->lp_next) {
-		if ((ether_cmp(&port->lp_lacp.PartnerOperSystem,
-		    &grp->aggr.PartnerSystem) == 0) &&
-		    (port->lp_lacp.PartnerOperKey ==
-		    grp->aggr.PartnerOperAggrKey)) {
-			/*
-			 * The Partner port information is already in use
-			 * by ports in another aggregation so disable this
-			 * port.
-			 */
-			port->lp_lacp.sm.selected = AGGR_UNSELECTED;
-			cmn_err(CE_NOTE, "aggr: (%s/%d): Port Partner "
-			    "MAC and key (%d) in use on aggregation "
-			    "key (%d)\n",
-			    port->lp_devname, port->lp_port,
-			    port->lp_lacp.PartnerOperKey,
-			    grp->aggr.PartnerOperAggrKey);
-			state->cs_found = B_TRUE;
-			break;
-		}
-	}
-
-	rw_exit(&grp->lg_lock);
-	AGGR_LACP_UNLOCK(grp);
-}
-
 /*
  * Verify that the Partner MAC and Key recorded by the specified
  * port are not found in other ports that are not part of our
@@ -1011,18 +1036,130 @@ lacp_misconfig_walker(aggr_grp_t *grp, void *arg)
 static boolean_t
 lacp_misconfig_check(aggr_port_t *portp)
 {
-	lacp_misconfig_check_state_t state;
+	aggr_grp_t *grp = portp->lp_grp;
+	lacp_sel_ports_t *cport;
 
-	ASSERT(AGGR_LACP_LOCK_HELD(portp->lp_grp));
+	mutex_enter(&lacp_sel_lock);
 
-	state.cs_portp = portp;
-	state.cs_found = B_FALSE;
+	for (cport = sel_ports; cport != NULL; cport = cport->sp_next) {
 
-	aggr_grp_walk(lacp_misconfig_walker, &state);
+		/* skip entries of the group of the port being checked */
+		if (cport->sp_key == grp->lg_key)
+			continue;
 
-	return (state.cs_found);
+		if ((ether_cmp(&cport->sp_partner_system,
+		    &grp->aggr.PartnerSystem) == 0) &&
+		    (cport->sp_partner_key == grp->aggr.PartnerOperAggrKey)) {
+			char mac_str[ETHERADDRL*3];
+			struct ether_addr *mac = &cport->sp_partner_system;
+
+			/*
+			 * The Partner port information is already in use
+			 * by ports in another aggregation so disable this
+			 * port.
+			 */
+
+			(void) snprintf(mac_str, sizeof (mac_str),
+			    "%x:%x:%x:%x:%x:%x",
+			    mac->ether_addr_octet[0], mac->ether_addr_octet[1],
+			    mac->ether_addr_octet[2], mac->ether_addr_octet[3],
+			    mac->ether_addr_octet[4], mac->ether_addr_octet[5]);
+
+			portp->lp_lacp.sm.selected = AGGR_UNSELECTED;
+			cmn_err(CE_NOTE, "aggr key %d port %s/%d: Port Partner "
+			    "MAC %s and key %d in use on aggregation "
+			    "key %d port %s/%d\n", grp->lg_key,
+			    portp->lp_devname, portp->lp_port,
+			    mac_str, portp->lp_lacp.PartnerOperKey,
+			    cport->sp_key, cport->sp_devname, cport->sp_port);
+			break;
+		}
+	}
+
+	mutex_exit(&lacp_sel_lock);
+	return (cport != NULL);
 }
 
+/*
+ * Remove the specified port from the list of selected ports.
+ */
+static void
+lacp_sel_ports_del(aggr_port_t *portp)
+{
+	lacp_sel_ports_t *cport, **prev = NULL;
+
+	mutex_enter(&lacp_sel_lock);
+
+	prev = &sel_ports;
+	for (cport = sel_ports; cport != NULL; prev = &cport->sp_next,
+	    cport = cport->sp_next) {
+		if (bcmp(portp->lp_devname, cport->sp_devname,
+		    MAXNAMELEN + 1) == 0 &&
+		    (portp->lp_port == cport->sp_port)) {
+			break;
+		}
+	}
+
+	if (cport == NULL) {
+		mutex_exit(&lacp_sel_lock);
+		return;
+	}
+
+	*prev = cport->sp_next;
+	kmem_free(cport, sizeof (*cport));
+
+	mutex_exit(&lacp_sel_lock);
+}
+
+/*
+ * Add the specified port to the list of selected ports. Returns B_FALSE
+ * if the operation could not be performed due to an memory allocation
+ * error.
+ */
+static boolean_t
+lacp_sel_ports_add(aggr_port_t *portp)
+{
+	lacp_sel_ports_t *new_port;
+	lacp_sel_ports_t *cport, **last;
+
+	mutex_enter(&lacp_sel_lock);
+
+	/* check if port is already in the list */
+	last = &sel_ports;
+	for (cport = sel_ports; cport != NULL;
+	    last = &cport->sp_next, cport = cport->sp_next) {
+		if (bcmp(portp->lp_devname, cport->sp_devname,
+		    MAXNAMELEN + 1) == 0 && (portp->lp_port ==
+		    cport->sp_port)) {
+			ASSERT(cport->sp_partner_key ==
+			    portp->lp_lacp.PartnerOperKey);
+			ASSERT(ether_cmp(&cport->sp_partner_system,
+			    &portp->lp_lacp.PartnerOperSystem) == 0);
+
+			mutex_exit(&lacp_sel_lock);
+			return (B_TRUE);
+		}
+	}
+
+	/* create and initialize new entry */
+	new_port = kmem_zalloc(sizeof (lacp_sel_ports_t), KM_NOSLEEP);
+	if (new_port == NULL) {
+		mutex_exit(&lacp_sel_lock);
+		return (B_FALSE);
+	}
+
+	new_port->sp_key = portp->lp_grp->lg_key;
+	bcopy(&portp->lp_lacp.PartnerOperSystem,
+	    &new_port->sp_partner_system, sizeof (new_port->sp_partner_system));
+	new_port->sp_partner_key = portp->lp_lacp.PartnerOperKey;
+	bcopy(portp->lp_devname, new_port->sp_devname, MAXNAMELEN + 1);
+	new_port->sp_port = portp->lp_port;
+
+	*last = new_port;
+
+	mutex_exit(&lacp_sel_lock);
+	return (B_TRUE);
+}
 
 /*
  * lacp_selection_logic - LACP selection logic
@@ -1053,7 +1190,7 @@ lacp_selection_logic(aggr_port_t *portp)
 
 	/* LACP_OFF state not in specification so check here.  */
 	if (!pl->sm.lacp_on) {
-		pl->sm.selected = AGGR_UNSELECTED;
+		lacp_port_unselect(portp);
 		aggrp->aggr.ready = B_FALSE;
 		lacp_mux_sm(portp);
 		return;
@@ -1069,7 +1206,7 @@ lacp_selection_logic(aggr_port_t *portp)
 		    pl->sm.begin, pl->sm.lacp_enabled,
 		    portp->lp_state));
 
-		pl->sm.selected = AGGR_UNSELECTED;
+		lacp_port_unselect(portp);
 		aggrp->aggr.ready = B_FALSE;
 		lacp_mux_sm(portp);
 		return;
@@ -1083,7 +1220,7 @@ lacp_selection_logic(aggr_port_t *portp)
 		    "selected %d-->%d\n", portp->lp_devname, portp->lp_port,
 		    pl->sm.selected, AGGR_UNSELECTED));
 
-		pl->sm.selected = AGGR_UNSELECTED;
+		lacp_port_unselect(portp);
 		lacp_mux_sm(portp);
 		return;
 	}
@@ -1149,10 +1286,10 @@ lacp_selection_logic(aggr_port_t *portp)
 	 */
 	if (ether_cmp(&pl->PartnerOperSystem,
 	    (struct ether_addr *)&aggrp->lg_addr) == 0) {
-		pl->sm.selected = AGGR_UNSELECTED;
 		cmn_err(CE_NOTE, "trunk link: (%s/%d): Loopback condition.\n",
 		    portp->lp_devname, portp->lp_port);
 
+		lacp_port_unselect(portp);
 		lacp_mux_sm(portp);
 		return;
 	}
@@ -1203,7 +1340,8 @@ lacp_selection_logic(aggr_port_t *portp)
 		 * that of the other ports in the aggregation
 		 * so disable this port.
 		 */
-		pl->sm.selected = AGGR_UNSELECTED;
+		lacp_port_unselect(portp);
+
 		cmn_err(CE_NOTE, "trunk link: (%s/%d): Port Partner MAC or"
 		    " key (%d) incompatible with Aggregation Partner "
 		    "MAC or key (%d)\n",
@@ -1219,8 +1357,8 @@ lacp_selection_logic(aggr_port_t *portp)
 		AGGR_LACP_DBG(("lacp_selection_logic:(%s/%d): "
 		    "selected %d-->%d\n", portp->lp_devname, portp->lp_port,
 		    pl->sm.selected, AGGR_SELECTED));
-
-		pl->sm.selected = AGGR_SELECTED;
+		if (!lacp_port_select(portp))
+			return;
 		lacp_mux_sm(portp);
 	}
 
@@ -1703,7 +1841,7 @@ update_selected(aggr_port_t *portp, lacp_t *lacp)
 		    "selected  %d-->%d\n", portp->lp_devname, portp->lp_port,
 		    pl->sm.selected, AGGR_UNSELECTED));
 
-		pl->sm.selected = AGGR_UNSELECTED;
+		lacp_port_unselect(portp);
 		return (B_TRUE);
 	} else {
 		return (B_FALSE);
@@ -1734,7 +1872,8 @@ update_default_selected(aggr_port_t *portp)
 		AGGR_LACP_DBG(("update_default_selected:(%s/%d): "
 		    "selected  %d-->%d\n", portp->lp_devname, portp->lp_port,
 		    pl->sm.selected, AGGR_UNSELECTED));
-		pl->sm.selected = AGGR_UNSELECTED;
+
+		lacp_port_unselect(portp);
 	}
 }
 
@@ -1836,7 +1975,7 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 
 	switch (pl->sm.receive_state) {
 	case LACP_INITIALIZE:
-		pl->sm.selected = AGGR_UNSELECTED;
+		lacp_port_unselect(portp);
 		record_Default(portp);
 		pl->ActorOperPortState.bit.expired = B_FALSE;
 		pl->sm.port_moved = B_FALSE;
@@ -1891,7 +2030,7 @@ lacp_receive_sm(aggr_port_t *portp, lacp_t *lacp)
 		 * This is the normal state for recv_sm when LACP_OFF
 		 * is set or the NIC is in half duplex mode.
 		 */
-		pl->sm.selected = AGGR_UNSELECTED;
+		lacp_port_unselect(portp);
 		record_Default(portp);
 		pl->PartnerOperPortState.bit.aggregation = B_FALSE;
 		pl->ActorOperPortState.bit.expired = B_FALSE;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1051,28 +1050,6 @@ aggr_grp_info(uint_t *ngroups, uint32_t group_key, void *fn_arg,
 
 	rw_exit(&aggr_grp_lock);
 	return (rc);
-}
-
-/*
- * Aggregation group walker.
- */
-
-typedef struct aggr_grp_walker_state_s {
-	aggr_grp_walker_fn_t ws_walker_fn;
-	void		*ws_arg;
-} aggr_grp_walker_state_t;
-
-void
-aggr_grp_walk(aggr_grp_walker_fn_t walker, void *arg)
-{
-	aggr_grp_walker_state_t state;
-
-	state.ws_walker_fn = walker;
-	state.ws_arg = arg;
-
-	rw_enter(&aggr_grp_lock, RW_READER);
-	mod_hash_walk(aggr_grp_hash, aggr_grp_info_walker, &state);
-	rw_exit(&aggr_grp_lock);
 }
 
 static void

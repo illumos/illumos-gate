@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -166,7 +165,6 @@ typedef int (*aggr_grp_info_new_grp_fn_t)(void *, uint32_t, uchar_t *,
     boolean_t, uint32_t, uint32_t, aggr_lacp_mode_t, aggr_lacp_timer_t);
 typedef int (*aggr_grp_info_new_port_fn_t)(void *, char *, uint32_t,
     uchar_t *, aggr_port_state_t, aggr_lacp_state_t *);
-typedef void (*aggr_grp_walker_fn_t)(aggr_grp_t *, void *);
 
 extern void aggr_grp_init(void);
 extern int aggr_grp_fini(void);
@@ -187,7 +185,6 @@ extern void aggr_grp_update_ports_mac(aggr_grp_t *);
 extern int aggr_grp_modify(uint32_t, aggr_grp_t *, uint8_t, uint32_t,
     boolean_t, const uchar_t *, aggr_lacp_mode_t, aggr_lacp_timer_t);
 extern void aggr_grp_multicst_port(aggr_port_t *, boolean_t);
-extern void aggr_grp_walk(aggr_grp_walker_fn_t, void *);
 extern uint_t aggr_grp_count(void);
 
 extern void aggr_port_init(void);
@@ -209,6 +206,8 @@ extern void aggr_send_port_enable(aggr_port_t *);
 extern void aggr_send_port_disable(aggr_port_t *);
 extern void aggr_send_update_policy(aggr_grp_t *, uint32_t);
 
+extern void aggr_lacp_init(void);
+extern void aggr_lacp_fini(void);
 extern void aggr_lacp_init_port(aggr_port_t *);
 extern void aggr_lacp_init_grp(aggr_grp_t *);
 extern void aggr_lacp_set_mode(aggr_grp_t *, aggr_lacp_mode_t,
