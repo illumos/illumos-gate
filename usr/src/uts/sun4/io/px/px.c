@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,8 @@
 #include <sys/spl.h>
 #include <sys/epm.h>
 #include <sys/iommutsb.h>
+#include <sys/hotplug/pci/pcihp.h>
+#include <sys/hotplug/pci/pciehpc.h>
 #include "px_obj.h"
 #include <sys/pci_tools.h>
 #include "px_tools_ext.h"
@@ -58,6 +60,12 @@ static int px_info(dev_info_t *dip, ddi_info_cmd_t infocmd,
 	void *arg, void **result);
 static int px_pwr_setup(dev_info_t *dip);
 static void px_pwr_teardown(dev_info_t *dip);
+
+/*
+ * function prototypes for hotplug routines:
+ */
+static uint_t px_init_hotplug(px_t *px_p);
+static uint_t px_uninit_hotplug(dev_info_t *dip);
 
 /*
  * bus ops and dev ops structures:
@@ -181,14 +189,12 @@ px_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
 	int	instance = getminor((dev_t)arg);
 	px_t	*px_p = INST_TO_STATE(instance);
 
-#ifdef	HOTPLUG
 	/*
 	 * Allow hotplug to deal with ones it manages
 	 * Hot Plug will be done later.
 	 */
-	if (px_p && (px_p->hotplug_capable == B_TRUE))
+	if (px_p && (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE))
 		return (pcihp_info(dip, infocmd, arg, result));
-#endif	/* HOTPLUG */
 
 	/* non-hotplug or not attached */
 	switch (infocmd) {
@@ -239,6 +245,8 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		px_p->px_soft_state = PX_SOFT_STATE_CLOSED;
 		px_p->px_open_count = 0;
 
+		(void) ddi_prop_update_string(DDI_DEV_T_NONE, dip,
+				"device_type", "pciex");
 		/*
 		 * Get key properties of the pci bridge node and
 		 * determine it's type (psycho, schizo, etc ...).
@@ -292,6 +300,8 @@ px_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
 		 */
 		if ((ret = px_err_add_intr(&px_p->px_fault)) != DDI_SUCCESS)
 			goto err_bad_pec_add_intr;
+
+		(void) px_init_hotplug(px_p);
 
 		/*
 		 * Create the "devctl" node for hotplug and pcitool support.
@@ -420,17 +430,11 @@ px_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
 		 */
 		px_cpr_rem_callb(px_p);
 
-#ifdef	HOTPLUG
-		/*
-		 * Hot plug will be done later.
-		 */
-		if (px_p->hotplug_capable == B_TRUE) {
-			if (pxhp_uninit(dip) == DDI_FAILURE) {
+		if (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)
+			if (px_uninit_hotplug(dip) != DDI_SUCCESS) {
 				mutex_exit(&px_p->px_mutex);
 				return (DDI_FAILURE);
 			}
-		}
-#endif	/* HOTPLUG */
 
 		/*
 		 * things which used to be done in obj_destroy
@@ -529,6 +533,8 @@ px_pwr_setup(dev_info_t *dip)
 	mutex_init(&px_p->px_l23ready_lock, NULL, MUTEX_DRIVER,
 	    DDI_INTR_PRI(px_pwr_pil));
 	cv_init(&px_p->px_l23ready_cv, NULL, CV_DRIVER, NULL);
+
+
 
 	/* Initilize handle */
 	hdl.ih_cb_arg1 = px_p;
@@ -1303,4 +1309,79 @@ px_intr_ops(dev_info_t *dip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	}
 
 	return (ret);
+}
+
+static uint_t
+px_init_hotplug(px_t *px_p)
+{
+	px_bus_range_t bus_range;
+	dev_info_t *dip;
+	pciehpc_regops_t regops;
+
+	dip = px_p->px_dip;
+
+	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "hotplug-capable") == 0)
+		return (DDI_FAILURE);
+
+	/*
+	 * Before initializing hotplug - open up bus range.  The busra
+	 * module will initialize its pool of bus numbers from this.
+	 * "busra" will be the agent that keeps track of them during
+	 * hotplug.  Also, note, that busra will remove any bus numbers
+	 * already in use from boot time.
+	 */
+	if (ddi_prop_exists(DDI_DEV_T_ANY, dip, DDI_PROP_DONTPASS,
+	    "bus-range") == 0) {
+		cmn_err(CE_WARN, "%s%d: bus-range not found\n",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+#ifdef	DEBUG
+		bus_range.lo = 0x0;
+		bus_range.hi = 0xff;
+
+		if (ndi_prop_update_int_array(DDI_DEV_T_NONE,
+		    dip, "bus-range", (int *)&bus_range, 2)
+		    != DDI_PROP_SUCCESS) {
+			return (DDI_FAILURE);
+		}
+#else
+		return (DDI_FAILURE);
+#endif
+	}
+
+	if (px_lib_hotplug_init(dip, (void *)&regops) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (pciehpc_init(dip, &regops) != DDI_SUCCESS) {
+		px_lib_hotplug_uninit(dip);
+		return (DDI_FAILURE);
+	}
+
+	if (pcihp_init(dip) != DDI_SUCCESS) {
+		(void) pciehpc_uninit(dip);
+		px_lib_hotplug_uninit(dip);
+		return (DDI_FAILURE);
+	}
+
+	if (pcihp_get_cb_ops() != NULL) {
+		DBG(DBG_ATTACH, dip, "%s%d hotplug enabled",
+		    ddi_driver_name(dip), ddi_get_instance(dip));
+		px_p->px_dev_caps |= PX_HOTPLUG_CAPABLE;
+	}
+
+	return (DDI_SUCCESS);
+}
+
+static uint_t
+px_uninit_hotplug(dev_info_t *dip)
+{
+	if (pcihp_uninit(dip) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	if (pciehpc_uninit(dip) != DDI_SUCCESS)
+		return (DDI_FAILURE);
+
+	px_lib_hotplug_uninit(dip);
+
+	return (DDI_SUCCESS);
 }

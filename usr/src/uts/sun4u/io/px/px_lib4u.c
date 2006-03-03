@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -42,6 +42,7 @@
 #include <sys/cpuvar.h>
 #include <sys/ivintr.h>
 #include <sys/byteorder.h>
+#include <sys/hotplug/pci/pciehpc.h>
 #include <px_obj.h>
 #include <pcie_pwr.h>
 #include <px_regs.h>
@@ -2024,4 +2025,17 @@ void
 px_cpr_rem_callb(px_t *px_p)
 {
 	(void) callb_delete(px_p->px_cprcb_id);
+}
+
+/*ARGSUSED*/
+int
+px_lib_hotplug_init(dev_info_t *dip, void *arg)
+{
+	return (DDI_ENOTSUP);
+}
+
+/*ARGSUSED*/
+void
+px_lib_hotplug_uninit(dev_info_t *dip)
+{
 }

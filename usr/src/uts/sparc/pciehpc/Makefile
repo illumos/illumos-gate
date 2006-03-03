@@ -20,15 +20,15 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/fcpci/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# uts/sparc/pciehpc/Makefile
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the ebus driver kernel module
-#
-#	sun4u implementation architecture dependent
+#	This makefile drives the production of the kernel/misc/pciehpc module
+#	(PCIe hotplug controller module) for PCIe hotplug support in PCIe nexus
+#	drivers.
 #
 
 #
@@ -39,15 +39,15 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= fcpci
-OBJECTS		= $(FCPCI_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(FCPCI_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_MISC_DIR)/$(MODULE)
+MODULE		= pciehpc
+OBJECTS		= $(PCIEHPCNEXUS_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCIEHPCNEXUS_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
-#
-include $(UTSBASE)/sun4u/Makefile.sun4u
+
+include $(UTSBASE)/sparc/Makefile.sparc
 
 #
 #	Define targets
@@ -56,18 +56,9 @@ ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
-# Turn this on once compiler understands v9 in it's backend
-#INLINES		+= $(UTSBASE)/sun4/io/fcode.il
-
 #
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
-
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
+#	Dependency
+LDFLAGS		+= -dy -Nmisc/hpcsvc -Nmisc/pcie
 
 #
 #	Default build targets.
@@ -93,4 +84,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sun4u/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ

@@ -50,6 +50,7 @@ SUN4_HDRS=			\
 	eeprom.h		\
 	errclassify.h		\
 	fcode.h			\
+	fc_plat.h		\
 	idprom.h		\
 	intr.h			\
 	intreg.h		\
@@ -80,7 +81,6 @@ HDRS=	\
 	envctrl_ue250.h		\
 	envctrl_ue450.h		\
 	gpio_87317.h		\
-	fc_plat.h		\
 	iocache.h		\
 	iommu.h			\
 	machasi.h		\

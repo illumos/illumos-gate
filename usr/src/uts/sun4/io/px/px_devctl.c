@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -82,6 +82,8 @@ static int
 px_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 {
 	px_t *px_p;
+	int rval;
+	uint_t orig_px_soft_state;
 
 	/*
 	 * Make sure the open is for the right file type.
@@ -101,6 +103,7 @@ px_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 	 */
 	DBG(DBG_OPEN, px_p->px_dip, "devp=%x: flags=%x\n", devp, flags);
 	mutex_enter(&px_p->px_mutex);
+	orig_px_soft_state = px_p->px_soft_state;
 	if (flags & FEXCL) {
 		if (px_p->px_soft_state != PX_SOFT_STATE_CLOSED) {
 			mutex_exit(&px_p->px_mutex);
@@ -116,6 +119,15 @@ px_open(dev_t *devp, int flags, int otyp, cred_t *credp)
 		}
 		px_p->px_soft_state = PX_SOFT_STATE_OPEN;
 	}
+
+	if (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)
+		if (rval = (pcihp_get_cb_ops())->cb_open(devp, flags,
+		    otyp, credp)) {
+			px_p->px_soft_state = orig_px_soft_state;
+			mutex_exit(&px_p->px_mutex);
+			return (rval);
+		}
+
 	px_p->px_open_count++;
 	mutex_exit(&px_p->px_mutex);
 	return (0);
@@ -127,6 +139,7 @@ static int
 px_close(dev_t dev, int flags, int otyp, cred_t *credp)
 {
 	px_t *px_p;
+	int rval;
 
 	if (otyp != OTYP_CHR)
 		return (EINVAL);
@@ -137,6 +150,14 @@ px_close(dev_t dev, int flags, int otyp, cred_t *credp)
 
 	DBG(DBG_CLOSE, px_p->px_dip, "dev=%x: flags=%x\n", dev, flags);
 	mutex_enter(&px_p->px_mutex);
+
+	if (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)
+		if (rval = (pcihp_get_cb_ops())->cb_close(dev, flags,
+		    otyp, credp)) {
+			mutex_exit(&px_p->px_mutex);
+			return (rval);
+		}
+
 	px_p->px_soft_state = PX_SOFT_STATE_CLOSED;
 	px_p->px_open_count = 0;
 	mutex_exit(&px_p->px_mutex);
@@ -230,6 +251,9 @@ px_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp, int *rvalp)
 		return (rv);
 
 	default:
+		if (px_p->px_dev_caps & PX_HOTPLUG_CAPABLE)
+			return ((pcihp_get_cb_ops())->cb_ioctl(dev, cmd,
+			    arg, mode, credp, rvalp));
 		break;
 	}
 

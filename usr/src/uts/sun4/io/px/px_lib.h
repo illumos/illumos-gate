@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -209,6 +209,12 @@ extern void px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
  */
 extern void px_cpr_add_callb(px_t *);
 extern void px_cpr_rem_callb(px_t *);
+
+/*
+ * Hotplug functions
+ */
+extern int px_lib_hotplug_init(dev_info_t *dip, void *regops);
+extern void px_lib_hotplug_uninit(dev_info_t *dip);
 
 #ifdef	__cplusplus
 }

@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -68,6 +68,7 @@ FD_OBJS	+=	fd_asm.o
 CPR_SPARC_OBJS +=	cpr_sparc.o
 PCI_PCI_OBJS +=		pci_pci.o pci_debug.o pci_pwr.o pcix.o
 PX_PCI_OBJS +=		px_pci.o px_debug.o pcie_pwr.o
+FCODE_OBJS +=		fcode.o
 
 #
 #			file system modules
@@ -90,6 +91,9 @@ KRTLD_OBJS +=		\
 	kobj_reloc.o
 
 SWAPGENERIC_OBJS += swapgeneric.o
+PCICFG_E_OBJS	+= pcicfg.e.o
+FCPCI_OBJS	+= fcpci.o
+FCODEM_OBJS	+= fc_ddi.o fc_physio.o fc_ops.o fc_subr.o
 
 #
 #			special files

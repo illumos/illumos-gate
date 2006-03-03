@@ -21,8 +21,9 @@
 #
 #
 # uts/sun4u/daktari/Makefile
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -85,13 +86,7 @@ install: 	$(ROOT_DAKTARI_DIR) $(USR_DAKTARI_DIR) \
 		$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/include) \
 		$(LINKED_PLATFORMS:%=$(USR_PLAT_DIR)/%/sbin) \
 		$(DAKTARI_CRYPTO_LINKS) \
-		.WAIT $(DAKTARI_KMODS) \
-		pcicfg
-
-pcicfg:		$(ROOT_PSM_MISC_DIR_64)/pcicfg.e
-		-@$(RM) $(ROOT_DAKTARI_MISC_DIR_64)/$@
-		$(SYMLINK) ../../../../sun4u/kernel/misc/sparcv9/pcicfg.e \
-		$(ROOT_DAKTARI_MISC_DIR_64)/$@
+		.WAIT $(DAKTARI_KMODS)
 
 $(DAKTARI_CRYPTO_LINKS): $(ROOT_DAKTARI_CRYPTO_DIR_64)
 	-$(RM) $(ROOT_DAKTARI_CRYPTO_DIR_64)/$@;

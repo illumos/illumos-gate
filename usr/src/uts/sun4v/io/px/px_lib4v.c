@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -40,6 +40,7 @@
 #include <sys/hypervisor_api.h>
 #include <px_obj.h>
 #include <sys/machsystm.h>
+#include <sys/hotplug/pci/pcihp.h>
 #include "px_lib4v.h"
 #include "px_err.h"
 
@@ -72,6 +73,14 @@ px_lib_dev_init(dev_info_t *dip, devhandle_t *dev_hdl)
 
 	ddi_prop_free(rp);
 
+	/*
+	 * hotplug implementation requires this property to be associated with
+	 * any indirect PCI config access services
+	 */
+	(void) ddi_prop_update_int(makedevice(ddi_driver_major(dip),
+	    PCIHP_AP_MINOR_NUM(ddi_get_instance(dip), PCIHP_DEVCTL_MINOR)), dip,
+	    PCI_BUS_CONF_MAP_PROP, 1);
+
 	DBG(DBG_ATTACH, dip, "px_lib_dev_init: dev_hdl 0x%llx\n", *dev_hdl);
 
 	return (DDI_SUCCESS);
@@ -82,6 +91,10 @@ int
 px_lib_dev_fini(dev_info_t *dip)
 {
 	DBG(DBG_DETACH, dip, "px_lib_dev_fini: dip 0x%p\n", dip);
+
+	(void) ddi_prop_remove(makedevice(ddi_driver_major(dip),
+	    PCIHP_AP_MINOR_NUM(ddi_get_instance(dip), PCIHP_DEVCTL_MINOR)), dip,
+	    PCI_BUS_CONF_MAP_PROP);
 
 	return (DDI_SUCCESS);
 }
@@ -1822,6 +1835,19 @@ px_fab_set(px_t *px_p, pcie_req_id_t bdf, uint16_t offset,
 	wdata.qw = (uint32_t)val;
 	(void) hvio_config_put(px_p->px_dev_hdl,
 	    (bdf << PX_RA_BDF_SHIFT), offset, 4, wdata);
+}
+
+/*ARGSUSED*/
+int
+px_lib_hotplug_init(dev_info_t *dip, void *arg)
+{
+	return (DDI_ENOTSUP);
+}
+
+/*ARGSUSED*/
+void
+px_lib_hotplug_uninit(dev_info_t *dip)
+{
 }
 
 /* Dummy cpr add callback */

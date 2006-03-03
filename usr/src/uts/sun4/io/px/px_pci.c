@@ -37,11 +37,19 @@
 #include <sys/autoconf.h>
 #include <sys/ddi_impldefs.h>
 #include <sys/ddi_subrdefs.h>
+#include <sys/time.h>
+#include <sys/proc.h>
+#include <sys/thread.h>
+#include <sys/disp.h>
+#include <sys/condvar.h>
+#include <sys/callb.h>
 #include <sys/pcie.h>
 #include <sys/pcie_impl.h>
 #include <sys/ddi.h>
 #include <sys/sunndi.h>
 #include <sys/hotplug/pci/pcihp.h>
+#include <sys/hotplug/pci/pciehpc.h>
+#include <sys/hotplug/pci/pcishpc.h>
 #include <sys/open.h>
 #include <sys/stat.h>
 #include <sys/file.h>
@@ -49,12 +57,13 @@
 #include "px_pci.h"
 #include "px_debug.h"
 
+/* Tunables. Beware: Some are for debug purpose only. */
 /*
  * PXB MSI tunable:
  *
  * By default MSI is enabled on all supported platforms.
  */
-boolean_t pxb_enable_msi = B_TRUE;
+boolean_t pxb_enable_msi = B_TRUE; /* MSI enabled by default, otherwise INTX */
 
 static int pxb_bus_map(dev_info_t *, dev_info_t *, ddi_map_req_t *,
 	off_t, off_t, caddr_t *);
@@ -72,6 +81,11 @@ static int pxb_fm_init_child(dev_info_t *dip, dev_info_t *cdip, int cap,
     ddi_iblock_cookie_t *ibc_p);
 static int pxb_fm_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
     const void *impl_data);
+
+static int ppb_pcie_device_type(pxb_devstate_t *pxb_p);
+#ifdef	PRINT_PLX_SEEPROM_CRC
+static void pxb_print_plx_seeprom_crc_data(pxb_devstate_t *pxb_p);
+#endif
 
 struct bus_ops pxb_bus_ops = {
 	BUSO_REV,
@@ -142,6 +156,17 @@ static int pxb_pwr_setup(dev_info_t *dip);
 static int pxb_pwr_init_and_raise(dev_info_t *dip, pcie_pwr_t *pwr_p);
 static void pxb_pwr_teardown(dev_info_t *dip);
 
+static int pxb_get_cap(ddi_acc_handle_t config_handle, uint8_t cap_id);
+static uint16_t pxb_find_ext_cap_reg(ddi_acc_handle_t config_handle,
+	uint16_t cap_id);
+static int pxb_bad_func(pxb_devstate_t *pxb, int func);
+static int pxb_check_bad_devs(pxb_devstate_t *pxb, int vend);
+
+/* Hotplug related functions */
+static int pxb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
+static int pxb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle);
+static void pxb_init_hotplug(pxb_devstate_t *pxb);
+
 struct dev_ops pxb_ops = {
 	DEVO_REV,		/* devo_rev */
 	0,			/* refcnt  */
@@ -162,7 +187,7 @@ struct dev_ops pxb_ops = {
 
 static struct modldrv modldrv = {
 	&mod_driverops, /* Type of module */
-	"PCIe/PCI nexus driver %I%",
+	"PCIe/PCI nexus driver 1.29",
 	&pxb_ops,   /* driver ops */
 };
 
@@ -188,11 +213,12 @@ int pxb_tlp_count = 64;
 static int pxb_intr_init(pxb_devstate_t *pxb, int intr_type);
 static void pxb_intr_fini(pxb_devstate_t *pxb);
 static uint_t pxb_intr(caddr_t arg1, caddr_t arg2);
+static int pxb_intr_attach(pxb_devstate_t *pxb);
+
 static int pxb_get_port_type(dev_info_t *dip, ddi_acc_handle_t config_handle);
 static void pxb_removechild(dev_info_t *);
 static int pxb_initchild(dev_info_t *child);
 static dev_info_t *get_my_childs_dip(dev_info_t *dip, dev_info_t *rdip);
-static void pxb_init_hotplug(pxb_devstate_t *pxb);
 static void pxb_create_ranges_prop(dev_info_t *, ddi_acc_handle_t);
 
 int
@@ -262,7 +288,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	int			instance;
 	pxb_devstate_t		*pxb;
 	ddi_acc_handle_t	config_handle;
-	int			intr_types;
+	char			device_type[8];
 
 	instance = ddi_get_instance(devi);
 
@@ -326,6 +352,7 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/* Save the vnedor id and device id */
 	pxb->pxb_vendor_id = pci_config_get16(config_handle, PCI_CONF_VENID);
 	pxb->pxb_device_id = pci_config_get16(config_handle, PCI_CONF_DEVID);
+	pxb->pxb_rev_id = pci_config_get8(config_handle, PCI_CONF_REVID);
 
 	/*
 	 * This is a software workaround to fix the Broadcom PCIe-PCI bridge
@@ -356,13 +383,8 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 		goto fail;
 	}
 
-	if ((pxb_fm_init(pxb)) != DDI_SUCCESS) {
-		DBG(DBG_ATTACH, devi, "Failed in px_pci_fm_attach\n");
-		goto fail;
-	}
-	pxb->pxb_init_flags |= PXB_INIT_FM;
-
 	pxb->pxb_port_type = pxb_get_port_type(devi, config_handle);
+
 	if ((pxb->pxb_port_type != PX_CAP_REG_DEV_TYPE_UP) &&
 	    (pxb->pxb_port_type != PX_CAP_REG_DEV_TYPE_DOWN) &&
 	    (pxb->pxb_port_type != PX_CAP_REG_DEV_TYPE_PCIE2PCI) &&
@@ -374,8 +396,12 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	/*
 	 * Make sure the "device_type" property exists.
 	 */
+	if (ppb_pcie_device_type(pxb) == DDI_SUCCESS)
+		(void) strcpy(device_type, "pciex");
+	else
+		(void) strcpy(device_type, "pci");
 	(void) ddi_prop_update_string(DDI_DEV_T_NONE, devi,
-	    "device_type", "pciex");
+	    "device_type", device_type);
 
 	/*
 	 * Check whether the "ranges" property is present.
@@ -388,32 +414,6 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	}
 
 	/*
-	 * Initialize interrupt handlers.
-	 * If both MSI and FIXED are supported, try to attach MSI first.
-	 * If MSI fails for any reason, then try FIXED, but only allow one
-	 * type to be attached.
-	 */
-	if (ddi_intr_get_supported_types(devi, &intr_types) != DDI_SUCCESS) {
-		DBG(DBG_ATTACH, devi, "ddi_intr_get_supported_types failed\n");
-		goto fail;
-	}
-
-	if ((intr_types & DDI_INTR_TYPE_MSI) && pxb_enable_msi) {
-		if (pxb_intr_init(pxb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
-			intr_types = DDI_INTR_TYPE_MSI;
-		else
-			DBG(DBG_ATTACH, devi, "Unable to attach MSI handler\n");
-	}
-
-	if (intr_types & DDI_INTR_TYPE_FIXED) {
-		if (pxb_intr_init(pxb, DDI_INTR_TYPE_FIXED) != DDI_SUCCESS) {
-			DBG(DBG_ATTACH, devi,
-			    "Unable to attach INTx handler\n");
-			goto fail;
-		}
-	}
-
-	/*
 	 * Initialize hotplug support on this bus. At minimum
 	 * (for non hotplug bus) this would create ":devctl" minor
 	 * node to support DEVCTL_DEVICE_* and DEVCTL_BUS_* ioctls
@@ -421,7 +421,23 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	 * slots and successfully initializes Hot Plug Framework.
 	 */
 	pxb->pxb_hotplug_capable = B_FALSE;
-	pxb_init_hotplug(pxb);
+
+	if ((pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_DOWN) ||
+	    (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCIE2PCI) ||
+	    (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCI2PCIE)) {
+		pxb_init_hotplug(pxb);
+	}
+
+	/* attach interrupt only if hotplug functionality is required */
+	if (pxb->pxb_hotplug_capable != B_FALSE) {
+		if (pxb_intr_attach(pxb) != DDI_SUCCESS)
+			goto fail;
+	}
+#ifdef	PRINT_PLX_SEEPROM_CRC
+	/* check seeprom CRC to ensure the platform config is right */
+	(void) pxb_print_plx_seeprom_crc_data(pxb);
+#endif
+
 	if (pxb->pxb_hotplug_capable == B_FALSE) {
 		/*
 		 * create minor node for devctl interfaces
@@ -435,6 +451,12 @@ pxb_attach(dev_info_t *devi, ddi_attach_cmd_t cmd)
 	DBG(DBG_ATTACH, devi,
 	    "pxb_attach(): this nexus %s hotplug slots\n",
 	    pxb->pxb_hotplug_capable == B_TRUE ? "has":"has no");
+
+	if ((pxb_fm_init(pxb)) != DDI_SUCCESS) {
+		DBG(DBG_ATTACH, devi, "Failed in px_pci_fm_attach\n");
+		goto fail;
+	}
+	pxb->pxb_init_flags |= PXB_INIT_FM;
 
 	ddi_report_dev(devi);
 
@@ -463,16 +485,22 @@ pxb_detach(dev_info_t *devi, ddi_detach_cmd_t cmd)
 		pxb = (pxb_devstate_t *)
 		    ddi_get_soft_state(pxb_state, ddi_get_instance(devi));
 
-		if (pxb->pxb_hotplug_capable == B_TRUE)
+		if (pxb->pxb_hotplug_capable == B_TRUE) {
 			if (pcihp_uninit(devi) == DDI_FAILURE)
 				error = DDI_FAILURE;
+
+			if (pxb->pxb_hpc_type == HPC_PCIE)
+				(void) pciehpc_uninit(devi);
+			else if (pxb->pxb_hpc_type == HPC_SHPC)
+				(void) pcishpc_uninit(devi);
+		}
 		else
 			ddi_remove_minor_node(devi, "devctl");
 
 		(void) ddi_prop_remove(DDI_DEV_T_NONE, devi, "device_type");
 
-		pxb_intr_fini(pxb);
-
+		if (pxb->pxb_hotplug_capable != B_FALSE)
+			pxb_intr_fini(pxb);
 		if (pxb->pxb_init_flags & PXB_INIT_FM)
 			pxb_fm_fini(pxb);
 
@@ -881,8 +909,13 @@ pxb_initchild(dev_info_t *child)
 	 * optimized out.
 	 */
 	if ((!pxb_tlp_count) ||
-	    (pxb->pxb_vendor_id != PXB_VENDOR_PLX) ||
-	    ((pxb->pxb_device_id != PXB_DEVICE_PLX_8532) &&
+	    ((pxb->pxb_vendor_id != PXB_VENDOR_SUN) &&
+		(pxb->pxb_vendor_id != PXB_VENDOR_PLX)) ||
+	    ((pxb->pxb_vendor_id == PXB_VENDOR_SUN) &&
+		(pxb->pxb_device_id != PXB_DEVICE_PLX_PCIX) &&
+		(pxb->pxb_device_id != PXB_DEVICE_PLX_PCIE)) ||
+	    ((pxb->pxb_vendor_id == PXB_VENDOR_PLX) &&
+		(pxb->pxb_device_id != PXB_DEVICE_PLX_8532) &&
 		(pxb->pxb_device_id != PXB_DEVICE_PLX_8516))) {
 		/* Workaround not needed return success */
 		result = DDI_SUCCESS;
@@ -906,6 +939,46 @@ done:
 	return (result);
 }
 
+static int
+pxb_intr_attach(pxb_devstate_t *pxb)
+{
+	int			intr_types;
+	dev_info_t		*devi;
+	uint8_t			bad_msi_dev = 0;
+
+	devi = pxb->pxb_dip;
+	/*
+	 * Initialize interrupt handlers.
+	 * If both MSI and FIXED are supported, try to attach MSI first.
+	 * If MSI fails for any reason, then try FIXED, but only allow one
+	 * type to be attached.
+	 */
+	if (ddi_intr_get_supported_types(devi, &intr_types) != DDI_SUCCESS) {
+		DBG(DBG_ATTACH, devi, "ddi_intr_get_supported_types failed\n");
+		return (DDI_FAILURE);
+	}
+
+	if (pxb_bad_func(pxb, PXB_MSI))
+		bad_msi_dev = 1;
+
+	if ((intr_types & DDI_INTR_TYPE_MSI) && pxb_enable_msi &&
+				!bad_msi_dev) {
+		if (pxb_intr_init(pxb, DDI_INTR_TYPE_MSI) == DDI_SUCCESS)
+			intr_types = DDI_INTR_TYPE_MSI;
+		else
+			DBG(DBG_ATTACH, devi, "Unable to attach MSI handler\n");
+	}
+
+	if (intr_types & DDI_INTR_TYPE_FIXED) {
+		if (pxb_intr_init(pxb, DDI_INTR_TYPE_FIXED) != DDI_SUCCESS) {
+			DBG(DBG_ATTACH, devi,
+			    "Unable to attach INTx handler\n");
+			return (DDI_FAILURE);
+		}
+	}
+	return (DDI_SUCCESS);
+}
+
 /*
  * This function initializes internally generated interrupts only.
  * It does not affect any interrupts generated by downstream devices
@@ -917,7 +990,8 @@ done:
  * device might not ask for any interrupts.
  */
 static int
-pxb_intr_init(pxb_devstate_t *pxb, int intr_type) {
+pxb_intr_init(pxb_devstate_t *pxb, int intr_type)
+{
 	dev_info_t	*dip = pxb->pxb_dip;
 	int		request, count, x;
 	int		ret;
@@ -1055,8 +1129,9 @@ fail:
 	return (DDI_FAILURE);
 }
 
-static
-void pxb_intr_fini(pxb_devstate_t *pxb) {
+static void
+pxb_intr_fini(pxb_devstate_t *pxb)
+{
 	int x;
 	int count = pxb->pxb_intr_count;
 	int flags = pxb->pxb_init_flags;
@@ -1093,21 +1168,30 @@ void pxb_intr_fini(pxb_devstate_t *pxb) {
  */
 /*ARGSUSED*/
 static uint_t
-pxb_intr(caddr_t arg1, caddr_t arg2) {
+pxb_intr(caddr_t arg1, caddr_t arg2)
+{
 	pxb_devstate_t	*pxb = (pxb_devstate_t *)arg1;
 	dev_info_t	*dip = pxb->pxb_dip;
+	int rval = DDI_INTR_UNCLAIMED;
 
-	cmn_err(CE_WARN,
-	    "%s%d: Received %s Interrupt\n",
-	    ddi_driver_name(dip),
-	    ddi_get_instance(dip),
-	    (pxb->pxb_intr_type == DDI_INTR_TYPE_MSI) ? "MSI" : "INTx");
+	if (pxb->pxb_hotplug_capable == B_TRUE) {
+		if (pxb->pxb_hpc_type == HPC_PCIE)
+			rval = pciehpc_intr(pxb->pxb_dip);
+		else
+		if (pxb->pxb_hpc_type == HPC_SHPC)
+			rval = pcishpc_intr(pxb->pxb_dip);
+	}
+	if ((rval == DDI_INTR_UNCLAIMED) && (pxb->pxb_intr_type ==
+			DDI_INTR_TYPE_MSI))
+		cmn_err(CE_WARN, "%s%d: Cannot handle interrupt",
+			ddi_driver_name(dip), ddi_get_instance(dip));
 
-	return (DDI_INTR_UNCLAIMED);
+	return (rval);
 }
 
-static
-int pxb_get_port_type(dev_info_t *dip, ddi_acc_handle_t config_handle) {
+static int
+pxb_get_port_type(dev_info_t *dip, ddi_acc_handle_t config_handle)
+{
 	ushort_t	caps_ptr, cap;
 	int		port_type = PX_CAP_REG_DEV_TYPE_PCIE_DEV;
 
@@ -1168,10 +1252,41 @@ pxb_removechild(dev_info_t *dip)
 static void
 pxb_init_hotplug(pxb_devstate_t *pxb)
 {
-	/*
-	 * Hot plug support to be decided.
-	 */
+	int rv;
 
+	pxb->pxb_hpc_type = HPC_NONE;
+
+	if (((pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_DOWN) ||
+	    (pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCI2PCIE)) &&
+	    (pxb_pciehpc_probe(pxb->pxb_dip,
+	    pxb->pxb_config_handle) == DDI_SUCCESS)) {
+		rv = pciehpc_init(pxb->pxb_dip, NULL);
+		if (rv == DDI_SUCCESS)
+			pxb->pxb_hpc_type = HPC_PCIE;
+	} else if ((pxb->pxb_port_type == PX_CAP_REG_DEV_TYPE_PCIE2PCI) &&
+		    (pxb_pcishpc_probe(pxb->pxb_dip,
+		    pxb->pxb_config_handle) == DDI_SUCCESS)) {
+		rv = pcishpc_init(pxb->pxb_dip);
+		if (rv == DDI_SUCCESS)
+			pxb->pxb_hpc_type = HPC_SHPC;
+	}
+
+	if (pxb->pxb_hpc_type != HPC_NONE) {
+		if (pcihp_init(pxb->pxb_dip) != DDI_SUCCESS) {
+			if (pxb->pxb_hpc_type == HPC_PCIE)
+				(void) pciehpc_uninit(pxb->pxb_dip);
+			else if (pxb->pxb_hpc_type == HPC_SHPC)
+				(void) pcishpc_uninit(pxb->pxb_dip);
+
+			pxb->pxb_hpc_type = HPC_NONE;
+			cmn_err(CE_WARN,
+			    "%s%d: Failed setting hotplug framework",
+			    ddi_driver_name(pxb->pxb_dip),
+			    ddi_get_instance(pxb->pxb_dip));
+		}
+	}
+
+	pxb->pxb_hotplug_capable = (pxb->pxb_hpc_type != HPC_NONE);
 }
 
 static void
@@ -1442,9 +1557,12 @@ pxb_pwr_setup(dev_info_t *dip)
 	 * Due to PLX erratum #34, we can't allow the downstream device
 	 * go to non-D0 state.
 	 */
-	if ((pxb->pxb_vendor_id == PXB_VENDOR_PLX) &&
-	    ((pxb->pxb_device_id == PXB_DEVICE_PLX_8516) ||
-	    (pxb->pxb_device_id == PXB_DEVICE_PLX_8532))) {
+	if (((pxb->pxb_vendor_id == PXB_VENDOR_SUN) &&
+		((pxb->pxb_device_id == PXB_DEVICE_PLX_PCIX) ||
+		(pxb->pxb_device_id == PXB_DEVICE_PLX_PCIE))) ||
+	    ((pxb->pxb_vendor_id == PXB_VENDOR_PLX) &&
+		((pxb->pxb_device_id == PXB_DEVICE_PLX_8516) ||
+		(pxb->pxb_device_id == PXB_DEVICE_PLX_8532)))) {
 		DBG(DBG_PWR, dip, "pxb_pwr_setup: PLX8532/PLX8516 found "
 		    "disabling PM\n");
 		pwr_p->pwr_func_lvl = PM_LEVEL_D0;
@@ -1601,7 +1719,8 @@ pxb_fm_init(pxb_devstate_t *pxb_p)
 	/*
 	 * Register error callback with our parent.
 	 */
-	ddi_fm_handler_register(pxb_p->pxb_dip, pxb_fm_err_callback, NULL);
+	ddi_fm_handler_register(pxb_p->pxb_dip, pxb_fm_err_callback,
+	    (void *)&pxb_p->pxb_config_handle);
 	return (DDI_SUCCESS);
 }
 
@@ -1636,20 +1755,24 @@ pxb_fm_init_child(dev_info_t *dip, dev_info_t *cdip, int cap,
 }
 
 /*
- * Error callback handler.
+ * FMA Error callback handler.
+ * Need to revisit when pcie fm is supported.
  */
 /*ARGSUSED*/
 static int
 pxb_fm_err_callback(dev_info_t *dip, ddi_fm_error_t *derr,
     const void *impl_data)
 {
-	/* Need to revisit when pcie fm is supported */
 	uint16_t pci_cfg_stat, pci_cfg_sec_stat;
+	int ret;
+	ddi_acc_handle_t hdl = *(ddi_acc_handle_t *)impl_data;
 
 	pci_ereport_post(dip, derr, &pci_cfg_stat);
 	pci_bdg_ereport_post(dip, derr, &pci_cfg_sec_stat);
-	return (pci_bdg_check_status(dip, derr, pci_cfg_stat,
-	    pci_cfg_sec_stat));
+	ret = pci_bdg_check_status(dip, derr, pci_cfg_stat, pci_cfg_sec_stat);
+	/* do this till Fabric FMA is in place. */
+	pcie_clear_errors(dip, hdl);
+	return (ret);
 }
 
 /*
@@ -1666,4 +1789,278 @@ pxb_pwr_teardown(dev_info_t *dip)
 	(void) ddi_prop_remove(DDI_DEV_T_NONE, dip, "pm-components");
 	if (pwr_p->pwr_conf_hdl)
 		pci_config_teardown(&pwr_p->pwr_conf_hdl);
+}
+
+/*ARGSUSED*/
+static int pxb_pciehpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle)
+{
+	uint16_t status;
+	uint8_t cap_ptr, cap_id;
+
+	status = pci_config_get16(config_handle, PCI_CONF_STAT);
+
+	if (!(status & PCI_STAT_CAP))
+		cap_ptr = PCI_CAP_NEXT_PTR_NULL;
+	else {
+		cap_ptr = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
+		cap_ptr &= 0xFC;
+	}
+
+	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
+		cap_id = pci_config_get8(config_handle, cap_ptr);
+
+		if (cap_id == PCI_CAP_ID_PCI_E) {
+			uint16_t slotimpl;
+
+			slotimpl = pci_config_get16(config_handle, cap_ptr +
+				PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
+			if (slotimpl)
+				if (pci_config_get32(config_handle, cap_ptr +
+						PCIE_SLOTCAP) &
+						PCIE_SLOTCAP_HP_CAPABLE)
+					break;
+		}
+
+		cap_ptr = pci_config_get8(config_handle, cap_ptr +
+				PCI_CAP_NEXT_PTR);
+		cap_ptr &= 0xFC;
+	}
+
+	return ((cap_ptr != PCI_CAP_NEXT_PTR_NULL) ? DDI_SUCCESS : DDI_FAILURE);
+}
+
+/*ARGSUSED*/
+static int pxb_pcishpc_probe(dev_info_t *dip, ddi_acc_handle_t config_handle)
+{
+	uint16_t status;
+	uint8_t cap_ptr, cap_id;
+
+	status = pci_config_get16(config_handle, PCI_CONF_STAT);
+
+	if (!(status & PCI_STAT_CAP))
+		cap_ptr = PCI_CAP_NEXT_PTR_NULL;
+	else {
+		cap_ptr = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
+		cap_ptr &= 0xFC;
+	}
+
+	while (cap_ptr != PCI_CAP_NEXT_PTR_NULL) {
+		cap_id = pci_config_get8(config_handle, cap_ptr);
+
+		if (cap_id == PCI_CAP_ID_PCI_HOTPLUG)
+			break;
+
+		cap_ptr = pci_config_get8(config_handle, cap_ptr +
+			PCI_CAP_NEXT_PTR);
+		cap_ptr &= 0xFC;
+	}
+
+	return ((cap_ptr != PCI_CAP_NEXT_PTR_NULL) ? DDI_SUCCESS : DDI_FAILURE);
+}
+
+/* check if this device has PCIe link underneath. */
+static int
+ppb_pcie_device_type(pxb_devstate_t *pxb_p)
+{
+	int port_type = pxb_p->pxb_port_type;
+
+	/* No PCIe CAP regs, we are not PCIe device_type */
+	if (port_type < 0)
+		return (DDI_FAILURE);
+
+	/* check for all PCIe device_types */
+	if ((port_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
+			(port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
+			(port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
+		return (DDI_SUCCESS);
+
+	return (DDI_FAILURE);
+}
+
+#ifdef	PRINT_PLX_SEEPROM_CRC
+static void
+pxb_print_plx_seeprom_crc_data(pxb_devstate_t *pxb_p)
+{
+	ddi_acc_handle_t h;
+	dev_info_t *dip = pxb_p->pxb_dip;
+	int nregs;
+	caddr_t mp;
+	off_t bar_size;
+	ddi_device_acc_attr_t mattr = {
+		DDI_DEVICE_ATTR_V0,
+		DDI_STRUCTURE_LE_ACC,
+		DDI_STRICTORDER_ACC
+	};
+	uint32_t addr_reg_off = 0x260, data_reg_off = 0x264, data = 0x6BE4;
+
+	if (pxb_p->pxb_vendor_id != PXB_VENDOR_PLX)
+		return;
+	if (ddi_dev_nregs(dip, &nregs) != DDI_SUCCESS)
+		return;
+	if (nregs < 2)	/* check for CONF entry only, no BARs */
+		return;
+	if (ddi_dev_regsize(dip, 1, &bar_size) != DDI_SUCCESS)
+		return;
+	if (ddi_regs_map_setup(dip, 1, (caddr_t *)&mp, 0, bar_size,
+			&mattr, &h) != DDI_SUCCESS)
+		return;
+	ddi_put32(h, (uint32_t *)((uchar_t *)mp + addr_reg_off), data);
+	delay(drv_usectohz(1000000));
+	printf("%s#%d: EEPROM StatusReg = %x, CRC = %x\n",
+		ddi_driver_name(dip), ddi_get_instance(dip),
+		ddi_get32(h, (uint32_t *)((uchar_t *)mp + addr_reg_off)),
+		ddi_get32(h, (uint32_t *)((uchar_t *)mp + data_reg_off)));
+#ifdef PLX_HOT_RESET_DISABLE
+	/* prevent hot reset from propogating downstream. */
+	data = ddi_get32(h, (uint32_t *)((uchar_t *)mp + 0x1DC));
+	ddi_put32(h, (uint32_t *)((uchar_t *)mp + 0x1DC), data | 0x80000);
+	delay(drv_usectohz(1000000));
+	printf("%s#%d: EEPROM 0x1DC prewrite=%x postwrite=%x\n",
+		ddi_driver_name(dip), ddi_get_instance(dip), data,
+		ddi_get32(h, (uint32_t *)((uchar_t *)mp + 0x1DC)));
+#endif
+	ddi_regs_map_free(&h);
+}
+#endif
+
+/*
+ * given a cap_id, return its cap_id location in config space
+ */
+static int
+pxb_get_cap(ddi_acc_handle_t config_handle, uint8_t cap_id)
+{
+	uint8_t curcap;
+	uint_t	cap_id_loc;
+	uint16_t	status;
+	int location = -1;
+
+	/*
+	 * Need to check the Status register for ECP support first.
+	 * Also please note that for type 1 devices, the
+	 * offset could change. Should support type 1 next.
+	 */
+	status = pci_config_get16(config_handle, PCI_CONF_STAT);
+	if (!(status & PCI_STAT_CAP)) {
+		return (-1);
+	}
+	cap_id_loc = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
+
+	/* Walk the list of capabilities */
+	while (cap_id_loc) {
+
+		curcap = pci_config_get8(config_handle, cap_id_loc);
+
+		if (curcap == cap_id) {
+			location = cap_id_loc;
+			break;
+		}
+		cap_id_loc = pci_config_get8(config_handle,
+		    cap_id_loc + 1);
+	}
+	return (location);
+}
+
+static uint16_t
+pxb_find_ext_cap_reg(ddi_acc_handle_t config_handle, uint16_t cap_id)
+{
+	uint32_t	hdr, hdr_next_ptr, hdr_cap_id;
+	uint16_t	offset = P2ALIGN(PCIE_EXT_CAP, 4);
+
+	hdr = pci_config_get32(config_handle, offset);
+	hdr_next_ptr = (hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
+		PCIE_EXT_CAP_NEXT_PTR_MASK;
+	hdr_cap_id = (hdr >> PCIE_EXT_CAP_ID_SHIFT) &
+		PCIE_EXT_CAP_ID_MASK;
+
+	while ((hdr_next_ptr != PCIE_EXT_CAP_NEXT_PTR_NULL) &&
+	    (hdr_cap_id != cap_id)) {
+		offset = P2ALIGN(hdr_next_ptr, 4);
+		hdr = pci_config_get32(config_handle, offset);
+		hdr_next_ptr = (hdr >> PCIE_EXT_CAP_NEXT_PTR_SHIFT) &
+			PCIE_EXT_CAP_NEXT_PTR_MASK;
+		hdr_cap_id = (hdr >> PCIE_EXT_CAP_ID_SHIFT) &
+			PCIE_EXT_CAP_ID_MASK;
+	}
+
+	if (hdr_cap_id == cap_id)
+		return (P2ALIGN(offset, 4));
+
+	return (PCIE_EXT_CAP_NEXT_PTR_NULL);
+}
+
+/* check for known bad functionality in devices */
+static int
+pxb_bad_func(pxb_devstate_t *pxb, int func)
+{
+	int ret = B_FALSE;
+
+	switch (func) {
+		/* some devices do not render MSI well. */
+		case PXB_MSI:
+			if (pxb_check_bad_devs(pxb, PXB_VENDOR_SUN) ||
+				pxb_check_bad_devs(pxb, PXB_VENDOR_PLX)) {
+
+				if (pxb->pxb_rev_id <=
+						PXB_DEVICE_PLX_BAD_MSI_REV)
+					ret = B_TRUE;
+			}
+			break;
+
+		case PXB_LINK_INIT:
+		/*
+		 * some devices require certain initialization sequence so
+		 * as to not get wedged.
+		 */
+
+		case PXB_HOTPLUG_MSGS:
+		/*
+		 * disable UR for 1.0a implementations where
+		 * hotplug messages sent downstream cause URs to be
+		 * detected causing error messages to be sent to the fabric.
+		 */
+			if (pxb_check_bad_devs(pxb, PXB_VENDOR_SUN) ||
+				pxb_check_bad_devs(pxb, PXB_VENDOR_PLX)) {
+
+				ret = B_TRUE;
+			}
+			if (func == PXB_HOTPLUG_MSGS)
+				ret = B_TRUE;
+			break;
+
+
+		default:
+			break;
+	}
+	return (ret);
+}
+
+/* check for known bad devices from a vendor */
+static int
+pxb_check_bad_devs(pxb_devstate_t *pxb, int vend)
+{
+	int ret = B_FALSE;
+
+	switch (vend) {
+		case PXB_VENDOR_SUN:
+			if ((pxb->pxb_vendor_id == PXB_VENDOR_SUN) &&
+					((pxb->pxb_device_id ==
+						PXB_DEVICE_PLX_PCIX) ||
+					(pxb->pxb_device_id ==
+						PXB_DEVICE_PLX_PCIE))) {
+				ret = B_TRUE;
+			}
+			break;
+		case PXB_VENDOR_PLX:
+			if ((pxb->pxb_vendor_id == PXB_VENDOR_PLX) &&
+					((pxb->pxb_device_id ==
+						PXB_DEVICE_PLX_8532) ||
+					(pxb->pxb_device_id ==
+						PXB_DEVICE_PLX_8516))) {
+				ret = B_TRUE;
+			}
+			break;
+		default:
+			break;
+	}
+	return (ret);
 }

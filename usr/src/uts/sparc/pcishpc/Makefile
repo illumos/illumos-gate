@@ -20,15 +20,15 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4u/fcode/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# uts/sparc/pcishpc/Makefile
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the ebus driver kernel module
-#
-#	sun4u implementation architecture dependent
+#	This makefile drives the production of the kernel/misc/pcishpc module
+#	(PCI SHPC hotplug controller module) for PCI hotplug support in PCI
+#	nexus drivers.
 #
 
 #
@@ -39,37 +39,26 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= fcode
-OBJECTS		= $(FCODE_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(FCODE_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
-CONF_SRCDIR	= $(UTSBASE)/sun4/io/efcode
-
+MODULE		= pcishpc
+OBJECTS		= $(PCISHPC_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(PCISHPC_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
-#
-include $(UTSBASE)/sun4u/Makefile.sun4u
+
+include $(UTSBASE)/sparc/Makefile.sparc
 
 #
 #	Define targets
 #
-ALL_TARGET	= $(BINARY) $(SRC_CONFFILE)
+ALL_TARGET	= $(BINARY)
 LINT_TARGET	= $(MODULE).lint
-INSTALL_TARGET	= $(BINARY) $(ROOTMODULE) $(ROOT_CONFFILE)
-
-# Turn this on once compiler understands v9 in it's backend
-#INLINES		+= $(UTSBASE)/sun4/io/fcode.il
+INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-# lint pass one enforcement
-#
-CFLAGS += $(CCVERBOSE)
-
-#
-# Turn on doubleword alignment for 64 bit registers
-#
-CFLAGS += -dalign
+#	Dependency
+LDFLAGS		+= -dy -Nmisc/hpcsvc
 
 #
 #	Default build targets.
@@ -95,4 +84,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/sun4u/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ

@@ -21,8 +21,9 @@
 #
 #
 # uts/sun4u/serengeti/Makefile
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -86,13 +87,7 @@ install:	$(ROOT_SERENGETI_DIR) $(USR_SERENGETI_DIR) \
 		$(USR_SERENGETI_LIB_DIR) \
 		$(SERENGETI_CRYPTO_LINKS) \
 		genassym unix .WAIT \
-		$(SERENGETI_KMODS) $(CLOSED_SERENGETI_KMODS) \
-		pcicfg
-
-pcicfg:		$(ROOT_PSM_MISC_DIR_64)/pcicfg.e $(ROOT_SERENGETI_MISC_DIR_64)
-		-@$(RM) $(ROOT_SERENGETI_MISC_DIR_64)/$@
-		$(SYMLINK) ../../../../sun4u/kernel/misc/sparcv9/pcicfg.e \
-		$(ROOT_SERENGETI_MISC_DIR_64)/$@
+		$(SERENGETI_KMODS) $(CLOSED_SERENGETI_KMODS)
 
 genassym unix $(SERENGETI_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

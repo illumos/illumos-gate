@@ -20,15 +20,16 @@
 # CDDL HEADER END
 #
 #
-# uts/sun4v/px/Makefile
+# uts/sparc/fcpci/Makefile
 #
 # Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
-#	This makefile drives the production of the px driver kernel module.
-#	sun4v implementation architecture dependent
+#	This makefile drives the production of the fcpci kernel misc module
+#
+#	sparc implementation architecture dependent
 #
 #
 #	Path to the base of the uts directory tree (usually /usr/src/uts).
@@ -38,21 +39,15 @@ UTSBASE	= ../..
 #
 #	Define the module and object file sets.
 #
-MODULE		= px
-OBJECTS		= $(PX_OBJS:%=$(OBJS_DIR)/%)
-LINTS		= $(PX_OBJS:%.o=$(LINTS_DIR)/%.ln)
-ROOTMODULE	= $(ROOT_PSM_DRV_DIR)/$(MODULE)
+MODULE		= fcpci
+OBJECTS		= $(FCPCI_OBJS:%=$(OBJS_DIR)/%)
+LINTS		= $(FCPCI_OBJS:%.o=$(LINTS_DIR)/%.ln)
+ROOTMODULE	= $(ROOT_MISC_DIR)/$(MODULE)
 
 #
 #	Include common rules.
 #
-include $(UTSBASE)/sun4v/Makefile.sun4v
-
-#
-#	Override defaults to build a unique, local modstubs.o.
-#
-MODSTUBS_DIR	= $(OBJS_DIR)
-CLEANFILES	+= $(MODSTUBS_O)
+include $(UTSBASE)/sparc/Makefile.sparc
 
 #
 #	Define targets
@@ -62,9 +57,12 @@ LINT_TARGET	= $(MODULE).lint
 INSTALL_TARGET	= $(BINARY) $(ROOTMODULE)
 
 #
-#	Include SUN4 specific headers files
+#	Include sun4 specific headers files
 #
-INC_PATH	+= -I$(UTSBASE)/sun4/io/px
+INC_PATH	+= -I$(UTSBASE)/sun4
+
+# Turn this on once compiler understands v9 in it's backend
+#INLINES		+= $(UTSBASE)/sun4/io/fcode.il
 
 #
 # lint pass one enforcement
@@ -76,10 +74,7 @@ CFLAGS += $(CCVERBOSE)
 #
 CFLAGS += -dalign
 
-#	Dependency
 #
-LDFLAGS += -dy -Nmisc/busra -Nmisc/pcie -Nmisc/pciehpc -Nmisc/pcihp
-
 #	Default build targets.
 #
 .KEEP_STATE:
@@ -103,4 +98,4 @@ install:	$(INSTALL_DEPS)
 #
 #	Include common targets.
 #
-include $(UTSBASE)/$(PLATFORM)/Makefile.targ
+include $(UTSBASE)/sparc/Makefile.targ

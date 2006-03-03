@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -37,20 +37,19 @@
 #include <sys/debug.h>
 #include <sys/modctl.h>
 #include <sys/autoconf.h>
-
 #include <sys/hwconf.h>
 #include <sys/ddi_impldefs.h>
-
 #include <sys/fcode.h>
-
-#include <sys/pci.h>
-
+#include <sys/pcie.h>
+#include <sys/pcie_impl.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
 #include <sys/sunndi.h>
 #include <sys/hotplug/pci/pcicfg.h>
-
 #include <sys/ndi_impldefs.h>
+
+#define	PCICFG_DEVICE_TYPE_PCI	1
+#define	PCICFG_DEVICE_TYPE_PCIE	2
 
 #define	EFCODE21554	/* changes for supporting 21554 */
 
@@ -99,6 +98,12 @@ static	int	pcicfg_start_devno = 0;	/* for Debug only */
 #define	PCICFG_MEM_MULT 4
 #define	PCICFG_IO_MULT 4
 #define	PCICFG_RANGE_LEN 2 /* Number of range entries */
+
+static int pcicfg_slot_busnums = 8;
+static int pcicfg_slot_memsize = 32 * PCICFG_MEMGRAN; /* 32MB per slot */
+static int pcicfg_slot_iosize = 64 * PCICFG_IOGRAN; /* 64K per slot */
+static int pcicfg_chassis_per_tree = 1;
+static int pcicfg_sec_reset_delay = 1000000;
 
 /*
  * The following typedef is used to represent a
@@ -173,6 +178,14 @@ struct pcicfg_find_ctrl {
 	uint_t		function;
 	dev_info_t	*dip;
 };
+
+typedef struct pcicfg_err_regs {
+	uint16_t cmd;
+	uint16_t bcntl;
+	uint16_t pcie_dev;
+	uint16_t devctl;
+	int pcie_cap_off;
+} pcicfg_err_regs_t;
 
 /*
  * List of Indirect Config Map Devices. At least the intent of the
@@ -249,7 +262,8 @@ int pcicfg_dont_interpret = 1;
 
 static int pcicfg_add_config_reg(dev_info_t *,
 	uint_t, uint_t, uint_t);
-static int pcicfg_probe_children(dev_info_t *, uint_t, uint_t, uint_t);
+static int pcicfg_probe_children(dev_info_t *, uint_t, uint_t, uint_t,
+								uint_t *);
 
 #ifdef PCICFG_INTERPRET_FCODE
 static int pcicfg_load_fcode(dev_info_t *, uint_t, uint_t, uint_t,
@@ -275,10 +289,14 @@ static int pcicfg_bridge_assign(dev_info_t *, void *);
 static int pcicfg_free_resources(dev_info_t *);
 static void pcicfg_setup_bridge(pcicfg_phdl_t *, ddi_acc_handle_t);
 static void pcicfg_update_bridge(pcicfg_phdl_t *, ddi_acc_handle_t);
+static void pcicfg_enable_bridge_probe_err(dev_info_t *dip,
+				ddi_acc_handle_t h, pcicfg_err_regs_t *regs);
+static void pcicfg_disable_bridge_probe_err(dev_info_t *dip,
+				ddi_acc_handle_t h, pcicfg_err_regs_t *regs);
 static int pcicfg_update_assigned_prop(dev_info_t *, pci_regspec_t *);
 static void pcicfg_device_on(ddi_acc_handle_t);
 static void pcicfg_device_off(ddi_acc_handle_t);
-static int pcicfg_set_busnode_props(dev_info_t *);
+static int pcicfg_set_busnode_props(dev_info_t *, uint8_t);
 static int pcicfg_free_bridge_resources(dev_info_t *);
 static int pcicfg_free_device_resources(dev_info_t *);
 static int pcicfg_teardown_device(dev_info_t *);
@@ -380,7 +398,7 @@ extern struct mod_ops mod_miscops;
 
 static struct modlmisc modlmisc = {
 	&mod_miscops, /* Type of module */
-	"PCI Config (EFCode Enabled) v%I%"
+	"PCIe/PCI Config (EFCode Enabled) v%I%"
 };
 
 static struct modlinkage modlinkage = {
@@ -539,6 +557,152 @@ struct modinfo *modinfop;
 }
 
 /*
+ * given a cap_id, return its cap_id location in config space
+ */
+static int
+pcicfg_get_cap(ddi_acc_handle_t config_handle, uint8_t cap_id)
+{
+	uint8_t curcap;
+	uint_t	cap_id_loc;
+	uint16_t	status;
+	int location = -1;
+
+	/*
+	 * Need to check the Status register for ECP support first.
+	 * Also please note that for type 1 devices, the
+	 * offset could change. Should support type 1 next.
+	 */
+	status = pci_config_get16(config_handle, PCI_CONF_STAT);
+	if (!(status & PCI_STAT_CAP)) {
+		return (-1);
+	}
+	cap_id_loc = pci_config_get8(config_handle, PCI_CONF_CAP_PTR);
+
+	/* Walk the list of capabilities */
+	while (cap_id_loc) {
+
+		curcap = pci_config_get8(config_handle, cap_id_loc);
+
+		if (curcap == cap_id) {
+			location = cap_id_loc;
+			break;
+		}
+		cap_id_loc = pci_config_get8(config_handle,
+		    cap_id_loc + 1);
+	}
+	return (location);
+}
+
+/*ARGSUSED*/
+static uint8_t
+pcicfg_get_nslots(dev_info_t *dip, ddi_acc_handle_t handle)
+{
+	int cap_id_loc;
+	uint8_t num_slots = 0;
+
+	/* just depend on the pcie_cap for now. */
+	if ((cap_id_loc = pcicfg_get_cap(handle, PCI_CAP_ID_PCI_E))
+							> 0) {
+		if (pci_config_get16(handle, cap_id_loc +
+					PCIE_PCIECAP) &
+					PCIE_PCIECAP_SLOT_IMPL)
+			num_slots = 1;
+	} else /* not a PCIe switch/bridge. Must be a PCI-PCI[-X] bridge */
+	if ((cap_id_loc = pcicfg_get_cap(handle, PCI_CAP_ID_SLOT_ID))
+								> 0) {
+		uint8_t esr_reg = pci_config_get8(handle, cap_id_loc +
+			PCI_CAP_ID_REGS_OFF);
+		num_slots = PCI_CAPSLOT_NSLOTS(esr_reg);
+	}
+	/* XXX - need to cover PCI-PCIe bridge with n slots */
+	return (num_slots);
+}
+
+/*ARGSUSED*/
+static uint8_t
+pcicfg_is_chassis(dev_info_t *dip, ddi_acc_handle_t handle)
+{
+	int cap_id_loc;
+
+	if ((cap_id_loc = pcicfg_get_cap(handle, PCI_CAP_ID_SLOT_ID))
+								> 0) {
+		uint8_t esr_reg = pci_config_get8(handle, cap_id_loc + 2);
+		if (PCI_CAPSLOT_FIC(esr_reg))
+			return (B_TRUE);
+	}
+	return (B_FALSE);
+}
+
+/*ARGSUSED*/
+static int
+pcicfg_pcie_dev(dev_info_t *dip, int bus_type, pcicfg_err_regs_t *regs)
+{
+	/* get parent device's device_type property */
+	char *device_type;
+	int rc = DDI_FAILURE;
+	dev_info_t *pdip = ddi_get_parent(dip);
+
+	regs->pcie_dev = 0;
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
+		DDI_PROP_DONTPASS, "device_type", &device_type)
+				!= DDI_PROP_SUCCESS) {
+		DEBUG2("device_type property missing for %s#%d",
+			ddi_get_name(pdip), ddi_get_instance(pdip));
+		return (DDI_FAILURE);
+	}
+	switch (bus_type) {
+		case PCICFG_DEVICE_TYPE_PCIE:
+			if (strcmp(device_type, "pciex") == 0) {
+				rc = DDI_SUCCESS;
+				regs->pcie_dev = 1;
+			}
+			break;
+		case PCICFG_DEVICE_TYPE_PCI:
+			if (strcmp(device_type, "pci") == 0)
+				rc = DDI_SUCCESS;
+			break;
+		default:
+			break;
+	}
+	ddi_prop_free(device_type);
+	return (rc);
+}
+
+/*ARGSUSED*/
+static int
+pcicfg_pcie_port_type(dev_info_t *dip, ddi_acc_handle_t handle)
+{
+	int port_type = -1;
+	int cap_loc;
+
+	if ((cap_loc = pcicfg_get_cap(handle, PCI_CAP_ID_PCI_E)) > 0)
+		port_type = pci_config_get16(handle,
+			cap_loc + PCIE_PCIECAP) & PCIE_PCIECAP_DEV_TYPE_MASK;
+
+	return (port_type);
+}
+
+static int
+pcicfg_pcie_device_type(dev_info_t *dip, ddi_acc_handle_t handle)
+{
+	int port_type = pcicfg_pcie_port_type(dip, handle);
+
+	DEBUG1("device port_type = %x\n", port_type);
+	/* No PCIe CAP regs, we are not PCIe device_type */
+	if (port_type < 0)
+		return (DDI_FAILURE);
+
+	/* check for all PCIe device_types */
+	if ((port_type == PCIE_PCIECAP_DEV_TYPE_UP) ||
+			(port_type == PCIE_PCIECAP_DEV_TYPE_DOWN) ||
+			(port_type == PCIE_PCIECAP_DEV_TYPE_PCI2PCIE))
+		return (DDI_SUCCESS);
+
+	return (DDI_FAILURE);
+
+}
+
+/*
  * In the following functions ndi_devi_enter() without holding the
  * parent dip is sufficient. This is because  pci dr is driven through
  * opens on the nexus which is in the device tree path above the node
@@ -597,6 +761,8 @@ pcicfg_configure(dev_info_t *devi, uint_t device)
 				DEBUG3("no device : bus "
 				"[0x%x] slot [0x%x] func [0x%x]\n",
 					bus, device, func);
+				if (func)
+					continue;
 				break;
 			default:
 				DEBUG3("configure: bus => [%d] "
@@ -632,7 +798,7 @@ cleanup:
 		if ((new_device = pcicfg_devi_find(devi,
 			device, func)) == NULL) {
 			DEBUG0("No more devices to clean up\n");
-			break;
+			continue;
 		}
 
 		DEBUG2("Cleaning up device [0x%x] function [0x%x]\n",
@@ -667,6 +833,7 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	uint64_t		next_bus;
 	uint64_t		blen;
 	ndi_ra_request_t	req;
+	uint8_t			pcie_device_type = 0;
 
 	/*
 	 * If we need to do indirect config, lets create a property here
@@ -675,15 +842,22 @@ pcicfg_configure_ntbridge(dev_info_t *new_device, uint_t bus, uint_t device)
 	 * mapped directly under the host.
 	 */
 	if ((rc = ndi_prop_update_int(DDI_DEV_T_NONE, new_device,
-		PCICFG_DEV_CONF_MAP_PROP, (int)DDI_SUCCESS))
+		PCI_DEV_CONF_MAP_PROP, (int)DDI_SUCCESS))
 						!= DDI_SUCCESS) {
 
 		DEBUG0("Cannot create indirect conf map property.\n");
 		return ((int)PCICFG_FAILURE);
 	}
+	if (pci_config_setup(new_device, &config_handle) != DDI_SUCCESS)
+		return (PCICFG_FAILURE);
+	/* check if we are PCIe device */
+	if (pcicfg_pcie_device_type(new_device, config_handle) == DDI_SUCCESS)
+		pcie_device_type = 1;
+	pci_config_teardown(&config_handle);
 
 	/* create Bus node properties for ntbridge. */
-	if (pcicfg_set_busnode_props(new_device) != PCICFG_SUCCESS) {
+	if (pcicfg_set_busnode_props(new_device, pcie_device_type) !=
+						PCICFG_SUCCESS) {
 		DEBUG0("Failed to set busnode props\n");
 		return (rc);
 	}
@@ -1217,15 +1391,15 @@ pcicfg_indirect_map(dev_info_t *dip)
 #if defined(__sparc)
 	int rc = DDI_FAILURE;
 
-	if (ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(dip), DDI_PROP_DONTPASS,
-	    PCICFG_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
+	if (ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip), 0,
+			PCI_DEV_CONF_MAP_PROP, DDI_FAILURE) != DDI_FAILURE)
 		rc = DDI_SUCCESS;
 	else
-		if (ddi_getprop(DDI_DEV_T_ANY, ddi_get_parent(dip),
-		    DDI_PROP_DONTPASS, PCICFG_BUS_CONF_MAP_PROP,
-		    DDI_FAILURE) != DDI_FAILURE)
+		if (ddi_prop_get_int(DDI_DEV_T_ANY, ddi_get_parent(dip),
+				0, PCI_BUS_CONF_MAP_PROP,
+				DDI_FAILURE) != DDI_FAILURE)
 			rc = DDI_SUCCESS;
-
+	DEBUG1("pci conf map = %d", rc);
 	return (rc);
 #else
 	return (DDI_SUCCESS);
@@ -1299,7 +1473,7 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device)
 	 */
 	for (func = 0; func < PCICFG_MAX_FUNCTION; func++) {
 		if ((child_dip = pcicfg_devi_find(devi, device, func)) == NULL)
-			break;
+			continue;
 
 		if (ndi_devi_offline(child_dip, NDI_UNCONFIG) == NDI_SUCCESS)
 			continue;
@@ -1311,12 +1485,12 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device)
 		DEBUG2("Device [0x%x] function [%x] is busy\n", device, func);
 		for (i = 0; i < func; i++) {
 		    if ((child_dip = pcicfg_devi_find(devi, device, i))
-			== NULL) {
+				== NULL) {
 			DEBUG0("No more devices to put back on line!!\n");
 			/*
 			 * Made it through all functions
 			 */
-			break;
+			continue;
 		    }
 		    if (ndi_devi_online(child_dip, NDI_CONFIG) != NDI_SUCCESS) {
 			DEBUG0("Failed to put back devices state\n");
@@ -1333,7 +1507,7 @@ pcicfg_unconfigure(dev_info_t *devi, uint_t device)
 		if ((child_dip = pcicfg_devi_find(devi,
 			device, func)) == NULL) {
 			DEBUG0("No more devices to tear down!\n");
-			break;
+			continue;
 		}
 
 		DEBUG2("Tearing down device [0x%x] function [0x%x]\n",
@@ -1561,16 +1735,14 @@ pcicfg_bridge_assign(dev_info_t *dip, void *hdl)
 
 	pcicfg_phdl_t *entry = (pcicfg_phdl_t *)hdl;
 
-	DEBUG1("bridge assign: assigning addresses to %s\n",
-					ddi_get_name(dip));
-
-	entry->error = PCICFG_SUCCESS;
+	DEBUG1("bridge assign: assigning addresses to %s\n", ddi_get_name(dip));
 
 	if (entry == NULL) {
 		DEBUG0("Failed to get entry\n");
-		entry->error = PCICFG_FAILURE;
 		return (DDI_WALK_TERMINATE);
 	}
+
+	entry->error = PCICFG_SUCCESS;
 
 	if (pcicfg_config_setup(dip, &handle) != DDI_SUCCESS) {
 		DEBUG0("Failed to map config space!\n");
@@ -1841,6 +2013,12 @@ pcicfg_device_assign(dev_info_t *dip)
 
 				reg[i].pci_phys_low = PCICFG_LOADDR(answer);
 				reg[i].pci_phys_mid = PCICFG_HIADDR(answer);
+				/*
+				 * currently support 32b address space
+				 * assignments only.
+				 */
+				reg[i].pci_phys_hi ^= PCI_ADDR_MEM64 ^
+							PCI_ADDR_MEM32;
 
 				offset += 8;
 				break;
@@ -2345,11 +2523,22 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 		DDI_PROP_DONTPASS, "ranges", (caddr_t)&ranges,
 		&length) != DDI_PROP_SUCCESS) {
 		DEBUG0("Failed to read ranges property\n");
+		if (ddi_get_child(dip)) {
+			cmn_err(CE_WARN, "No ranges property found for %s",
+					ddi_get_name(dip));
+			/*
+			 * strictly speaking, we can check for children with
+			 * assigned-addresses but for now it is better to
+			 * be conservative and assume that if there are child
+			 * nodes, then they do consume PCI memory or IO
+			 * resources, Hence return failure.
+			 */
+			return (PCICFG_FAILURE);
+		}
+		length = 0;
 
-#if 0
-		return (PCICFG_FAILURE);
-#endif
-	} else {
+	}
+
 	for (i = 0; i < length / sizeof (pcicfg_range_t); i++) {
 		if (ranges[i].size_lo != 0 ||
 			ranges[i].size_hi != 0) {
@@ -2396,8 +2585,8 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 		}
 	}
 
-	kmem_free(ranges, length);
-	}
+	if (length)
+		kmem_free(ranges, length);
 
 	if (ddi_getlongprop(DDI_DEV_T_ANY, dip,
 		DDI_PROP_DONTPASS, "bus-range", (caddr_t)&bus,
@@ -2412,6 +2601,7 @@ pcicfg_free_bridge_resources(dev_info_t *dip)
 	if (ndi_ra_free(ddi_get_parent(dip),
 		(uint64_t)bus[0], (uint64_t)(bus[1] - bus[0] + 1),
 		NDI_RA_TYPE_PCI_BUSNUM, NDI_RA_PASS) != NDI_SUCCESS) {
+		/*EMPTY*/
 		DEBUG0("Failed to free a bus number\n");
 	}
 	/*
@@ -2785,16 +2975,17 @@ pcicfg_device_off(ddi_acc_handle_t config_handle)
  * header of the PCI device
  */
 static int
-pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle)
+pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
+	uint8_t pcie_dev)
 {
-	int ret;
+	int ret, cap_id_loc;
 	uint16_t val;
 	uint32_t wordval;
 	uint8_t byteval;
 
 	/* These two exists only for non-bridges */
-	if ((pci_config_get8(config_handle,
-		PCI_CONF_HEADER) & PCI_HEADER_TYPE_M) == PCI_HEADER_ZERO) {
+	if (((pci_config_get8(config_handle, PCI_CONF_HEADER)
+			& PCI_HEADER_TYPE_M) == PCI_HEADER_ZERO) && !pcie_dev) {
 		byteval = pci_config_get8(config_handle, PCI_CONF_MIN_G);
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 			"min-grant", byteval)) != DDI_SUCCESS) {
@@ -2848,13 +3039,17 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	 * present (but with no value other than its own existence) if the bit
 	 * is set, non-existent otherwise
 	 */
-	if (pci_config_get16(config_handle, PCI_CONF_STAT) & PCI_STAT_FBBC) {
+	if ((!pcie_dev) &&
+			(pci_config_get16(config_handle, PCI_CONF_STAT) &
+				PCI_STAT_FBBC)) {
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 				"fast-back-to-back", 0)) != DDI_SUCCESS) {
 			return (ret);
 		}
 	}
-	if (pci_config_get16(config_handle, PCI_CONF_STAT) & PCI_STAT_66MHZ) {
+	if ((!pcie_dev) &&
+			(pci_config_get16(config_handle, PCI_CONF_STAT) &
+				PCI_STAT_66MHZ)) {
 		if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
 				"66mhz-capable", 0)) != DDI_SUCCESS) {
 			return (ret);
@@ -2909,15 +3104,38 @@ pcicfg_set_standard_props(dev_info_t *dip, ddi_acc_handle_t config_handle)
 			return (ret);
 		}
 	}
+	if (pcie_dev && (cap_id_loc = pcicfg_get_cap(config_handle,
+					PCI_CAP_ID_PCI_E)) > 0) {
+		val = pci_config_get16(config_handle, cap_id_loc +
+				PCIE_PCIECAP) & PCIE_PCIECAP_SLOT_IMPL;
+		/* if slot implemented, get physical slot number */
+		if (val) {
+			wordval = (pci_config_get32(config_handle, cap_id_loc +
+					PCIE_SLOTCAP) >>
+					PCIE_SLOTCAP_PHY_SLOT_NUM_SHIFT) &
+					PCIE_SLOTCAP_PHY_SLOT_NUM_MASK;
+			if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE,
+					dip, "physical-slot#", wordval))
+						!= DDI_SUCCESS) {
+				return (ret);
+			}
+		}
+	}
 	return (PCICFG_SUCCESS);
 }
 static int
-pcicfg_set_busnode_props(dev_info_t *dip)
+pcicfg_set_busnode_props(dev_info_t *dip, uint8_t pcie_device_type)
 {
 	int ret;
+	char device_type[8];
+
+	if (pcie_device_type)
+		(void) strcpy(device_type, "pciex");
+	else
+		(void) strcpy(device_type, "pci");
 
 	if ((ret = ndi_prop_update_string(DDI_DEV_T_NONE, dip,
-				"device_type", "pci")) != DDI_SUCCESS) {
+				"device_type", device_type)) != DDI_SUCCESS) {
 		return (ret);
 	}
 	if ((ret = ndi_prop_update_int(DDI_DEV_T_NONE, dip,
@@ -2932,27 +3150,38 @@ pcicfg_set_busnode_props(dev_info_t *dip)
 }
 
 static int
-pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle)
+pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle,
+	uint8_t pcie_dev)
 {
 
 	int		ret;
-#ifndef _DONT_USE_1275_GENERIC_NAMES
-	uint32_t	wordval;
-#endif
 	char		*name;
-	char		buffer[64];
-	uint32_t	classcode;
-	char		*compat[8];
+	char		buffer[64], pprefix[8];
+	uint16_t	classcode;
+	uint8_t		revid, pif, pclass, psubclass;
+	char		*compat[24];
 	int		i;
 	int		n;
-	uint16_t		sub_vid, sub_sid;
+	uint16_t		sub_vid, sub_sid, vid, did;
+
+	/* set the property prefix based on the device type */
+	if (pcie_dev)
+		(void) sprintf(pprefix, "pciex");
+	else
+		(void) sprintf(pprefix, "pci");
+	sub_vid = pci_config_get16(config_handle, PCI_CONF_SUBVENID),
+	sub_sid = pci_config_get16(config_handle, PCI_CONF_SUBSYSID);
+	vid = pci_config_get16(config_handle, PCI_CONF_VENID),
+	did = pci_config_get16(config_handle, PCI_CONF_DEVID);
+	revid = pci_config_get8(config_handle, PCI_CONF_REVID);
+	pif = pci_config_get8(config_handle, PCI_CONF_PROGCLASS);
+	classcode = pci_config_get16(config_handle, PCI_CONF_SUBCLASS);
+	pclass = pci_config_get8(config_handle, PCI_CONF_BASCLASS);
+	psubclass = pci_config_get8(config_handle, PCI_CONF_SUBCLASS);
+
 	/*
 	 * NOTE: These are for both a child and PCI-PCI bridge node
 	 */
-#ifndef _DONT_USE_1275_GENERIC_NAMES
-	wordval = (pci_config_get16(config_handle, PCI_CONF_SUBCLASS)<< 8) |
-		(pci_config_get8(config_handle, PCI_CONF_PROGCLASS));
-#endif
 
 	/*
 	 *	"name" property rule
@@ -2980,15 +3209,10 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	 *   ssid = subsystem id
 	 */
 
-	sub_vid = pci_config_get16(config_handle, PCI_CONF_SUBVENID),
-	sub_sid = pci_config_get16(config_handle, PCI_CONF_SUBSYSID);
-	if ((pci_config_get16(config_handle, PCI_CONF_SUBSYSID) != 0) ||
-	    (pci_config_get16(config_handle, PCI_CONF_SUBVENID) != 0)) {
-		(void) sprintf(buffer, "pci%x,%x", sub_vid, sub_sid);
+	if ((sub_sid != 0) || (sub_vid != 0)) {
+		(void) sprintf(buffer, "%s%x,%x", pprefix, sub_vid, sub_sid);
 	} else {
-		(void) sprintf(buffer, "pci%x,%x",
-			pci_config_get16(config_handle, PCI_CONF_VENID),
-			pci_config_get16(config_handle, PCI_CONF_DEVID));
+		(void) sprintf(buffer, "%s%x,%x", pprefix, vid, did);
 	}
 
 	/*
@@ -3000,7 +3224,7 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle)
 #ifdef _DONT_USE_1275_GENERIC_NAMES
 	name = buffer;
 #else
-	if ((name = pcicfg_get_class_name(wordval>>8)) == NULL) {
+	if ((name = pcicfg_get_class_name(classcode)) == NULL) {
 		/*
 		 * Set name to the above fabricated name
 		 */
@@ -3025,23 +3249,53 @@ pcicfg_set_childnode_props(dev_info_t *dip, ddi_acc_handle_t config_handle)
 	(void) strcpy(compat[n++], buffer);
 
 	/*
-	 * Add in the VendorID/DeviceID compatible name.
+	 * Setup 'compatible' as per the PCI2.1 bindings document.
+	 *	pci[ex]VVVV,DDDD.SSSS.ssss.RR
+	 *	pci[ex]VVVV,DDDD.SSSS.ssss
+	 *	pciSSSS.ssss  -> not created for PCIe as per PCIe bindings
+	 *	pci[ex]VVVV,DDDD.RR
+	 *	pci[ex]VVVV,DDDD
+	 *	pci[ex]class,CCSSPP
+	 *	pci[ex]class,CCSS
 	 */
-	(void) sprintf(buffer, "pci%x,%x",
-		pci_config_get16(config_handle, PCI_CONF_VENID),
-		pci_config_get16(config_handle, PCI_CONF_DEVID));
 
+	/* pci[ex]VVVV,DDDD.SSSS.ssss.RR */
+	(void) sprintf(buffer, "%s%x,%x.%x.%x.%x", pprefix,  vid, did,
+					sub_vid, sub_sid, revid);
 	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
 	(void) strcpy(compat[n++], buffer);
 
-	classcode = (pci_config_get16(config_handle, PCI_CONF_SUBCLASS)<< 8) |
-		(pci_config_get8(config_handle, PCI_CONF_PROGCLASS));
+	/* pci[ex]VVVV,DDDD.SSSS.ssss */
+	(void) sprintf(buffer, "%s%x,%x.%x.%x", pprefix,  vid, did,
+					sub_vid, sub_sid);
+	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
+	(void) strcpy(compat[n++], buffer);
 
-	/*
-	 * Add in the Classcode
-	 */
-	(void) sprintf(buffer, "pciclass,%06x", classcode);
+	/* pciSSSS.ssss  -> not created for PCIe as per PCIe bindings */
+	if (!pcie_dev) {
+		(void) sprintf(buffer, "pci%x,%x", sub_vid, sub_sid);
+		compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
+		(void) strcpy(compat[n++], buffer);
+	}
 
+	/* pci[ex]VVVV,DDDD.RR */
+	(void) sprintf(buffer, "%s%x,%x.%x", pprefix,  vid, did, revid);
+	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
+	(void) strcpy(compat[n++], buffer);
+
+	/* pci[ex]VVVV,DDDD */
+	(void) sprintf(buffer, "%s%x,%x", pprefix, vid, did);
+	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
+	(void) strcpy(compat[n++], buffer);
+
+	/* pci[ex]class,CCSSPP */
+	(void) sprintf(buffer, "%sclass,%02x%02x%02x", pprefix,
+		pclass, psubclass, pif);
+	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
+	(void) strcpy(compat[n++], buffer);
+
+	/* pci[ex]class,CCSS */
+	(void) sprintf(buffer, "%sclass,%04x", pprefix, classcode);
 	compat[n] = kmem_alloc(strlen(buffer) + 1, KM_SLEEP);
 	(void) strcpy(compat[n++], buffer);
 
@@ -3075,6 +3329,8 @@ static void
 pcicfg_set_bus_numbers(ddi_acc_handle_t config_handle,
 uint_t primary, uint_t secondary, uint_t subordinate)
 {
+	DEBUG3("Setting bridge bus-range %d,%d,%d\n", primary, secondary,
+		subordinate);
 	/*
 	 * Primary bus#
 	 */
@@ -3151,7 +3407,7 @@ pcicfg_setup_bridge(pcicfg_phdl_t *entry,
 	 * first Configuration access.  The worst case is 33MHz, which
 	 * is a 1 second wait.
 	 */
-	drv_usecwait(1000000);
+	drv_usecwait(pcicfg_sec_reset_delay);
 
 }
 
@@ -3211,30 +3467,80 @@ pcicfg_update_bridge(pcicfg_phdl_t *entry,
 	}
 }
 
+/*ARGSUSED*/
+static void
+pcicfg_disable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
+	pcicfg_err_regs_t *regs)
+{
+	uint16_t val;
+
+	/* disable SERR generated in the context of Master Aborts. */
+	regs->cmd = val = pci_config_get16(h, PCI_CONF_COMM);
+	val &= ~PCI_COMM_SERR_ENABLE;
+	pci_config_put16(h, PCI_CONF_COMM, val);
+	regs->bcntl = val = pci_config_get16(h, PCI_BCNF_BCNTRL);
+	val &= ~PCI_BCNF_BCNTRL_SERR_ENABLE;
+	pci_config_put16(h, PCI_BCNF_BCNTRL, val);
+	/* clear any current pending errors */
+	pci_config_put16(h, PCI_CONF_STAT, PCI_STAT_S_TARG_AB|
+		PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
+	pci_config_put16(h, PCI_BCNF_SEC_STATUS, PCI_STAT_S_TARG_AB|
+		PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
+	/* if we are a PCIe device, disable the generation of UR, CE and NFE */
+	if (regs->pcie_dev) {
+		uint16_t devctl;
+		int off = pcicfg_get_cap(h, PCI_CAP_ID_PCI_E);
+
+		regs->pcie_cap_off = off;
+		regs->devctl = devctl = pci_config_get16(h, off + PCIE_DEVCTL);
+		devctl &= ~(PCIE_DEVCTL_UR_REPORTING_EN |
+				PCIE_DEVCTL_CE_REPORTING_EN |
+				PCIE_DEVCTL_NFE_REPORTING_EN |
+				PCIE_DEVCTL_FE_REPORTING_EN);
+		pci_config_put16(h, off + PCIE_DEVCTL, devctl);
+	}
+}
+
+/*ARGSUSED*/
+static void
+pcicfg_enable_bridge_probe_err(dev_info_t *dip, ddi_acc_handle_t h,
+	pcicfg_err_regs_t *regs)
+{
+	/* clear any pending errors */
+	pci_config_put16(h, PCI_CONF_STAT, PCI_STAT_S_TARG_AB|
+		PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
+	pci_config_put16(h, PCI_BCNF_SEC_STATUS, PCI_STAT_S_TARG_AB|
+		PCI_STAT_R_TARG_AB | PCI_STAT_R_MAST_AB | PCI_STAT_S_SYSERR);
+
+	/* restore original settings */
+	if (regs->pcie_dev) {
+		pcie_clear_errors(dip, h);
+		pci_config_put16(h, regs->pcie_cap_off + PCIE_DEVCTL,
+				regs->devctl);
+	}
+
+	pci_config_put16(h, PCI_BCNF_BCNTRL, regs->bcntl);
+	pci_config_put16(h, PCI_CONF_COMM, regs->cmd);
+
+}
+
 static int
 pcicfg_probe_children(dev_info_t *parent, uint_t bus,
-	uint_t device, uint_t func)
+	uint_t device, uint_t func, uint_t *highest_bus)
 {
 	dev_info_t		*new_child;
 	ddi_acc_handle_t	config_handle;
-	uint8_t			header_type;
+	uint8_t			header_type, pcie_dev = 0;
 
-	int			i, j;
-	ndi_ra_request_t	req;
-	uint64_t		next_bus;
-	uint64_t		blen;
+	int			i;
 	uint32_t		request;
-	uint_t			new_bus;
 	int			ret;
-	int			circ;
-
+	pcicfg_err_regs_t	regs;
 	/*
 	 * This node will be put immediately below
 	 * "parent". Allocate a blank device node.  It will either
 	 * be filled in or freed up based on further probing.
 	 */
-
-	ndi_devi_enter(parent, &circ);
 	/*
 	 * Note: in usr/src/uts/common/io/hotplug/pcicfg/pcicfg.c
 	 * ndi_devi_alloc() is called as ndi_devi_alloc_sleep()
@@ -3243,7 +3549,6 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 		(pnode_t)DEVI_SID_NODEID, &new_child)
 		!= NDI_SUCCESS) {
 		DEBUG0("pcicfg_probe_children(): Failed to alloc child node\n");
-		ndi_devi_exit(parent, circ);
 		return (PCICFG_FAILURE);
 	}
 
@@ -3258,7 +3563,6 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 		!= PCICFG_SUCCESS) {
 		if (ret == PCICFG_NODEVICE) {
 			(void) ndi_devi_free(new_child);
-			ndi_devi_exit(parent, circ);
 			return (ret);
 		}
 		DEBUG0("pcicfg_probe_children():"
@@ -3273,12 +3577,18 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	 */
 	(void) pcicfg_device_off(config_handle);
 
+	/* check if we are PCIe device */
+	if (pcicfg_pcie_dev(new_child, PCICFG_DEVICE_TYPE_PCIE, &regs)
+					== DDI_SUCCESS) {
+		DEBUG0("PCIe device detected\n");
+		pcie_dev = 1;
+	}
 
 	/*
 	 * Set 1275 properties common to all devices
 	 */
-	if (pcicfg_set_standard_props(new_child,
-		config_handle) != PCICFG_SUCCESS) {
+	if (pcicfg_set_standard_props(new_child, config_handle,
+			pcie_dev) != PCICFG_SUCCESS) {
 		DEBUG0("Failed to set standard properties\n");
 		goto failedchild;
 	}
@@ -3286,8 +3596,8 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	/*
 	 * Child node properties  NOTE: Both for PCI-PCI bridge and child node
 	 */
-	if (pcicfg_set_childnode_props(new_child,
-		config_handle) != PCICFG_SUCCESS) {
+	if (pcicfg_set_childnode_props(new_child, config_handle,
+			pcie_dev) != PCICFG_SUCCESS) {
 		goto failedchild;
 	}
 
@@ -3296,11 +3606,10 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	/*
 	 * If this is not a multi-function card only probe function zero.
 	 */
-	if (!(header_type & PCI_HEADER_MULTI) && (func != 0)) {
+	if ((!(header_type & PCI_HEADER_MULTI)) && (func != 0)) {
 
 		(void) pcicfg_config_teardown(&config_handle);
 		(void) ndi_devi_free(new_child);
-		ndi_devi_exit(parent, circ);
 		return (PCICFG_NODEVICE);
 	}
 
@@ -3309,52 +3618,20 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 	DEBUG1("---Device ID = [0x%x]\n",
 		pci_config_get16(config_handle, PCI_CONF_DEVID));
 
+	/*
+	 * Attach the child to its parent
+	 */
+	(void) i_ndi_config_node(new_child, DS_LINKED, 0);
+
 	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
 
 		DEBUG3("--Bridge found bus [0x%x] device"
 			"[0x%x] func [0x%x]\n", bus, device, func);
 
-		/*
-		 * Get next bus in sequence and program device.
-		 * XXX There might have to be slot specific
-		 * ranges taken care of here.
-		 */
-		bzero((caddr_t)&req, sizeof (ndi_ra_request_t));
-		req.ra_len = 1;
-		if (ndi_ra_alloc(ddi_get_parent(new_child), &req,
-			&next_bus, &blen, NDI_RA_TYPE_PCI_BUSNUM,
-			NDI_RA_PASS) != NDI_SUCCESS) {
-			DEBUG0("Failed to get a bus number\n");
+		if (pcicfg_probe_bridge(new_child, config_handle,
+				bus, highest_bus) != PCICFG_SUCCESS) {
+			(void) pcicfg_free_bridge_resources(new_child);
 			goto failedchild;
-		}
-		new_bus = next_bus;
-
-		DEBUG1("NEW bus found  ->[%d]\n", new_bus);
-
-		(void) pcicfg_set_bus_numbers(config_handle,
-			bus, new_bus, new_bus);
-		/*
-		 * Set bus properties
-		 */
-		if (pcicfg_set_busnode_props(new_child) != PCICFG_SUCCESS) {
-			DEBUG0("Failed to set busnode props\n");
-			goto failedchild;
-		}
-
-		/*
-		 * Probe all children devices
-		 */
-		for (i = 0; i < PCICFG_MAX_DEVICE; i++) {
-			for (j = 0; j < PCICFG_MAX_FUNCTION; j++) {
-				if (pcicfg_probe_children(new_child,
-					new_bus, i, j) ==
-							PCICFG_FAILURE) {
-					DEBUG3("Failed to configure bus "
-					"[0x%x] device [0x%x] func [0x%x]\n",
-						new_bus, i, j);
-					goto failedchild;
-				}
-			}
 		}
 
 	} else {
@@ -3430,16 +3707,16 @@ pcicfg_probe_children(dev_info_t *parent, uint_t bus,
 				goto failedchild;
 			}
 		}
+
+		/* now allocate & program the resources */
+		if (pcicfg_device_assign(new_child) != PCICFG_SUCCESS) {
+			(void) pcicfg_free_device_resources(new_child);
+			goto failedchild;
+		}
+		(void) ndi_devi_bind_driver(new_child, 0);
 	}
 
-	/*
-	 * Attach the child to its parent
-	 */
-	(void) ndi_devi_bind_driver(new_child, 0);
-
 	(void) pcicfg_config_teardown(&config_handle);
-	ndi_devi_exit(parent, circ);
-
 	return (PCICFG_SUCCESS);
 
 failedchild:
@@ -3449,8 +3726,6 @@ failedchild:
 failedconfig:
 
 	(void) ndi_devi_free(new_child);
-	ndi_devi_exit(parent, circ);
-
 	return (PCICFG_FAILURE);
 }
 
@@ -3461,10 +3736,10 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	dev_info_t		*new_child;
 	int8_t			header_type;
 	int			ret;
-	ddi_acc_handle_t	h;
+	ddi_acc_handle_t	h, ph;
 	int			error = 0;
-	int			rval;
 	extern int		pcicfg_dont_interpret;
+	pcicfg_err_regs_t	parent_regs, regs;
 #ifdef PCICFG_INTERPRET_FCODE
 	struct pci_ops_bus_args	po;
 	fco_handle_t		c;
@@ -3479,6 +3754,22 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 #endif
 
 	/*
+	 * check if our parent is of type pciex.
+	 * if so, program config space to disable error msgs during probe.
+	 */
+	if (pcicfg_pcie_dev(parent, PCICFG_DEVICE_TYPE_PCIE, &parent_regs)
+				== DDI_SUCCESS) {
+		DEBUG0("PCI/PCIe parent detected. Disable errors.\n");
+		/*
+		 * disable parent generating URs or SERR#s during probing
+		 * alone.
+		 */
+		if (pci_config_setup(parent, &ph) != DDI_SUCCESS)
+			return (DDI_FAILURE);
+		pcicfg_disable_bridge_probe_err(parent, ph, &parent_regs);
+	}
+
+	/*
 	 * This node will be put immediately below
 	 * "parent". Allocate a blank device node.  It will either
 	 * be filled in or freed up based on further probing.
@@ -3488,7 +3779,9 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 		(pnode_t)DEVI_SID_NODEID, &new_child)
 		!= NDI_SUCCESS) {
 		DEBUG0("pcicfg_fcode_probe(): Failed to alloc child node\n");
-		return (PCICFG_FAILURE);
+		/* return (PCICFG_FAILURE); */
+		ret = PCICFG_FAILURE;
+		goto failed2;
 	}
 
 	/*
@@ -3497,21 +3790,19 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	 * produce one by hand.
 	 */
 	if (pcicfg_add_config_reg(new_child, bus,
-		device, func) != DDI_SUCCESS) {
-
-		(void) ndi_devi_free(new_child);
-		return (PCICFG_FAILURE);
+			device, func) != DDI_SUCCESS) {
+		ret = PCICFG_FAILURE;
+		goto failed3;
 	}
 #ifdef	EFCODE21554
 	if ((ret = pcicfg_config_setup(new_child, &h))
 						!= PCICFG_SUCCESS) {
 		DEBUG0("pcicfg_fcode_probe():"
 			"Failed to setup config space\n");
-		(void) ndi_devi_free(new_child);
-		return (ret);
+		ret = PCICFG_NODEVICE;
+		goto failed3;
 	}
 
-	DEBUG0("fcode_probe: conf space mapped.\n");
 #else
 	p.pci_phys_hi = PCICFG_MAKE_REG_HIGH(bus, device, func, 0);
 	p.pci_phys_mid = p.pci_phys_low = 0;
@@ -3526,11 +3817,9 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 
 	if (pcicfg_map_phys(new_child, &p, &virt, &acc, &h)) {
 		DEBUG0("pcicfg_fcode_probe():"
-		"Failed to setup config space\n");
-
-		(void) ndi_devi_free(new_child);
-
-		return (PCICFG_FAILURE);
+				"Failed to setup config space\n");
+		ret = PCICFG_NODEVICE;
+		goto failed3;
 	}
 
 	/*
@@ -3541,10 +3830,11 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	if (ddi_peek16(new_child, (int16_t *)v, &vendor_id)) {
 		DEBUG0("Can not read Vendor ID");
 		pcicfg_unmap_phys(&h, &p);
-		(void) ndi_devi_free(new_child);
-		return (PCICFG_NODEVICE);
+		ret = PCICFG_NODEVICE;
+		goto failed3;
 	}
 #endif
+	DEBUG0("fcode_probe: conf space mapped.\n");
 	/*
 	 * As soon as we have access to config space,
 	 * turn off device. It will get turned on
@@ -3552,11 +3842,18 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	 */
 	(void) pcicfg_device_off(h);
 
+	/* check if we are PCIe device */
+	if (pcicfg_pcie_dev(new_child, PCICFG_DEVICE_TYPE_PCIE, &regs)
+					== DDI_SUCCESS) {
+		/*EMPTY*/
+		DEBUG0("PCI/PCIe device detected\n");
+	}
+
 	/*
 	 * Set 1275 properties common to all devices
 	 */
 	if (pcicfg_set_standard_props(new_child,
-	    h) != PCICFG_SUCCESS) {
+	    h, regs.pcie_dev) != PCICFG_SUCCESS) {
 		DEBUG0("Failed to set standard properties\n");
 		goto failed;
 	}
@@ -3565,7 +3862,8 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	 * Child node properties  NOTE: Both for PCI-PCI bridge and child node
 	 */
 	if (pcicfg_set_childnode_props(new_child,
-		h) != PCICFG_SUCCESS) {
+		h, regs.pcie_dev) != PCICFG_SUCCESS) {
+		ret = PCICFG_FAILURE;
 		goto failed;
 	}
 
@@ -3576,13 +3874,8 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 	 */
 	if (!(header_type & PCI_HEADER_MULTI) && (func > 0)) {
 
-#ifdef	EFCODE21554
-		pcicfg_config_teardown(&h);
-#else
-		pcicfg_unmap_phys(&h, &p);
-#endif
-		(void) ndi_devi_free(new_child);
-		return (PCICFG_NODEVICE);
+		ret = PCICFG_NODEVICE;
+		goto failed;
 	}
 
 	if ((header_type & PCI_HEADER_TYPE_M) == PCI_HEADER_PPB) {
@@ -3600,17 +3893,10 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 		DEBUG3("--Bridge found bus [0x%x] device"
 			"[0x%x] func [0x%x]\n", bus, device, func);
 
-		rval = pcicfg_probe_bridge(new_child, h, bus, highest_bus);
-
-#ifdef	EFCODE21554
-		pcicfg_config_teardown(&h);
-#else
-		pcicfg_unmap_phys(&h, &p);
-#endif
-		if (rval != PCICFG_SUCCESS)
-			(void) ndi_devi_free(new_child);
-
-		return (rval);
+		if ((ret = pcicfg_probe_bridge(new_child, h,
+				bus, highest_bus)) != PCICFG_SUCCESS)
+			(void) pcicfg_free_bridge_resources(new_child);
+		goto done;
 	} else {
 
 		DEBUG3("--Leaf device found bus [0x%x] device"
@@ -3660,6 +3946,7 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 				    != PCICFG_SUCCESS) {
 					DEBUG0("Failed to assign addresses to "
 					    "implemented BARs");
+					ret = PCICFG_FAILURE;
 					goto failed;
 				}
 
@@ -3695,8 +3982,8 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 				    != DDI_SUCCESS) {
 					DEBUG0("Failed to create "
 					    "fcode-rom-offset property\n");
-					(void) ndi_devi_free(new_child);
-					return (PCICFG_FAILURE);
+					ret = PCICFG_FAILURE;
+					goto failed;
 				}
 			} else {
 				DEBUG0("There is no Expansion ROM\n");
@@ -3769,32 +4056,24 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 			 */
 			if (pcicfg_alloc_new_resources(new_child) ==
 			    PCICFG_FAILURE) {
-#ifdef	EFCODE21554
-				pcicfg_config_teardown(&h);
-#else
-				pcicfg_unmap_phys(&h, &p);
-#endif
-				(void) ndi_devi_free(new_child);
-				return (PCICFG_FAILURE);
+				ret = PCICFG_FAILURE;
+				goto failed;
 			}
 
-#ifdef	EFCODE21554
-			pcicfg_config_teardown(&h);
-#else
-			pcicfg_unmap_phys(&h, &p);
-#endif
+			ret = PCICFG_SUCCESS;
 			/* no fcode, bind driver now */
 			(void) ndi_devi_bind_driver(new_child, 0);
 
-			return (PCICFG_SUCCESS);
+			goto done;
 		} else if ((error != FC_NO_FCODE) &&
-				    (pcicfg_dont_interpret == 0))  {
+				(pcicfg_dont_interpret == 0))  {
 			/*
 			 * The interpreter located fcode, but had an error in
 			 * processing. Cleanup and fail the operation.
 			 */
 			DEBUG0("Interpreter detected fcode failure\n");
 			(void) pcicfg_free_resources(new_child);
+			ret = PCICFG_FAILURE;
 			goto failed;
 		} else {
 			/*
@@ -3822,11 +4101,12 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 
 			DEBUG0("No Drop-in Probe device ourself\n");
 
-			ret = pcicfg_probe_children(parent, bus, device, func);
+			ret = pcicfg_probe_children(parent, bus, device, func,
+					highest_bus);
 
 			if (ret != PCICFG_SUCCESS) {
 				DEBUG0("Could not self probe child\n");
-				return (ret);
+				goto failed2;
 			}
 
 			/*
@@ -3836,13 +4116,8 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 			    parent, device, func)) == NULL) {
 				DEBUG0("Did'nt find device node "
 				    "just created\n");
-				return (PCICFG_FAILURE);
-			}
-			if (pcicfg_program_ap(new_child)
-			    == PCICFG_FAILURE) {
-				DEBUG0("Failed to program devices\n");
-				(void) ndi_devi_free(new_child);
-				return (PCICFG_FAILURE);
+				ret = PCICFG_FAILURE;
+				goto failed2;
 			}
 #ifdef	EFCODE21554
 			/*
@@ -3883,19 +4158,26 @@ pcicfg_fcode_probe(dev_info_t *parent, uint_t bus,
 				(void) pcicfg_teardown_device(new_child);
 			}
 #endif
-
-			return (ret);
+			goto done2;
 		}
 	}
+done:
 failed:
 #ifdef	EFCODE21554
 	pcicfg_config_teardown(&h);
 #else
 	pcicfg_unmap_phys(&h, &p);
 #endif
-	(void) ndi_devi_free(new_child);
-
-	return (PCICFG_FAILURE);
+failed3:
+	if (ret != PCICFG_SUCCESS)
+		(void) ndi_devi_free(new_child);
+done2:
+failed2:
+	if (parent_regs.pcie_dev) {
+		pcicfg_enable_bridge_probe_err(parent, ph, &parent_regs);
+		pci_config_teardown(&ph);
+	}
+	return (ret);
 }
 
 static int
@@ -3903,12 +4185,11 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 			uint_t *highest_bus)
 {
 	uint64_t next_bus;
-	uint_t new_bus;
+	uint_t new_bus, num_slots;
 	ndi_ra_request_t req;
 	int rval, i, j;
-	uint64_t mem_answer, io_answer, mem_base, io_base, mem_alen, io_alen;
-	uint64_t mem_size, io_size;
-	uint64_t mem_end, io_end;
+	uint64_t mem_answer, mem_base, mem_alen, mem_size, mem_end;
+	uint64_t io_answer, io_base, io_alen, io_size, io_end;
 	uint64_t round_answer, round_len;
 	pcicfg_range_t range[PCICFG_RANGE_LEN];
 	int bus_range[2];
@@ -3916,6 +4197,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	int count;
 	uint64_t pcibus_base, pcibus_alen;
 	uint64_t max_bus;
+	uint8_t pcie_device_type = 0;
 
 	bzero((caddr_t)&req, sizeof (ndi_ra_request_t));
 	req.ra_flags = (NDI_RA_ALLOC_BOUNDED | NDI_RA_ALLOC_PARTIAL_OK);
@@ -3929,6 +4211,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 
 	if (rval != NDI_SUCCESS) {
 		if (rval == NDI_RA_PARTIAL_REQ) {
+			/*EMPTY*/
 			DEBUG0("NDI_RA_PARTIAL_REQ returned for bus range\n");
 		} else {
 			DEBUG0(
@@ -3970,6 +4253,10 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	bzero((caddr_t)&req, sizeof (ndi_ra_request_t));
 	req.ra_flags = (NDI_RA_ALLOC_BOUNDED | NDI_RA_ALLOC_PARTIAL_OK);
 	req.ra_boundbase = 0;
+	/*
+	 * Note: To support a 32b system, boundlen and len need to be
+	 * 32b quantities
+	 */
 	req.ra_boundlen = PCICFG_4GIG_LIMIT + 1;
 	req.ra_len = PCICFG_4GIG_LIMIT + 1; /* Get as big as possible */
 	req.ra_align_mask =
@@ -3980,6 +4267,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 
 	if (rval != NDI_SUCCESS) {
 		if (rval == NDI_RA_PARTIAL_REQ) {
+			/*EMPTY*/
 			DEBUG0("NDI_RA_PARTIAL_REQ returned\n");
 		} else {
 			DEBUG0(
@@ -4021,28 +4309,33 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 
 	if (rval != NDI_SUCCESS) {
 		if (rval == NDI_RA_PARTIAL_REQ) {
+			/*EMPTY*/
 			DEBUG0("NDI_RA_PARTIAL_REQ returned\n");
 		} else {
 			DEBUG0("Failed to allocate io space for bridge\n");
-			return (PCICFG_FAILURE);
+			io_base = io_answer = io_alen = 0;
+			/* return (PCICFG_FAILURE); */
 		}
 	}
 
-	DEBUG3("Bridge IO Space Allocated [0x%x.%x] len [0x%x]\n",
-	    PCICFG_HIADDR(io_answer), PCICFG_LOADDR(io_answer), io_alen);
+	if (io_alen) {
+		DEBUG3("Bridge IO Space Allocated [0x%x.%x] len [0x%x]\n",
+			PCICFG_HIADDR(io_answer), PCICFG_LOADDR(io_answer),
+				io_alen);
 
-	if (ndi_ra_map_setup(new_child, NDI_RA_TYPE_IO) == NDI_FAILURE) {
-		DEBUG0("Can not setup resource map - NDI_RA_TYPE_IO\n");
-		return (PCICFG_FAILURE);
+		if (ndi_ra_map_setup(new_child, NDI_RA_TYPE_IO) ==
+				NDI_FAILURE) {
+			DEBUG0("Can not setup resource map - NDI_RA_TYPE_IO\n");
+			return (PCICFG_FAILURE);
+		}
+
+		/*
+		 * Put available I/O into the pool.
+		 */
+		(void) ndi_ra_free(new_child, io_answer, io_alen,
+			NDI_RA_TYPE_IO, NDI_RA_PASS);
+		io_base = io_answer;
 	}
-
-	/*
-	 * Put available I/O into the pool.
-	 */
-	(void) ndi_ra_free(new_child, io_answer, io_alen, NDI_RA_TYPE_IO,
-	    NDI_RA_PASS);
-
-	io_base = io_answer;
 
 	(void) pcicfg_set_bus_numbers(h, bus, new_bus, max_bus);
 
@@ -4151,10 +4444,15 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	 */
 	pci_config_put8(h, PCI_CONF_ILINE, 0xf);
 
+	/* check our device_type as defined by Open Firmware */
+	if (pcicfg_pcie_device_type(new_child, h) == DDI_SUCCESS)
+		pcie_device_type = 1;
+
 	/*
 	 * Set bus properties
 	 */
-	if (pcicfg_set_busnode_props(new_child) != PCICFG_SUCCESS) {
+	if (pcicfg_set_busnode_props(new_child, pcie_device_type)
+				!= PCICFG_SUCCESS) {
 		DEBUG0("Failed to set busnode props\n");
 		return (PCICFG_FAILURE);
 	}
@@ -4174,7 +4472,7 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	 * first Configuration access.  The worst case is 33MHz, which
 	 * is a 1 second wait.
 	 */
-	drv_usecwait(1000000);
+	drv_usecwait(pcicfg_sec_reset_delay);
 
 	/*
 	 * Probe all children devices
@@ -4183,16 +4481,35 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	ndi_devi_enter(new_child, &count);
 	for (i = 0; i < PCICFG_MAX_DEVICE; i++) {
 		for (j = 0; j < PCICFG_MAX_FUNCTION; j++) {
-			if (pcicfg_fcode_probe(new_child,
-				new_bus, i, j, highest_bus) != PCICFG_SUCCESS) {
-				DEBUG3("Failed to configure bus "
-				"[0x%x] device [0x%x] func [0x%x]\n",
-					new_bus, i, j);
+			if ((rval = pcicfg_fcode_probe(new_child,
+					new_bus, i, j, highest_bus))
+							!= PCICFG_SUCCESS) {
+				if (rval == PCICFG_NODEVICE) {
+					DEBUG3("No Device at bus [0x%x]"
+						"device [0x%x] "
+						"func [0x%x]\n", new_bus, i, j);
+					if (j)
+						continue;
+				} else {
+					DEBUG3("Failed to configure bus "
+						"[0x%x] device [0x%x] "
+						"func [0x%x]\n", new_bus, i, j);
+					rval = PCICFG_FAILURE;
+				}
+
 				break;
 			}
 		}
+		/* if any function fails to be configured, no need to proceed */
+		if (rval != PCICFG_NODEVICE) {
+			break;
+		}
 	}
 	ndi_devi_exit(new_child, count);
+
+	/* if empty topology underneath, it is still a success. */
+	if (rval != PCICFG_FAILURE)
+		rval = PCICFG_SUCCESS;
 
 	/*
 	 * Offline the bridge to allow reprogramming of resources.
@@ -4200,8 +4517,9 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	(void) ndi_devi_offline(new_child, NDI_NO_EVENT|NDI_UNCONFIG);
 
 	phdl.dip = new_child;
-	phdl.memory_base = 0;
-	phdl.io_base = 0;
+	phdl.memory_base = mem_answer;
+	phdl.io_base = (uint32_t)io_answer;
+	phdl.error = PCICFG_SUCCESS;    /* in case of empty child tree */
 
 	ndi_devi_enter(ddi_get_parent(new_child), &count);
 	ddi_walk_devs(new_child, pcicfg_find_resource_end, (void *)&phdl);
@@ -4212,22 +4530,71 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		return (PCICFG_FAILURE);
 	}
 
+	num_slots = pcicfg_get_nslots(new_child, h);
 	mem_end = PCICFG_ROUND_UP(phdl.memory_base, PCICFG_MEMGRAN);
 	io_end = PCICFG_ROUND_UP(phdl.io_base, PCICFG_IOGRAN);
 
-	DEBUG2("Start of Unallocated Bridge Resources Mem=0x%lx I/O=0x%lx\n",
-	    mem_end, io_end);
+	DEBUG3("Start of Unallocated Bridge(%d slots) Resources "
+		"Mem=0x%lx I/O=0x%lx\n", num_slots, mem_end, io_end);
 
+	/*
+	 * if the bridge a slots, then preallocate. If not, assume static
+	 * configuration. Also check for preallocation limits and spit
+	 * warning messages appropriately (perhaps some can be in debug mode).
+	 */
+	if (num_slots) {
+		uint64_t mem_reqd = mem_answer + (num_slots *
+						pcicfg_slot_memsize);
+		uint64_t io_reqd = io_answer + (num_slots *
+						pcicfg_slot_iosize);
+		uint8_t highest_bus_reqd = new_bus + (num_slots *
+						pcicfg_slot_busnums);
 
-	if (mem_end == 0) {
-		/*
-		 * Give back all memory space back to parent.
-		 */
-		(void) ndi_ra_free(ddi_get_parent(new_child),
-		    mem_answer, mem_alen, NDI_RA_TYPE_MEM, NDI_RA_PASS);
+		if (mem_end > mem_reqd)
+			cmn_err(CE_WARN, "Memory space consumed by bridge"
+				" more than planned for %d slot(s)(%lx, %lx)",
+				num_slots, mem_answer, mem_end);
+		if (io_end > io_reqd)
+			cmn_err(CE_WARN, "IO space consumed by bridge"
+				" more than planned for %d slot(s)(%lx, %lx)",
+				num_slots, io_answer, io_end);
+		if (*highest_bus > highest_bus_reqd)
+			cmn_err(CE_WARN, "Buses consumed by bridge"
+				" more than planned for %d slot(s)(%x, %x)",
+				num_slots, new_bus, *highest_bus);
 
+		if (mem_reqd > (mem_answer + mem_alen))
+			cmn_err(CE_WARN, "Memory space required by bridge"
+				" more than available for %d slot(s)(%lx, %lx)",
+				num_slots, mem_answer, mem_end);
+
+		if (io_reqd > (io_answer + io_alen))
+			cmn_err(CE_WARN, "IO space required by bridge"
+				" more than available for %d slot(s)(%lx, %lx)",
+				num_slots, io_answer, io_end);
+		if (highest_bus_reqd > max_bus)
+			cmn_err(CE_WARN, "Bus numbers required by bridge"
+				" more than available for %d slot(s)(%x, %x)",
+				num_slots, new_bus, *highest_bus);
+
+		mem_end = MAX((MIN(mem_reqd, (mem_answer + mem_alen))),
+								mem_end);
+		io_end = MAX((MIN(io_reqd, (io_answer + io_alen))), io_end);
+		*highest_bus = MAX((MIN(highest_bus_reqd, max_bus)),
+							*highest_bus);
+		DEBUG3("mem_end %lx, io_end %lx, highest_bus %x\n",
+				mem_end, io_end, *highest_bus);
+	}
+
+	/*
+	 * Give back unused memory space to parent.
+	 */
+	(void) ndi_ra_free(ddi_get_parent(new_child),
+	    mem_end, (mem_answer + mem_alen) - mem_end, NDI_RA_TYPE_MEM,
+		NDI_RA_PASS);
+
+	if (mem_end == mem_answer) {
 		DEBUG0("No memory resources used\n");
-
 		/*
 		 * To prevent the bridge from forwarding any Memory
 		 * transactions, the Memory Limit will be programmed
@@ -4239,12 +4606,6 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		mem_size = 0;
 	} else {
 		/*
-		 * Give back the unused memory space to the parent.
-		 */
-		(void) ndi_ra_free(ddi_get_parent(new_child),
-		    mem_end, (mem_answer + mem_alen) - mem_end, NDI_RA_TYPE_MEM,
-		    NDI_RA_PASS);
-		/*
 		 * Reprogram the end of the memory.
 		 */
 		pci_config_put16(h, PCI_BCNF_MEM_LIMIT,
@@ -4252,14 +4613,14 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 		mem_size = mem_end - mem_base;
 	}
 
+	/*
+	 * Give back unused io space to parent.
+	 */
+	(void) ndi_ra_free(ddi_get_parent(new_child),
+	    io_end, (io_answer + io_alen) - io_end,
+	    NDI_RA_TYPE_IO, NDI_RA_PASS);
 
-	if (io_end == 0) {
-		/*
-		 * Give back all io space back to parent.
-		 */
-		(void) ndi_ra_free(ddi_get_parent(new_child),
-		    io_answer, io_alen, NDI_RA_TYPE_IO, NDI_RA_PASS);
-
+	if (io_end == io_answer) {
 		DEBUG0("No IO Space resources used\n");
 
 		/*
@@ -4274,13 +4635,6 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 
 		io_size = 0;
 	} else {
-		/*
-		 * Give back the unused io space to the parent.
-		 */
-		(void) ndi_ra_free(ddi_get_parent(new_child),
-		    io_end, (io_answer + io_alen) - io_end,
-		    NDI_RA_TYPE_IO, NDI_RA_PASS);
-
 		/*
 		 * Reprogram the end of the io space.
 		 */
@@ -4354,25 +4708,29 @@ pcicfg_probe_bridge(dev_info_t *new_child, ddi_acc_handle_t h, uint_t bus,
 	}
 	/*
 	 * Remove the resource maps for the bridge since we no longer
-	 * need them.
+	 * need them.  Note that the failure is ignored since the
+	 * ndi_devi_offline above may have already taken care of it via
+	 * driver detach.
+	 * It has been checked that there are no other reasons for
+	 * failure other than map itself being non-existent. So we are Ok.
 	 */
 	if (ndi_ra_map_destroy(new_child, NDI_RA_TYPE_MEM) == NDI_FAILURE) {
+		/*EMPTY*/
 		DEBUG0("Can not destroy resource map - NDI_RA_TYPE_MEM\n");
-		return (PCICFG_FAILURE);
 	}
 
 	if (ndi_ra_map_destroy(new_child, NDI_RA_TYPE_IO) == NDI_FAILURE) {
+		/*EMPTY*/
 		DEBUG0("Can not destroy resource map - NDI_RA_TYPE_IO\n");
-		return (PCICFG_FAILURE);
 	}
 
 	if (ndi_ra_map_destroy(new_child, NDI_RA_TYPE_PCI_BUSNUM)
 			== NDI_FAILURE) {
+		/*EMPTY*/
 		DEBUG0("Can't destroy resource map - NDI_RA_TYPE_PCI_BUSNUM\n");
-		return (PCICFG_FAILURE);
 	}
 
-	return (PCICFG_SUCCESS);
+	return (rval);
 }
 
 /*
@@ -4395,6 +4753,7 @@ pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 	 * mapped, otherwise it is 0. "flags" is introduced in support of any
 	 * non transparent bridges, where configuration space is indirectly
 	 * mapped.
+	 * Indirect mapping is always true on sun4v systems.
 	 */
 	int			flags = 0;
 
@@ -4425,6 +4784,7 @@ pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 	attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
 	attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
 	attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+	attr.devacc_attr_access = DDI_CAUTIOUS_ACC;
 
 #ifdef	EFCODE21554
 	if (ddi_regs_map_setup(dip, 0, &virt,
@@ -4452,12 +4812,18 @@ pcicfg_config_setup(dev_info_t *dip, ddi_acc_handle_t *handle)
 	}
 
 	if (ret == DDI_SUCCESS) {
-		if ((tmp == (int16_t)0xffff) || (tmp == -1)) {
+		if (tmp == -1) {
 			DEBUG1("NO DEVICEFOUND, read %x\n", tmp);
 			ret = PCICFG_NODEVICE;
 		} else {
-			DEBUG1("DEVICEFOUND, read %x\n", tmp);
-			ret = PCICFG_SUCCESS;
+			/* XXX - Need to check why HV is returning 0 */
+			if (tmp == 0) {
+				DEBUG0("Device Not Ready yet ?");
+				ret = PCICFG_NODEVICE;
+			} else {
+				DEBUG1("DEVICEFOUND, read %x\n", tmp);
+				ret = PCICFG_SUCCESS;
+			}
 		}
 	} else {
 		DEBUG0("ddi_peek failed, must be NODEVICE\n");

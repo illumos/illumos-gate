@@ -684,6 +684,8 @@ PCIHPNEXUS_OBJS += pcihp.o
 
 PCIEHPCNEXUS_OBJS += pciehpc.o
 
+PCISHPC_OBJS += pcishpc.o
+
 PCICFG_OBJS += pcicfg.o
 
 OPENEEPR_OBJS += openprom.o

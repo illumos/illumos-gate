@@ -22,8 +22,9 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 #
 #	This makefile drives the production of the sun4u starcat platform
 #	module.
@@ -86,12 +87,7 @@ install: $(ROOT_STARCAT_DIR) $(USR_STARCAT_DIR) \
 	$(USR_STARCAT_LIB_DIR) \
 	$(STARCAT_CRYPTO_LINKS) \
 	genassym unix .WAIT $(STARCAT_CPU_KMODS) \
-	$(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS) pcicfg
-
-pcicfg:		$(ROOT_PSM_MISC_DIR_64)/pcicfg.e $(ROOT_STARCAT_MISC_DIR_64)
-		-@$(RM) $(ROOT_STARCAT_MISC_DIR_64)/$@
-		$(SYMLINK) ../../../../sun4u/kernel/misc/sparcv9/pcicfg.e \
-		$(ROOT_STARCAT_MISC_DIR_64)/$@
+	$(STARCAT_KMODS) $(CLOSED_STARCAT_KMODS)
 
 genassym unix $(STARCAT_KMODS) $(STARCAT_CPU_KMODS): FRC
 	@cd $@; pwd; $(MAKE) $(NO_STATE) $(TARGET)

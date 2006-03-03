@@ -228,7 +228,7 @@ px_dma_attach(px_t *px_p)
 			PCI_MAP_ATTR_WRITE|PCI_MAP_ATTR_READ,
 			&baddr) != DDI_ENOTSUP)
 		/* ignore all other errors */
-		px_p->px_soft_state |= PX_BYPASS_DMA_ALLOWED;
+		px_p->px_dev_caps |= PX_BYPASS_DMA_ALLOWED;
 
 	return (DDI_SUCCESS);
 }
@@ -276,7 +276,7 @@ px_dma_attr2hdl(px_t *px_p, ddi_dma_impl_t *mp)
 		 * If Bypass DMA is not supported, return error so that
 		 * target driver can fall back to dvma mode of operation
 		 */
-		if (!(px_p->px_soft_state & PX_BYPASS_DMA_ALLOWED))
+		if (!(px_p->px_dev_caps & PX_BYPASS_DMA_ALLOWED))
 			return (DDI_DMA_BADATTR);
 		mp->dmai_flags |= PX_DMAI_FLAGS_BYPASSREQ;
 		if (nocross != UINT64_MAX)

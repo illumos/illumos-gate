@@ -47,6 +47,9 @@
 #include <sys/callb.h>
 #include <sys/ddi.h>
 #include <sys/sunddi.h>
+#if defined(__sparc)
+#include <sys/pcie_impl.h>
+#endif
 #include <sys/hotplug/pci/pciehpc_impl.h>
 
 /*
@@ -69,6 +72,12 @@ static void pciehpc_destroy_soft_state(dev_info_t *dip);
 static char *pciehpc_led_state_text(hpc_led_state_t state);
 static void pciehpc_attn_btn_handler(pciehpc_t *ctrl_p);
 static void pciehpc_dev_info(pciehpc_t *ctrl_p);
+
+static int pciehpc_pcie_dev(dev_info_t *dip, ddi_acc_handle_t handle);
+#if defined(__sparc)
+static void pciehpc_disable_errors(pciehpc_t *ctrl_p);
+static void pciehpc_enable_errors(pciehpc_t *ctrl_p);
+#endif
 
 #ifdef DEBUG
 int pciehpc_debug = 0;
@@ -186,6 +195,8 @@ pciehpc_init(dev_info_t *dip, pciehpc_regops_t *regops)
 		    goto cleanup;
 	}
 
+	PCIEHPC_DISABLE_ERRORS(ctrl_p);
+
 	/*
 	 * Set the platform specific hot plug mode.
 	 */
@@ -245,6 +256,7 @@ cleanup2:
 	(void) (ctrl_p->ops.uninit_hpc_hw)(ctrl_p);
 
 cleanup1:
+	PCIEHPC_ENABLE_ERRORS(ctrl_p);
 	pciehpc_regs_teardown(&ctrl_p->cfghdl);
 
 cleanup:
@@ -284,6 +296,8 @@ pciehpc_uninit(dev_info_t *dip)
 
 	/* uninitialize hpc, remove interrupt handler, etc. */
 	(void) (ctrl_p->ops.uninit_hpc_hw)(ctrl_p);
+
+	PCIEHPC_ENABLE_ERRORS(ctrl_p);
 
 	/* free up the HPC register mapping */
 	pciehpc_regs_teardown(&ctrl_p->cfghdl);
@@ -1257,6 +1271,7 @@ pciehpc_slot_control(caddr_t ops_arg, hpc_slot_t slot_hdl,
 		/* if power to the slot is still on then set Power led to ON */
 		if (ctrl_p->slot.slot_state == HPC_SLOT_CONNECTED)
 		    pciehpc_set_led_state(ctrl_p, HPC_POWER_LED, HPC_LED_ON);
+		PCIEHPC_ENABLE_ERRORS(ctrl_p);
 		break;
 	    case HPC_CTRL_ENABLE_AUTOCFG:
 	    case HPC_CTRL_DISABLE_AUTOCFG:
@@ -1270,11 +1285,16 @@ pciehpc_slot_control(caddr_t ops_arg, hpc_slot_t slot_hdl,
 
 	    case HPC_CTRL_DEV_CONFIG_START:
 	    case HPC_CTRL_DEV_UNCONFIG_START:
+		PCIEHPC_DISABLE_ERRORS(ctrl_p);
 		/* no action is needed here */
 		break;
 	    case HPC_CTRL_DEV_CONFIGURED:
 	    case HPC_CTRL_DEV_UNCONFIGURED:
 		/* no action is needed here */
+		if (request == HPC_CTRL_DEV_CONFIGURED) {
+			/*EMPTY*/
+			PCIEHPC_ENABLE_ERRORS(ctrl_p);
+		}
 		break;
 	    default:
 		PCIEHPC_DEBUG((CE_WARN,
@@ -1683,6 +1703,15 @@ pciehpc_dev_info(pciehpc_t *ctrl_p)
 	int reglen;
 	dev_info_t *dip = ctrl_p->dip;
 
+	/*
+	 * Check if it is a PCIe fabric hotplug nexus. This is specially
+	 * not so for Rootcomplex nodes supporting PCIe hotplug.
+	 * We save this information so as to implement hardening for
+	 * fabric nodes only via pcie services.
+	 */
+	if (pciehpc_pcie_dev(dip, ctrl_p->cfghdl) == DDI_SUCCESS)
+		ctrl_p->soft_state |= PCIEHPC_SOFT_STATE_PCIE_DEV;
+
 	/* Get the device number. */
 	if (ddi_getlongprop(DDI_DEV_T_NONE, dip, DDI_PROP_DONTPASS,
 		"reg", (caddr_t)&regspec, &reglen) != DDI_SUCCESS) {
@@ -1757,3 +1786,52 @@ pciehpc_set_slot_name(pciehpc_t *ctrl_p)
 			p->slotNum);
 	}
 }
+
+/*ARGSUSED*/
+static int
+pciehpc_pcie_dev(dev_info_t *dip, ddi_acc_handle_t handle)
+{
+	/* get parent device's device_type property */
+	char *device_type;
+	int rc;
+	dev_info_t *pdip = ddi_get_parent(dip);
+
+	if (ddi_prop_lookup_string(DDI_DEV_T_ANY, pdip,
+		DDI_PROP_DONTPASS, "device_type", &device_type)
+			!= DDI_PROP_SUCCESS) {
+		PCIEHPC_DEBUG2((CE_NOTE, "device_type property missing for "
+			"%s#%d", ddi_get_name(pdip), ddi_get_instance(pdip)));
+		return (DDI_FAILURE);
+	}
+
+	PCIEHPC_DEBUG((CE_NOTE, "device_type=<%s>\n", device_type));
+	rc = DDI_FAILURE;
+	if (strcmp(device_type, "pciex") == 0)
+		rc = DDI_SUCCESS;
+	ddi_prop_free(device_type);
+	return (rc);
+}
+
+#if defined(__sparc)
+static void
+pciehpc_disable_errors(pciehpc_t *ctrl_p)
+{
+	if (ctrl_p->soft_state & PCIEHPC_SOFT_STATE_PCIE_DEV) {
+		pcie_disable_errors(ctrl_p->dip, ctrl_p->cfghdl);
+		PCIEHPC_DEBUG3((CE_NOTE, "%s%d: pciehpc_disable_errors\n",
+		    ddi_driver_name(ctrl_p->dip),
+		    ddi_get_instance(ctrl_p->dip)));
+	}
+}
+
+static void
+pciehpc_enable_errors(pciehpc_t *ctrl_p)
+{
+	if (ctrl_p->soft_state & PCIEHPC_SOFT_STATE_PCIE_DEV) {
+		pcie_enable_errors(ctrl_p->dip, ctrl_p->cfghdl);
+		PCIEHPC_DEBUG3((CE_NOTE, "%s%d: pciehpc_enable_errors\n",
+		    ddi_driver_name(ctrl_p->dip),
+		    ddi_get_instance(ctrl_p->dip)));
+	}
+}
+#endif

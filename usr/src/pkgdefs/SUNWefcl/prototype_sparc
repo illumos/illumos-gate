@@ -22,7 +22,7 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -64,3 +64,6 @@ f none usr/lib/efcode/sparcv9/lfc_upa_pci.so 755 root bin
 f none usr/lib/efcode/sparcv9/lfc_gptwo.so 755 root bin
 s none usr/lib/efcode/sparcv9/lfc_gptwo_gptwo.so=lfc_gptwo.so
 s none usr/lib/efcode/sparcv9/lfc_gptwo_pci.so=lfc_upa_pci.so
+s none usr/lib/efcode/sparcv9/lfc_pciex_pciex.so=lfc_upa_pci.so
+s none usr/lib/efcode/sparcv9/lfc_pciex_pci.so=lfc_upa_pci.so
+s none usr/lib/efcode/sparcv9/lfc_pci_pciex.so=lfc_upa_pci.so

@@ -114,6 +114,8 @@ typedef struct {
 	uint32_t	size_low;
 } pxb_ranges_t;
 
+typedef enum { HPC_NONE, HPC_PCIE, HPC_SHPC, HPC_OUTBAND } pxb_hpc_type_t;
+
 typedef struct {
 	dev_info_t		*pxb_dip;
 
@@ -133,6 +135,7 @@ typedef struct {
 	 * HP support
 	 */
 	boolean_t		pxb_hotplug_capable;
+	pxb_hpc_type_t		pxb_hpc_type;
 
 	kmutex_t		pxb_mutex;
 	uint_t			pxb_soft_state;
@@ -147,7 +150,7 @@ typedef struct {
 	/* Vendor Device Id */
 	uint16_t		pxb_vendor_id;
 	uint16_t		pxb_device_id;
-
+	uint8_t			pxb_rev_id;
 } pxb_devstate_t;
 
 /*
@@ -183,6 +186,19 @@ extern void *pxb_state;
 #define	PXB_IS_BCM5714(pxb) \
 	((pxb->pxb_vendor_id == PXB_VENDOR_BCM) && \
 	(pxb->pxb_device_id == PXB_DEVICE_BCM5714))
+
+#define	PXB_DEVICE_PLX_BAD_MSI_REV	0xAA	/* last known bad rev for MSI */
+
+#define	PXB_VENDOR_SUN			0x108E
+#define	PXB_DEVICE_PLX_PCIX		0x9010
+#define	PXB_DEVICE_PLX_PCIE		0x9020
+
+#define	PXB_HOTPLUG_INTR_PRI		(LOCK_LEVEL - 1)
+
+/* functionality checks */
+#define	PXB_MSI				1
+#define	PXB_LINK_INIT			2
+#define	PXB_HOTPLUG_MSGS		3
 
 #ifdef	__cplusplus
 }

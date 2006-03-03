@@ -21,7 +21,7 @@
 #
 #
 # uts/sparc/pcihp/Makefile
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
@@ -71,7 +71,7 @@ CLEANFILES	+= $(MODSTUBS_O)
 
 #
 #	Dependency
-LDFLAGS		+= -dy -Nmisc/busra -Nmisc/hpcsvc -Nmisc/pcicfg
+LDFLAGS		+= -dy -Nmisc/busra -Nmisc/hpcsvc -Nmisc/pcicfg.e
 
 #
 #	Default build targets.

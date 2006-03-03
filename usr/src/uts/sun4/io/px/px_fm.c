@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -804,7 +804,9 @@ px_err_fabric_intr(px_t *px_p, msgcode_t msg_code,
 	 */
 	if ((err & (PX_FATAL_GOS | PX_FATAL_SW)) ||
 	    (ret == DDI_FM_FATAL) || (fab_err == DDI_FM_FATAL))
-		PX_FM_PANIC("Fatal PCIe Fabric Error has occurred\n");
+		PX_FM_PANIC("%s#%d: Fatal PCIe Fabric Error has occurred"
+				"(%x,%x,%x)\n", ddi_driver_name(rpdip),
+				ddi_get_instance(rpdip), err, fab_err, ret);
 
 	return (DDI_INTR_CLAIMED);
 }

@@ -21,8 +21,9 @@
 #
 #
 # uts/sun4u/montecarlo/Makefile
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
+#
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 #
@@ -71,12 +72,7 @@ install:        $(ROOT_MONTECARLO_DIR) $(USR_MONTECARLO_DIR) \
                 $(USR_MONTECARLO_SBIN_DIR) \
                 $(USR_MONTECARLO_LIB_DIR) \
                 .WAIT $(MONTECARLO_KMODS) $(CLOSED_MONTECARLO_KMODS) \
-		pcicfg se.conf ttymux.conf
-
-pcicfg:		$(ROOT_MONTECARLO_MISC_DIR_64)
-		-@$(RM) $(ROOT_MONTECARLO_MISC_DIR_64)/$@
-		$(SYMLINK) ../../../../sun4u/kernel/misc/sparcv9/pcicfg.e \
-		$(ROOT_MONTECARLO_MISC_DIR_64)/$@
+		se.conf ttymux.conf
 
 se.conf:	$(ROOT_MONTECARLO_DRV_DIR)
 		-@$(RM) $(ROOT_MONTECARLO_DRV_DIR)/$@

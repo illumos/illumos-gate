@@ -22,7 +22,7 @@
 #
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 #
-# Copyright 2000-2001,2003 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # This required package information file contains a list of package contents.
@@ -46,52 +46,20 @@ i depend
 #
 # SUNWefc.u
 #
+d none kernel 755 root sys
+d none kernel/drv 755 root sys
+f none kernel/drv/fcode.conf 644 root sys
+d none kernel/drv/sparcv9 755 root sys
+f none kernel/drv/sparcv9/fcode 755 root sys
+d none kernel/misc 755 root sys
+d none kernel/misc/sparcv9 755 root sys
+f none kernel/misc/sparcv9/fcodem 755 root sys
+f none kernel/misc/sparcv9/fcpci 755 root sys
+f none kernel/misc/sparcv9/pcicfg.e 755 root sys
 d none platform 755 root sys
 d none platform/sun4u 755 root sys
 d none platform/sun4u/kernel 755 root sys
-d none platform/sun4u/kernel/drv 755 root sys
-f none platform/sun4u/kernel/drv/fcode.conf 644 root sys
-d none platform/sun4u/kernel/drv/sparcv9 755 root sys
-f none platform/sun4u/kernel/drv/sparcv9/fcode 755 root sys
 d none platform/sun4u/kernel/misc 755 root sys
 d none platform/sun4u/kernel/misc/sparcv9 755 root sys
-f none platform/sun4u/kernel/misc/sparcv9/fcodem 755 root sys
-f none platform/sun4u/kernel/misc/sparcv9/fcpci 755 root sys
-f none platform/sun4u/kernel/misc/sparcv9/pcicfg.e 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/gptwocfg 755 root sys
 f none platform/sun4u/kernel/misc/sparcv9/gptwo_cpu 755 root sys
-d none platform/SUNW,Sun-Fire 755 root sys
-d none platform/SUNW,Sun-Fire/kernel 755 root sys
-d none platform/SUNW,Sun-Fire/kernel/misc 755 root sys
-d none platform/SUNW,Sun-Fire/kernel/misc/sparcv9 755 root sys
-s none platform/SUNW,Sun-Fire/kernel/misc/sparcv9/pcicfg=../../../../sun4u/kernel/misc/sparcv9/pcicfg.e
-d none platform/SUNW,Sun-Fire-880 755 root sys
-d none platform/SUNW,Sun-Fire-880/kernel 755 root sys
-d none platform/SUNW,Sun-Fire-880/kernel/misc 755 root sys
-d none platform/SUNW,Sun-Fire-880/kernel/misc/sparcv9 755 root sys
-s none platform/SUNW,Sun-Fire-880/kernel/misc/sparcv9/pcicfg=../../../../sun4u/kernel/misc/sparcv9/pcicfg.e
-d none platform/SUNW,Sun-Fire-15000 755 root sys
-d none platform/SUNW,Sun-Fire-15000/kernel 755 root sys
-d none platform/SUNW,Sun-Fire-15000/kernel/misc 755 root sys
-d none platform/SUNW,Sun-Fire-15000/kernel/misc/sparcv9 755 root sys
-s none platform/SUNW,Sun-Fire-15000/kernel/misc/sparcv9/pcicfg=../../../../sun4u/kernel/misc/sparcv9/pcicfg.e
-d none platform/SUNW,UltraSPARC-IIi-Netract 755 root sys
-d none platform/SUNW,UltraSPARC-IIi-Netract/kernel 755 root sys
-d none platform/SUNW,UltraSPARC-IIi-Netract/kernel/misc 755 root sys
-d none platform/SUNW,UltraSPARC-IIi-Netract/kernel/misc/sparcv9 755 root sys
-s none platform/SUNW,UltraSPARC-IIi-Netract/kernel/misc/sparcv9/pcicfg=../../../../sun4u/kernel/misc/sparcv9/pcicfg.e
-d none platform/SUNW,Netra-T12 755 root sys
-d none platform/SUNW,Netra-T12/kernel 755 root sys
-d none platform/SUNW,Netra-T12/kernel/misc 755 root sys
-d none platform/SUNW,Netra-T12/kernel/misc/sparcv9 755 root sys
-s none platform/SUNW,Netra-T12/kernel/misc/sparcv9/pcicfg=../../../../sun4u/kernel/misc/sparcv9/pcicfg.e
-d none platform/SUNW,UltraSPARC-IIe-NetraCT-40 755 root sys
-d none platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel 755 root sys
-d none platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/misc 755 root sys
-d none platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/misc/sparcv9 755 root sys
-s none platform/SUNW,UltraSPARC-IIe-NetraCT-40/kernel/misc/sparcv9/pcicfg=../../../../sun4u/kernel/misc/sparcv9/pcicfg.e
-d none platform/SUNW,UltraSPARC-IIe-NetraCT-60 755 root sys
-d none platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel 755 root sys
-d none platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/misc 755 root sys
-d none platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/misc/sparcv9 755 root sys
-s none platform/SUNW,UltraSPARC-IIe-NetraCT-60/kernel/misc/sparcv9/pcicfg=../../../../sun4u/kernel/misc/sparcv9/pcicfg.e

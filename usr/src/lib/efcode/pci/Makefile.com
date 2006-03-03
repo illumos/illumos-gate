@@ -20,7 +20,7 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -29,6 +29,7 @@
 OBJECTS	= pci.o
 LIBRARY	= lfc_upa_pci.a
 
-SYMLINKS = lfc_pci_pci.so lfc_gptwo_pci.so
+SYMLINKS = lfc_pci_pci.so lfc_gptwo_pci.so lfc_pciex_pciex.so \
+		lfc_pciex_pci.so lfc_pci_pciex.so
 
 include ../../Makefile.efcode

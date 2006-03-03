@@ -21,7 +21,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -80,6 +80,7 @@ typedef uint32_t pciehpc_soft_state_t;
 #define	PCIEHPC_SOFT_STATE_INIT_ENABLE		0x20
 #define	PCIEHPC_SOFT_STATE_INIT_BLOCK		0x40
 #define	PCIEHPC_SOFT_STATE_INIT_FM		0x80
+#define	PCIEHPC_SOFT_STATE_PCIE_DEV		0x10000
 
 /*
  * PCI Express Hotplug controller soft state structure
@@ -209,6 +210,14 @@ extern int pciehpc_debug;
 
 /* default interrupt priority for Hot Plug interrupts */
 #define	PCIEHPC_INTR_PRI	1
+
+#if	defined(__sparc)
+#define	PCIEHPC_ENABLE_ERRORS(arg)	pciehpc_enable_errors(arg)
+#define	PCIEHPC_DISABLE_ERRORS(arg)	pciehpc_disable_errors(arg)
+#else
+#define	PCIEHPC_ENABLE_ERRORS(arg)
+#define	PCIEHPC_DISABLE_ERRORS(arg)
+#endif
 
 #ifdef	__cplusplus
 }

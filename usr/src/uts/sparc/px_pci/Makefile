@@ -22,7 +22,7 @@
 #
 # uts/sparc/px_pci/Makefile
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -75,7 +75,7 @@ CFLAGS += -dalign
 #
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/pcie
+LDFLAGS += -dy -Nmisc/pcie -Nmisc/pcishpc -Nmisc/pcihp -Nmisc/pciehpc
 
 #
 #	Default build targets.
@@ -102,4 +102,3 @@ install:	$(INSTALL_DEPS)
 #	Include common targets.
 #
 include $(UTSBASE)/sparc/Makefile.targ
-include $(UTSBASE)/sun4/Makefile.rules

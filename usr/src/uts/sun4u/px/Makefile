@@ -22,7 +22,7 @@
 #
 # uts/sun4u/px/Makefile
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
@@ -76,7 +76,7 @@ CFLAGS += -dalign
 #
 #	Dependency
 #
-LDFLAGS += -dy -Nmisc/busra -Nmisc/pcie
+LDFLAGS += -dy -Nmisc/busra -Nmisc/pcie -Nmisc/pcihp -Nmisc/pciehpc
 
 #
 #	Default build targets.

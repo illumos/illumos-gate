@@ -264,6 +264,7 @@ DRV_KMODS	+= sbp2
 DRV_KMODS	+= ib ibd
 DRV_KMODS	+= pci_pci px_pci pcie
 DRV_KMODS	+= i8042 kb8042 mouse8042
+DRV_KMODS	+= fcode
 
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audioens
 $(CLOSED_BUILD)CLOSED_DRV_KMODS	+= audiovia823x
@@ -352,7 +353,7 @@ MISC_KMODS	+= kmech_krb5
 MISC_KMODS	+= fssnap_if
 MISC_KMODS	+= hidparser kbtrans usba usba10 usbs49_fw
 MISC_KMODS	+= s1394
-MISC_KMODS	+= hpcsvc pcicfg pcihp
+MISC_KMODS	+= hpcsvc pcihp pciehpc pcishpc
 MISC_KMODS	+= rsmops
 MISC_KMODS	+= kcf
 MISC_KMODS	+= ibcm
@@ -364,6 +365,7 @@ MISC_KMODS	+= zmod
 MISC_KMODS	+= mac dls
 MISC_KMODS	+= cmlb
 MISC_KMODS	+= tem
+MISC_KMODS	+= pcicfg.e fcodem fcpci
 
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= amsrc1
 $(CLOSED_BUILD)CLOSED_MISC_KMODS	+= klmmod klmops

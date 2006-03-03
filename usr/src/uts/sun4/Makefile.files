@@ -80,9 +80,6 @@ PX_OBJS		+= px.o px_cb.o px_debug.o px_devctl.o px_dma.o \
 FPC_OBJS        += fpc.o fpc-impl.o fpc-kstats.o
 VIS_OBJS	+= visinstr.o
 TOD_OBJS	+= tod.o
-FCODE_OBJS	+= fcode.o
-FCODEM_OBJS	+= fc_ddi.o fc_physio.o fc_ops.o fc_subr.o
-FCPCI_OBJS	+= fcpci.o
 EBUS_OBJS	+= ebus.o
 SU_OBJS		+= su_driver.o
 

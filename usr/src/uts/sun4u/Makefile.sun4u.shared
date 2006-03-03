@@ -367,7 +367,6 @@ DRV_KMODS	+= su
 DRV_KMODS	+= tod
 DRV_KMODS	+= power
 DRV_KMODS	+= epic
-DRV_KMODS       += fcode
 DRV_KMODS	+= grbeep
 DRV_KMODS	+= pcf8584 max1617 seeprom tda8444 pca9556
 DRV_KMODS	+= ics951601 adm1031
@@ -434,7 +433,6 @@ SYS_KMODS	+=
 MISC_KMODS	+= obpsym bootdev vis cpr platmod md5 sha1 i2c_svc
 MISC_KMODS	+= sbd
 
-MISC_KMODS	+= fcodem fcpci pcicfg.e
 MISC_KMODS	+= kmech_krb5
 MISC_KMODS	+= zuluvm
 

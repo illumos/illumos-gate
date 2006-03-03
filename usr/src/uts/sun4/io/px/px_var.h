@@ -20,7 +20,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -132,6 +132,8 @@ struct px {
 	int px_fm_cap;
 	ddi_iblock_cookie_t px_fm_ibc;
 
+	uint32_t	px_dev_caps;
+
 	/* Platform specific information */
 	void	*px_plat_p;
 
@@ -152,7 +154,10 @@ struct px {
 #define	PX_SOFT_STATE_OPEN		0x01
 #define	PX_SOFT_STATE_OPEN_EXCL		0x02
 #define	PX_SOFT_STATE_CLOSED		0x04
-#define	PX_BYPASS_DMA_ALLOWED		0x10
+
+/* px_dev_caps definition */
+#define	PX_BYPASS_DMA_ALLOWED		0x00000001
+#define	PX_HOTPLUG_CAPABLE		0x00000002
 
 /* px_pm_flags definitions used with interrupts and FMA code */
 #define	PX_PMETOACK_RECVD		0x01 /* With PME_To_ACK interrupt */
