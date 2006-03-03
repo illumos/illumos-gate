@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,6 +46,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <locale.h>
+#include <string.h>
 
 #define	PRIVILEGED	0 			/* priviledged id */
 
@@ -72,7 +73,7 @@ struct spwd *
 local_getspnam(char *name)
 {
 	FILE *shadf;
-	struct spwd * sp;
+	struct spwd *sp;
 
 
 	if ((shadf = fopen("/etc/shadow", "r")) == NULL)
@@ -83,7 +84,7 @@ local_getspnam(char *name)
 			break;
 	}
 
-	fclose(shadf);
+	(void) fclose(shadf);
 
 	return (sp);
 }
@@ -101,8 +102,9 @@ main(int argc, char **argv)
 	int file_exist = 1;
 	int end_of_file = 0;
 	mode_t mode;
+	mode_t pwd_mode;
 	int pwerr = 0;
-	ushort i;
+	ushort_t i;
 	gid_t pwd_gid, sp_gid;
 	uid_t pwd_uid, sp_uid;
 	FILE *pwf;
@@ -119,7 +121,8 @@ main(int argc, char **argv)
 	prognamp = argv[0];
 	/* only PRIVILEGED can execute this command */
 	if (getuid() != PRIVILEGED) {
-		fprintf(stderr, gettext("%s: Permission denied.\n"), prognamp);
+		(void) fprintf(stderr, gettext("%s: Permission denied.\n"),
+		    prognamp);
 		exit(NOPERM);
 	}
 
@@ -128,7 +131,7 @@ main(int argc, char **argv)
 		(void) fprintf(stderr,
 		gettext("%s: Invalid command syntax.\n"),
 			prognamp);
-		fprintf(stderr, gettext("Usage: pwconv\n"));
+		(void) fprintf(stderr, gettext("Usage: pwconv\n"));
 		exit(BADSYN);
 	}
 
@@ -142,7 +145,7 @@ main(int argc, char **argv)
 
 	/* All signals will be ignored during the execution of pwconv */
 	for (i = 1; i < NSIG; i++)
-		sigset(i, SIG_IGN);
+		(void) sigset(i, SIG_IGN);
 
 	/* reset errno to avoid side effects of a failed */
 	/* sigset (e.g., SIGKILL) */
@@ -156,9 +159,10 @@ main(int argc, char **argv)
 	}
 	pwd_gid = buf.st_gid;
 	pwd_uid = buf.st_uid;
+	pwd_mode = buf.st_mode;
 
 	/* mode for the password file should be read-only or less */
-	umask(S_IAMB & ~(buf.st_mode & (S_IRUSR|S_IRGRP|S_IROTH)));
+	(void) umask(S_IAMB & ~(buf.st_mode & (S_IRUSR|S_IRGRP|S_IROTH)));
 
 	/* open temporary password file */
 	if ((tp_fp = fopen(PASSTEMP, "w")) == NULL) {
@@ -198,7 +202,7 @@ main(int argc, char **argv)
 	 * get the mode of shadow password file  -- mode of the file should
 	 * be read-only for user or less.
 	 */
-	umask(mode);
+	(void) umask(mode);
 
 	/* open temporary shadow file */
 	if ((tsp_fp = fopen(SHADTEMP, "w")) == NULL) {
@@ -258,7 +262,7 @@ main(int argc, char **argv)
 				 * convert aging info from weeks to days
 				 */
 				if (pwdp->pw_age && *pwdp->pw_age != NULL) {
-					when = (long) a64l(pwdp->pw_age);
+					when = (long)a64l(pwdp->pw_age);
 					maxweeks = when & 077;
 					minweeks = (when >> 6) & 077;
 					when >>= 12;
@@ -344,7 +348,7 @@ main(int argc, char **argv)
 			 * convert aging info from weeks to days
 			 */
 			if (pwdp->pw_age && *pwdp->pw_age != NULL) {
-				when = (long) a64l(pwdp->pw_age);
+				when = (long)a64l(pwdp->pw_age);
 				maxweeks = when & 077;
 				minweeks = (when >> 6) & 077;
 				when >>= 12;
@@ -377,8 +381,9 @@ main(int argc, char **argv)
 			errno = 0;
 			pwerr = 1;
 			(void) fprintf(stderr,
-			gettext("%s: ERROR: bad entry or blank line at line %d in /etc/passwd\n"),
-					prognamp, count);
+			    gettext("%s: ERROR: bad entry or blank "
+			    "line at line %d in /etc/passwd\n"),
+			    prognamp, count);
 		}
 	    }
 	} /* end of while */
@@ -452,6 +457,9 @@ main(int argc, char **argv)
 		exit(FMERR);
 	}
 
+	/* Make new mode same as old */
+	(void) chmod(PASSWD, pwd_mode);
+
 	/* Change old password file to read only by owner   */
 	/* If chmod fails, delete the old password file so that */
 	/* the password fields can not be read by others */
@@ -481,7 +489,7 @@ no_convert(void)
 void
 f_err(void)
 {
-	fprintf(stderr,
+	(void) fprintf(stderr,
 		gettext("%s: Unexpected failure. Conversion not done.\n"),
 			prognamp);
 	(void) ulckpwdf();
@@ -490,7 +498,7 @@ f_err(void)
 void
 f_miss(void)
 {
-	fprintf(stderr,
+	(void) fprintf(stderr,
 		gettext("%s: Unexpected failure. Password file(s) missing.\n"),
 			prognamp);
 	(void) ulckpwdf();
@@ -499,7 +507,7 @@ f_miss(void)
 void
 f_bdshw(void)
 {
-	fprintf(stderr,
+	(void) fprintf(stderr,
 		gettext("%s: Bad entry in /etc/shadow. Conversion not done.\n"),
 			prognamp);
 	(void) ulckpwdf();
