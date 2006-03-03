@@ -112,10 +112,9 @@ asru chip/cpu;
  * faulted in this way on a single DIMM exceeds a threshold we will
  * diagnose a fault.memory.dimm_sb against the DIMM.
  *
- * Multibit ChipKill-correctable errors produce an immediate page fault
- * and corresponding fault.memory.dimm_ck.  This is achieved through
- * SERD engines using N=0 so the facility is there to be a little more
- * tolerant of these errors.
+ * Multibit ChipKill-correctable errors produce an immediate page fault.
+ * This is achieved through SERD engines using N=0 so the facility is there
+ * to be a little more tolerant of these errors in future.
  *
  * Uncorrectable errors produce an immediate page fault and corresponding
  * fault.memory.dimm_ue.
@@ -230,13 +229,17 @@ prop fault.memory.dimm_sb@dimm (0)->
 	count(stat.page_fault@dimm) >= DIMM_SB_THRESH };
 
 /*								#DIMM_CK#
- * ChipKill-correctable multi-bit faults indicate a likely failing SDRAM
- * part.  We will SERD them but with a very low/zero tolerance.
+ * ChipKill-correctable multi-bit errors produce immediate page faults.
+ * If the fault is indeed isolated to just a few cells then we have contained
+ * the error;  if not, say if the SDRAM device is failing, then we will hit a
+ * number of other similar errors in a short space of time.  Thus we will
+ * SERD these in diagnosing a fault.memory.dimm_ck and not simply fault
+ * the DIMM at the first instance.
  */
 
 #define DIMM_CK_FIT		4000 
-#define	DIMM_CK_COUNT		0
-#define	DIMM_CK_TIME		1h
+#define	DIMM_CK_COUNT		2
+#define	DIMM_CK_TIME		72h
 
 event fault.memory.dimm_ck@dimm, FITrate=DIMM_CK_FIT, FRU=dimm, ASRU=dimm,
     action=confcall("rewrite-ASRU");
@@ -742,10 +745,17 @@ prop fault.cpu.amd.datapath@chip/cpu (1)->
  *  - inf_sys_ecc1 : reported by ic on access from a local cpu
  *  - inf_sys_ecc1 : reported by dc on access from a local cpu
  *  - s_ecc1 : reported by bu on access from a local cpu (hw prefetch etc)
+ *
+ * Empirical observations show that in 64/8 ECC mode some memory CEs *can*
+ * travel past the DRAM controller and on to the IC/DC/BU to be reported
+ * via the above errors.  This is not the case with ChipKill enabled.
+ * We should not be diagnosing datapath/chip errors for these.  While
+ * this behaviour is clarified the serd parameters will be set to infinity
+ * (and the multibit counterpats will not be seen because of sync flood).
  */
 
-#define	CPU_DP_COUNT	3
-#define	CPU_DP_TIME	12h
+#define	CPU_DP_COUNT	5000
+#define	CPU_DP_TIME	1m
 
 event ereport.cpu.amd.ic.inf_sys_ecc1@chip/cpu{within(5s)};
 event ereport.cpu.amd.dc.inf_sys_ecc1@chip/cpu{within(5s)};

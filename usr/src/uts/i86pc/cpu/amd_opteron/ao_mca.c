@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -354,7 +353,7 @@ ao_nb_cfg(ao_mca_t *mca)
 int
 ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 {
-	int i, fatal, n = 0;
+	int i, fatal = 0, n = 0;
 
 	acl->acl_timestamp = gethrtime_waitfree();
 	acl->acl_mcg_status = rdmsr(IA32_MSR_MCG_STATUS);
@@ -393,7 +392,8 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 	 * If we took a machine-check trap, then the error is fatal if the
 	 * return instruction pointer is not valid in the global register.
 	 */
-	fatal = rp != NULL && !(acl->acl_mcg_status & MCG_STATUS_RIPV);
+	if (rp != NULL && !(acl->acl_mcg_status & MCG_STATUS_RIPV))
+		fatal++;
 
 	/*
 	 * Now iterate over the saved logout area, determining whether the
@@ -403,12 +403,18 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 	for (i = 0; i < AMD_MCA_BANK_COUNT; i++) {
 		ao_bank_logout_t *abl = &acl->acl_banks[i];
 		const ao_error_disp_t *aed;
+		uint8_t when;
 
 		if (!(abl->abl_status & AMD_BANK_STAT_VALID))
 			continue;
 
 		aed = ao_disp_match(i, abl->abl_status);
-		fatal |= (aed->aed_panic_when != AO_AED_PANIC_NEVER);
+		if ((when = aed->aed_panic_when) != AO_AED_PANIC_NEVER) {
+			if ((when & AO_AED_PANIC_ALWAYS) ||
+			    ((when & AO_AED_PANIC_IFMCE) && rp != NULL)) {
+					fatal++;
+			}
+		}
 
 		/*
 		 * If we are taking a machine-check exception and the overflow
@@ -421,7 +427,7 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 		 */
 		if (rp != NULL && (abl->abl_status &
 		    (AMD_BANK_STAT_OVER | AMD_BANK_STAT_PCC)))
-			fatal = 1;
+			fatal++;
 
 		/*
 		 * If we are taking a machine-check exception and we don't
@@ -430,7 +436,7 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 		 * Rev E exception mechanism for detecting correctable errors.
 		 */
 		if (rp != NULL && aed == &ao_disp_unknown)
-			fatal = 1;
+			fatal++;
 
 		n++;
 	}
@@ -444,7 +450,7 @@ ao_mca_logout(ao_cpu_logout_t *acl, struct regs *rp, int *np)
 	if (np != NULL)
 		*np = n; /* return number of errors found to caller */
 
-	return (fatal);
+	return (fatal != 0);
 }
 
 static uint_t

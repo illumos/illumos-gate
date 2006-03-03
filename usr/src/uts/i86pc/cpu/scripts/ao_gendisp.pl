@@ -3,9 +3,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -104,7 +103,8 @@ sub print_bits() {
 		print "\t( ", join(" | ", @bits), " ),";
 	}
 
-	print " /* $name */\n";
+	print " /* $name */" if (defined $name);
+	print "\n";
 }
 
 sub field_burst() {
@@ -272,13 +272,13 @@ sub state_code() {
 }
 
 sub state_panic() {
-	my $val = $_[0];
+	my @vals = split(/,\s*/, $_[0]);
 
-	if ($val eq "") {
+	if ($#vals < 0) {
 		print "\t0, /* panic_when */\n";
 	} else {
-		$val =~ tr/[a-z]/[A-Z]/;
-		print "\tAO_AED_PANIC_$val,\n";
+		@vals = map { tr/[a-z]/[A-Z]/; "AO_AED_PANIC_" . $_; } @vals;
+		&print_bits("panic_when", @vals);
 	}
 }
 

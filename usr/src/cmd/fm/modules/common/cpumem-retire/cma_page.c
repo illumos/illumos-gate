@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -211,6 +210,8 @@ cma_page_retire(fmd_hdl_t *hdl, nvlist_t *nvl, nvlist_t *asru, const char *uuid)
 	} else if (errno != EAGAIN) {
 		fmd_hdl_debug(hdl, "retire of page 0x%llx failed, will not "
 		    "retry: %s\n", (u_longlong_t)pageaddr, strerror(errno));
+		if (uuid != NULL && cma.cma_page_maxretries != 0)
+			fmd_case_uuclose(hdl, uuid);
 		if (asrucp)
 			nvlist_free(asrucp);
 		return;

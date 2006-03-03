@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -71,13 +70,12 @@ extern ao_bank_regs_t ao_bank_regs[AMD_MCA_BANK_COUNT];
  * bits in aed_stat_code for matching.  Similar reasoning lies behind the
  * creation of the pp and ii fields.
  */
-#define	AO_AED_PANIC_NEVER	0x00000000
-#define	AO_AED_PANIC_PRIV	0x00000001
-#define	AO_AED_PANIC_USER	0x00000002
-#define	AO_AED_PANIC_ALWAYS	0x00000003
+#define	AO_AED_PANIC_NEVER	0x00
+#define	AO_AED_PANIC_IFMCE	0x01
+#define	AO_AED_PANIC_ALWAYS	0x80
 
-#define	AO_AED_F_CORRECTABLE	0x00000001
-#define	AO_AED_F_LOFAULT_OK	0x00000002
+#define	AO_AED_F_CORRECTABLE	0x01
+#define	AO_AED_F_LOFAULT_OK	0x02
 
 typedef struct ao_error_disp {
 	const char *aed_class;		/* ereport class for use if match */
