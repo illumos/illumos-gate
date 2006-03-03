@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 /*
@@ -811,9 +811,11 @@ lyr_get_info(agp_kern_info_t *info, agp_registered_dev_t *agp_regdev)
 		    "lyr_get_info: function doesn't work for unknown arc"));
 		return (-1);
 	}
-	if (info->agpki_apersize >= MAXAPERMEGAS) {
+	if ((info->agpki_apersize >= MAXAPERMEGAS) ||
+	    (info->agpki_apersize == 0) ||
+	    (info->agpki_aperbase == 0)) {
 		AGPDB_PRINT2((CE_WARN,
-		    "lyr_get_info: aper size is too large!"));
+		    "lyr_get_info: aperture is not programmed correctly!"));
 		return (-1);
 	}
 
