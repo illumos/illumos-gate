@@ -355,29 +355,69 @@ ASRU_set(tnode_t *tn, did_t *pd,
     const char *dpnm, const char *tpgrp, const char *tpnm)
 {
 	topo_mod_t *mp;
-	nvlist_t *fmri;
-	char *nm;
-	int e;
+	topo_hdl_t *hp;
+	nvlist_t *fmri, *in;
+	char *dnpath, *path, *fpath, *nm;
+	int d, e, f;
 
 	/*
-	 * If this topology node represents a device, and that device
-	 * implements a slot, set the ASRU to be the resource describing
-	 * this topology node.  Otherwise, inherit our parent's ASRU value.
+	 * If this topology node represents a function of device,
+	 * set the ASRU to a dev scheme FMRI based on the value of
+	 * di_devfs_path().  If that path is NULL, set the ASRU to
+	 * be the resource describing this topology node.  If this
+	 * isn't a function, inherit any ASRU from the parent.
 	 */
 	mp = did_mod(pd);
+	hp = topo_mod_handle(mp);
 	nm = topo_node_name(tn);
-	if (strcmp(nm, PCI_DEVICE) == 0 || strcmp(nm, PCIEX_DEVICE) == 0) {
-		if (did_label(pd, topo_node_instance(tn)) != NULL) {
+	if (strcmp(nm, PCI_FUNCTION) == 0 || strcmp(nm, PCIEX_FUNCTION) == 0) {
+		if ((dnpath = di_devfs_path(did_dinode(pd))) != NULL) {
+			/*
+			 * Dup the path, dev_path_fix() may replace it and
+			 * dev_path_fix() wouldn't know to use
+			 * di_devfs_path_free()
+			 */
+			if ((path = topo_mod_strdup(mp, dnpath)) == NULL) {
+				di_devfs_path_free(dnpath);
+				return (topo_mod_seterrno(mp, EMOD_NOMEM));
+			}
+			di_devfs_path_free(dnpath);
+			did_BDF(pd, NULL, &d, &f);
+			if ((fpath = dev_path_fix(mp, path, d, f)) == NULL)
+				return (topo_mod_seterrno(mp, EMOD_NOMEM));
+
+			if (topo_mod_nvalloc(mp, &in, NV_UNIQUE_NAME) != 0) {
+				topo_mod_strfree(mp, fpath);
+				return (topo_mod_seterrno(mp, EMOD_FMRI_NVL));
+			}
+			if (nvlist_add_string(in,
+			    FM_FMRI_DEV_PATH, fpath) != 0) {
+				nvlist_free(in);
+				topo_mod_strfree(mp, fpath);
+				return (topo_mod_seterrno(mp, EMOD_NOMEM));
+			}
+			fmri = topo_fmri_create(hp, FM_FMRI_SCHEME_DEV,
+			    FM_FMRI_SCHEME_DEV, 0, in, &e);
+			nvlist_free(in);
+			if (fmri == NULL) {
+				topo_mod_dprintf(mp,
+				    "dev:///%s fmri creation failed.\n", fpath);
+				topo_mod_strfree(mp, fpath);
+				return (topo_mod_seterrno(mp, e));
+			}
+			topo_mod_strfree(mp, fpath);
+		} else {
+			topo_mod_dprintf(mp, "NULL di_devfs_path.\n");
 			if (topo_prop_get_fmri(tn, TOPO_PGROUP_PROTOCOL,
 			    TOPO_PROP_RESOURCE, &fmri, &e) < 0)
 				return (topo_mod_seterrno(mp, e));
-			if (topo_node_asru_set(tn, fmri, 0, &e) < 0) {
-				nvlist_free(fmri);
-				return (topo_mod_seterrno(mp, e));
-			}
-			nvlist_free(fmri);
-			return (0);
 		}
+		if (topo_node_asru_set(tn, fmri, 0, &e) < 0) {
+			nvlist_free(fmri);
+			return (topo_mod_seterrno(mp, e));
+		}
+		nvlist_free(fmri);
+		return (0);
 	}
 	if (topo_node_asru_set(tn, NULL, 0, &e) < 0)
 		if (e != ETOPO_PROP_NOENT)

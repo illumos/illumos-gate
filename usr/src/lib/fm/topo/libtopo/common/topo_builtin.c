@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -36,10 +35,11 @@
 
 static const struct topo_builtin _topo_builtins[] = {
 	{ "cpu", cpu_init, cpu_fini },
+	{ "dev", dev_init, dev_fini },
 	{ "mem", mem_init, mem_fini },
-	{ "hc", hc_init, hc_fini },
-	{ "mod", mod_init, mod_fini },
 	{ "pkg", pkg_init, pkg_fini },
+	{ "mod", mod_init, mod_fini },
+	{ "hc", hc_init, hc_fini },
 	{ NULL, NULL, NULL }
 };
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -160,4 +159,35 @@ topo_hdl_root(topo_hdl_t *thp, const char *scheme)
 	}
 
 	return (NULL);
+}
+
+/*
+ * buf_append -- Append str to buf (if it's non-NULL).  Place prepend
+ * in buf in front of str and append behind it (if they're non-NULL).
+ * Continue to update size even if we run out of space to actually
+ * stuff characters in the buffer.
+ */
+void
+topo_fmristr_build(ssize_t *sz, char *buf, size_t buflen, char *str,
+    char *prepend, char *append)
+{
+	ssize_t left;
+
+	if (str == NULL)
+		return;
+
+	if (buflen == 0 || (left = buflen - *sz) < 0)
+		left = 0;
+
+	if (buf != NULL && left != 0)
+		buf += *sz;
+
+	if (prepend == NULL && append == NULL)
+		*sz += snprintf(buf, left, "%s", str);
+	else if (append == NULL)
+		*sz += snprintf(buf, left, "%s%s", prepend, str);
+	else if (prepend == NULL)
+		*sz += snprintf(buf, left, "%s%s", str, append);
+	else
+		*sz += snprintf(buf, left, "%s%s%s", prepend, str, append);
 }

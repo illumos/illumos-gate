@@ -30,6 +30,7 @@ VERS = .1
 
 BUILTINSRCS = \
 	cpu.c \
+	dev.c \
 	hc.c \
 	mem.c \
 	mod.c \

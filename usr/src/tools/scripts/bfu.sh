@@ -4394,8 +4394,9 @@ mondo_loop() {
 	rm -rf $usr/lib/fm/topo
 
 	#
-	# Remove old prtopo
+	# Remove old prtopo and obsoleted include file.
 	#
+	rm -f $usr/include/fm/libtopo_enum.h
 	rm -f $usr/lib/fm/prtopo
 
 	#

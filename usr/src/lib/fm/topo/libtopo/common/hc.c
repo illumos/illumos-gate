@@ -39,6 +39,7 @@
 #include <sys/systeminfo.h>
 #include <sys/fm/protocol.h>
 #include <topo_parse.h>
+#include <topo_subr.h>
 
 #include <hc_canon.h>
 
@@ -233,37 +234,6 @@ hc_compare(topo_mod_t *mp, tnode_t *node, topo_version_t version,
 	return (1);
 }
 
-/*
- * buf_append -- Append str to buf (if it's non-NULL).  Place prepend
- * in buf in front of str and append behind it (if they're non-NULL).
- * Continue to update size even if we run out of space to actually
- * stuff characters in the buffer.
- */
-static void
-buf_append(ssize_t *sz, char *buf, size_t buflen, char *str,
-    char *prepend, char *append)
-{
-	ssize_t left;
-
-	if (str == NULL)
-		return;
-
-	if (buflen == 0 || (left = buflen - *sz) < 0)
-		left = 0;
-
-	if (buf != NULL && left != 0)
-		buf += *sz;
-
-	if (prepend == NULL && append == NULL)
-		*sz += snprintf(buf, left, "%s", str);
-	else if (append == NULL)
-		*sz += snprintf(buf, left, "%s%s", prepend, str);
-	else if (prepend == NULL)
-		*sz += snprintf(buf, left, "%s%s", str, append);
-	else
-		*sz += snprintf(buf, left, "%s%s%s", prepend, str, append);
-}
-
 static ssize_t
 fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 {
@@ -328,40 +298,47 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 	(void) nvlist_lookup_string(nvl, FM_FMRI_HC_REVISION, &rev);
 
 	/* hc:// */
-	buf_append(&size, buf, buflen, FM_FMRI_SCHEME_HC, NULL, "://");
+	topo_fmristr_build(&size, buf, buflen, FM_FMRI_SCHEME_HC, NULL, "://");
 
 	/* authority, if any */
 	if (aprod != NULL)
-		buf_append(&size, buf, buflen, aprod, FM_FMRI_AUTH_PRODUCT "=",
+		topo_fmristr_build(&size,
+		    buf, buflen, aprod, FM_FMRI_AUTH_PRODUCT "=",
 		    --more_auth > 0 ? "," : NULL);
 	if (achas != NULL)
-		buf_append(&size, buf, buflen, achas, FM_FMRI_AUTH_CHASSIS "=",
+		topo_fmristr_build(&size,
+		    buf, buflen, achas, FM_FMRI_AUTH_CHASSIS "=",
 		    --more_auth > 0 ? "," : NULL);
 	if (adom != NULL)
-		buf_append(&size, buf, buflen, adom, FM_FMRI_AUTH_DOMAIN "=",
+		topo_fmristr_build(&size,
+		    buf, buflen, adom, FM_FMRI_AUTH_DOMAIN "=",
 		    --more_auth > 0 ? "," : NULL);
 	if (asrvr != NULL)
-		buf_append(&size, buf, buflen, asrvr, FM_FMRI_AUTH_SERVER "=",
+		topo_fmristr_build(&size,
+		    buf, buflen, asrvr, FM_FMRI_AUTH_SERVER "=",
 		    --more_auth > 0 ? "," : NULL);
 	if (ahost != NULL)
-		buf_append(&size, buf, buflen, ahost, FM_FMRI_AUTH_HOST "=",
+		topo_fmristr_build(&size,
+		    buf, buflen, ahost, FM_FMRI_AUTH_HOST "=",
 		    NULL);
 
 	/* separating slash */
 	if (serial != NULL || part != NULL || rev != NULL)
-		buf_append(&size, buf, buflen, "/", NULL, NULL);
+		topo_fmristr_build(&size, buf, buflen, "/", NULL, NULL);
 
 	/* hardware-id part */
-	buf_append(&size, buf, buflen, serial, ":" FM_FMRI_HC_SERIAL_ID "=",
-	    NULL);
-	buf_append(&size, buf, buflen, part, ":" FM_FMRI_HC_PART "=", NULL);
-	buf_append(&size, buf, buflen, rev, ":" FM_FMRI_HC_REVISION "=", NULL);
+	topo_fmristr_build(&size,
+	    buf, buflen, serial, ":" FM_FMRI_HC_SERIAL_ID "=", NULL);
+	topo_fmristr_build(&size,
+	    buf, buflen, part, ":" FM_FMRI_HC_PART "=", NULL);
+	topo_fmristr_build(&size,
+	    buf, buflen, rev, ":" FM_FMRI_HC_REVISION "=", NULL);
 
 	/* separating slash */
-	buf_append(&size, buf, buflen, "/", NULL, NULL);
+	topo_fmristr_build(&size, buf, buflen, "/", NULL, NULL);
 
 	/* hc-root */
-	buf_append(&size, buf, buflen, root, NULL, NULL);
+	topo_fmristr_build(&size, buf, buflen, root, NULL, NULL);
 
 	/* all the pairs */
 	for (i = 0; i < hcnprs; i++) {
@@ -369,13 +346,14 @@ fmri_nvl2str(nvlist_t *nvl, char *buf, size_t buflen)
 		char *id = NULL;
 
 		if (i > 0)
-			buf_append(&size, buf, buflen, "/", NULL, NULL);
+			topo_fmristr_build(&size,
+			    buf, buflen, "/", NULL, NULL);
 		(void) nvlist_lookup_string(hcprs[i], FM_FMRI_HC_NAME, &nm);
 		(void) nvlist_lookup_string(hcprs[i], FM_FMRI_HC_ID, &id);
 		if (nm == NULL || id == NULL)
 			return (0);
-		buf_append(&size, buf, buflen, nm, NULL, "=");
-		buf_append(&size, buf, buflen, id, NULL, NULL);
+		topo_fmristr_build(&size, buf, buflen, nm, NULL, "=");
+		topo_fmristr_build(&size, buf, buflen, id, NULL, NULL);
 	}
 
 	return (size);
