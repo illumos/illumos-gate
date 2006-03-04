@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -95,13 +94,15 @@ typedef struct ddi_intr_handle_impl {
 	 *			  to various nexus drivers.
 	 *	scratch2	- used to send 'behavior' flag
 	 *			  information to the nexus drivers
-	 *			  from ddi_intr_alloc()
+	 *			  from ddi_intr_alloc().  It is also
+	 *			  used to send 'h_array' to the nexus drivers
+	 *			  for ddi_intr_block_enable/disable() on x86.
 	 *	private		- On X86 it usually carries a pointer to
 	 *			  ihdl_plat_t.  Not used on SPARC platforms.
 	 */
 	void			*ih_private;	/* Platform specific data */
 	uint_t			ih_scratch1;	/* Scratch1: #interrupts */
-	uint_t			ih_scratch2;	/* Scratch2: flag */
+	void			*ih_scratch2;	/* Scratch2: flag/h_array */
 } ddi_intr_handle_impl_t;
 
 /* values for ih_state (strictly for interrupt handle) */

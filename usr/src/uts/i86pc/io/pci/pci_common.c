@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -21,7 +20,7 @@
  */
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -224,13 +223,14 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 	int			pci_rval, psm_rval = PSM_FAILURE;
 	int			types = 0;
 	int			pciepci = 0;
-	int			i, j;
+	int			i, j, count;
 	int			behavior;
 	ddi_intrspec_t		isp;
 	struct intrspec		*ispec;
 	ddi_intr_handle_impl_t	tmp_hdl;
 	ddi_intr_msix_t		*msix_p;
 	ihdl_plat_t		*ihdl_plat_datap;
+	ddi_intr_handle_t	*h_array;
 
 	DDI_INTR_NEXDBG((CE_CONT,
 	    "pci_common_intr_ops: pdip 0x%p, rdip 0x%p, op %x handle 0x%p\n",
@@ -281,7 +281,7 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 				pciepci = 1;
 			} else
 				hdlp->ih_pri = priority;
-			behavior = hdlp->ih_scratch2;
+			behavior = (int)hdlp->ih_scratch2;
 			(void) (*psm_intr_ops)(rdip, hdlp,
 			    PSM_INTR_OP_ALLOC_VECTORS, result);
 
@@ -470,18 +470,23 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		if (psm_intr_ops == NULL)
 			return (DDI_FAILURE);
 
-		for (i = 0; i < hdlp->ih_scratch1; i++) {
+		count = hdlp->ih_scratch1;
+		h_array = (ddi_intr_handle_t *)hdlp->ih_scratch2;
+		for (i = 0; i < count; i++) {
+			hdlp = (ddi_intr_handle_impl_t *)h_array[i];
 			if (pci_enable_intr(pdip, rdip, hdlp,
-			    hdlp->ih_inum + i) != DDI_SUCCESS) {
+			    hdlp->ih_inum) != DDI_SUCCESS) {
 				DDI_INTR_NEXDBG((CE_CONT, "BLOCKENABLE: "
 				    "pci_enable_intr failed for %d\n", i));
-				for (j = 0; j < i; j++)
-					pci_disable_intr(pdip, rdip, hdlp,
-					    hdlp->ih_inum + j);
+				for (j = 0; j < i; j++) {
+				    hdlp = (ddi_intr_handle_impl_t *)h_array[j];
+				    pci_disable_intr(pdip, rdip, hdlp,
+					    hdlp->ih_inum);
+				}
 				return (DDI_FAILURE);
 			}
 			DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: "
-			    "BLOCKENABLE inum %x done\n", hdlp->ih_inum + i));
+			    "BLOCKENABLE inum %x done\n", hdlp->ih_inum));
 		}
 		break;
 	case DDI_INTROP_BLOCKDISABLE:
@@ -496,10 +501,13 @@ pci_common_intr_ops(dev_info_t *pdip, dev_info_t *rdip, ddi_intr_op_t intr_op,
 		if (psm_intr_ops == NULL)
 			return (DDI_FAILURE);
 
-		for (i = 0; i < hdlp->ih_scratch1; i++) {
-			pci_disable_intr(pdip, rdip, hdlp, hdlp->ih_inum + i);
+		count = hdlp->ih_scratch1;
+		h_array = (ddi_intr_handle_t *)hdlp->ih_scratch2;
+		for (i = 0; i < count; i++) {
+			hdlp = (ddi_intr_handle_impl_t *)h_array[i];
+			pci_disable_intr(pdip, rdip, hdlp, hdlp->ih_inum);
 			DDI_INTR_NEXDBG((CE_CONT, "pci_common_intr_ops: "
-			    "BLOCKDISABLE inum %x done\n", hdlp->ih_inum + i));
+			    "BLOCKDISABLE inum %x done\n", hdlp->ih_inum));
 		}
 		break;
 	case DDI_INTROP_SETMASK:

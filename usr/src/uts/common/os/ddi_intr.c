@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -278,7 +277,7 @@ ddi_intr_alloc(dev_info_t *dip, ddi_intr_handle_t *h_array, int type, int inum,
 	tmp_hdl.ih_type = type;
 	tmp_hdl.ih_inum = inum;
 	tmp_hdl.ih_scratch1 = count;
-	tmp_hdl.ih_scratch2 = behavior;
+	tmp_hdl.ih_scratch2 = (void *)behavior;
 	tmp_hdl.ih_dip = dip;
 
 	if (i_ddi_intr_ops(dip, dip, DDI_INTROP_ALLOC,
@@ -794,6 +793,7 @@ ddi_intr_block_enable(ddi_intr_handle_t *h_array, int count)
 	hdlp = (ddi_intr_handle_impl_t *)h_array[0];
 	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
 	hdlp->ih_scratch1 = count;
+	hdlp->ih_scratch2 = (void *)h_array;
 
 	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_BLOCKENABLE, hdlp, NULL);
@@ -839,6 +839,7 @@ ddi_intr_block_disable(ddi_intr_handle_t *h_array, int count)
 	hdlp = (ddi_intr_handle_impl_t *)h_array[0];
 	rw_enter(&hdlp->ih_rwlock, RW_WRITER);
 	hdlp->ih_scratch1 = count;
+	hdlp->ih_scratch2 = (void *)h_array;
 
 	ret = i_ddi_intr_ops(hdlp->ih_dip, hdlp->ih_dip,
 	    DDI_INTROP_BLOCKDISABLE, hdlp, NULL);
