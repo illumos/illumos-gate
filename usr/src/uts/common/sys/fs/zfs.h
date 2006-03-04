@@ -133,6 +133,8 @@ uint64_t zfs_prop_default_numeric(zfs_prop_t);
 #define	ZPOOL_CONFIG_STATS		"stats"
 #define	ZPOOL_CONFIG_WHOLE_DISK		"whole_disk"
 #define	ZPOOL_CONFIG_OFFLINE		"offline"
+#define	ZPOOL_CONFIG_ERRCOUNT		"error_count"
+#define	ZPOOL_CONFIG_NOT_PRESENT	"not_present"
 
 #define	VDEV_TYPE_ROOT			"root"
 #define	VDEV_TYPE_MIRROR		"mirror"
@@ -304,8 +306,24 @@ typedef enum zfs_ioc {
 	ZFS_IOC_ROLLBACK,
 	ZFS_IOC_RENAME,
 	ZFS_IOC_RECVBACKUP,
-	ZFS_IOC_SENDBACKUP
+	ZFS_IOC_SENDBACKUP,
+	ZFS_IOC_INJECT_FAULT,
+	ZFS_IOC_CLEAR_FAULT,
+	ZFS_IOC_INJECT_LIST_NEXT,
+	ZFS_IOC_ERROR_LOG,
+	ZFS_IOC_CLEAR,
+	ZFS_IOC_BOOKMARK_NAME
 } zfs_ioc_t;
+
+/*
+ * Internal SPA load state.  Used by FMA diagnosis engine.
+ */
+typedef enum {
+	SPA_LOAD_NONE,		/* no load in progress */
+	SPA_LOAD_OPEN,		/* normal open */
+	SPA_LOAD_IMPORT,	/* import in progress */
+	SPA_LOAD_TRYIMPORT	/* tryimport in progress */
+} spa_load_state_t;
 
 #ifdef	__cplusplus
 }

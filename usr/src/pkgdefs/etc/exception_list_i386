@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -744,19 +744,10 @@ lib/amd64/libc_i18n.a			i386
 #
 # ZFS internal tools and lint libraries
 #
-lib/llib-lzfs.ln			i386
-lib/llib-lzfs				i386
-lib/amd64/llib-lzfs.ln			i386
-usr/bin/ztest				i386
-usr/bin/i86/ztest			i386
-usr/bin/amd64/ztest			i386
-usr/lib/llib-lzfs.ln			i386
-usr/lib/llib-lzfs			i386
 usr/lib/llib-lzfs_jni			i386
 usr/lib/llib-lzfs_jni.ln		i386
 usr/lib/llib-lzpool			i386
 usr/lib/llib-lzpool.ln			i386
-usr/lib/amd64/llib-lzfs.ln		i386
 usr/lib/amd64/llib-lzfs_jni.ln		i386
 usr/lib/amd64/llib-lzpool.ln		i386
 #

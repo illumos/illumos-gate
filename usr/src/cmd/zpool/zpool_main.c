@@ -58,6 +58,7 @@ static int zpool_do_status(int, char **);
 
 static int zpool_do_online(int, char **);
 static int zpool_do_offline(int, char **);
+static int zpool_do_clear(int, char **);
 
 static int zpool_do_attach(int, char **);
 static int zpool_do_detach(int, char **);
@@ -87,6 +88,7 @@ _umem_logging_init(void)
 typedef enum {
 	HELP_ADD,
 	HELP_ATTACH,
+	HELP_CLEAR,
 	HELP_CREATE,
 	HELP_DESTROY,
 	HELP_DETACH,
@@ -110,9 +112,8 @@ typedef struct zpool_command {
 
 /*
  * Master command table.  Each ZFS command has a name, associated function, and
- * usage message.  Unfortunately, the usage messages need to be
- * iternationalized, so we have to have a function to return the usage message
- * based on a command index.
+ * usage message.  The usage messages need to be internationalized, so we have
+ * to have a function to return the usage message based on a command index.
  *
  * These commands are organized according to how they are displayed in the usage
  * message.  An empty command (one with a NULL name) indicates an empty line in
@@ -130,6 +131,7 @@ static zpool_command_t command_table[] = {
 	{ NULL },
 	{ "online",	zpool_do_online,	HELP_ONLINE		},
 	{ "offline",	zpool_do_offline,	HELP_OFFLINE		},
+	{ "clear",	zpool_do_clear,		HELP_CLEAR		},
 	{ NULL },
 	{ "attach",	zpool_do_attach,	HELP_ATTACH		},
 	{ "detach",	zpool_do_detach,	HELP_DETACH		},
@@ -153,6 +155,8 @@ get_usage(zpool_help_t idx) {
 	case HELP_ATTACH:
 		return (gettext("\tattach [-f] <pool> <device> "
 		    "<new_device>\n"));
+	case HELP_CLEAR:
+		return (gettext("\tclear <pool> [device]\n"));
 	case HELP_CREATE:
 		return (gettext("\tcreate  [-fn] [-R root] [-m mountpoint] "
 		    "<pool> <vdev> ...\n"));
@@ -277,12 +281,15 @@ usage(int requested)
 }
 
 const char *
-state_to_name(int state)
+state_to_name(vdev_stat_t *vs)
 {
-	switch (state) {
+	switch (vs->vs_state) {
 	case VDEV_STATE_CLOSED:
 	case VDEV_STATE_CANT_OPEN:
-		return (gettext("FAULTED"));
+		if (vs->vs_aux == VDEV_AUX_CORRUPT_DATA)
+			return (gettext("FAULTED"));
+		else
+			return (gettext("UNAVAIL"));
 	case VDEV_STATE_OFFLINE:
 		return (gettext("OFFLINE"));
 	case VDEV_STATE_DEGRADED:
@@ -771,7 +778,7 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 	(void) printf("\t%*s%-*s", depth, "", namewidth - depth, name);
 
 	if (vs->vs_aux != 0) {
-		(void) printf("  %-8s  ", state_to_name(vs->vs_state));
+		(void) printf("  %-8s  ", state_to_name(vs));
 
 		switch (vs->vs_aux) {
 		case VDEV_AUX_OPEN_FAILED:
@@ -791,7 +798,7 @@ print_import_config(const char *name, nvlist_t *nv, int namewidth, int depth)
 			break;
 		}
 	} else {
-		(void) printf("  %s", state_to_name(vs->vs_state));
+		(void) printf("  %s", state_to_name(vs));
 	}
 	(void) printf("\n");
 
@@ -865,6 +872,11 @@ show_import(nvlist_t *config)
 	case ZPOOL_STATUS_OFFLINE_DEV:
 		(void) printf(gettext("status: One or more devices "
 		    "are offlined.\n"));
+		break;
+
+	case ZPOOL_STATUS_CORRUPT_POOL:
+		(void) printf(gettext("status: The pool metadata is "
+		    "corrupted.\n"));
 		break;
 
 	default:
@@ -1671,7 +1683,7 @@ list_callback(zpool_handle_t *zhp, void *data)
 				verify(nvlist_lookup_uint64_array(nvroot,
 				    ZPOOL_CONFIG_STATS, (uint64_t **)&vs,
 				    &vsc) == 0);
-				(void) strlcpy(buf, state_to_name(vs->vs_state),
+				(void) strlcpy(buf, state_to_name(vs),
 				    sizeof (buf));
 			}
 			break;
@@ -2081,6 +2093,42 @@ zpool_do_offline(int argc, char **argv)
 	return (ret);
 }
 
+/*
+ * zpool clear <pool> [device]
+ *
+ * Clear all errors associated with a pool or a particular device.
+ */
+int
+zpool_do_clear(int argc, char **argv)
+{
+	int ret = 0;
+	zpool_handle_t *zhp;
+	char *pool, *device;
+
+	if (argc < 2) {
+		(void) fprintf(stderr, gettext("missing pool name\n"));
+		usage(FALSE);
+	}
+
+	if (argc > 3) {
+		(void) fprintf(stderr, gettext("too many arguments\n"));
+		usage(FALSE);
+	}
+
+	pool = argv[1];
+	device = argc == 3 ? argv[2] : NULL;
+
+	if ((zhp = zpool_open(pool)) == NULL)
+		return (1);
+
+	if (zpool_clear(zhp, device) != 0)
+		ret = 1;
+
+	zpool_close(zhp);
+
+	return (ret);
+}
+
 typedef struct scrub_cbdata {
 	int	cb_type;
 } scrub_cbdata_t;
@@ -2089,6 +2137,15 @@ int
 scrub_callback(zpool_handle_t *zhp, void *data)
 {
 	scrub_cbdata_t *cb = data;
+
+	/*
+	 * Ignore faulted pools.
+	 */
+	if (zpool_get_state(zhp) == POOL_STATE_UNAVAIL) {
+		(void) fprintf(stderr, gettext("cannot scrub '%s': pool is "
+		    "currently unavailable\n"), zpool_get_name(zhp));
+		return (1);
+	}
 
 	return (zpool_scrub(zhp, cb->cb_type) != 0);
 }
@@ -2201,8 +2258,9 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	nvlist_t **child;
 	uint_t c, children;
 	vdev_stat_t *vs;
-	char rbuf[6], wbuf[6], cbuf[6], repaired[6];
+	char rbuf[6], wbuf[6], cbuf[6], repaired[7];
 	char *vname;
+	uint64_t notpresent;
 
 	verify(nvlist_lookup_uint64_array(nv, ZPOOL_CONFIG_STATS,
 	    (uint64_t **)&vs, &c) == 0);
@@ -2212,14 +2270,19 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 		children = 0;
 
 	(void) printf("\t%*s%-*s  %-8s", depth, "", namewidth - depth,
-	    name, state_to_name(vs->vs_state));
+	    name, state_to_name(vs));
 
 	zfs_nicenum(vs->vs_read_errors, rbuf, sizeof (rbuf));
 	zfs_nicenum(vs->vs_write_errors, wbuf, sizeof (wbuf));
 	zfs_nicenum(vs->vs_checksum_errors, cbuf, sizeof (cbuf));
 	(void) printf(" %5s %5s %5s", rbuf, wbuf, cbuf);
 
-	if (vs->vs_aux != 0) {
+	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
+	    &notpresent) == 0) {
+		char *path;
+		verify(nvlist_lookup_string(nv, ZPOOL_CONFIG_PATH, &path) == 0);
+		(void) printf("  was %s\n", path);
+	} else if (vs->vs_aux != 0) {
 		(void) printf("  ");
 
 		switch (vs->vs_aux) {
@@ -2259,6 +2322,60 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
 	}
 }
 
+static void
+print_error_log(zpool_handle_t *zhp)
+{
+	nvlist_t **log;
+	size_t nelem;
+	size_t maxdsname = sizeof ("DATASET") - 1;
+	size_t maxobjname = sizeof ("OBJECT") - 1;
+	int i;
+	nvlist_t *nv;
+	size_t len;
+	char *dsname, *objname, *range;
+
+	if (zpool_get_errlog(zhp, &log, &nelem) != 0) {
+		(void) printf("errors: List of errors unavailable "
+		    "(insufficient privileges)\n");
+		return;
+	}
+
+	for (i = 0; i < nelem; i++) {
+		nv = log[i];
+
+		verify(nvlist_lookup_string(nv, ZPOOL_ERR_DATASET,
+		    &dsname) == 0);
+		len = strlen(dsname);
+		if (len > maxdsname)
+			maxdsname = len;
+
+		verify(nvlist_lookup_string(nv, ZPOOL_ERR_OBJECT,
+		    &objname) == 0);
+		len = strlen(objname);
+		if (len > maxobjname)
+			maxobjname = len;
+	}
+
+	(void) printf("errors: The following persistent errors have been "
+	    "detected:\n\n");
+	(void) printf("%8s  %-*s  %-*s  %s\n", "", maxdsname, "DATASET",
+	    maxobjname, "OBJECT", "RANGE");
+
+	for (i = 0; i < nelem; i++) {
+		nv = log[i];
+
+		verify(nvlist_lookup_string(nv, ZPOOL_ERR_DATASET,
+		    &dsname) == 0);
+		verify(nvlist_lookup_string(nv, ZPOOL_ERR_OBJECT,
+		    &objname) == 0);
+		verify(nvlist_lookup_string(nv, ZPOOL_ERR_RANGE,
+		    &range) == 0);
+
+		(void) printf("%8s  %-*s  %-*s  %s\n", "", maxdsname,
+		    dsname, maxobjname, objname, range);
+	}
+}
+
 /*
  * Display a summary of pool status.  Displays a summary such as:
  *
@@ -2269,7 +2386,7 @@ print_status_config(zpool_handle_t *zhp, const char *name, nvlist_t *nv,
  *	config:
  *		mirror		DEGRADED
  *                c1t0d0	OK
- *                c2t0d0	FAULTED
+ *                c2t0d0	UNAVAIL
  *
  * When given the '-v' option, we print out the complete config.  If the '-e'
  * option is specified, then we print out error rate information as well.
@@ -2348,7 +2465,7 @@ status_callback(zpool_handle_t *zhp, void *data)
 		    "unaffected.\n"));
 		(void) printf(gettext("action: Determine if the device needs "
 		    "to be replaced, and clear the errors\n\tusing "
-		    "'zpool online' or replace the device with 'zpool "
+		    "'zpool clear' or replace the device with 'zpool "
 		    "replace'.\n"));
 		break;
 
@@ -2370,6 +2487,22 @@ status_callback(zpool_handle_t *zhp, void *data)
 		    "complete.\n"));
 		break;
 
+	case ZPOOL_STATUS_CORRUPT_DATA:
+		(void) printf(gettext("status: One or more devices has "
+		    "experienced an error resulting in data\n\tcorruption.  "
+		    "Applications may be affected.\n"));
+		(void) printf(gettext("action: Restore the file in question "
+		    "if possible.  Otherwise restore the\n\tentire pool from "
+		    "backup.\n"));
+		break;
+
+	case ZPOOL_STATUS_CORRUPT_POOL:
+		(void) printf(gettext("status: The pool metadata is corrupted "
+		    "and the pool cannot be opened.\n"));
+		(void) printf(gettext("action: Destroy and re-create the pool "
+		    "from a backup source.\n"));
+		break;
+
 	default:
 		/*
 		 * The remaining errors can't actually be generated, yet.
@@ -2383,6 +2516,8 @@ status_callback(zpool_handle_t *zhp, void *data)
 
 	if (config != NULL) {
 		int namewidth;
+		uint64_t nerr;
+		size_t realerr;
 
 		verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 		    &nvroot) == 0);
@@ -2399,6 +2534,28 @@ status_callback(zpool_handle_t *zhp, void *data)
 		    "NAME", "STATE", "READ", "WRITE", "CKSUM");
 		print_status_config(zhp, zpool_get_name(zhp), nvroot,
 		    namewidth, 0);
+
+		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_ERRCOUNT,
+		    &nerr) == 0) {
+			/*
+			 * If the approximate error count is small, get a
+			 * precise count by fetching the entire log and
+			 * uniquifying the results.
+			 */
+			if (nerr < 100 && !cbp->cb_verbose &&
+			    zpool_get_errlog(zhp, NULL, &realerr) == 0)
+				nerr = realerr;
+
+			(void) printf("\n");
+			if (nerr == 0)
+				(void) printf(gettext("errors: No known data "
+				    "errors\n"));
+			else if (!cbp->cb_verbose)
+				(void) printf(gettext("errors: %d data errors, "
+				    "use '-v' for a list\n"), nerr);
+			else
+				print_error_log(zhp);
+		}
 	} else {
 		(void) printf(gettext("config: The configuration cannot be "
 		    "determined.\n"));
@@ -2507,8 +2664,8 @@ main(int argc, char **argv)
 	 * 'freeze' is a vile debugging abomination, so we treat it as such.
 	 */
 	if (strcmp(cmdname, "freeze") == 0 && argc == 3) {
-		char buf[8192];
-		int fd = open("/dev/zpoolctl", O_RDWR);
+		char buf[16384];
+		int fd = open(ZFS_DEV, O_RDWR);
 		(void) strcpy((void *)buf, argv[2]);
 		return (!!ioctl(fd, ZFS_IOC_POOL_FREEZE, buf));
 	}

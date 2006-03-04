@@ -43,6 +43,8 @@ d none etc/zfs 755 root sys
 d none lib 755 root bin
 s none lib/libzfs.so=libzfs.so.1
 f none lib/libzfs.so.1 755 root bin
+f none lib/llib-lzfs.ln 644 root bin
+f none lib/llib-lzfs 644 root bin
 d none sbin 755 root sys
 f none sbin/zfs 555 root bin
 f none sbin/zpool 555 root bin

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -67,11 +66,11 @@ typedef struct bplist {
 
 extern uint64_t bplist_create(objset_t *mos, int blocksize, dmu_tx_t *tx);
 extern void bplist_destroy(objset_t *mos, uint64_t object, dmu_tx_t *tx);
-extern void bplist_open(bplist_t *bpl, objset_t *mos, uint64_t object);
+extern int bplist_open(bplist_t *bpl, objset_t *mos, uint64_t object);
 extern void bplist_close(bplist_t *bpl);
 extern boolean_t bplist_empty(bplist_t *bpl);
 extern int bplist_iterate(bplist_t *bpl, uint64_t *itorp, blkptr_t *bp);
-extern void bplist_enqueue(bplist_t *bpl, blkptr_t *bp, dmu_tx_t *tx);
+extern int bplist_enqueue(bplist_t *bpl, blkptr_t *bp, dmu_tx_t *tx);
 extern void bplist_enqueue_deferred(bplist_t *bpl, blkptr_t *bp);
 extern void bplist_sync(bplist_t *bpl, dmu_tx_t *tx);
 extern void bplist_vacate(bplist_t *bpl, dmu_tx_t *tx);

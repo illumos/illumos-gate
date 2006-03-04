@@ -233,6 +233,7 @@ COMMON_SUBDIRS= \
 	SUNWocfh \
 	SUNWocfr \
 	SUNWonfmes \
+	SUNWonzfs \
 	SUNWosdem \
 	SUNWypr \
 	SUNWypu \

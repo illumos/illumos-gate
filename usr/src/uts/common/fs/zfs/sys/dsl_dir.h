@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -98,11 +97,11 @@ struct dsl_dir {
 };
 
 void dsl_dir_close(dsl_dir_t *dd, void *tag);
-dsl_dir_t *dsl_dir_open(const char *name, void *tag, const char **tail);
-dsl_dir_t *dsl_dir_open_spa(spa_t *spa, const char *name, void *tag,
+int dsl_dir_open(const char *name, void *tag, dsl_dir_t **, const char **tail);
+int dsl_dir_open_spa(spa_t *spa, const char *name, void *tag, dsl_dir_t **,
     const char **tailp);
-dsl_dir_t *dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
-    const char *tail, void *tag);
+int dsl_dir_open_obj(dsl_pool_t *dp, uint64_t ddobj,
+    const char *tail, void *tag, dsl_dir_t **);
 void dsl_dir_name(dsl_dir_t *dd, char *buf);
 int dsl_dir_is_private(dsl_dir_t *dd);
 int dsl_dir_create_sync(dsl_dir_t *pds, const char *name, dmu_tx_t *tx);

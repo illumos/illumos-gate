@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -73,6 +72,7 @@ static vmem_t *mod_sysfile_arena;	/* parser memory */
 
 char obp_bootpath[BO_MAXOBJNAME];	/* bootpath from obp */
 char svm_bootpath[BO_MAXOBJNAME];	/* bootpath redirected via rootdev */
+char zfs_bootpath[BO_MAXOBJNAME];	/* zfs bootpath, set via zfsroot */
 
 #if defined(_PSM_MODULES)
 
@@ -489,6 +489,8 @@ static struct modcmd modcmd[] = {
 	{ "set32",	MOD_SET32	},
 	{ "SET64",	MOD_SET64	},
 	{ "set64",	MOD_SET64	},
+	{ "ZFSROOT", 	MOD_ZFSROOT	},
+	{ "zfsroot", 	MOD_ZFSROOT	},
 	{ NULL,		MOD_UNKNOWN	}
 };
 
@@ -528,6 +530,7 @@ do_sysfile_cmd(struct _buf *file, const char *cmd)
 		 */
 	case MOD_ROOTFS:
 	case MOD_SWAPFS:
+	case MOD_ZFSROOT:
 		if ((token = kobj_lex(file, tok1, sizeof (tok1))) == COLON) {
 			token = kobj_lex(file, tok1, sizeof (tok1));
 		} else {
@@ -1520,7 +1523,10 @@ setparams()
 			(void) copystr(sysp->sys_ptr, bootobjp->bo_fstype,
 			    BO_MAXOBJNAME, NULL);
 			break;
-
+		case MOD_ZFSROOT:
+			(void) copystr(sysp->sys_ptr, zfs_bootpath,
+			    BO_MAXOBJNAME, NULL);
+			break;
 		default:
 			break;
 		}

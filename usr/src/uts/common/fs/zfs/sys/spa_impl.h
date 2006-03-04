@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -46,10 +45,16 @@ extern "C" {
 
 typedef struct spa_config_lock {
 	kmutex_t	scl_lock;
-	uint64_t	scl_count;
+	refcount_t	scl_count;
 	kthread_t	*scl_writer;
 	kcondvar_t	scl_cv;
 } spa_config_lock_t;
+
+typedef struct spa_error_entry {
+	zbookmark_t	se_bookmark;
+	char		*se_name;
+	avl_node_t	se_avl;
+} spa_error_entry_t;
 
 struct spa {
 	/*
@@ -57,16 +62,16 @@ struct spa {
 	 */
 	char		*spa_name;
 	avl_node_t	spa_avl;
-	int		spa_anon;
 	nvlist_t	*spa_config;
 	uint64_t	spa_config_txg;		/* txg of last config change */
 	spa_config_lock_t spa_config_lock;	/* configuration changes */
 	kmutex_t	spa_config_cache_lock;	/* for spa_config RW_READER */
 	int		spa_sync_pass;		/* iterate-to-convergence */
 	int		spa_state;		/* pool state */
-	uint8_t		spa_minref;		/* min refcnt of open pool */
+	int		spa_inject_ref;		/* injection references */
 	uint8_t		spa_traverse_wanted;	/* traverse lock wanted */
-	taskq_t		*spa_vdev_retry_taskq;
+	uint8_t		spa_sync_on;		/* sync threads are running */
+	spa_load_state_t spa_load_state;	/* current load operation */
 	taskq_t		*spa_zio_issue_taskq[ZIO_TYPES];
 	taskq_t		*spa_zio_intr_taskq[ZIO_TYPES];
 	dsl_pool_t	*spa_dsl_pool;
@@ -88,18 +93,33 @@ struct spa {
 	kthread_t	*spa_scrub_thread;	/* scrub/resilver thread */
 	traverse_handle_t *spa_scrub_th;	/* scrub traverse handle */
 	uint64_t	spa_scrub_restart_txg;	/* need to restart */
+	uint64_t	spa_scrub_mintxg;	/* min txg we'll scrub */
 	uint64_t	spa_scrub_maxtxg;	/* max txg we'll scrub */
 	uint64_t	spa_scrub_inflight;	/* in-flight scrub I/Os */
+	int64_t		spa_scrub_throttled;	/* over-throttle scrub I/Os */
 	uint64_t	spa_scrub_errors;	/* scrub I/O error count */
+	int		spa_scrub_suspended;	/* tell scrubber to suspend */
 	kcondvar_t	spa_scrub_cv;		/* scrub thread state change */
 	kcondvar_t	spa_scrub_io_cv;	/* scrub I/O completion */
 	uint8_t		spa_scrub_stop;		/* tell scrubber to stop */
-	uint8_t		spa_scrub_suspend;	/* tell scrubber to suspend */
 	uint8_t		spa_scrub_active;	/* active or suspended? */
 	uint8_t		spa_scrub_type;		/* type of scrub we're doing */
-	int		spa_sync_on;		/* sync threads are running */
+	kmutex_t	spa_async_lock;		/* protect async state */
+	kthread_t	*spa_async_thread;	/* thread doing async task */
+	int		spa_async_suspended;	/* async tasks suspended */
+	kcondvar_t	spa_async_cv;		/* wait for thread_exit() */
+	uint16_t	spa_async_tasks;	/* async task mask */
 	char		*spa_root;		/* alternate root directory */
 	kmutex_t	spa_uberblock_lock;	/* vdev_uberblock_load_done() */
+	uint64_t	spa_ena;		/* spa-wide ereport ENA */
+	boolean_t	spa_last_open_failed;	/* true if last open faled */
+	kmutex_t	spa_errlog_lock;	/* error log lock */
+	uint64_t	spa_errlog_last;	/* last error log object */
+	uint64_t	spa_errlog_scrub;	/* scrub error log object */
+	kmutex_t	spa_errlist_lock;	/* error list/ereport lock */
+	avl_tree_t	spa_errlist_last;	/* last error list */
+	avl_tree_t	spa_errlist_scrub;	/* scrub error list */
+	int		spa_scrub_finished;	/* indicator to rotate logs */
 	/*
 	 * spa_refcnt must be the last element because it changes size based on
 	 * compilation options.  In order for the MDB module to function

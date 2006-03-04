@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -129,9 +128,19 @@ zil_prt_rec_write(zilog_t *zilog, int txtype, lr_write_t *lr)
 		if (bp->blk_birth == 0) {
 			bzero(buf, sizeof (buf));
 		} else {
+			zbookmark_t zb;
+
+			ASSERT3U(bp->blk_cksum.zc_word[2], ==,
+			    dmu_objset_id(zilog->zl_os));
+
+			zb.zb_objset = bp->blk_cksum.zc_word[2];
+			zb.zb_object = 0;
+			zb.zb_level = -1;
+			zb.zb_blkid = bp->blk_cksum.zc_word[3];
+
 			error = zio_wait(zio_read(NULL, zilog->zl_spa,
 			    bp, buf, BP_GET_LSIZE(bp), NULL, NULL,
-			    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL));
+			    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL, &zb));
 			if (error)
 				return;
 		}

@@ -273,6 +273,7 @@ COMMON_SUBDIRS = \
 	cmd/zdb \
 	cmd/zdump \
 	cmd/zfs \
+	cmd/zinject \
 	cmd/zlogin \
 	cmd/zoneadm \
 	cmd/zoneadmd \

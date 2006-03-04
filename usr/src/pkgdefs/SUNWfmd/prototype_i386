@@ -53,6 +53,7 @@ f none usr/lib/fm/fmd/schemes/amd64/legacy-hc.so 555 root bin
 f none usr/lib/fm/fmd/schemes/amd64/mem.so 555 root bin
 f none usr/lib/fm/fmd/schemes/amd64/mod.so 555 root bin
 f none usr/lib/fm/fmd/schemes/amd64/pkg.so 555 root bin
+f none usr/lib/fm/fmd/schemes/amd64/zfs.so 555 root bin
 f none usr/lib/fm/dict/AMD.dict 444 root bin
 f none usr/lib/locale/C/LC_MESSAGES/AMD.mo 444 root bin
 d none usr/platform 755 root sys

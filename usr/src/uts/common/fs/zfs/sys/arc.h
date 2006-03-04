@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -41,6 +40,7 @@ typedef struct arc_buf_hdr arc_buf_hdr_t;
 typedef struct arc_buf arc_buf_t;
 typedef void arc_done_func_t(zio_t *zio, arc_buf_t *buf, void *private);
 typedef void arc_byteswap_func_t(void *buf, size_t size);
+typedef int arc_evict_func_t(void *private);
 
 /* generic arc_done_func_t's which you can use */
 arc_done_func_t arc_bcopy_func;
@@ -50,6 +50,8 @@ struct arc_buf {
 	arc_buf_hdr_t		*b_hdr;
 	arc_buf_t		*b_next;
 	void			*b_data;
+	arc_evict_func_t	*b_efunc;
+	void			*b_private;
 };
 
 /*
@@ -60,21 +62,29 @@ struct arc_buf {
 #define	ARC_PREFETCH	(1 << 3)	/* I/O is a prefetch */
 
 arc_buf_t *arc_buf_alloc(spa_t *spa, int size, void *tag);
-void arc_buf_free(arc_buf_t *buf, void *tag);
+void arc_buf_add_ref(arc_buf_t *buf, void *tag);
+int arc_buf_remove_ref(arc_buf_t *buf, void *tag);
 int arc_buf_size(arc_buf_t *buf);
 void arc_release(arc_buf_t *buf, void *tag);
 int arc_released(arc_buf_t *buf);
+int arc_has_callback(arc_buf_t *buf);
+#ifdef ZFS_DEBUG
+int arc_referenced(arc_buf_t *buf);
+#endif
 
 int arc_read(zio_t *pio, spa_t *spa, blkptr_t *bp, arc_byteswap_func_t *swap,
     arc_done_func_t *done, void *private, int priority, int flags,
-    uint32_t arc_flags);
+    uint32_t arc_flags, zbookmark_t *zb);
 int arc_write(zio_t *pio, spa_t *spa, int checksum, int compress,
     uint64_t txg, blkptr_t *bp, arc_buf_t *buf,
     arc_done_func_t *done, void *private, int priority, int flags,
-    uint32_t arc_flags);
+    uint32_t arc_flags, zbookmark_t *zb);
 int arc_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     zio_done_func_t *done, void *private, uint32_t arc_flags);
 int arc_tryread(spa_t *spa, blkptr_t *bp, void *data);
+
+void arc_set_callback(arc_buf_t *buf, arc_evict_func_t *func, void *private);
+int arc_buf_evict(arc_buf_t *buf);
 
 void arc_flush(void);
 void arc_tempreserve_clear(uint64_t tempreserve);

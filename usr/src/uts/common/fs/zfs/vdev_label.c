@@ -165,8 +165,8 @@ vdev_label_read(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
 	zio_nowait(zio_read_phys(zio, vd,
 	    vdev_label_offset(vd->vdev_psize, l, offset),
 	    size, buf, ZIO_CHECKSUM_LABEL, done, private,
-	    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_SPECULATIVE |
-	    ZIO_FLAG_CANFAIL | ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_DONT_RETRY));
+	    ZIO_PRIORITY_SYNC_READ,
+	    ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE));
 }
 
 static void
@@ -178,8 +178,7 @@ vdev_label_write(zio_t *zio, vdev_t *vd, int l, void *buf, uint64_t offset,
 	zio_nowait(zio_write_phys(zio, vd,
 	    vdev_label_offset(vd->vdev_psize, l, offset),
 	    size, buf, ZIO_CHECKSUM_LABEL, done, private,
-	    ZIO_PRIORITY_SYNC_WRITE,
-	    ZIO_FLAG_CANFAIL | ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_DONT_RETRY));
+	    ZIO_PRIORITY_SYNC_WRITE, ZIO_FLAG_CONFIG_HELD | ZIO_FLAG_CANFAIL));
 }
 
 /*
@@ -190,7 +189,7 @@ vdev_config_generate(vdev_t *vd, int getstats)
 {
 	nvlist_t *nv = NULL;
 
-	VERIFY(nvlist_alloc(&nv, NV_UNIQUE_NAME, 0) == 0);
+	VERIFY(nvlist_alloc(&nv, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 	VERIFY(nvlist_add_string(nv, ZPOOL_CONFIG_TYPE,
 	    vd->vdev_ops->vdev_op_type) == 0);
@@ -208,6 +207,9 @@ vdev_config_generate(vdev_t *vd, int getstats)
 	if (vd->vdev_wholedisk != -1ULL)
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
 		    vd->vdev_wholedisk) == 0);
+
+	if (vd->vdev_not_present)
+		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT, 1) == 0);
 
 	if (vd == vd->vdev_top) {
 		VERIFY(nvlist_add_uint64(nv, ZPOOL_CONFIG_METASLAB_ARRAY,
@@ -269,7 +271,6 @@ vdev_label_read_config(vdev_t *vd)
 {
 	nvlist_t *config = NULL;
 	vdev_phys_t *vp;
-	uint64_t version;
 	zio_t *zio;
 	int l;
 
@@ -280,8 +281,8 @@ vdev_label_read_config(vdev_t *vd)
 
 	for (l = 0; l < VDEV_LABELS; l++) {
 
-		zio = zio_root(vd->vdev_spa, NULL, NULL,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_CONFIG_HELD);
+		zio = zio_root(vd->vdev_spa, NULL, NULL, ZIO_FLAG_CANFAIL |
+		    ZIO_FLAG_SPECULATIVE | ZIO_FLAG_CONFIG_HELD);
 
 		vdev_label_read(zio, vd, l, vp,
 		    offsetof(vdev_label_t, vl_vdev_phys),
@@ -289,10 +290,7 @@ vdev_label_read_config(vdev_t *vd)
 
 		if (zio_wait(zio) == 0 &&
 		    nvlist_unpack(vp->vp_nvlist, sizeof (vp->vp_nvlist),
-		    &config, 0) == 0 &&
-		    nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
-		    &version) == 0 &&
-		    version == UBERBLOCK_VERSION)
+		    &config, 0) == 0)
 			break;
 
 		if (config != NULL) {
@@ -341,16 +339,15 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg)
 	 * Check whether this device is already in use.
 	 * Ignore the check if crtxg == 0, which we use for device removal.
 	 */
-	if (crtxg != 0 && (label = vdev_label_read_config(vd)) != NULL) {
-		uint64_t version, state, pool_guid, device_guid, txg;
+	if (crtxg != 0 &&
+	    (label = vdev_label_read_config(vd)) != NULL) {
+		uint64_t state, pool_guid, device_guid, txg;
 		uint64_t mycrtxg = 0;
 
 		(void) nvlist_lookup_uint64(label, ZPOOL_CONFIG_CREATE_TXG,
 		    &mycrtxg);
 
-		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_VERSION,
-		    &version) == 0 && version == UBERBLOCK_VERSION &&
-		    nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE,
+		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE,
 		    &state) == 0 && state == POOL_STATE_ACTIVE &&
 		    nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_GUID,
 		    &pool_guid) == 0 &&
@@ -390,7 +387,7 @@ vdev_label_init(vdev_t *vd, uint64_t crtxg)
 	buf = vp->vp_nvlist;
 	buflen = sizeof (vp->vp_nvlist);
 
-	if (nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, 0) != 0) {
+	if (nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, KM_SLEEP) != 0) {
 		nvlist_free(label);
 		zio_buf_free(vp, sizeof (vdev_phys_t));
 		return (EINVAL);
@@ -491,7 +488,7 @@ vdev_uberblock_load_done(zio_t *zio)
 
 	ASSERT3U(zio->io_size, ==, sizeof (uberblock_phys_t));
 
-	if (uberblock_verify(ub) == 0) {
+	if (zio->io_error == 0 && uberblock_verify(ub) == 0) {
 		mutex_enter(&spa->spa_uberblock_lock);
 		if (vdev_uberblock_compare(ub, ubbest) > 0)
 			*ubbest = *ub;
@@ -645,7 +642,7 @@ vdev_sync_label(zio_t *zio, vdev_t *vd, int l, uint64_t txg)
 	buf = vp->vp_nvlist;
 	buflen = sizeof (vp->vp_nvlist);
 
-	if (nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, 0) == 0)
+	if (nvlist_pack(label, &buf, &buflen, NV_ENCODE_XDR, KM_SLEEP) == 0)
 		vdev_label_write(zio, vd, l, vp,
 		    offsetof(vdev_label_t, vl_vdev_phys), sizeof (vdev_phys_t),
 		    vdev_sync_label_done, NULL);

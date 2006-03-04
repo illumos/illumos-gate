@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1741,13 +1740,10 @@ secpolicy_contract_event_choice(const cred_t *cr)
 }
 
 /*
- * Name:   secpolicy_gart_access
+ * secpolicy_gart_access
  *
- * Normal: Verify if the subject has sufficient priveleges to make ioctls
- *	   to agpgart device
- *
- * Output: EPERM - if not privileged
- *
+ * Determine if the subject has sufficient priveleges to make ioctls to agpgart
+ * device.
  */
 int
 secpolicy_gart_access(const cred_t *cr)
@@ -1756,13 +1752,10 @@ secpolicy_gart_access(const cred_t *cr)
 }
 
 /*
- * Name:   secpolicy_gart_map
+ * secpolicy_gart_map
  *
- * Normal: Verify if the subject has sufficient privelegs to map aperture
- *	   range through agpgart driver
- *
- * Output: EPERM - if not privileged
- *
+ * Determine if the subject has sufficient priveleges to map aperture range
+ * through agpgart driver.
  */
 int
 secpolicy_gart_map(const cred_t *cr)
@@ -1774,10 +1767,22 @@ secpolicy_gart_map(const cred_t *cr)
 }
 
 /*
+ * secpolicy_zinject
+ *
+ * Determine if the subject can inject faults in the ZFS fault injection
+ * framework.  Requires all privileges.
+ */
+int
+secpolicy_zinject(const cred_t *cr)
+{
+	return (secpolicy_require_set(cr, PRIV_FULLSET, NULL));
+}
+
+/*
  * secpolicy_zfs
  *
- * Determine if the user has permission to manipulate ZFS datasets (not pools).
- * Equivalent to the SYS_MOUNT privilege.
+ * Determine if the subject has permission to manipulate ZFS datasets
+ * (not pools).  Equivalent to the SYS_MOUNT privilege.
  */
 int
 secpolicy_zfs(const cred_t *cr)

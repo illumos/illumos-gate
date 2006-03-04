@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -1066,6 +1065,37 @@ fm_fmri_mem_set(nvlist_t *fmri, int version, const nvlist_t *auth,
 				atomic_add_64(&erpt_kstat_data.
 				    fmri_set_failed.value.ui64, 1);
 			}
+		}
+	}
+}
+
+void
+fm_fmri_zfs_set(nvlist_t *fmri, int version, uint64_t pool_guid,
+    uint64_t vdev_guid)
+{
+	if (version != ZFS_SCHEME_VERSION0) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		return;
+	}
+
+	if (nvlist_add_uint8(fmri, FM_VERSION, version) != 0) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		return;
+	}
+
+	if (nvlist_add_string(fmri, FM_FMRI_SCHEME, FM_FMRI_SCHEME_ZFS) != 0) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+		return;
+	}
+
+	if (nvlist_add_uint64(fmri, FM_FMRI_ZFS_POOL, pool_guid) != 0) {
+		atomic_add_64(&erpt_kstat_data.fmri_set_failed.value.ui64, 1);
+	}
+
+	if (vdev_guid != 0) {
+		if (nvlist_add_uint64(fmri, FM_FMRI_ZFS_VDEV, vdev_guid) != 0) {
+			atomic_add_64(
+			    &erpt_kstat_data.fmri_set_failed.value.ui64, 1);
 		}
 	}
 }

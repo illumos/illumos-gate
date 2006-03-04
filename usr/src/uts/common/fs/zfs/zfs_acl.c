@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -288,25 +287,33 @@ zfs_acl_node_read_internal(znode_t *zp)
 /*
  * Read an external acl object.
  */
-zfs_acl_t *
-zfs_acl_node_read(znode_t *zp)
+static int
+zfs_acl_node_read(znode_t *zp, zfs_acl_t **aclpp)
 {
 	uint64_t extacl = zp->z_phys->zp_acl.z_acl_extern_obj;
 	zfs_acl_t	*aclp;
+	int error;
 
 	ASSERT(MUTEX_HELD(&zp->z_acl_lock));
 
-	if (zp->z_phys->zp_acl.z_acl_extern_obj == 0)
-		return (zfs_acl_node_read_internal(zp));
+	if (zp->z_phys->zp_acl.z_acl_extern_obj == 0) {
+		*aclpp = zfs_acl_node_read_internal(zp);
+		return (0);
+	}
 
 	aclp = zfs_acl_alloc(zp->z_phys->zp_acl.z_acl_count);
 
-	dmu_read(zp->z_zfsvfs->z_os, extacl, 0,
+	error = dmu_read(zp->z_zfsvfs->z_os, extacl, 0,
 	    ZFS_ACL_SIZE(zp->z_phys->zp_acl.z_acl_count), aclp->z_acl);
+	if (error != 0) {
+		zfs_acl_free(aclp);
+		return (error);
+	}
 
 	aclp->z_acl_count = zp->z_phys->zp_acl.z_acl_count;
 
-	return (aclp);
+	*aclpp = aclp;
+	return (0);
 }
 
 static boolean_t
@@ -868,15 +875,17 @@ zfs_acl_chmod(znode_t *zp, uint64_t mode, zfs_acl_t *aclp,
 int
 zfs_acl_chmod_setattr(znode_t *zp, uint64_t mode, dmu_tx_t *tx)
 {
-	zfs_acl_t *aclp;
+	zfs_acl_t *aclp = NULL;
 	int error;
 
 	ASSERT(MUTEX_HELD(&zp->z_lock));
 	mutex_enter(&zp->z_acl_lock);
-	aclp = zfs_acl_node_read(zp);
-	error = zfs_acl_chmod(zp, mode, aclp, tx);
+	error = zfs_acl_node_read(zp, &aclp);
+	if (error == 0)
+		error = zfs_acl_chmod(zp, mode, aclp, tx);
 	mutex_exit(&zp->z_acl_lock);
-	zfs_acl_free(aclp);
+	if (aclp)
+		zfs_acl_free(aclp);
 	return (error);
 }
 
@@ -1047,7 +1056,7 @@ zfs_perm_init(znode_t *zp, znode_t *parent, int flag,
 	pull_down = (parent->z_phys->zp_flags & ZFS_INHERIT_ACE);
 	if (pull_down) {
 		mutex_enter(&parent->z_acl_lock);
-		paclp = zfs_acl_node_read(parent);
+		VERIFY(0 == zfs_acl_node_read(parent, &paclp));
 		mutex_exit(&parent->z_acl_lock);
 		aclp = zfs_acl_inherit(zp, paclp);
 		zfs_acl_free(paclp);
@@ -1106,7 +1115,12 @@ zfs_getacl(znode_t *zp, vsecattr_t  *vsecp, cred_t *cr)
 
 	mutex_enter(&zp->z_acl_lock);
 
-	aclp = zfs_acl_node_read(zp);
+	error = zfs_acl_node_read(zp, &aclp);
+	if (error != 0) {
+		mutex_exit(&zp->z_acl_lock);
+		return (error);
+	}
+
 
 	if (mask & VSA_ACECNT) {
 		vsecp->vsa_aclcnt = aclp->z_acl_count;
@@ -1240,6 +1254,7 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 	int		mode_wanted = v4_mode;
 	int		cnt;
 	int		i;
+	int		error;
 	int		access_deny = ACCESS_UNDETERMINED;
 	uint_t		entry_type;
 	uid_t		uid = crgetuid(cr);
@@ -1257,7 +1272,12 @@ zfs_zaccess_common(znode_t *zp, int v4_mode, int *working_mode, cred_t *cr)
 
 	mutex_enter(&zp->z_acl_lock);
 
-	aclp = zfs_acl_node_read(zp);
+	error = zfs_acl_node_read(zp, &aclp);
+	if (error != 0) {
+		mutex_exit(&zp->z_acl_lock);
+		return (error);
+	}
+
 
 	zacep = aclp->z_acl;
 	cnt = aclp->z_acl_count;

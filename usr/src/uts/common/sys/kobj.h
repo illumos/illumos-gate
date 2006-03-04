@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -34,6 +33,7 @@
 #include <sys/machelf.h>
 #include <sys/vmem.h>
 #include <sys/sdt.h>
+#include <sys/bootstat.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -162,6 +162,7 @@ extern uintptr_t kobj_getsymvalue(char *, int);
 extern char *kobj_getsymname(uintptr_t, ulong_t *);
 extern char *kobj_searchsym(struct module *, uintptr_t, ulong_t *);
 
+extern int kobj_fstat(intptr_t, struct bootstat *);
 extern intptr_t kobj_open(char *);
 extern int kobj_path_exists(char *, int);
 extern struct _buf *kobj_open_path(char *, int, int);

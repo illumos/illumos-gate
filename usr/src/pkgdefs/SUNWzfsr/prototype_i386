@@ -34,3 +34,4 @@
 d none lib/amd64 755 root bin
 s none lib/amd64/libzfs.so=libzfs.so.1
 f none lib/amd64/libzfs.so.1 755 root bin
+f none lib/amd64/llib-lzfs.ln 644 root bin

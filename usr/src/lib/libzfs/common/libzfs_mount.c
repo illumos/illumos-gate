@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -63,14 +62,6 @@
 
 #include "libzfs_impl.h"
 
-
-/*
- * The following two files are opened as part of zfs_init().  It's OK to for
- * the sharetab to be NULL, but mnttab must always be non-NULL;
- */
-FILE *mnttab_file;
-FILE *sharetab_file;
-
 /*
  * Search the sharetab for the given mountpoint, returning TRUE if it is found.
  */
@@ -79,12 +70,12 @@ is_shared(const char *mountpoint)
 {
 	char buf[MAXPATHLEN], *tab;
 
-	if (sharetab_file == NULL)
+	if (zfs_sharetab() == NULL)
 		return (0);
 
-	(void) fseek(sharetab_file, 0, SEEK_SET);
+	(void) fseek(zfs_sharetab(), 0, SEEK_SET);
 
-	while (fgets(buf, sizeof (buf), sharetab_file) != NULL) {
+	while (fgets(buf, sizeof (buf), zfs_sharetab()) != NULL) {
 
 		/* the mountpoint is the first entry on each line */
 		if ((tab = strchr(buf, '\t')) != NULL) {
@@ -143,8 +134,8 @@ zfs_is_mounted(zfs_handle_t *zhp, char **where)
 	search.mnt_special = (char *)zfs_get_name(zhp);
 	search.mnt_fstype = MNTTYPE_ZFS;
 
-	rewind(mnttab_file);
-	if (getmntany(mnttab_file, &entry, &search) != 0)
+	rewind(zfs_mnttab());
+	if (getmntany(zfs_mnttab(), &entry, &search) != 0)
 		return (FALSE);
 
 	if (where != NULL)
@@ -262,9 +253,9 @@ zfs_unmount(zfs_handle_t *zhp, const char *mountpoint, int flags)
 	/* check to see if need to unmount the filesystem */
 	search.mnt_special = (char *)zfs_get_name(zhp);
 	search.mnt_fstype = MNTTYPE_ZFS;
-	rewind(mnttab_file);
+	rewind(zfs_mnttab());
 	if (mountpoint != NULL || ((zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) &&
-	    getmntany(mnttab_file, &entry, &search) == 0)) {
+	    getmntany(zfs_mnttab(), &entry, &search) == 0)) {
 
 		if (mountpoint == NULL)
 			mountpoint = entry.mnt_mountp;
@@ -442,9 +433,9 @@ zfs_unshare(zfs_handle_t *zhp, const char *mountpoint)
 	/* check to see if need to unmount the filesystem */
 	search.mnt_special = (char *)zfs_get_name(zhp);
 	search.mnt_fstype = MNTTYPE_ZFS;
-	rewind(mnttab_file);
+	rewind(zfs_mnttab());
 	if (mountpoint != NULL || ((zfs_get_type(zhp) == ZFS_TYPE_FILESYSTEM) &&
-	    getmntany(mnttab_file, &entry, &search) == 0)) {
+	    getmntany(zfs_mnttab(), &entry, &search) == 0)) {
 
 		if (mountpoint == NULL)
 			mountpoint = entry.mnt_mountp;

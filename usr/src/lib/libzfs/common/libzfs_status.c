@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,6 +61,25 @@ static char *msgid_table[] = {
 	"ZFS-8000-8A",
 	"ZFS-8000-9P",
 	"ZFS-8000-A5"
+};
+
+/*
+ * If the pool is active, a certain class of static errors is overridden by the
+ * faults as analayzed by FMA.  These faults have separate knowledge articles,
+ * and the article referred to by 'zpool status' must match that indicated by
+ * the syslog error message.  We override missing data as well as corrupt pool.
+ */
+static char *msgid_table_active[] = {
+	"ZFS-8000-14",
+	"ZFS-8000-D3",		/* overridden */
+	"ZFS-8000-D3",		/* overridden */
+	"ZFS-8000-4J",
+	"ZFS-8000-5E",
+	"ZFS-8000-6X",
+	"ZFS-8000-CS",		/* overridden */
+	"ZFS-8000-8A",
+	"ZFS-8000-9P",
+	"ZFS-8000-CS",		/* overridden */
 };
 
 #define	NMSGID	(sizeof (msgid_table) / sizeof (msgid_table[0]))
@@ -143,9 +161,10 @@ find_vdev_problem(nvlist_t *vdev, int (*func)(uint64_t, uint64_t, uint64_t))
  * following:
  *
  *	- Check for a complete and valid configuration
- *	- Look for any missing devices
- *	- Look for any devices showing errors
+ *	- Look for any missing devices in a non-replicated config
  *	- Check for any data errors
+ *	- Check for any missing devices in a replicated config
+ *	- Look for any devices showing errors
  *	- Check for any resilvering devices
  *
  * There can obviously be multiple errors within a single pool, so this routine
@@ -157,6 +176,7 @@ check_status(nvlist_t *config, int isimport)
 	nvlist_t *nvroot;
 	vdev_stat_t *vs;
 	uint_t vsc;
+	uint64_t nerr;
 
 	verify(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);
@@ -167,29 +187,43 @@ check_status(nvlist_t *config, int isimport)
 	 * Check that the config is complete.
 	 */
 	if (vs->vs_state == VDEV_STATE_CANT_OPEN &&
-	    vs->vs_aux == VDEV_AUX_BAD_GUID_SUM) {
+	    vs->vs_aux == VDEV_AUX_BAD_GUID_SUM)
 		return (ZPOOL_STATUS_BAD_GUID_SUM);
+
+	/*
+	 * Missing devices in non-replicated config.
+	 */
+	if (vs->vs_state == VDEV_STATE_CANT_OPEN &&
+	    find_vdev_problem(nvroot, vdev_missing))
+		return (ZPOOL_STATUS_MISSING_DEV_NR);
+
+	if (vs->vs_state == VDEV_STATE_CANT_OPEN &&
+	    find_vdev_problem(nvroot, vdev_broken))
+		return (ZPOOL_STATUS_CORRUPT_LABEL_NR);
+
+	/*
+	 * Corrupted pool metadata
+	 */
+	if (vs->vs_state == VDEV_STATE_CANT_OPEN &&
+	    vs->vs_aux == VDEV_AUX_CORRUPT_DATA)
+		return (ZPOOL_STATUS_CORRUPT_POOL);
+
+	/*
+	 * Persistent data errors.
+	 */
+	if (!isimport) {
+		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_ERRCOUNT,
+		    &nerr) == 0 && nerr != 0)
+			return (ZPOOL_STATUS_CORRUPT_DATA);
 	}
 
 	/*
-	 * Missing devices
+	 * Missing devices in a replicated config.
 	 */
-	if (find_vdev_problem(nvroot, vdev_missing)) {
-		if (vs->vs_state == VDEV_STATE_CANT_OPEN)
-			return (ZPOOL_STATUS_MISSING_DEV_NR);
-		else
-			return (ZPOOL_STATUS_MISSING_DEV_R);
-	}
-
-	/*
-	 * Devices with corrupted labels.
-	 */
-	if (find_vdev_problem(nvroot, vdev_broken)) {
-		if (vs->vs_state == VDEV_STATE_CANT_OPEN)
-			return (ZPOOL_STATUS_CORRUPT_LABEL_NR);
-		else
-			return (ZPOOL_STATUS_CORRUPT_LABEL_R);
-	}
+	if (find_vdev_problem(nvroot, vdev_missing))
+		return (ZPOOL_STATUS_MISSING_DEV_R);
+	if (find_vdev_problem(nvroot, vdev_broken))
+		return (ZPOOL_STATUS_CORRUPT_LABEL_R);
 
 	/*
 	 * Devices with errors
@@ -214,8 +248,6 @@ check_status(nvlist_t *config, int isimport)
 	 *
 	 * 	CORRUPT_CACHE
 	 * 	VERSION_MISMATCH
-	 * 	CORRUPT_POOL
-	 * 	CORRUPT_DATA
 	 */
 
 	return (ZPOOL_STATUS_OK);
@@ -229,7 +261,7 @@ zpool_get_status(zpool_handle_t *zhp, char **msgid)
 	if (ret >= NMSGID)
 		*msgid = NULL;
 	else
-		*msgid = msgid_table[ret];
+		*msgid = msgid_table_active[ret];
 
 	return (ret);
 }

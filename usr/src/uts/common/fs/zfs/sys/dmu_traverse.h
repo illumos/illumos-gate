@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,7 +44,8 @@ extern "C" {
 #define	ADVANCE_PRUNE	0x02		/* prune by prev snapshot birth time */
 #define	ADVANCE_DATA	0x04		/* read user data blocks */
 #define	ADVANCE_HOLES	0x08		/* visit holes */
-#define	ADVANCE_NOLOCK	0x10		/* Don't grab SPA sync lock */
+#define	ADVANCE_ZIL	0x10		/* visit intent log blocks */
+#define	ADVANCE_NOLOCK	0x20		/* Don't grab SPA sync lock */
 
 #define	ZB_NO_LEVEL	-2
 #define	ZB_MAXLEVEL	32		/* Next power of 2 >= DN_MAX_LEVELS */
@@ -57,13 +57,6 @@ extern "C" {
 #define	ZB_MDN_CACHE	1
 #define	ZB_DN_CACHE	2
 #define	ZB_DEPTH	3
-
-typedef struct zbookmark {
-	uint64_t	zb_objset;
-	uint64_t	zb_object;
-	int		zb_level;
-	uint64_t	zb_blkid;
-} zbookmark_t;
 
 typedef struct zseg {
 	uint64_t	seg_mintxg;
@@ -93,6 +86,7 @@ struct traverse_handle {
 	int		th_zio_flags;
 	list_t		th_seglist;
 	traverse_blk_cache_t th_cache[ZB_DEPTH][ZB_MAXLEVEL];
+	traverse_blk_cache_t th_zil_cache;
 	uint64_t	th_hits;
 	uint64_t	th_arc_hits;
 	uint64_t	th_reads;

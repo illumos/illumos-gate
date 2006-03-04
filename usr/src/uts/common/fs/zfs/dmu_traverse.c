@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -339,7 +338,7 @@ traverse_read(traverse_handle_t *th, traverse_blk_cache_t *bc, blkptr_t *bp,
 	} else {
 		error = zio_wait(zio_read(NULL, th->th_spa, bp, bc->bc_data,
 		    BP_GET_LSIZE(bp), NULL, NULL, ZIO_PRIORITY_SYNC_READ,
-		    th->th_zio_flags | ZIO_FLAG_DONT_CACHE));
+		    th->th_zio_flags | ZIO_FLAG_DONT_CACHE, zb));
 
 		if (BP_SHOULD_BYTESWAP(bp) && error == 0)
 			(zb->zb_level > 0 ? byteswap_uint64_array :
@@ -469,13 +468,70 @@ get_dnode(traverse_handle_t *th, uint64_t objset, dnode_phys_t *mdn,
 	return (rc);
 }
 
+/* ARGSUSED */
+static void
+traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t maxtxg)
+{
+	traverse_handle_t *th = arg;
+	traverse_blk_cache_t *bc = &th->th_zil_cache;
+	zbookmark_t *zb = &bc->bc_bookmark;
+
+	if (bp->blk_birth < maxtxg) {
+		zb->zb_object = 0;
+		zb->zb_blkid = bp->blk_cksum.zc_word[3];
+		bc->bc_blkptr = *bp;
+		(void) th->th_func(bc, th->th_spa, th->th_arg);
+	}
+}
+
+/* ARGSUSED */
+static void
+traverse_zil_record(zilog_t *zilog, lr_t *lrc, void *arg, uint64_t maxtxg)
+{
+	traverse_handle_t *th = arg;
+	traverse_blk_cache_t *bc = &th->th_zil_cache;
+	zbookmark_t *zb = &bc->bc_bookmark;
+
+	if (lrc->lrc_txtype == TX_WRITE) {
+		lr_write_t *lr = (lr_write_t *)lrc;
+		blkptr_t *bp = &lr->lr_blkptr;
+
+		if (bp->blk_birth != 0 && bp->blk_birth < maxtxg) {
+			zb->zb_object = lr->lr_foid;
+			zb->zb_blkid = lr->lr_offset / BP_GET_LSIZE(bp);
+			bc->bc_blkptr = *bp;
+			(void) th->th_func(bc, th->th_spa, th->th_arg);
+		}
+	}
+}
+
+static void
+traverse_zil(traverse_handle_t *th, traverse_blk_cache_t *bc, uint64_t maxtxg)
+{
+	spa_t *spa = th->th_spa;
+	objset_phys_t *osphys = bc->bc_data;
+	dsl_pool_t *dp = spa_get_dsl(spa);
+	zilog_t *zilog;
+
+	ASSERT(bc == &th->th_cache[ZB_MDN_CACHE][ZB_MAXLEVEL - 1]);
+	ASSERT(bc->bc_bookmark.zb_level == -1);
+
+	th->th_zil_cache.bc_bookmark = bc->bc_bookmark;
+
+	zilog = zil_alloc(dp->dp_meta_objset, &osphys->os_zil_header);
+
+	zil_parse(zilog, traverse_zil_block, traverse_zil_record, th, maxtxg);
+
+	zil_free(zilog);
+}
+
 static int
 traverse_segment(traverse_handle_t *th, zseg_t *zseg, blkptr_t *mosbp)
 {
 	zbookmark_t *zb = &zseg->seg_start;
 	traverse_blk_cache_t *bc;
 	dnode_phys_t *dn, *dn_tmp;
-	int worklimit = 1000;
+	int worklimit = 100;
 	int rc;
 
 	dprintf("<%llu, %llu, %d, %llx>\n",
@@ -529,6 +585,8 @@ traverse_segment(traverse_handle_t *th, zseg_t *zseg, blkptr_t *mosbp)
 
 	if (zb->zb_level == -1) {
 		ASSERT(zb->zb_object == 0);
+		ASSERT(zb->zb_blkid == 0);
+		ASSERT(BP_GET_TYPE(&bc->bc_blkptr) == DMU_OT_OBJSET);
 
 		if (bc->bc_blkptr.blk_birth > zseg->seg_mintxg) {
 			rc = traverse_callback(th, zseg, bc);
@@ -536,6 +594,9 @@ traverse_segment(traverse_handle_t *th, zseg_t *zseg, blkptr_t *mosbp)
 				ASSERT(rc == EINTR);
 				return (rc);
 			}
+			if ((th->th_advance & ADVANCE_ZIL) &&
+			    zb->zb_objset != 0)
+				traverse_zil(th, bc, zseg->seg_maxtxg);
 		}
 
 		return (advance_from_osphys(zseg, th->th_advance));

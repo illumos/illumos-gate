@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -111,9 +110,8 @@ typedef struct zfs_command {
 
 /*
  * Master command table.  Each ZFS command has a name, associated function, and
- * usage message.  Unfortunately, the usage messages need to be
- * iternationalized, so we have to have a function to return the usage message
- * based on a command index.
+ * usage message.  The usage messages need to be internationalized, so we have
+ * to have a function to return the usage message based on a command index.
  *
  * These commands are organized according to how they are displayed in the usage
  * message.  An empty command (one with a NULL name) indicates an empty line in
@@ -2569,13 +2567,16 @@ manual_mount(int argc, char **argv)
 	char *dataset, *path;
 
 	/* check options */
-	while ((c = getopt(argc, argv, ":o:O")) != -1) {
+	while ((c = getopt(argc, argv, ":mo:O")) != -1) {
 		switch (c) {
 		case 'o':
 			(void) strlcpy(mntopts, optarg, sizeof (mntopts));
 			break;
 		case 'O':
 			flags |= MS_OVERLAY;
+			break;
+		case 'm':
+			flags |= MS_NOMNTTAB;
 			break;
 		case ':':
 			(void) fprintf(stderr, gettext("missing argument for "

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -49,6 +48,7 @@ struct zfs_handle {
 	uint64_t zfs_volsize;
 	uint64_t zfs_volblocksize;
 	char *zfs_mntopts;
+	char zfs_root[MAXPATHLEN];
 };
 
 struct zpool_handle {
@@ -57,6 +57,8 @@ struct zpool_handle {
 	size_t zpool_config_size;
 	nvlist_t *zpool_config;
 	nvlist_t *zpool_old_config;
+	nvlist_t **zpool_error_log;
+	size_t zpool_error_count;
 };
 
 void zfs_error(const char *, ...);
@@ -70,12 +72,7 @@ void no_memory(void);
 	"internal error: unexpected error %d at line %d of %s"),	\
 	(err), (__LINE__), (__FILE__)))
 
-int zfs_fd;
-
 char **get_dependents(const char *, size_t *);
-
-FILE *mnttab_file;
-FILE *sharetab_file;
 
 typedef struct prop_changelist prop_changelist_t;
 
@@ -91,12 +88,16 @@ int changelist_haszonedchild(prop_changelist_t *);
 void remove_mountpoint(zfs_handle_t *);
 
 zfs_handle_t *make_dataset_handle(const char *);
-void set_pool_health(nvlist_t *config);
+void set_pool_health(nvlist_t *);
 
-zpool_handle_t *zpool_open_silent(const char *pool);
+zpool_handle_t *zpool_open_silent(const char *);
 
-int zvol_create_link(const char *dataset);
-int zvol_remove_link(const char *dataset);
+int zvol_create_link(const char *);
+int zvol_remove_link(const char *);
+
+int zfs_ioctl(int, zfs_cmd_t *);
+FILE *zfs_mnttab(void);
+FILE *zfs_sharetab(void);
 
 #ifdef	__cplusplus
 }

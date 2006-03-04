@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -133,8 +132,6 @@ typedef struct zfs_dirlock {
 	struct zfs_dirlock *dl_next;	/* next in z_dirlocks list */
 } zfs_dirlock_t;
 
-struct zcache_state;
-
 typedef struct znode {
 	struct zfsvfs	*z_zfsvfs;
 	vnode_t		*z_vnode;
@@ -150,16 +147,12 @@ typedef struct znode {
 	uint8_t		z_atime_dirty;	/* atime needs to be synced */
 	uint8_t		z_dbuf_held;	/* Is z_dbuf already held? */
 	uint8_t		z_zn_prefetch;	/* Prefetch znodes? */
-	uint_t		z_mapcnt;	/* number of memory maps to file */
 	uint_t		z_blksz;	/* block size in bytes */
 	uint_t		z_seq;		/* modification sequence number */
+	uint64_t	z_mapcnt;	/* number of pages mapped to file */
 	uint64_t	z_last_itx;	/* last ZIL itx on this znode */
 	kmutex_t	z_acl_lock;	/* acl data lock */
 	list_node_t	z_link_node;	/* all znodes in fs link */
-	list_node_t	z_zcache_node;
-	struct zcache_state *z_zcache_state;
-	uint64_t	z_zcache_access;
-
 	/*
 	 * These are dmu managed fields.
 	 */
@@ -241,14 +234,12 @@ extern int	zfs_freesp(znode_t *, uint64_t, uint64_t, int, dmu_tx_t *,
     cred_t *cr);
 extern void	zfs_znode_init(void);
 extern void	zfs_znode_fini(void);
-extern znode_t	*zfs_znode_alloc(zfsvfs_t *, dmu_buf_t *, uint64_t, int);
 extern int	zfs_zget(zfsvfs_t *, uint64_t, znode_t **);
 extern void	zfs_zinactive(znode_t *);
 extern void	zfs_znode_delete(znode_t *, dmu_tx_t *);
 extern void	zfs_znode_free(znode_t *);
 extern int	zfs_delete_thread_target(zfsvfs_t *zfsvfs, int nthreads);
 extern void	zfs_delete_wait_empty(zfsvfs_t *zfsvfs);
-extern void	zfs_zcache_flush(zfsvfs_t *zfsvf);
 extern void	zfs_remove_op_tables();
 extern int	zfs_create_op_tables();
 extern int	zfs_sync(vfs_t *vfsp, short flag, cred_t *cr);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -251,29 +250,19 @@ static void (*_zfs_close)(zfs_handle_t *);
 static uint64_t (*_zfs_prop_get_int)(zfs_handle_t *, zfs_prop_t);
 static void (*_zfs_set_error_handler)(void (*)(const char *, va_list));
 
-int
-main(int argc, char *argv[])
+/*
+ * Dynamically check for libzfs, in case the user hasn't installed the SUNWzfs
+ * packages.  A basic utility such as df shouldn't depend on optional
+ * filesystems.
+ */
+static int
+load_libzfs(void)
 {
 	void *hdl;
 
-	(void) setlocale(LC_ALL, "");
+	if (_zfs_open != NULL)
+		return (1);
 
-#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
-#define	TEXT_DOMAIN "SYS_TEST"
-#endif
-	(void) textdomain(TEXT_DOMAIN);
-
-	program_name = basename(argv[0]);
-
-#ifdef	_iBCS2
-	sysv3_set = getenv("SYSV3");
-#endif	/* _iBCS2 */
-
-	/*
-	 * Dynamically check for libzfs, in case the user hasn't installed the
-	 * SUNWzfs packages.  A basic utility such as df shouldn't depend on
-	 * optional filesystems.
-	 */
 	if ((hdl = dlopen("libzfs.so", RTLD_LAZY)) != NULL) {
 		_zfs_set_error_handler = (void (*)())
 		    dlsym(hdl, "zfs_set_error_handler");
@@ -292,8 +281,28 @@ main(int argc, char *argv[])
 			 * like "can't open ..." under race conditions.
 			 */
 			_zfs_set_error_handler(dummy_error_handler);
+			return (1);
 		}
 	}
+
+	return (0);
+}
+
+int
+main(int argc, char *argv[])
+{
+	(void) setlocale(LC_ALL, "");
+
+#if !defined(TEXT_DOMAIN)		/* Should be defined by cc -D */
+#define	TEXT_DOMAIN "SYS_TEST"
+#endif
+	(void) textdomain(TEXT_DOMAIN);
+
+	program_name = basename(argv[0]);
+
+#ifdef	_iBCS2
+	sysv3_set = getenv("SYSV3");
+#endif	/* _iBCS2 */
 
 	if (EQ(program_name, DEVNM_CMD))
 		do_devnm(argc, argv);
@@ -1231,7 +1240,7 @@ adjust_total_blocks(struct df_request *dfrp, fsblkcnt64_t *total,
 	uint64_t quota;
 
 	if (strcmp(DFR_FSTYPE(dfrp), MNTTYPE_ZFS) != 0 ||
-	    _zfs_open == NULL)
+	    !load_libzfs())
 		return;
 
 	/*

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -99,6 +98,8 @@ typedef enum dmu_object_type {
 	DMU_OT_PLAIN_OTHER,		/* UINT8 */
 	DMU_OT_UINT64_OTHER,		/* UINT64 */
 	DMU_OT_ZAP_OTHER,		/* ZAP */
+	/* new object types: */
+	DMU_OT_ERROR_LOG,		/* ZAP */
 
 	DMU_OT_NUMTYPES
 } dmu_object_type_t;
@@ -146,6 +147,7 @@ void zfs_znode_byteswap(void *buf, size_t size);
 int dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
     objset_t **osp);
 void dmu_objset_close(objset_t *os);
+void dmu_objset_evict_dbufs(objset_t *os);
 int dmu_objset_create(const char *name, dmu_objset_type_t type,
     objset_t *clone_parent,
     void (*func)(objset_t *os, void *arg, dmu_tx_t *tx), void *arg);
@@ -177,6 +179,8 @@ typedef void dmu_byteswap_func_t(void *buf, size_t size);
 #define	DMU_POOL_CONFIG			"config"
 #define	DMU_POOL_ROOT_DATASET		"root_dataset"
 #define	DMU_POOL_SYNC_BPLIST		"sync_bplist"
+#define	DMU_POOL_ERRLOG_SCRUB		"errlog_scrub"
+#define	DMU_POOL_ERRLOG_LAST		"errlog_last"
 
 /*
  * Allocate an object from this objset.  The range of object numbers
@@ -268,8 +272,7 @@ void dmu_object_set_compress(objset_t *os, uint64_t object, uint8_t compress,
  * dmu_buf_will_dirty.  You may use dmu_buf_set_user() on the bonus
  * buffer as well.  You must release your hold with dmu_buf_rele().
  */
-dmu_buf_t *dmu_bonus_hold(objset_t *os, uint64_t object);
-dmu_buf_t *dmu_bonus_hold_tag(objset_t *os, uint64_t object, void *tag);
+int dmu_bonus_hold(objset_t *os, uint64_t object, void *tag, dmu_buf_t **);
 int dmu_bonus_max(void);
 
 /*
@@ -286,11 +289,10 @@ int dmu_bonus_max(void);
  *
  * The object number must be a valid, allocated object number.
  */
-dmu_buf_t *dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset);
+int dmu_buf_hold(objset_t *os, uint64_t object, uint64_t offset,
+    void *tag, dmu_buf_t **);
 void dmu_buf_add_ref(dmu_buf_t *db, void* tag);
-void dmu_buf_remove_ref(dmu_buf_t *db, void* tag);
-void dmu_buf_rele(dmu_buf_t *db);
-void dmu_buf_rele_tag(dmu_buf_t *db, void *tag);
+void dmu_buf_rele(dmu_buf_t *db, void *tag);
 uint64_t dmu_buf_refcount(dmu_buf_t *db);
 
 /*
@@ -303,9 +305,9 @@ uint64_t dmu_buf_refcount(dmu_buf_t *db);
  * with dmu_buf_rele_array.  You can NOT release the hold on each buffer
  * individually with dmu_buf_rele.
  */
-dmu_buf_t **dmu_buf_hold_array(objset_t *os, uint64_t object,
-    uint64_t offset, uint64_t length, int *numbufs);
-void dmu_buf_rele_array(dmu_buf_t **, int numbufs);
+int dmu_buf_hold_array(objset_t *os, uint64_t object, uint64_t offset,
+    uint64_t length, int read, void *tag, int *numbufsp, dmu_buf_t ***dbpp);
+void dmu_buf_rele_array(dmu_buf_t **, int numbufs, void *tag);
 
 /*
  * Returns NULL on success, or the existing user ptr if it's already
@@ -348,19 +350,6 @@ void dmu_buf_rele_data(dmu_buf_t *db);
 void *dmu_buf_get_user(dmu_buf_t *db);
 
 /*
- * Indicate that you are going to read the buffer's data (db_data).
- *
- * This routine will read the data from disk if necessary.
- *
- * These routines will return 0 on success, or an errno if there is a
- * nonrecoverable I/O error.
- */
-void dmu_buf_read(dmu_buf_t *db);
-int dmu_buf_read_canfail(dmu_buf_t *db);
-void dmu_buf_read_array(dmu_buf_t **dbp, int numbufs);
-int dmu_buf_read_array_canfail(dmu_buf_t **dbp, int numbufs);
-
-/*
  * Indicate that you are going to modify the buffer's data (db_data).
  *
  * The transaction (tx) must be assigned to a txg (ie. you've called
@@ -368,20 +357,6 @@ int dmu_buf_read_array_canfail(dmu_buf_t **dbp, int numbufs);
  * (ie. you've called dmu_tx_hold_object(tx, db->db_object)).
  */
 void dmu_buf_will_dirty(dmu_buf_t *db, dmu_tx_t *tx);
-
-/*
- * Indicate that you are going to modify the entire contents of the
- * buffer's data ("fill" it).
- *
- * This routine is the same as dmu_buf_will_dirty, except that it won't
- * read the contents off the disk, so the contents may be uninitialized
- * and you must overwrite it.
- *
- * The transaction (tx) must be assigned to a txg (ie. you've called
- * dmu_tx_assign()).  The buffer's object must be held in the tx (ie.
- * you've called dmu_tx_hold_object(tx, db->db_object)).
- */
-/* void dmu_buf_will_fill(dmu_buf_t *db, dmu_tx_t *tx); */
 
 /*
  * You must create a transaction, then hold the objects which you will
@@ -408,7 +383,7 @@ dmu_tx_t *dmu_tx_create(objset_t *os);
 void dmu_tx_hold_write(dmu_tx_t *tx, uint64_t object, uint64_t off, int len);
 void dmu_tx_hold_free(dmu_tx_t *tx, uint64_t object, uint64_t off,
     uint64_t len);
-void dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int ops);
+void dmu_tx_hold_zap(dmu_tx_t *tx, uint64_t object, int add, char *name);
 void dmu_tx_hold_bonus(dmu_tx_t *tx, uint64_t object);
 void dmu_tx_abort(dmu_tx_t *tx);
 int dmu_tx_assign(dmu_tx_t *tx, uint64_t txg_how);
@@ -418,7 +393,7 @@ void dmu_tx_commit(dmu_tx_t *tx);
  * Free up the data blocks for a defined range of a file.  If size is
  * zero, the range from offset to end-of-file is freed.
  */
-void dmu_free_range(objset_t *os, uint64_t object, uint64_t offset,
+int dmu_free_range(objset_t *os, uint64_t object, uint64_t offset,
 	uint64_t size, dmu_tx_t *tx);
 
 /*
@@ -427,10 +402,8 @@ void dmu_free_range(objset_t *os, uint64_t object, uint64_t offset,
  * Canfail routines will return 0 on success, or an errno if there is a
  * nonrecoverable I/O error.
  */
-void dmu_read(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
+int dmu_read(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	void *buf);
-int dmu_read_canfail(objset_t *dd, uint64_t object, uint64_t offset,
-	uint64_t size, void *buf);
 void dmu_write(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
 	const void *buf, dmu_tx_t *tx);
 int dmu_write_uio(objset_t *os, uint64_t object, uint64_t offset, uint64_t size,
@@ -491,8 +464,7 @@ uint64_t dmu_object_max_nonzero_offset(objset_t *os, uint64_t object);
 typedef struct dmu_objset_stats {
 	dmu_objset_type_t dds_type;
 	uint8_t dds_is_snapshot;
-	uint8_t dds_is_placeholder;
-	uint8_t dds_pad[2];
+	uint8_t dds_pad[3];
 
 	uint64_t dds_creation_time;
 	uint64_t dds_creation_txg;
@@ -532,7 +504,6 @@ typedef struct dmu_objset_stats {
 	 * change, so there is a small probability that it will collide.
 	 */
 	uint64_t dds_fsid_guid;
-	uint64_t dds_guid;
 
 	uint64_t dds_objects_used;	/* number of objects used */
 	uint64_t dds_objects_avail;	/* number of objects available */
@@ -553,15 +524,9 @@ typedef struct dmu_objset_stats {
 	uint64_t dds_available;
 
 	/*
-	 * Miscellaneous
+	 * Used for debugging purposes
 	 */
-	char dds_altroot[MAXPATHLEN];
-
-	/* The following are for debugging purposes only */
 	uint64_t dds_last_txg;
-	uint64_t dds_dir_obj;
-	uint64_t dds_objset_obj;
-	uint64_t dds_clone_of_obj;
 } dmu_objset_stats_t;
 
 /*
@@ -617,7 +582,7 @@ void dmu_traverse_objset(objset_t *os, uint64_t txg_start,
     dmu_traverse_cb_t cb, void *arg);
 
 int dmu_sendbackup(objset_t *tosnap, objset_t *fromsnap, struct vnode *vp);
-int dmu_recvbackup(struct drr_begin *drrb, uint64_t *sizep,
+int dmu_recvbackup(char *tosnap, struct drr_begin *drrb, uint64_t *sizep,
     struct vnode *vp, uint64_t voffset);
 
 /* CRC64 table */

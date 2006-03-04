@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -379,11 +378,11 @@ metaslab_sync(metaslab_t *msp, uint64_t txg)
 			    os, tx);
 		}
 
-		db = dmu_bonus_hold(os, smo->smo_object);
+		VERIFY(0 == dmu_bonus_hold(os, smo->smo_object, FTAG, &db));
 		dmu_buf_will_dirty(db, tx);
 		ASSERT3U(db->db_size, ==, sizeof (*smo));
 		bcopy(smo, db->db_data, db->db_size);
-		dmu_buf_rele(db);
+		dmu_buf_rele(db, FTAG);
 
 		dmu_tx_commit(tx);
 	}

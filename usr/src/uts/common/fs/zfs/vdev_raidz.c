@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -32,6 +31,7 @@
 #include <sys/zio.h>
 #include <sys/zio_checksum.h>
 #include <sys/fs/zfs.h>
+#include <sys/fm/fs/zfs.h>
 
 /*
  * Virtual device vector for RAID-Z.
@@ -327,6 +327,28 @@ vdev_raidz_io_start(zio_t *zio)
 	zio_wait_children_done(zio);
 }
 
+/*
+ * Report a checksum error for a child of a RAID-Z device.
+ */
+static void
+raidz_checksum_error(zio_t *zio, raidz_col_t *rc)
+{
+	vdev_t *vd = zio->io_vd->vdev_child[rc->rc_col];
+	dprintf_bp(zio->io_bp, "imputed checksum error on %s: ",
+	    vdev_description(vd));
+
+	if (!(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
+		mutex_enter(&vd->vdev_stat_lock);
+		vd->vdev_stat.vs_checksum_errors++;
+		mutex_exit(&vd->vdev_stat_lock);
+	}
+
+	if (!(zio->io_flags & ZIO_FLAG_SPECULATIVE))
+		zfs_ereport_post(FM_EREPORT_ZFS_CHECKSUM,
+		    zio->io_spa, vd, zio, rc->rc_offset, rc->rc_size);
+}
+
+
 static void
 vdev_raidz_io_done(zio_t *zio)
 {
@@ -398,8 +420,7 @@ vdev_raidz_io_done(zio_t *zio)
 			bcopy(rc->rc_data, orig, rc->rc_size);
 			vdev_raidz_reconstruct(rm, c);
 			if (bcmp(orig, rc->rc_data, rc->rc_size) != 0) {
-				vdev_checksum_error(zio,
-				    vd->vdev_child[rc->rc_col]);
+				raidz_checksum_error(zio, rc);
 				rc->rc_error = ECKSUM;
 				unexpected_errors++;
 			}
@@ -500,8 +521,7 @@ vdev_raidz_io_done(zio_t *zio)
 			 * inform it.
 			 */
 			if (rc->rc_tried && rc->rc_error == 0)
-				vdev_checksum_error(zio,
-				    vd->vdev_child[rc->rc_col]);
+				raidz_checksum_error(zio, rc);
 			rc->rc_error = ECKSUM;
 			goto done;
 		}
@@ -511,9 +531,18 @@ vdev_raidz_io_done(zio_t *zio)
 	}
 
 	/*
-	 * All combinations failed to checksum.
+	 * All combinations failed to checksum.  Generate checksum ereports for
+	 * every one.
 	 */
 	zio->io_error = ECKSUM;
+	if (!(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
+		for (c = 0; c < rm->rm_cols; c++) {
+			rc = &rm->rm_col[c];
+			zfs_ereport_post(FM_EREPORT_ZFS_CHECKSUM,
+			    zio->io_spa, vd->vdev_child[rc->rc_col], zio,
+			    rc->rc_offset, rc->rc_size);
+		}
+	}
 
 done:
 	zio_checksum_verified(zio);
@@ -558,11 +587,12 @@ static void
 vdev_raidz_state_change(vdev_t *vd, int faulted, int degraded)
 {
 	if (faulted > 1)
-		vdev_set_state(vd, VDEV_STATE_CANT_OPEN, VDEV_AUX_NO_REPLICAS);
+		vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_NO_REPLICAS);
 	else if (degraded + faulted != 0)
-		vdev_set_state(vd, VDEV_STATE_DEGRADED, VDEV_AUX_NONE);
+		vdev_set_state(vd, B_FALSE, VDEV_STATE_DEGRADED, VDEV_AUX_NONE);
 	else
-		vdev_set_state(vd, VDEV_STATE_HEALTHY, VDEV_AUX_NONE);
+		vdev_set_state(vd, B_FALSE, VDEV_STATE_HEALTHY, VDEV_AUX_NONE);
 }
 
 vdev_ops_t vdev_raidz_ops = {

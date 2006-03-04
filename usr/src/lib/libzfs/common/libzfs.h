@@ -88,6 +88,8 @@ extern int zpool_vdev_offline(zpool_handle_t *, const char *, int);
 extern int zpool_vdev_attach(zpool_handle_t *, const char *, const char *,
     nvlist_t *, int);
 extern int zpool_vdev_detach(zpool_handle_t *, const char *);
+extern int zpool_clear(zpool_handle_t *, const char *);
+extern uint64_t zpool_vdev_to_guid(zpool_handle_t *, const char *);
 
 /*
  * Pool health statistics.
@@ -122,14 +124,19 @@ typedef enum {
 	ZPOOL_STATUS_OK
 } zpool_status_t;
 
-extern zpool_status_t zpool_get_status(zpool_handle_t *, char **msgid);
-extern zpool_status_t zpool_import_status(nvlist_t *, char **msgid);
+extern zpool_status_t zpool_get_status(zpool_handle_t *, char **);
+extern zpool_status_t zpool_import_status(nvlist_t *, char **);
 
 /*
  * Statistics and configuration functions.
  */
-extern nvlist_t *zpool_get_config(zpool_handle_t *, nvlist_t **oldconfig);
+extern nvlist_t *zpool_get_config(zpool_handle_t *, nvlist_t **);
 extern int zpool_refresh_stats(zpool_handle_t *);
+extern int zpool_get_errlog(zpool_handle_t *, nvlist_t ***, size_t *);
+
+#define	ZPOOL_ERR_DATASET	"dataset"
+#define	ZPOOL_ERR_OBJECT	"object"
+#define	ZPOOL_ERR_RANGE		"range"
 
 /*
  * Import and export functions
@@ -140,7 +147,7 @@ extern int zpool_import(nvlist_t *, const char *, const char *);
 /*
  * Search for pools to import
  */
-extern nvlist_t *zpool_find_import(int argc, char **argv);
+extern nvlist_t *zpool_find_import(int, char **);
 
 /*
  * Miscellaneous pool functions

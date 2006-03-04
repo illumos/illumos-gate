@@ -323,6 +323,9 @@ vdev_disk_io_done(zio_t *zio)
 	if (zio->io_type == ZIO_TYPE_WRITE)
 		vdev_cache_write(zio);
 
+	if (zio_injection_enabled && zio->io_error == 0)
+		zio->io_error = zio_handle_device_injection(zio->io_vd, EIO);
+
 	zio_next_stage(zio);
 }
 

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -193,7 +192,7 @@ dump_packed_nvlist(objset_t *os, uint64_t object, void *data, size_t size)
 	size_t nvsize = *(uint64_t *)data;
 	char *packed = umem_alloc(nvsize, UMEM_NOFAIL);
 
-	dmu_read(os, object, 0, nvsize, packed);
+	VERIFY(0 == dmu_read(os, object, 0, nvsize, packed));
 
 	VERIFY(nvlist_unpack(packed, nvsize, &nv, 0) == 0);
 
@@ -365,7 +364,8 @@ dump_spacemap(objset_t *os, space_map_obj_t *smo, space_map_t *sm)
 	 */
 	alloc = 0;
 	for (offset = 0; offset < smo->smo_objsize; offset += sizeof (entry)) {
-		dmu_read(os, smo->smo_object, offset, sizeof (entry), &entry);
+		VERIFY(0 == dmu_read(os, smo->smo_object, offset,
+		    sizeof (entry), &entry));
 		if (SM_DEBUG_DECODE(entry)) {
 			(void) printf("\t\t[%4llu] %s: txg %llu, pass %llu\n",
 			    (u_longlong_t)(offset / sizeof (entry)),
@@ -434,10 +434,10 @@ dump_metaslabs(spa_t *spa)
 	for (c = 0; c < rvd->vdev_children; c++) {
 		vd = rvd->vdev_child[c];
 
-		spa_config_enter(spa, RW_READER);
+		spa_config_enter(spa, RW_READER, FTAG);
 		(void) printf("\n    vdev %llu = %s\n\n",
 		    (u_longlong_t)vd->vdev_id, vdev_description(vd));
-		spa_config_exit(spa);
+		spa_config_exit(spa, FTAG);
 
 		if (dump_opt['d'] <= 5) {
 			(void) printf("\t%10s   %10s   %5s\n",
@@ -463,9 +463,9 @@ dump_dtl(vdev_t *vd, int indent)
 	if (indent == 0)
 		(void) printf("\nDirty time logs:\n\n");
 
-	spa_config_enter(spa, RW_READER);
+	spa_config_enter(spa, RW_READER, FTAG);
 	(void) printf("\t%*s%s\n", indent, "", vdev_description(vd));
-	spa_config_exit(spa);
+	spa_config_exit(spa, FTAG);
 
 	for (ss = avl_first(t); ss; ss = AVL_NEXT(t, ss)) {
 		/*
@@ -523,11 +523,11 @@ zdb_indirect_cb(traverse_blk_cache_t *bc, spa_t *spa, void *a)
 
 	if (bc->bc_errno) {
 		(void) sprintf(buffer,
-		    "Error %d reading <%llu, %llu, %d, %llu>: ",
+		    "Error %d reading <%llu, %llu, %lld, %llu>: ",
 		    bc->bc_errno,
 		    (u_longlong_t)zb->zb_objset,
 		    (u_longlong_t)zb->zb_object,
-		    zb->zb_level,
+		    (u_longlong_t)zb->zb_level,
 		    (u_longlong_t)zb->zb_blkid);
 		goto out;
 	}
@@ -547,7 +547,6 @@ zdb_indirect_cb(traverse_blk_cache_t *bc, spa_t *spa, void *a)
 		for (bpx = data, bpend = bpx + BP_GET_LSIZE(bp) / sizeof (*bpx);
 		    bpx < bpend; bpx++) {
 			if (bpx->blk_birth != 0) {
-				ASSERT(bpx->blk_fill > 0);
 				fill += bpx->blk_fill;
 			} else {
 				ASSERT(bpx->blk_fill == 0);
@@ -575,8 +574,8 @@ zdb_indirect_cb(traverse_blk_cache_t *bc, spa_t *spa, void *a)
 
 	for (l = dnp->dn_nlevels - 1; l >= -1; l--) {
 		if (l == zb->zb_level) {
-			(void) sprintf(buffer + strlen(buffer), "L%x",
-			    zb->zb_level);
+			(void) sprintf(buffer + strlen(buffer), "L%llx",
+			    (u_longlong_t)zb->zb_level);
 		} else {
 			(void) sprintf(buffer + strlen(buffer), " ");
 		}
@@ -730,7 +729,7 @@ dump_bplist(objset_t *mos, uint64_t object, char *name)
 	if (dump_opt['d'] < 3)
 		return;
 
-	bplist_open(&bpl, mos, object);
+	VERIFY(0 == bplist_open(&bpl, mos, object));
 	if (bplist_empty(&bpl)) {
 		bplist_close(&bpl);
 		return;
@@ -776,20 +775,20 @@ znode_path(objset_t *os, uint64_t object, char *pathbuf, size_t size)
 	size_t complen;
 	char component[MAXNAMELEN + 1];
 	char *path;
+	int error;
 
 	path = pathbuf + size;
 	*--path = '\0';
 
 	for (;;) {
-		db = dmu_bonus_hold(os, object);
-		if (db == NULL)
+		error = dmu_bonus_hold(os, object, FTAG, &db);
+		if (error)
 			break;
 
-		dmu_buf_read(db);
 		dmu_object_info_from_db(db, &doi);
 		zp = db->db_data;
 		parent = zp->zp_parent;
-		dmu_buf_rele(db);
+		dmu_buf_rele(db, FTAG);
 
 		if (doi.doi_bonus_type != DMU_OT_ZNODE)
 			break;
@@ -881,7 +880,7 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
 	dump_none,		/* ZIL intent log		*/
 	dump_dnode,		/* DMU dnode			*/
 	dump_dmu_objset,	/* DMU objset			*/
-	dump_dsl_dir,	/* DSL directory			*/
+	dump_dsl_dir,		/* DSL directory		*/
 	dump_zap,		/* DSL directory child map	*/
 	dump_zap,		/* DSL dataset snap map		*/
 	dump_zap,		/* DSL props			*/
@@ -897,6 +896,7 @@ static object_viewer_t *object_viewer[DMU_OT_NUMTYPES] = {
 	dump_uint8,		/* other uint8[]		*/
 	dump_uint64,		/* other uint64[]		*/
 	dump_zap,		/* other ZAP			*/
+	dump_zap,		/* persistent error log		*/
 };
 
 static void
@@ -920,10 +920,10 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 	if (object == 0) {
 		dn = os->os->os_meta_dnode;
 	} else {
-		db = dmu_bonus_hold(os, object);
-		if (db == NULL)
-			fatal("dmu_bonus_hold(%llu) failed", object);
-		dmu_buf_read(db);
+		error = dmu_bonus_hold(os, object, FTAG, &db);
+		if (error)
+			fatal("dmu_bonus_hold(%llu) failed, errno %u",
+			    object, error);
 		bonus = db->db_data;
 		bsize = db->db_size;
 		dn = ((dmu_buf_impl_t *)db)->db_dnode;
@@ -999,7 +999,7 @@ dump_object(objset_t *os, uint64_t object, int verbosity, int *print_header)
 	}
 
 	if (db != NULL)
-		dmu_buf_rele(db);
+		dmu_buf_rele(db, FTAG);
 }
 
 static char *objset_types[DMU_OST_NUMTYPES] = {
@@ -1214,7 +1214,7 @@ zdb_space_map_load(spa_t *spa)
 }
 
 static int
-zdb_space_map_claim(spa_t *spa, blkptr_t *bp)
+zdb_space_map_claim(spa_t *spa, blkptr_t *bp, zbookmark_t *zb)
 {
 	dva_t *dva = &bp->blk_dva[0];
 	uint64_t vdev = DVA_GET_VDEV(dva);
@@ -1248,7 +1248,7 @@ zdb_space_map_claim(spa_t *spa, blkptr_t *bp)
 		error = zio_wait(zio_read(NULL, spa, &blk,
 		    &gbh, SPA_GANGBLOCKSIZE, NULL, NULL,
 		    ZIO_PRIORITY_SYNC_READ,
-		    ZIO_FLAG_CANFAIL | ZIO_FLAG_CONFIG_HELD));
+		    ZIO_FLAG_CANFAIL | ZIO_FLAG_CONFIG_HELD, zb));
 		if (error)
 			return (error);
 		if (BP_SHOULD_BYTESWAP(&blk))
@@ -1256,7 +1256,7 @@ zdb_space_map_claim(spa_t *spa, blkptr_t *bp)
 		for (g = 0; g < SPA_GBH_NBLKPTRS; g++) {
 			if (gbh.zg_blkptr[g].blk_birth == 0)
 				break;
-			error = zdb_space_map_claim(spa, &gbh.zg_blkptr[g]);
+			error = zdb_space_map_claim(spa, &gbh.zg_blkptr[g], zb);
 			if (error)
 				return (error);
 		}
@@ -1327,11 +1327,6 @@ zdb_refresh_ubsync(spa_t *spa)
 	zio_t *zio;
 
 	/*
-	 * Reopen all devices to purge zdb's vdev caches.
-	 */
-	vdev_reopen(rvd, NULL);
-
-	/*
 	 * Reload the uberblock.
 	 */
 	zio = zio_root(spa, NULL, NULL,
@@ -1367,8 +1362,6 @@ typedef struct zdb_cb {
 	int		zcb_haderrors;
 } zdb_cb_t;
 
-static blkptr_cb_t zdb_blkptr_cb;
-
 static void
 zdb_count_block(spa_t *spa, zdb_cb_t *zcb, blkptr_t *bp, int type)
 {
@@ -1388,7 +1381,7 @@ zdb_count_block(spa_t *spa, zdb_cb_t *zcb, blkptr_t *bp, int type)
 	if (dump_opt['L'])
 		return;
 
-	error = zdb_space_map_claim(spa, bp);
+	error = zdb_space_map_claim(spa, bp, &zcb->zcb_cache->bc_bookmark);
 
 	if (error == 0)
 		return;
@@ -1400,22 +1393,6 @@ zdb_count_block(spa_t *spa, zdb_cb_t *zcb, blkptr_t *bp, int type)
 		(void) fatal("reference to freed block, bp=%p", bp);
 
 	(void) fatal("fatal error %d in bp %p", error, bp);
-}
-
-static void
-zdb_log_block_cb(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t first_txg)
-{
-	if (bp->blk_birth < first_txg) {
-		zdb_cb_t *zcb = arg;
-		traverse_blk_cache_t bc = *zcb->zcb_cache;
-		zbookmark_t *zb = &bc.bc_bookmark;
-
-		zb->zb_objset = bp->blk_cksum.zc_word[2];
-		zb->zb_blkid = bp->blk_cksum.zc_word[3];
-		bc.bc_blkptr = *bp;
-
-		(void) zdb_blkptr_cb(&bc, zilog->zl_spa, arg);
-	}
 }
 
 static int
@@ -1444,11 +1421,11 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 			blkbuf[0] = '\0';
 
 		(void) printf("zdb_blkptr_cb: Got error %d reading "
-		    "<%llu, %llu, %d, %llx> %s -- %s\n",
+		    "<%llu, %llu, %lld, %llx> %s -- %s\n",
 		    bc->bc_errno,
 		    (u_longlong_t)zb->zb_objset,
 		    (u_longlong_t)zb->zb_object,
-		    zb->zb_level,
+		    (u_longlong_t)zb->zb_level,
 		    (u_longlong_t)zb->zb_blkid,
 		    blkbuf,
 		    error == EAGAIN ? "retrying" : "skipping");
@@ -1472,18 +1449,6 @@ zdb_blkptr_cb(traverse_blk_cache_t *bc, spa_t *spa, void *arg)
 		    blkbuf);
 	}
 
-	if (type == DMU_OT_OBJSET) {
-		objset_phys_t *osphys = bc->bc_data;
-		zilog_t zilog = { 0 };
-		zilog.zl_header = &osphys->os_zil_header;
-		zilog.zl_spa = spa;
-
-		zcb->zcb_cache = bc;
-
-		zil_parse(&zilog, zdb_log_block_cb, NULL, zcb,
-		    spa_first_txg(spa));
-	}
-
 	return (0);
 }
 
@@ -1492,6 +1457,7 @@ dump_block_stats(spa_t *spa)
 {
 	traverse_handle_t *th;
 	zdb_cb_t zcb = { 0 };
+	traverse_blk_cache_t dummy_cache = { 0 };
 	zdb_blkstats_t *zb, *tzb;
 	uint64_t alloc, space;
 	int leaks = 0;
@@ -1499,10 +1465,12 @@ dump_block_stats(spa_t *spa)
 	int flags;
 	int e;
 
+	zcb.zcb_cache = &dummy_cache;
+
 	if (dump_opt['c'])
 		advance |= ADVANCE_DATA;
 
-	advance |= ADVANCE_PRUNE;
+	advance |= ADVANCE_PRUNE | ADVANCE_ZIL;
 
 	(void) printf("\nTraversing all blocks to %sverify"
 	    " nothing leaked ...\n",
@@ -1526,8 +1494,8 @@ dump_block_stats(spa_t *spa)
 		blkptr_t blk;
 		uint64_t itor = 0;
 
-		bplist_open(bpl, spa->spa_meta_objset,
-		    spa->spa_sync_bplist_obj);
+		VERIFY(0 == bplist_open(bpl, spa->spa_meta_objset,
+		    spa->spa_sync_bplist_obj));
 
 		while (bplist_iterate(bpl, &itor, &blk) == 0) {
 			zdb_count_block(spa, &zcb, &blk, DMU_OT_DEFERRED);
@@ -1543,8 +1511,8 @@ dump_block_stats(spa_t *spa)
 	}
 
 	/*
-	 * Now traverse the pool.  If we're read all data to verify checksums,
-	 * do a scrubbing read so that we validate all copies.
+	 * Now traverse the pool.  If we're reading all data to verify
+	 * checksums, do a scrubbing read so that we validate all copies.
 	 */
 	flags = ZIO_FLAG_CANFAIL;
 	if (advance & ADVANCE_DATA)
@@ -1552,7 +1520,7 @@ dump_block_stats(spa_t *spa)
 	th = traverse_init(spa, zdb_blkptr_cb, &zcb, advance, flags);
 	th->th_noread = zdb_noread;
 
-	traverse_add_pool(th, 0, -1ULL);
+	traverse_add_pool(th, 0, spa_first_txg(spa));
 
 	while (traverse_more(th) == EAGAIN)
 		continue;
@@ -1734,6 +1702,7 @@ main(int argc, char **argv)
 	int verbose = 0;
 	int error;
 	int flag, set;
+	vdev_knob_t *vk;
 
 	(void) setrlimit(RLIMIT_NOFILE, &rl);
 
@@ -1789,10 +1758,10 @@ main(int argc, char **argv)
 			zdb_noread.zb_level = strtol(endstr + 1, &endstr, 0);
 			zdb_noread.zb_blkid = strtoull(endstr + 1, &endstr, 16);
 			(void) printf("simulating bad block "
-			    "<%llu, %llu, %d, %llx>\n",
+			    "<%llu, %llu, %lld, %llx>\n",
 			    (u_longlong_t)zdb_noread.zb_objset,
 			    (u_longlong_t)zdb_noread.zb_object,
-			    zdb_noread.zb_level,
+			    (u_longlong_t)zdb_noread.zb_level,
 			    (u_longlong_t)zdb_noread.zb_blkid);
 			break;
 		case 'v':
@@ -1808,6 +1777,15 @@ main(int argc, char **argv)
 	}
 
 	kernel_init(FREAD);
+
+	/*
+	 * Disable vdev caching.  If we don't do this, live pool traversal
+	 * won't make progress because it will never see disk updates.
+	 */
+	for (vk = vdev_knob_next(NULL); vk != NULL; vk = vdev_knob_next(vk)) {
+		if (strcmp(vk->vk_name, "cache_size") == 0)
+			vk->vk_default = 0;
+	}
 
 	for (c = 0; c < 256; c++) {
 		if (dump_all && c != 'L' && c != 'l')

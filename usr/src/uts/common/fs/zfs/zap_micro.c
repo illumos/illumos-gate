@@ -29,6 +29,7 @@
 #include <sys/dmu.h>
 #include <sys/zfs_context.h>
 #include <sys/zap.h>
+#include <sys/refcount.h>
 #include <sys/zap_impl.h>
 #include <sys/zap_leaf.h>
 #include <sys/avl.h>
@@ -269,7 +270,9 @@ zap_lockdir(objset_t *os, uint64_t obj, dmu_tx_t *tx,
 
 	*zapp = NULL;
 
-	db = dmu_buf_hold(os, obj, 0);
+	err = dmu_buf_hold(os, obj, 0, NULL, &db);
+	if (err)
+		return (err);
 
 #ifdef ZFS_DEBUG
 	{
@@ -278,12 +281,6 @@ zap_lockdir(objset_t *os, uint64_t obj, dmu_tx_t *tx,
 		ASSERT(dmu_ot[doi.doi_type].ot_byteswap == zap_byteswap);
 	}
 #endif
-
-	/*
-	 * The zap can deal with EIO here, but its callers don't yet, so
-	 * spare them by doing a mustsucceed read.
-	 */
-	dmu_buf_read(db);
 
 	zap = dmu_buf_get_user(db);
 	if (zap == NULL)
@@ -340,7 +337,7 @@ void
 zap_unlockdir(zap_t *zap)
 {
 	rw_exit(&zap->zap_rwlock);
-	dmu_buf_rele(zap->zap_dbuf);
+	dmu_buf_rele(zap->zap_dbuf, NULL);
 }
 
 static void
@@ -375,7 +372,7 @@ mzap_upgrade(zap_t *zap, dmu_tx_t *tx)
 		    mze->mze_name, mze->mze_value);
 		err = fzap_add_cd(zap,
 		    mze->mze_name, 8, 1, &mze->mze_value,
-		    mze->mze_cd, tx, NULL);
+		    mze->mze_cd, tx);
 		ASSERT3U(err, ==, 0);
 	}
 	kmem_free(mzp, sz);
@@ -411,7 +408,7 @@ mzap_create_impl(objset_t *os, uint64_t obj, dmu_tx_t *tx)
 	dmu_buf_t *db;
 	mzap_phys_t *zp;
 
-	db = dmu_buf_hold(os, obj, 0);
+	VERIFY(0 == dmu_buf_hold(os, obj, 0, FTAG, &db));
 
 #ifdef ZFS_DEBUG
 	{
@@ -426,7 +423,7 @@ mzap_create_impl(objset_t *os, uint64_t obj, dmu_tx_t *tx)
 	zp->mz_block_type = ZBT_MICRO;
 	zp->mz_salt = ((uintptr_t)db ^ (uintptr_t)tx ^ (obj << 1)) | 1ULL;
 	ASSERT(zp->mz_salt != 0);
-	dmu_buf_rele(db);
+	dmu_buf_rele(db, FTAG);
 }
 
 int

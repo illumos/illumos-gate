@@ -26,6 +26,7 @@
 #pragma ident	"%Z%%M%	%I%	%E% SMI"
 
 #include <sys/zfs_context.h>
+#include <sys/fm/fs/zfs.h>
 #include <sys/spa.h>
 #include <sys/spa_impl.h>
 #include <sys/dmu.h>
@@ -132,34 +133,6 @@ vdev_lookup_top(spa_t *spa, uint64_t vdev)
 
 	if (vdev < rvd->vdev_children)
 		return (rvd->vdev_child[vdev]);
-
-	return (NULL);
-}
-
-vdev_t *
-vdev_lookup_by_path(vdev_t *vd, const char *path)
-{
-	int c;
-	vdev_t *mvd;
-
-	if (vd->vdev_path != NULL) {
-		if (vd->vdev_wholedisk == 1) {
-			/*
-			 * For whole disks, the internal path has 's0', but the
-			 * path passed in by the user doesn't.
-			 */
-			if (strlen(path) == strlen(vd->vdev_path) - 2 &&
-			    strncmp(path, vd->vdev_path, strlen(path)) == 0)
-				return (vd);
-		} else if (strcmp(path, vd->vdev_path) == 0) {
-			return (vd);
-		}
-	}
-
-	for (c = 0; c < vd->vdev_children; c++)
-		if ((mvd = vdev_lookup_by_path(vd->vdev_child[c], path)) !=
-		    NULL)
-			return (mvd);
 
 	return (NULL);
 }
@@ -305,10 +278,6 @@ vdev_alloc_common(spa_t *spa, uint_t id, uint64_t guid, vdev_ops_t *ops)
 	vd->vdev_ops = ops;
 	vd->vdev_state = VDEV_STATE_CLOSED;
 
-	mutex_init(&vd->vdev_io_lock, NULL, MUTEX_DEFAULT, NULL);
-	cv_init(&vd->vdev_io_cv, NULL, CV_DEFAULT, NULL);
-	list_create(&vd->vdev_io_pending, sizeof (zio_t),
-	    offsetof(zio_t, io_pending));
 	mutex_init(&vd->vdev_dirty_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&vd->vdev_dtl_lock, NULL, MUTEX_DEFAULT, NULL);
 	space_map_create(&vd->vdev_dtl_map, 0, -1ULL, 0, &vd->vdev_dtl_lock);
@@ -343,9 +312,6 @@ vdev_free_common(vdev_t *vd)
 	mutex_exit(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_dtl_lock);
 	mutex_destroy(&vd->vdev_dirty_lock);
-	list_destroy(&vd->vdev_io_pending);
-	mutex_destroy(&vd->vdev_io_lock);
-	cv_destroy(&vd->vdev_io_cv);
 
 	kmem_free(vd, sizeof (vdev_t));
 }
@@ -400,6 +366,13 @@ vdev_alloc(spa_t *spa, nvlist_t *nv, vdev_t *parent, uint_t id, int alloctype)
 	if (nvlist_lookup_uint64(nv, ZPOOL_CONFIG_WHOLE_DISK,
 	    &vd->vdev_wholedisk) != 0)
 		vd->vdev_wholedisk = -1ULL;
+
+	/*
+	 * Look for the 'not present' flag.  This will only be set if the device
+	 * was not present at the time of import.
+	 */
+	(void) nvlist_lookup_uint64(nv, ZPOOL_CONFIG_NOT_PRESENT,
+	    &vd->vdev_not_present);
 
 	/*
 	 * If we're a top-level vdev, try to load the allocation parameters.
@@ -536,8 +509,8 @@ vdev_top_transfer(vdev_t *svd, vdev_t *tvd)
 		vdev_config_dirty(tvd);
 	}
 
-	ASSERT(svd->vdev_io_retry == NULL);
-	ASSERT(list_is_empty(&svd->vdev_io_pending));
+	tvd->vdev_reopen_wanted = svd->vdev_reopen_wanted;
+	svd->vdev_reopen_wanted = 0;
 }
 
 static void
@@ -611,7 +584,7 @@ vdev_remove_parent(vdev_t *cvd)
 	vdev_free(mvd);
 }
 
-void
+int
 vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 {
 	spa_t *spa = vd->vdev_spa;
@@ -621,6 +594,7 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 	uint64_t newc = vd->vdev_asize >> vd->vdev_ms_shift;
 	space_map_obj_t *smo = vd->vdev_smo;
 	metaslab_t **mspp = vd->vdev_ms;
+	int ret;
 
 	dprintf("%s oldc %llu newc %llu\n", vdev_description(vd), oldc, newc);
 
@@ -638,21 +612,29 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 			ms_array = kmem_zalloc(newc * sizeof (uint64_t),
 			    KM_SLEEP);
 
-			dmu_read(spa->spa_meta_objset, vd->vdev_ms_array,
-			    0, newc * sizeof (uint64_t), ms_array);
+			if ((ret = dmu_read(spa->spa_meta_objset,
+			    vd->vdev_ms_array, 0,
+			    newc * sizeof (uint64_t), ms_array)) != 0) {
+				kmem_free(ms_array, newc * sizeof (uint64_t));
+				goto error;
+			}
 
 			for (c = 0; c < newc; c++) {
 				if (ms_array[c] == 0)
 					continue;
-				db = dmu_bonus_hold(spa->spa_meta_objset,
-				    ms_array[c]);
-				dmu_buf_read(db);
+				if ((ret = dmu_bonus_hold(
+				    spa->spa_meta_objset, ms_array[c],
+				    FTAG, &db)) != 0) {
+					kmem_free(ms_array,
+					    newc * sizeof (uint64_t));
+					goto error;
+				}
 				ASSERT3U(db->db_size, ==, sizeof (*smo));
 				bcopy(db->db_data, &vd->vdev_smo[c],
 				    db->db_size);
 				ASSERT3U(vd->vdev_smo[c].smo_object, ==,
 				    ms_array[c]);
-				dmu_buf_rele(db);
+				dmu_buf_rele(db, FTAG);
 			}
 			kmem_free(ms_array, newc * sizeof (uint64_t));
 		}
@@ -674,6 +656,21 @@ vdev_metaslab_init(vdev_t *vd, uint64_t txg)
 		kmem_free(mspp, oldc * sizeof (*mspp));
 	}
 
+	return (0);
+
+error:
+	/*
+	 * On error, undo any partial progress we may have made, and restore the
+	 * old metaslab values.
+	 */
+	kmem_free(vd->vdev_smo, newc * sizeof (*smo));
+	kmem_free(vd->vdev_ms, newc * sizeof (*mspp));
+
+	vd->vdev_smo = smo;
+	vd->vdev_ms = mspp;
+	vd->vdev_ms_count = oldc;
+
+	return (ret);
 }
 
 void
@@ -735,39 +732,39 @@ vdev_open(vdev_t *vd)
 
 	if (vd->vdev_offline) {
 		ASSERT(vd->vdev_children == 0);
-		dprintf("OFFLINE: %s = ENXIO\n", vdev_description(vd));
-		vd->vdev_state = VDEV_STATE_OFFLINE;
+		vdev_set_state(vd, B_TRUE, VDEV_STATE_OFFLINE, VDEV_AUX_NONE);
 		return (ENXIO);
 	}
 
 	error = vd->vdev_ops->vdev_op_open(vd, &osize, &ashift);
 
+	if (zio_injection_enabled && error == 0)
+		error = zio_handle_device_injection(vd, ENXIO);
+
 	dprintf("%s = %d, osize %llu, state = %d\n",
 	    vdev_description(vd), error, osize, vd->vdev_state);
 
 	if (error) {
-		dprintf("%s in %s failed to open, error %d, aux %d\n",
-		    vdev_description(vd),
-		    vdev_description(vd->vdev_parent),
-		    error,
+		vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
 		    vd->vdev_stat.vs_aux);
-
-		vd->vdev_state = VDEV_STATE_CANT_OPEN;
 		return (error);
 	}
 
 	vd->vdev_state = VDEV_STATE_HEALTHY;
 
 	for (c = 0; c < vd->vdev_children; c++)
-		if (vd->vdev_child[c]->vdev_state != VDEV_STATE_HEALTHY)
-			vd->vdev_state = VDEV_STATE_DEGRADED;
+		if (vd->vdev_child[c]->vdev_state != VDEV_STATE_HEALTHY) {
+			vdev_set_state(vd, B_TRUE, VDEV_STATE_DEGRADED,
+			    VDEV_AUX_NONE);
+			break;
+		}
 
 	osize = P2ALIGN(osize, (uint64_t)sizeof (vdev_label_t));
 
 	if (vd->vdev_children == 0) {
 		if (osize < SPA_MINDEVSIZE) {
-			vd->vdev_state = VDEV_STATE_CANT_OPEN;
-			vd->vdev_stat.vs_aux = VDEV_AUX_TOO_SMALL;
+			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_TOO_SMALL);
 			return (EOVERFLOW);
 		}
 		psize = osize;
@@ -775,8 +772,8 @@ vdev_open(vdev_t *vd)
 	} else {
 		if (osize < SPA_MINDEVSIZE -
 		    (VDEV_LABEL_START_SIZE + VDEV_LABEL_END_SIZE)) {
-			vd->vdev_state = VDEV_STATE_CANT_OPEN;
-			vd->vdev_stat.vs_aux = VDEV_AUX_TOO_SMALL;
+			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_TOO_SMALL);
 			return (EOVERFLOW);
 		}
 		psize = 0;
@@ -796,9 +793,8 @@ vdev_open(vdev_t *vd)
 		 * Make sure the alignment requirement hasn't increased.
 		 */
 		if (ashift > vd->vdev_ashift) {
-			dprintf("%s: ashift grew\n", vdev_description(vd));
-			vd->vdev_state = VDEV_STATE_CANT_OPEN;
-			vd->vdev_stat.vs_aux = VDEV_AUX_BAD_LABEL;
+			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_BAD_LABEL);
 			return (EINVAL);
 		}
 
@@ -806,9 +802,8 @@ vdev_open(vdev_t *vd)
 		 * Make sure the device hasn't shrunk.
 		 */
 		if (asize < vd->vdev_asize) {
-			dprintf("%s: device shrank\n", vdev_description(vd));
-			vd->vdev_state = VDEV_STATE_CANT_OPEN;
-			vd->vdev_stat.vs_aux = VDEV_AUX_BAD_LABEL;
+			vdev_set_state(vd, B_TRUE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_BAD_LABEL);
 			return (EINVAL);
 		}
 
@@ -818,10 +813,28 @@ vdev_open(vdev_t *vd)
 		 */
 		if (vd->vdev_state == VDEV_STATE_HEALTHY &&
 		    asize > vd->vdev_asize) {
-			dprintf("%s: device grew\n", vdev_description(vd));
 			vd->vdev_asize = asize;
 		}
 	}
+
+	/*
+	 * If we were able to open a vdev that was marked permanently
+	 * unavailable, clear that state now.
+	 */
+	if (vd->vdev_not_present)
+		vd->vdev_not_present = 0;
+
+	/*
+	 * This allows the ZFS DE to close cases appropriately.  If a device
+	 * goes away and later returns, we want to close the associated case.
+	 * But it's not enough to simply post this only when a device goes from
+	 * CANT_OPEN -> HEALTHY.  If we reboot the system and the device is
+	 * back, we also need to close the case (otherwise we will try to replay
+	 * it).  So we have to post this notifier every time.  Since this only
+	 * occurs during pool open or error recovery, this should not be an
+	 * issue.
+	 */
+	zfs_post_ok(vd->vdev_spa, vd);
 
 	return (0);
 }
@@ -832,8 +845,6 @@ vdev_open(vdev_t *vd)
 void
 vdev_close(vdev_t *vd)
 {
-	ASSERT3P(list_head(&vd->vdev_io_pending), ==, NULL);
-
 	vd->vdev_ops->vdev_op_close(vd);
 
 	if (vd->vdev_cache_active) {
@@ -846,43 +857,29 @@ vdev_close(vdev_t *vd)
 		vd->vdev_state = VDEV_STATE_OFFLINE;
 	else
 		vd->vdev_state = VDEV_STATE_CLOSED;
+	vd->vdev_stat.vs_aux = VDEV_AUX_NONE;
 }
 
 void
-vdev_reopen(vdev_t *vd, zio_t **rq)
+vdev_reopen(vdev_t *vd)
 {
-	vdev_t *rvd = vd->vdev_spa->spa_root_vdev;
+	spa_t *spa = vd->vdev_spa;
+	vdev_t *rvd = spa->spa_root_vdev;
 	int c;
 
+	ASSERT(spa_config_held(spa, RW_WRITER));
+
 	if (vd == rvd) {
-		ASSERT(rq == NULL);
 		for (c = 0; c < rvd->vdev_children; c++)
-			vdev_reopen(rvd->vdev_child[c], NULL);
+			vdev_reopen(rvd->vdev_child[c]);
 		return;
 	}
 
 	/* only valid for top-level vdevs */
 	ASSERT3P(vd, ==, vd->vdev_top);
 
-	/*
-	 * vdev_state can change when spa_config_lock is held as writer,
-	 * or when it's held as reader and we're doing a vdev_reopen().
-	 * To handle the latter case, we grab rvd's io_lock to serialize
-	 * reopens.  This ensures that there's never more than one vdev
-	 * state changer active at a time.
-	 */
-	mutex_enter(&rvd->vdev_io_lock);
-
-	mutex_enter(&vd->vdev_io_lock);
-	while (list_head(&vd->vdev_io_pending) != NULL)
-		cv_wait(&vd->vdev_io_cv, &vd->vdev_io_lock);
 	vdev_close(vd);
 	(void) vdev_open(vd);
-	if (rq != NULL) {
-		*rq = vd->vdev_io_retry;
-		vd->vdev_io_retry = NULL;
-	}
-	mutex_exit(&vd->vdev_io_lock);
 
 	/*
 	 * Reassess root vdev's health.
@@ -892,8 +889,6 @@ vdev_reopen(vdev_t *vd, zio_t **rq)
 		uint64_t state = rvd->vdev_child[c]->vdev_state;
 		rvd->vdev_state = MIN(rvd->vdev_state, state);
 	}
-
-	mutex_exit(&rvd->vdev_io_lock);
 }
 
 int
@@ -930,7 +925,7 @@ vdev_create(vdev_t *vd, uint64_t txg)
  * For creation, we want to try to create all vdevs at once and then undo it
  * if anything fails; this is much harder if we have pending transactions.
  */
-void
+int
 vdev_init(vdev_t *vd, uint64_t txg)
 {
 	/*
@@ -942,7 +937,7 @@ vdev_init(vdev_t *vd, uint64_t txg)
 	/*
 	 * Initialize the vdev's metaslabs.
 	 */
-	vdev_metaslab_init(vd, txg);
+	return (vdev_metaslab_init(vd, txg));
 }
 
 void
@@ -993,9 +988,10 @@ vdev_dtl_contains(space_map_t *sm, uint64_t txg, uint64_t size)
 void
 vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 {
+	spa_t *spa = vd->vdev_spa;
 	int c;
 
-	ASSERT(spa_config_held(vd->vdev_spa, RW_WRITER));
+	ASSERT(spa_config_held(spa, RW_WRITER));
 
 	if (vd->vdev_children == 0) {
 		mutex_enter(&vd->vdev_dtl_lock);
@@ -1019,6 +1015,12 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 		return;
 	}
 
+	/*
+	 * Make sure the DTLs are always correct under the scrub lock.
+	 */
+	if (vd == spa->spa_root_vdev)
+		mutex_enter(&spa->spa_scrub_lock);
+
 	mutex_enter(&vd->vdev_dtl_lock);
 	space_map_vacate(&vd->vdev_dtl_map, NULL, NULL);
 	space_map_vacate(&vd->vdev_dtl_scrub, NULL, NULL);
@@ -1032,6 +1034,9 @@ vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg, int scrub_done)
 		space_map_union(&vd->vdev_dtl_scrub, &cvd->vdev_dtl_scrub);
 		mutex_exit(&vd->vdev_dtl_lock);
 	}
+
+	if (vd == spa->spa_root_vdev)
+		mutex_exit(&spa->spa_scrub_lock);
 }
 
 static int
@@ -1047,11 +1052,12 @@ vdev_dtl_load(vdev_t *vd)
 	if (smo->smo_object == 0)
 		return (0);
 
-	db = dmu_bonus_hold(spa->spa_meta_objset, smo->smo_object);
-	dmu_buf_read(db);
+	if ((error = dmu_bonus_hold(spa->spa_meta_objset, smo->smo_object,
+	    FTAG, &db)) != 0)
+		return (error);
 	ASSERT3U(db->db_size, ==, sizeof (*smo));
 	bcopy(db->db_data, smo, db->db_size);
-	dmu_buf_rele(db);
+	dmu_buf_rele(db, FTAG);
 
 	mutex_enter(&vd->vdev_dtl_lock);
 	error = space_map_load(&vd->vdev_dtl_map, smo, SM_ALLOC,
@@ -1100,8 +1106,8 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 		vdev_config_dirty(vd->vdev_top);
 	}
 
-	dmu_free_range(spa->spa_meta_objset, smo->smo_object,
-	    0, smo->smo_objsize, tx);
+	VERIFY(0 == dmu_free_range(spa->spa_meta_objset, smo->smo_object,
+	    0, smo->smo_objsize, tx));
 
 	mutex_init(&smlock, NULL, MUTEX_DEFAULT, NULL);
 
@@ -1124,17 +1130,18 @@ vdev_dtl_sync(vdev_t *vd, uint64_t txg)
 	mutex_exit(&smlock);
 	mutex_destroy(&smlock);
 
-	db = dmu_bonus_hold(spa->spa_meta_objset, smo->smo_object);
+	VERIFY(0 == dmu_bonus_hold(spa->spa_meta_objset, smo->smo_object,
+	    FTAG, &db));
 	dmu_buf_will_dirty(db, tx);
 	ASSERT3U(db->db_size, ==, sizeof (*smo));
 	bcopy(smo, db->db_data, db->db_size);
-	dmu_buf_rele(db);
+	dmu_buf_rele(db, FTAG);
 
 	dmu_tx_commit(tx);
 }
 
 int
-vdev_load(vdev_t *vd, int import)
+vdev_load(vdev_t *vd)
 {
 	spa_t *spa = vd->vdev_spa;
 	int c, error;
@@ -1147,7 +1154,7 @@ vdev_load(vdev_t *vd, int import)
 	 * Recursively load all children.
 	 */
 	for (c = 0; c < vd->vdev_children; c++)
-		if ((error = vdev_load(vd->vdev_child[c], import)) != 0)
+		if ((error = vdev_load(vd->vdev_child[c])) != 0)
 			return (error);
 
 	/*
@@ -1166,7 +1173,7 @@ vdev_load(vdev_t *vd, int import)
 		 */
 		if ((label = vdev_label_read_config(vd)) == NULL) {
 			dprintf("can't load label config\n");
-			vdev_set_state(vd, VDEV_STATE_CANT_OPEN,
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			return (0);
 		}
@@ -1174,7 +1181,7 @@ vdev_load(vdev_t *vd, int import)
 		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_GUID,
 		    &guid) != 0 || guid != spa_guid(spa)) {
 			dprintf("bad or missing pool GUID (%llu)\n", guid);
-			vdev_set_state(vd, VDEV_STATE_CANT_OPEN,
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			nvlist_free(label);
 			return (0);
@@ -1184,7 +1191,7 @@ vdev_load(vdev_t *vd, int import)
 		    guid != vd->vdev_guid) {
 			dprintf("bad or missing vdev guid (%llu != %llu)\n",
 			    guid, vd->vdev_guid);
-			vdev_set_state(vd, VDEV_STATE_CANT_OPEN,
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			nvlist_free(label);
 			return (0);
@@ -1201,14 +1208,15 @@ vdev_load(vdev_t *vd, int import)
 		if (nvlist_lookup_uint64(label, ZPOOL_CONFIG_POOL_STATE,
 		    &state)) {
 			dprintf("missing pool state\n");
-			vdev_set_state(vd, VDEV_STATE_CANT_OPEN,
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			nvlist_free(label);
 			return (0);
 		}
 
 		if (state != POOL_STATE_ACTIVE &&
-		    (!import || state != POOL_STATE_EXPORTED)) {
+		    (spa->spa_load_state == SPA_LOAD_OPEN ||
+		    state != POOL_STATE_EXPORTED)) {
 			dprintf("pool state not active (%llu)\n", state);
 			nvlist_free(label);
 			return (EBADF);
@@ -1227,12 +1235,16 @@ vdev_load(vdev_t *vd, int import)
 		    vd->vdev_ms_shift == 0 ||
 		    vd->vdev_ashift == 0 ||
 		    vd->vdev_asize == 0) {
-			vdev_set_state(vd, VDEV_STATE_CANT_OPEN,
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			return (0);
 		}
 
-		vdev_metaslab_init(vd, 0);
+		if ((error = vdev_metaslab_init(vd, 0)) != 0) {
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_CORRUPT_DATA);
+			return (0);
+		}
 	}
 
 	/*
@@ -1243,7 +1255,7 @@ vdev_load(vdev_t *vd, int import)
 		if (error) {
 			dprintf("can't load DTL for %s, error %d\n",
 			    vdev_description(vd), error);
-			vdev_set_state(vd, VDEV_STATE_CANT_OPEN,
+			vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
 			    VDEV_AUX_CORRUPT_DATA);
 			return (0);
 		}
@@ -1344,7 +1356,7 @@ vdev_description(vdev_t *vd)
 }
 
 int
-vdev_online(spa_t *spa, const char *path)
+vdev_online(spa_t *spa, uint64_t guid)
 {
 	vdev_t *rvd, *vd;
 	uint64_t txg;
@@ -1352,24 +1364,14 @@ vdev_online(spa_t *spa, const char *path)
 	txg = spa_vdev_enter(spa);
 
 	rvd = spa->spa_root_vdev;
-	if ((vd = vdev_lookup_by_path(rvd, path)) == NULL)
+	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
 
 	dprintf("ONLINE: %s\n", vdev_description(vd));
 
 	vd->vdev_offline = B_FALSE;
 	vd->vdev_tmpoffline = B_FALSE;
-
-	/*
-	 * Clear the error counts.  The idea is that you expect to see all
-	 * zeroes when everything is working, so if you've just onlined a
-	 * device, you don't want to keep hearing about errors from before.
-	 */
-	vd->vdev_stat.vs_read_errors = 0;
-	vd->vdev_stat.vs_write_errors = 0;
-	vd->vdev_stat.vs_checksum_errors = 0;
-
-	vdev_reopen(vd->vdev_top, NULL);
+	vdev_reopen(vd->vdev_top);
 
 	spa_config_set(spa, spa_config_generate(spa, rvd, txg, 0));
 
@@ -1383,7 +1385,7 @@ vdev_online(spa_t *spa, const char *path)
 }
 
 int
-vdev_offline(spa_t *spa, const char *path, int istmp)
+vdev_offline(spa_t *spa, uint64_t guid, int istmp)
 {
 	vdev_t *rvd, *vd;
 	uint64_t txg;
@@ -1391,7 +1393,7 @@ vdev_offline(spa_t *spa, const char *path, int istmp)
 	txg = spa_vdev_enter(spa);
 
 	rvd = spa->spa_root_vdev;
-	if ((vd = vdev_lookup_by_path(rvd, path)) == NULL)
+	if ((vd = vdev_lookup_by_guid(rvd, guid)) == NULL)
 		return (spa_vdev_exit(spa, NULL, txg, ENODEV));
 
 	dprintf("OFFLINE: %s\n", vdev_description(vd));
@@ -1416,10 +1418,10 @@ vdev_offline(spa_t *spa, const char *path, int istmp)
 	 * undo it and fail the request.
 	 */
 	vd->vdev_offline = B_TRUE;
-	vdev_reopen(vd->vdev_top, NULL);
+	vdev_reopen(vd->vdev_top);
 	if (vdev_is_dead(vd->vdev_top)) {
 		vd->vdev_offline = B_FALSE;
-		vdev_reopen(vd->vdev_top, NULL);
+		vdev_reopen(vd->vdev_top);
 		return (spa_vdev_exit(spa, NULL, txg, EBUSY));
 	}
 
@@ -1434,25 +1436,25 @@ vdev_offline(spa_t *spa, const char *path, int istmp)
 	return (spa_vdev_exit(spa, NULL, txg, 0));
 }
 
-int
-vdev_error_setup(spa_t *spa, const char *path, int mode, int mask, uint64_t arg)
+/*
+ * Clear the error counts associated with this vdev.  Unlike vdev_online() and
+ * vdev_offline(), we assume the spa config is locked.  We also clear all
+ * children.  If 'vd' is NULL, then the user wants to clear all vdevs.
+ */
+void
+vdev_clear(spa_t *spa, vdev_t *vd)
 {
-	vdev_t *vd;
+	int c;
 
-	spa_config_enter(spa, RW_WRITER);
+	if (vd == NULL)
+		vd = spa->spa_root_vdev;
 
-	if ((vd = vdev_lookup_by_path(spa->spa_root_vdev, path)) == NULL) {
-		spa_config_exit(spa);
-		return (ENODEV);
-	}
+	vd->vdev_stat.vs_read_errors = 0;
+	vd->vdev_stat.vs_write_errors = 0;
+	vd->vdev_stat.vs_checksum_errors = 0;
 
-	vd->vdev_fault_mode = mode;
-	vd->vdev_fault_mask = mask;
-	vd->vdev_fault_arg = arg;
-
-	spa_config_exit(spa);
-
-	return (0);
+	for (c = 0; c < vd->vdev_children; c++)
+		vdev_clear(spa, vd->vdev_child[c]);
 }
 
 int
@@ -1631,24 +1633,6 @@ vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type, boolean_t complete)
 }
 
 /*
- * Report checksum errors that a vdev that didn't realize it made.
- * This can happen, for example, when RAID-Z combinatorial reconstruction
- * infers that one of its components returned bad data.
- */
-void
-vdev_checksum_error(zio_t *zio, vdev_t *vd)
-{
-	dprintf_bp(zio->io_bp, "imputed checksum error on %s: ",
-	    vdev_description(vd));
-
-	if (!(zio->io_flags & ZIO_FLAG_SPECULATIVE)) {
-		mutex_enter(&vd->vdev_stat_lock);
-		vd->vdev_stat.vs_checksum_errors++;
-		mutex_exit(&vd->vdev_stat_lock);
-	}
-}
-
-/*
  * Update the in-core space usage stats for this vdev and the root vdev.
  */
 void
@@ -1707,6 +1691,14 @@ static vdev_knob_t vdev_knob[] = {
 		10000,
 		35,
 		offsetof(struct vdev, vdev_queue.vq_max_pending)
+	},
+	{
+		"scrub_limit",
+		"maximum scrub/resilver I/O queue",
+		0,
+		10000,
+		70,
+		offsetof(struct vdev, vdev_queue.vq_scrub_limit)
 	},
 	{
 		"agg_limit",
@@ -1781,20 +1773,78 @@ vdev_config_clean(vdev_t *vd)
 }
 
 /*
- * Set a vdev's state, updating any parent's state as well.
+ * Set a vdev's state.  If this is during an open, we don't update the parent
+ * state, because we're in the process of opening children depth-first.
+ * Otherwise, we propagate the change to the parent.
+ *
+ * If this routine places a device in a faulted state, an appropriate ereport is
+ * generated.
  */
 void
-vdev_set_state(vdev_t *vd, vdev_state_t state, vdev_aux_t aux)
+vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state, vdev_aux_t aux)
 {
-	if (state == vd->vdev_state)
+	uint64_t prev_state;
+
+	if (state == vd->vdev_state) {
+		vd->vdev_stat.vs_aux = aux;
 		return;
+	}
+
+	prev_state = vd->vdev_state;
 
 	vd->vdev_state = state;
 	vd->vdev_stat.vs_aux = aux;
 
+	if (state == VDEV_STATE_CANT_OPEN) {
+		/*
+		 * If we fail to open a vdev during an import, we mark it as
+		 * "not available", which signifies that it was never there to
+		 * begin with.  Failure to open such a device is not considered
+		 * an error.
+		 */
+		if (!vd->vdev_not_present &&
+		    vd != vd->vdev_spa->spa_root_vdev) {
+			const char *class;
+
+			switch (aux) {
+			case VDEV_AUX_OPEN_FAILED:
+				class = FM_EREPORT_ZFS_DEVICE_OPEN_FAILED;
+				break;
+			case VDEV_AUX_CORRUPT_DATA:
+				class = FM_EREPORT_ZFS_DEVICE_CORRUPT_DATA;
+				break;
+			case VDEV_AUX_NO_REPLICAS:
+				class = FM_EREPORT_ZFS_DEVICE_NO_REPLICAS;
+				break;
+			case VDEV_AUX_BAD_GUID_SUM:
+				class = FM_EREPORT_ZFS_DEVICE_BAD_GUID_SUM;
+				break;
+			case VDEV_AUX_TOO_SMALL:
+				class = FM_EREPORT_ZFS_DEVICE_TOO_SMALL;
+				break;
+			case VDEV_AUX_BAD_LABEL:
+				class = FM_EREPORT_ZFS_DEVICE_BAD_LABEL;
+				break;
+			default:
+				class = FM_EREPORT_ZFS_DEVICE_UNKNOWN;
+			}
+
+			zfs_ereport_post(class, vd->vdev_spa,
+			    vd, NULL, prev_state, 0);
+		}
+
+		if (vd->vdev_spa->spa_load_state == SPA_LOAD_IMPORT &&
+		    vd->vdev_ops->vdev_op_leaf)
+			vd->vdev_not_present = 1;
+	}
+
+	if (isopen)
+		return;
+
 	if (vd->vdev_parent != NULL) {
 		int c;
 		int degraded = 0, faulted = 0;
+		int corrupted = 0;
 		vdev_t *parent, *child;
 
 		parent = vd->vdev_parent;
@@ -1804,9 +1854,23 @@ vdev_set_state(vdev_t *vd, vdev_state_t state, vdev_aux_t aux)
 				faulted++;
 			else if (child->vdev_state == VDEV_STATE_DEGRADED)
 				degraded++;
+
+			if (child->vdev_stat.vs_aux == VDEV_AUX_CORRUPT_DATA)
+				corrupted++;
 		}
 
 		vd->vdev_parent->vdev_ops->vdev_op_state_change(
 		    vd->vdev_parent, faulted, degraded);
-	    }
+
+		/*
+		 * Root special: if this is a toplevel vdev that cannot be
+		 * opened due to corrupted metadata, then propagate the root
+		 * vdev's aux state as 'corrupt' rather than 'insufficient
+		 * replicas'.
+		 */
+		if (corrupted && vd == vd->vdev_top)
+			vdev_set_state(vd->vdev_spa->spa_root_vdev,
+			    B_FALSE, VDEV_STATE_CANT_OPEN,
+			    VDEV_AUX_CORRUPT_DATA);
+	}
 }

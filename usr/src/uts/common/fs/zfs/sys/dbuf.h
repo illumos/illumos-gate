@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -45,13 +44,14 @@ extern "C" {
 #define	IN_DMU_SYNC ((blkptr_t *)-1)
 
 /*
- * define flags for dbuf_read and friends
+ * define flags for dbuf_read
  */
 
 #define	DB_RF_MUST_SUCCEED	0
 #define	DB_RF_CANFAIL		(1 << 1)
 #define	DB_RF_HAVESTRUCT	(1 << 2)
 #define	DB_RF_NOPREFETCH	(1 << 3)
+#define	DB_RF_NEVERWAIT		(1 << 4)
 
 /*
  * The state transition diagram for dbufs looks like:
@@ -59,7 +59,7 @@ extern "C" {
  *		+----> READ ----+
  *		|		|
  *		|		V
- *   (alloc)-->UNCACHED	     CACHED-->(free)
+ *  (alloc)-->UNCACHED	     CACHED-->EVICTING-->(free)
  *		|		^
  *		|		|
  *		+----> FILL ----+
@@ -68,7 +68,8 @@ typedef enum dbuf_states {
 	DB_UNCACHED,
 	DB_FILL,
 	DB_READ,
-	DB_CACHED
+	DB_CACHED,
+	DB_EVICTING
 } dbuf_states_t;
 
 struct objset_impl;
@@ -158,8 +159,8 @@ typedef struct dmu_buf_impl {
 	uint64_t db_dirtied;
 
 	/*
-	 * If dd_dnode != NULL, our link on the owner dnodes's dn_dbufs list.
-	 * Protected by its dn_mtx.
+	 * If db_dnode != NULL, our link on the owner dnodes's dn_dbufs list.
+	 * Protected by its dn_dbufs_mtx.
 	 */
 	list_node_t db_link;
 
@@ -194,7 +195,7 @@ typedef struct dmu_buf_impl {
 		 * modify (dirty or clean). db_mtx must be held
 		 * before dn_dirty_mtx.
 		 */
-		arc_buf_t *db_data_old[TXG_SIZE];
+		void *db_data_old[TXG_SIZE];
 		blkptr_t *db_overridden_by[TXG_SIZE];
 	} db_d;
 } dmu_buf_impl_t;
@@ -212,35 +213,32 @@ typedef struct dbuf_hash_table {
 uint64_t dbuf_whichblock(struct dnode *di, uint64_t offset);
 
 dmu_buf_impl_t *dbuf_create_tlib(struct dnode *dn, char *data);
+dmu_buf_impl_t *dbuf_create_bonus(struct dnode *dn);
 
-dmu_buf_impl_t *dbuf_hold(struct dnode *dn, uint64_t blkid);
+dmu_buf_impl_t *dbuf_hold(struct dnode *dn, uint64_t blkid, void *tag);
 dmu_buf_impl_t *dbuf_hold_level(struct dnode *dn, int level, uint64_t blkid,
     void *tag);
-dmu_buf_impl_t *dbuf_hold_bonus(struct dnode *dn, void *tag);
 int dbuf_hold_impl(struct dnode *dn, uint8_t level, uint64_t blkid, int create,
     void *tag, dmu_buf_impl_t **dbp);
 
 void dbuf_prefetch(struct dnode *dn, uint64_t blkid);
 
 void dbuf_add_ref(dmu_buf_impl_t *db, void *tag);
-void dbuf_remove_ref(dmu_buf_impl_t *db, void *tag);
 uint64_t dbuf_refcount(dmu_buf_impl_t *db);
 
-void dbuf_rele(dmu_buf_impl_t *db);
+void dbuf_rele(dmu_buf_impl_t *db, void *tag);
 
 dmu_buf_impl_t *dbuf_find(struct dnode *dn, uint8_t level, uint64_t blkid);
 
-void dbuf_read(dmu_buf_impl_t *db);
-int dbuf_read_canfail(dmu_buf_impl_t *db);
-void dbuf_read_havestruct(dmu_buf_impl_t *db);
-void dbuf_read_impl(dmu_buf_impl_t *db, zio_t *zio, uint32_t flags);
+int dbuf_read(dmu_buf_impl_t *db, zio_t *zio, uint32_t flags);
 void dbuf_will_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
-void dbuf_will_fill(dmu_buf_impl_t *db, dmu_tx_t *tx);
+void dmu_buf_will_fill(dmu_buf_t *db, dmu_tx_t *tx);
 void dbuf_fill_done(dmu_buf_impl_t *db, dmu_tx_t *tx);
 void dmu_buf_will_fill(dmu_buf_t *db, dmu_tx_t *tx);
 void dmu_buf_fill_done(dmu_buf_t *db, dmu_tx_t *tx);
 void dbuf_dirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
 
+void dbuf_clear(dmu_buf_impl_t *db);
 void dbuf_evict(dmu_buf_impl_t *db);
 
 void dbuf_setdirty(dmu_buf_impl_t *db, dmu_tx_t *tx);
@@ -250,7 +248,6 @@ void dbuf_unoverride(dmu_buf_impl_t *db, uint64_t txg);
 void dbuf_free_range(struct dnode *dn, uint64_t blkid, uint64_t nblks,
     struct dmu_tx *);
 
-void dbuf_downgrade(dmu_buf_impl_t *db, int evicting);
 void dbuf_new_size(dmu_buf_impl_t *db, int size, dmu_tx_t *tx);
 
 void dbuf_init(void);

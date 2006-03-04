@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -44,7 +43,10 @@
 
 #include "libzfs_impl.h"
 
-int zfs_fd;
+static int zfs_fd = -1;
+static FILE *mnttab_file;
+static FILE *sharetab_file;
+static int sharetab_opened;
 
 void (*error_func)(const char *, va_list);
 
@@ -144,34 +146,55 @@ zfs_strdup(const char *str)
 }
 
 /*
- * Initialize the library.  Sets the command name used when reporting errors.
- * This command name is used to prefix all error messages appropriately.
- * Also opens /dev/zfs and dies if it cannot be opened.
+ * Utility functions around common used files - /dev/zfs, /etc/mnttab, and
+ * /etc/dfs/sharetab.
  */
-#pragma init(zfs_init)
-void
-zfs_init(void)
+int
+zfs_ioctl(int cmd, zfs_cmd_t *zc)
 {
-	if ((zfs_fd = open(ZFS_DEV, O_RDWR)) < 0)
-		zfs_fatal(dgettext(TEXT_DOMAIN,
-		    "internal error: cannot open zfs device"));
+	if (zfs_fd == -1 &&
+	    (zfs_fd = open(ZFS_DEV, O_RDWR)) < 0)
+		zfs_fatal(dgettext(TEXT_DOMAIN, "internal error: unable to "
+		    "open ZFS device\n"), MNTTAB);
 
-	if ((mnttab_file = fopen(MNTTAB, "r")) == NULL)
+	return (ioctl(zfs_fd, cmd, zc));
+}
+
+FILE *
+zfs_mnttab(void)
+{
+	if (mnttab_file == NULL &&
+	    (mnttab_file = fopen(MNTTAB, "r")) == NULL)
 		zfs_fatal(dgettext(TEXT_DOMAIN, "internal error: unable to "
 		    "open %s\n"), MNTTAB);
 
-	sharetab_file = fopen("/etc/dfs/sharetab", "r");
+	return (mnttab_file);
+}
+
+FILE *
+zfs_sharetab(void)
+{
+	if (sharetab_opened)
+		return (sharetab_file);
+
+	sharetab_opened = TRUE;
+	return (sharetab_file = fopen("/etc/dfs/sharetab", "r"));
 }
 
 /*
- * Cleanup function for library.  Simply close the file descriptors that we
- * opened as part of libzfs_init().
+ * Cleanup function for library.  Close any file descriptors that were
+ * opened as part of the above functions.
  */
 #pragma fini(zfs_fini)
 void
 zfs_fini(void)
 {
-	(void) close(zfs_fd);
+	if (zfs_fd != -1)
+		(void) close(zfs_fd);
+	if (sharetab_file)
+		(void) fclose(sharetab_file);
+	if (mnttab_file)
+		(void) fclose(mnttab_file);
 }
 
 /*

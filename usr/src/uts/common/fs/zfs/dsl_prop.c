@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -75,7 +74,10 @@ dsl_prop_get_impl(dsl_pool_t *dp, uint64_t ddobj, const char *propname,
 	ASSERT(RW_LOCK_HELD(&dp->dp_config_rwlock));
 
 	while (ddobj != 0) {
-		dsl_dir_t *dd = dsl_dir_open_obj(dp, ddobj, NULL, FTAG);
+		dsl_dir_t *dd;
+		err = dsl_dir_open_obj(dp, ddobj, NULL, FTAG, &dd);
+		if (err)
+			break;
 		err = zap_lookup(mos, dd->dd_phys->dd_props_zapobj,
 		    propname, intsz, numint, buf);
 		if (err != ENOENT) {
@@ -136,7 +138,8 @@ dsl_prop_register(dsl_dataset_t *ds, const char *propname,
 
 	cbr->cbr_func(cbr->cbr_arg, value);
 
-	(void) dsl_dir_open_obj(dd->dd_pool, dd->dd_object, NULL, cbr);
+	VERIFY(0 == dsl_dir_open_obj(dd->dd_pool, dd->dd_object,
+	    NULL, cbr, &dd));
 	rw_exit(&dd->dd_pool->dp_config_rwlock);
 	/* Leave dataset open until this callback is unregistered */
 	return (0);
@@ -164,9 +167,9 @@ dsl_prop_get(const char *ddname, const char *propname,
 	const char *tail;
 	int err;
 
-	dd = dsl_dir_open(ddname, FTAG, &tail);
-	if (dd == NULL)
-		return (ENOENT);
+	err = dsl_dir_open(ddname, FTAG, &dd, &tail);
+	if (err)
+		return (err);
 	if (tail && tail[0] != '@') {
 		dsl_dir_close(dd, FTAG);
 		return (ENOENT);
@@ -258,7 +261,9 @@ dsl_prop_changed_notify(dsl_pool_t *dp, uint64_t ddobj,
 	int err;
 
 	ASSERT(RW_WRITE_HELD(&dp->dp_config_rwlock));
-	dd = dsl_dir_open_obj(dp, ddobj, NULL, FTAG);
+	err = dsl_dir_open_obj(dp, ddobj, NULL, FTAG, &dd);
+	if (err)
+		return;
 
 	if (!first) {
 		/*
@@ -353,15 +358,15 @@ dsl_prop_set(const char *ddname, const char *propname,
 	int err;
 	struct prop_set_arg psa;
 
-	dd = dsl_dir_open(ddname, FTAG, NULL);
-	if (dd == NULL)
-		return (ENOENT);
+	err = dsl_dir_open(ddname, FTAG, &dd, NULL);
+	if (err)
+		return (err);
 
 	psa.name = propname;
 	psa.intsz = intsz;
 	psa.numints = numints;
 	psa.buf = buf;
-	err = dsl_dir_sync_task(dd, dsl_prop_set_sync, &psa, 0);
+	err = dsl_dir_sync_task(dd, dsl_prop_set_sync, &psa, 1<<20);
 
 	dsl_dir_close(dd, FTAG);
 
@@ -457,10 +462,12 @@ dsl_prop_get_all(objset_t *os, nvlist_t **nvp)
 		if (dd->dd_phys->dd_parent_obj == 0)
 			parent = NULL;
 		else
-			parent = dsl_dir_open_obj(dp,
-			    dd->dd_phys->dd_parent_obj, NULL, FTAG);
+			err = dsl_dir_open_obj(dp,
+			    dd->dd_phys->dd_parent_obj, NULL, FTAG, &parent);
 		if (dd != ds->ds_dir)
 			dsl_dir_close(dd, FTAG);
+		if (err)
+			break;
 		dd = parent;
 	}
 	rw_exit(&dp->dp_config_rwlock);

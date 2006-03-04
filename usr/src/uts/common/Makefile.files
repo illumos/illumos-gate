@@ -864,6 +864,7 @@ ZFS_COMMON_OBJS +=		\
 	sha256.o		\
 	spa.o			\
 	spa_config.o		\
+	spa_errlog.o		\
 	spa_misc.o		\
 	space_map.o		\
 	txg.o			\
@@ -882,10 +883,12 @@ ZFS_COMMON_OBJS +=		\
 	zap_leaf.o		\
 	zap_micro.o		\
 	zfs_byteswap.o		\
+	zfs_fm.o		\
 	zil.o			\
 	zio.o			\
 	zio_checksum.o		\
-	zio_compress.o
+	zio_compress.o		\
+	zio_inject.o
 
 ZFS_SHARED_OBJS +=		\
 	zfs_namecheck.o		\

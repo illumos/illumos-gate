@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -108,8 +107,8 @@ int dsl_dataset_open_spa(spa_t *spa, const char *name, int mode,
     void *tag, dsl_dataset_t **dsp);
 int dsl_dataset_open(const char *name, int mode, void *tag,
     dsl_dataset_t **dsp);
-dsl_dataset_t *dsl_dataset_open_obj(struct dsl_pool *dp, uint64_t dsobj,
-    const char *tail, int mode, void *tag);
+int dsl_dataset_open_obj(struct dsl_pool *dp, uint64_t dsobj,
+    const char *tail, int mode, void *tag, dsl_dataset_t **);
 void dsl_dataset_name(dsl_dataset_t *ds, char *name);
 void dsl_dataset_close(dsl_dataset_t *ds, int mode, void *tag);
 int dsl_dataset_create_sync(dsl_dir_t *pds, const char *fullname,
@@ -134,8 +133,8 @@ void dsl_dataset_sync(dsl_dataset_t *os, dmu_tx_t *tx);
 
 void dsl_dataset_block_born(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx);
 void dsl_dataset_block_kill(dsl_dataset_t *ds, blkptr_t *bp, dmu_tx_t *tx);
-int dsl_dataset_block_freeable(dsl_dataset_t *ds, uint64_t blk_birth,
-    dmu_tx_t *tx);
+int dsl_dataset_block_freeable(dsl_dataset_t *ds, uint64_t blk_birth);
+uint64_t dsl_dataset_prev_snap_txg(dsl_dataset_t *ds);
 
 void dsl_dataset_dirty(dsl_dataset_t *ds, dmu_tx_t *tx);
 void dsl_dataset_stats(dsl_dataset_t *os, dmu_objset_stats_t *dds);

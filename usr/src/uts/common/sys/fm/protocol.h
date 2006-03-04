@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -168,6 +167,7 @@ extern "C" {
 #define	FM_FMRI_SCHEME_MOD		"mod"
 #define	FM_FMRI_SCHEME_PKG		"pkg"
 #define	FM_FMRI_SCHEME_LEGACY		"legacy-hc"
+#define	FM_FMRI_SCHEME_ZFS		"zfs"
 
 /* Scheme versions */
 #define	FMD_SCHEME_VERSION0		0
@@ -187,6 +187,8 @@ extern "C" {
 #define	FM_PKG_SCHEME_VERSION		PKG_SCHEME_VERSION0
 #define	LEGACY_SCHEME_VERSION0		0
 #define	FM_LEGACY_SCHEME_VERSION	LEGACY_SCHEME_VERSION0
+#define	ZFS_SCHEME_VERSION0		0
+#define	FM_ZFS_SCHEME_VERSION		ZFS_SCHEME_VERSION0
 
 /* hc scheme member names */
 #define	FM_FMRI_HC_SERIAL_ID		"serial"
@@ -253,6 +255,10 @@ extern "C" {
 #define	FM_FMRI_MOD_ID			"mod-id"
 #define	FM_FMRI_MOD_DESC		"mod-desc"
 
+/* zfs scheme member names */
+#define	FM_FMRI_ZFS_POOL		"pool"
+#define	FM_FMRI_ZFS_VDEV		"vdev"
+
 extern nv_alloc_t *fm_nva_xcreate(char *, size_t);
 extern void fm_nva_xdestroy(nv_alloc_t *);
 
@@ -277,6 +283,7 @@ extern void fm_fmri_mem_set(nvlist_t *, int, const nvlist_t *, const char *,
     const char *, uint64_t);
 extern void fm_authority_set(nvlist_t *, int, const char *, const char *,
     const char *, const char *);
+extern void fm_fmri_zfs_set(nvlist_t *, int, uint64_t, uint64_t);
 
 extern uint64_t fm_ena_increment(uint64_t);
 extern uint64_t fm_ena_generate(uint64_t, uchar_t);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -127,8 +126,9 @@ dmu_objset_byteswap(void *buf, size_t size)
 	osp->os_type = BSWAP_64(osp->os_type);
 }
 
-objset_impl_t *
-dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp)
+int
+dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
+    objset_impl_t **osip)
 {
 	objset_impl_t *winner, *osi;
 	int i, err, checksum;
@@ -141,15 +141,25 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp)
 		osi->os_rootbp = *bp;
 	osi->os_phys = zio_buf_alloc(sizeof (objset_phys_t));
 	if (!BP_IS_HOLE(&osi->os_rootbp)) {
+		zbookmark_t zb;
+		zb.zb_objset = ds ? ds->ds_object : 0;
+		zb.zb_object = 0;
+		zb.zb_level = -1;
+		zb.zb_blkid = 0;
+
 		dprintf_bp(&osi->os_rootbp, "reading %s", "");
-		(void) arc_read(NULL, spa, &osi->os_rootbp,
+		err = arc_read(NULL, spa, &osi->os_rootbp,
 		    dmu_ot[DMU_OT_OBJSET].ot_byteswap,
 		    arc_bcopy_func, osi->os_phys,
-		    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_MUSTSUCCEED, ARC_WAIT);
+		    ZIO_PRIORITY_SYNC_READ, ZIO_FLAG_CANFAIL, ARC_WAIT, &zb);
+		if (err) {
+			zio_buf_free(osi->os_phys, sizeof (objset_phys_t));
+			kmem_free(osi, sizeof (objset_impl_t));
+			return (err);
+		}
 	} else {
 		bzero(osi->os_phys, sizeof (objset_phys_t));
 	}
-	osi->os_zil = zil_alloc(&osi->os, &osi->os_phys->os_zil_header);
 
 	/*
 	 * Note: the changed_cb will be called once before the register
@@ -159,17 +169,21 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp)
 	if (ds) {
 		err = dsl_prop_register(ds, "checksum",
 		    checksum_changed_cb, osi);
-		ASSERT(err == 0);
-
-		err = dsl_prop_register(ds, "compression",
-		    compression_changed_cb, osi);
-		ASSERT(err == 0);
+		if (err == 0)
+			err = dsl_prop_register(ds, "compression",
+			    compression_changed_cb, osi);
+		if (err) {
+			zio_buf_free(osi->os_phys, sizeof (objset_phys_t));
+			kmem_free(osi, sizeof (objset_impl_t));
+			return (err);
+		}
 	} else {
 		/* It's the meta-objset. */
-		/* XXX - turn off metadata compression temporarily */
 		osi->os_checksum = ZIO_CHECKSUM_FLETCHER_4;
-		osi->os_compress = ZIO_COMPRESS_OFF;
+		osi->os_compress = ZIO_COMPRESS_LZJB;
 	}
+
+	osi->os_zil = zil_alloc(&osi->os, &osi->os_phys->os_zil_header);
 
 	/*
 	 * Metadata always gets compressed and checksummed.
@@ -184,9 +198,7 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp)
 		osi->os_md_checksum = checksum;
 	else
 		osi->os_md_checksum = ZIO_CHECKSUM_FLETCHER_4;
-
-	/* XXX - turn off metadata compression temporarily */
-	osi->os_md_compress = ZIO_COMPRESS_OFF;
+	osi->os_md_compress = ZIO_COMPRESS_LZJB;
 
 	for (i = 0; i < TXG_SIZE; i++) {
 		list_create(&osi->os_dirty_dnodes[i], sizeof (dnode_t),
@@ -210,7 +222,8 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp)
 		}
 	}
 
-	return (osi);
+	*osip = osi;
+	return (0);
 }
 
 /* called from zpl */
@@ -235,7 +248,13 @@ dmu_objset_open(const char *name, dmu_objset_type_t type, int mode,
 		blkptr_t bp;
 
 		dsl_dataset_get_blkptr(ds, &bp);
-		osi = dmu_objset_open_impl(dsl_dataset_get_spa(ds), ds, &bp);
+		err = dmu_objset_open_impl(dsl_dataset_get_spa(ds),
+		    ds, &bp, &osi);
+		if (err) {
+			dsl_dataset_close(ds, mode, os);
+			kmem_free(os, sizeof (objset_t));
+			return (err);
+		}
 	}
 
 	os->os = osi;
@@ -257,9 +276,51 @@ dmu_objset_close(objset_t *os)
 }
 
 void
+dmu_objset_evict_dbufs(objset_t *os)
+{
+	objset_impl_t *osi = os->os;
+	dnode_t *mdn = osi->os_meta_dnode;
+	dnode_t *dn;
+	int allzero = B_TRUE;
+
+	/*
+	 * Each time we process an entry on the list, we first move it
+	 * to the tail so that we don't process it over and over again.
+	 * We use the meta-dnode as a marker: if we make a complete pass
+	 * over the list without finding any work to do, we're done.
+	 * This ensures that we complete in linear time rather than
+	 * quadratic time, as described in detail in bug 1182169.
+	 */
+	mutex_enter(&osi->os_lock);
+	list_remove(&osi->os_dnodes, mdn);
+	list_insert_tail(&osi->os_dnodes, mdn);
+	while ((dn = list_head(&osi->os_dnodes)) != NULL) {
+		list_remove(&osi->os_dnodes, dn);
+		list_insert_tail(&osi->os_dnodes, dn);
+		if (dn == mdn) {
+			if (allzero)
+				break;
+			allzero = B_TRUE;
+			continue;
+		}
+		if (!refcount_is_zero(&dn->dn_holds)) {
+			allzero = B_FALSE;
+			dnode_add_ref(dn, FTAG);
+			mutex_exit(&osi->os_lock);
+			dnode_evict_dbufs(dn);
+			dnode_rele(dn, FTAG);
+			mutex_enter(&osi->os_lock);
+		}
+	}
+	mutex_exit(&osi->os_lock);
+	dnode_evict_dbufs(mdn);
+}
+
+void
 dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 {
 	objset_impl_t *osi = arg;
+	objset_t os;
 	int err, i;
 
 	for (i = 0; i < TXG_SIZE; i++) {
@@ -276,6 +337,13 @@ dmu_objset_evict(dsl_dataset_t *ds, void *arg)
 		    compression_changed_cb, osi);
 		ASSERT(err == 0);
 	}
+
+	/*
+	 * We should need only a single pass over the dnode list, since
+	 * nothing can be added to the list at this point.
+	 */
+	os.os = osi;
+	dmu_objset_evict_dbufs(&os);
 
 	ASSERT3P(list_head(&osi->os_dnodes), ==, osi->os_meta_dnode);
 	ASSERT3P(list_tail(&osi->os_dnodes), ==, osi->os_meta_dnode);
@@ -297,7 +365,7 @@ dmu_objset_create_impl(spa_t *spa, dsl_dataset_t *ds, dmu_objset_type_t type,
 	dnode_t *mdn;
 
 	ASSERT(dmu_tx_is_syncing(tx));
-	osi = dmu_objset_open_impl(spa, ds, NULL);
+	VERIFY(0 == dmu_objset_open_impl(spa, ds, NULL, &osi));
 	mdn = osi->os_meta_dnode;
 
 	dnode_allocate(mdn, DMU_OT_DNODE, 1 << DNODE_BLOCK_SHIFT,
@@ -314,9 +382,21 @@ dmu_objset_create_impl(spa_t *spa, dsl_dataset_t *ds, dmu_objset_type_t type,
 	 * needs to be synced multiple times as spa_sync() iterates
 	 * to convergence, so minimizing its dn_nlevels matters.
 	 */
-	if (ds != NULL)
+	if (ds != NULL) {
+		int levels = 1;
+
+		/*
+		 * Determine the number of levels necessary for the meta-dnode
+		 * to contain DN_MAX_OBJECT dnodes.
+		 */
+		while ((uint64_t)mdn->dn_nblkptr << (mdn->dn_datablkshift +
+		    (levels - 1) * (mdn->dn_indblkshift - SPA_BLKPTRSHIFT)) <
+		    DN_MAX_OBJECT * sizeof (dnode_phys_t))
+			levels++;
+
 		mdn->dn_next_nlevels[tx->tx_txg & TXG_MASK] =
-		    mdn->dn_nlevels = DN_META_DNODE_LEVELS;
+		    mdn->dn_nlevels = levels;
+	}
 
 	ASSERT(type != DMU_OST_NONE);
 	ASSERT(type != DMU_OST_ANY);
@@ -354,9 +434,8 @@ dmu_objset_create_sync(dsl_dir_t *dd, void *arg, dmu_tx_t *tx)
 	if (err)
 		return (err);
 
-	err = dsl_dataset_open_spa(dd->dd_pool->dp_spa, oa->fullname,
-	    DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ds);
-	ASSERT3U(err, ==, 0);
+	VERIFY(0 == dsl_dataset_open_spa(dd->dd_pool->dp_spa, oa->fullname,
+	    DS_MODE_STANDARD | DS_MODE_READONLY, FTAG, &ds));
 	dsl_dataset_get_blkptr(ds, &bp);
 	if (BP_IS_HOLE(&bp)) {
 		objset_impl_t *osi;
@@ -382,9 +461,9 @@ dmu_objset_create(const char *name, dmu_objset_type_t type,
 	const char *tail;
 	int err = 0;
 
-	pds = dsl_dir_open(name, FTAG, &tail);
-	if (pds == NULL)
-		return (ENOENT);
+	err = dsl_dir_open(name, FTAG, &pds, &tail);
+	if (err)
+		return (err);
 	if (tail == NULL) {
 		dsl_dir_close(pds, FTAG);
 		return (EEXIST);
@@ -554,6 +633,7 @@ dmu_objset_sync(objset_impl_t *os, dmu_tx_t *tx)
 	int txgoff;
 	list_t *dirty_list;
 	int err;
+	zbookmark_t zb;
 	arc_buf_t *abuf =
 	    arc_buf_alloc(os->os_spa, sizeof (objset_phys_t), FTAG);
 
@@ -586,11 +666,15 @@ dmu_objset_sync(objset_impl_t *os, dmu_tx_t *tx)
 	 * Sync the root block.
 	 */
 	bcopy(os->os_phys, abuf->b_data, sizeof (objset_phys_t));
+	zb.zb_objset = os->os_dsl_dataset ? os->os_dsl_dataset->ds_object : 0;
+	zb.zb_object = 0;
+	zb.zb_level = -1;
+	zb.zb_blkid = 0;
 	err = arc_write(NULL, os->os_spa, os->os_md_checksum,
 	    os->os_md_compress, tx->tx_txg, &os->os_rootbp, abuf, killer, os,
-	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, ARC_WAIT);
+	    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, ARC_WAIT, &zb);
 	ASSERT(err == 0);
-	arc_buf_free(abuf, FTAG);
+	VERIFY(arc_buf_remove_ref(abuf, FTAG) == 1);
 
 	dsl_dataset_set_blkptr(os->os_dsl_dataset, &os->os_rootbp, tx);
 
@@ -707,10 +791,10 @@ dmu_objset_find(char *name, void func(char *, void *), void *arg, int flags)
 	zap_cursor_t zc;
 	zap_attribute_t attr;
 	char *child;
-	int do_self;
+	int do_self, err;
 
-	dd = dsl_dir_open(name, FTAG, NULL);
-	if (dd == NULL)
+	err = dsl_dir_open(name, FTAG, &dd, NULL);
+	if (err)
 		return;
 
 	do_self = (dd->dd_phys->dd_head_dataset_obj != 0);

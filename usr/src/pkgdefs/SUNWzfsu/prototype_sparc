@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -42,5 +42,6 @@ f none usr/lib/sparcv9/libzfs_jni.so.1 755 root bin
 s none usr/lib/sparcv9/libzfs_jni.so=libzfs_jni.so.1
 f none usr/lib/sparcv9/libzpool.so.1 755 root bin
 s none usr/lib/sparcv9/libzpool.so=libzpool.so.1
+s none usr/lib/sparcv9/llib-lzfs.ln=../../../lib/sparcv9/llib-lzfs.ln
 d none usr/sbin/sparcv9 755 root bin
 f none usr/sbin/sparcv9/zdb 555 root bin

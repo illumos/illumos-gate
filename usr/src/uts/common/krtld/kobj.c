@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -108,6 +107,7 @@ static int kobj_boot_open(char *, int);
 static int kobj_boot_close(int);
 static int kobj_boot_seek(int, off_t, off_t);
 static int kobj_boot_read(int, caddr_t, size_t);
+static int kobj_boot_fstat(int, struct bootstat *);
 
 static Sym *lookup_one(struct module *, const char *);
 static void sym_insert(struct module *, char *, symid_t);
@@ -3324,8 +3324,8 @@ kobj_open(char *filename)
 			 */
 			cred_t *saved_cred = curthread->t_cred;
 			curthread->t_cred = kcred;
-			Errno = vn_open(filename, UIO_SYSSPACE, FREAD, 0, &vp,
-			    0, 0);
+			Errno = vn_openat(filename, UIO_SYSSPACE, FREAD, 0, &vp,
+			    0, 0, rootdir);
 			curthread->t_cred = saved_cred;
 		}
 		kobjopen_free(ltp);
@@ -3457,6 +3457,47 @@ kobj_close(intptr_t descr)
 	} else
 		(void) kobj_boot_close((int)descr);
 }
+
+int
+kobj_fstat(intptr_t descr, struct bootstat *buf)
+{
+	if (buf == NULL)
+		return (-1);
+
+	if (_modrootloaded) {
+		vattr_t vattr;
+		struct vnode *vp = (struct vnode *)descr;
+		if (VOP_GETATTR(vp, &vattr, 0, kcred) != 0)
+			return (-1);
+
+		/*
+		 * The vattr and bootstat structures are similar, but not
+		 * identical.  We do our best to fill in the bootstat structure
+		 * from the contents of vattr (transfering only the ones that
+		 * are obvious.
+		 */
+
+		buf->st_mode = (uint32_t)vattr.va_mode;
+		buf->st_nlink = (uint32_t)vattr.va_nlink;
+		buf->st_uid = (int32_t)vattr.va_uid;
+		buf->st_gid = (int32_t)vattr.va_gid;
+		buf->st_rdev = (uint64_t)vattr.va_rdev;
+		buf->st_size = (uint64_t)vattr.va_size;
+		buf->st_atim.tv_sec = (int64_t)vattr.va_atime.tv_sec;
+		buf->st_atim.tv_nsec = (int64_t)vattr.va_atime.tv_nsec;
+		buf->st_mtim.tv_sec = (int64_t)vattr.va_mtime.tv_sec;
+		buf->st_mtim.tv_nsec = (int64_t)vattr.va_mtime.tv_nsec;
+		buf->st_ctim.tv_sec = (int64_t)vattr.va_ctime.tv_sec;
+		buf->st_ctim.tv_nsec = (int64_t)vattr.va_ctime.tv_nsec;
+		buf->st_blksize = (int32_t)vattr.va_blksize;
+		buf->st_blocks = (int64_t)vattr.va_nblocks;
+
+		return (0);
+	}
+
+	return (kobj_boot_fstat((int)descr, buf));
+}
+
 
 struct _buf *
 kobj_open_file(char *name)
@@ -4096,6 +4137,18 @@ kobj_record_file(char *filename)
 	buf += n;
 }
 #endif	/* __x86 */
+
+static int
+kobj_boot_fstat(int fd, struct bootstat *stp)
+{
+#if defined(__sparc)
+	if (!standalone && _ioquiesced)
+		return (-1);
+	return (BOP_FSTAT(ops, fd, stp));
+#else
+	return (BRD_FSTAT(bfs_ops, fd, stp));
+#endif
+}
 
 /*
  * XXX these wrappers should go away when sparc is converted

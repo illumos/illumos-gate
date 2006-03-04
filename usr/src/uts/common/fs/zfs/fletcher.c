@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -90,6 +89,52 @@ fletcher_4_byteswap(const void *buf, uint64_t size, zio_cksum_t *zcp)
 	uint64_t a, b, c, d;
 
 	for (a = b = c = d = 0; ip < ipend; ip++) {
+		a += BSWAP_32(ip[0]);
+		b += a;
+		c += b;
+		d += c;
+	}
+
+	ZIO_SET_CHECKSUM(zcp, a, b, c, d);
+}
+
+void
+fletcher_4_incremental_native(const void *buf, uint64_t size,
+    zio_cksum_t *zcp)
+{
+	const uint32_t *ip = buf;
+	const uint32_t *ipend = ip + (size / sizeof (uint32_t));
+	uint64_t a, b, c, d;
+
+	a = zcp->zc_word[0];
+	b = zcp->zc_word[1];
+	c = zcp->zc_word[2];
+	d = zcp->zc_word[3];
+
+	for (; ip < ipend; ip++) {
+		a += ip[0];
+		b += a;
+		c += b;
+		d += c;
+	}
+
+	ZIO_SET_CHECKSUM(zcp, a, b, c, d);
+}
+
+void
+fletcher_4_incremental_byteswap(const void *buf, uint64_t size,
+    zio_cksum_t *zcp)
+{
+	const uint32_t *ip = buf;
+	const uint32_t *ipend = ip + (size / sizeof (uint32_t));
+	uint64_t a, b, c, d;
+
+	a = zcp->zc_word[0];
+	b = zcp->zc_word[1];
+	c = zcp->zc_word[2];
+	d = zcp->zc_word[3];
+
+	for (; ip < ipend; ip++) {
 		a += BSWAP_32(ip[0]);
 		b += a;
 		c += b;

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -193,7 +192,7 @@ get_stats(zfs_handle_t *zhp)
 	zc.zc_config_src = (uint64_t)(uintptr_t)zfs_malloc(1024);
 	zc.zc_config_src_size = 1024;
 
-	while (ioctl(zfs_fd, ZFS_IOC_OBJSET_STATS, &zc) != 0) {
+	while (zfs_ioctl(ZFS_IOC_OBJSET_STATS, &zc) != 0) {
 		if (errno == ENOMEM) {
 			zc.zc_config_src = (uint64_t)(uintptr_t)
 			    zfs_malloc(zc.zc_config_src_size);
@@ -205,6 +204,8 @@ get_stats(zfs_handle_t *zhp)
 
 	bcopy(&zc.zc_objset_stats, &zhp->zfs_dmustats,
 	    sizeof (zc.zc_objset_stats));
+
+	(void) strcpy(zhp->zfs_root, zc.zc_root);
 
 	verify(nvlist_unpack((void *)(uintptr_t)zc.zc_config_src,
 	    zc.zc_config_src_size, &zhp->zfs_props, 0) == 0);
@@ -300,6 +301,16 @@ zfs_open(const char *path, int types)
 			 */
 			zfs_error(dgettext(TEXT_DOMAIN,
 			    "cannot open '%s': %s is busy"), path,
+			    path_to_str(path, types));
+			break;
+
+		case ENXIO:
+		case EIO:
+			/*
+			 * I/O error from the underlying pool.
+			 */
+			zfs_error(dgettext(TEXT_DOMAIN,
+			    "cannot open '%s': I/O error"), path,
 			    path_to_str(path, types));
 			break;
 
@@ -800,11 +811,11 @@ zfs_prop_set(zfs_handle_t *zhp, zfs_prop_t prop, const char *propval)
 	switch (prop) {
 	case ZFS_PROP_QUOTA:
 		zc.zc_cookie = number;
-		ret = ioctl(zfs_fd, ZFS_IOC_SET_QUOTA, &zc);
+		ret = zfs_ioctl(ZFS_IOC_SET_QUOTA, &zc);
 		break;
 	case ZFS_PROP_RESERVATION:
 		zc.zc_cookie = number;
-		ret = ioctl(zfs_fd, ZFS_IOC_SET_RESERVATION, &zc);
+		ret = zfs_ioctl(ZFS_IOC_SET_RESERVATION, &zc);
 		break;
 	case ZFS_PROP_MOUNTPOINT:
 	case ZFS_PROP_SHARENFS:
@@ -817,15 +828,15 @@ zfs_prop_set(zfs_handle_t *zhp, zfs_prop_t prop, const char *propval)
 		    sizeof (zc.zc_prop_value));
 		zc.zc_intsz = 1;
 		zc.zc_numints = strlen(propval) + 1;
-		ret = ioctl(zfs_fd, ZFS_IOC_SET_PROP, &zc);
+		ret = zfs_ioctl(ZFS_IOC_SET_PROP, &zc);
 		break;
 	case ZFS_PROP_VOLSIZE:
 		zc.zc_volsize = number;
-		ret = ioctl(zfs_fd, ZFS_IOC_SET_VOLSIZE, &zc);
+		ret = zfs_ioctl(ZFS_IOC_SET_VOLSIZE, &zc);
 		break;
 	case ZFS_PROP_VOLBLOCKSIZE:
 		zc.zc_volblocksize = number;
-		ret = ioctl(zfs_fd, ZFS_IOC_SET_VOLBLOCKSIZE, &zc);
+		ret = zfs_ioctl(ZFS_IOC_SET_VOLBLOCKSIZE, &zc);
 		break;
 	default:
 		(void) strlcpy(zc.zc_prop_name, propname,
@@ -834,7 +845,7 @@ zfs_prop_set(zfs_handle_t *zhp, zfs_prop_t prop, const char *propval)
 		*(uint64_t *)zc.zc_prop_value = number;
 		zc.zc_intsz = 8;
 		zc.zc_numints = 1;
-		ret = ioctl(zfs_fd, ZFS_IOC_SET_PROP, &zc);
+		ret = zfs_ioctl(ZFS_IOC_SET_PROP, &zc);
 		break;
 	}
 
@@ -1001,7 +1012,7 @@ zfs_prop_inherit(zfs_handle_t *zhp, zfs_prop_t prop)
 
 	zc.zc_numints = 0;
 
-	if ((ret = ioctl(zfs_fd, ZFS_IOC_SET_PROP, &zc)) != 0) {
+	if ((ret = zfs_ioctl(ZFS_IOC_SET_PROP, &zc)) != 0) {
 		switch (errno) {
 		case EPERM:
 			zfs_error(dgettext(TEXT_DOMAIN,
@@ -1178,6 +1189,9 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 		}
 		return (val);
 
+	case ZFS_PROP_CREATION:
+		return (zhp->zfs_dmustats.dds_creation_time);
+
 	case ZFS_PROP_QUOTA:
 		if (zhp->zfs_dmustats.dds_quota == 0)
 			*source = "";	/* default */
@@ -1250,9 +1264,9 @@ get_numeric_property(zfs_handle_t *zhp, zfs_prop_t prop, zfs_source_t *src,
 
 			search.mnt_special = (char *)zhp->zfs_name;
 			search.mnt_fstype = MNTTYPE_ZFS;
-			rewind(mnttab_file);
+			rewind(zfs_mnttab());
 
-			if (getmntany(mnttab_file, &entry, &search) == 0)
+			if (getmntany(zfs_mnttab(), &entry, &search) == 0)
 				zhp->zfs_mntopts =
 				    zfs_strdup(entry.mnt_mntopts);
 		}
@@ -1431,7 +1445,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		 * If the pool has an alternate root, we want to prepend that
 		 * root to any values we return.
 		 */
-		root = zhp->zfs_dmustats.dds_altroot;
+		root = zhp->zfs_root;
 		str = getprop_string(zhp, prop, &source);
 
 		if (str[0] == '\0') {
@@ -1465,7 +1479,7 @@ zfs_prop_get(zfs_handle_t *zhp, zfs_prop_t prop, char *propbuf, size_t proplen,
 		break;
 
 	case ZFS_PROP_ORIGIN:
-		(void) strlcpy(propbuf, getprop_string(zhp, prop, &source),
+		(void) strlcpy(propbuf, zhp->zfs_dmustats.dds_clone_of,
 		    proplen);
 		/*
 		 * If there is no parent at all, return failure to indicate that
@@ -1620,7 +1634,7 @@ zfs_iter_filesystems(zfs_handle_t *zhp, zfs_iter_f func, void *data)
 	int ret;
 
 	for ((void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
-	    ioctl(zfs_fd, ZFS_IOC_DATASET_LIST_NEXT, &zc) == 0;
+	    zfs_ioctl(ZFS_IOC_DATASET_LIST_NEXT, &zc) == 0;
 	    (void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name))) {
 		/*
 		 * Ignore private dataset names.
@@ -1661,7 +1675,7 @@ zfs_iter_snapshots(zfs_handle_t *zhp, zfs_iter_f func, void *data)
 	int ret;
 
 	for ((void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
-	    ioctl(zfs_fd, ZFS_IOC_SNAPSHOT_LIST_NEXT, &zc) == 0;
+	    zfs_ioctl(ZFS_IOC_SNAPSHOT_LIST_NEXT, &zc) == 0;
 	    (void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name))) {
 
 		if ((nzhp = make_dataset_handle(zc.zc_name)) == NULL)
@@ -1740,7 +1754,7 @@ check_parents(const char *path, zfs_type_t type)
 		slash = parent + strlen(parent);
 	(void) strncpy(zc.zc_name, parent, slash - parent);
 	zc.zc_name[slash - parent] = '\0';
-	if (ioctl(zfs_fd, ZFS_IOC_OBJSET_STATS, &zc) != 0 &&
+	if (zfs_ioctl(ZFS_IOC_OBJSET_STATS, &zc) != 0 &&
 	    errno == ENOENT) {
 		zfs_error(dgettext(TEXT_DOMAIN,
 		    "cannot create '%s': no such pool '%s'"), path, zc.zc_name);
@@ -1835,7 +1849,7 @@ zfs_create(const char *path, zfs_type_t type,
 	 * first try to see if the dataset exists.
 	 */
 	(void) strlcpy(zc.zc_name, path, sizeof (zc.zc_name));
-	if (ioctl(zfs_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0) {
+	if (zfs_ioctl(ZFS_IOC_OBJSET_STATS, &zc) == 0) {
 		zfs_error(dgettext(TEXT_DOMAIN,
 		    "cannot create '%s': dataset exists"), path);
 		return (-1);
@@ -1886,7 +1900,7 @@ zfs_create(const char *path, zfs_type_t type,
 	}
 
 	/* create the dataset */
-	ret = ioctl(zfs_fd, ZFS_IOC_CREATE, &zc);
+	ret = zfs_ioctl(ZFS_IOC_CREATE, &zc);
 
 	if (ret == 0 && type == ZFS_TYPE_VOLUME)
 		ret = zvol_create_link(path);
@@ -2003,7 +2017,7 @@ zfs_destroy(zfs_handle_t *zhp)
 		zc.zc_objset_type = DMU_OST_ZFS;
 	}
 
-	ret = ioctl(zfs_fd, ZFS_IOC_DESTROY, &zc);
+	ret = zfs_ioctl(ZFS_IOC_DESTROY, &zc);
 
 	if (ret != 0) {
 		switch (errno) {
@@ -2093,7 +2107,7 @@ zfs_clone(zfs_handle_t *zhp, const char *target)
 
 	(void) strlcpy(zc.zc_name, target, sizeof (zc.zc_name));
 	(void) strlcpy(zc.zc_filename, zhp->zfs_name, sizeof (zc.zc_filename));
-	ret = ioctl(zfs_fd, ZFS_IOC_CREATE, &zc);
+	ret = zfs_ioctl(ZFS_IOC_CREATE, &zc);
 
 	if (ret != 0) {
 		switch (errno) {
@@ -2207,12 +2221,12 @@ zfs_snapshot(const char *path)
 	else
 		zc.zc_objset_type = DMU_OST_ZFS;
 
-	ret = ioctl(zfs_fd, ZFS_IOC_CREATE, &zc);
+	ret = zfs_ioctl(ZFS_IOC_CREATE, &zc);
 
 	if (ret == 0 && zhp->zfs_type == ZFS_TYPE_VOLUME) {
 		ret = zvol_create_link(path);
 		if (ret != 0)
-			(void) ioctl(zfs_fd, ZFS_IOC_DESTROY, &zc);
+			(void) zfs_ioctl(ZFS_IOC_DESTROY, &zc);
 	}
 
 	if (ret != 0) {
@@ -2283,7 +2297,7 @@ zfs_backup(zfs_handle_t *zhp_to, zfs_handle_t *zhp_from)
 	}
 	zc.zc_cookie = STDOUT_FILENO;
 
-	ret = ioctl(zfs_fd, ZFS_IOC_SENDBACKUP, &zc);
+	ret = zfs_ioctl(ZFS_IOC_SENDBACKUP, &zc);
 	if (ret != 0) {
 		switch (errno) {
 		case EPERM:
@@ -2402,7 +2416,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	/*
 	 * Determine name of destination snapshot.
 	 */
-	(void) strcpy(drrb->drr_toname, tosnap);
+	(void) strcpy(zc.zc_filename, tosnap);
 	if (isprefix) {
 		if (strchr(tosnap, '@') != NULL) {
 			zfs_error(dgettext(TEXT_DOMAIN,
@@ -2417,8 +2431,8 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		else
 			cp++;
 
-		(void) strcat(drrb->drr_toname, "/");
-		(void) strcat(drrb->drr_toname, cp);
+		(void) strcat(zc.zc_filename, "/");
+		(void) strcat(zc.zc_filename, cp);
 	} else if (strchr(tosnap, '@') == NULL) {
 		/*
 		 * they specified just a filesystem; tack on the
@@ -2427,11 +2441,10 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		cp = strchr(drr.drr_u.drr_begin.drr_toname, '@');
 		if (cp == NULL || strlen(tosnap) + strlen(cp) >= MAXNAMELEN) {
 			zfs_error(dgettext(TEXT_DOMAIN,
-			    "cannot restore: invalid backup stream "
-			    "(invalid snapshot name)"));
+			    "cannot restore: invalid snapshot name"));
 			return (-1);
 		}
-		(void) strcat(drrb->drr_toname, cp);
+		(void) strcat(zc.zc_filename, cp);
 	}
 
 	if (drrb->drr_fromguid) {
@@ -2439,7 +2452,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		/* incremental backup stream */
 
 		/* do the ioctl to the containing fs */
-		(void) strcpy(zc.zc_name, drrb->drr_toname);
+		(void) strcpy(zc.zc_name, zc.zc_filename);
 		cp = strchr(zc.zc_name, '@');
 		*cp = '\0';
 
@@ -2464,7 +2477,7 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	} else {
 		/* full backup stream */
 
-		(void) strcpy(zc.zc_name, drrb->drr_toname);
+		(void) strcpy(zc.zc_name, zc.zc_filename);
 
 		/* make sure they aren't trying to restore into the root */
 		if (strchr(zc.zc_name, '/') == NULL) {
@@ -2490,33 +2503,58 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 				    tosnap);
 				return (-1);
 			}
+			zfs_close(h);
 
 			/* create any necessary ancestors up to prefix */
 			zc.zc_objset_type = DMU_OST_ZFS;
+
 			/*
 			 * zc.zc_name is now the full name of the snap
-			 * we're restoring into
+			 * we're restoring into.  Attempt to create,
+			 * mount, and share any ancestor filesystems, up
+			 * to the one that was named.
 			 */
-			cp = zc.zc_name + strlen(tosnap) + 1;
-			while (cp = strchr(cp, '/')) {
+			for (cp = zc.zc_name + strlen(tosnap) + 1;
+			    cp = strchr(cp, '/'); *cp = '/', cp++) {
+				const char *opname;
 				*cp = '\0';
-				err = ioctl(zfs_fd, ZFS_IOC_CREATE, &zc);
-				if (err && errno != ENOENT && errno != EEXIST) {
-					zfs_error(dgettext(TEXT_DOMAIN,
-					    "cannot restore: "
-					    "couldn't create ancestor %s"),
-					    zc.zc_name);
-					return (-1);
+
+				opname = "create";
+				if (zfs_create(zc.zc_name, ZFS_TYPE_FILESYSTEM,
+				    NULL, NULL) != 0) {
+					if (errno == EEXIST)
+						continue;
+					goto ancestorerr;
 				}
-				*cp = '/';
-				cp++;
+
+				opname = "open";
+				h = zfs_open(zc.zc_name, ZFS_TYPE_FILESYSTEM);
+				if (h == NULL)
+					goto ancestorerr;
+
+				opname = "mount";
+				if (zfs_mount(h, NULL, 0) != 0)
+					goto ancestorerr;
+
+				opname = "share";
+				if (zfs_share(h) != 0)
+					goto ancestorerr;
+
+				zfs_close(h);
+
+				continue;
+ancestorerr:
+				zfs_error(dgettext(TEXT_DOMAIN,
+				    "cannot restore: couldn't %s ancestor %s"),
+				    opname, zc.zc_name);
+				return (-1);
 			}
 		}
 
 		/* Make sure destination fs does not exist */
 		cp = strchr(zc.zc_name, '@');
 		*cp = '\0';
-		if (ioctl(zfs_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0) {
+		if (zfs_ioctl(ZFS_IOC_OBJSET_STATS, &zc) == 0) {
 			zfs_error(dgettext(TEXT_DOMAIN,
 			    "cannot restore full backup: "
 			    "destination filesystem %s already exists"),
@@ -2537,12 +2575,12 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		    dryrun ? "would restore" : "restoring",
 		    drrb->drr_fromguid ? "incremental" : "full",
 		    drr.drr_u.drr_begin.drr_toname,
-		    zc.zc_begin_record.drr_toname);
+		    zc.zc_filename);
 		(void) fflush(stdout);
 	}
 	if (dryrun)
 		return (0);
-	err = ioctl_err = ioctl(zfs_fd, ZFS_IOC_RECVBACKUP, &zc);
+	err = ioctl_err = zfs_ioctl(ZFS_IOC_RECVBACKUP, &zc);
 	if (ioctl_err != 0) {
 		switch (errno) {
 		case ENODEV:
@@ -2561,12 +2599,12 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 		case EEXIST:
 			if (drrb->drr_fromguid == 0) {
 				/* it's the containing fs that exists */
-				cp = strchr(drrb->drr_toname, '@');
+				cp = strchr(zc.zc_filename, '@');
 				*cp = '\0';
 			}
 			zfs_error(dgettext(TEXT_DOMAIN,
 			    "cannot restore to %s: destination already exists"),
-			    drrb->drr_toname);
+			    zc.zc_filename);
 			break;
 		case ENOENT:
 			zfs_error(dgettext(TEXT_DOMAIN,
@@ -2592,6 +2630,11 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 			zfs_error(dgettext(TEXT_DOMAIN,
 			    "cannot restore: invalid backup stream"));
 			break;
+		case ECKSUM:
+			zfs_error(dgettext(TEXT_DOMAIN,
+			    "cannot restore: invalid backup stream "
+			    "(checksum mismatch)"));
+			break;
 		case EPERM:
 			zfs_error(dgettext(TEXT_DOMAIN,
 			    "cannot restore: permission denied"));
@@ -2607,12 +2650,12 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 	 * restore), and the /dev links for the new snapshot (if
 	 * created).
 	 */
-	cp = strchr(drrb->drr_toname, '@');
+	cp = strchr(zc.zc_filename, '@');
 	if (cp && (ioctl_err == 0 || drrb->drr_fromguid)) {
 		zfs_handle_t *h;
 
 		*cp = '\0';
-		h = zfs_open(drrb->drr_toname,
+		h = zfs_open(zc.zc_filename,
 		    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME);
 		*cp = '@';
 		if (h) {
@@ -2620,10 +2663,8 @@ zfs_restore(const char *tosnap, int isprefix, int verbose, int dryrun)
 				err = zfs_mount(h, NULL, 0);
 			} else {
 				err = zvol_create_link(h->zfs_name);
-				if (err == 0 && ioctl_err == 0) {
-					err =
-					    zvol_create_link(drrb->drr_toname);
-				}
+				if (err == 0 && ioctl_err == 0)
+					err = zvol_create_link(zc.zc_filename);
 			}
 			zfs_close(h);
 		}
@@ -2723,7 +2764,7 @@ do_rollback(zfs_handle_t *zhp)
 	 * condition where the user has taken a snapshot since we verified that
 	 * this was the most recent.
 	 */
-	if ((ret = ioctl(zfs_fd, ZFS_IOC_ROLLBACK, &zc)) != 0) {
+	if ((ret = zfs_ioctl(ZFS_IOC_ROLLBACK, &zc)) != 0) {
 		switch (errno) {
 		case EPERM:
 			/*
@@ -2966,7 +3007,7 @@ zfs_rename(zfs_handle_t *zhp, const char *target)
 	else
 		zc.zc_objset_type = DMU_OST_ZFS;
 
-	if ((ret = ioctl(zfs_fd, ZFS_IOC_RENAME, &zc)) != 0) {
+	if ((ret = zfs_ioctl(ZFS_IOC_RENAME, &zc)) != 0) {
 		switch (errno) {
 		case EPERM:
 			/*
@@ -3051,7 +3092,7 @@ zvol_create_link(const char *dataset)
 	/*
 	 * Issue the appropriate ioctl.
 	 */
-	if (ioctl(zfs_fd, ZFS_IOC_CREATE_MINOR, &zc) != 0) {
+	if (zfs_ioctl(ZFS_IOC_CREATE_MINOR, &zc) != 0) {
 		switch (errno) {
 		case EPERM:
 			zfs_error(dgettext(TEXT_DOMAIN, "cannot create "
@@ -3080,7 +3121,7 @@ zvol_create_link(const char *dataset)
 	if ((hdl = di_devlink_init(ZFS_DRIVER, DI_MAKE_LINK)) == NULL) {
 		zfs_error(dgettext(TEXT_DOMAIN,
 		    "cannot create device links for '%s'"), dataset);
-		(void) ioctl(zfs_fd, ZFS_IOC_REMOVE_MINOR, &zc);
+		(void) zfs_ioctl(ZFS_IOC_REMOVE_MINOR, &zc);
 		return (-1);
 	} else {
 		(void) di_devlink_fini(&hdl);
@@ -3099,7 +3140,7 @@ zvol_remove_link(const char *dataset)
 
 	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
 
-	if (ioctl(zfs_fd, ZFS_IOC_REMOVE_MINOR, &zc) != 0) {
+	if (zfs_ioctl(ZFS_IOC_REMOVE_MINOR, &zc) != 0) {
 		switch (errno) {
 		case EPERM:
 			zfs_error(dgettext(TEXT_DOMAIN, "cannot remove "

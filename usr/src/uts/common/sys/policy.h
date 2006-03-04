@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -141,6 +140,7 @@ int secpolicy_vnode_setdac(const cred_t *, uid_t);
 int secpolicy_vnode_setid_retain(const cred_t *, boolean_t);
 int secpolicy_vnode_setids_setgids(const cred_t *, gid_t);
 int secpolicy_vnode_stky_modify(const cred_t *);
+int secpolicy_zinject(const cred_t *);
 int secpolicy_zfs(const cred_t *);
 void secpolicy_setid_clear(vattr_t *, cred_t *);
 

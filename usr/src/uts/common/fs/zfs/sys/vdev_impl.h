@@ -103,9 +103,11 @@ struct vdev_cache {
 struct vdev_queue {
 	uint64_t	vq_min_pending;
 	uint64_t	vq_max_pending;
+	uint64_t	vq_scrub_limit;
 	uint64_t	vq_agg_limit;
 	uint64_t	vq_time_shift;
 	uint64_t	vq_ramp_rate;
+	uint64_t	vq_scrub_count;
 	avl_tree_t	vq_deadline_tree;
 	avl_tree_t	vq_read_tree;
 	avl_tree_t	vq_write_tree;
@@ -150,10 +152,9 @@ struct vdev {
 	txg_list_t	vdev_dtl_list;	/* per-txg dirty DTL lists	*/
 	txg_node_t	vdev_txg_node;	/* per-txg dirty vdev linkage	*/
 	uint8_t		vdev_dirty[TXG_SIZE]; /* per-txg dirty flags	*/
-	int		vdev_is_dirty;	/* on config dirty list?	*/
+	uint8_t		vdev_is_dirty;	/* on config dirty list?	*/
+	uint8_t		vdev_reopen_wanted; /* async reopen wanted?	*/
 	list_node_t	vdev_dirty_node; /* config dirty list		*/
-	zio_t		*vdev_io_retry;	/* I/O retry list		*/
-	list_t		vdev_io_pending; /* I/O pending list		*/
 
 	/*
 	 * Leaf vdev state.
@@ -173,6 +174,8 @@ struct vdev {
 	uint8_t		vdev_detached;	/* device detached?		*/
 	vdev_queue_t	vdev_queue;	/* I/O deadline schedule queue	*/
 	vdev_cache_t	vdev_cache;	/* physical block cache		*/
+	uint64_t	vdev_not_present; /* not present during import	*/
+	hrtime_t	vdev_last_try;	/* last reopen time		*/
 
 	/*
 	 * For DTrace to work in userland (libzpool) context, these fields must
@@ -183,8 +186,6 @@ struct vdev {
 	 */
 	kmutex_t	vdev_dtl_lock;	/* vdev_dtl_{map,resilver}	*/
 	kmutex_t	vdev_dirty_lock; /* vdev_dirty[]		*/
-	kmutex_t	vdev_io_lock;	/* vdev_io_pending list		*/
-	kcondvar_t	vdev_io_cv;	/* vdev_io_pending list empty?	*/
 	kmutex_t	vdev_stat_lock;	/* vdev_stat			*/
 };
 
@@ -260,7 +261,7 @@ extern void vdev_remove_parent(vdev_t *cvd);
 /*
  * vdev sync load and sync
  */
-extern int vdev_load(vdev_t *vd, int import);
+extern int vdev_load(vdev_t *vd);
 extern void vdev_sync(vdev_t *vd, uint64_t txg);
 extern void vdev_sync_done(vdev_t *vd, uint64_t txg);
 extern void vdev_dirty(vdev_t *vd, uint8_t flags, uint64_t txg);

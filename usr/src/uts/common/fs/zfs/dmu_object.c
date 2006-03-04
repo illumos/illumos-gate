@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,7 +38,7 @@ dmu_object_alloc(objset_t *os, dmu_object_type_t ot, int blocksize,
 	uint64_t object;
 	uint64_t L2_dnode_count = DNODES_PER_BLOCK <<
 	    (osi->os_meta_dnode->dn_indblkshift - SPA_BLKPTRSHIFT);
-	dnode_t *dn;
+	dnode_t *dn = NULL;
 	int restarted = B_FALSE;
 
 	mutex_enter(&osi->os_obj_lock);
@@ -62,7 +61,14 @@ dmu_object_alloc(objset_t *os, dmu_object_type_t ot, int blocksize,
 		}
 		osi->os_obj_next = ++object;
 
-		dn = dnode_hold_impl(os->os, object, DNODE_MUST_BE_FREE, FTAG);
+		/*
+		 * XXX We should check for an i/o error here and return
+		 * up to our caller.  Actually we should pre-read it in
+		 * dmu_tx_assign(), but there is currently no mechanism
+		 * to do so.
+		 */
+		(void) dnode_hold_impl(os->os, object, DNODE_MUST_BE_FREE,
+		    FTAG, &dn);
 		if (dn)
 			break;
 
@@ -84,13 +90,14 @@ dmu_object_claim(objset_t *os, uint64_t object, dmu_object_type_t ot,
     int blocksize, dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx)
 {
 	dnode_t *dn;
+	int err;
 
-	if ((object & DMU_PRIVATE_OBJECT) && !dmu_tx_private_ok(tx))
+	if (object == DMU_META_DNODE_OBJECT && !dmu_tx_private_ok(tx))
 		return (EBADF);
 
-	dn = dnode_hold_impl(os->os, object, DNODE_MUST_BE_FREE, FTAG);
-	if (dn == NULL)
-		return (EEXIST);
+	err = dnode_hold_impl(os->os, object, DNODE_MUST_BE_FREE, FTAG, &dn);
+	if (err)
+		return (err);
 	dnode_allocate(dn, ot, blocksize, 0, bonustype, bonuslen, tx);
 	dnode_rele(dn, FTAG);
 
@@ -103,13 +110,15 @@ dmu_object_reclaim(objset_t *os, uint64_t object, dmu_object_type_t ot,
     int blocksize, dmu_object_type_t bonustype, int bonuslen, dmu_tx_t *tx)
 {
 	dnode_t *dn;
+	int err;
 
-	if ((object & DMU_PRIVATE_OBJECT) && !dmu_tx_private_ok(tx))
+	if (object == DMU_META_DNODE_OBJECT && !dmu_tx_private_ok(tx))
 		return (EBADF);
 
-	dn = dnode_hold_impl(os->os, object, DNODE_MUST_BE_ALLOCATED, FTAG);
-	if (dn == NULL)
-		return (EBADF);
+	err = dnode_hold_impl(os->os, object, DNODE_MUST_BE_ALLOCATED,
+	    FTAG, &dn);
+	if (err)
+		return (err);
 	dnode_reallocate(dn, ot, blocksize, bonustype, bonuslen, tx);
 	dnode_rele(dn, FTAG);
 
@@ -120,12 +129,14 @@ int
 dmu_object_free(objset_t *os, uint64_t object, dmu_tx_t *tx)
 {
 	dnode_t *dn;
+	int err;
 
-	ASSERT(!(object & DMU_PRIVATE_OBJECT) || dmu_tx_private_ok(tx));
+	ASSERT(object != DMU_META_DNODE_OBJECT || dmu_tx_private_ok(tx));
 
-	dn = dnode_hold_impl(os->os, object, DNODE_MUST_BE_ALLOCATED, FTAG);
-	if (dn == NULL)
-		return (ENOENT);
+	err = dnode_hold_impl(os->os, object, DNODE_MUST_BE_ALLOCATED,
+	    FTAG, &dn);
+	if (err)
+		return (err);
 
 	ASSERT(dn->dn_type != DMU_OT_NONE);
 	dnode_free(dn, tx);

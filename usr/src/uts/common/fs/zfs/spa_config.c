@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,11 @@
 #include <sys/fs/zfs.h>
 #include <sys/vdev_impl.h>
 #include <sys/zfs_ioctl.h>
+#ifdef _KERNEL
+#include <sys/kobj.h>
+#endif
+
+extern int modrootloaded;
 
 /*
  * Pool configuration repository.
@@ -65,43 +69,39 @@ const char *spa_config_dir = ZPOOL_CACHE_DIR;
 void
 spa_config_load(void)
 {
-	vnode_t *vp;
 	void *buf = NULL;
-	vattr_t vattr;
-	ssize_t resid;
 	nvlist_t *nvlist, *child;
 	nvpair_t *nvpair;
 	spa_t *spa;
 	char pathname[128];
+	struct _buf *file;
+	struct bootstat bst;
 
 	/*
 	 * Open the configuration file.
 	 */
-	(void) snprintf(pathname, sizeof (pathname), "./%s/%s", spa_config_dir,
-	    ZPOOL_CACHE_FILE);
-	if (vn_openat(pathname, UIO_SYSSPACE, FREAD | FOFFMAX, 0, &vp, 0, 0,
-	    rootdir) != 0)
+	(void) snprintf(pathname, sizeof (pathname), "%s%s/%s",
+	    (modrootloaded) ? "./" : "", spa_config_dir, ZPOOL_CACHE_FILE);
+
+	file = kobj_open_file(pathname);
+	if (file == (struct _buf *)-1)
 		return;
+
+	if (kobj_fstat(file->_fd, &bst) != 0)
+		goto out;
+
+	buf = kmem_alloc(bst.st_size, KM_SLEEP);
 
 	/*
 	 * Read the nvlist from the file.
 	 */
-	if (VOP_GETATTR(vp, &vattr, 0, kcred) != 0)
-		goto out;
-
-	buf = kmem_alloc(vattr.va_size, KM_SLEEP);
-
-	if (vn_rdwr(UIO_READ, vp, buf, vattr.va_size, 0, UIO_SYSSPACE,
-	    0, RLIM64_INFINITY, kcred, &resid) != 0)
-		goto out;
-
-	if (resid != 0)
+	if (kobj_read_file(file, buf, bst.st_size, 0) < 0)
 		goto out;
 
 	/*
 	 * Unpack the nvlist.
 	 */
-	if (nvlist_unpack(buf, vattr.va_size, &nvlist, KM_SLEEP) != 0)
+	if (nvlist_unpack(buf, bst.st_size, &nvlist, KM_SLEEP) != 0)
 		goto out;
 
 	/*
@@ -133,10 +133,9 @@ spa_config_load(void)
 
 out:
 	if (buf != NULL)
-		kmem_free(buf, vattr.va_size);
+		kmem_free(buf, bst.st_size);
 
-	(void) VOP_CLOSE(vp, FREAD | FOFFMAX, 1, 0, kcred);
-	VN_RELE(vp);
+	kobj_close_file(file);
 }
 
 /*
@@ -157,7 +156,7 @@ spa_config_sync(void)
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
-	VERIFY(nvlist_alloc(&config, NV_UNIQUE_NAME, 0) == 0);
+	VERIFY(nvlist_alloc(&config, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 	/*
 	 * Add all known pools to the configuration list, ignoring those with
@@ -179,7 +178,8 @@ spa_config_sync(void)
 
 	buf = kmem_alloc(buflen, KM_SLEEP);
 
-	VERIFY(nvlist_pack(config, &buf, &buflen, NV_ENCODE_XDR, 0) == 0);
+	VERIFY(nvlist_pack(config, &buf, &buflen, NV_ENCODE_XDR,
+	    KM_SLEEP) == 0);
 
 	/*
 	 * Write the configuration to disk.  We need to do the traditional
@@ -226,7 +226,7 @@ spa_all_configs(uint64_t *generation)
 	if (*generation == spa_config_generation)
 		return (NULL);
 
-	VERIFY(nvlist_alloc(&pools, NV_UNIQUE_NAME, 0) == 0);
+	VERIFY(nvlist_alloc(&pools, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 	spa = NULL;
 	mutex_enter(&spa_namespace_lock);
@@ -279,7 +279,7 @@ spa_config_generate(spa_t *spa, vdev_t *vd, uint64_t txg, int getstats)
 	else if (txg != 0 && vd == rvd)
 		spa->spa_config_txg = txg;
 
-	VERIFY(nvlist_alloc(&config, NV_UNIQUE_NAME, 0) == 0);
+	VERIFY(nvlist_alloc(&config, NV_UNIQUE_NAME, KM_SLEEP) == 0);
 
 	VERIFY(nvlist_add_uint64(config, ZPOOL_CONFIG_VERSION,
 	    UBERBLOCK_VERSION) == 0);

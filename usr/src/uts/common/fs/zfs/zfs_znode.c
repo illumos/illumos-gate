@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -55,251 +54,6 @@
 
 struct kmem_cache *znode_cache = NULL;
 
-/*
- * Note that znodes can be on one of 2 states:
- *	ZCACHE_mru	- recently used, currently cached
- *	ZCACHE_mfu	- frequently used, currently cached
- * When there are no active references to the znode, they
- * are linked onto one of the lists in zcache.  These are the
- * only znodes that can be evicted.
- */
-
-typedef struct zcache_state {
-	list_t	list;	/* linked list of evictable znodes in state */
-	uint64_t lcnt;	/* total number of znodes in the linked list */
-	uint64_t cnt;	/* total number of all znodes in this state */
-	uint64_t hits;
-	kmutex_t mtx;
-} zcache_state_t;
-
-/* The 2 states: */
-static zcache_state_t ZCACHE_mru;
-static zcache_state_t ZCACHE_mfu;
-
-static struct zcache {
-	zcache_state_t	*mru;
-	zcache_state_t	*mfu;
-	uint64_t	p;		/* Target size of mru */
-	uint64_t	c;		/* Target size of cache */
-	uint64_t	c_max;		/* Maximum target cache size */
-
-	/* performance stats */
-	uint64_t	missed;
-	uint64_t	evicted;
-	uint64_t	skipped;
-} zcache;
-
-void zcache_kmem_reclaim(void);
-
-#define	ZCACHE_MINTIME (hz>>4) /* 62 ms */
-
-/*
- * Move the supplied znode to the indicated state.  The mutex
- * for the znode must be held by the caller.
- */
-static void
-zcache_change_state(zcache_state_t *new_state, znode_t *zp)
-{
-	/* ASSERT(MUTEX_HELD(hash_mtx)); */
-	ASSERT(zp->z_active);
-
-	if (zp->z_zcache_state) {
-		ASSERT3U(zp->z_zcache_state->cnt, >=, 1);
-		atomic_add_64(&zp->z_zcache_state->cnt, -1);
-	}
-	atomic_add_64(&new_state->cnt, 1);
-	zp->z_zcache_state = new_state;
-}
-
-static void
-zfs_zcache_evict(znode_t *zp, kmutex_t *hash_mtx)
-{
-	zfsvfs_t *zfsvfs = zp->z_zfsvfs;
-
-	ASSERT(zp->z_phys);
-	ASSERT(zp->z_dbuf_held);
-
-	zp->z_dbuf_held = 0;
-	mutex_exit(&zp->z_lock);
-	dmu_buf_rele(zp->z_dbuf);
-	mutex_exit(hash_mtx);
-	VFS_RELE(zfsvfs->z_vfs);
-}
-
-/*
- * Evict znodes from list until we've removed the specified number
- */
-static void
-zcache_evict_state(zcache_state_t *state, int64_t cnt, zfsvfs_t *zfsvfs)
-{
-	int znodes_evicted = 0;
-	znode_t *zp, *zp_prev;
-	kmutex_t *hash_mtx;
-
-	ASSERT(state == zcache.mru || state == zcache.mfu);
-
-	mutex_enter(&state->mtx);
-
-	for (zp = list_tail(&state->list); zp; zp = zp_prev) {
-		zp_prev = list_prev(&state->list, zp);
-		if (zfsvfs && zp->z_zfsvfs != zfsvfs)
-			continue;
-		hash_mtx = ZFS_OBJ_MUTEX(zp);
-		if (mutex_tryenter(hash_mtx)) {
-			mutex_enter(&zp->z_lock);
-			list_remove(&zp->z_zcache_state->list, zp);
-			zp->z_zcache_state->lcnt -= 1;
-			ASSERT3U(zp->z_zcache_state->cnt, >=, 1);
-			atomic_add_64(&zp->z_zcache_state->cnt, -1);
-			zp->z_zcache_state = NULL;
-			zp->z_zcache_access = 0;
-			/* drops z_lock and hash_mtx */
-			zfs_zcache_evict(zp, hash_mtx);
-			znodes_evicted += 1;
-			atomic_add_64(&zcache.evicted, 1);
-			if (znodes_evicted >= cnt)
-				break;
-		} else {
-			atomic_add_64(&zcache.skipped, 1);
-		}
-	}
-	mutex_exit(&state->mtx);
-
-	if (znodes_evicted < cnt)
-		dprintf("only evicted %lld znodes from %x",
-		    (longlong_t)znodes_evicted, state);
-}
-
-static void
-zcache_adjust(void)
-{
-	uint64_t mrucnt = zcache.mru->lcnt;
-	uint64_t mfucnt = zcache.mfu->lcnt;
-	uint64_t p = zcache.p;
-	uint64_t c = zcache.c;
-
-	if (mrucnt > p)
-		zcache_evict_state(zcache.mru, mrucnt - p, NULL);
-
-	if (mfucnt > 0 && mrucnt + mfucnt > c) {
-		int64_t toevict = MIN(mfucnt, mrucnt + mfucnt - c);
-		zcache_evict_state(zcache.mfu, toevict, NULL);
-	}
-}
-
-/*
- * Flush all *evictable* data from the cache.
- * NOTE: this will not touch "active" (i.e. referenced) data.
- */
-void
-zfs_zcache_flush(zfsvfs_t *zfsvfs)
-{
-	zcache_evict_state(zcache.mru, zcache.mru->lcnt, zfsvfs);
-	zcache_evict_state(zcache.mfu, zcache.mfu->lcnt, zfsvfs);
-}
-
-static void
-zcache_try_grow(int64_t cnt)
-{
-	int64_t size;
-	/*
-	 * If we're almost to the current target cache size,
-	 * increment the target cache size
-	 */
-	size = zcache.mru->lcnt + zcache.mfu->lcnt;
-	if ((zcache.c - size) <= 1) {
-		atomic_add_64(&zcache.c, cnt);
-		if (zcache.c > zcache.c_max)
-			zcache.c = zcache.c_max;
-		else if (zcache.p + cnt < zcache.c)
-			atomic_add_64(&zcache.p, cnt);
-	}
-}
-
-/*
- * This routine is called whenever a znode is accessed.
- */
-static void
-zcache_access(znode_t *zp, kmutex_t *hash_mtx)
-{
-	ASSERT(MUTEX_HELD(hash_mtx));
-
-	if (zp->z_zcache_state == NULL) {
-		/*
-		 * This znode is not in the cache.
-		 * Add the new znode to the MRU state.
-		 */
-
-		zcache_try_grow(1);
-
-		ASSERT(zp->z_zcache_access == 0);
-		zp->z_zcache_access = lbolt;
-		zcache_change_state(zcache.mru, zp);
-		mutex_exit(hash_mtx);
-
-		/*
-		 * If we are using less than 2/3 of our total target
-		 * cache size, bump up the target size for the MRU
-		 * list.
-		 */
-		if (zcache.mru->lcnt + zcache.mfu->lcnt < zcache.c*2/3) {
-			zcache.p = zcache.mru->lcnt + zcache.c/6;
-		}
-
-		zcache_adjust();
-
-		atomic_add_64(&zcache.missed, 1);
-	} else if (zp->z_zcache_state == zcache.mru) {
-		/*
-		 * This znode has been "accessed" only once so far,
-		 * Move it to the MFU state.
-		 */
-		if (lbolt > zp->z_zcache_access + ZCACHE_MINTIME) {
-			/*
-			 * More than 125ms have passed since we
-			 * instantiated this buffer.  Move it to the
-			 * most frequently used state.
-			 */
-			zp->z_zcache_access = lbolt;
-			zcache_change_state(zcache.mfu, zp);
-		}
-		atomic_add_64(&zcache.mru->hits, 1);
-		mutex_exit(hash_mtx);
-	} else {
-		ASSERT(zp->z_zcache_state == zcache.mfu);
-		/*
-		 * This buffer has been accessed more than once.
-		 * Keep it in the MFU state.
-		 */
-		atomic_add_64(&zcache.mfu->hits, 1);
-		mutex_exit(hash_mtx);
-	}
-}
-
-static void
-zcache_init(void)
-{
-	zcache.c = 20;
-	zcache.c_max = 50;
-
-	zcache.mru = &ZCACHE_mru;
-	zcache.mfu = &ZCACHE_mfu;
-
-	list_create(&zcache.mru->list, sizeof (znode_t),
-	    offsetof(znode_t, z_zcache_node));
-	list_create(&zcache.mfu->list, sizeof (znode_t),
-	    offsetof(znode_t, z_zcache_node));
-}
-
-static void
-zcache_fini(void)
-{
-	zfs_zcache_flush(NULL);
-
-	list_destroy(&zcache.mru->list);
-	list_destroy(&zcache.mfu->list);
-}
-
 /*ARGSUSED*/
 static void
 znode_pageout_func(dmu_buf_t *dbuf, void *user_ptr)
@@ -307,9 +61,15 @@ znode_pageout_func(dmu_buf_t *dbuf, void *user_ptr)
 	znode_t *zp = user_ptr;
 	vnode_t *vp = ZTOV(zp);
 
+	mutex_enter(&zp->z_lock);
 	if (vp->v_count == 0) {
+		mutex_exit(&zp->z_lock);
 		vn_invalid(vp);
 		zfs_znode_free(zp);
+	} else {
+		/* signal force unmount that this znode can be freed */
+		zp->z_dbuf = NULL;
+		mutex_exit(&zp->z_lock);
 	}
 }
 
@@ -359,15 +119,11 @@ zfs_znode_init(void)
 	znode_cache = kmem_cache_create("zfs_znode_cache",
 	    sizeof (znode_t), 0, zfs_znode_cache_constructor,
 	    zfs_znode_cache_destructor, NULL, NULL, NULL, 0);
-
-	zcache_init();
 }
 
 void
 zfs_znode_fini(void)
 {
-	zcache_fini();
-
 	/*
 	 * Cleanup vfs & vnode ops
 	 */
@@ -488,8 +244,8 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	if (dmu_object_info(os, MASTER_NODE_OBJ, &doi) == ENOENT) {
 		dmu_tx_t *tx = dmu_tx_create(os);
 
-		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, 3); /* master node */
-		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, 1); /* delete queue */
+		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, TRUE, NULL); /* master */
+		dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, TRUE, NULL); /* del queue */
 		dmu_tx_hold_bonus(tx, DMU_NEW_OBJECT); /* root node */
 		error = dmu_tx_assign(tx, TXG_WAIT);
 		ASSERT3U(error, ==, 0);
@@ -497,8 +253,10 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 		dmu_tx_commit(tx);
 	}
 
-	if (zap_lookup(os, MASTER_NODE_OBJ, ZFS_VERSION_OBJ, 8, 1, &version)) {
-		return (EINVAL);
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_VERSION_OBJ, 8, 1,
+	    &version);
+	if (error) {
+		return (error);
 	} else if (version != ZFS_VERSION) {
 		(void) printf("Mismatched versions:  File system "
 		    "is version %lld on-disk format, which is "
@@ -524,9 +282,9 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 	kmem_free(stats, sizeof (dmu_objset_stats_t));
 	stats = NULL;
 
-	if (zap_lookup(os, MASTER_NODE_OBJ, ZFS_ROOT_OBJ, 8, 1, &zoid)) {
-		return (EINVAL);
-	}
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_ROOT_OBJ, 8, 1, &zoid);
+	if (error)
+		return (error);
 	ASSERT(zoid != 0);
 	zfsvfs->z_root = zoid;
 
@@ -545,9 +303,9 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
 		return (error);
 	ASSERT3U((*zpp)->z_id, ==, zoid);
 
-	if (zap_lookup(os, MASTER_NODE_OBJ, ZFS_DELETE_QUEUE, 8, 1, &zoid)) {
-		return (EINVAL);
-	}
+	error = zap_lookup(os, MASTER_NODE_OBJ, ZFS_DELETE_QUEUE, 8, 1, &zoid);
+	if (error)
+		return (error);
 
 	zfsvfs->z_dqueue = zoid;
 
@@ -570,7 +328,7 @@ zfs_init_fs(zfsvfs_t *zfsvfs, znode_t **zpp, cred_t *cr)
  * up to the caller to do, in case you don't want to
  * return the znode
  */
-znode_t *
+static znode_t *
 zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, uint64_t obj_num, int blksz)
 {
 	znode_t	*zp;
@@ -592,8 +350,6 @@ zfs_znode_alloc(zfsvfs_t *zfsvfs, dmu_buf_t *db, uint64_t obj_num, int blksz)
 	zp->z_id = obj_num;
 	zp->z_blksz = blksz;
 	zp->z_seq = 0x7A4653;
-
-	bzero(&zp->z_zcache_node, sizeof (list_node_t));
 
 	mutex_enter(&zfsvfs->z_znodes_lock);
 	list_insert_tail(&zfsvfs->z_all_znodes, zp);
@@ -662,9 +418,6 @@ zfs_znode_dmu_init(znode_t *zp)
 		ZTOV(zp)->v_flag |= VROOT;
 	}
 
-	zp->z_zcache_state = NULL;
-	zp->z_zcache_access = 0;
-
 	ASSERT(zp->z_dbuf_held == 0);
 	zp->z_dbuf_held = 1;
 	VFS_HOLD(zfsvfs->z_vfs);
@@ -715,6 +468,12 @@ zfs_mknode(znode_t *dzp, vattr_t *vap, uint64_t *oid, dmu_tx_t *tx, cred_t *cr,
 	/*
 	 * Create a new DMU object.
 	 */
+	/*
+	 * There's currently no mechanism for pre-reading the blocks that will
+	 * be to needed allocate a new object, so we accept the small chance
+	 * that there will be an i/o error and we will fail one of the
+	 * assertions below.
+	 */
 	if (vap->va_type == VDIR) {
 		if (flag & IS_REPLAY) {
 			err = zap_create_claim(zfsvfs->z_os, *oid,
@@ -738,7 +497,7 @@ zfs_mknode(znode_t *dzp, vattr_t *vap, uint64_t *oid, dmu_tx_t *tx, cred_t *cr,
 			    DMU_OT_ZNODE, sizeof (znode_phys_t) + bonuslen, tx);
 		}
 	}
-	dbp = dmu_bonus_hold(zfsvfs->z_os, *oid);
+	VERIFY(0 == dmu_bonus_hold(zfsvfs->z_os, *oid, NULL, &dbp));
 	dmu_buf_will_dirty(dbp, tx);
 
 	/*
@@ -803,11 +562,12 @@ zfs_mknode(znode_t *dzp, vattr_t *vap, uint64_t *oid, dmu_tx_t *tx, cred_t *cr,
 
 		mutex_enter(hash_mtx);
 		zfs_znode_dmu_init(zp);
-		zcache_access(zp, hash_mtx);
+		mutex_exit(hash_mtx);
+
 		*zpp = zp;
 	} else {
 		ZTOV(zp)->v_count = 0;
-		dmu_buf_rele(dbp);
+		dmu_buf_rele(dbp, NULL);
 		zfs_znode_free(zp);
 	}
 }
@@ -818,25 +578,25 @@ zfs_zget(zfsvfs_t *zfsvfs, uint64_t obj_num, znode_t **zpp)
 	dmu_object_info_t doi;
 	dmu_buf_t	*db;
 	znode_t		*zp;
+	int err;
 
 	*zpp = NULL;
 
 	ZFS_OBJ_HOLD_ENTER(zfsvfs, obj_num);
 
-	db = dmu_bonus_hold(zfsvfs->z_os, obj_num);
-	if (db == NULL) {
+	err = dmu_bonus_hold(zfsvfs->z_os, obj_num, NULL, &db);
+	if (err) {
 		ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
-		return (ENOENT);
+		return (err);
 	}
 
 	dmu_object_info_from_db(db, &doi);
 	if (doi.doi_bonus_type != DMU_OT_ZNODE ||
 	    doi.doi_bonus_size < sizeof (znode_phys_t)) {
-		dmu_buf_rele(db);
+		dmu_buf_rele(db, NULL);
 		ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
 		return (EINVAL);
 	}
-	dmu_buf_read(db);
 
 	ASSERT(db->db_object == obj_num);
 	ASSERT(db->db_offset == -1);
@@ -849,29 +609,23 @@ zfs_zget(zfsvfs_t *zfsvfs, uint64_t obj_num, znode_t **zpp)
 
 		ASSERT3U(zp->z_id, ==, obj_num);
 		if (zp->z_reap) {
-			dmu_buf_rele(db);
+			dmu_buf_rele(db, NULL);
 			mutex_exit(&zp->z_lock);
 			ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
 			return (ENOENT);
 		} else if (zp->z_dbuf_held) {
-			dmu_buf_rele(db);
+			dmu_buf_rele(db, NULL);
 		} else {
 			zp->z_dbuf_held = 1;
 			VFS_HOLD(zfsvfs->z_vfs);
 		}
 
-		if (zp->z_active == 0) {
+		if (zp->z_active == 0)
 			zp->z_active = 1;
-			if (list_link_active(&zp->z_zcache_node)) {
-				mutex_enter(&zp->z_zcache_state->mtx);
-				list_remove(&zp->z_zcache_state->list, zp);
-				zp->z_zcache_state->lcnt -= 1;
-				mutex_exit(&zp->z_zcache_state->mtx);
-			}
-		}
+
 		VN_HOLD(ZTOV(zp));
 		mutex_exit(&zp->z_lock);
-		zcache_access(zp, ZFS_OBJ_MUTEX(zp));
+		ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
 		*zpp = zp;
 		return (0);
 	}
@@ -882,7 +636,7 @@ zfs_zget(zfsvfs_t *zfsvfs, uint64_t obj_num, znode_t **zpp)
 	zp = zfs_znode_alloc(zfsvfs, db, obj_num, doi.doi_data_block_size);
 	ASSERT3U(zp->z_id, ==, obj_num);
 	zfs_znode_dmu_init(zp);
-	zcache_access(zp, ZFS_OBJ_MUTEX(zp));
+	ZFS_OBJ_HOLD_EXIT(zfsvfs, obj_num);
 	*zpp = zp;
 	return (0);
 }
@@ -899,15 +653,11 @@ zfs_znode_delete(znode_t *zp, dmu_tx_t *tx)
 		    zp->z_phys->zp_acl.z_acl_extern_obj, tx);
 		ASSERT3U(error, ==, 0);
 	}
-	if (zp->z_zcache_state) {
-		ASSERT3U(zp->z_zcache_state->cnt, >=, 1);
-		atomic_add_64(&zp->z_zcache_state->cnt, -1);
-	}
 	error = dmu_object_free(zfsvfs->z_os, zp->z_id, tx);
 	ASSERT3U(error, ==, 0);
 	zp->z_dbuf_held = 0;
 	ZFS_OBJ_HOLD_EXIT(zfsvfs, zp->z_id);
-	dmu_buf_rele(zp->z_dbuf);
+	dmu_buf_rele(zp->z_dbuf, NULL);
 }
 
 void
@@ -954,9 +704,6 @@ zfs_zinactive(znode_t *zp)
 	if (zp->z_reap) {
 		mutex_exit(&zp->z_lock);
 		ZFS_OBJ_HOLD_EXIT(zfsvfs, z_id);
-		ASSERT3U(zp->z_zcache_state->cnt, >=, 1);
-		atomic_add_64(&zp->z_zcache_state->cnt, -1);
-		zp->z_zcache_state = NULL;
 		/* XATTR files are not put on the delete queue */
 		if (zp->z_phys->zp_flags & ZFS_XATTR) {
 			zfs_rmnode(zp);
@@ -970,23 +717,14 @@ zfs_zinactive(znode_t *zp)
 		VFS_RELE(zfsvfs->z_vfs);
 		return;
 	}
+	ASSERT(zp->z_phys);
+	ASSERT(zp->z_dbuf_held);
 
-	/*
-	 * If the file system for this znode is no longer mounted,
-	 * evict the znode now, don't put it in the cache.
-	 */
-	if (zfsvfs->z_unmounted1) {
-		zfs_zcache_evict(zp, ZFS_OBJ_MUTEX(zp));
-		return;
-	}
-
-	/* put znode on evictable list */
-	mutex_enter(&zp->z_zcache_state->mtx);
-	list_insert_head(&zp->z_zcache_state->list, zp);
-	zp->z_zcache_state->lcnt += 1;
-	mutex_exit(&zp->z_zcache_state->mtx);
+	zp->z_dbuf_held = 0;
 	mutex_exit(&zp->z_lock);
+	dmu_buf_rele(zp->z_dbuf, NULL);
 	ZFS_OBJ_HOLD_EXIT(zfsvfs, z_id);
+	VFS_RELE(zfsvfs->z_vfs);
 }
 
 void
@@ -1206,14 +944,14 @@ zfs_freesp(znode_t *zp, uint64_t from, uint64_t len, int flag, dmu_tx_t *tx,
 		len = -1;
 	else if (end > size)
 		len = size - from;
-	dmu_free_range(zp->z_zfsvfs->z_os, zp->z_id, from, len, tx);
+	VERIFY(0 == dmu_free_range(zp->z_zfsvfs->z_os,
+	    zp->z_id, from, len, tx));
 
 	if (!have_grow_lock)
 		rw_exit(&zp->z_grow_lock);
 
 	return (0);
 }
-
 
 void
 zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
@@ -1228,6 +966,10 @@ zfs_create_fs(objset_t *os, cred_t *cr, dmu_tx_t *tx)
 
 	/*
 	 * First attempt to create master node.
+	 */
+	/*
+	 * In an empty objset, there are no blocks to read and thus
+	 * there can be no i/o errors (which we assert below).
 	 */
 	moid = MASTER_NODE_OBJ;
 	error = zap_create_claim(os, moid, DMU_OT_MASTER_NODE,

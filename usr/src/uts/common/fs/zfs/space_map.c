@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -293,7 +292,8 @@ space_map_load(space_map_t *sm, space_map_obj_t *smo, uint8_t maptype,
 
 		dprintf("object=%llu  offset=%llx  size=%llx\n",
 		    smo->smo_object, offset, size);
-		dmu_read(os, smo->smo_object, offset, size, entry_map);
+		VERIFY(0 == dmu_read(os, smo->smo_object, offset, size,
+		    entry_map));
 
 		entry_map_end = entry_map + (size / sizeof (uint64_t));
 		for (entry = entry_map; entry < entry_map_end; entry++) {
@@ -394,7 +394,8 @@ space_map_write(space_map_t *sm, space_map_obj_t *smo, objset_t *os,
 {
 	uint64_t oldsize = smo->smo_objsize;
 
-	dmu_free_range(os, smo->smo_object, 0, smo->smo_objsize, tx);
+	VERIFY(0 == dmu_free_range(os, smo->smo_object, 0,
+	    smo->smo_objsize, tx));
 
 	smo->smo_objsize = 0;
 

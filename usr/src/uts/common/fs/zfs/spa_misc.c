@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -60,6 +59,7 @@
  * 		- Increase spa_refcount from non-zero
  * 		- Check if spa_refcount is zero
  * 		- Rename a spa_t
+ *		- add/remove/attach/detach devices
  * 		- Held for the duration of create/destroy/import/export
  *
  * 	It does not need to handle recursion.  A create or destroy may
@@ -91,14 +91,6 @@
  *      must have the namespace lock or non-zero refcount to have any kind
  *      of spa_t pointer at all.
  *
- * spa_vdev_lock (global mutex)
- *
- * 	This special lock is a global mutex used to serialize attempts to
- * 	access devices through ZFS.  It makes sure that we do not try to add
- * 	a single vdev to multiple pools at the same time.  It must be held
- * 	when adding or removing a device from the pool.
- *
- *
  * The locking order is fairly straightforward:
  *
  * 		spa_namespace_lock	->	spa_refcount
@@ -111,10 +103,9 @@
  * 	There must be at least one valid reference on the spa_t to acquire
  * 	the config lock.
  *
- * 		spa_vdev_lock		->	spa_config_lock
+ * 		spa_namespace_lock	->	spa_config_lock
  *
- * 	There are no locks required for spa_vdev_lock, but it must be
- * 	acquired before spa_config_lock.
+ * 	The namespace lock must always be taken before the config lock.
  *
  *
  * The spa_namespace_lock and spa_config_cache_lock can be acquired directly and
@@ -136,6 +127,7 @@
  * 	spa_evict_all()		Shutdown and remove all spa_t structures in
  * 				the system.
  *
+ *	spa_guid_exists()	Determine whether a pool/device guid exists.
  *
  * The spa_refcount is manipulated using the following functions:
  *
@@ -162,15 +154,14 @@
  * 	spa_config_held()	Returns true if the config lock is currently
  * 				held in the given state.
  *
- * The spa_vdev_lock, while acquired directly, is hidden by the following
- * functions, which imply additional semantics that must be followed:
+ * The vdev configuration is protected by spa_vdev_enter() / spa_vdev_exit().
  *
- * 	spa_vdev_enter()	Acquire the vdev lock and the config lock for
- * 				writing.
+ * 	spa_vdev_enter()	Acquire the namespace lock and the config lock
+ *				for writing.
  *
  * 	spa_vdev_exit()		Release the config lock, wait for all I/O
- * 				to complete, release the vdev lock, and sync
- * 				the updated configs to the cache.
+ * 				to complete, sync the updated configs to the
+ *				cache, and release the namespace lock.
  *
  * The spa_name() function also requires either the spa_namespace_lock
  * or the spa_config_lock, as both are needed to do a rename.  spa_rename() is
@@ -190,8 +181,6 @@ int zfs_flags = ~0;
 #else
 int zfs_flags = 0;
 #endif
-
-static kmutex_t spa_vdev_lock;
 
 #define	SPA_MINREF	5	/* spa_refcnt for an open-but-idle pool */
 
@@ -238,6 +227,7 @@ spa_add(const char *name)
 	spa->spa_freeze_txg = UINT64_MAX;
 
 	refcount_create(&spa->spa_refcount);
+	refcount_create(&spa->spa_config_lock.scl_count);
 
 	avl_add(&spa_namespace_avl, spa);
 
@@ -268,6 +258,7 @@ spa_remove(spa_t *spa)
 	spa_config_set(spa, NULL);
 
 	refcount_destroy(&spa->spa_refcount);
+	refcount_destroy(&spa->spa_config_lock.scl_count);
 
 	kmem_free(spa, sizeof (spa_t));
 }
@@ -351,7 +342,7 @@ spa_refcount_zero(spa_t *spa)
  * valid use during create.
  */
 void
-spa_config_enter(spa_t *spa, krw_t rw)
+spa_config_enter(spa_t *spa, krw_t rw, void *tag)
 {
 	spa_config_lock_t *scl = &spa->spa_config_lock;
 
@@ -362,13 +353,14 @@ spa_config_enter(spa_t *spa, krw_t rw)
 			while (scl->scl_writer != NULL)
 				cv_wait(&scl->scl_cv, &scl->scl_lock);
 		} else {
-			while (scl->scl_writer != NULL || scl->scl_count > 0)
+			while (scl->scl_writer != NULL ||
+			    !refcount_is_zero(&scl->scl_count))
 				cv_wait(&scl->scl_cv, &scl->scl_lock);
 			scl->scl_writer = curthread;
 		}
 	}
 
-	scl->scl_count++;
+	(void) refcount_add(&scl->scl_count, tag);
 
 	mutex_exit(&scl->scl_lock);
 }
@@ -377,14 +369,14 @@ spa_config_enter(spa_t *spa, krw_t rw)
  * Release the spa config lock, notifying any waiters in the process.
  */
 void
-spa_config_exit(spa_t *spa)
+spa_config_exit(spa_t *spa, void *tag)
 {
 	spa_config_lock_t *scl = &spa->spa_config_lock;
 
 	mutex_enter(&scl->scl_lock);
 
-	ASSERT(scl->scl_count > 0);
-	if (--scl->scl_count == 0) {
+	ASSERT(!refcount_is_zero(&scl->scl_count));
+	if (refcount_remove(&scl->scl_count, tag) == 0) {
 		cv_broadcast(&scl->scl_cv);
 		scl->scl_writer = NULL;  /* OK in either case */
 	}
@@ -405,7 +397,7 @@ spa_config_held(spa_t *spa, krw_t rw)
 	if (rw == RW_WRITER)
 		held = (scl->scl_writer == curthread);
 	else
-		held = (scl->scl_count != 0);
+		held = !refcount_is_zero(&scl->scl_count);
 	mutex_exit(&scl->scl_lock);
 
 	return (held);
@@ -418,16 +410,22 @@ spa_config_held(spa_t *spa, krw_t rw)
  */
 
 /*
- * Lock the given spa_t for the purpose of adding or removing a vdev.  This
- * grabs the global spa_vdev_lock as well as the spa config lock for writing.
+ * Lock the given spa_t for the purpose of adding or removing a vdev.
+ * Grabs the global spa_namespace_lock plus the spa config lock for writing.
  * It returns the next transaction group for the spa_t.
  */
 uint64_t
 spa_vdev_enter(spa_t *spa)
 {
-	mutex_enter(&spa_vdev_lock);
+	/*
+	 * Suspend scrub activity while we mess with the config.
+	 */
+	spa_scrub_suspend(spa);
 
-	spa_config_enter(spa, RW_WRITER);
+	if (spa->spa_root_vdev != NULL)		/* not spa_create() */
+		mutex_enter(&spa_namespace_lock);
+
+	spa_config_enter(spa, RW_WRITER, spa);
 
 	return (spa_last_synced_txg(spa) + 1);
 }
@@ -441,14 +439,26 @@ spa_vdev_enter(spa_t *spa)
 int
 spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 {
-	vdev_dtl_reassess(spa->spa_root_vdev, 0, 0, B_FALSE);
+	ASSERT(txg != 0);
 
-	spa_config_exit(spa);
+	/*
+	 * Reassess the DTLs.  spa_scrub() looks at the DTLs without
+	 * taking the config lock at all, so keep it safe.
+	 */
+	if (spa->spa_root_vdev)
+		vdev_dtl_reassess(spa->spa_root_vdev, 0, 0, B_FALSE);
 
-	if (vd == spa->spa_root_vdev) {		/* spa_create() */
-		mutex_exit(&spa_vdev_lock);
+	spa_config_exit(spa, spa);
+
+	/*
+	 * If there was a scrub or resilver in progress, indicate that
+	 * it must restart, and then allow it to resume.
+	 */
+	spa_scrub_restart(spa, txg);
+	spa_scrub_resume(spa);
+
+	if (vd == spa->spa_root_vdev)		/* spa_create() */
 		return (error);
-	}
 
 	/*
 	 * Note: this txg_wait_synced() is important because it ensures
@@ -457,8 +467,6 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 	 */
 	if (error == 0)
 		txg_wait_synced(spa->spa_dsl_pool, txg);
-
-	mutex_exit(&spa_vdev_lock);
 
 	if (vd != NULL) {
 		ASSERT(!vd->vdev_detached || vd->vdev_dtl.smo_object == 0);
@@ -469,11 +477,10 @@ spa_vdev_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error)
 	 * If we're in the middle of export or destroy, don't sync the
 	 * config -- it will do that anyway, and we deadlock if we try.
 	 */
-	if (error == 0 && spa->spa_state == POOL_STATE_ACTIVE) {
-		mutex_enter(&spa_namespace_lock);
+	if (error == 0 && spa->spa_state == POOL_STATE_ACTIVE)
 		spa_config_sync();
-		mutex_exit(&spa_namespace_lock);
-	}
+
+	mutex_exit(&spa_namespace_lock);
 
 	return (error);
 }
@@ -497,7 +504,7 @@ spa_rename(const char *name, const char *newname)
 	 * Lookup the spa_t and grab the config lock for writing.  We need to
 	 * actually open the pool so that we can sync out the necessary labels.
 	 * It's OK to call spa_open() with the namespace lock held because we
-	 * alllow recursive calls for other reasons.
+	 * allow recursive calls for other reasons.
 	 */
 	mutex_enter(&spa_namespace_lock);
 	if ((err = spa_open(name, &spa, FTAG)) != 0) {
@@ -505,7 +512,7 @@ spa_rename(const char *name, const char *newname)
 		return (err);
 	}
 
-	spa_config_enter(spa, RW_WRITER);
+	spa_config_enter(spa, RW_WRITER, FTAG);
 
 	avl_remove(&spa_namespace_avl, spa);
 	spa_strfree(spa->spa_name);
@@ -519,7 +526,7 @@ spa_rename(const char *name, const char *newname)
 	 */
 	vdev_config_dirty(spa->spa_root_vdev);
 
-	spa_config_exit(spa);
+	spa_config_exit(spa, FTAG);
 
 	txg_wait_synced(spa->spa_dsl_pool, 0);
 
@@ -548,12 +555,8 @@ spa_guid_exists(uint64_t pool_guid, uint64_t device_guid)
 {
 	spa_t *spa;
 	avl_tree_t *t = &spa_namespace_avl;
-	boolean_t locked = B_FALSE;
 
-	if (mutex_owner(&spa_namespace_lock) != curthread) {
-		mutex_enter(&spa_namespace_lock);
-		locked = B_TRUE;
-	}
+	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
 	for (spa = avl_first(t); spa != NULL; spa = AVL_NEXT(t, spa)) {
 		if (spa->spa_state == POOL_STATE_UNINITIALIZED)
@@ -564,9 +567,6 @@ spa_guid_exists(uint64_t pool_guid, uint64_t device_guid)
 		    vdev_lookup_by_guid(spa->spa_root_vdev, device_guid)))
 			break;
 	}
-
-	if (locked)
-		mutex_exit(&spa_namespace_lock);
 
 	return (spa != NULL);
 }
@@ -646,12 +646,12 @@ spa_freeze(spa_t *spa)
 {
 	uint64_t freeze_txg = 0;
 
-	spa_config_enter(spa, RW_WRITER);
+	spa_config_enter(spa, RW_WRITER, FTAG);
 	if (spa->spa_freeze_txg == UINT64_MAX) {
 		freeze_txg = spa_last_synced_txg(spa) + TXG_SIZE;
 		spa->spa_freeze_txg = freeze_txg;
 	}
-	spa_config_exit(spa);
+	spa_config_exit(spa, FTAG);
 	if (freeze_txg != 0)
 		txg_wait_synced(spa_get_dsl(spa), freeze_txg);
 }

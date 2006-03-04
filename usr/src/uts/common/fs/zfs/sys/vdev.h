@@ -60,11 +60,10 @@ typedef struct vdev_knob {
 extern int vdev_open(vdev_t *);
 extern void vdev_close(vdev_t *);
 extern int vdev_create(vdev_t *, uint64_t txg);
-extern void vdev_init(vdev_t *, uint64_t txg);
-extern void vdev_reopen(vdev_t *, zio_t **zq);
+extern int vdev_init(vdev_t *, uint64_t txg);
+extern void vdev_reopen(vdev_t *);
 
 extern vdev_t *vdev_lookup_top(spa_t *spa, uint64_t vdev);
-extern vdev_t *vdev_lookup_by_path(vdev_t *vd, const char *path);
 extern vdev_t *vdev_lookup_by_guid(vdev_t *vd, uint64_t guid);
 extern void vdev_dtl_dirty(space_map_t *sm, uint64_t txg, uint64_t size);
 extern int vdev_dtl_contains(space_map_t *sm, uint64_t txg, uint64_t size);
@@ -73,16 +72,16 @@ extern void vdev_dtl_reassess(vdev_t *vd, uint64_t txg, uint64_t scrub_txg,
 
 extern const char *vdev_description(vdev_t *vd);
 
-extern void vdev_metaslab_init(vdev_t *vd, uint64_t txg);
+extern int vdev_metaslab_init(vdev_t *vd, uint64_t txg);
 extern void vdev_metaslab_fini(vdev_t *vd);
 
 extern void vdev_get_stats(vdev_t *vd, vdev_stat_t *vs);
 extern void vdev_stat_update(zio_t *zio);
 extern void vdev_scrub_stat_update(vdev_t *vd, pool_scrub_type_t type,
     boolean_t complete);
-extern void vdev_checksum_error(zio_t *zio, vdev_t *vd);
 extern int vdev_getspec(spa_t *spa, uint64_t vdev, char **vdev_spec);
-extern void vdev_set_state(vdev_t *vd, vdev_state_t state, vdev_aux_t aux);
+extern void vdev_set_state(vdev_t *vd, boolean_t isopen, vdev_state_t state,
+    vdev_aux_t aux);
 
 extern void vdev_space_update(vdev_t *vd, uint64_t space_delta,
     uint64_t alloc_delta);
@@ -92,11 +91,10 @@ extern uint64_t vdev_psize_to_asize(vdev_t *vd, uint64_t psize);
 extern void vdev_io_start(zio_t *zio);
 extern void vdev_io_done(zio_t *zio);
 
-extern int vdev_online(spa_t *spa, const char *path);
-extern int vdev_offline(spa_t *spa, const char *path, int istmp);
+extern int vdev_online(spa_t *spa, uint64_t guid);
+extern int vdev_offline(spa_t *spa, uint64_t guid, int istmp);
+extern void vdev_clear(spa_t *spa, vdev_t *vd);
 
-extern int vdev_error_setup(spa_t *spa, const char *path, int mode, int mask,
-    uint64_t arg);
 extern int vdev_error_inject(vdev_t *vd, zio_t *zio);
 extern int vdev_is_dead(vdev_t *vd);
 

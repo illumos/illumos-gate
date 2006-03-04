@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -418,6 +417,7 @@ zvol_create_minor(zfs_cmd_t *zc)
 
 	zvol_size_changed(zv, dev);
 
+	/* XXX this should handle the possible i/o error */
 	VERIFY(dsl_prop_register(dmu_objset_ds(zv->zv_objset),
 	    "readonly", zvol_readonly_changed_cb, zv) == 0);
 
@@ -500,7 +500,7 @@ zvol_set_volsize(zfs_cmd_t *zc)
 	}
 
 	tx = dmu_tx_create(zv->zv_objset);
-	dmu_tx_hold_zap(tx, ZVOL_ZAP_OBJ, 1);
+	dmu_tx_hold_zap(tx, ZVOL_ZAP_OBJ, TRUE, NULL);
 	dmu_tx_hold_free(tx, ZVOL_OBJ, zc->zc_volsize, DMU_OBJECT_END);
 	error = dmu_tx_assign(tx, TXG_WAIT);
 	if (error) {
@@ -511,9 +511,10 @@ zvol_set_volsize(zfs_cmd_t *zc)
 
 	error = zap_update(zv->zv_objset, ZVOL_ZAP_OBJ, "size", 8, 1,
 	    &zc->zc_volsize, tx);
-	if (error == 0)
-		dmu_free_range(zv->zv_objset, ZVOL_OBJ, zc->zc_volsize,
+	if (error == 0) {
+		error = dmu_free_range(zv->zv_objset, ZVOL_OBJ, zc->zc_volsize,
 		    DMU_OBJECT_END, tx);
+	}
 
 	dmu_tx_commit(tx);
 
@@ -744,7 +745,7 @@ zvol_strategy(buf_t *bp)
 			size = volsize - off;
 
 		if (bp->b_flags & B_READ) {
-			error = dmu_read_canfail(os, ZVOL_OBJ,
+			error = dmu_read(os, ZVOL_OBJ,
 			    off, size, addr);
 		} else {
 			dmu_tx_t *tx = dmu_tx_create(os);

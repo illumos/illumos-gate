@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -63,22 +62,15 @@ extern "C" {
 #define	DNODE_SIZE	(1 << DNODE_SHIFT)
 #define	DN_MAX_NBLKPTR	((DNODE_SIZE - DNODE_CORE_SIZE) >> SPA_BLKPTRSHIFT)
 #define	DN_MAX_BONUSLEN	(DNODE_SIZE - DNODE_CORE_SIZE - (1 << SPA_BLKPTRSHIFT))
+#define	DN_MAX_OBJECT	(1ULL << DN_MAX_OBJECT_SHIFT)
 
 #define	DNODES_PER_BLOCK_SHIFT	(DNODE_BLOCK_SHIFT - DNODE_SHIFT)
 #define	DNODES_PER_BLOCK	(1ULL << DNODES_PER_BLOCK_SHIFT)
 #define	DNODES_PER_LEVEL_SHIFT	(DN_MAX_INDBLKSHIFT - SPA_BLKPTRSHIFT)
 
-#define	DN_META_DNODE_LEVELS	\
-	(1 + (DN_MAX_OBJECT_SHIFT - DNODE_SHIFT + SPA_BLKPTRSHIFT -	\
-	DNODES_PER_BLOCK_SHIFT) / DNODES_PER_LEVEL_SHIFT)
-
 /* The +2 here is a cheesy way to round up */
 #define	DN_MAX_LEVELS	(2 + ((DN_MAX_OFFSET_SHIFT - SPA_MINBLOCKSHIFT) / \
 	(DN_MIN_INDBLKSHIFT - SPA_BLKPTRSHIFT)))
-
-#define	DN_MAX_OBJECT		\
-	((uint64_t)DN_MAX_NBLKPTR << (DNODES_PER_BLOCK_SHIFT +	\
-	(DN_META_DNODE_LEVELS - 1) * DNODES_PER_LEVEL_SHIFT))
 
 #define	DN_BONUS(dnp)	((void*)((dnp)->dn_bonus + \
 	(((dnp)->dn_nblkptr - 1) * sizeof (blkptr_t))))
@@ -213,15 +205,7 @@ typedef struct dnode {
 
 	kmutex_t dn_dbufs_mtx;
 	list_t dn_dbufs;		/* linked list of descendent dbuf_t's */
-	kcondvar_t dn_evicted;		/* a child dbuf has been evicted */
-
-	/*
-	 * Performance hack: whenever we have a hold on the bonus buffer of a
-	 * ZAP object, we will also have a hold on db0.  This will keep the
-	 * meta-data for a micro-zap object cached as long as the znode for the
-	 * object is in the znode cache.
-	 */
-	struct dmu_buf_impl *dn_db0;
+	struct dmu_buf_impl *dn_bonus;	/* bonus buffer dbuf */
 
 	/* holds prefetch structure */
 	struct zfetch	dn_zfetch;
@@ -237,9 +221,10 @@ dnode_t *dnode_special_open(struct objset_impl *dd, dnode_phys_t *dnp,
     uint64_t object);
 void dnode_special_close(dnode_t *dn);
 
-dnode_t *dnode_hold(struct objset_impl *dd, uint64_t object, void *ref);
-dnode_t *dnode_hold_impl(struct objset_impl *dd, uint64_t object, int flag,
-    void *ref);
+int dnode_hold(struct objset_impl *dd, uint64_t object,
+    void *ref, dnode_t **dnp);
+int dnode_hold_impl(struct objset_impl *dd, uint64_t object, int flag,
+    void *ref, dnode_t **dnp);
 void dnode_add_ref(dnode_t *dn, void *ref);
 void dnode_rele(dnode_t *dn, void *ref);
 void dnode_setdirty(dnode_t *dn, dmu_tx_t *tx);
@@ -266,6 +251,7 @@ void dnode_init(void);
 void dnode_fini(void);
 int dnode_next_offset(dnode_t *dn, boolean_t hole, uint64_t *off, int minlvl,
     uint64_t blkfill);
+void dnode_evict_dbufs(dnode_t *dn);
 
 #ifdef ZFS_DEBUG
 

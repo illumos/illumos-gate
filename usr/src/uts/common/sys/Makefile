@@ -657,6 +657,9 @@ FMHDRS=				\
 	protocol.h		\
 	util.h
 
+FMFSHDRS=			\
+	zfs.h
+
 FMIOHDRS=			\
 	ddi.h			\
 	pci.h			\
@@ -914,6 +917,7 @@ CHECKHDRS=						\
 	$(TAVORHDRS:%.h=ib/adapters/tavor/%.check)	\
 	$(ISOHDRS:%.h=iso/%.check)			\
 	$(FMHDRS:%.h=fm/%.check)			\
+	$(FMFSHDRS:%.h=fm/fs/%.check)			\
 	$(FMIOHDRS:%.h=fm/io/%.check)			\
 	$(FSHDRS:%.h=fs/%.check)			\
 	$(LVMHDRS:%.h=lvm/%.check)			\
@@ -949,6 +953,7 @@ CHECKHDRS=						\
 	$(ROOTISOHDRS)		\
 	$(ROOTFMHDRS)		\
 	$(ROOTFMIOHDRS)		\
+	$(ROOTFMFSHDRS)		\
 	$(ROOTFSHDRS)		\
 	$(ROOTIBDHDRS)		\
 	$(ROOTIBHDRS)		\
@@ -992,7 +997,8 @@ install_h:			\
 	$(ROOTDCAMHDRS)		\
 	$(ROOTISOHDRS)		\
 	$(ROOTFMHDRS)		\
-	$(ROOTFMIOHDRS)	\
+	$(ROOTFMFSHDRS)		\
+	$(ROOTFMIOHDRS)		\
 	$(ROOTFSHDRS)		\
 	$(ROOTIBDHDRS)		\
 	$(ROOTIBHDRS)		\

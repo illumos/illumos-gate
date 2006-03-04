@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -136,6 +135,7 @@ static int bhsfs_close(int fd);
 static void bhsfs_closeall(void);
 static ssize_t bhsfs_read(int fdesc, char *buf, size_t count);
 static off_t bhsfs_lseek(int fdesc, off_t addr, int whence);
+static int bhsfs_fstat(int fdesc, struct bootstat *stp);
 
 static fileid_t *
 find_fp(int fd)
@@ -563,6 +563,48 @@ bhsfs_lseek(int fd, off_t addr, int whence)
 	return (0);
 }
 
+static int
+bhsfs_fstat(int fd, struct bootstat *stp)
+{
+	fileid_t	*filep;
+	struct inode	*ip;
+
+	if (!(filep = find_fp(fd)))
+		return (-1);
+
+	ip = filep->fi_inode;
+
+	stp->st_mode = 0;
+	stp->st_size = 0;
+
+	if (ip == NULL)
+		return (0);
+
+	switch (ip->i_smode & IFMT) {
+	case IFDIR:
+		stp->st_mode = S_IFDIR;
+		break;
+	case IFREG:
+		stp->st_mode = S_IFREG;
+		break;
+	default:
+		break;
+	}
+	stp->st_size = ip->i_size;
+
+	/* file times */
+	stp->st_atim.tv_sec = ip->i_atime.tv_sec;
+	stp->st_atim.tv_nsec = ip->i_atime.tv_usec * 1000;
+	stp->st_mtim.tv_sec = ip->i_mtime.tv_sec;
+	stp->st_mtim.tv_nsec = ip->i_mtime.tv_usec * 1000;
+	stp->st_ctim.tv_sec = ip->i_ctime.tv_sec;
+	stp->st_ctim.tv_nsec = ip->i_ctime.tv_usec * 1000;
+
+	return (0);
+
+}
+
+
 /*
  * Parse a directory entry.
  *
@@ -757,5 +799,6 @@ struct boot_fs_ops bhsfs_ops = {
 	bhsfs_close,
 	bhsfs_read,
 	bhsfs_lseek,
+	bhsfs_fstat,
 	NULL
 };

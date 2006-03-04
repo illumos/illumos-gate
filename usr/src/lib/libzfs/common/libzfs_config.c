@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -119,7 +118,7 @@ namespace_reload()
 	    zfs_malloc(zc.zc_config_dst_size);
 	for (;;) {
 		zc.zc_cookie = namespace_generation;
-		if (ioctl(zfs_fd, ZFS_IOC_POOL_CONFIGS, &zc) != 0) {
+		if (zfs_ioctl(ZFS_IOC_POOL_CONFIGS, &zc) != 0) {
 			switch (errno) {
 			case EEXIST:
 				/*
@@ -213,32 +212,23 @@ zpool_refresh_stats(zpool_handle_t *zhp)
 	zc.zc_config_dst = (uint64_t)(uintptr_t)
 	    zfs_malloc(zc.zc_config_dst_size);
 
-	while ((error = ioctl(zfs_fd, ZFS_IOC_POOL_STATS, &zc)) != 0) {
-		error = errno;
-
-		if (error == ENXIO) {
+	for (;;) {
+		if (zfs_ioctl(ZFS_IOC_POOL_STATS, &zc) == 0) {
 			/*
-			 * We can't open one or more top-level vdevs,
-			 * but we have the config.
+			 * The real error is returned in the zc_cookie field.
 			 */
+			error = zc.zc_cookie;
 			break;
 		}
 
-		free((void *)(uintptr_t)zc.zc_config_dst);
-
-		if (error == ENOENT || error == EINVAL) {
-			/*
-			 * There's no such pool (ENOENT)
-			 * or the config is bogus (EINVAL).
-			 */
-			return (error);
+		if (errno == ENOMEM) {
+			free((void *)(uintptr_t)zc.zc_config_dst);
+			zc.zc_config_dst = (uint64_t)(uintptr_t)
+			    zfs_malloc(zc.zc_config_dst_size);
+		} else {
+			free((void *)(uintptr_t)zc.zc_config_dst);
+			return (errno);
 		}
-
-		if (error != ENOMEM)
-			zfs_baderror(error);
-
-		zc.zc_config_dst =
-		    (uint64_t)(uintptr_t)zfs_malloc(zc.zc_config_dst_size);
 	}
 
 	verify(nvlist_unpack((void *)(uintptr_t)zc.zc_config_dst,

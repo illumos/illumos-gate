@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -925,6 +924,18 @@ const struct ioc {
 	{ (uint_t)ZFS_IOC_RECVBACKUP,		"ZFS_IOC_RECVBACKUP",
 		"zfs_cmd_t" },
 	{ (uint_t)ZFS_IOC_SENDBACKUP,		"ZFS_IOC_SENDBACKUP",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_INJECT_FAULT,		"ZFS_IOC_INJECT_FAULT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_CLEAR_FAULT,		"ZFS_IOC_CLEAR_FAULT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_INJECT_LIST_NEXT,	"ZFS_IOC_INJECT_LIST_NEXT",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_ERROR_LOG,		"ZFS_IOC_ERROR_LOG",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_CLEAR,		"ZFS_IOC_CLEAR",
+		"zfs_cmd_t" },
+	{ (uint_t)ZFS_IOC_BOOKMARK_NAME,	"ZFS_IOC_BOOKMARK_NAME",
 		"zfs_cmd_t" },
 
 	/* kssl ioctls */

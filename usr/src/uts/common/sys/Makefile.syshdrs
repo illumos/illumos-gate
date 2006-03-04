@@ -1,5 +1,5 @@
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -18,10 +18,13 @@ av/%.check:	av/%.h
 fm/%.check:     fm/%.h
 	$(DOT_H_CHECK)
 
-fm/cpu/%.check:     fm/cpu/%.h
+fm/cpu/%.check:	fm/cpu/%.h
 	$(DOT_H_CHECK)
 
-fm/io/%.check:     fm/io/%.h
+fm/fs/%.check:	fm/fs/%.h
+	$(DOT_H_CHECK)
+
+fm/io/%.check:	fm/io/%.h
 	$(DOT_H_CHECK)
 
 fs/%.check:	fs/%.h
@@ -129,6 +132,7 @@ ROOTDIRS=			\
 	$(ROOTDIR)/iso		\
 	$(ROOTDIR)/fm		\
 	$(ROOTDIR)/fm/cpu	\
+	$(ROOTDIR)/fm/fs	\
 	$(ROOTDIR)/fm/io	\
 	$(ROOTDIR)/fs		\
 	$(ROOTDIR)/ib		\
@@ -187,6 +191,7 @@ ROOTISOHDRS= $(ISOHDRS:%=$(ROOTDIR)/iso/%)
 ROOTFMHDRS= $(FMHDRS:%=$(ROOTDIR)/fm/%)
 ROOTFMCPUHDRS= $(FMCPUHDRS:%=$(ROOTDIR)/fm/cpu/%)
 ROOTFMIOHDRS= $(FMIOHDRS:%=$(ROOTDIR)/fm/io/%)
+ROOTFMFSHDRS= $(FMFSHDRS:%=$(ROOTDIR)/fm/fs/%)
 
 ROOTFSHDRS= $(FSHDRS:%=$(ROOTDIR)/fs/%)
 

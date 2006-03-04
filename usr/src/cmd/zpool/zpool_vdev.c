@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -112,6 +111,13 @@ vdev_error(const char *fmt, ...)
 static void
 libdiskmgt_error(int error)
 {
+	/*
+	 * ENXIO is a valid error message if the device doesn't live in
+	 * /dev/dsk.  Don't bother printing an error message in this case.
+	 */
+	if (error == ENXIO)
+		return;
+
 	(void) fprintf(stderr, gettext("warning: device in use checking "
 	    "failed: %s\n"), strerror(error));
 }

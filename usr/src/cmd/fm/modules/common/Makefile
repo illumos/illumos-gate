@@ -27,6 +27,6 @@
 #
 
 SUBDIRS = cpumem-retire eversholt io-retire ip-transport snmp-trapgen	\
-	syslog-msgs
+	syslog-msgs zfs-diagnosis
 
 include ../../Makefile.subdirs

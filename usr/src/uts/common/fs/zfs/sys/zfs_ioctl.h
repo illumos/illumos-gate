@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -31,6 +30,7 @@
 
 #include <sys/cred.h>
 #include <sys/dmu.h>
+#include <sys/zio.h>
 
 #ifdef	__cplusplus
 extern "C" {
@@ -66,7 +66,7 @@ typedef struct dmu_replay_record {
 			char drr_toname[MAXNAMELEN];
 		} drr_begin;
 		struct drr_end {
-			uint64_t drr_checksum;
+			zio_cksum_t drr_checksum;
 		} drr_end;
 		struct drr_object {
 			uint64_t drr_object;
@@ -97,15 +97,31 @@ typedef struct dmu_replay_record {
 	} drr_u;
 } dmu_replay_record_t;
 
+typedef struct zinject_record {
+	uint64_t	zi_objset;
+	uint64_t	zi_object;
+	uint64_t	zi_start;
+	uint64_t	zi_end;
+	uint64_t	zi_guid;
+	uint32_t	zi_level;
+	uint32_t	zi_error;
+	uint64_t	zi_type;
+	uint32_t	zi_freq;
+} zinject_record_t;
+
+#define	ZINJECT_NULL		0x1
+#define	ZINJECT_FLUSH_ARC	0x2
+#define	ZINJECT_UNLOAD_SPA	0x4
+
 typedef struct zfs_cmd {
 	char		zc_name[MAXNAMELEN];
 	char		zc_prop_name[MAXNAMELEN];
 	char		zc_prop_value[MAXPATHLEN];
 	char		zc_root[MAXPATHLEN];
-	char		zc_filename[MAXPATHLEN];
+	char		zc_filename[MAXNAMELEN];
 	uint32_t	zc_intsz;
 	uint32_t	zc_numints;
-	uint64_t	zc_pool_guid;
+	uint64_t	zc_guid;
 	uint64_t	zc_config_src;	/* really (char *) */
 	uint64_t	zc_config_src_size;
 	uint64_t	zc_config_dst;	/* really (char *) */
@@ -116,9 +132,10 @@ typedef struct zfs_cmd {
 	uint64_t	zc_volsize;
 	uint64_t	zc_volblocksize;
 	uint64_t	zc_objset_type;
-	dmu_object_info_t zc_object_info;
 	dmu_objset_stats_t zc_objset_stats;
 	struct drr_begin zc_begin_record;
+	zinject_record_t zc_inject_record;
+	zbookmark_t	zc_bookmark;
 } zfs_cmd_t;
 
 #define	ZVOL_MAX_MINOR	(1 << 16)

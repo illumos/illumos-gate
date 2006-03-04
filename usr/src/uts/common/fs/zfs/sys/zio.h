@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -109,23 +108,25 @@ enum zio_compress {
 #define	ZIO_PRIORITY_SCRUB		(zio_priority_table[9])
 #define	ZIO_PRIORITY_TABLE_SIZE		10
 
-#define	ZIO_FLAG_MUSTSUCCEED		0x0000
-#define	ZIO_FLAG_CANFAIL		0x0001
-#define	ZIO_FLAG_FAILFAST		0x0002
-#define	ZIO_FLAG_CONFIG_HELD		0x0004
+#define	ZIO_FLAG_MUSTSUCCEED		0x00000
+#define	ZIO_FLAG_CANFAIL		0x00001
+#define	ZIO_FLAG_FAILFAST		0x00002
+#define	ZIO_FLAG_CONFIG_HELD		0x00004
 
-#define	ZIO_FLAG_DONT_CACHE		0x0010
-#define	ZIO_FLAG_DONT_QUEUE		0x0020
-#define	ZIO_FLAG_DONT_PROPAGATE		0x0040
-#define	ZIO_FLAG_DONT_RETRY		0x0080
+#define	ZIO_FLAG_DONT_CACHE		0x00010
+#define	ZIO_FLAG_DONT_QUEUE		0x00020
+#define	ZIO_FLAG_DONT_PROPAGATE		0x00040
+#define	ZIO_FLAG_DONT_RETRY		0x00080
 
-#define	ZIO_FLAG_PHYSICAL		0x0100
-#define	ZIO_FLAG_IO_BYPASS		0x0200
-#define	ZIO_FLAG_IO_REPAIR		0x0400
-#define	ZIO_FLAG_SPECULATIVE		0x0800
+#define	ZIO_FLAG_PHYSICAL		0x00100
+#define	ZIO_FLAG_IO_BYPASS		0x00200
+#define	ZIO_FLAG_IO_REPAIR		0x00400
+#define	ZIO_FLAG_SPECULATIVE		0x00800
 
-#define	ZIO_FLAG_RESILVER		0x1000
-#define	ZIO_FLAG_SCRUB			0x2000
+#define	ZIO_FLAG_RESILVER		0x01000
+#define	ZIO_FLAG_SCRUB			0x02000
+
+#define	ZIO_FLAG_NOBOOKMARK		0x10000
 
 #define	ZIO_FLAG_GANG_INHERIT		\
 	(ZIO_FLAG_CANFAIL |		\
@@ -155,11 +156,39 @@ typedef struct zio_transform zio_transform_t;
 extern uint8_t zio_priority_table[ZIO_PRIORITY_TABLE_SIZE];
 extern char *zio_type_name[ZIO_TYPES];
 
+/*
+ * A bookmark is a four-tuple <objset, object, level, blkid> that uniquely
+ * identifies any block in the pool.  By convention, the meta-objset (MOS)
+ * is objset 0, the meta-dnode is object 0, the root block (osphys_t) is
+ * level -1 of the meta-dnode, and intent log blocks (which are chained
+ * off the root block) have blkid == sequence number.  In summary:
+ *
+ *	mos is objset 0
+ *	meta-dnode is object 0
+ *	root block is <objset, 0, -1, 0>
+ *	intent log is <objset, 0, -1, ZIL sequence number>
+ *
+ * Note: this structure is called a bookmark because its first purpose was
+ * to remember where to resume a pool-wide traverse.  The absolute ordering
+ * for block visitation during traversal is defined in compare_bookmark().
+ *
+ * Note: this structure is passed between userland and the kernel.
+ * Therefore it must not change size or alignment between 32/64 bit
+ * compilation options.
+ */
+typedef struct zbookmark {
+	uint64_t	zb_objset;
+	uint64_t	zb_object;
+	int64_t		zb_level;
+	uint64_t	zb_blkid;
+} zbookmark_t;
+
 struct zio {
 	/* Core information about this I/O */
 	zio_t		*io_parent;
 	zio_t		*io_root;
 	spa_t		*io_spa;
+	zbookmark_t	io_bookmark;
 	int		io_checksum;
 	int		io_compress;
 	int		io_dva_index;
@@ -170,6 +199,7 @@ struct zio {
 	zio_t		*io_sibling_prev;
 	zio_t		*io_sibling_next;
 	zio_transform_t *io_transform_stack;
+	zio_t		*io_logical;
 
 	/* Callback info */
 	zio_done_func_t	*io_done;
@@ -191,8 +221,6 @@ struct zio {
 	avl_tree_t	*io_vdev_tree;
 	zio_t		*io_delegate_list;
 	zio_t		*io_delegate_next;
-	zio_t		*io_retry_next;
-	list_node_t	io_pending;
 
 	/* Internal pipeline state */
 	int		io_flags;
@@ -212,6 +240,9 @@ struct zio {
 	void		*io_waiter;
 	kmutex_t	io_lock;
 	kcondvar_t	io_cv;
+
+	/* FMA state */
+	uint64_t	io_ena;
 };
 
 extern zio_t *zio_null(zio_t *pio, spa_t *spa,
@@ -222,15 +253,17 @@ extern zio_t *zio_root(spa_t *spa,
 
 extern zio_t *zio_read(zio_t *pio, spa_t *spa, blkptr_t *bp, void *data,
     uint64_t size, zio_done_func_t *done, void *private,
-    int priority, int flags);
+    int priority, int flags, zbookmark_t *zb);
 
 extern zio_t *zio_write(zio_t *pio, spa_t *spa, int checksum, int compress,
     uint64_t txg, blkptr_t *bp, void *data, uint64_t size,
-    zio_done_func_t *done, void *private, int priority, int flags);
+    zio_done_func_t *done, void *private, int priority, int flags,
+    zbookmark_t *zb);
 
 extern zio_t *zio_rewrite(zio_t *pio, spa_t *spa, int checksum,
     uint64_t txg, blkptr_t *bp, void *data, uint64_t size,
-    zio_done_func_t *done, void *private, int priority, int flags);
+    zio_done_func_t *done, void *private, int priority, int flags,
+    zbookmark_t *zb);
 
 extern zio_t *zio_free(zio_t *pio, spa_t *spa, uint64_t txg, blkptr_t *bp,
     zio_done_func_t *done, void *private);
@@ -285,11 +318,26 @@ extern void zio_set_gang_verifier(zio_t *zio, zio_cksum_t *zcp);
 extern uint8_t zio_checksum_select(uint8_t child, uint8_t parent);
 extern uint8_t zio_compress_select(uint8_t child, uint8_t parent);
 
+boolean_t zio_should_retry(zio_t *zio);
+
 /*
  * Initial setup and teardown.
  */
 extern void zio_init(void);
 extern void zio_fini(void);
+
+/*
+ * Fault injection
+ */
+struct zinject_record;
+extern uint32_t zio_injection_enabled;
+extern int zio_inject_fault(char *name, int flags, int *id,
+    struct zinject_record *record);
+extern int zio_inject_list_next(int *id, char *name, size_t buflen,
+    struct zinject_record *record);
+extern int zio_clear_fault(int id);
+extern int zio_handle_fault_injection(zio_t *zio, int error);
+extern int zio_handle_device_injection(vdev_t *vd, int error);
 
 #ifdef	__cplusplus
 }

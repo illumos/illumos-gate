@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -34,6 +33,7 @@
 #include <stdlib.h>
 #include <sys/spa.h>
 #include <sys/fs/zfs.h>
+#include <sys/refcount.h>
 
 /*
  * Routines needed by more than one client of libzpool.
@@ -125,11 +125,11 @@ show_pool_stats(spa_t *spa)
 	nvlist_t *config = NULL;
 	nvlist_t *nvroot = NULL;
 
-	spa_config_enter(spa, RW_READER);
-	VERIFY(spa_get_stats(spa_name(spa), &config) == 0);
+	spa_config_enter(spa, RW_READER, FTAG);
+	VERIFY(spa_get_stats(spa_name(spa), &config, NULL, 0) == 0);
 	VERIFY(nvlist_lookup_nvlist(config, ZPOOL_CONFIG_VDEV_TREE,
 	    &nvroot) == 0);
 
 	show_vdev_stats(spa_name(spa), nvroot, 0);
-	spa_config_exit(spa);
+	spa_config_exit(spa, FTAG);
 }

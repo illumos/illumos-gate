@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -103,12 +102,36 @@ vdev_queue_fini(vdev_t *vd)
 {
 	vdev_queue_t *vq = &vd->vdev_queue;
 
+	ASSERT(vq->vq_scrub_count == 0);
+
 	avl_destroy(&vq->vq_deadline_tree);
 	avl_destroy(&vq->vq_read_tree);
 	avl_destroy(&vq->vq_write_tree);
 	avl_destroy(&vq->vq_pending_tree);
 
 	mutex_destroy(&vq->vq_lock);
+}
+
+static void
+vdev_queue_io_add(vdev_queue_t *vq, zio_t *zio)
+{
+	avl_add(&vq->vq_deadline_tree, zio);
+	avl_add(zio->io_vdev_tree, zio);
+
+	if ((zio->io_flags & (ZIO_FLAG_SCRUB | ZIO_FLAG_RESILVER)) &&
+	    ++vq->vq_scrub_count >= vq->vq_scrub_limit)
+		spa_scrub_throttle(zio->io_spa, 1);
+}
+
+static void
+vdev_queue_io_remove(vdev_queue_t *vq, zio_t *zio)
+{
+	if ((zio->io_flags & (ZIO_FLAG_SCRUB | ZIO_FLAG_RESILVER)) &&
+	    vq->vq_scrub_count-- >= vq->vq_scrub_limit)
+		spa_scrub_throttle(zio->io_spa, -1);
+
+	avl_remove(&vq->vq_deadline_tree, zio);
+	avl_remove(zio->io_vdev_tree, zio);
 }
 
 static void
@@ -182,18 +205,19 @@ vdev_queue_io_to_issue(vdev_queue_t *vq, uint64_t pending_limit,
 		aio = zio_vdev_child_io(fio, NULL, fio->io_vd,
 		    fio->io_offset, buf, size, fio->io_type,
 		    ZIO_PRIORITY_NOW, ZIO_FLAG_DONT_QUEUE |
-		    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_PROPAGATE,
+		    ZIO_FLAG_DONT_CACHE | ZIO_FLAG_DONT_PROPAGATE |
+		    ZIO_FLAG_NOBOOKMARK,
 		    vdev_queue_agg_io_done, NULL);
 
 		aio->io_delegate_list = fio;
 
 		for (dio = fio; dio != NULL; dio = dio->io_delegate_next) {
 			ASSERT(dio->io_type == aio->io_type);
+			ASSERT(dio->io_vdev_tree == tree);
 			if (dio->io_type == ZIO_TYPE_WRITE)
 				bcopy(dio->io_data, buf + offset, dio->io_size);
 			offset += dio->io_size;
-			avl_remove(&vq->vq_deadline_tree, dio);
-			avl_remove(tree, dio);
+			vdev_queue_io_remove(vq, dio);
 			zio_vdev_io_bypass(dio);
 			nagg++;
 		}
@@ -211,8 +235,8 @@ vdev_queue_io_to_issue(vdev_queue_t *vq, uint64_t pending_limit,
 		return (aio);
 	}
 
-	avl_remove(&vq->vq_deadline_tree, fio);
-	avl_remove(tree, fio);
+	ASSERT(fio->io_vdev_tree == tree);
+	vdev_queue_io_remove(vq, fio);
 
 	avl_add(&vq->vq_pending_tree, fio);
 
@@ -245,8 +269,7 @@ vdev_queue_io(zio_t *zio)
 	zio->io_deadline = (zio->io_timestamp >> vq->vq_time_shift) +
 	    zio->io_priority;
 
-	avl_add(&vq->vq_deadline_tree, zio);
-	avl_add(zio->io_vdev_tree, zio);
+	vdev_queue_io_add(vq, zio);
 
 	nio = vdev_queue_io_to_issue(vq, vq->vq_min_pending, &func);
 

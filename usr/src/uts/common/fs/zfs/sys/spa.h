@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -292,21 +291,30 @@ typedef struct blkptr {
 
 /* state manipulation functions */
 extern int spa_open(const char *pool, spa_t **, void *tag);
-extern int spa_get_stats(const char *pool, nvlist_t **config);
+extern int spa_get_stats(const char *pool, nvlist_t **config,
+    char *altroot, size_t buflen);
 extern int spa_create(const char *pool, nvlist_t *config, char *altroot);
 extern int spa_import(const char *pool, nvlist_t *config, char *altroot);
 extern nvlist_t *spa_tryimport(nvlist_t *tryconfig);
 extern int spa_destroy(char *pool);
 extern int spa_export(char *pool);
+extern int spa_reset(char *pool);
+extern void spa_async_request(spa_t *spa, int flag);
+extern void spa_async_suspend(spa_t *spa);
+extern void spa_async_resume(spa_t *spa);
+extern spa_t *spa_inject_addref(char *pool);
+extern void spa_inject_delref(spa_t *spa);
+
+#define	SPA_ASYNC_REOPEN	0x01
+#define	SPA_ASYNC_REPLACE_DONE	0x02
+#define	SPA_ASYNC_SCRUB		0x04
+#define	SPA_ASYNC_RESILVER	0x08
 
 /* device manipulation */
 extern int spa_vdev_add(spa_t *spa, nvlist_t *nvroot);
-extern int spa_vdev_add_unlocked(spa_t *spa, nvlist_t *nvroot);
-extern int spa_vdev_attach(spa_t *spa, const char *path, nvlist_t *nvroot,
+extern int spa_vdev_attach(spa_t *spa, uint64_t guid, nvlist_t *nvroot,
     int replacing);
-extern int spa_vdev_detach(spa_t *spa, const char *path, uint64_t guid,
-    int replace_done);
-extern void spa_vdev_replace_done(spa_t *spa);
+extern int spa_vdev_detach(spa_t *spa, uint64_t guid, int replace_done);
 extern int spa_vdev_setpath(spa_t *spa, uint64_t guid, const char *newpath);
 
 /* scrubbing */
@@ -314,6 +322,7 @@ extern int spa_scrub(spa_t *spa, pool_scrub_type_t type, boolean_t force);
 extern void spa_scrub_suspend(spa_t *spa);
 extern void spa_scrub_resume(spa_t *spa);
 extern void spa_scrub_restart(spa_t *spa, uint64_t txg);
+extern void spa_scrub_throttle(spa_t *spa, int direction);
 
 /* spa syncing */
 extern void spa_sync(spa_t *spa, uint64_t txg); /* only for DMU use */
@@ -345,8 +354,8 @@ extern void spa_close(spa_t *spa, void *tag);
 extern boolean_t spa_refcount_zero(spa_t *spa);
 
 /* Pool configuration lock */
-extern void spa_config_enter(spa_t *spa, krw_t rw);
-extern void spa_config_exit(spa_t *spa);
+extern void spa_config_enter(spa_t *spa, krw_t rw, void *tag);
+extern void spa_config_exit(spa_t *spa, void *tag);
 extern boolean_t spa_config_held(spa_t *spa, krw_t rw);
 
 /* Pool vdev add/remove lock */
@@ -383,6 +392,23 @@ extern uint64_t spa_get_random(uint64_t range);
 extern void sprintf_blkptr(char *buf, int len, blkptr_t *bp);
 extern void spa_freeze(spa_t *spa);
 extern void spa_evict_all(void);
+extern vdev_t *spa_lookup_by_guid(spa_t *spa, uint64_t guid);
+
+/* error handling */
+struct zbookmark;
+struct zio;
+extern void spa_log_error(spa_t *spa, struct zio *zio);
+extern void zfs_ereport_post(const char *class, spa_t *spa, vdev_t *vd,
+    struct zio *zio, uint64_t stateoroffset, uint64_t length);
+extern void zfs_post_ok(spa_t *spa, vdev_t *vd);
+extern uint64_t spa_get_errlog_size(spa_t *spa);
+extern int spa_get_errlog(spa_t *spa, void *uaddr, size_t *count);
+extern void spa_errlog_rotate(spa_t *spa);
+extern void spa_errlog_drain(spa_t *spa);
+extern void spa_errlog_sync(spa_t *spa, uint64_t txg);
+extern int spa_bookmark_name(spa_t *spa, struct zbookmark *zb, char *ds,
+    size_t dsname, char *obj, size_t objname, char *range, size_t rangelen);
+extern void spa_get_errlists(spa_t *spa, avl_tree_t *last, avl_tree_t *scrub);
 
 /* Initialization and termination */
 extern void spa_init(int flags);

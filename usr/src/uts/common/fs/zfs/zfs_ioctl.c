@@ -297,6 +297,16 @@ zfs_secpolicy_config(const char *unused, const char *unused2, cred_t *cr)
 }
 
 /*
+ * Policy for fault injection.  Requires all privileges.
+ */
+/* ARGSUSED */
+static int
+zfs_secpolicy_inject(const char *unused, const char *unused2, cred_t *cr)
+{
+	return (secpolicy_zinject(cr));
+}
+
+/*
  * Returns the nvlist as specified by the user in the zfs_cmd_t.
  */
 static int
@@ -368,7 +378,7 @@ zfs_ioc_pool_import(zfs_cmd_t *zc)
 		return (error);
 
 	if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_GUID, &guid) != 0 ||
-	    guid != zc->zc_pool_guid)
+	    guid != zc->zc_guid)
 		error = EINVAL;
 	else
 		error = spa_import(zc->zc_name, config,
@@ -396,7 +406,8 @@ zfs_ioc_pool_configs(zfs_cmd_t *zc)
 	if ((configs = spa_all_configs(&zc->zc_cookie)) == NULL)
 		return (EEXIST);
 
-	VERIFY(nvlist_pack(configs, &packed, &size, NV_ENCODE_NATIVE, 0) == 0);
+	VERIFY(nvlist_pack(configs, &packed, &size, NV_ENCODE_NATIVE,
+	    KM_SLEEP) == 0);
 
 	if (size > zc->zc_config_dst_size)
 		error = ENOMEM;
@@ -420,7 +431,7 @@ zfs_ioc_pool_guid(zfs_cmd_t *zc)
 
 	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error == 0) {
-		zc->zc_pool_guid = spa_guid(spa);
+		zc->zc_guid = spa_guid(spa);
 		spa_close(spa, FTAG);
 	}
 	return (error);
@@ -433,28 +444,37 @@ zfs_ioc_pool_stats(zfs_cmd_t *zc)
 	char *packed = NULL;
 	size_t size = 0;
 	int error;
+	int ret = 0;
 
-	error = spa_get_stats(zc->zc_name, &config);
+	error = spa_get_stats(zc->zc_name, &config, zc->zc_root,
+	    sizeof (zc->zc_root));
 
 	if (config != NULL) {
 		VERIFY(nvlist_pack(config, &packed, &size,
-		    NV_ENCODE_NATIVE, 0) == 0);
+		    NV_ENCODE_NATIVE, KM_SLEEP) == 0);
 
 		if (size > zc->zc_config_dst_size)
-			error = ENOMEM;
+			ret = ENOMEM;
 		else if (xcopyout(packed, (void *)(uintptr_t)zc->zc_config_dst,
 		    size))
-			error = EFAULT;
+			ret = EFAULT;
 
 		zc->zc_config_dst_size = size;
 
 		kmem_free(packed, size);
 		nvlist_free(config);
+
+		/*
+		 * The config may be present even if 'error' is non-zero.
+		 * In this case we return success, and preserve the real errno
+		 * in 'zc_cookie'.
+		 */
+		zc->zc_cookie = error;
 	} else {
-		ASSERT(error != 0);
+		ret = error;
 	}
 
-	return (error);
+	return (ret);
 }
 
 /*
@@ -479,7 +499,8 @@ zfs_ioc_pool_tryimport(zfs_cmd_t *zc)
 	if (config == NULL)
 		return (EINVAL);
 
-	VERIFY(nvlist_pack(config, &packed, &size, NV_ENCODE_NATIVE, 0) == 0);
+	VERIFY(nvlist_pack(config, &packed, &size, NV_ENCODE_NATIVE,
+	    KM_SLEEP) == 0);
 
 	if (size > zc->zc_config_dst_size)
 		error = ENOMEM;
@@ -554,13 +575,12 @@ static int
 zfs_ioc_vdev_online(zfs_cmd_t *zc)
 {
 	spa_t *spa;
-	char *path = zc->zc_prop_value;
 	int error;
 
 	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error != 0)
 		return (error);
-	error = vdev_online(spa, path);
+	error = vdev_online(spa, zc->zc_guid);
 	spa_close(spa, FTAG);
 	return (error);
 }
@@ -569,14 +589,13 @@ static int
 zfs_ioc_vdev_offline(zfs_cmd_t *zc)
 {
 	spa_t *spa;
-	char *path = zc->zc_prop_value;
 	int istmp = zc->zc_cookie;
 	int error;
 
 	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error != 0)
 		return (error);
-	error = vdev_offline(spa, path, istmp);
+	error = vdev_offline(spa, zc->zc_guid, istmp);
 	spa_close(spa, FTAG);
 	return (error);
 }
@@ -585,7 +604,6 @@ static int
 zfs_ioc_vdev_attach(zfs_cmd_t *zc)
 {
 	spa_t *spa;
-	char *path = zc->zc_prop_value;
 	int replacing = zc->zc_cookie;
 	nvlist_t *config;
 	int error;
@@ -595,7 +613,7 @@ zfs_ioc_vdev_attach(zfs_cmd_t *zc)
 		return (error);
 
 	if ((error = get_config(zc, &config)) == 0) {
-		error = spa_vdev_attach(spa, path, config, replacing);
+		error = spa_vdev_attach(spa, zc->zc_guid, config, replacing);
 		nvlist_free(config);
 	}
 
@@ -607,14 +625,13 @@ static int
 zfs_ioc_vdev_detach(zfs_cmd_t *zc)
 {
 	spa_t *spa;
-	char *path = zc->zc_prop_value;
 	int error;
 
 	error = spa_open(zc->zc_name, &spa, FTAG);
 	if (error != 0)
 		return (error);
 
-	error = spa_vdev_detach(spa, path, 0, B_FALSE);
+	error = spa_vdev_detach(spa, zc->zc_guid, B_FALSE);
 
 	spa_close(spa, FTAG);
 	return (error);
@@ -625,7 +642,7 @@ zfs_ioc_vdev_setpath(zfs_cmd_t *zc)
 {
 	spa_t *spa;
 	char *path = zc->zc_prop_value;
-	uint64_t guid = zc->zc_pool_guid;
+	uint64_t guid = zc->zc_guid;
 	int error;
 
 	error = spa_open(zc->zc_name, &spa, FTAG);
@@ -687,6 +704,8 @@ retry:
 
 	if (!error && zc->zc_objset_stats.dds_type == DMU_OST_ZVOL)
 		error = zvol_get_stats(zc, os);
+
+	spa_altroot(dmu_objset_spa(os), zc->zc_root, sizeof (zc->zc_root));
 
 	dmu_objset_close(os);
 	return (error);
@@ -1008,8 +1027,8 @@ zfs_ioc_recvbackup(zfs_cmd_t *zc)
 	fp = getf(fd);
 	if (fp == NULL)
 		return (EBADF);
-	error = dmu_recvbackup(&zc->zc_begin_record, &zc->zc_cookie,
-	    fp->f_vnode, fp->f_offset);
+	error = dmu_recvbackup(zc->zc_filename, &zc->zc_begin_record,
+	    &zc->zc_cookie, fp->f_vnode, fp->f_offset);
 	releasef(fd);
 	return (error);
 }
@@ -1053,6 +1072,110 @@ zfs_ioc_sendbackup(zfs_cmd_t *zc)
 	return (error);
 }
 
+static int
+zfs_ioc_inject_fault(zfs_cmd_t *zc)
+{
+	int id, error;
+
+	error = zio_inject_fault(zc->zc_name, (int)zc->zc_guid, &id,
+	    &zc->zc_inject_record);
+
+	if (error == 0)
+		zc->zc_guid = (uint64_t)id;
+
+	return (error);
+}
+
+static int
+zfs_ioc_clear_fault(zfs_cmd_t *zc)
+{
+	return (zio_clear_fault((int)zc->zc_guid));
+}
+
+static int
+zfs_ioc_inject_list_next(zfs_cmd_t *zc)
+{
+	int id = (int)zc->zc_guid;
+	int error;
+
+	error = zio_inject_list_next(&id, zc->zc_name, sizeof (zc->zc_name),
+	    &zc->zc_inject_record);
+
+	zc->zc_guid = id;
+
+	return (error);
+}
+
+static int
+zfs_ioc_error_log(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	int error;
+	size_t count = (size_t)zc->zc_config_dst_size;
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	error = spa_get_errlog(spa, (void *)(uintptr_t)zc->zc_config_dst,
+	    &count);
+	if (error == 0)
+		zc->zc_config_dst_size = count;
+	else
+		zc->zc_config_dst_size = spa_get_errlog_size(spa);
+
+	spa_close(spa, FTAG);
+
+	return (error);
+}
+
+static int
+zfs_ioc_clear(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	vdev_t *vd;
+	int error;
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	spa_config_enter(spa, RW_WRITER, FTAG);
+
+	if (zc->zc_prop_value[0] == '\0')
+		vd = NULL;
+	else if ((vd = spa_lookup_by_guid(spa, zc->zc_guid)) == NULL) {
+		spa_config_exit(spa, FTAG);
+		spa_close(spa, FTAG);
+		return (ENODEV);
+	}
+
+	vdev_clear(spa, vd);
+
+	spa_config_exit(spa, FTAG);
+
+	spa_close(spa, FTAG);
+
+	return (0);
+}
+
+static int
+zfs_ioc_bookmark_name(zfs_cmd_t *zc)
+{
+	spa_t *spa;
+	int error;
+
+	if ((error = spa_open(zc->zc_name, &spa, FTAG)) != 0)
+		return (error);
+
+	error = spa_bookmark_name(spa, &zc->zc_bookmark,
+	    zc->zc_prop_name, sizeof (zc->zc_prop_name), zc->zc_prop_value,
+	    sizeof (zc->zc_prop_value), zc->zc_filename,
+	    sizeof (zc->zc_filename));
+
+	spa_close(spa, FTAG);
+
+	return (error);
+}
+
 static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_pool_create,		zfs_secpolicy_config,	pool_name },
 	{ zfs_ioc_pool_destroy,		zfs_secpolicy_config,	pool_name },
@@ -1087,6 +1210,12 @@ static zfs_ioc_vec_t zfs_ioc_vec[] = {
 	{ zfs_ioc_rename,		zfs_secpolicy_write,	dataset_name },
 	{ zfs_ioc_recvbackup,		zfs_secpolicy_write,	dataset_name },
 	{ zfs_ioc_sendbackup,		zfs_secpolicy_write,	dataset_name },
+	{ zfs_ioc_inject_fault,		zfs_secpolicy_inject,	no_name },
+	{ zfs_ioc_clear_fault,		zfs_secpolicy_inject,	no_name },
+	{ zfs_ioc_inject_list_next,	zfs_secpolicy_inject,	no_name },
+	{ zfs_ioc_error_log,		zfs_secpolicy_inject,	pool_name },
+	{ zfs_ioc_clear,		zfs_secpolicy_config,	pool_name },
+	{ zfs_ioc_bookmark_name,	zfs_secpolicy_inject,	pool_name }
 };
 
 static int
@@ -1279,7 +1408,7 @@ _fini(void)
 {
 	int error;
 
-	if (spa_busy() || zfs_busy() || zvol_busy())
+	if (spa_busy() || zfs_busy() || zvol_busy() || zio_injection_enabled)
 		return (EBUSY);
 
 	if ((error = mod_remove(&modlinkage)) != 0)

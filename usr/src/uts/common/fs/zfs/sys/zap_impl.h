@@ -199,7 +199,7 @@ void zap_put_leaf(struct zap_leaf *l);
 
 int fzap_add_cd(zap_t *zap, const char *name,
     uint64_t integer_size, uint64_t num_integers,
-    const void *val, uint32_t cd, dmu_tx_t *tx, struct zap_leaf **lp);
+    const void *val, uint32_t cd, dmu_tx_t *tx);
 void fzap_upgrade(zap_t *zap, dmu_tx_t *tx);
 
 #ifdef	__cplusplus

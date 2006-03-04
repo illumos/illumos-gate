@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -655,6 +655,8 @@ d none usr/include/sys/fm 755 root bin
 d none usr/include/sys/fm/cpu 755 root bin
 f none usr/include/sys/fm/protocol.h 644 root bin
 f none usr/include/sys/fm/util.h 644 root bin
+d none usr/include/sys/fm/fs 755 root bin
+f none usr/include/sys/fm/fs/zfs.h 644 root bin
 d none usr/include/sys/fm/io 755 root bin
 f none usr/include/sys/fm/io/ddi.h 644 root bin
 f none usr/include/sys/fm/io/pci.h 644 root bin

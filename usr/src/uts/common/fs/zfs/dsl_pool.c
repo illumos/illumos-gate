@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -39,8 +38,8 @@
 /* internal reserved dir name */
 #define	MOS_DIR_NAME "$MOS"
 
-static dsl_dir_t *
-dsl_pool_open_mos_dir(dsl_pool_t *dp)
+static int
+dsl_pool_open_mos_dir(dsl_pool_t *dp, dsl_dir_t **ddp)
 {
 	uint64_t obj;
 	int err;
@@ -48,9 +47,10 @@ dsl_pool_open_mos_dir(dsl_pool_t *dp)
 	err = zap_lookup(dp->dp_meta_objset,
 	    dp->dp_root_dir->dd_phys->dd_child_dir_zapobj,
 	    MOS_DIR_NAME, sizeof (obj), 1, &obj);
-	ASSERT3U(err, ==, 0);
+	if (err)
+		return (err);
 
-	return (dsl_dir_open_obj(dp, obj, MOS_DIR_NAME, dp));
+	return (dsl_dir_open_obj(dp, obj, MOS_DIR_NAME, dp, ddp));
 }
 
 static dsl_pool_t *
@@ -74,38 +74,56 @@ dsl_pool_open_impl(spa_t *spa, uint64_t txg)
 	return (dp);
 }
 
-dsl_pool_t *
-dsl_pool_open(spa_t *spa, uint64_t txg)
+int
+dsl_pool_open(spa_t *spa, uint64_t txg, dsl_pool_t **dpp)
 {
 	int err;
 	dsl_pool_t *dp = dsl_pool_open_impl(spa, txg);
-
-	dp->dp_meta_objset =
-	    &dmu_objset_open_impl(spa, NULL, &dp->dp_meta_rootbp)->os;
+	objset_impl_t *osi;
 
 	rw_enter(&dp->dp_config_rwlock, RW_READER);
+	err = dmu_objset_open_impl(spa, NULL, &dp->dp_meta_rootbp, &osi);
+	if (err)
+		goto out;
+	dp->dp_meta_objset = &osi->os;
+
 	err = zap_lookup(dp->dp_meta_objset, DMU_POOL_DIRECTORY_OBJECT,
 	    DMU_POOL_ROOT_DATASET, sizeof (uint64_t), 1,
 	    &dp->dp_root_dir_obj);
-	ASSERT3U(err, ==, 0);
+	if (err)
+		goto out;
 
-	dp->dp_root_dir = dsl_dir_open_obj(dp, dp->dp_root_dir_obj,
-	    NULL, dp);
-	dp->dp_mos_dir = dsl_pool_open_mos_dir(dp);
+	err = dsl_dir_open_obj(dp, dp->dp_root_dir_obj,
+	    NULL, dp, &dp->dp_root_dir);
+	if (err)
+		goto out;
+
+	err = dsl_pool_open_mos_dir(dp, &dp->dp_mos_dir);
+	if (err)
+		goto out;
+
+out:
 	rw_exit(&dp->dp_config_rwlock);
+	if (err)
+		dsl_pool_close(dp);
+	else
+		*dpp = dp;
 
-	return (dp);
+	return (err);
 }
 
 void
 dsl_pool_close(dsl_pool_t *dp)
 {
 	/* drop our reference from dsl_pool_open() */
-	dsl_dir_close(dp->dp_mos_dir, dp);
-	dsl_dir_close(dp->dp_root_dir, dp);
+	if (dp->dp_mos_dir)
+		dsl_dir_close(dp->dp_mos_dir, dp);
+	if (dp->dp_root_dir)
+		dsl_dir_close(dp->dp_root_dir, dp);
 
 	/* undo the dmu_objset_open_impl(mos) from dsl_pool_open() */
-	dmu_objset_evict(NULL, dp->dp_meta_objset->os);
+	if (dp->dp_meta_objset)
+		dmu_objset_evict(NULL, dp->dp_meta_objset->os);
 
 	txg_list_destroy(&dp->dp_dirty_datasets);
 	txg_list_destroy(&dp->dp_dirty_dirs);
@@ -132,14 +150,13 @@ dsl_pool_create(spa_t *spa, uint64_t txg)
 
 	/* create and open the root dir */
 	dsl_dataset_create_root(dp, &dp->dp_root_dir_obj, tx);
-	dp->dp_root_dir = dsl_dir_open_obj(dp, dp->dp_root_dir_obj,
-	    NULL, dp);
+	VERIFY(0 == dsl_dir_open_obj(dp, dp->dp_root_dir_obj,
+	    NULL, dp, &dp->dp_root_dir));
 
 	/* create and open the meta-objset dir */
-	err = dsl_dir_create_sync(dp->dp_root_dir, MOS_DIR_NAME,
-	    tx);
+	VERIFY(0 == dsl_dir_create_sync(dp->dp_root_dir, MOS_DIR_NAME, tx));
 	ASSERT3U(err, ==, 0);
-	dp->dp_mos_dir = dsl_pool_open_mos_dir(dp);
+	VERIFY(0 == dsl_pool_open_mos_dir(dp, &dp->dp_mos_dir));
 
 	dmu_tx_commit(tx);
 

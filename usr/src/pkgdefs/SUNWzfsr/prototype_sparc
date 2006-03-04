@@ -34,3 +34,4 @@
 d none lib/sparcv9 755 root bin
 s none lib/sparcv9/libzfs.so=libzfs.so.1
 f none lib/sparcv9/libzfs.so.1 755 root bin
+f none lib/sparcv9/llib-lzfs.ln 644 root bin

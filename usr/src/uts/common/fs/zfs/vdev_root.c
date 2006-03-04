@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -79,11 +78,12 @@ static void
 vdev_root_state_change(vdev_t *vd, int faulted, int degraded)
 {
 	if (faulted > 0)
-		vdev_set_state(vd, VDEV_STATE_CANT_OPEN, VDEV_AUX_NO_REPLICAS);
+		vdev_set_state(vd, B_FALSE, VDEV_STATE_CANT_OPEN,
+		    VDEV_AUX_NO_REPLICAS);
 	else if (degraded != 0)
-		vdev_set_state(vd, VDEV_STATE_DEGRADED, VDEV_AUX_NONE);
+		vdev_set_state(vd, B_FALSE, VDEV_STATE_DEGRADED, VDEV_AUX_NONE);
 	else
-		vdev_set_state(vd, VDEV_STATE_HEALTHY, VDEV_AUX_NONE);
+		vdev_set_state(vd, B_FALSE, VDEV_STATE_HEALTHY, VDEV_AUX_NONE);
 }
 
 vdev_ops_t vdev_root_ops = {

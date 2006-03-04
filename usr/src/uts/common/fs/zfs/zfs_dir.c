@@ -289,6 +289,21 @@ zfs_dq_hexname(char namebuf[17], uint64_t x)
 	return (name);
 }
 
+/*
+ * Delete Queue Error Handling
+ *
+ * When dealing with the delete queue, we dmu_tx_hold_zap(), but we
+ * don't specify the name of the entry that we will be manipulating.  We
+ * also fib and say that we won't be adding any new entries to the
+ * delete queue, even though we might (this is to lower the minimum file
+ * size that can be deleted in a full filesystem).  So on the small
+ * chance that the delete queue is using a fat zap (ie. has more than
+ * 2000 entries), we *may* not pre-read a block that's needed.
+ * Therefore it is remotely possible for some of the assertions
+ * regarding the delete queue below to fail due to i/o error.  On a
+ * nondebug system, this will result in the space being leaked.
+ */
+
 void
 zfs_dq_add(znode_t *zp, dmu_tx_t *tx)
 {
@@ -338,9 +353,9 @@ zfs_purgedir(znode_t *dzp)
 
 		tx = dmu_tx_create(zfsvfs->z_os);
 		dmu_tx_hold_bonus(tx, dzp->z_id);
-		dmu_tx_hold_zap(tx, dzp->z_id, -1);
+		dmu_tx_hold_zap(tx, dzp->z_id, FALSE, zap.za_name);
 		dmu_tx_hold_bonus(tx, xzp->z_id);
-		dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, 1);
+		dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, FALSE, NULL);
 		error = dmu_tx_assign(tx, TXG_WAIT);
 		if (error) {
 			dmu_tx_abort(tx);
@@ -579,10 +594,10 @@ zfs_rmnode(znode_t *zp)
 	 */
 	tx = dmu_tx_create(os);
 	dmu_tx_hold_free(tx, zp->z_id, 0, DMU_OBJECT_END);
-	dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, -1);
+	dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, FALSE, NULL);
 	if (xzp) {
 		dmu_tx_hold_bonus(tx, xzp->z_id);
-		dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, 1);
+		dmu_tx_hold_zap(tx, zfsvfs->z_dqueue, TRUE, NULL);
 	}
 	if (acl_obj)
 		dmu_tx_hold_free(tx, acl_obj, 0, DMU_OBJECT_END);
@@ -764,7 +779,7 @@ zfs_make_xattrdir(znode_t *zp, vattr_t *vap, vnode_t **xvpp, cred_t *cr)
 
 	tx = dmu_tx_create(zfsvfs->z_os);
 	dmu_tx_hold_bonus(tx, zp->z_id);
-	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, 0);
+	dmu_tx_hold_zap(tx, DMU_NEW_OBJECT, FALSE, NULL);
 	error = dmu_tx_assign(tx, zfsvfs->z_assign);
 	if (error) {
 		dmu_tx_abort(tx);

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -483,8 +482,8 @@ get_configs(pool_list_t *pl)
 		    &guid) == 0);
 
 		(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
-		if (ioctl(zfs_fd, ZFS_IOC_POOL_GUID, &zc) == 0 &&
-		    guid == zc.zc_pool_guid) {
+		if (zfs_ioctl(ZFS_IOC_POOL_GUID, &zc) == 0 &&
+		    guid == zc.zc_guid) {
 			nvlist_free(config);
 			continue;
 		}
@@ -511,7 +510,7 @@ get_configs(pool_list_t *pl)
 		zc.zc_config_dst = (uint64_t)(uintptr_t)
 		    zfs_malloc(zc.zc_config_dst_size);
 
-		while ((err = ioctl(zfs_fd, ZFS_IOC_POOL_TRYIMPORT,
+		while ((err = zfs_ioctl(ZFS_IOC_POOL_TRYIMPORT,
 		    &zc)) != 0 && errno == ENOMEM) {
 			free((void *)(uintptr_t)zc.zc_config_dst);
 			zc.zc_config_dst = (uint64_t)(uintptr_t)
@@ -562,7 +561,7 @@ zpool_read_label(int fd)
 	int l;
 	vdev_label_t *label;
 	nvlist_t *config;
-	uint64_t version, state, txg;
+	uint64_t state, txg;
 
 	if (fstat64(fd, &statbuf) == -1)
 		return (NULL);
@@ -577,12 +576,6 @@ zpool_read_label(int fd)
 		if (nvlist_unpack(label->vl_vdev_phys.vp_nvlist,
 		    sizeof (label->vl_vdev_phys.vp_nvlist), &config, 0) != 0)
 			continue;
-
-		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_VERSION,
-		    &version) != 0 || version != UBERBLOCK_VERSION) {
-			nvlist_free(config);
-			continue;
-		}
 
 		if (nvlist_lookup_uint64(config, ZPOOL_CONFIG_POOL_STATE,
 		    &state) != 0 || state > POOL_STATE_EXPORTED) {
@@ -747,8 +740,8 @@ zpool_in_use(int fd, pool_state_t *state, char **namestr)
 		 * message if the pool cannot be opened.
 		 */
 		(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
-		if (ioctl(zfs_fd, ZFS_IOC_POOL_GUID, &zc) == 0 &&
-		    guid == zc.zc_pool_guid) {
+		if (zfs_ioctl(ZFS_IOC_POOL_GUID, &zc) == 0 &&
+		    guid == zc.zc_guid) {
 			/*
 			 * Because the device may have been removed while
 			 * offlined, we only report it as active if the vdev is

@@ -52,6 +52,7 @@
 #include <sys/modctl.h>
 #include <sys/zfs_ioctl.h>
 #include <sys/zfs_ctldir.h>
+#include <sys/bootconf.h>
 #include <sys/sunddi.h>
 #include <sys/dnlc.h>
 
@@ -61,8 +62,11 @@ static major_t zfs_major;
 static minor_t zfs_minor;
 static kmutex_t	zfs_dev_mtx;
 
+extern char zfs_bootpath[BO_MAXOBJNAME];
+
 static int zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr);
 static int zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr);
+static int zfs_mountroot(vfs_t *vfsp, enum whymountroot);
 static int zfs_root(vfs_t *vfsp, vnode_t **vpp);
 static int zfs_statvfs(vfs_t *vfsp, struct statvfs64 *statp);
 static int zfs_vget(vfs_t *vfsp, vnode_t **vpp, fid_t *fidp);
@@ -71,6 +75,7 @@ static void zfs_objset_close(zfsvfs_t *zfsvfs);
 
 static const fs_operation_def_t zfs_vfsops_template[] = {
 	VFSNAME_MOUNT, zfs_mount,
+	VFSNAME_MOUNTROOT, zfs_mountroot,
 	VFSNAME_UNMOUNT, zfs_umount,
 	VFSNAME_ROOT, zfs_root,
 	VFSNAME_STATVFS, zfs_statvfs,
@@ -146,6 +151,58 @@ zfs_sync(vfs_t *vfsp, short flag, cred_t *cr)
 		 */
 		spa_sync_allpools();
 	}
+
+	return (0);
+}
+
+static int
+zfs_create_unique_device(dev_t *dev)
+{
+	major_t new_major;
+
+	do {
+		ASSERT3U(zfs_minor, <=, MAXMIN32);
+		minor_t start = zfs_minor;
+		do {
+			mutex_enter(&zfs_dev_mtx);
+			if (zfs_minor >= MAXMIN32) {
+				/*
+				 * If we're still using the real major
+				 * keep out of /dev/zfs and /dev/zvol minor
+				 * number space.  If we're using a getudev()'ed
+				 * major number, we can use all of its minors.
+				 */
+				if (zfs_major == ddi_name_to_major(ZFS_DRIVER))
+					zfs_minor = ZFS_MIN_MINOR;
+				else
+					zfs_minor = 0;
+			} else {
+				zfs_minor++;
+			}
+			*dev = makedevice(zfs_major, zfs_minor);
+			mutex_exit(&zfs_dev_mtx);
+		} while (vfs_devismounted(*dev) && zfs_minor != start);
+		if (zfs_minor == start) {
+			/*
+			 * We are using all ~262,000 minor numbers for the
+			 * current major number.  Create a new major number.
+			 */
+			if ((new_major = getudev()) == (major_t)-1) {
+				cmn_err(CE_WARN,
+				    "zfs_mount: Can't get unique major "
+				    "device number.");
+				return (-1);
+			}
+			mutex_enter(&zfs_dev_mtx);
+			zfs_major = new_major;
+			zfs_minor = 0;
+
+			mutex_exit(&zfs_dev_mtx);
+		} else {
+			break;
+		}
+		/* CONSTANTCONDITION */
+	} while (1);
 
 	return (0);
 }
@@ -271,21 +328,409 @@ acl_inherit_changed_cb(void *arg, uint64_t newval)
 	zfsvfs->z_acl_inherit = newval;
 }
 
+static int
+zfs_refresh_properties(vfs_t *vfsp)
+{
+	zfsvfs_t *zfsvfs = vfsp->vfs_data;
+
+	if (vfs_optionisset(vfsp, MNTOPT_RO, NULL)) {
+		readonly_changed_cb(zfsvfs, B_TRUE);
+	} else if (vfs_optionisset(vfsp, MNTOPT_RW, NULL)) {
+		if (dmu_objset_is_snapshot(zfsvfs->z_os))
+			return (EROFS);
+		readonly_changed_cb(zfsvfs, B_FALSE);
+	}
+
+	if (vfs_optionisset(vfsp, MNTOPT_NOSUID, NULL)) {
+		devices_changed_cb(zfsvfs, B_FALSE);
+		setuid_changed_cb(zfsvfs, B_FALSE);
+	} else {
+		if (vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL))
+			devices_changed_cb(zfsvfs, B_FALSE);
+		else if (vfs_optionisset(vfsp, MNTOPT_DEVICES, NULL))
+			devices_changed_cb(zfsvfs, B_TRUE);
+
+		if (vfs_optionisset(vfsp, MNTOPT_NOSETUID, NULL))
+			setuid_changed_cb(zfsvfs, B_FALSE);
+		else if (vfs_optionisset(vfsp, MNTOPT_SETUID, NULL))
+			setuid_changed_cb(zfsvfs, B_TRUE);
+	}
+
+	if (vfs_optionisset(vfsp, MNTOPT_NOEXEC, NULL))
+		exec_changed_cb(zfsvfs, B_FALSE);
+	else if (vfs_optionisset(vfsp, MNTOPT_EXEC, NULL))
+		exec_changed_cb(zfsvfs, B_TRUE);
+
+	return (0);
+}
+
+static int
+zfs_register_callbacks(vfs_t *vfsp)
+{
+	struct dsl_dataset *ds = NULL;
+	objset_t *os = NULL;
+	zfsvfs_t *zfsvfs = NULL;
+	int do_readonly = FALSE, readonly;
+	int do_setuid = FALSE, setuid;
+	int do_exec = FALSE, exec;
+	int do_devices = FALSE, devices;
+	int error = 0;
+
+	ASSERT(vfsp);
+	zfsvfs = vfsp->vfs_data;
+	ASSERT(zfsvfs);
+	os = zfsvfs->z_os;
+
+	/*
+	 * The act of registering our callbacks will destroy any mount
+	 * options we may have.  In order to enable temporary overrides
+	 * of mount options, we stash away the current values and restore
+	 * restore them after we register the callbacks.
+	 */
+	if (vfs_optionisset(vfsp, MNTOPT_RO, NULL)) {
+		readonly = B_TRUE;
+		do_readonly = B_TRUE;
+	} else if (vfs_optionisset(vfsp, MNTOPT_RW, NULL)) {
+		readonly = B_FALSE;
+		do_readonly = B_TRUE;
+	}
+	if (vfs_optionisset(vfsp, MNTOPT_NOSUID, NULL)) {
+		devices = B_FALSE;
+		setuid = B_FALSE;
+		do_devices = B_TRUE;
+		do_setuid = B_TRUE;
+	} else {
+		if (vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL)) {
+			devices = B_FALSE;
+			do_devices = B_TRUE;
+		} else if (vfs_optionisset(vfsp,
+			    MNTOPT_DEVICES, NULL)) {
+			devices = B_TRUE;
+			do_devices = B_TRUE;
+		}
+
+		if (vfs_optionisset(vfsp, MNTOPT_NOSETUID, NULL)) {
+			setuid = B_FALSE;
+			do_setuid = B_TRUE;
+		} else if (vfs_optionisset(vfsp, MNTOPT_SETUID, NULL)) {
+			setuid = B_TRUE;
+			do_setuid = B_TRUE;
+		}
+	}
+	if (vfs_optionisset(vfsp, MNTOPT_NOEXEC, NULL)) {
+		exec = B_FALSE;
+		do_exec = B_TRUE;
+	} else if (vfs_optionisset(vfsp, MNTOPT_EXEC, NULL)) {
+		exec = B_TRUE;
+		do_exec = B_TRUE;
+	}
+
+	/*
+	 * Register property callbacks.
+	 *
+	 * It would probably be fine to just check for i/o error from
+	 * the first prop_register(), but I guess I like to go
+	 * overboard...
+	 */
+	ds = dmu_objset_ds(os);
+	error = dsl_prop_register(ds, "atime", atime_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "recordsize", blksz_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "readonly", readonly_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "devices", devices_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "setuid", setuid_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "exec", exec_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "snapdir", snapdir_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "aclmode", acl_mode_changed_cb, zfsvfs);
+	error = error ? error : dsl_prop_register(ds,
+	    "aclinherit", acl_inherit_changed_cb, zfsvfs);
+	if (error)
+		goto unregister;
+
+	/*
+	 * Invoke our callbacks to restore temporary mount options.
+	 */
+	if (do_readonly)
+		readonly_changed_cb(zfsvfs, readonly);
+	if (do_setuid)
+		setuid_changed_cb(zfsvfs, setuid);
+	if (do_exec)
+		exec_changed_cb(zfsvfs, exec);
+	if (do_devices)
+		devices_changed_cb(zfsvfs, devices);
+
+	return (0);
+
+unregister:
+	/*
+	 * We may attempt to unregister some callbacks that are not
+	 * registered, but this is OK; it will simply return ENOMSG,
+	 * which we will ignore.
+	 */
+	(void) dsl_prop_unregister(ds, "atime", atime_changed_cb, zfsvfs);
+	(void) dsl_prop_unregister(ds, "recordsize", blksz_changed_cb, zfsvfs);
+	(void) dsl_prop_unregister(ds, "readonly", readonly_changed_cb, zfsvfs);
+	(void) dsl_prop_unregister(ds, "devices", devices_changed_cb, zfsvfs);
+	(void) dsl_prop_unregister(ds, "setuid", setuid_changed_cb, zfsvfs);
+	(void) dsl_prop_unregister(ds, "exec", exec_changed_cb, zfsvfs);
+	(void) dsl_prop_unregister(ds, "snapdir", snapdir_changed_cb, zfsvfs);
+	(void) dsl_prop_unregister(ds, "aclmode", acl_mode_changed_cb, zfsvfs);
+	(void) dsl_prop_unregister(ds, "aclinherit", acl_inherit_changed_cb,
+	    zfsvfs);
+	return (error);
+
+}
+
+static int
+zfs_domount(vfs_t *vfsp, char *osname, cred_t *cr)
+{
+	dev_t mount_dev;
+	uint64_t recordsize, readonly;
+	int error = 0;
+	int mode;
+	zfsvfs_t *zfsvfs;
+	znode_t *zp = NULL;
+
+	ASSERT(vfsp);
+	ASSERT(osname);
+
+	/*
+	 * Initialize the zfs-specific filesystem structure.
+	 * Should probably make this a kmem cache, shuffle fields,
+	 * and just bzero up to z_hold_mtx[].
+	 */
+	zfsvfs = kmem_zalloc(sizeof (zfsvfs_t), KM_SLEEP);
+	zfsvfs->z_vfs = vfsp;
+	zfsvfs->z_parent = zfsvfs;
+	zfsvfs->z_assign = TXG_NOWAIT;
+	zfsvfs->z_max_blksz = SPA_MAXBLOCKSIZE;
+	zfsvfs->z_show_ctldir = ZFS_SNAPDIR_VISIBLE;
+
+	mutex_init(&zfsvfs->z_znodes_lock, NULL, MUTEX_DEFAULT, NULL);
+	list_create(&zfsvfs->z_all_znodes, sizeof (znode_t),
+	    offsetof(znode_t, z_link_node));
+	rw_init(&zfsvfs->z_um_lock, NULL, RW_DEFAULT, NULL);
+
+	/* Initialize the generic filesystem structure. */
+	vfsp->vfs_bcount = 0;
+	vfsp->vfs_data = NULL;
+
+	if (zfs_create_unique_device(&mount_dev) == -1) {
+		error = ENODEV;
+		goto out;
+	}
+	ASSERT(vfs_devismounted(mount_dev) == 0);
+
+	if (error = dsl_prop_get_integer(osname, "recordsize", &recordsize,
+	    NULL))
+		goto out;
+
+	vfsp->vfs_dev = mount_dev;
+	vfsp->vfs_fstype = zfsfstype;
+	vfsp->vfs_bsize = recordsize;
+	vfsp->vfs_flag |= VFS_NOTRUNC;
+	vfsp->vfs_data = zfsvfs;
+
+	if (error = dsl_prop_get_integer(osname, "readonly", &readonly, NULL))
+		goto out;
+
+	if (readonly)
+		mode = DS_MODE_PRIMARY | DS_MODE_READONLY;
+	else
+		mode = DS_MODE_PRIMARY;
+
+	error = dmu_objset_open(osname, DMU_OST_ZFS, mode, &zfsvfs->z_os);
+	if (error == EROFS) {
+		mode = DS_MODE_PRIMARY | DS_MODE_READONLY;
+		error = dmu_objset_open(osname, DMU_OST_ZFS, mode,
+		    &zfsvfs->z_os);
+	}
+
+	if (error)
+		goto out;
+
+	if (error = zfs_init_fs(zfsvfs, &zp, cr))
+		goto out;
+
+	/* The call to zfs_init_fs leaves the vnode held, release it here. */
+	VN_RELE(ZTOV(zp));
+
+	if (dmu_objset_is_snapshot(zfsvfs->z_os)) {
+		ASSERT(mode & DS_MODE_READONLY);
+		atime_changed_cb(zfsvfs, B_FALSE);
+		readonly_changed_cb(zfsvfs, B_TRUE);
+		zfsvfs->z_issnap = B_TRUE;
+	} else {
+		error = zfs_register_callbacks(vfsp);
+		if (error)
+			goto out;
+
+		/*
+		 * Start a delete thread running.
+		 */
+		(void) zfs_delete_thread_target(zfsvfs, 1);
+
+		/*
+		 * Parse and replay the intent log.
+		 */
+		zil_replay(zfsvfs->z_os, zfsvfs, &zfsvfs->z_assign,
+		    zfs_replay_vector, (void (*)(void *))zfs_delete_wait_empty);
+
+		if (!zil_disable)
+			zfsvfs->z_log = zil_open(zfsvfs->z_os, zfs_get_data);
+	}
+
+	if (!zfsvfs->z_issnap)
+		zfsctl_create(zfsvfs);
+out:
+	if (error) {
+		if (zfsvfs->z_os)
+			dmu_objset_close(zfsvfs->z_os);
+		kmem_free(zfsvfs, sizeof (zfsvfs_t));
+	} else {
+		atomic_add_32(&zfs_active_fs_count, 1);
+	}
+
+	return (error);
+
+}
+
+void
+zfs_unregister_callbacks(zfsvfs_t *zfsvfs)
+{
+	objset_t *os = zfsvfs->z_os;
+	struct dsl_dataset *ds;
+
+	/*
+	 * Unregister properties.
+	 */
+	if (!dmu_objset_is_snapshot(os)) {
+		ds = dmu_objset_ds(os);
+		VERIFY(dsl_prop_unregister(ds, "atime", atime_changed_cb,
+		    zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "recordsize", blksz_changed_cb,
+		    zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "readonly", readonly_changed_cb,
+		    zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "devices", devices_changed_cb,
+		    zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "setuid", setuid_changed_cb,
+		    zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "exec", exec_changed_cb,
+		    zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "snapdir", snapdir_changed_cb,
+		    zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "aclmode", acl_mode_changed_cb,
+		    zfsvfs) == 0);
+
+		VERIFY(dsl_prop_unregister(ds, "aclinherit",
+		    acl_inherit_changed_cb, zfsvfs) == 0);
+	}
+}
+
+static int
+zfs_mountroot(vfs_t *vfsp, enum whymountroot why)
+{
+	int error = 0;
+	int ret = 0;
+	static int zfsrootdone = 0;
+	zfsvfs_t *zfsvfs = NULL;
+	znode_t *zp = NULL;
+	vnode_t *vp = NULL;
+
+	ASSERT(vfsp);
+
+	/*
+	 * The filesystem that we mount as root is defined in
+	 * /etc/system using the zfsroot variable.  The value defined
+	 * there is copied early in startup code to zfs_bootpath
+	 * (defined in modsysfile.c).
+	 */
+	if (why == ROOT_INIT) {
+		if (zfsrootdone++)
+			return (EBUSY);
+
+		/*
+		 * This needs to be done here, so that when we return from
+		 * mountroot, the vfs resource name will be set correctly.
+		 */
+		if (snprintf(rootfs.bo_name, BO_MAXOBJNAME, "%s", zfs_bootpath)
+		    >= BO_MAXOBJNAME)
+			return (ENAMETOOLONG);
+
+		if (error = vfs_lock(vfsp))
+			return (error);
+
+		if (error = zfs_domount(vfsp, zfs_bootpath, CRED()))
+			goto out;
+
+		zfsvfs = (zfsvfs_t *)vfsp->vfs_data;
+		ASSERT(zfsvfs);
+		if (error = zfs_zget(zfsvfs, zfsvfs->z_root, &zp))
+			goto out;
+
+		vp = ZTOV(zp);
+		mutex_enter(&vp->v_lock);
+		vp->v_flag |= VROOT;
+		mutex_exit(&vp->v_lock);
+		rootvp = vp;
+
+		/*
+		 * The zfs_zget call above returns with a hold on vp, we release
+		 * it here.
+		 */
+		VN_RELE(vp);
+
+		/*
+		 * Mount root as readonly initially, it will be remouted
+		 * read/write by /lib/svc/method/fs-usr.
+		 */
+		readonly_changed_cb(vfsp->vfs_data, B_TRUE);
+		vfs_add((struct vnode *)0, vfsp,
+		    (vfsp->vfs_flag & VFS_RDONLY) ? MS_RDONLY : 0);
+out:
+		vfs_unlock(vfsp);
+		ret = (error) ? error : 0;
+		return (ret);
+
+	} else if (why == ROOT_REMOUNT) {
+
+		readonly_changed_cb(vfsp->vfs_data, B_FALSE);
+		vfsp->vfs_flag |= VFS_REMOUNT;
+		return (zfs_refresh_properties(vfsp));
+
+	} else if (why == ROOT_UNMOUNT) {
+		zfs_unregister_callbacks((zfsvfs_t *)vfsp->vfs_data);
+		(void) zfs_sync(vfsp, 0, 0);
+		return (0);
+	}
+
+	/*
+	 * if "why" is equal to anything else other than ROOT_INIT,
+	 * ROOT_REMOUNT, or ROOT_UNMOUNT, we do not support it.
+	 */
+	return (ENOTSUP);
+}
+
 /*ARGSUSED*/
 static int
 zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 {
-	zfsvfs_t	*zfsvfs = NULL;
-	znode_t		*zp = NULL;
-	vnode_t		*vp = NULL;
-	objset_t	*os = NULL;
-	struct dsl_dataset *ds;
 	char		*osname;
-	uint64_t	readonly, recordsize;
 	pathname_t	spn;
-	dev_t		mount_dev;
-	major_t		new_major;
-	int		mode;
 	int		error = 0;
 	uio_seg_t	fromspace = (uap->flags & MS_SYSSPACE) ?
 				UIO_SYSSPACE : UIO_USERSPACE;
@@ -317,37 +762,7 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 	 * according to those options set in the current VFS options.
 	 */
 	if (uap->flags & MS_REMOUNT) {
-		zfsvfs = vfsp->vfs_data;
-
-		if (vfs_optionisset(vfsp, MNTOPT_RO, NULL))
-			readonly_changed_cb(zfsvfs, B_TRUE);
-		else if (vfs_optionisset(vfsp, MNTOPT_RW, NULL)) {
-			if (dmu_objset_is_snapshot(zfsvfs->z_os))
-				return (EROFS);
-			readonly_changed_cb(zfsvfs, B_FALSE);
-		}
-
-		if (vfs_optionisset(vfsp, MNTOPT_NOSUID, NULL)) {
-			devices_changed_cb(zfsvfs, B_FALSE);
-			setuid_changed_cb(zfsvfs, B_FALSE);
-		} else {
-			if (vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL))
-				devices_changed_cb(zfsvfs, B_FALSE);
-			else if (vfs_optionisset(vfsp, MNTOPT_DEVICES, NULL))
-				devices_changed_cb(zfsvfs, B_TRUE);
-
-			if (vfs_optionisset(vfsp, MNTOPT_NOSETUID, NULL))
-				setuid_changed_cb(zfsvfs, B_FALSE);
-			else if (vfs_optionisset(vfsp, MNTOPT_SETUID, NULL))
-				setuid_changed_cb(zfsvfs, B_TRUE);
-		}
-
-		if (vfs_optionisset(vfsp, MNTOPT_NOEXEC, NULL))
-			exec_changed_cb(zfsvfs, B_FALSE);
-		else if (vfs_optionisset(vfsp, MNTOPT_EXEC, NULL))
-			exec_changed_cb(zfsvfs, B_TRUE);
-
-		return (0);
+		return (zfs_refresh_properties(vfsp));
 	}
 
 	/*
@@ -371,242 +786,9 @@ zfs_mount(vfs_t *vfsp, vnode_t *mvp, struct mounta *uap, cred_t *cr)
 		goto out;
 	}
 
-	/*
-	 * Initialize the zfs-specific filesystem structure.
-	 * Should probably make this a kmem cache, shuffle fields,
-	 * and just bzero upto z_hold_mtx[].
-	 */
-	zfsvfs = kmem_zalloc(sizeof (zfsvfs_t), KM_SLEEP);
-	zfsvfs->z_vfs = vfsp;
-	zfsvfs->z_parent = zfsvfs;
-	zfsvfs->z_assign = TXG_NOWAIT;
-	zfsvfs->z_max_blksz = SPA_MAXBLOCKSIZE;
-	zfsvfs->z_show_ctldir = ZFS_SNAPDIR_VISIBLE;
+	error = zfs_domount(vfsp, osname, cr);
 
-	mutex_init(&zfsvfs->z_znodes_lock, NULL, MUTEX_DEFAULT, NULL);
-	list_create(&zfsvfs->z_all_znodes, sizeof (znode_t),
-	    offsetof(znode_t, z_link_node));
-	rw_init(&zfsvfs->z_um_lock, NULL, RW_DEFAULT, NULL);
-
-	/*
-	 * Initialize the generic filesystem structure.
-	 */
-	vfsp->vfs_bcount = 0;
-	vfsp->vfs_data = NULL;
-
-	/*
-	 * Create a unique device for the mount.
-	 */
-	do {
-		ASSERT3U(zfs_minor, <=, MAXMIN32);
-		minor_t start = zfs_minor;
-		do {
-			mutex_enter(&zfs_dev_mtx);
-			if (zfs_minor >= MAXMIN32) {
-				/*
-				 * If we're still using the real major number,
-				 * keep out of /dev/zfs and /dev/zvol minor
-				 * number space.  If we're using a getudev()'ed
-				 * major number, we can use all of its minors.
-				 */
-				if (zfs_major == ddi_name_to_major(ZFS_DRIVER))
-					zfs_minor = ZFS_MIN_MINOR;
-				else
-					zfs_minor = 0;
-			} else {
-				zfs_minor++;
-			}
-			mount_dev = makedevice(zfs_major, zfs_minor);
-			mutex_exit(&zfs_dev_mtx);
-		} while (vfs_devismounted(mount_dev) && zfs_minor != start);
-		if (zfs_minor == start) {
-			/*
-			 * We are using all ~262,000 minor numbers
-			 * for the current major number.  Create a
-			 * new major number.
-			 */
-			if ((new_major = getudev()) == (major_t)-1) {
-				cmn_err(CE_WARN,
-				    "zfs_mount: Can't get unique"
-				    " major device number.");
-				goto out;
-			}
-			mutex_enter(&zfs_dev_mtx);
-			zfs_major = new_major;
-			zfs_minor = 0;
-			mutex_exit(&zfs_dev_mtx);
-		} else {
-			break;
-		}
-		/* CONSTANTCONDITION */
-	} while (1);
-
-	ASSERT(vfs_devismounted(mount_dev) == 0);
-
-	if (dsl_prop_get_integer(osname, "recordsize", &recordsize, NULL) != 0)
-		recordsize = SPA_MAXBLOCKSIZE;
-
-	vfsp->vfs_dev = mount_dev;
-	vfsp->vfs_fstype = zfsfstype;
-	vfsp->vfs_bsize = recordsize;
-	vfsp->vfs_flag |= VFS_NOTRUNC;
-	vfsp->vfs_data = zfsvfs;
-
-	error = dsl_prop_get_integer(osname, "readonly", &readonly, NULL);
-	if (error)
-		goto out;
-
-	if (readonly)
-		mode = DS_MODE_PRIMARY | DS_MODE_READONLY;
-	else
-		mode = DS_MODE_PRIMARY;
-
-	error = dmu_objset_open(osname, DMU_OST_ZFS, mode, &zfsvfs->z_os);
-	if (error == EROFS) {
-		mode = DS_MODE_PRIMARY | DS_MODE_READONLY;
-		error = dmu_objset_open(osname, DMU_OST_ZFS, mode,
-		    &zfsvfs->z_os);
-	}
-	os = zfsvfs->z_os;
-
-	if (error)
-		goto out;
-
-	if (error = zfs_init_fs(zfsvfs, &zp, cr))
-		goto out;
-
-	if (dmu_objset_is_snapshot(os)) {
-		ASSERT(mode & DS_MODE_READONLY);
-		atime_changed_cb(zfsvfs, B_FALSE);
-		readonly_changed_cb(zfsvfs, B_TRUE);
-		zfsvfs->z_issnap = B_TRUE;
-	} else {
-		int do_readonly = FALSE, readonly;
-		int do_setuid = FALSE, setuid;
-		int do_exec = FALSE, exec;
-		int do_devices = FALSE, devices;
-
-		/*
-		 * Start a delete thread running.
-		 */
-		(void) zfs_delete_thread_target(zfsvfs, 1);
-
-		/*
-		 * Parse and replay the intent log.
-		 */
-		zil_replay(os, zfsvfs, &zfsvfs->z_assign, zfs_replay_vector,
-		    (void (*)(void *))zfs_delete_wait_empty);
-
-		if (!zil_disable)
-			zfsvfs->z_log = zil_open(os, zfs_get_data);
-
-		/*
-		 * The act of registering our callbacks will destroy any mount
-		 * options we may have.  In order to enable temporary overrides
-		 * of mount options, we stash away the current values and
-		 * restore them after we register the callbacks.
-		 */
-		if (vfs_optionisset(vfsp, MNTOPT_RO, NULL)) {
-			readonly = B_TRUE;
-			do_readonly = B_TRUE;
-		} else if (vfs_optionisset(vfsp, MNTOPT_RW, NULL)) {
-			readonly = B_FALSE;
-			do_readonly = B_TRUE;
-		}
-		if (vfs_optionisset(vfsp, MNTOPT_NOSUID, NULL)) {
-			devices = B_FALSE;
-			setuid = B_FALSE;
-			do_devices = B_TRUE;
-			do_setuid = B_TRUE;
-		} else {
-			if (vfs_optionisset(vfsp, MNTOPT_NODEVICES, NULL)) {
-				devices = B_FALSE;
-				do_devices = B_TRUE;
-			} else if (vfs_optionisset(vfsp,
-			    MNTOPT_DEVICES, NULL)) {
-				devices = B_TRUE;
-				do_devices = B_TRUE;
-			}
-
-			if (vfs_optionisset(vfsp, MNTOPT_NOSETUID, NULL)) {
-				setuid = B_FALSE;
-				do_setuid = B_TRUE;
-			} else if (vfs_optionisset(vfsp, MNTOPT_SETUID, NULL)) {
-				setuid = B_TRUE;
-				do_setuid = B_TRUE;
-			}
-		}
-		if (vfs_optionisset(vfsp, MNTOPT_NOEXEC, NULL)) {
-			exec = B_FALSE;
-			do_exec = B_TRUE;
-		} else if (vfs_optionisset(vfsp, MNTOPT_EXEC, NULL)) {
-			exec = B_TRUE;
-			do_exec = B_TRUE;
-		}
-
-		/*
-		 * Register property callbacks.
-		 */
-		ds = dmu_objset_ds(os);
-		VERIFY(dsl_prop_register(ds, "atime", atime_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_register(ds, "recordsize", blksz_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_register(ds, "readonly", readonly_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_register(ds, "devices", devices_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_register(ds, "setuid", setuid_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_register(ds, "exec", exec_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_register(ds, "snapdir", snapdir_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_register(ds, "aclmode", acl_mode_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_register(ds, "aclinherit",
-		    acl_inherit_changed_cb, zfsvfs) == 0);
-
-
-		/*
-		 * Invoke our callbacks to restore temporary mount options.
-		 */
-		if (do_readonly)
-			readonly_changed_cb(zfsvfs, readonly);
-		if (do_setuid)
-			setuid_changed_cb(zfsvfs, setuid);
-		if (do_exec)
-			exec_changed_cb(zfsvfs, exec);
-		if (do_devices)
-			devices_changed_cb(zfsvfs, devices);
-	}
-
-	vp = ZTOV(zp);
-	if (!zfsvfs->z_issnap)
-		zfsctl_create(zfsvfs);
 out:
-	if (error) {
-		if (zp)
-			VN_RELE(vp);
-
-		if (zfsvfs) {
-			if (os)
-				dmu_objset_close(os);
-			kmem_free(zfsvfs, sizeof (zfsvfs_t));
-		}
-	} else {
-		atomic_add_32(&zfs_active_fs_count, 1);
-		VN_RELE(vp);
-	}
-
 	pn_free(&spn);
 	return (error);
 }
@@ -739,9 +921,6 @@ zfs_umount(vfs_t *vfsp, int fflag, cred_t *cr)
 
 		return (0);
 	}
-
-	zfs_zcache_flush(zfsvfs);
-
 	/*
 	 * Stop all delete threads.
 	 */
@@ -866,7 +1045,6 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 	zfs_delete_t	*zd = &zfsvfs->z_delete_head;
 	znode_t		*zp, *nextzp;
 	objset_t	*os = zfsvfs->z_os;
-	struct dsl_dataset *ds;
 
 	/*
 	 * Stop all delete threads.
@@ -881,8 +1059,6 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 	 */
 	rw_enter(&zfsvfs->z_um_lock, RW_WRITER);
 
-	zfs_zcache_flush(zfsvfs);
-
 	/*
 	 * Release all delete in progress znodes
 	 * They will be processed when the file system remounts.
@@ -891,7 +1067,7 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 	while (zp = list_head(&zd->z_znodes)) {
 		list_remove(&zd->z_znodes, zp);
 		zp->z_dbuf_held = 0;
-		dmu_buf_rele(zp->z_dbuf);
+		dmu_buf_rele(zp->z_dbuf, NULL);
 	}
 	mutex_exit(&zd->z_mutex);
 
@@ -911,7 +1087,7 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 			/* dbufs should only be held when force unmounting */
 			zp->z_dbuf_held = 0;
 			mutex_exit(&zfsvfs->z_znodes_lock);
-			dmu_buf_rele(zp->z_dbuf);
+			dmu_buf_rele(zp->z_dbuf, NULL);
 			/* Start again */
 			mutex_enter(&zfsvfs->z_znodes_lock);
 			nextzp = list_head(&zfsvfs->z_all_znodes);
@@ -922,36 +1098,8 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 	/*
 	 * Unregister properties.
 	 */
-	if (!dmu_objset_is_snapshot(os)) {
-		ds = dmu_objset_ds(os);
-
-		VERIFY(dsl_prop_unregister(ds, "atime", atime_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_unregister(ds, "recordsize", blksz_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_unregister(ds, "readonly", readonly_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_unregister(ds, "devices", devices_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_unregister(ds, "setuid", setuid_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_unregister(ds, "exec", exec_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_unregister(ds, "snapdir", snapdir_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_unregister(ds, "aclmode", acl_mode_changed_cb,
-		    zfsvfs) == 0);
-
-		VERIFY(dsl_prop_unregister(ds, "aclinherit",
-		    acl_inherit_changed_cb, zfsvfs) == 0);
-	}
+	if (!dmu_objset_is_snapshot(os))
+		zfs_unregister_callbacks(zfsvfs);
 
 	/*
 	 * Make the dmu drop all it dbuf holds so that zfs_inactive
@@ -975,6 +1123,11 @@ zfs_objset_close(zfsvfs_t *zfsvfs)
 		zil_close(zfsvfs->z_log);
 		zfsvfs->z_log = NULL;
 	}
+
+	/*
+	 * Evict all dbufs so that cached znodes will be freed
+	 */
+	dmu_objset_evict_dbufs(os);
 
 	/*
 	 * Finally close the objset

@@ -136,11 +136,17 @@ zil_read_log_block(zilog_t *zilog, blkptr_t *bp, char *buf)
 	uint64_t blksz = BP_GET_LSIZE(bp);
 	zil_trailer_t *ztp = (zil_trailer_t *)(buf + blksz) - 1;
 	zio_cksum_t cksum;
+	zbookmark_t zb;
 	int error;
+
+	zb.zb_objset = bp->blk_cksum.zc_word[2];
+	zb.zb_object = 0;
+	zb.zb_level = -1;
+	zb.zb_blkid = bp->blk_cksum.zc_word[3];
 
 	error = zio_wait(zio_read(NULL, zilog->zl_spa, bp, buf, blksz,
 	    NULL, NULL, ZIO_PRIORITY_SYNC_READ,
-	    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE));
+	    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE, &zb));
 	if (error) {
 		dprintf_bp(bp, "zilog %p bp %p read failed, error %d: ",
 		    zilog, bp, error);
@@ -551,6 +557,7 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	zil_trailer_t *ztp = (zil_trailer_t *)(lwb->lwb_buf + lwb->lwb_sz) - 1;
 	uint64_t txg;
 	uint64_t zil_blksz;
+	zbookmark_t zb;
 	int error;
 
 	ASSERT(lwb->lwb_nused <= ZIL_BLK_DATA_SZ(lwb));
@@ -579,11 +586,21 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	error = zio_alloc_blk(zilog->zl_spa, ZIO_CHECKSUM_ZILOG,
 	    zil_blksz, &ztp->zit_next_blk, txg);
 	if (error) {
+		/*
+		 * Reinitialise the lwb.
+		 * By returning NULL the caller will call tx_wait_synced()
+		 */
+		mutex_enter(&zilog->zl_lock);
+		ASSERT(lwb->lwb_state == UNWRITTEN);
+		lwb->lwb_nused = 0;
+		lwb->lwb_seq = 0;
+		mutex_exit(&zilog->zl_lock);
 		txg_rele_to_sync(&lwb->lwb_txgh);
 		return (NULL);
 	}
 
 	ASSERT3U(ztp->zit_next_blk.blk_birth, ==, txg);
+	ztp->zit_pad = 0;
 	ztp->zit_nused = lwb->lwb_nused;
 	ztp->zit_bt.zbt_cksum = lwb->lwb_blk.blk_cksum;
 	ztp->zit_next_blk.blk_cksum = lwb->lwb_blk.blk_cksum;
@@ -617,9 +634,15 @@ zil_lwb_write_start(zilog_t *zilog, lwb_t *lwb)
 	 * write the old log block
 	 */
 	dprintf_bp(&lwb->lwb_blk, "lwb %p txg %llu: ", lwb, txg);
+
+	zb.zb_objset = lwb->lwb_blk.blk_cksum.zc_word[2];
+	zb.zb_object = 0;
+	zb.zb_level = -1;
+	zb.zb_blkid = lwb->lwb_blk.blk_cksum.zc_word[3];
+
 	zio_nowait(zio_rewrite(NULL, zilog->zl_spa, ZIO_CHECKSUM_ZILOG, 0,
 	    &lwb->lwb_blk, lwb->lwb_buf, lwb->lwb_sz, zil_lwb_write_done, lwb,
-	    ZIO_PRIORITY_LOG_WRITE, ZIO_FLAG_MUSTSUCCEED));
+	    ZIO_PRIORITY_LOG_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb));
 
 	return (nlwb);
 }
@@ -674,7 +697,8 @@ zil_lwb_commit(zilog_t *zilog, itx_t *itx, lwb_t *lwb)
 		lwb = zil_lwb_write_start(zilog, lwb);
 		if (lwb == NULL)
 			return (NULL);
-		if (lwb->lwb_nused + reclen > ZIL_BLK_DATA_SZ(lwb)) {
+		ASSERT(lwb->lwb_nused == 0);
+		if (reclen > ZIL_BLK_DATA_SZ(lwb)) {
 			txg_wait_synced(zilog->zl_dmu_pool, txg);
 			mutex_enter(&zilog->zl_lock);
 			zilog->zl_ss_seq = MAX(seq, zilog->zl_ss_seq);
@@ -1157,10 +1181,17 @@ zil_replay_log_record(zilog_t *zilog, lr_t *lr, void *zra, uint64_t claim_txg)
 			 * checksum error.  We can safely ignore this because
 			 * the later write will provide the correct data.
 			 */
+			zbookmark_t zb;
+
+			zb.zb_objset = dmu_objset_id(zilog->zl_os);
+			zb.zb_object = lrw->lr_foid;
+			zb.zb_level = -1;
+			zb.zb_blkid = lrw->lr_offset / BP_GET_LSIZE(wbp);
+
 			(void) zio_wait(zio_read(NULL, zilog->zl_spa,
 			    wbp, wbuf, BP_GET_LSIZE(wbp), NULL, NULL,
 			    ZIO_PRIORITY_SYNC_READ,
-			    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE));
+			    ZIO_FLAG_CANFAIL | ZIO_FLAG_SPECULATIVE, &zb));
 			(void) memmove(wbuf, wbuf + lrw->lr_blkoff, wlen);
 		}
 	}
