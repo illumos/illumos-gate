@@ -107,6 +107,7 @@ d none usr/platform/sun4v/lib/fm/topo/plugins 755 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/chip.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/hostbridge.so 555 root bin
 f none usr/platform/sun4v/lib/fm/topo/plugins/pcibus.so 555 root bin
+f none usr/platform/sun4v/lib/fm/topo/plugins/ioboard.so 555 root bin
 d none usr/platform/SUNW,Sun-Fire 755 root sys
 d none usr/platform/SUNW,Sun-Fire/lib 755 root bin
 d none usr/platform/SUNW,Sun-Fire/lib/fm 755 root bin
