@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1436,7 +1435,7 @@ dtrace_check_override(dis86_t *x, int opindex)
 {
 #ifdef DIS_TEXT
 	if (x->d86_seg_prefix) {
-		strlcat(x->d86_opnd[opindex].d86_prefix,
+		(void) strlcat(x->d86_opnd[opindex].d86_prefix,
 		    x->d86_seg_prefix, PFIXLEN);
 	}
 #endif
@@ -1480,39 +1479,39 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 #ifdef DIS_TEXT
 		switch (wbit) {
 		case MM_OPND:
-			strlcat(opnd, dis_MMREG[r_m], OPLEN);
+			(void) strlcat(opnd, dis_MMREG[r_m], OPLEN);
 			break;
 		case XMM_OPND:
-			strlcat(opnd, dis_XMMREG[r_m], OPLEN);
+			(void) strlcat(opnd, dis_XMMREG[r_m], OPLEN);
 			break;
 		case SEG_OPND:
-			strlcat(opnd, dis_SEGREG[r_m], OPLEN);
+			(void) strlcat(opnd, dis_SEGREG[r_m], OPLEN);
 			break;
 		case CONTROL_OPND:
-			strlcat(opnd, dis_CONTROLREG[r_m], OPLEN);
+			(void) strlcat(opnd, dis_CONTROLREG[r_m], OPLEN);
 			break;
 		case DEBUG_OPND:
-			strlcat(opnd, dis_DEBUGREG[r_m], OPLEN);
+			(void) strlcat(opnd, dis_DEBUGREG[r_m], OPLEN);
 			break;
 		case TEST_OPND:
-			strlcat(opnd, dis_TESTREG[r_m], OPLEN);
+			(void) strlcat(opnd, dis_TESTREG[r_m], OPLEN);
 			break;
 		case BYTE_OPND:
 			if (x->d86_rex_prefix == 0)
-				strlcat(opnd, dis_REG8[r_m], OPLEN);
+				(void) strlcat(opnd, dis_REG8[r_m], OPLEN);
 			else
-				strlcat(opnd, dis_REG8_REX[r_m], OPLEN);
+				(void) strlcat(opnd, dis_REG8_REX[r_m], OPLEN);
 			break;
 		case WORD_OPND:
-			strlcat(opnd, dis_REG16[r_m], OPLEN);
+			(void) strlcat(opnd, dis_REG16[r_m], OPLEN);
 			break;
 		case LONG_OPND:
 			if (x->d86_opnd_size == SIZE16)
-				strlcat(opnd, dis_REG16[r_m], OPLEN);
+				(void) strlcat(opnd, dis_REG16[r_m], OPLEN);
 			else if (x->d86_opnd_size == SIZE32)
-				strlcat(opnd, dis_REG32[r_m], OPLEN);
+				(void) strlcat(opnd, dis_REG32[r_m], OPLEN);
 			else
-				strlcat(opnd, dis_REG64[r_m], OPLEN);
+				(void) strlcat(opnd, dis_REG64[r_m], OPLEN);
 			break;
 		}
 #endif /* DIS_TEXT */
@@ -1543,7 +1542,7 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 			x->d86_opnd[opindex].d86_mode = MODE_NONE;
 		else
 			x->d86_opnd[opindex].d86_mode = MODE_OFFSET;
-		strlcat(opnd, dis_addr16[mode][r_m], OPLEN);
+		(void) strlcat(opnd, dis_addr16[mode][r_m], OPLEN);
 #endif
 		return;
 	}
@@ -1593,17 +1592,17 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 	if (have_SIB == 0) {
 		if (x->d86_mode == SIZE32) {
 			if (mode == 0)
-				strlcat(opnd, dis_addr32_mode0[r_m],
+				(void) strlcat(opnd, dis_addr32_mode0[r_m],
 				    OPLEN);
 			else
-				strlcat(opnd, dis_addr32_mode12[r_m],
+				(void) strlcat(opnd, dis_addr32_mode12[r_m],
 				    OPLEN);
 		} else {
 			if (mode == 0)
-				strlcat(opnd, dis_addr64_mode0[r_m],
+				(void) strlcat(opnd, dis_addr64_mode0[r_m],
 				    OPLEN);
 			else
-				strlcat(opnd, dis_addr64_mode12[r_m],
+				(void) strlcat(opnd, dis_addr64_mode12[r_m],
 				    OPLEN);
 		}
 	} else {
@@ -1619,12 +1618,12 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 		 */
 		if (base == EBP_REGNO && mode == 0) {
 			if (index != ESP_REGNO) {
-				strlcat(opnd, "(", OPLEN);
+				(void) strlcat(opnd, "(", OPLEN);
 				need_paren = 1;
 			}
 		} else {
-			strlcat(opnd, "(", OPLEN);
-			strlcat(opnd, regs[base], OPLEN);
+			(void) strlcat(opnd, "(", OPLEN);
+			(void) strlcat(opnd, regs[base], OPLEN);
 			need_paren = 1;
 		}
 
@@ -1632,12 +1631,12 @@ dtrace_get_operand(dis86_t *x, uint_t mode, uint_t r_m, int wbit, int opindex)
 		 * print the index (if any)
 		 */
 		if (index != ESP_REGNO) {
-			strlcat(opnd, ",", OPLEN);
-			strlcat(opnd, regs[index], OPLEN);
-			strlcat(opnd, dis_scale_factor[ss], OPLEN);
+			(void) strlcat(opnd, ",", OPLEN);
+			(void) strlcat(opnd, regs[index], OPLEN);
+			(void) strlcat(opnd, dis_scale_factor[ss], OPLEN);
 		} else
 			if (need_paren)
-				strlcat(opnd, ")", OPLEN);
+				(void) strlcat(opnd, ")", OPLEN);
 	}
 #endif
 }
@@ -1764,9 +1763,9 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 		goto error;
 
 	if (opcode1 == 0 && opcode2 == 0 &&
-	    x->d86_check_func != NULL && x->d86_check_func()) {
+	    x->d86_check_func != NULL && x->d86_check_func(x->d86_data)) {
 #ifdef DIS_TEXT
-		strncpy(x->d86_mneu, ".byte\t0", OPLEN);
+		(void) strncpy(x->d86_mneu, ".byte\t0", OPLEN);
 #endif
 		goto done;
 	}
@@ -2036,22 +2035,22 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	 * including the prefixes.
 	 */
 	if (lock_prefix)
-		strlcat(x->d86_mneu, "lock ", OPLEN);
+		(void) strlcat(x->d86_mneu, "lock ", OPLEN);
 
 	if (rep_prefix == 0xf2)
-		strlcat(x->d86_mneu, "repnz ", OPLEN);
+		(void) strlcat(x->d86_mneu, "repnz ", OPLEN);
 	else if (rep_prefix == 0xf3)
-		strlcat(x->d86_mneu, "repz ", OPLEN);
+		(void) strlcat(x->d86_mneu, "repz ", OPLEN);
 
 	if (cpu_mode == SIZE64 && addr_size_prefix)
-		strlcat(x->d86_mneu, "addr32 ", OPLEN);
+		(void) strlcat(x->d86_mneu, "addr32 ", OPLEN);
 
 	if (dp->it_adrmode != CBW &&
 	    dp->it_adrmode != CWD &&
 	    dp->it_adrmode != XMMSFNC) {
 		if (strcmp(dp->it_name, "INVALID") == 0)
 			goto error;
-		strlcat(x->d86_mneu, dp->it_name, OPLEN);
+		(void) strlcat(x->d86_mneu, dp->it_name, OPLEN);
 		if (dp->it_suffix) {
 			char *types[] = {"", "w", "l", "q"};
 			if (opcode_bytes == 2 && opcode4 == 4) {
@@ -2061,8 +2060,10 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 						break;
 				}
 				x->d86_mneu[i - 1] = *types[opnd_size];
-			} else
-				strlcat(x->d86_mneu, types[opnd_size], OPLEN);
+			} else {
+				(void) strlcat(x->d86_mneu, types[opnd_size],
+				    OPLEN);
+			}
 		}
 	}
 #endif
@@ -2083,7 +2084,7 @@ dtrace_disx86(dis86_t *x, uint_t cpu_mode)
 	case MOVSXZ:
 #ifdef DIS_TEXT
 		if (rex_prefix == 0)
-			strncpy(x->d86_mneu, "movzld", OPLEN);
+			(void) strncpy(x->d86_mneu, "movzld", OPLEN);
 #endif
 		dtrace_get_modrm(x, &mode, &reg, &r_m);
 		dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
@@ -2274,7 +2275,7 @@ mm_shift:
 		dtrace_get_operand(x, mode, r_m, wbit, 1);
 #ifdef DIS_TEXT
 		if (vbit) {
-			strlcat(x->d86_opnd[0].d86_opnd, "%cl", OPLEN);
+			(void) strlcat(x->d86_opnd[0].d86_opnd, "%cl", OPLEN);
 		} else {
 			x->d86_opnd[0].d86_mode = MODE_SIGNED;
 			x->d86_opnd[0].d86_value_size = 1;
@@ -2310,7 +2311,7 @@ just_mem:
 	case SWAPGS:
 		if (cpu_mode == SIZE64 && mode == 3 && r_m == 0) {
 #ifdef DIS_TEXT
-			strncpy(x->d86_mneu, "swapgs", OPLEN);
+			(void) strncpy(x->d86_mneu, "swapgs", OPLEN);
 #endif
 			NOMEM;
 			break;
@@ -2520,9 +2521,9 @@ xmmprm:
 		 */
 		if (mode == REG_ONLY) {
 			if (strcmp(dp->it_name, "movlps") == 0)
-				strncpy(x->d86_mneu, "movhlps", OPLEN);
+				(void) strncpy(x->d86_mneu, "movhlps", OPLEN);
 			else if (strcmp(dp->it_name, "movhps") == 0)
-				strncpy(x->d86_mneu, "movlhps", OPLEN);
+				(void) strncpy(x->d86_mneu, "movlhps", OPLEN);
 		}
 #endif
 		if (dp->it_adrmode == XMMXIMPL)
@@ -2554,7 +2555,7 @@ xmmprm:
 #ifdef DIS_TEXT
 		if (mode == REG_ONLY) {
 			if (strcmp(dp->it_name, "movhps") == 0)
-				strncpy(x->d86_mneu, "movlhps", OPLEN);
+				(void) strncpy(x->d86_mneu, "movlhps", OPLEN);
 			else
 				goto error;
 		}
@@ -2630,10 +2631,10 @@ xmmprm:
 			if (pred >= (sizeof (dis_PREDSUFFIX) / sizeof (char *)))
 				goto error;
 
-			strncpy(x->d86_mneu, "cmp", OPLEN);
-			strlcat(x->d86_mneu, dis_PREDSUFFIX[pred],
+			(void) strncpy(x->d86_mneu, "cmp", OPLEN);
+			(void) strlcat(x->d86_mneu, dis_PREDSUFFIX[pred],
 			    OPLEN);
-			strlcat(x->d86_mneu,
+			(void) strlcat(x->d86_mneu,
 			    dp->it_name + strlen(dp->it_name) - 2,
 			    OPLEN);
 			x->d86_opnd[0] = x->d86_opnd[1];
@@ -2664,19 +2665,19 @@ xmmprm:
 		dtrace_check_override(x, 0);
 		x->d86_numopnds = 2;
 		if (addr_size == SIZE64) {
-			strlcat(x->d86_opnd[0].d86_opnd, "(%rsi)",
+			(void) strlcat(x->d86_opnd[0].d86_opnd, "(%rsi)",
 			    OPLEN);
-			strlcat(x->d86_opnd[1].d86_opnd, "(%rdi)",
+			(void) strlcat(x->d86_opnd[1].d86_opnd, "(%rdi)",
 			    OPLEN);
 		} else if (addr_size == SIZE32) {
-			strlcat(x->d86_opnd[0].d86_opnd, "(%esi)",
+			(void) strlcat(x->d86_opnd[0].d86_opnd, "(%esi)",
 			    OPLEN);
-			strlcat(x->d86_opnd[1].d86_opnd, "(%edi)",
+			(void) strlcat(x->d86_opnd[1].d86_opnd, "(%edi)",
 			    OPLEN);
 		} else {
-			strlcat(x->d86_opnd[0].d86_opnd, "(%si)",
+			(void) strlcat(x->d86_opnd[0].d86_opnd, "(%si)",
 			    OPLEN);
-			strlcat(x->d86_opnd[1].d86_opnd, "(%di)",
+			(void) strlcat(x->d86_opnd[1].d86_opnd, "(%di)",
 			    OPLEN);
 		}
 #endif
@@ -2691,13 +2692,13 @@ xmmprm:
 		x->d86_numopnds = 2;
 		dtrace_get_operand(x, REG_ONLY, EAX_REGNO, wbit, 0);
 		if (addr_size == SIZE64)
-			strlcat(x->d86_opnd[1].d86_opnd, "(%rdi)",
+			(void) strlcat(x->d86_opnd[1].d86_opnd, "(%rdi)",
 			    OPLEN);
 		else if (addr_size == SIZE32)
-			strlcat(x->d86_opnd[1].d86_opnd, "(%edi)",
+			(void) strlcat(x->d86_opnd[1].d86_opnd, "(%edi)",
 			    OPLEN);
 		else
-			strlcat(x->d86_opnd[1].d86_opnd, "(%di)",
+			(void) strlcat(x->d86_opnd[1].d86_opnd, "(%di)",
 			    OPLEN);
 #endif
 		break;
@@ -2709,13 +2710,13 @@ xmmprm:
 		dtrace_check_override(x, 0);
 		x->d86_numopnds = 2;
 		if (addr_size == SIZE64)
-			strlcat(x->d86_opnd[0].d86_opnd, "(%rsi)",
+			(void) strlcat(x->d86_opnd[0].d86_opnd, "(%rsi)",
 			    OPLEN);
 		else if (addr_size == SIZE32)
-			strlcat(x->d86_opnd[0].d86_opnd, "(%esi)",
+			(void) strlcat(x->d86_opnd[0].d86_opnd, "(%esi)",
 			    OPLEN);
 		else
-			strlcat(x->d86_opnd[0].d86_opnd, "(%si)",
+			(void) strlcat(x->d86_opnd[0].d86_opnd, "(%si)",
 			    OPLEN);
 		dtrace_get_operand(x, REG_ONLY, EAX_REGNO, wbit, 1);
 #endif
@@ -2733,7 +2734,7 @@ xmmprm:
 	/* jmp/call indirect to memory or register operand		*/
 	case INM:
 #ifdef DIS_TEXT
-		strlcat(x->d86_opnd[0].d86_prefix, "*", OPLEN);
+		(void) strlcat(x->d86_opnd[0].d86_prefix, "*", OPLEN);
 #endif
 		dtrace_rex_adjust(rex_prefix, mode, NULL, &r_m);
 		dtrace_get_operand(x, mode, r_m, LONG_OPND, 0);
@@ -2813,7 +2814,7 @@ xmmprm:
 		x->d86_numopnds = 1;
 		dtrace_check_override(x, 0);
 #ifdef DIS_TEXT
-		strlcat(x->d86_opnd[0].d86_opnd, "(%dx)", OPLEN);
+		(void) strlcat(x->d86_opnd[0].d86_opnd, "(%dx)", OPLEN);
 #endif
 		NOMEM;
 		break;
@@ -2854,11 +2855,11 @@ xmmprm:
 	case CBW:
 #ifdef DIS_TEXT
 		if (opnd_size == SIZE16)
-			strlcat(x->d86_mneu, "cbtw", OPLEN);
+			(void) strlcat(x->d86_mneu, "cbtw", OPLEN);
 		else if (opnd_size == SIZE32)
-			strlcat(x->d86_mneu, "cwtl", OPLEN);
+			(void) strlcat(x->d86_mneu, "cwtl", OPLEN);
 		else
-			strlcat(x->d86_mneu, "cltq", OPLEN);
+			(void) strlcat(x->d86_mneu, "cltq", OPLEN);
 #endif
 		wbit = LONG_OPND;
 		NOMEM;
@@ -2867,11 +2868,11 @@ xmmprm:
 	case CWD:
 #ifdef DIS_TEXT
 		if (opnd_size == SIZE16)
-			strlcat(x->d86_mneu, "cwtd", OPLEN);
+			(void) strlcat(x->d86_mneu, "cwtd", OPLEN);
 		else if (opnd_size == SIZE32)
-			strlcat(x->d86_mneu, "cltd", OPLEN);
+			(void) strlcat(x->d86_mneu, "cltd", OPLEN);
 		else
-			strlcat(x->d86_mneu, "cqtd", OPLEN);
+			(void) strlcat(x->d86_mneu, "cqtd", OPLEN);
 #endif
 		wbit = LONG_OPND;
 		NOMEM;
@@ -2887,9 +2888,9 @@ xmmprm:
 		/* sfence doesn't take operands */
 #ifdef DIS_TEXT
 		if (mode == REG_ONLY) {
-			strlcat(x->d86_mneu, "sfence", OPLEN);
+			(void) strlcat(x->d86_mneu, "sfence", OPLEN);
 		} else {
-			strlcat(x->d86_mneu, "clflush", OPLEN);
+			(void) strlcat(x->d86_mneu, "clflush", OPLEN);
 			dtrace_rex_adjust(rex_prefix, mode, &reg, &r_m);
 			dtrace_get_operand(x, mode, r_m, BYTE_OPND, 0);
 			NOMEM;
@@ -2932,7 +2933,7 @@ xmmprm:
 	case F:
 #ifdef DIS_TEXT
 		x->d86_numopnds = 1;
-		strlcat(x->d86_opnd[0].d86_opnd, "%st(X)", OPLEN);
+		(void) strlcat(x->d86_opnd[0].d86_opnd, "%st(X)", OPLEN);
 		x->d86_opnd[0].d86_opnd[4] = r_m + '0';
 #endif
 		NOMEM;
@@ -2945,8 +2946,8 @@ xmmprm:
 	case FFC:				/* case for vbit always = 0 */
 #ifdef DIS_TEXT
 		x->d86_numopnds = 2;
-		strlcat(x->d86_opnd[1 - vbit].d86_opnd, "%st", OPLEN);
-		strlcat(x->d86_opnd[vbit].d86_opnd, "%st(X)", OPLEN);
+		(void) strlcat(x->d86_opnd[1 - vbit].d86_opnd, "%st", OPLEN);
+		(void) strlcat(x->d86_opnd[vbit].d86_opnd, "%st(X)", OPLEN);
 		x->d86_opnd[vbit].d86_opnd[4] = r_m + '0';
 #endif
 		NOMEM;
@@ -3022,7 +3023,7 @@ done:
 
 error:
 #ifdef DIS_TEXT
-	strlcat(x->d86_mneu, "undef", OPLEN);
+	(void) strlcat(x->d86_mneu, "undef", OPLEN);
 #endif
 	return (1);
 }
@@ -3075,6 +3076,12 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uintptr_t pc, char *buf,
 
 	dis->d86_sprintf_func(buf, buflen, "%-6s ", dis->d86_mneu);
 
+	/*
+	 * For PC-relative jumps, the pc is really the next pc after executing
+	 * this instruction, so increment it appropriately.
+	 */
+	pc += dis->d86_len;
+
 	for (i = 0; i < dis->d86_numopnds; i++) {
 		d86opnd_t *op = &dis->d86_opnd[i];
 		int64_t sv;
@@ -3099,7 +3106,8 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uintptr_t pc, char *buf,
 		case MODE_OFFSET:
 
 			if (dis->d86_seg_prefix)
-				strlcat(buf, dis->d86_seg_prefix, buflen);
+				(void) strlcat(buf, dis->d86_seg_prefix,
+				    buflen);
 
 			switch (op->d86_value_size) {
 			case 1:
@@ -3121,7 +3129,7 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uintptr_t pc, char *buf,
 
 			if (op->d86_mode == MODE_SIGNED ||
 			    op->d86_mode == MODE_IMPLIED)
-				strlcat(buf, "$", buflen);
+				(void) strlcat(buf, "$", buflen);
 
 			if (sv < 0 && sv > -0xffff &&
 			    !isunsigned_op(dis->d86_mneu)) {
@@ -3135,7 +3143,7 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uintptr_t pc, char *buf,
 				    (dis->d86_flags & DIS_OP_OCTAL) ?
 				    "0%llo" : "0x%llx", sv & mask);
 			}
-			strlcat(buf, op->d86_opnd, buflen);
+			(void) strlcat(buf, op->d86_opnd, buflen);
 			break;
 
 		case MODE_IPREL:
@@ -3163,17 +3171,17 @@ dtrace_disx86_str(dis86_t *dis, uint_t mode, uintptr_t pc, char *buf,
 				    (dis->d86_flags & DIS_OP_OCTAL) ?
 				    "+0%llo" : "+0x%llx", sv + dis->d86_len);
 
-			strlcat(buf, "\t<", buflen);
+			(void) strlcat(buf, "\t<", buflen);
 
 			if (dis->d86_sym_lookup == NULL ||
-			    dis->d86_sym_lookup(pc + sv, buf + strlen(buf),
-			    buflen - strlen(buf)) != 0)
+			    dis->d86_sym_lookup(dis->d86_data, pc + sv,
+			    buf + strlen(buf), buflen - strlen(buf)) != 0)
 				dis->d86_sprintf_func(buf + strlen(buf),
 				    buflen - strlen(buf),
 				    (dis->d86_flags & DIS_OP_OCTAL) ?
 				    "0%llo" : "0x%llx", pc + sv);
 
-			strlcat(buf, ">", buflen);
+			(void) strlcat(buf, ">", buflen);
 
 			break;
 		}

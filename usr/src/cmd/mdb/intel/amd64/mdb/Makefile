@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -20,16 +19,12 @@
 # CDDL HEADER END
 #
 #
-# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
-SRCS =	\
-	bits.c \
-	dis_tables.c \
-	inteldis.c \
-	kvm_amd64dep.c \
+SRCS =	kvm_amd64dep.c \
 	mdb_amd64util.c \
 	proc_amd64dep.c
 
@@ -41,17 +36,10 @@ SRCS =	\
 	$(COMPILE.c) $<
 	$(CTFCONVERT_O)
 
-%.o: $(SRC)/common/dis/i386/%.c
-	$(COMPILE.c) $<
-	$(CTFCONVERT_O)
-
 %.ln: %.c
 	$(LINT.c) -c $<
 
 %.ln: ../../mdb/%.c
-	$(LINT.c) -c $<
-
-%.ln: $(SRC)/common/dis/i386/%.c
 	$(LINT.c) -c $<
 
 include ../../../../Makefile.cmd
@@ -59,6 +47,6 @@ include ../../../../Makefile.cmd.64
 include ../../Makefile.amd64
 include ../../../Makefile.mdb
 
-CPPFLAGS += -I../../mdb -I$(SRC)/common/dis/i386 -DDIS_TEXT
+CPPFLAGS += -I../../mdb
 
 install: all $(ISAEXEC) $(ROOTPROG64) $(ROOTLINK64)

@@ -101,6 +101,7 @@ COMMON_SUBDIRS = \
 	cmd/devmgmt \
 	cmd/dfs.cmds \
 	cmd/diff3 \
+	cmd/dis \
 	cmd/dirname \
 	cmd/diskscan \
 	cmd/dispadmin \
@@ -302,6 +303,7 @@ COMMON_SUBDIRS = \
 	lib/libdhcpdu \
 	lib/libdhcpsvc \
 	lib/libdhcputil \
+	lib/libdisasm \
 	lib/libdiskmgt \
 	lib/libdladm \
 	lib/libdlpi \

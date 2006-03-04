@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -33,6 +32,8 @@
 #include <mdb/mdb_err.h>
 #include <mdb/mdb_nv.h>
 #include <mdb/mdb.h>
+
+#include <libdisasm.h>
 
 int
 mdb_dis_select(const char *name)
@@ -174,6 +175,304 @@ cmd_disasms(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
 	return (DCMD_OK);
 }
 
+/*
+ * Generic libdisasm disassembler interfaces.
+ */
+
+#define	DISBUFSZ	64
+
+/*
+ * Internal structure used by the read and lookup routines.
+ */
+typedef struct dis_buf {
+	mdb_tgt_t	*db_tgt;
+	mdb_tgt_as_t	db_as;
+	mdb_tgt_addr_t	db_addr;
+	mdb_tgt_addr_t	db_nextaddr;
+	uchar_t		db_buf[DISBUFSZ];
+	ssize_t		db_bufsize;
+} dis_buf_t;
+
+/*
+ * Disassembler support routine for lookup up an address.  Rely on mdb's "%a"
+ * qualifier to convert the address to a symbol.
+ */
+/*ARGSUSED*/
+static int
+libdisasm_lookup(void *data, uint64_t addr, char *buf, size_t buflen,
+    uint64_t *start, size_t *len)
+{
+	if (buf != NULL) {
+		GElf_Sym sym;
+
+#ifdef __sparc
+		uint32_t instr[3];
+		uint32_t dtrace_id;
+
+		/*
+		 * On SPARC, DTrace FBT trampoline entries have a sethi/or pair
+		 * that indicates the dtrace probe id; this may appear as the
+		 * first two instructions or one instruction into the
+		 * trampoline.
+		 */
+		if (mdb_vread(instr, sizeof (instr), (uintptr_t)addr) ==
+		    sizeof (instr)) {
+			if ((instr[0] & 0xfffc0000) == 0x11000000 &&
+			    (instr[1] & 0xffffe000) == 0x90122000) {
+				dtrace_id = (instr[0] << 10) |
+				    (instr[1] & 0x1fff);
+				(void) mdb_snprintf(buf, sizeof (buf), "dt=%#x",
+				    dtrace_id);
+				goto out;
+			} else if ((instr[1] & 0xfffc0000) == 0x11000000 &&
+			    (instr[2] & 0xffffe000) == 0x90122000) {
+				dtrace_id = (instr[1] << 10) |
+				    (instr[2] & 0x1fff);
+				(void) mdb_snprintf(buf, sizeof (buf), "dt=%#x",
+				    dtrace_id);
+				goto out;
+			}
+		}
+#endif
+		if (mdb_lookup_by_addr((uintptr_t)addr, MDB_SYM_FUZZY,
+					buf, buflen, &sym) < 0) {
+			if (buflen > 0)
+				*buf = '\0';
+			return (-1);
+		}
+	}
+
+#ifdef __sparc
+out:
+#endif
+	if (start != NULL || len != NULL) {
+		GElf_Sym sym;
+		char c;
+
+		if (mdb_lookup_by_addr(addr, MDB_SYM_FUZZY, &c, 1, &sym) < 0)
+			return (-1);
+
+		if (start != NULL)
+			*start = sym.st_value;
+		if (len != NULL)
+			*len = sym.st_size;
+	}
+
+	return (0);
+}
+
+/*
+ * Disassembler support routine for reading from the target.  Rather than having
+ * to read one byte at a time, we read from the address space in chunks.  If the
+ * current address doesn't lie within our buffer range, we read in the chunk
+ * starting from the given address.
+ */
+static int
+libdisasm_read(void *data, uint64_t pc, void *buf, size_t buflen)
+{
+	dis_buf_t *db = data;
+	size_t offset;
+	size_t len;
+
+	if (pc - db->db_addr >= db->db_bufsize) {
+		if ((db->db_bufsize = mdb_tgt_aread(db->db_tgt, db->db_as,
+		    db->db_buf, sizeof (db->db_buf), pc)) == -1)
+			return (-1);
+		db->db_addr = pc;
+	}
+
+	offset = pc - db->db_addr;
+
+	len = MIN(buflen, db->db_bufsize - offset);
+
+	memcpy(buf, (char *)db->db_buf + offset, len);
+	db->db_nextaddr = pc + len;
+
+	return (len);
+}
+
+static mdb_tgt_addr_t
+libdisasm_ins2str(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
+    char *buf, size_t len, mdb_tgt_addr_t pc)
+{
+	dis_handle_t *dhp = dp->dis_data;
+	dis_buf_t db = { 0 };
+
+	/*
+	 * Set the libdisasm data to point to our buffer.  This will be
+	 * passed as the first argument to the lookup and read functions.
+	 */
+	db.db_tgt = t;
+	db.db_as = as;
+
+	dis_set_data(dhp, &db);
+
+	/*
+	 * Attempt to disassemble the instruction
+	 */
+	if (dis_disassemble(dhp, pc, buf, len) != 0)
+		(void) mdb_snprintf(buf, len,
+		    "***ERROR--unknown op code***");
+
+	/*
+	 * Return the updated location
+	 */
+	return (db.db_nextaddr);
+}
+
+static mdb_tgt_addr_t
+libdisasm_previns(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
+    mdb_tgt_addr_t pc, uint_t n)
+{
+	dis_handle_t *dhp = dp->dis_data;
+	dis_buf_t db = { 0 };
+
+	/*
+	 * Set the libdisasm data to point to our buffer.  This will be
+	 * passed as the first argument to the lookup and read functions.
+	 */
+	db.db_tgt = t;
+	db.db_as = as;
+
+	dis_set_data(dhp, &db);
+
+	return (dis_previnstr(dhp, pc, n));
+}
+
+/*ARGSUSED*/
+static mdb_tgt_addr_t
+libdisasm_nextins(mdb_disasm_t *dp, mdb_tgt_t *t, mdb_tgt_as_t as,
+    mdb_tgt_addr_t pc)
+{
+	mdb_tgt_addr_t npc;
+	char c;
+
+	if ((npc = libdisasm_ins2str(dp, t, as, &c, 1, pc)) == pc)
+		return (pc);
+
+	/*
+	 * Probe the address to make sure we can read something from it - we
+	 * want the address we return to actually contain something.
+	 */
+	if (mdb_tgt_aread(t, as, &c, 1, npc) != 1)
+		return (pc);
+
+	return (npc);
+}
+
+static void
+libdisasm_destroy(mdb_disasm_t *dp)
+{
+	dis_handle_t *dhp = dp->dis_data;
+
+	dis_handle_destroy(dhp);
+}
+
+static const mdb_dis_ops_t libdisasm_ops = {
+	libdisasm_destroy,
+	libdisasm_ins2str,
+	libdisasm_previns,
+	libdisasm_nextins
+};
+
+/*
+ * Generic function for creating a libdisasm-backed disassembler.  Creates an
+ * MDB disassembler with the given name backed by libdis with the given flags.
+ */
+static int
+libdisasm_create(mdb_disasm_t *dp, const char *name,
+		const char *desc, int flags)
+{
+	if ((dp->dis_data = dis_handle_create(flags, NULL, libdisasm_lookup,
+	    libdisasm_read)) == NULL)
+		return (-1);
+
+	dp->dis_name = name;
+	dp->dis_ops = &libdisasm_ops;
+	dp->dis_desc = desc;
+
+	return (0);
+}
+
+
+#if defined(__i386) || defined(__amd64)
+static int
+ia32_create(mdb_disasm_t *dp)
+{
+	return (libdisasm_create(dp,
+	    "ia32",
+	    "Intel 32-bit disassembler",
+	    DIS_X86_SIZE32));
+}
+#endif
+
+#if defined(__amd64)
+static int
+amd64_create(mdb_disasm_t *dp)
+{
+	return (libdisasm_create(dp,
+	    "amd64",
+	    "AMD64 and IA32e 64-bit disassembler",
+	    DIS_X86_SIZE64));
+}
+#endif
+
+#if defined(__sparc)
+static int
+sparc1_create(mdb_disasm_t *dp)
+{
+	return (libdisasm_create(dp,
+	    "1",
+	    "SPARC-v8 disassembler",
+	    DIS_SPARC_V8));
+}
+
+static int
+sparc2_create(mdb_disasm_t *dp)
+{
+	return (libdisasm_create(dp,
+	    "2",
+	    "SPARC-v9 disassembler",
+	    DIS_SPARC_V9));
+}
+
+static int
+sparc4_create(mdb_disasm_t *dp)
+{
+	return (libdisasm_create(dp,
+	    "4",
+	    "UltraSPARC1-v9 disassembler",
+	    DIS_SPARC_V9 | DIS_SPARC_V9_SGI));
+}
+
+static int
+sparcv8_create(mdb_disasm_t *dp)
+{
+	return (libdisasm_create(dp,
+	    "v8",
+	    "SPARC-v8 disassembler",
+	    DIS_SPARC_V8));
+}
+
+static int
+sparcv9_create(mdb_disasm_t *dp)
+{
+	return (libdisasm_create(dp,
+	    "v9",
+	    "SPARC-v9 disassembler",
+	    DIS_SPARC_V9));
+}
+
+static int
+sparcv9plus_create(mdb_disasm_t *dp)
+{
+	return (libdisasm_create(dp,
+	    "v9plus",
+	    "UltraSPARC1-v9 disassembler",
+	    DIS_SPARC_V9 | DIS_SPARC_V9_SGI));
+}
+#endif
+
 /*ARGSUSED*/
 static void
 defdis_destroy(mdb_disasm_t *dp)
@@ -223,12 +522,19 @@ defdis_create(mdb_disasm_t *dp)
 }
 
 mdb_dis_ctor_f *const mdb_dis_builtins[] = {
+	defdis_create,
 #if defined(__amd64)
 	ia32_create,
 	amd64_create,
 #elif defined(__i386)
 	ia32_create,
+#elif defined(__sparc)
+	sparc1_create,
+	sparc2_create,
+	sparc4_create,
+	sparcv8_create,
+	sparcv9_create,
+	sparcv9plus_create,
 #endif
-	defdis_create,
 	NULL
 };

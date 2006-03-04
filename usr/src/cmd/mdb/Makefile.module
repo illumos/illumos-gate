@@ -2,9 +2,8 @@
 # CDDL HEADER START
 #
 # The contents of this file are subject to the terms of the
-# Common Development and Distribution License, Version 1.0 only
-# (the "License").  You may not use this file except in compliance
-# with the License.
+# Common Development and Distribution License (the "License").
+# You may not use this file except in compliance with the License.
 #
 # You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
 # or http://www.opensolaris.org/os/licensing.
@@ -66,10 +65,6 @@ TARGETS_kvm_kmdb	= $(KMODFILE)
 TARGETS_kvm_mdb		= $(MODFILE)
 TARGETS_kvm_both	= $(TARGETS_kvm_mdb) $(TARGETS_kvm_kmdb)
 TARGETS_kvm		= $(TARGETS_kvm_$(TARGETS_kvm_type))
-TARGETS_disasm_kmdb	= $(KMODFILE)
-TARGETS_disasm_mdb	= $(MODFILE)
-TARGETS_disasm_both	= $(TARGETS_disasm_mdb) $(TARGETS_disasm_kmdb)
-TARGETS_disasm		= $(TARGETS_disasm_$(TARGETS_kvm_type))
 TARGETS_proc		= $(MODFILE)
 TARGETS_raw		= $(MODFILE)
 TARGETS			= $(TARGETS_$(MDBTGT))
@@ -80,10 +75,6 @@ ROOTTGTS_kvm_kmdb	= $(ROOTKMOD)/$(KMODULE)
 ROOTTGTS_kvm_mdb	= $(ROOTMOD)/$(MODULE)
 ROOTTGTS_kvm_both	= $(ROOTTGTS_kvm_mdb) $(ROOTTGTS_kvm_kmdb)
 ROOTTGTS_kvm		= $(ROOTTGTS_kvm_$(ROOTTGTS_kvm_type))
-ROOTTGTS_disasm_kmdb	= $(ROOTKMOD)/$(KMODULE)
-ROOTTGTS_disasm_mdb	= $(ROOTMOD)/$(MODULE)
-ROOTTGTS_disasm_both	= $(ROOTTGTS_disasm_mdb) $(ROOTTGTS_disasm_kmdb)
-ROOTTGTS_disasm		= $(ROOTTGTS_disasm_$(TARGETS_kvm_type))
 ROOTTGTS_proc		= $(ROOTMOD)/$(MODULE)
 ROOTTGTS_raw		= $(ROOTMOD)/$(MODULE)
 ROOTTGTS		= $(ROOTTGTS_$(MDBTGT))
@@ -96,9 +87,6 @@ LINTFILES_kvm_type	= $(TARGETS_kvm_type)
 LINTFILES_kvm_both	= $(KLINTOBJS) $(LINTOBJS)
 LINTFILES_kvm_mdb	= $(LINTOBJS)
 LINTFILES_kvm		= $(LINTFILES_kvm_$(LINTFILES_kvm_type))
-LINTFILES_disasm_both	= $(KLINTOBJS) $(LINTOBJS)
-LINTFILES_disasm_mdb	= $(LINTOBJS)
-LINTFILES_disasm	= $(LINTFILES_disasm_$(TARGETS_kvm_type))
 LINTFILES_proc		= $(LINTOBJS)
 LINTFILES_raw		= $(LINTOBJS)
 LINTFILES		= $(LINTFILES_$(MDBTGT))
@@ -177,7 +165,8 @@ $(MODFILE): dmod .WAIT $(MODOBJS)
 LINKTESTOBJ = $(KMDBDIR)/kmdb_modlinktest.o
 
 KMDB_LINKTEST = \
-	$(LD) -zdefs -dy -r -o $@.linktest $(KMODOBJS) $(LINKTESTOBJ) && \
+	$(LD) $(ZDEFS) -dy -r -o $@.linktest $(KMODOBJS) \
+	$(STANDOBJS) $(LINKTESTOBJ) && \
 	$(RM) $@.linktest
 
 KMDB_LINKTEST_ENABLE=$(POUND_SIGN)
@@ -189,7 +178,8 @@ $(KMDB_LINKTEST_ENABLE)KMDB_LINKTEST_CMD = $(KMDB_LINKTEST)
 KMDB_FPTEST_CMD = $(KMDB_FPTEST)
 
 $(KMODFILE): kmod .WAIT $(KMODOBJS) $(MAPFILE)
-	$(LD) -dy -r $(MAPFILE:%=-M%) -Nmisc/kmdbmod -o $@ $(KMODOBJS)
+	$(LD) -dy -r $(MAPFILE:%=-M%) -Nmisc/kmdbmod -o $@ $(KMODOBJS) \
+	$(STANDOBJS)
 	$(KMDB_LINKTEST_CMD)
 	$(KMDB_FPTEST_CMD)
 	$(CTFMERGE) -f -L VERSION -o $@ $(KMODOBJS)
@@ -199,7 +189,7 @@ linktest: linktest_check .WAIT kmod .WAIT $(KMODOBJS)
 	$(KMDB_LINKTEST)
 
 linktest_check:
-	@if [ "$(MDBTGT)" != "kvm" ] && [ "$(MDBTGT)" != "disasm" ] ; then \
+	@if [ "$(MDBTGT)" != "kvm" ] ; then \
 		echo "ERROR: linktest is not supported non-kvm/disasm dmods" \
 		    >&2 ; \
 		exit 1 ; \

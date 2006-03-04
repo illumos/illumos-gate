@@ -177,6 +177,7 @@ SUBDIRS += \
 	watchmalloc	\
 	madv		\
 	mpss		\
+	libdisasm	\
 	libwrap		\
 	libxcurses	\
 	libxcurses2	\
@@ -306,6 +307,7 @@ HDRSUBDIRS= libaio	\
 	libdhcpagent	\
 	libdhcpsvc	\
 	libdhcputil	\
+	libdisasm	\
 	libdtrace	\
 	libdtrace_jni	\
 	libeti		\

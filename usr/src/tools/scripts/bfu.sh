@@ -4366,6 +4366,14 @@ mondo_loop() {
 	smf_handle_new_services
 
 	#
+	# Remove obsolete disassembler module
+	#
+	if [ $target_isa = sparc ]; then 
+		rm -rf $usr/lib/mdb/disasm/*
+		rm -f $root/kernel/kmdb/sparcv9/sparc
+	fi
+
+	#
 	# Remove obsolete Sun-Fire-880 (daktari) FMA Fault Tree directory
 	# and file.  Backwards BFUs will resurrect them from the archives.
 	#

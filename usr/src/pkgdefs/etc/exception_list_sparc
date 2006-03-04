@@ -421,6 +421,13 @@ lib/llib-lproc			sparc
 lib/llib-lproc.ln		sparc
 lib/sparcv9/llib-lproc.ln	sparc
 #
+# Private libdisasm interfaces
+#
+usr/include/libdisasm.h		sparc
+usr/lib/llib-ldisasm		sparc
+usr/lib/llib-ldisasm.ln		sparc
+usr/lib/sparcv9/llib-ldisasm.ln	sparc
+#
 # This file is used for private communication between mdb, drv/kmdb, and
 # misc/kmdb.  The interfaces described herein are not intended for customer
 # use, and are thus excluded from packaging.
@@ -829,3 +836,9 @@ usr/include/libzfs_jni_util.h		sparc
 #
 usr/include/sys/scsi/adapters/mpapi_impl.h	sparc
 usr/include/sys/scsi/adapters/mpapi_scsi_vhci.h	sparc
+
+#
+# This library is installed in the proto area by the build of libdisasm, and is
+# only used when building the KMDB disasm module.
+#
+usr/lib/sparcv9/libstanddisasm.so	sparc

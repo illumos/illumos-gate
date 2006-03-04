@@ -20,7 +20,7 @@
 #
 
 #
-# Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+# Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
 # Use is subject to license terms.
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
@@ -219,6 +219,8 @@ s none usr/lib/amd64/libdevid.so.1=../../../lib/amd64/libdevid.so.1
 s none usr/lib/amd64/libdevid.so=../../../lib/amd64/libdevid.so.1
 s none usr/lib/amd64/libdevinfo.so.1=../../../lib/amd64/libdevinfo.so.1
 s none usr/lib/amd64/libdevinfo.so=../../../lib/amd64/libdevinfo.so.1
+f none usr/lib/amd64/libdisasm.so.1 755 root bin
+s none usr/lib/amd64/libdisasm.so=libdisasm.so.1
 s none usr/lib/amd64/libdl.so.1=../../../lib/amd64/libdl.so.1
 s none usr/lib/amd64/libdl.so=../../../lib/amd64/libdl.so.1
 s none usr/lib/amd64/libdoor.so.1=../../../lib/amd64/libdoor.so.1

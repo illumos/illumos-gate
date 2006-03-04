@@ -414,6 +414,13 @@ lib/llib-lproc			i386
 lib/llib-lproc.ln		i386
 lib/amd64/llib-lproc.ln		i386
 #
+# Private interfaces for libdisasm
+#
+usr/include/libdisasm.h		i386
+usr/lib/llib-ldisasm		i386
+usr/lib/llib-ldisasm.ln		i386
+usr/lib/amd64/llib-ldisasm.ln	i386
+#
 # This file is used for private communication between mdb, drv/kmdb, and
 # misc/kmdb.  The interfaces described herein are not intended for customer
 # use, and are thus excluded from packaging.
@@ -768,3 +775,10 @@ usr/include/libzfs_jni_util.h		i386
 #
 usr/include/sys/scsi/adapters/mpapi_impl.h	i386
 usr/include/sys/scsi/adapters/mpapi_scsi_vhci.h	i386
+
+#
+# This library is installed in the proto area by the build of libdisasm, and is
+# only used when building the KMDB disasm module.
+#
+usr/lib/libstanddisasm.so		i386
+usr/lib/amd64/libstanddisasm.so		i386

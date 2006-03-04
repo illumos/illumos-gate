@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -62,24 +61,6 @@ struct mdb_disasm {
 	const mdb_dis_ops_t *dis_ops;	/* Pointer to ops vector */
 	void *dis_data;			/* Private storage */
 };
-
-#ifdef _MDB
-
-#if defined(__sparc)
-extern mdb_dis_ctor_f sparc1_create;
-extern mdb_dis_ctor_f sparc2_create;
-extern mdb_dis_ctor_f sparc4_create;
-extern mdb_dis_ctor_f sparcv8_create;
-extern mdb_dis_ctor_f sparcv9_create;
-extern mdb_dis_ctor_f sparcv9plus_create;
-#else /* __i386 */
-extern mdb_dis_ctor_f ia32_create;
-#if defined(__amd64)
-extern mdb_dis_ctor_f amd64_create;
-#endif /* __amd64 */
-#endif	/* __sparc */
-
-#endif	/* _MDB */
 
 #ifdef	__cplusplus
 }
