@@ -46,10 +46,6 @@ CURTYPE=	library
 COMDIR=		$(SRC)/lib/libdisasm/common
 SPECDIR=	$(SRC)/lib/libdisasm/spec
 
-# Files specific to the library version of libdisasm
-OBJECTS_library =
-SRC_libary = $(OBJECTS_library:%.o=$(COMDIR)/%.c)
-
 #
 # Architecture-dependent files common to both versions of libdisasm
 #
@@ -67,7 +63,6 @@ SRC_common_common = $(OBJECTS_common_common:%.o=$(COMDIR)/%.c)
 
 
 OBJECTS=				\
-	$(OBJECTS_$(CURTYPE))		\
 	$(OBJECTS_common_$(MACH))	\
 	$(OBJECTS_common_common)
 
