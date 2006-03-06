@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -20,7 +19,7 @@
  * CDDL HEADER END
  */
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -226,7 +225,6 @@ copyfile(char *from, char *to)
 int
 editfile(char *editor, char *temp, char *orig, time_t *mtime)
 {
-
 	(void)sprintf(buf, "%s %s", editor, temp);
 	if (system(buf) == 0) {
 		return (sanity_check(temp, mtime, orig));
@@ -262,7 +260,8 @@ sanity_check(char *temp, time_t *mtime, char *orig)
 {
 	int i, ok = 0;
 	FILE *ft;
-	struct stat sbuf;
+	struct stat sbuf, statbuf;
+	char *ldir;
 	int isshadow = 0;
 
 	if (!strcmp(orig, shadow))
@@ -349,15 +348,28 @@ bad_root:		(void)fprintf(stderr,
 		}
 		if (!isshadow) {
 			/* root's login directory */
-			if (strncmp(++cp, "/:", 2)) {
-				(void)fprintf(stderr,
-				    "Root login directory != \"/\" or%s\n%s\n",
-				    " default shell missing:", buf);
+			ldir = ++cp;
+			cp = index(cp, ':');
+			if (cp == 0)
+				goto bad_root;
+			*cp = '\0';
+			if (stat(ldir, &statbuf) < 0) {
+				*cp = ':';
+				(void) fprintf(stderr,
+				    "root login dir doesn't exist:\n%s\n",
+				    buf);
+				break;
+			} else if (!S_ISDIR(statbuf.st_mode)) {
+				*cp = ':';
+				(void) fprintf(stderr,
+				    "root login dir is not a directory:\n%s\n",
+				    buf);
 				break;
 			}
 
+			*cp = ':';
 			/* root's login shell */
-			cp += 2;
+			++cp;
 			if (*cp && ! validsh(cp)) {
 				(void)fprintf(stderr,
 				    "Invalid root shell:\n%s\n", buf);
