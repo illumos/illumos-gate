@@ -217,6 +217,7 @@ COMMON_SUBDIRS = \
 	cmd/pt_chmod \
 	cmd/ptools \
 	cmd/pwck \
+	cmd/pwconv \
 	cmd/ramdiskadm \
 	cmd/raidctl \
 	cmd/rcap \
