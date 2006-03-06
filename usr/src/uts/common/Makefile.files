@@ -797,7 +797,7 @@ MNTFS_OBJS +=	mntvfsops.o	mntvnops.o
 SPEC_OBJS +=	specsubr.o	specvfsops.o	specvnops.o
 
 SOCK_OBJS +=	socksubr.o	sockvfsops.o	sockvnops.o	\
-		socksyscalls.o	socktpi.o	sockstr.o	ncafs.o \
+		socksyscalls.o	socktpi.o	sockstr.o	\
 		socksctp.o	socksctpsubr.o	socksctpvnops.o	sockssl.o \
 		nl7c.o		nl7curi.o	nl7chttp.o	nl7clogd.o \
 		nl7cnca.o

@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -105,7 +105,6 @@ static int socktpi_poll(struct vnode *, short, int, short *,
     struct pollhead **);
 
 struct vnodeops *socktpi_vnodeops;
-struct vnodeops *socknca_vnodeops;
 
 const fs_operation_def_t socktpi_vnodeops_template[] = {
 	VOPNAME_OPEN, socktpi_open,
@@ -122,25 +121,6 @@ const fs_operation_def_t socktpi_vnodeops_template[] = {
 	VOPNAME_FID, socktpi_fid,
 	VOPNAME_SEEK, socktpi_seek,
 	VOPNAME_POLL, (fs_generic_func_p) socktpi_poll,
-	VOPNAME_DISPOSE, fs_error,
-	NULL, NULL
-};
-
-const fs_operation_def_t socknca_vnodeops_template[] = {
-	VOPNAME_OPEN, socktpi_open,
-	VOPNAME_CLOSE, socknca_close,
-	VOPNAME_READ, socknca_read,
-	VOPNAME_WRITE, socknca_write,
-	VOPNAME_IOCTL, socknca_ioctl,
-	VOPNAME_SETFL, socktpi_setfl,
-	VOPNAME_GETATTR, socktpi_getattr,
-	VOPNAME_SETATTR, socktpi_setattr,
-	VOPNAME_ACCESS, socktpi_access,
-	VOPNAME_FSYNC, socktpi_fsync,
-	VOPNAME_INACTIVE, (fs_generic_func_p) socknca_inactive,
-	VOPNAME_FID, socktpi_fid,
-	VOPNAME_SEEK, socktpi_seek,
-	VOPNAME_POLL, (fs_generic_func_p) nca_poll,
 	VOPNAME_DISPOSE, fs_error,
 	NULL, NULL
 };
@@ -727,7 +707,8 @@ socktpi_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		 * in response to I_POP or I_PUSH.
 		 */
 #ifdef DEBUG
-		cmn_err(CE_WARN, "Unsupported STREAMS ioctl 0x%x on socket. "
+		zcmn_err(getzoneid(), CE_WARN,
+		    "Unsupported STREAMS ioctl 0x%x on socket. "
 		    "Pid = %d\n", cmd, curproc->p_pid);
 #endif /* DEBUG */
 		return (EOPNOTSUPP);
@@ -760,7 +741,7 @@ socktpi_ioctl(struct vnode *vp, int cmd, intptr_t arg, int mode,
 		if ((cmd & 0xffffff00U) == STR &&
 		    so->so_version == SOV_SOCKBSD) {
 #ifdef DEBUG
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "Unsupported STREAMS ioctl 0x%x on socket. "
 			    "Pid = %d\n", cmd, 	curproc->p_pid);
 #endif /* DEBUG */
@@ -1310,8 +1291,7 @@ sock_getmsg(
 	}
 	ASSERT(vp->v_stream->sd_vnode);
 	vp = vp->v_stream->sd_vnode;
-	ASSERT(vn_matchops(vp, socktpi_vnodeops) ||
-	    vn_matchops(vp, socknca_vnodeops));
+	ASSERT(vn_matchops(vp, socktpi_vnodeops));
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("sock_getmsg(%p) %s\n",
@@ -1356,8 +1336,7 @@ sock_putmsg(
 	}
 	ASSERT(vp->v_stream->sd_vnode);
 	vp = vp->v_stream->sd_vnode;
-	ASSERT(vn_matchops(vp, socktpi_vnodeops) ||
-	    vn_matchops(vp, socknca_vnodeops));
+	ASSERT(vn_matchops(vp, socktpi_vnodeops));
 	so = VTOSO(vp);
 
 	dprintso(so, 1, ("sock_putmsg(%p) %s\n",

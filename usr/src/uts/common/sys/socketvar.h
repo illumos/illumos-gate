@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -681,27 +681,6 @@ extern const struct fs_operation_def	socktpi_vnodeops_template[];
 extern sonodeops_t			sotpi_sonodeops;
 
 extern dev_t				sockdev;
-
-/* NCAfs symbols */
-
-extern int	socknca_read(struct vnode *, struct uio *, int, struct cred *,
-		    struct caller_context *);
-extern int	socknca_write(struct vnode *, struct uio *, int, struct cred *,
-		    struct caller_context *);
-extern int	socknca_ioctl(struct vnode *, int, intptr_t, int,
-		    struct cred *, int *);
-extern int	nca_poll(struct vnode *, short, int, short *,
-		    struct pollhead **);
-extern int	socknca_close(struct vnode *, int, int, offset_t,
-		    struct cred *);
-extern void	socknca_inactive(struct vnode *, struct cred *);
-
-extern const struct fs_operation_def	socknca_vnodeops_template[];
-extern struct vnodeops			*socknca_vnodeops;
-
-extern void		sonca_init(void);
-extern struct sonode	*sonca_create(vnode_t *, int, int, int, int,
-			    struct sonode *, int *);
 
 /*
  * sockfs functions

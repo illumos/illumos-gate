@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -57,8 +57,6 @@
 #include <netinet/in.h>
 #include <sys/sendfile.h>
 #include <sys/un.h>
-#include <inet/nca/ncadoorhdr.h>
-#include <inet/nca/ncaio.h>
 #include <sys/tihdr.h>
 #include <sys/atomic.h>
 
@@ -67,7 +65,6 @@
 #include <inet/ip6.h>
 #include <inet/tcp.h>
 
-extern int nca_sendfilev(file_t *, struct sendfilevec *, int, ssize_t *);
 extern int sosendfile64(file_t *, file_t *, const struct ksendfilevec64 *,
 		ssize32_t *);
 extern void nl7c_sendfilev(struct sonode *, u_offset_t, struct sendfilevec *,
@@ -1143,7 +1140,6 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 		}
 		is_sock = B_TRUE;
 		switch (so->so_family) {
-		case AF_NCA:
 		case AF_INET:
 		case AF_INET6:
 			/*
@@ -1278,10 +1274,6 @@ sendfilev(int opcode, int fildes, const struct sendfilevec *vec, int sfvcnt,
 				else
 					error = sendvec_chunk(fp, &fileoff,
 					    sfv, copy_cnt, &count);
-				break;
-			case AF_NCA:
-				error = nca_sendfilev(fp, sfv, copy_cnt,
-				    &count);
 				break;
 			}
 		} else {

@@ -361,7 +361,6 @@ stubs_base:
 	SCALL_NU_STUB(sockfs, getsockopt,  	nomod_zero);
 	SCALL_NU_STUB(sockfs, setsockopt,  	nomod_zero);
 	SCALL_NU_STUB(sockfs, sockconfig,  	nomod_zero);
-	SCALL_NU_STUB(sockfs, nca_sendfilev,  	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sock_getmsg,  	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sock_putmsg,  	nomod_zero);
 	NO_UNLOAD_STUB(sockfs, sosendfile64,  	nomod_zero);

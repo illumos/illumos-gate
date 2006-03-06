@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -1024,7 +1024,7 @@ void
 soqueueack(struct sonode *so, mblk_t *mp)
 {
 	if (DB_TYPE(mp) != M_PCPROTO) {
-		cmn_err(CE_WARN,
+		zcmn_err(getzoneid(), CE_WARN,
 		    "sockfs: received unexpected M_PROTO TPI ack. Prim %d\n",
 		    *(t_scalar_t *)mp->b_rptr);
 		freemsg(mp);
@@ -1098,7 +1098,7 @@ void
 soqueueconnind(struct sonode *so, mblk_t *mp)
 {
 	if (DB_TYPE(mp) != M_PROTO) {
-		cmn_err(CE_WARN,
+		zcmn_err(getzoneid(), CE_WARN,
 		    "sockfs: received unexpected M_PCPROTO T_CONN_IND\n");
 		freemsg(mp);
 		return;
@@ -1407,7 +1407,7 @@ so_save_discon_ind(struct sonode *so,
 	 * or being processed.
 	 */
 	if (so->so_discon_ind_mp != NULL || (so->so_flag & SOASYNC_UNBIND)) {
-		cmn_err(CE_WARN,
+		zcmn_err(getzoneid(), CE_WARN,
 		    "sockfs: received unexpected additional T_DISCON_IND\n");
 		freemsg(mp);
 		return;
@@ -1650,7 +1650,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	if (MBLKL(mp) < sizeof (tpr->type)) {
 		/* The message is too short to even contain the primitive */
-		cmn_err(CE_WARN,
+		zcmn_err(getzoneid(), CE_WARN,
 		    "sockfs: Too short TPI message received. Len = %ld\n",
 		    (ptrdiff_t)(MBLKL(mp)));
 		freemsg(mp);
@@ -1658,7 +1658,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 	}
 	if (!__TPI_PRIM_ISALIGNED(mp->b_rptr)) {
 		/* The read pointer is not aligned correctly for TPI */
-		cmn_err(CE_WARN,
+		zcmn_err(getzoneid(), CE_WARN,
 		    "sockfs: Unaligned TPI message received. rptr = %p\n",
 		    (void *)mp->b_rptr);
 		freemsg(mp);
@@ -1671,7 +1671,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	case T_DATA_IND:
 		if (MBLKL(mp) < sizeof (struct T_data_ind)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_DATA_IND. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -1702,7 +1702,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		t_uscalar_t		addrlen;
 
 		if (MBLKL(mp) < sizeof (struct T_unitdata_ind)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_UNITDATA_IND. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -1731,7 +1731,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 					mutex_enter(&so->so_lock);
 					soseterror(so, EPROTO);
 					mutex_exit(&so->so_lock);
-					cmn_err(CE_WARN,
+					zcmn_err(getzoneid(), CE_WARN,
 					    "sockfs: T_unidata_ind with "
 					    "invalid optlen/offset %u/%d\n",
 					    optlen, tudi->OPT_offset);
@@ -1788,7 +1788,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			mutex_enter(&so->so_lock);
 			soseterror(so, EPROTO);
 			mutex_exit(&so->so_lock);
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: T_unidata_ind with invalid "
 			    "addrlen/offset %u/%d\n",
 			    addrlen, tudi->SRC_offset);
@@ -1886,7 +1886,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				mutex_enter(&so->so_lock);
 				soseterror(so, EPROTO);
 				mutex_exit(&so->so_lock);
-				cmn_err(CE_WARN,
+				zcmn_err(getzoneid(), CE_WARN,
 				    "sockfs: T_unidata_ind with invalid "
 				    "optlen/offset %u/%d\n",
 				    optlen, tudi->OPT_offset);
@@ -1918,7 +1918,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		struct T_optdata_ind	*tdi = &tpr->optdata_ind;
 
 		if (MBLKL(mp) < sizeof (struct T_optdata_ind)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_OPTDATA_IND. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -1948,7 +1948,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 				mutex_enter(&so->so_lock);
 				soseterror(so, EPROTO);
 				mutex_exit(&so->so_lock);
-				cmn_err(CE_WARN,
+				zcmn_err(getzoneid(), CE_WARN,
 				    "sockfs: T_optdata_ind with invalid "
 				    "optlen/offset %u/%d\n",
 				    optlen, tdi->OPT_offset);
@@ -1977,7 +1977,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		mblk_t		*mctl, *mdata;
 
 		if (MBLKL(mp) < sizeof (struct T_exdata_ind)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_EXDATA_IND. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2066,7 +2066,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		 * and drop the message.
 		 */
 		if (MBLKL(mp) < sizeof (struct T_conn_con)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_CONN_CON. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2093,7 +2093,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		if (so->so_family == AF_UNIX ?
 		    addrlen != (t_uscalar_t)sizeof (so->so_ux_laddr) :
 		    addrlen > (t_uscalar_t)so->so_faddr_maxlen) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: T_conn_con with different "
 			    "length %u/%d\n",
 			    addrlen, conn_con->RES_length);
@@ -2114,7 +2114,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		}
 		addr = sogetoff(mp, conn_con->RES_offset, addrlen, 1);
 		if (addr == NULL) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: T_conn_con with invalid "
 			    "addrlen/offset %u/%d\n",
 			    addrlen, conn_con->RES_offset);
@@ -2175,7 +2175,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		 * the so_conn_ind_head/tail list.
 		 */
 		if (MBLKL(mp) < sizeof (struct T_conn_ind)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_CONN_IND. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2187,7 +2187,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			audit_sock(T_CONN_IND, strvp2wq(vp), mp, 0);
 #endif /* C2_AUDIT */
 		if (!(so->so_state & SS_ACCEPTCONN)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: T_conn_ind on non-listening socket\n");
 			freemsg(mp);
 			return (NULL);
@@ -2222,7 +2222,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	case T_ORDREL_IND:
 		if (MBLKL(mp) < sizeof (struct T_ordrel_ind)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_ORDREL_IND. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2253,7 +2253,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	case T_DISCON_IND:
 		if (MBLKL(mp) < sizeof (struct T_discon_ind)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_DISCON_IND. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2329,7 +2329,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			("T_UDERROR_IND: error %d\n", tudi->ERROR_type));
 
 		if (MBLKL(mp) < sizeof (struct T_uderror_ind)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_UDERROR_IND. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2339,7 +2339,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		if (so->so_mode & SM_CONNREQUIRED) {
 			freemsg(mp);
 			eprintsoline(so, 0);
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: T_uderror_ind on connection-oriented "
 			    "transport\n");
 			return (NULL);
@@ -2347,7 +2347,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		addrlen = tudi->DEST_length;
 		addr = sogetoff(mp, tudi->DEST_offset, addrlen, 1);
 		if (addr == NULL) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: T_uderror_ind with invalid "
 			    "addrlen/offset %u/%d\n",
 			    addrlen, tudi->DEST_offset);
@@ -2477,7 +2477,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 			tpr->error_ack.UNIX_error));
 
 		if (MBLKL(mp) < sizeof (struct T_error_ack)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_ERROR_ACK. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2500,7 +2500,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	case T_OK_ACK:
 		if (MBLKL(mp) < sizeof (struct T_ok_ack)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_OK_ACK. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2525,7 +2525,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	case T_INFO_ACK:
 		if (MBLKL(mp) < sizeof (struct T_info_ack)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_INFO_ACK. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2542,7 +2542,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		 * provider.
 		 */
 		if (MBLKL(mp) < 2 * sizeof (t_uscalar_t)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_CAPABILITY_ACK. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2553,7 +2553,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	case T_BIND_ACK:
 		if (MBLKL(mp) < sizeof (struct T_bind_ack)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_BIND_ACK. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2564,7 +2564,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 
 	case T_OPTMGMT_ACK:
 		if (MBLKL(mp) < sizeof (struct T_optmgmt_ack)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: Too short T_OPTMGMT_ACK. Len = %ld\n",
 			    (ptrdiff_t)(MBLKL(mp)));
 			freemsg(mp);
@@ -2574,7 +2574,7 @@ strsock_proto(vnode_t *vp, mblk_t *mp,
 		return (NULL);
 	default:
 #ifdef DEBUG
-		cmn_err(CE_WARN,
+		zcmn_err(getzoneid(), CE_WARN,
 			"sockfs: unknown TPI primitive %d received\n",
 			tpr->type);
 #endif /* DEBUG */

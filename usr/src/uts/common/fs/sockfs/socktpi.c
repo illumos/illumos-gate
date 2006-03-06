@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -474,8 +474,8 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			 * protocol families. For example, AF_X25 does not
 			 * have a family field.
 			 */
-			so->so_laddr_len = 0;	/* XXX correct? */
 			bzero(so->so_laddr_sa, so->so_laddr_len);
+			so->so_laddr_len = 0;	/* XXX correct? */
 			addr = NULL;
 			addrlen = 0;
 			break;
@@ -623,14 +623,14 @@ sotpi_bindlisten(struct sonode *so, struct sockaddr *name,
 			 */
 			if (sin6->sin6_scope_id != 0 &&
 			    !IN6_IS_ADDR_LINKSCOPE(&sin6->sin6_addr)) {
-				cmn_err(CE_WARN,
+				zcmn_err(getzoneid(), CE_WARN,
 				    "bind with uninitialized sin6_scope_id "
 				    "(%d) on socket. Pid = %d\n",
 				    (int)sin6->sin6_scope_id,
 				    (int)curproc->p_pid);
 			}
 			if (sin6->__sin6_src_id != 0) {
-				cmn_err(CE_WARN,
+				zcmn_err(getzoneid(), CE_WARN,
 				    "bind with uninitialized __sin6_src_id "
 				    "(%d) on socket. Pid = %d\n",
 				    (int)sin6->__sin6_src_id,
@@ -4504,7 +4504,7 @@ sotpi_getpeername(struct sonode *so)
 			(t_uscalar_t)so->so_faddr_len)));
 #endif /* DEBUG */
 
-	if (so->so_family == AF_UNIX || so->so_family == AF_NCA) {
+	if (so->so_family == AF_UNIX) {
 		/* Transport has different name space - return local info */
 		error = 0;
 		goto done;
@@ -4908,10 +4908,6 @@ sotpi_getsockopt(struct sonode *so, int level, int option_name,
 		}
 	}
 
-	if (so->so_family == AF_NCA) {
-		goto done2;
-	}
-
 	mutex_exit(&so->so_lock);
 
 	/* Send request */
@@ -5027,12 +5023,6 @@ sotpi_setsockopt(struct sonode *so, int level, int option_name,
 	mutex_enter(&so->so_lock);
 	so_lock_single(so);	/* Set SOLOCKED */
 	mutex_exit(&so->so_lock);
-
-	if (so->so_family == AF_NCA) {
-		/* Ignore any flow control problems with the transport. */
-		mutex_enter(&so->so_lock);
-		goto done;
-	}
 
 	/*
 	 * For SOCKET or TCP level options, try to set it here itself

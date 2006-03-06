@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -684,7 +684,8 @@ sockinit(int fstype, char *name)
 
 	error = vfs_setfsops(fstype, sock_vfsops_template, NULL);
 	if (error != 0) {
-		cmn_err(CE_WARN, "sockinit: bad vfs ops template");
+		zcmn_err(GLOBAL_ZONEID, CE_WARN,
+		    "sockinit: bad vfs ops template");
 		return (error);
 	}
 
@@ -693,14 +694,6 @@ sockinit(int fstype, char *name)
 		err_str = "sockinit: bad sock vnode ops template";
 		/* vn_make_ops() does not reset socktpi_vnodeops on failure. */
 		socktpi_vnodeops = NULL;
-		goto failure;
-	}
-
-	error = vn_make_ops("nca", socknca_vnodeops_template,
-	    &socknca_vnodeops);
-	if (error != 0) {
-		err_str = "sockinit: bad nca vnode ops template";
-		socknca_vnodeops = NULL;
 		goto failure;
 	}
 
@@ -743,7 +736,6 @@ sockinit(int fstype, char *name)
 	sockdev = makedevice(dev, 0);
 
 	mutex_init(&socklist.sl_lock, NULL, MUTEX_DEFAULT, NULL);
-	sonca_init();
 	sendfile_init();
 	nl7c_init();
 
@@ -753,10 +745,8 @@ failure:
 	(void) vfs_freevfsops_by_type(fstype);
 	if (socktpi_vnodeops != NULL)
 		vn_freevnodeops(socktpi_vnodeops);
-	if (socknca_vnodeops != NULL)
-		vn_freevnodeops(socknca_vnodeops);
 	if (err_str != NULL)
-		cmn_err(CE_WARN, err_str);
+		zcmn_err(GLOBAL_ZONEID, CE_WARN, err_str);
 	return (error);
 }
 
@@ -1022,7 +1012,7 @@ so_addr_verify(struct sonode *so, const struct sockaddr *name,
 		sin6 = (struct sockaddr_in6 *)name;
 		if (sin6->sin6_scope_id != 0 &&
 		    !IN6_IS_ADDR_LINKSCOPE(&sin6->sin6_addr)) {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "connect/send* with uninitialized sin6_scope_id "
 			    "(%d) on socket. Pid = %d\n",
 			    (int)sin6->sin6_scope_id, (int)curproc->p_pid);
@@ -1337,13 +1327,13 @@ fdbuf_verify(mblk_t *mp, struct fdbuf *fdbuf, int fdbuflen)
 				fdbuf, fdbuflen));
 			return (1);
 		} else {
-			cmn_err(CE_WARN,
+			zcmn_err(getzoneid(), CE_WARN,
 			    "sockfs: mismatched fdbuf content (%p)",
 			    (void *)mp);
 			return (0);
 		}
 	} else {
-		cmn_err(CE_WARN,
+		zcmn_err(getzoneid(), CE_WARN,
 		    "sockfs: mismatched fdbuf len %d, %d\n",
 		    fdbuflen, fdbuf->fd_size);
 		return (0);
