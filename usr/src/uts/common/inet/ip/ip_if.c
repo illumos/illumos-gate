@@ -764,15 +764,6 @@ ill_delete_tail(ill_t *ill)
 		ipif_down_tail(ipif);
 
 	/*
-	 * Send the detach if there's one to send (i.e., if we're above a
-	 * style 2 DLPI driver).
-	 */
-	if (ill->ill_detach_mp != NULL) {
-		ill_dlpi_send(ill, ill->ill_detach_mp);
-		ill->ill_detach_mp = NULL;
-	}
-
-	/*
 	 * If polling capability is enabled (which signifies direct
 	 * upcall into IP and driver has ill saved as a handle),
 	 * we need to make sure that unbind has completed before we
@@ -780,11 +771,24 @@ ill_delete_tail(ill_t *ill)
 	 * to this ill.
 	 */
 	mutex_enter(&ill->ill_lock);
-	if (ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING)) {
-		while (!(ill->ill_state_flags & ILL_DL_UNBIND_DONE))
-			cv_wait(&ill->ill_cv, &ill->ill_lock);
-	}
+	while (ill->ill_state_flags & ILL_DL_UNBIND_IN_PROGRESS)
+		cv_wait(&ill->ill_cv, &ill->ill_lock);
 	mutex_exit(&ill->ill_lock);
+
+	/*
+	 * Clean up polling and soft ring capabilities
+	 */
+	if (ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING))
+		ill_capability_dls_disable(ill);
+
+	/*
+	 * Send the detach if there's one to send (i.e., if we're above a
+	 * style 2 DLPI driver).
+	 */
+	if (ill->ill_detach_mp != NULL) {
+		ill_dlpi_send(ill, ill->ill_detach_mp);
+		ill->ill_detach_mp = NULL;
+	}
 
 	if (ill->ill_net_type != IRE_LOOPBACK)
 		qprocsoff(ill->ill_rq);
@@ -828,12 +832,6 @@ ill_delete_tail(ill_t *ill)
 		    sizeof (ill_zerocopy_capab_t));
 		ill->ill_zerocopy_capab = NULL;
 	}
-
-	/*
-	 * Clean up polling and soft ring capabilities
-	 */
-	if (ill->ill_capabilities & (ILL_CAPAB_POLL|ILL_CAPAB_SOFT_RING))
-		ill_capability_dls_disable(ill);
 
 	if (ill->ill_dls_capab != NULL) {
 		CONN_DEC_REF(ill->ill_dls_capab->ill_unbind_conn);
@@ -17108,6 +17106,9 @@ ill_dl_down(ill_t *ill)
 		ip1dbg(("ill_dl_down: %s (%u) for %s\n",
 		    dlpi_prim_str(*(int *)mp->b_rptr), *(int *)mp->b_rptr,
 		    ill->ill_name));
+		mutex_enter(&ill->ill_lock);
+		ill->ill_state_flags |= ILL_DL_UNBIND_IN_PROGRESS;
+		mutex_exit(&ill->ill_lock);
 		ill_dlpi_send(ill, mp);
 	}
 
@@ -17148,7 +17149,7 @@ ill_dlpi_dispatch(ill_t *ill, mblk_t *mp)
 	}
 	case DL_BIND_REQ:
 		mutex_enter(&ill->ill_lock);
-		ill->ill_state_flags &= ~ILL_DL_UNBIND_DONE;
+		ill->ill_state_flags &= ~ILL_DL_UNBIND_IN_PROGRESS;
 		mutex_exit(&ill->ill_lock);
 		break;
 	}

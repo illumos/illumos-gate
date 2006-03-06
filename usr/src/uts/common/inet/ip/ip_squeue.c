@@ -497,9 +497,6 @@ ip_squeue_soft_ring_affinity(void *arg)
 	min_cpu_id = (cpu_id / ip_threads_per_cpu) * ip_threads_per_cpu;
 	max_cpu_id = min_cpu_id + ip_threads_per_cpu;
 
-	cmn_err(CE_CONT, "soft_ring_affinity: min/max/intr = %d/%d/%d\n",
-	    min_cpu_id, max_cpu_id, (int)intr_cpu->cpu_id);
-
 	/*
 	 * Quickly check if there are enough CPUs present for fanout
 	 * and also max_cpu_id is less than the id of the active CPU.
@@ -584,9 +581,6 @@ ip_squeue_soft_ring_affinity(void *arg)
 			    sqp->sq_bind);
 		}
 		mutex_exit(&sqp->sq_lock);
-
-		cmn_err(CE_CONT, "soft_ring_affinity: ring = %d, bind = %d\n",
-		    i - j, sqp->sq_bind);
 	}
 	mutex_exit(&ill->ill_lock);
 
@@ -601,6 +595,7 @@ ip_squeue_soft_ring_affinity(void *arg)
 	ill_waiter_dcr(ill);
 }
 
+/* ARGSUSED */
 void
 ip_soft_ring_assignment(ill_t *ill, ill_rx_ring_t *ip_ring,
 mblk_t *mp_chain, size_t hdrlen)
@@ -609,7 +604,6 @@ mblk_t *mp_chain, size_t hdrlen)
 	boolean_t	refheld;
 
 	ASSERT(servicing_interrupt());
-	ASSERT(ip_ring == NULL);
 
 	mutex_enter(&ill->ill_lock);
 	if (!(ill->ill_state_flags & ILL_SOFT_RING_ASSIGN)) {
@@ -620,7 +614,7 @@ mblk_t *mp_chain, size_t hdrlen)
 			goto out;
 
 		taskq_arg->ip_taskq_ill = ill;
-		taskq_arg->ip_taskq_ill_rx_ring = ip_ring;
+		taskq_arg->ip_taskq_ill_rx_ring = NULL;
 		taskq_arg->ip_taskq_cpu = CPU;
 
 		/*
@@ -653,7 +647,7 @@ mblk_t *mp_chain, size_t hdrlen)
 	kmem_free(taskq_arg, sizeof (ip_taskq_arg_t));
 
 out:
-	ip_input(ill, ip_ring, mp_chain, hdrlen);
+	ip_input(ill, NULL, mp_chain, hdrlen);
 }
 
 static squeue_t *

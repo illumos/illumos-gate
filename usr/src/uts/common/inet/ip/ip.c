@@ -13698,8 +13698,13 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 		    dlea->dl_errno,
 		    dlea->dl_unix_errno));
 		switch (dlea->dl_error_primitive) {
-		case DL_NOTIFY_REQ:
 		case DL_UNBIND_REQ:
+			mutex_enter(&ill->ill_lock);
+			ill->ill_state_flags &= ~ILL_DL_UNBIND_IN_PROGRESS;
+			cv_signal(&ill->ill_cv);
+			mutex_exit(&ill->ill_lock);
+			/* FALLTHRU */
+		case DL_NOTIFY_REQ:
 		case DL_ATTACH_REQ:
 		case DL_DETACH_REQ:
 		case DL_INFO_REQ:
@@ -13759,7 +13764,7 @@ ip_rput_dlpi(queue_t *q, mblk_t *mp)
 		switch (dloa->dl_correct_primitive) {
 		case DL_UNBIND_REQ:
 			mutex_enter(&ill->ill_lock);
-			ill->ill_state_flags |= ILL_DL_UNBIND_DONE;
+			ill->ill_state_flags &= ~ILL_DL_UNBIND_IN_PROGRESS;
 			cv_signal(&ill->ill_cv);
 			mutex_exit(&ill->ill_lock);
 			/* FALLTHRU */

@@ -1629,7 +1629,7 @@ typedef struct ill_rx_ring ill_rx_ring_t;
 #define	ILL_LL_SUBNET_PENDING	0x01	/* Waiting for DL_INFO_ACK from drv */
 #define	ILL_CONDEMNED		0x02	/* No more new ref's to the ILL */
 #define	ILL_CHANGING		0x04	/* ILL not globally visible */
-#define	ILL_DL_UNBIND_DONE	0x08	/* UNBIND_REQ has been Acked */
+#define	ILL_DL_UNBIND_IN_PROGRESS	0x08	/* UNBIND_REQ is sent */
 #define	ILL_SOFT_RING_ASSIGN	0x10	/* Makeing soft ring assigment */
 
 /* Is this an ILL whose source address is used by other ILL's ? */

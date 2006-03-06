@@ -1718,8 +1718,13 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 	 */
 	subsize = 0;
 
-	/* Always advertize soft ring capability for GLDv3 drivers */
-	subsize += sizeof (dl_capability_sub_t) + sizeof (dl_capab_dls_t);
+	/*
+	 * Advertize soft ring capability if
+	 * VLAN_ID_NONE for GLDv3 drivers
+	 */
+	if (dsp->ds_vid == VLAN_ID_NONE)
+		subsize += sizeof (dl_capability_sub_t) +
+				    sizeof (dl_capab_dls_t);
 
 	/*
 	 * Check if polling can be enabled on this interface.
@@ -1829,25 +1834,27 @@ proto_capability_advertise(dld_str_t *dsp, mblk_t *mp)
 
 	ASSERT(RW_READ_HELD(&dsp->ds_lock));
 
-	dlsp = (dl_capability_sub_t *)ptr;
+	if (dsp->ds_vid == VLAN_ID_NONE) {
+		dlsp = (dl_capability_sub_t *)ptr;
 
-	dlsp->dl_cap = DL_CAPAB_SOFT_RING;
-	dlsp->dl_length = sizeof (dl_capab_dls_t);
-	ptr += sizeof (dl_capability_sub_t);
+		dlsp->dl_cap = DL_CAPAB_SOFT_RING;
+		dlsp->dl_length = sizeof (dl_capab_dls_t);
+		ptr += sizeof (dl_capability_sub_t);
 
-	bzero(&soft_ring, sizeof (dl_capab_dls_t));
-	soft_ring.dls_version = SOFT_RING_VERSION_1;
-	soft_ring.dls_flags = SOFT_RING_CAPABLE;
-	soft_ring.dls_tx_handle = (uintptr_t)dsp;
-	soft_ring.dls_tx = (uintptr_t)str_mdata_fastpath_put;
-	soft_ring.dls_ring_change_status =
-	    (uintptr_t)proto_change_soft_ring_fanout;
-	soft_ring.dls_ring_bind = (uintptr_t)soft_ring_bind;
-	soft_ring.dls_ring_unbind = (uintptr_t)soft_ring_unbind;
+		bzero(&soft_ring, sizeof (dl_capab_dls_t));
+		soft_ring.dls_version = SOFT_RING_VERSION_1;
+		soft_ring.dls_flags = SOFT_RING_CAPABLE;
+		soft_ring.dls_tx_handle = (uintptr_t)dsp;
+		soft_ring.dls_tx = (uintptr_t)str_mdata_fastpath_put;
+		soft_ring.dls_ring_change_status =
+		    (uintptr_t)proto_change_soft_ring_fanout;
+		soft_ring.dls_ring_bind = (uintptr_t)soft_ring_bind;
+		soft_ring.dls_ring_unbind = (uintptr_t)soft_ring_unbind;
 
-	dlcapabsetqid(&(soft_ring.dls_mid), dsp->ds_rq);
-	bcopy(&soft_ring, ptr, sizeof (dl_capab_dls_t));
-	ptr += sizeof (dl_capab_dls_t);
+		dlcapabsetqid(&(soft_ring.dls_mid), dsp->ds_rq);
+		bcopy(&soft_ring, ptr, sizeof (dl_capab_dls_t));
+		ptr += sizeof (dl_capab_dls_t);
+	}
 
 	/*
 	 * TCP/IP checksum offload.
