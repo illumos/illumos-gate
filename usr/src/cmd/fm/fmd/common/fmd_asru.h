@@ -53,7 +53,7 @@ typedef struct fmd_asru {
 	uint_t asru_refs;		/* reference count */
 	uint_t asru_flags;		/* flags (see below) */
 	fmd_case_t *asru_case;		/* case associated with last change */
-	nvlist_t *asru_event;		/* case event inside of asru_case */
+	nvlist_t *asru_event;		/* event associated with last change */
 } fmd_asru_t;
 
 #define	FMD_ASRU_FAULTY		0x01	/* asru has been diagnosed as faulty */
@@ -62,6 +62,7 @@ typedef struct fmd_asru {
 #define	FMD_ASRU_INTERNAL	0x08	/* asru is managed by fmd itself */
 #define	FMD_ASRU_INVISIBLE	0x10	/* asru is not visibly administered */
 #define	FMD_ASRU_RECREATED	0x20	/* asru recreated by cache replay */
+#define	FMD_ASRU_PRESENT	0x40	/* asru present at last R$ update */
 
 #define	FMD_ASRU_STATE	(FMD_ASRU_FAULTY | FMD_ASRU_UNUSABLE)
 
@@ -78,6 +79,7 @@ typedef struct fmd_asru_hash {
 extern fmd_asru_hash_t *fmd_asru_hash_create(const char *, const char *);
 extern void fmd_asru_hash_destroy(fmd_asru_hash_t *);
 extern void fmd_asru_hash_refresh(fmd_asru_hash_t *);
+extern void fmd_asru_hash_replay(fmd_asru_hash_t *);
 
 extern void fmd_asru_hash_apply(fmd_asru_hash_t *,
     void (*)(fmd_asru_t *, void *), void *);

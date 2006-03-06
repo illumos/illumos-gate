@@ -84,10 +84,11 @@ typedef struct fmd_case_impl {
 #define	FMD_CASE_CLOSED		3	/* case is closed (reconfig done) */
 #define	FMD_CASE_REPAIRED	4	/* case is repaired (can be freed) */
 
-#define	FMD_CF_DIRTY		0x1	/* case is in need of checkpoint */
-#define	FMD_CF_SOLVED		0x2	/* case has been solved */
-#define	FMD_CF_ISOLATED		0x4	/* case has been isolated */
-#define	FMD_CF_REPAIRED		0x8	/* case has been repaired */
+#define	FMD_CF_DIRTY		0x01	/* case is in need of checkpoint */
+#define	FMD_CF_SOLVED		0x02	/* case has been solved */
+#define	FMD_CF_ISOLATED		0x04	/* case has been isolated */
+#define	FMD_CF_REPAIRED		0x08	/* case has been repaired */
+#define	FMD_CF_REPAIRING	0x10	/* case repair in progress */
 
 typedef struct fmd_case_hash {
 	pthread_rwlock_t ch_lock;	/* lock protecting case hash */

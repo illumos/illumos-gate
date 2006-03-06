@@ -541,6 +541,23 @@ fmd_case_create(fmd_module_t *mp, void *data)
 	return ((fmd_case_t *)cip);
 }
 
+static void
+fmd_case_destroy_suspects(fmd_case_impl_t *cip)
+{
+	fmd_case_susp_t *cis, *ncis;
+
+	ASSERT(MUTEX_HELD(&cip->ci_lock));
+
+	for (cis = cip->ci_suspects; cis != NULL; cis = ncis) {
+		ncis = cis->cis_next;
+		nvlist_free(cis->cis_nvl);
+		fmd_free(cis, sizeof (fmd_case_susp_t));
+	}
+
+	cip->ci_suspects = NULL;
+	cip->ci_nsuspects = 0;
+}
+
 fmd_case_t *
 fmd_case_recreate(fmd_module_t *mp, fmd_xprt_t *xp,
     uint_t state, const char *uuid, const char *code)
@@ -612,6 +629,9 @@ fmd_case_recreate(fmd_module_t *mp, fmd_xprt_t *xp,
 		cip->ci_mod = mp;
 		fmd_module_hold(mp);
 
+		fmd_case_destroy_suspects(cip);
+		cip->ci_state = state;
+
 		(void) pthread_mutex_unlock(&cip->ci_lock);
 		fmd_case_rele((fmd_case_t *)cip);
 	}
@@ -631,7 +651,6 @@ fmd_case_destroy(fmd_case_t *cp, int visible)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 	fmd_case_item_t *cit, *ncit;
-	fmd_case_susp_t *cis, *ncis;
 
 	ASSERT(MUTEX_HELD(&cip->ci_lock));
 	ASSERT(cip->ci_refs == 0);
@@ -647,11 +666,7 @@ fmd_case_destroy(fmd_case_t *cp, int visible)
 		fmd_free(cit, sizeof (fmd_case_item_t));
 	}
 
-	for (cis = cip->ci_suspects; cis != NULL; cis = ncis) {
-		ncis = cis->cis_next;
-		nvlist_free(cis->cis_nvl);
-		fmd_free(cis, sizeof (fmd_case_susp_t));
-	}
+	fmd_case_destroy_suspects(cip);
 
 	if (cip->ci_principal != NULL)
 		fmd_event_rele(cip->ci_principal);
@@ -834,20 +849,12 @@ void
 fmd_case_reset_suspects(fmd_case_t *cp)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
-	fmd_case_susp_t *cis, *ncis;
 
 	(void) pthread_mutex_lock(&cip->ci_lock);
 	ASSERT(cip->ci_state < FMD_CASE_SOLVED);
 
-	for (cis = cip->ci_suspects; cis != NULL; cis = ncis) {
-		ncis = cis->cis_next;
-		nvlist_free(cis->cis_nvl);
-		fmd_free(cis, sizeof (fmd_case_susp_t));
-	}
-
+	fmd_case_destroy_suspects(cip);
 	cip->ci_flags |= FMD_CF_DIRTY;
-	cip->ci_suspects = NULL;
-	cip->ci_nsuspects = 0;
 
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 	fmd_module_setcdirty(cip->ci_mod);
@@ -863,7 +870,6 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 {
 	fmd_case_impl_t *cip = (fmd_case_impl_t *)cp;
 
-	uint_t old_state;
 	fmd_case_susp_t *cis;
 	fmd_case_item_t *cit;
 	fmd_asru_t *asru;
@@ -872,6 +878,10 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 
 	ASSERT(state <= FMD_CASE_REPAIRED);
 	(void) pthread_mutex_lock(&cip->ci_lock);
+
+	if (!(cip->ci_flags & FMD_CF_SOLVED))
+		flags &= ~(FMD_CF_ISOLATED | FMD_CF_REPAIRED);
+
 	cip->ci_flags |= flags;
 
 	if (cip->ci_state >= state) {
@@ -882,7 +892,6 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 	TRACE((FMD_DBG_CASE, "case %s %s->%s", cip->ci_uuid,
 	    _fmd_case_snames[cip->ci_state], _fmd_case_snames[state]));
 
-	old_state = cip->ci_state;
 	cip->ci_state = state;
 	cip->ci_flags |= FMD_CF_DIRTY;
 
@@ -927,29 +936,16 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 		}
 
 	close_wait_finish:
-		if (!fmd_case_orphaned(cp))
-			break; /* state transition complete */
-
 		/*
 		 * If an orphaned case transitions to CLOSE_WAIT, the owning
 		 * module is no longer loaded: continue on to CASE_CLOSED.
 		 */
-		state = cip->ci_state = FMD_CASE_CLOSED;
-		/*FALLTHRU*/
-
-	case FMD_CASE_CLOSED:
-		ASSERT(fmd_case_orphaned(cp));
-		fmd_module_lock(cip->ci_mod);
-		fmd_list_append(&cip->ci_mod->mod_cases, cip);
-		fmd_module_unlock(cip->ci_mod);
+		if (fmd_case_orphaned(cp))
+			state = cip->ci_state = FMD_CASE_CLOSED;
 		break;
 
 	case FMD_CASE_REPAIRED:
 		ASSERT(fmd_case_orphaned(cp));
-
-		if (old_state == FMD_CASE_CLOSE_WAIT)
-			break; /* case was never closed (transition 6 above) */
-
 		fmd_module_lock(cip->ci_mod);
 		fmd_list_delete(&cip->ci_mod->mod_cases, cip);
 		fmd_module_unlock(cip->ci_mod);
@@ -976,12 +972,11 @@ fmd_case_transition(fmd_case_t *cp, uint_t state, uint_t flags)
 	}
 
 	/*
-	 * If we transitioned to CLOSED or REPAIRED, adjust the reference count
-	 * to reflect our addition to or removal from fmd.d_rmod->mod_cases.
+	 * If we transitioned to REPAIRED, adjust the reference count to
+	 * reflect our removal from fmd.d_rmod->mod_cases.  If the caller has
+	 * not placed an additional hold on the case, it will now be freed.
 	 */
-	if (state == FMD_CASE_CLOSED)
-		fmd_case_hold(cp);
-	else if (state == FMD_CASE_REPAIRED && old_state != FMD_CASE_CLOSE_WAIT)
+	if (state == FMD_CASE_REPAIRED)
 		fmd_case_rele(cp);
 }
 
@@ -1099,7 +1094,8 @@ fmd_case_update(fmd_case_t *cp)
 	(void) pthread_mutex_lock(&cip->ci_lock);
 	cstate = cip->ci_state;
 
-	if (cip->ci_xprt != NULL || cip->ci_state < FMD_CASE_SOLVED) {
+	if ((cip->ci_flags & FMD_CF_REPAIRING) ||
+	    cip->ci_xprt != NULL || cip->ci_state < FMD_CASE_SOLVED) {
 		(void) pthread_mutex_unlock(&cip->ci_lock);
 		return; /* update is not appropriate */
 	}
@@ -1163,6 +1159,18 @@ fmd_case_delete(fmd_case_t *cp)
 	fmd_module_hold(cip->ci_mod);
 
 	/*
+	 * If the case is not proxied and it has been solved, then retain it
+	 * on the root module's case list at least until we're transitioned.
+	 * Otherwise free the case with our final fmd_case_rele() below.
+	 */
+	if (cip->ci_xprt == NULL && (cip->ci_flags & FMD_CF_SOLVED)) {
+		fmd_module_lock(cip->ci_mod);
+		fmd_list_append(&cip->ci_mod->mod_cases, cip);
+		fmd_module_unlock(cip->ci_mod);
+		fmd_case_hold(cp);
+	}
+
+	/*
 	 * If a proxied case finishes CLOSE_WAIT, then it can be discarded
 	 * rather than orphaned because by definition it can have no entries
 	 * in the resource cache of the current fault manager.
@@ -1189,6 +1197,14 @@ fmd_case_discard(fmd_case_t *cp)
 	ASSERT(fmd_module_locked(cip->ci_mod));
 	fmd_list_delete(&cip->ci_mod->mod_cases, cip);
 	fmd_case_rele(cp);
+}
+
+static void
+fmd_case_repair_containee(fmd_asru_t *ee, void *er)
+{
+	if ((ee->asru_flags & FMD_ASRU_FAULTY) &&
+	    fmd_fmri_contains(er, ee->asru_fmri) > 0)
+		(void) fmd_asru_clrflags(ee, FMD_ASRU_FAULTY, NULL, NULL);
 }
 
 /*
@@ -1218,7 +1234,7 @@ fmd_case_repair(fmd_case_t *cp)
 		return (fmd_set_errno(EFMD_CASE_OWNER));
 	}
 
-	if (cstate < FMD_CASE_SOLVED) {
+	if (cstate < FMD_CASE_SOLVED || (cip->ci_flags & FMD_CF_REPAIRING)) {
 		(void) pthread_mutex_unlock(&cip->ci_lock);
 		return (fmd_set_errno(EFMD_CASE_STATE));
 	}
@@ -1239,14 +1255,34 @@ fmd_case_repair(fmd_case_t *cp)
 			aa[i] = fmd_asru_hash_lookup_nvl(ahp, nvl, FMD_B_FALSE);
 	}
 
+	cip->ci_flags |= FMD_CF_REPAIRING;
 	(void) pthread_mutex_unlock(&cip->ci_lock);
 
+	/*
+	 * For each suspect ASRU, if the case associated with this ASRU matches
+	 * case 'cp', close all ASRUs contained by 'ap' and clear FAULTY.  Note
+	 * that at present, we're assuming that when a given resource FMRI R1
+	 * contains another R2, that any faults are related by a common
+	 * diagnosis engine.  This is true in our current architecture, but may
+	 * not always be true, at which point we'll need more cleverness here.
+	 */
 	for (i = 0; i < an; i++) {
 		if (aa[i] == NULL)
 			continue; /* no asru was found */
-		(void) fmd_asru_clrflags(aa[i], FMD_ASRU_FAULTY, NULL, NULL);
+
+		if (aa[i]->asru_case == cp) {
+			fmd_asru_hash_apply(fmd.d_asrus,
+			    fmd_case_repair_containee, aa[i]->asru_fmri);
+			(void) fmd_asru_clrflags(aa[i],
+			    FMD_ASRU_FAULTY, NULL, NULL);
+		}
+
 		fmd_asru_hash_release(ahp, aa[i]);
 	}
+
+	(void) pthread_mutex_lock(&cip->ci_lock);
+	cip->ci_flags &= ~FMD_CF_REPAIRING;
+	(void) pthread_mutex_unlock(&cip->ci_lock);
 
 	if (cstate == FMD_CASE_CLOSED)
 		fmd_case_transition(cp, FMD_CASE_REPAIRED, FMD_CF_REPAIRED);

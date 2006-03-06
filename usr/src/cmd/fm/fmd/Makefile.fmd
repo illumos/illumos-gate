@@ -215,7 +215,7 @@ $(ROOTVDIR): $(ROOT)/var/fm
 $(ROOTVSUB): $(ROOTVDIR)
 	$(INS.dir)
 
-$(ROOT)/usr/lib/%:
+$(ROOT)/usr/lib/fm:
 	$(INS.dir)
 
 $(ROOTPDIR): $(ROOT)/usr/lib/fm

@@ -667,20 +667,6 @@ fmd_adm_logrotate_1_svc(char *name, int *rvp, struct svc_req *req)
 	return (TRUE);
 }
 
-/*
- * If the case associated with this ASRU matches our input case, close all
- * ASRUs contained by 'ap' and trigger appropriate case close events.
- */
-static void
-fmd_adm_caserepair_asru(fmd_asru_t *ap, void *cp)
-{
-	if (ap->asru_case == cp) {
-		fmd_asru_hash_apply(fmd.d_asrus,
-		    fmd_adm_repair_containee, ap->asru_fmri);
-		(void) fmd_asru_clrflags(ap, FMD_ASRU_FAULTY, NULL, NULL);
-	}
-}
-
 bool_t
 fmd_adm_caserepair_1_svc(char *uuid, int *rvp, struct svc_req *req)
 {
@@ -691,9 +677,7 @@ fmd_adm_caserepair_1_svc(char *uuid, int *rvp, struct svc_req *req)
 		err = FMD_ADM_ERR_PERM;
 	else if ((cp = fmd_case_hash_lookup(fmd.d_cases, uuid)) == NULL)
 		err = FMD_ADM_ERR_CASESRCH;
-	else if (fmd_case_repair(cp) == 0)
-		fmd_asru_hash_apply(fmd.d_asrus, fmd_adm_caserepair_asru, cp);
-	else {
+	else if (fmd_case_repair(cp) != 0) {
 		err = errno == EFMD_CASE_OWNER ?
 		    FMD_ADM_ERR_CASEXPRT : FMD_ADM_ERR_CASEOPEN;
 	}

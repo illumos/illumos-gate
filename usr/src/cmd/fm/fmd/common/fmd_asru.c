@@ -102,6 +102,7 @@ fmd_asru_destroy(fmd_asru_t *ap)
 	if (ap->asru_case != NULL)
 		fmd_case_rele(ap->asru_case);
 
+	nvlist_free(ap->asru_event);
 	fmd_strfree(ap->asru_name);
 	nvlist_free(ap->asru_fmri);
 	fmd_strfree(ap->asru_root);
@@ -165,10 +166,7 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	char *name = NULL;
 	ssize_t namelen;
 
-	nvlist_t *fmri, *flt;
-	fmd_event_t *e;
-	char *class;
-
+	nvlist_t *fmri, *flt, *flt_copy;
 	boolean_t f, u, m;
 	fmd_asru_t *ap;
 	int ps, us;
@@ -233,12 +231,10 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 	 * delete the existing entry and continue on using the new entry; if
 	 * the new entry is no "better", return an error and ignore it.
 	 */
-	if ((ap = fmd_asru_hash_lookup(ahp, name)) != NULL &&
-	    (ap->asru_flags & FMD_ASRU_RECREATED)) {
+	if ((ap = fmd_asru_hash_lookup(ahp, name)) != NULL) {
 		if (!u && (ap->asru_flags & FMD_ASRU_UNUSABLE)) {
 			(void) fmd_asru_hash_delete_name(ahp, name);
 			fmd_asru_hash_release(ahp, ap);
-			ap = NULL;
 		} else {
 			fmd_error(EFMD_ASRU_DUP, "removing duplicate asru "
 			    "log %s for %s\n", lp->log_name, name);
@@ -249,14 +245,12 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 		}
 	}
 
-	if (ap == NULL) {
-		ap = fmd_asru_create(ahp,
-		    fmd_strbasename(lp->log_name), name, fmri);
-	}
-
+	ap = fmd_asru_create(ahp, fmd_strbasename(lp->log_name), name, fmri);
 	fmd_free(name, namelen + 1);
 	ap->asru_flags |= FMD_ASRU_RECREATED;
 
+	if (ps)
+		ap->asru_flags |= FMD_ASRU_PRESENT;
 	if (f)
 		ap->asru_flags |= FMD_ASRU_FAULTY;
 	if (u)
@@ -292,37 +286,17 @@ fmd_asru_hash_recreate(fmd_log_t *lp, fmd_event_t *ep, fmd_asru_hash_t *ahp)
 
 		if (ap->asru_case != NULL && fmd_case_orphaned(ap->asru_case)) {
 			(void) nvlist_xdup(flt, &ap->asru_event, &fmd.d_nva);
-			fmd_case_recreate_suspect(
-			    ap->asru_case, ap->asru_event);
+			(void) nvlist_xdup(flt, &flt_copy, &fmd.d_nva);
+			fmd_case_recreate_suspect(ap->asru_case, flt_copy);
 		}
 	}
 
-	if (!(ap->asru_flags & FMD_ASRU_VALID)) {
-		ap->asru_flags |= FMD_ASRU_VALID;
-		fmd_asru_hash_insert(ahp, ap);
-	}
+	ASSERT(!(ap->asru_flags & FMD_ASRU_VALID));
+	ap->asru_flags |= FMD_ASRU_VALID;
+	fmd_asru_hash_insert(ahp, ap);
 
 	TRACE((FMD_DBG_ASRU, "asru %s recreated as %p (%s)", ap->asru_uuid,
 	    (void *)ap, _fmd_asru_snames[ap->asru_flags & FMD_ASRU_STATE]));
-
-	/*
-	 * If the resource is present and faulty but not unusable, replay the
-	 * fault event that caused it be marked faulty.  This will cause the
-	 * agent subscribing to this fault class to again disable the resource.
-	 */
-	if (ap->asru_case != NULL && !(ap->asru_flags & FMD_ASRU_UNUSABLE)) {
-		fmd_dprintf(FMD_DBG_ASRU,
-		    "replaying fault event for %s", ap->asru_name);
-
-		(void) nvlist_xdup(flt, &flt, &fmd.d_nva);
-		(void) nvlist_lookup_string(flt, FM_CLASS, &class);
-
-		if (case_uuid != NULL)
-			(void) nvlist_add_string(flt, FMD_EVN_UUID, case_uuid);
-
-		e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, flt, class);
-		fmd_dispq_dispatch(fmd.d_disp, e, class);
-	}
 }
 
 static void
@@ -398,6 +372,42 @@ fmd_asru_hash_refresh(fmd_asru_hash_t *ahp)
 
 	(void) pthread_rwlock_unlock(&ahp->ah_lock);
 	(void) closedir(dirp);
+}
+
+/*
+ * If the resource is present and faulty but not unusable, replay the fault
+ * event that caused it be marked faulty.  This will cause the agent
+ * subscribing to this fault class to again disable the resource.
+ */
+/*ARGSUSED*/
+static void
+fmd_asru_hash_replay_asru(fmd_asru_t *ap, void *data)
+{
+	fmd_event_t *e;
+	nvlist_t *nvl;
+	char *class;
+
+	if (ap->asru_event != NULL && (ap->asru_flags & (FMD_ASRU_STATE |
+	    FMD_ASRU_PRESENT)) == (FMD_ASRU_FAULTY | FMD_ASRU_PRESENT)) {
+
+		fmd_dprintf(FMD_DBG_ASRU,
+		    "replaying fault event for %s", ap->asru_name);
+
+		(void) nvlist_xdup(ap->asru_event, &nvl, &fmd.d_nva);
+		(void) nvlist_lookup_string(nvl, FM_CLASS, &class);
+
+		(void) nvlist_add_string(nvl, FMD_EVN_UUID,
+		    ((fmd_case_impl_t *)ap->asru_case)->ci_uuid);
+
+		e = fmd_event_create(FMD_EVT_PROTOCOL, FMD_HRT_NOW, nvl, class);
+		fmd_dispq_dispatch(fmd.d_disp, e, class);
+	}
+}
+
+void
+fmd_asru_hash_replay(fmd_asru_hash_t *ahp)
+{
+	fmd_asru_hash_apply(ahp, fmd_asru_hash_replay_asru, NULL);
 }
 
 fmd_asru_hash_t *
@@ -699,6 +709,7 @@ int
 fmd_asru_setflags(fmd_asru_t *ap, uint_t sflag, fmd_case_t *cp, nvlist_t *nvl)
 {
 	fmd_case_t *old_case = NULL;
+	nvlist_t *old_nvl = NULL;
 	uint_t nstate, ostate;
 	boolean_t msg;
 
@@ -720,7 +731,8 @@ fmd_asru_setflags(fmd_asru_t *ap, uint_t sflag, fmd_case_t *cp, nvlist_t *nvl)
 		old_case = ap->asru_case;
 		fmd_case_hold_locked(cp);
 		ap->asru_case = cp;
-		ap->asru_event = nvl;
+		old_nvl = ap->asru_event;
+		(void) nvlist_xdup(nvl, &ap->asru_event, &fmd.d_nva);
 	}
 
 	if (nvl != NULL && nvlist_lookup_boolean_value(nvl,
@@ -738,6 +750,9 @@ fmd_asru_setflags(fmd_asru_t *ap, uint_t sflag, fmd_case_t *cp, nvlist_t *nvl)
 	if (old_case != NULL)
 		fmd_case_rele(old_case);
 
+	if (old_nvl != NULL)
+		nvlist_free(old_nvl);
+
 	return (1);
 }
 
@@ -745,6 +760,7 @@ int
 fmd_asru_clrflags(fmd_asru_t *ap, uint_t sflag, fmd_case_t *cp, nvlist_t *nvl)
 {
 	fmd_case_t *old_case = NULL;
+	nvlist_t *old_nvl = NULL;
 	uint_t nstate, ostate;
 
 	ASSERT(!(sflag & ~FMD_ASRU_STATE));
@@ -765,7 +781,8 @@ fmd_asru_clrflags(fmd_asru_t *ap, uint_t sflag, fmd_case_t *cp, nvlist_t *nvl)
 		old_case = ap->asru_case;
 		fmd_case_hold_locked(cp);
 		ap->asru_case = cp;
-		ap->asru_event = nvl;
+		old_nvl = ap->asru_event;
+		(void) nvlist_xdup(nvl, &ap->asru_event, &fmd.d_nva);
 	}
 
 	TRACE((FMD_DBG_ASRU, "asru %s %s->%s", ap->asru_uuid,
@@ -776,6 +793,7 @@ fmd_asru_clrflags(fmd_asru_t *ap, uint_t sflag, fmd_case_t *cp, nvlist_t *nvl)
 	if (cp == NULL && (sflag & FMD_ASRU_FAULTY)) {
 		old_case = ap->asru_case;
 		ap->asru_case = NULL;
+		old_nvl = ap->asru_event;
 		ap->asru_event = NULL;
 	}
 
@@ -787,6 +805,9 @@ fmd_asru_clrflags(fmd_asru_t *ap, uint_t sflag, fmd_case_t *cp, nvlist_t *nvl)
 			fmd_case_update(old_case);
 		fmd_case_rele(old_case);
 	}
+
+	if (old_nvl != NULL)
+		nvlist_free(old_nvl);
 
 	return (1);
 }

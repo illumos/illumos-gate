@@ -560,7 +560,6 @@ fmd_destroy(fmd_t *dp)
 	while ((cp = fmd_list_next(&dp->d_rmod->mod_cases)) != NULL)
 		fmd_case_discard(cp);
 
-
 	fmd_module_unlock(dp->d_rmod);
 	fmd_free(dp->d_rmod->mod_stats, sizeof (fmd_modstat_t));
 	dp->d_rmod->mod_stats = NULL;
@@ -864,6 +863,13 @@ fmd_run(fmd_t *dp, int pfd)
 	if (pfd >= 0)
 		(void) write(pfd, &status, sizeof (status));
 
+	/*
+	 * Before loading all modules, repopulate the ASRU cache from its
+	 * persistent repository on disk.  Then during module loading, the
+	 * restoration of checkpoint files will reparent any active cases.
+	 */
+	fmd_asru_hash_refresh(dp->d_asrus);
+
 	(void) fmd_conf_getprop(dp->d_conf, "plugin.path", &pap);
 	fmd_modhash_loadall(dp->d_mod_hash, pap, &fmd_rtld_ops, ".so");
 
@@ -876,7 +882,7 @@ fmd_run(fmd_t *dp, int pfd)
 	 * that did not finish processing the last time ran, and then release
 	 * the global module barrier by executing a final rele on d_mod_event.
 	 */
-	fmd_asru_hash_refresh(dp->d_asrus);
+	fmd_asru_hash_replay(dp->d_asrus);
 
 	(void) pthread_rwlock_rdlock(&dp->d_log_lock);
 	fmd_log_replay(dp->d_errlog, (fmd_log_f *)fmd_err_replay, dp);
