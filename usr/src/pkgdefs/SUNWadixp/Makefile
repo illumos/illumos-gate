@@ -25,27 +25,13 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
 
-#!search <pathname pathname ...>	# where to find pkg objects
-#!include <filename>			# include another 'prototype' file
-#!default <mode> <owner> <group>	# default used if not specified on entry
-#!<param>=<value>			# puts parameter in pkg environment
+include ../Makefile.com
 
-#
-# Include ISA independent files (prototype_com)
-#
-!include prototype_com
-#
-# List files which are i386 specific here
-#
-# source locations relative to the prototype file
-#
-# SUNWaudh
-#
-f none usr/include/sys/audio/audio810.h 644 root bin
-f none usr/include/sys/audio/audioixp.h 644 root bin
-f none usr/include/sys/audio/audiovia823x.h 644 root bin
+
+.KEEP_STATE:
+
+all: $(FILES) depend postinstall preremove
+install: all pkg
+
+include ../Makefile.targ

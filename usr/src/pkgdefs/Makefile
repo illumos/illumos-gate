@@ -95,6 +95,7 @@ sparc_XMODS=
 i386_SUBDIRS= \
 	SUNWaac \
 	SUNWad810 \
+	SUNWadixp \
         SUNWagp \
         SUNWagph \
 	SUNWamr \

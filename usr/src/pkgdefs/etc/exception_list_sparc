@@ -778,6 +778,11 @@ usr/include/sys/libdevid.h			sparc
 kernel/drv/sparcv9/audio810			sparc
 kernel/drv/audio810.conf			sparc 
 #
+# ATI IXP audio driver doesn't ship in sparc platform.
+#
+kernel/drv/sparcv9/audioixp			sparc
+kernel/drv/audioixp.conf			sparc 
+#
 # VIA VT823x audio driver doesn't ship in sparc platform.
 #
 kernel/drv/sparcv9/audiovia823x			sparc

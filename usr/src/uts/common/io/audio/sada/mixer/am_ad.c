@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -19,8 +18,9 @@
  *
  * CDDL HEADER END
  */
+
 /*
- * Copyright 1999-2003 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -3461,7 +3461,11 @@ am_get_samples(audio_ch_t *chptr, int samples, void *buf, int mode)
 	mute = info->output_muted;
 	if (mute) {
 		/* we return zeros */
-		bytes_needed = samples << AM_INT32_SHIFT;
+		if (mode == AM_COMPAT_MODE)
+			bytes_needed = samples << AM_INT16_SHIFT;
+		else /* mixer mode */
+			bytes_needed = samples << AM_INT32_SHIFT;
+
 		ATRACE("am_get_samples() bzero", buf);
 		bzero(buf, bytes_needed);
 	}

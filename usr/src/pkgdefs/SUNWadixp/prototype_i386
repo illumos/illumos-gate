@@ -44,8 +44,11 @@
 #
 # source locations relative to the prototype file
 #
-# SUNWaudh
+# SUNWadixp
 #
-f none usr/include/sys/audio/audio810.h 644 root bin
-f none usr/include/sys/audio/audioixp.h 644 root bin
-f none usr/include/sys/audio/audiovia823x.h 644 root bin
+d none kernel 755 root sys
+d none kernel/drv 755 root sys
+f none kernel/drv/audioixp 755 root sys
+f none kernel/drv/audioixp.conf 644 root sys
+d none kernel/drv/amd64 755 root sys
+f none kernel/drv/amd64/audioixp 755 root sys

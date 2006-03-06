@@ -25,27 +25,30 @@
 #
 # ident	"%Z%%M%	%I%	%E% SMI"
 #
-# This required package information file contains a list of package contents.
-# The 'pkgmk' command uses this file to identify the contents of a package
-# and their location on the development machine when building the package.
-# Can be created via a text editor or through use of the 'pkgproto' command.
+# This package information file defines software dependencies associated
+# with the pkg.  You can define three types of pkg dependencies with this file:
+#	 P indicates a prerequisite for installation
+#	 I indicates an incompatible package
+#	 R indicates a reverse dependency
+# <pkg.abbr> see pkginfo(4), PKG parameter
+# <name> see pkginfo(4), NAME parameter
+# <version> see pkginfo(4), VERSION parameter
+# <arch> see pkginfo(4), ARCH parameter
+# <type> <pkg.abbr> <name>
+# 	(<arch>)<version>
+# 	(<arch>)<version>
+# 	...
+# <type> <pkg.abbr> <name>
+# ...
+#
 
-#!search <pathname pathname ...>	# where to find pkg objects
-#!include <filename>			# include another 'prototype' file
-#!default <mode> <owner> <group>	# default used if not specified on entry
-#!<param>=<value>			# puts parameter in pkg environment
-
-#
-# Include ISA independent files (prototype_com)
-#
-!include prototype_com
-#
-# List files which are i386 specific here
-#
-# source locations relative to the prototype file
-#
-# SUNWaudh
-#
-f none usr/include/sys/audio/audio810.h 644 root bin
-f none usr/include/sys/audio/audioixp.h 644 root bin
-f none usr/include/sys/audio/audiovia823x.h 644 root bin
+P SUNWcar	Core Architecture, (Root)
+P SUNWcakr	Core Solaris Kernel Architecture (Root)
+P SUNWkvm	Core Architecture, (Kvm)
+P SUNWcsr	Core Solaris, (Root)
+P SUNWckr	Core Solaris Kernel (Root)
+P SUNWcnetr	Core Solaris Network Infrastructure (Root)
+P SUNWcsu	Core Solaris, (Usr)
+P SUNWcsd	Core Solaris Devices
+P SUNWcsl	Core Solaris Libraries
+P SUNWaudd	Audio Drivers
