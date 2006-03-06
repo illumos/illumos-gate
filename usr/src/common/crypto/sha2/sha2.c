@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -2559,4 +2559,7 @@ SHA2Final(uint8_t *digest, SHA2_CTX *ctx)
 			Encode64(digest, ctx->state.s64,
 			    sizeof (ctx->state.s64));
 	}
+
+	/* zeroize sensitive information */
+	bzero(ctx, sizeof (*ctx));
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -672,6 +672,9 @@ SHA1Final(uint8_t *digest, SHA1_CTX *ctx)
 
 	/* store state in digest */
 	Encode(digest, ctx->state, sizeof (ctx->state));
+
+	/* zeroize sensitive information */
+	bzero(ctx, sizeof (*ctx));
 }
 
 /*
