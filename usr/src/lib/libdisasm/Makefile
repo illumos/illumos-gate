@@ -32,7 +32,7 @@ HDRS=		libdisasm.h
 HDRDIR=		common
 $(INTEL_BLD)SUBDIRS= $(MACH)
 $(INTEL_BLD)$(BUILD64)SUBDIRS += $(MACH64)
-$(CLOSED_BLD)SUBDIRS += $(CLOSED)/lib/libdisasm
+$(CLOSED_BUILD)SUBDIRS += $(CLOSED)/lib/libdisasm
 
 all := 		TARGET = all
 clean :=	TARGET = clean
