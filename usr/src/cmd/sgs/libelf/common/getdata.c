@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -24,7 +23,7 @@
 
 
 /*
- * Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+ * Copyright 2006 Sun Microsystems, Inc.  All rights reserved.
  * Use is subject to license terms.
  */
 
@@ -246,14 +245,33 @@ _elf_locked_getdata(Elf_Scn * scn, Elf_Data * data)
 
 		/*
 		 * If the destination size (memory) is at least as
-		 * big as the source size (file), reuse the space.
+		 * big as the source size (file), and has the necessary
+		 * alignment, reuse the space.
+		 *
+		 * Note that it is not sufficient to check the alignment
+		 * of the offset within the object. Rather, we must check
+		 * the alignment of the actual data buffer. The offset is
+		 * sufficient if the file is a plain object file, which
+		 * will always be mapped on a page boundary. In an archive
+		 * however, the only guarantee is that the object will start
+		 * on an even boundary within the archive file. The
+		 * Solaris ar(1) adds padding in most (but not all cases)
+		 * which minimizes this issue, but it is still important
+		 * for the remaining cases that do not get padded. It also
+		 * matters with archives produced by other versions of
+		 * ar(1), such as the GNU version, or one from another
+		 * ELF based operating system.
 		 */
 
-		if ((d->db_data.d_size <= src.d_size) &&
-		    (d->db_off % ALIGN(elf)[d->db_data.d_type] == 0)) {
+		if (d->db_data.d_size <= src.d_size) {
 			d->db_data.d_buf = (Elf_Void *)(elf->ed_ident +
 				d->db_off);
-			break;
+			if (((uintptr_t)d->db_data.d_buf
+				% ALIGN(elf)[d->db_data.d_type]) == 0) {
+				break;
+			} else {   /* Failure: Restore NULL buffer pointer */
+				d->db_data.d_buf = 0;
+			}
 		}
 
 		/*FALLTHRU*/

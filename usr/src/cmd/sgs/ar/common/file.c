@@ -2,9 +2,8 @@
  * CDDL HEADER START
  *
  * The contents of this file are subject to the terms of the
- * Common Development and Distribution License, Version 1.0 only
- * (the "License").  You may not use this file except in compliance
- * with the License.
+ * Common Development and Distribution License (the "License").
+ * You may not use this file except in compliance with the License.
  *
  * You can obtain a copy of the license at usr/src/OPENSOLARIS.LICENSE
  * or http://www.opensolaris.org/os/licensing.
@@ -39,8 +38,35 @@
 static char *str_base;	/* start of string table for names */
 static char *str_top;	/* pointer to next available location */
 static char *str_base1, *str_top1;
-static int pad_symtab;
+static int pad_symtab;	/* # of bytes by which to pad symbol table */
 
+
+/*
+ * The ar file format requires objects to be padded to an even size.
+ * We do that, but it turns out to be beneficial to go farther.
+ *
+ * ld(1) accesses archives by mmapping them into memory. If the mapped
+ * objects have the proper alignment, we can access them directly. If the
+ * alignment is wrong, elflib "slides" them so that they are also accessible.
+ * This  is expensive in time (to copy memory) and space (it causes swap
+ * to be allocated by the system to back the now-modified pages). Hence, we
+ * really want to ensure that the alignment is right.
+ *
+ * We used to align 32-bit objects at 4-byte boundaries, and 64-bit objects
+ * at 8-byte. More recently, an elf section type has appeared that has
+ * 8-byte alignment requirements (SUNW_move) even in 32-bit objects. So,
+ * the current strategy is to align all objects to 8-bytes.
+ *
+ * There are two important things to consider when setting this value:
+ *	1) If a new elf section that ld(1) accesses in memory appears
+ *	   with a greater than 8-byte alignment requirement, this value
+ *	   will need to be raised. Or, alternatively, the entire approach may
+ *	   need reconsideration.
+ *	2) The size of this padding must be smaller than the size of the
+ *	   smallest possible ELF section. Otherwise, the logic contained
+ *	   in recover_padding() can be tricked.
+ */
+#define	PADSZ 8
 
 /*
  * Function Prototypes
@@ -109,11 +135,27 @@ getaf(Cmd_info *cmd_info)
 }
 
 /*
- * If the current archive item is a 32 or 64-bit object, then
- * ar(1) may have added newline padding at the end in order to
- * bring 64-bit objects into 8-byte alignment within the file. This
- * padding cannot be distinguished from data using the information kept
- * in the ar headers. This routine examines the objects, using knowledge of
+ * Given a size, return the number of bytes required to round it
+ * up to the next PADSZ boundary.
+ */
+static int
+pad(int n)
+{
+	int r;
+
+	r = n % PADSZ;
+	if (r)
+		r = PADSZ - r;
+
+	return (r);
+}
+
+/*
+ * If the current archive item is an object, then ar(1) may have added
+ * newline padding at the end in order to bring the following object
+ * into PADSZ alignment within the file. This padding cannot be
+ * distinguished from data using the information kept in the ar headers.
+ * This routine examines the objects, using knowledge of
  * ELF and how our tools lay out objects to determine whether padding was
  * added to an archive item. If so, it adjusts the st_size and
  * st_padding fields of the file argument to reflect it.
@@ -136,20 +178,20 @@ recover_padding(Elf *elf, ARFILE *file)
 	 * use elflib or follow this convention. So, it is extremely
 	 * likely that the section header array is at the end of this
 	 * object: Find the address at the end of the array and compare
-	 * it to the archive ar_size. If they are within 8 bytes, then
-	 * we've found the end, and the difference is padding (no ELF
-	 * section can fit into 8 bytes).
+	 * it to the archive ar_size. If they are within PADSZ bytes, then
+	 * we've found the end, and the difference is padding (We assume
+	 * that no ELF section can fit into PADSZ bytes).
 	 */
 	extent = gelf_getehdr(elf, &ehdr)
 		? (ehdr.e_shoff + (ehdr.e_shnum * ehdr.e_shentsize)) : 0;
 	padding = file->ar_size - extent;
 
-	if ((padding < 0) || (padding >= 8)) {
+	if ((padding < 0) || (padding >= PADSZ)) {
 		/*
 		 * The section header array is not at the end of the object.
 		 * Traverse the section headers and look for the one with
 		 * the highest used address. If this address is within
-		 * 8-bytes of ar_size, then this is the end of the object.
+		 * PADSZ bytes of ar_size, then this is the end of the object.
 		 */
 		Elf_Scn *scn = 0;
 
@@ -169,18 +211,18 @@ recover_padding(Elf *elf, ARFILE *file)
 
 	/*
 	 * Now, test the padding. We only act on padding in the range
-	 * 1-7 (ar(1) will never add more than this). A pad of 0
-	 * requires no action, and any other size outside of 1-7 means
+	 * (0 < pad < PADSZ) (ar(1) will never add more than this). A pad
+	 * of 0 requires no action, and any other size above (PADSZ-1) means
 	 * that we don't understand the layout of this object, and as such,
 	 * cannot do anything.
 	 *
-	 * If the padding is in the range 1-7, and the raw data for the
+	 * If the padding is in range, and the raw data for the
 	 * object is available, then we perform one additional sanity
 	 * check before moving forward: ar(1) always pads with newline
 	 * characters. If anything else is seen, it is not padding so
 	 * leave it alone.
 	 */
-	if ((padding > 0) && (padding < 8)) {
+	if ((padding > 0) && (padding < PADSZ)) {
 		if (file->ar_contents) {
 			long cnt = padding;
 			char *p = file->ar_contents + extent;
@@ -651,14 +693,14 @@ writesymtab(char *dst, long nsyms, ARFILEP *symlist)
 	}
 
 	/*
-	 * The first member file is ELFCLASS64. We need to make the member
-	 * to be placed at the 8 byte boundary.
+	 * The first member file is an ELF object. We need to make
+	 * sure it will be placed at the PADSZ byte boundary.
 	 */
 	if (pad_symtab) {
 		int i;
-		for (i = 0; i < 4; i++)
+		for (i = 0; i < pad_symtab; i++)
 			*dst++ = 0;
-		sum += 4;
+		sum += pad_symtab;
 	}
 
 	free(buf2);
@@ -1267,21 +1309,17 @@ sizeofmembers(int psum)
 		sum += hdrsize;
 
 		if ((fptr->ar_flag & (F_CLASS32 | F_CLASS64)) &&
-		    fptr->ar_next && (fptr->ar_next->ar_flag & F_CLASS64)) {
-			int remainder;
-
-			remainder = (psum + sum + hdrsize) % 8;
-			if (remainder) {
-				sum += (8 - remainder);
-				fptr->ar_padding = 8 - remainder;
-			}
+		    fptr->ar_next &&
+		    (fptr->ar_next->ar_flag & (F_CLASS32 | F_CLASS64))) {
+			fptr->ar_padding = pad(psum + sum + hdrsize);
+			sum += fptr->ar_padding;
 		}
 	}
 	return (sum);
 }
 
 static int
-sizeofnewarchive(int nsyms, int longnames)
+sizeofnewarchiveheader(int nsyms, int longnames)
 {
 	int sum = 0;
 
@@ -1304,16 +1342,24 @@ sizeofnewarchive(int nsyms, int longnames)
 	}
 
 	/*
-	 * If the first member file is ELFCLASS64 type,
+	 * If the first member file is an ELF object,
 	 * we have to ensure the member contents will align
-	 * on 8 byte boundary.
+	 * on PADSZ byte boundary.
 	 */
-	if (listhead && (listhead->ar_flag & F_CLASS64)) {
-		if (((sum + (sizeof (struct ar_hdr))) % 8) != 0) {
-			sum += 4;
-			pad_symtab = 4;
-		}
+	if (listhead && (listhead->ar_flag & (F_CLASS32 | F_CLASS64))) {
+		pad_symtab = pad(sum + sizeof (struct ar_hdr));
+		sum += pad_symtab;
 	}
+
+	return (sum);
+}
+
+static int
+sizeofnewarchive(int nsyms, int longnames)
+{
+	int sum;
+
+	sum = sizeofnewarchiveheader(nsyms, longnames);
 	sum += sizeofmembers(sum);
 	return (sum);
 }
@@ -1413,42 +1459,6 @@ ar_rename(char *from, char *to)
 		(void) unlink(from);
 	}
 	return (ret);
-}
-
-static int
-sizeofnewarchiveheader(int nsyms, int longnames)
-{
-	int sum = 0;
-
-	sum += SARMAG;
-
-	if (nsyms) {
-		char *top = (char *)str_top;
-		char *base = (char *)str_base;
-
-		while ((top - base) & 03)
-			top++;
-		sum += sizeof (struct ar_hdr);
-		sum += (nsyms + 1) * 4;
-		sum += top - base;
-	}
-
-	if (longnames) {
-		sum += sizeof (struct ar_hdr);
-		sum += str_top1 - str_base1;
-	}
-
-	/*
-	 * If the first member file is ELFCLASS64 type,
-	 * we have to ensure the member contents will align
-	 * on 8 byte boundary.
-	 */
-	if (listhead && (listhead->ar_flag & F_CLASS64)) {
-		if (((sum + (sizeof (struct ar_hdr))) % 8) != 0) {
-			sum += 4;
-		}
-	}
-	return (sum);
 }
 
 static char *
